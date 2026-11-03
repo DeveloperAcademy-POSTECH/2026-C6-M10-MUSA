@@ -4401,3 +4401,16 @@ Consolidated three byte-identical textures into shared material references; conf
   - 시각 20 전 단언이 프레임 실행 없이 통과하던 문제를 고쳤다.
 - **남은 검사 공백:** Host 분기와 나머지 8개 소비자는 소비자별 검사가 없다. 각 소비자는 공유 시계를 한 줄로 읽으며, 시계 규칙은 `LabGuestBattleClockTests`·`LabJigwiABPresentationTests`가 검사한다.
 - **미실행:** Guest 실기기에서 늦은 스냅샷·일시정지 때 HUD 숫자와 효과음이 튀지 않는지 확인하지 않았다.
+
+## #471 로비 연결 끊김 뒤 핸들러 재등록·로비 표시 — 2026-11-04
+
+기준 main `035c5989`에서 `fix/#471-lobby-message-handler` 별도 worktree로 작업했다. 다른 작업이 쓰는 원래 체크아웃과 그 Editor는 건드리지 않았다. Unity 6000.6.5f1 macOS batch Editor(`unity test`)에서 확인했다.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| EditMode 전체 | **1857/1857 PASS** | 접속 규약·설정 257개 핀 포함 |
+| `LabMessageHandlerReconnectTests` (새 검사) | **PASS**, main 코드에서는 **FAIL** | Lab Scene Host 시작 → `Stop` 없이 NGO `Shutdown` → 다시 Host. 새 `CustomMessagingManager`에 `C6Lab.Packet.3`·`C6Lab.Bulk.1` 핸들러가 등록됨. main 코드에서는 목록이 비어 실패 |
+| `GameLobbyViewTests.ALobbyThatLosesItsConnectionLeavesLikeTheLeaveButtonAndShowsWhy` (새 검사) | **PASS**, main 코드에서는 **FAIL** | 저장 Home에서 Hapio Host 로비 → transport `Shutdown` → 방 목록(Home)·연결 해제·끊김 안내. main 코드에서는 안내 없이 화면만 바뀜 |
+| 로비·접속·흐름 PlayMode 묶음 | **89/90**, 재실행 **30/30 ×2 PASS** | `GameSceneFlowTests`·`GameLobbyViewTests`·`LabQuickConnectTests`·`LabLobbyPositionSelectionTests`·`LabFigmaLobbyTests`·`LabLocalBoardNetworkIntegrationTests`·`LabDeveloperSoloIntegrationTests`·새 검사. 첫 실행의 1건 실패는 `DevelopmentSoloButtonStarts…`의 `Server failed to bind`(검사가 고른 빈 포트를 다른 프로세스가 먼저 씀)이며, 자리 흐림 수정 뒤 로비 묶음 두 번 재실행에서 같은 검사가 통과했다. 재실행에 `GameSceneFlowTests` 등 나머지는 다시 돌리지 않았다 |
+
+게스트가 Host 로비를 받기 전 "방 정보를 받고 있소..." 표시와 빈 자리 흐림은 실제 게스트 연결이 필요해 자동 검사가 없다(코드 검토만). 두 기기 실제 접속(Mac 2프로세스 포함)·iOS 빌드·실기기 LAN/핫스팟에서의 방장 이탈·화면 잠금 재현은 **미실행**이다.
