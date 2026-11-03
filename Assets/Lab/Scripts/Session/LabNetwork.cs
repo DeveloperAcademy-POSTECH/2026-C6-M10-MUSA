@@ -2632,11 +2632,8 @@ namespace C6Lab
                 && displayedPaintRevision == source.Revision && displayedPaintCount == snapshot.paintCount
                 && displayedPaintVisualVersion == source.VisualVersion
                 && clientPaintSurface.Columns == source.Columns && clientPaintSurface.Rows == source.Rows) return;
-            var pixels = new Color32[source.CellCount];
-            var painters = new byte[source.CellCount];
-            source.CopyPixels(pixels);
-            source.CopyPainterSlots(painters);
-            if (!clientPaintSurface.TryReplacePixels(source.Columns, source.Rows, source.Revision, pixels, painters, snapshot.paintCount, source.CopyVisualStamps()))
+            // Same result as installing copies of the source maps, written into the display's own arrays (#449).
+            if (!clientPaintSurface.TryCopyReplicaFrom(source, snapshot.paintCount))
                 throw new InvalidOperationException("Invalid authoritative paint display state.");
             displayedPaintSession = snapshot.sessionId; displayedPaintRound = snapshot.round;
             displayedPaintRevision = source.Revision; displayedPaintCount = snapshot.paintCount;

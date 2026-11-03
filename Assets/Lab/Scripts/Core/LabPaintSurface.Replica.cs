@@ -16,16 +16,16 @@ namespace C6Lab
         /// <paramref name="changedCells"/> (strictly increasing, the first <paramref name="changedCount"/> entries) and
         /// derives the covered count from them. The caller guarantees every other cell equals the current map.
         /// Otherwise, or when <paramref name="changedCells"/> is null, every cell is checked. The covered count must
-        /// equal <paramref name="expectedCovered"/>. On success the previous arrays come back for reuse when the size
-        /// is unchanged, and the caller must not touch the adopted arrays again. On failure nothing changes.
+        /// equal <paramref name="expectedCovered"/>. Null <paramref name="visualStamps"/> keeps the current stamps. On
+        /// success the previous arrays come back for reuse when the size is unchanged, and the caller must not touch the
+        /// adopted arrays again. On failure nothing changes.
         /// </summary>
         public bool TryAdoptReplica(int columns, int rows, uint fromRevision, uint revision, Color32[] nextPixels,
             byte[] nextPainters, int paintCount, int expectedCovered, LabPaintVisualStamp[] visualStamps,
             int[] changedCells, int changedCount, out Color32[] recycledPixels, out byte[] recycledPainters)
         {
             recycledPixels = null; recycledPainters = null;
-            var nextVisualStamps = visualStamps ?? Array.Empty<LabPaintVisualStamp>();
-            if (!LabPaintVisualStamp.Valid(nextVisualStamps)) return false;
+            if (visualStamps != null && !LabPaintVisualStamp.Valid(visualStamps)) return false;
             if (!ValidReplicaShape(columns, rows, nextPixels, nextPainters, paintCount)) return false;
             // Adopting the surface's own arrays would make the incremental check compare a cell with itself.
             if (ReferenceEquals(nextPixels, pixels) || ReferenceEquals(nextPainters, painterSlots)) return false;
@@ -50,7 +50,7 @@ namespace C6Lab
             Color32[] oldPixels = pixels;
             byte[] oldPainters = painterSlots;
             InstallReplica(columns, rows, revision, nextPixels, nextPainters, covered, paintCount);
-            ReplaceVisualStamps(nextVisualStamps);
+            if (visualStamps != null) ReplaceVisualStamps(visualStamps);
             if (sameSize) { recycledPixels = oldPixels; recycledPainters = oldPainters; }
             return true;
         }

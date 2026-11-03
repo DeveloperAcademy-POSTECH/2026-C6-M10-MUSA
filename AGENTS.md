@@ -141,3 +141,7 @@
 ## #444 도색 복제본 설치 API
 
 - Guest 도색 복제본은 `TryReplacePixels`(복사), `TryAdoptReplica`(호출자 배열 소유권 이전, 같은 크기·같은 기준 리비전의 복제본이면 바뀐 셀만 검사), `TryCopyReplicaFrom`(같은 크기면 기존 배열에 덮어씀)로 설치한다. 셋은 같은 셀 규칙과 `InstallReplica` 상태를 공유하며 실패 시 표면을 바꾸지 않는다. `TryAdoptReplica`에 넘긴 배열은 이후 호출자가 건드리지 않고, 바뀐 셀 목록 밖의 셀은 현재 지도와 같아야 한다.
+
+## #449 Guest 도색 수신 제자리 적용
+
+- `LabPaintReceiver`는 재사용 버퍼(해독 payload, 이중 버퍼 지도, 바뀐 셀 목록, SHA 청크)로 트랜잭션을 만들고 `TryAdoptReplica`로 설치한다. 셀 규칙·칠해진 셀 수 검사는 표면이 하며, 수신 결과(Applied/Rejected/NeedCheckpoint)는 이전 구현과 같아야 한다. 조각별 base64 해독은 마지막을 뺀 조각이 패딩·공백 없는 순수 base64일 때만 쓴다. `visualBytes == -1`의 스탬프 해시는 `VisualVersion`으로 캐시하므로 스탬프를 바꾸는 표면 경로는 계속 `VisualVersion`을 올려야 한다. `CopyPaintToDisplay`는 `TryCopyReplicaFrom`을 쓴다.

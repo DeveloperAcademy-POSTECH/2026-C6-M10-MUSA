@@ -4054,3 +4054,53 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
   - 이 PR에서는 고치지 않았다.
 - 코드 검토 워크플로(세 관점 검토 + 지적별 반박 검증)에서 제품 코드 결함은 확인되지 않았다. 검사 공백 3건(칠해진 셀 수 증분이 실제로 바뀌는 경우, 음수 칠 횟수 거절이 다른 실패에 가려짐, 복제본이 아닌 표면의 전체 검사)을 지적받아 검사를 추가했다.
 - **미실행:** 호출 경로 연결과 Guest GC 측정은 다음 이슈에서 한다. iPhone 실기기는 실행하지 않았다.
+
+## #449 Guest 도색 수신 제자리 적용·표시 복사 할당 제거 — 2026-11-03
+
+- **기준:** main `90b649ea` → `fix/#449-paint-receive-in-place`. Unity6000.6.5f1/macOS의 연결된 Editor에서 실행했다. 새 Mac·iOS 빌드는 만들지 않았다.
+- **배경:** Guest는 도색 delta 하나를 받을 때마다 다음을 새로 만들었다.
+  - 조각을 이은 base64 문자열과 해독 바이트
+  - 새 색·칠한 사람 배열과, `TryReplacePixels`가 그 배열을 다시 복사한 사본
+  - SHA용 160 KB 셀 바이트
+  - 시각 스탬프 복사·인코딩
+  - 또 스냅샷마다 `CopyPaintToDisplay`가 표시용 배열 두 개를 만들었다.
+- **수정:** #444의 표면 API를 연결했다.
+  - `LabPaintReceiver`
+    - 조각을 이어 붙이지 않고 재사용 버퍼에 바로 해독한다. 마지막을 뺀 조각이 패딩·공백 없는 순수 base64일 때만 쓰고, 그 밖에는 기존처럼 이어 붙여 해독한다.
+    - 표면이 돌려준 이전 배열(이중 버퍼)에 delta를 적용하고 바뀐 셀 목록을 모은다.
+    - 스트리밍 SHA-256 `LabPaintPublisher.Hash(pixels, painters, SHA256, byte[] chunk)`로 확인한 뒤 `TryAdoptReplica`로 설치한다(delta는 바뀐 셀만 검사, 칠해진 셀 수 증분, 실패 시 표면 불변).
+    - `visualBytes == -1`이면 현재 스탬프 해시를 `VisualVersion`으로 캐시하고 스탬프를 복사하지 않는다(`TryAdoptReplica`의 null 스탬프 = 유지).
+  - `CopyPaintToDisplay`는 `TryCopyReplicaFrom`을 쓴다.
+  - 공개 `Hash` 출력·프레임·접속 규약 **5682/Lab43/Game27**·공유 설정 257개·Scene·판정은 그대로다.
+
+| Editor 측정 (256×128 Splatter, 스탬프 57개, delta 34~35개 평균, 3회) | 전 | 후 |
+| --- | --- | --- |
+| delta 수신 1회 할당 | 536.3 / 536.0 / 532.9 KB | **12.6 / 16.1 / 17.7 KB** |
+| delta 수신 1회 시간 | 7.58 / 7.07 / 7.08 ms | **0.95 / 0.94 / 0.95 ms** |
+| 표시 복사 1회 할당 | 339.7 / 339.6 / 339.6 KB | **2.5 / 2.3 / 2.1 KB** |
+| 표시 복사 1회 시간 | 0.82 / 0.80 / 0.77 ms | **0.086 / 0.086 / 0.088 ms** |
+
+- 할당은 `GC.GetTotalMemory(false)` 차이로 쟀고 그 사이 GC가 돈 표본은 뺐다(이 Mono 프로필에서 `GC.GetAllocatedBytesForCurrentThread`는 0을 반환한다). 표본의 약 40%는 스탬프를 유지하는 delta, 나머지는 스탬프가 바뀐 delta다. "후" 값은 아래 검토 수정 뒤 다시 잰 것이다(수정 전 측정은 12.3/14.2/11.9 KB).
+
+| 실행 검사 | 결과 | 시간 |
+| --- | --- | --- |
+| 전체 EditMode | **1808/1808 PASS** | 46.01초 |
+| PlayMode `LabLocalBoardNetworkIntegrationTests` | **16/16 PASS** | 0.34초 |
+| PlayMode `LabGourdPaintTests` | **9/9 PASS** | 11.30초 |
+| PlayMode `LabHighResolutionPaintRuntimeTests` | **2/2 PASS** | 0.06초 |
+| PlayMode `LabWatercolorPaintRuntimeTests` | **7/7 PASS** | 6.64초 |
+| PlayMode `GourdResultViewerPlayModeTests` | **3/3 PASS** | 13.25초 |
+| PlayMode `LabDeveloperSoloIntegrationTests` | **14/14 PASS** | 18.54초 |
+| PlayMode `GameSceneFlowTests` | **21/21 PASS** | 209.95초 |
+
+- 각 실행의 skip/inconclusive0. `LabWatercolorPaintRuntimeTests`·`GourdResultViewerPlayModeTests`·`LabDeveloperSoloIntegrationTests`는 해독 조건 수정 전에 실행했다(수정은 잘못된 조각 처리에만 해당). 나머지는 수정 뒤에 실행했다.
+- 새 검사 `LabPaintReceiveInPlaceTests` 13개
+  - 스트리밍 해시 = 기존 해시(해상도 0/1/2, 청크 5 B·35 B·20 KB·지도보다 큼, 4 B 거절)
+  - 스탬프를 유지하는 delta 수신 할당 < 64 KB, 같은 크기 표시 복사 할당 < 8 KB
+  - 칠해진 셀 수·잘못된 셀(해시는 맞춤)·해시 변조 delta 거절 시 표면 불변과 이후 체크포인트·delta 정상 적용
+  - 해상도 변경 뒤 delta 적용
+  - 스탬프 해시 캐시가 틀린 해시를 받아들이지 않고 새 스탬프를 따라감
+  - 패딩·공백이 낀 중간 조각을 이전처럼 거절
+- 기존 복제 검사(`LabPaintReplicationTests`·`LabPaintVisualStateTests`·`LabPaintPainterSlotTests` 등)는 그대로 통과했다.
+- 코드 검토 워크플로(세 관점 검토 + 지적별 반박 검증)에서 한 가지 결함이 세 번 독립적으로 확인됐다. 중간 조각 끝에 패딩 뒤 공백이 붙은 변조 프레임을 조각별 해독은 받아들이지만 이전의 이어 붙인 해독은 거절하는 차이다. 빠른 경로를 순수 base64 조각으로 제한해 고쳤다. 추가한 검사는 수정 전 조건으로 돌리면 두 경우 모두 `Applied`가 되어 실패하고, 수정 뒤 통과함을 확인했다.
+- **미실행:** iPhone 실기기·여러 폰의 GC·프레임 시간. 전체 PlayMode는 실행하지 않았다.
