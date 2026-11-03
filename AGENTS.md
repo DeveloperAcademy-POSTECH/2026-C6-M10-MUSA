@@ -149,3 +149,7 @@
 ## #451 Guest 공유 연출 시계
 
 - Guest 연출 시간은 `LabNetwork.BattlePresentationTime`(`LabGuestBattleClock`)이다. 스냅샷 객체가 아니라 세션·라운드·`serverTime`·정지 값으로 기준을 잡는다. 같은 라운드 안에서 0.5초 미만으로는 뒤로 가지 않고, 외삽은 최대 1초다. 1초 정체·정지·시작 대기는 `BattlePresentationHeld`로 음성·애니메이션이 멈춘다. 판정이나 Host로 보내는 값에 이 시계를 쓰지 않는다. 지귀 화면은 0.075초(`RewindToleranceSeconds`) 넘게 되감길 때만 새 스테이지로 본다.
+
+## #454 매달린 박 렌더 보간
+
+- `LabHangingTarget`의 보간 자세는 URP 렌더 콜백(`beginContextRendering`~`endContextRendering`) 사이에서만 Transform에 있다. 그 밖의 모든 스크립트·물리·네트워크 처리는 고정 스텝 자세를 읽으므로 명중·도색 판정에 보간 자세를 쓰지 않는다. 박에 붙여 화면 위치를 계산하는 표시 전용 UI는 `LabHangingTarget.DrawnPoint`로 그려지는 위치를 얻는다. 판정과 같은 계산을 쓰는 지귀 B 불장막 틀은 고정 자세 그대로다.

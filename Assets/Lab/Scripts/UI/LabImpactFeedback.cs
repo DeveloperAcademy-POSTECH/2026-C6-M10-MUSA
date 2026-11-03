@@ -148,7 +148,9 @@ namespace C6Lab
 
         private void UpdateHit(ActiveHit hit, float progress)
         {
-            Vector3 screen = battleCamera.WorldToScreenPoint(hit.Anchor.TransformPoint(hit.AnchorLocalPoint));
+            // Stay on the drawn gourd, which is interpolated between physics steps (#454).
+            Vector3 screen = battleCamera.WorldToScreenPoint(
+                LabHangingTarget.DrawnPoint(hit.Anchor, hit.Anchor.TransformPoint(hit.AnchorLocalPoint)));
             bool visible = screen.z > 0f && battleCamera.pixelRect.Contains(
                 new Vector2(screen.x, screen.y));
             hit.Root.gameObject.SetActive(visible);
