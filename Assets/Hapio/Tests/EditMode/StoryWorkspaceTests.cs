@@ -88,7 +88,7 @@ namespace Hapio.Tests
             foreach (var cloud in drift.clouds)
             {
                 Assert.That(cloud.distance, Is.GreaterThan(0));
-                Assert.That(cloud.seconds, Is.GreaterThan(20));
+                Assert.That(cloud.seconds, Is.InRange(10f, 20f), "#467: a lively drift, about 3x the old 32~44 s sway.");
                 Assert.That(cloud.target.GetComponentInChildren<UnityEngine.UI.Image>(true).sprite, Is.Not.Null);
             }
             Assert.That(drift.clouds[0].target.anchoredPosition, Is.EqualTo(new Vector2(-182, -257)));

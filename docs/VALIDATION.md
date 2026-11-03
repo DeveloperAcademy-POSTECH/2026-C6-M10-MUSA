@@ -4408,3 +4408,18 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
   - PlayMode `StoryTitleTests.TitleArtCoversTheWholeScreenWhileItsPageStaysFittedInside`(위 6개 비율)는 그림이 네 변을 다 덮는지, 한 변은 꼭 맞는지, 가운데 기준인지를 확인한다. 페이지 배율·글자 배치가 그대로이고 글자가 화면 안인지도 확인한다.
   - EditMode `StoryWorkspaceTests.AnimatedTitleSharesFourOriginalCloudsWithTheHomeStartPage`에 프리팹 부품 확인을 추가했다.
 - **미실행:** Play에서 Game 뷰 비율을 바꿔 보는 확인, iPhone 실기기 확인.
+
+### #467 2단계: 구름 속도 — 2026-11-03
+
+- **기준:** `dabf7422`(1단계 커밋) 위. `AnimatedTitle.prefab`의 `Title Cloud Drift` 값만 Editor API로 바꿨다. 코드·움직임 방식(제자리 좌우 왕복, 게임 시계가 멈춰도 움직임)은 그대로다.
+
+| 구름 | 이동 폭 | 왕복 시간 | 가장 빠른 순간 (좌표/초) |
+| --- | --- | --- | --- |
+| Cloud Left | 24 → **30** | 38 → **14**초 | 3.97 → 13.46 (3.4배) |
+| Cloud Right (반대 방향) | 20 → **26** | 44 → **16**초 | 2.86 → 10.21 (3.6배) |
+| Cloud Lower | 12 → **16** | 32 → **12**초 | 2.36 → 8.38 (3.6배) |
+| Cloud Upper (반대 방향) | 10 → **14** | 36 → **13**초 | 1.75 → 6.77 (3.9배) |
+
+- Cloud Upper는 x=15에서 ±14만 움직여 그림 왼쪽 끝 안에 남는다. 나머지는 원래도 그림 밖으로 걸쳐 있어 잘린다.
+- EditMode `StoryWorkspaceTests.AnimatedTitleSharesFourOriginalCloudsWithTheHomeStartPage`의 주기 조건을 `> 20`에서 `10~20`으로 바꿨다 (**NOT_RUN**).
+- **미실행:** Play에서 느낌 확인, iPhone 실기기.

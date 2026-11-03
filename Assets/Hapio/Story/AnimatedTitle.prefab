@@ -297,20 +297,20 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.TitleCloudDrift
   clouds:
   - target: {fileID: 1087842139303391096}
-    distance: 24
-    seconds: 38
+    distance: 30
+    seconds: 14
     reverse: 0
   - target: {fileID: 7907387035352142869}
-    distance: 20
-    seconds: 44
+    distance: 26
+    seconds: 16
     reverse: 1
   - target: {fileID: 5873589256742553043}
-    distance: 12
-    seconds: 32
+    distance: 16
+    seconds: 12
     reverse: 0
   - target: {fileID: 5410035902355965275}
-    distance: 10
-    seconds: 36
+    distance: 14
+    seconds: 13
     reverse: 1
 --- !u!114 &6854476936464384518
 MonoBehaviour:
