@@ -251,13 +251,14 @@ namespace C6Lab
         // 5681: #417 board frames, action receipts and paint frames accept the six players of a 3:3 territory room.
         // 5682: #428 lean packet envelope (bodies in a JSON payload string, no default nested objects); immediate
         //       board publishes skip peers whose delta is empty.
-        internal const ushort LabProtocolVersion = 5682;
+        // 5683: #461 paint frame bodies may be deflate-compressed (LabPaintFrame.encoding).
+        internal const ushort LabProtocolVersion = 5683;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Double-tap a blue fox orb to clear it, and keep your Yin and Yang away.";
         /// <summary>More fox orbs than one fox fire ever drops; a longer list is ignored (#251).</summary>
         private const int MaximumFoxFireOrbs = 10;
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/43");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/44");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;
