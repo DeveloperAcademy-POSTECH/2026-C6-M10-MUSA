@@ -93,6 +93,29 @@ namespace Hapio.Editor
             finally { PrefabUtility.UnloadPrefabContents(root); }
         }
 
+        private static readonly string[] LeafArt = { "LeafMapleRed.png", "LeafMapleYellow.png", "LeafLongRed.png", "LeafLongYellow.png" };
+
+        // #467: leaves blow across the whole title in front of the clouds; the start button stays above the title art.
+        [MenuItem("Hapio/Story/Add Title Falling Leaves")]
+        public static void AddFallingLeaves()
+        {
+            foreach (var file in LeafArt) StoryWorkspaceBuilder.ImportSprite(Art + file);
+            var root = PrefabUtility.LoadPrefabContents(TitlePath);
+            try
+            {
+                if (root.transform.Find("Falling Leaves") != null) return;
+                var area = StoryWorkspaceBuilder.Rect("Falling Leaves", root.transform, new Rect(0, 0, 402, 874));
+                area.SetAsLastSibling();
+                var leaves = area.gameObject.AddComponent<TitleFallingLeaves>();
+                leaves.sprites = LeafArt.Select(file => AssetDatabase.LoadAssetAtPath<Sprite>(Art + file)).ToArray();
+                if (leaves.sprites.Any(sprite => sprite == null)) throw new InvalidOperationException("Missing title leaf image");
+                // The same gust as the flag, so everything on the title is hit at once.
+                leaves.gustSeconds = root.transform.Find("Wind Flag/Banner").GetComponent<TitleWindWave>().gustSeconds;
+                PrefabUtility.SaveAsPrefabAsset(root, TitlePath);
+            }
+            finally { PrefabUtility.UnloadPrefabContents(root); }
+        }
+
         // Tied at the pole end (upper right of the art), the tail streams left and lifts in a gust.
         private static void Ribbon(TitleWindWave ribbon, float phase)
         {

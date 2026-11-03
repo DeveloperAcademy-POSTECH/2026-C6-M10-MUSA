@@ -139,6 +139,76 @@ namespace Hapio.Tests
             finally { Object.DestroyImmediate(root); }
         }
 
+        // #467: a fixed set of leaves is recycled inside the title, a gust sweeps them left, and every start looks the same.
+        [UnityTest]
+        public IEnumerator LeavesRecycleInsideTheTitleBlowLeftInAGustAndRestartTheSame()
+        {
+            var root = new GameObject("Leaves", typeof(RectTransform), typeof(Canvas));
+            var texture = new Texture2D(4, 2);
+            var sprite = Sprite.Create(texture, new Rect(0, 0, 4, 2), Vector2.one * .5f);
+            float clock = Time.timeScale;
+            try
+            {
+                var area = new GameObject("Falling Leaves", typeof(RectTransform)).GetComponent<RectTransform>();
+                area.SetParent(root.transform, false); area.sizeDelta = new Vector2(402, 874);
+                area.gameObject.SetActive(false);
+                var leaves = area.gameObject.AddComponent<TitleFallingLeaves>();
+                leaves.sprites = new[] { sprite }; leaves.count = 6;
+                area.gameObject.SetActive(true);
+
+                Assert.That(leaves.Count, Is.EqualTo(6)); Assert.That(area.childCount, Is.EqualTo(6));
+                for (int i = 0; i < leaves.Count; i++)
+                {
+                    var image = leaves.LeafAt(i).GetComponent<Image>();
+                    Assert.That(image.raycastTarget, Is.False, "Leaves must not block the start button.");
+                    Assert.That(Mathf.Max(image.rectTransform.sizeDelta.x, image.rectTransform.sizeDelta.y),
+                        Is.InRange(leaves.size.x - .01f, leaves.size.y + .01f));
+                    Assert.That(image.rectTransform.sizeDelta.x, Is.EqualTo(image.rectTransform.sizeDelta.y * 2).Within(.01f), "Keeps the leaf's shape.");
+                }
+
+                Vector2 calm = TitleFallingLeaves.Drift(0, 20, 110, 50), gust = TitleFallingLeaves.Drift(1, 20, 110, 50);
+                Assert.That(calm, Is.EqualTo(new Vector2(-20, 50)));
+                Assert.That(gust.x, Is.LessThan(calm.x), "A gust sweeps them further left.");
+                Assert.That(gust.y, Is.GreaterThan(calm.y));
+
+                System.Func<Vector2[]> positions = () =>
+                {
+                    var now = new Vector2[leaves.Count];
+                    for (int i = 0; i < now.Length; i++) now[i] = leaves.LeafAt(i).anchoredPosition;
+                    return now;
+                };
+                leaves.Restart();
+                for (int frame = 0; frame < 90; frame++) leaves.Advance(1 / 30f);
+                Vector2[] first = positions();
+                leaves.Restart();
+                for (int frame = 0; frame < 90; frame++) leaves.Advance(1 / 30f);
+                Assert.That(positions(), Is.EqualTo(first), "The same seed starts the same way every time.");
+
+                for (int frame = 0; frame < 900; frame++)
+                {
+                    leaves.Advance(1 / 30f);
+                    for (int i = 0; i < leaves.Count; i++)
+                    {
+                        Vector2 p = leaves.PositionAt(i);
+                        Assert.That(p.x >= -40 && p.x <= 402 + 160 && p.y >= -40 && p.y <= 874 + 40, Is.True,
+                            $"Leaf {i} left the title at {p} instead of coming back.");
+                    }
+                }
+                Assert.That(leaves.Recycled, Is.GreaterThan(leaves.Count), "Fallen leaves come back from the top or the right.");
+
+                Vector2[] before = positions();
+                Time.timeScale = 0;
+                yield return null; yield return null;
+                Assert.That(positions(), Is.Not.EqualTo(before), "Leaves keep falling with a paused game clock.");
+            }
+            finally
+            {
+                Time.timeScale = clock;
+                Object.Destroy(root); Object.Destroy(sprite); Object.Destroy(texture);
+            }
+            yield return null;
+        }
+
         [UnityTest]
         public IEnumerator TitleWaitsForTheStartButtonAndCanReturnWithoutOldStoryViews()
         {

@@ -141,6 +141,24 @@ namespace Hapio.Tests
         }
 
         [Test]
+        public void TitleLeavesFallInFrontOfTheCloudsWithTheFlagsGust()
+        {
+            var title = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Hapio/Story/AnimatedTitle.prefab");
+            var area = title.transform.Find("Falling Leaves");
+            Assert.That(area.GetSiblingIndex(), Is.EqualTo(title.transform.childCount - 1), "#467: in front of the clouds.");
+            Assert.That(area.childCount, Is.Zero, "Leaves are made while playing, not saved in the prefab.");
+            var leaves = area.GetComponent<TitleFallingLeaves>();
+            Assert.That(leaves.sprites.Length, Is.EqualTo(4));
+            foreach (var sprite in leaves.sprites)
+                Assert.That(Mathf.Max(sprite.rect.width, sprite.rect.height), Is.LessThanOrEqualTo(256), sprite.name + " is downsized.");
+            Assert.That(leaves.count, Is.GreaterThan(0));
+            Assert.That(leaves.size.x, Is.GreaterThanOrEqualTo(20), "Larger than the leaves painted in the landscape.");
+            Assert.That(leaves.wind, Is.GreaterThan(0), "Blown left, the way the ribbons stream.");
+            Assert.That(leaves.gustSeconds, Is.EqualTo(title.transform.Find("Wind Flag/Banner").GetComponent<TitleWindWave>().gustSeconds),
+                "The flag and the leaves are hit by the same gust.");
+        }
+
+        [Test]
         public void SecondCutHasOriginalCharacterLayersSpeakerBadgeAndTwoCutPreview()
         {
             var cut = AssetDatabase.LoadAssetAtPath<StoryCutDefinition>("Assets/Hapio/Story/Opening/Cuts/OP_002.asset");

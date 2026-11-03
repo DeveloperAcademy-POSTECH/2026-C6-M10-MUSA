@@ -4452,3 +4452,23 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
   - PlayMode `StoryTitleTests.GustsComeOnceAPeriodAndSmoothly`
   - PlayMode `StoryTitleTests.WindKeepsTheTiedEdgeStillAndSwingsTheFreeEndFurtherInAGust`
 - **미실행:** Play에서 실제 움직임 느낌, iPhone 실기기 성능(조각 3개 × 매 프레임 메시 다시 만들기).
+
+### #467 4단계: 낙엽 — 2026-11-03
+
+- **기준:** `64fa185c`(3단계 커밋) 위. 연결된 Editor에서 컴파일, Editor API 배치, Editor 안 화면 그리기, 계산 확인만 했다. Play·Test Runner·실기기는 실행하지 않았다.
+- **바꾼 것:**
+  - 나뭇잎 4장(단풍 빨강·노랑, 긴 잎 빨강·노랑)을 투명 여백을 잘라 긴 변 256px로 줄여 추가했다.
+  - 새 `TitleFallingLeaves`를 `StoryTitleBuilder.AddFallingLeaves`(메뉴 `Hapio > Story > Add Title Falling Leaves`)로 타이틀 맨 앞 `Falling Leaves`에 붙였다.
+  - 값은 나뭇잎 9장, 크기 20~32, 떨어지는 속도 초당 40~70, 바람 초당 20(돌풍 최고 +110), 흔들림 폭 12, 회전 최대 초당 140도, 씨앗 467이다. 돌풍 간격은 깃발과 같은 6초다.
+  - 처음 그린 크기 14~22는 배경에 그려진 낙엽과 섞여 잘 안 보여서 20~32로 키웠다.
+
+| 실행한 확인 | 결과 |
+| --- | --- |
+| 컴파일 · Console 오류 | **PASS** (오류 0) |
+| Editor 안 화면 그리기 0 · 2 · 4.05 · 8초 | **PASS** — 9장이 화면 곳곳에서 시작해 왼쪽 아래로 날리고, 돌풍(4.05초) 동안 왼쪽 밖으로 쓸려 나간 잎이 위·오른쪽에서 다시 나온다(8초까지 6번 재활용). 합이오 글자 앞을 잎이 지나갈 수 있다 |
+| 새 검사 값 미리 계산 (미리보기 씬) | **PASS** — 6장 생성·raycast 꺼짐·잎 모양 유지, 같은 씨앗 3초 뒤 위치 같음, 30초 동안 x −39.97~557.38 · y −33.50~913.76(범위 안), 재활용 20번, 바람 평상시 (−20, 50) → 돌풍 (−130, 70) |
+
+- **새 검사 (NOT_RUN):**
+  - EditMode `StoryWorkspaceTests.TitleLeavesFallInFrontOfTheCloudsWithTheFlagsGust`
+  - PlayMode `StoryTitleTests.LeavesRecycleInsideTheTitleBlowLeftInAGustAndRestartTheSame`(게임 시계 0에서도 움직이는지 포함)
+- **미실행:** Play에서 실제 움직임 느낌, iPhone 실기기 성능(나뭇잎 9장 매 프레임 이동).
