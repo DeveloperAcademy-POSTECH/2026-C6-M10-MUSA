@@ -4193,3 +4193,40 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
   - 지귀 B 불장막 화면 틀(`TryGetJigwiABCurtainFrame`)은 판정 콜라이더와 같은 계산을 써서 고정 자세 그대로 두었다. 빠른 흔들림에서는 그려지는 박이 틀 가장자리(여유 0.06 이상)를 최대 한 스텝만큼 벗어날 수 있다.
   - 도색 완료 연출(`LabPaintFinishPresentation.Begin`)의 복사본은 고정 자세에서 찍혀, 시작하는 한 프레임에 최대 한 고정 스텝(0.02초 움직임)만큼 앞으로 튈 수 있다.
 - **미실행:** iPhone 실기기에서의 체감·프레임 시간. 전체 PlayMode는 실행하지 않았다.
+
+## #457 Guest 북 탭 소리·진동 선반영 — 2026-11-03
+
+- **기준:** main `35b68b00` → `fix/#457-drum-tap-local-feedback`. Unity6000.6.5f1/macOS의 연결된 Editor에서 실행했다. 새 Mac·iOS 빌드는 만들지 않았다.
+- **배경:** Guest의 북 탭 소리(`LabGenerateSound`)·진동(`LabHaptics`)은 Host가 생성을 승인하고 새 구슬이 조합판 프레임으로 도착한 뒤에야 `SpawnStarted`로 울렸다. 그래서 탭에서 소리까지 왕복 지연 전체를 기다렸다.
+- **수정:**
+  - Guest가 미리보기를 만든 탭 중 승인이 확실한 탭은 `LabOrbBoard.AnnounceGenerationPreview`로 `SpawnStarted`를 바로 올린다(소리·진동 함께). 확실함은 순수 `LabGenerationPrediction.Certain`이 정한다. 다음을 모두 만족해야 한다.
+    - 스냅샷 스태미나 ≥ 비용 × 아직 답이 없는 생성 요청 수
+    - 내 보관 구슬(Host `CountStored`와 같은 필터) + 대기 생성 수 + 도착 여유 ≤ 보관 한도. 도착 여유는 양쪽 이웃 2 + 여우불 최대 + 오색구슬 보상 수 + 열고 있는 아이템 수다.
+    - 진행 중이고 일시정지·시작 대기가 아님
+    - 지귀 B 예고·진행 중이 아니고 legacy 지귀 불·과열이 아님
+  - 미리 울린 탭은 크레딧을 남긴다. 승인 영수증이 오면 실제 구슬 ID로 옮겨(`ResolveGenerationCredit`) 그 구슬이 나타날 때 다시 울리지 않는다. 거절·소각·롤백·퍼지·Clear는 크레딧을 버린다. 영수증은 같은 순서 보장 채널에서 구슬을 담은 조합판 프레임보다 먼저 도착한다.
+  - 확실하지 않은 탭은 이전처럼 승인 뒤 한 번 울린다. Host 판정·와이어·접속 규약 **5682/Lab43/Game27**·공유 설정 257개는 그대로다.
+
+| 실행 검사 | 결과 | 시간 |
+| --- | --- | --- |
+| 전체 EditMode | **1829/1829 PASS** | 48.83초 |
+| PlayMode `LabGenerationCertaintyTests` | **3/3 PASS** | 0.02초 |
+| PlayMode `LabLocalBoardPredictionTests` | **15/15 PASS** | 0.13초 |
+| PlayMode `LabLocalBoardNetworkIntegrationTests` | **16/16 PASS** | 0.36초 |
+| PlayMode `LabStaminaFeedbackTests` | **8/8 PASS** | 0.04초 |
+| PlayMode `GameSceneFlowTests` | **21/21 PASS** | 220.16초 |
+| PlayMode `LabStaminaShortFeedbackTests` | **5/5 PASS** | 0.02초 |
+
+- 각 실행의 skip/inconclusive0. `LabStaminaShortFeedbackTests`는 아래 검토 수정 전 코드에서 실행했다. 나머지는 최종 코드에서 실행했다.
+- 새 검사
+  - EditMode `LabGenerationPredictionTests` 8개: 스태미나·대기 수, 도착 여유를 남긴 보관 한도, 여유 계산, 진행·정지·지귀 위험, 잘못된 입력
+  - PlayMode `LabGenerationCertaintyTests` 3개: 이번 라운드의 답을 받은 요청은 대기 수에 넣지 않음, 보관 구슬·열고 있는 아이템·비행 중 구슬, 정지·종료·지귀 불
+  - PlayMode `LabLocalBoardPredictionTests`에 2개: 선반영은 탭당 한 번이고 승인된 구슬은 소리 없이 튀어나옴, 거절·Clear·이미 나타난 구슬의 크레딧이 남지 않음
+  - `LabGenerateSoundTests`·`LabHapticsTests`(EditMode)는 그대로 통과했다.
+- 코드 검토 워크플로(세 관점 검토 + 지적별 반박 검증)에서 확인된 지적을 고쳤다.
+  - `actionRequests`는 라운드 동안 지워지지 않는데, 이를 그대로 대기 수로 세어 라운드 초반 5~6번 탭 뒤로는 선반영이 꺼지던 결함
+  - 도착 여유 1개로는 여우불(2~5)·오색구슬 보상(3)·양쪽 이웃·아이템 열기를 감당하지 못함
+  - legacy 지귀 불이 Host 처리 전에 과열될 수 있음
+  - 검사가 첫 결함을 가렸음
+- **남은 한계:** 여유를 크게 잡아 보관 구슬이 많은 판(기본 한도 20에서 10개 이상)에서는 선반영하지 않고 이전처럼 승인 뒤에 울린다. 위 조건 밖의 드문 거절(예: 북을 옮기는 중의 소유권 변경)에서는 소리만 먼저 나고 구슬은 생기지 않는다.
+- **미실행:** iPhone 실기기·여러 폰에서의 체감. 전체 PlayMode는 실행하지 않았다.

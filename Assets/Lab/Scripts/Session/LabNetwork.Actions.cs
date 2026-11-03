@@ -138,7 +138,11 @@ namespace C6Lab
                     board.TryCreateCombinePreview(packet.provisionalId, packet.firstId, packet.secondId,
                         new Vector2(packet.x, packet.y), new Vector2(packet.vx, packet.vy));
                 else if (packet.type == "generate")
-                    board.TryCreateGenerationPreview(packet.provisionalId, new Vector2(packet.x, packet.y));
+                {
+                    if (board.TryCreateGenerationPreview(packet.provisionalId, new Vector2(packet.x, packet.y))
+                        && GenerationCertain())
+                        board.AnnounceGenerationPreview(packet.provisionalId);
+                }
                 else if (packet.type == "launch")
                 {
                     board.BeginPendingLaunch(packet.firstId);
@@ -148,6 +152,37 @@ namespace C6Lab
                     board.BeginPendingLaunch(packet.firstId);
             }
             FlushBoardActions(now);
+        }
+
+        /// <summary>
+        /// A Guest tap whose approval is certain from what this screen knows (#457): see
+        /// <see cref="LabGenerationPrediction"/>. Called after the request was registered, so it counts itself.
+        /// </summary>
+        private bool GenerationCertain()
+        {
+            if (IsHost || latest == null || config == null) return false;
+            LabPlayerState me = (latest.players ?? Array.Empty<LabPlayerState>()).FirstOrDefault(player => player != null
+                && player.id == LocalPlayerId);
+            if (me == null) return false;
+            // actionRequests keeps answered requests for the round; count only those still waiting for a receipt.
+            int pending = 0, opening = 0;
+            foreach (var entry in actionRequests)
+            {
+                if (!localActions.TryGetPending(entry.Key, out var info) || info.state == LabPendingActionState.Accepted
+                    || info.state == LabPendingActionState.Rejected) continue;
+                if (entry.Value.type == "generate") pending++;
+                else if (entry.Value.type == "use") opening++; // An opened bomb or box becomes two orbs.
+            }
+            int stored = (latest.orbs ?? Array.Empty<LabOrbState>()).Count(orb => orb != null && orb.owner == LocalPlayerId
+                && !orb.inFlight && !orb.jigwiSupply);
+            LabJigwiState jigwi = latest.JigwiFor(LocalPlayerId);
+            // A B mission (warning included) can end in a failure that empties stamina; a legacy fire can overheat
+            // the player before the Host reaches this tap and burn it.
+            bool jigwiRisk = latest.jigwiAB != null && latest.jigwiAB.enabled && latest.jigwiAB.Active(latest.serverTime) != null
+                || jigwi != null && (jigwi.Overheated(latest.serverTime) || jigwi.FireActive(latest.serverTime));
+            int reserve = LabGenerationPrediction.ArrivalReserve(config.FoxFireCountMax, config.YaguangFiveColorOrbCount, opening);
+            return LabGenerationPrediction.Certain(me.stamina, config.GenerateCost, pending, stored, config.OrbStorageLimit,
+                reserve, latest.phase == LabPhase.Playing, latest.paused || GameStartHeld, jigwiRisk);
         }
 
         private void RejectBoardActionLocally(LabNetworkPacket packet, string reason)
@@ -393,6 +428,12 @@ namespace C6Lab
                     RollBackAction(receipt.requestId);
                 }
             }
+            if (board != null && request.type == "generate")
+            {
+                if (!purged && receipt.accepted && !receipt.consumedWithoutOutput)
+                    board.ResolveGenerationCredit(request.provisionalId, receipt.outputId);
+                else board.DropGenerationCredit(request.provisionalId);
+            }
             NotifyLocalStaminaSpent(request, receipt, purged);
             if (!purged && receipt.accepted && !receipt.consumedWithoutOutput && request.type == "combine") LocalCombined?.Invoke();
             predictedJigwiBurns.Remove(receipt.requestId);
@@ -419,7 +460,11 @@ namespace C6Lab
             if (predictedShots.TryGetValue(requestId, out var shot) && shot != null) Destroy(shot.gameObject);
             predictedShots.Remove(requestId);
             if (board == null) return;
-            if (request.type == "generate") board.RemoveGenerationPreview(request.provisionalId);
+            if (request.type == "generate")
+            {
+                board.RemoveGenerationPreview(request.provisionalId);
+                board.DropGenerationCredit(request.provisionalId);
+            }
             else if (request.type == "combine")
             {
                 if (!board.RejectCombinePreview(request.provisionalId))
