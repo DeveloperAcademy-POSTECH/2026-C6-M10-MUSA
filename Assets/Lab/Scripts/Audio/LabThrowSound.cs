@@ -171,7 +171,7 @@ namespace C6Lab
         {
             if (bigSource == null) return;
             // 소리 시험 (#464): 시험 소리를 골랐으면 징 대신 그 소리를 낸다.
-            AudioClip test = LabFiveColorHitSoundChoice.TestClip;
+            AudioClip test = LabFiveColorHitSoundChoice.NextTestClip();
             if (test != null)
             {
                 bigSource.Stop();

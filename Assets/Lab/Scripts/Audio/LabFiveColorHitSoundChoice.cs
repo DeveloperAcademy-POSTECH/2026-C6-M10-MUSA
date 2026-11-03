@@ -20,7 +20,7 @@ namespace C6Lab
             [InspectorName("3 · 바라 타격음 (강)")] Test3 = 3,
             [InspectorName("4 · 뿌직 up")] Test4 = 4,
             [InspectorName("5 · 진고 타격음 (강)")] Test5 = 5,
-            [InspectorName("6 · 가야금 오음 띠리리리링 (중간)")] Test6 = 6,
+            [InspectorName("6 · 가야금 오음 C D F G B♭ (오르내림 번갈아)")] Test6 = 6,
             [InspectorName("7 · 가야금 오음 띠리리리링 (낮게)")] Test7 = 7
         }
 
@@ -39,7 +39,7 @@ namespace C6Lab
         public bool drumAlwaysFiveColor;
 
         [Header("소리 (오색구슬 명중 + BIG 큰 공 명중)")]
-        [Tooltip("0 = 지금 징 (Audio/FiveColorHit), 1~7 = 시험 소리 (Audio/FiveColorHitTest/FiveColorHitTest_번호)")]
+        [Tooltip("0 = 지금 징 (Audio/FiveColorHit), 1~7 = 시험 소리 (Audio/FiveColorHitTest/FiveColorHitTest_번호, 같은 번호가 여러 개면 번갈아)")]
         public Sound sound = Sound.Test1;
         [Tooltip("시험 소리 크기 (징 크기는 기존 설정 그대로)")]
         [Range(0f, 1f)] public float testVolume = 1f;
@@ -64,20 +64,24 @@ namespace C6Lab
             }
         }
 
-        /// <summary>고른 시험 소리. 징(0)을 골랐거나 파일이 없으면 null.</summary>
-        public static AudioClip TestClip
+        private static int testTurn;
+
+        /// <summary>
+        /// 이번에 낼 시험 소리. 징(0)을 골랐거나 파일이 없으면 null.
+        /// 같은 번호 파일이 여러 개면(FiveColorHitTest_6, FiveColorHitTest_6_2, ...) 부를 때마다 이름 순서대로 번갈아 낸다.
+        /// </summary>
+        public static AudioClip NextTestClip()
         {
-            get
-            {
-                int number = Current != null ? (int)Current.sound : 0;
-                if (number <= 0) return null;
-                AudioClip[] clips = TestClips;
-                return number <= clips.Length ? clips[number - 1] : null;
-            }
+            int number = Current != null ? (int)Current.sound : 0;
+            if (number <= 0) return null;
+            string name = "FiveColorHitTest_" + number;
+            var matches = new System.Collections.Generic.List<AudioClip>();
+            foreach (AudioClip clip in TestClips)
+                if (clip != null && (clip.name == name || clip.name.StartsWith(name + "_", System.StringComparison.Ordinal))) matches.Add(clip);
+            if (matches.Count == 0) return null;
+            return matches[testTurn++ % matches.Count];
         }
 
-        /// <summary>시험용: 북에서 늘 오색구슬이 나오는지 (에디터/개발 빌드에서만)</summary>
-        public static bool DrumAlwaysFiveColor => Debug.isDebugBuild && Current != null && Current.drumAlwaysFiveColor;
         public static float TestVolume => Current != null ? Mathf.Clamp01(Current.testVolume) : 1f;
         public static bool UseDust => Current != null && Current.effect == HitEffect.Dust;
         public static float StarScale => Current != null ? Mathf.Max(.1f, Current.starScale) : 1f;
