@@ -117,8 +117,6 @@ namespace C6Lab
         private int boardLook;
         private bool starsWereOn;
 
-        private LabSnapshot seenSnapshot;
-        private double seenAtRealtime;
         private uint shownResultCount;
         private float resultElapsed = -1f;
         private LabComboResult shownResult;
@@ -221,7 +219,7 @@ namespace C6Lab
         {
             LabSnapshot snapshot = network != null ? network.Snapshot : null;
             bool battle = snapshot != null && snapshot.phase == LabPhase.Playing && !snapshot.paused;
-            double serverNow = battle ? EstimateServerNow(snapshot) : 0d;
+            double serverNow = battle ? network.BattlePresentationTime : 0d;
             // 조합판 구슬 크기(#257)는 콤보 화면이 숨어 있어도 정한다. 일시정지 중에는 그대로 둔다.
             if (snapshot == null || snapshot.phase != LabPhase.Playing) SetBoardLook(0);
             else if (!snapshot.paused) SetBoardLook(LocalEffect(snapshot, serverNow, out _));
@@ -424,19 +422,6 @@ namespace C6Lab
             else if (left <= 3d)
                 scale += .06f * Mathf.Max(0f, Mathf.Sin(Time.unscaledTime * Mathf.PI * 4f));
             effectBadge.localScale = Vector3.one * scale;
-        }
-
-        /// <summary>스냅샷 사이에도 남은 시간이 매끄럽게 줄도록, 받은 뒤 흐른 실제 시간을 더한다.</summary>
-        private double EstimateServerNow(LabSnapshot snapshot)
-        {
-            double realtime = Time.realtimeSinceStartupAsDouble;
-            if (!ReferenceEquals(snapshot, seenSnapshot))
-            {
-                seenSnapshot = snapshot;
-                seenAtRealtime = realtime;
-            }
-            // 스냅샷이 늦게 와도 최대 1초까지만 앞당겨 본다.
-            return snapshot.serverTime + System.Math.Min(1d, realtime - seenAtRealtime);
         }
 
         private void DetectChanges(LabSnapshot snapshot)

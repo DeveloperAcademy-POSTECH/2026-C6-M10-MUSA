@@ -17,8 +17,6 @@ namespace C6Lab
         public GameObject testPanel;
         private int targetSlot;
         private bool choseTarget;
-        private double lastServerTime = -1d;
-        private float receivedAt;
         private bool wired;
         private LabJigwiScreenPresentation screenPresentation;
         private float blockedUntilRealtime = -1f;
@@ -155,12 +153,9 @@ namespace C6Lab
                 if (stageNotice != null) stageNotice.gameObject.SetActive(false);
                 if (heat != null) heat.gameObject.SetActive(false);
                 if (effectText != null) effectText.gameObject.SetActive(false);
-                lastServerTime = -1d;
                 return;
             }
-            if (snapshot.serverTime != lastServerTime)
-            { lastServerTime = snapshot.serverTime; receivedAt = Time.unscaledTime; }
-            double now = snapshot.serverTime + (snapshot.paused ? 0d : Time.unscaledTime - receivedAt);
+            double now = network.BattlePresentationTime;
             if (snapshot.jigwiAB?.enabled == true)
             {
                 if (screenPresentation == null || screenPresentation.source != network) EnsureScreenPresentation();
@@ -225,7 +220,7 @@ namespace C6Lab
         {
             blockedUntilRealtime = Time.unscaledTime + .65f;
             if (network?.Snapshot != null)
-                ApplyStageSnapshot(network.Snapshot, network.LocalPlayerId, network.Snapshot.serverTime);
+                ApplyStageSnapshot(network.Snapshot, network.LocalPlayerId, network.BattlePresentationTime);
         }
 
         public static string DescribeStage(LabJigwiStageSnapshot stage, LabSnapshot snapshot, ulong localPlayer, double now)
