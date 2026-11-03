@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 01ac332979234f8398c64dce6d76c98f, type: 3}
   m_Name: GourdModelPreviewSet
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.GameGourdModelPreviewSet
-  show: 2
+  show: 1
   onlyYaguang: 1
   gourdScale: 1
   showButton: 0
@@ -21,13 +21,6 @@ MonoBehaviour:
   paintStrength: 1
   newLighting: 1
   models:
-  - label: "1\uCC28"
-    prefab: {fileID: 7311737831349322903, guid: 7c4e7cff0f74347db80144a8c04366c6, type: 3}
-    fit: 1
-    scale: 1
-    offset: {x: 0, y: 0, z: 0}
-    yaw: 0
-    replaySeconds: 10
   - label: "2\uCC28"
     prefab: {fileID: 2155159449602463254, guid: a082beff730084facb80a2d6bdbec379, type: 3}
     fit: 0
