@@ -305,6 +305,46 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void ASmallClockStepBackKeepsTheFailureFlashAndALargeOneStartsAgain()
+        {
+            var group = Group(); group.endsAt = 21d;
+            snapshot = Snapshot(group); SetSnapshot(snapshot);
+            view.ApplySnapshot(snapshot, Local, 20.5d);
+            group.resolution = LabJigwiABResolution.Expired; group.resolvedAt = 21d;
+            view.ApplySnapshot(snapshot, Local, 21d);
+            Assert.That(view.FailureVisible, Is.True); Assert.That(view.FailureFlashCount, Is.EqualTo(1));
+            view.ApplySnapshot(snapshot, Local, 21d - LabJigwiScreenPresentation.RewindToleranceSeconds + .01d);
+            Assert.That(view.FailureFlashCount, Is.EqualTo(1), "Jitter inside the tolerance is not a new stage (#451).");
+            view.ApplySnapshot(snapshot, Local, 21.1d);
+            Assert.That(view.FailureVisible, Is.True, "The flash continues once the clock moves on; a reset would have dropped it.");
+            view.ApplySnapshot(snapshot, Local, 20.9d);
+            Assert.That(view.FailureVisible, Is.False, "A real rewind still starts the history again.");
+            Assert.That(view.FailureFlashCount, Is.Zero);
+        }
+
+        [UnityTest]
+        public IEnumerator TheGuestClockDoesNotStepBackWhenTheSameHeaderArrivesAgain()
+        {
+            snapshot = Snapshot(Group()); snapshot.serverTime = 11.8d; SetSnapshot(snapshot);
+            double first = network.JigwiABPresentationTime;
+            yield return new WaitForSecondsRealtime(.08f);
+            double advanced = network.JigwiABPresentationTime;
+            Assert.That(advanced, Is.GreaterThan(first + .05d));
+            SetSnapshot(JsonUtility.FromJson<LabSnapshot>(JsonUtility.ToJson(snapshot)));
+            Assert.That(network.JigwiABPresentationTime, Is.GreaterThanOrEqualTo(advanced),
+                "A new snapshot object with the same Host time must not restart the extrapolation.");
+            Assert.That(network.BattlePresentationTime, Is.EqualTo(network.JigwiABPresentationTime).Within(.01d));
+            Assert.That(network.BattlePresentationHeld, Is.False);
+            yield return new WaitForSecondsRealtime((float)LabGuestBattleClock.MaximumExtrapolationSeconds + .05f);
+            double stalled = network.JigwiABPresentationTime;
+            Assert.That(stalled, Is.EqualTo(11.8d + LabGuestBattleClock.MaximumExtrapolationSeconds).Within(1e-6));
+            Assert.That(network.BattlePresentationHeld, Is.True, "No Host time for a second: voices hold instead of re-seeking.");
+            snapshot.serverTime = 13d; SetSnapshot(snapshot);
+            Assert.That(network.JigwiABPresentationTime, Is.EqualTo(13d).Within(.01d));
+            Assert.That(network.BattlePresentationHeld, Is.False);
+        }
+
+        [Test]
         public void TimedMissionKeepsItsCountdownBesideNextWarningAndFlashesFailureOnlyOnce()
         {
             var group = Group(); group.endsAt = 21d;
