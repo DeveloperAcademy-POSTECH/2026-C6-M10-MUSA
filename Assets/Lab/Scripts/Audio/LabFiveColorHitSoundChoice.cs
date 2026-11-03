@@ -83,6 +83,8 @@ namespace C6Lab
             return matches[testTurn++ % matches.Count];
         }
 
+        /// <summary>시험용: 북에서 늘 오색구슬이 나오는지 (에디터/개발 빌드에서만)</summary>
+        public static bool DrumAlwaysFiveColor => Debug.isDebugBuild && Current != null && Current.drumAlwaysFiveColor;
         public static float TestVolume => Current != null ? Mathf.Clamp01(Current.testVolume) : 1f;
         public static bool UseDust => Current != null && Current.effect == HitEffect.Dust;
         public static float StarScale => Current != null ? Mathf.Max(.1f, Current.starScale) : 1f;
