@@ -4104,3 +4104,23 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 - 기존 복제 검사(`LabPaintReplicationTests`·`LabPaintVisualStateTests`·`LabPaintPainterSlotTests` 등)는 그대로 통과했다.
 - 코드 검토 워크플로(세 관점 검토 + 지적별 반박 검증)에서 한 가지 결함이 세 번 독립적으로 확인됐다. 중간 조각 끝에 패딩 뒤 공백이 붙은 변조 프레임을 조각별 해독은 받아들이지만 이전의 이어 붙인 해독은 거절하는 차이다. 빠른 경로를 순수 base64 조각으로 제한해 고쳤다. 추가한 검사는 수정 전 조건으로 돌리면 두 경우 모두 `Applied`가 되어 실패하고, 수정 뒤 통과함을 확인했다.
 - **미실행:** iPhone 실기기·여러 폰의 GC·프레임 시간. 전체 PlayMode는 실행하지 않았다.
+
+
+## 2026-11-03 — Stage 02 gourd art import
+
+Imported Assets/Hapio/Art/Gourds/Stage02_Yagwanggwi; reserved Stage01_Gumiho and Stage03_Jigwi folders. Unity Editor verification: 22 renderers, 446,594 triangles; 9 URP Lit materials, no missing materials or unsupported shaders; 4-second combined animation, 280 curve bindings, zero unresolved animation paths; Animator sampling changed 11 transforms. Preview rendered and inspected after correcting parent inverse matrices in export copies. Existing gameplay prefabs, stage catalog and scene assets were not replaced. EditMode/PlayMode suites and device performance tests were not run for this isolated art import.
+
+
+## 2026-11-03 — Stage 02 gourd placement scale
+
+Created Yagwanggwi_Gourd_GameReady.prefab with outer uniform scale 17.096283 and body-centered origin; preserved the nested source prefab and Animator hierarchy. Reloaded prefab in an isolated preview scene and verified body height 2.390325, center within 0.001 of origin, no unresolved animation paths, and 17 changing transforms during playback before save. No gameplay scene placement/replacement or device test was performed.
+
+
+## 2026-11-03 — Gourd prefab handoff cleanup
+
+Unpacked the redundant small source-prefab layer inside GameReady. Verified no project prefab/scene/asset referenced it, then removed it. Reloaded remaining prefab: body height 2.390325, 17 animated transforms, zero missing materials. FBX, material and controller references are preserved. No gameplay/device test performed.
+
+
+## 2026-11-03 — Gourd texture cleanup
+
+Consolidated three byte-identical textures into shared material references; confirmed zero asset references before deleting three duplicates and three unused source/reference images with their meta files (28,189,225 image bytes). Reloaded GameReady prefab: height 2.390325, 17 animated transforms, zero missing materials or required color/normal/metallic maps. No gameplay/device test performed.
