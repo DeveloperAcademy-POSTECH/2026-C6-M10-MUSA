@@ -302,7 +302,7 @@ namespace Hapio
         {
             if (Instance == null || choice == null) return;
             Transform t = Instance.transform;
-            float scale = Mathf.Max(.01f, choice.scale);
+            float scale = Mathf.Max(.01f, choice.scale) * (set != null ? Mathf.Max(.01f, set.gourdScale) : 1f);
             t.localScale = baseLocalScale * scale;
             t.localRotation = Quaternion.Euler(0f, choice.yaw, 0f) * baseLocalRotation;
             // 배율은 흰 박 가운데를 기준으로 키우고 줄인다.

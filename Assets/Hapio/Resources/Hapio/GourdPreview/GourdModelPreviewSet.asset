@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.GameGourdModelPreviewSet
   show: 2
   onlyYaguang: 1
+  gourdScale: 1
   showButton: 0
   showPaint: 1
   paintAllParts: 0
