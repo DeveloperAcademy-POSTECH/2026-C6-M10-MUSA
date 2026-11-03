@@ -4348,3 +4348,35 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
   - Host 실제 구성(공유 캐시 + `Auto`) 검사 없음
 - **병합 뒤 주의:** 모든 기기가 새 빌드를 써야 한다. 5682/Lab43/Game27 빌드와는 접속되지 않는다.
 - **미실행:** iPhone 실기기·여러 폰에서의 시작 지연 체감과 대역폭, iOS IL2CPP 빌드에서의 `System.IO.Compression` 동작.
+
+## #463 HUD·효과음의 공유 연출 시계 — 2026-11-03
+
+- **기준:** main `bc5fd050` → `fix/#463-presentation-clock`. Unity6000.6.5f1/macOS의 연결된 Editor에서 실행했다. 앱 빌드·Mac 다중 프로세스·iOS는 실행하지 않았다.
+- **배경:** #451에서 Guest 연출 시각을 `LabNetwork.BattlePresentationTime`(`LabGuestBattleClock`)으로 모았지만, HUD·효과음 10곳은 각자 Host 시각을 어림했다.
+  - 대부분은 `serverTime + 최대 1초`였다.
+  - 일시정지 중에도 흐르는 것과 멈추는 것이 섞여 있었다.
+  - 스냅샷 객체가 바뀔 때마다 기준을 다시 잡는 것과 값이 바뀔 때만 잡는 것이 섞여 있었다.
+  - `LabJigwiHud`는 상한이 없었다.
+  - 그래서 늦게 온 스냅샷에서 시계가 뒤로 튀고, 시작 대기 중에 앞서 나갔다.
+- **수정:** 위 10곳의 자체 어림(필드·메서드)을 지우고 `network.BattlePresentationTime`을 읽는다. `LabJigwiHud.ShowStageBlocked`도 같은 시각을 넘긴다.
+  - Host는 `battleClock.Now`를 읽는다.
+  - Guest는 같은 라운드 안에서 0.5초 미만으로는 뒤로 가지 않는다. 외삽은 최대 1초이고, 일시정지·시작 대기에는 멈춘다.
+  - 판정·Host로 보내는 값·와이어·접속 규약(5683/Lab44/Game28)·공유 설정 257개·Scene은 바꾸지 않았다.
+
+| 실행 검사 | 결과 | 시간 |
+| --- | --- | --- |
+| 전체 EditMode | **1857/1857 PASS** | 54.59초 |
+| PlayMode 새 `LabPresentationClockConsumerTests` | **1/1 PASS**(수정 뒤 4회) | 0.78~0.82초 |
+| PlayMode `LabFeverTimeHudTests` 3/3 · `LabCharmBubblesTests` 9/9 · `LabYaguangFlashLookTests` 5/5 · `LabYaguangCountLookTests` 1/1 · `LabFlashShakeRequestTests` 6/6 · `LabBattleBgmStageTests` 3/3 · `LabGourdYokaiTests` 13/13 · `LabComboEffectLookTests` 7/7 · `LabComboProjectileIntegrationTests` 4/4 · `LabJigwiStagePresentationTests` 8/8 · `LabJigwiABPresentationTests` 24/24 · `GameYokaiPresentationTests` 2/2 | **모두 PASS** | — |
+| PlayMode `LabGourdPaintTests` 9/9 · `LabDeveloperSoloIntegrationTests` 14/14 · `GameSceneFlowTests` 21/21 | **모두 PASS** | 12.56 / 19.68 / 229.5초 |
+
+- 각 실행의 skip/inconclusive는 0이다.
+- **새 검사:** Guest(`IsHost` false)의 `LabFeverTimeHud`·`LabCharmHud`가 Host 시각 20에 피버·내 매혹을 같이 켠다.
+  - 조금 늦게 온 스냅샷이 와도 시계가 뒤로 가지 않고 둘 다 켜진 채다.
+  - 일시정지 동안 0.3초 실제 시간이 지나도 `BattlePresentationTime`이 그대로다.
+  - 이 검사는 main의 두 HUD 코드로 바꿔 돌리면 `The late snapshot does not turn fever off`로 실패했고, 변경 코드로 되돌린 뒤 통과했다.
+- **코드 검토 워크플로:** 세 관점 검토와 지적별 반박 검증에서 제품 코드의 결함은 확인되지 않았다. 새 검사에서 확인된 2건을 고쳤다.
+  - 늦은 스냅샷 시각을 측정값 기준으로 바꿨다(느린 프레임에서 0.5초 되감김 허용치를 넘던 문제).
+  - 시각 20 전 단언이 프레임 실행 없이 통과하던 문제를 고쳤다.
+- **남은 검사 공백:** Host 분기와 나머지 8개 소비자는 소비자별 검사가 없다. 각 소비자는 공유 시계를 한 줄로 읽으며, 시계 규칙은 `LabGuestBattleClockTests`·`LabJigwiABPresentationTests`가 검사한다.
+- **미실행:** Guest 실기기에서 늦은 스냅샷·일시정지 때 HUD 숫자와 효과음이 튀지 않는지 확인하지 않았다.
