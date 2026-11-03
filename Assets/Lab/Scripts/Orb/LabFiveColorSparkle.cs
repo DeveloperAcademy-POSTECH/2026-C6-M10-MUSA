@@ -59,6 +59,12 @@ namespace C6Lab
         private readonly System.Collections.Generic.List<MeshRenderer> tinted = new System.Collections.Generic.List<MeshRenderer>();
         // 날아가는 오색구슬의 꼬리 (#469): 다섯 색 그라데이션이 시간에 따라 꼬리를 타고 흘러간다.
         private const float TrailFlowSpeed = 2f, TrailHeadAlpha = .9f, TrailMiddleAlpha = .6f;
+        // 기본 꼬리(원소 없는 공용)는 폭 ≈ 공 반지름 × 0.75, 0.28초라 공 뒤에 가려 거의 안 보인다.
+        // 원소 먹선 꼬리(폭 0.6, 0.42초)와 비슷하게 보이도록 폭과 길이를 늘린다 (#469).
+        private const float TrailWidthScale = 5f, TrailSeconds = .45f;
+        private static readonly AnimationCurve TrailWidthCurve = new AnimationCurve(
+            new Keyframe(0f, 1f), new Keyframe(.55f, .65f), new Keyframe(1f, 0f));
+        private float trailWrittenWidth = -1f;
         private TrailRenderer flightTrail;
         private Gradient trailGradient;
         private readonly GradientColorKey[] trailColors = new GradientColorKey[5];
@@ -277,6 +283,7 @@ namespace C6Lab
         /// <summary>
         /// 날아가는 구슬의 꼬리(TrailRenderer)를 다섯 색 그라데이션으로 칠한다. 머리부터 꼬리 끝까지 다섯 색이 한 번씩 놓이고,
         /// 시간이 지나면 색이 꼬리를 타고 뒤로 흘러간다. 투명도는 머리 쪽이 진하고 끝으로 갈수록 사라진다. 꼬리가 없으면 넘어간다.
+        /// 기본 꼬리는 너무 얇고 짧아 원소 꼬리만큼 보이도록 폭과 길이도 키운다.
         /// </summary>
         public void TintTrail()
         {
@@ -293,6 +300,14 @@ namespace C6Lab
                 }
             }
             if (flightTrail == null) return;
+            // 공이 크기/꼬리를 다시 정하면(던질 때, 예측 보정 때) 그 폭을 기준으로 다시 키운다.
+            if (!Mathf.Approximately(flightTrail.widthMultiplier, trailWrittenWidth))
+            {
+                trailWrittenWidth = flightTrail.widthMultiplier * TrailWidthScale;
+                flightTrail.widthMultiplier = trailWrittenWidth;
+                flightTrail.time = TrailSeconds;
+                flightTrail.widthCurve = TrailWidthCurve;
+            }
             if (trailGradient == null) trailGradient = new Gradient();
             float flow = age * TrailFlowSpeed;
             for (int i = 0; i < trailColors.Length; i++)
