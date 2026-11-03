@@ -96,8 +96,6 @@ namespace C6Lab
         private Canvas canvas;
         private RectTransform layer;
         private float bobPhase;
-        private double seenServerTime = -1d;
-        private float seenAt;
         private ulong wokenPlayer;
         private float wokenAt = float.NegativeInfinity;
         // This screen's own taps on the current charm (#305): shown at once, before the Host's count catches up.
@@ -165,7 +163,7 @@ namespace C6Lab
         {
             if (network == null) return;
             LabSnapshot snapshot = network.Snapshot;
-            Present(snapshot, network.LocalPlayerId, snapshot != null ? ServerNow(snapshot) : 0d,
+            Present(snapshot, network.LocalPlayerId, snapshot != null ? network.BattlePresentationTime : 0d,
                 network.config != null ? network.config.CharmRescueTaps : 0);
         }
 
@@ -448,17 +446,6 @@ namespace C6Lab
             if (side.Woken != null) side.Woken.gameObject.SetActive(false);
             side.CheckAge = -1f;
             if (side.Check != null) side.Check.gameObject.SetActive(false);
-        }
-
-        private double ServerNow(LabSnapshot snapshot)
-        {
-            float realtime = Time.realtimeSinceStartup;
-            if (snapshot.serverTime != seenServerTime)
-            {
-                seenServerTime = snapshot.serverTime;
-                seenAt = realtime;
-            }
-            return snapshot.serverTime + Math.Min(1d, realtime - seenAt);
         }
 
         private bool EnsureLayer()

@@ -283,6 +283,53 @@ namespace C6Lab.Tests
             Assert.That(board.RejectCombinePreview("preview"), Is.False);
         }
 
+        [Test]
+        public void AnAnnouncedGenerationPlaysItsSpawnOnceAndItsApprovedOrbPopsSilently()
+        {
+            var heard = new System.Collections.Generic.List<string>();
+            board.SpawnStarted += heard.Add;
+            Assert.That(board.AnnounceGenerationPreview("draw"), Is.False, "Only a pending generation can be announced.");
+            Assert.That(board.TryCreateGenerationPreview("draw", Vector2.one * .5f), Is.True);
+            Assert.That(board.AnnounceGenerationPreview("draw"), Is.True);
+            Assert.That(board.AnnounceGenerationPreview("draw"), Is.False, "Once per tap.");
+            Assert.That(heard, Is.EqualTo(new[] { "draw" }), "Sound and vibration at the tap (#457).");
+
+            board.RemoveGenerationPreview("draw");
+            board.ResolveGenerationCredit("draw", "approved");
+            board.UpsertOrb("approved", LabOrbKind.Yin, new Vector2(.5f, .5f), playSpawn: true);
+            Assert.That(heard, Is.EqualTo(new[] { "draw" }), "The approved orb does not play the spawn again.");
+            Assert.That(board.TryGetMotion("approved", out _, out _), Is.True, "It still pops onto the board.");
+            board.UpsertOrb("later", LabOrbKind.Yang, new Vector2(.4f, .5f), playSpawn: true);
+            Assert.That(heard, Is.EqualTo(new[] { "draw", "later" }), "Only that one orb was credited.");
+        }
+
+        [Test]
+        public void ARejectedOrClearedGenerationLeavesNoCreditBehind()
+        {
+            var heard = new System.Collections.Generic.List<string>();
+            board.SpawnStarted += heard.Add;
+            Assert.That(board.TryCreateGenerationPreview("rejected", Vector2.one * .5f), Is.True);
+            board.AnnounceGenerationPreview("rejected");
+            board.DropGenerationCredit("rejected");
+            board.ResolveGenerationCredit("rejected", "orb-a");
+            board.UpsertOrb("orb-a", LabOrbKind.Yin, new Vector2(.5f, .5f), playSpawn: true);
+            Assert.That(heard, Is.EqualTo(new[] { "rejected", "orb-a" }), "A dropped credit cannot silence a later orb.");
+
+            Assert.That(board.TryCreateGenerationPreview("cleared", Vector2.one * .5f), Is.True);
+            board.AnnounceGenerationPreview("cleared");
+            board.ResolveGenerationCredit("cleared", "orb-b");
+            board.Clear();
+            board.UpsertOrb("orb-b", LabOrbKind.Yang, new Vector2(.5f, .5f), playSpawn: true);
+            Assert.That(heard, Is.EqualTo(new[] { "rejected", "orb-a", "cleared", "orb-b" }), "Clear drops the credits too.");
+
+            Assert.That(board.TryCreateGenerationPreview("late", Vector2.one * .5f), Is.True);
+            board.AnnounceGenerationPreview("late");
+            board.UpsertOrb("orb-c", LabOrbKind.Yin, new Vector2(.3f, .5f), playSpawn: true);
+            board.ResolveGenerationCredit("late", "orb-c");
+            board.UpsertOrb("orb-d", LabOrbKind.Yin, new Vector2(.6f, .5f), playSpawn: true);
+            Assert.That(heard[heard.Count - 1], Is.EqualTo("orb-d"), "A credit for an orb already shown is not kept.");
+        }
+
         private void AddPair()
         {
             board.UpsertOrb("yin", LabOrbKind.Yin, new Vector2(.4f, .5f));

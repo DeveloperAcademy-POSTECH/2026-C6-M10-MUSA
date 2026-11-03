@@ -56,8 +56,6 @@ namespace C6Lab
         private readonly Image[] puffs = new Image[Puffs.Length];
         private float age = -1f;
         private bool puffing;
-        private double seenServerTime = -1d;
-        private float seenAt;
         private static readonly Vector3[] Corners = new Vector3[4];
 
         /// <summary>The bubble is on screen (#334).</summary>
@@ -92,7 +90,7 @@ namespace C6Lab
         {
             if (network == null) return;
             LabSnapshot snapshot = network.Snapshot;
-            Present(snapshot, snapshot != null ? ServerNow(snapshot) : 0d);
+            Present(snapshot, snapshot != null ? network.BattlePresentationTime : 0d);
         }
 
         /// <summary>이 스냅샷의 이 Host 시각에 맞춰 말풍선을 보여 주거나 감춘다.</summary>
@@ -230,17 +228,6 @@ namespace C6Lab
             }
             else scale = 1f + PulseAmount * Mathf.Sin((since - PopSeconds) * PulseHz * 2f * Mathf.PI);
             bubble.localScale = Vector3.one * scale;
-        }
-
-        private double ServerNow(LabSnapshot snapshot)
-        {
-            float realtime = Time.realtimeSinceStartup;
-            if (snapshot.serverTime != seenServerTime)
-            {
-                seenServerTime = snapshot.serverTime;
-                seenAt = realtime;
-            }
-            return snapshot.serverTime + System.Math.Min(1d, realtime - seenAt);
         }
 
         private bool EnsureLayer()

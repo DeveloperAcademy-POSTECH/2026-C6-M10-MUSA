@@ -17,6 +17,7 @@ namespace C6Lab
         private readonly Dictionary<long, double> actionStartedAt = new Dictionary<long, double>();
         private readonly Dictionary<long, LabProjectile> predictedShots = new Dictionary<long, LabProjectile>();
         private readonly HashSet<long> presentedShots = new HashSet<long>();
+        private readonly LabLocalHitPresentation localHits = new LabLocalHitPresentation();
         private readonly HashSet<string> presentedRemoteShots = new HashSet<string>(StringComparer.Ordinal);
         private readonly Dictionary<ulong, long> boardSequences = new Dictionary<ulong, long>();
         private readonly LabBoardPublisher boardPublisher = new LabBoardPublisher();
@@ -59,7 +60,7 @@ namespace C6Lab
             ClearJigwiFireSurfaces();
             predictedJigwiBurns.Clear();
             foreach (var shot in predictedShots.Values) if (shot != null) Destroy(shot.gameObject);
-            predictedShots.Clear(); presentedShots.Clear(); presentedRemoteShots.Clear();
+            predictedShots.Clear(); presentedShots.Clear(); presentedRemoteShots.Clear(); localHits.Clear();
             pendingBlastReports.Clear();
             boardChunks = null; boardChunkSession = null; boardChunkRound = 0; boardChunkSequence = 0;
             displayedPaintSession = null; displayedPaintCount = -1;
@@ -138,7 +139,11 @@ namespace C6Lab
                     board.TryCreateCombinePreview(packet.provisionalId, packet.firstId, packet.secondId,
                         new Vector2(packet.x, packet.y), new Vector2(packet.vx, packet.vy));
                 else if (packet.type == "generate")
-                    board.TryCreateGenerationPreview(packet.provisionalId, new Vector2(packet.x, packet.y));
+                {
+                    if (board.TryCreateGenerationPreview(packet.provisionalId, new Vector2(packet.x, packet.y))
+                        && GenerationCertain())
+                        board.AnnounceGenerationPreview(packet.provisionalId);
+                }
                 else if (packet.type == "launch")
                 {
                     board.BeginPendingLaunch(packet.firstId);
@@ -148,6 +153,37 @@ namespace C6Lab
                     board.BeginPendingLaunch(packet.firstId);
             }
             FlushBoardActions(now);
+        }
+
+        /// <summary>
+        /// A Guest tap whose approval is certain from what this screen knows (#457): see
+        /// <see cref="LabGenerationPrediction"/>. Called after the request was registered, so it counts itself.
+        /// </summary>
+        private bool GenerationCertain()
+        {
+            if (IsHost || latest == null || config == null) return false;
+            LabPlayerState me = (latest.players ?? Array.Empty<LabPlayerState>()).FirstOrDefault(player => player != null
+                && player.id == LocalPlayerId);
+            if (me == null) return false;
+            // actionRequests keeps answered requests for the round; count only those still waiting for a receipt.
+            int pending = 0, opening = 0;
+            foreach (var entry in actionRequests)
+            {
+                if (!localActions.TryGetPending(entry.Key, out var info) || info.state == LabPendingActionState.Accepted
+                    || info.state == LabPendingActionState.Rejected) continue;
+                if (entry.Value.type == "generate") pending++;
+                else if (entry.Value.type == "use") opening++; // An opened bomb or box becomes two orbs.
+            }
+            int stored = (latest.orbs ?? Array.Empty<LabOrbState>()).Count(orb => orb != null && orb.owner == LocalPlayerId
+                && !orb.inFlight && !orb.jigwiSupply);
+            LabJigwiState jigwi = latest.JigwiFor(LocalPlayerId);
+            // A B mission (warning included) can end in a failure that empties stamina; a legacy fire can overheat
+            // the player before the Host reaches this tap and burn it.
+            bool jigwiRisk = latest.jigwiAB != null && latest.jigwiAB.enabled && latest.jigwiAB.Active(latest.serverTime) != null
+                || jigwi != null && (jigwi.Overheated(latest.serverTime) || jigwi.FireActive(latest.serverTime));
+            int reserve = LabGenerationPrediction.ArrivalReserve(config.FoxFireCountMax, config.YaguangFiveColorOrbCount, opening);
+            return LabGenerationPrediction.Certain(me.stamina, config.GenerateCost, pending, stored, config.OrbStorageLimit,
+                reserve, latest.phase == LabPhase.Playing, latest.paused || GameStartHeld, jigwiRisk);
         }
 
         private void RejectBoardActionLocally(LabNetworkPacket packet, string reason)
@@ -393,6 +429,12 @@ namespace C6Lab
                     RollBackAction(receipt.requestId);
                 }
             }
+            if (board != null && request.type == "generate")
+            {
+                if (!purged && receipt.accepted && !receipt.consumedWithoutOutput)
+                    board.ResolveGenerationCredit(request.provisionalId, receipt.outputId);
+                else board.DropGenerationCredit(request.provisionalId);
+            }
             NotifyLocalStaminaSpent(request, receipt, purged);
             if (!purged && receipt.accepted && !receipt.consumedWithoutOutput && request.type == "combine") LocalCombined?.Invoke();
             predictedJigwiBurns.Remove(receipt.requestId);
@@ -418,8 +460,13 @@ namespace C6Lab
             if (!actionRequests.TryGetValue(requestId, out var request)) return;
             if (predictedShots.TryGetValue(requestId, out var shot) && shot != null) Destroy(shot.gameObject);
             predictedShots.Remove(requestId);
+            if (localHits.TryTakeRequest(requestId, out var presented)) RevertPresentedHit(presented);
             if (board == null) return;
-            if (request.type == "generate") board.RemoveGenerationPreview(request.provisionalId);
+            if (request.type == "generate")
+            {
+                board.RemoveGenerationPreview(request.provisionalId);
+                board.DropGenerationCredit(request.provisionalId);
+            }
             else if (request.type == "combine")
             {
                 if (!board.RejectCombinePreview(request.provisionalId))
@@ -522,6 +569,7 @@ namespace C6Lab
             float scale = player.comboPenaltyUntil > latest.serverTime ? config.ComboPenaltySizeScale
                 : player.comboRewardUntil > latest.serverTime ? config.ComboRewardSizeScale : 1f;
             if (!config.GourdColorComboEnabled) scale = 1f;
+            float comboScale = scale;
             bool rewarded = JigwiRewardAt(latest.serverTime);
             if (rewarded) scale *= config.JigwiABRewardSizeScale;
             visual.SetRadiusScale(scale);
@@ -531,9 +579,104 @@ namespace C6Lab
             visual.SetMissSurface(battleFloor);
             SyncJigwiFireSurfaces();
             visual.SetFireSurfaces(JigwiFireSurfacesFor(LocalPlayerId));
-            visual.LaunchVisual(velocity, config, target);
+            long requestId = request.requestId;
+            bool supply = orb != null && (orb.jigwiSupply || !string.IsNullOrEmpty(orb.jigwiABSupplyEventId));
+            int attack = LabModel.AttackValueFor(orb?.kind ?? LabOrbKind.Combined, orb?.relayStage ?? 0, config.Damage,
+                config.RelayDoubleMultiplier, config.RelayMaxMultiplier);
+            localHits.Register(requestId, id);
+            visual.LaunchVisual(velocity, config, target,
+                contact => OnPredictedShotContact(requestId, contact, element, attack, comboScale, fiveColor, supply));
             predictedShots[request.requestId] = visual;
             presentedShots.Add(request.requestId);
+        }
+
+        /// <summary>
+        /// The thrower's own visual copy reached a surface (#459). A gourd contact plays the kick, burst, hit sound and
+        /// vibration now, from the same formulas the Host uses; a floor contact plays the miss sound. The Host's
+        /// targetImpact/targetMiss later corrects or takes it back. Fire, jigwi supply orbs and moments when the Host
+        /// may block or burn the shot (B curtain, stage fire, legacy fire) wait for the Host as before.
+        /// </summary>
+        private void OnPredictedShotContact(long requestId, LabProjectileResult contact, LabOrbElement element,
+            int attackValue, float comboScale, bool fiveColor, bool supply)
+        {
+            if (IsHost || target == null || supply || !PredictedContactAllowed()) return;
+            if (contact.Kind == LabProjectileHitKind.Monster)
+            {
+                if (!localHits.CanPresent(requestId)) return;
+                LabHangingTarget hanging = target.GetComponent<LabHangingTarget>();
+                LabHangingTarget.AppliedImpact applied = default;
+                if (hanging != null) hanging.ApplyPredictedImpact(contact.HitPoint, contact.ImpactVelocity, out applied);
+                localHits.TryPresent(requestId, new LabLocalHitPresentation.Presented(
+                    LabLocalHitPresentation.Outcome.Hit, applied, BattlePresentationTime));
+                // A header frame captured before this impact must not pull the swing back (#433 hook).
+                HoldTargetPoseForPredictedImpact(Time.realtimeSinceStartupAsDouble
+                    + Math.Max(.3d, 2d * LastActionRoundTripMilliseconds / 1000d));
+                Transform hitbox = target.Hitbox != null ? target.Hitbox.transform : target.transform;
+                Vector3 local = hitbox.InverseTransformPoint(contact.HitPoint);
+                impactFeedback?.PlayHit(target, local, element, attackValue, contact.ImpactVelocity, false);
+                LastLocalHitOffset = LabThrowSound.HitOffset(local, hitbox.InverseTransformDirection(contact.ImpactVelocity));
+                LastLocalHitSmall = LabThrowSound.IsSmallThrow(comboScale);
+                LastLocalHitBig = LabThrowSound.IsBigThrow(comboScale);
+                LastLocalHitFiveColor = fiveColor;
+                LocalThrowHit?.Invoke(attackValue);
+            }
+            else if (contact.Kind == LabProjectileHitKind.Miss
+                && localHits.TryPresent(requestId, new LabLocalHitPresentation.Presented(
+                    LabLocalHitPresentation.Outcome.Miss, default, BattlePresentationTime)))
+                LocalThrowMissed?.Invoke();
+        }
+
+        /// <summary>
+        /// Whether a contact can be presented before the Host: nothing about it may block, burn or consume the shot.
+        /// The Host meets the shot later than this screen, so a B curtain or stage fire that starts within
+        /// <see cref="PredictedContactMarginSeconds"/> of the current battle time also waits for the Host.
+        /// </summary>
+        private bool PredictedContactAllowed()
+        {
+            if (latest == null || latest.phase != LabPhase.Playing || latest.paused || GameStartHeld) return false;
+            double now = Math.Max(latest.serverTime, BattlePresentationTime);
+            double soon = now + PredictedContactMarginSeconds;
+            if (latest.jigwiAB != null && latest.jigwiAB.enabled && (latest.jigwiAB.rounds ?? Array.Empty<LabJigwiABRound>())
+                .Any(round => round != null && round.kind == LabJigwiABKind.GroupFire && round.resolvedAt < 0d
+                    && round.warningAt <= soon && now < round.endsAt))
+                return false;
+            if (latest.jigwiStage != null && latest.jigwiStage.enabled && (latest.jigwiStage.groups ?? Array.Empty<LabJigwiStageGroup>())
+                .Any(group => group != null && group.affectedPlayer == LocalPlayerId && group.resolvedAt < 0d
+                    && group.warningAt <= soon && now < group.expiresAt))
+                return false;
+            LabJigwiState jigwi = latest.JigwiFor(LocalPlayerId);
+            return jigwi == null || !jigwi.FireActive(now) && !jigwi.FireActive(soon) && !jigwi.Overheated(soon);
+        }
+
+        private const double PredictedContactMarginSeconds = .75d;
+
+        /// <summary>
+        /// A presented hit the Host has not answered by then is taken back; the Host sends nothing for a voided contact.
+        /// Measured on the battle presentation clock, which stands still while paused, start-held or stalled.
+        /// </summary>
+        private double PresentedHitTimeoutSeconds => Math.Max(1.5d, 4d * LastActionRoundTripMilliseconds / 1000d);
+        private readonly List<LabLocalHitPresentation.Presented> expiredHits = new List<LabLocalHitPresentation.Presented>();
+
+        private void ExpirePresentedHits(double now)
+        {
+            if (localHits.Count == 0) return;
+            expiredHits.Clear();
+            localHits.TakeExpiredHits(now, PresentedHitTimeoutSeconds, expiredHits);
+            foreach (LabLocalHitPresentation.Presented presented in expiredHits) RevertPresentedHit(presented);
+        }
+
+        /// <summary>The Host decided a presented hit missed, voided it, or its launch was rolled back: take the kick and spin back.</summary>
+        private void RevertPresentedHit(LabLocalHitPresentation.Presented presented)
+        {
+            if (presented.Outcome != LabLocalHitPresentation.Outcome.Hit || target == null) return;
+            target.GetComponent<LabHangingTarget>()?.UndoPredictedImpact(presented.Applied);
+            ReleasePresentedHold();
+        }
+
+        /// <summary>The swing hold ends once no presented hit is still waiting for the Host.</summary>
+        private void ReleasePresentedHold()
+        {
+            if (localHits.PendingHits == 0) ReleaseTargetPoseHold();
         }
 
         private bool HasPresentedProjectile(LabNetworkPacket packet)
@@ -542,6 +685,7 @@ namespace C6Lab
                 || jigwiMissionPurge.Cancels(packet.modelRevision) || RejectJigwiSupplyProjectile(packet)) return true;
             if (packet.owner == LocalPlayerId && presentedShots.Contains(packet.requestId))
             {
+                localHits.Bind(packet.requestId, packet.firstId);
                 if (predictedShots.TryGetValue(packet.requestId, out var visual) && visual != null)
                 {
                     visual.ReconcileVisual((LabOrbElement)packet.element,

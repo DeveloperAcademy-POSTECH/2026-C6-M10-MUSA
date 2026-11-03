@@ -63,8 +63,6 @@ namespace C6Lab
         private bool gumihoBgm, gumihoFever, yaguangBgm;
         private float feverBlend; // 0 = 전투 BGM, 1 = 피버 곡
         private float toneSemitones; // 지금 전투 BGM 높이 (반음, 콤보 BIG/SMALL)
-        private double seenServerTime = -1d;
-        private float seenAt;
 
         public bool IsPlaying => source != null && source.isPlaying;
         /// <summary>피버 곡을 틀고 있는지 (#343)</summary>
@@ -157,22 +155,10 @@ namespace C6Lab
             if (network == null) return -1d;
             double yaguang = network.YaguangFeverElapsed(snapshot);
             if (yaguang >= 0d) return yaguang;
-            double now = ServerNow(snapshot);
+            double now = network.BattlePresentationTime;
             if (!snapshot.FeverTimeOn(now)) return -1d;
             gumiho = true;
             return now - snapshot.feverTimeAt;
-        }
-
-        // 스냅샷 사이에도 Host 시각을 이어서 어림한다 (LabFeverTimeHud와 같은 방식, 최대 1초).
-        private double ServerNow(LabSnapshot snapshot)
-        {
-            float realtime = Time.realtimeSinceStartup;
-            if (snapshot.serverTime != seenServerTime)
-            {
-                seenServerTime = snapshot.serverTime;
-                seenAt = realtime;
-            }
-            return snapshot.serverTime + System.Math.Min(1d, realtime - seenAt);
         }
 
         /// <summary>피버 시작 추임새 "좋다"를 한 번 낸다 (콤보 성공과 같은 파일).</summary>
@@ -256,7 +242,7 @@ namespace C6Lab
                     if (!source.isPlaying) source.Play();
                 }
                 DriveFever(snapshot);
-                if (!snapshot.paused) DriveTone(snapshot, ServerNow(snapshot), Time.unscaledDeltaTime);
+                if (!snapshot.paused) DriveTone(snapshot, network.BattlePresentationTime, Time.unscaledDeltaTime);
                 return;
             }
 

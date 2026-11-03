@@ -329,7 +329,8 @@ namespace C6Lab
                 return;
             }
             Bounds gourd = hitbox.bounds;
-            Vector3 shoulder = gourd.center + Vector3.up * (gourd.extents.y * .8f)
+            // The bubble follows the drawn gourd, which is interpolated between physics steps (#454).
+            Vector3 shoulder = LabHangingTarget.DrawnPoint(hitbox, gourd.center) + Vector3.up * (gourd.extents.y * .8f)
                 + battleCamera.transform.right * (Mathf.Max(gourd.extents.x, gourd.extents.z) * .55f);
             Vector3 screen = battleCamera.WorldToScreenPoint(shoulder);
             bool visible = screen.z > 0f && battleCamera.pixelRect.Contains(new Vector2(screen.x, screen.y));

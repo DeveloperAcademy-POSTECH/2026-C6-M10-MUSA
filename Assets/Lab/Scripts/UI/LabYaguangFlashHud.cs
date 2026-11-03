@@ -124,10 +124,6 @@ namespace C6Lab
         private string seenSession;
         private uint seenRound;
         private uint seenFlashCount;
-        private double seenServerTime = -1d;
-        private string clockSession;
-        private uint clockRound;
-        private float seenAt;
         private double eyesShownFor = -1d;
 
         /// <summary>예고 중 눈이 빛나기 시작하는 지점과 다 빛나는 지점 (예고 길이 비율). 그 전에는 보통 눈이다.</summary>
@@ -185,7 +181,7 @@ namespace C6Lab
                 Hide();
                 return;
             }
-            double now = ServerNow(snapshot);
+            double now = network.BattlePresentationTime;
             ulong me = network.LocalPlayerId;
             // #329: 흔들어 풀기가 켜져 있으면 섬광은 흔들어야만 풀린다(시간으로 풀리지 않음).
             float glare = LabYaguangFlash.GlareAmount(snapshot, now, me, config.YaguangFlashGlareLimitSeconds,
@@ -491,21 +487,6 @@ namespace C6Lab
             LabGourdAlert alert = GetComponent<LabGourdAlert>();
             if (alert != null && alert.ShowingEyes) alert.Hide();
             eyesShownFor = -1d;
-        }
-
-        private double ServerNow(LabSnapshot snapshot)
-        {
-            float realtime = Time.realtimeSinceStartup;
-            if (snapshot.paused || snapshot.sessionId != clockSession || snapshot.round != clockRound
-                || snapshot.serverTime != seenServerTime)
-            {
-                clockSession = snapshot.sessionId;
-                clockRound = snapshot.round;
-                seenServerTime = snapshot.serverTime;
-                seenAt = realtime;
-            }
-            return snapshot.paused ? snapshot.serverTime
-                : snapshot.serverTime + System.Math.Min(1d, realtime - seenAt);
         }
 
         private bool EnsureLayer()

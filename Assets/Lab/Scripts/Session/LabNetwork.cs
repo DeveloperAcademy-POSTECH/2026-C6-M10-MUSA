@@ -251,13 +251,14 @@ namespace C6Lab
         // 5681: #417 board frames, action receipts and paint frames accept the six players of a 3:3 territory room.
         // 5682: #428 lean packet envelope (bodies in a JSON payload string, no default nested objects); immediate
         //       board publishes skip peers whose delta is empty.
-        internal const ushort LabProtocolVersion = 5682;
+        // 5683: #461 paint frame bodies may be deflate-compressed (LabPaintFrame.encoding).
+        internal const ushort LabProtocolVersion = 5683;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Double-tap a blue fox orb to clear it, and keep your Yin and Yang away.";
         /// <summary>More fox orbs than one fox fire ever drops; a longer list is ignored (#251).</summary>
         private const int MaximumFoxFireOrbs = 10;
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/43");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/44");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;
@@ -1371,6 +1372,7 @@ namespace C6Lab
                 FlushBoardActions(now);
             }
             FlushBulkPackets();
+            if (!IsHost && latest != null) ExpirePresentedHits(BattlePresentationTime);
             if (!IsHost && (pendingPaintSnapshot != null || PartialPaintStalled(now))
                 && now >= nextPaintRequestAt) RequestPaintCheckpoint();
             // Command-line smoke mode is intentionally separate from ordinary UI play.
@@ -2396,9 +2398,22 @@ namespace C6Lab
                         new Vector3(packet.x, packet.y, packet.z),
                         new Vector3(packet.wx, packet.wy, packet.wz), packet.spinImpulse))
                     {
+                        Vector3 hostVelocity = new Vector3(packet.wx, packet.wy, packet.wz);
+                        LabHangingTarget hanging = target.GetComponent<LabHangingTarget>();
+                        // My own hit may already have been presented on contact (#459): correct it instead of replaying.
+                        LabLocalHitPresentation.Presented early = default;
+                        bool presentedHit = packet.owner == LocalPlayerId && localHits.TryTake(packet.firstId, out early)
+                            && early.Outcome == LabLocalHitPresentation.Outcome.Hit;
+                        // Presented, then taken back by time before this late verdict: kick again, but no second sound.
+                        bool presentedBefore = presentedHit
+                            || packet.owner == LocalPlayerId && localHits.TryTakeExpired(packet.firstId);
+                        if (presentedHit)
+                        {
+                            hanging?.CorrectPredictedImpact(early.Applied, hostVelocity, packet.spinImpulse);
+                            ReleasePresentedHold();
+                        }
                         // Cell state arrives separately from feedback; never rerun a local Stamp.
-                        target.GetComponent<LabHangingTarget>()?.ApplyRemoteImpact(
-                            new Vector3(packet.wx, packet.wy, packet.wz), packet.spinImpulse);
+                        else hanging?.ApplyRemoteImpact(hostVelocity, packet.spinImpulse);
                         if (packet.paintBlocked)
                         {
                             jigwiStagePresentation?.PlayBlocked(new Vector3(packet.x, packet.y, packet.z));
@@ -2407,13 +2422,14 @@ namespace C6Lab
                         else
                         {
                             target.NotifyApprovedHit(new Vector3(packet.x, packet.y, packet.z), (LabOrbElement)packet.element);
-                            impactFeedback?.PlayHit(target, new Vector3(packet.x, packet.y, packet.z),
-                                (LabOrbElement)packet.element, packet.damage,
-                                new Vector3(packet.wx, packet.wy, packet.wz), false);
+                            if (!presentedBefore)
+                                impactFeedback?.PlayHit(target, new Vector3(packet.x, packet.y, packet.z),
+                                    (LabOrbElement)packet.element, packet.damage,
+                                    new Vector3(packet.wx, packet.wy, packet.wz), false);
                             if (packet.fiveColor) PresentFiveColorHit(new Vector3(packet.x, packet.y, packet.z), packet.owner);
                         }
                         // 같은 타격은 위에서 한 번만 받아들이므로 소리·햅틱도 한 번만 난다.
-                        if (!packet.paintBlocked && packet.owner == LocalPlayerId)
+                        if (!packet.paintBlocked && packet.owner == LocalPlayerId && !presentedBefore)
                         {
                             Transform localHitbox = target.Hitbox != null ? target.Hitbox.transform : target.transform;
                             LastLocalHitOffset = LabThrowSound.HitOffset(new Vector3(packet.x, packet.y, packet.z),
@@ -2430,6 +2446,11 @@ namespace C6Lab
                         && packet.firstId != lastMissNoticeId)
                     {
                         lastMissNoticeId = packet.firstId;
+                        // A miss already presented on contact stays; a presented hit is taken back (#459).
+                        localHits.TryTakeExpired(packet.firstId);
+                        bool presented = localHits.TryTake(packet.firstId, out var early);
+                        if (presented && early.Outcome == LabLocalHitPresentation.Outcome.Miss) break;
+                        if (presented) RevertPresentedHit(early);
                         LocalThrowMissed?.Invoke();
                     }
                     break;
