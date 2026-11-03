@@ -171,6 +171,70 @@ namespace C6Lab.Tests
             Assert.That(seen.Count, Is.GreaterThan(1), "Time.time − Time.fixedTime moves between fixed steps in this Editor.");
         }
 
+        [Test]
+        public void CorrectingAPresentedImpactEqualsTheHostImpactAndUndoingRemovesItEvenWhenClamped()
+        {
+            LabTarget predicted = LabTarget.CreateCylinder(null, Vector3.zero, .6f, 2.7f); owned.Add(predicted.gameObject);
+            LabTarget host = LabTarget.CreateCylinder(null, Vector3.right * 20f, .6f, 2.7f); owned.Add(host.gameObject);
+            LabHangingTarget a = predicted.gameObject.AddComponent<LabHangingTarget>();
+            LabHangingTarget b = host.gameObject.AddComponent<LabHangingTarget>();
+            Vector3 offset = Vector3.right * .4f; // Off-axis, so the impact also spins the gourd.
+            Vector3 guess = new Vector3(1f, 0f, -4f), actual = new Vector3(2f, .5f, -5f);
+            float predictedSpin = a.ApplyPredictedImpact(predicted.Hitbox.bounds.center + offset, guess, out var applied);
+            Assert.That(applied.Yaw, Is.EqualTo(predictedSpin).Within(1e-3f));
+            Assert.That(Mathf.Abs(applied.Yaw), Is.GreaterThan(.1f), "The test needs a real spin.");
+            float hostSpin = b.ApplyHostImpact(host.Hitbox.bounds.center + offset, actual);
+            a.CorrectPredictedImpact(applied, actual, hostSpin);
+            Assert.That(Vector2.Distance(SwingVelocity(a), SwingVelocity(b)), Is.LessThan(1e-3f), "#459: the Host's impact replaces the guess.");
+            Assert.That(a.VerticalVelocity, Is.EqualTo(b.VerticalVelocity).Within(1e-4f));
+            Assert.That(a.YawSpeedDegreesPerSecond, Is.EqualTo(b.YawSpeedDegreesPerSecond).Within(1e-3f));
+
+            // Near the swing limit the presented kick is clamped; undoing removes exactly what it added.
+            a.ResetSwing();
+            for (int i = 0; i < 6; i++) a.Kick(new Vector3(0f, 0f, -30f));
+            Vector2 before = SwingVelocity(a); float bounceBefore = a.VerticalVelocity, yawBefore = a.YawSpeedDegreesPerSecond;
+            a.ApplyPredictedImpact(predicted.Hitbox.bounds.center + offset, new Vector3(0f, 0f, -30f), out var clamped);
+            a.UndoPredictedImpact(clamped);
+            Assert.That(Vector2.Distance(SwingVelocity(a), before), Is.LessThan(1e-3f), "A Host miss takes the presented impact back out.");
+            Assert.That(a.VerticalVelocity, Is.EqualTo(bounceBefore).Within(1e-4f));
+            Assert.That(a.YawSpeedDegreesPerSecond, Is.EqualTo(yawBefore).Within(1e-3f));
+        }
+
+        [UnityTest]
+        public IEnumerator ALateVerdictTakesOutWhatThePresentedImpactHasBecomeNotACounterKick()
+        {
+            LabTarget predicted = LabTarget.CreateCylinder(null, Vector3.zero, .6f, 2.7f); owned.Add(predicted.gameObject);
+            LabTarget untouched = LabTarget.CreateCylinder(null, Vector3.right * 20f, .6f, 2.7f); owned.Add(untouched.gameObject);
+            LabTarget host = LabTarget.CreateCylinder(null, Vector3.right * 40f, .6f, 2.7f); owned.Add(host.gameObject);
+            LabHangingTarget a = predicted.gameObject.AddComponent<LabHangingTarget>();
+            LabHangingTarget quiet = untouched.gameObject.AddComponent<LabHangingTarget>();
+            LabHangingTarget b = host.gameObject.AddComponent<LabHangingTarget>();
+            yield return new WaitForFixedUpdate();
+            Vector3 offset = Vector3.right * .4f, guess = new Vector3(1f, 0f, -6f), actual = new Vector3(2f, .5f, -5f);
+            a.ApplyPredictedImpact(predicted.Hitbox.bounds.center + offset, guess, out var applied);
+            float hostSpin = b.ApplyHostImpact(host.Hitbox.bounds.center + offset, actual);
+            for (int i = 0; i < 40; i++) yield return new WaitForFixedUpdate(); // About 0.8 s of swinging.
+
+            // Correcting late matches the gourd the Host's impact alone would have moved.
+            a.CorrectPredictedImpact(applied, actual, hostSpin);
+            Assert.That(Vector2.Distance(a.SwingAngles, b.SwingAngles), Is.LessThan(.6f), "Swing angle follows the Host's impact.");
+            Assert.That(Vector2.Distance(SwingVelocity(a), SwingVelocity(b)), Is.LessThan(2f));
+            Assert.That(a.YawSpeedDegreesPerSecond, Is.EqualTo(b.YawSpeedDegreesPerSecond).Within(Mathf.Abs(hostSpin) * .05f + .5f));
+
+            // Undoing late returns to the gourd nothing hit, not a reversed swing.
+            LabHangingTarget.AppliedImpact second;
+            a.ApplyPredictedImpact(predicted.Hitbox.bounds.center + offset, guess, out second);
+            float swingAfterKick = SwingVelocity(a).magnitude;
+            for (int i = 0; i < 40; i++) yield return new WaitForFixedUpdate();
+            a.UndoPredictedImpact(second);
+            Vector2 left = SwingVelocity(a) - SwingVelocity(b);
+            Assert.That(left.magnitude, Is.LessThan(swingAfterKick * .1f + 1f), "Only the Host's motion is left after the undo.");
+            Assert.That(quiet.SwingAngles.magnitude, Is.LessThan(.001f), "The untouched gourd is the reference for rest.");
+        }
+
+        private static Vector2 SwingVelocity(LabHangingTarget hanging)
+            => (Vector2)typeof(LabHangingTarget).GetField("velocity", Private).GetValue(hanging);
+
         private LabTarget CreateMovingTarget(out LabHangingTarget hanging)
         {
             LabTarget target = LabTarget.CreateCylinder(null, Vector3.zero, .6f, 2.7f);

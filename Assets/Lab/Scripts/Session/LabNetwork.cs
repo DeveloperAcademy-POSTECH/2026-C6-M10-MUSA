@@ -1371,6 +1371,7 @@ namespace C6Lab
                 FlushBoardActions(now);
             }
             FlushBulkPackets();
+            if (!IsHost && latest != null) ExpirePresentedHits(BattlePresentationTime);
             if (!IsHost && (pendingPaintSnapshot != null || PartialPaintStalled(now))
                 && now >= nextPaintRequestAt) RequestPaintCheckpoint();
             // Command-line smoke mode is intentionally separate from ordinary UI play.
@@ -2396,9 +2397,22 @@ namespace C6Lab
                         new Vector3(packet.x, packet.y, packet.z),
                         new Vector3(packet.wx, packet.wy, packet.wz), packet.spinImpulse))
                     {
+                        Vector3 hostVelocity = new Vector3(packet.wx, packet.wy, packet.wz);
+                        LabHangingTarget hanging = target.GetComponent<LabHangingTarget>();
+                        // My own hit may already have been presented on contact (#459): correct it instead of replaying.
+                        LabLocalHitPresentation.Presented early = default;
+                        bool presentedHit = packet.owner == LocalPlayerId && localHits.TryTake(packet.firstId, out early)
+                            && early.Outcome == LabLocalHitPresentation.Outcome.Hit;
+                        // Presented, then taken back by time before this late verdict: kick again, but no second sound.
+                        bool presentedBefore = presentedHit
+                            || packet.owner == LocalPlayerId && localHits.TryTakeExpired(packet.firstId);
+                        if (presentedHit)
+                        {
+                            hanging?.CorrectPredictedImpact(early.Applied, hostVelocity, packet.spinImpulse);
+                            ReleasePresentedHold();
+                        }
                         // Cell state arrives separately from feedback; never rerun a local Stamp.
-                        target.GetComponent<LabHangingTarget>()?.ApplyRemoteImpact(
-                            new Vector3(packet.wx, packet.wy, packet.wz), packet.spinImpulse);
+                        else hanging?.ApplyRemoteImpact(hostVelocity, packet.spinImpulse);
                         if (packet.paintBlocked)
                         {
                             jigwiStagePresentation?.PlayBlocked(new Vector3(packet.x, packet.y, packet.z));
@@ -2407,13 +2421,14 @@ namespace C6Lab
                         else
                         {
                             target.NotifyApprovedHit(new Vector3(packet.x, packet.y, packet.z), (LabOrbElement)packet.element);
-                            impactFeedback?.PlayHit(target, new Vector3(packet.x, packet.y, packet.z),
-                                (LabOrbElement)packet.element, packet.damage,
-                                new Vector3(packet.wx, packet.wy, packet.wz), false);
+                            if (!presentedBefore)
+                                impactFeedback?.PlayHit(target, new Vector3(packet.x, packet.y, packet.z),
+                                    (LabOrbElement)packet.element, packet.damage,
+                                    new Vector3(packet.wx, packet.wy, packet.wz), false);
                             if (packet.fiveColor) PresentFiveColorHit(new Vector3(packet.x, packet.y, packet.z), packet.owner);
                         }
                         // 같은 타격은 위에서 한 번만 받아들이므로 소리·햅틱도 한 번만 난다.
-                        if (!packet.paintBlocked && packet.owner == LocalPlayerId)
+                        if (!packet.paintBlocked && packet.owner == LocalPlayerId && !presentedBefore)
                         {
                             Transform localHitbox = target.Hitbox != null ? target.Hitbox.transform : target.transform;
                             LastLocalHitOffset = LabThrowSound.HitOffset(new Vector3(packet.x, packet.y, packet.z),
@@ -2430,6 +2445,11 @@ namespace C6Lab
                         && packet.firstId != lastMissNoticeId)
                     {
                         lastMissNoticeId = packet.firstId;
+                        // A miss already presented on contact stays; a presented hit is taken back (#459).
+                        localHits.TryTakeExpired(packet.firstId);
+                        bool presented = localHits.TryTake(packet.firstId, out var early);
+                        if (presented && early.Outcome == LabLocalHitPresentation.Outcome.Miss) break;
+                        if (presented) RevertPresentedHit(early);
                         LocalThrowMissed?.Invoke();
                     }
                     break;

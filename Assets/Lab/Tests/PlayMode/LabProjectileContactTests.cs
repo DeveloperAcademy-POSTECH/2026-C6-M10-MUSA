@@ -215,6 +215,25 @@ namespace C6Lab.Tests
             yield return AssertNoFurtherReceipts(receipt);
         }
 
+        [UnityTest]
+        public IEnumerator AVisualCopyReportsWhatItTouchedOnceAndNeverResolvesTheHit()
+        {
+            var hit = new Receipt(); var miss = new Receipt();
+            LabProjectile centred = LabProjectile.Create(Center + new Vector3(0f, 0f, 3f), config, fixture.transform);
+            centred.SetMissSurface(backstop);
+            Assert.That(centred.LaunchVisual(Vector3.forward * -12f, config, target, hit.Receive), Is.True);
+            LabProjectile wide = LabProjectile.Create(Center + new Vector3(3f, 0f, 3f), config, fixture.transform);
+            wide.SetMissSurface(backstop);
+            Assert.That(wide.LaunchVisual(Vector3.forward * -12f, config, target, miss.Receive), Is.True);
+            yield return Await(hit, miss);
+            Assert.That(hit.Result.Kind, Is.EqualTo(LabProjectileHitKind.Monster), "The thrower's screen hears the gourd contact (#459).");
+            Assert.That(hit.Result.ProjectileId, Is.Null, "A visual copy carries no Host identity.");
+            Assert.That(Vector3.Distance(hit.Result.HitPoint, target.Hitbox.ClosestPoint(hit.Result.HitPoint)), Is.LessThan(.05f));
+            Assert.That(hit.Result.ImpactVelocity.z, Is.LessThan(0f));
+            Assert.That(miss.Result.Kind, Is.EqualTo(LabProjectileHitKind.Miss));
+            yield return AssertNoFurtherReceipts(hit, miss);
+        }
+
         private LabProjectile Shot(string id, float x, float z, float blastScale, float comboScale,
             float velocityZ, Receipt receipt, Collider missSurface = null)
         {
