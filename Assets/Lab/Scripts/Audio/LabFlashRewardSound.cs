@@ -9,7 +9,7 @@ namespace C6Lab
     ///   (LabYaguangFlashHud.ShakeCount). 눈부심이 먼저 풀려도 이어서 끝까지 흔들어야 난다.
     ///   다음 섬광·방해 종료·라운드 종료로 풀릴 때는 나지 않는다.
     /// - 오색구슬 피격: 내가 던진 오색구슬(#329)이 박에 맞았을 때, 던진 사람 기기에서만 (LabNetwork.LocalFiveColorHit, 진동과 같은 때).
-    ///   #395에서 국립국악원 징으로 바꿨고, 여음이 길어 앞 징이 울리는 중에 또 맞으면 끊고 새로 친다.
+    ///   #395에서 국립국악원 징으로, #464에서 25현 가야금 가락 두 개로 바꿨다. 앞 소리가 울리는 중에 또 맞으면 끊고 새로 친다.
     /// 소리 파일은 Resources/Audio/FlashClear(여러 개면 무작위), Resources/Audio/FiveColorHit(여러 개면 이름 순서대로
     /// 번갈아) 폴더의 파일을 쓰고, 없으면 조용히 넘어간다. 크기는 volume × 일시정지 메뉴 효과음 설정.
     /// </summary>
@@ -26,7 +26,7 @@ namespace C6Lab
 
         private AudioClip[] flashClearClips, fiveColorHitClips;
         private AudioSource source;
-        // 오색구슬 명중 징 (#395): 여음이 길어서 따로 둔다. 다 울리기 전에 또 맞으면 앞 소리를 끊고 새로 친다.
+        // 오색구슬 명중 소리 (#395, #464 가야금): 여음이 길어서 따로 둔다. 다 울리기 전에 또 맞으면 앞 소리를 끊고 새로 친다.
         private AudioSource hitSource;
         private LabNetwork network;
         private int fiveColorHitNext;
@@ -101,7 +101,7 @@ namespace C6Lab
 
         /// <summary>
         /// 내가 던진 오색구슬이 박에 맞았다. 소리를 냈으면 true. 소리가 여러 개면 이름 순서대로 번갈아 낸다.
-        /// 징(#395)이 다 울리기 전에 또 맞으면 앞 소리를 끊고 새 소리를 처음부터 낸다.
+        /// 앞 소리가 다 울리기 전에 또 맞으면 앞 소리를 끊고 새 소리를 처음부터 낸다.
         /// </summary>
         public bool OnFiveColorHit()
         {
@@ -110,7 +110,7 @@ namespace C6Lab
             int index = count > 0 ? fiveColorHitNext % count : 0;
             fiveColorHitNext = count > 0 ? (index + 1) % count : 0;
             if (hitSource == null) return false;
-            // 소리 시험 (#464): 시험 소리를 골랐으면 징 대신 그 소리를 낸다.
+            // 소리 시험 (#464): 시험 소리를 골랐으면 기본 소리 대신 그 소리를 낸다.
             AudioClip test = LabFiveColorHitSoundChoice.NextTestClip();
             if (test != null)
             {
@@ -122,7 +122,7 @@ namespace C6Lab
                 return true;
             }
             if (count == 0) return false;
-            // 앞 징이 아직 울려도 끊고 처음부터 새로 친다 (#395).
+            // 앞 소리가 아직 울려도 끊고 처음부터 새로 친다 (#395).
             hitSource.Stop();
             hitSource.clip = fiveColorHitClips[index];
             hitSource.volume = fiveColorHitVolume * LabAudioSettings.SfxVolume;

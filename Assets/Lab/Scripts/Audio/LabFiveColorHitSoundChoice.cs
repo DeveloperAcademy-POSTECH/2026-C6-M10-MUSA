@@ -6,15 +6,15 @@ namespace C6Lab
     /// 오색구슬 명중 / 콤보 BIG 큰 공 명중 소리와 오색구슬 명중 효과 시험 (#464, 시험용).
     /// Play 중에 Inspector에서 바꾸면 다음 명중부터 바로 반영된다.
     /// LabConfig는 판마다 복사본을 쓰므로 Play 중 변경이 반영되지 않아, 시험용 설정을 따로 둔다.
-    /// 에셋이 없으면 지금처럼 징 + 별가루를 쓴다.
+    /// 에셋이 없으면 기본 소리(Audio/FiveColorHit, 25현 가야금) + 별가루를 쓴다.
     /// </summary>
     [CreateAssetMenu(menuName = "C6 Physics Lab/Five Color Hit Sound Choice")]
     public sealed class LabFiveColorHitSoundChoice : ScriptableObject
     {
-        /// <summary>시험 소리. 숫자는 Audio/FiveColorHitTest/FiveColorHitTest_번호 파일과 같다 (0은 지금 징).</summary>
+        /// <summary>시험 소리. 숫자는 Audio/FiveColorHitTest/FiveColorHitTest_번호 파일과 같다 (0은 기본 소리).</summary>
         public enum Sound
         {
-            [InspectorName("0 · 징 (지금 소리)")] Gong = 0,
+            [InspectorName("0 · 기본 (25현 가야금)")] Gong = 0,
             [InspectorName("1 · 건고 타격음 (강)")] Test1 = 1,
             [InspectorName("2 · 교방고 타격음 (강)")] Test2 = 2,
             [InspectorName("3 · 바라 타격음 (강)")] Test3 = 3,
@@ -40,9 +40,9 @@ namespace C6Lab
         public bool drumAlwaysFiveColor;
 
         [Header("소리 (오색구슬 명중 + BIG 큰 공 명중)")]
-        [Tooltip("0 = 지금 징 (Audio/FiveColorHit), 1~8 = 시험 소리 (Audio/FiveColorHitTest/FiveColorHitTest_번호, 같은 번호가 여러 개면 번갈아)")]
+        [Tooltip("0 = 기본 소리 (Audio/FiveColorHit, #464부터 25현 가야금), 1~8 = 시험 소리 (Audio/FiveColorHitTest/FiveColorHitTest_번호, 같은 번호가 여러 개면 번갈아)")]
         public Sound sound = Sound.Test1;
-        [Tooltip("시험 소리 크기 (징 크기는 기존 설정 그대로)")]
+        [Tooltip("시험 소리 크기 (기본 소리 크기는 기존 설정 그대로)")]
         [Range(0f, 1f)] public float testVolume = 1f;
 
         [Header("오색구슬 명중 효과")]
