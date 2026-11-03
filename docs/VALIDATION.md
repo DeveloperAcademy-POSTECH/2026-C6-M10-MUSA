@@ -4423,3 +4423,32 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 - Cloud Upper는 x=15에서 ±14만 움직여 그림 왼쪽 끝 안에 남는다. 나머지는 원래도 그림 밖으로 걸쳐 있어 잘린다.
 - EditMode `StoryWorkspaceTests.AnimatedTitleSharesFourOriginalCloudsWithTheHomeStartPage`의 주기 조건을 `> 20`에서 `10~20`으로 바꿨다 (**NOT_RUN**).
 - **미실행:** Play에서 느낌 확인, iPhone 실기기.
+
+### #467 3단계: 배경 교체·깃발 바람 연출 — 2026-11-03
+
+- **기준:** `e89b52bb`(2단계 커밋) 위. 연결된 Editor에서 컴파일, Editor API 배치, Editor 안 화면 그리기, 계산 확인만 했다. Play·Test Runner·실기기는 실행하지 않았다.
+- **바꾼 것:**
+  - `a763a.png`을 깃대·깃발·리본이 없는 3배 배경(1206×2622)으로 교체했다. GUID·가져오기 설정은 그대로이고, `Artwork`는 402×874에 딱 맞췄다.
+  - 깃대·깃발·리본 2개를 투명 여백을 잘라 긴 변 1024px로 줄여 추가했다.
+  - 새 `TitleWindWave`(UI 메시 물결)를 깃발·리본에 붙였다.
+  - `StoryTitleBuilder.AddWindFlag`(메뉴 `Hapio > Story > Add Title Wind Flag`)로 프리팹에 배치했다.
+- **배치 (402×874 좌표, 예전 그림의 깃발 자리를 따름):**
+
+| 조각 | 위치·크기 | 비고 |
+| --- | --- | --- |
+| 깃대 | (304, 455) 58×335 | 막대만 늘어나는 9분할, 꼭대기 455 · 가로대 486~492 |
+| 깃발 | (311, 484) 44×167 | 위 가운데에 묶임, 왼쪽으로 3 기울고 폭 2.5 · 0.5회/초 |
+| 빨강·노랑 리본 | (219, 472) 112×63 | 가로대 위 막대에 묶임, 폭 4 · 1.2회/초 |
+| 파랑 리본 | (216, 490) 90×65 | 가로대 왼쪽 끝에 묶임, 0.37초 어긋남 |
+
+| 실행한 확인 | 결과 |
+| --- | --- |
+| 컴파일 · Console 오류 | **PASS** (오류 0) |
+| Editor 안 화면 그리기(미리보기 씬, 603×1311): 0 · 1.6 · 3.3 · 4.05초 | **PASS** — 깃발 아랫단이 왼쪽으로 일렁이고, 4.05초(돌풍 최고)에 깃발이 크게 휘고 리본 꼬리가 들린다. 글자·구름·버튼 자리는 그대로다 |
+| 새 검사 값 미리 계산 | **PASS** — 묶인 쪽 이동 0, 같은 물결 위상에서 돌풍 최고는 평상시의 2.5배(−5.47 → −13.67), 4×16칸 메시 정점 85·인덱스 384, 깃대 배율×폭 = 318, 타이틀 그림 전체 raycast 꺼짐 |
+
+- **새 검사 (NOT_RUN):**
+  - EditMode `StoryWorkspaceTests.TitleFlagWavesOverAThreeTimesLandscapeThatNoLongerPaintsIt`
+  - PlayMode `StoryTitleTests.GustsComeOnceAPeriodAndSmoothly`
+  - PlayMode `StoryTitleTests.WindKeepsTheTiedEdgeStillAndSwingsTheFreeEndFurtherInAGust`
+- **미실행:** Play에서 실제 움직임 느낌, iPhone 실기기 성능(조각 3개 × 매 프레임 메시 다시 만들기).

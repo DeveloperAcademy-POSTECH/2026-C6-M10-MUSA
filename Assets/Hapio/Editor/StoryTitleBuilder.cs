@@ -55,6 +55,64 @@ namespace Hapio.Editor
             finally { Object.DestroyImmediate(root); }
         }
 
+        // #467: the landscape no longer paints the flag; these pieces are placed over it and move in the wind.
+        private const string Pole = "FlagPole.png";
+        private static readonly string[] FlagArt = { Pole, "FlagBanner.png", "RibbonRedYellow.png", "RibbonBlue.png" };
+        // FlagPole.png (318x1024): finial and crossbar in the top 212px, base cap in the bottom 24px; only the shaft stretches.
+        private static readonly Vector4 PoleBorder = new Vector4(0, 24, 0, 212);
+        private const float PoleWidth = 58;
+
+        [MenuItem("Hapio/Story/Add Title Wind Flag")]
+        public static void AddWindFlag()
+        {
+            foreach (var file in FlagArt) StoryWorkspaceBuilder.ImportSprite(Art + file);
+            var importer = (TextureImporter)AssetImporter.GetAtPath(Art + Pole);
+            if (importer.spriteBorder != PoleBorder) { importer.spriteBorder = PoleBorder; importer.SaveAndReimport(); }
+            var root = PrefabUtility.LoadPrefabContents(TitlePath);
+            try
+            {
+                if (root.transform.Find("Wind Flag") != null) return;
+                // The 3x landscape is exactly 402x874, so it fills its frame without the old sub-pixel crop.
+                var landscape = (RectTransform)root.transform.Find("Paper Landscape/Artwork");
+                landscape.anchoredPosition = Vector2.zero; landscape.sizeDelta = new Vector2(402, 874);
+                var flag = StoryWorkspaceBuilder.Rect("Wind Flag", root.transform, new Rect(0, 0, 402, 874));
+                flag.SetSiblingIndex(1); // over the landscape, under the name and the clouds
+                var ribbon = Wave(flag, "Ribbon Red Yellow", new Rect(219, 472, 112, 63), "RibbonRedYellow.png");
+                Ribbon(ribbon, 0);
+                ribbon = Wave(flag, "Ribbon Blue", new Rect(216, 490, 90, 65), "RibbonBlue.png");
+                Ribbon(ribbon, .37f);
+                var pole = Picture(flag, "Pole", new Rect(333 - PoleWidth * .5f, 455, PoleWidth, 335), Pole);
+                pole.type = UnityEngine.UI.Image.Type.Sliced;
+                pole.pixelsPerUnitMultiplier = pole.sprite.rect.width / PoleWidth;
+                var banner = Wave(flag, "Banner", new Rect(311, 484, 44, 167), "FlagBanner.png");
+                banner.pinned = new Vector2(.5f, 1); banner.tip = new Vector2(.5f, 0);
+                banner.amplitude = 2.5f; banner.lean = -3; banner.waves = .8f; banner.speed = .5f; banner.stiffness = 1.6f;
+                banner.gustStrength = 1.5f; banner.columns = 4; banner.rows = 16;
+                PrefabUtility.SaveAsPrefabAsset(root, TitlePath);
+            }
+            finally { PrefabUtility.UnloadPrefabContents(root); }
+        }
+
+        // Tied at the pole end (upper right of the art), the tail streams left and lifts in a gust.
+        private static void Ribbon(TitleWindWave ribbon, float phase)
+        {
+            ribbon.pinned = new Vector2(.98f, .97f); ribbon.tip = new Vector2(.02f, .03f);
+            ribbon.amplitude = 4; ribbon.lean = -4; ribbon.waves = 1.5f; ribbon.speed = 1.2f; ribbon.stiffness = 1.2f;
+            ribbon.phase = phase; ribbon.gustStrength = 1.5f; ribbon.columns = 16; ribbon.rows = 9;
+        }
+
+        private static TitleWindWave Wave(Transform parent, string name, Rect box, string file) =>
+            Picture(parent, name, box, file).gameObject.AddComponent<TitleWindWave>();
+
+        private static Image Picture(Transform parent, string name, Rect box, string file)
+        {
+            var image = StoryWorkspaceBuilder.Rect(name, parent, box).gameObject.AddComponent<Image>();
+            image.sprite = AssetDatabase.LoadAssetAtPath<Sprite>(Art + file);
+            if (image.sprite == null) throw new InvalidOperationException("Missing title image " + file);
+            image.raycastTarget = false;
+            return image;
+        }
+
         private static void Cloud(Transform parent, List<TitleCloudDrift.Cloud> tracks, string name, Rect box,
             string image, float distance, float seconds, bool reverse)
         {

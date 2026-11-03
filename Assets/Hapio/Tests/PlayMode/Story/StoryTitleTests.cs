@@ -80,6 +80,65 @@ namespace Hapio.Tests
             finally { Object.DestroyImmediate(screenObject); }
         }
 
+        [Test]
+        public void GustsComeOnceAPeriodAndSmoothly()
+        {
+            Assert.That(TitleWindWave.Gust(0, 6), Is.Zero, "Calm when the title first opens.");
+            Assert.That(TitleWindWave.Gust(2.9f, 6), Is.Zero);
+            Assert.That(TitleWindWave.Gust(4.05f, 6), Is.EqualTo(1).Within(.001f));
+            Assert.That(TitleWindWave.Gust(3.3f, 6), Is.InRange(.01f, .99f), "Rises smoothly instead of snapping.");
+            Assert.That(TitleWindWave.Gust(5.2f, 6), Is.Zero);
+            Assert.That(TitleWindWave.Gust(10.05f, 6), Is.EqualTo(1).Within(.001f), "Repeats every period.");
+        }
+
+        // #467: tied edge still, free end swings, a gust swings the same shape further, and the picture is cut into a grid.
+        [Test]
+        public void WindKeepsTheTiedEdgeStillAndSwingsTheFreeEndFurtherInAGust()
+        {
+            var root = new GameObject("Wind", typeof(RectTransform), typeof(Canvas));
+            try
+            {
+                var image = new GameObject("Banner", typeof(RectTransform)).AddComponent<Image>();
+                image.transform.SetParent(root.transform, false);
+                image.rectTransform.sizeDelta = new Vector2(40, 160);
+                var wave = image.gameObject.AddComponent<TitleWindWave>();
+                wave.pinned = new Vector2(.5f, 1); wave.tip = new Vector2(.5f, 0);
+                wave.amplitude = 2.5f; wave.lean = -3; wave.waves = .8f; wave.speed = .5f; wave.gustStrength = 1.5f; wave.gustSeconds = 6;
+                wave.columns = 4; wave.rows = 16;
+                Rect rect = image.rectTransform.rect;
+                var tiedCorner = new Vector2(rect.xMin, rect.yMax);
+                var freeEnd = new Vector2(rect.center.x, rect.yMin);
+
+                Assert.That(wave.Offset(tiedCorner, rect, 1.3f), Is.EqualTo(Vector2.zero), "The whole tied edge stays on the crossbar.");
+                Vector2 calm = wave.Offset(freeEnd, rect, .05f), gust = wave.Offset(freeEnd, rect, 4.05f);
+                Assert.That(calm.x, Is.LessThan(0)); Assert.That(calm.y, Is.Zero);
+                Assert.That(gust.x, Is.EqualTo(calm.x * 2.5f).Within(.0001f), "Two wave periods apart, only the gust differs.");
+                Assert.That(wave.Offset(freeEnd, rect, 1.3f), Is.EqualTo(wave.Offset(freeEnd, rect, 1.3f)));
+                Assert.That(Mathf.Abs(wave.Offset(new Vector2(rect.center.x, rect.center.y), rect, .05f).x),
+                    Is.LessThan(Mathf.Abs(calm.x)), "Swings less nearer the tie.");
+
+                var mesh = new VertexHelper();
+                mesh.AddVert(new Vector3(rect.xMin, rect.yMin), Color.white, new Vector2(0, 0));
+                mesh.AddVert(new Vector3(rect.xMin, rect.yMax), Color.white, new Vector2(0, 1));
+                mesh.AddVert(new Vector3(rect.xMax, rect.yMax), Color.white, new Vector2(1, 1));
+                mesh.AddVert(new Vector3(rect.xMax, rect.yMin), Color.white, new Vector2(1, 0));
+                mesh.AddTriangle(0, 1, 2); mesh.AddTriangle(2, 3, 0);
+                wave.Sample(4.05f);
+                wave.ModifyMesh(mesh);
+                Assert.That(mesh.currentVertCount, Is.EqualTo(5 * 17));
+                Assert.That(mesh.currentIndexCount, Is.EqualTo(4 * 16 * 6));
+                var vertex = new UIVertex();
+                mesh.PopulateUIVertex(ref vertex, 5 * 17 - 1);
+                Assert.That((Vector2)vertex.position, Is.EqualTo(new Vector2(rect.xMax, rect.yMax)), "Top corner stays tied.");
+                Assert.That((Vector2)vertex.uv0, Is.EqualTo(Vector2.one));
+                mesh.PopulateUIVertex(ref vertex, 2);
+                Assert.That(vertex.position.x, Is.LessThan(rect.center.x - 1), "The free end blows downwind.");
+                Assert.That((Vector2)vertex.uv0, Is.EqualTo(new Vector2(.5f, 0)));
+                mesh.Dispose();
+            }
+            finally { Object.DestroyImmediate(root); }
+        }
+
         [UnityTest]
         public IEnumerator TitleWaitsForTheStartButtonAndCanReturnWithoutOldStoryViews()
         {
