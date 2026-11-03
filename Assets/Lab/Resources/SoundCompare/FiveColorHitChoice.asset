@@ -14,4 +14,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: C6Lab.Runtime::C6Lab.LabFiveColorHitSoundChoice
   sound: 1
   testVolume: 1
+  effect: 1
+  starScale: 1
   dustPuffScale: 2

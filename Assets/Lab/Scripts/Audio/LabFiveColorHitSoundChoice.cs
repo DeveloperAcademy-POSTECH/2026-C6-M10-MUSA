@@ -3,23 +3,46 @@ using UnityEngine;
 namespace C6Lab
 {
     /// <summary>
-    /// 오색구슬 명중 / 콤보 BIG 큰 공 명중 소리 시험과 먼지 효과 크기 (#464, 시험용).
+    /// 오색구슬 명중 / 콤보 BIG 큰 공 명중 소리와 오색구슬 명중 효과 시험 (#464, 시험용).
     /// Play 중에 Inspector에서 바꾸면 다음 명중부터 바로 반영된다.
     /// LabConfig는 판마다 복사본을 쓰므로 Play 중 변경이 반영되지 않아, 시험용 설정을 따로 둔다.
-    /// 에셋이 없으면 지금처럼 징을 쓰고, 먼지 크기는 기본값을 쓴다.
+    /// 에셋이 없으면 지금처럼 징 + 별가루를 쓴다.
     /// </summary>
     [CreateAssetMenu(menuName = "C6 Physics Lab/Five Color Hit Sound Choice")]
     public sealed class LabFiveColorHitSoundChoice : ScriptableObject
     {
+        /// <summary>시험 소리. 숫자는 Audio/FiveColorHitTest/FiveColorHitTest_번호 파일과 같다 (0은 지금 징).</summary>
+        public enum Sound
+        {
+            [InspectorName("0 · 징 (지금 소리)")] Gong = 0,
+            [InspectorName("1 · 낮은 둥 + 긴 울림")] Test1 = 1,
+            [InspectorName("2 · 낮은 울림 (조금 짧게)")] Test2 = 2,
+            [InspectorName("3 · 넓게 퍼지는 촤아")] Test3 = 3,
+            [InspectorName("4 · 짧은 뿌지직")] Test4 = 4,
+            [InspectorName("5 · 낮은 쿵 + 긴 꼬리")] Test5 = 5
+        }
+
+        public enum HitEffect
+        {
+            [InspectorName("별가루")] Stars = 0,
+            [InspectorName("먼지 털림")] Dust = 1
+        }
+
         public const string ResourcesPath = "SoundCompare/FiveColorHitChoice";
         public const string TestFolder = "Audio/FiveColorHitTest";
         public const float DefaultDustPuffScale = 2f;
 
+        [Header("소리 (오색구슬 명중 + BIG 큰 공 명중)")]
         [Tooltip("0 = 지금 징 (Audio/FiveColorHit), 1~5 = 시험 소리 (Audio/FiveColorHitTest/FiveColorHitTest_번호)")]
-        [Range(0, 5)] public int sound = 1;
+        public Sound sound = Sound.Test1;
         [Tooltip("시험 소리 크기 (징 크기는 기존 설정 그대로)")]
         [Range(0f, 1f)] public float testVolume = 1f;
-        [Tooltip("오색구슬 명중 먼지 뭉게구름 크기 배율")]
+
+        [Header("오색구슬 명중 효과")]
+        public HitEffect effect = HitEffect.Dust;
+        [Tooltip("별가루 크기 배율 (별 크기와 퍼지는 거리 함께)")]
+        [Range(.5f, 5f)] public float starScale = 1f;
+        [Tooltip("먼지 뭉게구름 크기 배율")]
         [Range(.5f, 5f)] public float dustPuffScale = DefaultDustPuffScale;
 
         private static LabFiveColorHitSoundChoice cached;
@@ -35,18 +58,21 @@ namespace C6Lab
             }
         }
 
-        /// <summary>고른 시험 소리. 0번(징)을 골랐거나 파일이 없으면 null.</summary>
+        /// <summary>고른 시험 소리. 징(0)을 골랐거나 파일이 없으면 null.</summary>
         public static AudioClip TestClip
         {
             get
             {
-                if (Current == null || Current.sound <= 0) return null;
+                int number = Current != null ? (int)Current.sound : 0;
+                if (number <= 0) return null;
                 AudioClip[] clips = TestClips;
-                return Current.sound <= clips.Length ? clips[Current.sound - 1] : null;
+                return number <= clips.Length ? clips[number - 1] : null;
             }
         }
 
         public static float TestVolume => Current != null ? Mathf.Clamp01(Current.testVolume) : 1f;
+        public static bool UseDust => Current != null && Current.effect == HitEffect.Dust;
+        public static float StarScale => Current != null ? Mathf.Max(.1f, Current.starScale) : 1f;
         public static float DustPuffScale => Current != null ? Mathf.Max(.1f, Current.dustPuffScale) : DefaultDustPuffScale;
 
         public static AudioClip[] TestClips

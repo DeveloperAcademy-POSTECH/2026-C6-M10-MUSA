@@ -7,7 +7,7 @@ namespace C6Lab
     /// 섬광 파훼 보상 오색구슬 (#329)의 모습. 판·투사체 구슬 위에 다섯 색(노랑·초록·파랑·빨강·갈색) 사이를 쉬지 않고
     /// 부드럽게 건너가는 구슬을 얹는다. 몸통 색이 바뀌는 동안 안쪽에서 다음 색 빛이 천천히 돌아 물들고, 둘레에는 같은 색
     /// 빛무리, 가장자리를 따라 도는 윤광, 둘레에서 피었다 지는 별빛이 있어 영롱하게 보인다. 박에 맞은 자리에서는
-    /// 다섯 색 가루 먼지가 털린다 (#464, 예전 별가루 대신). 화면 표시만 하며 규칙·물리에는 쓰지 않는다.
+    /// 다섯 색 별가루를 터뜨리거나 가루 먼지가 털린다 (#464, LabFiveColorHitSoundChoice로 고름). 화면 표시만 하며 규칙·물리에는 쓰지 않는다.
     /// 3D로 날아가는 오색구슬(투사체)은 납작한 그림을 얹지 않고, 구슬(3D 공) 자체의 색이 다섯 색 사이를 건너간다 (#426).
     /// 그림은 카메라 쪽으로 돌려 세워야 하는데, 자리마다 전투 카메라 방향이 달라 옆자리에서는 그림이 납작하게 공 옆으로 비켜 보였다.
     /// 먹선·그늘·하이라이트 그림은 Resources/Yaguang/FiveColorOrb, 별은 FiveColorSparkle에 있고, 없으면 코드로 그린 것을 쓴다.
@@ -19,9 +19,9 @@ namespace C6Lab
         private const string ArtName = "Five Color Orb";
         private const int HaloOrder = 10, BodyOrder = 11, SwirlOrder = 12, ShadeOrder = 13, RimOrder = 14, TwinkleOrder = 15,
             BurstOrder = 30;
-        private const int TwinkleCount = 5, SwirlCount = 2;
+        private const int BurstCount = 10, TwinkleCount = 5, SwirlCount = 2;
         // 먹선 그림 폭 = 구슬 지름 / 그림 속 원 비율(0.92). 결합 구슬 그림과 같은 크기가 된다.
-        private const float ArtWidth = 2f / .92f, BodySize = .97f;
+        private const float ArtWidth = 2f / .92f, BodySize = .97f, BurstSeconds = .65f, BurstReach = 3.2f;
         // 몸통: ColorSeconds마다 다음 색으로 부드럽게 건너간다 (다섯 색 한 바퀴 = 5 × ColorSeconds).
         private const float ColorSeconds = .9f;
         // 안쪽 빛: 다음 색들이 몸통 안을 SwirlDegreesPerSecond로 돌며 물든다.
@@ -49,7 +49,10 @@ namespace C6Lab
         private SpriteRenderer body, shade, halo, rim;
         private readonly SpriteRenderer[] swirls = new SpriteRenderer[SwirlCount];
         private readonly SpriteRenderer[] twinkles = new SpriteRenderer[TwinkleCount];
+        private SpriteRenderer[] burstStars;
         private float radius = .3f, age, dim;
+        private bool burst;
+        private Vector3[] burstDirections;
         // 3D로 날아가는 구슬: 그림 대신 이 구슬의 3D 공 렌더러 색을 바꾼다.
         private Transform flightRoot;
         private MaterialPropertyBlock tintBlock;
@@ -92,6 +95,27 @@ namespace C6Lab
             }
             look.SetRadius(orbRadius);
             look.Show(true);
+            return look;
+        }
+
+        /// <summary>박에 맞은 자리에서 다섯 색 별가루를 한 번 터뜨린다. 스스로 사라진다.</summary>
+        public static LabFiveColorSparkle Burst(Vector3 worldPoint, float orbRadius)
+        {
+            var root = new GameObject("Five Color Sparkle Burst");
+            root.transform.position = worldPoint;
+            var look = root.AddComponent<LabFiveColorSparkle>();
+            look.burst = true;
+            look.radius = orbRadius > 0f ? orbRadius : .3f;
+            RenderPipelineManager.beginCameraRendering += look.FaceRenderingCamera;
+            look.burstDirections = new Vector3[BurstCount];
+            look.burstStars = new SpriteRenderer[BurstCount];
+            for (int i = 0; i < BurstCount; i++)
+            {
+                float angle = (i + .37f * (i % 3)) / BurstCount * Mathf.PI * 2f;
+                look.burstDirections[i] = new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), 0f) * (.75f + .25f * ((i * 7) % 4) / 3f);
+                look.burstStars[i] = look.Part("Five Color Burst Star " + i, SparkleSprite(), StarColor(i), BurstOrder);
+            }
+            look.Update();
             return look;
         }
 
@@ -198,6 +222,22 @@ namespace C6Lab
                 }
                 if (u >= 1f) Destroy(gameObject);
             }
+            else if (burst)
+            {
+                float u = Mathf.Clamp01(age / BurstSeconds);
+                for (int i = 0; i < BurstCount; i++)
+                {
+                    SpriteRenderer star = burstStars[i];
+                    float ease = 1f - (1f - u) * (1f - u);
+                    star.transform.localPosition = burstDirections[i] * (BurstReach * radius * ease);
+                    star.transform.localScale = Vector3.one * (radius * (1.1f - .7f * u));
+                    Color color = StarColor(i);
+                    color.a = 1f - u * u;
+                    star.color = color;
+                    star.transform.localRotation = Quaternion.Euler(0f, 0f, 180f * u + i * 30f);
+                }
+                if (u >= 1f) Destroy(gameObject);
+            }
             else Pose();
         }
 
@@ -231,7 +271,7 @@ namespace C6Lab
 
         private void OnDestroy()
         {
-            if (dust) RenderPipelineManager.beginCameraRendering -= FaceRenderingCamera;
+            if (burst || dust) RenderPipelineManager.beginCameraRendering -= FaceRenderingCamera;
         }
 
         private void Pose()
