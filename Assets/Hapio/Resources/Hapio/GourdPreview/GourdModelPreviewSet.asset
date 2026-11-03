@@ -15,6 +15,7 @@ MonoBehaviour:
   show: 1
   onlyYaguang: 1
   gourdScale: 1.1
+  matchHitbox: 1
   showButton: 0
   showPaint: 1
   paintAllParts: 0
