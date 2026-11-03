@@ -71,6 +71,7 @@ namespace C6Lab
             deferredBoardFrame = null;
             nextActionRecoveryAt = nextBoardCheckpointAt = 0d;
             ResetTargetPoseReconcile();
+            guestBattleClock.Reset();
         }
 
         private long NextBoardSequence(ulong recipient)

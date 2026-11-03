@@ -87,8 +87,9 @@ namespace C6Lab
         {
             if (network == null || !network.HasBattleReferences) { StopCurrent(); return; }
             LabSnapshot snapshot = network.Snapshot;
-            Observe(snapshot, network.JigwiABPresentationTime,
-                network.GameStartHeld || snapshot != null && snapshot.paused);
+            // Read the time first: it updates whether a Guest's clock has stalled (#451).
+            double now = network.JigwiABPresentationTime;
+            Observe(snapshot, now, network.GameStartHeld || network.BattlePresentationHeld);
         }
 
         /// <summary>Explicit shared-clock entry point for the live observer and isolated audio tests.
