@@ -47,6 +47,8 @@ namespace Hapio
         [Tooltip("꺼져 있으면 몸통(가장 큰 부품)에만, 켜면 줄/리본/눈 등 모든 부품에 물감을 덧그린다.")]
         public bool paintAllParts;
         [Range(0f, 1f)] public float paintStrength = 1f;
+        [Tooltip("#455의 새 조명(주변광 회색 단색 0.5 + 해 밝기 1.5). 끄면 예전 조명(하늘 주변광 + 해 밝기 1.35)으로 본다. Battle 씬은 바꾸지 않는다.")]
+        public bool newLighting = true;
         public GameGourdModelChoice[] models = Array.Empty<GameGourdModelChoice>();
 
         public int Count => (models != null ? models.Length : 0) + 1;

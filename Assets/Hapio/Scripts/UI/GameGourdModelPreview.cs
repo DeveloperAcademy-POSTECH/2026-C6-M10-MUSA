@@ -35,6 +35,15 @@ namespace Hapio
         private readonly List<Renderer> overlays = new List<Renderer>();
         private Material overlayMaterial;
         private MaterialPropertyBlock shellBlock, overlayBlock;
+        private bool lightingCaptured;
+        private int seenLighting = -1;
+        private UnityEngine.Rendering.AmbientMode capturedAmbientMode;
+        private Color capturedAmbientSky;
+        private Light sun;
+        private float capturedSunIntensity;
+        // #455 이전 Battle 씬 값 (git diff 기준)
+        private static readonly Color OldAmbientSky = new Color(.212f, .227f, .259f, 1f);
+        private const float OldSunIntensity = 1.35f;
         private const string OverlayShaderPath = "Hapio/GourdPreview/GourdPreviewPaintOverlay";
 
         public GameObject Instance { get; private set; }
@@ -93,6 +102,7 @@ namespace Hapio
         private void LateUpdate()
         {
             if (set == null) set = Resources.Load<GameGourdModelPreviewSet>(GameGourdModelPreviewSet.ResourcesPath);
+            ApplyLighting();
             LabTarget target = bindings != null ? bindings.target : null;
             GameObject visual = target != null ? target.MountedVisual : null;
             int show = StageWanted() ? WantedShow() : 0;
@@ -115,6 +125,48 @@ namespace Hapio
             Place(choice);
             Follow();
             Replay(choice);
+        }
+
+        // 조명 비교: 씬에 저장된 새 조명을 처음 한 번 기억해 두고, 끄면 예전 값, 켜면 기억한 값으로 되돌린다.
+        private void ApplyLighting()
+        {
+            if (set == null) return;
+            int wanted = set.newLighting ? 1 : 0;
+            if (wanted == seenLighting) return;
+            if (!lightingCaptured)
+            {
+                capturedAmbientMode = RenderSettings.ambientMode;
+                capturedAmbientSky = RenderSettings.ambientSkyColor;
+                sun = FindSun();
+                capturedSunIntensity = sun != null ? sun.intensity : 0f;
+                lightingCaptured = true;
+            }
+            if (set.newLighting)
+            {
+                RenderSettings.ambientMode = capturedAmbientMode;
+                RenderSettings.ambientSkyColor = capturedAmbientSky;
+                if (sun != null) sun.intensity = capturedSunIntensity;
+            }
+            else
+            {
+                RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Skybox;
+                RenderSettings.ambientSkyColor = OldAmbientSky;
+                if (sun != null) sun.intensity = OldSunIntensity;
+            }
+            DynamicGI.UpdateEnvironment();
+            seenLighting = wanted;
+            Debug.Log("[GourdPreview] 조명: " + (set.newLighting ? "새 조명 (#455)" : "예전 조명")
+                + (sun != null ? " · 해 " + sun.name + " " + sun.intensity.ToString("0.00") : " · 해를 찾지 못함"));
+        }
+
+        private Light FindSun()
+        {
+            if (RenderSettings.sun != null) return RenderSettings.sun;
+            Light best = null;
+            foreach (GameObject root in gameObject.scene.GetRootGameObjects())
+                foreach (Light light in root.GetComponentsInChildren<Light>(true))
+                    if (light.type == LightType.Directional && (best == null || light.intensity > best.intensity)) best = light;
+            return best;
         }
 
         private void Mount(GameObject visual, GameGourdModelChoice choice)

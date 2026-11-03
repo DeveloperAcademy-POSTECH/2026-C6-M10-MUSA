@@ -18,6 +18,7 @@ MonoBehaviour:
   showPaint: 1
   paintAllParts: 0
   paintStrength: 1
+  newLighting: 1
   models:
   - label: "1\uCC28"
     prefab: {fileID: 7311737831349322903, guid: 7c4e7cff0f74347db80144a8c04366c6, type: 3}
