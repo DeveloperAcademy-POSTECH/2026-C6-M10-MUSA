@@ -4297,3 +4297,54 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
   - 표현한 명중의 `paintBlocked` 결과에는 명중 효과와 막힘 효과가 함께 보인다.
   - 흔들림 한도에 부딪힌 반동은 보정 계산에 넣지 않는다.
 - **미실행:** iPhone 실기기·여러 폰에서의 체감. 전체 PlayMode는 실행하지 않았다.
+
+## #461 도색 페이로드 deflate 압축·접속 규약 5683 — 2026-11-03
+
+- **기준:** main `7ba2f0e8` → `fix/#461-paint-deflate`. Unity6000.6.5f1/macOS의 연결된 Editor와 이 브랜치로 만든 Lab Mac Development 앱에서 실행했다. iOS 빌드는 만들지 않았다.
+- **배경:** 스테이지 시작 때 Host는 Guest마다 256×128 전체 도색 지도(셀당 5바이트, 약 160 KB)를 base64로 보냈다. 빈 지도도 도색 프레임 107개·Bulk 데이터그램 427개라, 시작 직후 Bulk 채널이 몇 초 동안 막혔다.
+- **수정:**
+  - `LabPaintFrame.encoding`을 추가했다(0 원본, 1 deflate).
+  - 발행자 정책 `LabPaintEncodingPolicy`: `RawOnly`(기본, 이전과 같은 바이트)와 `Auto`(deflate `Fastest` 결과가 더 짧을 때만 1)를 두었다. Host의 피어별 발행자는 `Auto`를 쓰며, 압축 결과는 #439 공유 캡처에 한 번만 만들어 공유한다.
+  - 수신기는 base64 해독 뒤 `encoding == 1`이면 헤더가 정한 상한(full `columns·rows·5 + 시각 바이트`, delta `columns·rows·7 + 시각 바이트`) 안에서만 inflate한다. 상한 초과·실패는 체크포인트를 요청한다. `encoding`은 `Valid`(0/1만)와 `SameHeader`에 들어간다.
+  - 해시·covered·`Revision`·`Matches` 의미는 그대로다.
+  - 접속 규약을 **5683 / `C6PhysicsLab/44` / `C6HapioGame/28`**로 올렸다(공유 설정 257개 그대로).
+
+| Editor 측정 (256×128 Splatter) | 원본(RawOnly) | 압축(Auto) |
+| --- | --- | --- |
+| 빈 지도(스테이지 시작) | 프레임 107개 / Bulk 데이터그램 427개 | **프레임 1개 / 2개** |
+| 12회 명중(칠 22%) | 107개 / 534개 | **3개 / 12개** |
+| 60회 명중(칠 64%) | 108개 / 539개 | **6개 / 29개** |
+| 압축 발행 / 수신 1회 시간 | — | 1.4~2.8 ms / 1.2~1.4 ms |
+
+| 실행 검사 | 결과 | 시간 |
+| --- | --- | --- |
+| 전체 EditMode | **1857/1857 PASS** | 52.24초 |
+| PlayMode `LabLocalBoardNetworkIntegrationTests` | **21/21 PASS** | 0.40초 |
+| PlayMode `LabHighResolutionPaintRuntimeTests` | **2/2 PASS** | 0.11초 |
+| PlayMode `LabGourdPaintTests` | **9/9 PASS** | 11.88초 |
+| PlayMode `LabDeveloperSoloIntegrationTests` | **14/14 PASS** | 19.25초 |
+| PlayMode `GameSceneFlowTests` | **21/21 PASS** | 219.65초 |
+| Lab Mac 앱 3프로세스(새 Host·새 Client 2, `127.0.0.1:17993`) + 이전 빌드 Client | **PASS** | 150초 |
+
+- 각 실행의 skip/inconclusive0.
+- 새 검사 `LabPaintDeflateTests` 13개
+  - 빈 시작 지도가 `Auto`에서 프레임 1개·실제 Bulk 조각 3개 이하이고 수신·`Matches` 통과(`RawOnly`는 107개)
+  - 칠한 지도의 프레임 수 감소와 delta·압축 체크포인트 수신
+  - Host 실제 구성(공유 캐시 + `Auto`)이 비공유 `Auto`와 같은 프레임이고 건너뛴 피어까지 지도 일치
+  - 1셀 delta는 원본 유지
+  - 압축 full의 낮은 리비전 거절
+  - `encoding` -1·2·99 거절
+  - 원본을 압축으로 표시한 본문·압축 폭탄·조각 간 `encoding` 불일치는 체크포인트
+  - codec 왕복·상한·쓰레기 입력
+- 조각 수를 고정한 기존 `LabPaintReplicationTests`는 `RawOnly`로 숫자(7/27/107)를 그대로 유지하고 `encoding == 0`을 추가로 확인했다. 접속 규약 고정 검사(`LabGameFlowBridgeTests`·`LabSharedSettingsSchemaTests`)를 갱신했다.
+- **Mac 3프로세스:** 이 브랜치로 만든 `Builds/Lab/20261103-144056-74c8ef35` 앱을 Host와 Client 2개로 실행했다(`--lab-auto-start --lab-auto-generate --lab-auto-transfer`).
+  - Host 로그는 `protocol=5683`이다. 이전 빌드(`Builds/Lab/20261102-223606-5ecfe8d0`, Lab43) Client의 접속은 `C6_LAB_JOIN_REJECTED`로 거절됐다.
+  - 새 Client 두 개는 `Playing` 시작과 120초 `Defeat`를 모두 받았다. Guest의 스냅샷은 도색 지도가 맞아야 적용되므로, 압축된 시작 지도를 받아 적용했음을 뜻한다. Bulk 오류·중단은 없었다.
+  - 한 Client의 첫 자동 행동은 시작 직후 `Restoring board state`로 한 번 거절됐다. #437 기록과 같은 시작 시점의 조합판 체크포인트 대기이며, 이후 행동은 승인됐다.
+  - 이 실행은 이후의 메모리 수정(원본 base64 문자열을 만들지 않고 길이만 비교) 전 코드다. 그 수정은 와이어 바이트를 바꾸지 않는다.
+- 코드 검토 워크플로(세 관점 검토 + 지적별 반박 검증)에서 확인된 3건을 고쳤다.
+  - `Auto`가 비교만 하려고 원본 base64 문자열을 만들어 보관함
+  - 문서의 현재 호환 묶음이 5682로 남음
+  - Host 실제 구성(공유 캐시 + `Auto`) 검사 없음
+- **병합 뒤 주의:** 모든 기기가 새 빌드를 써야 한다. 5682/Lab43/Game27 빌드와는 접속되지 않는다.
+- **미실행:** iPhone 실기기·여러 폰에서의 시작 지연 체감과 대역폭, iOS IL2CPP 빌드에서의 `System.IO.Compression` 동작.

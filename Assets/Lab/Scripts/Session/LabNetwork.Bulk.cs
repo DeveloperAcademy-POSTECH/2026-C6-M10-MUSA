@@ -67,7 +67,7 @@ namespace C6Lab
         private LabPaintPublisher PeerPaintPublisher(ulong peer)
         {
             if (!peerPaintPublishers.TryGetValue(peer, out var publisher))
-                peerPaintPublishers.Add(peer, publisher = new LabPaintPublisher(paintPublishCache));
+                peerPaintPublishers.Add(peer, publisher = new LabPaintPublisher(paintPublishCache, LabPaintEncodingPolicy.Auto));
             return publisher;
         }
 
