@@ -44,10 +44,6 @@ namespace Hapio
         // #455 이전 Battle 씬 값 (git diff 기준)
         private static readonly Color OldAmbientSky = new Color(.212f, .227f, .259f, 1f);
         private const float OldSunIntensity = 1.35f;
-        // 히트박스 배율 (#469): 흰 박 몸통 원점 기준으로 키우고, 떠날 때 원래 크기로 되돌린다.
-        private Transform hitbox;
-        private Vector3 hitboxBaseScale, hitboxAppliedScale;
-        private bool hitboxScaled;
         private const string OverlayShaderPath = "Hapio/GourdPreview/GourdPreviewPaintOverlay";
 
         public GameObject Instance { get; private set; }
@@ -129,35 +125,6 @@ namespace Hapio
             Place(choice);
             Follow();
             Replay(choice);
-            ApplyHitboxScale(target, choice);
-        }
-
-        /// <summary>
-        /// 히트박스를 보이는 박과 같은 배율로 맞춘다. LabTarget이 박을 다시 붙이며 원래 자세로 되돌리면
-        /// 그 값을 새 기준으로 삼아 다시 키운다. 모든 기기가 같은 스테이지와 설정으로 같은 배율을 쓴다.
-        /// </summary>
-        private void ApplyHitboxScale(LabTarget target, GameGourdModelChoice choice)
-        {
-            Transform current = target != null && target.Hitbox != null ? target.Hitbox.transform : null;
-            if (current != hitbox) { RestoreHitbox(); hitbox = current; }
-            if (hitbox == null) return;
-            float factor = set != null && set.matchHitbox && choice != null
-                ? Mathf.Max(.01f, choice.scale) * Mathf.Max(.01f, set.gourdScale) : 1f;
-            if (!hitboxScaled || hitbox.localScale != hitboxAppliedScale) hitboxBaseScale = hitbox.localScale;
-            Vector3 wanted = hitboxBaseScale * factor;
-            if (hitbox.localScale != wanted) { hitbox.localScale = wanted; Physics.SyncTransforms(); }
-            hitboxAppliedScale = wanted;
-            hitboxScaled = true;
-        }
-
-        private void RestoreHitbox()
-        {
-            if (hitbox != null && hitboxScaled && hitbox.localScale == hitboxAppliedScale)
-            {
-                hitbox.localScale = hitboxBaseScale;
-                Physics.SyncTransforms();
-            }
-            hitboxScaled = false;
         }
 
         // 조명 비교: 씬에 저장된 새 조명을 처음 한 번 기억해 두고, 끄면 예전 값, 켜면 기억한 값으로 되돌린다.
@@ -362,7 +329,6 @@ namespace Hapio
 
         private void Release()
         {
-            RestoreHitbox();
             foreach (Renderer renderer in hidden) if (renderer != null) renderer.forceRenderingOff = false;
             hidden.Clear();
             overlays.Clear();

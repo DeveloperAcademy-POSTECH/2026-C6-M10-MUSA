@@ -40,10 +40,8 @@ namespace Hapio
         [Min(0)] public int show = 2;
         [Tooltip("켜면 야광귀 스테이지에서만 바꿔 보여 준다. 끄면 모든 스테이지에서 보여 준다 (빠른 확인용).")]
         public bool onlyYaguang = true;
-        [Tooltip("보이는 박 모델 크기 배율 (모델별 Scale에 곱해짐). Match Hitbox가 켜져 있으면 히트박스도 같은 배율로 커진다.")]
+        [Tooltip("보이는 박 모델 크기 배율 (모델별 Scale에 곱해짐). 겉모습만 바뀌고 히트박스/물감 판정 크기는 그대로다.")]
         [Range(.3f, 3f)] public float gourdScale = 1f;
-        [Tooltip("켜면 공이 맞는 히트박스도 보이는 박과 같은 배율(Gourd Scale × 모델 Scale)로 키운다 (#469). 물감 방향 계산은 그대로 맞다.")]
-        public bool matchHitbox = true;
         [Tooltip("화면 왼쪽에 '박: ○○' 버튼을 띄워 눌러서 바꿔 볼 수 있게 한다 (에디터/개발 빌드에서만).")]
         public bool showButton;
         [Tooltip("숨은 흰 박에 칠해지는 물감을 새 모델 위에 덧그린다.")]
