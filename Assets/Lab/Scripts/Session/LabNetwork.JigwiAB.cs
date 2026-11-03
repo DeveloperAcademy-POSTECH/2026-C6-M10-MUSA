@@ -7,8 +7,7 @@ namespace C6Lab
     /// <summary>Owner-scoped invisible B collision planes; visible flames belong to the Canvas.</summary>
     public sealed partial class LabNetwork
     {
-        private LabSnapshot jigwiABClockSnapshot;
-        private double jigwiABReceivedAt;
+        private readonly LabGuestBattleClock guestBattleClock = new LabGuestBattleClock();
         private readonly HashSet<string> jigwiABKeepSurfaces = new HashSet<string>(StringComparer.Ordinal);
         private readonly List<string> jigwiABRemoveSurfaces = new List<string>();
         private readonly Dictionary<ulong, JigwiABReachableBand> jigwiABReachableBands = new Dictionary<ulong, JigwiABReachableBand>();
@@ -22,22 +21,31 @@ namespace C6Lab
         }
 
 
-        /// <summary>One held battle-clock sample for the Canvas and local/Host fire collision motion.</summary>
-        public double JigwiABPresentationTime
+        /// <summary>
+        /// The battle time presentation code reads: the Host's own clock, or on a Guest the latest Host time
+        /// extrapolated by <see cref="LabGuestBattleClock"/>, held while paused or start-held and never stepping back
+        /// by less than half a second within a round (#451).
+        /// </summary>
+        public double BattlePresentationTime
         {
             get
             {
                 if (latest == null) return 0d;
                 if (IsHost) return battleClock.Now(Time.realtimeSinceStartupAsDouble);
-                if (!ReferenceEquals(jigwiABClockSnapshot, latest))
-                {
-                    jigwiABClockSnapshot = latest;
-                    jigwiABReceivedAt = Time.realtimeSinceStartupAsDouble;
-                }
-                return latest.serverTime + (latest.paused || GameStartHeld ? 0d
-                    : Math.Max(0d, Time.realtimeSinceStartupAsDouble - jigwiABReceivedAt));
+                return guestBattleClock.Sample(latest.sessionId, latest.round, latest.serverTime,
+                    latest.paused || GameStartHeld, Time.realtimeSinceStartupAsDouble);
             }
         }
+
+        /// <summary>One held battle-clock sample for the Canvas and local/Host fire collision motion.</summary>
+        public double JigwiABPresentationTime => BattlePresentationTime;
+
+        /// <summary>
+        /// The presentation clock is standing still: paused, start-held, or a Guest that has had no Host time for a
+        /// second (<see cref="LabGuestBattleClock.Stalled"/>). Voices and animations hold instead of re-seeking.
+        /// </summary>
+        public bool BattlePresentationHeld => latest != null && (latest.paused || GameStartHeld
+            || !IsHost && guestBattleClock.Stalled);
 
         private void SyncJigwiRewardBoardPresentation()
         {

@@ -4124,3 +4124,45 @@ Unpacked the redundant small source-prefab layer inside GameReady. Verified no p
 ## 2026-11-03 — Gourd texture cleanup
 
 Consolidated three byte-identical textures into shared material references; confirmed zero asset references before deleting three duplicates and three unused source/reference images with their meta files (28,189,225 image bytes). Reloaded GameReady prefab: height 2.390325, 17 animated transforms, zero missing materials or required color/normal/metallic maps. No gameplay/device test performed.
+
+
+## #451 Guest 공유 연출 시계·지귀 화면 되감김 허용치 — 2026-11-03
+
+- **기준:** main `e8648369` → `fix/#451-guest-battle-clock`. Unity6000.6.5f1/macOS의 연결된 Editor에서 실행했다. 새 Mac·iOS 빌드는 만들지 않았다.
+- **배경:** Guest 연출 시계(`JigwiABPresentationTime`)는 마지막 스냅샷의 `serverTime`에 그 **스냅샷 객체**를 처음 본 뒤 흐른 실시간을 더했다. 그래서 다음 경우에 뒤로 갔다.
+  - 같은 시각의 헤더가 새 객체로 오면 경과 시간이 0으로 돌아간다.
+  - 다음 스냅샷이 지연으로 외삽 값보다 뒤에 있다.
+  - 지귀 화면은 시계가 조금만 뒤로 가도 새 스테이지로 보고 물 뿌리기·실패 연출 기록을 지웠다.
+- **수정:**
+  - 새 순수 `LabGuestBattleClock`
+    - 세션·라운드·`serverTime`·정지 여부 값을 키로 기준을 잡는다(객체 identity 아님).
+    - 같은 라운드 안에서는 0.5초 미만으로 뒤로 가지 않는다(늦은 표본이 오면 실시간이 따라잡을 때까지 멈춤). 0.5초 이상 되감김·새 라운드·새 세션은 정정으로 받아들인다.
+    - 외삽은 최대 1초, 정지·시작 대기 중에는 고정한다.
+  - `LabNetwork.BattlePresentationTime`(공개, Host는 기존 `battleClock`)을 두고 `JigwiABPresentationTime`이 이를 쓴다. 행동 전송 초기화 때 시계를 초기화한다.
+  - `BattlePresentationHeld`(정지·시작 대기, 또는 Guest 시계가 1초 상한에 걸린 상태)를 지귀 음성·화면의 held 입력으로 쓴다.
+  - `LabJigwiScreenPresentation`은 `now < previousNow − 0.075`(지귀 음성 `SeekToleranceSeconds`와 같은 값, `RewindToleranceSeconds`)일 때만 새 스테이지로 본다.
+  - Host 경로·판정·와이어·접속 규약 **5682/Lab43/Game27**·공유 설정 257개는 그대로다.
+
+| 실행 검사 | 결과 | 시간 |
+| --- | --- | --- |
+| 전체 EditMode | **1815/1815 PASS** | 48.74초 |
+| PlayMode `LabJigwiABPresentationTests` | **24/24 PASS** | 1.68초 |
+| PlayMode `LabJigwiPatternAudioTests` | **22/22 PASS** | 0.30초 |
+| PlayMode `LabJigwiGroupFireAudioTests` | **5/5 PASS** | 0.10초 |
+| PlayMode `LabJigwiABNetworkTests` | **13/13 PASS** | 11.04초 |
+| PlayMode `LabJigwiRewardBoardFireTests` | **4/4 PASS** | 0.11초 |
+| PlayMode `LabJigwiMissionCancellationTests` | **3/3 PASS** | 0.07초 |
+| PlayMode `LabJigwiWaterTrailTests` | **8/8 PASS** | 0.98초 |
+| PlayMode `LabJigwiRewardFireTrailTests` | **4/4 PASS** | 1.19초 |
+| PlayMode `LabStaminaFeedbackTests` | **8/8 PASS** | 0.07초 |
+| PlayMode `LabStaminaShortFeedbackTests` | **5/5 PASS** | 0.03초 |
+| PlayMode `LabLocalBoardNetworkIntegrationTests` | **16/16 PASS** | 0.37초 |
+| PlayMode `GameSceneFlowTests` | **21/21 PASS** | 217.05초 |
+
+- 각 실행의 skip/inconclusive0. `LabJigwiRewardBoardFireTests`부터 `LabLocalBoardNetworkIntegrationTests`까지 일곱 줄은 아래 검토 수정(정체 시 음성·화면 고정) 전에 실행했다. 그 수정은 음성·화면의 held 입력만 바꾼다. 나머지는 수정 뒤에 실행했다.
+- 새 검사
+  - EditMode `LabGuestBattleClockTests` 7개: 늦은 표본에서 단조 유지, 같은 값의 새 표본에서 외삽 유지, 1초 상한, 상한 도달 시 정체 표시와 해제, 정지 고정과 재개 재기준, 0.5초 되감김·라운드·세션 변경 수용, 잘못된 표본 무시와 Reset
+  - PlayMode `LabJigwiABPresentationTests`에 2개: 허용치 안의 작은 역행 뒤에도 실패 연출이 이어지고 큰 역행은 새로 시작함, 같은 헤더가 새 객체로 와도 시계가 되감기지 않고 1초 정체 시 `BattlePresentationHeld`가 켜졌다가 새 표본에서 풀림
+- 기존 정지 고정·재개 진행 검사는 그대로 통과했다.
+- 코드 검토 워크플로(세 관점 검토 + 지적별 반박 검증)에서 1건이 확인됐다. 1초 넘게 Host 시각이 오지 않으면 시계는 멈추는데 지귀 음성은 계속 재생된다. 그러면 0.075초마다 같은 지점으로 되돌아가며 끊긴다. 정체를 held로 다뤄 음성·화면이 멈추게 고쳤다.
+- **미실행:** 실제 다기기에서 지연이 들쭉날쭉할 때의 연출 체감, iPhone 실기기. 전체 PlayMode는 실행하지 않았다.
