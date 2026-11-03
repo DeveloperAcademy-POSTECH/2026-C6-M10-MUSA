@@ -1788,12 +1788,18 @@ namespace C6Lab
             phase == LabPhase.Playing && swipeBlockedUntil > now && now >= swipeBlockStartedAt
             && player == swipeBlockedPlayer && right == swipeBlockedRight;
 
-        private int DamageFor(LabOrbState orb)
+        private int DamageFor(LabOrbState orb) => AttackValueFor(orb.kind, orb.relayStage, rules.Damage,
+            rules.RelayDoubleMultiplier, rules.RelayMaxMultiplier);
+
+        /// <summary>
+        /// The attack value of a hit, shared by the Host's ConfirmHit and a Guest presenting its own hit before the
+        /// receipt (#459). A relay orb multiplies the base damage by its stage.
+        /// </summary>
+        public static int AttackValueFor(LabOrbKind kind, int relayStage, int damage, float relayDouble, float relayMax)
         {
-            if (orb.kind != LabOrbKind.Relay) return rules.Damage;
-            float multiplier = orb.relayStage >= RelayMaxStage ? rules.RelayMaxMultiplier
-                : orb.relayStage == 2 ? rules.RelayDoubleMultiplier : 1f;
-            return Math.Max(1, (int)Math.Round(rules.Damage * multiplier));
+            if (kind != LabOrbKind.Relay) return damage;
+            float multiplier = relayStage >= RelayMaxStage ? relayMax : relayStage == 2 ? relayDouble : 1f;
+            return Math.Max(1, (int)Math.Round(damage * multiplier));
         }
 
         // Items last the item lifetime; for a locked bomb that is its fuse. An unlocked bomb is an

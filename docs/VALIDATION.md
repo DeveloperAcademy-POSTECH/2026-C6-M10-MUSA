@@ -4230,3 +4230,70 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
   - 검사가 첫 결함을 가렸음
 - **남은 한계:** 여유를 크게 잡아 보관 구슬이 많은 판(기본 한도 20에서 10개 이상)에서는 선반영하지 않고 이전처럼 승인 뒤에 울린다. 위 조건 밖의 드문 거절(예: 북을 옮기는 중의 소유권 변경)에서는 소리만 먼저 나고 구슬은 생기지 않는다.
 - **미실행:** iPhone 실기기·여러 폰에서의 체감. 전체 PlayMode는 실행하지 않았다.
+
+## #459 Guest 내 투척 명중 반응 접촉 즉시 표현 — 2026-11-03
+
+- **기준:** main `ae60df93` → `fix/#459-own-throw-local-contact`. Unity6000.6.5f1/macOS의 연결된 Editor에서 실행했다. 새 Mac·iOS 빌드는 만들지 않았다.
+- **배경:** Guest가 던진 공은 로컬 시각 복제본으로 날아갔다. 그러나 박에 닿아도 Host의 `targetImpact`가 올 때까지 박의 흔들림·명중 효과·타격음·진동이 나지 않았다.
+- **수정:**
+  - **시각 복제본 접촉 보고:** `LabProjectile.LaunchVisual(..., contact)`로 시각 복제본이 닿은 대상(박/바닥/불)·지점·속도를 한 번 알린다. Host 판정 콜백은 여전히 시각 복제본에서 호출되지 않는다.
+  - **접촉 즉시 표현:** 내 투척이 박에 닿으면 Host와 같은 식으로 킥·회전을 적용하고(`ApplyPredictedImpact`, 실제로 더해진 양 기록), 명중 효과와 `LocalThrowHit`를 바로 낸다. 타격 값은 Host와 같은 `LabModel.AttackValueFor`다. 바닥이면 `LocalThrowMissed`를 바로 낸다. 불은 Host 전용이다. 요청당 한 번만 표현한다(`LabLocalHitPresentation`).
+  - **Host 결과로 보정:**
+    - Host `targetImpact`가 표현한 명중을 확정하면, 예측 충격이 지금까지 남긴 영향을 빼고 Host 충격이 같은 시점부터 남겼을 영향을 넣는다(`CorrectPredictedImpact`, 흔들림·줄 감쇠 스프링과 회전 감쇠를 따라 계산). 효과·소리는 다시 내지 않는다.
+    - `targetMiss`면 같은 방식으로 되돌리고(`UndoPredictedImpact`) 빗나감 소리를 낸다.
+    - 표현한 빗나감 뒤 Host 명중은 이전처럼 전부 재생한다.
+    - 도색·오색·불에 막힘 알림은 항상 Host 결과다.
+  - **판정이 오지 않을 때:** Host는 무효로 만든 접촉(라운드 종료·불장막·공급 구슬)에 아무것도 보내지 않는다. 그래서 전투 연출 시계(정지·정체 중 멈춤)로 max(1.5초, 4×RTT) 안에 판정이 없으면 킥을 되돌린다. 그 뒤 늦게 온 판정은 킥만 적용하고 소리를 다시 내지 않는다.
+  - **보류 훅:** 접촉 때 #433의 보류 훅을 걸고, 대기 중인 명중이 없을 때만 푼다.
+  - **선반영하지 않는 경우:** 진행 중이 아님, 지귀 B 불장막·예고(현재 연출 시각 + 0.75초 안), 나에게 걸린 지귀 스테이지 불, legacy 불·과열, 지귀 공급 구슬.
+  - Host 판정·와이어·접속 규약 **5682/Lab43/Game27**·공유 설정 257개는 그대로다.
+
+| 실행 검사 | 결과 | 시간 |
+| --- | --- | --- |
+| 전체 EditMode | **1847/1847 PASS** | 51.51초 |
+| PlayMode `LabLocalBoardNetworkIntegrationTests` | **21/21 PASS** | 0.50초 |
+| PlayMode `LabHangingRenderInterpolationTests` | **9/9 PASS** | 1.97초 |
+| PlayMode `LabProjectileContactTests` | **8/8 PASS** | 4.41초 |
+| PlayMode `LabRopeReconciliationTests` | **8/8 PASS** | 0.15초 |
+| PlayMode `LabHangingPresentationTests` | **14/14 PASS** | 22.67초 |
+| PlayMode `LabImpactFeedbackTests` | **2/2 PASS** | 0.87초 |
+| PlayMode `LabJigwiABNetworkTests` | **13/13 PASS** | 11.02초 |
+| PlayMode `LabComboProjectileIntegrationTests` | **4/4 PASS** | 0.09초 |
+| PlayMode `LabStraightThrowTests` | **3/3 PASS** | 2.12초 |
+| PlayMode `LabDeveloperSoloIntegrationTests` | **14/14 PASS**(아래 참고) | 21.35초 |
+| PlayMode `GameSceneFlowTests` | **21/21 PASS** | 219.39초 |
+
+- 각 실행의 skip/inconclusive0.
+- `LabDeveloperSoloIntegrationTests`는 최종 코드에서 처음 실행했을 때 `SavedSceneSoloCanGenerateCombineAndPhysicallyPaintTheGourd` 1건이 실패했다(13/14). 바로 두 번 다시 실행해 모두 14/14였다. 실제 물리 투척이 들어간 검사로, 이번 변경 전 코드에서도 이 PR 중 통과·실패가 갈린 적은 없었다. 원인을 따로 확인하지 않아 간헐 실패로만 기록한다.
+- 최종 코드에서 EditMode 전체와 `LabLocalBoardNetworkIntegrationTests`·`LabHangingRenderInterpolationTests`·`LabProjectileContactTests`·`LabHangingPresentationTests`·`GameSceneFlowTests`를 다시 실행했다. 나머지 PlayMode 일곱 클래스는 3차 검토 수정(만료 기록 키·과감쇠 공식) 전 코드에서 실행했다. 그 수정은 Guest 표현 원장과 보정 계산에만 해당한다.
+- 새 검사
+  - EditMode `LabLocalHitPresentationTests` 18개: 1회 표현·승인 ID로 찾기, Host가 먼저 정하면 늦은 표현 막기, 롤백 뒤 같은 구슬 재발사가 별도 항목, 시간으로 되돌림과 늦은 판정 표시, 임시 ID로 만료된 뒤 Host ID로 찾기, 롤백·재발사가 만료 기록을 지움, 스프링 응답 = 시뮬레이션(과감쇠·임계·무복원 포함), 타격 값 = Host 규칙
+  - PlayMode `LabProjectileContactTests`에 1개: 시각 복제본이 박·바닥 접촉을 한 번 알리고 Host 식별자를 싣지 않음
+  - PlayMode `LabHangingRenderInterpolationTests`에 2개: 같은 프레임 보정·제한에 걸린 되돌림, 0.8초 흔들린 뒤 늦은 보정·되돌림이 반대 킥이 아님
+  - PlayMode `LabLocalBoardNetworkIntegrationTests`에 5개(실제 `Receive` 경로)
+    - 표현한 명중은 Host 확정 뒤에도 한 번이고 회전 차이만 적용
+    - Host 빗나감은 킥·회전을 되돌리고 빗나감 소리
+    - 표현한 빗나감 뒤 Host 명중은 재생하고 확정된 빗나감은 두 번 나지 않음
+    - 판정이 없으면 시간으로 되돌리고 늦은 판정은 소리 없이 킥만 적용
+    - 지귀 B 불장막·A와 겹친 B 예고 중에는 표현하지 않음
+- 코드 검토 워크플로를 네 번(관점별 검토 + 지적별 반박 검증) 돌려 확인된 지적을 고쳤다.
+  - 1차
+    - Host가 판정 패킷을 보내지 않는 무효 접촉
+    - A와 겹친 B 예고를 놓치는 판정
+    - 롤백 뒤 재발사의 중복 표현
+    - 첫 판정이 다른 대기 명중의 보류를 푸는 문제
+    - 제한에 걸린 킥을 선형으로 되돌리는 문제
+    - 회전 없는 검사
+  - 2차
+    - 시간 되돌림 뒤 늦은 판정의 전체 재생
+    - 정지 중에도 흐르는 만료 시계
+    - 감쇠된 흔들림을 원래 속도로 빼서 생기는 반대 킥
+  - 3차
+    - 임시 ID로 만료된 기록을 늦은 판정이 찾지 못하는 문제
+    - 롤백 뒤 남은 만료 기록이 다음 진짜 명중 소리를 막는 문제
+    - 과감쇠 스프링 공식
+- **남은 한계:**
+  - 먼저 낸 타격음·진동·명중 효과는 되돌릴 수 없다. 그래서 Host가 빗나감·무효로 정하면 소리·진동만 먼저 난 셈이 된다(빗나감은 빗나감 소리, 무효는 킥만 되돌림).
+  - 표현한 명중의 `paintBlocked` 결과에는 명중 효과와 막힘 효과가 함께 보인다.
+  - 흔들림 한도에 부딪힌 반동은 보정 계산에 넣지 않는다.
+- **미실행:** iPhone 실기기·여러 폰에서의 체감. 전체 PlayMode는 실행하지 않았다.

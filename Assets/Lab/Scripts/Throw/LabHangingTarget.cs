@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -285,12 +286,128 @@ namespace C6Lab
         {
             if (pivot == null) return;
             ApplyRopeLength();
-            Vector3 local = transform.InverseTransformDirection(incomingVelocity);
-            if (!Finite(local.x) || !Finite(local.y) || !Finite(local.z)) return;
-            velocity += Vector2.ClampMagnitude(new Vector2(-local.z, local.x) * ImpactStrength, 180f);
+            if (!KickContribution(incomingVelocity, out Vector2 swing, out float bounce)) return;
+            velocity += swing;
             velocity = Vector2.ClampMagnitude(velocity, 220f);
-            verticalVelocity = Mathf.Clamp(verticalVelocity + Mathf.Min(local.magnitude, 30f) * BounceStrength, -8f, 8f);
+            verticalVelocity = Mathf.Clamp(verticalVelocity + bounce, -8f, 8f);
             flash = .16f;
+            ShiftPose();
+        }
+
+        /// <summary>What one impact adds to the swing and rope velocities, before the overall limits.</summary>
+        private bool KickContribution(Vector3 incomingVelocity, out Vector2 swing, out float bounce)
+        {
+            swing = Vector2.zero; bounce = 0f;
+            Vector3 local = transform.InverseTransformDirection(incomingVelocity);
+            if (!Finite(local.x) || !Finite(local.y) || !Finite(local.z)) return false;
+            swing = Vector2.ClampMagnitude(new Vector2(-local.z, local.x) * ImpactStrength, 180f);
+            bounce = Mathf.Min(local.magnitude, 30f) * BounceStrength;
+            return true;
+        }
+
+        /// <summary>The swing, rope and spin velocity one impact actually added, after every limit, and when (#459).</summary>
+        public readonly struct AppliedImpact
+        {
+            public readonly Vector2 Swing;
+            public readonly float Bounce, Yaw;
+            /// <summary>Scaled game time of the impact: it stops while paused, like the simulation.</summary>
+            public readonly double AppliedAt;
+            public AppliedImpact(Vector2 swing, float bounce, float yaw, double appliedAt)
+            { Swing = swing; Bounce = bounce; Yaw = yaw; AppliedAt = appliedAt; }
+        }
+
+        /// <summary>
+        /// The thrower's screen presents its own contact with the Host's formula (<see cref="ApplyHostImpact"/>) and
+        /// keeps what it actually changed, so the Host's verdict can replace it, limits included.
+        /// </summary>
+        public float ApplyPredictedImpact(Vector3 hitPointWorld, Vector3 impactVelocity, out AppliedImpact applied)
+        {
+            Vector2 swing = velocity; float bounce = verticalVelocity, yaw = yawSpeedDegreesPerSecond;
+            float impulse = ApplyHostImpact(hitPointWorld, impactVelocity);
+            applied = new AppliedImpact(velocity - swing, verticalVelocity - bounce, yawSpeedDegreesPerSecond - yaw, Time.timeAsDouble);
+            return impulse;
+        }
+
+        /// <summary>
+        /// The Host confirmed a presented impact with its own values: take out what the prediction has become by now
+        /// and put in what the Host's impact would have become since the same moment.
+        /// </summary>
+        public void CorrectPredictedImpact(AppliedImpact applied, Vector3 hostVelocity, float hostYawImpulse)
+        {
+            if (pivot == null) return;
+            Evolve(applied, -1f);
+            KickContribution(hostVelocity, out Vector2 swing, out float bounce);
+            Evolve(new AppliedImpact(swing, bounce, Finite(hostYawImpulse) ? hostYawImpulse : 0f, applied.AppliedAt), 1f);
+            ApplyEvolvedPose();
+        }
+
+        /// <summary>The Host decided a presented impact did not count: take out what it has become by now.</summary>
+        public void UndoPredictedImpact(AppliedImpact applied)
+        {
+            if (pivot == null) return;
+            Evolve(applied, -1f);
+            ApplyEvolvedPose();
+        }
+
+        /// <summary>
+        /// Add (or remove) an impact's effect as it stands now. The swing and rope are damped springs and the spin a
+        /// damped rate, all linear, so an old impulse can be taken out exactly as the simulation carried it forward
+        /// (apart from the swing limit's rebound, which is rare). Removing only the original velocity would turn the
+        /// undo into a counter-kick once the swing has moved on.
+        /// </summary>
+        private void Evolve(AppliedImpact impact, float sign)
+        {
+            float elapsed = Mathf.Max(0f, (float)(Time.timeAsDouble - impact.AppliedAt));
+            SpringResponse(ReturnStrength, SwingDamping, elapsed, out float swingAngle, out float swingRate);
+            angle += sign * impact.Swing * swingAngle;
+            velocity += sign * impact.Swing * swingRate;
+            if (MaximumExtension > 0f)
+            {
+                SpringResponse(BounceReturnStrength, BounceDamping, elapsed, out float offset, out float rate);
+                verticalOffset += sign * impact.Bounce * offset;
+                verticalVelocity += sign * impact.Bounce * rate;
+            }
+            float decay = Mathf.Exp(-spinDamping * elapsed);
+            yawSpeedDegreesPerSecond += sign * impact.Yaw * decay;
+            yawAngleDegrees += sign * impact.Yaw * (spinDamping > 0f ? (1f - decay) / spinDamping : elapsed);
+        }
+
+        /// <summary>Position and velocity, <paramref name="elapsed"/> seconds after a unit velocity impulse, of x'' = -k·x - c·x'.</summary>
+        public static void SpringResponse(float stiffness, float damping, float elapsed, out float position, out float rate)
+        {
+            double half = damping * .5d, t = elapsed, squared = stiffness - half * half;
+            if (squared > 1e-6d)
+            {
+                double frequency = Math.Sqrt(squared), envelope = Math.Exp(-half * t);
+                double sine = Math.Sin(frequency * t), cosine = Math.Cos(frequency * t);
+                position = (float)(envelope * sine / frequency);
+                rate = (float)(envelope * (cosine - half / frequency * sine));
+            }
+            else if (squared < -1e-6d)
+            {
+                // Overdamped (a DEV setting can make the damping exceed the restoring force).
+                double root = Math.Sqrt(-squared), fast = -half - root, slow = -half + root;
+                double fastDecay = Math.Exp(fast * t), slowDecay = Math.Exp(slow * t);
+                position = (float)((slowDecay - fastDecay) / (slow - fast));
+                rate = (float)((slow * slowDecay - fast * fastDecay) / (slow - fast));
+            }
+            else
+            {
+                double envelope = Math.Exp(-half * t);
+                position = (float)(t * envelope);
+                rate = (float)(envelope * (1d - half * t));
+            }
+        }
+
+        private void ApplyEvolvedPose()
+        {
+            angle = Vector2.ClampMagnitude(angle, MaximumAngle);
+            velocity = Vector2.ClampMagnitude(velocity, 220f);
+            verticalVelocity = Mathf.Clamp(verticalVelocity, -8f, 8f);
+            yawSpeedDegreesPerSecond = Mathf.Clamp(yawSpeedDegreesPerSecond, -maximumSpinSpeed, maximumSpinSpeed);
+            pivot.localRotation = Quaternion.Euler(angle.x, 0, angle.y);
+            ApplyYawRotation();
+            ApplyRopeLength();
             ShiftPose();
         }
 

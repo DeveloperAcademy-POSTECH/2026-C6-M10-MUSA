@@ -157,3 +157,7 @@
 ## #457 Guest 북 탭 선반영
 
 - Guest 북 탭의 `SpawnStarted`(소리·진동)는 `LabGenerationPrediction.Certain`이 참일 때만 승인 전에 올리고, 그 구슬은 크레딧으로 다시 울리지 않는다. 대기 수는 `localActions`에서 아직 답이 없는 요청만 센다(`actionRequests`는 라운드 동안 남는다). 보관 한도 판정에는 여우불·오색구슬 보상·양쪽 이웃·아이템 열기의 도착 여유를 둔다. 생성 판정·Host 규칙을 바꾸면 이 조건도 함께 맞춘다.
+
+## #459 Guest 내 투척 접촉 즉시 표현
+
+- Guest는 자기 투척의 시각 복제본 접촉(`LabProjectile.LaunchVisual`의 contact 콜백)으로 박 킥·명중 효과·타격음·진동 또는 빗나감 소리를 Host 판정 전에 한 번 낸다(`LabLocalHitPresentation`). Host `targetImpact`·`targetMiss`는 그 표현을 감쇠까지 고려해 보정하거나 되돌리며(`CorrectPredictedImpact`/`UndoPredictedImpact`), 판정이 없으면 전투 연출 시계로 시간이 지나면 되돌린다. 도색·피해·오색·막힘은 항상 Host 결과이고, 지귀 B 불장막·스테이지 불·legacy 불·공급 구슬 중에는 선반영하지 않는다. Host가 판정 패킷을 보내는 경우를 바꾸면 이 경로도 함께 확인한다.
