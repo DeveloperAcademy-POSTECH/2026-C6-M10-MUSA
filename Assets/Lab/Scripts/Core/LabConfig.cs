@@ -944,7 +944,7 @@ namespace C6Lab
         [SerializeField, Range(0f, 1f)] private float yaguangComboBigEndSoundVolume = .7f;
         [Tooltip("SMALL 중 던진 작은 공이 맞을 때 일반 타격음을 높이는 반음 수 (0이면 그대로, 던진 사람 기기)")]
         [SerializeField, Range(0f, 12f)] private float smallHitPitchSemitones = 6f;
-        [Tooltip("BIG 중 던진 큰 공이 맞을 때 징 크기 (Resources/Audio/FiveColorHit, 던진 사람 기기)")]
+        [Tooltip("BIG 중 던진 큰 공이 맞을 때 소리 크기 (Resources/Audio/FiveColorHit, #464부터 25현 가야금, 던진 사람 기기)")]
         [SerializeField, Range(0f, 1f)] private float bigHitSoundVolume = .8f;
         [Header("야광귀 콤보 BIG/SMALL BGM 톤과 성공 대사 (Inspector 전용)")]
         [Tooltip("BIG 배지가 떠 있는 동안 전투 BGM을 높이는 반음 (2 = 한 음, 0이면 그대로, 모든 기기)")]

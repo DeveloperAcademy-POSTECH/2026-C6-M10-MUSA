@@ -7,7 +7,7 @@ namespace C6Lab
     /// 섬광 파훼 보상 오색구슬 (#329)의 모습. 판·투사체 구슬 위에 다섯 색(노랑·초록·파랑·빨강·갈색) 사이를 쉬지 않고
     /// 부드럽게 건너가는 구슬을 얹는다. 몸통 색이 바뀌는 동안 안쪽에서 다음 색 빛이 천천히 돌아 물들고, 둘레에는 같은 색
     /// 빛무리, 가장자리를 따라 도는 윤광, 둘레에서 피었다 지는 별빛이 있어 영롱하게 보인다. 박에 맞은 자리에서는
-    /// 다섯 색 별가루를 터뜨린다. 화면 표시만 하며 규칙·물리에는 쓰지 않는다.
+    /// 다섯 색 가루 먼지가 털리고 그 위로 별가루가 함께 터진다 (#464). 화면 표시만 하며 규칙·물리에는 쓰지 않는다.
     /// 3D로 날아가는 오색구슬(투사체)은 납작한 그림을 얹지 않고, 구슬(3D 공) 자체의 색이 다섯 색 사이를 건너간다 (#426).
     /// 그림은 카메라 쪽으로 돌려 세워야 하는데, 자리마다 전투 카메라 방향이 달라 옆자리에서는 그림이 납작하게 공 옆으로 비켜 보였다.
     /// 먹선·그늘·하이라이트 그림은 Resources/Yaguang/FiveColorOrb, 별은 FiveColorSparkle에 있고, 없으면 코드로 그린 것을 쓴다.
@@ -52,11 +52,22 @@ namespace C6Lab
         private SpriteRenderer[] burstStars;
         private float radius = .3f, age, dim;
         private bool burst;
+        private Vector3[] burstDirections;
         // 3D로 날아가는 구슬: 그림 대신 이 구슬의 3D 공 렌더러 색을 바꾼다.
         private Transform flightRoot;
         private MaterialPropertyBlock tintBlock;
         private readonly System.Collections.Generic.List<MeshRenderer> tinted = new System.Collections.Generic.List<MeshRenderer>();
-        private Vector3[] burstDirections;
+        // 먼지 털림 (오색구슬 명중 비교용): 부드러운 가루 뭉게구름 + 작은 알갱이.
+        private const int DustPuffCount = 7, DustSpeckCount = 14;
+        private const float DustSeconds = .9f, DustReach = 2.4f, SpeckReach = 3.6f;
+        /// <summary>먼지 뭉게구름 크기 배율 기본값 (#464에서 시험해 고른 값)</summary>
+        public const float DefaultDustPuffScale = 2f;
+        private static readonly Color DustTone = new Color(.93f, .88f, .78f, 1f);
+        private bool dust;
+        private SpriteRenderer[] dustPuffs, dustSpecks;
+        private Vector3[] puffDirections, speckDirections;
+        private float[] puffSizes, speckSizes;
+        private float puffScale = 1f;
 
         /// <summary>오색구슬 그림이 보이는지</summary>
         public bool Shown => body != null && body.gameObject.activeSelf;
@@ -110,6 +121,45 @@ namespace C6Lab
             return look;
         }
 
+        /// <summary>
+        /// 박에 맞은 자리에서 다섯 색 가루 먼지가 털리듯 퍼진다. 부드러운 뭉게구름이 확 퍼졌다 느려지며 커지고 살짝 떠오르며
+        /// 흐려지고, 작은 알갱이는 더 멀리 튀었다 떨어진다. 스스로 사라진다.
+        /// </summary>
+        public static LabFiveColorSparkle DustBurst(Vector3 worldPoint, float orbRadius, float puffScale = DefaultDustPuffScale)
+        {
+            var root = new GameObject("Five Color Dust Burst");
+            root.transform.position = worldPoint;
+            var look = root.AddComponent<LabFiveColorSparkle>();
+            look.dust = true;
+            look.radius = orbRadius > 0f ? orbRadius : .3f;
+            look.puffScale = puffScale > 0f && !float.IsInfinity(puffScale) ? puffScale : DefaultDustPuffScale;
+            RenderPipelineManager.beginCameraRendering += look.FaceRenderingCamera;
+            look.dustPuffs = new SpriteRenderer[DustPuffCount];
+            look.puffDirections = new Vector3[DustPuffCount];
+            look.puffSizes = new float[DustPuffCount];
+            for (int i = 0; i < DustPuffCount; i++)
+            {
+                float angle = (i + Random.value * .6f) / DustPuffCount * Mathf.PI * 2f;
+                look.puffDirections[i] = new Vector3(Mathf.Cos(angle), Mathf.Sin(angle) * .75f + .15f, 0f) * Random.Range(.55f, 1f);
+                look.puffSizes[i] = Random.Range(.9f, 1.4f);
+                look.dustPuffs[i] = look.Part("Five Color Dust Puff " + i, GlowSprite(),
+                    Color.Lerp(StarColor(i), DustTone, .55f), BurstOrder - 2); // 별가루 아래
+            }
+            look.dustSpecks = new SpriteRenderer[DustSpeckCount];
+            look.speckDirections = new Vector3[DustSpeckCount];
+            look.speckSizes = new float[DustSpeckCount];
+            for (int i = 0; i < DustSpeckCount; i++)
+            {
+                float angle = Random.value * Mathf.PI * 2f;
+                look.speckDirections[i] = new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), 0f) * Random.Range(.6f, 1.1f);
+                look.speckSizes[i] = Random.Range(.08f, .16f);
+                look.dustSpecks[i] = look.Part("Five Color Dust Speck " + i, DiscSprite(),
+                    Color.Lerp(StarColor(i), DustTone, .3f), BurstOrder - 1);
+            }
+            look.Update();
+            return look;
+        }
+
         public void Show(bool shown)
         {
             if (body == null) return;
@@ -146,7 +196,35 @@ namespace C6Lab
         private void Update()
         {
             age += Time.deltaTime;
-            if (burst)
+            if (dust)
+            {
+                float u = Mathf.Clamp01(age / DustSeconds);
+                float ease = 1f - (1f - u) * (1f - u) * (1f - u);
+                // 처음 아주 짧게 피어나고, 끝으로 갈수록 흐려진다.
+                float fade = Mathf.Pow(1f - u, 1.5f) * Mathf.Clamp01(u * 8f + .2f);
+                for (int i = 0; i < DustPuffCount; i++)
+                {
+                    SpriteRenderer puff = dustPuffs[i];
+                    // 크게 할수록 조금 더 멀리 퍼지게 한다 (뭉게구름끼리 한 덩어리로 뭉치지 않게).
+                    float spread = Mathf.Lerp(1f, puffScale, .5f);
+                    puff.transform.localPosition = puffDirections[i] * (DustReach * radius * spread * ease) + Vector3.up * (.35f * radius * puffScale * u);
+                    puff.transform.localScale = Vector3.one * (radius * puffScale * puffSizes[i] * (.5f + 1.7f * ease));
+                    Color color = puff.color;
+                    color.a = .75f * fade;
+                    puff.color = color;
+                }
+                for (int i = 0; i < DustSpeckCount; i++)
+                {
+                    SpriteRenderer speck = dustSpecks[i];
+                    speck.transform.localPosition = speckDirections[i] * (SpeckReach * radius * ease) + Vector3.down * (1.2f * radius * u * u);
+                    speck.transform.localScale = Vector3.one * (radius * speckSizes[i] * 2f * (1f - .5f * u));
+                    Color color = speck.color;
+                    color.a = 1f - u;
+                    speck.color = color;
+                }
+                if (u >= 1f) Destroy(gameObject);
+            }
+            else if (burst)
             {
                 float u = Mathf.Clamp01(age / BurstSeconds);
                 for (int i = 0; i < BurstCount; i++)
@@ -195,7 +273,7 @@ namespace C6Lab
 
         private void OnDestroy()
         {
-            if (burst) RenderPipelineManager.beginCameraRendering -= FaceRenderingCamera;
+            if (burst || dust) RenderPipelineManager.beginCameraRendering -= FaceRenderingCamera;
         }
 
         private void Pose()
