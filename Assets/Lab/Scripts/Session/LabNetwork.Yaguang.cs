@@ -56,12 +56,13 @@ namespace C6Lab
             if (fresh > 0) FiveColorOrbsReceived?.Invoke(fresh);
         }
 
-        /// <summary>오색구슬 명중 (#329): 맞은 자리에 다섯 색 별가루를 터뜨리고, 던진 사람이면 진동한다.</summary>
+        /// <summary>오색구슬 명중 (#329): 맞은 자리에 다섯 색 가루 먼지를 털고 (#464, 별가루 대신), 던진 사람이면 진동한다.</summary>
         private void PresentFiveColorHit(Vector3 targetLocalPoint, ulong owner)
         {
             if (target == null) return;
             Transform hitbox = target.Hitbox != null ? target.Hitbox.transform : target.transform;
-            LabFiveColorSparkle.Burst(hitbox.TransformPoint(targetLocalPoint), config != null ? config.OrbRadius : .3f);
+            LabFiveColorSparkle.DustBurst(hitbox.TransformPoint(targetLocalPoint), config != null ? config.OrbRadius : .3f,
+                LabFiveColorHitSoundChoice.DustPuffScale);
             if (owner == LocalPlayerId) LocalFiveColorHit?.Invoke();
         }
     }

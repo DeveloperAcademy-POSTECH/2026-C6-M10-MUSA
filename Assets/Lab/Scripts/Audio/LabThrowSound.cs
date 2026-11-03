@@ -170,6 +170,17 @@ namespace C6Lab
         private void PlayBig()
         {
             if (bigSource == null) return;
+            // 소리 시험 (#464): 시험 소리를 골랐으면 징 대신 그 소리를 낸다.
+            AudioClip test = LabFiveColorHitSoundChoice.TestClip;
+            if (test != null)
+            {
+                bigSource.Stop();
+                bigSource.clip = test;
+                bigSource.volume = LabFiveColorHitSoundChoice.TestVolume * LabAudioSettings.SfxVolume;
+                bigSource.Play();
+                Debug.Log("[FiveColorHit] BIG 큰 공 명중 소리: " + test.name);
+                return;
+            }
             int index = Random.Range(0, bigHitClips.Length);
             if (bigHitClips.Length > 1 && index == lastBigIndex)
                 index = (index + 1 + Random.Range(0, bigHitClips.Length - 1)) % bigHitClips.Length;
