@@ -21,7 +21,8 @@ namespace C6Lab
             [InspectorName("4 · 뿌직 up")] Test4 = 4,
             [InspectorName("5 · 진고 타격음 (강)")] Test5 = 5,
             [InspectorName("6 · 가야금 오음 C D F G B♭ (오르내림 번갈아)")] Test6 = 6,
-            [InspectorName("7 · 가야금 오음 띠리리리링 (낮게)")] Test7 = 7
+            [InspectorName("7 · 가야금 오음 띠리리리링 (낮게)")] Test7 = 7,
+            [InspectorName("8 · 새 소리 1/2 번갈아")] Test8 = 8
         }
 
         public enum HitEffect
@@ -39,7 +40,7 @@ namespace C6Lab
         public bool drumAlwaysFiveColor;
 
         [Header("소리 (오색구슬 명중 + BIG 큰 공 명중)")]
-        [Tooltip("0 = 지금 징 (Audio/FiveColorHit), 1~7 = 시험 소리 (Audio/FiveColorHitTest/FiveColorHitTest_번호, 같은 번호가 여러 개면 번갈아)")]
+        [Tooltip("0 = 지금 징 (Audio/FiveColorHit), 1~8 = 시험 소리 (Audio/FiveColorHitTest/FiveColorHitTest_번호, 같은 번호가 여러 개면 번갈아)")]
         public Sound sound = Sound.Test1;
         [Tooltip("시험 소리 크기 (징 크기는 기존 설정 그대로)")]
         [Range(0f, 1f)] public float testVolume = 1f;
