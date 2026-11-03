@@ -109,19 +109,7 @@ namespace C6Lab
             int count = FiveColorHitClipCount;
             int index = count > 0 ? fiveColorHitNext % count : 0;
             fiveColorHitNext = count > 0 ? (index + 1) % count : 0;
-            if (hitSource == null) return false;
-            // 소리 시험 (#464): 시험 소리를 골랐으면 기본 소리 대신 그 소리를 낸다.
-            AudioClip test = LabFiveColorHitSoundChoice.NextTestClip();
-            if (test != null)
-            {
-                hitSource.Stop();
-                hitSource.clip = test;
-                hitSource.volume = LabFiveColorHitSoundChoice.TestVolume * LabAudioSettings.SfxVolume;
-                hitSource.Play();
-                Debug.Log("[FiveColorHit] 오색구슬 명중 소리: " + test.name);
-                return true;
-            }
-            if (count == 0) return false;
+            if (count == 0 || hitSource == null) return false;
             // 앞 소리가 아직 울려도 끊고 처음부터 새로 친다 (#395).
             hitSource.Stop();
             hitSource.clip = fiveColorHitClips[index];

@@ -7,7 +7,7 @@ namespace C6Lab
     /// 섬광 파훼 보상 오색구슬 (#329)의 모습. 판·투사체 구슬 위에 다섯 색(노랑·초록·파랑·빨강·갈색) 사이를 쉬지 않고
     /// 부드럽게 건너가는 구슬을 얹는다. 몸통 색이 바뀌는 동안 안쪽에서 다음 색 빛이 천천히 돌아 물들고, 둘레에는 같은 색
     /// 빛무리, 가장자리를 따라 도는 윤광, 둘레에서 피었다 지는 별빛이 있어 영롱하게 보인다. 박에 맞은 자리에서는
-    /// 다섯 색 별가루를 터뜨리거나 가루 먼지가 털린다 (#464, LabFiveColorHitSoundChoice로 고름). 화면 표시만 하며 규칙·물리에는 쓰지 않는다.
+    /// 다섯 색 가루 먼지가 털리고 그 위로 별가루가 함께 터진다 (#464). 화면 표시만 하며 규칙·물리에는 쓰지 않는다.
     /// 3D로 날아가는 오색구슬(투사체)은 납작한 그림을 얹지 않고, 구슬(3D 공) 자체의 색이 다섯 색 사이를 건너간다 (#426).
     /// 그림은 카메라 쪽으로 돌려 세워야 하는데, 자리마다 전투 카메라 방향이 달라 옆자리에서는 그림이 납작하게 공 옆으로 비켜 보였다.
     /// 먹선·그늘·하이라이트 그림은 Resources/Yaguang/FiveColorOrb, 별은 FiveColorSparkle에 있고, 없으면 코드로 그린 것을 쓴다.
@@ -60,6 +60,8 @@ namespace C6Lab
         // 먼지 털림 (오색구슬 명중 비교용): 부드러운 가루 뭉게구름 + 작은 알갱이.
         private const int DustPuffCount = 7, DustSpeckCount = 14;
         private const float DustSeconds = .9f, DustReach = 2.4f, SpeckReach = 3.6f;
+        /// <summary>먼지 뭉게구름 크기 배율 기본값 (#464에서 시험해 고른 값)</summary>
+        public const float DefaultDustPuffScale = 2f;
         private static readonly Color DustTone = new Color(.93f, .88f, .78f, 1f);
         private bool dust;
         private SpriteRenderer[] dustPuffs, dustSpecks;
@@ -123,14 +125,14 @@ namespace C6Lab
         /// 박에 맞은 자리에서 다섯 색 가루 먼지가 털리듯 퍼진다. 부드러운 뭉게구름이 확 퍼졌다 느려지며 커지고 살짝 떠오르며
         /// 흐려지고, 작은 알갱이는 더 멀리 튀었다 떨어진다. 스스로 사라진다.
         /// </summary>
-        public static LabFiveColorSparkle DustBurst(Vector3 worldPoint, float orbRadius, float puffScale = 2f)
+        public static LabFiveColorSparkle DustBurst(Vector3 worldPoint, float orbRadius, float puffScale = DefaultDustPuffScale)
         {
             var root = new GameObject("Five Color Dust Burst");
             root.transform.position = worldPoint;
             var look = root.AddComponent<LabFiveColorSparkle>();
             look.dust = true;
             look.radius = orbRadius > 0f ? orbRadius : .3f;
-            look.puffScale = puffScale > 0f && !float.IsInfinity(puffScale) ? puffScale : 2f;
+            look.puffScale = puffScale > 0f && !float.IsInfinity(puffScale) ? puffScale : DefaultDustPuffScale;
             RenderPipelineManager.beginCameraRendering += look.FaceRenderingCamera;
             look.dustPuffs = new SpriteRenderer[DustPuffCount];
             look.puffDirections = new Vector3[DustPuffCount];
@@ -141,7 +143,7 @@ namespace C6Lab
                 look.puffDirections[i] = new Vector3(Mathf.Cos(angle), Mathf.Sin(angle) * .75f + .15f, 0f) * Random.Range(.55f, 1f);
                 look.puffSizes[i] = Random.Range(.9f, 1.4f);
                 look.dustPuffs[i] = look.Part("Five Color Dust Puff " + i, GlowSprite(),
-                    Color.Lerp(StarColor(i), DustTone, .55f), BurstOrder);
+                    Color.Lerp(StarColor(i), DustTone, .55f), BurstOrder - 2); // 별가루 아래
             }
             look.dustSpecks = new SpriteRenderer[DustSpeckCount];
             look.speckDirections = new Vector3[DustSpeckCount];
@@ -152,7 +154,7 @@ namespace C6Lab
                 look.speckDirections[i] = new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), 0f) * Random.Range(.6f, 1.1f);
                 look.speckSizes[i] = Random.Range(.08f, .16f);
                 look.dustSpecks[i] = look.Part("Five Color Dust Speck " + i, DiscSprite(),
-                    Color.Lerp(StarColor(i), DustTone, .3f), BurstOrder + 1);
+                    Color.Lerp(StarColor(i), DustTone, .3f), BurstOrder - 1);
             }
             look.Update();
             return look;

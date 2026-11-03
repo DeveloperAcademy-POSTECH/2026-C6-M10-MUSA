@@ -71,8 +71,6 @@
 
 > 본 저작물은 '국립국악원'에서 작성하여 공공누리 제1유형으로 개방한 '25현 가야금 - 기본음계 - 강(작성자: 국립국악원)'을 이용하였으며, 해당 저작물은 '국립국악원, https://www.gugak.go.kr/digitaleum/front/monotone/list.do'에서 무료로 다운받으실 수 있습니다.
 
-> 본 저작물은 '국립국악원'에서 작성하여 공공누리 제1유형으로 개방한 '건고 - 타격음 - 강, 교방고 - 타격음 - 강, 바라 - 타격음 - 강, 진고 - 타격음 - 강(작성자: 국립국악원)'을 이용하였으며, 해당 저작물은 '국립국악원, https://www.gugak.go.kr/digitaleum/front/monotone/list.do'에서 무료로 다운받으실 수 있습니다. (#464 시험용 소리, 출시 전 정리)
-
 | 우리 파일 | 국립국악원 저작물명 |
 | --- | --- |
 | `BGM/Kkwaenggwari_13.wav` | 동살풀이 |
@@ -82,7 +80,6 @@
 | `ComboClear/Jota.wav` | 추임새 – 좋타 (염경애) |
 | `ComboHit/ComboHit.wav` | 양금 기본음 강 |
 | `FiveColorHit/FiveColorHit_1.wav`, `FiveColorHit_2.wav` | 25현 가야금 - 기본음계 - 강 |
-| `FiveColorHitTest/` (#464 시험용, 출시 전 정리) | 건고 / 교방고 / 바라 / 진고 - 타격음 - 강, 25현 가야금 - 기본음계 - 강 |
 | `Fever/Fever_Whimori.wav` | 동살풀이 (꽹과리), 연주 - 능게 (태평소) |
 
 **CC BY 소리 (출처 표시 의무 있음)**
