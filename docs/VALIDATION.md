@@ -4145,3 +4145,51 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 - 기존 정지 고정·재개 진행 검사는 그대로 통과했다.
 - 코드 검토 워크플로(세 관점 검토 + 지적별 반박 검증)에서 1건이 확인됐다. 1초 넘게 Host 시각이 오지 않으면 시계는 멈추는데 지귀 음성은 계속 재생된다. 그러면 0.075초마다 같은 지점으로 되돌아가며 끊긴다. 정체를 held로 다뤄 음성·화면이 멈추게 고쳤다.
 - **미실행:** 실제 다기기에서 지연이 들쭉날쭉할 때의 연출 체감, iPhone 실기기. 전체 PlayMode는 실행하지 않았다.
+
+## #454 매달린 박 자세 렌더 보간 — 2026-11-03
+
+- **기준:** main `869f2c69` → `fix/#454-gourd-render-interpolation`. Unity6000.6.5f1/macOS의 연결된 Editor(URP)에서 실행했다. 새 Mac·iOS 빌드는 만들지 않았다.
+- **배경:** `LabHangingTarget`은 흔들림·회전·줄 길이를 `FixedUpdate`(50 Hz)에서만 적분하고 그때만 Transform에 썼다. 화면은 60 fps라 어떤 프레임은 같은 자세를 두 번 그리고 어떤 프레임은 한 스텝을 건너뛰어 박이 계단처럼 끊겨 보였다.
+- **수정:**
+  - 고정 스텝 적분·히트박스 권한은 그대로다. 마지막 두 고정 자세(`RigState`: 흔들림 각도·펼친 회전 각도·줄 오프셋·피벗 높이)를 보관한다.
+  - URP `RenderPipelineManager.beginContextRendering`에서만 `(Time.time − Time.fixedTime) / fixedDeltaTime` 비율로 보간한 자세를 쓰고, `endContextRendering`(과 `OnDisable`)에서 고정 자세로 되돌린다. 그래서 모든 스크립트(EarlyUpdate 네트워크 처리, FixedUpdate, Update의 Host 도색 흐름 표본, LateUpdate의 지귀 캡), 물리 질의, 코루틴은 고정 자세를 읽는다. `FixedUpdate`도 시작할 때 고정 자세를 다시 쓴다.
+  - 정지·홀드·일시정지 고정·초기화·설정 변경은 두 자세를 같게 고정해(`SnapPose`) 재개 때 뒤로 가지 않는다. 실행 중 네트워크 보정(`ReconcileYaw/Rope`)과 킥은 두 자세를 같은 양만큼 옮겨(`ShiftPose`) 10 Hz 보정마다 그림이 튀지 않는다.
+  - 박에 붙은 화면 UI(매혹 경고 말풍선 `LabGourdAlert`, 명중 표시 `LabImpactFeedback`)는 표시 전용 `LabHangingTarget.DrawnPoint`로 그려지는 위치에 맞춘다.
+  - 명중·도색·물리 판정·Scene·와이어·접속 규약 **5682/Lab43/Game27**·공유 설정 257개는 그대로다.
+
+| 실행 검사 | 결과 | 시간 |
+| --- | --- | --- |
+| 전체 EditMode | **1821/1821 PASS** | 48.79초 |
+| PlayMode `LabHangingRenderInterpolationTests` | **7/7 PASS** | 0.35초 |
+| PlayMode `LabHangingPresentationTests` | **14/14 PASS** | 22.65초 |
+| PlayMode `LabRopeReconciliationTests` | **8/8 PASS** | 0.12초 |
+| PlayMode `LabPaintFlowHostDirectionTests` | **1/1 PASS** | 0.70초 |
+| PlayMode `LabGourdAlertTests` | **3/3 PASS** | 4.02초 |
+| PlayMode `LabImpactFeedbackTests` | **2/2 PASS** | 0.85초 |
+| PlayMode `GameSceneFlowTests` | **21/21 PASS** | 219.43초 |
+| PlayMode `LabYaguangFlashLookTests` | **5/5 PASS** | 0.79초 |
+| PlayMode `LabDeveloperSoloIntegrationTests` | **14/14 PASS** | 19.12초 |
+| PlayMode `LabGourdHitboxTests` | **7/7 PASS** | 3.04초 |
+| PlayMode `LabProjectileContactTests` | **7/7 PASS** | 3.83초 |
+| PlayMode `LabStraightThrowTests` | **3/3 PASS** | 2.02초 |
+| PlayMode `LabGourdRopeDeveloperTests` | **4/4 PASS** | 1.49초 |
+| PlayMode `LabLocalBoardNetworkIntegrationTests` | **16/16 PASS** | 0.31초 |
+
+- 각 실행의 skip/inconclusive0. `LabGourdHitboxTests` 위의 여덟 줄은 최종 코드에서 실행했다. `LabGourdHitboxTests`부터 아래 다섯 줄은 렌더 단계 보간으로 바꾼 뒤, UI 위치 보정(`DrawnPoint`)을 넣기 전에 실행했다. 그 보정은 두 UI 컴포넌트의 화면 위치 계산만 바꾼다.
+- 새 검사
+  - EditMode `LabHangingRigStateTests` 6개: 중간값, 회전은 펼친 각도로(350→370의 중간은 360), alpha 범위 제한, NaN
+  - PlayMode `LabHangingRenderInterpolationTests` 7개
+    - 렌더 중 중간 자세와 렌더 끝의 고정 자세 복원, 홀드 중 FixedUpdate의 고정 자세
+    - 실제 프레임의 Update 뒤·프레임 끝에서 늘 고정 자세
+    - 실제 URP 렌더 중 두 고정 자세 사이를 그림(렌더가 없을 때만 Inconclusive이고 이번 실행은 통과)
+    - `DrawnPoint`가 그려지는 위치와 일치
+    - 홀드 시 두 자세 고정
+    - 실행 중 보정·킥의 보간 간격 유지와 정지 보정의 고정
+    - 프레임 alpha 범위
+- 코드 검토 워크플로를 두 번(관점별 검토 + 지적별 반박 검증) 돌렸다.
+  - 1차: LateUpdate의 보간 기록 때문에 지귀 표면 캡(LateUpdate)이 보간된 Transform과 고정 자세 콜라이더를 섞어 캐시함, 일시정지 재개 때 한 스텝 뒤로 감, 검사 하나가 자명함. 렌더 단계 보간으로 구조를 바꾸고 정지 시 고정·검사 교체로 고쳤다.
+  - 2차: 박에 붙은 화면 UI가 그려지는 박과 한 스텝까지 어긋남, 실제 렌더 검사가 회귀를 Inconclusive로 가릴 수 있음. `DrawnPoint`와 검사 수정으로 고쳤다.
+- **남은 한계(기록만)**
+  - 지귀 B 불장막 화면 틀(`TryGetJigwiABCurtainFrame`)은 판정 콜라이더와 같은 계산을 써서 고정 자세 그대로 두었다. 빠른 흔들림에서는 그려지는 박이 틀 가장자리(여유 0.06 이상)를 최대 한 스텝만큼 벗어날 수 있다.
+  - 도색 완료 연출(`LabPaintFinishPresentation.Begin`)의 복사본은 고정 자세에서 찍혀, 시작하는 한 프레임에 최대 한 고정 스텝(0.02초 움직임)만큼 앞으로 튈 수 있다.
+- **미실행:** iPhone 실기기에서의 체감·프레임 시간. 전체 PlayMode는 실행하지 않았다.
