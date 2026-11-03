@@ -57,6 +57,15 @@ namespace C6Lab
         private Transform flightRoot;
         private MaterialPropertyBlock tintBlock;
         private readonly System.Collections.Generic.List<MeshRenderer> tinted = new System.Collections.Generic.List<MeshRenderer>();
+        // 날아가는 오색구슬의 꼬리 (#469): 다섯 색 그라데이션이 시간에 따라 꼬리를 타고 흘러간다.
+        private const float TrailFlowSpeed = 2f, TrailHeadAlpha = .9f, TrailMiddleAlpha = .6f;
+        private TrailRenderer flightTrail;
+        private Gradient trailGradient;
+        private readonly GradientColorKey[] trailColors = new GradientColorKey[5];
+        private static readonly GradientAlphaKey[] TrailAlphas =
+        {
+            new GradientAlphaKey(TrailHeadAlpha, 0f), new GradientAlphaKey(TrailMiddleAlpha, .5f), new GradientAlphaKey(0f, 1f)
+        };
         // 먼지 털림 (오색구슬 명중 비교용): 부드러운 가루 뭉게구름 + 작은 알갱이.
         private const int DustPuffCount = 7, DustSpeckCount = 14;
         private const float DustSeconds = .9f, DustReach = 2.4f, SpeckReach = 3.6f;
@@ -245,7 +254,7 @@ namespace C6Lab
 
         private void LateUpdate()
         {
-            if (flightRoot != null) Tint();
+            if (flightRoot != null) { Tint(); TintTrail(); }
         }
 
         /// <summary>날아가는 구슬의 3D 공(굴림 표시 점 제외)을 지금 몸통 색으로 칠한다. 공이 바뀌어도 매번 다시 찾는다.</summary>
@@ -263,6 +272,33 @@ namespace C6Lab
                 tintBlock.SetColor("_Color", color);     // Standard shader fallback
                 surface.SetPropertyBlock(tintBlock);
             }
+        }
+
+        /// <summary>
+        /// 날아가는 구슬의 꼬리(TrailRenderer)를 다섯 색 그라데이션으로 칠한다. 머리부터 꼬리 끝까지 다섯 색이 한 번씩 놓이고,
+        /// 시간이 지나면 색이 꼬리를 타고 뒤로 흘러간다. 투명도는 머리 쪽이 진하고 끝으로 갈수록 사라진다. 꼬리가 없으면 넘어간다.
+        /// </summary>
+        public void TintTrail()
+        {
+            if (flightRoot == null) return;
+            if (flightTrail == null)
+            {
+                // 공의 기본 꼬리를 쓴다 (지귀 보상 불꽃 꼬리 같은 다른 꼬리는 건드리지 않는다).
+                LabProjectile projectile = flightRoot.GetComponentInParent<LabProjectile>();
+                flightTrail = projectile != null ? projectile.FlightTrail : null;
+                if (flightTrail == null)
+                {
+                    Transform found = flightRoot.Find("Flight Trail");
+                    if (found != null) flightTrail = found.GetComponent<TrailRenderer>();
+                }
+            }
+            if (flightTrail == null) return;
+            if (trailGradient == null) trailGradient = new Gradient();
+            float flow = age * TrailFlowSpeed;
+            for (int i = 0; i < trailColors.Length; i++)
+                trailColors[i] = new GradientColorKey(ColorAt(flow + (trailColors.Length - 1 - i) * ColorSeconds), i / (trailColors.Length - 1f));
+            trailGradient.SetKeys(trailColors, TrailAlphas);
+            flightTrail.colorGradient = trailGradient;
         }
 
         // 별가루는 그리는 카메라마다 그 카메라 쪽으로 돌려 세운다 (전투 카메라에 MainCamera 태그가 없어도 된다).
