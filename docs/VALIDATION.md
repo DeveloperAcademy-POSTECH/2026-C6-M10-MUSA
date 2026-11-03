@@ -4493,3 +4493,27 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
   - PlayMode `StoryTitleTests.CloudsStayBoundedMoveInOppositeDirectionsAndRestoreWhenReenabled`를 `CloudsDriftOneWayComeBackFromTheOtherSideAndRestoreWhenReenabled`로 바꿨다. 10초 위치, 다 나간 직후 반대쪽 진입(401, −144.5), 200초 동안 범위, 한 바퀴 복귀, 복원, 게임 시계 0에서 왼쪽 이동을 확인한다.
   - EditMode `AnimatedTitleSharesFourOriginalCloudsWithTheHomeStartPage`는 속도 8~30·왼쪽·글자보다 뒤를 확인한다.
 - **미실행:** Play에서 흐름 속도 느낌, iPhone 실기기.
+
+### #467 6단계: 짧은 구름 그림으로 교체·엇갈리는 방향 — 2026-11-03
+
+- **기준:** `bf8e9976`(5단계 커밋) 위. 연결된 Editor에서 컴파일, Editor API 프리팹 수정, Editor 안 화면 그리기, 계산 확인만 했다. Play·Test Runner·실기기는 실행하지 않았다.
+- **요청:**
+  - 구름이 모두 왼쪽으로만 가지 않고 몇 개는 오른쪽으로 가며 엇갈리게.
+  - "구름이 너무 길다"는 후기에 따라 새 구름 그림 3종으로 교체.
+  - 첫 화면을 본 뒤 가운데 구름만 다시 받은 납작한 구름(`구름1.png`)으로 교체.
+- **바꾼 것:**
+  - `CloudRound.png`(396×216)·`CloudWave.png`(633×211)는 원본의 투명 여백만 잘랐다. `CloudLong.png`는 `구름1.png`(1520×676)를 잘라 1024×214로 줄였다.
+  - 구름 4개의 그림·출발 위치·크기·방향·속도를 Editor API로 바꿨다(위에서부터 → 14, ← 12, → 16, ← 20). 구름 틀과 그림 크기는 그림 비율과 같다.
+  - 가운데 구름은 폭 250에서 가늘고 작아 보여 300(높이 63)으로 키웠고, 높이 가운데(약 344)는 유지했다(출발 (−30, 313)).
+  - `StoryTitleBuilder`의 새로 만들기도 같은 값을 쓴다.
+  - 예전 구름 그림 3개는 프리팹에서 더 이상 쓰지 않지만 파일은 지우지 않았다.
+
+| 실행한 확인 | 결과 |
+| --- | --- |
+| 컴파일 · Console 오류 | **PASS** (오류 0) |
+| 그림 선명도 (그림 px ÷ 화면 폭 pt) | **PASS** — 가운데 3.41 · 위 3.01 · 아래 2.83 · 왼쪽 위 3.30 (3배 폰 기준 약 3) |
+| Editor 안 화면 그리기 0 · 8 · 16 · 24초, 가운데 구름 교체 뒤 0 · 10 · 20초 | **PASS** — 위쪽 작은 구름(→)과 물결 구름(←)이 엇갈리고, 가운데 납작한 구름은 오른쪽으로 나가 왼쪽에서, 아래 구름은 왼쪽으로 나가 오른쪽에서 다시 들어온다. 구름이 합이오 글자와 겹치지 않는다 |
+| 바뀐 EditMode 검사 조건 미리 계산 | **PASS** — 모두 `Cloud…` 그림, 폭 ≤ 300, 선명도 ≥ 2.8, 잘림 없음, 글자 뒤, 위에서부터 방향 번갈아 |
+
+- **검사 변경 (NOT_RUN):** EditMode `AnimatedTitleSharesFourOriginalCloudsWithTheHomeStartPage` → `AnimatedTitleSharesFourCloudsWithTheHomeStartPage`(위 조건과 새 출발 위치).
+- **미실행:** Play에서 느낌, iPhone 실기기.

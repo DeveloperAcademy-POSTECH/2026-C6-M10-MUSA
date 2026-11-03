@@ -1,3 +1,4 @@
+using System.Linq;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
@@ -78,7 +79,7 @@ namespace Hapio.Tests
         }
 
         [Test]
-        public void AnimatedTitleSharesFourOriginalCloudsWithTheHomeStartPage()
+        public void AnimatedTitleSharesFourCloudsWithTheHomeStartPage()
         {
             var title = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Hapio/Story/AnimatedTitle.prefab");
             var drift = title.GetComponent<TitleCloudDrift>();
@@ -89,13 +90,20 @@ namespace Hapio.Tests
             foreach (var cloud in drift.clouds)
             {
                 Assert.That(cloud.speed, Is.InRange(8f, 30f), "#467: a steady one-way drift across the title.");
-                Assert.That(cloud.reverse, Is.False, "Left, with the wind that blows the flag and the leaves.");
-                Assert.That(cloud.target.GetComponentInChildren<UnityEngine.UI.Image>(true).sprite, Is.Not.Null);
+                var image = cloud.target.GetComponentInChildren<UnityEngine.UI.Image>(true);
+                Assert.That(image.sprite.name, Does.StartWith("Cloud"), "#467: the shorter cloud art.");
+                Assert.That(cloud.target.sizeDelta.x, Is.LessThanOrEqualTo(300), "Shorter than the old 450-long clouds.");
+                Assert.That(image.sprite.rect.width / cloud.target.sizeDelta.x, Is.GreaterThanOrEqualTo(2.8f), "Sharp on a 3x phone.");
+                Assert.That(image.rectTransform.sizeDelta, Is.EqualTo(cloud.target.sizeDelta), "Shown whole, not cropped.");
                 Assert.That(cloud.target.GetSiblingIndex(), Is.LessThan(title.transform.Find("합이오").GetSiblingIndex()),
                     "Clouds pass behind the name.");
             }
-            Assert.That(drift.clouds[0].target.anchoredPosition, Is.EqualTo(new Vector2(-182, -257)));
-            Assert.That(drift.clouds[1].target.anchoredPosition, Is.EqualTo(new Vector2(193, -67)));
+            var topDown = drift.clouds.OrderByDescending(cloud => cloud.target.anchoredPosition.y).ToArray();
+            for (int i = 1; i < topDown.Length; i++)
+                Assert.That(topDown[i].reverse, Is.Not.EqualTo(topDown[i - 1].reverse),
+                    "From top to bottom the clouds take turns going right and left, so they cross.");
+            Assert.That(drift.clouds[0].target.anchoredPosition, Is.EqualTo(new Vector2(-30, -313)));
+            Assert.That(drift.clouds[1].target.anchoredPosition, Is.EqualTo(new Vector2(175, -85)));
             var home = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Hapio/Art/UI/GameLobby.prefab").GetComponentInChildren<GameLobbyView>(true);
             Assert.That(home.titlePage.GetComponentInChildren<TitleCloudDrift>(true), Is.Not.Null);
             Assert.That(home.enterButton.gameObject.activeSelf, Is.True);

@@ -39,12 +39,13 @@ namespace Hapio.Editor
             try
             {
                 Image(root.transform, "Paper Landscape", new Rect(0, 0, 402, 874), "a763a.png");
-                // #467: clouds drift left with the wind across the whole width, so the name is drawn in front of them.
+                // #467: short clouds cross the whole width, taking turns right and left from top to bottom,
+                // so the name is drawn in front of them.
                 var tracks = new List<TitleCloudDrift.Cloud>();
-                Cloud(root.transform, tracks, "Cloud Left", new Rect(-182, 257, 459, 153), "5e97a.png", 16);
-                Cloud(root.transform, tracks, "Cloud Right", new Rect(193, 67, 459, 153), "5e97a.png", 12);
-                Cloud(root.transform, tracks, "Cloud Lower", new Rect(233, 766, 218, 87), "4c1b0.png", 20);
-                Cloud(root.transform, tracks, "Cloud Upper", new Rect(15, 9, 145, 91), "31590.png", 14);
+                Cloud(root.transform, tracks, "Cloud Left", new Vector2(-30, 313), 300, "CloudLong.png", 16, true);
+                Cloud(root.transform, tracks, "Cloud Right", new Vector2(175, 85), 210, "CloudWave.png", 12);
+                Cloud(root.transform, tracks, "Cloud Lower", new Vector2(240, 775), 140, "CloudRound.png", 20);
+                Cloud(root.transform, tracks, "Cloud Upper", new Vector2(20, 14), 120, "CloudRound.png", 14, true);
                 root.GetComponent<TitleCloudDrift>().clouds = tracks.ToArray();
                 var logo = StoryWorkspaceBuilder.Rect("합이오", root.transform, new Rect(82, 164, 238, 113)).gameObject.AddComponent<Text>();
                 logo.font = AssetDatabase.LoadAssetAtPath<Font>("Assets/Lab/Art/Fonts/ShillaCultureBold.otf");
@@ -137,11 +138,14 @@ namespace Hapio.Editor
             return image;
         }
 
-        private static void Cloud(Transform parent, List<TitleCloudDrift.Cloud> tracks, string name, Rect box,
-            string image, float speed)
+        // The frame takes the picture's own shape, so nothing is cropped and the cloud wraps as soon as it has left.
+        private static void Cloud(Transform parent, List<TitleCloudDrift.Cloud> tracks, string name, Vector2 at, float width,
+            string image, float speed, bool rightward = false)
         {
-            var frame = Image(parent, name, box, image);
-            tracks.Add(new TitleCloudDrift.Cloud { target = frame, speed = speed });
+            var sprite = AssetDatabase.LoadAssetAtPath<Sprite>(Art + image);
+            if (sprite == null) throw new InvalidOperationException("Missing title image " + image);
+            var frame = Image(parent, name, new Rect(at.x, at.y, width, width * sprite.rect.height / sprite.rect.width), image);
+            tracks.Add(new TitleCloudDrift.Cloud { target = frame, speed = speed, reverse = rightward });
         }
 
         private static RectTransform Image(Transform parent, string name, Rect box, string file)
