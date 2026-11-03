@@ -15,11 +15,13 @@ namespace C6Lab
         public enum Sound
         {
             [InspectorName("0 · 징 (지금 소리)")] Gong = 0,
-            [InspectorName("1 · 낮은 둥 + 긴 울림")] Test1 = 1,
-            [InspectorName("2 · 낮은 울림 (조금 짧게)")] Test2 = 2,
-            [InspectorName("3 · 넓게 퍼지는 촤아")] Test3 = 3,
-            [InspectorName("4 · 짧은 뿌지직")] Test4 = 4,
-            [InspectorName("5 · 낮은 쿵 + 긴 꼬리")] Test5 = 5
+            [InspectorName("1 · 건고 타격음 (강)")] Test1 = 1,
+            [InspectorName("2 · 교방고 타격음 (강)")] Test2 = 2,
+            [InspectorName("3 · 바라 타격음 (강)")] Test3 = 3,
+            [InspectorName("4 · 뿌직 up")] Test4 = 4,
+            [InspectorName("5 · 진고 타격음 (강)")] Test5 = 5,
+            [InspectorName("6 · 가야금 오음 띠리리리링 (중간)")] Test6 = 6,
+            [InspectorName("7 · 가야금 오음 띠리리리링 (낮게)")] Test7 = 7
         }
 
         public enum HitEffect
@@ -32,8 +34,12 @@ namespace C6Lab
         public const string TestFolder = "Audio/FiveColorHitTest";
         public const float DefaultDustPuffScale = 2f;
 
+        [Header("시험 편의")]
+        [Tooltip("켜면 어느 스테이지든 북을 누르면 바로 오색구슬이 나온다 (피버와 같은 규칙). 에디터/개발 빌드에서만, 판정하는 Host 기기 기준. Test Runner 돌릴 때는 끌 것.")]
+        public bool drumAlwaysFiveColor;
+
         [Header("소리 (오색구슬 명중 + BIG 큰 공 명중)")]
-        [Tooltip("0 = 지금 징 (Audio/FiveColorHit), 1~5 = 시험 소리 (Audio/FiveColorHitTest/FiveColorHitTest_번호)")]
+        [Tooltip("0 = 지금 징 (Audio/FiveColorHit), 1~7 = 시험 소리 (Audio/FiveColorHitTest/FiveColorHitTest_번호)")]
         public Sound sound = Sound.Test1;
         [Tooltip("시험 소리 크기 (징 크기는 기존 설정 그대로)")]
         [Range(0f, 1f)] public float testVolume = 1f;
@@ -70,6 +76,8 @@ namespace C6Lab
             }
         }
 
+        /// <summary>시험용: 북에서 늘 오색구슬이 나오는지 (에디터/개발 빌드에서만)</summary>
+        public static bool DrumAlwaysFiveColor => Debug.isDebugBuild && Current != null && Current.drumAlwaysFiveColor;
         public static float TestVolume => Current != null ? Mathf.Clamp01(Current.testVolume) : 1f;
         public static bool UseDust => Current != null && Current.effect == HitEffect.Dust;
         public static float StarScale => Current != null ? Mathf.Max(.1f, Current.starScale) : 1f;

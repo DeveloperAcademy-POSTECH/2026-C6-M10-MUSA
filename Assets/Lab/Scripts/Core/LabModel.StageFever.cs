@@ -40,7 +40,8 @@ namespace C6Lab
         /// </summary>
         private void ApplyStageFeverGeneration(LabOrbState orb, double now)
         {
-            if (orb == null || orb.fever || !StageFeverOn(now)) return;
+            // 시험 편의 (#464): FiveColorHitChoice의 체크를 켜면 피버가 아니어도 오색구슬 (에디터/개발 빌드에서만)
+            if (orb == null || orb.fever || !StageFeverOn(now) && !LabFiveColorHitSoundChoice.DrumAlwaysFiveColor) return;
             orb.kind = LabOrbKind.Combined;
             orb.element = LabOrbElement.None;
             orb.fiveColor = true;

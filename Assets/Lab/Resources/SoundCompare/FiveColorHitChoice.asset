@@ -12,6 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9e141654bfe24cdabe02d07e01818f9d, type: 3}
   m_Name: FiveColorHitChoice
   m_EditorClassIdentifier: C6Lab.Runtime::C6Lab.LabFiveColorHitSoundChoice
+  drumAlwaysFiveColor: 0
   sound: 1
   testVolume: 1
   effect: 1
