@@ -26,6 +26,7 @@ namespace C6Lab
         private MaterialPropertyBlock properties;
         private float left, age, radius = .32f, drawn = -1f;
         private bool held;
+        private static int nextSeed;
         /// <summary>A Host deadline is scheduled for this orb (it may not be charring yet).</summary>
         public bool Burning => left > 0f && flame != null;
         /// <summary>The bottom-up char is on screen (only the last second).</summary>
@@ -101,7 +102,7 @@ namespace C6Lab
                 wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear
             };
             pixels = new Color32[Size * Size];
-            edge = RaggedEdge(Mathf.Abs(GetInstanceID()) % 997);
+            edge = RaggedEdge(nextSeed = (nextSeed + 37) % 997); // each orb its own ragged front
             Material source = Resources.Load<Material>("Jigwi/SurfaceFlame");
             if (source != null) material = new Material(source);
             else
