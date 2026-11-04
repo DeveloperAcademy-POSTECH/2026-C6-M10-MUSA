@@ -229,7 +229,7 @@ namespace C6Lab
             frameImage.color = new Color(0f, 0f, 0f, 0f); frameImage.raycastTarget = false;
             var outline = frame.gameObject.AddComponent<UnityEngine.UI.Outline>();
             outline.effectColor = inkColor; outline.effectDistance = new Vector2(3f, -3f);
-            hint = NewText("Talisman Hint", paper, "손가락으로\n'물'을 따라 쓰세요", 22, inkColor);
+            hint = NewText("Talisman Hint", paper, "손가락으로 '물'을 적어\n부적을 완성하세요.", 22, inkColor);
             var hintRect = hint.rectTransform;
             hintRect.anchorMin = new Vector2(.08f, .83f); hintRect.anchorMax = new Vector2(.92f, .96f);
             hintRect.offsetMin = hintRect.offsetMax = Vector2.zero;
@@ -321,21 +321,29 @@ namespace C6Lab
     }
 
     /// <summary>
-    /// #479 부적 "물"의 점선. 글자 칸(0~1, 위가 1) 안의 꺾은선을 일정 간격 점으로 나누고,
-    /// 지나간 선분에서 여유 거리 안에 든 점을 칠한다. 획 순서와 손 떼기는 따지지 않는다.
+    /// #479 부적 "물"의 점선. 신라문화체 굵은 "물"을 그린 뒤 획의 가운데 선만 남겨 일정 간격(글자 칸의 2.8%)으로 고른 점이다
+    /// (글자 칸 0~1, 위가 1). 지나간 선분에서 여유 거리 안에 든 점을 칠하며, 획 순서와 손 떼기는 따지지 않는다.
     /// </summary>
     public sealed class LabJigwiTalismanStroke
     {
-        /// <summary>한글 "물": ㅁ(위) / ㅜ(가운데) / ㄹ(아래)</summary>
-        public static readonly Vector2[][] Water =
+        /// <summary>신라문화체(ShillaCultureBold) "물"의 가운데 선 점들</summary>
+        public static readonly Vector2[] Water =
         {
-            new[] { new Vector2(.3f, .9f), new Vector2(.3f, .68f) },
-            new[] { new Vector2(.3f, .9f), new Vector2(.7f, .9f), new Vector2(.7f, .68f) },
-            new[] { new Vector2(.3f, .68f), new Vector2(.7f, .68f) },
-            new[] { new Vector2(.12f, .58f), new Vector2(.88f, .58f) },
-            new[] { new Vector2(.5f, .58f), new Vector2(.5f, .44f) },
-            new[] { new Vector2(.28f, .36f), new Vector2(.72f, .36f), new Vector2(.72f, .24f),
-                new Vector2(.28f, .24f), new Vector2(.28f, .1f), new Vector2(.74f, .1f) }
+            new Vector2(0.514f, 0.122f), new Vector2(0.549f, 0.124f), new Vector2(0.467f, 0.145f), new Vector2(0.575f, 0.138f), new Vector2(0.603f, 0.148f), new Vector2(0.446f, 0.164f),
+            new Vector2(0.630f, 0.156f), new Vector2(0.657f, 0.166f), new Vector2(0.685f, 0.177f), new Vector2(0.425f, 0.195f), new Vector2(0.711f, 0.188f), new Vector2(0.738f, 0.195f),
+            new Vector2(0.415f, 0.224f), new Vector2(0.407f, 0.254f), new Vector2(0.486f, 0.264f), new Vector2(0.370f, 0.271f), new Vector2(0.433f, 0.266f), new Vector2(0.515f, 0.269f),
+            new Vector2(0.544f, 0.274f), new Vector2(0.574f, 0.280f), new Vector2(0.601f, 0.288f), new Vector2(0.630f, 0.290f), new Vector2(0.616f, 0.314f), new Vector2(0.627f, 0.340f),
+            new Vector2(0.640f, 0.369f), new Vector2(0.397f, 0.379f), new Vector2(0.426f, 0.382f), new Vector2(0.456f, 0.385f), new Vector2(0.485f, 0.389f), new Vector2(0.651f, 0.400f),
+            new Vector2(0.680f, 0.401f), new Vector2(0.509f, 0.408f), new Vector2(0.538f, 0.410f), new Vector2(0.567f, 0.410f), new Vector2(0.596f, 0.411f), new Vector2(0.625f, 0.413f),
+            new Vector2(0.522f, 0.434f), new Vector2(0.494f, 0.453f), new Vector2(0.522f, 0.464f), new Vector2(0.551f, 0.460f), new Vector2(0.215f, 0.484f), new Vector2(0.244f, 0.487f),
+            new Vector2(0.273f, 0.492f), new Vector2(0.522f, 0.494f), new Vector2(0.302f, 0.497f), new Vector2(0.330f, 0.503f), new Vector2(0.357f, 0.511f), new Vector2(0.386f, 0.516f),
+            new Vector2(0.415f, 0.521f), new Vector2(0.444f, 0.524f), new Vector2(0.498f, 0.524f), new Vector2(0.535f, 0.519f), new Vector2(0.554f, 0.542f), new Vector2(0.648f, 0.540f),
+            new Vector2(0.580f, 0.555f), new Vector2(0.607f, 0.563f), new Vector2(0.832f, 0.565f), new Vector2(0.637f, 0.568f), new Vector2(0.666f, 0.569f), new Vector2(0.695f, 0.574f),
+            new Vector2(0.788f, 0.574f), new Vector2(0.722f, 0.584f), new Vector2(0.751f, 0.581f), new Vector2(0.527f, 0.644f), new Vector2(0.428f, 0.665f), new Vector2(0.486f, 0.665f),
+            new Vector2(0.457f, 0.668f), new Vector2(0.528f, 0.673f), new Vector2(0.404f, 0.684f), new Vector2(0.556f, 0.681f), new Vector2(0.585f, 0.684f), new Vector2(0.536f, 0.704f),
+            new Vector2(0.389f, 0.715f), new Vector2(0.544f, 0.734f), new Vector2(0.376f, 0.744f), new Vector2(0.556f, 0.760f), new Vector2(0.372f, 0.775f), new Vector2(0.570f, 0.784f),
+            new Vector2(0.360f, 0.804f), new Vector2(0.580f, 0.813f), new Vector2(0.351f, 0.834f), new Vector2(0.475f, 0.839f), new Vector2(0.586f, 0.844f), new Vector2(0.502f, 0.849f),
+            new Vector2(0.338f, 0.863f), new Vector2(0.530f, 0.859f), new Vector2(0.557f, 0.865f), new Vector2(0.601f, 0.868f)
         };
 
         public readonly Vector2[] Samples;
@@ -343,16 +351,9 @@ namespace C6Lab
         public int CoveredCount { get; private set; }
         public float Coverage => Samples.Length == 0 ? 0f : CoveredCount / (float)Samples.Length;
 
-        public LabJigwiTalismanStroke(Vector2[][] lines, float spacing = .03f)
+        public LabJigwiTalismanStroke(Vector2[] samples)
         {
-            var points = new List<Vector2>();
-            foreach (Vector2[] line in lines)
-                for (int i = 0; i + 1 < line.Length; i++)
-                {
-                    int steps = Mathf.Max(1, Mathf.CeilToInt(Vector2.Distance(line[i], line[i + 1]) / spacing));
-                    for (int s = i == 0 ? 0 : 1; s <= steps; s++) points.Add(Vector2.Lerp(line[i], line[i + 1], s / (float)steps));
-                }
-            Samples = points.ToArray();
+            Samples = (Vector2[])samples.Clone();
             covered = new bool[Samples.Length];
         }
 

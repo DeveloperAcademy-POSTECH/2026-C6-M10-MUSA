@@ -65,10 +65,11 @@ namespace C6Lab.Tests
             LabSnapshot snapshot = Snapshot(-1d);
             overlay.Present(snapshot, Local, 11d);
             Assert.That(overlay.Coverage, Is.Zero);
-            Trace(overlay, 4); // ㅁ과 ㅜ 일부만: 아직 덜 썼다.
-            Assert.That(overlay.Coverage, Is.GreaterThan(0f).And.LessThan(.8f));
+            // 위쪽(ㅁ)만 쓰면 아직 덜 썼다.
+            foreach (Vector2 point in LabJigwiTalismanStroke.Water) if (point.y > .7f) overlay.PaintNormalized(point, point);
+            Assert.That(overlay.Coverage, Is.GreaterThan(0f).And.LessThan(.6f));
             Assert.That(overlay.CompletedCount, Is.Zero); Assert.That(overlay.Visible, Is.True);
-            Trace(overlay, LabJigwiTalismanStroke.Water.Length);
+            Trace(overlay);
             Assert.That(overlay.CompletedCount, Is.EqualTo(1));
             Assert.That(overlay.Visible, Is.False); Assert.That(overlay.WantsBoardBlocked, Is.False);
             overlay.Present(snapshot, Local, 12d);
@@ -97,23 +98,18 @@ namespace C6Lab.Tests
         {
             var forward = new LabJigwiTalismanStroke(LabJigwiTalismanStroke.Water);
             var backward = new LabJigwiTalismanStroke(LabJigwiTalismanStroke.Water);
-            Assert.That(forward.Samples.Length, Is.InRange(80, 200));
-            foreach (Vector2[] line in LabJigwiTalismanStroke.Water)
-                for (int i = 0; i + 1 < line.Length; i++) forward.Paint(line[i], line[i + 1], .07f);
-            for (int l = LabJigwiTalismanStroke.Water.Length - 1; l >= 0; l--)
-                for (int i = LabJigwiTalismanStroke.Water[l].Length - 1; i > 0; i--)
-                    backward.Paint(LabJigwiTalismanStroke.Water[l][i], LabJigwiTalismanStroke.Water[l][i - 1], .07f);
+            Vector2[] points = LabJigwiTalismanStroke.Water;
+            Assert.That(forward.Samples.Length, Is.InRange(60, 200));
+            foreach (Vector2 point in points) Assert.That(point.x >= 0f && point.x <= 1f && point.y >= 0f && point.y <= 1f, Is.True);
+            for (int i = 0; i < points.Length; i++) forward.Paint(points[i], points[i], .07f);
+            for (int i = points.Length - 1; i >= 0; i--) backward.Paint(points[i], points[i], .07f);
             Assert.That(forward.Coverage, Is.EqualTo(1f)); Assert.That(backward.Coverage, Is.EqualTo(1f));
             forward.Clear(); Assert.That(forward.CoveredCount, Is.Zero);
         }
 
-        private static void Trace(LabJigwiTalismanOverlay target, int lines)
+        private static void Trace(LabJigwiTalismanOverlay target)
         {
-            for (int l = 0; l < lines; l++)
-            {
-                Vector2[] line = LabJigwiTalismanStroke.Water[l];
-                for (int i = 0; i + 1 < line.Length; i++) target.PaintNormalized(line[i], line[i + 1]);
-            }
+            foreach (Vector2 point in LabJigwiTalismanStroke.Water) target.PaintNormalized(point, point);
         }
 
         private static LabSnapshot Snapshot(double localTalismanAt) => new LabSnapshot
