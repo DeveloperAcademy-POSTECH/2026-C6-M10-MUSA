@@ -62,6 +62,10 @@ namespace Hapio
         private bool listeningToThrows;
         private float remarkAt = -1f;
         private GameTutorialSpeaker remarkSpeaker;
+        private float remarkSeconds;
+        // The tease stays up even while an orb is held, and the word that follows it once it ends.
+        private bool remarkHolds;
+        private string remarkThen;
         private RectTransform mirror;
         private CanvasGroup mirrorGroup;
         private Image mirrorDrum;
@@ -78,6 +82,8 @@ namespace Hapio
 
         /// <summary>How many throws missed in 3단계 (each gave the red orb back).</summary>
         public int ThrowMisses { get; private set; }
+        /// <summary>How many times the fifth-miss tease has been said (once at most).</summary>
+        public int TeasesShown { get; private set; }
         /// <summary>A short word ("다시 해 봐!") is up during an action.</summary>
         public bool IsShowingRemark => remarkAt >= 0f && bubbleRoot != null && bubbleRoot.gameObject.activeSelf;
         private int actionProgress;
@@ -521,7 +527,7 @@ namespace Hapio
             hand.gameObject.SetActive(false);
             arrow.gameObject.SetActive(false);
             hand.color = Color.white;
-            remarkAt = -1f;
+            ClearRemark();
             PlaceBanner(art.bannerTopFraction);
             // Nothing crosses to a neighbor unless this beat passes it: an orb that reaches an edge bounces back.
             session.Network.TutorialAllowPasses();
@@ -548,11 +554,27 @@ namespace Hapio
         /// A short word during an action (3단계 "다시 해 봐!"): the speaker's bubble pops up without taking the screen,
         /// and goes when the player takes hold of an orb again or after <see cref="GameTutorialArt.remarkSeconds"/>.
         /// </summary>
-        private void ShowRemark(GameTutorialSpeaker speaker, string text)
+        private void ShowRemark(GameTutorialSpeaker speaker, string text) =>
+            ShowRemark(speaker, text, art.remarkSeconds, false, null);
+
+        /// <summary>
+        /// The same, up for <paramref name="seconds"/>; one that <paramref name="holds"/> stays while an orb is held, and
+        /// <paramref name="then"/> pops up from the same speaker once it ends (the tease, then "다시 해 봐!").
+        /// </summary>
+        private void ShowRemark(GameTutorialSpeaker speaker, string text, float seconds, bool holds, string then)
         {
             remarkSpeaker = speaker;
             remarkAt = Time.unscaledTime;
+            remarkSeconds = seconds;
+            remarkHolds = holds;
+            remarkThen = then;
             ShowBubble(speaker, text);
+        }
+
+        private void ClearRemark()
+        {
+            remarkAt = -1f;
+            remarkThen = null;
         }
 
         private void ShowBubble(GameTutorialSpeaker speaker, string text)
@@ -693,7 +715,14 @@ namespace Hapio
             if (!HasBeat || CurrentBeat.Action != GameTutorialAction.ThrowOrb || actionDoneAt >= 0f) return;
             ThrowMisses++;
             session.Network.TutorialDropOrb(LabOrbKind.Combined, GameTutorialScript.CombineResult, GameTutorialScript.RetryLanding);
-            ShowRemark(GameTutorialScript.RetrySpeaker, GameTutorialScript.RetryLine);
+            string first = GameTutorialScript.MissLine(ThrowMisses);
+            // The fifth miss, once: "...... 너 일부러 그러는 거지?" stays its full time, then "다시 해 봐!" as ever.
+            if (first != GameTutorialScript.RetryLine)
+            {
+                TeasesShown++;
+                ShowRemark(GameTutorialScript.RetrySpeaker, first, art.teaseSeconds, true, GameTutorialScript.RetryLine);
+            }
+            else ShowRemark(GameTutorialScript.RetrySpeaker, first);
         }
 
         private void OnDestroy() => ListenToThrows(false);
@@ -984,7 +1013,8 @@ namespace Hapio
             hand.gameObject.SetActive(false);
             arrow.gameObject.SetActive(false);
             ListenToThrows(false);
-            remarkAt = -1f;
+            // A hit during the tease ends it there; "다시 해 봐!" does not follow.
+            ClearRemark();
             bubbleRoot.gameObject.SetActive(false);
             // The empty gauge breathes back only a sliver, still short of a tap, so the short cue's red shows on it.
             if (CurrentBeat.Action == GameTutorialAction.TapDrum && session.Network.config != null)
@@ -1041,10 +1071,12 @@ namespace Hapio
             ApplyHudDressing();
             UpdateKeepOut();
             bool line = HasBeat && CurrentBeat.IsLine;
-            if (remarkAt >= 0f && (Time.unscaledTime - remarkAt > art.remarkSeconds || board.IsHolding))
+            if (remarkAt >= 0f && (Time.unscaledTime - remarkAt > remarkSeconds || !remarkHolds && board.IsHolding))
             {
-                remarkAt = -1f;
+                string then = remarkThen;
+                ClearRemark();
                 bubbleRoot.gameObject.SetActive(false);
+                if (then != null) ShowRemark(remarkSpeaker, then);
             }
             if (line || remarkAt >= 0f)
             {

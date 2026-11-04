@@ -78,6 +78,8 @@ namespace Hapio
         [Tooltip("던지기를 기다리는 동안 안내 띠 가운데의 높이 (화면 위에서 화면 높이 비율). 박을 가리지 않게 판 바로 위.")]
         [Range(0f, 1f)] public float throwBannerTopFraction = .47f;
         [Tooltip("빗나갔을 때 \"다시 해 봐!\" 말풍선이 떠 있는 시간")] [Min(.3f)] public float remarkSeconds = 2f;
+        [Tooltip("다섯 번째로 빗나갔을 때 \"너 일부러 그러는 거지?\" 말풍선이 떠 있는 시간. 구슬을 잡아도 사라지지 않고, 끝나면 \"다시 해 봐!\"가 이어서 뜬다.")]
+        [Min(.3f)] public float teaseSeconds = 2.4f;
         [Tooltip("진행률 막대를 밝히는 곳을 막대보다 사방으로 얼마나 크게")] [Min(0f)] public float progressSpotlightPadding = 8f;
 
         [Header("북에서 나오는 구슬 (1단계)")]

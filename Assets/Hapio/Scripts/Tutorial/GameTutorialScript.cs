@@ -249,6 +249,15 @@ namespace Hapio
         /// <summary>3단계에서 빗나갔을 때 금옥이가 하는 말. 말풍선은 잠깐 뜨고, 화면을 막지 않아 바로 다시 던질 수 있다.</summary>
         public const string RetryLine = "다시 해 봐!";
         public const GameTutorialSpeaker RetrySpeaker = GameTutorialSpeaker.Geumok;
+        /// <summary>
+        /// 이스터에그: 이만큼째 빗나가면 금옥이가 "다시 해 봐!" 대신 이 말을 먼저 한다. 그다음 "다시 해 봐!"가 이어서 뜨고,
+        /// 그 뒤로 빗나가면 다시 "다시 해 봐!"만 나온다 (한 번만).
+        /// </summary>
+        public const int TeaseMisses = 5;
+        public const string TeaseLine = "......\n너 일부러 그러는 거지?";
+
+        /// <summary>The first word after the <paramref name="misses"/>th miss: the tease once, at the fifth, else "다시 해 봐!".</summary>
+        public static string MissLine(int misses) => misses == TeaseMisses ? TeaseLine : RetryLine;
         /// <summary>빗나간 빨간 구슬이 다시 떨어지는 자리 (판 0..1): 오른쪽, 북과 남은 음구슬을 피해서.</summary>
         public static readonly UnityEngine.Vector2 RetryLanding = new UnityEngine.Vector2(.72f, .6f);
 
@@ -276,9 +285,9 @@ namespace Hapio
         /// </summary>
         public static readonly GameTutorialStep Pass = new GameTutorialStep("4단계 · 넘기기",
             Bul("나만 너무 열심히 하고 있는 거 아니야?"),
-            Geumok("북은 같이 써야 해.\n옆으로 밀면 넘어가."),
+            Geumok("맞아! 너가 북을 줘야지... \n북은 몇 개 없어서 같이 써야 해! 옆으로 밀면 넘어가. "),
             GameTutorialBeat.Do(GameTutorialAction.PassDrum, "북을 오른쪽 끝으로 밀어 금옥이에게 넘기시오", GameTutorialFocus.None),
-            Geumok("고마워!\n대신 내가 만든 거 줄게~", cue: GameTutorialCue.GiveBack),
+            Geumok("고마워!\n대신 내가 만든 구슬과 북 줄게~", cue: GameTutorialCue.GiveBack),
             Geumok("짝이 안 맞는 구슬은\n이렇게 친구한테 넘기면 돼."));
 
         /// <summary>5단계 폭탄의 자물쇠 수: 내가 넘기면 1, 금옥이가 돌려주면 0이 되어 내 판에서 열린다.</summary>

@@ -342,6 +342,28 @@ namespace Hapio.Tests
         }
 
         [Test]
+        public void FifthMissTeasesOnceThenItIsTryAgainAsEver()
+        {
+            // Easter egg: 금옥이 says "다시 해 봐!" after every miss, except the fifth, which opens with the tease.
+            string[] firstWords = Enumerable.Range(1, 9).Select(GameTutorialScript.MissLine).ToArray();
+            CollectionAssert.AreEqual(new[]
+            {
+                GameTutorialScript.RetryLine, GameTutorialScript.RetryLine, GameTutorialScript.RetryLine,
+                GameTutorialScript.RetryLine, GameTutorialScript.TeaseLine, GameTutorialScript.RetryLine,
+                GameTutorialScript.RetryLine, GameTutorialScript.RetryLine, GameTutorialScript.RetryLine
+            }, firstWords);
+            Assert.That(GameTutorialScript.TeaseMisses, Is.EqualTo(5));
+            Assert.That(GameTutorialScript.TeaseLine, Is.EqualTo("......\n너 일부러 그러는 거지?"));
+            Assert.That(GameTutorialScript.TeaseLine.Split('\n').Length, Is.LessThanOrEqualTo(2), "One bubble, two lines at most.");
+            var art = ScriptableObject.CreateInstance<GameTutorialArt>();
+            try
+            {
+                Assert.That(art.teaseSeconds, Is.GreaterThan(art.remarkSeconds), "The pause before the punch line needs its time.");
+            }
+            finally { Object.DestroyImmediate(art); }
+        }
+
+        [Test]
         public void PaintBarLightEndsAtTheDrawnPercentNotItsWideBox()
         {
             var box = new Rect(100f, 0f, 200f, 30f);
@@ -385,8 +407,9 @@ namespace Hapio.Tests
             }, beats.Select(beat => beat.Action).ToArray());
             CollectionAssert.AreEqual(new[]
             {
-                "나만 너무 열심히 하고 있는 거 아니야?", "북은 같이 써야 해.\n옆으로 밀면 넘어가.",
-                "고마워!\n대신 내가 만든 거 줄게~", "짝이 안 맞는 구슬은\n이렇게 친구한테 넘기면 돼."
+                "나만 너무 열심히 하고 있는 거 아니야?",
+                "맞아! 너가 북을 줘야지... \n북은 몇 개 없어서 같이 써야 해! 옆으로 밀면 넘어가. ",
+                "고마워!\n대신 내가 만든 구슬과 북 줄게~", "짝이 안 맞는 구슬은\n이렇게 친구한테 넘기면 돼."
             }, pass.Lines.Select(line => line.Text).ToArray());
             CollectionAssert.AreEqual(new[]
             {

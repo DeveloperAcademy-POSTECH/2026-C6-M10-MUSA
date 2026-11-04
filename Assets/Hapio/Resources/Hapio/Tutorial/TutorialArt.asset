@@ -59,6 +59,7 @@ MonoBehaviour:
   throwGuideLength: 150
   throwBannerTopFraction: 0.47
   remarkSeconds: 2
+  teaseSeconds: 2.4
   progressSpotlightPadding: 8
   drumLaunchExtra: 0.06
   drumLaunchEdgeMargin: 0.1
