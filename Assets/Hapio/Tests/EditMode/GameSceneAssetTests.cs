@@ -137,7 +137,7 @@ namespace Hapio.Tests
                 Assert.That(studio.groundPng, Is.Not.Null);
                 // #447: stage 1 has its own ground, board backing and surround; every other saved Lab environment value is kept.
                 const string stageOne = "Assets/Hapio/Art/Environment/Stage01/Textures/";
-                Assert.That(AssetDatabase.GetAssetPath(studio.groundPng), Is.EqualTo(stageOne + "Stage01_Ground_BlushBeige.png"), "Ground texture");
+                Assert.That(AssetDatabase.GetAssetPath(studio.groundPng), Is.EqualTo(stageOne + "Stage01_Ground_SandBeige.png"), "Ground texture");
                 Assert.That(studio.boardBackgroundPng, Is.SameAs(studio.groundPng), "Board backing texture");
                 Assert.That(AssetDatabase.GetAssetPath(studio.paperPng), Is.EqualTo(stageOne + "Stage01_Sky_WarmBeige.png"), "Surround texture");
                 Assert.That(studio.groundSize, Is.EqualTo(original.groundSize));

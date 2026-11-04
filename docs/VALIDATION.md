@@ -4677,3 +4677,12 @@ Metal 파이프라인(PSO)이 실제로 준비 구간에서 만들어지는지�
 **1스테이지:** 문서의 후속 미술 수정대로 `Stage01_Ground_BlushBeige`로 바꿨다. 그동안 실제로 적용돼 있던 것은 `Stage01_Ground_SandBeige`였다. 바꾼 곳은 기본 `Background Studio`의 `groundPng`·`boardBackgroundPng`와 Stage01 `YokaiGround`·`YokaiBacking`의 `_BaseMap`·`_MainTex`이며, 같은 Unity API 방식으로 했다(Scene 2줄, 재질 4줄). 사용자가 세 후보 이미지를 직접 보고 결정했다.
 
 **미실행:** iPhone 화면 확인.
+
+## #490 1스테이지 바닥 SandBeige 복원 — 2026-11-04
+
+#487에서 문서의 후속 미술 수정을 근거로 1스테이지 바닥·조합판 뒤를 BlushBeige로 바꿨다. 사용자가 SandBeige가 맞다고 확인해 되돌렸다.
+
+- 같은 Unity API 방식으로 되돌렸다. 대상은 기본 `Background Studio`의 `groundPng`·`boardBackgroundPng`와 Stage01 `YokaiGround`·`YokaiBacking`의 `_BaseMap`·`_MainTex`다.
+- 1스테이지 관련 값은 #487 이전(`b835dc3c`)과 같다. 2스테이지 Yagwanggwi는 유지한다.
+- `GameSceneAssetTests` 기대값과 `docs/STAGE_BACKGROUNDS.md`도 SandBeige로 바로잡았다.
+- 배경 Scene·재질 EditMode 검사(`GameSceneAssetTests`·`GameStageBackgroundAssetTests`·`GameBackgroundAnimationAssetTests`) **12/12 PASS**. 화면은 #487 직전 캡처와 같은 값이라 다시 찍지 않았다.
