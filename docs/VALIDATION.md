@@ -4745,3 +4745,23 @@ Editor 로그 `C6_AUDIO_WARMUP`: 첫 전투는 32개를 약 70~80 ms에, 같은 
 | 지귀·게임 흐름 PlayMode | **66/67** → 위 검사 대기 조건 수정 뒤 해당 검사 단독 **1/1 PASS** | `LabJigwiABPresentationTests`·`LabJigwiGroupFireAudioTests`·`LabJigwiWaterTrailTests`·`LabJigwiStagePresentationTests`·`GameSceneFlowTests`. 실패 1건은 새 단언이 `IsLoadingScene`(준비 구간 전체가 true)을 기다리던 검사 문장 문제였다 |
 
 **미실행:** iPhone 1·2스테이지 로딩 시간·메모리 실측.
+
+
+## #515 Battle 주광 방향·강도 조정 (2026-11-04)
+
+- 변경: `Assets/Hapio/Scenes/Battle.unity`의 `BattleLight`만 변경. 회전 `(42, 330, 0)` → `(38, 150, 0)`, 강도 `1.5` → `0.85`. +Z의 BattleCamera 쪽에서 박 정면을 비추도록 조정했다. 모델·텍스처·머티리얼·셰이더·게임 로직·카메라·환경광·OrbBoardLight·후처리는 보존했다.
+- 환경 확인: Unity MCP 10.3.0 연결, URP `PC_RPAsset`, Flat 환경광 `(0.5, 0.5, 0.5)`/강도 1, 반사 강도 1. 두 카메라에 AdditionalCameraData가 없고 씬 Volume도 없다. 새 후처리는 추가하지 않았다.
+- 실제 Editor 솔로: 기존 StartSolo와 DEV 다음 스테이지를 통해 1→2→3 Playing/박 IsReady를 확인했다. 각 스테이지에서 게임과 Editor를 정지하고 같은 Game View(1206×2612), 카메라·애니메이션·도색·UI·이펙트 상태로 원래 조명/후보 조명을 각각 촬영했다. 비교 PNG 6장은 저장소 밖에 보관했다.
+- 육안 비교: 1스테이지 박 입구·끈·노출된 검은 요괴의 눈, 2스테이지 박 문양·끈·표면, 3스테이지 박 입구·끈의 식별 개선. 바닥 밝기가 낮아져 박·경고와 구분된다. 광범위한 박 표면의 흰색 소실은 보이지 않으나 2스테이지 뚜껑의 작은 정반사 하이라이트는 남는다. 1스테이지 폭탄, 2스테이지 섬광 오버레이, 3스테이지 경고·폭탄의 공존 화면을 확인했다.
+- 한계: 공통 박 셸의 종이/도색 셰이더는 자체 고정 조명을 사용하므로 씬 주광으로 종이 밝기를 바꾸지 않는다. 가려진 내부 요괴를 드러내거나 형태를 바꾸지 않았다. 도색 진행별·모든 이펙트 시점·다인 카메라 방향·실기기/iOS 성능·색 재현은 미검증이다.
+- EditMode: `GameStageBackgroundAssetTests.StageTwoUsesIsolatedArtworkAndRestoresTheDefaultForOtherStages` **1/1 PASS** (0.58초).
+- PlayMode: `GameSceneFlowTests.SharedCountdownWaitsForInitialPresentationAndOnlyThenStartsGameplay` **1/1 PASS** (6.50초). 실제 저장 Home→Battle 준비/카운트다운 흐름 검사다.
+- 초기 EditMode 실행 요청 2회는 Play Mode 상태로 시작하지 못해 검사 0개였으며, 전용 stop 도구로 종료 후 위 검사를 실행했다. 미실행 요청을 통과 수에 포함하지 않는다.
+- 저장 직후 콘솔 error 조회 0개, `git diff --check` 통과. C# 변경이 없어 별도 재컴파일을 유발하지 않았다. 커밋·push는 수행하지 않았다. 원격 브랜치 존재와 로컬 HEAD 동일 여부는 읽기 전용 ls-remote로 확인했다.
+
+
+### #515 바닥 밝기 피드백 반영 (2026-11-04)
+
+앞선 0.85/(38,150,0)안은 바닥을 과도하게 어둡게 해 최종값을 **1.16/(60,150,0)**으로 수정했다. 수평면에 들어오는 주광의 Lambert 성분은 원래 `1.5 × sin(42°) ≈ 1.004`, 보정안 `1.16 × sin(60°) ≈ 1.005`로 거의 같다. 카메라 쪽 조명 방향은 유지한다. 실행 중인 2스테이지를 Editor에서 잠시 정지해 기존 카메라로 원래 조명과 보정안을 촬영했다. 사용자의 게임 일시정지 상태는 유지하고 Editor 정지를 해제했다. Play Mode 상태를 씬으로 저장하지 않고 디스크의 주광 회전·강도 두 값만 수정했다. 모델·머티리얼·환경광·로직은 그대로다. 위 자동 검사 통과 기록은 이전 후보 값에서의 결과이며, 이번 수치 보정 후에는 재실행하지 않았다. 이번 최종값의 세 스테이지·실기기 시각 비교는 미검증이다.
+
+- 추가 밝기 피드백: 주광 최종 강도를 1.16 → **1.28**(약 +10%)로 올리고 회전 (60,150,0)을 유지했다. 실행 씬에도 같은 값을 적용하고 BattleCamera 촬영으로 현재 화면의 하이라이트를 확인했다. 세 스테이지 전체 및 자동 검사는 이번 수치 보정 후 재실행하지 않았다.
