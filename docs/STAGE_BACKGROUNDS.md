@@ -63,6 +63,8 @@ Stage01_Ground_Gumiho(옅은 청록), Stage02_Ground_Yagwanggwi(청회색), Stag
 
 Stage 1 바닥은 후속 미술 수정으로 Stage01_Ground_BlushBeige(베이지에 옅은 핑크빛)로 변경했다.
 
+1스테이지는 #487에서 기본 Background Studio와 Stage01 YokaiGround·YokaiBacking 재질을 실제로 BlushBeige로 연결했다(그 전에는 SandBeige가 남아 있었다). 2스테이지는 #487에서 Stage02 Background Studio의 ground·board backing PNG와 Stage02 YokaiGround·YokaiBacking 재질의 `_BaseMap`을 모두 Stage02_Ground_Yagwanggwi로 연결했다. 기기는 저장된 재질의 `_BaseMap`을 그리므로 studio 값과 재질 값이 같아야 하며 `GameStageBackgroundAssetTests`가 세 스테이지 모두 이를 검사한다.
+
 ## 조명 작업실
 
 Hapio > 배틀 조명 작업실에서 Battle Scene 조명 색·강도·방향과 환경광·반사를 조절한다. 편집 모드에서 스테이지 미리보기와 씬 저장을 지원하고 플레이 중 변경은 임시다. 창을 열었을 때 상태 복원 및 현재 상태를 복원 기준으로 지정할 수 있다. 복원 기준은 창 세션 안에서 유지하며 플레이 상태 전환 시 새로 잡는다. 조명은 세 스테이지 공통이고 하늘 PNG는 별도 Unlit 재질이다.
