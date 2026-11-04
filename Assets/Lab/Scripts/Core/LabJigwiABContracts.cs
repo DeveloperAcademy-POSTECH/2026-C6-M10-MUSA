@@ -45,6 +45,9 @@ namespace C6Lab
         public bool shrunk;
         public float shrinkScale, moveAmount, movePeriodSeconds, targetRadius;
         public LabJigwiABPlayerFire[] players = Array.Empty<LabJigwiABPlayerFire>();
+        /// <summary>#509 B: synchronized clears so far (0..3), the open one-second window (-1 none) and the last reset.</summary>
+        public int syncCount;
+        public double syncWindowAt = -1d, syncResetAt = -1d;
         public bool Warning(double now) => resolution == LabJigwiABResolution.None && now >= warningAt && now < activeAt;
         public bool Active(double now) => resolution == LabJigwiABResolution.None && now >= activeAt && now < endsAt;
         public bool RewardActive(double now) => kind == LabJigwiABKind.GroupFire
@@ -158,6 +161,8 @@ namespace C6Lab
                     if (round.resolvedAt != -1d || ++unresolved > 2) return false;
                 }
                 else if (round.resolvedAt < round.warningAt) return false;
+                if (round.kind == LabJigwiABKind.PersonalBurn
+                    && (round.syncCount != 0 || round.syncWindowAt != -1d || round.syncResetAt != -1d)) return false;
                 if (round.kind == LabJigwiABKind.PersonalBurn)
                 {
                     // #479: A ignites every seat; each seat only records when it finished its talisman.
@@ -176,8 +181,16 @@ namespace C6Lab
                     continue;
                 }
                 if (round.shrinkAt < round.activeAt || round.players.Any(player => player != null && player.talismanAt != -1d)
-                    || Math.Abs(round.endsAt - round.activeAt - 10d) > .00001d
+                    || Math.Abs(round.endsAt - Math.Min(state.cutoffAt, round.activeAt + LabJigwiABTimeline.GroupMissionSeconds)) > .00001d
                     || round.resolution != LabJigwiABResolution.Skipped && round.players.Length == 0) return false;
+                // #509 sync progress: 0..2 while running/failed, exactly 3 once completed; a window only while running.
+                bool completed = round.resolution == LabJigwiABResolution.Completed;
+                if (round.syncCount < 0 || round.syncCount > LabJigwiABTimeline.GroupSyncRequired
+                    || completed != (round.syncCount == LabJigwiABTimeline.GroupSyncRequired)
+                    || round.syncWindowAt != -1d && (round.resolution != LabJigwiABResolution.None
+                        || !Range(round.syncWindowAt, round.activeAt, round.endsAt))
+                    || round.syncResetAt != -1d && !Range(round.syncResetAt, round.activeAt,
+                        round.endsAt + LabJigwiABTimeline.GroupSyncWindowSeconds)) return false;
                 var owners = new HashSet<ulong>();
                 var targets = new HashSet<string>(StringComparer.Ordinal);
                 foreach (var player in round.players)
@@ -189,25 +202,24 @@ namespace C6Lab
                     {
                         if (target == null || string.IsNullOrEmpty(target.id) || target.id.Length > 256 || !targets.Add(target.id)
                             || !Range(target.x, .1d, .9d) || !Range(target.y, .48d, .86d)
-                            || !Range(target.extinguishedAt, -1d, round.endsAt) || !Finite(target.relightAt)
-                            || target.relightAt < -1d) return false;
-                        if (target.extinguishedAt < 0d)
-                        {
-                            if (target.extinguishedAt != -1d || target.relightAt != -1d || !target.lit) return false;
-                        }
-                        else if (target.extinguishedAt < round.activeAt || target.relightAt <= target.extinguishedAt
-                            || target.relightAt - target.extinguishedAt > 60.00001d) return false;
+                            || target.relightAt != -1d || target.lit == completed) return false;
+                        // A hit time exists only inside the open window.
+                        if (target.extinguishedAt != -1d && (round.syncWindowAt < 0d
+                            || target.extinguishedAt < round.syncWindowAt
+                            || target.extinguishedAt >= round.syncWindowAt + LabJigwiABTimeline.GroupSyncWindowSeconds)) return false;
                     }
                 }
-                if (memberIds != null && round.resolution != LabJigwiABResolution.Skipped && !owners.SetEquals(memberIds)) return false;
+                // #509: only the picked seats are listed (helpers are everyone else).
+                if (memberIds != null && round.resolution != LabJigwiABResolution.Skipped
+                    && owners.Count != LabJigwiABTimeline.GroupPickCount(memberIds.Count)) return false;
                 bool allOff = round.players.Length > 0 && round.players.All(player => player.targets.All(target => !target.lit));
                 if (round.resolution == LabJigwiABResolution.Completed && !allOff
                     || (round.resolution == LabJigwiABResolution.None || failed) && allOff) return false;
             }
             var pending = state.rounds.Where(value => value.resolution == LabJigwiABResolution.None)
                 .OrderBy(value => value.activeAt).ToArray();
-            if (pending.Length == 2 && (pending[0].kind != LabJigwiABKind.PersonalBurn
-                || pending[1].kind != LabJigwiABKind.GroupFire || pending[1].slot != pending[0].slot + 1
+            // Either kind may still run during the next round's one-second warning (#509: B2 runs into A3's).
+            if (pending.Length == 2 && (pending[0].kind == pending[1].kind || pending[1].slot != pending[0].slot + 1
                 || pending[0].endsAt <= pending[1].warningAt || pending[0].endsAt > pending[1].activeAt)) return false;
             return true;
         }

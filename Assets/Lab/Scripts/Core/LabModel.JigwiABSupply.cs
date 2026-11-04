@@ -25,9 +25,19 @@ namespace C6Lab
             jigwiABSupplySequence.Clear();
             jigwiABNextSupplyAt[mission.id] = mission.activeAt + jigwiABSupplyInterval;
             if (!mission.Active(now)) return;
-            foreach (var player in mission.players)
-                if (player.targets.Any(fire => fire.lit))
-                    GrantJigwiABSupply(mission, player.playerId, jigwiABSupplyInitial, now);
+            foreach (ulong helper in JigwiABSupplyRecipients(mission))
+                GrantJigwiABSupply(mission, helper, jigwiABSupplyInitial, now);
+        }
+
+        /// <summary>
+        /// #509: free Water lands on the helpers' boards (the seats B did not pick), so it has to be rolled to a
+        /// picked neighbour. With no helper at all (a solo DEV room) the picked seat gets it directly.
+        /// </summary>
+        private IEnumerable<ulong> JigwiABSupplyRecipients(LabJigwiABRound mission)
+        {
+            var picked = new HashSet<ulong>(mission.players.Select(player => player.playerId));
+            ulong[] helpers = seats.Take(activeSeatCount).Where(owner => !picked.Contains(owner)).ToArray();
+            return helpers.Length > 0 ? helpers : picked.ToArray();
         }
 
         private void AdvanceJigwiABSupply(LabJigwiABRound mission, double now)
@@ -39,9 +49,8 @@ namespace C6Lab
             double next = mission.activeAt + (elapsedIntervals + 1d) * jigwiABSupplyInterval;
             if (!(next > now)) next = now + jigwiABSupplyInterval;
             jigwiABNextSupplyAt[mission.id] = next;
-            foreach (var player in mission.players)
-                if (player.targets.Any(fire => fire.lit))
-                    GrantJigwiABSupply(mission, player.playerId, 1, now);
+            foreach (ulong helper in JigwiABSupplyRecipients(mission))
+                GrantJigwiABSupply(mission, helper, 1, now);
         }
 
         private void GrantJigwiABSupply(LabJigwiABRound mission, ulong recipient, int requested, double now)

@@ -38,12 +38,13 @@ namespace C6Lab.Tests
             {
                 id = First, slot = 1, kind = LabJigwiABKind.GroupFire,
                 resolution = completed ? LabJigwiABResolution.Completed : LabJigwiABResolution.None,
-                warningAt = 24d, activeAt = 25d, endsAt = 35d, resolvedAt = completed ? 29d : -1d,
+                warningAt = 24d, activeAt = 25d, endsAt = 40d, resolvedAt = completed ? 29d : -1d,
+                syncCount = completed ? LabJigwiABTimeline.GroupSyncRequired : 0, // #509
                 rewardUntil = completed ? 34d : -1d, rewardSizeScale = 1.3f, rewardPaintScale = 1.5f,
                 shrinkAt = 25d, shrinkScale = 1f, moveAmount = .03f, movePeriodSeconds = 4f, targetRadius = .3f,
                 players = new[] { new LabJigwiABPlayerFire { playerId = 10ul,
                     targets = new[] { new LabJigwiABFireTarget { id = First + "/10/0", x = .5f, y = .62f,
-                        lit = !completed, extinguishedAt = completed ? 29d : -1d, relightAt = completed ? 41d : -1d } } } }
+                        lit = !completed } } } }
             } }
         };
 

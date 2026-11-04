@@ -12,7 +12,8 @@ namespace C6Lab
         private readonly HashSet<string> jigwiABActivated = new HashSet<string>(StringComparer.Ordinal);
         private bool jigwiABEnabled;
         private int jigwiABFireCount;
-        private const double JigwiABMissionSeconds = 10d, JigwiABRewardSeconds = 5d;
+        private const double JigwiABMissionSeconds = LabJigwiABTimeline.GroupMissionSeconds, JigwiABRewardSeconds = 5d;
+        private const uint JigwiGroupPickSalt = 0x509B1C4Bu;
         // #479: A burns each owner's orbs one at a time. The last queued deadline per owner for the running A.
         private readonly Dictionary<ulong, double> jigwiABLastBurnAt = new Dictionary<ulong, double>();
         private string jigwiABBurnQueueId;
@@ -68,9 +69,8 @@ namespace C6Lab
                 if (item.resolution == LabJigwiABResolution.None)
                 {
                     Include(item.activeAt); Include(item.endsAt);
-                    if (item.kind == LabJigwiABKind.GroupFire)
-                        foreach (var player in item.players)
-                            foreach (var fire in player.targets) if (!fire.lit) Include(fire.relightAt);
+                    if (item.kind == LabJigwiABKind.GroupFire && item.syncWindowAt >= 0d)
+                        Include(item.syncWindowAt + LabJigwiABTimeline.GroupSyncWindowSeconds);
                 }
                 if (item.RewardActive(lastTime)) Include(item.rewardUntil);
             }
@@ -117,9 +117,7 @@ namespace C6Lab
                 revision++;
             }
             if (active.kind != LabJigwiABKind.GroupFire) return;
-            foreach (var player in active.players)
-                foreach (var fire in player.targets)
-                    if (!fire.lit && now >= fire.relightAt) { fire.lit = true; revision++; }
+            CloseJigwiSyncWindow(active, now);
             if (firstActivation) StartJigwiABSupply(active, now);
             else AdvanceJigwiABSupply(active, now);
         }
@@ -145,15 +143,20 @@ namespace C6Lab
             {
                 playerId = owner, targets = Array.Empty<LabJigwiABFireTarget>()
             }).ToArray();
-            else item.players = seats.Take(activeSeatCount).Select(owner => new LabJigwiABPlayerFire
+            // #509: B picks a few seats; each picked screen gets one fire pillar in front of the boss.
+            // The others are helpers. The draw is stable per seed/slot and differs between B rounds.
+            else item.players = JigwiGroupPicks(slot).Select(owner => new LabJigwiABPlayerFire
             {
-                playerId = owner, targets = Enumerable.Range(0, jigwiABFireCount).Select(i => new LabJigwiABFireTarget
-                {
-                    id = item.id + "/" + owner + "/" + i,
-                    x = .2f + .6f * (i + 1f) / (jigwiABFireCount + 1f), y = .62f + .04f * (i % 2)
-                }).ToArray()
+                playerId = owner, targets = new[] { new LabJigwiABFireTarget { id = item.id + "/" + owner + "/0", x = .5f, y = .62f } }
             }).ToArray();
             jigwiABRounds.Add(item); revision++;
+        }
+        private ulong[] JigwiGroupPicks(int slot)
+        {
+            ulong[] all = seats.Take(activeSeatCount).ToArray();
+            int count = LabJigwiABTimeline.GroupPickCount(all.Length);
+            return all.OrderBy(owner => DrawFor(seed ^ JigwiGroupPickSalt, owner, (uint)slot)).ThenBy(owner => owner)
+                .Take(count).ToArray();
         }
         private void ResolveJigwiAB(LabJigwiABRound item, LabJigwiABResolution result, double at)
         {
@@ -173,7 +176,8 @@ namespace C6Lab
                     item.rewardUntil = Math.Min(jigwiStageCutoffAt, item.resolvedAt + JigwiABRewardSeconds);
                 else if (result == LabJigwiABResolution.Expired)
                 {
-                    var affected = new HashSet<ulong>(item.players.Select(player => player.playerId));
+                    // #509: a failed B still empties every board (picked and helpers), as before.
+                    var affected = new HashSet<ulong>(seats.Take(activeSeatCount));
                     foreach (var orb in orbs.Values.Where(value => affected.Contains(value.owner)).ToArray())
                     {
                         orbs.Remove(orb.id); launchScales.Remove(orb.id);
@@ -272,13 +276,41 @@ namespace C6Lab
             if (!curtain && fire == null) return false;
             ConsumeJigwiABWaterImpact(orb, owner, now);
             if (!curtain && orb.kind == LabOrbKind.Combined && orb.element == LabOrbElement.Water)
+                extinguished = RecordJigwiSyncHit(active, fire, now);
+            return true;
+        }
+        /// <summary>
+        /// #509: a picked player's Water on their own pillar. The first hit opens a one-second window; when every
+        /// picked player has hit inside it, one synchronized clear counts. Three clears finish B. A late or missing
+        /// partner closes the window and resets the count to zero (see <see cref="CloseJigwiSyncWindow"/>).
+        /// Returns true only when this hit completed a synchronized clear.
+        /// </summary>
+        private bool RecordJigwiSyncHit(LabJigwiABRound active, LabJigwiABFireTarget fire, double now)
+        {
+            CloseJigwiSyncWindow(active, now);
+            if (active.resolution != LabJigwiABResolution.None) return false;
+            if (active.syncWindowAt < 0d) active.syncWindowAt = now;
+            if (fire.extinguishedAt < 0d) fire.extinguishedAt = now;
+            revision++;
+            if (!active.players.All(p => p.targets.All(value => value.extinguishedAt >= 0d))) return false;
+            active.syncCount++;
+            active.syncWindowAt = -1d;
+            foreach (var target in active.players.SelectMany(p => p.targets)) target.extinguishedAt = -1d;
+            if (active.syncCount >= LabJigwiABTimeline.GroupSyncRequired)
             {
-                fire.lit = false; fire.extinguishedAt = now; fire.relightAt = now + jigwiABRelight;
-                extinguished = true; revision++;
-                if (active.players.All(p => p.targets.All(value => !value.lit)))
-                    ResolveJigwiAB(active, LabJigwiABResolution.Completed, now);
+                foreach (var target in active.players.SelectMany(p => p.targets)) target.lit = false;
+                ResolveJigwiAB(active, LabJigwiABResolution.Completed, now);
             }
             return true;
+        }
+        /// <summary>#509: a window whose second passed without every picked hit resets the count to zero.</summary>
+        private void CloseJigwiSyncWindow(LabJigwiABRound active, double now)
+        {
+            if (active.syncWindowAt < 0d || now < active.syncWindowAt + LabJigwiABTimeline.GroupSyncWindowSeconds) return;
+            active.syncResetAt = active.syncWindowAt + LabJigwiABTimeline.GroupSyncWindowSeconds;
+            active.syncWindowAt = -1d; active.syncCount = 0;
+            foreach (var target in active.players.SelectMany(p => p.targets)) target.extinguishedAt = -1d;
+            revision++;
         }
         /// <summary>
         /// #479 지귀 부적: 이 회차 A에서 "물"을 다 쓴 사람의 불만 끄고(남은 구슬은 더 타지 않음) 그 판에 물 구슬을 준다.

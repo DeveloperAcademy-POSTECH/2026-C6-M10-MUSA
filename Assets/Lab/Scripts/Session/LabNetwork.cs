@@ -254,13 +254,14 @@ namespace C6Lab
         // 5683: #461 paint frame bodies may be deflate-compressed (LabPaintFrame.encoding).
         // 5684: #479 Jigwi A talisman: A carries every seat's talismanAt (no target/hit count), the
         //       "jigwiTalisman" request and the talisman water orb flag.
-        internal const ushort LabProtocolVersion = 5684;
+        // 5685: #509 Jigwi B lists only the picked seats (one fire each), lasts 15 s; A2 starts at 42 s.
+        internal const ushort LabProtocolVersion = 5685;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Double-tap a blue fox orb to clear it, and keep your Yin and Yang away.";
         /// <summary>More fox orbs than one fox fire ever drops; a longer list is ignored (#251).</summary>
         private const int MaximumFoxFireOrbs = 10;
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/45");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/46");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;

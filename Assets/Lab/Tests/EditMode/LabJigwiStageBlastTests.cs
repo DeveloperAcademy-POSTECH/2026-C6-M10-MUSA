@@ -26,14 +26,15 @@ namespace C6Lab.Tests
         [TearDown] public void TearDown() { Object.DestroyImmediate(config); }
         private void CompleteFinalScreenMission()
         {
-            // These tests isolate bomb-origin cleanup at 100, rather than the independent
-            // B failure wipe at 95. Finish B through real approved Water/fire transactions.
+            // These tests isolate bomb-origin cleanup at 100. Finish B3 through real approved
+            // Water/fire transactions: #509 needs three synchronized clears by the picked seat(s).
             var group = room.Snapshot(90d).jigwiAB.Active(90d);
             Assert.That(group.kind, Is.EqualTo(LabJigwiABKind.GroupFire));
             int index = 0;
-            foreach (var player in group.players)
-                foreach (var target in player.targets)
+            for (int sync = 0; sync < LabJigwiABTimeline.GroupSyncRequired; sync++)
+            for (int p = 0; p < group.players.Length; p++)
                 {
+                    var player = group.players[p]; var target = player.targets[0];
                     string id = "cutoff-water-" + ++index;
                     orbs.Add(id, new LabOrbState { id = id, owner = player.playerId,
                         kind = LabOrbKind.Combined, element = LabOrbElement.Water,
@@ -42,7 +43,7 @@ namespace C6Lab.Tests
                         out _, out var reason), Is.True, reason);
                     Assert.That(room.ConfirmJigwiABFireHit(id, group.id, target.id, 90d,
                         out bool extinguished), Is.True);
-                    Assert.That(extinguished, Is.True);
+                    Assert.That(extinguished, Is.EqualTo(p == group.players.Length - 1));
                 }
             var completed = room.Snapshot(90d).jigwiAB.rounds.Single(value => value.id == group.id);
             Assert.That(completed.resolution, Is.EqualTo(LabJigwiABResolution.Completed));

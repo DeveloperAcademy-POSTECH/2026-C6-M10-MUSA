@@ -458,7 +458,7 @@ namespace C6Lab.Tests
             var replica = ActiveReplica();
             Assert.That(replica.TryApply(VersionedFrame(1, true, 30ul, 34d,
                 RevisionOrb("kept", 10ul, 20ul)), out _), Is.True);
-            LabBoardFrame frame = VersionedFrame(2, false, 50ul, 35d);
+            LabBoardFrame frame = VersionedFrame(2, false, 50ul, 40d);
             frame.removedIds = new[] { "kept" };
             frame.players = new[] { new LabPlayerState { id = 10ul, seat = 0, stamina = 0f, personalHp = 237 } };
             frame.jigwiAB = new LabJigwiABSnapshot
@@ -469,7 +469,7 @@ namespace C6Lab.Tests
                     new LabJigwiABRound
                     {
                         id = "failed-mission", slot = 1, kind = LabJigwiABKind.GroupFire,
-                        warningAt = 24d, activeAt = 25d, endsAt = 35d, resolvedAt = 35d,
+                        warningAt = 24d, activeAt = 25d, endsAt = 40d, resolvedAt = 40d, // #509 15 s B
                         resolution = LabJigwiABResolution.Expired, clearedThroughRevision = 51ul,
                         shrinkAt = 25d, shrinkScale = 1f, movePeriodSeconds = 4f, targetRadius = .3f,
                         rewardSizeScale = 1.3f, rewardPaintScale = 1.5f,
