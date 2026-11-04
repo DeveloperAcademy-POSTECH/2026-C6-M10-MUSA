@@ -408,13 +408,28 @@ namespace Hapio
             for (int i = 0; i < teamPageDots.Length; i++) teamPageDots[i].color = ColorOf(i == teamPage ? "3F3D38" : "C7C0B0");
         }
 
+        private const float DisabledSeatAlpha = .45f;
+        private Color[] slotImageColors;
+
+        private Color SlotImageColor(int index)
+        {
+            if (slotImageColors == null)
+            {
+                slotImageColors = new Color[slotImages.Length];
+                for (int i = 0; i < slotImages.Length; i++) slotImageColors[i] = slotImages[i].color;
+            }
+            return slotImageColors[index];
+        }
+
         private void RefreshPositions()
         {
             int count = Network.TargetParticipantCount;
-            bool allChosen = Network.ParticipantCount == count && Network.SelectedParticipantCount == count;
+            // Until the Host's lobby arrives the count is the last room's or the chip's (#471): show no seats.
+            bool waiting = Network.LobbyInfoPending;
+            bool allChosen = !waiting && Network.ParticipantCount == count && Network.SelectedParticipantCount == count;
             // 땅따먹기 (#281, #394): 1:1 and 2:2 show both team boxes, 3:3 one team's page at a time; the saved anchors
             // move the shared texts down under the mode title.
-            int size = TerritoryRoom(count) && teamLayout != null ? LabTeams.TeamSize(count) : 0;
+            int size = !waiting && TerritoryRoom(count) && teamLayout != null ? LabTeams.TeamSize(count) : 0;
             RectTransform[] teamAnchors = size > 0 ? TeamAnchors(size) : null;
             bool team = teamAnchors != null;
             if (!team) size = 0;
@@ -426,17 +441,17 @@ namespace Hapio
             if (storyShifted != null)
                 for (int i = 0; i < teamShifted.Length; i++) CopyRect(team ? teamShiftAnchors[i] : storyShifted[i], teamShifted[i]);
             heading.fontSize = team ? teamHeadingFontSize : storyHeadingFontSize;
-            heading.text = allChosen ? (team ? "준비 완료!" : "요괴 봉인 준비 완료!") : "빈 자리를 고르시오.";
-            subheading.text = Network.SlotSelectionPending ? "자리 선택을 확인하고 있소..."
+            heading.text = waiting ? "방 정보를 받고 있소..." : allChosen ? (team ? "준비 완료!" : "요괴 봉인 준비 완료!") : "빈 자리를 고르시오.";
+            subheading.text = waiting ? "" : Network.SlotSelectionPending ? "자리 선택을 확인하고 있소..."
                 : allChosen ? (Network.SessionConfigReady ? "" : "방 설정을 확인하고 있소...")
                 : team ? TeamSeatHint(count) : "실제로 앉은 위치의 빈 자리를 눌러주시오.";
             roomName.text = Network.HostRoomNamePending ? "방을 만들고 있소..." : LabRoomNames.Display(Network.ConnectedRoomName);
-            joinedCount.text = Network.ParticipantCount + " / " + count + "명 입장";
-            selectedCount.text = Network.SelectedParticipantCount + " / " + count + "명 자리 확정";
+            joinedCount.text = waiting ? "인원 확인 중" : Network.ParticipantCount + " / " + count + "명 입장";
+            selectedCount.text = waiting ? "" : Network.SelectedParticipantCount + " / " + count + "명 자리 확정";
             // The story layouts stop at five; a larger room is always territory, so never index past them.
             int storyLines = Mathf.Min(count - 3, Mathf.Min(lines.Length, lineLayouts.Length) - 1);
-            connectionLines.gameObject.SetActive(storyLines >= 0 && !team);
-            if (storyLines >= 0 && !team)
+            connectionLines.gameObject.SetActive(!waiting && storyLines >= 0 && !team);
+            if (!waiting && storyLines >= 0 && !team)
             {
                 connectionLines.sprite = lines[storyLines];
                 CopyRect(lineLayouts[storyLines], connectionLines.rectTransform);
@@ -445,7 +460,7 @@ namespace Hapio
             for (int i = 0; i < slotButtons.Length; i++)
             {
                 // 3:3 shows only the seats of the team page on screen.
-                bool active = i < count && i < anchors.Length
+                bool active = !waiting && i < count && i < anchors.Length
                     && (size != 3 || (LabTeams.SeatTeam(i, count) == LabTeam.Red) == (teamPage == 1));
                 slotButtons[i].gameObject.SetActive(active); localLabels[i].gameObject.SetActive(active);
                 if (!active) continue;
@@ -457,6 +472,12 @@ namespace Hapio
                 slotLabels[i].text = "P" + (i + 1);
                 slotLabels[i].color = ColorOf(occupied ? "F6F6F6" : "3F3D38");
                 slotButtons[i].interactable = Network.CanSelectPlayerSlot && (!occupied || mine);
+                // The Button tints only its transparent hit area, so dim an empty seat that cannot be chosen. A choice
+                // or developer restart awaiting the Host only pauses the seats; they are not refused.
+                Color seatColor = SlotImageColor(i);
+                if (!occupied && !slotButtons[i].interactable && !Network.SlotSelectionPending && !Network.IsDeveloperRestartPending)
+                    seatColor.a *= DisabledSeatAlpha;
+                slotImages[i].color = seatColor;
                 bool host = occupied && owner == Unity.Netcode.NetworkManager.ServerClientId;
                 localLabels[i].fontSize = team ? teamLocalLabelFontSize
                     : storyLocalLabelFontSizes[Mathf.Min(i, storyLocalLabelFontSizes.Length - 1)];

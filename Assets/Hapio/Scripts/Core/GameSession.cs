@@ -201,7 +201,13 @@ namespace Hapio
                     { phase = GameFlowPhase.Lobby, mode = joiningMode, totalStages = GameRunFlow.StagesFor(joiningMode) });
             }
             if (state.phase == GameFlowPhase.Lobby && !network.IsConnected && !network.IsJoiningRoom)
-                SetLocalState(new GameFlowState());
+            {
+                // A lost lobby leaves like 나가기 (#471): without Stop the next room inherits this connection's state.
+                GoHome();
+                UiNotice = "방과의 연결이 끊어졌소.";
+                Changed?.Invoke();
+                return;
+            }
             if (battleReadyPending && network.HasBattleReferences && sceneRoutine == null
                 && StageConfigurationReady)
             {

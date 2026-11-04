@@ -302,7 +302,11 @@ namespace C6Lab
         private double nextSnapshotAt;
 
         private long requestSequence;
-        private bool handlerRegistered;
+        /// <summary>
+        /// The messaging manager the handlers were registered on. NGO builds a new one for every start, so a handler
+        /// left over from a session that ended without <see cref="Stop"/> (a lobby disconnect) must not count (#471).
+        /// </summary>
+        private CustomMessagingManager registeredMessaging;
         private bool autoStart;
         private bool autoGenerate;
         private bool autoTransfer;
@@ -416,6 +420,8 @@ namespace C6Lab
         public int TargetParticipantCount => targetParticipantCount;
         public int LocalSlotNumber => IsConnected && playerSlots != null ? playerSlots.GetSlot(LocalPlayerId) : 0;
         public bool SlotSelectionPending => slotSelectionPending;
+        /// <summary>A Guest is connected but has not received the Host's lobby: the room size and seats it shows are stale.</summary>
+        public bool LobbyInfoPending => IsConnected && !IsHost && receivedLobbyRevision == 0;
         public bool IsDeveloperRestartPending => pendingDeveloperRestart;
         public bool CanSelectPlayerSlot => IsConnected && !developerSolo && model == null && latest == null
             && (!gameFlowEnabled || !gameRosterLocked)
@@ -1434,20 +1440,19 @@ namespace C6Lab
 
         private void RegisterHandler()
         {
-            if (handlerRegistered || manager.CustomMessagingManager == null) return;
-            manager.CustomMessagingManager.RegisterNamedMessageHandler(MessageName, Receive);
-            manager.CustomMessagingManager.RegisterNamedMessageHandler(BulkMessageName, ReceiveBulk);
-            handlerRegistered = true;
+            CustomMessagingManager messaging = manager.CustomMessagingManager;
+            if (messaging == null || messaging == registeredMessaging) return;
+            UnregisterHandler();
+            messaging.RegisterNamedMessageHandler(MessageName, Receive);
+            messaging.RegisterNamedMessageHandler(BulkMessageName, ReceiveBulk);
+            registeredMessaging = messaging;
         }
 
         private void UnregisterHandler()
         {
-            if (handlerRegistered && manager != null && manager.CustomMessagingManager != null)
-            {
-                manager.CustomMessagingManager.UnregisterNamedMessageHandler(MessageName);
-                manager.CustomMessagingManager.UnregisterNamedMessageHandler(BulkMessageName);
-            }
-            handlerRegistered = false;
+            registeredMessaging?.UnregisterNamedMessageHandler(MessageName);
+            registeredMessaging?.UnregisterNamedMessageHandler(BulkMessageName);
+            registeredMessaging = null;
         }
 
         private void OnConnected(ulong id)
@@ -1533,6 +1538,8 @@ namespace C6Lab
                 {
                     GameFlowDisconnected?.Invoke(id, true);
                     clientSessionConnected = false;
+                    UnregisterHandler();
+                    Debug.LogWarning("C6_LAB_DISCONNECTED reason=" + (manager == null ? string.Empty : manager.DisconnectReason));
                     // Keep the last snapshot until GameSession captures the terminal screen.
                     // Its Home action performs the eventual transport shutdown.
                     SetStatus("Connection ended. Return home from Game Over.");

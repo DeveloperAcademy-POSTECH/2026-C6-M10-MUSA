@@ -477,6 +477,29 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
+        public IEnumerator ALobbyThatLosesItsConnectionLeavesLikeTheLeaveButtonAndShowsWhy()
+        {
+            if (!LabBonjourDiscovery.IsSupported) Assert.Ignore("Native game-room advertisement requires macOS or iOS.");
+            session.Network.SetTargetParticipantCount(2);
+            session.Host();
+            yield return Until(() => session.State.phase == GameFlowPhase.Lobby && !session.IsLoadingScene
+                && SceneManager.GetActiveScene().path == GameScenePaths.Lobby && session.Network.IsHost,
+                "Host lobby", 15f);
+            // #471: the transport ends underneath the lobby, not through 나가기. The test assembly has no Netcode reference.
+            object manager = session.Network.GetType().GetField("manager").GetValue(session.Network);
+            manager.GetType().GetMethod("Shutdown").Invoke(manager, new object[] { false });
+            yield return Until(() => session.State.phase == GameFlowPhase.Home && !session.IsLoadingScene
+                && SceneManager.GetActiveScene().path == GameScenePaths.Home && session.Network.CanChooseConnection,
+                "Room browser after the lobby lost its connection", 15f);
+            yield return null;
+            Assert.That(session.RoomBrowserVisible, Is.True, "Like 나가기 from the lobby, it returns to the room list.");
+            Assert.That(session.Network.IsConnected, Is.False);
+            Assert.That(session.Network.ParticipantCount, Is.Zero, "Stop cleared the old room.");
+            Assert.That(session.UiNotice, Is.EqualTo("방과의 연결이 끊어졌소."));
+            Assert.That(View().message.text, Is.EqualTo("방과의 연결이 끊어졌소."));
+        }
+
+        [UnityTest]
         public IEnumerator DirectGameHostKeepsItsGuidNameAndAdvertisesTheGameFamilyBeforeEnteringTheLobby()
         {
             if (!LabBonjourDiscovery.IsSupported) Assert.Ignore("Native game-room advertisement requires macOS or iOS.");
