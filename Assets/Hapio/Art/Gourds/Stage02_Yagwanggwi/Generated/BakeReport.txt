@@ -1,3 +1,4 @@
+source=Assets/Hapio/Art/Gourds/Stage02_Yagwanggwi/Prefabs/Yagwanggwi_Gourd_GameReady.prefab
 bodyHeightBefore=2.3903 scale=1.00000
 paintOrigin=(0.0000, 0.0000, 0.0000) axis=(0.0000, 0.8660, 0.5000) bodyExtentInFrame=(0.9334, 0.8411, 0.9334)
 bodyTris=40960 outerTris=20608 starShaped=100.00 %

@@ -42,12 +42,24 @@
 ## 현재 상태
 
 - 흰 박의 마운트·판정·칠 binding·요괴 자세는 main에서 기록한 골든(`Assets/Lab/Tests/PlayMode/Golden/`)과 같아야 한다.
-- 1·3스테이지: 흰 박(`gourdVisualResource` 비어 있음).
-- 2스테이지: `Hapio/Gourds/Stage02_Yagwanggwi_Battle`(아래 굽기 결과). 게임 토큰 `C6HapioGame/29`.
+- 1스테이지: `Hapio/Gourds/Stage01_Gumiho_Battle`, 2스테이지: `Stage02_Yagwanggwi_Battle`, 3스테이지: `Stage03_Jigwi_Battle`. 게임 토큰 `C6HapioGame/30`.
+- 흰 박은 Lab 단판과 2:2 땅따먹기(스토리 스테이지 정의가 없음)에만 쓰인다.
 
-## 2스테이지 야광귀 박 굽기 (#507 PR-2)
+## 스테이지 박 굽기 (#507)
 
-`Hapio > Gourds > Bake Stage 2 Yagwanggwi Gourd` 또는 `-executeMethod Hapio.Editor.GameGourdRigBaker.BakeFromCommandLine`. 계산은 `Hapio.GameGourdRigBake`(Editor 전용, 테스트가 다시 계산해 저장본과 비교), 저장은 `GameGourdRigBaker`가 한다. 다시 실행하면 같은 GUID의 asset을 제자리에서 덮어쓴다.
+`Hapio > Gourds > Bake All Stage Gourds`(스테이지별 `Bake Stage N ...` 메뉴도 있음) 또는 `-executeMethod Hapio.Editor.GameGourdRigBaker.BakeAllFromCommandLine`. 계산은 `Hapio.GameGourdRigBake`(Editor 전용, 테스트가 다시 계산해 저장본과 비교), 저장은 `GameGourdRigBaker`가 한다. 다시 실행하면 같은 GUID의 asset을 제자리에서 덮어쓴다.
+
+스테이지마다 `GameGourdRigBake.Spec`(아트 폴더·요괴 이름·StageDefinition)만 다르다. 세 아트는 같은 계층(`<요괴>_Gourd`/`Vessel_Forward_Tilt`/`Lid_Hinge`/`model_part0`·`model_part3`/`Spirit_Peek_Control`/`Eye_Pop_Control`/`Rear_Rope_*`)을 쓰며, 노드는 Blender 복제 접미사(`.001`)를 뗀 이름으로 찾는다. 칠 아래 바탕은 원래 몸통·뚜껑 재질의 `_BaseMap`이다. 출력은 `Assets/Hapio/Art/Gourds/<스테이지>/Generated/`(`Stage0N_PaintShell`·`LidPaint`·`HitShell`·`YokaiPeek`·`YokaiProfile`·`BodyPaint`·`LidPaint` 재질, `BakeReport.txt`)와 `Assets/Hapio/Resources/Hapio/Gourds/<스테이지>_Battle.prefab`이다.
+
+| 스테이지 | 바깥 면 / 몸통 | star-shaped | 판정 편차 평균·최대 | 시간표(프레임) | 렌더러·삼각형 |
+| --- | --- | --- | --- | --- | --- |
+| 1 구미호 | 7,262 / 14,336 | 100% | 0.013 · 0.045 | 15/26/29/38/45/47, 주기 48 | 30 · 61,505 |
+| 2 야광귀 | 20,608 / 40,960 | 100% | 0.013 · 0.046 | 15/26/29/38/45/47, 주기 48 | 17 · 311,442 |
+| 3 지귀 | 7,262 / 14,336 | 100% | 0.013 · 0.045 | 15/26/29/38/45/47, 주기 48 | 17 · 66,637 |
+
+1스테이지 눈의 표정(`Fierce narrowed fox eye` BlendShape) 커브도 요괴 클립에 옮긴다. 1스테이지 눈은 `SkinnedMeshRenderer`라 완성 연출·결과 미리보기 복사(`MeshRenderer`만 복사)에는 빠진다(완성 때는 뚜껑이 닫혀 있다).
+
+아래 표는 2스테이지를 처음 구울 때의 단계 설명이며 1·3스테이지도 같은 단계를 거친다.
 
 | 단계 | 내용 |
 | --- | --- |
