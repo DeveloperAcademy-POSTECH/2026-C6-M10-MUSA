@@ -4687,6 +4687,28 @@ Metal 파이프라인(PSO)이 실제로 준비 구간에서 만들어지는지�
 - `GameSceneAssetTests` 기대값과 `docs/STAGE_BACKGROUNDS.md`도 SandBeige로 바로잡았다.
 - 배경 Scene·재질 EditMode 검사(`GameSceneAssetTests`·`GameStageBackgroundAssetTests`·`GameBackgroundAnimationAssetTests`) **12/12 PASS**. 화면은 #487 직전 캡처와 같은 값이라 다시 찍지 않았다.
 
+## #489 야광귀·기본 전투 배경음 Streaming — 2026-11-04
+
+기준 main `8c020fca`에서 Unity 6000.6.5f1 macOS batch Editor로 확인했다.
+
+**변경**
+- 임시 Editor 스크립트로 `AudioImporter`를 바꿨다. 스크립트는 커밋하지 않았고 .meta는 손으로 고치지 않았다.
+- 대상은 `Yaguang_Stage.wav`·`Kkwaenggwari_13.wav`의 기본 `loadType`이다: DecompressOnLoad → Streaming.
+- diff는 .meta 2줄이다. 구미호·땅따먹기 곡과 같은 설정이며, 피버곡 2개는 DecompressOnLoad 그대로다.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| EditMode `LabBattleBgmImportTests`(새 검사)·`LabGumihoSoundTests`·`LabYaguangFeverTests` | **15/15 PASS** | 긴 스테이지 곡 4폴더 모두 Streaming, 피버곡 DecompressOnLoad |
+| PlayMode `LabBattleBgmStageTests`·3스테이지 결과 흐름 | **4/4 PASS** | |
+
+**Editor 계측(#481, 1회)**
+- 이전 실행: 야광귀 약 200 ms·지귀 약 85 ms의 `BattleMusic` 프레임이 있었다.
+- 이번 실행: 2·3스테이지에서 그 프레임이 나오지 않았다.
+- 같은 실행의 1스테이지(구미호, 원래 Streaming)에서는 `BattleMusic`이 표시된 187 ms 프레임이 한 번 있었다. Streaming 시작도 비용이 0은 아니다.
+- Editor 수치이고 1회라 기기 판단 근거가 아니다.
+
+**미실행:** iPhone에서 배경음 시작 지연이 들리는지, 시작 프레임 시간.
+
 ## #492 현재 스테이지 효과음·피버곡·지귀 보상 불꽃 미리 로드 — 2026-11-04
 
 기준 main `76d71b78`에서 Unity 6000.6.5f1 macOS batch Editor로 확인했다.
