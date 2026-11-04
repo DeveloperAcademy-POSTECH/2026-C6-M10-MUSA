@@ -964,8 +964,10 @@ namespace Hapio.Tests
                     var scenery = Object.FindFirstObjectByType<GameStageBackgrounds>();
                     Assert.That(scenery, Is.Not.Null);
                     Assert.That(scenery.AppliedStage, Is.EqualTo(stage));
-                    Assert.That(scenery.defaultBackground.studio.gameObject.activeInHierarchy, Is.EqualTo(stage != 2));
+                    // #447: stages 2 and 3 each show their own scenery; stage 1 shows the default.
+                    Assert.That(scenery.defaultBackground.studio.gameObject.activeInHierarchy, Is.EqualTo(stage == 1));
                     Assert.That(scenery.Resolve(2).studio.gameObject.activeInHierarchy, Is.EqualTo(stage == 2));
+                    Assert.That(scenery.Resolve(3).studio.gameObject.activeInHierarchy, Is.EqualTo(stage == 3));
 
                     network.Generate();
                     yield return Until(() => network.Snapshot.players.Single().generatedTotal == 1,
