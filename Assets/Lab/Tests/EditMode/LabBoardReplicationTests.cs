@@ -453,14 +453,13 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void ABoardFrameCannotInstallAFailureFenceFromAFutureModelRevision()
+        public void ABoardFrameCannotInstallABoardWipeFenceButAcceptsTheBoardFireFailure()
         {
             var replica = ActiveReplica();
             Assert.That(replica.TryApply(VersionedFrame(1, true, 30ul, 34d,
                 RevisionOrb("kept", 10ul, 20ul)), out _), Is.True);
             LabBoardFrame frame = VersionedFrame(2, false, 50ul, 40d);
-            frame.removedIds = new[] { "kept" };
-            frame.players = new[] { new LabPlayerState { id = 10ul, seat = 0, stamina = 0f, personalHp = 237 } };
+            frame.players = new[] { new LabPlayerState { id = 10ul, seat = 0, stamina = 40f, personalHp = 237 } };
             frame.jigwiAB = new LabJigwiABSnapshot
             {
                 enabled = true, startedAt = 0d, cutoffAt = 100d,
@@ -470,9 +469,8 @@ namespace C6Lab.Tests
                     {
                         id = "failed-mission", slot = 1, kind = LabJigwiABKind.GroupFire,
                         warningAt = 24d, activeAt = 25d, endsAt = 40d, resolvedAt = 40d, // #509 15 s B
-                        resolution = LabJigwiABResolution.Expired, clearedThroughRevision = 51ul,
+                        resolution = LabJigwiABResolution.Expired, clearedThroughRevision = 50ul,
                         shrinkAt = 25d, shrinkScale = 1f, movePeriodSeconds = 4f, targetRadius = .3f,
-                        rewardSizeScale = 1.3f, rewardPaintScale = 1.5f,
                         players = new[]
                         {
                             new LabJigwiABPlayerFire
@@ -484,18 +482,17 @@ namespace C6Lab.Tests
                     }
                 }
             };
-            Assert.That(LabJigwiABNetworkValidation.Valid(frame.jigwiAB, frame.players), Is.True,
-                "The payload is otherwise valid; only the frame's model revision makes its fence impossible.");
+            // #509: a failed B no longer wipes boards, so any purge fence is malformed.
+            Assert.That(LabJigwiABNetworkValidation.Valid(frame.jigwiAB, frame.players), Is.False);
             Assert.That(replica.TryApply(frame, out string reason), Is.False);
             Assert.That(reason, Is.EqualTo("INVALID_BOARD_FRAME"));
             Assert.That(replica.LatestSequence, Is.EqualTo(1));
-            Assert.That(replica.NeedsCheckpoint, Is.False);
-            Assert.That(replica.TryGetState("kept", out _), Is.True,
-                "Invalid outcome metadata must be rejected before applying unrelated removals.");
-            frame.jigwiAB.rounds.Single().clearedThroughRevision = 50ul;
+            LabJigwiABRound failed = frame.jigwiAB.rounds.Single();
+            failed.clearedThroughRevision = 0ul; failed.boardFireUntil = 43d;
+            Assert.That(LabJigwiABNetworkValidation.Valid(frame.jigwiAB, frame.players), Is.True);
             Assert.That(replica.TryApply(frame, out reason), Is.True, reason);
             Assert.That(replica.LatestSequence, Is.EqualTo(2));
-            Assert.That(replica.TryGetState("kept", out _), Is.False);
+            Assert.That(replica.TryGetState("kept", out _), Is.True, "The board fire keeps every orb on the board.");
         }
 
         [Test]

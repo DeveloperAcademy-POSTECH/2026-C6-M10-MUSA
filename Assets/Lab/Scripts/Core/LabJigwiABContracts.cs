@@ -48,6 +48,8 @@ namespace C6Lab
         /// <summary>#509 B: synchronized clears so far (0..3), the open one-second window (-1 none) and the last reset.</summary>
         public int syncCount;
         public double syncWindowAt = -1d, syncResetAt = -1d;
+        /// <summary>#509 B failure: nobody can press a drum until this battle time (-1 = no board fire).</summary>
+        public double boardFireUntil = -1d;
         public bool Warning(double now) => resolution == LabJigwiABResolution.None && now >= warningAt && now < activeAt;
         public bool Active(double now) => resolution == LabJigwiABResolution.None && now >= activeAt && now < endsAt;
         public bool RewardActive(double now) => kind == LabJigwiABKind.GroupFire
@@ -146,15 +148,11 @@ namespace C6Lab
                     intervals.Add(round);
                 }
                 bool failed = round.kind == LabJigwiABKind.GroupFire && round.resolution == LabJigwiABResolution.Expired;
-                if (failed != (round.clearedThroughRevision > 0)
+                // #509: a failed B no longer wipes boards (no purge fence) and success has no timed launch reward.
+                if (round.clearedThroughRevision != 0
                     || modelRevision.HasValue && round.clearedThroughRevision > modelRevision.Value) return false;
-                bool rewarded = round.kind == LabJigwiABKind.GroupFire && round.resolution == LabJigwiABResolution.Completed;
-                if (rewarded)
-                {
-                    if (round.rewardUntil <= round.resolvedAt
-                        || Math.Abs(round.rewardUntil - Math.Min(state.cutoffAt, round.resolvedAt + 5d)) > .00001d) return false;
-                }
-                else if (round.rewardUntil != -1d) return false;
+                if (round.rewardUntil != -1d) return false;
+                if (failed ? !Range(round.boardFireUntil, round.resolvedAt, round.resolvedAt + 10d) : round.boardFireUntil != -1d) return false;
                 if (round.resolution == LabJigwiABResolution.None)
                 {
                     // A may still be running during the next B's one-second warning.

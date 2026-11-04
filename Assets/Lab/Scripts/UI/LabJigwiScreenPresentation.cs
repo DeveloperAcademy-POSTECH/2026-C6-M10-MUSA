@@ -484,7 +484,7 @@ namespace C6Lab
             else SetFiresHidden(held);
             DrawWater(now, held);
             DrawStatus(stage, active, snapshot, localPlayer, now, held);
-            DrawFailure(now);
+            DrawFailure(stage, now);
         }
 
         /// <summary>#479: true once this seat finished writing its talisman in this A.</summary>
@@ -510,17 +510,31 @@ namespace C6Lab
             }
         }
 
-        private void DrawFailure(double now)
+        /// <summary>#509: true while a failed B keeps the boards on fire (drums blocked).</summary>
+        public bool BoardFireVisible { get; private set; }
+        private void DrawFailure(LabJigwiABSnapshot stage, double now)
         {
             if (failureOverlay == null) return;
-            bool visible = failedAt >= 0d && now >= failedAt && now - failedAt < FailureFlashSeconds;
+            double fireUntil = -1d;
+            foreach (var round in stage?.rounds ?? Array.Empty<LabJigwiABRound>())
+                if (round != null && round.kind == LabJigwiABKind.GroupFire && round.resolution == LabJigwiABResolution.Expired
+                    && now >= round.resolvedAt && now < round.boardFireUntil) fireUntil = Math.Max(fireUntil, round.boardFireUntil);
+            BoardFireVisible = fireUntil > now;
+            bool flash = failedAt >= 0d && now >= failedAt && now - failedAt < FailureFlashSeconds;
+            bool visible = flash || BoardFireVisible;
             failureOverlay.gameObject.SetActive(visible);
             if (!visible) return;
-            float elapsed = (float)(now - failedAt), opacity = 1f - elapsed / (float)FailureFlashSeconds;
+            float elapsed = (float)(now - Math.Max(0d, failedAt));
+            float opacity = flash ? 1f - elapsed / (float)FailureFlashSeconds : 0f;
+            if (BoardFireVisible) opacity = Mathf.Max(opacity, .55f);
+            if (failureStatus != null)
+                failureStatus.text = BoardFireVisible
+                    ? "조합판에 불이 붙었다! " + Math.Max(0d, fireUntil - now).ToString("0.0", CultureInfo.InvariantCulture) + "초"
+                    : "실패";
             failureOverlay.color = new Color(1f, .13f, .01f, .22f * opacity);
             if (failureFlames != null) for (int i = 0; i < failureFlames.Length; i++)
                 AnimateFlame(failureFlames[i], elapsed, i * 1.73f, .95f * opacity);
-            if (failureStatus != null) failureStatus.color = new Color(1f, .97f, .83f, opacity);
+            if (failureStatus != null) failureStatus.color = new Color(1f, .97f, .83f, BoardFireVisible ? 1f : opacity);
         }
 
         private void ObserveDouses(LabJigwiABSnapshot stage, ulong localPlayer, double now, bool baseline)
@@ -727,18 +741,7 @@ namespace C6Lab
                 foreach (var finished in stage.rounds ?? Array.Empty<LabJigwiABRound>())
                     if (finished != null && finished.kind == LabJigwiABKind.GroupFire
                         && finished.resolution == LabJigwiABResolution.Completed && Recent(finished.resolvedAt, now))
-                        words = "모든 불을 함께 껐어요!";
-            LabJigwiABRound reward = stage.Reward(now);
-            if (reward != null)
-            {
-                string remaining = Math.Max(0d, reward.rewardUntil - now).ToString("0.0", CultureInfo.InvariantCulture);
-                words = words.Length > 0 ? words + "\n성공 보상 · " + remaining + "초"
-                    : "모든 불을 함께 껐어요! · 보상 " + remaining + "초";
-                if (rows.Length > 0) rows.Append('\n');
-                rows.Append("투척 크기 ").Append(reward.rewardSizeScale.ToString("0.#", CultureInfo.InvariantCulture))
-                    .Append("배 · 도색 ").Append(reward.rewardPaintScale.ToString("0.#", CultureInfo.InvariantCulture))
-                    .Append("배 · 불꽃 궤적");
-            }
+                        words = "물벼락! 박을 크게 적셨어요";
             foreach (var upcoming in stage.rounds ?? Array.Empty<LabJigwiABRound>())
             {
                 if (upcoming == null || upcoming == active || !upcoming.Warning(now)) continue;

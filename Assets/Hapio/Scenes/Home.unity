@@ -34449,7 +34449,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\uC9C0\uADC0 \uC131\uACF5 \uBCF4\uC0C1 \uCE60 \uBA74\uC801 (\uBC30)"
+  m_Text: Reserved Jigwi B Reward Paint (unused)
 --- !u!222 &398146536
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -117669,7 +117669,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\uC9C0\uADC0 \uC131\uACF5 \uBCF4\uC0C1 \uAD6C\uC2AC \uD06C\uAE30 (\uBC30)"
+  m_Text: Reserved Jigwi B Reward Size (unused)
 --- !u!222 &1317399235
 CanvasRenderer:
   m_ObjectHideFlags: 0

@@ -153,8 +153,9 @@ namespace C6Lab.Tests
             // #509: B3 now runs until the 100 s cutoff, so at 98 it is still open; the rest expired.
             Assert.That(state.rounds.Where(item => item.slot != 5).All(item => item.resolution == LabJigwiABResolution.Expired), Is.True);
             Assert.That(state.rounds.Single(item => item.slot == 5).Active(98d), Is.True);
+            // #509: a failed B sets the boards on fire for 3 s instead of wiping them (no purge fence).
             Assert.That(state.rounds.Where(item => item.kind == LabJigwiABKind.GroupFire && item.slot != 5)
-                .All(item => item.clearedThroughRevision > 0), Is.True);
+                .All(item => item.clearedThroughRevision == 0 && Math.Abs(item.boardFireUntil - (item.resolvedAt + 3d)) < .00001d), Is.True);
             Assert.That(ScreenState(room, 98d).rounds.Length, Is.EqualTo(6));
             Assert.That(LabJigwiABNetworkValidation.Valid(state, room.Snapshot(98d).players, room.Revision), Is.True);
         }
@@ -354,12 +355,16 @@ namespace C6Lab.Tests
             Apply(values);
             var room = Room();
             // #509: B2 is the last B that can fail (at 70); B3 runs into the cutoff and is cancelled without penalty.
-            Assert.That(room.Snapshot(70d).players[0].stamina, Is.Zero, "The last failed B clears stamina once at 70.");
+            // A failed B no longer empties stamina, so compare the recovery steps around the cutoff.
+            Assert.That(room.Snapshot(70d).jigwiAB.rounds.Single(item => item.slot == 4).boardFireUntil, Is.EqualTo(73d).Within(.00001d));
             ulong fence = room.JigwiABFailureRevision;
-            Assert.That(room.Snapshot(99.5d).players[0].stamina, Is.EqualTo(29.5f).Within(.0001f));
-            Assert.That(room.Snapshot(100d).players[0].stamina, Is.EqualTo(30f).Within(.0001f));
-            Assert.That(room.Snapshot(100.5d).players[0].stamina, Is.EqualTo(31f).Within(.0001f));
-            Assert.That(room.Snapshot(101d).players[0].stamina, Is.EqualTo(32f).Within(.0001f));
+            float before = room.Snapshot(99.5d).players[0].stamina;
+            float atCutoff = room.Snapshot(100d).players[0].stamina;
+            float half = room.Snapshot(100.5d).players[0].stamina;
+            float one = room.Snapshot(101d).players[0].stamina;
+            Assert.That(atCutoff - before, Is.EqualTo(.5f).Within(.0001f));
+            Assert.That(half - atCutoff, Is.EqualTo(1f).Within(.0001f));
+            Assert.That(one - half, Is.EqualTo(1f).Within(.0001f));
             Assert.That(room.JigwiABFailureRevision, Is.EqualTo(fence));
             Assert.That(room.JigwiStageRecoveryMultiplier(99.99d), Is.EqualTo(1f));
             Assert.That(room.JigwiStageRecoveryMultiplier(100d), Is.EqualTo(2f));

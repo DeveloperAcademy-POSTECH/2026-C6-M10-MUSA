@@ -11,15 +11,18 @@ namespace C6Lab
         private readonly List<LabJigwiABRound> jigwiABRounds = new List<LabJigwiABRound>();
         private readonly HashSet<string> jigwiABActivated = new HashSet<string>(StringComparer.Ordinal);
         private bool jigwiABEnabled;
-        private const double JigwiABMissionSeconds = LabJigwiABTimeline.GroupMissionSeconds, JigwiABRewardSeconds = 5d;
+        private const double JigwiABMissionSeconds = LabJigwiABTimeline.GroupMissionSeconds;
         private const uint JigwiGroupPickSalt = 0x509B1C4Bu;
+        // #509: where each picked seat's last counted Water hit the boss, for the success splash.
+        private readonly Dictionary<ulong, Vector3> jigwiSyncDirections = new Dictionary<ulong, Vector3>();
+        private float jigwiSplashShare, jigwiBoardFireSeconds;
         // #479: A burns each owner's orbs one at a time. The last queued deadline per owner for the running A.
         private readonly Dictionary<ulong, double> jigwiABLastBurnAt = new Dictionary<ulong, double>();
         private string jigwiABBurnQueueId;
         private int jigwiTalismanWaterCount;
         private float jigwiTalismanWaterLifetime, jigwiTalismanWaterPaint;
         private float jigwiABDuration, jigwiABBurnSeconds, jigwiABBurnStagger,
-            jigwiABMoveAmount, jigwiABMovePeriod, jigwiABTargetRadius, jigwiABRewardSize, jigwiABRewardPaint;
+            jigwiABMoveAmount, jigwiABMovePeriod, jigwiABTargetRadius;
         private ulong jigwiABFailureRevision;
         public bool JigwiABEnabled => jigwiABEnabled;
         public ulong JigwiABFailureRevision => jigwiABFailureRevision;
@@ -45,7 +48,8 @@ namespace C6Lab
             jigwiABBurnSeconds = config.JigwiABPersonalBurnSeconds; jigwiABBurnStagger = config.JigwiABBurnStaggerSeconds;
             jigwiTalismanWaterCount = config.JigwiTalismanWaterCount; jigwiTalismanWaterLifetime = config.JigwiTalismanWaterLifetimeSeconds;
             jigwiTalismanWaterPaint = config.JigwiTalismanWaterPaintScale;
-            jigwiABRewardSize = config.JigwiABRewardSizeScale; jigwiABRewardPaint = config.JigwiABRewardPaintScale;
+            jigwiSplashShare = config.JigwiBSplashPaintShare; jigwiBoardFireSeconds = config.JigwiBBoardFireSeconds;
+            jigwiSyncDirections.Clear();
             jigwiABMoveAmount = config.JigwiABFireMoveAmount; jigwiABMovePeriod = config.JigwiABFireMovePeriodSeconds;
             jigwiABTargetRadius = config.JigwiABFireTargetRadius;
             paintSurface.SetPaintBlocker(null);
@@ -70,7 +74,8 @@ namespace C6Lab
                     if (item.kind == LabJigwiABKind.GroupFire && item.syncWindowAt >= 0d)
                         Include(item.syncWindowAt + LabJigwiABTimeline.GroupSyncWindowSeconds);
                 }
-                if (item.RewardActive(lastTime)) Include(item.rewardUntil);
+                Include(item.boardFireUntil); // #509: the board fire ends exactly on time
+
             }
             return next;
         }
@@ -134,7 +139,8 @@ namespace C6Lab
                 // Reserved shrink fields remain on the wire, but the timed mission never shrinks an orb.
                 shrinkAt = activeAt, shrinkScale = 1f,
                 moveAmount = jigwiABMoveAmount, movePeriodSeconds = jigwiABMovePeriod, targetRadius = jigwiABTargetRadius,
-                rewardSizeScale = personal ? 1f : jigwiABRewardSize, rewardPaintScale = personal ? 1f : jigwiABRewardPaint
+                // #509: B success no longer gives a timed launch reward.
+                rewardSizeScale = 1f, rewardPaintScale = 1f
             };
             // #479: A ignites every seat at once; each seat clears its own fire with a talisman.
             if (personal) item.players = seats.Take(activeSeatCount).Select(owner => new LabJigwiABPlayerFire
@@ -143,7 +149,8 @@ namespace C6Lab
             }).ToArray();
             // #509: B picks a few seats; each picked screen gets one fire pillar in front of the boss.
             // The others are helpers. The draw is stable per seed/slot and differs between B rounds.
-            else item.players = JigwiGroupPicks(slot).Select(owner => new LabJigwiABPlayerFire
+            if (!personal) jigwiSyncDirections.Clear();
+            if (!personal) item.players = JigwiGroupPicks(slot).Select(owner => new LabJigwiABPlayerFire
             {
                 playerId = owner, targets = new[] { new LabJigwiABFireTarget { id = item.id + "/" + owner + "/0", x = .5f, y = .62f } }
             }).ToArray();
@@ -170,23 +177,10 @@ namespace C6Lab
             if (item.kind == LabJigwiABKind.GroupFire)
             {
                 ClearJigwiABSupplies(item);
-                if (result == LabJigwiABResolution.Completed)
-                    item.rewardUntil = Math.Min(jigwiStageCutoffAt, item.resolvedAt + JigwiABRewardSeconds);
-                else if (result == LabJigwiABResolution.Expired)
-                {
-                    // #509: a failed B still empties every board (picked and helpers), as before.
-                    var affected = new HashSet<ulong>(seats.Take(activeSeatCount));
-                    foreach (var orb in orbs.Values.Where(value => affected.Contains(value.owner)).ToArray())
-                    {
-                        orbs.Remove(orb.id); launchScales.Remove(orb.id);
-                        orbExpiries.Add(new LabOrbExpiry(orb.owner, orb.id));
-                    }
-                    foreach (ulong owner in affected)
-                        if (players.TryGetValue(owner, out var player)) player.stamina = 0f;
-                    // A scalar fence retires every pre-failure approval without an unbounded ID array.
-                    item.clearedThroughRevision = ++revision;
-                    jigwiABFailureRevision = item.clearedThroughRevision;
-                }
+                // #509: failure sets every board on fire for a few seconds (no drum presses); orbs and stamina stay.
+                // It stops at the fever cutoff like every other yokai interference.
+                if (result == LabJigwiABResolution.Expired && jigwiBoardFireSeconds > 0f)
+                    item.boardFireUntil = Math.Max(item.resolvedAt, Math.Min(jigwiStageCutoffAt, item.resolvedAt + jigwiBoardFireSeconds));
             }
             revision++;
         }
@@ -241,7 +235,7 @@ namespace C6Lab
         /// #509: during B, a picked player's Water Combined that really hits the boss is that player's sync hit
         /// (one second for every picked player, three times). The hit itself is judged as usual afterwards.
         /// </summary>
-        private void RecordJigwiBossSyncHit(LabOrbState orb, double now)
+        private void RecordJigwiBossSyncHit(LabOrbState orb, double now, Vector3 paintDirection)
         {
             if (!jigwiABEnabled || orb.kind != LabOrbKind.Combined || orb.element != LabOrbElement.Water) return;
             var active = ActiveJigwiABRound(now);
@@ -249,8 +243,39 @@ namespace C6Lab
             if (!string.IsNullOrEmpty(orb.jigwiABSupplyEventId) && orb.jigwiABSupplyEventId != active.id) return;
             var picked = active.players.FirstOrDefault(player => player.playerId == orb.owner);
             var slot = picked?.targets?.FirstOrDefault();
-            if (slot != null && slot.lit) RecordJigwiSyncHit(active, slot, now);
+            if (slot == null || !slot.lit) return;
+            if (paintDirection.sqrMagnitude > 1e-6f && !float.IsNaN(paintDirection.x)) jigwiSyncDirections[orb.owner] = paintDirection.normalized;
+            RecordJigwiSyncHit(active, slot, now);
+            if (active.resolution == LabJigwiABResolution.Completed) SplashJigwiSuccess(active, now);
         }
+
+        /// <summary>
+        /// #509 B success: each picked seat's Water bursts into a big blue splash where it last hit the boss
+        /// (the largest single-hit paint share). It can win the battle on the spot.
+        /// </summary>
+        private void SplashJigwiSuccess(LabJigwiABRound round, double now)
+        {
+            if (teamMode || jigwiSplashShare <= 0f) return;
+            foreach (var picked in round.players)
+            {
+                if (!players.TryGetValue(picked.playerId, out var player)) continue;
+                Vector3 direction = jigwiSyncDirections.TryGetValue(picked.playerId, out var hit) ? hit : Vector3.forward;
+                bool painted = paintSurface.RegisterHit(direction, PaintColorFor(LabOrbElement.Water), player.id, player.seat + 1,
+                    Mathf.Min(3f, jigwiSplashShare));
+                if (painted && paintSurface.IsComplete && phase == LabPhase.Playing)
+                {
+                    phase = LabPhase.Victory;
+                    if (players.TryGetValue(paintSurface.LastPainter, out var painter)) painter.lastHit = true;
+                    AdvanceJigwiStage(now);
+                }
+            }
+            revision++;
+        }
+
+        /// <summary>#509: true while a failed B keeps every board on fire (drums cannot be pressed).</summary>
+        public bool JigwiBoardOnFire(double now) => jigwiABEnabled && jigwiABRounds.Any(value =>
+            value.kind == LabJigwiABKind.GroupFire && value.resolution == LabJigwiABResolution.Expired
+            && value.boardFireUntil > now);
         private void ConsumeJigwiABWaterImpact(LabOrbState orb, LabJigwiABPlayerFire owner, double now)
         {
             orbs.Remove(orb.id); launchScales.Remove(orb.id);

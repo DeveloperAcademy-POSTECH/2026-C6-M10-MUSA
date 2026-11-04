@@ -400,6 +400,7 @@ namespace C6Lab
         {
             orb = null;
             if (!BeginRequest(sender, requestId, now, out reason)) return false;
+            if (JigwiBoardOnFire(now)) return Reject("JIGWI_BOARD_FIRE", out reason); // #509 지귀 B 실패: 잠깐 북을 못 누름
             // Without a tapped drum, use the sender's earliest placed one (drums are never removed).
             LabOrbState drum = drumId == null
                 ? drums.Values.FirstOrDefault(candidate => candidate.owner == sender)
@@ -637,7 +638,7 @@ namespace C6Lab
                 || !orbs.TryGetValue(id ?? string.Empty, out var orb) || !orb.inFlight
                 || !players.TryGetValue(orb.owner, out var attacker)) return false;
             // #509 지귀 B: a picked player's Water on the boss counts toward the simultaneous hit.
-            RecordJigwiBossSyncHit(orb, now);
+            RecordJigwiBossSyncHit(orb, now, paintDirection);
             if (TryBlockJigwiABBossHit(orb, now)) return false;
             if (ConsumeJigwiABSupplyBossHit(orb, now)) return false;
             element = orb.element;
@@ -672,7 +673,7 @@ namespace C6Lab
                 bool painted = paints && (orb.fiveColor
                     ? PaintFiveColors(paintDirection, attacker, share)
                     : paintSurface.RegisterHit(paintDirection, PaintColorFor(element), attacker.id, attacker.seat + 1, share));
-                if (painted && paintSurface.IsComplete)
+                if (painted && paintSurface.IsComplete && phase == LabPhase.Playing) // #509: B 물벼락이 먼저 이겼으면 한 번만
                 {
                     phase = LabPhase.Victory;
                     if (players.TryGetValue(paintSurface.LastPainter, out var painter)) painter.lastHit = true;

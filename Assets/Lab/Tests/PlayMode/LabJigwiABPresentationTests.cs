@@ -330,22 +330,38 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void SuccessRewardShowsItsAcceptedFiveSecondClockAndScalesWithoutChangingTheCanvas()
+        public void SuccessShowsTheWaterSplashLineWithoutAnyRewardRows()
         {
             var group = Group(); snapshot = Snapshot(group); SetSnapshot(snapshot);
             view.ApplySnapshot(snapshot, Local, 11.2d);
             group.resolution = LabJigwiABResolution.Completed; group.resolvedAt = 12d;
-            group.rewardUntil = 17d; group.rewardSizeScale = 1.3f; group.rewardPaintScale = 1.5f;
             view.ApplySnapshot(snapshot, Local, 12d);
-            Assert.That(view.status.text, Does.Contain("모든 불을 함께 껐어요").And.Contain("5.0초"));
-            Assert.That(view.playerStatus.text, Does.Contain("1.3배").And.Contain("1.5배").And.Contain("불꽃 궤적"));
-            view.ApplySnapshot(snapshot, Local, 16.5d);
-            Assert.That(view.status.text, Does.Contain("0.5초"));
-            view.ApplySnapshot(snapshot, Local, 17d);
+            // #509: B success is one big splash on the boss; no 5-second launch reward any more.
+            Assert.That(view.status.text, Does.Contain("물벼락"));
             Assert.That(view.status.text, Does.Not.Contain("보상"));
-            Assert.That(view.FailureVisible, Is.False);
+            Assert.That(view.playerStatus.text, Does.Not.Contain("배").And.Not.Contain("불꽃 궤적"));
+            Assert.That(view.FailureVisible, Is.False); Assert.That(view.BoardFireVisible, Is.False);
             Assert.That(view.GetComponentsInChildren<Canvas>(true), Is.Empty, "Reuse the authored Canvas hierarchy.");
             Assert.That(view.GetComponentsInChildren<Collider>(true), Is.Empty);
+        }
+
+        [Test]
+        public void FailedBoardFireKeepsTheOverlayAndCountsDownUntilItsAcceptedEnd()
+        {
+            var group = Group(); group.endsAt = 21d;
+            snapshot = Snapshot(group); SetSnapshot(snapshot);
+            view.ApplySnapshot(snapshot, Local, 20.5d);
+            group.resolution = LabJigwiABResolution.Expired; group.resolvedAt = 21d; group.boardFireUntil = 24d;
+            view.ApplySnapshot(snapshot, Local, 21d);
+            Assert.That(view.FailureVisible, Is.True); Assert.That(view.BoardFireVisible, Is.True);
+            Assert.That(view.failureStatus.text, Does.Contain("조합판에 불이 붙었다").And.Contain("3.0초"));
+            view.ApplySnapshot(snapshot, Local, 23.5d);
+            Assert.That(view.FailureVisible, Is.True, "The fire outlasts the one-second failure flash.");
+            Assert.That(view.failureStatus.text, Does.Contain("0.5초"));
+            Assert.That(view.failureOverlay.GetComponentsInChildren<UnityEngine.UI.Graphic>(true)
+                .All(graphic => !graphic.raycastTarget), Is.True, "The fire never consumes input.");
+            view.ApplySnapshot(snapshot, Local, 24d);
+            Assert.That(view.BoardFireVisible, Is.False); Assert.That(view.FailureVisible, Is.False);
         }
 
         [Test]
@@ -368,7 +384,7 @@ namespace C6Lab.Tests
             group.resolution = LabJigwiABResolution.Completed; group.resolvedAt = 23.8d;
             view.ApplySnapshot(snapshot, Local, 23.8d);
             Assert.That(view.SyncPillar.DropsVisible, Is.False);
-            Assert.That(view.status.text, Does.Contain("모든 불을 함께 껐어요"));
+            Assert.That(view.status.text, Does.Contain("물벼락"));
             snapshot.phase = LabPhase.Victory; view.ApplySnapshot(snapshot, Local, 24.5d);
             Assert.That(view.statusPanel.gameObject.activeSelf, Is.False);
         }

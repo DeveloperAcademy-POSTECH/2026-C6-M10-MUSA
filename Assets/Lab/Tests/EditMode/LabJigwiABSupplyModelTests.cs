@@ -253,28 +253,32 @@ namespace C6Lab.Tests
             ClearTeam(model, mission, 25d);
             LabSnapshot after = model.Snapshot(25d);
             Assert.That(after.jigwiAB.rounds.Single(value => value.id == mission.id).resolution, Is.EqualTo(LabJigwiABResolution.Completed));
-            Assert.That(after.jigwiAB.rounds.Single(value => value.id == mission.id).rewardUntil, Is.EqualTo(30d));
+            Assert.That(after.jigwiAB.rounds.Single(value => value.id == mission.id).rewardUntil, Is.EqualTo(-1d), "#509: no launch reward.");
             Assert.That(after.orbs.Select(orb => orb.id), Is.EquivalentTo(new[] { ordinary.id }));
             Assert.That(model.ConfirmMiss(flying.id, 25d), Is.False);
             Assert.That(Supplies(model, 34d), Is.Empty);
         }
 
         [Test]
-        public void DeadlineFailureKeepsTheExistingWholeBoardAndFlightPurgeAndZeroStamina()
+        public void DeadlineFailureRemovesOnlyThisMissionsSupplyAndKeepsBoardsAndStamina()
         {
-            // #509: the 40 s common gimmick becomes a swipe block (no orb) so only B's own wipe is checked.
+            // #509: the 40 s common gimmick becomes a swipe block (no orb) so only B's own result is checked.
             float[] values = config.CaptureDeveloperValues();
             int Field(string label) => LabConfig.DeveloperFields.Select((field, index) => (field, index)).First(pair => pair.field.Label == label).index;
             values[Field("Gimmick Chance Gourd Bomb (%)")] = 0; values[Field("Gimmick Chance Swipe Block (%)")] = 100;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             LabModel model = Room(); B(model);
             LabOrbState flying = Supplies(model, 25d).First(); Launch(model, flying, 25d);
-            Add(model, Players[0], 25d); Add(model, Players[1], 25d, LabOrbKind.Potion);
+            LabOrbState fire = Add(model, Players[0], 25d); LabOrbState potion = Add(model, Players[1], 25d, LabOrbKind.Potion);
+            float[] stamina = model.Snapshot(39.9d).players.Select(player => player.stamina).ToArray();
             LabSnapshot after = model.Snapshot(40d);
-            Assert.That(after.jigwiAB.rounds.Single(value => value.slot == 1).resolution, Is.EqualTo(LabJigwiABResolution.Expired));
-            Assert.That(after.orbs, Is.Empty, "#509: the picked seat and the helper both lose their boards.");
-            Assert.That(after.players.All(player => player.stamina == 0f), Is.True);
-            Assert.That(model.ConfirmMiss(flying.id, 40d), Is.False);
+            LabJigwiABRound failed = after.jigwiAB.rounds.Single(value => value.slot == 1);
+            Assert.That(failed.resolution, Is.EqualTo(LabJigwiABResolution.Expired));
+            Assert.That(failed.boardFireUntil, Is.EqualTo(43d), "#509: the boards burn for 3 s instead of being emptied.");
+            Assert.That(after.orbs.Where(orb => !orb.kind.IsDrum()).Select(orb => orb.id), Is.EquivalentTo(new[] { fire.id, potion.id }));
+            Assert.That(after.players.Select(player => player.stamina), Is.EqualTo(stamina));
+            Assert.That(model.ConfirmMiss(flying.id, 40d), Is.False, "This B's supplied Water still disappears with it.");
+            Assert.That(Supplies(model, 41d), Is.Empty);
         }
 
         [Test]
