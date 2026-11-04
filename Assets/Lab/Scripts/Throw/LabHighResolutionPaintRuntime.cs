@@ -191,7 +191,7 @@ namespace C6Lab
         }
 
         /// <summary>The brush cache's format at a tiny size: the GPU pipeline depends on the format, not the size.</summary>
-        internal static RenderTextureDescriptor PrewarmDescriptor() =>
+        public static RenderTextureDescriptor PrewarmDescriptor() =>
             new RenderTextureDescriptor(4, 2, RenderTextureFormat.ARGB32, 0)
             { sRGB = false, msaaSamples = 1, useMipMap = false, autoGenerateMips = false };
 
