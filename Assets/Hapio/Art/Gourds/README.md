@@ -1,6 +1,6 @@
 # Stage gourds
 
-- Stage01_Gumiho: reserved for Stage 1.
+- Stage01_Gumiho: imported Stage 1 model, textures, URP materials, controller and placement prefab; stage-selection integration is pending.
 - Stage02_Yagwanggwi: imported Stage 2 model, textures, materials, controller and prefab.
 - Stage03_Jigwi: reserved for Stage 3.
 
