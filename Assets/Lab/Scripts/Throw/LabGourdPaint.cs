@@ -278,6 +278,9 @@ namespace C6Lab
             ApplyVisualSize();
             if (!target.BindHitboxMesh(rig.hitShell))
                 return FailInitialization("The gourd rig's hit shell could not supply its collision mesh.");
+            // #507: a continuous rope ends at the model's rope socket instead of the hitbox top.
+            LabHangingTarget hanging = target.GetComponent<LabHangingTarget>();
+            if (hanging != null) hanging.SetRopeSocket(rig.ropeSocket);
             InitializationError = null;
             RefreshPaintMap(true);
             subscribedTarget = target;
@@ -532,6 +535,11 @@ namespace C6Lab
             if (subscribedTarget != null) subscribedTarget.ApprovedHit -= OnHit;
             subscribedTarget = null;
             // Never clear Surface here: disabling/rebuilding a renderer cannot erase team progress.
+            if (rig != null && mountedTarget != null)
+            {
+                LabHangingTarget hanging = mountedTarget.GetComponent<LabHangingTarget>();
+                if (hanging != null) hanging.SetRopeSocket(null);
+            }
             if (mountedTarget != null && VisualInstance != null && mountedTarget.MountedVisual == VisualInstance)
                 mountedTarget.SetVisualPrefab(null);
             if (highResolution != null) highResolution.Dispose();

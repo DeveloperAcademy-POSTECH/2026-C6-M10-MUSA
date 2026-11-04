@@ -4804,3 +4804,17 @@ PR-1(`feat/#507-gourd-rig-contract`) 위에서 Unity 6000.6.5f1 macOS batch Edit
 | 실제 전투 캡처(임시, 커밋하지 않음) | 1·2·3스테이지 모두 `style=Curved segments=24` 로그, 정지·좌·우 화면에서 고정점부터 박까지 한 줄로 이어짐을 눈으로 확인 | 2스테이지는 덧씌우기 모델의 자체 줄(`Rear_Rope_Strand_*`)이 함께 보인다. 덧씌우기 제거는 PR-2 범위다 |
 
 **미실행:** iOS 실기기 화면·성능, 다인 Guest 화면.
+
+## #507 후속 2스테이지 줄 연결점 — 2026-11-04
+
+#517(PR-2) 위에 #511(곡선 줄)을 합친 브랜치에서 Unity 6000.6.5f1 macOS batch Editor로 확인했다. 세 PR(#511·#516·#517)을 합친 상태의 첫 실행이다.
+
+**변경**: `LabGourdPaint`가 박 모델 계약을 마운트하면 `rig.ropeSocket`을 `LabHangingTarget.SetRopeSocket`에 넘기고, 계약을 해제할 때 null로 되돌린다(흰 박은 기존대로 판정 상단). 읽기용 `LabHangingTarget.RopeSocket`을 더했다. 합치기 충돌은 `AGENTS.md`·`VALIDATION.md` 끝에 각각 덧붙인 절뿐이었고 둘 다 남겼다.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| EditMode 전체 | **1877/1877 PASS** | |
+| PlayMode 관련 묶음 | **94/94 PASS** | `GameStage2GourdIntegrationTests`(2스테이지 곡선 줄·연결점=rig 소켓·마지막 조각 끝이 소켓에 닿음, 1·3은 연결점 null), `LabGourdVisualRigTests`(소켓 전달·해제 시 null), `LabContinuousRopeTests`, 흰 박 골든, 매달림·요괴·도색·지귀·씬 흐름·완성·결과 뷰어 |
+| 실제 전투 캡처(임시) | 확인 | 2스테이지 정지·좌·우: 고정점부터 박 걸이까지 곡선 한 줄, 모델 자체 줄 없음 |
+
+**미실행:** iOS 실기기, 다인 Guest. 이 묶음에는 `LabHangingRenderInterpolationTests`·`LabWatercolorPaintRuntimeTests`를 넣지 않았다.

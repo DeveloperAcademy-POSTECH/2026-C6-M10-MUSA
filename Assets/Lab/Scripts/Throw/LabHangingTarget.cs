@@ -91,6 +91,8 @@ namespace C6Lab
         public LabRopeStyle RopeStyle => ropeStyle;
         /// <summary>The continuous rope root (Straight/Curved), a child of this target; null until one is needed.</summary>
         public Transform ContinuousRope => continuousRope;
+        /// <summary>Where the continuous rope meets the gourd, or null for the hitbox top (#507).</summary>
+        public Transform RopeSocket => ropeSocket;
         public float ImpactStrength => Safe(impactStrength, 12f, 0f, 20f);
         public float SwingDamping => Safe(swingDamping, 1.4f, 0f, 20f);
         public float MaximumAngle => Safe(maximumAngle, 40f, 1f, 75f);

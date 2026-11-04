@@ -84,6 +84,14 @@ namespace Hapio.Tests
             Vector3 paintDirection = paint.Shell.InverseTransformPoint(hit.point).normalized;
             Assert.That(Vector3.Distance(hitDirection, paintDirection), Is.LessThan(1e-4f), "The Host's paint direction is the shell's.");
 
+            // The continuous rope (#511) ends at the model's rope socket.
+            LabHangingTarget hanging = target.GetComponent<LabHangingTarget>();
+            Assert.That(hanging.RopeStyle, Is.EqualTo(LabRopeStyle.Curved));
+            Assert.That(hanging.RopeSocket, Is.SameAs(rig.ropeSocket));
+            Transform lastSegment = hanging.ContinuousRope.GetChild(hanging.ContinuousRope.childCount - 1);
+            Vector3 ropeEnd = lastSegment.position + lastSegment.up * (lastSegment.lossyScale.y - .004f);
+            Assert.That(Vector3.Distance(ropeEnd, rig.ropeSocket.position), Is.LessThan(.01f), "The rope meets the gourd at its socket.");
+
             // Paint binding on the body and the lid.
             paint.RefreshCommittedMap();
             Assert.That(paint.PaintExtras.Count, Is.EqualTo(1));
@@ -143,6 +151,7 @@ namespace Hapio.Tests
             Assert.That(paint.visualPrefab, Is.SameAs(Resources.Load<GameObject>("GourdPaint/WhiteGourd")), stage);
             Assert.That(paint.Shell.name, Is.EqualTo("White Gourd"), stage);
             Assert.That(network.target.Hitbox.sharedMesh, Is.SameAs(paint.Shell.GetComponent<MeshFilter>().sharedMesh), stage);
+            Assert.That(network.target.GetComponent<LabHangingTarget>().RopeSocket, Is.Null, stage + ": the rope ends at the hitbox top.");
         }
 
         private IEnumerator WaitPlaying(int stage) => Until(() => session.State.phase == GameFlowPhase.Playing
