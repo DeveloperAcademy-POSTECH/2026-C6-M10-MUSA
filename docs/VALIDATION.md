@@ -4699,7 +4699,8 @@ Metal 파이프라인(PSO)이 실제로 준비 구간에서 만들어지는지�
 | 확인 | 이번 결과 | 범위 |
 | --- | --- | --- |
 | EditMode 전체 | **1866/1866 PASS** | 새 `LabJigwiOverlayStagePolicyTests` 포함 |
-| `GameJigwiStageIntegrationTests`(단언 추가) | **PASS**, 게이트를 끄면 **FAIL** | 1·2스테이지 Playing에 오버레이 0개, 3스테이지는 카운트다운(시작 대기) 중에 이미 1개. 게이트를 임시로 항상 참으로 바꾸면 1스테이지에서 `ScreenOverlay(Clone)`이 있어 실패한다 |
+| `GameJigwiStageIntegrationTests`(단언 추가) | **PASS** | 1·2스테이지 Playing에 오버레이 0개. 3스테이지는 첫 라운드 스냅샷보다 먼저 오버레이 1개가 있어야 한다(LateUpdate 안전망은 스냅샷이 있어야 만들므로 미리 만들었음을 구분). 프레임 기록에서 Battle 바인딩 4프레임 뒤, 스냅샷이 없을 때 생성됐다 |
+| 같은 검사의 반대 확인 | 게이트 항상 참 → **FAIL**, 지귀도 막기(안전망만) → **FAIL** | 각각 1스테이지에 오버레이가 있어서, 3스테이지에서 스냅샷이 먼저 와서 실패한다. 검사가 두 경우를 구분함을 확인했다 |
 | 지귀·게임 흐름 PlayMode | **66/67** → 위 검사 대기 조건 수정 뒤 해당 검사 단독 **1/1 PASS** | `LabJigwiABPresentationTests`·`LabJigwiGroupFireAudioTests`·`LabJigwiWaterTrailTests`·`LabJigwiStagePresentationTests`·`GameSceneFlowTests`. 실패 1건은 새 단언이 `IsLoadingScene`(준비 구간 전체가 true)을 기다리던 검사 문장 문제였다 |
 
 **미실행:** iPhone 1·2스테이지 로딩 시간·메모리 실측.

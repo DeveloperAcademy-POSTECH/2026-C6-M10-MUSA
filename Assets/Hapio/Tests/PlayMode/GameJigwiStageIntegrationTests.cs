@@ -73,11 +73,14 @@ namespace Hapio.Tests
             Assert.That(Object.FindObjectsByType<LabJigwiScreenPresentation>(FindObjectsInactive.Include, FindObjectsSortMode.None), Is.Empty);
             Assert.That(network.PauseBattle(), Is.True);
             Assert.That(session.DeveloperNextStage(), Is.True);
-            // IsLoadingScene stays true through the whole preparing window, so wait for the bound, still held Battle.
-            yield return Until(() => session.State.stageIndex == 3 && session.State.phase == GameFlowPhase.Countdown
-                && network.HasBattleReferences && network.GameStartHeld, "Stage 3 countdown, still held");
-            Assert.That(Object.FindObjectsByType<LabJigwiScreenPresentation>(FindObjectsInactive.Include, FindObjectsSortMode.None),
-                Has.Length.EqualTo(1), "Built behind the preparing overlay, not by the in-battle fallback.");
+            // The HUD's LateUpdate fallback needs a round snapshot. Wait for whichever comes first: an overlay that
+            // exists before any snapshot was built ahead by Bind/Start behind the preparing overlay.
+            System.Func<int> overlays = () => Object.FindObjectsByType<LabJigwiScreenPresentation>(FindObjectsInactive.Include,
+                FindObjectsSortMode.None).Length;
+            yield return Until(() => session.State.stageIndex == 3 && network.HasBattleReferences
+                && (overlays() > 0 || network.Snapshot != null), "Stage 3 overlay or first round snapshot");
+            Assert.That(overlays(), Is.EqualTo(1), "Built behind the preparing overlay, not by the in-battle fallback.");
+            Assert.That(network.Snapshot, Is.Null, "It existed before the first round snapshot.");
             yield return WaitPlaying(3);
 
             int spendEvents = 0; float spentCost = 0f;
