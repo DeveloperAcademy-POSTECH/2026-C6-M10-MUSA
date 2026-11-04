@@ -30,6 +30,7 @@ namespace Hapio.Tests
                 Assert.That(controller.Resolve(99), Is.SameAs(baseline));
                 Assert.That(sunset.studio.target, Is.SameAs(baseline.studio.target));
                 Assert.That(sunset.studio.collisionFloor, Is.SameAs(baseline.studio.collisionFloor));
+                Assert.That(sunset.studio.boardCamera, Is.SameAs(baseline.studio.boardCamera));
                 Assert.That(night.studio.target, Is.SameAs(baseline.studio.target));
                 Assert.That(night.studio.collisionFloor, Is.SameAs(baseline.studio.collisionFloor));
                 Assert.That(night.studio.boardCamera, Is.SameAs(baseline.studio.boardCamera));
@@ -70,7 +71,10 @@ namespace Hapio.Tests
                     }
                 Assert.That(sunset.ground.GetComponent<Renderer>().sharedMaterial,
                     Is.Not.SameAs(baseline.ground.GetComponent<Renderer>().sharedMaterial));
+                Assert.That(sunset.boardBacking.GetComponent<Renderer>().sharedMaterial,
+                    Is.Not.SameAs(baseline.boardBacking.GetComponent<Renderer>().sharedMaterial));
                 Assert.That(sunset.ground.transform.parent, Is.SameAs(baseline.ground.transform.parent));
+                Assert.That(sunset.boardBacking.transform.parent, Is.SameAs(baseline.boardBacking.transform.parent));
                 Assert.That(night.ground.transform.parent, Is.SameAs(baseline.ground.transform.parent));
                 Assert.That(night.boardBacking.transform.parent, Is.SameAs(baseline.boardBacking.transform.parent));
                 foreach (string componentName in new[] { "Camera", "Canvas", "Rigidbody", "Collider" })
