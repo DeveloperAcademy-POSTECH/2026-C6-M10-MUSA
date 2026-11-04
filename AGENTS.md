@@ -198,6 +198,6 @@
 - 소각은 한꺼번에가 아니라 **한 개씩** 탄다. 첫 구슬은 DEV243(기본 1초) 뒤, 이후 Inspector `jigwiABBurnStaggerSeconds`(1초) 간격이며 소유자별 생성 순서(createdAt/id)를 따른다(`NextJigwiABBurnAt`).
 - 각 기기의 `LabJigwiTalismanOverlay`(`LabJigwiScreenPresentation.EnsureTalisman`이 만듦)가 조합판 위 **전투 영역**에 세로 한지 부적을 띄우고, 쓰는 동안 `board.SetUiInputBlocked`로 조합판 조작을 막는다. 신라문화체 모양의 점선 "물"(88점, `LabJigwiTalismanStroke.Water`)을 Inspector 기준 90% 덮으면 `jigwiTalisman` 요청(firstId)을 보내고 1초마다 다시 보낸다. 판정은 Host `TryCompleteJigwiTalisman`만 한다.
 - Host는 그 자리의 소각 예약을 지우고 `jigwiTalismanReward` Water 5개(수명 15초, 칠 1.5배, B 불 꼬리 없음)를 준다. 모든 자리가 쓰면 A를 Completed로 일찍 끝내고, 못 쓰면 15초에 벌점 없이 끝난다.
-- DEV241/242는 은퇴 슬롯("Reserved …(unused)", 인덱스 보존, Home/Lobby 저장 라벨도 맞춤)이다. A 스태미나 화염 테두리, 화면 붉은 기운/양옆 불기둥, 구슬 위 불꽃 그림은 지웠고(구슬은 마감 전 1초 동안 `LabJigwiOrbFlame`이 아래에서 위로 타 들어가게 그림), A 외침은 `PatternAudioProfile.personalVoiceEnabled`(0)로 꺼 두었다(B 외침은 유지).
-- 에디터 전용: `Hapio > DEV SOLO 시작 스테이지` 메뉴(EditorPrefs, Home에서 Play할 때만 적용)와 `LabJigwiEventMonitor`. 빌드와 Test Runner에는 영향이 없다.
+- DEV241/242는 은퇴 슬롯("Reserved …(unused)", 인덱스 보존, Home/Lobby 저장 라벨도 맞춤)이다. A 스태미나 화염 테두리, 화면 붉은 기운/양옆 불기둥, 구슬 위 불꽃 그림은 지웠고(구슬은 마감 전 1초 동안 `LabJigwiOrbFlame`이 아래에서 위로 타 들어가고, 그 선 위에 먹선 불꽃이 따라 올라감), A 외침은 `PatternAudioProfile.personalVoiceEnabled`(0)로 꺼 두었다(B 외침은 유지).
+- 에디터 전용: `Hapio > DEV SOLO 시작 스테이지` 메뉴(EditorPrefs, Home에서 Play할 때만 적용). 빌드와 Test Runner에는 영향이 없다.
 - 현재 호환 묶음은 설정 257개·5684·`C6PhysicsLab/45`·`C6HapioGame/29`다. 이전 5683 앱과 혼용하지 않는다.

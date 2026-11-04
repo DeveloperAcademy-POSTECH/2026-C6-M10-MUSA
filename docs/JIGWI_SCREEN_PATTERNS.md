@@ -49,7 +49,7 @@ Host의 실제 발동 시각과 표의 **1초 전 상태/화면 예고**는 바�
 
 `LabOrbState.jigwiABBurnAt`은 이름과 달리 **시작 시각이 아닌 절대 소각 마감 시각**이다. 일반 `createdAt/expiresAt`을 덮어쓰지 않고 두 수명 중 빠른 기한을 사용한다. `jigwiABBurnEventId`로 해제 출처를 구분한다.
 
-#479에서 A 스태미나 수채 화염 테두리·`회복 4배`·`과열/명중` 문구와 `LabStaminaFlameGraphic`/`LabStaminaFlameArtGraphic`을 지웠다. A 동안의 화면 붉은 기운(`personalHeat`)과 양옆 불기둥(`personalFlames`)도 표시하지 않는다. 저장된 프리팹 객체는 남겨 두고 항상 끈다. 구슬 위 불꽃 그림(`SurfaceFlameWash`)도 쓰지 않고, `LabJigwiOrbFlame`이 각 구슬의 소각 마감 전 마지막1초(`CharSeconds`) 동안만 **아래에서 위로 종이처럼 타 들어가는** 그림(재 + 들쭉날쭉한 불씨 선, 실행 중 만든64×64 텍스처)을 구슬 위에 덧그린다. 구슬 공용 그림/셰이더는 바꾸지 않는다.
+#479에서 A 스태미나 수채 화염 테두리·`회복 4배`·`과열/명중` 문구와 `LabStaminaFlameGraphic`/`LabStaminaFlameArtGraphic`을 지웠다. A 동안의 화면 붉은 기운(`personalHeat`)과 양옆 불기둥(`personalFlames`)도 표시하지 않는다. 저장된 프리팹 객체는 남겨 두고 항상 끈다. 구슬 위 불꽃 그림(`SurfaceFlameWash`)도 쓰지 않고, `LabJigwiOrbFlame`이 각 구슬의 소각 마감 전 마지막1초(`CharSeconds`) 동안만 **아래에서 위로 종이처럼 타 들어가는** 그림(재 + 들쭉날쭉한 불씨 선, 실행 중 만든64×64 텍스처)을 구슬 위에 덧그리고, 그 선 위에 기존 먹선 불꽃 원화(`SurfaceFlameWash`)를 세워 함께 올라가며 흔들리게 한다. 불꽃 폭은 그 높이의 구슬 폭을 따르고 끝으로 갈수록 작아진다. 구슬 공용 그림/셰이더는 바꾸지 않는다.
 
 공통 스태미나 소비는 중복 제거된 생성 승인 `LocalStaminaSpent`에 연결한다. (#418부터 저장된 `StaminaFeedbackProfile`의 소비 효과는 꺼져 있다. 게이지는 스태미나가 모자란데 북을 눌렀을 때만 빨갛게 빛난다. 아래 설명은 켰을 때의 동작이다.) 기본.18초 동안 파란 채움과 방금 소모한 구간의 잔광만 표시하고 원본 잔량/빈 베이지/프레임/입력은 변경하지 않는다. 회복과 소비가 같은 frame에 겹쳐도 수치 감소로 추측하지 않는다. 거절·재전송·초기 snapshot·무료 공급에는 소비 효과를 만들지 않는다. 새 passive UI는 기존 스태미나 부모 아래에 있어 구슬보다 뒤에 표시되고 야광귀 피버 레이어와 분리된다.
 
@@ -148,7 +148,7 @@ Cue를 늘리면 전체 음성이 더 일찍 시작하며, 실제 A/B 발동 시
 | 음성 예고·슬롯 기록·정지/복귀 | `Assets/Lab/Scripts/Audio/LabJigwiPatternAudio.cs`, `LabJigwiPatternAudioProfile.cs`; `LabSceneController`가 network에 Attach |
 | A/B 상태·타이밍·보상/소비 | `Assets/Lab/Scripts/Core/LabModel.JigwiAB.cs` — A 부적 승인 `TryCompleteJigwiTalisman`, 부적 물 지급 |
 | A 부적 화면·쓰기 판정 | `Assets/Lab/Scripts/UI/LabJigwiTalismanOverlay.cs`(`LabJigwiTalismanStroke` 포함) |
-| 에디터 전용 실험 | `Assets/Hapio/Editor/GameDeveloperSoloStartMenu.cs`, `Assets/Lab/Scripts/UI/LabJigwiEventMonitor.cs` |
+| 에디터 전용 실험 | `Assets/Hapio/Editor/GameDeveloperSoloStartMenu.cs` |
 | B 무료 지급·상한·회차 정리·박 명중 차단 | `Assets/Lab/Scripts/Core/LabModel.JigwiABSupply.cs` |
 | 기존 모델의 호출 지점 | `LabModel.cs`: 생성·조합·전달·발사·ConfirmHit·회복·ExpiresAt, `LabModel.JigwiStage.cs`: facade |
 | DTO·깊은 복사·입력 검증·불 미동 | `LabJigwiABContracts.cs`; `LabContracts.cs`: snapshot/orb metadata |

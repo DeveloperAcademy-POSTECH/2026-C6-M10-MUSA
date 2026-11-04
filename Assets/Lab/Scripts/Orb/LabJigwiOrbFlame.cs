@@ -7,8 +7,8 @@ namespace C6Lab
     /// Only A's presentation. It neither changes expiry nor replaces the independent bomb fire.
     /// #479: no flame sprite any more. In the last <see cref="CharSeconds"/> before the Host deadline the orb
     /// chars like paper from the bottom up: dark ash below a glowing, ragged ember line that rises until the
-    /// whole orb is black when the Host removes it. Drawn as a circle over the orb, so the shared orb
-    /// art/shader is untouched.
+    /// whole orb is black when the Host removes it, while the existing ink flame art rides that line as
+    /// live flames licking upward. Drawn over the orb, so the shared orb art/shader is untouched.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class LabJigwiOrbFlame : MonoBehaviour
@@ -24,6 +24,10 @@ namespace C6Lab
         private Color32[] pixels;
         private float[] edge;
         private MaterialPropertyBlock properties;
+        private Mesh tongueMesh;
+        private MeshRenderer tongue;
+        private Material tongueMaterial;
+        private MaterialPropertyBlock tongueProperties;
         private float left, age, radius = .32f, drawn = -1f;
         private bool held;
         private static int nextSeed;
@@ -38,6 +42,8 @@ namespace C6Lab
         public bool Held => held;
         public MeshRenderer FlameRenderer => flame;
         public Texture2D CharTexture => texture;
+        /// <summary>The flames on the burning line (the ink flame art).</summary>
+        public MeshRenderer TongueRenderer => tongue;
 
         public static LabJigwiOrbFlame Create(Transform orb)
         {
@@ -127,6 +133,63 @@ namespace C6Lab
             flame.lightProbeUsage = LightProbeUsage.Off;
             flame.reflectionProbeUsage = ReflectionProbeUsage.Off;
             flame.enabled = false;
+            EnsureTongue(source);
+        }
+
+        private void EnsureTongue(Material source)
+        {
+            tongueProperties = new MaterialPropertyBlock();
+            var art = new GameObject("Jigwi A Char Flames");
+            art.layer = gameObject.layer;
+            art.transform.SetParent(transform, false);
+            // Pivot at the flame's base so it can stand on the burning line.
+            tongueMesh = new Mesh { name = "Jigwi A char flame quad", hideFlags = HideFlags.DontSave };
+            tongueMesh.vertices = new[] { new Vector3(-.5f, -.08f, 0f), new Vector3(.5f, -.08f, 0f),
+                new Vector3(.5f, .92f, 0f), new Vector3(-.5f, .92f, 0f) };
+            tongueMesh.uv = new[] { Vector2.zero, Vector2.right, Vector2.one, Vector2.up };
+            tongueMesh.triangles = new[] { 0, 2, 1, 0, 3, 2 };
+            tongueMesh.RecalculateBounds();
+            art.AddComponent<MeshFilter>().sharedMesh = tongueMesh;
+            tongue = art.AddComponent<MeshRenderer>();
+            if (source != null) tongueMaterial = new Material(source);
+            else
+            {
+                tongueMaterial = new Material(material);
+                Texture2D wash = Resources.Load<Texture2D>("Jigwi/SurfaceFlameWash");
+                if (tongueMaterial.HasProperty("_BaseMap")) tongueMaterial.SetTexture("_BaseMap", wash);
+                if (tongueMaterial.HasProperty("_MainTex")) tongueMaterial.SetTexture("_MainTex", wash);
+            }
+            tongueMaterial.name = "Jigwi A char flames (runtime)";
+            tongueMaterial.hideFlags = HideFlags.DontSave;
+            tongue.sharedMaterial = tongueMaterial;
+            tongue.shadowCastingMode = ShadowCastingMode.Off;
+            tongue.receiveShadows = false;
+            tongue.lightProbeUsage = LightProbeUsage.Off;
+            tongue.reflectionProbeUsage = ReflectionProbeUsage.Off;
+            tongue.enabled = false;
+        }
+
+        /// <summary>Flames stand on the line: as wide as the orb there, tall at first, shrinking out at the top.</summary>
+        private void PoseTongue(float progress)
+        {
+            if (tongue == null) return;
+            tongue.enabled = flame.enabled;
+            if (!tongue.enabled) return;
+            float diameter = radius * 2.04f;
+            float line = Mathf.Clamp(Mathf.Lerp(-.12f, 1.14f, progress), 0f, 1f);
+            float half = Mathf.Sqrt(Mathf.Max(0f, .25f - (line - .5f) * (line - .5f)));
+            float width = diameter * Mathf.Max(.55f, 2f * half) * 1.15f;
+            float height = width * 1.2f * (1f - .35f * progress);
+            tongue.transform.localPosition = new Vector3(0f, (line - .5f) * diameter - height * .05f, -radius * 1.12f);
+            tongue.transform.localScale = new Vector3(width, height, 1f);
+            Color tint = Color.white;
+            tint.a = Mathf.Clamp01(progress / .08f) * Mathf.Clamp01((1f - progress) / .12f + .35f);
+            tongueProperties.SetColor("_BaseColor", tint); tongueProperties.SetColor("_Color", tint);
+            tongueProperties.SetFloat("_FlameTime", age);
+            tongueProperties.SetFloat("_FlameSpeed", 3.2f);
+            tongueProperties.SetFloat("_Sway", .06f);
+            tongueProperties.SetFloat("_Seed", edge != null && edge.Length > 0 ? edge[0] * 3f : 0f);
+            tongue.SetPropertyBlock(tongueProperties);
         }
 
         private void Pose()
@@ -134,6 +197,7 @@ namespace C6Lab
             if (flame == null) return;
             float progress = Progress;
             flame.enabled = left > 0f && progress > 0f;
+            PoseTongue(progress);
             if (!flame.enabled) return;
             flame.transform.localPosition = new Vector3(0f, 0f, -radius * 1.05f);
             flame.transform.localScale = new Vector3(radius * 2.04f, radius * 2.04f, 1f);
@@ -216,6 +280,7 @@ namespace C6Lab
         {
             left = age = 0f; drawn = -1f;
             if (flame != null) flame.enabled = false;
+            if (tongue != null) tongue.enabled = false;
         }
         private void OnDisable() => Clear();
         private void OnDestroy()
@@ -223,6 +288,8 @@ namespace C6Lab
             if (mesh != null) Dispose(mesh);
             if (material != null) Dispose(material);
             if (texture != null) Dispose(texture);
+            if (tongueMesh != null) Dispose(tongueMesh);
+            if (tongueMaterial != null) Dispose(tongueMaterial);
         }
         private static void Dispose(Object value)
         {

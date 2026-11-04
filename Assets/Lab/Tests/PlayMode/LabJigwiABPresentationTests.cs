@@ -445,12 +445,16 @@ namespace C6Lab.Tests
             Assert.That(material.GetTexture("_BaseMap"), Is.SameAs(body.JigwiABFlame.CharTexture), "The runtime char, not the old flame art.");
             body.SetJigwiABBurn(.5f, true);
             Assert.That(body.JigwiABFlame.Charring, Is.True, "The last second chars it from the bottom.");
+            Assert.That(body.JigwiABFlame.TongueRenderer.enabled, Is.True, "Live flames stand on the burning line.");
+            Assert.That(body.JigwiABFlame.TongueRenderer.sharedMaterial.GetTexture("_BaseMap"),
+                Is.SameAs(Resources.Load<Texture2D>("Jigwi/SurfaceFlameWash")));
             Assert.That(body.JigwiABFlame.Progress, Is.EqualTo(.5f).Within(.0001f));
             Texture2D art = body.JigwiABFlame.CharTexture;
             Assert.That(art.GetPixel(32, 4).a, Is.GreaterThan(.8f), "The bottom is ash.");
             Assert.That(art.GetPixel(32, 60).a, Is.Zero, "The top is still untouched.");
             body.SetJigwiABBurn(5f, true);
             Assert.That(body.JigwiABFlame.Charring, Is.False);
+            Assert.That(body.JigwiABFlame.TongueRenderer.enabled, Is.False);
             yield return new WaitForSecondsRealtime(.045f);
             Assert.That(body.JigwiABFlame.SecondsLeft, Is.EqualTo(5f).Within(.0001f));
             Assert.That(body.JigwiABFlame.AnimationTime, Is.Zero);
