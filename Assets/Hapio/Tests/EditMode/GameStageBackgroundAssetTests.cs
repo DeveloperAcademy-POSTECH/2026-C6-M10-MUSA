@@ -11,7 +11,7 @@ namespace Hapio.Tests
     public sealed class GameStageBackgroundAssetTests
     {
         [Test]
-        public void StageTwoUsesIsolatedArtworkAndRestoresTheDefaultForOtherStages()
+        public void StagesTwoAndThreeUseIsolatedArtworkAndRestoreTheDefaultForOtherStages()
         {
             Scene previous = SceneManager.GetActiveScene();
             Scene scene = EditorSceneManager.OpenScene(GameScenePaths.Battle, OpenSceneMode.Additive);
@@ -21,22 +21,31 @@ namespace Hapio.Tests
                     .SelectMany(root => root.GetComponentsInChildren<GameStageBackgrounds>(true)).Single();
                 var baseline = controller.defaultBackground;
                 var night = controller.Resolve(2);
+                // #475 gave stage 3 its own scenery set too; only stage 1 and unknown stages use the default.
+                var third = controller.Resolve(3);
                 Assert.That(night, Is.Not.SameAs(baseline));
+                Assert.That(third, Is.Not.SameAs(baseline));
+                Assert.That(third, Is.Not.SameAs(night));
                 Assert.That(controller.Resolve(1), Is.SameAs(baseline));
-                Assert.That(controller.Resolve(3), Is.SameAs(baseline));
                 Assert.That(controller.Resolve(99), Is.SameAs(baseline));
-                Assert.That(night.studio.target, Is.SameAs(baseline.studio.target));
-                Assert.That(night.studio.collisionFloor, Is.SameAs(baseline.studio.collisionFloor));
-                Assert.That(night.studio.boardCamera, Is.SameAs(baseline.studio.boardCamera));
-                foreach (int stage in new[] { 1, 2, 3, 2, 1 })
+                foreach (var set in new[] { night, third })
+                {
+                    Assert.That(set.studio.target, Is.SameAs(baseline.studio.target));
+                    Assert.That(set.studio.collisionFloor, Is.SameAs(baseline.studio.collisionFloor));
+                    Assert.That(set.studio.boardCamera, Is.SameAs(baseline.studio.boardCamera));
+                }
+                foreach (int stage in new[] { 1, 2, 3, 2, 1, 3 })
                 {
                     controller.ApplyStage(stage);
-                    Assert.That(baseline.studio.gameObject.activeSelf, Is.EqualTo(stage != 2));
-                    Assert.That(baseline.ground.activeSelf, Is.EqualTo(stage != 2));
-                    Assert.That(baseline.boardBacking.activeSelf, Is.EqualTo(stage != 2));
+                    Assert.That(baseline.studio.gameObject.activeSelf, Is.EqualTo(stage == 1));
+                    Assert.That(baseline.ground.activeSelf, Is.EqualTo(stage == 1));
+                    Assert.That(baseline.boardBacking.activeSelf, Is.EqualTo(stage == 1));
                     Assert.That(night.studio.gameObject.activeSelf, Is.EqualTo(stage == 2));
                     Assert.That(night.ground.activeSelf, Is.EqualTo(stage == 2));
                     Assert.That(night.boardBacking.activeSelf, Is.EqualTo(stage == 2));
+                    Assert.That(third.studio.gameObject.activeSelf, Is.EqualTo(stage == 3));
+                    Assert.That(third.ground.activeSelf, Is.EqualTo(stage == 3));
+                    Assert.That(third.boardBacking.activeSelf, Is.EqualTo(stage == 3));
                 }
                 var baselineMaterials = baseline.studio.GetComponentsInChildren<Renderer>(true)
                     .SelectMany(renderer => renderer.sharedMaterials).ToArray();
