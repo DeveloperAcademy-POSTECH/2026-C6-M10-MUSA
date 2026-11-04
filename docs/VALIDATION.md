@@ -3980,3 +3980,383 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 - 코드 검토 워크플로(세 관점 검토 + 지적별 반박 검증)에서 확인된 결함은 없었다. "같은 프레임 검사가 새 코드끼리만 비교한다"는 지적을 받아 main 발행자와의 바이트 비교 검사를 추가했다.
 - 검사 중 `GameSceneFlowTests` 실행과 재컴파일이 겹쳐 Editor가 응답하지 않았고, 사용자가 Editor를 재시작했다. 그 실행은 결과가 없으며 표의 21/21은 재시작 뒤 다시 실행한 것이다. 남은 임시 `InitTestScene` 파일은 지웠고, 재시작 뒤 열린 Scene은 저장되지 않은 변경이 없는 빈 Scene이었다.
 - **미실행:** iPhone 실기기·여러 폰에서의 Host 프레임 시간. 전체 PlayMode는 실행하지 않았다.
+
+## #444 Guest 도색 복제본을 복사 없이 넘겨받는 표면 API — 2026-11-03
+
+- **기준:** main `4fa0a5c1` → `fix/#444-paint-replica-adopt`. Unity6000.6.5f1/macOS의 연결된 Editor에서 실행했다. 새 Mac·iOS 빌드는 만들지 않았다.
+- **배경:** Guest는 도색 프레임마다 `TryReplacePixels`로 지도를 설치한다. 이 API는 받은 배열을 다시 새 배열로 복사하고 전체 셀을 검사한다. `CopyPaintToDisplay`도 스냅샷마다 수신 표면을 새 배열 두 개로 복사한 뒤 같은 API를 부른다. 이 이슈는 다음 작업(수신기 제자리 적용)이 쓸 표면 API만 추가하며 호출 경로는 바꾸지 않는다.
+- **수정:**
+  - 새 partial `LabPaintSurface.Replica.cs`
+    - `TryAdoptReplica`: 호출자가 만든 배열의 소유권을 복사 없이 넘겨받는다. 같은 크기의 복제본에서 `fromRevision == Revision`이면 바뀐 셀만 기존 규칙으로 검사하고 칠해진 셀 수를 증분 계산한다. 이전 배열은 재사용하도록 돌려준다.
+    - `TryCopyReplicaFrom`: 같은 크기면 기존 배열에 덮어쓰고, 시각 스탬프가 같으면 `VisualVersion`을 유지한다.
+    - 두 API 모두 실패하면 표면을 바꾸지 않는다.
+  - `TryReplacePixels`는 시그니처·복사 의미·검사 순서를 그대로 두고 공통 검사·설치(`ValidReplicaShape`·`CountValidReplicaCells`·`InstallReplica`)로 옮겼다. 시각 스탬프 비교는 `SameStamp`로 묶었다.
+  - 와이어·접속 규약 **5682/Lab43/Game27**·공유 설정 257개·Scene·판정은 그대로다.
+
+| 실행 검사 | 결과 | 시간 |
+| --- | --- | --- |
+| 전체 EditMode | **1787/1788** (아래 1건 실패) | 46.02초 |
+| PlayMode `LabLocalBoardNetworkIntegrationTests` | **16/16 PASS** | 0.35초 |
+| PlayMode `LabHighResolutionPaintRuntimeTests` | **2/2 PASS** | 0.10초 |
+| PlayMode `LabWatercolorPaintRuntimeTests` | **7/7 PASS** | 6.84초 |
+| PlayMode `LabDeveloperSoloIntegrationTests` | **14/14 PASS** | 18.83초 |
+| PlayMode `GameSceneFlowTests` | **21/21 PASS** | 209.17초 |
+
+- 새 검사 `LabPaintReplicaAdoptTests` 20개가 모두 통과했다.
+  - 전체 adopt가 `TryReplacePixels`와 같은 결과이고 배열을 복사하지 않음
+  - 바뀐 셀만 검사하는 증분 경로와 이전 배열 반환
+  - 칠해진 셀 수 증분(새로 칠함 2·지움 3·둘 다, 이전 개수 거절)
+  - 잘못된 셀·정렬·중복·범위·개수·칠해진 셀 수·스탬프·자기 배열 10가지에서 원자성
+  - 기준 리비전이 다르거나 아직 복제본이 아니면 전체 검사
+  - 성장·건조 권한 없음
+  - `TryCopyReplicaFrom`의 동일성·같은 크기 배열 재사용·`VisualVersion` 유지·크기 변경·잘못된 원본 거절
+- 기존 `TryReplacePixels` 검사(`LabPaintPainterSlotTests` 등)는 그대로 통과했다. PlayMode 앞의 네 클래스는 검토 뒤 테스트를 추가하기 전(제품 코드는 같음)에, `GameSceneFlowTests`는 추가한 뒤에 실행했다.
+- **EditMode 실패 1건:** `LabFiveColorFlightTests.AFlyingFiveColorOrbIsOneColouredBallWithoutFlatArt`. 이 변경과 무관한 #426 검사다.
+  - 구슬 색 나이를 정적 카운터(`attachCount`)로 정하고, `MaterialPropertyBlock`에 넣었다 꺼낸 색을 정확히 같은지 비교한다.
+  - Linear 색 공간에서는 이 왕복이 정확하지 않다(Editor에서 차이 약 3e-8을 확인). 그래서 실행 순서에 따라 통과하거나 실패한다. 같은 Editor에서 #439 기록의 1762개 실행 때는 통과했다.
+  - 이 PR에서는 고치지 않았다.
+- 코드 검토 워크플로(세 관점 검토 + 지적별 반박 검증)에서 제품 코드 결함은 확인되지 않았다. 검사 공백 3건(칠해진 셀 수 증분이 실제로 바뀌는 경우, 음수 칠 횟수 거절이 다른 실패에 가려짐, 복제본이 아닌 표면의 전체 검사)을 지적받아 검사를 추가했다.
+- **미실행:** 호출 경로 연결과 Guest GC 측정은 다음 이슈에서 한다. iPhone 실기기는 실행하지 않았다.
+
+## #449 Guest 도색 수신 제자리 적용·표시 복사 할당 제거 — 2026-11-03
+
+- **기준:** main `90b649ea` → `fix/#449-paint-receive-in-place`. Unity6000.6.5f1/macOS의 연결된 Editor에서 실행했다. 새 Mac·iOS 빌드는 만들지 않았다.
+- **배경:** Guest는 도색 delta 하나를 받을 때마다 다음을 새로 만들었다.
+  - 조각을 이은 base64 문자열과 해독 바이트
+  - 새 색·칠한 사람 배열과, `TryReplacePixels`가 그 배열을 다시 복사한 사본
+  - SHA용 160 KB 셀 바이트
+  - 시각 스탬프 복사·인코딩
+  - 또 스냅샷마다 `CopyPaintToDisplay`가 표시용 배열 두 개를 만들었다.
+- **수정:** #444의 표면 API를 연결했다.
+  - `LabPaintReceiver`
+    - 조각을 이어 붙이지 않고 재사용 버퍼에 바로 해독한다. 마지막을 뺀 조각이 패딩·공백 없는 순수 base64일 때만 쓰고, 그 밖에는 기존처럼 이어 붙여 해독한다.
+    - 표면이 돌려준 이전 배열(이중 버퍼)에 delta를 적용하고 바뀐 셀 목록을 모은다.
+    - 스트리밍 SHA-256 `LabPaintPublisher.Hash(pixels, painters, SHA256, byte[] chunk)`로 확인한 뒤 `TryAdoptReplica`로 설치한다(delta는 바뀐 셀만 검사, 칠해진 셀 수 증분, 실패 시 표면 불변).
+    - `visualBytes == -1`이면 현재 스탬프 해시를 `VisualVersion`으로 캐시하고 스탬프를 복사하지 않는다(`TryAdoptReplica`의 null 스탬프 = 유지).
+  - `CopyPaintToDisplay`는 `TryCopyReplicaFrom`을 쓴다.
+  - 공개 `Hash` 출력·프레임·접속 규약 **5682/Lab43/Game27**·공유 설정 257개·Scene·판정은 그대로다.
+
+| Editor 측정 (256×128 Splatter, 스탬프 57개, delta 34~35개 평균, 3회) | 전 | 후 |
+| --- | --- | --- |
+| delta 수신 1회 할당 | 536.3 / 536.0 / 532.9 KB | **12.6 / 16.1 / 17.7 KB** |
+| delta 수신 1회 시간 | 7.58 / 7.07 / 7.08 ms | **0.95 / 0.94 / 0.95 ms** |
+| 표시 복사 1회 할당 | 339.7 / 339.6 / 339.6 KB | **2.5 / 2.3 / 2.1 KB** |
+| 표시 복사 1회 시간 | 0.82 / 0.80 / 0.77 ms | **0.086 / 0.086 / 0.088 ms** |
+
+- 할당은 `GC.GetTotalMemory(false)` 차이로 쟀고 그 사이 GC가 돈 표본은 뺐다(이 Mono 프로필에서 `GC.GetAllocatedBytesForCurrentThread`는 0을 반환한다). 표본의 약 40%는 스탬프를 유지하는 delta, 나머지는 스탬프가 바뀐 delta다. "후" 값은 아래 검토 수정 뒤 다시 잰 것이다(수정 전 측정은 12.3/14.2/11.9 KB).
+
+| 실행 검사 | 결과 | 시간 |
+| --- | --- | --- |
+| 전체 EditMode | **1808/1808 PASS** | 46.01초 |
+| PlayMode `LabLocalBoardNetworkIntegrationTests` | **16/16 PASS** | 0.34초 |
+| PlayMode `LabGourdPaintTests` | **9/9 PASS** | 11.30초 |
+| PlayMode `LabHighResolutionPaintRuntimeTests` | **2/2 PASS** | 0.06초 |
+| PlayMode `LabWatercolorPaintRuntimeTests` | **7/7 PASS** | 6.64초 |
+| PlayMode `GourdResultViewerPlayModeTests` | **3/3 PASS** | 13.25초 |
+| PlayMode `LabDeveloperSoloIntegrationTests` | **14/14 PASS** | 18.54초 |
+| PlayMode `GameSceneFlowTests` | **21/21 PASS** | 209.95초 |
+
+- 각 실행의 skip/inconclusive0. `LabWatercolorPaintRuntimeTests`·`GourdResultViewerPlayModeTests`·`LabDeveloperSoloIntegrationTests`는 해독 조건 수정 전에 실행했다(수정은 잘못된 조각 처리에만 해당). 나머지는 수정 뒤에 실행했다.
+- 새 검사 `LabPaintReceiveInPlaceTests` 13개
+  - 스트리밍 해시 = 기존 해시(해상도 0/1/2, 청크 5 B·35 B·20 KB·지도보다 큼, 4 B 거절)
+  - 스탬프를 유지하는 delta 수신 할당 < 64 KB, 같은 크기 표시 복사 할당 < 8 KB
+  - 칠해진 셀 수·잘못된 셀(해시는 맞춤)·해시 변조 delta 거절 시 표면 불변과 이후 체크포인트·delta 정상 적용
+  - 해상도 변경 뒤 delta 적용
+  - 스탬프 해시 캐시가 틀린 해시를 받아들이지 않고 새 스탬프를 따라감
+  - 패딩·공백이 낀 중간 조각을 이전처럼 거절
+- 기존 복제 검사(`LabPaintReplicationTests`·`LabPaintVisualStateTests`·`LabPaintPainterSlotTests` 등)는 그대로 통과했다.
+- 코드 검토 워크플로(세 관점 검토 + 지적별 반박 검증)에서 한 가지 결함이 세 번 독립적으로 확인됐다. 중간 조각 끝에 패딩 뒤 공백이 붙은 변조 프레임을 조각별 해독은 받아들이지만 이전의 이어 붙인 해독은 거절하는 차이다. 빠른 경로를 순수 base64 조각으로 제한해 고쳤다. 추가한 검사는 수정 전 조건으로 돌리면 두 경우 모두 `Applied`가 되어 실패하고, 수정 뒤 통과함을 확인했다.
+- **미실행:** iPhone 실기기·여러 폰의 GC·프레임 시간. 전체 PlayMode는 실행하지 않았다.
+
+## #451 Guest 공유 연출 시계·지귀 화면 되감김 허용치 — 2026-11-03
+
+- **기준:** main `e8648369` → `fix/#451-guest-battle-clock`. Unity6000.6.5f1/macOS의 연결된 Editor에서 실행했다. 새 Mac·iOS 빌드는 만들지 않았다.
+- **배경:** Guest 연출 시계(`JigwiABPresentationTime`)는 마지막 스냅샷의 `serverTime`에 그 **스냅샷 객체**를 처음 본 뒤 흐른 실시간을 더했다. 그래서 다음 경우에 뒤로 갔다.
+  - 같은 시각의 헤더가 새 객체로 오면 경과 시간이 0으로 돌아간다.
+  - 다음 스냅샷이 지연으로 외삽 값보다 뒤에 있다.
+  - 지귀 화면은 시계가 조금만 뒤로 가도 새 스테이지로 보고 물 뿌리기·실패 연출 기록을 지웠다.
+- **수정:**
+  - 새 순수 `LabGuestBattleClock`
+    - 세션·라운드·`serverTime`·정지 여부 값을 키로 기준을 잡는다(객체 identity 아님).
+    - 같은 라운드 안에서는 0.5초 미만으로 뒤로 가지 않는다(늦은 표본이 오면 실시간이 따라잡을 때까지 멈춤). 0.5초 이상 되감김·새 라운드·새 세션은 정정으로 받아들인다.
+    - 외삽은 최대 1초, 정지·시작 대기 중에는 고정한다.
+  - `LabNetwork.BattlePresentationTime`(공개, Host는 기존 `battleClock`)을 두고 `JigwiABPresentationTime`이 이를 쓴다. 행동 전송 초기화 때 시계를 초기화한다.
+  - `BattlePresentationHeld`(정지·시작 대기, 또는 Guest 시계가 1초 상한에 걸린 상태)를 지귀 음성·화면의 held 입력으로 쓴다.
+  - `LabJigwiScreenPresentation`은 `now < previousNow − 0.075`(지귀 음성 `SeekToleranceSeconds`와 같은 값, `RewindToleranceSeconds`)일 때만 새 스테이지로 본다.
+  - Host 경로·판정·와이어·접속 규약 **5682/Lab43/Game27**·공유 설정 257개는 그대로다.
+
+| 실행 검사 | 결과 | 시간 |
+| --- | --- | --- |
+| 전체 EditMode | **1815/1815 PASS** | 48.74초 |
+| PlayMode `LabJigwiABPresentationTests` | **24/24 PASS** | 1.68초 |
+| PlayMode `LabJigwiPatternAudioTests` | **22/22 PASS** | 0.30초 |
+| PlayMode `LabJigwiGroupFireAudioTests` | **5/5 PASS** | 0.10초 |
+| PlayMode `LabJigwiABNetworkTests` | **13/13 PASS** | 11.04초 |
+| PlayMode `LabJigwiRewardBoardFireTests` | **4/4 PASS** | 0.11초 |
+| PlayMode `LabJigwiMissionCancellationTests` | **3/3 PASS** | 0.07초 |
+| PlayMode `LabJigwiWaterTrailTests` | **8/8 PASS** | 0.98초 |
+| PlayMode `LabJigwiRewardFireTrailTests` | **4/4 PASS** | 1.19초 |
+| PlayMode `LabStaminaFeedbackTests` | **8/8 PASS** | 0.07초 |
+| PlayMode `LabStaminaShortFeedbackTests` | **5/5 PASS** | 0.03초 |
+| PlayMode `LabLocalBoardNetworkIntegrationTests` | **16/16 PASS** | 0.37초 |
+| PlayMode `GameSceneFlowTests` | **21/21 PASS** | 217.05초 |
+
+- 각 실행의 skip/inconclusive0. `LabJigwiRewardBoardFireTests`부터 `LabLocalBoardNetworkIntegrationTests`까지 일곱 줄은 아래 검토 수정(정체 시 음성·화면 고정) 전에 실행했다. 그 수정은 음성·화면의 held 입력만 바꾼다. 나머지는 수정 뒤에 실행했다.
+- 새 검사
+  - EditMode `LabGuestBattleClockTests` 7개: 늦은 표본에서 단조 유지, 같은 값의 새 표본에서 외삽 유지, 1초 상한, 상한 도달 시 정체 표시와 해제, 정지 고정과 재개 재기준, 0.5초 되감김·라운드·세션 변경 수용, 잘못된 표본 무시와 Reset
+  - PlayMode `LabJigwiABPresentationTests`에 2개: 허용치 안의 작은 역행 뒤에도 실패 연출이 이어지고 큰 역행은 새로 시작함, 같은 헤더가 새 객체로 와도 시계가 되감기지 않고 1초 정체 시 `BattlePresentationHeld`가 켜졌다가 새 표본에서 풀림
+- 기존 정지 고정·재개 진행 검사는 그대로 통과했다.
+- 코드 검토 워크플로(세 관점 검토 + 지적별 반박 검증)에서 1건이 확인됐다. 1초 넘게 Host 시각이 오지 않으면 시계는 멈추는데 지귀 음성은 계속 재생된다. 그러면 0.075초마다 같은 지점으로 되돌아가며 끊긴다. 정체를 held로 다뤄 음성·화면이 멈추게 고쳤다.
+- **미실행:** 실제 다기기에서 지연이 들쭉날쭉할 때의 연출 체감, iPhone 실기기. 전체 PlayMode는 실행하지 않았다.
+
+## #454 매달린 박 자세 렌더 보간 — 2026-11-03
+
+- **기준:** main `869f2c69` → `fix/#454-gourd-render-interpolation`. Unity6000.6.5f1/macOS의 연결된 Editor(URP)에서 실행했다. 새 Mac·iOS 빌드는 만들지 않았다.
+- **배경:** `LabHangingTarget`은 흔들림·회전·줄 길이를 `FixedUpdate`(50 Hz)에서만 적분하고 그때만 Transform에 썼다. 화면은 60 fps라 어떤 프레임은 같은 자세를 두 번 그리고 어떤 프레임은 한 스텝을 건너뛰어 박이 계단처럼 끊겨 보였다.
+- **수정:**
+  - 고정 스텝 적분·히트박스 권한은 그대로다. 마지막 두 고정 자세(`RigState`: 흔들림 각도·펼친 회전 각도·줄 오프셋·피벗 높이)를 보관한다.
+  - URP `RenderPipelineManager.beginContextRendering`에서만 `(Time.time − Time.fixedTime) / fixedDeltaTime` 비율로 보간한 자세를 쓰고, `endContextRendering`(과 `OnDisable`)에서 고정 자세로 되돌린다. 그래서 모든 스크립트(EarlyUpdate 네트워크 처리, FixedUpdate, Update의 Host 도색 흐름 표본, LateUpdate의 지귀 캡), 물리 질의, 코루틴은 고정 자세를 읽는다. `FixedUpdate`도 시작할 때 고정 자세를 다시 쓴다.
+  - 정지·홀드·일시정지 고정·초기화·설정 변경은 두 자세를 같게 고정해(`SnapPose`) 재개 때 뒤로 가지 않는다. 실행 중 네트워크 보정(`ReconcileYaw/Rope`)과 킥은 두 자세를 같은 양만큼 옮겨(`ShiftPose`) 10 Hz 보정마다 그림이 튀지 않는다.
+  - 박에 붙은 화면 UI(매혹 경고 말풍선 `LabGourdAlert`, 명중 표시 `LabImpactFeedback`)는 표시 전용 `LabHangingTarget.DrawnPoint`로 그려지는 위치에 맞춘다.
+  - 명중·도색·물리 판정·Scene·와이어·접속 규약 **5682/Lab43/Game27**·공유 설정 257개는 그대로다.
+
+| 실행 검사 | 결과 | 시간 |
+| --- | --- | --- |
+| 전체 EditMode | **1821/1821 PASS** | 48.79초 |
+| PlayMode `LabHangingRenderInterpolationTests` | **7/7 PASS** | 0.35초 |
+| PlayMode `LabHangingPresentationTests` | **14/14 PASS** | 22.65초 |
+| PlayMode `LabRopeReconciliationTests` | **8/8 PASS** | 0.12초 |
+| PlayMode `LabPaintFlowHostDirectionTests` | **1/1 PASS** | 0.70초 |
+| PlayMode `LabGourdAlertTests` | **3/3 PASS** | 4.02초 |
+| PlayMode `LabImpactFeedbackTests` | **2/2 PASS** | 0.85초 |
+| PlayMode `GameSceneFlowTests` | **21/21 PASS** | 219.43초 |
+| PlayMode `LabYaguangFlashLookTests` | **5/5 PASS** | 0.79초 |
+| PlayMode `LabDeveloperSoloIntegrationTests` | **14/14 PASS** | 19.12초 |
+| PlayMode `LabGourdHitboxTests` | **7/7 PASS** | 3.04초 |
+| PlayMode `LabProjectileContactTests` | **7/7 PASS** | 3.83초 |
+| PlayMode `LabStraightThrowTests` | **3/3 PASS** | 2.02초 |
+| PlayMode `LabGourdRopeDeveloperTests` | **4/4 PASS** | 1.49초 |
+| PlayMode `LabLocalBoardNetworkIntegrationTests` | **16/16 PASS** | 0.31초 |
+
+- 각 실행의 skip/inconclusive0. `LabGourdHitboxTests` 위의 여덟 줄은 최종 코드에서 실행했다. `LabGourdHitboxTests`부터 아래 다섯 줄은 렌더 단계 보간으로 바꾼 뒤, UI 위치 보정(`DrawnPoint`)을 넣기 전에 실행했다. 그 보정은 두 UI 컴포넌트의 화면 위치 계산만 바꾼다.
+- 새 검사
+  - EditMode `LabHangingRigStateTests` 6개: 중간값, 회전은 펼친 각도로(350→370의 중간은 360), alpha 범위 제한, NaN
+  - PlayMode `LabHangingRenderInterpolationTests` 7개
+    - 렌더 중 중간 자세와 렌더 끝의 고정 자세 복원, 홀드 중 FixedUpdate의 고정 자세
+    - 실제 프레임의 Update 뒤·프레임 끝에서 늘 고정 자세
+    - 실제 URP 렌더 중 두 고정 자세 사이를 그림(렌더가 없을 때만 Inconclusive이고 이번 실행은 통과)
+    - `DrawnPoint`가 그려지는 위치와 일치
+    - 홀드 시 두 자세 고정
+    - 실행 중 보정·킥의 보간 간격 유지와 정지 보정의 고정
+    - 프레임 alpha 범위
+- 코드 검토 워크플로를 두 번(관점별 검토 + 지적별 반박 검증) 돌렸다.
+  - 1차: LateUpdate의 보간 기록 때문에 지귀 표면 캡(LateUpdate)이 보간된 Transform과 고정 자세 콜라이더를 섞어 캐시함, 일시정지 재개 때 한 스텝 뒤로 감, 검사 하나가 자명함. 렌더 단계 보간으로 구조를 바꾸고 정지 시 고정·검사 교체로 고쳤다.
+  - 2차: 박에 붙은 화면 UI가 그려지는 박과 한 스텝까지 어긋남, 실제 렌더 검사가 회귀를 Inconclusive로 가릴 수 있음. `DrawnPoint`와 검사 수정으로 고쳤다.
+- **남은 한계(기록만)**
+  - 지귀 B 불장막 화면 틀(`TryGetJigwiABCurtainFrame`)은 판정 콜라이더와 같은 계산을 써서 고정 자세 그대로 두었다. 빠른 흔들림에서는 그려지는 박이 틀 가장자리(여유 0.06 이상)를 최대 한 스텝만큼 벗어날 수 있다.
+  - 도색 완료 연출(`LabPaintFinishPresentation.Begin`)의 복사본은 고정 자세에서 찍혀, 시작하는 한 프레임에 최대 한 고정 스텝(0.02초 움직임)만큼 앞으로 튈 수 있다.
+- **미실행:** iPhone 실기기에서의 체감·프레임 시간. 전체 PlayMode는 실행하지 않았다.
+
+## #457 Guest 북 탭 소리·진동 선반영 — 2026-11-03
+
+- **기준:** main `35b68b00` → `fix/#457-drum-tap-local-feedback`. Unity6000.6.5f1/macOS의 연결된 Editor에서 실행했다. 새 Mac·iOS 빌드는 만들지 않았다.
+- **배경:** Guest의 북 탭 소리(`LabGenerateSound`)·진동(`LabHaptics`)은 Host가 생성을 승인하고 새 구슬이 조합판 프레임으로 도착한 뒤에야 `SpawnStarted`로 울렸다. 그래서 탭에서 소리까지 왕복 지연 전체를 기다렸다.
+- **수정:**
+  - Guest가 미리보기를 만든 탭 중 승인이 확실한 탭은 `LabOrbBoard.AnnounceGenerationPreview`로 `SpawnStarted`를 바로 올린다(소리·진동 함께). 확실함은 순수 `LabGenerationPrediction.Certain`이 정한다. 다음을 모두 만족해야 한다.
+    - 스냅샷 스태미나 ≥ 비용 × 아직 답이 없는 생성 요청 수
+    - 내 보관 구슬(Host `CountStored`와 같은 필터) + 대기 생성 수 + 도착 여유 ≤ 보관 한도. 도착 여유는 양쪽 이웃 2 + 여우불 최대 + 오색구슬 보상 수 + 열고 있는 아이템 수다.
+    - 진행 중이고 일시정지·시작 대기가 아님
+    - 지귀 B 예고·진행 중이 아니고 legacy 지귀 불·과열이 아님
+  - 미리 울린 탭은 크레딧을 남긴다. 승인 영수증이 오면 실제 구슬 ID로 옮겨(`ResolveGenerationCredit`) 그 구슬이 나타날 때 다시 울리지 않는다. 거절·소각·롤백·퍼지·Clear는 크레딧을 버린다. 영수증은 같은 순서 보장 채널에서 구슬을 담은 조합판 프레임보다 먼저 도착한다.
+  - 확실하지 않은 탭은 이전처럼 승인 뒤 한 번 울린다. Host 판정·와이어·접속 규약 **5682/Lab43/Game27**·공유 설정 257개는 그대로다.
+
+| 실행 검사 | 결과 | 시간 |
+| --- | --- | --- |
+| 전체 EditMode | **1829/1829 PASS** | 48.83초 |
+| PlayMode `LabGenerationCertaintyTests` | **3/3 PASS** | 0.02초 |
+| PlayMode `LabLocalBoardPredictionTests` | **15/15 PASS** | 0.13초 |
+| PlayMode `LabLocalBoardNetworkIntegrationTests` | **16/16 PASS** | 0.36초 |
+| PlayMode `LabStaminaFeedbackTests` | **8/8 PASS** | 0.04초 |
+| PlayMode `GameSceneFlowTests` | **21/21 PASS** | 220.16초 |
+| PlayMode `LabStaminaShortFeedbackTests` | **5/5 PASS** | 0.02초 |
+
+- 각 실행의 skip/inconclusive0. `LabStaminaShortFeedbackTests`는 아래 검토 수정 전 코드에서 실행했다. 나머지는 최종 코드에서 실행했다.
+- 새 검사
+  - EditMode `LabGenerationPredictionTests` 8개: 스태미나·대기 수, 도착 여유를 남긴 보관 한도, 여유 계산, 진행·정지·지귀 위험, 잘못된 입력
+  - PlayMode `LabGenerationCertaintyTests` 3개: 이번 라운드의 답을 받은 요청은 대기 수에 넣지 않음, 보관 구슬·열고 있는 아이템·비행 중 구슬, 정지·종료·지귀 불
+  - PlayMode `LabLocalBoardPredictionTests`에 2개: 선반영은 탭당 한 번이고 승인된 구슬은 소리 없이 튀어나옴, 거절·Clear·이미 나타난 구슬의 크레딧이 남지 않음
+  - `LabGenerateSoundTests`·`LabHapticsTests`(EditMode)는 그대로 통과했다.
+- 코드 검토 워크플로(세 관점 검토 + 지적별 반박 검증)에서 확인된 지적을 고쳤다.
+  - `actionRequests`는 라운드 동안 지워지지 않는데, 이를 그대로 대기 수로 세어 라운드 초반 5~6번 탭 뒤로는 선반영이 꺼지던 결함
+  - 도착 여유 1개로는 여우불(2~5)·오색구슬 보상(3)·양쪽 이웃·아이템 열기를 감당하지 못함
+  - legacy 지귀 불이 Host 처리 전에 과열될 수 있음
+  - 검사가 첫 결함을 가렸음
+- **남은 한계:** 여유를 크게 잡아 보관 구슬이 많은 판(기본 한도 20에서 10개 이상)에서는 선반영하지 않고 이전처럼 승인 뒤에 울린다. 위 조건 밖의 드문 거절(예: 북을 옮기는 중의 소유권 변경)에서는 소리만 먼저 나고 구슬은 생기지 않는다.
+- **미실행:** iPhone 실기기·여러 폰에서의 체감. 전체 PlayMode는 실행하지 않았다.
+
+## #459 Guest 내 투척 명중 반응 접촉 즉시 표현 — 2026-11-03
+
+- **기준:** main `ae60df93` → `fix/#459-own-throw-local-contact`. Unity6000.6.5f1/macOS의 연결된 Editor에서 실행했다. 새 Mac·iOS 빌드는 만들지 않았다.
+- **배경:** Guest가 던진 공은 로컬 시각 복제본으로 날아갔다. 그러나 박에 닿아도 Host의 `targetImpact`가 올 때까지 박의 흔들림·명중 효과·타격음·진동이 나지 않았다.
+- **수정:**
+  - **시각 복제본 접촉 보고:** `LabProjectile.LaunchVisual(..., contact)`로 시각 복제본이 닿은 대상(박/바닥/불)·지점·속도를 한 번 알린다. Host 판정 콜백은 여전히 시각 복제본에서 호출되지 않는다.
+  - **접촉 즉시 표현:** 내 투척이 박에 닿으면 Host와 같은 식으로 킥·회전을 적용하고(`ApplyPredictedImpact`, 실제로 더해진 양 기록), 명중 효과와 `LocalThrowHit`를 바로 낸다. 타격 값은 Host와 같은 `LabModel.AttackValueFor`다. 바닥이면 `LocalThrowMissed`를 바로 낸다. 불은 Host 전용이다. 요청당 한 번만 표현한다(`LabLocalHitPresentation`).
+  - **Host 결과로 보정:**
+    - Host `targetImpact`가 표현한 명중을 확정하면, 예측 충격이 지금까지 남긴 영향을 빼고 Host 충격이 같은 시점부터 남겼을 영향을 넣는다(`CorrectPredictedImpact`, 흔들림·줄 감쇠 스프링과 회전 감쇠를 따라 계산). 효과·소리는 다시 내지 않는다.
+    - `targetMiss`면 같은 방식으로 되돌리고(`UndoPredictedImpact`) 빗나감 소리를 낸다.
+    - 표현한 빗나감 뒤 Host 명중은 이전처럼 전부 재생한다.
+    - 도색·오색·불에 막힘 알림은 항상 Host 결과다.
+  - **판정이 오지 않을 때:** Host는 무효로 만든 접촉(라운드 종료·불장막·공급 구슬)에 아무것도 보내지 않는다. 그래서 전투 연출 시계(정지·정체 중 멈춤)로 max(1.5초, 4×RTT) 안에 판정이 없으면 킥을 되돌린다. 그 뒤 늦게 온 판정은 킥만 적용하고 소리를 다시 내지 않는다.
+  - **보류 훅:** 접촉 때 #433의 보류 훅을 걸고, 대기 중인 명중이 없을 때만 푼다.
+  - **선반영하지 않는 경우:** 진행 중이 아님, 지귀 B 불장막·예고(현재 연출 시각 + 0.75초 안), 나에게 걸린 지귀 스테이지 불, legacy 불·과열, 지귀 공급 구슬.
+  - Host 판정·와이어·접속 규약 **5682/Lab43/Game27**·공유 설정 257개는 그대로다.
+
+| 실행 검사 | 결과 | 시간 |
+| --- | --- | --- |
+| 전체 EditMode | **1847/1847 PASS** | 51.51초 |
+| PlayMode `LabLocalBoardNetworkIntegrationTests` | **21/21 PASS** | 0.50초 |
+| PlayMode `LabHangingRenderInterpolationTests` | **9/9 PASS** | 1.97초 |
+| PlayMode `LabProjectileContactTests` | **8/8 PASS** | 4.41초 |
+| PlayMode `LabRopeReconciliationTests` | **8/8 PASS** | 0.15초 |
+| PlayMode `LabHangingPresentationTests` | **14/14 PASS** | 22.67초 |
+| PlayMode `LabImpactFeedbackTests` | **2/2 PASS** | 0.87초 |
+| PlayMode `LabJigwiABNetworkTests` | **13/13 PASS** | 11.02초 |
+| PlayMode `LabComboProjectileIntegrationTests` | **4/4 PASS** | 0.09초 |
+| PlayMode `LabStraightThrowTests` | **3/3 PASS** | 2.12초 |
+| PlayMode `LabDeveloperSoloIntegrationTests` | **14/14 PASS**(아래 참고) | 21.35초 |
+| PlayMode `GameSceneFlowTests` | **21/21 PASS** | 219.39초 |
+
+- 각 실행의 skip/inconclusive0.
+- `LabDeveloperSoloIntegrationTests`는 최종 코드에서 처음 실행했을 때 `SavedSceneSoloCanGenerateCombineAndPhysicallyPaintTheGourd` 1건이 실패했다(13/14). 바로 두 번 다시 실행해 모두 14/14였다. 실제 물리 투척이 들어간 검사로, 이번 변경 전 코드에서도 이 PR 중 통과·실패가 갈린 적은 없었다. 원인을 따로 확인하지 않아 간헐 실패로만 기록한다.
+- 최종 코드에서 EditMode 전체와 `LabLocalBoardNetworkIntegrationTests`·`LabHangingRenderInterpolationTests`·`LabProjectileContactTests`·`LabHangingPresentationTests`·`GameSceneFlowTests`를 다시 실행했다. 나머지 PlayMode 일곱 클래스는 3차 검토 수정(만료 기록 키·과감쇠 공식) 전 코드에서 실행했다. 그 수정은 Guest 표현 원장과 보정 계산에만 해당한다.
+- 새 검사
+  - EditMode `LabLocalHitPresentationTests` 18개: 1회 표현·승인 ID로 찾기, Host가 먼저 정하면 늦은 표현 막기, 롤백 뒤 같은 구슬 재발사가 별도 항목, 시간으로 되돌림과 늦은 판정 표시, 임시 ID로 만료된 뒤 Host ID로 찾기, 롤백·재발사가 만료 기록을 지움, 스프링 응답 = 시뮬레이션(과감쇠·임계·무복원 포함), 타격 값 = Host 규칙
+  - PlayMode `LabProjectileContactTests`에 1개: 시각 복제본이 박·바닥 접촉을 한 번 알리고 Host 식별자를 싣지 않음
+  - PlayMode `LabHangingRenderInterpolationTests`에 2개: 같은 프레임 보정·제한에 걸린 되돌림, 0.8초 흔들린 뒤 늦은 보정·되돌림이 반대 킥이 아님
+  - PlayMode `LabLocalBoardNetworkIntegrationTests`에 5개(실제 `Receive` 경로)
+    - 표현한 명중은 Host 확정 뒤에도 한 번이고 회전 차이만 적용
+    - Host 빗나감은 킥·회전을 되돌리고 빗나감 소리
+    - 표현한 빗나감 뒤 Host 명중은 재생하고 확정된 빗나감은 두 번 나지 않음
+    - 판정이 없으면 시간으로 되돌리고 늦은 판정은 소리 없이 킥만 적용
+    - 지귀 B 불장막·A와 겹친 B 예고 중에는 표현하지 않음
+- 코드 검토 워크플로를 네 번(관점별 검토 + 지적별 반박 검증) 돌려 확인된 지적을 고쳤다.
+  - 1차
+    - Host가 판정 패킷을 보내지 않는 무효 접촉
+    - A와 겹친 B 예고를 놓치는 판정
+    - 롤백 뒤 재발사의 중복 표현
+    - 첫 판정이 다른 대기 명중의 보류를 푸는 문제
+    - 제한에 걸린 킥을 선형으로 되돌리는 문제
+    - 회전 없는 검사
+  - 2차
+    - 시간 되돌림 뒤 늦은 판정의 전체 재생
+    - 정지 중에도 흐르는 만료 시계
+    - 감쇠된 흔들림을 원래 속도로 빼서 생기는 반대 킥
+  - 3차
+    - 임시 ID로 만료된 기록을 늦은 판정이 찾지 못하는 문제
+    - 롤백 뒤 남은 만료 기록이 다음 진짜 명중 소리를 막는 문제
+    - 과감쇠 스프링 공식
+- **남은 한계:**
+  - 먼저 낸 타격음·진동·명중 효과는 되돌릴 수 없다. 그래서 Host가 빗나감·무효로 정하면 소리·진동만 먼저 난 셈이 된다(빗나감은 빗나감 소리, 무효는 킥만 되돌림).
+  - 표현한 명중의 `paintBlocked` 결과에는 명중 효과와 막힘 효과가 함께 보인다.
+  - 흔들림 한도에 부딪힌 반동은 보정 계산에 넣지 않는다.
+- **미실행:** iPhone 실기기·여러 폰에서의 체감. 전체 PlayMode는 실행하지 않았다.
+
+## #461 도색 페이로드 deflate 압축·접속 규약 5683 — 2026-11-03
+
+- **기준:** main `7ba2f0e8` → `fix/#461-paint-deflate`. Unity6000.6.5f1/macOS의 연결된 Editor와 이 브랜치로 만든 Lab Mac Development 앱에서 실행했다. iOS 빌드는 만들지 않았다.
+- **배경:** 스테이지 시작 때 Host는 Guest마다 256×128 전체 도색 지도(셀당 5바이트, 약 160 KB)를 base64로 보냈다. 빈 지도도 도색 프레임 107개·Bulk 데이터그램 427개라, 시작 직후 Bulk 채널이 몇 초 동안 막혔다.
+- **수정:**
+  - `LabPaintFrame.encoding`을 추가했다(0 원본, 1 deflate).
+  - 발행자 정책 `LabPaintEncodingPolicy`: `RawOnly`(기본, 이전과 같은 바이트)와 `Auto`(deflate `Fastest` 결과가 더 짧을 때만 1)를 두었다. Host의 피어별 발행자는 `Auto`를 쓰며, 압축 결과는 #439 공유 캡처에 한 번만 만들어 공유한다.
+  - 수신기는 base64 해독 뒤 `encoding == 1`이면 헤더가 정한 상한(full `columns·rows·5 + 시각 바이트`, delta `columns·rows·7 + 시각 바이트`) 안에서만 inflate한다. 상한 초과·실패는 체크포인트를 요청한다. `encoding`은 `Valid`(0/1만)와 `SameHeader`에 들어간다.
+  - 해시·covered·`Revision`·`Matches` 의미는 그대로다.
+  - 접속 규약을 **5683 / `C6PhysicsLab/44` / `C6HapioGame/28`**로 올렸다(공유 설정 257개 그대로).
+
+| Editor 측정 (256×128 Splatter) | 원본(RawOnly) | 압축(Auto) |
+| --- | --- | --- |
+| 빈 지도(스테이지 시작) | 프레임 107개 / Bulk 데이터그램 427개 | **프레임 1개 / 2개** |
+| 12회 명중(칠 22%) | 107개 / 534개 | **3개 / 12개** |
+| 60회 명중(칠 64%) | 108개 / 539개 | **6개 / 29개** |
+| 압축 발행 / 수신 1회 시간 | — | 1.4~2.8 ms / 1.2~1.4 ms |
+
+| 실행 검사 | 결과 | 시간 |
+| --- | --- | --- |
+| 전체 EditMode | **1857/1857 PASS** | 52.24초 |
+| PlayMode `LabLocalBoardNetworkIntegrationTests` | **21/21 PASS** | 0.40초 |
+| PlayMode `LabHighResolutionPaintRuntimeTests` | **2/2 PASS** | 0.11초 |
+| PlayMode `LabGourdPaintTests` | **9/9 PASS** | 11.88초 |
+| PlayMode `LabDeveloperSoloIntegrationTests` | **14/14 PASS** | 19.25초 |
+| PlayMode `GameSceneFlowTests` | **21/21 PASS** | 219.65초 |
+| Lab Mac 앱 3프로세스(새 Host·새 Client 2, `127.0.0.1:17993`) + 이전 빌드 Client | **PASS** | 150초 |
+
+- 각 실행의 skip/inconclusive0.
+- 새 검사 `LabPaintDeflateTests` 13개
+  - 빈 시작 지도가 `Auto`에서 프레임 1개·실제 Bulk 조각 3개 이하이고 수신·`Matches` 통과(`RawOnly`는 107개)
+  - 칠한 지도의 프레임 수 감소와 delta·압축 체크포인트 수신
+  - Host 실제 구성(공유 캐시 + `Auto`)이 비공유 `Auto`와 같은 프레임이고 건너뛴 피어까지 지도 일치
+  - 1셀 delta는 원본 유지
+  - 압축 full의 낮은 리비전 거절
+  - `encoding` -1·2·99 거절
+  - 원본을 압축으로 표시한 본문·압축 폭탄·조각 간 `encoding` 불일치는 체크포인트
+  - codec 왕복·상한·쓰레기 입력
+- 조각 수를 고정한 기존 `LabPaintReplicationTests`는 `RawOnly`로 숫자(7/27/107)를 그대로 유지하고 `encoding == 0`을 추가로 확인했다. 접속 규약 고정 검사(`LabGameFlowBridgeTests`·`LabSharedSettingsSchemaTests`)를 갱신했다.
+- **Mac 3프로세스:** 이 브랜치로 만든 `Builds/Lab/20261103-144056-74c8ef35` 앱을 Host와 Client 2개로 실행했다(`--lab-auto-start --lab-auto-generate --lab-auto-transfer`).
+  - Host 로그는 `protocol=5683`이다. 이전 빌드(`Builds/Lab/20261102-223606-5ecfe8d0`, Lab43) Client의 접속은 `C6_LAB_JOIN_REJECTED`로 거절됐다.
+  - 새 Client 두 개는 `Playing` 시작과 120초 `Defeat`를 모두 받았다. Guest의 스냅샷은 도색 지도가 맞아야 적용되므로, 압축된 시작 지도를 받아 적용했음을 뜻한다. Bulk 오류·중단은 없었다.
+  - 한 Client의 첫 자동 행동은 시작 직후 `Restoring board state`로 한 번 거절됐다. #437 기록과 같은 시작 시점의 조합판 체크포인트 대기이며, 이후 행동은 승인됐다.
+  - 이 실행은 이후의 메모리 수정(원본 base64 문자열을 만들지 않고 길이만 비교) 전 코드다. 그 수정은 와이어 바이트를 바꾸지 않는다.
+- 코드 검토 워크플로(세 관점 검토 + 지적별 반박 검증)에서 확인된 3건을 고쳤다.
+  - `Auto`가 비교만 하려고 원본 base64 문자열을 만들어 보관함
+  - 문서의 현재 호환 묶음이 5682로 남음
+  - Host 실제 구성(공유 캐시 + `Auto`) 검사 없음
+- **병합 뒤 주의:** 모든 기기가 새 빌드를 써야 한다. 5682/Lab43/Game27 빌드와는 접속되지 않는다.
+- **미실행:** iPhone 실기기·여러 폰에서의 시작 지연 체감과 대역폭, iOS IL2CPP 빌드에서의 `System.IO.Compression` 동작.
+
+## #463 HUD·효과음의 공유 연출 시계 — 2026-11-03
+
+- **기준:** main `bc5fd050` → `fix/#463-presentation-clock`. Unity6000.6.5f1/macOS의 연결된 Editor에서 실행했다. 앱 빌드·Mac 다중 프로세스·iOS는 실행하지 않았다.
+- **배경:** #451에서 Guest 연출 시각을 `LabNetwork.BattlePresentationTime`(`LabGuestBattleClock`)으로 모았지만, HUD·효과음 10곳은 각자 Host 시각을 어림했다.
+  - 대부분은 `serverTime + 최대 1초`였다.
+  - 일시정지 중에도 흐르는 것과 멈추는 것이 섞여 있었다.
+  - 스냅샷 객체가 바뀔 때마다 기준을 다시 잡는 것과 값이 바뀔 때만 잡는 것이 섞여 있었다.
+  - `LabJigwiHud`는 상한이 없었다.
+  - 그래서 늦게 온 스냅샷에서 시계가 뒤로 튀고, 시작 대기 중에 앞서 나갔다.
+- **수정:** 위 10곳의 자체 어림(필드·메서드)을 지우고 `network.BattlePresentationTime`을 읽는다. `LabJigwiHud.ShowStageBlocked`도 같은 시각을 넘긴다.
+  - Host는 `battleClock.Now`를 읽는다.
+  - Guest는 같은 라운드 안에서 0.5초 미만으로는 뒤로 가지 않는다. 외삽은 최대 1초이고, 일시정지·시작 대기에는 멈춘다.
+  - 판정·Host로 보내는 값·와이어·접속 규약(5683/Lab44/Game28)·공유 설정 257개·Scene은 바꾸지 않았다.
+
+| 실행 검사 | 결과 | 시간 |
+| --- | --- | --- |
+| 전체 EditMode | **1857/1857 PASS** | 54.59초 |
+| PlayMode 새 `LabPresentationClockConsumerTests` | **1/1 PASS**(수정 뒤 4회) | 0.78~0.82초 |
+| PlayMode `LabFeverTimeHudTests` 3/3 · `LabCharmBubblesTests` 9/9 · `LabYaguangFlashLookTests` 5/5 · `LabYaguangCountLookTests` 1/1 · `LabFlashShakeRequestTests` 6/6 · `LabBattleBgmStageTests` 3/3 · `LabGourdYokaiTests` 13/13 · `LabComboEffectLookTests` 7/7 · `LabComboProjectileIntegrationTests` 4/4 · `LabJigwiStagePresentationTests` 8/8 · `LabJigwiABPresentationTests` 24/24 · `GameYokaiPresentationTests` 2/2 | **모두 PASS** | — |
+| PlayMode `LabGourdPaintTests` 9/9 · `LabDeveloperSoloIntegrationTests` 14/14 · `GameSceneFlowTests` 21/21 | **모두 PASS** | 12.56 / 19.68 / 229.5초 |
+
+- 각 실행의 skip/inconclusive는 0이다.
+- **새 검사:** Guest(`IsHost` false)의 `LabFeverTimeHud`·`LabCharmHud`가 Host 시각 20에 피버·내 매혹을 같이 켠다.
+  - 조금 늦게 온 스냅샷이 와도 시계가 뒤로 가지 않고 둘 다 켜진 채다.
+  - 일시정지 동안 0.3초 실제 시간이 지나도 `BattlePresentationTime`이 그대로다.
+  - 이 검사는 main의 두 HUD 코드로 바꿔 돌리면 `The late snapshot does not turn fever off`로 실패했고, 변경 코드로 되돌린 뒤 통과했다.
+- **코드 검토 워크플로:** 세 관점 검토와 지적별 반박 검증에서 제품 코드의 결함은 확인되지 않았다. 새 검사에서 확인된 2건을 고쳤다.
+  - 늦은 스냅샷 시각을 측정값 기준으로 바꿨다(느린 프레임에서 0.5초 되감김 허용치를 넘던 문제).
+  - 시각 20 전 단언이 프레임 실행 없이 통과하던 문제를 고쳤다.
+- **남은 검사 공백:** Host 분기와 나머지 8개 소비자는 소비자별 검사가 없다. 각 소비자는 공유 시계를 한 줄로 읽으며, 시계 규칙은 `LabGuestBattleClockTests`·`LabJigwiABPresentationTests`가 검사한다.
+- **미실행:** Guest 실기기에서 늦은 스냅샷·일시정지 때 HUD 숫자와 효과음이 튀지 않는지 확인하지 않았다.
+
+## Stage 3 지귀 PNG 배경
+
+- Unity 에디터에서 Stage 1→2→3→2→1→3 배경 활성화 및 PNG 참조 검사 통과.
+- BattleCamera 캡처로 석양 하늘과 PNG 배치 확인.
+- 이후 Home 플레이 모드 전환으로 최종 배치 보정은 저장 Scene에 적용. 최종 보정 후 플레이 검사는 미실행.
+
+## 요괴별 바닥 PNG 적용 및 충돌 복구
+
+- Battle Scene 및 검증 문서의 stash 충돌에서 양쪽 추가 내용을 보존하고 충돌 표시 제거. 누락된 Stage02 배경 종속 파일을 기존 작업 커밋에서 복원.
+- Stage 1/2/3의 ground 및 backing PNG·독립 재질 연결 후 Battle Scene 저장.
+- 실행 중 1→2→3→2→1→3 활성 상태, PNG 참조, 배경 missing component 검사 통과. 검사 후 원래 스테이지 복원.
+- BattleCamera에서 Stage1 청록 바닥 화면 확인. 전체 NUnit·실기기 검사는 미실행.
+
+- Stage1 바닥 후속 수정: BlushBeige PNG를 ground/backing 재질 및 저장 Scene의 두 슬롯에 연결. Stage2/3 참조 유지.
+
+- 배틀 조명 작업실: 에디터 스크립트 컴파일 및 창 열기 성공. 해당 파일 관련 콘솔 오류 0건. 수동 슬라이더·저장 후 재실행 검사는 미실행.
