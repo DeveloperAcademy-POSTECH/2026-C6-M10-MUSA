@@ -86,7 +86,8 @@ namespace C6Lab
         }
         public Rect BattleFireClipRect { get; private set; }
         public int VisibleScreenFires { get; private set; }
-        public bool CurtainVisible => groupFireCurtain != null && groupFireCurtain.gameObject.activeSelf;
+        /// <summary>#509: B's visible block is now the picked player's sync pillar (the old curtain art stays hidden).</summary>
+        public bool CurtainVisible => SyncPillar != null && SyncPillar.PillarVisible;
         public int CurtainVisualLevel { get; private set; }
         public bool CurtainWaterVisible => curtainWaterDouse != null && curtainWaterDouse.gameObject.activeSelf;
         public bool GroupCurtainVisible => CurtainVisible;
@@ -140,6 +141,21 @@ namespace C6Lab
                         - (transform.GetSiblingIndex() < pause.GetSiblingIndex() ? 1 : 0)));
             }
             EnsureTalisman();
+            EnsureSyncPillar();
+        }
+
+        /// <summary>#509: the picked player's temporary fire pillar and the shared 0/3 drops. Created at runtime.</summary>
+        public LabJigwiSyncPillarView SyncPillar { get; private set; }
+        private void EnsureSyncPillar()
+        {
+            if (fireLayer == null) return;
+            if (SyncPillar == null)
+            {
+                SyncPillar = gameObject.AddComponent<LabJigwiSyncPillarView>();
+                SyncPillar.Build(fireLayer, font);
+            }
+            Font shilla = canvas != null ? LabYaguangFeverHud.ShillaFont(canvas) : null;
+            SyncPillar.SetFont(shilla != null ? shilla : font);
         }
 
         /// <summary>#479: the talisman that covers this player's board during A. Created at runtime, never saved in the prefab.</summary>
@@ -549,27 +565,33 @@ namespace C6Lab
             LabJigwiABPlayerFire mine = null;
             foreach (var player in round.players ?? Array.Empty<LabJigwiABPlayerFire>())
                 if (player != null && player.playerId == localPlayer) { mine = player; break; }
+            UpdateBattleFireClip();
+            // #509: the old curtain/ignition art is never shown; collision geometry is unchanged.
+            if (groupFireCurtain != null) groupFireCurtain.gameObject.SetActive(false);
+            if (fireImages != null) foreach (var image in fireImages) if (image != null) image.gameObject.SetActive(false);
+            bool haptics = source != null && source.config != null && source.config.HapticsEnabled;
             if (mine == null)
             {
-                // An absent owner is not a completed B; never retain another owner's residue.
+                // A helper sees only the shared progress; never another owner's pillar or trail residue.
                 if (waterFlightTrail != null) waterFlightTrail.Hide();
                 if (audioView != null) audioView.Stop();
-                SetFiresHidden(held); return;
+                CurtainVisualLevel = 0; RemainingIgnitions = 0;
+                if (SyncPillar != null) SyncPillar.Present(round, null, false, null, BattleFireClipRect, now, held, haptics);
+                return;
             }
-            UpdateBattleFireClip();
-            DrawCurtain(round, mine, localPlayer, now, animationTime);
-            for (int i = 0; i < fireImages.Length; i++)
+            Rect? area = null;
+            var target = mine.targets != null && mine.targets.Length > 0 ? mine.targets[0] : null;
+            if (target != null && target.lit && TryProjectCurtain(round, localPlayer, now, out Vector2 frameCentre, out Vector2 frameSize))
             {
-                var fire = mine.targets != null && i < mine.targets.Length ? mine.targets[i] : null;
-                if (fire == null || !fire.lit || !TryProject(round, fire, localPlayer, i, now, out Vector2 centre, out Vector2 size))
-                { if (fireImages[i] != null) fireImages[i].gameObject.SetActive(false); continue; }
-                lastFirePositions[i] = centre; lastFireSizes[i] = size; hasFirePosition[i] = true;
-                fireImages[i].rectTransform.anchoredPosition = centre;
-                fireImages[i].rectTransform.sizeDelta = size;
-                fireImages[i].gameObject.SetActive(true);
-                AnimateFlame(fireImages[i], animationTime, round.slot * 1.71f + i * 2.399f, round.Warning(now) ? .45f : 1f);
-                VisibleScreenFires++;
+                bool projected = TryProject(round, target, localPlayer, 0, now, out Vector2 fireCentre, out Vector2 fireSize);
+                if (projected) { lastFirePositions[0] = fireCentre; lastFireSizes[0] = fireSize; hasFirePosition[0] = true; }
+                float x = projected ? fireCentre.x : frameCentre.x;
+                area = new Rect(x - frameSize.x * .5f, frameCentre.y - frameSize.y * .5f, frameSize.x, frameSize.y);
             }
+            int left = target != null && target.lit ? Math.Max(1, LabJigwiABTimeline.GroupSyncRequired - round.syncCount) : 0;
+            RemainingIgnitions = left; CurtainVisualLevel = Mathf.Clamp(left, 0, 3);
+            if (SyncPillar != null) SyncPillar.Present(round, mine, true, area, BattleFireClipRect, now, held, haptics);
+            if (SyncPillar != null && SyncPillar.PillarVisible) VisibleScreenFires++;
             // Reproject the real local water projectile path above B's Canvas curtain only.
             // No extra movement, input, collision or shared combat state is produced here.
             if (waterFlightTrail != null) waterFlightTrail.Present(canvas, battleCamera, localPlayer, round.id, now, held);
@@ -730,22 +752,26 @@ namespace C6Lab
             if (active != null)
             {
                 string shout = active.Warning(now) ? (active.kind == LabJigwiABKind.PersonalBurn
-                        ? "으아아 마음이 불타오른다!!!\n" : "화면에 불이 붙었어요!\n") : string.Empty;
+                        ? "으아아 마음이 불타오른다!!!\n" : "불기둥이 솟는다!\n") : string.Empty;
                 // #479: A has no hit count or target text; only the warning shout remains.
                 if (active.kind == LabJigwiABKind.PersonalBurn) words = shout.TrimEnd('\n');
                 else
                 {
-                    words = shout + "지급 물구슬로 불씨를 끄세요 · "
-                        + Math.Max(0d, active.endsAt - Math.Max(now, active.activeAt)).ToString("0.0", CultureInfo.InvariantCulture) + "초";
+                    // #509: who is picked, and what this screen should do.
+                    var picked = new StringBuilder();
+                    bool mine = false;
                     foreach (var player in active.players ?? Array.Empty<LabJigwiABPlayerFire>())
                     {
                         if (player == null) continue;
-                        int off = 0;
-                        foreach (var fire in player.targets ?? Array.Empty<LabJigwiABFireTarget>()) if (fire != null && !fire.lit) off++;
-                        if (rows.Length > 0) rows.Append("  ·  ");
-                        rows.Append(PlayerLabel(snapshot, player.playerId)).Append(' ').Append(off).Append('/').Append(player.targets?.Length ?? 0);
+                        if (picked.Length > 0) picked.Append('·');
+                        picked.Append(PlayerLabel(snapshot, player.playerId));
+                        mine |= player.playerId == local;
                     }
-                    rows.Append("\n발화점을 모두 꺼야 박 공격 가능");
+                    words = shout + "지목 " + picked + " · 1초 안에 함께 맞히기 "
+                        + active.syncCount + "/" + LabJigwiABTimeline.GroupSyncRequired + " · "
+                        + Math.Max(0d, active.endsAt - Math.Max(now, active.activeAt)).ToString("0.0", CultureInfo.InvariantCulture) + "초";
+                    rows.Append(mine ? "물 구슬로 내 불기둥을 맞혀요 · 지목된 사람과 동시에"
+                        : "물 구슬을 " + picked + "에게 굴려 주세요");
                 }
             }
             if (active == null && !stage.fever)
@@ -767,7 +793,7 @@ namespace C6Lab
             foreach (var upcoming in stage.rounds ?? Array.Empty<LabJigwiABRound>())
             {
                 if (upcoming == null || upcoming == active || !upcoming.Warning(now)) continue;
-                words += "\n다음 기믹 예고 · " + (upcoming.kind == LabJigwiABKind.PersonalBurn ? "개인 과열" : "공동 소화");
+                words += "\n다음 기믹 예고 · " + (upcoming.kind == LabJigwiABKind.PersonalBurn ? "부적 쓰기" : "동시 소화");
                 break;
             }
             status.text = words; playerStatus.text = rows.ToString();
@@ -821,6 +847,7 @@ namespace C6Lab
             // Keep only that already-bound owner/event's residue; no new path is introduced.
             if (waterFlightTrail != null) waterFlightTrail.ContinueFading(held);
             CurtainVisualLevel = 0; RemainingIgnitions = 0;
+            if (SyncPillar != null) SyncPillar.Hide();
             if (groupFireCurtain != null) groupFireCurtain.gameObject.SetActive(false);
             if (fireImages != null) foreach (var image in fireImages) if (image != null) image.gameObject.SetActive(false);
         }
@@ -832,6 +859,7 @@ namespace C6Lab
             VisibleScreenFires = 0;
             RestoreStatusLayout();
             CurtainVisualLevel = 0; RemainingIgnitions = 0;
+            if (SyncPillar != null) SyncPillar.Hide();
             if (groupFireCurtain != null) groupFireCurtain.gameObject.SetActive(false);
             if (curtainWaterDouse != null) curtainWaterDouse.gameObject.SetActive(false);
             if (personalHeat != null) personalHeat.gameObject.SetActive(false);
