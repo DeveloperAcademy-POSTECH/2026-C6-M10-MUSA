@@ -92,3 +92,18 @@ Unity 6000.6.5f1의 별도 검증 복사본에서 실행했다. 복사본은 정
 ## 사용자 저장 실험값 — 커밋 시점
 
 Scene에 저장된 값: 밀리는 힘 20, 감쇠 0, 최대 각도 55도, 복원력 44, 줄 길이 1.5, 위아래 튕기는 힘 0.18, 위아래 복원력 45, 위아래 감쇠 1.5, 최대 늘어나는 거리 0.5. 위의 자동 검사 기록은 코드 구현 검증이며 이 조합의 재미나 다인 체감을 보증하지 않는다.
+
+## 연속 줄 표현 (#507)
+
+`LabHangingTarget.ropeStyle`은 줄을 그리는 방식만 정한다. 흔들림 물리·피벗 높이·판정은 바꾸지 않는다.
+
+| 값 | 표현 |
+| --- | --- |
+| `Segmented`(기본) | 기존 방식. 루트에 고정된 위쪽 줄(`Upper Rope`, 길이 `suspensionVisualExtension`)과 피벗에 붙은 아래 줄(`Rope`)이 공중에서 꺾인다. Lab Scene과 저장된 Battle.unity 값이다. |
+| `Straight` | 고정점 `(0, 피벗 높이 + 연장, 0)`에서 박 연결점까지 원기둥 하나 |
+| `Curved` | 같은 두 점을 물리 피벗을 제어점으로 둔 2차 베지어로 잇는다. 고정점에서는 수직, 박에서는 박의 축 방향으로 접해 꺾이지 않는다. 원기둥 24개(`CurvedRopeSegments`) |
+
+- Hapio 전투는 `GameBattleBindings.Awake`가 모든 스테이지에 `Curved`를 런타임으로 지정한다. Battle.unity YAML은 바꾸지 않았다.
+- `Straight`/`Curved`에서 기존 `Rope`·`Upper Rope`는 transform을 그대로 계산하고 렌더러만 끈다. 연속 줄은 루트 아래 `Continuous Rope`이며 충돌체가 없다.
+- 연속 줄은 `WritePose`·`ApplyRopeLength`와 스윙 설정·yaw 갱신에서 다시 놓는다. 그래서 #454 렌더 보간 자세와 정지·홀드·초기화 자세를 그대로 따른다. 메시는 바꾸지 않고 조각 transform만 움직이므로 완성 연출 복사본은 그 순간의 줄 모양을 따로 갖는다.
+- 박 연결점은 기본적으로 기존 `Rope` 아래끝(판정 상단, 몸통 축 위)이다. `SetRopeSocket(transform)`으로 박 안의 연결점을 줄 수 있으며, 이 target 밖의 transform은 무시한다(박 모델 계약은 #507 PR-1·PR-2).
