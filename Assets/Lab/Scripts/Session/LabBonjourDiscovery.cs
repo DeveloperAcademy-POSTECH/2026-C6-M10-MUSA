@@ -111,6 +111,8 @@ namespace C6Lab
         private byte[] advertisedPresence;
         private readonly int thread = Thread.CurrentThread.ManagedThreadId;
         private readonly Dictionary<string, Service> services = new Dictionary<string, Service>(StringComparer.Ordinal);
+        // A room the live browse already reported never gets a second Add, so one that failed is re-resolved here (#476).
+        private readonly Dictionary<string, ServiceRetry> serviceRetries = new Dictionary<string, ServiceRetry>(StringComparer.Ordinal);
         private readonly List<Operation> operations = new List<Operation>();
         private readonly Queue<string> diagnostics = new Queue<string>();
         private Operation advertisement;
@@ -249,9 +251,24 @@ namespace C6Lab
                 }
                 foreach (Service service in services.Values.ToArray())
                 {
-                    foreach (string key in service.Addresses.Where(x => x.Value.ExpiresAt <= now).Select(x => x.Key).ToArray())
-                    { service.Addresses.Remove(key); changed = true; Report("stage=address result=ttl_expired"); }
+                    bool renew = false;
+                    foreach (KeyValuePair<string, AddressRecord> pair in service.Addresses.ToArray())
+                    {
+                        LabAddressExpiry state = LabDiscoveryBackoff.NextAddressState(pair.Value.ExpiresAt, pair.Value.Renewing, now);
+                        if (state == LabAddressExpiry.Renew)
+                        { pair.Value.Renewing = true; pair.Value.ExpiresAt = now + ResolveTimeoutSeconds; renew = true; }
+                        else if (state == LabAddressExpiry.Remove)
+                        { service.Addresses.Remove(pair.Key); changed = true; Report("stage=address result=ttl_expired"); }
+                    }
+                    // The open query stays silent while mDNSResponder refreshes its cache. A new query answers from that
+                    // cache at once; if the Host is gone it times out and the room leaves the list as before.
+                    if (renew && IsBrowsing && service.HostName != null && services.ContainsKey(service.Key))
+                    {
+                        if (service.Address != null) service.Address.Done = true;
+                        Report("stage=address result=renewing"); GetAddresses(service, service.HostName);
+                    }
                 }
+                RetryServices();
             }
             finally { pumping = false; Flush(); }
         }
@@ -273,7 +290,22 @@ namespace C6Lab
         {
             if (browse != null) browse.Done = true; browse = null;
             foreach (Service service in services.Values) Cancel(service);
-            services.Clear(); changed = true;
+            services.Clear(); serviceRetries.Clear(); changed = true;
+        }
+
+        private void RetryServices()
+        {
+            if (!IsBrowsing) { serviceRetries.Clear(); return; }
+            foreach (ServiceRetry retry in serviceRetries.Values.Where(x => x.RetryAt <= now).ToArray())
+            {
+                if (services.ContainsKey(retry.Key)) { serviceRetries.Remove(retry.Key); continue; }
+                if (services.Count >= MaximumServices) continue;
+                serviceRetries.Remove(retry.Key);
+                var service = new Service { Name = retry.Name, InterfaceIndex = retry.InterfaceIndex, Key = retry.Key, RetryAttempt = retry.Attempt + 1 };
+                services.Add(retry.Key, service);
+                Report("stage=resolve result=retry attempt=" + service.RetryAttempt.ToString(CultureInfo.InvariantCulture));
+                Resolve(service);
+            }
         }
 
         private void StopAdvertisingInternal()
@@ -313,7 +345,15 @@ namespace C6Lab
             operation.Done = true;
             if (operation == browse) StopBrowsingInternal();
             if (operation == advertisement) StopAdvertisingInternal();
-            if (operation.Service != null) Remove(operation.Service.Key);
+            if (operation.Service != null)
+            {
+                Service service = operation.Service;
+                bool current = services.TryGetValue(service.Key, out Service listed) && listed == service;
+                Remove(service.Key);
+                if (current && IsBrowsing && LabDiscoveryBackoff.CanRetry(service.RetryAttempt, LabDiscoveryBackoff.ServiceRetryLimit))
+                    serviceRetries[service.Key] = new ServiceRetry(service.Key, service.Name, service.InterfaceIndex, service.RetryAttempt,
+                        now + LabDiscoveryBackoff.Delay(service.RetryAttempt));
+            }
             LastError = reason; changed = true; Report("stage=" + operation.Stage + " result=failed reason=" + reason);
         }
 
@@ -435,8 +475,10 @@ namespace C6Lab
                 if (string.IsNullOrEmpty(serviceName) || serviceType?.TrimEnd('.') != ServiceType ||
                     !string.Equals(serviceDomain, Domain, StringComparison.OrdinalIgnoreCase)) return;
                 string key = interfaceIndex + "|" + serviceName;
-                if ((flags & LabBonjourNative.Add) == 0) { owner.Remove(key); owner.Report("stage=browse result=removed"); return; }
+                if ((flags & LabBonjourNative.Add) == 0)
+                { owner.Remove(key); owner.serviceRetries.Remove(key); owner.Report("stage=browse result=removed"); return; }
                 if (owner.services.ContainsKey(key)) return;
+                owner.serviceRetries.Remove(key);
                 if (owner.services.Count >= MaximumServices) { owner.Report("stage=browse result=capacity_reached"); return; }
                 var service = new Service { Name = serviceName, InterfaceIndex = interfaceIndex, Key = key };
                 owner.services.Add(key, service); owner.Report("stage=browse result=found"); owner.Resolve(service);
@@ -465,7 +507,7 @@ namespace C6Lab
                     owner.Report("stage=resolve result=incompatible_room_ignored");
                     return;
                 }
-                service.Port = LabBonjourNative.NetworkPort(port); operation.HasAddressOrReply = true; operation.Done = true;
+                service.Port = LabBonjourNative.NetworkPort(port); service.HostName = hostName; operation.HasAddressOrReply = true; operation.Done = true;
                 owner.Report("stage=resolve result=completed"); owner.GetAddresses(service, hostName);
                 var presence = owner.Create("presence", service); service.Presence = presence;
                 int queryError = Native(() => LabBonjourNative.DNSServiceQueryRecord(out presence.Reference, 0, service.InterfaceIndex,
@@ -495,7 +537,7 @@ namespace C6Lab
                 if (!service.Addresses.ContainsKey(key) && service.Addresses.Count >= MaximumAddressesPerService)
                 { owner.Report("stage=address result=capacity_reached"); return; }
                 service.Addresses[key] = new AddressRecord(new LabBonjourTarget(candidate, service.Port, routeInterface, service.Name), owner.now + ttl);
-                operation.HasAddressOrReply = true; owner.changed = true;
+                operation.HasAddressOrReply = true; owner.changed = true; service.RetryAttempt = 0;
                 owner.Report("stage=address result=ready family=" + LabBonjourAddressCodec.Family(candidate));
             });
         }
@@ -542,13 +584,19 @@ namespace C6Lab
 
         private sealed class Service
         {
-            internal string Key, Name; internal uint InterfaceIndex; internal ushort Port; internal bool Ipv4, Ipv6, Playing, WaitingForHost, Team; internal int Participants, Capacity; internal Operation Resolve, Address, Presence;
+            internal string Key, Name, HostName; internal int RetryAttempt; internal uint InterfaceIndex; internal ushort Port; internal bool Ipv4, Ipv6, Playing, WaitingForHost, Team; internal int Participants, Capacity; internal Operation Resolve, Address, Presence;
             internal readonly Dictionary<string, AddressRecord> Addresses = new Dictionary<string, AddressRecord>(StringComparer.Ordinal);
         }
         private sealed class AddressRecord
         {
-            internal readonly LabBonjourTarget Target; internal readonly double ExpiresAt;
+            internal readonly LabBonjourTarget Target; internal double ExpiresAt; internal bool Renewing;
             internal AddressRecord(LabBonjourTarget target, double expiresAt) { Target = target; ExpiresAt = expiresAt; }
+        }
+        private sealed class ServiceRetry
+        {
+            internal readonly string Key, Name; internal readonly uint InterfaceIndex; internal readonly int Attempt; internal readonly double RetryAt;
+            internal ServiceRetry(string key, string name, uint interfaceIndex, int attempt, double retryAt)
+            { Key = key; Name = name; InterfaceIndex = interfaceIndex; Attempt = attempt; RetryAt = retryAt; }
         }
     }
 }
