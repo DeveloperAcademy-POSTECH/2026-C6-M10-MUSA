@@ -878,4 +878,4 @@ A/B 시간표·B 미션10초/보상5초·100초 정리는 코드 고정이다. B
 |242|Reserved Jigwi A Required Hits (unused)|은퇴. 예전 박 명중3회 해제. 저장값·위치만 보존, DEV/Inspector 숨김|
 |243|JigwiABPersonalBurnSeconds / **1초** (전5초)|.5~30초. A 활성 뒤 각 판의 첫 구슬이 타기까지. 이후는 Inspector 간격으로 한 개씩|
 
-Home/Lobby에 저장된 DEV 패널의241/242 라벨과243 값(1)도 코드와 맞췄다. DEV 행이 없는 Inspector 전용 값(`LabConfig`): 소각 간격 `jigwiABBurnStaggerSeconds`1초, 부적 물 구슬5개/수명15초/칠1.5배, 완료 기준 .995, 허용 거리 .07. 규칙과 화면은 [지귀 화면 사양](JIGWI_SCREEN_PATTERNS.md)의2절·5절을 따른다. 이 문서 갱신은 실행 검증을 뜻하지 않는다.
+Home/Lobby에 저장된 DEV 패널의241/242 라벨과243 값(1)도 코드와 맞췄다. DEV 행이 없는 Inspector 전용 값(`LabConfig`): 소각 간격 `jigwiABBurnStaggerSeconds`1초, 부적 물 구슬5개/수명15초/칠1.5배, 완료 기준 .9(90%), 허용 거리 .07. 규칙과 화면은 [지귀 화면 사양](JIGWI_SCREEN_PATTERNS.md)의2절·5절을 따른다. 이 문서 갱신은 실행 검증을 뜻하지 않는다.

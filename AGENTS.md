@@ -180,7 +180,7 @@
 
 - A는 5/40/70초에 **모든 자리**에서 동시에 열린다. 예전의 대상 한 명·박 3번 명중·회복 4배는 없다. 자리마다 스냅샷 `LabJigwiABPlayerFire.talismanAt`(아직 안 썼으면 음수)을 둔다.
 - 소각은 한꺼번에가 아니라 **한 개씩** 탄다. 첫 구슬은 DEV243(기본 1초) 뒤, 이후 Inspector `jigwiABBurnStaggerSeconds`(1초) 간격이며 소유자별 생성 순서(createdAt/id)를 따른다(`NextJigwiABBurnAt`).
-- 각 기기의 `LabJigwiTalismanOverlay`(`LabJigwiScreenPresentation.EnsureTalisman`이 만듦)가 조합판 위 **전투 영역**에 세로 한지 부적을 띄우고, 쓰는 동안 `board.SetUiInputBlocked`로 조합판 조작을 막는다. 신라문화체 모양의 점선 "물"(88점, `LabJigwiTalismanStroke.Water`)을 Inspector 기준 99.5% 덮으면 `jigwiTalisman` 요청(firstId)을 보내고 1초마다 다시 보낸다. 판정은 Host `TryCompleteJigwiTalisman`만 한다.
+- 각 기기의 `LabJigwiTalismanOverlay`(`LabJigwiScreenPresentation.EnsureTalisman`이 만듦)가 조합판 위 **전투 영역**에 세로 한지 부적을 띄우고, 쓰는 동안 `board.SetUiInputBlocked`로 조합판 조작을 막는다. 신라문화체 모양의 점선 "물"(88점, `LabJigwiTalismanStroke.Water`)을 Inspector 기준 90% 덮으면 `jigwiTalisman` 요청(firstId)을 보내고 1초마다 다시 보낸다. 판정은 Host `TryCompleteJigwiTalisman`만 한다.
 - Host는 그 자리의 소각 예약을 지우고 `jigwiTalismanReward` Water 5개(수명 15초, 칠 1.5배, B 불 꼬리 없음)를 준다. 모든 자리가 쓰면 A를 Completed로 일찍 끝내고, 못 쓰면 15초에 벌점 없이 끝난다.
 - DEV241/242는 은퇴 슬롯("Reserved …(unused)", 인덱스 보존, Home/Lobby 저장 라벨도 맞춤)이다. A 스태미나 화염 테두리는 지웠고, A 외침은 `PatternAudioProfile.personalVoiceEnabled`(0)로 꺼 두었다(B 외침은 유지).
 - 에디터 전용: `Hapio > DEV SOLO 시작 스테이지` 메뉴(EditorPrefs, Home에서 Play할 때만 적용)와 `LabJigwiEventMonitor`. 빌드와 Test Runner에는 영향이 없다.

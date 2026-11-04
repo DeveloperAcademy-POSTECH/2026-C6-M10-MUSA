@@ -124,7 +124,7 @@ namespace C6Lab
         }
 
         private float Tolerance => source != null && source.config != null ? source.config.JigwiTalismanTolerance : .07f;
-        private float Required => source != null && source.config != null ? source.config.JigwiTalismanCoverage : .995f;
+        private float Required => source != null && source.config != null ? source.config.JigwiTalismanCoverage : .9f;
 
         private void Send()
         {

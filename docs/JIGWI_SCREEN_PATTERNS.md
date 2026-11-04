@@ -43,7 +43,7 @@ Host의 실제 발동 시각과 표의 **1초 전 상태/화면 예고**는 바�
 2. 각 판의 Raw/Combined가 **한 개씩** 탄다. 첫 구슬은 활성 뒤 DEV243(기본1초), 이후 Inspector `jigwiABBurnStaggerSeconds`(1초) 간격이며 소유자별 생성 순서(createdAt/id)를 따른다(`NextJigwiABBurnAt`). 북·아이템은 제외하고, 합성/전달로 가장 이른 기한을 늘리지 않는다. 이미 발사 승인된 비행 공은 태우지 않는다.
 3. 같은 시각 각 기기의 `LabJigwiTalismanOverlay`가 조합판 위 **전투 영역**(조합판 카메라 위쪽, 위 여백 `topInset`.14)에 세로로 긴 한지 부적을 띄운다. 부적이 떠 있는 동안 `board.SetUiInputBlocked`로 조합판 조작을 막는다. 모든 Graphic의 raycastTarget은 OFF다.
 4. 부적에는 신라문화체 모양의 점선 "물"(`LabJigwiTalismanStroke.Water`, 0~1 정사각형의88점)과 안내 "손가락으로 '물'을 적어 / 부적을 완성하세요."가 있다. 쓴 점은 파란색으로 바뀐다. 획 순서는 상관없고 점에서 허용 거리(.07) 안을 지나면 덮인다. 점선에서 먼 낙서는 세지 않는다.
-5. 덮은 비율이 Inspector 기준(.995=99.5%)을 넘으면 부적을 내리고 `jigwiTalisman` 요청(roundId, firstId)을 보낸다. Host 확인 전까지1초마다 다시 보낸다. 판정은 Host `TryCompleteJigwiTalisman`만 하며 같은 회차·참가자·활성 중일 때 한 번만 승인한다.
+5. 덮은 비율이 Inspector 기준(.9=90%) 이상이면 부적을 내리고 `jigwiTalisman` 요청(roundId, firstId)을 보낸다. Host 확인 전까지1초마다 다시 보낸다. 판정은 Host `TryCompleteJigwiTalisman`만 하며 같은 회차·참가자·활성 중일 때 한 번만 승인한다.
 6. Host는 그 자리의 소각 예약을 지우고 **부적 물 구슬5개**(`jigwiTalismanReward`, 물방울 원화, 수명15초, 칠1.5배)를 준다. B 보상 불 꼬리·크기 배율은 붙이지 않는다. 다른 자리에는 아무 영향이 없다. 아직 안 쓴 자리는 계속 탄다.
 7. 모든 자리가 쓰면 A를 Completed로 일찍 끝낸다. 못 쓴 자리가 있으면 최대 지속에서 Expired로 끝나며 벌점은 없다. 자연 만료·100초 정리에서 남은 소각 예약은 제거하고 이미 탄 공은 복원하지 않는다.
 
@@ -124,7 +124,7 @@ Host의 실제 발동 시각과 표의 **1초 전 상태/화면 예고**는 바�
 
 기존230~234 표면 설정은 값/배열 위치를 보존하되 DEV에서 숨긴 예약 슬롯이다. 기존236·237 오색구슬 보상과238·239 구미호 피버는 그대로 유지한다. 기존0~252를 보존하고 공급 간격/초기 수량/미소모 상한/발화점 거리253~256을 더해 총257개를 공유한다.229·241·242·246·247은 Inspector와 DEV에서 숨기며 저장값은 그대로 보존한다. B 미션10초와 성공 보상5초는 현재 고정 규칙이고 별도 DEV 행은 없다. Inspector의 화면 효과 `waterDouseSeconds/flameSpeed/flameSway`와 B의 `curtainTexture/curtainStage2Texture/curtainStage1Texture/curtainDenseFrame/curtainDenseUv`는 새 프리팹에서 조정할 수 있다. B 단계 원화는3종을 쓰고 중앙 밀도용 크롭은 강한3단계 원본을 유지한다. 모든 원화는 UV 크롭으로 종횡비를 보존한다. `waterFlightTrail`의 최소/최대 표시 폭·먹선/물/하이라이트 색을 Inspector에서 조절하며 잔상 수명/길이는 기존 WaterFlightTrail 프로필을 따른다. `audioView.clip/volume`은 Inspector에서 바꿀 수 있다.
 
-A 부적의 Inspector 전용 값(DEV 행 없음, `LabConfig`): `jigwiABBurnStaggerSeconds`1초, 부적 물 구슬 수5개/수명15초/칠1.5배, 완료 기준 .995, 허용 거리 .07. 부적 화면의 종이 비율(.55)/위 여백(.14)은 `LabJigwiTalismanOverlay`에 있다.
+A 부적의 Inspector 전용 값(DEV 행 없음, `LabConfig`): `jigwiABBurnStaggerSeconds`1초, 부적 물 구슬 수5개/수명15초/칠1.5배, 완료 기준 .9(90%), 허용 거리 .07. 부적 화면의 종이 비율(.55)/위 여백(.14)은 `LabJigwiTalismanOverlay`에 있다.
 
 ### 5.1. 음성 Inspector 설정 (로컬 표현 전용)
 
