@@ -48,6 +48,12 @@ namespace C6Lab
         private float appliedGrainSize, appliedGrainStrength, appliedMottleStrength;
         private MaterialPropertyBlock block;
         private Renderer shell;
+        // #507 박 모델 계약. 흰 박(legacy)에서는 rig가 null, extras가 비어 있고 활성 재질은 paintMaterial이다.
+        private LabGourdVisualRig rig;
+        private Renderer[] extras = System.Array.Empty<Renderer>();
+        private Material activeMaterial;
+        private float rigReferenceSize = 1.8f;
+        private Vector3 rigSizeAnchor;
         private LabTarget mountedTarget;
         private LabTarget subscribedTarget;
         private bool initialized;
@@ -78,13 +84,37 @@ namespace C6Lab
             && (!appliedWatercolorEnabled || watercolor == null || watercolor.Error != null
                 || watercolor.Ready && !watercolor.HasPendingWork && !watercolor.IsAnimating);
         public Transform Shell => shell != null ? shell.transform : null;
+        /// <summary>마운트한 박의 모델 계약(#507). 흰 박이거나 계약 검사에 실패해 흰 박으로 돌아갔으면 null.</summary>
+        public LabGourdVisualRig Rig => rig;
+        /// <summary>몸통과 같은 칠 공간을 쓰는 추가 렌더러(#507). 흰 박에서는 비어 있다.</summary>
+        public System.Collections.Generic.IReadOnlyList<Renderer> PaintExtras => extras;
+        /// <summary>몸통에 쓰는 칠 재질. 흰 박은 paintMaterial, 박 모델 계약은 그 계약의 재질.</summary>
+        public Material ActivePaintMaterial => activeMaterial != null ? activeMaterial : paintMaterial;
+        /// <summary>요청한 박 모델 계약이 검사에 실패해 흰 박으로 돌아간 이유. 없으면 null.</summary>
+        public string RigFallbackReason { get; private set; }
         public GameObject VisualInstance { get; private set; }
         public string InitializationError { get; private set; }
         public bool IsReady => initialized && isActiveAndEnabled && target != null && target == mountedTarget
             && network != null && network.target == target && target.Hitbox != null
             && target.VisualMount != null && VisualInstance != null && target.MountedVisual == VisualInstance
-            && shell != null && shell.enabled && shell.gameObject.activeInHierarchy && paintMaterial != null
-            && shell.sharedMaterial == paintMaterial && paintTexture != null && painterTexture != null;
+            && shell != null && shell.enabled && shell.gameObject.activeInHierarchy && ActivePaintMaterial != null
+            && shell.sharedMaterial == ActivePaintMaterial && paintTexture != null && painterTexture != null;
+
+        /// <summary>
+        /// 스테이지 박(#507)을 <see cref="Attach"/>보다 먼저 지정한다. Attach는 비어 있을 때만 흰 박을 채운다.
+        /// 박 모델 계약(<see cref="LabGourdVisualRig"/>)이 없는 프리팹은 흰 박과 같은 경로를 탄다.
+        /// </summary>
+        public static LabGourdPaint PrepareVisual(LabTarget target, GameObject prefab)
+        {
+            if (target == null) return null;
+            var paint = target.GetComponent<LabGourdPaint>();
+            if (paint == null) paint = target.gameObject.AddComponent<LabGourdPaint>();
+            if (prefab == null) return paint;
+            if (paint.VisualInstance != null && paint.visualPrefab != prefab)
+                Debug.LogWarning("C6_GOURD_PREPARE_LATE prefab=" + prefab.name + " (already mounted; applies on the next mount)");
+            paint.visualPrefab = prefab;
+            return paint;
+        }
 
         /// <summary>Bind the ordinary target before presentation Start methods run.</summary>
         public static LabGourdPaint Attach(LabNetwork network)
@@ -154,17 +184,30 @@ namespace C6Lab
                 || !paintMaterial.HasProperty("_PaintMap") || !paintMaterial.HasProperty("_PaintMapReady")
                 || !paintMaterial.HasProperty("_PainterMap"))
                 return FailInitialization("The white gourd prefab or C6Lab/GourdPaint material is missing.");
-            Transform prefabShell = visualPrefab.transform.Find("White Gourd");
+            GameObject prefab = visualPrefab;
+            RigFallbackReason = null;
+            var prefabRig = prefab.GetComponent<LabGourdVisualRig>();
+            if (prefabRig != null && !prefabRig.Validate(out string rigReason))
+            {
+                // The same build makes the same choice on every device, so hits stay consistent.
+                RigFallbackReason = rigReason;
+                Debug.LogWarning("C6_GOURD_RIG_FALLBACK prefab=" + prefab.name + " reason=" + rigReason);
+                prefab = Resources.Load<GameObject>(ResourceFolder + "WhiteGourd");
+                prefabRig = null;
+                if (prefab == null) return FailInitialization("The white gourd fallback prefab is missing.");
+            }
+            if (prefabRig != null) return InitializeRig(prefab, prefabRig);
+            Transform prefabShell = prefab.transform.Find("White Gourd");
             MeshFilter mesh = prefabShell != null ? prefabShell.GetComponent<MeshFilter>() : null;
             MeshRenderer prefabRenderer = prefabShell != null ? prefabShell.GetComponent<MeshRenderer>() : null;
-            if (!visualPrefab.activeSelf || prefabShell == null || !prefabShell.gameObject.activeSelf
+            if (!prefab.activeSelf || prefabShell == null || !prefabShell.gameObject.activeSelf
                 || prefabRenderer == null || !prefabRenderer.enabled || mesh == null || mesh.sharedMesh == null)
                 return FailInitialization("The white gourd prefab needs an active 'White Gourd' mesh renderer.");
             if (target.MountedVisual != null)
                 return FailInitialization("The target already owns another mounted visual.");
 
             mountedTarget = target;
-            target.SetVisualPrefab(visualPrefab);
+            target.SetVisualPrefab(prefab);
             VisualInstance = target.MountedVisual;
             Transform white = VisualInstance != null ? VisualInstance.transform.Find("White Gourd") : null;
             shell = white != null ? white.GetComponent<Renderer>() : null;
@@ -192,6 +235,54 @@ namespace C6Lab
             return true;
         }
 
+        /// <summary>
+        /// 박 모델 계약 경로(#507): 계약이 명시한 몸통·추가 렌더러에 칠하고, 판정 껍데기로 충돌 메시를 만든다.
+        /// 순서는 흰 박 경로와 같다.
+        /// </summary>
+        private bool InitializeRig(GameObject prefab, LabGourdVisualRig prefabRig)
+        {
+            if (target.MountedVisual != null)
+                return FailInitialization("The target already owns another mounted visual.");
+            mountedTarget = target;
+            target.SetVisualPrefab(prefab);
+            VisualInstance = target.MountedVisual;
+            rig = VisualInstance != null ? VisualInstance.GetComponent<LabGourdVisualRig>() : null;
+            shell = rig != null ? rig.paintShell : null;
+            if (shell == null || rig.hitShell == null)
+                return FailInitialization("The target did not mount a usable gourd rig.");
+            var list = new System.Collections.Generic.List<Renderer>();
+            if (rig.paintExtras != null)
+                foreach (Renderer extra in rig.paintExtras) if (extra != null) list.Add(extra);
+            extras = list.ToArray();
+            activeMaterial = prefabRig.paintMaterial;
+            rigReferenceSize = prefabRig.referenceVisualSize;
+            rigSizeAnchor = prefabRig.AnchorInRoot;
+            foreach (var animator in VisualInstance.GetComponentsInChildren<Animator>(true))
+                animator.enabled = false;
+            if (rig.yokaiAnimation != null)
+            {
+                LabGourdYokai yokai = VisualInstance.GetComponent<LabGourdYokai>();
+                if (yokai == null) yokai = VisualInstance.AddComponent<LabGourdYokai>();
+                yokai.Configure(rig.yokaiAnimation, rig.yokaiProfile);
+                yokai.Bind(network);
+            }
+            shell.sharedMaterial = activeMaterial;
+            foreach (Renderer extra in extras) extra.sharedMaterial = activeMaterial;
+            block = new MaterialPropertyBlock();
+            EnsureTexture(Surface);
+            initialized = true;
+            if (watercolorProfile == null)
+                watercolorProfile = Resources.Load<LabWatercolorPaintProfile>(ResourceFolder + "WatercolorProfile");
+            ApplyVisualSize();
+            if (!target.BindHitboxMesh(rig.hitShell))
+                return FailInitialization("The gourd rig's hit shell could not supply its collision mesh.");
+            InitializationError = null;
+            RefreshPaintMap(true);
+            subscribedTarget = target;
+            subscribedTarget.ApprovedHit += OnHit;
+            return true;
+        }
+
         private bool FailInitialization(string reason)
         {
             ReleasePresentation();
@@ -212,9 +303,20 @@ namespace C6Lab
         {
             if (VisualInstance == null) return;
             float size = network != null && network.config != null ? network.config.GourdVisualSize : 1.4f;
-            float ratio = size / 1.8f;
-            Vector3 scale = Vector3.one * ratio;
-            Vector3 position = Vector3.up * (.84f * (1f - ratio));
+            Vector3 scale, position;
+            if (rig == null)
+            {
+                float ratio = size / 1.8f;
+                scale = Vector3.one * ratio;
+                position = Vector3.up * (.84f * (1f - ratio));
+            }
+            else
+            {
+                // #507: the rig names the size it was authored for and the point that stays put.
+                float ratio = size / rigReferenceSize;
+                scale = Vector3.one * ratio;
+                position = rigSizeAnchor * (1f - ratio);
+            }
             if (VisualInstance.transform.localScale == scale
                 && VisualInstance.transform.localPosition == position) return;
             VisualInstance.transform.localScale = scale;
@@ -391,6 +493,7 @@ namespace C6Lab
             // This is a presentation switch. Keep both authoritative maps intact while OFF.
             block.SetFloat("_PlayerPaintPatternsEnabled", playerPaintPatternsEnabled ? 1f : 0f);
             shell.SetPropertyBlock(block);
+            foreach (Renderer extra in extras) if (extra != null) extra.SetPropertyBlock(block);
             appliedPlayerPaintPatternsEnabled = playerPaintPatternsEnabled;
             appliedGrainEnabled = grainEnabled; appliedGrainSize = grainSize;
             appliedGrainStrength = grainStrength; appliedMottleStrength = mottleStrength;
@@ -439,6 +542,9 @@ namespace C6Lab
             appliedHighResolutionColumns = 0;
             uploadedVisualVersion = 0;
             shell = null;
+            rig = null;
+            extras = System.Array.Empty<Renderer>();
+            activeMaterial = null;
             VisualInstance = null;
             mountedTarget = null;
             initialized = false;
