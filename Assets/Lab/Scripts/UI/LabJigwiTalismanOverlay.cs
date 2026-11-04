@@ -15,7 +15,10 @@ namespace C6Lab
     {
         [Tooltip("조합판 영역 안쪽 여백 (판 크기 대비). 부적 종이가 판 가장자리에서 이만큼 떨어진다.")]
         [SerializeField, Range(0f, .2f)] private float margin = .04f;
-        [SerializeField] private Color paperColor = new Color(.96f, .82f, .38f, .97f);
+        [Tooltip("한지 무늬 위에 곱하는 색. 흰색이면 한지 그대로.")]
+        [SerializeField] private Color paperColor = new Color(1f, 1f, 1f, .98f);
+        [Tooltip("부적 종이의 가로/세로 비율. 작을수록 좁고 길다.")]
+        [SerializeField, Range(.35f, 1f)] private float paperAspect = .55f;
         [SerializeField] private Color inkColor = new Color(.72f, .11f, .07f, 1f);
         [SerializeField] private Color guideColor = new Color(.45f, .3f, .12f, .35f);
         [Tooltip("#479: 손가락이 지나가 칠해진 점선 색 (물빛 파랑).")]
@@ -25,7 +28,9 @@ namespace C6Lab
 
         private LabNetwork source;
         private RectTransform root, paper, frame, glyphArea;
-        private UnityEngine.UI.Image paperImage, frameImage;
+        private UnityEngine.UI.RawImage paperImage;
+        private UnityEngine.UI.Image frameImage;
+        private static Texture2D hanji;
         private UnityEngine.UI.Image[] dots = Array.Empty<UnityEngine.UI.Image>();
         private UnityEngine.UI.Text hint;
         private Font font;
@@ -117,7 +122,7 @@ namespace C6Lab
         }
 
         private float Tolerance => source != null && source.config != null ? source.config.JigwiTalismanTolerance : .07f;
-        private float Required => source != null && source.config != null ? source.config.JigwiTalismanCoverage : .95f;
+        private float Required => source != null && source.config != null ? source.config.JigwiTalismanCoverage : .99f;
 
         private void Send()
         {
@@ -188,7 +193,9 @@ namespace C6Lab
             // Local points are relative to the root's pivot, which is what localPosition uses.
             paper.anchorMin = paper.anchorMax = paper.pivot = new Vector2(.5f, .5f);
             paper.localPosition = new Vector3((low.x + high.x) * .5f, (low.y + high.y) * .5f, 0f);
-            paper.sizeDelta = new Vector2(Mathf.Abs(high.x - low.x), Mathf.Abs(high.y - low.y));
+            // A tall, narrow talisman inside the board area.
+            float height = Mathf.Abs(high.y - low.y), width = Mathf.Min(Mathf.Abs(high.x - low.x), height * paperAspect);
+            paper.sizeDelta = new Vector2(width, height);
             LayoutGlyph();
         }
 
@@ -197,9 +204,9 @@ namespace C6Lab
         {
             if (glyphArea == null || paper == null) return;
             Vector2 size = paper.rect.size;
-            float side = Mathf.Max(1f, Mathf.Min(size.x * .86f, size.y * .74f));
+            float side = Mathf.Max(1f, Mathf.Min(size.x * .84f, size.y * .62f));
             glyphArea.anchorMin = glyphArea.anchorMax = glyphArea.pivot = new Vector2(.5f, .5f);
-            glyphArea.anchoredPosition = new Vector2(0f, -size.y * .06f);
+            glyphArea.anchoredPosition = new Vector2(0f, -size.y * .04f);
             glyphArea.sizeDelta = new Vector2(side, side);
             float dot = Mathf.Max(4f, side * .045f);
             for (int i = 0; i < dots.Length; i++)
@@ -213,19 +220,25 @@ namespace C6Lab
             if (root == null) return;
             if (font == null) font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             paper = NewRect("Talisman Paper", root);
-            paper.sizeDelta = new Vector2(360f, 360f);
-            paperImage = paper.gameObject.AddComponent<UnityEngine.UI.Image>();
-            paperImage.color = paperColor; paperImage.raycastTarget = false;
+            paper.sizeDelta = new Vector2(200f, 360f);
+            paperImage = paper.gameObject.AddComponent<UnityEngine.UI.RawImage>();
+            paperImage.texture = HanjiTexture(); paperImage.color = paperColor; paperImage.raycastTarget = false;
             frame = NewRect("Talisman Frame", paper);
             Stretch(frame, .035f);
             frameImage = frame.gameObject.AddComponent<UnityEngine.UI.Image>();
             frameImage.color = new Color(0f, 0f, 0f, 0f); frameImage.raycastTarget = false;
             var outline = frame.gameObject.AddComponent<UnityEngine.UI.Outline>();
             outline.effectColor = inkColor; outline.effectDistance = new Vector2(3f, -3f);
-            hint = NewText("Talisman Hint", paper, "손가락으로 '물'을 따라 쓰세요", 22, inkColor);
+            hint = NewText("Talisman Hint", paper, "손가락으로\n'물'을 따라 쓰세요", 22, inkColor);
             var hintRect = hint.rectTransform;
-            hintRect.anchorMin = new Vector2(.05f, .86f); hintRect.anchorMax = new Vector2(.95f, .98f);
+            hintRect.anchorMin = new Vector2(.08f, .83f); hintRect.anchorMax = new Vector2(.92f, .96f);
             hintRect.offsetMin = hintRect.offsetMax = Vector2.zero;
+            // A small red seal at the foot, as on a real talisman.
+            var seal = NewRect("Talisman Seal", paper);
+            seal.anchorMin = new Vector2(.36f, .045f); seal.anchorMax = new Vector2(.64f, .12f);
+            seal.offsetMin = seal.offsetMax = Vector2.zero;
+            var sealImage = seal.gameObject.AddComponent<UnityEngine.UI.Image>();
+            sealImage.color = new Color(inkColor.r, inkColor.g, inkColor.b, .82f); sealImage.raycastTarget = false;
             hint.resizeTextForBestFit = true; hint.resizeTextMinSize = 10; hint.resizeTextMaxSize = 28;
             glyphArea = NewRect("Talisman Glyph (물)", paper);
             dots = new UnityEngine.UI.Image[stroke.Samples.Length];
@@ -239,6 +252,46 @@ namespace C6Lab
             }
             LayoutGlyph();
             paper.gameObject.SetActive(false);
+        }
+
+        /// <summary>
+        /// 한지 질감 (런타임에 한 번 만든다, 에셋 없음): 노란 괴황지 바탕에 얼룩, 가는 섬유, 가장자리 바램.
+        /// </summary>
+        public static Texture2D HanjiTexture()
+        {
+            if (hanji != null) return hanji;
+            const int width = 256, height = 512;
+            var light = new Color(.98f, .88f, .52f); var dark = new Color(.86f, .7f, .34f);
+            var pixels = new Color[width * height];
+            for (int y = 0; y < height; y++)
+                for (int x = 0; x < width; x++)
+                {
+                    float mottle = Mathf.PerlinNoise(x * .03f + 7f, y * .03f + 3f) * .65f
+                        + Mathf.PerlinNoise(x * .13f + 31f, y * .13f + 17f) * .35f;
+                    float edge = Mathf.Clamp01(Mathf.Min(Mathf.Min(x, width - 1 - x), Mathf.Min(y, height - 1 - y)) / 26f);
+                    Color c = Color.Lerp(dark, light, mottle);
+                    pixels[y * width + x] = c * Mathf.Lerp(.8f, 1f, edge);
+                }
+            var random = new System.Random(479);
+            for (int i = 0; i < 900; i++)
+            {
+                float px = (float)random.NextDouble() * width, py = (float)random.NextDouble() * height;
+                float angle = (float)(random.NextDouble() * Math.PI * 2d), length = 5f + (float)random.NextDouble() * 20f;
+                Color fiber = random.NextDouble() < .6d ? new Color(1f, .96f, .78f) : new Color(.78f, .6f, .28f);
+                float strength = .18f + (float)random.NextDouble() * .25f;
+                for (float t = 0f; t < length; t += .7f)
+                {
+                    int fx = Mathf.RoundToInt(px + Mathf.Cos(angle) * t), fy = Mathf.RoundToInt(py + Mathf.Sin(angle) * t);
+                    if (fx < 0 || fy < 0 || fx >= width || fy >= height) break;
+                    int index = fy * width + fx;
+                    pixels[index] = Color.Lerp(pixels[index], fiber, strength);
+                }
+            }
+            hanji = new Texture2D(width, height, TextureFormat.RGBA32, false)
+            { name = "Talisman Hanji (#479 runtime)", hideFlags = HideFlags.DontSave, wrapMode = TextureWrapMode.Clamp };
+            for (int i = 0; i < pixels.Length; i++) pixels[i].a = 1f;
+            hanji.SetPixels(pixels); hanji.Apply(false, true);
+            return hanji;
         }
 
         private UnityEngine.UI.Text NewText(string name, RectTransform parent, string value, int size, Color color)

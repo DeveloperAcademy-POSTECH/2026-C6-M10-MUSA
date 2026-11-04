@@ -155,7 +155,9 @@ namespace C6Lab
                 rect.anchorMin = Vector2.zero; rect.anchorMax = Vector2.one; rect.offsetMin = rect.offsetMax = Vector2.zero;
                 Talisman = go.AddComponent<LabJigwiTalismanOverlay>();
             }
-            Talisman.Bind(source, font);
+            // #479: the talisman is written in the battle screen's Shilla Culture font (신라문화체).
+            Font shilla = canvas != null ? LabYaguangFeverHud.ShillaFont(canvas) : null;
+            Talisman.Bind(source, shilla != null ? shilla : font);
         }
 
         /// <summary>Used by the dedicated prefab builder; never rebuilds the existing battle Canvas.</summary>
