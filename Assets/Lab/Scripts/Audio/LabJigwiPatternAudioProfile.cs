@@ -16,6 +16,11 @@ namespace C6Lab
         [Tooltip("User-approved initial cue. Adjust locally to align the start of '줘' in the original recording.")]
         [SerializeField, Min(.01f)] private float groupCueSeconds = 2.08f;
         [SerializeField, Range(0f, 1f)] private float personalVolume = 1f, groupVolume = 1f;
+        [Tooltip("#479: A(부적) 예고 외침을 낼지. 저장된 프로필은 끔(사랑해요 외침 빼기). 파일과 큐 위치는 그대로 둔다.")]
+        [SerializeField] private bool personalVoiceEnabled = true;
+
+        /// <summary>#479: 이 기믹의 예고 외침을 낼지. B는 늘 낸다.</summary>
+        public bool VoiceEnabledFor(LabJigwiABKind kind) => kind != LabJigwiABKind.PersonalBurn || personalVoiceEnabled;
 
         public AudioClip ClipFor(LabJigwiABKind kind) => kind == LabJigwiABKind.PersonalBurn ? personalClip : groupClip;
         public float CueSecondsFor(LabJigwiABKind kind)

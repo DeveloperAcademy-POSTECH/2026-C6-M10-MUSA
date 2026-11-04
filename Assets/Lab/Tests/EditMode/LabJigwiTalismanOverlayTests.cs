@@ -59,6 +59,63 @@ namespace C6Lab.Tests
             Assert.That(overlay.Visible, Is.False);
         }
 
+        [Test]
+        public void TracingTheWholeGuideFinishesOnceAndUncoversTheBoard()
+        {
+            LabSnapshot snapshot = Snapshot(-1d);
+            overlay.Present(snapshot, Local, 11d);
+            Assert.That(overlay.Coverage, Is.Zero);
+            Trace(overlay, 4); // ㅁ과 ㅜ 일부만: 아직 덜 썼다.
+            Assert.That(overlay.Coverage, Is.GreaterThan(0f).And.LessThan(.8f));
+            Assert.That(overlay.CompletedCount, Is.Zero); Assert.That(overlay.Visible, Is.True);
+            Trace(overlay, LabJigwiTalismanStroke.Water.Length);
+            Assert.That(overlay.CompletedCount, Is.EqualTo(1));
+            Assert.That(overlay.Visible, Is.False); Assert.That(overlay.WantsBoardBlocked, Is.False);
+            overlay.Present(snapshot, Local, 12d);
+            Assert.That(overlay.Visible, Is.False, "While the Host confirms, the finished talisman stays down.");
+            Assert.That(overlay.CompletedCount, Is.EqualTo(1));
+            LabSnapshot next = Snapshot(-1d); next.jigwiAB.rounds[0].id = "ab-a2";
+            overlay.Present(next, Local, 12d);
+            Assert.That(overlay.Visible, Is.True, "The next A brings a fresh talisman.");
+            Assert.That(overlay.Coverage, Is.Zero);
+        }
+
+        [Test]
+        public void ScribblesAwayFromTheGuideNeverCount()
+        {
+            overlay.Present(Snapshot(-1d), Local, 11d);
+            overlay.PaintNormalized(new Vector2(0f, 0f), new Vector2(.05f, .05f));
+            overlay.PaintNormalized(new Vector2(.97f, .97f), new Vector2(.99f, .2f));
+            Assert.That(overlay.Coverage, Is.Zero);
+            overlay.PaintNormalized(new Vector2(float.NaN, 0f), new Vector2(.5f, .5f));
+            Assert.That(overlay.Coverage, Is.Zero);
+            Assert.That(overlay.CompletedCount, Is.Zero);
+        }
+
+        [Test]
+        public void TheGuideIsEvenlySampledAndOrderFree()
+        {
+            var forward = new LabJigwiTalismanStroke(LabJigwiTalismanStroke.Water);
+            var backward = new LabJigwiTalismanStroke(LabJigwiTalismanStroke.Water);
+            Assert.That(forward.Samples.Length, Is.InRange(80, 200));
+            foreach (Vector2[] line in LabJigwiTalismanStroke.Water)
+                for (int i = 0; i + 1 < line.Length; i++) forward.Paint(line[i], line[i + 1], .07f);
+            for (int l = LabJigwiTalismanStroke.Water.Length - 1; l >= 0; l--)
+                for (int i = LabJigwiTalismanStroke.Water[l].Length - 1; i > 0; i--)
+                    backward.Paint(LabJigwiTalismanStroke.Water[l][i], LabJigwiTalismanStroke.Water[l][i - 1], .07f);
+            Assert.That(forward.Coverage, Is.EqualTo(1f)); Assert.That(backward.Coverage, Is.EqualTo(1f));
+            forward.Clear(); Assert.That(forward.CoveredCount, Is.Zero);
+        }
+
+        private static void Trace(LabJigwiTalismanOverlay target, int lines)
+        {
+            for (int l = 0; l < lines; l++)
+            {
+                Vector2[] line = LabJigwiTalismanStroke.Water[l];
+                for (int i = 0; i + 1 < line.Length; i++) target.PaintNormalized(line[i], line[i + 1]);
+            }
+        }
+
         private static LabSnapshot Snapshot(double localTalismanAt) => new LabSnapshot
         {
             sessionId = "talisman", round = 1, phase = LabPhase.Playing,
