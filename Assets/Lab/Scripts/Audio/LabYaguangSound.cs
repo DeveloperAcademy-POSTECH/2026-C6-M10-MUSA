@@ -65,6 +65,8 @@ namespace C6Lab
             ComboStartFolder, ComboTickFolder, ComboTickFastFolder,
             ComboTauntFolder, ComboSmallStartFolder, ComboSmallEndFolder, ComboBigStartFolder, ComboBigEndFolder,
             ComboClearedFirstFolder, ComboClearedSecondFolder };
+        /// <summary>The folders this component loads, for the battle audio preload (#492).</summary>
+        public static System.Collections.Generic.IReadOnlyList<string> ClipFolders => Folders;
         /// <summary>째깍은 그 박자보다 이 초 넘게 늦게 알아채면 건너뛴다 (스냅샷이 늦게 와도 몰아서 울리지 않게).</summary>
         public const double TickLateSeconds = .3d;
         public const double DefaultTickInterval = .5d;
