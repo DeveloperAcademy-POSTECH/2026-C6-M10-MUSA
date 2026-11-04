@@ -67,7 +67,7 @@ namespace C6Lab
         private bool artReady, missingShaderReported, baselineReady;
         private string sessionId;
         private uint roundNumber;
-        /// <summary>Same as <c>LabJigwiPatternAudio</c>'s seek tolerance.</summary>
+        /// <summary>A clock step back smaller than this is jitter, not a new stage (#451).</summary>
         public const double RewindToleranceSeconds = .075d;
         private double stageStartedAt = -1d, previousNow = -1d, personalDousedAt = -1d, curtainDousedAt = -1d;
         private Vector2 curtainSplashCentre, curtainSplashSize;

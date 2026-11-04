@@ -117,19 +117,7 @@ namespace Hapio.Tests
             Assert.That(overlay, Is.Not.Null, "The saved battle HUD must install the editable screen prefab.");
             Assert.That(Resources.Load<GameObject>(LabJigwiScreenPresentation.PrefabResource), Is.Not.Null);
             Assert.That(overlay.source, Is.SameAs(network));
-            var patternVoice = network.GetComponent<LabJigwiPatternAudio>();
-            Assert.That(patternVoice, Is.Not.Null, "Saved Battle binds forewarning audio to the persistent network.");
-            Assert.That(LabJigwiPatternAudio.Attach(network), Is.SameAs(patternVoice));
-            Assert.That(network.GetComponents<LabJigwiPatternAudio>(), Has.Length.EqualTo(1));
-            Assert.That(patternVoice.Profile, Is.SameAs(Resources.Load<LabJigwiPatternAudioProfile>(LabJigwiPatternAudioProfile.ResourcesPath)));
-            Assert.That(patternVoice.Profile.ClipFor(LabJigwiABKind.PersonalBurn),
-                Is.SameAs(Resources.Load<AudioClip>(LabJigwiPatternAudioProfile.PersonalClipResource)).And.Not.Null);
-            Assert.That(patternVoice.Profile.ClipFor(LabJigwiABKind.GroupFire),
-                Is.SameAs(Resources.Load<AudioClip>(LabJigwiPatternAudioProfile.GroupClipResource)).And.Not.Null);
-            Assert.That(patternVoice.Source, Is.Not.SameAs(overlay.audioView.Source));
-            Assert.That(patternVoice.Source.loop, Is.False);
-            Assert.That(patternVoice.Source.spatialBlend, Is.Zero);
-            Assert.That(patternVoice.Source.dopplerLevel, Is.Zero);
+            // #509: the 지귀 shout voice was removed; nothing attaches a pattern voice any more.
             Assert.That(overlay.canvas.rootCanvas, Is.SameAs(hud.canvas.rootCanvas));
             Assert.That(overlay.transform.parent, Is.SameAs(hud.canvas.rootCanvas.transform));
             Assert.That(overlay.battleCamera, Is.SameAs(binding.battleCamera));
