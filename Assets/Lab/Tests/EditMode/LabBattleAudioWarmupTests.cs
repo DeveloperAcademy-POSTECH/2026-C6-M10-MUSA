@@ -32,6 +32,8 @@ namespace C6Lab.Tests
             Assert.That(LabBattleAudioWarmup.StageFolders(LabStageYokai.Gumiho), Does.Contain(LabBattleBgm.GumihoFeverClipFolder));
             Assert.That(LabBattleAudioWarmup.StageFolders(LabStageYokai.Yaguang), Does.Contain(LabBattleBgm.FeverClipFolder));
             Assert.That(LabBattleAudioWarmup.StageFolders(LabStageYokai.None), Is.Empty);
+            Assert.That(LabBattleAudioWarmup.StageFolders(LabStageYokai.Jigwi), Does.Not.Contain(LabBattleBgm.FeverClipFolder),
+                "지귀 never plays a fever song.");
 
             LabBattleAudioWarmup.Preload(LabStageYokai.Yaguang);
             AssertLoaded(LabStageYokai.Yaguang, true);
@@ -49,6 +51,16 @@ namespace C6Lab.Tests
             Assert.That(LabBattleAudioWarmup.RetainedRewardFire, Is.InstanceOf<LabJigwiRewardFireProfile>(),
                 "지귀 keeps its reward fire art loaded before the first personal fire.");
             Assert.That(LabBattleAudioWarmup.Preload(LabStageYokai.Jigwi), Is.Zero, "A second preload of the same stage loads nothing new.");
+            foreach (string resource in LabBattleAudioWarmup.StageClips(LabStageYokai.Jigwi))
+                Assert.That(LabBattleAudioWarmup.RetainedClips, Does.Contain(Resources.Load<AudioClip>(resource)),
+                    "The pattern clips stay referenced through the scene load's unused-asset sweep.");
+            var owner = new object();
+            LabBattleAudioWarmup.Preload(LabStageYokai.Jigwi, owner);
+            LabBattleAudioWarmup.Release(new object());
+            Assert.That(LabBattleAudioWarmup.RetainedClips, Is.Not.Empty, "A closing Battle never drops another Battle's preload.");
+            LabBattleAudioWarmup.Release(owner);
+            Assert.That(LabBattleAudioWarmup.RetainedRewardFire, Is.Null);
+            Assert.That(LabBattleAudioWarmup.RetainedClips, Is.Empty);
         }
 
         private static void AssertLoaded(LabStageYokai yokai, bool loaded)

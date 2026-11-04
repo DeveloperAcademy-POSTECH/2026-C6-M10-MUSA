@@ -4695,7 +4695,9 @@ Metal 파이프라인(PSO)이 실제로 준비 구간에서 만들어지는지�
 - `LabBattleAudioWarmup.Preload(yokai)`를 `GameBattleBindings.Awake`가 호출한다. 이 시점은 Battle Scene 활성화 프레임이고, 불투명 준비 화면 아래다.
 - 로드하는 것: 공통 효과음, 현재 스테이지 전용 효과음, 그 스테이지의 피버곡. 각 소리 컴포넌트가 이미 가진 같은 clip 객체에 `LoadAudioData`를 부른다.
 - 다른 스테이지 전용 효과음 데이터는 해제한다.
-- 지귀 스테이지는 보상 불꽃 이미지 묶음도 미리 읽어 스테이지 동안 붙잡아 둔다.
+- 지귀 스테이지는 보상 불꽃 이미지 묶음도 미리 읽는다. 지귀는 피버곡이 없어 피버곡을 읽지 않는다.
+- 미리 읽은 clip과 이미지는 그 Battle이 닫힐 때(`GameBattleBindings.OnDestroy`)까지 정적 참조로 붙잡는다. Scene 로드의 미사용 에셋 정리가 첫 사용 전에 지우지 않게 하기 위해서다.
+- 해제는 미리 읽은 Battle만 할 수 있다(소유자 확인). 그래서 닫히는 Battle이 다음 Battle의 미리 읽기를 지우지 않는다.
 - import 설정·Scene/Prefab·소리 규칙은 그대로다.
 
 | 확인 | 이번 결과 | 범위 |
