@@ -99,6 +99,9 @@ namespace Hapio
         [Tooltip("\"고마워!\" 대사가 뜬 뒤 금옥이가 양구슬을 돌려줄 때까지")] [Min(0f)] public float giveBackDelay = .35f;
         [Tooltip("양구슬 뒤 북이 돌아올 때까지")] [Min(0f)] public float giveBackGap = .35f;
         [Tooltip("엉뚱한 쪽(묵이)으로 넘긴 북을 묵이가 돌려줄 때까지")] [Min(0f)] public float wrongSideReturnDelay = .8f;
+        [Tooltip("\"앗 뜨거! 도로 받아!\" 대사가 뜬 뒤 금옥이가 폭탄을 돌려줄 때까지")] [Min(0f)] public float bombReturnDelay = .35f;
+        [Tooltip("폭탄 넘기기 안내(5단계)에서 손이 한 번 끄는 데 걸리는 시간. 폭탄은 무거워 더 세게 밀어야 해서 북보다 빠르다.")]
+        [Min(.3f)] public float bombHandDragSeconds = 1.1f;
 
         [Header("화살표 (끌어 놓을 방향)")]
         public Color arrowColor = new Color(.36f, .66f, .29f, 1f);

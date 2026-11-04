@@ -249,7 +249,50 @@ namespace Hapio.Tests
                 Is.EqualTo(1), "The yin left from 2단계 is still there.");
             yield return TapThrough(director, tap, art);
             yield return TapThrough(director, tap, art);
-            Assert.That(director.IsFinishing, Is.True, "4단계 is the last step for now.");
+
+            // 5단계: the gourd drops a two-lock bomb; I push it right to 금옥이, she sends it back unlocked and it opens
+            // into two elemental orbs on my board.
+            Assert.That(director.StepIndex, Is.EqualTo(5));
+            Assert.That(director.CurrentBeat.Cue, Is.EqualTo(GameTutorialCue.DropBomb));
+            LabOrbState dropped = null;
+            yield return Until(() => (dropped = network.Snapshot.orbs.FirstOrDefault(orb => orb.kind == LabOrbKind.Bomb)) != null,
+                "The gourd drops a bomb", 10f);
+            Assert.That((dropped.owner, dropped.lockSwipes), Is.EqualTo((network.LocalPlayerId, GameTutorialScript.BombLocks)));
+            yield return Until(() => board.IsDropping(dropped.id), "It falls in from the gourd", 2f);
+            yield return TapThrough(director, tap, art);
+            Assert.That(director.CurrentBeat.Focus, Is.EqualTo(GameTutorialFocus.Bomb), "The bomb is lit.");
+            yield return TapThrough(director, tap, art);
+            Assert.That(director.CurrentBeat.Action, Is.EqualTo(GameTutorialAction.PassBomb));
+            Assert.That(board.AllowedGestures, Is.EqualTo(LabBoardGestures.OrbMove), "Orbs move; the drum stays, nothing is thrown.");
+            for (int attempt = 0; attempt < 4 && director.IsWaitingForAction; attempt++)
+            {
+                LabOrbView bombView = null;
+                yield return Until(() => (bombView = Object.FindObjectsByType<LabOrbView>(FindObjectsSortMode.None)
+                    .FirstOrDefault(view => view.Kind == LabOrbKind.Bomb && !board.IsDropping(view.OrbId))) != null,
+                    "The bomb has landed on my board");
+                yield return new WaitForSecondsRealtime(.4f);
+                yield return DragOffSide(board, bombView, 1f);
+                // A short push leaves it sliding on my board; give it time to cross or come to rest before trying again.
+                float pushed = Time.realtimeSinceStartup;
+                while (director.IsWaitingForAction && Time.realtimeSinceStartup - pushed < 2.5f) yield return null;
+            }
+            Assert.That(director.IsWaitingForAction, Is.False, "The bomb reached 금옥이 within four pushes.");
+            LabOrbState atGeumok = network.Snapshot.orbs.Single(orb => orb.kind == LabOrbKind.Bomb);
+            Assert.That((atGeumok.owner, atGeumok.lockSwipes), Is.EqualTo((LabNetwork.TutorialRightSeatId, 1)), "One lock off.");
+            yield return Until(() => director.CurrentBeat.IsLine, "\"앗 뜨거! 도로 받아!\" after 성공!", 10f);
+            Assert.That(director.CurrentBeat.Cue, Is.EqualTo(GameTutorialCue.ReturnBomb));
+            yield return Until(() => network.Snapshot.orbs.Any(orb => orb.kind == LabOrbKind.Bomb
+                && orb.owner == network.LocalPlayerId && orb.lockSwipes == 0), "금옥이 sends it back, the last lock off", 10f);
+            // Left up a while, the bubble does not stop the step: the bomb may open before the tap.
+            yield return new WaitForSecondsRealtime(2.5f);
+            yield return TapThrough(director, tap, art);
+            yield return Until(() => director.CurrentBeat.IsLine, "It opens and \"풀렸다!\"", 15f);
+            LabOrbState[] opened = network.Snapshot.orbs.Where(orb => orb.owner == network.LocalPlayerId).ToArray();
+            Assert.That(opened.Any(orb => orb.kind == LabOrbKind.Bomb), Is.False);
+            Assert.That(opened.Count(orb => orb.kind == LabOrbKind.Combined && orb.element != LabOrbElement.None),
+                Is.GreaterThanOrEqualTo(2), "Two elemental orbs for 6단계.");
+            for (int line = 0; line < 3; line++) yield return TapThrough(director, tap, art);
+            Assert.That(director.IsFinishing, Is.True, "5단계 is the last step for now.");
             yield return Until(() => session.State.phase == GameFlowPhase.Home && !session.IsLoadingScene
                 && session.RoomBrowserVisible, "The tutorial leaves for the room list", 30f);
             Assert.That(session.IsTutorial, Is.False);
@@ -300,6 +343,26 @@ namespace Hapio.Tests
             Assert.That(board.TryBeginDragAtWorld(start, began), Is.True, "The drum can be picked up.");
             board.DragToWorld(start + flick * .5f, began + .04d);
             Assert.That(board.EndDragAtWorld(start + flick, began + .08d), Is.True);
+        }
+
+        /// <summary>
+        /// Hold <paramref name="view"/> and walk the finger past one side of the board (+1 right, -1 left) over a few
+        /// frames, so even a heavy bomb that trails the finger reaches the pass strip, then let go there.
+        /// </summary>
+        private static IEnumerator DragOffSide(LabOrbBoard board, LabOrbView view, float side, float seconds = .7f)
+        {
+            Vector2 start = view.transform.position;
+            Rect area = board.CenterBounds;
+            var end = new Vector2(side > 0f ? area.xMax + area.width * .2f : area.xMin - area.width * .2f, start.y);
+            Assert.That(board.TryBeginDragAtWorld(start, Time.realtimeSinceStartupAsDouble), Is.True, view.Kind + " can be picked up.");
+            float began = Time.realtimeSinceStartup;
+            while (Time.realtimeSinceStartup - began < seconds)
+            {
+                float reach = Mathf.Clamp01((Time.realtimeSinceStartup - began) / (seconds * .5f));
+                board.DragToWorld(Vector2.Lerp(start, end, reach), Time.realtimeSinceStartupAsDouble);
+                yield return null;
+            }
+            board.EndDragAtWorld(end, Time.realtimeSinceStartupAsDouble);
         }
 
         private static LabPlayerState LocalPlayer(LabNetwork network) =>

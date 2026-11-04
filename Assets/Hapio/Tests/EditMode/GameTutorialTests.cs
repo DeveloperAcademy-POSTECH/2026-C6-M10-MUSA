@@ -445,6 +445,101 @@ namespace Hapio.Tests
         }
 
         [Test]
+        public void BombStepDropsABombThePlayerPassesRightAndGeumokSendsBack()
+        {
+            GameTutorialStep bomb = GameTutorialScript.Steps[5];
+            Assert.That(bomb, Is.SameAs(GameTutorialScript.Bomb));
+            GameTutorialBeat[] beats = bomb.Beats.ToArray();
+            CollectionAssert.AreEqual(new[]
+            {
+                GameTutorialAction.None, GameTutorialAction.None, GameTutorialAction.PassBomb, GameTutorialAction.None,
+                GameTutorialAction.WaitBombOpen, GameTutorialAction.None, GameTutorialAction.None, GameTutorialAction.None
+            }, beats.Select(beat => beat.Action).ToArray());
+            CollectionAssert.AreEqual(new[]
+            {
+                "으악! 박에서 뭐가 떨어졌어!", "요괴가 던진 폭탄이야!\n적힌 숫자만큼 옆으로 넘기면 풀려.",
+                "앗 뜨거! 도로 받아!", "풀렸다!", "풀린 폭탄은 오행 구슬 두 개가 돼.",
+                "가만히 냅두면 터지니까\n얼른얼른 넘겨야겠네!"
+            }, bomb.Lines.Select(line => line.Text).ToArray());
+            CollectionAssert.AreEqual(new[]
+            {
+                GameTutorialSpeaker.Bul, GameTutorialSpeaker.Geumok, GameTutorialSpeaker.Geumok, GameTutorialSpeaker.Geumok,
+                GameTutorialSpeaker.Geumok, GameTutorialSpeaker.Bul
+            }, bomb.Lines.Select(line => line.Speaker).ToArray());
+            Assert.That(beats[0].Cue, Is.EqualTo(GameTutorialCue.DropBomb), "The bomb falls as 불이 cries out.");
+            Assert.That(beats[1].Focus, Is.EqualTo(GameTutorialFocus.Bomb), "The bomb is lit while 금옥이 explains it.");
+            Assert.That(beats[3].Cue, Is.EqualTo(GameTutorialCue.ReturnBomb), "\"앗 뜨거!\" passes it straight back.");
+            Assert.That(GameTutorialDirector.BannerText(beats[2], 0), Is.EqualTo("폭탄을 오른쪽 금옥이에게 넘기시오"));
+            Assert.That(string.IsNullOrEmpty(beats[4].Text), Is.True, "Waiting for it to open shows no banner.");
+            // Two locks: one comes off going to 금옥이, the last coming back, so it opens on my board.
+            Assert.That(GameTutorialScript.BombLocks, Is.EqualTo(2));
+            var art = ScriptableObject.CreateInstance<GameTutorialArt>();
+            try
+            {
+                Assert.That(art.bombHandDragSeconds, Is.LessThan(art.handDragSeconds), "The bomb's hand pushes faster.");
+            }
+            finally { Object.DestroyImmediate(art); }
+        }
+
+        [Test]
+        public void GourdBombLosesOneLockEachWayAndOpensIntoTwoOrbsOnMyBoard()
+        {
+            using (var settings = new GameStageSettings(Resources.Load<LabConfig>("LabConfig"), GameStageCatalog.RequireDefault()))
+            {
+                LabConfig tutorial = settings.CreateTutorialConfig();
+                try
+                {
+                    const ulong me = 0UL;
+                    ulong geumok = LabNetwork.TutorialRightSeatId, muk = LabNetwork.TutorialLeftSeatId;
+                    var model = new LabModel();
+                    double now = 10d;
+                    model.Begin("tutorial-bomb", new[] { geumok, me, muk }, now, tutorial, LabStageYokai.Gumiho);
+                    model.TutorialHandDrumsTo(me);
+                    Assert.That(model.TutorialDropGourdBomb(me, GameTutorialScript.BombLanding, GameTutorialScript.BombLocks, now,
+                        out LabOrbState dropped), Is.True);
+                    Assert.That((dropped.owner, dropped.kind, dropped.lockSwipes, dropped.origin),
+                        Is.EqualTo((me, LabOrbKind.Bomb, 2, LabOrbOrigin.Gourd)));
+                    LabGourdBomb[] announced = model.DrainGourdBombs();
+                    Assert.That(announced.Length, Is.EqualTo(1), "Announced once so the board drops it in from the gourd.");
+                    Assert.That((announced[0].BombId, announced[0].Position), Is.EqualTo((dropped.id, GameTutorialScript.BombLanding)));
+                    Assert.That(model.DrainGourdBombs(), Is.Empty);
+
+                    // Locked, it cannot be opened in place.
+                    Assert.That(model.TryUseItemAt(me, dropped.id, "open-early", now, GameTutorialScript.BombLanding, out _,
+                        out string why), Is.False);
+                    Assert.That(why, Is.EqualTo("ITEM_LOCKED"));
+
+                    // I push it off my right edge to 금옥이: one lock off.
+                    now += .5d;
+                    Assert.That(model.TryTransferAt(me, dropped.id, true, new Vector2(1f, .7f), new Vector2(1.5f, 0f), "bomb-right",
+                        now, LabEdgeCrossingKind.Swipe, out _, out why), Is.True, why);
+                    LabOrbState atGeumok = model.Snapshot(now).orbs.Single(orb => orb.id == dropped.id);
+                    Assert.That((atGeumok.owner, atGeumok.lockSwipes), Is.EqualTo((geumok, 1)));
+
+                    // "앗 뜨거! 도로 받아!": the last lock comes off on the way back, and it stops inside my board.
+                    now += .5d;
+                    Assert.That(model.TutorialHandOver(geumok, dropped.id, me, .5f, 1f, now, out why), Is.True, why);
+                    LabOrbState back = model.Snapshot(now).orbs.Single(orb => orb.id == dropped.id);
+                    Assert.That((back.owner, back.lockSwipes, back.arrival), Is.EqualTo((me, 0, LabDrumArrival.Stop)));
+                    Assert.That(back.x, Is.EqualTo(1f), "Comes in over the edge shared with 금옥이.");
+                    Assert.That(back.stopAt, Is.InRange(.2f, .48f), "Rests in the near stretch of my board.");
+
+                    // Resting, my board opens it: two elemental attack orbs.
+                    int before = model.Snapshot(now).orbs.Count(orb => orb.owner == me && orb.kind == LabOrbKind.Combined);
+                    now += .5d;
+                    Assert.That(model.TryUseItemAt(me, dropped.id, "open", now, new Vector2(.7f, .5f), out _, out why), Is.True, why);
+                    Assert.That(why, Is.EqualTo("BOMB_OPENED"));
+                    LabSnapshot opened = model.Snapshot(now);
+                    Assert.That(opened.orbs.Any(orb => orb.kind == LabOrbKind.Bomb), Is.False);
+                    LabOrbState[] made = opened.orbs.Where(orb => orb.owner == me && orb.kind == LabOrbKind.Combined).ToArray();
+                    Assert.That(made.Length, Is.EqualTo(before + 2));
+                    Assert.That(made.All(orb => orb.element != LabOrbElement.None), Is.True, "Each is an elemental attack orb.");
+                }
+                finally { Object.DestroyImmediate(tutorial); }
+            }
+        }
+
+        [Test]
         public void MirrorSlidesInShowsTheDrumArriveAndSlidesOut()
         {
             GameTutorialDirector.MirrorPose(0f, out float offset, out float alpha, out float drum);

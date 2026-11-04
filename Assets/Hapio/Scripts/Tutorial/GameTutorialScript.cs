@@ -20,7 +20,9 @@ namespace Hapio
         /// <summary>합칠 음구슬 하나와 양구슬 하나 (양구슬에 가장 가까운 음구슬).</summary>
         Pair,
         /// <summary>위쪽 박 칠하기 진행률 막대와 그 옆 % 글자.</summary>
-        Progress
+        Progress,
+        /// <summary>내 판의 폭탄 (자물쇠 숫자가 보이게).</summary>
+        Bomb
     }
 
     /// <summary>다음으로 넘어가기 전에 기다리는 일. None은 화면을 눌러 넘기는 대사다.</summary>
@@ -42,7 +44,14 @@ namespace Hapio
         /// 북을 오른쪽 끝으로 밀어 금옥이에게 넘긴다. 북 옮기기만 열린다. 왼쪽(묵이)으로 가면 묵이가 "이건 금옥이한테 줘."
         /// 하고 바로 돌려준다. 금옥이가 받으면 금옥이 화면 미니 창에 북이 들어오는 모습이 뜬다.
         /// </summary>
-        PassDrum
+        PassDrum,
+        /// <summary>
+        /// 잠긴 폭탄을 오른쪽 끝으로 밀어 금옥이에게 넘긴다 (자물쇠 2→1). 구슬 옮기기만 열리고, 폭탄은 오른쪽으로만 넘어간다
+        /// (왼쪽은 되튕김). 폭탄은 무거워 더 세게 밀어야 해서 손 안내가 더 빠르다.
+        /// </summary>
+        PassBomb,
+        /// <summary>금옥이가 돌려준 폭탄(자물쇠 1→0)이 내 판에서 멈춰 공격 구슬 두 개로 열릴 때까지 기다린다. 화면은 누를 수 없다.</summary>
+        WaitBombOpen
     }
 
     /// <summary>한 장면이 뜰 때 함께 보여 주는 연출.</summary>
@@ -50,7 +59,11 @@ namespace Hapio
     {
         None, StaminaShort,
         /// <summary>금옥이가 만든 양구슬과 받은 북을 오른쪽에서 함께 돌려준다 (4단계).</summary>
-        GiveBack
+        GiveBack,
+        /// <summary>박이 내 판에 자물쇠 2짜리 폭탄을 떨어뜨린다 (5단계, 박 폭탄 경고·요괴 연출과 함께).</summary>
+        DropBomb,
+        /// <summary>금옥이가 받은 폭탄을 "앗 뜨거!" 하며 도로 넘겨준다. 넘어오며 자물쇠가 0이 된다 (5단계).</summary>
+        ReturnBomb
     }
 
     /// <summary>
@@ -257,8 +270,30 @@ namespace Hapio
             Geumok("고마워!\n대신 내가 만든 거 줄게~", cue: GameTutorialCue.GiveBack),
             Geumok("짝이 안 맞는 구슬은\n이렇게 친구한테 넘기면 돼."));
 
+        /// <summary>5단계 폭탄의 자물쇠 수: 내가 넘기면 1, 금옥이가 돌려주면 0이 되어 내 판에서 열린다.</summary>
+        public const int BombLocks = 2;
+        /// <summary>
+        /// 폭탄이 떨어지는 자리 (판 0..1): 북보다 위·왼쪽. 오른쪽 끝으로 미는 길이 금옥이 얼굴(위 오른쪽 구석)과
+        /// 돌려받은 양구슬(오른쪽 0.62 높이) 사이로 난다.
+        /// </summary>
+        public static readonly UnityEngine.Vector2 BombLanding = new UnityEngine.Vector2(.42f, .72f);
+
+        /// <summary>
+        /// 5단계 · 폭탄: 요괴가 박에서 자물쇠 2짜리 폭탄을 떨어뜨린다. 오른쪽 금옥이에게 넘기면(2→1) 금옥이가 "앗 뜨거!" 하며
+        /// 도로 넘겨주고(1→0), 풀린 폭탄은 내 판에서 공격 구슬 두 개로 열린다. 그 구슬은 6단계에서 넘긴다.
+        /// </summary>
+        public static readonly GameTutorialStep Bomb = new GameTutorialStep("5단계 · 폭탄",
+            GameTutorialBeat.Line(GameTutorialSpeaker.Bul, "으악! 박에서 뭐가 떨어졌어!", cue: GameTutorialCue.DropBomb),
+            Geumok("요괴가 던진 폭탄이야!\n적힌 숫자만큼 옆으로 넘기면 풀려.", GameTutorialFocus.Bomb),
+            GameTutorialBeat.Do(GameTutorialAction.PassBomb, "폭탄을 오른쪽 금옥이에게 넘기시오", GameTutorialFocus.None),
+            Geumok("앗 뜨거! 도로 받아!", cue: GameTutorialCue.ReturnBomb),
+            GameTutorialBeat.Do(GameTutorialAction.WaitBombOpen, string.Empty, GameTutorialFocus.None),
+            Geumok("풀렸다!"),
+            Geumok("풀린 폭탄은 오행 구슬 두 개가 돼."),
+            Bul("가만히 냅두면 터지니까\n얼른얼른 넘겨야겠네!"));
+
         /// <summary>순서대로 진행하는 단계들. 마지막 단계가 끝나면 어두워지며 방 목록으로 간다.</summary>
-        public static readonly IReadOnlyList<GameTutorialStep> Steps = Array.AsReadOnly(new[] { Goal, Drum, Combine, Throw, Pass });
+        public static readonly IReadOnlyList<GameTutorialStep> Steps = Array.AsReadOnly(new[] { Goal, Drum, Combine, Throw, Pass, Bomb });
 
         /// <summary>
         /// The seat (P number - 1) each speaker sits in. A player's right neighbor is the previous seat and the left

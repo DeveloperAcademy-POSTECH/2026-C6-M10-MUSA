@@ -146,6 +146,30 @@ namespace C6Lab
             return true;
         }
 
+        /// <summary>
+        /// 5단계: the gourd drops a bomb with exactly <paramref name="lockSwipes"/> locks on <paramref name="target"/>'s
+        /// board at <paramref name="landing"/> (0..1), the same way as its random bombs (#177): it is reported once
+        /// through <see cref="DrainGourdBombs"/>, so the warning, the yokai's throw and the fall from above all play.
+        /// </summary>
+        public bool TutorialDropGourdBomb(ulong target, Vector2 landing, int lockSwipes, double now, out LabOrbState bomb)
+        {
+            bomb = null;
+            if (phase != LabPhase.Playing || !players.ContainsKey(target) || !Unit(landing.x) || !Unit(landing.y)
+                || lockSwipes < 1 || lockSwipes > 20) return false;
+            if (!TryAdvance(now, out _)) return false;
+            gourdBombCount++;
+            var made = new LabOrbState
+            {
+                id = NewOrbId(), owner = target, kind = LabOrbKind.Bomb, lockSwipes = lockSwipes,
+                origin = LabOrbOrigin.Gourd, originOwner = target,
+                x = landing.x, y = landing.y, createdAt = now, revision = ++revision, inFlight = false
+            };
+            orbs.Add(made.id, made);
+            gourdBombs.Add(new LabGourdBomb(target, made.id, landing));
+            bomb = made.Copy();
+            return true;
+        }
+
         private uint tutorialHandOvers;
 
         /// <summary>

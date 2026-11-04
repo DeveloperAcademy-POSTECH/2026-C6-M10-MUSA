@@ -16,28 +16,51 @@ namespace C6Lab
         private bool tutorialSeats;
         private readonly System.Collections.Generic.HashSet<LabOrbKind> tutorialPassKinds =
             new System.Collections.Generic.HashSet<LabOrbKind>();
+        private int tutorialPassSide;
 
         /// <summary>
-        /// Which kinds may cross a side edge to a story neighbor right now. Nothing else crosses: like a solo board, an orb
-        /// that reaches an edge bounces back. The tutorial opens only the kind its step passes (4단계: the drum).
+        /// Which kinds may cross a side edge to a story neighbor right now, over either edge. Nothing else crosses: like a
+        /// solo board, an orb that reaches an edge bounces back. The tutorial opens only the kind its step passes.
         /// </summary>
-        public void TutorialAllowPasses(params LabOrbKind[] kinds)
+        public void TutorialAllowPasses(params LabOrbKind[] kinds) => TutorialAllowPasses(0, kinds);
+
+        /// <summary>
+        /// The same over one edge only: <paramref name="side"/> +1 the right edge (5단계: the bomb to 금옥이), -1 the
+        /// left, 0 both (4단계: the drum, which 묵이 hands back).
+        /// </summary>
+        public void TutorialAllowPasses(int side, params LabOrbKind[] kinds)
         {
             tutorialPassKinds.Clear();
+            tutorialPassSide = side > 0 ? 1 : side < 0 ? -1 : 0;
             if (kinds != null) foreach (LabOrbKind kind in kinds) tutorialPassKinds.Add(kind);
         }
 
         public bool TutorialPassAllowed(LabOrbKind kind) => tutorialSeats && tutorialPassKinds.Contains(kind);
 
+        public bool TutorialPassAllowed(LabOrbKind kind, bool toRight) => TutorialPassAllowed(kind)
+            && (tutorialPassSide == 0 || tutorialPassSide > 0 == toRight);
+
         /// <summary>Whether this edge crossing may go on to a story neighbor (false outside the tutorial).</summary>
-        private bool TutorialCrossingAllowed(string orbId)
+        private bool TutorialCrossingAllowed(string orbId, bool toRight)
         {
             if (!tutorialSeats || latest == null || string.IsNullOrEmpty(orbId)) return false;
             foreach (LabOrbState drum in latest.drums ?? System.Array.Empty<LabOrbState>())
-                if (drum != null && drum.id == orbId) return TutorialPassAllowed(drum.kind);
+                if (drum != null && drum.id == orbId) return TutorialPassAllowed(drum.kind, toRight);
             foreach (LabOrbState orb in latest.orbs ?? System.Array.Empty<LabOrbState>())
-                if (orb != null && orb.id == orbId) return TutorialPassAllowed(orb.kind);
+                if (orb != null && orb.id == orbId) return TutorialPassAllowed(orb.kind, toRight);
             return false;
+        }
+
+        /// <summary>
+        /// 5단계: the gourd drops a bomb with <paramref name="lockSwipes"/> locks at <paramref name="landing"/> on my board.
+        /// The drop is announced before the snapshot that holds it, so it falls in from above with the gourd's warning.
+        /// </summary>
+        public bool TutorialDropGourdBomb(Vector2 landing, int lockSwipes)
+        {
+            if (!TutorialHostReady || !model.TutorialDropGourdBomb(LocalPlayerId, landing, lockSwipes,
+                battleClock.Now(Time.realtimeSinceStartupAsDouble), out _)) return false;
+            PublishSnapshot(true);
+            return true;
         }
 
         /// <summary>This device's practice board with two virtual neighbors.</summary>
