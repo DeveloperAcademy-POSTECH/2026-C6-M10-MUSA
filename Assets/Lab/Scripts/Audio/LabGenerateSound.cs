@@ -92,7 +92,7 @@ namespace C6Lab
             if (pool.Length > 1 && index == last)
                 index = (index + 1 + Random.Range(0, pool.Length - 1)) % pool.Length;
             last = index;
-            source.PlayOneShot(pool[index], BaseVolume * LabAudioSettings.SfxVolume);
+            using (LabFirstUse.Measure(LabFirstUseKind.Sound)) source.PlayOneShot(pool[index], BaseVolume * LabAudioSettings.SfxVolume);
         }
 
         private void OnDestroy()

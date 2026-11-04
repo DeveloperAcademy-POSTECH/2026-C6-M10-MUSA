@@ -181,3 +181,8 @@
 - `LabBonjourDiscovery`는 주소 TTL이 지나면 같은 호스트를 한 번 다시 조회하고(응답 없으면 8초 뒤 제거), 검색이 살아 있는 동안 확인에 실패한 방을 최대 3회 다시 확인한다(`serviceRetries`). 교체된 항목에 남은 조회가 같은 키의 새 항목을 지우지 않게 한다. 재시도 간격·횟수는 순수 함수 `LabDiscoveryBackoff`다.
 - `LabNetwork.Recovery.cs`가 검색 재시작(1~30초, 최대 6회)·방장 공개 재등록(같은 요청 이름, 이관 방은 이름 고정)·모바일 복귀 처리를 맡는다. `DisposeDiscovery`가 대기 중인 재시도를 지우므로 실패 경로는 그 뒤에 예약한다. 살아 있는 등록은 복귀 때 다시 만들지 않는다.
 - iPhone만 연결·입장 중·검색 중(`RoomSearchKeepsAwake`, Hapio는 방 목록이 보일 때만)·재시도 대기에 `SleepTimeout.NeverSleep`이다. NGO·전송 소켓 재생성, 전투 중 백그라운드 처리, 접속 규약·TXT·설정 수·Scene/Prefab은 바꾸지 않는다.
+
+## #481 전투 초반 프레임 계측
+
+- Development/Editor(`Debug.isDebugBuild`)에서만 `GameSession`이 `GameFrameSpikeProbe`를 런타임에 붙인다. 전투 단계(LoadingBattle~Playing)의 25 ms 초과 프레임과 그 프레임에 처음 실행된 일(`LabFirstUse`의 `Hapio.FirstUse.*` 마커)을 미리 할당한 배열에만 담고, 스테이지가 끝나거나 같은 스테이지를 다시 불러올 때 `HAPIO_FRAME_SPIKE`·`HAPIO_FRAME_SUMMARY`로 스택 없이 한 번 출력한다. 출력한 프레임은 다음 스테이지 측정에서 뺀다.
+- 측정 전용이다. 마커를 감싼 코드의 동작·판정·설정·규약은 바꾸지 않는다. 새 첫 사용 비용 지점을 추가하면 `LabFirstUseKind`에 뒤에만 덧붙인다. Editor 프레임 시간은 기기 PSO·오디오 판단 근거가 아니다.

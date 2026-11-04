@@ -4621,3 +4621,27 @@ Consolidated three byte-identical textures into shared material references; conf
 **남은 사항(바꾸지 않음):** `docs/STAGE_BACKGROUNDS.md`는 2스테이지 바닥을 `Stage02_Ground_Yagwanggwi`라고 하지만, 실제 `YokaiGround`/`YokaiBacking` 재질의 `_BaseMap`과 Stage02 studio는 `HanjiSand`다. 아트 결정이라 이 수정 범위에서 바꾸지 않았다.
 
 **미실행:** 화면으로 배경 배치 확인, iOS 빌드·실기기.
+
+## #481 전투 초반 프레임 계측 — 2026-11-04
+
+기준 main `afaee674`에서 `perf/#481-frame-spike-probe` 별도 worktree로 작업했다. Unity 6000.6.5f1 macOS batch Editor(`unity test`)에서 확인했다.
+
+- **main의 Battle.unity 문제:** main `afaee674`의 `Assets/Hapio/Scenes/Battle.unity`는 열 때 `Problem detected while opening the Scene file`와 `Restored Transform child parent pointer from NULL`이 납니다. 이 변경 없이 main만으로도 재현되며 #447 병합 이후입니다. 그래서 Battle을 여는 검사는 이 브랜치에서 모두 실패합니다.
+- **검사 방법:** 게임 흐름 검사는 #447 직전 `b50cded6`에 #476과 이 변경을 얹은 임시 기준에서 따로 돌렸습니다.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| EditMode 전체(이 브랜치) | **1861/1865** | 새 `GameFrameSpikePolicyTests` 3개 통과. 실패 4건은 main `afaee674` 단독과 같은 #447 Battle/배경 검사 |
+| EditMode 전체(#447 이전 기준) | **1865/1865 PASS** | 리뷰 수정 전 첫 구현 |
+| 게임 흐름·오디오·도색 PlayMode(#447 이전 기준) | **108/108 PASS** | 리뷰 수정 전 첫 구현. 솔로 1스테이지에서 `HAPIO_FRAME_SUMMARY` 1회 |
+| 리뷰 수정 후 게임 흐름 PlayMode(#447 이전 기준, #482와 함께) | **85/85 PASS** | `GameSceneFlowTests`(같은 스테이지 DEV 재적용 시 flush 1회 추가 단언 포함)·`GameLobbyViewTests`·`LabDeveloperSoloIntegrationTests`·`LabJigwiABPresentationTests`·`LabGourdYokaiTests` |
+
+Editor 관찰값입니다. 기기 근거가 아닙니다.
+- 스테이지마다 Battle 로딩 중 50~165 ms 프레임 3개
+- 야광귀 배경음 시작 약 200 ms, 지귀 약 85 ms(SynchronizingBattle)
+
+**#485 병합 뒤 실제 main 기준 재검사** (#485·#481·#482를 함께 쌓음)
+- EditMode **1865/1865**, 관련 PlayMode **142/142**(게임 흐름·로비·솔로·지귀·요괴·도색·오디오·새 #482 검사)
+- 첫 실행에서는 140/142였다. `SharedCountdown…`·`StageTwoDefeat…` 2건이 실패했는데, 그 실행의 계측에서 카운트다운이 452초로 기록되고 25 ms 넘는 프레임은 없었다. 그래서 그 실행 환경의 이상으로 보고, 같은 클래스 단독 2회(21/21×2)와 전체 재실행에서 모두 통과한 것을 기록한다.
+
+**미실행:** 비개발 Player 빌드에서 `HAPIO_FRAME_*`가 없는지 확인, iPhone 기준선(cold 재설치 3회·warm 1회, 방장·게스트).

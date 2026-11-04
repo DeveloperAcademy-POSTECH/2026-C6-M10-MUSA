@@ -265,7 +265,9 @@ namespace C6Lab
         {
             int index = (int)pattern;
             if (index < 1 || index >= brushes.Length) return null;
-            if (brushes[index] == null) brushes[index] = Resources.Load<Texture2D>("GourdPaint/Patterns/" + pattern);
+            if (brushes[index] == null)
+                using (LabFirstUse.Measure(LabFirstUseKind.BrushLoad))
+                    brushes[index] = Resources.Load<Texture2D>("GourdPaint/Patterns/" + pattern);
             return brushes[index];
         }
 
