@@ -526,6 +526,8 @@ namespace C6Lab
         [SerializeField, Range(.5f, 30f)] private float jigwiABPersonalBurnSeconds = 5f;
         [SerializeField, Range(1, 6)] private int jigwiABGroupFireCount = 3;
         [SerializeField, Range(1f, 60f)] private float jigwiABRelightSeconds = 12f;
+        [Tooltip("#479 Inspector 전용: A 동안 한 사람 판의 구슬이 하나씩 차례로 탈 때의 간격(초). 첫 구슬은 DEV '지귀 A 구슬 소각 대기' 뒤에 탄다. 0이면 모두 한꺼번에. Host 값만 쓴다.")]
+        [SerializeField, Range(0f, 5f)] private float jigwiABBurnStaggerSeconds = 1f;
         [HideInInspector, SerializeField, Range(0f, 60f)] private float jigwiABShrinkDelaySeconds = 12f;
         [HideInInspector, SerializeField, Range(.2f, 1f)] private float jigwiABShrinkScale = .65f;
         [SerializeField, Range(0f, .1f)] private float jigwiABFireMoveAmount = .03f;
@@ -1088,6 +1090,7 @@ namespace C6Lab
         public float JigwiABPersonalRecoveryMultiplier => Mathf.Clamp(Finite(jigwiABPersonalRecoveryMultiplier, 4f), 1f, 10f);
         public int JigwiABPersonalRequiredHits => Mathf.Clamp(jigwiABPersonalRequiredHits, 1, 10);
         public float JigwiABPersonalBurnSeconds => Mathf.Clamp(Finite(jigwiABPersonalBurnSeconds, 5f), .5f, 30f);
+        public float JigwiABBurnStaggerSeconds => Mathf.Clamp(Finite(jigwiABBurnStaggerSeconds, 1f), 0f, 5f);
         public int JigwiABGroupFireCount => Mathf.Clamp(jigwiABGroupFireCount, 1, 6);
         public float JigwiABRelightSeconds => Mathf.Clamp(Finite(jigwiABRelightSeconds, 12f), 1f, 60f);
         public float JigwiABShrinkDelaySeconds => Mathf.Clamp(Finite(jigwiABShrinkDelaySeconds, 12f), 0f, 60f);

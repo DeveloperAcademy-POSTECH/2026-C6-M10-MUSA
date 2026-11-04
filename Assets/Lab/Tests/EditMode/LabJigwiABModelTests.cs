@@ -61,6 +61,20 @@ namespace C6Lab.Tests
             Assert.That(m.Snapshot(5).orbs.Single(x=>x.id==mine.id).jigwiABBurnAt,Is.EqualTo(10));
             Assert.That(m.Snapshot(5).orbs.Single(x=>x.id==theirs.id).jigwiABBurnAt,Is.EqualTo(10));
         }
+        [Test] public void EachOwnersOrbsBurnOneAfterAnotherInCreationOrder()
+        {
+            // #479: the first orb burns after the DEV delay (5 s), each next one a stagger (1 s) later, per owner.
+            var m=Room();var a=Add(m,Players[0],3);var b=Add(m,Players[0],3.5);var c=Add(m,Players[0],4);var other=Add(m,Players[1],4);
+            var s=m.Snapshot(5);
+            Assert.That(s.orbs.Single(x=>x.id==a.id).jigwiABBurnAt,Is.EqualTo(10));
+            Assert.That(s.orbs.Single(x=>x.id==b.id).jigwiABBurnAt,Is.EqualTo(11));
+            Assert.That(s.orbs.Single(x=>x.id==c.id).jigwiABBurnAt,Is.EqualTo(12));
+            Assert.That(s.orbs.Single(x=>x.id==other.id).jigwiABBurnAt,Is.EqualTo(10),"Another board has its own queue.");
+            Assert.That(m.TryGenerate(Players[0],Request(),6,out var late,out var e),Is.True,e);
+            Assert.That(late.jigwiABBurnAt,Is.EqualTo(13),"A new orb joins the end of its board's queue.");
+            Assert.That(m.Snapshot(10.5).orbs.Any(x=>x.id==a.id),Is.False);
+            Assert.That(m.Snapshot(10.5).orbs.Any(x=>x.id==b.id),Is.True,"The next orb is still burning.");
+        }
         [Test] public void GenerateCombineAndTransferKeepEarliestBurnAndOrdinaryExpiry()
         {
             var m=Room();var a=Current(m,11);ulong owner=Players[0];

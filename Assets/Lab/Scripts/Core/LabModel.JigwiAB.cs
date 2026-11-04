@@ -13,7 +13,10 @@ namespace C6Lab
         private bool jigwiABEnabled;
         private int jigwiABFireCount;
         private const double JigwiABMissionSeconds = 10d, JigwiABRewardSeconds = 5d;
-        private float jigwiABDuration, jigwiABBurnSeconds, jigwiABRelight,
+        // #479: A burns each owner's orbs one at a time. The last queued deadline per owner for the running A.
+        private readonly Dictionary<ulong, double> jigwiABLastBurnAt = new Dictionary<ulong, double>();
+        private string jigwiABBurnQueueId;
+        private float jigwiABDuration, jigwiABBurnSeconds, jigwiABBurnStagger, jigwiABRelight,
             jigwiABMoveAmount, jigwiABMovePeriod, jigwiABTargetRadius, jigwiABRewardSize, jigwiABRewardPaint;
         private ulong jigwiABFailureRevision;
         public bool JigwiABEnabled => jigwiABEnabled;
@@ -28,6 +31,7 @@ namespace C6Lab
         {
             jigwiABEnabled = !teamMode && StageYokai == LabStageYokai.Jigwi && config.JigwiStageTimelineEnabled;
             jigwiABRounds.Clear(); jigwiABActivated.Clear(); jigwiABFailureRevision = 0;
+            jigwiABLastBurnAt.Clear(); jigwiABBurnQueueId = null;
             ResetJigwiABSupply(config);
             if (!jigwiABEnabled) return;
             // Preserve the old code as an inactive migration path, never run two policies together.
@@ -36,7 +40,7 @@ namespace C6Lab
             jigwiStageStartedAt = now; jigwiStageCutoffAt = now + 100d;
             jigwiStageWarning = (float)LabJigwiABTimeline.WarningSeconds; jigwiStageFever = config.JigwiStageFeverMultiplier;
             jigwiABDuration = Mathf.Min(15f, config.JigwiABPersonalDurationSeconds);
-            jigwiABBurnSeconds = config.JigwiABPersonalBurnSeconds;
+            jigwiABBurnSeconds = config.JigwiABPersonalBurnSeconds; jigwiABBurnStagger = config.JigwiABBurnStaggerSeconds;
             jigwiABFireCount = config.JigwiABGroupFireCount; jigwiABRelight = config.JigwiABRelightSeconds;
             jigwiABRewardSize = config.JigwiABRewardSizeScale; jigwiABRewardPaint = config.JigwiABRewardPaintScale;
             jigwiABMoveAmount = config.JigwiABFireMoveAmount; jigwiABMovePeriod = config.JigwiABFireMovePeriodSeconds;
@@ -103,7 +107,9 @@ namespace C6Lab
             bool firstActivation = jigwiABActivated.Add(active.id);
             if (firstActivation)
             {
-                foreach (var orb in orbs.Values) ApplyJigwiABOrb(orb, active.activeAt);
+                // A stable order so each owner's orbs catch fire one after another in creation order.
+                foreach (var orb in orbs.Values.OrderBy(value => value.createdAt).ThenBy(value => value.id, StringComparer.Ordinal).ToArray())
+                    ApplyJigwiABOrb(orb, active.activeAt);
                 revision++;
             }
             if (active.kind != LabJigwiABKind.GroupFire) return;
@@ -181,10 +187,24 @@ namespace C6Lab
             if (active == null || !active.Active(now)) return;
             if (active.kind == LabJigwiABKind.PersonalBurn)
             {
-                double deadline = now + jigwiABBurnSeconds;
+                // An orb already burning in this A (combined or passed on) keeps its place in the queue.
+                if (orb.jigwiABBurnAt >= 0d && orb.jigwiABBurnEventId == active.id) return;
+                double deadline = NextJigwiABBurnAt(active.id, orb.owner, now);
                 if (orb.jigwiABBurnAt < 0d || deadline < orb.jigwiABBurnAt)
                 { orb.jigwiABBurnAt = deadline; orb.jigwiABBurnEventId = active.id; orb.revision = ++revision; }
             }
+        }
+        /// <summary>
+        /// #479: the first orb on a board burns after the DEV burn delay, each next one a stagger later,
+        /// so fire looks like it spreads from orb to orb. Positions are never read.
+        /// </summary>
+        private double NextJigwiABBurnAt(string roundId, ulong owner, double now)
+        {
+            if (jigwiABBurnQueueId != roundId) { jigwiABLastBurnAt.Clear(); jigwiABBurnQueueId = roundId; }
+            double next = now + jigwiABBurnSeconds;
+            if (jigwiABLastBurnAt.TryGetValue(owner, out double last)) next = Math.Max(next, last + jigwiABBurnStagger);
+            jigwiABLastBurnAt[owner] = next;
+            return next;
         }
         private void CaptureJigwiABLaunchReward(LabOrbState orb, double now)
         {

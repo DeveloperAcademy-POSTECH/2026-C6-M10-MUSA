@@ -244,7 +244,8 @@ namespace C6Lab.Tests
             Assert.That(reason, Is.EqualTo("BOMB_OPENED"));
             var attacks = room.Snapshot(11d).orbs.Where(orb => orb.kind == LabOrbKind.Combined).ToArray();
             Assert.That(attacks, Has.Length.EqualTo(2));
-            Assert.That(attacks.All(orb => orb.jigwiABBurnAt == 16d), Is.True);
+            // #479: the two opened attacks catch fire one after the other (default stagger 1 s).
+            Assert.That(attacks.Select(orb => orb.jigwiABBurnAt).OrderBy(value => value), Is.EqualTo(new[] { 16d, 17d }));
             Launch(room, Players[0], attacks[0], 11d);
             Assert.That(room.ConfirmHit(attacks[0].id, 11d, Vector3.forward, out _, out _, out _), Is.True);
             Assert.That(ScreenState(room, 11d).rounds.Single().Active(11d), Is.True);
