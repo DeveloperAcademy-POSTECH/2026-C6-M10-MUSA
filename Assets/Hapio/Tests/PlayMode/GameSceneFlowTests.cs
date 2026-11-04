@@ -910,10 +910,14 @@ namespace Hapio.Tests
             Set(values, "Player Max HP", 219f);
             Set(values, "Starting Stamina", 73f);
             Set(values, "Gimmick Charm (0 off, 1 on)", 0f);
+            int probeFlushes = session.FrameProbe != null ? session.FrameProbe.FlushCount : 0;
             Assert.That(session.ApplyDeveloperSettings(values, out string error), Is.True, error);
             yield return Until(() => session.State.phase == GameFlowPhase.Playing
                 && session.State.battleSessionId != battleId && !session.IsLoadingScene,
                 "Applying DEV settings must pass through a fresh Battle load barrier.");
+            if (session.FrameProbe != null)
+                Assert.That(session.FrameProbe.FlushCount, Is.EqualTo(probeFlushes + 1),
+                    "#481: the reload of the same stage is reported as its own attempt.");
             Assert.That(session.State.stageIndex, Is.EqualTo(1));
             Assert.That(session.State.runId, Is.EqualTo(runId));
             Assert.That(oldBoard == null, Is.True);
@@ -960,8 +964,10 @@ namespace Hapio.Tests
                     var scenery = Object.FindFirstObjectByType<GameStageBackgrounds>();
                     Assert.That(scenery, Is.Not.Null);
                     Assert.That(scenery.AppliedStage, Is.EqualTo(stage));
-                    Assert.That(scenery.defaultBackground.studio.gameObject.activeInHierarchy, Is.EqualTo(stage != 2));
+                    // #447: stages 2 and 3 each show their own scenery; stage 1 shows the default.
+                    Assert.That(scenery.defaultBackground.studio.gameObject.activeInHierarchy, Is.EqualTo(stage == 1));
                     Assert.That(scenery.Resolve(2).studio.gameObject.activeInHierarchy, Is.EqualTo(stage == 2));
+                    Assert.That(scenery.Resolve(3).studio.gameObject.activeInHierarchy, Is.EqualTo(stage == 3));
 
                     network.Generate();
                     yield return Until(() => network.Snapshot.players.Single().generatedTotal == 1,

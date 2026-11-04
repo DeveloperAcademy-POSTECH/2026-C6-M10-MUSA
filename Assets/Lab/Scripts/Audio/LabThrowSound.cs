@@ -187,7 +187,7 @@ namespace C6Lab
             if (clips.Length > 1 && index == lastIndex)
                 index = (index + 1 + Random.Range(0, clips.Length - 1)) % clips.Length;
             lastIndex = index;
-            source.PlayOneShot(clips[index], volume * LabAudioSettings.SfxVolume);
+            using (LabFirstUse.Measure(LabFirstUseKind.Sound)) source.PlayOneShot(clips[index], volume * LabAudioSettings.SfxVolume);
         }
 
         private void OnDestroy()

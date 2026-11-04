@@ -43,13 +43,16 @@ namespace C6Lab
                 throw new ArgumentOutOfRangeException(nameof(pattern));
             int index = (int)pattern;
             if (Cache[index] != null) return Cache[index];
-            string path = "GourdPaint/Patterns/" + pattern;
-            Texture2D source = Resources.Load<Texture2D>(path);
-            if (source == null || !source.isReadable)
-                throw new InvalidOperationException("Missing readable runtime paint mask: Resources/" + path);
-            var mask = new LabPaintPatternMask(source);
-            Cache[index] = mask;
-            return mask;
+            using (LabFirstUse.Measure(LabFirstUseKind.PatternMask))
+            {
+                string path = "GourdPaint/Patterns/" + pattern;
+                Texture2D source = Resources.Load<Texture2D>(path);
+                if (source == null || !source.isReadable)
+                    throw new InvalidOperationException("Missing readable runtime paint mask: Resources/" + path);
+                var mask = new LabPaintPatternMask(source);
+                Cache[index] = mask;
+                return mask;
+            }
         }
 
         /// <summary>Bilinear alpha-weighted luminance. V=0 is the texture's bottom edge.</summary>

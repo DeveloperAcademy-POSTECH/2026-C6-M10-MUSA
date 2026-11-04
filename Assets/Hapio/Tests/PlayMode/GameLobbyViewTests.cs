@@ -553,8 +553,24 @@ namespace Hapio.Tests
             Assert.That(session.State.stageIndex, Is.EqualTo(1));
             Assert.That(Object.FindObjectsByType<GameLobbyView>(FindObjectsSortMode.None), Is.Empty);
             Assert.That(Object.FindObjectsByType<LabLobbyView>(FindObjectsSortMode.None), Is.Empty);
+            // #492: the stage's effects were loaded behind the preparing overlay, before their first play.
+            foreach (AudioClip clip in LabGumihoSound.ClipFolders.Concat(LabBattleAudioWarmup.CommonFolders).SelectMany(Resources.LoadAll<AudioClip>))
+                Assert.That(clip.loadState, Is.EqualTo(AudioDataLoadState.Loaded), clip.name);
+            // #482: the Host resolved the round's judgment mask before any hit.
+            object model = typeof(LabNetwork).GetField("model", System.Reflection.BindingFlags.Instance
+                | System.Reflection.BindingFlags.NonPublic).GetValue(session.Network);
+            var surface = (LabPaintSurface)model.GetType().GetProperty("PaintSurface").GetValue(model);
+            if (surface.Pattern != LabPaintPattern.Legacy)
+                Assert.That(typeof(LabPaintSurface).GetField("patternMask", System.Reflection.BindingFlags.Instance
+                    | System.Reflection.BindingFlags.NonPublic).GetValue(surface), Is.Not.Null);
+            // #481: the Development/Editor frame probe follows the battle and reports it once when it leaves Playing.
+            Assert.That(session.FrameProbe, Is.Not.Null, "The Editor counts as a debug build.");
+            int flushes = session.FrameProbe.FlushCount;
+            LogAssert.Expect(LogType.Log, new System.Text.RegularExpressions.Regex(
+                "^HAPIO_FRAME_SUMMARY run=\\S+ stage=1 yokai=Gumiho loading=\\d+\\.\\d\\d sync=\\d+\\.\\d\\d countdown=\\d+\\.\\d\\d reschedules=0 opening_frames=\\d+ "));
             session.ExitRun();
             yield return Until(() => session.State.phase == GameFlowPhase.GameOver && !session.IsLoadingScene, "Game Over");
+            Assert.That(session.FrameProbe.FlushCount, Is.EqualTo(flushes + 1), "One summary per battle stage.");
             session.GoHome();
             yield return Until(() => session.State.phase == GameFlowPhase.Home && !session.IsLoadingScene
                 && SceneManager.GetActiveScene().path == GameScenePaths.Home, "Home title after a terminal run");

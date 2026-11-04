@@ -151,6 +151,12 @@ namespace Hapio
             if (network == null) network = GetComponent<LabNetwork>();
             if (network == null || !network.SetGameFlowEnabled(true))
                 throw new InvalidOperationException("A disconnected game transport is required at bootstrap.");
+            // Long-frame measurement (#481), never attached to a release player.
+            if (GameFrameSpikePolicy.ProbeEnabled(Debug.isDebugBuild))
+            {
+                frameProbe = gameObject.AddComponent<GameFrameSpikeProbe>();
+                frameProbe.Bind(this);
+            }
             if (stageCatalog == null) stageCatalog = GameStageCatalog.RequireDefault();
             stageCatalog.Validate();
             stageSettings = new GameStageSettings(network.config, stageCatalog);
@@ -181,6 +187,8 @@ namespace Hapio
         private void Update()
         {
             if (Instance != this || network == null) return;
+            // The browse that resumes behind the title after a game must not keep the phone awake there (#476).
+            network.RoomSearchKeepsAwake = roomBrowserVisible;
             pendingRooms.Tick(out string pendingError);
             if (!string.IsNullOrEmpty(pendingError)) { UiNotice = pendingError; Changed?.Invoke(); }
             UpdateRoomCreation();

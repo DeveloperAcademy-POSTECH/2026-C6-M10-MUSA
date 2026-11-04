@@ -46,6 +46,12 @@ namespace Hapio
             LabNetwork network = session.Network;
             network.BindBattleReferences(board, target, battleCamera, battleFloor, impactFeedback, projectileRoot);
             RebindScene(network);
+            // #492: the stage's sound data and 지귀 art load here, behind the opaque preparing overlay, not on first use.
+            float warmupStarted = Time.realtimeSinceStartup;
+            int warmed = LabBattleAudioWarmup.Preload(network.GameStageYokai, this);
+            if (Debug.isDebugBuild)
+                Debug.Log("C6_AUDIO_WARMUP yokai=" + network.GameStageYokai + " loaded=" + warmed
+                    + " ms=" + ((Time.realtimeSinceStartup - warmupStarted) * 1000f).ToString("0"));
             session.NotifyBattleBound(board);
             network.ConfigApplied += OnConfigApplied;
         }
@@ -140,6 +146,7 @@ namespace Hapio
 
         private void OnDestroy()
         {
+            LabBattleAudioWarmup.Release(this); // #492: the stage's preloaded data is not kept past its Battle.
             if (session != null && session.Network != null) session.Network.ConfigApplied -= OnConfigApplied;
         }
         private static void Route(UnityEngine.UI.Button button, UnityEngine.Events.UnityAction action, string label)

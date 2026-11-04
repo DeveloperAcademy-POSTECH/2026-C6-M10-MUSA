@@ -4585,3 +4585,175 @@ Consolidated three byte-identical textures into shared material references; conf
 - main `b50cded6`을 Stage 3 환경 브랜치에 병합했다. Battle Scene은 Stage 3 배경·스테이지별 바닥을 유지하고 main의 환경광·방향광 설정을 보존했다. 두 브랜치의 검증 기록을 모두 유지했다.
 - 정적 검사 통과: Scene 객체 ID 4,416개 중복 없음, 양쪽 Scene 대비 새로 누락된 로컬 fileID 참조 0개, Stage 3 override 유지, 양쪽 검증 기록의 순서·내용 보존, `git diff --check` 통과.
 - 이번 병합 결과에 대한 Unity 컴파일·EditMode·PlayMode·실기기 검사는 미실행이다.
+
+## #476 방 검색·방 공개 자동 복구와 화면 잠금 — 2026-11-04
+
+기준 main `b50cded6`에서 `fix/#476-discovery-recovery` 별도 worktree로 작업했다. 다른 작업이 쓰는 원래 체크아웃과 그 Editor는 건드리지 않았다. Unity 6000.6.5f1 macOS batch Editor(`unity test`)와 macOS 실제 dns_sd(mDNSResponder)로 확인했다. 실패는 discovery 자신의 `Fail` 경로를 리플렉션으로 불러 만들었다. 실제 iPhone 잠금·백그라운드·로컬 네트워크 권한 거부를 재현한 것은 아니다.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| EditMode 전체 | **1862/1862 PASS** | 새 `LabDiscoveryBackoffTests`: 재시도 1/2/4/8/16/30초·6회·3회 한도, 주소 만료 Keep→Renew→Remove, iPhone 전용 화면 잠금 판단 |
+| `LabDiscoveryRecoveryTests` (새 검사, 5개) | **PASS** | ① 주소 TTL을 강제로 지나게 해도 `renewing` 재조회로 방이 한 번도 빠지지 않고 같은 항목이 남음(재확인 경로로 구조된 것이 아님을 로그로 확인) ② 주소 조회 실패 뒤 검색이 살아 있는 동안 방이 `retry attempt=1`로 다시 보임 ③ Lab Host 공개를 끊으면 같은 discovery로 같은 이름을 다시 등록하고 "방을 만들고 있소..." 상태가 한 번도 켜지지 않음 ④ 검색 실패 뒤 자동 재시작·실패 문구 원복·같은 실패 문구가 두 번 붙지 않음·횟수 소진 뒤 앱 복귀만 재시도·재시도 사이 취소 유지 ⑤ 앱 복귀가 살아 있는 Host 등록을 다시 만들지 않음 |
+| 방 검색·로비·흐름 PlayMode 묶음 | **72/72 PASS ×2** | 새 검사, `LabRoomFamilyDiscoveryTests`, `LabQuickConnectTests`, `GameLobbyViewTests`, `GamePendingRoomRegistryTests`, `GameOpeningControllerTests`, `LabFigmaLobbyTests`, `LabMessageHandlerReconnectTests`, `LabLobbyPositionSelectionTests`, `GameSceneFlowTests`, `LabStaminaBarHudTests` |
+
+새 검사는 main에 없는 필드·API(`Renewing`, `RoomSearchRetryPending`, `ResumeDiscoveryAfterPause`)를 써서 main 코드로는 컴파일되지 않는다. 그래서 #471처럼 main에서 실패하는 것을 따로 보이지는 않았다.
+
+**미실행:** iPhone 빌드·실기기. 아래 항목을 확인하지 않았다.
+- 로비·결과·방 목록에서 3분 넘게 화면이 잠기지 않는지, 타이틀에서는 시스템 설정대로 잠기는지
+- 새로고침 없이 방 카드가 3분 넘게 남는지
+- 방장이 30초·2분 백그라운드 뒤에도 새 참가자에게 보이는지
+- 게스트 복귀 뒤 탭 없이 목록이 돌아오는지
+- 로컬 네트워크 권한을 거부했다가 설정에서 허용하고 복귀했을 때 검색이 돌아오는지
+- 백그라운드 중 NGO 연결 유지
+
+## #485 Battle.unity Transform 부모 복구와 #447 배경 검사 갱신 — 2026-11-04
+
+기준 main `afaee674`에서 `fix/#485-battle-scene-hierarchy` 별도 worktree로 작업했다. Unity 6000.6.5f1 macOS batch Editor를 사용했다.
+
+**원인과 수정**
+- #447(PR #475) 이후 Battle.unity의 배경 장식 Transform 30개가 부모 `m_Children`에 남은 채 `m_Father: 0`이었고 SceneRoots에도 들어 있었다. 그래서 열 때마다 `Restored Transform child parent pointer from NULL`이 났다.
+- 이 30개는 #447 이전(`b50cded6`)에 같은 부모의 자식이었고, 로컬 위치·회전·크기도 같다.
+- 임시 Editor 스크립트로 Unity가 Scene을 열고 저장하게 했다. YAML은 손으로 고치지 않았고, 스크립트는 커밋하지 않았다.
+- fileID 기준 내용 비교에서 바뀐 것은 정확히 31개다.
+  - 30개 Transform의 `m_Father`: 그 자식을 가진 부모로, #447 이전 값과 같다.
+  - SceneRoots에서 그 30개 항목 제거
+  - 그 밖의 텍스트 차이는 Unity 저장 순서의 재정렬이다.
+- 독립 검토(별도 파서)도 같은 결과를 냈다: 중복 ID 0, 끊긴 fileID 0, 계층 불일치 0, 미해결 GUID 0(내장 리소스 제외).
+- #447이 실수로 커밋한 Unity 복구 Scene `Assets/_Recovery/0.unity`(약 10만 줄)를 지우고 `.gitignore`에 넣었다. 이 GUID를 참조하는 곳은 없었다.
+
+**검사 갱신 (#447의 의도된 디자인에 맞춤)**
+- 1스테이지 바닥·조합판 뒤는 `Stage01_Ground_SandBeige`, 둘레는 `Stage01_Sky_WarmBeige`다.
+- 3스테이지는 전용 석양 배경이고, 1스테이지와 모르는 번호는 기본 배경이다.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| EditMode 전체 | **1862/1862 PASS** | 수정 전 main 단독에서 실패하던 4건 포함 |
+| Battle을 여는 PlayMode | **106/106 PASS**, Scene 경고 0 | `GameSceneFlowTests`(3스테이지 배경 전환 단언 갱신 포함)·`GameLobbyViewTests`·`LabDeveloperSoloIntegrationTests`·`LabJigwiABPresentationTests`·`LabGourdYokaiTests`·`GameYokaiPresentationTests`·`GameOpeningControllerTests`·`LabGourdPaintTests`. 수정 전 main 단독에서는 Battle을 여는 검사 22건이 Scene 오류로 실패 |
+
+**남은 사항(바꾸지 않음):** `docs/STAGE_BACKGROUNDS.md`는 2스테이지 바닥을 `Stage02_Ground_Yagwanggwi`라고 하지만, 실제 `YokaiGround`/`YokaiBacking` 재질의 `_BaseMap`과 Stage02 studio는 `HanjiSand`다. 아트 결정이라 이 수정 범위에서 바꾸지 않았다.
+
+**미실행:** 화면으로 배경 배치 확인, iOS 빌드·실기기.
+
+## #481 전투 초반 프레임 계측 — 2026-11-04
+
+기준 main `afaee674`에서 `perf/#481-frame-spike-probe` 별도 worktree로 작업했다. Unity 6000.6.5f1 macOS batch Editor(`unity test`)에서 확인했다.
+
+- **main의 Battle.unity 문제:** main `afaee674`의 `Assets/Hapio/Scenes/Battle.unity`는 열 때 `Problem detected while opening the Scene file`와 `Restored Transform child parent pointer from NULL`이 납니다. 이 변경 없이 main만으로도 재현되며 #447 병합 이후입니다. 그래서 Battle을 여는 검사는 이 브랜치에서 모두 실패합니다.
+- **검사 방법:** 게임 흐름 검사는 #447 직전 `b50cded6`에 #476과 이 변경을 얹은 임시 기준에서 따로 돌렸습니다.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| EditMode 전체(이 브랜치) | **1861/1865** | 새 `GameFrameSpikePolicyTests` 3개 통과. 실패 4건은 main `afaee674` 단독과 같은 #447 Battle/배경 검사 |
+| EditMode 전체(#447 이전 기준) | **1865/1865 PASS** | 리뷰 수정 전 첫 구현 |
+| 게임 흐름·오디오·도색 PlayMode(#447 이전 기준) | **108/108 PASS** | 리뷰 수정 전 첫 구현. 솔로 1스테이지에서 `HAPIO_FRAME_SUMMARY` 1회 |
+| 리뷰 수정 후 게임 흐름 PlayMode(#447 이전 기준, #482와 함께) | **85/85 PASS** | `GameSceneFlowTests`(같은 스테이지 DEV 재적용 시 flush 1회 추가 단언 포함)·`GameLobbyViewTests`·`LabDeveloperSoloIntegrationTests`·`LabJigwiABPresentationTests`·`LabGourdYokaiTests` |
+
+Editor 관찰값입니다. 기기 근거가 아닙니다.
+- 스테이지마다 Battle 로딩 중 50~165 ms 프레임 3개
+- 야광귀 배경음 시작 약 200 ms, 지귀 약 85 ms(SynchronizingBattle)
+
+**#485 병합 뒤 실제 main 기준 재검사** (#485·#481·#482를 함께 쌓음)
+- EditMode **1865/1865**, 관련 PlayMode **142/142**(게임 흐름·로비·솔로·지귀·요괴·도색·오디오·새 #482 검사)
+- 첫 실행에서는 140/142였다. `SharedCountdown…`·`StageTwoDefeat…` 2건이 실패했는데, 그 실행의 계측에서 카운트다운이 452초로 기록되고 25 ms 넘는 프레임은 없었다. 그래서 그 실행 환경의 이상으로 보고, 같은 클래스 단독 2회(21/21×2)와 전체 재실행에서 모두 통과한 것을 기록한다.
+
+**미실행:** 비개발 Player 빌드에서 `HAPIO_FRAME_*`가 없는지 확인, iPhone 기준선(cold 재설치 3회·warm 1회, 방장·게스트).
+
+## #482 도색 첫 명중 작업을 준비 구간으로 — 2026-11-04
+
+#481 브랜치 위 `perf/#482-first-hit-paint-prewarm`에서 Unity 6000.6.5f1 macOS batch Editor로 확인했다. main의 Battle.unity 문제(#481 절)로 게임 흐름 검사는 #447 직전 `b50cded6` + #476 + #481 + 이 변경의 임시 기준에서 돌렸다.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| EditMode 전체(이 브랜치) | **1861/1865** | 실패 4건은 main 단독과 같은 #447 Battle/배경 검사 |
+| 도색·오디오 PlayMode(이 브랜치) | **45/45 PASS** | 새 `LabFirstHitPaintPrewarmTests` 6개: 공유 거리장이 기존 생성과 GPU에서 같고 런타임 해제 뒤 남음; prewarm 뒤 첫 스탬프에서 붓 로드·거리장 생성 0회; prewarm 전후 Ready·오류·스탬프 수와 다음 명중 이미지가 prewarm 없는 쪽과 픽셀 단위 동일; 임시 RT 형식; 라운드 붓 무늬; 방장 마스크 미리 풀기. 기존 `LabGourdPaintTests`·`LabWatercolorPaintRuntimeTests`·`LabHighResolutionPaintRuntimeTests`·`LabPaintGrainRenderTests`·`LabPlayerPaintPatternRenderTests`·`LabPaintDryingPlayModeTests`·오디오·지귀 피드백 |
+| 게임 흐름 PlayMode(#447 이전 기준) | **85/85 PASS** | 솔로 Host 라운드가 첫 명중 전에 판정 마스크를 갖는지 단언 포함. Editor 계측에서 붓 로드가 LoadingBattle 프레임으로 옮겨진 것을 확인(`uses=BrushLoad`) |
+
+Metal 파이프라인(PSO)이 실제로 준비 구간에서 만들어지는지는 Editor로 판단할 수 없다. 이 항목과 iPhone cold/warm 첫 명중 프레임 시간, Metal System Trace는 **미실행**이다.
+
+## #487 2스테이지 바닥 Yagwanggwi 연결 — 2026-11-04
+
+기준 main `59c197cb`에서 Unity 6000.6.5f1 macOS batch Editor로 확인했다.
+
+**수정 방법**
+- 임시 Editor 스크립트를 커밋하지 않고 Unity API로 다음을 바꿨다. YAML은 손으로 고치지 않았다.
+  - `Stage02 Background Studio`의 `groundPng`·`boardBackgroundPng`
+  - `Stage02/Materials/YokaiGround.mat`·`YokaiBacking.mat`의 `_BaseMap`
+- 결과 diff는 Scene 2줄과 재질 2줄뿐이다. 색·타일링·다른 스테이지는 그대로다.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| EditMode 전체 | **1865/1865 PASS** | `GameStageBackgroundAssetTests`에 세 스테이지 모두 studio PNG와 저장 재질 `_BaseMap`이 같은지 검사를 추가했다 |
+| 실제 전투 캡처(DEV 솔로 1→2→3스테이지, 임시 검사·커밋 안 함) | 바닥·조합판 뒤가 1 **`Stage01_Ground_BlushBeige`**, 2 **`Stage02_Ground_Yagwanggwi`**, 3 `Stage03_Ground_Jigwi` | 수정 전 main에서 2스테이지는 `HanjiSand_BaseColor`였고, 플레이할 때마다 Editor가 재질의 `_MainTex`를 HanjiSand로 덮었다. 수정 뒤에는 플레이해도 재질 파일이 바뀌지 않는다 |
+| PlayMode `GameSceneFlowTests`·`GameLobbyViewTests` | **34/34 PASS** | |
+
+**1스테이지:** 문서의 후속 미술 수정대로 `Stage01_Ground_BlushBeige`로 바꿨다. 그동안 실제로 적용돼 있던 것은 `Stage01_Ground_SandBeige`였다. 바꾼 곳은 기본 `Background Studio`의 `groundPng`·`boardBackgroundPng`와 Stage01 `YokaiGround`·`YokaiBacking`의 `_BaseMap`·`_MainTex`이며, 같은 Unity API 방식으로 했다(Scene 2줄, 재질 4줄). 사용자가 세 후보 이미지를 직접 보고 결정했다.
+
+**미실행:** iPhone 화면 확인.
+
+## #490 1스테이지 바닥 SandBeige 복원 — 2026-11-04
+
+#487에서 문서의 후속 미술 수정을 근거로 1스테이지 바닥·조합판 뒤를 BlushBeige로 바꿨다. 사용자가 SandBeige가 맞다고 확인해 되돌렸다.
+
+- 같은 Unity API 방식으로 되돌렸다. 대상은 기본 `Background Studio`의 `groundPng`·`boardBackgroundPng`와 Stage01 `YokaiGround`·`YokaiBacking`의 `_BaseMap`·`_MainTex`다.
+- 1스테이지 관련 값은 #487 이전(`b835dc3c`)과 같다. 2스테이지 Yagwanggwi는 유지한다.
+- `GameSceneAssetTests` 기대값과 `docs/STAGE_BACKGROUNDS.md`도 SandBeige로 바로잡았다.
+- 배경 Scene·재질 EditMode 검사(`GameSceneAssetTests`·`GameStageBackgroundAssetTests`·`GameBackgroundAnimationAssetTests`) **12/12 PASS**. 화면은 #487 직전 캡처와 같은 값이라 다시 찍지 않았다.
+
+## #489 야광귀·기본 전투 배경음 Streaming — 2026-11-04
+
+기준 main `8c020fca`에서 Unity 6000.6.5f1 macOS batch Editor로 확인했다.
+
+**변경**
+- 임시 Editor 스크립트로 `AudioImporter`를 바꿨다. 스크립트는 커밋하지 않았고 .meta는 손으로 고치지 않았다.
+- 대상은 `Yaguang_Stage.wav`·`Kkwaenggwari_13.wav`의 기본 `loadType`이다: DecompressOnLoad → Streaming.
+- diff는 .meta 2줄이다. 구미호·땅따먹기 곡과 같은 설정이며, 피버곡 2개는 DecompressOnLoad 그대로다.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| EditMode `LabBattleBgmImportTests`(새 검사)·`LabGumihoSoundTests`·`LabYaguangFeverTests` | **15/15 PASS** | 긴 스테이지 곡 4폴더 모두 Streaming, 피버곡 DecompressOnLoad |
+| PlayMode `LabBattleBgmStageTests`·3스테이지 결과 흐름 | **4/4 PASS** | |
+
+**Editor 계측(#481, 1회)**
+- 이전 실행: 야광귀 약 200 ms·지귀 약 85 ms의 `BattleMusic` 프레임이 있었다.
+- 이번 실행: 2·3스테이지에서 그 프레임이 나오지 않았다.
+- 같은 실행의 1스테이지(구미호, 원래 Streaming)에서는 `BattleMusic`이 표시된 187 ms 프레임이 한 번 있었다. Streaming 시작도 비용이 0은 아니다.
+- Editor 수치이고 1회라 기기 판단 근거가 아니다.
+
+**미실행:** iPhone에서 배경음 시작 지연이 들리는지, 시작 프레임 시간.
+
+## #492 현재 스테이지 효과음·피버곡·지귀 보상 불꽃 미리 로드 — 2026-11-04
+
+## #493 지귀 화면 오버레이를 지귀 스테이지에서만 로드 — 2026-11-04
+
+기준 main `76d71b78`에서 Unity 6000.6.5f1 macOS batch Editor로 확인했다.
+
+**변경**
+- `LabBattleAudioWarmup.Preload(yokai)`를 `GameBattleBindings.Awake`가 호출한다. 이 시점은 Battle Scene 활성화 프레임이고, 불투명 준비 화면 아래다.
+- 로드하는 것: 공통 효과음, 현재 스테이지 전용 효과음, 그 스테이지의 피버곡. 각 소리 컴포넌트가 이미 가진 같은 clip 객체에 `LoadAudioData`를 부른다.
+- 다른 스테이지 전용 효과음 데이터는 해제한다.
+- 지귀 스테이지는 보상 불꽃 이미지 묶음도 미리 읽는다. 지귀는 피버곡이 없어 피버곡을 읽지 않는다.
+- 미리 읽은 clip과 이미지는 그 Battle이 닫힐 때(`GameBattleBindings.OnDestroy`)까지 정적 참조로 붙잡는다. Scene 로드의 미사용 에셋 정리가 첫 사용 전에 지우지 않게 하기 위해서다.
+- 해제는 미리 읽은 Battle만 할 수 있다(소유자 확인). 그래서 닫히는 Battle이 다음 Battle의 미리 읽기를 지우지 않는다.
+- import 설정·Scene/Prefab·소리 규칙은 그대로다.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| EditMode 전체 | **1867/1867 PASS** 기준(새 `LabBattleAudioWarmupTests` 2개: 소리 컴포넌트의 공통 폴더 상수가 모두 포함되는지, 스테이지별 로드·다른 스테이지 해제·지귀 보상 불꽃 유지·같은 스테이지 재호출 시 0개) | 새 검사는 수정 뒤 단독 재실행 2/2. 첫 전체 실행의 1건은 비어 있는 `Audio/FlashClear` 폴더를 가정한 검사 문장이어서 고쳤다 |
+| PlayMode `GameLobbyViewTests`(솔로 1스테이지에서 구미호·공통 효과음이 Playing 전에 로드됐는지 단언 추가)·`GameSceneFlowTests`·`LabStaminaFeedbackTests`·`LabJigwiABPresentationTests`·`LabBattleBgmStageTests`·`LabGumihoSoundTests`·`LabStaminaShortFeedbackTests` | **74/74 PASS** | |
+
+Editor 로그 `C6_AUDIO_WARMUP`: 첫 전투는 32개를 약 70~80 ms에, 같은 실행의 다음 전투는 4개를 약 45 ms에 읽었다. Editor 수치다.
+
+**미실행:** iPhone에서 첫 탭·명중·폭탄·지귀 5초 프레임 시간, 오디오 상주 메모리 실측.
+
+- `LabJigwiHud.Bind`·`Start`는 이제 Hapio 게임 흐름의 지귀 스테이지에서만 오버레이(`Jigwi/ScreenOverlay` 프리팹과 큰 텍스처)를 미리 만든다.
+- Lab 단판(게임 흐름 OFF)은 기존대로 만든다.
+- 지귀 A/B가 켜진 스냅샷에서 만드는 기존 LateUpdate 안전망은 그대로 둔다.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| EditMode 전체 | **1866/1866 PASS** | 새 `LabJigwiOverlayStagePolicyTests` 포함 |
+| `GameJigwiStageIntegrationTests`(단언 추가) | **PASS** | 1·2스테이지 Playing에 오버레이 0개. 3스테이지는 첫 라운드 스냅샷보다 먼저 오버레이 1개가 있어야 한다(LateUpdate 안전망은 스냅샷이 있어야 만들므로 미리 만들었음을 구분). 프레임 기록에서 Battle 바인딩 4프레임 뒤, 스냅샷이 없을 때 생성됐다 |
+| 같은 검사의 반대 확인 | 게이트 항상 참 → **FAIL**, 지귀도 막기(안전망만) → **FAIL** | 각각 1스테이지에 오버레이가 있어서, 3스테이지에서 스냅샷이 먼저 와서 실패한다. 검사가 두 경우를 구분함을 확인했다 |
+| 지귀·게임 흐름 PlayMode | **66/67** → 위 검사 대기 조건 수정 뒤 해당 검사 단독 **1/1 PASS** | `LabJigwiABPresentationTests`·`LabJigwiGroupFireAudioTests`·`LabJigwiWaterTrailTests`·`LabJigwiStagePresentationTests`·`GameSceneFlowTests`. 실패 1건은 새 단언이 `IsLoadingScene`(준비 구간 전체가 true)을 기다리던 검사 문장 문제였다 |
+
+**미실행:** iPhone 1·2스테이지 로딩 시간·메모리 실측.

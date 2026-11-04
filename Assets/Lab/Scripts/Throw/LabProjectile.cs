@@ -250,6 +250,7 @@ namespace C6Lab
             LabOrbElement element = LabOrbElement.None, float sizeScale = 1f)
         {
             if (config == null) throw new ArgumentNullException(nameof(config));
+            LabFirstUse.Note(LabFirstUseKind.Projectile);
             GameObject root = new GameObject("Throw Projectile");
             if (parent != null) root.transform.SetParent(parent, false);
             root.transform.position = position;

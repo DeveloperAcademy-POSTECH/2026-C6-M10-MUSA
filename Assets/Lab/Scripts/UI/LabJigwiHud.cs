@@ -27,7 +27,7 @@ namespace C6Lab
             canvas = targetCanvas != null ? targetCanvas.rootCanvas : null;
             EnsureWidgets();
             Wire();
-            EnsureScreenPresentation();
+            EnsureScreenPresentation(false);
         }
 
         private void Start()
@@ -36,16 +36,24 @@ namespace C6Lab
             if (canvas == null) canvas = GetComponentInParent<Canvas>();
             EnsureWidgets();
             Wire();
-            EnsureScreenPresentation();
+            EnsureScreenPresentation(false);
         }
 
-        private void EnsureScreenPresentation()
+        /// <summary>
+        /// The overlay loads a prefab and about 33 MiB of art. In the Hapio game only the 지귀 stage builds it ahead
+        /// (#493); an active 지귀 A/B snapshot (<paramref name="required"/>) still builds it anywhere, and Lab keeps
+        /// building it as before.
+        /// </summary>
+        private void EnsureScreenPresentation(bool required)
         {
             if (!Application.isPlaying || canvas == null || network == null) return;
+            if (!required && !WantsScreenPresentation(network.GameFlowEnabled, network.GameStageYokai)) return;
             LabHud battleHud = canvas.GetComponentInChildren<LabHud>(true);
             Camera camera = network.BattleCamera != null ? network.BattleCamera : battleHud != null ? battleHud.battleCamera : null;
             screenPresentation = LabJigwiScreenPresentation.EnsureFor(network, canvas, camera);
         }
+
+        public static bool WantsScreenPresentation(bool gameFlow, LabStageYokai yokai) => !gameFlow || yokai == LabStageYokai.Jigwi;
 
         /// <summary>Editor creation and a missing-reference fallback share the same small hierarchy.</summary>
         public void EnsureWidgets()
@@ -158,7 +166,7 @@ namespace C6Lab
             double now = network.BattlePresentationTime;
             if (snapshot.jigwiAB?.enabled == true)
             {
-                if (screenPresentation == null || screenPresentation.source != network) EnsureScreenPresentation();
+                if (screenPresentation == null || screenPresentation.source != network) EnsureScreenPresentation(true);
                 if (stageNotice != null) stageNotice.gameObject.SetActive(false);
                 if (heat != null) heat.gameObject.SetActive(false);
                 if (effectText != null) effectText.gameObject.SetActive(false);

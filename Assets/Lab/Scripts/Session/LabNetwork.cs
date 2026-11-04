@@ -456,8 +456,9 @@ namespace C6Lab
         }
         // Bonjour may rename a duplicate service. Only its confirmed name is shared.
         public string HostRoomName => IsHost ? connectedRoomName : string.Empty;
+        // A re-registration after the room was named (#476) keeps that name instead of showing "creating" again.
         public bool HostRoomNamePending => IsHost && discovery != null && discovery.IsAdvertising
-            && !discovery.AdvertisingConfirmed;
+            && !discovery.AdvertisingConfirmed && string.IsNullOrEmpty(connectedRoomName);
         public bool SessionConfigReady => IsHost
             ? order.Count > 0 && order.All(id => configAcknowledgements.Contains(id))
             : clientConfigReady;
@@ -788,7 +789,11 @@ namespace C6Lab
         }
 
         /// <summary>Browse without joining. Refresh preserves cached rows briefly, never stale routes.</summary>
-        public bool StartRoomSearch() => StartRoomSearchInternal(false);
+        public bool StartRoomSearch()
+        {
+            ResetRoomSearchRetry();
+            return StartRoomSearchInternal(false);
+        }
 
         private bool StartRoomSearchInternal(bool preserveMessage)
         {
@@ -813,8 +818,10 @@ namespace C6Lab
                 string error = discovery.LastError ?? "Room search could not start. Use direct IP.";
                 DisposeDiscovery(true);
                 ReportRoomSearchFailure(error, preserveMessage);
+                ScheduleRoomSearchRetry(Time.realtimeSinceStartupAsDouble);
                 return false;
             }
+            OnRoomSearchStarted();
             discoveryJoinActive = false;
             discoveryRoomKey = null;
             if (!preserveMessage) SetStatus("Searching local rooms; keep the Host app open...");
@@ -824,7 +831,13 @@ namespace C6Lab
 
         public void CancelRoomSearch()
         {
-            if (!roomSearchActive || IsJoiningRoom) return;
+            if (IsJoiningRoom) return;
+            if (!roomSearchActive)
+            {
+                // A canceled search must not come back by itself between two retries (#476).
+                if (RoomSearchRetryPending) { roomSearchRetryAt = double.NaN; Changed?.Invoke(); }
+                return;
+            }
             DisposeDiscovery();
             SetRoomSearchMessage("Room search canceled. Create a room or refresh to search again.", false);
         }
@@ -978,7 +991,7 @@ namespace C6Lab
             discoveryRoomKey = null;
             stopAfterDisconnect = false;
             ResetLocal();
-            // Exactly one automatic resume for this failure/cancel. A Bonjour failure stays stopped.
+            // Exactly one automatic resume for this failure/cancel. A Bonjour failure retries with backoff (#476).
             StartRoomSearchInternal(true);
         }
 
@@ -993,6 +1006,7 @@ namespace C6Lab
             discoveryJoinActive = false;
             discoveryRoomKey = null;
             DisposeDiscovery();
+            ResetRoomSearchRetry();
             UnregisterHandler();
             if (manager != null && manager.IsListening && !manager.ShutdownInProgress) manager.Shutdown();
             ResetLocal();
@@ -1028,6 +1042,7 @@ namespace C6Lab
             model.Begin(sessionId, playersInPOrder, beginAt, config,
                 stageYokai: gameFlowEnabled ? gameStageYokai : LabStageYokai.None);
             if (GameStartHeld) battleClock.Pause(beginAt);
+            model.PaintSurface?.PreloadPatternMask();
             SampleHostPaintFlow(battleClock.Now(Time.realtimeSinceStartupAsDouble));
             impactReceipts.SetActive(sessionId, model.Round);
             SetNotice(string.Empty);
@@ -1112,6 +1127,7 @@ namespace C6Lab
             model.BeginSolo(sessionId, LocalPlayerId, beginAt, config,
                 stageYokai: gameFlowEnabled ? gameStageYokai : LabStageYokai.None);
             if (GameStartHeld) battleClock.Pause(beginAt);
+            model.PaintSurface?.PreloadPatternMask();
             SampleHostPaintFlow(battleClock.Now(Time.realtimeSinceStartupAsDouble));
             impactReceipts.SetActive(sessionId, model.Round);
             SetNotice(string.Empty);
@@ -1295,6 +1311,7 @@ namespace C6Lab
                 resumeRoomSearchAfterStop = false;
                 if (!IsSearchingRooms) StartRoomSearchInternal(true);
             }
+            UpdateRoomSearchRecovery(now);
             if (joinFinishPending)
             {
                 CompleteJoinShutdown();
@@ -1323,6 +1340,7 @@ namespace C6Lab
                         activeDiscovery.UpdatePresence(ipv4, ipv6, order.Count, targetParticipantCount, RoomPresenceBusy);
                 }
                 activeDiscovery.Tick();
+                if (discovery == activeDiscovery) RecoverHostAdvertisement(activeDiscovery, now);
                 if (discovery == activeDiscovery && roomSearchActive && !activeDiscovery.IsBrowsing)
                 {
                     string error = activeDiscovery.LastError ?? "Room search ended. Use direct IP or search again.";
@@ -1330,6 +1348,7 @@ namespace C6Lab
                     roomSearchStartedAt = now;
                     roomCacheGraceActive = discoveredRooms.Count > 0;
                     ReportRoomSearchFailure(error, true);
+                    ScheduleRoomSearchRetry(now);
                 }
                 if (discovery == activeDiscovery && discoveryJoinActive)
                 {
@@ -2864,6 +2883,8 @@ namespace C6Lab
             {
                 connectedRoomName = registeredRoom.RegisteredServiceName;
                 advertisedName = connectedRoomName;
+                // The card's explicit sequential name, re-registered as is if the registration later dies (#476).
+                RememberHostAdvertisement(connectedRoomName, false);
                 // The reserved socket family is only a preparation hint. Publish the real Host listeners.
                 if (!discovery.UpdatePresence(ipv4, ipv6, order.Count, targetParticipantCount, RoomPresenceBusy))
                     Debug.LogWarning("C6_LAB_DISCOVERY_UNAVAILABLE " + discovery.LastError);
@@ -2873,10 +2894,12 @@ namespace C6Lab
             // Keep the existing direct Game Host API's unique name; it has no pending-room allocator.
             advertisedName = gameFlowEnabled ? "Hapio-" + Guid.NewGuid().ToString("N").Substring(0, 8)
                 : LabRoomNames.ServiceBase;
+            // The requested name, not a daemon rename, so a later re-registration keeps the room's identity (#476).
+            RememberHostAdvertisement(advertisedName, true);
             if (!discovery.StartAdvertise(advertisedName, port, ipv4, ipv6, order.Count, targetParticipantCount))
             {
+                // Keep the discovery: RecoverHostAdvertisement retries this registration with backoff.
                 Debug.LogWarning("C6_LAB_DISCOVERY_UNAVAILABLE " + discovery.LastError);
-                DisposeDiscovery();
             }
             else Debug.Log("C6_LAB_LISTEN_FAMILIES ipv4=" + ipv4 + " ipv6=" + ipv6);
         }
@@ -2897,6 +2920,11 @@ namespace C6Lab
             }
             if (!IsJoiningRoom) discoveryRoomKey = null;
             advertisedName = null;
+            // Hosting, joining, stopping, canceling and a new search all pass here; the failure paths schedule after it
+            // and StartAdvertising remembers again after it.
+            roomSearchRetryAt = double.NaN;
+            roomSearchRetryExhausted = false;
+            ForgetHostAdvertisement();
             Changed?.Invoke();
         }
 
@@ -2909,6 +2937,7 @@ namespace C6Lab
             }
             else if (IsHost && discovery != null && discovery.AdvertisingConfirmed)
             {
+                OnHostAdvertisementConfirmed();
                 string confirmed = discovery.RegisteredServiceName ?? string.Empty;
                 if (confirmed != connectedRoomName && ValidRoomName(confirmed))
                 {
@@ -2950,9 +2979,13 @@ namespace C6Lab
 
         private void ReportRoomSearchFailure(string error, bool preserveMessage)
         {
-            string message = preserveMessage && !string.IsNullOrEmpty(roomSearchMessage)
-                ? roomSearchMessage + " Search unavailable: " + error : error;
+            // A retried search reports against what its first failure was appended to, so the text does not grow (#476).
+            bool repeat = searchFailureMessage != null && roomSearchMessage == searchFailureMessage;
+            string prefix = repeat ? searchFailureBase : preserveMessage ? roomSearchMessage : string.Empty;
+            bool prefixFailed = repeat ? searchFailureBaseFailed : preserveMessage && roomSearchFailed;
+            string message = !string.IsNullOrEmpty(prefix) ? prefix + " Search unavailable: " + error : error;
             SetRoomSearchMessage(message, true);
+            searchFailureBase = prefix; searchFailureBaseFailed = prefixFailed; searchFailureMessage = message;
         }
 
         private static bool ValidRoomName(string name)

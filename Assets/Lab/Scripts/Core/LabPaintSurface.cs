@@ -128,6 +128,15 @@ namespace C6Lab
         /// orb paints less (#213). A share of 0 paints nothing. 박 색상 콤보(#222)의 페널티(1보다 작음)/보상(1보다 큼)
         /// 배율도 여기에 곱해서 들어오므로 최대 3까지 받는다.
         /// </summary>
+        /// <summary>
+        /// Resolves the judgment mask now instead of on the first hit (#482). The Host calls this right after a round
+        /// begins, behind the preparing overlay; the mask and every hit it judges are the same as before.
+        /// </summary>
+        public void PreloadPatternMask()
+        {
+            if (pattern != LabPaintPattern.Legacy && patternMask == null) patternMask = LabPaintPatternMask.Load(pattern);
+        }
+
         public bool RegisterHit(Vector3 direction, Color color, ulong attackerId, int painterSlot = 0, float share = 1f)
         {
             if (painterSlot < 0 || painterSlot > MaxPainterSlot) return false;

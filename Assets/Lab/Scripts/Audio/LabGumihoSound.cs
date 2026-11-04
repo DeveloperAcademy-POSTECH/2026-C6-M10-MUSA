@@ -31,6 +31,8 @@ namespace C6Lab
         public const string BombOpenFolder = "Audio/BombOpen";
         private static readonly string[] Folders =
             { CharmCastFolder, CharmCheckFolder, CharmReleaseFolder, FoxFallFolder, FoxClearFolder, BombOpenFolder };
+        /// <summary>The folders this component loads, for the battle audio preload (#492).</summary>
+        public static System.Collections.Generic.IReadOnlyList<string> ClipFolders => Folders;
         // 매혹이 걸린 지 이 초 안에 알아챈 기기만 소리를 낸다.
         private const double LateSeconds = 1d;
 

@@ -13,6 +13,10 @@ namespace Hapio
         private double nextInitialReadyAt, nextCountdownReadyAt, nextCountdownCommitAt;
         private double countdownLeadSeconds = 1d;
         private bool countdownCommitted;
+        private GameFrameSpikeProbe frameProbe;
+
+        /// <summary>The Development/Editor battle frame probe (#481); null in a release player.</summary>
+        public GameFrameSpikeProbe FrameProbe => frameProbe;
 
         public bool IsPreparingBattle => state.phase == GameFlowPhase.LoadingBattle
             || state.phase == GameFlowPhase.SynchronizingBattle || state.phase == GameFlowPhase.Countdown;

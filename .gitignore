@@ -45,3 +45,7 @@ sysinfo.txt
 *.provisionprofile
 *.key
 *.cer
+
+# Unity crash recovery scenes (#485)
+/[Aa]ssets/_Recovery/
+/[Aa]ssets/_Recovery.meta
