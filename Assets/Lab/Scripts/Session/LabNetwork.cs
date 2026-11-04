@@ -1040,6 +1040,7 @@ namespace C6Lab
             model.Begin(sessionId, playersInPOrder, beginAt, config,
                 stageYokai: gameFlowEnabled ? gameStageYokai : LabStageYokai.None);
             if (GameStartHeld) battleClock.Pause(beginAt);
+            model.PaintSurface?.PreloadPatternMask();
             SampleHostPaintFlow(battleClock.Now(Time.realtimeSinceStartupAsDouble));
             impactReceipts.SetActive(sessionId, model.Round);
             SetNotice(string.Empty);
@@ -1124,6 +1125,7 @@ namespace C6Lab
             model.BeginSolo(sessionId, LocalPlayerId, beginAt, config,
                 stageYokai: gameFlowEnabled ? gameStageYokai : LabStageYokai.None);
             if (GameStartHeld) battleClock.Pause(beginAt);
+            model.PaintSurface?.PreloadPatternMask();
             SampleHostPaintFlow(battleClock.Now(Time.realtimeSinceStartupAsDouble));
             impactReceipts.SetActive(sessionId, model.Round);
             SetNotice(string.Empty);

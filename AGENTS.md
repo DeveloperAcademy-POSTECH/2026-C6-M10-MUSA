@@ -186,3 +186,8 @@
 
 - Development/Editor(`Debug.isDebugBuild`)에서만 `GameSession`이 `GameFrameSpikeProbe`를 런타임에 붙인다. 전투 단계(LoadingBattle~Playing)의 25 ms 초과 프레임과 그 프레임에 처음 실행된 일(`LabFirstUse`의 `Hapio.FirstUse.*` 마커)을 미리 할당한 배열에만 담고, 스테이지가 끝나거나 같은 스테이지를 다시 불러올 때 `HAPIO_FRAME_SPIKE`·`HAPIO_FRAME_SUMMARY`로 스택 없이 한 번 출력한다. 출력한 프레임은 다음 스테이지 측정에서 뺀다.
 - 측정 전용이다. 마커를 감싼 코드의 동작·판정·설정·규약은 바꾸지 않는다. 새 첫 사용 비용 지점을 추가하면 `LabFirstUseKind`에 뒤에만 덧붙인다. Editor 프레임 시간은 기기 PSO·오디오 판단 근거가 아니다.
+
+## #482 도색 첫 명중 작업 미리 하기
+
+- 수채 붓 거리장은 `LabWatercolorBrushDistance.GetOrCreate`의 패턴별 공유 텍스처다(앱 수명, 패턴당 약 4 MB·최대 3개). 런타임 `Dispose`는 지우지 않고, 재생 시작·Editor 스크립트 재로드·편집 모드 복귀에서만 `ReleaseShared`가 지운다.
+- `LabGourdPaint`는 두 도색 런타임을 만든 직후 라운드 붓 무늬(`RoundBrushPattern`: 라운드 config, 땅따먹기의 옛 둥근 붓은 흩뿌림)로 `Prewarm`을 1회 부른다. 실제와 같은 형식의 작은 임시 RT에만 그리고 표시 RT·Ready·Error·스탬프 수는 건드리지 않는다. 방장은 라운드 시작 직후 `PreloadPatternMask`로 판정 마스크를 미리 푼다. 판정·셀·해시·표시 결과는 같아야 한다.

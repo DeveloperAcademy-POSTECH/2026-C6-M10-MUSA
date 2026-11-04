@@ -4645,3 +4645,15 @@ Editor 관찰값입니다. 기기 근거가 아닙니다.
 - 첫 실행에서는 140/142였다. `SharedCountdown…`·`StageTwoDefeat…` 2건이 실패했는데, 그 실행의 계측에서 카운트다운이 452초로 기록되고 25 ms 넘는 프레임은 없었다. 그래서 그 실행 환경의 이상으로 보고, 같은 클래스 단독 2회(21/21×2)와 전체 재실행에서 모두 통과한 것을 기록한다.
 
 **미실행:** 비개발 Player 빌드에서 `HAPIO_FRAME_*`가 없는지 확인, iPhone 기준선(cold 재설치 3회·warm 1회, 방장·게스트).
+
+## #482 도색 첫 명중 작업을 준비 구간으로 — 2026-11-04
+
+#481 브랜치 위 `perf/#482-first-hit-paint-prewarm`에서 Unity 6000.6.5f1 macOS batch Editor로 확인했다. main의 Battle.unity 문제(#481 절)로 게임 흐름 검사는 #447 직전 `b50cded6` + #476 + #481 + 이 변경의 임시 기준에서 돌렸다.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| EditMode 전체(이 브랜치) | **1861/1865** | 실패 4건은 main 단독과 같은 #447 Battle/배경 검사 |
+| 도색·오디오 PlayMode(이 브랜치) | **45/45 PASS** | 새 `LabFirstHitPaintPrewarmTests` 6개: 공유 거리장이 기존 생성과 GPU에서 같고 런타임 해제 뒤 남음; prewarm 뒤 첫 스탬프에서 붓 로드·거리장 생성 0회; prewarm 전후 Ready·오류·스탬프 수와 다음 명중 이미지가 prewarm 없는 쪽과 픽셀 단위 동일; 임시 RT 형식; 라운드 붓 무늬; 방장 마스크 미리 풀기. 기존 `LabGourdPaintTests`·`LabWatercolorPaintRuntimeTests`·`LabHighResolutionPaintRuntimeTests`·`LabPaintGrainRenderTests`·`LabPlayerPaintPatternRenderTests`·`LabPaintDryingPlayModeTests`·오디오·지귀 피드백 |
+| 게임 흐름 PlayMode(#447 이전 기준) | **85/85 PASS** | 솔로 Host 라운드가 첫 명중 전에 판정 마스크를 갖는지 단언 포함. Editor 계측에서 붓 로드가 LoadingBattle 프레임으로 옮겨진 것을 확인(`uses=BrushLoad`) |
+
+Metal 파이프라인(PSO)이 실제로 준비 구간에서 만들어지는지는 Editor로 판단할 수 없다. 이 항목과 iPhone cold/warm 첫 명중 프레임 시간, Metal System Trace는 **미실행**이다.

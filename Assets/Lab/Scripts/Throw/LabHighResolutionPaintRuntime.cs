@@ -145,6 +145,56 @@ namespace C6Lab
             return brushes[index];
         }
 
+        /// <summary>Why the last <see cref="Prewarm"/> could not draw; it never becomes <see cref="Error"/>.</summary>
+        public string PrewarmError { get; private set; }
+
+        /// <summary>
+        /// Loads the round's brush and draws the brush pass once into a throwaway target of the cache's format (#482), so
+        /// the first hit neither loads the brush nor builds the pass's GPU pipeline. Call after Update created the
+        /// material. The cache, its stamps and Ready are untouched; a failure only leaves the old first-hit path.
+        /// </summary>
+        public bool Prewarm(LabPaintPattern pattern)
+        {
+            if (disposed || material == null) return false;
+            RenderTexture target = null;
+            CommandBuffer commands = null;
+            try
+            {
+                Texture2D brush = Brush(pattern);
+                if (brush == null) return false;
+                target = RenderTexture.GetTemporary(PrewarmDescriptor());
+                commands = new CommandBuffer { name = "Prewarm gourd brush geometry" };
+                commands.SetRenderTarget(target);
+                commands.ClearRenderTarget(false, true, Color.clear);
+                var block = new MaterialPropertyBlock();
+                block.SetTexture("_Brush", brush);
+                block.SetVector("_Center", Vector3.forward);
+                block.SetVector("_Right", Vector3.right);
+                block.SetVector("_Up", Vector3.Cross(Vector3.forward, Vector3.right));
+                block.SetFloat("_Radius", .01f);
+                commands.DrawProcedural(Matrix4x4.identity, material, 0, MeshTopology.Triangles, 3, 1, block);
+                Graphics.ExecuteCommandBuffer(commands);
+                PrewarmError = null;
+                return true;
+            }
+            catch (Exception exception)
+            {
+                PrewarmError = exception.Message;
+                Debug.LogWarning("C6_PAINT_PREWARM runtime=high_resolution result=failed reason=" + exception.Message);
+                return false;
+            }
+            finally
+            {
+                commands?.Release();
+                if (target != null) RenderTexture.ReleaseTemporary(target);
+            }
+        }
+
+        /// <summary>The brush cache's format at a tiny size: the GPU pipeline depends on the format, not the size.</summary>
+        public static RenderTextureDescriptor PrewarmDescriptor() =>
+            new RenderTextureDescriptor(4, 2, RenderTextureFormat.ARGB32, 0)
+            { sRGB = false, msaaSamples = 1, useMipMap = false, autoGenerateMips = false };
+
         private bool EnsureResources(int columns)
         {
             if (material == null)

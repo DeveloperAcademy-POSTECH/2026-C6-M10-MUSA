@@ -553,6 +553,13 @@ namespace Hapio.Tests
             Assert.That(session.State.stageIndex, Is.EqualTo(1));
             Assert.That(Object.FindObjectsByType<GameLobbyView>(FindObjectsSortMode.None), Is.Empty);
             Assert.That(Object.FindObjectsByType<LabLobbyView>(FindObjectsSortMode.None), Is.Empty);
+            // #482: the Host resolved the round's judgment mask before any hit.
+            object model = typeof(LabNetwork).GetField("model", System.Reflection.BindingFlags.Instance
+                | System.Reflection.BindingFlags.NonPublic).GetValue(session.Network);
+            var surface = (LabPaintSurface)model.GetType().GetProperty("PaintSurface").GetValue(model);
+            if (surface.Pattern != LabPaintPattern.Legacy)
+                Assert.That(typeof(LabPaintSurface).GetField("patternMask", System.Reflection.BindingFlags.Instance
+                    | System.Reflection.BindingFlags.NonPublic).GetValue(surface), Is.Not.Null);
             // #481: the Development/Editor frame probe follows the battle and reports it once when it leaves Playing.
             Assert.That(session.FrameProbe, Is.Not.Null, "The Editor counts as a debug build.");
             int flushes = session.FrameProbe.FlushCount;

@@ -5,6 +5,48 @@ namespace C6Lab
 {
     public static class LabWatercolorBrushDistance
     {
+        // One field per pattern for the app's life (#482): the runtime is rebuilt every round, and rebuilding this on the
+        // first hit of each stage stalled that frame. A 1024² brush keeps about 4 MB per pattern, at most three.
+        private static readonly Texture2D[] Shared = new Texture2D[4];
+
+        /// <summary>The shared field of a pattern's brush; built on first request and never destroyed by a runtime.</summary>
+        public static Texture2D GetOrCreate(LabPaintPattern pattern, Texture2D brush)
+        {
+            int index = (int)pattern;
+            if (index < 1 || index >= Shared.Length) throw new ArgumentOutOfRangeException(nameof(pattern));
+            if (Shared[index] == null) Shared[index] = Create(brush);
+            return Shared[index];
+        }
+
+        /// <summary>Whether a pattern's shared field already exists; tests and measurements only.</summary>
+        public static bool IsShared(LabPaintPattern pattern)
+        {
+            int index = (int)pattern;
+            return index >= 1 && index < Shared.Length && Shared[index] != null;
+        }
+
+#if UNITY_EDITOR
+        // DontSave fields outlive a script reload and edit-mode study renders; free them before the array is lost.
+        [UnityEditor.InitializeOnLoadMethod]
+        private static void ReleaseInEditor()
+        {
+            UnityEditor.AssemblyReloadEvents.beforeAssemblyReload += ReleaseShared;
+            UnityEditor.EditorApplication.playModeStateChanged += state =>
+            { if (state == UnityEditor.PlayModeStateChange.EnteredEditMode) ReleaseShared(); };
+        }
+#endif
+
+        /// <summary>Drop the shared fields (Editor play sessions without a domain reload, and tests).</summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        public static void ReleaseShared()
+        {
+            for (int i = 0; i < Shared.Length; i++)
+            {
+                if (Shared[i] != null) LabVisualSafety.DestroyVisualObject(Shared[i]);
+                Shared[i] = null;
+            }
+        }
+
         /// <summary>
         /// Private optical rim data derived from a readable brush. The source asset and its
         /// gameplay threshold stay unchanged. R stores the interior distance in UV units times eight.
