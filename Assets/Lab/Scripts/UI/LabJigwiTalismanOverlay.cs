@@ -6,7 +6,7 @@ using UnityEngine.InputSystem;
 namespace C6Lab
 {
     /// <summary>
-    /// #479 지귀 부적: A가 시작되면 아직 부적을 안 쓴 사람의 조합판 위에 노란 부적을 덮고, 쓰는 동안 판 조작(구슬 끌기·북·던지기)을 막는다.
+    /// #479 지귀 부적: A가 시작되면 아직 부적을 안 쓴 사람의 전투 영역(박 쪽)에 세로 한지 부적을 띄우고, 쓰는 동안 조합판 조작(구슬 끌기·북·던지기)을 막는다.
     /// 부적의 점선 "물"을 손가락으로 따라 쓰면(획 순서/손 떼기 자유, 점선 밖은 무시) 지나간 점이 붉게 칠해지고,
     /// 정해 둔 비율이 칠해지면 이 기기가 Host에 한 번 알린다. 불 끄기와 보상은 Host가 정한다.
     /// </summary>
@@ -19,6 +19,8 @@ namespace C6Lab
         [SerializeField] private Color paperColor = new Color(1f, 1f, 1f, .98f);
         [Tooltip("부적 종이의 가로/세로 비율. 작을수록 좁고 길다.")]
         [SerializeField, Range(.35f, 1f)] private float paperAspect = .55f;
+        [Tooltip("전투 영역 위쪽에서 비워 둘 높이 (전투 영역 대비). 시간·체력 HUD를 가리지 않게.")]
+        [SerializeField, Range(0f, .4f)] private float topInset = .14f;
         [SerializeField] private Color inkColor = new Color(.72f, .11f, .07f, 1f);
         [SerializeField] private Color guideColor = new Color(.45f, .3f, .12f, .35f);
         [Tooltip("#479: 손가락이 지나가 칠해진 점선 색 (물빛 파랑).")]
@@ -80,7 +82,7 @@ namespace C6Lab
             Present(snapshot, source.LocalPlayerId, source.JigwiABPresentationTime);
             if (Visible)
             {
-                FitToBoard(source.board != null ? source.board.ViewCamera : null);
+                FitToBattle(source.board != null ? source.board.ViewCamera : null);
                 bool held = snapshot == null || snapshot.paused || source.GameStartHeld || source.BattlePresentationHeld;
                 if (held) hasLast = false; else ReadPointer();
             }
@@ -122,7 +124,7 @@ namespace C6Lab
         }
 
         private float Tolerance => source != null && source.config != null ? source.config.JigwiTalismanTolerance : .07f;
-        private float Required => source != null && source.config != null ? source.config.JigwiTalismanCoverage : .99f;
+        private float Required => source != null && source.config != null ? source.config.JigwiTalismanCoverage : .995f;
 
         private void Send()
         {
@@ -178,18 +180,22 @@ namespace C6Lab
             if (source != null && source.board != null) source.board.SetUiInputBlocked(value);
         }
 
-        /// <summary>판을 비추는 카메라의 화면 칸에 맞춰 부적 종이를 놓는다.</summary>
-        private void FitToBoard(Camera boardCamera)
+        /// <summary>
+        /// 조합판 위쪽 전투 영역(박이 보이는 칸)에 부적 종이를 놓는다. 아래 조합판은 가리지 않아 구슬이 타는 게 보인다.
+        /// 위쪽 HUD(시간·체력)는 topInset만큼 비운다.
+        /// </summary>
+        private void FitToBattle(Camera boardCamera)
         {
             if (paper == null || root == null) return;
             Canvas canvas = GetComponentInParent<Canvas>();
-            Rect pixels = boardCamera != null ? boardCamera.pixelRect : new Rect(0f, 0f, Screen.width, Screen.height * .46f);
+            float boardTop = boardCamera != null ? boardCamera.pixelRect.yMax : Screen.height * .46f;
+            var pixels = new Rect(0f, boardTop, Screen.width, Mathf.Max(1f, Screen.height - boardTop));
             Camera eye = canvas == null || canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
             float inset = Mathf.Min(pixels.width, pixels.height) * margin;
             if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(root,
                     new Vector2(pixels.xMin + inset, pixels.yMin + inset), eye, out Vector2 low)
                 || !RectTransformUtility.ScreenPointToLocalPointInRectangle(root,
-                    new Vector2(pixels.xMax - inset, pixels.yMax - inset), eye, out Vector2 high)) return;
+                    new Vector2(pixels.xMax - inset, pixels.yMax - pixels.height * topInset), eye, out Vector2 high)) return;
             // Local points are relative to the root's pivot, which is what localPosition uses.
             paper.anchorMin = paper.anchorMax = paper.pivot = new Vector2(.5f, .5f);
             paper.localPosition = new Vector3((low.x + high.x) * .5f, (low.y + high.y) * .5f, 0f);
@@ -233,12 +239,6 @@ namespace C6Lab
             var hintRect = hint.rectTransform;
             hintRect.anchorMin = new Vector2(.08f, .83f); hintRect.anchorMax = new Vector2(.92f, .96f);
             hintRect.offsetMin = hintRect.offsetMax = Vector2.zero;
-            // A small red seal at the foot, as on a real talisman.
-            var seal = NewRect("Talisman Seal", paper);
-            seal.anchorMin = new Vector2(.36f, .045f); seal.anchorMax = new Vector2(.64f, .12f);
-            seal.offsetMin = seal.offsetMax = Vector2.zero;
-            var sealImage = seal.gameObject.AddComponent<UnityEngine.UI.Image>();
-            sealImage.color = new Color(inkColor.r, inkColor.g, inkColor.b, .82f); sealImage.raycastTarget = false;
             hint.resizeTextForBestFit = true; hint.resizeTextMinSize = 10; hint.resizeTextMaxSize = 28;
             glyphArea = NewRect("Talisman Glyph (물)", paper);
             dots = new UnityEngine.UI.Image[stroke.Samples.Length];
