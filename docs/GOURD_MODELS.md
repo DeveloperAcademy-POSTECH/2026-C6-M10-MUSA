@@ -41,5 +41,23 @@
 
 ## 현재 상태
 
-- PR-1(이 문서 도입): 계약과 흰 박 legacy 경로만 있다. 세 스테이지 모두 `gourdVisualResource`가 비어 있어 화면 변화가 없다. 흰 박의 마운트·판정·칠 binding·요괴 자세는 main에서 기록한 골든(`Assets/Lab/Tests/PlayMode/Golden/`)과 같아야 한다.
-- 2스테이지 야광귀 박 연결은 PR-2에서 한다.
+- 흰 박의 마운트·판정·칠 binding·요괴 자세는 main에서 기록한 골든(`Assets/Lab/Tests/PlayMode/Golden/`)과 같아야 한다.
+- 1·3스테이지: 흰 박(`gourdVisualResource` 비어 있음).
+- 2스테이지: `Hapio/Gourds/Stage02_Yagwanggwi_Battle`(아래 굽기 결과). 게임 토큰 `C6HapioGame/29`.
+
+## 2스테이지 야광귀 박 굽기 (#507 PR-2)
+
+`Hapio > Gourds > Bake Stage 2 Yagwanggwi Gourd` 또는 `-executeMethod Hapio.Editor.GameGourdRigBaker.BakeFromCommandLine`. 계산은 `Hapio.GameGourdRigBake`(Editor 전용, 테스트가 다시 계산해 저장본과 비교), 저장은 `GameGourdRigBaker`가 한다. 다시 실행하면 같은 GUID의 asset을 제자리에서 덮어쓴다.
+
+| 단계 | 내용 |
+| --- | --- |
+| 크기 | 몸통 높이를 흰 박 전투 높이 2.390325에 맞춘다. 현재 아트는 이미 맞아 배율 1.00000이다. `referenceVisualSize` 1.4(LabConfig 기본 Gourd Visual Size)에서 배율 1. 루트 배율 17.096은 자식 `Yagwanggwi_Gourd`로 옮기고 루트는 1이다. |
+| 칠 공간 | 원점=몸통 중심, +Y=몸통 축(Blender Z-up과 아트의 정적 30° 앞 기울기). `Paint Shell` transform이 그 기울기를 가지므로 화면 모습은 아트와 같다. |
+| 칠 껍데기 | `model_part0.001`(이중 벽 40,960삼각형)에서 원점 방향 광선의 가장 바깥 면만 남겨 20,608삼각형. 원점에서 본 바깥 면 비율(star-shaped) 100%. 몸통 바탕 그림(`model_part0_BaseColor`)은 `_UNDERPAINT_MAP` 재질로 칠 아래에 보인다. |
+| 뚜껑 | `model_part3.001`을 닫힌 자세의 같은 칠 공간으로 구워 `Lid_Hinge` 아래 `Lid Paint`로 둔다(뚜껑 바탕 `Image_0`). 열려도 칠이 뚜껑과 함께 움직인다. 칠 셰이더 재질을 가진 extra는 자기 재질을 유지한다. |
+| 판정 껍데기 | 바깥 벽과 닫힌 뚜껑의 48×24 방향별 최대 반지름(2,208삼각형, Read/Write). 뚜껑 가장자리와 몸통 입구 사이 틈(극에서 30° 링 48방향)은 같은 열의 위아래 값으로 잇는다. 표면과의 편차 평균 0.013·최대 0.046(몸통 반지름 약 0.9). |
+| 줄·장식 | 모델 자체 줄 `Rear_Rope_Strand_1-3`·`Binding`·`Eye_Tie`를 삭제하고, 삭제 전 binding 상단 중심을 `Rope Socket`으로 둔다. 짚신은 정지 자세로 남는다(꾸밈 반복 없음). |
+| 요괴 | Animator를 지우고 첫 2초(48프레임) 중 뚜껑·정령·눈 커브만 legacy `Animation` 클립으로 옮긴다. 뚜껑 커브에서 시각을 뽑는다: 열림 시작 15f, 다 열림 26f, 열림 유지 29f까지, 내려감 38f, 거의 닫힘 45f, 닫힘 47f. `idleLoop` 꺼짐(평소 닫힘), 움찔 대상 `Eye_Pop_Control`, 들썩임 로컬 Z 0.00005. |
+| 결과 | 렌더러 17개, 311,442삼각형(원본 446,594). 아트 경량 재출력 뒤 목표는 60k 이하. |
+
+굽기 결과 최신 여부와 형상 기준은 `GameGourdRigBakeTests`가 검사한다. 아트를 바꾼 뒤 이 검사가 실패하면 굽기 도구를 다시 실행한다.

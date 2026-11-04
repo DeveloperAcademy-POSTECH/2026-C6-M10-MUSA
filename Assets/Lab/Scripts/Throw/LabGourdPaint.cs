@@ -267,7 +267,9 @@ namespace C6Lab
                 yokai.Bind(network);
             }
             shell.sharedMaterial = activeMaterial;
-            foreach (Renderer extra in extras) extra.sharedMaterial = activeMaterial;
+            // An extra with its own paint-shader material (its own body art under the paint) keeps it.
+            foreach (Renderer extra in extras)
+                if (!LabGourdVisualRig.UsesPaintShader(extra.sharedMaterial)) extra.sharedMaterial = activeMaterial;
             block = new MaterialPropertyBlock();
             EnsureTexture(Surface);
             initialized = true;

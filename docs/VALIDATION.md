@@ -4766,3 +4766,22 @@ Editor 로그 `C6_AUDIO_WARMUP`: 첫 전투는 32개를 약 70~80 ms에, 같은 
 **미실행:** iOS 실기기, 다인 Guest 화면. 실제 스테이지 박(2스테이지)은 PR-2 범위다.
 
 **골든 수정(같은 PR):** 마운트 골든의 `shellInRoot`·`hitboxInRoot`는 target 루트 기준이라 매달린 줄의 자동 상하 주기(시간에 따라 움직임)를 포함했다. 처음 기록·비교에서는 프레임 수가 같아 우연히 맞았고, 이후 실행에서 y가 -0.334445 → -0.353289로 달라져 FAIL했다. 두 줄을 움직이지 않는 VisualMount 기준(`shellInMount`·`hitboxInMount`)으로 바꿨다. 기대값은 다시 기록하지 않고 main에서 기록한 `visual.*`(위치 0.186667, 배율 0.777778)·`shell.*`(위치 -0.67, 배율 1.8, 회전 없음)의 곱으로 계산했다(배율 1.4, y -0.334444). 수정 뒤 `LabWhiteGourdGoldenTests`·`LabGourdVisualRigTests` **6/6 PASS**.
+
+## #507 PR-2 2스테이지 야광귀 박 정식 연결 — 2026-11-04
+
+PR-1(`feat/#507-gourd-rig-contract`) 위에서 Unity 6000.6.5f1 macOS batch Editor로 확인했다.
+
+**변경**
+- 굽기: `Hapio.GameGourdRigBake`(계산, Editor 전용)·`Hapio.Editor.GameGourdRigBaker`(메뉴·batch). 결과는 `docs/GOURD_MODELS.md` 표와 `Generated/BakeReport.txt`. 바깥 벽 20,608/40,960삼각형, star-shaped 100%, 판정 껍데기 2,208삼각형(표면 편차 평균 0.013·최대 0.046), 시간표 프레임 15/26/29/38/45/47(주기 48), 렌더러 17개·311,442삼각형(원본 446,594).
+- `C6Lab/GourdPaint`에 `_UNDERPAINT_MAP`(흰 박 재질은 키워드 꺼짐), 칠 셰이더 재질을 가진 extra는 자기 재질 유지.
+- `Stage02_yaguang.asset`의 `gourdVisualResource`를 굽기 도구가 SerializedObject로 설정. `GameStageAssets.EnsureAssets`는 1·3을 비움.
+- `GameGourdModelPreview`·`GameGourdModelPreviewSet`·`Resources/Hapio/GourdPreview/` 삭제(참조 GUID 0개 확인).
+- 게임 토큰 `C6HapioGame/28` → `/29`. 프로토콜 5683·`C6PhysicsLab/44`·공유 설정 257개는 그대로.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| EditMode 전체 | **1877/1877 PASS** | 새 `GameGourdRigBakeTests` 3개(메모리에서 다시 구운 메시 3개=저장본, 시간표=저장 프로필·클립 길이·모든 커브 경로 존재·뚜껑 닫힘/열림 시각, star-shaped ≥99%·판정 편차·판정 껍데기 위 애니메이션 없음·닫힌 뚜껑=칠 공간·흰 박 키워드 꺼짐·삼각형 상한 320k), `GameStageGourdVisualTests` 3개(2만 경로·1/3 비어 있음, 프리팹 계약 통과·Animator/모델 줄 없음, 덧씌우기 타입·리소스 없음), 토큰 `/29` |
+| PlayMode 관련 묶음 | **91/92** | 새 `GameStage2GourdIntegrationTests`(실제 Home→솔로→1·2·3: 1·3 흰 박, 2는 rig 마운트·판정 메시/자세=hitShell·카메라에서 쏜 광선이 판정 껍데기에 맞고 그 방향=칠 공간·몸통/뚜껑 칠 binding·요괴 평소 닫힘→콤보 예고에 뚜껑 20°+ 열림·완성 연출 복사에 몸통/뚜껑 포함·모델 줄 없음), 흰 박 골든 2/2, `LabGourdVisualRigTests`, 기존 박·요괴·매달림·지귀·씬 흐름·완성·결과 뷰어 검사. 실패 1건은 PR-1에서 main 코드로도 FAIL을 확인한 `LabWatercolorPaintRuntimeTests.DescriptorBurst…`(한 픽셀 alpha 194/195) |
+| 실제 전투 캡처(임시 코드, 커밋하지 않음) | 확인 | 1·3스테이지: 덧씌우기 삭제 전(PR-1 브랜치)과 후를 같은 정지 자세로 렌더해 비교. 3스테이지 최대 차이 1/255, 1스테이지 눈으로 같음(최대 48/255인 픽셀 1.3%가 바닥·아래쪽 배경에 흩어져 있음, 원인 미확인 — 3스테이지는 0이라 조명 변경으로 보지 않음). 2스테이지: 야광귀 박이 흰 박 크기로 마운트, 콤보 예고에 뚜껑 열림·정령 등장, PNG 내보내기(`GourdPngCapture`) 512px 성공. 연결된 판의 표면은 직접 칠할 수 없어(복제본), Lab 씬 오프라인 미리보기에서 같은 프리팹을 마운트해 71회 칠: 몸통·뚜껑에 칠이 보이고 닫힌 뚜껑 경계에서 이어짐 |
+
+**미실행:** 2스테이지에서 실제 투사체 명중이 칠 칸으로 들어가는 PlayMode(판정 메시·자세·방향이 칠 공간과 같음까지만 검사), 완성 100% 연출과 결과 미리보기의 2스테이지 실제 진입, iOS 실기기 화면·성능(311k 삼각형), 다인 Guest 화면.
