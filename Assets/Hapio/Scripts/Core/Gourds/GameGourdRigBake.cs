@@ -11,38 +11,61 @@ using Object = UnityEngine.Object;
 namespace Hapio
 {
     /// <summary>
-    /// #507 PR-2: the pure part of baking the Stage 2 Yagwanggwi gourd into the gourd model contract
-    /// (<see cref="LabGourdVisualRig"/>). It reads the art prefab without changing it and returns meshes, the yokai
-    /// timeline and a legacy clip in memory. The Editor tool (`GameGourdRigBaker`) saves them; the freshness test calls
-    /// this again and compares. Editor only (the art meshes are not Read/Write, so they are read with
-    /// <see cref="Mesh.AcquireReadOnlyMeshData(Mesh)"/>).
+    /// #507: the pure part of baking a stage's art gourd into the gourd model contract (<see cref="LabGourdVisualRig"/>).
+    /// It reads the art prefab without changing it and returns meshes, the yokai timeline and a legacy clip in memory.
+    /// The Editor tool (`GameGourdRigBaker`) saves them; the freshness test calls this again and compares. Editor only
+    /// (the art meshes are not Read/Write, so they are read with <see cref="Mesh.AcquireReadOnlyMeshData(Mesh)"/>).
+    /// All three stage gourds share one art layout; nodes are found by name without Blender's ".001" suffixes.
     /// </summary>
     public static class GameGourdRigBake
     {
-        public const string SourcePrefab = "Assets/Hapio/Art/Gourds/Stage02_Yagwanggwi/Prefabs/Yagwanggwi_Gourd_GameReady.prefab";
         /// <summary>The white gourd's in-battle height (hitbox AABB at the default Gourd Visual Size).</summary>
         public const float TargetBodyHeight = 2.390325f;
         /// <summary>The Gourd Visual Size at which the baked prefab is used at scale 1 (LabConfig default).</summary>
         public const float ReferenceVisualSize = 1.4f;
         public const int HitColumns = 48, HitRows = 24;
-        public const int CycleFrames = 48;
-        public const string ModelPath = "Yagwanggwi_Gourd";
-        public const string VesselPath = "Vessel_Forward_Tilt.002";
-        public const string BodyPath = VesselPath + "/model_part0.001";
-        public const string LidHingePath = VesselPath + "/Lid_Hinge.001";
-        public const string LidPath = LidHingePath + "/model_part3.001";
-        public const string SpiritPath = VesselPath + "/Spirit_Peek_Control.001";
-        public const string YokaiBodyPath = SpiritPath + "/Eye_Pop_Control.001";
-        public const string RopeBindingPath = "Rear_Rope_Binding.001";
+        public const string Vessel = "Vessel_Forward_Tilt", Body = "model_part0", LidHinge = "Lid_Hinge", Lid = "model_part3",
+            Spirit = "Spirit_Peek_Control", EyePop = "Eye_Pop_Control", RopeBinding = "Rear_Rope_Binding";
         /// <summary>The model's own hanging rope. The game draws its own rope, so these are removed.</summary>
         public static readonly string[] ModelRopeParts =
+            { "Rear_Rope_Strand_1", "Rear_Rope_Strand_2", "Rear_Rope_Strand_3", "Rear_Rope_Binding", "Rear_Rope_Eye_Tie" };
+
+        /// <summary>Where one stage's art comes from and where its battle gourd goes.</summary>
+        public sealed class Spec
         {
-            "Rear_Rope_Strand_1.001", "Rear_Rope_Strand_2.001", "Rear_Rope_Strand_3.001",
-            "Rear_Rope_Binding.001", "Rear_Rope_Eye_Tie.001"
-        };
+            public int Stage;
+            /// <summary>Art folder name, e.g. Stage02_Yagwanggwi.</summary>
+            public string Id;
+            public string Creature;
+            public string StageAsset;
+            public string ArtFolder => "Assets/Hapio/Art/Gourds/" + Id;
+            public string SourcePrefab => ArtFolder + "/Prefabs/" + Creature + "_Gourd_GameReady.prefab";
+            public string ModelName => Creature + "_Gourd";
+            public string GeneratedFolder => ArtFolder + "/Generated";
+            public string FilePrefix => Id.Substring(0, 7) + "_"; // Stage02_
+            public string Resource => "Hapio/Gourds/" + Id + "_Battle";
+            public string PrefabPath => "Assets/Hapio/Resources/" + Resource + ".prefab";
+            public string Label => Id.Replace('_', ' ');
+            public string Generated(string name) => GeneratedFolder + "/" + FilePrefix + name;
+        }
+
+        public static readonly Spec Stage1 = new Spec { Stage = 1, Id = "Stage01_Gumiho", Creature = "Gumiho",
+            StageAsset = "Assets/Hapio/Resources/Hapio/Stages/Stage01_gumiho.asset" };
+        public static readonly Spec Stage2 = new Spec { Stage = 2, Id = "Stage02_Yagwanggwi", Creature = "Yagwanggwi",
+            StageAsset = "Assets/Hapio/Resources/Hapio/Stages/Stage02_yaguang.asset" };
+        public static readonly Spec Stage3 = new Spec { Stage = 3, Id = "Stage03_Jigwi", Creature = "Jigwi",
+            StageAsset = "Assets/Hapio/Resources/Hapio/Stages/Stage03_jigwi.asset" };
+        public static readonly Spec[] All = { Stage1, Stage2, Stage3 };
+
+        public static Spec For(int stage)
+        {
+            foreach (Spec spec in All) if (spec.Stage == stage) return spec;
+            throw new ArgumentOutOfRangeException(nameof(stage));
+        }
 
         public sealed class Result
         {
+            public Spec Spec;
             public float Scale;
             /// <summary>Paint space in the (scaled) art root space: origin at the body centre, +Y along the body axis.</summary>
             public Vector3 PaintOrigin;
@@ -51,6 +74,10 @@ namespace Hapio
             public Vector3 RopeSocket, SizeAnchor;
             public float LidOpensAt, RisenAt, LookFrom, LookTo, EyesBackAt, SinkFrom, SunkAt, LidClosedAt, ClipLength;
             public AnimationClip Clip;
+            /// <summary>Paths below the model (the Animation's GameObject), as the art names them.</summary>
+            public string BodyPath, LidHingePath, LidPath, SpiritPath, YokaiBodyPath;
+            /// <summary>The art's own colour maps, shown under the paint.</summary>
+            public Texture BodyArt, LidArt;
             public int BodyTriangles, OuterTriangles, LidTriangles;
             public float StarShapedRatio, HitMaxDeviation, HitMeanDeviation;
             public readonly StringBuilder Log = new StringBuilder();
@@ -63,32 +90,42 @@ namespace Hapio
         }
 
         /// <summary>Bake from the saved art prefab. The caller destroys the returned objects (<see cref="Result.Destroy"/>).</summary>
-        public static Result Compute()
+        public static Result Compute(Spec spec)
         {
-            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(SourcePrefab);
-            if (prefab == null) throw new InvalidOperationException("Missing art prefab " + SourcePrefab);
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(spec.SourcePrefab);
+            if (prefab == null) throw new InvalidOperationException("Missing art prefab " + spec.SourcePrefab);
             GameObject art = Object.Instantiate(prefab);
-            try { return Compute(art); }
+            try { return Compute(spec, art); }
             finally { Object.DestroyImmediate(art); }
         }
 
         /// <summary>Bake from an instance of the art prefab at the origin. Scales the instance to the target height.</summary>
-        public static Result Compute(GameObject art)
+        public static Result Compute(Spec spec, GameObject art)
         {
-            var result = new Result();
+            var result = new Result { Spec = spec };
             Transform root = art.transform;
             root.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
-            Transform model = Require(root, ModelPath);
+            Transform model = Require(root, spec.ModelName);
             AnimationClip source = SourceClip(model);
             source.SampleAnimation(model.gameObject, 0f); // closed pose
 
-            MeshRenderer bodyRenderer = Require(model, BodyPath).GetComponent<MeshRenderer>();
-            MeshRenderer lidRenderer = Require(model, LidPath).GetComponent<MeshRenderer>();
-            Transform vessel = Require(model, VesselPath);
+            Transform vessel = Find(model, Vessel);
+            Transform bodyNode = Find(vessel, Body), hinge = Find(vessel, LidHinge), lidNode = Find(hinge, Lid);
+            Transform spirit = Find(vessel, Spirit), eyePop = Find(spirit, EyePop);
+            result.BodyPath = PathFrom(model, bodyNode);
+            result.LidHingePath = PathFrom(model, hinge);
+            result.LidPath = PathFrom(model, lidNode);
+            result.SpiritPath = PathFrom(model, spirit);
+            result.YokaiBodyPath = PathFrom(model, eyePop);
+            MeshRenderer bodyRenderer = bodyNode.GetComponent<MeshRenderer>();
+            MeshRenderer lidRenderer = lidNode.GetComponent<MeshRenderer>();
+            result.BodyArt = BaseMap(bodyRenderer);
+            result.LidArt = BaseMap(lidRenderer);
 
             float height = bodyRenderer.bounds.size.y;
             result.Scale = TargetBodyHeight / height;
             root.localScale *= result.Scale;
+            result.Log.AppendLine("source=" + spec.SourcePrefab);
             result.Log.AppendLine("bodyHeightBefore=" + height.ToString("F4") + " scale=" + result.Scale.ToString("F5"));
 
             // Paint frame: +Y along the body's own axis (Blender Z-up plus the art's static 30° forward tilt), X along the
@@ -112,7 +149,7 @@ namespace Hapio
             result.Log.AppendLine("paintOrigin=" + origin.ToString("F4") + " axis=" + axis.ToString("F4")
                 + " bodyExtentInFrame=" + ((max - min) * .5f).ToString("F4"));
 
-            // Body in paint space; keep only the outer wall (the art body is double-walled).
+            // Body in paint space; keep only the outer wall (an art body may be double-walled).
             Triangles bodyTris = Transform(body, worldToPaint * bodyToWorld);
             result.BodyTriangles = bodyTris.Count;
             var bodyGrid = new DirectionGrid(bodyTris);
@@ -131,7 +168,7 @@ namespace Hapio
             }
             result.OuterTriangles = outer.Count;
             result.StarShapedRatio = outer.Count > 0 ? starFacing / (float)outer.Count : 0f;
-            result.PaintShell = bodyTris.Build(outer, "Stage02 Yagwanggwi paint shell");
+            result.PaintShell = bodyTris.Build(outer, spec.Label + " paint shell");
             result.Log.AppendLine("bodyTris=" + bodyTris.Count + " outerTris=" + outer.Count
                 + " starShaped=" + result.StarShapedRatio.ToString("P2"));
 
@@ -139,18 +176,19 @@ namespace Hapio
             Triangles lidTris = Transform(Read(lidRenderer.GetComponent<MeshFilter>().sharedMesh),
                 worldToPaint * lidRenderer.transform.localToWorldMatrix);
             result.LidTriangles = lidTris.Count;
-            result.LidPaint = lidTris.Build(null, "Stage02 Yagwanggwi lid paint");
+            result.LidPaint = lidTris.Build(null, spec.Label + " lid paint");
 
             // Hit shell: the outermost radius of the outer wall and the closed lid along 48 x 24 directions.
             Triangles outerTris = bodyTris.Subset(outer);
             var hitGrid = new DirectionGrid(outerTris, lidTris);
             result.HitShell = BuildHitShell(hitGrid, result);
+            result.HitShell.name = spec.Label + " hit shell";
             // Deviation: how far the outer wall lies from the hit shell along rays from the paint origin.
             MeasureHitDeviation(outerTris, result);
             result.Log.AppendLine("hitTris=" + result.HitShell.triangles.Length / 3 + " hitMaxDeviation="
                 + result.HitMaxDeviation.ToString("F4") + " hitMeanDeviation=" + result.HitMeanDeviation.ToString("F4"));
 
-            Transform binding = Require(root, ModelPath + "/" + RopeBindingPath);
+            Transform binding = Find(model, RopeBinding);
             Bounds bindingBounds = binding.GetComponent<Renderer>().bounds;
             result.RopeSocket = new Vector3(bindingBounds.center.x, bindingBounds.max.y, bindingBounds.center.z);
             Bounds hitBounds = result.HitShell.bounds;
@@ -158,8 +196,8 @@ namespace Hapio
             result.Log.AppendLine("ropeSocket=" + result.RopeSocket.ToString("F4") + " sizeAnchor=" + result.SizeAnchor.ToString("F4")
                 + " hitTopInPaint=" + hitBounds.max.y.ToString("F4"));
 
-            ExtractTimeline(source, result);
-            result.Clip = BuildLegacyClip(source);
+            int cycle = ExtractTimeline(source, result);
+            result.Clip = BuildLegacyClip(source, result, cycle);
             return result;
         }
 
@@ -172,37 +210,81 @@ namespace Hapio
             return animator.runtimeAnimatorController.animationClips[0];
         }
 
-        /// <summary>
-        /// Profile times from the lid curve of the first 2-second cycle: closed until it starts opening, fully open
-        /// (risen), held open (look-around), sinking once it is 20% closed, sunk when nearly shut, then closed.
-        /// </summary>
-        private static void ExtractTimeline(AnimationClip clip, Result result)
+        /// <summary>The art name without Blender's duplicate suffix (".001", ".002").</summary>
+        public static string BaseName(string name)
         {
-            AnimationCurve lid = Curve(clip, LidHingePath, "m_LocalRotation.x");
+            int dot = name.LastIndexOf('.');
+            if (dot <= 0 || dot == name.Length - 1) return name;
+            for (int i = dot + 1; i < name.Length; i++) if (!char.IsDigit(name[i])) return name;
+            return name.Substring(0, dot);
+        }
+
+        /// <summary>The single node below <paramref name="root"/> with this base name (an active rendering one wins a tie).</summary>
+        public static Transform Find(Transform root, string baseName)
+        {
+            var found = new List<Transform>();
+            foreach (Transform t in root.GetComponentsInChildren<Transform>(true))
+                if (t != root && BaseName(t.name) == baseName) found.Add(t);
+            if (found.Count > 1)
+            {
+                var rendering = found.FindAll(t => t.gameObject.activeInHierarchy
+                    && (t.GetComponent<Renderer>() == null || t.GetComponent<Renderer>().enabled));
+                if (rendering.Count == 1) return rendering[0];
+                throw new InvalidOperationException("Several art parts are named " + baseName + ".");
+            }
+            if (found.Count == 0) throw new InvalidOperationException("Missing art part " + baseName);
+            return found[0];
+        }
+
+        public static string PathFrom(Transform root, Transform child)
+        {
+            string path = child.name;
+            for (Transform t = child.parent; t != null && t != root; t = t.parent) path = t.name + "/" + path;
+            return path;
+        }
+
+        private static Texture BaseMap(Renderer renderer)
+        {
+            Material material = renderer.sharedMaterial;
+            Texture art = material != null && material.HasProperty("_BaseMap") ? material.GetTexture("_BaseMap") : null;
+            if (art == null) throw new InvalidOperationException(renderer.name + " has no base colour map to show under the paint.");
+            return art;
+        }
+
+        /// <summary>
+        /// Profile times from the lid curve's first cycle: closed until it starts opening, fully open (risen), held open
+        /// (look-around), sinking once it is 20% closed, sunk when nearly shut, then closed. The cycle ends one frame after it
+        /// closes. Returns the cycle length in frames.
+        /// </summary>
+        private static int ExtractTimeline(AnimationClip clip, Result result)
+        {
+            AnimationCurve lid = Curve(clip, result.LidHingePath, "m_LocalRotation.x");
             float fps = clip.frameRate;
-            var open = new float[CycleFrames + 1];
+            int frames = Mathf.RoundToInt(clip.length * fps);
+            var open = new float[frames + 1];
             float closedValue = lid.Evaluate(0f), openValue = closedValue;
-            for (int f = 0; f <= CycleFrames; f++)
+            for (int f = 0; f <= frames; f++)
             {
                 float value = lid.Evaluate(f / fps);
                 if (Mathf.Abs(value - closedValue) > Mathf.Abs(openValue - closedValue)) openValue = value;
             }
             float span = openValue - closedValue;
-            if (Mathf.Abs(span) < 1e-4f) throw new InvalidOperationException("The lid never opens in the first cycle.");
-            for (int f = 0; f <= CycleFrames; f++) open[f] = (lid.Evaluate(f / fps) - closedValue) / span;
+            if (Mathf.Abs(span) < 1e-4f) throw new InvalidOperationException("The lid never opens.");
+            for (int f = 0; f <= frames; f++) open[f] = (lid.Evaluate(f / fps) - closedValue) / span;
             int opens = -1, risen = -1, held = -1, sink = -1, sunk = -1, closed = -1;
-            for (int f = 0; f <= CycleFrames; f++)
+            for (int f = 0; f <= frames && closed < 0; f++)
             {
                 if (opens < 0 && open[f] > .01f) opens = f - 1;
                 if (opens >= 0 && risen < 0 && open[f] > .99f) risen = f;
-                if (risen >= 0 && open[f] > .99f) held = f;
+                if (risen >= 0 && sink < 0 && open[f] > .99f) held = f;
                 if (held >= 0 && f > held && sink < 0 && open[f] < .8f) sink = f;
                 if (sink >= 0 && sunk < 0 && open[f] < .05f) sunk = f;
                 if (sunk >= 0 && closed < 0 && open[f] < .001f) closed = f;
             }
-            if (opens < 0 || risen < 0 || held <= risen || sink < 0 || sunk < 0 || closed < 0)
+            if (opens < 0 || risen < 0 || held <= risen || sink < 0 || sunk < 0 || closed < 0 || closed + 1 > frames)
                 throw new InvalidOperationException("Could not find the lid keys (" + opens + "," + risen + "," + held + ","
                     + sink + "," + sunk + "," + closed + ").");
+            int cycle = closed + 1;
             result.LidOpensAt = opens / fps;
             result.RisenAt = risen / fps;
             result.LookFrom = risen / fps;
@@ -211,24 +293,30 @@ namespace Hapio
             result.EyesBackAt = (result.LookTo + result.SinkFrom) * .5f;
             result.SunkAt = sunk / fps;
             result.LidClosedAt = closed / fps;
-            result.ClipLength = CycleFrames / fps;
+            result.ClipLength = cycle / fps;
             result.Log.AppendLine("timeline frames opens=" + opens + " risen=" + risen + " held=" + held + " sink=" + sink
-                + " sunk=" + sunk + " closed=" + closed + " cycle=" + CycleFrames);
+                + " sunk=" + sunk + " closed=" + closed + " cycle=" + cycle);
+            return cycle;
         }
 
-        /// <summary>The lid, peek and eye curves of the first cycle as a legacy clip. Decorations (sandal) do not loop.</summary>
-        private static AnimationClip BuildLegacyClip(AnimationClip source)
+        /// <summary>
+        /// The lid, peek and eye curves of the first cycle as a legacy clip: transforms, and the eyes' expression blend
+        /// shapes. Decorations (sandal, charm, ribbons) do not loop.
+        /// </summary>
+        private static AnimationClip BuildLegacyClip(AnimationClip source, Result result, int cycleFrames)
         {
-            var clip = new AnimationClip { name = "Yagwanggwi_Peek", legacy = true, frameRate = source.frameRate, wrapMode = WrapMode.Once };
-            float end = CycleFrames / source.frameRate;
+            var clip = new AnimationClip { name = result.Spec.Creature + "_Peek", legacy = true, frameRate = source.frameRate,
+                wrapMode = WrapMode.Once };
+            float end = cycleFrames / source.frameRate;
             foreach (EditorCurveBinding binding in AnimationUtility.GetCurveBindings(source))
             {
-                if (binding.type != typeof(Transform)) continue;
-                if (!binding.path.StartsWith(LidHingePath, StringComparison.Ordinal)
-                    && !binding.path.StartsWith(SpiritPath, StringComparison.Ordinal)) continue;
+                bool transform = binding.type == typeof(Transform);
+                bool expression = binding.type == typeof(SkinnedMeshRenderer)
+                    && binding.propertyName.StartsWith("blendShape.", StringComparison.Ordinal);
+                if (!transform && !expression) continue;
+                if (!Under(binding.path, result.LidHingePath) && !Under(binding.path, result.SpiritPath)) continue;
                 // The art lid and body meshes are replaced by the baked paint meshes.
-                if (binding.path == LidPath || binding.path.StartsWith(LidPath + "/", StringComparison.Ordinal)
-                    || binding.path == BodyPath) continue;
+                if (Under(binding.path, result.LidPath) || binding.path == result.BodyPath) continue;
                 AnimationCurve curve = AnimationUtility.GetEditorCurve(source, binding);
                 var keys = new List<Keyframe>();
                 foreach (Keyframe key in curve.keys) if (key.time <= end + 1e-4f) keys.Add(key);
@@ -237,6 +325,9 @@ namespace Hapio
             }
             return clip;
         }
+
+        private static bool Under(string path, string root) => path == root
+            || path.StartsWith(root + "/", StringComparison.Ordinal);
 
         public static AnimationCurve Curve(AnimationClip clip, string path, string property)
         {

@@ -6,21 +6,26 @@ using UnityEngine;
 namespace Hapio.Tests
 {
     /// <summary>
-    /// #507 PR-2: the saved Stage 2 battle gourd is what baking the art prefab produces now (re-bake in memory and compare),
-    /// and the bake meets its geometric checks. Re-run `Hapio > Gourds > Bake Stage 2 Yagwanggwi Gourd` when this fails
-    /// after an art update.
+    /// #507: each stage's saved battle gourd is what baking its art prefab produces now (re-bake in memory and compare),
+    /// and the bake meets its geometric checks. Re-run `Hapio > Gourds > Bake All Stage Gourds` when this fails after an
+    /// art update.
     /// </summary>
+    [TestFixture(1)]
+    [TestFixture(2)]
+    [TestFixture(3)]
     public sealed class GameGourdRigBakeTests
     {
-        private const string Generated = "Assets/Hapio/Art/Gourds/Stage02_Yagwanggwi/Generated/";
-        private const string Prefab = "Assets/Hapio/Resources/Hapio/Gourds/Stage02_Yagwanggwi_Battle.prefab";
-        /// <summary>Before the lighter art re-export. Lower to 60k when it arrives.</summary>
-        private const int TriangleBudget = 320000;
+        private readonly GameGourdRigBake.Spec spec;
+        private string Prefab => spec.PrefabPath;
+        /// <summary>Triangles in the battle gourd. Stage 2 is before its lighter art re-export (lower to 60k when it arrives).</summary>
+        private int TriangleBudget => spec.Stage == 2 ? 320000 : 90000;
 
-        private static GameGourdRigBake.Result result;
+        private GameGourdRigBake.Result result;
+
+        public GameGourdRigBakeTests(int stage) { spec = GameGourdRigBake.For(stage); }
 
         [OneTimeSetUp]
-        public void Bake() => result = GameGourdRigBake.Compute();
+        public void Bake() => result = GameGourdRigBake.Compute(spec);
 
         [OneTimeTearDown]
         public void Release() { result?.Destroy(); result = null; }
@@ -28,17 +33,17 @@ namespace Hapio.Tests
         [Test]
         public void TheSavedMeshesAreTheCurrentBake()
         {
-            AssertSame(result.PaintShell, Generated + "Stage02_PaintShell.asset");
-            AssertSame(result.LidPaint, Generated + "Stage02_LidPaint.asset");
-            AssertSame(result.HitShell, Generated + "Stage02_HitShell.asset");
-            Assert.That(AssetDatabase.LoadAssetAtPath<Mesh>(Generated + "Stage02_HitShell.asset").isReadable, Is.True,
+            AssertSame(result.PaintShell, spec.Generated("PaintShell.asset"));
+            AssertSame(result.LidPaint, spec.Generated("LidPaint.asset"));
+            AssertSame(result.HitShell, spec.Generated("HitShell.asset"));
+            Assert.That(AssetDatabase.LoadAssetAtPath<Mesh>(spec.Generated("HitShell.asset")).isReadable, Is.True,
                 "The runtime MeshCollider needs a readable hit shell.");
         }
 
         [Test]
         public void TheSavedTimelineIsTheCurrentBakeInOrderWithExistingPaths()
         {
-            var profile = AssetDatabase.LoadAssetAtPath<LabGourdYokaiProfile>(Generated + "Stage02_YokaiProfile.asset");
+            var profile = AssetDatabase.LoadAssetAtPath<LabGourdYokaiProfile>(spec.Generated("YokaiProfile.asset"));
             Assert.That(profile, Is.Not.Null);
             Assert.That(profile.IsValid(out string reason), Is.True, reason);
             Assert.That(profile.lidOpensAt, Is.EqualTo(result.LidOpensAt).Within(1e-5f));
@@ -52,7 +57,7 @@ namespace Hapio.Tests
             Assert.That(profile.clipLength, Is.EqualTo(result.ClipLength).Within(1e-5f));
             Assert.That(profile.idleLoop, Is.False);
 
-            var clip = AssetDatabase.LoadAssetAtPath<AnimationClip>(Generated + "Stage02_YokaiPeek.anim");
+            var clip = AssetDatabase.LoadAssetAtPath<AnimationClip>(spec.Generated("YokaiPeek.anim"));
             Assert.That(clip.legacy, Is.True);
             Assert.That(clip.length, Is.EqualTo(profile.clipLength).Within(1e-4f));
             var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(Prefab);
@@ -64,7 +69,7 @@ namespace Hapio.Tests
             foreach (EditorCurveBinding binding in AnimationUtility.GetCurveBindings(clip))
                 Assert.That(model.Find(binding.path), Is.Not.Null, "Every curve path exists: " + binding.path);
             // The clip's own lid matches the source performance at each extracted time.
-            AnimationCurve saved = GameGourdRigBake.Curve(clip, GameGourdRigBake.LidHingePath, "m_LocalRotation.x");
+            AnimationCurve saved = GameGourdRigBake.Curve(clip, result.LidHingePath, "m_LocalRotation.x");
             Assert.That(saved.Evaluate(profile.lidOpensAt), Is.EqualTo(saved.Evaluate(0f)).Within(1e-3f), "Closed until it opens.");
             Assert.That(saved.Evaluate(profile.lidClosedAt), Is.EqualTo(saved.Evaluate(0f)).Within(1e-3f), "Closed again.");
             Assert.That(Mathf.Abs(saved.Evaluate(profile.risenAt) - saved.Evaluate(0f)), Is.GreaterThan(.2f), "Open when risen.");
@@ -75,7 +80,7 @@ namespace Hapio.Tests
         {
             TestContext.WriteLine(result.Log.ToString());
             Assert.That(result.StarShapedRatio, Is.GreaterThanOrEqualTo(.99f), "Paint directions map one-to-one onto the shell.");
-            Assert.That(result.OuterTriangles, Is.LessThan(result.BodyTriangles), "Only the outer wall of the double-walled body.");
+            Assert.That(result.OuterTriangles, Is.LessThanOrEqualTo(result.BodyTriangles), "Only the outer wall of the body.");
             Assert.That(result.OuterTriangles, Is.GreaterThan(result.BodyTriangles / 3));
             Assert.That(result.HitMeanDeviation, Is.LessThan(.03f), "The hit shell hugs the painted surface.");
             Assert.That(result.HitMaxDeviation, Is.LessThan(.08f));
@@ -97,10 +102,11 @@ namespace Hapio.Tests
                 "The white gourd keeps the original shader variant.");
 
             int triangles = 0, renderers = 0;
-            foreach (MeshRenderer renderer in prefab.GetComponentsInChildren<MeshRenderer>(true))
+            foreach (Renderer renderer in prefab.GetComponentsInChildren<Renderer>(true))
             {
+                Mesh mesh = renderer is SkinnedMeshRenderer skinned ? skinned.sharedMesh : renderer.GetComponent<MeshFilter>()?.sharedMesh;
+                if (mesh == null) continue;
                 renderers++;
-                Mesh mesh = renderer.GetComponent<MeshFilter>().sharedMesh;
                 for (int s = 0; s < mesh.subMeshCount; s++) triangles += (int)mesh.GetIndexCount(s) / 3;
             }
             TestContext.WriteLine("renderers=" + renderers + " triangles=" + triangles);

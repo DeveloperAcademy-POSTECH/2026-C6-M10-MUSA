@@ -4875,3 +4875,21 @@ PR-1(`feat/#507-gourd-rig-contract`) 위에서 Unity 6000.6.5f1 macOS batch Edit
 | 새 검사 + `GameStage2GourdIntegrationTests`·`GameSceneFlowTests`·`GameJigwiStageIntegrationTests` | **24/24 PASS** |
 
 **미실행:** iOS 실기기 화면·성능, 다인 Guest 화면, 아트 경량 재출력 반영.
+
+## #507 후속 1·3스테이지 박 굽기와 연결 — 2026-11-04
+
+기준 main `35ca1de8`(#512 구미호·#514 지귀 아트, #519 주광 병합 뒤)에서 Unity 6000.6.5f1 macOS batch Editor로 확인했다.
+
+**변경**
+- 굽기 도구를 스테이지별 명세(`GameGourdRigBake.Spec`)로 일반화: 노드를 `.001` 접미사를 뗀 이름으로 찾고, 칠 아래 바탕은 원래 재질의 `_BaseMap`, 시간표 주기는 첫 "닫힘→열림→닫힘"의 닫힌 프레임+1, 요괴 클립에 눈 BlendShape 커브 포함. 메뉴는 스테이지별 3개와 `Bake All Stage Gourds`.
+- 일반화 뒤 2스테이지만 다시 구워 git으로 비교: 메시·클립·프로필·재질·프리팹이 **바이트 단위로 같음**(`BakeReport.txt`에 source 줄만 추가).
+- 1·3스테이지 굽기와 `Stage01_gumiho`·`Stage03_jigwi` `gourdVisualResource` 연결. `GameStageAssets.EnsureAssets`는 경로를 더 이상 비우지 않는다. 게임 토큰 `C6HapioGame/29` → `/30`.
+- 굽기 결과는 `docs/GOURD_MODELS.md` 표(1·3: 바깥 면 7,262/14,336, star-shaped 100%, 판정 편차 평균 0.013·최대 0.045, 시간표 15/26/29/38/45/47·주기 48, 1: 30렌더러·61,505삼각형, 3: 17렌더러·66,637삼각형).
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| EditMode 전체 | **1885/1885 PASS** | `GameGourdRigBakeTests`를 세 스테이지 fixture로(최신 여부·시간표·형상·삼각형 상한), `GameStageGourdVisualTests`(세 스테이지 경로·계약), 토큰 `/30` |
+| PlayMode 관련 묶음 | **84/84 PASS** | `GameStageGourdIntegrationTests`(이전 `GameStage2GourdIntegrationTests`, 세 스테이지 모두 rig·판정=hitShell·광선 방향=칠 공간·줄 끝=소켓·몸통/뚜껑 칠 binding·요괴 평소 닫힘→콤보 예고에 뚜껑 열림·완성 복사), `GameJigwiStageIntegrationTests`(3스테이지 rig·A/B가 판정 메시를 바꾸지 않음), `GameStage2GourdHitFinishTests`, `GameSceneFlowTests`(1→2→3 완료·결과 미리보기), 흰 박 골든, `LabGourdVisualRigTests`, `LabContinuousRopeTests`, `LabGourdYokaiTests`, `LabGourdPaintTests`, `GourdResultViewerPlayModeTests`, `LabJigwiABPresentationTests` |
+| 실제 전투 캡처(임시) | 확인 | 1·2·3스테이지 정지와 콤보 예고(정령 등장). 1·3스테이지 박을 Lab 오프라인 미리보기에 마운트해 71회 칠: 몸통·뚜껑에 칠이 보임 |
+
+**미실행:** iOS 실기기 화면·성능, 다인 Guest 화면. 1스테이지 눈(`SkinnedMeshRenderer`)은 완성 연출·결과 미리보기 복사에 들어가지 않는다(완성 때 뚜껑이 닫혀 있어 보이지 않음).

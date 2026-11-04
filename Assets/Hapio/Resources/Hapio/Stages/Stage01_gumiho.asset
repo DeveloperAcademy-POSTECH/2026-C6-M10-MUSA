@@ -17,4 +17,5 @@ MonoBehaviour:
   displayName: "\uAD6C\uBBF8\uD638"
   yokai: 1
   yokaiVisual: {fileID: 0}
+  gourdVisualResource: Hapio/Gourds/Stage01_Gumiho_Battle
   defaultValues: []

@@ -30,3 +30,7 @@ In the current Unity Editor:
 - Body center and height match the placement convention used by stage2. The active Battle Scene remained unmodified.
 
 No gameplay, network, paint/collision integration, device performance or full test-suite pass is claimed. The console also contained Transport/domain-lifecycle errors; this asset validation is not a zero-console-errors claim.
+
+## Battle bake (#507)
+
+The game uses `Resources/Hapio/Gourds/Stage01_Gumiho_Battle.prefab`, baked from the GameReady prefab by `Hapio > Gourds > Bake All Stage Gourds` (`Hapio.Editor.GameGourdRigBaker`). The art prefab, FBX and materials are not modified. The bake writes `Generated/` (outer-wall paint shell, closed-lid paint mesh, 48 x 24 hit shell, legacy 2 s yokai clip, yokai timeline, body and lid paint materials showing the art's base colour under the paint) and `Generated/BakeReport.txt`. It removes the model's own hanging rope (`Rear_Rope_*`) and the looping Animator; decorations stay in their closed pose.

@@ -17,4 +17,5 @@ MonoBehaviour:
   displayName: "\uC9C0\uADC0"
   yokai: 3
   yokaiVisual: {fileID: 0}
+  gourdVisualResource: Hapio/Gourds/Stage03_Jigwi_Battle
   defaultValues: []

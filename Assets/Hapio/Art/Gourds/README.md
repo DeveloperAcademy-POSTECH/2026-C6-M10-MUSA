@@ -1,7 +1,9 @@
 # Stage gourds
 
-- Stage01_Gumiho: imported Stage 1 model, textures, URP materials, controller and placement prefab; stage-selection integration is pending.
-- Stage02_Yagwanggwi: imported Stage 2 model, textures, materials, controller and prefab.
-- Stage03_Jigwi: reserved for Stage 3.
+- Stage01_Gumiho: Stage 1 art (model, textures, URP materials, controller, placement prefab).
+- Stage02_Yagwanggwi: Stage 2 art.
+- Stage03_Jigwi: Stage 3 art.
+
+The game uses the baked battle gourds in `Assets/Hapio/Resources/Hapio/Gourds/` (each stage's `Generated/` folder holds the baked meshes, clip, timeline and paint materials). Bake them with `Hapio > Gourds > Bake All Stage Gourds`; never edit the art prefabs for gameplay. See `docs/GOURD_MODELS.md`.
 
 Keep each stage's Models, Textures, Materials, Animations and Prefabs in its own folder.
