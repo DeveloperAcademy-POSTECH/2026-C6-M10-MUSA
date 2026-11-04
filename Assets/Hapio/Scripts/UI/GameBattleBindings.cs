@@ -42,6 +42,10 @@ namespace Hapio
             foreach (GameObject root in gameObject.scene.GetRootGameObjects())
                 foreach (LabLobbyView standaloneLobby in root.GetComponentsInChildren<LabLobbyView>(true))
                     standaloneLobby.gameObject.SetActive(false);
+            // #507: every Hapio stage draws one curved rope from the fixed anchor to the gourd. Presentation only;
+            // runs before LabHangingTarget.Awake builds the rig, and Battle.unity keeps its saved Segmented value.
+            LabHangingTarget hanging = target != null ? target.GetComponent<LabHangingTarget>() : null;
+            if (hanging != null) hanging.SetRopeStyle(LabRopeStyle.Curved);
             session = GameSession.EnsureExists();
             LabNetwork network = session.Network;
             network.BindBattleReferences(board, target, battleCamera, battleFloor, impactFeedback, projectileRoot);
