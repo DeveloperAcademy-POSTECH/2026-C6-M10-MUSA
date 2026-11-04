@@ -18,27 +18,45 @@ namespace Hapio
         private Rect hole;
         private float corner;
         private float soft;
+        private float angle;
         private readonly List<Vector2> outline = new List<Vector2>();
         private readonly List<Vector2> normals = new List<Vector2>();
 
         public Rect Hole => hole;
         public float Corner => corner;
+        public float Angle => angle;
 
         /// <summary>
         /// A hole in this graphic's local space with rounded corners (a circle when <paramref name="cornerRadius"/> is
-        /// half its side). <paramref name="softWidth"/> is the fading rim inside the hole's edge.
+        /// half its side), turned <paramref name="degrees"/> counter-clockwise about its center (a tilted capsule).
+        /// <paramref name="softWidth"/> is the fading rim inside the hole's edge.
         /// </summary>
-        public void SetHole(Rect area, float cornerRadius, float softWidth)
+        public void SetHole(Rect area, float cornerRadius, float softWidth, float degrees = 0f)
         {
             area.width = Mathf.Max(0f, area.width);
             area.height = Mathf.Max(0f, area.height);
             cornerRadius = Mathf.Clamp(cornerRadius, 0f, Mathf.Min(area.width, area.height) * .5f);
             softWidth = Mathf.Clamp(softWidth, 0f, cornerRadius);
-            if (area == hole && Mathf.Approximately(cornerRadius, corner) && Mathf.Approximately(softWidth, soft)) return;
+            if (float.IsNaN(degrees) || float.IsInfinity(degrees)) degrees = 0f;
+            if (area == hole && Mathf.Approximately(cornerRadius, corner) && Mathf.Approximately(softWidth, soft)
+                && Mathf.Approximately(degrees, angle)) return;
             hole = area;
             corner = cornerRadius;
             soft = softWidth;
+            angle = degrees;
             SetVerticesDirty();
+        }
+
+        /// <summary>Turn outline points and normals <paramref name="degrees"/> counter-clockwise about <paramref name="pivot"/>.</summary>
+        public static void Rotate(List<Vector2> points, List<Vector2> outward, Vector2 pivot, float degrees)
+        {
+            if (Mathf.Approximately(degrees, 0f)) return;
+            Quaternion turn = Quaternion.Euler(0f, 0f, degrees);
+            for (int i = 0; i < points.Count; i++)
+            {
+                points[i] = pivot + (Vector2)(turn * (points[i] - pivot));
+                outward[i] = turn * outward[i];
+            }
         }
 
         /// <summary>A round hole: <see cref="SetHole(Rect, float, float)"/> with a square and half its side as the corner.</summary>
@@ -121,6 +139,7 @@ namespace Hapio
             clear.a = 0;
             Outline(hole, corner, outline, normals);
             Vector2 center = hole.center;
+            Rotate(outline, normals, center, angle);
             float far = CoveringRadius(area, center, outline);
             for (int i = 0; i < outline.Count; i++)
             {

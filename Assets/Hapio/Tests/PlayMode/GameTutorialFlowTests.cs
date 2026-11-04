@@ -148,7 +148,44 @@ namespace Hapio.Tests
             // The refill is released and shown until full, then the tutorial leaves for the room list.
             Assert.That(director.CurrentBeat.Action, Is.EqualTo(GameTutorialAction.RefillStamina));
             Assert.That(network.TutorialStaminaHeld, Is.False);
-            yield return Until(() => director.IsFinishing, "The gauge refills and the last step ends", 15f);
+            yield return Until(() => director.StepIndex == 2 && director.IsShowingLine, "The gauge refills and 2단계 starts", 15f);
+
+            // 2단계: three lines over the orbs, then one yin dragged onto the yang makes fire and leaves one yin.
+            Assert.That(board.KeepOutCount, Is.EqualTo(4), "Walls keep orbs off the three faces and the gauge.");
+            // The three orbs always rest in the same places around the drum: yin left, yang right, yin just above the yang.
+            LabOrbView drumView = Object.FindObjectsByType<LabOrbView>(FindObjectsSortMode.None).Single(view => view.Kind == LabOrbKind.Drum);
+            Vector3[] rested = network.Snapshot.orbs.Where(orb => orb.owner == network.LocalPlayerId).OrderBy(orb => orb.createdAt)
+                .Select(orb => Object.FindObjectsByType<LabOrbView>(FindObjectsSortMode.None).Single(view => view.OrbId == orb.id)
+                    .transform.position - drumView.transform.position).ToArray();
+            Assert.That(rested.Length, Is.EqualTo(3));
+            Assert.That(rested[0].x < 0f, Is.True, "First yin left of the drum: " + rested[0]);
+            Assert.That(rested[1].x > 0f, Is.True, "Yang right of the drum: " + rested[1]);
+            Assert.That(rested[2].x > 0f && rested[2].y > rested[1].y, Is.True, "Second yin above the yang: " + rested[2]);
+            Assert.That((rested[2] - rested[1]).magnitude, Is.LessThan((rested[0] - rested[1]).magnitude), "The yin beside the yang pairs.");
+            for (int line = 0; line < 3; line++) yield return TapThrough(director, tap, art);
+            Assert.That(director.CurrentBeat.Action, Is.EqualTo(GameTutorialAction.CombineOrbs));
+            Assert.That(board.AllowedGestures, Is.EqualTo(LabBoardGestures.OrbMove), "Only orbs move; no drum, no throw.");
+            yield return null;
+            Assert.That(director.GetComponentsInChildren<GameTutorialArrow>(true).Single().gameObject.activeSelf, Is.True,
+                "The arrow points from a yin to the yang.");
+            LabOrbView[] views = Object.FindObjectsByType<LabOrbView>(FindObjectsSortMode.None);
+            LabOrbView yang = views.Single(view => view.Kind == LabOrbKind.Yang);
+            LabOrbView yin = views.Where(view => view.Kind == LabOrbKind.Yin)
+                .OrderBy(view => (view.transform.position - yang.transform.position).sqrMagnitude).First();
+            double now = Time.realtimeSinceStartupAsDouble;
+            Assert.That(board.TryBeginDragAtWorld(yin.transform.position, now), Is.True, "The yin can be picked up.");
+            board.DragToWorld(yang.transform.position, now + .1d);
+            Assert.That(board.EndDragAtWorld(yang.transform.position, now + .4d), Is.True);
+            yield return Until(() => director.ActionProgress == 1, "Dropped on the yang, the pair combines");
+            LabOrbState[] mine = network.Snapshot.orbs.Where(orb => orb.owner == network.LocalPlayerId).ToArray();
+            Assert.That(mine.Count(orb => orb.kind == LabOrbKind.Combined && orb.element == GameTutorialScript.CombineResult),
+                Is.EqualTo(1), "Always fire (red).");
+            Assert.That(mine.Count(orb => orb.kind == LabOrbKind.Yin), Is.EqualTo(1), "One yin is kept for 4단계.");
+            Assert.That(mine.Count(orb => orb.kind == LabOrbKind.Yang), Is.EqualTo(0));
+            yield return Until(() => director.CurrentBeat.IsLine, "\"우와, 색이 변했어!\" after 성공!");
+            Assert.That(director.CurrentBeat.Focus, Is.EqualTo(GameTutorialFocus.None), "The red orb and the yin show plainly.");
+            for (int line = 0; line < 3; line++) yield return TapThrough(director, tap, art);
+            Assert.That(director.IsFinishing, Is.True, "2단계 is the last step for now.");
             yield return Until(() => session.State.phase == GameFlowPhase.Home && !session.IsLoadingScene
                 && session.RoomBrowserVisible, "The tutorial leaves for the room list", 30f);
             Assert.That(session.IsTutorial, Is.False);

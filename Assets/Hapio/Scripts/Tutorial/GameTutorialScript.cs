@@ -12,7 +12,14 @@ namespace Hapio
     public enum GameTutorialSpeaker { Bul, Muk, Geumok }
 
     /// <summary>화면을 어둡게 하고 밝혀 둘 곳. None이면 어둡게 하지 않는다.</summary>
-    public enum GameTutorialFocus { None, Gourd, Drum, Stamina }
+    public enum GameTutorialFocus
+    {
+        None, Gourd, Drum, Stamina,
+        /// <summary>내 판의 검은 음구슬 두 개만 (흰 양구슬은 빼고). 둘을 잇는 방향으로 기울어진 알약 모양으로 밝힌다.</summary>
+        Yins,
+        /// <summary>합칠 음구슬 하나와 양구슬 하나 (양구슬에 가장 가까운 음구슬).</summary>
+        Pair
+    }
 
     /// <summary>다음으로 넘어가기 전에 기다리는 일. None은 화면을 눌러 넘기는 대사다.</summary>
     public enum GameTutorialAction
@@ -21,7 +28,9 @@ namespace Hapio
         /// <summary>북을 Count번 눌러 구슬을 만든다. 북은 가운데에 고정되고 다른 손동작은 막힌다.</summary>
         TapDrum,
         /// <summary>멈춰 둔 기운 회복을 풀고 막대가 다 차기를 기다린다. 화면은 누를 수 없다.</summary>
-        RefillStamina
+        RefillStamina,
+        /// <summary>음구슬을 끌어 양구슬 위에 놓아 Count번 합친다. 구슬만 잡을 수 있고 북·던지기는 막힌다.</summary>
+        CombineOrbs
     }
 
     /// <summary>한 장면이 뜰 때 함께 보여 주는 연출.</summary>
@@ -103,6 +112,27 @@ namespace Hapio
         public static readonly IReadOnlyList<LabOrbKind> DrumResults =
             Array.AsReadOnly(new[] { LabOrbKind.Yin, LabOrbKind.Yang, LabOrbKind.Yin });
 
+        /// <summary>
+        /// 세 구슬이 북에서 나가는 방향(바로 위에서 몇 도, 오른쪽 +)과 멈출 때까지 가는 거리(판 너비 비율). 매번 같은 자리에 선다
+        /// (사용자 시안 2026-11-04): 첫 음은 북 왼쪽, 양은 북 오른쪽(같은 높이), 둘째 음은 양의 왼쪽 위.
+        /// 2단계는 양에 붙어 있는 둘째 음을 양 위로 끌어 놓고, 왼쪽 음은 4단계까지 남는다.
+        /// </summary>
+        public static readonly IReadOnlyList<(float angleFromUp, float distance)> DrumLaunches = Array.AsReadOnly(new[]
+        {
+            (-79.1f, .36f), (74.8f, .259f), (38.5f, .25f)
+        });
+
+        /// <summary>
+        /// The launch that stops an orb <paramref name="distance"/> board widths away in that direction, when the floor
+        /// slows it by <paramref name="deceleration"/> board widths per second²: speed² = 2 × deceleration × distance.
+        /// </summary>
+        public static UnityEngine.Vector2 LaunchVelocity(float angleFromUp, float distance, float deceleration)
+        {
+            float radians = angleFromUp * UnityEngine.Mathf.Deg2Rad;
+            float speed = UnityEngine.Mathf.Sqrt(2f * UnityEngine.Mathf.Max(0f, deceleration) * UnityEngine.Mathf.Max(0f, distance));
+            return new UnityEngine.Vector2(UnityEngine.Mathf.Sin(radians), UnityEngine.Mathf.Cos(radians)) * speed;
+        }
+
         private static GameTutorialBeat Bul(string text, GameTutorialFocus focus = GameTutorialFocus.None) =>
             GameTutorialBeat.Line(GameTutorialSpeaker.Bul, text, focus);
         private static GameTutorialBeat Geumok(string text, GameTutorialFocus focus = GameTutorialFocus.None,
@@ -131,8 +161,24 @@ namespace Hapio
             Geumok("바닥나면 잠깐 숨을 골라야 해.", GameTutorialFocus.Stamina, GameTutorialCue.StaminaShort),
             GameTutorialBeat.Do(GameTutorialAction.RefillStamina, string.Empty, GameTutorialFocus.Stamina));
 
+        /// <summary>2단계에서 음·양을 합치면 나오는 오행: 화(빨강). 3단계에서 이 빨간 구슬을 던진다.</summary>
+        public const LabOrbElement CombineResult = LabOrbElement.Fire;
+
+        /// <summary>
+        /// 2단계 · 조합: 음구슬 하나를 끌어 양구슬 위에 놓으면 화(빨강) 오행구슬이 된다. 남은 음구슬 하나는 4단계에서 쓴다.
+        /// 합친 뒤에는 어둡게 하지 않아 빨간 구슬과 남은 음구슬이 함께 보인다.
+        /// </summary>
+        public static readonly GameTutorialStep Combine = new GameTutorialStep("2단계 · 조합",
+            Geumok("검은 음구슬과 하얀 양구슬을\n맞붙여 봐.", GameTutorialFocus.Pair),
+            Bul("검은 거 두 개는 안 돼?", GameTutorialFocus.Yins),
+            Geumok("같은 색끼리는 안 붙어!", GameTutorialFocus.Yins),
+            GameTutorialBeat.Do(GameTutorialAction.CombineOrbs, "음구슬을 끌어 양구슬 위에 놓으시오", GameTutorialFocus.Pair),
+            Bul("우와, 색이 변했어!"),
+            Geumok("그게 오행구슬이야."),
+            Geumok("화·수·목·금·토 중 하나가 나와."));
+
         /// <summary>순서대로 진행하는 단계들. 마지막 단계가 끝나면 어두워지며 방 목록으로 간다.</summary>
-        public static readonly IReadOnlyList<GameTutorialStep> Steps = Array.AsReadOnly(new[] { Goal, Drum });
+        public static readonly IReadOnlyList<GameTutorialStep> Steps = Array.AsReadOnly(new[] { Goal, Drum, Combine });
 
         /// <summary>
         /// The seat (P number - 1) each speaker sits in. A player's right neighbor is the previous seat and the left

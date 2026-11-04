@@ -18,6 +18,7 @@ MonoBehaviour:
   localPortraitScale: 1.2
   neighborPortraitScale: 1.8
   portraitScreenMargin: 6
+  keepOutPadding: 4
   bubble: {fileID: 21300000, guid: 66fb9310974fa40edadc8b7b52411c39, type: 3}
   bubbleSize: {x: 236, y: 150}
   textInset: {x: 0.08, y: 0.27, z: 0.08, w: 0.11}
@@ -46,13 +47,20 @@ MonoBehaviour:
   successFontSize: 28
   afterActionSeconds: 0.9
   afterRefillSeconds: 0.4
-  shortStaminaShareOfTap: 0.5
+  shortStaminaShareOfTap: 0.25
   hand: {fileID: 21300000, guid: 256e904b76ffb466cbaabfa31d3195d6, type: 3}
   handSize: {x: 64, y: 64}
   handTip: {x: 0.09, y: 0.93}
   handRestOffset: {x: 12, y: -12}
   handTapSeconds: 0.9
   handPressScale: 0.9
+  handDragSeconds: 1.6
+  arrowColor: {r: 0.36, g: 0.66, b: 0.29, a: 1}
+  arrowWidth: 7
+  arrowHeadLength: 18
+  arrowHeadWidth: 22
+  arrowGap: 2
+  orbSpotlightPadding: 14
   firstLineDelay: 0.6
   tapCooldown: 0.2
   exitFadeSeconds: 0.6

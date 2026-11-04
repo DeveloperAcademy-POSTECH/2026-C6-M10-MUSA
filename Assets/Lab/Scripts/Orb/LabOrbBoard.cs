@@ -809,6 +809,21 @@ namespace C6Lab
             return true;
         }
 
+        /// <summary>#477 이 판에 보이는 구슬 orbId의 화면 중심과 반지름 (픽셀). 튜토리얼이 구슬을 밝히고 손으로 가리킬 때 쓴다.</summary>
+        public bool TryGetScreenCircle(string orbId, out Vector2 center, out float radiusPixels)
+        {
+            center = default;
+            radiusPixels = 0f;
+            if (!TryGetScreenPoint(orbId, out center) || !entries.TryGetValue(orbId, out Entry entry)
+                || entry.View.HitSphere == null) return false;
+            Vector3 middle = entry.View.transform.position;
+            float radius = entry.View.HitSphere.radius * Mathf.Abs(entry.View.HitSphere.transform.lossyScale.x);
+            Vector3 edge = inputCamera.WorldToScreenPoint(middle + inputCamera.transform.right * radius);
+            if (edge.z < 0f) return false;
+            radiusPixels = Vector2.Distance(center, edge);
+            return radiusPixels > 0f;
+        }
+
         private float flashGlare;
 
         /// <summary>

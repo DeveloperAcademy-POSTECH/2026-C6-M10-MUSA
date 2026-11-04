@@ -417,7 +417,7 @@ namespace C6Lab
             player.stamina = Mathf.Max(0f, player.stamina - rules.GenerateCost);
             var kind = GeneratedKindFor(seed, sender, generated, rules.GenerationChances);
             kind = CorrectRawGenerationKind(kind, sender, generated);
-            kind = TutorialScriptedKind(sender, kind);
+            TutorialTakeGeneration(sender, ref kind, out Vector2? scriptedLaunch);
             int lockSwipes = kind.IsItem() ? LockSwipesFor(seed, sender, generated) : 0;
             int relayStage = kind == LabOrbKind.Relay && lockSwipes == 0 ? 1 : 0;
             generatedCounts[sender] = generated + 1;
@@ -427,7 +427,8 @@ namespace C6Lab
                 reason = "JIGWI_BURNED";
                 return true;
             }
-            Vector2 launch = SpawnVelocityFor(seed, sender, generated, position.x);
+            // The tutorial (#477) sends each scripted orb its own way so it always rests in the same place.
+            Vector2 launch = scriptedLaunch ?? SpawnVelocityFor(seed, sender, generated, position.x);
             orb = new LabOrbState
             {
                 id = NewOrbId(), owner = sender, kind = kind, lockSwipes = lockSwipes, relayStage = relayStage,
@@ -475,6 +476,7 @@ namespace C6Lab
 
             orbs.Remove(firstId); orbs.Remove(secondId);
             var element = CombinedElementFor(sender);
+            element = TutorialScriptedElement(sender, element);
             Vector2 velocity = Vector2.ClampMagnitude(normalizedVelocity, rules.MaximumMotionSpeed);
             orb = new LabOrbState
             {

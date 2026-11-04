@@ -27,6 +27,9 @@ namespace C6Lab
 
         public LabBoardGestures AllowedGestures => allowedGestures;
 
+        /// <summary>A finger is holding an orb or the drum right now (the tutorial hides its guide hand meanwhile).</summary>
+        public bool IsHolding => heldId != null;
+
         /// <summary>Open only these gestures. A held orb that is no longer allowed is let go where it is.</summary>
         public void SetAllowedGestures(LabBoardGestures gestures)
         {

@@ -46,6 +46,8 @@ namespace Hapio
         private Text bannerText;
         private Text successText;
         private Image hand;
+        private GameTutorialArrow arrow;
+        private string pairYinId, pairYangId;
 
         private int stepIndex;
         private int beatIndex = -1;
@@ -61,7 +63,7 @@ namespace Hapio
         private float successAt = -1f;
         private bool spotlightPlaced;
         private Rect spotRect;
-        private float spotCorner, spotSoft;
+        private float spotCorner, spotSoft, spotAngle;
 
         /// <summary>The step being played (index into <see cref="GameTutorialScript.Steps"/>).</summary>
         public int StepIndex => stepIndex;
@@ -207,6 +209,55 @@ namespace Hapio
             if ((rect.anchoredPosition - target).sqrMagnitude > 1e-4f) rect.anchoredPosition = target;
         }
 
+        private readonly List<Rect> keepOutCircles = new List<Rect>(Seats);
+        private readonly List<Rect> keepOutBoxes = new List<Rect>(1);
+        private LabStaminaShortFeedback shortFeedback;
+
+        /// <summary>
+        /// Orbs never cover the three faces or the stamina bar in the tutorial: the board keeps invisible walls over
+        /// them (a little larger by <see cref="GameTutorialArt.keepOutPadding"/>), following the HUD as it is laid out.
+        /// </summary>
+        private void UpdateKeepOut()
+        {
+            // The short cue shakes the whole gauge for a moment; the walls stay where the gauge rests.
+            if (shortFeedback == null) shortFeedback = FindInBattle<LabStaminaShortFeedback>();
+            if (shortFeedback != null && shortFeedback.Playing) return;
+            keepOutCircles.Clear();
+            keepOutBoxes.Clear();
+            for (int seat = 0; seat < Seats; seat++)
+                if (portraits[seat] != null && TryScreenRect(portraits[seat].rectTransform, out Rect face))
+                    keepOutCircles.Add(Padded(face, portraits[seat].canvas));
+            var bar = hud.staminaFill != null ? hud.staminaFill.transform.parent as RectTransform : null;
+            if (bar != null && TryScreenRect(bar, out Rect gauge)) keepOutBoxes.Add(Padded(gauge, hud.staminaFill.canvas));
+            board.SetKeepOut(keepOutCircles, keepOutBoxes);
+        }
+
+        private Rect Padded(Rect screen, Canvas canvas)
+        {
+            float pad = art.keepOutPadding * (canvas != null ? canvas.rootCanvas.scaleFactor : 1f);
+            return new Rect(screen.xMin - pad, screen.yMin - pad, screen.width + pad * 2f, screen.height + pad * 2f);
+        }
+
+        /// <summary>A visible HUD element's area in screen pixels.</summary>
+        private bool TryScreenRect(RectTransform target, out Rect rect)
+        {
+            rect = default;
+            if (target == null || !target.gameObject.activeInHierarchy) return false;
+            Canvas canvas = target.GetComponentInParent<Canvas>();
+            Camera eventCamera = canvas == null || canvas.rootCanvas.renderMode == RenderMode.ScreenSpaceOverlay
+                ? null : canvas.rootCanvas.worldCamera;
+            target.GetWorldCorners(corners);
+            Vector2 min = new Vector2(float.MaxValue, float.MaxValue), max = new Vector2(float.MinValue, float.MinValue);
+            foreach (Vector3 corner in corners)
+            {
+                Vector2 screen = RectTransformUtility.WorldToScreenPoint(eventCamera, corner);
+                min = Vector2.Min(min, screen);
+                max = Vector2.Max(max, screen);
+            }
+            rect = Rect.MinMaxRect(min.x, min.y, max.x, max.y);
+            return rect.width > 0f && rect.height > 0f;
+        }
+
         /// <summary>How far a span [low, high] must move to sit inside [from, to]; nothing when it is too large to fit.</summary>
         public static float Inward(float low, float high, float from, float to)
         {
@@ -270,6 +321,13 @@ namespace Hapio
             speakerPortrait.enabled = false;
 
             BuildBanner();
+            arrow = new GameObject("Guide Arrow", typeof(RectTransform), typeof(CanvasRenderer), typeof(GameTutorialArrow))
+                .GetComponent<GameTutorialArrow>();
+            arrow.rectTransform.SetParent(overlay, false);
+            Stretch(arrow.rectTransform);
+            arrow.color = art.arrowColor;
+            arrow.raycastTarget = false;
+            arrow.gameObject.SetActive(false);
             hand = AddImage("Pointing Hand", overlay, Color.white, art.hand, false);
             hand.preserveAspect = true;
             hand.rectTransform.pivot = art.handTip;
@@ -429,6 +487,8 @@ namespace Hapio
             banner.gameObject.SetActive(false);
             successText.gameObject.SetActive(false);
             hand.gameObject.SetActive(false);
+            arrow.gameObject.SetActive(false);
+            hand.color = Color.white;
             dimTarget = beat.Focus == GameTutorialFocus.None ? 0f : 1f;
             if (beat.IsLine)
             {
@@ -465,7 +525,7 @@ namespace Hapio
         private void BeginAction(GameTutorialBeat beat)
         {
             LabNetwork network = session.Network;
-            bool playerActs = beat.Action == GameTutorialAction.TapDrum;
+            bool playerActs = beat.Action == GameTutorialAction.TapDrum || beat.Action == GameTutorialAction.CombineOrbs;
             // The player's own action goes through to the board; waiting on the gauge still keeps the screen.
             tapCatcher.raycastTarget = !playerActs;
             if (!string.IsNullOrEmpty(beat.Text))
@@ -476,9 +536,17 @@ namespace Hapio
             switch (beat.Action)
             {
                 case GameTutorialAction.TapDrum:
+                    // Fixed kinds and fixed resting places (yin up-left, yang up-right, yin down-left).
                     var results = new LabOrbKind[GameTutorialScript.DrumResults.Count];
-                    for (int i = 0; i < results.Length; i++) results[i] = GameTutorialScript.DrumResults[i];
-                    network.TutorialScriptGenerations(results);
+                    var launches = new Vector2[results.Length];
+                    float slowing = network.config != null ? network.config.OrbFloorDeceleration : 0f;
+                    for (int i = 0; i < results.Length; i++)
+                    {
+                        results[i] = GameTutorialScript.DrumResults[i];
+                        (float angle, float distance) = GameTutorialScript.DrumLaunches[i];
+                        launches[i] = GameTutorialScript.LaunchVelocity(angle, distance, slowing);
+                    }
+                    network.TutorialScriptGenerations(results, slowing > 0f ? launches : null);
                     actionBaseline = LocalPlayer()?.generatedTotal ?? 0;
                     board.SetAllowedGestures(LabBoardGestures.DrumTap);
                     hand.gameObject.SetActive(art.hand != null);
@@ -486,6 +554,14 @@ namespace Hapio
                 case GameTutorialAction.RefillStamina:
                     board.SetAllowedGestures(LabBoardGestures.None);
                     network.TutorialHoldStamina(false);
+                    break;
+                case GameTutorialAction.CombineOrbs:
+                    network.TutorialScriptCombinations(GameTutorialScript.CombineResult);
+                    actionBaseline = LocalPlayer()?.combinedTotal ?? 0;
+                    // Only orbs move: the drum stays put and nothing is thrown yet.
+                    board.SetAllowedGestures(LabBoardGestures.OrbMove);
+                    hand.gameObject.SetActive(art.hand != null);
+                    arrow.gameObject.SetActive(true);
                     break;
             }
         }
@@ -515,6 +591,15 @@ namespace Hapio
                     if (me != null && config != null && me.stamina >= config.StaminaMax - .001f
                         && Time.unscaledTime - shownAt >= .3f) CompleteAction(false);
                     break;
+                case GameTutorialAction.CombineOrbs:
+                    int combined = (LocalPlayer()?.combinedTotal ?? actionBaseline) - actionBaseline;
+                    if (combined != actionProgress)
+                    {
+                        actionProgress = combined;
+                        bannerText.text = BannerText(beat, combined);
+                    }
+                    if (combined >= beat.Count) CompleteAction(true);
+                    break;
             }
         }
 
@@ -524,6 +609,7 @@ namespace Hapio
             board.SetAllowedGestures(LabBoardGestures.None);
             tapCatcher.raycastTarget = true;
             hand.gameObject.SetActive(false);
+            arrow.gameObject.SetActive(false);
             // The empty gauge breathes back only a sliver, still short of a tap, so the short cue's red shows on it.
             if (CurrentBeat.Action == GameTutorialAction.TapDrum && session.Network.config != null)
                 session.Network.TutorialCapStamina(ShortStaminaFor(session.Network.config.GenerateCost, art.shortStaminaShareOfTap));
@@ -552,6 +638,7 @@ namespace Hapio
             banner.gameObject.SetActive(false);
             successText.gameObject.SetActive(false);
             hand.gameObject.SetActive(false);
+            arrow.gameObject.SetActive(false);
             dimTarget = 0f;
             StartCoroutine(FadeOutAndLeave());
         }
@@ -574,6 +661,7 @@ namespace Hapio
         {
             if (unavailable || hud == null || overlay == null) return;
             ApplyHudDressing();
+            UpdateKeepOut();
             bool line = HasBeat && CurrentBeat.IsLine;
             if (line)
             {
@@ -584,7 +672,8 @@ namespace Hapio
             if (successAt >= 0f)
                 successText.rectTransform.localScale = Vector3.one * PopScale((Time.unscaledTime - successAt) / art.popSeconds,
                     art.popOvershoot);
-            if (hand.gameObject.activeSelf) PlaceHand();
+            if (HasBeat && CurrentBeat.Action == GameTutorialAction.CombineOrbs && actionDoneAt < 0f) PlaceDragGuide();
+            else if (hand.gameObject.activeSelf) PlaceHand();
             dimGroup.alpha = Mathf.MoveTowards(dimGroup.alpha, dimTarget, Time.unscaledDeltaTime / art.dimFadeSeconds);
             if (HasBeat && CurrentBeat.Focus != GameTutorialFocus.None) PlaceSpotlight(CurrentBeat.Focus);
             speakerPortrait.enabled = line && dimGroup.alpha > .01f && speakerPortrait.sprite != null;
@@ -629,16 +718,77 @@ namespace Hapio
             rect.localScale = Vector3.one * Mathf.Lerp(1f, art.handPressScale, press);
         }
 
+        /// <summary>
+        /// 2단계: the hand presses on the yin, drags it along the arrow onto the yang and lets go, again and again.
+        /// Both step aside while the player's own finger holds an orb.
+        /// </summary>
+        private void PlaceDragGuide()
+        {
+            Vector2 from = default, to = default;
+            float fromRadius = 0f, toRadius = 0f;
+            bool shown = !board.IsHolding && TryPair(out string yinId, out string yangId)
+                && TryOrbCircle(yinId, out from, out fromRadius) && TryOrbCircle(yangId, out to, out toRadius);
+            arrow.gameObject.SetActive(shown);
+            hand.gameObject.SetActive(shown && art.hand != null);
+            if (!shown) return;
+            Vector2 line = to - from;
+            float length = line.magnitude;
+            Vector2 along = length > 1e-3f ? line / length : Vector2.right;
+            float start = fromRadius + art.arrowGap, end = Mathf.Max(start, length - toRadius - art.arrowGap);
+            arrow.Set(from + along * start, from + along * end, art.arrowWidth, art.arrowHeadLength, art.arrowHeadWidth);
+            HandDrag((Time.unscaledTime - shownAt) / art.handDragSeconds, out float travel, out float press, out float alpha);
+            RectTransform rect = hand.rectTransform;
+            rect.anchoredPosition = Vector2.Lerp(from, to, travel) + art.handRestOffset * (1f - press);
+            rect.localScale = Vector3.one * Mathf.Lerp(1f, art.handPressScale, press);
+            hand.color = new Color(1f, 1f, 1f, alpha);
+        }
+
+        /// <summary>
+        /// The drag guide over one cycle (t = 0..1): fade in pressing on the start, travel to the end while pressed,
+        /// let go, then fade out. travel and press are 0..1.
+        /// </summary>
+        public static void HandDrag(float t, out float travel, out float press, out float alpha)
+        {
+            t = Mathf.Repeat(t, 1f);
+            if (t < .12f) { travel = 0f; press = alpha = t / .12f; return; }
+            if (t < .72f)
+            {
+                float u = (t - .12f) / .6f;
+                travel = u * u * (3f - 2f * u);
+                press = alpha = 1f;
+                return;
+            }
+            travel = 1f;
+            if (t < .84f) { press = 1f - (t - .72f) / .12f; alpha = 1f; return; }
+            press = 0f;
+            alpha = 1f - (t - .84f) / .16f;
+        }
+
         private void PlaceSpotlight(GameTutorialFocus focus)
         {
             Rect bounds = overlay.rect;
             Rect target;
             float corner;
+            // A round or level light needs no turn; keep the current one so a circle never spins.
+            float degrees = focus == GameTutorialFocus.Stamina ? 0f : spotAngle;
             if (focus == GameTutorialFocus.Stamina && TryStaminaRect(out Rect bar))
             {
                 float pad = art.barSpotlightPadding;
                 target = new Rect(bar.xMin - pad, bar.yMin - pad, bar.width + pad * 2f, bar.height + pad * 2f);
                 corner = Mathf.Min(target.width, target.height) * .5f;
+            }
+            else if (focus == GameTutorialFocus.Pair && TryPairCircle(out Vector2 pairCenter, out float pairRadius))
+            {
+                // The two orbs to combine sit side by side: one round light around both.
+                float radius = pairRadius + art.orbSpotlightPadding;
+                target = new Rect(pairCenter.x - radius, pairCenter.y - radius, radius * 2f, radius * 2f);
+                corner = radius;
+            }
+            else if (focus == GameTutorialFocus.Yins && TryYinCapsule(out Vector2 first, out Vector2 second, out float yinRadius))
+            {
+                // Only the two black orbs, not the white: a capsule tilted along the line between them.
+                CapsuleBetween(first, second, yinRadius + art.orbSpotlightPadding, out target, out degrees);
+                corner = target.height * .5f;
             }
             else
             {
@@ -667,8 +817,121 @@ namespace Hapio
                 Mathf.Lerp(spotRect.width, target.width, follow), Mathf.Lerp(spotRect.height, target.height, follow));
             spotCorner = Mathf.Lerp(spotCorner, corner, follow);
             spotSoft = Mathf.Lerp(spotSoft, soft, follow);
+            spotAngle = Mathf.LerpAngle(spotAngle, degrees, follow);
             spotlightPlaced = true;
-            spotlight.SetHole(spotRect, spotCorner, spotSoft);
+            spotlight.SetHole(spotRect, spotCorner, spotSoft, spotAngle);
+        }
+
+        /// <summary>
+        /// A capsule of <paramref name="radius"/> from <paramref name="a"/> to <paramref name="b"/>: its level rectangle
+        /// around the middle and the turn (degrees, -90..90) that lays it along the line.
+        /// </summary>
+        public static void CapsuleBetween(Vector2 a, Vector2 b, float radius, out Rect level, out float degrees)
+        {
+            float length = Vector2.Distance(a, b);
+            Vector2 middle = (a + b) * .5f;
+            level = new Rect(middle.x - length * .5f - radius, middle.y - radius, length + radius * 2f, radius * 2f);
+            degrees = length > 1e-4f ? Mathf.Atan2(b.y - a.y, b.x - a.x) * Mathf.Rad2Deg : 0f;
+            // A capsule looks the same turned half a circle; keep the smaller turn so it never flips.
+            if (degrees > 90f) degrees -= 180f;
+            else if (degrees <= -90f) degrees += 180f;
+        }
+
+        /// <summary>My two black orbs (oldest first) and their radius, in overlay units; one alone gives a circle.</summary>
+        private bool TryYinCapsule(out Vector2 first, out Vector2 second, out float radius)
+        {
+            first = second = default;
+            radius = 0f;
+            int found = 0;
+            var yins = new List<LabOrbState>();
+            foreach (LabOrbState orb in LocalOrbs()) if (orb.kind == LabOrbKind.Yin) yins.Add(orb);
+            yins.Sort((x, y) => x.createdAt.CompareTo(y.createdAt));
+            foreach (LabOrbState yin in yins)
+            {
+                if (found == 2 || !TryOrbCircle(yin.id, out Vector2 center, out float size)) continue;
+                if (found == 0) first = second = center; else second = center;
+                radius = Mathf.Max(radius, size);
+                found++;
+            }
+            return found > 0;
+        }
+
+        /// <summary>The smallest circle around both orbs of the pair (centered between them), in overlay units.</summary>
+        private bool TryPairCircle(out Vector2 center, out float radius)
+        {
+            center = default;
+            radius = 0f;
+            if (!TryPair(out string yinId, out string yangId) || !TryOrbCircle(yinId, out Vector2 yin, out float yinRadius)
+                || !TryOrbCircle(yangId, out Vector2 yang, out float yangRadius)) return false;
+            PairCircle(yin, yinRadius, yang, yangRadius, out center, out radius);
+            return true;
+        }
+
+        /// <summary>The smallest circle holding two circles: along the line through their centers.</summary>
+        public static void PairCircle(Vector2 a, float aRadius, Vector2 b, float bRadius, out Vector2 center, out float radius)
+        {
+            float gap = Vector2.Distance(a, b);
+            if (gap + bRadius <= aRadius) { center = a; radius = aRadius; return; }
+            if (gap + aRadius <= bRadius) { center = b; radius = bRadius; return; }
+            radius = (gap + aRadius + bRadius) * .5f;
+            Vector2 along = (b - a) / gap;
+            center = a + along * (radius - aRadius);
+        }
+
+        /// <summary>
+        /// The yin and yang to combine: the first yang and the yin nearest to it on screen. Kept while both are on the
+        /// board, so the guide never jumps between two equally near yins.
+        /// </summary>
+        private bool TryPair(out string yinId, out string yangId)
+        {
+            yinId = yangId = null;
+            LabOrbState yin = null, yang = null;
+            foreach (LabOrbState orb in LocalOrbs())
+            {
+                if (orb.id == pairYinId && orb.kind == LabOrbKind.Yin) yin = orb;
+                if (orb.id == pairYangId && orb.kind == LabOrbKind.Yang) yang = orb;
+            }
+            if (yin == null || yang == null)
+            {
+                yang = null;
+                foreach (LabOrbState orb in LocalOrbs()) if (orb.kind == LabOrbKind.Yang) { yang = orb; break; }
+                if (yang == null || !TryOrbCircle(yang.id, out Vector2 yangCenter, out _)) return false;
+                float nearest = float.MaxValue;
+                yin = null;
+                foreach (LabOrbState orb in LocalOrbs())
+                {
+                    if (orb.kind != LabOrbKind.Yin || !TryOrbCircle(orb.id, out Vector2 center, out _)) continue;
+                    float distance = (center - yangCenter).sqrMagnitude;
+                    if (distance < nearest) { nearest = distance; yin = orb; }
+                }
+                if (yin == null) return false;
+                pairYinId = yin.id;
+                pairYangId = yang.id;
+            }
+            yinId = pairYinId;
+            yangId = pairYangId;
+            return true;
+        }
+
+        private IEnumerable<LabOrbState> LocalOrbs()
+        {
+            LabNetwork network = session.Network;
+            LabSnapshot snapshot = network != null ? network.Snapshot : null;
+            if (snapshot?.orbs == null) yield break;
+            foreach (LabOrbState orb in snapshot.orbs)
+                if (orb != null && orb.owner == network.LocalPlayerId && !orb.inFlight) yield return orb;
+        }
+
+        /// <summary>An orb on my board: center and radius in overlay units.</summary>
+        private bool TryOrbCircle(string orbId, out Vector2 center, out float radius)
+        {
+            center = default;
+            radius = 0f;
+            if (orbId == null || board == null || !board.TryGetScreenCircle(orbId, out Vector2 screen, out float pixels))
+                return false;
+            center = ScreenToOverlay(screen);
+            radius = pixels / overlayCanvas.scaleFactor;
+            return true;
         }
 
         /// <summary>The local drum's center and radius in overlay units.</summary>

@@ -52,6 +52,15 @@ namespace C6Lab
         public bool TutorialScriptGenerations(params LabOrbKind[] kinds) =>
             TutorialHostReady && model.TutorialScriptGenerations(LocalPlayerId, kinds);
 
+        /// <summary>The same, with each orb's launch (board widths per second) so it always rests in the same place.</summary>
+        public bool TutorialScriptGenerations(System.Collections.Generic.IReadOnlyList<LabOrbKind> kinds,
+            System.Collections.Generic.IReadOnlyList<Vector2> launches) =>
+            TutorialHostReady && model.TutorialScriptGenerations(LocalPlayerId, kinds, launches);
+
+        /// <summary>My next combinations make exactly these elements, in order (2단계: 화).</summary>
+        public bool TutorialScriptCombinations(params LabOrbElement[] elements) =>
+            TutorialHostReady && model.TutorialScriptCombinations(LocalPlayerId, elements);
+
         /// <summary>Hold or release the stamina refill, and show it at once.</summary>
         public bool TutorialHoldStamina(bool held) => TutorialCapStamina(held ? 0f : float.PositiveInfinity);
 

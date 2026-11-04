@@ -76,6 +76,184 @@ namespace Hapio.Tests
         }
 
         [Test]
+        public void CombineStepDragsOneYinOntoTheYangAndThenShowsTheRedOrbPlainly()
+        {
+            GameTutorialStep combine = GameTutorialScript.Steps[2];
+            Assert.That(combine, Is.SameAs(GameTutorialScript.Combine));
+            GameTutorialBeat[] beats = combine.Beats.ToArray();
+            CollectionAssert.AreEqual(new[]
+            {
+                "검은 음구슬과 하얀 양구슬을\n맞붙여 봐.", "검은 거 두 개는 안 돼?", "같은 색끼리는 안 붙어!",
+                "우와, 색이 변했어!", "그게 오행구슬이야.", "화·수·목·금·토 중 하나가 나와."
+            }, combine.Lines.Select(line => line.Text).ToArray());
+            CollectionAssert.AreEqual(new[]
+            {
+                GameTutorialSpeaker.Geumok, GameTutorialSpeaker.Bul, GameTutorialSpeaker.Geumok,
+                GameTutorialSpeaker.Bul, GameTutorialSpeaker.Geumok, GameTutorialSpeaker.Geumok
+            }, combine.Lines.Select(line => line.Speaker).ToArray());
+            Assert.That(beats[3].Action, Is.EqualTo(GameTutorialAction.CombineOrbs));
+            Assert.That(beats.Count(beat => !beat.IsLine), Is.EqualTo(1));
+            CollectionAssert.AreEqual(new[]
+            {
+                GameTutorialFocus.Pair, GameTutorialFocus.Yins, GameTutorialFocus.Yins, GameTutorialFocus.Pair,
+                GameTutorialFocus.None, GameTutorialFocus.None, GameTutorialFocus.None
+            }, beats.Select(beat => beat.Focus).ToArray());
+            Assert.That(GameTutorialDirector.BannerText(beats[3], 0), Is.EqualTo("음구슬을 끌어 양구슬 위에 놓으시오"),
+                "One combination needs no counter.");
+            Assert.That(GameTutorialScript.CombineResult, Is.EqualTo(LabOrbElement.Fire));
+        }
+
+        [Test]
+        public void ScriptedCombinationIsAlwaysFireAndKeepsTheOtherYin()
+        {
+            using (var settings = new GameStageSettings(Resources.Load<LabConfig>("LabConfig"), GameStageCatalog.RequireDefault()))
+            {
+                LabConfig tutorial = settings.CreateTutorialConfig();
+                try
+                {
+                    const ulong me = 0UL;
+                    ulong[] seats = { LabNetwork.TutorialRightSeatId, me, LabNetwork.TutorialLeftSeatId };
+                    for (int round = 0; round < 8; round++)
+                    {
+                        var model = new LabModel();
+                        double now = 10d;
+                        model.Begin("tutorial-combine-" + round, seats, now, tutorial, LabStageYokai.Gumiho);
+                        model.TutorialHandDrumsTo(me);
+                        model.TutorialScriptGenerations(me, LabOrbKind.Yin, LabOrbKind.Yang, LabOrbKind.Yin);
+                        var made = new System.Collections.Generic.List<LabOrbState>();
+                        for (int tap = 0; tap < 3; tap++)
+                        {
+                            now += .5d;
+                            Assert.That(model.TryGenerate(me, "tap-" + tap, now, out LabOrbState orb, out string why), Is.True, why);
+                            made.Add(orb);
+                        }
+                        Assert.That(model.TutorialScriptCombinations(me, GameTutorialScript.CombineResult), Is.True);
+                        now += .5d;
+                        Assert.That(model.TryCombineAt(me, made[0].id, made[1].id, "combine", now, new Vector2(.5f, .5f),
+                            Vector2.zero, out LabOrbState fire, out string reason), Is.True, reason);
+                        Assert.That(fire.kind, Is.EqualTo(LabOrbKind.Combined));
+                        Assert.That(fire.element, Is.EqualTo(LabOrbElement.Fire), "Round " + round);
+                        Assert.That(model.TutorialScriptedCombinationsLeft, Is.EqualTo(0));
+                        LabSnapshot snapshot = model.Snapshot(now);
+                        Assert.That(snapshot.orbs.Count(orb => orb.owner == me && orb.kind == LabOrbKind.Yin), Is.EqualTo(1));
+                        Assert.That(snapshot.players.Single(player => player.id == me).combinedTotal, Is.EqualTo(1));
+                    }
+                    var other = new LabModel();
+                    other.Begin("tutorial-combine-other", seats, 1d, tutorial, LabStageYokai.Gumiho);
+                    Assert.That(other.TutorialScriptCombinations(me, LabOrbElement.None), Is.False, "Only the five elements.");
+                    Assert.That(other.TutorialScriptCombinations(99UL, LabOrbElement.Fire), Is.False, "Only a seated player.");
+                }
+                finally { Object.DestroyImmediate(tutorial); }
+            }
+        }
+
+        [Test]
+        public void DrumOrbsLeaveOnFixedLaunchesToFixedRestingPlaces()
+        {
+            // speed² = 2 × slowing × distance: the floor stops each orb exactly that far away.
+            Vector2 launch = GameTutorialScript.LaunchVelocity(0f, .5f, 2f);
+            Assert.That(launch.x, Is.EqualTo(0f).Within(1e-5f));
+            Assert.That(launch.y, Is.EqualTo(Mathf.Sqrt(2f)).Within(1e-5f));
+            Assert.That(GameTutorialScript.LaunchVelocity(-90f, .25f, 2f).x, Is.EqualTo(-1f).Within(1e-5f));
+            Assert.That(GameTutorialScript.DrumLaunches.Count, Is.EqualTo(GameTutorialScript.DrumResults.Count));
+            // Where each rests from the drum (board widths), as the user's layout: first yin left of the drum, the yang
+            // right of it at the same height, the other yin just up-left of the yang.
+            Vector2[] rest = GameTutorialScript.DrumLaunches.Select(item => new Vector2(
+                Mathf.Sin(item.angleFromUp * Mathf.Deg2Rad), Mathf.Cos(item.angleFromUp * Mathf.Deg2Rad)) * item.distance).ToArray();
+            Assert.That(rest[0].x, Is.EqualTo(-.354f).Within(.005f)); Assert.That(rest[0].y, Is.EqualTo(.068f).Within(.005f));
+            Assert.That(rest[1].x, Is.EqualTo(.25f).Within(.005f)); Assert.That(rest[1].y, Is.EqualTo(.068f).Within(.005f));
+            Assert.That(rest[2].x, Is.EqualTo(.155f).Within(.005f)); Assert.That(rest[2].y, Is.EqualTo(.195f).Within(.005f));
+            foreach (Vector2 place in rest) Assert.That(Mathf.Abs(place.x), Is.LessThan(.4f), "Stays well inside the sides.");
+            // 2단계 pairs the yang with its nearest yin: the one beside it; the left yin waits for 4단계.
+            Assert.That((rest[2] - rest[1]).magnitude, Is.LessThan((rest[0] - rest[1]).magnitude * .5f));
+
+            using (var settings = new GameStageSettings(Resources.Load<LabConfig>("LabConfig"), GameStageCatalog.RequireDefault()))
+            {
+                LabConfig tutorial = settings.CreateTutorialConfig();
+                try
+                {
+                    const ulong me = 0UL;
+                    var model = new LabModel();
+                    double now = 10d;
+                    model.Begin("tutorial-launch", new[] { LabNetwork.TutorialRightSeatId, me, LabNetwork.TutorialLeftSeatId },
+                        now, tutorial, LabStageYokai.Gumiho);
+                    model.TutorialHandDrumsTo(me);
+                    Vector2[] launches = GameTutorialScript.DrumLaunches.Select(item =>
+                        GameTutorialScript.LaunchVelocity(item.angleFromUp, item.distance, tutorial.OrbFloorDeceleration)).ToArray();
+                    Assert.That(model.TutorialScriptGenerations(me, GameTutorialScript.DrumResults, launches), Is.True);
+                    for (int tap = 0; tap < launches.Length; tap++)
+                    {
+                        now += .5d;
+                        Assert.That(model.TryGenerate(me, "tap-" + tap, now, out LabOrbState orb, out string why), Is.True, why);
+                        Assert.That(orb.kind, Is.EqualTo(GameTutorialScript.DrumResults[tap]));
+                        Assert.That(new Vector2(orb.vx, orb.vy), Is.EqualTo(launches[tap]), "Launch " + tap);
+                        Assert.That(new Vector2(orb.x, orb.y), Is.EqualTo(new Vector2(.5f, .5f)), "From the drum's center.");
+                    }
+                    Assert.That(model.TutorialScriptGenerations(me, GameTutorialScript.DrumResults, new[] { Vector2.zero }), Is.False,
+                        "One launch per orb.");
+                }
+                finally { Object.DestroyImmediate(tutorial); }
+            }
+        }
+
+        [Test]
+        public void BlackOrbsLightIsACapsuleTiltedAlongThem()
+        {
+            GameTutorialDirector.CapsuleBetween(new Vector2(0f, 0f), new Vector2(10f, 10f), 2f, out Rect level, out float degrees);
+            Assert.That(level.center.x, Is.EqualTo(5f).Within(1e-4f));
+            Assert.That(level.center.y, Is.EqualTo(5f).Within(1e-4f));
+            Assert.That(level.width, Is.EqualTo(10f * Mathf.Sqrt(2f) + 4f).Within(1e-4f));
+            Assert.That(level.height, Is.EqualTo(4f).Within(1e-4f));
+            Assert.That(degrees, Is.EqualTo(45f).Within(1e-3f));
+            GameTutorialDirector.CapsuleBetween(new Vector2(10f, 0f), new Vector2(0f, 10f), 2f, out _, out degrees);
+            Assert.That(degrees, Is.EqualTo(-45f).Within(1e-3f), "Never more than a quarter turn.");
+            GameTutorialDirector.CapsuleBetween(new Vector2(3f, 3f), new Vector2(3f, 3f), 2f, out level, out degrees);
+            Assert.That((level.width, level.height, degrees), Is.EqualTo((4f, 4f, 0f)), "One orb: a circle.");
+            // Turning the outline keeps it the same shape about its center.
+            var points = new System.Collections.Generic.List<Vector2>();
+            var normals = new System.Collections.Generic.List<Vector2>();
+            var hole = new Rect(-12f, -2f, 24f, 4f);
+            GameTutorialSpotlight.Outline(hole, 2f, points, normals);
+            var before = points.Select(point => (point - hole.center).magnitude).ToArray();
+            GameTutorialSpotlight.Rotate(points, normals, hole.center, 30f);
+            for (int i = 0; i < points.Count; i++)
+                Assert.That((points[i] - hole.center).magnitude, Is.EqualTo(before[i]).Within(1e-4f));
+            Assert.That(normals.All(normal => Mathf.Abs(normal.magnitude - 1f) < 1e-4f), Is.True);
+        }
+
+        [Test]
+        public void PairLightIsTheSmallestCircleAroundBothOrbs()
+        {
+            GameTutorialDirector.PairCircle(new Vector2(0f, 0f), 1f, new Vector2(4f, 0f), 1f, out Vector2 center, out float radius);
+            Assert.That(center, Is.EqualTo(new Vector2(2f, 0f)));
+            Assert.That(radius, Is.EqualTo(3f));
+            GameTutorialDirector.PairCircle(new Vector2(0f, 0f), 1f, new Vector2(0f, 3f), 2f, out center, out radius);
+            Assert.That(radius, Is.EqualTo(3f));
+            Assert.That(center.y, Is.EqualTo(1f).Within(1e-5f), "Shifted toward the bigger one.");
+            GameTutorialDirector.PairCircle(new Vector2(0f, 0f), 5f, new Vector2(1f, 0f), 1f, out center, out radius);
+            Assert.That((center, radius), Is.EqualTo((new Vector2(0f, 0f), 5f)), "One inside the other.");
+        }
+
+        [Test]
+        public void DragGuidePressesTravelsLetsGoAndFades()
+        {
+            GameTutorialDirector.HandDrag(0f, out float travel, out float press, out float alpha);
+            Assert.That((travel, press, alpha), Is.EqualTo((0f, 0f, 0f)));
+            GameTutorialDirector.HandDrag(.12f, out travel, out press, out alpha);
+            Assert.That(travel, Is.EqualTo(0f).Within(1e-4f));
+            Assert.That(press, Is.EqualTo(1f).Within(1e-4f));
+            GameTutorialDirector.HandDrag(.42f, out travel, out press, out _);
+            Assert.That(travel, Is.EqualTo(.5f).Within(1e-4f), "Halfway along the arrow.");
+            Assert.That(press, Is.EqualTo(1f));
+            GameTutorialDirector.HandDrag(.84f, out travel, out press, out alpha);
+            Assert.That(travel, Is.EqualTo(1f));
+            Assert.That(press, Is.EqualTo(0f).Within(1e-4f), "Let go on the yang.");
+            Assert.That(alpha, Is.EqualTo(1f).Within(1e-4f));
+            GameTutorialDirector.HandDrag(.99f, out _, out _, out alpha);
+            Assert.That(alpha, Is.LessThan(.1f), "Fades before the next pass.");
+        }
+
+        [Test]
         public void SpeakersSitMukLeftBulMiddleGeumokRightByTheGamesNeighborRule()
         {
             // A player's right neighbor is the previous seat and the left one the next seat.

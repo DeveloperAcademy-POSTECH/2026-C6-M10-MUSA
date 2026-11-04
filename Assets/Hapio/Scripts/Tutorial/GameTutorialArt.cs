@@ -19,6 +19,8 @@ namespace Hapio
         [Tooltip("양옆 이웃 얼굴을 원래 동그라미보다 몇 배로")] [Min(.5f)] public float neighborPortraitScale = 1.8f;
         [Tooltip("얼굴이 화면 가장자리에서 떨어지는 최소 거리. 원래 화면 끝에 걸쳐 있던 이웃 얼굴은 이만큼 안쪽으로 옮겨 다 보이게 한다.")]
         [Min(0f)] public float portraitScreenMargin = 6f;
+        [Tooltip("구슬이 얼굴·기운 막대를 가리지 않도록 세우는 보이지 않는 벽을 그것들보다 사방으로 얼마나 크게")]
+        [Min(0f)] public float keepOutPadding = 4f;
 
         [Header("말풍선")]
         [Tooltip("꼬리가 왼쪽 아래에 있는 그림. 오른쪽 사람은 좌우를 뒤집어 쓴다.")] public Sprite bubble;
@@ -59,7 +61,7 @@ namespace Hapio
         [Tooltip("동작을 해낸 뒤 다음 장면까지 (\"성공!\"이 보이는 시간)")] [Min(0f)] public float afterActionSeconds = .9f;
         [Tooltip("기운이 다 차오른 뒤 다음 장면까지")] [Min(0f)] public float afterRefillSeconds = .4f;
         [Tooltip("북을 다 친 뒤 기운이 이만큼만 살짝 차고 멈춘다 (북 한 번 비용 대비). 1보다 작아 여전히 부족하고, 기운 부족 빨간 빛이 이 부분에 보인다.")]
-        [Range(.05f, .95f)] public float shortStaminaShareOfTap = .5f;
+        [Range(.05f, .95f)] public float shortStaminaShareOfTap = .25f;
 
         [Header("손 그림 (누르는 곳을 가리킴)")]
         [Tooltip("손가락이 왼쪽 위를 가리키는 그림")] public Sprite hand;
@@ -69,6 +71,16 @@ namespace Hapio
         public Vector2 handRestOffset = new Vector2(12f, -12f);
         [Tooltip("한 번 누르는 데 걸리는 시간")] [Min(.2f)] public float handTapSeconds = .9f;
         [Tooltip("누르는 순간 손 크기")] [Range(.5f, 1f)] public float handPressScale = .9f;
+
+        [Tooltip("끌어 놓기 안내(2단계)에서 손이 한 번 끌고 떼는 데 걸리는 시간")] [Min(.4f)] public float handDragSeconds = 1.6f;
+
+        [Header("화살표 (끌어 놓을 방향)")]
+        public Color arrowColor = new Color(.36f, .66f, .29f, 1f);
+        [Min(1f)] public float arrowWidth = 7f;
+        [Min(1f)] public float arrowHeadLength = 18f;
+        [Min(1f)] public float arrowHeadWidth = 22f;
+        [Tooltip("화살표 양 끝을 구슬 가장자리에서 띄우는 거리")] [Min(0f)] public float arrowGap = 2f;
+        [Tooltip("구슬을 밝히는 곳을 구슬보다 사방으로 얼마나 크게")] [Min(0f)] public float orbSpotlightPadding = 14f;
 
         [Header("진행")]
         [Tooltip("판이 보인 뒤 첫 대사까지")] [Min(0f)] public float firstLineDelay = .6f;
