@@ -32,7 +32,8 @@ namespace C6Lab.Tests
             Texture2D fresh = LabWatercolorBrushDistance.Create(brush);
             try
             {
-                Assert.That(shared.GetPixels32().SequenceEqual(fresh.GetPixels32()), Is.True, "Same field as the old per-runtime build.");
+                // Both fields release their CPU copy after upload, so compare what the GPU holds.
+                Assert.That(ReadTexture(shared).SequenceEqual(ReadTexture(fresh)), Is.True, "Same field as the old per-runtime build.");
                 Assert.That(LabWatercolorBrushDistance.GetOrCreate(LabPaintPattern.Splatter, brush), Is.SameAs(shared));
             }
             finally { Object.Destroy(fresh); }
@@ -94,6 +95,20 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void ThePrewarmFollowsTheRoundBrushNotTheDisplayReplica()
+        {
+            var config = ScriptableObject.CreateInstance<LabConfig>();
+            try
+            {
+                var replica = new LabPaintSurface(new LabPaintGrowthSettings { Resolution = 0 }, 1u);
+                Assert.That(LabGourdPaint.RoundBrushPattern(null, replica), Is.EqualTo(replica.Pattern));
+                Assert.That(LabGourdPaint.RoundBrushPattern(config, replica), Is.EqualTo(config.PaintPattern),
+                    "The round config, not the replica's default pattern.");
+            }
+            finally { Object.DestroyImmediate(config); }
+        }
+
+        [Test]
         public void TheTemporaryTargetsUseTheFormatsOfTheRealCaches()
         {
             RenderTextureDescriptor high = LabHighResolutionPaintRuntime.PrewarmDescriptor();
@@ -117,7 +132,7 @@ namespace C6Lab.Tests
             object loaded = mask.GetValue(surface);
             Assert.That(loaded, Is.Not.Null);
             Assert.That(surface.RegisterHit(Vector3.forward, LabPaintPalette.ColorFor(LabOrbElement.Water), 1, 1), Is.True);
-            Assert.That(mask.GetValue(surface), Is.SameAs(loaded), "The hit judges with the same mask.");
+            Assert.That(mask.GetValue(surface), Is.SameAs(loaded), "The hit keeps the preloaded mask.");
             var legacy = new LabPaintSurface(new LabPaintGrowthSettings { Resolution = 0, Pattern = LabPaintPattern.Legacy }, 482u);
             legacy.PreloadPatternMask();
             Assert.That(mask.GetValue(legacy), Is.Null, "Legacy paint has no mask.");
@@ -177,6 +192,13 @@ namespace C6Lab.Tests
         {
             if (SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null || !SystemInfo.supports2DArrayTextures)
                 Assert.Ignore("A real graphics device with texture-array support is required.");
+        }
+
+        private static Color32[] ReadTexture(Texture source)
+        {
+            RenderTexture target = RenderTexture.GetTemporary(source.width, source.height, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
+            try { Graphics.Blit(source, target); return Read(target); }
+            finally { RenderTexture.ReleaseTemporary(target); }
         }
 
         private static Color32[] Read(RenderTexture texture)

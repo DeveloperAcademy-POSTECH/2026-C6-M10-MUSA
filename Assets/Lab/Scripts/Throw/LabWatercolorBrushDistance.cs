@@ -25,6 +25,17 @@ namespace C6Lab
             return index >= 1 && index < Shared.Length && Shared[index] != null;
         }
 
+#if UNITY_EDITOR
+        // DontSave fields outlive a script reload and edit-mode study renders; free them before the array is lost.
+        [UnityEditor.InitializeOnLoadMethod]
+        private static void ReleaseInEditor()
+        {
+            UnityEditor.AssemblyReloadEvents.beforeAssemblyReload += ReleaseShared;
+            UnityEditor.EditorApplication.playModeStateChanged += state =>
+            { if (state == UnityEditor.PlayModeStateChange.EnteredEditMode) ReleaseShared(); };
+        }
+#endif
+
         /// <summary>Drop the shared fields (Editor play sessions without a domain reload, and tests).</summary>
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         public static void ReleaseShared()

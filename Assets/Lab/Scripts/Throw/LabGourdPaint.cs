@@ -105,6 +105,17 @@ namespace C6Lab
             return paint;
         }
 
+        /// <summary>
+        /// The brush the round's stamps will use, for the prewarm (#482). The display replica keeps a default pattern,
+        /// so read the round config as the Host's model does: territory turns the old round brush into splatter.
+        /// </summary>
+        public static LabPaintPattern RoundBrushPattern(LabConfig config, LabPaintSurface fallback)
+        {
+            if (config == null) return fallback != null ? fallback.Pattern : LabPaintPattern.Splatter;
+            LabPaintPattern pattern = config.PaintPattern;
+            return pattern == LabPaintPattern.Legacy && config.TeamTerritoryEnabled ? LabPaintPattern.Splatter : pattern;
+        }
+
         /// <summary>Called at initialization and accepted config boundaries, never from a frame poll.</summary>
         public bool ApplyMode()
         {
@@ -280,6 +291,7 @@ namespace C6Lab
             LabConfig config = network != null ? network.config : null;
             bool highResolutionEnabled = config == null || config.HighResolutionPaintEnabled;
             int highResolutionColumns = config != null ? config.HighResolutionPaintColumns : LabHighResolutionPaintRuntime.DefaultColumns;
+            LabPaintPattern brushPattern = RoundBrushPattern(config, source);
             bool highResolutionChanged = appliedHighResolutionEnabled != highResolutionEnabled
                 || appliedHighResolutionColumns != highResolutionColumns;
             bool visualChanged = uploadedVisualVersion != source.VisualVersion;
@@ -330,10 +342,11 @@ namespace C6Lab
             {
                 if (highResolution == null) highResolution = new LabHighResolutionPaintRuntime();
                 highResolution.Update(source, paintTexture, painterTexture, highResolutionColumns, completeRebuild);
-                if (prewarmedHighResolution != highResolution || prewarmedHighResolutionPattern != source.Pattern)
+                if (brushPattern != LabPaintPattern.Legacy
+                    && (prewarmedHighResolution != highResolution || prewarmedHighResolutionPattern != brushPattern))
                 {
-                    if (highResolution.Prewarm(source.Pattern) || highResolution.PrewarmError != null)
-                    { prewarmedHighResolution = highResolution; prewarmedHighResolutionPattern = source.Pattern; }
+                    if (highResolution.Prewarm(brushPattern) || highResolution.PrewarmError != null)
+                    { prewarmedHighResolution = highResolution; prewarmedHighResolutionPattern = brushPattern; }
                 }
             }
             else if (highResolution != null)
@@ -356,10 +369,11 @@ namespace C6Lab
                     && (network.Snapshot.phase == LabPhase.Victory || network.Snapshot.phase == LabPhase.Defeat);
                 watercolor.Update(source, highResolution.PaintTexture, highResolution.PainterTexture,
                     watercolorSettings, Time.realtimeSinceStartupAsDouble, final);
-                if (prewarmedWatercolor != watercolor || prewarmedWatercolorPattern != source.Pattern)
+                if (brushPattern != LabPaintPattern.Legacy
+                    && (prewarmedWatercolor != watercolor || prewarmedWatercolorPattern != brushPattern))
                 {
-                    if (watercolor.Prewarm(source.Pattern) || watercolor.PrewarmError != null)
-                    { prewarmedWatercolor = watercolor; prewarmedWatercolorPattern = source.Pattern; }
+                    if (watercolor.Prewarm(brushPattern) || watercolor.PrewarmError != null)
+                    { prewarmedWatercolor = watercolor; prewarmedWatercolorPattern = brushPattern; }
                 }
             }
             else if ((!watercolorEnabled || highResolution == null) && watercolor != null)
