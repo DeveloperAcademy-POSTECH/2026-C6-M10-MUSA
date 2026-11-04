@@ -17,6 +17,7 @@ MonoBehaviour:
   displayName: "\uC57C\uAD11\uADC0"
   yokai: 2
   yokaiVisual: {fileID: 0}
+  gourdVisualResource: Hapio/Gourds/Stage02_Yagwanggwi_Battle
   defaultValues:
   - index: 155
     value: 1
