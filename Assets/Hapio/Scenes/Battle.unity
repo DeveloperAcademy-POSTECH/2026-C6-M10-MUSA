@@ -83537,7 +83537,7 @@ MonoBehaviour:
   collisionFloor: {fileID: 561349814}
   center: {x: 0, y: 1.35, z: 10}
   showGround: 1
-  groundPng: {fileID: 2800000, guid: f28ad7b35edb348afab244ba49529df9, type: 3}
+  groundPng: {fileID: 2800000, guid: c89682bcf55ff41f7953e404d7beffb0, type: 3}
   groundColor: {r: 1, g: 1, b: 1, a: 1}
   groundSize: {x: 40, y: 40}
   groundTiling: {x: 3, y: 3}
@@ -83553,7 +83553,7 @@ MonoBehaviour:
   paperTiling: {x: 8, y: 4}
   fillBoardBackground: 1
   boardCamera: {fileID: 760621525}
-  boardBackgroundPng: {fileID: 2800000, guid: f28ad7b35edb348afab244ba49529df9, type: 3}
+  boardBackgroundPng: {fileID: 2800000, guid: c89682bcf55ff41f7953e404d7beffb0, type: 3}
   boardBackgroundColor: {r: 1, g: 1, b: 1, a: 1}
   decorations:
   - title: "Mountains / \uC0B0\uACFC \uC18C\uB098\uBB34"

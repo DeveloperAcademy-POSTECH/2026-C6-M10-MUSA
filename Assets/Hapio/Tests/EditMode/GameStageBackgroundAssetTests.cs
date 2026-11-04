@@ -93,7 +93,17 @@ namespace Hapio.Tests
                         }
                 }
                 Assert.That(night.studio.paperPng.name, Is.EqualTo("Sky_Hanji"));
-                Assert.That(night.studio.groundPng.name, Is.EqualTo("HanjiSand_BaseColor"));
+                Assert.That(night.studio.groundPng.name, Is.EqualTo("Stage02_Ground_Yagwanggwi"), "#487: stage 2's blue-grey ground.");
+                Assert.That(sunset.studio.groundPng.name, Is.EqualTo("Stage03_Ground_Jigwi"));
+                // A player draws the saved material, not the studio field: both must name the same texture (#487).
+                foreach (var set in new[] { baseline, night, sunset })
+                {
+                    Texture backing = set.studio.boardBackgroundPng != null ? set.studio.boardBackgroundPng : set.studio.groundPng;
+                    Assert.That(set.ground.GetComponent<Renderer>().sharedMaterial.GetTexture("_BaseMap"), Is.SameAs(set.studio.groundPng),
+                        set.studio.name + " ground");
+                    Assert.That(set.boardBacking.GetComponent<Renderer>().sharedMaterial.GetTexture("_BaseMap"), Is.SameAs(backing),
+                        set.studio.name + " board backing");
+                }
                 Assert.That(night.studio.boardBackgroundPng, Is.SameAs(night.studio.groundPng));
                 Assert.That(night.studio.decorations.Single(d => d.png != null && d.png.name == "Moon").count, Is.EqualTo(1));
                 Assert.That(night.studio.decorations.Single(d => d.png != null && d.png.name == "RockAndPines").visible, Is.False);

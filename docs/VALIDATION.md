@@ -4657,3 +4657,23 @@ Editor 관찰값입니다. 기기 근거가 아닙니다.
 | 게임 흐름 PlayMode(#447 이전 기준) | **85/85 PASS** | 솔로 Host 라운드가 첫 명중 전에 판정 마스크를 갖는지 단언 포함. Editor 계측에서 붓 로드가 LoadingBattle 프레임으로 옮겨진 것을 확인(`uses=BrushLoad`) |
 
 Metal 파이프라인(PSO)이 실제로 준비 구간에서 만들어지는지는 Editor로 판단할 수 없다. 이 항목과 iPhone cold/warm 첫 명중 프레임 시간, Metal System Trace는 **미실행**이다.
+
+## #487 2스테이지 바닥 Yagwanggwi 연결 — 2026-11-04
+
+기준 main `59c197cb`에서 Unity 6000.6.5f1 macOS batch Editor로 확인했다.
+
+**수정 방법**
+- 임시 Editor 스크립트를 커밋하지 않고 Unity API로 다음을 바꿨다. YAML은 손으로 고치지 않았다.
+  - `Stage02 Background Studio`의 `groundPng`·`boardBackgroundPng`
+  - `Stage02/Materials/YokaiGround.mat`·`YokaiBacking.mat`의 `_BaseMap`
+- 결과 diff는 Scene 2줄과 재질 2줄뿐이다. 색·타일링·다른 스테이지는 그대로다.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| EditMode 전체 | **1865/1865 PASS** | `GameStageBackgroundAssetTests`에 세 스테이지 모두 studio PNG와 저장 재질 `_BaseMap`이 같은지 검사를 추가했다 |
+| 실제 전투 캡처(DEV 솔로 1→2→3스테이지, 임시 검사·커밋 안 함) | 바닥·조합판 뒤가 1 `Stage01_Ground_SandBeige`, 2 **`Stage02_Ground_Yagwanggwi`**, 3 `Stage03_Ground_Jigwi` | 수정 전 main에서 2스테이지는 `HanjiSand_BaseColor`였고, 플레이할 때마다 Editor가 재질의 `_MainTex`를 HanjiSand로 덮었다. 수정 뒤에는 플레이해도 재질 파일이 바뀌지 않는다 |
+| PlayMode `GameSceneFlowTests`·`GameLobbyViewTests` | **34/34 PASS** | |
+
+**남은 사항:** 이 문서는 1스테이지 바닥이 후속 미술 수정으로 `Stage01_Ground_BlushBeige`가 됐다고 하지만, 실제로는 `Stage01_Ground_SandBeige`다. 결정이 필요해 바꾸지 않았다.
+
+**미실행:** iPhone 화면 확인.
