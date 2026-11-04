@@ -4402,6 +4402,143 @@ Consolidated three byte-identical textures into shared material references; conf
 - **남은 검사 공백:** Host 분기와 나머지 8개 소비자는 소비자별 검사가 없다. 각 소비자는 공유 시계를 한 줄로 읽으며, 시계 규칙은 `LabGuestBattleClockTests`·`LabJigwiABPresentationTests`가 검사한다.
 - **미실행:** Guest 실기기에서 늦은 스냅샷·일시정지 때 HUD 숫자와 효과음이 튀지 않는지 확인하지 않았다.
 
+## #467 타이틀 화면 비율 자동 맞춤 (1단계: 흰선) — 2026-11-03
+
+- **기준:** main `2ab6b3c3` → `feat/#467-title-fit-wind`. Unity6000.6.5f1/macOS의 연결된 Editor에서 컴파일과 Editor 계산 확인만 했다. Play·Test Runner·앱 빌드·iOS 실기기는 실행하지 않았다.
+- **원인:** Home 페이지는 402×874 설계를 화면 안에 다 들어가게 줄인다(`GameLobbyView.FitScreen`). 비율이 다른 폰에서는 남는 띠로 뒤의 예전 로비 그림(밝은 종이)이 보였다. 새 타이틀 양끝의 어두운 나무 기둥 옆이라 흰선처럼 보였다.
+- **수정:** 새 `TitleArtCover`를 `AnimatedTitle.prefab` 루트에 Editor API로 붙였다.
+  - 그림만 화면 가운데 기준으로 화면을 덮을 때까지 키운다.
+  - 버튼이 있는 페이지 배율, 그림 안의 배치, 구름 움직임, Scene은 바꾸지 않았다.
+  - `StoryTitleBuilder`도 새로 만들 때 같은 부품을 붙인다.
+
+| 실행한 확인 | 결과 |
+| --- | --- |
+| 컴파일 · Console 오류 | **PASS** (오류 0) |
+| Editor 계산: 실제 프리팹을 폰 크기별 화면에 놓고 수정 전 띠와 수정 후 넘침을 쟀다 | **PASS** — 아래 표 |
+
+| 화면(pt) | 수정 전 띠 | 수정 후 그림 넘침 | 합이오 글자 |
+| --- | --- | --- | --- |
+| SE 375×667 | 양옆 34.11 | 위아래 74.15씩 | 화면 안 (위에서 78.8) |
+| 13 mini 375×812 | 양옆 0.76 | 위아래 1.65씩 | 화면 안 |
+| 15 393×852 | 양옆 0.56 | 위아래 1.22씩 | 화면 안 |
+| 16 Pro 402×874 | 없음 | 없음 | 화면 안 |
+| 16 Pro Max 440×956 | 양옆 0.14 | 위아래 0.31씩 | 화면 안 |
+| 더 긴 화면 360×820 | 위아래 18.66 | 양옆 8.58씩 | 화면 안 |
+
+- **새 검사 (NOT_RUN):**
+  - PlayMode `StoryTitleTests.TitleArtCoversTheWholeScreenWhileItsPageStaysFittedInside`(위 6개 비율)는 그림이 네 변을 다 덮는지, 한 변은 꼭 맞는지, 가운데 기준인지를 확인한다. 페이지 배율·글자 배치가 그대로이고 글자가 화면 안인지도 확인한다.
+  - EditMode `StoryWorkspaceTests.AnimatedTitleSharesFourOriginalCloudsWithTheHomeStartPage`에 프리팹 부품 확인을 추가했다.
+- **미실행:** Play에서 Game 뷰 비율을 바꿔 보는 확인, iPhone 실기기 확인.
+
+### #467 2단계: 구름 속도 — 2026-11-03
+
+- **기준:** `dabf7422`(1단계 커밋) 위. `AnimatedTitle.prefab`의 `Title Cloud Drift` 값만 Editor API로 바꿨다. 코드·움직임 방식(제자리 좌우 왕복, 게임 시계가 멈춰도 움직임)은 그대로다.
+
+| 구름 | 이동 폭 | 왕복 시간 | 가장 빠른 순간 (좌표/초) |
+| --- | --- | --- | --- |
+| Cloud Left | 24 → **30** | 38 → **14**초 | 3.97 → 13.46 (3.4배) |
+| Cloud Right (반대 방향) | 20 → **26** | 44 → **16**초 | 2.86 → 10.21 (3.6배) |
+| Cloud Lower | 12 → **16** | 32 → **12**초 | 2.36 → 8.38 (3.6배) |
+| Cloud Upper (반대 방향) | 10 → **14** | 36 → **13**초 | 1.75 → 6.77 (3.9배) |
+
+- Cloud Upper는 x=15에서 ±14만 움직여 그림 왼쪽 끝 안에 남는다. 나머지는 원래도 그림 밖으로 걸쳐 있어 잘린다.
+- EditMode `StoryWorkspaceTests.AnimatedTitleSharesFourOriginalCloudsWithTheHomeStartPage`의 주기 조건을 `> 20`에서 `10~20`으로 바꿨다 (**NOT_RUN**).
+- **미실행:** Play에서 느낌 확인, iPhone 실기기.
+
+### #467 3단계: 배경 교체·깃발 바람 연출 — 2026-11-03
+
+- **기준:** `e89b52bb`(2단계 커밋) 위. 연결된 Editor에서 컴파일, Editor API 배치, Editor 안 화면 그리기, 계산 확인만 했다. Play·Test Runner·실기기는 실행하지 않았다.
+- **바꾼 것:**
+  - `a763a.png`을 깃대·깃발·리본이 없는 3배 배경(1206×2622)으로 교체했다. GUID·가져오기 설정은 그대로이고, `Artwork`는 402×874에 딱 맞췄다.
+  - 깃대·깃발·리본 2개를 투명 여백을 잘라 긴 변 1024px로 줄여 추가했다.
+  - 새 `TitleWindWave`(UI 메시 물결)를 깃발·리본에 붙였다.
+  - `StoryTitleBuilder.AddWindFlag`(메뉴 `Hapio > Story > Add Title Wind Flag`)로 프리팹에 배치했다.
+- **배치 (402×874 좌표, 예전 그림의 깃발 자리를 따름):**
+
+| 조각 | 위치·크기 | 비고 |
+| --- | --- | --- |
+| 깃대 | (304, 455) 58×335 | 막대만 늘어나는 9분할, 꼭대기 455 · 가로대 486~492 |
+| 깃발 | (311, 484) 44×167 | 위 가운데에 묶임, 왼쪽으로 3 기울고 폭 2.5 · 0.5회/초 |
+| 빨강·노랑 리본 | (219, 472) 112×63 | 가로대 위 막대에 묶임, 폭 4 · 1.2회/초 |
+| 파랑 리본 | (216, 490) 90×65 | 가로대 왼쪽 끝에 묶임, 0.37초 어긋남 |
+
+| 실행한 확인 | 결과 |
+| --- | --- |
+| 컴파일 · Console 오류 | **PASS** (오류 0) |
+| Editor 안 화면 그리기(미리보기 씬, 603×1311): 0 · 1.6 · 3.3 · 4.05초 | **PASS** — 깃발 아랫단이 왼쪽으로 일렁이고, 4.05초(돌풍 최고)에 깃발이 크게 휘고 리본 꼬리가 들린다. 글자·구름·버튼 자리는 그대로다 |
+| 새 검사 값 미리 계산 | **PASS** — 묶인 쪽 이동 0, 같은 물결 위상에서 돌풍 최고는 평상시의 2.5배(−5.47 → −13.67), 4×16칸 메시 정점 85·인덱스 384, 깃대 배율×폭 = 318, 타이틀 그림 전체 raycast 꺼짐 |
+
+- **새 검사 (NOT_RUN):**
+  - EditMode `StoryWorkspaceTests.TitleFlagWavesOverAThreeTimesLandscapeThatNoLongerPaintsIt`
+  - PlayMode `StoryTitleTests.GustsComeOnceAPeriodAndSmoothly`
+  - PlayMode `StoryTitleTests.WindKeepsTheTiedEdgeStillAndSwingsTheFreeEndFurtherInAGust`
+- **미실행:** Play에서 실제 움직임 느낌, iPhone 실기기 성능(조각 3개 × 매 프레임 메시 다시 만들기).
+
+### #467 4단계: 낙엽 — 2026-11-03
+
+- **기준:** `64fa185c`(3단계 커밋) 위. 연결된 Editor에서 컴파일, Editor API 배치, Editor 안 화면 그리기, 계산 확인만 했다. Play·Test Runner·실기기는 실행하지 않았다.
+- **바꾼 것:**
+  - 나뭇잎 4장(단풍 빨강·노랑, 긴 잎 빨강·노랑)을 투명 여백을 잘라 긴 변 256px로 줄여 추가했다.
+  - 새 `TitleFallingLeaves`를 `StoryTitleBuilder.AddFallingLeaves`(메뉴 `Hapio > Story > Add Title Falling Leaves`)로 타이틀 맨 앞 `Falling Leaves`에 붙였다.
+  - 값은 나뭇잎 9장, 크기 20~32, 떨어지는 속도 초당 40~70, 바람 초당 20(돌풍 최고 +110), 흔들림 폭 12, 회전 최대 초당 140도, 씨앗 467이다. 돌풍 간격은 깃발과 같은 6초다.
+  - 처음 그린 크기 14~22는 배경에 그려진 낙엽과 섞여 잘 안 보여서 20~32로 키웠다.
+
+| 실행한 확인 | 결과 |
+| --- | --- |
+| 컴파일 · Console 오류 | **PASS** (오류 0) |
+| Editor 안 화면 그리기 0 · 2 · 4.05 · 8초 | **PASS** — 9장이 화면 곳곳에서 시작해 왼쪽 아래로 날리고, 돌풍(4.05초) 동안 왼쪽 밖으로 쓸려 나간 잎이 위·오른쪽에서 다시 나온다(8초까지 6번 재활용). 합이오 글자 앞을 잎이 지나갈 수 있다 |
+| 새 검사 값 미리 계산 (미리보기 씬) | **PASS** — 6장 생성·raycast 꺼짐·잎 모양 유지, 같은 씨앗 3초 뒤 위치 같음, 30초 동안 x −39.97~557.38 · y −33.50~913.76(범위 안), 재활용 20번, 바람 평상시 (−20, 50) → 돌풍 (−130, 70) |
+
+- **새 검사 (NOT_RUN):**
+  - EditMode `StoryWorkspaceTests.TitleLeavesFallInFrontOfTheCloudsWithTheFlagsGust`
+  - PlayMode `StoryTitleTests.LeavesRecycleInsideTheTitleBlowLeftInAGustAndRestartTheSame`(게임 시계 0에서도 움직이는지 포함)
+- **미실행:** Play에서 실제 움직임 느낌, iPhone 실기기 성능(나뭇잎 9장 매 프레임 이동).
+
+### #467 5단계: 구름이 한 방향으로 흘러가 반대쪽에서 다시 등장 — 2026-11-03
+
+- **기준:** `cfaaa6ae`(4단계 커밋) 위. 연결된 Editor에서 컴파일, Editor API 프리팹 수정, Editor 안 화면 그리기, 계산 확인만 했다. Play·Test Runner·실기기는 실행하지 않았다.
+- **요청:** 좌우 왕복 대신 한쪽으로 쭉 이동한 뒤 다시 등장.
+- **바꾼 것:**
+  - `TitleCloudDrift`의 `distance`·`seconds`를 지우고 `speed`(초당 이동)와 `width`(지나가는 폭 402)를 추가했다. `reverse`는 오른쪽으로 흐르게 하는 뜻으로 바꿨다.
+  - 위치는 `Wrap`으로 계산한다. 구름 왼쪽 끝이 [−구름 폭, 402) 안에서 돌기 때문에, 완전히 나간 순간 반대쪽 가장자리에 닿아 있다.
+  - 프리팹은 구름 4개 모두 왼쪽(속도 16·12·20·14)이다. 합이오 글자를 구름 뒤(순서 6)로 옮겨 구름이 글자 뒤로 지나가게 했다.
+  - `StoryTitleBuilder`의 새로 만들기도 같은 값과 순서를 쓴다.
+
+| 실행한 확인 | 결과 |
+| --- | --- |
+| 컴파일 · Console 오류 | **PASS** (오류 0) |
+| 프리팹 diff | **PASS** — 구름 값(`speed`·`reverse`·`width`)과 글자 순서만 바뀜 |
+| Editor 안 화면 그리기 0 · 12 · 24 · 36초 | **PASS** — 구름이 모두 왼쪽으로 흐르고, 가운데 큰 구름은 왼쪽으로 나간 뒤 24초에 오른쪽에서 들어온다. 작은 구름도 같다. 위쪽 큰 구름이 글자 뒤로 지나간다 |
+
+- **검사 변경 (NOT_RUN):**
+  - PlayMode `StoryTitleTests.CloudsStayBoundedMoveInOppositeDirectionsAndRestoreWhenReenabled`를 `CloudsDriftOneWayComeBackFromTheOtherSideAndRestoreWhenReenabled`로 바꿨다. 10초 위치, 다 나간 직후 반대쪽 진입(401, −144.5), 200초 동안 범위, 한 바퀴 복귀, 복원, 게임 시계 0에서 왼쪽 이동을 확인한다.
+  - EditMode `AnimatedTitleSharesFourOriginalCloudsWithTheHomeStartPage`는 속도 8~30·왼쪽·글자보다 뒤를 확인한다.
+- **미실행:** Play에서 흐름 속도 느낌, iPhone 실기기.
+
+### #467 6단계: 짧은 구름 그림으로 교체·엇갈리는 방향 — 2026-11-03
+
+- **기준:** `bf8e9976`(5단계 커밋) 위. 연결된 Editor에서 컴파일, Editor API 프리팹 수정, Editor 안 화면 그리기, 계산 확인만 했다. Play·Test Runner·실기기는 실행하지 않았다.
+- **요청:**
+  - 구름이 모두 왼쪽으로만 가지 않고 몇 개는 오른쪽으로 가며 엇갈리게.
+  - "구름이 너무 길다"는 후기에 따라 새 구름 그림 3종으로 교체.
+  - 첫 화면을 본 뒤 가운데 구름만 다시 받은 납작한 구름(`구름1.png`)으로 교체.
+- **바꾼 것:**
+  - `CloudRound.png`(396×216)·`CloudWave.png`(633×211)는 원본의 투명 여백만 잘랐다. `CloudLong.png`는 `구름1.png`(1520×676)를 잘라 1024×214로 줄였다.
+  - 구름 4개의 그림·출발 위치·크기·방향·속도를 Editor API로 바꿨다(위에서부터 → 14, ← 12, → 16, ← 20). 구름 틀과 그림 크기는 그림 비율과 같다.
+  - 가운데 구름은 폭 250에서 가늘고 작아 보여 300(높이 63)으로 키웠고, 높이 가운데(약 344)는 유지했다(출발 (−30, 313)).
+  - `StoryTitleBuilder`의 새로 만들기도 같은 값을 쓴다.
+  - 예전 구름 그림 3개는 프리팹에서 더 이상 쓰지 않지만 파일은 지우지 않았다.
+
+| 실행한 확인 | 결과 |
+| --- | --- |
+| 컴파일 · Console 오류 | **PASS** (오류 0) |
+| 그림 선명도 (그림 px ÷ 화면 폭 pt) | **PASS** — 가운데 3.41 · 위 3.01 · 아래 2.83 · 왼쪽 위 3.30 (3배 폰 기준 약 3) |
+| Editor 안 화면 그리기 0 · 8 · 16 · 24초, 가운데 구름 교체 뒤 0 · 10 · 20초 | **PASS** — 위쪽 작은 구름(→)과 물결 구름(←)이 엇갈리고, 가운데 납작한 구름은 오른쪽으로 나가 왼쪽에서, 아래 구름은 왼쪽으로 나가 오른쪽에서 다시 들어온다. 구름이 합이오 글자와 겹치지 않는다 |
+| 바뀐 EditMode 검사 조건 미리 계산 | **PASS** — 모두 `Cloud…` 그림, 폭 ≤ 300, 선명도 ≥ 2.8, 잘림 없음, 글자 뒤, 위에서부터 방향 번갈아 |
+
+- **검사 변경 (NOT_RUN):** EditMode `AnimatedTitleSharesFourOriginalCloudsWithTheHomeStartPage` → `AnimatedTitleSharesFourCloudsWithTheHomeStartPage`(위 조건과 새 출발 위치).
+- **미실행:** Play에서 느낌, iPhone 실기기.
+
 ## #471 로비 연결 끊김 뒤 핸들러 재등록·로비 표시 — 2026-11-04
 
 기준 main `035c5989`에서 `fix/#471-lobby-message-handler` 별도 worktree로 작업했다. 다른 작업이 쓰는 원래 체크아웃과 그 Editor는 건드리지 않았다. Unity 6000.6.5f1 macOS batch Editor(`unity test`)에서 확인했다.

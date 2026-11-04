@@ -33,32 +33,119 @@ namespace Hapio.Editor
         private static void CreateTitle()
         {
             if (AssetDatabase.LoadAssetAtPath<GameObject>(TitlePath) != null) return;
-            var root = new GameObject("Animated Title", typeof(RectTransform), typeof(RectMask2D), typeof(TitleCloudDrift));
+            var root = new GameObject("Animated Title", typeof(RectTransform), typeof(RectMask2D), typeof(TitleCloudDrift),
+                typeof(TitleArtCover));
             Stretch((RectTransform)root.transform);
             try
             {
                 Image(root.transform, "Paper Landscape", new Rect(0, 0, 402, 874), "a763a.png");
+                // #467: short clouds cross the whole width, taking turns right and left from top to bottom,
+                // so the name is drawn in front of them.
+                var tracks = new List<TitleCloudDrift.Cloud>();
+                Cloud(root.transform, tracks, "Cloud Left", new Vector2(-30, 313), 300, "CloudLong.png", 16, true);
+                Cloud(root.transform, tracks, "Cloud Right", new Vector2(175, 85), 210, "CloudWave.png", 12);
+                Cloud(root.transform, tracks, "Cloud Lower", new Vector2(240, 775), 140, "CloudRound.png", 20);
+                Cloud(root.transform, tracks, "Cloud Upper", new Vector2(20, 14), 120, "CloudRound.png", 14, true);
+                root.GetComponent<TitleCloudDrift>().clouds = tracks.ToArray();
                 var logo = StoryWorkspaceBuilder.Rect("합이오", root.transform, new Rect(82, 164, 238, 113)).gameObject.AddComponent<Text>();
                 logo.font = AssetDatabase.LoadAssetAtPath<Font>("Assets/Lab/Art/Fonts/ShillaCultureBold.otf");
                 logo.fontSize = 96; logo.text = "합이오"; logo.color = Color.black;
                 logo.alignment = TextAnchor.MiddleLeft; logo.horizontalOverflow = HorizontalWrapMode.Overflow;
                 logo.verticalOverflow = VerticalWrapMode.Overflow; logo.raycastTarget = false;
-                var tracks = new List<TitleCloudDrift.Cloud>();
-                Cloud(root.transform, tracks, "Cloud Left", new Rect(-182, 257, 459, 153), "5e97a.png", 24, 38, false);
-                Cloud(root.transform, tracks, "Cloud Right", new Rect(193, 67, 459, 153), "5e97a.png", 20, 44, true);
-                Cloud(root.transform, tracks, "Cloud Lower", new Rect(233, 766, 218, 87), "4c1b0.png", 12, 32, false);
-                Cloud(root.transform, tracks, "Cloud Upper", new Rect(15, 9, 145, 91), "31590.png", 10, 36, true);
-                root.GetComponent<TitleCloudDrift>().clouds = tracks.ToArray();
                 PrefabUtility.SaveAsPrefabAsset(root, TitlePath);
             }
             finally { Object.DestroyImmediate(root); }
         }
 
-        private static void Cloud(Transform parent, List<TitleCloudDrift.Cloud> tracks, string name, Rect box,
-            string image, float distance, float seconds, bool reverse)
+        // #467: the landscape no longer paints the flag; these pieces are placed over it and move in the wind.
+        private const string Pole = "FlagPole.png";
+        private static readonly string[] FlagArt = { Pole, "FlagBanner.png", "RibbonRedYellow.png", "RibbonBlue.png" };
+        // FlagPole.png (318x1024): finial and crossbar in the top 212px, base cap in the bottom 24px; only the shaft stretches.
+        private static readonly Vector4 PoleBorder = new Vector4(0, 24, 0, 212);
+        private const float PoleWidth = 58;
+
+        [MenuItem("Hapio/Story/Add Title Wind Flag")]
+        public static void AddWindFlag()
         {
-            var frame = Image(parent, name, box, image);
-            tracks.Add(new TitleCloudDrift.Cloud { target = frame, distance = distance, seconds = seconds, reverse = reverse });
+            foreach (var file in FlagArt) StoryWorkspaceBuilder.ImportSprite(Art + file);
+            var importer = (TextureImporter)AssetImporter.GetAtPath(Art + Pole);
+            if (importer.spriteBorder != PoleBorder) { importer.spriteBorder = PoleBorder; importer.SaveAndReimport(); }
+            var root = PrefabUtility.LoadPrefabContents(TitlePath);
+            try
+            {
+                if (root.transform.Find("Wind Flag") != null) return;
+                // The 3x landscape is exactly 402x874, so it fills its frame without the old sub-pixel crop.
+                var landscape = (RectTransform)root.transform.Find("Paper Landscape/Artwork");
+                landscape.anchoredPosition = Vector2.zero; landscape.sizeDelta = new Vector2(402, 874);
+                var flag = StoryWorkspaceBuilder.Rect("Wind Flag", root.transform, new Rect(0, 0, 402, 874));
+                flag.SetSiblingIndex(1); // over the landscape, under the name and the clouds
+                var ribbon = Wave(flag, "Ribbon Red Yellow", new Rect(219, 472, 112, 63), "RibbonRedYellow.png");
+                Ribbon(ribbon, 0);
+                ribbon = Wave(flag, "Ribbon Blue", new Rect(216, 490, 90, 65), "RibbonBlue.png");
+                Ribbon(ribbon, .37f);
+                var pole = Picture(flag, "Pole", new Rect(333 - PoleWidth * .5f, 455, PoleWidth, 335), Pole);
+                pole.type = UnityEngine.UI.Image.Type.Sliced;
+                pole.pixelsPerUnitMultiplier = pole.sprite.rect.width / PoleWidth;
+                var banner = Wave(flag, "Banner", new Rect(311, 484, 44, 167), "FlagBanner.png");
+                banner.pinned = new Vector2(.5f, 1); banner.tip = new Vector2(.5f, 0);
+                banner.amplitude = 2.5f; banner.lean = -3; banner.waves = .8f; banner.speed = .5f; banner.stiffness = 1.6f;
+                banner.gustStrength = 1.5f; banner.columns = 4; banner.rows = 16;
+                PrefabUtility.SaveAsPrefabAsset(root, TitlePath);
+            }
+            finally { PrefabUtility.UnloadPrefabContents(root); }
+        }
+
+        private static readonly string[] LeafArt = { "LeafMapleRed.png", "LeafMapleYellow.png", "LeafLongRed.png", "LeafLongYellow.png" };
+
+        // #467: leaves blow across the whole title in front of the clouds; the start button stays above the title art.
+        [MenuItem("Hapio/Story/Add Title Falling Leaves")]
+        public static void AddFallingLeaves()
+        {
+            foreach (var file in LeafArt) StoryWorkspaceBuilder.ImportSprite(Art + file);
+            var root = PrefabUtility.LoadPrefabContents(TitlePath);
+            try
+            {
+                if (root.transform.Find("Falling Leaves") != null) return;
+                var area = StoryWorkspaceBuilder.Rect("Falling Leaves", root.transform, new Rect(0, 0, 402, 874));
+                area.SetAsLastSibling();
+                var leaves = area.gameObject.AddComponent<TitleFallingLeaves>();
+                leaves.sprites = LeafArt.Select(file => AssetDatabase.LoadAssetAtPath<Sprite>(Art + file)).ToArray();
+                if (leaves.sprites.Any(sprite => sprite == null)) throw new InvalidOperationException("Missing title leaf image");
+                // The same gust as the flag, so everything on the title is hit at once.
+                leaves.gustSeconds = root.transform.Find("Wind Flag/Banner").GetComponent<TitleWindWave>().gustSeconds;
+                PrefabUtility.SaveAsPrefabAsset(root, TitlePath);
+            }
+            finally { PrefabUtility.UnloadPrefabContents(root); }
+        }
+
+        // Tied at the pole end (upper right of the art), the tail streams left and lifts in a gust.
+        private static void Ribbon(TitleWindWave ribbon, float phase)
+        {
+            ribbon.pinned = new Vector2(.98f, .97f); ribbon.tip = new Vector2(.02f, .03f);
+            ribbon.amplitude = 4; ribbon.lean = -4; ribbon.waves = 1.5f; ribbon.speed = 1.2f; ribbon.stiffness = 1.2f;
+            ribbon.phase = phase; ribbon.gustStrength = 1.5f; ribbon.columns = 16; ribbon.rows = 9;
+        }
+
+        private static TitleWindWave Wave(Transform parent, string name, Rect box, string file) =>
+            Picture(parent, name, box, file).gameObject.AddComponent<TitleWindWave>();
+
+        private static Image Picture(Transform parent, string name, Rect box, string file)
+        {
+            var image = StoryWorkspaceBuilder.Rect(name, parent, box).gameObject.AddComponent<Image>();
+            image.sprite = AssetDatabase.LoadAssetAtPath<Sprite>(Art + file);
+            if (image.sprite == null) throw new InvalidOperationException("Missing title image " + file);
+            image.raycastTarget = false;
+            return image;
+        }
+
+        // The frame takes the picture's own shape, so nothing is cropped and the cloud wraps as soon as it has left.
+        private static void Cloud(Transform parent, List<TitleCloudDrift.Cloud> tracks, string name, Vector2 at, float width,
+            string image, float speed, bool rightward = false)
+        {
+            var sprite = AssetDatabase.LoadAssetAtPath<Sprite>(Art + image);
+            if (sprite == null) throw new InvalidOperationException("Missing title image " + image);
+            var frame = Image(parent, name, new Rect(at.x, at.y, width, width * sprite.rect.height / sprite.rect.width), image);
+            tracks.Add(new TitleCloudDrift.Cloud { target = frame, speed = speed, reverse = rightward });
         }
 
         private static RectTransform Image(Transform parent, string name, Rect box, string file)
