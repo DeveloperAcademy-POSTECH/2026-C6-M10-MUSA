@@ -135,9 +135,11 @@ namespace Hapio.Tests
                 Assert.That(studio.collisionFloor, Is.SameAs(bindings.battleFloor.transform));
                 Assert.That(studio.boardCamera, Is.SameAs(bindings.sceneController.orbCamera));
                 Assert.That(studio.groundPng, Is.Not.Null);
-                AssertSameSavedAsset(studio.groundPng, original.groundPng, "Ground texture");
-                AssertSameSavedAsset(studio.paperPng, original.paperPng, "Surround texture");
-                AssertSameSavedAsset(studio.boardBackgroundPng, original.boardBackgroundPng, "Board backing texture");
+                // #447: stage 1 has its own ground, board backing and surround; every other saved Lab environment value is kept.
+                const string stageOne = "Assets/Hapio/Art/Environment/Stage01/Textures/";
+                Assert.That(AssetDatabase.GetAssetPath(studio.groundPng), Is.EqualTo(stageOne + "Stage01_Ground_SandBeige.png"), "Ground texture");
+                Assert.That(studio.boardBackgroundPng, Is.SameAs(studio.groundPng), "Board backing texture");
+                Assert.That(AssetDatabase.GetAssetPath(studio.paperPng), Is.EqualTo(stageOne + "Stage01_Sky_WarmBeige.png"), "Surround texture");
                 Assert.That(studio.groundSize, Is.EqualTo(original.groundSize));
                 Assert.That(studio.groundTiling, Is.EqualTo(original.groundTiling));
                 Assert.That(studio.showGround && studio.showSurround && studio.fillBoardBackground, Is.True);

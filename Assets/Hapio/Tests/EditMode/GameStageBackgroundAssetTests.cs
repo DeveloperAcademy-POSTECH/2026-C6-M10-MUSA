@@ -21,22 +21,31 @@ namespace Hapio.Tests
                     .SelectMany(root => root.GetComponentsInChildren<GameStageBackgrounds>(true)).Single();
                 var baseline = controller.defaultBackground;
                 var night = controller.Resolve(2);
+                // #447: stage 3 has its own sunset set too; stage 1 and unknown stages keep the default.
+                var sunset = controller.Resolve(3);
                 Assert.That(night, Is.Not.SameAs(baseline));
+                Assert.That(sunset, Is.Not.SameAs(baseline));
+                Assert.That(sunset, Is.Not.SameAs(night));
                 Assert.That(controller.Resolve(1), Is.SameAs(baseline));
-                Assert.That(controller.Resolve(3), Is.SameAs(baseline));
                 Assert.That(controller.Resolve(99), Is.SameAs(baseline));
+                Assert.That(sunset.studio.target, Is.SameAs(baseline.studio.target));
+                Assert.That(sunset.studio.collisionFloor, Is.SameAs(baseline.studio.collisionFloor));
+                Assert.That(sunset.studio.boardCamera, Is.SameAs(baseline.studio.boardCamera));
                 Assert.That(night.studio.target, Is.SameAs(baseline.studio.target));
                 Assert.That(night.studio.collisionFloor, Is.SameAs(baseline.studio.collisionFloor));
                 Assert.That(night.studio.boardCamera, Is.SameAs(baseline.studio.boardCamera));
                 foreach (int stage in new[] { 1, 2, 3, 2, 1 })
                 {
                     controller.ApplyStage(stage);
-                    Assert.That(baseline.studio.gameObject.activeSelf, Is.EqualTo(stage != 2));
-                    Assert.That(baseline.ground.activeSelf, Is.EqualTo(stage != 2));
-                    Assert.That(baseline.boardBacking.activeSelf, Is.EqualTo(stage != 2));
+                    Assert.That(baseline.studio.gameObject.activeSelf, Is.EqualTo(stage == 1));
+                    Assert.That(baseline.ground.activeSelf, Is.EqualTo(stage == 1));
+                    Assert.That(baseline.boardBacking.activeSelf, Is.EqualTo(stage == 1));
                     Assert.That(night.studio.gameObject.activeSelf, Is.EqualTo(stage == 2));
                     Assert.That(night.ground.activeSelf, Is.EqualTo(stage == 2));
                     Assert.That(night.boardBacking.activeSelf, Is.EqualTo(stage == 2));
+                    Assert.That(sunset.studio.gameObject.activeSelf, Is.EqualTo(stage == 3));
+                    Assert.That(sunset.ground.activeSelf, Is.EqualTo(stage == 3));
+                    Assert.That(sunset.boardBacking.activeSelf, Is.EqualTo(stage == 3));
                 }
                 var baselineMaterials = baseline.studio.GetComponentsInChildren<Renderer>(true)
                     .SelectMany(renderer => renderer.sharedMaterials).ToArray();
@@ -51,6 +60,21 @@ namespace Hapio.Tests
                     Is.Not.SameAs(baseline.ground.GetComponent<Renderer>().sharedMaterial));
                 Assert.That(night.boardBacking.GetComponent<Renderer>().sharedMaterial,
                     Is.Not.SameAs(baseline.boardBacking.GetComponent<Renderer>().sharedMaterial));
+                var nightMaterials = night.studio.GetComponentsInChildren<Renderer>(true)
+                    .SelectMany(renderer => renderer.sharedMaterials).ToArray();
+                foreach (var renderer in sunset.studio.GetComponentsInChildren<Renderer>(true))
+                    foreach (var material in renderer.sharedMaterials)
+                    {
+                        Assert.That(material, Is.Not.Null, renderer.name);
+                        Assert.That(baselineMaterials, Has.None.SameAs(material), renderer.name);
+                        Assert.That(nightMaterials, Has.None.SameAs(material), renderer.name);
+                    }
+                Assert.That(sunset.ground.GetComponent<Renderer>().sharedMaterial,
+                    Is.Not.SameAs(baseline.ground.GetComponent<Renderer>().sharedMaterial));
+                Assert.That(sunset.boardBacking.GetComponent<Renderer>().sharedMaterial,
+                    Is.Not.SameAs(baseline.boardBacking.GetComponent<Renderer>().sharedMaterial));
+                Assert.That(sunset.ground.transform.parent, Is.SameAs(baseline.ground.transform.parent));
+                Assert.That(sunset.boardBacking.transform.parent, Is.SameAs(baseline.boardBacking.transform.parent));
                 Assert.That(night.ground.transform.parent, Is.SameAs(baseline.ground.transform.parent));
                 Assert.That(night.boardBacking.transform.parent, Is.SameAs(baseline.boardBacking.transform.parent));
                 foreach (string componentName in new[] { "Camera", "Canvas", "Rigidbody", "Collider" })
