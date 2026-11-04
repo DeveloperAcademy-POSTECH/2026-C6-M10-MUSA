@@ -198,3 +198,7 @@
 - `LabGourdVisualRig`가 없는 프리팹(흰 박)은 기존 경로를 글자 그대로 탄다. 흰 박의 마운트·판정·칠·요괴 자세는 `Assets/Lab/Tests/PlayMode/Golden/`의 main 기록과 같아야 하며, 골든은 흰 박이 바뀌는 의도된 변경에서만 `GOURD_GOLDEN_RECORD=1`로 다시 기록한다. 계약 검사 실패는 `C6_GOURD_RIG_FALLBACK`과 함께 흰 박으로 돌아간다. 상세는 `docs/GOURD_MODELS.md`.
 - 2스테이지만 `gourdVisualResource = Hapio/Gourds/Stage02_Yagwanggwi_Battle`(야광귀 박)이며 1·3은 비워 둔다(`GameStageAssets.EnsureAssets`가 1·3을 비움). 판정·도색·요괴 반응·완성/결과/PNG까지 이 박을 쓴다. 아트 원본 프리팹은 고치지 않고 `Hapio > Gourds > Bake Stage 2 Yagwanggwi Gourd`(`GameGourdRigBaker`)로만 다시 굽는다. 미리보기 덧씌우기(`GameGourdModelPreview`·`GourdPreview` 리소스)는 삭제했으며 재생성하지 않는다.
 - 2스테이지 판정 모양이 바뀌어 현재 최신 묶음은 **공유 설정 257개·5683/`C6PhysicsLab/44`/`C6HapioGame/29`**다. Game28 앱과 혼용하지 않는다.
+
+## #507 연속 곡선 줄
+
+- Hapio 전투는 `GameBattleBindings.Awake`가 모든 스테이지의 `LabHangingTarget`에 `LabRopeStyle.Curved`를 런타임으로 지정한다. 고정점에서 박 연결점까지 피벗을 제어점으로 둔 베지어 한 줄이며, 물리·피벗 높이·판정·접속 규약은 바꾸지 않는다. Lab Scene과 Battle.unity 저장값은 `Segmented`이며 YAML을 고치지 않는다. 기존 `Rope`·`Upper Rope`는 transform을 계속 계산하고 렌더러만 끈다. 상세는 `docs/PINATA_TUNING_GUIDE.md`.
