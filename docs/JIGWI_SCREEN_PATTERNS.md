@@ -1,6 +1,6 @@
-# 지귀 개인 발화·전원 화면 소화 — 현재 #427 기준
+# 지귀 개인 부적·전원 화면 소화 — 현재 #479 기준
 
-작성: 2026-10-27. 구현 명세 갱신: 2026-11-02, `feat/#427-jigwi-pattern-shout-cues`(main `79a96817` 기준). #412 회복 표시·물 공급과 #417 호환 규약은 유지한다. 1~8절은 현재 코드 기준이며 #341의 A/B 시간표·B 장기 유지/축소 동작을 대체한다. 9~12절의 과거 실행 기록과 생성 프롬프트는 당시 근거로 보존한다. 이 문서 갱신 자체는 자동 검사·실기기 PASS를 뜻하지 않으며 실제 수행 결과는 `VALIDATION.md`에서 구분한다.
+작성: 2026-10-27. 구현 명세 갱신: 2026-11-02 #427, 2026-11-04 `feat/#479-jigwi-talisman`(A를 부적 쓰기로 교체, B는 그대로). #412 회복 표시·물 공급과 #417 호환 규약은 유지한다. 1~8절은 현재 코드 기준이며 #341의 A/B 시간표·B 장기 유지/축소 동작을 대체한다. 9~12절의 과거 실행 기록과 생성 프롬프트는 당시 근거로 보존한다. 이 문서 갱신 자체는 자동 검사·실기기 PASS를 뜻하지 않으며 실제 수행 결과는 `VALIDATION.md`에서 구분한다.
 
 ## 1. 실행 범위와 유지하는 규칙
 
@@ -10,20 +10,20 @@
 
 | 회차 | 예고 시작 | 실제 활성 | 최대 종료 | 범위 |
 |---|---:|---:|---:|---|
-| A1 | 4초 | 5초 | 20초 | 개인 발화 |
+| A1 | 4초 | 5초 | 20초 | 전원 개인 부적 |
 | B1 | 24초 | 25초 | 35초 | 전원 소화 미션 |
-| A2 | 39초 | 40초 | 55초 | 개인 발화 |
+| A2 | 39초 | 40초 | 55초 | 전원 개인 부적 |
 | B2 | 54초 | 55초 | 65초 | 전원 소화 미션 |
-| A3 | 69초 | 70초 | 85초 | 개인 발화 |
+| A3 | 69초 | 70초 | 85초 | 전원 개인 부적 |
 | B3 | 84초 | 85초 | 95초 | 전원 소화 미션 |
 
-- A 최대 지속은 DEV240으로1~15초에서 줄일 수 있다. B 미션은10초 고정, 예고는 활성 전1초 고정이다. A 조기 성공은 다음 예약 시각을 당기지 않는다. A2/B2와 A3/B3에서는 **다음 경고만 앞 패턴과 겹친다**. 실제 활성은 겹치지 않으며 같은 시각에 앞 A를 종료한 뒤 B를 활성화한다. #341의 중첩 슬롯 Skipped 정책은 사용하지 않는다.
+- A 최대 지속은 DEV240으로1~15초에서 줄일 수 있다. B 미션은10초 고정, 예고는 활성 전1초 고정이다. A가 모든 자리의 부적 완료로 일찍 끝나도 다음 예약 시각을 당기지 않는다. A2/B2와 A3/B3에서는 **다음 경고만 앞 패턴과 겹친다**. 실제 활성은 겹치지 않으며 같은 시각에 앞 A를 종료한 뒤 B를 활성화한다. #341의 중첩 슬롯 Skipped 정책은 사용하지 않는다.
 - 공통 기믹은20/40/60/80초의 기존 가중 난수 경로다. A/B 진행과 별개이며100초에는 남은 방해를 무벌점 정리하고 마지막20초 자동 회복2배(DEV235)를 적용한다. 전투 제한은120초, 미완성 시간 초과는 Defeat다.
-- 기존 LAN·핫스팟·owner-local 조합판을 유지한다. 현재 호환 묶음은 **공유 설정257개 / 프로토콜5683 / `C6PhysicsLab/44` / `C6HapioGame/28`**다(#461 도색 압축, 지귀 규칙 변경 없음). 5682/Lab43/Game27, 5681/Lab42/Game26, 5680/Lab41/Game25, 251개·5677/Lab38/Game21·22 등 이전 빌드와 혼용하지 않는다.
+- 기존 LAN·핫스팟·owner-local 조합판을 유지한다. 현재 호환 묶음은 **공유 설정257개 / 프로토콜5684 / `C6PhysicsLab/45` / `C6HapioGame/29`**다(#479 부적 요청·`talismanAt`·부적 물 구슬 추가). 5683/Lab44/Game28, 5682/Lab43/Game27, 5681/Lab42/Game26, 5680/Lab41/Game25, 251개·5677/Lab38/Game21·22 등 이전 빌드와 혼용하지 않는다.
 
 ### 1.1. 음성 예고와 실제 발동 (#427)
 
-Host의 실제 발동 시각과 표의 **1초 전 상태/화면 예고**는 바꾸지 않는다. 별도로 각 기기의 `LabJigwiPatternAudio`가 같은 전투 clock·공유 시간표를 읽어 **음성 시작 = 실제 발동 − 파일 내 외침 기준점**으로 재생한다. 음성 종료 이벤트로 게임 규칙을 시작하지 않는다. A는 대상 선정 전부터 전원에게 들리고, 실제 개인 화염은 Host가 선택한 대상에게만 표시한다.
+Host의 실제 발동 시각과 표의 **1초 전 상태/화면 예고**는 바꾸지 않는다. 별도로 각 기기의 `LabJigwiPatternAudio`가 같은 전투 clock·공유 시간표를 읽어 **음성 시작 = 실제 발동 − 파일 내 외침 기준점**으로 재생한다. 음성 종료 이벤트로 게임 규칙을 시작하지 않는다. #479부터 A 외침은 `PatternAudioProfile.personalVoiceEnabled`=0으로 꺼 두었고(파일·기준점은 보존), B 외침만 재생한다.
 
 | 사용자 제공 원본 | 길이 | 파일 내 외침 기준점 | 1회차 음성 시작 → 발동 |
 | --- | ---: | ---: | --- |
@@ -37,17 +37,19 @@ Host의 실제 발동 시각과 표의 **1초 전 상태/화면 예고**는 바�
 - `(sessionId, round, startedAt)` 범위의6슬롯 재생/건너뜀 기록을 유지한다. 반복 snapshot·HUD 재연결로 예고를 다시 재생하지 않는다. 늦게 받은 상태는 외침 전이면 현재 파일 위치로 맞추고, 이미 발동한 슬롯은 건너뛴다. 새 판에서만 슬롯 기록을 초기화한다.
 - 공동 Pause/시작 대기에는 음성을 멈춘다. 앱 포커스가 돌아왔을 때 전투 시계가 진행했다면 재생 위치를 맞추고, 외침 시각이 지났다면 뒤늦게 외치지 않는다. 종료·Scene 이탈·패턴 해결에서는 해당 재생을 중단한다. 파일 누락은 경고 후 해당 슬롯을 건너뛰며 게임 규칙은 계속된다.
 
-## 2. A — 개인 발화
+## 2. A — 전원 개인 부적 (#479)
 
-1. 5/40/70초에 대상 한 명을 활성화한다. 직전1초 예고 후 최대15초(DEV240) 동안 자동 스태미나 회복4배를 적용한다. 최댓값·생성 비용·명중 즉시 회복은 바꾸지 않는다.
-2. 대상 판의 기존·신규·수신 Raw/Combined에5초 소각 기한을 부여한다. 북과 아이템은 제외한다. 합성/전달로 가장 이른 기한을 늘리지 않는다.
-3. 실제 발사 승인 뒤에는 이미 비행 중인 공을 소각하지 않는다. 기존 투사체 물리·종료 처리를 따른다.
-4. 대상 본인의 실제 Combined 박 명중3회로 A를 조기 종료한다. 오색 Combined도 충돌1회당1회, Relay는 제외한다. 화재 충돌·가상 호환 명중·중복 명중은 세지 않는다. 정상 박 명중의 칠·보상·통계는 기존대로 한 번만 적용한다.
-5. 조기 성공 시 물을 끼얹는 효과를0.6초 표시하고 해당 A에서 부여한 소각 예약을 모든 소유자의 구슬에서 제거한다. 아직 남은 공은 보존하고 이미 소각된 공은 복원하지 않는다. 자연 만료·100초 정리도 예약을 제거하되 성공 효과는 재생하지 않는다.
+1. 5/40/70초에 **모든 참가자 자리**에서 A가 열린다. 대상 한 명 선정·박 명중3회·자동 회복4배는 없다(#479에서 제거). 스냅샷의 자리별 `LabJigwiABPlayerFire.talismanAt`은 아직 안 썼으면 음수, 쓰면 Host 승인 시각이다. 최대 지속은 DEV240(기본15초).
+2. 각 판의 Raw/Combined가 **한 개씩** 탄다. 첫 구슬은 활성 뒤 DEV243(기본1초), 이후 Inspector `jigwiABBurnStaggerSeconds`(1초) 간격이며 소유자별 생성 순서(createdAt/id)를 따른다(`NextJigwiABBurnAt`). 북·아이템은 제외하고, 합성/전달로 가장 이른 기한을 늘리지 않는다. 이미 발사 승인된 비행 공은 태우지 않는다.
+3. 같은 시각 각 기기의 `LabJigwiTalismanOverlay`가 조합판 위 **전투 영역**(조합판 카메라 위쪽, 위 여백 `topInset`.14)에 세로로 긴 한지 부적을 띄운다. 부적이 떠 있는 동안 `board.SetUiInputBlocked`로 조합판 조작을 막는다. 모든 Graphic의 raycastTarget은 OFF다.
+4. 부적에는 신라문화체 모양의 점선 "물"(`LabJigwiTalismanStroke.Water`, 0~1 정사각형의88점)과 안내 "손가락으로 '물'을 적어 / 부적을 완성하세요."가 있다. 쓴 점은 파란색으로 바뀐다. 획 순서는 상관없고 점에서 허용 거리(.07) 안을 지나면 덮인다. 점선에서 먼 낙서는 세지 않는다.
+5. 덮은 비율이 Inspector 기준(.995=99.5%)을 넘으면 부적을 내리고 `jigwiTalisman` 요청(roundId, firstId)을 보낸다. Host 확인 전까지1초마다 다시 보낸다. 판정은 Host `TryCompleteJigwiTalisman`만 하며 같은 회차·참가자·활성 중일 때 한 번만 승인한다.
+6. Host는 그 자리의 소각 예약을 지우고 **부적 물 구슬5개**(`jigwiTalismanReward`, 물방울 원화, 수명15초, 칠1.5배)를 준다. B 보상 불 꼬리·크기 배율은 붙이지 않는다. 다른 자리에는 아무 영향이 없다. 아직 안 쓴 자리는 계속 탄다.
+7. 모든 자리가 쓰면 A를 Completed로 일찍 끝낸다. 못 쓴 자리가 있으면 최대 지속에서 Expired로 끝나며 벌점은 없다. 자연 만료·100초 정리에서 남은 소각 예약은 제거하고 이미 탄 공은 복원하지 않는다.
 
-`LabOrbState.jigwiABBurnAt`은 이름과 달리 **시작 시각이 아닌 절대 소각 마감 시각**이다. 예:11초에 부여→16초에 소각. 일반 `createdAt/expiresAt`을 덮어쓰지 않고 두 수명 중 빠른 기한을 사용한다. `jigwiABBurnEventId`로 해제 출처를 구분한다.
+`LabOrbState.jigwiABBurnAt`은 이름과 달리 **시작 시각이 아닌 절대 소각 마감 시각**이다. 일반 `createdAt/expiresAt`을 덮어쓰지 않고 두 수명 중 빠른 기한을 사용한다. `jigwiABBurnEventId`로 해제 출처를 구분한다.
 
-A 대상자의 기존 스태미나 창에는 `LabStaminaFeedback`의 수채 화염 테두리와 `회복 4배` 표시가 붙는다. 기본.4초 점화 후 실제 게이지 잔량을 따라가며, 가득 차도 불이 유지된다. 정지/시작대기에서는 표현 시계를 멈추고, 이미 진행 중인 A를 처음 수신할 때도 해당 단계에서 보인다.
+#479에서 A 스태미나 수채 화염 테두리·`회복 4배`·`과열/명중` 문구와 `LabStaminaFlameGraphic`/`LabStaminaFlameArtGraphic`을 지웠다. 부적을 다 쓴 자리는 화면 가장자리 불도 끈다(`LabJigwiScreenPresentation.TalismanWritten`).
 
 공통 스태미나 소비는 중복 제거된 생성 승인 `LocalStaminaSpent`에 연결한다. (#418부터 저장된 `StaminaFeedbackProfile`의 소비 효과는 꺼져 있다. 게이지는 스태미나가 모자란데 북을 눌렀을 때만 빨갛게 빛난다. 아래 설명은 켰을 때의 동작이다.) 기본.18초 동안 파란 채움과 방금 소모한 구간의 잔광만 표시하고 원본 잔량/빈 베이지/프레임/입력은 변경하지 않는다. 회복과 소비가 같은 frame에 겹쳐도 수치 감소로 추측하지 않는다. 거절·재전송·초기 snapshot·무료 공급에는 소비 효과를 만들지 않는다. 새 passive UI는 기존 스태미나 부모 아래에 있어 구슬보다 뒤에 표시되고 야광귀 피버 레이어와 분리된다.
 
@@ -103,9 +105,9 @@ A 대상자의 기존 스태미나 창에는 `LabStaminaFeedback`의 수채 화�
 |229|JigwiStageWarningSeconds|기존1초 저장값 보존|미사용·숨긴 예약 슬롯, 현행 A/B는1초 고정|
 |235|JigwiStageFeverMultiplier|2배|1~4배|
 |240|JigwiABPersonalDurationSeconds|15초|1~15초|
-|241|JigwiABPersonalRecoveryMultiplier|4배|1~10배|
-|242|JigwiABPersonalRequiredHits|3회|정수1~10|
-|243|JigwiABPersonalBurnSeconds|5초|.5~30초|
+|241|Reserved Jigwi A Recovery Multiplier (unused)|저장값 보존|#479 은퇴·숨긴 슬롯|
+|242|Reserved Jigwi A Required Hits (unused)|저장값 보존|#479 은퇴·숨긴 슬롯|
+|243|JigwiABPersonalBurnSeconds|1초 (#479 전5초)|.5~30초, A 활성 뒤 첫 구슬이 타기까지|
 |244|JigwiABGroupFireCount|3개/명|정수1~6|
 |245|JigwiABRelightSeconds|12초|1~60초|
 |246|JigwiABShrinkDelaySeconds|12초 저장값 보존|미사용·숨긴 예약 슬롯|
@@ -120,7 +122,9 @@ A 대상자의 기존 스태미나 창에는 `LabStaminaFeedback`의 수채 화�
 |255|JigwiABSupplyLimit|5개|1~12개|
 |256|JigwiABFireDepth|.8|.4~.9, 박 전면까지 비율|
 
-기존230~234 표면 설정은 값/배열 위치를 보존하되 DEV에서 숨긴 예약 슬롯이다. 기존236·237 오색구슬 보상과238·239 구미호 피버는 그대로 유지한다. 기존0~252를 보존하고 공급 간격/초기 수량/미소모 상한/발화점 거리253~256을 더해 총257개를 공유한다.229·246·247은 Inspector와 DEV에서 숨기며 저장값은 그대로 보존한다. B 미션10초와 성공 보상5초는 현재 고정 규칙이고 별도 DEV 행은 없다. Inspector의 화면 효과 `waterDouseSeconds/flameSpeed/flameSway`와 B의 `curtainTexture/curtainStage2Texture/curtainStage1Texture/curtainDenseFrame/curtainDenseUv`는 새 프리팹에서 조정할 수 있다. B 단계 원화는3종을 쓰고 중앙 밀도용 크롭은 강한3단계 원본을 유지한다. 모든 원화는 UV 크롭으로 종횡비를 보존한다. `waterFlightTrail`의 최소/최대 표시 폭·먹선/물/하이라이트 색을 Inspector에서 조절하며 잔상 수명/길이는 기존 WaterFlightTrail 프로필을 따른다. `audioView.clip/volume`은 Inspector에서 바꿀 수 있다.
+기존230~234 표면 설정은 값/배열 위치를 보존하되 DEV에서 숨긴 예약 슬롯이다. 기존236·237 오색구슬 보상과238·239 구미호 피버는 그대로 유지한다. 기존0~252를 보존하고 공급 간격/초기 수량/미소모 상한/발화점 거리253~256을 더해 총257개를 공유한다.229·241·242·246·247은 Inspector와 DEV에서 숨기며 저장값은 그대로 보존한다. B 미션10초와 성공 보상5초는 현재 고정 규칙이고 별도 DEV 행은 없다. Inspector의 화면 효과 `waterDouseSeconds/flameSpeed/flameSway`와 B의 `curtainTexture/curtainStage2Texture/curtainStage1Texture/curtainDenseFrame/curtainDenseUv`는 새 프리팹에서 조정할 수 있다. B 단계 원화는3종을 쓰고 중앙 밀도용 크롭은 강한3단계 원본을 유지한다. 모든 원화는 UV 크롭으로 종횡비를 보존한다. `waterFlightTrail`의 최소/최대 표시 폭·먹선/물/하이라이트 색을 Inspector에서 조절하며 잔상 수명/길이는 기존 WaterFlightTrail 프로필을 따른다. `audioView.clip/volume`은 Inspector에서 바꿀 수 있다.
+
+A 부적의 Inspector 전용 값(DEV 행 없음, `LabConfig`): `jigwiABBurnStaggerSeconds`1초, 부적 물 구슬 수5개/수명15초/칠1.5배, 완료 기준 .995, 허용 거리 .07. 부적 화면의 종이 비율(.55)/위 여백(.14)은 `LabJigwiTalismanOverlay`에 있다.
 
 ### 5.1. 음성 Inspector 설정 (로컬 표현 전용)
 
@@ -132,6 +136,7 @@ Project 창에서 `Assets/Lab/Resources/Jigwi/PatternAudio/PatternAudioProfile.a
 |Personal Cue Seconds|1.05초(사용자 승인)|A 파일 내 `요` 강세 시작 위치|
 |Group Cue Seconds|2.08초(사용자 승인)|B 파일 내 `줘` 강세 시작 위치|
 |Personal Volume / Group Volume|각1|0~1, 최종 음량은 기존 SFX 설정과 곱함|
+|Personal Voice Enabled|0 (#479)|A 외침 ON/OFF. B는 항상 재생|
 
 Cue를 늘리면 전체 음성이 더 일찍 시작하며, 실제 A/B 발동 시각은 그대로다. 유효 범위는 최소.01초~해당 클립 길이이며 비정상 값은 기본값으로 보정한다. 이 프로필은 도색/투척/공유 수치 원본 `LabConfig`와 별개다. 청취 조정은 실제 지귀 전투에서 Pause/Resume와 함께 확인한다. 아직 실행하지 않은 실기기 청취를 자동 검사 PASS로 해석하지 않는다.
 
@@ -141,7 +146,9 @@ Cue를 늘리면 전체 음성이 더 일찍 시작하며, 실제 A/B 발동 시
 | --- | --- |
 | 공통 A/B 실제 발동 시간표 | `Assets/Lab/Scripts/Core/LabJigwiABTimeline.cs` — 모델·DTO 검사·음성에서 같은 자료 사용 |
 | 음성 예고·슬롯 기록·정지/복귀 | `Assets/Lab/Scripts/Audio/LabJigwiPatternAudio.cs`, `LabJigwiPatternAudioProfile.cs`; `LabSceneController`가 network에 Attach |
-| A/B 상태·타이밍·보상/소비 | `Assets/Lab/Scripts/Core/LabModel.JigwiAB.cs` |
+| A/B 상태·타이밍·보상/소비 | `Assets/Lab/Scripts/Core/LabModel.JigwiAB.cs` — A 부적 승인 `TryCompleteJigwiTalisman`, 부적 물 지급 |
+| A 부적 화면·쓰기 판정 | `Assets/Lab/Scripts/UI/LabJigwiTalismanOverlay.cs`(`LabJigwiTalismanStroke` 포함) |
+| 에디터 전용 실험 | `Assets/Hapio/Editor/GameDeveloperSoloStartMenu.cs`, `Assets/Lab/Scripts/UI/LabJigwiEventMonitor.cs` |
 | B 무료 지급·상한·회차 정리·박 명중 차단 | `Assets/Lab/Scripts/Core/LabModel.JigwiABSupply.cs` |
 | 기존 모델의 호출 지점 | `LabModel.cs`: 생성·조합·전달·발사·ConfirmHit·회복·ExpiresAt, `LabModel.JigwiStage.cs`: facade |
 | DTO·깊은 복사·입력 검증·불 미동 | `LabJigwiABContracts.cs`; `LabContracts.cs`: snapshot/orb metadata |
@@ -178,7 +185,7 @@ Cue를 늘리면 전체 음성이 더 일찍 시작하며, 실제 A/B 발동 시
 
 ## 8. 확인 방법 — 기대 결과, 실행 여부와 구분
 
-1. 같은 새 버전 솔로 또는2~5인 LAN/핫스팟 방에서 지귀로 진입한다. A의4초 예고→5초 활성,39→40,69→70을 확인한다. 대상 회복4배·5초 소각·합성/전달의 가장 이른 마감·유효 명중3회 조기 해제와 남은 구슬 보존을 본다.
+1. 같은 새 버전 솔로 또는2~5인 LAN/핫스팟 방에서 지귀로 진입한다. A의4초 예고→5초 활성,39→40,69→70을 확인한다. 모든 자리에 부적이 뜨고 조합판이 막히는지, 구슬이 1초 간격으로 한 개씩 타는지, "물"을 다 쓰면 부적이 내려가고 물방울 구슬5개가 오는지, 전원이 쓰면 A가 일찍 끝나는지 본다.
 2. A2가 끝나기 전54초에 B 경고가 함께 보이고55초에는 A 종료/B 활성으로 이어져야 한다.84/85초도 같다. 실제 활성 중첩이나 Skipped가 없어야 한다. Pause/시작 대기에서는 시간이 흐르지 않아야 한다.
 3. B의24/25·54/55·84/85초 경계를 확인한다. Water 장막 명중은 물 효과만, 발화점은 소화·3/2/1 단계 피드백을 보인다. 자기 마지막 불까지 박을 막고 전원 동시 소화가 성공 조건이어야 한다.
 4.10초 안에 성공했을 때 조합판의 Raw/Combined에 보상 화염이 표시되고, 그 순간부터5초간 새로 던진 공만 커지고 불꽃 잔상/칠 배율을 사용해야 한다. 실제 원소는 유지되고 기존 비행은 그대로, 종료 직전 발사한 공은 종료 후 명중해도 보상을 유지해야 한다. DEV251/252를 각각 바꿔 크기와 면적의 독립성을 비교한다.
