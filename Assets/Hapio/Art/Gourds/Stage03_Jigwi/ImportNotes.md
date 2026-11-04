@@ -11,3 +11,7 @@ Use `Prefabs/Jigwi_Gourd_GameReady.prefab` for development placement. Folder lay
 The looping Animator is an art preview. Gameplay-event integration, model selection, paint and collision integration belong to the development team. Do not assign this whole-gourd prefab to an interior-only yokaiVisual slot. Battle scenes, stage definitions and existing stage assets were not changed. The authoring blend remains outside Assets.
 
 Current Editor validation is recorded in `docs/VALIDATION.md`. No gameplay/device or full test-suite pass is claimed.
+
+## Battle bake (#507)
+
+The game uses `Resources/Hapio/Gourds/Stage03_Jigwi_Battle.prefab`, baked from the GameReady prefab by `Hapio > Gourds > Bake All Stage Gourds` (`Hapio.Editor.GameGourdRigBaker`). The art prefab, FBX and materials are not modified. The bake writes `Generated/` (outer-wall paint shell, closed-lid paint mesh, 48 x 24 hit shell, legacy 2 s yokai clip, yokai timeline, body and lid paint materials showing the art's base colour under the paint) and `Generated/BakeReport.txt`. It removes the model's own hanging rope (`Rear_Rope_*`) and the looping Animator; decorations stay in their closed pose.

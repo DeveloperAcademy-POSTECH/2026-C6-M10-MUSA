@@ -1,4 +1,3 @@
-using System;
 using C6Lab;
 using NUnit.Framework;
 using UnityEngine;
@@ -6,28 +5,33 @@ using UnityEngine;
 namespace Hapio.Tests
 {
     /// <summary>
-    /// #507: only Stage 2 has its own battle gourd; 1 and 3 keep the white gourd. The stage gourd is a Resources path,
-    /// not a prefab reference, so loading the catalog does not load every stage's model. The old preview overlay is gone.
+    /// #507: every story stage names its own baked battle gourd. The stage gourd is a Resources path, not a prefab
+    /// reference, so loading the catalog does not load every stage's model. The old preview overlay is gone.
     /// </summary>
     public sealed class GameStageGourdVisualTests
     {
-        public const string Stage2Resource = "Hapio/Gourds/Stage02_Yagwanggwi_Battle";
+        public static readonly string[] StageResources =
+        {
+            "Hapio/Gourds/Stage01_Gumiho_Battle", "Hapio/Gourds/Stage02_Yagwanggwi_Battle", "Hapio/Gourds/Stage03_Jigwi_Battle"
+        };
 
         [Test]
-        public void OnlyStageTwoNamesItsOwnBattleGourd()
+        public void EveryStoryStageNamesItsOwnBattleGourd()
         {
             GameStageCatalog catalog = GameStageCatalog.RequireDefault();
-            Assert.That(catalog.Get(1).gourdVisualResource, Is.Null.Or.Empty, "Stage 1 keeps the white gourd.");
-            Assert.That(catalog.Get(2).gourdVisualResource, Is.EqualTo(Stage2Resource));
-            Assert.That(catalog.Get(3).gourdVisualResource, Is.Null.Or.Empty, "Stage 3 keeps the white gourd.");
             for (int index = 1; index <= 3; index++)
+            {
+                Assert.That(catalog.Get(index).gourdVisualResource, Is.EqualTo(StageResources[index - 1]), "Stage " + index);
                 Assert.That(catalog.Get(index).yokaiVisual, Is.Null, "The decorative override stays empty.");
+            }
         }
 
-        [Test]
-        public void TheStageTwoGourdLoadsAndPassesTheModelContract()
+        [TestCase(1)]
+        [TestCase(2)]
+        [TestCase(3)]
+        public void EachStageGourdLoadsAndPassesTheModelContract(int stage)
         {
-            var prefab = Resources.Load<GameObject>(Stage2Resource);
+            var prefab = Resources.Load<GameObject>(StageResources[stage - 1]);
             Assert.That(prefab, Is.Not.Null);
             var rig = prefab.GetComponent<LabGourdVisualRig>();
             Assert.That(rig, Is.Not.Null);
