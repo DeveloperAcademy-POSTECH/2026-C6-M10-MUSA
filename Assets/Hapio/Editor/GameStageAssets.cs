@@ -47,6 +47,12 @@ namespace Hapio.Editor
                     definition.yokaiVisual = null;
                     EditorUtility.SetDirty(definition);
                 }
+                // #507: only Stage 2 has its own battle gourd (set by GameGourdRigBaker); 1 and 3 keep the white gourd.
+                if (i != 1 && !string.IsNullOrEmpty(definition.gourdVisualResource))
+                {
+                    definition.gourdVisualResource = string.Empty;
+                    EditorUtility.SetDirty(definition);
+                }
                 definitions[i] = definition;
             }
             catalog.stages = definitions; catalog.Validate(); EditorUtility.SetDirty(catalog);
