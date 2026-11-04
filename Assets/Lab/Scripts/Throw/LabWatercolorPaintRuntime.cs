@@ -16,7 +16,6 @@ namespace C6Lab
         public const int StampPassBudget = 8;
         private const int PaletteCount = 5;
         private readonly Texture2D[] brushes = new Texture2D[4];
-        private readonly Texture2D[] distances = new Texture2D[4];
         private readonly Vector4[] palette = new Vector4[PaletteCount];
         private readonly List<ActiveStamp> active = new List<ActiveStamp>();
         private readonly LabWatercolorPaintSettings defaults = new LabWatercolorPaintSettings();
@@ -245,10 +244,9 @@ namespace C6Lab
         {
             Texture2D brush = Brush(stamp.pattern);
             if (brush == null || stamp.radius <= 0f) return false;
-            int index = (int)stamp.pattern;
-            if (distances[index] == null) distances[index] = LabWatercolorBrushDistance.Create(brush);
+            Texture2D distance = LabWatercolorBrushDistance.GetOrCreate(stamp.pattern, brush);
             var block = new MaterialPropertyBlock();
-            block.SetTexture("_Brush", brush); block.SetTexture("_InteriorDistance", distances[index]);
+            block.SetTexture("_Brush", brush); block.SetTexture("_InteriorDistance", distance);
             block.SetVector("_Center", stamp.center); block.SetVector("_Right", stamp.right); block.SetVector("_Up", stamp.Up);
             block.SetFloat("_Radius", stamp.radius); block.SetFloat("_Progress", progress);
             block.SetFloat("_Mottle", applied.mottle); block.SetFloat("_EdgeWidth", applied.edgeWidth);
@@ -295,6 +293,63 @@ namespace C6Lab
             material.SetFloat("_EdgeWidth", applied.edgeWidth); material.SetFloat("_TextureScale", applied.textureScale);
             for (int i = 0; i < PaletteCount; i++) material.SetVector("_Palette" + i, palette[i]);
         }
+
+        /// <summary>Why the last <see cref="Prewarm"/> could not draw; it never becomes <see cref="Error"/>.</summary>
+        public string PrewarmError { get; private set; }
+
+        /// <summary>
+        /// Loads the round's brush, builds its shared distance field and draws the stamp pass once into a throwaway
+        /// array target of the optics' format (#482), so the first hit does none of it. Call after Update created the
+        /// material. Optics, queued stamps, counts and Ready are untouched; a failure only leaves the old first-hit path.
+        /// </summary>
+        public bool Prewarm(LabPaintPattern pattern)
+        {
+            if (disposed || material == null) return false;
+            RenderTexture target = null;
+            CommandBuffer commands = null;
+            try
+            {
+                Texture2D brush = Brush(pattern);
+                if (brush == null) return false;
+                Texture2D distance = LabWatercolorBrushDistance.GetOrCreate(pattern, brush);
+                target = RenderTexture.GetTemporary(PrewarmDescriptor());
+                commands = new CommandBuffer { name = "Prewarm gourd watercolor stamp" };
+                commands.SetRenderTarget(target, 0, CubemapFace.Unknown, 0);
+                commands.ClearRenderTarget(false, true, Color.clear);
+                var block = new MaterialPropertyBlock();
+                block.SetTexture("_Brush", brush); block.SetTexture("_InteriorDistance", distance);
+                block.SetVector("_Center", Vector3.forward); block.SetVector("_Right", Vector3.right);
+                block.SetVector("_Up", Vector3.Cross(Vector3.forward, Vector3.right));
+                block.SetFloat("_Radius", .01f); block.SetFloat("_Progress", 1f);
+                LabWatercolorPaintSettings look = applied ?? defaults;
+                block.SetFloat("_Mottle", look.mottle); block.SetFloat("_EdgeWidth", look.edgeWidth);
+                block.SetFloat("_TextureScale", look.textureScale);
+                block.SetVector("_Seed", Vector4.zero);
+                commands.DrawProcedural(Matrix4x4.identity, material, 0, MeshTopology.Triangles, 3, 1, block);
+                Graphics.ExecuteCommandBuffer(commands);
+                PrewarmError = null;
+                return true;
+            }
+            catch (Exception exception)
+            {
+                PrewarmError = exception.Message;
+                Debug.LogWarning("C6_PAINT_PREWARM runtime=watercolor result=failed reason=" + exception.Message);
+                return false;
+            }
+            finally
+            {
+                commands?.Release();
+                if (target != null) RenderTexture.ReleaseTemporary(target);
+            }
+        }
+
+        /// <summary>The optics arrays' format at a tiny size: the GPU pipeline depends on the format, not the size.</summary>
+        internal static RenderTextureDescriptor PrewarmDescriptor() =>
+            new RenderTextureDescriptor(4, 2, RenderTextureFormat.ARGB32, 0)
+            {
+                sRGB = false, msaaSamples = 1, useMipMap = false, autoGenerateMips = false,
+                dimension = TextureDimension.Tex2DArray, volumeDepth = PaletteCount
+            };
 
         private bool EnsureResources(int columns)
         {
@@ -374,8 +429,7 @@ namespace C6Lab
         {
             if (disposed) return;
             disposed = true; ReleaseTextures();
-            for (int i = 0; i < distances.Length; i++)
-                if (distances[i] != null) { LabVisualSafety.DestroyVisualObject(distances[i]); distances[i] = null; }
+            // The brush distance fields are shared across runtimes (#482) and stay for the next round.
             if (material != null) LabVisualSafety.DestroyVisualObject(material);
             material = null;
             // Resources owns the original brushes; they are not destroyed or modified here.

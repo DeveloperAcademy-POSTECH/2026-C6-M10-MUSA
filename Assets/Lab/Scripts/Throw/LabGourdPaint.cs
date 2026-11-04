@@ -29,6 +29,9 @@ namespace C6Lab
         private Texture2D painterTexture;
         private LabHighResolutionPaintRuntime highResolution;
         private LabWatercolorPaintRuntime watercolor;
+        // Each runtime prewarms its round's brush once, while the battle is still behind the preparing overlay (#482).
+        private object prewarmedHighResolution, prewarmedWatercolor;
+        private LabPaintPattern prewarmedHighResolutionPattern, prewarmedWatercolorPattern;
         private bool appliedWatercolorEnabled;
         private int appliedWatercolorSettings;
         private bool appliedHighResolutionEnabled;
@@ -327,6 +330,11 @@ namespace C6Lab
             {
                 if (highResolution == null) highResolution = new LabHighResolutionPaintRuntime();
                 highResolution.Update(source, paintTexture, painterTexture, highResolutionColumns, completeRebuild);
+                if (prewarmedHighResolution != highResolution || prewarmedHighResolutionPattern != source.Pattern)
+                {
+                    if (highResolution.Prewarm(source.Pattern) || highResolution.PrewarmError != null)
+                    { prewarmedHighResolution = highResolution; prewarmedHighResolutionPattern = source.Pattern; }
+                }
             }
             else if (highResolution != null)
             {
@@ -348,6 +356,11 @@ namespace C6Lab
                     && (network.Snapshot.phase == LabPhase.Victory || network.Snapshot.phase == LabPhase.Defeat);
                 watercolor.Update(source, highResolution.PaintTexture, highResolution.PainterTexture,
                     watercolorSettings, Time.realtimeSinceStartupAsDouble, final);
+                if (prewarmedWatercolor != watercolor || prewarmedWatercolorPattern != source.Pattern)
+                {
+                    if (watercolor.Prewarm(source.Pattern) || watercolor.PrewarmError != null)
+                    { prewarmedWatercolor = watercolor; prewarmedWatercolorPattern = source.Pattern; }
+                }
             }
             else if ((!watercolorEnabled || highResolution == null) && watercolor != null)
             {
