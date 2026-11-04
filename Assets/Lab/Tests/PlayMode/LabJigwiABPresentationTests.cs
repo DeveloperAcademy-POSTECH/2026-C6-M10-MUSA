@@ -162,11 +162,10 @@ namespace C6Lab.Tests
             Assert.That(view.PersonalHeatVisible, Is.False);
             Assert.That(view.VisibleScreenFires, Is.Zero);
             view.ApplySnapshot(snapshot, Local, activeAt);
-            Assert.That(view.PersonalHeatVisible, Is.True, "Heat starts at the host's activeAt, not warningAt.");
-            Assert.That(view.status.text, Does.Not.Contain("으아아 마음이 불타오른다"));
-            Assert.That(view.personalFlames[0].material.GetFloat("_FlameTime"), Is.EqualTo(0f).Within(.0001f));
+            Assert.That(view.PersonalHeatVisible, Is.False, "#479: A never tints the screen or shows edge flames.");
+            Assert.That(view.status.text, Does.Not.Contain("으아아 마음이 불타오른다"), "The warning text still ends at activeAt.");
             view.ApplySnapshot(snapshot, Other, activeAt + .01d);
-            Assert.That(view.PersonalHeatVisible, Is.True, "#479: A ignites every seat, so every screen receives heat.");
+            Assert.That(view.PersonalHeatVisible, Is.False);
             view.ApplySnapshot(snapshot, Local, personal.endsAt);
             Assert.That(view.PersonalHeatVisible, Is.False, "The active window remains half open.");
         }
@@ -209,18 +208,18 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void PersonalHeatReachesEverySeatWithoutHitCountOrRecoveryText()
+        public void PersonalAShowsNoScreenHeatHitCountOrRecoveryText()
         {
             LabJigwiABRound personal = snapshot.jigwiAB.rounds[0];
             view.ApplySnapshot(snapshot, Local, 11.2d);
-            Assert.That(view.PersonalHeatVisible, Is.True);
+            Assert.That(view.PersonalHeatVisible, Is.False, "#479: no screen heat or edge flames.");
             Assert.That(view.status.text, Does.Not.Contain("과열").And.Not.Contain("명중"));
             Assert.That(view.playerStatus.text, Does.Not.Contain("회복").And.Not.Contain("동료"));
             Assert.That(view.VisibleScreenFires, Is.Zero);
             Assert.That(view.GetComponentsInChildren<MeshRenderer>(true), Is.Empty,
                 "A's heat belongs to the screen, not a mark attached to the painted boss.");
             view.ApplySnapshot(snapshot, Other, 11.3d);
-            Assert.That(view.PersonalHeatVisible, Is.True, "#479: A ignites every seat.");
+            Assert.That(view.PersonalHeatVisible, Is.False);
             view.ApplySnapshot(snapshot, Local, personal.endsAt);
             Assert.That(view.PersonalHeatVisible, Is.False);
             Assert.That(view.PersonalWaterVisible, Is.False, "Expiry has no completion splash.");
@@ -242,7 +241,7 @@ namespace C6Lab.Tests
             typeof(LabNetwork).GetMethod("SyncJigwiStagePresentation", Private).Invoke(network, null);
             Assert.That(legacy.VisibleGroups, Is.Zero); Assert.That(legacy.VisibleRoots, Is.Zero);
             view.ApplySnapshot(snapshot, Local, 11.2d);
-            Assert.That(view.PersonalHeatVisible, Is.True);
+            Assert.That(view.PersonalHeatVisible, Is.False);
             Assert.That(root.GetComponentsInChildren<Collider>(true).Length, Is.EqualTo(colliders));
             Assert.That(legacy.VisibleGroups, Is.Zero, "Showing A must never recreate a boss surface source.");
         }
@@ -440,9 +439,18 @@ namespace C6Lab.Tests
             Assert.That(body.JigwiABFlame.Burning, Is.True);
             Assert.That(body.JigwiABFlame.Held, Is.True);
             Assert.That(body.JigwiABFlame.SecondsLeft, Is.EqualTo(5f));
+            Assert.That(body.JigwiABFlame.Charring, Is.False, "#479: nothing shows until its last second.");
             Material material = body.JigwiABFlame.FlameRenderer.sharedMaterial;
             Assert.That(material.shader.name, Is.EqualTo("C6Lab/Jigwi Ink Flame"));
-            Assert.That(material.GetTexture("_BaseMap"), Is.SameAs(Resources.Load<Texture2D>("Jigwi/SurfaceFlameWash")));
+            Assert.That(material.GetTexture("_BaseMap"), Is.SameAs(body.JigwiABFlame.CharTexture), "The runtime char, not the old flame art.");
+            body.SetJigwiABBurn(.5f, true);
+            Assert.That(body.JigwiABFlame.Charring, Is.True, "The last second chars it from the bottom.");
+            Assert.That(body.JigwiABFlame.Progress, Is.EqualTo(.5f).Within(.0001f));
+            Texture2D art = body.JigwiABFlame.CharTexture;
+            Assert.That(art.GetPixel(32, 4).a, Is.GreaterThan(.8f), "The bottom is ash.");
+            Assert.That(art.GetPixel(32, 60).a, Is.Zero, "The top is still untouched.");
+            body.SetJigwiABBurn(5f, true);
+            Assert.That(body.JigwiABFlame.Charring, Is.False);
             yield return new WaitForSecondsRealtime(.045f);
             Assert.That(body.JigwiABFlame.SecondsLeft, Is.EqualTo(5f).Within(.0001f));
             Assert.That(body.JigwiABFlame.AnimationTime, Is.Zero);

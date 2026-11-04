@@ -459,13 +459,10 @@ namespace C6Lab
             // Active() can return the upcoming warning for instructions. Flames and the B loop
             // belong only to the real mission window, aligned with the voice's terminal shout.
             bool missionActive = active != null && active.Active(now);
-            // #479: A ignites every seat; a screen whose talisman is finished stops burning.
-            bool personal = missionActive && active.kind == LabJigwiABKind.PersonalBurn
-                && !TalismanWritten(active, localPlayer);
-            personalHeat.gameObject.SetActive(personal);
+            // #479: A no longer tints the screen or stands edge flames beside the board; the talisman and
+            // the orbs charring one by one carry it. The saved objects stay (prefab), always hidden.
+            personalHeat.gameObject.SetActive(false);
             float animationTime = missionActive ? (float)Math.Max(0d, now - active.activeAt) : 0f;
-            if (personalFlames != null) for (int i = 0; i < personalFlames.Length; i++)
-                AnimateFlame(personalFlames[i], animationTime, i * 2.13f, .9f);
             VisibleScreenFires = 0;
             if (missionActive && active.kind == LabJigwiABKind.GroupFire) DrawGroup(active, localPlayer, now, animationTime, held);
             else SetFiresHidden(held);
