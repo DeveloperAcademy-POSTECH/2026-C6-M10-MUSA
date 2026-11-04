@@ -528,6 +528,12 @@ namespace C6Lab
         [SerializeField, Range(1f, 60f)] private float jigwiABRelightSeconds = 12f;
         [Tooltip("#479 Inspector 전용: A 동안 한 사람 판의 구슬이 하나씩 차례로 탈 때의 간격(초). 첫 구슬은 DEV '지귀 A 구슬 소각 대기' 뒤에 탄다. 0이면 모두 한꺼번에. Host 값만 쓴다.")]
         [SerializeField, Range(0f, 5f)] private float jigwiABBurnStaggerSeconds = 1f;
+        [Tooltip("#479 Inspector 전용: 부적(\"물\")을 다 쓴 사람 판에 생기는 물방울 무늬 물 구슬 수. 0이면 보상 없음. Host 값만 쓴다.")]
+        [SerializeField, Range(0, 6)] private int jigwiTalismanWaterCount = 5;
+        [Tooltip("#479 Inspector 전용: 부적 보상 물 구슬이 사라지기까지 (초).")]
+        [SerializeField, Range(1f, 60f)] private float jigwiTalismanWaterLifetimeSeconds = 15f;
+        [Tooltip("#479 Inspector 전용: 부적 보상 물 구슬로 박을 맞혔을 때 칠 면적 (배). 도색 한 번은 최대 3배.")]
+        [SerializeField, Range(1f, 3f)] private float jigwiTalismanWaterPaintScale = 1.5f;
         [HideInInspector, SerializeField, Range(0f, 60f)] private float jigwiABShrinkDelaySeconds = 12f;
         [HideInInspector, SerializeField, Range(.2f, 1f)] private float jigwiABShrinkScale = .65f;
         [SerializeField, Range(0f, .1f)] private float jigwiABFireMoveAmount = .03f;
@@ -1091,6 +1097,9 @@ namespace C6Lab
         public int JigwiABPersonalRequiredHits => Mathf.Clamp(jigwiABPersonalRequiredHits, 1, 10);
         public float JigwiABPersonalBurnSeconds => Mathf.Clamp(Finite(jigwiABPersonalBurnSeconds, 5f), .5f, 30f);
         public float JigwiABBurnStaggerSeconds => Mathf.Clamp(Finite(jigwiABBurnStaggerSeconds, 1f), 0f, 5f);
+        public int JigwiTalismanWaterCount => Mathf.Clamp(jigwiTalismanWaterCount, 0, 6);
+        public float JigwiTalismanWaterLifetimeSeconds => Mathf.Clamp(Finite(jigwiTalismanWaterLifetimeSeconds, 15f), 1f, 60f);
+        public float JigwiTalismanWaterPaintScale => Mathf.Clamp(Finite(jigwiTalismanWaterPaintScale, 1.5f), 1f, 3f);
         public int JigwiABGroupFireCount => Mathf.Clamp(jigwiABGroupFireCount, 1, 6);
         public float JigwiABRelightSeconds => Mathf.Clamp(Finite(jigwiABRelightSeconds, 12f), 1f, 60f);
         public float JigwiABShrinkDelaySeconds => Mathf.Clamp(Finite(jigwiABShrinkDelaySeconds, 12f), 0f, 60f);

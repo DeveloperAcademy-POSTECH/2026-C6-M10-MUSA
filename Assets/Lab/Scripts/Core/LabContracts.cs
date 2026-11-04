@@ -126,6 +126,11 @@ namespace C6Lab
         /// <summary>Captured only when this projectile launches during a completed B mission's reward window.</summary>
         public bool jigwiABReward;
         public float jigwiABRewardSizeScale = 1f, jigwiABRewardPaintScale = 1f;
+        /// <summary>
+        /// #479 지귀 부적 보상 물 구슬: "물"을 다 쓴 사람 판에 생기는 물방울 무늬 Water. 박을 칠하고,
+        /// 칠 면적은 만들 때 정한 jigwiABRewardPaintScale을 쓴다(B 보상의 불꽃 꼬리·크기와는 따로).
+        /// </summary>
+        public bool jigwiTalismanReward;
         /// <summary>2:2 fever (#281): made during a team fever or turned by one; every board rings it with a rainbow.</summary>
         public bool fever;
         /// <summary>

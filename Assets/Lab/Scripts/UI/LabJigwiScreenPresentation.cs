@@ -440,8 +440,9 @@ namespace C6Lab
             // Active() can return the upcoming warning for instructions. Flames and the B loop
             // belong only to the real mission window, aligned with the voice's terminal shout.
             bool missionActive = active != null && active.Active(now);
-            // #479: A ignites every seat, so every screen shows the edge flames.
-            bool personal = missionActive && active.kind == LabJigwiABKind.PersonalBurn;
+            // #479: A ignites every seat; a screen whose talisman is finished stops burning.
+            bool personal = missionActive && active.kind == LabJigwiABKind.PersonalBurn
+                && !TalismanWritten(active, localPlayer);
             personalHeat.gameObject.SetActive(personal);
             float animationTime = missionActive ? (float)Math.Max(0d, now - active.activeAt) : 0f;
             if (personalFlames != null) for (int i = 0; i < personalFlames.Length; i++)
@@ -452,6 +453,15 @@ namespace C6Lab
             DrawWater(now, held);
             DrawStatus(stage, active, snapshot, localPlayer, now, held);
             DrawFailure(now);
+        }
+
+        /// <summary>#479: true once this seat finished writing its talisman in this A.</summary>
+        public static bool TalismanWritten(LabJigwiABRound round, ulong player)
+        {
+            if (round == null || round.kind != LabJigwiABKind.PersonalBurn) return false;
+            foreach (var seat in round.players ?? Array.Empty<LabJigwiABPlayerFire>())
+                if (seat != null && seat.playerId == player) return seat.talismanAt >= 0d;
+            return false;
         }
 
         private void ObserveFailures(LabJigwiABSnapshot stage, double now, bool baseline)

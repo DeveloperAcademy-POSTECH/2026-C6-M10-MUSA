@@ -665,7 +665,7 @@ namespace C6Lab
             else
             {
                 float share = Mathf.Min(3f, (orb.small ? rules.SmallOrbPaintShare : 1f) * areaScale
-                    * (orb.jigwiABReward ? orb.jigwiABRewardPaintScale : 1f));
+                    * (orb.jigwiABReward || orb.jigwiTalismanReward ? orb.jigwiABRewardPaintScale : 1f));
                 // 오색구슬 (#329): 다섯 원소 색 얼룩으로, 정해 둔 배율만큼 넓게 칠한다. 도색 한 번은 최대 3배다.
                 if (orb.fiveColor) share = Mathf.Min(3f, share * rules.FiveColorOrbPaintScale);
                 bool paints = orb.fiveColor || element >= LabOrbElement.Fire && element <= LabOrbElement.Earth;

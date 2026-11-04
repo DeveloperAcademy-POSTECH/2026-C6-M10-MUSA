@@ -252,13 +252,15 @@ namespace C6Lab
         // 5682: #428 lean packet envelope (bodies in a JSON payload string, no default nested objects); immediate
         //       board publishes skip peers whose delta is empty.
         // 5683: #461 paint frame bodies may be deflate-compressed (LabPaintFrame.encoding).
-        internal const ushort LabProtocolVersion = 5683;
+        // 5684: #479 Jigwi A talisman: A carries every seat's talismanAt (no target/hit count), the
+        //       "jigwiTalisman" request and the talisman water orb flag.
+        internal const ushort LabProtocolVersion = 5684;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Double-tap a blue fox orb to clear it, and keep your Yin and Yang away.";
         /// <summary>More fox orbs than one fox fire ever drops; a longer list is ignored (#251).</summary>
         private const int MaximumFoxFireOrbs = 10;
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/44");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/45");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;
@@ -1920,6 +1922,13 @@ namespace C6Lab
                 if (model.TryFlashFiveColorBonus(sender, packet.flashGeneration, now, out _)) PublishSnapshot(true);
                 return;
             }
+            if (packet.type == JigwiTalismanPacket)
+            {
+                // #479 지귀 부적: "물"을 다 쓴 사람의 불만 끄고 물 구슬을 준다. 한 회차에 한 사람 한 번.
+                if (battleClock.IsPaused || packet.requestId < 1) return;
+                if (model.TryCompleteJigwiTalisman(sender, packet.firstId, now)) PublishSnapshot(true);
+                return;
+            }
             if (packet.type == FlashShakePacket)
             {
                 // 야광귀 섬광 (#301): 폰을 다 흔든 사람의 눈부심만 푼다. 눈부시지 않으면 무시한다.
@@ -2146,7 +2155,8 @@ namespace C6Lab
                     // An unlocked bomb (#328) glides in to the Host's spot like a drum, then opens there.
                     arrival: orb.kind == LabOrbKind.Bomb && orb.JustArrived(latest.serverTime) ? orb.arrival : LabDrumArrival.None,
                     stopAt: orb.stopAt);
-                view?.SetJigwiSupplyWaterArt(!string.IsNullOrEmpty(orb.jigwiABSupplyEventId), latest.paused || GameStartHeld);
+                view?.SetJigwiSupplyWaterArt(!string.IsNullOrEmpty(orb.jigwiABSupplyEventId) || orb.jigwiTalismanReward,
+                    latest.paused || GameStartHeld);
             }
             foreach (var drum in latest.drums ?? Array.Empty<LabOrbState>())
             {
