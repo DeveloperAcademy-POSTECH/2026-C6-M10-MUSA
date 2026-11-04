@@ -4818,3 +4818,19 @@ PR-1(`feat/#507-gourd-rig-contract`) 위에서 Unity 6000.6.5f1 macOS batch Edit
 | 실제 전투 캡처(임시) | 확인 | 2스테이지 정지·좌·우: 고정점부터 박 걸이까지 곡선 한 줄, 모델 자체 줄 없음 |
 
 **미실행:** iOS 실기기, 다인 Guest. 이 묶음에는 `LabHangingRenderInterpolationTests`·`LabWatercolorPaintRuntimeTests`를 넣지 않았다.
+
+## #507 후속 2스테이지 실제 명중·완성·결과 검사 — 2026-11-04
+
+기준 main `856b5749`(#516·#517·#511 병합 뒤)에서 Unity 6000.6.5f1 macOS batch Editor로 확인했다. 런타임 코드 변경 없이 검사만 더했다.
+
+새 `GameStage2GourdHitFinishTests`: 저장 Home → DEV 솔로 → 2스테이지에서 DEV 값(비밀 상자 100%, 잠금 0, 생성 비용 1, 생성 속도 0)을 적용해 다시 불러온 뒤,
+- 실제 보드 제스처로 비밀 상자를 열고 Combined 구슬을 던진다. 보드의 놓기 속도는 마지막 0.12초 이동 거리로 정해지므로 마지막 튕김 길이(보드 폭 0.45~0.7)를 바꿔 가며 던진다. 이번 실행에서는 첫 투척(0.6)이 `SHOT HIT`.
+- Host가 승인한 명중의 판정 로컬 지점 방향이 칠 껍데기 방향과 같고, 그 방향의 칠 칸(또는 바로 옆 칸)에 칠이 들어갔으며 칠 수가 늘었다. 몸통·뚜껑 렌더러가 현재 칠 지도를 받는다.
+- Host 표면에 실제 칠 명중을 구 전체에 고르게 넣고 성장으로 100%가 된 뒤: 완성 연출 복사본에 `Paint Shell`·`Lid Paint`가 있고 모델 줄은 없다. 결과 미리보기(`LabGourdResultPreview`)도 같은 두 부분을 복사한다. 2스테이지 결과 Scene이 열리고 미리보기 텍스처가 Battle 해제 뒤에도 남는다.
+
+| 확인 | 이번 결과 |
+| --- | --- |
+| 새 검사 단독 | **1/1 PASS** |
+| 새 검사 + `GameStage2GourdIntegrationTests`·`GameSceneFlowTests`·`GameJigwiStageIntegrationTests` | **24/24 PASS** |
+
+**미실행:** iOS 실기기 화면·성능, 다인 Guest 화면, 아트 경량 재출력 반영.
