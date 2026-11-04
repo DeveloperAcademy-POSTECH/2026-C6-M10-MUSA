@@ -4745,3 +4745,24 @@ Editor 로그 `C6_AUDIO_WARMUP`: 첫 전투는 32개를 약 70~80 ms에, 같은 
 | 지귀·게임 흐름 PlayMode | **66/67** → 위 검사 대기 조건 수정 뒤 해당 검사 단독 **1/1 PASS** | `LabJigwiABPresentationTests`·`LabJigwiGroupFireAudioTests`·`LabJigwiWaterTrailTests`·`LabJigwiStagePresentationTests`·`GameSceneFlowTests`. 실패 1건은 새 단언이 `IsLoadingScene`(준비 구간 전체가 true)을 기다리던 검사 문장 문제였다 |
 
 **미실행:** iPhone 1·2스테이지 로딩 시간·메모리 실측.
+
+## #507 PR-1 박 모델 계약과 흰 박 legacy 경로 — 2026-11-04
+
+기준 main `6524427b`에서 Unity 6000.6.5f1 macOS batch Editor로 확인했다.
+
+**순서**: 코드를 바꾸기 전에 main 코드로 흰 박 골든(`Assets/Lab/Tests/PlayMode/Golden/WhiteGourdMount.txt` 28줄, `WhiteGourdYokai.txt` 737줄)을 기록하고 같은 코드에서 비교 모드로 다시 실행해 2/2 PASS를 확인한 뒤 별도 커밋했다. 그 뒤 계약 코드를 넣고 같은 골든과 비교했다.
+
+**변경**
+- `LabGourdVisualRig`(계약), `LabGourdYokaiProfile`(시간표, `Legacy`=기존 상수), `LabGourdPaint.PrepareVisual`·rig 마운트 분기·`paintExtras` property block·rig 크기 정책, `LabGourdYokai.Configure`·프로필 기반 시각·`idleLoop`.
+- `GameStageDefinition.gourdVisualResource`(비면 흰 박), `GameBattleBindings.MountStageGourd`. 세 스테이지 모두 경로가 비어 있어 화면 변화가 없다. Scene·Prefab·StageDefinition YAML은 고치지 않았다.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| EditMode 전체 | **1873/1873 PASS** | 새 `LabGourdYokaiProfileTests` 2개(Legacy 값 = 기존 상수, 순서·유한성 검사), `GameStageGourdVisualTests` 2개(세 스테이지 경로 비어 있음, 경로가 string) |
+| `LabWhiteGourdGoldenTests` | **2/2 PASS** | main 기록과 비교: 마운트 transform·셸 경로/자세·판정 메시/자세·재질·칠 property block·요괴 준비·Animator 꺼짐, 콤보 예고·콤보·명중 3회·해제·폭탄·섬광 예고·번쩍임의 YokaiRoot·LidPivot·눈 자세 시퀀스 |
+| 새 `LabGourdVisualRigTests` | **4/4 PASS** | 합성 rig: 판정 메시=hitShell·자세 일치, 판정 로컬 좌표=칠 공간, extras에 같은 재질과 칠 binding; 크기 변경 시 고정점 유지와 판정 추종; 잘못된 rig(hitShell 비identity)→흰 박·legacy 요괴; rig 요괴가 자기 Animation·프로필로 나오고 `idleLoop` 꺼지면 닫힌 시각에 멈춤 |
+| 관련 PlayMode(`LabGourdYokaiTests`·`LabGourdPaintTests`·`LabGourdHitboxTests`·`LabHangingPresentationTests`·`LabRopeReconciliationTests`·`GameJigwiStageIntegrationTests`·`GameYokaiPresentationTests`·`GameSceneFlowTests`·`LabPaintFinish*`·`GourdResultViewerPlayModeTests`·`LabWatercolorPaintRuntimeTests`, 위 새 검사 포함) | **89/91** 첫 실행 → 새 검사 문장 수정 뒤 rig 검사 4/4 | 실패 1건은 새 검사의 `Has.Count`(배열에 Count 속성 없음) 문장 문제였다. 다른 1건 `LabWatercolorPaintRuntimeTests.DescriptorBurstRespectsTheActiveCapAndConvergesToASettledCheckpoint`(한 픽셀 alpha 194/195)는 이번 변경을 잠시 빼고 main 코드로 단독 실행해도 같은 방식으로 **FAIL**했다. 이번 변경과 무관한 기존 상태로 기록한다 |
+
+**미실행:** iOS 실기기, 다인 Guest 화면. 실제 스테이지 박(2스테이지)은 PR-2 범위다.
+
+**골든 수정(같은 PR):** 마운트 골든의 `shellInRoot`·`hitboxInRoot`는 target 루트 기준이라 매달린 줄의 자동 상하 주기(시간에 따라 움직임)를 포함했다. 처음 기록·비교에서는 프레임 수가 같아 우연히 맞았고, 이후 실행에서 y가 -0.334445 → -0.353289로 달라져 FAIL했다. 두 줄을 움직이지 않는 VisualMount 기준(`shellInMount`·`hitboxInMount`)으로 바꿨다. 기대값은 다시 기록하지 않고 main에서 기록한 `visual.*`(위치 0.186667, 배율 0.777778)·`shell.*`(위치 -0.67, 배율 1.8, 회전 없음)의 곱으로 계산했다(배율 1.4, y -0.334444). 수정 뒤 `LabWhiteGourdGoldenTests`·`LabGourdVisualRigTests` **6/6 PASS**.

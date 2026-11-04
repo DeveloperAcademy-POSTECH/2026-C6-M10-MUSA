@@ -191,3 +191,8 @@
 
 - 수채 붓 거리장은 `LabWatercolorBrushDistance.GetOrCreate`의 패턴별 공유 텍스처다(앱 수명, 패턴당 약 4 MB·최대 3개). 런타임 `Dispose`는 지우지 않고, 재생 시작·Editor 스크립트 재로드·편집 모드 복귀에서만 `ReleaseShared`가 지운다.
 - `LabGourdPaint`는 두 도색 런타임을 만든 직후 라운드 붓 무늬(`RoundBrushPattern`: 라운드 config, 땅따먹기의 옛 둥근 붓은 흩뿌림)로 `Prewarm`을 1회 부른다. 실제와 같은 형식의 작은 임시 RT에만 그리고 표시 RT·Ready·Error·스탬프 수는 건드리지 않는다. 방장은 라운드 시작 직후 `PreloadPatternMask`로 판정 마스크를 미리 푼다. 판정·셀·해시·표시 결과는 같아야 한다.
+
+## #507 박 모델 계약
+
+- 스테이지 박은 `GameStageDefinition.gourdVisualResource`(Resources 경로, 비면 흰 박)를 `GameBattleBindings.MountStageGourd`가 `LabGourdPaint.PrepareVisual`로 `Attach`보다 먼저 지정한다. 2:2·Lab 단판은 흰 박이다. 프리팹 직접 참조로 바꾸지 않는다.
+- `LabGourdVisualRig`가 없는 프리팹(흰 박)은 기존 경로를 글자 그대로 탄다. 흰 박의 마운트·판정·칠·요괴 자세는 `Assets/Lab/Tests/PlayMode/Golden/`의 main 기록과 같아야 하며, 골든은 흰 박이 바뀌는 의도된 변경에서만 `GOURD_GOLDEN_RECORD=1`로 다시 기록한다. 계약 검사 실패는 `C6_GOURD_RIG_FALLBACK`과 함께 흰 박으로 돌아간다. 상세는 `docs/GOURD_MODELS.md`.
