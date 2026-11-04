@@ -255,7 +255,8 @@ namespace Hapio.Tests
             Assert.That(radius, Is.EqualTo(3f));
             GameTutorialDirector.PairCircle(new Vector2(0f, 0f), 1f, new Vector2(0f, 3f), 2f, out center, out radius);
             Assert.That(radius, Is.EqualTo(3f));
-            Assert.That(center.y, Is.EqualTo(1f).Within(1e-5f), "Shifted toward the bigger one.");
+            // From the small one's far side (y -1) to the big one's (y 5): the middle is y 2, past the halfway point 1.5.
+            Assert.That(center.y, Is.EqualTo(2f).Within(1e-5f), "Shifted toward the bigger one.");
             GameTutorialDirector.PairCircle(new Vector2(0f, 0f), 5f, new Vector2(1f, 0f), 1f, out center, out radius);
             Assert.That((center, radius), Is.EqualTo((new Vector2(0f, 0f), 5f)), "One inside the other.");
         }
@@ -804,6 +805,9 @@ namespace Hapio.Tests
                     Vector2 inner = new Vector2(Mathf.Clamp(points[i].x, hole.xMin + corner, hole.xMax - corner),
                         Mathf.Clamp(points[i].y, hole.yMin + corner, hole.yMax - corner));
                     Assert.That(Vector2.Distance(points[i], inner), Is.EqualTo(corner).Within(1e-3f));
+                    // No point twice: a near-zero edge points anywhere and leaves a sliver in the mesh.
+                    Assert.That(Vector2.Distance(points[i], points[(i + 1) % points.Count]), Is.GreaterThan(.1f),
+                        hole + " points " + i + " and " + (i + 1) % points.Count);
                 }
                 float far = GameTutorialSpotlight.CoveringRadius(area, hole.center, points);
                 var ring = points.Select(point => hole.center + (point - hole.center).normalized * far).ToArray();

@@ -4797,3 +4797,25 @@ Consolidated three byte-identical textures into shared material references; conf
   - EditMode: 6단계 장면 순서·대사 9개·화자·안내 띠·막는 쪽, 번쩍이는 시간 = 가장자리 처음 번쩍임. 막기가 풀 때까지 유지되고 내 오른쪽 넘기기만 막는지. 남은 초를 끈 가장자리에 숫자가 없고, 켜면 다시 보이는지.
   - PlayMode: 흐름 검사를 6단계 끝까지 늘렸다. 번쩍이는 동안 말풍선 없음·숫자 없음, 오른쪽으로 민 북이 튕김, 왼쪽으로 넘기면 묵이 소유·막기 풀림, 마지막 대사 뒤 종료를 본다.
 - **미실행:** Play에서 빨간 가장자리·박 알림이 말풍선과 겹치는지, 튕겨 나오는 느낌, 마지막 대사 뒤 방 목록으로 가는 흐름, iPhone 실기기.
+
+### #477 튜토리얼 검사 실행 결과와 수정 — 2026-11-04
+
+- **사용자 실행 (Test Runner):** EditMode `GameTutorialTests` 중 3개 실패, PlayMode `GameTutorialFlowTests` 2개 모두 실패.
+- **사용자 Play (콘솔 기록):** 0~6단계를 끝까지 진행했다. 북 3번 → 조합 → 던지기(빗나감 2·맞힘 1) → 북 넘기기 → 박 폭탄 → 폭탄 넘기기 → 폭탄 열림(`BOMB_OPENED`) → 묵이에게 북 넘기기 → 방 목록. 오류 로그는 없었다.
+- **EditMode 실패 3개와 수정:**
+  1. `MirrorSlidesInShowsTheDrumArriveAndSlidesOut`: 미니 창이 끝나는 시각(t=1)에 계산 오차로 (0.9999996, 1.8e-7)이 나왔다. 화면으로는 보이지 않는 차이다. `MirrorPose` 끝 구간을 `Mathf.InverseLerp`로 바꿔 끝에서 정확히 (1, 0)이 되게 했다.
+  2. `PairLightIsTheSmallestCircleAroundBothOrbs`: **검사 기댓값이 틀렸다.** 반지름 1(0,0)과 반지름 2(0,3)를 모두 감싸는 가장 작은 원의 중심은 y=2다(아래 끝 −1, 위 끝 5). 함수가 낸 2가 맞아 기댓값을 고쳤다.
+  3. `SpotlightIsOneSheetWhoseOuterRingReachesEveryScreenCorner`: 둥근 구멍에서 윤곽선의 마지막 점(360°)과 첫 점(0°)이 계산 오차만큼 어긋났다. 그래서 길이가 거의 0인 변이 생겨 방향이 무작위로 나왔고, 화면 모서리 판정이 틀어졌다. 어둡게 덮는 판에도 보이지 않을 만큼 가는 조각이 생겼다. 윤곽선이 같은 점을 두 번 만들지 않게 고쳤다: 모서리 호는 끝점 바로 앞에서 멈추고, 이어지는 직선 변이 그 끝점에서 시작한다. 검사에 "이웃한 두 점 사이 0.1 이상"을 추가했다.
+  - 확인: 컴파일 **PASS**(오류 0). Editor 안 계산 **PASS**:
+    - 미니 창(t=1) = (1, 0).
+    - 두 구슬 원 = 중심 y 2, 반지름 3.
+    - 덮는 판 5종(둥근 구멍 3, 기운 막대 1, 기울인 캡슐 1)은 모두 화면 네 모서리를 덮는다.
+    - 이웃 점 최소 간격 0.174~8.7, 가장자리 오차 3e-5 이하.
+    - Test Runner 재실행은 **NOT_RUN**.
+- **PlayMode 실패 2개 (튜토리얼과 무관):** 두 검사 모두 Battle 씬을 여는 순간 Unity 오류 로그로 실패했다. 오류는 "Problem detected while opening the Scene file: `Assets/Hapio/Scenes/Battle.unity`"와 "Restored Transform child parent pointer from NULL" ×30이다. 검사 도구는 예상하지 않은 오류 로그를 실패로 친다.
+  - 원인: 씬 파일에서 배경 장식 30개(나비·발자국·산 그림 등)가 문제다. 부모의 자식 목록에는 들어 있는데 자식의 `m_Father`가 0이다. Unity는 열 때마다 부모를 되살리며 오류를 낸다. 읽기만 해서 확인했다.
+  - 이 브랜치는 Battle 씬을 바꾸지 않았다. 마지막 변경은 main의 `7f35211a`(#447 환경 작업 병합)다. Battle 씬을 여는 다른 PlayMode 검사도 같은 이유로 실패한다.
+  - 처리: Editor로 Battle 씬을 열고 저장해, Unity가 바로잡은 부모를 파일에 쓰게 했다(YAML 손수정 안 함). 커밋은 별도 fix 브랜치에서 한다.
+    - 저장 전 파일을 따로 보관해 두고 객체 단위로 비교했다. 객체 4,416개 중 추가·삭제는 없다. 내용이 바뀐 것은 31개뿐이다: 장식 30개의 `m_Father`가 0에서 자기를 목록에 둔 부모로 채워졌고, 같은 30개가 씬 최상위 목록(`SceneRoots`)에서 빠졌다.
+    - 나머지 줄 변화(약 1만 줄)는 순서뿐이다. 손으로 합친 파일은 객체가 번호 순이 아니었고, Unity는 저장할 때 번호 순으로 다시 쓴다. 누가 Editor에서 이 씬을 저장해도 같은 정렬이 일어난다.
+    - 확인 **PASS**: 다시 열 때 Console 오류 0, 부모·자식 불일치 0, 최상위 객체 6개. 작업 뒤 Editor 화면은 원래 열려 있던 Home 씬으로 되돌렸다. 튜토리얼 PlayMode 재실행은 **NOT_RUN**.

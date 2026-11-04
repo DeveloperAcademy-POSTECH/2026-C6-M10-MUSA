@@ -833,7 +833,8 @@ namespace Hapio
                 drumTravel = 1f + (back + 1f) * v * v * v + back * v * v;
                 return;
             }
-            float w = (t - .85f) / .15f;
+            // InverseLerp divides the same difference by itself at the end, so the window is exactly gone at t = 1.
+            float w = Mathf.InverseLerp(.85f, 1f, t);
             offset = w * w;
             alpha = 1f - w;
             drumTravel = 1f;
