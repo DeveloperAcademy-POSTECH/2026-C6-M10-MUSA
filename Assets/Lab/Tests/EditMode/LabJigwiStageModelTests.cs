@@ -68,8 +68,11 @@ namespace C6Lab.Tests
         {
             var water = SuppliedWater(room, round, owner, now);
             Launch(room, owner, water, now);
-            Assert.That(room.ConfirmJigwiABFireHit(water.id, round.id, targetId, now, out bool off), Is.True);
-            Assert.That(off, Is.EqualTo(synced));
+            // #509: the supplied Water hits the boss itself; it counts and is consumed without paint.
+            int before = ScreenState(room, now).rounds.Single(item => item.id == round.id).syncCount;
+            Assert.That(room.ConfirmHit(water.id, now, Vector3.forward, out _, out _, out _), Is.False);
+            var after = ScreenState(room, now).rounds.Single(item => item.id == round.id);
+            if (synced && after.resolution == LabJigwiABResolution.None) Assert.That(after.syncCount, Is.EqualTo(before + 1));
         }
         /// <summary>#509: three synchronized clears by every picked seat.</summary>
         private void ExtinguishAll(LabModel room, LabJigwiABRound round, double now)
@@ -201,7 +204,9 @@ namespace C6Lab.Tests
             var picked = group.players[0]; ulong helper = Players.Single(id => id != picked.playerId);
             var helperShot = SuppliedWater(room, group, helper, 31d);
             Launch(room, helper, helperShot, 31d);
-            Assert.That(room.ConfirmJigwiABFireHit(helperShot.id, group.id, picked.targets[0].id, 31d, out _), Is.False);
+            Assert.That(room.ConfirmHit(helperShot.id, 31d, Vector3.forward, out _, out _, out _), Is.False, "Supply never paints.");
+            Assert.That(ScreenState(room, 31d).rounds.Single(item => item.id == group.id).syncCount, Is.Zero,
+                "A helper's Water on the boss does not count.");
             Extinguish(room, group, picked.playerId, picked.targets[0].id, 31d);
             var halfway = ScreenState(room, 31d).rounds.Single(item => item.id == group.id);
             Assert.That(halfway.syncCount, Is.EqualTo(1));
@@ -292,9 +297,9 @@ namespace C6Lab.Tests
             var water = SuppliedWater(room, group, owner, 31d); Launch(room, owner, water, 31d);
             var before = room.Snapshot(31d).players.Single(player => player.id == owner);
             int paints = room.PaintSurface.PaintCount;
-            Assert.That(room.ConfirmJigwiABFireHit(water.id, group.id, group.players[0].targets[0].id,
-                31d, out bool off), Is.True);
-            Assert.That(off, Is.True);
+            Assert.That(room.ConfirmHit(water.id, 31d, Vector3.forward, out _, out _, out _), Is.False,
+                "#509: supplied Water on the boss counts for B but never paints.");
+            Assert.That(ScreenState(room, 31d).rounds.Single(item => item.id == group.id).syncCount, Is.EqualTo(1));
             var after = room.Snapshot(31d).players.Single(player => player.id == owner);
             Assert.That(room.PaintSurface.PaintCount, Is.EqualTo(paints));
             Assert.That(after.hitTotal, Is.EqualTo(before.hitTotal));
@@ -315,7 +320,7 @@ namespace C6Lab.Tests
             Assert.That(after.players[0].targets[0].lit, Is.True);
             Assert.That(after.syncCount, Is.EqualTo(1));
             Assert.That(after.resolution, Is.EqualTo(LabJigwiABResolution.None));
-            Assert.That(room.JigwiABBlocksBoss(owner.playerId, 33d), Is.True);
+            Assert.That(room.JigwiABBlocksBoss(owner.playerId, 33d), Is.False, "#509: B never blocks the boss.");
         }
 
         [Test]

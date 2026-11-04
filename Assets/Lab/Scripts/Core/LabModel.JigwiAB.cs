@@ -234,13 +234,22 @@ namespace C6Lab
             combined.jigwiABBurnAt = earliest.jigwiABBurnAt; combined.jigwiABBurnEventId = earliest.jigwiABBurnEventId;
             ApplyJigwiABOrb(combined, now);
         }
-        /// <summary>A cleared personal curtain opens that player's boss even while teammates are still extinguishing theirs.</summary>
-        public bool JigwiABBlocksBoss(ulong owner, double now)
+        /// <summary>#509: B no longer puts a curtain in front of the boss; nobody's boss is blocked.</summary>
+        public bool JigwiABBlocksBoss(ulong owner, double now) => false;
+
+        /// <summary>
+        /// #509: during B, a picked player's Water Combined that really hits the boss is that player's sync hit
+        /// (one second for every picked player, three times). The hit itself is judged as usual afterwards.
+        /// </summary>
+        private void RecordJigwiBossSyncHit(LabOrbState orb, double now)
         {
+            if (!jigwiABEnabled || orb.kind != LabOrbKind.Combined || orb.element != LabOrbElement.Water) return;
             var active = ActiveJigwiABRound(now);
-            return jigwiABEnabled && phase == LabPhase.Playing && active != null
-                && active.kind == LabJigwiABKind.GroupFire && active.Active(now)
-                && active.players.Any(player => player.playerId == owner && player.targets.Any(target => target.lit));
+            if (active == null || active.kind != LabJigwiABKind.GroupFire || !active.Active(now)) return;
+            if (!string.IsNullOrEmpty(orb.jigwiABSupplyEventId) && orb.jigwiABSupplyEventId != active.id) return;
+            var picked = active.players.FirstOrDefault(player => player.playerId == orb.owner);
+            var slot = picked?.targets?.FirstOrDefault();
+            if (slot != null && slot.lit) RecordJigwiSyncHit(active, slot, now);
         }
         private void ConsumeJigwiABWaterImpact(LabOrbState orb, LabJigwiABPlayerFire owner, double now)
         {

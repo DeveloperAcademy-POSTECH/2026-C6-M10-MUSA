@@ -151,99 +151,48 @@ namespace Hapio.Tests
             LabSnapshot current = network.Snapshot;
             LabJigwiABRound b = current.jigwiAB.Active(startedAt + 31.2d);
             Assert.That(b, Is.Not.Null); Assert.That(b.kind, Is.EqualTo(LabJigwiABKind.GroupFire));
-            Assert.That(overlay.PersonalHeatVisible, Is.False);
-            // #509: a solo room picks its only seat; one pillar, three synchronized clears.
+            // #509: a solo room picks its only seat; B is judged on the boss itself, with no fire art or colliders.
             Assert.That(b.players.Single().playerId, Is.EqualTo(network.LocalPlayerId));
-            Assert.That(overlay.VisibleScreenFires, Is.EqualTo(1));
+            Assert.That(overlay.PersonalHeatVisible, Is.False);
+            Assert.That(overlay.VisibleScreenFires, Is.Zero);
+            Assert.That(overlay.GroupCurtainVisible, Is.False);
+            Assert.That(overlay.SyncPillar.DropsVisible, Is.True);
             Assert.That(overlay.status.text, Does.Contain("지목 P1").And.Contain("0/3"));
+            Assert.That(overlay.playerStatus.text, Does.Contain("물 구슬로 박을 맞혀요"));
             Assert.That(current.orbs.Any(orb => orb.jigwiABSupplyEventId == b.id), Is.True,
                 "B supplies real owned Water, without a player generation request.");
             Assert.That(spendEvents, Is.EqualTo(1), "Free supply and new snapshots never flash as a paid generation.");
             Assert.That(staminaFeedback.ConsumptionPulseCount, Is.Zero);
-            Assert.That(overlay.playerStatus.text, Does.Contain("내 불기둥을"));
-            var surfaces = network.GetComponentsInChildren<LabJigwiFireSurface>(true)
-                .Where(surface => surface.FireId == b.id && surface.OwnerPlayerId == network.LocalPlayerId).ToArray();
-            Assert.That(surfaces, Has.Length.EqualTo(2), "One pillar collider and its curtain.");
-            var curtain = surfaces.Single(surface => surface.IsCurtain);
-            Assert.That(curtain.Hitbox, Is.TypeOf<BoxCollider>());
-            Assert.That(overlay.GroupCurtainVisible, Is.True);
-            Assert.That(overlay.RemainingIgnitions, Is.EqualTo(3));
-            Assert.That(overlay.CurtainStrength, Is.EqualTo(1f));
-            Assert.That(network.TryGetJigwiABCurtainFrame(b, network.LocalPlayerId, current.serverTime,
-                out Vector3 curtainCenter, out Quaternion curtainRotation, out Vector2 curtainHalfSize), Is.True);
-            Assert.That(Vector3.Distance(curtain.transform.position, curtainCenter), Is.LessThan(.005f));
-            Assert.That(Quaternion.Angle(curtain.transform.rotation, curtainRotation), Is.LessThan(.01f));
-            Assert.That(surfaces.All(surface => surface.Active && surface.Hitbox.isTrigger), Is.True);
-            Assert.That(surfaces.SelectMany(surface => surface.GetComponentsInChildren<Renderer>(true))
-                .Any(renderer => renderer.enabled && renderer.gameObject.activeInHierarchy), Is.False,
-                "The real B hit targets are invisible world colliders; visible fire belongs only to the Canvas.");
-            var localFires = b.players.Single(player => player.playerId == network.LocalPlayerId).targets;
-            for (int i = 0; i < localFires.Length; i++)
-            {
-                Assert.That(network.TryGetJigwiABFireWorldPosition(b, localFires[i], network.LocalPlayerId, i,
-                    current.serverTime, out Vector3 world), Is.True);
-                var collider = surfaces.Single(surface => surface.FireTargetId == localFires[i].id);
-                Assert.That(Vector3.Distance(collider.transform.position, world), Is.LessThan(.005f));
-                Assert.That(collider.Hitbox.bounds.extents.x, Is.EqualTo(b.targetRadius).Within(.005f));
-                Vector3 projected = binding.battleCamera.WorldToViewportPoint(world);
-                Assert.That(projected.z, Is.GreaterThan(0f));
-                Assert.That(projected.x, Is.InRange(0f, 1f)); Assert.That(projected.y, Is.InRange(0f, 1f));
-                Camera uiCamera = overlay.canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : overlay.canvas.worldCamera;
-                Assert.That(RectTransformUtility.ScreenPointToLocalPointInRectangle(overlay.fireLayer,
-                    binding.battleCamera.WorldToScreenPoint(world), uiCamera, out Vector2 expected), Is.True);
-                Assert.That(overlay.SyncPillar.PillarRect.anchoredPosition.x, Is.EqualTo(expected.x).Within(.1f),
-                    "The visible pillar stands on the real collider's column.");
-            }
+            Assert.That(network.GetComponentsInChildren<LabJigwiFireSurface>(true), Is.Empty);
+            Assert.That(model.JigwiABBlocksBoss(network.LocalPlayerId, current.serverTime), Is.False);
             AssertNoOldSurfacePresentation();
             Assert.That(paint.IsReady, Is.True);
             Assert.That(target.Hitbox.sharedMesh, Is.SameAs(shell), "Switching A/B cannot replace the bound WhiteGourd paint/hit shell.");
             Assert.That(target.GetComponentsInChildren<Collider>(true).Length, Is.EqualTo(originalColliderCount));
             Assert.That(clock.IsPaused, Is.True);
-
-            // Actual running model + saved UI: a smaller visual must never create an attack gap.
-            // This fixture supplies approved in-flight Water states; real flight contact is tested separately.
-            // Hold the clock without allowing the Pause panel to hide the effect in evidence captures.
-            Transform pauseRoot = binding.hud.pauseMenu.transform;
-            while (pauseRoot.parent != null && pauseRoot.parent != overlay.canvas.transform) pauseRoot = pauseRoot.parent;
-            var pauseCapture = pauseRoot.GetComponent<CanvasGroup>();
-            if (pauseCapture == null) pauseCapture = pauseRoot.gameObject.AddComponent<CanvasGroup>();
-            pauseCapture.alpha = 0f;
-            TestContext.WriteLine("JIGWI_CURTAIN_GEOMETRY frame=" + curtainHalfSize + " eyeRect=" + binding.battleCamera.rect
-                + " mesh=" + shell.bounds + " scale=" + target.Hitbox.transform.lossyScale + " actual=" + target.Hitbox.bounds);
             CaptureScreenEvidence("3"); yield return null;
             int paintedBefore = model.PaintSurface.CoveredCount;
-            float previousStrength = overlay.CurtainStrength;
-            for (int i = 0; i < 2; i++)
+            for (int i = 0; i < 3; i++)
             {
-                ThrowFixtureWaterAt(b, localFires[0].id, "saved-point-" + i);
+                ThrowFixtureWaterAtBoss("saved-sync-" + i);
                 PublishFireState(); yield return null;
-                Assert.That(overlay.RemainingIgnitions, Is.EqualTo(2 - i));
-                Assert.That(overlay.GroupCurtainVisible, Is.True);
-                Assert.That(overlay.CurtainStrength, Is.LessThan(previousStrength));
-                previousStrength = overlay.CurtainStrength;
-                Assert.That(curtain.Active, Is.True);
-                Assert.That(model.JigwiABBlocksBoss(network.LocalPlayerId, current.serverTime), Is.True);
-                HoldAt(31.9d + i * .7d); yield return null;
+                if (i < 2)
+                {
+                    Assert.That(overlay.SyncPillar.FilledDrops, Is.EqualTo(i + 1));
+                    Assert.That(overlay.status.text, Does.Contain((i + 1) + "/3"));
+                }
+                HoldAt(31.4d + i * .3d); yield return null;
                 CaptureScreenEvidence((2 - i).ToString()); yield return null;
             }
-            ThrowFixtureWaterAt(b, LabJigwiABFireMotion.CurtainId(b.id, network.LocalPlayerId), "saved-curtain-only");
-            PublishFireState(); yield return null;
-            Assert.That(overlay.GroupWaterVisible, Is.True, "A Water hit on the curtain gives feedback without clearing the last ignition.");
-            Assert.That(overlay.RemainingIgnitions, Is.EqualTo(1));
-            Assert.That(overlay.GroupCurtainVisible, Is.True);
-            Assert.That(curtain.Active, Is.True);
-            ThrowFixtureWaterAt(b, localFires[0].id, "saved-final-point");
-            PublishFireState(); yield return null;
-            Assert.That(overlay.RemainingIgnitions, Is.Zero);
-            Assert.That(overlay.GroupCurtainVisible, Is.False);
-            Assert.That(curtain == null || !curtain.Active, Is.True);
-            Assert.That(model.JigwiABBlocksBoss(network.LocalPlayerId, current.serverTime), Is.False);
-            Assert.That(model.PaintSurface.CoveredCount, Is.EqualTo(paintedBefore));
+            Assert.That(network.Snapshot.jigwiAB.rounds.Single(round => round.id == b.id).resolution,
+                Is.EqualTo(LabJigwiABResolution.Completed));
+            Assert.That(overlay.SyncPillar.DropsVisible, Is.False);
+            Assert.That(model.PaintSurface.CoveredCount, Is.GreaterThan(paintedBefore), "The counted Water paints the boss as usual.");
             Assert.That(target.Hitbox.sharedMesh, Is.SameAs(shell));
             network.LocalStaminaSpent -= onSpent;
             HoldAt(35d); yield return null;
             CaptureScreenEvidence("0"); yield return null;
-            TestContext.WriteLine("JIGWI_AB_SAVED_STAGE3: Home/DEV skips/A11.2/B31.2/Canvas+collider projection/sync 0-1-2-3 checked. "
+            TestContext.WriteLine("JIGWI_AB_SAVED_STAGE3: Home/DEV skips/A11.2/B31.2/no B colliders/boss sync 0-1-2-3 checked. "
                 + "Screen Space Overlay GPU pixels are not sampled by camera.Render; device/GPU visual review is separate.");
         }
 
@@ -255,15 +204,15 @@ namespace Hapio.Tests
             ScreenCapture.CaptureScreenshot(Path.Combine(Path.GetTempPath(), "jigwi341-curtain-" + remaining + ".png"));
         }
 
-        private void ThrowFixtureWaterAt(LabJigwiABRound round, string targetId, string id)
+        /// <summary>#509: an approved in-flight Water fixture that hits the boss itself.</summary>
+        private void ThrowFixtureWaterAtBoss(string id)
         {
             double now = clock.Now(Time.realtimeSinceStartupAsDouble);
             var orb = new LabOrbState { id = id, owner = network.LocalPlayerId, kind = LabOrbKind.Combined,
                 element = LabOrbElement.Water, createdAt = now, x = .5f, y = .5f };
             ((Dictionary<string, LabOrbState>)typeof(LabModel).GetField("orbs", Private).GetValue(model)).Add(id, orb);
             Assert.That(model.TryLaunch(orb.owner, id, "launch/" + id, now, out _, out string reason), Is.True, reason);
-            Assert.That(model.ConfirmJigwiABFireHit(id, round.id, targetId, now, out bool extinguished), Is.True);
-            Assert.That(extinguished, Is.EqualTo(targetId != LabJigwiABFireMotion.CurtainId(round.id, orb.owner)));
+            Assert.That(model.ConfirmHit(id, now, Vector3.back, out _, out _, out _), Is.True);
         }
         private void PublishFireState()
         {

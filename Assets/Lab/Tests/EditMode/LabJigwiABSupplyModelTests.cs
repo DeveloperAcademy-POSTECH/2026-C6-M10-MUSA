@@ -56,8 +56,8 @@ namespace C6Lab.Tests
         private void Extinguish(LabModel model, LabJigwiABRound mission, ulong owner, string target, double at)
         {
             LabOrbState water = Add(model, owner, at); Launch(model, water, at);
-            Assert.That(model.ConfirmJigwiABFireHit(water.id, mission.id, target, at, out bool extinguished), Is.True);
-            Assert.That(extinguished, Is.True);
+            // #509: a picked seat's ordinary Water on the boss counts (and paints as usual).
+            Assert.That(model.ConfirmHit(water.id, at, Vector3.back, out _, out _, out _), Is.True);
         }
         /// <summary>#509: two players → one picked seat; three of its own hits are three synchronized clears.</summary>
         private void ClearTeam(LabModel model, LabJigwiABRound mission, double at)
@@ -198,10 +198,9 @@ namespace C6Lab.Tests
             supplied = Orbs(model)[supplied.id]; supplied.owner = picked; // as if rolled over to the picked seat
             LabPlayerState before = model.Snapshot(25d).players.Single(player => player.id == picked);
             Launch(model, supplied, 25d);
-            string fire = mission.players.Single().targets[0].id;
-            Assert.That(model.ConfirmJigwiABFireHit(supplied.id, mission.id, fire, 25d, out bool synced), Is.True);
-            Assert.That(synced, Is.True);
-            Assert.That(model.ConfirmJigwiABFireHit(supplied.id, mission.id, fire, 25d, out _), Is.False);
+            // #509: the supply hits the boss: it counts as the sync hit and is consumed without paint.
+            Assert.That(model.ConfirmHit(supplied.id, 25d, Vector3.forward, out _, out _, out _), Is.False);
+            Assert.That(model.ConfirmHit(supplied.id, 25d, Vector3.forward, out _, out _, out _), Is.False);
             Assert.That(B(model, 25d).syncCount, Is.EqualTo(1));
             LabPlayerState after = model.Snapshot(25d).players.Single(player => player.id == picked);
             Assert.That(after.stamina, Is.EqualTo(before.stamina));

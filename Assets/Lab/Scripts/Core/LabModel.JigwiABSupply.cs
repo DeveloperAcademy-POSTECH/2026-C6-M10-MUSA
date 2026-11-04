@@ -91,13 +91,8 @@ namespace C6Lab
         private bool ConsumeJigwiABSupplyBossHit(LabOrbState orb, double now)
         {
             if (string.IsNullOrEmpty(orb.jigwiABSupplyEventId)) return false;
-            var mission = jigwiABRounds.FirstOrDefault(value => value.id == orb.jigwiABSupplyEventId);
-            var player = mission?.players.FirstOrDefault(value => value.playerId == orb.owner);
-            if (player != null) ConsumeJigwiABWaterImpact(orb, player, now);
-            else
-            {
-                orbs.Remove(orb.id); launchScales.Remove(orb.id); revision++;
-            }
+            // #509: it may already have counted as a sync hit; it is consumed without paint or a curtain splash.
+            orbs.Remove(orb.id); launchScales.Remove(orb.id); revision++;
             return true;
         }
     }

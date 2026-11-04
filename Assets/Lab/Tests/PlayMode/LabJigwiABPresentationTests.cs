@@ -173,40 +173,26 @@ namespace C6Lab.Tests
         [TestCase(25d)]
         [TestCase(55d)]
         [TestCase(85d)]
-        public void GroupWarningKeepsInstructionsButCurtainIgnitionsAndLoopStartTogetherAtTheAcceptedBoundary(double activeAt)
+        public void GroupWarningNamesThePickedAndTheDropsStartAtTheAcceptedBoundaryWithoutAnyFireArt(double activeAt)
         {
             var group = Group();
-            group.warningAt = activeAt - 1d; group.activeAt = activeAt; group.endsAt = activeAt + 10d;
+            group.warningAt = activeAt - 1d; group.activeAt = activeAt; group.endsAt = activeAt + 15d;
             snapshot = Snapshot(group); SetSnapshot(snapshot);
             view.audioView.Source.mute = true;
-            view.audioView.SendMessage("OnApplicationFocus", true, SendMessageOptions.RequireReceiver);
             view.ApplySnapshot(snapshot, Local, group.warningAt);
-            Assert.That(view.status.text, Does.Contain("불기둥이 솟는다"));
+            Assert.That(view.status.text, Does.Contain("다 함께 물을 끼얹어라"));
             Assert.That(view.status.text, Does.Contain("지목 P1·P2"));
-            Assert.That(view.playerStatus.text, Does.Contain("내 불기둥을"));
-            Assert.That(view.GroupCurtainVisible, Is.False);
-            Assert.That(view.VisibleScreenFires, Is.Zero);
-            Assert.That(view.audioView.WantsLoop, Is.False);
-            Assert.That(view.audioView.PlaybackStartCount, Is.Zero);
-            view.ApplySnapshot(snapshot, Local, activeAt - .001d);
-            Assert.That(view.GroupCurtainVisible, Is.False);
-            Assert.That(view.VisibleScreenFires, Is.Zero);
-            Assert.That(view.audioView.PlaybackStartCount, Is.Zero);
+            Assert.That(view.playerStatus.text, Does.Contain("물 구슬로 박을 맞혀요"));
+            Assert.That(view.SyncPillar.DropsVisible, Is.False, "The drops start with the mission, not the warning.");
             view.ApplySnapshot(snapshot, Local, activeAt);
-            Assert.That(view.GroupCurtainVisible, Is.True, "#509: the picked seat's pillar.");
-            Assert.That(view.CurtainVisualLevel, Is.EqualTo(3));
-            Assert.That(view.VisibleScreenFires, Is.EqualTo(1));
             Assert.That(view.SyncPillar.DropsVisible, Is.True);
-            Assert.That(view.audioView.WantsLoop, Is.True);
-            Assert.That(view.audioView.PlaybackStartCount, Is.EqualTo(1));
-            Assert.That(view.status.text, Does.Not.Contain("불기둥이 솟는다"));
-            view.ApplySnapshot(snapshot, Local, activeAt + .01d);
-            view.ApplySnapshot(snapshot, Local, activeAt + .02d);
-            Assert.That(view.audioView.PlaybackStartCount, Is.EqualTo(1), "Accepted active snapshots cannot restart the loop.");
-            view.ApplySnapshot(snapshot, Local, group.endsAt);
-            Assert.That(view.GroupCurtainVisible, Is.False);
+            Assert.That(view.GroupCurtainVisible, Is.False, "#509: no curtain or pillar.");
             Assert.That(view.VisibleScreenFires, Is.Zero);
-            Assert.That(view.audioView.WantsLoop, Is.False);
+            Assert.That(view.RemainingIgnitions, Is.EqualTo(3));
+            Assert.That(view.audioView.WantsLoop, Is.False, "No fire on screen, no fire loop.");
+            Assert.That(view.status.text, Does.Not.Contain("다 함께 물을 끼얹어라"));
+            view.ApplySnapshot(snapshot, Local, group.endsAt);
+            Assert.That(view.SyncPillar.DropsVisible, Is.False);
         }
 
         [Test]
@@ -246,41 +232,6 @@ namespace C6Lab.Tests
             Assert.That(view.PersonalHeatVisible, Is.False);
             Assert.That(root.GetComponentsInChildren<Collider>(true).Length, Is.EqualTo(colliders));
             Assert.That(legacy.VisibleGroups, Is.Zero, "Showing A must never recreate a boss surface source.");
-        }
-
-        [UnityTest]
-        public IEnumerator ThePillarStandsOnTheProjectedFireAndMovesOnlyWithTheSharedBattleClock()
-        {
-            snapshot = Snapshot(Group()); SetSnapshot(snapshot);
-            view.ApplySnapshot(snapshot, Local, 11.2d);
-            Assert.That(view.VisibleScreenFires, Is.EqualTo(1));
-            LabJigwiABRound group = snapshot.jigwiAB.rounds[0];
-            var fire = group.players.Single(player => player.playerId == Local).targets[0];
-            Assert.That(network.TryGetJigwiABFireWorldPosition(group, fire, Local, 0, 11.2d, out Vector3 world), Is.True);
-            Camera ui = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
-            Assert.That(RectTransformUtility.ScreenPointToLocalPointInRectangle(view.fireLayer, camera.WorldToScreenPoint(world), ui,
-                out Vector2 expected), Is.True);
-            RectTransform pillar = view.SyncPillar.PillarRect;
-            Assert.That(pillar.anchoredPosition.x, Is.EqualTo(expected.x).Within(.05f), "The pillar sits on the real fire collider's column.");
-            Assert.That(pillar.sizeDelta.y, Is.GreaterThan(pillar.sizeDelta.x), "A tall pillar, not a round marker.");
-            target.transform.Rotate(0f, 137f, 0f); Physics.SyncTransforms();
-            Assert.That(network.TryGetJigwiABFireWorldPosition(group, fire, Local, 0, 11.2d, out Vector3 still), Is.True);
-            Assert.That(Vector3.Distance(world, still), Is.LessThan(.001f), "Screen fires must not rotate with the painted gourd.");
-            Vector2 beforeMove = pillar.anchoredPosition;
-            view.ApplySnapshot(snapshot, Local, 11.8d);
-            Assert.That(Vector2.Distance(beforeMove, pillar.anchoredPosition), Is.GreaterThan(.1f));
-            snapshot.serverTime = 11.8d; snapshot.paused = true; SetSnapshot(snapshot);
-            double heldAt = network.JigwiABPresentationTime;
-            view.ApplySnapshot(snapshot, Local, heldAt, true);
-            Vector2 heldPosition = pillar.anchoredPosition; Vector2 heldSize = pillar.sizeDelta;
-            yield return new WaitForSecondsRealtime(.045f);
-            Assert.That(network.JigwiABPresentationTime, Is.EqualTo(heldAt).Within(.0001d));
-            view.ApplySnapshot(snapshot, Local, network.JigwiABPresentationTime, true);
-            Assert.That(pillar.anchoredPosition, Is.EqualTo(heldPosition));
-            Assert.That(pillar.sizeDelta, Is.EqualTo(heldSize), "A held clock freezes the pillar's sway too.");
-            Assert.That(view.GetComponentsInChildren<Collider>(true), Is.Empty);
-            foreach (var graphic in view.GetComponentsInChildren<UnityEngine.UI.Graphic>(true))
-                Assert.That(graphic.raycastTarget, Is.False);
         }
 
         [Test]
@@ -346,7 +297,7 @@ namespace C6Lab.Tests
             Assert.That(view.status.text, Does.Contain("10.0초"));
             view.ApplySnapshot(snapshot, Local, 20.5d);
             Assert.That(view.status.text, Does.Contain("0.5초").And.Contain("다음 기믹 예고"));
-            Assert.That(view.GroupCurtainVisible, Is.True, "The upcoming A warning must not hide B before its deadline.");
+            Assert.That(view.SyncPillar.DropsVisible, Is.True, "The upcoming A warning must not hide B before its deadline.");
             group.resolution = LabJigwiABResolution.Expired; group.resolvedAt = 21d;
             view.ApplySnapshot(snapshot, Local, 21d);
             Assert.That(view.FailureVisible, Is.True); Assert.That(view.FailureFlashCount, Is.EqualTo(1));
@@ -398,7 +349,7 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void SyncProgressFillsTheDropsAndSharedCompletionRemovesThePillar()
+        public void SyncProgressFillsTheDropsAndSharedCompletionClearsThem()
         {
             LabJigwiABRound group = Group(); snapshot = Snapshot(group); SetSnapshot(snapshot);
             view.ApplySnapshot(snapshot, Local, 11.2d);
@@ -412,12 +363,11 @@ namespace C6Lab.Tests
             view.ApplySnapshot(snapshot, Local, 11.6d);
             Assert.That(view.SyncPillar.FilledDrops, Is.EqualTo(1));
             Assert.That(view.status.text, Does.Contain("1/3"));
-            Assert.That(view.VisibleScreenFires, Is.EqualTo(1));
+            Assert.That(view.RemainingIgnitions, Is.EqualTo(2));
             group.syncCount = 3; foreach (var player in group.players) player.targets[0].lit = false;
             group.resolution = LabJigwiABResolution.Completed; group.resolvedAt = 23.8d;
             view.ApplySnapshot(snapshot, Local, 23.8d);
-            Assert.That(view.VisibleScreenFires, Is.Zero);
-            Assert.That(view.GroupCurtainVisible, Is.False);
+            Assert.That(view.SyncPillar.DropsVisible, Is.False);
             Assert.That(view.status.text, Does.Contain("모든 불을 함께 껐어요"));
             snapshot.phase = LabPhase.Victory; view.ApplySnapshot(snapshot, Local, 24.5d);
             Assert.That(view.statusPanel.gameObject.activeSelf, Is.False);
@@ -468,125 +418,6 @@ namespace C6Lab.Tests
             Assert.That(orb.GetComponentsInChildren<Collider>(true).Length, Is.EqualTo(colliders));
             Assert.That(body.HitSphere.radius, Is.EqualTo(radius));
             Assert.That(orb.activeSelf, Is.True, "The presentation itself cannot expire or destroy the actual orb.");
-        }
-
-        [Test]
-        public void SavedRawImagesRenderWarmAAndBAndBlueWaterIntoAnIsolatedPortraitUiTarget()
-        {
-            if (SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Null)
-                Assert.Ignore("No GPU: Jigwi screen effect pixels were not rendered.");
-            // Screen Space Overlay does not enter camera.Render(). Only this fixture's existing
-            // Canvas is temporarily switched to Camera mode, using the actual saved RawImages,
-            // texture and UI shader. No production Canvas/Scene or live GameView is changed.
-            const int width = 390, height = 844, layer = 31;
-            Shader shader = Resources.Load<Shader>("Jigwi/ScreenFlame");
-            Assert.That(shader, Is.Not.Null); Assert.That(shader.isSupported, Is.True);
-            var uiObject = new GameObject("Temporary Jigwi GPU UI camera");
-            var uiCamera = uiObject.AddComponent<Camera>(); uiCamera.enabled = false;
-            var targetTexture = new RenderTexture(width, height, 24, RenderTextureFormat.ARGB32)
-                { antiAliasing = 1, useDynamicScale = false };
-            var readback = new Texture2D(width, height, TextureFormat.RGBA32, false);
-            var sheet = new Texture2D(width * 3, height, TextureFormat.RGBA32, false);
-            RenderTexture oldActive = RenderTexture.active, oldBattleTarget = camera.targetTexture;
-            Rect oldBattleRect = camera.rect;
-            float oldBattleAspect = camera.aspect, oldPlane = canvas.planeDistance;
-            RenderMode oldMode = canvas.renderMode; Camera oldUiCamera = canvas.worldCamera;
-            Transform[] uiTransforms = canvas.GetComponentsInChildren<Transform>(true);
-            int[] oldLayers = uiTransforms.Select(item => item.gameObject.layer).ToArray();
-            try
-            {
-                Assert.That(targetTexture.Create(), Is.True);
-                uiCamera.transform.position = new Vector3(0f, 0f, -20f);
-                uiCamera.transform.rotation = Quaternion.identity;
-                uiCamera.orthographic = true; uiCamera.orthographicSize = height * .5f;
-                uiCamera.nearClipPlane = .01f; uiCamera.farClipPlane = 100f;
-                uiCamera.clearFlags = CameraClearFlags.SolidColor; uiCamera.backgroundColor = Color.clear;
-                uiCamera.cullingMask = 1 << layer; uiCamera.allowHDR = false; uiCamera.allowMSAA = false;
-                uiCamera.targetTexture = targetTexture; uiCamera.rect = new Rect(0f, 0f, 1f, 1f);
-                uiCamera.aspect = width / (float)height;
-                foreach (Transform item in uiTransforms) item.gameObject.layer = layer;
-                canvas.renderMode = RenderMode.ScreenSpaceCamera; canvas.worldCamera = uiCamera; canvas.planeDistance = 10f;
-                // Projection must use the same pixel rectangle as the UI capture, independently
-                // of the person's current Editor GameView dimensions or selected aspect.
-                camera.targetTexture = targetTexture; camera.rect = new Rect(0f, 0f, 1f, 1f);
-                camera.aspect = width / (float)height;
-                view.Hide();
-                Color32[] baseline = RenderUi(uiCamera, targetTexture, readback, width, height);
-
-                // #479: A draws no screen flames any more (the talisman is its own overlay), so only B is sampled.
-
-                // Match the saved Battle viewport. B must leave the board's lower 46% untouched.
-                camera.rect = new Rect(0f, .46f, 1f, .54f);
-                snapshot = Snapshot(Group()); SetSnapshot(snapshot);
-                view.ApplySnapshot(snapshot, Local, 11.3d);
-                view.statusPanel.gameObject.SetActive(false);
-                Assert.That(view.VisibleScreenFires, Is.EqualTo(1));
-                Color32[] b = RenderUi(uiCamera, targetTexture, readback, width, height);
-                int warmB = WarmPixels(b, baseline), changedB = ChangedPixels(b, baseline);
-                Assert.That(warmB, Is.GreaterThan(64), "B's actual projected saved RawImages and UI shader must reach the portrait render target.");
-                Assert.That(changedB, Is.GreaterThan(128));
-                int boardPixels = 0;
-                for (int y = 0; y < Mathf.FloorToInt(height * .46f); y++)
-                    for (int x = 0; x < width; x++) if (b[y * width + x].a > baseline[y * width + x].a + 8) boardPixels++;
-                Assert.That(boardPixels, Is.Zero, "B's shader/body/markers must be clipped above the combination board.");
-                sheet.SetPixels32(width, 0, width, height, b);
-
-                // #509: once the picked pillar is gone, nothing warm remains.
-                foreach (var player in snapshot.jigwiAB.rounds[0].players) player.targets[0].lit = false;
-                view.ApplySnapshot(snapshot, Local, 11.35d);
-                view.statusPanel.gameObject.SetActive(false);
-                foreach (var splash in view.fireWaterDouses) splash.gameObject.SetActive(false);
-                Assert.That(view.GroupCurtainVisible, Is.False);
-                Color32[] cleared = RenderUi(uiCamera, targetTexture, readback, width, height);
-                Assert.That(WarmPixels(cleared, baseline), Is.Zero);
-                sheet.SetPixels32(width * 2, 0, width, height, cleared);
-
-                sheet.Apply(false, false); // #479: A no longer completes by hits, so no A water douse frame.
-                string evidence = Path.Combine(Path.GetTempPath(), "jigwi341-screen-overlay-gpu.png");
-                File.WriteAllBytes(evidence, sheet.EncodeToPNG());
-                TestContext.WriteLine("JIGWI_AB_UI_GPU B(warm/changed)=" + warmB + "/" + changedB
-                    + " evidence=" + evidence + " (fixture camera-mode capture; no device visual claim)");
-            }
-            finally
-            {
-                view.Hide();
-                canvas.renderMode = oldMode; canvas.worldCamera = oldUiCamera; canvas.planeDistance = oldPlane;
-                camera.targetTexture = oldBattleTarget; camera.rect = oldBattleRect; camera.aspect = oldBattleAspect;
-                for (int i = 0; i < uiTransforms.Length; i++) if (uiTransforms[i] != null) uiTransforms[i].gameObject.layer = oldLayers[i];
-                uiCamera.targetTexture = null;
-                RenderTexture.active = oldActive;
-                targetTexture.Release();
-                Object.DestroyImmediate(targetTexture); Object.DestroyImmediate(readback);
-                Object.DestroyImmediate(sheet); Object.DestroyImmediate(uiObject);
-            }
-        }
-
-        private static Color32[] RenderUi(Camera uiCamera, RenderTexture target, Texture2D readback, int width, int height)
-        {
-            Canvas.ForceUpdateCanvases();
-            uiCamera.Render();
-            RenderTexture.active = target;
-            readback.ReadPixels(new Rect(0f, 0f, width, height), 0, 0); readback.Apply(false, false);
-            return readback.GetPixels32();
-        }
-        private static bool Different(Color32 a, Color32 b) =>
-            Math.Abs(a.r - b.r) + Math.Abs(a.g - b.g) + Math.Abs(a.b - b.b) > 30;
-        private static int ChangedPixels(Color32[] image, Color32[] baseline)
-        {
-            int count = 0;
-            for (int i = 0; i < image.Length; i++) if (Different(image[i], baseline[i])) count++;
-            return count;
-        }
-        private static int WarmPixels(Color32[] image, Color32[] baseline)
-        {
-            int count = 0;
-            for (int i = 0; i < image.Length; i++)
-            {
-                Color32 pixel = image[i];
-                if (Different(pixel, baseline[i]) && pixel.a > 32 && pixel.r > 48
-                    && pixel.r > pixel.g * 1.2f && pixel.r > pixel.b * 1.4f) count++;
-            }
-            return count;
         }
 
         [Test]
@@ -651,80 +482,6 @@ namespace C6Lab.Tests
             Assert.That(view.personalHeat.rectTransform.sizeDelta, Is.EqualTo(originalA));
             Assert.That(view.personalHeat.GetComponentsInParent<UnityEngine.UI.RectMask2D>(true), Is.Empty);
             Assert.That(view.personalWaterDouse.GetComponentsInParent<UnityEngine.UI.RectMask2D>(true), Is.Empty);
-        }
-
-        [Test]
-        public void BInstructionsAvoidThePickedPillarAndARestoresTheOriginalLayout()
-        {
-            Vector2 originalMin = view.statusPanel.rectTransform.anchorMin, originalMax = view.statusPanel.rectTransform.anchorMax;
-            Vector2 originalPivot = view.statusPanel.rectTransform.pivot, originalPosition = view.statusPanel.rectTransform.anchoredPosition;
-            Vector2 originalSize = view.statusPanel.rectTransform.sizeDelta;
-            var model = new LabModel(); model.Begin("curtain-art-layout", new[] { Other, Local }, 0d, config, LabStageYokai.Jigwi);
-            snapshot = model.Snapshot(31.2d); SetSnapshot(snapshot);
-            var group = snapshot.jigwiAB.Active(snapshot.serverTime);
-            ulong me = group.players[0].playerId; // #509: look from the picked seat
-            camera.rect = new Rect(0f, .46f, 1f, .54f);
-            Canvas.ForceUpdateCanvases(); view.ApplySnapshot(snapshot, me, snapshot.serverTime); Canvas.ForceUpdateCanvases();
-            Assert.That(view.GroupCurtainVisible, Is.True);
-            var mine = group.players[0];
-            var panelCorners = new Vector3[4]; view.statusPanel.rectTransform.GetWorldCorners(panelCorners);
-            Vector2 min = Vector2.one * float.PositiveInfinity, max = -min;
-            foreach (Vector3 point in panelCorners)
-            { Vector2 local = view.fireLayer.InverseTransformPoint(point); min = Vector2.Min(min, local); max = Vector2.Max(max, local); }
-            Rect statusRect = Rect.MinMaxRect(min.x, min.y, max.x, max.y);
-            Assert.That(statusRect.yMin, Is.GreaterThanOrEqualTo(view.BattleFireClipRect.yMin - .1f));
-            Assert.That(statusRect.yMax, Is.LessThanOrEqualTo(view.BattleFireClipRect.yMax + .1f));
-            Assert.That(network.TryGetJigwiABFireWorldPosition(group, mine.targets[0], me, 0, snapshot.serverTime, out Vector3 world), Is.True);
-            Assert.That(RectTransformUtility.ScreenPointToLocalPointInRectangle(view.fireLayer,
-                camera.WorldToScreenPoint(world), null, out Vector2 centre), Is.True);
-            Assert.That(statusRect.Contains(centre), Is.False, "B instructions cannot cover the projected fire centre.");
-            var personalSnapshot = Snapshot(Personal()); SetSnapshot(personalSnapshot);
-            view.ApplySnapshot(personalSnapshot, Local, 11.3d);
-            Assert.That(view.statusPanel.rectTransform.anchorMin, Is.EqualTo(originalMin));
-            Assert.That(view.statusPanel.rectTransform.anchorMax, Is.EqualTo(originalMax));
-            Assert.That(view.statusPanel.rectTransform.pivot, Is.EqualTo(originalPivot));
-            Assert.That(view.statusPanel.rectTransform.anchoredPosition, Is.EqualTo(originalPosition));
-            Assert.That(view.statusPanel.rectTransform.sizeDelta, Is.EqualTo(originalSize));
-        }
-
-        [Test]
-        public void WaterOnTheCurtainShowsOnlyASplashWithoutChangingIgnitionsAndCannotReplayOnLateRestore()
-        {
-            snapshot = Snapshot(Group()); SetSnapshot(snapshot);
-            LabJigwiABRound group = snapshot.jigwiAB.rounds[0];
-            var mine = group.players.Single(player => player.playerId == Local);
-            view.ApplySnapshot(snapshot, Local, 11.2d);
-            Assert.That(view.CurtainWaterVisible, Is.False);
-            mine.lastWaterSplashAt = 11.3d;
-            view.ApplySnapshot(snapshot, Local, 11.35d);
-            Assert.That(view.CurtainWaterVisible, Is.True);
-            Assert.That(mine.targets.All(fire => fire.lit), Is.True);
-            Assert.That(view.CurtainVisible, Is.True); Assert.That(view.CurtainVisualLevel, Is.EqualTo(3));
-            Assert.That(view.VisibleScreenFires, Is.EqualTo(1));
-            Assert.That(view.fireWaterDouses.All(image => !image.gameObject.activeSelf), Is.True,
-                "A curtain splash without a changed ignition must not invent per-point extinguishing feedback.");
-            Vector2 splashPosition = view.curtainWaterDouse.rectTransform.anchoredPosition;
-            Vector2 splashSize = view.curtainWaterDouse.rectTransform.sizeDelta;
-            Color splashColor = view.curtainWaterDouse.color;
-            view.ApplySnapshot(snapshot, Local, 11.35d, true);
-            Assert.That(view.curtainWaterDouse.rectTransform.anchoredPosition, Is.EqualTo(splashPosition));
-            Assert.That(view.curtainWaterDouse.rectTransform.sizeDelta, Is.EqualTo(splashSize));
-            Assert.That(view.curtainWaterDouse.color, Is.EqualTo(splashColor));
-            view.ApplySnapshot(snapshot, Local, 12d);
-            Assert.That(view.CurtainWaterVisible, Is.False);
-            view.ApplySnapshot(snapshot, Local, 12.2d);
-            Assert.That(view.CurtainWaterVisible, Is.False);
-            GameObject lateObject = Object.Instantiate(Resources.Load<GameObject>(LabJigwiScreenPresentation.PrefabResource),
-                canvas.transform, false);
-            var late = lateObject.GetComponent<LabJigwiScreenPresentation>(); late.enabled = false;
-            late.Bind(network, canvas, camera); late.ApplySnapshot(snapshot, Local, 12.2d);
-            Assert.That(late.CurtainWaterVisible, Is.False, "An old accepted impact cannot replay after binding.");
-            Object.DestroyImmediate(lateObject);
-            mine.lastWaterSplashAt = 12.3d;
-            view.ApplySnapshot(snapshot, Local, 12.31d);
-            Assert.That(view.CurtainWaterVisible, Is.True);
-            Assert.That(view.CurtainVisible, Is.True); Assert.That(view.CurtainVisualLevel, Is.EqualTo(3));
-            Assert.That(view.PersonalWaterVisible, Is.False, "A's completion effect is a separate source.");
         }
 
         private void SetSnapshot(LabSnapshot value) => typeof(LabNetwork).GetField("latest", Private).SetValue(network, value);

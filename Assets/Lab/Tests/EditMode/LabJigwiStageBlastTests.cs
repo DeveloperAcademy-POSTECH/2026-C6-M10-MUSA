@@ -41,9 +41,8 @@ namespace C6Lab.Tests
                         createdAt = 90d, expiresAt = 119d, x = .5f, y = .5f });
                     Assert.That(room.TryLaunch(player.playerId, id, "launch-" + id, 90d,
                         out _, out var reason), Is.True, reason);
-                    Assert.That(room.ConfirmJigwiABFireHit(id, group.id, target.id, 90d,
-                        out bool extinguished), Is.True);
-                    Assert.That(extinguished, Is.EqualTo(p == group.players.Length - 1));
+                    // #509: the picked seats' Water hits the boss itself.
+                    Assert.That(room.ConfirmHit(id, 90d, Vector3.back, out _, out _, out _), Is.True);
                 }
             var completed = room.Snapshot(90d).jigwiAB.rounds.Single(value => value.id == group.id);
             Assert.That(completed.resolution, Is.EqualTo(LabJigwiABResolution.Completed));

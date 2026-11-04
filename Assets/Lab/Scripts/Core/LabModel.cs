@@ -636,8 +636,8 @@ namespace C6Lab
             if (!TryAdvance(now, out _) || phase != LabPhase.Playing
                 || !orbs.TryGetValue(id ?? string.Empty, out var orb) || !orb.inFlight
                 || !players.TryGetValue(orb.owner, out var attacker)) return false;
-            // One remaining local ignition keeps the entire B curtain closed. A bypassed
-            // physics contact is consumed here before any normal boss paint/reward/statistic.
+            // #509 지귀 B: a picked player's Water on the boss counts toward the simultaneous hit.
+            RecordJigwiBossSyncHit(orb, now);
             if (TryBlockJigwiABBossHit(orb, now)) return false;
             if (ConsumeJigwiABSupplyBossHit(orb, now)) return false;
             element = orb.element;
