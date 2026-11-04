@@ -11,10 +11,9 @@ namespace C6Lab
         private readonly List<LabJigwiABRound> jigwiABRounds = new List<LabJigwiABRound>();
         private readonly HashSet<string> jigwiABActivated = new HashSet<string>(StringComparer.Ordinal);
         private bool jigwiABEnabled;
-        private int jigwiABFirstSeat, jigwiABRequiredHits, jigwiABFireCount;
-        private int[] jigwiABAffectedCounts;
+        private int jigwiABFireCount;
         private const double JigwiABMissionSeconds = 10d, JigwiABRewardSeconds = 5d;
-        private float jigwiABDuration, jigwiABRecovery, jigwiABBurnSeconds, jigwiABRelight,
+        private float jigwiABDuration, jigwiABBurnSeconds, jigwiABRelight,
             jigwiABMoveAmount, jigwiABMovePeriod, jigwiABTargetRadius, jigwiABRewardSize, jigwiABRewardPaint;
         private ulong jigwiABFailureRevision;
         public bool JigwiABEnabled => jigwiABEnabled;
@@ -36,14 +35,12 @@ namespace C6Lab
             jigwiStageNextSlot = 0; jigwiStageCutoffReached = false;
             jigwiStageStartedAt = now; jigwiStageCutoffAt = now + 100d;
             jigwiStageWarning = (float)LabJigwiABTimeline.WarningSeconds; jigwiStageFever = config.JigwiStageFeverMultiplier;
-            jigwiABDuration = Mathf.Min(15f, config.JigwiABPersonalDurationSeconds); jigwiABRecovery = config.JigwiABPersonalRecoveryMultiplier;
-            jigwiABRequiredHits = config.JigwiABPersonalRequiredHits; jigwiABBurnSeconds = config.JigwiABPersonalBurnSeconds;
+            jigwiABDuration = Mathf.Min(15f, config.JigwiABPersonalDurationSeconds);
+            jigwiABBurnSeconds = config.JigwiABPersonalBurnSeconds;
             jigwiABFireCount = config.JigwiABGroupFireCount; jigwiABRelight = config.JigwiABRelightSeconds;
             jigwiABRewardSize = config.JigwiABRewardSizeScale; jigwiABRewardPaint = config.JigwiABRewardPaintScale;
             jigwiABMoveAmount = config.JigwiABFireMoveAmount; jigwiABMovePeriod = config.JigwiABFireMovePeriodSeconds;
-            jigwiABTargetRadius = config.JigwiABFireTargetRadius; jigwiABAffectedCounts = new int[activeSeatCount];
-            jigwiABFirstSeat = ((int)(DrawFor(SeedFor(sessionId, 1u) ^ 0x332A0B01u, ulong.MaxValue - 8UL, 0u)
-                % (ulong)activeSeatCount) + (int)((round - 1u) % (uint)activeSeatCount)) % activeSeatCount;
+            jigwiABTargetRadius = config.JigwiABFireTargetRadius;
             paintSurface.SetPaintBlocker(null);
             nextCommonGimmickAt = NextJigwiABCommonAt(0u);
             nextUniqueGimmickAt = nextComboAt = nextFlashAt = nextStageJigwiAt = double.PositiveInfinity;
@@ -128,20 +125,13 @@ namespace C6Lab
                 endsAt = Math.Min(jigwiStageCutoffAt, personal
                     ? Math.Min(activeAt + jigwiABDuration, jigwiStageStartedAt + LabJigwiABTimeline.ActiveOffset(slot + 1))
                     : activeAt + JigwiABMissionSeconds),
-                requiredHits = personal ? jigwiABRequiredHits : 0,
                 // Reserved shrink fields remain on the wire, but the timed mission never shrinks an orb.
                 shrinkAt = activeAt, shrinkScale = 1f,
                 moveAmount = jigwiABMoveAmount, movePeriodSeconds = jigwiABMovePeriod, targetRadius = jigwiABTargetRadius,
                 rewardSizeScale = personal ? 1f : jigwiABRewardSize, rewardPaintScale = personal ? 1f : jigwiABRewardPaint
             };
-            if (personal)
-            {
-                int minimum = jigwiABAffectedCounts.Min();
-                int chosen = Enumerable.Range(0, activeSeatCount).Select(i => (jigwiABFirstSeat + i) % activeSeatCount)
-                    .First(i => jigwiABAffectedCounts[i] == minimum);
-                item.targetPlayer = seats[chosen]; jigwiABAffectedCounts[chosen]++;
-            }
-            else item.players = seats.Take(activeSeatCount).Select(owner => new LabJigwiABPlayerFire
+            // #479: A ignites every seat at once, so it no longer picks one target.
+            if (!personal) item.players = seats.Take(activeSeatCount).Select(owner => new LabJigwiABPlayerFire
             {
                 playerId = owner, targets = Enumerable.Range(0, jigwiABFireCount).Select(i => new LabJigwiABFireTarget
                 {
@@ -184,19 +174,12 @@ namespace C6Lab
             }
             revision++;
         }
-        public float JigwiABRecoveryMultiplier(ulong player, double at)
-        {
-            var active = ActiveJigwiABRound(at);
-            if (jigwiABEnabled && active != null && active.kind == LabJigwiABKind.PersonalBurn
-                && active.targetPlayer == player && active.Active(at)) return jigwiABRecovery;
-            return JigwiStageRecoveryMultiplier(at);
-        }
         private void ApplyJigwiABOrb(LabOrbState orb, double now)
         {
             if (!jigwiABEnabled || orb.inFlight || (!orb.kind.IsRaw() && orb.kind != LabOrbKind.Combined)) return;
             var active = ActiveJigwiABRound(now);
             if (active == null || !active.Active(now)) return;
-            if (active.kind == LabJigwiABKind.PersonalBurn && orb.owner == active.targetPlayer)
+            if (active.kind == LabJigwiABKind.PersonalBurn)
             {
                 double deadline = now + jigwiABBurnSeconds;
                 if (orb.jigwiABBurnAt < 0d || deadline < orb.jigwiABBurnAt)
@@ -216,15 +199,6 @@ namespace C6Lab
                 ? first : second;
             combined.jigwiABBurnAt = earliest.jigwiABBurnAt; combined.jigwiABBurnEventId = earliest.jigwiABBurnEventId;
             ApplyJigwiABOrb(combined, now);
-        }
-        private void RecordJigwiABBossHit(LabOrbState orb, Vector3 direction, double now)
-        {
-            var active = ActiveJigwiABRound(now);
-            if (!jigwiABEnabled || active == null || !active.Active(now) || active.kind != LabJigwiABKind.PersonalBurn
-                || active.targetPlayer != orb.owner || orb.kind != LabOrbKind.Combined
-                || !LabJigwiStageNetworkValidation.Direction(direction, false)) return;
-            active.hitCount++; revision++;
-            if (active.hitCount >= active.requiredHits) ResolveJigwiAB(active, LabJigwiABResolution.Completed, now);
         }
         /// <summary>A cleared personal curtain opens that player's boss even while teammates are still extinguishing theirs.</summary>
         public bool JigwiABBlocksBoss(ulong owner, double now)

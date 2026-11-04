@@ -136,11 +136,9 @@ namespace Hapio.Tests
             Assert.That(clock.Now(Time.realtimeSinceStartupAsDouble), Is.EqualTo(startedAt + 11.2d).Within(.00001d));
             LabJigwiABRound a = network.Snapshot.jigwiAB.Active(startedAt + 11.2d);
             Assert.That(a, Is.Not.Null); Assert.That(a.kind, Is.EqualTo(LabJigwiABKind.PersonalBurn));
-            Assert.That(a.targetPlayer, Is.EqualTo(network.LocalPlayerId));
-            Assert.That(a.requiredHits, Is.EqualTo(network.config.JigwiABPersonalRequiredHits));
             Assert.That(overlay.PersonalHeatVisible, Is.True);
             Assert.That(overlay.VisibleScreenFires, Is.Zero);
-            Assert.That(overlay.status.text, Does.Contain("과열").And.Contain("0/" + a.requiredHits));
+            Assert.That(overlay.status.text, Does.Not.Contain("과열"), "#479 removed A's hit-count text.");
             Assert.That(overlay.personalFlames.All(image => image.texture
                 == Resources.Load<Texture2D>("Jigwi/SurfaceFlameWash")), Is.True);
             Assert.That(hud.heat.gameObject.activeInHierarchy, Is.False);

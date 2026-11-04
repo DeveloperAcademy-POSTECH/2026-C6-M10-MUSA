@@ -36,13 +36,11 @@ namespace C6Lab
         public int slot;
         public LabJigwiABKind kind;
         public LabJigwiABResolution resolution;
-        public ulong targetPlayer;
         public double warningAt, activeAt, endsAt, resolvedAt = -1d;
         public double rewardUntil = -1d;
         public float rewardSizeScale = 1f, rewardPaintScale = 1f;
         /// <summary>Expired B retired all approvals through this Host revision; no orb-ID history is transmitted.</summary>
         public ulong clearedThroughRevision;
-        public int hitCount, requiredHits;
         public double shrinkAt;
         public bool shrunk;
         public float shrinkScale, moveAmount, movePeriodSeconds, targetRadius;
@@ -160,14 +158,12 @@ namespace C6Lab
                 else if (round.resolvedAt < round.warningAt) return false;
                 if (round.kind == LabJigwiABKind.PersonalBurn)
                 {
-                    if (round.requiredHits < 1 || round.requiredHits > 10 || round.hitCount < 0 || round.hitCount > round.requiredHits
-                        || round.players.Length != 0 || round.rewardSizeScale != 1f || round.rewardPaintScale != 1f
-                        || round.endsAt - round.activeAt < .99999d || round.endsAt - round.activeAt > 15.00001d
-                        || memberIds != null && !memberIds.Contains(round.targetPlayer)) return false;
-                    if (round.resolution == LabJigwiABResolution.Completed && round.hitCount != round.requiredHits) return false;
+                    // #479: A ignites every seat, so it carries no target or hit count.
+                    if (round.players.Length != 0 || round.rewardSizeScale != 1f || round.rewardPaintScale != 1f
+                        || round.endsAt - round.activeAt < .99999d || round.endsAt - round.activeAt > 15.00001d) return false;
                     continue;
                 }
-                if (round.requiredHits != 0 || round.hitCount != 0 || round.shrinkAt < round.activeAt
+                if (round.shrinkAt < round.activeAt
                     || Math.Abs(round.endsAt - round.activeAt - 10d) > .00001d
                     || round.resolution != LabJigwiABResolution.Skipped && round.players.Length == 0) return false;
                 var owners = new HashSet<ulong>();

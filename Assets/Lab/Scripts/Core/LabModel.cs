@@ -643,7 +643,6 @@ namespace C6Lab
             element = orb.element;
             if (element >= LabOrbElement.Fire && element <= LabOrbElement.Earth)
                 TryExtinguishJigwiStageRoot(orb.owner, paintDirection, now, out _);
-            RecordJigwiABBossHit(orb, paintDirection, now);
             orbs.Remove(id);
             float areaScale = LaunchScaleOf(id);
             launchScales.Remove(id);
@@ -1445,7 +1444,7 @@ namespace C6Lab
                         + YaguangFeverSecondsBetween(lastTime, effectiveNow) * (rules.YaguangFeverStaminaMultiplier - 1d);
                     foreach (var player in players.Values)
                         player.stamina = Mathf.Min(rules.StaminaMax,
-                            (float)(player.stamina + (elapsed * JigwiABRecoveryMultiplier(player.id, lastTime)
+                            (float)(player.stamina + (elapsed * JigwiStageRecoveryMultiplier(lastTime)
                                 + feverRefill) * rules.StaminaRecoveryPerSecond));
                     // 결과 대시보드 기록: 이 사이에 북을 점유한 사람의 점유 시간 (북 점유율 계산용)
                     // (북은 넘길 때도 먼저 시간을 진행시키므로 넘기기 전 주인에게 쌓인다)
