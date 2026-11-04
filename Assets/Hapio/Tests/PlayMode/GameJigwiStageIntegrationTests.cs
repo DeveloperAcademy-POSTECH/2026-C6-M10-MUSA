@@ -164,16 +164,18 @@ namespace Hapio.Tests
             LabJigwiABRound b = current.jigwiAB.Active(startedAt + 31.2d);
             Assert.That(b, Is.Not.Null); Assert.That(b.kind, Is.EqualTo(LabJigwiABKind.GroupFire));
             Assert.That(overlay.PersonalHeatVisible, Is.False);
-            Assert.That(overlay.VisibleScreenFires, Is.EqualTo(network.config.JigwiABGroupFireCount));
-            Assert.That(overlay.status.text, Does.Contain("지급 물구슬"));
+            // #509: a solo room picks its only seat; one pillar, three synchronized clears.
+            Assert.That(b.players.Single().playerId, Is.EqualTo(network.LocalPlayerId));
+            Assert.That(overlay.VisibleScreenFires, Is.EqualTo(1));
+            Assert.That(overlay.status.text, Does.Contain("지목 P1").And.Contain("0/3"));
             Assert.That(current.orbs.Any(orb => orb.jigwiABSupplyEventId == b.id), Is.True,
                 "B supplies real owned Water, without a player generation request.");
             Assert.That(spendEvents, Is.EqualTo(1), "Free supply and new snapshots never flash as a paid generation.");
             Assert.That(staminaFeedback.ConsumptionPulseCount, Is.Zero);
-            Assert.That(overlay.playerStatus.text, Does.Contain("P1 0/" + network.config.JigwiABGroupFireCount));
+            Assert.That(overlay.playerStatus.text, Does.Contain("내 불기둥을"));
             var surfaces = network.GetComponentsInChildren<LabJigwiFireSurface>(true)
                 .Where(surface => surface.FireId == b.id && surface.OwnerPlayerId == network.LocalPlayerId).ToArray();
-            Assert.That(surfaces, Has.Length.EqualTo(network.config.JigwiABGroupFireCount + 1));
+            Assert.That(surfaces, Has.Length.EqualTo(2), "One pillar collider and its curtain.");
             var curtain = surfaces.Single(surface => surface.IsCurtain);
             Assert.That(curtain.Hitbox, Is.TypeOf<BoxCollider>());
             Assert.That(overlay.GroupCurtainVisible, Is.True);
@@ -201,9 +203,8 @@ namespace Hapio.Tests
                 Camera uiCamera = overlay.canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : overlay.canvas.worldCamera;
                 Assert.That(RectTransformUtility.ScreenPointToLocalPointInRectangle(overlay.fireLayer,
                     binding.battleCamera.WorldToScreenPoint(world), uiCamera, out Vector2 expected), Is.True);
-                Assert.That(Vector2.Distance(overlay.fireImages[i].rectTransform.anchoredPosition, expected), Is.LessThan(.1f));
-                Assert.That(overlay.fireImages[i].raycastTarget, Is.False);
-                Assert.That(overlay.fireImages[i].material.shader.name, Is.EqualTo("C6Lab/Jigwi Screen Flame"));
+                Assert.That(overlay.SyncPillar.PillarRect.anchoredPosition.x, Is.EqualTo(expected.x).Within(.1f),
+                    "The visible pillar stands on the real collider's column.");
             }
             AssertNoOldSurfacePresentation();
             Assert.That(paint.IsReady, Is.True);
@@ -226,7 +227,7 @@ namespace Hapio.Tests
             float previousStrength = overlay.CurtainStrength;
             for (int i = 0; i < 2; i++)
             {
-                ThrowFixtureWaterAt(b, localFires[i].id, "saved-point-" + i);
+                ThrowFixtureWaterAt(b, localFires[0].id, "saved-point-" + i);
                 PublishFireState(); yield return null;
                 Assert.That(overlay.RemainingIgnitions, Is.EqualTo(2 - i));
                 Assert.That(overlay.GroupCurtainVisible, Is.True);
@@ -243,7 +244,7 @@ namespace Hapio.Tests
             Assert.That(overlay.RemainingIgnitions, Is.EqualTo(1));
             Assert.That(overlay.GroupCurtainVisible, Is.True);
             Assert.That(curtain.Active, Is.True);
-            ThrowFixtureWaterAt(b, localFires[2].id, "saved-final-point");
+            ThrowFixtureWaterAt(b, localFires[0].id, "saved-final-point");
             PublishFireState(); yield return null;
             Assert.That(overlay.RemainingIgnitions, Is.Zero);
             Assert.That(overlay.GroupCurtainVisible, Is.False);
@@ -254,7 +255,7 @@ namespace Hapio.Tests
             network.LocalStaminaSpent -= onSpent;
             HoldAt(35d); yield return null;
             CaptureScreenEvidence("0"); yield return null;
-            TestContext.WriteLine("JIGWI_AB_SAVED_STAGE3: Home/DEV skips/A11.2/B31.2/Canvas+collider projection/curtain3-2-1-0 checked. "
+            TestContext.WriteLine("JIGWI_AB_SAVED_STAGE3: Home/DEV skips/A11.2/B31.2/Canvas+collider projection/sync 0-1-2-3 checked. "
                 + "Screen Space Overlay GPU pixels are not sampled by camera.Render; device/GPU visual review is separate.");
         }
 
