@@ -4402,6 +4402,22 @@ Consolidated three byte-identical textures into shared material references; conf
 - **남은 검사 공백:** Host 분기와 나머지 8개 소비자는 소비자별 검사가 없다. 각 소비자는 공유 시계를 한 줄로 읽으며, 시계 규칙은 `LabGuestBattleClockTests`·`LabJigwiABPresentationTests`가 검사한다.
 - **미실행:** Guest 실기기에서 늦은 스냅샷·일시정지 때 HUD 숫자와 효과음이 튀지 않는지 확인하지 않았다.
 
+## Stage 3 지귀 PNG 배경
+
+- Unity 에디터에서 Stage 1→2→3→2→1→3 배경 활성화 및 PNG 참조 검사 통과.
+- BattleCamera 캡처로 석양 하늘과 PNG 배치 확인.
+- 이후 Home 플레이 모드 전환으로 최종 배치 보정은 저장 Scene에 적용. 최종 보정 후 플레이 검사는 미실행.
+
+## 요괴별 바닥 PNG 적용 및 충돌 복구
+
+- Battle Scene 및 검증 문서의 stash 충돌에서 양쪽 추가 내용을 보존하고 충돌 표시 제거. 누락된 Stage02 배경 종속 파일을 기존 작업 커밋에서 복원.
+- Stage 1/2/3의 ground 및 backing PNG·독립 재질 연결 후 Battle Scene 저장.
+- 실행 중 1→2→3→2→1→3 활성 상태, PNG 참조, 배경 missing component 검사 통과. 검사 후 원래 스테이지 복원.
+- BattleCamera에서 Stage1 청록 바닥 화면 확인. 전체 NUnit·실기기 검사는 미실행.
+
+- Stage1 바닥 후속 수정: BlushBeige PNG를 ground/backing 재질 및 저장 Scene의 두 슬롯에 연결. Stage2/3 참조 유지.
+
+- 배틀 조명 작업실: 에디터 스크립트 컴파일 및 창 열기 성공. 해당 파일 관련 콘솔 오류 0건. 수동 슬라이더·저장 후 재실행 검사는 미실행.
 ## #467 타이틀 화면 비율 자동 맞춤 (1단계: 흰선) — 2026-11-03
 
 - **기준:** main `2ab6b3c3` → `feat/#467-title-fit-wind`. Unity6000.6.5f1/macOS의 연결된 Editor에서 컴파일과 Editor 계산 확인만 했다. Play·Test Runner·앱 빌드·iOS 실기기는 실행하지 않았다.
@@ -4551,6 +4567,12 @@ Consolidated three byte-identical textures into shared material references; conf
 | 로비·접속·흐름 PlayMode 묶음 | **89/90**, 재실행 **30/30 ×2 PASS** | `GameSceneFlowTests`·`GameLobbyViewTests`·`LabQuickConnectTests`·`LabLobbyPositionSelectionTests`·`LabFigmaLobbyTests`·`LabLocalBoardNetworkIntegrationTests`·`LabDeveloperSoloIntegrationTests`·새 검사. 첫 실행의 1건 실패는 `DevelopmentSoloButtonStarts…`의 `Server failed to bind`(검사가 고른 빈 포트를 다른 프로세스가 먼저 씀)이며, 자리 흐림 수정 뒤 로비 묶음 두 번 재실행에서 같은 검사가 통과했다. 재실행에 `GameSceneFlowTests` 등 나머지는 다시 돌리지 않았다 |
 
 게스트가 Host 로비를 받기 전 "방 정보를 받고 있소..." 표시와 빈 자리 흐림은 실제 게스트 연결이 필요해 자동 검사가 없다(코드 검토만). 두 기기 실제 접속(Mac 2프로세스 포함)·iOS 빌드·실기기 LAN/핫스팟에서의 방장 이탈·화면 잠금 재현은 **미실행**이다.
+
+## #447 main 병합 충돌 해결 — 2026-11-04
+
+- main `b50cded6`을 Stage 3 환경 브랜치에 병합했다. Battle Scene은 Stage 3 배경·스테이지별 바닥을 유지하고 main의 환경광·방향광 설정을 보존했다. 두 브랜치의 검증 기록을 모두 유지했다.
+- 정적 검사 통과: Scene 객체 ID 4,416개 중복 없음, 양쪽 Scene 대비 새로 누락된 로컬 fileID 참조 0개, Stage 3 override 유지, 양쪽 검증 기록의 순서·내용 보존, `git diff --check` 통과.
+- 이번 병합 결과에 대한 Unity 컴파일·EditMode·PlayMode·실기기 검사는 미실행이다.
 
 ## #476 방 검색·방 공개 자동 복구와 화면 잠금 — 2026-11-04
 

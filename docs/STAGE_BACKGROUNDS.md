@@ -1,6 +1,6 @@
 # 스테이지 배경 편집
 
-Hapio는 하나의 Battle Scene에서 배경 세트를 선택한다. `BattleStage/Stage Backgrounds`의 `GameStageBackgrounds`가 현재 GameSession의 스테이지를 따라 기본 세트 또는 override를 활성화한다. Stage 1·3과 땅따먹기는 기존 기본 배경을 사용하고, Stage 2만 야광귀 밤 배경을 사용한다. 별도 Lab Scene은 변경하지 않는다.
+Hapio는 하나의 Battle Scene에서 배경 세트를 선택한다. `BattleStage/Stage Backgrounds`의 `GameStageBackgrounds`가 현재 GameSession의 스테이지를 따라 기본 세트 또는 override를 활성화한다. Stage 1과 땅따먹기는 기본 배경, Stage 2는 야광귀 밤 배경, Stage 3는 지귀 석양 배경을 사용한다. 별도 Lab Scene은 변경하지 않는다.
 
 ## 미리보기와 PNG 교체
 
@@ -52,3 +52,17 @@ Stage02 Background Studio/Firefly Couple에는 정확히2개의 Firefly가 있�
 Stage02 Background Studio/Passing Footsteps는 바닥 위14개 짚신 밑창 자국을 좌우 교대로 표시한다. .16초 간격으로 찍히고 각 자국은 약2.3초 유지 뒤3.5초까지 순서대로 사라진다. 전체10초 반복. 가까운 바닥에 .72×1.25 크기·먹회색alpha.94로 배치해 전투 카메라에서도 보이게 했다. 기본 Animator와 재질 alpha 커브를 사용하며 충돌/게임 규칙 변경은 없다.
 
 발자국 경로는 가로 이동 대신 화면 전경에서 기와집 문 앞으로 향하도록 변경했다. 시작(2.4,-.06,13)에서 끝(5.2,-.06,1.9)으로 완만히 이어지며 각 밑창도 진행 방향을 향한다.
+
+## Stage 3 지귀 석양 PNG
+
+Stage03 Background Studio에 석양 하늘, 첨성대·석등·부처 바위·소나무와 구름·불티·연무·불꽃 PNG를 정적으로 배치했다. PNG 및 독립 재질은 Art/Environment/Stage03에 있으며 금팔찌 단독 PNG는 제외했다. 애니메이션은 추가하지 않았다.
+
+## 요괴별 바닥 PNG
+
+Stage01_Ground_Gumiho(옅은 청록), Stage02_Ground_Yagwanggwi(청회색), Stage03_Ground_Jigwi(황토·주황)을 각 스테이지의 ground 및 board backing에 연결한다. 재질은 Stage01/02/03의 YokaiGround·YokaiBacking으로 분리하며 tint는 흰색이다. 하단 조합판 UI 자체 이미지는 변경하지 않는다.
+
+Stage 1 바닥은 후속 미술 수정으로 Stage01_Ground_BlushBeige(베이지에 옅은 핑크빛)로 변경했다.
+
+## 조명 작업실
+
+Hapio > 배틀 조명 작업실에서 Battle Scene 조명 색·강도·방향과 환경광·반사를 조절한다. 편집 모드에서 스테이지 미리보기와 씬 저장을 지원하고 플레이 중 변경은 임시다. 창을 열었을 때 상태 복원 및 현재 상태를 복원 기준으로 지정할 수 있다. 복원 기준은 창 세션 안에서 유지하며 플레이 상태 전환 시 새로 잡는다. 조명은 세 스테이지 공통이고 하늘 PNG는 별도 Unlit 재질이다.
