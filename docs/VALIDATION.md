@@ -4746,6 +4746,28 @@ Editor 로그 `C6_AUDIO_WARMUP`: 첫 전투는 32개를 약 70~80 ms에, 같은 
 
 **미실행:** iPhone 1·2스테이지 로딩 시간·메모리 실측.
 
+
+## 2026-11-04 — #513 Stage03 Jigwi art import
+
+- Added only the Stage03_Jigwi art package: FBX, 12 baked/source textures, 12 external URP Lit materials, a looping controller and placement prefab.
+- Unity 6000.6.5f1 import: **90,931 triangles**, 22 renderers; 0 missing materials, 0 unsupported shaders, 0 unresolved animation paths. 282 animation bindings include 2 cloth BlendShape bindings. Generic clip is 24 fps and approximately 4 seconds, looping.
+- Animator evaluation changed 3 transforms. Sampled all 97 frame positions: eye/pupil local depth remains fixed (maximum numerical delta approximately 7.3e-12). Forward eye-pop and separate pupil dilation are excluded.
+- Closed/front, open/front, blink/front and back renders were inspected in an isolated preview scene. Red lid motifs, navy/beige ribbons and the curled fire charm are present.
+- Placement body center is the root origin; height is 2.390325 Unity units, matching Stage01/02. Battle scene remained clean. Existing stage assets and gameplay code were not modified.
+- Console already contained Transport lifecycle/invalid GC handle and NullReferenceException entries before the import; this is not a zero-console-errors claim.
+- Not run: gameplay-event integration, multiplayer, paint/collision integration, device performance or the full EditMode/PlayMode suite.
+
+- Final reimport: absolute FBX source paths removed. A temporary metadata conversion caused an FBX import failure during preparation; it was corrected by regenerating the FBX and rebuilding the controller state. Final checks again report 90,931 triangles, 22 renderers, 1 looping clip, 0 missing materials, 0 unresolved animation paths and 3 Animator-driven transform changes. No absolute user paths remain in Stage03 assets.
+
+## #510 Stage1 구미호 박 Unity 에셋 (2026-11-04)
+
+- `Assets/Hapio/Art/Gourds/Stage01_Gumiho`에 FBX·URP 재질·텍스처·Animator Controller·GameReady 프리팹을 추가했다. Stage2와 같은 폴더/파일명 규칙과 몸통 중심·높이 기준을 쓴다.
+- 현재 Editor에서 가져온 결과는 **85,799 triangles / 35 renderers / 15 materials**. 재질 누락 0, 지원하지 않는 shader 0, 애니메이션 transform 경로 누락 0.
+- FBX 내장 `Gumiho_Performance`: 24fps, 약 4초, binding 424개. 눈 2개와 천 2개의 BlendShape binding이 있다. 0·0.65·1.2·1.5·2·3.2초 샘플에서 눈 weight 0↔100과 고정된 동공 scale을 확인했고 Animator 직접 평가에서 Transform 변화도 확인했다.
+- 별도 preview scene에서 닫힌 정면·등장 정면·후면 이미지를 렌더해 확인했다. 몸통 높이 2.390325, 중심 0으로 stage2 배치 기준에 맞췄다. Battle Scene은 dirty가 아니며 스테이지 설정·표시 코드·기존 에셋은 바꾸지 않았다.
+- 관찰한 콘솔에는 Transport/domain 수명주기 오류가 남아 있었다. 콘솔 전체 0오류나 전체 검사 PASS를 주장하지 않는다.
+- **미실행:** stage1 런타임 모델 선택 연결, 게임 이벤트 기반 애니메이션, 도색·충돌·네트워크·실기기 성능 및 전체 EditMode/PlayMode 검사. 에셋별 전달 설명은 `Stage01_Gumiho/ImportNotes.md`.
+
 ## #507 PR-1 박 모델 계약과 흰 박 legacy 경로 — 2026-11-04
 
 기준 main `6524427b`에서 Unity 6000.6.5f1 macOS batch Editor로 확인했다.
@@ -4837,3 +4859,19 @@ PR-1(`feat/#507-gourd-rig-contract`) 위에서 Unity 6000.6.5f1 macOS batch Edit
 앞선 0.85/(38,150,0)안은 바닥을 과도하게 어둡게 해 최종값을 **1.16/(60,150,0)**으로 수정했다. 수평면에 들어오는 주광의 Lambert 성분은 원래 `1.5 × sin(42°) ≈ 1.004`, 보정안 `1.16 × sin(60°) ≈ 1.005`로 거의 같다. 카메라 쪽 조명 방향은 유지한다. 실행 중인 2스테이지를 Editor에서 잠시 정지해 기존 카메라로 원래 조명과 보정안을 촬영했다. 사용자의 게임 일시정지 상태는 유지하고 Editor 정지를 해제했다. Play Mode 상태를 씬으로 저장하지 않고 디스크의 주광 회전·강도 두 값만 수정했다. 모델·머티리얼·환경광·로직은 그대로다. 위 자동 검사 통과 기록은 이전 후보 값에서의 결과이며, 이번 수치 보정 후에는 재실행하지 않았다. 이번 최종값의 세 스테이지·실기기 시각 비교는 미검증이다.
 
 - 추가 밝기 피드백: 주광 최종 강도를 1.16 → **1.28**(약 +10%)로 올리고 회전 (60,150,0)을 유지했다. 실행 씬에도 같은 값을 적용하고 BattleCamera 촬영으로 현재 화면의 하이라이트를 확인했다. 세 스테이지 전체 및 자동 검사는 이번 수치 보정 후 재실행하지 않았다.
+
+## #507 후속 2스테이지 실제 명중·완성·결과 검사 — 2026-11-04
+
+기준 main `856b5749`(#516·#517·#511 병합 뒤)에서 Unity 6000.6.5f1 macOS batch Editor로 확인했다. 런타임 코드 변경 없이 검사만 더했다.
+
+새 `GameStage2GourdHitFinishTests`: 저장 Home → DEV 솔로 → 2스테이지에서 DEV 값(비밀 상자 100%, 잠금 0, 생성 비용 1, 생성 속도 0)을 적용해 다시 불러온 뒤,
+- 실제 보드 제스처로 비밀 상자를 열고 Combined 구슬을 던진다. 보드의 놓기 속도는 마지막 0.12초 이동 거리로 정해지므로 마지막 튕김 길이(보드 폭 0.45~0.7)를 바꿔 가며 던진다. 이번 실행에서는 첫 투척(0.6)이 `SHOT HIT`.
+- Host가 승인한 명중의 판정 로컬 지점 방향이 칠 껍데기 방향과 같고, 그 방향의 칠 칸(또는 바로 옆 칸)에 칠이 들어갔으며 칠 수가 늘었다. 몸통·뚜껑 렌더러가 현재 칠 지도를 받는다.
+- Host 표면에 실제 칠 명중을 구 전체에 고르게 넣고 성장으로 100%가 된 뒤: 완성 연출 복사본에 `Paint Shell`·`Lid Paint`가 있고 모델 줄은 없다. 결과 미리보기(`LabGourdResultPreview`)도 같은 두 부분을 복사한다. 2스테이지 결과 Scene이 열리고 미리보기 텍스처가 Battle 해제 뒤에도 남는다.
+
+| 확인 | 이번 결과 |
+| --- | --- |
+| 새 검사 단독 | **1/1 PASS** |
+| 새 검사 + `GameStage2GourdIntegrationTests`·`GameSceneFlowTests`·`GameJigwiStageIntegrationTests` | **24/24 PASS** |
+
+**미실행:** iOS 실기기 화면·성능, 다인 Guest 화면, 아트 경량 재출력 반영.
