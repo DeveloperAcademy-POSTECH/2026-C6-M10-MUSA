@@ -29,6 +29,7 @@ namespace C6Lab.Tests
                 / LabPaintPublisher.FragmentCharacters));
             Assert.That(parts, Is.LessThanOrEqualTo(LabPaintPublisher.MaximumFragmentCount));
             Assert.That(frames.All(frame => frame.full), Is.True);
+            Assert.That(frames.All(frame => frame.encoding == LabPaintPayloadCodec.Raw), Is.True, "RawOnly keeps the raw body (#461).");
             Assert.That(frames.All(frame => frame.columns == columns && frame.rows == rows), Is.True);
             Assert.That(frames.Select(frame => frame.part), Is.EqualTo(Enumerable.Range(0, parts)));
             Assert.That(frames.All(frame => frame.parts == parts), Is.True);

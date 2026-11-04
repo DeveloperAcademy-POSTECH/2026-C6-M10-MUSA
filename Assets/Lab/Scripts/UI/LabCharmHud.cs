@@ -50,8 +50,6 @@ namespace C6Lab
         private LabGuideText waitGuide;
         private float awakeLeft = -1f;
         private bool wasCharmed;
-        private double seenServerTime = -1d;
-        private float seenAt;
 
         /// <summary>The charm's time-left gauge is showing on this screen.</summary>
         public bool GaugeVisible => gauge != null && gauge.gameObject.activeInHierarchy;
@@ -93,7 +91,7 @@ namespace C6Lab
                 if (layer != null) layer.gameObject.SetActive(false);
                 return;
             }
-            double now = ServerNow(snapshot);
+            double now = network.BattlePresentationTime;
             bool charmed = snapshot.charmedPlayer == network.LocalPlayerId
                 && snapshot.charmUntil > now && now >= snapshot.charmStartedAt;
             bool warned = snapshot.CharmWarningAt(now);
@@ -166,17 +164,6 @@ namespace C6Lab
             gauge.anchorMin = gauge.anchorMax = new Vector2(.5f, .5f);
             gauge.pivot = new Vector2(.5f, 0f);
             gauge.anchoredPosition = new Vector2(top.x, top.y + gaugeGap);
-        }
-
-        private double ServerNow(LabSnapshot snapshot)
-        {
-            float realtime = Time.realtimeSinceStartup;
-            if (snapshot.serverTime != seenServerTime)
-            {
-                seenServerTime = snapshot.serverTime;
-                seenAt = realtime;
-            }
-            return snapshot.serverTime + System.Math.Min(1d, realtime - seenAt);
         }
 
         // "정신 차림!"이 톡 튀어나왔다가 사라진다.

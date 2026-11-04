@@ -129,7 +129,7 @@ namespace C6Lab
                 player.comboRewardUntil = Math.Min(player.comboRewardUntil, at);
                 if (flashOn && player.flashReleasedAt < lastFlashAt) player.flashReleasedAt = at;
             }
-            if (BlockOn(at)) swipeBlockedUntil = at;
+            ReleaseInterferenceForFever(at); // #441: 피버 시작에 걸린 방해 풀기 (세 스테이지 공통)
             foreach (LabOrbState bomb in orbs.Values
                 .Where(orb => orb.kind == LabOrbKind.Bomb && orb.origin == LabOrbOrigin.Gourd && !orb.inFlight).ToArray())
             {

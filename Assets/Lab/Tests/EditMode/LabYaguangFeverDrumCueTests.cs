@@ -28,5 +28,17 @@ namespace C6Lab.Tests
             count = LabYaguangFeverDrumCue.NextTapCount(count, 11.2f, 12.5f, .8f);
             Assert.That(count, Is.EqualTo(1), "A pause longer than the window starts again from 1.");
         }
+
+        [Test]
+        public void TheTapCountStaysSmallAndCalm()
+        {
+            // #441: 연타가 늘어도 숫자는 아주 조금만 커지고 1.25배에서 멈춘다. 기본 크기 배율은 0.45.
+            Assert.That(LabYaguangFeverDrumCue.TapSize(2), Is.EqualTo(1f));
+            Assert.That(LabYaguangFeverDrumCue.TapSize(6), Is.EqualTo(1.1f).Within(1e-4f));
+            Assert.That(LabYaguangFeverDrumCue.TapSize(50), Is.EqualTo(1.25f));
+            var config = UnityEngine.ScriptableObject.CreateInstance<LabConfig>();
+            try { Assert.That(config.YaguangFeverTapCountSize, Is.EqualTo(.45f)); }
+            finally { UnityEngine.Object.DestroyImmediate(config); }
+        }
     }
 }

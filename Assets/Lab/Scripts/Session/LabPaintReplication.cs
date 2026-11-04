@@ -19,6 +19,8 @@ namespace C6Lab
         // -1 keeps the previous hints for a delta; >=0 is a complete bounded hint checkpoint.
         public int visualBytes;
         public string visualHash;
+        /// <summary>0 raw cell bytes, 1 deflate of them (#461). The hash still covers the inflated map.</summary>
+        public int encoding;
     }
 
     public enum LabPaintReceive { Rejected, Pending, Applied, NeedCheckpoint }
@@ -35,6 +37,7 @@ namespace C6Lab
         public const int MaximumFragmentCount = (((256 * 128 * 5 + LabPaintVisualStamp.MaximumBytes + 2) / 3) * 4
             + FragmentCharacters - 1) / FragmentCharacters;
         private readonly LabPaintPublishCache cache;
+        private readonly LabPaintEncodingPolicy policy;
         private LabPaintPublishCapture published;
         private string session;
         private uint round;
@@ -42,7 +45,12 @@ namespace C6Lab
 
         /// <param name="cache">Shared by every peer's publisher on the Host so one publish pass copies, hashes and
         /// encodes the surface once instead of once per peer (#439). Null keeps a private capture per call.</param>
-        public LabPaintPublisher(LabPaintPublishCache cache = null) => this.cache = cache;
+        /// <param name="policy">Raw keeps every frame's bytes as before; the Host's peers use Auto (#461).</param>
+        public LabPaintPublisher(LabPaintPublishCache cache = null, LabPaintEncodingPolicy policy = LabPaintEncodingPolicy.RawOnly)
+        {
+            this.cache = cache;
+            this.policy = policy;
+        }
 
         public LabPaintFrame[] Publish(LabPaintSurface source, string nextSession, uint nextRound, long nextEpoch)
         {
@@ -57,9 +65,10 @@ namespace C6Lab
                 || published.Columns != source.Columns || published.Rows != source.Rows;
             LabPaintPublishCapture.Body body = fresh ? current.FullBody : current.BodyFrom(published);
             if (body == null) return Array.Empty<LabPaintFrame>();
+            string encoded = body.EncodedFor(policy, out int encoding);
             var frames = Frames(nextSession, nextRound, nextEpoch, ++sequence, body.Full,
                 fresh ? 0u : published.Revision, current.Revision, current.Columns, current.Rows,
-                current.PaintCount, current.CoveredCount, current.Hash, body.Encoded, body.VisualSize, current.VisualHash);
+                current.PaintCount, current.CoveredCount, current.Hash, encoded, body.VisualSize, current.VisualHash, encoding);
             published = current;
             session = nextSession; round = nextRound; epoch = nextEpoch;
             return frames;
@@ -69,8 +78,9 @@ namespace C6Lab
         {
             if (published == null) return Array.Empty<LabPaintFrame>();
             LabPaintPublishCapture.Body body = published.FullBody;
+            string encoded = body.EncodedFor(policy, out int encoding);
             return Frames(session, round, epoch, ++sequence, true, 0, published.Revision, published.Columns, published.Rows,
-                published.PaintCount, published.CoveredCount, published.Hash, body.Encoded, body.VisualSize, published.VisualHash);
+                published.PaintCount, published.CoveredCount, published.Hash, encoded, body.VisualSize, published.VisualHash, encoding);
         }
 
         public void Reset()
@@ -82,7 +92,7 @@ namespace C6Lab
 
         private static LabPaintFrame[] Frames(string session, uint round, long epoch, long sequence,
             bool full, uint from, uint revision, int columns, int rows, int paintCount,
-            int coveredCount, string hash, string encoded, int visualSize, string visualHash)
+            int coveredCount, string hash, string encoded, int visualSize, string visualHash, int encoding)
         {
             int count = Math.Max(1, (encoded.Length + FragmentCharacters - 1) / FragmentCharacters);
             var result = new LabPaintFrame[count];
@@ -92,15 +102,15 @@ namespace C6Lab
                     session = session, round = round, epoch = epoch, sequence = sequence,
                     full = full, fromRevision = from, revision = revision, columns = columns, rows = rows,
                     paintCount = paintCount, coveredCount = coveredCount, hash = hash, part = i, parts = count,
-                    visualBytes = visualSize, visualHash = visualHash,
+                    visualBytes = visualSize, visualHash = visualHash, encoding = encoding,
                     data = encoded.Substring(i * FragmentCharacters,
                         Math.Min(FragmentCharacters, encoded.Length - i * FragmentCharacters))
                 };
             return result;
         }
 
-        /// <summary>Cell payload plus the visual descriptor when it is included, as one Base64 string.</summary>
-        internal static string EncodeBody(byte[] cellPayload, byte[] visual, bool includeVisual, out int visualSize)
+        /// <summary>Cell payload plus the visual descriptor when it is included, as one body.</summary>
+        internal static byte[] BuildBody(byte[] cellPayload, byte[] visual, bool includeVisual, out int visualSize)
         {
             visualSize = includeVisual ? visual.Length : visual.Length == 0 ? 0 : -1;
             byte[] payload = cellPayload;
@@ -110,7 +120,7 @@ namespace C6Lab
                 Array.Copy(cellPayload, payload, cellPayload.Length);
                 Array.Copy(visual, 0, payload, cellPayload.Length, visual.Length);
             }
-            return Convert.ToBase64String(payload);
+            return payload;
         }
 
         internal static bool SameBytes(byte[] a, byte[] b)
@@ -153,6 +163,34 @@ namespace C6Lab
             return bytes;
         }
 
+        /// <summary>
+        /// The same digest as <see cref="Hash(Color32[], byte[])"/>, streamed through <paramref name="chunk"/> instead of one
+        /// 5-bytes-per-cell copy of the map (#449). Both buffers are the caller's to reuse; <paramref name="chunk"/> holds at
+        /// least one cell.
+        /// </summary>
+        public static string Hash(Color32[] pixels, byte[] painters, SHA256 sha, byte[] chunk)
+        {
+            if (pixels == null || painters == null || pixels.Length != painters.Length)
+                throw new ArgumentException("Paint color and painter maps must have equal lengths.");
+            if (sha == null) throw new ArgumentNullException(nameof(sha));
+            if (chunk == null || chunk.Length < 5) throw new ArgumentException("The chunk must hold at least one cell.", nameof(chunk));
+            int cellsPerChunk = chunk.Length / 5;
+            sha.Initialize();
+            for (int start = 0; start < pixels.Length; start += cellsPerChunk)
+            {
+                int end = Math.Min(pixels.Length, start + cellsPerChunk), at = 0;
+                for (int i = start; i < end; i++, at += 5)
+                {
+                    chunk[at] = pixels[i].r; chunk[at + 1] = pixels[i].g;
+                    chunk[at + 2] = pixels[i].b; chunk[at + 3] = pixels[i].a;
+                    chunk[at + 4] = painters[i];
+                }
+                sha.TransformBlock(chunk, 0, at, null, 0);
+            }
+            sha.TransformFinalBlock(chunk, 0, 0);
+            return BitConverter.ToString(sha.Hash).Replace("-", "").ToLowerInvariant();
+        }
+
         /// <summary>Transaction identity includes attribution even when pigment colors match.</summary>
         public static string Hash(Color32[] pixels, byte[] painters)
         {
@@ -172,8 +210,29 @@ namespace C6Lab
         internal sealed class Body
         {
             public bool Full;
-            public string Encoded;
+            public byte[] Payload;
             public int VisualSize;
+            private string raw, compressed;
+            private bool compressionTried;
+
+            public string Encoded => raw ?? (raw = Convert.ToBase64String(Payload));
+
+            /// <summary>The Base64 body for a policy, compressed once and shared by every peer that uses it (#461).</summary>
+            public string EncodedFor(LabPaintEncodingPolicy policy, out int encoding)
+            {
+                encoding = LabPaintPayloadCodec.Raw;
+                if (policy != LabPaintEncodingPolicy.Auto) return Encoded;
+                if (!compressionTried)
+                {
+                    compressionTried = true;
+                    string candidate = Convert.ToBase64String(LabPaintPayloadCodec.Compress(Payload));
+                    // Compare with the raw Base64 length without building that string; it is only made if raw wins.
+                    if (candidate.Length < (Payload.Length + 2) / 3 * 4) compressed = candidate;
+                }
+                if (compressed == null) return Encoded;
+                encoding = LabPaintPayloadCodec.Deflate;
+                return compressed;
+            }
         }
 
         private const int MaximumCachedBodies = 8;
@@ -219,7 +278,7 @@ namespace C6Lab
         internal Body FullBody => fullBody ?? (fullBody = new Body
         {
             Full = true,
-            Encoded = LabPaintPublisher.EncodeBody(LabPaintPublisher.CellBytes(Pixels, Painters), Visual, true, out int size),
+            Payload = LabPaintPublisher.BuildBody(LabPaintPublisher.CellBytes(Pixels, Painters), Visual, true, out int size),
             VisualSize = size
         });
 
@@ -252,7 +311,7 @@ namespace C6Lab
                 else body = new Body
                 {
                     Full = false,
-                    Encoded = LabPaintPublisher.EncodeBody(delta.ToArray(), Visual, visualChanged, out int size),
+                    Payload = LabPaintPublisher.BuildBody(delta.ToArray(), Visual, visualChanged, out int size),
                     VisualSize = size
                 };
             }
@@ -289,6 +348,19 @@ namespace C6Lab
     public sealed class LabPaintReceiver
     {
         private readonly LabPaintSurface surface;
+        // Reused across transactions so a delta allocates no map-sized buffer (#449). The spare maps are the surface's
+        // previous arrays handed back by TryAdoptReplica; they are refilled before every use.
+        private readonly SHA256 sha = SHA256.Create();
+        private readonly byte[] hashChunk = new byte[4096 * 5];
+        private Color32[] sparePixels;
+        private byte[] sparePainters;
+        private int[] changedCells = Array.Empty<int>();
+        private byte[] payload = Array.Empty<byte>();
+        private byte[] inflated = Array.Empty<byte>();
+        private uint hashedVisualVersion;
+        private bool visualHashed;
+        private int currentVisualLength;
+        private string currentVisualHash;
         private LabPaintFrame pending;
         private string[] fragments;
         private int received;
@@ -325,73 +397,157 @@ namespace C6Lab
             else if (fragments[frame.part] != frame.data) { DiscardPending(); return LabPaintReceive.NeedCheckpoint; }
             if (received != frame.parts) return LabPaintReceive.Pending;
             LabPaintFrame head = pending;
-            string encoded = string.Concat(fragments);
+            string[] parts = fragments;
             DiscardPending();
-            byte[] bytes;
-            try { bytes = Convert.FromBase64String(encoded); }
-            catch (FormatException) { return LabPaintReceive.NeedCheckpoint; }
-            LabPaintVisualStamp[] nextVisual;
-            if (head.visualBytes == -1) nextVisual = surface.CopyVisualStamps();
-            else if (head.visualBytes == 0) nextVisual = Array.Empty<LabPaintVisualStamp>();
+            if (!TryDecodePayload(parts, out int length)) return LabPaintReceive.NeedCheckpoint;
+            byte[] bytes = payload;
+            if (head.encoding == LabPaintPayloadCodec.Deflate)
+            {
+                // The header fixes the most a valid body can inflate to: a full map exactly, a delta at most every cell.
+                int cells = head.columns * head.rows, visual = Math.Max(0, head.visualBytes);
+                int limit = head.full ? cells * 5 + visual : cells * 7 + visual;
+                if (!LabPaintPayloadCodec.TryInflate(payload, length, limit, ref inflated, out length))
+                    return LabPaintReceive.NeedCheckpoint;
+                bytes = inflated;
+            }
+            // null keeps the surface's current stamps: no copy, no re-encoding of an unchanged descriptor.
+            LabPaintVisualStamp[] nextVisual = null;
+            int cellLength = length;
+            if (head.visualBytes == -1)
+            {
+                if (!CurrentVisualMatches(head.visualHash)) return LabPaintReceive.NeedCheckpoint;
+            }
+            else if (head.visualBytes == 0)
+            {
+                nextVisual = Array.Empty<LabPaintVisualStamp>();
+                if (!string.IsNullOrEmpty(head.visualHash)) return LabPaintReceive.NeedCheckpoint;
+            }
             else
             {
-                if (bytes.Length < head.visualBytes) return LabPaintReceive.NeedCheckpoint;
+                if (length < head.visualBytes) return LabPaintReceive.NeedCheckpoint;
                 var visual = new byte[head.visualBytes];
-                Array.Copy(bytes, bytes.Length - visual.Length, visual, 0, visual.Length);
+                Array.Copy(bytes, length - visual.Length, visual, 0, visual.Length);
                 if (!LabPaintVisualStamp.TryDecode(visual, out nextVisual)) return LabPaintReceive.NeedCheckpoint;
-                var cells = new byte[bytes.Length - visual.Length];
-                Array.Copy(bytes, cells, cells.Length); bytes = cells;
+                cellLength = length - visual.Length;
+                byte[] checkedVisual = LabPaintVisualStamp.Encode(nextVisual);
+                if (checkedVisual.Length > 0 && LabPaintVisualStamp.Hash(checkedVisual) != head.visualHash)
+                    return LabPaintReceive.NeedCheckpoint;
+                if (checkedVisual.Length == 0 && !string.IsNullOrEmpty(head.visualHash))
+                    return LabPaintReceive.NeedCheckpoint;
             }
-            byte[] checkedVisual = LabPaintVisualStamp.Encode(nextVisual);
-            if (checkedVisual.Length > 0 && LabPaintVisualStamp.Hash(checkedVisual) != head.visualHash)
-                return LabPaintReceive.NeedCheckpoint;
-            if (checkedVisual.Length == 0 && !string.IsNullOrEmpty(head.visualHash))
-                return LabPaintReceive.NeedCheckpoint;
             int size = head.columns * head.rows;
-            Color32[] next;
-            byte[] nextPainters;
+            int changedCount = 0;
             if (head.full)
             {
-                if (bytes.Length != size * 5) return LabPaintReceive.NeedCheckpoint;
+                if (cellLength != size * 5) return LabPaintReceive.NeedCheckpoint;
                 if (session == head.session && round == head.round && head.revision < surface.Revision)
                     return LabPaintReceive.Rejected;
-                next = new Color32[size];
-                nextPainters = new byte[size];
+                EnsureSpare(size);
                 for (int i = 0; i < size; i++)
-                { next[i] = Pixel(bytes, i * 5); nextPainters[i] = bytes[i * 5 + 4]; }
+                { sparePixels[i] = Pixel(bytes, i * 5); sparePainters[i] = bytes[i * 5 + 4]; }
             }
             else
             {
                 if (head.columns != surface.Columns || head.rows != surface.Rows
                     || head.fromRevision != surface.Revision || head.revision < head.fromRevision
-                    || bytes.Length % 7 != 0 || bytes.Length > size * 7)
+                    || cellLength % 7 != 0 || cellLength > size * 7)
                     return LabPaintReceive.NeedCheckpoint;
-                next = new Color32[size]; surface.CopyPixels(next);
-                nextPainters = new byte[size]; surface.CopyPainterSlots(nextPainters);
+                EnsureSpare(size);
+                surface.CopyPixels(sparePixels);
+                surface.CopyPainterSlots(sparePainters);
+                if (changedCells.Length < cellLength / 7) changedCells = new int[cellLength / 7];
                 int previous = -1;
-                for (int at = 0; at < bytes.Length; at += 7)
+                for (int at = 0; at < cellLength; at += 7)
                 {
                     int index = bytes[at] | bytes[at + 1] << 8;
                     if (index >= size || index <= previous) return LabPaintReceive.NeedCheckpoint;
-                    next[index] = Pixel(bytes, at + 2); nextPainters[index] = bytes[at + 6]; previous = index;
+                    sparePixels[index] = Pixel(bytes, at + 2); sparePainters[index] = bytes[at + 6];
+                    changedCells[changedCount++] = index; previous = index;
                 }
             }
-            int covered = 0;
-            for (int i = 0; i < size; i++)
-            {
-                Color32 pixel = next[i];
-                if (pixel.a != 0 && pixel.a != 255) return LabPaintReceive.NeedCheckpoint;
-                if (pixel.a == 0 && (pixel.r != 0 || pixel.g != 0 || pixel.b != 0)) return LabPaintReceive.NeedCheckpoint;
-                // P6 of a 3:3 territory room paints slot 6 (#394, #417), the surface's own bound.
-                if (nextPainters[i] > LabPaintSurface.MaxPainterSlot || (pixel.a == 0 && nextPainters[i] != 0))
-                    return LabPaintReceive.NeedCheckpoint;
-                if (pixel.a == 255) covered++;
-            }
-            if (covered != head.coveredCount || LabPaintPublisher.Hash(next, nextPainters) != head.hash
-                || !surface.TryReplacePixels(head.columns, head.rows, head.revision, next, nextPainters, head.paintCount, nextVisual))
+            // The surface checks the cells (only the changed ones for a delta on its own base), the P6 bound
+            // (#394, #417) and the covered count, and changes nothing when any of them fails.
+            if (LabPaintPublisher.Hash(sparePixels, sparePainters, sha, hashChunk) != head.hash
+                || !surface.TryAdoptReplica(head.columns, head.rows, head.fromRevision, head.revision, sparePixels, sparePainters,
+                    head.paintCount, head.coveredCount, nextVisual, head.full ? null : changedCells, changedCount,
+                    out Color32[] recycled, out byte[] recycledPainters))
                 return LabPaintReceive.NeedCheckpoint;
+            sparePixels = recycled; sparePainters = recycledPainters;
             session = head.session; round = head.round; epoch = head.epoch; completedSequence = head.sequence;
             return LabPaintReceive.Applied;
+        }
+
+        private void EnsureSpare(int size)
+        {
+            if (sparePixels == null || sparePixels.Length != size) sparePixels = new Color32[size];
+            if (sparePainters == null || sparePainters.Length != size) sparePainters = new byte[size];
+        }
+
+        /// <summary>
+        /// Decode the fragments into the reused payload buffer, each on its own: when every fragment but the last is a whole
+        /// number of plain Base64 quanta (no padding, no whitespace), this equals decoding their concatenation. Anything else takes the
+        /// concatenating path, which accepts and rejects exactly what it did before (#449).
+        /// </summary>
+        private bool TryDecodePayload(string[] parts, out int length)
+        {
+            length = 0;
+            int characters = 0;
+            bool aligned = true;
+            for (int i = 0; i < parts.Length; i++)
+            {
+                string part = parts[i];
+                characters += part.Length;
+                if (i < parts.Length - 1 && (part.Length % 4 != 0 || !PlainBase64(part))) aligned = false;
+            }
+            int capacity = characters / 4 * 3 + 3;
+            if (payload.Length < capacity) payload = new byte[capacity];
+            if (aligned)
+            {
+                bool decoded = true;
+                foreach (string part in parts)
+                {
+                    if (!Convert.TryFromBase64String(part, new Span<byte>(payload, length, payload.Length - length), out int written))
+                    { decoded = false; break; }
+                    length += written;
+                }
+                if (decoded) return true;
+                length = 0;
+            }
+            byte[] bytes;
+            try { bytes = Convert.FromBase64String(string.Concat(parts)); }
+            catch (FormatException) { return false; }
+            if (payload.Length < bytes.Length) payload = new byte[bytes.Length];
+            Array.Copy(bytes, payload, bytes.Length);
+            length = bytes.Length;
+            return true;
+        }
+
+        /// <summary>
+        /// Only the 64 data characters. Padding or whitespace inside a non-final fragment is something the concatenated
+        /// decode rejects but a per-fragment decode could accept, so such a fragment takes the old path.
+        /// </summary>
+        private static bool PlainBase64(string part)
+        {
+            foreach (char c in part)
+                if (!(c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z' || c >= '0' && c <= '9' || c == '+' || c == '/')) return false;
+            return true;
+        }
+
+        /// <summary>
+        /// A delta that keeps the stamps (visualBytes -1) must still match the hash of the stamps this surface has. That
+        /// hash is computed once per <see cref="LabPaintSurface.VisualVersion"/>, which changes whenever the stamps do.
+        /// </summary>
+        private bool CurrentVisualMatches(string expectedHash)
+        {
+            if (!visualHashed || hashedVisualVersion != surface.VisualVersion)
+            {
+                byte[] current = LabPaintVisualStamp.Encode(surface.CopyVisualStamps());
+                currentVisualLength = current.Length;
+                currentVisualHash = current.Length == 0 ? null : LabPaintVisualStamp.Hash(current);
+                hashedVisualVersion = surface.VisualVersion; visualHashed = true;
+            }
+            if (currentVisualLength > 0 && currentVisualHash != expectedHash) return false;
+            return currentVisualLength > 0 || string.IsNullOrEmpty(expectedHash);
         }
 
         public bool Matches(LabSnapshot snapshot)
@@ -404,6 +560,7 @@ namespace C6Lab
         {
             DiscardPending(); completedSequence = epoch = 0; session = null; round = 0;
             surface.Reset(new LabPaintGrowthSettings(), 1);
+            sparePixels = null; sparePainters = null; visualHashed = false;
         }
         private void DiscardPending() { pending = null; fragments = null; received = 0; }
         private static Color32 Pixel(byte[] source, int at) => new Color32(source[at], source[at + 1], source[at + 2], source[at + 3]);
@@ -418,12 +575,14 @@ namespace C6Lab
                 && (!f.full || f.visualBytes >= 0)
                 && (f.visualBytes <= 0 || f.visualBytes % LabPaintVisualStamp.ByteSize == 0)
                 && (f.visualBytes == 0 ? string.IsNullOrEmpty(f.visualHash)
-                    : f.visualHash != null && f.visualHash.Length == 64);
+                    : f.visualHash != null && f.visualHash.Length == 64)
+                && (f.encoding == LabPaintPayloadCodec.Raw || f.encoding == LabPaintPayloadCodec.Deflate);
         private static bool SameHeader(LabPaintFrame a, LabPaintFrame b)
             => a.session == b.session && a.round == b.round && a.sequence == b.sequence && a.epoch == b.epoch
                 && a.fromRevision == b.fromRevision && a.revision == b.revision && a.columns == b.columns
                 && a.rows == b.rows && a.parts == b.parts && a.full == b.full && a.paintCount == b.paintCount
                 && a.coveredCount == b.coveredCount && a.hash == b.hash
-                && a.visualBytes == b.visualBytes && (a.visualHash ?? string.Empty) == (b.visualHash ?? string.Empty);
+                && a.visualBytes == b.visualBytes && (a.visualHash ?? string.Empty) == (b.visualHash ?? string.Empty)
+                && a.encoding == b.encoding;
     }
 }

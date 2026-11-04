@@ -44,8 +44,6 @@ namespace C6Lab
         private bool subscribed;
         // 걸림 소리를 낸 마지막 매혹 (그 매혹이 걸린 Host 시각)
         private double castCharm = double.NaN;
-        private double seenServerTime = -1d;
-        private float seenAt;
 
         public static string Folder(LabGumihoSfx sfx) => Folders[(int)sfx];
         public int ClipCount(LabGumihoSfx sfx) => clips == null ? 0 : clips[(int)sfx].Length;
@@ -116,7 +114,7 @@ namespace C6Lab
         {
             LabSnapshot snapshot = network != null ? network.Snapshot : null;
             if (snapshot == null || snapshot.phase != LabPhase.Playing || snapshot.paused) return;
-            if (ObserveCharm(snapshot, ServerNow(snapshot))) Play(LabGumihoSfx.CharmCast);
+            if (ObserveCharm(snapshot, network.BattlePresentationTime)) Play(LabGumihoSfx.CharmCast);
         }
 
         /// <summary>
@@ -163,18 +161,6 @@ namespace C6Lab
                 case LabGumihoSfx.FoxClear: return config.FoxClearSoundVolume;
                 default: return config.BombOpenSoundVolume;
             }
-        }
-
-        // 스냅샷 사이에도 Host 시각을 이어서 어림한다 (LabCharmHud와 같은 방식, 최대 1초).
-        private double ServerNow(LabSnapshot snapshot)
-        {
-            float realtime = Time.realtimeSinceStartup;
-            if (snapshot.serverTime != seenServerTime)
-            {
-                seenServerTime = snapshot.serverTime;
-                seenAt = realtime;
-            }
-            return snapshot.serverTime + System.Math.Min(1d, realtime - seenAt);
         }
     }
 }

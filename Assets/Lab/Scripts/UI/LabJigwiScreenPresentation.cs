@@ -67,6 +67,8 @@ namespace C6Lab
         private bool artReady, missingShaderReported, baselineReady;
         private string sessionId;
         private uint roundNumber;
+        /// <summary>Same as <c>LabJigwiPatternAudio</c>'s seek tolerance.</summary>
+        public const double RewindToleranceSeconds = .075d;
         private double stageStartedAt = -1d, previousNow = -1d, personalDousedAt = -1d, curtainDousedAt = -1d;
         private Vector2 curtainSplashCentre, curtainSplashSize;
         private RectTransform hpBoundaryRoot;
@@ -411,8 +413,8 @@ namespace C6Lab
         {
             if (source == null) { Hide(); return; }
             if (battleCamera == null) battleCamera = source.BattleCamera;
-            ApplySnapshot(source.Snapshot, source.LocalPlayerId, source.JigwiABPresentationTime,
-                source.GameStartHeld || source.Snapshot != null && source.Snapshot.paused);
+            double now = source.JigwiABPresentationTime;
+            ApplySnapshot(source.Snapshot, source.LocalPlayerId, now, source.GameStartHeld || source.BattlePresentationHeld);
         }
 
         public void ApplySnapshot(LabSnapshot snapshot, ulong localPlayer, double now, bool held = false)
@@ -422,8 +424,9 @@ namespace C6Lab
             if (snapshot == null || snapshot.phase != LabPhase.Playing || snapshot.jigwiAB?.enabled != true)
             { Hide(); ResetHistory(); return; }
             LabJigwiABSnapshot stage = snapshot.jigwiAB;
+            // A step back within the jigwi voice's seek tolerance is clock jitter, not a new stage (#451).
             bool fresh = sessionId != snapshot.sessionId || roundNumber != snapshot.round || stageStartedAt != stage.startedAt
-                || previousNow >= 0d && now < previousNow;
+                || previousNow >= 0d && now < previousNow - RewindToleranceSeconds;
             if (fresh)
             {
                 ResetHistory();
@@ -701,9 +704,9 @@ namespace C6Lab
             if (active != null && active.kind == LabJigwiABKind.GroupFire) PositionGroupStatus(active, local, now);
             else RestoreStatusLayout();
             rows.Clear();
-            float feverMultiplier = source != null && source.config != null ? source.config.JigwiStageFeverMultiplier : 2f;
             float personalMultiplier = source != null && source.config != null ? source.config.JigwiABPersonalRecoveryMultiplier : 4f;
-            string words = stage.fever ? "피버 · 스태미나 자동 회복 " + feverMultiplier.ToString("0.#") + "배" : string.Empty;
+            // 피버는 세 스테이지 공통 연출(#441, LabYaguangFeverHud)이 알린다.
+            string words = string.Empty;
             if (active != null)
             {
                 string shout = active.Warning(now) ? (active.kind == LabJigwiABKind.PersonalBurn

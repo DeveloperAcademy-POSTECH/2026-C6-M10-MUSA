@@ -24,7 +24,7 @@ namespace C6Lab
         // 박 원기둥(Unity 기본 Cylinder)의 로컬 반지름.
         private const float HitboxLocalRadius = .5f;
         public const string MissFolder = "Audio/Miss";
-        /// <summary>BIG 중 던진 큰 공의 징 (#398). 오색구슬 징과 같은 폴더를 쓴다.</summary>
+        /// <summary>BIG 중 던진 큰 공의 소리 (#398 징, #464부터 25현 가야금). 오색구슬 명중과 같은 폴더를 쓴다.</summary>
         public const string BigHitFolder = LabFlashRewardSound.FiveColorHitFolder;
 
         // LabConfig를 읽을 수 없을 때만 쓰는 기본 크기. 평소에는 LabConfig의 Hit/Miss Sound Volume을 쓴다.

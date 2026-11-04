@@ -534,9 +534,152 @@ namespace C6Lab.Tests
             Assert.That(board.GetComponentsInChildren<LabOrbVanishSmoke>(true), Is.Empty);
         }
 
-        private void ReceiveControl(string type, string orbId, string session, uint round)
+        [Test]
+        public void MyPresentedHitIsCorrectedByTheHostImpactWithoutPlayingItTwice()
         {
-            object packet = NewPacket(type, 0, orbId);
+            LabHangingTarget hanging = AddHangingTarget();
+            int hits = 0, misses = 0;
+            network.LocalThrowHit += _ => hits++;
+            network.LocalThrowMissed += () => misses++;
+            Vector3 point = network.target.Hitbox.bounds.center + Vector3.forward * .5f + Vector3.right * .4f,
+                velocity = Vector3.back * 9f;
+            float yawBefore = hanging.YawSpeedDegreesPerSecond;
+            PresentContact(7, "orb-7", LabProjectileHitKind.Monster, point, velocity);
+            Assert.That(hits, Is.EqualTo(1), "The hit sound and vibration play at contact (#459).");
+            float presentedYaw = hanging.YawSpeedDegreesPerSecond - yawBefore;
+            Assert.That(Mathf.Abs(presentedYaw), Is.GreaterThan(.1f), "An off-axis hit spins the gourd at contact.");
+            float bounce = hanging.VerticalVelocity;
+            Assert.That(bounce, Is.GreaterThan(0f), "The gourd is kicked at contact.");
+
+            ReceiveImpact("orb-7", point, velocity, presentedYaw + 30f);
+            Assert.That(hits, Is.EqualTo(1), "The Host's confirmation does not replay the hit.");
+            Assert.That(hanging.VerticalVelocity, Is.EqualTo(bounce).Within(1e-4f), "Same velocity: no second kick.");
+            Assert.That(hanging.YawSpeedDegreesPerSecond - yawBefore, Is.EqualTo(presentedYaw + 30f).Within(.01f),
+                "Only the spin difference is applied.");
+            Assert.That(misses, Is.Zero);
+        }
+
+        [Test]
+        public void MyPresentedHitIsTakenBackWhenTheHostDecidesAMiss()
+        {
+            LabHangingTarget hanging = AddHangingTarget();
+            int hits = 0, misses = 0;
+            network.LocalThrowHit += _ => hits++;
+            network.LocalThrowMissed += () => misses++;
+            PresentContact(8, "orb-8", LabProjectileHitKind.Monster,
+                network.target.Hitbox.bounds.center + Vector3.forward * .5f + Vector3.right * .4f, Vector3.back * 9f);
+            Assert.That(Mathf.Abs(hanging.YawSpeedDegreesPerSecond), Is.GreaterThan(.1f));
+            ReceiveMiss("orb-8");
+            Assert.That(hits, Is.EqualTo(1));
+            Assert.That(misses, Is.EqualTo(1), "The miss sound plays when the Host disagrees.");
+            Assert.That(hanging.VerticalVelocity, Is.EqualTo(0f).Within(1e-4f), "The presented kick is removed.");
+            Assert.That(hanging.YawSpeedDegreesPerSecond, Is.EqualTo(0f).Within(.01f));
+        }
+
+        [Test]
+        public void APresentedMissIsReplayedInFullWhenTheHostDecidesAHitAndAMissIsNotPlayedTwice()
+        {
+            AddHangingTarget();
+            int hits = 0, misses = 0;
+            network.LocalThrowHit += _ => hits++;
+            network.LocalThrowMissed += () => misses++;
+            PresentContact(9, "orb-9", LabProjectileHitKind.Miss, Vector3.zero, Vector3.back * 9f);
+            Assert.That(misses, Is.EqualTo(1));
+            ReceiveImpact("orb-9", network.target.Hitbox.bounds.center, Vector3.back * 9f, 0f);
+            Assert.That(hits, Is.EqualTo(1), "The Host's hit plays as before.");
+
+            PresentContact(10, "orb-10", LabProjectileHitKind.Miss, Vector3.zero, Vector3.back * 9f);
+            ReceiveMiss("orb-10");
+            Assert.That(misses, Is.EqualTo(2), "The confirmed miss is not played a second time.");
+        }
+
+        [Test]
+        public void AHitTheHostNeverAnswersIsTakenBackByTime()
+        {
+            LabHangingTarget hanging = AddHangingTarget();
+            PresentContact(12, "orb-12", LabProjectileHitKind.Monster,
+                network.target.Hitbox.bounds.center + Vector3.forward * .5f + Vector3.right * .4f, Vector3.back * 9f);
+            Assert.That(hanging.VerticalVelocity, Is.GreaterThan(0f));
+            int hits = 0;
+            network.LocalThrowHit += _ => hits++;
+            double now = network.BattlePresentationTime;
+            Invoke("ExpirePresentedHits", now + .5d);
+            Assert.That(hanging.VerticalVelocity, Is.GreaterThan(0f), "Still waiting for the Host.");
+            Invoke("ExpirePresentedHits", now + 10d);
+            Assert.That(hanging.VerticalVelocity, Is.EqualTo(0f).Within(1e-4f), "A voided contact is never answered; time takes it back.");
+            Assert.That(hanging.YawSpeedDegreesPerSecond, Is.EqualTo(0f).Within(.01f));
+
+            // The verdict was only late: the gourd is kicked by the Host's values, without a second hit sound.
+            ReceiveImpact("orb-12", network.target.Hitbox.bounds.center + Vector3.forward * .5f, Vector3.back * 9f, 0f);
+            Assert.That(hits, Is.Zero, "The hit was presented once already.");
+            Assert.That(hanging.VerticalVelocity, Is.GreaterThan(0f), "The Host's impact still moves the gourd.");
+        }
+
+        [Test]
+        public void ANearlyDecidedJigwiCurtainWaitsForTheHost()
+        {
+            AddHangingTarget();
+            int hits = 0;
+            network.LocalThrowHit += _ => hits++;
+            initial.jigwiAB = new LabJigwiABSnapshot { enabled = true, startedAt = 0d, cutoffAt = 100d, rounds = new[]
+            {
+                new LabJigwiABRound { id = "curtain", kind = LabJigwiABKind.GroupFire, warningAt = .5d, activeAt = 1.5d, endsAt = 20d }
+            } };
+            PresentContact(11, "orb-11", LabProjectileHitKind.Monster, network.target.Hitbox.bounds.center, Vector3.back * 9f);
+            Assert.That(hits, Is.Zero, "The Host may block it at the curtain; nothing is presented early.");
+            // An A round still running while the next B warns (#388 54/84 s) must not hide the B.
+            initial.jigwiAB.rounds = new[]
+            {
+                new LabJigwiABRound { id = "a", kind = LabJigwiABKind.PersonalBurn, warningAt = 0d, activeAt = .2d, endsAt = 1.6d },
+                new LabJigwiABRound { id = "b-soon", kind = LabJigwiABKind.GroupFire, warningAt = 1.5d, activeAt = 2.5d, endsAt = 12d }
+            };
+            PresentContact(12, "orb-12", LabProjectileHitKind.Monster, network.target.Hitbox.bounds.center, Vector3.back * 9f);
+            Assert.That(hits, Is.Zero, "The B warning starts within the margin; the Host may meet the shot behind the curtain.");
+        }
+
+        private LabHangingTarget AddHangingTarget()
+        {
+            LabTarget target = LabTarget.CreateCylinder(root.transform, new Vector3(0f, 500f, 0f), .6f, 2.7f);
+            LabHangingTarget hanging = target.gameObject.AddComponent<LabHangingTarget>();
+            network.target = target;
+            // Snapshot handling activates the impact gate for the round; this fixture does it directly.
+            Get<LabImpactReceiptGate>("impactReceipts").SetActive(Session, 1u);
+            return hanging;
+        }
+
+        private void PresentContact(long requestId, string projectileId, LabProjectileHitKind kind, Vector3 point, Vector3 velocity)
+        {
+            Get<LabLocalHitPresentation>("localHits").Register(requestId, projectileId);
+            Invoke("OnPredictedShotContact", requestId,
+                new LabProjectileResult(null, 0ul, kind, point, .5f, 1f, 3f, velocity), LabOrbElement.None, 20, 1f, false, false);
+        }
+
+        private void ReceiveImpact(string projectileId, Vector3 worldPoint, Vector3 velocity, float spin)
+        {
+            object packet = NewPacket("targetImpact", 0, projectileId);
+            Vector3 local = network.target.Hitbox.transform.InverseTransformPoint(worldPoint);
+            Type type = packet.GetType();
+            type.GetField("owner").SetValue(packet, owner);
+            type.GetField("element").SetValue(packet, (int)LabOrbElement.None);
+            type.GetField("impactValue").SetValue(packet, 20);
+            type.GetField("x").SetValue(packet, local.x); type.GetField("y").SetValue(packet, local.y); type.GetField("z").SetValue(packet, local.z);
+            type.GetField("wx").SetValue(packet, velocity.x); type.GetField("wy").SetValue(packet, velocity.y); type.GetField("wz").SetValue(packet, velocity.z);
+            type.GetField("spinImpulse").SetValue(packet, spin);
+            ReceivePacket(packet, Session, 1u);
+        }
+
+        private void ReceiveMiss(string projectileId)
+        {
+            object packet = NewPacket("targetMiss", 0, projectileId);
+            packet.GetType().GetField("owner").SetValue(packet, owner);
+            ReceivePacket(packet, Session, 1u);
+        }
+
+        private void ReceiveControl(string type, string orbId, string session, uint round)
+            => ReceivePacket(NewPacket(type, 0, orbId), session, round);
+
+        private void ReceivePacket(object packet, string session, uint round)
+        {
             packet.GetType().GetField("sessionId").SetValue(packet, session);
             packet.GetType().GetField("round").SetValue(packet, round);
             byte[] payload = Encoding.UTF8.GetBytes(JsonUtility.ToJson(packet));

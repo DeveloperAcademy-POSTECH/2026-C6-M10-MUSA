@@ -511,35 +511,14 @@ namespace C6Lab
         {
             var nextVisualStamps = visualStamps ?? Array.Empty<LabPaintVisualStamp>();
             if (!LabPaintVisualStamp.Valid(nextVisualStamps)) return false;
-            if (!((columns == 64 && rows == 32) || (columns == 128 && rows == 64)
-                || (columns == Width && rows == Height)) || source == null
-                || source.Length != columns * rows || painterSlots == null
-                || painterSlots.Length != source.Length || paintCount < 0) return false;
-            int covered = 0;
-            for (int i = 0; i < source.Length; i++)
-            {
-                Color32 value = source[i];
-                if (painterSlots[i] > MaxPainterSlot || value.a == 0 && painterSlots[i] != 0) return false;
-                if (value.a != 0 && value.a != 255) return false;
-                if (value.a == 0 && (value.r != 0 || value.g != 0 || value.b != 0)) return false;
-                if (value.a == 255) covered++;
-            }
+            if (!ValidReplicaShape(columns, rows, source, painterSlots, paintCount)) return false;
+            int covered = CountValidReplicaCells(source, painterSlots);
+            if (covered < 0) return false;
             var replacement = new Color32[source.Length];
             Array.Copy(source, replacement, source.Length);
             var replacementSlots = new byte[painterSlots.Length];
             Array.Copy(painterSlots, replacementSlots, painterSlots.Length);
-            decimal oldCount = CellCount;
-            initialCells = initialCells / oldCount * replacement.Length;
-            repeatCells = repeatCells / oldCount * replacement.Length;
-            cellsPerSecond = cellsPerSecond / oldCount * replacement.Length;
-            Columns = columns; Rows = rows; pixels = replacement;
-            this.painterSlots = replacementSlots;
-            points = null; cellRegions = null;
-            regions.Clear(); activeRegions.Clear();
-            CoveredCount = covered; PaintCount = paintCount; Revision = revision;
-            LastPainter = 0; speedCredit = totalBudget = 0m;
-            preview = false; replica = true;
-            ClearDryingReplica();
+            InstallReplica(columns, rows, revision, replacement, replacementSlots, covered, paintCount);
             ReplaceVisualStamps(nextVisualStamps);
             return true;
         }

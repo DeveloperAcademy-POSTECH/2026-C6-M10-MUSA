@@ -72,8 +72,6 @@ namespace C6Lab
         private uint releaseFlashCount;
         private int seenReleases;
 
-        private LabSnapshot seenSnapshot;
-        private double seenAtRealtime;
 
         /// <summary>콤보 또는 폭탄 때문에 요괴를 붙잡아 두고 있는지</summary>
         public bool Holding => holding;
@@ -137,7 +135,7 @@ namespace C6Lab
         {
             LabSnapshot snapshot = network != null ? network.Snapshot : null;
             bool paused = snapshot != null && snapshot.paused;
-            double serverNow = snapshot == null ? 0d : paused ? snapshot.serverTime : EstimateServerNow(snapshot);
+            double serverNow = snapshot == null ? 0d : network.BattlePresentationTime;
             Advance(snapshot, serverNow, paused ? 0f : Time.deltaTime);
         }
 
@@ -356,17 +354,6 @@ namespace C6Lab
             yokai.localScale = yokaiScale * (pop ? 1f + PopStretch * wave : 1f - FlinchSquash * wave);
             // Add the hop only after sampling the base pose, including paused frames.
             yokai.localPosition += new Vector3(0f, 0f, (pop ? 2f : 1f) * FlinchHop * Mathf.Sin(u * Mathf.PI));
-        }
-
-        private double EstimateServerNow(LabSnapshot snapshot)
-        {
-            double realtime = Time.realtimeSinceStartupAsDouble;
-            if (!ReferenceEquals(snapshot, seenSnapshot))
-            {
-                seenSnapshot = snapshot;
-                seenAtRealtime = realtime;
-            }
-            return snapshot.serverTime + System.Math.Min(1d, realtime - seenAtRealtime);
         }
 
         private void OnDestroy()

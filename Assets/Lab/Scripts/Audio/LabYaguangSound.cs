@@ -101,10 +101,6 @@ namespace C6Lab
         // 이번 라운드에 본 콤보 성공 수 (첫 성공 "이런!", 그 뒤 "이럴 수가!")
         private int clearedCount;
         private LabYaguangFlashHud flashHud;
-        private string clockSession;
-        private uint clockRound;
-        private double seenServerTime = -1d;
-        private float seenAt;
 
         public static string Folder(LabYaguangSfx sfx) => Folders[(int)sfx];
         public int ClipCount(LabYaguangSfx sfx) => clips == null ? 0 : clips[(int)sfx].Length;
@@ -139,7 +135,7 @@ namespace C6Lab
             if (network == null || network.GameStartHeld) return;
             LabSnapshot snapshot = network.Snapshot;
             if (snapshot == null) return;
-            ObserveFlash(snapshot, ServerNow(snapshot), network.LocalPlayerId);
+            ObserveFlash(snapshot, network.BattlePresentationTime, network.LocalPlayerId);
             if (flashHud == null) flashHud = GetComponent<LabYaguangFlashHud>();
             if (flashHud != null && network.config != null && snapshot.phase == LabPhase.Playing)
                 ObserveShakes(flashHud.ShakeCount, network.config.YaguangFlashShakeCount);
@@ -483,21 +479,6 @@ namespace C6Lab
                 case LabYaguangSfx.ComboClearedSecond: return config.YaguangComboClearedSoundVolume;
                 default: return config.YaguangFlashBurstSoundVolume;
             }
-        }
-
-        // 스냅샷 사이에도 Host 시각을 이어서 어림한다 (LabYaguangFlashHud와 같은 방식, 최대 1초, 일시정지면 멈춤).
-        private double ServerNow(LabSnapshot snapshot)
-        {
-            float realtime = Time.realtimeSinceStartup;
-            if (snapshot.paused || snapshot.sessionId != clockSession || snapshot.round != clockRound
-                || snapshot.serverTime != seenServerTime)
-            {
-                clockSession = snapshot.sessionId;
-                clockRound = snapshot.round;
-                seenServerTime = snapshot.serverTime;
-                seenAt = realtime;
-            }
-            return snapshot.paused ? snapshot.serverTime : snapshot.serverTime + System.Math.Min(1d, realtime - seenAt);
         }
     }
 }

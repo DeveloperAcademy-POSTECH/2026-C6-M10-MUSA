@@ -3,16 +3,21 @@ using UnityEngine;
 
 namespace Hapio
 {
-    /// <summary>Slow, bounded paper-cloud motion around editable authored positions.</summary>
+    /// <summary>
+    /// Paper clouds drift one way across the title and come back in from the other side (#467). By default they go left
+    /// with the wind that blows the flag and the leaves; "반대 방향" sends one right. A cloud wraps the moment it has fully
+    /// left the title width, so it starts entering the other edge at once. Positions are a function of time from the
+    /// authored start (no per-frame accumulation), the clock runs with a paused game, and disabling restores the start.
+    /// </summary>
     public sealed class TitleCloudDrift : MonoBehaviour
     {
         [Serializable] public sealed class Cloud
         {
             public RectTransform target;
-            [InspectorName("좌우 이동 폭"), Min(0)] public float distance = 20;
-            [InspectorName("왕복 시간(초)"), Min(1)] public float seconds = 36;
-            [InspectorName("반대 방향")] public bool reverse;
+            [InspectorName("초당 이동"), Min(0)] public float speed = 12;
+            [InspectorName("반대 방향 (오른쪽으로)")] public bool reverse;
         }
+        [InspectorName("구름이 지나가는 폭")] public float width = 402;
         public Cloud[] clouds;
         private Vector2[] origins;
         private float elapsed;
@@ -24,6 +29,17 @@ namespace Hapio
             for (int i = 0; i < origins.Length; i++)
                 if (clouds[i] != null && clouds[i].target != null) origins[i] = clouds[i].target.anchoredPosition;
         }
+
+        /// <summary>
+        /// Left edge of a cloud (top-left pivot) after moving <paramref name="travelled"/> from <paramref name="start"/>.
+        /// It stays in [-cloudWidth, areaWidth): fully gone past one edge is the same as just touching the other.
+        /// </summary>
+        public static float Wrap(float start, float travelled, float cloudWidth, float areaWidth)
+        {
+            float span = Mathf.Max(1f, areaWidth + cloudWidth);
+            return -cloudWidth + Mathf.Repeat(start + cloudWidth + travelled, span);
+        }
+
         public void Sample(float seconds)
         {
             if (clouds == null) return;
@@ -32,9 +48,9 @@ namespace Hapio
             {
                 var cloud = clouds[i];
                 if (cloud == null || cloud.target == null) continue;
-                float offset = Mathf.Sin(seconds * 2 * Mathf.PI / Mathf.Max(1, cloud.seconds)) *
-                    Mathf.Max(0, cloud.distance) * (cloud.reverse ? -1 : 1);
-                cloud.target.anchoredPosition = origins[i] + new Vector2(offset, 0);
+                float travelled = seconds * Mathf.Max(0, cloud.speed) * (cloud.reverse ? 1 : -1);
+                cloud.target.anchoredPosition = new Vector2(
+                    Wrap(origins[i].x, travelled, cloud.target.rect.width, width), origins[i].y);
             }
         }
         private void OnDisable()

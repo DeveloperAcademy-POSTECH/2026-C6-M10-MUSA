@@ -11,7 +11,7 @@ namespace C6Lab
     /// 그 뒤로도 피버 내내 부적이 공격 영역(조합판 위)에서만 조금씩 흘러내린다. 던지기를 가리지 않게 양은 적다.
     /// 번쩍임·문구는 피버 시작 뒤 조금 지나 들어온 기기(StartWindowSeconds 넘음)에는 띄우지 않고, 흐르는 부적만 보인다.
     /// 화면 표시만 하며 터치를 막지 않는다.
-    /// 구미호 피버 타임(#334)과는 따로 돌아가고, 야광귀 스테이지에서만 켜진다.
+    /// #441부터 세 스테이지(구미호/야광귀/지귀) 피버 공통 연출이다. 시작 시각은 LabNetwork.StageFeverElapsed.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class LabYaguangFeverHud : MonoBehaviour
@@ -72,7 +72,7 @@ namespace C6Lab
 
         private void LateUpdate()
         {
-            double elapsed = network != null ? network.YaguangFeverElapsed(network.Snapshot) : -1d;
+            double elapsed = network != null ? network.StageFeverElapsed(network.Snapshot) : -1d;
             bool now = elapsed >= 0d;
             if (now != fever)
             {

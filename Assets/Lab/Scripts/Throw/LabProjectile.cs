@@ -78,6 +78,8 @@ namespace C6Lab
         private LabTarget target;
         private Collider missSurface;
         private Action<LabProjectileResult> onResolved;
+        // A visual copy reports what it touched for local presentation only (#459). It never reaches onResolved.
+        private Action<LabProjectileResult> visualContact;
         private string projectileId;
         private ulong ownerPlayerId;
         private Vector3 lastPosition;
@@ -283,12 +285,18 @@ namespace C6Lab
             return true;
         }
 
-        /// <summary>Starts a client-only replica. Collision may hide it but cannot change HP.</summary>
-        public bool LaunchVisual(Vector3 velocity, LabConfig tuning, LabTarget hitTarget = null)
+        /// <summary>
+        /// Starts a client-only replica. Collision may hide it but cannot change HP. <paramref name="contact"/> hears,
+        /// once, which surface the copy reached (gourd, floor, fire) with the point and incoming velocity, so the
+        /// thrower's screen can present it before the Host decides (#459). It carries no projectile ID or owner.
+        /// </summary>
+        public bool LaunchVisual(Vector3 velocity, LabConfig tuning, LabTarget hitTarget = null,
+            Action<LabProjectileResult> contact = null)
         {
             if (launched) return false;
             if (tuning == null) throw new ArgumentNullException(nameof(tuning));
             authoritative = false;
+            visualContact = contact;
             target = hitTarget;
             Prepare(velocity, tuning, true);
             return true;
@@ -385,7 +393,11 @@ namespace C6Lab
         {
             if (!launched || resolved || Time.time - launchedAt < launchedLifetime) return;
             if (authoritative) Resolve(false, transform.position);
-            else FinishVisual();
+            else
+            {
+                ReportVisualContact(LabProjectileHitKind.Miss, transform.position, null);
+                FinishVisual();
+            }
         }
 
         private void OnCollisionEnter(Collision collision)
@@ -404,7 +416,11 @@ namespace C6Lab
             // Fire uses trigger geometry so non-owners never bounce off it. Authoritative hits
             // still require the same swept/overlap proof as a monster, not the callback alone.
             if (authoritative) ResolveSurfaceIfFound(null);
-            else FinishVisual();
+            else
+            {
+                ReportVisualContact(LabProjectileHitKind.Fire, transform.position, FireFor(other));
+                FinishVisual();
+            }
         }
 
         // The completed physics segment is shared by the FixedUpdate sweep and collision callback.
@@ -416,7 +432,11 @@ namespace C6Lab
             ResolutionSurface nearest = FindResolutionSurface(collision);
             if (!nearest.Found) return;
             if (authoritative) Resolve(nearest.Kind, nearest.Point, nearest.Fire);
-            else FinishVisual();
+            else
+            {
+                ReportVisualContact(nearest.Kind, nearest.Point, nearest.Fire);
+                FinishVisual();
+            }
         }
 
         private ResolutionSurface FindResolutionSurface(Collision collision)
@@ -559,6 +579,17 @@ namespace C6Lab
             previousFirePoses.Clear();
             for (int i = 0; i < fireSurfaces.Count; i++)
                 if (fireSurfaces[i] != null) previousFirePoses.Add(new SurfacePose(fireSurfaces[i].Hitbox));
+        }
+
+        private void ReportVisualContact(LabProjectileHitKind kind, Vector3 point, LabJigwiFireSurface fire)
+        {
+            if (resolved || visualContact == null) return;
+            Action<LabProjectileResult> report = visualContact;
+            visualContact = null;
+            Vector2 startXZ = new Vector2(launchPosition.x, launchPosition.z);
+            report(new LabProjectileResult(null, 0ul, kind, point, Mathf.Max(0f, Time.time - launchedAt),
+                Mathf.Max(0f, peakHeight - launchPosition.y), Vector2.Distance(startXZ, new Vector2(point.x, point.z)),
+                incomingVelocity, fire != null ? fire.FireId : null, fire != null ? fire.FireTargetId : null));
         }
 
         private void FinishVisual()

@@ -3818,6 +3818,43 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 - 기존 야광귀 FBX/추출 클립을 24fps, 1–193프레임의 8초 버전으로 교체. meta GUID 유지. Unity에서 FBX 8초·추출 클립 8초·클립 1개·바인딩 경로 누락 0개 확인. Controller 상태 Speed=1. 게임 통합/실기기/자동 테스트는 미실행.
 
 
+## 2026-11-03 — Stage 2 야광귀 배경 세트 첫 배치
+
+- 연결된 Unity 6000.6.5f1 Editor에서 Battle에 Stage02 전용 Studio·Ground·Board Backing과 독립 재질을 저장했다. 원본 PNG 11개를 별도 Stage02 폴더로 가져왔으며 기본 배경과 Lab Scene·게임 규칙·카메라·물리·통신 설정은 유지했다.
+- EditMode: GameStageBackgroundAssetTests, GameBackgroundAnimationAssetTests, GameSceneAssetTests **12/12 PASS**, 1.71초. 기존 기본 배경과 저장 Lab 에셋/카드 Transform 보존, PNG 연결, 재질 분리, Stage 1/2/3 반복 선택, 기본 fallback, 충돌 없는 장식, 구름·나비 애니메이션 연결을 확인했다. 초기 검사에서 비활성 legacy 카드 placeholder의 빈 컴포넌트 및 이름의 slash에 의한 나비 탐색 문제를 확인하고 보완한 뒤 통과했다.
+- PlayMode: GameSceneFlowTests.PausedDeveloperNextStageUsesSavedButtonAndFreshBattlesWithoutApplyingUnsavedFields **1/1 PASS**, 15.94초. 실제 저장 Home에서 시작해 Stage 1→2→3으로 새 Battle을 로드할 때 Stage 2만 밤 배경이 활성화되는 assertion을 추가해 확인했다.
+- 전투 카메라 렌더 및 P1~P5 방향의 배경 전용 렌더를 확인했다. 최초 도깨비불이 각 좌석의 중앙 박 뒤에 겹쳐 보이지 않아 반경11·높이2.2·시작각0으로 이동하고 5방향 렌더를 다시 만들었다. 카메라 위치·회전·viewport·RenderTexture는 캡처 뒤 복원했다. 해당 렌더는 HUD를 포함한 실기기 화면 검수가 아니다.
+- 종료: Play OFF, Battle Scene의 Stage 2 편집 미리보기 저장. Stage Backgrounds Inspector에서 Stage 1/2/3 미리보기 가능. PNG 폴더 자동 분류 UI, 새 Mac/iOS 빌드·다중 앱·실기기 검증은 수행하지 않았다. 구름 원본 가장자리의 일부 잘림과 밝은 기존 바닥/HUD의 밤 색감은 후속 미술 조정 대상이다.
+
+### 2026-11-03 — Stage 2 바위소나무를 기와집·호롱불로 교체
+
+- Stage 2 바위소나무 그룹만 비활성화하고, 기존 Hanok 2개를 신발이 놓인 새 PNG로 교체하여 해당 두 위치로 옮겼다. 노란 호롱불은 각 집 옆1개, 총2개. 원본 파일·기본 배경·Stage1/3과 게임 코드는 유지했다. 점등 애니메이션은 미구현.
+- EditMode 관련3클래스 **12/12 PASS**(1.71초), 실제1→2→3 전환 PlayMode **1/1 PASS**(15.77초). 업데이트된 에셋 검사에서 Stage2 바위소나무 OFF·새 한옥2개·호롱불2개를 확인했다.
+- 최종 P1~P5 배경 전용 렌더에서 위치·겹침·접지를 확인. Play OFF, Battle의 Stage2 미리보기 저장. 컴파일 오류0. 새 빌드·실기기 검증은 미실행.
+
+- 2026-11-03 후속: Stage2 GhostFlame 장식 그룹의 visible 및 activeSelf를 false로 저장. 저장 씬을 다시 열어 그룹 및 하위5개 불꽃이 activeInHierarchy=false임을 확인한다. 미술 표시 토글만 변경하며 자동 테스트는 재실행하지 않는다.
+
+### 2026-11-03 — Stage 2 은은한 눈
+
+- 기본 ParticleSystem과 URP Particles/Unlit 투명 재질·절차적 부드러운 점 텍스처를 Stage2 전용으로 저장했다. 기본 배경·도깨비불 OFF·기와집/호롱불을 보존한다. 18초 시뮬레이션에서88개 파티클 및 배경 전용 렌더를 확인했다. 새 스크립트는 없다.
+- 관련 EditMode **12/12 PASS**(1.55초), 저장 Scene의1→2→3 전환 PlayMode **1/1 PASS**(15.84초). 컴파일 오류 없음. 최종 저장 씬을 다시 열어 loop/playOnAwake 및 충돌/조명OFF를 확인했다. 실기기 시인성·성능은 미실행.
+
+### 2026-11-03 — Stage 2 반딧불이 한 쌍
+
+- Stage2에 정확히2개 반딧불이와32초 loop clip, 작은 노란 core/halo, .65초 투명 잔상을 저장. loop·전체 커브 바인딩 경로·2개체 참조 및 잔상 끝 alpha0을 확인했고0/8/16/24초 샘플에서 약.76 간격을 확인했다. 6초 샘플 배경 렌더에서 두 노란 점을 확인하고 시작 pose/카메라를 복원했다.
+- 관련 EditMode **12/12 PASS**(1.89초), 저장1→2→3 전환 PlayMode **1/1 PASS**(15.68초). 컴파일 오류 없음. 실제 다중 기기 시인성/성능은 미실행. Play OFF, Battle Stage2 편집 미리보기.
+
+- 2026-11-03 반딧불이 시인성 피드백: core3배·halo2.4배 및 밝기/잔상폭을 높이고 Animator 상태속도를2.2배로 저장. 최종 카메라 렌더에서 두 노란 빛의 확대를 확인했고 저장 씬 재오픈 후 크기.45·상태속도2.2를 확인했다. 컴파일 오류0. 가역적인 미술 수치 변경으로 자동 검사는 재실행하지 않았다.
+
+- 2026-11-03 기와집 부유 피드백: 두 Hanok 카드의 높이를2.8→2.23으로 조정. 최종 전투 카메라 렌더에서 집 아래 어두운 틈이 사라지고 돌기단/신발이 지면과 이어짐을 확인했다. 저장 씬 재오픈 후 그룹/두 카드 높이 일치를 확인했다. 위치만 변경하여 자동 검사는 재실행하지 않았다.
+
+### 2026-11-03 — Stage 2 지나가는 발자국
+
+- 절차적 짚신 밑창 마스크·투명 재질·14개 바닥 Quad·10초 반복 alpha clip을 저장. 전체 자국 바인딩과7초 이후 alpha0을 확인하고2.2초 샘플 렌더에서 좌우교대 발자국이 바닥에 보임을 확인했다. 원근에 작게 보이던 초기 위치/크기를 앞쪽으로 옮겨 확대했다.
+- 관련 EditMode **12/12 PASS**(1.90초), 실제 저장1→2→3 전환 PlayMode **1/1 PASS**(15.84초). 종료 시 애니메이션 시작값/카메라 복원, Battle Stage2 미리보기 저장. 실기기 검증은 미실행.
+
+- 2026-11-03 발자국 경로 피드백: 전경→기와집 문 앞 경로 및 밑창 방향으로 변경.2.2초 카메라 렌더에서 화면 아래쪽부터 집까지 이어짐을 확인하고 시작 상태로 복원, 저장 씬 재오픈 후 양 끝 위치 확인. Transform만 바꿔 자동 검사는 재실행하지 않았다.
+
 ## #427 지귀 A/B 예고 음성과 외침 발동 연결 — 2026-11-02
 
 - **기준:** main `79a96817` → `feat/#427-jigwi-pattern-shout-cues`. 작업 중 데스크탑 프로젝트가 별도 #428 작업 브랜치로 전환된 것을 감지해, 이번 소유 파일을 해시 확인 후 별도 작업트리로 옮겼다. 데스크탑은 #428 수정만 남겼으며 그 브랜치·진행 파일·기존 스태시9개를 보존했다. 이번 전용 Unity6000.6.5f1/macOS/Metal **batch Editor**에서 검사했으며 사용자 Editor의 Scene을 저장하거나 전환하지 않았다.
@@ -4067,6 +4104,27 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 - 기존 복제 검사(`LabPaintReplicationTests`·`LabPaintVisualStateTests`·`LabPaintPainterSlotTests` 등)는 그대로 통과했다.
 - 코드 검토 워크플로(세 관점 검토 + 지적별 반박 검증)에서 한 가지 결함이 세 번 독립적으로 확인됐다. 중간 조각 끝에 패딩 뒤 공백이 붙은 변조 프레임을 조각별 해독은 받아들이지만 이전의 이어 붙인 해독은 거절하는 차이다. 빠른 경로를 순수 base64 조각으로 제한해 고쳤다. 추가한 검사는 수정 전 조건으로 돌리면 두 경우 모두 `Applied`가 되어 실패하고, 수정 뒤 통과함을 확인했다.
 - **미실행:** iPhone 실기기·여러 폰의 GC·프레임 시간. 전체 PlayMode는 실행하지 않았다.
+
+
+## 2026-11-03 — Stage 02 gourd art import
+
+Imported Assets/Hapio/Art/Gourds/Stage02_Yagwanggwi; reserved Stage01_Gumiho and Stage03_Jigwi folders. Unity Editor verification: 22 renderers, 446,594 triangles; 9 URP Lit materials, no missing materials or unsupported shaders; 4-second combined animation, 280 curve bindings, zero unresolved animation paths; Animator sampling changed 11 transforms. Preview rendered and inspected after correcting parent inverse matrices in export copies. Existing gameplay prefabs, stage catalog and scene assets were not replaced. EditMode/PlayMode suites and device performance tests were not run for this isolated art import.
+
+
+## 2026-11-03 — Stage 02 gourd placement scale
+
+Created Yagwanggwi_Gourd_GameReady.prefab with outer uniform scale 17.096283 and body-centered origin; preserved the nested source prefab and Animator hierarchy. Reloaded prefab in an isolated preview scene and verified body height 2.390325, center within 0.001 of origin, no unresolved animation paths, and 17 changing transforms during playback before save. No gameplay scene placement/replacement or device test was performed.
+
+
+## 2026-11-03 — Gourd prefab handoff cleanup
+
+Unpacked the redundant small source-prefab layer inside GameReady. Verified no project prefab/scene/asset referenced it, then removed it. Reloaded remaining prefab: body height 2.390325, 17 animated transforms, zero missing materials. FBX, material and controller references are preserved. No gameplay/device test performed.
+
+
+## 2026-11-03 — Gourd texture cleanup
+
+Consolidated three byte-identical textures into shared material references; confirmed zero asset references before deleting three duplicates and three unused source/reference images with their meta files (28,189,225 image bytes). Reloaded GameReady prefab: height 2.390325, 17 animated transforms, zero missing materials or required color/normal/metallic maps. No gameplay/device test performed.
+
 
 ## #451 Guest 공유 연출 시계·지귀 화면 되감김 허용치 — 2026-11-03
 
@@ -4360,3 +4418,158 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 - Stage1 바닥 후속 수정: BlushBeige PNG를 ground/backing 재질 및 저장 Scene의 두 슬롯에 연결. Stage2/3 참조 유지.
 
 - 배틀 조명 작업실: 에디터 스크립트 컴파일 및 창 열기 성공. 해당 파일 관련 콘솔 오류 0건. 수동 슬라이더·저장 후 재실행 검사는 미실행.
+## #467 타이틀 화면 비율 자동 맞춤 (1단계: 흰선) — 2026-11-03
+
+- **기준:** main `2ab6b3c3` → `feat/#467-title-fit-wind`. Unity6000.6.5f1/macOS의 연결된 Editor에서 컴파일과 Editor 계산 확인만 했다. Play·Test Runner·앱 빌드·iOS 실기기는 실행하지 않았다.
+- **원인:** Home 페이지는 402×874 설계를 화면 안에 다 들어가게 줄인다(`GameLobbyView.FitScreen`). 비율이 다른 폰에서는 남는 띠로 뒤의 예전 로비 그림(밝은 종이)이 보였다. 새 타이틀 양끝의 어두운 나무 기둥 옆이라 흰선처럼 보였다.
+- **수정:** 새 `TitleArtCover`를 `AnimatedTitle.prefab` 루트에 Editor API로 붙였다.
+  - 그림만 화면 가운데 기준으로 화면을 덮을 때까지 키운다.
+  - 버튼이 있는 페이지 배율, 그림 안의 배치, 구름 움직임, Scene은 바꾸지 않았다.
+  - `StoryTitleBuilder`도 새로 만들 때 같은 부품을 붙인다.
+
+| 실행한 확인 | 결과 |
+| --- | --- |
+| 컴파일 · Console 오류 | **PASS** (오류 0) |
+| Editor 계산: 실제 프리팹을 폰 크기별 화면에 놓고 수정 전 띠와 수정 후 넘침을 쟀다 | **PASS** — 아래 표 |
+
+| 화면(pt) | 수정 전 띠 | 수정 후 그림 넘침 | 합이오 글자 |
+| --- | --- | --- | --- |
+| SE 375×667 | 양옆 34.11 | 위아래 74.15씩 | 화면 안 (위에서 78.8) |
+| 13 mini 375×812 | 양옆 0.76 | 위아래 1.65씩 | 화면 안 |
+| 15 393×852 | 양옆 0.56 | 위아래 1.22씩 | 화면 안 |
+| 16 Pro 402×874 | 없음 | 없음 | 화면 안 |
+| 16 Pro Max 440×956 | 양옆 0.14 | 위아래 0.31씩 | 화면 안 |
+| 더 긴 화면 360×820 | 위아래 18.66 | 양옆 8.58씩 | 화면 안 |
+
+- **새 검사 (NOT_RUN):**
+  - PlayMode `StoryTitleTests.TitleArtCoversTheWholeScreenWhileItsPageStaysFittedInside`(위 6개 비율)는 그림이 네 변을 다 덮는지, 한 변은 꼭 맞는지, 가운데 기준인지를 확인한다. 페이지 배율·글자 배치가 그대로이고 글자가 화면 안인지도 확인한다.
+  - EditMode `StoryWorkspaceTests.AnimatedTitleSharesFourOriginalCloudsWithTheHomeStartPage`에 프리팹 부품 확인을 추가했다.
+- **미실행:** Play에서 Game 뷰 비율을 바꿔 보는 확인, iPhone 실기기 확인.
+
+### #467 2단계: 구름 속도 — 2026-11-03
+
+- **기준:** `dabf7422`(1단계 커밋) 위. `AnimatedTitle.prefab`의 `Title Cloud Drift` 값만 Editor API로 바꿨다. 코드·움직임 방식(제자리 좌우 왕복, 게임 시계가 멈춰도 움직임)은 그대로다.
+
+| 구름 | 이동 폭 | 왕복 시간 | 가장 빠른 순간 (좌표/초) |
+| --- | --- | --- | --- |
+| Cloud Left | 24 → **30** | 38 → **14**초 | 3.97 → 13.46 (3.4배) |
+| Cloud Right (반대 방향) | 20 → **26** | 44 → **16**초 | 2.86 → 10.21 (3.6배) |
+| Cloud Lower | 12 → **16** | 32 → **12**초 | 2.36 → 8.38 (3.6배) |
+| Cloud Upper (반대 방향) | 10 → **14** | 36 → **13**초 | 1.75 → 6.77 (3.9배) |
+
+- Cloud Upper는 x=15에서 ±14만 움직여 그림 왼쪽 끝 안에 남는다. 나머지는 원래도 그림 밖으로 걸쳐 있어 잘린다.
+- EditMode `StoryWorkspaceTests.AnimatedTitleSharesFourOriginalCloudsWithTheHomeStartPage`의 주기 조건을 `> 20`에서 `10~20`으로 바꿨다 (**NOT_RUN**).
+- **미실행:** Play에서 느낌 확인, iPhone 실기기.
+
+### #467 3단계: 배경 교체·깃발 바람 연출 — 2026-11-03
+
+- **기준:** `e89b52bb`(2단계 커밋) 위. 연결된 Editor에서 컴파일, Editor API 배치, Editor 안 화면 그리기, 계산 확인만 했다. Play·Test Runner·실기기는 실행하지 않았다.
+- **바꾼 것:**
+  - `a763a.png`을 깃대·깃발·리본이 없는 3배 배경(1206×2622)으로 교체했다. GUID·가져오기 설정은 그대로이고, `Artwork`는 402×874에 딱 맞췄다.
+  - 깃대·깃발·리본 2개를 투명 여백을 잘라 긴 변 1024px로 줄여 추가했다.
+  - 새 `TitleWindWave`(UI 메시 물결)를 깃발·리본에 붙였다.
+  - `StoryTitleBuilder.AddWindFlag`(메뉴 `Hapio > Story > Add Title Wind Flag`)로 프리팹에 배치했다.
+- **배치 (402×874 좌표, 예전 그림의 깃발 자리를 따름):**
+
+| 조각 | 위치·크기 | 비고 |
+| --- | --- | --- |
+| 깃대 | (304, 455) 58×335 | 막대만 늘어나는 9분할, 꼭대기 455 · 가로대 486~492 |
+| 깃발 | (311, 484) 44×167 | 위 가운데에 묶임, 왼쪽으로 3 기울고 폭 2.5 · 0.5회/초 |
+| 빨강·노랑 리본 | (219, 472) 112×63 | 가로대 위 막대에 묶임, 폭 4 · 1.2회/초 |
+| 파랑 리본 | (216, 490) 90×65 | 가로대 왼쪽 끝에 묶임, 0.37초 어긋남 |
+
+| 실행한 확인 | 결과 |
+| --- | --- |
+| 컴파일 · Console 오류 | **PASS** (오류 0) |
+| Editor 안 화면 그리기(미리보기 씬, 603×1311): 0 · 1.6 · 3.3 · 4.05초 | **PASS** — 깃발 아랫단이 왼쪽으로 일렁이고, 4.05초(돌풍 최고)에 깃발이 크게 휘고 리본 꼬리가 들린다. 글자·구름·버튼 자리는 그대로다 |
+| 새 검사 값 미리 계산 | **PASS** — 묶인 쪽 이동 0, 같은 물결 위상에서 돌풍 최고는 평상시의 2.5배(−5.47 → −13.67), 4×16칸 메시 정점 85·인덱스 384, 깃대 배율×폭 = 318, 타이틀 그림 전체 raycast 꺼짐 |
+
+- **새 검사 (NOT_RUN):**
+  - EditMode `StoryWorkspaceTests.TitleFlagWavesOverAThreeTimesLandscapeThatNoLongerPaintsIt`
+  - PlayMode `StoryTitleTests.GustsComeOnceAPeriodAndSmoothly`
+  - PlayMode `StoryTitleTests.WindKeepsTheTiedEdgeStillAndSwingsTheFreeEndFurtherInAGust`
+- **미실행:** Play에서 실제 움직임 느낌, iPhone 실기기 성능(조각 3개 × 매 프레임 메시 다시 만들기).
+
+### #467 4단계: 낙엽 — 2026-11-03
+
+- **기준:** `64fa185c`(3단계 커밋) 위. 연결된 Editor에서 컴파일, Editor API 배치, Editor 안 화면 그리기, 계산 확인만 했다. Play·Test Runner·실기기는 실행하지 않았다.
+- **바꾼 것:**
+  - 나뭇잎 4장(단풍 빨강·노랑, 긴 잎 빨강·노랑)을 투명 여백을 잘라 긴 변 256px로 줄여 추가했다.
+  - 새 `TitleFallingLeaves`를 `StoryTitleBuilder.AddFallingLeaves`(메뉴 `Hapio > Story > Add Title Falling Leaves`)로 타이틀 맨 앞 `Falling Leaves`에 붙였다.
+  - 값은 나뭇잎 9장, 크기 20~32, 떨어지는 속도 초당 40~70, 바람 초당 20(돌풍 최고 +110), 흔들림 폭 12, 회전 최대 초당 140도, 씨앗 467이다. 돌풍 간격은 깃발과 같은 6초다.
+  - 처음 그린 크기 14~22는 배경에 그려진 낙엽과 섞여 잘 안 보여서 20~32로 키웠다.
+
+| 실행한 확인 | 결과 |
+| --- | --- |
+| 컴파일 · Console 오류 | **PASS** (오류 0) |
+| Editor 안 화면 그리기 0 · 2 · 4.05 · 8초 | **PASS** — 9장이 화면 곳곳에서 시작해 왼쪽 아래로 날리고, 돌풍(4.05초) 동안 왼쪽 밖으로 쓸려 나간 잎이 위·오른쪽에서 다시 나온다(8초까지 6번 재활용). 합이오 글자 앞을 잎이 지나갈 수 있다 |
+| 새 검사 값 미리 계산 (미리보기 씬) | **PASS** — 6장 생성·raycast 꺼짐·잎 모양 유지, 같은 씨앗 3초 뒤 위치 같음, 30초 동안 x −39.97~557.38 · y −33.50~913.76(범위 안), 재활용 20번, 바람 평상시 (−20, 50) → 돌풍 (−130, 70) |
+
+- **새 검사 (NOT_RUN):**
+  - EditMode `StoryWorkspaceTests.TitleLeavesFallInFrontOfTheCloudsWithTheFlagsGust`
+  - PlayMode `StoryTitleTests.LeavesRecycleInsideTheTitleBlowLeftInAGustAndRestartTheSame`(게임 시계 0에서도 움직이는지 포함)
+- **미실행:** Play에서 실제 움직임 느낌, iPhone 실기기 성능(나뭇잎 9장 매 프레임 이동).
+
+### #467 5단계: 구름이 한 방향으로 흘러가 반대쪽에서 다시 등장 — 2026-11-03
+
+- **기준:** `cfaaa6ae`(4단계 커밋) 위. 연결된 Editor에서 컴파일, Editor API 프리팹 수정, Editor 안 화면 그리기, 계산 확인만 했다. Play·Test Runner·실기기는 실행하지 않았다.
+- **요청:** 좌우 왕복 대신 한쪽으로 쭉 이동한 뒤 다시 등장.
+- **바꾼 것:**
+  - `TitleCloudDrift`의 `distance`·`seconds`를 지우고 `speed`(초당 이동)와 `width`(지나가는 폭 402)를 추가했다. `reverse`는 오른쪽으로 흐르게 하는 뜻으로 바꿨다.
+  - 위치는 `Wrap`으로 계산한다. 구름 왼쪽 끝이 [−구름 폭, 402) 안에서 돌기 때문에, 완전히 나간 순간 반대쪽 가장자리에 닿아 있다.
+  - 프리팹은 구름 4개 모두 왼쪽(속도 16·12·20·14)이다. 합이오 글자를 구름 뒤(순서 6)로 옮겨 구름이 글자 뒤로 지나가게 했다.
+  - `StoryTitleBuilder`의 새로 만들기도 같은 값과 순서를 쓴다.
+
+| 실행한 확인 | 결과 |
+| --- | --- |
+| 컴파일 · Console 오류 | **PASS** (오류 0) |
+| 프리팹 diff | **PASS** — 구름 값(`speed`·`reverse`·`width`)과 글자 순서만 바뀜 |
+| Editor 안 화면 그리기 0 · 12 · 24 · 36초 | **PASS** — 구름이 모두 왼쪽으로 흐르고, 가운데 큰 구름은 왼쪽으로 나간 뒤 24초에 오른쪽에서 들어온다. 작은 구름도 같다. 위쪽 큰 구름이 글자 뒤로 지나간다 |
+
+- **검사 변경 (NOT_RUN):**
+  - PlayMode `StoryTitleTests.CloudsStayBoundedMoveInOppositeDirectionsAndRestoreWhenReenabled`를 `CloudsDriftOneWayComeBackFromTheOtherSideAndRestoreWhenReenabled`로 바꿨다. 10초 위치, 다 나간 직후 반대쪽 진입(401, −144.5), 200초 동안 범위, 한 바퀴 복귀, 복원, 게임 시계 0에서 왼쪽 이동을 확인한다.
+  - EditMode `AnimatedTitleSharesFourOriginalCloudsWithTheHomeStartPage`는 속도 8~30·왼쪽·글자보다 뒤를 확인한다.
+- **미실행:** Play에서 흐름 속도 느낌, iPhone 실기기.
+
+### #467 6단계: 짧은 구름 그림으로 교체·엇갈리는 방향 — 2026-11-03
+
+- **기준:** `bf8e9976`(5단계 커밋) 위. 연결된 Editor에서 컴파일, Editor API 프리팹 수정, Editor 안 화면 그리기, 계산 확인만 했다. Play·Test Runner·실기기는 실행하지 않았다.
+- **요청:**
+  - 구름이 모두 왼쪽으로만 가지 않고 몇 개는 오른쪽으로 가며 엇갈리게.
+  - "구름이 너무 길다"는 후기에 따라 새 구름 그림 3종으로 교체.
+  - 첫 화면을 본 뒤 가운데 구름만 다시 받은 납작한 구름(`구름1.png`)으로 교체.
+- **바꾼 것:**
+  - `CloudRound.png`(396×216)·`CloudWave.png`(633×211)는 원본의 투명 여백만 잘랐다. `CloudLong.png`는 `구름1.png`(1520×676)를 잘라 1024×214로 줄였다.
+  - 구름 4개의 그림·출발 위치·크기·방향·속도를 Editor API로 바꿨다(위에서부터 → 14, ← 12, → 16, ← 20). 구름 틀과 그림 크기는 그림 비율과 같다.
+  - 가운데 구름은 폭 250에서 가늘고 작아 보여 300(높이 63)으로 키웠고, 높이 가운데(약 344)는 유지했다(출발 (−30, 313)).
+  - `StoryTitleBuilder`의 새로 만들기도 같은 값을 쓴다.
+  - 예전 구름 그림 3개는 프리팹에서 더 이상 쓰지 않지만 파일은 지우지 않았다.
+
+| 실행한 확인 | 결과 |
+| --- | --- |
+| 컴파일 · Console 오류 | **PASS** (오류 0) |
+| 그림 선명도 (그림 px ÷ 화면 폭 pt) | **PASS** — 가운데 3.41 · 위 3.01 · 아래 2.83 · 왼쪽 위 3.30 (3배 폰 기준 약 3) |
+| Editor 안 화면 그리기 0 · 8 · 16 · 24초, 가운데 구름 교체 뒤 0 · 10 · 20초 | **PASS** — 위쪽 작은 구름(→)과 물결 구름(←)이 엇갈리고, 가운데 납작한 구름은 오른쪽으로 나가 왼쪽에서, 아래 구름은 왼쪽으로 나가 오른쪽에서 다시 들어온다. 구름이 합이오 글자와 겹치지 않는다 |
+| 바뀐 EditMode 검사 조건 미리 계산 | **PASS** — 모두 `Cloud…` 그림, 폭 ≤ 300, 선명도 ≥ 2.8, 잘림 없음, 글자 뒤, 위에서부터 방향 번갈아 |
+
+- **검사 변경 (NOT_RUN):** EditMode `AnimatedTitleSharesFourOriginalCloudsWithTheHomeStartPage` → `AnimatedTitleSharesFourCloudsWithTheHomeStartPage`(위 조건과 새 출발 위치).
+- **미실행:** Play에서 느낌, iPhone 실기기.
+
+## #471 로비 연결 끊김 뒤 핸들러 재등록·로비 표시 — 2026-11-04
+
+기준 main `035c5989`에서 `fix/#471-lobby-message-handler` 별도 worktree로 작업했다. 다른 작업이 쓰는 원래 체크아웃과 그 Editor는 건드리지 않았다. Unity 6000.6.5f1 macOS batch Editor(`unity test`)에서 확인했다.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| EditMode 전체 | **1857/1857 PASS** | 접속 규약·설정 257개 핀 포함 |
+| `LabMessageHandlerReconnectTests` (새 검사) | **PASS**, main 코드에서는 **FAIL** | Lab Scene Host 시작 → `Stop` 없이 NGO `Shutdown` → 다시 Host. 새 `CustomMessagingManager`에 `C6Lab.Packet.3`·`C6Lab.Bulk.1` 핸들러가 등록됨. main 코드에서는 목록이 비어 실패 |
+| `GameLobbyViewTests.ALobbyThatLosesItsConnectionLeavesLikeTheLeaveButtonAndShowsWhy` (새 검사) | **PASS**, main 코드에서는 **FAIL** | 저장 Home에서 Hapio Host 로비 → transport `Shutdown` → 방 목록(Home)·연결 해제·끊김 안내. main 코드에서는 안내 없이 화면만 바뀜 |
+| 로비·접속·흐름 PlayMode 묶음 | **89/90**, 재실행 **30/30 ×2 PASS** | `GameSceneFlowTests`·`GameLobbyViewTests`·`LabQuickConnectTests`·`LabLobbyPositionSelectionTests`·`LabFigmaLobbyTests`·`LabLocalBoardNetworkIntegrationTests`·`LabDeveloperSoloIntegrationTests`·새 검사. 첫 실행의 1건 실패는 `DevelopmentSoloButtonStarts…`의 `Server failed to bind`(검사가 고른 빈 포트를 다른 프로세스가 먼저 씀)이며, 자리 흐림 수정 뒤 로비 묶음 두 번 재실행에서 같은 검사가 통과했다. 재실행에 `GameSceneFlowTests` 등 나머지는 다시 돌리지 않았다 |
+
+게스트가 Host 로비를 받기 전 "방 정보를 받고 있소..." 표시와 빈 자리 흐림은 실제 게스트 연결이 필요해 자동 검사가 없다(코드 검토만). 두 기기 실제 접속(Mac 2프로세스 포함)·iOS 빌드·실기기 LAN/핫스팟에서의 방장 이탈·화면 잠금 재현은 **미실행**이다.
+
+## #447 main 병합 충돌 해결 — 2026-11-04
+
+- main `b50cded6`을 Stage 3 환경 브랜치에 병합했다. Battle Scene은 Stage 3 배경·스테이지별 바닥을 유지하고 main의 환경광·방향광 설정을 보존했다. 두 브랜치의 검증 기록을 모두 유지했다.
+- 정적 검사 통과: Scene 객체 ID 4,416개 중복 없음, 양쪽 Scene 대비 새로 누락된 로컬 fileID 참조 0개, Stage 3 override 유지, 양쪽 검증 기록의 순서·내용 보존, `git diff --check` 통과.
+- 이번 병합 결과에 대한 Unity 컴파일·EditMode·PlayMode·실기기 검사는 미실행이다.

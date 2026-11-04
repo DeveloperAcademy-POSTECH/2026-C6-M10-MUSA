@@ -108,11 +108,11 @@
 - 공유 설정 257개·인덱스는 그대로이며 #417 당시 묶음은 **5681/Lab42/Game26**이었다(현재 기준은 아래 #428). 6명을 거절하던 5680 앱과 혼용하지 않는다. 실행한 검사만 `docs/VALIDATION.md`에 기록하고 6대 실기기 시작은 별도로 확인한다.
 
 
-## #428 통신 패킷 봉투와 조합판 프레임 전송 — 최신 호환 기준
+## #428 통신 패킷 봉투와 조합판 프레임 전송
 
 - `LabNetworkPacket`에 메시지 본문을 타입 필드로 두지 않는다. JsonUtility는 null인 클래스 필드를 기본값 객체로 써서 모든 패킷이 그 타입의 사본을 실어 가므로, 행동 결과(`LabActionReceipt`)와 도색 프레임(`LabPaintFrame`)은 `payload` JSON 문자열로만 보내고 `LabPacketPayload.Encode/Decode`로 다룬다. `LabBulkPayload`도 같다. 값을 넣는 곳이 없던 `snapshot`·`boardFrame` 필드는 지웠다. 본문 없는 패킷은 약 1 KB다(측정 937 B, 검사 상한 1,100 B; 이전 4,189 B).
 - 승인된 행동 직후 `HandleBoardAction`이 보내는 조합판 프레임(`PublishOwnerBoards(..., skipEmpty: true)`)만 변경·제거 구슬이 없고 체크포인트가 아닌 수신자를 건너뛴다. 건너뛴 프레임은 순번을 소비하지 않는다(`PeekBoardSequence`/`CommitBoardSequence`). `PublishSnapshot`이 보내는 프레임(100 ms 타이머, 명중·시작·일시정지/재개·섬광 등 즉시 발행)과 5초 체크포인트는 그대로 전원에게 간다. 재개 스냅샷은 정지 중 헤더와 같은 serverTime을 가지므로 헤더 프레임을 생략하면 Guest가 다음 타이머 프레임까지 정지 상태로 남는다.
-- 공유 설정 257개·인덱스는 그대로이며 최신 묶음은 **5682/Lab43/Game27**이다. 이전 봉투 형식의 앱과 혼용하지 않는다. 실행한 검사와 패킷 크기 측정만 `docs/VALIDATION.md`에 기록한다.
+- 공유 설정 257개·인덱스는 그대로이며 #428 당시 묶음은 **5682/Lab43/Game27**이었다(현재 기준은 아래 #461). 이전 봉투 형식의 앱과 혼용하지 않는다. 실행한 검사와 패킷 크기 측정만 `docs/VALIDATION.md`에 기록한다.
 
 
 ## #431 iOS 목표 프레임레이트
@@ -137,3 +137,41 @@
 ## #439 Host 도색 발행 캡처 공유
 
 - Host의 피어별 `LabPaintPublisher`는 하나의 `LabPaintPublishCache`를 공유한다. 한 번의 발행(같은 epoch)에서 표면 복사·해시·인코딩은 한 번이며 피어별 발행자는 자기가 마지막으로 보낸 캡처를 기준으로 delta를 만든다. 캡처 키는 표면·epoch·Revision·PaintCount·VisualVersion·크기이므로 픽셀을 바꾸는 표면 경로는 계속 Revision을 올려야 한다. 프레임 바이트는 이전 구현과 같아야 하며 `LabPaintPublishCacheTests`의 main 참조 비교로 고정한다.
+
+## #444 도색 복제본 설치 API
+
+- Guest 도색 복제본은 `TryReplacePixels`(복사), `TryAdoptReplica`(호출자 배열 소유권 이전, 같은 크기·같은 기준 리비전의 복제본이면 바뀐 셀만 검사), `TryCopyReplicaFrom`(같은 크기면 기존 배열에 덮어씀)로 설치한다. 셋은 같은 셀 규칙과 `InstallReplica` 상태를 공유하며 실패 시 표면을 바꾸지 않는다. `TryAdoptReplica`에 넘긴 배열은 이후 호출자가 건드리지 않고, 바뀐 셀 목록 밖의 셀은 현재 지도와 같아야 한다.
+
+## #449 Guest 도색 수신 제자리 적용
+
+- `LabPaintReceiver`는 재사용 버퍼(해독 payload, 이중 버퍼 지도, 바뀐 셀 목록, SHA 청크)로 트랜잭션을 만들고 `TryAdoptReplica`로 설치한다. 셀 규칙·칠해진 셀 수 검사는 표면이 하며, 수신 결과(Applied/Rejected/NeedCheckpoint)는 이전 구현과 같아야 한다. 조각별 base64 해독은 마지막을 뺀 조각이 패딩·공백 없는 순수 base64일 때만 쓴다. `visualBytes == -1`의 스탬프 해시는 `VisualVersion`으로 캐시하므로 스탬프를 바꾸는 표면 경로는 계속 `VisualVersion`을 올려야 한다. `CopyPaintToDisplay`는 `TryCopyReplicaFrom`을 쓴다.
+
+## #451 Guest 공유 연출 시계
+
+- Guest 연출 시간은 `LabNetwork.BattlePresentationTime`(`LabGuestBattleClock`)이다. 스냅샷 객체가 아니라 세션·라운드·`serverTime`·정지 값으로 기준을 잡는다. 같은 라운드 안에서 0.5초 미만으로는 뒤로 가지 않고, 외삽은 최대 1초다. 1초 정체·정지·시작 대기는 `BattlePresentationHeld`로 음성·애니메이션이 멈춘다. 판정이나 Host로 보내는 값에 이 시계를 쓰지 않는다. 지귀 화면은 0.075초(`RewindToleranceSeconds`) 넘게 되감길 때만 새 스테이지로 본다.
+
+## #463 HUD·효과음의 공유 연출 시계
+
+- 전투 HUD·효과음(`LabGourdComboHud`·`LabGourdYokai`·`LabCharmHud`·`LabCharmBubbles`·`LabFeverTimeHud`·`LabYaguangFlashHud`·`LabBattleBgm`·`LabGumihoSound`·`LabYaguangSound`·`LabJigwiHud`)은 Host 시각을 따로 어림하지 않고 `network.BattlePresentationTime`을 읽는다. 새 연출 컴포넌트도 `serverTime + 실제 경과` 같은 자체 어림을 두지 않는다. 테스트용 `Present(snapshot, now)` 진입점은 그대로 둔다.
+
+## #454 매달린 박 렌더 보간
+
+- `LabHangingTarget`의 보간 자세는 URP 렌더 콜백(`beginContextRendering`~`endContextRendering`) 사이에서만 Transform에 있다. 그 밖의 모든 스크립트·물리·네트워크 처리는 고정 스텝 자세를 읽으므로 명중·도색 판정에 보간 자세를 쓰지 않는다. 박에 붙여 화면 위치를 계산하는 표시 전용 UI는 `LabHangingTarget.DrawnPoint`로 그려지는 위치를 얻는다. 판정과 같은 계산을 쓰는 지귀 B 불장막 틀은 고정 자세 그대로다.
+
+## #457 Guest 북 탭 선반영
+
+- Guest 북 탭의 `SpawnStarted`(소리·진동)는 `LabGenerationPrediction.Certain`이 참일 때만 승인 전에 올리고, 그 구슬은 크레딧으로 다시 울리지 않는다. 대기 수는 `localActions`에서 아직 답이 없는 요청만 센다(`actionRequests`는 라운드 동안 남는다). 보관 한도 판정에는 여우불·오색구슬 보상·양쪽 이웃·아이템 열기의 도착 여유를 둔다. 생성 판정·Host 규칙을 바꾸면 이 조건도 함께 맞춘다.
+
+## #459 Guest 내 투척 접촉 즉시 표현
+
+- Guest는 자기 투척의 시각 복제본 접촉(`LabProjectile.LaunchVisual`의 contact 콜백)으로 박 킥·명중 효과·타격음·진동 또는 빗나감 소리를 Host 판정 전에 한 번 낸다(`LabLocalHitPresentation`). Host `targetImpact`·`targetMiss`는 그 표현을 감쇠까지 고려해 보정하거나 되돌리며(`CorrectPredictedImpact`/`UndoPredictedImpact`), 판정이 없으면 전투 연출 시계로 시간이 지나면 되돌린다. 도색·피해·오색·막힘은 항상 Host 결과이고, 지귀 B 불장막·스테이지 불·legacy 불·공급 구슬 중에는 선반영하지 않는다. Host가 판정 패킷을 보내는 경우를 바꾸면 이 경로도 함께 확인한다.
+
+## #461 도색 페이로드 압축 — 최신 호환 기준
+
+- `LabPaintFrame.encoding`은 0 원본, 1 deflate다. Host의 피어별 발행자는 `LabPaintEncodingPolicy.Auto`(압축이 더 짧을 때만 1)를 쓰고, 기본 생성자는 `RawOnly`다. 해시·covered·`Revision`은 늘 풀어 놓은 지도 기준이다. 수신기는 헤더에서 정한 크기 상한(full `columns·rows·5 + 시각 바이트`, delta `columns·rows·7 + 시각 바이트`) 안에서만 풀고, 넘거나 깨지면 체크포인트를 요청한다. 빈 256×128 지도는 도색 프레임 1개(Bulk 2조각)다.
+- 공유 설정 257개·인덱스는 그대로이며 최신 묶음은 **5683/Lab44/Game28**이다. 이전 5682 앱과 혼용하지 않으며, 병합 뒤에는 모든 기기가 새 빌드를 써야 한다. 실행한 검사만 `docs/VALIDATION.md`에 기록한다.
+
+## #471 로비 연결 끊김 뒤 핸들러 재등록
+
+- `LabNetwork`는 패킷 핸들러를 등록한 `CustomMessagingManager` 인스턴스를 기억하고, NGO가 새 세션에서 새 인스턴스를 만들면 다시 등록한다. `Stop`을 거치지 않고 끝난 세션(방장 이탈·화면 잠김·Wi-Fi 끊김)이 다음 방의 패킷 수신을 막지 않아야 한다. 게임 흐름 게스트 끊김도 핸들러를 풀고 `C6_LAB_DISCONNECTED`를 남긴다.
+- Hapio Lobby에서 연결이 끊기면 `GameSession`이 나가기와 같은 `GoHome`(`network.Stop` 포함)으로 방 목록에 돌아가고 끊김 안내를 표시한다. 게스트가 Host 로비를 받기 전(`LobbyInfoPending`)에는 지난 방 인원·자리 대신 "방 정보를 받고 있소..."를 표시하고, 고를 수 없는 빈 자리는 흐리게 그린다. 자리 선택 규칙·접속 규약·설정 수·Scene/Prefab은 바꾸지 않는다.
