@@ -14,6 +14,31 @@ namespace C6Lab
         /// <summary>The story character on the player's left: the next seat, P3.</summary>
         public const ulong TutorialLeftSeatId = 0x7475_7400_0003UL;
         private bool tutorialSeats;
+        private readonly System.Collections.Generic.HashSet<LabOrbKind> tutorialPassKinds =
+            new System.Collections.Generic.HashSet<LabOrbKind>();
+
+        /// <summary>
+        /// Which kinds may cross a side edge to a story neighbor right now. Nothing else crosses: like a solo board, an orb
+        /// that reaches an edge bounces back. The tutorial opens only the kind its step passes (4단계: the drum).
+        /// </summary>
+        public void TutorialAllowPasses(params LabOrbKind[] kinds)
+        {
+            tutorialPassKinds.Clear();
+            if (kinds != null) foreach (LabOrbKind kind in kinds) tutorialPassKinds.Add(kind);
+        }
+
+        public bool TutorialPassAllowed(LabOrbKind kind) => tutorialSeats && tutorialPassKinds.Contains(kind);
+
+        /// <summary>Whether this edge crossing may go on to a story neighbor (false outside the tutorial).</summary>
+        private bool TutorialCrossingAllowed(string orbId)
+        {
+            if (!tutorialSeats || latest == null || string.IsNullOrEmpty(orbId)) return false;
+            foreach (LabOrbState drum in latest.drums ?? System.Array.Empty<LabOrbState>())
+                if (drum != null && drum.id == orbId) return TutorialPassAllowed(drum.kind);
+            foreach (LabOrbState orb in latest.orbs ?? System.Array.Empty<LabOrbState>())
+                if (orb != null && orb.id == orbId) return TutorialPassAllowed(orb.kind);
+            return false;
+        }
 
         /// <summary>This device's practice board with two virtual neighbors.</summary>
         public bool IsTutorial => tutorialSeats;
@@ -73,6 +98,33 @@ namespace C6Lab
             if (board != null) board.ExpectDrop(orb.id);
             PublishSnapshot(true);
             return true;
+        }
+
+        /// <summary>
+        /// A story neighbor passes <paramref name="orbId"/> back to me over our shared edge, entering at
+        /// <paramref name="height"/> (0..1) and sliding in at <paramref name="speed"/> board widths per second.
+        /// </summary>
+        public bool TutorialHandOver(ulong from, string orbId, float height, float speed)
+        {
+            if (!TutorialHostReady || !IsVirtualSeat(from)) return false;
+            if (!model.TutorialHandOver(from, orbId, LocalPlayerId, height, speed,
+                battleClock.Now(Time.realtimeSinceStartupAsDouble), out string reason))
+            {
+                Debug.LogWarning("C6_LAB_TUTORIAL_HAND_OVER_REFUSED " + reason);
+                return false;
+            }
+            PublishSnapshot(true);
+            return true;
+        }
+
+        /// <summary>A story neighbor makes an orb of its own and passes it to me (4단계: 금옥이의 양구슬).</summary>
+        public bool TutorialGiveFrom(ulong from, LabOrbKind kind, LabOrbElement element, float height, float speed)
+        {
+            if (!TutorialHostReady || !IsVirtualSeat(from)) return false;
+            double now = battleClock.Now(Time.realtimeSinceStartupAsDouble);
+            if (!model.TutorialDropOrb(from, kind, element, new Vector2(.5f, Mathf.Clamp01(height)), now, out LabOrbState made))
+                return false;
+            return TutorialHandOver(from, made.id, height, speed);
         }
 
         /// <summary>Hold or release the stamina refill, and show it at once.</summary>

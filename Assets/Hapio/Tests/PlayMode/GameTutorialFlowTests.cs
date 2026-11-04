@@ -132,6 +132,11 @@ namespace Hapio.Tests
             CollectionAssert.AreEqual(GameTutorialScript.DrumResults, network.Snapshot.orbs
                 .Where(orb => orb.owner == network.LocalPlayerId).OrderBy(orb => orb.createdAt).Select(orb => orb.kind).ToArray());
             Assert.That(LocalPlayer(network).stamina, Is.LessThan(network.config.GenerateCost), "Three taps empty the gauge.");
+            Assert.That(network.TutorialPassAllowed(LabOrbKind.Yin) || network.TutorialPassAllowed(LabOrbKind.Yang), Is.False,
+                "Nothing crosses to a neighbor while tapping.");
+            yield return new WaitForSecondsRealtime(1.5f);
+            Assert.That(network.Snapshot.orbs.Count(orb => orb.owner == network.LocalPlayerId), Is.EqualTo(3),
+                "All three orbs stay on my board (none slid over to 묵이 or 금옥이).");
             Assert.That(board.AllowedGestures, Is.EqualTo(LabBoardGestures.None), "No fourth tap.");
             yield return Until(() => director.CurrentBeat.IsLine, "\"오, 나온다 나와!\" after 성공!");
             yield return TapThrough(director, tap, art);
@@ -220,7 +225,31 @@ namespace Hapio.Tests
             yield return TapThrough(director, tap, art);
             Assert.That(director.CurrentBeat.Focus, Is.EqualTo(GameTutorialFocus.Progress), "Only the paint bar is lit.");
             yield return TapThrough(director, tap, art);
-            Assert.That(director.IsFinishing, Is.True, "3단계 is the last step for now.");
+
+            // 4단계: the drum goes to 묵이 by mistake and comes straight back, then right to 금옥이, who returns it with a yang.
+            Assert.That(director.StepIndex, Is.EqualTo(4));
+            yield return TapThrough(director, tap, art);
+            yield return TapThrough(director, tap, art);
+            Assert.That(director.CurrentBeat.Action, Is.EqualTo(GameTutorialAction.PassDrum));
+            Assert.That(board.AllowedGestures, Is.EqualTo(LabBoardGestures.DrumMove), "Only the drum moves.");
+            yield return FlickDrum(board, -1f);
+            yield return Until(() => director.WrongSidePasses == 1, "The drum reaches 묵이 on the left", 10f);
+            Assert.That(director.IsShowingRemark, Is.True, "\"이건 금옥이한테 줘.\"");
+            yield return Until(() => network.Snapshot.drums[0].owner == network.LocalPlayerId, "묵이 hands it straight back", 10f);
+            yield return new WaitForSecondsRealtime(1f);
+            Assert.That(director.IsWaitingForAction, Is.True, "Still waiting for the pass to 금옥이.");
+            yield return FlickDrum(board, 1f);
+            yield return Until(() => director.IsShowingMirror, "금옥이's mirror shows the drum arriving", 10f);
+            Assert.That(network.Snapshot.drums[0].owner, Is.EqualTo(LabNetwork.TutorialRightSeatId));
+            yield return Until(() => director.CurrentBeat.IsLine, "\"고마워!\" after the mirror", 10f);
+            yield return Until(() => network.Snapshot.drums[0].owner == network.LocalPlayerId
+                && network.Snapshot.orbs.Any(orb => orb.owner == network.LocalPlayerId && orb.kind == LabOrbKind.Yang),
+                "The yang and the drum come back", 10f);
+            Assert.That(network.Snapshot.orbs.Count(orb => orb.owner == network.LocalPlayerId && orb.kind == LabOrbKind.Yin),
+                Is.EqualTo(1), "The yin left from 2단계 is still there.");
+            yield return TapThrough(director, tap, art);
+            yield return TapThrough(director, tap, art);
+            Assert.That(director.IsFinishing, Is.True, "4단계 is the last step for now.");
             yield return Until(() => session.State.phase == GameFlowPhase.Home && !session.IsLoadingScene
                 && session.RoomBrowserVisible, "The tutorial leaves for the room list", 30f);
             Assert.That(session.IsTutorial, Is.False);
@@ -256,6 +285,21 @@ namespace Hapio.Tests
             tap.onClick.Invoke();
             Assert.That(director.IsFinishing || director.StepIndex != step || director.BeatIndex == beat + 1, Is.True,
                 "Tap moved on from step " + step + " beat " + beat);
+        }
+
+        /// <summary>Flick my drum hard toward one side (+1 right, -1 left) so it slides off that edge.</summary>
+        private static IEnumerator FlickDrum(LabOrbBoard board, float side)
+        {
+            LabOrbView drum = null;
+            yield return Until(() => (drum = Object.FindObjectsByType<LabOrbView>(FindObjectsSortMode.None)
+                .FirstOrDefault(view => view.Kind == LabOrbKind.Drum)) != null, "My drum is on the board");
+            yield return new WaitForSecondsRealtime(.5f);
+            Vector2 start = drum.transform.position;
+            var flick = new Vector2(side * 2f, 0f);
+            double began = Time.realtimeSinceStartupAsDouble;
+            Assert.That(board.TryBeginDragAtWorld(start, began), Is.True, "The drum can be picked up.");
+            board.DragToWorld(start + flick * .5f, began + .04d);
+            Assert.That(board.EndDragAtWorld(start + flick, began + .08d), Is.True);
         }
 
         private static LabPlayerState LocalPlayer(LabNetwork network) =>

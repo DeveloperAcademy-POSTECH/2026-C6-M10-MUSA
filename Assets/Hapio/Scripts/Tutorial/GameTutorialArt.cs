@@ -80,6 +80,26 @@ namespace Hapio
         [Tooltip("빗나갔을 때 \"다시 해 봐!\" 말풍선이 떠 있는 시간")] [Min(.3f)] public float remarkSeconds = 2f;
         [Tooltip("진행률 막대를 밝히는 곳을 막대보다 사방으로 얼마나 크게")] [Min(0f)] public float progressSpotlightPadding = 8f;
 
+        [Header("북에서 나오는 구슬 (1단계)")]
+        [Tooltip("세 구슬이 시안 자리보다 더 미끄러지는 거리 (판 너비 비율). 클수록 북에서 멀리 튀어나간다.")]
+        [Range(0f, .3f)] public float drumLaunchExtra = .06f;
+        [Tooltip("구슬 중심이 판 옆 끝에서 떨어져 멈추는 최소 거리 (판 너비 비율). 더 미끄러져도 이 안쪽에서 멈춘다.")]
+        [Range(.05f, .4f)] public float drumLaunchEdgeMargin = .1f;
+
+        [Header("금옥이 화면 미니 창 (4단계: 넘긴 북을 받는 모습)")]
+        [Tooltip("비워 두면 북 미니맵의 태극 북 그림을 쓴다")] public Sprite mirrorDrum;
+        public Vector2 mirrorSize = new Vector2(150f, 100f);
+        [Min(.5f)] public float mirrorSeconds = 1.8f;
+        public Color mirrorColor = new Color(.96f, .91f, .8f, 1f);
+        public Color mirrorBorderColor = new Color(.33f, .24f, .17f, 1f);
+        [Min(10f)] public float mirrorDrumSize = 46f;
+        [Min(10f)] public float mirrorFaceSize = 42f;
+
+        [Header("돌려주기 (4·5단계)")]
+        [Tooltip("\"고마워!\" 대사가 뜬 뒤 금옥이가 양구슬을 돌려줄 때까지")] [Min(0f)] public float giveBackDelay = .35f;
+        [Tooltip("양구슬 뒤 북이 돌아올 때까지")] [Min(0f)] public float giveBackGap = .35f;
+        [Tooltip("엉뚱한 쪽(묵이)으로 넘긴 북을 묵이가 돌려줄 때까지")] [Min(0f)] public float wrongSideReturnDelay = .8f;
+
         [Header("화살표 (끌어 놓을 방향)")]
         public Color arrowColor = new Color(.36f, .66f, .29f, 1f);
         [Min(1f)] public float arrowWidth = 7f;

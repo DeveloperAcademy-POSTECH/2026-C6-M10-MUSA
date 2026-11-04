@@ -2207,7 +2207,8 @@ namespace C6Lab
         private void OnEdgeCrossed(LabOrbEdgeCrossing edge)
         {
             if (latest == null || latest.phase != LabPhase.Playing || latest.paused) return;
-            if (developerSolo)
+            // The tutorial's practice board (#477) passes to its story neighbors only what its step passes.
+            if (developerSolo && !TutorialCrossingAllowed(edge.OrbId))
             {
                 // The single player has no neighbor. Restore the stopped edge orb immediately.
                 board.RejectEdge(edge.OrbId);
@@ -2843,6 +2844,7 @@ namespace C6Lab
             model = null;
             developerSolo = false;
             tutorialSeats = false;
+            tutorialPassKinds.Clear();
             latest = null;
             sessionId = null;
             configRevision = 0;

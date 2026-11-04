@@ -37,11 +37,21 @@ namespace Hapio
         /// 오행구슬을 위로 밀어 박에 맞힌다. 던지기만 열린다. 빗나가면 금옥이가 "다시 해 봐!"라고 하고 같은 구슬이
         /// 위에서 떨어져 다시 생긴다. 맞힐 때까지 기다린다.
         /// </summary>
-        ThrowOrb
+        ThrowOrb,
+        /// <summary>
+        /// 북을 오른쪽 끝으로 밀어 금옥이에게 넘긴다. 북 옮기기만 열린다. 왼쪽(묵이)으로 가면 묵이가 "이건 금옥이한테 줘."
+        /// 하고 바로 돌려준다. 금옥이가 받으면 금옥이 화면 미니 창에 북이 들어오는 모습이 뜬다.
+        /// </summary>
+        PassDrum
     }
 
     /// <summary>한 장면이 뜰 때 함께 보여 주는 연출.</summary>
-    public enum GameTutorialCue { None, StaminaShort }
+    public enum GameTutorialCue
+    {
+        None, StaminaShort,
+        /// <summary>금옥이가 만든 양구슬과 받은 북을 오른쪽에서 함께 돌려준다 (4단계).</summary>
+        GiveBack
+    }
 
     /// <summary>
     /// 튜토리얼 한 장면. 대사(Action None)는 말하는 사람 자리에서 말풍선으로 뜨고 화면을 누르면 넘어간다.
@@ -130,6 +140,34 @@ namespace Hapio
         });
 
         /// <summary>
+        /// How far from the drum's center a new orb starts, in board widths: the board begins its body just outside the
+        /// drum (drum radius + orb radius) so the two never start overlapped.
+        /// </summary>
+        public static float DrumClearance(float drumRadius, float orbRadius, float boardWidth) =>
+            boardWidth > 0f ? (UnityEngine.Mathf.Max(0f, drumRadius) + UnityEngine.Mathf.Max(0f, orbRadius)) / boardWidth : 0f;
+
+        /// <summary>The slide left for an orb to rest <paramref name="fromDrumCenter"/> away after leaving the drum's edge.</summary>
+        public static float SlideAfterDrum(float fromDrumCenter, float clearance) =>
+            UnityEngine.Mathf.Max(.01f, fromDrumCenter - UnityEngine.Mathf.Max(0f, clearance));
+
+        /// <summary>
+        /// The slide with <paramref name="extra"/> board widths more (so the orbs visibly fly out), but never so far that,
+        /// leaving a drum in the middle of the board at <paramref name="angleFromUp"/>, the orb's center comes nearer than
+        /// <paramref name="edgeMargin"/> to a side edge.
+        /// </summary>
+        public static float SlideAfterDrum(float fromDrumCenter, float clearance, float extra, float angleFromUp, float edgeMargin)
+        {
+            float slide = SlideAfterDrum(fromDrumCenter, clearance) + UnityEngine.Mathf.Max(0f, extra);
+            float side = UnityEngine.Mathf.Abs(UnityEngine.Mathf.Sin(angleFromUp * UnityEngine.Mathf.Deg2Rad));
+            if (side > .0001f)
+            {
+                float room = (.5f - UnityEngine.Mathf.Clamp(edgeMargin, 0f, .5f)) / side - UnityEngine.Mathf.Max(0f, clearance);
+                slide = UnityEngine.Mathf.Min(slide, UnityEngine.Mathf.Max(.01f, room));
+            }
+            return slide;
+        }
+
+        /// <summary>
         /// The launch that stops an orb <paramref name="distance"/> board widths away in that direction, when the floor
         /// slows it by <paramref name="deceleration"/> board widths per second²: speed² = 2 × deceleration × distance.
         /// </summary>
@@ -200,8 +238,27 @@ namespace Hapio
             Bul("맞았다! 박에 색이 묻었어!"),
             Geumok("박이 100% 칠해질 때까지\n계속 칠하면 돼!", GameTutorialFocus.Progress));
 
+        /// <summary>4단계에서 북을 왼쪽(묵이)으로 넘겼을 때 묵이가 하며 바로 돌려주는 말.</summary>
+        public const string WrongSideLine = "이건 금옥이한테 줘.";
+        public const GameTutorialSpeaker WrongSideSpeaker = GameTutorialSpeaker.Muk;
+        /// <summary>금옥이가 돌려주는 양구슬·북이 내 판 오른쪽 끝으로 들어오는 높이 (판 0..1).</summary>
+        public const float GiveBackYangHeight = .62f, GiveBackDrumHeight = .5f;
+        /// <summary>돌려받은 양구슬이 오른쪽 끝에서 미끄러져 들어와 멈추는 거리 (판 너비 비율).</summary>
+        public const float GiveBackSlide = .22f;
+
+        /// <summary>
+        /// 4단계 · 넘기기: 북은 몇 개 없어 같이 쓴다. 북을 오른쪽 끝으로 밀어 금옥이에게 넘기면, 금옥이가 고맙다며 자기가 만든
+        /// 양구슬과 북을 함께 돌려준다. 남은 음과 받은 양은 짝이 안 맞는 구슬을 친구에게 넘기는 이유가 된다.
+        /// </summary>
+        public static readonly GameTutorialStep Pass = new GameTutorialStep("4단계 · 넘기기",
+            Bul("나만 너무 열심히 하고 있는 거 아니야?"),
+            Geumok("북은 같이 써야 해.\n옆으로 밀면 넘어가."),
+            GameTutorialBeat.Do(GameTutorialAction.PassDrum, "북을 오른쪽 끝으로 밀어 금옥이에게 넘기시오", GameTutorialFocus.None),
+            Geumok("고마워!\n대신 내가 만든 거 줄게~", cue: GameTutorialCue.GiveBack),
+            Geumok("짝이 안 맞는 구슬은\n이렇게 친구한테 넘기면 돼."));
+
         /// <summary>순서대로 진행하는 단계들. 마지막 단계가 끝나면 어두워지며 방 목록으로 간다.</summary>
-        public static readonly IReadOnlyList<GameTutorialStep> Steps = Array.AsReadOnly(new[] { Goal, Drum, Combine, Throw });
+        public static readonly IReadOnlyList<GameTutorialStep> Steps = Array.AsReadOnly(new[] { Goal, Drum, Combine, Throw, Pass });
 
         /// <summary>
         /// The seat (P number - 1) each speaker sits in. A player's right neighbor is the previous seat and the left

@@ -62,6 +62,18 @@ namespace Hapio
         private bool listeningToThrows;
         private float remarkAt = -1f;
         private GameTutorialSpeaker remarkSpeaker;
+        private RectTransform mirror;
+        private CanvasGroup mirrorGroup;
+        private Image mirrorDrum;
+        private float mirrorAt = -1f;
+        private int giveBackStage;
+        private float giveBackAt = -1f;
+        private float wrongSideReturnAt = -1f;
+
+        /// <summary>How many times the drum went to 묵이 by mistake in 4단계 (each came straight back).</summary>
+        public int WrongSidePasses { get; private set; }
+        /// <summary>금옥이's mirror window is showing the drum arriving.</summary>
+        public bool IsShowingMirror => mirrorAt >= 0f && mirror != null && mirror.gameObject.activeSelf;
 
         /// <summary>How many throws missed in 3단계 (each gave the red orb back).</summary>
         public int ThrowMisses { get; private set; }
@@ -330,6 +342,7 @@ namespace Hapio
             speakerPortrait.enabled = false;
 
             BuildBanner();
+            BuildMirror();
             arrow = new GameObject("Guide Arrow", typeof(RectTransform), typeof(CanvasRenderer), typeof(GameTutorialArrow))
                 .GetComponent<GameTutorialArrow>();
             arrow.rectTransform.SetParent(overlay, false);
@@ -462,6 +475,7 @@ namespace Hapio
                 return;
             }
             if (finishing) return;
+            UpdateHandOvers();
             if (beatIndex < 0)
             {
                 if (!BattlePlayable()) { playableAt = -1f; return; }
@@ -508,6 +522,8 @@ namespace Hapio
             hand.color = Color.white;
             remarkAt = -1f;
             PlaceBanner(art.bannerTopFraction);
+            // Nothing crosses to a neighbor unless this beat passes it: an orb that reaches an edge bounces back.
+            session.Network.TutorialAllowPasses();
             dimTarget = beat.Focus == GameTutorialFocus.None ? 0f : 1f;
             if (beat.IsLine)
             {
@@ -515,6 +531,8 @@ namespace Hapio
                 tapCatcher.raycastTarget = true;
                 ShowBubble(beat.Speaker, beat.Text);
                 if (beat.Cue == GameTutorialCue.StaminaShort) session.Network.TutorialPlayStaminaShort();
+                // "고마워! 대신 내가 만든 거 줄게~": the yang, then the drum, slide back in from 금옥이's side.
+                if (beat.Cue == GameTutorialCue.GiveBack) { giveBackStage = 1; giveBackAt = Time.unscaledTime + art.giveBackDelay; }
                 return;
             }
             BeginAction(beat);
@@ -556,7 +574,7 @@ namespace Hapio
         {
             LabNetwork network = session.Network;
             bool playerActs = beat.Action == GameTutorialAction.TapDrum || beat.Action == GameTutorialAction.CombineOrbs
-                || beat.Action == GameTutorialAction.ThrowOrb;
+                || beat.Action == GameTutorialAction.ThrowOrb || beat.Action == GameTutorialAction.PassDrum;
             // The player's own action goes through to the board; waiting on the gauge still keeps the screen.
             tapCatcher.raycastTarget = !playerActs;
             if (!string.IsNullOrEmpty(beat.Text))
@@ -567,15 +585,21 @@ namespace Hapio
             switch (beat.Action)
             {
                 case GameTutorialAction.TapDrum:
-                    // Fixed kinds and fixed resting places (yin up-left, yang up-right, yin down-left).
+                    // Fixed kinds and fixed resting places (yin left, yang right, yin just above the yang). An orb
+                    // leaves from just outside the drum, so it slides only what is left after that clearance.
                     var results = new LabOrbKind[GameTutorialScript.DrumResults.Count];
                     var launches = new Vector2[results.Length];
-                    float slowing = network.config != null ? network.config.OrbFloorDeceleration : 0f;
+                    LabConfig tuning = network.config;
+                    float slowing = tuning != null ? tuning.OrbFloorDeceleration : 0f;
+                    float clearance = tuning != null ? GameTutorialScript.DrumClearance(tuning.DrumRadius, tuning.OrbRadius,
+                        board.AreaShape != null ? board.AreaShape.CenterBounds.width : 0f) : 0f;
                     for (int i = 0; i < results.Length; i++)
                     {
                         results[i] = GameTutorialScript.DrumResults[i];
                         (float angle, float distance) = GameTutorialScript.DrumLaunches[i];
-                        launches[i] = GameTutorialScript.LaunchVelocity(angle, distance, slowing);
+                        float slide = GameTutorialScript.SlideAfterDrum(distance, clearance, art.drumLaunchExtra, angle,
+                            art.drumLaunchEdgeMargin);
+                        launches[i] = GameTutorialScript.LaunchVelocity(angle, slide, slowing);
                     }
                     network.TutorialScriptGenerations(results, slowing > 0f ? launches : null);
                     actionBaseline = LocalPlayer()?.generatedTotal ?? 0;
@@ -591,6 +615,14 @@ namespace Hapio
                     actionBaseline = LocalPlayer()?.combinedTotal ?? 0;
                     // Only orbs move: the drum stays put and nothing is thrown yet.
                     board.SetAllowedGestures(LabBoardGestures.OrbMove);
+                    hand.gameObject.SetActive(art.hand != null);
+                    arrow.gameObject.SetActive(true);
+                    break;
+                case GameTutorialAction.PassDrum:
+                    // Only the drum moves now; tapping it makes nothing and orbs stay put. Only the drum may cross,
+                    // so an orb it bumps off the edge bounces back instead of reaching a neighbor.
+                    board.SetAllowedGestures(LabBoardGestures.DrumMove);
+                    network.TutorialAllowPasses(LabOrbKind.Drum);
                     hand.gameObject.SetActive(art.hand != null);
                     arrow.gameObject.SetActive(true);
                     break;
@@ -636,11 +668,160 @@ namespace Hapio
 
         private void OnDestroy() => ListenToThrows(false);
 
+        // ---------- 4단계: passing with the story neighbors ----------
+
+        /// <summary>Who holds the drum right now (0 when nobody is known).</summary>
+        private bool TryDrumOwner(out LabOrbState drum)
+        {
+            drum = null;
+            LabSnapshot snapshot = session.Network != null ? session.Network.Snapshot : null;
+            if (snapshot?.drums == null || snapshot.drums.Length == 0) return false;
+            drum = snapshot.drums[0];
+            return drum != null;
+        }
+
+        /// <summary>
+        /// The story neighbors' own hands: 금옥이 gives her yang and then the drum back after "고마워!", and 묵이 hands
+        /// back a drum that came to him by mistake. Runs whatever the beat, so a quick tap never strands the drum.
+        /// </summary>
+        private void UpdateHandOvers()
+        {
+            LabNetwork network = session.Network;
+            LabConfig config = network.config;
+            float slowing = config != null ? config.OrbFloorDeceleration : 2f;
+            float slide = GameTutorialScript.LaunchVelocity(90f, GameTutorialScript.GiveBackSlide, slowing).magnitude;
+            if (giveBackStage > 0 && Time.unscaledTime >= giveBackAt)
+            {
+                if (giveBackStage == 1)
+                {
+                    network.TutorialGiveFrom(LabNetwork.TutorialRightSeatId, LabOrbKind.Yang, LabOrbElement.None,
+                        GameTutorialScript.GiveBackYangHeight, slide);
+                    giveBackStage = 2;
+                    giveBackAt = Time.unscaledTime + art.giveBackGap;
+                }
+                else
+                {
+                    if (TryDrumOwner(out LabOrbState drum) && drum.owner == LabNetwork.TutorialRightSeatId)
+                        network.TutorialHandOver(LabNetwork.TutorialRightSeatId, drum.id, GameTutorialScript.GiveBackDrumHeight, slide);
+                    giveBackStage = 0;
+                }
+            }
+            if (wrongSideReturnAt >= 0f && Time.unscaledTime >= wrongSideReturnAt)
+            {
+                wrongSideReturnAt = -1f;
+                if (TryDrumOwner(out LabOrbState drum) && drum.owner == LabNetwork.TutorialLeftSeatId)
+                    network.TutorialHandOver(LabNetwork.TutorialLeftSeatId, drum.id, GameTutorialScript.GiveBackDrumHeight, slide);
+            }
+        }
+
+        private void BuildMirror()
+        {
+            mirror = new GameObject("Geumok Mirror", typeof(RectTransform), typeof(CanvasGroup), typeof(RectMask2D))
+                .GetComponent<RectTransform>();
+            mirror.SetParent(overlay, false);
+            Center(mirror);
+            mirror.sizeDelta = art.mirrorSize;
+            mirrorGroup = mirror.GetComponent<CanvasGroup>();
+            mirrorGroup.blocksRaycasts = mirrorGroup.interactable = false;
+            Image paper = AddImage("Her Board", mirror, art.mirrorColor, null, false);
+            Stretch(paper.rectTransform);
+            Outline border = paper.gameObject.AddComponent<Outline>();
+            border.effectColor = art.mirrorBorderColor;
+            border.effectDistance = new Vector2(2f, -2f);
+            LabDrumMinimap minimap = FindInBattle<LabDrumMinimap>();
+            mirrorDrum = AddImage("Arriving Drum", mirror, Color.white,
+                art.mirrorDrum != null ? art.mirrorDrum : minimap != null ? minimap.drumIconSprite : null, false);
+            mirrorDrum.preserveAspect = true;
+            mirrorDrum.rectTransform.sizeDelta = Vector2.one * art.mirrorDrumSize;
+            Image face = AddImage("Geumok", mirror, Color.white, art.geumok, false);
+            face.preserveAspect = true;
+            face.rectTransform.sizeDelta = Vector2.one * art.mirrorFaceSize;
+            face.rectTransform.anchoredPosition = new Vector2(art.mirrorSize.x * .5f - art.mirrorFaceSize * .45f,
+                -art.mirrorSize.y * .5f + art.mirrorFaceSize * .45f);
+            mirror.gameObject.SetActive(false);
+        }
+
+        /// <summary>
+        /// The mirror over one showing (t = 0..1): it slides in from the right edge, the drum slides into 금옥이's board
+        /// from its left and settles with a little overshoot, it holds, then slides back out. offset is 1 fully outside.
+        /// </summary>
+        public static void MirrorPose(float t, out float offset, out float alpha, out float drumTravel)
+        {
+            t = Mathf.Clamp01(t);
+            if (t < .15f)
+            {
+                float u = t / .15f;
+                offset = 1f - u * (2f - u);
+                alpha = u;
+                drumTravel = 0f;
+                return;
+            }
+            if (t < .85f)
+            {
+                offset = 0f;
+                alpha = 1f;
+                float v = Mathf.Clamp01((t - .15f) / .4f) - 1f;
+                const float back = 1.70158f;
+                drumTravel = 1f + (back + 1f) * v * v * v + back * v * v;
+                return;
+            }
+            float w = (t - .85f) / .15f;
+            offset = w * w;
+            alpha = 1f - w;
+            drumTravel = 1f;
+        }
+
+        private void PlaceMirror()
+        {
+            if (mirrorAt < 0f) return;
+            float t = (Time.unscaledTime - mirrorAt) / art.mirrorSeconds;
+            if (t >= 1f)
+            {
+                mirrorAt = -1f;
+                mirror.gameObject.SetActive(false);
+                return;
+            }
+            MirrorPose(t, out float offset, out float alpha, out float drumTravel);
+            Rect bounds = overlay.rect;
+            Vector2 size = art.mirrorSize;
+            // Just above 금옥이's face, against the right edge, like a rear-view glimpse of her screen.
+            float bottom = portraits[GameTutorialScript.SeatOf(GameTutorialSpeaker.Geumok)] != null
+                && TryOverlayRect(portraits[GameTutorialScript.SeatOf(GameTutorialSpeaker.Geumok)].rectTransform, out Rect face)
+                ? face.yMax + 6f : bounds.center.y;
+            float restX = bounds.xMax - art.screenMargin - size.x * .5f;
+            mirror.anchoredPosition = new Vector2(restX + offset * (size.x + art.screenMargin * 2f), bottom + size.y * .5f);
+            mirrorGroup.alpha = alpha;
+            float startX = -size.x * .5f - art.mirrorDrumSize * .5f;
+            mirrorDrum.rectTransform.anchoredPosition = new Vector2(Mathf.LerpUnclamped(startX, 0f, drumTravel), 0f);
+        }
+
+        /// <summary>4단계: the hand drags the drum to the right edge along the arrow, again and again.</summary>
+        private void PlacePassGuide()
+        {
+            bool shown = !board.IsHolding && TryDrumOwner(out LabOrbState drum) && drum.owner == session.Network.LocalPlayerId
+                && TryDrumCircle(out Vector2 from, out float radius);
+            arrow.gameObject.SetActive(shown);
+            hand.gameObject.SetActive(shown && art.hand != null);
+            if (!shown) return;
+            TryDrumCircle(out from, out radius);
+            Vector2 to = new Vector2(overlay.rect.xMax - art.screenMargin, from.y);
+            float start = radius + art.arrowGap;
+            arrow.Set(new Vector2(from.x + start, from.y), new Vector2(Mathf.Max(from.x + start, to.x), from.y),
+                art.arrowWidth, art.arrowHeadLength, art.arrowHeadWidth);
+            HandDrag((Time.unscaledTime - shownAt) / art.handDragSeconds, out float travel, out float press, out float alpha);
+            RectTransform rect = hand.rectTransform;
+            rect.anchoredPosition = Vector2.Lerp(from, to, travel) + art.handRestOffset * (1f - press);
+            rect.localScale = Vector3.one * Mathf.Lerp(1f, art.handPressScale, press);
+            hand.color = new Color(1f, 1f, 1f, alpha);
+        }
+
         private void UpdateAction(GameTutorialBeat beat)
         {
             if (actionDoneAt >= 0f)
             {
                 float wait = successAt >= 0f ? art.afterActionSeconds : art.afterRefillSeconds;
+                // The drum is seen arriving in 금옥이's mirror before she thanks.
+                if (beat.Action == GameTutorialAction.PassDrum) wait = Mathf.Max(wait, art.mirrorSeconds);
                 if (Time.unscaledTime - actionDoneAt >= wait) Advance();
                 return;
             }
@@ -677,6 +858,24 @@ namespace Hapio
                         CompleteAction(true);
                     }
                     break;
+                case GameTutorialAction.PassDrum:
+                    if (!TryDrumOwner(out LabOrbState drum)) break;
+                    if (drum.owner == LabNetwork.TutorialRightSeatId)
+                    {
+                        actionProgress = 1;
+                        CompleteAction(true);
+                        mirrorAt = Time.unscaledTime;
+                        mirror.gameObject.SetActive(true);
+                        PlaceMirror();
+                    }
+                    else if (drum.owner == LabNetwork.TutorialLeftSeatId && wrongSideReturnAt < 0f)
+                    {
+                        // Not this way: 묵이 sends it straight back, and the player tries again.
+                        WrongSidePasses++;
+                        ShowRemark(GameTutorialScript.WrongSideSpeaker, GameTutorialScript.WrongSideLine);
+                        wrongSideReturnAt = Time.unscaledTime + art.wrongSideReturnDelay;
+                    }
+                    break;
             }
         }
 
@@ -684,6 +883,7 @@ namespace Hapio
         {
             actionDoneAt = Time.unscaledTime;
             board.SetAllowedGestures(LabBoardGestures.None);
+            session.Network.TutorialAllowPasses();
             tapCatcher.raycastTarget = true;
             hand.gameObject.SetActive(false);
             arrow.gameObject.SetActive(false);
@@ -714,6 +914,7 @@ namespace Hapio
             finishing = true;
             ListenToThrows(false);
             board.SetAllowedGestures(LabBoardGestures.None);
+            session.Network.TutorialAllowPasses();
             tapCatcher.raycastTarget = true;
             bubbleRoot.gameObject.SetActive(false);
             banner.gameObject.SetActive(false);
@@ -761,10 +962,12 @@ namespace Hapio
             bool waiting = HasBeat && actionDoneAt < 0f;
             if (waiting && CurrentBeat.Action == GameTutorialAction.CombineOrbs) PlaceDragGuide();
             else if (waiting && CurrentBeat.Action == GameTutorialAction.ThrowOrb) PlaceThrowGuide();
+            else if (waiting && CurrentBeat.Action == GameTutorialAction.PassDrum) PlacePassGuide();
             else if (hand.gameObject.activeSelf) PlaceHand();
             dimGroup.alpha = Mathf.MoveTowards(dimGroup.alpha, dimTarget, Time.unscaledDeltaTime / art.dimFadeSeconds);
             if (HasBeat && CurrentBeat.Focus != GameTutorialFocus.None) PlaceSpotlight(CurrentBeat.Focus);
             speakerPortrait.enabled = line && dimGroup.alpha > .01f && speakerPortrait.sprite != null;
+            PlaceMirror();
         }
 
         private void PlaceBubble(GameTutorialSpeaker speaker)

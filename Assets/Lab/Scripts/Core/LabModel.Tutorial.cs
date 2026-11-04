@@ -146,6 +146,31 @@ namespace C6Lab
             return true;
         }
 
+        private uint tutorialHandOvers;
+
+        /// <summary>
+        /// 4·5·6단계: a story neighbor (a virtual seat) passes <paramref name="orbId"/> on to <paramref name="to"/>, its
+        /// next seat either way, as a real swipe over the shared edge would: through the same transfer, so a drum arrives
+        /// as drums do and a locked bomb loses a lock. It enters at <paramref name="height"/> (0..1) moving inward at
+        /// <paramref name="speed"/> board widths per second.
+        /// </summary>
+        public bool TutorialHandOver(ulong from, string orbId, ulong to, float height, float speed, double now,
+            out string reason)
+        {
+            reason = "NOT_NEIGHBORS";
+            if (phase != LabPhase.Playing || !players.TryGetValue(from, out LabPlayerState giver)
+                || !players.TryGetValue(to, out LabPlayerState taker) || from == to) return false;
+            bool right;
+            if (LabPlayerSlots.NeighborSeat(giver.seat, activeSeatCount, true) == taker.seat) right = true;
+            else if (LabPlayerSlots.NeighborSeat(giver.seat, activeSeatCount, false) == taker.seat) right = false;
+            else return false;
+            speed = Mathf.Clamp(speed, .01f, rules.MaximumMotionSpeed);
+            var edge = new Vector2(right ? 1f : 0f, Mathf.Clamp01(height));
+            var outward = new Vector2(right ? speed : -speed, 0f);
+            return TryTransferAt(from, orbId, right, edge, outward, "tutorial-hand-over-" + ++tutorialHandOvers, now,
+                LabEdgeCrossingKind.Swipe, out _, out reason);
+        }
+
         /// <summary>Scripted combinations still waiting.</summary>
         public int TutorialScriptedCombinationsLeft => tutorialCombinations.Count;
 

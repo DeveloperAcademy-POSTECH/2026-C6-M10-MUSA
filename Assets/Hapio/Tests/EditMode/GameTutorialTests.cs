@@ -222,6 +222,32 @@ namespace Hapio.Tests
         }
 
         [Test]
+        public void DrumOrbsSlideOnlyWhatIsLeftAfterLeavingTheDrumsEdge()
+        {
+            // A new orb starts just outside the drum (drum radius + orb radius), so its slide is shorter by that much.
+            float clearance = GameTutorialScript.DrumClearance(.6f, .32f, 4.6f);
+            Assert.That(clearance, Is.EqualTo(.2f).Within(1e-5f));
+            Assert.That(GameTutorialScript.SlideAfterDrum(.36f, clearance), Is.EqualTo(.16f).Within(1e-5f));
+            Assert.That(GameTutorialScript.SlideAfterDrum(.1f, clearance), Is.GreaterThan(0f), "Always a small push out.");
+            Assert.That(GameTutorialScript.DrumClearance(.6f, .32f, 0f), Is.EqualTo(0f), "No board yet: no clearance.");
+            // With a clearance like the saved layout's (about 0.16 of the board) every orb slides a little further for a
+            // livelier burst, yet the left yin stops at least 0.1 of the board inside the left edge.
+            const float layoutClearance = .164f, extra = .06f, margin = .1f;
+            foreach ((float angle, float distance) in GameTutorialScript.DrumLaunches)
+            {
+                float plain = GameTutorialScript.SlideAfterDrum(distance, layoutClearance);
+                float slide = GameTutorialScript.SlideAfterDrum(distance, layoutClearance, extra, angle, margin);
+                Assert.That(slide, Is.GreaterThan(plain), "Further than the plain slide at " + angle);
+                Assert.That(slide, Is.LessThanOrEqualTo(plain + extra + 1e-5f));
+                float restX = .5f + (layoutClearance + slide) * Mathf.Sin(angle * Mathf.Deg2Rad);
+                Assert.That(restX, Is.InRange(margin - 1e-4f, 1f - margin + 1e-4f), "Inside the sides at " + angle);
+            }
+            GameTutorialArt art = GameTutorialArt.Load();
+            Assert.That(art.drumLaunchExtra, Is.EqualTo(.06f));
+            Assert.That(art.drumLaunchEdgeMargin, Is.EqualTo(.1f));
+        }
+
+        [Test]
         public void PairLightIsTheSmallestCircleAroundBothOrbs()
         {
             GameTutorialDirector.PairCircle(new Vector2(0f, 0f), 1f, new Vector2(4f, 0f), 1f, out Vector2 center, out float radius);
@@ -346,6 +372,94 @@ namespace Hapio.Tests
         }
 
         [Test]
+        public void PassStepSendsTheDrumRightToGeumokWhoGivesItBackWithAYang()
+        {
+            GameTutorialStep pass = GameTutorialScript.Steps[4];
+            Assert.That(pass, Is.SameAs(GameTutorialScript.Pass));
+            GameTutorialBeat[] beats = pass.Beats.ToArray();
+            CollectionAssert.AreEqual(new[]
+            {
+                GameTutorialAction.None, GameTutorialAction.None, GameTutorialAction.PassDrum, GameTutorialAction.None,
+                GameTutorialAction.None
+            }, beats.Select(beat => beat.Action).ToArray());
+            CollectionAssert.AreEqual(new[]
+            {
+                "나만 너무 열심히 하고 있는 거 아니야?", "북은 같이 써야 해.\n옆으로 밀면 넘어가.",
+                "고마워!\n대신 내가 만든 거 줄게~", "짝이 안 맞는 구슬은\n이렇게 친구한테 넘기면 돼."
+            }, pass.Lines.Select(line => line.Text).ToArray());
+            CollectionAssert.AreEqual(new[]
+            {
+                GameTutorialSpeaker.Bul, GameTutorialSpeaker.Geumok, GameTutorialSpeaker.Geumok, GameTutorialSpeaker.Geumok
+            }, pass.Lines.Select(line => line.Speaker).ToArray());
+            Assert.That(beats[3].Cue, Is.EqualTo(GameTutorialCue.GiveBack), "\"고마워!\" gives the yang and the drum back.");
+            Assert.That(GameTutorialDirector.BannerText(beats[2], 0), Is.EqualTo("북을 오른쪽 끝으로 밀어 금옥이에게 넘기시오"));
+            Assert.That(GameTutorialScript.WrongSideLine, Is.EqualTo("이건 금옥이한테 줘."));
+            Assert.That(GameTutorialScript.WrongSideSpeaker, Is.EqualTo(GameTutorialSpeaker.Muk));
+        }
+
+        [Test]
+        public void StoryNeighborsHandTheDrumAndAYangBackOverTheSharedEdge()
+        {
+            using (var settings = new GameStageSettings(Resources.Load<LabConfig>("LabConfig"), GameStageCatalog.RequireDefault()))
+            {
+                LabConfig tutorial = settings.CreateTutorialConfig();
+                try
+                {
+                    const ulong me = 0UL;
+                    ulong geumok = LabNetwork.TutorialRightSeatId, muk = LabNetwork.TutorialLeftSeatId;
+                    var model = new LabModel();
+                    double now = 10d;
+                    model.Begin("tutorial-pass", new[] { geumok, me, muk }, now, tutorial, LabStageYokai.Gumiho);
+                    model.TutorialHandDrumsTo(me);
+                    string drum = model.Snapshot(now).drums[0].id;
+                    // I flick the drum off my right edge: it goes to 금옥이.
+                    now += .5d;
+                    Assert.That(model.TryTransferAt(me, drum, true, new Vector2(1f, .5f), new Vector2(1f, 0f), "pass-right", now,
+                        LabEdgeCrossingKind.Swipe, out _, out string why), Is.True, why);
+                    Assert.That(model.Snapshot(now).drums[0].owner, Is.EqualTo(geumok));
+                    // 금옥이 makes a yang and passes it back, then the drum: both enter at my right edge, sliding left.
+                    now += .5d;
+                    Assert.That(model.TutorialDropOrb(geumok, LabOrbKind.Yang, LabOrbElement.None, new Vector2(.5f, .62f), now,
+                        out LabOrbState yang), Is.True);
+                    Assert.That(model.TutorialHandOver(geumok, yang.id, me, .62f, 1f, now, out why), Is.True, why);
+                    Assert.That(model.TutorialHandOver(geumok, drum, me, .5f, 1f, now, out why), Is.True, why);
+                    LabSnapshot back = model.Snapshot(now);
+                    LabOrbState gotYang = back.orbs.Single(orb => orb.id == yang.id);
+                    Assert.That((gotYang.owner, gotYang.kind, gotYang.x), Is.EqualTo((me, LabOrbKind.Yang, 1f)));
+                    Assert.That(gotYang.vx, Is.LessThan(0f), "Slides in from the right.");
+                    Assert.That(back.drums[0].owner, Is.EqualTo(me));
+                    Assert.That(back.drums[0].x, Is.EqualTo(1f));
+                    // The wrong way: 묵이 hands the drum back from the left.
+                    now += .5d;
+                    Assert.That(model.TryTransferAt(me, drum, false, new Vector2(0f, .5f), new Vector2(-1f, 0f), "pass-left", now,
+                        LabEdgeCrossingKind.Swipe, out _, out why), Is.True, why);
+                    Assert.That(model.Snapshot(now).drums[0].owner, Is.EqualTo(muk));
+                    Assert.That(model.TutorialHandOver(muk, drum, me, .5f, 1f, now, out why), Is.True, why);
+                    LabOrbState fromMuk = model.Snapshot(now).drums[0];
+                    Assert.That((fromMuk.owner, fromMuk.x), Is.EqualTo((me, 0f)));
+                    Assert.That(fromMuk.vx, Is.GreaterThan(0f), "Slides in from the left.");
+                    Assert.That(model.TutorialHandOver(me, drum, me, .5f, 1f, now, out _), Is.False, "Not to oneself.");
+                }
+                finally { Object.DestroyImmediate(tutorial); }
+            }
+        }
+
+        [Test]
+        public void MirrorSlidesInShowsTheDrumArriveAndSlidesOut()
+        {
+            GameTutorialDirector.MirrorPose(0f, out float offset, out float alpha, out float drum);
+            Assert.That((offset, alpha, drum), Is.EqualTo((1f, 0f, 0f)), "Starts outside the right edge.");
+            GameTutorialDirector.MirrorPose(.15f, out offset, out alpha, out drum);
+            Assert.That((offset, alpha, drum), Is.EqualTo((0f, 1f, 0f)));
+            GameTutorialDirector.MirrorPose(.45f, out _, out _, out drum);
+            Assert.That(drum, Is.GreaterThan(1f), "Overshoots a little as it lands.");
+            GameTutorialDirector.MirrorPose(.7f, out offset, out _, out drum);
+            Assert.That((offset, drum), Is.EqualTo((0f, 1f)));
+            GameTutorialDirector.MirrorPose(1f, out offset, out alpha, out _);
+            Assert.That((offset, alpha), Is.EqualTo((1f, 0f)), "Gone again.");
+        }
+
+        [Test]
         public void SpeakersSitMukLeftBulMiddleGeumokRightByTheGamesNeighborRule()
         {
             // A player's right neighbor is the previous seat and the left one the next seat.
@@ -365,6 +479,8 @@ namespace Hapio.Tests
                 (2, "Battle Duration"), (10, "Orb Lifetime"), (45, "Item Lifetime"), (39, "Yin Chance"),
                 (40, "Yang Chance"), (41, "Relay Orb Chance"), (42, "Secret Box Chance"), (43, "Potion Chance"),
                 (44, "Bomb Chance"), (51, "Contact Combine"), (74, "Drum Count"), (76, "Drum Drift Speed"), (77, "Drum Drift Turning"),
+                (90, "Drum Stop Near From"), (91, "Drum Stop Near To"), (92, "Drum Stop Middle To"), (93, "Drum Stop Far To"),
+                (94, "Drum Stop Near Chance"), (95, "Drum Stop Middle Chance"), (96, "Drum Stop Far Chance"), (97, "Drum Pass Through Chance"),
                 (87, "Gourd Bomb Interval Min"), (88, "Gourd Bomb Interval Max"), (148, "Paint Drying"),
                 (152, "Swipe Block Interval"), (155, "Gourd Color Combo"), (184, "야광귀 섬광"),
                 (205, "Common Gimmick Interval"), (206, "Unique Gimmick Interval"), (207, "Gimmick Gourd Bomb"),

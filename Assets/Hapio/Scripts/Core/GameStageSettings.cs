@@ -150,6 +150,15 @@ namespace Hapio
             new KeyValuePair<int, float>(74, 1f),      // one drum for the three seats
             new KeyValuePair<int, float>(76, 0f),      // the drum does not wander
             new KeyValuePair<int, float>(77, 0f),
+            // A drum passed back always eases to the middle of the board, never passing through (4단계).
+            new KeyValuePair<int, float>(90, 20f),     // Drum Stop Near From
+            new KeyValuePair<int, float>(91, 48f),     // Near To / Middle From
+            new KeyValuePair<int, float>(92, 52f),     // Middle To / Far From
+            new KeyValuePair<int, float>(93, 80f),     // Far To
+            new KeyValuePair<int, float>(94, 0f),      // Near chance
+            new KeyValuePair<int, float>(95, 100f),    // Middle chance
+            new KeyValuePair<int, float>(96, 0f),      // Far chance
+            new KeyValuePair<int, float>(97, 0f),      // Pass-through chance
             new KeyValuePair<int, float>(87, 0f),      // no timed gourd bombs
             new KeyValuePair<int, float>(88, 0f),
             new KeyValuePair<int, float>(148, 0f),     // paint does not dry

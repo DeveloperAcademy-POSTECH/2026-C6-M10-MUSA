@@ -60,6 +60,18 @@ MonoBehaviour:
   throwBannerTopFraction: 0.47
   remarkSeconds: 2
   progressSpotlightPadding: 8
+  drumLaunchExtra: 0.06
+  drumLaunchEdgeMargin: 0.1
+  mirrorDrum: {fileID: 0}
+  mirrorSize: {x: 150, y: 100}
+  mirrorSeconds: 1.8
+  mirrorColor: {r: 0.96, g: 0.91, b: 0.8, a: 1}
+  mirrorBorderColor: {r: 0.33, g: 0.24, b: 0.17, a: 1}
+  mirrorDrumSize: 46
+  mirrorFaceSize: 42
+  giveBackDelay: 0.35
+  giveBackGap: 0.35
+  wrongSideReturnDelay: 0.8
   arrowColor: {r: 0.36, g: 0.66, b: 0.29, a: 1}
   arrowWidth: 7
   arrowHeadLength: 18
