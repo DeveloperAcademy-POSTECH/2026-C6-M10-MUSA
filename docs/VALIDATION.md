@@ -4711,6 +4711,8 @@ Metal 파이프라인(PSO)이 실제로 준비 구간에서 만들어지는지�
 
 ## #492 현재 스테이지 효과음·피버곡·지귀 보상 불꽃 미리 로드 — 2026-11-04
 
+## #493 지귀 화면 오버레이를 지귀 스테이지에서만 로드 — 2026-11-04
+
 기준 main `76d71b78`에서 Unity 6000.6.5f1 macOS batch Editor로 확인했다.
 
 **변경**
@@ -4730,3 +4732,16 @@ Metal 파이프라인(PSO)이 실제로 준비 구간에서 만들어지는지�
 Editor 로그 `C6_AUDIO_WARMUP`: 첫 전투는 32개를 약 70~80 ms에, 같은 실행의 다음 전투는 4개를 약 45 ms에 읽었다. Editor 수치다.
 
 **미실행:** iPhone에서 첫 탭·명중·폭탄·지귀 5초 프레임 시간, 오디오 상주 메모리 실측.
+
+- `LabJigwiHud.Bind`·`Start`는 이제 Hapio 게임 흐름의 지귀 스테이지에서만 오버레이(`Jigwi/ScreenOverlay` 프리팹과 큰 텍스처)를 미리 만든다.
+- Lab 단판(게임 흐름 OFF)은 기존대로 만든다.
+- 지귀 A/B가 켜진 스냅샷에서 만드는 기존 LateUpdate 안전망은 그대로 둔다.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| EditMode 전체 | **1866/1866 PASS** | 새 `LabJigwiOverlayStagePolicyTests` 포함 |
+| `GameJigwiStageIntegrationTests`(단언 추가) | **PASS** | 1·2스테이지 Playing에 오버레이 0개. 3스테이지는 첫 라운드 스냅샷보다 먼저 오버레이 1개가 있어야 한다(LateUpdate 안전망은 스냅샷이 있어야 만들므로 미리 만들었음을 구분). 프레임 기록에서 Battle 바인딩 4프레임 뒤, 스냅샷이 없을 때 생성됐다 |
+| 같은 검사의 반대 확인 | 게이트 항상 참 → **FAIL**, 지귀도 막기(안전망만) → **FAIL** | 각각 1스테이지에 오버레이가 있어서, 3스테이지에서 스냅샷이 먼저 와서 실패한다. 검사가 두 경우를 구분함을 확인했다 |
+| 지귀·게임 흐름 PlayMode | **66/67** → 위 검사 대기 조건 수정 뒤 해당 검사 단독 **1/1 PASS** | `LabJigwiABPresentationTests`·`LabJigwiGroupFireAudioTests`·`LabJigwiWaterTrailTests`·`LabJigwiStagePresentationTests`·`GameSceneFlowTests`. 실패 1건은 새 단언이 `IsLoadingScene`(준비 구간 전체가 true)을 기다리던 검사 문장 문제였다 |
+
+**미실행:** iPhone 1·2스테이지 로딩 시간·메모리 실측.
