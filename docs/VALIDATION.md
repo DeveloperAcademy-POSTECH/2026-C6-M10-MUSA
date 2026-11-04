@@ -4671,9 +4671,9 @@ Metal 파이프라인(PSO)이 실제로 준비 구간에서 만들어지는지�
 | 확인 | 이번 결과 | 범위 |
 | --- | --- | --- |
 | EditMode 전체 | **1865/1865 PASS** | `GameStageBackgroundAssetTests`에 세 스테이지 모두 studio PNG와 저장 재질 `_BaseMap`이 같은지 검사를 추가했다 |
-| 실제 전투 캡처(DEV 솔로 1→2→3스테이지, 임시 검사·커밋 안 함) | 바닥·조합판 뒤가 1 `Stage01_Ground_SandBeige`, 2 **`Stage02_Ground_Yagwanggwi`**, 3 `Stage03_Ground_Jigwi` | 수정 전 main에서 2스테이지는 `HanjiSand_BaseColor`였고, 플레이할 때마다 Editor가 재질의 `_MainTex`를 HanjiSand로 덮었다. 수정 뒤에는 플레이해도 재질 파일이 바뀌지 않는다 |
+| 실제 전투 캡처(DEV 솔로 1→2→3스테이지, 임시 검사·커밋 안 함) | 바닥·조합판 뒤가 1 **`Stage01_Ground_BlushBeige`**, 2 **`Stage02_Ground_Yagwanggwi`**, 3 `Stage03_Ground_Jigwi` | 수정 전 main에서 2스테이지는 `HanjiSand_BaseColor`였고, 플레이할 때마다 Editor가 재질의 `_MainTex`를 HanjiSand로 덮었다. 수정 뒤에는 플레이해도 재질 파일이 바뀌지 않는다 |
 | PlayMode `GameSceneFlowTests`·`GameLobbyViewTests` | **34/34 PASS** | |
 
-**남은 사항:** 이 문서는 1스테이지 바닥이 후속 미술 수정으로 `Stage01_Ground_BlushBeige`가 됐다고 하지만, 실제로는 `Stage01_Ground_SandBeige`다. 결정이 필요해 바꾸지 않았다.
+**1스테이지:** 문서의 후속 미술 수정대로 `Stage01_Ground_BlushBeige`로 바꿨다. 그동안 실제로 적용돼 있던 것은 `Stage01_Ground_SandBeige`였다. 바꾼 곳은 기본 `Background Studio`의 `groundPng`·`boardBackgroundPng`와 Stage01 `YokaiGround`·`YokaiBacking`의 `_BaseMap`·`_MainTex`이며, 같은 Unity API 방식으로 했다(Scene 2줄, 재질 4줄). 사용자가 세 후보 이미지를 직접 보고 결정했다.
 
 **미실행:** iPhone 화면 확인.
