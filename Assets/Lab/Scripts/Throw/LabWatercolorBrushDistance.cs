@@ -15,6 +15,11 @@ namespace C6Lab
             if (source == null) throw new ArgumentNullException(nameof(source));
             if (!source.isReadable || source.width < 2 || source.height < 2)
                 throw new ArgumentException("A readable brush of at least 2 by 2 pixels is required.", nameof(source));
+            using (LabFirstUse.Measure(LabFirstUseKind.BrushDistance)) return Build(source);
+        }
+
+        private static Texture2D Build(Texture2D source)
+        {
             int w = source.width, h = source.height;
             Color32[] pixels = source.GetPixels32();
             var distances = new float[pixels.Length];

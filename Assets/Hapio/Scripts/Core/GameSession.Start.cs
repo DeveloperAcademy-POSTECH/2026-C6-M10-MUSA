@@ -13,6 +13,10 @@ namespace Hapio
         private double nextInitialReadyAt, nextCountdownReadyAt, nextCountdownCommitAt;
         private double countdownLeadSeconds = 1d;
         private bool countdownCommitted;
+        private GameFrameSpikeProbe frameProbe;
+
+        /// <summary>The Development/Editor battle frame probe (#481); null in a release player.</summary>
+        public GameFrameSpikeProbe FrameProbe => frameProbe;
 
         public bool IsPreparingBattle => state.phase == GameFlowPhase.LoadingBattle
             || state.phase == GameFlowPhase.SynchronizingBattle || state.phase == GameFlowPhase.Countdown;
@@ -144,7 +148,11 @@ namespace Hapio
                         // Reserve more lead time rather than ever starting with a missing schedule receipt.
                         countdownLeadSeconds = Math.Min(5d, countdownLeadSeconds * 2d);
                         if (hostFlow.RescheduleCountdown(state.runId, state.stageIndex, state.revision,
-                            ReserveStartAt(countdownNow))) SetHostState();
+                            ReserveStartAt(countdownNow)))
+                        {
+                            if (frameProbe != null) frameProbe.CountdownRescheduled();
+                            SetHostState();
+                        }
                     }
                     else if (hostFlow.IsCountdownReady)
                     {

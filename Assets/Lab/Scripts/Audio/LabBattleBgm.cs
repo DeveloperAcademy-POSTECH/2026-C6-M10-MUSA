@@ -132,7 +132,7 @@ namespace C6Lab
                 feverSource.Stop();
                 feverSource.clip = clip;
                 feverSource.time = Mathf.Clamp((float)elapsed, 0f, Mathf.Max(0f, clip.length - .05f));
-                feverSource.Play();
+                using (LabFirstUse.Measure(LabFirstUseKind.FeverMusic)) feverSource.Play();
                 if (elapsed < CueWindowSeconds) PlayFeverCue();
             }
             else if (!fever && feverOn) StopFever();
@@ -217,7 +217,8 @@ namespace C6Lab
                     source.clip = gumihoBgm ? stageClip : yaguangBgm ? yaguangClip : battleClip;
                     source.volume = TargetVolume;
                     source.time = 0f;
-                    if (!snapshot.paused && source.clip != null) source.Play();
+                    if (!snapshot.paused && source.clip != null)
+                        using (LabFirstUse.Measure(LabFirstUseKind.BattleMusic)) source.Play();
                     return;
                 }
                 // 야광귀 새 BGM 후보 (#396): 전투 중에 Inspector 토글을 바꾸면 바로 다른 곡으로 처음부터 바꿔 들려준다.

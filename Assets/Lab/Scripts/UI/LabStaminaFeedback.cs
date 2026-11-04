@@ -157,7 +157,9 @@ namespace C6Lab
             if (personal)
             {
                 rim.Configure(FireFillFraction, fireAge, Profile.BorderWidthRatio, Profile.FireOpacity);
-                if (fireArt == null) fireArt = Resources.Load<LabJigwiRewardFireProfile>(LabJigwiRewardFireProfile.ResourcesPath);
+                if (fireArt == null)
+                    using (LabFirstUse.Measure(LabFirstUseKind.RewardFire))
+                        fireArt = Resources.Load<LabJigwiRewardFireProfile>(LabJigwiRewardFireProfile.ResourcesPath);
                 Texture2D texture = Profile.FlameAtlas != null ? Profile.FlameAtlas : fireArt != null ? fireArt.FlameTexture : null;
                 flames.Configure(texture, FireFillFraction, fireAge, Profile.FlameHeightRatio,
                     Profile.AnimationFps, Profile.FireOpacity);
