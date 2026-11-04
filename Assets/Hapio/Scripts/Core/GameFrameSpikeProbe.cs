@@ -59,13 +59,12 @@ namespace Hapio
         private int pendingUses;
         private string runId = string.Empty, yokai = string.Empty;
         private int stageIndex;
+        private double lastStartsAt;
 
         public int SpikeCount => spikeCount;
         public int FlushCount { get; private set; }
 
         public void Bind(GameSession owner) => session = owner;
-
-        public void CountdownRescheduled() { if (recording) reschedules++; }
 
         private void LateUpdate()
         {
@@ -75,10 +74,24 @@ namespace Hapio
             // This frame's delta is the previous frame's cost: pair it with what that frame recorded.
             if (pendingValid && recording) Record(Time.unscaledDeltaTime * 1000f, now);
             bool battle = state != null && GameFrameSpikePolicy.IsBattle(state.phase);
+            // A new load is a new attempt even for the same stage (a DEV restart goes Playing → LoadingBattle).
+            bool reload = state != null && state.phase == GameFlowPhase.LoadingBattle && pendingPhase != GameFlowPhase.LoadingBattle;
+            bool flushed = false;
             if (battle && !recording) Begin(state, now);
-            else if (recording && (!battle || state.runId != runId || state.stageIndex != stageIndex)) Flush(now, battle ? state : null);
-            if (recording && state.phase != pendingPhase) EnterPhase(state.phase, now);
-            pendingValid = recording;
+            else if (recording && (!battle || reload || state.runId != runId || state.stageIndex != stageIndex))
+            {
+                Flush(now, battle ? state : null);
+                flushed = true;
+            }
+            if (recording && !flushed && state.phase != pendingPhase) EnterPhase(state.phase, now);
+            // Host and Guest alike: the Host only ever moves a committed start later.
+            if (recording && state.phase == GameFlowPhase.Countdown)
+            {
+                if (pendingPhase == GameFlowPhase.Countdown && state.battleStartsAt > lastStartsAt) reschedules++;
+                lastStartsAt = state.battleStartsAt;
+            }
+            // The frame that logged a flush is the probe's own cost, never the next stage's first sample.
+            pendingValid = recording && !flushed;
             pendingPhase = state != null ? state.phase : GameFlowPhase.Home;
             pendingHeld = session.Network != null && session.Network.GameStartHeld;
             pendingUses = LabFirstUse.FlagsFor(Time.frameCount);
@@ -95,6 +108,8 @@ namespace Hapio
             loadingSeconds = syncSeconds = countdownSeconds = 0d;
             phaseStartedAt = now;
             playingStartedAt = state.phase == GameFlowPhase.Playing ? now : double.NaN;
+            lastStartsAt = state.battleStartsAt;
+            pendingPhase = state.phase;
         }
 
         private void EnterPhase(GameFlowPhase next, double now)
@@ -152,7 +167,7 @@ namespace Hapio
                 .Append(" spikes=").Append(spikeCount).Append(" dropped=").Append(droppedSpikes).ToString());
             FlushCount++;
             recording = false;
-            if (next != null) Begin(next, now);
+            if (next != null) Begin(next, Time.realtimeSinceStartupAsDouble);
         }
 
         private static void Log(string line) => Debug.LogFormat(LogType.Log, LogOption.NoStacktrace, null, "{0}", line);

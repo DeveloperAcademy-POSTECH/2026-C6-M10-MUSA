@@ -148,11 +148,7 @@ namespace Hapio
                         // Reserve more lead time rather than ever starting with a missing schedule receipt.
                         countdownLeadSeconds = Math.Min(5d, countdownLeadSeconds * 2d);
                         if (hostFlow.RescheduleCountdown(state.runId, state.stageIndex, state.revision,
-                            ReserveStartAt(countdownNow)))
-                        {
-                            if (frameProbe != null) frameProbe.CountdownRescheduled();
-                            SetHostState();
-                        }
+                            ReserveStartAt(countdownNow))) SetHostState();
                     }
                     else if (hostFlow.IsCountdownReady)
                     {
