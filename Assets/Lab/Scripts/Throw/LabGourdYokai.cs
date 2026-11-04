@@ -17,6 +17,8 @@ namespace C6Lab
     /// 잠시 뒤 들어간다(섬광을 누가 맞든 박은 모두에게 보인다). 시각은 Host 스냅샷(`flashWarningAt`/`flashAt`/`flashLastAt`)이다.
     /// 섬광 흔들어 풀기(#301)가 켜져 있으면 한 명이라도 눈부신 동안 계속 나와 두리번거리고(모든 기기, Host 시각 기준),
     /// 누군가 폰을 흔들어 풀 때마다 어지러운 듯 움찔한다.
+    /// 클립 안의 시각·움찔 대상·들썩임은 <see cref="LabGourdYokaiProfile"/>에서 읽는다(#507). 프로필이 없으면 흰 박의
+    /// 기존 상수(<see cref="LabGourdYokaiProfile.Legacy"/>)이며, 트리거는 모델과 무관하게 같다.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class LabGourdYokai : MonoBehaviour
@@ -44,12 +46,18 @@ namespace C6Lab
         [Tooltip("야광귀 섬광(#268)이 번쩍인 뒤 요괴가 더 나와 있는 시간 (초). 그 뒤 들어간다.")]
         [SerializeField, Min(0f)] private float flashStaySeconds = .6f;
 
-        private const float EyeAngle = 24f;
+        /// <summary>흰 박의 두리번 눈 각도 (도)</summary>
+        public const float LegacyEyeAngle = 24f;
+        /// <summary>흰 박에서 움찔·튀어나오는 대상 (Animation 기준 경로)</summary>
+        public const string LegacyBodyPath = "YokaiRoot";
+        /// <summary>흰 박의 들썩임. YokaiRoot 기준 (부모가 162배라 화면에서는 약 0.1)</summary>
+        public const float LegacyHop = .0006f;
         private const float FlinchSquash = .16f;
         private const float PopStretch = .22f;
-        private const float FlinchHop = .0006f; // YokaiRoot 기준 (부모가 162배라 화면에서는 약 0.1)
 
         private LabNetwork network;
+        private LabGourdYokaiProfile profile;
+        private Animation configuredPlayer;
         private Animation clipPlayer;
         private AnimationState state;
         private Transform yokai;
@@ -83,8 +91,26 @@ namespace C6Lab
         public float BombSecondsLeft => bombLeft;
         public float BombShowSeconds => bombShowSeconds;
         /// <summary>지금 애니메이션 시각 (0~6초)</summary>
-        public float ClipTime => state != null ? Mathf.Repeat(state.time, ClipLength) : 0f;
+        public float ClipTime => state != null ? Mathf.Repeat(state.time, P.clipLength) : 0f;
         public bool Ready => ready;
+        /// <summary>쓰고 있는 시간표. 지정하지 않았으면 흰 박의 기존 상수다.</summary>
+        public LabGourdYokaiProfile Profile => P;
+        private LabGourdYokaiProfile P => profile != null ? profile : LabGourdYokaiProfile.Legacy;
+
+        /// <summary>
+        /// 박 모델 계약(#507)의 요괴 Animation과 시간표를 쓴다. null이면 자식에서 찾은 Animation·흰 박 시간표다.
+        /// 바꾸면 처음부터 다시 준비한다.
+        /// </summary>
+        public void Configure(Animation animation, LabGourdYokaiProfile timeline)
+        {
+            if (ready && holding) Release();
+            if (ready && yokai != null) yokai.localScale = yokaiScale;
+            configuredPlayer = animation;
+            profile = timeline;
+            ready = false;
+            flinchElapsed = -1f;
+            EnsureReady();
+        }
 
         public void Bind(LabNetwork target)
         {
@@ -121,13 +147,14 @@ namespace C6Lab
         private bool EnsureReady()
         {
             if (ready) return true;
-            clipPlayer = GetComponentInChildren<Animation>(true);
+            clipPlayer = configuredPlayer != null ? configuredPlayer : GetComponentInChildren<Animation>(true);
             if (clipPlayer == null || clipPlayer.clip == null) return false;
             state = clipPlayer[clipPlayer.clip.name];
-            yokai = clipPlayer.transform.Find("YokaiRoot");
+            yokai = clipPlayer.transform.Find(P.bodyPath);
             if (state == null || yokai == null) return false;
             yokaiScale = yokai.localScale;
             ready = true;
+            if (!P.idleLoop) RestClosed();
             return true;
         }
 
@@ -171,14 +198,28 @@ namespace C6Lab
                 StepHeld(deltaTime * (combo ? 1f : bombRiseSpeed), deltaTime);
                 state.time = cursor;
                 clipPlayer.Sample();
-                if (popPending && !rewinding && cursor >= RisenAt)
+                if (popPending && !rewinding && cursor >= P.risenAt)
                 {
                     popPending = false;
                     StartEffect(1f, PopSeconds);
                 }
             }
-            else popPending = false;
+            else
+            {
+                popPending = false;
+                if (!P.idleLoop && state.speed > 0f && state.time >= P.lidClosedAt) RestClosed();
+            }
             ApplyFlinch(deltaTime);
+        }
+
+        /// <summary>평소 반복이 없는 모델(#507): 뚜껑이 닫힌 시각에 멈춰 둔다.</summary>
+        private void RestClosed()
+        {
+            state.enabled = true;
+            state.weight = 1f;
+            state.speed = 0f;
+            state.time = P.lidClosedAt;
+            clipPlayer.Sample();
         }
 
         /// <summary>예고 중이거나 콤보가 진행 중이면 true (전투 중일 때만)</summary>
@@ -246,30 +287,31 @@ namespace C6Lab
         private void Hold()
         {
             holding = true;
+            LabGourdYokaiProfile p = P;
             float t = ClipTime;
             lookDirection = 1f;
             rewinding = false;
-            if (t <= LookTo) cursor = t; // 닫힘 · 올라오는 중 · 두리번 앞부분: 그대로 이어서
-            else if (t <= EyesBackAt)
+            if (t <= p.lookTo) cursor = t; // 닫힘 · 올라오는 중 · 두리번 앞부분: 그대로 이어서
+            else if (t <= p.eyesBackAt)
             {
                 // 눈이 오른쪽에서 가운데로 돌아오는 중: 두리번 구간에서 눈 각도가 같은 곳으로, 왼쪽을 향해.
-                float eye = -EyeAngle * (1f - Smooth((t - LookTo) / (EyesBackAt - LookTo)));
-                cursor = LookFrom + (LookTo - LookFrom) * InverseSmooth((EyeAngle - eye) / (2f * EyeAngle));
+                float eye = -p.eyeAngle * (1f - Smooth((t - p.lookTo) / (p.eyesBackAt - p.lookTo)));
+                cursor = p.lookFrom + (p.lookTo - p.lookFrom) * InverseSmooth((p.eyeAngle - eye) / (2f * p.eyeAngle));
                 lookDirection = -1f;
             }
-            else if (t <= SinkFrom)
+            else if (t <= p.sinkFrom)
             {
-                cursor = (LookFrom + LookTo) * .5f; // 다 올라와 정면을 봄
+                cursor = (p.lookFrom + p.lookTo) * .5f; // 다 올라와 정면을 봄
                 lookDirection = -1f;
             }
-            else if (t <= LidClosedAt)
+            else if (t <= p.lidClosedAt)
             {
                 // 내려가는 중이거나 뚜껑이 닫히는 중: 그 자리에서 애니메이션을 거꾸로 돌려 다시 올라온다.
                 // 3.8초(다 올라옴 · 정면 · 뚜껑 열림)에 닿으면 모습이 같은 두리번 가운데(2.4초)로 이어진다.
                 cursor = t;
                 rewinding = true;
             }
-            else cursor = LidOpensAt; // 닫혀 있음 → 바로 열리기 시작
+            else cursor = p.lidOpensAt; // 닫혀 있음 → 바로 열리기 시작
             state.speed = 0f;
             state.enabled = true;
             state.weight = 1f;
@@ -296,26 +338,27 @@ namespace C6Lab
         /// <summary>올라오는(되감는) 동안은 riseTime, 다 올라와 두리번거리는 동안은 lookTime만큼 진행한다.</summary>
         private void StepHeld(float riseTime, float lookTime)
         {
+            LabGourdYokaiProfile p = P;
             float deltaTime = riseTime;
             if (rewinding)
             {
                 cursor -= deltaTime;
-                if (cursor > SinkFrom) return;
+                if (cursor > p.sinkFrom) return;
                 rewinding = false;
-                cursor = (LookFrom + LookTo) * .5f;
+                cursor = (p.lookFrom + p.lookTo) * .5f;
                 lookDirection = -1f;
                 return;
             }
-            if (cursor < LookFrom)
+            if (cursor < p.lookFrom)
             {
-                cursor = Mathf.Min(LookFrom, cursor + deltaTime);
+                cursor = Mathf.Min(p.lookFrom, cursor + deltaTime);
                 return;
             }
             deltaTime = lookTime;
             cursor += deltaTime * lookDirection;
-            if (cursor >= LookTo) { cursor = LookTo - (cursor - LookTo); lookDirection = -1f; }
-            if (cursor <= LookFrom) { cursor = LookFrom + (LookFrom - cursor); lookDirection = 1f; }
-            cursor = Mathf.Clamp(cursor, LookFrom, LookTo);
+            if (cursor >= p.lookTo) { cursor = p.lookTo - (cursor - p.lookTo); lookDirection = -1f; }
+            if (cursor <= p.lookFrom) { cursor = p.lookFrom + (p.lookFrom - cursor); lookDirection = 1f; }
+            cursor = Mathf.Clamp(cursor, p.lookFrom, p.lookTo);
         }
 
         /// <summary>
@@ -353,7 +396,7 @@ namespace C6Lab
             bool pop = effectSign > 0f;
             yokai.localScale = yokaiScale * (pop ? 1f + PopStretch * wave : 1f - FlinchSquash * wave);
             // Add the hop only after sampling the base pose, including paused frames.
-            yokai.localPosition += new Vector3(0f, 0f, (pop ? 2f : 1f) * FlinchHop * Mathf.Sin(u * Mathf.PI));
+            yokai.localPosition += P.hopAxis * ((pop ? 2f : 1f) * P.hop * Mathf.Sin(u * Mathf.PI));
         }
 
         private void OnDestroy()
