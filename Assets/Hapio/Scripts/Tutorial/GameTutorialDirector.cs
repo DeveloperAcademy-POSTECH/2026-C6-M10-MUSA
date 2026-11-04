@@ -58,6 +58,15 @@ namespace Hapio
         private bool finishing;
         private bool unavailable;
         private int actionBaseline;
+        private bool throwHit;
+        private bool listeningToThrows;
+        private float remarkAt = -1f;
+        private GameTutorialSpeaker remarkSpeaker;
+
+        /// <summary>How many throws missed in 3단계 (each gave the red orb back).</summary>
+        public int ThrowMisses { get; private set; }
+        /// <summary>A short word ("다시 해 봐!") is up during an action.</summary>
+        public bool IsShowingRemark => remarkAt >= 0f && bubbleRoot != null && bubbleRoot.gameObject.activeSelf;
         private int actionProgress;
         private float actionDoneAt = -1f;
         private float successAt = -1f;
@@ -349,12 +358,8 @@ namespace Hapio
         private void BuildBanner()
         {
             banner = AddImage("Guide Banner", overlay, art.bannerColor, null, false).rectTransform;
-            float y = 1f - art.bannerTopFraction;
-            banner.anchorMin = new Vector2(0f, y);
-            banner.anchorMax = new Vector2(1f, y);
             banner.pivot = new Vector2(.5f, .5f);
             banner.sizeDelta = new Vector2(0f, art.bannerHeight);
-            banner.anchoredPosition = Vector2.zero;
             bannerText = AddText("Guide", banner, art.bannerFont, art.bannerFontSize, art.bannerTextColor);
             bannerText.rectTransform.offsetMin = new Vector2(12f, 0f);
             bannerText.rectTransform.offsetMax = new Vector2(-12f, 0f);
@@ -363,13 +368,25 @@ namespace Hapio
 
             successText = AddText("Success", overlay, art.bannerFont, art.successFontSize, art.successColor);
             RectTransform success = successText.rectTransform;
-            success.anchorMin = success.anchorMax = new Vector2(.5f, y);
             success.pivot = new Vector2(.5f, 1f);
             success.sizeDelta = new Vector2(240f, art.successFontSize * 1.6f);
-            success.anchoredPosition = new Vector2(0f, -art.bannerHeight * .5f - 6f);
             successText.resizeTextForBestFit = false;
             successText.text = GameTutorialScript.SuccessText;
             successText.gameObject.SetActive(false);
+            PlaceBanner(art.bannerTopFraction);
+        }
+
+        /// <summary>The guide banner, and "성공!" just under it, centered this far down the screen (0 top, 1 bottom).</summary>
+        private void PlaceBanner(float topFraction)
+        {
+            float y = 1f - Mathf.Clamp01(topFraction);
+            banner.anchorMin = new Vector2(0f, y);
+            banner.anchorMax = new Vector2(1f, y);
+            banner.sizeDelta = new Vector2(0f, art.bannerHeight);
+            banner.anchoredPosition = Vector2.zero;
+            RectTransform success = successText.rectTransform;
+            success.anchorMin = success.anchorMax = new Vector2(.5f, y);
+            success.anchoredPosition = new Vector2(0f, -art.bannerHeight * .5f - 6f);
         }
 
         private Text AddText(string name, Transform parent, Font font, int size, Color color)
@@ -489,22 +506,35 @@ namespace Hapio
             hand.gameObject.SetActive(false);
             arrow.gameObject.SetActive(false);
             hand.color = Color.white;
+            remarkAt = -1f;
+            PlaceBanner(art.bannerTopFraction);
             dimTarget = beat.Focus == GameTutorialFocus.None ? 0f : 1f;
             if (beat.IsLine)
             {
                 board.SetAllowedGestures(LabBoardGestures.None);
                 tapCatcher.raycastTarget = true;
-                ShowLine(beat);
+                ShowBubble(beat.Speaker, beat.Text);
                 if (beat.Cue == GameTutorialCue.StaminaShort) session.Network.TutorialPlayStaminaShort();
                 return;
             }
             BeginAction(beat);
         }
 
-        private void ShowLine(GameTutorialBeat line)
+        /// <summary>
+        /// A short word during an action (3단계 "다시 해 봐!"): the speaker's bubble pops up without taking the screen,
+        /// and goes when the player takes hold of an orb again or after <see cref="GameTutorialArt.remarkSeconds"/>.
+        /// </summary>
+        private void ShowRemark(GameTutorialSpeaker speaker, string text)
         {
-            bool fromRight = line.Speaker == GameTutorialSpeaker.Geumok;
-            bubbleText.text = line.Text;
+            remarkSpeaker = speaker;
+            remarkAt = Time.unscaledTime;
+            ShowBubble(speaker, text);
+        }
+
+        private void ShowBubble(GameTutorialSpeaker speaker, string text)
+        {
+            bool fromRight = speaker == GameTutorialSpeaker.Geumok;
+            bubbleText.text = text;
             // The art's tail points down-left; the right neighbor's bubble is mirrored, its words are not.
             bubbleArt.localScale = new Vector3(fromRight ? -1f : 1f, 1f, 1f);
             Vector4 inset = art.textInset;
@@ -514,18 +544,19 @@ namespace Hapio
             words.offsetMin = words.offsetMax = Vector2.zero;
             bubbleRoot.pivot = fromRight ? new Vector2(1f - art.tailTip.x, art.tailTip.y) : art.tailTip;
             bubbleRoot.sizeDelta = art.bubbleSize;
-            Image face = portraits[GameTutorialScript.SeatOf(line.Speaker)];
+            Image face = portraits[GameTutorialScript.SeatOf(speaker)];
             speakerPortrait.sprite = face != null ? face.sprite : null;
             bubbleRoot.gameObject.SetActive(true);
             bubbleRoot.localScale = Vector3.zero;
             popStartedAt = Time.unscaledTime;
-            PlaceBubble(line.Speaker);
+            PlaceBubble(speaker);
         }
 
         private void BeginAction(GameTutorialBeat beat)
         {
             LabNetwork network = session.Network;
-            bool playerActs = beat.Action == GameTutorialAction.TapDrum || beat.Action == GameTutorialAction.CombineOrbs;
+            bool playerActs = beat.Action == GameTutorialAction.TapDrum || beat.Action == GameTutorialAction.CombineOrbs
+                || beat.Action == GameTutorialAction.ThrowOrb;
             // The player's own action goes through to the board; waiting on the gauge still keeps the screen.
             tapCatcher.raycastTarget = !playerActs;
             if (!string.IsNullOrEmpty(beat.Text))
@@ -563,8 +594,47 @@ namespace Hapio
                     hand.gameObject.SetActive(art.hand != null);
                     arrow.gameObject.SetActive(true);
                     break;
+                case GameTutorialAction.ThrowOrb:
+                    // The banner moves down to just above the board so the gourd stays in sight.
+                    PlaceBanner(art.throwBannerTopFraction);
+                    board.SetAllowedGestures(LabBoardGestures.Throw);
+                    throwHit = false;
+                    ListenToThrows(true);
+                    hand.gameObject.SetActive(art.hand != null);
+                    arrow.gameObject.SetActive(true);
+                    break;
             }
         }
+
+        private void ListenToThrows(bool listen)
+        {
+            LabNetwork network = session != null ? session.Network : null;
+            if (network == null || listeningToThrows == listen) return;
+            listeningToThrows = listen;
+            if (listen)
+            {
+                network.LocalThrowHit += OnThrowHit;
+                network.LocalThrowMissed += OnThrowMissed;
+            }
+            else
+            {
+                network.LocalThrowHit -= OnThrowHit;
+                network.LocalThrowMissed -= OnThrowMissed;
+            }
+        }
+
+        private void OnThrowHit(int _) => throwHit = true;
+
+        /// <summary>A miss is no failure: 금옥이 says try again and the red orb falls back onto the board from above.</summary>
+        private void OnThrowMissed()
+        {
+            if (!HasBeat || CurrentBeat.Action != GameTutorialAction.ThrowOrb || actionDoneAt >= 0f) return;
+            ThrowMisses++;
+            session.Network.TutorialDropOrb(LabOrbKind.Combined, GameTutorialScript.CombineResult, GameTutorialScript.RetryLanding);
+            ShowRemark(GameTutorialScript.RetrySpeaker, GameTutorialScript.RetryLine);
+        }
+
+        private void OnDestroy() => ListenToThrows(false);
 
         private void UpdateAction(GameTutorialBeat beat)
         {
@@ -600,6 +670,13 @@ namespace Hapio
                     }
                     if (combined >= beat.Count) CompleteAction(true);
                     break;
+                case GameTutorialAction.ThrowOrb:
+                    if (throwHit)
+                    {
+                        actionProgress = 1;
+                        CompleteAction(true);
+                    }
+                    break;
             }
         }
 
@@ -610,6 +687,9 @@ namespace Hapio
             tapCatcher.raycastTarget = true;
             hand.gameObject.SetActive(false);
             arrow.gameObject.SetActive(false);
+            ListenToThrows(false);
+            remarkAt = -1f;
+            bubbleRoot.gameObject.SetActive(false);
             // The empty gauge breathes back only a sliver, still short of a tap, so the short cue's red shows on it.
             if (CurrentBeat.Action == GameTutorialAction.TapDrum && session.Network.config != null)
                 session.Network.TutorialCapStamina(ShortStaminaFor(session.Network.config.GenerateCost, art.shortStaminaShareOfTap));
@@ -632,6 +712,7 @@ namespace Hapio
         private void BeginFinish()
         {
             finishing = true;
+            ListenToThrows(false);
             board.SetAllowedGestures(LabBoardGestures.None);
             tapCatcher.raycastTarget = true;
             bubbleRoot.gameObject.SetActive(false);
@@ -663,16 +744,23 @@ namespace Hapio
             ApplyHudDressing();
             UpdateKeepOut();
             bool line = HasBeat && CurrentBeat.IsLine;
-            if (line)
+            if (remarkAt >= 0f && (Time.unscaledTime - remarkAt > art.remarkSeconds || board.IsHolding))
             {
-                PlaceBubble(CurrentBeat.Speaker);
+                remarkAt = -1f;
+                bubbleRoot.gameObject.SetActive(false);
+            }
+            if (line || remarkAt >= 0f)
+            {
+                PlaceBubble(line ? CurrentBeat.Speaker : remarkSpeaker);
                 bubbleRoot.localScale = Vector3.one * PopScale((Time.unscaledTime - popStartedAt) / art.popSeconds,
                     art.popOvershoot);
             }
             if (successAt >= 0f)
                 successText.rectTransform.localScale = Vector3.one * PopScale((Time.unscaledTime - successAt) / art.popSeconds,
                     art.popOvershoot);
-            if (HasBeat && CurrentBeat.Action == GameTutorialAction.CombineOrbs && actionDoneAt < 0f) PlaceDragGuide();
+            bool waiting = HasBeat && actionDoneAt < 0f;
+            if (waiting && CurrentBeat.Action == GameTutorialAction.CombineOrbs) PlaceDragGuide();
+            else if (waiting && CurrentBeat.Action == GameTutorialAction.ThrowOrb) PlaceThrowGuide();
             else if (hand.gameObject.activeSelf) PlaceHand();
             dimGroup.alpha = Mathf.MoveTowards(dimGroup.alpha, dimTarget, Time.unscaledDeltaTime / art.dimFadeSeconds);
             if (HasBeat && CurrentBeat.Focus != GameTutorialFocus.None) PlaceSpotlight(CurrentBeat.Focus);
@@ -744,6 +832,53 @@ namespace Hapio
         }
 
         /// <summary>
+        /// 3단계: the hand presses on my red orb and flicks it up toward the gourd along the arrow, again and again.
+        /// Both step aside while a finger holds an orb, and while no elemental orb is on the board (in flight or falling back).
+        /// </summary>
+        private void PlaceThrowGuide()
+        {
+            LabOrbState fire = null;
+            foreach (LabOrbState orb in LocalOrbs()) if (orb.kind == LabOrbKind.Combined) { fire = orb; break; }
+            Vector2 from = default;
+            float radius = 0f;
+            bool shown = fire != null && !board.IsHolding && !board.IsDropping(fire.id)
+                && TryOrbCircle(fire.id, out from, out radius);
+            arrow.gameObject.SetActive(shown);
+            hand.gameObject.SetActive(shown && art.hand != null);
+            if (!shown) return;
+            Vector2 aim = TryGourdRect(out Rect gourd) ? gourd.center - from : Vector2.up;
+            Vector2 along = aim.sqrMagnitude > 1e-4f ? aim.normalized : Vector2.up;
+            float start = radius + art.arrowGap;
+            arrow.Set(from + along * start, from + along * (start + art.throwGuideLength), art.arrowWidth,
+                art.arrowHeadLength, art.arrowHeadWidth);
+            HandSwipe((Time.unscaledTime - shownAt) / art.handSwipeSeconds, out float travel, out float press, out float alpha);
+            RectTransform rect = hand.rectTransform;
+            rect.anchoredPosition = from + along * (art.throwGuideLength * travel) + art.handRestOffset * (1f - press);
+            rect.localScale = Vector3.one * Mathf.Lerp(1f, art.handPressScale, press);
+            hand.color = new Color(1f, 1f, 1f, alpha);
+        }
+
+        /// <summary>
+        /// The throw guide over one cycle (t = 0..1): fade in pressing on the orb, flick quickly up (speeding up), let go
+        /// fading at the top, then rest unseen before the next flick.
+        /// </summary>
+        public static void HandSwipe(float t, out float travel, out float press, out float alpha)
+        {
+            t = Mathf.Repeat(t, 1f);
+            if (t < .12f) { travel = 0f; press = alpha = t / .12f; return; }
+            if (t < .4f)
+            {
+                float u = (t - .12f) / .28f;
+                travel = u * u;
+                press = alpha = 1f;
+                return;
+            }
+            travel = 1f;
+            press = 0f;
+            alpha = t < .55f ? 1f - (t - .4f) / .15f : 0f;
+        }
+
+        /// <summary>
         /// The drag guide over one cycle (t = 0..1): fade in pressing on the start, travel to the end while pressed,
         /// let go, then fade out. travel and press are 0..1.
         /// </summary>
@@ -776,6 +911,14 @@ namespace Hapio
                 float pad = art.barSpotlightPadding;
                 target = new Rect(bar.xMin - pad, bar.yMin - pad, bar.width + pad * 2f, bar.height + pad * 2f);
                 corner = Mathf.Min(target.width, target.height) * .5f;
+            }
+            else if (focus == GameTutorialFocus.Progress && TryProgressRect(out Rect progress))
+            {
+                // The paint bar and its % together, as one long rounded light.
+                float pad = art.progressSpotlightPadding;
+                target = new Rect(progress.xMin - pad, progress.yMin - pad, progress.width + pad * 2f, progress.height + pad * 2f);
+                corner = Mathf.Min(target.width, target.height) * .5f;
+                degrees = 0f;
             }
             else if (focus == GameTutorialFocus.Pair && TryPairCircle(out Vector2 pairCenter, out float pairRadius))
             {
@@ -950,6 +1093,36 @@ namespace Hapio
                 return true;
             }
             return false;
+        }
+
+        /// <summary>The gourd paint bar at the top together with its "0.0%" text, in overlay units.</summary>
+        private bool TryProgressRect(out Rect rect)
+        {
+            rect = default;
+            var bar = hud.yokaiHpFill != null ? hud.yokaiHpFill.transform.parent as RectTransform : null;
+            if (bar == null || !TryOverlayRect(bar, out rect)) return false;
+            if (hud.hpText != null && hud.hpText.enabled && TryOverlayRect(hud.hpText.rectTransform, out Rect box))
+            {
+                // The % text's box is much wider than "1.9%": light only the words actually drawn.
+                Rect words = DrawnText(box, hud.hpText.rectTransform.rect.width, hud.hpText.preferredWidth, hud.hpText.alignment);
+                rect = Rect.MinMaxRect(Mathf.Min(rect.xMin, words.xMin), Mathf.Min(rect.yMin, words.yMin),
+                    Mathf.Max(rect.xMax, words.xMax), Mathf.Max(rect.yMax, words.yMax));
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// The part of a text box (overlay units) its words take: <paramref name="preferredWidth"/> of the box's
+        /// <paramref name="localWidth"/>, placed by the text's alignment.
+        /// </summary>
+        public static Rect DrawnText(Rect box, float localWidth, float preferredWidth, TextAnchor alignment)
+        {
+            if (localWidth <= 0f || preferredWidth <= 0f) return box;
+            float width = Mathf.Min(box.width, box.width * preferredWidth / localWidth);
+            bool left = alignment == TextAnchor.UpperLeft || alignment == TextAnchor.MiddleLeft || alignment == TextAnchor.LowerLeft;
+            bool right = alignment == TextAnchor.UpperRight || alignment == TextAnchor.MiddleRight || alignment == TextAnchor.LowerRight;
+            float xMin = left ? box.xMin : right ? box.xMax - width : box.center.x - width * .5f;
+            return new Rect(xMin, box.yMin, width, box.height);
         }
 
         private bool TryStaminaRect(out Rect rect)

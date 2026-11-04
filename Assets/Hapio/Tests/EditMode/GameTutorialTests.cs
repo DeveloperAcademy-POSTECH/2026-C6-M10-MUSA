@@ -254,6 +254,98 @@ namespace Hapio.Tests
         }
 
         [Test]
+        public void ThrowStepFlicksTheRedOrbAtTheGourdThenLightsThePaintBar()
+        {
+            GameTutorialStep throwing = GameTutorialScript.Steps[3];
+            Assert.That(throwing, Is.SameAs(GameTutorialScript.Throw));
+            GameTutorialBeat[] beats = throwing.Beats.ToArray();
+            CollectionAssert.AreEqual(new[]
+            {
+                GameTutorialAction.None, GameTutorialAction.ThrowOrb, GameTutorialAction.None, GameTutorialAction.None
+            }, beats.Select(beat => beat.Action).ToArray());
+            CollectionAssert.AreEqual(new[]
+            {
+                "이제 오행구슬을 위로 휙!\n박을 향해 던져 봐.", "맞았다! 박에 색이 묻었어!", "박이 100% 칠해질 때까지\n계속 칠하면 돼!"
+            }, throwing.Lines.Select(line => line.Text).ToArray());
+            CollectionAssert.AreEqual(new[] { GameTutorialSpeaker.Geumok, GameTutorialSpeaker.Bul, GameTutorialSpeaker.Geumok },
+                throwing.Lines.Select(line => line.Speaker).ToArray());
+            CollectionAssert.AreEqual(new[]
+            {
+                GameTutorialFocus.None, GameTutorialFocus.None, GameTutorialFocus.None, GameTutorialFocus.Progress
+            }, beats.Select(beat => beat.Focus).ToArray(), "The gourd stays in sight while throwing.");
+            Assert.That(GameTutorialDirector.BannerText(beats[1], 0), Is.EqualTo("빨간 구슬을 위로 밀어 박에 던지시오"));
+            Assert.That(GameTutorialScript.RetryLine, Is.EqualTo("다시 해 봐!"));
+            Assert.That(GameTutorialScript.RetrySpeaker, Is.EqualTo(GameTutorialSpeaker.Geumok));
+            Vector2 landing = GameTutorialScript.RetryLanding;
+            Assert.That(landing.x, Is.InRange(.6f, .9f), "Right, clear of the drum and the left yin.");
+            Assert.That(landing.y, Is.InRange(.5f, .9f));
+        }
+
+        [Test]
+        public void MissedRedOrbIsGivenBackAtItsLanding()
+        {
+            using (var settings = new GameStageSettings(Resources.Load<LabConfig>("LabConfig"), GameStageCatalog.RequireDefault()))
+            {
+                LabConfig tutorial = settings.CreateTutorialConfig();
+                try
+                {
+                    const ulong me = 0UL;
+                    var model = new LabModel();
+                    double now = 10d;
+                    model.Begin("tutorial-drop", new[] { LabNetwork.TutorialRightSeatId, me, LabNetwork.TutorialLeftSeatId },
+                        now, tutorial, LabStageYokai.Gumiho);
+                    float stamina = model.Snapshot(now).players.Single(player => player.id == me).stamina;
+                    now += 1d;
+                    Assert.That(model.TutorialDropOrb(me, LabOrbKind.Combined, LabOrbElement.Fire, GameTutorialScript.RetryLanding,
+                        now, out LabOrbState fire), Is.True);
+                    Assert.That((fire.kind, fire.element, fire.owner), Is.EqualTo((LabOrbKind.Combined, LabOrbElement.Fire, me)));
+                    Assert.That(new Vector2(fire.x, fire.y), Is.EqualTo(GameTutorialScript.RetryLanding));
+                    Assert.That(fire.kind.CanThrow(fire.lockSwipes), Is.True, "It can be thrown again.");
+                    LabSnapshot snapshot = model.Snapshot(now);
+                    Assert.That(snapshot.orbs.Any(orb => orb.id == fire.id), Is.True);
+                    Assert.That(snapshot.players.Single(player => player.id == me).stamina, Is.EqualTo(stamina).Within(1e-4f),
+                        "No stamina is spent.");
+                    Assert.That(model.TutorialDropOrb(me, LabOrbKind.Combined, LabOrbElement.None, new Vector2(.5f, .5f), now, out _), Is.False);
+                    Assert.That(model.TutorialDropOrb(me, LabOrbKind.Drum, LabOrbElement.None, new Vector2(.5f, .5f), now, out _), Is.False);
+                    Assert.That(model.TutorialDropOrb(me, LabOrbKind.Combined, LabOrbElement.Fire, new Vector2(1.5f, .5f), now, out _), Is.False);
+                    Assert.That(model.TutorialDropOrb(99UL, LabOrbKind.Combined, LabOrbElement.Fire, new Vector2(.5f, .5f), now, out _), Is.False);
+                }
+                finally { Object.DestroyImmediate(tutorial); }
+            }
+        }
+
+        [Test]
+        public void PaintBarLightEndsAtTheDrawnPercentNotItsWideBox()
+        {
+            var box = new Rect(100f, 0f, 200f, 30f);
+            Rect left = GameTutorialDirector.DrawnText(box, 100f, 25f, TextAnchor.MiddleLeft);
+            Assert.That((left.xMin, left.xMax), Is.EqualTo((100f, 150f)), "A quarter of the box from its left.");
+            Rect right = GameTutorialDirector.DrawnText(box, 100f, 25f, TextAnchor.MiddleRight);
+            Assert.That((right.xMin, right.xMax), Is.EqualTo((250f, 300f)));
+            Rect middle = GameTutorialDirector.DrawnText(box, 100f, 25f, TextAnchor.MiddleCenter);
+            Assert.That((middle.xMin, middle.xMax), Is.EqualTo((175f, 225f)));
+            Assert.That(GameTutorialDirector.DrawnText(box, 100f, 400f, TextAnchor.MiddleLeft).width, Is.EqualTo(200f),
+                "Never wider than the box.");
+        }
+
+        [Test]
+        public void ThrowGuideFlicksUpQuicklyAndRests()
+        {
+            GameTutorialDirector.HandSwipe(0f, out float travel, out float press, out float alpha);
+            Assert.That((travel, press, alpha), Is.EqualTo((0f, 0f, 0f)));
+            GameTutorialDirector.HandSwipe(.12f, out travel, out press, out _);
+            Assert.That(travel, Is.EqualTo(0f).Within(1e-4f));
+            Assert.That(press, Is.EqualTo(1f).Within(1e-4f));
+            GameTutorialDirector.HandSwipe(.26f, out float half, out _, out _);
+            Assert.That(half, Is.LessThan(.5f), "Speeds up like a flick.");
+            GameTutorialDirector.HandSwipe(.4f, out travel, out press, out alpha);
+            Assert.That(travel, Is.EqualTo(1f));
+            Assert.That(press, Is.EqualTo(0f));
+            GameTutorialDirector.HandSwipe(.7f, out _, out _, out alpha);
+            Assert.That(alpha, Is.EqualTo(0f), "Rests unseen before the next flick.");
+        }
+
+        [Test]
         public void SpeakersSitMukLeftBulMiddleGeumokRightByTheGamesNeighborRule()
         {
             // A player's right neighbor is the previous seat and the left one the next seat.

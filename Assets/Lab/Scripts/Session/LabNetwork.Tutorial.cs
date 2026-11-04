@@ -61,6 +61,20 @@ namespace C6Lab
         public bool TutorialScriptCombinations(params LabOrbElement[] elements) =>
             TutorialHostReady && model.TutorialScriptCombinations(LocalPlayerId, elements);
 
+        /// <summary>
+        /// 3단계: give a missed orb back. It appears at <paramref name="landing"/> (0..1) on my board, falling in from
+        /// above like the gourd's drops (#177).
+        /// </summary>
+        public bool TutorialDropOrb(LabOrbKind kind, LabOrbElement element, Vector2 landing)
+        {
+            if (!TutorialHostReady || !model.TutorialDropOrb(LocalPlayerId, kind, element, landing,
+                battleClock.Now(Time.realtimeSinceStartupAsDouble), out LabOrbState orb)) return false;
+            // Before the snapshot that holds it, so the board drops it in instead of popping it up.
+            if (board != null) board.ExpectDrop(orb.id);
+            PublishSnapshot(true);
+            return true;
+        }
+
         /// <summary>Hold or release the stamina refill, and show it at once.</summary>
         public bool TutorialHoldStamina(bool held) => TutorialCapStamina(held ? 0f : float.PositiveInfinity);
 

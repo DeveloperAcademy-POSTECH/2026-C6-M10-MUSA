@@ -185,7 +185,42 @@ namespace Hapio.Tests
             yield return Until(() => director.CurrentBeat.IsLine, "\"우와, 색이 변했어!\" after 성공!");
             Assert.That(director.CurrentBeat.Focus, Is.EqualTo(GameTutorialFocus.None), "The red orb and the yin show plainly.");
             for (int line = 0; line < 3; line++) yield return TapThrough(director, tap, art);
-            Assert.That(director.IsFinishing, Is.True, "2단계 is the last step for now.");
+
+            // 3단계: flick the red orb up at the gourd. A miss gives it back from above with "다시 해 봐!".
+            Assert.That(director.StepIndex, Is.EqualTo(3));
+            yield return TapThrough(director, tap, art);
+            Assert.That(director.CurrentBeat.Action, Is.EqualTo(GameTutorialAction.ThrowOrb));
+            Assert.That(board.AllowedGestures, Is.EqualTo(LabBoardGestures.Throw), "Only throwing is open.");
+            for (int attempt = 0; attempt < 5 && director.IsWaitingForAction; attempt++)
+            {
+                LabOrbView fire = null;
+                yield return Until(() => (fire = Object.FindObjectsByType<LabOrbView>(FindObjectsSortMode.None)
+                    .FirstOrDefault(view => view.Kind == LabOrbKind.Combined && !board.IsDropping(view.OrbId))) != null,
+                    "A red orb to throw");
+                yield return new WaitForSecondsRealtime(.6f);
+                int misses = director.ThrowMisses;
+                Vector2 start = fire.transform.position;
+                Vector2 flick = new Vector2(-.15f, 1f) * 1.5f;
+                double began = Time.realtimeSinceStartupAsDouble;
+                Assert.That(board.TryBeginDragAtWorld(start, began), Is.True, "The red orb can be picked up.");
+                board.DragToWorld(start + flick * .5f, began + .04d);
+                Assert.That(board.EndDragAtWorld(start + flick, began + .08d), Is.True);
+                yield return Until(() => !director.IsWaitingForAction || director.ThrowMisses > misses, "The throw lands or misses", 10f);
+                if (director.ThrowMisses > misses)
+                {
+                    Assert.That(director.IsShowingRemark, Is.True, "\"다시 해 봐!\"");
+                    Assert.That(network.Snapshot.orbs.Count(orb => orb.owner == network.LocalPlayerId
+                        && orb.kind == LabOrbKind.Combined && orb.element == GameTutorialScript.CombineResult), Is.EqualTo(1),
+                        "The red orb is given back.");
+                }
+            }
+            Assert.That(director.IsWaitingForAction, Is.False, "A throw hit the gourd within five tries.");
+            Assert.That(LocalPlayer(network).hitTotal, Is.GreaterThanOrEqualTo(1));
+            yield return Until(() => director.CurrentBeat.IsLine, "\"맞았다! 박에 색이 묻었어!\" after 성공!");
+            yield return TapThrough(director, tap, art);
+            Assert.That(director.CurrentBeat.Focus, Is.EqualTo(GameTutorialFocus.Progress), "Only the paint bar is lit.");
+            yield return TapThrough(director, tap, art);
+            Assert.That(director.IsFinishing, Is.True, "3단계 is the last step for now.");
             yield return Until(() => session.State.phase == GameFlowPhase.Home && !session.IsLoadingScene
                 && session.RoomBrowserVisible, "The tutorial leaves for the room list", 30f);
             Assert.That(session.IsTutorial, Is.False);

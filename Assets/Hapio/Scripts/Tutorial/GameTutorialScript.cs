@@ -18,7 +18,9 @@ namespace Hapio
         /// <summary>내 판의 검은 음구슬 두 개만 (흰 양구슬은 빼고). 둘을 잇는 방향으로 기울어진 알약 모양으로 밝힌다.</summary>
         Yins,
         /// <summary>합칠 음구슬 하나와 양구슬 하나 (양구슬에 가장 가까운 음구슬).</summary>
-        Pair
+        Pair,
+        /// <summary>위쪽 박 칠하기 진행률 막대와 그 옆 % 글자.</summary>
+        Progress
     }
 
     /// <summary>다음으로 넘어가기 전에 기다리는 일. None은 화면을 눌러 넘기는 대사다.</summary>
@@ -30,7 +32,12 @@ namespace Hapio
         /// <summary>멈춰 둔 기운 회복을 풀고 막대가 다 차기를 기다린다. 화면은 누를 수 없다.</summary>
         RefillStamina,
         /// <summary>음구슬을 끌어 양구슬 위에 놓아 Count번 합친다. 구슬만 잡을 수 있고 북·던지기는 막힌다.</summary>
-        CombineOrbs
+        CombineOrbs,
+        /// <summary>
+        /// 오행구슬을 위로 밀어 박에 맞힌다. 던지기만 열린다. 빗나가면 금옥이가 "다시 해 봐!"라고 하고 같은 구슬이
+        /// 위에서 떨어져 다시 생긴다. 맞힐 때까지 기다린다.
+        /// </summary>
+        ThrowOrb
     }
 
     /// <summary>한 장면이 뜰 때 함께 보여 주는 연출.</summary>
@@ -177,8 +184,24 @@ namespace Hapio
             Geumok("그게 오행구슬이야."),
             Geumok("화·수·목·금·토 중 하나가 나와."));
 
+        /// <summary>3단계에서 빗나갔을 때 금옥이가 하는 말. 말풍선은 잠깐 뜨고, 화면을 막지 않아 바로 다시 던질 수 있다.</summary>
+        public const string RetryLine = "다시 해 봐!";
+        public const GameTutorialSpeaker RetrySpeaker = GameTutorialSpeaker.Geumok;
+        /// <summary>빗나간 빨간 구슬이 다시 떨어지는 자리 (판 0..1): 오른쪽, 북과 남은 음구슬을 피해서.</summary>
+        public static readonly UnityEngine.Vector2 RetryLanding = new UnityEngine.Vector2(.72f, .6f);
+
+        /// <summary>
+        /// 3단계 · 던지기: 2단계에서 만든 빨간(화) 오행구슬을 위로 밀어 박에 맞힌다. 빗나가면 다시 준다.
+        /// 맞히면 박에 색이 묻고, 위쪽 진행률 막대만 밝혀 100%가 목표임을 보여 준다.
+        /// </summary>
+        public static readonly GameTutorialStep Throw = new GameTutorialStep("3단계 · 던지기",
+            Geumok("이제 오행구슬을 위로 휙!\n박을 향해 던져 봐."),
+            GameTutorialBeat.Do(GameTutorialAction.ThrowOrb, "빨간 구슬을 위로 밀어 박에 던지시오", GameTutorialFocus.None),
+            Bul("맞았다! 박에 색이 묻었어!"),
+            Geumok("박이 100% 칠해질 때까지\n계속 칠하면 돼!", GameTutorialFocus.Progress));
+
         /// <summary>순서대로 진행하는 단계들. 마지막 단계가 끝나면 어두워지며 방 목록으로 간다.</summary>
-        public static readonly IReadOnlyList<GameTutorialStep> Steps = Array.AsReadOnly(new[] { Goal, Drum, Combine });
+        public static readonly IReadOnlyList<GameTutorialStep> Steps = Array.AsReadOnly(new[] { Goal, Drum, Combine, Throw });
 
         /// <summary>
         /// The seat (P number - 1) each speaker sits in. A player's right neighbor is the previous seat and the left

@@ -55,6 +55,11 @@ MonoBehaviour:
   handTapSeconds: 0.9
   handPressScale: 0.9
   handDragSeconds: 1.6
+  handSwipeSeconds: 1.4
+  throwGuideLength: 150
+  throwBannerTopFraction: 0.47
+  remarkSeconds: 2
+  progressSpotlightPadding: 8
   arrowColor: {r: 0.36, g: 0.66, b: 0.29, a: 1}
   arrowWidth: 7
   arrowHeadLength: 18

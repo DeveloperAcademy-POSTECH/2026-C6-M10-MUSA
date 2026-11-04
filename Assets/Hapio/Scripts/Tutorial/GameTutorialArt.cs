@@ -73,6 +73,12 @@ namespace Hapio
         [Tooltip("누르는 순간 손 크기")] [Range(.5f, 1f)] public float handPressScale = .9f;
 
         [Tooltip("끌어 놓기 안내(2단계)에서 손이 한 번 끌고 떼는 데 걸리는 시간")] [Min(.4f)] public float handDragSeconds = 1.6f;
+        [Tooltip("던지기 안내(3단계)에서 손이 한 번 쓸어 올리는 주기")] [Min(.4f)] public float handSwipeSeconds = 1.4f;
+        [Tooltip("던지기 안내 화살표·손이 구슬에서 박 쪽으로 가는 길이")] [Min(10f)] public float throwGuideLength = 150f;
+        [Tooltip("던지기를 기다리는 동안 안내 띠 가운데의 높이 (화면 위에서 화면 높이 비율). 박을 가리지 않게 판 바로 위.")]
+        [Range(0f, 1f)] public float throwBannerTopFraction = .47f;
+        [Tooltip("빗나갔을 때 \"다시 해 봐!\" 말풍선이 떠 있는 시간")] [Min(.3f)] public float remarkSeconds = 2f;
+        [Tooltip("진행률 막대를 밝히는 곳을 막대보다 사방으로 얼마나 크게")] [Min(0f)] public float progressSpotlightPadding = 8f;
 
         [Header("화살표 (끌어 놓을 방향)")]
         public Color arrowColor = new Color(.36f, .66f, .29f, 1f);

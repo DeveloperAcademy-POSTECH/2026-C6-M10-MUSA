@@ -121,6 +121,31 @@ namespace C6Lab
             return true;
         }
 
+        /// <summary>
+        /// 3단계: a missed throw is given back. A new orb of <paramref name="kind"/> (and <paramref name="element"/> for an
+        /// elemental orb) appears on <paramref name="owner"/>'s board at <paramref name="landing"/> (0..1); the board shows
+        /// it falling in from above. No stamina is spent.
+        /// </summary>
+        public bool TutorialDropOrb(ulong owner, LabOrbKind kind, LabOrbElement element, Vector2 landing, double now,
+            out LabOrbState orb)
+        {
+            orb = null;
+            if (phase != LabPhase.Playing || !players.ContainsKey(owner) || !Enum.IsDefined(typeof(LabOrbKind), kind)
+                || kind.IsDrum() || !Unit(landing.x) || !Unit(landing.y)) return false;
+            if (kind == LabOrbKind.Combined && (element < LabOrbElement.Fire || element > LabOrbElement.Earth)) return false;
+            if (!TryAdvance(now, out _)) return false;
+            var dropped = new LabOrbState
+            {
+                id = NewOrbId(), owner = owner, kind = kind,
+                element = kind == LabOrbKind.Combined ? element : LabOrbElement.None,
+                origin = kind == LabOrbKind.Combined ? LabOrbOrigin.Combined : LabOrbOrigin.Gourd, originOwner = owner,
+                x = landing.x, y = landing.y, createdAt = now, revision = ++revision, inFlight = false
+            };
+            orbs.Add(dropped.id, dropped);
+            orb = dropped.Copy();
+            return true;
+        }
+
         /// <summary>Scripted combinations still waiting.</summary>
         public int TutorialScriptedCombinationsLeft => tutorialCombinations.Count;
 
