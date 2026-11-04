@@ -879,3 +879,15 @@ A/B 시간표·B 미션10초/보상5초·100초 정리는 코드 고정이다. B
 |243|JigwiABPersonalBurnSeconds / **1초** (전5초)|.5~30초. A 활성 뒤 각 판의 첫 구슬이 타기까지. 이후는 Inspector 간격으로 한 개씩|
 
 Home/Lobby에 저장된 DEV 패널의241/242 라벨과243 값(1)도 코드와 맞췄다. DEV 행이 없는 Inspector 전용 값(`LabConfig`): 소각 간격 `jigwiABBurnStaggerSeconds`1초, 부적 물 구슬5개/수명15초/칠1.5배, 완료 기준 .9(90%), 허용 거리 .07. 규칙과 화면은 [지귀 화면 사양](JIGWI_SCREEN_PATTERNS.md)의2절·5절을 따른다. 이 문서 갱신은 실행 검증을 뜻하지 않는다.
+
+## #509 지귀 B 지목 동시 소화 (Hapio 지귀 전용)
+
+배열 길이257개와 인덱스는 그대로다. B 규칙과 스냅샷이 바뀌어 접속 묶음은 **5685·`C6PhysicsLab/46`·`C6HapioGame/30`**이며 이전5684 앱과 혼용하지 않는다.
+
+| 인덱스 | 이름 / 기본값 | 현재 의미 |
+|---|---|---|
+|244|Reserved Jigwi B Fire Count (unused)|은퇴. 예전 자리당 불 개수(3). 지금은 지목된 자리마다 불기둥 1개. 저장값·위치만 보존, DEV/Inspector 숨김|
+|245|Reserved Jigwi B Relight (unused)|은퇴. 예전 재점화 대기(12초). 지금은 다시 켜지지 않음. 저장값·위치만 보존, DEV/Inspector 숨김|
+|253~255|물 구슬 지급 간격/시작 수/미소모 상한|그대로. 받는 사람이 도우미(지목 안 된 자리)로 바뀜|
+
+DEV 행이 없는 고정 규칙(`LabJigwiABTimeline`): B 15초, 동시 판정 1초, 성공 3회, 지목 수 1~2인 1명/3인 2명/4·5인 3명. 규칙과 화면은 [지귀 화면 사양](JIGWI_SCREEN_PATTERNS.md)의1·3·5절을 따른다. 이 문서 갱신은 실행 검증을 뜻하지 않는다.

@@ -192,7 +192,7 @@
 - 수채 붓 거리장은 `LabWatercolorBrushDistance.GetOrCreate`의 패턴별 공유 텍스처다(앱 수명, 패턴당 약 4 MB·최대 3개). 런타임 `Dispose`는 지우지 않고, 재생 시작·Editor 스크립트 재로드·편집 모드 복귀에서만 `ReleaseShared`가 지운다.
 - `LabGourdPaint`는 두 도색 런타임을 만든 직후 라운드 붓 무늬(`RoundBrushPattern`: 라운드 config, 땅따먹기의 옛 둥근 붓은 흩뿌림)로 `Prewarm`을 1회 부른다. 실제와 같은 형식의 작은 임시 RT에만 그리고 표시 RT·Ready·Error·스탬프 수는 건드리지 않는다. 방장은 라운드 시작 직후 `PreloadPatternMask`로 판정 마스크를 미리 푼다. 판정·셀·해시·표시 결과는 같아야 한다.
 
-## #479 지귀 A 부적 — 최신 호환 기준
+## #479 지귀 A 부적
 
 - A는 5/40/70초에 **모든 자리**에서 동시에 열린다. 예전의 대상 한 명·박 3번 명중·회복 4배는 없다. 자리마다 스냅샷 `LabJigwiABPlayerFire.talismanAt`(아직 안 썼으면 음수)을 둔다.
 - 소각은 한꺼번에가 아니라 **한 개씩** 탄다. 첫 구슬은 DEV243(기본 1초) 뒤, 이후 Inspector `jigwiABBurnStaggerSeconds`(1초) 간격이며 소유자별 생성 순서(createdAt/id)를 따른다(`NextJigwiABBurnAt`).
@@ -200,4 +200,14 @@
 - Host는 그 자리의 소각 예약을 지우고 `jigwiTalismanReward` Water 5개(수명 15초, 칠 1.5배, B 불 꼬리 없음)를 준다. 모든 자리가 쓰면 A를 Completed로 일찍 끝내고, 못 쓰면 15초에 벌점 없이 끝난다.
 - DEV241/242는 은퇴 슬롯("Reserved …(unused)", 인덱스 보존, Home/Lobby 저장 라벨도 맞춤)이다. A 스태미나 화염 테두리, 화면 붉은 기운/양옆 불기둥, 구슬 위 불꽃 그림은 지웠고(구슬은 마감 전 1초 동안 `LabJigwiOrbFlame`이 아래에서 위로 타 들어가고, 그 선 위에 먹선 불꽃이 따라 올라감), A 외침은 `PatternAudioProfile.personalVoiceEnabled`(0)로 꺼 두었다(B 외침은 유지).
 - 에디터 전용: `Hapio > DEV SOLO 시작 스테이지` 메뉴(EditorPrefs, Home에서 Play할 때만 적용). 빌드와 Test Runner에는 영향이 없다.
-- 현재 호환 묶음은 설정 257개·5684·`C6PhysicsLab/45`·`C6HapioGame/29`다. 이전 5683 앱과 혼용하지 않는다.
+- 당시 호환 묶음은 설정 257개·5684·`C6PhysicsLab/45`·`C6HapioGame/29`였다(최신은 #509 절).
+
+## #509 지귀 B 지목 동시 소화 — 최신 호환 기준
+
+- 시간표: A 5/42/70초, B 25/55/85초. A2는 공통 폭탄(40초)과 겹치지 않게 42초로 옮겼고, B는 15초(`LabJigwiABTimeline.GroupMissionSeconds`)다. B3는 100초 정리로 벌점 없이 취소된다.
+- B는 1~2인 1명 / 3인 2명 / 4·5인 3명을 seed로 뽑는다(`GroupPickCount`, `JigwiGroupPicks`). `round.players`에는 지목된 자리만 있고 자리마다 불기둥(발화점) 1개다. 지목된 자리만 박이 막힌다.
+- 지목된 전원이 첫 명중부터 1초 안에 자기 불기둥을 물로 맞히면 `syncCount`+1, 늦으면 0으로 초기화(`syncResetAt`). 3회면 성공(기존 5초 보상), 15초 만료면 모든 자리 판 비우기 + 스태미나 0. 판정은 Host `RecordJigwiSyncHit`/`CloseJigwiSyncWindow`만 한다.
+- 무료 물 구슬은 도우미 판에만 준다(도우미가 없으면 지목된 자리).
+- 화면은 `LabJigwiSyncPillarView`(런타임 생성, 코드로 그린 임시 불기둥·물방울 3칸·"지금!"·iOS 기본 진동)가 맡고, 예전 장막 그림은 켜지 않는다. 팀 공용 `LabHaptics`는 건드리지 않았다.
+- DEV244(B 불 개수)/245(재점화)는 은퇴 슬롯(인덱스·저장값 보존, Home/Lobby 라벨도 맞춤)이다.
+- 현재 호환 묶음은 설정 257개·5685·`C6PhysicsLab/46`·`C6HapioGame/30`다. 이전 5684 앱과 혼용하지 않는다.

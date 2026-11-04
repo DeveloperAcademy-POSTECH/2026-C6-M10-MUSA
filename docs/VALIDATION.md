@@ -1,5 +1,16 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-04 — #509 지귀 B 지목 동시 소화
+
+`feat/#509-jigwi-group-sync`(#479 브랜치 위) 작업 중 팀원이 Unity6000.6.5f1 Editor(macOS)로 확인한 것만 적는다.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| (1/5) Host 규칙 EditMode | **팀원 PASS 보고** | `LabJigwiABModelTests`·`LabJigwiABSupplyModelTests`·`LabJigwiStageModelTests`·`LabJigwiStageBlastTests`·`LabJigwiSupplyReplicationTests`·`LabBoardReplicationTests`·`LabSharedSettingsSchemaTests`·`LabGameFlowBridgeTests` (테스트 픽스처 실수 4건을 고친 뒤) |
+| (3/5) DEV 은퇴 EditMode | **팀원 PASS 보고** | `LabDeveloperConfigTests`·`LabJigwiABConfigTests`·`LabJigwiStageConfigTests`·`GameStageSettingsTests`·`MenuScreens_HaveSavedEditableCanvasAndInput` |
+
+(2/5) `LabJigwiSyncPillarViewTests`와 (4/5) PlayMode(`LabJigwiABPresentationTests`·`LabJigwiABNetworkTests`·`LabJigwiGroupFireAudioTests`·`GameJigwiStageIntegrationTests`), EditMode 전체 Run All, SOLO/2인 이상 Play, 실기기 진동·iOS 빌드·LAN/핫스팟은 이 기록 시점에 **결과를 받지 못했거나 미실행**이다. 확인하면 이 절에 덧붙인다.
+
 ## 2026-11-04 — #479 지귀 A 부적 쓰기
 
 `feat/#479-jigwi-talisman` 작업 브랜치에서 팀원이 Unity6000.6.5f1 Editor(macOS)로 직접 확인했다. 아래 표는 실제로 실행한 것만 적는다.
