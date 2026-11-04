@@ -4593,3 +4593,31 @@ Consolidated three byte-identical textures into shared material references; conf
 - 게스트 복귀 뒤 탭 없이 목록이 돌아오는지
 - 로컬 네트워크 권한을 거부했다가 설정에서 허용하고 복귀했을 때 검색이 돌아오는지
 - 백그라운드 중 NGO 연결 유지
+
+## #485 Battle.unity Transform 부모 복구와 #447 배경 검사 갱신 — 2026-11-04
+
+기준 main `afaee674`에서 `fix/#485-battle-scene-hierarchy` 별도 worktree로 작업했다. Unity 6000.6.5f1 macOS batch Editor를 사용했다.
+
+**원인과 수정**
+- #447(PR #475) 이후 Battle.unity의 배경 장식 Transform 30개가 부모 `m_Children`에 남은 채 `m_Father: 0`이었고 SceneRoots에도 들어 있었다. 그래서 열 때마다 `Restored Transform child parent pointer from NULL`이 났다.
+- 이 30개는 #447 이전(`b50cded6`)에 같은 부모의 자식이었고, 로컬 위치·회전·크기도 같다.
+- 임시 Editor 스크립트로 Unity가 Scene을 열고 저장하게 했다. YAML은 손으로 고치지 않았고, 스크립트는 커밋하지 않았다.
+- fileID 기준 내용 비교에서 바뀐 것은 정확히 31개다.
+  - 30개 Transform의 `m_Father`: 그 자식을 가진 부모로, #447 이전 값과 같다.
+  - SceneRoots에서 그 30개 항목 제거
+  - 그 밖의 텍스트 차이는 Unity 저장 순서의 재정렬이다.
+- 독립 검토(별도 파서)도 같은 결과를 냈다: 중복 ID 0, 끊긴 fileID 0, 계층 불일치 0, 미해결 GUID 0(내장 리소스 제외).
+- #447이 실수로 커밋한 Unity 복구 Scene `Assets/_Recovery/0.unity`(약 10만 줄)를 지우고 `.gitignore`에 넣었다. 이 GUID를 참조하는 곳은 없었다.
+
+**검사 갱신 (#447의 의도된 디자인에 맞춤)**
+- 1스테이지 바닥·조합판 뒤는 `Stage01_Ground_SandBeige`, 둘레는 `Stage01_Sky_WarmBeige`다.
+- 3스테이지는 전용 석양 배경이고, 1스테이지와 모르는 번호는 기본 배경이다.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| EditMode 전체 | **1862/1862 PASS** | 수정 전 main 단독에서 실패하던 4건 포함 |
+| Battle을 여는 PlayMode | **106/106 PASS**, Scene 경고 0 | `GameSceneFlowTests`(3스테이지 배경 전환 단언 갱신 포함)·`GameLobbyViewTests`·`LabDeveloperSoloIntegrationTests`·`LabJigwiABPresentationTests`·`LabGourdYokaiTests`·`GameYokaiPresentationTests`·`GameOpeningControllerTests`·`LabGourdPaintTests`. 수정 전 main 단독에서는 Battle을 여는 검사 22건이 Scene 오류로 실패 |
+
+**남은 사항(바꾸지 않음):** `docs/STAGE_BACKGROUNDS.md`는 2스테이지 바닥을 `Stage02_Ground_Yagwanggwi`라고 하지만, 실제 `YokaiGround`/`YokaiBacking` 재질의 `_BaseMap`과 Stage02 studio는 `HanjiSand`다. 아트 결정이라 이 수정 범위에서 바꾸지 않았다.
+
+**미실행:** 화면으로 배경 배치 확인, iOS 빌드·실기기.
