@@ -1,0 +1,9 @@
+bodyHeightBefore=2.3903 scale=1.00000
+paintOrigin=(0.0000, 0.0000, 0.0000) axis=(0.0000, 0.8660, 0.5000) bodyExtentInFrame=(0.9334, 0.8411, 0.9334)
+bodyTris=40960 outerTris=20608 starShaped=100.00 %
+hitMissingDirections=48 rings=3 north=1.2152 south=0.8411
+hitTris=2208 hitMaxDeviation=0.0455 hitMeanDeviation=0.0130
+ropeSocket=(0.0000, 1.6384, 0.0277) sizeAnchor=(0.0000, 1.0524, 0.6076) hitTopInPaint=1.2152
+timeline frames opens=15 risen=26 held=29 sink=38 sunk=45 closed=47 cycle=48
+renderers=17 triangles=311442
+animationAboveHitShell=False
