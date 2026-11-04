@@ -729,7 +729,8 @@ namespace Hapio
         {
             GameFlowState loading = hostFlow.State;
             Identity(loading, out string stageId, out LabStageYokai yokai);
-            LabConfig candidate = CreateModeConfig(loading.mode, loading.stageIndex);
+            LabConfig candidate = tutorialRun ? stageSettings.CreateTutorialConfig()
+                : CreateModeConfig(loading.mode, loading.stageIndex);
             try
             {
                 if (!network.PrepareGameStage(candidate, loading.stageIndex, stageId, yokai))
@@ -827,6 +828,8 @@ namespace Hapio
 
         public void ExitRun()
         {
+            // Quitting the tutorial (#477) is not a lost game: it leaves for the room list.
+            if (tutorialRun) { FinishTutorial(); return; }
             if (state.phase == GameFlowPhase.Home || state.phase == GameFlowPhase.Lobby
                 || state.phase == GameFlowPhase.Completed || state.phase == GameFlowPhase.GameOver)
             { GoHome(); return; }
@@ -846,6 +849,8 @@ namespace Hapio
         /// <summary>2:2 (#281): another player leaving or failing only stops the battle; the room returns to its lobby.</summary>
         private void AbortHost(string reason, string territoryNotice = "판을 멈추고 로비로 돌아왔소.")
         {
+            // A practice board that cannot load or start (#477) skips straight to the room list.
+            if (tutorialRun) { Debug.LogWarning("HAPIO_TUTORIAL_ABORTED: " + reason, this); FinishTutorial(); return; }
             if (IsTerritory && !network.IsDeveloperSolo && ReturnTerritoryToLobby(territoryNotice)) return;
             if (hostFlow.Abort(reason)) SetHostState();
         }
@@ -900,6 +905,7 @@ namespace Hapio
             ResetBattleStart();
             expectedSettingsRevision = 0; expectedSettingsFingerprint = null;
             hostMode = joiningMode = GameMode.Story;
+            tutorialRun = false;
             ReleaseResult(); UiNotice = string.Empty;
             stageResults.Clear(); stageResultsRunId = null;
         }

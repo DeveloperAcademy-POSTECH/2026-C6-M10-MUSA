@@ -47,7 +47,8 @@ namespace Hapio
                         countdownCommitted = false;
                     }
                 }
-                startOverlay?.ShowPreparing(StartReadyCount, StartParticipantCount);
+                if (tutorialRun) startOverlay?.ShowPreparing(TutorialPreparingText);
+                else startOverlay?.ShowPreparing(StartReadyCount, StartParticipantCount);
             }
             else if (state.phase == GameFlowPhase.Playing)
             {
@@ -139,7 +140,7 @@ namespace Hapio
                 }
                 if (network.IsHost)
                 {
-                    if (!countdownCommitted && countdownNow >= state.battleStartsAt - CountdownSeconds)
+                    if (!countdownCommitted && countdownNow >= state.battleStartsAt - ActiveCountdownSeconds)
                     {
                         // Reserve more lead time rather than ever starting with a missing schedule receipt.
                         countdownLeadSeconds = Math.Min(5d, countdownLeadSeconds * 2d);
@@ -180,11 +181,23 @@ namespace Hapio
         // Integer-ms schedules are stable through Unity JSON on Editor and Player. Receipts
         // are identified by the monotonically increasing flow revision, never by double equality.
         private double ReserveStartAt(double serverNow) =>
-            Math.Ceiling((serverNow + CountdownSeconds + countdownLeadSeconds) * 1000d) / 1000d;
+            Math.Ceiling((serverNow + ActiveCountdownSeconds + countdownLeadSeconds) * 1000d) / 1000d;
+
+        /// <summary>The tutorial (#477) opens on its first line instead of a 3-2-1 countdown.</summary>
+        private double ActiveCountdownSeconds => tutorialRun ? 0d : CountdownSeconds;
 
         private void RefreshStartOverlay()
         {
             if (startOverlay == null) return;
+            if (tutorialRun)
+            {
+                // No ready count, countdown or "시작!" on the practice board: one plain cover until it is playable.
+                bool playable = state.phase == GameFlowPhase.Playing && countdownCommitted && !network.GameStartHeld;
+                if (IsPreparingBattle || state.phase == GameFlowPhase.Playing && !playable)
+                    startOverlay.ShowPreparing(TutorialPreparingText);
+                else startOverlay.Hide();
+                return;
+            }
             if (state.phase == GameFlowPhase.LoadingBattle || state.phase == GameFlowPhase.SynchronizingBattle)
             {
                 startOverlay.ShowPreparing(StartReadyCount, StartParticipantCount);

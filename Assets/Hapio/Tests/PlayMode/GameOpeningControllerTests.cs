@@ -24,6 +24,9 @@ namespace Hapio.Tests
         {
             Assert.That(GameSession.Instance, Is.Null, "The preceding fixture must release its persistent session.");
             ResetAppRun();
+            // These checks keep the opening's own hand-over to the room list; the tutorial (#477) that
+            // normally comes between them has its own flow test (GameTutorialFlowTests).
+            GameSession.SkipTutorialThisRun();
             Assert.That(GameOpeningController.HasPlayedThisRun, Is.False);
             Assert.That(GameOpeningController.IsPresenting, Is.False);
             yield return null;

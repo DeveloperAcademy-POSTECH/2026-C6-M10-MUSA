@@ -48,6 +48,8 @@ namespace Hapio
             RebindScene(network);
             session.NotifyBattleBound(board);
             network.ConfigApplied += OnConfigApplied;
+            // The practice board (#477) dresses this Battle for the tutorial and runs its script.
+            if (session.IsTutorial) gameObject.AddComponent<GameTutorialDirector>().Bind(session, this);
         }
 
         private void RebindScene(LabNetwork network)
@@ -108,7 +110,8 @@ namespace Hapio
             if (session == null) return;
             GameStageDefinition stage = session.CurrentStageDefinition;
             if (yokaiPresentation != null) yokaiPresentation.Bind(target, stage);
-            if (stageLabel != null)
+            if (stageLabel != null && session.IsTutorial) stageLabel.text = GameTutorialScript.StageLabel;
+            else if (stageLabel != null)
                 stageLabel.text = (session.IsTerritory ? (session.TerritoryMatchLabel + " 땅따먹기").TrimStart()
                         : "STAGE " + session.State.stageIndex + " / " + session.State.totalStages
                             + (stage != null ? " · " + stage.displayName : string.Empty))

@@ -1121,15 +1121,18 @@ namespace C6Lab
             target?.GetComponent<LabHangingTarget>()?.ResetSwing();
             model = new LabModel();
             double beginAt = Time.realtimeSinceStartupAsDouble;
-            model.BeginSolo(sessionId, LocalPlayerId, beginAt, config,
+            // The tutorial (#477) seats two virtual neighbors around this one device.
+            if (tutorialSeats) BeginTutorialModel(beginAt);
+            else model.BeginSolo(sessionId, LocalPlayerId, beginAt, config,
                 stageYokai: gameFlowEnabled ? gameStageYokai : LabStageYokai.None);
             if (GameStartHeld) battleClock.Pause(beginAt);
             SampleHostPaintFlow(battleClock.Now(Time.realtimeSinceStartupAsDouble));
             impactReceipts.SetActive(sessionId, model.Round);
             SetNotice(string.Empty);
             PublishSnapshot(true);
-            SetStatus("DEVELOPER SOLO: 1 / 1");
-            Debug.Log("C6_LAB_SOLO_START session=" + sessionId + " player=" + LocalPlayerId);
+            SetStatus(tutorialSeats ? "TUTORIAL: 1 / 3" : "DEVELOPER SOLO: 1 / 1");
+            Debug.Log((tutorialSeats ? "C6_LAB_TUTORIAL_START session=" : "C6_LAB_SOLO_START session=")
+                + sessionId + " player=" + LocalPlayerId);
         }
 
         /// <summary>Generate from the first drum on this player's board.</summary>
@@ -2753,6 +2756,8 @@ namespace C6Lab
 
         private bool Send(ulong receiver, LabNetworkPacket packet, NetworkDelivery delivery = NetworkDelivery.ReliableFragmentedSequenced)
         {
+            // A tutorial neighbor (#477) has no device: its share of the board lives only in the Host model.
+            if (IsVirtualSeat(receiver)) return true;
             if (manager == null || !manager.IsListening || manager.ShutdownInProgress || manager.CustomMessagingManager == null) return false;
             try
             {
@@ -2837,6 +2842,7 @@ namespace C6Lab
             if (target != null) target.GetComponent<LabHangingTarget>()?.ResetSwing();
             model = null;
             developerSolo = false;
+            tutorialSeats = false;
             latest = null;
             sessionId = null;
             configRevision = 0;

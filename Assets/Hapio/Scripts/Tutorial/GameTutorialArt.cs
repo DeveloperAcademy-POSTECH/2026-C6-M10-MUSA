@@ -1,0 +1,59 @@
+using UnityEngine;
+
+namespace Hapio
+{
+    /// <summary>
+    /// 튜토리얼 (#477) 그림·글꼴·연출 값. Resources/Hapio/Tutorial/TutorialArt 하나를 전투 화면이 읽는다.
+    /// 크기·위치는 전투 HUD와 같은 기준 화면(390 × 844) 단위다.
+    /// </summary>
+    [CreateAssetMenu(fileName = "TutorialArt", menuName = "Hapio/Tutorial Art")]
+    public sealed class GameTutorialArt : ScriptableObject
+    {
+        public const string ResourcePath = "Hapio/Tutorial/TutorialArt";
+
+        [Header("자리별 캐릭터 얼굴 (P1·P2·P3 동그라미 대신)")]
+        [Tooltip("아래 가운데 = 나 (P2)")] public Sprite bul;
+        [Tooltip("왼쪽 이웃 (P3)")] public Sprite muk;
+        [Tooltip("오른쪽 이웃 (P1)")] public Sprite geumok;
+        [Tooltip("아래 내 얼굴을 원래 동그라미보다 몇 배로")] [Min(.5f)] public float localPortraitScale = 1.2f;
+        [Tooltip("양옆 이웃 얼굴을 원래 동그라미보다 몇 배로")] [Min(.5f)] public float neighborPortraitScale = 1.8f;
+        [Tooltip("얼굴이 화면 가장자리에서 떨어지는 최소 거리. 원래 화면 끝에 걸쳐 있던 이웃 얼굴은 이만큼 안쪽으로 옮겨 다 보이게 한다.")]
+        [Min(0f)] public float portraitScreenMargin = 6f;
+
+        [Header("말풍선")]
+        [Tooltip("꼬리가 왼쪽 아래에 있는 그림. 오른쪽 사람은 좌우를 뒤집어 쓴다.")] public Sprite bubble;
+        public Vector2 bubbleSize = new Vector2(236f, 150f);
+        [Tooltip("그림 안에서 글자가 들어갈 여백 (왼쪽, 아래, 오른쪽, 위 · 그림 크기 비율). 아래는 꼬리 높이를 포함한다.")]
+        public Vector4 textInset = new Vector4(.08f, .27f, .08f, .11f);
+        [Tooltip("꼬리 끝 위치 (그림 왼쪽 아래 기준 비율). 말풍선은 이 점에서 커진다.")]
+        public Vector2 tailTip = new Vector2(.045f, .02f);
+        [Tooltip("꼬리 끝을 얼굴 모서리에서 얼마나 띄울지 (바깥쪽 +x, 위 +y)")]
+        public Vector2 tailGap = new Vector2(2f, 2f);
+        [Tooltip("말풍선이 화면 가장자리에서 떨어지는 최소 거리")] [Min(0f)] public float screenMargin = 8f;
+        public Font dialogueFont;
+        [Min(8)] public int maxFontSize = 17;
+        [Min(8)] public int minFontSize = 12;
+        public Color textColor = new Color(.12f, .1f, .09f, 1f);
+
+        [Header("말풍선 등장 (살짝 커졌다가 제자리)")]
+        [Min(.01f)] public float popSeconds = .28f;
+        [Min(1f)] public float popOvershoot = 1.1f;
+
+        [Header("화면 어둡게 · 밝히기")]
+        public Color dimColor = new Color(0f, 0f, 0f, .62f);
+        [Min(.01f)] public float dimFadeSeconds = .25f;
+        [Tooltip("밝히는 원을 대상보다 몇 배 크게")] [Min(1f)] public float spotlightPadding = 1.2f;
+        [Tooltip("밝힌 원 가장자리의 번짐 (반지름 비율)")] [Range(.01f, .5f)] public float spotlightSoftness = .16f;
+
+        [Header("진행")]
+        [Tooltip("판이 보인 뒤 첫 대사까지")] [Min(0f)] public float firstLineDelay = .6f;
+        [Tooltip("대사가 뜬 뒤 다음 대사로 넘길 수 있을 때까지 (연타 방지)")] [Min(0f)] public float tapCooldown = .2f;
+        [Tooltip("마지막 대사 뒤 어두워지는 시간")] [Min(.01f)] public float exitFadeSeconds = .6f;
+
+        [Header("안내 띠 (동작 단계에서 사용)")]
+        public Font bannerFont;
+        public Color bannerTextColor = Color.black;
+
+        public static GameTutorialArt Load() => Resources.Load<GameTutorialArt>(ResourcePath);
+    }
+}
