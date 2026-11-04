@@ -41,14 +41,15 @@ namespace C6Lab.Tests
             Pose(lines, "visual", visual);
             lines.Add("shellPath=" + PathFrom(visual, paint.Shell));
             Pose(lines, "shell", paint.Shell);
-            Matrix(lines, "shellInRoot", target.transform.worldToLocalMatrix * paint.Shell.localToWorldMatrix);
+            // Relative to the visual mount: the hanging rope's automatic cycle moves the mount itself over time.
+            Matrix(lines, "shellInMount", target.VisualMount.worldToLocalMatrix * paint.Shell.localToWorldMatrix);
             Mesh hit = target.Hitbox.sharedMesh;
             lines.Add("hitMeshIsShellMesh=" + (hit == paint.Shell.GetComponent<MeshFilter>().sharedMesh));
             lines.Add("hitMeshName=" + hit.name);
             lines.Add("hitMeshVertices=" + hit.vertexCount);
             Vector(lines, "hitMeshBoundsCenter", hit.bounds.center);
             Vector(lines, "hitMeshBoundsExtents", hit.bounds.extents);
-            Matrix(lines, "hitboxInRoot", target.transform.worldToLocalMatrix * target.Hitbox.transform.localToWorldMatrix);
+            Matrix(lines, "hitboxInMount", target.VisualMount.worldToLocalMatrix * target.Hitbox.transform.localToWorldMatrix);
             Renderer shell = paint.Shell.GetComponent<Renderer>();
             lines.Add("shellMaterial=" + shell.sharedMaterial.name);
             lines.Add("shellMaterialIsPaint=" + (shell.sharedMaterial == paint.paintMaterial));
