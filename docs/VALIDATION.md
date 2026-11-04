@@ -4745,3 +4745,16 @@ Editor 로그 `C6_AUDIO_WARMUP`: 첫 전투는 32개를 약 70~80 ms에, 같은 
 | 지귀·게임 흐름 PlayMode | **66/67** → 위 검사 대기 조건 수정 뒤 해당 검사 단독 **1/1 PASS** | `LabJigwiABPresentationTests`·`LabJigwiGroupFireAudioTests`·`LabJigwiWaterTrailTests`·`LabJigwiStagePresentationTests`·`GameSceneFlowTests`. 실패 1건은 새 단언이 `IsLoadingScene`(준비 구간 전체가 true)을 기다리던 검사 문장 문제였다 |
 
 **미실행:** iPhone 1·2스테이지 로딩 시간·메모리 실측.
+
+
+## 2026-11-04 — #513 Stage03 Jigwi art import
+
+- Added only the Stage03_Jigwi art package: FBX, 12 baked/source textures, 12 external URP Lit materials, a looping controller and placement prefab.
+- Unity 6000.6.5f1 import: **90,931 triangles**, 22 renderers; 0 missing materials, 0 unsupported shaders, 0 unresolved animation paths. 282 animation bindings include 2 cloth BlendShape bindings. Generic clip is 24 fps and approximately 4 seconds, looping.
+- Animator evaluation changed 3 transforms. Sampled all 97 frame positions: eye/pupil local depth remains fixed (maximum numerical delta approximately 7.3e-12). Forward eye-pop and separate pupil dilation are excluded.
+- Closed/front, open/front, blink/front and back renders were inspected in an isolated preview scene. Red lid motifs, navy/beige ribbons and the curled fire charm are present.
+- Placement body center is the root origin; height is 2.390325 Unity units, matching Stage01/02. Battle scene remained clean. Existing stage assets and gameplay code were not modified.
+- Console already contained Transport lifecycle/invalid GC handle and NullReferenceException entries before the import; this is not a zero-console-errors claim.
+- Not run: gameplay-event integration, multiplayer, paint/collision integration, device performance or the full EditMode/PlayMode suite.
+
+- Final reimport: absolute FBX source paths removed. A temporary metadata conversion caused an FBX import failure during preparation; it was corrected by regenerating the FBX and rebuilding the controller state. Final checks again report 90,931 triangles, 22 renderers, 1 looping clip, 0 missing materials, 0 unresolved animation paths and 3 Animator-driven transform changes. No absolute user paths remain in Stage03 assets.
