@@ -8567,7 +8567,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\uC9C0\uADC0 A \uD574\uC81C \uBA85\uC911 \uC218"
+  m_Text: Reserved Jigwi A Required Hits (unused)
 --- !u!222 &75068788
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -56095,7 +56095,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\uC9C0\uADC0 A \uC790\uB3D9 \uD68C\uBCF5 \uBC30\uC728"
+  m_Text: Reserved Jigwi A Recovery Multiplier (unused)
 --- !u!222 &617588721
 CanvasRenderer:
   m_ObjectHideFlags: 0
