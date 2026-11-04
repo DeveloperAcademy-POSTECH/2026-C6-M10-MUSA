@@ -4551,3 +4551,23 @@ Consolidated three byte-identical textures into shared material references; conf
 | 로비·접속·흐름 PlayMode 묶음 | **89/90**, 재실행 **30/30 ×2 PASS** | `GameSceneFlowTests`·`GameLobbyViewTests`·`LabQuickConnectTests`·`LabLobbyPositionSelectionTests`·`LabFigmaLobbyTests`·`LabLocalBoardNetworkIntegrationTests`·`LabDeveloperSoloIntegrationTests`·새 검사. 첫 실행의 1건 실패는 `DevelopmentSoloButtonStarts…`의 `Server failed to bind`(검사가 고른 빈 포트를 다른 프로세스가 먼저 씀)이며, 자리 흐림 수정 뒤 로비 묶음 두 번 재실행에서 같은 검사가 통과했다. 재실행에 `GameSceneFlowTests` 등 나머지는 다시 돌리지 않았다 |
 
 게스트가 Host 로비를 받기 전 "방 정보를 받고 있소..." 표시와 빈 자리 흐림은 실제 게스트 연결이 필요해 자동 검사가 없다(코드 검토만). 두 기기 실제 접속(Mac 2프로세스 포함)·iOS 빌드·실기기 LAN/핫스팟에서의 방장 이탈·화면 잠금 재현은 **미실행**이다.
+
+## #476 방 검색·방 공개 자동 복구와 화면 잠금 — 2026-11-04
+
+기준 main `b50cded6`에서 `fix/#476-discovery-recovery` 별도 worktree로 작업했다. 다른 작업이 쓰는 원래 체크아웃과 그 Editor는 건드리지 않았다. Unity 6000.6.5f1 macOS batch Editor(`unity test`)와 macOS 실제 dns_sd(mDNSResponder)로 확인했다. 실패는 discovery 자신의 `Fail` 경로를 리플렉션으로 불러 만들었다. 실제 iPhone 잠금·백그라운드·로컬 네트워크 권한 거부를 재현한 것은 아니다.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| EditMode 전체 | **1862/1862 PASS** | 새 `LabDiscoveryBackoffTests`: 재시도 1/2/4/8/16/30초·6회·3회 한도, 주소 만료 Keep→Renew→Remove, iPhone 전용 화면 잠금 판단 |
+| `LabDiscoveryRecoveryTests` (새 검사, 5개) | **PASS** | ① 주소 TTL을 강제로 지나게 해도 `renewing` 재조회로 방이 한 번도 빠지지 않고 같은 항목이 남음(재확인 경로로 구조된 것이 아님을 로그로 확인) ② 주소 조회 실패 뒤 검색이 살아 있는 동안 방이 `retry attempt=1`로 다시 보임 ③ Lab Host 공개를 끊으면 같은 discovery로 같은 이름을 다시 등록하고 "방을 만들고 있소..." 상태가 한 번도 켜지지 않음 ④ 검색 실패 뒤 자동 재시작·실패 문구 원복·같은 실패 문구가 두 번 붙지 않음·횟수 소진 뒤 앱 복귀만 재시도·재시도 사이 취소 유지 ⑤ 앱 복귀가 살아 있는 Host 등록을 다시 만들지 않음 |
+| 방 검색·로비·흐름 PlayMode 묶음 | **72/72 PASS ×2** | 새 검사, `LabRoomFamilyDiscoveryTests`, `LabQuickConnectTests`, `GameLobbyViewTests`, `GamePendingRoomRegistryTests`, `GameOpeningControllerTests`, `LabFigmaLobbyTests`, `LabMessageHandlerReconnectTests`, `LabLobbyPositionSelectionTests`, `GameSceneFlowTests`, `LabStaminaBarHudTests` |
+
+새 검사는 main에 없는 필드·API(`Renewing`, `RoomSearchRetryPending`, `ResumeDiscoveryAfterPause`)를 써서 main 코드로는 컴파일되지 않는다. 그래서 #471처럼 main에서 실패하는 것을 따로 보이지는 않았다.
+
+**미실행:** iPhone 빌드·실기기. 아래 항목을 확인하지 않았다.
+- 로비·결과·방 목록에서 3분 넘게 화면이 잠기지 않는지, 타이틀에서는 시스템 설정대로 잠기는지
+- 새로고침 없이 방 카드가 3분 넘게 남는지
+- 방장이 30초·2분 백그라운드 뒤에도 새 참가자에게 보이는지
+- 게스트 복귀 뒤 탭 없이 목록이 돌아오는지
+- 로컬 네트워크 권한을 거부했다가 설정에서 허용하고 복귀했을 때 검색이 돌아오는지
+- 백그라운드 중 NGO 연결 유지

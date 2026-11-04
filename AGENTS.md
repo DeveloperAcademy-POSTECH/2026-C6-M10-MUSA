@@ -175,3 +175,9 @@
 
 - `LabNetwork`는 패킷 핸들러를 등록한 `CustomMessagingManager` 인스턴스를 기억하고, NGO가 새 세션에서 새 인스턴스를 만들면 다시 등록한다. `Stop`을 거치지 않고 끝난 세션(방장 이탈·화면 잠김·Wi-Fi 끊김)이 다음 방의 패킷 수신을 막지 않아야 한다. 게임 흐름 게스트 끊김도 핸들러를 풀고 `C6_LAB_DISCONNECTED`를 남긴다.
 - Hapio Lobby에서 연결이 끊기면 `GameSession`이 나가기와 같은 `GoHome`(`network.Stop` 포함)으로 방 목록에 돌아가고 끊김 안내를 표시한다. 게스트가 Host 로비를 받기 전(`LobbyInfoPending`)에는 지난 방 인원·자리 대신 "방 정보를 받고 있소..."를 표시하고, 고를 수 없는 빈 자리는 흐리게 그린다. 자리 선택 규칙·접속 규약·설정 수·Scene/Prefab은 바꾸지 않는다.
+
+## #476 방 검색·방 공개 자동 복구와 화면 잠금
+
+- `LabBonjourDiscovery`는 주소 TTL이 지나면 같은 호스트를 한 번 다시 조회하고(응답 없으면 8초 뒤 제거), 검색이 살아 있는 동안 확인에 실패한 방을 최대 3회 다시 확인한다(`serviceRetries`). 교체된 항목에 남은 조회가 같은 키의 새 항목을 지우지 않게 한다. 재시도 간격·횟수는 순수 함수 `LabDiscoveryBackoff`다.
+- `LabNetwork.Recovery.cs`가 검색 재시작(1~30초, 최대 6회)·방장 공개 재등록(같은 요청 이름, 이관 방은 이름 고정)·모바일 복귀 처리를 맡는다. `DisposeDiscovery`가 대기 중인 재시도를 지우므로 실패 경로는 그 뒤에 예약한다. 살아 있는 등록은 복귀 때 다시 만들지 않는다.
+- iPhone만 연결·입장 중·검색 중(`RoomSearchKeepsAwake`, Hapio는 방 목록이 보일 때만)·재시도 대기에 `SleepTimeout.NeverSleep`이다. NGO·전송 소켓 재생성, 전투 중 백그라운드 처리, 접속 규약·TXT·설정 수·Scene/Prefab은 바꾸지 않는다.

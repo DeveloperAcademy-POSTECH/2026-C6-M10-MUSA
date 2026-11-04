@@ -181,6 +181,8 @@ namespace Hapio
         private void Update()
         {
             if (Instance != this || network == null) return;
+            // The browse that resumes behind the title after a game must not keep the phone awake there (#476).
+            network.RoomSearchKeepsAwake = roomBrowserVisible;
             pendingRooms.Tick(out string pendingError);
             if (!string.IsNullOrEmpty(pendingError)) { UiNotice = pendingError; Changed?.Invoke(); }
             UpdateRoomCreation();

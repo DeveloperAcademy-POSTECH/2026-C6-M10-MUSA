@@ -348,8 +348,9 @@ namespace C6Lab
             if (operation.Service != null)
             {
                 Service service = operation.Service;
+                // An op left on a replaced entry must not remove the retried room that now holds its key.
                 bool current = services.TryGetValue(service.Key, out Service listed) && listed == service;
-                Remove(service.Key);
+                if (current) Remove(service.Key);
                 if (current && IsBrowsing && LabDiscoveryBackoff.CanRetry(service.RetryAttempt, LabDiscoveryBackoff.ServiceRetryLimit))
                     serviceRetries[service.Key] = new ServiceRetry(service.Key, service.Name, service.InterfaceIndex, service.RetryAttempt,
                         now + LabDiscoveryBackoff.Delay(service.RetryAttempt));
@@ -509,6 +510,8 @@ namespace C6Lab
                 }
                 service.Port = LabBonjourNative.NetworkPort(port); service.HostName = hostName; operation.HasAddressOrReply = true; operation.Done = true;
                 owner.Report("stage=resolve result=completed"); owner.GetAddresses(service, hostName);
+                // A synchronous address failure already removed this entry; a presence query would outlive it.
+                if (!owner.services.TryGetValue(service.Key, out Service listed) || listed != service) return;
                 var presence = owner.Create("presence", service); service.Presence = presence;
                 int queryError = Native(() => LabBonjourNative.DNSServiceQueryRecord(out presence.Reference, 0, service.InterfaceIndex,
                     Utf8(fullName), LabBonjourNative.TxtType, LabBonjourNative.InternetClass, PresenceCallback, presence.Context));
@@ -556,7 +559,12 @@ namespace C6Lab
                 var record = new byte[length]; Marshal.Copy(bytes, record, 0, length);
                 if (!LabRoomPresence.TryDecode(record, owner.ExpectedProtocol, out bool ipv4, out bool ipv6,
                     out int count, out int capacity, out bool playing, out bool waitingForHost, out bool team))
-                { owner.Remove(operation.Service.Key); return; }
+                {
+                    if (owner.services.TryGetValue(operation.Service.Key, out Service listed) && listed == operation.Service)
+                        owner.Remove(operation.Service.Key);
+                    else operation.Done = true;
+                    return;
+                }
                 var service = operation.Service;
                 if (service.Ipv4 != ipv4 || service.Ipv6 != ipv6)
                 {

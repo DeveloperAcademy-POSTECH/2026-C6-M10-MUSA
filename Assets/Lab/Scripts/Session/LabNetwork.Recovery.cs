@@ -12,9 +12,10 @@ namespace C6Lab
     public sealed partial class LabNetwork
     {
         private int roomSearchRetryAttempt;
+        // Retries ran out; app resume (a permission granted in Settings, a network back) still tries once more.
+        private bool roomSearchRetryExhausted;
         private double roomSearchRetryAt = double.NaN;
         private double browseAliveSince = double.NaN;
-        private bool roomSearchRetrying;
         // The search failure shown last and the message it was appended to, so a retry neither grows nor hides it.
         private string searchFailureMessage, searchFailureBase;
         private bool searchFailureBaseFailed;
@@ -31,7 +32,11 @@ namespace C6Lab
             if (!LabBonjourDiscovery.IsSupported
                 || !LabDiscoveryBackoff.CanRetry(roomSearchRetryAttempt, LabDiscoveryBackoff.MaximumAttempts))
             {
-                if (LabBonjourDiscovery.IsSupported) Debug.LogWarning("C6_LAB_DISCOVERY_RETRY kind=browse result=stopped");
+                if (LabBonjourDiscovery.IsSupported)
+                {
+                    roomSearchRetryExhausted = true;
+                    Debug.LogWarning("C6_LAB_DISCOVERY_RETRY kind=browse result=stopped");
+                }
                 return;
             }
             double delay = LabDiscoveryBackoff.Delay(roomSearchRetryAttempt++);
@@ -45,7 +50,14 @@ namespace C6Lab
             roomSearchRetryAttempt = 0;
             roomSearchRetryAt = double.NaN;
             browseAliveSince = double.NaN;
+            roomSearchRetryExhausted = false;
         }
+
+        /// <summary>
+        /// Whether a room search keeps an iPhone awake. Hapio browses quietly behind its title after a game; only the
+        /// visible room list counts there. Lab always shows its list.
+        /// </summary>
+        public bool RoomSearchKeepsAwake { get; set; } = true;
 
         /// <summary>Runs early in Update, where a pending one-shot resume runs too.</summary>
         private void UpdateRoomSearchRecovery(double now)
@@ -64,9 +76,7 @@ namespace C6Lab
                 return;
             }
             roomSearchRetryAt = double.NaN;
-            roomSearchRetrying = true;
-            try { StartRoomSearchInternal(true); }
-            finally { roomSearchRetrying = false; }
+            StartRoomSearchInternal(true);
         }
 
         /// <summary>A retried search that starts again restores whatever the failure was appended to.</summary>
@@ -157,9 +167,10 @@ namespace C6Lab
                 ResetRoomSearchRetry();
                 search = StartRoomSearchInternal(true);
             }
-            else if (RoomSearchRetryPending)
+            else if (RoomSearchRetryPending || roomSearchRetryExhausted)
             {
                 roomSearchRetryAttempt = 0;
+                roomSearchRetryExhausted = false;
                 roomSearchRetryAt = now;
                 search = true;
             }

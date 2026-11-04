@@ -11,7 +11,7 @@ namespace C6Lab
 
     /// <summary>
     /// Shared Lab/Hapio device presentation. It never changes network pause policy or saved Scene layout.
-    /// Only native iOS players apply orientation/gesture settings; Editor and Mac keep their presentation.
+    /// Only native iOS players apply orientation/gesture/idle-timer settings; Editor and Mac keep their presentation.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class LabMobilePresentationPolicy : MonoBehaviour
@@ -21,6 +21,7 @@ namespace C6Lab
         private bool backgrounded;
         private bool modeApplied;
         private LabSystemGestureEdges appliedMode;
+        private int appliedSleepTimeout = KeepSleepTimeout;
 
         public const LabSystemGestureEdges BattleGestureEdges = LabSystemGestureEdges.LeftEdge
             | LabSystemGestureEdges.BottomEdge | LabSystemGestureEdges.RightEdge;
@@ -66,6 +67,32 @@ namespace C6Lab
             if (target > 0) Application.targetFrameRate = target;
         }
 
+        /// <summary>Returned for every platform that keeps the system idle timer (Editor, Mac player).</summary>
+        public const int KeepSleepTimeout = int.MinValue;
+
+        /// <summary>
+        /// A phone left untouched in a room, a result or the room list locked and suspended the app, which dropped the
+        /// connection (#476). Stay awake only while a room is open or being looked for; the title and opening keep the
+        /// system setting.
+        /// </summary>
+        public static bool NetworkKeepsAwake(bool connected, bool joining, bool searching, bool retryPending) =>
+            connected || joining || searching || retryPending;
+
+        /// <summary>The idle timer a platform gets, or KeepSleepTimeout to leave Screen.sleepTimeout alone.</summary>
+        public static int SleepTimeoutFor(RuntimePlatform platform, bool keepAwake) =>
+            platform != RuntimePlatform.IPhonePlayer ? KeepSleepTimeout
+            : keepAwake ? SleepTimeout.NeverSleep : SleepTimeout.SystemSetting;
+
+        private void SetSleepTimeout(int timeout)
+        {
+            if (timeout == KeepSleepTimeout || timeout == appliedSleepTimeout) return;
+            appliedSleepTimeout = timeout;
+            Screen.sleepTimeout = timeout;
+#if UNITY_IOS && !UNITY_EDITOR && DEVELOPMENT_BUILD
+            Debug.Log("C6_MOBILE_SLEEP timeout=" + timeout);
+#endif
+        }
+
         private static void ApplyPortrait()
         {
 #if UNITY_IOS && !UNITY_EDITOR
@@ -98,6 +125,9 @@ namespace C6Lab
                 boardInteractive, snapshot != null && snapshot.paused,
                 network != null && network.GameStartHeld, focused && !backgrounded,
                 network != null && network.IsConnected));
+            bool awake = isActiveAndEnabled && network != null && NetworkKeepsAwake(network.IsConnected, network.IsJoiningRoom,
+                network.RoomSearchKeepsAwake && network.IsSearchingRooms, network.RoomSearchKeepsAwake && network.RoomSearchRetryPending);
+            SetSleepTimeout(SleepTimeoutFor(Application.platform, awake));
         }
 
         /// <summary>Preparing/countdown has a Playing snapshot but cannot defer gestures before input opens.</summary>
@@ -134,6 +164,7 @@ namespace C6Lab
             {
                 ApplyPortrait();
                 modeApplied = false; // Reapply to a resumed/recreated native view even if policy is unchanged.
+                appliedSleepTimeout = KeepSleepTimeout;
             }
             Refresh();
             LogLifecycle("focus", hasFocus);
@@ -146,6 +177,7 @@ namespace C6Lab
             {
                 ApplyPortrait();
                 modeApplied = false;
+                appliedSleepTimeout = KeepSleepTimeout;
             }
             Refresh();
             LogLifecycle("pause", paused);
@@ -154,8 +186,10 @@ namespace C6Lab
         private void OnDisable()
         {
             SetGestureMode(LabSystemGestureEdges.None);
+            SetSleepTimeout(SleepTimeoutFor(Application.platform, false));
             // Re-apply on the next enable even if the desired mode did not change.
             modeApplied = false;
+            appliedSleepTimeout = KeepSleepTimeout;
         }
 
         private static void LogLifecycle(string change, bool value)
