@@ -98,21 +98,57 @@ namespace Hapio.Tests
             Assert.That(hud.timeText.transform.parent.gameObject.activeInHierarchy, Is.False);
             Assert.That(bindings.stageLabel.text, Is.EqualTo(GameTutorialScript.StageLabel));
 
-            // Every tap shows the next line; the last line darkens around the gourd; then the room list.
+            // 0단계: every tap shows the next line; the last line darkens around the gourd.
             var tap = director.GetComponentsInChildren<UnityEngine.UI.Button>(true).Single(button => button.name == "Tap To Continue");
+            var dim = director.GetComponentsInChildren<CanvasGroup>(true).Single(group => group.name == "Dim");
+            LabOrbBoard board = bindings.board;
             int lines = GameTutorialScript.Goal.Lines.Count;
             for (int line = 1; line < lines; line++)
             {
-                Assert.That(director.LineIndex, Is.EqualTo(line - 1));
+                Assert.That(director.StepIndex, Is.EqualTo(0));
+                Assert.That(director.BeatIndex, Is.EqualTo(line - 1));
+                Assert.That(board.AllowedGestures, Is.EqualTo(LabBoardGestures.None), "Lines keep the board still.");
                 yield return new WaitForSecondsRealtime(art.tapCooldown + .05f);
                 tap.onClick.Invoke();
-                Assert.That(director.LineIndex, Is.EqualTo(line), "Tap " + line);
+                Assert.That(director.BeatIndex, Is.EqualTo(line), "Tap " + line);
             }
             yield return new WaitForSecondsRealtime(art.dimFadeSeconds + .1f);
-            var dim = director.GetComponentsInChildren<CanvasGroup>(true).Single(group => group.name == "Dim");
             Assert.That(dim.alpha, Is.EqualTo(1f).Within(.01f), "The goal line lights only the gourd.");
-            tap.onClick.Invoke();
-            Assert.That(director.IsFinishing, Is.True);
+            yield return TapThrough(director, tap, art);
+
+            // 1단계: two lines over the drum, then three taps on the pinned drum make yin, yang, yin.
+            Assert.That(director.StepIndex, Is.EqualTo(1));
+            yield return TapThrough(director, tap, art);
+            yield return TapThrough(director, tap, art);
+            Assert.That(director.IsWaitingForAction, Is.True);
+            Assert.That(director.CurrentBeat.Action, Is.EqualTo(GameTutorialAction.TapDrum));
+            Assert.That(board.AllowedGestures, Is.EqualTo(LabBoardGestures.DrumTap), "Only the drum tap is open.");
+            Assert.That(LocalPlayer(network).stamina, Is.EqualTo(network.config.StaminaMax).Within(.001f));
+            for (int press = 0; press < GameStageSettings.TutorialDrumTaps; press++)
+            {
+                network.Generate();
+                yield return Until(() => director.ActionProgress == press + 1, "Tap " + (press + 1) + " counted");
+            }
+            CollectionAssert.AreEqual(GameTutorialScript.DrumResults, network.Snapshot.orbs
+                .Where(orb => orb.owner == network.LocalPlayerId).OrderBy(orb => orb.createdAt).Select(orb => orb.kind).ToArray());
+            Assert.That(LocalPlayer(network).stamina, Is.LessThan(network.config.GenerateCost), "Three taps empty the gauge.");
+            Assert.That(board.AllowedGestures, Is.EqualTo(LabBoardGestures.None), "No fourth tap.");
+            yield return Until(() => director.CurrentBeat.IsLine, "\"오, 나온다 나와!\" after 성공!");
+            yield return TapThrough(director, tap, art);
+            // While it is explained the gauge breathes back only a sliver, short of a tap, so the red cue shows on it.
+            Assert.That(director.CurrentBeat.Focus, Is.EqualTo(GameTutorialFocus.Stamina));
+            Assert.That(network.TutorialStaminaHeld, Is.True);
+            yield return new WaitForSecondsRealtime(1f);
+            float sliver = GameTutorialDirector.ShortStaminaFor(network.config.GenerateCost, art.shortStaminaShareOfTap);
+            Assert.That(LocalPlayer(network).stamina, Is.EqualTo(sliver).Within(.01f), "Capped at a sliver.");
+            Assert.That(sliver, Is.GreaterThan(0f).And.LessThan(network.config.GenerateCost));
+            yield return TapThrough(director, tap, art);
+            Assert.That(director.CurrentBeat.Cue, Is.EqualTo(GameTutorialCue.StaminaShort));
+            yield return TapThrough(director, tap, art);
+            // The refill is released and shown until full, then the tutorial leaves for the room list.
+            Assert.That(director.CurrentBeat.Action, Is.EqualTo(GameTutorialAction.RefillStamina));
+            Assert.That(network.TutorialStaminaHeld, Is.False);
+            yield return Until(() => director.IsFinishing, "The gauge refills and the last step ends", 15f);
             yield return Until(() => session.State.phase == GameFlowPhase.Home && !session.IsLoadingScene
                 && session.RoomBrowserVisible, "The tutorial leaves for the room list", 30f);
             Assert.That(session.IsTutorial, Is.False);
@@ -138,6 +174,20 @@ namespace Hapio.Tests
             Assert.That(session.IsTutorial, Is.False);
             Assert.That(session.TryStartTutorial(), Is.False, "The tutorial does not come back in the same run.");
         }
+
+        /// <summary>Wait out the tap cooldown, tap once, and check the next beat came.</summary>
+        private static IEnumerator TapThrough(GameTutorialDirector director, UnityEngine.UI.Button tap, GameTutorialArt art)
+        {
+            Assert.That(director.IsShowingLine, Is.True, "A line is waiting for a tap.");
+            int step = director.StepIndex, beat = director.BeatIndex;
+            yield return new WaitForSecondsRealtime(art.tapCooldown + .05f);
+            tap.onClick.Invoke();
+            Assert.That(director.IsFinishing || director.StepIndex != step || director.BeatIndex == beat + 1, Is.True,
+                "Tap moved on from step " + step + " beat " + beat);
+        }
+
+        private static LabPlayerState LocalPlayer(LabNetwork network) =>
+            network.Snapshot.players.Single(player => player.id == network.LocalPlayerId);
 
         private static void ResetRunState(Type owner, string method)
         {

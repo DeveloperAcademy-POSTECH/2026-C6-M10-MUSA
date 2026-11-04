@@ -1474,7 +1474,7 @@ namespace C6Lab
             foreach (var entry in entries.Values)
             {
                 if (!entry.LocalOwner || entry.Locked || entry.EdgePending || entry.Held || entry.Dropping
-                    || entry.HiddenForPending || UnlockedBomb(entry)) continue;
+                    || entry.HiddenForPending || UnlockedBomb(entry) || !MayHold(entry)) continue;
                 float radius = entry.View.HitSphere.radius;
                 float originalReach = radius * 1.25f;
                 float reach = GripReach(entry);
@@ -1518,6 +1518,13 @@ namespace C6Lab
         {
             if (heldId == null || !entries.TryGetValue(heldId, out var entry) || !Finite(worldPoint) || !Finite(now))
                 return false;
+            if (DrumPinned(entry))
+            {
+                // Only the finger is followed, for the tap check; the drum itself stays put (#477).
+                entry.LastDragAt = now;
+                AddSample(worldPoint, now);
+                return true;
+            }
             Vector2 target = Clamp(worldPoint + entry.GrabOffset, entry.View.HitSphere.radius);
             // A heavy bomb (#212) trails the finger, closing the gap at a rate set by its drag lag
             // for however long passed since it last followed; anything else sticks to the finger.
@@ -1563,7 +1570,16 @@ namespace C6Lab
 
             // A tap is short and nearly still. Two taps on the same unlocked item use it in place.
             bool tapped = now - pressTime <= TapMaxSeconds && (worldPoint - pressPoint).magnitude <= config.OrbRadius * .5f;
-            if (tapped && entry.View.Kind.IsDrum())
+            if (DrumPinned(entry))
+            {
+                // A drum that may not move (#477) is only a button: a tap generates, any other release does nothing.
+                StopMotion(entry.View.Body);
+                SetBodyMode(entry);
+                lastTapId = null;
+                if (tapped && Allows(LabBoardGestures.DrumTap)) DrumTapped?.Invoke(id);
+                return true;
+            }
+            if (tapped && entry.View.Kind.IsDrum() && Allows(LabBoardGestures.DrumTap))
             {
                 // Every tap generates, so rapid taps fire in a burst. The drum keeps drifting the way
                 // it was going; only a drag or a flick moves it.
@@ -1627,7 +1643,7 @@ namespace C6Lab
                 || (worldPoint.x >= bounds.xMax && inputVelocity.x > 0f);
             // Charmed (#251), an upward swipe is no throw: the orb slides up like any flick and bounces off the top.
             if (!charmed && entry.View.Kind.CanThrow(entry.View.LockSwipes) && !outwardSide
-                && LabThrowMath.IsThrowGesture(inputVelocity, swipeDistance, config))
+                && Allows(LabBoardGestures.Throw) && LabThrowMath.IsThrowGesture(inputVelocity, swipeDistance, config))
             {
                 entry.BeforeRequest = CaptureMotion(entry);
                 entry.Locked = true;

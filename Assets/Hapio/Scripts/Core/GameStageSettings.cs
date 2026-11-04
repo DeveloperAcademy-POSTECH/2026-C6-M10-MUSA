@@ -146,6 +146,7 @@ namespace Hapio
             new KeyValuePair<int, float>(42, 0f),      // Secret Box
             new KeyValuePair<int, float>(43, 0f),      // Potion
             new KeyValuePair<int, float>(44, 0f),      // Bomb
+            new KeyValuePair<int, float>(51, 0f),      // Contact Combine: orbs flying out of the drum never merge by touch
             new KeyValuePair<int, float>(74, 1f),      // one drum for the three seats
             new KeyValuePair<int, float>(76, 0f),      // the drum does not wander
             new KeyValuePair<int, float>(77, 0f),
@@ -164,11 +165,23 @@ namespace Hapio
             new KeyValuePair<int, float>(238, 0f),     // no fever time
         };
 
-        /// <summary>The tutorial practice board (#477): stage 1 with <see cref="TutorialOverrides"/>.</summary>
+        /// <summary>1단계 북 치기: 기운은 북을 딱 이만큼 칠 수 있게 가득 차서 시작하고, 그만큼이 최대다.</summary>
+        public const int TutorialDrumTaps = 3;
+        private const int MaximumStaminaField = 3, StartingStaminaField = 4, GenerateCostField = 5,
+            RecoveryAmountField = 6, HitRewardField = 8;
+
+        /// <summary>
+        /// The tutorial practice board (#477): stage 1 with <see cref="TutorialOverrides"/>, and a full gauge that holds
+        /// exactly <see cref="TutorialDrumTaps"/> generations so the third tap empties it.
+        /// </summary>
         public LabConfig CreateTutorialConfig()
         {
             float[] values = Capture(1);
             foreach (KeyValuePair<int, float> item in TutorialOverrides) values[item.Key] = item.Value;
+            float gauge = values[GenerateCostField] * TutorialDrumTaps;
+            values[MaximumStaminaField] = values[StartingStaminaField] = gauge;
+            values[RecoveryAmountField] = Mathf.Min(values[RecoveryAmountField], gauge);
+            values[HitRewardField] = Mathf.Min(values[HitRewardField], gauge);
             var result = UnityEngine.Object.Instantiate(template);
             result.name = "Hapio Tutorial Settings";
             if (result.TryApplyDeveloperValues(values, out string error)) return result;

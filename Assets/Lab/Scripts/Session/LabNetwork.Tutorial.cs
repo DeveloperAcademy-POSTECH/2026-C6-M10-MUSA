@@ -1,3 +1,5 @@
+using UnityEngine;
+
 namespace C6Lab
 {
     /// <summary>
@@ -39,6 +41,36 @@ namespace C6Lab
             model.Begin(sessionId, new[] { TutorialRightSeatId, LocalPlayerId, TutorialLeftSeatId }, beginAt, config,
                 stageYokai: gameFlowEnabled ? gameStageYokai : LabStageYokai.None);
             model.TutorialHandDrumsTo(LocalPlayerId);
+            // The gauge only refills once the tutorial has shown it running out (1단계).
+            model.TutorialHoldStaminaRecovery(true, beginAt);
+        }
+
+        private bool TutorialHostReady => tutorialSeats && IsHost && model != null && latest != null
+            && latest.phase == LabPhase.Playing;
+
+        /// <summary>My next drum taps make exactly these orbs, in order (1단계: 음·양·음).</summary>
+        public bool TutorialScriptGenerations(params LabOrbKind[] kinds) =>
+            TutorialHostReady && model.TutorialScriptGenerations(LocalPlayerId, kinds);
+
+        /// <summary>Hold or release the stamina refill, and show it at once.</summary>
+        public bool TutorialHoldStamina(bool held) => TutorialCapStamina(held ? 0f : float.PositiveInfinity);
+
+        /// <summary>Let the stamina refill only up to <paramref name="ceiling"/> (1단계: a sliver for the short cue).</summary>
+        public bool TutorialCapStamina(float ceiling)
+        {
+            if (!TutorialHostReady
+                || !model.TutorialCapStaminaRecovery(ceiling, battleClock.Now(Time.realtimeSinceStartupAsDouble))) return false;
+            PublishSnapshot(true);
+            return true;
+        }
+
+        /// <summary>Whether the refill is held right now.</summary>
+        public bool TutorialStaminaHeld => tutorialSeats && model != null && model.TutorialStaminaHeld;
+
+        /// <summary>The "not enough stamina" shake, flash and sound, as if a tap had been refused (#418).</summary>
+        public void TutorialPlayStaminaShort()
+        {
+            if (TutorialHostReady) LocalStaminaShort?.Invoke();
         }
     }
 }

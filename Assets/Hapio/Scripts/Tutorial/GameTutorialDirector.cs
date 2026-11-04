@@ -8,11 +8,12 @@ namespace Hapio
 {
     /// <summary>
     /// 튜토리얼 (#477) 전투 화면. GameBattleBindings가 연습 판일 때만 붙인다.
-    /// 1) HUD: 자리 동그라미(P1·P2·P3)를 캐릭터 얼굴(묵이·불이·금옥이)로 바꾸고 타이머를 숨긴다. 북 미니맵도 얼굴로 그린다.
-    /// 2) 대본: 말하는 사람 자리의 얼굴에서 말풍선이 살짝 커졌다가 제자리로 뜨고, 화면을 누르면 다음 대사로 넘어간다.
-    ///    대사가 가리키는 곳(박)이 있으면 화면을 어둡게 하고 그곳만 동그랗게 밝히며, 말하는 사람 얼굴도 밝게 둔다.
-    /// 3) 마지막 대사 뒤에는 어두워지며 방 목록으로 간다.
-    /// 대사를 읽는 동안에는 화면 전체가 눌림을 받으므로 판의 구슬·북은 움직이지 않는다.
+    /// 1) HUD: 자리 동그라미(P1·P2·P3)를 캐릭터 얼굴(금옥이·불이·묵이)로 바꾸고 타이머를 숨긴다. 북 미니맵도 얼굴로 그린다.
+    /// 2) 대사: 말하는 사람 자리의 얼굴에서 말풍선이 살짝 커졌다가 제자리로 뜨고, 화면을 누르면 다음 장면으로 넘어간다.
+    ///    이때는 화면 전체가 눌림을 받으므로 판의 구슬·북은 움직이지 않는다.
+    /// 3) 동작: 말풍선 대신 검은 신라문화체 안내 띠와 손 그림을 보여 주고, 판에는 그 동작만 열어 둔 채 해낼 때까지 기다린다.
+    ///    해내면 "성공!"이 잠깐 뜬다.
+    /// 장면이 가리키는 곳(박·북·기운 막대)이 있으면 화면을 어둡게 하고 그곳만 밝힌다. 마지막 장면 뒤에는 어두워지며 방 목록으로 간다.
     /// </summary>
     [DefaultExecutionOrder(1000)]
     public sealed class GameTutorialDirector : MonoBehaviour
@@ -24,6 +25,7 @@ namespace Hapio
         private GameSession session;
         private GameBattleBindings battle;
         private LabHud hud;
+        private LabOrbBoard board;
         private GameTutorialArt art;
         private GameObject timerFrame;
         private readonly Image[] portraits = new Image[Seats];
@@ -31,43 +33,64 @@ namespace Hapio
         private readonly Vector2[] portraitPositions = new Vector2[Seats];
         private readonly Vector3[] corners = new Vector3[4];
 
+        private Canvas overlayCanvas;
         private RectTransform overlay;
-        private Button tapCatcher;
+        private Image tapCatcher;
         private CanvasGroup dimGroup;
         private GameTutorialSpotlight spotlight;
         private Image speakerPortrait;
         private RectTransform bubbleRoot;
         private RectTransform bubbleArt;
         private Text bubbleText;
+        private RectTransform banner;
+        private Text bannerText;
+        private Text successText;
+        private Image hand;
 
         private int stepIndex;
-        private int lineIndex = -1;
+        private int beatIndex = -1;
         private float playableAt = -1f;
         private float shownAt;
         private float popStartedAt;
         private float dimTarget;
         private bool finishing;
         private bool unavailable;
+        private int actionBaseline;
+        private int actionProgress;
+        private float actionDoneAt = -1f;
+        private float successAt = -1f;
+        private bool spotlightPlaced;
+        private Rect spotRect;
+        private float spotCorner, spotSoft;
 
         /// <summary>The step being played (index into <see cref="GameTutorialScript.Steps"/>).</summary>
         public int StepIndex => stepIndex;
-        /// <summary>The line on screen in that step, or -1 before the first line.</summary>
-        public int LineIndex => lineIndex;
+        /// <summary>The beat on screen in that step, or -1 before the first one.</summary>
+        public int BeatIndex => beatIndex;
         public bool IsFinishing => finishing;
-        public bool IsShowingLine => lineIndex >= 0 && !finishing && bubbleRoot != null && bubbleRoot.gameObject.activeSelf;
+        public bool HasBeat => beatIndex >= 0 && !finishing && stepIndex < GameTutorialScript.Steps.Count;
+        public GameTutorialBeat CurrentBeat => GameTutorialScript.Steps[stepIndex].Beats[beatIndex];
+        public bool IsShowingLine => HasBeat && CurrentBeat.IsLine && bubbleRoot != null && bubbleRoot.gameObject.activeSelf;
+        /// <summary>Waiting for the player (or the gauge) to finish the current action.</summary>
+        public bool IsWaitingForAction => HasBeat && !CurrentBeat.IsLine && actionDoneAt < 0f;
+        /// <summary>How many times the current action has been done.</summary>
+        public int ActionProgress => actionProgress;
 
         public void Bind(GameSession owner, GameBattleBindings bindings)
         {
             session = owner;
             battle = bindings;
             hud = bindings != null ? bindings.hud : null;
+            board = bindings != null ? bindings.board : null;
             art = GameTutorialArt.Load();
-            if (session == null || hud == null || art == null || art.bubble == null)
+            if (session == null || hud == null || board == null || art == null || art.bubble == null)
             {
                 Debug.LogWarning("HAPIO_TUTORIAL_UNAVAILABLE: the tutorial art or the battle HUD is missing.", this);
                 unavailable = true;
                 return;
             }
+            // Lines own the screen; each action opens only its own gesture.
+            board.SetAllowedGestures(LabBoardGestures.None);
             DressHud();
             BuildOverlay();
         }
@@ -85,6 +108,23 @@ namespace Hapio
             float v = (t - rise) / (1f - rise);
             return Mathf.Lerp(overshoot, 1f, v * v * (3f - 2f * v));
         }
+
+        /// <summary>How far the pointing hand has pressed in, 0..1, over one tap cycle (t = 0..1).</summary>
+        public static float HandPress(float t)
+        {
+            t = Mathf.Repeat(t, 1f);
+            if (t < .15f) return t / .15f;
+            if (t < .35f) return 1f - (t - .15f) / .2f;
+            return 0f;
+        }
+
+        /// <summary>The sliver of stamina left for the short cue: a share of one tap's cost, always short of a tap.</summary>
+        public static float ShortStaminaFor(float generateCost, float shareOfTap) =>
+            Mathf.Max(0f, generateCost) * Mathf.Clamp(shareOfTap, .05f, .95f);
+
+        /// <summary>The guide banner's words; a counted action adds its progress, e.g. "(1/3)".</summary>
+        public static string BannerText(GameTutorialBeat beat, int done) => beat.Count > 1
+            ? beat.Text + " (" + Mathf.Clamp(done, 0, beat.Count) + "/" + beat.Count + ")" : beat.Text;
 
         // ---------- HUD ----------
 
@@ -109,6 +149,32 @@ namespace Hapio
                 portraitPositions[seat] = portraits[seat].rectTransform.anchoredPosition;
             }
             ApplyHudDressing();
+        }
+
+        private static Sprite[] WithFaces(Sprite[] original, Sprite[] faces)
+        {
+            var result = new Sprite[Mathf.Max(original != null ? original.Length : 0, faces.Length)];
+            if (original != null) System.Array.Copy(original, result, original.Length);
+            for (int i = 0; i < faces.Length; i++) if (faces[i] != null) result[i] = faces[i];
+            return result;
+        }
+
+        /// <summary>LabHud refreshes its texts and samples every frame; this runs after it.</summary>
+        private void ApplyHudDressing()
+        {
+            if (timerFrame != null && timerFrame.activeSelf) timerFrame.SetActive(false);
+            Hide(hud.leftNeighborText);
+            Hide(hud.rightNeighborText);
+            Hide(hud.localPlayerPatternSample);
+            Hide(hud.leftPlayerPatternSample);
+            Hide(hud.rightPlayerPatternSample);
+            for (int seat = 0; seat < Seats; seat++)
+            {
+                if (portraits[seat] == null) continue;
+                if (portraits[seat].rectTransform.localScale != portraitScales[seat])
+                    portraits[seat].rectTransform.localScale = portraitScales[seat];
+                FitPortraitOnScreen(seat);
+            }
         }
 
         /// <summary>
@@ -150,32 +216,6 @@ namespace Hapio
             return 0f;
         }
 
-        private static Sprite[] WithFaces(Sprite[] original, Sprite[] faces)
-        {
-            var result = new Sprite[Mathf.Max(original != null ? original.Length : 0, faces.Length)];
-            if (original != null) System.Array.Copy(original, result, original.Length);
-            for (int i = 0; i < faces.Length; i++) if (faces[i] != null) result[i] = faces[i];
-            return result;
-        }
-
-        /// <summary>LabHud refreshes its texts and samples every frame; this runs after it.</summary>
-        private void ApplyHudDressing()
-        {
-            if (timerFrame != null && timerFrame.activeSelf) timerFrame.SetActive(false);
-            Hide(hud.leftNeighborText);
-            Hide(hud.rightNeighborText);
-            Hide(hud.localPlayerPatternSample);
-            Hide(hud.leftPlayerPatternSample);
-            Hide(hud.rightPlayerPatternSample);
-            for (int seat = 0; seat < Seats; seat++)
-            {
-                if (portraits[seat] == null) continue;
-                if (portraits[seat].rectTransform.localScale != portraitScales[seat])
-                    portraits[seat].rectTransform.localScale = portraitScales[seat];
-                FitPortraitOnScreen(seat);
-            }
-        }
-
         private static void Hide(Graphic graphic)
         {
             if (graphic != null && graphic.enabled) graphic.enabled = false;
@@ -198,18 +238,18 @@ namespace Hapio
             var root = new GameObject("Tutorial Overlay", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler),
                 typeof(GraphicRaycaster));
             root.transform.SetParent(transform, false);
-            var canvas = root.GetComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvas.sortingOrder = OverlaySortingOrder;
+            overlayCanvas = root.GetComponent<Canvas>();
+            overlayCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            overlayCanvas.sortingOrder = OverlaySortingOrder;
             CopyHudScaler(root.GetComponent<CanvasScaler>());
             overlay = (RectTransform)root.transform;
 
-            // Every touch lands here while lines are read, so the board under it never moves.
-            Image catcher = AddImage("Tap To Continue", overlay, Color.clear, null, true);
-            Stretch(catcher.rectTransform);
-            tapCatcher = catcher.gameObject.AddComponent<Button>();
-            tapCatcher.transition = Selectable.Transition.None;
-            tapCatcher.onClick.AddListener(OnTap);
+            // While a line is read every touch lands here, so the board under it never moves.
+            tapCatcher = AddImage("Tap To Continue", overlay, Color.clear, null, true);
+            Stretch(tapCatcher.rectTransform);
+            Button tap = tapCatcher.gameObject.AddComponent<Button>();
+            tap.transition = Selectable.Transition.None;
+            tap.onClick.AddListener(OnTap);
 
             var dim = new GameObject("Dim", typeof(RectTransform), typeof(CanvasGroup));
             dim.transform.SetParent(overlay, false);
@@ -217,7 +257,7 @@ namespace Hapio
             dimGroup = dim.GetComponent<CanvasGroup>();
             dimGroup.alpha = 0f;
             dimGroup.blocksRaycasts = dimGroup.interactable = false;
-            // One mesh with a round hole: separate pieces would double-darken where they meet.
+            // One mesh with a hole: separate pieces would double-darken where they meet.
             spotlight = new GameObject("Spotlight", typeof(RectTransform), typeof(CanvasRenderer), typeof(GameTutorialSpotlight))
                 .GetComponent<GameTutorialSpotlight>();
             spotlight.rectTransform.SetParent(dim.transform, false);
@@ -229,6 +269,13 @@ namespace Hapio
             speakerPortrait.preserveAspect = true;
             speakerPortrait.enabled = false;
 
+            BuildBanner();
+            hand = AddImage("Pointing Hand", overlay, Color.white, art.hand, false);
+            hand.preserveAspect = true;
+            hand.rectTransform.pivot = art.handTip;
+            hand.rectTransform.sizeDelta = art.handSize;
+            hand.gameObject.SetActive(false);
+
             bubbleRoot = new GameObject("Bubble", typeof(RectTransform)).GetComponent<RectTransform>();
             bubbleRoot.SetParent(overlay, false);
             Center(bubbleRoot);
@@ -236,21 +283,54 @@ namespace Hapio
             Image bubbleImage = AddImage("Bubble Art", bubbleRoot, Color.white, art.bubble, false);
             bubbleArt = bubbleImage.rectTransform;
             Stretch(bubbleArt);
-            bubbleText = new GameObject("Line", typeof(RectTransform), typeof(Text)).GetComponent<Text>();
-            bubbleText.rectTransform.SetParent(bubbleRoot, false);
-            bubbleText.font = art.dialogueFont != null ? art.dialogueFont
-                : hud.timeText != null ? hud.timeText.font : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            bubbleText.fontSize = art.maxFontSize;
-            bubbleText.resizeTextForBestFit = true;
-            bubbleText.resizeTextMaxSize = art.maxFontSize;
+            bubbleText = AddText("Line", bubbleRoot, art.dialogueFont, art.maxFontSize, art.textColor);
             bubbleText.resizeTextMinSize = Mathf.Min(art.minFontSize, art.maxFontSize);
-            bubbleText.alignment = TextAnchor.MiddleCenter;
-            bubbleText.horizontalOverflow = HorizontalWrapMode.Wrap;
-            bubbleText.verticalOverflow = VerticalWrapMode.Truncate;
-            bubbleText.supportRichText = false;
-            bubbleText.raycastTarget = false;
-            bubbleText.color = art.textColor;
             bubbleRoot.gameObject.SetActive(false);
+        }
+
+        private void BuildBanner()
+        {
+            banner = AddImage("Guide Banner", overlay, art.bannerColor, null, false).rectTransform;
+            float y = 1f - art.bannerTopFraction;
+            banner.anchorMin = new Vector2(0f, y);
+            banner.anchorMax = new Vector2(1f, y);
+            banner.pivot = new Vector2(.5f, .5f);
+            banner.sizeDelta = new Vector2(0f, art.bannerHeight);
+            banner.anchoredPosition = Vector2.zero;
+            bannerText = AddText("Guide", banner, art.bannerFont, art.bannerFontSize, art.bannerTextColor);
+            bannerText.rectTransform.offsetMin = new Vector2(12f, 0f);
+            bannerText.rectTransform.offsetMax = new Vector2(-12f, 0f);
+            bannerText.resizeTextMinSize = Mathf.Min(12, art.bannerFontSize);
+            banner.gameObject.SetActive(false);
+
+            successText = AddText("Success", overlay, art.bannerFont, art.successFontSize, art.successColor);
+            RectTransform success = successText.rectTransform;
+            success.anchorMin = success.anchorMax = new Vector2(.5f, y);
+            success.pivot = new Vector2(.5f, 1f);
+            success.sizeDelta = new Vector2(240f, art.successFontSize * 1.6f);
+            success.anchoredPosition = new Vector2(0f, -art.bannerHeight * .5f - 6f);
+            successText.resizeTextForBestFit = false;
+            successText.text = GameTutorialScript.SuccessText;
+            successText.gameObject.SetActive(false);
+        }
+
+        private Text AddText(string name, Transform parent, Font font, int size, Color color)
+        {
+            Text text = new GameObject(name, typeof(RectTransform), typeof(Text)).GetComponent<Text>();
+            text.rectTransform.SetParent(parent, false);
+            Stretch(text.rectTransform);
+            text.font = font != null ? font
+                : hud.timeText != null ? hud.timeText.font : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            text.fontSize = size;
+            text.resizeTextForBestFit = true;
+            text.resizeTextMaxSize = size;
+            text.alignment = TextAnchor.MiddleCenter;
+            text.horizontalOverflow = HorizontalWrapMode.Wrap;
+            text.verticalOverflow = VerticalWrapMode.Truncate;
+            text.supportRichText = false;
+            text.raycastTarget = false;
+            text.color = color;
+            return text;
         }
 
         private void CopyHudScaler(CanvasScaler target)
@@ -296,7 +376,6 @@ namespace Hapio
             rect.offsetMin = rect.offsetMax = Vector2.zero;
         }
 
-
         // ---------- Script ----------
 
         private void Update()
@@ -307,10 +386,15 @@ namespace Hapio
                 if (!finishing) { finishing = true; session.FinishTutorial(); }
                 return;
             }
-            if (finishing || lineIndex >= 0) return;
-            if (!BattlePlayable()) { playableAt = -1f; return; }
-            if (playableAt < 0f) playableAt = Time.unscaledTime;
-            if (Time.unscaledTime - playableAt >= art.firstLineDelay) Advance();
+            if (finishing) return;
+            if (beatIndex < 0)
+            {
+                if (!BattlePlayable()) { playableAt = -1f; return; }
+                if (playableAt < 0f) playableAt = Time.unscaledTime;
+                if (Time.unscaledTime - playableAt >= art.firstLineDelay) Advance();
+                return;
+            }
+            if (!CurrentBeat.IsLine) UpdateAction(CurrentBeat);
         }
 
         private bool BattlePlayable() => session.IsTutorial && session.State.phase == GameFlowPhase.Playing
@@ -319,24 +403,45 @@ namespace Hapio
 
         private void OnTap()
         {
-            if (finishing || lineIndex < 0 || Time.unscaledTime - shownAt < art.tapCooldown) return;
+            if (!HasBeat || !CurrentBeat.IsLine || Time.unscaledTime - shownAt < art.tapCooldown) return;
             Advance();
         }
 
         private void Advance()
         {
             IReadOnlyList<GameTutorialStep> steps = GameTutorialScript.Steps;
-            lineIndex++;
-            while (stepIndex < steps.Count && lineIndex >= steps[stepIndex].Lines.Count)
+            beatIndex++;
+            while (stepIndex < steps.Count && beatIndex >= steps[stepIndex].Beats.Count)
             {
                 stepIndex++;
-                lineIndex = 0;
+                beatIndex = 0;
             }
             if (stepIndex >= steps.Count) { BeginFinish(); return; }
-            ShowLine(steps[stepIndex].Lines[lineIndex]);
+            ShowBeat(steps[stepIndex].Beats[beatIndex]);
         }
 
-        private void ShowLine(GameTutorialLine line)
+        private void ShowBeat(GameTutorialBeat beat)
+        {
+            shownAt = Time.unscaledTime;
+            actionDoneAt = successAt = -1f;
+            actionProgress = 0;
+            bubbleRoot.gameObject.SetActive(false);
+            banner.gameObject.SetActive(false);
+            successText.gameObject.SetActive(false);
+            hand.gameObject.SetActive(false);
+            dimTarget = beat.Focus == GameTutorialFocus.None ? 0f : 1f;
+            if (beat.IsLine)
+            {
+                board.SetAllowedGestures(LabBoardGestures.None);
+                tapCatcher.raycastTarget = true;
+                ShowLine(beat);
+                if (beat.Cue == GameTutorialCue.StaminaShort) session.Network.TutorialPlayStaminaShort();
+                return;
+            }
+            BeginAction(beat);
+        }
+
+        private void ShowLine(GameTutorialBeat line)
         {
             bool fromRight = line.Speaker == GameTutorialSpeaker.Geumok;
             bubbleText.text = line.Text;
@@ -351,17 +456,102 @@ namespace Hapio
             bubbleRoot.sizeDelta = art.bubbleSize;
             Image face = portraits[GameTutorialScript.SeatOf(line.Speaker)];
             speakerPortrait.sprite = face != null ? face.sprite : null;
-            dimTarget = line.Focus == GameTutorialFocus.None ? 0f : 1f;
             bubbleRoot.gameObject.SetActive(true);
             bubbleRoot.localScale = Vector3.zero;
-            popStartedAt = shownAt = Time.unscaledTime;
+            popStartedAt = Time.unscaledTime;
             PlaceBubble(line.Speaker);
+        }
+
+        private void BeginAction(GameTutorialBeat beat)
+        {
+            LabNetwork network = session.Network;
+            bool playerActs = beat.Action == GameTutorialAction.TapDrum;
+            // The player's own action goes through to the board; waiting on the gauge still keeps the screen.
+            tapCatcher.raycastTarget = !playerActs;
+            if (!string.IsNullOrEmpty(beat.Text))
+            {
+                bannerText.text = BannerText(beat, 0);
+                banner.gameObject.SetActive(true);
+            }
+            switch (beat.Action)
+            {
+                case GameTutorialAction.TapDrum:
+                    var results = new LabOrbKind[GameTutorialScript.DrumResults.Count];
+                    for (int i = 0; i < results.Length; i++) results[i] = GameTutorialScript.DrumResults[i];
+                    network.TutorialScriptGenerations(results);
+                    actionBaseline = LocalPlayer()?.generatedTotal ?? 0;
+                    board.SetAllowedGestures(LabBoardGestures.DrumTap);
+                    hand.gameObject.SetActive(art.hand != null);
+                    break;
+                case GameTutorialAction.RefillStamina:
+                    board.SetAllowedGestures(LabBoardGestures.None);
+                    network.TutorialHoldStamina(false);
+                    break;
+            }
+        }
+
+        private void UpdateAction(GameTutorialBeat beat)
+        {
+            if (actionDoneAt >= 0f)
+            {
+                float wait = successAt >= 0f ? art.afterActionSeconds : art.afterRefillSeconds;
+                if (Time.unscaledTime - actionDoneAt >= wait) Advance();
+                return;
+            }
+            switch (beat.Action)
+            {
+                case GameTutorialAction.TapDrum:
+                    int made = (LocalPlayer()?.generatedTotal ?? actionBaseline) - actionBaseline;
+                    if (made != actionProgress)
+                    {
+                        actionProgress = made;
+                        bannerText.text = BannerText(beat, made);
+                    }
+                    if (made >= beat.Count) CompleteAction(true);
+                    break;
+                case GameTutorialAction.RefillStamina:
+                    LabPlayerState me = LocalPlayer();
+                    LabConfig config = session.Network.config;
+                    if (me != null && config != null && me.stamina >= config.StaminaMax - .001f
+                        && Time.unscaledTime - shownAt >= .3f) CompleteAction(false);
+                    break;
+            }
+        }
+
+        private void CompleteAction(bool success)
+        {
+            actionDoneAt = Time.unscaledTime;
+            board.SetAllowedGestures(LabBoardGestures.None);
+            tapCatcher.raycastTarget = true;
+            hand.gameObject.SetActive(false);
+            // The empty gauge breathes back only a sliver, still short of a tap, so the short cue's red shows on it.
+            if (CurrentBeat.Action == GameTutorialAction.TapDrum && session.Network.config != null)
+                session.Network.TutorialCapStamina(ShortStaminaFor(session.Network.config.GenerateCost, art.shortStaminaShareOfTap));
+            if (!success) return;
+            successAt = actionDoneAt;
+            successText.gameObject.SetActive(true);
+            successText.rectTransform.localScale = Vector3.zero;
+        }
+
+        private LabPlayerState LocalPlayer()
+        {
+            LabNetwork network = session.Network;
+            LabSnapshot snapshot = network != null ? network.Snapshot : null;
+            if (snapshot?.players == null) return null;
+            foreach (LabPlayerState player in snapshot.players)
+                if (player != null && player.id == network.LocalPlayerId) return player;
+            return null;
         }
 
         private void BeginFinish()
         {
             finishing = true;
-            if (bubbleRoot != null) bubbleRoot.gameObject.SetActive(false);
+            board.SetAllowedGestures(LabBoardGestures.None);
+            tapCatcher.raycastTarget = true;
+            bubbleRoot.gameObject.SetActive(false);
+            banner.gameObject.SetActive(false);
+            successText.gameObject.SetActive(false);
+            hand.gameObject.SetActive(false);
             dimTarget = 0f;
             StartCoroutine(FadeOutAndLeave());
         }
@@ -384,16 +574,20 @@ namespace Hapio
         {
             if (unavailable || hud == null || overlay == null) return;
             ApplyHudDressing();
-            if (lineIndex >= 0 && !finishing)
+            bool line = HasBeat && CurrentBeat.IsLine;
+            if (line)
             {
-                GameTutorialLine line = GameTutorialScript.Steps[stepIndex].Lines[lineIndex];
-                PlaceBubble(line.Speaker);
+                PlaceBubble(CurrentBeat.Speaker);
                 bubbleRoot.localScale = Vector3.one * PopScale((Time.unscaledTime - popStartedAt) / art.popSeconds,
                     art.popOvershoot);
             }
+            if (successAt >= 0f)
+                successText.rectTransform.localScale = Vector3.one * PopScale((Time.unscaledTime - successAt) / art.popSeconds,
+                    art.popOvershoot);
+            if (hand.gameObject.activeSelf) PlaceHand();
             dimGroup.alpha = Mathf.MoveTowards(dimGroup.alpha, dimTarget, Time.unscaledDeltaTime / art.dimFadeSeconds);
-            if (dimGroup.alpha > 0f) PlaceSpotlight();
-            speakerPortrait.enabled = dimGroup.alpha > .01f && speakerPortrait.sprite != null && !finishing;
+            if (HasBeat && CurrentBeat.Focus != GameTutorialFocus.None) PlaceSpotlight(CurrentBeat.Focus);
+            speakerPortrait.enabled = line && dimGroup.alpha > .01f && speakerPortrait.sprite != null;
         }
 
         private void PlaceBubble(GameTutorialSpeaker speaker)
@@ -425,14 +619,81 @@ namespace Hapio
             bubbleRoot.anchoredPosition = tip;
         }
 
-        private void PlaceSpotlight()
+        private void PlaceHand()
+        {
+            if (!TryDrumCircle(out Vector2 center, out _)) { hand.enabled = false; return; }
+            hand.enabled = true;
+            float press = HandPress((Time.unscaledTime - shownAt) / art.handTapSeconds);
+            RectTransform rect = hand.rectTransform;
+            rect.anchoredPosition = center + art.handRestOffset * (1f - press);
+            rect.localScale = Vector3.one * Mathf.Lerp(1f, art.handPressScale, press);
+        }
+
+        private void PlaceSpotlight(GameTutorialFocus focus)
         {
             Rect bounds = overlay.rect;
-            if (!TryGourdRect(out Rect target))
-                target = new Rect(bounds.center.x - 60f, bounds.yMax - bounds.height * .4f, 120f, 120f);
-            float radius = .5f * Mathf.Max(target.width, target.height) * art.spotlightPadding;
-            // The spotlight stretches over the overlay with a centered pivot, so overlay points are its local points.
-            spotlight.SetHole(target.center, radius, art.spotlightSoftness);
+            Rect target;
+            float corner;
+            if (focus == GameTutorialFocus.Stamina && TryStaminaRect(out Rect bar))
+            {
+                float pad = art.barSpotlightPadding;
+                target = new Rect(bar.xMin - pad, bar.yMin - pad, bar.width + pad * 2f, bar.height + pad * 2f);
+                corner = Mathf.Min(target.width, target.height) * .5f;
+            }
+            else
+            {
+                Vector2 center;
+                float radius;
+                if (focus == GameTutorialFocus.Drum && TryDrumCircle(out center, out radius)) { }
+                else if (TryGourdRect(out Rect gourd))
+                {
+                    center = gourd.center;
+                    radius = .5f * Mathf.Max(gourd.width, gourd.height);
+                }
+                else
+                {
+                    center = new Vector2(bounds.center.x, bounds.yMax - bounds.height * .3f);
+                    radius = 60f;
+                }
+                radius *= art.spotlightPadding;
+                target = new Rect(center.x - radius, center.y - radius, radius * 2f, radius * 2f);
+                corner = radius;
+            }
+            float soft = corner * art.spotlightSoftness;
+            // Glide to a new target while the screen stays dark; jump there when it was not dark yet.
+            float follow = !spotlightPlaced || dimGroup.alpha < .05f ? 1f
+                : 1f - Mathf.Exp(-Time.unscaledDeltaTime * art.spotlightFollow);
+            spotRect = new Rect(Mathf.Lerp(spotRect.x, target.x, follow), Mathf.Lerp(spotRect.y, target.y, follow),
+                Mathf.Lerp(spotRect.width, target.width, follow), Mathf.Lerp(spotRect.height, target.height, follow));
+            spotCorner = Mathf.Lerp(spotCorner, corner, follow);
+            spotSoft = Mathf.Lerp(spotSoft, soft, follow);
+            spotlightPlaced = true;
+            spotlight.SetHole(spotRect, spotCorner, spotSoft);
+        }
+
+        /// <summary>The local drum's center and radius in overlay units.</summary>
+        private bool TryDrumCircle(out Vector2 center, out float radius)
+        {
+            center = default;
+            radius = 0f;
+            LabSnapshot snapshot = session.Network != null ? session.Network.Snapshot : null;
+            if (snapshot?.drums == null || board == null) return false;
+            foreach (LabOrbState drum in snapshot.drums)
+            {
+                if (drum == null || drum.owner != session.Network.LocalPlayerId
+                    || !board.TryGetScreenPoint(drum.id, out Vector2 screen)) continue;
+                center = ScreenToOverlay(screen);
+                radius = board.TryGetDrumScreenDiameter(out float pixels) ? pixels * .5f / overlayCanvas.scaleFactor : 40f;
+                return true;
+            }
+            return false;
+        }
+
+        private bool TryStaminaRect(out Rect rect)
+        {
+            rect = default;
+            var bar = hud.staminaFill != null ? hud.staminaFill.transform.parent as RectTransform : null;
+            return bar != null && TryOverlayRect(bar, out rect);
         }
 
         private bool TryGourdRect(out Rect rect)
@@ -467,7 +728,6 @@ namespace Hapio
             Canvas canvas = target.GetComponentInParent<Canvas>();
             Camera eventCamera = canvas == null || canvas.rootCanvas.renderMode == RenderMode.ScreenSpaceOverlay
                 ? null : canvas.rootCanvas.worldCamera;
-            var corners = new Vector3[4];
             target.GetWorldCorners(corners);
             Vector2 min = new Vector2(float.MaxValue, float.MaxValue), max = new Vector2(float.MinValue, float.MinValue);
             foreach (Vector3 corner in corners)
@@ -485,6 +745,5 @@ namespace Hapio
             RectTransformUtility.ScreenPointToLocalPointInRectangle(overlay, screen, null, out Vector2 local);
             return local;
         }
-
     }
 }

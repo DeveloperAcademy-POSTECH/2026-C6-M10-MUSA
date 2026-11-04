@@ -42,17 +42,38 @@ namespace Hapio
         [Header("화면 어둡게 · 밝히기")]
         public Color dimColor = new Color(0f, 0f, 0f, .62f);
         [Min(.01f)] public float dimFadeSeconds = .25f;
-        [Tooltip("밝히는 원을 대상보다 몇 배 크게")] [Min(1f)] public float spotlightPadding = 1.2f;
-        [Tooltip("밝힌 원 가장자리의 번짐 (반지름 비율)")] [Range(.01f, .5f)] public float spotlightSoftness = .16f;
+        [Tooltip("동그랗게 밝히는 곳(박·북)을 대상보다 몇 배 크게")] [Min(1f)] public float spotlightPadding = 1.2f;
+        [Tooltip("막대처럼 길쭉하게 밝히는 곳(기운 막대)을 대상보다 사방으로 얼마나 크게")] [Min(0f)] public float barSpotlightPadding = 8f;
+        [Tooltip("밝힌 곳 가장자리의 번짐 (둥근 모서리 반지름 비율)")] [Range(.01f, .5f)] public float spotlightSoftness = .16f;
+        [Tooltip("밝히는 곳이 바뀔 때 옮겨 가는 빠르기 (클수록 빠름)")] [Min(1f)] public float spotlightFollow = 12f;
+
+        [Header("안내 띠 (동작을 기다릴 때)")]
+        public Font bannerFont;
+        public Color bannerTextColor = Color.black;
+        public Color bannerColor = new Color(.98f, .95f, .88f, .94f);
+        [Tooltip("띠 가운데가 화면 위에서 얼마나 내려와 있는지 (화면 높이 비율)")] [Range(0f, 1f)] public float bannerTopFraction = .3f;
+        [Min(10f)] public float bannerHeight = 46f;
+        [Min(8)] public int bannerFontSize = 20;
+        [Tooltip("동작을 해냈을 때 띠 아래에 잠깐 뜨는 \"성공!\"")] public Color successColor = new Color(.78f, .15f, .1f, 1f);
+        [Min(8)] public int successFontSize = 28;
+        [Tooltip("동작을 해낸 뒤 다음 장면까지 (\"성공!\"이 보이는 시간)")] [Min(0f)] public float afterActionSeconds = .9f;
+        [Tooltip("기운이 다 차오른 뒤 다음 장면까지")] [Min(0f)] public float afterRefillSeconds = .4f;
+        [Tooltip("북을 다 친 뒤 기운이 이만큼만 살짝 차고 멈춘다 (북 한 번 비용 대비). 1보다 작아 여전히 부족하고, 기운 부족 빨간 빛이 이 부분에 보인다.")]
+        [Range(.05f, .95f)] public float shortStaminaShareOfTap = .5f;
+
+        [Header("손 그림 (누르는 곳을 가리킴)")]
+        [Tooltip("손가락이 왼쪽 위를 가리키는 그림")] public Sprite hand;
+        public Vector2 handSize = new Vector2(64f, 64f);
+        [Tooltip("그림 안에서 손가락 끝 (왼쪽 아래 기준 비율)")] public Vector2 handTip = new Vector2(.09f, .93f);
+        [Tooltip("쉬는 동안 손가락 끝이 누를 곳에서 떨어져 있는 거리. 누를 때 이만큼 다가간다.")]
+        public Vector2 handRestOffset = new Vector2(12f, -12f);
+        [Tooltip("한 번 누르는 데 걸리는 시간")] [Min(.2f)] public float handTapSeconds = .9f;
+        [Tooltip("누르는 순간 손 크기")] [Range(.5f, 1f)] public float handPressScale = .9f;
 
         [Header("진행")]
         [Tooltip("판이 보인 뒤 첫 대사까지")] [Min(0f)] public float firstLineDelay = .6f;
         [Tooltip("대사가 뜬 뒤 다음 대사로 넘길 수 있을 때까지 (연타 방지)")] [Min(0f)] public float tapCooldown = .2f;
         [Tooltip("마지막 대사 뒤 어두워지는 시간")] [Min(.01f)] public float exitFadeSeconds = .6f;
-
-        [Header("안내 띠 (동작 단계에서 사용)")]
-        public Font bannerFont;
-        public Color bannerTextColor = Color.black;
 
         public static GameTutorialArt Load() => Resources.Load<GameTutorialArt>(ResourcePath);
     }
