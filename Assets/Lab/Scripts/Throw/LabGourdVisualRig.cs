@@ -15,7 +15,7 @@ namespace C6Lab
 
         [Tooltip("칠이 그려지는 몸통. 로컬 원점은 몸통 중심, +Y가 칠 극축이다(셰이더 normalize(positionOS)와 LabPaintSurface.CellFor가 같은 공간).")]
         public MeshRenderer paintShell;
-        [Tooltip("같은 칠 공간을 쓰는 추가 렌더러(예: 뚜껑). 닫힌 자세 기준으로 구운 메시.")]
+        [Tooltip("같은 칠 공간을 쓰는 추가 렌더러(예: 뚜껑). 닫힌 자세 기준으로 구운 메시. 칠 셰이더 재질을 이미 가졌으면 그 재질을 유지하고, 아니면 paintMaterial을 받는다.")]
         public Renderer[] paintExtras = System.Array.Empty<Renderer>();
         [Tooltip("판정 껍데기. paintShell의 identity 자식 MeshFilter이며 렌더러가 없고 Read/Write가 켜져 있어야 한다.")]
         public MeshFilter hitShell;
@@ -54,10 +54,7 @@ namespace C6Lab
                 return "hitShell must have an identity transform under paintShell.";
             if (hitShell.GetComponent<Renderer>() != null) return "hitShell must not render.";
             if (!hitShell.sharedMesh.isReadable) return "hitShell's mesh must be readable for the runtime collider.";
-            if (paintMaterial == null || paintMaterial.shader == null || paintMaterial.shader.name != PaintShaderName
-                || !paintMaterial.HasProperty("_PaintMap") || !paintMaterial.HasProperty("_PaintMapReady")
-                || !paintMaterial.HasProperty("_PainterMap"))
-                return "paintMaterial must use " + PaintShaderName + ".";
+            if (!UsesPaintShader(paintMaterial)) return "paintMaterial must use " + PaintShaderName + ".";
             if (paintExtras != null)
                 foreach (Renderer extra in paintExtras)
                     if (extra == null || !extra.transform.IsChildOf(transform) || extra == paintShell)
@@ -77,6 +74,11 @@ namespace C6Lab
             }
             return null;
         }
+
+        /// <summary>칠 셰이더와 칠 지도 속성을 가진 재질인지. 그런 재질의 추가 렌더러는 자기 재질(바탕 그림)을 유지한다.</summary>
+        public static bool UsesPaintShader(Material material) => material != null && material.shader != null
+            && material.shader.name == PaintShaderName && material.HasProperty("_PaintMap")
+            && material.HasProperty("_PaintMapReady") && material.HasProperty("_PainterMap");
 
         /// <summary>크기 고정점의 루트 기준 위치(루트 배율 1 기준).</summary>
         public Vector3 AnchorInRoot => sizeAnchor != null ? transform.InverseTransformPoint(sizeAnchor.position) : Vector3.zero;

@@ -18,7 +18,7 @@
 - 새 빌드는 `Hapio/Development Build` 메뉴를 사용한다. Lab 첫 Build Settings 항목과 기존 개발용 빌드는 바꾸지 않는다. 상세 책임·실행법·종료 조건은 `docs/GAME_FLOW.md`를 따른다.
 
 - #276 별도 게임의 고정 순서는 구미호→야광귀→지귀다. 공통 폭탄·좌우 전달 막기를 고유 패턴 추첨에 넣거나 끄지 않는다. `LabStageYokai.None`은 기존 Lab 동작을 유지한다.
-- 요괴별 기본값·규칙은 `Resources/Hapio/StageCatalog`와 StageDefinition, 실행 중 조정은 GameStageSettings 복사본으로 관리한다. #297 모든 스테이지의 표시 모델은 WhiteGourd 내부의 공통 검은 요괴이며, StageDefinition의 모델 override를 비워 두고 갱신 도구에서 구미호를 다시 연결하지 않는다. 원본 LabConfig를 자동 저장하지 않는다.
+- 요괴별 기본값·규칙은 `Resources/Hapio/StageCatalog`와 StageDefinition, 실행 중 조정은 GameStageSettings 복사본으로 관리한다. #297 1·3스테이지 표시 모델은 WhiteGourd 내부의 공통 검은 요괴이며(2스테이지는 아래 #507 야광귀 박), StageDefinition의 `yokaiVisual` override를 비워 두고 갱신 도구에서 구미호를 다시 연결하지 않는다. 원본 LabConfig를 자동 저장하지 않는다.
 
 - #281 2:2 청홍 땅따먹기는 Hapio의 독자 모드(4명, 한 판)다. 규칙은 `LabTeams`·`LabModel.Team`과 공유 설정196~199에 있고 Lab DEV에서도 4명·솔로로 켤 수 있다. Hapio에서 196 켜기는 방 모드가 정하며 DEV 탭에서 바꾸지 않는다. 전투 화면 요소(점유율 막대·피버·벽·무지개)는 실행 중에 만들고, 로비 팝업·팀 자리 화면은 `Hapio > Upgrade 2v2 Lobby UI`로만 저장한다.
 - #293/PR #382의 현재 2:2 디자인 결과는 `박 확인`·`나가기`만 표시하고 NEXT를 숨긴다. `나가기`는 `GameSession.GoHome`으로 연결을 종료하고 타이틀로 돌아간다. #281의 같은 방 로비 복귀는 `NextStage`·`ReturnTerritoryToLobby`와 구형 결과 fallback에 남아 있다. 전투 중 참가자 이탈·로딩 실패의 기존 로비 복귀 및 방장 이탈 정책은 유지한다.
@@ -81,7 +81,7 @@
 
 ## #402 보류된 요괴 확장 준비 정리
 
-- 현재 요괴 실행 자료는 `Resources/Hapio/StageCatalog`와 기존 구미호→야광귀→지귀의 StageDefinition 3개다. 기존 단계 순서·GUID·규칙·수치·모델 연결을 유지하며, 기존3종은 공통 검은 요괴를 계속 사용한다.
+- 현재 요괴 실행 자료는 `Resources/Hapio/StageCatalog`와 기존 구미호→야광귀→지귀의 StageDefinition 3개다. 기존 단계 순서·GUID·규칙·수치·모델 연결을 유지하며, 1·3스테이지는 공통 검은 요괴를 계속 사용한다(2스테이지는 #507 야광귀 박).
 - 10종 확장은 보류되어 #381의 제작용 카탈로그·정의 에셋·전용 코드·생성/검증 도구와 StageDefinition의 선택적 `content` 연결을 제거했다. #393의 공통 모듈 경로는 현재 게임에 추가하지 않는다. 확장을 재개할 때는 PR #383과 Git 이력의 자료를 확인하고 새 작업 범위를 정하며, 제거한 준비 파일을 자동 재생성하지 않는다.
 
 
@@ -169,7 +169,7 @@
 ## #461 도색 페이로드 압축 — 최신 호환 기준
 
 - `LabPaintFrame.encoding`은 0 원본, 1 deflate다. Host의 피어별 발행자는 `LabPaintEncodingPolicy.Auto`(압축이 더 짧을 때만 1)를 쓰고, 기본 생성자는 `RawOnly`다. 해시·covered·`Revision`은 늘 풀어 놓은 지도 기준이다. 수신기는 헤더에서 정한 크기 상한(full `columns·rows·5 + 시각 바이트`, delta `columns·rows·7 + 시각 바이트`) 안에서만 풀고, 넘거나 깨지면 체크포인트를 요청한다. 빈 256×128 지도는 도색 프레임 1개(Bulk 2조각)다.
-- 공유 설정 257개·인덱스는 그대로이며 최신 묶음은 **5683/Lab44/Game28**이다. 이전 5682 앱과 혼용하지 않으며, 병합 뒤에는 모든 기기가 새 빌드를 써야 한다. 실행한 검사만 `docs/VALIDATION.md`에 기록한다.
+- 공유 설정 257개·인덱스는 그대로이며 #461 당시 묶음은 **5683/Lab44/Game28**이었다(현재 기준은 아래 #507). 이전 5682 앱과 혼용하지 않으며, 병합 뒤에는 모든 기기가 새 빌드를 써야 한다. 실행한 검사만 `docs/VALIDATION.md`에 기록한다.
 
 ## #471 로비 연결 끊김 뒤 핸들러 재등록
 
@@ -196,3 +196,5 @@
 
 - 스테이지 박은 `GameStageDefinition.gourdVisualResource`(Resources 경로, 비면 흰 박)를 `GameBattleBindings.MountStageGourd`가 `LabGourdPaint.PrepareVisual`로 `Attach`보다 먼저 지정한다. 2:2·Lab 단판은 흰 박이다. 프리팹 직접 참조로 바꾸지 않는다.
 - `LabGourdVisualRig`가 없는 프리팹(흰 박)은 기존 경로를 글자 그대로 탄다. 흰 박의 마운트·판정·칠·요괴 자세는 `Assets/Lab/Tests/PlayMode/Golden/`의 main 기록과 같아야 하며, 골든은 흰 박이 바뀌는 의도된 변경에서만 `GOURD_GOLDEN_RECORD=1`로 다시 기록한다. 계약 검사 실패는 `C6_GOURD_RIG_FALLBACK`과 함께 흰 박으로 돌아간다. 상세는 `docs/GOURD_MODELS.md`.
+- 2스테이지만 `gourdVisualResource = Hapio/Gourds/Stage02_Yagwanggwi_Battle`(야광귀 박)이며 1·3은 비워 둔다(`GameStageAssets.EnsureAssets`가 1·3을 비움). 판정·도색·요괴 반응·완성/결과/PNG까지 이 박을 쓴다. 아트 원본 프리팹은 고치지 않고 `Hapio > Gourds > Bake Stage 2 Yagwanggwi Gourd`(`GameGourdRigBaker`)로만 다시 굽는다. 미리보기 덧씌우기(`GameGourdModelPreview`·`GourdPreview` 리소스)는 삭제했으며 재생성하지 않는다.
+- 2스테이지 판정 모양이 바뀌어 현재 최신 묶음은 **공유 설정 257개·5683/`C6PhysicsLab/44`/`C6HapioGame/29`**다. Game28 앱과 혼용하지 않는다.
