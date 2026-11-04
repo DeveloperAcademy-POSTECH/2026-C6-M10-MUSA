@@ -598,43 +598,6 @@ namespace C6Lab
             if (audioView != null) audioView.Apply(round.id, GroupCurtainVisible, held, CurtainVisualLevel);
         }
 
-        private void DrawCurtain(LabJigwiABRound round, LabJigwiABPlayerFire mine, ulong owner, double now, float animationTime)
-        {
-            int lit = 0;
-            foreach (var fire in mine.targets ?? Array.Empty<LabJigwiABFireTarget>()) if (fire != null && fire.lit) lit++;
-            RemainingIgnitions = lit;
-            CurtainVisualLevel = lit > 0 ? Mathf.Clamp(Mathf.CeilToInt(3f * lit / Mathf.Max(1, mine.targets.Length)), 1, 3) : 0;
-            if (CurtainVisualLevel == 0 || !TryProjectCurtain(round, owner, now, out Vector2 centre, out Vector2 size))
-            { groupFireCurtain.gameObject.SetActive(false); return; }
-            groupFireCurtain.gameObject.SetActive(true);
-            groupFireCurtain.anchoredPosition = centre; groupFireCurtain.sizeDelta = size;
-            // Each remaining-point step has its own painted silhouette. Keep the same physical
-            // frame and opacity: progress comes from the artwork, not a stretched or faded copy.
-            // The fixed textured centre keeps the gourd obscured until the final ignition is out.
-            Texture2D artwork = CurtainArtworkForLevel(CurtainVisualLevel);
-            float opacity = round.Warning(now) ? .45f : 1f;
-            curtainArt.gameObject.SetActive(true);
-            curtainArt.texture = artwork;
-            curtainArt.rectTransform.anchoredPosition = Vector2.zero;
-            curtainArt.rectTransform.sizeDelta = size;
-            curtainArt.uvRect = CoverUv(artwork, new Rect(0f, 0f, 1f, 1f), size.x / Mathf.Max(.01f, size.y));
-            AnimateFlame(curtainArt, animationTime, round.slot * 1.71f, opacity);
-            Rect core = SafeUv(curtainDenseFrame);
-            Stretch((RectTransform)curtainBody.transform, core.min, core.max);
-            curtainCore.gameObject.SetActive(true);
-            curtainCore.uvRect = CoverUv(curtainTexture, curtainDenseUv,
-                size.x * core.width / Mathf.Max(.01f, size.y * core.height));
-            AnimateFlame(curtainCore, animationTime, round.slot * 1.71f + .37f, round.Warning(now) ? .45f : 1f);
-        }
-
-        private Texture2D CurtainArtworkForLevel(int level)
-        {
-            if (level == 1 && curtainStage1Texture != null) return curtainStage1Texture;
-            if (level == 2 && curtainStage2Texture != null) return curtainStage2Texture;
-            // A partially imported prefab must remain visible instead of becoming a white quad.
-            return curtainTexture != null ? curtainTexture : flameTexture;
-        }
-
         private static Rect SafeUv(Rect value)
         {
             float x = Mathf.Clamp(value.x, 0f, .99f), y = Mathf.Clamp(value.y, 0f, .99f);

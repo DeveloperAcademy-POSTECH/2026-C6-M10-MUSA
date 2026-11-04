@@ -379,8 +379,8 @@ namespace C6Lab
             new LabDeveloperField("Reserved Jigwi A Recovery Multiplier (unused)", 1f, 10f),
             new LabDeveloperField("Reserved Jigwi A Required Hits (unused)", 1f, 10f, true),
             new LabDeveloperField("지귀 A 구슬 소각 대기 (초)", .5f, 30f),
-            new LabDeveloperField("지귀 B 개인 불 개수", 1f, 6f, true),
-            new LabDeveloperField("지귀 B 소화 후 재점화 (초)", 1f, 60f),
+            new LabDeveloperField("Reserved Jigwi B Fire Count (unused)", 1f, 6f, true),
+            new LabDeveloperField("Reserved Jigwi B Relight (unused)", 1f, 60f),
             new LabDeveloperField("Reserved Jigwi B Shrink Delay (unused)", 0f, 60f),
             new LabDeveloperField("Reserved Jigwi B Shrink Scale (unused)", .2f, 1f),
             new LabDeveloperField("지귀 B 불 이동 폭", 0f, .1f),
@@ -418,9 +418,10 @@ namespace C6Lab
         /// common battle time). They keep their places in the shared form so every other index stays put, but nothing
         /// reads them and DEV never shows them. #388 also retires the fixed warning slot and screen-B shrink delay/scale while preserving their stored values.
         /// #479 retires Jigwi A's recovery multiplier and required hits: A is now cleared by a talisman, not by boss hits.
+        /// #509 retires Jigwi B's fire count and relight: each picked seat has one pillar that never relights.
         /// </summary>
         public static IReadOnlyCollection<int> RetiredDeveloperFields { get; } =
-            Array.AsReadOnly(new[] { 55, 87, 88, 152, 154, 167, 168, 211, 229, 230, 231, 232, 233, 234, 241, 242, 246, 247 });
+            Array.AsReadOnly(new[] { 55, 87, 88, 152, 154, 167, 168, 211, 229, 230, 231, 232, 233, 234, 241, 242, 244, 245, 246, 247 });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
         public static IReadOnlyList<LabOrbKind> GeneratedKinds { get; } = Array.AsReadOnly(new[]
@@ -452,7 +453,7 @@ namespace C6Lab
                 134, 132, 133, 148, 149, 150, 151, 200, 201),
             new LabDeveloperCategory("Minimap", 98, 99, 100, 101),
             new LabDeveloperCategory("Jigwi", 178, 179, 180, 181, 182, 183, 192, 193, 194, 195),
-            new LabDeveloperCategory("지귀 120초 (Hapio 전용)", 228, 235, 240, 243, 244, 245, 248, 249, 250, 251, 252, 253, 254, 255, 256),
+            new LabDeveloperCategory("지귀 120초 (Hapio 전용)", 228, 235, 240, 243, 248, 249, 250, 251, 252, 253, 254, 255, 256),
             // 기믹 묶음 (#311): 공용(폭탄·넘기기 막기)과 고유(구미호: 여우불·매혹)를 나눠 간격·켜기·비율·세부값을 모은다.
             new LabDeveloperCategory("Gimmicks", 205, 207, 169, 208, 170, 153,
                 166, 206, 209, 171, 210, 172, 173, 174, 175, 176, 204, 177)
@@ -524,8 +525,8 @@ namespace C6Lab
         [HideInInspector, SerializeField, Range(1f, 10f)] private float jigwiABPersonalRecoveryMultiplier = 4f;
         [HideInInspector, SerializeField, Range(1, 10)] private int jigwiABPersonalRequiredHits = 3;
         [SerializeField, Range(.5f, 30f)] private float jigwiABPersonalBurnSeconds = 5f;
-        [SerializeField, Range(1, 6)] private int jigwiABGroupFireCount = 3;
-        [SerializeField, Range(1f, 60f)] private float jigwiABRelightSeconds = 12f;
+        [HideInInspector, SerializeField, Range(1, 6)] private int jigwiABGroupFireCount = 3;
+        [HideInInspector, SerializeField, Range(1f, 60f)] private float jigwiABRelightSeconds = 12f;
         [Tooltip("#479 Inspector 전용: A 동안 한 사람 판의 구슬이 하나씩 차례로 탈 때의 간격(초). 첫 구슬은 DEV '지귀 A 구슬 소각 대기' 뒤에 탄다. 0이면 모두 한꺼번에. Host 값만 쓴다.")]
         [SerializeField, Range(0f, 5f)] private float jigwiABBurnStaggerSeconds = 1f;
         [Tooltip("#479 Inspector 전용: 부적(\"물\")을 다 쓴 사람 판에 생기는 물방울 무늬 물 구슬 수. 0이면 보상 없음. Host 값만 쓴다.")]

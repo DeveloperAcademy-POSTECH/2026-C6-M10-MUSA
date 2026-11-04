@@ -11,7 +11,6 @@ namespace C6Lab
         private readonly List<LabJigwiABRound> jigwiABRounds = new List<LabJigwiABRound>();
         private readonly HashSet<string> jigwiABActivated = new HashSet<string>(StringComparer.Ordinal);
         private bool jigwiABEnabled;
-        private int jigwiABFireCount;
         private const double JigwiABMissionSeconds = LabJigwiABTimeline.GroupMissionSeconds, JigwiABRewardSeconds = 5d;
         private const uint JigwiGroupPickSalt = 0x509B1C4Bu;
         // #479: A burns each owner's orbs one at a time. The last queued deadline per owner for the running A.
@@ -19,7 +18,7 @@ namespace C6Lab
         private string jigwiABBurnQueueId;
         private int jigwiTalismanWaterCount;
         private float jigwiTalismanWaterLifetime, jigwiTalismanWaterPaint;
-        private float jigwiABDuration, jigwiABBurnSeconds, jigwiABBurnStagger, jigwiABRelight,
+        private float jigwiABDuration, jigwiABBurnSeconds, jigwiABBurnStagger,
             jigwiABMoveAmount, jigwiABMovePeriod, jigwiABTargetRadius, jigwiABRewardSize, jigwiABRewardPaint;
         private ulong jigwiABFailureRevision;
         public bool JigwiABEnabled => jigwiABEnabled;
@@ -46,7 +45,6 @@ namespace C6Lab
             jigwiABBurnSeconds = config.JigwiABPersonalBurnSeconds; jigwiABBurnStagger = config.JigwiABBurnStaggerSeconds;
             jigwiTalismanWaterCount = config.JigwiTalismanWaterCount; jigwiTalismanWaterLifetime = config.JigwiTalismanWaterLifetimeSeconds;
             jigwiTalismanWaterPaint = config.JigwiTalismanWaterPaintScale;
-            jigwiABFireCount = config.JigwiABGroupFireCount; jigwiABRelight = config.JigwiABRelightSeconds;
             jigwiABRewardSize = config.JigwiABRewardSizeScale; jigwiABRewardPaint = config.JigwiABRewardPaintScale;
             jigwiABMoveAmount = config.JigwiABFireMoveAmount; jigwiABMovePeriod = config.JigwiABFireMovePeriodSeconds;
             jigwiABTargetRadius = config.JigwiABFireTargetRadius;
