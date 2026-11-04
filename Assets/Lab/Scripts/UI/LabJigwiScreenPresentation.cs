@@ -139,6 +139,23 @@ namespace C6Lab
                     transform.SetSiblingIndex(Math.Max(0, pause.GetSiblingIndex()
                         - (transform.GetSiblingIndex() < pause.GetSiblingIndex() ? 1 : 0)));
             }
+            EnsureTalisman();
+        }
+
+        /// <summary>#479: the talisman that covers this player's board during A. Created at runtime, never saved in the prefab.</summary>
+        public LabJigwiTalismanOverlay Talisman { get; private set; }
+        private void EnsureTalisman()
+        {
+            if (!Application.isPlaying) return;
+            if (Talisman == null)
+            {
+                var go = new GameObject("Jigwi Talisman (#479)", typeof(RectTransform));
+                go.layer = gameObject.layer;
+                var rect = (RectTransform)go.transform; rect.SetParent(transform, false);
+                rect.anchorMin = Vector2.zero; rect.anchorMax = Vector2.one; rect.offsetMin = rect.offsetMax = Vector2.zero;
+                Talisman = go.AddComponent<LabJigwiTalismanOverlay>();
+            }
+            Talisman.Bind(source, font);
         }
 
         /// <summary>Used by the dedicated prefab builder; never rebuilds the existing battle Canvas.</summary>
