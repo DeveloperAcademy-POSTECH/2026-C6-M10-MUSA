@@ -2845,6 +2845,7 @@ namespace C6Lab
             developerSolo = false;
             tutorialSeats = false;
             tutorialPassKinds.Clear();
+            if (board != null) board.SetSwipeBlockCountdown(true);
             latest = null;
             sessionId = null;
             configRevision = 0;

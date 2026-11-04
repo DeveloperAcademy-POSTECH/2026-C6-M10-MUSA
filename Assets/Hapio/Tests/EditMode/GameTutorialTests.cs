@@ -540,6 +540,105 @@ namespace Hapio.Tests
         }
 
         [Test]
+        public void BlockStepShutsTheRightEdgeThenTheDrumGoesLeftToMukAndAllFourSayGo()
+        {
+            Assert.That(GameTutorialScript.Steps.Count, Is.EqualTo(7));
+            GameTutorialStep block = GameTutorialScript.Steps[6];
+            Assert.That(block, Is.SameAs(GameTutorialScript.Block), "The last step.");
+            GameTutorialBeat[] beats = block.Beats.ToArray();
+            CollectionAssert.AreEqual(new[]
+            {
+                GameTutorialAction.WatchBlock, GameTutorialAction.None, GameTutorialAction.None, GameTutorialAction.None,
+                GameTutorialAction.None, GameTutorialAction.PassDrumLeft, GameTutorialAction.None, GameTutorialAction.None,
+                GameTutorialAction.None, GameTutorialAction.None, GameTutorialAction.None
+            }, beats.Select(beat => beat.Action).ToArray());
+            CollectionAssert.AreEqual(new[]
+            {
+                "어? 오른쪽이 빨개졌어!", "요괴가 오른쪽을 막은 것 같아!", "막힌 쪽은 튕겨 나와.\n반대쪽 묵이한테 북을 넘겨!",
+                "드디어 내 차례가 왔네\n기다리느라 힘들었어...", "받았어. 고마워.", "좋아, 이 정도면\n잡을 수 있겠어!",
+                "앞으로 나올 요괴들이 어떤 방해를 할지 모르니,\n조심하자!", "이번엔 진짜다!\n다 같이 가자!", "가보자!"
+            }, block.Lines.Select(line => line.Text).ToArray());
+            CollectionAssert.AreEqual(new[]
+            {
+                GameTutorialSpeaker.Bul, GameTutorialSpeaker.Geumok, GameTutorialSpeaker.Geumok, GameTutorialSpeaker.Muk,
+                GameTutorialSpeaker.Muk, GameTutorialSpeaker.Geumok, GameTutorialSpeaker.Geumok, GameTutorialSpeaker.Bul,
+                GameTutorialSpeaker.Muk
+            }, block.Lines.Select(line => line.Speaker).ToArray());
+            Assert.That(string.IsNullOrEmpty(beats[0].Text), Is.True, "The red flashes come first, with no banner.");
+            Assert.That(beats.All(beat => beat.Focus == GameTutorialFocus.None), Is.True, "Nothing darkens the red edge.");
+            Assert.That(GameTutorialDirector.BannerText(beats[5], 0), Is.EqualTo("북을 왼쪽 끝으로 밀어 묵이에게 넘기시오"));
+            Assert.That(GameTutorialScript.BlockedSide, Is.EqualTo(1), "The yokai shuts the right edge, 금옥이's side.");
+            var art = ScriptableObject.CreateInstance<GameTutorialArt>();
+            try
+            {
+                Assert.That(art.blockWarningSeconds, Is.EqualTo(LabOrbEdgeBlock.OpeningSeconds), "The first line waits out the flashes.");
+            }
+            finally { Object.DestroyImmediate(art); }
+        }
+
+        [Test]
+        public void TutorialSwipeBlockHoldsUntilLiftedAndStopsOnlyMyPassesThatWay()
+        {
+            using (var settings = new GameStageSettings(Resources.Load<LabConfig>("LabConfig"), GameStageCatalog.RequireDefault()))
+            {
+                LabConfig tutorial = settings.CreateTutorialConfig();
+                try
+                {
+                    const ulong me = 0UL;
+                    ulong geumok = LabNetwork.TutorialRightSeatId, muk = LabNetwork.TutorialLeftSeatId;
+                    var model = new LabModel();
+                    double now = 10d;
+                    model.Begin("tutorial-block", new[] { geumok, me, muk }, now, tutorial, LabStageYokai.Gumiho);
+                    model.TutorialHandDrumsTo(me);
+                    string drum = model.Snapshot(now).drums[0].id;
+                    Assert.That(model.TutorialBlockSwipe(me, GameTutorialScript.BlockedSide, now), Is.True);
+                    Assert.That(model.TutorialBlockSwipe(0xDEADUL, 1, now), Is.False, "Only a player at the table.");
+
+                    // An hour later it still holds: it waits for the player, not the clock.
+                    now += 3600d;
+                    LabSnapshot held = model.Snapshot(now);
+                    Assert.That((held.SwipeBlockOn(me), held.swipeBlockedRight), Is.EqualTo((true, true)));
+                    Assert.That(held.swipeBlockedUntil - held.serverTime, Is.GreaterThan(3600d));
+                    Assert.That(model.SwipeBlocked(me, false, now), Is.False, "The left edge stays open.");
+
+                    Assert.That(model.TryTransferAt(me, drum, true, new Vector2(1f, .5f), new Vector2(1f, 0f), "blocked", now,
+                        LabEdgeCrossingKind.Swipe, out _, out string why), Is.False);
+                    Assert.That(why, Is.EqualTo("SWIPE_BLOCKED"));
+                    now += .5d;
+                    Assert.That(model.TryTransferAt(me, drum, false, new Vector2(0f, .5f), new Vector2(-1f, 0f), "to-muk", now,
+                        LabEdgeCrossingKind.Swipe, out _, out why), Is.True, why);
+                    Assert.That(model.Snapshot(now).drums[0].owner, Is.EqualTo(muk));
+
+                    Assert.That(model.TutorialBlockSwipe(me, 0, now), Is.True);
+                    LabSnapshot lifted = model.Snapshot(now);
+                    Assert.That((lifted.SwipeBlockOn(me), lifted.swipeBlockedUntil), Is.EqualTo((false, -1d)));
+                    Assert.That(model.SwipeBlocked(me, true, now), Is.False);
+                }
+                finally { Object.DestroyImmediate(tutorial); }
+            }
+        }
+
+        [Test]
+        public void HeldSwipeBlockEdgeGlowsWithoutACountdown()
+        {
+            var board = new GameObject("Tutorial Block Board");
+            try
+            {
+                LabOrbEdgeBlock edge = LabOrbEdgeBlock.Create(board.transform);
+                edge.SecondsShown = false;
+                edge.Show(true, 1f, -1f, 1f, 2f, .1f);
+                edge.SetSeconds((float)LabModel.TutorialSwipeBlockHoldSeconds);
+                Assert.That((edge.Visible, edge.Right), Is.EqualTo((true, true)));
+                Assert.That(edge.SecondsText, Is.Empty, "No 86400 on the edge.");
+                edge.SecondsShown = true;
+                Assert.That(edge.SecondsText, Is.EqualTo("86400"), "The game's own blocks still count down.");
+                edge.Hide();
+                Assert.That(edge.Visible, Is.False);
+            }
+            finally { Object.DestroyImmediate(board); }
+        }
+
+        [Test]
         public void MirrorSlidesInShowsTheDrumArriveAndSlidesOut()
         {
             GameTutorialDirector.MirrorPose(0f, out float offset, out float alpha, out float drum);

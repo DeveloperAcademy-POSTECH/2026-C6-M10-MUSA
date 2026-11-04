@@ -103,6 +103,10 @@ namespace Hapio
         [Tooltip("폭탄 넘기기 안내(5단계)에서 손이 한 번 끄는 데 걸리는 시간. 폭탄은 무거워 더 세게 밀어야 해서 북보다 빠르다.")]
         [Min(.3f)] public float bombHandDragSeconds = 1.1f;
 
+        [Header("막기 (6단계)")]
+        [Tooltip("요괴가 오른쪽을 막은 뒤 첫 대사까지 가장자리가 번쩍이는 시간. 막힌 가장자리는 처음에 세 번 번쩍인다 (1.05초).")]
+        [Min(0f)] public float blockWarningSeconds = C6Lab.LabOrbEdgeBlock.OpeningSeconds;
+
         [Header("화살표 (끌어 놓을 방향)")]
         public Color arrowColor = new Color(.36f, .66f, .29f, 1f);
         [Min(1f)] public float arrowWidth = 7f;

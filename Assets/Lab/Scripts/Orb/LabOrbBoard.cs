@@ -191,6 +191,7 @@ namespace C6Lab
         private Rect bounds;
         private int blockedSide;
         private float blockSecondsLeft;
+        private bool swipeBlockCountdown = true;
         private LabOrbEdgeBlock edgeBlock;
         // 땅따먹기: the closed edge of this board for the whole battle: -1 left, +1 right, LabTeams.BothSides (1:1, #394).
         private int teamWallSide;
@@ -738,9 +739,20 @@ namespace C6Lab
             if (edgeBlock != null) edgeBlock.Hide();
         }
 
+        /// <summary>Whether the swipe block writes its seconds left on the edge (false for the tutorial's held block).</summary>
+        public void SetSwipeBlockCountdown(bool shown)
+        {
+            swipeBlockCountdown = shown;
+            if (edgeBlock != null) edgeBlock.SecondsShown = shown;
+        }
+
         private void ShowSwipeBlock()
         {
-            if (edgeBlock == null) edgeBlock = LabOrbEdgeBlock.Create(transform);
+            if (edgeBlock == null)
+            {
+                edgeBlock = LabOrbEdgeBlock.Create(transform);
+                edgeBlock.SecondsShown = swipeBlockCountdown;
+            }
             // The side planes are the board's visible side edges; the area gives the edge's height there.
             float edgeX = blockedSide > 0 ? bounds.xMax : bounds.xMin;
             Vector2 range = areaShape.VerticalRange(edgeX, 0f);

@@ -74,6 +74,7 @@ MonoBehaviour:
   wrongSideReturnDelay: 0.8
   bombReturnDelay: 0.35
   bombHandDragSeconds: 1.1
+  blockWarningSeconds: 1.05
   arrowColor: {r: 0.36, g: 0.66, b: 0.29, a: 1}
   arrowWidth: 7
   arrowHeadLength: 18

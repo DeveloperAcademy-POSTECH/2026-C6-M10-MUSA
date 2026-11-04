@@ -63,6 +63,20 @@ namespace C6Lab
             return true;
         }
 
+        /// <summary>
+        /// 6단계: the gourd holds one of my side edges shut (+1 right, -1 left) until lifted (0). It is the game's own
+        /// swipe block (#215) — the red edge, its opening flashes, the gourd's warning and the bounce — with no countdown
+        /// written on the edge, since it waits for the player instead of running out.
+        /// </summary>
+        public bool TutorialBlockSwipe(int side)
+        {
+            if (!TutorialHostReady || !model.TutorialBlockSwipe(LocalPlayerId, side,
+                battleClock.Now(Time.realtimeSinceStartupAsDouble))) return false;
+            if (board != null) board.SetSwipeBlockCountdown(false);
+            PublishSnapshot(true);
+            return true;
+        }
+
         /// <summary>This device's practice board with two virtual neighbors.</summary>
         public bool IsTutorial => tutorialSeats;
 

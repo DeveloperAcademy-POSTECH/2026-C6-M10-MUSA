@@ -292,7 +292,35 @@ namespace Hapio.Tests
             Assert.That(opened.Count(orb => orb.kind == LabOrbKind.Combined && orb.element != LabOrbElement.None),
                 Is.GreaterThanOrEqualTo(2), "Two elemental orbs for 6단계.");
             for (int line = 0; line < 3; line++) yield return TapThrough(director, tap, art);
-            Assert.That(director.IsFinishing, Is.True, "5단계 is the last step for now.");
+
+            // 6단계: the yokai shuts my right edge; it flashes red before anyone speaks. Pushed right the drum bounces off;
+            // passed left to 묵이, the block lifts and the four say their last words.
+            Assert.That(director.StepIndex, Is.EqualTo(6));
+            Assert.That(director.CurrentBeat.Action, Is.EqualTo(GameTutorialAction.WatchBlock));
+            yield return Until(() => board.BlockedSide == 1, "The right edge is shut", 2f);
+            Assert.That(board.EdgeBlock.Opening, Is.True, "It opens with its red flashes.");
+            Assert.That(board.EdgeBlock.SecondsText, Is.Empty, "The held block writes no countdown.");
+            Assert.That(director.IsShowingLine, Is.False, "No bubble over the flashes.");
+            yield return Until(() => director.IsShowingLine, "\"어? 오른쪽이 빨개졌어!\" after the flashes", 5f);
+            Assert.That(board.EdgeBlock.Opening, Is.False);
+            for (int line = 0; line < 4; line++) yield return TapThrough(director, tap, art);
+            Assert.That(director.CurrentBeat.Action, Is.EqualTo(GameTutorialAction.PassDrumLeft));
+            Assert.That(board.AllowedGestures, Is.EqualTo(LabBoardGestures.DrumMove), "Only the drum moves.");
+            int bounces = board.BlockBounces;
+            yield return FlickDrum(board, 1f);
+            yield return Until(() => board.BlockBounces > bounces, "Pushed right, the drum bounces off the red edge", 5f);
+            Assert.That(network.Snapshot.drums[0].owner, Is.Not.EqualTo(LabNetwork.TutorialRightSeatId), "Nothing reached 금옥이.");
+            // A hard push can carry the bounced drum all the way to 묵이; otherwise push it left.
+            yield return new WaitForSecondsRealtime(1.5f);
+            if (director.IsWaitingForAction) yield return FlickDrum(board, -1f);
+            yield return Until(() => !director.IsWaitingForAction, "The drum reaches 묵이", 10f);
+            Assert.That(network.Snapshot.drums[0].owner, Is.EqualTo(LabNetwork.TutorialLeftSeatId));
+            yield return Until(() => board.BlockedSide == 0, "The block lifts once 묵이 has the drum", 2f);
+            Assert.That(network.Snapshot.SwipeBlockOn(network.LocalPlayerId), Is.False);
+            yield return Until(() => director.CurrentBeat.IsLine, "\"받았어. 고마워.\" after 성공!", 10f);
+            Assert.That(director.CurrentBeat.Speaker, Is.EqualTo(GameTutorialSpeaker.Muk));
+            for (int line = 0; line < 5; line++) yield return TapThrough(director, tap, art);
+            Assert.That(director.IsFinishing, Is.True, "\"가보자!\" ends the tutorial.");
             yield return Until(() => session.State.phase == GameFlowPhase.Home && !session.IsLoadingScene
                 && session.RoomBrowserVisible, "The tutorial leaves for the room list", 30f);
             Assert.That(session.IsTutorial, Is.False);

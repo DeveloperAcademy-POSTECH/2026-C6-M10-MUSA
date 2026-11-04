@@ -581,7 +581,7 @@ namespace Hapio
             LabNetwork network = session.Network;
             bool playerActs = beat.Action == GameTutorialAction.TapDrum || beat.Action == GameTutorialAction.CombineOrbs
                 || beat.Action == GameTutorialAction.ThrowOrb || beat.Action == GameTutorialAction.PassDrum
-                || beat.Action == GameTutorialAction.PassBomb;
+                || beat.Action == GameTutorialAction.PassBomb || beat.Action == GameTutorialAction.PassDrumLeft;
             // The player's own action goes through to the board; waiting on the gauge still keeps the screen.
             tapCatcher.raycastTarget = !playerActs;
             if (!string.IsNullOrEmpty(beat.Text))
@@ -643,6 +643,18 @@ namespace Hapio
                     break;
                 case GameTutorialAction.WaitBombOpen:
                     board.SetAllowedGestures(LabBoardGestures.None);
+                    break;
+                case GameTutorialAction.WatchBlock:
+                    // The yokai shuts my right edge: it flashes red three times before anyone speaks.
+                    board.SetAllowedGestures(LabBoardGestures.None);
+                    network.TutorialBlockSwipe(GameTutorialScript.BlockedSide);
+                    break;
+                case GameTutorialAction.PassDrumLeft:
+                    // Only the drum moves. The right edge is shut, so pushed that way it bounces back off the red edge.
+                    board.SetAllowedGestures(LabBoardGestures.DrumMove);
+                    network.TutorialAllowPasses(-1, LabOrbKind.Drum);
+                    hand.gameObject.SetActive(art.hand != null);
+                    arrow.gameObject.SetActive(true);
                     break;
                 case GameTutorialAction.ThrowOrb:
                     // The banner moves down to just above the board so the gourd stays in sight.
@@ -852,7 +864,8 @@ namespace Hapio
         }
 
         /// <summary>4단계: the hand drags the drum to the right edge along the arrow, again and again.</summary>
-        private void PlacePassGuide()
+        /// <summary>4·6단계: the hand drags the drum to one side's edge (+1 right to 금옥이, -1 left to 묵이).</summary>
+        private void PlacePassGuide(int side)
         {
             bool shown = !board.IsHolding && TryDrumOwner(out LabOrbState drum) && drum.owner == session.Network.LocalPlayerId
                 && TryDrumCircle(out Vector2 from, out float radius);
@@ -860,9 +873,11 @@ namespace Hapio
             hand.gameObject.SetActive(shown && art.hand != null);
             if (!shown) return;
             TryDrumCircle(out from, out radius);
-            Vector2 to = new Vector2(overlay.rect.xMax - art.screenMargin, from.y);
-            float start = radius + art.arrowGap;
-            arrow.Set(new Vector2(from.x + start, from.y), new Vector2(Mathf.Max(from.x + start, to.x), from.y),
+            float way = side < 0 ? -1f : 1f;
+            Vector2 to = new Vector2(way > 0f ? overlay.rect.xMax - art.screenMargin : overlay.rect.xMin + art.screenMargin, from.y);
+            float start = from.x + way * (radius + art.arrowGap);
+            float end = way > 0f ? Mathf.Max(start, to.x) : Mathf.Min(start, to.x);
+            arrow.Set(new Vector2(start, from.y), new Vector2(end, from.y),
                 art.arrowWidth, art.arrowHeadLength, art.arrowHeadWidth);
             HandDrag((Time.unscaledTime - shownAt) / art.handDragSeconds, out float travel, out float press, out float alpha);
             RectTransform rect = hand.rectTransform;
@@ -925,6 +940,18 @@ namespace Hapio
                     // Done once no bomb is left anywhere: it opened into its two orbs, in the same snapshot. It may
                     // already have opened while "앗 뜨거!" was still up, so nothing is counted from this beat's start.
                     if (!TryBomb(out _) && Time.unscaledTime - shownAt >= .3f) CompleteAction(false);
+                    break;
+                case GameTutorialAction.WatchBlock:
+                    if (Time.unscaledTime - shownAt >= art.blockWarningSeconds) CompleteAction(false);
+                    break;
+                case GameTutorialAction.PassDrumLeft:
+                    if (TryDrumOwner(out LabOrbState given) && given.owner == LabNetwork.TutorialLeftSeatId)
+                    {
+                        actionProgress = 1;
+                        CompleteAction(true);
+                        // The block held until now, however long it took.
+                        session.Network.TutorialBlockSwipe(0);
+                    }
                     break;
                 case GameTutorialAction.PassDrum:
                     if (!TryDrumOwner(out LabOrbState drum)) break;
@@ -1030,7 +1057,8 @@ namespace Hapio
             bool waiting = HasBeat && actionDoneAt < 0f;
             if (waiting && CurrentBeat.Action == GameTutorialAction.CombineOrbs) PlaceDragGuide();
             else if (waiting && CurrentBeat.Action == GameTutorialAction.ThrowOrb) PlaceThrowGuide();
-            else if (waiting && CurrentBeat.Action == GameTutorialAction.PassDrum) PlacePassGuide();
+            else if (waiting && CurrentBeat.Action == GameTutorialAction.PassDrum) PlacePassGuide(1);
+            else if (waiting && CurrentBeat.Action == GameTutorialAction.PassDrumLeft) PlacePassGuide(-1);
             else if (waiting && CurrentBeat.Action == GameTutorialAction.PassBomb) PlaceBombGuide();
             else if (hand.gameObject.activeSelf) PlaceHand();
             dimGroup.alpha = Mathf.MoveTowards(dimGroup.alpha, dimTarget, Time.unscaledDeltaTime / art.dimFadeSeconds);

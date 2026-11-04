@@ -51,7 +51,17 @@ namespace Hapio
         /// </summary>
         PassBomb,
         /// <summary>금옥이가 돌려준 폭탄(자물쇠 1→0)이 내 판에서 멈춰 공격 구슬 두 개로 열릴 때까지 기다린다. 화면은 누를 수 없다.</summary>
-        WaitBombOpen
+        WaitBombOpen,
+        /// <summary>
+        /// 요괴가 내 판 오른쪽 끝을 막는다(실제 박의 넘기기 막기). 막힌 가장자리가 빨갛게 세 번 번쩍이는 동안 기다리고,
+        /// 그다음 대사가 뜬다. 화면은 누를 수 없다. 막기는 시간이 흐르지 않고, 북을 묵이에게 넘길 때 풀린다.
+        /// </summary>
+        WatchBlock,
+        /// <summary>
+        /// 북을 왼쪽 끝으로 밀어 묵이에게 넘긴다. 북 옮기기만 열린다. 오른쪽은 막혀 있어 북이 튕겨 나온다.
+        /// 묵이가 받으면 막기가 풀린다.
+        /// </summary>
+        PassDrumLeft
     }
 
     /// <summary>한 장면이 뜰 때 함께 보여 주는 연출.</summary>
@@ -195,6 +205,7 @@ namespace Hapio
             GameTutorialBeat.Line(GameTutorialSpeaker.Bul, text, focus);
         private static GameTutorialBeat Geumok(string text, GameTutorialFocus focus = GameTutorialFocus.None,
             GameTutorialCue cue = GameTutorialCue.None) => GameTutorialBeat.Line(GameTutorialSpeaker.Geumok, text, focus, cue);
+        private static GameTutorialBeat Muk(string text) => GameTutorialBeat.Line(GameTutorialSpeaker.Muk, text);
 
         /// <summary>0단계 · 목표: 박을 오행의 기운으로 빈틈없이 칠하면 요괴를 가둔다.</summary>
         public static readonly GameTutorialStep Goal = new GameTutorialStep("0단계 · 목표",
@@ -280,7 +291,7 @@ namespace Hapio
 
         /// <summary>
         /// 5단계 · 폭탄: 요괴가 박에서 자물쇠 2짜리 폭탄을 떨어뜨린다. 오른쪽 금옥이에게 넘기면(2→1) 금옥이가 "앗 뜨거!" 하며
-        /// 도로 넘겨주고(1→0), 풀린 폭탄은 내 판에서 공격 구슬 두 개로 열린다. 그 구슬은 6단계에서 넘긴다.
+        /// 도로 넘겨주고(1→0), 풀린 폭탄은 내 판에서 공격 구슬 두 개로 열린다.
         /// </summary>
         public static readonly GameTutorialStep Bomb = new GameTutorialStep("5단계 · 폭탄",
             GameTutorialBeat.Line(GameTutorialSpeaker.Bul, "으악! 박에서 뭐가 떨어졌어!", cue: GameTutorialCue.DropBomb),
@@ -292,8 +303,29 @@ namespace Hapio
             Geumok("풀린 폭탄은 오행 구슬 두 개가 돼."),
             Bul("가만히 냅두면 터지니까\n얼른얼른 넘겨야겠네!"));
 
+        /// <summary>6단계에서 요괴가 막는 쪽: 내 판 오른쪽(금옥이 쪽).</summary>
+        public const int BlockedSide = 1;
+
+        /// <summary>
+        /// 6단계 · 막기 + 마무리: 요괴가 오른쪽을 막아 가장자리가 빨갛게 번쩍인 뒤 대사가 뜬다. 막힌 쪽으로 밀면 튕겨 나오고,
+        /// 반대쪽 묵이에게 북을 넘기면 막기가 풀린다. 넷이 한마디씩 하고 어두워지며 방 목록으로 간다.
+        /// </summary>
+        public static readonly GameTutorialStep Block = new GameTutorialStep("6단계 · 막기",
+            GameTutorialBeat.Do(GameTutorialAction.WatchBlock, string.Empty, GameTutorialFocus.None),
+            Bul("어? 오른쪽이 빨개졌어!"),
+            Geumok("요괴가 오른쪽을 막은 것 같아!"),
+            Geumok("막힌 쪽은 튕겨 나와.\n반대쪽 묵이한테 북을 넘겨!"),
+            Muk("드디어 내 차례가 왔네\n기다리느라 힘들었어..."),
+            GameTutorialBeat.Do(GameTutorialAction.PassDrumLeft, "북을 왼쪽 끝으로 밀어 묵이에게 넘기시오", GameTutorialFocus.None),
+            Muk("받았어. 고마워."),
+            Geumok("좋아, 이 정도면\n잡을 수 있겠어!"),
+            Geumok("앞으로 나올 요괴들이 어떤 방해를 할지 모르니,\n조심하자!"),
+            Bul("이번엔 진짜다!\n다 같이 가자!"),
+            Muk("가보자!"));
+
         /// <summary>순서대로 진행하는 단계들. 마지막 단계가 끝나면 어두워지며 방 목록으로 간다.</summary>
-        public static readonly IReadOnlyList<GameTutorialStep> Steps = Array.AsReadOnly(new[] { Goal, Drum, Combine, Throw, Pass, Bomb });
+        public static readonly IReadOnlyList<GameTutorialStep> Steps =
+            Array.AsReadOnly(new[] { Goal, Drum, Combine, Throw, Pass, Bomb, Block });
 
         /// <summary>
         /// The seat (P number - 1) each speaker sits in. A player's right neighbor is the previous seat and the left

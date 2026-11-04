@@ -170,6 +170,33 @@ namespace C6Lab
             return true;
         }
 
+        /// <summary>How long a tutorial swipe block holds unless lifted: as long as the practice battle itself.</summary>
+        public const double TutorialSwipeBlockHoldSeconds = 86400d;
+
+        /// <summary>
+        /// 6단계: the gourd shuts one of <paramref name="target"/>'s side edges (+1 right, -1 left) the same way as its
+        /// timed swipe block (#215), so the edge glows red and that player's own passes bounce off it, but it holds until
+        /// the tutorial lifts it with <paramref name="side"/> 0 instead of running out.
+        /// </summary>
+        public bool TutorialBlockSwipe(ulong target, int side, double now)
+        {
+            if (phase != LabPhase.Playing || !players.ContainsKey(target)) return false;
+            if (!TryAdvance(now, out _)) return false;
+            if (side == 0)
+            {
+                swipeBlockedPlayer = 0;
+                swipeBlockedRight = false;
+                swipeBlockStartedAt = swipeBlockedUntil = -1d;
+                return true;
+            }
+            swipeBlockCount++;
+            swipeBlockedPlayer = target;
+            swipeBlockedRight = side > 0;
+            swipeBlockStartedAt = now;
+            swipeBlockedUntil = now + TutorialSwipeBlockHoldSeconds;
+            return true;
+        }
+
         private uint tutorialHandOvers;
 
         /// <summary>
