@@ -4686,3 +4686,23 @@ Metal 파이프라인(PSO)이 실제로 준비 구간에서 만들어지는지�
 - 1스테이지 관련 값은 #487 이전(`b835dc3c`)과 같다. 2스테이지 Yagwanggwi는 유지한다.
 - `GameSceneAssetTests` 기대값과 `docs/STAGE_BACKGROUNDS.md`도 SandBeige로 바로잡았다.
 - 배경 Scene·재질 EditMode 검사(`GameSceneAssetTests`·`GameStageBackgroundAssetTests`·`GameBackgroundAnimationAssetTests`) **12/12 PASS**. 화면은 #487 직전 캡처와 같은 값이라 다시 찍지 않았다.
+
+## #492 현재 스테이지 효과음·피버곡·지귀 보상 불꽃 미리 로드 — 2026-11-04
+
+기준 main `76d71b78`에서 Unity 6000.6.5f1 macOS batch Editor로 확인했다.
+
+**변경**
+- `LabBattleAudioWarmup.Preload(yokai)`를 `GameBattleBindings.Awake`가 호출한다. 이 시점은 Battle Scene 활성화 프레임이고, 불투명 준비 화면 아래다.
+- 로드하는 것: 공통 효과음, 현재 스테이지 전용 효과음, 그 스테이지의 피버곡. 각 소리 컴포넌트가 이미 가진 같은 clip 객체에 `LoadAudioData`를 부른다.
+- 다른 스테이지 전용 효과음 데이터는 해제한다.
+- 지귀 스테이지는 보상 불꽃 이미지 묶음도 미리 읽어 스테이지 동안 붙잡아 둔다.
+- import 설정·Scene/Prefab·소리 규칙은 그대로다.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| EditMode 전체 | **1867/1867 PASS** 기준(새 `LabBattleAudioWarmupTests` 2개: 소리 컴포넌트의 공통 폴더 상수가 모두 포함되는지, 스테이지별 로드·다른 스테이지 해제·지귀 보상 불꽃 유지·같은 스테이지 재호출 시 0개) | 새 검사는 수정 뒤 단독 재실행 2/2. 첫 전체 실행의 1건은 비어 있는 `Audio/FlashClear` 폴더를 가정한 검사 문장이어서 고쳤다 |
+| PlayMode `GameLobbyViewTests`(솔로 1스테이지에서 구미호·공통 효과음이 Playing 전에 로드됐는지 단언 추가)·`GameSceneFlowTests`·`LabStaminaFeedbackTests`·`LabJigwiABPresentationTests`·`LabBattleBgmStageTests`·`LabGumihoSoundTests`·`LabStaminaShortFeedbackTests` | **74/74 PASS** | |
+
+Editor 로그 `C6_AUDIO_WARMUP`: 첫 전투는 32개를 약 70~80 ms에, 같은 실행의 다음 전투는 4개를 약 45 ms에 읽었다. Editor 수치다.
+
+**미실행:** iPhone에서 첫 탭·명중·폭탄·지귀 5초 프레임 시간, 오디오 상주 메모리 실측.

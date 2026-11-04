@@ -553,6 +553,9 @@ namespace Hapio.Tests
             Assert.That(session.State.stageIndex, Is.EqualTo(1));
             Assert.That(Object.FindObjectsByType<GameLobbyView>(FindObjectsSortMode.None), Is.Empty);
             Assert.That(Object.FindObjectsByType<LabLobbyView>(FindObjectsSortMode.None), Is.Empty);
+            // #492: the stage's effects were loaded behind the preparing overlay, before their first play.
+            foreach (AudioClip clip in LabGumihoSound.ClipFolders.Concat(LabBattleAudioWarmup.CommonFolders).SelectMany(Resources.LoadAll<AudioClip>))
+                Assert.That(clip.loadState, Is.EqualTo(AudioDataLoadState.Loaded), clip.name);
             // #482: the Host resolved the round's judgment mask before any hit.
             object model = typeof(LabNetwork).GetField("model", System.Reflection.BindingFlags.Instance
                 | System.Reflection.BindingFlags.NonPublic).GetValue(session.Network);
