@@ -15,6 +15,10 @@ Shader "C6Lab/GourdPaint"
         _PaperLightContrast("Paper Shape Shading", Range(0,1)) = .55
         _PaperBrightness("Paper Brightness", Range(.5,1.5)) = 1.08
         _PaperSmoothness("Smoothness (0 = Matte)", Range(0,1)) = .05
+        [Header(Underpaint (507 stage gourds))]
+        [Toggle(_UNDERPAINT_MAP)] _UnderpaintMap("Use Body Art Under Paint", Float) = 0
+        [NoScaleOffset] _UnderpaintTex("Body Art (UV0)", 2D) = "white" {}
+        _UnderpaintFiber("Paper Fiber Over Body Art", Range(0,1)) = .35
         [HideInInspector] [NoScaleOffset] _PaintMap("Cumulative premultiplied paint", 2D) = "black" {}
         [HideInInspector] [NoScaleOffset] _PainterMap("Committed painter P byte (linear point)", 2D) = "black" {}
         [HideInInspector] _PaintMapReady("Paint map ready", Float) = 0
@@ -33,16 +37,32 @@ Shader "C6Lab/GourdPaint"
             HLSLPROGRAM
             #pragma vertex vert
             #pragma fragment frag
+            // #507: stage gourds show their own body art under the paint. The white gourd keeps the keyword off.
+            #pragma shader_feature_local _UNDERPAINT_MAP
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
-            struct Attributes { float4 positionOS:POSITION; float3 normalOS:NORMAL; };
-            struct Varyings { float4 positionCS:SV_POSITION; float3 positionOS:TEXCOORD0; float3 normalWS:TEXCOORD1; float3 normalOS:TEXCOORD2; float3 positionWS:TEXCOORD3; };
+            struct Attributes
+            {
+                float4 positionOS:POSITION; float3 normalOS:NORMAL;
+            #if defined(_UNDERPAINT_MAP)
+                float2 uv:TEXCOORD0;
+            #endif
+            };
+            struct Varyings
+            {
+                float4 positionCS:SV_POSITION; float3 positionOS:TEXCOORD0; float3 normalWS:TEXCOORD1; float3 normalOS:TEXCOORD2; float3 positionWS:TEXCOORD3;
+            #if defined(_UNDERPAINT_MAP)
+                float2 uv:TEXCOORD4;
+            #endif
+            };
             TEXTURE2D(_PaperTex);
             SAMPLER(sampler_PaperTex);
             TEXTURE2D(_PaintMap);
             SAMPLER(sampler_PaintMap);
             TEXTURE2D(_PainterMap);
             SAMPLER(sampler_PainterMap);
+            TEXTURE2D(_UnderpaintTex);
+            SAMPLER(sampler_UnderpaintTex);
             CBUFFER_START(UnityPerMaterial)
                 float4 _BaseColor;
                 float _PaperScale, _PaperContrast, _PaperBump, _PaperUnderPaint, _PaperSmoothness;
@@ -55,6 +75,7 @@ Shader "C6Lab/GourdPaint"
                 float _PaintGrainSize;
                 float _PaintGrainStrength;
                 float _PaintMottleStrength;
+                float _UnderpaintFiber;
             CBUFFER_END
 
             float2 PaperOffset(float2 cell)
@@ -182,6 +203,9 @@ Shader "C6Lab/GourdPaint"
                 output.normalOS = input.normalOS;
                 output.positionWS = TransformObjectToWorld(input.positionOS.xyz);
                 output.normalWS = TransformObjectToWorldNormal(input.normalOS);
+            #if defined(_UNDERPAINT_MAP)
+                output.uv = input.uv;
+            #endif
                 return output;
             }
 
@@ -226,7 +250,13 @@ Shader "C6Lab/GourdPaint"
                 // Paper-only art direction: the existing pigment lighting stays intact.
                 float paperDiffuse = saturate(dot(n, SafeNormalize(_PaperLightDirection.xyz)));
                 float paperLight = lerp(1.0, .45 + .65 * paperDiffuse, _PaperLightContrast) * _PaperBrightness;
-                half3 shaded = _BaseColor.rgb * paperColor * (1.0-paint.a) * paperLight + paint.rgb * light;
+                half3 baseColor = _BaseColor.rgb * paperColor;
+            #if defined(_UNDERPAINT_MAP)
+                // The body art replaces the paper tint; a little fiber stays visible through it.
+                half3 bodyArt = SAMPLE_TEXTURE2D(_UnderpaintTex, sampler_UnderpaintTex, input.uv).rgb;
+                baseColor = bodyArt * lerp(half3(1,1,1), paperColor, _UnderpaintFiber);
+            #endif
+                half3 shaded = baseColor * (1.0-paint.a) * paperLight + paint.rgb * light;
                 return half4(shaded + specular, 1);
             }
             ENDHLSL
