@@ -4686,3 +4686,20 @@ Metal 파이프라인(PSO)이 실제로 준비 구간에서 만들어지는지�
 - 1스테이지 관련 값은 #487 이전(`b835dc3c`)과 같다. 2스테이지 Yagwanggwi는 유지한다.
 - `GameSceneAssetTests` 기대값과 `docs/STAGE_BACKGROUNDS.md`도 SandBeige로 바로잡았다.
 - 배경 Scene·재질 EditMode 검사(`GameSceneAssetTests`·`GameStageBackgroundAssetTests`·`GameBackgroundAnimationAssetTests`) **12/12 PASS**. 화면은 #487 직전 캡처와 같은 값이라 다시 찍지 않았다.
+
+## #493 지귀 화면 오버레이를 지귀 스테이지에서만 로드 — 2026-11-04
+
+기준 main `76d71b78`에서 Unity 6000.6.5f1 macOS batch Editor로 확인했다.
+
+**변경**
+- `LabJigwiHud.Bind`·`Start`는 이제 Hapio 게임 흐름의 지귀 스테이지에서만 오버레이(`Jigwi/ScreenOverlay` 프리팹과 큰 텍스처)를 미리 만든다.
+- Lab 단판(게임 흐름 OFF)은 기존대로 만든다.
+- 지귀 A/B가 켜진 스냅샷에서 만드는 기존 LateUpdate 안전망은 그대로 둔다.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| EditMode 전체 | **1866/1866 PASS** | 새 `LabJigwiOverlayStagePolicyTests` 포함 |
+| `GameJigwiStageIntegrationTests`(단언 추가) | **PASS**, 게이트를 끄면 **FAIL** | 1·2스테이지 Playing에 오버레이 0개, 3스테이지는 카운트다운(시작 대기) 중에 이미 1개. 게이트를 임시로 항상 참으로 바꾸면 1스테이지에서 `ScreenOverlay(Clone)`이 있어 실패한다 |
+| 지귀·게임 흐름 PlayMode | **66/67** → 위 검사 대기 조건 수정 뒤 해당 검사 단독 **1/1 PASS** | `LabJigwiABPresentationTests`·`LabJigwiGroupFireAudioTests`·`LabJigwiWaterTrailTests`·`LabJigwiStagePresentationTests`·`GameSceneFlowTests`. 실패 1건은 새 단언이 `IsLoadingScene`(준비 구간 전체가 true)을 기다리던 검사 문장 문제였다 |
+
+**미실행:** iPhone 1·2스테이지 로딩 시간·메모리 실측.

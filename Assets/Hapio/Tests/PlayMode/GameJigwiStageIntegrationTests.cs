@@ -65,11 +65,19 @@ namespace Hapio.Tests
         {
             session.StartSolo();
             yield return WaitPlaying(1);
+            // #493: the 지귀 overlay and its art load only for the 지귀 stage, already before its countdown ends.
+            Assert.That(Object.FindObjectsByType<LabJigwiScreenPresentation>(FindObjectsInactive.Include, FindObjectsSortMode.None), Is.Empty);
             Assert.That(network.PauseBattle(), Is.True);
             Assert.That(session.DeveloperNextStage(), Is.True);
             yield return WaitPlaying(2);
+            Assert.That(Object.FindObjectsByType<LabJigwiScreenPresentation>(FindObjectsInactive.Include, FindObjectsSortMode.None), Is.Empty);
             Assert.That(network.PauseBattle(), Is.True);
             Assert.That(session.DeveloperNextStage(), Is.True);
+            // IsLoadingScene stays true through the whole preparing window, so wait for the bound, still held Battle.
+            yield return Until(() => session.State.stageIndex == 3 && session.State.phase == GameFlowPhase.Countdown
+                && network.HasBattleReferences && network.GameStartHeld, "Stage 3 countdown, still held");
+            Assert.That(Object.FindObjectsByType<LabJigwiScreenPresentation>(FindObjectsInactive.Include, FindObjectsSortMode.None),
+                Has.Length.EqualTo(1), "Built behind the preparing overlay, not by the in-battle fallback.");
             yield return WaitPlaying(3);
 
             int spendEvents = 0; float spentCost = 0f;
