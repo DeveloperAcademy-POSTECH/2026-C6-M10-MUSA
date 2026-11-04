@@ -62,6 +62,13 @@ namespace C6Lab.Tests
             Assert.That(extraBlock.GetFloat("_PaintMapReady"), Is.EqualTo(1f), "Extras get the same paint binding.");
             Assert.That(extraBlock.GetTexture("_PaintMap"), Is.SameAs(paint.VisualPaintTexture));
             Assert.That(extraBlock.GetTexture("_PainterMap"), Is.SameAs(paint.VisualPainterTexture));
+
+            var hanging = paint.target.GetComponent<LabHangingTarget>();
+            Assert.That(hanging, Is.Not.Null, "The saved Lab target hangs.");
+            Assert.That(rig.ropeSocket, Is.Not.Null);
+            Assert.That(hanging.RopeSocket, Is.SameAs(rig.ropeSocket), "The rig hands its rope socket to the hanging target.");
+            paint.enabled = false;
+            Assert.That(hanging.RopeSocket, Is.Null, "Releasing the rig clears it.");
         }
 
         [UnityTest]
@@ -177,6 +184,9 @@ namespace C6Lab.Tests
             lid.transform.localPosition = new Vector3(0f, .5f, 0f);
             lid.transform.localScale = Vector3.one * .2f;
             lid.GetComponent<MeshFilter>().sharedMesh = lidMesh;
+            var socket = new GameObject("Rope Socket").transform;
+            socket.SetParent(root.transform, false);
+            socket.localPosition = new Vector3(0f, 1.3f, 0f);
             var anchor = new GameObject("Size Anchor").transform;
             anchor.SetParent(root.transform, false);
             anchor.localPosition = new Vector3(0f, 1.1f, 0f);
@@ -207,6 +217,7 @@ namespace C6Lab.Tests
             rig.paintMaterial = material;
             rig.referenceVisualSize = 1.8f;
             rig.sizeAnchor = anchor;
+            rig.ropeSocket = socket;
             rig.yokaiAnimation = animation;
             rig.yokaiProfile = profile;
             Assert.That(rig.Validate(out string reason), Is.EqualTo(valid), reason);
