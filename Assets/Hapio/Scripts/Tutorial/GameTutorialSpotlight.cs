@@ -15,6 +15,8 @@ namespace Hapio
     {
         private const int CornerSegments = 18;
         private const float EdgeStep = 10f;
+        /// <summary>A straight side shorter than this (UI units) is treated as none: the two arcs meet.</summary>
+        private const float MinimumSide = .01f;
         private Rect hole;
         private float corner;
         private float soft;
@@ -77,21 +79,26 @@ namespace Hapio
                 new Vector2(area.xMax - c, area.yMax - c), new Vector2(area.xMin + c, area.yMax - c),
                 new Vector2(area.xMin + c, area.yMin + c), new Vector2(area.xMax - c, area.yMin + c)
             };
+            // Each point appears once. A corner's arc stops one step short of its end, and the straight side that
+            // follows starts exactly there; for a round hole the sides have no length, so the next arc carries on.
+            // Repeating the shared end instead left a near-zero edge (360° vs 0° differ in the last digits) whose
+            // direction is noise, a sliver in the mesh.
             for (int k = 0; k < 4; k++)
             {
-                for (int s = 0; s <= CornerSegments; s++)
+                for (int s = 0; s < CornerSegments; s++)
                 {
                     float angle = (k + (float)s / CornerSegments) * Mathf.PI * .5f;
                     var normal = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle));
                     points.Add(centers[k] + normal * c);
                     outward.Add(normal);
                 }
-                // The straight side toward the next corner, without its two ends.
+                // The straight side toward the next corner, from the arc's end up to (not including) the next arc.
                 float endAngle = (k + 1) * Mathf.PI * .5f;
                 var sideNormal = new Vector2(Mathf.Round(Mathf.Cos(endAngle)), Mathf.Round(Mathf.Sin(endAngle)));
                 Vector2 from = centers[k] + sideNormal * c, to = centers[(k + 1) % 4] + sideNormal * c;
-                int pieces = Mathf.FloorToInt(Vector2.Distance(from, to) / EdgeStep);
-                for (int i = 1; i < pieces; i++)
+                float length = Vector2.Distance(from, to);
+                int pieces = length > MinimumSide ? Mathf.Max(1, Mathf.FloorToInt(length / EdgeStep)) : 0;
+                for (int i = 0; i < pieces; i++)
                 {
                     points.Add(Vector2.Lerp(from, to, (float)i / pieces));
                     outward.Add(sideNormal);
