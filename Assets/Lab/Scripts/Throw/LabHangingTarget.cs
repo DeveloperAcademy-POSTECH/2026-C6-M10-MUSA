@@ -5,6 +5,17 @@ using UnityEngine.Rendering;
 
 namespace C6Lab
 {
+    /// <summary>How the visible rope is drawn. Presentation only: none of these changes the swing, pivot or hitbox (#507).</summary>
+    public enum LabRopeStyle
+    {
+        /// <summary>A fixed upper rope on the root and a swinging lower rope on the pivot (bends in mid-air).</summary>
+        Segmented,
+        /// <summary>One straight rope from the fixed anchor to the gourd.</summary>
+        Straight,
+        /// <summary>One quadratic Bézier rope: vertical at the anchor, along the gourd axis at the gourd.</summary>
+        Curved,
+    }
+
     /// <summary>
     /// A damped pendulum with a freely turning body. The hitbox and art share both pivots.
     /// Physics owns the fixed-step pose; the drawn pose is interpolated from the last two fixed poses (#454), but only
@@ -48,6 +59,8 @@ namespace C6Lab
         private float ropeLength = .85f;
         [SerializeField, Min(0f), Tooltip("Extra rope above the physical suspension pivot. Presentation only; does not change the swing arm or hitbox.")]
         private float suspensionVisualExtension;
+        [SerializeField, Tooltip("How the visible rope is drawn. Presentation only; Segmented keeps the original upper and lower ropes.")]
+        private LabRopeStyle ropeStyle = LabRopeStyle.Segmented;
 
         [SerializeField, Min(0f), Tooltip("Downward bounce impulse per unit of impact speed. Range: 0–2.")]
         private float bounceStrength = .18f;
@@ -73,6 +86,13 @@ namespace C6Lab
         public float CycleAmplitude => Safe(cycleAmplitude, 0f, 0f, 1f);
         public float CyclePeriod => Safe(cyclePeriod, 3f, .5f, 10f);
         public float RopeLength => Safe(ropeLength, .85f, .1f, 8f);
+        public const int CurvedRopeSegments = 24;
+        public const float RopeDiameter = .055f;
+        public LabRopeStyle RopeStyle => ropeStyle;
+        /// <summary>The continuous rope root (Straight/Curved), a child of this target; null until one is needed.</summary>
+        public Transform ContinuousRope => continuousRope;
+        /// <summary>Where the continuous rope meets the gourd, or null for the hitbox top (#507).</summary>
+        public Transform RopeSocket => ropeSocket;
         public float ImpactStrength => Safe(impactStrength, 12f, 0f, 20f);
         public float SwingDamping => Safe(swingDamping, 1.4f, 0f, 20f);
         public float MaximumAngle => Safe(maximumAngle, 40f, 1f, 75f);
@@ -80,6 +100,9 @@ namespace C6Lab
         // Configured from the session's LabConfig copy; these are only safe standalone defaults.
         private float spinStrength = 80f, spinDamping = 1.2f, maximumSpinSpeed = 720f;
         private Transform pivot, twistPivot, hangingBody, visualMount, rope, upperRope, ceilingBeam, ceilingPlate;
+        private Transform continuousRope, ropeSocket;
+        private Transform[] ropeSegments = Array.Empty<Transform>();
+        private float drawnRopeStretch;
         private float verticalOffset, verticalVelocity, cycleElapsed, currentRopeOffset;
         private Vector2 angle, velocity;
         private float yawAngleDegrees, yawSpeedDegreesPerSecond;
@@ -140,8 +163,32 @@ namespace C6Lab
                 new Vector3(0, 1.85f, 0), new Vector3(5f, .18f, .5f), ropeMaterial);
             ceilingPlate = Primitive("Ceiling Plate", PrimitiveType.Cube, transform,
                 new Vector3(0, 2.01f, 0), new Vector3(6f, .12f, 3f), ropeMaterial);
+            ApplyRopeStyle();
             ApplyRopeLength();
             SnapPose();
+        }
+
+        /// <summary>
+        /// Choose how the rope is drawn (#507). Straight/Curved hide the original rope renderers but keep computing
+        /// their transforms; the swing, pivot height and hitbox are unchanged. Safe to call before Awake.
+        /// </summary>
+        public void SetRopeStyle(LabRopeStyle style)
+        {
+            if (!Enum.IsDefined(typeof(LabRopeStyle), style)) style = LabRopeStyle.Segmented;
+            ropeStyle = style;
+            if (pivot == null) return;
+            ApplyRopeStyle();
+            UpdateContinuousRope(drawnRopeStretch);
+        }
+
+        /// <summary>
+        /// Where a continuous rope meets the gourd: a transform inside the hanging body (a model's rope socket).
+        /// Null, or one outside this target, uses the top of the hitbox on the body axis, as the original rope does.
+        /// </summary>
+        public void SetRopeSocket(Transform socket)
+        {
+            ropeSocket = socket;
+            if (pivot != null) UpdateContinuousRope(drawnRopeStretch);
         }
 
         /// <summary>Apply the session tuning without mutating the source LabConfig asset.</summary>
@@ -162,7 +209,11 @@ namespace C6Lab
             returnStrength = Safe(restoring, 10f, 0f, 100f);
             swingDamping = Safe(damping, 1.4f, 0f, 20f);
             angle = Vector2.ClampMagnitude(angle, MaximumAngle);
-            if (pivot != null) pivot.localRotation = Quaternion.Euler(angle.x, 0, angle.y);
+            if (pivot != null)
+            {
+                pivot.localRotation = Quaternion.Euler(angle.x, 0, angle.y);
+                UpdateContinuousRope(drawnRopeStretch);
+            }
             SnapPose();
         }
 
@@ -569,11 +620,15 @@ namespace C6Lab
             float stretchedLength = RopeLength + pose.RopeOffset;
             rope.localPosition = Vector3.down * (stretchedLength * .5f);
             rope.localScale = new Vector3(.055f, stretchedLength * .5f, .055f);
+            UpdateContinuousRope(stretchedLength);
         }
 
         private void ApplyYawRotation()
         {
-            if (twistPivot != null) twistPivot.localRotation = Quaternion.Euler(0f, yawAngleDegrees, 0f);
+            if (twistPivot == null) return;
+            twistPivot.localRotation = Quaternion.Euler(0f, yawAngleDegrees, 0f);
+            // An off-axis rope socket turns with the body.
+            if (ropeSocket != null) UpdateContinuousRope(drawnRopeStretch);
         }
 
         private void ApplyRopeLength()
@@ -613,7 +668,82 @@ namespace C6Lab
             ceilingBeam.localPosition = Vector3.up * (pivotHeight + extension + .1f);
             ceilingPlate.localPosition = Vector3.up * (pivotHeight + extension + .26f);
             // Keep the resting target centre fixed so tuning length doesn't change the aim point.
+            UpdateContinuousRope(stretchedLength);
+        }
 
+        /// <summary>Show either the original two ropes or the continuous one, building its pieces on first use.</summary>
+        private void ApplyRopeStyle()
+        {
+            bool segmented = ropeStyle == LabRopeStyle.Segmented;
+            SetRendererEnabled(rope, segmented);
+            SetRendererEnabled(upperRope, segmented);
+            if (segmented)
+            {
+                if (continuousRope != null) continuousRope.gameObject.SetActive(false);
+                return;
+            }
+            if (continuousRope == null)
+            {
+                continuousRope = new GameObject("Continuous Rope").transform;
+                continuousRope.SetParent(transform, false);
+            }
+            continuousRope.gameObject.SetActive(true);
+            int wanted = ropeStyle == LabRopeStyle.Curved ? CurvedRopeSegments : 1;
+            if (ropeSegments.Length == wanted) return;
+            foreach (Transform old in ropeSegments)
+                if (old != null) { old.gameObject.SetActive(false); Destroy(old.gameObject); }
+            ropeSegments = new Transform[wanted];
+            for (int i = 0; i < wanted; i++)
+                ropeSegments[i] = Primitive("Rope Segment " + i, PrimitiveType.Cylinder, continuousRope,
+                    Vector3.zero, Vector3.one, ropeMaterial);
+        }
+
+        private static void SetRendererEnabled(Transform part, bool enabled)
+        {
+            Renderer renderer = part != null ? part.GetComponent<Renderer>() : null;
+            if (renderer != null) renderer.enabled = enabled;
+        }
+
+        /// <summary>
+        /// Lay the continuous rope from the fixed anchor above the pivot to the gourd, in this target's local space.
+        /// Called wherever the pivot or rope transforms are written (fixed pose, drawn pose, hold and reset), so it
+        /// follows the #454 interpolation without its own state.
+        /// </summary>
+        private void UpdateContinuousRope(float stretchedLength)
+        {
+            drawnRopeStretch = stretchedLength;
+            if (pivot == null || continuousRope == null || !continuousRope.gameObject.activeSelf) return;
+            float extension = Safe(suspensionVisualExtension, 0f, 0f, 20f);
+            Vector3 control = pivot.localPosition;
+            Vector3 anchor = control + Vector3.up * extension;
+            Vector3 end = control + pivot.localRotation * (Vector3.down * stretchedLength);
+            if (ropeSocket != null && ropeSocket.IsChildOf(transform) && FiniteVector(ropeSocket.position))
+                end = transform.InverseTransformPoint(ropeSocket.position);
+            int count = ropeSegments.Length;
+            if (count == 1)
+            {
+                PlaceSegment(ropeSegments[0], anchor, end);
+                return;
+            }
+            Vector3 previous = anchor;
+            for (int i = 0; i < count; i++)
+            {
+                float t = (i + 1f) / count, u = 1f - t;
+                Vector3 point = u * u * anchor + 2f * u * t * control + t * t * end;
+                PlaceSegment(ropeSegments[i], previous, point);
+                previous = point;
+            }
+        }
+
+        /// <summary>A Unity cylinder is 2 units tall along Y; overlap the ends slightly so the joints stay closed.</summary>
+        private static void PlaceSegment(Transform segment, Vector3 from, Vector3 to)
+        {
+            if (segment == null) return;
+            Vector3 delta = to - from;
+            float length = delta.magnitude;
+            segment.localPosition = (from + to) * .5f;
+            segment.localRotation = length > 1e-5f ? Quaternion.FromToRotation(Vector3.up, delta / length) : Quaternion.identity;
+            segment.localScale = new Vector3(RopeDiameter, length * .5f + (length > 1e-5f ? .004f : 0f), RopeDiameter);
         }
 
         private float BodyTopInMount()
@@ -668,6 +798,7 @@ namespace C6Lab
             maximumAngle = MaximumAngle;
             returnStrength = ReturnStrength;
             ropeLength = RopeLength;
+            if (!Enum.IsDefined(typeof(LabRopeStyle), ropeStyle)) ropeStyle = LabRopeStyle.Segmented;
             bounceStrength = BounceStrength;
             bounceReturnStrength = BounceReturnStrength;
             bounceDamping = BounceDamping;

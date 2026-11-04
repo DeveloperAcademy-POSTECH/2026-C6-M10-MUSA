@@ -17,3 +17,7 @@ Use Prefabs/Yagwanggwi_Gourd_GameReady.prefab for development placement. The out
 ## Texture cleanup
 
 Byte-identical duplicate color, normal and metallic/smoothness images share the original textures across materials. Unused original ORM images and the paper reference image were removed after baking. Prefab materials and animation were revalidated.
+
+## Battle bake (#507)
+
+The game uses `Resources/Hapio/Gourds/Stage02_Yagwanggwi_Battle.prefab`, baked from the GameReady prefab by `Hapio > Gourds > Bake Stage 2 Yagwanggwi Gourd` (`Hapio.Editor.GameGourdRigBaker`). The art prefab, FBX and materials are not modified. The bake writes `Generated/` (outer-wall paint shell, closed-lid paint mesh, 48 x 24 hit shell, legacy 2 s yokai clip, yokai timeline, two paint materials with the body art under the paint) and `Generated/BakeReport.txt`. It removes the model's own hanging rope (`Rear_Rope_*`) and the looping Animator. When a lighter re-export arrives, replace the art and run only the bake again.
