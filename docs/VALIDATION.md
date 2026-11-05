@@ -10,7 +10,7 @@
 | 실패 1개 | `GameSceneAssetTests.BattleCopy_PreservesTheCurrentSavedLabEnvironment` | Battle 바닥 텍스처 GUID가 Lab 저장값과 다름(Stage01 바닥 vs Lab HanjiSand). #479 변경과 무관한 배경 작업 쪽 기대값이며 담당 팀원에게 전달함 |
 | SOLO 지귀 Play(에디터) | **팀원 손 확인** | Home에서 `Hapio > DEV SOLO 시작 스테이지 > 3`으로 지귀 진입. 전투 영역의 세로 한지 부적, 조합판 막힘, 1초 간격 소각, 점선 "물"을 90% 이상 쓰면 통과·물방울 구슬 지급을 보며 화면/기준값을 조정함 |
 
-main `f40e028`(#507 박 모델·#515 조명 포함)을 합쳤다. 충돌은 게임 토큰 줄(`LabNetwork.GameFlow.cs`, `LabGameFlowBridgeTests`)과 `AGENTS.md` 절 추가뿐이었다. #507이 Game29·30을 먼저 써서 #479는 **Game31**로 올렸다(5684·Lab45·설정 257개 그대로). 병합 뒤 Test Runner 결과는 아직 다시 기록하지 않았다.
+main `f40e028`(#507 박 모델·#515 조명 포함)을 합쳤다. 충돌은 게임 토큰 줄(`LabNetwork.GameFlow.cs`, `LabGameFlowBridgeTests`)과 `AGENTS.md` 절 추가뿐이었다. #507이 Game29·30을 먼저 써서 #479는 Game31로 올렸다. 이 병합 뒤 EditMode Run All·`GameJigwiStageIntegrationTests`·SOLO 지귀 Play를 팀원이 확인했다. 이어서 main `0681d25`(#506 클레이 스티커, 5686/Lab47/Game31·설정 259개)를 다시 합쳐 #479를 **5687/`C6PhysicsLab/48`/`C6HapioGame/32`**로 올렸다. 두 번째 병합 뒤 Test Runner 결과는 아직 다시 기록하지 않았다.
 
 실기기(iPhone)·iOS 빌드·2~5인 LAN/핫스팟·5683 앱과의 혼용 거부·모바일 성능은 **미실행**이다. Stage02 `YokaiBacking.mat`/`YokaiGround.mat`이 배경 도구로 바뀌는 것은 매번 되돌렸고 이번 작업에 넣지 않았다.
 
