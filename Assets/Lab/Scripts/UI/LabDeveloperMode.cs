@@ -412,9 +412,11 @@ namespace C6Lab
                     SetCategoryExpanded(title, name, rows, expanded);
                 });
             }
-            // Settings the gimmick groups replaced (#311) keep their rows for the shared form but are never shown.
-            foreach (int retired in LabConfig.RetiredDeveloperFields)
-                valueInputs[retired].transform.parent.gameObject.SetActive(false);
+            // Retired slots (#311) and settings with no effect in the current game keep their rows for the shared form
+            // (APPLY still reads them) but have no category and are never shown.
+            for (int i = 0; i < valueInputs.Length; i++)
+                if (LabConfig.IsDeveloperFieldHidden(i))
+                    valueInputs[i].transform.parent.gameObject.SetActive(false);
         }
 
         /// <summary>묶음 안 구분선 한 줄 (#268). 누를 수 없고, 묶음을 접으면 같이 숨는다.</summary>

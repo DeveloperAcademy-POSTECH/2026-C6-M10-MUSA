@@ -555,7 +555,7 @@ namespace Hapio
             {
                 developerInputs[i].SetTextWithoutNotify(values[i].ToString("0.######", CultureInfo.InvariantCulture));
                 developerSliders[i].SetValueWithoutNotify(values[i]);
-                Show(developerInputs[i].transform.parent.gameObject, GameStageSettings.IsFieldVisible(scope, i));
+                Show(developerInputs[i].transform.parent.gameObject, GameStageSettings.IsFieldShown(scope, i, values));
             }
             syncingDeveloper = false;
             string name = scope == 0 ? "공통" : scope == GameStageSettings.TerritoryScope ? "2:2 땅따먹기"
@@ -566,7 +566,8 @@ namespace Hapio
                     developerScopeButtons[i].targetGraphic.color = i == scope
                         ? new Color(.18f, .43f, .47f, 1f) : new Color(.12f, .18f, .21f, 1f);
             Text(developerFeedback, name + " 설정 · 탭을 바꾸기 전에 APPLY로 적용해주세요."
-                + (scope == 2 ? "\n야광귀는 시간표로 발동하며 일반 기믹 간격·확률은 사용하지 않습니다." : string.Empty));
+                + (scope == 2 ? "\n야광귀는 시간표로 발동하며 일반 기믹 간격·확률은 사용하지 않습니다."
+                    : scope == 3 ? JigwiTimelineNote : string.Empty));
             var scroll = developerPanel != null ? developerPanel.GetComponentInChildren<UnityEngine.UI.ScrollRect>(true) : null;
             if (scroll != null) scroll.verticalNormalizedPosition = 1f;
         }
@@ -593,6 +594,7 @@ namespace Hapio
             developerSliders[index].SetValueWithoutNotify(value);
             syncingDeveloper = false;
             PreviewClayField(index);
+            RefreshJigwiTimelineRows(index, value);
         }
         private void SyncInput(int index, float value)
         {
@@ -601,6 +603,24 @@ namespace Hapio
             developerInputs[index].SetTextWithoutNotify(value.ToString("0.######", CultureInfo.InvariantCulture));
             syncingDeveloper = false;
             PreviewClayField(index);
+            RefreshJigwiTimelineRows(index, value);
+        }
+
+        private const string JigwiTimelineNote =
+            "\n지귀 120초(228)가 켜져 있으면 쓰지 않는 구형 불·자동 주기·공용 기믹 간격은 숨깁니다. 끄면 보입니다.";
+
+        /// <summary>
+        /// Jigwi's tab: switching its 120-second timeline (228) in the form shows or hides, at once and before APPLY,
+        /// the old fire, its automatic cycle and the common gimmick interval that the timeline replaces.
+        /// </summary>
+        private void RefreshJigwiTimelineRows(int index, float value)
+        {
+            if (index != GameStageSettings.JigwiTimelineField || DeveloperScope != 3 || developerInputs == null) return;
+            var form = new float[developerInputs.Length];
+            form[index] = value;
+            for (int i = 0; i < developerInputs.Length; i++)
+                if (GameStageSettings.IsReplacedByJigwiTimeline(i) && developerInputs[i] != null)
+                    Show(developerInputs[i].transform.parent.gameObject, GameStageSettings.IsFieldShown(DeveloperScope, i, form));
         }
         /// <summary>Append only the two new rows to older saved panels; retain all edited rows and layout.</summary>
         public bool EnsureClayDeveloperRows()
@@ -631,7 +651,7 @@ namespace Hapio
                 input.SetTextWithoutNotify(defaults[i].ToString("0.######", CultureInfo.InvariantCulture));
                 slider.SetValueWithoutNotify(defaults[i]);
                 developerInputs[i] = input; developerSliders[i] = slider;
-                copy.SetActive(GameStageSettings.IsFieldVisible(0, i));
+                copy.SetActive(GameStageSettings.IsFieldShown(0, i, defaults));
             }
             return true;
         }

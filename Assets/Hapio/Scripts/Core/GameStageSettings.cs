@@ -59,6 +59,25 @@ namespace Hapio
         private static readonly int[] RetiredFields = System.Linq.Enumerable.ToArray(LabConfig.RetiredDeveloperFields);
         /// <summary>The common gimmick group's settings (#311), which each of the three stages keeps for itself.</summary>
         public static bool IsStageCommonGimmick(int index) => index == 169 || index == 170 || index == 205 || index == 207 || index == 208;
+        /// <summary>Jigwi's 120-second timeline switch (#332): on by default, it schedules A/B and the common gimmicks itself.</summary>
+        public const int JigwiTimelineField = LabConfig.JigwiStageFirstField;
+        /// <summary>
+        /// What Jigwi's timeline (228) replaces while it is on: the old water-only surface fire (178~183), its
+        /// automatic cycle (192~195) and the common gimmick interval (205; the common gimmicks come at 20/40/60/80 s).
+        /// They stay editable in Jigwi's tab, which only shows them while the form has the timeline off.
+        /// </summary>
+        public static bool IsReplacedByJigwiTimeline(int index) =>
+            index >= 178 && index <= 183 || index >= 192 && index <= 195 || index == 205;
+        /// <summary>
+        /// A DEV tab row for this form: the fields the scope may edit (<see cref="IsFieldVisible"/>), less the settings
+        /// with no effect in the current game (<see cref="LabConfig.InactiveDeveloperFields"/>) and the rows Jigwi's
+        /// timeline replaces while the form has it on. Hiding a row never changes which values a scope may apply.
+        /// </summary>
+        public static bool IsFieldShown(int scope, int index, float[] values) => IsFieldVisible(scope, index)
+            && !LabConfig.IsInactiveDeveloperField(index)
+            && !(scope == 3 && IsReplacedByJigwiTimeline(index) && values != null && values.Length > JigwiTimelineField
+                && values[JigwiTimelineField] >= .5f);
+        /// <summary>The fields a scope may edit, apply and carry; the tab shows them through <see cref="IsFieldShown"/>.</summary>
         public static bool IsFieldVisible(int scope, int index)
         {
             if (scope < 0 || scope > TerritoryScope || index < 0 || index >= LabConfig.DeveloperFields.Count) return false;
@@ -71,7 +90,9 @@ namespace Hapio
                 || index == 186 || index == 187)) return false;
             if (index == 79) return false; // Retired crack-mode selector; numeric slot stays reserved.
             if (scope == TerritoryScope) return index >= 197 && index <= 199 || IsTerritoryOwned(index);
-            bool yaguang = index >= 155 && index <= 164 || index >= 184 && index <= 191 || index >= 202 && index <= 203 || index >= 236 && index <= 237;
+            // The flash's five-color reward count (236) is the Yaguang's; their paint scale (237) is Common, because every
+            // stage's fever turns the drum's orbs into five-color orbs too (#441).
+            bool yaguang = index >= 155 && index <= 164 || index >= 184 && index <= 191 || index >= 202 && index <= 203 || index == 236;
             // The game always flashes everyone (#301); Lab alone can select a single target.
             if (index == FlashTargetOneField) return false;
             // Lab's own switch for borrowing the fox's gimmicks (#311); a game stage's yokai decides them instead.

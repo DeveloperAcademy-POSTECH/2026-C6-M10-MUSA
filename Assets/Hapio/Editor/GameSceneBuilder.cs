@@ -229,7 +229,7 @@ namespace Hapio.Editor
             for (int i = existing; i < count; i++)
             {
                 CreateDeveloperRow(screen, scroll.content, i, values[i]);
-                screen.developerInputs[i].transform.parent.gameObject.SetActive(GameStageSettings.IsFieldVisible(0, i));
+                screen.developerInputs[i].transform.parent.gameObject.SetActive(GameStageSettings.IsFieldShown(0, i, null));
             }
             EditorUtility.SetDirty(screen);
         }
@@ -323,7 +323,7 @@ namespace Hapio.Editor
                 rect.anchorMax = new Vector2(rect.anchorMax.x, .82f);
             }
             for (int i = 0; i < screen.developerInputs.Length; i++)
-                screen.developerInputs[i].transform.parent.gameObject.SetActive(GameStageSettings.IsFieldVisible(0, i));
+                screen.developerInputs[i].transform.parent.gameObject.SetActive(GameStageSettings.IsFieldShown(0, i, null));
         }
 
         private static void UpgradeScene(string path, Action<Scene> change)
