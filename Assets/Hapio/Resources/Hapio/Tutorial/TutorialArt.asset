@@ -1,0 +1,120 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0b2203f5c00744d08fe1709d71bef72, type: 3}
+  m_Name: TutorialArt
+  m_EditorClassIdentifier: Hapio.Runtime::Hapio.GameTutorialArt
+  bul: {fileID: 21300000, guid: 40412c97cf13348ed8c5bad0639e1be0, type: 3}
+  muk: {fileID: 21300000, guid: 8117c975722404c2ba1b389641b39cda, type: 3}
+  geumok: {fileID: 21300000, guid: da0cda881eead46239bdc7c8b2e2c247, type: 3}
+  localPortraitScale: 1.2
+  neighborPortraitScale: 1.8
+  localPortraitOffset: {x: 0, y: 9}
+  portraitScreenMargin: 6
+  keepOutPadding: 4
+  nameFont: {fileID: 0}
+  nameFontSize: 14
+  nameColor: {r: 0, g: 0, b: 0, a: 1}
+  nameGap: 2
+  nameScreenMargin: 2
+  bubble: {fileID: 21300000, guid: 66fb9310974fa40edadc8b7b52411c39, type: 3}
+  bubbleSize: {x: 236, y: 150}
+  textInset: {x: 0.08, y: 0.27, z: 0.08, w: 0.11}
+  tailTip: {x: 0.045, y: 0.02}
+  tailGap: {x: 2, y: 2}
+  screenMargin: 8
+  dialogueFont: {fileID: 12800000, guid: fd14532f91d8a4659ae355392f330bc2, type: 3}
+  maxFontSize: 17
+  minFontSize: 12
+  textColor: {r: 0.12, g: 0.1, b: 0.09, a: 1}
+  tapHint: {fileID: 21300000, guid: 25a97783e4f1249f1baf70606dccbac4, type: 3}
+  tapHintSize: {x: 16, y: 14}
+  tapHintOffset: {x: 0, y: 5}
+  tapHintDepth: 4
+  tapHintSeconds: 0.8
+  popSeconds: 0.28
+  popOvershoot: 1.1
+  dimColor: {r: 0, g: 0, b: 0, a: 0.62}
+  dimFadeSeconds: 0.25
+  spotlightPadding: 1.2
+  barSpotlightPadding: 8
+  spotlightSoftness: 0.16
+  spotlightFollow: 12
+  bannerFont: {fileID: 12800000, guid: 5f76b20538a6c4b1caa80654c9df48f1, type: 3}
+  bannerTextColor: {r: 0, g: 0, b: 0, a: 1}
+  bannerColor: {r: 0.98, g: 0.95, b: 0.88, a: 0.94}
+  bannerTopFraction: 0.3
+  bannerHeight: 46
+  bannerFontSize: 20
+  successColor: {r: 1, g: 1, b: 1, a: 1}
+  successFontSize: 36
+  successStroke: 0.2
+  successStrokeColor: {r: 0, g: 0, b: 0, a: 1}
+  afterActionSeconds: 0.9
+  afterRefillSeconds: 0.4
+  shortStaminaShareOfTap: 0.25
+  hand: {fileID: 21300000, guid: 256e904b76ffb466cbaabfa31d3195d6, type: 3}
+  handSize: {x: 64, y: 64}
+  handTip: {x: 0.09, y: 0.93}
+  handRestOffset: {x: 12, y: -12}
+  handTapSeconds: 0.9
+  handPressScale: 0.9
+  handDragSeconds: 1.6
+  handSwipeSeconds: 1.4
+  throwGuideLength: 150
+  remarkSeconds: 2
+  teaseSeconds: 2.4
+  progressSpotlightPadding: 8
+  minimapSpotlightPadding: 6
+  minimapSpotlightCorner: 14
+  drumLaunchExtra: 0.06
+  drumLaunchEdgeMargin: 0.1
+  mirrorDrum: {fileID: 0}
+  mirrorViewPastStop: 0.25
+  mirrorViewMinWidth: 0.6
+  mirrorDrumHeightInView: 0.35
+  mirrorHoldSeconds: 0.5
+  mirrorFadeSeconds: 0.15
+  mirrorColor: {r: 0.96, g: 0.91, b: 0.8, a: 1}
+  giveBackDelay: 0.35
+  giveBackGap: 0.35
+  wrongSideReturnDelay: 0.8
+  bombReturnDelay: 0.35
+  bombHandDragSeconds: 1.1
+  blockWarningSeconds: 1.05
+  skipButton: {fileID: 21300000, guid: 4b788930b07044b0289956fd90eb9094, type: 3}
+  skipPanel: {fileID: 21300000, guid: 1f841ccf1acbe40ed9386e34ca533eba, type: 3}
+  skipArtPixelsPerPoint: 3
+  skipButtonSize: {x: 72, y: 30}
+  skipButtonMargin: 16
+  skipButtonFontSize: 14
+  skipFadeSeconds: 0.5
+  skipDimColor: {r: 0, g: 0, b: 0, a: 0.55}
+  skipPanelSize: {x: 336, y: 172}
+  skipPanelTopFraction: 0.4
+  skipTitleFontSize: 21
+  skipBodyFontSize: 14
+  skipChoiceSize: {x: 120, y: 48}
+  skipChoiceGap: 12
+  skipChoiceDrop: 10
+  skipChoiceFontSize: 16
+  skipChoicePressScale: 1.08
+  skipChoicePressSeconds: 0.08
+  skipCloseSeconds: 0.12
+  arrowColor: {r: 0.36, g: 0.66, b: 0.29, a: 1}
+  arrowWidth: 7
+  arrowHeadLength: 18
+  arrowHeadWidth: 22
+  arrowGap: 2
+  orbSpotlightPadding: 14
+  firstLineDelay: 0.6
+  tapCooldown: 0.2
+  exitFadeSeconds: 0.6
