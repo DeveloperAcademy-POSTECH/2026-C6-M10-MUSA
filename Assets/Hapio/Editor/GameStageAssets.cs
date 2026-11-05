@@ -47,6 +47,7 @@ namespace Hapio.Editor
                     definition.yokaiVisual = null;
                     EditorUtility.SetDirty(definition);
                 }
+                // #507: each stage's battle gourd path (gourdVisualResource) is set only by GameGourdRigBaker.
                 definitions[i] = definition;
             }
             catalog.stages = definitions; catalog.Validate(); EditorUtility.SetDirty(catalog);

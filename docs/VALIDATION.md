@@ -4757,3 +4757,151 @@ Editor 로그 `C6_AUDIO_WARMUP`: 첫 전투는 32개를 약 70~80 ms에, 같은 
 | 지귀·게임 흐름 PlayMode | **66/67** → 위 검사 대기 조건 수정 뒤 해당 검사 단독 **1/1 PASS** | `LabJigwiABPresentationTests`·`LabJigwiGroupFireAudioTests`·`LabJigwiWaterTrailTests`·`LabJigwiStagePresentationTests`·`GameSceneFlowTests`. 실패 1건은 새 단언이 `IsLoadingScene`(준비 구간 전체가 true)을 기다리던 검사 문장 문제였다 |
 
 **미실행:** iPhone 1·2스테이지 로딩 시간·메모리 실측.
+
+
+## 2026-11-04 — #513 Stage03 Jigwi art import
+
+- Added only the Stage03_Jigwi art package: FBX, 12 baked/source textures, 12 external URP Lit materials, a looping controller and placement prefab.
+- Unity 6000.6.5f1 import: **90,931 triangles**, 22 renderers; 0 missing materials, 0 unsupported shaders, 0 unresolved animation paths. 282 animation bindings include 2 cloth BlendShape bindings. Generic clip is 24 fps and approximately 4 seconds, looping.
+- Animator evaluation changed 3 transforms. Sampled all 97 frame positions: eye/pupil local depth remains fixed (maximum numerical delta approximately 7.3e-12). Forward eye-pop and separate pupil dilation are excluded.
+- Closed/front, open/front, blink/front and back renders were inspected in an isolated preview scene. Red lid motifs, navy/beige ribbons and the curled fire charm are present.
+- Placement body center is the root origin; height is 2.390325 Unity units, matching Stage01/02. Battle scene remained clean. Existing stage assets and gameplay code were not modified.
+- Console already contained Transport lifecycle/invalid GC handle and NullReferenceException entries before the import; this is not a zero-console-errors claim.
+- Not run: gameplay-event integration, multiplayer, paint/collision integration, device performance or the full EditMode/PlayMode suite.
+
+- Final reimport: absolute FBX source paths removed. A temporary metadata conversion caused an FBX import failure during preparation; it was corrected by regenerating the FBX and rebuilding the controller state. Final checks again report 90,931 triangles, 22 renderers, 1 looping clip, 0 missing materials, 0 unresolved animation paths and 3 Animator-driven transform changes. No absolute user paths remain in Stage03 assets.
+
+## #510 Stage1 구미호 박 Unity 에셋 (2026-11-04)
+
+- `Assets/Hapio/Art/Gourds/Stage01_Gumiho`에 FBX·URP 재질·텍스처·Animator Controller·GameReady 프리팹을 추가했다. Stage2와 같은 폴더/파일명 규칙과 몸통 중심·높이 기준을 쓴다.
+- 현재 Editor에서 가져온 결과는 **85,799 triangles / 35 renderers / 15 materials**. 재질 누락 0, 지원하지 않는 shader 0, 애니메이션 transform 경로 누락 0.
+- FBX 내장 `Gumiho_Performance`: 24fps, 약 4초, binding 424개. 눈 2개와 천 2개의 BlendShape binding이 있다. 0·0.65·1.2·1.5·2·3.2초 샘플에서 눈 weight 0↔100과 고정된 동공 scale을 확인했고 Animator 직접 평가에서 Transform 변화도 확인했다.
+- 별도 preview scene에서 닫힌 정면·등장 정면·후면 이미지를 렌더해 확인했다. 몸통 높이 2.390325, 중심 0으로 stage2 배치 기준에 맞췄다. Battle Scene은 dirty가 아니며 스테이지 설정·표시 코드·기존 에셋은 바꾸지 않았다.
+- 관찰한 콘솔에는 Transport/domain 수명주기 오류가 남아 있었다. 콘솔 전체 0오류나 전체 검사 PASS를 주장하지 않는다.
+- **미실행:** stage1 런타임 모델 선택 연결, 게임 이벤트 기반 애니메이션, 도색·충돌·네트워크·실기기 성능 및 전체 EditMode/PlayMode 검사. 에셋별 전달 설명은 `Stage01_Gumiho/ImportNotes.md`.
+
+## #507 PR-1 박 모델 계약과 흰 박 legacy 경로 — 2026-11-04
+
+기준 main `6524427b`에서 Unity 6000.6.5f1 macOS batch Editor로 확인했다.
+
+**순서**: 코드를 바꾸기 전에 main 코드로 흰 박 골든(`Assets/Lab/Tests/PlayMode/Golden/WhiteGourdMount.txt` 28줄, `WhiteGourdYokai.txt` 737줄)을 기록하고 같은 코드에서 비교 모드로 다시 실행해 2/2 PASS를 확인한 뒤 별도 커밋했다. 그 뒤 계약 코드를 넣고 같은 골든과 비교했다.
+
+**변경**
+- `LabGourdVisualRig`(계약), `LabGourdYokaiProfile`(시간표, `Legacy`=기존 상수), `LabGourdPaint.PrepareVisual`·rig 마운트 분기·`paintExtras` property block·rig 크기 정책, `LabGourdYokai.Configure`·프로필 기반 시각·`idleLoop`.
+- `GameStageDefinition.gourdVisualResource`(비면 흰 박), `GameBattleBindings.MountStageGourd`. 세 스테이지 모두 경로가 비어 있어 화면 변화가 없다. Scene·Prefab·StageDefinition YAML은 고치지 않았다.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| EditMode 전체 | **1873/1873 PASS** | 새 `LabGourdYokaiProfileTests` 2개(Legacy 값 = 기존 상수, 순서·유한성 검사), `GameStageGourdVisualTests` 2개(세 스테이지 경로 비어 있음, 경로가 string) |
+| `LabWhiteGourdGoldenTests` | **2/2 PASS** | main 기록과 비교: 마운트 transform·셸 경로/자세·판정 메시/자세·재질·칠 property block·요괴 준비·Animator 꺼짐, 콤보 예고·콤보·명중 3회·해제·폭탄·섬광 예고·번쩍임의 YokaiRoot·LidPivot·눈 자세 시퀀스 |
+| 새 `LabGourdVisualRigTests` | **4/4 PASS** | 합성 rig: 판정 메시=hitShell·자세 일치, 판정 로컬 좌표=칠 공간, extras에 같은 재질과 칠 binding; 크기 변경 시 고정점 유지와 판정 추종; 잘못된 rig(hitShell 비identity)→흰 박·legacy 요괴; rig 요괴가 자기 Animation·프로필로 나오고 `idleLoop` 꺼지면 닫힌 시각에 멈춤 |
+| 관련 PlayMode(`LabGourdYokaiTests`·`LabGourdPaintTests`·`LabGourdHitboxTests`·`LabHangingPresentationTests`·`LabRopeReconciliationTests`·`GameJigwiStageIntegrationTests`·`GameYokaiPresentationTests`·`GameSceneFlowTests`·`LabPaintFinish*`·`GourdResultViewerPlayModeTests`·`LabWatercolorPaintRuntimeTests`, 위 새 검사 포함) | **89/91** 첫 실행 → 새 검사 문장 수정 뒤 rig 검사 4/4 | 실패 1건은 새 검사의 `Has.Count`(배열에 Count 속성 없음) 문장 문제였다. 다른 1건 `LabWatercolorPaintRuntimeTests.DescriptorBurstRespectsTheActiveCapAndConvergesToASettledCheckpoint`(한 픽셀 alpha 194/195)는 이번 변경을 잠시 빼고 main 코드로 단독 실행해도 같은 방식으로 **FAIL**했다. 이번 변경과 무관한 기존 상태로 기록한다 |
+
+**미실행:** iOS 실기기, 다인 Guest 화면. 실제 스테이지 박(2스테이지)은 PR-2 범위다.
+
+**골든 수정(같은 PR):** 마운트 골든의 `shellInRoot`·`hitboxInRoot`는 target 루트 기준이라 매달린 줄의 자동 상하 주기(시간에 따라 움직임)를 포함했다. 처음 기록·비교에서는 프레임 수가 같아 우연히 맞았고, 이후 실행에서 y가 -0.334445 → -0.353289로 달라져 FAIL했다. 두 줄을 움직이지 않는 VisualMount 기준(`shellInMount`·`hitboxInMount`)으로 바꿨다. 기대값은 다시 기록하지 않고 main에서 기록한 `visual.*`(위치 0.186667, 배율 0.777778)·`shell.*`(위치 -0.67, 배율 1.8, 회전 없음)의 곱으로 계산했다(배율 1.4, y -0.334444). 수정 뒤 `LabWhiteGourdGoldenTests`·`LabGourdVisualRigTests` **6/6 PASS**.
+
+## #507 PR-2 2스테이지 야광귀 박 정식 연결 — 2026-11-04
+
+PR-1(`feat/#507-gourd-rig-contract`) 위에서 Unity 6000.6.5f1 macOS batch Editor로 확인했다.
+
+**변경**
+- 굽기: `Hapio.GameGourdRigBake`(계산, Editor 전용)·`Hapio.Editor.GameGourdRigBaker`(메뉴·batch). 결과는 `docs/GOURD_MODELS.md` 표와 `Generated/BakeReport.txt`. 바깥 벽 20,608/40,960삼각형, star-shaped 100%, 판정 껍데기 2,208삼각형(표면 편차 평균 0.013·최대 0.046), 시간표 프레임 15/26/29/38/45/47(주기 48), 렌더러 17개·311,442삼각형(원본 446,594).
+- `C6Lab/GourdPaint`에 `_UNDERPAINT_MAP`(흰 박 재질은 키워드 꺼짐), 칠 셰이더 재질을 가진 extra는 자기 재질 유지.
+- `Stage02_yaguang.asset`의 `gourdVisualResource`를 굽기 도구가 SerializedObject로 설정. `GameStageAssets.EnsureAssets`는 1·3을 비움.
+- `GameGourdModelPreview`·`GameGourdModelPreviewSet`·`Resources/Hapio/GourdPreview/` 삭제(참조 GUID 0개 확인).
+- 게임 토큰 `C6HapioGame/28` → `/29`. 프로토콜 5683·`C6PhysicsLab/44`·공유 설정 257개는 그대로.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| EditMode 전체 | **1877/1877 PASS** | 새 `GameGourdRigBakeTests` 3개(메모리에서 다시 구운 메시 3개=저장본, 시간표=저장 프로필·클립 길이·모든 커브 경로 존재·뚜껑 닫힘/열림 시각, star-shaped ≥99%·판정 편차·판정 껍데기 위 애니메이션 없음·닫힌 뚜껑=칠 공간·흰 박 키워드 꺼짐·삼각형 상한 320k), `GameStageGourdVisualTests` 3개(2만 경로·1/3 비어 있음, 프리팹 계약 통과·Animator/모델 줄 없음, 덧씌우기 타입·리소스 없음), 토큰 `/29` |
+| PlayMode 관련 묶음 | **91/92** | 새 `GameStage2GourdIntegrationTests`(실제 Home→솔로→1·2·3: 1·3 흰 박, 2는 rig 마운트·판정 메시/자세=hitShell·카메라에서 쏜 광선이 판정 껍데기에 맞고 그 방향=칠 공간·몸통/뚜껑 칠 binding·요괴 평소 닫힘→콤보 예고에 뚜껑 20°+ 열림·완성 연출 복사에 몸통/뚜껑 포함·모델 줄 없음), 흰 박 골든 2/2, `LabGourdVisualRigTests`, 기존 박·요괴·매달림·지귀·씬 흐름·완성·결과 뷰어 검사. 실패 1건은 PR-1에서 main 코드로도 FAIL을 확인한 `LabWatercolorPaintRuntimeTests.DescriptorBurst…`(한 픽셀 alpha 194/195) |
+| 실제 전투 캡처(임시 코드, 커밋하지 않음) | 확인 | 1·3스테이지: 덧씌우기 삭제 전(PR-1 브랜치)과 후를 같은 정지 자세로 렌더해 비교. 3스테이지 최대 차이 1/255, 1스테이지 눈으로 같음(최대 48/255인 픽셀 1.3%가 바닥·아래쪽 배경에 흩어져 있음, 원인 미확인 — 3스테이지는 0이라 조명 변경으로 보지 않음). 2스테이지: 야광귀 박이 흰 박 크기로 마운트, 콤보 예고에 뚜껑 열림·정령 등장, PNG 내보내기(`GourdPngCapture`) 512px 성공. 연결된 판의 표면은 직접 칠할 수 없어(복제본), Lab 씬 오프라인 미리보기에서 같은 프리팹을 마운트해 71회 칠: 몸통·뚜껑에 칠이 보이고 닫힌 뚜껑 경계에서 이어짐 |
+
+**미실행:** 2스테이지에서 실제 투사체 명중이 칠 칸으로 들어가는 PlayMode(판정 메시·자세·방향이 칠 공간과 같음까지만 검사), 완성 100% 연출과 결과 미리보기의 2스테이지 실제 진입, iOS 실기기 화면·성능(311k 삼각형), 다인 Guest 화면.
+
+## #507 PR-0·PR-3 연속 곡선 줄 — 2026-11-04
+
+기준 main `6524427b`에서 Unity 6000.6.5f1 macOS batch Editor로 확인했다.
+
+**PR-0 줄 시안(코드 변경 없음)**: 임시 PlayMode 캡처(커밋하지 않음)로 실제 저장 Home → DEV 솔로 → 1·2스테이지 전투를 띄우고, 같은 자세(정지, 좌·우 최대 각도 40°의 90%)를 A 현재 / B 직선 / C 곡선으로 렌더했다. 2스테이지는 당시 덧씌우기 모델이며 모델 자체 줄은 캡처 중에만 숨겼다. 사용자가 **C 곡선·전 스테이지**를 승인했다.
+
+**PR-3 변경**
+- `LabHangingTarget.ropeStyle`(`Segmented` 기본/`Straight`/`Curved`), `SetRopeStyle`, `SetRopeSocket`. 물리·피벗 높이·판정은 그대로다.
+- `GameBattleBindings.Awake`가 Hapio 전투의 모든 스테이지에 `Curved`를 지정한다. Scene/Prefab YAML·Lab Scene·접속 규약·공유 설정은 바꾸지 않았다.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| EditMode 전체 | **1869/1869 PASS** | |
+| 새 `LabContinuousRopeTests` | **5/5 PASS** | 기본 Segmented에 연속 줄 없음·기존 렌더러 켜짐; Curved 24조각이 정지·흔들린 고정 자세·보간 그리기 자세·렌더 후 복원·초기화에서 고정점과 기존 줄 아래끝에 붙고 조각이 이어짐; 고정점 접선 수직·박 접선이 박 축(3° 이내); 충돌체 없음; 숨긴 기존 줄의 transform 유지; Straight 1조각과 Segmented 복귀; 박 안 socket이 흔들림·회전을 따라감; 완성 연출 복사(`CopyMeshes`)에 연속 줄 24조각이 들어가고 꺼진 기존 줄은 빠짐 |
+| 관련 PlayMode(`LabHangingPresentationTests`·`LabRopeReconciliationTests`·`LabHangingRenderInterpolationTests`·`LabHangingRigStateTests`·`LabGourdRope*`·`GameJigwiStageIntegrationTests`·`GameYokaiPresentationTests`·`LabGourdPaintTests`·`GameSceneFlowTests`·`LabPaintFinish*`, 새 검사 포함) | **70 PASS / 2 FAIL / 1 inconclusive** (총 73) | FAIL 1건은 새 검사의 충돌체 단언을 생성 프레임(`Destroy` 완료 전)에 둔 검사 문장 문제로, 고친 뒤 새 검사 단독 5/5. 다른 FAIL `LabHangingRenderInterpolationTests.OutsideRenderingTheTransformsAlwaysHoldTheFixedPose`는 batch에서 `WaitForEndOfFrame`이 호출되지 않는다는 실행 환경 예외이고, inconclusive `DuringRealRendering…`도 batch에서 렌더 패스가 없어서다. 두 검사는 수정하지 않았고 main에서 같은 결과인지는 이번에 따로 실행하지 않았다 |
+| 실제 전투 캡처(임시, 커밋하지 않음) | 1·2·3스테이지 모두 `style=Curved segments=24` 로그, 정지·좌·우 화면에서 고정점부터 박까지 한 줄로 이어짐을 눈으로 확인 | 2스테이지는 덧씌우기 모델의 자체 줄(`Rear_Rope_Strand_*`)이 함께 보인다. 덧씌우기 제거는 PR-2 범위다 |
+
+**미실행:** iOS 실기기 화면·성능, 다인 Guest 화면.
+
+## #507 후속 2스테이지 줄 연결점 — 2026-11-04
+
+#517(PR-2) 위에 #511(곡선 줄)을 합친 브랜치에서 Unity 6000.6.5f1 macOS batch Editor로 확인했다. 세 PR(#511·#516·#517)을 합친 상태의 첫 실행이다.
+
+**변경**: `LabGourdPaint`가 박 모델 계약을 마운트하면 `rig.ropeSocket`을 `LabHangingTarget.SetRopeSocket`에 넘기고, 계약을 해제할 때 null로 되돌린다(흰 박은 기존대로 판정 상단). 읽기용 `LabHangingTarget.RopeSocket`을 더했다. 합치기 충돌은 `AGENTS.md`·`VALIDATION.md` 끝에 각각 덧붙인 절뿐이었고 둘 다 남겼다.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| EditMode 전체 | **1877/1877 PASS** | |
+| PlayMode 관련 묶음 | **94/94 PASS** | `GameStage2GourdIntegrationTests`(2스테이지 곡선 줄·연결점=rig 소켓·마지막 조각 끝이 소켓에 닿음, 1·3은 연결점 null), `LabGourdVisualRigTests`(소켓 전달·해제 시 null), `LabContinuousRopeTests`, 흰 박 골든, 매달림·요괴·도색·지귀·씬 흐름·완성·결과 뷰어 |
+| 실제 전투 캡처(임시) | 확인 | 2스테이지 정지·좌·우: 고정점부터 박 걸이까지 곡선 한 줄, 모델 자체 줄 없음 |
+
+**미실행:** iOS 실기기, 다인 Guest. 이 묶음에는 `LabHangingRenderInterpolationTests`·`LabWatercolorPaintRuntimeTests`를 넣지 않았다.
+
+## #515 Battle 주광 방향·강도 조정 (2026-11-04)
+
+- 변경: `Assets/Hapio/Scenes/Battle.unity`의 `BattleLight`만 변경. 회전 `(42, 330, 0)` → `(38, 150, 0)`, 강도 `1.5` → `0.85`. +Z의 BattleCamera 쪽에서 박 정면을 비추도록 조정했다. 모델·텍스처·머티리얼·셰이더·게임 로직·카메라·환경광·OrbBoardLight·후처리는 보존했다.
+- 환경 확인: Unity MCP 10.3.0 연결, URP `PC_RPAsset`, Flat 환경광 `(0.5, 0.5, 0.5)`/강도 1, 반사 강도 1. 두 카메라에 AdditionalCameraData가 없고 씬 Volume도 없다. 새 후처리는 추가하지 않았다.
+- 실제 Editor 솔로: 기존 StartSolo와 DEV 다음 스테이지를 통해 1→2→3 Playing/박 IsReady를 확인했다. 각 스테이지에서 게임과 Editor를 정지하고 같은 Game View(1206×2612), 카메라·애니메이션·도색·UI·이펙트 상태로 원래 조명/후보 조명을 각각 촬영했다. 비교 PNG 6장은 저장소 밖에 보관했다.
+- 육안 비교: 1스테이지 박 입구·끈·노출된 검은 요괴의 눈, 2스테이지 박 문양·끈·표면, 3스테이지 박 입구·끈의 식별 개선. 바닥 밝기가 낮아져 박·경고와 구분된다. 광범위한 박 표면의 흰색 소실은 보이지 않으나 2스테이지 뚜껑의 작은 정반사 하이라이트는 남는다. 1스테이지 폭탄, 2스테이지 섬광 오버레이, 3스테이지 경고·폭탄의 공존 화면을 확인했다.
+- 한계: 공통 박 셸의 종이/도색 셰이더는 자체 고정 조명을 사용하므로 씬 주광으로 종이 밝기를 바꾸지 않는다. 가려진 내부 요괴를 드러내거나 형태를 바꾸지 않았다. 도색 진행별·모든 이펙트 시점·다인 카메라 방향·실기기/iOS 성능·색 재현은 미검증이다.
+- EditMode: `GameStageBackgroundAssetTests.StageTwoUsesIsolatedArtworkAndRestoresTheDefaultForOtherStages` **1/1 PASS** (0.58초).
+- PlayMode: `GameSceneFlowTests.SharedCountdownWaitsForInitialPresentationAndOnlyThenStartsGameplay` **1/1 PASS** (6.50초). 실제 저장 Home→Battle 준비/카운트다운 흐름 검사다.
+- 초기 EditMode 실행 요청 2회는 Play Mode 상태로 시작하지 못해 검사 0개였으며, 전용 stop 도구로 종료 후 위 검사를 실행했다. 미실행 요청을 통과 수에 포함하지 않는다.
+- 저장 직후 콘솔 error 조회 0개, `git diff --check` 통과. C# 변경이 없어 별도 재컴파일을 유발하지 않았다. 커밋·push는 수행하지 않았다. 원격 브랜치 존재와 로컬 HEAD 동일 여부는 읽기 전용 ls-remote로 확인했다.
+
+
+### #515 바닥 밝기 피드백 반영 (2026-11-04)
+
+앞선 0.85/(38,150,0)안은 바닥을 과도하게 어둡게 해 최종값을 **1.16/(60,150,0)**으로 수정했다. 수평면에 들어오는 주광의 Lambert 성분은 원래 `1.5 × sin(42°) ≈ 1.004`, 보정안 `1.16 × sin(60°) ≈ 1.005`로 거의 같다. 카메라 쪽 조명 방향은 유지한다. 실행 중인 2스테이지를 Editor에서 잠시 정지해 기존 카메라로 원래 조명과 보정안을 촬영했다. 사용자의 게임 일시정지 상태는 유지하고 Editor 정지를 해제했다. Play Mode 상태를 씬으로 저장하지 않고 디스크의 주광 회전·강도 두 값만 수정했다. 모델·머티리얼·환경광·로직은 그대로다. 위 자동 검사 통과 기록은 이전 후보 값에서의 결과이며, 이번 수치 보정 후에는 재실행하지 않았다. 이번 최종값의 세 스테이지·실기기 시각 비교는 미검증이다.
+
+- 추가 밝기 피드백: 주광 최종 강도를 1.16 → **1.28**(약 +10%)로 올리고 회전 (60,150,0)을 유지했다. 실행 씬에도 같은 값을 적용하고 BattleCamera 촬영으로 현재 화면의 하이라이트를 확인했다. 세 스테이지 전체 및 자동 검사는 이번 수치 보정 후 재실행하지 않았다.
+
+## #507 후속 2스테이지 실제 명중·완성·결과 검사 — 2026-11-04
+
+기준 main `856b5749`(#516·#517·#511 병합 뒤)에서 Unity 6000.6.5f1 macOS batch Editor로 확인했다. 런타임 코드 변경 없이 검사만 더했다.
+
+새 `GameStage2GourdHitFinishTests`: 저장 Home → DEV 솔로 → 2스테이지에서 DEV 값(비밀 상자 100%, 잠금 0, 생성 비용 1, 생성 속도 0)을 적용해 다시 불러온 뒤,
+- 실제 보드 제스처로 비밀 상자를 열고 Combined 구슬을 던진다. 보드의 놓기 속도는 마지막 0.12초 이동 거리로 정해지므로 마지막 튕김 길이(보드 폭 0.45~0.7)를 바꿔 가며 던진다. 이번 실행에서는 첫 투척(0.6)이 `SHOT HIT`.
+- Host가 승인한 명중의 판정 로컬 지점 방향이 칠 껍데기 방향과 같고, 그 방향의 칠 칸(또는 바로 옆 칸)에 칠이 들어갔으며 칠 수가 늘었다. 몸통·뚜껑 렌더러가 현재 칠 지도를 받는다.
+- Host 표면에 실제 칠 명중을 구 전체에 고르게 넣고 성장으로 100%가 된 뒤: 완성 연출 복사본에 `Paint Shell`·`Lid Paint`가 있고 모델 줄은 없다. 결과 미리보기(`LabGourdResultPreview`)도 같은 두 부분을 복사한다. 2스테이지 결과 Scene이 열리고 미리보기 텍스처가 Battle 해제 뒤에도 남는다.
+
+| 확인 | 이번 결과 |
+| --- | --- |
+| 새 검사 단독 | **1/1 PASS** |
+| 새 검사 + `GameStage2GourdIntegrationTests`·`GameSceneFlowTests`·`GameJigwiStageIntegrationTests` | **24/24 PASS** |
+
+**미실행:** iOS 실기기 화면·성능, 다인 Guest 화면, 아트 경량 재출력 반영.
+
+## #507 후속 1·3스테이지 박 굽기와 연결 — 2026-11-04
+
+기준 main `35ca1de8`(#512 구미호·#514 지귀 아트, #519 주광 병합 뒤)에서 Unity 6000.6.5f1 macOS batch Editor로 확인했다.
+
+**변경**
+- 굽기 도구를 스테이지별 명세(`GameGourdRigBake.Spec`)로 일반화: 노드를 `.001` 접미사를 뗀 이름으로 찾고, 칠 아래 바탕은 원래 재질의 `_BaseMap`, 시간표 주기는 첫 "닫힘→열림→닫힘"의 닫힌 프레임+1, 요괴 클립에 눈 BlendShape 커브 포함. 메뉴는 스테이지별 3개와 `Bake All Stage Gourds`.
+- 일반화 뒤 2스테이지만 다시 구워 git으로 비교: 메시·클립·프로필·재질·프리팹이 **바이트 단위로 같음**(`BakeReport.txt`에 source 줄만 추가).
+- 1·3스테이지 굽기와 `Stage01_gumiho`·`Stage03_jigwi` `gourdVisualResource` 연결. `GameStageAssets.EnsureAssets`는 경로를 더 이상 비우지 않는다. 게임 토큰 `C6HapioGame/29` → `/30`.
+- 굽기 결과는 `docs/GOURD_MODELS.md` 표(1·3: 바깥 면 7,262/14,336, star-shaped 100%, 판정 편차 평균 0.013·최대 0.045, 시간표 15/26/29/38/45/47·주기 48, 1: 30렌더러·61,505삼각형, 3: 17렌더러·66,637삼각형).
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| EditMode 전체 | **1885/1885 PASS** | `GameGourdRigBakeTests`를 세 스테이지 fixture로(최신 여부·시간표·형상·삼각형 상한), `GameStageGourdVisualTests`(세 스테이지 경로·계약), 토큰 `/30` |
+| PlayMode 관련 묶음 | **84/84 PASS** | `GameStageGourdIntegrationTests`(이전 `GameStage2GourdIntegrationTests`, 세 스테이지 모두 rig·판정=hitShell·광선 방향=칠 공간·줄 끝=소켓·몸통/뚜껑 칠 binding·요괴 평소 닫힘→콤보 예고에 뚜껑 열림·완성 복사), `GameJigwiStageIntegrationTests`(3스테이지 rig·A/B가 판정 메시를 바꾸지 않음), `GameStage2GourdHitFinishTests`, `GameSceneFlowTests`(1→2→3 완료·결과 미리보기), 흰 박 골든, `LabGourdVisualRigTests`, `LabContinuousRopeTests`, `LabGourdYokaiTests`, `LabGourdPaintTests`, `GourdResultViewerPlayModeTests`, `LabJigwiABPresentationTests` |
+| 실제 전투 캡처(임시) | 확인 | 1·2·3스테이지 정지와 콤보 예고(정령 등장). 1·3스테이지 박을 Lab 오프라인 미리보기에 마운트해 71회 칠: 몸통·뚜껑에 칠이 보임 |
+
+**미실행:** iOS 실기기 화면·성능, 다인 Guest 화면. 1스테이지 눈(`SkinnedMeshRenderer`)은 완성 연출·결과 미리보기 복사에 들어가지 않는다(완성 때 뚜껑이 닫혀 있어 보이지 않음).
