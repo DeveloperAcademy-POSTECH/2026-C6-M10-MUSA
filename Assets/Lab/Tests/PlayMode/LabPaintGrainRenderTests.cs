@@ -135,6 +135,7 @@ namespace C6Lab.Tests
                 // A fixture creates a matching complete result; this does not claim a real hit.
                 network.port = 17896;
                 Assert.That(network.StartDeveloperSolo(), Is.True, network.Notice);
+                LabPaintPresentationTestFixture.SelectRetainedStyleForSyntheticMap(network);
                 LabPaintSurface map = network.PaintSurface;
                 map.Reset(new LabPaintGrowthSettings { Pattern = LabPaintPattern.Legacy, Resolution = 0, InitialPercent = 100f }, 196u);
                 Assert.That(map.RegisterHit(Vector3.forward, new Color(.25f, .45f, .7f), 1), Is.True);

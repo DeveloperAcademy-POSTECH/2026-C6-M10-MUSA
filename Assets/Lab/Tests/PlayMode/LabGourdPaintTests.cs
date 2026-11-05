@@ -718,7 +718,15 @@ namespace C6Lab.Tests
             Assert.That(expected.Count(pixel => pixel.a != 0), Is.EqualTo(surface.CoveredCount));
             Assert.That(surface.Coverage, Is.EqualTo(surface.CoveredCount / (float)surface.CellCount));
             Assert.That(ReadBlock(paint).GetTexture("_PaintMap"), Is.SameAs(paint.VisualPaintTexture));
-            Assert.That(ReadBlock(paint).GetFloat("_PaintMapReady"), Is.EqualTo(1f));
+            Assert.That(ReadBlock(paint).GetFloat("_PaintMapReady"), Is.EqualTo(paint.ClayStickersActive?0f:1f));
+            if(paint.ClayStickersActive)
+            {
+                var coat=paint.VisualInstance.GetComponentsInChildren<Renderer>(true).Single(r=>r.enabled && r.sharedMaterial!=null && r.sharedMaterial.shader.name=="C6Lab/ClayStickerSurface");
+                var b=new MaterialPropertyBlock();coat.GetPropertyBlock(b);
+                Assert.That(b.GetFloat("_PaintMapReady"),Is.EqualTo(1f));
+                Assert.That(b.GetTexture("_PaintMap"),Is.SameAs(paint.VisualPaintTexture));
+                Assert.That(b.GetTexture("_HeightMap"),Is.SameAs(paint.VisualHeightTexture));
+            }
         }
 
         static void AssertPixelsClose(Color32[] expected, Color32[] actual, int tolerance, string message)

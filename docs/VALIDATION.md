@@ -1,12 +1,47 @@
 # C6 Physics Lab 검증 범위
 
-## 2026-11-04 — 화 캐릭터 로딩 달리기 에셋 1차 시안
+## 2026-11-04~05 — #509 지귀 B 지목 동시 명중
 
-`output/imagegen/hwa-loading-run-v1`에 기본 이미지 생성 도구로 만든 캐릭터 6포즈와 빈 한지 배경을 준비했다. PNG 크기 조정·스프라이트시트·GIF 조립만 별도 패키징 도구로 수행했다. 게임 기능 구현이나 Unity 에셋 연결은 하지 않았다.
+`feat/#509-jigwi-group-sync`(#479 브랜치 위) 작업 중 팀원이 Unity6000.6.5f1 Editor(macOS)로 확인한 것만 적는다.
 
-- **파일 검사 완료:** 서로 다른 투명 PNG 6장, 각 1024×1024, 투명 영역 및 캔버스 가장자리의 잘림 없음. 스프라이트시트 3072×2048·3열×2행. 캐릭터/로딩 GIF 각각 6프레임·프레임당 140ms·무한 반복 메타데이터를 확인했다.
-- **시각 검토 완료:** 6포즈 비교 이미지와 402×916 로딩 화면 정지 이미지를 확인했다. 생성 프레임의 얼굴 세부 선·옷 주름·손 윤곽에는 작은 차이가 남아 있어 최종 적용 전 아트 정리 대상이다.
-- **미실행:** Unity 컴파일·Scene/Prefab 연결·EditMode·PlayMode·Mac/iOS 빌드·실기기 재생/성능. 로딩바는 고정 시안이며 실제 진행률과 연결하지 않았다.
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| (1/5) Host 규칙 EditMode | **팀원 PASS 보고** | `LabJigwiABModelTests`·`LabJigwiABSupplyModelTests`·`LabJigwiStageModelTests`·`LabJigwiStageBlastTests`·`LabJigwiSupplyReplicationTests`·`LabBoardReplicationTests`·`LabSharedSettingsSchemaTests`·`LabGameFlowBridgeTests` (테스트 픽스처 실수 4건을 고친 뒤) |
+| (3/5) DEV 은퇴 EditMode | **팀원 PASS 보고** | `LabDeveloperConfigTests`·`LabJigwiABConfigTests`·`LabJigwiStageConfigTests`·`GameStageSettingsTests`·`MenuScreens_HaveSavedEditableCanvasAndInput` |
+
+(2/5) `LabJigwiSyncPillarViewTests`와 (4/5) PlayMode(`LabJigwiABPresentationTests`·`LabJigwiABNetworkTests`·`LabJigwiGroupFireAudioTests`·`GameJigwiStageIntegrationTests`), EditMode 전체 Run All, SOLO/2인 이상 Play, 실기기 진동·iOS 빌드·LAN/핫스팟은 이 기록 시점에 **결과를 받지 못했거나 미실행**이다. 확인하면 이 절에 덧붙인다.
+
+이후 단계: (6/9) 지귀 A/B 외침 목소리 삭제와 (7/9) 불기둥 대신 박 동시 명중으로 바꾼 뒤 팀원이 Test Runner를 돌려 실패 2개를 보고했고, 테스트 픽스처(동기 명중에 지급 물 구슬 사용)를 고쳤다. (8/9) 성공 물벼락 / 실패 조합판 불바다 3초 / 5초 보상과 DEV251/252 은퇴는 커밋만 했고 **Test Runner 결과는 아직 받지 못했다**.
+
+#479 브랜치(main `0681d25` #506까지 병합)를 합쳤다. 충돌은 접속 번호 줄, `LabModel.cs` 칠하기 줄(main의 `paintImpactStrength` + #509 승리 1회 조건), `AGENTS.md`/`JIGWI_SCREEN_PATTERNS.md` 절이었다. #509는 **5688/`C6PhysicsLab/49`/`C6HapioGame/33`**, 설정 259개다. 병합 뒤 결과는 아직 기록하지 않았다.
+
+## 2026-11-05 — 마지막 일격 다시보기 (스토리 1·2·3)
+
+`feat/final-hit-replay` 브랜치에서 Unity 6000.6.5f1 batch mode(macOS)로 실행했다. 아래 표는 실제로 실행한 것만 적는다.
+
+| 확인 | 결과 | 범위 |
+| --- | --- | --- |
+| EditMode 전체 | **1970 PASS / 0 FAIL** | 새 `LabFinishReplayShotTests`(기록 왕복·크기·거절·비행 경로·자세 보간·장면 시간표·짧은 비행 맞춤), `GamePaintFinishBarrierTests` 다시보기 release 2개, `GameSessionFinishTests` 기록 채택·패킷 4096자 한도 2개, 토큰 `C6HapioGame/33` |
+| PlayMode 다시보기·회귀(검토 수정 뒤) | **36 PASS / 0 FAIL** | `GameFinishReplayTests`(1·3스테이지 실제 투척 → 세 장면·명중 3회·ghost 물리 없음·HUD/전투 카메라 꺼짐·실제 박 표시·통계/칠 불변·한지 막 아래 결과, 새 탭 건너뛰기 → 솔로 결과, 최근 명중 없는 100% → 기존 1.2초 복사본), `GameStage2GourdHitFinishTests`(2스테이지 실제 투척 → 다시보기·결과 미리보기), `GameSceneFlowTests`, `LabWhiteGourdGoldenTests`, `LabContinuousRopeTests`, `GameStageGourdIntegrationTests` |
+| PlayMode 회귀(검토 수정 전) | **56 PASS / 0 FAIL** | 위 항목에 더해 `LabGourdPaintTests`, `LabPaintDryingPlayModeTests`, `GourdResultViewerPlayModeTests`, `GameJigwiStageIntegrationTests`, `LabGourdVisualRigTests` |
+| 세 스테이지 장면 캡처 | 임시 PlayMode(커밋 안 함) | 휴대폰 세로 비율 RT로 장면당 6프레임 확인. 레터박스 막대는 이미지에 직접 그렸고 캡션·컷 번쩍임은 화면 오버레이라 캡처에 없음 |
+| 코드 검토 | 독립 검토 3관점 + 반박 검증 | 확인된 2건 수정: 늦은 재예약에서 12초 안에 들지 않으면 commit 전에 기존 연출로 내림, 자세 기록 256스텝으로 늘리고 창이 다 남지 않은 명중 제외 |
+
+미실행: iOS·Mac 앱 실기기(세로 화면 구도·성능), 다인 Host/Guest 동시 재생·Guest 건너뛰기·늦은 재예약 내림. 검토 수정 뒤에는 `LabGourdPaintTests` 등 위 56개 중 나머지 PlayMode를 다시 돌리지 않았다.
+
+## 2026-11-04 — #479 지귀 A 부적 쓰기
+
+`feat/#479-jigwi-talisman` 작업 브랜치에서 팀원이 Unity6000.6.5f1 Editor(macOS)로 직접 확인했다. 아래 표는 실제로 실행한 것만 적는다.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| EditMode 전체(Run All) | **1867 PASS / 1 FAIL / 0 skip** | Lab·Hapio EditMode 전체. 부적·소각 순서·DTO/복제 검증·접속 버전5684·DEV241/242 은퇴·Home/Lobby 저장 DEV 패널 포함 |
+| 실패 1개 | `GameSceneAssetTests.BattleCopy_PreservesTheCurrentSavedLabEnvironment` | Battle 바닥 텍스처 GUID가 Lab 저장값과 다름(Stage01 바닥 vs Lab HanjiSand). #479 변경과 무관한 배경 작업 쪽 기대값이며 담당 팀원에게 전달함 |
+| SOLO 지귀 Play(에디터) | **팀원 손 확인** | Home에서 `Hapio > DEV SOLO 시작 스테이지 > 3`으로 지귀 진입. 전투 영역의 세로 한지 부적, 조합판 막힘, 1초 간격 소각, 점선 "물"을 90% 이상 쓰면 통과·물방울 구슬 지급을 보며 화면/기준값을 조정함 |
+
+main `f40e028`(#507 박 모델·#515 조명 포함)을 합쳤다. 충돌은 게임 토큰 줄(`LabNetwork.GameFlow.cs`, `LabGameFlowBridgeTests`)과 `AGENTS.md` 절 추가뿐이었다. #507이 Game29·30을 먼저 써서 #479는 Game31로 올렸다. 이 병합 뒤 EditMode Run All·`GameJigwiStageIntegrationTests`·SOLO 지귀 Play를 팀원이 확인했다. 이어서 main `0681d25`(#506 클레이 스티커, 5686/Lab47/Game31·설정 259개)를 다시 합쳐 #479를 **5687/`C6PhysicsLab/48`/`C6HapioGame/32`**로 올렸다. 두 번째 병합 뒤 Test Runner 결과는 아직 다시 기록하지 않았다.
+
+실기기(iPhone)·iOS 빌드·2~5인 LAN/핫스팟·5683 앱과의 혼용 거부·모바일 성능은 **미실행**이다. Stage02 `YokaiBacking.mat`/`YokaiGround.mat`이 배경 도구로 바뀌는 것은 매번 되돌렸고 이번 작업에 넣지 않았다.
 
 ## 2026-10-29 — #386 미사용 Target·Target2·GourdCrack·PackageInstaller 정리
 
@@ -4602,6 +4637,519 @@ Consolidated three byte-identical textures into shared material references; conf
 - 로컬 네트워크 권한을 거부했다가 설정에서 허용하고 복귀했을 때 검색이 돌아오는지
 - 백그라운드 중 NGO 연결 유지
 
+## #485 Battle.unity Transform 부모 복구와 #447 배경 검사 갱신 — 2026-11-04
+
+기준 main `afaee674`에서 `fix/#485-battle-scene-hierarchy` 별도 worktree로 작업했다. Unity 6000.6.5f1 macOS batch Editor를 사용했다.
+
+**원인과 수정**
+- #447(PR #475) 이후 Battle.unity의 배경 장식 Transform 30개가 부모 `m_Children`에 남은 채 `m_Father: 0`이었고 SceneRoots에도 들어 있었다. 그래서 열 때마다 `Restored Transform child parent pointer from NULL`이 났다.
+- 이 30개는 #447 이전(`b50cded6`)에 같은 부모의 자식이었고, 로컬 위치·회전·크기도 같다.
+- 임시 Editor 스크립트로 Unity가 Scene을 열고 저장하게 했다. YAML은 손으로 고치지 않았고, 스크립트는 커밋하지 않았다.
+- fileID 기준 내용 비교에서 바뀐 것은 정확히 31개다.
+  - 30개 Transform의 `m_Father`: 그 자식을 가진 부모로, #447 이전 값과 같다.
+  - SceneRoots에서 그 30개 항목 제거
+  - 그 밖의 텍스트 차이는 Unity 저장 순서의 재정렬이다.
+- 독립 검토(별도 파서)도 같은 결과를 냈다: 중복 ID 0, 끊긴 fileID 0, 계층 불일치 0, 미해결 GUID 0(내장 리소스 제외).
+- #447이 실수로 커밋한 Unity 복구 Scene `Assets/_Recovery/0.unity`(약 10만 줄)를 지우고 `.gitignore`에 넣었다. 이 GUID를 참조하는 곳은 없었다.
+
+**검사 갱신 (#447의 의도된 디자인에 맞춤)**
+- 1스테이지 바닥·조합판 뒤는 `Stage01_Ground_SandBeige`, 둘레는 `Stage01_Sky_WarmBeige`다.
+- 3스테이지는 전용 석양 배경이고, 1스테이지와 모르는 번호는 기본 배경이다.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| EditMode 전체 | **1862/1862 PASS** | 수정 전 main 단독에서 실패하던 4건 포함 |
+| Battle을 여는 PlayMode | **106/106 PASS**, Scene 경고 0 | `GameSceneFlowTests`(3스테이지 배경 전환 단언 갱신 포함)·`GameLobbyViewTests`·`LabDeveloperSoloIntegrationTests`·`LabJigwiABPresentationTests`·`LabGourdYokaiTests`·`GameYokaiPresentationTests`·`GameOpeningControllerTests`·`LabGourdPaintTests`. 수정 전 main 단독에서는 Battle을 여는 검사 22건이 Scene 오류로 실패 |
+
+**남은 사항(바꾸지 않음):** `docs/STAGE_BACKGROUNDS.md`는 2스테이지 바닥을 `Stage02_Ground_Yagwanggwi`라고 하지만, 실제 `YokaiGround`/`YokaiBacking` 재질의 `_BaseMap`과 Stage02 studio는 `HanjiSand`다. 아트 결정이라 이 수정 범위에서 바꾸지 않았다.
+
+**미실행:** 화면으로 배경 배치 확인, iOS 빌드·실기기.
+
+## #481 전투 초반 프레임 계측 — 2026-11-04
+
+기준 main `afaee674`에서 `perf/#481-frame-spike-probe` 별도 worktree로 작업했다. Unity 6000.6.5f1 macOS batch Editor(`unity test`)에서 확인했다.
+
+- **main의 Battle.unity 문제:** main `afaee674`의 `Assets/Hapio/Scenes/Battle.unity`는 열 때 `Problem detected while opening the Scene file`와 `Restored Transform child parent pointer from NULL`이 납니다. 이 변경 없이 main만으로도 재현되며 #447 병합 이후입니다. 그래서 Battle을 여는 검사는 이 브랜치에서 모두 실패합니다.
+- **검사 방법:** 게임 흐름 검사는 #447 직전 `b50cded6`에 #476과 이 변경을 얹은 임시 기준에서 따로 돌렸습니다.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| EditMode 전체(이 브랜치) | **1861/1865** | 새 `GameFrameSpikePolicyTests` 3개 통과. 실패 4건은 main `afaee674` 단독과 같은 #447 Battle/배경 검사 |
+| EditMode 전체(#447 이전 기준) | **1865/1865 PASS** | 리뷰 수정 전 첫 구현 |
+| 게임 흐름·오디오·도색 PlayMode(#447 이전 기준) | **108/108 PASS** | 리뷰 수정 전 첫 구현. 솔로 1스테이지에서 `HAPIO_FRAME_SUMMARY` 1회 |
+| 리뷰 수정 후 게임 흐름 PlayMode(#447 이전 기준, #482와 함께) | **85/85 PASS** | `GameSceneFlowTests`(같은 스테이지 DEV 재적용 시 flush 1회 추가 단언 포함)·`GameLobbyViewTests`·`LabDeveloperSoloIntegrationTests`·`LabJigwiABPresentationTests`·`LabGourdYokaiTests` |
+
+Editor 관찰값입니다. 기기 근거가 아닙니다.
+- 스테이지마다 Battle 로딩 중 50~165 ms 프레임 3개
+- 야광귀 배경음 시작 약 200 ms, 지귀 약 85 ms(SynchronizingBattle)
+
+**#485 병합 뒤 실제 main 기준 재검사** (#485·#481·#482를 함께 쌓음)
+- EditMode **1865/1865**, 관련 PlayMode **142/142**(게임 흐름·로비·솔로·지귀·요괴·도색·오디오·새 #482 검사)
+- 첫 실행에서는 140/142였다. `SharedCountdown…`·`StageTwoDefeat…` 2건이 실패했는데, 그 실행의 계측에서 카운트다운이 452초로 기록되고 25 ms 넘는 프레임은 없었다. 그래서 그 실행 환경의 이상으로 보고, 같은 클래스 단독 2회(21/21×2)와 전체 재실행에서 모두 통과한 것을 기록한다.
+
+**미실행:** 비개발 Player 빌드에서 `HAPIO_FRAME_*`가 없는지 확인, iPhone 기준선(cold 재설치 3회·warm 1회, 방장·게스트).
+
+## #482 도색 첫 명중 작업을 준비 구간으로 — 2026-11-04
+
+#481 브랜치 위 `perf/#482-first-hit-paint-prewarm`에서 Unity 6000.6.5f1 macOS batch Editor로 확인했다. main의 Battle.unity 문제(#481 절)로 게임 흐름 검사는 #447 직전 `b50cded6` + #476 + #481 + 이 변경의 임시 기준에서 돌렸다.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| EditMode 전체(이 브랜치) | **1861/1865** | 실패 4건은 main 단독과 같은 #447 Battle/배경 검사 |
+| 도색·오디오 PlayMode(이 브랜치) | **45/45 PASS** | 새 `LabFirstHitPaintPrewarmTests` 6개: 공유 거리장이 기존 생성과 GPU에서 같고 런타임 해제 뒤 남음; prewarm 뒤 첫 스탬프에서 붓 로드·거리장 생성 0회; prewarm 전후 Ready·오류·스탬프 수와 다음 명중 이미지가 prewarm 없는 쪽과 픽셀 단위 동일; 임시 RT 형식; 라운드 붓 무늬; 방장 마스크 미리 풀기. 기존 `LabGourdPaintTests`·`LabWatercolorPaintRuntimeTests`·`LabHighResolutionPaintRuntimeTests`·`LabPaintGrainRenderTests`·`LabPlayerPaintPatternRenderTests`·`LabPaintDryingPlayModeTests`·오디오·지귀 피드백 |
+| 게임 흐름 PlayMode(#447 이전 기준) | **85/85 PASS** | 솔로 Host 라운드가 첫 명중 전에 판정 마스크를 갖는지 단언 포함. Editor 계측에서 붓 로드가 LoadingBattle 프레임으로 옮겨진 것을 확인(`uses=BrushLoad`) |
+
+Metal 파이프라인(PSO)이 실제로 준비 구간에서 만들어지는지는 Editor로 판단할 수 없다. 이 항목과 iPhone cold/warm 첫 명중 프레임 시간, Metal System Trace는 **미실행**이다.
+
+## #487 2스테이지 바닥 Yagwanggwi 연결 — 2026-11-04
+
+기준 main `59c197cb`에서 Unity 6000.6.5f1 macOS batch Editor로 확인했다.
+
+**수정 방법**
+- 임시 Editor 스크립트를 커밋하지 않고 Unity API로 다음을 바꿨다. YAML은 손으로 고치지 않았다.
+  - `Stage02 Background Studio`의 `groundPng`·`boardBackgroundPng`
+  - `Stage02/Materials/YokaiGround.mat`·`YokaiBacking.mat`의 `_BaseMap`
+- 결과 diff는 Scene 2줄과 재질 2줄뿐이다. 색·타일링·다른 스테이지는 그대로다.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| EditMode 전체 | **1865/1865 PASS** | `GameStageBackgroundAssetTests`에 세 스테이지 모두 studio PNG와 저장 재질 `_BaseMap`이 같은지 검사를 추가했다 |
+| 실제 전투 캡처(DEV 솔로 1→2→3스테이지, 임시 검사·커밋 안 함) | 바닥·조합판 뒤가 1 **`Stage01_Ground_BlushBeige`**, 2 **`Stage02_Ground_Yagwanggwi`**, 3 `Stage03_Ground_Jigwi` | 수정 전 main에서 2스테이지는 `HanjiSand_BaseColor`였고, 플레이할 때마다 Editor가 재질의 `_MainTex`를 HanjiSand로 덮었다. 수정 뒤에는 플레이해도 재질 파일이 바뀌지 않는다 |
+| PlayMode `GameSceneFlowTests`·`GameLobbyViewTests` | **34/34 PASS** | |
+
+**1스테이지:** 문서의 후속 미술 수정대로 `Stage01_Ground_BlushBeige`로 바꿨다. 그동안 실제로 적용돼 있던 것은 `Stage01_Ground_SandBeige`였다. 바꾼 곳은 기본 `Background Studio`의 `groundPng`·`boardBackgroundPng`와 Stage01 `YokaiGround`·`YokaiBacking`의 `_BaseMap`·`_MainTex`이며, 같은 Unity API 방식으로 했다(Scene 2줄, 재질 4줄). 사용자가 세 후보 이미지를 직접 보고 결정했다.
+
+**미실행:** iPhone 화면 확인.
+
+## #490 1스테이지 바닥 SandBeige 복원 — 2026-11-04
+
+#487에서 문서의 후속 미술 수정을 근거로 1스테이지 바닥·조합판 뒤를 BlushBeige로 바꿨다. 사용자가 SandBeige가 맞다고 확인해 되돌렸다.
+
+- 같은 Unity API 방식으로 되돌렸다. 대상은 기본 `Background Studio`의 `groundPng`·`boardBackgroundPng`와 Stage01 `YokaiGround`·`YokaiBacking`의 `_BaseMap`·`_MainTex`다.
+- 1스테이지 관련 값은 #487 이전(`b835dc3c`)과 같다. 2스테이지 Yagwanggwi는 유지한다.
+- `GameSceneAssetTests` 기대값과 `docs/STAGE_BACKGROUNDS.md`도 SandBeige로 바로잡았다.
+- 배경 Scene·재질 EditMode 검사(`GameSceneAssetTests`·`GameStageBackgroundAssetTests`·`GameBackgroundAnimationAssetTests`) **12/12 PASS**. 화면은 #487 직전 캡처와 같은 값이라 다시 찍지 않았다.
+
+## #489 야광귀·기본 전투 배경음 Streaming — 2026-11-04
+
+기준 main `8c020fca`에서 Unity 6000.6.5f1 macOS batch Editor로 확인했다.
+
+**변경**
+- 임시 Editor 스크립트로 `AudioImporter`를 바꿨다. 스크립트는 커밋하지 않았고 .meta는 손으로 고치지 않았다.
+- 대상은 `Yaguang_Stage.wav`·`Kkwaenggwari_13.wav`의 기본 `loadType`이다: DecompressOnLoad → Streaming.
+- diff는 .meta 2줄이다. 구미호·땅따먹기 곡과 같은 설정이며, 피버곡 2개는 DecompressOnLoad 그대로다.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| EditMode `LabBattleBgmImportTests`(새 검사)·`LabGumihoSoundTests`·`LabYaguangFeverTests` | **15/15 PASS** | 긴 스테이지 곡 4폴더 모두 Streaming, 피버곡 DecompressOnLoad |
+| PlayMode `LabBattleBgmStageTests`·3스테이지 결과 흐름 | **4/4 PASS** | |
+
+**Editor 계측(#481, 1회)**
+- 이전 실행: 야광귀 약 200 ms·지귀 약 85 ms의 `BattleMusic` 프레임이 있었다.
+- 이번 실행: 2·3스테이지에서 그 프레임이 나오지 않았다.
+- 같은 실행의 1스테이지(구미호, 원래 Streaming)에서는 `BattleMusic`이 표시된 187 ms 프레임이 한 번 있었다. Streaming 시작도 비용이 0은 아니다.
+- Editor 수치이고 1회라 기기 판단 근거가 아니다.
+
+**미실행:** iPhone에서 배경음 시작 지연이 들리는지, 시작 프레임 시간.
+
+## #492 현재 스테이지 효과음·피버곡·지귀 보상 불꽃 미리 로드 — 2026-11-04
+
+## #493 지귀 화면 오버레이를 지귀 스테이지에서만 로드 — 2026-11-04
+
+기준 main `76d71b78`에서 Unity 6000.6.5f1 macOS batch Editor로 확인했다.
+
+**변경**
+- `LabBattleAudioWarmup.Preload(yokai)`를 `GameBattleBindings.Awake`가 호출한다. 이 시점은 Battle Scene 활성화 프레임이고, 불투명 준비 화면 아래다.
+- 로드하는 것: 공통 효과음, 현재 스테이지 전용 효과음, 그 스테이지의 피버곡. 각 소리 컴포넌트가 이미 가진 같은 clip 객체에 `LoadAudioData`를 부른다.
+- 다른 스테이지 전용 효과음 데이터는 해제한다.
+- 지귀 스테이지는 보상 불꽃 이미지 묶음도 미리 읽는다. 지귀는 피버곡이 없어 피버곡을 읽지 않는다.
+- 미리 읽은 clip과 이미지는 그 Battle이 닫힐 때(`GameBattleBindings.OnDestroy`)까지 정적 참조로 붙잡는다. Scene 로드의 미사용 에셋 정리가 첫 사용 전에 지우지 않게 하기 위해서다.
+- 해제는 미리 읽은 Battle만 할 수 있다(소유자 확인). 그래서 닫히는 Battle이 다음 Battle의 미리 읽기를 지우지 않는다.
+- import 설정·Scene/Prefab·소리 규칙은 그대로다.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| EditMode 전체 | **1867/1867 PASS** 기준(새 `LabBattleAudioWarmupTests` 2개: 소리 컴포넌트의 공통 폴더 상수가 모두 포함되는지, 스테이지별 로드·다른 스테이지 해제·지귀 보상 불꽃 유지·같은 스테이지 재호출 시 0개) | 새 검사는 수정 뒤 단독 재실행 2/2. 첫 전체 실행의 1건은 비어 있는 `Audio/FlashClear` 폴더를 가정한 검사 문장이어서 고쳤다 |
+| PlayMode `GameLobbyViewTests`(솔로 1스테이지에서 구미호·공통 효과음이 Playing 전에 로드됐는지 단언 추가)·`GameSceneFlowTests`·`LabStaminaFeedbackTests`·`LabJigwiABPresentationTests`·`LabBattleBgmStageTests`·`LabGumihoSoundTests`·`LabStaminaShortFeedbackTests` | **74/74 PASS** | |
+
+Editor 로그 `C6_AUDIO_WARMUP`: 첫 전투는 32개를 약 70~80 ms에, 같은 실행의 다음 전투는 4개를 약 45 ms에 읽었다. Editor 수치다.
+
+**미실행:** iPhone에서 첫 탭·명중·폭탄·지귀 5초 프레임 시간, 오디오 상주 메모리 실측.
+
+- `LabJigwiHud.Bind`·`Start`는 이제 Hapio 게임 흐름의 지귀 스테이지에서만 오버레이(`Jigwi/ScreenOverlay` 프리팹과 큰 텍스처)를 미리 만든다.
+- Lab 단판(게임 흐름 OFF)은 기존대로 만든다.
+- 지귀 A/B가 켜진 스냅샷에서 만드는 기존 LateUpdate 안전망은 그대로 둔다.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| EditMode 전체 | **1866/1866 PASS** | 새 `LabJigwiOverlayStagePolicyTests` 포함 |
+| `GameJigwiStageIntegrationTests`(단언 추가) | **PASS** | 1·2스테이지 Playing에 오버레이 0개. 3스테이지는 첫 라운드 스냅샷보다 먼저 오버레이 1개가 있어야 한다(LateUpdate 안전망은 스냅샷이 있어야 만들므로 미리 만들었음을 구분). 프레임 기록에서 Battle 바인딩 4프레임 뒤, 스냅샷이 없을 때 생성됐다 |
+| 같은 검사의 반대 확인 | 게이트 항상 참 → **FAIL**, 지귀도 막기(안전망만) → **FAIL** | 각각 1스테이지에 오버레이가 있어서, 3스테이지에서 스냅샷이 먼저 와서 실패한다. 검사가 두 경우를 구분함을 확인했다 |
+| 지귀·게임 흐름 PlayMode | **66/67** → 위 검사 대기 조건 수정 뒤 해당 검사 단독 **1/1 PASS** | `LabJigwiABPresentationTests`·`LabJigwiGroupFireAudioTests`·`LabJigwiWaterTrailTests`·`LabJigwiStagePresentationTests`·`GameSceneFlowTests`. 실패 1건은 새 단언이 `IsLoadingScene`(준비 구간 전체가 true)을 기다리던 검사 문장 문제였다 |
+
+**미실행:** iPhone 1·2스테이지 로딩 시간·메모리 실측.
+
+
+## 2026-11-04 — #513 Stage03 Jigwi art import
+
+- Added only the Stage03_Jigwi art package: FBX, 12 baked/source textures, 12 external URP Lit materials, a looping controller and placement prefab.
+- Unity 6000.6.5f1 import: **90,931 triangles**, 22 renderers; 0 missing materials, 0 unsupported shaders, 0 unresolved animation paths. 282 animation bindings include 2 cloth BlendShape bindings. Generic clip is 24 fps and approximately 4 seconds, looping.
+- Animator evaluation changed 3 transforms. Sampled all 97 frame positions: eye/pupil local depth remains fixed (maximum numerical delta approximately 7.3e-12). Forward eye-pop and separate pupil dilation are excluded.
+- Closed/front, open/front, blink/front and back renders were inspected in an isolated preview scene. Red lid motifs, navy/beige ribbons and the curled fire charm are present.
+- Placement body center is the root origin; height is 2.390325 Unity units, matching Stage01/02. Battle scene remained clean. Existing stage assets and gameplay code were not modified.
+- Console already contained Transport lifecycle/invalid GC handle and NullReferenceException entries before the import; this is not a zero-console-errors claim.
+- Not run: gameplay-event integration, multiplayer, paint/collision integration, device performance or the full EditMode/PlayMode suite.
+
+- Final reimport: absolute FBX source paths removed. A temporary metadata conversion caused an FBX import failure during preparation; it was corrected by regenerating the FBX and rebuilding the controller state. Final checks again report 90,931 triangles, 22 renderers, 1 looping clip, 0 missing materials, 0 unresolved animation paths and 3 Animator-driven transform changes. No absolute user paths remain in Stage03 assets.
+
+## #510 Stage1 구미호 박 Unity 에셋 (2026-11-04)
+
+- `Assets/Hapio/Art/Gourds/Stage01_Gumiho`에 FBX·URP 재질·텍스처·Animator Controller·GameReady 프리팹을 추가했다. Stage2와 같은 폴더/파일명 규칙과 몸통 중심·높이 기준을 쓴다.
+- 현재 Editor에서 가져온 결과는 **85,799 triangles / 35 renderers / 15 materials**. 재질 누락 0, 지원하지 않는 shader 0, 애니메이션 transform 경로 누락 0.
+- FBX 내장 `Gumiho_Performance`: 24fps, 약 4초, binding 424개. 눈 2개와 천 2개의 BlendShape binding이 있다. 0·0.65·1.2·1.5·2·3.2초 샘플에서 눈 weight 0↔100과 고정된 동공 scale을 확인했고 Animator 직접 평가에서 Transform 변화도 확인했다.
+- 별도 preview scene에서 닫힌 정면·등장 정면·후면 이미지를 렌더해 확인했다. 몸통 높이 2.390325, 중심 0으로 stage2 배치 기준에 맞췄다. Battle Scene은 dirty가 아니며 스테이지 설정·표시 코드·기존 에셋은 바꾸지 않았다.
+- 관찰한 콘솔에는 Transport/domain 수명주기 오류가 남아 있었다. 콘솔 전체 0오류나 전체 검사 PASS를 주장하지 않는다.
+- **미실행:** stage1 런타임 모델 선택 연결, 게임 이벤트 기반 애니메이션, 도색·충돌·네트워크·실기기 성능 및 전체 EditMode/PlayMode 검사. 에셋별 전달 설명은 `Stage01_Gumiho/ImportNotes.md`.
+
+## #507 PR-1 박 모델 계약과 흰 박 legacy 경로 — 2026-11-04
+
+기준 main `6524427b`에서 Unity 6000.6.5f1 macOS batch Editor로 확인했다.
+
+**순서**: 코드를 바꾸기 전에 main 코드로 흰 박 골든(`Assets/Lab/Tests/PlayMode/Golden/WhiteGourdMount.txt` 28줄, `WhiteGourdYokai.txt` 737줄)을 기록하고 같은 코드에서 비교 모드로 다시 실행해 2/2 PASS를 확인한 뒤 별도 커밋했다. 그 뒤 계약 코드를 넣고 같은 골든과 비교했다.
+
+**변경**
+- `LabGourdVisualRig`(계약), `LabGourdYokaiProfile`(시간표, `Legacy`=기존 상수), `LabGourdPaint.PrepareVisual`·rig 마운트 분기·`paintExtras` property block·rig 크기 정책, `LabGourdYokai.Configure`·프로필 기반 시각·`idleLoop`.
+- `GameStageDefinition.gourdVisualResource`(비면 흰 박), `GameBattleBindings.MountStageGourd`. 세 스테이지 모두 경로가 비어 있어 화면 변화가 없다. Scene·Prefab·StageDefinition YAML은 고치지 않았다.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| EditMode 전체 | **1873/1873 PASS** | 새 `LabGourdYokaiProfileTests` 2개(Legacy 값 = 기존 상수, 순서·유한성 검사), `GameStageGourdVisualTests` 2개(세 스테이지 경로 비어 있음, 경로가 string) |
+| `LabWhiteGourdGoldenTests` | **2/2 PASS** | main 기록과 비교: 마운트 transform·셸 경로/자세·판정 메시/자세·재질·칠 property block·요괴 준비·Animator 꺼짐, 콤보 예고·콤보·명중 3회·해제·폭탄·섬광 예고·번쩍임의 YokaiRoot·LidPivot·눈 자세 시퀀스 |
+| 새 `LabGourdVisualRigTests` | **4/4 PASS** | 합성 rig: 판정 메시=hitShell·자세 일치, 판정 로컬 좌표=칠 공간, extras에 같은 재질과 칠 binding; 크기 변경 시 고정점 유지와 판정 추종; 잘못된 rig(hitShell 비identity)→흰 박·legacy 요괴; rig 요괴가 자기 Animation·프로필로 나오고 `idleLoop` 꺼지면 닫힌 시각에 멈춤 |
+| 관련 PlayMode(`LabGourdYokaiTests`·`LabGourdPaintTests`·`LabGourdHitboxTests`·`LabHangingPresentationTests`·`LabRopeReconciliationTests`·`GameJigwiStageIntegrationTests`·`GameYokaiPresentationTests`·`GameSceneFlowTests`·`LabPaintFinish*`·`GourdResultViewerPlayModeTests`·`LabWatercolorPaintRuntimeTests`, 위 새 검사 포함) | **89/91** 첫 실행 → 새 검사 문장 수정 뒤 rig 검사 4/4 | 실패 1건은 새 검사의 `Has.Count`(배열에 Count 속성 없음) 문장 문제였다. 다른 1건 `LabWatercolorPaintRuntimeTests.DescriptorBurstRespectsTheActiveCapAndConvergesToASettledCheckpoint`(한 픽셀 alpha 194/195)는 이번 변경을 잠시 빼고 main 코드로 단독 실행해도 같은 방식으로 **FAIL**했다. 이번 변경과 무관한 기존 상태로 기록한다 |
+
+**미실행:** iOS 실기기, 다인 Guest 화면. 실제 스테이지 박(2스테이지)은 PR-2 범위다.
+
+**골든 수정(같은 PR):** 마운트 골든의 `shellInRoot`·`hitboxInRoot`는 target 루트 기준이라 매달린 줄의 자동 상하 주기(시간에 따라 움직임)를 포함했다. 처음 기록·비교에서는 프레임 수가 같아 우연히 맞았고, 이후 실행에서 y가 -0.334445 → -0.353289로 달라져 FAIL했다. 두 줄을 움직이지 않는 VisualMount 기준(`shellInMount`·`hitboxInMount`)으로 바꿨다. 기대값은 다시 기록하지 않고 main에서 기록한 `visual.*`(위치 0.186667, 배율 0.777778)·`shell.*`(위치 -0.67, 배율 1.8, 회전 없음)의 곱으로 계산했다(배율 1.4, y -0.334444). 수정 뒤 `LabWhiteGourdGoldenTests`·`LabGourdVisualRigTests` **6/6 PASS**.
+
+## #507 PR-2 2스테이지 야광귀 박 정식 연결 — 2026-11-04
+
+PR-1(`feat/#507-gourd-rig-contract`) 위에서 Unity 6000.6.5f1 macOS batch Editor로 확인했다.
+
+**변경**
+- 굽기: `Hapio.GameGourdRigBake`(계산, Editor 전용)·`Hapio.Editor.GameGourdRigBaker`(메뉴·batch). 결과는 `docs/GOURD_MODELS.md` 표와 `Generated/BakeReport.txt`. 바깥 벽 20,608/40,960삼각형, star-shaped 100%, 판정 껍데기 2,208삼각형(표면 편차 평균 0.013·최대 0.046), 시간표 프레임 15/26/29/38/45/47(주기 48), 렌더러 17개·311,442삼각형(원본 446,594).
+- `C6Lab/GourdPaint`에 `_UNDERPAINT_MAP`(흰 박 재질은 키워드 꺼짐), 칠 셰이더 재질을 가진 extra는 자기 재질 유지.
+- `Stage02_yaguang.asset`의 `gourdVisualResource`를 굽기 도구가 SerializedObject로 설정. `GameStageAssets.EnsureAssets`는 1·3을 비움.
+- `GameGourdModelPreview`·`GameGourdModelPreviewSet`·`Resources/Hapio/GourdPreview/` 삭제(참조 GUID 0개 확인).
+- 게임 토큰 `C6HapioGame/28` → `/29`. 프로토콜 5683·`C6PhysicsLab/44`·공유 설정 257개는 그대로.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| EditMode 전체 | **1877/1877 PASS** | 새 `GameGourdRigBakeTests` 3개(메모리에서 다시 구운 메시 3개=저장본, 시간표=저장 프로필·클립 길이·모든 커브 경로 존재·뚜껑 닫힘/열림 시각, star-shaped ≥99%·판정 편차·판정 껍데기 위 애니메이션 없음·닫힌 뚜껑=칠 공간·흰 박 키워드 꺼짐·삼각형 상한 320k), `GameStageGourdVisualTests` 3개(2만 경로·1/3 비어 있음, 프리팹 계약 통과·Animator/모델 줄 없음, 덧씌우기 타입·리소스 없음), 토큰 `/29` |
+| PlayMode 관련 묶음 | **91/92** | 새 `GameStage2GourdIntegrationTests`(실제 Home→솔로→1·2·3: 1·3 흰 박, 2는 rig 마운트·판정 메시/자세=hitShell·카메라에서 쏜 광선이 판정 껍데기에 맞고 그 방향=칠 공간·몸통/뚜껑 칠 binding·요괴 평소 닫힘→콤보 예고에 뚜껑 20°+ 열림·완성 연출 복사에 몸통/뚜껑 포함·모델 줄 없음), 흰 박 골든 2/2, `LabGourdVisualRigTests`, 기존 박·요괴·매달림·지귀·씬 흐름·완성·결과 뷰어 검사. 실패 1건은 PR-1에서 main 코드로도 FAIL을 확인한 `LabWatercolorPaintRuntimeTests.DescriptorBurst…`(한 픽셀 alpha 194/195) |
+| 실제 전투 캡처(임시 코드, 커밋하지 않음) | 확인 | 1·3스테이지: 덧씌우기 삭제 전(PR-1 브랜치)과 후를 같은 정지 자세로 렌더해 비교. 3스테이지 최대 차이 1/255, 1스테이지 눈으로 같음(최대 48/255인 픽셀 1.3%가 바닥·아래쪽 배경에 흩어져 있음, 원인 미확인 — 3스테이지는 0이라 조명 변경으로 보지 않음). 2스테이지: 야광귀 박이 흰 박 크기로 마운트, 콤보 예고에 뚜껑 열림·정령 등장, PNG 내보내기(`GourdPngCapture`) 512px 성공. 연결된 판의 표면은 직접 칠할 수 없어(복제본), Lab 씬 오프라인 미리보기에서 같은 프리팹을 마운트해 71회 칠: 몸통·뚜껑에 칠이 보이고 닫힌 뚜껑 경계에서 이어짐 |
+
+**미실행:** 2스테이지에서 실제 투사체 명중이 칠 칸으로 들어가는 PlayMode(판정 메시·자세·방향이 칠 공간과 같음까지만 검사), 완성 100% 연출과 결과 미리보기의 2스테이지 실제 진입, iOS 실기기 화면·성능(311k 삼각형), 다인 Guest 화면.
+
+## #507 PR-0·PR-3 연속 곡선 줄 — 2026-11-04
+
+기준 main `6524427b`에서 Unity 6000.6.5f1 macOS batch Editor로 확인했다.
+
+**PR-0 줄 시안(코드 변경 없음)**: 임시 PlayMode 캡처(커밋하지 않음)로 실제 저장 Home → DEV 솔로 → 1·2스테이지 전투를 띄우고, 같은 자세(정지, 좌·우 최대 각도 40°의 90%)를 A 현재 / B 직선 / C 곡선으로 렌더했다. 2스테이지는 당시 덧씌우기 모델이며 모델 자체 줄은 캡처 중에만 숨겼다. 사용자가 **C 곡선·전 스테이지**를 승인했다.
+
+**PR-3 변경**
+- `LabHangingTarget.ropeStyle`(`Segmented` 기본/`Straight`/`Curved`), `SetRopeStyle`, `SetRopeSocket`. 물리·피벗 높이·판정은 그대로다.
+- `GameBattleBindings.Awake`가 Hapio 전투의 모든 스테이지에 `Curved`를 지정한다. Scene/Prefab YAML·Lab Scene·접속 규약·공유 설정은 바꾸지 않았다.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| EditMode 전체 | **1869/1869 PASS** | |
+| 새 `LabContinuousRopeTests` | **5/5 PASS** | 기본 Segmented에 연속 줄 없음·기존 렌더러 켜짐; Curved 24조각이 정지·흔들린 고정 자세·보간 그리기 자세·렌더 후 복원·초기화에서 고정점과 기존 줄 아래끝에 붙고 조각이 이어짐; 고정점 접선 수직·박 접선이 박 축(3° 이내); 충돌체 없음; 숨긴 기존 줄의 transform 유지; Straight 1조각과 Segmented 복귀; 박 안 socket이 흔들림·회전을 따라감; 완성 연출 복사(`CopyMeshes`)에 연속 줄 24조각이 들어가고 꺼진 기존 줄은 빠짐 |
+| 관련 PlayMode(`LabHangingPresentationTests`·`LabRopeReconciliationTests`·`LabHangingRenderInterpolationTests`·`LabHangingRigStateTests`·`LabGourdRope*`·`GameJigwiStageIntegrationTests`·`GameYokaiPresentationTests`·`LabGourdPaintTests`·`GameSceneFlowTests`·`LabPaintFinish*`, 새 검사 포함) | **70 PASS / 2 FAIL / 1 inconclusive** (총 73) | FAIL 1건은 새 검사의 충돌체 단언을 생성 프레임(`Destroy` 완료 전)에 둔 검사 문장 문제로, 고친 뒤 새 검사 단독 5/5. 다른 FAIL `LabHangingRenderInterpolationTests.OutsideRenderingTheTransformsAlwaysHoldTheFixedPose`는 batch에서 `WaitForEndOfFrame`이 호출되지 않는다는 실행 환경 예외이고, inconclusive `DuringRealRendering…`도 batch에서 렌더 패스가 없어서다. 두 검사는 수정하지 않았고 main에서 같은 결과인지는 이번에 따로 실행하지 않았다 |
+| 실제 전투 캡처(임시, 커밋하지 않음) | 1·2·3스테이지 모두 `style=Curved segments=24` 로그, 정지·좌·우 화면에서 고정점부터 박까지 한 줄로 이어짐을 눈으로 확인 | 2스테이지는 덧씌우기 모델의 자체 줄(`Rear_Rope_Strand_*`)이 함께 보인다. 덧씌우기 제거는 PR-2 범위다 |
+
+**미실행:** iOS 실기기 화면·성능, 다인 Guest 화면.
+
+## #507 후속 2스테이지 줄 연결점 — 2026-11-04
+
+#517(PR-2) 위에 #511(곡선 줄)을 합친 브랜치에서 Unity 6000.6.5f1 macOS batch Editor로 확인했다. 세 PR(#511·#516·#517)을 합친 상태의 첫 실행이다.
+
+**변경**: `LabGourdPaint`가 박 모델 계약을 마운트하면 `rig.ropeSocket`을 `LabHangingTarget.SetRopeSocket`에 넘기고, 계약을 해제할 때 null로 되돌린다(흰 박은 기존대로 판정 상단). 읽기용 `LabHangingTarget.RopeSocket`을 더했다. 합치기 충돌은 `AGENTS.md`·`VALIDATION.md` 끝에 각각 덧붙인 절뿐이었고 둘 다 남겼다.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| EditMode 전체 | **1877/1877 PASS** | |
+| PlayMode 관련 묶음 | **94/94 PASS** | `GameStage2GourdIntegrationTests`(2스테이지 곡선 줄·연결점=rig 소켓·마지막 조각 끝이 소켓에 닿음, 1·3은 연결점 null), `LabGourdVisualRigTests`(소켓 전달·해제 시 null), `LabContinuousRopeTests`, 흰 박 골든, 매달림·요괴·도색·지귀·씬 흐름·완성·결과 뷰어 |
+| 실제 전투 캡처(임시) | 확인 | 2스테이지 정지·좌·우: 고정점부터 박 걸이까지 곡선 한 줄, 모델 자체 줄 없음 |
+
+**미실행:** iOS 실기기, 다인 Guest. 이 묶음에는 `LabHangingRenderInterpolationTests`·`LabWatercolorPaintRuntimeTests`를 넣지 않았다.
+
+## #515 Battle 주광 방향·강도 조정 (2026-11-04)
+
+- 변경: `Assets/Hapio/Scenes/Battle.unity`의 `BattleLight`만 변경. 회전 `(42, 330, 0)` → `(38, 150, 0)`, 강도 `1.5` → `0.85`. +Z의 BattleCamera 쪽에서 박 정면을 비추도록 조정했다. 모델·텍스처·머티리얼·셰이더·게임 로직·카메라·환경광·OrbBoardLight·후처리는 보존했다.
+- 환경 확인: Unity MCP 10.3.0 연결, URP `PC_RPAsset`, Flat 환경광 `(0.5, 0.5, 0.5)`/강도 1, 반사 강도 1. 두 카메라에 AdditionalCameraData가 없고 씬 Volume도 없다. 새 후처리는 추가하지 않았다.
+- 실제 Editor 솔로: 기존 StartSolo와 DEV 다음 스테이지를 통해 1→2→3 Playing/박 IsReady를 확인했다. 각 스테이지에서 게임과 Editor를 정지하고 같은 Game View(1206×2612), 카메라·애니메이션·도색·UI·이펙트 상태로 원래 조명/후보 조명을 각각 촬영했다. 비교 PNG 6장은 저장소 밖에 보관했다.
+- 육안 비교: 1스테이지 박 입구·끈·노출된 검은 요괴의 눈, 2스테이지 박 문양·끈·표면, 3스테이지 박 입구·끈의 식별 개선. 바닥 밝기가 낮아져 박·경고와 구분된다. 광범위한 박 표면의 흰색 소실은 보이지 않으나 2스테이지 뚜껑의 작은 정반사 하이라이트는 남는다. 1스테이지 폭탄, 2스테이지 섬광 오버레이, 3스테이지 경고·폭탄의 공존 화면을 확인했다.
+- 한계: 공통 박 셸의 종이/도색 셰이더는 자체 고정 조명을 사용하므로 씬 주광으로 종이 밝기를 바꾸지 않는다. 가려진 내부 요괴를 드러내거나 형태를 바꾸지 않았다. 도색 진행별·모든 이펙트 시점·다인 카메라 방향·실기기/iOS 성능·색 재현은 미검증이다.
+- EditMode: `GameStageBackgroundAssetTests.StageTwoUsesIsolatedArtworkAndRestoresTheDefaultForOtherStages` **1/1 PASS** (0.58초).
+- PlayMode: `GameSceneFlowTests.SharedCountdownWaitsForInitialPresentationAndOnlyThenStartsGameplay` **1/1 PASS** (6.50초). 실제 저장 Home→Battle 준비/카운트다운 흐름 검사다.
+- 초기 EditMode 실행 요청 2회는 Play Mode 상태로 시작하지 못해 검사 0개였으며, 전용 stop 도구로 종료 후 위 검사를 실행했다. 미실행 요청을 통과 수에 포함하지 않는다.
+- 저장 직후 콘솔 error 조회 0개, `git diff --check` 통과. C# 변경이 없어 별도 재컴파일을 유발하지 않았다. 커밋·push는 수행하지 않았다. 원격 브랜치 존재와 로컬 HEAD 동일 여부는 읽기 전용 ls-remote로 확인했다.
+
+
+### #515 바닥 밝기 피드백 반영 (2026-11-04)
+
+앞선 0.85/(38,150,0)안은 바닥을 과도하게 어둡게 해 최종값을 **1.16/(60,150,0)**으로 수정했다. 수평면에 들어오는 주광의 Lambert 성분은 원래 `1.5 × sin(42°) ≈ 1.004`, 보정안 `1.16 × sin(60°) ≈ 1.005`로 거의 같다. 카메라 쪽 조명 방향은 유지한다. 실행 중인 2스테이지를 Editor에서 잠시 정지해 기존 카메라로 원래 조명과 보정안을 촬영했다. 사용자의 게임 일시정지 상태는 유지하고 Editor 정지를 해제했다. Play Mode 상태를 씬으로 저장하지 않고 디스크의 주광 회전·강도 두 값만 수정했다. 모델·머티리얼·환경광·로직은 그대로다. 위 자동 검사 통과 기록은 이전 후보 값에서의 결과이며, 이번 수치 보정 후에는 재실행하지 않았다. 이번 최종값의 세 스테이지·실기기 시각 비교는 미검증이다.
+
+- 추가 밝기 피드백: 주광 최종 강도를 1.16 → **1.28**(약 +10%)로 올리고 회전 (60,150,0)을 유지했다. 실행 씬에도 같은 값을 적용하고 BattleCamera 촬영으로 현재 화면의 하이라이트를 확인했다. 세 스테이지 전체 및 자동 검사는 이번 수치 보정 후 재실행하지 않았다.
+
+## #507 후속 2스테이지 실제 명중·완성·결과 검사 — 2026-11-04
+
+기준 main `856b5749`(#516·#517·#511 병합 뒤)에서 Unity 6000.6.5f1 macOS batch Editor로 확인했다. 런타임 코드 변경 없이 검사만 더했다.
+
+새 `GameStage2GourdHitFinishTests`: 저장 Home → DEV 솔로 → 2스테이지에서 DEV 값(비밀 상자 100%, 잠금 0, 생성 비용 1, 생성 속도 0)을 적용해 다시 불러온 뒤,
+- 실제 보드 제스처로 비밀 상자를 열고 Combined 구슬을 던진다. 보드의 놓기 속도는 마지막 0.12초 이동 거리로 정해지므로 마지막 튕김 길이(보드 폭 0.45~0.7)를 바꿔 가며 던진다. 이번 실행에서는 첫 투척(0.6)이 `SHOT HIT`.
+- Host가 승인한 명중의 판정 로컬 지점 방향이 칠 껍데기 방향과 같고, 그 방향의 칠 칸(또는 바로 옆 칸)에 칠이 들어갔으며 칠 수가 늘었다. 몸통·뚜껑 렌더러가 현재 칠 지도를 받는다.
+- Host 표면에 실제 칠 명중을 구 전체에 고르게 넣고 성장으로 100%가 된 뒤: 완성 연출 복사본에 `Paint Shell`·`Lid Paint`가 있고 모델 줄은 없다. 결과 미리보기(`LabGourdResultPreview`)도 같은 두 부분을 복사한다. 2스테이지 결과 Scene이 열리고 미리보기 텍스처가 Battle 해제 뒤에도 남는다.
+
+| 확인 | 이번 결과 |
+| --- | --- |
+| 새 검사 단독 | **1/1 PASS** |
+| 새 검사 + `GameStage2GourdIntegrationTests`·`GameSceneFlowTests`·`GameJigwiStageIntegrationTests` | **24/24 PASS** |
+
+**미실행:** iOS 실기기 화면·성능, 다인 Guest 화면, 아트 경량 재출력 반영.
+
+## #507 후속 1·3스테이지 박 굽기와 연결 — 2026-11-04
+
+기준 main `35ca1de8`(#512 구미호·#514 지귀 아트, #519 주광 병합 뒤)에서 Unity 6000.6.5f1 macOS batch Editor로 확인했다.
+
+**변경**
+- 굽기 도구를 스테이지별 명세(`GameGourdRigBake.Spec`)로 일반화: 노드를 `.001` 접미사를 뗀 이름으로 찾고, 칠 아래 바탕은 원래 재질의 `_BaseMap`, 시간표 주기는 첫 "닫힘→열림→닫힘"의 닫힌 프레임+1, 요괴 클립에 눈 BlendShape 커브 포함. 메뉴는 스테이지별 3개와 `Bake All Stage Gourds`.
+- 일반화 뒤 2스테이지만 다시 구워 git으로 비교: 메시·클립·프로필·재질·프리팹이 **바이트 단위로 같음**(`BakeReport.txt`에 source 줄만 추가).
+- 1·3스테이지 굽기와 `Stage01_gumiho`·`Stage03_jigwi` `gourdVisualResource` 연결. `GameStageAssets.EnsureAssets`는 경로를 더 이상 비우지 않는다. 게임 토큰 `C6HapioGame/29` → `/30`.
+- 굽기 결과는 `docs/GOURD_MODELS.md` 표(1·3: 바깥 면 7,262/14,336, star-shaped 100%, 판정 편차 평균 0.013·최대 0.045, 시간표 15/26/29/38/45/47·주기 48, 1: 30렌더러·61,505삼각형, 3: 17렌더러·66,637삼각형).
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| EditMode 전체 | **1885/1885 PASS** | `GameGourdRigBakeTests`를 세 스테이지 fixture로(최신 여부·시간표·형상·삼각형 상한), `GameStageGourdVisualTests`(세 스테이지 경로·계약), 토큰 `/30` |
+| PlayMode 관련 묶음 | **84/84 PASS** | `GameStageGourdIntegrationTests`(이전 `GameStage2GourdIntegrationTests`, 세 스테이지 모두 rig·판정=hitShell·광선 방향=칠 공간·줄 끝=소켓·몸통/뚜껑 칠 binding·요괴 평소 닫힘→콤보 예고에 뚜껑 열림·완성 복사), `GameJigwiStageIntegrationTests`(3스테이지 rig·A/B가 판정 메시를 바꾸지 않음), `GameStage2GourdHitFinishTests`, `GameSceneFlowTests`(1→2→3 완료·결과 미리보기), 흰 박 골든, `LabGourdVisualRigTests`, `LabContinuousRopeTests`, `LabGourdYokaiTests`, `LabGourdPaintTests`, `GourdResultViewerPlayModeTests`, `LabJigwiABPresentationTests` |
+| 실제 전투 캡처(임시) | 확인 | 1·2·3스테이지 정지와 콤보 예고(정령 등장). 1·3스테이지 박을 Lab 오프라인 미리보기에 마운트해 71회 칠: 몸통·뚜껑에 칠이 보임 |
+
+**미실행:** iOS 실기기 화면·성능, 다인 Guest 화면. 1스테이지 눈(`SkinnedMeshRenderer`)은 완성 연출·결과 미리보기 복사에 들어가지 않는다(완성 때 뚜껑이 닫혀 있어 보이지 않음).
+
+
+## #466 수채 브러시 누적·작품 기록 — 2026-11-03
+
+- **기준:** main `2ab6b3c3` → `feat/#466-watercolor-brush-stamps`. Unity6000.6.5f1/macOS/Metal. 기존 Scene·Prefab·LabConfig·패키지·ProjectSettings 파일 차이는 없다. 호환 규약은5684/Lab45/Game29, 공유 설정257개다.
+- **구현과 조절법:** [수채 브러시 채색](WATERCOLOR_BRUSH_STAMPS.md). AI 시안과 실제 Editor 렌더를 구분했다. 원본3장의 SHA를 보존하고512² 여백·채널·수입 설정·베이크 버전 검사를 실제 Editor에서 수행했다. 새 프로필은ON·농도0.8이다.
+
+| 실제 수행 | 결과 | 시간·범위 |
+| --- | --- | --- |
+| 최종 전체 EditMode | **1882/1882 PASS**, skip/inconclusive0 | 55.94초 |
+| 초기 전체 PlayMode | 614개 중607 PASS·7 FAIL | 599.24초, 아래 원인 수정 전 |
+| 수정 후 전체 PlayMode | **615개 중613 PASS·2 FAIL**, skip/inconclusive0 | 596.98초, 아래 정적 렌더1단계 차이2건 |
+| `LabPaintGrainRenderTests` 분리 재실행 | **2/2 PASS** | 2.66초, 허용 오차 변경 없음 |
+| `LabPlayerPaintPatternRenderTests` 분리 재실행 | **5/5 PASS** | 4.94초, 허용 오차 변경 없음 |
+| 새 `LabWatercolorStampRuntimeTests` | **5/5 PASS** (수정 후 전체 실행에 포함) | 순서·분할/중복·삭제/재도색·GPU재생성·128개 초과·공유시계·버전 불일치 |
+| 실제3스테이지 완료·사본·홈 흐름 단독 재검사 | **1/1 PASS** | 20.62초, 이후 전체에서도 해당 항목 PASS |
+| 실제 박 Editor 비교 | **6/6 PASS** | 최초+재타격0/1/3,2색/3색/5색, 전체/증분 재생RGBA바이트와 색/P지도 해시 일치 |
+| Mac 실행 파일 빌드 | **Succeeded, 오류0** | 21.10초, 개발용 Lab 진입점·이번 실행에만 Pipeline DEV 포함 |
+| Mac Host/Guest 두 프로세스 실제UDP | **기록·지도·GPU그림 일치 확인** | 같은Mac의127.0.0.1, 2명·공유설정 승인·P1/P2·Playing |
+
+### 확인한 실패와 처리
+
+- 초기7건 중 실제 결함은 GPU readback 완료 뒤 갱신된 `RenderedThrough`를 `LabGourdPaint`가 다시 세션에 전달하지 않던 경로였다. 준비 중 연산이 없다는 이유로 조기 반환해 완료 관람을 기다리던 문제를 수정했다. 실제3스테이지·완료 사본 검사로 재확인했다.
+- `SharedCountdown...`은 기존 수채가 활성이라는 단언을 새 기본 브러시 활성 단언으로 바꾸고 동일한 실제 바인딩 검사를 유지했다.
+- 건조 검사에서는 가짜 시계용으로 교체한 실제 모델에 새 기록을 붙이고 같은 Commit/Seal을 호출하도록 픽스처를 연결했다. 새 기본 표현과 기존3초 완료 제한을 유지했다. 재질/P지도만 검사하는 합성지도2건은 이력이 없는 지도를 임의로 도장으로 꾸미지 않고 보존된 기존 표현을 명시적으로 선택했다.
+- 다른 채팅에서 겹쳐 작성한 중복 전송 타입 파일은 남기지 않았다. 필요한 검사는 합치고, 고해상도 조건 중복·작품 오류가 GameOver를 만들던 연결·이전 라운드 실패 잔류·앱 단계에서 무시된 페이지의 재전송·GPU 복원 오류의 영구 잔류를 보완했다.
+- Metal에서 async-compute graphics-fence의 `.passed` 확인이 지원되지 않는 경우를 실제 비교 중 발견했다. 전체 그림 대신 최대1개 비동기1픽셀 readback으로 완료 확인을 바꿨다.
+
+### 최종 전체 실행의 정적 렌더 차이2건 — 원인 미확정
+
+- `LabPaintGrainRenderTests.SavedGourdShaderChangesOnlyPigmentAndZeroStrengthMatchesOffExactly`: 512² 중 비교에서 RGB 한 채널이77→76으로 달랐다.
+- `LabPlayerPaintPatternRenderTests.PatternToggleChangesOnlyRenderedInkWithoutReuploadingOrRevisingMaps`: 한 채널145→144 차이였다.
+- 두 검사는 각각의 클래스 단독 재실행에서 통과했다. 이 실행에는 Mac검증 앱이 함께 GPU를 사용했지만, 이것이 원인이라고 입증하지 않았다. 고정 셰이더·카메라 입력을 검토했으며 `(1000,1000,1000)` 렌더 픽스처의 미분 정밀도도 가능성일 뿐이다. 검사를 지우거나 허용 오차를 넓히지 않았다. **단일 전체 실행615/615 통과로 기록하지 않는다.** 재발 시 입력 텍스처 해시·카메라 행렬부터 비교해야 한다.
+
+### 실제 Editor 이미지·기록 크기
+
+- [기존/새 표현 최초+재타격3회](images/watercolor-stamps-466-comparison.png), [5색 완성6방향](images/watercolor-stamps-466-six-views.png)는 실제 저장된 박의 Metal 렌더다.
+- 초기 시각 검사에서 회색 색 전달·셀 계단을 발견해 수정했다. 전체 그림을 흐리지 않고 서로 다른 도장의 경계와 외곽만 재구성했다.
+- 최초/재타격0·1·3회 기록은 각각659/1151/2136연산,15,746/27,386/50,689바이트였다. 5색100% fixture는32,830연산·775,726바이트·191페이지, 페이지캐시775,726바이트였다.
+- 해당 fixture 생성·재생·readback·PNG 저장 전체 경과는137~556ms였다. **GPU 전용 시간, 실시간 프레임 비용, 복원 단독 시간으로 해석하지 않는다.**
+
+### Mac 두 프로세스 범위와 측정 한계
+
+- 원본 설정을 바꾸지 않은 런타임 복사본으로 낮은2048셀·최초/재타격각0.2%·건조OFF의 비교 방을 만들었다. Host에서 실제 `RegisterHit`와 `Advance`를 호출했다. 손가락 투척 조작을 자동화한 플레이 테스트는 아니다.
+- 초기1회+자동150회로 총151회 기록 후, 양쪽은 **604개 칠한 셀·Revision606·759연산·8페이지·23,861바이트**가 같았다. 전체 기록 prefix SHA와1024×512 GPU RGBA SHA도 같았다. 그림 SHA는 `2aa697bca72f93b7c4980cfcc5042857f2e3e39ff9a5843d0df170e1ad6151a2`다. 이미128개를 넘은 시점의 같은 그림을 확인했다.
+- 자동150회 주입 전체 경과는71.77ms였다. 정상1회 명중이나 프레임당 CPU비용을 뜻하지 않는다. Host의 Main Thread 표본 평균16.68ms는60Hz 대기·CLI·동시 Editor 검사의 영향을 포함하므로 새 도색 합성의 CPU시간으로 보고하지 않는다.
+- 같은 시점 Unity allocated는Host173,179,650B/Guest172,933,945B, reserved는599,392,256B/597,295,104B였다. 전체OS메모리·최대사용량·GPU전용메모리는 아니다. 독립적인 GPU시간과 정상플레이 프레임 비용은 아직 미측정이다.
+- 이 실행은Playing 중 그림 동기화 확인이며 최종Seal/완성 관람의 실제 네트워크 검증은 아니다. 최종Seal/관람·건조/재도색은 위 자동검사와 Editor fixture 범위다. 일반Wi-Fi·핫스팟, 손실이 있는 실제망,3명 이상은 이번 Mac 실행에서 검증하지 않았다.
+- 사용자 요청으로 검증 앱2개를 종료했고 해당 프로세스가0개임을 확인했다. Unity Editor만 유지했다.
+- **iOS:** 사용자 선택에 따라 이번에는 실행·빌드·일반Wi-Fi/핫스팟 실기기 검증을 수행하지 않았다.
+
+
+### #466 V2 — 색감·안료 입자·불규칙 테두리 보완 (2026-11-03)
+
+- 같은 `feat/#466-watercolor-brush-stamps`에서 `watercolor-stamps-v2`로 표현 버전을 올렸다. 농도0.9·겹침0.78·테두리0.55/0.025, 대비1.6·채도1.15·입자0.25/120·테두리 끊김0.45, 등장0.35초다. 새5개 설정은 복사/정리/검증/라운드 지문에 포함했다. 현재 설정 지문은`1802febc`, 베이크 해시는 기존과 같다. 호환5684/Lab45/Game29·공유설정257개는 바꾸지 않았다.
+- 진한 안료에만 광학적 흡수를 강화하고, 테두리를 seed로 불규칙하게 끊는다. 미세 입자는 경계 재구성 이후 실제 박 셸에서 물체 좌표와 한지 섬유로 처리한다. 별도 누적 RT를 추가하거나 입자를 아래층에 되먹이지 않는다. Alpha·셀/P지도·성장/건조·난수·실제 면적은 변경하지 않았다. 미분 계산이 픽셀별 Alpha 분기 안에 들어가지 않도록 했다.
+
+| 이번 실제 수행 | 결과 | 시간·범위 |
+| --- | --- | --- |
+| 전체 EditMode | **1886/1886 PASS** | 52.57초, skip/inconclusive0 |
+| V2 설정 검사 별도 실행 | **4/4 PASS** | 0.23초, 위 전체에도 포함 |
+| 최종 `Watercolor` PlayMode | **16/16 PASS** | 16.74초, 기존수채7·땅따먹기1·누적기록6·새표면입자2 |
+| 기존 `LabPaintGrainRenderTests` | **2/2 PASS** | 2.54초, 기존 단언/오차 유지 |
+| 기존 `LabPlayerPaintPatternRenderTests` | **5/5 PASS** | 4.99초, 기존 단언/오차 유지 |
+| 실제3스테이지·관람 사본 연결 | **1/1 PASS** | 20.13초, 같은 기존 검사에 V2/라운드 입자 값 연결 단언을 추가 |
+| 정적 실제 박 비교·기록 재생 | **6/6 확인** | 최초+재타격0/1/3·2색·3색·5색100%, 1024×512 |
+| 실제 Battle Game 뷰 비교 | **6/6 촬영·지도 보존 확인** | 저장된 Home→솔로→Battle,390×844, 아래 분류 참조 |
+| 실제 PNG 출력 경로 | **V2 설정 전달·원본 보존·준비 후 픽셀 일치 확인** | 5색완료512², 아래 첫 출력 차이 별도 |
+
+- 이 PlayMode 결과는 선택한24개 검사의 개별 실행 합계다. 전체 PlayMode를 이번 V2에서 다시 실행한 것으로 쓰지 않는다. 위 V1 전체615개 실행에서 남았던2건의 원인 미확정 기록도 지우지 않았다. `|`로 필터를 묶은 시도는0개가 실행되어 검증으로 세지 않고, 실제 클래스/메서드별 재실행 결과만 표에 기록했다.
+- 정적6사례는 같은 Host 규칙·seed·전체 기록으로 V1중립 비교값과 V2를 만들었다. 색/P지도 해시가 같고, 전체 재생과 증분 처리의 최종 premultiplied RGBA 바이트도 각 사례에서 일치했다. 최초/1회/3회 재타격은655/1146/2129개 칠한 셀, 5색완료는32768개 셀이다. 도색된 실제 셀만 집계한다.
+- 새 입자 검사는 원본 지도/Alpha·미도색 종이를 보존하면서 공간적 안료 차이가 생기는지 확인한다. 정지 시간 경과,13픽셀 투영 이동, 카메라/모델 전체 회전 후 같은 표면의 무늬가 유지되는지도 검사했다.
+- 실제3스테이지 검사는 살아 있는 Battle 셸, 종료 연출 중 준비된 관람 사본, Battle 언로드 후 사본에서 V2활성과 그 라운드의 입자 강도/크기가 일치하는지 확인했다. 기존 게임 지도·독립 GPU사본·명시적 다음 스테이지·홈 검사는 유지했다.
+
+#### 실제 Battle 이미지의 분류
+
+- [전체 화면 전후](images/watercolor-stamps-v2-466-battle.png), [같은 화면의 박 영역](images/watercolor-stamps-v2-466-battle-crop.png)은 실제 저장된 Battle 카메라/레이아웃/셸 셰이더를 쓴 Game 뷰다. **게임에 영향을 주지 않는 비교용 Host 규칙 지도**를 렌더에만 잠시 붙였다. 화면HUD0%와 그림의5색100%는 서로 다른 지도이며 게임 승리/손가락 투척 검증을 뜻하지 않는다.
+- 촬영 중 솔로 세션/물리 갱신만 잠시 멈추고, 복사한 셸 재질·MPB로 비교했다. 실제 게임 색/P지도 SHA는 전후 같았다. finally에서 원래 재질·renderer/slot별MPB·자세·컴포넌트 enabled를 복원한 뒤, 실제 수채 준비 상태가 돌아왔음을 확인했다. 원본 Scene과 설정을 저장하지 않았다.
+- [재타격 비교](images/watercolor-stamps-v2-466-comparison.png), [완성 박6방향](images/watercolor-stamps-v2-466-six-views.png)은 격리된 Editor 정적 렌더다. 색 농담과 입자는 강화됐지만 **첫 참고 이미지보다 전체가 옅고 색군 배치가 다르다. 미적 최종 승인으로 기록하지 않는다.**
+
+#### PNG 대조와 남은 정밀도 차이
+
+- 실제 `GourdPngCapture.Capture`를 사용해 [V2 박 PNG](images/watercolor-stamps-v2-466-production-export.png)를 출력했다. V2를 재질에 둔 출력과 중립 재질+slot MPB에 둔 출력이 준비 후 **262144픽셀 전체 RGBA 바이트 일치**했다. V2 OFF 대조는77990픽셀에서 달라 실제 효과가 전달됨을 확인했다. 원본 재질 참조/직렬화값·MPB·누적 GPU지도·Host 색/P 해시는 보존됐다. PNG크기는 이 검사만512²이며 제품 메뉴의4096설정을 바꾸지 않았다.
+- 초기 검사에서 첫 PNG와 같은 입력의 즉시 반복 PNG가137/262144픽셀에서 달랐다(최대RGB6단계·합383, Alpha차이0). 반면 반복 재질 출력과slot출력은 PNG SHA 및 RGBA가 같았다. **첫 출력 차이의 근본 원인은 확정하지 않았다.** 비교 도구는 첫 캡처를 진단용으로 보존하고 그 다음 출력끼리 오차 없이 검사한다. 제품 PNG동작이나 기존 렌더 검사 허용 오차는 바꾸지 않았다. 첫 PNG부터 반복 PNG까지 비트 단위로 같다고 주장하지 않는다.
+- PNG 비교 도구에서 비동기 `Ready`와 유효한 정적 텍스처 준비를 혼동하던 진입 조건도 수정했다. 정적 비교는 모든 연산 적용·연출 종료·오류 없음 확인 뒤 동기 렌더/readback으로 최종 출력을 확인한다. 실행 게임의 수신/적용/GPU완료·정확한 관람 gate는 완화하지 않았다.
+
+- 최종 컴파일 오류0, Scene/Prefab/LabConfig/Packages/ProjectSettings의 파일 변경 없음. 검증 종료 후 원래의 저장되지 않은 변경이 없는 빈 Scene으로 복원하고 Play모드를 종료했다.
+- **이번 V2 미실행:** 독립 Mac 검증 앱 재실행, Wi-Fi/핫스팟 실제 다중기기, iOS 빌드/실기기, GPU 전용 성능·정상 프레임 비용 측정. 기존 V1 Mac 결과를 V2검증으로 대체하지 않는다.
+
+
+### #466 V3 Editor 비교 시제품 — 2026-11-03
+
+- 같은 브랜치의 비교 전용 작업이다. 게임 기본값은`watercolor-stamps-v2/.../1802febc`, V3는`watercolor-stamps-v3-study-r3`의 비게임 비교 ID다. 모든 V3 셰이더/데이터/프로필은 Editor폴더에 두고, runtime의 별도 셰이더/브러시 주입은 UNITY_EDITOR에만 컴파일한다. 판정·공유설정257개·접속규약5684/Lab45/Game29는 그대로다.
+- [구현·조절·이미지](WATERCOLOR_BRUSH_STAMPS.md)의 V3 항목을 따른다. Unity6000.6.5f1/macOS/Metal에서 실행했다. 시각 비교의 통과를 사용자의 미적 승인으로 대신하지 않았다.
+
+| 실제 수행 | 결과 | 시간/범위 |
+| --- | --- | --- |
+| 전체 EditMode | **1889/1889 PASS** |50.10초, skip/inconclusive0|
+| 새 V3 분리·데이터 검사 별도 실행 | **3/3 PASS** |0.31초, 위 전체에도 포함|
+| 최종 Watercolor PlayMode | **18/18 PASS** |32.27초, skip/inconclusive0|
+| 실제 박 정적 비교 | **6사례×2후보의 전체·증분 재생 RGBA 바이트 일치** |최초/재타격3·10/2색/3색/5색완료,1024×512|
+| 오행 단색·색 순서 비교 | **25개 상태의3열 이미지·색/P지도 보존 확인** |단색5개+순서를 구분한겹침20개,3장의5×5조합표|
+| 실제 Battle 비교 | **2사례×3열=6프레임·복원 확인** |390×844,아래 임시 비교지도 분류 참조|
+| 실제 PNG 내보내기 경로 | **최초/완료×3열=6개 PNG 생성·원본 지도 보존** |512²,촬영과 다른 카메라/투명배경의 바이트 동일성을 주장하지 않음|
+
+- 새 EditMode는 V3가 Editor전용이고 V2기본값이 유지되는지, 캡처 후 Inspector/반환 사본 변경이 표현 지문을 바꾸지 않는지, 흰 원본의 농도 바닥값 제거가 V2의 G/A/B/여백/지원 영역을 바꾸지 않는지 검사했다.
+- 새 중립 주입 GPU검사는 기존 V2셰이더/브러시+빈 비교 설정 주입이 기본 생성자와 같은 RGBA를 만드는지 확인했다. 전달 배열 변경·비교 해제 후에도 원본 텍스처가 유지되고 원본 라운드 버전은 바뀌지 않았다.
+- 새 V3 GPU검사는 실제 베이크/셰이더를0.75·0.85에 적용했다. 기본 draw한도를 넘는 다색 겹침의 전체/분할 일치, 모든 색층 삭제, 깨끗한 파랑 기준과 재도색 일치, GPU텍스처 소실 복원,4회 갱신에서 색/Alpha/DrawCount 불변을 확인했다. 같은 검사를 가짜 자산으로 대체하지 않았다.
+- 정적 비교는 동일한 V2 원본 기록을 두 불변 V3설정으로 읽었다. 원본/베이크/V2프로필/원래 재질·프리팹/Scene/설정의 전후 SHA와 메모리 설정이 같았다. 최종 JSON은 실제 두 셰이더 SHA,수치,데이터 SHA,원본 버전과 판정 해시를 별도로 기록했다. V3dataSHA는`9c4ce4b23678b0cfa9aff5c2cca7d2cdb254e3f17f2aada4e721925d986bce5f`다.
+- 첫 비교에서는 새 베이크의 낮은 농도 범위에 기존0.45대비 기준을 쓰면서 농담이 대부분0으로 잘리는 문제를 발견했다. V3만 새 범위의 단조 증가 농담으로 보정하고 종이/입자/밝기를 조정했다. 원본 V2수식은 보존했다.
+- 초기5색 완료0.85의 증분 재생에서524288픽셀 중1개RGB채널1단계 차이(Alpha차이0)를 기록했다. V3 완료 단계는 이전 이미지와 불필요한lerp를 하지 않고 확정 그림을 직접 읽게 수정했다. 최종12개 재생 비교와 V3 GPU검사는 오차 허용 없이 통과했다. 그 사이 농담 조정도 있었으므로 작은 수치 차이의 원인을 독립된 A/B로 입증했다고 주장하지 않는다. 원본 V2최종패스나 기존 검사 허용오차를 바꾸지 않았다.
+
+#### Battle 촬영 분류와 복원
+
+- 실제 저장된 Home에서 솔로로 Battle에 진입했다. 실행용 복사본만 전투600초/건조OFF로 바꾸고 원본을 저장하지 않았다. Blue최초와5색완료의 격리된 Host규칙 비교지도/기록을 실제 셸·카메라에 렌더로만 연결했다. 따라서 화면HUD0%는 실제 비어 있는 게임 지도이며5색100%비교지도와 다르다. 플레이 승리/손가락 조작/네트워크 검증이 아니다.
+- 촬영 중 실제 게임 색/P지도 SHA는 전후 같았다. 매 열마다 원본 재질/블록으로 초기화해 V3종이가 V2열에 남지 않게 했으며, finally뒤 재질참조·도색바인딩·컴포넌트 상태·자세 복원을 모두 확인했다. 추가로 실제 V2렌더가 다시Ready인 것을 확인하고 Play를 종료했다. 원래의 깨끗한 빈 Scene으로 복원했다.
+- [실제 화면](images/watercolor-v3-466-battle.png)과[박 영역](images/watercolor-v3-466-battle-crop.png), [정적3열](images/watercolor-v3-466-comparison.png)을 함께 본다. 큰 주름은 줄었지만 참고 이미지와 같은 선명도/미감이라는 최종 승인은 아직 없다.
+- V2때 남긴 첫 PNG의 미세RGB차이/전체PlayMode의2건 기록은 지우지 않았다. 이번에 전체 PlayMode를 다시 실행한 것이 아니라 관련18건을 실행했다.
+- **미실행:** V3게임 기본 전환·실제 라운드/관람 세션 통합, 독립Mac검증앱, iOS빌드/실기기, 실제LAN/핫스팟과 GPU전용 성능 측정. 시제품 승인 뒤의 게임 연결 작업과 구분한다.
+
+
+## 2026-11-03 — #466 수채 투과·겹침 Editor 시제품
+
+- 환경: Unity 6000.6.5f1, macOS Editor Metal. 기존 연결 Editor에서 실행했으며 별도 Mac Player·iOS·네트워크 플레이는 실행하지 않았다.
+- 새 `TransmissionStudy` 셰이더와 Editor 비교 도구 컴파일 완료. 초기 SceneHandle 구 API 오류는 Scene 구조체 비교로 수정한 뒤 컴파일 실패 없음 확인.
+- 같은 seed와 원본 기록으로 최초 1회·재타격 3회·2색 겹침·3색 교차·5색 완성의 5개 fixture × 3표현을 실제 저장된 WhiteGourd 복사본으로 렌더링했다. 실제/중립 표면, 바탕/입자 개별 진단, 겹침 비교안의 6방향을 출력했다.
+- 15개 표현에서 같은 기록 반복 적용과 새 런타임 전체 재생의 최종 RGBA 바이트가 각각 일치했다. 최초 1회에서 두 개선안의 지도 바이트가 일치했다. 5개 fixture의 판정 색/P 및 고해상도 입력 지도·기록 해시/순번이 보존됐다. 이는 fixture 검증이며 실제 멀티플레이 통과 기록이 아니다.
+- 비교 도구가 확인한 원본 의존 파일 69개와 Scene/직렬화 상태가 보존됐다. 추가 외부 해시 검사에서 기존 게임 코드·설정·Scene·브러시·V3 등 605개 파일 변경 없음 확인 후 문서만 덧붙였다.
+- `Watercolor` 필터 EditMode 7/7 통과(0.42초), PlayMode 18/18 통과(30.49초). 기존 전체 테스트를 다시 실행한 기록은 아니다.
+- 게임 기본 V2, V3 프로필, 실제 게임 수치·규칙·통신·Scene 배치는 유지한다. 미적 승인·실기기·프레임/메모리 성능은 미검증이다.
+
+
+## 2026-11-04 — #466 단일 얼룩 평면 텍스처 시제품
+
+- 범위: 계획1~2단계만 수행. Unity6000.6.5f1/macOS Editor Metal, 1024² 평면 비교·512² 동일 위치 crop·1254² 원본 충실도 출력. Scene·광택·조명·박 물리·게임 판정 마스크는 사용하지 않았다.
+- 새 Editor 셰이더/도구 컴파일 완료. 3개 원본×V2/V3의 저장된 6개 베이크는 현재 pure Bake 결과와 일치했다. 자동 재베이크·Importer 재설정·원본 저장은 수행하지 않았다.
+- 검정·Gain1의 원본 흰 바탕 합성은 native1254²에서 최대 display RGB 바이트 오차0이었다. Enhancement0은 직접 원본 표현과 GPU float32 및 display 바이트가 정확히 일치했다. 3개 비교안의 반복 렌더도 각각 일치했다.
+- 개선안 native 출력에서 원본의 투명/순백794609픽셀을 확인해 색 누출0을 기록했다. 모든 출력은 유한한 opaque RGB이며, 이 비교의 Alpha는 종이 위 합성 출력이므로 게임의 coverage가 아니다.
+- Watercolor 필터 EditMode7/7 통과(0.45초). PlayMode/전체 테스트/네트워크/Mac Player/iOS/성능은 이번 단계에서 실행하지 않았다. 이전 날짜의 통과 기록을 이번 검증으로 재사용하지 않는다.
+- 원본 파일·설정·Scene·로드된 상태·Importer 보존 검사 통과. 외부 해시로 확인한 기존632개 파일도 문서 기록 전 변경 없음 확인. 이후 기존 문서 뒤에 이 기록만 덧붙였다. 게임 기본 V2와 #466의 기존 로컬 구현은 유지한다. 미적 승인과 실제 박 연결은 아직 완료로 기록하지 않는다.
+
+
+## 2026-11-04 — #466 선택 질감 실제 박 비교
+
+- 사용자 선택: 평면 비교 오른쪽(원본 기반 중간 대비 보강). Unity6000.6.5f1/macOS Editor Metal의 실제 WhiteGourd 복사본에 최초1회·최초+재타격3회, seed123, 같은 Round3슬롯과 빨강을 적용했다. 기존 Transmission대조/선택안 × 실제/중립표면 × 배율1/1.6을 비교했다. Scene저장·Player빌드·iOS실기기·네트워크·완성관람·성능 검증은 수행하지 않았다.
+- 평면 셰이더와 새 도장 셰이더의 흰 바탕 단일층 native1254² GPU 비교에서 최대 선형RGB차이는3.58e-7(허용1e-5), 행반전 없음이었다. 이 결과는 셀 마스크·8비트누적·박음영 적용 전의 층 계산이며 최종 박 이미지 전체의 일치를 뜻하지 않는다.
+- 네 가지 입력/표현 조합에서 반복 적용과 새 런타임 재생의 최종RGBA 바이트가 각각 일치했다. 두 fixture의 CPU색/P·고해상도 입력 지도·저널 해시/순번은 유지됐다. source mip 복사본의 base픽셀도 원본 float데이터와 일치했다. 파일·Importer·authoring·로드 Scene 보존 검사를 통과했다.
+- Watercolor 필터 EditMode7/7(0.35초), PlayMode18/18(26.92초) 통과. 전체 테스트 재실행이나 시각 승인을 뜻하지 않는다.
+- 외부 해시에서 기존639개 보호 파일 중 Flat helper의 private→internal 두 지점만 변경 확인 후 문서를 덧붙였다. 게임 기본 V2·기존 구현·사용자 로컬 수정은 유지한다. 남은 확인: 판정 셀에서 잘리는 외곽과 작은 자국에서 읽히는 질감, 다색/전체완성/관람/PNG 연결.
+
+
+## 2026-11-04 — #466 수채 외곽 교체 Editor 시제품
+
+- Unity6000.6.5f1/macOS Editor Metal. 같은 선택 질감·Round3슬롯·빨강·seed123으로 기존 Splatter외곽과 Round원본Alpha외곽을 비교했다. 실제 WhiteGourd 복사본의 배율1/1.6, 최초1회/최초+재타격3회 이미지다. Scene/Resources/기본설정 저장과 Mac Player/iOS/네트워크·성능 확인은 수행하지 않았다.
+- 두 외곽의 첫 명중은 각각655셀, 재타격3회 후는 각각2129셀로 일치했다. 셀 위치와 판정 해시는 의도적으로 달라졌다. 각 입력의 원본 CPU색/P·고해상도 입력지도·저널 해시/순번은 렌더 전후 유지됐고,4개 경우에서 반복 및 새 런타임 재생의 최종RGBA 바이트가 일치했다.
+- 원본/파생마스크·파일·Importer·authoring·로드 Scene·Unity 전역 난수 상태 보존 검사 통과. 로컬 마스크가 전역 캐시에 영향을 주지 않으며, 원본 텍스처를 바꾸거나 제거해도 이후 판정은 불변 복사본을 사용하는 새 검사를 추가했다. invalid/late/Legacy 입력의 원자적 거절, Clear/Reset, 정면/극점/이음새, 분할dt 결정성을 검사했다.
+- Watercolor EditMode13/13(새6개 포함,0.62초), 기존 LabPaintPatternTests44/44(1.74초), Watercolor PlayMode18/18(25.24초) 통과: 관련75건. 전체 테스트나 실기기·미적 승인 기록은 아니다.
+- 수정 범위는 Editor 전용 local mask hooks, fixture override, 최종 패스 material opt-in, Editor 비교/검사다. 기존 Player 기본 게임 규칙과 V2 리소스/통신은 유지한다. 게임 경로 도입, 다색 완성·관람·PNG 연결은 후속 범위다.
+
+
+## 2026-11-04 — #466 불투명 한지 얼룩 스티커
+
+- 기준: `feat/#466-watercolor-brush-stamps`의 기존 로컬 변경을 보존하고 사용자 승인 스티커 시안으로 표현을 변경했다. 저장 기본값은 PaperSticker, 원래 수채/V3 자료와 Scene·Prefab 배치는 보존했다. GPU/CPU 공통 새 Splatter를 사용하므로 실제 셀 위치·색/P지도 해시는 의도적으로 달라진다. 초기·반복 예산 유지와 같은 새 입력의 결정성을 검증한 것이며, 기존 모양과 같은 지도라는 뜻은 아니다.
+- 환경: Unity6000.6.5f1, Mac Editor Metal. iOS/Mac Player 빌드, 실제 LAN/핫스팟·실기기·모바일 성능 검증은 수행하지 않았다. 새 빌드 전 데이터 검증 훅은 직접 호출해 통과했으나 실제 Player 빌드 통과로 기록하지 않는다. 접속 규약5685/Lab46/Game30, 공유 설정257개다.
+- 최종 전체 EditMode **1906/1906 통과** (50.44초). 새 외곽/설정9건과 표현OFF/고해상도OFF 통합2건 포함.
+- 전체 PlayMode 1회는 **621/625 통과·4실패** (538.66초)였다. 실패 원인은 새 모드가 실제로 동작하지 않는 구형 표시 경로에서 Grain을 억제한 조건3건과 새 기본값을 수채로만 단언한3스테이지 검사1건이었다. 실제 활성 PaperSticker일 때만 구형Grain을 억제하도록 수정했고, 3스테이지 검사는 두 모드의 플래그와 스티커 종이결이 전투·관람 복사본에 전달되는지 확인하도록 확장했다.
+- 수정 후 재실행: grain 2/2(2.83초), spread 2/2(1.44초), three-stage 1/1(19.84초). 관련5건 모두 통과했다. 최종 수정 후 전체625건을 다시 실행한 것은 아니므로 전체PlayMode625/625 PASS로 기록하지 않는다.
+- 새 스티커 GPU5건은 전체PlayMode에서 모두 통과했다. 도장UV 밖 실제 지급 셀의 불투명 채색·미지급영역 보존·겹침 완전 덮기·건조/재도색·GPU자원 손실·보조ID자원 단독 손실·프레임 예산·전체/분할 재생을 확인했다.
+- 실제 `RegisterHit`와 `Advance`로 최초1회655셀·재타격3회2129셀을 만들었고, 유지된 원래 외곽과 명중 횟수·사용 예산이 일치했다. 5색완성은 실제Advance60회/명중60회,32768/32768셀이다. 최종1024×512 지도524288픽셀 전부Alpha255, 투명빈틈0이었다. 최초 자국만 쌓은 이전 가상완성 시제품으로 성장 성공을 대신하지 않았다.
+- 3가지 실제 입력에서 전체/분할 GPU재생 픽셀이 일치했고 렌더 전후 CPU지도·저널순번/해시가 유지됐다. 6방향과 productionPNG의 표현 전달·원본 보존 검증 통과. Scene/저장입력/Config/Unity전역난수 보존 검증 통과. 실제 생성 시안과의 미적 일치나 실기기 성능 승인을 의미하지 않는다.
+- [사용자 승인 생성 시안](images/paper-sticker-approved-concept.png), [실제 Unity 정면](images/paper-sticker-actual-front.png), [실제 Unity6방향](images/paper-sticker-actual-six-views.png). Inspector 조절·내부 연결은 [불투명 얼룩 스티커](PAPER_STICKER_PAINT.md)를 따른다.
+- 마지막 스티커 ID별 경계 복원 보정 후 새 GPU검사5/5(5.32초)와 실제 성장/전체재생/분할재생/PNG 검증을 다시 통과했다. RGB를 평균하는 대신 ID별 가중치로 하나의 색면을 고르고, 최상층 ID 지도는 경계 강도0일 때도 곡선 복원을 위해 유지한다.
+
+
+## 2026-11-04 · #466 곡면 RGBA 스티커 외형 시제품
+
+- 환경: Unity 6000.6.5f1 / Metal / 정지 상태 Editor. 별도 Preview Scene의 실제 WhiteGourd 복사본과 새 RGBA 원본 3종. Scene 저장·Player 빌드·Mac 검증 앱·iOS·실환경 LAN/핫스팟은 수행하지 않음.
+- 기록 보조 검사 **6개 통과**: 중복 연산, 모든 층 삭제, 재도색, 셀 합집합, 에셋 선택 안정성, 순번 누락 거절.
+- 실제 메시 셰이더 계약 검사 **7개 통과**: 미도색 Alpha0, 내부 Alpha255/색 유지, 접점 Alpha 틈0/색 혼합 없음, 역순 제출 동일, 원본 Alpha, 잘못된 영역 거절, 반지름 독립/경도 연결. 초기 GPU 검사 사각형의 Metal 앞뒷면 차이는 양방향 winding 검사 메시로 보정 후 재실행했으며 실제 셰이더의 Cull Back은 유지했다.
+- 실제 규칙 fixture: 최초 명중1회 **655셀/1타격**, 최초+재타격3회 **2129셀/4타격**, 두색 **1146셀/2타격**. 표시 전후 색/P지도 해시·CoveredCount·PaintCount 동일. Scene 목록/dirty·Unity RNG·원본 LabConfig도 동일.
+- 새 시제품 C#과 Metal 셰이더 로딩/렌더 성공. 기존 비교 도구의 콜백 없는 기본 호출도 같은 이미지 생성에서 실행했다. 전체 EditMode/PlayMode 묶음은 이번에 재실행하지 않았다. 이전 수천 건의 결과를 이번 재실행 결과로 합산하지 않는다.
+- 실제 이미지: [3열 비교](images/surface-sticker-comparison.png), [6방향](images/surface-sticker-six-views.png), [확대](images/surface-sticker-detail.png). 가운데 열은 원본 에셋 실루엣 외형 비교이며 면적 판정 보장 없음. 오른쪽 열은 지급 셀 영역 제한형으로 원본 Alpha 윤곽은 유지되지 않음.
+- 한계: 기존 도색 위 재덮기, 성장 중 고정 UV, 128개 초과 실시간 렌더/메모리 상한, 관람/PNG 연결, 동기화, 기기 성능은 미검증·미연결. 정점/인덱스 버퍼 크기는 추정이며 프로파일링 측정값이 아님. 외형 승인 전 기본 게임 표현은 유지한다.
+
+
+## 2026-11-04 · #506 원형 클레이·충돌 농도·DEV 조절
+
+- 기준: `feat/#506-gourd-clay-stickers`. 기존 #466과 로컬 수정은 보존했다. 환경은 Unity 6000.6.5f1 / Metal / Mac Editor다. Scene·Prefab 배치, Packages, ProjectSettings, 저장 LabConfig, README 소개글을 보존하고 표현 프로필의 기본 모드만 Clay로 설정했다.
+- 전체 EditMode **1921/1921 PASS**, 건너뜀 0, 최종 통합 후 재실행 48.14초. 구형 공유 설정 257개·프로토콜 5685·Paper 기본값에 대한 기대값을 갱신했다. 저장 Home/Lobby의 기존 257개 행 검사는 유지하고, 동적으로 추가되는 2개 행은 실행 검사에서 확인했다.
+- 전체 PlayMode 최초 실행은 **627개 중 603 PASS / 24 FAIL**이었다. 별도 렌더러 때문에 달라진 기대값 3건, 지연 Destroy가 관람 복제에 남는 문제 2건, 트레일 검사의 LateUpdate 대기 1건, 첫 프레임 준비 지연과 뒤따르는 정리 실패를 수정했다. 수정 후 관련 **55/55 PASS**: LabGourdPaint 9, Grain 2, PlayerPattern 5, ClayDeveloper 2, JigwiRewardTrail 4, GameSceneFlow 23, GameStageUi 2, ProjectileContact 8. 초기 표시의 1프레임 차단과 전투 DEV 직접 변경 → 두 값만 Common 보존 → 다음 스테이지 새 도색·재질값 유지 회귀 검사를 포함한다. 마지막 GameSession 이벤트 연결 후 GameSceneFlow 23건을 전부 재실행해 통과했다. 수정 후 전체 PlayMode를 다시 실행한 결과로 표현하지 않는다.
+- DEV 실행 검사: Host 일시정지 → 실제 슬라이더 → 클레이 렌더러 MPB의 두께 0/.02·광택 0/1 즉시 반영과 독립성 → 닫기/다시 열기 → Restart 값 유지 PASS. Guest 직접 수신 계약은 이전 session/round/config/sequence와 NaN 거절을 검사했다. 실제 기기 간 수신 검증은 아니다.
+- 클레이 GPU 계약 **9/9 PASS**: 실제 최초 1회/재타격 3회, 제한 예산/전체 재생 동일, 높이 지도만 유실 후 복원, 실제 100%에서 모든 출력 texel의 Alpha 255, 강도별 RGB 차이와 동일한 Alpha, 모든 층 건조와 재도색, 129개 도장과 옛 도장의 성장 복원, Unity RNG/원본 설정 보존. 추가한 표시 마스크 회귀는 ±1셀 GPU 빈틈, U 이음새와 극점의 겹친 지원, 건조 시 참조 수 대칭성을 검사한다. 최초 655셀, 재타격 3회 후 2129셀, 완료 32768셀이다.
+- 실제 Unity 렌더: [최초·재타격·두 색](images/clay-first-rehits-overlap.png), [약한/강한 명중](images/clay-impact-weak-strong.png), [두께·광택 끝값](images/clay-thickness-gloss-endpoints.png), [완성 6방향](images/clay-completed-six-views.png), [PNG](images/clay-production-png.png). 실규칙으로 67회 명중 후 실제 100% 도색했고, 최종 수신·적용·GPU 순번이 일치했다. 표시 전후 authority hash, Scene dirty, RNG, 원본 config도 동일했다. 정지 프레임 끝값 비교이며 실기기 회전 중 깜빡임이나 성능 검증은 아니다.
+- 읽기 전용 빌드 데이터 검사를 직접 실행해 통과했다. Player 빌드, iOS, Mac 검증 앱, 실제 일반 Wi-Fi/핫스팟은 미실행이다. 접속에는 5686 / Lab47 / Game31 / 공유 설정 259개의 새 앱을 함께 써야 한다. 원시 로그·개인 절대 경로·기기 식별자는 저장소에 추가하지 않았다.
+
+
+## 2026-11-05 · #506 완성 박 Mac 재질 실험 앱
+
+- 환경: Unity 6000.6.5f1 / macOS / Metal. 기존 #506 브랜치에서 실험 전용 Scene·Runtime assembly·UI Toolkit 패널·Mac 빌드 메뉴를 추가했다. 기존 게임 Scene과 일반 6개 Build Settings 항목은 유지했다.
+- 완성 샘플은 기존 실제 규칙과 seed 123, 고정된 명중 순서로 생성했다. 실제 67회 명중 후 32768/32768셀, 100% 완료였다. 색 PNG·높이 Half EXR는 각각 1024×512이며 Linear·무압축·Bilinear·U Repeat/V Clamp를 유지한다. GPU 원본→저장→재임포트 최대 오차는 색·높이 모두 0이었다. 원본 LabConfig, Unity RNG, 기존 Scene 보존 검사를 통과했다. `SampleInfo.json`이 결과와 해시를 보관한다.
+- 새 PlayMode 검사 **5/5 PASS**, 건너뜀 0(1.72초): 샘플 임포트·일반 빌드와의 분리, 실제 슬라이더의 재질값 반영·독립성·Reset, 6방향 모델 전체 프레이밍, 실제 GPU 출력 변화와 도안 불변, Unload 시 소유 자원 해제·원본 및 프레임 제한 설정 복원. 최초 3 PASS/2 FAIL은 검사 입력의 버튼 target 누락이었으며 Focus·target 지정을 보완하고 같은 단언으로 재실행했다. 기존 게임 전체 검사를 새로 실행한 기록은 아니다.
+- 독립 Mac Development 앱 빌드 성공, 결과 크기 479,761,669바이트. 전용 Scene 하나를 명시했으며 원래 빌드 플랫폼은 StandaloneOSX로 유지했다. 앱을 실제 실행해 완성된 3D 박과 조절 패널을 확인했고, 마우스로 광택 드래그·우측면 보기·회전/휠 확대·Reset을 확인했다. 최종 화면은 두께 0.01·광택 0.35·정면·기본 배율로 복원해 열어두었다. 실제 창 크기 변경과 Quit 버튼 종료는 이 수동 확인에서 수행하지 않았으며, 프레이밍·자원 해제는 위 자동 검사로 구분한다.
+- 첫 빌드에서 PlayerSettings API 값은 복원됐지만 빌드가 디스크에 쓴 임시 제품명·창 설정·Standalone ID가 파일에 남는 것을 외부 해시 검사로 발견했다. 원본 파일을 작업 전 바이트로 복원했다. 빌드 도구도 원본 파일 바이트·해시를 보관하고 API 복원 후 디스크까지 검증하도록 보완했다. 실제 빌드가 남긴 파일 내용을 다시 넣어 복원 루틴을 직접 검사한 결과 메모리 값·디스크 바이트 모두 복원됐다. 이 Editor 전용 보완 뒤 Mac 앱을 다시 빌드한 것으로 기록하지 않는다.
+- 앱의 30fps 제한·비활성 시 카메라 중지는 코드와 자동 검사 범위다. CPU/GPU 사용량·메모리 실측, iOS, LAN/핫스팟 검증은 수행하지 않았다. 샘플 자료는 Resources 밖에 있으며 일반 게임 Scene의 직접 의존성에 포함되지 않는 것을 확인했다. 기존 공용 Resources가 실험 앱 빌드에 포함되지 않는다는 뜻은 아니다. 실행 파일·개인 경로·원시 로그는 저장소에 추가하지 않는다.
+
+
+## 2026-11-05 · #506 최신 main 통합·PR 최종 검사
+
+- 기준: 원격 main `f40e028c`와 #506 통합본, Unity 6000.6.5f1 / macOS / Metal. 최신 main의 #507 스테이지별 박·몸통/뚜껑·판정 껍데기·연속 줄·요괴 반응과 기존 도색/오디오 준비·로비 복구를 보존했다. 기존 Lab/Hapio Scene·로비 UI 배치·Packages·ProjectSettings는 기준 main과 차이가 없다. 실험 Scene은 별도 폴더에만 추가했다.
+- 통합 후 전체 EditMode **1949/1949 PASS**, 건너뜀 0, 48.19초. PlayMode 최초 실행은 **669개 중 666 PASS / 3 FAIL**이었다. 실패는 LateUpdate 경로를 너무 일찍 읽는 검사, 단일 도색 셸을 가정한 관람 검사, TCP 빈 포트를 UDP Host용으로 고르는 검사였다. 게임 코드를 변경하지 않고 해당 검사 3개를 보완했다.
+- 수정 후 전체 PlayMode **669/669 PASS**, 건너뜀 0, 597.56초. 몸통·뚜껑 각각의 원본 메시/identity 코트·Ready·색/P/높이 바인딩과 독립 복사 해시, Battle 해제 후 결과 유지, 다음 스테이지/Home에서 이전 지도 해제를 확인한다. 이 중 저장 Home→3스테이지→결과 검사를 먼저 단독 실행해 **1/1 PASS**(18.38초)한 뒤 전체 묶음을 실행했다. 기존 흰 박 골든은 다시 기록하지 않았다.
+- 통합본 클레이 GPU 검사 **9/9 PASS**. 실제 최초 명중 655셀·재타격 3회 후 2129셀·100% 완료 32768셀, 제한/전체 재생의 색·높이 일치, 높이 자원 유실 복원, 129개 자국/옛 도장 성장, 전층 건조·재도색, 표시 여유의 이음새/극점, 게임 지도·Unity RNG·원본 설정 보존을 확인했다. 읽기 전용 빌드 데이터 검사도 통과했다.
+- Mac 실험 앱 빌드·실제 조작은 위의 통합 전 #506 버전에서 수행했고 사용자도 동작을 확인했다. 최신 main 통합본은 위 Editor 검사로 확인했으며, 통합 후 Mac Player 재빌드·재실행은 수행하지 않았다. 실험 앱은 WhiteGourd 고정 완성 도안의 재질 비교용이며 스테이지별 모델 선택 도구가 아니다. 빌드/실행·두께/광택·6방향·Reset·게임 DEV에 값 적용하는 방법은 [사용법](CLAY_STICKER_PAINT.md)에 정리했다.
+- iOS, 실제 기기 간 일반 Wi-Fi/핫스팟, CPU/GPU 시간·메모리·복원 시간의 성능 실측은 이번 검증에서 수행하지 않았다. 소스/문서 차이의 공백 검사와 문서 링크를 확인했으며 원시 로그·개인 경로·실행 파일을 PR에 포함하지 않는다.
 ## #477 튜토리얼 0단계: 연습 판·캐릭터 얼굴·말풍선·목표 — 2026-11-04
 
 - **기준:** main `afaee674` → `feat/#477-tutoria`. 연결된 Editor에서 컴파일, Editor API 에셋 작업, Editor 안 계산만 했다. Play·Test Runner·앱 빌드·iPhone 실기기는 실행하지 않았다.
@@ -5080,3 +5628,18 @@ Consolidated three byte-identical textures into shared material references; conf
   - 원래 자리(Battle 씬 HUD)에 이 값을 더한 뒤 화면 안쪽으로 맞추므로 화면 밖으로는 나가지 않는다. 매 프레임 적용되어 Play 중에도 바로 보인다.
   - 이름·말풍선 꼬리·구슬 벽이 얼굴을 따라간다. 실제 게임 HUD는 바뀌지 않는다.
   - 확인: 컴파일 **PASS**(오류 0), 에셋 저장 **PASS**(기본값 0·0). Play 확인은 **NOT_RUN**.
+
+### #477 튜토리얼 main 반영 (병합) — 2026-11-05
+
+- 원격 main `25014885`(84개 커밋 앞섬)을 합쳤다. 충돌은 두 파일이다.
+  - `LabModel.cs`: 기운 회복 줄 한 곳. main이 회복 배수를 `JigwiABRecoveryMultiplier(player.id, …)`에서 `JigwiStageRecoveryMultiplier(lastTime)`로 바꿨고, 튜토리얼은 같은 줄을 기운 상한으로 감쌌다. 튜토리얼 감싸기는 두고, 배수는 main 것을 썼다.
+  - 이 문서: 양쪽이 새 절만 더했다.
+    - 끝 부분은 main 절 다음에 튜토리얼 절을 이어 둘 다 남겼다.
+    - 맨 위의 "화 캐릭터 로딩 달리기 에셋 1차 시안" 절은 튜토리얼 작업이 아니다. 같은 작업 폴더에서 다른 작업이 이 문서에 써 둔 것이 5단계 커밋(`f2a681b7`)에 섞여 들어왔다. 저장소에 없는 `output/` 파일을 기록하므로 이 PR에서는 빼고 main 쪽을 따랐다(내용은 `f2a681b7`에 남아 있다).
+- Battle 씬 부모 연결 깨짐은 main의 #485(위 절)로 이미 고쳐져 있다(원격 main 씬 불일치 0). 앞서 이 브랜치 작업 폴더에서 다시 저장한 씬은 쓰지 않는다.
+- 확인 (병합 뒤, Editor 안):
+  - 컴파일 **PASS**(compilationFailed=false, 오류 0).
+  - 폭탄 흐름 **PASS**(병합 전과 같은 값: 잠금 2→1→0, `BOMB_OPENED`, 오행 구슬 2개).
+  - 한쪽 막기 **PASS**(1시간 뒤에도 유지, 오른쪽 `SWIPE_BLOCKED`, 왼쪽 묵이에게 넘어감, 풀기).
+  - 충돌 난 기운 회복 줄 **PASS**: 최대 60, 북 3번에 0, 멈춘 10초 동안 0, 상한 5에서 멈춤, 풀면 60.
+  - Test Runner는 **NOT_RUN**.

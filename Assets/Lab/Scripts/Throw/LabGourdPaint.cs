@@ -9,7 +9,7 @@ namespace C6Lab
     /// state survives visual disable/reinitialization; direct painting is an offline preview only.
     /// </summary>
     [DisallowMultipleComponent]
-    public sealed class LabGourdPaint : MonoBehaviour
+    public sealed partial class LabGourdPaint : MonoBehaviour
     {
         public const string ResourceFolder = "GourdPaint/";
 
@@ -18,6 +18,7 @@ namespace C6Lab
         public GameObject visualPrefab;
         public Material paintMaterial;
         public LabWatercolorPaintProfile watercolorProfile;
+        public LabWatercolorStampProfile stampProfile;
         [Tooltip("Offline preview brush only. Real session growth uses the Host round settings.")]
         [Range(.05f, .3f)] public float splatRadius = LabPaintSurface.DefaultRadius;
 
@@ -29,6 +30,13 @@ namespace C6Lab
         private Texture2D painterTexture;
         private LabHighResolutionPaintRuntime highResolution;
         private LabWatercolorPaintRuntime watercolor;
+        private LabWatercolorStampRuntime watercolorStamps;
+        private bool appliedStampEnabled;
+        private int appliedStampFingerprint;
+        private ulong reportedStampApplied, reportedStampRendered;
+        // Each runtime prewarms its round's brush once, while the battle is still behind the preparing overlay (#482).
+        private object prewarmedHighResolution, prewarmedWatercolor;
+        private LabPaintPattern prewarmedHighResolutionPattern, prewarmedWatercolorPattern;
         private bool appliedWatercolorEnabled;
         private int appliedWatercolorSettings;
         private bool appliedHighResolutionEnabled;
@@ -45,6 +53,12 @@ namespace C6Lab
         private float appliedGrainSize, appliedGrainStrength, appliedMottleStrength;
         private MaterialPropertyBlock block;
         private Renderer shell;
+        // #507 박 모델 계약. 흰 박(legacy)에서는 rig가 null, extras가 비어 있고 활성 재질은 paintMaterial이다.
+        private LabGourdVisualRig rig;
+        private Renderer[] extras = System.Array.Empty<Renderer>();
+        private Material activeMaterial;
+        private float rigReferenceSize = 1.8f;
+        private Vector3 rigSizeAnchor;
         private LabTarget mountedTarget;
         private LabTarget subscribedTarget;
         private bool initialized;
@@ -58,13 +72,16 @@ namespace C6Lab
         public Texture2D PaintTexture => paintTexture;
         public Texture2D PainterTexture => painterTexture;
         /// <summary>Actually bound render maps. Authoritative Texture2D observation APIs stay unchanged.</summary>
-        public Texture VisualPaintTexture => WatercolorActive ? watercolor.PaintTexture
+        public Texture VisualPaintTexture => ClayStickersActive ? clayStickers.PaintTexture : WatercolorStampsActive ? watercolorStamps.PaintTexture : WatercolorActive ? watercolor.PaintTexture
             : HighResolutionActive ? highResolution.PaintTexture : paintTexture;
         public Texture VisualPainterTexture => HighResolutionActive ? highResolution.PainterTexture : painterTexture;
         public bool HighResolutionActive => appliedHighResolutionEnabled && highResolution != null && highResolution.Ready;
         public string HighResolutionError => highResolution != null ? highResolution.Error : null;
         public bool WatercolorActive => appliedWatercolorEnabled && HighResolutionActive
             && watercolor != null && watercolor.Ready;
+        public bool WatercolorStampsActive => appliedStampEnabled && watercolorStamps != null
+            && watercolorStamps.PaintTexture != null && watercolorStamps.Error == null;
+        public string WatercolorStampError => clayStickers?.Error ?? watercolorStamps?.Error ?? network?.PaintArtError;
         public string WatercolorError => watercolor != null ? watercolor.Error : null;
         /// <summary>True only after the final authoritative map and all bounded high-resolution batches are installed.</summary>
         public bool CompletionVisualReady => IsReady && hasUploadedSurface && uploadedSurface == Surface
@@ -73,15 +90,42 @@ namespace C6Lab
             && (network.config == null || !network.config.HighResolutionPaintEnabled
                 || highResolution != null && highResolution.Ready && !highResolution.HasPendingWork && highResolution.Error == null)
             && (!appliedWatercolorEnabled || watercolor == null || watercolor.Error != null
-                || watercolor.Ready && !watercolor.HasPendingWork && !watercolor.IsAnimating);
+                || watercolor.Ready && !watercolor.HasPendingWork && !watercolor.IsAnimating)
+            && (network == null || !network.RequiresPaintArt || network.PaintArtCompletionReady
+                && (ClayStickersActive ? clayStickers.Ready && clayStickers.Error == null
+                    : watercolorStamps != null && watercolorStamps.Ready && watercolorStamps.Error == null));
         public Transform Shell => shell != null ? shell.transform : null;
+        /// <summary>마운트한 박의 모델 계약(#507). 흰 박이거나 계약 검사에 실패해 흰 박으로 돌아갔으면 null.</summary>
+        public LabGourdVisualRig Rig => rig;
+        /// <summary>몸통과 같은 칠 공간을 쓰는 추가 렌더러(#507). 흰 박에서는 비어 있다.</summary>
+        public System.Collections.Generic.IReadOnlyList<Renderer> PaintExtras => extras;
+        /// <summary>몸통에 쓰는 칠 재질. 흰 박은 paintMaterial, 박 모델 계약은 그 계약의 재질.</summary>
+        public Material ActivePaintMaterial => activeMaterial != null ? activeMaterial : paintMaterial;
+        /// <summary>요청한 박 모델 계약이 검사에 실패해 흰 박으로 돌아간 이유. 없으면 null.</summary>
+        public string RigFallbackReason { get; private set; }
         public GameObject VisualInstance { get; private set; }
         public string InitializationError { get; private set; }
         public bool IsReady => initialized && isActiveAndEnabled && target != null && target == mountedTarget
             && network != null && network.target == target && target.Hitbox != null
             && target.VisualMount != null && VisualInstance != null && target.MountedVisual == VisualInstance
-            && shell != null && shell.enabled && shell.gameObject.activeInHierarchy && paintMaterial != null
-            && shell.sharedMaterial == paintMaterial && paintTexture != null && painterTexture != null;
+            && shell != null && shell.enabled && shell.gameObject.activeInHierarchy && ActivePaintMaterial != null
+            && shell.sharedMaterial == ActivePaintMaterial && paintTexture != null && painterTexture != null;
+
+        /// <summary>
+        /// 스테이지 박(#507)을 <see cref="Attach"/>보다 먼저 지정한다. Attach는 비어 있을 때만 흰 박을 채운다.
+        /// 박 모델 계약(<see cref="LabGourdVisualRig"/>)이 없는 프리팹은 흰 박과 같은 경로를 탄다.
+        /// </summary>
+        public static LabGourdPaint PrepareVisual(LabTarget target, GameObject prefab)
+        {
+            if (target == null) return null;
+            var paint = target.GetComponent<LabGourdPaint>();
+            if (paint == null) paint = target.gameObject.AddComponent<LabGourdPaint>();
+            if (prefab == null) return paint;
+            if (paint.VisualInstance != null && paint.visualPrefab != prefab)
+                Debug.LogWarning("C6_GOURD_PREPARE_LATE prefab=" + prefab.name + " (already mounted; applies on the next mount)");
+            paint.visualPrefab = prefab;
+            return paint;
+        }
 
         /// <summary>Bind the ordinary target before presentation Start methods run.</summary>
         public static LabGourdPaint Attach(LabNetwork network)
@@ -97,9 +141,22 @@ namespace C6Lab
                 paint.paintMaterial = Resources.Load<Material>(ResourceFolder + "WhiteGourd");
             if (paint.watercolorProfile == null)
                 paint.watercolorProfile = Resources.Load<LabWatercolorPaintProfile>(ResourceFolder + "WatercolorProfile");
+            if (paint.stampProfile == null)
+                paint.stampProfile = Resources.Load<LabWatercolorStampProfile>(ResourceFolder + "WatercolorStampProfile");
             paint.ApplyMode();
             LabPaintFinishPresentation.Attach(network);
             return paint;
+        }
+
+        /// <summary>
+        /// The brush the round's stamps will use, for the prewarm (#482). The display replica keeps a default pattern,
+        /// so read the round config as the Host's model does: territory turns the old round brush into splatter.
+        /// </summary>
+        public static LabPaintPattern RoundBrushPattern(LabConfig config, LabPaintSurface fallback)
+        {
+            if (config == null) return fallback != null ? fallback.Pattern : LabPaintPattern.Splatter;
+            LabPaintPattern pattern = config.PaintPattern;
+            return pattern == LabPaintPattern.Legacy && config.TeamTerritoryEnabled ? LabPaintPattern.Splatter : pattern;
         }
 
         /// <summary>Called at initialization and accepted config boundaries, never from a frame poll.</summary>
@@ -140,17 +197,30 @@ namespace C6Lab
                 || !paintMaterial.HasProperty("_PaintMap") || !paintMaterial.HasProperty("_PaintMapReady")
                 || !paintMaterial.HasProperty("_PainterMap"))
                 return FailInitialization("The white gourd prefab or C6Lab/GourdPaint material is missing.");
-            Transform prefabShell = visualPrefab.transform.Find("White Gourd");
+            GameObject prefab = visualPrefab;
+            RigFallbackReason = null;
+            var prefabRig = prefab.GetComponent<LabGourdVisualRig>();
+            if (prefabRig != null && !prefabRig.Validate(out string rigReason))
+            {
+                // The same build makes the same choice on every device, so hits stay consistent.
+                RigFallbackReason = rigReason;
+                Debug.LogWarning("C6_GOURD_RIG_FALLBACK prefab=" + prefab.name + " reason=" + rigReason);
+                prefab = Resources.Load<GameObject>(ResourceFolder + "WhiteGourd");
+                prefabRig = null;
+                if (prefab == null) return FailInitialization("The white gourd fallback prefab is missing.");
+            }
+            if (prefabRig != null) return InitializeRig(prefab, prefabRig);
+            Transform prefabShell = prefab.transform.Find("White Gourd");
             MeshFilter mesh = prefabShell != null ? prefabShell.GetComponent<MeshFilter>() : null;
             MeshRenderer prefabRenderer = prefabShell != null ? prefabShell.GetComponent<MeshRenderer>() : null;
-            if (!visualPrefab.activeSelf || prefabShell == null || !prefabShell.gameObject.activeSelf
+            if (!prefab.activeSelf || prefabShell == null || !prefabShell.gameObject.activeSelf
                 || prefabRenderer == null || !prefabRenderer.enabled || mesh == null || mesh.sharedMesh == null)
                 return FailInitialization("The white gourd prefab needs an active 'White Gourd' mesh renderer.");
             if (target.MountedVisual != null)
                 return FailInitialization("The target already owns another mounted visual.");
 
             mountedTarget = target;
-            target.SetVisualPrefab(visualPrefab);
+            target.SetVisualPrefab(prefab);
             VisualInstance = target.MountedVisual;
             Transform white = VisualInstance != null ? VisualInstance.transform.Find("White Gourd") : null;
             shell = white != null ? white.GetComponent<Renderer>() : null;
@@ -178,6 +248,59 @@ namespace C6Lab
             return true;
         }
 
+        /// <summary>
+        /// 박 모델 계약 경로(#507): 계약이 명시한 몸통·추가 렌더러에 칠하고, 판정 껍데기로 충돌 메시를 만든다.
+        /// 순서는 흰 박 경로와 같다.
+        /// </summary>
+        private bool InitializeRig(GameObject prefab, LabGourdVisualRig prefabRig)
+        {
+            if (target.MountedVisual != null)
+                return FailInitialization("The target already owns another mounted visual.");
+            mountedTarget = target;
+            target.SetVisualPrefab(prefab);
+            VisualInstance = target.MountedVisual;
+            rig = VisualInstance != null ? VisualInstance.GetComponent<LabGourdVisualRig>() : null;
+            shell = rig != null ? rig.paintShell : null;
+            if (shell == null || rig.hitShell == null)
+                return FailInitialization("The target did not mount a usable gourd rig.");
+            var list = new System.Collections.Generic.List<Renderer>();
+            if (rig.paintExtras != null)
+                foreach (Renderer extra in rig.paintExtras) if (extra != null) list.Add(extra);
+            extras = list.ToArray();
+            activeMaterial = prefabRig.paintMaterial;
+            rigReferenceSize = prefabRig.referenceVisualSize;
+            rigSizeAnchor = prefabRig.AnchorInRoot;
+            foreach (var animator in VisualInstance.GetComponentsInChildren<Animator>(true))
+                animator.enabled = false;
+            if (rig.yokaiAnimation != null)
+            {
+                LabGourdYokai yokai = VisualInstance.GetComponent<LabGourdYokai>();
+                if (yokai == null) yokai = VisualInstance.AddComponent<LabGourdYokai>();
+                yokai.Configure(rig.yokaiAnimation, rig.yokaiProfile);
+                yokai.Bind(network);
+            }
+            shell.sharedMaterial = activeMaterial;
+            // An extra with its own paint-shader material (its own body art under the paint) keeps it.
+            foreach (Renderer extra in extras)
+                if (!LabGourdVisualRig.UsesPaintShader(extra.sharedMaterial)) extra.sharedMaterial = activeMaterial;
+            block = new MaterialPropertyBlock();
+            EnsureTexture(Surface);
+            initialized = true;
+            if (watercolorProfile == null)
+                watercolorProfile = Resources.Load<LabWatercolorPaintProfile>(ResourceFolder + "WatercolorProfile");
+            ApplyVisualSize();
+            if (!target.BindHitboxMesh(rig.hitShell))
+                return FailInitialization("The gourd rig's hit shell could not supply its collision mesh.");
+            // #507: a continuous rope ends at the model's rope socket instead of the hitbox top.
+            LabHangingTarget hanging = target.GetComponent<LabHangingTarget>();
+            if (hanging != null) hanging.SetRopeSocket(rig.ropeSocket);
+            InitializationError = null;
+            RefreshPaintMap(true);
+            subscribedTarget = target;
+            subscribedTarget.ApprovedHit += OnHit;
+            return true;
+        }
+
         private bool FailInitialization(string reason)
         {
             ReleasePresentation();
@@ -198,9 +321,20 @@ namespace C6Lab
         {
             if (VisualInstance == null) return;
             float size = network != null && network.config != null ? network.config.GourdVisualSize : 1.4f;
-            float ratio = size / 1.8f;
-            Vector3 scale = Vector3.one * ratio;
-            Vector3 position = Vector3.up * (.84f * (1f - ratio));
+            Vector3 scale, position;
+            if (rig == null)
+            {
+                float ratio = size / 1.8f;
+                scale = Vector3.one * ratio;
+                position = Vector3.up * (.84f * (1f - ratio));
+            }
+            else
+            {
+                // #507: the rig names the size it was authored for and the point that stays put.
+                float ratio = size / rigReferenceSize;
+                scale = Vector3.one * ratio;
+                position = rigSizeAnchor * (1f - ratio);
+            }
             if (VisualInstance.transform.localScale == scale
                 && VisualInstance.transform.localPosition == position) return;
             VisualInstance.transform.localScale = scale;
@@ -277,6 +411,7 @@ namespace C6Lab
             LabConfig config = network != null ? network.config : null;
             bool highResolutionEnabled = config == null || config.HighResolutionPaintEnabled;
             int highResolutionColumns = config != null ? config.HighResolutionPaintColumns : LabHighResolutionPaintRuntime.DefaultColumns;
+            LabPaintPattern brushPattern = RoundBrushPattern(config, source);
             bool highResolutionChanged = appliedHighResolutionEnabled != highResolutionEnabled
                 || appliedHighResolutionColumns != highResolutionColumns;
             bool visualChanged = uploadedVisualVersion != source.VisualVersion;
@@ -285,7 +420,20 @@ namespace C6Lab
             LabWatercolorPaintSettings watercolorSettings = watercolorProfile != null ? watercolorProfile.settings : null;
             // 2:2 땅따먹기 (#293)는 청·홍이 한눈에 갈려야 해서 반투명한 수채(#369) 대신 기존 선명한 고해상도 칠을 쓴다.
             bool teamTerritory = network != null && network.Snapshot != null && network.Snapshot.teamTerritory;
-            bool watercolorEnabled = highResolutionEnabled && !teamTerritory
+            LabWatercolorStampSettings stampSettings = network != null && network.PinnedWatercolorSettings != null
+                ? network.PinnedWatercolorSettings : stampProfile != null ? stampProfile.settings.SanitizedCopy()
+                : LabWatercolorStampSettings.CaptureDefault();
+            bool stampsEnabled = network != null && network.IsConnected && highResolutionEnabled && !teamTerritory
+                && stampSettings.enabled;
+            bool stampsChanged = appliedStampEnabled != stampsEnabled || appliedStampFingerprint != stampSettings.Fingerprint;
+            // The received journal can advance without a new cell revision (overlap, final commit, replay).
+            bool pendingStamps = stampsEnabled && network.PaintArtJournal != null
+                && (stampSettings.UsesClayStickers ? ClayPending(network.PaintArtJournal)
+                    : watercolorStamps == null || watercolorStamps.Error == null
+                    && (!watercolorStamps.Ready || watercolorStamps.AppliedThrough != network.PaintArtJournal.LastSequence
+                        || reportedStampApplied != watercolorStamps.AppliedThrough
+                        || reportedStampRendered != watercolorStamps.RenderedThrough));
+            bool watercolorEnabled = !stampsEnabled && highResolutionEnabled && !teamTerritory
                 && watercolorSettings != null && watercolorSettings.enabled;
             int watercolorSettingsHash = watercolorSettings != null ? watercolorSettings.Fingerprint : 0;
             bool watercolorChanged = appliedWatercolorEnabled != watercolorEnabled
@@ -302,7 +450,8 @@ namespace C6Lab
                 || appliedMottleStrength != mottleStrength;
             bool patternsChanged = !grainSettingsApplied || appliedPlayerPaintPatternsEnabled != playerPaintPatternsEnabled;
             if (!uploadMap && !grainChanged && !patternsChanged && !highResolutionChanged
-                && !visualChanged && !pendingVisual && !watercolorChanged && !pendingWatercolor && !completeRebuild) return;
+                && !visualChanged && !pendingVisual && !watercolorChanged && !pendingWatercolor
+                && !stampsChanged && !pendingStamps && !completeRebuild && !ClaySettingsChanged()) return;
             if (block == null) block = new MaterialPropertyBlock();
             shell.GetPropertyBlock(block);
             if (uploadMap)
@@ -327,6 +476,12 @@ namespace C6Lab
             {
                 if (highResolution == null) highResolution = new LabHighResolutionPaintRuntime();
                 highResolution.Update(source, paintTexture, painterTexture, highResolutionColumns, completeRebuild);
+                if (brushPattern != LabPaintPattern.Legacy
+                    && (prewarmedHighResolution != highResolution || prewarmedHighResolutionPattern != brushPattern))
+                {
+                    if (highResolution.Prewarm(brushPattern) || highResolution.PrewarmError != null)
+                    { prewarmedHighResolution = highResolution; prewarmedHighResolutionPattern = brushPattern; }
+                }
             }
             else if (highResolution != null)
             {
@@ -348,22 +503,58 @@ namespace C6Lab
                     && (network.Snapshot.phase == LabPhase.Victory || network.Snapshot.phase == LabPhase.Defeat);
                 watercolor.Update(source, highResolution.PaintTexture, highResolution.PainterTexture,
                     watercolorSettings, Time.realtimeSinceStartupAsDouble, final);
+                if (brushPattern != LabPaintPattern.Legacy
+                    && (prewarmedWatercolor != watercolor || prewarmedWatercolorPattern != brushPattern))
+                {
+                    if (watercolor.Prewarm(brushPattern) || watercolor.PrewarmError != null)
+                    { prewarmedWatercolor = watercolor; prewarmedWatercolorPattern = brushPattern; }
+                }
             }
             else if ((!watercolorEnabled || highResolution == null) && watercolor != null)
             {
                 watercolor.Dispose(); watercolor = null;
             }
+            if ((generationChanged || highResolutionChanged || stampsChanged) && watercolorStamps != null)
+            { watercolorStamps.Dispose(); watercolorStamps = null; }
+            if ((generationChanged || highResolutionChanged || stampsChanged) && clayStickers != null) ReleaseClay();
+            if (stampsEnabled && stampSettings.UsesClayStickers && network.PaintArtJournal != null)
+            {
+                UpdateClay(network.PaintArtJournal, stampSettings, highResolutionColumns, completeRebuild);
+            }
+            else if (stampsEnabled && network.PaintArtJournal != null)
+            {
+                watercolorStamps ??= new LabWatercolorStampRuntime();
+                watercolorStamps.Update(network.PaintArtJournal, HighResolutionActive ? highResolution.PaintTexture : paintTexture, highResolutionColumns, stampSettings,
+                    network.BattlePresentationTime, completeRebuild);
+                if (watercolorStamps.Error != null || watercolorStamps.Ready)
+                    network.ReportPaintArtRenderingError(watercolorStamps.Error);
+                network.ReportPaintArtRendered(watercolorStamps.AppliedThrough, watercolorStamps.RenderedThrough);
+                reportedStampApplied = watercolorStamps.AppliedThrough; reportedStampRendered = watercolorStamps.RenderedThrough;
+            }
+            else if ((!stampsEnabled || stampSettings.UsesClayStickers) && watercolorStamps != null)
+            { watercolorStamps.Dispose(); watercolorStamps = null; }
+            if (!stampsEnabled && clayStickers != null) ReleaseClay();
+            appliedStampEnabled = stampsEnabled; appliedStampFingerprint = stampSettings.Fingerprint;
             appliedWatercolorEnabled = watercolorEnabled;
             appliedWatercolorSettings = watercolorSettingsHash;
             block.SetTexture("_PaintMap", VisualPaintTexture);
             block.SetTexture("_PainterMap", VisualPainterTexture);
-            block.SetFloat("_PaintGrainEnabled", grainEnabled ? 1f : 0f);
+            block.SetFloat("_WatercolorV2Enabled", WatercolorStampsActive && !stampSettings.UsesPaperStickers ? 1f : 0f);
+            block.SetFloat("_PaperStickerEnabled", WatercolorStampsActive && stampSettings.UsesPaperStickers ? 1f : 0f);
+            block.SetFloat("_PaperStickerGrainStrength", stampSettings.paperSticker.grainStrength);
+            block.SetFloat("_WatercolorGranulationStrength", stampSettings.granulationStrength);
+            block.SetFloat("_WatercolorGranulationScale", stampSettings.granulationScale);
+            block.SetFloat("_PaintGrainEnabled", grainEnabled && !(WatercolorStampsActive && stampSettings.UsesPaperStickers) ? 1f : 0f);
             block.SetFloat("_PaintGrainSize", grainSize);
             block.SetFloat("_PaintGrainStrength", grainStrength);
             block.SetFloat("_PaintMottleStrength", mottleStrength);
             // This is a presentation switch. Keep both authoritative maps intact while OFF.
             block.SetFloat("_PlayerPaintPatternsEnabled", playerPaintPatternsEnabled ? 1f : 0f);
-            shell.SetPropertyBlock(block);
+            // The neutral body and the clay coat are separate renderers. No saved base asset is edited.
+            bool clayActive=ClayStickersActive;
+            BindClay(clayActive,playerPaintPatternsEnabled);
+            BindClayBase(shell,clayActive);
+            foreach (Renderer extra in extras) if (extra != null) BindClayBase(extra,clayActive);
             appliedPlayerPaintPatternsEnabled = playerPaintPatternsEnabled;
             appliedGrainEnabled = grainEnabled; appliedGrainSize = grainSize;
             appliedGrainStrength = grainStrength; appliedMottleStrength = mottleStrength;
@@ -400,18 +591,31 @@ namespace C6Lab
             if (subscribedTarget != null) subscribedTarget.ApprovedHit -= OnHit;
             subscribedTarget = null;
             // Never clear Surface here: disabling/rebuilding a renderer cannot erase team progress.
+            if (rig != null && mountedTarget != null)
+            {
+                LabHangingTarget hanging = mountedTarget.GetComponent<LabHangingTarget>();
+                if (hanging != null) hanging.SetRopeSocket(null);
+            }
             if (mountedTarget != null && VisualInstance != null && mountedTarget.MountedVisual == VisualInstance)
                 mountedTarget.SetVisualPrefab(null);
+            ReleaseClay();
             if (highResolution != null) highResolution.Dispose();
             highResolution = null;
             if (watercolor != null) watercolor.Dispose();
             watercolor = null;
+            watercolorStamps?.Dispose(); watercolorStamps = null;
+            if (network != null) network.ReportPaintArtRendered(0, 0);
+            appliedStampEnabled = false; appliedStampFingerprint = 0;
+            reportedStampApplied = reportedStampRendered = 0;
             appliedWatercolorEnabled = false;
             appliedWatercolorSettings = 0;
             appliedHighResolutionEnabled = false;
             appliedHighResolutionColumns = 0;
             uploadedVisualVersion = 0;
             shell = null;
+            rig = null;
+            extras = System.Array.Empty<Renderer>();
+            activeMaterial = null;
             VisualInstance = null;
             mountedTarget = null;
             initialized = false;

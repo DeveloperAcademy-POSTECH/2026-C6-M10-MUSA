@@ -151,6 +151,12 @@ namespace Hapio
             if (network == null) network = GetComponent<LabNetwork>();
             if (network == null || !network.SetGameFlowEnabled(true))
                 throw new InvalidOperationException("A disconnected game transport is required at bootstrap.");
+            // Long-frame measurement (#481), never attached to a release player.
+            if (GameFrameSpikePolicy.ProbeEnabled(Debug.isDebugBuild))
+            {
+                frameProbe = gameObject.AddComponent<GameFrameSpikeProbe>();
+                frameProbe.Bind(this);
+            }
             if (stageCatalog == null) stageCatalog = GameStageCatalog.RequireDefault();
             stageCatalog.Validate();
             stageSettings = new GameStageSettings(network.config, stageCatalog);
@@ -168,6 +174,7 @@ namespace Hapio
             network.GameFlowMessage += ReceiveControl;
             network.GameFlowDisconnected += OnPeerDisconnected;
             network.GameFlowDeveloperRestartRequested += OnDeveloperRestart;
+            network.ClayAppearanceChanged += OnBattleClayAppearanceChanged;
             SceneManager.sceneLoaded += OnSceneLoaded;
         }
 
@@ -220,6 +227,7 @@ namespace Hapio
             double now = Time.realtimeSinceStartupAsDouble;
             UpdateBattleStart(now);
             UpdatePaintFinish(now);
+            UpdateReplayCover();
             if (network.IsHost && network.IsConnected && now >= nextStateAt)
             {
                 BroadcastState();
@@ -455,7 +463,7 @@ namespace Hapio
             if (!MatchesBattle(network.Snapshot) || network.Snapshot.phase != LabPhase.Victory) return false;
             if (network.config == null || !network.config.CompletedGourdViewerEnabled
                 || network.config.GourdMode != LabGourdMode.Paint) return true;
-            return LabGourdResultPreview.SurfaceMatches(network, out _);
+            return LabGourdResultPreview.SurfaceMatches(network, out _, requireExactArtwork: false);
         }
 
         private void CaptureResult()
@@ -480,6 +488,8 @@ namespace Hapio
                 DontDestroyOnLoad(preview.PreviewCamera.transform.root.gameObject);
                 RememberCapturedResult();
             }
+            else if (network.RequiresPaintArt)
+                UiNotice = "The round result is preserved, but its exact artwork is not ready for viewing.";
         }
 
         private void RememberCapturedResult()
@@ -698,8 +708,23 @@ namespace Hapio
             if (IsCreatingRoom || state.phase != GameFlowPhase.Home || !network.PrepareDeveloperSoloGame()) return;
             hostMode = mode;
             hostFlow.EnterLobby(mode);
-            if (hostFlow.BeginRun(network.ConnectedPlayerIds)) PrepareStage();
+            if (!hostFlow.BeginRun(network.ConnectedPlayerIds)) return;
+#if UNITY_EDITOR
+            // #479 실험실: 메뉴 Hapio > DEV SOLO 시작 스테이지. 기본 1이면 지금과 같다.
+            // Home 씬에서 직접 Play한 경우에만 쓴다(Test Runner는 다른 씬에서 시작하므로 늘 1스테이지부터).
+            if (mode == GameMode.Story && developerSoloStartAllowed)
+                hostFlow.DeveloperStartAt(UnityEditor.EditorPrefs.GetInt(DeveloperSoloStartStageKey, 1));
+#endif
+            PrepareStage();
         }
+        /// <summary>#479 실험실: 에디터 전용 SOLO 시작 스테이지를 이 컴퓨터에만 저장하는 키.</summary>
+        public const string DeveloperSoloStartStageKey = "Hapio.DeveloperSoloStartStage";
+#if UNITY_EDITOR
+        private static bool developerSoloStartAllowed;
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+        private static void CaptureDeveloperSoloStart() =>
+            developerSoloStartAllowed = SceneManager.GetActiveScene().path == GameScenePaths.Home;
+#endif
 
         public void NextStage()
         {
@@ -926,6 +951,7 @@ namespace Hapio
                 network.GameFlowMessage -= ReceiveControl;
                 network.GameFlowDisconnected -= OnPeerDisconnected;
                 network.GameFlowDeveloperRestartRequested -= OnDeveloperRestart;
+                network.ClayAppearanceChanged -= OnBattleClayAppearanceChanged;
                 network.GameFlowDeveloperConfigValidation = null;
             }
             stageSettings?.Dispose();

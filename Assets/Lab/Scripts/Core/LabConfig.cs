@@ -376,23 +376,32 @@ namespace C6Lab
             new LabDeveloperField("피버 타임 시작 (남은 초, 0 = 끔)", 0f, 60f),
             new LabDeveloperField("피버 타임 충전 배율", 1f, 5f),
             new LabDeveloperField("지귀 A 최대 지속 (초)", 1f, 15f),
-            new LabDeveloperField("지귀 A 자동 회복 배율", 1f, 10f),
-            new LabDeveloperField("지귀 A 해제 명중 수", 1f, 10f, true),
+            new LabDeveloperField("Reserved Jigwi A Recovery Multiplier (unused)", 1f, 10f),
+            new LabDeveloperField("Reserved Jigwi A Required Hits (unused)", 1f, 10f, true),
             new LabDeveloperField("지귀 A 구슬 소각 대기 (초)", .5f, 30f),
-            new LabDeveloperField("지귀 B 개인 불 개수", 1f, 6f, true),
-            new LabDeveloperField("지귀 B 소화 후 재점화 (초)", 1f, 60f),
+            new LabDeveloperField("Reserved Jigwi B Fire Count (unused)", 1f, 6f, true),
+            new LabDeveloperField("Reserved Jigwi B Relight (unused)", 1f, 60f),
             new LabDeveloperField("Reserved Jigwi B Shrink Delay (unused)", 0f, 60f),
             new LabDeveloperField("Reserved Jigwi B Shrink Scale (unused)", .2f, 1f),
             new LabDeveloperField("지귀 B 불 이동 폭", 0f, .1f),
             new LabDeveloperField("지귀 B 불 이동 주기 (초)", 1f, 20f),
             new LabDeveloperField("지귀 B 소화 표적 반경", .1f, 1f),
-            new LabDeveloperField("지귀 성공 보상 구슬 크기 (배)", 1f, 3f),
-            new LabDeveloperField("지귀 성공 보상 칠 면적 (배)", 1f, 3f),
-            new LabDeveloperField("지귀 B 물 구슬 지급 간격 (초)", .25f, 10f),
-            new LabDeveloperField("지귀 B 시작 물 구슬 수", 0f, 5f, true),
-            new LabDeveloperField("지귀 B 미소모 지급 상한", 1f, 12f, true),
-            new LabDeveloperField("지귀 B 발화점 거리 (박까지 비율)", .4f, .9f)
+            new LabDeveloperField("Reserved Jigwi B Reward Size (unused)", 1f, 3f),
+            new LabDeveloperField("Reserved Jigwi B Reward Paint (unused)", 1f, 3f),
+            new LabDeveloperField("Reserved Jigwi B Supply Interval (unused)", .25f, 10f),
+            new LabDeveloperField("Reserved Jigwi B Supply Initial (unused)", 0f, 5f, true),
+            new LabDeveloperField("Reserved Jigwi B Supply Limit (unused)", 1f, 12f, true),
+            new LabDeveloperField("지귀 B 발화점 거리 (박까지 비율)", .4f, .9f),
+            new LabDeveloperField("Clay Thickness (body units)", 0f, .02f),
+            new LabDeveloperField("Clay Gloss", 0f, 1f)
         });
+
+        public const int ClayThicknessField = 257;
+        public const int ClayGlossField = 258;
+        public static bool IsClayPresentationField(int index) => index == ClayThicknessField || index == ClayGlossField;
+        public static bool ValidClayAppearance(float thickness, float gloss) =>
+            float.IsFinite(thickness) && thickness >= 0f && thickness <= .02f
+            && float.IsFinite(gloss) && gloss >= 0f && gloss <= 1f;
 
         public const int JigwiStageFirstField = 228;
         public const int JigwiStageLastField = 235;
@@ -417,9 +426,13 @@ namespace C6Lab
         /// opens into two attack orbs instead of being thrown) and the Yaguang's own battle time (every stage uses the
         /// common battle time). They keep their places in the shared form so every other index stays put, but nothing
         /// reads them and DEV never shows them. #388 also retires the fixed warning slot and screen-B shrink delay/scale while preserving their stored values.
+        /// #479 retires Jigwi A's recovery multiplier and required hits: A is now cleared by a talisman, not by boss hits.
+        /// #509 retires Jigwi B's fire count and relight: each picked seat has one pillar that never relights.
+        /// #509 also retires B's 5-second launch reward size/paint: success is now one big water splash on the boss.
+        /// #509 also retires B's free-water interval/initial count/cap: each picked seat gets one special Water orb instead.
         /// </summary>
         public static IReadOnlyCollection<int> RetiredDeveloperFields { get; } =
-            Array.AsReadOnly(new[] { 55, 87, 88, 152, 154, 167, 168, 211, 229, 230, 231, 232, 233, 234, 246, 247 });
+            Array.AsReadOnly(new[] { 55, 87, 88, 152, 154, 167, 168, 211, 229, 230, 231, 232, 233, 234, 241, 242, 244, 245, 246, 247, 251, 252, 253, 254, 255 });
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
         public static IReadOnlyList<LabOrbKind> GeneratedKinds { get; } = Array.AsReadOnly(new[]
@@ -448,10 +461,10 @@ namespace C6Lab
             new LabDeveloperCategory("Drum", 74, 75, 76, 77, 78, 90, 91, 92, 93, 94, 95, 96, 97),
             new LabDeveloperCategory("Gourd", 140, 79, 104, 105, 106, 138, 139, 107, 108, 109, 110, 137,
                 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131,
-                134, 132, 133, 148, 149, 150, 151, 200, 201),
+                134, 132, 133, 148, 149, 150, 151, 200, 201, ClayThicknessField, ClayGlossField),
             new LabDeveloperCategory("Minimap", 98, 99, 100, 101),
             new LabDeveloperCategory("Jigwi", 178, 179, 180, 181, 182, 183, 192, 193, 194, 195),
-            new LabDeveloperCategory("지귀 120초 (Hapio 전용)", 228, 235, 240, 241, 242, 243, 244, 245, 248, 249, 250, 251, 252, 253, 254, 255, 256),
+            new LabDeveloperCategory("지귀 120초 (Hapio 전용)", 228, 235, 240, 243, 248, 249, 250, 256),
             // 기믹 묶음 (#311): 공용(폭탄·넘기기 막기)과 고유(구미호: 여우불·매혹)를 나눠 간격·켜기·비율·세부값을 모은다.
             new LabDeveloperCategory("Gimmicks", 205, 207, 169, 208, 170, 153,
                 166, 206, 209, 171, 210, 172, 173, 174, 175, 176, 204, 177)
@@ -520,11 +533,27 @@ namespace C6Lab
 
         [Header("Jigwi screen patterns (#341)")]
         [SerializeField, Range(1f, 15f)] private float jigwiABPersonalDurationSeconds = 15f;
-        [SerializeField, Range(1f, 10f)] private float jigwiABPersonalRecoveryMultiplier = 4f;
-        [SerializeField, Range(1, 10)] private int jigwiABPersonalRequiredHits = 3;
+        [HideInInspector, SerializeField, Range(1f, 10f)] private float jigwiABPersonalRecoveryMultiplier = 4f;
+        [HideInInspector, SerializeField, Range(1, 10)] private int jigwiABPersonalRequiredHits = 3;
         [SerializeField, Range(.5f, 30f)] private float jigwiABPersonalBurnSeconds = 5f;
-        [SerializeField, Range(1, 6)] private int jigwiABGroupFireCount = 3;
-        [SerializeField, Range(1f, 60f)] private float jigwiABRelightSeconds = 12f;
+        [HideInInspector, SerializeField, Range(1, 6)] private int jigwiABGroupFireCount = 3;
+        [HideInInspector, SerializeField, Range(1f, 60f)] private float jigwiABRelightSeconds = 12f;
+        [Tooltip("#479 Inspector 전용: A 동안 한 사람 판의 구슬이 하나씩 차례로 탈 때의 간격(초). 첫 구슬은 DEV '지귀 A 구슬 소각 대기' 뒤에 탄다. 0이면 모두 한꺼번에. Host 값만 쓴다.")]
+        [SerializeField, Range(0f, 5f)] private float jigwiABBurnStaggerSeconds = 1f;
+        [Tooltip("#479 Inspector 전용: 부적(\"물\")을 다 쓴 사람 판에 생기는 물방울 무늬 물 구슬 수. 0이면 보상 없음. Host 값만 쓴다.")]
+        [SerializeField, Range(0, 6)] private int jigwiTalismanWaterCount = 5;
+        [Tooltip("#479 Inspector 전용: 부적 보상 물 구슬이 사라지기까지 (초).")]
+        [SerializeField, Range(1f, 60f)] private float jigwiTalismanWaterLifetimeSeconds = 15f;
+        [Tooltip("#479 Inspector 전용: 부적 보상 물 구슬로 박을 맞혔을 때 칠 면적 (배). 도색 한 번은 최대 3배.")]
+        [SerializeField, Range(1f, 3f)] private float jigwiTalismanWaterPaintScale = 1.5f;
+        [Tooltip("#479 Inspector 전용(각 기기): 부적 점선 \"물\" 중 이만큼 칠하면 다 쓴 것으로 본다 (0~1).")]
+        [SerializeField, Range(.3f, 1f)] private float jigwiTalismanCoverage = .9f;
+        [Tooltip("#479 Inspector 전용(각 기기): 손가락이 점선에서 이만큼(글자 칸 크기 대비) 떨어져도 칠한다. 클수록 쉽다.")]
+        [SerializeField, Range(.02f, .2f)] private float jigwiTalismanTolerance = .07f;
+        [Tooltip("#509 Inspector 전용(Host): B 성공 때 지목된 사람마다 박에 떨어지는 물벼락의 칠 크기(한 번 맞힘 대비, 최대 3).")]
+        [SerializeField, Range(0f, 3f)] private float jigwiBSplashPaintShare = 3f;
+        [Tooltip("#509 Inspector 전용(Host): B 실패 때 모든 조합판에 불이 붙어 북을 못 누르는 시간(초). 0이면 벌점 없음.")]
+        [SerializeField, Range(0f, 10f)] private float jigwiBBoardFireSeconds = 3f;
         [HideInInspector, SerializeField, Range(0f, 60f)] private float jigwiABShrinkDelaySeconds = 12f;
         [HideInInspector, SerializeField, Range(.2f, 1f)] private float jigwiABShrinkScale = .65f;
         [SerializeField, Range(0f, .1f)] private float jigwiABFireMoveAmount = .03f;
@@ -799,6 +828,14 @@ namespace C6Lab
         [SerializeField, Range(0f, 1.5f)] private float teamWallFlashSeconds = .35f;
         [Tooltip("벽 반짝임 세기: 튕긴 순간 벽 빛 불투명도에 더하는 값 (평소 벽 빛 0.32)")]
         [SerializeField, Range(0f, .68f)] private float teamWallFlashBoost = .4f;
+        [Header("Clay stamp presentation (#506)")]
+        [Tooltip("Appearance only. Local body-space displacement height; does not alter the hit collider or paint area.")]
+        [SerializeField, Range(0f, .02f)] private float clayThickness = .006f;
+        [Tooltip("Appearance only. Independent from clay thickness. Zero is matte, one is glossy.")]
+        [SerializeField, Range(0f, 1f)] private float clayGloss = .25f;
+        public float ClayThickness => Mathf.Clamp(Finite(clayThickness, .006f), 0f, .02f);
+        public float ClayGloss => Mathf.Clamp01(Finite(clayGloss, .25f));
+
         [Header("High resolution paint presentation (#299)")]
         [Tooltip("Use the continuous high-resolution paint presentation. Host cell coverage, attribution and battle rules are unchanged.")]
         [SerializeField] private bool highResolutionPaintEnabled = true;
@@ -1087,6 +1124,14 @@ namespace C6Lab
         public float JigwiABPersonalRecoveryMultiplier => Mathf.Clamp(Finite(jigwiABPersonalRecoveryMultiplier, 4f), 1f, 10f);
         public int JigwiABPersonalRequiredHits => Mathf.Clamp(jigwiABPersonalRequiredHits, 1, 10);
         public float JigwiABPersonalBurnSeconds => Mathf.Clamp(Finite(jigwiABPersonalBurnSeconds, 5f), .5f, 30f);
+        public float JigwiABBurnStaggerSeconds => Mathf.Clamp(Finite(jigwiABBurnStaggerSeconds, 1f), 0f, 5f);
+        public int JigwiTalismanWaterCount => Mathf.Clamp(jigwiTalismanWaterCount, 0, 6);
+        public float JigwiTalismanWaterLifetimeSeconds => Mathf.Clamp(Finite(jigwiTalismanWaterLifetimeSeconds, 15f), 1f, 60f);
+        public float JigwiTalismanWaterPaintScale => Mathf.Clamp(Finite(jigwiTalismanWaterPaintScale, 1.5f), 1f, 3f);
+        public float JigwiTalismanCoverage => Mathf.Clamp(Finite(jigwiTalismanCoverage, .9f), .3f, 1f);
+        public float JigwiTalismanTolerance => Mathf.Clamp(Finite(jigwiTalismanTolerance, .07f), .02f, .2f);
+        public float JigwiBSplashPaintShare => Mathf.Clamp(Finite(jigwiBSplashPaintShare, 3f), 0f, 3f);
+        public float JigwiBBoardFireSeconds => Mathf.Clamp(Finite(jigwiBBoardFireSeconds, 3f), 0f, 10f);
         public int JigwiABGroupFireCount => Mathf.Clamp(jigwiABGroupFireCount, 1, 6);
         public float JigwiABRelightSeconds => Mathf.Clamp(Finite(jigwiABRelightSeconds, 12f), 1f, 60f);
         public float JigwiABShrinkDelaySeconds => Mathf.Clamp(Finite(jigwiABShrinkDelaySeconds, 12f), 0f, 60f);
@@ -1578,7 +1623,8 @@ namespace C6Lab
                 JigwiABPersonalBurnSeconds, JigwiABGroupFireCount, JigwiABRelightSeconds, JigwiABShrinkDelaySeconds,
                 JigwiABShrinkScale, JigwiABFireMoveAmount, JigwiABFireMovePeriodSeconds, JigwiABFireTargetRadius,
                 JigwiABRewardSizeScale, JigwiABRewardPaintScale,
-                JigwiABSupplyIntervalSeconds, JigwiABSupplyInitialCount, JigwiABSupplyLimit, JigwiABFireDepth
+                JigwiABSupplyIntervalSeconds, JigwiABSupplyInitialCount, JigwiABSupplyLimit, JigwiABFireDepth,
+                ClayThickness, ClayGloss
             };
         }
 
@@ -1875,6 +1921,8 @@ namespace C6Lab
             jigwiABSupplyInitialCount = (int)values[254];
             jigwiABSupplyLimit = (int)values[255];
             jigwiABFireDepth = values[256];
+            clayThickness = values[ClayThicknessField];
+            clayGloss = values[ClayGlossField];
             error = string.Empty;
             return true;
         }

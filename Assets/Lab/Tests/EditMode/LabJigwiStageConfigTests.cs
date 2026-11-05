@@ -17,7 +17,7 @@ namespace C6Lab.Tests
         [Test]
         public void RetainedSurfaceFieldsKeepValuesWhileTheActiveCategoryUsesScreenFields()
         {
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(257));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(259));
             Assert.That(LabConfig.JigwiStageFirstField, Is.EqualTo(228));
             Assert.That(LabConfig.JigwiStageLastField, Is.EqualTo(235));
             Assert.That(config.CaptureDeveloperValues().Skip(228).Take(8), Is.EqualTo(new[] { 1f, 1f, 7f, 18f, 30f, 1f, 3f, 2f }));
@@ -26,7 +26,7 @@ namespace C6Lab.Tests
             Assert.That(LabConfig.DeveloperFields[228].IsToggle, Is.True);
             Assert.That(LabConfig.DeveloperFields[234].WholeNumber, Is.True);
             Assert.That(LabConfig.DeveloperCategories.Single(category => category.Title == "지귀 120초 (Hapio 전용)")
-                .FieldIndices, Is.EqualTo(new[] { 228, 235 }.Concat(Enumerable.Range(240, 17)).Except(new[] { 246, 247 })));
+                .FieldIndices, Is.EqualTo(new[] { 228, 235 }.Concat(Enumerable.Range(240, 17)).Except(new[] { 241, 242, 244, 245, 246, 247, 251, 252, 253, 254, 255 })));
         }
 
         [Test]

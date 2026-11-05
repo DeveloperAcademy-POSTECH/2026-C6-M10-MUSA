@@ -400,6 +400,7 @@ namespace C6Lab
         {
             orb = null;
             if (!BeginRequest(sender, requestId, now, out reason)) return false;
+            if (JigwiBoardOnFire(now)) return Reject("JIGWI_BOARD_FIRE", out reason); // #509 지귀 B 실패: 잠깐 북을 못 누름
             // Without a tapped drum, use the sender's earliest placed one (drums are never removed).
             LabOrbState drum = drumId == null
                 ? drums.Values.FirstOrDefault(candidate => candidate.owner == sender)
@@ -631,7 +632,7 @@ namespace C6Lab
         /// value even after the diagnostic HP reaches zero.
         /// </summary>
         public bool ConfirmHit(string id, double now, Vector3 paintDirection,
-            out LabOrbElement element, out int actualDamage, out int impactValue)
+            out LabOrbElement element, out int actualDamage, out int impactValue, float paintImpactStrength = .5f)
         {
             element = LabOrbElement.None;
             actualDamage = 0;
@@ -639,14 +640,13 @@ namespace C6Lab
             if (!TryAdvance(now, out _) || phase != LabPhase.Playing
                 || !orbs.TryGetValue(id ?? string.Empty, out var orb) || !orb.inFlight
                 || !players.TryGetValue(orb.owner, out var attacker)) return false;
-            // One remaining local ignition keeps the entire B curtain closed. A bypassed
-            // physics contact is consumed here before any normal boss paint/reward/statistic.
+            // #509 지귀 B: a picked player's Water on the boss counts toward the simultaneous hit.
+            RecordJigwiBossSyncHit(orb, now, paintDirection);
             if (TryBlockJigwiABBossHit(orb, now)) return false;
             if (ConsumeJigwiABSupplyBossHit(orb, now)) return false;
             element = orb.element;
             if (element >= LabOrbElement.Fire && element <= LabOrbElement.Earth)
                 TryExtinguishJigwiStageRoot(orb.owner, paintDirection, now, out _);
-            RecordJigwiABBossHit(orb, paintDirection, now);
             orbs.Remove(id);
             float areaScale = LaunchScaleOf(id);
             launchScales.Remove(id);
@@ -669,14 +669,14 @@ namespace C6Lab
             else
             {
                 float share = Mathf.Min(3f, (orb.small ? rules.SmallOrbPaintShare : 1f) * areaScale
-                    * (orb.jigwiABReward ? orb.jigwiABRewardPaintScale : 1f));
+                    * (orb.jigwiABReward || orb.jigwiTalismanReward ? orb.jigwiABRewardPaintScale : 1f));
                 // 오색구슬 (#329): 다섯 원소 색 얼룩으로, 정해 둔 배율만큼 넓게 칠한다. 도색 한 번은 최대 3배다.
                 if (orb.fiveColor) share = Mathf.Min(3f, share * rules.FiveColorOrbPaintScale);
                 bool paints = orb.fiveColor || element >= LabOrbElement.Fire && element <= LabOrbElement.Earth;
                 bool painted = paints && (orb.fiveColor
-                    ? PaintFiveColors(paintDirection, attacker, share)
-                    : paintSurface.RegisterHit(paintDirection, PaintColorFor(element), attacker.id, attacker.seat + 1, share));
-                if (painted && paintSurface.IsComplete)
+                    ? PaintFiveColors(paintDirection, attacker, share, paintImpactStrength)
+                    : paintSurface.RegisterHit(paintDirection, PaintColorFor(element), attacker.id, attacker.seat + 1, share, paintImpactStrength));
+                if (painted && paintSurface.IsComplete && phase == LabPhase.Playing) // #509: B 물벼락이 먼저 이겼으면 한 번만
                 {
                     phase = LabPhase.Victory;
                     if (players.TryGetValue(paintSurface.LastPainter, out var painter)) painter.lastHit = true;
@@ -1273,7 +1273,9 @@ namespace C6Lab
             if (countThrow && string.IsNullOrEmpty(orb.jigwiABSupplyEventId) && phase == LabPhase.Playing
                 && players.TryGetValue(orb.owner, out var thrower)) thrower.throwTotal++;
             launchScales.Remove(id);
-            return orbs.Remove(id);
+            bool removed = orbs.Remove(id);
+            if (removed) FailJigwiSyncOnMiss(orb, now); // #509 지귀 B: 특수 물구슬이 빗나가면 그 B는 바로 실패
+            return removed;
         }
 
         private bool BlockOn(double now) => phase == LabPhase.Playing && swipeBlockedUntil > now && now >= swipeBlockStartedAt;
@@ -1449,7 +1451,7 @@ namespace C6Lab
                     foreach (var player in players.Values)
                     {
                         float refilled = Mathf.Min(rules.StaminaMax,
-                            (float)(player.stamina + (elapsed * JigwiABRecoveryMultiplier(player.id, lastTime)
+                            (float)(player.stamina + (elapsed * JigwiStageRecoveryMultiplier(lastTime)
                                 + feverRefill) * rules.StaminaRecoveryPerSecond));
                         // The tutorial (#477) may stop the refill at a ceiling (0 holds it). Nothing above it is taken
                         // away, and nothing held back is owed afterwards. Every other round refills exactly as before.

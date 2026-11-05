@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace C6Lab.Tests
 {
-    /// <summary>Existing fill/layout is kept while passive overlays reflect approved costs and A's real clock.</summary>
+    /// <summary>Existing fill/layout is kept while passive overlays reflect approved costs (#479 removed Jigwi A's fire).</summary>
     public sealed class LabStaminaFeedbackTests
     {
         private GameObject root;
@@ -57,7 +57,6 @@ namespace C6Lab.Tests
             Assert.That(saved, Is.Not.Null);
             Assert.That(saved.ConsumptionEnabled, Is.False, "The gauge glows only red, when stamina is short (#418).");
             Assert.That(saved.ShortEnabled, Is.True);
-            Assert.That(saved.PersonalFireEnabled, Is.True, "Jigwi A's recovery fire stays.");
         }
 
         [Test]
@@ -68,7 +67,7 @@ namespace C6Lab.Tests
             var fever = new GameObject("Existing Yaguang Fever Colour", typeof(RectTransform)).AddComponent<UnityEngine.UI.Image>();
             fever.transform.SetParent(fill.transform.parent, false); fever.color = Color.green;
             feedback.NotifySpent(20f);
-            feedback.Present(State(), 2, 2d, false, 0f, 4f);
+            feedback.Present(State(), 2, 2d, false, 0f);
             Assert.That(feedback.PulseVisible, Is.True);
             Assert.That(feedback.ConsumptionPulseCount, Is.EqualTo(1));
             Assert.That(feedback.ConsumptionImage.fillAmount, Is.EqualTo(.5f + 20f / 120f).Within(.00001f));
@@ -86,66 +85,33 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void TheLastCostStillFlashesAndHeldClockFreezesBothThePulseAndAFlames()
+        public void TheLastCostStillFlashesAndHeldClockFreezesThePulse()
         {
             fill.fillAmount = 0f;
             feedback.NotifySpent(20f);
             LabSnapshot snapshot = State(true);
-            feedback.Present(snapshot, 2, 5.1d, false, .05f, 4f);
+            feedback.Present(snapshot, 2, 5.1d, false, .05f);
             Assert.That(feedback.PulseVisible, Is.True, "20→0 must remain visible as a short spent-coverage afterimage.");
             Assert.That(feedback.PulseFillFraction, Is.EqualTo(1f / 6f).Within(.00001f));
             Assert.That(fill.fillAmount, Is.Zero, "The afterimage does not restore actual stamina.");
-            float opacity = feedback.PulseAlpha, animation = feedback.FireAnimationSeconds;
-            feedback.Present(snapshot, 2, 5.1d, true, 1f, 4f);
+            float opacity = feedback.PulseAlpha;
+            feedback.Present(snapshot, 2, 5.1d, true, 1f);
             Assert.That(feedback.PulseAlpha, Is.EqualTo(opacity));
-            Assert.That(feedback.FireAnimationSeconds, Is.EqualTo(animation));
-            feedback.Present(snapshot, 2, 5.4d, false, .2f, 4f);
+            feedback.Present(snapshot, 2, 5.4d, false, .2f);
             Assert.That(feedback.PulseVisible, Is.False);
-            Assert.That(feedback.FireVisible, Is.True);
             feedback.NotifySpent(0f); feedback.NotifySpent(float.NaN);
             Assert.That(feedback.ConsumptionPulseCount, Is.EqualTo(1));
         }
 
         [Test]
-        public void OnlyTheActiveATargetGetsIgnitionAndItsFireCoverageFollowsTheRealFill()
+        public void AnActiveJigwiAShowsNoStaminaFireOrRecoveryLabel()
         {
-            var snapshot = State(true);
-            feedback.Present(snapshot, 3, 5.1d, false, .2f, 4f);
-            Assert.That(feedback.FireVisible, Is.False);
-            feedback.Present(snapshot, 2, 4.5d, false, .2f, 4f);
-            Assert.That(feedback.FireVisible, Is.False, "The one-second warning must not impersonate active 4x recovery.");
-            feedback.Present(snapshot, 2, 5.1d, false, .2f, 4f);
-            Assert.That(feedback.FireVisible, Is.True);
-            Assert.That(feedback.FireFillFraction, Is.GreaterThan(0f).And.LessThan(fill.fillAmount));
-            feedback.Present(snapshot, 2, 5.4d, false, .3f, 4f);
-            Assert.That(feedback.FireFillFraction, Is.EqualTo(.5f).Within(.00001f));
-            Assert.That(feedback.MultiplierLabel.text, Does.Contain("4"));
-            fill.fillAmount = 1f;
-            feedback.Present(snapshot, 2, 6d, false, .2f, 4f);
-            Assert.That(feedback.FireFillFraction, Is.EqualTo(1f));
-            Assert.That(feedback.FireVisible, Is.True, "Full stamina still communicates the active A buff.");
-            snapshot.jigwiAB.rounds[0].resolution = LabJigwiABResolution.Completed;
-            feedback.Present(snapshot, 2, 6d, false, .1f, 4f);
-            Assert.That(feedback.FireVisible, Is.False);
-            Assert.That(feedback.MultiplierLabel.gameObject.activeSelf, Is.False);
-        }
-
-        [Test]
-        public void FirstObservationOfAnAlreadyActiveHeldAStartsAtItsExistingIgnitionPhase()
-        {
+            // #479 retired A's recovery boost, so the stamina window no longer burns during A.
             LabSnapshot snapshot = State(true);
-            feedback.Present(snapshot, 2, 11.2d, true, 0f, 4f);
-            Assert.That(feedback.FireVisible, Is.True);
-            Assert.That(feedback.FireAnimationSeconds, Is.EqualTo(6.2f).Within(.00001f));
-            Assert.That(feedback.FireFillFraction, Is.EqualTo(fill.fillAmount).Within(.00001f),
-                "A late paused snapshot must render its existing full fire coverage immediately.");
-            float animation = feedback.FireAnimationSeconds;
-            feedback.Present(snapshot, 2, 11.2d, true, 2f, 4f);
-            Assert.That(feedback.FireAnimationSeconds, Is.EqualTo(animation));
-            Assert.That(feedback.FireFillFraction, Is.EqualTo(fill.fillAmount).Within(.00001f));
-            feedback.Present(snapshot, 2, 11.3d, false, .1f, 4f);
-            Assert.That(feedback.FireAnimationSeconds, Is.EqualTo(animation + .1f).Within(.00001f));
-            Assert.That(feedback.PulseVisible, Is.False, "Receiving an existing A state is not a new stamina spend.");
+            feedback.Present(snapshot, 2, 11.2d, false, .2f);
+            Assert.That(feedback.PulseVisible, Is.False);
+            Assert.That(feedback.EffectRoot.gameObject.activeSelf, Is.False);
+            Assert.That(feedback.EffectRoot.GetComponentsInChildren<UnityEngine.UI.Text>(true), Is.Empty);
         }
 
         [TestCase(false)]
@@ -158,7 +124,7 @@ namespace C6Lab.Tests
                 System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
             LabSnapshot oldRound = State();
             latest.SetValue(network, oldRound);
-            feedback.Present(oldRound, 2, 2d, false, 0f, 4f);
+            feedback.Present(oldRound, 2, 2d, false, 0f);
 
             LabSnapshot nextRound = State();
             if (newSession) nextRound.sessionId = "new-stamina-session";
@@ -166,7 +132,7 @@ namespace C6Lab.Tests
             latest.SetValue(network, nextRound);
             // Accepted generation arrives before the new round's first LateUpdate.
             feedback.NotifySpent(20f);
-            feedback.Present(nextRound, 2, 0d, false, 0f, 4f);
+            feedback.Present(nextRound, 2, 0d, false, 0f);
 
             Assert.That(feedback.ConsumptionPulseCount, Is.EqualTo(1));
             Assert.That(feedback.PulseVisible, Is.True,
@@ -181,21 +147,19 @@ namespace C6Lab.Tests
             var snapshot = State();
             snapshot.orbs = new[] { new LabOrbState { id = "free-water", owner = 2,
                 kind = LabOrbKind.Combined, element = LabOrbElement.Water, jigwiSupply = true } };
-            feedback.Present(snapshot, 2, 25d, false, .02f, 4f);
+            feedback.Present(snapshot, 2, 25d, false, .02f);
             Assert.That(feedback.PulseVisible, Is.False);
             Assert.That(feedback.ConsumptionPulseCount, Is.Zero);
             feedback.NotifySpent(20f);
-            feedback.Present(snapshot, 2, 25d, false, 0f, 4f);
+            feedback.Present(snapshot, 2, 25d, false, 0f);
             Assert.That(feedback.PulseVisible, Is.True);
             snapshot.round++;
-            feedback.Present(snapshot, 2, 0d, false, 0f, 4f);
-            Assert.That(feedback.PulseVisible, Is.False, "A new round cannot inherit an old spend or fire.");
-            snapshot = State(true);
-            feedback.Present(snapshot, 2, 6d, false, .4f, 4f);
-            Assert.That(feedback.FireVisible, Is.True);
+            feedback.Present(snapshot, 2, 0d, false, 0f);
+            Assert.That(feedback.PulseVisible, Is.False, "A new round cannot inherit an old spend.");
+            feedback.NotifySpent(20f);
             snapshot.phase = LabPhase.Victory;
-            feedback.Present(snapshot, 2, 6d, false, .1f, 4f);
-            Assert.That(feedback.FireVisible, Is.False); Assert.That(feedback.PulseVisible, Is.False);
+            feedback.Present(snapshot, 2, 6d, false, .1f);
+            Assert.That(feedback.PulseVisible, Is.False);
             Assert.That(feedback.EffectRoot.gameObject.activeSelf, Is.False);
             Assert.That(fill.gameObject.activeSelf, Is.True);
         }
@@ -207,7 +171,7 @@ namespace C6Lab.Tests
             jigwiAB = new LabJigwiABSnapshot { enabled = personal, startedAt = personal ? 0d : -1d,
                 cutoffAt = personal ? 100d : -1d, rounds = personal ? new[] {
                     new LabJigwiABRound { id = "jigwi-ab/stamina-ui/1/0", kind = LabJigwiABKind.PersonalBurn,
-                        targetPlayer = 2, warningAt = 4d, activeAt = 5d, endsAt = 20d }
+                        warningAt = 4d, activeAt = 5d, endsAt = 20d }
                 } : System.Array.Empty<LabJigwiABRound>() }
         };
     }

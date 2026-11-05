@@ -252,13 +252,19 @@ namespace C6Lab
         // 5682: #428 lean packet envelope (bodies in a JSON payload string, no default nested objects); immediate
         //       board publishes skip peers whose delta is empty.
         // 5683: #461 paint frame bodies may be deflate-compressed (LabPaintFrame.encoding).
-        internal const ushort LabProtocolVersion = 5683;
+        // 5685: #466 approved opaque paper contour, data pack and pinned presentation mode.
+        // #506: clay appearance, live DEV fields and impact density hints.
+        // 5687: #479 Jigwi A talisman: A carries every seat's talismanAt (no target/hit count), the
+        //       "jigwiTalisman" request and the talisman water orb flag (5684~5686 were taken on main).
+        // 5688: #509 Jigwi B lists only the picked seats, lasts 15 s and is judged by simultaneous Water boss hits;
+        //       success splashes the boss, failure sets every board on fire (boardFireUntil). A2 starts at 42 s.
+        internal const ushort LabProtocolVersion = 5688;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Double-tap a blue fox orb to clear it, and keep your Yin and Yang away.";
         /// <summary>More fox orbs than one fox fire ever drops; a longer list is ignored (#251).</summary>
         private const int MaximumFoxFireOrbs = 10;
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/44");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/49");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;
@@ -1039,7 +1045,9 @@ namespace C6Lab
             double beginAt = Time.realtimeSinceStartupAsDouble;
             model.Begin(sessionId, playersInPOrder, beginAt, config,
                 stageYokai: gameFlowEnabled ? gameStageYokai : LabStageYokai.None);
+            BeginPaintArt();
             if (GameStartHeld) battleClock.Pause(beginAt);
+            model.PaintSurface?.PreloadPatternMask();
             SampleHostPaintFlow(battleClock.Now(Time.realtimeSinceStartupAsDouble));
             impactReceipts.SetActive(sessionId, model.Round);
             SetNotice(string.Empty);
@@ -1125,7 +1133,9 @@ namespace C6Lab
             if (tutorialSeats) BeginTutorialModel(beginAt);
             else model.BeginSolo(sessionId, LocalPlayerId, beginAt, config,
                 stageYokai: gameFlowEnabled ? gameStageYokai : LabStageYokai.None);
+            BeginPaintArt();
             if (GameStartHeld) battleClock.Pause(beginAt);
+            model.PaintSurface?.PreloadPatternMask();
             SampleHostPaintFlow(battleClock.Now(Time.realtimeSinceStartupAsDouble));
             impactReceipts.SetActive(sessionId, model.Round);
             SetNotice(string.Empty);
@@ -1397,6 +1407,7 @@ namespace C6Lab
                 FlushPendingBlastReports(now);
                 FlushBoardActions(now);
             }
+            TickPaintArt(now);
             FlushBulkPackets();
             if (!IsHost && latest != null) ExpirePresentedHits(BattlePresentationTime);
             if (!IsHost && (pendingPaintSnapshot != null || PartialPaintStalled(now))
@@ -1701,6 +1712,7 @@ namespace C6Lab
             // many reliable fragments per peer until the network becomes unusable.
             nextSnapshotAt = now + ((latest.orbs?.Length ?? 0) > 100 ? .5d : .1d);
             // Commit the Host's view and counts from the very same authoritative map version.
+            CommitPaintArt(latest);
             CopyPaintToDisplay(model.PaintSurface, latest);
             if (target != null) target.GetComponent<LabGourdPaint>()?.RefreshCommittedMap();
             ApplyLocalPause(latest.paused);
@@ -1940,6 +1952,13 @@ namespace C6Lab
                 if (model.TryFlashFiveColorBonus(sender, packet.flashGeneration, now, out _)) PublishSnapshot(true);
                 return;
             }
+            if (packet.type == JigwiTalismanPacket)
+            {
+                // #479 지귀 부적: "물"을 다 쓴 사람의 불만 끄고 물 구슬을 준다. 한 회차에 한 사람 한 번.
+                if (battleClock.IsPaused || packet.requestId < 1) return;
+                if (model.TryCompleteJigwiTalisman(sender, packet.firstId, now)) PublishSnapshot(true);
+                return;
+            }
             if (packet.type == FlashShakePacket)
             {
                 // 야광귀 섬광 (#301): 폰을 다 흔든 사람의 눈부심만 푼다. 눈부시지 않으면 무시한다.
@@ -1996,6 +2015,7 @@ namespace C6Lab
             SyncJigwiFireSurfaces();
             projectile.SetFireSurfaces(JigwiFireSurfacesFor(orb.owner));
             projectile.Launch(orb.id, orb.owner, velocity, config, target, OnProjectileResolved);
+            RememberReplayLaunch(orb, projectile, model != null ? model.LaunchScaleOf(orb.id) : 1f);
             var notice = new LabNetworkPacket { type = "projectile", sessionId = sessionId,
                 round = model.Round, requestId = actionId,
                 firstId = orb.id, owner = orb.owner, element = (int)orb.element, small = orb.small, fiveColor = orb.fiveColor,
@@ -2052,7 +2072,8 @@ namespace C6Lab
                 // 던질 때 정해진 공 크기 (#398 작은 공 타격음). ConfirmHit이 지우기 전에 읽는다.
                 float launchScale = model.LaunchScaleOf(result.ProjectileId);
                 bool approvedHit = model.ConfirmHit(result.ProjectileId, now, paintDirection,
-                    out var element, out int actualDamage, out int impactValue);
+                    out var element, out int actualDamage, out int impactValue,
+                    LabPaintImpact.Normalize(result.ImpactVelocity, result.HitNormal));
                 blockedByCurtain = !approvedHit && model.JigwiABBlocksBoss(result.OwnerPlayerId, now);
                 if (blockedByCurtain) SetNotice("불장막에 막힘 · 불씨를 모두 꺼주세요.");
                 if (approvedHit && target != null)
@@ -2075,6 +2096,8 @@ namespace C6Lab
                             result.ImpactVelocity, false);
                     }
                     bool fiveColor = model.LastHitFiveColor;
+                    // The final-hit replay only shows a hit that painted (never a blocked or element-less one).
+                    if (!paintBlocked && (element != LabOrbElement.None || fiveColor)) RememberReplayHit(result);
                     if (fiveColor && !paintBlocked) PresentFiveColorHit(targetLocalPoint, result.OwnerPlayerId);
                     if (!paintBlocked && result.OwnerPlayerId == LocalPlayerId)
                     {
@@ -2146,6 +2169,7 @@ namespace C6Lab
                 current.Add(orb.id);
                 if (board.IsSnapshotSuppressed(orb.id)) continue;
                 bool showSpawn = ShowsDrumSpawn(orb, LocalPlayerId);
+                if (orb.jigwiTalismanReward && latest.serverTime - orb.createdAt < .5d) board.ExpectDrop(orb.id); // #509 부적 물구슬은 위에서 하나씩 떨어짐
                 // Every screen derives a locked bomb's fuse from the shared Host clock in the snapshot.
                 float fuse = orb.kind == LabOrbKind.Bomb && orb.lockSwipes > 0 && config != null
                     ? Mathf.Max(0f, (float)(orb.createdAt + config.ItemLifetimeSeconds - latest.serverTime)) : -1f;
@@ -2166,7 +2190,8 @@ namespace C6Lab
                     // An unlocked bomb (#328) glides in to the Host's spot like a drum, then opens there.
                     arrival: orb.kind == LabOrbKind.Bomb && orb.JustArrived(latest.serverTime) ? orb.arrival : LabDrumArrival.None,
                     stopAt: orb.stopAt);
-                view?.SetJigwiSupplyWaterArt(!string.IsNullOrEmpty(orb.jigwiABSupplyEventId), latest.paused || GameStartHeld);
+                view?.SetJigwiSupplyWaterArt(!string.IsNullOrEmpty(orb.jigwiABSupplyEventId) || orb.jigwiTalismanReward,
+                    latest.paused || GameStartHeld, special: !string.IsNullOrEmpty(orb.jigwiABSupplyEventId)); // #509 특수 물구슬
             }
             foreach (var drum in latest.drums ?? Array.Empty<LabOrbState>())
             {
@@ -2289,6 +2314,8 @@ namespace C6Lab
                     }
                     return;
                 }
+                if (packet.type == "paint_art_ack")
+                { ReceivePaintArtReceipt(sender, packet); return; }
                 if (packet.type == "paint_resync")
                 {
                     if (model != null && packet.sessionId == sessionId && packet.round == model.Round
@@ -2310,6 +2337,12 @@ namespace C6Lab
             if (sender != NetworkManager.ServerClientId) return;
             switch (packet.type)
             {
+                case "clay_appearance":
+                    ReceiveClayAppearance(packet);
+                    break;
+                case "paint_art_error":
+                    ReceivePaintArtError(packet);
+                    break;
                 case "action_retry":
                     ReceiveActionRetry(packet);
                     break;
@@ -2738,6 +2771,7 @@ namespace C6Lab
 
         private void ResetPaintTransport()
         {
+            ResetPaintArt();
             peerPaintPublishers.Clear();
             paintPublishCache.Clear();
             peerSharedRounds.Clear();

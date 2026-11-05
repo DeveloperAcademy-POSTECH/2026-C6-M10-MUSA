@@ -142,6 +142,7 @@ namespace C6Lab
         {
             if (!CanOpen) return;
             Fill(network.IsConnected && network.config != null ? network.config : runtimeConfig);
+            FillCurrentClayPreview();
             if (targetParticipantsSlider != null)
                 targetParticipantsSlider.SetValueWithoutNotify(network.TargetParticipantCount);
             RefreshTargetLabel();
@@ -166,6 +167,7 @@ namespace C6Lab
         {
             if (!available || !HasTuningAuthority) return;
             Fill(sourceConfig);
+            PreviewClayFromForm();
             // Fill suppresses input callbacks; update the visible toggle state in this
             // button action rather than leaving the previous label until the next frame.
             RefreshToggles();
@@ -589,6 +591,7 @@ namespace C6Lab
             LabDeveloperField field = LabConfig.DeveloperFields[index];
             if (float.IsNaN(value) || float.IsInfinity(value) || value < field.Min || value > field.Max) return;
             valueSliders[index].SetValueWithoutNotify(LabDeveloperSliderScale.Normalize(field, defaultValues[index], value));
+            if (LabConfig.IsClayPresentationField(index)) PreviewClayFromForm();
             if (index == 111 || index == PaintPatternField || index == PaintDryingField) RefreshToggles();
         }
 
@@ -598,7 +601,35 @@ namespace C6Lab
             float value = LabDeveloperSliderScale.Denormalize(field, defaultValues[index], position);
             if (field.WholeNumber) value = Mathf.Round(value);
             valueInputs[index].SetTextWithoutNotify(value.ToString("0.######", CultureInfo.InvariantCulture));
+            if (LabConfig.IsClayPresentationField(index)) PreviewClayFromForm();
             if (index == 111 || index == PaintPatternField || index == PaintDryingField) RefreshToggles();
+        }
+
+        private void FillCurrentClayPreview()
+        {
+            if (network == null || !network.CanPreviewClayAppearance || valueInputs == null
+                || valueInputs.Length <= LabConfig.ClayGlossField) return;
+            int[] indices = { LabConfig.ClayThicknessField, LabConfig.ClayGlossField };
+            float[] values = { network.ClayThickness, network.ClayGloss };
+            for (int j = 0; j < indices.Length; j++)
+            {
+                int i = indices[j];
+                valueInputs[i].SetTextWithoutNotify(values[j].ToString("0.######", CultureInfo.InvariantCulture));
+                valueSliders[i].SetValueWithoutNotify(LabDeveloperSliderScale.Normalize(LabConfig.DeveloperFields[i], defaultValues[i], values[j]));
+            }
+        }
+
+        private void PreviewClayFromForm()
+        {
+            if (network == null || !network.CanPreviewClayAppearance || valueInputs == null
+                || valueInputs.Length <= LabConfig.ClayGlossField || runtimeConfig == null) return;
+            if (!TryParse(valueInputs[LabConfig.ClayThicknessField].text, out float thickness)
+                || !TryParse(valueInputs[LabConfig.ClayGlossField].text, out float gloss)
+                || !LabConfig.ValidClayAppearance(thickness, gloss)) return;
+            if (!network.TryPreviewClayAppearance(thickness, gloss)) return;
+            // Accepted config stays untouched, even when Developer Solo uses runtimeConfig
+            // directly. Reopening reads the live override; explicit APPLY reads this form.
+            SetFeedback("Clay thickness/gloss preview is shared immediately. Other settings still require APPLY.");
         }
 
         // 0/1 항목(켜기/끄기, 박 모드)은 숫자 입력칸·슬라이더 대신 누를 때마다 바뀌는 버튼으로 보여준다.

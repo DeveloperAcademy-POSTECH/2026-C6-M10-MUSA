@@ -383,5 +383,24 @@ namespace Hapio.Tests
             Assert.That(flow.MarkSynchronizing(load.runId, 1, load.revision, new string('b', 129), 1), Is.False);
             Assert.That(GameFlowSnapshot.IsValid(flow.State, out _), Is.True);
         }
+
+        [Test]
+        public void DeveloperStartAtOnlyMovesAFreshlyLoadingRunWithinItsStages()
+        {
+            // #479 지귀 실험실: 에디터 SOLO가 3스테이지부터 시작할 수 있고, 1이면 아무것도 바꾸지 않는다.
+            var flow = new GameRunFlow();
+            Assert.That(flow.EnterLobby(), Is.True);
+            Assert.That(flow.DeveloperStartAt(3), Is.False, "Only a run that is already loading can move.");
+            Assert.That(flow.BeginRun(new ulong[] { 0 }), Is.True);
+            int total = flow.State.totalStages;
+            Assert.That(flow.DeveloperStartAt(1), Is.False);
+            Assert.That(flow.DeveloperStartAt(total + 1), Is.False);
+            Assert.That(flow.State.stageIndex, Is.EqualTo(1));
+            Assert.That(flow.DeveloperStartAt(3), Is.True);
+            Assert.That(flow.State.stageIndex, Is.EqualTo(3));
+            Assert.That(flow.State.phase, Is.EqualTo(GameFlowPhase.LoadingBattle));
+            Assert.That(flow.DeveloperStartAt(2), Is.False, "It moves only once, from stage 1.");
+            Assert.That(GameFlowSnapshot.IsValid(flow.State, out _), Is.True);
+        }
     }
 }

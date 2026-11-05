@@ -93,7 +93,7 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void SavedPresentationPlaysOnlyOwnVisibleBAndStopsForAAllClearAndStageExit()
+        public void SavedPresentationKeepsTheFireLoopSilentDuringTheNewB()
         {
             config = Object.Instantiate(Resources.Load<LabConfig>("LabConfig"));
             var passive = new GameObject("Passive B replica"); passive.transform.SetParent(root.transform, false);
@@ -113,27 +113,20 @@ namespace C6Lab.Tests
             var group = new LabJigwiABRound { id = "scene/B", kind = LabJigwiABKind.GroupFire,
                 warningAt = 1d, activeAt = 2d, endsAt = 30d, targetRadius = .3f,
                 players = new[] { new LabJigwiABPlayerFire { playerId = 42,
-                    targets = Enumerable.Range(0, 3).Select(i => new LabJigwiABFireTarget { id = "point/" + i, lit = true, x = .3f + i * .2f, y = .6f }).ToArray() } } };
+                    // #509: one pillar per picked seat.
+                    targets = new[] { new LabJigwiABFireTarget { id = "point/0", lit = true, x = .5f, y = .62f } } } } };
             var state = new LabSnapshot { sessionId = "audio-session", round = 1, phase = LabPhase.Playing, serverTime = 1.2d,
                 players = new[] { new LabPlayerState { id = 42, seat = 0 } },
                 jigwiAB = new LabJigwiABSnapshot { enabled = true, startedAt = 0d, cutoffAt = 100d, rounds = new[] { group } } };
             typeof(LabNetwork).GetField("latest", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(network, state);
             Canvas.ForceUpdateCanvases(); view.ApplySnapshot(state, 42, 1.2d);
             Assert.That(view.GroupCurtainVisible, Is.False); Assert.That(view.audioView.WantsLoop, Is.False);
-            Assert.That(view.audioView.PlaybackStartCount, Is.Zero, "A warning must not start the active fire loop.");
+            Assert.That(view.audioView.PlaybackStartCount, Is.Zero, "A warning must not start the fire loop.");
+            // #509: B shows no fire on screen any more, so its saved fire loop stays silent through the mission.
             state.serverTime = 2.2d; view.ApplySnapshot(state, 42, 2.2d);
-            Assert.That(view.GroupCurtainVisible, Is.True); Assert.That(view.audioView.WantsLoop, Is.True);
-            Assert.That(view.audioView.PlaybackStartCount, Is.EqualTo(1));
-            foreach (var point in group.players[0].targets) point.lit = false;
-            view.ApplySnapshot(state, 42, 2.3d);
-            Assert.That(view.audioView.WantsLoop, Is.False);
-            group.players[0].targets[1].lit = true; view.ApplySnapshot(state, 42, 2.4d);
-            Assert.That(view.audioView.PlaybackStartCount, Is.EqualTo(2));
-            view.ApplySnapshot(state, 99, 2.5d); Assert.That(view.audioView.WantsLoop, Is.False, "An absent local owner cannot play another player's fire.");
-            group.kind = LabJigwiABKind.PersonalBurn; group.targetPlayer = 42;
-            view.ApplySnapshot(state, 42, 2.6d); Assert.That(view.audioView.WantsLoop, Is.False);
-            group.kind = LabJigwiABKind.GroupFire; view.ApplySnapshot(state, 42, 2.7d);
-            Assert.That(view.audioView.WantsLoop, Is.True);
+            Assert.That(view.GroupCurtainVisible, Is.False); Assert.That(view.audioView.WantsLoop, Is.False);
+            Assert.That(view.audioView.PlaybackStartCount, Is.Zero);
+            view.ApplySnapshot(state, 99, 2.5d); Assert.That(view.audioView.WantsLoop, Is.False);
             state.phase = LabPhase.Victory; view.ApplySnapshot(state, 42, 2.8d);
             Assert.That(view.audioView.WantsLoop, Is.False);
         }

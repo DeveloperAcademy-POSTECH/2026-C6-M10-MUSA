@@ -15,6 +15,8 @@ namespace C6Lab
         public readonly LabProjectileHitKind Kind;
         public readonly string FireId, FireTargetId;
         public readonly Vector3 ImpactVelocity;
+        /// <summary>Physics surface normal captured with the chosen contact, for appearance only.</summary>
+        public readonly Vector3 HitNormal;
         public readonly Vector3 HitPoint;
         public readonly float FlightSeconds;
         public readonly float PeakRise;
@@ -22,13 +24,13 @@ namespace C6Lab
         public string Id => ProjectileId;
 
         public LabProjectileResult(string projectileId, ulong ownerPlayerId, bool hit,
-            Vector3 hitPoint, float flightSeconds, float peakRise, float horizontalDistance, Vector3 impactVelocity = default)
+            Vector3 hitPoint, float flightSeconds, float peakRise, float horizontalDistance, Vector3 impactVelocity = default, Vector3 hitNormal = default)
             : this(projectileId, ownerPlayerId, hit ? LabProjectileHitKind.Monster : LabProjectileHitKind.Miss,
-                hitPoint, flightSeconds, peakRise, horizontalDistance, impactVelocity) { }
+                hitPoint, flightSeconds, peakRise, horizontalDistance, impactVelocity, hitNormal: hitNormal) { }
 
         public LabProjectileResult(string projectileId, ulong ownerPlayerId, LabProjectileHitKind kind,
             Vector3 hitPoint, float flightSeconds, float peakRise, float horizontalDistance,
-            Vector3 impactVelocity = default, string fireId = null, string fireTargetId = null)
+            Vector3 impactVelocity = default, string fireId = null, string fireTargetId = null, Vector3 hitNormal = default)
         {
             ProjectileId = projectileId;
             OwnerPlayerId = ownerPlayerId;
@@ -37,6 +39,7 @@ namespace C6Lab
             FireId = kind == LabProjectileHitKind.Fire ? fireId : null;
             FireTargetId = kind == LabProjectileHitKind.Fire ? fireTargetId : null;
             ImpactVelocity = impactVelocity;
+            HitNormal = hitNormal;
             HitPoint = hitPoint;
             FlightSeconds = flightSeconds;
             PeakRise = peakRise;
@@ -109,6 +112,7 @@ namespace C6Lab
             public LabJigwiFireSurface Fire;
             public float Distance;
             public Vector3 Point;
+            public Vector3 Normal;
         }
         private Vector3 incomingVelocity;
         private float launchedGravity, launchedLifetime;
@@ -123,6 +127,8 @@ namespace C6Lab
         private bool jigwiABReward;
         private bool authoritative;
         private bool resolved;
+        // The final-hit replay's ghost: same look, no physics, moved by its presenter. It never launches or resolves.
+        private bool puppet;
 
         public string ProjectileId => projectileId;
         public ulong OwnerPlayerId => ownerPlayerId;
@@ -250,6 +256,7 @@ namespace C6Lab
             LabOrbElement element = LabOrbElement.None, float sizeScale = 1f)
         {
             if (config == null) throw new ArgumentNullException(nameof(config));
+            LabFirstUse.Note(LabFirstUseKind.Projectile);
             GameObject root = new GameObject("Throw Projectile");
             if (parent != null) root.transform.SetParent(parent, false);
             root.transform.position = position;
@@ -329,6 +336,43 @@ namespace C6Lab
             body = GetComponent<Rigidbody>();
             sphere = GetComponent<SphereCollider>();
         }
+
+        /// <summary>
+        /// Presentation-only flight look for the final-hit replay: the orb, colour, ink trail and B reward fire of a real
+        /// shot, with a kinematic body that detects nothing. The caller moves the transform and ends it with
+        /// <see cref="EndPuppet"/>. It never launches, never reports contact and never resolves.
+        /// </summary>
+        internal void BeginPuppet(LabConfig tuning, bool jigwiReward)
+        {
+            if (launched || puppet || resolved || tuning == null) return;
+            config = tuning;
+            if (body == null) body = GetComponent<Rigidbody>();
+            if (sphere == null) sphere = GetComponent<SphereCollider>();
+            body.isKinematic = true;
+            body.useGravity = false;
+            body.detectCollisions = false;
+            body.interpolation = RigidbodyInterpolation.None;
+            sphere.enabled = false;
+            puppet = true;
+            ConfigureAppearance(tuning.OrbAppearance);
+            EnsureDefaultVisual(ScaledRadius);
+            EnsureFlightTrail(ScaledRadius);
+            if (elementFlightTrail != null) elementFlightTrail.Begin(transform, ScaledTrailProfile());
+            if (flightTrail != null) { flightTrail.Clear(); flightTrail.emitting = true; }
+            jigwiABReward = jigwiReward;
+            ConfigureJigwiRewardFireTrail();
+        }
+
+        /// <summary>The ghost reached the gourd: leave its trails fading, like a real contact, and remove it.</summary>
+        internal void EndPuppet()
+        {
+            if (!puppet || resolved) return;
+            resolved = true;
+            LeaveFadingTrail();
+            Destroy(gameObject);
+        }
+
+        internal bool IsPuppet => puppet;
 
         private void Prepare(Vector3 velocity, LabConfig tuning, bool visualOnly)
         {
@@ -431,10 +475,10 @@ namespace C6Lab
         {
             ResolutionSurface nearest = FindResolutionSurface(collision);
             if (!nearest.Found) return;
-            if (authoritative) Resolve(nearest.Kind, nearest.Point, nearest.Fire);
+            if (authoritative) Resolve(nearest.Kind, nearest.Point, nearest.Fire, nearest.Normal);
             else
             {
-                ReportVisualContact(nearest.Kind, nearest.Point, nearest.Fire);
+                ReportVisualContact(nearest.Kind, nearest.Point, nearest.Fire, nearest.Normal);
                 FinishVisual();
             }
         }
@@ -474,7 +518,7 @@ namespace C6Lab
                 {
                     ContactPoint contact = collision.GetContact(i);
                     if (contact.separation <= ActualContactTolerance)
-                        ConsiderSurface(collision.collider, contact.point, distance, ref nearest);
+                        ConsiderSurface(collision.collider, contact.point, distance, ref nearest, contact.normal);
                     else if (contact.separation <= skin + ActualContactTolerance)
                     {
                         ConsiderSweep(displacement, radius + skin, ref nearest, collision.collider);
@@ -503,7 +547,7 @@ namespace C6Lab
                 // An initial-overlap cast has no surface point (Unity returns point zero).
                 // Penetration and contact-normal rays supply genuine surface points instead.
                 if (hits[i].distance == 0f && hits[i].point == Vector3.zero) continue;
-                ConsiderSurface(hits[i].collider, hits[i].point, hits[i].distance, ref nearest);
+                ConsiderSurface(hits[i].collider, hits[i].point, hits[i].distance, ref nearest, hits[i].normal);
             }
         }
 
@@ -511,7 +555,7 @@ namespace C6Lab
             float reach, float distance, ref ResolutionSurface nearest)
         {
             if (collider.Raycast(new Ray(center, direction), out RaycastHit hit, reach))
-                ConsiderSurface(collider, hit.point, distance, ref nearest);
+                ConsiderSurface(collider, hit.point, distance, ref nearest, hit.normal);
         }
 
         private void ConsiderOverlap(SurfacePose surface, Vector3 center, float distance,
@@ -522,11 +566,11 @@ namespace C6Lab
                 surface.Collider, surface.Position, surface.Rotation, out Vector3 direction, out float depth)) return;
             // Move the sphere out, then step back one radius to its point on the surface.
             Vector3 point = center + direction * (depth - radius);
-            ConsiderSurface(surface.Collider, point, distance, ref nearest);
+            ConsiderSurface(surface.Collider, point, distance, ref nearest, direction);
         }
 
         private void ConsiderSurface(Collider collider, Vector3 point, float distance,
-            ref ResolutionSurface nearest)
+            ref ResolutionSurface nearest, Vector3 normal = default)
         {
             LabJigwiFireSurface fire = FireFor(collider);
             LabProjectileHitKind kind = fire != null ? LabProjectileHitKind.Fire
@@ -544,6 +588,7 @@ namespace C6Lab
             nearest.Kind = kind;
             nearest.Fire = fire;
             nearest.Point = point;
+            nearest.Normal = normal;
             nearest.Distance = distance;
         }
 
@@ -581,7 +626,7 @@ namespace C6Lab
                 if (fireSurfaces[i] != null) previousFirePoses.Add(new SurfacePose(fireSurfaces[i].Hitbox));
         }
 
-        private void ReportVisualContact(LabProjectileHitKind kind, Vector3 point, LabJigwiFireSurface fire)
+        private void ReportVisualContact(LabProjectileHitKind kind, Vector3 point, LabJigwiFireSurface fire, Vector3 normal = default)
         {
             if (resolved || visualContact == null) return;
             Action<LabProjectileResult> report = visualContact;
@@ -589,7 +634,7 @@ namespace C6Lab
             Vector2 startXZ = new Vector2(launchPosition.x, launchPosition.z);
             report(new LabProjectileResult(null, 0ul, kind, point, Mathf.Max(0f, Time.time - launchedAt),
                 Mathf.Max(0f, peakHeight - launchPosition.y), Vector2.Distance(startXZ, new Vector2(point.x, point.z)),
-                incomingVelocity, fire != null ? fire.FireId : null, fire != null ? fire.FireTargetId : null));
+                incomingVelocity, fire != null ? fire.FireId : null, fire != null ? fire.FireTargetId : null, normal));
         }
 
         private void FinishVisual()
@@ -603,7 +648,7 @@ namespace C6Lab
         private void Resolve(bool hit, Vector3 point) => Resolve(
             hit ? LabProjectileHitKind.Monster : LabProjectileHitKind.Miss, point, null);
 
-        private void Resolve(LabProjectileHitKind kind, Vector3 point, LabJigwiFireSurface fire)
+        private void Resolve(LabProjectileHitKind kind, Vector3 point, LabJigwiFireSurface fire, Vector3 normal = default)
         {
             if (resolved) return;
             resolved = true;
@@ -619,7 +664,7 @@ namespace C6Lab
             LabProjectileResult result = new LabProjectileResult(projectileId, ownerPlayerId,
                 kind, point, Mathf.Max(0f, Time.time - launchedAt),
                 Mathf.Max(0f, peakHeight - launchPosition.y), Vector2.Distance(startXZ, endXZ), impactVelocity,
-                fire != null ? fire.FireId : null, fire != null ? fire.FireTargetId : null);
+                fire != null ? fire.FireId : null, fire != null ? fire.FireTargetId : null, normal);
             // Keep the last visible part of the flight briefly. If the callback ends the
             // round, ClearProjectiles also destroys this detached child of projectileRoot.
             LeaveFadingTrail();
@@ -704,7 +749,7 @@ namespace C6Lab
                 jigwiRewardFireTrail = null;
                 return;
             }
-            if (!launched || resolved) return;
+            if ((!launched && !puppet) || resolved) return;
             if (jigwiRewardFireTrail != null)
             {
                 if (jigwiRewardFireTrail.IsEmitting) jigwiRewardFireTrail.Reconfigure(ScaledRadius);

@@ -100,9 +100,13 @@ namespace C6Lab.Tests
             var actualElement = typeof(LabProjectile).GetField("element", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
             Assert.That(actualElement.GetValue(host), Is.EqualTo(LabOrbElement.Water));
             Assert.That(actualElement.GetValue(predicted), Is.EqualTo(LabOrbElement.Metal), "Fire is a reward trail, not a pigment conversion.");
-            yield return new WaitForFixedUpdate(); yield return null;
             var trail = predicted.ElementFlightTrail;
             var rewardTrail = predicted.JigwiRewardFireTrail;
+            // Rigidbody interpolation reaches these rendered histories in LateUpdate.
+            // A physics step followed by the next Update can still leave only the launch
+            // position recorded, so await both real histories without forcing a sample.
+            yield return Until(() => trail.PathCount >= 2 && rewardTrail.PathCount >= 2,
+                "The predicted Metal projectile must record both its elemental ink and its separate reward fire before reconciliation.");
             Assert.That(trail.PathCount, Is.GreaterThanOrEqualTo(2));
             Assert.That(rewardTrail.PathCount, Is.GreaterThanOrEqualTo(2));
             int count = trail.PathCount, rewardCount = rewardTrail.PathCount;

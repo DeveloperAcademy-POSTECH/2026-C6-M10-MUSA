@@ -61,7 +61,9 @@ Stage03 Background Studio에 석양 하늘, 첨성대·석등·부처 바위·�
 
 Stage01_Ground_Gumiho(옅은 청록), Stage02_Ground_Yagwanggwi(청회색), Stage03_Ground_Jigwi(황토·주황)을 각 스테이지의 ground 및 board backing에 연결한다. 재질은 Stage01/02/03의 YokaiGround·YokaiBacking으로 분리하며 tint는 흰색이다. 하단 조합판 UI 자체 이미지는 변경하지 않는다.
 
-Stage 1 바닥은 후속 미술 수정으로 Stage01_Ground_BlushBeige(베이지에 옅은 핑크빛)로 변경했다.
+Stage 1 바닥·조합판 뒤는 Stage01_Ground_SandBeige다(#490에서 사용자 확인). BlushBeige·Gumiho PNG는 후보로 남아 있으며 연결하지 않는다.
+
+2스테이지는 #487에서 Stage02 Background Studio의 ground·board backing PNG와 Stage02 YokaiGround·YokaiBacking 재질의 `_BaseMap`을 모두 Stage02_Ground_Yagwanggwi로 연결했다. 기기는 저장된 재질의 `_BaseMap`을 그리므로 studio 값과 재질 값이 같아야 하며 `GameStageBackgroundAssetTests`가 세 스테이지 모두 이를 검사한다.
 
 ## 조명 작업실
 

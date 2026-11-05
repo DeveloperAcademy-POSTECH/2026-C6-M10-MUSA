@@ -1,4 +1,5 @@
 using System.Collections;
+using C6Lab;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -19,6 +20,15 @@ namespace Hapio
         [Tooltip("다음 화면이 뜬 뒤 밝아지는 시간 (초). 0이면 바로 걷힌다.")]
         [SerializeField, Min(0f)] private float lobbyFadeInSeconds = .35f;
         [SerializeField] private Color lobbyFadeColor = Color.black;
+        [Header("마지막 일격 다시보기 뒤 결과로 넘어갈 때")]
+        [Tooltip("다시보기 끝 0.5초 동안 덮는 막의 색. 결과 화면의 한지와 이어지게 밝은 색이다.")]
+        [SerializeField] private Color replayCoverColor = new Color(.96f, .93f, .86f, 1f);
+        [Tooltip("다시보기를 탭으로 건너뛴 뒤 막이 덮이는 시간 (초).")]
+        [SerializeField, Min(.05f)] private float replaySkipCoverSeconds = .3f;
+        public const string ReplayWaitingStatus = "다른 참가자를 기다리는 중…";
+        private bool replayCovering;
+        private float replayCoverSeconds = .5f;
+        private float holdFadeOutSeconds;
         // 씬을 불러온 직후의 긴 프레임에 막이 한 번에 걷히지 않게, 밝아질 때 한 프레임에 쓰는 시간을 줄인다.
         private const float MaxFadeInStep = 1f / 30f;
         private GameSceneFade sceneFade;
@@ -38,11 +48,46 @@ namespace Hapio
                 || path == GameScenePaths.Home && active == GameScenePaths.Lobby);
         }
 
+        /// <summary>다시보기가 막을 덮기 시작한 전투에서 결과·게임 오버로 가는지. 그때는 막 아래에서 씬을 바꾼다.</summary>
+        private bool ReplayCoversSceneChange(string path) => sceneFade != null && replayCovering
+            && SceneManager.GetActiveScene().path == GameScenePaths.Battle
+            && (path == GameScenePaths.StageResult || path == GameScenePaths.GameOver);
+
         /// <summary>이 프레임부터 떠나는 화면을 그대로 두고, 가려진 뒤에 씬을 바꾸게 한다.</summary>
         private void HoldForFade(string path)
         {
-            holdForFade = FadesBetweenHomeAndLobby(path);
+            bool lobby = FadesBetweenHomeAndLobby(path);
+            bool replay = !lobby && ReplayCoversSceneChange(path);
+            holdForFade = lobby || replay;
+            holdFadeOutSeconds = replay ? replayCoverSeconds : lobbyFadeOutSeconds;
+            if (lobby) sceneFade.SetColor(lobbyFadeColor);
             heldScenePath = holdForFade ? SceneManager.GetActiveScene().path : null;
+        }
+
+        /// <summary>
+        /// 마지막 일격 다시보기: 남은 0.5초(전환)에 들어가거나 이 기기에서 건너뛰면 막을 한지색으로 덮는다. 다 덮였는데 아직
+        /// 결과로 넘어가지 않았으면(다른 참가자가 보는 중) 기다림 문구를 띄운다. 씬을 바꾸기 시작하면 FadeOutOfScene이 이어받는다.
+        /// </summary>
+        private void UpdateReplayCover()
+        {
+            if (sceneFade == null || holdForFade || quitting || finishReplay == null || replayShot == null
+                || SceneManager.GetActiveScene().path != GameScenePaths.Battle) return;
+            bool cover = finishReplay.Skipped || finishReplay.Complete
+                || finishReplay.Running && finishReplay.Remaining <= LabFinishReplayTimeline.TransitionSeconds;
+            if (!cover) return;
+            if (!replayCovering)
+            {
+                replayCovering = true;
+                replayCoverSeconds = finishReplay.Skipped ? replaySkipCoverSeconds
+                    : Mathf.Max(.05f, finishReplay.Remaining);
+                if (fadeInRoutine != null) { StopCoroutine(fadeInRoutine); fadeInRoutine = null; }
+                sceneFade.SetColor(replayCoverColor);
+            }
+            float alpha = Mathf.Min(1f, sceneFade.Alpha + Time.unscaledDeltaTime / replayCoverSeconds);
+            sceneFade.Set(alpha, true);
+            bool waiting = alpha >= 1f && !finishReleased && !network.IsDeveloperSolo;
+            sceneFade.SetStatus(waiting ? ReplayWaitingStatus : null,
+                finishReplay.Overlay != null ? LabGuideText.FontOf(finishReplay.Overlay) : null);
         }
 
         /// <summary>떠나는 화면을 그대로 둔 채 어두워진다. 그사이 지금 씬에 머물게 되면(입장 실패·취소) 멈춘다.</summary>
@@ -52,7 +97,7 @@ namespace Hapio
             float alpha = sceneFade.Alpha;
             while (alpha < 1f && !quitting && wantedScene != SceneManager.GetActiveScene().path)
             {
-                alpha = lobbyFadeOutSeconds <= 0f ? 1f : alpha + Time.unscaledDeltaTime / lobbyFadeOutSeconds;
+                alpha = holdFadeOutSeconds <= 0f ? 1f : alpha + Time.unscaledDeltaTime / holdFadeOutSeconds;
                 sceneFade.Set(alpha, true);
                 if (alpha < 1f) yield return null;
             }
@@ -63,6 +108,8 @@ namespace Hapio
         {
             holdForFade = false;
             heldScenePath = null;
+            replayCovering = false;
+            if (sceneFade != null) sceneFade.SetStatus(null);
             if (sceneFade == null || !sceneFade.Visible || quitting) return;
             if (fadeInRoutine != null) StopCoroutine(fadeInRoutine);
             fadeInRoutine = StartCoroutine(FadeIn());

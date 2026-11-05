@@ -42,14 +42,47 @@ namespace Hapio
             foreach (GameObject root in gameObject.scene.GetRootGameObjects())
                 foreach (LabLobbyView standaloneLobby in root.GetComponentsInChildren<LabLobbyView>(true))
                     standaloneLobby.gameObject.SetActive(false);
+            // #507: every Hapio stage draws one curved rope from the fixed anchor to the gourd. Presentation only;
+            // runs before LabHangingTarget.Awake builds the rig, and Battle.unity keeps its saved Segmented value.
+            LabHangingTarget hanging = target != null ? target.GetComponent<LabHangingTarget>() : null;
+            if (hanging != null) hanging.SetRopeStyle(LabRopeStyle.Curved);
             session = GameSession.EnsureExists();
+            MountStageGourd(session);
             LabNetwork network = session.Network;
             network.BindBattleReferences(board, target, battleCamera, battleFloor, impactFeedback, projectileRoot);
             RebindScene(network);
+            // #492: the stage's sound data and 지귀 art load here, behind the opaque preparing overlay, not on first use.
+            float warmupStarted = Time.realtimeSinceStartup;
+            int warmed = LabBattleAudioWarmup.Preload(network.GameStageYokai, this);
+            if (Debug.isDebugBuild)
+                Debug.Log("C6_AUDIO_WARMUP yokai=" + network.GameStageYokai + " loaded=" + warmed
+                    + " ms=" + ((Time.realtimeSinceStartup - warmupStarted) * 1000f).ToString("0"));
             session.NotifyBattleBound(board);
             network.ConfigApplied += OnConfigApplied;
             // The practice board (#477) dresses this Battle for the tutorial and runs its script.
             if (session.IsTutorial) gameObject.AddComponent<GameTutorialDirector>().Bind(session, this);
+        }
+
+        /// <summary>
+        /// #507: the story stage's own gourd, set before LabSceneController.Awake (-100) attaches the paint, which only
+        /// fills an empty prefab with the white gourd. 2:2 and stages without a path keep the white gourd.
+        /// </summary>
+        private void MountStageGourd(GameSession session)
+        {
+            GameStageDefinition stage = session != null ? session.CurrentStageDefinition : null;
+            string path = stage != null ? stage.gourdVisualResource : null;
+            if (string.IsNullOrEmpty(path) || target == null) return;
+            float started = Time.realtimeSinceStartup;
+            GameObject prefab = Resources.Load<GameObject>(path);
+            if (prefab == null)
+            {
+                Debug.LogWarning("C6_GOURD_MOUNT missing=" + path + " (white gourd)");
+                return;
+            }
+            LabGourdPaint.PrepareVisual(target, prefab);
+            if (Debug.isDebugBuild)
+                Debug.Log("C6_GOURD_MOUNT stage=" + stage.stageIndex + " prefab=" + prefab.name
+                    + " ms=" + ((Time.realtimeSinceStartup - started) * 1000f).ToString("0"));
         }
 
         private void RebindScene(LabNetwork network)
@@ -143,6 +176,7 @@ namespace Hapio
 
         private void OnDestroy()
         {
+            LabBattleAudioWarmup.Release(this); // #492: the stage's preloaded data is not kept past its Battle.
             if (session != null && session.Network != null) session.Network.ConfigApplied -= OnConfigApplied;
         }
         private static void Route(UnityEngine.UI.Button button, UnityEngine.Events.UnityAction action, string label)

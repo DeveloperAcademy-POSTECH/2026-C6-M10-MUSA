@@ -44,11 +44,11 @@ namespace C6Lab
         private bool PaintCellBlocked(ulong owner, int cell) => PaintBlocked(owner, CellDirection(cell));
 
         private void RegisterBlockedLegacyHit(Vector3 direction, int cell, Color32 color,
-            ulong owner, byte painterSlot, decimal initial)
+            ulong owner, byte painterSlot, decimal initial, byte impact01 = 0)
         {
             var region = new Region(regions.Count);
             regions.Add(region);
-            Ink ink = Supply(region, initial, color, owner, painterSlot);
+            Ink ink = Supply(region, initial, color, owner, painterSlot, impact01: impact01);
             int immediate = (int)Math.Min(decimal.Floor(initial), CellCount - CoveredCount);
             region = PaintFundedCell(region, cell, ink);
             InitialPatch patch = flowStyle == 1 ? new InitialPatch(this, direction, cell) : null;

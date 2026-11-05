@@ -55,8 +55,10 @@ namespace C6Lab
         private void ObserveJigwiMissionFailures()
         {
             if (latest?.jigwiAB?.enabled != true) return;
+            // #509: a failed B no longer purges boards; only an older wiping failure carries a fence.
             foreach (var failed in latest.jigwiAB.rounds.Where(value => value != null
-                && value.kind == LabJigwiABKind.GroupFire && value.resolution == LabJigwiABResolution.Expired)
+                && value.kind == LabJigwiABKind.GroupFire && value.resolution == LabJigwiABResolution.Expired
+                && value.clearedThroughRevision > 0)
                 .OrderBy(value => value.clearedThroughRevision))
                 ApplyJigwiMissionFailure(latest.sessionId, latest.round, failed.id,
                     failed.clearedThroughRevision, failed.resolvedAt);

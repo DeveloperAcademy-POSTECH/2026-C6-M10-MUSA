@@ -15,6 +15,10 @@ Shader "C6Lab/GourdPaint"
         _PaperLightContrast("Paper Shape Shading", Range(0,1)) = .55
         _PaperBrightness("Paper Brightness", Range(.5,1.5)) = 1.08
         _PaperSmoothness("Smoothness (0 = Matte)", Range(0,1)) = .05
+        [Header(Underpaint (507 stage gourds))]
+        [Toggle(_UNDERPAINT_MAP)] _UnderpaintMap("Use Body Art Under Paint", Float) = 0
+        [NoScaleOffset] _UnderpaintTex("Body Art (UV0)", 2D) = "white" {}
+        _UnderpaintFiber("Paper Fiber Over Body Art", Range(0,1)) = .35
         [HideInInspector] [NoScaleOffset] _PaintMap("Cumulative premultiplied paint", 2D) = "black" {}
         [HideInInspector] [NoScaleOffset] _PainterMap("Committed painter P byte (linear point)", 2D) = "black" {}
         [HideInInspector] _PaintMapReady("Paint map ready", Float) = 0
@@ -23,6 +27,11 @@ Shader "C6Lab/GourdPaint"
         [HideInInspector] _PaintGrainSize("Paint grain size", Float) = 1
         [HideInInspector] _PaintGrainStrength("Paint grain strength", Float) = .3
         [HideInInspector] _PaintMottleStrength("Paint mottle strength", Float) = .18
+        [HideInInspector] _PaperStickerEnabled("Opaque paper sticker surface", Float) = 0
+        [HideInInspector] _PaperStickerGrainStrength("Opaque paper fiber strength", Float) = 0
+        [HideInInspector] _WatercolorV2Enabled("Watercolor V2 surface", Float) = 0
+        [HideInInspector] _WatercolorGranulationStrength("Watercolor pigment granulation", Float) = 0
+        [HideInInspector] _WatercolorGranulationScale("Watercolor pigment grain scale", Float) = 120
     }
     SubShader
     {
@@ -33,16 +42,32 @@ Shader "C6Lab/GourdPaint"
             HLSLPROGRAM
             #pragma vertex vert
             #pragma fragment frag
+            // #507: stage gourds show their own body art under the paint. The white gourd keeps the keyword off.
+            #pragma shader_feature_local _UNDERPAINT_MAP
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
-            struct Attributes { float4 positionOS:POSITION; float3 normalOS:NORMAL; };
-            struct Varyings { float4 positionCS:SV_POSITION; float3 positionOS:TEXCOORD0; float3 normalWS:TEXCOORD1; float3 normalOS:TEXCOORD2; float3 positionWS:TEXCOORD3; };
+            struct Attributes
+            {
+                float4 positionOS:POSITION; float3 normalOS:NORMAL;
+            #if defined(_UNDERPAINT_MAP)
+                float2 uv:TEXCOORD0;
+            #endif
+            };
+            struct Varyings
+            {
+                float4 positionCS:SV_POSITION; float3 positionOS:TEXCOORD0; float3 normalWS:TEXCOORD1; float3 normalOS:TEXCOORD2; float3 positionWS:TEXCOORD3;
+            #if defined(_UNDERPAINT_MAP)
+                float2 uv:TEXCOORD4;
+            #endif
+            };
             TEXTURE2D(_PaperTex);
             SAMPLER(sampler_PaperTex);
             TEXTURE2D(_PaintMap);
             SAMPLER(sampler_PaintMap);
             TEXTURE2D(_PainterMap);
             SAMPLER(sampler_PainterMap);
+            TEXTURE2D(_UnderpaintTex);
+            SAMPLER(sampler_UnderpaintTex);
             CBUFFER_START(UnityPerMaterial)
                 float4 _BaseColor;
                 float _PaperScale, _PaperContrast, _PaperBump, _PaperUnderPaint, _PaperSmoothness;
@@ -55,6 +80,9 @@ Shader "C6Lab/GourdPaint"
                 float _PaintGrainSize;
                 float _PaintGrainStrength;
                 float _PaintMottleStrength;
+                float _PaperStickerEnabled, _PaperStickerGrainStrength;
+                float _WatercolorV2Enabled, _WatercolorGranulationStrength, _WatercolorGranulationScale;
+                float _UnderpaintFiber;
             CBUFFER_END
 
             float2 PaperOffset(float2 cell)
@@ -146,6 +174,35 @@ Shader "C6Lab/GourdPaint"
                 return saturate(paintColor * brightness);
             }
 
+            float ResolvedPigmentNoise(float3 position)
+            {
+                // Object coordinates determine the marks; derivatives only attenuate an
+                // unresolved frequency so rotation/zoom does not turn it into sparkling.
+                float3 footprint=fwidth(position);
+                float resolved=1-smoothstep(.35,1.25,max(footprint.x,max(footprint.y,footprint.z)));
+                return (GrainNoise(position)-.5)*resolved;
+            }
+
+            half3 WatercolorPigmentGrain(half4 paint, float3 direction, half paperLuma)
+            {
+                float scale=max(_WatercolorGranulationScale,1);
+                float fine=ResolvedPigmentNoise(direction*scale+float3(19.3,7.1,31.7));
+                float middle=ResolvedPigmentNoise(direction*(scale*.29)+float3(2.1,47.3,11.9));
+                // The existing Hanji asset has mipmaps. Its final 1x1 mip supplies the
+                // actual paper mean, preserving fiber detail under rich pigment without
+                // baking a paper brightness assumption into the effect.
+                float3 averagePaper=SAMPLE_TEXTURE2D_LOD(_PaperTex,sampler_PaperTex,float2(.5,.5),16).rgb;
+                float mean=max(dot(averagePaper,float3(.2126,.7152,.0722)),.01);
+                float fiber=clamp((paperLuma/mean-1)*4,-1,1);
+                float variation=fine*2.2+middle*.8+fiber*.8;
+                float brightness=max(.2,1+saturate(_WatercolorGranulationStrength)*variation);
+                // One scalar preserves the pigment hue. The alpha and uncovered paper
+                // remain exact; headroom limiting preserves premultiplied RGB<=alpha.
+                float maximum=max(paint.r,max(paint.g,paint.b));
+                brightness=min(brightness,paint.a/max(maximum,.000001));
+                return paint.rgb*brightness;
+            }
+
             float PeriodicLine(float coordinate, float width)
             {
                 float distance = abs(frac(coordinate + .5) - .5);
@@ -182,6 +239,9 @@ Shader "C6Lab/GourdPaint"
                 output.normalOS = input.normalOS;
                 output.positionWS = TransformObjectToWorld(input.positionOS.xyz);
                 output.normalWS = TransformObjectToWorldNormal(input.normalOS);
+            #if defined(_UNDERPAINT_MAP)
+                output.uv = input.uv;
+            #endif
                 return output;
             }
 
@@ -195,7 +255,8 @@ Shader "C6Lab/GourdPaint"
                 half4 paint = SAMPLE_TEXTURE2D(_PaintMap, sampler_PaintMap, uv) * saturate(_PaintMapReady);
                 // Modulate only premultiplied pigment RGB: coverage, alpha and unpainted
                 // paper retain the original map. OFF and both strengths zero bypass exactly.
-                if (_PaintGrainEnabled > .5 && (_PaintGrainStrength > 0 || _PaintMottleStrength > 0))
+                if (_WatercolorV2Enabled < .5 && _PaintGrainEnabled > .5
+                    && (_PaintGrainStrength > 0 || _PaintMottleStrength > 0))
                     paint.rgb = GrainColor(paint.rgb, direction);
                 // Ownership changes brightness only. It cannot punch holes into pigment,
                 // alter coverage, replace element hues, or touch unpainted paper.
@@ -206,6 +267,17 @@ Shader "C6Lab/GourdPaint"
                 }
                 half3 paper = PaperSample(input.positionOS, normalize(input.normalOS));
                 half paperLuma = dot(paper, half3(.2126,.7152,.0722));
+                // This runs after the map's boundary reconstruction, so its fine grain
+                // is not blurred across cells or fed into a later reveal's base image.
+                if (_WatercolorV2Enabled > .5 && _WatercolorGranulationStrength > 0)
+                    paint.rgb = WatercolorPigmentGrain(paint,direction,paperLuma);
+                // Opaque colored paper: existing surface fibers modulate RGB only.
+                // Never make the sticker translucent or reveal a previous paint layer.
+                if (_PaperStickerEnabled > .5 && _PaperStickerGrainStrength > 0)
+                {
+                    float fiberTone = clamp(paperLuma / .8, .65, 1.25);
+                    paint.rgb = min(paint.aaa, paint.rgb * lerp(1, fiberTone, saturate(_PaperStickerGrainStrength * 4)));
+                }
                 paper = lerp(paperLuma.xxx, paper, _PaperSaturation);
                 half3 paperColor = saturate(1.0 + (paper - 1.0) * _PaperContrast);
                 // Derive surface gradients from the same PNG, without a separate normal map.
@@ -226,7 +298,13 @@ Shader "C6Lab/GourdPaint"
                 // Paper-only art direction: the existing pigment lighting stays intact.
                 float paperDiffuse = saturate(dot(n, SafeNormalize(_PaperLightDirection.xyz)));
                 float paperLight = lerp(1.0, .45 + .65 * paperDiffuse, _PaperLightContrast) * _PaperBrightness;
-                half3 shaded = _BaseColor.rgb * paperColor * (1.0-paint.a) * paperLight + paint.rgb * light;
+                half3 baseColor = _BaseColor.rgb * paperColor;
+            #if defined(_UNDERPAINT_MAP)
+                // The body art replaces the paper tint; a little fiber stays visible through it.
+                half3 bodyArt = SAMPLE_TEXTURE2D(_UnderpaintTex, sampler_UnderpaintTex, input.uv).rgb;
+                baseColor = bodyArt * lerp(half3(1,1,1), paperColor, _UnderpaintFiber);
+            #endif
+                half3 shaded = baseColor * (1.0-paint.a) * paperLight + paint.rgb * light;
                 return half4(shaded + specular, 1);
             }
             ENDHLSL

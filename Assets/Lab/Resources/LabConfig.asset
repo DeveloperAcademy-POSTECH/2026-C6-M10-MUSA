@@ -48,7 +48,7 @@ MonoBehaviour:
   jigwiABPersonalDurationSeconds: 15
   jigwiABPersonalRecoveryMultiplier: 4
   jigwiABPersonalRequiredHits: 3
-  jigwiABPersonalBurnSeconds: 5
+  jigwiABPersonalBurnSeconds: 1
   jigwiABGroupFireCount: 3
   jigwiABRelightSeconds: 12
   jigwiABShrinkDelaySeconds: 12

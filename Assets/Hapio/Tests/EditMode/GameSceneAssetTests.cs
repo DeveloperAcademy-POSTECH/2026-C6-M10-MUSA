@@ -135,9 +135,11 @@ namespace Hapio.Tests
                 Assert.That(studio.collisionFloor, Is.SameAs(bindings.battleFloor.transform));
                 Assert.That(studio.boardCamera, Is.SameAs(bindings.sceneController.orbCamera));
                 Assert.That(studio.groundPng, Is.Not.Null);
-                AssertSameSavedAsset(studio.groundPng, original.groundPng, "Ground texture");
-                AssertSameSavedAsset(studio.paperPng, original.paperPng, "Surround texture");
-                AssertSameSavedAsset(studio.boardBackgroundPng, original.boardBackgroundPng, "Board backing texture");
+                // #447: stage 1 has its own ground, board backing and surround; every other saved Lab environment value is kept.
+                const string stageOne = "Assets/Hapio/Art/Environment/Stage01/Textures/";
+                Assert.That(AssetDatabase.GetAssetPath(studio.groundPng), Is.EqualTo(stageOne + "Stage01_Ground_SandBeige.png"), "Ground texture");
+                Assert.That(studio.boardBackgroundPng, Is.SameAs(studio.groundPng), "Board backing texture");
+                Assert.That(AssetDatabase.GetAssetPath(studio.paperPng), Is.EqualTo(stageOne + "Stage01_Sky_WarmBeige.png"), "Surround texture");
                 Assert.That(studio.groundSize, Is.EqualTo(original.groundSize));
                 Assert.That(studio.groundTiling, Is.EqualTo(original.groundTiling));
                 Assert.That(studio.showGround && studio.showSurround && studio.fillBoardBackground, Is.True);
@@ -220,8 +222,8 @@ namespace Hapio.Tests
                 if (expected == GameScreenKind.GameOver) Assert.That(screen.homeButton, Is.Not.Null);
                 if (expected == GameScreenKind.Home || expected == GameScreenKind.Lobby)
                 {
-                    Assert.That(screen.developerInputs, Has.Length.EqualTo(LabConfig.DeveloperFields.Count));
-                    Assert.That(screen.developerSliders, Has.Length.EqualTo(LabConfig.DeveloperFields.Count));
+                    Assert.That(screen.developerInputs, Has.Length.EqualTo(LabConfig.ClayThicknessField), "Authored legacy controls remain saved; the two clay rows append at runtime.");
+                    Assert.That(screen.developerSliders, Has.Length.EqualTo(LabConfig.ClayThicknessField));
                     Assert.That(screen.developerInputs.All(value => value != null), Is.True);
                     Assert.That(screen.developerSliders.All(value => value != null), Is.True);
                     Assert.That(screen.developerPanel.activeSelf, Is.False);
@@ -234,11 +236,13 @@ namespace Hapio.Tests
                     Assert.That(sharedFont, Is.Not.Null);
                     foreach (UnityEngine.UI.Text text in screen.developerPanel.GetComponentsInChildren<UnityEngine.UI.Text>(true))
                         Assert.That(text.font, Is.SameAs(sharedFont), "Korean stage/DEV labels use the existing project font.");
-                    Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(257), "The current Lab schema includes Flash, counting and Jigwi stage scheduling.");
+                    Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(259), "The current Lab schema includes Flash, counting and Jigwi stage scheduling.");
                     Assert.That(SavedConfig().GourdColorComboEnabled, Is.False);
                     Assert.That(SavedConfig().LabUniqueGimmicksEnabled, Is.False);
                     float[] defaults = SavedConfig().CaptureDeveloperValues();
-                    for (int i = 0; i < defaults.Length; i++)
+                    // Inspect every authored control, without pretending the runtime-only
+                    // clay rows have been written into the user's saved Scene.
+                    for (int i = 0; i < screen.developerInputs.Length; i++)
                     {
                         LabDeveloperField field = LabConfig.DeveloperFields[i];
                         var input = screen.developerInputs[i];

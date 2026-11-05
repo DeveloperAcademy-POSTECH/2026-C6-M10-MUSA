@@ -12,3 +12,5 @@
 .watercolor-image { flex-grow: 1; min-height: 220px; }
 .watercolor-status { white-space: normal; margin-top: 8px; }
 .watercolor-error { color: #ffb2a1; }
+
+.watercolor-hidden { display: none; }

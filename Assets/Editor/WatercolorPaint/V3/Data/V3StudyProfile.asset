@@ -1,0 +1,42 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4885e6965d1946d9a8d06446ec0f99d, type: 3}
+  m_Name: V3StudyProfile
+  m_EditorClassIdentifier: Assembly-CSharp-Editor::C6Lab.Experiments.Editor.LabWatercolorV3Profile
+  baseStampSettings:
+    enabled: 1
+    density: 0.9
+    overlap: 0.78
+    edgeStrength: 0.55
+    edgeWidth: 0.025
+    pigmentContrast: 1.6
+    pigmentSaturation: 1.15
+    granulationStrength: 0.25
+    granulationScale: 120
+    rimBreakup: 0.45
+    revealSeconds: 0.35
+  layerOpacityCap: 0.75
+  washOpacity: 0.12
+  pigmentDepth: 1.4
+  poolStrength: 0.5
+  flowScale: 4
+  rimWobble: 0.35
+  paperRelief: 0.0005
+  paperFiberInfluence: 0.15
+  paperBrightness: 1
+  paperContrast: 1.4
+  pigmentGrain: 0.32
+  pigmentGrainScale: 96
+  roundBrush: {fileID: 2800000, guid: fa5d1cca1e4cc429aa153bdb08db132e, type: 3}
+  growthBrush: {fileID: 2800000, guid: 8a3b7e5acefc24382985438022950ff6, type: 3}
+  overlapBrush: {fileID: 2800000, guid: 8b7bde81ee350470b820ec81de8edf4f, type: 3}
+  paperTexture: {fileID: 2800000, guid: f520ca3eaf6734cd6bd7ffe4431f8537, type: 3}

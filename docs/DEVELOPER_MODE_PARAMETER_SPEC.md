@@ -832,10 +832,10 @@ DEV **Jigwi** 카테고리에 인덱스178~183의6개 슬라이더를 추가했�
 | 인덱스 | 속성·기본값 | 현재 범위/적용 |
 |---|---|---|
 |228|JigwiStageTimelineEnabled / ON|지귀 화면 A/B 시간표 ON/OFF|
-|229|JigwiStageWarningSeconds / 기존1초 저장값|미사용·Inspector/DEV 숨김, 현행 A/B 경고는1초 고정|
+|229|JigwiStageWarningSeconds / 기존1초 저장값|미사용·Inspector/DEV 숨김, 현행 A/B 경고는 2초 고정(#509)|
 |235|JigwiStageFeverMultiplier / 2|1~4,100초 이후 자동 회복만 배율 적용|
 |240|JigwiABPersonalDurationSeconds / 15초|1~15초, A의 최대 활성 길이|
-|241~243|A 회복4배·해제3회·소각5초|기존 범위/소모·명중 보상·기한 보존|
+|241~243|A 회복4배·해제3회·소각5초|#479에서241/242 은퇴, 243 기본1초로 변경(아래 #479 절)|
 |244|JigwiABGroupFireCount / 3개|정수1~6, 참가자마다 같은 개수|
 |245|JigwiABRelightSeconds / 12초|1~60초, 꺼진 불마다 개별 재점화|
 |246/247|구형 B 축소 대기12초/배율.65 저장값|미사용·Inspector/DEV 숨긴 예약 슬롯, 저장/배열 위치만 보존|
@@ -865,4 +865,31 @@ DEV **Jigwi** 카테고리에 인덱스178~183의6개 슬라이더를 추가했�
 
 A/B 시간표·B 미션10초/보상5초·100초 정리는 코드 고정이다. B의 일반 조합은 평소 원소를 유지하고 Host 공급만 무료 소화 Water다. 비용/생성 통계를 늘리지 않으며 끝난 회차의 지급분만 안전하게 제거한다. B 실패의 전체 제거/스태미나0 규칙은 유지한다.
 
-`Resources/Stamina/StaminaFeedbackProfile`은 로컬 표시 전용으로 공유 배열에 넣지 않는다. 일반 소비 깜빡임은 .18초(저장된 프로필은 #418에서 꺼 둠: 게이지는 스태미나 부족 때만 빨갛게 빛난다), A 화염 테두리는 기본ON/.4초 점화이며 Inspector에서 색/강도/속도를 바꾼다. 스태미나 부족 표시(#418: 모자란데 북을 눌러 Host가 생성을 거절하면 게이지가 지지직 흔들리고 충전 중인 칸이 빨갛게 빛남)도 같은 프로필의 "스태미나 부족" 칸에서 켜기/끄기·흔들림 .32초·높이 대비 .3·초당 32번·빨간 빛 .4초·색을 바꾼다. 소리 크기는 LabConfig Inspector `Stamina Short Sound Volume`(기본 1, DEV 칸 없음). 실제 잔량/비용/회복량은 바꾸지 않는다. 구체적인 동작은 [지귀 화면 사양](JIGWI_SCREEN_PATTERNS.md)의1~5절, 실행 근거는 `VALIDATION.md`를 따른다.
+`Resources/Stamina/StaminaFeedbackProfile`은 로컬 표시 전용으로 공유 배열에 넣지 않는다. 일반 소비 깜빡임은 .18초(저장된 프로필은 #418에서 꺼 둠: 게이지는 스태미나 부족 때만 빨갛게 빛난다), A 화염 테두리는 #479에서 지웠다. 스태미나 부족 표시(#418: 모자란데 북을 눌러 Host가 생성을 거절하면 게이지가 지지직 흔들리고 충전 중인 칸이 빨갛게 빛남)도 같은 프로필의 "스태미나 부족" 칸에서 켜기/끄기·흔들림 .32초·높이 대비 .3·초당 32번·빨간 빛 .4초·색을 바꾼다. 소리 크기는 LabConfig Inspector `Stamina Short Sound Volume`(기본 1, DEV 칸 없음). 실제 잔량/비용/회복량은 바꾸지 않는다. 구체적인 동작은 [지귀 화면 사양](JIGWI_SCREEN_PATTERNS.md)의1~5절, 실행 근거는 `VALIDATION.md`를 따른다.
+
+## #479 지귀 A 부적 (Hapio 지귀 전용)
+
+#479는 인덱스를 늘리지 않는다(main #506 뒤 배열 259개). A 규칙이 바뀌어 접속 묶음은 **5687·`C6PhysicsLab/48`·`C6HapioGame/32`**이며(main #466/#506/#507이 5684~5686·Lab45~47·Game29~31을 먼저 씀) 이전 앱과 혼용하지 않는다.
+
+| 인덱스 | 이름 / 기본값 | 현재 의미 |
+|---|---|---|
+|240|JigwiABPersonalDurationSeconds / 15초|A 최대 길이. 부적을 못 쓴 자리는 이 시간에 벌점 없이 끝난다|
+|241|Reserved Jigwi A Recovery Multiplier (unused)|은퇴. 예전 A 대상 회복4배. 저장값·위치만 보존, DEV/Inspector 숨김|
+|242|Reserved Jigwi A Required Hits (unused)|은퇴. 예전 박 명중3회 해제. 저장값·위치만 보존, DEV/Inspector 숨김|
+|243|JigwiABPersonalBurnSeconds / **1초** (전5초)|.5~30초. A 활성 뒤 각 판의 첫 구슬이 타기까지. 이후는 Inspector 간격으로 한 개씩|
+
+Home/Lobby에 저장된 DEV 패널의241/242 라벨과243 값(1)도 코드와 맞췄다. DEV 행이 없는 Inspector 전용 값(`LabConfig`): 소각 간격 `jigwiABBurnStaggerSeconds`1초, 부적 물 구슬5개/수명15초/칠1.5배, 완료 기준 .9(90%), 허용 거리 .07. 규칙과 화면은 [지귀 화면 사양](JIGWI_SCREEN_PATTERNS.md)의2절·5절을 따른다. 이 문서 갱신은 실행 검증을 뜻하지 않는다.
+
+## #509 지귀 B 지목 동시 명중 (Hapio 지귀 전용)
+
+#509는 인덱스를 늘리지 않는다(main #506 뒤 배열 259개). B 규칙과 스냅샷이 바뀌어 접속 묶음은 **5688·`C6PhysicsLab/49`·`C6HapioGame/34`**이며(main #525가 Game33 사용) 이전 5687(#479·#525) 앱과 혼용하지 않는다.
+
+| 인덱스 | 이름 / 기본값 | 현재 의미 |
+|---|---|---|
+|244|Reserved Jigwi B Fire Count (unused)|은퇴. 예전 자리당 불 개수(3). 저장값·위치만 보존, DEV/Inspector 숨김|
+|245|Reserved Jigwi B Relight (unused)|은퇴. 예전 재점화 대기(12초). 저장값·위치만 보존, DEV/Inspector 숨김|
+|251|Reserved Jigwi B Reward Size (unused)|은퇴. 예전 5초 발사 보상 크기(1.3배). 저장값·위치만 보존, DEV 숨김|
+|252|Reserved Jigwi B Reward Paint (unused)|은퇴. 예전 5초 발사 보상 칠 면적(1.5배). 저장값·위치만 보존, DEV 숨김|
+|253~255|물 구슬 지급 간격/시작 수/미소모 상한|그대로. 받는 사람이 도우미(지목 안 된 자리)로 바뀜|
+
+DEV 행이 없는 고정 규칙(`LabJigwiABTimeline`): 예고 2초(`WarningSeconds`), B 15초, 동시 판정 1초, 성공 3회, 지목 수 1~2인 1명/3인 2명/4·5인 3명. Inspector 전용(Host만 사용): `jigwiBSplashPaintShare` 성공 물벼락 칠 크기 기본3(0~3), `jigwiBBoardFireSeconds` 실패 불바다 기본3초(0~10, 0이면 벌점 없음). 규칙과 화면은 [지귀 화면 사양](JIGWI_SCREEN_PATTERNS.md)의1·3·5절을 따른다. 이 문서 갱신은 실행 검증을 뜻하지 않는다.
