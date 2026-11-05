@@ -72,6 +72,14 @@ namespace Hapio.Experiments.Tests
         [Test]
         public void SavedSampleUsesLinearNativeMapsAndStaysOutsideNormalBuildScenes()
         {
+            Assert.That(preview.sampleInfo, Is.Not.Null);
+            Assert.That(ClayPreviewSampleInfo.TryValidate(preview.sampleInfo.text, preview.sampleMetadataHash,
+                out ClayPreviewSampleInfo info, out string metadataError), Is.True, metadataError);
+            Assert.That(info.format, Is.EqualTo("clay-preview-sample-v2"));
+            Assert.That(info.heightChannels, Is.EqualTo(ClayPreviewSampleInfo.HeightChannels));
+            Assert.That(info.styleVersion, Does.StartWith("clay-stickers-v2/"));
+            Assert.That(info.colorFileHash, Is.EqualTo(colorHash.ToLowerInvariant()));
+            Assert.That(info.heightFileHash, Is.EqualTo(heightHash.ToLowerInvariant()));
             foreach (string path in new[] { ColorPath, HeightPath })
             {
                 var importer = (TextureImporter)AssetImporter.GetAtPath(path);
@@ -93,6 +101,8 @@ namespace Hapio.Experiments.Tests
             string[] experimentDependencies = AssetDatabase.GetDependencies(ScenePath, true);
             Assert.That(experimentDependencies, Does.Contain(AssetDatabase.GetAssetPath(preview.clayShader)),
                 "The production clay shader needs a direct Scene dependency so Player stripping keeps it.");
+            Assert.That(experimentDependencies, Does.Contain(AssetDatabase.GetAssetPath(preview.sampleInfo)),
+                "The Player must carry the same generated sample contract as its textures.");
             foreach (var entry in EditorBuildSettings.scenes)
             {
                 Assert.That(entry.path, Is.Not.EqualTo(ScenePath), "The normal game's Scene list must stay unchanged.");
@@ -102,6 +112,85 @@ namespace Hapio.Experiments.Tests
             Assert.That(scene.GetRootGameObjects().SelectMany(x => x.GetComponentsInChildren<MonoBehaviour>(true))
                 .Any(x => x != null && (x.GetType().FullName == "Hapio.GameSession" || x.GetType().FullName == "C6Lab.LabNetwork")),
                 Is.False, "The experiment must not create a room or a gameplay session.");
+        }
+
+        [UnityTest]
+        public IEnumerator LegacyOrChangedSampleMetadataIsRejectedBeforeCreatingMaterials()
+        {
+            string original = preview.sampleInfo.text;
+            string[] invalid =
+            {
+                original.Replace("clay-preview-sample-v2", "clay-preview-sample-v1"),
+                original.Replace("clay-stickers-v2/", "clay-stickers-v1/"),
+                original.Replace(ClayPreviewSampleInfo.HeightChannels, "R:legacy-height"),
+                original + " " // Well-formed metadata, but not the manifest pinned by the saved Scene.
+            };
+            for (int i = 0; i < invalid.Length; i++)
+            {
+                string pinnedHash = i == invalid.Length - 1 ? preview.sampleMetadataHash : ClayPreviewSampleInfo.ContentHash(invalid[i]);
+                Assert.That(ClayPreviewSampleInfo.TryValidate(invalid[i], pinnedHash, out _, out string reason), Is.False);
+                var metadata = new TextAsset(invalid[i]);
+                var root = new GameObject("Rejected clay preview sample");
+                root.SetActive(false);
+                var rejected = root.AddComponent<ClayPreviewController>();
+                rejected.sourcePrefab = preview.sourcePrefab;
+                rejected.colorMap = preview.colorMap; rejected.heightMap = preview.heightMap;
+                rejected.clayShader = preview.clayShader;
+                rejected.sampleInfo = metadata; rejected.sampleMetadataHash = pinnedHash;
+                int frameRate = Application.targetFrameRate, vsync = QualitySettings.vSyncCount;
+                bool background = Application.runInBackground;
+                try
+                {
+                    LogAssert.Expect(LogType.Error, "CLAY_PREVIEW_FAILED: " + reason);
+                    root.SetActive(true);
+                    Assert.That(rejected.Error, Is.EqualTo(reason));
+                    Assert.That(rejected.IsReady, Is.False);
+                    Assert.That(rejected.ClayMaterial, Is.Null, "Never interpret legacy GB/A as a local coating normal.");
+                    Assert.That(rejected.ModelRoot, Is.Null);
+                    Assert.That(Application.targetFrameRate, Is.EqualTo(frameRate));
+                    Assert.That(QualitySettings.vSyncCount, Is.EqualTo(vsync));
+                    Assert.That(Application.runInBackground, Is.EqualTo(background));
+                }
+                finally { Object.Destroy(root); Object.Destroy(metadata); }
+                yield return null;
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator PackedSampleKeepsAllFourHalfChannelsAndActualCoatingCoverage()
+        {
+            if (SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null || !SystemInfo.supportsAsyncGPUReadback)
+                Assert.Ignore("This sample precision test needs a real graphics device with asynchronous readback.");
+            Assert.That(ClayPreviewSampleInfo.TryValidate(preview.sampleInfo.text, preview.sampleMetadataHash,
+                out ClayPreviewSampleInfo info, out string error), Is.True, error);
+            var request = AsyncGPUReadback.Request(preview.heightMap, 0, TextureFormat.RGBAHalf);
+            yield return Readback(request);
+            byte[] packed = request.GetData<byte>().ToArray();
+            Assert.That(packed.Length, Is.EqualTo(1024 * 512 * 8), "RGBA Half preserves every packed surface channel.");
+            Assert.That(ByteHash(packed), Is.EqualTo(info.heightRawHash), "EXR import preserves R, G, B and A exactly.");
+            var physical = new byte[1024 * 512 * 2];
+            int coated = 0, tilted = 0, invalidPixels = 0;
+            float minNormal = float.PositiveInfinity, maxNormal = float.NegativeInfinity;
+            for (int i = 0; i < 1024 * 512; i++)
+            {
+                physical[i * 2] = packed[i * 8]; physical[i * 2 + 1] = packed[i * 8 + 1];
+                float r = Mathf.HalfToFloat(BitConverter.ToUInt16(packed, i * 8));
+                float g = Mathf.HalfToFloat(BitConverter.ToUInt16(packed, i * 8 + 2));
+                float b = Mathf.HalfToFloat(BitConverter.ToUInt16(packed, i * 8 + 4));
+                float a = Mathf.HalfToFloat(BitConverter.ToUInt16(packed, i * 8 + 6));
+                if (!float.IsFinite(r) || !float.IsFinite(g) || !float.IsFinite(b) || !float.IsFinite(a)
+                    || r < 0 || a < 0 || a > 1) invalidPixels++;
+                if (a <= .01f) continue;
+                coated++;
+                minNormal = Mathf.Min(minNormal, Mathf.Min(g / a, b / a));
+                maxNormal = Mathf.Max(maxNormal, Mathf.Max(g / a, b / a));
+                if (Mathf.Abs(g - .5f * a) + Mathf.Abs(b - .5f * a) > .001f) tilted++;
+            }
+            Assert.That(ByteHash(physical), Is.EqualTo(info.physicalHeightRawHash), "The independent physical-height R channel is preserved.");
+            Assert.That(invalidPixels, Is.Zero, "Packed height, normal and coverage values must be finite, with nonnegative height and coverage in [0,1].");
+            Assert.That(coated, Is.GreaterThan(0), "The completed sample has actual stamped coating, not only its completion backing.");
+            Assert.That(tilted, Is.GreaterThan(100), "Local stamp slopes must survive the saved sample.");
+            Assert.That(maxNormal - minNormal, Is.GreaterThan(.01f));
         }
 
         [UnityTest]
@@ -260,6 +349,12 @@ namespace Hapio.Experiments.Tests
         {
             using (SHA256 hash = SHA256.Create())
                 return BitConverter.ToString(hash.ComputeHash(File.ReadAllBytes(AbsolutePath(relativePath)))).Replace("-", string.Empty);
+        }
+
+        static string ByteHash(byte[] data)
+        {
+            using (SHA256 hash = SHA256.Create())
+                return BitConverter.ToString(hash.ComputeHash(data)).Replace("-", string.Empty).ToLowerInvariant();
         }
 
         static string AbsolutePath(string relativePath) => Path.GetFullPath(Path.Combine(Application.dataPath, "..", relativePath));

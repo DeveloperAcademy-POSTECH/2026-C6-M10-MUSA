@@ -1,12 +1,66 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.UIElements;
 
 namespace Hapio.Experiments
 {
+    /// <summary>The generated sample contract, shared by the Editor baker and the standalone Player.</summary>
+    [Serializable]
+    public class ClayPreviewSampleInfo
+    {
+        public const string FormatVersion = "clay-preview-sample-v2";
+        public const string StyleVersion = "clay-stickers-v2";
+        public const string HeightChannels = "R:physical-height;GB:coating-normal;A:actual-coverage";
+
+        public string format = FormatVersion;
+        public string heightChannels = HeightChannels;
+        public string unity, createdUtc, styleVersion, sourceConfigHash, authorityHash;
+        public string colorFileHash, heightFileHash, colorRawHash, heightRawHash, physicalHeightRawHash;
+        public int seed = 123, width = 1024, height = 512, hits, cells, totalCells;
+        public float colorRoundtripMaxError, heightRoundtripMaxError;
+        public bool complete, sourceConfigPreserved, randomPreserved, scenesPreserved;
+
+        public static string ContentHash(string json)
+        {
+            using (var hash = SHA256.Create())
+                return BitConverter.ToString(hash.ComputeHash(Encoding.UTF8.GetBytes(json ?? string.Empty)))
+                    .Replace("-", string.Empty).ToLowerInvariant();
+        }
+
+        public static bool TryValidate(string json, string expectedMetadataHash, out ClayPreviewSampleInfo info, out string error)
+        {
+            info = null;
+            try
+            {
+                info = JsonUtility.FromJson<ClayPreviewSampleInfo>(json);
+                if (info == null || info.format != FormatVersion || info.heightChannels != HeightChannels)
+                    throw new InvalidOperationException("Prepare the v2 preview sample: the legacy height map has no coating normals or coverage.");
+                if (string.IsNullOrEmpty(info.styleVersion) || !info.styleVersion.StartsWith(StyleVersion + "/", StringComparison.Ordinal))
+                    throw new InvalidOperationException("The preview sample and clay shader style versions do not match.");
+                if (!IsHash(expectedMetadataHash) || !string.Equals(ContentHash(json), expectedMetadataHash, StringComparison.Ordinal))
+                    throw new InvalidOperationException("The preview Scene is not bound to this generated sample metadata. Prepare the preview again.");
+                if (!IsHash(info.colorFileHash) || !IsHash(info.heightFileHash) || !IsHash(info.colorRawHash)
+                    || !IsHash(info.heightRawHash) || !IsHash(info.physicalHeightRawHash)
+                    || !IsHash(info.sourceConfigHash) || !IsHash(info.authorityHash))
+                    throw new InvalidOperationException("The preview sample hashes are missing or invalid.");
+                if (info.width != 1024 || info.height != 512 || !info.complete || info.totalCells <= 0
+                    || info.cells != info.totalCells || !info.sourceConfigPreserved || !info.randomPreserved || !info.scenesPreserved)
+                    throw new InvalidOperationException("The preview metadata does not describe the preserved completed sample.");
+                error = null;
+                return true;
+            }
+            catch (Exception exception) { error = exception.Message; return false; }
+        }
+
+        private static bool IsHash(string value) => value != null && value.Length == 64
+            && Array.TrueForAll(value.ToCharArray(), c => c >= '0' && c <= '9' || c >= 'a' && c <= 'f');
+    }
+
     /// <summary>A local material study. It never creates a session, physics target or paint model.</summary>
     [RequireComponent(typeof(UIDocument))]
     public sealed class ClayPreviewController : MonoBehaviour
@@ -17,6 +71,8 @@ namespace Hapio.Experiments
 
         public GameObject sourcePrefab;
         public Texture2D colorMap, heightMap;
+        public TextAsset sampleInfo;
+        public string sampleMetadataHash;
         public Shader clayShader;
         public Font uiFont;
         public StyleSheet styleSheet;
@@ -54,11 +110,16 @@ namespace Hapio.Experiments
             if (!Application.isPlaying) return;
             try
             {
+                Require(sampleInfo != null, "The generated v2 sample metadata is missing.");
+                Require(ClayPreviewSampleInfo.TryValidate(sampleInfo.text, sampleMetadataHash,
+                    out _, out string metadataError), metadataError);
                 Require(sourcePrefab != null && colorMap != null && heightMap != null && clayShader != null,
                     "The completed sample, gourd model or clay shader is missing.");
                 Require(clayShader.isSupported, "The clay shader is unavailable on this graphics device.");
                 Require(colorMap.width == 1024 && colorMap.height == 512 && heightMap.width == 1024 && heightMap.height == 512,
                     "The sample maps must both be 1024 x 512.");
+                Require(heightMap.format == TextureFormat.RGBAHalf,
+                    "The packed physical height, coating normals and coverage require an RGBA Half EXR.");
                 CaptureGlobals();
                 if (!Application.isEditor) Screen.SetResolution(1280, 800, FullScreenMode.Windowed);
                 BuildPresentation();

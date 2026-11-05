@@ -30,15 +30,7 @@ namespace C6Lab.Experiments.Editor
         private const string ResultPath = "Temp/clay_preview_build_result.json";
 
         [Serializable]
-        public sealed class SampleInfo
-        {
-            public string format = "clay-preview-sample-v1";
-            public string unity, createdUtc, styleVersion, sourceConfigHash, authorityHash;
-            public string colorFileHash, heightFileHash, colorRawHash, heightRawHash;
-            public int seed = 123, width = 1024, height = 512, hits, cells, totalCells;
-            public float colorRoundtripMaxError, heightRoundtripMaxError;
-            public bool complete, sourceConfigPreserved, randomPreserved, scenesPreserved;
-        }
+        public sealed class SampleInfo : ClayPreviewSampleInfo { }
 
         [Serializable]
         public sealed class Validation
@@ -60,14 +52,12 @@ namespace C6Lab.Experiments.Editor
         [MenuItem("C6 Lab/Experiments/Clay Sticker/Prepare Mac Preview Scene")]
         public static void PrepareMenu() => Debug.Log("CLAY_PREVIEW_PREPARED " + Prepare());
 
-        /// <summary>Existing sample maps remain frozen until an explicit rebake.</summary>
+        /// <summary>Explicit preparation rebakes the same fixed artwork; build validation never rebakes.</summary>
         public static string Prepare()
         {
             RequireStopped();
-            bool any = File.Exists(ColorPath) || File.Exists(HeightPath) || File.Exists(SampleInfoPath);
-            if (!any) BakeSample();
-            else Require(File.Exists(ColorPath) && File.Exists(HeightPath) && File.Exists(SampleInfoPath),
-                "The preview sample is incomplete. Use Rebake Completed Preview Sample to replace only its generated files.");
+            RequirePreviewSceneSaved();
+            BakeSample();
             CreateSceneIfMissing();
             return ValidatePreparedSample();
         }
@@ -76,6 +66,7 @@ namespace C6Lab.Experiments.Editor
         public static void RebakeMenu()
         {
             RequireStopped();
+            RequirePreviewSceneSaved();
             BakeSample();
             CreateSceneIfMissing();
             Debug.Log("CLAY_PREVIEW_SAMPLE_REBAKED " + ValidatePreparedSample());
@@ -91,8 +82,7 @@ namespace C6Lab.Experiments.Editor
             LabConfig source = Resources.Load<LabConfig>("LabConfig");
             Require(source != null, "The saved LabConfig is missing.");
             string config = EditorJsonUtility.ToJson(source);
-            var settings = new LabWatercolorStampSettings { mode = LabPaintStampMode.ClaySticker, revealSeconds = 0 };
-            settings.Validate();
+            LabWatercolorStampSettings settings = SampleSettings();
             var info = new SampleInfo
             {
                 unity = Application.unityVersion, createdUtc = DateTime.UtcNow.ToString("O"),
@@ -123,6 +113,14 @@ namespace C6Lab.Experiments.Editor
                     Require(color.GetPixels32().All(p => p.a == 255), "The completed color map has transparent holes.");
                     info.colorRawHash = Hash(color.GetRawTextureData());
                     info.heightRawHash = Hash(height.GetRawTextureData());
+                    byte[] packedHeight = height.GetRawTextureData();
+                    var physicalHeight = new byte[height.width * height.height * 2];
+                    for (int i = 0; i < physicalHeight.Length / 2; i++)
+                    {
+                        physicalHeight[i * 2] = packedHeight[i * 8];
+                        physicalHeight[i * 2 + 1] = packedHeight[i * 8 + 1];
+                    }
+                    info.physicalHeightRawHash = Hash(physicalHeight);
                     File.WriteAllBytes(ColorPath, color.EncodeToPNG());
                     File.WriteAllBytes(HeightPath, height.EncodeToEXR(Texture2D.EXRFlags.None));
                     ImportMap(ColorPath, false, true); ImportMap(HeightPath, true, true);
@@ -214,7 +212,7 @@ namespace C6Lab.Experiments.Editor
         public static void CreateSceneIfMissing()
         {
             RequireStopped();
-            if (File.Exists(ScenePath)) return;
+            if (File.Exists(ScenePath)) { RefreshSceneMetadata(); return; }
             EnsureFolder(Root + "/Scenes");
             GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(LabPaintStudyRenderer.PrefabPath);
             Texture2D color = AssetDatabase.LoadAssetAtPath<Texture2D>(ColorPath);
@@ -251,6 +249,7 @@ namespace C6Lab.Experiments.Editor
                 var controller = root.AddComponent<ClayPreviewController>();
                 controller.sourcePrefab = prefab; controller.colorMap = color; controller.heightMap = height;
                 controller.clayShader = shader; controller.uiFont = font; controller.styleSheet = style;
+                BindMetadata(controller);
                 Require(EditorSceneManager.SaveScene(scene, ScenePath), "Could not save the isolated preview Scene.");
             }
             finally
@@ -262,17 +261,83 @@ namespace C6Lab.Experiments.Editor
             Require(buildScenes == BuildScenesState(), "Creating the preview changed normal Build Settings.");
         }
 
+        private static LabWatercolorStampSettings SampleSettings()
+        {
+            var settings = new LabWatercolorStampSettings { mode = LabPaintStampMode.ClaySticker, revealSeconds = 0 };
+            settings.Validate();
+            return settings;
+        }
+
+        private static void RequirePreviewSceneSaved()
+        {
+            Scene existing = SceneManager.GetSceneByPath(ScenePath);
+            Require(!existing.IsValid() || !existing.isLoaded || !existing.isDirty,
+                "Save or preserve unsaved preview Scene edits first. Preparing never saves unrelated user changes.");
+        }
+
+        private static void BindMetadata(ClayPreviewController controller)
+        {
+            TextAsset metadata = AssetDatabase.LoadAssetAtPath<TextAsset>(SampleInfoPath);
+            Require(metadata != null, "The generated preview metadata is missing.");
+            controller.sampleInfo = metadata;
+            controller.sampleMetadataHash = ClayPreviewSampleInfo.ContentHash(metadata.text);
+        }
+
+        private static void RefreshSceneMetadata() => InspectSceneMetadata(true);
+        private static void ValidateSceneMetadata() => InspectSceneMetadata(false);
+
+        private static void InspectSceneMetadata(bool update)
+        {
+            if (update) RequirePreviewSceneSaved();
+            Scene active = SceneManager.GetActiveScene();
+            string before = SceneState(), buildScenes = BuildScenesState();
+            Scene scene = SceneManager.GetSceneByPath(ScenePath);
+            bool opened = !scene.IsValid() || !scene.isLoaded;
+            try
+            {
+                if (opened) scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Additive);
+                ClayPreviewController[] controllers = scene.GetRootGameObjects()
+                    .SelectMany(root => root.GetComponentsInChildren<ClayPreviewController>(true)).ToArray();
+                Require(controllers.Length == 1, "The experiment Scene must contain exactly one preview controller.");
+                ClayPreviewController controller = controllers[0];
+                TextAsset metadata = AssetDatabase.LoadAssetAtPath<TextAsset>(SampleInfoPath);
+                Require(metadata != null, "The generated preview metadata is missing.");
+                string expectedHash = ClayPreviewSampleInfo.ContentHash(metadata.text);
+                if (update && (controller.sampleInfo != metadata || controller.sampleMetadataHash != expectedHash))
+                {
+                    BindMetadata(controller);
+                    EditorUtility.SetDirty(controller);
+                    EditorSceneManager.MarkSceneDirty(scene);
+                    Require(EditorSceneManager.SaveScene(scene, ScenePath), "Could not bind the v2 sample to the experiment Scene.");
+                }
+                Require(controller.sampleInfo == metadata && controller.sampleMetadataHash == expectedHash,
+                    "The experiment Scene still references an older sample. Prepare the preview explicitly before building.");
+                Require(controller.colorMap == AssetDatabase.LoadAssetAtPath<Texture2D>(ColorPath)
+                    && controller.heightMap == AssetDatabase.LoadAssetAtPath<Texture2D>(HeightPath),
+                    "The experiment Scene does not reference the validated frozen maps.");
+            }
+            finally
+            {
+                if (active.IsValid() && active.isLoaded) SceneManager.SetActiveScene(active);
+                if (opened && scene.IsValid() && scene.isLoaded) EditorSceneManager.CloseScene(scene, true);
+            }
+            Require(before == SceneState(), "Inspecting the sample binding changed a previously loaded Scene.");
+            Require(buildScenes == BuildScenesState(), "Inspecting the sample binding changed normal Build Settings.");
+        }
+
         public static string ValidatePreparedSample()
         {
-            Require(File.Exists(ScenePath) && File.Exists(SampleInfoPath), "Prepare the preview Scene and sample first.");
-            SampleInfo info = JsonUtility.FromJson<SampleInfo>(File.ReadAllText(SampleInfoPath));
-            Require(info != null && info.format == "clay-preview-sample-v1" && info.complete
-                && info.cells == info.totalCells && info.totalCells > 0, "The sample metadata is not an actual complete surface.");
-            Require(info.sourceConfigPreserved && info.randomPreserved && info.scenesPreserved,
-                "The sample bake did not preserve shared source state.");
+            Require(File.Exists(ScenePath) && File.Exists(SampleInfoPath) && File.Exists(ColorPath) && File.Exists(HeightPath),
+                "Prepare the preview Scene and v2 sample first. Building does not generate or replace sample assets.");
+            string json = File.ReadAllText(SampleInfoPath);
+            Require(ClayPreviewSampleInfo.TryValidate(json, ClayPreviewSampleInfo.ContentHash(json),
+                out ClayPreviewSampleInfo info, out string metadataError), metadataError);
+            Require(info.styleVersion == SampleSettings().Version,
+                "The frozen sample uses a different clay style or brush version. Prepare the preview explicitly.");
             Require(info.colorFileHash == Hash(File.ReadAllBytes(ColorPath))
                 && info.heightFileHash == Hash(File.ReadAllBytes(HeightPath)), "The frozen sample changed after baking.");
             ValidateMap(ColorPath, false); ValidateMap(HeightPath, true);
+            ValidateSceneMetadata();
             Require(!EditorBuildSettings.scenes.Any(s => s.path.StartsWith(Root + "/", StringComparison.Ordinal)),
                 "The experiment must not be added to the normal game Build Settings.");
             string[] normal = EditorBuildSettings.scenes.Where(s => s.enabled && !string.IsNullOrEmpty(s.path)).Select(s => s.path).ToArray();
@@ -282,7 +347,7 @@ namespace C6Lab.Experiments.Editor
             {
                 valid = true, complete = true, normalBuildScenesPreserved = true,
                 width = info.width, height = info.height, hits = info.hits, cells = info.cells,
-                checks = 8, colorFileHash = info.colorFileHash, heightFileHash = info.heightFileHash
+                checks = 11, colorFileHash = info.colorFileHash, heightFileHash = info.heightFileHash
             }, true);
         }
 
@@ -344,7 +409,7 @@ namespace C6Lab.Experiments.Editor
             {
                 Require(!Enumerable.Range(0, SceneManager.sceneCount).Any(i => SceneManager.GetSceneAt(i).isDirty),
                     "Save or keep a separate copy of unsaved Scene edits before building. This tool never saves them automatically.");
-                Prepare();
+                ValidatePreparedSample();
                 if (previousTarget != BuildTarget.StandaloneOSX)
                     Require(EditorUserBuildSettings.SwitchActiveBuildTarget(BuildTargetGroup.Standalone, BuildTarget.StandaloneOSX),
                         "Could not activate the installed Mac build platform.");
