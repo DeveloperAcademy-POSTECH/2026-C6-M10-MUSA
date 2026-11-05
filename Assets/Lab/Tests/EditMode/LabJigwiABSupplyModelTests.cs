@@ -8,10 +8,11 @@ using Object = UnityEngine.Object;
 
 namespace C6Lab.Tests
 {
-    /// <summary>Authoritative B ammunition cadence and lifecycle fixtures; not device/playability evidence.</summary>
+    /// <summary>#509 B special Water (one per picked seat, one chance) lifecycle fixtures; not device/playability evidence.</summary>
     public sealed class LabJigwiABSupplyModelTests
     {
         private static readonly ulong[] Players = { 10ul, 20ul };
+        private static readonly ulong[] Three = { 10ul, 20ul, 30ul };
         private LabConfig config;
         private int serial;
 
@@ -29,9 +30,9 @@ namespace C6Lab.Tests
         }
         [TearDown] public void TearDown() => Object.DestroyImmediate(config);
 
-        private LabModel Room(LabStageYokai stage = LabStageYokai.Jigwi)
+        private LabModel Room(LabStageYokai stage = LabStageYokai.Jigwi, ulong[] seats = null)
         {
-            var model = new LabModel(); model.Begin("supply-412", Players, 0d, config, stage); return model;
+            var model = new LabModel(); model.Begin("supply-412", seats ?? Players, 0d, config, stage); return model;
         }
         private string Request() => "supply-request-" + ++serial;
         private Dictionary<string, LabOrbState> Orbs(LabModel model) =>
@@ -53,114 +54,44 @@ namespace C6Lab.Tests
         private void Launch(LabModel model, LabOrbState orb, double at) =>
             Assert.That(model.TryLaunch(orb.owner, orb.id, Request(), at, out _, out string error), Is.True, error);
         private LabJigwiABRound B(LabModel model, double at = 25d) => model.Snapshot(at).jigwiAB.Active(at);
-        private void Extinguish(LabModel model, LabJigwiABRound mission, ulong owner, string target, double at)
-        {
-            LabOrbState water = Add(model, owner, at); Launch(model, water, at);
-            // #509: a picked seat's ordinary Water on the boss counts (and paints as usual).
-            Assert.That(model.ConfirmHit(water.id, at, Vector3.back, out _, out _, out _), Is.True);
-        }
-        /// <summary>#509: two players → one picked seat; three of its own hits are three synchronized clears.</summary>
-        private void ClearTeam(LabModel model, LabJigwiABRound mission, double at)
-        {
-            var picked = mission.players.Single();
-            for (int i = 0; i < LabJigwiABTimeline.GroupSyncRequired; i++)
-                Extinguish(model, mission, picked.playerId, picked.targets[0].id, at);
-        }
-        private static ulong Picked(LabJigwiABRound mission) => mission.players.Single().playerId;
-        private static ulong Helper(LabJigwiABRound mission) => Players.Single(id => id != Picked(mission));
+        private LabOrbState Special(LabModel model, LabJigwiABRound mission, ulong seat) =>
+            Orbs(model).Values.Single(orb => orb.jigwiABSupplyEventId == mission.id && orb.originOwner == seat);
+        private static ulong Helper(LabJigwiABRound mission, IEnumerable<ulong> seats) =>
+            seats.First(id => mission.players.All(player => player.playerId != id));
 
         [Test]
-        public void SupplyBeginsAtActivationOnTheHelperOnlyAndCostsNoStaminaOrGenerationStatistics()
+        public void EachPickedSeatGetsOneSpecialWaterAtActivationWithoutStaminaOrStatistics()
         {
-            LabModel model = Room(); LabSnapshot warning = model.Snapshot(24d);
+            LabModel model = Room(Stage(), Three); LabSnapshot warning = model.Snapshot(24d);
             Assert.That(warning.jigwiAB.Warning(24d).kind, Is.EqualTo(LabJigwiABKind.GroupFire));
             Assert.That(Supplies(model, 24.999d), Is.Empty);
-            LabSnapshot active = model.Snapshot(25d);
-            LabJigwiABRound mission = active.jigwiAB.Active(25d);
-            ulong helper = Helper(mission);
-            LabOrbState supply = active.orbs.Single(orb => !string.IsNullOrEmpty(orb.jigwiABSupplyEventId));
-            Assert.That(supply.owner, Is.EqualTo(helper), "#509: free Water lands on the helper, who rolls it over.");
-            Assert.That(supply.kind, Is.EqualTo(LabOrbKind.Combined));
-            Assert.That(supply.element, Is.EqualTo(LabOrbElement.Water));
-            Assert.That(supply.jigwiSupply, Is.True);
-            Assert.That(supply.jigwiABSupplyEventId, Is.EqualTo(mission.id));
-            Assert.That(supply.origin, Is.EqualTo(LabOrbOrigin.Gourd));
-            Assert.That(supply.originOwner, Is.EqualTo(helper));
-            Assert.That(supply.expiresAt, Is.GreaterThanOrEqualTo(40d));
-            foreach (ulong owner in Players)
+            LabSnapshot before = model.Snapshot(24.999d);
+            LabJigwiABRound mission = B(model);
+            LabOrbState[] specials = Supplies(model, 25d);
+            Assert.That(specials.Select(orb => orb.originOwner), Is.EquivalentTo(mission.players.Select(player => player.playerId)));
+            Assert.That(specials.All(orb => orb.owner == orb.originOwner && orb.jigwiSupply && orb.kind == LabOrbKind.Combined
+                && orb.element == LabOrbElement.Water && orb.origin == LabOrbOrigin.Gourd), Is.True);
+            Assert.That(specials.Any(orb => orb.originOwner == Helper(mission, Three)), Is.False, "Helpers get no Water.");
+            LabSnapshot after = model.Snapshot(25d);
+            foreach (LabPlayerState player in after.players)
             {
-                LabPlayerState player = active.players.Single(value => value.id == owner);
-                LabPlayerState before = warning.players.Single(value => value.id == owner);
-                Assert.That(player.stamina, Is.EqualTo(before.stamina));
-                Assert.That(player.generatedTotal, Is.EqualTo(before.generatedTotal));
-                Assert.That(player.combinedTotal, Is.EqualTo(before.combinedTotal));
+                LabPlayerState old = before.players.Single(value => value.id == player.id);
+                Assert.That(player.stamina, Is.EqualTo(old.stamina)); Assert.That(player.throwTotal, Is.EqualTo(old.throwTotal));
             }
+            Assert.That(Supplies(model, 39d), Has.Length.EqualTo(specials.Length), "No cadence: still one each later.");
+            Assert.That(LabJigwiABNetworkValidation.Valid(after.jigwiAB, after.players, model.Revision), Is.True);
         }
+        private static LabStageYokai Stage() => LabStageYokai.Jigwi;
 
         [Test]
-        public void NormalCadenceStopsAtTheOutstandingCapAndRepeatedSnapshotsDoNotDuplicate()
+        public void TheSpecialWaterIsNotRegrantedAfterItIsThrownOrPassed()
         {
-            LabModel model = Room(); ulong helper = Helper(B(model)); var ids = new HashSet<string>();
-            for (int step = 0; step < 5; step++)
-            {
-                double at = 25d + step * 2d;
-                LabOrbState[] supplies = Supplies(model, at);
-                Assert.That(supplies.Count(orb => orb.originOwner == helper), Is.EqualTo(step + 1));
-                Assert.That(supplies.All(orb => orb.originOwner == helper), Is.True);
-                Assert.That(Supplies(model, at).Select(orb => orb.id), Is.EquivalentTo(supplies.Select(orb => orb.id)));
-                foreach (var supply in supplies) ids.Add(supply.id);
-                Assert.That(Supplies(model, at + 1.999d), Has.Length.EqualTo(step + 1));
-            }
-            Assert.That(ids.Count, Is.EqualTo(5));
-            Assert.That(Supplies(model, 39d), Has.Length.EqualTo(5), "The cap of five unconsumed supplies holds.");
-            Assert.That(Supplies(model, 40d), Is.Empty, "The 15-second deadline fails the mission and removes them.");
-        }
-
-        [Test]
-        public void SupplySettingsCanChangeTheInitialCountIntervalAndOutstandingCapIndependently()
-        {
-            SetConfig("jigwiABSupplyInitialCount", 0);
-            SetConfig("jigwiABSupplyIntervalSeconds", 1f);
-            SetConfig("jigwiABSupplyLimit", 2);
-            LabModel model = Room();
-            Assert.That(Supplies(model, 25d), Is.Empty);
-            Assert.That(Supplies(model, 26d), Has.Length.EqualTo(1));
-            Assert.That(Supplies(model, 27d), Has.Length.EqualTo(2));
-            Assert.That(Supplies(model, 28d), Has.Length.EqualTo(2));
-        }
-
-        [Test]
-        public void ADelayedUpdateSkipsOverdueBatchesRatherThanFloodingTheBoards()
-        {
-            LabModel model = Room(); Assert.That(Supplies(model, 25d), Has.Length.EqualTo(1));
-            Assert.That(Supplies(model, 34d), Has.Length.EqualTo(2));
-            Assert.That(Supplies(model, 34d), Has.Length.EqualTo(2));
-            Assert.That(Supplies(model, 34.99d), Has.Length.EqualTo(2));
-            Assert.That(Supplies(model, 40d), Is.Empty);
-        }
-
-        [Test]
-        public void TheQuotaIncludesTransferredAndFlyingUnconsumedSupplies()
-        {
-            SetConfig("jigwiABSupplyInitialCount", 5);
             LabModel model = Room(); LabJigwiABRound mission = B(model);
-            ulong helper = Helper(mission), picked = Picked(mission);
-            LabOrbState[] born = Supplies(model, 25d);
-            LabOrbState passed = born.First();
-            bool right = picked == Players[1];
-            Assert.That(model.TryTransferAt(passed.owner, passed.id, right, new Vector2(right ? 1f : 0f, .5f),
-                right ? Vector2.right : Vector2.left, Request(), 25d, LabEdgeCrossingKind.Swipe,
-                out LabOrbState received, out string error), Is.True, error);
-            Assert.That(received.owner, Is.EqualTo(picked));
-            Assert.That(received.originOwner, Is.EqualTo(helper));
-            Assert.That(received.jigwiABSupplyEventId, Is.EqualTo(passed.jigwiABSupplyEventId));
-            LabOrbState flying = born.First(orb => orb.id != passed.id); Launch(model, flying, 25d);
-            Assert.That(Supplies(model, 27d), Has.Length.EqualTo(5), "Transfer/flight do not free an unconsumed supply quota.");
-            Assert.That(model.ConfirmMiss(flying.id, 27d, false), Is.True);
-            LabOrbState[] replenished = Supplies(model, 29d);
-            Assert.That(replenished, Has.Length.EqualTo(5));
-            Assert.That(replenished.All(orb => orb.originOwner == helper), Is.True);
-            Assert.That(replenished.Any(orb => orb.id == passed.id), Is.True);
+            LabOrbState mine = Special(model, mission, Players[0]);
+            Assert.That(model.TryTransferAt(Players[0], mine.id, true, new Vector2(1, .5f), Vector2.right, Request(), 25.2d,
+                LabEdgeCrossingKind.Swipe, out LabOrbState received, out string error), Is.True, error);
+            Assert.That(received.owner, Is.EqualTo(Players[1]));
+            Assert.That(Supplies(model, 30d).Count(orb => orb.originOwner == Players[0]), Is.EqualTo(1), "Passing does not make a new one.");
         }
 
         [Test]
@@ -190,72 +121,63 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void APassedSupplyCountsAsASyncHitWithoutOrdinaryBossRewards()
+        public void APassedSpecialWaterStillCountsForItsPickedSeatWithoutOrdinaryBossRewards()
         {
             LabModel model = Room(); LabJigwiABRound mission = B(model);
-            ulong picked = Picked(mission);
-            LabOrbState supplied = Supplies(model, 25d).First();
-            supplied = Orbs(model)[supplied.id]; supplied.owner = picked; // as if rolled over to the picked seat
-            LabPlayerState before = model.Snapshot(25d).players.Single(player => player.id == picked);
-            Launch(model, supplied, 25d);
-            // #509: the supply hits the boss: it counts as the sync hit and is consumed without paint.
-            Assert.That(model.ConfirmHit(supplied.id, 25d, Vector3.forward, out _, out _, out _), Is.False);
-            Assert.That(model.ConfirmHit(supplied.id, 25d, Vector3.forward, out _, out _, out _), Is.False);
-            Assert.That(B(model, 25d).syncCount, Is.EqualTo(1));
-            LabPlayerState after = model.Snapshot(25d).players.Single(player => player.id == picked);
-            Assert.That(after.stamina, Is.EqualTo(before.stamina));
-            Assert.That(after.hitTotal, Is.EqualTo(before.hitTotal));
-            Assert.That(after.throwTotal, Is.EqualTo(before.throwTotal));
-            Assert.That(model.PaintSurface.PaintCount, Is.Zero);
-        }
-
-        [Test]
-        public void SuppliedWaterThrownAtTheBossByTheHelperNeverPaints()
-        {
-            LabModel model = Room(); LabJigwiABRound mission = B(model); ulong helper = Helper(mission);
-            LabOrbState supplied = Supplies(model, 25d).First();
-            Assert.That(model.JigwiABBlocksBoss(helper, 25d), Is.False);
-            LabPlayerState before = model.Snapshot(25d).players.Single(player => player.id == helper);
+            LabOrbState special = Special(model, mission, Players[0]);
+            special.owner = Players[1]; // as if rolled over to the other seat, who throws it
+            LabPlayerState before = model.Snapshot(25d).players.Single(player => player.id == Players[1]);
             int hp = model.Snapshot(25d).hp;
-            Launch(model, supplied, 25d);
-            Assert.That(model.ConfirmHit(supplied.id, 25d, Vector3.forward, out _, out _, out _), Is.False);
+            Launch(model, special, 25d);
+            Assert.That(model.ConfirmHit(special.id, 25d, Vector3.forward, out _, out _, out _), Is.False);
+            Assert.That(model.ConfirmHit(special.id, 25d, Vector3.forward, out _, out _, out _), Is.False, "Consumed once.");
+            LabJigwiABRound now = B(model, 25d);
+            Assert.That(now.syncWindowAt, Is.EqualTo(25d));
+            Assert.That(now.players.Single(player => player.playerId == Players[0]).targets[0].extinguishedAt, Is.EqualTo(25d),
+                "It counts for the seat it was given to.");
             LabSnapshot after = model.Snapshot(25d);
-            Assert.That(after.orbs.Any(orb => orb.id == supplied.id), Is.False);
+            LabPlayerState thrower = after.players.Single(player => player.id == Players[1]);
+            Assert.That(thrower.stamina, Is.EqualTo(before.stamina));
+            Assert.That(thrower.hitTotal, Is.EqualTo(before.hitTotal));
+            Assert.That(thrower.throwTotal, Is.EqualTo(before.throwTotal));
             Assert.That(after.hp, Is.EqualTo(hp));
-            Assert.That(after.players.Single(player => player.id == helper).hitTotal, Is.EqualTo(before.hitTotal));
-            Assert.That(after.players.Single(player => player.id == helper).stamina, Is.EqualTo(before.stamina));
             Assert.That(model.PaintSurface.PaintCount, Is.Zero);
-            LabOrbState ordinary = Add(model, helper, 25d); Launch(model, ordinary, 25d);
-            Assert.That(model.ConfirmHit(ordinary.id, 25d, Vector3.forward, out _, out _, out _), Is.True,
-                "Ordinary Water keeps its normal boss attack for a helper.");
         }
 
         [Test]
-        public void ADiscardedSupplyNeverChangesOrdinaryThrowAccuracyButAnOrdinaryMissStillDoes()
-        {
-            LabModel model = Room(); ulong helper = Helper(B(model));
-            LabOrbState supplied = Supplies(model, 25d).First();
-            int before = model.Snapshot(25d).players.Single(player => player.id == helper).throwTotal;
-            Launch(model, supplied, 25d);
-            Assert.That(model.ConfirmMiss(supplied.id, 25d), Is.True);
-            Assert.That(model.Snapshot(25d).players.Single(player => player.id == helper).throwTotal, Is.EqualTo(before));
-            LabOrbState ordinary = Add(model, helper, 25d); Launch(model, ordinary, 25d);
-            Assert.That(model.ConfirmMiss(ordinary.id, 25d), Is.True);
-            Assert.That(model.Snapshot(25d).players.Single(player => player.id == helper).throwTotal, Is.EqualTo(before + 1));
-        }
-
-        [Test]
-        public void TeamSuccessRemovesOnlyThisMissionsSupplyIncludingFlightAndKeepsOrdinaryWater()
+        public void AMissedSpecialWaterFailsBWithoutChangingThrowAccuracy()
         {
             LabModel model = Room(); LabJigwiABRound mission = B(model);
-            LabOrbState flying = Supplies(model, 25d).First(); Launch(model, flying, 25d);
-            LabOrbState ordinary = Add(model, Helper(mission), 25d);
-            ClearTeam(model, mission, 25d);
+            LabOrbState special = Special(model, mission, Players[0]);
+            int before = model.Snapshot(25d).players.Single(player => player.id == Players[0]).throwTotal;
+            Launch(model, special, 25d);
+            Assert.That(model.ConfirmMiss(special.id, 25.5d), Is.True);
+            LabSnapshot after = model.Snapshot(25.5d);
+            Assert.That(after.players.Single(player => player.id == Players[0]).throwTotal, Is.EqualTo(before));
+            LabJigwiABRound failed = after.jigwiAB.rounds.Single(value => value.id == mission.id);
+            Assert.That(failed.resolution, Is.EqualTo(LabJigwiABResolution.Expired));
+            Assert.That(failed.boardFireUntil, Is.EqualTo(28.5d).Within(1e-9));
+            Assert.That(Supplies(model, 25.5d), Is.Empty, "The other seat's special Water goes with the failed B.");
+            LabOrbState ordinary = Add(model, Players[0], 26d); Launch(model, ordinary, 26d);
+            Assert.That(model.ConfirmMiss(ordinary.id, 26d), Is.True);
+            Assert.That(model.Snapshot(26d).players.Single(player => player.id == Players[0]).throwTotal, Is.EqualTo(before + 1));
+        }
+
+        [Test]
+        public void TeamSuccessRemovesOnlyThisMissionsSupplyAndKeepsOrdinaryWater()
+        {
+            LabModel model = Room(Stage(), Three); LabJigwiABRound mission = B(model);
+            LabOrbState ordinary = Add(model, Helper(mission, Three), 25d);
+            foreach (var picked in mission.players)
+            {
+                LabOrbState special = Special(model, mission, picked.playerId); Launch(model, special, 25d);
+                Assert.That(model.ConfirmHit(special.id, 25d, Vector3.back, out _, out _, out _), Is.False);
+            }
             LabSnapshot after = model.Snapshot(25d);
-            Assert.That(after.jigwiAB.rounds.Single(value => value.id == mission.id).resolution, Is.EqualTo(LabJigwiABResolution.Completed));
-            Assert.That(after.jigwiAB.rounds.Single(value => value.id == mission.id).rewardUntil, Is.EqualTo(-1d), "#509: no launch reward.");
-            Assert.That(after.orbs.Select(orb => orb.id), Is.EquivalentTo(new[] { ordinary.id }));
-            Assert.That(model.ConfirmMiss(flying.id, 25d), Is.False);
+            LabJigwiABRound done = after.jigwiAB.rounds.Single(value => value.id == mission.id);
+            Assert.That(done.resolution, Is.EqualTo(LabJigwiABResolution.Completed));
+            Assert.That(done.rewardUntil, Is.EqualTo(-1d), "#509: no launch reward.");
+            Assert.That(after.orbs.Where(orb => !orb.kind.IsDrum()).Select(orb => orb.id), Is.EquivalentTo(new[] { ordinary.id }));
             Assert.That(Supplies(model, 34d), Is.Empty);
         }
 
@@ -268,16 +190,15 @@ namespace C6Lab.Tests
             values[Field("Gimmick Chance Gourd Bomb (%)")] = 0; values[Field("Gimmick Chance Swipe Block (%)")] = 100;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             LabModel model = Room(); B(model);
-            LabOrbState flying = Supplies(model, 25d).First(); Launch(model, flying, 25d);
             LabOrbState fire = Add(model, Players[0], 25d); LabOrbState potion = Add(model, Players[1], 39.5d, LabOrbKind.Potion); // items have their own short lifetime
             float[] stamina = model.Snapshot(39.9d).players.Select(player => player.stamina).ToArray();
+            Assert.That(Supplies(model, 39.9d), Has.Length.EqualTo(2), "Nobody threw the special Water.");
             LabSnapshot after = model.Snapshot(40d);
             LabJigwiABRound failed = after.jigwiAB.rounds.Single(value => value.slot == 1);
             Assert.That(failed.resolution, Is.EqualTo(LabJigwiABResolution.Expired));
             Assert.That(failed.boardFireUntil, Is.EqualTo(43d), "#509: the boards burn for 3 s instead of being emptied.");
             Assert.That(after.orbs.Where(orb => !orb.kind.IsDrum()).Select(orb => orb.id), Is.EquivalentTo(new[] { fire.id, potion.id }));
             Assert.That(after.players.Select(player => player.stamina), Is.EqualTo(stamina));
-            Assert.That(model.ConfirmMiss(flying.id, 40d), Is.False, "This B's supplied Water still disappears with it.");
             Assert.That(Supplies(model, 41d), Is.Empty);
         }
 
@@ -285,19 +206,19 @@ namespace C6Lab.Tests
         public void BattleCancellationCleansFlightSuppliesButPreservesOrdinaryOrbsAndStamina()
         {
             LabModel model = Room(); LabJigwiABRound mission = B(model);
-            LabOrbState supply = Supplies(model, 25d).First(); Launch(model, supply, 25d);
+            LabOrbState supply = Special(model, mission, Players[0]); Launch(model, supply, 25d);
             LabOrbState ordinary = Add(model, Players[0], 25d);
             foreach (ulong owner in Players)
                 Assert.That(model.TryApplyPlayerDamage(owner, config.PlayerMaxHp, 26d), Is.True);
             LabSnapshot after = model.Snapshot(26d);
             Assert.That(after.phase, Is.EqualTo(LabPhase.Defeat));
-            Assert.That(after.orbs.Select(orb => orb.id), Is.EquivalentTo(new[] { ordinary.id }));
+            Assert.That(after.orbs.Where(orb => !orb.kind.IsDrum()).Select(orb => orb.id), Is.EquivalentTo(new[] { ordinary.id }));
             Assert.That(after.players.All(player => player.stamina == 100f), Is.True);
             Assert.That(after.jigwiAB.rounds.Single(value => value.id == mission.id).resolution, Is.EqualTo(LabJigwiABResolution.Cancelled));
         }
 
         [Test]
-        public void ANewRoundStartsANewSupplyIdentityAndDoesNotCarryOverCadenceOrQuota()
+        public void ANewRoundStartsANewSupplyIdentity()
         {
             LabModel model = Room(); string first = B(model).id;
             model.Tick(120d);
@@ -305,7 +226,7 @@ namespace C6Lab.Tests
             model.Begin("supply-reset", Players, 200d, config, LabStageYokai.Jigwi);
             Assert.That(Supplies(model, 224.99d), Is.Empty);
             LabOrbState[] next = Supplies(model, 225d);
-            Assert.That(next, Has.Length.EqualTo(1));
+            Assert.That(next, Has.Length.EqualTo(2));
             Assert.That(next.All(orb => orb.jigwiABSupplyEventId != first), Is.True);
         }
 

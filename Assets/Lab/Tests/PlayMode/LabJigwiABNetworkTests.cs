@@ -63,11 +63,13 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
-        public IEnumerator APickedSeatsRealWaterShotOnTheBossCountsAsItsSyncHitAndPaints()
+        public IEnumerator APickedSeatsRealSpecialWaterShotOnTheBossCountsWithoutPaint()
         {
             LabSnapshot snapshot = Install(31.1d);
-            Assert.That(snapshot.jigwiAB.Active(snapshot.serverTime).syncCount, Is.Zero);
-            LabOrbState orb = Add(model, 0, snapshot.serverTime, LabOrbElement.Water);
+            LabJigwiABRound round = snapshot.jigwiAB.Active(snapshot.serverTime);
+            Assert.That(round.syncCount, Is.Zero);
+            // #509: both seats of two are picked; seat 0 throws the special Water B gave it.
+            LabOrbState orb = Special(round.id, 0);
             Assert.That(model.TryLaunch(0, orb.id, "sync-boss-flight", snapshot.serverTime, out _, out string error), Is.True, error);
             yield return null;
             bool received = false, approved = false; LabProjectileResult result = default;
@@ -86,10 +88,11 @@ namespace C6Lab.Tests
             Assert.That(received, Is.True, "The saved-profile legal shot must resolve; form=" + config.ThrowForm
                 + " origin=" + shot.LaunchPosition + " velocity=" + launchVelocity + " gravity=" + config.EffectiveThrowGravity);
             Assert.That(result.Kind, Is.EqualTo(LabProjectileHitKind.Monster), "Nothing stands in front of the boss during B.");
-            Assert.That(approved, Is.True);
-            Assert.That(model.PaintSurface.CoveredCount, Is.GreaterThan(0));
-            Assert.That(model.Snapshot(snapshot.serverTime).jigwiAB.Active(snapshot.serverTime).syncCount, Is.EqualTo(1),
-                "Seat 0 is the only picked seat, so its Water on the boss is one synchronized clear.");
+            Assert.That(approved, Is.False, "The special Water is consumed by the Host, never as an ordinary paint hit.");
+            Assert.That(model.PaintSurface.CoveredCount, Is.Zero);
+            LabJigwiABRound after = model.Snapshot(snapshot.serverTime).jigwiAB.Active(snapshot.serverTime);
+            Assert.That(after.syncWindowAt, Is.EqualTo(snapshot.serverTime), "Seat 0's hit opens the one-second window.");
+            Assert.That(after.players.Single(player => player.playerId == 0ul).targets[0].extinguishedAt, Is.EqualTo(snapshot.serverTime));
         }
 
         [Test]
@@ -235,8 +238,8 @@ namespace C6Lab.Tests
             // while the actual timed B curtain stays active only for the other player.
             ExtinguishOwnPoints(0, 31d);
             Assert.That(model.JigwiABBlocksBoss(0, 31d), Is.False);
-            Assert.That(model.JigwiABBlocksBoss(20, 31d), Is.False, "#509: the helper is never blocked.");
-            int modelBefore = model.PaintSurface.CoveredCount; // the three sync hits already painted the back
+            Assert.That(model.JigwiABBlocksBoss(20, 31d), Is.False, "#509: nobody is ever blocked.");
+            int modelBefore = model.PaintSurface.CoveredCount; // the success splash already painted the back
             // Hit after B's 5-second success reward [31, 36) so both rooms use the ordinary paint budget.
             LabOrbState reduced = Add(model, 0, 37d, LabOrbElement.Water);
             reduced.jigwiABRadiusScale = .65f; // Explicit old-field fixture, not a timed-mission penalty.
@@ -422,26 +425,28 @@ namespace C6Lab.Tests
             }
         }
 
-        /// <summary>#509: the single picked seat's three hits are three synchronized clears (B succeeds).</summary>
+        /// <summary>#509: every picked seat throws its special Water at the boss together (B succeeds at once).</summary>
         private void ExtinguishOwnPoints(ulong owner, double at)
         {
             LabJigwiABRound round = model.Snapshot(at).jigwiAB.Active(at);
-            string fire = round.players.Single(player => player.playerId == owner).targets[0].id;
-            for (int i = 0; i < LabJigwiABTimeline.GroupSyncRequired; i++) ExtinguishPoint(owner, round.id, fire, at);
+            Assert.That(round.players.Any(player => player.playerId == owner), Is.True);
+            foreach (var player in round.players)
+            {
+                // Aimed at the back, away from the paint checks; the success splash lands there too.
+                LabOrbState water = Special(round.id, player.playerId);
+                Assert.That(model.TryLaunch(water.owner, water.id, "clear-point-" + water.id, at, out _, out string error), Is.True, error);
+                Assert.That(model.ConfirmHit(water.id, at, Vector3.back, out _, out _, out _), Is.False);
+            }
+            Assert.That(model.Snapshot(at).jigwiAB.rounds.Single(value => value.id == round.id).resolution,
+                Is.EqualTo(LabJigwiABResolution.Completed));
         }
-        private void ExtinguishPoint(ulong owner, string roundId, string targetId, double at)
-        {
-            // #509: the picked seat's Water on the boss (aimed at the back, away from the paint checks).
-            LabOrbState water = Add(model, owner, at, LabOrbElement.Water);
-            Assert.That(model.TryLaunch(owner, water.id, "clear-point-" + water.id, at, out _, out string error), Is.True, error);
-            Assert.That(model.ConfirmHit(water.id, at, Vector3.back, out _, out _, out _), Is.True);
-        }
+        private LabOrbState Special(string roundId, ulong seat) =>
+            ((Dictionary<string, LabOrbState>)typeof(LabModel).GetField("orbs", Private).GetValue(model)).Values
+                .Single(orb => orb.jigwiABSupplyEventId == roundId && orb.originOwner == seat);
 
         private LabModel Room(LabStageYokai stage)
         {
-            // #509: B picks one of two seats from the session seed; this id picks seat 0 for B1 and B2
-            // (seat 20 is the helper), so the fixtures below can keep aiming from seat 0.
-            // (Checked inside the tests that read B; asking here would advance the model clock.)
+            // #509: with two seats both are picked for B, so the fixtures can keep aiming from seat 0.
             var value = new LabModel(); value.Begin("jigwi-ab-network2", new[] { 0ul, 20ul }, 0d, config, stage);
             return value;
         }

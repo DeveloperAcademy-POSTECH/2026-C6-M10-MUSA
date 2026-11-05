@@ -17,10 +17,10 @@ namespace C6Lab.Tests
             Assert.That(v.Skip(240).Take(13),Is.EqualTo(new[]{15f,4f,3f,5f,3f,12f,12f,.65f,.03f,4f,.3f,1.3f,1.5f}));
             Assert.That(v.Skip(253).Take(4),Is.EqualTo(new[]{2f,1f,5f,.8f}));
             Assert.That(v.Skip(228).Take(8),Is.EqualTo(new[]{1f,1f,7f,18f,30f,1f,3f,2f}));
-            var old=new[]{229,230,231,232,233,234,241,242,244,245,246,247,251,252};
+            var old=new[]{229,230,231,232,233,234,241,242,244,245,246,247,251,252,253,254,255};
             foreach(int i in old)Assert.That(LabConfig.RetiredDeveloperFields,Does.Contain(i));
             var category=LabConfig.DeveloperCategories.Single(x=>x.Title=="지귀 120초 (Hapio 전용)");
-            Assert.That(category.FieldIndices,Is.EqualTo(new[]{228,235}.Concat(Enumerable.Range(240,17)).Except(new[]{241,242,244,245,246,247,251,252})));
+            Assert.That(category.FieldIndices,Is.EqualTo(new[]{228,235}.Concat(Enumerable.Range(240,17)).Except(new[]{241,242,244,245,246,247,251,252,253,254,255})));
             Assert.That(v[55],Is.EqualTo(3));Assert.That(v[211],Is.EqualTo(120));
             Assert.That(LabConfig.DeveloperFields[240].Max, Is.EqualTo(15f));
         }

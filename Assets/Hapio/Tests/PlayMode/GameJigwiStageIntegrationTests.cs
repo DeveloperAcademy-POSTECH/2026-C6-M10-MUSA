@@ -175,27 +175,22 @@ namespace Hapio.Tests
             Assert.That(clock.IsPaused, Is.True);
             CaptureScreenEvidence("3"); yield return null;
             int paintedBefore = model.PaintSurface.CoveredCount;
-            for (int i = 0; i < 3; i++)
-            {
-                ThrowFixtureWaterAtBoss("saved-sync-" + i);
-                PublishFireState(); yield return null;
-                if (i < 2)
-                {
-                    Assert.That(overlay.SyncPillar.FilledDrops, Is.EqualTo(i + 1));
-                    Assert.That(overlay.status.text, Is.Empty);
-                }
-                HoldAt(31.4d + i * .3d); yield return null;
-                CaptureScreenEvidence((2 - i).ToString()); yield return null;
-            }
+            Assert.That(overlay.SyncPillar.DropCount, Is.EqualTo(1), "Solo: one picked seat, one drop.");
+            // #509: solo is the test room — its one special Water on the boss is the whole B.
+            ThrowSpecialWaterAtBoss(b.id);
+            PublishFireState(); yield return null;
+            HoldAt(31.4d); yield return null;
+            CaptureScreenEvidence("2"); yield return null;
             Assert.That(network.Snapshot.jigwiAB.rounds.Single(round => round.id == b.id).resolution,
                 Is.EqualTo(LabJigwiABResolution.Completed));
             Assert.That(overlay.SyncPillar.DropsVisible, Is.False);
-            Assert.That(model.PaintSurface.CoveredCount, Is.GreaterThan(paintedBefore), "The counted Water paints the boss as usual.");
+            Assert.That(overlay.status.text, Is.Empty);
+            Assert.That(model.PaintSurface.CoveredCount, Is.GreaterThan(paintedBefore), "The success splash paints the boss.");
             Assert.That(target.Hitbox.sharedMesh, Is.SameAs(shell));
             network.LocalStaminaSpent -= onSpent;
             HoldAt(35d); yield return null;
             CaptureScreenEvidence("0"); yield return null;
-            TestContext.WriteLine("JIGWI_AB_SAVED_STAGE3: Home/DEV skips/A11.2/B31.2/no B colliders/boss sync 0-1-2-3 checked. "
+            TestContext.WriteLine("JIGWI_AB_SAVED_STAGE3: Home/DEV skips/A11.2/B31.2/no B colliders/one special Water clears solo B. "
                 + "Screen Space Overlay GPU pixels are not sampled by camera.Render; device/GPU visual review is separate.");
         }
 
@@ -207,15 +202,14 @@ namespace Hapio.Tests
             ScreenCapture.CaptureScreenshot(Path.Combine(Path.GetTempPath(), "jigwi341-curtain-" + remaining + ".png"));
         }
 
-        /// <summary>#509: an approved in-flight Water fixture that hits the boss itself.</summary>
-        private void ThrowFixtureWaterAtBoss(string id)
+        /// <summary>#509: the local seat throws the special Water B gave it; it hits the boss itself.</summary>
+        private void ThrowSpecialWaterAtBoss(string roundId)
         {
             double now = clock.Now(Time.realtimeSinceStartupAsDouble);
-            var orb = new LabOrbState { id = id, owner = network.LocalPlayerId, kind = LabOrbKind.Combined,
-                element = LabOrbElement.Water, createdAt = now, x = .5f, y = .5f };
-            ((Dictionary<string, LabOrbState>)typeof(LabModel).GetField("orbs", Private).GetValue(model)).Add(id, orb);
-            Assert.That(model.TryLaunch(orb.owner, id, "launch/" + id, now, out _, out string reason), Is.True, reason);
-            Assert.That(model.ConfirmHit(id, now, Vector3.back, out _, out _, out _), Is.True);
+            var orb = ((Dictionary<string, LabOrbState>)typeof(LabModel).GetField("orbs", Private).GetValue(model)).Values
+                .Single(value => value.jigwiABSupplyEventId == roundId && value.originOwner == network.LocalPlayerId);
+            Assert.That(model.TryLaunch(orb.owner, orb.id, "launch/" + orb.id, now, out _, out string reason), Is.True, reason);
+            Assert.That(model.ConfirmHit(orb.id, now, Vector3.back, out _, out _, out _), Is.False, "Consumed as the sync token.");
         }
         private void PublishFireState()
         {

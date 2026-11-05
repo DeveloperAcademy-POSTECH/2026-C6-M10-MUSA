@@ -122,7 +122,6 @@ namespace C6Lab
             if (active.kind != LabJigwiABKind.GroupFire) return;
             CloseJigwiSyncWindow(active, now);
             if (firstActivation) StartJigwiABSupply(active, now);
-            else AdvanceJigwiABSupply(active, now);
         }
         private void BeginJigwiABSlot(int slot, double activeAt)
         {
@@ -240,11 +239,12 @@ namespace C6Lab
             if (!jigwiABEnabled || orb.kind != LabOrbKind.Combined || orb.element != LabOrbElement.Water) return;
             var active = ActiveJigwiABRound(now);
             if (active == null || active.kind != LabJigwiABKind.GroupFire || !active.Active(now)) return;
-            if (!string.IsNullOrEmpty(orb.jigwiABSupplyEventId) && orb.jigwiABSupplyEventId != active.id) return;
-            var picked = active.players.FirstOrDefault(player => player.playerId == orb.owner);
+            // #509: only this B's special Water counts, for the picked seat it was given to (whoever throws it).
+            if (orb.jigwiABSupplyEventId != active.id) return;
+            var picked = active.players.FirstOrDefault(player => player.playerId == orb.originOwner);
             var slot = picked?.targets?.FirstOrDefault();
             if (slot == null || !slot.lit) return;
-            if (paintDirection.sqrMagnitude > 1e-6f && !float.IsNaN(paintDirection.x)) jigwiSyncDirections[orb.owner] = paintDirection.normalized;
+            if (paintDirection.sqrMagnitude > 1e-6f && !float.IsNaN(paintDirection.x)) jigwiSyncDirections[orb.originOwner] = paintDirection.normalized;
             RecordJigwiSyncHit(active, slot, now);
             if (active.resolution == LabJigwiABResolution.Completed) SplashJigwiSuccess(active, now);
         }
@@ -335,14 +335,11 @@ namespace C6Lab
             }
             return true;
         }
-        /// <summary>#509: a window whose second passed without every picked hit resets the count to zero.</summary>
+        /// <summary>#509: a window whose second passed without every picked hit fails B (one chance only).</summary>
         private void CloseJigwiSyncWindow(LabJigwiABRound active, double now)
         {
             if (active.syncWindowAt < 0d || now < active.syncWindowAt + LabJigwiABTimeline.GroupSyncWindowSeconds) return;
-            active.syncResetAt = active.syncWindowAt + LabJigwiABTimeline.GroupSyncWindowSeconds;
-            active.syncWindowAt = -1d; active.syncCount = 0;
-            foreach (var target in active.players.SelectMany(p => p.targets)) target.extinguishedAt = -1d;
-            revision++;
+            FailJigwiSync(active, active.syncWindowAt + LabJigwiABTimeline.GroupSyncWindowSeconds);
         }
         /// <summary>
         /// #479 지귀 부적: 이 회차 A에서 "물"을 다 쓴 사람의 불만 끄고(남은 구슬은 더 타지 않음) 그 판에 물 구슬을 준다.

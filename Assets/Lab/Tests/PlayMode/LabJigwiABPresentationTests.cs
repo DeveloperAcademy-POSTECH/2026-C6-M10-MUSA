@@ -188,7 +188,8 @@ namespace C6Lab.Tests
             Assert.That(view.SyncPillar.DropsVisible, Is.True);
             Assert.That(view.GroupCurtainVisible, Is.False, "#509: no curtain or pillar.");
             Assert.That(view.VisibleScreenFires, Is.Zero);
-            Assert.That(view.RemainingIgnitions, Is.EqualTo(3));
+            Assert.That(view.RemainingIgnitions, Is.EqualTo(2), "#509: both picked seats still have to hit.");
+            Assert.That(view.SyncPillar.DropCount, Is.EqualTo(2), "One drop per picked seat.");
             Assert.That(view.audioView.WantsLoop, Is.False, "No fire on screen, no fire loop.");
             Assert.That(view.status.text, Is.Empty, "After the warning B shows no words at all.");
             Assert.That(view.statusPanel.gameObject.activeSelf, Is.False);
@@ -375,12 +376,13 @@ namespace C6Lab.Tests
             view.ApplySnapshot(snapshot, Local, 11.45d);
             Assert.That(view.fireWaterDouses[0].gameObject.activeSelf, Is.True, "My accepted hit splashes once.");
             Assert.That(view.SyncPillar.NowCueVisible, Is.False, "I already hit; only the partner gets 'now'.");
-            group.syncWindowAt = -1d; mine.targets[0].extinguishedAt = -1d; group.syncCount = 1;
-            view.ApplySnapshot(snapshot, Local, 11.6d);
+            // #509: one drop per picked seat (two here); mine is filled while the partner's is still empty.
+            Assert.That(view.SyncPillar.DropCount, Is.EqualTo(2));
             Assert.That(view.SyncPillar.FilledDrops, Is.EqualTo(1));
             Assert.That(view.status.text, Is.Empty);
-            Assert.That(view.RemainingIgnitions, Is.EqualTo(2));
-            group.syncCount = 3; foreach (var player in group.players) player.targets[0].lit = false;
+            Assert.That(view.RemainingIgnitions, Is.EqualTo(1));
+            group.syncWindowAt = -1d; foreach (var player in group.players) player.targets[0].extinguishedAt = -1d;
+            group.syncCount = 1; foreach (var player in group.players) player.targets[0].lit = false;
             group.resolution = LabJigwiABResolution.Completed; group.resolvedAt = 23.8d;
             view.ApplySnapshot(snapshot, Local, 23.8d);
             Assert.That(view.SyncPillar.DropsVisible, Is.False);

@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace C6Lab.Tests
 {
-    /// <summary>#509 B 화면: 물방울 3칸/"지금!"/어긋남 표시를 스냅샷 값만으로 정하는지(불기둥 없음).</summary>
+    /// <summary>#509 B 화면: 지목 수만큼의 물방울 칸/"지금" 진동/어긋남 표시를 스냅샷 값만으로 정하는지(불기둥 없음).</summary>
     public sealed class LabJigwiSyncPillarViewTests
     {
         private const ulong Me = 2, Partner = 1;
@@ -23,14 +23,18 @@ namespace C6Lab.Tests
         public void Destroy() => Object.DestroyImmediate(root);
 
         [Test]
-        public void APickedScreenShowsTheDropsAndTheyFillWithEachSync()
+        public void APickedScreenShowsOneDropPerPickedSeatAndEachHitFillsOne()
         {
             var round = Round();
             view.Present(round, round.players[1], true, Clip, 26d, false, false);
             Assert.That(view.DropsVisible, Is.True);
+            Assert.That(view.DropCount, Is.EqualTo(2));
             Assert.That(view.FilledDrops, Is.Zero);
-            round.syncCount = 2;
-            view.Present(round, round.players[1], true, Clip, 27d, false, false);
+            round.syncWindowAt = 26.5d; round.players[0].targets[0].extinguishedAt = 26.5d;
+            view.Present(round, round.players[1], true, Clip, 26.6d, false, false);
+            Assert.That(view.FilledDrops, Is.EqualTo(1));
+            round.players[1].targets[0].extinguishedAt = 26.8d;
+            view.Present(round, round.players[1], true, Clip, 26.8d, false, false);
             Assert.That(view.FilledDrops, Is.EqualTo(2));
             foreach (var graphic in root.GetComponentsInChildren<UnityEngine.UI.Graphic>(true))
                 Assert.That(graphic.raycastTarget, Is.False, "B's drops never swallow taps.");

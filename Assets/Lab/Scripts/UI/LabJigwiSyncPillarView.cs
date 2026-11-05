@@ -5,7 +5,7 @@ using UnityEngine.UI;
 namespace C6Lab
 {
     /// <summary>
-    /// #509 지귀 B 화면(각 기기, 스냅샷만 본다). 불기둥 없이 전투 영역 위쪽에 물방울 3칸만 보여 준다(지목된 사람과
+    /// #509 지귀 B 화면(각 기기, 스냅샷만 본다). 불기둥 없이 전투 영역 위쪽에 지목된 사람 수만큼 물방울 칸을 보여 준다(지목된 사람과
     /// 도우미 모두). 지목된 사람 중 누가 먼저 박을 맞혀 1초 창이 열리면 아직 안 맞힌 지목자 화면에 "지금!"과 줄어드는
     /// 1초 막대가 뜨고 폰이 한 번 울린다. 창이 어긋나 0/3으로 돌아가면 물방울이 빨갛게 흔들린다. 글자는 띄우지 않는다.
     /// 그림은 코드로 만든 임시 그림이고(최종 그림은 VFX 이슈), 규칙/충돌은 바꾸지 않는다. 모든 Graphic은 터치를 막지 않는다.
@@ -14,6 +14,8 @@ namespace C6Lab
     public sealed class LabJigwiSyncPillarView : MonoBehaviour
     {
         private const float FlashSeconds = .45f, ResetSeconds = .6f;
+        /// <summary>#509: one drop per picked seat (at most three are picked).</summary>
+        public const int MaxDrops = 3;
         private RectTransform root, dropsRect, barBack;
         private RawImage[] drops;
         private Image bar;
@@ -27,6 +29,8 @@ namespace C6Lab
         public bool NowCueVisible { get; private set; }
         public bool ResetCueVisible { get; private set; }
         public int FilledDrops { get; private set; }
+        /// <summary>#509: how many drops are shown — the number of picked seats.</summary>
+        public int DropCount { get; private set; }
         public int VibrationCount { get; private set; }
         public RectTransform DropsRect => dropsRect;
 
@@ -39,7 +43,7 @@ namespace C6Lab
             dropTexture = Drop("Jigwi Sync Drop (runtime)", false); ringTexture = Drop("Jigwi Sync Drop Empty (runtime)", true);
             dropsRect = new GameObject("Sync Drops", typeof(RectTransform)).GetComponent<RectTransform>();
             dropsRect.SetParent(root, false); dropsRect.anchorMin = dropsRect.anchorMax = new Vector2(.5f, .5f);
-            drops = new RawImage[LabJigwiABTimeline.GroupSyncRequired];
+            drops = new RawImage[MaxDrops];
             for (int i = 0; i < drops.Length; i++)
             {
                 drops[i] = Raw("Drop " + (i + 1), dropsRect, dropTexture);
@@ -75,11 +79,12 @@ namespace C6Lab
             if (round == null || !round.Active(now)) { Hide(); return; }
             if (roundId != round.id)
             {
-                roundId = round.id; shownCount = round.syncCount; lastWindowAt = round.syncWindowAt;
+                roundId = round.id; shownCount = Hits(round); lastWindowAt = round.syncWindowAt;
                 lastResetAt = round.syncResetAt; filledAt = resetAt = -1d; vibrateForWindow = false;
             }
-            if (round.syncCount > shownCount) filledAt = now;
-            shownCount = round.syncCount;
+            int hits = Hits(round);
+            if (hits > shownCount) filledAt = now;
+            shownCount = hits;
             if (round.syncResetAt != lastResetAt && round.syncResetAt >= 0d) { resetAt = now; lastResetAt = round.syncResetAt; }
             bool mineHit = mine != null && mine.targets != null && mine.targets.Length > 0 && mine.targets[0].extinguishedAt >= 0d;
             bool windowOpen = round.syncWindowAt >= 0d && now < round.syncWindowAt + LabJigwiABTimeline.GroupSyncWindowSeconds;
@@ -97,16 +102,20 @@ namespace C6Lab
             float size = Mathf.Clamp(clip.height * .085f, 26f, 64f);
             float shake = ResetVisible(now) ? Mathf.Sin((float)(now - resetAt) * 60f) * size * .18f : 0f;
             dropsRect.anchoredPosition = new Vector2(clip.center.x + shake, clip.yMax - size * 1.6f);
-            FilledDrops = Mathf.Clamp(round.syncCount, 0, drops.Length);
+            // #509: one drop per picked seat; it fills when that seat's special Water hits inside the window.
+            DropCount = Mathf.Clamp(round.players?.Length ?? 0, 1, drops.Length);
+            FilledDrops = Mathf.Clamp(hits, 0, DropCount);
             ResetCueVisible = ResetVisible(now);
             for (int i = 0; i < drops.Length; i++)
             {
+                drops[i].gameObject.SetActive(i < DropCount);
+                if (i >= DropCount) continue;
                 RectTransform rect = drops[i].rectTransform;
                 bool filled = i < FilledDrops;
                 float pop = filled && i == FilledDrops - 1 && filledAt >= 0d && now - filledAt < FlashSeconds
                     ? 1f + .35f * (1f - (float)((now - filledAt) / FlashSeconds)) : 1f;
                 rect.sizeDelta = Vector2.one * size * pop;
-                rect.anchoredPosition = new Vector2((i - (drops.Length - 1) * .5f) * size * 1.25f, 0f);
+                rect.anchoredPosition = new Vector2((i - (DropCount - 1) * .5f) * size * 1.25f, 0f);
                 drops[i].texture = filled ? dropTexture : ringTexture;
                 drops[i].color = ResetCueVisible ? new Color(1f, .45f, .4f, .95f)
                     : filled ? new Color(.35f, .75f, 1f, 1f) : new Color(1f, 1f, 1f, .8f);
@@ -130,9 +139,19 @@ namespace C6Lab
 
         private bool ResetVisible(double now) => resetAt >= 0d && now - resetAt < ResetSeconds;
 
+        /// <summary>#509: picked seats whose special Water already hit inside the open window.</summary>
+        private static int Hits(LabJigwiABRound round)
+        {
+            if (round.resolution == LabJigwiABResolution.Completed) return round.players?.Length ?? 0;
+            int hits = 0;
+            foreach (var player in round.players ?? Array.Empty<LabJigwiABPlayerFire>())
+                if (player?.targets != null && player.targets.Length > 0 && player.targets[0].extinguishedAt >= 0d) hits++;
+            return hits;
+        }
+
         public void Hide()
         {
-            NowCueVisible = ResetCueVisible = false; FilledDrops = 0;
+            NowCueVisible = ResetCueVisible = false; FilledDrops = 0; DropCount = 0;
             if (dropsRect != null) dropsRect.gameObject.SetActive(false);
         }
 

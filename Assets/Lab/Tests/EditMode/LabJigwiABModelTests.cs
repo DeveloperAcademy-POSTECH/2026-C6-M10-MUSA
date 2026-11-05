@@ -38,21 +38,17 @@ namespace C6Lab.Tests
         /// <summary>#509: a real boss hit (aimed at the back so it never overlaps the paint checks aimed forward).</summary>
         void Hit(LabModel m,ulong owner,double at,LabOrbElement element=LabOrbElement.Water)
         { var o=Add(m,owner,at,element:element);Launch(m,o,at);Assert.That(m.ConfirmHit(o.id,at,Vector3.back,out _,out _,out _),Is.True); }
-        /// <summary>
-        /// #509: one synchronized clear = every picked seat's Water hits the boss inside one second. Uses this B's
-        /// supplied Water, which counts but never paints, so paint-sensitive fixtures are not disturbed.
-        /// </summary>
-        void Sync(LabModel m,LabJigwiABRound g,double at)
+        /// <summary>#509: this B's special Water given to a picked seat (one each).</summary>
+        LabOrbState Special(LabModel m,LabJigwiABRound g,ulong seat)=>Orbs(m).Values.Single(o=>o.jigwiABSupplyEventId==g.id&&o.originOwner==seat);
+        /// <summary>#509: the picked seat throws its special Water at the boss; it counts but never paints.</summary>
+        void Throw(LabModel m,LabJigwiABRound g,ulong seat,double at,Vector3? dir=null)
         {
-            foreach(var p in g.players)
-            {
-                var o=Add(m,p.playerId,at,element:LabOrbElement.Water);o.jigwiSupply=true;o.jigwiABSupplyEventId=g.id;Launch(m,o,at);
-                Assert.That(m.ConfirmHit(o.id,at,Vector3.back,out _,out _,out _),Is.False,"Supplied Water is consumed without paint.");
-            }
+            var o=Special(m,g,seat);Launch(m,o,at);
+            Assert.That(m.ConfirmHit(o.id,at,dir??Vector3.back,out _,out _,out _),Is.False,"Special Water is consumed without paint.");
         }
-        /// <summary>#509: three synchronized clears finish B.</summary>
-        void Clear(LabModel m,LabJigwiABRound g,double at)
-        {for(int k=0;k<LabJigwiABTimeline.GroupSyncRequired;k++)Sync(m,g,at);}
+        /// <summary>#509: every picked seat hits inside one second — the whole B in one go.</summary>
+        void Sync(LabModel m,LabJigwiABRound g,double at,Vector3? dir=null){foreach(var p in g.players)Throw(m,g,p.playerId,at,dir);}
+        void Clear(LabModel m,LabJigwiABRound g,double at)=>Sync(m,g,at);
         static readonly ulong[] Three = { 10ul, 20ul, 30ul };
         static int Field(string label)=>LabConfig.DeveloperFields.Select((f,i)=>(f,i)).First(p=>p.f.Label==label).i;
         /// <summary>
@@ -194,60 +190,75 @@ namespace C6Lab.Tests
             Assert.That(done.orbs.Single(o=>o.id==late.id).jigwiABBurnAt,Is.EqualTo(-1));
             Assert.That(done.orbs.Single(o=>o.id==late.id).expiresAt,Is.EqualTo(-1));
         }
-        [Test] public void BProvidesTaggedWaterWhileOrdinaryRawPairsKeepTheirNormalElement()
+        [Test] public void BGivesEachPickedSeatOneSpecialWaterWhileOrdinaryRawPairsKeepTheirNormalElement()
         {
-            // #509: two players → one picked seat with one pillar; free Water lands on the helper's board.
+            // #509: two players → both picked; each gets exactly one special Water on its own board.
             var m=Room();var normal=Room(LabStageYokai.None);var b=Current(m,31);normal.Tick(31);
-            Assert.That(b.players.Length,Is.EqualTo(1));Assert.That(b.players.Single().targets.Length,Is.EqualTo(1));
-            ulong helper=Helper(b,Players);
-            Assert.That(m.Snapshot(31).orbs.Where(o=>o.jigwiSupply),Is.Not.Empty);
-            Assert.That(m.Snapshot(31).orbs.All(o=>o.jigwiABSupplyEventId==b.id && o.element==LabOrbElement.Water && o.owner==helper),Is.True);
+            Assert.That(b.players.Select(p=>p.playerId),Is.EquivalentTo(Players));
+            var specials=m.Snapshot(31).orbs.Where(o=>o.jigwiSupply).ToArray();
+            Assert.That(specials.Select(o=>o.originOwner),Is.EquivalentTo(Players));
+            Assert.That(specials.All(o=>o.owner==o.originOwner&&o.jigwiABSupplyEventId==b.id&&o.kind==LabOrbKind.Combined&&o.element==LabOrbElement.Water),Is.True);
+            m.Tick(39);Assert.That(m.Snapshot(39).orbs.Count(o=>o.jigwiSupply),Is.EqualTo(2),"No more special Water over time.");
             var yin=Add(m,Players[0],31,LabOrbKind.Yin);var yang=Add(m,Players[0],31,LabOrbKind.Yang);
             var oldYin=Add(normal,Players[0],31,LabOrbKind.Yin);var oldYang=Add(normal,Players[0],31,LabOrbKind.Yang);
-            Assert.That(normal.TryCombineAt(Players[0],oldYin.id,oldYang.id,Request(),31,new Vector2(.5f,.5f),Vector2.zero,out var expected,out var error),Is.True,error);
-            Assert.That(m.TryCombineAt(Players[0],yin.id,yang.id,Request(),31,new Vector2(.5f,.5f),Vector2.zero,out var actual,out error),Is.True,error);
+            Assert.That(normal.TryCombineAt(Players[0],oldYin.id,oldYang.id,Request(),39,new Vector2(.5f,.5f),Vector2.zero,out var expected,out var error),Is.True,error);
+            Assert.That(m.TryCombineAt(Players[0],yin.id,yang.id,Request(),39,new Vector2(.5f,.5f),Vector2.zero,out var actual,out error),Is.True,error);
             Assert.That(actual.element,Is.EqualTo(expected.element));Assert.That(actual.jigwiABSupplyEventId,Is.Null.Or.Empty);
-            Assert.That(m.Snapshot(31).jigwi,Is.Empty,"The old manual fire policy stays inactive.");
+            Assert.That(m.Snapshot(39).jigwi,Is.Empty,"The old manual fire policy stays inactive.");
         }
         [Test]
-        public void APickedWaterBossHitCountsAndStillPaintsWhileOtherColoursAndHelpersDoNotCount()
+        public void OnlyTheSpecialWaterCountsWhileOrdinaryWaterStillPaints()
         {
-            var m=Room();var b=Current(m,31);var p=b.players[0];ulong helper=Helper(b,Players);
-            Hit(m,p.playerId,31,LabOrbElement.Fire);Assert.That(Current(m,31).syncCount,Is.Zero,"Only Water counts.");
-            Hit(m,helper,31);Assert.That(Current(m,31).syncCount,Is.Zero,"A helper's Water is ordinary paint.");
-            int painted=m.PaintSurface.PaintCount;var before=m.Snapshot(31).players.Single(x=>x.id==p.playerId);
-            Hit(m,p.playerId,31);
-            Assert.That(Current(m,31).syncCount,Is.EqualTo(1),"A single picked seat completes a sync with its own hit.");
-            var after=m.Snapshot(31).players.Single(x=>x.id==p.playerId);
-            Assert.That(m.PaintSurface.PaintCount,Is.EqualTo(painted+1),"The counted Water still paints the boss as usual.");
-            Assert.That(after.hitTotal,Is.EqualTo(before.hitTotal+1));
-            Assert.That(m.JigwiABBlocksBoss(p.playerId,31),Is.False,"#509: no curtain blocks anyone.");
+            var m=Room3();var b=Current(m,31);ulong p=b.players[0].playerId;ulong helper=Helper(b,Three);
+            Hit(m,p,31,LabOrbElement.Fire);Hit(m,p,31);Hit(m,helper,31);
+            Assert.That(Current(m,31).syncWindowAt,Is.EqualTo(-1d),"Ordinary Water (even the picked seat's) does not count.");
+            int painted=m.PaintSurface.PaintCount;
+            Throw(m,b,p,31.2);
+            var now=Current(m,31.2);
+            Assert.That(now.syncWindowAt,Is.EqualTo(31.2d));Assert.That(now.syncCount,Is.Zero);
+            Assert.That(now.players.Single(x=>x.playerId==p).targets[0].extinguishedAt,Is.EqualTo(31.2d));
+            Assert.That(m.PaintSurface.PaintCount,Is.EqualTo(painted),"The special Water never paints.");
+            Assert.That(m.JigwiABBlocksBoss(p,31),Is.False,"#509: no curtain blocks anyone.");
         }
-        [Test] public void PickedSeatsMustHitWithinOneSecondOrTheCountResets()
+        [Test] public void EveryPickedSeatInsideOneSecondClearsBAtOnce()
         {
-            // #509: three players → two picked. Both inside 1 s counts; a late partner resets to 0.
+            // #509: three players → two picked. Both special Waters inside 1 s is the whole B.
             var m=Room3();var b=Current(m,31);Assert.That(b.players.Length,Is.EqualTo(2));
-            ulong first=b.players[0].playerId,second=b.players[1].playerId;
-            Hit(m,first,31);
-            Assert.That(Current(m,31.5).syncWindowAt,Is.EqualTo(31d));
-            Hit(m,second,31.9);
-            var now=Current(m,31.9);Assert.That(now.syncCount,Is.EqualTo(1));Assert.That(now.syncWindowAt,Is.EqualTo(-1d));
-            Assert.That(now.players.All(p=>p.targets[0].extinguishedAt==-1d),Is.True);
-            Hit(m,first,32);
-            m.Tick(33);now=Current(m,33);
-            Assert.That(now.syncCount,Is.Zero,"The partner missed the second: back to 0/3.");
-            Assert.That(now.syncResetAt,Is.EqualTo(33d));Assert.That(now.syncWindowAt,Is.EqualTo(-1d));
-            var s=m.Snapshot(33);Assert.That(LabJigwiABNetworkValidation.Valid(s.jigwiAB,s.players,m.Revision),Is.True);
-            Clear(m,b,34);
-            Assert.That(m.Snapshot(34).jigwiAB.rounds.Single(r=>r.slot==1).resolution,Is.EqualTo(LabJigwiABResolution.Completed));
-            foreach(ulong id in Three)Assert.That(m.JigwiABBlocksBoss(id,34),Is.False);
+            Throw(m,b,b.players[0].playerId,31);Throw(m,b,b.players[1].playerId,31.9);
+            var done=m.Snapshot(31.9).jigwiAB.rounds.Single(r=>r.slot==1);
+            Assert.That(done.resolution,Is.EqualTo(LabJigwiABResolution.Completed));Assert.That(done.resolvedAt,Is.EqualTo(31.9d));
+            Assert.That(done.syncCount,Is.EqualTo(1));Assert.That(done.boardFireUntil,Is.EqualTo(-1d));
+            var s=m.Snapshot(31.9);Assert.That(LabJigwiABNetworkValidation.Valid(s.jigwiAB,s.players,m.Revision),Is.True);
         }
-        [Test] public void NobodyIsBlockedAndOnlyHelpersGetTheFreeWater()
+        [Test] public void ALatePartnerFailsTheOnlyChance()
+        {
+            var m=Room3();var b=Current(m,31);var late=Special(m,b,b.players[1].playerId);
+            Throw(m,b,b.players[0].playerId,31);
+            m.Tick(32);var failed=m.Snapshot(32).jigwiAB.rounds.Single(r=>r.slot==1);
+            Assert.That(failed.resolution,Is.EqualTo(LabJigwiABResolution.Expired),"One chance: the window closed short.");
+            Assert.That(failed.resolvedAt,Is.EqualTo(32d));Assert.That(failed.boardFireUntil,Is.EqualTo(35d));
+            Assert.That(failed.syncResetAt,Is.EqualTo(32d));Assert.That(failed.syncWindowAt,Is.EqualTo(-1d));
+            Assert.That(m.Snapshot(32).orbs.Any(o=>o.id==late.id),Is.False,"The unused special Water goes with the failed B.");
+            var s=m.Snapshot(32);Assert.That(LabJigwiABNetworkValidation.Valid(s.jigwiAB,s.players,m.Revision),Is.True);
+        }
+        [Test] public void AMissedSpecialWaterFailsBAtOnce()
+        {
+            var m=Room3();var b=Current(m,31);var mine=Special(m,b,b.players[0].playerId);
+            Launch(m,mine,31.5);Assert.That(m.ConfirmMiss(mine.id,31.6),Is.True);
+            var failed=m.Snapshot(31.6).jigwiAB.rounds.Single(r=>r.slot==1);
+            Assert.That(failed.resolution,Is.EqualTo(LabJigwiABResolution.Expired));Assert.That(failed.resolvedAt,Is.EqualTo(31.6d));
+            Assert.That(failed.boardFireUntil,Is.EqualTo(34.6d).Within(1e-9));
+            Assert.That(m.Snapshot(31.6).orbs.Any(o=>o.jigwiSupply),Is.False);
+            var ordinary=Add(m,b.players[1].playerId,36);Launch(m,ordinary,36);Assert.That(m.ConfirmMiss(ordinary.id,36),Is.True,
+                "An ordinary miss never touches B.");
+        }
+        [Test] public void NobodyIsBlockedAndHelpersGetNoWater()
         {
             var m=Room3();var b=Current(m,31);ulong helper=Helper(b,Three);
             foreach(ulong id in Three)Assert.That(m.JigwiABBlocksBoss(id,31),Is.False);
-            Assert.That(m.Snapshot(31).orbs.Where(o=>o.jigwiSupply).All(o=>o.originOwner==helper),Is.True);
-            Assert.That(m.Snapshot(31).orbs.Count(o=>o.jigwiSupply),Is.GreaterThan(0));
+            m.Tick(38);var supplies=m.Snapshot(38).orbs.Where(o=>o.jigwiSupply).ToArray();
+            Assert.That(supplies.Any(o=>o.originOwner==helper),Is.False);
+            Assert.That(supplies.Select(o=>o.originOwner),Is.EquivalentTo(b.players.Select(p=>p.playerId)));
         }
         [Test] public void BSuccessSplashesTheBossOnceAndGivesNoLaunchReward()
         {
@@ -274,21 +285,18 @@ namespace C6Lab.Tests
             Assert.That(approved.jigwiABRewardPaintScale,Is.EqualTo(1f));
             Assert.That(snapshot.jigwiAB.rounds.All(r=>r.rewardSizeScale==1f&&r.rewardPaintScale==1f),Is.True);
         }
-        [Test] public void BSuccessSplashPaintsOneMaximumWaterHitWhereThePickedPlayerLastHit()
+        [Test] public void BSuccessSplashPaintsOneMaximumWaterHitWhereEachPickedSeatHit()
         {
-            var m=Room();var b=Current(m,31);ulong picked=b.players.Single().playerId;
-            // Two counted clears through supplied Water (no paint), then the last one through ordinary Water forward.
-            Sync(m,b,31);Sync(m,b,31);
-            var last=Add(m,picked,31,element:LabOrbElement.Water);Launch(m,last,31);
-            Assert.That(m.ConfirmHit(last.id,31,Vector3.forward,out _,out _,out _),Is.True);
+            var m=Room();var b=Current(m,31);
+            Sync(m,b,31,Vector3.forward);
             Assert.That(m.Snapshot(31).jigwiAB.rounds.Single(r=>r.slot==1).resolution,Is.EqualTo(LabJigwiABResolution.Completed));
             double budget=m.PaintSurface.Coverage+m.PaintSurface.PendingCoverage;
-            var reference=Room(LabStageYokai.None);var seat=m.Snapshot(31).players.Single(p=>p.id==picked).seat;
-            Assert.That(reference.PaintSurface.RegisterHit(Vector3.forward,reference.PaintColorFor(LabOrbElement.Water),picked,seat+1,3f),Is.True);
-            Assert.That(reference.PaintSurface.RegisterHit(Vector3.forward,reference.PaintColorFor(LabOrbElement.Water),picked,seat+1,1f),Is.True);
+            var reference=Room(LabStageYokai.None);
+            foreach(var seat in m.Snapshot(31).players.Where(p=>b.players.Any(x=>x.playerId==p.id)))
+                Assert.That(reference.PaintSurface.RegisterHit(Vector3.forward,reference.PaintColorFor(LabOrbElement.Water),seat.id,seat.seat+1,3f),Is.True);
             double expected=reference.PaintSurface.Coverage+reference.PaintSurface.PendingCoverage;
             Assert.That(budget,Is.EqualTo(expected).Within(2d/m.PaintSurface.CellCount),
-                "Splash (3 shares) on the last hit spot plus the ordinary Water hit itself.");
+                "One splash (3 shares) per picked seat where its special Water hit; the special Water itself never paints.");
         }
         [Test] public void OverlappingWarningsNeverSkipActivationAndTheHundredSecondFeverRemains()
         {
@@ -348,7 +356,7 @@ namespace C6Lab.Tests
             Assert.That(e,Is.EqualTo("STAGE_PATTERN_NOT_ALLOWED"));
             Assert.That(m.TryStartJigwiGenerationBurn(Players[0],0,out _),Is.False);Assert.That(m.Snapshot(0).orbs,Is.Empty);
         }
-        [TestCase(2,1)] [TestCase(3,2)] [TestCase(4,3)] [TestCase(5,3)]
+        [TestCase(2,2)] [TestCase(3,2)] [TestCase(4,3)] [TestCase(5,3)]
         public void GroupFirePicksOneTwoOrThreeActualParticipantsIncludingHostZero(int count,int picked)
         {
             var ids=Enumerable.Range(0,count).Select(i=>(ulong)(i*10)).ToArray();var m=new LabModel();
@@ -390,7 +398,7 @@ namespace C6Lab.Tests
         [TestCase(0)] [TestCase(1)] [TestCase(2)] [TestCase(3)]
         public void SyncProgressValidationRejectsImpossibleWindowsAndCounts(int scenario)
         {
-            var m=Room3();var b=Current(m,31);Hit(m,b.players[0].playerId,31);
+            var m=Room3();var b=Current(m,31);Throw(m,b,b.players[0].playerId,31);
             var snapshot=m.Snapshot(31.2);var copy=snapshot.jigwiAB.Copy();var value=copy.rounds.Single(r=>r.slot==1);
             Assert.That(LabJigwiABNetworkValidation.Valid(snapshot.jigwiAB,snapshot.players),Is.True);
             if(scenario==0)value.players[1].targets[0].extinguishedAt=32.5; // outside the open window
@@ -405,9 +413,9 @@ namespace C6Lab.Tests
             var model = Room(); var group = Current(model, 31d); var own = group.players[0];
             Clear(model, group, 31d);
             Assert.That(model.Snapshot(31d).jigwiAB.rounds.Single(r => r.slot == 1).resolution, Is.EqualTo(LabJigwiABResolution.Completed));
-            Assert.That(model.Snapshot(31d).jigwiAB.rounds.Single(r => r.slot == 1).syncCount, Is.EqualTo(3));
+            Assert.That(model.Snapshot(31d).jigwiAB.rounds.Single(r => r.slot == 1).syncCount, Is.EqualTo(LabJigwiABTimeline.GroupSyncRequired));
             Hit(model, own.playerId, 31.5d);
-            Assert.That(model.Snapshot(31.5d).jigwiAB.rounds.Single(r => r.slot == 1).syncCount, Is.EqualTo(3));
+            Assert.That(model.Snapshot(31.5d).jigwiAB.rounds.Single(r => r.slot == 1).syncCount, Is.EqualTo(LabJigwiABTimeline.GroupSyncRequired));
             foreach (ulong id in Players) Assert.That(model.JigwiABBlocksBoss(id, 31.5d), Is.False);
         }
 
@@ -506,8 +514,8 @@ namespace C6Lab.Tests
         public void PaintVictoryCancelsTheUnfinishedBWithoutItsFailurePenalty()
         {
             var values=config.CaptureDeveloperValues();values[105]=100f;values[107]=100f;Apply(values);
-            var m=Room();var group=Current(m,31d);var own=group.players[0];ulong helper=Helper(group,Players);
-            Sync(m,group,31d);
+            var m=Room3();var group=Current(m,31d);var own=group.players[0];ulong helper=Helper(group,Three);
+            Throw(m,group,own.playerId,31d); // one picked seat has thrown; the other has not yet
             var preserved=Add(m,own.playerId,31d);
             BossHit(m,Add(m,helper,31d),31d,Vector3.forward);
             var ended=m.Snapshot(35d);

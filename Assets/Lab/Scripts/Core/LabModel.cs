@@ -1270,7 +1270,9 @@ namespace C6Lab
             if (countThrow && string.IsNullOrEmpty(orb.jigwiABSupplyEventId) && phase == LabPhase.Playing
                 && players.TryGetValue(orb.owner, out var thrower)) thrower.throwTotal++;
             launchScales.Remove(id);
-            return orbs.Remove(id);
+            bool removed = orbs.Remove(id);
+            if (removed) FailJigwiSyncOnMiss(orb, now); // #509 지귀 B: 특수 물구슬이 빗나가면 그 B는 바로 실패
+            return removed;
         }
 
         private bool BlockOn(double now) => phase == LabPhase.Playing && swipeBlockedUntil > now && now >= swipeBlockStartedAt;

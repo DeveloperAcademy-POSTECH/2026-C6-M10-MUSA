@@ -585,7 +585,12 @@ namespace C6Lab
             bool picked = mine != null;
             var slot = picked && mine.targets != null && mine.targets.Length > 0 ? mine.targets[0] : null;
             CurtainVisualLevel = 0;
-            RemainingIgnitions = slot != null && slot.lit ? Math.Max(1, LabJigwiABTimeline.GroupSyncRequired - round.syncCount) : 0;
+            // #509: picked seats that still have to hit inside the one chance (0 for a helper screen).
+            int hitsSoFar = 0, pickedCount = 0;
+            foreach (var player in round.players ?? Array.Empty<LabJigwiABPlayerFire>())
+                if (player?.targets != null && player.targets.Length > 0)
+                { pickedCount++; if (player.targets[0].extinguishedAt >= 0d) hitsSoFar++; }
+            RemainingIgnitions = slot != null && slot.lit ? Math.Max(0, pickedCount - hitsSoFar) : 0;
             if (SyncPillar != null) SyncPillar.Present(round, mine, picked, BattleFireClipRect, now, held, haptics);
             // Reproject the real local water projectile path (picked seats throw the counted Water).
             if (waterFlightTrail != null)
