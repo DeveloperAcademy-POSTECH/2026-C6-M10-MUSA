@@ -102,21 +102,26 @@ namespace C6Lab.Tests
             var s=m.Snapshot(6.5);
             Assert.That(s.orbs.Single(o=>o.id==mine.id).jigwiABBurnAt,Is.EqualTo(-1));
             Assert.That(s.orbs.Single(o=>o.id==theirs.id).jigwiABBurnAt,Is.EqualTo(10),"Another seat keeps burning.");
-            var water=s.orbs.Where(o=>o.jigwiTalismanReward).ToArray();
+            // #509: the five talisman Waters drop in one at a time, every 0.3 s from the moment it was written.
+            Assert.That(s.orbs.Count(o=>o.jigwiTalismanReward),Is.EqualTo(2),"6.0 and 6.3 so far.");
+            s=m.Snapshot(7.25);
+            var water=s.orbs.Where(o=>o.jigwiTalismanReward).OrderBy(o=>o.createdAt).ToArray();
             Assert.That(water,Has.Length.EqualTo(5));
+            Assert.That(water.Select(o=>o.createdAt).ToArray(),Is.EqualTo(new[]{6d,6.3d,6.6d,6.9d,7.2d}).Within(1e-9));
             Assert.That(water.All(o=>o.owner==Players[0]&&o.kind==LabOrbKind.Combined&&o.element==LabOrbElement.Water),Is.True);
-            Assert.That(water.All(o=>o.expiresAt==21&&o.jigwiABBurnAt==-1&&o.jigwiABRewardPaintScale==1.5f),Is.True);
+            Assert.That(water.All(o=>System.Math.Abs(o.expiresAt-(o.createdAt+15))<1e-9&&o.jigwiABBurnAt==-1&&o.jigwiABRewardPaintScale==1.5f),Is.True);
             Assert.That(string.IsNullOrEmpty(water[0].jigwiABSupplyEventId),Is.True,"Talisman water paints; it is not B ammunition.");
-            Assert.That(m.TryGenerate(Players[0],Request(),7,out var fresh,out var e),Is.True,e);
+            Assert.That(m.TryGenerate(Players[0],Request(),7.3,out var fresh,out var e),Is.True,e);
             Assert.That(fresh.jigwiABBurnAt,Is.EqualTo(-1),"A finished seat no longer catches fire.");
-            var mid=m.Snapshot(7);
-            Assert.That(mid.jigwiAB.Active(7).resolution,Is.EqualTo(LabJigwiABResolution.None));
+            var mid=m.Snapshot(7.3);
+            Assert.That(mid.jigwiAB.Active(7.3).resolution,Is.EqualTo(LabJigwiABResolution.None));
             Assert.That(LabJigwiABNetworkValidation.Valid(mid.jigwiAB,mid.players,m.Revision),Is.True);
             Assert.That(m.TryCompleteJigwiTalisman(Players[1],a.id,8),Is.True);
             var done=m.Snapshot(8).jigwiAB.rounds.Single();
             Assert.That(done.resolution,Is.EqualTo(LabJigwiABResolution.Completed));Assert.That(done.resolvedAt,Is.EqualTo(8));
-            Assert.That(m.Snapshot(8).orbs.Count(o=>o.jigwiTalismanReward),Is.EqualTo(10));
-            Assert.That(LabJigwiABNetworkValidation.Valid(m.Snapshot(8).jigwiAB,m.Snapshot(8).players,m.Revision),Is.True);
+            Assert.That(m.Snapshot(8).orbs.Count(o=>o.jigwiTalismanReward),Is.EqualTo(6),"The second seat's first drop.");
+            Assert.That(m.Snapshot(9.25).orbs.Count(o=>o.jigwiTalismanReward),Is.EqualTo(10));
+            Assert.That(LabJigwiABNetworkValidation.Valid(m.Snapshot(9.25).jigwiAB,m.Snapshot(9.25).players,m.Revision),Is.True);
             Assert.That(m.TryCompleteJigwiTalisman(Players[0],a.id,31),Is.False,"No talisman outside a running A.");
         }
         [Test] public void TalismanWaterPaintsMoreThanOrdinaryWaterWithoutBFireReward()

@@ -2163,6 +2163,7 @@ namespace C6Lab
                 current.Add(orb.id);
                 if (board.IsSnapshotSuppressed(orb.id)) continue;
                 bool showSpawn = ShowsDrumSpawn(orb, LocalPlayerId);
+                if (orb.jigwiTalismanReward && latest.serverTime - orb.createdAt < .5d) board.ExpectDrop(orb.id); // #509 부적 물구슬은 위에서 하나씩 떨어짐
                 // Every screen derives a locked bomb's fuse from the shared Host clock in the snapshot.
                 float fuse = orb.kind == LabOrbKind.Bomb && orb.lockSwipes > 0 && config != null
                     ? Mathf.Max(0f, (float)(orb.createdAt + config.ItemLifetimeSeconds - latest.serverTime)) : -1f;

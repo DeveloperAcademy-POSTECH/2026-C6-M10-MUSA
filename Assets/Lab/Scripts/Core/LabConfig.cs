@@ -547,7 +547,7 @@ namespace C6Lab
         [Tooltip("#479 Inspector 전용: 부적 보상 물 구슬로 박을 맞혔을 때 칠 면적 (배). 도색 한 번은 최대 3배.")]
         [SerializeField, Range(1f, 3f)] private float jigwiTalismanWaterPaintScale = 1.5f;
         [Tooltip("#479 Inspector 전용(각 기기): 부적 점선 \"물\" 중 이만큼 칠하면 다 쓴 것으로 본다 (0~1).")]
-        [SerializeField, Range(.3f, 1f)] private float jigwiTalismanCoverage = .9f;
+        [SerializeField, Range(.3f, 1f)] private float jigwiTalismanCoverage = .995f;
         [Tooltip("#479 Inspector 전용(각 기기): 손가락이 점선에서 이만큼(글자 칸 크기 대비) 떨어져도 칠한다. 클수록 쉽다.")]
         [SerializeField, Range(.02f, .2f)] private float jigwiTalismanTolerance = .07f;
         [Tooltip("#509 Inspector 전용(Host): B 성공 때 지목된 사람마다 박에 떨어지는 물벼락의 칠 크기(한 번 맞힘 대비, 최대 3).")]
@@ -1128,7 +1128,7 @@ namespace C6Lab
         public int JigwiTalismanWaterCount => Mathf.Clamp(jigwiTalismanWaterCount, 0, 6);
         public float JigwiTalismanWaterLifetimeSeconds => Mathf.Clamp(Finite(jigwiTalismanWaterLifetimeSeconds, 15f), 1f, 60f);
         public float JigwiTalismanWaterPaintScale => Mathf.Clamp(Finite(jigwiTalismanWaterPaintScale, 1.5f), 1f, 3f);
-        public float JigwiTalismanCoverage => Mathf.Clamp(Finite(jigwiTalismanCoverage, .9f), .3f, 1f);
+        public float JigwiTalismanCoverage => Mathf.Clamp(Finite(jigwiTalismanCoverage, .995f), .3f, 1f);
         public float JigwiTalismanTolerance => Mathf.Clamp(Finite(jigwiTalismanTolerance, .07f), .02f, .2f);
         public float JigwiBSplashPaintShare => Mathf.Clamp(Finite(jigwiBSplashPaintShare, 3f), 0f, 3f);
         public float JigwiBBoardFireSeconds => Mathf.Clamp(Finite(jigwiBBoardFireSeconds, 3f), 0f, 10f);

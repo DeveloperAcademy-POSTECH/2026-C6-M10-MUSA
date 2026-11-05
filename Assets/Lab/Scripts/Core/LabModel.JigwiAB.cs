@@ -20,6 +20,9 @@ namespace C6Lab
         private readonly Dictionary<ulong, double> jigwiABLastBurnAt = new Dictionary<ulong, double>();
         private string jigwiABBurnQueueId;
         private int jigwiTalismanWaterCount;
+        /// <summary>#509: talisman Water drops in one at a time; each pending orb's owner, index and Host due time.</summary>
+        private readonly List<(ulong owner, int index, double dueAt)> jigwiTalismanDrops = new List<(ulong, int, double)>();
+        public const double JigwiTalismanDropSeconds = .3d;
         private float jigwiTalismanWaterLifetime, jigwiTalismanWaterPaint;
         private float jigwiABDuration, jigwiABBurnSeconds, jigwiABBurnStagger,
             jigwiABMoveAmount, jigwiABMovePeriod, jigwiABTargetRadius;
@@ -36,7 +39,7 @@ namespace C6Lab
         {
             jigwiABEnabled = !teamMode && StageYokai == LabStageYokai.Jigwi && config.JigwiStageTimelineEnabled;
             jigwiABRounds.Clear(); jigwiABActivated.Clear(); jigwiABFailureRevision = 0;
-            jigwiABLastBurnAt.Clear(); jigwiABBurnQueueId = null;
+            jigwiABLastBurnAt.Clear(); jigwiABBurnQueueId = null; jigwiTalismanDrops.Clear();
             ResetJigwiABSupply(config);
             if (!jigwiABEnabled) return;
             // Preserve the old code as an inactive migration path, never run two policies together.
@@ -64,6 +67,7 @@ namespace C6Lab
             double next = requested;
             void Include(double at) { if (at > lastTime && at < next) next = at; }
             Include(jigwiStageCutoffAt);
+            foreach (var drop in jigwiTalismanDrops) Include(drop.dueAt); // #509 talisman Water, one at a time
             if (jigwiStageNextSlot < LabJigwiABTimeline.SlotCount)
                 Include(jigwiStageStartedAt + LabJigwiABTimeline.ActiveOffset(jigwiStageNextSlot) - LabJigwiABTimeline.WarningSeconds);
             foreach (var item in jigwiABRounds)
@@ -88,9 +92,11 @@ namespace C6Lab
         {
             if (phase != LabPhase.Playing)
             {
+                jigwiTalismanDrops.Clear();
                 CancelJigwiABForBattleEnd(now);
                 return;
             }
+            GrantDueJigwiTalismanWater(now);
             if (!jigwiStageCutoffReached && now >= jigwiStageCutoffAt)
             {
                 CancelJigwiABForBattleEnd(jigwiStageCutoffAt);
@@ -363,14 +369,25 @@ namespace C6Lab
         }
         private void GrantJigwiTalismanWater(ulong owner, double now)
         {
+            // #509: one at a time, every 0.3 s, so each drop falls in with its own moment.
             for (int i = 0; i < jigwiTalismanWaterCount; i++)
+                jigwiTalismanDrops.Add((owner, i, now + i * JigwiTalismanDropSeconds));
+            GrantDueJigwiTalismanWater(now);
+        }
+        private void GrantDueJigwiTalismanWater(double now)
+        {
+            for (int k = 0; k < jigwiTalismanDrops.Count; k++)
             {
+                var (owner, i, dueAt) = jigwiTalismanDrops[k];
+                if (dueAt > now) continue;
+                jigwiTalismanDrops.RemoveAt(k--);
+                if (!players.ContainsKey(owner)) continue;
                 var water = new LabOrbState
                 {
                     id = NewOrbId(), owner = owner, kind = LabOrbKind.Combined, element = LabOrbElement.Water,
                     origin = LabOrbOrigin.Gourd, originOwner = owner,
                     x = .15f + .7f * ((i * .61803398875f + .5f) % 1f), y = .22f + .1f * (i % 3),
-                    createdAt = now, expiresAt = now + jigwiTalismanWaterLifetime,
+                    createdAt = dueAt, expiresAt = dueAt + jigwiTalismanWaterLifetime,
                     jigwiTalismanReward = true, jigwiABRewardPaintScale = jigwiTalismanWaterPaint, revision = ++revision
                 };
                 orbs.Add(water.id, water);
