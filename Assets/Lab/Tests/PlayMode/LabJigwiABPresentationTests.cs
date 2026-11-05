@@ -520,8 +520,10 @@ namespace C6Lab.Tests
                 view.statusPanel.gameObject.SetActive(false); // Sample art, not the warm instruction background/text.
                 Color32[] a = RenderUi(uiCamera, targetTexture, readback, width, height);
                 int warmA = WarmPixels(a, baseline), changedA = ChangedPixels(a, baseline);
-                Assert.That(warmA, Is.GreaterThan(64), "A must draw coloured, nontransparent ink flames rather than only create UI objects.");
-                Assert.That(changedA, Is.GreaterThan(128));
+                // #479 removed A's screen heat and edge flames (the talisman and the charring orbs carry A), so the
+                // saved A RawImages must stay off the rendered screen while B below still reaches it.
+                Assert.That(view.PersonalHeatVisible, Is.False);
+                Assert.That(warmA, Is.Zero, "#479: A draws no warm screen flames.");
                 sheet.SetPixels32(0, 0, width, height, a);
 
                 // Match the saved Battle viewport. B must leave the board's lower 46% untouched.
@@ -576,7 +578,7 @@ namespace C6Lab.Tests
                 sheet.Apply(false, false); // #479: A no longer completes by hits, so no A water douse frame.
                 string evidence = Path.Combine(Path.GetTempPath(), "jigwi341-screen-overlay-gpu.png");
                 File.WriteAllBytes(evidence, sheet.EncodeToPNG());
-                TestContext.WriteLine("JIGWI_AB_UI_GPU A(warm/changed)=" + warmA + "/" + changedA
+                TestContext.WriteLine("JIGWI_AB_UI_GPU A(warm/changed, #479 expects no warm)=" + warmA + "/" + changedA
                     + " B=" + warmB + "/" + changedB
                     + " evidence=" + evidence + " (fixture camera-mode capture; no device visual claim)");
             }

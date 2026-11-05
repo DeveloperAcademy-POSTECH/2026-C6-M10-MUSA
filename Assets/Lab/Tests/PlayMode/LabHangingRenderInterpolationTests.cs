@@ -13,6 +13,7 @@ namespace C6Lab.Tests
     {
         private const BindingFlags Private = BindingFlags.Instance | BindingFlags.NonPublic;
         private readonly List<GameObject> owned = new List<GameObject>();
+        private readonly List<RenderTexture> targets = new List<RenderTexture>();
         private float timeScale;
 
         [SetUp]
@@ -23,8 +24,26 @@ namespace C6Lab.Tests
         {
             foreach (GameObject item in owned) if (item != null) Object.Destroy(item);
             owned.Clear();
+            foreach (RenderTexture texture in targets) if (texture != null) { texture.Release(); Object.Destroy(texture); }
+            targets.Clear();
             yield return null;
             Time.timeScale = timeScale;
+        }
+
+        /// <summary>A camera this test renders itself: batch mode never renders the player loop.</summary>
+        private Camera RenderCamera()
+        {
+            if (SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null)
+                Assert.Ignore("No graphics device (-nographics): no render pass can run.");
+            var texture = new RenderTexture(64, 64, 16);
+            Assert.That(texture.Create(), Is.True);
+            targets.Add(texture);
+            var camera = new GameObject("Interpolation camera").AddComponent<Camera>();
+            owned.Add(camera.gameObject);
+            camera.enabled = false;
+            camera.targetTexture = texture;
+            camera.transform.position = new Vector3(0f, 1f, -8f);
+            return camera;
         }
 
         [UnityTest]
@@ -56,22 +75,38 @@ namespace C6Lab.Tests
         public IEnumerator OutsideRenderingTheTransformsAlwaysHoldTheFixedPose()
         {
             LabTarget target = CreateMovingTarget(out LabHangingTarget hanging);
-            for (int frame = 0; frame < 8; frame++)
+            Camera camera = RenderCamera();
+            int interpolated = 0;
+            // Subscribed after the target, so this sees the pose the render pass draws.
+            void Drawn(ScriptableRenderContext context, List<Camera> cameras)
+            { if (!Draws(target, Pose(hanging, "currentPose"))) interpolated++; }
+            for (int i = 0; i < 4; i++) yield return new WaitForFixedUpdate(); // Two different fixed poses to blend.
+            RenderPipelineManager.beginContextRendering += Drawn;
+            try
             {
-                yield return null; // After Update, before LateUpdate.
-                AssertDrawn(target, Pose(hanging, "currentPose"), "Update readers (the Host's paint-flow sample).");
-                yield return new WaitForEndOfFrame(); // After LateUpdate and rendering.
-                AssertDrawn(target, Pose(hanging, "currentPose"), "End-of-frame readers.");
+                for (int frame = 0; frame < 8; frame++)
+                {
+                    yield return null; // After Update, before LateUpdate.
+                    AssertDrawn(target, Pose(hanging, "currentPose"), "Update readers (the Host's paint-flow sample).");
+                    // Batch mode renders no player loop and never reaches WaitForEndOfFrame (the Test Framework fails
+                    // that yield there), so this frame's real URP pass is driven here and must end on the fixed pose.
+                    camera.Render();
+                    AssertDrawn(target, Pose(hanging, "currentPose"), "Readers after a render pass.");
+                    if (Application.isBatchMode) continue;
+                    yield return new WaitForEndOfFrame(); // After LateUpdate and the Editor's own rendering.
+                    AssertDrawn(target, Pose(hanging, "currentPose"), "End-of-frame readers.");
+                }
             }
+            finally { RenderPipelineManager.beginContextRendering -= Drawn; }
+            Assert.That(interpolated, Is.GreaterThan(0),
+                "The render passes drew an interpolated pose, so the restores checked above actually happened.");
         }
 
         [UnityTest]
         public IEnumerator DuringRealRenderingTheDrawnPoseLiesBetweenTheTwoFixedPoses()
         {
             LabTarget target = CreateMovingTarget(out LabHangingTarget hanging);
-            var camera = new GameObject("Interpolation camera").AddComponent<Camera>();
-            owned.Add(camera.gameObject);
-            camera.transform.position = new Vector3(0f, 1f, -8f);
+            Camera camera = RenderCamera();
             Transform twist = target.transform.Find("Suspension Pivot/Body Twist Pivot");
             int renders = 0, turning = 0, between = 0;
             void Observe(ScriptableRenderContext context, List<Camera> cameras)
@@ -86,11 +121,19 @@ namespace C6Lab.Tests
                 if (Mathf.Abs(Mathf.DeltaAngle(LabHangingTarget.RigState.Lerp(from, to, t).Yaw, drawn)) < .05f
                     && t > .001f && t < .999f) between++;
             }
+            // Batch frames are ~0.1 ms, so 40 of them can pass between two fixed steps: start from two kept poses.
+            for (int i = 0; i < 2; i++) yield return new WaitForFixedUpdate();
             // Subscribed after the target, so this runs once the drawn pose is in place.
             RenderPipelineManager.beginContextRendering += Observe;
             try
             {
-                for (int frame = 0; frame < 40; frame++) yield return null;
+                for (int frame = 0; frame < 40; frame++)
+                {
+                    yield return null;
+                    // The Editor renders its views on its own; batch mode renders nothing, so each frame also
+                    // drives one real URP pass. Its alpha is this frame's Time.time, as in the player loop.
+                    camera.Render();
+                }
             }
             finally { RenderPipelineManager.beginContextRendering -= Observe; }
             if (renders == 0) Assert.Inconclusive("No render pass ran in this test environment.");
@@ -253,6 +296,14 @@ namespace C6Lab.Tests
 
         private static void Invoke(LabHangingTarget hanging, string method, params object[] arguments)
             => typeof(LabHangingTarget).GetMethod(method, Private).Invoke(hanging, arguments);
+
+        private static bool Draws(LabTarget target, LabHangingTarget.RigState pose)
+        {
+            Transform pivot = target.transform.Find("Suspension Pivot");
+            Transform twist = pivot.Find("Body Twist Pivot");
+            return Quaternion.Angle(pivot.localRotation, Quaternion.Euler(pose.Swing.x, 0f, pose.Swing.y)) < .01f
+                && Quaternion.Angle(twist.localRotation, Quaternion.Euler(0f, pose.Yaw, 0f)) < .01f;
+        }
 
         private static void AssertDrawn(LabTarget target, LabHangingTarget.RigState pose, string message)
         {

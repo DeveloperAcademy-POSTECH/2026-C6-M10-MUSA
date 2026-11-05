@@ -210,10 +210,12 @@ namespace C6Lab
         private bool CommitFinished(CommandBuffer commands, double now, bool force)
         {
             bool changed = false;
-            for (int i = active.Count - 1; i >= 0; i--)
+            // Oldest first, the queue order a fresh checkpoint draws. Additive blending into the 8-bit optics is
+            // rounded after every pass, so swapping two overlapping stamps can move a texel by one step.
+            for (int i = 0; i < active.Count;)
             {
                 ActiveStamp item = active[i];
-                if (!force && now - item.Birth < applied.spreadSeconds) continue;
+                if (!force && now - item.Birth < applied.spreadSeconds) { i++; continue; }
                 if (DrawStamp(commands, committed, item.Stamp, item.Slice, 1f)) CommittedStampCount++;
                 active.RemoveAt(i); changed = true;
             }
