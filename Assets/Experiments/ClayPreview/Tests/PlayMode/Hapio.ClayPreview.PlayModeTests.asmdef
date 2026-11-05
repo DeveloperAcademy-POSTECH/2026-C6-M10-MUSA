@@ -1,0 +1,17 @@
+{
+  "name": "Hapio.ClayPreview.PlayModeTests",
+  "rootNamespace": "Hapio.Experiments.Tests",
+  "references": [
+    "Hapio.ClayPreview.Runtime",
+    "Unity.Collections"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": true,
+  "precompiledReferences": ["nunit.framework.dll"],
+  "autoReferenced": false,
+  "defineConstraints": ["UNITY_INCLUDE_TESTS"],
+  "versionDefines": [],
+  "optionalUnityReferences": ["TestAssemblies"]
+}

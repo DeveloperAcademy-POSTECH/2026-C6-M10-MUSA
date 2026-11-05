@@ -65,7 +65,7 @@ namespace C6Lab
         /// 오색구슬 명중 (#329): 맞은 자리 둘레에 다섯 원소 색 얼룩을 하나씩 칠한다. 다섯 얼룩의 칠 면적을 합치면 share다.
         /// 원소 색 그대로지만 맞힌 구슬의 원소가 없어 콤보에는 세지 않는다. 하나라도 칠했으면 true.
         /// </summary>
-        private bool PaintFiveColors(Vector3 direction, LabPlayerState attacker, float share)
+        private bool PaintFiveColors(Vector3 direction, LabPlayerState attacker, float share, float impactStrength = .5f)
         {
             if (direction.sqrMagnitude < 1e-6f) return false;
             Vector3 normal = direction.normalized;
@@ -81,7 +81,7 @@ namespace C6Lab
                 float angle = (start - 72f * i) * Mathf.Deg2Rad;
                 Vector3 spot = (normal + (side * Mathf.Cos(angle) + up * Mathf.Sin(angle)) * reach).normalized;
                 painted |= paintSurface.RegisterHit(spot, PaintColorFor(FiveColorPaintOrder[i]),
-                    attacker.id, attacker.seat + 1, each);
+                    attacker.id, attacker.seat + 1, each, impactStrength);
             }
             return painted;
         }

@@ -174,6 +174,7 @@ namespace Hapio
             network.GameFlowMessage += ReceiveControl;
             network.GameFlowDisconnected += OnPeerDisconnected;
             network.GameFlowDeveloperRestartRequested += OnDeveloperRestart;
+            network.ClayAppearanceChanged += OnBattleClayAppearanceChanged;
             SceneManager.sceneLoaded += OnSceneLoaded;
         }
 
@@ -461,7 +462,7 @@ namespace Hapio
             if (!MatchesBattle(network.Snapshot) || network.Snapshot.phase != LabPhase.Victory) return false;
             if (network.config == null || !network.config.CompletedGourdViewerEnabled
                 || network.config.GourdMode != LabGourdMode.Paint) return true;
-            return LabGourdResultPreview.SurfaceMatches(network, out _);
+            return LabGourdResultPreview.SurfaceMatches(network, out _, requireExactArtwork: false);
         }
 
         private void CaptureResult()
@@ -486,6 +487,8 @@ namespace Hapio
                 DontDestroyOnLoad(preview.PreviewCamera.transform.root.gameObject);
                 RememberCapturedResult();
             }
+            else if (network.RequiresPaintArt)
+                UiNotice = "The round result is preserved, but its exact artwork is not ready for viewing.";
         }
 
         private void RememberCapturedResult()
@@ -926,6 +929,7 @@ namespace Hapio
                 network.GameFlowMessage -= ReceiveControl;
                 network.GameFlowDisconnected -= OnPeerDisconnected;
                 network.GameFlowDeveloperRestartRequested -= OnDeveloperRestart;
+                network.ClayAppearanceChanged -= OnBattleClayAppearanceChanged;
                 network.GameFlowDeveloperConfigValidation = null;
             }
             stageSettings?.Dispose();

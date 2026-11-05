@@ -94,7 +94,7 @@ namespace Hapio.Tests
             Assert.That(network.IsGameInitialStateReady(session.State.battleSessionId, session.State.battleRound), Is.True);
             Assert.That(UnityEngine.Object.FindFirstObjectByType<GameBattleBindings>().IsPresentationReady, Is.True);
             var watercolorPaint = UnityEngine.Object.FindFirstObjectByType<LabGourdPaint>();
-            Assert.That(watercolorPaint.WatercolorActive, Is.True, watercolorPaint.WatercolorError);
+            Assert.That(network.PinnedWatercolorSettings.UsesClayStickers ? watercolorPaint.ClayStickersActive : watercolorPaint.WatercolorStampsActive, Is.True, watercolorPaint.WatercolorStampError);
             var watercolorBlock = new MaterialPropertyBlock();
             watercolorPaint.Shell.GetComponent<Renderer>().GetPropertyBlock(watercolorBlock);
             Assert.That(watercolorBlock.GetTexture("_PaintMap"), Is.SameAs(watercolorPaint.VisualPaintTexture),
@@ -155,6 +155,42 @@ namespace Hapio.Tests
             Assert.That(session.State.endReason, Does.Contain("preparing"));
             Assert.That(session.StartOverlay.Visible, Is.False);
             Assert.That(network.Snapshot.playedSeconds, Is.Zero);
+        }
+
+        [UnityTest]
+        public IEnumerator PreparedRoundEntersSynchronizationEvenWhenInitialArtworkIsNotReadyOnTheCreationFrame()
+        {
+            FieldInfo mismatch = typeof(LabNetwork).GetField("paintArtVersionMismatch", BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(mismatch, Is.Not.Null);
+            bool heldOneFrame = false;
+            Action holdInitialReadiness = () =>
+            {
+                if (heldOneFrame || network.Snapshot == null || !network.GameStartHeld
+                    || network.Snapshot.phase != LabPhase.Playing) return;
+                heldOneFrame = true;
+                mismatch.SetValue(network, true);
+            };
+            network.Changed += holdInitialReadiness;
+            try
+            {
+                session.StartSolo();
+                yield return Until(() => heldOneFrame, "The first held round must be created.");
+                Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.SynchronizingBattle),
+                    "Creating a held round must advance to synchronization even if presentation needs another frame.");
+                Assert.That(network.IsGameInitialStateReady(session.State.battleSessionId, session.State.battleRound), Is.False);
+                Assert.That(network.GameStartHeld, Is.True);
+                network.Generate();
+                Assert.That(network.Snapshot.orbs, Is.Empty);
+                mismatch.SetValue(network, false);
+                yield return Until(() => session.State.phase == GameFlowPhase.Countdown,
+                    "The existing synchronization barrier must reserve a countdown after readiness recovers.");
+                Assert.That(network.GameStartHeld, Is.True);
+            }
+            finally
+            {
+                network.Changed -= holdInitialReadiness;
+                mismatch.SetValue(network, false);
+            }
         }
 
         [UnityTest]
@@ -370,6 +406,39 @@ namespace Hapio.Tests
         [UnityTest]
         public IEnumerator SavedHomeRunsThreeFreshBattlesWithOneRoomAndKeepsCompletedMapAfterUnload()
         {
+            void AssertStampSurfaceBindings(Transform modelRoot, LabWatercolorStampSettings expected, string context)
+            {
+                Assert.That(modelRoot, Is.Not.Null, context + ": a gourd model must exist.");
+                Renderer[] shells = modelRoot.GetComponentsInChildren<Renderer>(true)
+                    .Where(renderer => renderer.sharedMaterials.Any(material => material != null
+                        && material.shader != null && material.shader.name == "C6Lab/GourdPaint")).ToArray();
+                Assert.That(shells, Has.Length.EqualTo(1), context + ": select the actual painted shell, not rope or cap.");
+                var block = new MaterialPropertyBlock();
+                if(expected.UsesClayStickers)
+                {
+                    Renderer[] coats=modelRoot.GetComponentsInChildren<Renderer>(true).Where(r=>r.sharedMaterial!=null && r.sharedMaterial.shader.name=="C6Lab/ClayStickerSurface").ToArray();
+                    Assert.That(coats,Has.Length.EqualTo(1),context+": the separate clay coat survives Battle and viewer cloning.");
+                    coats[0].GetPropertyBlock(block);
+                    Assert.That(block.GetTexture("_HeightMap"),Is.Not.Null,context+": frozen clay relief must not refer to a destroyed runtime map.");
+                    Assert.That(block.GetTexture("_PaintMap"),Is.Not.Null);
+                    Assert.That(block.GetFloat("_PaintMapReady"),Is.EqualTo(1f));
+                }
+                shells[0].GetPropertyBlock(block);
+                if(expected.UsesClayStickers)Assert.That(block.GetFloat("_PaintMapReady"),Is.Zero,context+": base paper must not duplicate the separate clay coat.");
+                Assert.That(block.GetFloat("_WatercolorV2Enabled"), Is.EqualTo(expected.UsesPaperStickers || expected.UsesClayStickers ? 0f : 1f),
+                    context + ": use this round's captured rendering mode independently of the raw paint map.");
+                Assert.That(block.GetFloat("_PaperStickerEnabled"), Is.EqualTo(expected.UsesPaperStickers ? 1f : 0f),
+                    context + ": opaque paper appearance must survive Battle and independent viewer copies.");
+                Assert.That(block.GetFloat("_PaperStickerGrainStrength"), Is.EqualTo(expected.paperSticker.grainStrength),
+                    context + ": copy the pinned paper fiber strength to the result object.");
+                Assert.That(block.GetFloat("_WatercolorGranulationStrength"), Is.EqualTo(expected.granulationStrength),
+                    context + ": use this round's captured pigment strength.");
+                Assert.That(block.GetFloat("_WatercolorGranulationScale"), Is.EqualTo(expected.granulationScale),
+                    context + ": use this round's captured object-local pigment scale.");
+            }
+
+            LabWatercolorStampSettings defaultWatercolor = LabWatercolorStampSettings.CaptureDefault();
+            Assert.That(defaultWatercolor.enabled, Is.True, "Saved Home must start with the default watercolor presentation.");
             GameSession persistent = session;
             LabNetwork persistentNetwork = network;
             string previousBattleId = null;
@@ -436,6 +505,15 @@ namespace Hapio.Tests
                     yield return null;
                 }
 
+                Assert.That(network.PinnedWatercolorSettings, Is.Not.Null);
+                LabWatercolorStampSettings roundWatercolor = network.PinnedWatercolorSettings.Clone();
+                Assert.That(roundWatercolor.Version, Is.EqualTo(defaultWatercolor.Version),
+                    "Each fresh Battle must capture the saved default V2 appearance, not inherit a previous round's settings.");
+                LabGourdPaint livePaint = network.target.GetComponent<LabGourdPaint>();
+                Assert.That(livePaint, Is.Not.Null);
+                Assert.That(roundWatercolor.UsesClayStickers ? livePaint.ClayStickersActive : livePaint.WatercolorStampsActive, Is.True, livePaint.WatercolorStampError);
+                AssertStampSurfaceBindings(livePaint.Shell, roundWatercolor, "Live Battle stage " + stage);
+
                 LabOrbBoard thisBoard = network.board;
                 network.Generate();
                 yield return Until(() => network.Snapshot.players.Single().generatedTotal == 1,
@@ -460,6 +538,7 @@ namespace Hapio.Tests
                 Assert.That(thisBoard != null, Is.True);
                 Assert.That(preparedPreview.SessionId, Is.EqualTo(previousBattleId));
                 Assert.That(preparedPreview.Round, Is.EqualTo(session.State.battleRound));
+                AssertStampSurfaceBindings(preparedPreview.ModelRoot, roundWatercolor, "Prepared result stage " + stage);
                 if (SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null)
                 {
                     Assert.That(preparedVisualPaint, Is.InstanceOf<RenderTexture>());
@@ -485,6 +564,7 @@ namespace Hapio.Tests
                 Assert.That(typeof(GameSession).GetField("preview", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(session),
                     Is.SameAs(preparedPreview), "Scene navigation reuses the same completed-result copy.");
                 Assert.That(preparedPreview.VisualPaintTexture, Is.SameAs(preparedVisualPaint));
+                AssertStampSurfaceBindings(preparedPreview.ModelRoot, roundWatercolor, "Result after Battle unload stage " + stage);
                 if (SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null)
                 {
                     var captured = (LabGourdResultPreview)typeof(GameSession).GetField("preview",
@@ -930,6 +1010,56 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
+        public IEnumerator PausedBattleClayPreviewPersistsOnlyItsTwoCommonValuesIntoTheNextStage()
+        {
+            session.StartSolo();
+            yield return WaitPlaying(1);
+            LabConfig source = Resources.Load<LabConfig>("LabConfig");
+            string saved = JsonUtility.ToJson(source);
+            float[][] before = Enumerable.Range(0, 4).Select(session.CaptureDeveloperSettings).ToArray();
+            LabConfig acceptedConfig = network.config;
+            float[] accepted = acceptedConfig.CaptureDeveloperValues();
+            session.Pause();
+            yield return null;
+            Assert.That(network.IsBattlePaused, Is.True);
+            string oldBattle = session.State.battleSessionId;
+            uint flowRevision = session.State.revision;
+            int settingsRevision = network.SessionConfigRevision;
+            string fingerprint = network.SessionConfigFingerprint;
+
+            // Battle's LabDeveloperMode calls this API directly. Do not use the Home/
+            // Lobby GameSession wrapper: the event bridge must persist these values.
+            Assert.That(network.TryPreviewClayAppearance(.018f, .83f), Is.True);
+            Assert.That(network.ClayThickness, Is.EqualTo(.018f));
+            Assert.That(network.ClayGloss, Is.EqualTo(.83f));
+            Assert.That(network.config, Is.SameAs(acceptedConfig));
+            Assert.That(network.config.CaptureDeveloperValues(), Is.EqualTo(accepted),
+                "Cosmetic preview must not replace or alter the accepted battle config.");
+            Assert.That(network.SessionConfigRevision, Is.EqualTo(settingsRevision));
+            Assert.That(network.SessionConfigFingerprint, Is.EqualTo(fingerprint));
+            Assert.That(session.State.revision, Is.EqualTo(flowRevision));
+            Assert.That(session.State.battleSessionId, Is.EqualTo(oldBattle));
+            for (int scope = 0; scope < 4; scope++)
+            {
+                float[] remembered = session.CaptureDeveloperSettings(scope);
+                Assert.That(remembered[LabConfig.ClayThicknessField], Is.EqualTo(.018f), "Scope " + scope);
+                Assert.That(remembered[LabConfig.ClayGlossField], Is.EqualTo(.83f), "Scope " + scope);
+                Assert.That(remembered.Take(LabConfig.ClayThicknessField), Is.EqualTo(before[scope].Take(LabConfig.ClayThicknessField)),
+                    "The battle event must not apply an unrelated DEV draft in scope " + scope);
+            }
+            Assert.That(session.DeveloperNextStage(), Is.True);
+            yield return WaitPlaying(2);
+            Assert.That(session.State.battleSessionId, Is.Not.EqualTo(oldBattle));
+            Assert.That(network.config, Is.Not.SameAs(acceptedConfig));
+            Assert.That(network.config.ClayThickness, Is.EqualTo(.018f));
+            Assert.That(network.config.ClayGloss, Is.EqualTo(.83f));
+            Assert.That(network.ClayThickness, Is.EqualTo(.018f));
+            Assert.That(network.ClayGloss, Is.EqualTo(.83f));
+            Assert.That(network.PaintSurface.CoveredCount, Is.Zero);
+            Assert.That(JsonUtility.ToJson(source), Is.EqualTo(saved));
+        }
+
+        [UnityTest]
         public IEnumerator PausedDeveloperNextStageUsesSavedButtonAndFreshBattlesWithoutApplyingUnsavedFields()
         {
             Assert.That(session.CanDeveloperAdvanceStage, Is.False);
@@ -1242,7 +1372,7 @@ namespace Hapio.Tests
         private void AssertDeveloperSettings(float[] expected)
         {
             float[] actual = network.config.CaptureDeveloperValues();
-            Assert.That(actual.Length, Is.EqualTo(257), "The persistent game session must use the current shared schema.");
+            Assert.That(actual.Length, Is.EqualTo(259), "The persistent game session must use the current shared schema.");
             Assert.That(actual, Is.EqualTo(expected),
                 "All approved values, including the gimmick group fields (#311), must survive Scene-owned DEV cleanup.");
         }

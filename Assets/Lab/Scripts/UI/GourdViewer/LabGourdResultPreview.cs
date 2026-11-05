@@ -29,7 +29,7 @@ namespace C6Lab
         private RenderTexture texture;
         private Texture2D paintTexture;
         private Texture2D painterTexture;
-        private RenderTexture visualPaintCopy, visualPainterCopy;
+        private RenderTexture visualPaintCopy, visualPainterCopy, visualHeightCopy;
         private float zoomNormalized = DefaultZoom;
         private float fitDistance;
         private int previewSlot = -1;
@@ -39,6 +39,7 @@ namespace C6Lab
         public Texture2D PaintTexture => paintTexture;
         public Texture2D PainterTexture => painterTexture;
         public Texture VisualPaintTexture => visualPaintCopy != null ? (Texture)visualPaintCopy : paintTexture;
+        public Texture VisualHeightTexture => visualHeightCopy;
         public Texture VisualPainterTexture => visualPainterCopy != null ? (Texture)visualPainterCopy : painterTexture;
         public Quaternion ModelRotation => modelPivot != null ? modelPivot.localRotation : Quaternion.identity;
         public float ZoomNormalized => zoomNormalized;
@@ -102,7 +103,7 @@ namespace C6Lab
         }
 
         /// <summary>Only an authoritative, complete map committed with its matching result can be viewed.</summary>
-        public static bool SurfaceMatches(LabNetwork network, out string error)
+        public static bool SurfaceMatches(LabNetwork network, out string error, bool requireExactArtwork = true)
         {
             if (network == null || !network.IsConnected || network.config == null
                 || !network.config.CompletedGourdViewerEnabled || network.config.GourdMode != LabGourdMode.Paint)
@@ -125,6 +126,11 @@ namespace C6Lab
                 || snapshot.paintCount != surface.PaintCount || !surface.IsComplete)
             {
                 error = "The completed map and result have not been committed together.";
+                return false;
+            }
+            if (requireExactArtwork && network.RequiresPaintArt && !network.PaintArtCompletionReady)
+            {
+                error = network.PaintArtError ?? "The exact artwork history and final image are still being prepared.";
                 return false;
             }
             error = null;
@@ -167,10 +173,13 @@ namespace C6Lab
             // Freeze a private copy before Battle unload/Retry can dispose the live GPU maps.
             // Authoritative CPU copies and eligibility/hash above remain unchanged.
             source.PrepareVisualCapture();
+            if (source.network != null && source.network.RequiresPaintArt && !source.CompletionVisualReady)
+                throw new InvalidOperationException(source.WatercolorStampError ?? "The exact artwork is still being prepared.");
             if (source.HighResolutionActive)
             {
                 visualPaintCopy = CopyVisualMap(source.VisualPaintTexture, false, "Completed high-resolution pigment copy");
                 visualPainterCopy = CopyVisualMap(source.VisualPainterTexture, true, "Completed high-resolution P-number copy");
+                if(source.VisualHeightTexture!=null)visualHeightCopy=CopyVisualMap(source.VisualHeightTexture,false,"Completed clay relief copy");
             }
 
             root = NewObject("Completed gourd preview", null);
@@ -234,7 +243,8 @@ namespace C6Lab
         {
             if (source == null || source.width < 1 || source.height < 1)
                 throw new InvalidOperationException("The accepted visual map is unavailable.");
-            var copy = new RenderTexture(source.width, source.height, 0, RenderTextureFormat.ARGB32,
+            var copy = new RenderTexture(source.width, source.height, 0,
+                source is RenderTexture rt ? rt.format : RenderTextureFormat.ARGB32,
                 RenderTextureReadWrite.Linear)
             {
                 name = name, hideFlags = HideFlags.HideAndDontSave,
@@ -299,7 +309,11 @@ namespace C6Lab
                 {
                     block.SetTexture(PaintMapId, VisualPaintTexture);
                     block.SetTexture(PainterMapId, VisualPainterTexture);
-                    block.SetFloat(PaintReadyId, 1f);
+                    if(VisualHeightTexture!=null && Array.Exists(materials,m=>m!=null && m.HasProperty("_HeightMap")))block.SetTexture("_HeightMap",VisualHeightTexture);
+                    // A clay result includes both the unpainted base and its raised coat.
+                    // Preserve each source Ready value for every rig part (body and lid),
+                    // rather than assuming only the legacy 'White Gourd' needs Ready0.
+                    if(visualHeightCopy==null)block.SetFloat(PaintReadyId, 1f);
                     paintedRenderers++;
                 }
                 renderer.SetPropertyBlock(block);
@@ -314,7 +328,8 @@ namespace C6Lab
                     {
                         block.SetTexture(PaintMapId, VisualPaintTexture);
                         block.SetTexture(PainterMapId, VisualPainterTexture);
-                        block.SetFloat(PaintReadyId, 1f);
+                        if(VisualHeightTexture!=null && materials[i].HasProperty("_HeightMap"))block.SetTexture("_HeightMap",VisualHeightTexture);
+                        if(visualHeightCopy==null)block.SetFloat(PaintReadyId, 1f);
                     }
                     renderer.SetPropertyBlock(block, i);
                 }
@@ -408,6 +423,8 @@ namespace C6Lab
             DestroyOwned(painterTexture);
             if (visualPaintCopy != null) visualPaintCopy.Release();
             if (visualPainterCopy != null) visualPainterCopy.Release();
+            if(visualHeightCopy!=null)visualHeightCopy.Release();
+            DestroyOwned(visualHeightCopy);visualHeightCopy=null;
             DestroyOwned(visualPaintCopy);
             DestroyOwned(visualPainterCopy);
             visualPaintCopy = visualPainterCopy = null;

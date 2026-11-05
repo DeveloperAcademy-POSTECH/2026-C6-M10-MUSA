@@ -14,7 +14,13 @@ namespace C6Lab.Experiments.Editor
         [SerializeField] private float yaw, pitch, zoom = 1f;
         [SerializeField] private HighResolutionHitLocation location;
         [SerializeField] private LabWatercolorPaintSettings settings = new LabWatercolorPaintSettings();
+        [SerializeField] private bool useBrushStamps = true;
+        [SerializeField] private LabWatercolorStampFixture fixture;
+        [SerializeField] private LabWatercolorStampSettings stampSettings = new LabWatercolorStampSettings();
         private LabWatercolorPaintStudy study;
+        private LabWatercolorStampStudy stampStudy;
+        private EnumField fixtureField;
+        private Button sixViewsButton;
         private Texture2D[] frames;
         private Image currentImage, candidateImage;
         private Label status;
@@ -43,6 +49,7 @@ namespace C6Lab.Experiments.Editor
             }
             layout.CloneTree(rootVisualElement);
             settings ??= new LabWatercolorPaintSettings();
+            stampSettings ??= new LabWatercolorStampSettings();
             currentImage = rootVisualElement.Q<Image>("currentImage");
             candidateImage = rootVisualElement.Q<Image>("candidateImage");
             currentImage.scaleMode = candidateImage.scaleMode = ScaleMode.ScaleToFit;
@@ -50,10 +57,20 @@ namespace C6Lab.Experiments.Editor
             exportButton = rootVisualElement.Q<Button>("exportComparison");
             exportButton.SetEnabled(false);
             exportButton.clicked += Export;
+            sixViewsButton = rootVisualElement.Q<Button>("exportSixViews");
+            sixViewsButton.clicked += ExportSixViews;
             renderRequest = rootVisualElement.schedule.Execute(Render);
             renderRequest.Pause();
 
             VisualElement viewControls = rootVisualElement.Q<VisualElement>("viewControls");
+            var modeToggle = new Toggle("New layered brush stamps") { value = useBrushStamps };
+            modeToggle.AddToClassList("watercolor-control");
+            modeToggle.RegisterValueChangedCallback(e => { useBrushStamps = e.newValue; UpdateMode(); ScheduleRender(); });
+            viewControls.Add(modeToggle);
+            fixtureField = new EnumField("Color fixture", fixture);
+            fixtureField.AddToClassList("watercolor-control");
+            fixtureField.RegisterValueChangedCallback(e => { fixture = (LabWatercolorStampFixture)e.newValue; ScheduleRender(); });
+            viewControls.Add(fixtureField);
             repeatsSlider = new SliderInt("Re-hits after first", 0, 3)
                 { value = repeats, showInputField = true };
             repeatsSlider.AddToClassList("watercolor-control");
@@ -86,12 +103,30 @@ namespace C6Lab.Experiments.Editor
             AddSlider(pigmentControls, "Edge width", .005f, .12f, settings.edgeWidth, v => settings.edgeWidth = v);
             AddSlider(pigmentControls, "Texture size", .25f, 4f, settings.textureScale, v => settings.textureScale = v);
 
+            VisualElement stampControls = rootVisualElement.Q<VisualElement>("stampControls");
+            AddSlider(stampControls, "Stamp density", .05f, 1f, stampSettings.density, v => stampSettings.density = v);
+            AddSlider(stampControls, "Overlap opacity", 0f, 1f, stampSettings.overlap, v => stampSettings.overlap = v);
+            AddSlider(stampControls, "Stamp edge", 0f, 1f, stampSettings.edgeStrength, v => stampSettings.edgeStrength = v);
+            AddSlider(stampControls, "Stamp edge width", .002f, .15f, stampSettings.edgeWidth, v => stampSettings.edgeWidth = v);
+            AddSlider(stampControls, "Reveal seconds (static settled)", 0f, 2f, stampSettings.revealSeconds, v => stampSettings.revealSeconds = v);
+            UpdateMode();
+
             rootVisualElement.Q<Button>("nextHit").clicked += () => repeatsSlider.value = repeats < 3 ? repeats + 1 : 0;
             rootVisualElement.Q<Button>("frontView").clicked += () => SetView(0f, 0f);
             rootVisualElement.Q<Button>("seamView").clicked += () => SetView(90f, 0f);
             rootVisualElement.Q<Button>("poleView").clicked += () => SetView(0f, 90f);
             rootVisualElement.Q<Button>("refreshComparison").clicked += Render;
             Render();
+        }
+
+        private void UpdateMode()
+        {
+            rootVisualElement.Q<VisualElement>("pigmentControls").EnableInClassList("watercolor-hidden", useBrushStamps);
+            rootVisualElement.Q<VisualElement>("stampControls").EnableInClassList("watercolor-hidden", !useBrushStamps);
+            fixtureField?.SetEnabled(useBrushStamps);
+            sixViewsButton?.SetEnabled(useBrushStamps);
+            rootVisualElement.Q<Label>("currentHeading").text = useBrushStamps ? "PREVIOUS · Watercolor" : "BASELINE · High resolution";
+            rootVisualElement.Q<Label>("candidateHeading").text = useBrushStamps ? "NEW · Ordered brush stamps" : "WATERCOLOR · Previous renderer";
         }
 
         private Slider AddSlider(VisualElement parent, string label, float low, float high,
@@ -121,17 +156,26 @@ namespace C6Lab.Experiments.Editor
             if (status == null || currentImage == null || candidateImage == null) return;
             try
             {
-                study ??= new LabWatercolorPaintStudy();
-                study.HitDirection = LabHighResolutionPaintWindow.Direction(location);
                 ClearFrames();
-                frames = study.Render(repeats, unchecked((uint)seed), yaw, pitch, zoom, settings);
+                if (useBrushStamps)
+                {
+                    stampStudy ??= new LabWatercolorStampStudy();
+                    stampStudy.HitDirection = LabHighResolutionPaintWindow.Direction(location);
+                    frames = stampStudy.Render(fixture, repeats, unchecked((uint)seed), yaw, pitch, zoom, stampSettings);
+                }
+                else
+                {
+                    study ??= new LabWatercolorPaintStudy();
+                    study.HitDirection = LabHighResolutionPaintWindow.Direction(location);
+                    frames = study.Render(repeats, unchecked((uint)seed), yaw, pitch, zoom, settings);
+                }
                 if (frames == null || frames.Length != 2 || frames[0] == null || frames[1] == null)
                     throw new InvalidOperationException("The paint study did not return two comparison images.");
                 currentImage.image = frames[0];
                 candidateImage.image = frames[1];
                 status.RemoveFromClassList("watercolor-error");
-                LabPaintSurface surface = study.Surface;
-                status.text = $"WATER / blue · {location} · first hit + {repeats} re-hit(s) · seed {seed} · "
+                LabPaintSurface surface = useBrushStamps ? stampStudy.Surface : study.Surface;
+                status.text = $"{(useBrushStamps ? fixture.ToString() : "WATER / blue")} · {location} · first hit + {repeats} re-hit(s) · seed {seed} · "
                     + $"Host-rule fixture {surface.Coverage:P2} ({surface.CoveredCount:N0}/{surface.CellCount:N0} cells). "
                     + "Drying OFF only in this private fixture. Static comparison of the game renderer; "
                     + "active spreading is finalized here. This window does not change a live session.";
@@ -151,7 +195,7 @@ namespace C6Lab.Experiments.Editor
         {
             if (frames == null || frames.Length != 2 || frames[0] == null || frames[1] == null) return;
             string path = EditorUtility.SaveFilePanel("Export watercolor comparison", string.Empty,
-                $"watercolor-369-first-plus-{repeats}", "png");
+                $"watercolor-{(useBrushStamps ? "stamps-" + fixture : "legacy")}-first-plus-{repeats}", "png");
             if (string.IsNullOrEmpty(path)) return;
             Texture2D comparison = null;
             try
@@ -167,6 +211,35 @@ namespace C6Lab.Experiments.Editor
                 Debug.LogException(exception);
             }
             finally { if (comparison != null) Object.DestroyImmediate(comparison); }
+        }
+
+        private void ExportSixViews()
+        {
+            if (!useBrushStamps) return;
+            string path = EditorUtility.SaveFilePanel("Export six saved-gourd views", string.Empty,
+                $"watercolor-stamps-{fixture}-six-views", "png");
+            if (string.IsNullOrEmpty(path)) return;
+            Texture2D[] views = null;
+            Texture2D combined = null;
+            try
+            {
+                stampStudy ??= new LabWatercolorStampStudy();
+                stampStudy.HitDirection = LabHighResolutionPaintWindow.Direction(location);
+                views = stampStudy.RenderSixViews(true, fixture, repeats, unchecked((uint)seed), stampSettings);
+                combined = LabWatercolorStampStudy.CombineGrid(views);
+                File.WriteAllBytes(path, combined.EncodeToPNG());
+                EditorUtility.RevealInFinder(path);
+            }
+            catch (Exception exception)
+            {
+                status.AddToClassList("watercolor-error"); status.text = "Export failed: " + exception.Message;
+                Debug.LogException(exception);
+            }
+            finally
+            {
+                if (combined != null) Object.DestroyImmediate(combined);
+                if (views != null) foreach (Texture2D view in views) if (view != null) Object.DestroyImmediate(view);
+            }
         }
 
         private void ClearFrames()
@@ -185,6 +258,7 @@ namespace C6Lab.Experiments.Editor
             renderRequest?.Pause(); renderRequest = null;
             ClearFrames();
             study?.Dispose(); study = null;
+            stampStudy?.Dispose(); stampStudy = null;
         }
     }
 }

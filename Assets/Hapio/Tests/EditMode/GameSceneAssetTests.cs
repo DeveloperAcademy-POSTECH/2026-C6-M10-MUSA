@@ -222,8 +222,8 @@ namespace Hapio.Tests
                 if (expected == GameScreenKind.GameOver) Assert.That(screen.homeButton, Is.Not.Null);
                 if (expected == GameScreenKind.Home || expected == GameScreenKind.Lobby)
                 {
-                    Assert.That(screen.developerInputs, Has.Length.EqualTo(LabConfig.DeveloperFields.Count));
-                    Assert.That(screen.developerSliders, Has.Length.EqualTo(LabConfig.DeveloperFields.Count));
+                    Assert.That(screen.developerInputs, Has.Length.EqualTo(LabConfig.ClayThicknessField), "Authored legacy controls remain saved; the two clay rows append at runtime.");
+                    Assert.That(screen.developerSliders, Has.Length.EqualTo(LabConfig.ClayThicknessField));
                     Assert.That(screen.developerInputs.All(value => value != null), Is.True);
                     Assert.That(screen.developerSliders.All(value => value != null), Is.True);
                     Assert.That(screen.developerPanel.activeSelf, Is.False);
@@ -236,11 +236,13 @@ namespace Hapio.Tests
                     Assert.That(sharedFont, Is.Not.Null);
                     foreach (UnityEngine.UI.Text text in screen.developerPanel.GetComponentsInChildren<UnityEngine.UI.Text>(true))
                         Assert.That(text.font, Is.SameAs(sharedFont), "Korean stage/DEV labels use the existing project font.");
-                    Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(257), "The current Lab schema includes Flash, counting and Jigwi stage scheduling.");
+                    Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(259), "The current Lab schema includes Flash, counting and Jigwi stage scheduling.");
                     Assert.That(SavedConfig().GourdColorComboEnabled, Is.False);
                     Assert.That(SavedConfig().LabUniqueGimmicksEnabled, Is.False);
                     float[] defaults = SavedConfig().CaptureDeveloperValues();
-                    for (int i = 0; i < defaults.Length; i++)
+                    // Inspect every authored control, without pretending the runtime-only
+                    // clay rows have been written into the user's saved Scene.
+                    for (int i = 0; i < screen.developerInputs.Length; i++)
                     {
                         LabDeveloperField field = LabConfig.DeveloperFields[i];
                         var input = screen.developerInputs[i];

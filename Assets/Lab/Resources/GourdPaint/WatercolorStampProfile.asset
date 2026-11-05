@@ -1,0 +1,34 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 209dd04edcade4d5da27b9bd7dbd044c, type: 3}
+  m_Name: WatercolorStampProfile
+  m_EditorClassIdentifier: C6Lab.Runtime::C6Lab.LabWatercolorStampProfile
+  settings:
+    mode: 2
+    paperSticker:
+      grainStrength: 0.24
+      edgeStrength: 0.08
+      grainScale: 2
+    claySticker:
+      minimumDensity: 0.65
+      maximumDensity: 1
+    enabled: 1
+    density: 0.9
+    overlap: 0.78
+    edgeStrength: 0.55
+    edgeWidth: 0.025
+    pigmentContrast: 1.6
+    pigmentSaturation: 1.15
+    granulationStrength: 0.25
+    granulationScale: 120
+    rimBreakup: 0.45
+    revealSeconds: 0

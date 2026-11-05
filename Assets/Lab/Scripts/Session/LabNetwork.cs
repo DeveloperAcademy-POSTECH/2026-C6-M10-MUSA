@@ -252,13 +252,15 @@ namespace C6Lab
         // 5682: #428 lean packet envelope (bodies in a JSON payload string, no default nested objects); immediate
         //       board publishes skip peers whose delta is empty.
         // 5683: #461 paint frame bodies may be deflate-compressed (LabPaintFrame.encoding).
-        internal const ushort LabProtocolVersion = 5683;
+        // 5685: #466 approved opaque paper contour, data pack and pinned presentation mode.
+        // #506: clay appearance, live DEV fields and impact density hints.
+        internal const ushort LabProtocolVersion = 5686;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Double-tap a blue fox orb to clear it, and keep your Yin and Yang away.";
         /// <summary>More fox orbs than one fox fire ever drops; a longer list is ignored (#251).</summary>
         private const int MaximumFoxFireOrbs = 10;
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/44");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/47");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;
@@ -1039,6 +1041,7 @@ namespace C6Lab
             double beginAt = Time.realtimeSinceStartupAsDouble;
             model.Begin(sessionId, playersInPOrder, beginAt, config,
                 stageYokai: gameFlowEnabled ? gameStageYokai : LabStageYokai.None);
+            BeginPaintArt();
             if (GameStartHeld) battleClock.Pause(beginAt);
             model.PaintSurface?.PreloadPatternMask();
             SampleHostPaintFlow(battleClock.Now(Time.realtimeSinceStartupAsDouble));
@@ -1124,6 +1127,7 @@ namespace C6Lab
             double beginAt = Time.realtimeSinceStartupAsDouble;
             model.BeginSolo(sessionId, LocalPlayerId, beginAt, config,
                 stageYokai: gameFlowEnabled ? gameStageYokai : LabStageYokai.None);
+            BeginPaintArt();
             if (GameStartHeld) battleClock.Pause(beginAt);
             model.PaintSurface?.PreloadPatternMask();
             SampleHostPaintFlow(battleClock.Now(Time.realtimeSinceStartupAsDouble));
@@ -1396,6 +1400,7 @@ namespace C6Lab
                 FlushPendingBlastReports(now);
                 FlushBoardActions(now);
             }
+            TickPaintArt(now);
             FlushBulkPackets();
             if (!IsHost && latest != null) ExpirePresentedHits(BattlePresentationTime);
             if (!IsHost && (pendingPaintSnapshot != null || PartialPaintStalled(now))
@@ -1700,6 +1705,7 @@ namespace C6Lab
             // many reliable fragments per peer until the network becomes unusable.
             nextSnapshotAt = now + ((latest.orbs?.Length ?? 0) > 100 ? .5d : .1d);
             // Commit the Host's view and counts from the very same authoritative map version.
+            CommitPaintArt(latest);
             CopyPaintToDisplay(model.PaintSurface, latest);
             if (target != null) target.GetComponent<LabGourdPaint>()?.RefreshCommittedMap();
             ApplyLocalPause(latest.paused);
@@ -2051,7 +2057,8 @@ namespace C6Lab
                 // 던질 때 정해진 공 크기 (#398 작은 공 타격음). ConfirmHit이 지우기 전에 읽는다.
                 float launchScale = model.LaunchScaleOf(result.ProjectileId);
                 bool approvedHit = model.ConfirmHit(result.ProjectileId, now, paintDirection,
-                    out var element, out int actualDamage, out int impactValue);
+                    out var element, out int actualDamage, out int impactValue,
+                    LabPaintImpact.Normalize(result.ImpactVelocity, result.HitNormal));
                 blockedByCurtain = !approvedHit && model.JigwiABBlocksBoss(result.OwnerPlayerId, now);
                 if (blockedByCurtain) SetNotice("불장막에 막힘 · 불씨를 모두 꺼주세요.");
                 if (approvedHit && target != null)
@@ -2287,6 +2294,8 @@ namespace C6Lab
                     }
                     return;
                 }
+                if (packet.type == "paint_art_ack")
+                { ReceivePaintArtReceipt(sender, packet); return; }
                 if (packet.type == "paint_resync")
                 {
                     if (model != null && packet.sessionId == sessionId && packet.round == model.Round
@@ -2308,6 +2317,12 @@ namespace C6Lab
             if (sender != NetworkManager.ServerClientId) return;
             switch (packet.type)
             {
+                case "clay_appearance":
+                    ReceiveClayAppearance(packet);
+                    break;
+                case "paint_art_error":
+                    ReceivePaintArtError(packet);
+                    break;
                 case "action_retry":
                     ReceiveActionRetry(packet);
                     break;
@@ -2736,6 +2751,7 @@ namespace C6Lab
 
         private void ResetPaintTransport()
         {
+            ResetPaintArt();
             peerPaintPublishers.Clear();
             paintPublishCache.Clear();
             peerSharedRounds.Clear();
