@@ -7,7 +7,7 @@ namespace C6Lab
     /// <summary>
     /// #509 지귀 B 화면(각 기기, 스냅샷만 본다). 불기둥 없이 전투 영역 위쪽에 물방울 3칸만 보여 준다(지목된 사람과
     /// 도우미 모두). 지목된 사람 중 누가 먼저 박을 맞혀 1초 창이 열리면 아직 안 맞힌 지목자 화면에 "지금!"과 줄어드는
-    /// 1초 막대가 뜨고 폰이 한 번 울린다. 창이 어긋나 0/3으로 돌아가면 물방울이 빨갛게 흔들린다.
+    /// 1초 막대가 뜨고 폰이 한 번 울린다. 창이 어긋나 0/3으로 돌아가면 물방울이 빨갛게 흔들린다. 글자는 띄우지 않는다.
     /// 그림은 코드로 만든 임시 그림이고(최종 그림은 VFX 이슈), 규칙/충돌은 바꾸지 않는다. 모든 Graphic은 터치를 막지 않는다.
     /// (클래스 이름은 처음 불기둥으로 만들 때의 것을 그대로 둔다.)
     /// </summary>
@@ -123,11 +123,9 @@ namespace C6Lab
             cue.fontSize = Mathf.RoundToInt(size * .62f);
             cue.rectTransform.anchoredPosition = new Vector2(0f, -size * 1.6f);
             cue.rectTransform.sizeDelta = new Vector2(size * 6f, size);
-            if (ResetCueVisible) { cue.text = "어긋났어요!"; cue.color = new Color(1f, .55f, .5f); }
-            else if (NowCueVisible) { cue.text = "지금!"; cue.color = new Color(1f, .93f, .45f); }
-            else if (windowOpen && picked) { cue.text = "기다려요…"; cue.color = new Color(.8f, .9f, 1f); }
-            else cue.text = string.Empty;
-            cue.gameObject.SetActive(cue.text.Length > 0);
+            // #509: no words beside the drops; the red shake, the one-second bar and the vibration remain.
+            cue.text = string.Empty;
+            cue.gameObject.SetActive(false);
         }
 
         private bool ResetVisible(double now) => resetAt >= 0d && now - resetAt < ResetSeconds;

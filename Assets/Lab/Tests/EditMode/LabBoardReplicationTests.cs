@@ -468,7 +468,7 @@ namespace C6Lab.Tests
                     new LabJigwiABRound
                     {
                         id = "failed-mission", slot = 1, kind = LabJigwiABKind.GroupFire,
-                        warningAt = 24d, activeAt = 25d, endsAt = 40d, resolvedAt = 40d, // #509 15 s B
+                        warningAt = 23d, activeAt = 25d, endsAt = 40d, resolvedAt = 40d, // #509 15 s B, 2 s warning
                         resolution = LabJigwiABResolution.Expired, clearedThroughRevision = 50ul,
                         shrinkAt = 25d, shrinkScale = 1f, movePeriodSeconds = 4f, targetRadius = .3f,
                         players = new[]

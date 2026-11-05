@@ -152,18 +152,18 @@ namespace C6Lab.Tests
         public void PersonalWarningKeepsInstructionsButHeatStartsOnlyAtTheAcceptedMissionBoundary(double activeAt)
         {
             var personal = Personal();
-            personal.warningAt = activeAt - 1d; personal.activeAt = activeAt; personal.endsAt = activeAt + 15d;
+            personal.warningAt = activeAt - LabJigwiABTimeline.WarningSeconds; personal.activeAt = activeAt; personal.endsAt = activeAt + 15d;
             snapshot = Snapshot(personal); SetSnapshot(snapshot);
             view.ApplySnapshot(snapshot, Local, personal.warningAt);
             Assert.That(view.PersonalHeatVisible, Is.False, "The voice warning must not apply active heat early.");
-            Assert.That(view.status.text, Does.Contain("으아아 마음이 불타오른다"));
+            Assert.That(view.status.text, Does.Contain("타올라라, 모두 재가 되어라"));
             Assert.That(view.playerStatus.text, Does.Not.Contain("결합 구슬로 박을 맞혀"), "#479 removed A's boss-hit instruction.");
             view.ApplySnapshot(snapshot, Local, activeAt - .001d);
             Assert.That(view.PersonalHeatVisible, Is.False);
             Assert.That(view.VisibleScreenFires, Is.Zero);
             view.ApplySnapshot(snapshot, Local, activeAt);
             Assert.That(view.PersonalHeatVisible, Is.False, "#479: A never tints the screen or shows edge flames.");
-            Assert.That(view.status.text, Does.Not.Contain("으아아 마음이 불타오른다"), "The warning text still ends at activeAt.");
+            Assert.That(view.status.text, Does.Not.Contain("타올라라, 모두 재가 되어라"), "The warning text still ends at activeAt.");
             view.ApplySnapshot(snapshot, Other, activeAt + .01d);
             Assert.That(view.PersonalHeatVisible, Is.False);
             view.ApplySnapshot(snapshot, Local, personal.endsAt);
@@ -176,13 +176,13 @@ namespace C6Lab.Tests
         public void GroupWarningNamesThePickedAndTheDropsStartAtTheAcceptedBoundaryWithoutAnyFireArt(double activeAt)
         {
             var group = Group();
-            group.warningAt = activeAt - 1d; group.activeAt = activeAt; group.endsAt = activeAt + 15d;
+            group.warningAt = activeAt - LabJigwiABTimeline.WarningSeconds; group.activeAt = activeAt; group.endsAt = activeAt + 15d;
             snapshot = Snapshot(group); SetSnapshot(snapshot);
             view.audioView.Source.mute = true;
             view.ApplySnapshot(snapshot, Local, group.warningAt);
-            Assert.That(view.status.text, Does.Contain("다 함께 물을 끼얹어라"));
-            Assert.That(view.status.text, Does.Contain("지목 P1·P2"));
-            Assert.That(view.playerStatus.text, Does.Contain("물 구슬로 박을 맞혀요"));
+            // #509: the warning shows only Jigwi's taunt; no picked names, guide or progress.
+            Assert.That(view.status.text, Is.EqualTo("흩어진 물방울로는 어림없다!"));
+            Assert.That(view.playerStatus.gameObject.activeSelf, Is.False);
             Assert.That(view.SyncPillar.DropsVisible, Is.False, "The drops start with the mission, not the warning.");
             view.ApplySnapshot(snapshot, Local, activeAt);
             Assert.That(view.SyncPillar.DropsVisible, Is.True);
@@ -190,7 +190,8 @@ namespace C6Lab.Tests
             Assert.That(view.VisibleScreenFires, Is.Zero);
             Assert.That(view.RemainingIgnitions, Is.EqualTo(3));
             Assert.That(view.audioView.WantsLoop, Is.False, "No fire on screen, no fire loop.");
-            Assert.That(view.status.text, Does.Not.Contain("다 함께 물을 끼얹어라"));
+            Assert.That(view.status.text, Is.Empty, "After the warning B shows no words at all.");
+            Assert.That(view.statusPanel.gameObject.activeSelf, Is.False);
             view.ApplySnapshot(snapshot, Local, group.endsAt);
             Assert.That(view.SyncPillar.DropsVisible, Is.False);
         }
@@ -243,7 +244,7 @@ namespace C6Lab.Tests
             Assert.That(view.GroupCurtainVisible, Is.False);
             Assert.That(view.VisibleScreenFires, Is.Zero);
             Assert.That(view.SyncPillar.DropsVisible, Is.True);
-            Assert.That(view.playerStatus.text, Does.Contain("물 구슬을 P1에게 굴려 주세요"));
+            Assert.That(view.playerStatus.gameObject.activeSelf, Is.False, "#509: no passing hint text.");
             Assert.That(view.audioView.WantsLoop, Is.False, "Only a picked screen plays the fire loop.");
         }
 
@@ -294,14 +295,14 @@ namespace C6Lab.Tests
             var next = Personal(); next.id = "next-personal"; next.warningAt = 20d; next.activeAt = 21d; next.endsAt = 36d;
             snapshot = Snapshot(group); snapshot.jigwiAB.rounds = new[] { next, group }; SetSnapshot(snapshot);
             view.ApplySnapshot(snapshot, Local, 11d);
-            Assert.That(view.status.text, Does.Contain("10.0초"));
+            Assert.That(view.status.text, Is.Empty, "#509: no countdown text.");
             view.ApplySnapshot(snapshot, Local, 20.5d);
-            Assert.That(view.status.text, Does.Contain("0.5초").And.Contain("다음 기믹 예고"));
+            Assert.That(view.status.text, Is.EqualTo("타올라라, 모두 재가 되어라!"), "The next A shows only its own taunt.");
             Assert.That(view.SyncPillar.DropsVisible, Is.True, "The upcoming A warning must not hide B before its deadline.");
             group.resolution = LabJigwiABResolution.Expired; group.resolvedAt = 21d;
             view.ApplySnapshot(snapshot, Local, 21d);
             Assert.That(view.FailureVisible, Is.True); Assert.That(view.FailureFlashCount, Is.EqualTo(1));
-            Assert.That(view.failureStatus.text, Is.EqualTo("실패"));
+            Assert.That(view.failureStatus.text, Is.Empty, "#509: no failure words.");
             Assert.That(view.failureOverlay.rectTransform.anchorMin, Is.EqualTo(Vector2.zero));
             Assert.That(view.failureOverlay.rectTransform.anchorMax, Is.EqualTo(Vector2.one));
             Assert.That(view.failureOverlay.GetComponentsInChildren<UnityEngine.UI.Graphic>(true)
@@ -330,16 +331,15 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void SuccessShowsTheWaterSplashLineWithoutAnyRewardRows()
+        public void SuccessShowsNoWordsAndNoRewardRows()
         {
             var group = Group(); snapshot = Snapshot(group); SetSnapshot(snapshot);
             view.ApplySnapshot(snapshot, Local, 11.2d);
             group.resolution = LabJigwiABResolution.Completed; group.resolvedAt = 12d;
             view.ApplySnapshot(snapshot, Local, 12d);
             // #509: B success is one big splash on the boss; no 5-second launch reward any more.
-            Assert.That(view.status.text, Does.Contain("물벼락"));
-            Assert.That(view.status.text, Does.Not.Contain("보상"));
-            Assert.That(view.playerStatus.text, Does.Not.Contain("배").And.Not.Contain("불꽃 궤적"));
+            Assert.That(view.status.text, Is.Empty, "#509: no success or reward words; the splash is on the boss.");
+            Assert.That(view.playerStatus.gameObject.activeSelf, Is.False);
             Assert.That(view.FailureVisible, Is.False); Assert.That(view.BoardFireVisible, Is.False);
             Assert.That(view.GetComponentsInChildren<Canvas>(true), Is.Empty, "Reuse the authored Canvas hierarchy.");
             Assert.That(view.GetComponentsInChildren<Collider>(true), Is.Empty);
@@ -354,10 +354,10 @@ namespace C6Lab.Tests
             group.resolution = LabJigwiABResolution.Expired; group.resolvedAt = 21d; group.boardFireUntil = 24d;
             view.ApplySnapshot(snapshot, Local, 21d);
             Assert.That(view.FailureVisible, Is.True); Assert.That(view.BoardFireVisible, Is.True);
-            Assert.That(view.failureStatus.text, Does.Contain("조합판에 불이 붙었다").And.Contain("3.0초"));
+            Assert.That(view.failureStatus.text, Is.Empty, "#509: the board fire has no words.");
             view.ApplySnapshot(snapshot, Local, 23.5d);
             Assert.That(view.FailureVisible, Is.True, "The fire outlasts the one-second failure flash.");
-            Assert.That(view.failureStatus.text, Does.Contain("0.5초"));
+            Assert.That(view.BoardFireVisible, Is.True);
             Assert.That(view.failureOverlay.GetComponentsInChildren<UnityEngine.UI.Graphic>(true)
                 .All(graphic => !graphic.raycastTarget), Is.True, "The fire never consumes input.");
             view.ApplySnapshot(snapshot, Local, 24d);
@@ -378,13 +378,13 @@ namespace C6Lab.Tests
             group.syncWindowAt = -1d; mine.targets[0].extinguishedAt = -1d; group.syncCount = 1;
             view.ApplySnapshot(snapshot, Local, 11.6d);
             Assert.That(view.SyncPillar.FilledDrops, Is.EqualTo(1));
-            Assert.That(view.status.text, Does.Contain("1/3"));
+            Assert.That(view.status.text, Is.Empty);
             Assert.That(view.RemainingIgnitions, Is.EqualTo(2));
             group.syncCount = 3; foreach (var player in group.players) player.targets[0].lit = false;
             group.resolution = LabJigwiABResolution.Completed; group.resolvedAt = 23.8d;
             view.ApplySnapshot(snapshot, Local, 23.8d);
             Assert.That(view.SyncPillar.DropsVisible, Is.False);
-            Assert.That(view.status.text, Does.Contain("물벼락"));
+            Assert.That(view.status.text, Is.Empty);
             snapshot.phase = LabPhase.Victory; view.ApplySnapshot(snapshot, Local, 24.5d);
             Assert.That(view.statusPanel.gameObject.activeSelf, Is.False);
         }

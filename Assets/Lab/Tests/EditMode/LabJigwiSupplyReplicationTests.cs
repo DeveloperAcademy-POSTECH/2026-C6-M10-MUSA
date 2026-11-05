@@ -38,7 +38,7 @@ namespace C6Lab.Tests
             {
                 id = First, slot = 1, kind = LabJigwiABKind.GroupFire,
                 resolution = completed ? LabJigwiABResolution.Completed : LabJigwiABResolution.None,
-                warningAt = 24d, activeAt = 25d, endsAt = 40d, resolvedAt = completed ? 29d : -1d,
+                warningAt = 23d, activeAt = 25d, endsAt = 40d, resolvedAt = completed ? 29d : -1d, // #509 2 s warning
                 syncCount = completed ? LabJigwiABTimeline.GroupSyncRequired : 0, // #509
                 rewardUntil = -1d, rewardSizeScale = 1f, rewardPaintScale = 1f, // #509: no B reward
                 shrinkAt = 25d, shrinkScale = 1f, moveAmount = .03f, movePeriodSeconds = 4f, targetRadius = .3f,

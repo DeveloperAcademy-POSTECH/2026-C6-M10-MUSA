@@ -124,12 +124,14 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void PersonalFireHasOneSecondWarningFifteenSecondLimitAndNoSurfaceSpread()
+        public void PersonalFireHasTwoSecondWarningFifteenSecondLimitAndNoSurfaceSpread()
         {
             var room = Room();
-            Assert.That(ScreenState(room, 3.99d).rounds, Is.Empty);
-            var warning = ScreenState(room, 4d).rounds.Single();
-            Assert.That(warning.Warning(4d), Is.True);
+            // #509: the warning (Jigwi's taunt) shows for two seconds, from 3 s.
+            Assert.That(ScreenState(room, 2.99d).rounds, Is.Empty);
+            var warning = ScreenState(room, 3d).rounds.Single();
+            Assert.That(warning.Warning(3d), Is.True);
+            Assert.That(warning.warningAt, Is.EqualTo(3d));
             Assert.That(warning.Active(4d), Is.False);
             var active = ScreenState(room, 5d).rounds.Single();
             Assert.That(active.kind, Is.EqualTo(LabJigwiABKind.PersonalBurn));

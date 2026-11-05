@@ -159,8 +159,9 @@ namespace Hapio.Tests
             Assert.That(overlay.VisibleScreenFires, Is.Zero);
             Assert.That(overlay.GroupCurtainVisible, Is.False);
             Assert.That(overlay.SyncPillar.DropsVisible, Is.True);
-            Assert.That(overlay.status.text, Does.Contain("지목 P1").And.Contain("0/3"));
-            Assert.That(overlay.playerStatus.text, Does.Contain("물 구슬로 박을 맞혀요"));
+            // #509: past the two-second taunt B shows no words; the drops carry the progress.
+            Assert.That(overlay.status.text, Is.Empty);
+            Assert.That(overlay.SyncPillar.FilledDrops, Is.Zero);
             Assert.That(current.orbs.Any(orb => orb.jigwiABSupplyEventId == b.id), Is.True,
                 "B supplies real owned Water, without a player generation request.");
             Assert.That(spendEvents, Is.EqualTo(1), "Free supply and new snapshots never flash as a paid generation.");
@@ -181,7 +182,7 @@ namespace Hapio.Tests
                 if (i < 2)
                 {
                     Assert.That(overlay.SyncPillar.FilledDrops, Is.EqualTo(i + 1));
-                    Assert.That(overlay.status.text, Does.Contain((i + 1) + "/3"));
+                    Assert.That(overlay.status.text, Is.Empty);
                 }
                 HoldAt(31.4d + i * .3d); yield return null;
                 CaptureScreenEvidence((2 - i).ToString()); yield return null;

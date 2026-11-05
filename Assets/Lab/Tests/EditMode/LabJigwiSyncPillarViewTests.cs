@@ -72,7 +72,7 @@ namespace C6Lab.Tests
         private static LabJigwiABRound Round() => new LabJigwiABRound
         {
             id = "b-sync", slot = 1, kind = LabJigwiABKind.GroupFire,
-            warningAt = 24d, activeAt = 25d, endsAt = 40d,
+            warningAt = 23d, activeAt = 25d, endsAt = 40d,
             players = new[]
             {
                 new LabJigwiABPlayerFire { playerId = Partner, targets = new[] { new LabJigwiABFireTarget { id = "p", x = .5f, y = .62f } } },

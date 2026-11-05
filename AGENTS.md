@@ -253,11 +253,12 @@
 ## #509 지귀 B 지목 동시 명중 — 최신 호환 기준
 
 - 시간표: A 5/42/70초, B 25/55/85초. A2는 공통 폭탄(40초)과 겹치지 않게 42초로 옮겼고, B는 15초(`LabJigwiABTimeline.GroupMissionSeconds`)다. B3는 100초 정리로 벌점 없이 취소된다.
+- 예고는 활성 2초 전(`LabJigwiABTimeline.WarningSeconds`, 이전 1초)이고 상단에 지귀 도발만 띄운다: A "타올라라, 모두 재가 되어라!", B "흩어진 물방울로는 어림없다!". 파훼법은 문구로 설명하지 않는다.
 - B는 1~2인 1명 / 3인 2명 / 4·5인 3명을 seed로 뽑는다(`GroupPickCount`, `JigwiGroupPicks`). `round.players`에는 지목된 자리만 있다. 아무도 막히지 않고(`JigwiABBlocksBoss` false), 불기둥/장막/콜라이더가 없다.
 - 지목된 전원이 첫 명중부터 1초 안에 **박**을 Water Combined로 맞히면(`RecordJigwiBossSyncHit` → `RecordJigwiSyncHit`) `syncCount`+1, 늦으면 0으로 초기화(`syncResetAt`). 혼자면 1번 = 1회. 3회면 성공.
 - 성공(물벼락): 3번째 동시 명중 순간 지목된 사람마다 마지막으로 맞힌 자리에 Water 칠을 한 번 더(Inspector `jigwiBSplashPaintShare`, 기본 3 = 한 타격 최대). 5초 발사 보상은 없다(`rewardUntil` -1, DEV251/252 은퇴).
 - 실패(조합판 불바다): 15초 만료 시 `boardFireUntil` = 만료+Inspector `jigwiBBoardFireSeconds`(기본 3초, 100초 정리에서 자름)까지 모든 자리의 `TryGenerate`가 `JIGWI_BOARD_FIRE`로 거절된다. 판 구슬/스태미나는 그대로이고 판 비우기 fence(`clearedThroughRevision`)는 늘 0이다.
 - 무료 물 구슬은 도우미 판에만 준다(도우미가 없으면 지목된 자리). 이 물은 진행에만 쓰이고 칠하지 않는다.
-- 화면은 `LabJigwiSyncPillarView`(클래스 이름만 예전 그대로, 물방울 3칸·1초 막대·"지금!"·iOS 기본 진동)와 실패 오버레이의 "조합판에 불이 붙었다! n초"다. 지귀 A/B 외침 목소리는 지웠다.
+- 화면은 `LabJigwiSyncPillarView`(클래스 이름만 예전 그대로, 물방울 3칸·1초 막대·빨간 흔들림·iOS 기본 진동, 글자 없음)와 글자 없는 붉은 실패 오버레이다. B 동안 화면 글자는 예고 2초의 지귀 도발뿐이다(지목 이름/진행/안내/결과/다음 기믹 문구 없음). 지귀 A/B 외침 목소리는 지웠다.
 - DEV244/245/251/252는 은퇴 슬롯(인덱스·저장값 보존, Home/Lobby 라벨도 맞춤)이다.
 - 현재 호환 묶음은 설정 259개·**5688**·`C6PhysicsLab/49`·`C6HapioGame/33`다. 이전 5687(#479) 앱과 혼용하지 않는다.

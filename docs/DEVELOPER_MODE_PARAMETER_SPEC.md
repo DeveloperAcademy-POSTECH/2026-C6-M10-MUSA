@@ -832,7 +832,7 @@ DEV **Jigwi** 카테고리에 인덱스178~183의6개 슬라이더를 추가했�
 | 인덱스 | 속성·기본값 | 현재 범위/적용 |
 |---|---|---|
 |228|JigwiStageTimelineEnabled / ON|지귀 화면 A/B 시간표 ON/OFF|
-|229|JigwiStageWarningSeconds / 기존1초 저장값|미사용·Inspector/DEV 숨김, 현행 A/B 경고는1초 고정|
+|229|JigwiStageWarningSeconds / 기존1초 저장값|미사용·Inspector/DEV 숨김, 현행 A/B 경고는 2초 고정(#509)|
 |235|JigwiStageFeverMultiplier / 2|1~4,100초 이후 자동 회복만 배율 적용|
 |240|JigwiABPersonalDurationSeconds / 15초|1~15초, A의 최대 활성 길이|
 |241~243|A 회복4배·해제3회·소각5초|#479에서241/242 은퇴, 243 기본1초로 변경(아래 #479 절)|
@@ -892,4 +892,4 @@ Home/Lobby에 저장된 DEV 패널의241/242 라벨과243 값(1)도 코드와 �
 |252|Reserved Jigwi B Reward Paint (unused)|은퇴. 예전 5초 발사 보상 칠 면적(1.5배). 저장값·위치만 보존, DEV 숨김|
 |253~255|물 구슬 지급 간격/시작 수/미소모 상한|그대로. 받는 사람이 도우미(지목 안 된 자리)로 바뀜|
 
-DEV 행이 없는 고정 규칙(`LabJigwiABTimeline`): B 15초, 동시 판정 1초, 성공 3회, 지목 수 1~2인 1명/3인 2명/4·5인 3명. Inspector 전용(Host만 사용): `jigwiBSplashPaintShare` 성공 물벼락 칠 크기 기본3(0~3), `jigwiBBoardFireSeconds` 실패 불바다 기본3초(0~10, 0이면 벌점 없음). 규칙과 화면은 [지귀 화면 사양](JIGWI_SCREEN_PATTERNS.md)의1·3·5절을 따른다. 이 문서 갱신은 실행 검증을 뜻하지 않는다.
+DEV 행이 없는 고정 규칙(`LabJigwiABTimeline`): 예고 2초(`WarningSeconds`), B 15초, 동시 판정 1초, 성공 3회, 지목 수 1~2인 1명/3인 2명/4·5인 3명. Inspector 전용(Host만 사용): `jigwiBSplashPaintShare` 성공 물벼락 칠 크기 기본3(0~3), `jigwiBBoardFireSeconds` 실패 불바다 기본3초(0~10, 0이면 벌점 없음). 규칙과 화면은 [지귀 화면 사양](JIGWI_SCREEN_PATTERNS.md)의1·3·5절을 따른다. 이 문서 갱신은 실행 검증을 뜻하지 않는다.

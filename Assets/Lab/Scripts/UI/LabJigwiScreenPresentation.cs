@@ -300,7 +300,7 @@ namespace C6Lab
             {
                 failureStatus = Label("FailureInstruction", failureOverlay.transform, 40);
                 Stretch(failureStatus.rectTransform, new Vector2(.12f, .42f), new Vector2(.88f, .58f));
-                failureStatus.text = "실패";
+                failureStatus.text = string.Empty;
             }
         }
 
@@ -527,10 +527,7 @@ namespace C6Lab
             float elapsed = (float)(now - Math.Max(0d, failedAt));
             float opacity = flash ? 1f - elapsed / (float)FailureFlashSeconds : 0f;
             if (BoardFireVisible) opacity = Mathf.Max(opacity, .55f);
-            if (failureStatus != null)
-                failureStatus.text = BoardFireVisible
-                    ? "조합판에 불이 붙었다! " + Math.Max(0d, fireUntil - now).ToString("0.0", CultureInfo.InvariantCulture) + "초"
-                    : "실패";
+            if (failureStatus != null) failureStatus.text = string.Empty; // #509: no failure / board-fire words
             failureOverlay.color = new Color(1f, .13f, .01f, .22f * opacity);
             if (failureFlames != null) for (int i = 0; i < failureFlames.Length; i++)
                 AnimateFlame(failureFlames[i], elapsed, i * 1.73f, .95f * opacity);
@@ -711,47 +708,24 @@ namespace C6Lab
             RestoreStatusLayout();
             rows.Clear();
             // 피버는 세 스테이지 공통 연출(#441, LabYaguangFeverHud)이 알린다.
+            // #509: the only words on screen are Jigwi's two-second taunts (no progress, guide, result or next-gimmick
+            // lines). The drops, the "now" vibration and the failure overlay carry the rest without text.
             string words = string.Empty;
-            if (active != null)
-            {
-                string shout = active.Warning(now) ? (active.kind == LabJigwiABKind.PersonalBurn
-                        ? "으아아 마음이 불타오른다!!!\n" : "다 함께 물을 끼얹어라!\n") : string.Empty;
-                // #479: A has no hit count or target text; only the warning shout remains.
-                if (active.kind == LabJigwiABKind.PersonalBurn) words = shout.TrimEnd('\n');
-                else
-                {
-                    // #509: who is picked, and what this screen should do.
-                    var picked = new StringBuilder();
-                    bool mine = false;
-                    foreach (var player in active.players ?? Array.Empty<LabJigwiABPlayerFire>())
-                    {
-                        if (player == null) continue;
-                        if (picked.Length > 0) picked.Append('·');
-                        picked.Append(PlayerLabel(snapshot, player.playerId));
-                        mine |= player.playerId == local;
-                    }
-                    words = shout + "지목 " + picked + " · 1초 안에 함께 박 맞히기 "
-                        + active.syncCount + "/" + LabJigwiABTimeline.GroupSyncRequired + " · "
-                        + Math.Max(0d, active.endsAt - Math.Max(now, active.activeAt)).ToString("0.0", CultureInfo.InvariantCulture) + "초";
-                    rows.Append(mine ? "물 구슬로 박을 맞혀요 · 지목된 사람과 동시에"
-                        : "물 구슬을 " + picked + "에게 굴려 주세요");
-                }
-            }
-            if (active == null && !stage.fever)
-                foreach (var finished in stage.rounds ?? Array.Empty<LabJigwiABRound>())
-                    if (finished != null && finished.kind == LabJigwiABKind.GroupFire
-                        && finished.resolution == LabJigwiABResolution.Completed && Recent(finished.resolvedAt, now))
-                        words = "물벼락! 박을 크게 적셨어요";
+            if (active != null && active.Warning(now)) words = Taunt(active.kind);
             foreach (var upcoming in stage.rounds ?? Array.Empty<LabJigwiABRound>())
             {
                 if (upcoming == null || upcoming == active || !upcoming.Warning(now)) continue;
-                words += "\n다음 기믹 예고 · " + (upcoming.kind == LabJigwiABKind.PersonalBurn ? "부적 쓰기" : "동시 소화");
+                words = words.Length > 0 ? words + "\n" + Taunt(upcoming.kind) : Taunt(upcoming.kind);
                 break;
             }
             status.text = words; playerStatus.text = rows.ToString();
             statusPanel.gameObject.SetActive(words.Length > 0);
             playerStatus.gameObject.SetActive(rows.Length > 0);
         }
+
+        /// <summary>#509 지귀 도발(파훼법은 말하지 않음). 예고 2초 동안만 보인다.</summary>
+        public static string Taunt(LabJigwiABKind kind) =>
+            kind == LabJigwiABKind.PersonalBurn ? "타올라라, 모두 재가 되어라!" : "흩어진 물방울로는 어림없다!";
 
         private void PositionGroupStatus(LabJigwiABRound round, ulong owner, double now)
         {
