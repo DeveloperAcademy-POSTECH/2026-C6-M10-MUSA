@@ -726,6 +726,19 @@ namespace Hapio.Tests
         }
 
         [Test]
+        public void EachSeatShowsItsCharactersNameUnderTheFace()
+        {
+            Assert.That(GameTutorialScript.NameOf(GameTutorialSpeaker.Muk), Is.EqualTo("묵이"));
+            Assert.That(GameTutorialScript.NameOf(GameTutorialSpeaker.Geumok), Is.EqualTo("금옥"));
+            Assert.That(GameTutorialScript.NameOf(GameTutorialSpeaker.Bul), Is.EqualTo("불이"));
+            foreach (GameTutorialSpeaker speaker in new[] { GameTutorialSpeaker.Bul, GameTutorialSpeaker.Muk, GameTutorialSpeaker.Geumok })
+                Assert.That(GameTutorialScript.SpeakerAt(GameTutorialScript.SeatOf(speaker)), Is.EqualTo(speaker));
+            var art = ScriptableObject.CreateInstance<GameTutorialArt>();
+            try { Assert.That((art.nameColor, art.nameFontSize), Is.EqualTo((Color.black, 14))); }
+            finally { Object.DestroyImmediate(art); }
+        }
+
+        [Test]
         public void SpeakersSitMukLeftBulMiddleGeumokRightByTheGamesNeighborRule()
         {
             // A player's right neighbor is the previous seat and the left one the next seat.

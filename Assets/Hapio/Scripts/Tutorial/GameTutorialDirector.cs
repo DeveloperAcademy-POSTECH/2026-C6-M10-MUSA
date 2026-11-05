@@ -220,7 +220,9 @@ namespace Hapio
             var root = canvas != null ? canvas.rootCanvas.transform as RectTransform : null;
             var parent = rect.parent as RectTransform;
             if (root == null || parent == null) return;
-            Vector2 saved = portraitPositions[seat];
+            // The tutorial's own nudge (불이 only for now), in screen points, before keeping it on screen.
+            Vector2 nudge = seat == 1 ? art.localPortraitOffset : Vector2.zero;
+            Vector2 saved = portraitPositions[seat] + (Vector2)parent.InverseTransformVector(root.TransformVector(nudge));
             Vector3 fromSaved = parent.TransformVector(rect.anchoredPosition - saved);
             rect.GetWorldCorners(corners);
             Vector2 min = new Vector2(float.MaxValue, float.MaxValue), max = new Vector2(float.MinValue, float.MinValue);
@@ -258,6 +260,9 @@ namespace Hapio
                     keepOutCircles.Add(Padded(face, portraits[seat].canvas));
             var bar = hud.staminaFill != null ? hud.staminaFill.transform.parent as RectTransform : null;
             if (bar != null && TryScreenRect(bar, out Rect gauge)) keepOutBoxes.Add(Padded(gauge, hud.staminaFill.canvas));
+            // Nor over the names under the faces.
+            foreach (Text label in nameLabels)
+                if (label != null && TryScreenRect(label.rectTransform, out Rect name)) keepOutBoxes.Add(Padded(name, overlayCanvas));
             board.SetKeepOut(keepOutCircles, keepOutBoxes);
         }
 
@@ -330,6 +335,8 @@ namespace Hapio
             Button tap = tapCatcher.gameObject.AddComponent<Button>();
             tap.transition = Selectable.Transition.None;
             tap.onClick.AddListener(OnTap);
+            // Names go under the dim, so they darken with the faces.
+            BuildNames();
 
             var dim = new GameObject("Dim", typeof(RectTransform), typeof(CanvasGroup));
             dim.transform.SetParent(overlay, false);
@@ -1032,6 +1039,7 @@ namespace Hapio
             if (unavailable || hud == null || overlay == null) return;
             ApplyHudDressing();
             FaceYokaiToMe();
+            PlaceNames();
             UpdateKeepOut();
             if (UpdatePause()) return;
             if (UpdateSkip()) return;

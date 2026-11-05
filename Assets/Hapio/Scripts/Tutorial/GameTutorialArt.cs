@@ -17,10 +17,19 @@ namespace Hapio
         [Tooltip("오른쪽 이웃 (P1)")] public Sprite geumok;
         [Tooltip("아래 내 얼굴을 원래 동그라미보다 몇 배로")] [Min(.5f)] public float localPortraitScale = 1.2f;
         [Tooltip("양옆 이웃 얼굴을 원래 동그라미보다 몇 배로")] [Min(.5f)] public float neighborPortraitScale = 1.8f;
+        [Tooltip("아래 내 얼굴(불이)을 원래 자리에서 옮기는 거리 (pt, 오른쪽 +x, 위 +y). 튜토리얼에서만. 이름·말풍선·구슬 벽이 따라간다.")]
+        public Vector2 localPortraitOffset = Vector2.zero;
         [Tooltip("얼굴이 화면 가장자리에서 떨어지는 최소 거리. 원래 화면 끝에 걸쳐 있던 이웃 얼굴은 이만큼 안쪽으로 옮겨 다 보이게 한다.")]
         [Min(0f)] public float portraitScreenMargin = 6f;
         [Tooltip("구슬이 얼굴·기운 막대를 가리지 않도록 세우는 보이지 않는 벽을 그것들보다 사방으로 얼마나 크게")]
         [Min(0f)] public float keepOutPadding = 4f;
+
+        [Header("캐릭터 이름 (얼굴 아래)")]
+        [Tooltip("비워 두면 안내 띠 글꼴(굵은 신라문화체)")] public Font nameFont;
+        [Min(8)] public int nameFontSize = 14;
+        public Color nameColor = Color.black;
+        [Tooltip("얼굴 아래 끝에서 이름 위 끝까지")] public float nameGap = 2f;
+        [Tooltip("이름이 화면 아래 끝에서 떨어지는 최소 거리")] [Min(0f)] public float nameScreenMargin = 2f;
 
         [Header("말풍선")]
         [Tooltip("꼬리가 왼쪽 아래에 있는 그림. 오른쪽 사람은 좌우를 뒤집어 쓴다.")] public Sprite bubble;

@@ -17,8 +17,14 @@ MonoBehaviour:
   geumok: {fileID: 21300000, guid: da0cda881eead46239bdc7c8b2e2c247, type: 3}
   localPortraitScale: 1.2
   neighborPortraitScale: 1.8
+  localPortraitOffset: {x: 0, y: 9}
   portraitScreenMargin: 6
   keepOutPadding: 4
+  nameFont: {fileID: 0}
+  nameFontSize: 14
+  nameColor: {r: 0, g: 0, b: 0, a: 1}
+  nameGap: 2
+  nameScreenMargin: 2
   bubble: {fileID: 21300000, guid: 66fb9310974fa40edadc8b7b52411c39, type: 3}
   bubbleSize: {x: 236, y: 150}
   textInset: {x: 0.08, y: 0.27, z: 0.08, w: 0.11}

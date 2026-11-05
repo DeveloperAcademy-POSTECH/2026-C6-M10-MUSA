@@ -97,6 +97,21 @@ namespace Hapio.Tests
             Assert.That(hud.rightPlayerCircle.sprite, Is.SameAs(art.geumok));
             Assert.That(hud.timeText.transform.parent.gameObject.activeInHierarchy, Is.False);
             Assert.That(bindings.stageLabel.text, Is.EqualTo(GameTutorialScript.StageLabel));
+            // Each face has its name just under it: 금옥 (P1, right), 불이 (P2, me), 묵이 (P3, left).
+            yield return null;
+            string[] names = { "금옥", "불이", "묵이" };
+            for (int seat = 0; seat < 3; seat++)
+            {
+                UnityEngine.UI.Text name = director.NameLabelAt(seat);
+                Assert.That(name.gameObject.activeInHierarchy, Is.True, "Name " + (seat + 1));
+                Assert.That(name.text, Is.EqualTo(names[seat]));
+                UnityEngine.UI.Image faceImage = seat == 0 ? hud.rightPlayerCircle : seat == 1 ? hud.localPlayerCircle : hud.leftPlayerCircle;
+                Rect face = ScreenRect(faceImage.rectTransform), label = ScreenRect(name.rectTransform);
+                Assert.That(Mathf.Abs(label.center.x - face.center.x), Is.LessThan(1f), names[seat] + " is centered under the face.");
+                Assert.That(label.yMax, Is.LessThanOrEqualTo(face.yMin + 1f).Or.LessThanOrEqualTo(label.height + 1f),
+                    names[seat] + " is under the face (or held at the bottom of the screen).");
+                Assert.That(label.yMin, Is.GreaterThanOrEqualTo(-1f), names[seat] + " stays on screen.");
+            }
             // Seen from the middle seat, the gourd's yokai is turned round to face me; its white body is not.
             Assert.That(director.YokaiFacesMe, Is.True, "The yokai looks at me, not at P1.");
             Assert.That(director.YokaiTurnDegrees, Is.EqualTo(120f).Within(.01f));
@@ -219,7 +234,7 @@ namespace Hapio.Tests
             yield return Until(() => director.StepIndex == 2 && director.IsShowingLine, "The gauge refills and 2단계 starts", 15f);
 
             // 2단계: three lines over the orbs, then one yin dragged onto the yang makes fire and leaves one yin.
-            Assert.That(board.KeepOutCount, Is.EqualTo(4), "Walls keep orbs off the three faces and the gauge.");
+            Assert.That(board.KeepOutCount, Is.EqualTo(7), "Walls keep orbs off the three faces, their names and the gauge.");
             // The three orbs always rest in the same places around the drum: yin left, yang right, yin just above the yang.
             LabOrbView drumView = Object.FindObjectsByType<LabOrbView>(FindObjectsSortMode.None).Single(view => view.Kind == LabOrbKind.Drum);
             Vector3[] rested = network.Snapshot.orbs.Where(orb => orb.owner == network.LocalPlayerId).OrderBy(orb => orb.createdAt)
