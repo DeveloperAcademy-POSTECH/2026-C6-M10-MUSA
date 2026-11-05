@@ -42,6 +42,7 @@ namespace Hapio
         private RectTransform bubbleRoot;
         private RectTransform bubbleArt;
         private Text bubbleText;
+        private Image tapHint;
         private RectTransform banner;
         private Text bannerText;
         private Text successText;
@@ -101,6 +102,8 @@ namespace Hapio
         public bool HasBeat => beatIndex >= 0 && !finishing && stepIndex < GameTutorialScript.Steps.Count;
         public GameTutorialBeat CurrentBeat => GameTutorialScript.Steps[stepIndex].Beats[beatIndex];
         public bool IsShowingLine => HasBeat && CurrentBeat.IsLine && bubbleRoot != null && bubbleRoot.gameObject.activeSelf;
+        /// <summary>The ▽ on the bubble: up only on a line that a tap moves on from, once it can.</summary>
+        public bool IsShowingTapHint => tapHint != null && tapHint.gameObject.activeInHierarchy;
         /// <summary>Waiting for the player (or the gauge) to finish the current action.</summary>
         public bool IsWaitingForAction => HasBeat && !CurrentBeat.IsLine && actionDoneAt < 0f;
         /// <summary>How many times the current action has been done.</summary>
@@ -372,6 +375,12 @@ namespace Hapio
             Stretch(bubbleArt);
             bubbleText = AddText("Line", bubbleRoot, art.dialogueFont, art.maxFontSize, art.textColor);
             bubbleText.resizeTextMinSize = Mathf.Min(art.minFontSize, art.maxFontSize);
+            // ▽ at the words' bottom-right corner: on the bubble, not its (mirrored) art, so it is never flipped.
+            tapHint = AddImage("Tap Hint", bubbleRoot, Color.white, art.tapHint, false);
+            tapHint.preserveAspect = true;
+            tapHint.rectTransform.pivot = new Vector2(1f, 0f);
+            tapHint.rectTransform.sizeDelta = art.tapHintSize;
+            tapHint.gameObject.SetActive(false);
             bubbleRoot.gameObject.SetActive(false);
         }
 
@@ -588,6 +597,9 @@ namespace Hapio
             words.anchorMin = new Vector2(fromRight ? inset.z : inset.x, inset.y);
             words.anchorMax = new Vector2(1f - (fromRight ? inset.x : inset.z), 1f - inset.w);
             words.offsetMin = words.offsetMax = Vector2.zero;
+            RectTransform hint = tapHint.rectTransform;
+            hint.anchorMin = hint.anchorMax = new Vector2(words.anchorMax.x, words.anchorMin.y);
+            tapHint.gameObject.SetActive(false);
             bubbleRoot.pivot = fromRight ? new Vector2(1f - art.tailTip.x, art.tailTip.y) : art.tailTip;
             bubbleRoot.sizeDelta = art.bubbleSize;
             Image face = portraits[GameTutorialScript.SeatOf(speaker)];
@@ -1084,6 +1096,7 @@ namespace Hapio
                 bubbleRoot.localScale = Vector3.one * PopScale((Time.unscaledTime - popStartedAt) / art.popSeconds,
                     art.popOvershoot);
             }
+            PlaceTapHint(line);
             if (successAt >= 0f)
                 successText.rectTransform.localScale = Vector3.one * PopScale((Time.unscaledTime - successAt) / art.popSeconds,
                     art.popOvershoot);
@@ -1098,6 +1111,30 @@ namespace Hapio
             if (HasBeat && CurrentBeat.Focus != GameTutorialFocus.None) PlaceSpotlight(CurrentBeat.Focus);
             speakerPortrait.enabled = line && dimGroup.alpha > .01f && speakerPortrait.sprite != null;
             PlaceMirror();
+        }
+
+        /// <summary>When a tap first moves the line on: the bubble has popped to size and the tap cooldown is over.</summary>
+        private float TapReadyAt => Mathf.Max(popStartedAt + art.popSeconds, shownAt + art.tapCooldown);
+
+        /// <summary>The ▽ shows on a line (never on a remark) from the moment a tap moves it on, bobbing down and up.</summary>
+        private void PlaceTapHint(bool line)
+        {
+            bool shown = line && art.tapHint != null && Time.unscaledTime >= TapReadyAt;
+            if (tapHint.gameObject.activeSelf != shown) tapHint.gameObject.SetActive(shown);
+            if (!shown) return;
+            tapHint.rectTransform.anchoredPosition = art.tapHintOffset
+                + new Vector2(0f, TapHintDrop(Time.unscaledTime - TapReadyAt, art.tapHintSeconds, art.tapHintDepth));
+        }
+
+        /// <summary>
+        /// How far the ▽ sits below its rest <paramref name="t"/> seconds after it appeared: it starts at rest, eases down
+        /// <paramref name="depth"/> by half a <paramref name="period"/> and eases back up, over and over.
+        /// </summary>
+        public static float TapHintDrop(float t, float period, float depth)
+        {
+            if (period <= 0f || depth <= 0f || t <= 0f) return 0f;
+            float s = Mathf.Sin(Mathf.PI * (t / period % 1f));
+            return -depth * s * s;
         }
 
         private void PlaceBubble(GameTutorialSpeaker speaker)

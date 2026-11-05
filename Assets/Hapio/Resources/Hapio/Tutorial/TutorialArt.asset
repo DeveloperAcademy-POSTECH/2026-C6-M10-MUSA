@@ -29,6 +29,11 @@ MonoBehaviour:
   maxFontSize: 17
   minFontSize: 12
   textColor: {r: 0.12, g: 0.1, b: 0.09, a: 1}
+  tapHint: {fileID: 21300000, guid: 25a97783e4f1249f1baf70606dccbac4, type: 3}
+  tapHintSize: {x: 16, y: 14}
+  tapHintOffset: {x: 0, y: 5}
+  tapHintDepth: 4
+  tapHintSeconds: 0.8
   popSeconds: 0.28
   popOvershoot: 1.1
   dimColor: {r: 0, g: 0, b: 0, a: 0.62}

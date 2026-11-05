@@ -37,6 +37,15 @@ namespace Hapio
         [Min(8)] public int minFontSize = 12;
         public Color textColor = new Color(.12f, .1f, .09f, 1f);
 
+        [Header("누르기 표시 (말풍선 오른쪽 아래 ▽)")]
+        [Tooltip("화면을 눌러 다음 대사로 넘기라는 표시. 말풍선이 다 커지고 누를 수 있게 된 순간부터, 누르면 넘어가는 대사에만 뜬다.")]
+        public Sprite tapHint;
+        public Vector2 tapHintSize = new Vector2(16f, 14f);
+        [Tooltip("글자 영역 오른쪽 아래 모서리에서 옮기는 거리 (오른쪽 +x, 위 +y). 말하는 사람과 관계없이 늘 오른쪽 아래.")]
+        public Vector2 tapHintOffset = Vector2.zero;
+        [Tooltip("위에서 아래로 내려가는 깊이")] [Min(0f)] public float tapHintDepth = 4f;
+        [Tooltip("한 번 내려갔다 다시 올라오는 시간")] [Min(.2f)] public float tapHintSeconds = .8f;
+
         [Header("말풍선 등장 (살짝 커졌다가 제자리)")]
         [Min(.01f)] public float popSeconds = .28f;
         [Min(1f)] public float popOvershoot = 1.1f;

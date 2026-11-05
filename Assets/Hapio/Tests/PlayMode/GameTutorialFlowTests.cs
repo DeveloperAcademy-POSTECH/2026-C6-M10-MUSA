@@ -103,7 +103,13 @@ namespace Hapio.Tests
             var dim = director.GetComponentsInChildren<CanvasGroup>(true).Single(group => group.name == "Dim");
             LabOrbBoard board = bindings.board;
             int lines = GameTutorialScript.Goal.Lines.Count;
-            for (int line = 1; line < lines; line++)
+            // The ▽ comes once a tap moves the line on: after the bubble has popped and the cooldown is over.
+            yield return Until(() => director.IsShowingTapHint, "The ▽ shows on the first line", 2f);
+            tap.onClick.Invoke();
+            Assert.That(director.BeatIndex, Is.EqualTo(1), "A tap with the ▽ up moves on.");
+            Assert.That(director.IsShowingTapHint, Is.False, "The next line starts without it.");
+            yield return Until(() => director.IsShowingTapHint, "and shows it again once it can be tapped", 2f);
+            for (int line = 2; line < lines; line++)
             {
                 Assert.That(director.StepIndex, Is.EqualTo(0));
                 Assert.That(director.BeatIndex, Is.EqualTo(line - 1));
@@ -121,6 +127,7 @@ namespace Hapio.Tests
             yield return TapThrough(director, tap, art);
             yield return TapThrough(director, tap, art);
             Assert.That(director.IsWaitingForAction, Is.True);
+            Assert.That(director.IsShowingTapHint, Is.False, "No ▽ while an action is awaited.");
             Assert.That(director.CurrentBeat.Action, Is.EqualTo(GameTutorialAction.TapDrum));
             Assert.That(board.AllowedGestures, Is.EqualTo(LabBoardGestures.DrumTap), "Only the drum tap is open.");
             Assert.That(LocalPlayer(network).stamina, Is.EqualTo(network.config.StaminaMax).Within(.001f));
@@ -214,6 +221,7 @@ namespace Hapio.Tests
                 if (director.ThrowMisses > misses)
                 {
                     Assert.That(director.IsShowingRemark, Is.True, "\"다시 해 봐!\"");
+                    Assert.That(director.IsShowingTapHint, Is.False, "A remark needs no tap: no ▽.");
                     Assert.That(network.Snapshot.orbs.Count(orb => orb.owner == network.LocalPlayerId
                         && orb.kind == LabOrbKind.Combined && orb.element == GameTutorialScript.CombineResult), Is.EqualTo(1),
                         "The red orb is given back.");

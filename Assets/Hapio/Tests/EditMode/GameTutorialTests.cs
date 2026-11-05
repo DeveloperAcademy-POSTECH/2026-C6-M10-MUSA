@@ -968,7 +968,32 @@ namespace Hapio.Tests
             Assert.That(art.bannerFont != null ? art.bannerFont.name : null, Is.EqualTo("ShillaCultureBold"));
             Assert.That(art.bannerTextColor, Is.EqualTo(Color.black), "Black Shilla guide text.");
             Assert.That(art.hand, Is.Not.Null, "The pointing hand.");
+            Assert.That(art.tapHint, Is.Not.Null, "The ▽ that says tap to go on.");
             Assert.That(art.minFontSize, Is.LessThanOrEqualTo(art.maxFontSize));
+        }
+
+        [Test]
+        public void TapHintStartsAtRestEasesDownAndBackUpEachPeriod()
+        {
+            const float period = .8f, depth = 4f;
+            Assert.That(GameTutorialDirector.TapHintDrop(0f, period, depth), Is.EqualTo(0f), "Appears at rest.");
+            Assert.That(GameTutorialDirector.TapHintDrop(period * .25f, period, depth), Is.EqualTo(-depth * .5f).Within(1e-4f));
+            Assert.That(GameTutorialDirector.TapHintDrop(period * .5f, period, depth), Is.EqualTo(-depth).Within(1e-4f),
+                "Lowest halfway.");
+            Assert.That(GameTutorialDirector.TapHintDrop(period * .75f, period, depth), Is.EqualTo(-depth * .5f).Within(1e-4f));
+            Assert.That(GameTutorialDirector.TapHintDrop(period, period, depth), Is.EqualTo(0f).Within(1e-4f), "Back up.");
+            Assert.That(GameTutorialDirector.TapHintDrop(period * 2.5f, period, depth), Is.EqualTo(-depth).Within(1e-4f),
+                "Over and over.");
+            for (float t = 0f; t < 3f; t += .01f)
+                Assert.That(GameTutorialDirector.TapHintDrop(t, period, depth), Is.InRange(-depth, 0f), "Never above its rest.");
+            Assert.That(GameTutorialDirector.TapHintDrop(.4f, period, 0f), Is.EqualTo(0f), "No depth: still.");
+            Assert.That(GameTutorialDirector.TapHintDrop(.4f, 0f, depth), Is.EqualTo(0f), "No period: still.");
+            var art = ScriptableObject.CreateInstance<GameTutorialArt>();
+            try
+            {
+                Assert.That(art.tapHintSize.x / art.tapHintSize.y, Is.EqualTo(256f / 223f).Within(.05f), "The art's own shape.");
+            }
+            finally { Object.DestroyImmediate(art); }
         }
     }
 }
