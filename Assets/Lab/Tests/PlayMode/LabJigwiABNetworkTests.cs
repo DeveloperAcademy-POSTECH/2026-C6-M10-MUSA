@@ -232,6 +232,9 @@ namespace C6Lab.Tests
                 Assert.That(shot.RadiusScale, Is.EqualTo(combo), "B may not overwrite the combo/paint scale.");
                 Assert.That(shot.JigwiABRadiusScale, Is.EqualTo(.65f));
             }
+            // #509: switch the success splash off so it does not keep growing into the paint-budget comparison below.
+            typeof(LabConfig).GetField("jigwiBSplashPaintShare", Private).SetValue(config, 0f);
+            model = Room(LabStageYokai.Jigwi);
             LabModel control = Room(LabStageYokai.None);
             model.Tick(31d);
             // Retain the generic independent-radius compatibility check with an explicit fixture,
@@ -239,7 +242,7 @@ namespace C6Lab.Tests
             ExtinguishOwnPoints(0, 31d);
             Assert.That(model.JigwiABBlocksBoss(0, 31d), Is.False);
             Assert.That(model.JigwiABBlocksBoss(20, 31d), Is.False, "#509: nobody is ever blocked.");
-            int modelBefore = model.PaintSurface.CoveredCount; // the success splash already painted the back
+            int modelBefore = model.PaintSurface.CoveredCount; // no splash here, so nothing else is growing
             // Hit after B's 5-second success reward [31, 36) so both rooms use the ordinary paint budget.
             LabOrbState reduced = Add(model, 0, 37d, LabOrbElement.Water);
             reduced.jigwiABRadiusScale = .65f; // Explicit old-field fixture, not a timed-mission penalty.
@@ -455,7 +458,8 @@ namespace C6Lab.Tests
             LabSnapshot value = model.Snapshot(at);
             LabJigwiABRound b = value.jigwiAB?.Active(at);
             if (b != null && b.kind == LabJigwiABKind.GroupFire && b.slot <= 3 && value.players.Length == 2)
-                Assert.That(b.players.Single().playerId, Is.EqualTo(0ul), "Fixture assumption: seat 0 is the picked seat.");
+                Assert.That(b.players.Select(player => player.playerId), Does.Contain(0ul),
+                    "Fixture assumption: seat 0 is picked (#509: both seats of two are).");
             Field("latest").SetValue(network, value);
             Sync(); return value;
         }
