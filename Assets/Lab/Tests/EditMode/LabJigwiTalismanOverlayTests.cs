@@ -133,7 +133,7 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void WritingInStrokeOrderFinishesButALaterStrokeFirstDoesNotCount()
+        public void TheGuideFollowsStrokeOrderButAnyOrderStillPaints()
         {
             Vector2[] points = LabJigwiTalismanStroke.Water;
             var ordered = new LabJigwiTalismanStroke(points, LabJigwiTalismanStroke.WaterStrokes);
@@ -144,11 +144,20 @@ namespace C6Lab.Tests
             ordered.Clear();
             Assert.That(ordered.CoveredCount, Is.Zero); Assert.That(ordered.CurrentStroke, Is.Zero);
 
-            // #533: the last stroke (ㄹ bottom) written first paints nothing; the first stroke (ㅁ left) still can.
+            // #533: writing the last stroke (ㄹ bottom) first still paints; the guide keeps pointing at the first stroke.
             int[] last = LabJigwiTalismanStroke.WaterStrokes[LabJigwiTalismanStroke.WaterStrokes.Length - 1];
             foreach (int index in last) ordered.Paint(points[index], points[index], .07f);
-            Assert.That(ordered.CoveredCount, Is.Zero);
+            Assert.That(ordered.CoveredCount, Is.EqualTo(last.Length));
+            Assert.That(ordered.CurrentStroke, Is.Zero);
             Assert.That(ordered.NextPoint, Is.EqualTo(LabJigwiTalismanStroke.WaterStrokes[0][0]), "The guide points at the first stroke's start.");
+            // Once the first stroke is written the guide jumps past strokes already written to the next unwritten one.
+            foreach (int index in LabJigwiTalismanStroke.WaterStrokes[0]) ordered.Paint(points[index], points[index], .07f);
+            Assert.That(ordered.NextPoint, Is.EqualTo(LabJigwiTalismanStroke.WaterStrokes[1][0]));
+
+            // The strict mode (kept for later tuning) still blocks a later stroke.
+            var strict = new LabJigwiTalismanStroke(points, LabJigwiTalismanStroke.WaterStrokes) { EnforceOrder = true };
+            foreach (int index in last) strict.Paint(points[index], points[index], .07f);
+            Assert.That(strict.CoveredCount, Is.Zero);
 
             // Without a stroke order any point can be painted (the old behaviour).
             var free = new LabJigwiTalismanStroke(points);

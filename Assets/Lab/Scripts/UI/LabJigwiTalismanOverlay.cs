@@ -28,7 +28,7 @@ namespace C6Lab
         [SerializeField] private Color writtenColor = new Color(.16f, .47f, .93f, .5f);
         [Tooltip("#533: 수채화 점마다 색이 조금씩 흔들리는 정도 (0이면 모두 같은 색).")]
         [SerializeField, Range(0f, .3f)] private float watercolorJitter = .12f;
-        [Tooltip("#533: 한 획을 이만큼 쓰면 다음 획으로 넘어간다 (0~1). 다음 획은 그전까지 칠해지지 않는다.")]
+        [Tooltip("#533: 한 획을 이만큼 쓰면 깜빡이는 안내 점이 다음 획으로 넘어간다 (0~1). 칠하기 자체는 순서와 상관없다.")]
         [SerializeField, Range(.3f, 1f)] private float strokeAdvance = .8f;
         [Tooltip("#533: 다음에 쓸 곳을 알려 주는 깜빡이는 점 색.")]
         [SerializeField] private Color nextMarkerColor = new Color(.16f, .47f, .93f, .9f);
@@ -187,7 +187,7 @@ namespace C6Lab
             if (InkMode) dot.gameObject.SetActive(true);
         }
 
-        /// <summary>#533: 지금 써야 할 획의 다음 빈 점에서 깜빡이는 표시. 획 순서를 손가락으로 따라가게 이끈다.</summary>
+        /// <summary>#533: 지금 써야 할 획의 다음 빈 점에서 깜빡이는 표시. 획 순서를 알려 줄 뿐, 다른 곳을 칠해도 된다.</summary>
         private void UpdateNextMarker(float time)
         {
             if (nextMarker == null) return;
@@ -663,11 +663,13 @@ namespace C6Lab
         private readonly int[] strokeOf, strokeCovered;
         public int CoveredCount { get; private set; }
         public float Coverage => Samples.Length == 0 ? 0f : CoveredCount / (float)Samples.Length;
-        /// <summary>#533: 지금 쓸 수 있는 마지막 획 번호. 이보다 뒤 획의 점은 칠해지지 않는다(앞 획은 계속 메울 수 있다).</summary>
+        /// <summary>#533: 안내할 획 번호 (아직 StrokeAdvance만큼 쓰지 않은 첫 획). EnforceOrder면 이보다 뒤 획은 칠해지지 않는다.</summary>
         public int CurrentStroke { get; private set; }
         public int StrokeCount => strokes.Length;
         /// <summary>#533: 한 획을 이 비율만큼 쓰면 다음 획이 열린다.</summary>
         public float StrokeAdvance { get; set; } = .8f;
+        /// <summary>#533: 켜면 안내 획보다 뒤 획은 칠해지지 않는다. 직접 해 보니 너무 엄격해 기본은 끔(순서는 안내만).</summary>
+        public bool EnforceOrder { get; set; }
 
         /// <summary>strokes가 없으면 획 순서 없이 아무 점이나 칠한다.</summary>
         public LabJigwiTalismanStroke(Vector2[] samples, int[][] strokeOrder = null)
@@ -715,14 +717,14 @@ namespace C6Lab
             Array.Clear(strokeCovered, 0, strokeCovered.Length); CurrentStroke = 0;
         }
 
-        /// <summary>선분 from→to에서 tolerance 안에 든 점을 칠하고, 새로 칠한 점 번호를 fresh에 담는다. #533: 아직 열리지 않은 획의 점은 건너뛴다.</summary>
+        /// <summary>선분 from→to에서 tolerance 안에 든 점을 칠하고, 새로 칠한 점 번호를 fresh에 담는다. #533: EnforceOrder일 때만 아직 열리지 않은 획을 건너뛴다.</summary>
         public void Paint(Vector2 from, Vector2 to, float tolerance, List<int> fresh = null)
         {
             if (!Finite(from) || !Finite(to) || !(tolerance > 0f)) return;
             float limit = tolerance * tolerance;
             for (int i = 0; i < Samples.Length; i++)
             {
-                if (covered[i] || strokeOf[i] > CurrentStroke || DistanceSquared(Samples[i], from, to) > limit) continue;
+                if (covered[i] || (EnforceOrder && strokeOf[i] > CurrentStroke) || DistanceSquared(Samples[i], from, to) > limit) continue;
                 covered[i] = true; CoveredCount++; strokeCovered[strokeOf[i]]++;
                 fresh?.Add(i);
                 Advance();
