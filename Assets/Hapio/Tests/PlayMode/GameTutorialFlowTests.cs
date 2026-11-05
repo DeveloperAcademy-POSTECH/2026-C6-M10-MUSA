@@ -105,10 +105,29 @@ namespace Hapio.Tests
             int lines = GameTutorialScript.Goal.Lines.Count;
             // The ▽ comes once a tap moves the line on: after the bubble has popped and the cooldown is over.
             yield return Until(() => director.IsShowingTapHint, "The ▽ shows on the first line", 2f);
+            Assert.That((director.HasTappedOnce, director.SkipButtonAlpha), Is.EqualTo((false, 0f)), "No skip button before a tap.");
             tap.onClick.Invoke();
             Assert.That(director.BeatIndex, Is.EqualTo(1), "A tap with the ▽ up moves on.");
             Assert.That(director.IsShowingTapHint, Is.False, "The next line starts without it.");
             yield return Until(() => director.IsShowingTapHint, "and shows it again once it can be tapped", 2f);
+            // The first tap brings 건너뛰기 in, fading over half a second.
+            Assert.That(director.HasTappedOnce, Is.True);
+            yield return Until(() => director.SkipButtonAlpha >= .999f, "건너뛰기 has faded in", art.skipFadeSeconds + 1f);
+            var buttons = director.GetComponentsInChildren<UnityEngine.UI.Button>(true);
+            var skip = buttons.Single(button => button.name == "Skip Button");
+            var stay = buttons.Single(button => button.name == "Keep Learning");
+            // Open over a line: the line and its ▽ go behind the dialog and a tap does not move on.
+            skip.onClick.Invoke();
+            Assert.That(director.IsSkipDialogOpen, Is.True);
+            yield return new WaitForSecondsRealtime(art.popSeconds + .1f);
+            Assert.That(director.IsShowingLine, Is.False, "The bubble waits behind the dialog.");
+            tap.onClick.Invoke();
+            Assert.That(director.BeatIndex, Is.EqualTo(1), "No tap gets past the dialog.");
+            stay.onClick.Invoke();
+            yield return Until(() => !director.IsSkipDialogOpen, "계속 배우기 closes it quickly", 1f);
+            Assert.That((director.StepIndex, director.BeatIndex), Is.EqualTo((0, 1)), "Back where it was.");
+            Assert.That(director.IsShowingLine, Is.True, "The same line again.");
+            Assert.That(director.Skipped, Is.False);
             for (int line = 2; line < lines; line++)
             {
                 Assert.That(director.StepIndex, Is.EqualTo(0));
@@ -136,6 +155,13 @@ namespace Hapio.Tests
                 network.Generate();
                 yield return Until(() => director.ActionProgress == press + 1, "Tap " + (press + 1) + " counted");
             }
+            // 성공! is up; with the dialog open its wait does not run out, however long the dialog stays.
+            skip.onClick.Invoke();
+            Assert.That(board.AllowedGestures, Is.EqualTo(LabBoardGestures.None), "The board waits behind the dialog.");
+            yield return new WaitForSecondsRealtime(art.afterActionSeconds + .8f);
+            Assert.That(director.CurrentBeat.Action, Is.EqualTo(GameTutorialAction.TapDrum), "The tutorial clock stood still.");
+            stay.onClick.Invoke();
+            yield return Until(() => !director.IsSkipDialogOpen, "계속 배우기 closes it", 1f);
             CollectionAssert.AreEqual(GameTutorialScript.DrumResults, network.Snapshot.orbs
                 .Where(orb => orb.owner == network.LocalPlayerId).OrderBy(orb => orb.createdAt).Select(orb => orb.kind).ToArray());
             Assert.That(LocalPlayer(network).stamina, Is.LessThan(network.config.GenerateCost), "Three taps empty the gauge.");
@@ -351,6 +377,40 @@ namespace Hapio.Tests
             session.ExitRun();
             Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.Home), "Quitting is not a Game Over.");
             yield return Until(() => !session.IsLoadingScene && session.RoomBrowserVisible, "Room list after quitting", 30f);
+            Assert.That(session.IsTutorial, Is.False);
+            Assert.That(session.TryStartTutorial(), Is.False, "The tutorial does not come back in the same run.");
+        }
+
+        [UnityTest]
+        public IEnumerator SkippingAsksFirstThenLeavesForTheRoomList()
+        {
+            yield return SceneManager.LoadSceneAsync(GameScenePaths.Home, LoadSceneMode.Single);
+            yield return Until(() => GameSession.Instance != null && !GameSession.Instance.IsLoadingScene, "Saved Home bootstrap");
+            session = GameSession.Instance;
+            session.Network.port = AvailablePort();
+            yield return null;
+            Assert.That(session.TryStartTutorial(), Is.True);
+            GameTutorialDirector director = null;
+            yield return Until(() => (director = Object.FindFirstObjectByType<GameTutorialDirector>()) != null
+                && director.IsShowingLine, "The practice board plays its first line", 30f);
+            GameTutorialArt art = GameTutorialArt.Load();
+            var buttons = director.GetComponentsInChildren<UnityEngine.UI.Button>(true);
+            var tap = buttons.Single(button => button.name == "Tap To Continue");
+            var skip = buttons.Single(button => button.name == "Skip Button");
+            var leave = buttons.Single(button => button.name == "Skip Tutorial");
+            Assert.That(skip.gameObject.activeInHierarchy, Is.False, "Hidden until the screen is tapped.");
+            yield return new WaitForSecondsRealtime(art.tapCooldown + .05f);
+            tap.onClick.Invoke();
+            yield return Until(() => director.SkipButtonAlpha >= .999f, "건너뛰기 has faded in", art.skipFadeSeconds + 1f);
+            skip.onClick.Invoke();
+            Assert.That(director.IsSkipDialogOpen, Is.True, "It asks first.");
+            Assert.That(session.IsTutorial, Is.True, "Nothing is left yet.");
+            LogAssert.Expect(LogType.Log, new System.Text.RegularExpressions.Regex("^C6_LAB_TUTORIAL_SKIP step=0 beat=1$"));
+            leave.onClick.Invoke();
+            leave.onClick.Invoke();
+            Assert.That((director.Skipped, director.IsFinishing), Is.EqualTo((true, true)), "Skipped once, however often pressed.");
+            yield return Until(() => session.State.phase == GameFlowPhase.Home && !session.IsLoadingScene
+                && session.RoomBrowserVisible, "Skipping leaves for the room list", 30f);
             Assert.That(session.IsTutorial, Is.False);
             Assert.That(session.TryStartTutorial(), Is.False, "The tutorial does not come back in the same run.");
         }

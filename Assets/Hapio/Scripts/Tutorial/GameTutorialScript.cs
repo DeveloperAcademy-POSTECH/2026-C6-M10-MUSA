@@ -148,6 +148,16 @@ namespace Hapio
         /// <summary>동작을 해냈을 때 안내 띠 아래에 잠깐 뜨는 글자.</summary>
         public const string SuccessText = "성공!";
 
+        /// <summary>
+        /// 건너뛰기: 튜토리얼 화면을 한 번이라도 누르면 왼쪽 위에 이 버튼이 서서히 나타난다. 누르면 아래 경고 창이 뜬다.
+        /// "계속 배우기"는 하던 곳부터 잇고, "건너뛰기"는 마지막 장면 뒤와 같이 어두워지며 방 목록으로 간다.
+        /// </summary>
+        public const string SkipButtonLabel = "건너뛰기";
+        public const string SkipTitle = "튜토리얼을 건너뛰겠소?";
+        public const string SkipBody = "튜토리얼을 건너뛰면 구슬 전달과 조합 등\n기본 조작을 익히지 못해\n협동 플레이에 어려움이 있을 수 있소.";
+        public const string SkipStay = "계속 배우기";
+        public const string SkipLeave = "건너뛰기";
+
         /// <summary>1단계에서 북을 세 번 치면 나오는 구슬: 음 2개·양 1개라 2단계에서 한 쌍을 합치고 음 하나가 남는다.</summary>
         public static readonly IReadOnlyList<LabOrbKind> DrumResults =
             Array.AsReadOnly(new[] { LabOrbKind.Yin, LabOrbKind.Yang, LabOrbKind.Yin });

@@ -81,6 +81,23 @@ MonoBehaviour:
   bombReturnDelay: 0.35
   bombHandDragSeconds: 1.1
   blockWarningSeconds: 1.05
+  skipButton: {fileID: 21300000, guid: 4b788930b07044b0289956fd90eb9094, type: 3}
+  skipPanel: {fileID: 21300000, guid: 1f841ccf1acbe40ed9386e34ca533eba, type: 3}
+  skipArtPixelsPerPoint: 3
+  skipButtonSize: {x: 72, y: 30}
+  skipButtonMargin: 16
+  skipButtonFontSize: 14
+  skipFadeSeconds: 0.5
+  skipDimColor: {r: 0, g: 0, b: 0, a: 0.55}
+  skipPanelSize: {x: 336, y: 172}
+  skipPanelTopFraction: 0.4
+  skipTitleFontSize: 21
+  skipBodyFontSize: 14
+  skipChoiceSize: {x: 120, y: 48}
+  skipChoiceGap: 12
+  skipChoiceDrop: 10
+  skipChoiceFontSize: 16
+  skipCloseSeconds: 0.12
   arrowColor: {r: 0.36, g: 0.66, b: 0.29, a: 1}
   arrowWidth: 7
   arrowHeadLength: 18

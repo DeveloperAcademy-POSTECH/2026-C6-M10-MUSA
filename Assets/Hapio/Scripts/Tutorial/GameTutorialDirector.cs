@@ -16,7 +16,7 @@ namespace Hapio
     /// 장면이 가리키는 곳(박·북·기운 막대)이 있으면 화면을 어둡게 하고 그곳만 밝힌다. 마지막 장면 뒤에는 어두워지며 방 목록으로 간다.
     /// </summary>
     [DefaultExecutionOrder(1000)]
-    public sealed class GameTutorialDirector : MonoBehaviour
+    public sealed partial class GameTutorialDirector : MonoBehaviour
     {
         /// <summary>Above the battle HUD and DEV panel, below the start cover (30000) and the scene fade (30100).</summary>
         public const int OverlaySortingOrder = 20000;
@@ -382,6 +382,7 @@ namespace Hapio
             tapHint.rectTransform.sizeDelta = art.tapHintSize;
             tapHint.gameObject.SetActive(false);
             bubbleRoot.gameObject.SetActive(false);
+            BuildSkip();
         }
 
         private void BuildBanner()
@@ -484,6 +485,7 @@ namespace Hapio
 
         private void Update()
         {
+            AdvanceClock();
             if (session == null) return;
             if (unavailable)
             {
@@ -491,12 +493,14 @@ namespace Hapio
                 return;
             }
             if (finishing) return;
+            // The skip dialog stops the tutorial where it is: no line, action or neighbor moves on behind it.
+            if (skipOpen) return;
             UpdateHandOvers();
             if (beatIndex < 0)
             {
                 if (!BattlePlayable()) { playableAt = -1f; return; }
-                if (playableAt < 0f) playableAt = Time.unscaledTime;
-                if (Time.unscaledTime - playableAt >= art.firstLineDelay) Advance();
+                if (playableAt < 0f) playableAt = Now;
+                if (Now - playableAt >= art.firstLineDelay) Advance();
                 return;
             }
             if (!CurrentBeat.IsLine) UpdateAction(CurrentBeat);
@@ -508,7 +512,9 @@ namespace Hapio
 
         private void OnTap()
         {
-            if (!HasBeat || !CurrentBeat.IsLine || Time.unscaledTime - shownAt < art.tapCooldown) return;
+            NoteTap();
+            if (skipOpen) return;
+            if (!HasBeat || !CurrentBeat.IsLine || Now - shownAt < art.tapCooldown) return;
             Advance();
         }
 
@@ -527,7 +533,7 @@ namespace Hapio
 
         private void ShowBeat(GameTutorialBeat beat)
         {
-            shownAt = Time.unscaledTime;
+            shownAt = Now;
             actionDoneAt = successAt = -1f;
             actionProgress = 0;
             bubbleRoot.gameObject.SetActive(false);
@@ -548,12 +554,12 @@ namespace Hapio
                 ShowBubble(beat.Speaker, beat.Text);
                 if (beat.Cue == GameTutorialCue.StaminaShort) session.Network.TutorialPlayStaminaShort();
                 // "고마워! 대신 내가 만든 거 줄게~": the yang, then the drum, slide back in from 금옥이's side.
-                if (beat.Cue == GameTutorialCue.GiveBack) { giveBackStage = 1; giveBackAt = Time.unscaledTime + art.giveBackDelay; }
+                if (beat.Cue == GameTutorialCue.GiveBack) { giveBackStage = 1; giveBackAt = Now + art.giveBackDelay; }
                 // The yokai drops a two-lock bomb on my board, with the gourd's warning.
                 if (beat.Cue == GameTutorialCue.DropBomb)
                     session.Network.TutorialDropGourdBomb(GameTutorialScript.BombLanding, GameTutorialScript.BombLocks);
                 // "앗 뜨거! 도로 받아!": 금옥이 passes the bomb back, and its last lock comes off on the way.
-                if (beat.Cue == GameTutorialCue.ReturnBomb) bombReturnAt = Time.unscaledTime + art.bombReturnDelay;
+                if (beat.Cue == GameTutorialCue.ReturnBomb) bombReturnAt = Now + art.bombReturnDelay;
                 return;
             }
             BeginAction(beat);
@@ -573,7 +579,7 @@ namespace Hapio
         private void ShowRemark(GameTutorialSpeaker speaker, string text, float seconds, bool holds, string then)
         {
             remarkSpeaker = speaker;
-            remarkAt = Time.unscaledTime;
+            remarkAt = Now;
             remarkSeconds = seconds;
             remarkHolds = holds;
             remarkThen = then;
@@ -606,7 +612,7 @@ namespace Hapio
             speakerPortrait.sprite = face != null ? face.sprite : null;
             bubbleRoot.gameObject.SetActive(true);
             bubbleRoot.localScale = Vector3.zero;
-            popStartedAt = Time.unscaledTime;
+            popStartedAt = Now;
             PlaceBubble(speaker);
         }
 
@@ -761,14 +767,14 @@ namespace Hapio
             LabConfig config = network.config;
             float slowing = config != null ? config.OrbFloorDeceleration : 2f;
             float slide = GameTutorialScript.LaunchVelocity(90f, GameTutorialScript.GiveBackSlide, slowing).magnitude;
-            if (giveBackStage > 0 && Time.unscaledTime >= giveBackAt)
+            if (giveBackStage > 0 && Now >= giveBackAt)
             {
                 if (giveBackStage == 1)
                 {
                     network.TutorialGiveFrom(LabNetwork.TutorialRightSeatId, LabOrbKind.Yang, LabOrbElement.None,
                         GameTutorialScript.GiveBackYangHeight, slide);
                     giveBackStage = 2;
-                    giveBackAt = Time.unscaledTime + art.giveBackGap;
+                    giveBackAt = Now + art.giveBackGap;
                 }
                 else
                 {
@@ -777,13 +783,13 @@ namespace Hapio
                     giveBackStage = 0;
                 }
             }
-            if (wrongSideReturnAt >= 0f && Time.unscaledTime >= wrongSideReturnAt)
+            if (wrongSideReturnAt >= 0f && Now >= wrongSideReturnAt)
             {
                 wrongSideReturnAt = -1f;
                 if (TryDrumOwner(out LabOrbState drum) && drum.owner == LabNetwork.TutorialLeftSeatId)
                     network.TutorialHandOver(LabNetwork.TutorialLeftSeatId, drum.id, GameTutorialScript.GiveBackDrumHeight, slide);
             }
-            if (bombReturnAt >= 0f && Time.unscaledTime >= bombReturnAt)
+            if (bombReturnAt >= 0f && Now >= bombReturnAt)
             {
                 bombReturnAt = -1f;
                 // Through the real pass, so the last lock comes off as it crosses and it opens where it stops.
@@ -816,7 +822,7 @@ namespace Hapio
             float start = radius + art.arrowGap;
             arrow.Set(new Vector2(from.x + start, from.y), new Vector2(Mathf.Max(from.x + start, to.x), from.y),
                 art.arrowWidth, art.arrowHeadLength, art.arrowHeadWidth);
-            HandDrag((Time.unscaledTime - shownAt) / art.bombHandDragSeconds, out float travel, out float press, out float alpha);
+            HandDrag((Now - shownAt) / art.bombHandDragSeconds, out float travel, out float press, out float alpha);
             RectTransform rect = hand.rectTransform;
             rect.anchoredPosition = Vector2.Lerp(from, to, travel) + art.handRestOffset * (1f - press);
             rect.localScale = Vector3.one * Mathf.Lerp(1f, art.handPressScale, press);
@@ -884,7 +890,7 @@ namespace Hapio
         private void PlaceMirror()
         {
             if (mirrorAt < 0f) return;
-            float t = (Time.unscaledTime - mirrorAt) / art.mirrorSeconds;
+            float t = (Now - mirrorAt) / art.mirrorSeconds;
             if (t >= 1f)
             {
                 mirrorAt = -1f;
@@ -921,7 +927,7 @@ namespace Hapio
             float end = way > 0f ? Mathf.Max(start, to.x) : Mathf.Min(start, to.x);
             arrow.Set(new Vector2(start, from.y), new Vector2(end, from.y),
                 art.arrowWidth, art.arrowHeadLength, art.arrowHeadWidth);
-            HandDrag((Time.unscaledTime - shownAt) / art.handDragSeconds, out float travel, out float press, out float alpha);
+            HandDrag((Now - shownAt) / art.handDragSeconds, out float travel, out float press, out float alpha);
             RectTransform rect = hand.rectTransform;
             rect.anchoredPosition = Vector2.Lerp(from, to, travel) + art.handRestOffset * (1f - press);
             rect.localScale = Vector3.one * Mathf.Lerp(1f, art.handPressScale, press);
@@ -935,7 +941,7 @@ namespace Hapio
                 float wait = successAt >= 0f ? art.afterActionSeconds : art.afterRefillSeconds;
                 // The drum is seen arriving in 금옥이's mirror before she thanks.
                 if (beat.Action == GameTutorialAction.PassDrum) wait = Mathf.Max(wait, art.mirrorSeconds);
-                if (Time.unscaledTime - actionDoneAt >= wait) Advance();
+                if (Now - actionDoneAt >= wait) Advance();
                 return;
             }
             switch (beat.Action)
@@ -953,7 +959,7 @@ namespace Hapio
                     LabPlayerState me = LocalPlayer();
                     LabConfig config = session.Network.config;
                     if (me != null && config != null && me.stamina >= config.StaminaMax - .001f
-                        && Time.unscaledTime - shownAt >= .3f) CompleteAction(false);
+                        && Now - shownAt >= .3f) CompleteAction(false);
                     break;
                 case GameTutorialAction.CombineOrbs:
                     int combined = (LocalPlayer()?.combinedTotal ?? actionBaseline) - actionBaseline;
@@ -981,10 +987,10 @@ namespace Hapio
                 case GameTutorialAction.WaitBombOpen:
                     // Done once no bomb is left anywhere: it opened into its two orbs, in the same snapshot. It may
                     // already have opened while "앗 뜨거!" was still up, so nothing is counted from this beat's start.
-                    if (!TryBomb(out _) && Time.unscaledTime - shownAt >= .3f) CompleteAction(false);
+                    if (!TryBomb(out _) && Now - shownAt >= .3f) CompleteAction(false);
                     break;
                 case GameTutorialAction.WatchBlock:
-                    if (Time.unscaledTime - shownAt >= art.blockWarningSeconds) CompleteAction(false);
+                    if (Now - shownAt >= art.blockWarningSeconds) CompleteAction(false);
                     break;
                 case GameTutorialAction.PassDrumLeft:
                     if (TryDrumOwner(out LabOrbState given) && given.owner == LabNetwork.TutorialLeftSeatId)
@@ -1001,7 +1007,7 @@ namespace Hapio
                     {
                         actionProgress = 1;
                         CompleteAction(true);
-                        mirrorAt = Time.unscaledTime;
+                        mirrorAt = Now;
                         mirror.gameObject.SetActive(true);
                         PlaceMirror();
                     }
@@ -1010,7 +1016,7 @@ namespace Hapio
                         // Not this way: 묵이 sends it straight back, and the player tries again.
                         WrongSidePasses++;
                         ShowRemark(GameTutorialScript.WrongSideSpeaker, GameTutorialScript.WrongSideLine);
-                        wrongSideReturnAt = Time.unscaledTime + art.wrongSideReturnDelay;
+                        wrongSideReturnAt = Now + art.wrongSideReturnDelay;
                     }
                     break;
             }
@@ -1018,7 +1024,7 @@ namespace Hapio
 
         private void CompleteAction(bool success)
         {
-            actionDoneAt = Time.unscaledTime;
+            actionDoneAt = Now;
             board.SetAllowedGestures(LabBoardGestures.None);
             session.Network.TutorialAllowPasses();
             tapCatcher.raycastTarget = true;
@@ -1082,8 +1088,9 @@ namespace Hapio
             if (unavailable || hud == null || overlay == null) return;
             ApplyHudDressing();
             UpdateKeepOut();
+            if (UpdateSkip()) return;
             bool line = HasBeat && CurrentBeat.IsLine;
-            if (remarkAt >= 0f && (Time.unscaledTime - remarkAt > remarkSeconds || !remarkHolds && board.IsHolding))
+            if (remarkAt >= 0f && (Now - remarkAt > remarkSeconds || !remarkHolds && board.IsHolding))
             {
                 string then = remarkThen;
                 ClearRemark();
@@ -1093,12 +1100,12 @@ namespace Hapio
             if (line || remarkAt >= 0f)
             {
                 PlaceBubble(line ? CurrentBeat.Speaker : remarkSpeaker);
-                bubbleRoot.localScale = Vector3.one * PopScale((Time.unscaledTime - popStartedAt) / art.popSeconds,
+                bubbleRoot.localScale = Vector3.one * PopScale((Now - popStartedAt) / art.popSeconds,
                     art.popOvershoot);
             }
             PlaceTapHint(line);
             if (successAt >= 0f)
-                successText.rectTransform.localScale = Vector3.one * PopScale((Time.unscaledTime - successAt) / art.popSeconds,
+                successText.rectTransform.localScale = Vector3.one * PopScale((Now - successAt) / art.popSeconds,
                     art.popOvershoot);
             bool waiting = HasBeat && actionDoneAt < 0f;
             if (waiting && CurrentBeat.Action == GameTutorialAction.CombineOrbs) PlaceDragGuide();
@@ -1119,11 +1126,11 @@ namespace Hapio
         /// <summary>The ▽ shows on a line (never on a remark) from the moment a tap moves it on, bobbing down and up.</summary>
         private void PlaceTapHint(bool line)
         {
-            bool shown = line && art.tapHint != null && Time.unscaledTime >= TapReadyAt;
+            bool shown = line && art.tapHint != null && Now >= TapReadyAt;
             if (tapHint.gameObject.activeSelf != shown) tapHint.gameObject.SetActive(shown);
             if (!shown) return;
             tapHint.rectTransform.anchoredPosition = art.tapHintOffset
-                + new Vector2(0f, TapHintDrop(Time.unscaledTime - TapReadyAt, art.tapHintSeconds, art.tapHintDepth));
+                + new Vector2(0f, TapHintDrop(Now - TapReadyAt, art.tapHintSeconds, art.tapHintDepth));
         }
 
         /// <summary>
@@ -1170,7 +1177,7 @@ namespace Hapio
         {
             if (!TryDrumCircle(out Vector2 center, out _)) { hand.enabled = false; return; }
             hand.enabled = true;
-            float press = HandPress((Time.unscaledTime - shownAt) / art.handTapSeconds);
+            float press = HandPress((Now - shownAt) / art.handTapSeconds);
             RectTransform rect = hand.rectTransform;
             rect.anchoredPosition = center + art.handRestOffset * (1f - press);
             rect.localScale = Vector3.one * Mathf.Lerp(1f, art.handPressScale, press);
@@ -1194,7 +1201,7 @@ namespace Hapio
             Vector2 along = length > 1e-3f ? line / length : Vector2.right;
             float start = fromRadius + art.arrowGap, end = Mathf.Max(start, length - toRadius - art.arrowGap);
             arrow.Set(from + along * start, from + along * end, art.arrowWidth, art.arrowHeadLength, art.arrowHeadWidth);
-            HandDrag((Time.unscaledTime - shownAt) / art.handDragSeconds, out float travel, out float press, out float alpha);
+            HandDrag((Now - shownAt) / art.handDragSeconds, out float travel, out float press, out float alpha);
             RectTransform rect = hand.rectTransform;
             rect.anchoredPosition = Vector2.Lerp(from, to, travel) + art.handRestOffset * (1f - press);
             rect.localScale = Vector3.one * Mathf.Lerp(1f, art.handPressScale, press);
@@ -1221,7 +1228,7 @@ namespace Hapio
             float start = radius + art.arrowGap;
             arrow.Set(from + along * start, from + along * (start + art.throwGuideLength), art.arrowWidth,
                 art.arrowHeadLength, art.arrowHeadWidth);
-            HandSwipe((Time.unscaledTime - shownAt) / art.handSwipeSeconds, out float travel, out float press, out float alpha);
+            HandSwipe((Now - shownAt) / art.handSwipeSeconds, out float travel, out float press, out float alpha);
             RectTransform rect = hand.rectTransform;
             rect.anchoredPosition = from + along * (art.throwGuideLength * travel) + art.handRestOffset * (1f - press);
             rect.localScale = Vector3.one * Mathf.Lerp(1f, art.handPressScale, press);

@@ -973,6 +973,42 @@ namespace Hapio.Tests
         }
 
         [Test]
+        public void SkipDialogAsksInTheMockupsWordsOnTheGivenFrames()
+        {
+            Assert.That(GameTutorialScript.SkipButtonLabel, Is.EqualTo("건너뛰기"));
+            Assert.That(GameTutorialScript.SkipTitle, Is.EqualTo("튜토리얼을 건너뛰겠소?"));
+            Assert.That(GameTutorialScript.SkipBody.Split('\n'), Is.EqualTo(new[]
+            {
+                "튜토리얼을 건너뛰면 구슬 전달과 조합 등", "기본 조작을 익히지 못해", "협동 플레이에 어려움이 있을 수 있소."
+            }));
+            Assert.That((GameTutorialScript.SkipStay, GameTutorialScript.SkipLeave), Is.EqualTo(("계속 배우기", "건너뛰기")));
+            GameTutorialArt art = GameTutorialArt.Load();
+            Assert.That(art.skipPanel, Is.Not.Null, "The dialog frame.");
+            Assert.That(art.skipButton, Is.Not.Null, "The button frame.");
+            // Nine-sliced, so the frame keeps its width however wide the window or button is drawn.
+            Assert.That(art.skipPanel.border.x, Is.GreaterThan(0f));
+            Assert.That(art.skipButton.border.x, Is.GreaterThan(0f));
+            float scale = art.skipArtPixelsPerPoint;
+            Assert.That(art.skipPanel.border.y / scale * 2f, Is.LessThan(art.skipPanelSize.y), "The window fits its own corners.");
+            Assert.That(art.skipButton.border.y / scale * 2f, Is.LessThan(art.skipButtonSize.y), "The small button too.");
+            Assert.That(art.skipButton.border.y / scale * 2f, Is.LessThan(art.skipChoiceSize.y));
+            Assert.That(art.skipCloseSeconds, Is.LessThan(art.popSeconds), "It closes faster than it opens.");
+        }
+
+        [Test]
+        public void SkipButtonFadesInOverHalfASecondAfterTheFirstTap()
+        {
+            Assert.That(GameTutorialDirector.SkipFade(-1f, .5f), Is.EqualTo(0f), "Not before a tap.");
+            Assert.That(GameTutorialDirector.SkipFade(0f, .5f), Is.EqualTo(0f));
+            Assert.That(GameTutorialDirector.SkipFade(.25f, .5f), Is.EqualTo(.5f).Within(1e-5f));
+            Assert.That(GameTutorialDirector.SkipFade(.5f, .5f), Is.EqualTo(1f));
+            Assert.That(GameTutorialDirector.SkipFade(9f, .5f), Is.EqualTo(1f), "Then stays.");
+            var art = ScriptableObject.CreateInstance<GameTutorialArt>();
+            try { Assert.That(art.skipFadeSeconds, Is.EqualTo(.5f)); }
+            finally { Object.DestroyImmediate(art); }
+        }
+
+        [Test]
         public void TapHintStartsAtRestEasesDownAndBackUpEachPeriod()
         {
             const float period = .8f, depth = 4f;

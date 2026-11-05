@@ -118,6 +118,28 @@ namespace Hapio
         [Tooltip("요괴가 오른쪽을 막은 뒤 첫 대사까지 가장자리가 번쩍이는 시간. 막힌 가장자리는 처음에 세 번 번쩍인다 (1.05초).")]
         [Min(0f)] public float blockWarningSeconds = C6Lab.LabOrbEdgeBlock.OpeningSeconds;
 
+        [Header("건너뛰기 (튜토리얼 화면을 한 번 누른 뒤 왼쪽 위)")]
+        [Tooltip("작은 버튼 틀. 왼쪽 위 건너뛰기 버튼과 경고 창의 두 버튼이 함께 쓴다. 가장자리는 늘어나지 않는다(9분할).")]
+        public Sprite skipButton;
+        [Tooltip("경고 창 틀. 가장자리는 늘어나지 않는다(9분할).")] public Sprite skipPanel;
+        [Tooltip("틀 그림의 픽셀 수 ÷ 화면 pt. 3배 크기로 그린 그림이라 3이면 시안과 같은 굵기로 보인다.")]
+        [Min(.5f)] public float skipArtPixelsPerPoint = 3f;
+        public Vector2 skipButtonSize = new Vector2(72f, 30f);
+        [Tooltip("건너뛰기 버튼이 화면 왼쪽 끝에서 떨어지는 거리. 높이는 오른쪽 위 일시정지 버튼과 같다.")]
+        [Min(0f)] public float skipButtonMargin = 16f;
+        [Min(8)] public int skipButtonFontSize = 14;
+        [Tooltip("처음 누른 뒤 건너뛰기 버튼이 서서히 나타나는 시간")] [Min(.01f)] public float skipFadeSeconds = .5f;
+        [Tooltip("경고 창 뒤를 덮는 어둠")] public Color skipDimColor = new Color(0f, 0f, 0f, .55f);
+        public Vector2 skipPanelSize = new Vector2(336f, 172f);
+        [Tooltip("경고 창 가운데가 화면 위에서 얼마나 내려와 있는지 (화면 높이 비율)")] [Range(0f, 1f)] public float skipPanelTopFraction = .4f;
+        [Min(8)] public int skipTitleFontSize = 21;
+        [Min(8)] public int skipBodyFontSize = 14;
+        [Tooltip("\"계속 배우기\"·\"건너뛰기\" 버튼 하나의 크기")] public Vector2 skipChoiceSize = new Vector2(120f, 48f);
+        [Tooltip("두 버튼 사이")] [Min(0f)] public float skipChoiceGap = 12f;
+        [Tooltip("창 아래 끝에서 버튼까지")] [Min(0f)] public float skipChoiceDrop = 10f;
+        [Min(8)] public int skipChoiceFontSize = 16;
+        [Tooltip("\"계속 배우기\"를 누른 뒤 창이 사라지는 시간 (빠르게)")] [Min(.01f)] public float skipCloseSeconds = .12f;
+
         [Header("화살표 (끌어 놓을 방향)")]
         public Color arrowColor = new Color(.36f, .66f, .29f, 1f);
         [Min(1f)] public float arrowWidth = 7f;
