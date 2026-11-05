@@ -465,14 +465,14 @@ namespace C6Lab
         }
 
         /// <summary>Only tagged free B water gets the drop/ripple; ordinary Water art stays unchanged.</summary>
-        public void SetJigwiSupplyWaterArt(bool active, bool held = false)
+        public void SetJigwiSupplyWaterArt(bool active, bool held = false, bool special = false)
         {
             if (!isActiveAndEnabled || kind != LabOrbKind.Combined || element != LabOrbElement.Water) active = false;
             if (!active) { if (jigwiSupplyWaterArt != null) jigwiSupplyWaterArt.Clear(); return; }
             if (jigwiSupplyWaterArt == null) jigwiSupplyWaterArt = LabJigwiSupplyWaterArt.Create(visual);
             float artRadius = visualRadius * (orbSpriteArt != null && orbSpriteArt.gameObject.activeSelf
                 ? LabOrbSpriteArt.SizeScaleFor(kind) : 1f);
-            jigwiSupplyWaterArt.Show(artRadius, held, ExpiryLook.ElementTrailFor(LabOrbElement.Water));
+            jigwiSupplyWaterArt.Show(artRadius, held, ExpiryLook.ElementTrailFor(LabOrbElement.Water), special);
         }
 
         /// <summary>Current shared B reward, never a burn deadline or a persistent launch flag.</summary>

@@ -9,6 +9,7 @@ using Object = UnityEngine.Object;
 namespace C6Lab.Tests
 {
     /// <summary>Shared visual tuning only: these tests do not claim rendered or connected results.</summary>
+    [Category("LabOnly")]
     public sealed class LabPaintGrainConfigTests
     {
         private LabConfig config;

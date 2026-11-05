@@ -11,11 +11,11 @@ namespace Hapio.Tests
         [Test]
         public void JigwiScreenPatternFieldsAreOwnedOnlyByStageThreeAndCannotLeakFromCommonOrOtherStages()
         {
-            foreach (int field in System.Linq.Enumerable.Except(System.Linq.Enumerable.Concat(new[] { 228, 235 }, System.Linq.Enumerable.Range(240, 17)), new[] { 241, 242, 246, 247 }))
+            foreach (int field in System.Linq.Enumerable.Except(System.Linq.Enumerable.Concat(new[] { 228, 235 }, System.Linq.Enumerable.Range(240, 17)), new[] { 241, 242, 244, 245, 246, 247, 251, 252, 253, 254, 255 }))
                 for (int scope = 0; scope <= GameStageSettings.TerritoryScope; scope++)
                     Assert.That(GameStageSettings.IsFieldVisible(scope, field), Is.EqualTo(scope == 3),
                         "Field " + field + " in scope " + scope);
-            foreach (int field in new[] { 229, 230, 231, 232, 233, 234, 241, 242, 246, 247 })
+            foreach (int field in new[] { 229, 230, 231, 232, 233, 234, 241, 242, 244, 245, 246, 247, 251, 252, 253, 254, 255 })
                 for (int scope = 0; scope <= GameStageSettings.TerritoryScope; scope++)
                     Assert.That(GameStageSettings.IsFieldVisible(scope, field), Is.False,
                         "Obsolete surface geometry controls remain reserved but hidden: " + field);
@@ -24,7 +24,7 @@ namespace Hapio.Tests
             using (var settings = new GameStageSettings(source, GameStageCatalog.RequireDefault()))
             {
                 float[] common = settings.Capture(0), first = settings.Capture(1), second = settings.Capture(2), territory = settings.Capture(4);
-                float[] third = settings.Capture(3); third[228] = 0f; third[240] = 12f; third[235] = 3f; third[251] = 2.2f; third[252] = 2.4f;
+                float[] third = settings.Capture(3); third[228] = 0f; third[240] = 12f; third[235] = 3f; third[256] = .6f;
                 Assert.That(settings.TryApply(3, third, out string error), Is.True, error);
                 CollectionAssert.AreEqual(common, settings.Capture(0));
                 CollectionAssert.AreEqual(first, settings.Capture(1));
@@ -32,9 +32,9 @@ namespace Hapio.Tests
                 CollectionAssert.AreEqual(territory, settings.Capture(4));
                 foreach (int scope in new[] { 0, 1, 2, 4 })
                 {
-                    foreach (int field in new[] { 240, 251, 252 })
+                    foreach (int field in new[] { 240, 256 })
                     {
-                        float[] forged = settings.Capture(scope); forged[field] = field == 240 ? 19f : 2.7f;
+                        float[] forged = settings.Capture(scope); forged[field] = field == 240 ? 19f : .55f;
                         Assert.That(settings.TryApply(scope, forged, out _), Is.False);
                     }
                 }
@@ -44,8 +44,7 @@ namespace Hapio.Tests
                     Assert.That(runtime.JigwiStageTimelineEnabled, Is.False);
                     Assert.That(runtime.JigwiABPersonalDurationSeconds, Is.EqualTo(12f));
                     Assert.That(runtime.JigwiStageFeverMultiplier, Is.EqualTo(3f));
-                    Assert.That(runtime.JigwiABRewardSizeScale, Is.EqualTo(2.2f));
-                    Assert.That(runtime.JigwiABRewardPaintScale, Is.EqualTo(2.4f));
+                    Assert.That(runtime.JigwiABFireDepth, Is.EqualTo(.6f).Within(.0001f));
                 }
                 finally { UnityEngine.Object.DestroyImmediate(runtime); }
                 CollectionAssert.AreEqual(saved, source.CaptureDeveloperValues());
@@ -227,6 +226,119 @@ namespace Hapio.Tests
                 Assert.That(settings.TryApply(2, unused, out _), Is.False);
                 CollectionAssert.AreEqual(yaguang, settings.Capture(2));
             }
+        }
+
+        [Test]
+        public void InactiveSettingsAreShownOnNoTabButCommonStillCarriesThem()
+        {
+            LabConfig source = Resources.Load<LabConfig>("LabConfig");
+            float[] saved = source.CaptureDeveloperValues();
+            Assert.That(LabConfig.InactiveDeveloperFields, Is.EqualTo(new[] { 0, 1, 41, 43, 48, 52, 53, 54, 72, 73 }));
+            using (var settings = new GameStageSettings(source, GameStageCatalog.RequireDefault()))
+            {
+                foreach (int index in LabConfig.InactiveDeveloperFields)
+                    for (int scope = 0; scope <= GameStageSettings.TerritoryScope; scope++)
+                    {
+                        Assert.That(GameStageSettings.IsFieldShown(scope, index, settings.Capture(scope)), Is.False,
+                            "No tab shows " + index + " (scope " + scope + ")");
+                        Assert.That(GameStageSettings.IsFieldVisible(scope, index), Is.EqualTo(scope == 0),
+                            "Hiding the row keeps its scope: Common still carries " + index);
+                        Assert.That(settings.Capture(scope)[index], Is.EqualTo(saved[index]), "Scope " + scope + ": " + index);
+                    }
+                // A saved form or a battle restart that sets one (tests use Player Max HP as a restart marker) still works.
+                float[] battle = settings.Capture(1); battle[48] = 219f;
+                Assert.That(settings.TryApplyBattle(1, battle, out string error), Is.True, error);
+                for (int stage = 1; stage <= 3; stage++)
+                {
+                    var config = settings.CreateStageConfig(stage);
+                    try
+                    {
+                        Assert.That(config.PlayerMaxHp, Is.EqualTo(219), "Stage " + stage);
+                        Assert.That(new[] { config.MonsterMaxHp, config.Damage, config.PotionHeal }, Is.EqualTo(new[] { 1000, 20, 10 }));
+                        Assert.That(config.GenerationChances()[2] + config.GenerationChances()[4], Is.Zero,
+                            "Stage " + stage + " makes no relay orb or potion.");
+                    }
+                    finally { UnityEngine.Object.DestroyImmediate(config); }
+                }
+            }
+            CollectionAssert.AreEqual(saved, source.CaptureDeveloperValues());
+        }
+
+        [Test]
+        public void JigwiTabFoldsWhatItsTimelineReplacesWhileTheFormHasItOn()
+        {
+            int[] replaced = System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Concat(System.Linq.Enumerable.Range(178, 6),
+                System.Linq.Enumerable.Concat(System.Linq.Enumerable.Range(192, 4), new[] { 205 })));
+            for (int i = 0; i < LabConfig.DeveloperFields.Count; i++)
+                Assert.That(GameStageSettings.IsReplacedByJigwiTimeline(i), Is.EqualTo(System.Array.IndexOf(replaced, i) >= 0), "Field " + i);
+            Assert.That(GameStageSettings.JigwiTimelineField, Is.EqualTo(228));
+            using (var settings = new GameStageSettings(Resources.Load<LabConfig>("LabConfig"), GameStageCatalog.RequireDefault()))
+            {
+                float[] jigwi = settings.Capture(3);
+                Assert.That(jigwi[228], Is.EqualTo(1f), "Jigwi's 120-second timeline is on by default.");
+                float[] off = (float[])jigwi.Clone(); off[228] = 0f;
+                foreach (int index in replaced)
+                {
+                    Assert.That(GameStageSettings.IsFieldVisible(3, index), Is.True, "Still editable in Jigwi's tab: " + index);
+                    Assert.That(GameStageSettings.IsFieldShown(3, index, jigwi), Is.False, "Folded while 228 is on: " + index);
+                    Assert.That(GameStageSettings.IsFieldShown(3, index, off), Is.True, "Shown once 228 is off: " + index);
+                }
+                Assert.That(GameStageSettings.IsFieldShown(3, 228, jigwi) && GameStageSettings.IsFieldShown(3, 228, off), Is.True,
+                    "The switch itself always shows.");
+                foreach (int index in new[] { 169, 170, 207, 208, 240, 243 })
+                    Assert.That(GameStageSettings.IsFieldShown(3, index, jigwi), Is.True, "The timeline still uses " + index);
+                Assert.That(GameStageSettings.IsFieldShown(1, 205, settings.Capture(1)), Is.True, "The fox keeps its own interval.");
+                for (int scope = 0; scope <= GameStageSettings.TerritoryScope; scope++)
+                    for (int i = 0; i < LabConfig.DeveloperFields.Count; i++)
+                        if (scope != 3 || !GameStageSettings.IsReplacedByJigwiTimeline(i))
+                            Assert.That(GameStageSettings.IsFieldShown(scope, i, jigwi), Is.EqualTo(GameStageSettings.IsFieldVisible(scope, i)
+                                && !LabConfig.IsInactiveDeveloperField(i)), "Scope " + scope + ": " + i);
+
+                // Folding changes nothing about what the tab may apply.
+                jigwi[178] = 2f; jigwi[205] = 15f;
+                Assert.That(settings.TryApply(3, jigwi, out string error), Is.True, error);
+                var config = settings.CreateStageConfig(3);
+                try
+                {
+                    Assert.That(config.JigwiStageTimelineEnabled, Is.True);
+                    Assert.That(config.JigwiFireTargetCount, Is.EqualTo(2));
+                    Assert.That(config.CommonGimmickInterval, Is.EqualTo(15f));
+                }
+                finally { UnityEngine.Object.DestroyImmediate(config); }
+            }
+        }
+
+        [Test]
+        public void FiveColorPaintScaleIsCommonToEveryStageWhileTheFlashRewardCountStaysTheYaguangs()
+        {
+            for (int scope = 0; scope <= GameStageSettings.TerritoryScope; scope++)
+            {
+                Assert.That(GameStageSettings.IsFieldVisible(scope, 237), Is.EqualTo(scope == 0), "Paint scale in scope " + scope);
+                Assert.That(GameStageSettings.IsFieldVisible(scope, 236), Is.EqualTo(scope == 2), "Reward count in scope " + scope);
+            }
+            LabConfig source = Resources.Load<LabConfig>("LabConfig");
+            float[] saved = source.CaptureDeveloperValues();
+            using (var settings = new GameStageSettings(source, GameStageCatalog.RequireDefault()))
+            {
+                for (int scope = 0; scope <= GameStageSettings.TerritoryScope; scope++)
+                    Assert.That(settings.Capture(scope)[237], Is.EqualTo(saved[237]), "Scope " + scope);
+                float[] yaguang = settings.Capture(2); yaguang[237] = 2.5f;
+                Assert.That(settings.TryApply(2, yaguang, out _), Is.False, "The Yaguang tab no longer owns it.");
+                float[] common = settings.Capture(0); common[237] = 2.5f;
+                Assert.That(settings.TryApply(0, common, out string error), Is.True, error);
+                for (int stage = 1; stage <= 3; stage++)
+                {
+                    var config = settings.CreateStageConfig(stage);
+                    try { Assert.That(config.YaguangFiveColorOrbPaintScale, Is.EqualTo(2.5f), "Stage " + stage + "'s fever orbs"); }
+                    finally { UnityEngine.Object.DestroyImmediate(config); }
+                }
+                Assert.That(settings.Capture(2)[236], Is.EqualTo(saved[236]));
+                float[] battle = settings.Capture(1); battle[237] = 1.5f;
+                Assert.That(settings.TryApplyBattle(1, battle, out error), Is.True, error);
+                for (int scope = 0; scope <= 3; scope++)
+                    Assert.That(settings.Capture(scope)[237], Is.EqualTo(1.5f), "A fox battle edit reaches scope " + scope);
+            }
+            CollectionAssert.AreEqual(saved, source.CaptureDeveloperValues());
         }
 
         [Test]

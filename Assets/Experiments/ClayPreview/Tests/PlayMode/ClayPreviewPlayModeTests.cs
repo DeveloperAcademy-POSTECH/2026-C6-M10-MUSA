@@ -149,6 +149,7 @@ namespace Hapio.Experiments.Tests
             }
         }
 
+        [Category("GPU")]
         [UnityTest]
         public IEnumerator AppearanceChangesActualGpuOutputWithoutRepaintingTheFrozenSample()
         {

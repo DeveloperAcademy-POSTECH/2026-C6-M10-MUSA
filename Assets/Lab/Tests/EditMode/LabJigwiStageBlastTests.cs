@@ -26,24 +26,17 @@ namespace C6Lab.Tests
         [TearDown] public void TearDown() { Object.DestroyImmediate(config); }
         private void CompleteFinalScreenMission()
         {
-            // These tests isolate bomb-origin cleanup at 100, rather than the independent
-            // B failure wipe at 95. Finish B through real approved Water/fire transactions.
+            // These tests isolate bomb-origin cleanup at 100. Finish B3 through real approved
+            // transactions: #509 every picked seat throws its special Water at the boss together.
             var group = room.Snapshot(90d).jigwiAB.Active(90d);
             Assert.That(group.kind, Is.EqualTo(LabJigwiABKind.GroupFire));
-            int index = 0;
             foreach (var player in group.players)
-                foreach (var target in player.targets)
-                {
-                    string id = "cutoff-water-" + ++index;
-                    orbs.Add(id, new LabOrbState { id = id, owner = player.playerId,
-                        kind = LabOrbKind.Combined, element = LabOrbElement.Water,
-                        createdAt = 90d, expiresAt = 119d, x = .5f, y = .5f });
-                    Assert.That(room.TryLaunch(player.playerId, id, "launch-" + id, 90d,
-                        out _, out var reason), Is.True, reason);
-                    Assert.That(room.ConfirmJigwiABFireHit(id, group.id, target.id, 90d,
-                        out bool extinguished), Is.True);
-                    Assert.That(extinguished, Is.True);
-                }
+            {
+                var special = orbs.Values.Single(orb => orb.jigwiABSupplyEventId == group.id && orb.originOwner == player.playerId);
+                Assert.That(room.TryLaunch(special.owner, special.id, "launch-" + special.id, 90d,
+                    out _, out var reason), Is.True, reason);
+                Assert.That(room.ConfirmHit(special.id, 90d, Vector3.back, out _, out _, out _), Is.False);
+            }
             var completed = room.Snapshot(90d).jigwiAB.rounds.Single(value => value.id == group.id);
             Assert.That(completed.resolution, Is.EqualTo(LabJigwiABResolution.Completed));
             Assert.That(completed.clearedThroughRevision, Is.Zero);

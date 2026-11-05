@@ -155,6 +155,7 @@ namespace C6Lab.Tests
                     "Leaves must remain at passed world positions without inheriting orb motion or rotation.");
         }
 
+        [Category("GPU")]
         [UnityTest]
         public IEnumerator MetalHasThreeSeparatedRibbonsThatShareTheSameCurvedHistory()
         {
@@ -263,7 +264,7 @@ namespace C6Lab.Tests
                 .SelectMany(root => root.GetComponentsInChildren<LabDeveloperMode>(true)).Single();
             LabNetwork network = developerUi.network;
             startedNetwork = network;
-            network.port = 19219;
+            network.port = LabSavedSceneNetworkFixture.AvailableDualFamilyPort();
             Assert.That(network.StartDeveloperSolo(), Is.True, network.Notice);
             LabProjectile projectile = LabProjectile.Create(new Vector3(0f, 100f, 0f),
                 network.config, network.projectileRoot, LabOrbElement.Water);

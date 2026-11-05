@@ -51,247 +51,30 @@ namespace C6Lab.Tests
             yield return null;
         }
 
-        [UnityTest]
-        public IEnumerator AllThreeIgnitionsAreReachableByRealBoardGesturesWithTheSavedArcAndStraightProfiles()
+        [Test]
+        public void BCreatesNoFireOrCurtainCollidersInFrontOfTheBoss()
         {
-            var cameraObject = new GameObject("Legal flick board camera"); cameraObject.transform.SetParent(root.transform, false);
-            var camera = cameraObject.AddComponent<Camera>(); camera.enabled = false;
-            camera.orthographic = true; camera.transform.position = Vector3.back * 10f;
-            var boardObject = new GameObject("Real input measurement board"); boardObject.transform.SetParent(root.transform, false);
-            var board = boardObject.AddComponent<LabOrbBoard>();
-            board.Configure(config, camera, new Rect(-4f, -2f, 8f, 4f));
-            LabConfig saved = Resources.Load<LabConfig>("LabConfig");
-            Assert.That(config.ThrowGravity, Is.EqualTo(saved.ThrowGravity));
-            Assert.That(config.ThrowMaxWorldSpeed, Is.EqualTo(saved.ThrowMaxWorldSpeed));
-            Assert.That(config.ThrowForwardGain, Is.EqualTo(saved.ThrowForwardGain));
-            Assert.That(config.ThrowLateralGain, Is.EqualTo(saved.ThrowLateralGain));
-            Assert.That(config.ThrowPowerExponent, Is.EqualTo(saved.ThrowPowerExponent));
-            yield return null; // Retire the target's temporary primitive collider before any flight.
-            int completed = 0;
-            foreach (LabThrowForm form in new[] { LabThrowForm.Arc, LabThrowForm.Straight })
-            {
-                float[] values = config.CaptureDeveloperValues();
-                values[111] = (float)form;
-                values[244] = 3f;
-                values[248] = .1f; // Maximum existing motion setting: no enlarged target-radius workaround.
-                Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
-                foreach (int count in new[] { 3, 5 })
-                {
-                    ulong[] owners = Enumerable.Range(0, count).Select(index => (ulong)(index * 10)).ToArray();
-                    model = new LabModel();
-                    model.Begin("legal-saved-profile-" + form + "-" + count, owners, 0d, config, LabStageYokai.Jigwi);
-                    LabSnapshot normal = model.Snapshot(31.2d), reduced = model.Snapshot(32.2d);
-                    const float compatibilityRadiusScale = .65f; // Legacy small-radius API coverage; the timed B mission itself no longer shrinks.
-                    foreach (LabPlayerState player in normal.players)
-                        for (int pointIndex = 0; pointIndex < 3; pointIndex++)
-                        {
-                            bool small = (player.seat + pointIndex) % 2 == 0;
-                            LabSnapshot sample = LabBoardReplica.CopySnapshot(small ? reduced : normal);
-                            sample.serverTime += player.seat % 2 == 0 ? 0d : .75d;
-                            sample.paused = true; // Hold the target-motion sample; this fixture never changes global Time.timeScale.
-                            Field("latest").SetValue(network, sample); Sync();
-                            LabJigwiABRound active = sample.jigwiAB.Active(sample.serverTime);
-                            LabJigwiABFireTarget expected = active.players.Single(owner => owner.playerId == player.id).targets[pointIndex];
-                            Assert.That(active.players.All(owner => owner.targets.All(fire => fire.lit)), Is.True,
-                                "Every target stays lit: a neighbour cannot be disabled to make the desired ID pass.");
-                            float releaseX = Mathf.Lerp(.15f, .85f, pointIndex / 2f);
-                            LabOrbThrowGesture gesture = CaptureRealBoardGesture(board, releaseX, 2.8f, 100d + completed);
-                            Assert.That(LabThrowMath.IsThrowGesture(gesture.Velocity, gesture.DistanceInBoardWidths, config), Is.True);
-                            Assert.That(gesture.DistanceInBoardWidths, Is.GreaterThanOrEqualTo(config.ThrowSwipeMinDistance));
-                            Vector3 origin = LabThrowMath.LaunchPosition(player.seat, count, Arena, gesture.ReleaseX01, config);
-                            Vector3 anchor = LabThrowMath.SeatPosition(player.seat, count, Arena,
-                                config.ThrowOriginRadius, config.ThrowOriginHeightOffset, true);
-                            Vector3 velocity = LabThrowMath.LaunchVelocity(gesture.Velocity, anchor, Arena, config);
-                            Assert.That(network.TryGetJigwiABFireWorldPosition(active, expected, player.id, pointIndex,
-                                sample.serverTime, out Vector3 aim), Is.True);
-                            Assert.That(aim.y - Arena.y, Is.LessThan(.8f), "The old camera-elevated row was above the saved profile's reachable band.");
-                            var shot = LabProjectile.Create(origin, config, root.transform, LabOrbElement.Water);
-                            if (small) shot.SetJigwiABRadiusScale(compatibilityRadiusScale);
-                            shot.SetFireSurfaces(Surfaces().Values.Where(surface => surface.OwnerPlayerId == player.id));
-                            bool received = false; LabProjectileResult result = default;
-                            string label = form + " / players=" + count + " / seat=" + player.seat + " / point=" + pointIndex + " / small=" + small;
-                            Assert.That(shot.Launch("legal-" + completed, player.id, velocity, config, target,
-                                contact => { received = true; result = contact; }), Is.True);
-                            for (int step = 0; step < 60 && !received; step++) yield return new WaitForFixedUpdate();
-                            Assert.That(received, Is.True, label);
-                            Assert.That(result.Kind, Is.EqualTo(LabProjectileHitKind.Fire), label);
-                            Assert.That(result.FireId, Is.EqualTo(active.id), label);
-                            Assert.That(result.FireTargetId, Is.EqualTo(expected.id),
-                                label + " must hit the exact point, not the wall or an overlapping neighbour.");
-                            completed++;
-                            if (shot != null) { shot.gameObject.SetActive(false); Object.Destroy(shot.gameObject); }
-                        }
-                }
-            }
-            Assert.That(completed, Is.EqualTo(48));
-            TestContext.WriteLine("JIGWI_LEGAL_REACH cases=" + completed
-                + " board=TryBeginDrag/DragTo/EndDrag sourceGravity=" + saved.ThrowGravity
-                + " maxWorld=" + saved.ThrowMaxWorldSpeed + " maxMotion=.1 targetRadius=" + config.JigwiABFireTargetRadius);
+            // #509: B is judged on the boss itself.
+            LabSnapshot snapshot = Install(31.1d);
+            Assert.That(snapshot.jigwiAB.Active(snapshot.serverTime).kind, Is.EqualTo(LabJigwiABKind.GroupFire));
+            Assert.That(Surfaces(), Is.Empty);
+            Assert.That(network.GetComponentsInChildren<LabJigwiFireSurface>(true), Is.Empty);
+            Assert.That(model.JigwiABBlocksBoss(0, 31.1d), Is.False);
         }
 
         [UnityTest]
-        public IEnumerator AnActualAuthoritativeProjectileReachesTheOwnersScreenFireAndConsumesWithoutBossRewards()
+        public IEnumerator APickedSeatsRealSpecialWaterShotOnTheBossCountsWithoutPaint()
         {
             LabSnapshot snapshot = Install(31.1d);
-            LabJigwiABRound active = snapshot.jigwiAB.Active(snapshot.serverTime);
-            LabJigwiABFireTarget fire = active.players.Single(player => player.playerId == 0).targets[1];
-            Assert.That(network.TryGetJigwiABFireWorldPosition(active, fire, 0, 1, snapshot.serverTime, out Vector3 point), Is.True);
-            LabOrbState orb = Add(model, 0, snapshot.serverTime, LabOrbElement.Water);
-            Assert.That(model.TryLaunch(0, orb.id, "actual-ab-launch", snapshot.serverTime, out _, out string error), Is.True, error);
-            int beforeHits = snapshot.players.Single(player => player.id == 0).hitTotal;
-            float beforeStamina = snapshot.players.Single(player => player.id == 0).stamina;
-            int beforePaint = model.PaintSurface.CoveredCount;
-            yield return null;
-
-            bool received = false, accepted = false, extinguished = false;
-            LabProjectileResult result = default;
-            LabProjectile shot = Shot();
-            shot.SetFireSurfaces(Surfaces().Values.Where(surface => surface.OwnerPlayerId == 0));
-            shot.Launch(orb.id, 0, VelocityTo(point, .06f), config, target, contact =>
-            {
-                received = true; result = contact;
-                if (contact.Kind == LabProjectileHitKind.Fire)
-                    accepted = model.ConfirmJigwiABFireHit(contact.ProjectileId, contact.FireId,
-                        contact.FireTargetId, snapshot.serverTime, out extinguished);
-            });
-            for (int i = 0; i < 60 && !received; i++) yield return new WaitForFixedUpdate();
-            Assert.That(received, Is.True);
-            Assert.That(result.Kind, Is.EqualTo(LabProjectileHitKind.Fire));
-            Assert.That(result.Hit, Is.False);
-            Assert.That(result.FireId, Is.EqualTo(active.id));
-            Assert.That(accepted && extinguished, Is.True);
-            LabSnapshot after = model.Snapshot(snapshot.serverTime);
-            Assert.That(after.orbs.Any(item => item.id == orb.id), Is.False);
-            Assert.That(after.jigwiAB.Active(snapshot.serverTime).players.Single(player => player.playerId == 0)
-                .targets.Single(item => item.id == result.FireTargetId).lit, Is.False);
-            Assert.That(after.players.Single(player => player.id == 0).hitTotal, Is.EqualTo(beforeHits));
-            Assert.That(after.players.Single(player => player.id == 0).stamina, Is.EqualTo(beforeStamina));
-            Assert.That(model.PaintSurface.CoveredCount, Is.EqualTo(beforePaint));
-        }
-
-        [UnityTest]
-        public IEnumerator AnotherPlayersRealFireCollidersCannotCaptureTheSameFlight()
-        {
-            LabSnapshot snapshot = Install(31.1d);
-            LabJigwiABRound active = snapshot.jigwiAB.Active(snapshot.serverTime);
-            LabJigwiABFireTarget fire = active.players.Single(player => player.playerId == 0).targets[1];
-            Assert.That(network.TryGetJigwiABFireWorldPosition(active, fire, 0, 1, snapshot.serverTime, out Vector3 point), Is.True);
-            var wall = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            wall.transform.SetParent(root.transform, false);
-            wall.transform.position = Arena + Vector3.back * 2f;
-            wall.transform.localScale = new Vector3(30f, 30f, .1f);
-            yield return null;
-            bool received = false; LabProjectileResult result = default;
-            LabProjectile shot = Shot();
-            shot.SetMissSurface(wall.GetComponent<Collider>());
-            // Deliberately register foreign colliders in the shot's path: ownership must still
-            // be checked by the production projectile, not merely by a correct caller list.
-            shot.SetFireSurfaces(Surfaces().Values.Where(surface => surface.OwnerPlayerId == 0));
-            shot.Launch("foreign-fire-flight", 20, VelocityTo(point, .06f), config, target,
-                contact => { received = true; result = contact; });
-            for (int i = 0; i < 60 && !received; i++) yield return new WaitForFixedUpdate();
-            Assert.That(received, Is.True);
-            Assert.That(result.Kind, Is.Not.EqualTo(LabProjectileHitKind.Fire));
-            Assert.That(result.FireId, Is.Null);
-            Assert.That(active.players.Single(player => player.playerId == 0).targets.All(item => item.lit), Is.True);
-        }
-
-        [UnityTest]
-        public IEnumerator WaterHittingTheEmptyCurtainRectangleOnlySplashesAndReplicatesItsTimestamp()
-        {
-            LabSnapshot snapshot = Install(31.1d);
-            LabJigwiABRound active = snapshot.jigwiAB.Active(snapshot.serverTime);
-            Assert.That(network.TryGetJigwiABCurtainFrame(active, 0, snapshot.serverTime,
-                out Vector3 center, out Quaternion rotation, out Vector2 half), Is.True);
-            string curtainId = LabJigwiABFireMotion.CurtainId(active.id, 0);
-            LabJigwiFireSurface curtain = Surfaces()[curtainId];
-            Assert.That(curtain.IsCurtain, Is.True);
-            Assert.That(curtain.Hitbox, Is.TypeOf<BoxCollider>());
-            // Aim above the ignition row. The former lower corner intersects the nearer
-            // point plane on its ballistic ascent, so it is no longer empty along the path.
-            Vector3 aim = center + rotation * Vector3.right * (half.x * .7f)
-                + rotation * Vector3.up * (half.y * .75f);
-            LabOrbState orb = Add(model, 0, snapshot.serverTime, LabOrbElement.Water);
-            Assert.That(model.TryLaunch(0, orb.id, "actual-curtain-water", snapshot.serverTime, out _, out string error), Is.True, error);
-            int beforeHits = snapshot.players.Single(player => player.id == 0).hitTotal;
-            float beforeStamina = snapshot.players.Single(player => player.id == 0).stamina;
-            yield return null;
-            bool received = false, accepted = false, extinguished = true;
-            LabProjectileResult result = default;
-            LabProjectile shot = Shot();
-            shot.SetFireSurfaces(Surfaces().Values.Where(surface => surface.OwnerPlayerId == 0));
-            // The wall now sits close to the boss. A 60 ms injected flight is clamped
-            // by the unchanged speed limit and no longer reaches this empty wall location.
-            // Use a feasible ballistic velocity; this still exercises the real projectile query.
-            Vector3 wallVelocity = VelocityTo(aim, .4f);
-            Assert.That(wallVelocity.magnitude, Is.LessThanOrEqualTo(config.ThrowMaxWorldSpeed));
-            shot.Launch(orb.id, 0, wallVelocity, config, target, contact =>
-            {
-                received = true; result = contact;
-                if (contact.Kind == LabProjectileHitKind.Fire)
-                    accepted = model.ConfirmJigwiABFireHit(contact.ProjectileId, contact.FireId,
-                        contact.FireTargetId, snapshot.serverTime, out extinguished);
-            });
-            for (int i = 0; i < 60 && !received; i++) yield return new WaitForFixedUpdate();
-            Assert.That(received, Is.True, "The real projectile must reach the curtain.");
-            Assert.That(accepted, Is.True, "Contact=" + result.Kind + " target=" + result.FireTargetId);
-            Assert.That(result.Kind, Is.EqualTo(LabProjectileHitKind.Fire));
-            Assert.That(result.FireTargetId, Is.EqualTo(curtainId), "An empty part of the wall cannot count as an ignition point.");
-            Assert.That(extinguished, Is.False);
-            LabSnapshot after = model.Snapshot(snapshot.serverTime);
-            LabJigwiABPlayerFire owner = after.jigwiAB.Active(snapshot.serverTime).players.Single(player => player.playerId == 0);
-            Assert.That(owner.targets.All(fire => fire.lit), Is.True);
-            Assert.That(owner.lastWaterSplashAt, Is.EqualTo(snapshot.serverTime));
-            Assert.That(after.orbs.Any(value => value.id == orb.id), Is.False);
-            Assert.That(after.players.Single(player => player.id == 0).hitTotal, Is.EqualTo(beforeHits));
-            Assert.That(after.players.Single(player => player.id == 0).stamina, Is.EqualTo(beforeStamina));
-            Assert.That(model.PaintSurface.CoveredCount, Is.Zero);
-            var publisher = new LabBoardPublisher();
-            LabBoardFrame frame = publisher.Build(after, 0, 1, 1);
-            var replica = new LabBoardReplica(); replica.SetActive(after.sessionId, after.round, 0);
-            Assert.That(replica.TryApply(frame, out error), Is.True, error);
-            var oldPaint = new LabSnapshot { sessionId = after.sessionId, round = after.round,
-                phase = LabPhase.Playing, serverTime = 30d };
-            Assert.That(replica.Overlay(oldPaint).jigwiAB.Active(snapshot.serverTime).players
-                .Single(player => player.playerId == 0).lastWaterSplashAt, Is.EqualTo(snapshot.serverTime));
-        }
-
-        [UnityTest]
-        public IEnumerator TheWholeCurtainStaysClosedUntilTheLastLocalPointThenLetsARealBossShotThrough()
-        {
-            float[] values = config.CaptureDeveloperValues(); values[245] = 1f;
-            Assert.That(config.TryApplyDeveloperValues(values, out string relightError), Is.True, relightError);
-            model = Room(LabStageYokai.Jigwi); // Exercise real relighting before the ten-second B deadline.
-            Field("model").SetValue(network, model);
-            LabSnapshot snapshot = Install(31.1d);
-            LabJigwiABRound active = snapshot.jigwiAB.Active(snapshot.serverTime);
-            string curtainId = LabJigwiABFireMotion.CurtainId(active.id, 0);
-            LabJigwiFireSurface curtain = Surfaces()[curtainId];
-            Collider originalCollider = curtain.Hitbox;
-            Vector3 fullSize = ((BoxCollider)curtain.Hitbox).size;
-            string[] points = active.players.Single(player => player.playerId == 0).targets.Select(fire => fire.id).ToArray();
-            for (int i = 0; i < points.Length; i++)
-            {
-                double at = 31.2d + i * .1d;
-                ExtinguishPoint(0, active.id, points[i], at);
-                snapshot = Install(at);
-                Assert.That(Surfaces()[curtainId], Is.SameAs(curtain));
-                Assert.That(curtain.Hitbox, Is.SameAs(originalCollider));
-                Assert.That(((BoxCollider)curtain.Hitbox).size, Is.EqualTo(fullSize));
-                bool closed = i < points.Length - 1;
-                Assert.That(curtain.Active, Is.EqualTo(closed));
-                Assert.That(model.JigwiABBlocksBoss(0, at), Is.EqualTo(closed));
-            }
-            Assert.That(model.JigwiABBlocksBoss(20, snapshot.serverTime), Is.True,
-                "The other player's still-lit curtain is independent of this local opening.");
-            LabOrbState orb = Add(model, 0, snapshot.serverTime, LabOrbElement.Water);
-            Assert.That(model.TryLaunch(0, orb.id, "open-curtain-boss-flight", snapshot.serverTime, out _, out string error), Is.True, error);
+            LabJigwiABRound round = snapshot.jigwiAB.Active(snapshot.serverTime);
+            Assert.That(round.syncCount, Is.Zero);
+            // #509: both seats of two are picked; seat 0 throws the special Water B gave it.
+            LabOrbState orb = Special(round.id, 0);
+            Assert.That(model.TryLaunch(0, orb.id, "sync-boss-flight", snapshot.serverTime, out _, out string error), Is.True, error);
             yield return null;
             bool received = false, approved = false; LabProjectileResult result = default;
             LabProjectile shot = Shot();
-            shot.SetFireSurfaces(Surfaces().Values.Where(surface => surface.OwnerPlayerId == 0));
             Vector2 flick = new Vector2(0f, 2.8f);
-            Assert.That(LabThrowMath.IsThrowGesture(flick, Mathf.Max(.24f, config.ThrowSwipeMinDistance), config), Is.True);
             Vector3 anchor = LabThrowMath.SeatPosition(0, 2, Arena, config.ThrowOriginRadius, config.ThrowOriginHeightOffset, true);
             Vector3 launchVelocity = LabThrowMath.LaunchVelocity(flick, anchor, Arena, config);
             shot.Launch(orb.id, 0, launchVelocity, config, target, contact =>
@@ -302,16 +85,14 @@ namespace C6Lab.Tests
                         target.Hitbox.transform.InverseTransformPoint(contact.HitPoint).normalized, out _, out _, out _);
             });
             for (int i = 0; i < 60 && !received; i++) yield return new WaitForFixedUpdate();
-            Assert.That(received, Is.True, "The saved-profile legal post-curtain shot must resolve; form=" + config.ThrowForm
+            Assert.That(received, Is.True, "The saved-profile legal shot must resolve; form=" + config.ThrowForm
                 + " origin=" + shot.LaunchPosition + " velocity=" + launchVelocity + " gravity=" + config.EffectiveThrowGravity);
-            Assert.That(result.Kind, Is.EqualTo(LabProjectileHitKind.Monster), "After every local point is out, no curtain may intercept this legal boss-bound flight.");
-            Assert.That(approved, Is.True, "The actual Monster contact must pass the Host's final curtain gate after local extinction.");
-            Assert.That(model.PaintSurface.CoveredCount, Is.GreaterThan(0));
-            Install(32.5d);
-            Assert.That(Surfaces()[curtainId], Is.SameAs(curtain));
-            Assert.That(curtain.Hitbox, Is.SameAs(originalCollider));
-            Assert.That(curtain.Active, Is.True, "A relit point restores the entire wall on the retained collider.");
-            Assert.That(model.JigwiABBlocksBoss(0, 32.5d), Is.True);
+            Assert.That(result.Kind, Is.EqualTo(LabProjectileHitKind.Monster), "Nothing stands in front of the boss during B.");
+            Assert.That(approved, Is.False, "The special Water is consumed by the Host, never as an ordinary paint hit.");
+            Assert.That(model.PaintSurface.CoveredCount, Is.Zero);
+            LabJigwiABRound after = model.Snapshot(snapshot.serverTime).jigwiAB.Active(snapshot.serverTime);
+            Assert.That(after.syncWindowAt, Is.EqualTo(snapshot.serverTime), "Seat 0's hit opens the one-second window.");
+            Assert.That(after.players.Single(player => player.playerId == 0ul).targets[0].extinguishedAt, Is.EqualTo(snapshot.serverTime));
         }
 
         [Test]
@@ -325,7 +106,9 @@ namespace C6Lab.Tests
             var camera = cameraObject.AddComponent<Camera>(); camera.enabled = false;
             target.Hitbox.transform.localRotation = Quaternion.Euler(32f, 143f, 17f);
             Vector3[] meshVertices = target.Hitbox.sharedMesh.vertices;
-            foreach (LabPlayerState player in snapshot.players)
+            // #509: only the picked seats (3 of 5) have a curtain.
+            Assert.That(active.players, Has.Length.EqualTo(3));
+            foreach (LabPlayerState player in snapshot.players.Where(p => active.players.Any(owner => owner.playerId == p.id)))
             {
                 Assert.That(network.TryGetJigwiABCurtainFrame(active, player.id, snapshot.serverTime,
                     out Vector3 center, out Quaternion rotation, out Vector2 half), Is.True);
@@ -388,42 +171,13 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void UnlitTargetsKeepTheirExactColliderForRelightWithoutAnyWorldFlameVisual()
-        {
-            LabSnapshot snapshot = Install(31.1d);
-            LabJigwiABRound active = snapshot.jigwiAB.Active(snapshot.serverTime);
-            LabJigwiABFireTarget fire = active.players[0].targets[0];
-            LabJigwiFireSurface original = Surfaces()[fire.id];
-            Collider collider = original.Hitbox;
-            Assert.That(original.Active, Is.True);
-            Assert.That(original.GetComponentsInChildren<MeshRenderer>(true)
-                .Any(renderer => renderer.enabled && renderer.gameObject.activeInHierarchy), Is.False);
-            fire.lit = false; fire.extinguishedAt = 31.1d; fire.relightAt = 32.1d;
-            Sync();
-            Assert.That(Surfaces()[fire.id], Is.SameAs(original));
-            Assert.That(original.Hitbox, Is.SameAs(collider));
-            Assert.That(original.Active, Is.False);
-            fire.lit = true; snapshot.serverTime = 32.2d;
-            Sync();
-            Assert.That(Surfaces()[fire.id], Is.SameAs(original));
-            Assert.That(original.Hitbox, Is.SameAs(collider));
-            Assert.That(original.Active, Is.True);
-            snapshot.jigwiAB.fever = true;
-            active.resolution = LabJigwiABResolution.Cancelled; active.resolvedAt = 100d;
-            snapshot.serverTime = 100d;
-            Sync();
-            Assert.That(Surfaces(), Is.Empty);
-            Assert.That(original.Active, Is.False, "A queued Destroy cannot leave its old collider active after cutoff.");
-        }
-
-        [Test]
         public void PhoneAndTabletProjectionUseOneRotationIndependentWorldTargetAndRadius()
         {
             LabSnapshot snapshot = Install(31.1d);
             LabJigwiABRound active = snapshot.jigwiAB.Active(snapshot.serverTime);
-            LabJigwiABFireTarget fire = active.players[0].targets[1];
+            LabJigwiABFireTarget fire = active.players[0].targets[0];
             ulong owner = active.players[0].playerId;
-            Assert.That(network.TryGetJigwiABFireWorldPosition(active, fire, owner, 1, 31.1d, out Vector3 expected), Is.True);
+            Assert.That(network.TryGetJigwiABFireWorldPosition(active, fire, owner, 0, 31.1d, out Vector3 expected), Is.True);
             var cameraObject = new GameObject("AB phone and tablet projection"); cameraObject.transform.SetParent(root.transform, false);
             var camera = cameraObject.AddComponent<Camera>(); camera.enabled = false;
             LabPlayerState player = snapshot.players.Single(item => item.id == owner);
@@ -436,7 +190,7 @@ namespace C6Lab.Tests
             foreach (float aspect in new[] { 390f / 844f, 3f / 4f })
             {
                 camera.aspect = aspect;
-                Assert.That(network.TryGetJigwiABFireWorldPosition(active, fire, owner, 1, 31.1d, out Vector3 actual), Is.True);
+                Assert.That(network.TryGetJigwiABFireWorldPosition(active, fire, owner, 0, 31.1d, out Vector3 actual), Is.True);
                 Assert.That(Vector3.Distance(actual, expected), Is.LessThan(.00001f));
                 Vector3 projected = camera.WorldToViewportPoint(actual);
                 Assert.That(projected.z, Is.GreaterThan(0f));
@@ -445,7 +199,7 @@ namespace C6Lab.Tests
                 Assert.That(edge.x - projected.x, Is.GreaterThan(0f), "The Canvas can size the flame from the very same world radius as its collider.");
             }
             target.Hitbox.transform.localRotation = Quaternion.Euler(35f, 127f, 0f);
-            Assert.That(network.TryGetJigwiABFireWorldPosition(active, fire, owner, 1, 31.1d, out Vector3 rotated), Is.True);
+            Assert.That(network.TryGetJigwiABFireWorldPosition(active, fire, owner, 0, 31.1d, out Vector3 rotated), Is.True);
             Assert.That(Vector3.Distance(rotated, expected), Is.LessThan(.0001f));
         }
 
@@ -478,23 +232,28 @@ namespace C6Lab.Tests
                 Assert.That(shot.RadiusScale, Is.EqualTo(combo), "B may not overwrite the combo/paint scale.");
                 Assert.That(shot.JigwiABRadiusScale, Is.EqualTo(.65f));
             }
+            // #509: switch the success splash off so it does not keep growing into the paint-budget comparison below.
+            typeof(LabConfig).GetField("jigwiBSplashPaintShare", Private).SetValue(config, 0f);
+            model = Room(LabStageYokai.Jigwi);
             LabModel control = Room(LabStageYokai.None);
             model.Tick(31d);
             // Retain the generic independent-radius compatibility check with an explicit fixture,
             // while the actual timed B curtain stays active only for the other player.
             ExtinguishOwnPoints(0, 31d);
             Assert.That(model.JigwiABBlocksBoss(0, 31d), Is.False);
-            Assert.That(model.JigwiABBlocksBoss(20, 31d), Is.True);
-            LabOrbState reduced = Add(model, 0, 31d, LabOrbElement.Water);
+            Assert.That(model.JigwiABBlocksBoss(20, 31d), Is.False, "#509: nobody is ever blocked.");
+            int modelBefore = model.PaintSurface.CoveredCount; // no splash here, so nothing else is growing
+            // Hit after B's 5-second success reward [31, 36) so both rooms use the ordinary paint budget.
+            LabOrbState reduced = Add(model, 0, 37d, LabOrbElement.Water);
             reduced.jigwiABRadiusScale = .65f; // Explicit old-field fixture, not a timed-mission penalty.
-            LabOrbState normal = Add(control, 0, 31d, LabOrbElement.Water);
+            LabOrbState normal = Add(control, 0, 37d, LabOrbElement.Water);
             foreach (var pair in new[] { (model, reduced), (control, normal) })
             {
-                Assert.That(pair.Item1.TryLaunch(0, pair.Item2.id, "same-paint-launch", 31d, out _, out string error), Is.True, error);
+                Assert.That(pair.Item1.TryLaunch(0, pair.Item2.id, "same-paint-launch", 37d, out _, out string error), Is.True, error);
                 Assert.That(pair.Item1.LaunchScaleOf(pair.Item2.id), Is.EqualTo(1f));
-                Assert.That(pair.Item1.ConfirmHit(pair.Item2.id, 31d, Vector3.forward, out _, out _, out _), Is.True);
+                Assert.That(pair.Item1.ConfirmHit(pair.Item2.id, 37d, Vector3.forward, out _, out _, out _), Is.True);
             }
-            Assert.That(model.PaintSurface.CoveredCount, Is.EqualTo(control.PaintSurface.CoveredCount),
+            Assert.That(model.PaintSurface.CoveredCount - modelBefore, Is.EqualTo(control.PaintSurface.CoveredCount),
                 "An explicitly radius-reduced compatibility hit and one normal hit must fund the same newly painted area.");
         }
 
@@ -669,28 +428,38 @@ namespace C6Lab.Tests
             }
         }
 
+        /// <summary>#509: every picked seat throws its special Water at the boss together (B succeeds at once).</summary>
         private void ExtinguishOwnPoints(ulong owner, double at)
         {
             LabJigwiABRound round = model.Snapshot(at).jigwiAB.Active(at);
-            foreach (LabJigwiABFireTarget fire in round.players.Single(player => player.playerId == owner).targets)
-                if (fire.lit) ExtinguishPoint(owner, round.id, fire.id, at);
+            Assert.That(round.players.Any(player => player.playerId == owner), Is.True);
+            foreach (var player in round.players)
+            {
+                // Aimed at the back, away from the paint checks; the success splash lands there too.
+                LabOrbState water = Special(round.id, player.playerId);
+                Assert.That(model.TryLaunch(water.owner, water.id, "clear-point-" + water.id, at, out _, out string error), Is.True, error);
+                Assert.That(model.ConfirmHit(water.id, at, Vector3.back, out _, out _, out _), Is.False);
+            }
+            Assert.That(model.Snapshot(at).jigwiAB.rounds.Single(value => value.id == round.id).resolution,
+                Is.EqualTo(LabJigwiABResolution.Completed));
         }
-        private void ExtinguishPoint(ulong owner, string roundId, string targetId, double at)
-        {
-            LabOrbState water = Add(model, owner, at, LabOrbElement.Water);
-            Assert.That(model.TryLaunch(owner, water.id, "clear-point-" + water.id, at, out _, out string error), Is.True, error);
-            Assert.That(model.ConfirmJigwiABFireHit(water.id, roundId, targetId, at, out bool extinguished), Is.True);
-            Assert.That(extinguished, Is.True);
-        }
+        private LabOrbState Special(string roundId, ulong seat) =>
+            ((Dictionary<string, LabOrbState>)typeof(LabModel).GetField("orbs", Private).GetValue(model)).Values
+                .Single(orb => orb.jigwiABSupplyEventId == roundId && orb.originOwner == seat);
 
         private LabModel Room(LabStageYokai stage)
         {
-            var value = new LabModel(); value.Begin("jigwi-ab-network", new[] { 0ul, 20ul }, 0d, config, stage);
+            // #509: with two seats both are picked for B, so the fixtures can keep aiming from seat 0.
+            var value = new LabModel(); value.Begin("jigwi-ab-network2", new[] { 0ul, 20ul }, 0d, config, stage);
             return value;
         }
         private LabSnapshot Install(double at)
         {
             LabSnapshot value = model.Snapshot(at);
+            LabJigwiABRound b = value.jigwiAB?.Active(at);
+            if (b != null && b.kind == LabJigwiABKind.GroupFire && b.slot <= 3 && value.players.Length == 2)
+                Assert.That(b.players.Select(player => player.playerId), Does.Contain(0ul),
+                    "Fixture assumption: seat 0 is picked (#509: both seats of two are).");
             Field("latest").SetValue(network, value);
             Sync(); return value;
         }

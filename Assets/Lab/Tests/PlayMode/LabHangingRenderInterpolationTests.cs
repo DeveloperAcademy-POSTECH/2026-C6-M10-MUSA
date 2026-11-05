@@ -71,6 +71,7 @@ namespace C6Lab.Tests
             hanging.SetSimulationHeld(false);
         }
 
+        [Category("GPU")]
         [UnityTest]
         public IEnumerator OutsideRenderingTheTransformsAlwaysHoldTheFixedPose()
         {
@@ -102,6 +103,7 @@ namespace C6Lab.Tests
                 "The render passes drew an interpolated pose, so the restores checked above actually happened.");
         }
 
+        [Category("GPU")]
         [UnityTest]
         public IEnumerator DuringRealRenderingTheDrawnPoseLiesBetweenTheTwoFixedPoses()
         {

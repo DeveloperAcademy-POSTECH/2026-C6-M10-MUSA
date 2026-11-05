@@ -67,7 +67,7 @@ namespace C6Lab
         private bool artReady, missingShaderReported, baselineReady;
         private string sessionId;
         private uint roundNumber;
-        /// <summary>Same as <c>LabJigwiPatternAudio</c>'s seek tolerance.</summary>
+        /// <summary>A clock step back smaller than this is jitter, not a new stage (#451).</summary>
         public const double RewindToleranceSeconds = .075d;
         private double stageStartedAt = -1d, previousNow = -1d, personalDousedAt = -1d, curtainDousedAt = -1d;
         private Vector2 curtainSplashCentre, curtainSplashSize;
@@ -86,7 +86,8 @@ namespace C6Lab
         }
         public Rect BattleFireClipRect { get; private set; }
         public int VisibleScreenFires { get; private set; }
-        public bool CurtainVisible => groupFireCurtain != null && groupFireCurtain.gameObject.activeSelf;
+        /// <summary>#509: B shows no curtain or pillar any more; kept for callers that ask.</summary>
+        public bool CurtainVisible => false;
         public int CurtainVisualLevel { get; private set; }
         public bool CurtainWaterVisible => curtainWaterDouse != null && curtainWaterDouse.gameObject.activeSelf;
         public bool GroupCurtainVisible => CurtainVisible;
@@ -140,6 +141,21 @@ namespace C6Lab
                         - (transform.GetSiblingIndex() < pause.GetSiblingIndex() ? 1 : 0)));
             }
             EnsureTalisman();
+            EnsureSyncPillar();
+        }
+
+        /// <summary>#509: the shared 0/3 drops and the "now" cue (no pillar). Created at runtime.</summary>
+        public LabJigwiSyncPillarView SyncPillar { get; private set; }
+        private void EnsureSyncPillar()
+        {
+            if (fireLayer == null) return;
+            if (SyncPillar == null)
+            {
+                SyncPillar = gameObject.AddComponent<LabJigwiSyncPillarView>();
+                SyncPillar.Build(fireLayer, font);
+            }
+            Font shilla = canvas != null ? LabYaguangFeverHud.ShillaFont(canvas) : null;
+            SyncPillar.SetFont(shilla != null ? shilla : font);
         }
 
         /// <summary>#479: the talisman that covers this player's board during A. Created at runtime, never saved in the prefab.</summary>
@@ -284,7 +300,7 @@ namespace C6Lab
             {
                 failureStatus = Label("FailureInstruction", failureOverlay.transform, 40);
                 Stretch(failureStatus.rectTransform, new Vector2(.12f, .42f), new Vector2(.88f, .58f));
-                failureStatus.text = "실패";
+                failureStatus.text = string.Empty;
             }
         }
 
@@ -468,7 +484,7 @@ namespace C6Lab
             else SetFiresHidden(held);
             DrawWater(now, held);
             DrawStatus(stage, active, snapshot, localPlayer, now, held);
-            DrawFailure(now);
+            DrawFailure(stage, now);
         }
 
         /// <summary>#479: true once this seat finished writing its talisman in this A.</summary>
@@ -494,17 +510,28 @@ namespace C6Lab
             }
         }
 
-        private void DrawFailure(double now)
+        /// <summary>#509: true while a failed B keeps the boards on fire (drums blocked).</summary>
+        public bool BoardFireVisible { get; private set; }
+        private void DrawFailure(LabJigwiABSnapshot stage, double now)
         {
             if (failureOverlay == null) return;
-            bool visible = failedAt >= 0d && now >= failedAt && now - failedAt < FailureFlashSeconds;
+            double fireUntil = -1d;
+            foreach (var round in stage?.rounds ?? Array.Empty<LabJigwiABRound>())
+                if (round != null && round.kind == LabJigwiABKind.GroupFire && round.resolution == LabJigwiABResolution.Expired
+                    && now >= round.resolvedAt && now < round.boardFireUntil) fireUntil = Math.Max(fireUntil, round.boardFireUntil);
+            BoardFireVisible = fireUntil > now;
+            bool flash = failedAt >= 0d && now >= failedAt && now - failedAt < FailureFlashSeconds;
+            bool visible = flash || BoardFireVisible;
             failureOverlay.gameObject.SetActive(visible);
             if (!visible) return;
-            float elapsed = (float)(now - failedAt), opacity = 1f - elapsed / (float)FailureFlashSeconds;
+            float elapsed = (float)(now - Math.Max(0d, failedAt));
+            float opacity = flash ? 1f - elapsed / (float)FailureFlashSeconds : 0f;
+            if (BoardFireVisible) opacity = Mathf.Max(opacity, .55f);
+            if (failureStatus != null) failureStatus.text = string.Empty; // #509: no failure / board-fire words
             failureOverlay.color = new Color(1f, .13f, .01f, .22f * opacity);
             if (failureFlames != null) for (int i = 0; i < failureFlames.Length; i++)
                 AnimateFlame(failureFlames[i], elapsed, i * 1.73f, .95f * opacity);
-            if (failureStatus != null) failureStatus.color = new Color(1f, .97f, .83f, opacity);
+            if (failureStatus != null) failureStatus.color = new Color(1f, .97f, .83f, BoardFireVisible ? 1f : opacity);
         }
 
         private void ObserveDouses(LabJigwiABSnapshot stage, ulong localPlayer, double now, bool baseline)
@@ -549,68 +576,28 @@ namespace C6Lab
             LabJigwiABPlayerFire mine = null;
             foreach (var player in round.players ?? Array.Empty<LabJigwiABPlayerFire>())
                 if (player != null && player.playerId == localPlayer) { mine = player; break; }
-            if (mine == null)
-            {
-                // An absent owner is not a completed B; never retain another owner's residue.
-                if (waterFlightTrail != null) waterFlightTrail.Hide();
-                if (audioView != null) audioView.Stop();
-                SetFiresHidden(held); return;
-            }
             UpdateBattleFireClip();
-            DrawCurtain(round, mine, localPlayer, now, animationTime);
-            for (int i = 0; i < fireImages.Length; i++)
+            // #509: B is judged on the boss itself. No curtain, ignition or pillar art is shown and the fire loop stays off.
+            if (groupFireCurtain != null) groupFireCurtain.gameObject.SetActive(false);
+            if (fireImages != null) foreach (var image in fireImages) if (image != null) image.gameObject.SetActive(false);
+            if (audioView != null) audioView.Stop();
+            bool haptics = source != null && source.config != null && source.config.HapticsEnabled;
+            bool picked = mine != null;
+            var slot = picked && mine.targets != null && mine.targets.Length > 0 ? mine.targets[0] : null;
+            CurtainVisualLevel = 0;
+            // #509: picked seats that still have to hit inside the one chance (0 for a helper screen).
+            int hitsSoFar = 0, pickedCount = 0;
+            foreach (var player in round.players ?? Array.Empty<LabJigwiABPlayerFire>())
+                if (player?.targets != null && player.targets.Length > 0)
+                { pickedCount++; if (player.targets[0].extinguishedAt >= 0d) hitsSoFar++; }
+            RemainingIgnitions = slot != null && slot.lit ? Math.Max(0, pickedCount - hitsSoFar) : 0;
+            if (SyncPillar != null) SyncPillar.Present(round, mine, picked, BattleFireClipRect, now, held, haptics);
+            // Reproject the real local water projectile path (picked seats throw the counted Water).
+            if (waterFlightTrail != null)
             {
-                var fire = mine.targets != null && i < mine.targets.Length ? mine.targets[i] : null;
-                if (fire == null || !fire.lit || !TryProject(round, fire, localPlayer, i, now, out Vector2 centre, out Vector2 size))
-                { if (fireImages[i] != null) fireImages[i].gameObject.SetActive(false); continue; }
-                lastFirePositions[i] = centre; lastFireSizes[i] = size; hasFirePosition[i] = true;
-                fireImages[i].rectTransform.anchoredPosition = centre;
-                fireImages[i].rectTransform.sizeDelta = size;
-                fireImages[i].gameObject.SetActive(true);
-                AnimateFlame(fireImages[i], animationTime, round.slot * 1.71f + i * 2.399f, round.Warning(now) ? .45f : 1f);
-                VisibleScreenFires++;
+                if (picked) waterFlightTrail.Present(canvas, battleCamera, localPlayer, round.id, now, held);
+                else waterFlightTrail.Hide();
             }
-            // Reproject the real local water projectile path above B's Canvas curtain only.
-            // No extra movement, input, collision or shared combat state is produced here.
-            if (waterFlightTrail != null) waterFlightTrail.Present(canvas, battleCamera, localPlayer, round.id, now, held);
-            if (audioView != null) audioView.Apply(round.id, GroupCurtainVisible, held, CurtainVisualLevel);
-        }
-
-        private void DrawCurtain(LabJigwiABRound round, LabJigwiABPlayerFire mine, ulong owner, double now, float animationTime)
-        {
-            int lit = 0;
-            foreach (var fire in mine.targets ?? Array.Empty<LabJigwiABFireTarget>()) if (fire != null && fire.lit) lit++;
-            RemainingIgnitions = lit;
-            CurtainVisualLevel = lit > 0 ? Mathf.Clamp(Mathf.CeilToInt(3f * lit / Mathf.Max(1, mine.targets.Length)), 1, 3) : 0;
-            if (CurtainVisualLevel == 0 || !TryProjectCurtain(round, owner, now, out Vector2 centre, out Vector2 size))
-            { groupFireCurtain.gameObject.SetActive(false); return; }
-            groupFireCurtain.gameObject.SetActive(true);
-            groupFireCurtain.anchoredPosition = centre; groupFireCurtain.sizeDelta = size;
-            // Each remaining-point step has its own painted silhouette. Keep the same physical
-            // frame and opacity: progress comes from the artwork, not a stretched or faded copy.
-            // The fixed textured centre keeps the gourd obscured until the final ignition is out.
-            Texture2D artwork = CurtainArtworkForLevel(CurtainVisualLevel);
-            float opacity = round.Warning(now) ? .45f : 1f;
-            curtainArt.gameObject.SetActive(true);
-            curtainArt.texture = artwork;
-            curtainArt.rectTransform.anchoredPosition = Vector2.zero;
-            curtainArt.rectTransform.sizeDelta = size;
-            curtainArt.uvRect = CoverUv(artwork, new Rect(0f, 0f, 1f, 1f), size.x / Mathf.Max(.01f, size.y));
-            AnimateFlame(curtainArt, animationTime, round.slot * 1.71f, opacity);
-            Rect core = SafeUv(curtainDenseFrame);
-            Stretch((RectTransform)curtainBody.transform, core.min, core.max);
-            curtainCore.gameObject.SetActive(true);
-            curtainCore.uvRect = CoverUv(curtainTexture, curtainDenseUv,
-                size.x * core.width / Mathf.Max(.01f, size.y * core.height));
-            AnimateFlame(curtainCore, animationTime, round.slot * 1.71f + .37f, round.Warning(now) ? .45f : 1f);
-        }
-
-        private Texture2D CurtainArtworkForLevel(int level)
-        {
-            if (level == 1 && curtainStage1Texture != null) return curtainStage1Texture;
-            if (level == 2 && curtainStage2Texture != null) return curtainStage2Texture;
-            // A partially imported prefab must remain visible instead of becoming a white quad.
-            return curtainTexture != null ? curtainTexture : flameTexture;
         }
 
         private static Rect SafeUv(Rect value)
@@ -722,58 +709,28 @@ namespace C6Lab
 
         private void DrawStatus(LabJigwiABSnapshot stage, LabJigwiABRound active, LabSnapshot snapshot, ulong local, double now, bool held)
         {
-            if (active != null && active.kind == LabJigwiABKind.GroupFire) PositionGroupStatus(active, local, now);
-            else RestoreStatusLayout();
+            // #509: no fire target to avoid any more; the instructions keep their saved place.
+            RestoreStatusLayout();
             rows.Clear();
             // 피버는 세 스테이지 공통 연출(#441, LabYaguangFeverHud)이 알린다.
+            // #509: the only words on screen are Jigwi's two-second taunts (no progress, guide, result or next-gimmick
+            // lines). The drops, the "now" vibration and the failure overlay carry the rest without text.
             string words = string.Empty;
-            if (active != null)
-            {
-                string shout = active.Warning(now) ? (active.kind == LabJigwiABKind.PersonalBurn
-                        ? "으아아 마음이 불타오른다!!!\n" : "화면에 불이 붙었어요!\n") : string.Empty;
-                // #479: A has no hit count or target text; only the warning shout remains.
-                if (active.kind == LabJigwiABKind.PersonalBurn) words = shout.TrimEnd('\n');
-                else
-                {
-                    words = shout + "지급 물구슬로 불씨를 끄세요 · "
-                        + Math.Max(0d, active.endsAt - Math.Max(now, active.activeAt)).ToString("0.0", CultureInfo.InvariantCulture) + "초";
-                    foreach (var player in active.players ?? Array.Empty<LabJigwiABPlayerFire>())
-                    {
-                        if (player == null) continue;
-                        int off = 0;
-                        foreach (var fire in player.targets ?? Array.Empty<LabJigwiABFireTarget>()) if (fire != null && !fire.lit) off++;
-                        if (rows.Length > 0) rows.Append("  ·  ");
-                        rows.Append(PlayerLabel(snapshot, player.playerId)).Append(' ').Append(off).Append('/').Append(player.targets?.Length ?? 0);
-                    }
-                    rows.Append("\n발화점을 모두 꺼야 박 공격 가능");
-                }
-            }
-            if (active == null && !stage.fever)
-                foreach (var finished in stage.rounds ?? Array.Empty<LabJigwiABRound>())
-                    if (finished != null && finished.kind == LabJigwiABKind.GroupFire
-                        && finished.resolution == LabJigwiABResolution.Completed && Recent(finished.resolvedAt, now))
-                        words = "모든 불을 함께 껐어요!";
-            LabJigwiABRound reward = stage.Reward(now);
-            if (reward != null)
-            {
-                string remaining = Math.Max(0d, reward.rewardUntil - now).ToString("0.0", CultureInfo.InvariantCulture);
-                words = words.Length > 0 ? words + "\n성공 보상 · " + remaining + "초"
-                    : "모든 불을 함께 껐어요! · 보상 " + remaining + "초";
-                if (rows.Length > 0) rows.Append('\n');
-                rows.Append("투척 크기 ").Append(reward.rewardSizeScale.ToString("0.#", CultureInfo.InvariantCulture))
-                    .Append("배 · 도색 ").Append(reward.rewardPaintScale.ToString("0.#", CultureInfo.InvariantCulture))
-                    .Append("배 · 불꽃 궤적");
-            }
+            if (active != null && active.Warning(now)) words = Taunt(active.kind);
             foreach (var upcoming in stage.rounds ?? Array.Empty<LabJigwiABRound>())
             {
                 if (upcoming == null || upcoming == active || !upcoming.Warning(now)) continue;
-                words += "\n다음 기믹 예고 · " + (upcoming.kind == LabJigwiABKind.PersonalBurn ? "개인 과열" : "공동 소화");
+                words = words.Length > 0 ? words + "\n" + Taunt(upcoming.kind) : Taunt(upcoming.kind);
                 break;
             }
             status.text = words; playerStatus.text = rows.ToString();
             statusPanel.gameObject.SetActive(words.Length > 0);
             playerStatus.gameObject.SetActive(rows.Length > 0);
         }
+
+        /// <summary>#509 지귀 도발(파훼법은 말하지 않음). 예고 2초 동안만 보인다.</summary>
+        public static string Taunt(LabJigwiABKind kind) =>
+            kind == LabJigwiABKind.PersonalBurn ? "타올라라, 모두 재가 되어라!" : "흩어진 물방울로는 어림없다!";
 
         private void PositionGroupStatus(LabJigwiABRound round, ulong owner, double now)
         {
@@ -821,6 +778,7 @@ namespace C6Lab
             // Keep only that already-bound owner/event's residue; no new path is introduced.
             if (waterFlightTrail != null) waterFlightTrail.ContinueFading(held);
             CurtainVisualLevel = 0; RemainingIgnitions = 0;
+            if (SyncPillar != null) SyncPillar.Hide();
             if (groupFireCurtain != null) groupFireCurtain.gameObject.SetActive(false);
             if (fireImages != null) foreach (var image in fireImages) if (image != null) image.gameObject.SetActive(false);
         }
@@ -832,6 +790,7 @@ namespace C6Lab
             VisibleScreenFires = 0;
             RestoreStatusLayout();
             CurtainVisualLevel = 0; RemainingIgnitions = 0;
+            if (SyncPillar != null) SyncPillar.Hide();
             if (groupFireCurtain != null) groupFireCurtain.gameObject.SetActive(false);
             if (curtainWaterDouse != null) curtainWaterDouse.gameObject.SetActive(false);
             if (personalHeat != null) personalHeat.gameObject.SetActive(false);

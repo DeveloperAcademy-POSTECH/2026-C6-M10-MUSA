@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.TestTools;
 namespace C6Lab.Tests
 {
+    [Category("Slow")]
     public class LabHangingPresentationTests
     {
         [UnityTest]

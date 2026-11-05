@@ -25,8 +25,17 @@ namespace C6Lab
         [SerializeField] private Color guideColor = new Color(.45f, .3f, .12f, .35f);
         [Tooltip("#479: 손가락이 지나가 칠해진 점선 색 (물빛 파랑).")]
         [SerializeField] private Color writtenColor = new Color(.1f, .42f, .95f, 1f);
+        [Tooltip("#509: 다 쓴 글씨가 빛나는 시간(초). 그다음 부적이 천천히 사라진다.")]
+        [SerializeField, Range(.1f, 2f)] private float glowSeconds = .6f;
+        [Tooltip("#509: 빛난 뒤 부적이 사라지는 시간(초).")]
+        [SerializeField, Range(.2f, 3f)] private float fadeSeconds = 1.2f;
+        [Tooltip("#509: 다 쓴 글씨가 빛날 때의 색 (금빛).")]
+        [SerializeField] private Color glowColor = new Color(1f, .86f, .32f, 1f);
         /// <summary>요청이 사라졌을 때 다시 보내기까지 (초)</summary>
         private const float ResendSeconds = 1f;
+        private CanvasGroup paperGroup;
+        private float finishAge = -1f;
+        private Vector3 finishFrom;
 
         private LabNetwork source;
         private RectTransform root, paper, frame, glyphArea;
@@ -55,6 +64,11 @@ namespace C6Lab
         /// <summary>이 화면에서 부적을 다 쓴 횟수 (요청을 보낸 횟수, 다시 보낸 것은 빼고)</summary>
         public int CompletedCount { get; private set; }
         public LabJigwiTalismanStroke Stroke => stroke;
+        /// <summary>#509: 다 쓴 부적이 빛나며 사라지는 중인지. 이때 조합판은 이미 풀려 있다.</summary>
+        public bool Finishing => finishAge >= 0f;
+        public float FinishSeconds => glowSeconds + fadeSeconds;
+        /// <summary>#509: 사라지는 동안의 부적 불투명도 (1 → 0).</summary>
+        public float PaperAlpha => paperGroup != null ? paperGroup.alpha : 1f;
 
         public void Bind(LabNetwork network, Font labelFont)
         {
@@ -80,6 +94,7 @@ namespace C6Lab
             if (source == null) { Present(null, ulong.MaxValue, 0d); return; }
             LabSnapshot snapshot = source.Snapshot;
             Present(snapshot, source.LocalPlayerId, source.JigwiABPresentationTime);
+            if (Finishing) AdvanceFinish(Time.unscaledDeltaTime);
             if (Visible)
             {
                 FitToBattle(source.board != null ? source.board.ViewCamera : null);
@@ -94,11 +109,13 @@ namespace C6Lab
         {
             EnsureWidgets();
             LabJigwiABRound round = PendingTalisman(snapshot, localPlayer, now);
-            if (round?.id != RoundId && round?.id != writtenRound) ResetWriting();
+            // A new talisman cuts a still-fading old one short.
+            if (round != null && round.id != writtenRound && Finishing) EndFinish();
+            if (round?.id != RoundId && round?.id != writtenRound && !Finishing) ResetWriting();
             // A talisman this screen already finished stays hidden while the Host confirms it.
             Visible = round != null && round.id != writtenRound;
             RoundId = Visible ? round.id : null;
-            if (paper != null) paper.gameObject.SetActive(Visible);
+            if (paper != null) paper.gameObject.SetActive(Visible || Finishing);
             if (!Visible) hasLast = false;
             SetBoardBlocked(Visible);
         }
@@ -119,8 +136,57 @@ namespace C6Lab
             CompletedCount++;
             Send();
             Visible = false; RoundId = null; hasLast = false;
-            if (paper != null) paper.gameObject.SetActive(false);
             SetBoardBlocked(false);
+            // #509: the written "물" glows, then the talisman slowly fades away (the board is already free).
+            BeginFinish();
+        }
+
+        private void BeginFinish()
+        {
+            if (paper == null) return;
+            finishAge = 0f; finishFrom = paper.localPosition;
+            paper.gameObject.SetActive(true);
+            if (hint != null) hint.gameObject.SetActive(false);
+            DrawFinish();
+        }
+
+        /// <summary>#509: LateUpdate와 테스트가 같이 쓰는 빛남/사라짐 진행.</summary>
+        public void AdvanceFinish(float seconds)
+        {
+            if (!Finishing || float.IsNaN(seconds) || seconds < 0f) return;
+            finishAge += seconds;
+            if (finishAge >= FinishSeconds) { EndFinish(); return; }
+            DrawFinish();
+        }
+
+        private void DrawFinish()
+        {
+            float glow = Mathf.Clamp01(finishAge / Mathf.Max(.01f, glowSeconds));
+            float fade = Mathf.Clamp01((finishAge - glowSeconds) / Mathf.Max(.01f, fadeSeconds));
+            float eased = fade * fade * (3f - 2f * fade);
+            for (int i = 0; i < dots.Length; i++)
+            {
+                if (dots[i] == null || !stroke.IsCovered(i)) continue;
+                dots[i].color = Color.Lerp(writtenColor, glowColor, glow);
+                float pulse = 1f + .55f * glow + .15f * Mathf.Sin(finishAge * 14f) * (1f - fade);
+                dots[i].rectTransform.localScale = Vector3.one * pulse;
+            }
+            if (paperImage != null) paperImage.color = Color.Lerp(paperColor, new Color(1f, .97f, .85f, paperColor.a), glow);
+            if (paperGroup != null) paperGroup.alpha = 1f - eased;
+            paper.localScale = Vector3.one * (1f + .05f * eased);
+            paper.localPosition = finishFrom + Vector3.up * (paper.rect.height * .06f * eased);
+        }
+
+        private void EndFinish()
+        {
+            finishAge = -1f;
+            if (paper == null) return;
+            if (paperGroup != null) paperGroup.alpha = 1f;
+            paper.localScale = Vector3.one; paper.localPosition = finishFrom;
+            if (paperImage != null) paperImage.color = paperColor;
+            if (hint != null) hint.gameObject.SetActive(true);
+            for (int i = 0; i < dots.Length; i++) if (dots[i] != null) dots[i].rectTransform.localScale = Vector3.one;
+            paper.gameObject.SetActive(Visible);
         }
 
         private float Tolerance => source != null && source.config != null ? source.config.JigwiTalismanTolerance : .07f;
@@ -227,6 +293,8 @@ namespace C6Lab
             if (font == null) font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             paper = NewRect("Talisman Paper", root);
             paper.sizeDelta = new Vector2(200f, 360f);
+            paperGroup = paper.gameObject.AddComponent<CanvasGroup>();
+            paperGroup.blocksRaycasts = false; paperGroup.interactable = false;
             paperImage = paper.gameObject.AddComponent<UnityEngine.UI.RawImage>();
             paperImage.texture = HanjiTexture(); paperImage.color = paperColor; paperImage.raycastTarget = false;
             frame = NewRect("Talisman Frame", paper);
@@ -316,7 +384,7 @@ namespace C6Lab
             rect.offsetMin = rect.offsetMax = Vector2.zero;
         }
 
-        private void OnDisable() { SetBoardBlocked(false); Visible = false; RoundId = null; hasLast = false; if (paper != null) paper.gameObject.SetActive(false); }
+        private void OnDisable() { SetBoardBlocked(false); Visible = false; RoundId = null; hasLast = false; EndFinish(); if (paper != null) paper.gameObject.SetActive(false); }
         private void OnDestroy() => SetBoardBlocked(false);
     }
 

@@ -10,6 +10,8 @@ namespace C6Lab.Tests
     public sealed class LabPaintSplatterConsistencyTests
     {
         private static readonly Color[] Palette = { Color.red, Color.yellow, Color.green, Color.blue, Color.magenta };
+        // Same (Color32)Palette[i] values, converted once for the per-cell pigment check below.
+        private static readonly Color32[] Palette32 = Palette.Select(color => (Color32)color).ToArray();
         // Virgin first-hit maps captured from main 19289cbf before #211. These lock only
         // the approved initial SPLATTER silhouette, not the replacement growth timeline.
         private static readonly string[] ApprovedVirginHashes =
@@ -113,8 +115,10 @@ namespace C6Lab.Tests
             Assert.That(after.Count(p => p.Equals((Color32)Color.blue)), Is.Zero,
                 "No queued repeat may appear until timed growth selects and spends it.");
             AssertOldPaintUnchanged(before, after);
-            foreach (int cell in Enumerable.Range(0, before.Length).Where(i => before[i].a != 0))
-                Assert.That(surface.GetPainterSlot(cell), Is.EqualTo(beforePainters[cell]));
+            for (int cell = 0; cell < before.Length; cell++)
+                if (before[cell].a != 0 && surface.GetPainterSlot(cell) != beforePainters[cell])
+                    Assert.That(surface.GetPainterSlot(cell), Is.EqualTo(beforePainters[cell]),
+                        $"An older painted cell must keep its P number (first differing cell {cell}).");
             Assert.That(surface.PendingCoverage,
                 Is.EqualTo(budgetBefore + .02d - added.Length / (double)surface.CellCount).Within(1e-10d));
             surface.Advance(100d);
@@ -139,14 +143,14 @@ namespace C6Lab.Tests
                 Is.EqualTo((double)(expectedCredit - decimal.Floor(expectedCredit)) / surface.CellCount).Within(1e-10d));
             var exhausted = Pixels(surface); var painters = Painters(surface); uint revision = surface.Revision;
             surface.Advance(100000d);
-            Assert.That(Pixels(surface), Is.EqualTo(exhausted));
-            Assert.That(Painters(surface), Is.EqualTo(painters));
+            AssertSameCells(exhausted, Pixels(surface), "Exhausted pixels");
+            AssertSameSlots(painters, Painters(surface), "Exhausted painters");
             Assert.That(surface.Revision, Is.EqualTo(revision));
             surface.Clear();
             Assert.That(surface.CoveredCount, Is.Zero);
             Assert.That(surface.PendingCoverage, Is.Zero);
-            Assert.That(Pixels(surface), Is.All.EqualTo(new Color32()));
-            Assert.That(Painters(surface), Is.All.EqualTo((byte)0));
+            AssertAllCells(Pixels(surface), new Color32(), "Cleared pixels");
+            AssertAllSlots(Painters(surface), 0, "Cleared painters");
         }
 
         [TestCase(0)] [TestCase(1)] [TestCase(2)]
@@ -295,10 +299,45 @@ namespace C6Lab.Tests
             if (y > 0) yield return cell - surface.Columns;
             if (y + 1 < surface.Rows) yield return cell + surface.Columns;
         }
+        // The map helpers below check every cell with a plain comparison and call NUnit only for
+        // the first differing cell, so a failure still reports that cell's expected/actual value
+        // and index without boxing every cell of every map through NUnit's generic comparer.
+        private static bool SameCell(Color32 first, Color32 second)
+            => first.r == second.r && first.g == second.g && first.b == second.b && first.a == second.a;
+        private static void AssertSameCells(Color32[] expected, Color32[] actual, string context)
+        {
+            if (actual.Length != expected.Length)
+                Assert.That(actual.Length, Is.EqualTo(expected.Length), $"{context}: map length");
+            for (int cell = 0; cell < expected.Length; cell++)
+                if (!SameCell(actual[cell], expected[cell]))
+                    Assert.That(actual[cell], Is.EqualTo(expected[cell]), $"{context}: first differing cell {cell}");
+        }
+        private static void AssertSameSlots(byte[] expected, byte[] actual, string context)
+        {
+            if (actual.Length != expected.Length)
+                Assert.That(actual.Length, Is.EqualTo(expected.Length), $"{context}: map length");
+            for (int cell = 0; cell < expected.Length; cell++)
+                if (actual[cell] != expected[cell])
+                    Assert.That(actual[cell], Is.EqualTo(expected[cell]), $"{context}: first differing cell {cell}");
+        }
+        private static void AssertAllCells(Color32[] values, Color32 expected, string context)
+        {
+            for (int cell = 0; cell < values.Length; cell++)
+                if (!SameCell(values[cell], expected))
+                    Assert.That(values[cell], Is.EqualTo(expected), $"{context}: first differing cell {cell}");
+        }
+        private static void AssertAllSlots(byte[] values, byte expected, string context)
+        {
+            for (int cell = 0; cell < values.Length; cell++)
+                if (values[cell] != expected)
+                    Assert.That(values[cell], Is.EqualTo(expected), $"{context}: first differing cell {cell}");
+        }
         private static void AssertOldPaintUnchanged(Color32[] before, Color32[] after)
         {
             for (int cell = 0; cell < before.Length; cell++)
-                if (before[cell].a != 0) Assert.That(after[cell], Is.EqualTo(before[cell]), "Existing pigment cannot be replaced.");
+                if (before[cell].a != 0 && !SameCell(after[cell], before[cell]))
+                    Assert.That(after[cell], Is.EqualTo(before[cell]),
+                        $"Existing pigment cannot be replaced (first differing cell {cell}).");
         }
         private static void AssertPigmentsMatchPainters(LabPaintSurface surface)
         {
@@ -306,8 +345,19 @@ namespace C6Lab.Tests
             for (int cell = 0; cell < pixels.Length; cell++)
             {
                 int painter = surface.GetPainterSlot(cell);
-                if (pixels[cell].a == 0) Assert.That(painter, Is.Zero);
-                else Assert.That(pixels[cell], Is.EqualTo((Color32)Palette[painter - 1]), "Painter identity and pigment commit atomically.");
+                if (pixels[cell].a == 0)
+                {
+                    if (painter != 0)
+                        Assert.That(painter, Is.Zero, $"An unpainted cell has no painter (first differing cell {cell}).");
+                }
+                else
+                {
+                    // Palette32[painter - 1] throws for P0/out-of-range exactly like Palette[painter - 1] did.
+                    Color32 expected = Palette32[painter - 1];
+                    if (!SameCell(pixels[cell], expected))
+                        Assert.That(pixels[cell], Is.EqualTo(expected),
+                            $"Painter identity and pigment commit atomically (first differing cell {cell}, P{painter}).");
+                }
             }
         }
         private static void Receive(LabPaintReceiver receiver, LabPaintFrame[] frames)
@@ -320,8 +370,8 @@ namespace C6Lab.Tests
         }
         private static void AssertSame(LabPaintSurface source, LabPaintSurface replica)
         {
-            Assert.That(Pixels(replica), Is.EqualTo(Pixels(source)));
-            Assert.That(Painters(replica), Is.EqualTo(Painters(source)));
+            AssertSameCells(Pixels(source), Pixels(replica), "Replica pixels");
+            AssertSameSlots(Painters(source), Painters(replica), "Replica painters");
             Assert.That(replica.CoveredCount, Is.EqualTo(source.CoveredCount));
             Assert.That(replica.PaintCount, Is.EqualTo(source.PaintCount));
             Assert.That(replica.Revision, Is.EqualTo(source.Revision));

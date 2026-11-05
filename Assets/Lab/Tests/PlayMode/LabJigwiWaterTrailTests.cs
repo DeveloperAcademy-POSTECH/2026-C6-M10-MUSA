@@ -300,6 +300,7 @@ namespace C6Lab.Tests
             root.SetActive(false); Assert.That(LabJigwiWaterFlightPath.ActivePathCount, Is.Zero);
         }
 
+        [Category("GPU")]
         [UnityTest]
         public IEnumerator ActualWaterInkAndHeadRenderOnTopOfAnOpaqueRedCurtainWithoutChangingWorldMotion()
         {

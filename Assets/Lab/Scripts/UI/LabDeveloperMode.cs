@@ -401,20 +401,27 @@ namespace C6Lab
 
                 // 처음에는 모두 접힌 상태로 시작한다. 제목을 누르면 접고 펼친다.
                 // 숨긴 줄의 값도 APPLY 때 그대로 읽힌다.
-                string name = category.Title;
-                bool expanded = false;
-                SetCategoryExpanded(title, name, rows, expanded);
+                var view = new CategoryView
+                {
+                    Header = header, Title = title, Name = category.Title, Rows = rows,
+                    FieldRows = System.Array.ConvertAll(System.Array.FindAll(category.FieldIndices, index => index != 79),
+                        index => valueInputs[index].transform.parent.gameObject)
+                };
+                categoryViews.Add(view);
+                ShowCategory(view);
                 Button toggle = header.GetComponent<Button>();
                 toggle.targetGraphic = title;
                 toggle.onClick.AddListener(() =>
                 {
-                    expanded = !expanded;
-                    SetCategoryExpanded(title, name, rows, expanded);
+                    view.Expanded = !view.Expanded;
+                    ShowCategory(view);
                 });
             }
-            // Settings the gimmick groups replaced (#311) keep their rows for the shared form but are never shown.
-            foreach (int retired in LabConfig.RetiredDeveloperFields)
-                valueInputs[retired].transform.parent.gameObject.SetActive(false);
+            // Retired slots (#311) and settings with no effect in the current game keep their rows for the shared form
+            // (APPLY still reads them) but have no category and are never shown.
+            for (int i = 0; i < valueInputs.Length; i++)
+                if (LabConfig.IsDeveloperFieldHidden(i))
+                    valueInputs[i].transform.parent.gameObject.SetActive(false);
         }
 
         /// <summary>묶음 안 구분선 한 줄 (#268). 누를 수 없고, 묶음을 접으면 같이 숨는다.</summary>
@@ -505,11 +512,51 @@ namespace C6Lab
             }
         }
 
-        /// <summary>펼침 상태에 맞춰 제목의 세모(▶ 접힘 / ▼ 펼침)와 항목 줄 표시를 바꾼다.</summary>
-        private static void SetCategoryExpanded(Text title, string name, GameObject[] rows, bool expanded)
+        /// <summary>A category header with its rows (dividers included) and whether it is expanded.</summary>
+        private sealed class CategoryView
         {
-            title.text = (expanded ? "\u25BC  " : "\u25B6  ") + name;
-            foreach (GameObject row in rows) row.SetActive(expanded);
+            public GameObject Header;
+            public Text Title;
+            public string Name;
+            public GameObject[] Rows;
+            public GameObject[] FieldRows;
+            public bool Expanded;
+        }
+
+        private readonly System.Collections.Generic.List<CategoryView> categoryViews =
+            new System.Collections.Generic.List<CategoryView>();
+        // Rows Jigwi's 120-second timeline replaces in this Hapio game stage (see RefreshJigwiTimelineRows).
+        private readonly System.Collections.Generic.HashSet<GameObject> timelineHiddenRows =
+            new System.Collections.Generic.HashSet<GameObject>();
+
+        /// <summary>
+        /// 펼침 상태에 맞춰 제목의 세모(▶ 접힘 / ▼ 펼침)와 항목 줄 표시를 바꾼다. 지귀 시간표가 대신하는 줄은 펼쳐도 숨기고,
+        /// 줄이 모두 숨으면 제목도 숨긴다.
+        /// </summary>
+        private void ShowCategory(CategoryView view)
+        {
+            view.Title.text = (view.Expanded ? "\u25BC  " : "\u25B6  ") + view.Name;
+            foreach (GameObject row in view.Rows) row.SetActive(view.Expanded && !timelineHiddenRows.Contains(row));
+            bool anyRow = System.Array.Exists(view.FieldRows, row => !timelineHiddenRows.Contains(row));
+            if (view.Header.activeSelf != anyRow) view.Header.SetActive(anyRow);
+        }
+
+        /// <summary>
+        /// Battle DEV in a Hapio game stage: while the form has Jigwi's 120-second timeline (228) on, hide the old
+        /// water-only fire (178~183) and its automatic cycle (192~195), plus the common gimmick interval (205) in
+        /// Jigwi's own stage. The standalone Lab keeps every row. Hidden rows still hold their values for APPLY.
+        /// </summary>
+        private void RefreshJigwiTimelineRows()
+        {
+            if (valueInputs == null || network == null) return;
+            int field = LabConfig.JigwiStageFirstField;
+            bool timelineOn = network.GameFlowEnabled && valueInputs.Length > field && valueInputs[field] != null
+                && TryParse(valueInputs[field].text, out float value) && value >= .5f;
+            timelineHiddenRows.Clear();
+            for (int i = 0; i < valueInputs.Length; i++)
+                if (valueInputs[i] != null && LabConfig.HiddenByJigwiTimelineInGame(i, network.GameStageYokai, timelineOn))
+                    timelineHiddenRows.Add(valueInputs[i].transform.parent.gameObject);
+            foreach (CategoryView view in categoryViews) ShowCategory(view);
         }
 
         /// <summary>Extend older saved panels without deleting existing Inspector-edited rows.</summary>
@@ -583,6 +630,7 @@ namespace C6Lab
                         LabConfig.DeveloperFields[i], defaultValues[i], values[i]));
             }
             RefreshToggles();
+            RefreshJigwiTimelineRows();
         }
 
         private void SyncSliderFromInput(int index, string raw)
