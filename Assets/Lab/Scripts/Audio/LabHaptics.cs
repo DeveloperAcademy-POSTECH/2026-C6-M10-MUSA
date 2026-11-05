@@ -184,6 +184,22 @@ namespace C6Lab
                 PlayForComboFail(Config);
         }
 
+        /// <summary>
+        /// #533 지귀 부적처럼 LabHaptics 인스턴스 없이 화면이 직접 울릴 때 쓰는 진동. 탭 한 번 + (원하면) 이어지는 진동.
+        /// 설정의 진동 끄기를 따르고, 아이폰 빌드에서만 실제로 울린다.
+        /// </summary>
+        public static bool PlayDirect(LabConfig config, LabHapticStyle style, float intensity,
+            float continuousSeconds = 0f, float continuousIntensity = 0f, float continuousSharpness = .5f)
+        {
+            if (config == null || !config.HapticsEnabled || intensity <= 0f) return false;
+#if UNITY_IOS && !UNITY_EDITOR
+            C6Lab_PlayImpactHaptic((int)style, Mathf.Clamp01(intensity));
+            if (continuousSeconds > 0f && continuousIntensity > 0f)
+                C6Lab_PlayContinuousHaptic(continuousSeconds, Mathf.Clamp01(continuousIntensity), Mathf.Clamp01(continuousSharpness));
+#endif
+            return true;
+        }
+
         private bool Play(LabHapticKind kind, LabHapticStyle style, float intensity)
         {
             if (intensity <= 0f) return false;

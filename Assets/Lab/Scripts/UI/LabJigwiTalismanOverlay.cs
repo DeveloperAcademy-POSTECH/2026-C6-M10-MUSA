@@ -54,6 +54,25 @@ namespace C6Lab
         [SerializeField, Range(0f, .05f)] private float burstShake = .012f;
         [Tooltip("#533: 글자에서 퍼져 나가는 빛 고리가 퍼지는 시간(초).")]
         [SerializeField, Range(.1f, 1.5f)] private float ringSeconds = .55f;
+        [Header("#533 소리 (Resources/Audio 아래 폴더 이름, 폴더 안 파일 중 무작위. 비우면 소리 없음)")]
+        [Tooltip("금빛이 획을 훑기 시작할 때. 예: FiveColorHit(가야금 띠리링), CharmRelease, YaguangFlashGlow")]
+        [SerializeField] private string sweepSoundFolder = "FiveColorHit";
+        [SerializeField, Range(0f, 1f)] private float sweepSoundVolume = .7f;
+        [Tooltip("\"쾅\" 순간. 예: YaguangShakeBellFinal(방울), YaguangFlashBurst, ComboClear")]
+        [SerializeField] private string burstSoundFolder = "YaguangShakeBellFinal";
+        [SerializeField, Range(0f, 1f)] private float burstSoundVolume = 1f;
+        [Tooltip("번졌을 때. 예: Miss, ComboFail")]
+        [SerializeField] private string smudgeSoundFolder = "Miss";
+        [SerializeField, Range(0f, 1f)] private float smudgeSoundVolume = .8f;
+        [Header("#533 진동 (아이폰 빌드에서만, 설정의 진동 끄기를 따름)")]
+        [Tooltip("글자를 칠할 때 사각사각 짧은 진동 세기. 0이면 끔.")]
+        [SerializeField, Range(0f, 1f)] private float writeHapticIntensity = .35f;
+        [Tooltip("칠하는 진동 사이 최소 간격(초). 너무 자주 울리지 않게.")]
+        [SerializeField, Range(.02f, .3f)] private float writeHapticGapSeconds = .07f;
+        [Tooltip("\"쾅\" 진동: 센 탭 한 번 뒤 이만큼 이어지는 진동(초). 0이면 탭만.")]
+        [SerializeField, Range(0f, 1.5f)] private float burstHapticSeconds = .35f;
+        [Tooltip("번졌을 때 진동 세기. 0이면 끔.")]
+        [SerializeField, Range(0f, 1f)] private float smudgeHapticIntensity = .9f;
         [Tooltip("#509: 다 쓴 글씨가 빛나는 시간(초). #533부터 훑기 뒤에 빛난 채 머무는 시간. 그다음 부적이 천천히 사라진다.")]
         [SerializeField, Range(.1f, 2f)] private float glowSeconds = .6f;
         [Tooltip("#509: 빛난 뒤 부적이 사라지는 시간(초).")]
@@ -99,6 +118,12 @@ namespace C6Lab
         private static Sprite ringSprite;
         /// <summary>#533: 점마다 획 순서상 위치 (0~1). 완성 때 금빛이 이 순서로 훑는다.</summary>
         private float[] strokeRank = Array.Empty<float>();
+        private AudioSource sfx;
+        private float lastWriteHaptic = -1f;
+        private bool burstPlayed;
+        /// <summary>#533: 테스트용 — 마지막으로 낸 효과 이름(Sweep/Burst/Smudge)과 횟수.</summary>
+        public string LastCue { get; private set; }
+        public int CueCount { get; private set; }
         private readonly List<int> fresh = new List<int>();
 
         /// <summary>부적이 보이는지</summary>
@@ -197,6 +222,11 @@ namespace C6Lab
             stroke.Paint(from, to, Tolerance, fresh);
             for (int i = 0; i < fresh.Count; i++)
                 if (fresh[i] < dots.Length && dots[fresh[i]] != null) ShowWritten(dots[fresh[i]], fresh[i]);
+            if (fresh.Count > 0 && Time.unscaledTime - lastWriteHaptic >= writeHapticGapSeconds)
+            {
+                lastWriteHaptic = Time.unscaledTime;
+                LabHaptics.PlayDirect(Config, LabHapticStyle.Light, writeHapticIntensity);
+            }
             if (stroke.Coverage + 1e-5f < Required) return;
             writtenRound = RoundId;
             CompletedCount++;
@@ -286,6 +316,8 @@ namespace C6Lab
             paper.gameObject.SetActive(true);
             if (hint != null) hint.gameObject.SetActive(false);
             if (nextMarker != null) nextMarker.gameObject.SetActive(false);
+            burstPlayed = false;
+            Cue("Sweep", sweepSoundFolder, sweepSoundVolume);
             DrawFinish();
         }
 
@@ -307,6 +339,12 @@ namespace C6Lab
             float sweep = Mathf.Max(.01f, sweepSeconds);
             float sweepT = Mathf.Clamp01(finishAge / sweep);
             float after = finishAge - sweep;
+            if (after >= 0f && !burstPlayed)
+            {
+                burstPlayed = true;
+                Cue("Burst", burstSoundFolder, burstSoundVolume);
+                LabHaptics.PlayDirect(Config, LabHapticStyle.Heavy, 1f, burstHapticSeconds, .7f, .3f);
+            }
             float burst = after < 0f ? 0f : Mathf.Clamp01(after / .35f);
             float bump = after < 0f ? 0f : Mathf.Sin(Mathf.PI * burst);
             float fade = Mathf.Clamp01((finishAge - sweep - glowSeconds) / Mathf.Max(.01f, fadeSeconds));
@@ -374,6 +412,23 @@ namespace C6Lab
             paper.gameObject.SetActive(Visible);
         }
 
+        private LabConfig Config => source != null ? source.config : null;
+
+        /// <summary>#533: Resources/Audio/폴더의 소리 하나를 이 기기에서만 낸다(파일이 없으면 조용히 넘어감).</summary>
+        private void Cue(string name, string folder, float volume)
+        {
+            LastCue = name; CueCount++;
+            if (string.IsNullOrEmpty(folder) || volume <= 0f) return;
+            AudioClip[] clips = Resources.LoadAll<AudioClip>("Audio/" + folder);
+            if (clips == null || clips.Length == 0) return;
+            if (sfx == null)
+            {
+                sfx = gameObject.AddComponent<AudioSource>();
+                sfx.playOnAwake = false; sfx.spatialBlend = 0f;
+            }
+            sfx.PlayOneShot(clips[UnityEngine.Random.Range(0, clips.Length)], volume * LabAudioSettings.SfxVolume);
+        }
+
         private float Tolerance => source != null && source.config != null ? source.config.JigwiTalismanTolerance : .07f;
         private float Required => source != null && source.config != null ? source.config.JigwiTalismanCoverage : .9f;
 
@@ -422,6 +477,8 @@ namespace C6Lab
         {
             SmudgeCount++;
             ResetWriting();
+            Cue("Smudge", smudgeSoundFolder, smudgeSoundVolume);
+            LabHaptics.PlayDirect(Config, LabHapticStyle.Rigid, smudgeHapticIntensity);
             if (hint == null) return;
             hint.text = SmudgeText;
             smudgeHintUntil = Time.unscaledTime + smudgeHintSeconds;

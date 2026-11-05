@@ -89,9 +89,11 @@ namespace C6Lab.Tests
             // #509: the written "물" glows first, then the talisman fades out; the board is already free.
             Assert.That(overlay.Visible, Is.False); Assert.That(overlay.WantsBoardBlocked, Is.False);
             Assert.That(overlay.Finishing, Is.True);
+            Assert.That(overlay.LastCue, Is.EqualTo("Sweep"), "The gold sweep starts with its sound.");
             Assert.That(overlay.Paper.gameObject.activeSelf, Is.True, "It does not vanish at once.");
             Assert.That(overlay.PaperAlpha, Is.EqualTo(1f));
             overlay.AdvanceFinish(overlay.FinishSeconds * .8f);
+            Assert.That(overlay.LastCue, Is.EqualTo("Burst"), "The burst sounds once after the sweep.");
             Assert.That(overlay.PaperAlpha, Is.GreaterThan(0f).And.LessThan(1f), "Fading away slowly.");
             overlay.Present(Snapshot(-1d), Local, 11.5d);
             Assert.That(overlay.Paper.gameObject.activeSelf, Is.True, "The Host has not confirmed yet; it keeps fading.");
@@ -126,6 +128,7 @@ namespace C6Lab.Tests
                 overlay.PaintNormalized(new Vector2(.02f, y), new Vector2(.98f, y));
             }
             Assert.That(overlay.SmudgeCount, Is.GreaterThan(0));
+            Assert.That(overlay.LastCue, Is.EqualTo("Smudge"));
             Assert.That(overlay.CompletedCount, Is.Zero, "Scribbling never finishes the talisman.");
             Assert.That(overlay.Visible, Is.True);
         }
