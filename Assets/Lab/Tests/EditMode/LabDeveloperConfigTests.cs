@@ -787,7 +787,7 @@ namespace C6Lab.Tests
         {
             // The gimmick groups (#311) replaced the gourd's bomb and block timers and the sabotage interval.
             // #328 adds the bomb damage multiplier (bombs open instead of being thrown) and the Yaguang's own battle time.
-            Assert.That(LabConfig.RetiredDeveloperFields, Is.EqualTo(new[] { 55, 87, 88, 152, 154, 167, 168, 211, 229, 230, 231, 232, 233, 234, 241, 242, 246, 247 }));
+            Assert.That(LabConfig.RetiredDeveloperFields, Is.EqualTo(new[] { 55, 87, 88, 152, 154, 167, 168, 211, 229, 230, 231, 232, 233, 234, 241, 242, 244, 245, 246, 247, 251, 252, 253, 254, 255 }));
             Assert.That(LabConfig.RetiredDeveloperFields.Select(index => LabConfig.DeveloperFields[index].Label), Is.EqualTo(new[]
             {
                 "Bomb Damage Multiplier",
@@ -799,7 +799,11 @@ namespace C6Lab.Tests
                 "지귀 불 활성 수명 (초)", "지귀 근원 반경 (표면 각도)", "지귀 불 패치 반경 (표면 각도)",
                 "지귀 번짐 간격 (초)", "지귀 그룹 패치 수",
                 "Reserved Jigwi A Recovery Multiplier (unused)", "Reserved Jigwi A Required Hits (unused)",
-                "Reserved Jigwi B Shrink Delay (unused)", "Reserved Jigwi B Shrink Scale (unused)"
+                "Reserved Jigwi B Fire Count (unused)", "Reserved Jigwi B Relight (unused)",
+                "Reserved Jigwi B Shrink Delay (unused)", "Reserved Jigwi B Shrink Scale (unused)",
+                "Reserved Jigwi B Reward Size (unused)", "Reserved Jigwi B Reward Paint (unused)",
+                "Reserved Jigwi B Supply Interval (unused)", "Reserved Jigwi B Supply Initial (unused)",
+                "Reserved Jigwi B Supply Limit (unused)"
             }), "They keep their indices so the shared form and every later field keep their places.");
             foreach (LabDeveloperCategory category in LabConfig.DeveloperCategories)
                 Assert.That(category.FieldIndices.Intersect(LabConfig.RetiredDeveloperFields), Is.Empty, category.Title);
