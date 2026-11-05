@@ -691,6 +691,23 @@ namespace Hapio.Tests
         }
 
         [Test]
+        public void GourdYokaiTurnsAsFarAsMySeatGoesRoundSoItFacesMe()
+        {
+            // Seat cameras go round the gourd: the first seat at 0°, then 120° and 240° for three.
+            Assert.That(GameTutorialDirector.YokaiTurnFor(0, 3, true), Is.EqualTo(0f), "The first seat already faces it.");
+            Assert.That(GameTutorialDirector.YokaiTurnFor(1, 3, true), Is.EqualTo(120f), "Me in the middle (P2).");
+            Assert.That(GameTutorialDirector.YokaiTurnFor(2, 3, true), Is.EqualTo(240f));
+            Assert.That(GameTutorialDirector.YokaiTurnFor(1, 4, false), Is.EqualTo(-90f), "The other way round for team seats.");
+            Assert.That(GameTutorialDirector.YokaiTurnFor(-1, 3, true), Is.EqualTo(0f));
+            // The camera at that seat sits where the first seat's would after the same turn.
+            Vector3 first = LabThrowMath.SeatPosition(0, 3, Vector3.zero, 6f, 2f);
+            Vector3 mine = LabThrowMath.SeatPosition(1, 3, Vector3.zero, 6f, 2f);
+            Vector3 turned = Quaternion.AngleAxis(GameTutorialDirector.YokaiTurnFor(1, 3, true), Vector3.up) * first;
+            Assert.That(Vector3.Distance(turned, mine), Is.LessThan(1e-3f));
+            Assert.That(GameTutorialScript.SeatOf(GameTutorialSpeaker.Bul), Is.EqualTo(1), "Which is why the tutorial turns it.");
+        }
+
+        [Test]
         public void ChoiceButtonsLiftALittleUnderAFingerAndSettleBack()
         {
             Assert.That(GameTutorialPressScale.Approach(1f, 1.08f, 1.08f, .08f, .04f), Is.EqualTo(1.04f).Within(1e-4f),

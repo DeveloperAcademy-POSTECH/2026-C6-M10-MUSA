@@ -1008,6 +1008,7 @@ namespace Hapio
         {
             if (unavailable || hud == null || overlay == null) return;
             ApplyHudDressing();
+            FaceYokaiToMe();
             UpdateKeepOut();
             if (UpdatePause()) return;
             if (UpdateSkip()) return;

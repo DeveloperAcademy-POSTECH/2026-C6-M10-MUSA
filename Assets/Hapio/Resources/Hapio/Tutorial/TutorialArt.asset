@@ -71,6 +71,7 @@ MonoBehaviour:
   mirrorDrum: {fileID: 0}
   mirrorViewPastStop: 0.25
   mirrorViewMinWidth: 0.6
+  mirrorDrumHeightInView: 0.35
   mirrorHoldSeconds: 0.5
   mirrorFadeSeconds: 0.15
   mirrorColor: {r: 0.96, g: 0.91, b: 0.8, a: 1}

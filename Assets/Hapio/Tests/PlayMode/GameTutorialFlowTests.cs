@@ -97,6 +97,12 @@ namespace Hapio.Tests
             Assert.That(hud.rightPlayerCircle.sprite, Is.SameAs(art.geumok));
             Assert.That(hud.timeText.transform.parent.gameObject.activeInHierarchy, Is.False);
             Assert.That(bindings.stageLabel.text, Is.EqualTo(GameTutorialScript.StageLabel));
+            // Seen from the middle seat, the gourd's yokai is turned round to face me; its white body is not.
+            Assert.That(director.YokaiFacesMe, Is.True, "The yokai looks at me, not at P1.");
+            Assert.That(director.YokaiTurnDegrees, Is.EqualTo(120f).Within(.01f));
+            Transform shellBody = bindings.target.MountedVisual.transform.Find("White Gourd");
+            Assert.That(shellBody == null || Quaternion.Angle(shellBody.localRotation, Quaternion.identity) < .01f, Is.True,
+                "The painted shell stays as it is.");
 
             // 0단계: every tap shows the next line; the last line darkens around the gourd.
             var tap = director.GetComponentsInChildren<UnityEngine.UI.Button>(true).Single(button => button.name == "Tap To Continue");
