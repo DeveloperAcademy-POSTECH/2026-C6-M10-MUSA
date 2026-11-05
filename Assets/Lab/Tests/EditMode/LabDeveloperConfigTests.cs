@@ -877,8 +877,32 @@ namespace C6Lab.Tests
                     if (LabConfig.IsDeveloperFieldHidden(i))
                         Assert.That(ui.valueInputs[i].transform.parent.gameObject.activeSelf, Is.False,
                             LabConfig.DeveloperFields[i].Label + " (" + i + ") must stay hidden.");
+
+                // The standalone Lab never runs Jigwi's timeline, so its manual Jigwi rows stay with 228 on.
+                Assert.That(ui.network.GameFlowEnabled, Is.False);
+                ui.valueInputs[LabConfig.JigwiStageFirstField].text = "1";
+                typeof(LabDeveloperMode).GetMethod("RefreshJigwiTimelineRows",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Invoke(ui, null);
+                Assert.That(content.Find("Category Jigwi").gameObject.activeSelf, Is.True);
+                foreach (int index in new[] { 178, 183, 192, 195, 205 })
+                    Assert.That(ui.valueInputs[index].transform.parent.gameObject.activeSelf, Is.True, "Lab keeps " + index);
             }
             finally { UnityEditor.SceneManagement.EditorSceneManager.CloseScene(scene, true); }
+        }
+
+        [Test]
+        public void JigwiTimelineHidesTheOldFireInEveryGameStageAndTheCommonIntervalInJigwisAlone()
+        {
+            int[] replaced = Enumerable.Range(178, 6).Concat(Enumerable.Range(192, 4)).Concat(new[] { 205 }).ToArray();
+            for (int i = 0; i < LabConfig.DeveloperFields.Count; i++)
+                Assert.That(LabConfig.IsReplacedByJigwiTimeline(i), Is.EqualTo(replaced.Contains(i)), "Field " + i);
+            foreach (LabStageYokai stage in new[] { LabStageYokai.None, LabStageYokai.Gumiho, LabStageYokai.Yaguang, LabStageYokai.Jigwi })
+                for (int i = 0; i < LabConfig.DeveloperFields.Count; i++)
+                {
+                    Assert.That(LabConfig.HiddenByJigwiTimelineInGame(i, stage, false), Is.False, stage + " with 228 off: " + i);
+                    Assert.That(LabConfig.HiddenByJigwiTimelineInGame(i, stage, true),
+                        Is.EqualTo(replaced.Contains(i) && (i != 205 || stage == LabStageYokai.Jigwi)), stage + " with 228 on: " + i);
+                }
         }
 
         [Test]

@@ -410,6 +410,22 @@ namespace C6Lab
         public static bool IsJigwiStageField(int index) => index >= JigwiStageFirstField && index <= JigwiStageLastField
             || index >= JigwiABFirstField && index <= JigwiABLastField;
 
+        /// <summary>
+        /// What Jigwi's 120-second timeline (228) replaces while it is on: the old water-only surface fire (178~183), its
+        /// automatic cycle (192~195) and, in Jigwi's own stage, the common gimmick interval (205; the common gimmicks
+        /// come at 20/40/60/80 s). The standalone Lab never runs the timeline and keeps them for its manual tests.
+        /// </summary>
+        public static bool IsReplacedByJigwiTimeline(int index) =>
+            index >= 178 && index <= 183 || index >= 192 && index <= 195 || index == 205;
+
+        /// <summary>
+        /// The rows Battle DEV hides in a Hapio game stage while the form has the timeline on. Outside Jigwi's stage the
+        /// old fire and its cycle never run either (manual controls belong to Jigwi's stage alone), but the common
+        /// gimmick interval does, so it stays.
+        /// </summary>
+        public static bool HiddenByJigwiTimelineInGame(int index, LabStageYokai stage, bool timelineOn) =>
+            timelineOn && IsReplacedByJigwiTimeline(index) && (index != 205 || stage == LabStageYokai.Jigwi);
+
         /// <summary>Fever time (#334) DEV slots: when it starts (seconds left) and how much faster stamina refills.</summary>
         public const int FeverTimeSecondsField = 238;
         public const int FeverTimeRecoveryField = 239;

@@ -1,19 +1,18 @@
 # C6 Physics Lab 검증 범위
 
-## 2026-11-05 — DEV 표시 정리 (효과 없는 값·지귀 시간표·오색구슬 칠·Inspector)
+## 2026-11-05 — DEV 표시 정리 (효과 없는 값·지귀 시간표·오색구슬 칠·Inspector·전투 DEV)
 
 `chore/dev-hide-inactive-fields` 브랜치(main `25014885` 기준)의 별도 worktree에서 Unity 6000.6.5f1 batch mode(macOS)로 실행했다. 아래 표는 실제로 실행한 것만 적는다. 시간은 NUnit XML의 `duration`이고, Unity 시작·가져오기·컴파일은 포함하지 않는다.
 
 | 확인 | 결과 | 범위 |
 | --- | --- | --- |
-| EditMode 전체 | **1976 PASS / 0 FAIL**, 47.9초 | main 1970건에 새 검사 6건. `LabDeveloperConfigTests`: 효과 없는 10칸의 라벨·인덱스·저장값·폼 전달, 저장된 `Lab.unity` DEV 패널에서 묶음을 모두 펼쳐도 숨김·은퇴 행이 안 보임, 은퇴 18칸의 `HideInInspector`·`SerializeField`와 실제 폼 인덱스 대응. `GameStageSettingsTests`: 10칸이 어느 탭에도 표시되지 않고 공통 적용은 그대로, 지귀 탭이 폼의 228 ON에서 11칸을 접고 적용 범위는 그대로, 237이 공통 탭이고 세 스테이지에 들어감. 기존 묶음 범위 검사(`EveryDeveloperFieldBelongsToExactlyOneCategory`, Generation chances, `LabStageYokaiTests`)를 새 규칙으로 고쳤다 |
-| PlayMode 전체 | **673건 중 669 PASS · 3 FAIL · 1 Inconclusive**, 663.1초 | `GameStageUiTests`(저장된 Home DEV 탭: 공통에서 10칸 숨김·237 표시, 야광귀에서 236 표시·237 숨김, 지귀에서 228 슬라이더·입력으로 APPLY 전 즉시 접기/펴기, APPLY 뒤 다시 열기), Lab DEV 패널 PlayMode 9개 파일, `GameSceneFlowTests`의 DEV 검사 5건(Player Max HP를 재시작 표지로 쓰는 검사 포함) 모두 통과 |
+| EditMode 전체(전투 DEV 추가 뒤 최종) | **1977 PASS / 0 FAIL**, 45.7초 | 첫 실행(전투 DEV 추가 전)은 1976 PASS / 0 FAIL, 47.9초. main 1970건에 새 검사 7건. `LabDeveloperConfigTests.JigwiTimelineHidesTheOldFireInEveryGameStageAndTheCommonIntervalInJigwisAlone`: 전투 DEV 숨김 규칙(228 ON이면 178~183·192~195, 지귀 스테이지에서만 205). 저장된 Lab 패널 검사에 Lab 단독 장면은 228 ON에서도 `Jigwi` 묶음·205를 보인다는 확인을 더했다. `LabDeveloperConfigTests`: 효과 없는 10칸의 라벨·인덱스·저장값·폼 전달, 저장된 `Lab.unity` DEV 패널에서 묶음을 모두 펼쳐도 숨김·은퇴 행이 안 보임, 은퇴 18칸의 `HideInInspector`·`SerializeField`와 실제 폼 인덱스 대응. `GameStageSettingsTests`: 10칸이 어느 탭에도 표시되지 않고 공통 적용은 그대로, 지귀 탭이 폼의 228 ON에서 11칸을 접고 적용 범위는 그대로, 237이 공통 탭이고 세 스테이지에 들어감. 기존 묶음 범위 검사(`EveryDeveloperFieldBelongsToExactlyOneCategory`, Generation chances, `LabStageYokaiTests`)를 새 규칙으로 고쳤다 |
+| PlayMode 전체(전투 DEV 추가 뒤 최종) | **673건 중 669 PASS · 3 FAIL · 1 Inconclusive**, 661.1초 | 첫 실행(전투 DEV 추가 전)도 같은 결과, 663.1초. `GameSceneFlowTests.PausedDeveloperNextStageUsesSavedButtonAndFreshBattlesWithoutApplyingUnsavedFields`(실제 Battle의 전투 DEV를 1~3스테이지마다 열고 묶음을 펼쳐도 178~183·192~195와 `Jigwi` 제목이 숨고, 205는 3스테이지에서만 숨음), `GameStageUiTests`(저장된 Home DEV 탭: 공통에서 10칸 숨김·237 표시, 야광귀에서 236 표시·237 숨김, 지귀에서 228 슬라이더·입력으로 APPLY 전 즉시 접기/펴기, APPLY 뒤 다시 열기), Lab DEV 패널 PlayMode 9개 파일, `GameSceneFlowTests`의 DEV 검사 5건(Player Max HP를 재시작 표지로 쓰는 검사 포함) 모두 통과 |
 | PlayMode 실패 3·Inconclusive 1 | 기존 실패 | `LabHangingRenderInterpolationTests.OutsideRenderingTheTransformsAlwaysHoldTheFixedPose`(batchmode에서 WaitForEndOfFrame 없음), `LabJigwiABPresentationTests.SavedRawImagesRenderWarmAAndBAndBlueWaterIntoAnIsolatedPortraitUiTarget`(불꽃 픽셀 0), `LabWatercolorPaintRuntimeTests.DescriptorBurstRespectsTheActiveCapAndConvergesToASettledCheckpoint`(색 1단계 차이), Inconclusive `LabHangingRenderInterpolationTests.DuringRealRenderingTheDrawnPoseLiesBetweenTheTwoFixedPoses`. PR #528(검사 시간 단축)이 같은 날 main 그대로 실행해 기록한 기존 실패와 같은 항목이며 DEV 표시와 관계없다 |
 
 미실행:
 
 - Editor GUI Test Runner, Inspector 화면 눈 확인(`HideInInspector`는 속성 검사로만 확인)
-- Hapio 전투 중 DEV(Lab 패널)의 지귀 `Jigwi` 묶음: 이번 범위가 아니어서 그대로 보인다
 - 다른 Mac, iOS, 실기기, 다인 LAN
 
 ## 2026-11-05 — 마지막 일격 다시보기 (스토리 1·2·3)

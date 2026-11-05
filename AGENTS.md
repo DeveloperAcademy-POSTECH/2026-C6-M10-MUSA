@@ -261,4 +261,4 @@
 ## DEV 표시 정리 (2026-11-05)
 
 - 효과 없는 10칸(0·1·41·43·48·52·53·54·72·73)은 `LabConfig.InactiveDeveloperFields`다. 은퇴가 아니라 숨기기만 한다. 코드가 아직 읽으므로 라벨·저장값·Inspector·폼 전달은 그대로이고, Lab DEV 묶음에 넣지 않으며 Hapio는 `GameStageSettings.IsFieldShown`에서만 뺀다(`IsFieldVisible` 적용 범위는 공통 그대로).
-- Hapio 지귀 탭은 폼의 228이 켜져 있으면 178~183·192~195·205를 접는다(`IsReplacedByJigwiTimeline`). 237 오색구슬 칠 면적은 Hapio 공통 탭이다(236은 야광귀 탭). 은퇴 슬롯 18개는 모두 `HideInInspector`다. 설정 259개·5687/`C6PhysicsLab/48`/`C6HapioGame/33`은 바꾸지 않았다. 상세는 `docs/DEVELOPER_MODE_PARAMETER_SPEC.md`의 같은 절을 따른다.
+- Hapio 지귀 탭은 폼의 228이 켜져 있으면 178~183·192~195·205를 접는다(`LabConfig.IsReplacedByJigwiTimeline`). Hapio 전투 중 DEV(Lab 패널)도 228 ON이면 `Jigwi` 묶음을 숨기고, 지귀 스테이지에서만 205도 숨긴다(`HiddenByJigwiTimelineInGame`). Lab 단독 장면은 그대로 보인다. 237 오색구슬 칠 면적은 Hapio 공통 탭이다(236은 야광귀 탭). 은퇴 슬롯 18개는 모두 `HideInInspector`다. 설정 259개·5687/`C6PhysicsLab/48`/`C6HapioGame/33`은 바꾸지 않았다. 상세는 `docs/DEVELOPER_MODE_PARAMETER_SPEC.md`의 같은 절을 따른다.

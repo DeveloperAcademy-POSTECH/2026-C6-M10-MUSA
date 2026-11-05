@@ -62,12 +62,10 @@ namespace Hapio
         /// <summary>Jigwi's 120-second timeline switch (#332): on by default, it schedules A/B and the common gimmicks itself.</summary>
         public const int JigwiTimelineField = LabConfig.JigwiStageFirstField;
         /// <summary>
-        /// What Jigwi's timeline (228) replaces while it is on: the old water-only surface fire (178~183), its
-        /// automatic cycle (192~195) and the common gimmick interval (205; the common gimmicks come at 20/40/60/80 s).
-        /// They stay editable in Jigwi's tab, which only shows them while the form has the timeline off.
+        /// What Jigwi's timeline (228) replaces while it is on (<see cref="LabConfig.IsReplacedByJigwiTimeline"/>). They
+        /// stay editable in Jigwi's tab, which only shows them while the form has the timeline off.
         /// </summary>
-        public static bool IsReplacedByJigwiTimeline(int index) =>
-            index >= 178 && index <= 183 || index >= 192 && index <= 195 || index == 205;
+        public static bool IsReplacedByJigwiTimeline(int index) => LabConfig.IsReplacedByJigwiTimeline(index);
         /// <summary>
         /// A DEV tab row for this form: the fields the scope may edit (<see cref="IsFieldVisible"/>), less the settings
         /// with no effect in the current game (<see cref="LabConfig.InactiveDeveloperFields"/>) and the rows Jigwi's

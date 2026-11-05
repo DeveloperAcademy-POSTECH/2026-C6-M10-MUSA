@@ -906,7 +906,8 @@ Home/Lobby에 저장된 DEV 패널의241/242 라벨과243 값(1)도 코드와 �
 - 대상: 178~183(구형 물 전용 불), 192~195(구형 자동 주기), 205(공용 기믹 간격). 228이 켜져 있으면 수동 불은 막히고(`LabNetwork.JigwiManualControlsAllowed`), 자동 주기는 시작하지 않는다(`LabModel.ResetStageYokai`). 공용 기믹은 시간표의 20/40/60/80초에 나온다(`NextJigwiStageCommonAt`). 그래서 이 값들을 읽지 않는다.
 - 지귀 탭은 **폼의** 228 값으로 정한다. 슬라이더나 입력칸에서 228을 끄면 APPLY 전에도 바로 보이고, 켜면 바로 접힌다. 접힌 동안에도 값은 지귀 탭의 적용 범위에 남는다(`IsFieldVisible(3, …)`). 지귀 탭 안내 문구에 "지귀 120초(228)가 켜져 있으면 쓰지 않는 구형 불·자동 주기·공용 기믹 간격은 숨깁니다. 끄면 보입니다."가 붙는다.
 - 205는 구미호 탭에서 그대로 보인다(야광귀 탭은 원래 숨긴다). 공용 기믹 켜기(207·208)와 비율(169·170)은 지귀 시간표도 쓰므로 그대로 보인다.
-- Lab DEV의 `Jigwi` 묶음은 Lab 단독 장면의 수동 시험용이라 그대로 둔다.
+- Hapio 전투 중 DEV(일시정지 뒤 여는 Lab 패널)도 같은 규칙을 따른다. 228이 켜진 프로필에서는 `Jigwi` 묶음(178~183·192~195)이 제목까지 숨는다. 구미호·야광귀 스테이지와 2:2에서는 수동 불이 원래 지귀 스테이지 전용이라 시간표와 관계없이 쓰이지 않지만, 숨기는 조건은 228 ON으로 같다. 지귀 스테이지에서는 `Gimmicks` 묶음을 펼쳐도 205가 보이지 않는다. 다른 스테이지에서는 205를 그 스테이지의 공용 기믹 간격으로 쓰므로 그대로 보인다. 패널을 열 때(`Fill`)마다 그 폼의 228과 현재 스테이지(`LabNetwork.GameStageYokai`)로 다시 정한다. 전투 DEV에서는 228을 바꿀 수 없다. 규칙은 `LabConfig.IsReplacedByJigwiTimeline`·`HiddenByJigwiTimelineInGame` 한 곳에 있다.
+- Lab 단독 장면(게임 흐름 꺼짐)의 Lab DEV는 시간표를 쓰지 않으므로 `Jigwi` 묶음과 205를 그대로 보인다(수동 시험용).
 
 ### 237 오색구슬 칠 면적 — Hapio 공통 탭
 
@@ -917,4 +918,4 @@ Home/Lobby에 저장된 DEV 패널의241/242 라벨과243 값(1)도 코드와 �
 
 55·87·88·152·154·167·168·211·230~234 13개에 `HideInInspector`를 붙였다(229·241·242·246·247은 이미 숨김). `SerializeField`는 그대로라 `LabConfig.asset`의 저장값과 DEV 배열 값은 바뀌지 않는다. 211에 붙어 있던 `Yaguang stage schedule` 머리글은 다음 칸(212)으로 옮겨 Inspector에 남긴다.
 
-근거: `LabConfig.InactiveDeveloperFields`·`IsInactiveDeveloperField`·`IsDeveloperFieldHidden`·`DeveloperCategories`, `LabDeveloperMode.BuildCategoryLayout`, `GameStageSettings.IsFieldShown`·`IsReplacedByJigwiTimeline`·`IsFieldVisible`, `GameScreen.SelectDeveloperScope`·`RefreshJigwiTimelineRows`. 이 문서 갱신은 실행 검증을 뜻하지 않는다. 실행 결과는 `VALIDATION.md`의 2026-11-05 DEV 표시 정리 절을 따른다.
+근거: `LabConfig.InactiveDeveloperFields`·`IsInactiveDeveloperField`·`IsDeveloperFieldHidden`·`DeveloperCategories`, `LabDeveloperMode.BuildCategoryLayout`, `LabConfig.IsReplacedByJigwiTimeline`·`HiddenByJigwiTimelineInGame`, `LabDeveloperMode.RefreshJigwiTimelineRows`·`ShowCategory`, `GameStageSettings.IsFieldShown`·`IsFieldVisible`, `GameScreen.SelectDeveloperScope`·`RefreshJigwiTimelineRows`. 이 문서 갱신은 실행 검증을 뜻하지 않는다. 실행 결과는 `VALIDATION.md`의 2026-11-05 DEV 표시 정리 절을 따른다.
