@@ -83,13 +83,13 @@ Hapio에서는 `GameSession`이 전투 DEV의 `ClayAppearanceChanged`를 구독�
 4. 우측 슬라이더를 움직여 두께·광택을 조절한다. 숫자 표시는 현재 값이며, 박 위 드래그는 회전, 마우스 휠은 확대·축소다.
 5. `Front / Right / Back / Left / Diagonal / Above`는 6방향 보기다. `Reset defaults`는 두께 **0.01**·광택 **0.35**·정면·기본 배율로 복원하고, `Quit`는 앱을 종료한다.
 
+실험 앱은 확인한 `WhiteGourd` 모델과 고정 완성 도안의 재질 비교용이다. 현재 일반 게임의 스테이지별 박 모델을 선택하는 도구는 아니다.
+
 실험 앱의 시작값은 앞서 확인한 완성 렌더 기준이다. 일반 게임 DEV의 기본 두께 0.006·광택 0.25와 구분하며, 앱에서 조절한 값은 일반 게임에 자동 적용되지 않는다. 실험 Scene을 Unity에서 직접 열어 Play할 수도 있으나 기존 게임의 Build Settings에는 추가하지 않는다.
 
 ### 샘플과 빌드 관리
 
-`C6 Lab → Experiments → Clay Sticker → Build Mac Preview App`으로 별도 `Hapio-Clay-Experiment.app`을 만든다. 결과는 `Builds/Experiments/ClayPreview/<생성시각>/`에 저장되며, `Open Last Mac Preview Build`로 폴더를 연다. 일반 게임의 Build Settings에는 실험 Scene을 추가하지 않는다.
-
-앱을 켜면 100% 완성된 5색 박이 바로 표시된다. 두께는 0~0.02(시작 0.01), 광택은 0~1(시작 0.35)이며 슬라이더 옆 숫자로 현재 값을 확인한다. 박 영역에서 마우스를 끌어 회전하고 휠로 확대·축소한다. 우측의 6방향 버튼으로 시점을 선택하며 `Reset defaults`는 두 재질값과 정면·기본 배율을 복원한다. `Quit`로 종료한다. 앱의 조절값은 게임 설정이나 샘플에 저장하지 않는다.
+결과는 `Builds/Experiments/ClayPreview/<생성시각>/Hapio-Clay-Experiment.app`에 저장된다. 실행하면 100% 완성된 5색 박이 바로 표시되므로 방 입장이나 직접 도색은 필요 없다. 앱을 다시 실행하면 시작값으로 돌아온다. 실험값을 실제 게임에 사용하려면 원하는 숫자를 확인한 뒤 게임 DEV에서 별도로 입력한다.
 
 새 전용 Scene과 `Assets/Experiments/ClayPreview/Sample`의 색 PNG·높이 Half EXR를 직접 참조한다. 샘플은 기존 실제 도색 규칙과 seed 123으로 생성하며 1024×512 Linear 값을 유지한다. 현재 샘플은 67회 명중으로 32768/32768셀을 채운 결과다. 숫자 67을 고정된 완성 조건으로 사용하지 않는다. 샘플 생성과 임포트의 왕복 오차·해시·원본 보존 결과는 `SampleInfo.json`에 기록한다.
 
