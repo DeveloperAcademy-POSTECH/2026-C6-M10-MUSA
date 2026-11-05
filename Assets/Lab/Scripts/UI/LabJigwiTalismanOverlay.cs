@@ -54,9 +54,12 @@ namespace C6Lab
         private static Sprite roundDot;
         /// <summary>#533: 신라문화체 굵은 "물"의 글자 모양 범위 (판정 점과 같은 글자 칸 0~1 좌표, 위가 1). 점선에 맞춰 잰 값.</summary>
         private static readonly Rect GlyphInkRect = Rect.MinMaxRect(.149f, .081f, .848f, .92f);
-        private LabJigwiTalismanGlyph glyph;
+        /// <summary>#533: 흐린 "물" 글자(보통 Text). 먹 붓 점을 글자 모양 안에만 보이게 가리는 Mask 그림이기도 하다.</summary>
+        private UnityEngine.UI.Text ghost;
+        private const int GhostFontSize = 200;
+        private readonly TextGenerator ghostGenerator = new TextGenerator();
         /// <summary>#533: 실제 글꼴 글자 위에 먹으로 쓰는 모양인지 (신라문화체가 없으면 예전 점선 모양).</summary>
-        public bool InkMode => glyph != null;
+        public bool InkMode => ghost != null;
         private UnityEngine.UI.Image[] dots = Array.Empty<UnityEngine.UI.Image>();
         private UnityEngine.UI.Text hint;
         private Font font;
@@ -91,7 +94,7 @@ namespace C6Lab
             if (labelFont != null) font = labelFont;
             EnsureWidgets();
             if (labelFont != null && hint != null) hint.font = labelFont;
-            if (glyph != null && IsShilla(labelFont)) glyph.GlyphFont = labelFont;
+            if (ghost != null && IsShilla(labelFont) && ghost.font != labelFont) { ghost.font = labelFont; LayoutGlyph(); }
         }
 
         /// <summary>아직 부적을 안 쓴 내 자리가 있는 진행 중인 A. 없으면 null.</summary>
@@ -318,8 +321,44 @@ namespace C6Lab
             glyphArea.anchoredPosition = new Vector2((.5f - centre.x) * side, -size.y * .06f + (.5f - centre.y) * side);
             glyphArea.sizeDelta = new Vector2(side, side);
             float dot = Mathf.Max(4f, side * (InkMode ? brushWidth : strokeWidth));
+            if (InkMode && FitGhost(side, dot)) return;
             for (int i = 0; i < dots.Length; i++)
                 if (dots[i] != null) dots[i].rectTransform.sizeDelta = new Vector2(dot, dot);
+        }
+
+        /// <summary>
+        /// #533: 흐린 "물" Text의 실제 글자 사각형을 재서, 그 사각형이 GlyphInkRect(판정 점과 같은 칸 좌표)에 꼭 맞게
+        /// Text를 늘이고 옮긴다. 먹 붓 점은 Text의 자식이라 같은 비율을 되돌려 놓는다.
+        /// </summary>
+        private bool FitGhost(float side, float dot)
+        {
+            RectTransform g = ghost.rectTransform;
+            g.anchorMin = g.anchorMax = g.pivot = new Vector2(.5f, .5f);
+            g.sizeDelta = new Vector2(GhostFontSize * 2f, GhostFontSize * 2f);
+            TextGenerationSettings settings = ghost.GetGenerationSettings(g.rect.size);
+            if (!ghostGenerator.Populate(ghost.text, settings) || ghostGenerator.vertexCount < 4) return false;
+            IList<UIVertex> verts = ghostGenerator.verts;
+            float unit = 1f / Mathf.Max(.0001f, ghost.pixelsPerUnit);
+            Vector2 min = new Vector2(float.MaxValue, float.MaxValue), max = new Vector2(float.MinValue, float.MinValue);
+            for (int i = 0; i < 4; i++) { Vector2 v = verts[i].position * unit; min = Vector2.Min(min, v); max = Vector2.Max(max, v); }
+            Vector2 quad = max - min;
+            if (quad.x <= .001f || quad.y <= .001f) return false;
+            var target = Rect.MinMaxRect((GlyphInkRect.xMin - .5f) * side, (GlyphInkRect.yMin - .5f) * side,
+                (GlyphInkRect.xMax - .5f) * side, (GlyphInkRect.yMax - .5f) * side);
+            var scale = new Vector2(target.width / quad.x, target.height / quad.y);
+            Vector2 offset = target.center - Vector2.Scale((min + max) * .5f, scale);
+            g.localScale = new Vector3(scale.x, scale.y, 1f);
+            g.anchoredPosition = offset;
+            for (int i = 0; i < dots.Length; i++)
+            {
+                if (dots[i] == null) continue;
+                Vector2 at = (stroke.Samples[i] - new Vector2(.5f, .5f)) * side;
+                RectTransform d = dots[i].rectTransform;
+                d.anchorMin = d.anchorMax = new Vector2(.5f, .5f);
+                d.anchoredPosition = new Vector2((at.x - offset.x) / scale.x, (at.y - offset.y) / scale.y);
+                d.sizeDelta = new Vector2(dot / scale.x, dot / scale.y);
+            }
+            return true;
         }
 
         private void EnsureWidgets()
@@ -351,24 +390,19 @@ namespace C6Lab
             RectTransform dotParent = glyphArea;
             if (IsShilla(font))
             {
-                GameObject ghost = NewRect("Talisman Ghost Glyph (물)", glyphArea).gameObject;
-                // A runtime-added custom Graphic needs its CanvasRenderer in place before it enables.
-                if (ghost.GetComponent<CanvasRenderer>() == null) ghost.AddComponent<CanvasRenderer>();
-                glyph = ghost.AddComponent<LabJigwiTalismanGlyph>();
-                glyph.raycastTarget = false; glyph.color = ghostColor; glyph.GlyphFont = font;
-                RectTransform g = glyph.rectTransform;
-                g.anchorMin = GlyphInkRect.min; g.anchorMax = GlyphInkRect.max; g.offsetMin = g.offsetMax = Vector2.zero;
-                glyph.gameObject.AddComponent<UnityEngine.UI.Mask>().showMaskGraphic = true;
-                dotParent = g;
+                ghost = NewText("Talisman Ghost Glyph (물)", glyphArea, "물", GhostFontSize, ghostColor);
+                ghost.horizontalOverflow = HorizontalWrapMode.Overflow; ghost.verticalOverflow = VerticalWrapMode.Overflow;
+                ghost.alignment = TextAnchor.MiddleCenter;
+                ghost.gameObject.AddComponent<UnityEngine.UI.Mask>().showMaskGraphic = true;
+                dotParent = ghost.rectTransform;
             }
             dots = new UnityEngine.UI.Image[stroke.Samples.Length];
             for (int i = 0; i < dots.Length; i++)
             {
                 var dot = NewRect("Dot " + i, dotParent).gameObject.AddComponent<UnityEngine.UI.Image>();
                 dot.raycastTarget = false; dot.sprite = RoundDot();
-                Vector2 at = stroke.Samples[i];
-                if (InkMode) at = new Vector2((at.x - GlyphInkRect.xMin) / GlyphInkRect.width, (at.y - GlyphInkRect.yMin) / GlyphInkRect.height);
-                dot.rectTransform.anchorMin = dot.rectTransform.anchorMax = at;
+                // In ink mode FitGhost places the dots inside the scaled glyph.
+                dot.rectTransform.anchorMin = dot.rectTransform.anchorMax = stroke.Samples[i];
                 dot.rectTransform.anchoredPosition = Vector2.zero;
                 dot.color = InkMode ? writtenColor : guideColor;
                 if (InkMode) dot.gameObject.SetActive(false);
