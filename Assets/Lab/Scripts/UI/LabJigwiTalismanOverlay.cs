@@ -25,9 +25,13 @@ namespace C6Lab
         [Tooltip("#533: 아직 안 쓴 글자 획 색. 둥근 점이 겹치므로 불투명으로 둔다(반투명이면 겹친 곳이 얼룩진다).")]
         [SerializeField] private Color guideColor = new Color(.79f, .67f, .4f, 1f);
         [Tooltip("#479/#533: 손가락이 지나가 칠해진 획 색. #533부터 수채화 파랑(반투명 점이 겹쳐 물감처럼 고인다). 알파가 낮을수록 묽다.")]
-        [SerializeField] private Color writtenColor = new Color(.16f, .47f, .93f, .34f);
+        [SerializeField] private Color writtenColor = new Color(.16f, .47f, .93f, .5f);
         [Tooltip("#533: 수채화 점마다 색이 조금씩 흔들리는 정도 (0이면 모두 같은 색).")]
         [SerializeField, Range(0f, .3f)] private float watercolorJitter = .12f;
+        [Tooltip("#533: 한 획을 이만큼 쓰면 다음 획으로 넘어간다 (0~1). 다음 획은 그전까지 칠해지지 않는다.")]
+        [SerializeField, Range(.3f, 1f)] private float strokeAdvance = .8f;
+        [Tooltip("#533: 다음에 쓸 곳을 알려 주는 깜빡이는 점 색.")]
+        [SerializeField] private Color nextMarkerColor = new Color(.16f, .47f, .93f, .9f);
         [Tooltip("#533: 흐린 글자의 경계선 색 (칠하기 전부터 글자 모양이 보이게).")]
         [SerializeField] private Color ghostOutlineColor = new Color(.62f, .45f, .22f, 1f);
         [Tooltip("#533: 흐린 글자 경계선 두께 (화면 픽셀).")]
@@ -76,7 +80,8 @@ namespace C6Lab
         private Vector2 last;
         private string writtenRound;
         private float sentAt;
-        private readonly LabJigwiTalismanStroke stroke = new LabJigwiTalismanStroke(LabJigwiTalismanStroke.Water);
+        private readonly LabJigwiTalismanStroke stroke = new LabJigwiTalismanStroke(LabJigwiTalismanStroke.Water, LabJigwiTalismanStroke.WaterStrokes);
+        private UnityEngine.UI.Image nextMarker;
         private readonly List<int> fresh = new List<int>();
 
         /// <summary>부적이 보이는지</summary>
@@ -133,6 +138,7 @@ namespace C6Lab
                 FitToBattle(source.board != null ? source.board.ViewCamera : null);
                 bool held = snapshot == null || snapshot.paused || source.GameStartHeld || source.BattlePresentationHeld;
                 if (held) hasLast = false; else ReadPointer();
+                UpdateNextMarker(Time.unscaledTime);
             }
             ResendIfLost(snapshot);
         }
@@ -161,6 +167,7 @@ namespace C6Lab
         {
             if (!Visible) return;
             fresh.Clear();
+            stroke.StrokeAdvance = strokeAdvance;
             stroke.Paint(from, to, Tolerance, fresh);
             for (int i = 0; i < fresh.Count; i++)
                 if (fresh[i] < dots.Length && dots[fresh[i]] != null) ShowWritten(dots[fresh[i]], fresh[i]);
@@ -178,6 +185,22 @@ namespace C6Lab
         {
             dot.color = InkColor(index);
             if (InkMode) dot.gameObject.SetActive(true);
+        }
+
+        /// <summary>#533: 지금 써야 할 획의 다음 빈 점에서 깜빡이는 표시. 획 순서를 손가락으로 따라가게 이끈다.</summary>
+        private void UpdateNextMarker(float time)
+        {
+            if (nextMarker == null) return;
+            int next = stroke.NextPoint;
+            bool show = Visible && next >= 0;
+            if (nextMarker.gameObject.activeSelf != show) nextMarker.gameObject.SetActive(show);
+            if (!show) return;
+            RectTransform m = nextMarker.rectTransform;
+            m.anchorMin = m.anchorMax = stroke.Samples[next];
+            m.anchoredPosition = Vector2.zero;
+            float pulse = .5f + .5f * Mathf.Sin(time * 6f);
+            m.localScale = Vector3.one * (.75f + .35f * pulse);
+            Color c = nextMarkerColor; c.a *= .45f + .55f * pulse; nextMarker.color = c;
         }
 
         private Color InkColor(int index) => InkMode && index < inkColors.Length ? inkColors[index] : writtenColor;
@@ -353,6 +376,7 @@ namespace C6Lab
             glyphArea.anchoredPosition = new Vector2((.5f - centre.x) * side, -size.y * .06f + (.5f - centre.y) * side);
             glyphArea.sizeDelta = new Vector2(side, side);
             float dot = Mathf.Max(4f, side * (InkMode ? brushWidth : strokeWidth));
+            if (nextMarker != null) nextMarker.rectTransform.sizeDelta = Vector2.one * Mathf.Max(6f, side * .07f);
             if (InkMode && FitGhost(side, dot)) return;
             for (int i = 0; i < dots.Length; i++)
                 if (dots[i] != null) dots[i].rectTransform.sizeDelta = new Vector2(dot, dot);
@@ -456,6 +480,10 @@ namespace C6Lab
                 dots[i] = dot;
             }
             BuildInkColors();
+            // #533: drawn last so it sits above the ghost letter and the ink.
+            nextMarker = NewRect("Talisman Next Stroke", glyphArea).gameObject.AddComponent<UnityEngine.UI.Image>();
+            nextMarker.raycastTarget = false; nextMarker.sprite = RoundDot(); nextMarker.color = nextMarkerColor;
+            nextMarker.gameObject.SetActive(false);
             LayoutGlyph();
             paper.gameObject.SetActive(false);
         }
@@ -613,32 +641,99 @@ namespace C6Lab
             new Vector2(0.338f, 0.863f), new Vector2(0.530f, 0.859f), new Vector2(0.557f, 0.865f), new Vector2(0.601f, 0.868f)
         };
 
+        /// <summary>
+        /// #533 "물"의 획 순서. 각 획은 Water 점 번호를 쓰는 방향대로 나열한다.
+        /// ㅁ(왼쪽 세로 → 위·오른쪽 → 아래) → ㅜ(가로 → 세로) → ㄹ(위·오른쪽 → 가운데 → 왼쪽·아래).
+        /// </summary>
+        public static readonly int[][] WaterStrokes =
+        {
+            new[] { 84, 80, 78, 76, 74, 72, 68 },
+            new[] { 81, 83, 85, 86, 87, 82, 79, 77, 75, 73, 71 },
+            new[] { 64, 66, 65, 63, 67, 69, 70 },
+            new[] { 40, 41, 42, 44, 45, 46, 47, 48, 49, 50, 52, 54, 55, 53, 57, 58, 59, 61, 62, 60, 56 },
+            new[] { 51, 43, 38, 39, 37, 36 },
+            new[] { 25, 26, 27, 28, 31, 32, 33, 34, 35, 29, 30, 24, 23, 22 },
+            new[] { 16, 14, 17, 18, 19, 20, 21 },
+            new[] { 15, 13, 12, 9, 5, 2, 0, 1, 3, 4, 6, 7, 8, 10, 11 }
+        };
+
         public readonly Vector2[] Samples;
         private readonly bool[] covered;
+        private readonly int[][] strokes;
+        private readonly int[] strokeOf, strokeCovered;
         public int CoveredCount { get; private set; }
         public float Coverage => Samples.Length == 0 ? 0f : CoveredCount / (float)Samples.Length;
+        /// <summary>#533: 지금 쓸 수 있는 마지막 획 번호. 이보다 뒤 획의 점은 칠해지지 않는다(앞 획은 계속 메울 수 있다).</summary>
+        public int CurrentStroke { get; private set; }
+        public int StrokeCount => strokes.Length;
+        /// <summary>#533: 한 획을 이 비율만큼 쓰면 다음 획이 열린다.</summary>
+        public float StrokeAdvance { get; set; } = .8f;
 
-        public LabJigwiTalismanStroke(Vector2[] samples)
+        /// <summary>strokes가 없으면 획 순서 없이 아무 점이나 칠한다.</summary>
+        public LabJigwiTalismanStroke(Vector2[] samples, int[][] strokeOrder = null)
         {
             Samples = (Vector2[])samples.Clone();
             covered = new bool[Samples.Length];
+            strokeOf = new int[Samples.Length];
+            var listed = new bool[Samples.Length];
+            var built = new List<int[]>();
+            if (strokeOrder != null)
+                foreach (int[] order in strokeOrder)
+                {
+                    var keep = new List<int>();
+                    foreach (int index in order ?? Array.Empty<int>())
+                        if (index >= 0 && index < Samples.Length && !listed[index]) { listed[index] = true; keep.Add(index); }
+                    if (keep.Count > 0) built.Add(keep.ToArray());
+                }
+            // Points no stroke lists join the last stroke, so a guide is always finishable.
+            var rest = new List<int>();
+            for (int i = 0; i < Samples.Length; i++) if (!listed[i]) rest.Add(i);
+            if (rest.Count > 0 || built.Count == 0) built.Add(rest.ToArray());
+            strokes = built.ToArray();
+            for (int s = 0; s < strokes.Length; s++) foreach (int index in strokes[s]) strokeOf[index] = s;
+            strokeCovered = new int[strokes.Length];
         }
 
         public bool IsCovered(int index) => covered[index];
+        public int StrokeOf(int index) => strokeOf[index];
+        public int[] StrokePoints(int stroke) => (int[])strokes[stroke].Clone();
 
-        public void Clear() { Array.Clear(covered, 0, covered.Length); CoveredCount = 0; }
+        /// <summary>#533: 지금 획에서 쓰는 방향으로 다음에 칠할 빈 점 번호. 다 썼으면 -1.</summary>
+        public int NextPoint
+        {
+            get
+            {
+                for (int s = CurrentStroke; s < strokes.Length; s++)
+                    foreach (int index in strokes[s]) if (!covered[index]) return index;
+                return -1;
+            }
+        }
 
-        /// <summary>선분 from→to에서 tolerance 안에 든 점을 칠하고, 새로 칠한 점 번호를 fresh에 담는다.</summary>
+        public void Clear()
+        {
+            Array.Clear(covered, 0, covered.Length); CoveredCount = 0;
+            Array.Clear(strokeCovered, 0, strokeCovered.Length); CurrentStroke = 0;
+        }
+
+        /// <summary>선분 from→to에서 tolerance 안에 든 점을 칠하고, 새로 칠한 점 번호를 fresh에 담는다. #533: 아직 열리지 않은 획의 점은 건너뛴다.</summary>
         public void Paint(Vector2 from, Vector2 to, float tolerance, List<int> fresh = null)
         {
             if (!Finite(from) || !Finite(to) || !(tolerance > 0f)) return;
             float limit = tolerance * tolerance;
             for (int i = 0; i < Samples.Length; i++)
             {
-                if (covered[i] || DistanceSquared(Samples[i], from, to) > limit) continue;
-                covered[i] = true; CoveredCount++;
+                if (covered[i] || strokeOf[i] > CurrentStroke || DistanceSquared(Samples[i], from, to) > limit) continue;
+                covered[i] = true; CoveredCount++; strokeCovered[strokeOf[i]]++;
                 fresh?.Add(i);
+                Advance();
             }
+        }
+
+        private void Advance()
+        {
+            float need = Mathf.Clamp01(StrokeAdvance);
+            while (CurrentStroke < strokes.Length - 1
+                   && strokeCovered[CurrentStroke] >= Mathf.CeilToInt(strokes[CurrentStroke].Length * need - 1e-4f)) CurrentStroke++;
         }
 
         private static bool Finite(Vector2 v) => !float.IsNaN(v.x) && !float.IsNaN(v.y) && !float.IsInfinity(v.x) && !float.IsInfinity(v.y);

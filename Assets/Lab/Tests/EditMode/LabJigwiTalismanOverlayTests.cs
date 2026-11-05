@@ -116,22 +116,51 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void TheGuideIsEvenlySampledAndOrderFree()
+        public void TheGuideIsEvenlySampledAndEveryPointBelongsToOneStroke()
         {
-            var forward = new LabJigwiTalismanStroke(LabJigwiTalismanStroke.Water);
-            var backward = new LabJigwiTalismanStroke(LabJigwiTalismanStroke.Water);
             Vector2[] points = LabJigwiTalismanStroke.Water;
-            Assert.That(forward.Samples.Length, Is.InRange(60, 200));
+            Assert.That(points.Length, Is.InRange(60, 200));
             foreach (Vector2 point in points) Assert.That(point.x >= 0f && point.x <= 1f && point.y >= 0f && point.y <= 1f, Is.True);
-            for (int i = 0; i < points.Length; i++) forward.Paint(points[i], points[i], .07f);
-            for (int i = points.Length - 1; i >= 0; i--) backward.Paint(points[i], points[i], .07f);
-            Assert.That(forward.Coverage, Is.EqualTo(1f)); Assert.That(backward.Coverage, Is.EqualTo(1f));
-            forward.Clear(); Assert.That(forward.CoveredCount, Is.Zero);
+            var seen = new bool[points.Length];
+            foreach (int[] order in LabJigwiTalismanStroke.WaterStrokes)
+                foreach (int index in order)
+                {
+                    Assert.That(index, Is.InRange(0, points.Length - 1));
+                    Assert.That(seen[index], Is.False, "Point " + index + " is listed twice.");
+                    seen[index] = true;
+                }
+            Assert.That(System.Array.TrueForAll(seen, x => x), Is.True, "Every point belongs to a stroke.");
+        }
+
+        [Test]
+        public void WritingInStrokeOrderFinishesButALaterStrokeFirstDoesNotCount()
+        {
+            Vector2[] points = LabJigwiTalismanStroke.Water;
+            var ordered = new LabJigwiTalismanStroke(points, LabJigwiTalismanStroke.WaterStrokes);
+            foreach (int[] order in LabJigwiTalismanStroke.WaterStrokes)
+                foreach (int index in order) ordered.Paint(points[index], points[index], .07f);
+            Assert.That(ordered.Coverage, Is.EqualTo(1f));
+            Assert.That(ordered.NextPoint, Is.EqualTo(-1));
+            ordered.Clear();
+            Assert.That(ordered.CoveredCount, Is.Zero); Assert.That(ordered.CurrentStroke, Is.Zero);
+
+            // #533: the last stroke (ㄹ bottom) written first paints nothing; the first stroke (ㅁ left) still can.
+            int[] last = LabJigwiTalismanStroke.WaterStrokes[LabJigwiTalismanStroke.WaterStrokes.Length - 1];
+            foreach (int index in last) ordered.Paint(points[index], points[index], .07f);
+            Assert.That(ordered.CoveredCount, Is.Zero);
+            Assert.That(ordered.NextPoint, Is.EqualTo(LabJigwiTalismanStroke.WaterStrokes[0][0]), "The guide points at the first stroke's start.");
+
+            // Without a stroke order any point can be painted (the old behaviour).
+            var free = new LabJigwiTalismanStroke(points);
+            for (int i = points.Length - 1; i >= 0; i--) free.Paint(points[i], points[i], .07f);
+            Assert.That(free.Coverage, Is.EqualTo(1f));
         }
 
         private static void Trace(LabJigwiTalismanOverlay target)
         {
-            foreach (Vector2 point in LabJigwiTalismanStroke.Water) target.PaintNormalized(point, point);
+            Vector2[] points = LabJigwiTalismanStroke.Water;
+            foreach (int[] order in LabJigwiTalismanStroke.WaterStrokes)
+                foreach (int index in order) target.PaintNormalized(points[index], points[index]);
         }
 
         private static LabSnapshot Snapshot(double localTalismanAt) => new LabSnapshot
