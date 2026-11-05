@@ -2,17 +2,19 @@
 
 ## 2026-11-05 — Editor 메뉴 정리 (Battle 덮어쓰기·고장 메뉴 제거)
 
-`chore/editor-menu-cleanup` 브랜치(기준 main `25014885`)에서 Unity 6000.6.5f1 batch mode(macOS, `-nographics`)로 실행했다. 아래 표는 실제로 실행한 것만 적는다.
+`chore/editor-menu-cleanup` 브랜치에서 Unity 6000.6.5f1 batch mode(macOS)로 실행했다. 처음에는 main `25014885` 기준으로, 이어 main `683c6f27`(#528·#509 포함)을 병합한 뒤 다시 실행했다. EditMode는 `-nographics`, PlayMode는 그래픽을 켠 batch다. 아래 표는 실제로 실행한 것만 적는다.
 
 | 확인 | 결과 | 범위 |
 | --- | --- | --- |
 | 컴파일 | **PASS** | batch 실행 중 Runtime·Editor(`Assembly-CSharp-Editor`)·EditMode/PlayMode 검사 묶음 전체 컴파일, 오류 0. `LabSceneBuilder.cs`의 경고는 남은 기존 줄의 `FindFirstObjectByType` 폐기 경고(CS0618)뿐이다. |
-| EditMode 전체 | **1972 PASS / 0 FAIL / 0 skip** (48.6초) | Lab·Hapio EditMode 전체. 새 `GameEditorMenuCleanupTests` 2건 포함: 다시 만든 Stage02 기본값(`GameStageAssets.YaguangDefaults`)이 야광귀 탭에 보이는 칸만 쓰고 저장 Stage02와 같으며 카탈로그 `Validate`를 통과함, 지운 메뉴 6개와 `UpgradeBattleFromSavedLab`이 Editor 어셈블리에 다시 등록되지 않음. |
+| EditMode 전체(병합 뒤) | **1969 PASS / 0 FAIL / 0 skip** (21.7초) | main `683c6f27`의 1,967건(C6Lab 1,782 · Hapio 185)과 새 검사 2건. |
+| EditMode 전체(병합 전, main `25014885` 기준) | **1972 PASS / 0 FAIL / 0 skip** (48.6초) | Lab·Hapio EditMode 전체. 새 `GameEditorMenuCleanupTests` 2건 포함: 다시 만든 Stage02 기본값(`GameStageAssets.YaguangDefaults`)이 야광귀 탭에 보이는 칸만 쓰고 저장 Stage02와 같으며 카탈로그 `Validate`를 통과함, 지운 메뉴 6개와 `UpgradeBattleFromSavedLab`이 Editor 어셈블리에 다시 등록되지 않음. 두 검사 모두 밀리초 단위이고 GPU·Lab 전용·대체 기능 검사가 아니라 `[Category]`를 붙이지 않았다. |
+| PlayMode `Hapio.PlayModeTests` 전체(병합 뒤) | **58 PASS / 0 FAIL / 0 skip** (143.8초) | 바뀐 Editor 코드를 직접 부르는 PlayMode 검사는 없다. 저장된 스테이지 카탈로그·Battle·Home/Lobby DEV 행을 읽는 가장 가까운 묶음(`GameSceneFlowTests` 21, `GameLobbyViewTests` 13, `GameOpeningControllerTests` 10, `GameFinishReplayTests` 4, `GameStageUiTests` 2, `GameYokaiPresentationTests` 2 등)을 실행했다. |
 | 참조 검색 | **없음** | `git grep`으로 지운 메뉴 이름·메서드·클래스를 찾았다. 남은 언급은 고친 `docs/GAME_FLOW.md`·`Assets/Lab/Art/UI/README.md`의 제거 안내, 과거 실행 기록(이 문서의 「#262 최신 main 동기화 및 Draft 준비 — 2026-10-21」 등)과 새 검사뿐이다. |
 
-변경: `Hapio/Upgrade Existing Game Scenes From Current Lab`과 Lab 전체를 Battle 위에 저장하던 `UpgradeBattleFromSavedLab`을 지웠다. `Hapio/Upgrade Three Yokai Stages`는 정의·카탈로그 생성과 Home/Lobby DEV 행·StageResult/GameOver 글꼴 갱신만 하고 Battle을 열거나 저장하지 않는다. `YaguangDefaults`에서 은퇴 슬롯 211을 뺐다. `C6 Lab/Build Editable Lab Scene`·`Migrate Legacy Throw Tuning`·`Remove Unused Template Samples`(그 메서드와 Build 전용 보조 함수)와 `LabDeveloperPanelUpgrade.cs`(`Upgrade Developer Controls`)·`LabTemporaryBackdropUpgrade.cs`(`Apply Temporary Battle Background`)를 지웠다. Scene·Prefab·에셋 YAML은 바꾸지 않았다. batch 가져오기가 Lobby PNG `.meta` 20개에 WebGL 플랫폼 항목을 덧붙였으나 이번 변경과 무관해 되돌렸다.
+변경: `Hapio/Upgrade Existing Game Scenes From Current Lab`과 Lab 전체를 Battle 위에 저장하던 `UpgradeBattleFromSavedLab`을 지웠다. `Hapio/Upgrade Three Yokai Stages`는 정의·카탈로그 생성과 Home/Lobby DEV 행·StageResult/GameOver 글꼴 갱신만 하고 Battle을 열거나 저장하지 않는다. `YaguangDefaults`에서 은퇴 슬롯 211을 뺐다. `C6 Lab/Build Editable Lab Scene`·`Migrate Legacy Throw Tuning`·`Remove Unused Template Samples`(그 메서드와 Build 전용 보조 함수)와 `LabDeveloperPanelUpgrade.cs`(`Upgrade Developer Controls`)·`LabTemporaryBackdropUpgrade.cs`(`Apply Temporary Battle Background`)를 지웠다. Scene·Prefab·에셋 YAML은 바꾸지 않았다. batch 가져오기가 실행 때마다 Lobby PNG `.meta` 20개에 WebGL 플랫폼 항목을 덧붙였으나 이번 변경과 무관해 매번 되돌렸다. 접속 번호(5688/`C6PhysicsLab/49`/`C6HapioGame/34`)와 공유 설정 수는 바꾸지 않았다.
 
-미실행: PlayMode, 메뉴 자체 실행(`Upgrade Three Yokai Stages`는 Home/Lobby/StageResult/GameOver를 저장하므로 실행하지 않았다), Editor 화면에서 메뉴 목록 육안 확인, iOS·Mac 앱.
+미실행: Lab·Story·ClayPreview PlayMode, 메뉴 자체 실행(`Upgrade Three Yokai Stages`는 Home/Lobby/StageResult/GameOver를 저장하므로 실행하지 않았다), Editor 화면에서 메뉴 목록 육안 확인, iOS·Mac 앱.
 
 ## 2026-11-05 — 검사 시간 단축·카테고리
 
