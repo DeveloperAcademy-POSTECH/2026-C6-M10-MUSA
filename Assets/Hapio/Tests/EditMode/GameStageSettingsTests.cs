@@ -11,11 +11,11 @@ namespace Hapio.Tests
         [Test]
         public void JigwiScreenPatternFieldsAreOwnedOnlyByStageThreeAndCannotLeakFromCommonOrOtherStages()
         {
-            foreach (int field in System.Linq.Enumerable.Except(System.Linq.Enumerable.Concat(new[] { 228, 235 }, System.Linq.Enumerable.Range(240, 17)), new[] { 241, 242, 244, 245, 246, 247 }))
+            foreach (int field in System.Linq.Enumerable.Except(System.Linq.Enumerable.Concat(new[] { 228, 235 }, System.Linq.Enumerable.Range(240, 17)), new[] { 241, 242, 244, 245, 246, 247, 251, 252 }))
                 for (int scope = 0; scope <= GameStageSettings.TerritoryScope; scope++)
                     Assert.That(GameStageSettings.IsFieldVisible(scope, field), Is.EqualTo(scope == 3),
                         "Field " + field + " in scope " + scope);
-            foreach (int field in new[] { 229, 230, 231, 232, 233, 234, 241, 242, 244, 245, 246, 247 })
+            foreach (int field in new[] { 229, 230, 231, 232, 233, 234, 241, 242, 244, 245, 246, 247, 251, 252 })
                 for (int scope = 0; scope <= GameStageSettings.TerritoryScope; scope++)
                     Assert.That(GameStageSettings.IsFieldVisible(scope, field), Is.False,
                         "Obsolete surface geometry controls remain reserved but hidden: " + field);

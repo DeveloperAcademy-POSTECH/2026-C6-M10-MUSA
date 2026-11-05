@@ -269,7 +269,7 @@ namespace C6Lab.Tests
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             LabModel model = Room(); B(model);
             LabOrbState flying = Supplies(model, 25d).First(); Launch(model, flying, 25d);
-            LabOrbState fire = Add(model, Players[0], 25d); LabOrbState potion = Add(model, Players[1], 25d, LabOrbKind.Potion);
+            LabOrbState fire = Add(model, Players[0], 25d); LabOrbState potion = Add(model, Players[1], 39.5d, LabOrbKind.Potion); // items have their own short lifetime
             float[] stamina = model.Snapshot(39.9d).players.Select(player => player.stamina).ToArray();
             LabSnapshot after = model.Snapshot(40d);
             LabJigwiABRound failed = after.jigwiAB.rounds.Single(value => value.slot == 1);

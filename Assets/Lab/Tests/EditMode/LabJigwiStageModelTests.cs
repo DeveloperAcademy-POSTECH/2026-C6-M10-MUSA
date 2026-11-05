@@ -356,7 +356,7 @@ namespace C6Lab.Tests
             var room = Room();
             // #509: B2 is the last B that can fail (at 70); B3 runs into the cutoff and is cancelled without penalty.
             // A failed B no longer empties stamina, so compare the recovery steps around the cutoff.
-            Assert.That(room.Snapshot(70d).jigwiAB.rounds.Single(item => item.slot == 4).boardFireUntil, Is.EqualTo(73d).Within(.00001d));
+            Assert.That(room.Snapshot(70d).jigwiAB.rounds.Single(item => item.slot == 3).boardFireUntil, Is.EqualTo(73d).Within(.00001d));
             ulong fence = room.JigwiABFailureRevision;
             float before = room.Snapshot(99.5d).players[0].stamina;
             float atCutoff = room.Snapshot(100d).players[0].stamina;

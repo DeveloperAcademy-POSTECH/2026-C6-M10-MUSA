@@ -26,7 +26,7 @@ namespace C6Lab.Tests
             Assert.That(LabConfig.DeveloperFields[228].IsToggle, Is.True);
             Assert.That(LabConfig.DeveloperFields[234].WholeNumber, Is.True);
             Assert.That(LabConfig.DeveloperCategories.Single(category => category.Title == "지귀 120초 (Hapio 전용)")
-                .FieldIndices, Is.EqualTo(new[] { 228, 235 }.Concat(Enumerable.Range(240, 17)).Except(new[] { 241, 242, 244, 245, 246, 247 })));
+                .FieldIndices, Is.EqualTo(new[] { 228, 235 }.Concat(Enumerable.Range(240, 17)).Except(new[] { 241, 242, 244, 245, 246, 247, 251, 252 })));
         }
 
         [Test]
