@@ -101,6 +101,31 @@
 
 미실행: iOS·Mac 앱 실기기(세로 화면 구도·성능), 다인 Host/Guest 동시 재생·Guest 건너뛰기·늦은 재예약 내림. 검토 수정 뒤에는 `LabGourdPaintTests` 등 위 56개 중 나머지 PlayMode를 다시 돌리지 않았다.
 
+## 2026-11-05 — batch PlayMode 기존 실패 7건 원인과 수정
+
+`fix/batch-playmode-failures` 브랜치(main `25014885` 기준)에서 Unity 6000.6.5f1 batch mode(`-runTests`, `-nographics` 없음)로 실행했다. macOS, Apple M3 Pro, Metal, batch의 품질 레벨은 Mobile이다. 아래 표는 실제로 실행한 것만 적는다. 원인 확인용 임시 진단 검사와 셰이더 사본(float RT 분해)은 커밋하지 않았다. 일부 실행 동안 같은 Mac에서 다른 worktree의 Unity batch가 함께 돌았다.
+
+| 검사 | 확인한 원인 | 수정 |
+| --- | --- | --- |
+| `LabHangingRenderInterpolationTests.OutsideRenderingTheTransformsAlwaysHoldTheFixedPose` | batch에서는 Editor가 player loop 렌더를 하지 않아 `WaitForEndOfFrame`이 없고 Test Framework가 그 yield를 실패로 처리한다. 검사 환경 문제 | 매 프레임 검사가 `camera.Render()`(64px RT)로 실제 URP 패스를 돌린 뒤 고정 자세 복귀를 본다. 패스 안에서 보간 자세가 실제로 그려졌는지(>0회)를 새로 단언한다. GUI Editor에서만 기존 `WaitForEndOfFrame` 확인을 이어서 한다 |
+| `…DuringRealRenderingTheDrawnPoseLiesBetweenTheTwoFixedPoses`(Inconclusive) | 같은 이유로 batch에서 `beginContextRendering`이 0회였다 | 매 프레임 `camera.Render()`. batch 프레임은 약 0.1ms라 40프레임 동안 물리 스텝이 없을 수 있어 고정 스텝 2번 뒤 시작한다 |
+| `LabJigwiABPresentationTests.SavedRawImagesRenderWarmAAndBAndBlueWaterIntoAnIsolatedPortraitUiTarget` | #479(`82708df7`)이 A의 화면 붉은 기운·양옆 불기둥을 지웠는데 이 GPU 캡처 검사만 A 따뜻한 픽셀 >64를 그대로 기대했다. 환경과 무관한 낡은 기대값 | 브랜치에서는 A 따뜻한 픽셀 0·`PersonalHeatVisible == false`로 고쳤다. main(#509 `d12f4f84`)이 이 검사를 지웠으므로 병합 뒤에는 없다(되살리지 않았다) |
+| `LabWatercolorPaintRuntimeTests.DescriptorBurstRespectsTheActiveCapAndConvergesToASettledCheckpoint` | **런타임 버그.** `CommitFinished`가 남은 활성 얼룩을 역순으로 확정해 체크포인트(대기열 순서)와 순서가 달랐다. ARGB32 `Blend One One` 누적은 이 GPU에서 순서에 따라 반올림이 달라진다(진단: 같은 순서 반복 0차이, 마지막 두 도장만 바꾸면 54px ±1, 전부 뒤집으면 258px 최대 ±3) | `LabWatercolorPaintRuntime`이 오래된 것부터 확정한다. 표현 전용 경로이며 판정·통신은 바뀌지 않는다 |
+| `LabJigwiWaterTrailTests.AuthoritativeAndPredictedWater…`(간헐) | batch 프레임은 약 0.12ms라 첫 물리 스텝 직후 LateUpdate의 보간 alpha가 0에 가깝고 0.1mm 미만 이동은 경로가 버린다. 고정 대기 뒤 바로 `Count >= 2`를 단언했다(진단: 같은 시나리오 40회 중 4회 1점, 모두 이동 0) | 같은 파일의 다른 검사처럼 `Until(…, 2초)`로 실제 두 번째 점을 기다린다 |
+| `LabWatercolorSurfaceGrainTests.PigmentTextureIsStatic…`(간헐) | 시간에 따른 변화가 아니다. 셰이더에 시간 입력이 없고, 같은 프레임의 연속 렌더 사이에서도 가끔 한 번의 렌더만 화면 전체에 흩어진 약 420px이 ±1~2 다르다(진단: 입자 ON 렌더의 약 7%, 불투명 안료라 종이가 가려지는 OFF는 0%). float RT로 항을 나눠 보면 위치·SV_Position·미분·종이 1×1 밉은 비트 동일했고 `C6Lab/GourdPaint`의 한지 종이 샘플(`PaperSample`)만 달랐다(점 필터에서도 인접 텍셀 값, 같은 내용의 GPU 복사 텍스처에서도 발생). 이 값이 입자의 fiber 항으로 안료에 들어간다. **어느 계산·자원이 그 렌더에서 달라지는지는 확정하지 못했다.** 진단용 셰이더 사본을 다시 컴파일한 두 실행에서는 1,800번 렌더 동안 한 번도 나타나지 않았다 | 바꾸지 않았다. 아래 반복 실행에서 같은 종이 변동이 이 클래스의 다른 단언(`SurfaceGrainChangesPigmentDetail…`의 "Unpainted paper…" 2 > 1)도 깨뜨려, 한 단언만 고치는 것은 의미가 없었다 |
+| `LabPlayerPaintPatternRenderTests.ActualSavedShaderDistinguishesAllSixPainters…`(간헐) | 같은 셰이더·같은 종이 샘플 변동으로 본다. 반복 실행에서 이 검사의 "Neutral owner 0 must retain the original shader arithmetic"(같은 상태 두 렌더의 정확 비교)가 한지 종이색 픽셀 `RGBA(134,118,96)`→`95`로 1 달라 실패했고, 원래 증상("modulate pigment brightness only")도 한 번 나왔다. 저수준 원인은 위와 같이 **확정하지 못했다** | 바꾸지 않았다 |
+
+| 확인 | 결과 | 범위 |
+| --- | --- | --- |
+| 변경 전 단독 재현 | 26건 중 22 PASS · 3 FAIL · 1 Inconclusive | 4개 클래스 전체와 JigwiAB·수채 버스트 메서드 지정. 매번 실패 3건과 Inconclusive 1건이 그대로 나왔다 |
+| 변경 전 간헐 3건 단독 10회(별도 실행 10번) | 정적 입자 **2/10 실패**, 물 경로 0/10, 소유권 렌더 0/10 | 메서드 3개만 지정 |
+| 변경 뒤 6개 클래스 10회(별도 실행 10번, 55건씩) | 매달린 박 10/10, JigwiAB 10/10, 수채 런타임 10/10, 물 경로 10/10 통과. 종이 셰이더 두 클래스는 **3/10 실행에서 1건씩 실패**(정적 입자 클래스 1번, 소유권 렌더 2번) | 위 수정 대상 4건 포함. 종이 셰이더 두 클래스는 바꾸지 않은 상태 그대로다. 이 10회 뒤 매달린 박 검사에 그래픽 장치 없음(`-nographics`) Ignore 가드만 더했다 |
+| 변경 뒤 PlayMode 전체 1회 | **673건 중 673 PASS · 0 FAIL · 0 Inconclusive**, 642.3초 | 가드 추가 뒤 최종 코드. 이번 1회에서는 종이 셰이더 두 클래스의 간헐 실패가 나오지 않았다. 바꾸지 않았으므로 다음 실행에서 다시 나올 수 있다 |
+| main `84afd2f8`(#509·#528·#529·#530) 병합 뒤 EditMode 전체 1회 | **1976 PASS / 0 FAIL**, 22.6초 | 런타임 `LabWatercolorPaintRuntime` 변경을 포함한 병합 트리 |
+| 같은 병합 뒤 PlayMode 전체 1회 | **640건 중 640 PASS · 0 FAIL · 0 Inconclusive**, 429.0초 | #509가 지운 JigwiAB 검사는 되살리지 않았다. #528 `[Category]`는 그대로 두고 렌더를 하게 된 `OutsideRendering…`에 `GPU`를 더했다. 이 1회에서도 종이 셰이더 간헐 실패는 나오지 않았다 |
+
+미실행: Editor GUI Test Runner(바꾼 매달린 박 검사의 GUI 분기와 Editor 자체 렌더 경로 포함), 다른 Mac·GPU, iOS 실기기, EditMode(이번에 EditMode 코드는 바꾸지 않았다).
+
 ## 2026-11-04 — #479 지귀 A 부적 쓰기
 
 `feat/#479-jigwi-talisman` 작업 브랜치에서 팀원이 Unity6000.6.5f1 Editor(macOS)로 직접 확인했다. 아래 표는 실제로 실행한 것만 적는다.

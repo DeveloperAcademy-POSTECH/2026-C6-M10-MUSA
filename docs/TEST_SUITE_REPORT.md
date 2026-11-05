@@ -20,7 +20,7 @@ NUnit `[Category]`로 실행 범위를 고른다. 검사를 지우는 표시가 
 | 카테고리 | 뜻 | PlayMode | EditMode |
 | --- | --- | ---: | ---: |
 | `Slow` | fixture 하나가 5초 이상(2026-11-05 측정, 클래스 단위) | 236건 · 350.2초 | 0건 |
-| `GPU` | 실제 렌더링·픽셀 읽기가 필요하다 | 58건 · 84.0초 | 0건 |
+| `GPU` | 실제 렌더링·픽셀 읽기가 필요하다 | 59건 · 84.1초 | 0건 |
 | `Bonjour` | macOS Bonjour 등록·검색이 필요하다 | 22건 · 51.7초 | 8건 |
 | `LabOnly` | Lab.unity, Lab DEV 패널, Development 솔로, 기본 OFF인 DEV 대안 기능만 검사한다 | 76건 · 67.1초 | 85건 |
 | `Legacy` | 도달할 수 없거나 대체된 기능, Editor 비교 도구를 검사한다 | 36건 · 39.3초 | 61건 |
@@ -61,14 +61,19 @@ main #509(`d12f4f84`)로 지귀 B 장막·5초 보상·실패 비우기 fence·B
 
 ### batch 실행에서 원래 실패하던 검사
 
-변경 전 main `25014885` 실행부터 실패했고, 이번 변경과는 관계없다. 병합한 트리(main `d12f4f84`)에서 다시 확인했다.
+변경 전 main `25014885` 실행부터 실패했다(#528 변경과는 관계없음). #531이 원인을 확인한 것은 고쳤다. 원인·근거는 [VALIDATION](VALIDATION.md)의 2026-11-05 "batch PlayMode 기존 실패 7건" 절에 있다.
 
-- 매번 실패:
-  - `LabHangingRenderInterpolationTests.OutsideRenderingTheTransformsAlwaysHoldTheFixedPose`: batchmode에서 WaitForEndOfFrame이 호출되지 않는다.
-  - (병합 뒤 없음) `LabJigwiABPresentationTests.SavedRawImagesRenderWarmAAndBAndBlueWaterIntoAnIsolatedPortraitUiTarget`: 불꽃 픽셀이 0이었다. main #509(`d12f4f84`)가 이 검사를 지웠다.
-  - `LabWatercolorPaintRuntimeTests.DescriptorBurstRespectsTheActiveCapAndConvergesToASettledCheckpoint`: 색이 1단계 다르다.
-- 때때로 실패: `LabJigwiWaterTrailTests`, `LabPlayerPaintPatternRenderTests`의 여섯 P 구분, `LabWatercolorSurfaceGrainTests`의 정적 입자·종이 영향, `LabPaintSpreadFlowRenderTests.SavedShellComparesLegacyAndSpreadFlow…`(경계 반올림 3, 병합 뒤 전체 실행에서 한 번 실패했고 단독 3회·GPU 묶음 1회 재실행은 모두 통과).
-- 매번 Inconclusive: `LabHangingRenderInterpolationTests.DuringRealRenderingTheDrawnPoseLiesBetweenTheTwoFixedPoses`.
+#531에서 고친 것:
+
+- `LabHangingRenderInterpolationTests.OutsideRenderingTheTransformsAlwaysHoldTheFixedPose`(매번 실패)·`DuringRealRenderingTheDrawnPoseLiesBetweenTheTwoFixedPoses`(매번 Inconclusive): batch에는 player loop 렌더가 없어 `WaitForEndOfFrame`·렌더 콜백이 오지 않았다. 검사가 직접 `camera.Render()`로 실제 URP 패스를 돌린다. 앞 검사에도 `GPU`를 붙였다.
+- `LabWatercolorPaintRuntimeTests.DescriptorBurstRespectsTheActiveCapAndConvergesToASettledCheckpoint`(매번 실패, 색 1단계): 런타임이 활성 얼룩을 역순으로 확정해 체크포인트와 누적 순서가 달랐다. `LabWatercolorPaintRuntime`을 오래된 것부터 확정하게 고쳤다.
+- `LabJigwiWaterTrailTests.AuthoritativeAndPredictedWater…`(때때로 실패): batch 프레임이 짧아 첫 물리 스텝 직후 보간 위치가 출발점과 거의 같았다. 실제 두 번째 점을 기다린다.
+- (#509로 없음) `LabJigwiABPresentationTests.SavedRawImagesRenderWarmAAndBAndBlueWaterIntoAnIsolatedPortraitUiTarget`: 불꽃 픽셀이 0이었다. main #509(`d12f4f84`)가 이 검사를 지웠다.
+
+남은 것(때때로 실패):
+
+- `LabPlayerPaintPatternRenderTests`의 여섯 P 구분, `LabWatercolorSurfaceGrainTests`의 정적 입자·종이 영향: `C6Lab/GourdPaint`의 한지 종이 샘플이 같은 입력의 연속 렌더에서 가끔 다른 값을 낸다(같은 프레임 안에서도). 저수준 원인을 확정하지 못해 검사를 바꾸지 않았다.
+- `LabPaintSpreadFlowRenderTests.SavedShellComparesLegacyAndSpreadFlow…`: 경계 반올림 3. 병합 뒤 전체 실행에서 한 번 실패했고 단독 3회·GPU 묶음 1회 재실행은 모두 통과했다. #531에서 보지 않았다.
 
 ## 2026-10-29 구성 — #380 (당시 기록)
 
