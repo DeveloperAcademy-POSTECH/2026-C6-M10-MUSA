@@ -1,20 +1,17 @@
 using System;
 using System.IO;
 using C6Lab;
-using Unity.Netcode;
-using Unity.Netcode.Transports.UTP;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
-using UnityEngine.EventSystems;
-using UnityEngine.InputSystem.UI;
 using UnityEngine.SceneManagement;
 
 namespace C6Lab.Editor
 {
     /// <summary>
-    /// One-time, Editor-only setup. Gameplay never creates or replaces the saved Canvas.
-    /// Re-running this command does not overwrite a scene that a designer has edited.
+    /// Editor-only upgrades of the saved Lab Scene. Gameplay never creates or replaces the saved Canvas.
+    /// The original scene builder, legacy throw-tuning migration and template-sample cleanup were
+    /// one-time steps that can no longer run against the current project, so they were removed.
     /// </summary>
     public static class LabSceneBuilder
     {
@@ -22,56 +19,7 @@ namespace C6Lab.Editor
         private const string ConfigPath = "Assets/Lab/Resources/LabConfig.asset";
         private static readonly Color Ink = new Color(.94f, .96f, .98f, 1f);
         private static readonly Color DimInk = new Color(.65f, .73f, .78f, 1f);
-        private static readonly Color Panel = new Color(.045f, .075f, .095f, .78f);
         private static readonly Color ButtonColor = new Color(.15f, .35f, .43f, .94f);
-
-        [MenuItem("C6 Lab/Build Editable Lab Scene")]
-        public static void Build()
-        {
-            EnsureFolder("Assets/Lab", "Scenes");
-            EnsureFolder("Assets/Lab", "Resources");
-            if (File.Exists(ScenePath))
-                throw new InvalidOperationException("The Lab Scene already exists. Open it and edit its saved objects; the builder will not overwrite them.");
-
-            LabConfig config = AssetDatabase.LoadAssetAtPath<LabConfig>(ConfigPath);
-            if (config == null)
-            {
-                if (File.Exists(ConfigPath))
-                    throw new InvalidOperationException("The Lab Config path already contains another asset.");
-                config = ScriptableObject.CreateInstance<LabConfig>();
-                AssetDatabase.CreateAsset(config, ConfigPath);
-            }
-
-            Scene previous = SceneManager.GetActiveScene();
-            bool preservePrevious = previous.IsValid() && previous.isLoaded && !string.IsNullOrEmpty(previous.path);
-            Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene,
-                preservePrevious ? NewSceneMode.Additive : NewSceneMode.Single);
-            if (!scene.IsValid() || !scene.isLoaded) throw new InvalidOperationException("Could not open the new Lab Scene.");
-            if (preservePrevious && SceneManager.GetActiveScene() != scene && !SceneManager.SetActiveScene(scene))
-                throw new InvalidOperationException("Could not activate the new Lab Scene.");
-            bool saved = false;
-            try
-            {
-                BuildScene(config);
-                EditorSceneManager.MarkSceneDirty(scene);
-                saved = EditorSceneManager.SaveScene(scene, ScenePath);
-                if (!saved) throw new IOException("Unity did not save the Lab Scene.");
-                AssetDatabase.SaveAssets();
-                AssetDatabase.Refresh();
-                EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
-                Debug.Log("C6_LAB_SCENE_CREATED scene=" + ScenePath + " config=" + ConfigPath);
-            }
-            finally
-            {
-                if (preservePrevious && previous.IsValid() && previous.isLoaded)
-                {
-                    SceneManager.SetActiveScene(previous);
-                    // Keep the caller's previously open Scene intact. The new saved Scene is opened explicitly.
-                    if (scene.IsValid() && scene.isLoaded) EditorSceneManager.CloseScene(scene, true);
-                }
-                if (!saved) Debug.LogWarning("C6_LAB_SCENE_INCOMPLETE; inspect the Editor error before retrying.");
-            }
-        }
 
         [MenuItem("C6 Lab/Rebind Saved UI Values")]
         public static void RebindSavedUiValues()
@@ -150,215 +98,6 @@ namespace C6Lab.Editor
             EditorSceneManager.MarkSceneDirty(scene);
             if (!EditorSceneManager.SaveScene(scene)) throw new IOException("Could not save developer UI.");
             Debug.Log("C6_LAB_DEV_PANEL_SAVED fields=" + LabConfig.DeveloperFields.Count);
-        }
-
-        [MenuItem("C6 Lab/Migrate Legacy Throw Tuning")]
-        public static void MigrateLegacyThrowTuning()
-        {
-            LabConfig config = AssetDatabase.LoadAssetAtPath<LabConfig>(ConfigPath);
-            if (config == null) throw new FileNotFoundException("Lab Config is missing.", ConfigPath);
-            var serialized = new SerializedObject(config);
-            SerializedProperty lateral = serialized.FindProperty("throwLateralGain");
-            SerializedProperty forward = serialized.FindProperty("throwForwardGain");
-            if (Mathf.Abs(lateral.floatValue - 6f) > .0001f ||
-                Mathf.Abs(forward.floatValue - 8f) > .0001f)
-                throw new InvalidOperationException("Throw tuning differs from the legacy values. Edit LabConfig in the Inspector instead.");
-            SetFloat(serialized, "spawnPopStartScale", .3f);
-            SetFloat(serialized, "spawnPopDuration", .15f);
-            SetFloat(serialized, "cameraRadius", 8f);
-            SetFloat(serialized, "cameraHeightOffset", .65f);
-            SetFloat(serialized, "throwOriginRadius", 4f);
-            SetFloat(serialized, "throwOriginHeightOffset", -.5f);
-            SetFloat(serialized, "throwOriginLateralRange", 1f);
-            SetFloat(serialized, "throwSwipeMinSpeed", .8f);
-            SetFloat(serialized, "throwSwipeMinDistance", .12f);
-            SetFloat(serialized, "throwSwipeUpDominance", .65f);
-            SetFloat(serialized, "throwMaxSwipeSpeed", 6f);
-            SetFloat(serialized, "throwMinUpSpeed", 2f);
-            SetFloat(serialized, "throwLateralGain", 2.5f);
-            SetFloat(serialized, "throwUpGain", 2.1f);
-            SetFloat(serialized, "throwForwardGain", 4.5f);
-            SetFloat(serialized, "throwMaxWorldSpeed", 18f);
-            serialized.ApplyModifiedPropertiesWithoutUndo();
-            EditorUtility.SetDirty(config);
-            AssetDatabase.SaveAssets();
-            Debug.Log("C6_LAB_THROW_TUNING_MIGRATED");
-        }
-
-        private static void SetFloat(SerializedObject serialized, string name, float value)
-        {
-            SerializedProperty property = serialized.FindProperty(name);
-            if (property == null) throw new InvalidOperationException("Missing LabConfig field: " + name);
-            property.floatValue = value;
-        }
-
-        [MenuItem("C6 Lab/Remove Unused Template Samples")]
-        public static void RemoveTemplateSamples()
-        {
-            if (!File.Exists(ScenePath))
-                throw new InvalidOperationException("Build the Lab Scene before removing template samples.");
-            string[] unused =
-            {
-                "Assets/TutorialInfo", "Assets/Readme.asset",
-                "Assets/Scenes", "Assets/InputSystem_Actions.inputactions"
-            };
-            foreach (string path in unused)
-            {
-                if (!File.Exists(path) && !Directory.Exists(path)) continue;
-                if (!AssetDatabase.DeleteAsset(path)) throw new IOException("Could not remove unused template asset: " + path);
-            }
-            AssetDatabase.SaveAssets();
-            Debug.Log("C6_LAB_TEMPLATE_SAMPLES_REMOVED");
-        }
-
-        private static void BuildScene(LabConfig config)
-        {
-            var stage = new GameObject("BattleStage");
-            var target = LabTarget.CreateCylinder(stage.transform, new Vector3(0f, 1.35f, 10f), .6f, 2.7f);
-            var floor = GameObject.CreatePrimitive(PrimitiveType.Plane);
-            floor.name = "BattleFloor";
-            floor.transform.SetParent(stage.transform, false);
-            floor.transform.position = new Vector3(0f, -.1f, 10f);
-            floor.transform.localScale = new Vector3(1.8f, 1f, 1.8f);
-
-            var lightObject = new GameObject("BattleLight", typeof(Light));
-            lightObject.transform.SetParent(stage.transform, false);
-            lightObject.transform.rotation = Quaternion.Euler(42f, -30f, 0f);
-            var light = lightObject.GetComponent<Light>();
-            light.type = LightType.Directional;
-            light.intensity = 1.35f;
-
-            var projectileRoot = new GameObject("Projectiles").transform;
-            projectileRoot.SetParent(stage.transform, false);
-            Camera battleCamera = Camera("BattleCamera", stage.transform, new Rect(0f, .46f, 1f, .54f),
-                new Color(.18f, .24f, .28f), false);
-            battleCamera.transform.position = new Vector3(0f, 1.5f, 0f);
-            battleCamera.transform.LookAt(target.transform.position + Vector3.up * .05f);
-            battleCamera.fieldOfView = 52f;
-            battleCamera.nearClipPlane = .3f;
-            battleCamera.farClipPlane = 50f;
-
-            var boardObject = new GameObject("OrbBoard", typeof(LabOrbBoard));
-            Camera orbCamera = Camera("OrbCamera", boardObject.transform, new Rect(0f, 0f, 1f, .46f),
-                new Color(.095f, .13f, .15f), true);
-            orbCamera.transform.position = new Vector3(0f, 0f, -10f);
-            orbCamera.transform.rotation = Quaternion.identity;
-            orbCamera.orthographicSize = config.BoardHeight * .5f;
-            orbCamera.nearClipPlane = .1f;
-            orbCamera.farClipPlane = 12f;
-            LabOrb3DSceneUpgrade.Configure(boardObject, orbCamera, battleCamera);
-
-            var sceneRoot = new GameObject("LabSceneController", typeof(LabSceneController));
-            var sceneController = sceneRoot.GetComponent<LabSceneController>();
-            sceneController.config = config;
-            sceneController.board = boardObject.GetComponent<LabOrbBoard>();
-            sceneController.orbCamera = orbCamera;
-
-            var networkObject = new GameObject("LabNetwork");
-            var transport = networkObject.AddComponent<UnityTransport>();
-            var manager = networkObject.AddComponent<NetworkManager>();
-            var network = networkObject.AddComponent<LabNetwork>();
-            network.config = config;
-            network.board = sceneController.board;
-            network.target = target;
-            network.battleFloor = floor.GetComponent<Collider>();
-            network.projectileRoot = projectileRoot;
-            network.manager = manager;
-            network.transport = transport;
-            network.port = 7777;
-            network.hostAddress = "127.0.0.1";
-
-            var seatCamera = battleCamera.gameObject.AddComponent<LabSeatCamera>();
-            seatCamera.network = network;
-            seatCamera.target = target;
-            seatCamera.battleCamera = battleCamera;
-            seatCamera.config = config;
-
-            BuildCanvas(network, config, sceneController, seatCamera);
-            var eventSystem = new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
-            eventSystem.GetComponent<InputSystemUIInputModule>().AssignDefaultActions();
-            eventSystem.transform.SetAsLastSibling();
-        }
-
-        private static Camera Camera(string name, Transform parent, Rect viewport, Color background, bool orthographic)
-        {
-            var gameObject = new GameObject(name, typeof(Camera));
-            gameObject.transform.SetParent(parent, false);
-            var camera = gameObject.GetComponent<Camera>();
-            camera.rect = viewport;
-            camera.clearFlags = CameraClearFlags.SolidColor;
-            camera.backgroundColor = background;
-            camera.orthographic = orthographic;
-            camera.allowHDR = false;
-            return camera;
-        }
-
-        private static void BuildCanvas(LabNetwork network, LabConfig config,
-            LabSceneController sceneController, LabSeatCamera seatCamera)
-        {
-            var canvasObject = new GameObject("LabCanvas", typeof(RectTransform), typeof(Canvas),
-                typeof(UnityEngine.UI.CanvasScaler), typeof(UnityEngine.UI.GraphicRaycaster), typeof(LabHud));
-            var canvas = canvasObject.GetComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvas.pixelPerfect = false;
-            var scaler = canvasObject.GetComponent<UnityEngine.UI.CanvasScaler>();
-            scaler.uiScaleMode = UnityEngine.UI.CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(390f, 844f);
-            scaler.screenMatchMode = UnityEngine.UI.CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-            scaler.matchWidthOrHeight = .5f;
-            var hud = canvasObject.GetComponent<LabHud>();
-            hud.network = network;
-            hud.battleCamera = seatCamera.battleCamera;
-            hud.orbCamera = sceneController.orbCamera;
-
-            // Keep the legacy UI shape for designer layouts, but let the lit board art show through.
-            RectTransform boardTint = CreateRect("BoardAreaTint", canvasObject.transform,
-                new Vector2(0f, 0f), new Vector2(1f, .46f), Vector2.zero, Vector2.zero);
-            var boardImage = boardTint.gameObject.AddComponent<UnityEngine.UI.Image>();
-            boardImage.color = new Color(.08f, .14f, .17f, .26f);
-            boardImage.raycastTarget = false;
-            boardImage.enabled = false;
-
-            RectTransform header = CreateRect("BattleHeader", canvasObject.transform,
-                new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(12f, -118f), new Vector2(-12f, -46f));
-            AddPanelImage(header, Panel);
-            hud.hpText = Text("YokaiHpText", header, "YOKAI HP —", 17, Ink,
-                new Vector2(0f, .5f), new Vector2(.55f, 1f), new Vector2(8f, 0f), new Vector2(-4f, -4f));
-            hud.timeText = Text("BattleTimeText", header, "TIME —", 17, Ink,
-                new Vector2(.55f, .5f), new Vector2(1f, 1f), new Vector2(4f, 0f), new Vector2(-8f, -4f));
-            hud.seatText = Text("SeatText", header, "NO SESSION", 13, DimInk,
-                new Vector2(0f, 0f), new Vector2(1f, .5f), new Vector2(8f, 4f), new Vector2(-8f, 0f));
-
-            RectTransform lobby = CreateRect("SessionControls", canvasObject.transform,
-                new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(12f, -262f), new Vector2(-12f, -126f));
-            AddPanelImage(lobby, Panel);
-            hud.sessionControls = lobby.gameObject;
-            hud.hostAddress = Input("HostAddressInput", lobby, "Host IP", "127.0.0.1",
-                new Vector2(.02f, .58f), new Vector2(.70f, .94f));
-            hud.port = Input("PortInput", lobby, "Port", "7777",
-                new Vector2(.73f, .58f), new Vector2(.98f, .94f));
-            hud.hostButton = Button("HostButton", lobby, "HOST", 0f);
-            hud.joinButton = Button("JoinButton", lobby, "JOIN", 1f);
-            hud.startButton = Button("StartButton", lobby, "START", 2f);
-            hud.leaveButton = Button("LeaveButton", lobby, "LEAVE", 3f);
-            hud.peersText = Text("PlayerCountText", lobby, "PLAYERS 0 / 3", 12, DimInk,
-                new Vector2(.02f, .01f), new Vector2(.98f, .19f), Vector2.zero, Vector2.zero);
-
-            hud.statusText = Text("SessionStatusText", canvasObject.transform, "Choose HOST or JOIN.", 13, Ink,
-                new Vector2(.03f, .64f), new Vector2(.97f, .68f), Vector2.zero, Vector2.zero);
-            hud.noticeText = Text("NoticeText", canvasObject.transform, string.Empty, 13,
-                new Color(1f, .76f, .44f), new Vector2(.03f, .60f), new Vector2(.97f, .64f), Vector2.zero, Vector2.zero);
-
-            RectTransform footer = CreateRect("BoardControls", canvasObject.transform,
-                new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(12f, 22f), new Vector2(-12f, 138f));
-            AddPanelImage(footer, Panel);
-            // Orbs are generated by tapping the drum on the board, so the footer has no button.
-            hud.staminaText = Text("StaminaText", footer, "STAMINA —", 15, Ink,
-                new Vector2(.03f, .58f), new Vector2(.54f, .96f), Vector2.zero, Vector2.zero);
-            hud.orbsText = Text("OrbCountText", footer, "ORBS —", 15, Ink,
-                new Vector2(.55f, .58f), new Vector2(.97f, .96f), Vector2.zero, Vector2.zero);
-
-            AddDeveloperUi(canvasObject.transform, network, config, sceneController, seatCamera);
         }
 
         private static void AddDeveloperUi(Transform canvasRoot, LabNetwork network,
@@ -501,12 +240,6 @@ namespace C6Lab.Editor
             rect.anchorMax = maximum;
             rect.offsetMin = Vector2.zero;
             rect.offsetMax = Vector2.zero;
-        }
-
-        private static void EnsureFolder(string parent, string child)
-        {
-            string path = parent + "/" + child;
-            if (!AssetDatabase.IsValidFolder(path)) AssetDatabase.CreateFolder(parent, child);
         }
 
         private static RectTransform CreateRect(string name, Transform parent,
