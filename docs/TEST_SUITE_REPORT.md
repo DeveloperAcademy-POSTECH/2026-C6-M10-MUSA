@@ -2,13 +2,13 @@
 
 ## 현재 구성 — 2026-11-05, 검사 시간 단축과 카테고리
 
-기준은 main `25014885`(#525 포함)에 이번 변경을 더한 것이다. 검사 C# 파일 255개, 어셈블리 6개다. 실제 실행 결과는 [VALIDATION](VALIDATION.md)의 2026-11-05 "검사 시간 단축" 절에 있다.
+기준은 main `d12f4f84`(#509 포함)에 이번 변경을 병합한 것이다. 검사 C# 파일 256개, 어셈블리 6개다. 아래 건수·시간은 병합한 트리의 2026-11-05 실행 값이고, 실제 실행 결과는 [VALIDATION](VALIDATION.md)의 2026-11-05 "검사 시간 단축" 절에 있다.
 
 | 어셈블리 | C# 파일 | 실행 케이스 |
 | --- | ---: | ---: |
-| C6Lab.EditModeTests | 128 | 1,785 |
+| C6Lab.EditModeTests | 130 | 1,782 |
 | Hapio.EditModeTests | 20 | 185 |
-| C6Lab.PlayModeTests | 90 (helper 2 포함) | 580 |
+| C6Lab.PlayModeTests | 89 (helper 2 포함) | 549 |
 | Hapio.PlayModeTests | 12 (SetUpFixture 1 포함) | 58 |
 | Hapio.Story.PlayModeTests | 4 | 28 |
 | Hapio.ClayPreview.PlayModeTests | 1 | 5 |
@@ -19,28 +19,30 @@ NUnit `[Category]`로 실행 범위를 고른다. 검사를 지우는 표시가 
 
 | 카테고리 | 뜻 | PlayMode | EditMode |
 | --- | --- | ---: | ---: |
-| `Slow` | fixture 하나가 5초 이상(2026-11-05 측정, 클래스 단위) | 249건 · 350.5초 | 0건 |
-| `GPU` | 실제 렌더링·픽셀 읽기가 필요하다 | 59건 · 77.1초 | 0건 |
-| `Bonjour` | macOS Bonjour 등록·검색이 필요하다 | 22건 · 49.9초 | 8건 |
-| `LabOnly` | Lab.unity, Lab DEV 패널, Development 솔로, 기본 OFF인 DEV 대안 기능만 검사한다 | 76건 · 62.7초 | 85건 |
-| `Legacy` | 도달할 수 없거나 대체된 기능, Editor 비교 도구를 검사한다 | 36건 · 35.9초 | 61건 |
+| `Slow` | fixture 하나가 5초 이상(2026-11-05 측정, 클래스 단위) | 236건 · 350.2초 | 0건 |
+| `GPU` | 실제 렌더링·픽셀 읽기가 필요하다 | 58건 · 84.0초 | 0건 |
+| `Bonjour` | macOS Bonjour 등록·검색이 필요하다 | 22건 · 51.7초 | 8건 |
+| `LabOnly` | Lab.unity, Lab DEV 패널, Development 솔로, 기본 OFF인 DEV 대안 기능만 검사한다 | 76건 · 67.1초 | 85건 |
+| `Legacy` | 도달할 수 없거나 대체된 기능, Editor 비교 도구를 검사한다 | 36건 · 39.3초 | 61건 |
 
 현재 경로를 지키는 유일한 검사에는 `Legacy`·`LabOnly`를 붙이지 않았다. `LabJigwiStageReplicationTests`의 빈 jigwiStage 호환·잘못된 헤더 거절, `LabJigwiActionRollbackTests`의 `CONTACT_COMBINE_DISABLED` 거절, `LabWatercolorV3IsolationTests`의 저장 프로필(클레이) 가드가 그렇다. Hapio도 쓰는 접속 취소(`LabQuickConnectTests.CancelingALocalPendingJoin…`), P번호 선택 승인·시간 초과(`LabLobbyPositionSelectionTests`), 실제 P 자리 매핑(`LabPlayerPaintPatternUiTests.BattleSamplesUseActualPSeats…`)도 Lab Scene에서 돌지만 `LabOnly`를 붙이지 않아 빠른 묶음에 남는다. 새 검사도 같은 기준으로 붙인다.
+
+main #509(`d12f4f84`)로 지귀 B 장막·5초 보상·실패 비우기 fence·B 불 소리 재생 경로를 게임이 쓰지 않게 됐다. 이 경로를 보는 기존 검사(`LabJigwiGroupFireAudioTests`·`LabJigwiMissionCancellationTests`의 일부, `LabJigwiReward*Tests`, `LabJigwiMissionPurgeGateTests` 등)에는 아직 `Legacy`를 붙이지 않았다. 모두 1초 안팎이라 빠른 묶음 시간에는 영향이 작다. 현재 B가 쓰는 물 궤적처럼 일부는 아직 쓰이므로 메서드 단위로 따로 정리한다.
 
 ### 실행 묶음
 
 | 묶음 | 인자 | 2026-11-05 결과 |
 | --- | --- | --- |
-| EditMode 전체 | `-testPlatform EditMode` | 1,970건 · 19.4초 |
-| EditMode 빠른 묶음 | `-testPlatform EditMode -testCategory "!Legacy;!LabOnly"` | 1,824건 · 18.1초 |
-| PlayMode 전체 | `-testPlatform PlayMode` | 671건 · 430.4초 |
-| PlayMode 빠른 묶음 | `-testPlatform PlayMode -testCategory "!Slow;!Legacy;!LabOnly"` | 358건 · 58.7초 |
+| EditMode 전체 | `-testPlatform EditMode` | 1,967건 · 25.1초 |
+| EditMode 빠른 묶음 | `-testPlatform EditMode -testCategory "!Legacy;!LabOnly"` | 1,821건 · 19.2초 |
+| PlayMode 전체 | `-testPlatform PlayMode` | 640건 · 435.9초 |
+| PlayMode 빠른 묶음 | `-testPlatform PlayMode -testCategory "!Slow;!Legacy;!LabOnly"` | 340건 · 61.0초 |
 
 예: `<Unity> -batchmode -projectPath . -runTests -testPlatform PlayMode -testCategory "!Slow;!Legacy;!LabOnly" -testResults <저장소 밖 경로>/play.xml`. `!`를 여러 개 쓰면 모두 제외된다. 빠른 묶음 결과 XML에 제외한 카테고리가 0건임을 확인했다. 평소에는 빠른 묶음을, PR 전에는 전체를 돌린다. Hapio 흐름 검사(`GameSceneFlowTests` 등)는 `Slow`라 빠른 묶음에서 빠진다. 흐름을 고쳤다면 해당 fixture를 `-testFilter`로 따로 돌린다.
 
 ### 줄인 시간
 
-같은 worktree·같은 Mac에서 변경 전후를 잰 값이다.
+같은 worktree·같은 Mac에서 변경 전후를 잰 값이다. #509 병합 전(main `25014885` 기준)에 쟀다.
 
 | 항목 | 전 | 후 | 방법 |
 | --- | ---: | ---: | --- |
@@ -59,13 +61,13 @@ NUnit `[Category]`로 실행 범위를 고른다. 검사를 지우는 표시가 
 
 ### batch 실행에서 원래 실패하던 검사
 
-변경 전 main `25014885` 실행부터 실패했고, 이번 변경과는 관계없다.
+변경 전 main `25014885` 실행부터 실패했고, 이번 변경과는 관계없다. 병합한 트리(main `d12f4f84`)에서 다시 확인했다.
 
 - 매번 실패:
   - `LabHangingRenderInterpolationTests.OutsideRenderingTheTransformsAlwaysHoldTheFixedPose`: batchmode에서 WaitForEndOfFrame이 호출되지 않는다.
-  - `LabJigwiABPresentationTests.SavedRawImagesRenderWarmAAndBAndBlueWaterIntoAnIsolatedPortraitUiTarget`: 불꽃 픽셀이 0이다.
+  - (병합 뒤 없음) `LabJigwiABPresentationTests.SavedRawImagesRenderWarmAAndBAndBlueWaterIntoAnIsolatedPortraitUiTarget`: 불꽃 픽셀이 0이었다. main #509(`d12f4f84`)가 이 검사를 지웠다.
   - `LabWatercolorPaintRuntimeTests.DescriptorBurstRespectsTheActiveCapAndConvergesToASettledCheckpoint`: 색이 1단계 다르다.
-- 때때로 실패: `LabJigwiWaterTrailTests`, `LabPlayerPaintPatternRenderTests`의 여섯 P 구분, `LabWatercolorSurfaceGrainTests`의 정적 입자.
+- 때때로 실패: `LabJigwiWaterTrailTests`, `LabPlayerPaintPatternRenderTests`의 여섯 P 구분, `LabWatercolorSurfaceGrainTests`의 정적 입자·종이 영향, `LabPaintSpreadFlowRenderTests.SavedShellComparesLegacyAndSpreadFlow…`(경계 반올림 3, 병합 뒤 전체 실행에서 한 번 실패했고 단독 3회·GPU 묶음 1회 재실행은 모두 통과).
 - 매번 Inconclusive: `LabHangingRenderInterpolationTests.DuringRealRenderingTheDrawnPoseLiesBetweenTheTwoFixedPoses`.
 
 ## 2026-10-29 구성 — #380 (당시 기록)

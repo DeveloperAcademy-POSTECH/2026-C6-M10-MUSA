@@ -2,7 +2,7 @@
 
 ## 2026-11-05 — 검사 시간 단축·카테고리
 
-`chore/test-suite-speedup` 브랜치(main `25014885` 기준)의 별도 worktree에서 실행했다. Unity 6000.6.5f1 batch mode, macOS, 같은 Mac이다. 아래 표는 실제로 실행한 것만 적는다. 시간은 NUnit XML의 `duration`이고, Unity 시작·가져오기·컴파일은 포함하지 않는다.
+`chore/test-suite-speedup` 브랜치(main `25014885` 기준)의 별도 worktree에서 실행했다. 표 끝의 "병합 뒤" 행은 main `d12f4f84`(#509)를 병합한 트리에서 실행했다. Unity 6000.6.5f1 batch mode, macOS, 같은 Mac이다. 아래 표는 실제로 실행한 것만 적는다. 시간은 NUnit XML의 `duration`이고, Unity 시작·가져오기·컴파일은 포함하지 않는다.
 
 | 확인 | 결과 | 범위 |
 | --- | --- | --- |
@@ -16,6 +16,11 @@
 | 코드 검토 | 독립 검토 3관점 + 반박 검증 | 확인된 4건 수정: 다시보기 검사의 대기를 `ResetSwing` 앞으로 옮겨 첫 투척이 리셋 자세에서 출발하게 함, Hapio도 쓰는 공용 경로 검사 3파일(`LabQuickConnectTests`, `LabLobbyPositionSelectionTests`, `LabPlayerPaintPatternUiTests`)의 `LabOnly`를 메서드 단위로 좁힘. 기각 3건(Slow 클래스 안의 짧은 동기 검사는 클래스 단위 유지) |
 | 검토 수정 뒤 최종 PlayMode 전체 | **671건 중 666 PASS · 4 FAIL · 1 Inconclusive**, 430.4초 | Hapio PlayMode 152.1초(전 362.6초), `GameSceneFlowTests` 83.3초(전 223.5초), 다시보기 5건 통과. 실패 4건은 모두 기존 실패다(아래 3건 + `LabWatercolorSurfaceGrainTests` 정적 입자, 1차 변경 뒤에도 같은 실패) |
 | 검토 수정 뒤 최종 PlayMode 빠른 묶음 | **358건 중 355 PASS · 2 FAIL · 1 Inconclusive**, 58.7초 | 제외 카테고리 0건. 실패 2건은 기존 실패다. EditMode는 r3 이후 바뀌지 않아 다시 돌리지 않았다 |
+| 병합 뒤 EditMode 전체 | **1967 PASS / 0 FAIL**, 25.1초 | 빠른 묶음(`"!Legacy;!LabOnly"`) **1821 PASS**, 19.2초, 제외 카테고리 0건 |
+| 병합 뒤 PlayMode 전체 | **640건 중 635 PASS · 4 FAIL · 1 Inconclusive**, 435.9초 | Hapio PlayMode 156.4초, `GameJigwiStageIntegrationTests` 3.4초(검사 전용 시작 단축 아래 #509 A·B 통과). 실패 중 3건은 기존 실패(`LabHangingRenderInterpolationTests` 렌더 밖 자세, `LabWatercolorPaintRuntimeTests` Descriptor, `LabWatercolorSurfaceGrainTests` 종이 영향 2). `LabPaintSpreadFlowRenderTests.SavedShellComparesLegacyAndSpreadFlow…`는 경계 반올림 3으로 한 번 실패했다. 단독 3회 재실행과 GPU 묶음 재실행에서 모두 통과했고 그 전 4회 전체 실행에서도 통과했다 |
+| 병합 뒤 GPU 묶음 | **58건 중 56 PASS · 1 FAIL · 1 Inconclusive**, 75.4초 | 실패는 기존 `LabWatercolorPaintRuntimeTests` Descriptor다 |
+| 병합 검토 | 독립 검토 3관점 + 반박 검증 | 수정 3건: 자동 병합이 #509가 지운 검사의 `GPU`를 다른 검사(`BMaskUsesTheBattleViewport…`)로 옮긴 것을 되돌림, 0.55초가 된 `LabJigwiABNetworkTests`의 `Slow` 제거, 보고서 현재 구성 건수 갱신. #509로 안 쓰이게 된 경로를 보는 검사의 `Legacy` 정리는 하지 않았다(보고서에 적음) |
+| 병합 뒤 PlayMode 빠른 묶음(`Slow` 제거 후) | **340건 중 338 PASS · 1 FAIL · 1 Inconclusive**, 61.0초 | 제외 카테고리 0건. 실패와 Inconclusive는 기존 `LabHangingRenderInterpolationTests` 2건이다 |
 
 기존 실패(변경 전 기준 실행부터 있었고 이번 변경과 관계없음):
 
@@ -34,6 +39,21 @@
 - 실제 게임의 시작 대기: 기본값을 바꾸지 않았으므로 앱 실행 확인은 하지 않았다
 
 구성·카테고리·실행 묶음은 [검사 모음 보고서](TEST_SUITE_REPORT.md)의 현재 구성 절에 있다.
+
+## 2026-11-04~05 — #509 지귀 B 지목 동시 명중
+
+`feat/#509-jigwi-group-sync`(#479 브랜치 위) 작업 중 팀원이 Unity6000.6.5f1 Editor(macOS)로 확인한 것만 적는다.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| (1/5) Host 규칙 EditMode | **팀원 PASS 보고** | `LabJigwiABModelTests`·`LabJigwiABSupplyModelTests`·`LabJigwiStageModelTests`·`LabJigwiStageBlastTests`·`LabJigwiSupplyReplicationTests`·`LabBoardReplicationTests`·`LabSharedSettingsSchemaTests`·`LabGameFlowBridgeTests` (테스트 픽스처 실수 4건을 고친 뒤) |
+| (3/5) DEV 은퇴 EditMode | **팀원 PASS 보고** | `LabDeveloperConfigTests`·`LabJigwiABConfigTests`·`LabJigwiStageConfigTests`·`GameStageSettingsTests`·`MenuScreens_HaveSavedEditableCanvasAndInput` |
+
+(2/5) `LabJigwiSyncPillarViewTests`와 (4/5) PlayMode(`LabJigwiABPresentationTests`·`LabJigwiABNetworkTests`·`LabJigwiGroupFireAudioTests`·`GameJigwiStageIntegrationTests`), EditMode 전체 Run All, SOLO/2인 이상 Play, 실기기 진동·iOS 빌드·LAN/핫스팟은 이 기록 시점에 **결과를 받지 못했거나 미실행**이다. 확인하면 이 절에 덧붙인다.
+
+이후 단계: (6/9) 지귀 A/B 외침 목소리 삭제와 (7/9) 불기둥 대신 박 동시 명중으로 바꾼 뒤 팀원이 Test Runner를 돌려 실패 2개를 보고했고, 테스트 픽스처(동기 명중에 지급 물 구슬 사용)를 고쳤다. (8/9) 성공 물벼락 / 실패 조합판 불바다 3초 / 5초 보상과 DEV251/252 은퇴는 커밋만 했고 **Test Runner 결과는 아직 받지 못했다**.
+
+#479 브랜치(main `0681d25` #506까지 병합)를 합쳤다. 충돌은 접속 번호 줄, `LabModel.cs` 칠하기 줄(main의 `paintImpactStrength` + #509 승리 1회 조건), `AGENTS.md`/`JIGWI_SCREEN_PATTERNS.md` 절이었다. #509는 **5688/`C6PhysicsLab/49`/`C6HapioGame/33`**, 설정 259개다. 병합 뒤 결과는 아직 기록하지 않았다.
 
 ## 2026-11-05 — 마지막 일격 다시보기 (스토리 1·2·3)
 
