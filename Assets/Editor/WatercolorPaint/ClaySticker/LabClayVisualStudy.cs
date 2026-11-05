@@ -344,7 +344,7 @@ namespace C6Lab.Experiments.Editor
             }
             public void Dispose(){Runtime.Dispose();Journal?.Dispose();}
         }
-        sealed class Preview:IDisposable
+        internal sealed class Preview:IDisposable
         {
             readonly LabPaintStudyRenderer renderer;
             Material clay;
@@ -381,14 +381,14 @@ namespace C6Lab.Experiments.Editor
         static string Scenes()=>string.Join("|",Enumerable.Range(0,SceneManager.sceneCount).Select(i=>{var s=SceneManager.GetSceneAt(i);return s.handle+":"+s.path+":"+s.isDirty;}));
         static string Hash(LabPaintSurface surface)
         {var colors=new Color32[surface.CellCount];var owners=new byte[surface.CellCount];surface.CopyPixels(colors);surface.CopyPainterSlots(owners);return LabPaintPublisher.Hash(colors,owners);}
-        static void Grid(string directory,string name,IList<Texture2D> frames,int columns)
+        internal static void Grid(string directory,string name,IList<Texture2D> frames,int columns)
         {
             int size=LabPaintStudyRenderer.RenderSize,rows=(frames.Count+columns-1)/columns;
             var sheet=new Texture2D(columns*size,rows*size,TextureFormat.RGBA32,false,false);
             try{for(int i=0;i<frames.Count;i++)sheet.SetPixels32(i%columns*size,(rows-1-i/columns)*size,size,size,frames[i].GetPixels32());sheet.Apply();Save(directory,name,sheet);}
             finally{Object.DestroyImmediate(sheet);}
         }
-        static void Save(string directory,string name,Texture2D image)=>File.WriteAllBytes(Path.Combine(directory,name),image.EncodeToPNG());
+        internal static void Save(string directory,string name,Texture2D image)=>File.WriteAllBytes(Path.Combine(directory,name),image.EncodeToPNG());
         static void Require(bool condition,string message){if(!condition)throw new InvalidOperationException(message);}
     }
 }

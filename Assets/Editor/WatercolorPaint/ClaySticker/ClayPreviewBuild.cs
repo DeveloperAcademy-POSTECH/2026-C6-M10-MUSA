@@ -150,7 +150,7 @@ namespace C6Lab.Experiments.Editor
             return json;
         }
 
-        private static Texture2D ReadMap(RenderTexture source, TextureFormat format)
+        internal static Texture2D ReadMap(RenderTexture source, TextureFormat format)
         {
             Require(source != null && source.IsCreated(), "The completed sample GPU map is unavailable.");
             var copy = new Texture2D(source.width, source.height, format, false, true)
@@ -167,7 +167,7 @@ namespace C6Lab.Experiments.Editor
             finally { RenderTexture.active = previous; }
         }
 
-        private static float Difference(Texture2D expected, Texture2D actual)
+        internal static float Difference(Texture2D expected, Texture2D actual)
         {
             Require(actual != null && expected.width == actual.width && expected.height == actual.height,
                 "The imported map dimensions do not match the actual GPU map.");
@@ -183,7 +183,7 @@ namespace C6Lab.Experiments.Editor
             return maximum;
         }
 
-        private static void ImportMap(string path, bool height, bool readable)
+        internal static void ImportMap(string path, bool height, bool readable)
         {
             AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceSynchronousImport);
             var importer = AssetImporter.GetAtPath(path) as TextureImporter;
@@ -268,7 +268,7 @@ namespace C6Lab.Experiments.Editor
             return settings;
         }
 
-        private static void RequirePreviewSceneSaved()
+        internal static void RequirePreviewSceneSaved()
         {
             Scene existing = SceneManager.GetSceneByPath(ScenePath);
             Require(!existing.IsValid() || !existing.isLoaded || !existing.isDirty,
@@ -351,7 +351,7 @@ namespace C6Lab.Experiments.Editor
             }, true);
         }
 
-        private static void ValidateMap(string path, bool height)
+        internal static void ValidateMap(string path, bool height)
         {
             var texture = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
             var importer = AssetImporter.GetAtPath(path) as TextureImporter;
@@ -392,7 +392,10 @@ namespace C6Lab.Experiments.Editor
             }
         }
 
-        public static string BuildMac()
+        public static string BuildMac() => BuildMac(ScenePath, ValidatePreparedSample);
+
+        // Comparison Scenes opt in explicitly; the ordinary game and v2 build stay unchanged.
+        internal static string BuildMac(string scenePath, Func<string> validateSample)
         {
             RequireStopped();
             string output = Path.Combine(ProjectRoot, "Builds", "Experiments", "ClayPreview",
@@ -409,7 +412,8 @@ namespace C6Lab.Experiments.Editor
             {
                 Require(!Enumerable.Range(0, SceneManager.sceneCount).Any(i => SceneManager.GetSceneAt(i).isDirty),
                     "Save or keep a separate copy of unsaved Scene edits before building. This tool never saves them automatically.");
-                ValidatePreparedSample();
+                Require(!string.IsNullOrEmpty(scenePath) && validateSample != null, "The isolated build Scene/validator is missing.");
+                validateSample();
                 if (previousTarget != BuildTarget.StandaloneOSX)
                     Require(EditorUserBuildSettings.SwitchActiveBuildTarget(BuildTargetGroup.Standalone, BuildTarget.StandaloneOSX),
                         "Could not activate the installed Mac build platform.");
@@ -418,7 +422,7 @@ namespace C6Lab.Experiments.Editor
                 player.ApplyPreviewDefaults();
                 BuildReport report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
                 {
-                    scenes = new[] { ScenePath }, locationPathName = output,
+                    scenes = new[] { scenePath }, locationPathName = output,
                     target = BuildTarget.StandaloneOSX, options = BuildOptions.Development
                 });
                 Require(report != null && report.summary.result == BuildResult.Succeeded,
@@ -543,19 +547,19 @@ namespace C6Lab.Experiments.Editor
         }
 
         private static string ProjectRoot => Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
-        private static string BuildScenesState() => string.Join("|", EditorBuildSettings.scenes.Select(s => s.path + ":" + s.enabled));
-        private static string SceneState() => string.Join("|", Enumerable.Range(0, SceneManager.sceneCount)
+        internal static string BuildScenesState() => string.Join("|", EditorBuildSettings.scenes.Select(s => s.path + ":" + s.enabled));
+        internal static string SceneState() => string.Join("|", Enumerable.Range(0, SceneManager.sceneCount)
             .Select(i => { Scene s = SceneManager.GetSceneAt(i); return s.handle + ":" + s.path + ":" + s.isDirty; }));
-        private static void RequireStopped() => Require(!EditorApplication.isPlayingOrWillChangePlaymode
+        internal static void RequireStopped() => Require(!EditorApplication.isPlayingOrWillChangePlaymode
             && !EditorApplication.isCompiling && !BuildPipeline.isBuildingPlayer, "Stop Play mode and finish compilation/building first.");
         private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
-        private static string Hash(byte[] data) { using (var hash = SHA256.Create()) return BitConverter.ToString(hash.ComputeHash(data)).Replace("-", "").ToLowerInvariant(); }
+        internal static string Hash(byte[] data) { using (var hash = SHA256.Create()) return BitConverter.ToString(hash.ComputeHash(data)).Replace("-", "").ToLowerInvariant(); }
         private static void WriteStatus(BuildStatus status)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(ResultPath));
             File.WriteAllText(ResultPath, JsonUtility.ToJson(status, true));
         }
-        private static void EnsureFolder(string path)
+        internal static void EnsureFolder(string path)
         {
             if (AssetDatabase.IsValidFolder(path)) return;
             string parent = Path.GetDirectoryName(path)?.Replace('\\', '/');

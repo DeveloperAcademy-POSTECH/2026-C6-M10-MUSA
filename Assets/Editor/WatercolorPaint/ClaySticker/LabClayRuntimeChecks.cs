@@ -150,9 +150,9 @@ namespace C6Lab.Experiments.Editor
                 checks.Add("impact changes opaque pigment density while preserving identical shape alpha");
             }
         }
-        static void CheckErase(LabWatercolorStampSettings settings,List<string> checks)
+        internal static void CheckErase(LabWatercolorStampSettings settings,List<string> checks,Func<LabClayStickerRuntime> factory=null)
         {
-            using(var journal=Journal(settings,64,32))using(var runtime=new LabClayStickerRuntime())
+            using(var journal=Journal(settings,64,32))using(var runtime=factory?.Invoke()??new LabClayStickerRuntime())
             {
                 int[] cells=Rectangle(64,24,40,10,22);Append(journal,Stamp(Color.red,1),cells);Finish(runtime,journal,settings,false);
                 foreach(int cell in cells)Require(journal.AppendErase(cell,9),"Record erase.");
@@ -165,9 +165,9 @@ namespace C6Lab.Experiments.Editor
                 checks.Add("drying clears every accumulated layer and outside halo; repaint cannot revive old pigment");
             }
         }
-        static void CheckOldStrokes(LabWatercolorStampSettings settings,List<string> checks)
+        internal static void CheckOldStrokes(LabWatercolorStampSettings settings,List<string> checks,Func<LabClayStickerRuntime> factory=null)
         {
-            using(var journal=Journal(settings,64,32))using(var runtime=new LabClayStickerRuntime())using(var replay=new LabClayStickerRuntime())
+            using(var journal=Journal(settings,64,32))using(var runtime=factory?.Invoke()??new LabClayStickerRuntime())using(var replay=factory?.Invoke()??new LabClayStickerRuntime())
             {
                 uint first=0;
                 for(int i=0;i<129;i++)

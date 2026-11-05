@@ -256,3 +256,11 @@
 - 현재 클레이 표현은 `clay-stickers-v2`다. 높이 R은 기존 변위, GB는 커버리지와 함께 인코딩한 공통 표면 기준 조명 기울기(최대25도), A는 실제 스티커 커버리지다. 완료용 바탕층은 색만 채우며 광택 마스크를 채우지 않는다. Gloss는 기존 공통0~1이고 두께와 독립적이다. 색/R/판정/통신 형식은 유지한다.
 - 관람/PNG는 전체 높이 채널을 복사한다. Mac 실험은 `clay-preview-sample-v2`와 Scene에 고정된 메타데이터를 검사하며 구형 EXR를 거절한다. Prepare/Rebake에서만 샘플을 재생성하고 Build는 읽기 전용으로 검사한다. 일반 Scene/원본 모델은 바꾸지 않는다.
 - Editor 전용 v1 reference shader 2개는 실제 GPU 결과의 독립 회귀 기준이다. Player 의존성에 넣지 않는다. 현재 접속 묶음5687/Lab48/Game32·설정259개는 그대로다. 사용법은 CLAY_STICKER_PAINT, 실제 실행 결과만 VALIDATION에 기록한다.
+
+
+## #527 둥근 클레이 비교 실험
+
+- `Assets/Experiments/ClayPreview/Rounded/Scenes/RoundedClayPreview.unity`는 원본 #524·기존 윤곽 개선 재질·둥근 윤곽 개선 재질의 Mac 전용 비교다. 일반 Home/Lab 실행 Scene 목록과 게임의 v2 표현 기본값을 변경하지 않는다.
+- 표현용 브러시/색 농도는 `LabClayStickerRuntime`의 명시적 생성자에만 주입한다. 게임 기본 생성자는 기존 Resources와 라운드 프로필을 유지한다. 실험 v3 metadata와 원래 v2 게임 기록 형식을 혼동하지 않는다.
+- 원본 생성 PNG는 보존하고 Alpha에서 순백색 마스크·20px 둥근 높이를 베이크한다. 같은 seed123·실제 67회 명중 저널의 판정/기록 해시를 세 프리셋에서 유지한다. 기존 v2 샘플을 자동 갱신해 비교 기준을 바꾸지 않는다.
+- 준비는 `C6 Lab/Experiments/Rounded Clay/Prepare Imported Comparison`, 빌드는 `Build Mac Comparison App`이다. 준비는 명시적으로만 수행하고 빌드 검증은 샘플을 다시 굽지 않는다. 사용법/한계는 `docs/ROUNDED_CLAY_STICKER_EXPERIMENT.md`, 수행 결과는 `docs/VALIDATION.md`를 따른다.

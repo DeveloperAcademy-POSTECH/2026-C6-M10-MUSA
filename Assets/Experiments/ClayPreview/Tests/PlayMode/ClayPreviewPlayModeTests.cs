@@ -21,6 +21,7 @@ namespace Hapio.Experiments.Tests
     {
         const string Root = "Assets/Experiments/ClayPreview/";
         const string ScenePath = Root + "Scenes/ClayPreview.unity";
+        const string RoundedScenePath = Root + "Rounded/Scenes/RoundedClayPreview.unity";
         const string ColorPath = Root + "Sample/Color.png";
         const string HeightPath = Root + "Sample/Height.exr";
         const string SourcePrefab = "Assets/Lab/Resources/GourdPaint/WhiteGourd.prefab";
@@ -264,6 +265,125 @@ namespace Hapio.Experiments.Tests
         }
 
         [UnityTest]
+        public IEnumerator ThreePreparedPresetsShareOneRecordAndSwitchWithoutReplacingTheModelOrMaterial()
+        {
+            yield return LoadComparison();
+            Assert.That(preview.PresetCount, Is.EqualTo(3));
+            Assert.That(preview.ActivePreset, Is.EqualTo(2), "The rounded contour experiment is the initial comparison.");
+            Assert.That(preview.IsEnhanced, Is.True);
+            AssertAppearance(.014f, .08f);
+            AssertSurfaceDetails(.15f, 1f);
+            var root = preview.GetComponent<UIDocument>().rootVisualElement;
+            Assert.That(root.Q<ScrollView>("materialPanel"), Is.Not.Null,
+                "All controls remain reachable when the comparison panel is taller than the window.");
+            string[] buttons = { "originalPreset", "materialPreset", "roundedPreset" };
+            Material sharedPreviewMaterial = preview.ClayMaterial;
+            Transform model = preview.ModelRoot;
+            preview.SetView(37f, 18f, 1.3f);
+            ClayPreviewSampleInfo first = null;
+            string[] paths = preview.presets.SelectMany(p => new[] { AssetDatabase.GetAssetPath(p.colorMap),
+                AssetDatabase.GetAssetPath(p.heightMap), AssetDatabase.GetAssetPath(p.sampleInfo) }).ToArray();
+            string[] hashes = paths.Select(FileHash).ToArray();
+            string[] dependencies = AssetDatabase.GetDependencies(RoundedScenePath, true);
+            for (int i = 0; i < buttons.Length; i++)
+            {
+                Submit(root.Q<Button>(buttons[i]));
+                yield return null;
+                ClayPreviewPreset preset = preview.presets[i];
+                Assert.That(preview.ActivePreset, Is.EqualTo(i));
+                Assert.That(preview.ClayMaterial, Is.SameAs(sharedPreviewMaterial));
+                Assert.That(preview.ModelRoot, Is.SameAs(model));
+                Assert.That(preview.colorMap, Is.SameAs(preset.colorMap));
+                Assert.That(preview.heightMap, Is.SameAs(preset.heightMap));
+                Assert.That(preview.ClayMaterial.shader, Is.SameAs(preset.shader));
+                Assert.That(preview.ClayMaterial.GetTexture("_PaintMap"), Is.SameAs(preset.colorMap));
+                Assert.That(preview.ClayMaterial.GetTexture("_HeightMap"), Is.SameAs(preset.heightMap));
+                Assert.That(preview.ClayMaterial.shader.name, Is.EqualTo(i == 0 ? ClayPreviewController.OriginalShader : ClayPreviewController.EnhancedShader));
+                Assert.That(dependencies, Does.Contain(AssetDatabase.GetAssetPath(preset.shader)), "Both shaders must survive Player stripping.");
+                Assert.That(root.Q<VisualElement>("enhancedControls").enabledInHierarchy, Is.EqualTo(i > 0));
+                AssertAppearance(i == 0 ? .01f : .014f, i == 0 ? .35f : .08f);
+                if (i > 0) AssertSurfaceDetails(.15f, 1f);
+                Assert.That(preview.Yaw, Is.EqualTo(37f));
+                Assert.That(preview.Pitch, Is.EqualTo(18f));
+                Assert.That(preview.Zoom, Is.EqualTo(1.3f));
+                Assert.That(ClayPreviewSampleInfo.TryValidate(preset.sampleInfo.text, preset.sampleMetadataHash,
+                    out ClayPreviewSampleInfo info, out string error), Is.True, error);
+                Assert.That(info.format, Is.EqualTo(i == 0 ? ClayPreviewSampleInfo.FormatVersion : ClayPreviewSampleInfo.ExperimentFormatVersion));
+                if (first == null) first = info;
+                else
+                {
+                    Assert.That(info.seed, Is.EqualTo(first.seed));
+                    Assert.That(info.sourceConfigHash, Is.EqualTo(first.sourceConfigHash));
+                    Assert.That(info.authorityHash, Is.EqualTo(first.authorityHash));
+                    Assert.That(info.recordHash, Is.EqualTo(first.recordHash));
+                }
+            }
+            Assert.That(paths.Select(FileHash).ToArray(), Is.EqualTo(hashes), "Comparison never repaints or overwrites any saved preset.");
+        }
+
+        [UnityTest]
+        public IEnumerator EnhancedSlidersAreIndependentAndResetOnlyTheCurrentPreset()
+        {
+            yield return LoadComparison();
+            var root = preview.GetComponent<UIDocument>().rootVisualElement;
+            Slider contact = root.Q<Slider>("contactSlider"), detail = root.Q<Slider>("detailSlider");
+            Assert.That(contact, Is.Not.Null); Assert.That(detail, Is.Not.Null);
+            Assert.That(contact.lowValue, Is.Zero); Assert.That(contact.highValue, Is.EqualTo(.5f));
+            Assert.That(detail.lowValue, Is.Zero); Assert.That(detail.highValue, Is.EqualTo(1f));
+            Texture color = preview.colorMap, height = preview.heightMap;
+            contact.value = .5f; yield return null;
+            AssertSurfaceDetails(.5f, 1f); AssertAppearance(.014f, .08f);
+            detail.value = 0f; yield return null;
+            AssertSurfaceDetails(.5f, 0f); AssertAppearance(.014f, .08f);
+            root.Q<Slider>("thicknessSlider").value = 0f;
+            root.Q<Slider>("glossSlider").value = .4f;
+            yield return null;
+            AssertAppearance(0f, .4f); AssertSurfaceDetails(.5f, 0f);
+            preview.SetView(65f, 25f, 1.4f);
+            Submit(root.Q<Button>("resetButton")); yield return null;
+            Assert.That(preview.ActivePreset, Is.EqualTo(2));
+            AssertAppearance(.014f, .08f); AssertSurfaceDetails(.15f, 1f);
+            Assert.That(preview.Yaw, Is.Zero); Assert.That(preview.Pitch, Is.Zero); Assert.That(preview.Zoom, Is.EqualTo(1f));
+            Assert.That(preview.colorMap, Is.SameAs(color)); Assert.That(preview.heightMap, Is.SameAs(height));
+            preview.SelectPreset(0);
+            Assert.That(contact.enabledInHierarchy, Is.False); Assert.That(detail.enabledInHierarchy, Is.False);
+            AssertAppearance(.01f, .35f);
+            preview.SelectPreset(1);
+            Assert.That(contact.enabledInHierarchy, Is.True); Assert.That(detail.enabledInHierarchy, Is.True);
+            AssertAppearance(.014f, .08f); AssertSurfaceDetails(.15f, 1f);
+        }
+
+        [UnityTest]
+        public IEnumerator ComparisonRejectsAChangedArtworkRecordBeforeCreatingAnyPresentation()
+        {
+            yield return LoadComparison();
+            var presets = preview.presets.Select(p => new ClayPreviewPreset
+            {
+                label = p.label, colorMap = p.colorMap, heightMap = p.heightMap, sampleInfo = p.sampleInfo,
+                sampleMetadataHash = p.sampleMetadataHash, shader = p.shader, improvedMaterial = p.improvedMaterial
+            }).ToArray();
+            var changedInfo = JsonUtility.FromJson<ClayPreviewSampleInfo>(presets[2].sampleInfo.text);
+            changedInfo.recordHash = (changedInfo.recordHash[0] == 'a' ? "b" : "a") + changedInfo.recordHash.Substring(1);
+            var changedMetadata = new TextAsset(JsonUtility.ToJson(changedInfo));
+            presets[2].sampleInfo = changedMetadata;
+            presets[2].sampleMetadataHash = ClayPreviewSampleInfo.ContentHash(changedMetadata.text);
+            var root = new GameObject("Rejected comparison record"); root.SetActive(false);
+            var rejected = root.AddComponent<ClayPreviewController>();
+            rejected.sourcePrefab = preview.sourcePrefab; rejected.presets = presets;
+            int frameRate = Application.targetFrameRate, vsync = QualitySettings.vSyncCount;
+            try
+            {
+                LogAssert.Expect(LogType.Error, "CLAY_PREVIEW_FAILED: Comparison presets must replay the same fixed artwork and game judgement.");
+                root.SetActive(true);
+                Assert.That(rejected.IsReady, Is.False);
+                Assert.That(rejected.ClayMaterial, Is.Null); Assert.That(rejected.ModelRoot, Is.Null);
+                Assert.That(Application.targetFrameRate, Is.EqualTo(frameRate)); Assert.That(QualitySettings.vSyncCount, Is.EqualTo(vsync));
+            }
+            finally { Object.Destroy(root); Object.Destroy(changedMetadata); }
+            yield return null;
+        }
+
+        [UnityTest]
         public IEnumerator UnloadingReleasesOnlyOwnedObjectsAndRestoresApplicationSettings()
         {
             Transform model = preview.ModelRoot;
@@ -293,6 +413,28 @@ namespace Hapio.Experiments.Tests
             Assert.That(preview.Gloss, Is.EqualTo(gloss).Within(.000001f));
             Assert.That(preview.ClayMaterial.GetFloat("_ClayThickness"), Is.EqualTo(thickness).Within(.000001f));
             Assert.That(preview.ClayMaterial.GetFloat("_ClayGloss"), Is.EqualTo(gloss).Within(.000001f));
+        }
+
+        void AssertSurfaceDetails(float contact, float detail)
+        {
+            Assert.That(preview.ContactStrength, Is.EqualTo(contact).Within(.000001f));
+            Assert.That(preview.DetailStrength, Is.EqualTo(detail).Within(.000001f));
+            Assert.That(preview.ClayMaterial.GetFloat("_ClayContactStrength"), Is.EqualTo(contact).Within(.000001f));
+            Assert.That(preview.ClayMaterial.GetFloat("_ClayDetailStrength"), Is.EqualTo(detail).Within(.000001f));
+        }
+
+        IEnumerator LoadComparison()
+        {
+            yield return UnloadPreview();
+            Assert.That(File.Exists(AbsolutePath(RoundedScenePath)), Is.True, "Prepare the isolated rounded-clay comparison first.");
+            yield return EditorSceneManager.LoadSceneAsyncInPlayMode(RoundedScenePath, new LoadSceneParameters(LoadSceneMode.Single));
+            scene = SceneManager.GetSceneByPath(RoundedScenePath);
+            preview = scene.GetRootGameObjects().SelectMany(x => x.GetComponentsInChildren<ClayPreviewController>(true)).Single();
+            float deadline = Time.realtimeSinceStartup + 5f;
+            while ((!preview.IsReady || preview.GetComponent<UIDocument>().rootVisualElement.panel == null)
+                && Time.realtimeSinceStartup < deadline) yield return null;
+            Assert.That(preview.Error, Is.Null.Or.Empty);
+            Assert.That(preview.IsReady, Is.True);
         }
 
         static void Submit(Button button)

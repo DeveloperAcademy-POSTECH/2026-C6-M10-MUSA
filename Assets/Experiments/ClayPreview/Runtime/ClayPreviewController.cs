@@ -15,11 +15,13 @@ namespace Hapio.Experiments
     {
         public const string FormatVersion = "clay-preview-sample-v2";
         public const string StyleVersion = "clay-stickers-v2";
+        public const string ExperimentFormatVersion = "clay-preview-sample-v3";
+        public const string ExperimentStyleVersion = "clay-stickers-v3";
         public const string HeightChannels = "R:physical-height;GB:coating-normal;A:actual-coverage";
 
         public string format = FormatVersion;
         public string heightChannels = HeightChannels;
-        public string unity, createdUtc, styleVersion, sourceConfigHash, authorityHash;
+        public string unity, createdUtc, styleVersion, sourceConfigHash, authorityHash, recordHash;
         public string colorFileHash, heightFileHash, colorRawHash, heightRawHash, physicalHeightRawHash;
         public int seed = 123, width = 1024, height = 512, hits, cells, totalCells;
         public float colorRoundtripMaxError, heightRoundtripMaxError;
@@ -38,10 +40,16 @@ namespace Hapio.Experiments
             try
             {
                 info = JsonUtility.FromJson<ClayPreviewSampleInfo>(json);
-                if (info == null || info.format != FormatVersion || info.heightChannels != HeightChannels)
-                    throw new InvalidOperationException("Prepare the v2 preview sample: the legacy height map has no coating normals or coverage.");
-                if (string.IsNullOrEmpty(info.styleVersion) || !info.styleVersion.StartsWith(StyleVersion + "/", StringComparison.Ordinal))
+                bool production = info != null && info.format == FormatVersion;
+                bool experiment = info != null && info.format == ExperimentFormatVersion;
+                if ((!production && !experiment) || info.heightChannels != HeightChannels)
+                    throw new InvalidOperationException("Prepare the v2/v3 preview sample: the legacy height map has no coating normals or coverage.");
+                if (string.IsNullOrEmpty(info.styleVersion) || (production
+                    ? !info.styleVersion.StartsWith(StyleVersion + "/", StringComparison.Ordinal)
+                    : info.styleVersion != ExperimentStyleVersion))
                     throw new InvalidOperationException("The preview sample and clay shader style versions do not match.");
+                if (experiment && !IsHash(info.recordHash))
+                    throw new InvalidOperationException("The experimental sample has no fixed artwork record hash.");
                 if (!IsHash(expectedMetadataHash) || !string.Equals(ContentHash(json), expectedMetadataHash, StringComparison.Ordinal))
                     throw new InvalidOperationException("The preview Scene is not bound to this generated sample metadata. Prepare the preview again.");
                 if (!IsHash(info.colorFileHash) || !IsHash(info.heightFileHash) || !IsHash(info.colorRawHash)
@@ -57,8 +65,19 @@ namespace Hapio.Experiments
             catch (Exception exception) { error = exception.Message; return false; }
         }
 
-        private static bool IsHash(string value) => value != null && value.Length == 64
+        public static bool IsHash(string value) => value != null && value.Length == 64
             && Array.TrueForAll(value.ToCharArray(), c => c >= '0' && c <= '9' || c >= 'a' && c <= 'f');
+    }
+
+    [Serializable]
+    public sealed class ClayPreviewPreset
+    {
+        public string label;
+        public Texture2D colorMap, heightMap;
+        public TextAsset sampleInfo;
+        public string sampleMetadataHash;
+        public Shader shader;
+        public bool improvedMaterial;
     }
 
     /// <summary>A local material study. It never creates a session, physics target or paint model.</summary>
@@ -67,6 +86,12 @@ namespace Hapio.Experiments
     {
         public const float DefaultThickness = .01f;
         public const float DefaultGloss = .35f;
+        public const float EnhancedThickness = .014f;
+        public const float EnhancedGloss = .08f;
+        public const float DefaultContact = .15f;
+        public const float DefaultDetail = 1f;
+        public const string OriginalShader = "C6Lab/ClayStickerSurface";
+        public const string EnhancedShader = "C6Lab/Experiments/RoundedClayStickerSurface";
         private const int PreviewLayer = 31;
 
         public GameObject sourcePrefab;
@@ -76,6 +101,8 @@ namespace Hapio.Experiments
         public Shader clayShader;
         public Font uiFont;
         public StyleSheet styleSheet;
+        public ClayPreviewPreset[] presets;
+        public int defaultPreset = 2;
 
         private readonly List<Material> materials = new List<Material>();
         private GameObject ownedRoot;
@@ -86,8 +113,10 @@ namespace Hapio.Experiments
         private RenderTexture target;
         private VisualElement uiRoot, viewport;
         private Image image;
-        private Label thicknessValue, glossValue, status;
-        private Slider thicknessSlider, glossSlider;
+        private Label thicknessValue, glossValue, contactValue, detailValue, status;
+        private Slider thicknessSlider, glossSlider, contactSlider, detailSlider;
+        private VisualElement extraControls;
+        private readonly List<Button> presetButtons = new List<Button>();
         private ViewManipulator manipulation;
         private bool initialized, globalsCaptured, focused = true;
         private int previousTargetFrameRate, previousVSync;
@@ -95,6 +124,11 @@ namespace Hapio.Experiments
 
         public float Thickness { get; private set; } = DefaultThickness;
         public float Gloss { get; private set; } = DefaultGloss;
+        public float ContactStrength { get; private set; } = DefaultContact;
+        public float DetailStrength { get; private set; } = DefaultDetail;
+        public int ActivePreset { get; private set; }
+        public int PresetCount => presets != null && presets.Length > 0 ? presets.Length : 1;
+        public bool IsEnhanced => presets != null && presets.Length > 0 && presets[ActivePreset].improvedMaterial;
         public float Yaw { get; private set; }
         public float Pitch { get; private set; }
         public float Zoom { get; private set; } = 1f;
@@ -110,16 +144,9 @@ namespace Hapio.Experiments
             if (!Application.isPlaying) return;
             try
             {
-                Require(sampleInfo != null, "The generated v2 sample metadata is missing.");
-                Require(ClayPreviewSampleInfo.TryValidate(sampleInfo.text, sampleMetadataHash,
-                    out _, out string metadataError), metadataError);
-                Require(sourcePrefab != null && colorMap != null && heightMap != null && clayShader != null,
-                    "The completed sample, gourd model or clay shader is missing.");
-                Require(clayShader.isSupported, "The clay shader is unavailable on this graphics device.");
-                Require(colorMap.width == 1024 && colorMap.height == 512 && heightMap.width == 1024 && heightMap.height == 512,
-                    "The sample maps must both be 1024 x 512.");
-                Require(heightMap.format == TextureFormat.RGBAHalf,
-                    "The packed physical height, coating normals and coverage require an RGBA Half EXR.");
+                ValidateInputs();
+                SelectPreset(PresetCount == 1 ? 0 : defaultPreset);
+                Require(sourcePrefab != null, "The gourd model is missing.");
                 CaptureGlobals();
                 if (!Application.isEditor) Screen.SetResolution(1280, 800, FullScreenMode.Windowed);
                 BuildPresentation();
@@ -136,6 +163,78 @@ namespace Hapio.Experiments
                 ReleasePresentation();
                 RestoreGlobals();
             }
+        }
+
+        private ClayPreviewSampleInfo ValidateMaps(Texture2D color, Texture2D height, TextAsset metadata,
+            string metadataHash, Shader shader, bool enhanced)
+        {
+            Require(metadata != null, "The generated v2/v3 sample metadata is missing.");
+            Require(ClayPreviewSampleInfo.TryValidate(metadata.text, metadataHash, out ClayPreviewSampleInfo info,
+                out string metadataError), metadataError);
+            Require(info.format == (enhanced ? ClayPreviewSampleInfo.ExperimentFormatVersion : ClayPreviewSampleInfo.FormatVersion),
+                "A preview preset's shader and packed sample versions do not match.");
+            Require(color != null && height != null && shader != null, "The completed sample or clay shader is missing.");
+            Require(shader.name == (enhanced ? EnhancedShader : OriginalShader) && shader.isSupported,
+                "The preview preset's clay shader is unavailable or has a different contract.");
+            Require(color.width == 1024 && color.height == 512 && height.width == 1024 && height.height == 512,
+                "The sample maps must both be 1024 x 512.");
+            Require(height.format == TextureFormat.RGBAHalf,
+                "The packed physical height, coating normals and coverage require an RGBA Half EXR.");
+            return info;
+        }
+
+        private void ValidateInputs()
+        {
+            if (presets == null || presets.Length == 0)
+            {
+                ValidateMaps(colorMap, heightMap, sampleInfo, sampleMetadataHash, clayShader, false);
+                return;
+            }
+            Require(presets.Length == 3, "The comparison requires all three prepared presets.");
+            Require(defaultPreset >= 0 && defaultPreset < presets.Length, "The default comparison preset is out of range.");
+            ClayPreviewSampleInfo first = null;
+            for (int i = 0; i < presets.Length; i++)
+            {
+                ClayPreviewPreset preset = presets[i];
+                Require(preset != null && !string.IsNullOrWhiteSpace(preset.label), "A comparison preset is missing.");
+                Require(preset.improvedMaterial == (i > 0), "Only the first preset may use the unchanged v2 material.");
+                ClayPreviewSampleInfo info = ValidateMaps(preset.colorMap, preset.heightMap, preset.sampleInfo,
+                    preset.sampleMetadataHash, preset.shader, preset.improvedMaterial);
+                Require(ClayPreviewSampleInfo.IsHash(info.recordHash), "Every comparison preset needs its fixed artwork record hash.");
+                if (first == null) first = info;
+                else Require(info.seed == first.seed && info.sourceConfigHash == first.sourceConfigHash
+                    && info.authorityHash == first.authorityHash && info.recordHash == first.recordHash,
+                    "Comparison presets must replay the same fixed artwork and game judgement.");
+            }
+        }
+
+        public void SelectPreset(int index)
+        {
+            if (index < 0 || index >= PresetCount) throw new ArgumentOutOfRangeException(nameof(index));
+            ValidateInputs();
+            if (presets != null && presets.Length > 0)
+            {
+                ClayPreviewPreset preset = presets[index];
+                colorMap = preset.colorMap; heightMap = preset.heightMap;
+                sampleInfo = preset.sampleInfo; sampleMetadataHash = preset.sampleMetadataHash;
+                clayShader = preset.shader;
+            }
+            ActivePreset = index;
+            if (clayMaterial != null)
+            {
+                clayMaterial.shader = clayShader;
+                clayMaterial.SetTexture("_PaintMap", colorMap);
+                clayMaterial.SetTexture("_HeightMap", heightMap);
+                clayMaterial.SetTexture("_PainterMap", Texture2D.blackTexture);
+                clayMaterial.SetFloat("_PaintMapReady", 1f);
+                clayMaterial.SetFloat("_PlayerPaintPatternsEnabled", 0f);
+            }
+            SetAppearance(IsEnhanced ? EnhancedThickness : DefaultThickness, IsEnhanced ? EnhancedGloss : DefaultGloss);
+            SetSurfaceDetails(DefaultContact, DefaultDetail);
+            extraControls?.SetEnabled(IsEnhanced);
+            for (int i = 0; i < presetButtons.Count; i++) presetButtons[i].EnableInClassList("clay-preset-active", i == index);
+            if (status != null) status.text = (IsEnhanced ? "Enhanced material · " : "Unchanged v2 · ")
+                + "fixed artwork\nDrag to rotate · scroll to zoom\n30 fps · no network session";
         }
 
         private void CaptureGlobals()
@@ -267,24 +366,47 @@ namespace Hapio.Experiments
             manipulation = new ViewManipulator(this);
             viewport.AddManipulator(manipulation);
             uiRoot.Add(viewport);
-            var panel = new VisualElement { name = "materialPanel" };
+            var panel = new ScrollView(ScrollViewMode.Vertical)
+            {
+                name = "materialPanel", horizontalScrollerVisibility = ScrollerVisibility.Hidden,
+                verticalScrollerVisibility = ScrollerVisibility.Auto
+            };
             panel.AddToClassList("clay-panel");
+            panel.contentContainer.AddToClassList("clay-panel-content");
             uiRoot.Add(panel);
             AddLabel(panel, "CLAY STUDY", "clay-heading");
-            AddLabel(panel, "Completed 5-color gourd\nMaterial preview only", "clay-subtitle");
+            AddLabel(panel, "Same 5-color artwork\nContour + material comparison", "clay-subtitle");
+            AddLabel(panel, "PRESET", "clay-section-label");
+            presetButtons.Clear();
+            string[] presetNames = { "originalPreset", "materialPreset", "roundedPreset" };
+            for (int i = 0; i < PresetCount; i++)
+            {
+                int selected = i;
+                Button button = AddButton(panel, presets != null && presets.Length > 0 ? presets[i].label : "Original v2",
+                    presetNames[i], () => SelectPreset(selected));
+                button.AddToClassList("clay-preset");
+                presetButtons.Add(button);
+            }
             thicknessSlider = AddSlider(panel, "THICKNESS", "thicknessSlider", 0, .02f, out thicknessValue);
             glossSlider = AddSlider(panel, "GLOSS", "glossSlider", 0, 1, out glossValue);
             thicknessSlider.RegisterValueChangedCallback(e => SetAppearance(e.newValue, Gloss));
             glossSlider.RegisterValueChangedCallback(e => SetAppearance(Thickness, e.newValue));
+            extraControls = new VisualElement { name = "enhancedControls" };
+            extraControls.AddToClassList("clay-extras"); panel.Add(extraControls);
+            contactSlider = AddSlider(extraControls, "CONTACT SHADE", "contactSlider", 0, .5f, out contactValue);
+            detailSlider = AddSlider(extraControls, "FINE DETAIL", "detailSlider", 0, 1, out detailValue);
+            contactSlider.RegisterValueChangedCallback(e => SetSurfaceDetails(e.newValue, DetailStrength));
+            detailSlider.RegisterValueChangedCallback(e => SetSurfaceDetails(ContactStrength, e.newValue));
             AddLabel(panel, "VIEW", "clay-section-label");
             AddViewRow(panel, new[] { "Front", "Right", "Back" }, new[] { "frontView", "rightView", "backView" }, new[] { 0f, 90f, 180f }, new[] { 0f, 0f, 0f });
             AddViewRow(panel, new[] { "Left", "Diagonal", "Above" }, new[] { "leftView", "diagonalView", "upperView" }, new[] { -90f, 45f, 45f }, new[] { 0f, 0f, 40f });
-            Button reset = AddButton(panel, "Reset defaults", "resetButton", ResetViewAndAppearance);
+            Button reset = AddButton(panel, "Reset preset", "resetButton", ResetViewAndAppearance);
             reset.AddToClassList("clay-primary");
             Button quit = AddButton(panel, "Quit", "quitButton", () => Application.Quit());
             quit.AddToClassList("clay-quit");
             var spacer = new VisualElement(); spacer.AddToClassList("clay-spacer"); panel.Add(spacer);
-            status = AddLabel(panel, "Drag the gourd to rotate.\nScroll to zoom.\n\n100% painted · fixed artwork\n30 fps · no network session\nChanges stay in this app only.", "clay-status");
+            status = AddLabel(panel, string.Empty, "clay-status");
+            SelectPreset(ActivePreset);
         }
 
         private static Label AddLabel(VisualElement parent, string text, string style)
@@ -332,6 +454,22 @@ namespace Hapio.Experiments
             if (glossValue != null) glossValue.text = Gloss.ToString("0.00", CultureInfo.InvariantCulture);
         }
 
+        public void SetSurfaceDetails(float contact, float detail)
+        {
+            if (!Finite(contact) || !Finite(detail)) throw new ArgumentOutOfRangeException("Surface detail values must be finite.");
+            ContactStrength = Mathf.Clamp(contact, 0, .5f);
+            DetailStrength = Mathf.Clamp01(detail);
+            if (clayMaterial != null && IsEnhanced)
+            {
+                clayMaterial.SetFloat("_ClayContactStrength", ContactStrength);
+                clayMaterial.SetFloat("_ClayDetailStrength", DetailStrength);
+            }
+            contactSlider?.SetValueWithoutNotify(ContactStrength);
+            detailSlider?.SetValueWithoutNotify(DetailStrength);
+            if (contactValue != null) contactValue.text = ContactStrength.ToString("0.00", CultureInfo.InvariantCulture);
+            if (detailValue != null) detailValue.text = DetailStrength.ToString("0.00", CultureInfo.InvariantCulture);
+        }
+
         public void SetView(float yaw, float pitch, float zoom = 1f)
         {
             if (!Finite(yaw) || !Finite(pitch) || !Finite(zoom)) throw new ArgumentOutOfRangeException("View values must be finite.");
@@ -344,7 +482,8 @@ namespace Hapio.Experiments
 
         public void ResetViewAndAppearance()
         {
-            SetAppearance(DefaultThickness, DefaultGloss);
+            SetAppearance(IsEnhanced ? EnhancedThickness : DefaultThickness, IsEnhanced ? EnhancedGloss : DefaultGloss);
+            SetSurfaceDetails(DefaultContact, DefaultDetail);
             SetView(0, 0, 1);
         }
 
