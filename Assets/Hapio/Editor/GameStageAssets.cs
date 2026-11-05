@@ -10,13 +10,17 @@ namespace Hapio.Editor
     public static class GameStageAssets
     {
         public const string CatalogPath = "Assets/Hapio/Resources/Hapio/StageCatalog.asset";
+        /// <summary>
+        /// Create missing stage assets and refresh the menu DEV rows. The saved Battle Scene is left as it is:
+        /// this no longer re-copies Lab over Battle, which erased Battle-only backgrounds, floors and lighting.
+        /// </summary>
         [MenuItem("Hapio/Upgrade Three Yokai Stages")]
         public static void Upgrade()
         {
             EnsureAssets();
-            GameSceneBuilder.UpgradeScenesForCurrentLab();
+            GameSceneBuilder.UpgradeMenusWithoutBattle();
             AssetDatabase.SaveAssets();
-            Debug.Log("HAPIO_THREE_YOKAI_READY: Gumiho -> Yaguang -> Jigwi; original Lab preserved.");
+            Debug.Log("HAPIO_THREE_YOKAI_READY: Gumiho -> Yaguang -> Jigwi; original Lab and Battle preserved.");
         }
         public static void EnsureAssets()
         {
@@ -62,7 +66,8 @@ namespace Hapio.Editor
             new GameStageValue(164, 4f), new GameStageValue(158, 13f),
             new GameStageValue(159, 8f), new GameStageValue(162, 8f),
             new GameStageValue(188, 3f), new GameStageValue(189, 11f), new GameStageValue(190, 1f),
-            new GameStageValue(211, 120f), new GameStageValue(212, 100f),
+            // 211 (yaguang battle seconds) is retired (#328); every stage shares the common 120 s battle.
+            new GameStageValue(212, 100f),
             new GameStageValue(213, 10f), new GameStageValue(214, 0f),
             new GameStageValue(215, 35f), new GameStageValue(216, 1f),
             new GameStageValue(217, 60f), new GameStageValue(218, 0f),

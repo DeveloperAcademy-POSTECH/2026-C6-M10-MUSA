@@ -28,7 +28,7 @@
 
 #354의 `GameOpeningController`는 Home의 독립 `GameOpening.prefab`과 기존 StoryPlayer를 연결한다. #359부터 타이틀 게임 시작에서 재생하고, 오프닝 중 메뉴·DEV 입력을 막고 완료/스킵 시 입력 해제 뒤 방 목록을 연다. 게임 진행 상태는 Home을 유지하며 네트워크 상태를 추가하지 않는다. 에셋 편집·실패 복구·실행 내 재생 정책은 [앱 시작 오프닝](APP_START_OPENING.md)을 따른다.
 
-이번 main 동기화에서는 최신 Lab의 3D 배경·미니맵 배치를 별도 Battle에 반영했다. Battle은 저장된 복사본이므로 이후 Lab Scene 수정이 자동으로 전달되지는 않는다. `Hapio > Upgrade Existing Game Scenes From Current Lab`은 명시적인 동기화 도구이며 Battle의 전투 구성을 다시 복사한다. Battle 전용 수정은 먼저 차이를 확인해 반영한다. 같은 도구의 Home/Lobby 설정 확장은 기존 객체와 배치를 유지하면서 새 DEV 행을 추가한다. 일반 Play·빌드는 이 도구를 자동 호출하지 않는다.
+Battle은 처음 만들 때만 저장된 Lab에서 복사했고(`CreateMissing`, Battle이 없을 때), 지금은 Lab에 없는 스테이지 배경(`GameStageBackgrounds`, #446/#447)·바닥·장식(#485/#487/#490)·주광(#515)을 가진 독립 Scene이다. 이후 Lab Scene 수정은 자동으로 전달되지 않으며, Lab 전체를 Battle 위에 다시 복사하는 도구는 없다(예전 `Hapio > Upgrade Existing Game Scenes From Current Lab`은 Battle 전용 구성을 지워서 제거했다). Lab 변경을 Battle에 옮길 때는 Battle을 직접 편집하거나 해당 객체만 고치는 대상 갱신을 쓴다. Home/Lobby의 새 DEV 행은 `Hapio > Upgrade Menu DEV Rows`가 기존 객체와 배치를 유지하면서 추가한다. 일반 Play·빌드는 이 도구들을 자동 호출하지 않는다.
 
 ## 세션과 전투의 수명
 
@@ -100,7 +100,7 @@ Home/Lobby DEV의 `공통 / 구미호 / 야광귀 / 지귀`에서 해당 값만 
 - 야광귀: 콤보155~164, 섬광184~190, 셈법191. 최초 기본값은 콤보·섬광·셈법 ON이다.
 - 지귀: 수동 패턴178~183, 자동 간격192/193(기본20~30초), 소화/생성 화상 가중치194/195(기본1:1). 가중치0은 해당 자동 선택에서 제외하고 둘 다0이면 지귀 자동만 멈춘다. 공통 패턴은 계속된다.
 
-새 Scene·카탈로그 생성/명시적 갱신은 `Hapio > Upgrade Three Yokai Stages`를 사용한다. 이 도구는 별도 Battle을 현재 저장 Lab에서 복사하므로 Battle 전용 수동 수정이 있다면 먼저 차이를 확인한다. 일반 Play/빌드에서는 자동 실행하지 않는다.
+없는 Scene 생성은 `Hapio > Create Missing Development Game Scenes`, 스테이지 카탈로그·정의 생성/명시적 갱신은 `Hapio > Upgrade Three Yokai Stages`를 사용한다. 후자는 없는 정의만 만들고 Home/Lobby DEV 행과 StageResult/GameOver 글꼴을 갱신하며, Battle은 열거나 저장하지 않는다. 일반 Play/빌드에서는 자동 실행하지 않는다.
 
 ## 검증 상태
 
