@@ -2184,7 +2184,7 @@ namespace C6Lab
                     arrival: orb.kind == LabOrbKind.Bomb && orb.JustArrived(latest.serverTime) ? orb.arrival : LabDrumArrival.None,
                     stopAt: orb.stopAt);
                 view?.SetJigwiSupplyWaterArt(!string.IsNullOrEmpty(orb.jigwiABSupplyEventId) || orb.jigwiTalismanReward,
-                    latest.paused || GameStartHeld);
+                    latest.paused || GameStartHeld, special: !string.IsNullOrEmpty(orb.jigwiABSupplyEventId)); // #509 특수 물구슬
             }
             foreach (var drum in latest.drums ?? Array.Empty<LabOrbState>())
             {
