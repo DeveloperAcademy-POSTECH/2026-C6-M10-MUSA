@@ -8,11 +8,39 @@ namespace C6Lab
     {
         private LabPaintPattern pattern;
         private LabPaintPatternMask patternMask;
+        private bool paperStickerContour;
+        public bool UsesPaperStickerContour => paperStickerContour;
+
+        /// <summary>Choose the approved contour on an empty round; never replaces the legacy cache.</summary>
+        public void SetPaperStickerContour()
+        {
+            if (preview || replica || PaintCount != 0 || CoveredCount != 0 || ArtJournal != null)
+                throw new InvalidOperationException("Select the paper contour before the first hit or journal attachment.");
+            if (pattern != LabPaintPattern.Splatter) return;
+            LabPaintPatternMask local = LabPaintPatternMask.LoadPaperSticker();
+            patternMask = local; paperStickerContour = true;
+        }
         /// <summary>Local growth setting. A pixel-only display replica takes its pattern name from shared LabConfig.</summary>
         public LabPaintPattern Pattern => pattern;
 
+#if UNITY_EDITOR
+        /// <summary>
+        /// Installs a local, copied contour before an offline study starts. Clear retains
+        /// this round's mask; Reset restores the saved pattern. Player defaults are unchanged.
+        /// </summary>
+        public void SetPatternForAppearanceStudy(Texture2D source)
+        {
+            if (preview || replica || PaintCount != 0 || CoveredCount != 0 || ArtJournal != null
+                || pattern == LabPaintPattern.Legacy)
+                throw new InvalidOperationException("Install an appearance contour before the first authoritative hit or journal attachment.");
+            // Construct first: invalid input must leave a previously installed local mask intact.
+            LabPaintPatternMask local = LabPaintPatternMask.FromAppearanceStudy(source);
+            patternMask = local;
+        }
+#endif
+
         private void RegisterPatternHit(Vector3 direction, int hitCell, Color32 color, ulong owner, byte painterSlot,
-            decimal initial)
+            decimal initial, byte impact01 = 0)
         {
             int requested = (int)Math.Min(decimal.Floor(initial), CellCount - CoveredCount);
             uint salt = initialSeed ^ unchecked((uint)PaintCount * 0x9E3779B9u);
@@ -24,7 +52,8 @@ namespace C6Lab
             if (paintBlocker != null)
                 for (int i = 0; i < footprint.Length; i++)
                     if (footprint[i] && PaintCellBlocked(owner, i)) footprint[i] = false;
-            RecordVisualStamp(patch, color, painterSlot);
+            RecordVisualStamp(patch, color, painterSlot, impact01);
+            uint artStroke = BeginArtStroke(patch, color, painterSlot, impact01);
 
             // An impact may seed detached splashes, but those are not one connected region.
             // Each receives only the integer ink it immediately spends. The impact component
@@ -34,10 +63,10 @@ namespace C6Lab
             var component = new List<int>();
             decimal fraction = requested == decimal.Floor(initial)
                 ? initial - requested : 0m;
-            PaintPatternComponent(hitCell, footprint, visited, queue, component, color, owner, painterSlot, fraction);
+            PaintPatternComponent(hitCell, footprint, visited, queue, component, color, owner, painterSlot, fraction, artStroke, impact01);
             for (int i = 0; i < footprint.Length; i++)
                 if (footprint[i] && !visited[i])
-                    PaintPatternComponent(i, footprint, visited, queue, component, color, owner, painterSlot, 0m);
+                    PaintPatternComponent(i, footprint, visited, queue, component, color, owner, painterSlot, 0m, artStroke, impact01);
 
             // Size the splash by the impact's area, not by how many white cells remain under
             // it. Overlap never stretches one splash across distant holes to recover its quota.
@@ -48,13 +77,14 @@ namespace C6Lab
             if (shortfall > 0 && !IsComplete)
             {
                 Region root = Root(cellRegions[hitCell]);
-                Supply(root, shortfall, color, owner, painterSlot, true, hitCell);
+                Ink remainder = Supply(root, shortfall, color, owner, painterSlot, true, hitCell, impact01);
+                if (remainder != null) remainder.ArtStroke = artStroke;
                 RefreshActive(root);
             }
         }
 
         private void PaintPatternComponent(int first, bool[] footprint, bool[] visited,
-            Queue<int> queue, List<int> component, Color32 color, ulong owner, byte painterSlot, decimal fraction)
+            Queue<int> queue, List<int> component, Color32 color, ulong owner, byte painterSlot, decimal fraction, uint artStroke = 0, byte impact01 = 0)
         {
             component.Clear(); queue.Clear();
             visited[first] = true; queue.Enqueue(first);
@@ -71,7 +101,8 @@ namespace C6Lab
             }
             var region = new Region(regions.Count);
             regions.Add(region);
-            Ink immediateInk = Supply(region, component.Count + fraction, color, owner, painterSlot);
+            Ink immediateInk = Supply(region, component.Count + fraction, color, owner, painterSlot, impact01: impact01);
+            if (immediateInk != null) immediateInk.ArtStroke = artStroke;
             // BFS order is connected inside this component. PaintCell also merges components
             // that are joined by pre-existing opaque paint. Debit this footprint's own ink;
             // older queued growth must keep its frozen location, color and painter together.
@@ -267,13 +298,13 @@ namespace C6Lab
                 up = tangent.normalized; right = Vector3.Cross(up, center).normalized;
                 cosine = Mathf.Cos(rotation); sine = Mathf.Sin(rotation);
             }
-            public LabPaintVisualStamp VisualStamp(uint sequence, Color32 color, byte painterSlot, LabPaintPattern pattern)
+            public LabPaintVisualStamp VisualStamp(uint sequence, Color32 color, byte painterSlot, LabPaintPattern pattern, byte impact01 = 0)
                 => new LabPaintVisualStamp
                 {
                     sequence = sequence, center = center,
                     right = right * cosine + up * sine,
                     radius = Mathf.Clamp(Radius, .000001f, LabPaintVisualStamp.MaximumRadius),
-                    color = color, painterSlot = painterSlot, pattern = pattern, seed = Salt
+                    color = color, painterSlot = painterSlot, pattern = pattern, seed = Salt, impact01 = impact01
                 };
 
             public Vector2 Project(Vector3 direction)

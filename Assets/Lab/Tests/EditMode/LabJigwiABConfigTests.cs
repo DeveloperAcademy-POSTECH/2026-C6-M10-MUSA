@@ -13,9 +13,9 @@ namespace C6Lab.Tests
         [TearDown] public void Dispose()=>Object.DestroyImmediate(config);
         [Test] public void ScreenRewardsAppendWithoutShiftingEarlierFieldsAndRetiredValuesRemainReserved()
         {
-            var v=config.CaptureDeveloperValues();Assert.That(v.Length,Is.EqualTo(257));
+            var v=config.CaptureDeveloperValues();Assert.That(v.Length,Is.EqualTo(259));
             Assert.That(v.Skip(240).Take(13),Is.EqualTo(new[]{15f,4f,3f,5f,3f,12f,12f,.65f,.03f,4f,.3f,1.3f,1.5f}));
-            Assert.That(v.Skip(253),Is.EqualTo(new[]{2f,1f,5f,.8f}));
+            Assert.That(v.Skip(253).Take(4),Is.EqualTo(new[]{2f,1f,5f,.8f}));
             Assert.That(v.Skip(228).Take(8),Is.EqualTo(new[]{1f,1f,7f,18f,30f,1f,3f,2f}));
             var old=new[]{229,230,231,232,233,234,241,242,244,245,246,247,251,252};
             foreach(int i in old)Assert.That(LabConfig.RetiredDeveloperFields,Does.Contain(i));

@@ -629,7 +629,7 @@ namespace C6Lab
         /// value even after the diagnostic HP reaches zero.
         /// </summary>
         public bool ConfirmHit(string id, double now, Vector3 paintDirection,
-            out LabOrbElement element, out int actualDamage, out int impactValue)
+            out LabOrbElement element, out int actualDamage, out int impactValue, float paintImpactStrength = .5f)
         {
             element = LabOrbElement.None;
             actualDamage = 0;
@@ -671,8 +671,8 @@ namespace C6Lab
                 if (orb.fiveColor) share = Mathf.Min(3f, share * rules.FiveColorOrbPaintScale);
                 bool paints = orb.fiveColor || element >= LabOrbElement.Fire && element <= LabOrbElement.Earth;
                 bool painted = paints && (orb.fiveColor
-                    ? PaintFiveColors(paintDirection, attacker, share)
-                    : paintSurface.RegisterHit(paintDirection, PaintColorFor(element), attacker.id, attacker.seat + 1, share));
+                    ? PaintFiveColors(paintDirection, attacker, share, paintImpactStrength)
+                    : paintSurface.RegisterHit(paintDirection, PaintColorFor(element), attacker.id, attacker.seat + 1, share, paintImpactStrength));
                 if (painted && paintSurface.IsComplete && phase == LabPhase.Playing) // #509: B 물벼락이 먼저 이겼으면 한 번만
                 {
                     phase = LabPhase.Victory;

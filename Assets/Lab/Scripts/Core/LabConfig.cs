@@ -391,8 +391,17 @@ namespace C6Lab
             new LabDeveloperField("지귀 B 물 구슬 지급 간격 (초)", .25f, 10f),
             new LabDeveloperField("지귀 B 시작 물 구슬 수", 0f, 5f, true),
             new LabDeveloperField("지귀 B 미소모 지급 상한", 1f, 12f, true),
-            new LabDeveloperField("지귀 B 발화점 거리 (박까지 비율)", .4f, .9f)
+            new LabDeveloperField("지귀 B 발화점 거리 (박까지 비율)", .4f, .9f),
+            new LabDeveloperField("Clay Thickness (body units)", 0f, .02f),
+            new LabDeveloperField("Clay Gloss", 0f, 1f)
         });
+
+        public const int ClayThicknessField = 257;
+        public const int ClayGlossField = 258;
+        public static bool IsClayPresentationField(int index) => index == ClayThicknessField || index == ClayGlossField;
+        public static bool ValidClayAppearance(float thickness, float gloss) =>
+            float.IsFinite(thickness) && thickness >= 0f && thickness <= .02f
+            && float.IsFinite(gloss) && gloss >= 0f && gloss <= 1f;
 
         public const int JigwiStageFirstField = 228;
         public const int JigwiStageLastField = 235;
@@ -451,7 +460,7 @@ namespace C6Lab
             new LabDeveloperCategory("Drum", 74, 75, 76, 77, 78, 90, 91, 92, 93, 94, 95, 96, 97),
             new LabDeveloperCategory("Gourd", 140, 79, 104, 105, 106, 138, 139, 107, 108, 109, 110, 137,
                 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131,
-                134, 132, 133, 148, 149, 150, 151, 200, 201),
+                134, 132, 133, 148, 149, 150, 151, 200, 201, ClayThicknessField, ClayGlossField),
             new LabDeveloperCategory("Minimap", 98, 99, 100, 101),
             new LabDeveloperCategory("Jigwi", 178, 179, 180, 181, 182, 183, 192, 193, 194, 195),
             new LabDeveloperCategory("지귀 120초 (Hapio 전용)", 228, 235, 240, 243, 248, 249, 250, 253, 254, 255, 256),
@@ -818,6 +827,14 @@ namespace C6Lab
         [SerializeField, Range(0f, 1.5f)] private float teamWallFlashSeconds = .35f;
         [Tooltip("벽 반짝임 세기: 튕긴 순간 벽 빛 불투명도에 더하는 값 (평소 벽 빛 0.32)")]
         [SerializeField, Range(0f, .68f)] private float teamWallFlashBoost = .4f;
+        [Header("Clay stamp presentation (#506)")]
+        [Tooltip("Appearance only. Local body-space displacement height; does not alter the hit collider or paint area.")]
+        [SerializeField, Range(0f, .02f)] private float clayThickness = .006f;
+        [Tooltip("Appearance only. Independent from clay thickness. Zero is matte, one is glossy.")]
+        [SerializeField, Range(0f, 1f)] private float clayGloss = .25f;
+        public float ClayThickness => Mathf.Clamp(Finite(clayThickness, .006f), 0f, .02f);
+        public float ClayGloss => Mathf.Clamp01(Finite(clayGloss, .25f));
+
         [Header("High resolution paint presentation (#299)")]
         [Tooltip("Use the continuous high-resolution paint presentation. Host cell coverage, attribution and battle rules are unchanged.")]
         [SerializeField] private bool highResolutionPaintEnabled = true;
@@ -1605,7 +1622,8 @@ namespace C6Lab
                 JigwiABPersonalBurnSeconds, JigwiABGroupFireCount, JigwiABRelightSeconds, JigwiABShrinkDelaySeconds,
                 JigwiABShrinkScale, JigwiABFireMoveAmount, JigwiABFireMovePeriodSeconds, JigwiABFireTargetRadius,
                 JigwiABRewardSizeScale, JigwiABRewardPaintScale,
-                JigwiABSupplyIntervalSeconds, JigwiABSupplyInitialCount, JigwiABSupplyLimit, JigwiABFireDepth
+                JigwiABSupplyIntervalSeconds, JigwiABSupplyInitialCount, JigwiABSupplyLimit, JigwiABFireDepth,
+                ClayThickness, ClayGloss
             };
         }
 
@@ -1902,6 +1920,8 @@ namespace C6Lab
             jigwiABSupplyInitialCount = (int)values[254];
             jigwiABSupplyLimit = (int)values[255];
             jigwiABFireDepth = values[256];
+            clayThickness = values[ClayThicknessField];
+            clayGloss = values[ClayGlossField];
             error = string.Empty;
             return true;
         }

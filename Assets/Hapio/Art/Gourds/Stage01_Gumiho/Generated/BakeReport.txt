@@ -1,0 +1,10 @@
+source=Assets/Hapio/Art/Gourds/Stage01_Gumiho/Prefabs/Gumiho_Gourd_GameReady.prefab
+bodyHeightBefore=2.3903 scale=1.00000
+paintOrigin=(0.0000, 0.0000, 0.0000) axis=(0.0000, 0.8660, 0.5000) bodyExtentInFrame=(0.9333, 0.8412, 0.9333)
+bodyTris=14336 outerTris=7262 starShaped=100.00 %
+hitMissingDirections=48 rings=3 north=1.2149 south=0.8412
+hitTris=2208 hitMaxDeviation=0.0448 hitMeanDeviation=0.0129
+ropeSocket=(-0.0004, 1.6385, 0.0274) sizeAnchor=(0.0000, 1.0522, 0.6075) hitTopInPaint=1.2149
+timeline frames opens=15 risen=26 held=29 sink=38 sunk=45 closed=47 cycle=48
+renderers=30 triangles=61505
+animationAboveHitShell=False

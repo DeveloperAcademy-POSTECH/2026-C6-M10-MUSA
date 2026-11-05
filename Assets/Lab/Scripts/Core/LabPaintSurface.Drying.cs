@@ -168,6 +168,7 @@ namespace C6Lab
                 dryingBoundary.Remove(cell);
                 CoveredCount--; removed++;
                 unchecked { Revision++; }
+                RecordArtErase(cell);
                 for (int side = 0; side < 4; side++)
                 {
                     int neighbor = Neighbor(cell, side);

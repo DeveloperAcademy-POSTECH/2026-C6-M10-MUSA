@@ -106,9 +106,11 @@ namespace Hapio.Tests
             Assert.That(target, Is.SameAs(binding.target));
             LabGourdPaint paint = target.GetComponent<LabGourdPaint>();
             Assert.That(paint.IsReady, Is.True);
-            Assert.That(paint.visualPrefab, Is.SameAs(Resources.Load<GameObject>("GourdPaint/WhiteGourd")));
+            // #507: Stage 3 mounts its baked Jigwi gourd; the hitbox is the rig's hit shell.
+            Assert.That(paint.visualPrefab, Is.SameAs(Resources.Load<GameObject>("Hapio/Gourds/Stage03_Jigwi_Battle")));
+            Assert.That(paint.Rig, Is.Not.Null, paint.RigFallbackReason);
             Assert.That(target.MountedVisual, Is.Not.Null);
-            Mesh shell = paint.Shell.GetComponent<MeshFilter>().sharedMesh;
+            Mesh shell = paint.Rig.hitShell.sharedMesh;
             Assert.That(target.Hitbox.sharedMesh, Is.SameAs(shell));
             int originalColliderCount = target.GetComponentsInChildren<Collider>(true).Length;
             var hud = Object.FindFirstObjectByType<LabJigwiHud>();
@@ -167,7 +169,7 @@ namespace Hapio.Tests
             Assert.That(model.JigwiABBlocksBoss(network.LocalPlayerId, current.serverTime), Is.False);
             AssertNoOldSurfacePresentation();
             Assert.That(paint.IsReady, Is.True);
-            Assert.That(target.Hitbox.sharedMesh, Is.SameAs(shell), "Switching A/B cannot replace the bound WhiteGourd paint/hit shell.");
+            Assert.That(target.Hitbox.sharedMesh, Is.SameAs(shell), "Switching A/B cannot replace the bound Stage 3 hit shell.");
             Assert.That(target.GetComponentsInChildren<Collider>(true).Length, Is.EqualTo(originalColliderCount));
             Assert.That(clock.IsPaused, Is.True);
             CaptureScreenEvidence("3"); yield return null;

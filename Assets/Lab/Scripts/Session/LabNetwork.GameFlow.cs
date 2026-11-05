@@ -11,7 +11,7 @@ namespace C6Lab
     /// </summary>
     public sealed partial class LabNetwork
     {
-        private static readonly byte[] GameConnectionToken = Encoding.ASCII.GetBytes("C6HapioGame/30");
+        private static readonly byte[] GameConnectionToken = Encoding.ASCII.GetBytes("C6HapioGame/33");
         private const int MaximumGameFlowBytes = 8192;
         private bool gameFlowEnabled;
         private bool gameBattleFrozen;
@@ -349,7 +349,11 @@ namespace C6Lab
             if (!StartCurrentGameStage(stageIndex, stageId, yokai, settingsRevision, settingsFingerprint)) return false;
             preparedGameSession = latest.sessionId;
             preparedGameRound = latest.round;
-            return IsGameInitialStateReady(preparedGameSession, preparedGameRound);
+            // Preparation creates a held round. Its snapshot/art/board can finish on a
+            // later frame, and the game's SynchronizingBattle barrier polls readiness.
+            // Returning false here after creating model/latest would strand Loading:
+            // retries cannot create the same round again because of the guard above.
+            return true;
         }
 
         /// <summary>Snapshot, paint and the owner checkpoint must belong to this exact prepared round.</summary>
@@ -367,6 +371,7 @@ namespace C6Lab
             if (!IsHost && (actionSession != battleSessionId || actionRound != battleRound
                 || boardReplica.LatestSequence <= 0 || boardReplica.NeedsCheckpoint || !PaintReceiver.Matches(latest)))
                 return false;
+            if (!PaintArtInitialReady) return false;
             // An empty local board is valid: some participants do not initially hold a drum.
             var shown = new System.Collections.Generic.HashSet<string>(board.OrbIds, StringComparer.Ordinal);
             foreach (LabOrbState orb in latest.orbs ?? Array.Empty<LabOrbState>())

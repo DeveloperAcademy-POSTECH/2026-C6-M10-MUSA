@@ -158,7 +158,8 @@ namespace C6Lab
                             configRevision = body.configRevision, configFingerprint = body.configFingerprint,
                             snapshotSequence = body.snapshotSequence, chunkIndex = body.chunkIndex,
                             chunkCount = body.chunkCount, chunkData = body.chunkData, payload = body.payload };
-                        if (packet.type == "paint_cells") ReceivePaintFrame(packet);
+                        if (packet.type == "paint_art") ReceivePaintArtPage(packet);
+                        else if (packet.type == "paint_cells") ReceivePaintFrame(packet);
                         else if (packet.type == "snapshot_chunk") ReceiveSnapshotChunk(packet);
                     }
                 }

@@ -18,7 +18,7 @@
 - 새 빌드는 `Hapio/Development Build` 메뉴를 사용한다. Lab 첫 Build Settings 항목과 기존 개발용 빌드는 바꾸지 않는다. 상세 책임·실행법·종료 조건은 `docs/GAME_FLOW.md`를 따른다.
 
 - #276 별도 게임의 고정 순서는 구미호→야광귀→지귀다. 공통 폭탄·좌우 전달 막기를 고유 패턴 추첨에 넣거나 끄지 않는다. `LabStageYokai.None`은 기존 Lab 동작을 유지한다.
-- 요괴별 기본값·규칙은 `Resources/Hapio/StageCatalog`와 StageDefinition, 실행 중 조정은 GameStageSettings 복사본으로 관리한다. #297 모든 스테이지의 표시 모델은 WhiteGourd 내부의 공통 검은 요괴이며, StageDefinition의 모델 override를 비워 두고 갱신 도구에서 구미호를 다시 연결하지 않는다. 원본 LabConfig를 자동 저장하지 않는다.
+- 요괴별 기본값·규칙은 `Resources/Hapio/StageCatalog`와 StageDefinition, 실행 중 조정은 GameStageSettings 복사본으로 관리한다. #297 당시 모든 스테이지의 표시 모델은 WhiteGourd 내부의 공통 검은 요괴였고, 현재는 아래 #507처럼 세 스테이지가 각자 구운 박(구미호·야광귀·지귀)을 쓴다. StageDefinition의 `yokaiVisual` override를 비워 두고 갱신 도구에서 구미호를 다시 연결하지 않는다. 원본 LabConfig를 자동 저장하지 않는다.
 
 - #281 2:2 청홍 땅따먹기는 Hapio의 독자 모드(4명, 한 판)다. 규칙은 `LabTeams`·`LabModel.Team`과 공유 설정196~199에 있고 Lab DEV에서도 4명·솔로로 켤 수 있다. Hapio에서 196 켜기는 방 모드가 정하며 DEV 탭에서 바꾸지 않는다. 전투 화면 요소(점유율 막대·피버·벽·무지개)는 실행 중에 만들고, 로비 팝업·팀 자리 화면은 `Hapio > Upgrade 2v2 Lobby UI`로만 저장한다.
 - #293/PR #382의 현재 2:2 디자인 결과는 `박 확인`·`나가기`만 표시하고 NEXT를 숨긴다. `나가기`는 `GameSession.GoHome`으로 연결을 종료하고 타이틀로 돌아간다. #281의 같은 방 로비 복귀는 `NextStage`·`ReturnTerritoryToLobby`와 구형 결과 fallback에 남아 있다. 전투 중 참가자 이탈·로딩 실패의 기존 로비 복귀 및 방장 이탈 정책은 유지한다.
@@ -81,7 +81,7 @@
 
 ## #402 보류된 요괴 확장 준비 정리
 
-- 현재 요괴 실행 자료는 `Resources/Hapio/StageCatalog`와 기존 구미호→야광귀→지귀의 StageDefinition 3개다. 기존 단계 순서·GUID·규칙·수치·모델 연결을 유지하며, 기존3종은 공통 검은 요괴를 계속 사용한다.
+- 현재 요괴 실행 자료는 `Resources/Hapio/StageCatalog`와 기존 구미호→야광귀→지귀의 StageDefinition 3개다. 기존 단계 순서·GUID·규칙·수치·모델 연결을 유지하며, 세 스테이지의 박 외형은 #507의 구운 스테이지 박이다.
 - 10종 확장은 보류되어 #381의 제작용 카탈로그·정의 에셋·전용 코드·생성/검증 도구와 StageDefinition의 선택적 `content` 연결을 제거했다. #393의 공통 모듈 경로는 현재 게임에 추가하지 않는다. 확장을 재개할 때는 PR #383과 Git 이력의 자료를 확인하고 새 작업 범위를 정하며, 제거한 준비 파일을 자동 재생성하지 않는다.
 
 
@@ -169,7 +169,7 @@
 ## #461 도색 페이로드 압축
 
 - `LabPaintFrame.encoding`은 0 원본, 1 deflate다. Host의 피어별 발행자는 `LabPaintEncodingPolicy.Auto`(압축이 더 짧을 때만 1)를 쓰고, 기본 생성자는 `RawOnly`다. 해시·covered·`Revision`은 늘 풀어 놓은 지도 기준이다. 수신기는 헤더에서 정한 크기 상한(full `columns·rows·5 + 시각 바이트`, delta `columns·rows·7 + 시각 바이트`) 안에서만 풀고, 넘거나 깨지면 체크포인트를 요청한다. 빈 256×128 지도는 도색 프레임 1개(Bulk 2조각)다.
-- 공유 설정 257개·인덱스는 그대로이며 당시 묶음은 **5683/Lab44/Game28**이었다(최신은 #479 절). 이전 5682 앱과 혼용하지 않으며, 병합 뒤에는 모든 기기가 새 빌드를 써야 한다. 실행한 검사만 `docs/VALIDATION.md`에 기록한다.
+- 공유 설정 257개·인덱스는 그대로이며 #461 당시 묶음은 **5683/Lab44/Game28**이었다(현재 기준은 아래 #509 절). 이전 5682 앱과 혼용하지 않으며, 병합 뒤에는 모든 기기가 새 빌드를 써야 한다. 실행한 검사만 `docs/VALIDATION.md`에 기록한다.
 
 ## #471 로비 연결 끊김 뒤 핸들러 재등록
 
@@ -192,6 +192,54 @@
 - 수채 붓 거리장은 `LabWatercolorBrushDistance.GetOrCreate`의 패턴별 공유 텍스처다(앱 수명, 패턴당 약 4 MB·최대 3개). 런타임 `Dispose`는 지우지 않고, 재생 시작·Editor 스크립트 재로드·편집 모드 복귀에서만 `ReleaseShared`가 지운다.
 - `LabGourdPaint`는 두 도색 런타임을 만든 직후 라운드 붓 무늬(`RoundBrushPattern`: 라운드 config, 땅따먹기의 옛 둥근 붓은 흩뿌림)로 `Prewarm`을 1회 부른다. 실제와 같은 형식의 작은 임시 RT에만 그리고 표시 RT·Ready·Error·스탬프 수는 건드리지 않는다. 방장은 라운드 시작 직후 `PreloadPatternMask`로 판정 마스크를 미리 푼다. 판정·셀·해시·표시 결과는 같아야 한다.
 
+## #507 박 모델 계약
+
+- 스테이지 박은 `GameStageDefinition.gourdVisualResource`(Resources 경로, 비면 흰 박)를 `GameBattleBindings.MountStageGourd`가 `LabGourdPaint.PrepareVisual`로 `Attach`보다 먼저 지정한다. 2:2·Lab 단판은 흰 박이다. 프리팹 직접 참조로 바꾸지 않는다.
+- `LabGourdVisualRig`가 없는 프리팹(흰 박)은 기존 경로를 글자 그대로 탄다. 흰 박의 마운트·판정·칠·요괴 자세는 `Assets/Lab/Tests/PlayMode/Golden/`의 main 기록과 같아야 하며, 골든은 흰 박이 바뀌는 의도된 변경에서만 `GOURD_GOLDEN_RECORD=1`로 다시 기록한다. 계약 검사 실패는 `C6_GOURD_RIG_FALLBACK`과 함께 흰 박으로 돌아간다. 상세는 `docs/GOURD_MODELS.md`.
+- 세 스테이지 모두 `gourdVisualResource = Hapio/Gourds/Stage0N_<요괴>_Battle`(구미호·야광귀·지귀 박)이며 판정·도색·요괴 반응·완성/결과/PNG까지 이 박을 쓴다. 경로는 굽기 도구만 설정하고 `GameStageAssets.EnsureAssets`는 건드리지 않는다. 아트 원본 프리팹은 고치지 않고 `Hapio > Gourds > Bake All Stage Gourds`(`GameGourdRigBaker`, 스테이지별 메뉴도 있음)로만 다시 굽는다. 미리보기 덧씌우기(`GameGourdModelPreview`·`GourdPreview` 리소스)는 삭제했으며 재생성하지 않는다.
+- 1·3스테이지 판정 모양까지 바뀌어 도입 당시 묶음은 **공유 설정 257개·5683/`C6PhysicsLab/44`/`C6HapioGame/30`**였다(현재 기준은 아래 #509 절)(2스테이지만 바뀐 묶음은 Game29). Game28·29 앱과 혼용하지 않는다.
+
+## #507 연속 곡선 줄
+
+- Hapio 전투는 `GameBattleBindings.Awake`가 모든 스테이지의 `LabHangingTarget`에 `LabRopeStyle.Curved`를 런타임으로 지정한다. 고정점에서 박 연결점까지 피벗을 제어점으로 둔 베지어 한 줄이며, 물리·피벗 높이·판정·접속 규약은 바꾸지 않는다. Lab Scene과 Battle.unity 저장값은 `Segmented`이며 YAML을 고치지 않는다. 기존 `Rope`·`Upper Rope`는 transform을 계속 계산하고 렌더러만 끈다. 상세는 `docs/PINATA_TUNING_GUIDE.md`.
+
+## #466 수채 브러시 누적 작품
+
+- 일반 협동은 `WatercolorStampProfile` V2 기본 ON·농도0.9, 기존 수채는 프로필 OFF의 비교 경로다. CPU 패턴·실제 셀/P지도·성장/건조·난수·면적·투척 규칙은 그대로이며 땅따먹기는 기존 청홍 표현이다. 원본은 Editor `BrushMasters`, 512² 표현 데이터는 `GourdPaint/WatercolorBrushes`다. 베이크 해시/설정을 라운드에 고정하고, 판정용 패턴 텍스처를 표현 목적으로 교체하지 않는다.
+- Host `LabPaintArtJournal`은 실제 셀 추가/삭제 지점만 별도 기록한다. 128개 기존 힌트/`paint_cells` 압축 형식을 바꾸거나 Guest 예측 명중을 확정 도색으로 기록하지 않는다. 4KiB 원본 페이지·피어당1개 미확인 페이지·게임 상태 우선·64MiB 원본/2MiB 페이지 캐시를 유지한다. 현재 라운드/관람 뒤 소유한 임시 파일만 정리한다.
+- 수신·적용·GPU 완료는 별도다. `LabGourdPaint`는 GPU 완료 콜백 후 새 순번도 세션에 전달해야 한다. 정확한 관람은 최종 기록/지도/렌더 일치가 필요하나 작품 오류를 게임 판정 실패로 바꾸지 않는다. GPU 재생성은 같은 기록을 재생하며, 연출은 `BattlePresentationTime`을 쓴다.
+- V2는 원본 대비/광학 농도·색역을 보존하는 채도·seed 고정의 끊긴 테두리를 누적 지도에 적용한다. 미세 안료는 경계 보간 뒤 셸 셰이더에서 물체 로컬 방향·실제 종이결로 표시하고 지도 Alpha/P/미도색 종이를 바꾸지 않는다. 최종 표면 입자를 `VisualPaintTexture`에 다시 쌓거나 등장 연출 아래층에 이중 누적하지 않는다. 전투/관람/관람PNG는 같은 지도와 전체 표현 블록을 사용한다. V1 당시 이미지는 이력으로 보존한다.
+- 최신 호환 묶음은 **5684/Lab45/Game29**, 공유 설정257개 그대로이며 표현 버전은 `watercolor-stamps-v2`다. 새 안료 대비1.6·채도1.15·입자0.25/120·테두리 끊김0.45와 기존 농도/테두리 조절을 표현 지문과 라운드 고정에 포함한다. 구현/비교는 `docs/WATERCOLOR_BRUSH_STAMPS.md`, 실제 실행 결과는 `docs/VALIDATION.md`를 따른다.
+
+- #466 V3는 `Assets/Editor/WatercolorPaint/V3`의 비교 전용 시제품이다. 게임 기본값은 V2를 유지하며 시각 승인 전 V3를 Resources/Scene/실제 라운드 준비에 연결하지 않는다. 별도 셰이더/브러시 주입은 UNITY_EDITOR에서만 컴파일하고 기본 생성자를 보존한다. V3는 원본 V2 기록을 읽는 비교 ID이며 게임 접속 버전과 혼동하지 않는다. 원본 브러시/한지·V2 베이크/프로필을 덮어쓰지 않는다.
+
+
+## #466 최신 승인 — 불투명 한지 얼룩 스티커
+
+- 일반 협동의 저장 프로필은 `PaperSticker`·`paper-stickers-v1`이 기본이다. 기존 Watercolor 생성자/자료/V3 실험은 비교용으로 보존한다. 최신 표현은 `docs/PAPER_STICKER_PAINT.md`를 따르며 위 수채 관련 문장은 해당 중간 버전 이력이다. Scene·Prefab·박 모델을 새 시안 모양으로 자동 교체하지 않는다.
+- 새 CPU/GPU 공통 Splatter 마스크는 `GourdPaint/PaperSticker`에 별도 보관한다. Host/Solo는 빈 라운드에서 명시적으로 선택한다. 기존 패턴 캐시와 Broad/Flow/Legacy·땅따먹기는 유지한다. 초기/반복 예산은 유지하지만 새 외곽의 실제 셀 위치·색/P해시는 의도적으로 달라진다.
+- 새 지급 셀은 도장 UV 범위와 무관하게 Alpha1로 채우고, 기존 칠 위 겹침은 새 마스크 안에서 불투명 덮기다. 종이결·얇은 경계는 RGB만 바꾸며 P지도/면적/건조 판정으로 역산하지 않는다. 보조 최상층 ID 자원도 복구와 GPU 작업 예산에 포함한다.
+- 저널/4KiB증분/Bulk/압축 형식과 공유 설정257개를 보존한다. 새 모드·설정·베이크 버전은 라운드에 고정하며 접속은 **5685/Lab46/Game30**이다. 모든 기기가 같은 새 빌드를 사용한다. 빌드 전 새 데이터 검사는 읽기 전용이고 자동 재베이크하지 않는다. 실제 실행 결과만 VALIDATION에 기록한다.
+
+
+## #466 별도 곡면 스티커 시제품 — 외형 승인 대기
+
+- `Assets/Editor/WatercolorPaint/SurfaceSticker`는 실제 박 곡면에 별도 MeshRenderer로 RGBA 에셋을 붙이는 Editor-only 비교다. 게임 기본 PaperSticker/저널/프로토콜/판정/Scene은 변경하지 않는다. 실행·열별 의미·한계는 `docs/SURFACE_STICKER_PROTOTYPE.md`를 따른다.
+- raw 열은 에셋 원형을 보여주는 외형 비교이며 실제 도색 면적 일치를 보장하지 않는다. fitted 열은 기존 지급 셀을 유지하되 에셋 Alpha 대신 실제 영역을 쓰므로 셀 윤곽이 남는다. 외형과 판정의 대응을 승인받기 전 기본 게임에 연결하지 않는다. 기존 칠 위 재덮기·성장 중 UV 고정·실시간 누적·관람/PNG/네트워크 연결 완료로 해석하지 않는다.
+- 원본 박/한지/생성 에셋과 이전 #466 작업을 보존한다. `LabPaintStudyRenderer`의 선택적 `configureStudyInstance`는 Preview Scene 복사본만 조작한다. 검증 앱과 실기기는 이번 범위에서 실행하지 않는다.
+
+
+## #506 현재 기본 표현 — 곡면 클레이 스티커
+
+- 사용자 원형 부착 승인과 #506에 따라 저장 프로필은 `ClaySticker`·`clay-stickers-v1`이다. 이전 Paper/Watercolor와 Editor 비교 자료를 보존하며 현재 연결·범위는 `docs/CLAY_STICKER_PAINT.md`가 우선한다. 원본 박 재질은 색 지도 Ready0, 별도 `Clay Sticker Overlay`가 원본 메시를 공유해 누적 색/높이를 표시한다. 도장마다 메시·GameObject를 생성하지 않는다. 한지 내부결 대신 둥근 클레이 표면/겹침 음영을 쓴다.
+- 실제 Host 접촉 법선/속도의 정면 속도를 초기0~20m/s 기준으로 정규화해 `LabPaintVisualStamp.impact01` 예약 바이트에 보존한다. 0은legacy0.5, 44바이트 크기는 유지한다. 농도는흰클레이→같은오행색 .65~1, Alpha/면적/성장/물리/스태미나/P판정을바꾸지않는다.
+- 원형 표현은 고정2셀 시각여유를 허용하며 면적에는포함하지않는다. 100%는 실제셀판정이고마지막표시빈틈은별도클레이바탕으로채운다. 건조는모든누적색/높이를제거하며0셀에서시각여유까지비운다. 저널/페이지/캐시/과거자국보존정책은유지한다.
+- DEV257(두께0~.02, 기본.006)·258(광택0~1, 기본.25)을뒤에붙여259개다. Host Pause중즉시미리보기는 `clay_appearance`의session/round/config/sequence를검사한다. 실제렌더는 `network.ClayThickness/ClayGloss`, sourceConfig를재저장하지않는다. HapioCommon프로필은두값을다음stage에도기억한다. 새접속묶음5686/Lab47/Game31, 원격main5683과혼용금지.
+- 최초준비는라운드생성성공→Synchronizing→기존ready/Countdown gate순서다. 첫프레임표시미준비를라운드생성실패로간주해Loading에갇히게하지않는다. 기존입력차단/전원시작확인은우회하지않는다.
+- 관람은색/P/높이를모두독립복사하고기본박Ready0을유지한다. 클레이해제는지연Destroy전에Renderer를즉시끈다. 빌드검사는읽기전용이며원본/데이터팩을자동베이크하지않는다. 실제실행결과만VALIDATION에기록하며iOS/실네트워크검증은이번범위에포함하지않았다.
+
+- #506 최신 main 통합: #507의 스테이지별 몸통/뚜껑 Rig·판정·연속 줄·요괴를 유지한다. 클레이는 각 paintShell/paintExtra의 identity 자식이며 결과 복제도 각 base의 Ready0과 coat의 Ready1을 유지한다. #482 도색 준비를 유지하고 새 클레이의 3브러시×색/높이 패스도 별도 작은 타깃에서 준비한다. 실제 지도·진행 순번·난수는 프리워밍으로 바꾸지 않는다.
+
 ## #479 지귀 A 부적
 
 - A는 5/40/70초에 **모든 자리**에서 동시에 열린다. 예전의 대상 한 명·박 3번 명중·회복 4배는 없다. 자리마다 스냅샷 `LabJigwiABPlayerFire.talismanAt`(아직 안 썼으면 음수)을 둔다.
@@ -200,14 +248,16 @@
 - Host는 그 자리의 소각 예약을 지우고 `jigwiTalismanReward` Water 5개(수명 15초, 칠 1.5배, B 불 꼬리 없음)를 준다. 모든 자리가 쓰면 A를 Completed로 일찍 끝내고, 못 쓰면 15초에 벌점 없이 끝난다.
 - DEV241/242는 은퇴 슬롯("Reserved …(unused)", 인덱스 보존, Home/Lobby 저장 라벨도 맞춤)이다. A 스태미나 화염 테두리, 화면 붉은 기운/양옆 불기둥, 구슬 위 불꽃 그림은 지웠고(구슬은 마감 전 1초 동안 `LabJigwiOrbFlame`이 아래에서 위로 타 들어가고, 그 선 위에 먹선 불꽃이 따라 올라감), A 외침은 `PatternAudioProfile.personalVoiceEnabled`(0)로 꺼 두었다(B 외침은 유지).
 - 에디터 전용: `Hapio > DEV SOLO 시작 스테이지` 메뉴(EditorPrefs, Home에서 Play할 때만 적용). 빌드와 Test Runner에는 영향이 없다.
-- 당시 호환 묶음은 설정 257개·5684·`C6PhysicsLab/45`·`C6HapioGame/29`였다(최신은 #509 절).
+- 당시 호환 묶음은 설정 259개(#506 클레이 257·258 포함)·**5687**·`C6PhysicsLab/48`·`C6HapioGame/32`다. main의 #466/#506/#507이 5684~5686·Lab45~47·Game29~31을 먼저 써서 #479는 그 위로 올렸다(최신은 #509 절).
 
-## #509 지귀 B 지목 동시 소화 — 최신 호환 기준
+## #509 지귀 B 지목 동시 명중 — 최신 호환 기준
 
 - 시간표: A 5/42/70초, B 25/55/85초. A2는 공통 폭탄(40초)과 겹치지 않게 42초로 옮겼고, B는 15초(`LabJigwiABTimeline.GroupMissionSeconds`)다. B3는 100초 정리로 벌점 없이 취소된다.
-- B는 1~2인 1명 / 3인 2명 / 4·5인 3명을 seed로 뽑는다(`GroupPickCount`, `JigwiGroupPicks`). `round.players`에는 지목된 자리만 있고 자리마다 불기둥(발화점) 1개다. 지목된 자리만 박이 막힌다.
-- 지목된 전원이 첫 명중부터 1초 안에 자기 불기둥을 물로 맞히면 `syncCount`+1, 늦으면 0으로 초기화(`syncResetAt`). 3회면 성공(기존 5초 보상), 15초 만료면 모든 자리 판 비우기 + 스태미나 0. 판정은 Host `RecordJigwiSyncHit`/`CloseJigwiSyncWindow`만 한다.
-- 무료 물 구슬은 도우미 판에만 준다(도우미가 없으면 지목된 자리).
-- 화면은 `LabJigwiSyncPillarView`(런타임 생성, 코드로 그린 임시 불기둥·물방울 3칸·"지금!"·iOS 기본 진동)가 맡고, 예전 장막 그림은 켜지 않는다. 팀 공용 `LabHaptics`는 건드리지 않았다.
-- DEV244(B 불 개수)/245(재점화)는 은퇴 슬롯(인덱스·저장값 보존, Home/Lobby 라벨도 맞춤)이다.
-- 현재 호환 묶음은 설정 257개·5685·`C6PhysicsLab/46`·`C6HapioGame/30`다. 이전 5684 앱과 혼용하지 않는다.
+- B는 1~2인 1명 / 3인 2명 / 4·5인 3명을 seed로 뽑는다(`GroupPickCount`, `JigwiGroupPicks`). `round.players`에는 지목된 자리만 있다. 아무도 막히지 않고(`JigwiABBlocksBoss` false), 불기둥/장막/콜라이더가 없다.
+- 지목된 전원이 첫 명중부터 1초 안에 **박**을 Water Combined로 맞히면(`RecordJigwiBossSyncHit` → `RecordJigwiSyncHit`) `syncCount`+1, 늦으면 0으로 초기화(`syncResetAt`). 혼자면 1번 = 1회. 3회면 성공.
+- 성공(물벼락): 3번째 동시 명중 순간 지목된 사람마다 마지막으로 맞힌 자리에 Water 칠을 한 번 더(Inspector `jigwiBSplashPaintShare`, 기본 3 = 한 타격 최대). 5초 발사 보상은 없다(`rewardUntil` -1, DEV251/252 은퇴).
+- 실패(조합판 불바다): 15초 만료 시 `boardFireUntil` = 만료+Inspector `jigwiBBoardFireSeconds`(기본 3초, 100초 정리에서 자름)까지 모든 자리의 `TryGenerate`가 `JIGWI_BOARD_FIRE`로 거절된다. 판 구슬/스태미나는 그대로이고 판 비우기 fence(`clearedThroughRevision`)는 늘 0이다.
+- 무료 물 구슬은 도우미 판에만 준다(도우미가 없으면 지목된 자리). 이 물은 진행에만 쓰이고 칠하지 않는다.
+- 화면은 `LabJigwiSyncPillarView`(클래스 이름만 예전 그대로, 물방울 3칸·1초 막대·"지금!"·iOS 기본 진동)와 실패 오버레이의 "조합판에 불이 붙었다! n초"다. 지귀 A/B 외침 목소리는 지웠다.
+- DEV244/245/251/252는 은퇴 슬롯(인덱스·저장값 보존, Home/Lobby 라벨도 맞춤)이다.
+- 현재 호환 묶음은 설정 259개·**5688**·`C6PhysicsLab/49`·`C6HapioGame/33`다. 이전 5687(#479) 앱과 혼용하지 않는다.

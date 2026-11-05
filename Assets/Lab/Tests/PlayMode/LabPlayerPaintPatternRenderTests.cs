@@ -277,6 +277,7 @@ namespace C6Lab.Tests
             {
                 network.port = 17946;
                 Assert.That(network.StartDeveloperSolo(), Is.True, network.Notice);
+                LabPaintPresentationTestFixture.SelectRetainedStyleForSyntheticMap(network);
                 LabPaintSurface surface = network.PaintSurface;
                 var pixels = new Color32[surface.CellCount];
                 var owners = new byte[surface.CellCount];
