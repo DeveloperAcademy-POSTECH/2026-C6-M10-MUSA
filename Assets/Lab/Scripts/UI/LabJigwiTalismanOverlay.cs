@@ -63,11 +63,20 @@ namespace C6Lab
         [Tooltip("#533: 빛 고리 사이 간격(초).")]
         [SerializeField, Range(.05f, .8f)] private float ringGapSeconds = .28f;
         [Header("#533 소리 (Resources/Audio 아래 폴더 이름, 폴더 안 파일 중 무작위. 비우면 소리 없음)")]
-        [Tooltip("금빛이 획을 훑기 시작할 때. 예: FiveColorHit(가야금 띠리링), CharmRelease, YaguangFlashGlow")]
-        [SerializeField] private string sweepSoundFolder = "FiveColorHit";
+        [Tooltip("글자를 칠하는 동안 이어지는 연필 사각 소리. 파일 중 무작위(같은 파일 연속 X)에 높낮이·크기를 조금씩 흔든다.")]
+        [SerializeField] private string writeSoundFolder = "JigwiTalismanWrite";
+        [SerializeField, Range(0f, 1f)] private float writeSoundVolume = .6f;
+        [Tooltip("연필 소리 높낮이 흔들림 (0.08 = ±8%).")]
+        [SerializeField, Range(0f, .3f)] private float writePitchJitter = .08f;
+        [Tooltip("연필 소리 크기 흔들림 (0.2 = ±20%).")]
+        [SerializeField, Range(0f, .5f)] private float writeVolumeJitter = .2f;
+        [Tooltip("앞 연필 소리가 이만큼(0~1) 지나면 계속 칠할 때 다음 소리를 잇는다. 작을수록 촘촘하다.")]
+        [SerializeField, Range(.3f, 1f)] private float writeChainAt = .7f;
+        [Tooltip("금빛이 획을 훑기 시작할 때. 기본 JigwiTalismanSweep(가야금 띠리링을 조금 느리게). 예: FiveColorHit, CharmRelease")]
+        [SerializeField] private string sweepSoundFolder = "JigwiTalismanSweep";
         [SerializeField, Range(0f, 1f)] private float sweepSoundVolume = .7f;
-        [Tooltip("\"쾅\" 순간. 기본 JigwiTalismanGong(징). 예: YaguangShakeBellFinal(방울), YaguangFlashBurst, ComboClear")]
-        [SerializeField] private string burstSoundFolder = "JigwiTalismanGong";
+        [Tooltip("\"쾅\" 순간. 기본 JigwiTalismanChime(띠리링을 한 음 높이고 긴 여운). 예: YaguangShakeBellFinal(방울), YaguangFlashBurst")]
+        [SerializeField] private string burstSoundFolder = "JigwiTalismanChime";
         [SerializeField, Range(0f, 1f)] private float burstSoundVolume = 1f;
         [Tooltip("번졌을 때. 예: Miss, ComboFail")]
         [SerializeField] private string smudgeSoundFolder = "Miss";
@@ -131,7 +140,12 @@ namespace C6Lab
         private static Sprite ringSprite;
         /// <summary>#533: 점마다 획 순서상 위치 (0~1). 완성 때 금빛이 이 순서로 훑는다.</summary>
         private float[] strokeRank = Array.Empty<float>();
-        private AudioSource sfx;
+        private AudioSource sfx, scratch;
+        private AudioClip[] writeClips;
+        private string writeClipsFolder;
+        private int lastWriteClip = -1;
+        /// <summary>#533: 테스트용 — 연필 소리를 낸 횟수.</summary>
+        public int WriteSoundCount { get; private set; }
         private float lastWriteHaptic = -1f;
         private bool burstPlayed;
         /// <summary>#533: 테스트용 — 마지막으로 낸 효과 이름(Sweep/Burst/Smudge)과 횟수.</summary>
@@ -235,6 +249,7 @@ namespace C6Lab
             stroke.Paint(from, to, Tolerance, fresh);
             for (int i = 0; i < fresh.Count; i++)
                 if (fresh[i] < dots.Length && dots[fresh[i]] != null) ShowWritten(dots[fresh[i]], fresh[i]);
+            if (fresh.Count > 0) Scratch();
             if (fresh.Count > 0 && Time.unscaledTime - lastWriteHaptic >= writeHapticGapSeconds)
             {
                 lastWriteHaptic = Time.unscaledTime;
@@ -437,6 +452,38 @@ namespace C6Lab
         }
 
         private LabConfig Config => source != null ? source.config : null;
+
+        /// <summary>
+        /// #533: 칠하는 동안 연필 사각 소리를 잇는다. 앞 소리가 거의 끝났을 때만 다음 소리를 내서 겹쳐 쌓이지 않고,
+        /// 손을 멈추면 지금 소리까지만 난다. 매번 다른 파일·높낮이·크기로 단조롭지 않게.
+        /// </summary>
+        private void Scratch()
+        {
+            if (string.IsNullOrEmpty(writeSoundFolder) || writeSoundVolume <= 0f) return;
+            if (writeClips == null || writeClipsFolder != writeSoundFolder)
+            {
+                writeClipsFolder = writeSoundFolder;
+                writeClips = Resources.LoadAll<AudioClip>("Audio/" + writeSoundFolder);
+                lastWriteClip = -1;
+            }
+            if (writeClips == null || writeClips.Length == 0) return;
+            if (scratch == null)
+            {
+                scratch = gameObject.AddComponent<AudioSource>();
+                scratch.playOnAwake = false; scratch.spatialBlend = 0f; scratch.loop = false;
+            }
+            if (scratch.isPlaying && scratch.clip != null && scratch.time < scratch.clip.length * writeChainAt) return;
+            int index = UnityEngine.Random.Range(0, writeClips.Length);
+            if (writeClips.Length > 1 && index == lastWriteClip)
+                index = (index + 1 + UnityEngine.Random.Range(0, writeClips.Length - 1)) % writeClips.Length;
+            lastWriteClip = index;
+            scratch.clip = writeClips[index];
+            scratch.pitch = 1f + UnityEngine.Random.Range(-writePitchJitter, writePitchJitter);
+            scratch.volume = Mathf.Clamp01(writeSoundVolume * (1f + UnityEngine.Random.Range(-writeVolumeJitter, writeVolumeJitter)))
+                * LabAudioSettings.SfxVolume;
+            scratch.Play();
+            WriteSoundCount++;
+        }
 
         /// <summary>#533: Resources/Audio/폴더의 소리 하나를 이 기기에서만 낸다(파일이 없으면 조용히 넘어감).</summary>
         private void Cue(string name, string folder, float volume)
