@@ -8,6 +8,7 @@ using NUnit.Framework;
 using UnityEngine;
 namespace C6Lab.Tests
 {
+    [Category("LabOnly")]
     public sealed class LabLobbyDesignTests
     {
         [TestCase(2,1,false)] [TestCase(3,2,false)] [TestCase(4,4,false)] [TestCase(5,5,true)]

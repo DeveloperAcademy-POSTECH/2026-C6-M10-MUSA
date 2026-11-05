@@ -4,6 +4,7 @@ using NUnit.Framework;
 
 namespace C6Lab.Tests
 {
+    [Category("LabOnly")]
     public sealed class LabJigwiReplicationTests
     {
         private static LabJigwiState Fire() => new LabJigwiState

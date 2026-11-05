@@ -35,11 +35,16 @@ namespace C6Lab.Tests
         public ushort UseAvailablePort(LabNetwork network)
         {
             Assert.That(network, Is.SameAs(ownedNetwork), "Assign ports only to this fixture's network.");
-            network.port = FindAvailableDualFamilyPort();
+            network.port = AvailableDualFamilyPort();
             return network.port;
         }
 
-        private static ushort FindAvailableDualFamilyPort()
+        /// <summary>
+        /// A UDP port that is currently free in both IPv4 and IPv6, for tests that open a real
+        /// Host or Solo without this fixture. Call it once per session that needs its own port;
+        /// keep the returned value when a test must reopen or join the same port.
+        /// </summary>
+        internal static ushort AvailableDualFamilyPort()
         {
             // Both listeners must be available because the real Host binds the same port in
             // both address families. Never enable port reuse or retry a failed real Host.
@@ -68,7 +73,7 @@ namespace C6Lab.Tests
                     }
                 }
             }
-            throw new InvalidOperationException("Could not reserve a free IPv4/IPv6 UDP port for the fixture.");
+            throw new InvalidOperationException("Could not reserve a free IPv4/IPv6 UDP port for the test.");
         }
 
         public IEnumerator Cleanup()

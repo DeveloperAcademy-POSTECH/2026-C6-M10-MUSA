@@ -11,11 +11,11 @@ namespace Hapio.Tests
         [Test]
         public void JigwiScreenPatternFieldsAreOwnedOnlyByStageThreeAndCannotLeakFromCommonOrOtherStages()
         {
-            foreach (int field in System.Linq.Enumerable.Except(System.Linq.Enumerable.Concat(new[] { 228, 235 }, System.Linq.Enumerable.Range(240, 17)), new[] { 241, 242, 246, 247 }))
+            foreach (int field in System.Linq.Enumerable.Except(System.Linq.Enumerable.Concat(new[] { 228, 235 }, System.Linq.Enumerable.Range(240, 17)), new[] { 241, 242, 244, 245, 246, 247, 251, 252, 253, 254, 255 }))
                 for (int scope = 0; scope <= GameStageSettings.TerritoryScope; scope++)
                     Assert.That(GameStageSettings.IsFieldVisible(scope, field), Is.EqualTo(scope == 3),
                         "Field " + field + " in scope " + scope);
-            foreach (int field in new[] { 229, 230, 231, 232, 233, 234, 241, 242, 246, 247 })
+            foreach (int field in new[] { 229, 230, 231, 232, 233, 234, 241, 242, 244, 245, 246, 247, 251, 252, 253, 254, 255 })
                 for (int scope = 0; scope <= GameStageSettings.TerritoryScope; scope++)
                     Assert.That(GameStageSettings.IsFieldVisible(scope, field), Is.False,
                         "Obsolete surface geometry controls remain reserved but hidden: " + field);
@@ -24,7 +24,7 @@ namespace Hapio.Tests
             using (var settings = new GameStageSettings(source, GameStageCatalog.RequireDefault()))
             {
                 float[] common = settings.Capture(0), first = settings.Capture(1), second = settings.Capture(2), territory = settings.Capture(4);
-                float[] third = settings.Capture(3); third[228] = 0f; third[240] = 12f; third[235] = 3f; third[251] = 2.2f; third[252] = 2.4f;
+                float[] third = settings.Capture(3); third[228] = 0f; third[240] = 12f; third[235] = 3f; third[256] = .6f;
                 Assert.That(settings.TryApply(3, third, out string error), Is.True, error);
                 CollectionAssert.AreEqual(common, settings.Capture(0));
                 CollectionAssert.AreEqual(first, settings.Capture(1));
@@ -32,9 +32,9 @@ namespace Hapio.Tests
                 CollectionAssert.AreEqual(territory, settings.Capture(4));
                 foreach (int scope in new[] { 0, 1, 2, 4 })
                 {
-                    foreach (int field in new[] { 240, 251, 252 })
+                    foreach (int field in new[] { 240, 256 })
                     {
-                        float[] forged = settings.Capture(scope); forged[field] = field == 240 ? 19f : 2.7f;
+                        float[] forged = settings.Capture(scope); forged[field] = field == 240 ? 19f : .55f;
                         Assert.That(settings.TryApply(scope, forged, out _), Is.False);
                     }
                 }
@@ -44,8 +44,7 @@ namespace Hapio.Tests
                     Assert.That(runtime.JigwiStageTimelineEnabled, Is.False);
                     Assert.That(runtime.JigwiABPersonalDurationSeconds, Is.EqualTo(12f));
                     Assert.That(runtime.JigwiStageFeverMultiplier, Is.EqualTo(3f));
-                    Assert.That(runtime.JigwiABRewardSizeScale, Is.EqualTo(2.2f));
-                    Assert.That(runtime.JigwiABRewardPaintScale, Is.EqualTo(2.4f));
+                    Assert.That(runtime.JigwiABFireDepth, Is.EqualTo(.6f).Within(.0001f));
                 }
                 finally { UnityEngine.Object.DestroyImmediate(runtime); }
                 CollectionAssert.AreEqual(saved, source.CaptureDeveloperValues());

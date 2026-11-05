@@ -48,7 +48,7 @@ namespace C6Lab.Tests
             {
                 float[] values = fixture.CaptureDeveloperValues(); values[132] = 1; values[134] = 0;
                 Assert.That(fixture.TryApplyDeveloperValues(values, out string error), Is.True, error);
-                network.config = fixture; network.port = 19898;
+                network.config = fixture; network.port = LabSavedSceneNetworkFixture.AvailableDualFamilyPort();
                 Assert.That(network.StartDeveloperSolo(), Is.True, network.Notice);
                 yield return null;
                 var room = (LabModel)typeof(LabNetwork).GetField("model", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(network);

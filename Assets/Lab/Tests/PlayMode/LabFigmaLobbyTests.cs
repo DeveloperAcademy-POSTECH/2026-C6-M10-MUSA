@@ -10,6 +10,7 @@ using UnityEngine.InputSystem.LowLevel;
 using UnityEngine.TestTools;
 namespace C6Lab.Tests
 {
+    [Category("Slow"), Category("LabOnly")]
     public sealed class LabFigmaLobbyTests
     {
         private readonly LabSavedSceneNetworkFixture fixture=new LabSavedSceneNetworkFixture();
@@ -109,6 +110,7 @@ namespace C6Lab.Tests
             Set("discoveredRooms",System.Array.Empty<LabDiscoveredRoom>());yield return null;yield return null;
             Assert.That(view.emptyRooms.activeSelf,Is.True);
         }
+        [Category("Bonjour")]
         [UnityTest]public IEnumerator CreatedRoomStaysInBrowserUntilItsCardIsPressedAndLeaveReturnsToBrowser()
         {
             view.EnterLobby();yield return null;yield return ClickPointer(view.createButton);
@@ -136,6 +138,7 @@ namespace C6Lab.Tests
             yield return ClickPointer(view.leaveButton);yield return null;
             Assert.That(network.IsConnected,Is.False);Assert.That(view.browserPage.activeSelf,Is.True);
         }
+        [Category("Bonjour")]
         [UnityTest]public IEnumerator MultipleCreatedRoomsResetTheFormAndOnlyTheirCreatorActivatesTheChosenRoom()
         {
             view.EnterLobby();yield return null;
@@ -199,6 +202,7 @@ namespace C6Lab.Tests
             Assert.That(VisibleRows().Length,Is.EqualTo(2));
             yield return ClickPointer(view.countButtons[0]);Assert.That(view.createButton.interactable,Is.True);
         }
+        [Category("Bonjour")]
         [UnityTest]public IEnumerator NativeBonjourPublishesLiveCountAndBattleChanges()
         {
             if(!LabBonjourDiscovery.IsSupported)Assert.Ignore("Bonjour is supported only on macOS/iOS.");
@@ -253,6 +257,7 @@ namespace C6Lab.Tests
             while(!network.CanChooseConnection&&Time.realtimeSinceStartupAsDouble<deadline)yield return null;
             Assert.That(network.CanChooseConnection,Is.True,network.Notice);
         }
+        [Category("Bonjour")]
         [UnityTest]public IEnumerator ThreePendingLabRoomsRetryConfirmedNameConflictsAndExposeSequentialNativeRoutes()
         {
             if(!LabBonjourDiscovery.IsSupported)Assert.Ignore("Bonjour is macOS/iOS only.");
@@ -316,6 +321,7 @@ namespace C6Lab.Tests
             }
             finally{foreach(var registration in registrations)registration?.Dispose();browser.Dispose();}
         }
+        [Category("Bonjour")]
         [UnityTest]
         public IEnumerator ExplicitNameLeaseFollowsTheNativeAdvertisementIntoHostAndReturnsAfterStop()
         {

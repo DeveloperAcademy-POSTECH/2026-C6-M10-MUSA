@@ -9,6 +9,7 @@ using UnityEngine.UI;
 namespace C6Lab.Tests
 {
     /// <summary>저장 Scene DEV 패널의 야광귀 묶음 (#268): 한꺼번에 켜기 버튼과 콤보·섬광 구분선.</summary>
+    [Category("LabOnly")]
     public sealed class LabYaguangDeveloperTests
     {
         private LabDeveloperMode ui;

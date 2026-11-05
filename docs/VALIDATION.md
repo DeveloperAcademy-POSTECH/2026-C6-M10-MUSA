@@ -2,18 +2,90 @@
 
 ## 2026-11-05 — DEV 표시 정리 (효과 없는 값·지귀 시간표·오색구슬 칠·Inspector·전투 DEV)
 
-`chore/dev-hide-inactive-fields` 브랜치(main `25014885` 기준)의 별도 worktree에서 Unity 6000.6.5f1 batch mode(macOS)로 실행했다. 아래 표는 실제로 실행한 것만 적는다. 시간은 NUnit XML의 `duration`이고, Unity 시작·가져오기·컴파일은 포함하지 않는다.
+`chore/dev-hide-inactive-fields` 브랜치의 별도 worktree에서 Unity 6000.6.5f1 batch mode(macOS)로 실행했다. 아래 표는 실제로 실행한 것만 적는다. 시간은 NUnit XML의 `duration`이고, Unity 시작·가져오기·컴파일은 포함하지 않는다.
 
 | 확인 | 결과 | 범위 |
 | --- | --- | --- |
-| EditMode 전체(전투 DEV 추가 뒤 최종) | **1977 PASS / 0 FAIL**, 45.7초 | 첫 실행(전투 DEV 추가 전)은 1976 PASS / 0 FAIL, 47.9초. main 1970건에 새 검사 7건. `LabDeveloperConfigTests.JigwiTimelineHidesTheOldFireInEveryGameStageAndTheCommonIntervalInJigwisAlone`: 전투 DEV 숨김 규칙(228 ON이면 178~183·192~195, 지귀 스테이지에서만 205). 저장된 Lab 패널 검사에 Lab 단독 장면은 228 ON에서도 `Jigwi` 묶음·205를 보인다는 확인을 더했다. `LabDeveloperConfigTests`: 효과 없는 10칸의 라벨·인덱스·저장값·폼 전달, 저장된 `Lab.unity` DEV 패널에서 묶음을 모두 펼쳐도 숨김·은퇴 행이 안 보임, 은퇴 18칸의 `HideInInspector`·`SerializeField`와 실제 폼 인덱스 대응. `GameStageSettingsTests`: 10칸이 어느 탭에도 표시되지 않고 공통 적용은 그대로, 지귀 탭이 폼의 228 ON에서 11칸을 접고 적용 범위는 그대로, 237이 공통 탭이고 세 스테이지에 들어감. 기존 묶음 범위 검사(`EveryDeveloperFieldBelongsToExactlyOneCategory`, Generation chances, `LabStageYokaiTests`)를 새 규칙으로 고쳤다 |
-| PlayMode 전체(전투 DEV 추가 뒤 최종) | **673건 중 669 PASS · 3 FAIL · 1 Inconclusive**, 661.1초 | 첫 실행(전투 DEV 추가 전)도 같은 결과, 663.1초. `GameSceneFlowTests.PausedDeveloperNextStageUsesSavedButtonAndFreshBattlesWithoutApplyingUnsavedFields`(실제 Battle의 전투 DEV를 1~3스테이지마다 열고 묶음을 펼쳐도 178~183·192~195와 `Jigwi` 제목이 숨고, 205는 3스테이지에서만 숨음), `GameStageUiTests`(저장된 Home DEV 탭: 공통에서 10칸 숨김·237 표시, 야광귀에서 236 표시·237 숨김, 지귀에서 228 슬라이더·입력으로 APPLY 전 즉시 접기/펴기, APPLY 뒤 다시 열기), Lab DEV 패널 PlayMode 9개 파일, `GameSceneFlowTests`의 DEV 검사 5건(Player Max HP를 재시작 표지로 쓰는 검사 포함) 모두 통과 |
-| PlayMode 실패 3·Inconclusive 1 | 기존 실패 | `LabHangingRenderInterpolationTests.OutsideRenderingTheTransformsAlwaysHoldTheFixedPose`(batchmode에서 WaitForEndOfFrame 없음), `LabJigwiABPresentationTests.SavedRawImagesRenderWarmAAndBAndBlueWaterIntoAnIsolatedPortraitUiTarget`(불꽃 픽셀 0), `LabWatercolorPaintRuntimeTests.DescriptorBurstRespectsTheActiveCapAndConvergesToASettledCheckpoint`(색 1단계 차이), Inconclusive `LabHangingRenderInterpolationTests.DuringRealRenderingTheDrawnPoseLiesBetweenTheTwoFixedPoses`. PR #528(검사 시간 단축)이 같은 날 main 그대로 실행해 기록한 기존 실패와 같은 항목이며 DEV 표시와 관계없다 |
+| EditMode 전체 — main `de1b56c5`(#509·#528·#529) 병합 뒤 최종 | **1976 PASS / 0 FAIL**, 23.5초 | 이 PR의 새 검사 7건 포함. `LabDeveloperConfigTests`: 효과 없는 10칸의 라벨·인덱스·저장값·폼 전달, 저장된 `Lab.unity` DEV 패널에서 묶음을 모두 펼쳐도 숨김·은퇴 행이 안 보이고 Lab 단독 장면은 228 ON에서도 `Jigwi` 묶음·205를 보임(`LabOnly`), 전투 DEV 숨김 규칙(228 ON이면 178~183·192~195, 지귀 스테이지에서만 205), 은퇴 25칸(#509의 244·245·251~255 포함)의 `HideInInspector`·`SerializeField`와 실제 폼 인덱스 대응. `GameStageSettingsTests`: 10칸이 어느 탭에도 표시되지 않고 공통 적용은 그대로, 지귀 탭이 폼의 228 ON에서 11칸을 접고 적용 범위는 그대로, 237이 공통 탭이고 세 스테이지에 들어감 |
+| PlayMode 전체 — 병합 뒤 최종 | **640건 중 637 PASS · 2 FAIL · 1 Inconclusive**, 415.2초 | DEV 관련 51건 모두 통과: `GameStageUiTests`(저장된 Home DEV 탭: 공통에서 10칸 숨김·237 표시, 야광귀에서 236 표시·237 숨김, 지귀에서 228 슬라이더·입력으로 APPLY 전 즉시 접기/펴기, APPLY 뒤 다시 열기), Lab DEV 패널 PlayMode 9개 파일, `GameSceneFlowTests` DEV 검사(실제 Battle의 전투 DEV를 1~3스테이지마다 열고 묶음을 펼쳐도 178~183·192~195와 `Jigwi` 제목이 숨고, 205는 3스테이지에서만 숨음) |
+| PlayMode 실패 2·Inconclusive 1 | 기존 실패 | `LabHangingRenderInterpolationTests.OutsideRenderingTheTransformsAlwaysHoldTheFixedPose`(batchmode에서 WaitForEndOfFrame 없음), `LabWatercolorPaintRuntimeTests.DescriptorBurstRespectsTheActiveCapAndConvergesToASettledCheckpoint`(색 1단계 차이), Inconclusive `LabHangingRenderInterpolationTests.DuringRealRenderingTheDrawnPoseLiesBetweenTheTwoFixedPoses`. 위 검사 시간 단축 절의 기존 실패 목록에 있는 항목이며 DEV 표시와 관계없다 |
+| 병합 전(main `25014885` 기준) | EditMode 1976·1977 PASS / 0 FAIL, PlayMode 673건 중 669 PASS · 3 FAIL · 1 Inconclusive(2회) | 첫 커밋 뒤와 전투 DEV 커밋 뒤에 각각 전체를 돌렸다. 실패 3건은 위 2건과 `LabJigwiABPresentationTests.SavedRawImagesRenderWarmAAndBAndBlueWaterIntoAnIsolatedPortraitUiTarget`(불꽃 픽셀 0)이다. 이 검사는 #509가 지귀 화면 검사를 다시 쓰면서 병합 트리에 없다 |
 
 미실행:
 
 - Editor GUI Test Runner, Inspector 화면 눈 확인(`HideInInspector`는 속성 검사로만 확인)
 - 다른 Mac, iOS, 실기기, 다인 LAN
+
+## 2026-11-05 — Editor 메뉴 정리 (Battle 덮어쓰기·고장 메뉴 제거)
+
+`chore/editor-menu-cleanup` 브랜치에서 Unity 6000.6.5f1 batch mode(macOS)로 실행했다. 처음에는 main `25014885` 기준으로, 이어 main `683c6f27`(#528·#509 포함)을 병합한 뒤 다시 실행했다. EditMode는 `-nographics`, PlayMode는 그래픽을 켠 batch다. 아래 표는 실제로 실행한 것만 적는다.
+
+| 확인 | 결과 | 범위 |
+| --- | --- | --- |
+| 컴파일 | **PASS** | batch 실행 중 Runtime·Editor(`Assembly-CSharp-Editor`)·EditMode/PlayMode 검사 묶음 전체 컴파일, 오류 0. `LabSceneBuilder.cs`의 경고는 남은 기존 줄의 `FindFirstObjectByType` 폐기 경고(CS0618)뿐이다. |
+| EditMode 전체(병합 뒤) | **1969 PASS / 0 FAIL / 0 skip** (21.7초) | main `683c6f27`의 1,967건(C6Lab 1,782 · Hapio 185)과 새 검사 2건. |
+| EditMode 전체(병합 전, main `25014885` 기준) | **1972 PASS / 0 FAIL / 0 skip** (48.6초) | Lab·Hapio EditMode 전체. 새 `GameEditorMenuCleanupTests` 2건 포함: 다시 만든 Stage02 기본값(`GameStageAssets.YaguangDefaults`)이 야광귀 탭에 보이는 칸만 쓰고 저장 Stage02와 같으며 카탈로그 `Validate`를 통과함, 지운 메뉴 6개와 `UpgradeBattleFromSavedLab`이 Editor 어셈블리에 다시 등록되지 않음. 두 검사 모두 밀리초 단위이고 GPU·Lab 전용·대체 기능 검사가 아니라 `[Category]`를 붙이지 않았다. |
+| PlayMode `Hapio.PlayModeTests` 전체(병합 뒤) | **58 PASS / 0 FAIL / 0 skip** (143.8초) | 바뀐 Editor 코드를 직접 부르는 PlayMode 검사는 없다. 저장된 스테이지 카탈로그·Battle·Home/Lobby DEV 행을 읽는 가장 가까운 묶음(`GameSceneFlowTests` 21, `GameLobbyViewTests` 13, `GameOpeningControllerTests` 10, `GameFinishReplayTests` 4, `GameStageUiTests` 2, `GameYokaiPresentationTests` 2 등)을 실행했다. |
+| 참조 검색 | **없음** | `git grep`으로 지운 메뉴 이름·메서드·클래스를 찾았다. 남은 언급은 고친 `docs/GAME_FLOW.md`·`Assets/Lab/Art/UI/README.md`의 제거 안내, 과거 실행 기록(이 문서의 「#262 최신 main 동기화 및 Draft 준비 — 2026-10-21」 등)과 새 검사뿐이다. |
+
+변경: `Hapio/Upgrade Existing Game Scenes From Current Lab`과 Lab 전체를 Battle 위에 저장하던 `UpgradeBattleFromSavedLab`을 지웠다. `Hapio/Upgrade Three Yokai Stages`는 정의·카탈로그 생성과 Home/Lobby DEV 행·StageResult/GameOver 글꼴 갱신만 하고 Battle을 열거나 저장하지 않는다. `YaguangDefaults`에서 은퇴 슬롯 211을 뺐다. `C6 Lab/Build Editable Lab Scene`·`Migrate Legacy Throw Tuning`·`Remove Unused Template Samples`(그 메서드와 Build 전용 보조 함수)와 `LabDeveloperPanelUpgrade.cs`(`Upgrade Developer Controls`)·`LabTemporaryBackdropUpgrade.cs`(`Apply Temporary Battle Background`)를 지웠다. Scene·Prefab·에셋 YAML은 바꾸지 않았다. batch 가져오기가 실행 때마다 Lobby PNG `.meta` 20개에 WebGL 플랫폼 항목을 덧붙였으나 이번 변경과 무관해 매번 되돌렸다. 접속 번호(5688/`C6PhysicsLab/49`/`C6HapioGame/34`)와 공유 설정 수는 바꾸지 않았다.
+
+미실행: Lab·Story·ClayPreview PlayMode, 메뉴 자체 실행(`Upgrade Three Yokai Stages`는 Home/Lobby/StageResult/GameOver를 저장하므로 실행하지 않았다), Editor 화면에서 메뉴 목록 육안 확인, iOS·Mac 앱.
+
+## 2026-11-05 — 검사 시간 단축·카테고리
+
+`chore/test-suite-speedup` 브랜치(main `25014885` 기준)의 별도 worktree에서 실행했다. 표 끝의 "병합 뒤" 행은 main `d12f4f84`(#509)를 병합한 트리에서 실행했다. Unity 6000.6.5f1 batch mode, macOS, 같은 Mac이다. 아래 표는 실제로 실행한 것만 적는다. 시간은 NUnit XML의 `duration`이고, Unity 시작·가져오기·컴파일은 포함하지 않는다.
+
+| 확인 | 결과 | 범위 |
+| --- | --- | --- |
+| 변경 전 EditMode 전체 | **1970 PASS / 0 FAIL**, 47.7초 | 기준 측정. main 그대로 |
+| 변경 전 PlayMode 전체 | **673건 중 667 PASS · 5 FAIL · 1 Inconclusive**, 639.4초 | 기준 측정. 실패 5건은 아래 기존 실패이며 변경 전부터 있었다 |
+| 1차 변경 뒤 PlayMode 전체 | **671건 중 662 PASS · 8 FAIL · 1 Inconclusive**, 410.0초 | 새 실패 4건(다시보기 `GameFinishReplayTests` 3건, `GameStage2GourdHitFinishTests` 1건)을 찾았다. 짧아진 시작 대기 때문에 박 자세 기록이 명중 0.8초 전까지 쌓이기 전에 던져 다시보기 후보에서 빠졌다. 진단 출력으로 확인했다(명중 2.46초, 가장 오래된 자세 1.68초) |
+| 다시보기 검사 수정 뒤 | **5/5 PASS** | `GameFinishReplayTests` 4건, `GameStage2GourdHitFinishTests` 1건. 던지기 전 자세 기록 창을 기다린다. 런타임은 고치지 않았다 |
+| 최종 EditMode 전체 | **1970 PASS / 0 FAIL**, 19.4초 | `LabPaintSplatterConsistencyTests` 1.41초, `LabPaintSpreadFlowTests` 0.25초 |
+| 카테고리 적용 뒤 PlayMode 전체 | **671건 중 667 PASS · 3 FAIL · 1 Inconclusive**, 424.0초 | 실패 3건은 모두 기존 실패다 |
+| 카테고리 적용 뒤 빠른 묶음 | PlayMode **352건 중 349 PASS · 2 FAIL · 1 Inconclusive**, 57.0초 / EditMode **1824 PASS**, 18.1초 | PlayMode는 `-testCategory "!Slow;!Legacy;!LabOnly"`, EditMode는 `"!Legacy;!LabOnly"`. 결과 XML에 제외 카테고리 0건 |
+| 코드 검토 | 독립 검토 3관점 + 반박 검증 | 확인된 4건 수정: 다시보기 검사의 대기를 `ResetSwing` 앞으로 옮겨 첫 투척이 리셋 자세에서 출발하게 함, Hapio도 쓰는 공용 경로 검사 3파일(`LabQuickConnectTests`, `LabLobbyPositionSelectionTests`, `LabPlayerPaintPatternUiTests`)의 `LabOnly`를 메서드 단위로 좁힘. 기각 3건(Slow 클래스 안의 짧은 동기 검사는 클래스 단위 유지) |
+| 검토 수정 뒤 최종 PlayMode 전체 | **671건 중 666 PASS · 4 FAIL · 1 Inconclusive**, 430.4초 | Hapio PlayMode 152.1초(전 362.6초), `GameSceneFlowTests` 83.3초(전 223.5초), 다시보기 5건 통과. 실패 4건은 모두 기존 실패다(아래 3건 + `LabWatercolorSurfaceGrainTests` 정적 입자, 1차 변경 뒤에도 같은 실패) |
+| 검토 수정 뒤 최종 PlayMode 빠른 묶음 | **358건 중 355 PASS · 2 FAIL · 1 Inconclusive**, 58.7초 | 제외 카테고리 0건. 실패 2건은 기존 실패다. EditMode는 r3 이후 바뀌지 않아 다시 돌리지 않았다 |
+| 병합 뒤 EditMode 전체 | **1967 PASS / 0 FAIL**, 25.1초 | 빠른 묶음(`"!Legacy;!LabOnly"`) **1821 PASS**, 19.2초, 제외 카테고리 0건 |
+| 병합 뒤 PlayMode 전체 | **640건 중 635 PASS · 4 FAIL · 1 Inconclusive**, 435.9초 | Hapio PlayMode 156.4초, `GameJigwiStageIntegrationTests` 3.4초(검사 전용 시작 단축 아래 #509 A·B 통과). 실패 중 3건은 기존 실패(`LabHangingRenderInterpolationTests` 렌더 밖 자세, `LabWatercolorPaintRuntimeTests` Descriptor, `LabWatercolorSurfaceGrainTests` 종이 영향 2). `LabPaintSpreadFlowRenderTests.SavedShellComparesLegacyAndSpreadFlow…`는 경계 반올림 3으로 한 번 실패했다. 단독 3회 재실행과 GPU 묶음 재실행에서 모두 통과했고 그 전 4회 전체 실행에서도 통과했다 |
+| 병합 뒤 GPU 묶음 | **58건 중 56 PASS · 1 FAIL · 1 Inconclusive**, 75.4초 | 실패는 기존 `LabWatercolorPaintRuntimeTests` Descriptor다 |
+| 병합 검토 | 독립 검토 3관점 + 반박 검증 | 수정 3건: 자동 병합이 #509가 지운 검사의 `GPU`를 다른 검사(`BMaskUsesTheBattleViewport…`)로 옮긴 것을 되돌림, 0.55초가 된 `LabJigwiABNetworkTests`의 `Slow` 제거, 보고서 현재 구성 건수 갱신. #509로 안 쓰이게 된 경로를 보는 검사의 `Legacy` 정리는 하지 않았다(보고서에 적음) |
+| 병합 뒤 PlayMode 빠른 묶음(`Slow` 제거 후) | **340건 중 338 PASS · 1 FAIL · 1 Inconclusive**, 61.0초 | 제외 카테고리 0건. 실패와 Inconclusive는 기존 `LabHangingRenderInterpolationTests` 2건이다 |
+
+기존 실패(변경 전 기준 실행부터 있었고 이번 변경과 관계없음):
+
+- 매번 실패:
+  - `LabHangingRenderInterpolationTests.OutsideRenderingTheTransformsAlwaysHoldTheFixedPose`: batchmode에서 WaitForEndOfFrame이 호출되지 않는다.
+  - `LabJigwiABPresentationTests.SavedRawImagesRenderWarmAAndBAndBlueWaterIntoAnIsolatedPortraitUiTarget`: 불꽃 픽셀이 0이다.
+  - `LabWatercolorPaintRuntimeTests.DescriptorBurstRespectsTheActiveCapAndConvergesToASettledCheckpoint`: 색이 1단계 다르다.
+- 실행마다 다르게 실패: `LabJigwiWaterTrailTests.AuthoritativeAndPredictedWater…`, `LabPlayerPaintPatternRenderTests.ActualSavedShaderDistinguishesAllSixPainters…`, `LabWatercolorSurfaceGrainTests.PigmentTextureIsStatic…`
+- 매번 Inconclusive: `LabHangingRenderInterpolationTests.DuringRealRenderingTheDrawnPoseLiesBetweenTheTwoFixedPoses`
+
+미실행:
+
+- Editor GUI Test Runner
+- 다른 Mac, iOS, 실기기
+- 동시에 여러 실행을 돌려 포트 충돌을 확인하는 검사
+- 실제 게임의 시작 대기: 기본값을 바꾸지 않았으므로 앱 실행 확인은 하지 않았다
+
+구성·카테고리·실행 묶음은 [검사 모음 보고서](TEST_SUITE_REPORT.md)의 현재 구성 절에 있다.
+
+## 2026-11-04~05 — #509 지귀 B 지목 동시 명중
+
+`feat/#509-jigwi-group-sync`(#479 브랜치 위) 작업 중 팀원이 Unity6000.6.5f1 Editor(macOS)로 확인한 것만 적는다.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| (1/5) Host 규칙 EditMode | **팀원 PASS 보고** | `LabJigwiABModelTests`·`LabJigwiABSupplyModelTests`·`LabJigwiStageModelTests`·`LabJigwiStageBlastTests`·`LabJigwiSupplyReplicationTests`·`LabBoardReplicationTests`·`LabSharedSettingsSchemaTests`·`LabGameFlowBridgeTests` (테스트 픽스처 실수 4건을 고친 뒤) |
+| (3/5) DEV 은퇴 EditMode | **팀원 PASS 보고** | `LabDeveloperConfigTests`·`LabJigwiABConfigTests`·`LabJigwiStageConfigTests`·`GameStageSettingsTests`·`MenuScreens_HaveSavedEditableCanvasAndInput` |
+
+(2/5) `LabJigwiSyncPillarViewTests`와 (4/5) PlayMode(`LabJigwiABPresentationTests`·`LabJigwiABNetworkTests`·`LabJigwiGroupFireAudioTests`·`GameJigwiStageIntegrationTests`), EditMode 전체 Run All, SOLO/2인 이상 Play, 실기기 진동·iOS 빌드·LAN/핫스팟은 이 기록 시점에 **결과를 받지 못했거나 미실행**이다. 확인하면 이 절에 덧붙인다.
+
+이후 단계: (6/9) 지귀 A/B 외침 목소리 삭제와 (7/9) 불기둥 대신 박 동시 명중으로 바꾼 뒤 팀원이 Test Runner를 돌려 실패 2개를 보고했고, 테스트 픽스처(동기 명중에 지급 물 구슬 사용)를 고쳤다. (8/9) 성공 물벼락 / 실패 조합판 불바다 3초 / 5초 보상과 DEV251/252 은퇴는 커밋만 했고 **Test Runner 결과는 아직 받지 못했다**.
+
+#479 브랜치(main `0681d25` #506까지 병합)를 합쳤다. 충돌은 접속 번호 줄, `LabModel.cs` 칠하기 줄(main의 `paintImpactStrength` + #509 승리 1회 조건), `AGENTS.md`/`JIGWI_SCREEN_PATTERNS.md` 절이었다. #509는 **5688/`C6PhysicsLab/49`/`C6HapioGame/33`**, 설정 259개다. 병합 뒤 결과는 아직 기록하지 않았다.
 
 ## 2026-11-05 — 마지막 일격 다시보기 (스토리 1·2·3)
 

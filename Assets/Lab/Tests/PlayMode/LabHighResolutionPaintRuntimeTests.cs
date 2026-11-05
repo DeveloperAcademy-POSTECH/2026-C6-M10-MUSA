@@ -10,6 +10,7 @@ using Object = UnityEngine.Object;
 namespace C6Lab.Tests
 {
     /// <summary>Actual GPU output, authoritative isolation, replay budget and resource lifetime.</summary>
+    [Category("GPU")]
     public sealed class LabHighResolutionPaintRuntimeTests
     {
         [UnityTest]

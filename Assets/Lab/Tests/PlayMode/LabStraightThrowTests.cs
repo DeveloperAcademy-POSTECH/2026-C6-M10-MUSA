@@ -8,6 +8,7 @@ using UnityEngine.TestTools;
 namespace C6Lab.Tests
 {
     /// <summary>Saved tuning, real board input and physical straight-flight regression coverage.</summary>
+    [Category("LabOnly")]
     public sealed class LabStraightThrowTests
     {
         private LabNetwork startedNetwork;
@@ -54,7 +55,7 @@ namespace C6Lab.Tests
             seatCamera.config = fixture;
             controller.ReconfigureBoard();
             seatCamera.RefreshPose();
-            network.port = 17890;
+            network.port = LabSavedSceneNetworkFixture.AvailableDualFamilyPort();
             int approvedEvents = 0;
             Vector3 approvedPoint = Vector3.zero;
             System.Action<Vector3, LabOrbElement> onApproved = (point, element) =>

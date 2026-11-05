@@ -21,6 +21,7 @@ namespace Hapio.Tests
     /// use an explicit CPU-map fixture completion, not simulated projectile collision: throw
     /// and contact correctness remain the dedicated Lab projectile suites' responsibility.
     /// </summary>
+    [Category("Slow")]
     public sealed class GameSceneFlowTests
     {
         private GameSession session;
@@ -66,6 +67,8 @@ namespace Hapio.Tests
         public IEnumerator ReleaseOwnedSession()
         {
             Time.timeScale = 1f;
+            // A test that ran the production countdown may have failed inside a nested yield, skipping its finally.
+            GameTestStartTiming.UseShort();
             if (session != null)
             {
                 network.Stop();
@@ -85,60 +88,72 @@ namespace Hapio.Tests
         [UnityTest]
         public IEnumerator SharedCountdownWaitsForInitialPresentationAndOnlyThenStartsGameplay()
         {
-            session.StartSolo();
-            Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.LoadingBattle));
-            Assert.That(session.StartOverlay.Visible && session.StartOverlay.BlocksInput, Is.True,
-                "The loading caption must exist before the asynchronous Scene load starts.");
-            yield return Until(() => session.State.phase == GameFlowPhase.Countdown
-                && session.StartOverlay.DisplayText == "3", "Prepared participants must enter the shared countdown.");
-            Assert.That(network.IsGameInitialStateReady(session.State.battleSessionId, session.State.battleRound), Is.True);
-            Assert.That(UnityEngine.Object.FindFirstObjectByType<GameBattleBindings>().IsPresentationReady, Is.True);
-            var watercolorPaint = UnityEngine.Object.FindFirstObjectByType<LabGourdPaint>();
-            Assert.That(network.PinnedWatercolorSettings.UsesClayStickers ? watercolorPaint.ClayStickersActive : watercolorPaint.WatercolorStampsActive, Is.True, watercolorPaint.WatercolorStampError);
-            var watercolorBlock = new MaterialPropertyBlock();
-            watercolorPaint.Shell.GetComponent<Renderer>().GetPropertyBlock(watercolorBlock);
-            Assert.That(watercolorBlock.GetTexture("_PaintMap"), Is.SameAs(watercolorPaint.VisualPaintTexture),
-                "Hapio's actual Battle must bind the same watercolor renderer before the shared countdown.");
-            LabSnapshot before = network.Snapshot;
-            double remaining = before.remaining;
-            float stamina = before.players.Single(player => player.id == network.LocalPlayerId).stamina;
-            var digits = new System.Collections.Generic.HashSet<string>();
-            LabOrbState drum = before.drums.Single(orb => orb.owner == network.LocalPlayerId);
-            Assert.That(network.board.TryGetMotion(drum.id, out Vector2 initialPosition, out _), Is.True);
-            LabHangingTarget hanging = network.target.GetComponent<LabHangingTarget>();
-            float ropeElapsed = hanging.CycleElapsed;
-            while (session.State.phase == GameFlowPhase.Countdown)
+            // This test owns the visible 3/2/1 and "시작!": it runs the production start durations, not the
+            // assembly's shortened gate (GameTestStartTiming), and pins those defaults.
+            GameTestStartTiming.UseDefaults();
+            try
             {
-                digits.Add(session.StartOverlay.DisplayText);
-                Assert.That(network.GameStartHeld, Is.True);
-                Assert.That(network.IsBattlePaused, Is.False);
-                Assert.That(Time.timeScale, Is.EqualTo(1f));
-                Assert.That(network.CanPauseBattle || network.CanResumeBattle || session.CanDeveloperAdvanceStage, Is.False);
-                Assert.That(network.PauseBattle(), Is.False);
-                Assert.That(network.ResumeBattle(), Is.False);
+                Assert.That(GameStartTiming.IsDefault, Is.True);
+                Assert.That(GameStartTiming.CountdownSeconds, Is.EqualTo(3d));
+                Assert.That(GameStartTiming.InitialLeadSeconds, Is.EqualTo(1d));
+                Assert.That(GameStartTiming.MaximumLeadSeconds, Is.EqualTo(5d));
+                Assert.That(GameStartTiming.StartedLabelSeconds, Is.EqualTo(.5d));
+                session.StartSolo();
+                Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.LoadingBattle));
+                Assert.That(session.StartOverlay.Visible && session.StartOverlay.BlocksInput, Is.True,
+                    "The loading caption must exist before the asynchronous Scene load starts.");
+                yield return Until(() => session.State.phase == GameFlowPhase.Countdown
+                    && session.StartOverlay.DisplayText == "3", "Prepared participants must enter the shared countdown.");
+                Assert.That(network.IsGameInitialStateReady(session.State.battleSessionId, session.State.battleRound), Is.True);
+                Assert.That(UnityEngine.Object.FindFirstObjectByType<GameBattleBindings>().IsPresentationReady, Is.True);
+                var watercolorPaint = UnityEngine.Object.FindFirstObjectByType<LabGourdPaint>();
+                Assert.That(network.PinnedWatercolorSettings.UsesClayStickers ? watercolorPaint.ClayStickersActive : watercolorPaint.WatercolorStampsActive, Is.True, watercolorPaint.WatercolorStampError);
+                var watercolorBlock = new MaterialPropertyBlock();
+                watercolorPaint.Shell.GetComponent<Renderer>().GetPropertyBlock(watercolorBlock);
+                Assert.That(watercolorBlock.GetTexture("_PaintMap"), Is.SameAs(watercolorPaint.VisualPaintTexture),
+                    "Hapio's actual Battle must bind the same watercolor renderer before the shared countdown.");
+                LabSnapshot before = network.Snapshot;
+                double remaining = before.remaining;
+                float stamina = before.players.Single(player => player.id == network.LocalPlayerId).stamina;
+                var digits = new System.Collections.Generic.HashSet<string>();
+                LabOrbState drum = before.drums.Single(orb => orb.owner == network.LocalPlayerId);
+                Assert.That(network.board.TryGetMotion(drum.id, out Vector2 initialPosition, out _), Is.True);
+                LabHangingTarget hanging = network.target.GetComponent<LabHangingTarget>();
+                float ropeElapsed = hanging.CycleElapsed;
+                while (session.State.phase == GameFlowPhase.Countdown)
+                {
+                    digits.Add(session.StartOverlay.DisplayText);
+                    Assert.That(network.GameStartHeld, Is.True);
+                    Assert.That(network.IsBattlePaused, Is.False);
+                    Assert.That(Time.timeScale, Is.EqualTo(1f));
+                    Assert.That(network.CanPauseBattle || network.CanResumeBattle || session.CanDeveloperAdvanceStage, Is.False);
+                    Assert.That(network.PauseBattle(), Is.False);
+                    Assert.That(network.ResumeBattle(), Is.False);
+                    network.Generate();
+                    Assert.That(network.Snapshot.remaining, Is.EqualTo(remaining));
+                    Assert.That(network.Snapshot.playedSeconds, Is.Zero);
+                    Assert.That(network.Snapshot.orbs, Is.Empty);
+                    Assert.That(network.Snapshot.players.Single(player => player.id == network.LocalPlayerId).stamina,
+                        Is.EqualTo(stamina));
+                    Assert.That(network.Snapshot.paintRevision, Is.EqualTo(before.paintRevision));
+                    Assert.That(network.board.TryGetMotion(drum.id, out Vector2 heldPosition, out _), Is.True);
+                    Assert.That(Vector2.Distance(heldPosition, initialPosition), Is.LessThan(.00001f));
+                    Assert.That(hanging.CycleElapsed, Is.EqualTo(ropeElapsed));
+                    yield return null;
+                }
+                Assert.That(digits, Is.SupersetOf(new[] { "3", "2", "1" }));
+                Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.Playing));
+                Assert.That(network.TryGetGameServerTime(out double serverNow), Is.True);
+                Assert.That(serverNow, Is.GreaterThanOrEqualTo(session.State.battleStartsAt));
+                Assert.That(network.GameStartHeld, Is.False);
+                Assert.That(session.StartOverlay.DisplayText, Is.EqualTo("시작!"));
+                Assert.That(session.StartOverlay.BlocksInput, Is.False);
                 network.Generate();
-                Assert.That(network.Snapshot.remaining, Is.EqualTo(remaining));
-                Assert.That(network.Snapshot.playedSeconds, Is.Zero);
-                Assert.That(network.Snapshot.orbs, Is.Empty);
-                Assert.That(network.Snapshot.players.Single(player => player.id == network.LocalPlayerId).stamina,
-                    Is.EqualTo(stamina));
-                Assert.That(network.Snapshot.paintRevision, Is.EqualTo(before.paintRevision));
-                Assert.That(network.board.TryGetMotion(drum.id, out Vector2 heldPosition, out _), Is.True);
-                Assert.That(Vector2.Distance(heldPosition, initialPosition), Is.LessThan(.00001f));
-                Assert.That(hanging.CycleElapsed, Is.EqualTo(ropeElapsed));
-                yield return null;
+                yield return Until(() => network.Snapshot.orbs.Length == 1, "Generation opens after the shared deadline.");
+                yield return Until(() => network.Snapshot.remaining < remaining && !session.StartOverlay.Visible,
+                    "The started caption fades while the normal battle clock advances.");
             }
-            Assert.That(digits, Is.SupersetOf(new[] { "3", "2", "1" }));
-            Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.Playing));
-            Assert.That(network.TryGetGameServerTime(out double serverNow), Is.True);
-            Assert.That(serverNow, Is.GreaterThanOrEqualTo(session.State.battleStartsAt));
-            Assert.That(network.GameStartHeld, Is.False);
-            Assert.That(session.StartOverlay.DisplayText, Is.EqualTo("시작!"));
-            Assert.That(session.StartOverlay.BlocksInput, Is.False);
-            network.Generate();
-            yield return Until(() => network.Snapshot.orbs.Length == 1, "Generation opens after the shared deadline.");
-            yield return Until(() => network.Snapshot.remaining < remaining && !session.StartOverlay.Visible,
-                "The started caption fades while the normal battle clock advances.");
+            finally { GameTestStartTiming.UseShort(); }
         }
 
         [UnityTest]
@@ -211,6 +226,7 @@ namespace Hapio.Tests
             Assert.That(network.GameStartHeld, Is.False);
         }
 
+        [Category("Bonjour")]
         [UnityTest]
         public IEnumerator PendingGameCardsSurviveBattleGameOverAndHomeWhileLobbyLeaveReturnsToTheBrowser()
         {
@@ -403,6 +419,7 @@ namespace Hapio.Tests
             Assert.That(session.PreviewTexture, Is.Null);
         }
 
+        [Category("GPU")]
         [UnityTest]
         public IEnumerator SavedHomeRunsThreeFreshBattlesWithOneRoomAndKeepsCompletedMapAfterUnload()
         {
@@ -759,7 +776,8 @@ namespace Hapio.Tests
             {
                 yield return WaitPlaying(stage);
                 CompleteMapInFixture(Model());
-                yield return Until(() => !session.IsLoadingScene && SceneManager.GetActiveScene().path == GameScenePaths.StageResult,
+                yield return Until(() => !session.IsLoadingScene && SceneManager.GetActiveScene().path == GameScenePaths.StageResult
+                    && (stage < 3 || session.State.phase == GameFlowPhase.Completed),
                     "The completed battle must show its saved Figma result.");
                 yield return null;
                 GameStageResultView view = Object.FindFirstObjectByType<GameStageResultView>();
@@ -775,6 +793,10 @@ namespace Hapio.Tests
                     Assert.That(view.guidance.text, Does.Contain("다음 스테이지를 시작하시오"));
                     if (stage == 1)
                     {
+                        // #367 absence check: the retired policy advanced 10 s after every result ACK, with no field or
+                        // event left to observe or fast-forward, so only real time beyond that delay can show that no
+                        // timer (re)starts the next stage. Nothing is opened meanwhile: the old timer paused while a
+                        // gourd was being viewed, so the viewer checks below must not overlap this wait.
                         yield return new WaitForSecondsRealtime(10.5f);
                         Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.StageResult),
                             "A ready result remains on screen beyond the retired automatic-advance delay.");
@@ -817,11 +839,21 @@ namespace Hapio.Tests
                     Assert.That(session.State.stageIndex, Is.EqualTo(stage + 1), "Repeated touches cannot skip a loading generation.");
                     continue;
                 }
+                // Formerly StageThreeVictoryShowsFinalVictoryAndOverallRecords, which ran these same three committed
+                // victories again: the final record is this battle's Victory and the rows are the overall records,
+                // checked on the same frame after loading as there.
+                LabSnapshot snapshot = session.ResultSnapshot;
+                Assert.That(snapshot.sessionId, Is.EqualTo(session.State.battleSessionId));
+                Assert.That(snapshot.round, Is.EqualTo(session.State.battleRound));
+                Assert.That(snapshot.phase, Is.EqualTo(LabPhase.Victory));
+                Assert.That(view.paint.text, Is.EqualTo("전체 스테이지 기록"));
+                AssertVisibleRows(view, LabResultTable.OverallRowsFor(session.StageResults, network.LocalPlayerId));
                 yield return Until(() => view.nextButton.interactable, "The final overall-record control waits for readiness.");
                 Assert.That(view.paint.text, Is.EqualTo("전체 스테이지 기록"));
                 view.nextButton.onClick.Invoke();
                 yield return null;
                 Assert.That(view.paint.text, Is.EqualTo("PAINT 100.0%"));
+                Assert.That(view.judgment.text, Is.EqualTo("최종 승리 !"));
                 view.nextButton.onClick.Invoke();
                 yield return null;
                 Assert.That(view.paint.text, Is.EqualTo("전체 스테이지 기록"));
@@ -902,6 +934,16 @@ namespace Hapio.Tests
                 Assert.That(defeat.homeButton.interactable, Is.False, "Defeat also shields the inherited battle pointer.");
                 defeat.homeButton.onClick.Invoke();
                 Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.GameOver));
+                // Formerly StageTwoDefeatShowsYaguangAndItsOwnRecordsWithoutGourdInspection, which ran this same path
+                // (stage-one victory → stage two → full damage → GameOver) again: its content one frame after loading.
+                yield return null;
+                GameStageResultView defeatView = Object.FindFirstObjectByType<GameStageResultView>();
+                Assert.That(defeatView.stage.text, Is.EqualTo("STAGE 2"));
+                Assert.That(defeatView.yokai.text, Is.EqualTo("야광귀"));
+                Assert.That(defeatView.judgment.text, Is.EqualTo("봉인 실패..."));
+                Assert.That(defeatView.viewerButton, Is.Null);
+                Assert.That(defeatView.design.Find("InspectSealedGourd"), Is.Null);
+                Assert.That(session.ResultSnapshot, Is.Null, "Stage-one victory must not leak into the stage-two defeat.");
                 InputSystem.QueueStateEvent(mouse, new MouseState());
                 InputSystem.Update();
                 yield return Until(() => defeat.homeButton.interactable, "Released defeat input restores HOME.");
@@ -930,41 +972,10 @@ namespace Hapio.Tests
             ExecuteEvents.Execute(button.gameObject, pointer, ExecuteEvents.pointerClickHandler);
         }
 
-        [UnityTest]
-        public IEnumerator StageTwoDefeatShowsYaguangAndItsOwnRecordsWithoutGourdInspection()
-        {
-            session.StartSolo();
-            yield return WaitPlaying(1);
-            CompleteMapInFixture(Model());
-            yield return Until(() => !session.IsLoadingScene && session.CanAdvanceStage
-                && session.State.phase == GameFlowPhase.StageResult, "Stage one result must be ready.");
-            session.NextStage();
-            yield return WaitPlaying(2);
-            LabModel model = Model();
-            Assert.That(model.TryApplyPlayerDamage(network.LocalPlayerId, network.config.PlayerMaxHp,
-                ModelTime(model)), Is.True);
-            yield return WaitGameOver();
-            yield return null;
-            GameStageResultView view = Object.FindFirstObjectByType<GameStageResultView>();
-            Assert.That(view.stage.text, Is.EqualTo("STAGE 2"));
-            Assert.That(view.yokai.text, Is.EqualTo("야광귀"));
-            Assert.That(view.judgment.text, Is.EqualTo("봉인 실패..."));
-            Assert.That(view.viewerButton, Is.Null);
-            Assert.That(view.design.Find("InspectSealedGourd"), Is.Null);
-            Assert.That(session.ResultSnapshot, Is.Null, "Stage-one victory must not leak into the stage-two defeat.");
-            view.homeButton.onClick.Invoke();
-            yield return WaitHome();
-        }
-
-        [UnityTest]
-        public IEnumerator StageThreeVictoryShowsFinalVictoryAndOverallRecords()
-            => CheckStageThreeJudgment(true);
-
+        // StageTwoDefeatShowsYaguang… now lives in ResultEntryRequiresEveryHeldMouseAndTouch… and
+        // StageThreeVictoryShowsFinalVictory… in FigmaResultsWaitForHostNext…: each repeated that test's exact path.
         [UnityTest]
         public IEnumerator StageThreeDefeatShowsJigwiAndOnlyTheCurrentBattleRecords()
-            => CheckStageThreeJudgment(false);
-
-        private IEnumerator CheckStageThreeJudgment(bool victory)
         {
             session.StartSolo();
             for (int stage = 1; stage < 3; stage++)
@@ -976,32 +987,32 @@ namespace Hapio.Tests
                 session.NextStage();
             }
             yield return WaitPlaying(3);
-            if (victory)
-            {
-                CompleteMapInFixture(Model());
-                yield return Until(() => session.State.phase == GameFlowPhase.Completed && !session.IsLoadingScene
-                    && SceneManager.GetActiveScene().path == GameScenePaths.StageResult, "Jigwi victory must show its final-stage result.");
-            }
-            else
-            {
-                LabModel model = Model();
-                Assert.That(model.TryApplyPlayerDamage(network.LocalPlayerId, network.config.PlayerMaxHp,
-                    ModelTime(model)), Is.True);
-                yield return WaitGameOver();
-            }
+            LabModel model = Model();
+            Assert.That(model.TryApplyPlayerDamage(network.LocalPlayerId, network.config.PlayerMaxHp,
+                ModelTime(model)), Is.True);
+            yield return WaitGameOver();
             yield return null;
             GameStageResultView view = Object.FindFirstObjectByType<GameStageResultView>();
-            Assert.That(view.stage.text, Is.EqualTo(victory ? "ALL STAGES CLEAR" : "STAGE 3"));
-            Assert.That(view.yokai.text, Is.EqualTo(victory ? "모든 요괴" : "지귀"));
-            Assert.That(view.judgment.text, Is.EqualTo(victory ? "최종 승리 !" : "봉인 실패..."));
-            LabSnapshot snapshot = victory ? session.ResultSnapshot : network.Snapshot;
+            Assert.That(view.stage.text, Is.EqualTo("STAGE 3"));
+            Assert.That(view.yokai.text, Is.EqualTo("지귀"));
+            Assert.That(view.judgment.text, Is.EqualTo("봉인 실패..."));
+            LabSnapshot snapshot = network.Snapshot;
             Assert.That(snapshot.sessionId, Is.EqualTo(session.State.battleSessionId));
             Assert.That(snapshot.round, Is.EqualTo(session.State.battleRound));
-            Assert.That(snapshot.phase, Is.EqualTo(victory ? LabPhase.Victory : LabPhase.Defeat));
-            Assert.That(view.paint.text, Is.EqualTo(victory ? "전체 스테이지 기록" : "PAINT "
+            Assert.That(snapshot.phase, Is.EqualTo(LabPhase.Defeat));
+            Assert.That(view.paint.text, Is.EqualTo("PAINT "
                 + (snapshot.paintCoverage * 100f).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + "%"));
-            var expected = victory ? LabResultTable.OverallRowsFor(session.StageResults, network.LocalPlayerId)
-                : LabResultTable.RowsFor(LabResultStats.Awards(snapshot.players, false), network.LocalPlayerId, snapshot.playedSeconds);
+            AssertVisibleRows(view, LabResultTable.RowsFor(LabResultStats.Awards(snapshot.players, false),
+                network.LocalPlayerId, snapshot.playedSeconds));
+            Assert.That(view.viewerButton, Is.Null);
+            Assert.That(session.ResultSnapshot, Is.Null, "Earlier victories must not replace Jigwi's failed battle.");
+            yield return Until(() => view.homeButton.interactable, "The result must allow exit after readiness.");
+            view.homeButton.onClick.Invoke();
+            yield return WaitHome();
+        }
+
+        private static void AssertVisibleRows(GameStageResultView view, System.Collections.Generic.IReadOnlyList<LabResultRow> expected)
+        {
             Transform[] visible = view.rows.Cast<Transform>().Where(row => row.gameObject.activeSelf).ToArray();
             Assert.That(visible.Length, Is.EqualTo(expected.Count));
             for (int index = 0; index < expected.Count; index++)
@@ -1012,22 +1023,6 @@ namespace Hapio.Tests
                 Assert.That(visible[index].Find("Record").GetComponent<UnityEngine.UI.Text>().text, Is.EqualTo(row.Record));
                 Assert.That(visible[index].Find("Highlight").gameObject.activeSelf, Is.EqualTo(row.Mine));
             }
-            if (victory)
-            {
-                Assert.That(view.viewerButton.GetComponentInChildren<UnityEngine.UI.Text>().text, Is.EqualTo("지귀 봉인 박 확인"));
-                view.nextButton.onClick.Invoke();
-                yield return null;
-                Assert.That(view.paint.text, Is.EqualTo("PAINT 100.0%"));
-                Assert.That(view.judgment.text, Is.EqualTo("최종 승리 !"));
-            }
-            else
-            {
-                Assert.That(view.viewerButton, Is.Null);
-                Assert.That(session.ResultSnapshot, Is.Null, "Earlier victories must not replace Jigwi's failed battle.");
-            }
-            yield return Until(() => view.homeButton.interactable, "The result must allow exit after readiness.");
-            view.homeButton.onClick.Invoke();
-            yield return WaitHome();
         }
 
         [UnityTest]

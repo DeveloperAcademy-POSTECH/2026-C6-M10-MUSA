@@ -24,7 +24,10 @@ namespace C6Lab.Tests
             yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
             yield return null;
             LabNetwork network = Object.FindAnyObjectByType<LabNetwork>();
-            network.port = 18273;
+            // One free port for the whole test: the second Host below reopens this same port after the
+            // underlying shutdown, exactly as the fixed port did.
+            ushort port = LabSavedSceneNetworkFixture.AvailableDualFamilyPort();
+            network.port = port;
             object manager = typeof(LabNetwork).GetField("manager").GetValue(network);
             try
             {

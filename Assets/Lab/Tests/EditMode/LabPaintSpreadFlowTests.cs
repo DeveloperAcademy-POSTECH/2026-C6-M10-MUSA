@@ -40,7 +40,7 @@ namespace C6Lab.Tests
                 Assert.That(first.RegisterHit(points[i], color, 1, 1), Is.True);
                 Assert.That(second.RegisterHit(points[i], color, 1, 1), Is.True);
                 Assert.That(first.CoveredCount, Is.EqualTo(initialCells * (i + 1)));
-                Assert.That(Pixels(second), Is.EqualTo(Pixels(first)));
+                AssertSameCells(Pixels(first), Pixels(second), $"Initial footprint after hit {i}");
                 Assert.That(second.PendingCoverage, Is.EqualTo(first.PendingCoverage));
                 Assert.That(second.Revision, Is.EqualTo(first.Revision));
             }
@@ -68,7 +68,7 @@ namespace C6Lab.Tests
                 surface.RegisterHit(Vector3.forward, Color.yellow, 12);
                 surface.Advance(2d);
             }
-            Assert.That(Pixels(second), Is.EqualTo(Pixels(first)));
+            AssertSameCells(Pixels(first), Pixels(second), "Legacy map");
             Assert.That(second.PendingCoverage, Is.EqualTo(first.PendingCoverage));
             Assert.That(second.Revision, Is.EqualTo(first.Revision));
             Assert.That(second.LastPainter, Is.EqualTo(first.LastPainter));
@@ -92,7 +92,7 @@ namespace C6Lab.Tests
                 Assert.That(surface.SetFlowDirection(invalid), Is.False);
                 Assert.That(Vector3.Distance(surface.FlowDirection, new Vector3(-.6f, -.8f, 0)), Is.LessThan(.00001f));
             }
-            Assert.That(Pixels(surface), Is.EqualTo(before));
+            AssertSameCells(before, Pixels(surface), "Map after direction input");
             Assert.That(surface.Revision, Is.EqualTo(revision));
             Assert.That(surface.PendingCoverage, Is.EqualTo(pending));
             surface.Clear();
@@ -120,7 +120,7 @@ namespace C6Lab.Tests
             field.SetValue(invalid, field.FieldType == typeof(int) ? (object)(int)value : value);
             Assert.Throws<ArgumentOutOfRangeException>(() => surface.Reset(invalid, 999));
             Assert.That(surface.Columns, Is.EqualTo(64));
-            Assert.That(Pixels(surface), Is.EqualTo(before));
+            AssertSameCells(before, Pixels(surface), "Map after rejected reset");
             Assert.That(surface.Revision, Is.EqualTo(revision));
             Assert.That(surface.PendingCoverage, Is.EqualTo(pending));
             Assert.That(surface.FlowDirection, Is.EqualTo(Vector3.left));
@@ -185,7 +185,7 @@ namespace C6Lab.Tests
             }
             first.Advance(6d);
             for (int i = 0; i < 60; i++) second.Advance(.1d);
-            Assert.That(Pixels(second), Is.EqualTo(Pixels(first)));
+            AssertSameCells(Pixels(first), Pixels(second), "Partitioned map");
             Assert.That(second.PendingCoverage, Is.EqualTo(first.PendingCoverage));
             Assert.That(second.Revision, Is.EqualTo(first.Revision));
             Assert.That(second.LastPainter, Is.EqualTo(first.LastPainter));
@@ -214,8 +214,10 @@ namespace C6Lab.Tests
             Assert.That(surface.Coverage, Is.EqualTo(1f));
             Assert.That(surface.PendingCoverage, Is.Zero);
             Assert.That(Pixels(surface).All(pixel => pixel.a == 255), Is.True);
+            Color32[] completed = Pixels(surface);
             for (int i = 0; i < original.Length; i++)
-                if (original[i].a != 0) Assert.That(Pixels(surface)[i], Is.EqualTo(original[i]));
+                if (original[i].a != 0 && !SameCell(completed[i], original[i]))
+                    Assert.That(completed[i], Is.EqualTo(original[i]), $"Original paint changed (first differing cell {i}).");
             Assert.That(surface.LastPainter, Is.EqualTo(2));
         }
 
@@ -241,7 +243,7 @@ namespace C6Lab.Tests
                 redirected.SetFlowDirection(Vector3.right);
                 down.Advance(40d / down.CellCount);
                 redirected.Advance(40d / redirected.CellCount);
-                Assert.That(Pixels(redirected), Is.EqualTo(Pixels(down)));
+                AssertSameCells(Pixels(down), Pixels(redirected), $"Seed {seed} redirected map");
                 Assert.That(redirected.PendingCoverage, Is.EqualTo(down.PendingCoverage));
                 Assert.That(redirected.CoveredCount, Is.EqualTo(before.Count(pixel => pixel.a != 0) + 80));
                 foreach (LabPaintSurface surface in new[] { down, redirected })
@@ -249,11 +251,17 @@ namespace C6Lab.Tests
                     Color32[] after = Pixels(surface);
                     for (int i = 0; i < after.Length; i++)
                     {
-                        if (before[i].a != 0) Assert.That(after[i], Is.EqualTo(before[i]));
+                        if (before[i].a != 0)
+                        {
+                            if (!SameCell(after[i], before[i]))
+                                Assert.That(after[i], Is.EqualTo(before[i]), $"Seed {seed}: old paint changed (first differing cell {i}).");
+                        }
                         else if (after[i].a != 0)
                         {
-                            Assert.That(after[i], Is.EqualTo((Color32)Color.blue));
-                            Assert.That(surface.GetPainterSlot(i), Is.EqualTo(2));
+                            if (!SameCell(after[i], Blue))
+                                Assert.That(after[i], Is.EqualTo(Blue), $"Seed {seed}: grown cell {i} pigment.");
+                            if (surface.GetPainterSlot(i) != 2)
+                                Assert.That(surface.GetPainterSlot(i), Is.EqualTo(2), $"Seed {seed}: grown cell {i} painter.");
                         }
                     }
                     AssertConnected(surface);
@@ -314,11 +322,16 @@ namespace C6Lab.Tests
                     fixedDirection.Advance(1d / fixedDirection.CellCount);
                     changingDirection.Advance(1d / changingDirection.CellCount);
                     Color32[] after = Pixels(fixedDirection);
-                    Assert.That(Pixels(changingDirection), Is.EqualTo(after));
+                    AssertSameCells(after, Pixels(changingDirection), $"Seed {seed} tick {tick} changing-direction map");
                     int added = 0;
                     for (int cell = 0; cell < after.Length; cell++)
                     {
-                        if (before[cell].a != 0) Assert.That(after[cell], Is.EqualTo(before[cell]));
+                        if (before[cell].a != 0)
+                        {
+                            if (!SameCell(after[cell], before[cell]))
+                                Assert.That(after[cell], Is.EqualTo(before[cell]),
+                                    $"Seed {seed} tick {tick}: old paint changed (first differing cell {cell}).");
+                        }
                         else if (after[cell].a != 0)
                         {
                             added++;
@@ -357,7 +370,24 @@ namespace C6Lab.Tests
                 if (first[i].a != 0) Assert.That(next[i], Is.EqualTo(first[i]));
             Assert.That(next.All(pixel => pixel.a == 0 || pixel.a == 255), Is.True);
             surface.Advance(1000000d);
-            Assert.That(Pixels(surface), Is.EqualTo(next), "No retained cluster can grow after its finite ink is exhausted.");
+            AssertSameCells(next, Pixels(surface), "No retained cluster can grow after its finite ink is exhausted.");
+        }
+
+        private static readonly Color32 Blue = Color.blue;
+
+        // Check every cell with a plain comparison and call NUnit only for the first differing
+        // cell, so a failure still reports that cell's expected/actual value and index without
+        // boxing every cell of every map through NUnit's generic collection comparer.
+        private static bool SameCell(Color32 first, Color32 second)
+            => first.r == second.r && first.g == second.g && first.b == second.b && first.a == second.a;
+
+        private static void AssertSameCells(Color32[] expected, Color32[] actual, string context)
+        {
+            if (actual.Length != expected.Length)
+                Assert.That(actual.Length, Is.EqualTo(expected.Length), $"{context}: map length");
+            for (int cell = 0; cell < expected.Length; cell++)
+                if (!SameCell(actual[cell], expected[cell]))
+                    Assert.That(actual[cell], Is.EqualTo(expected[cell]), $"{context}: first differing cell {cell}");
         }
 
         private static Color32[] Pixels(LabPaintSurface surface)

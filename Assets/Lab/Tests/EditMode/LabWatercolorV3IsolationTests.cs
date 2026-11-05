@@ -37,6 +37,7 @@ namespace C6Lab.Tests
             Assert.That(AssetDatabase.GetAssetPath(Property<Texture2D>(captured, "PaperTexture")), Does.StartWith("Assets/Editor/"));
         }
 
+        [Category("Legacy")]
         [Test]
         public void CapturedV3SettingsAndCopiesCannotFollowLaterInspectorChanges()
         {
@@ -71,6 +72,7 @@ namespace C6Lab.Tests
             Assert.That(EditorJsonUtility.ToJson(asset), Is.EqualTo(original), "The inspection study must never rewrite its authoring asset.");
         }
 
+        [Category("Legacy")]
         [Test]
         public void V3WhiteBrushRemovesTheDyeFloorWhileKeepingV2GeometryAndPadding()
         {

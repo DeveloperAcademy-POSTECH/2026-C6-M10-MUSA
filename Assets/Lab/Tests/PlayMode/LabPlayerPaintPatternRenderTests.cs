@@ -13,6 +13,7 @@ using Object = UnityEngine.Object;
 namespace C6Lab.Tests
 {
     /// <summary>Real saved-mesh/shader pixels; fixtures do not claim projectile or network approval.</summary>
+    [Category("Slow")]
     public sealed class LabPlayerPaintPatternRenderTests
     {
         [UnityTearDown]
@@ -49,6 +50,7 @@ namespace C6Lab.Tests
             }
         }
 
+        [Category("GPU")]
         [UnityTest]
         public IEnumerator ActualSavedShaderDistinguishesAllSixPaintersWithoutChangingPaperAlphaOrCoverage()
         {
@@ -132,6 +134,7 @@ namespace C6Lab.Tests
             }
         }
 
+        [Category("GPU")]
         [UnityTest]
         public IEnumerator AllSixPainterPatternsStayOnTheShellWhenCameraAndModelMoveTogether()
         {
@@ -185,6 +188,7 @@ namespace C6Lab.Tests
             }
         }
 
+        [Category("GPU")]
         [UnityTest]
         public IEnumerator PatternToggleChangesOnlyRenderedInkWithoutReuploadingOrRevisingMaps()
         {
@@ -275,7 +279,7 @@ namespace C6Lab.Tests
             LabGourdResultPreview preview = null;
             try
             {
-                network.port = 17946;
+                network.port = LabSavedSceneNetworkFixture.AvailableDualFamilyPort();
                 Assert.That(network.StartDeveloperSolo(), Is.True, network.Notice);
                 LabPaintPresentationTestFixture.SelectRetainedStyleForSyntheticMap(network);
                 LabPaintSurface surface = network.PaintSurface;

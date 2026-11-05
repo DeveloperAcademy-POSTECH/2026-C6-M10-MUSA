@@ -832,7 +832,7 @@ DEV **Jigwi** 카테고리에 인덱스178~183의6개 슬라이더를 추가했�
 | 인덱스 | 속성·기본값 | 현재 범위/적용 |
 |---|---|---|
 |228|JigwiStageTimelineEnabled / ON|지귀 화면 A/B 시간표 ON/OFF|
-|229|JigwiStageWarningSeconds / 기존1초 저장값|미사용·Inspector/DEV 숨김, 현행 A/B 경고는1초 고정|
+|229|JigwiStageWarningSeconds / 기존1초 저장값|미사용·Inspector/DEV 숨김, 현행 A/B 경고는 2초 고정(#509)|
 |235|JigwiStageFeverMultiplier / 2|1~4,100초 이후 자동 회복만 배율 적용|
 |240|JigwiABPersonalDurationSeconds / 15초|1~15초, A의 최대 활성 길이|
 |241~243|A 회복4배·해제3회·소각5초|#479에서241/242 은퇴, 243 기본1초로 변경(아래 #479 절)|
@@ -880,9 +880,23 @@ A/B 시간표·B 미션10초/보상5초·100초 정리는 코드 고정이다. B
 
 Home/Lobby에 저장된 DEV 패널의241/242 라벨과243 값(1)도 코드와 맞췄다. DEV 행이 없는 Inspector 전용 값(`LabConfig`): 소각 간격 `jigwiABBurnStaggerSeconds`1초, 부적 물 구슬5개/수명15초/칠1.5배, 완료 기준 .9(90%), 허용 거리 .07. 규칙과 화면은 [지귀 화면 사양](JIGWI_SCREEN_PATTERNS.md)의2절·5절을 따른다. 이 문서 갱신은 실행 검증을 뜻하지 않는다.
 
+## #509 지귀 B 지목 동시 명중 (Hapio 지귀 전용)
+
+#509는 인덱스를 늘리지 않는다(main #506 뒤 배열 259개). B 규칙과 스냅샷이 바뀌어 접속 묶음은 **5688·`C6PhysicsLab/49`·`C6HapioGame/34`**이며(main #525가 Game33 사용) 이전 5687(#479·#525) 앱과 혼용하지 않는다.
+
+| 인덱스 | 이름 / 기본값 | 현재 의미 |
+|---|---|---|
+|244|Reserved Jigwi B Fire Count (unused)|은퇴. 예전 자리당 불 개수(3). 저장값·위치만 보존, DEV/Inspector 숨김|
+|245|Reserved Jigwi B Relight (unused)|은퇴. 예전 재점화 대기(12초). 저장값·위치만 보존, DEV/Inspector 숨김|
+|251|Reserved Jigwi B Reward Size (unused)|은퇴. 예전 5초 발사 보상 크기(1.3배). 저장값·위치만 보존, DEV/Inspector 숨김|
+|252|Reserved Jigwi B Reward Paint (unused)|은퇴. 예전 5초 발사 보상 칠 면적(1.5배). 저장값·위치만 보존, DEV/Inspector 숨김|
+|253~255|Reserved Jigwi B Supply Interval/Initial/Limit (unused)|은퇴. 예전 무료 물 구슬 간격(2초)·시작 수(1)·미소모 상한(5). 저장값·위치만 보존, DEV/Inspector 숨김(Inspector 숨김은 아래 DEV 표시 정리 절). 코드에서 읽는 곳이 없다|
+
+DEV 행이 없는 고정 규칙(`LabJigwiABTimeline`): 예고 2초(`WarningSeconds`), B 15초, 동시 판정 1초, 성공 3회, 지목 수 1~2인 1명/3인 2명/4·5인 3명. Inspector 전용(Host만 사용): `jigwiBSplashPaintShare` 성공 물벼락 칠 크기 기본3(0~3), `jigwiBBoardFireSeconds` 실패 불바다 기본3초(0~10, 0이면 벌점 없음). 규칙과 화면은 [지귀 화면 사양](JIGWI_SCREEN_PATTERNS.md)의1·3·5절을 따른다. 이 문서 갱신은 실행 검증을 뜻하지 않는다.
+
 ## DEV 표시 정리 (2026-11-05)
 
-설정 259개의 번호·저장값·접속 규약(5687·`C6PhysicsLab/48`·`C6HapioGame/33`)은 그대로다. 화면에 보이는 칸만 줄였다. 배열 형식이 같아 접속 규약은 올리지 않았다.
+설정 259개의 번호·저장값과 접속 묶음은 그대로다(현재 기준은 위 #509 절의 5688·`C6PhysicsLab/49`·`C6HapioGame/34`). 화면에 보이는 칸만 줄였다. 배열 형식이 같아 접속 묶음은 올리지 않았다.
 
 ### 효과 없는 10칸 — `LabConfig.InactiveDeveloperFields`
 
@@ -914,8 +928,8 @@ Home/Lobby에 저장된 DEV 패널의241/242 라벨과243 값(1)도 코드와 �
 - 237은 섬광 보상 오색구슬뿐 아니라 세 스테이지 피버의 오색구슬(#441 `ApplyStageFeverGeneration`)에도 같은 배율로 쓴다. 그래서 Hapio에서 야광귀 탭 → **공통 탭**으로 옮겼다. 공통 탭에서 바꾸면 세 스테이지와 2:2 프로필에 함께 들어가고, 어느 스테이지 전투 DEV에서 바꿔도 공통으로 저장된다. 야광귀 탭은 더 이상 237을 바꾸지 못한다. StageCatalog의 스테이지 기본값에는 237이 없어 기존 값(2배)은 그대로다.
 - 236(섬광 오색구슬 수)은 야광귀 탭에 남는다. Lab DEV는 `야광귀` 묶음에 236·237을 그대로 둔다(Lab 단독 장면에는 스테이지 피버가 없다).
 
-### Inspector — 은퇴 슬롯 18개 모두 숨김
+### Inspector — 은퇴 슬롯 25개 모두 숨김
 
-55·87·88·152·154·167·168·211·230~234 13개에 `HideInInspector`를 붙였다(229·241·242·246·247은 이미 숨김). `SerializeField`는 그대로라 `LabConfig.asset`의 저장값과 DEV 배열 값은 바뀌지 않는다. 211에 붙어 있던 `Yaguang stage schedule` 머리글은 다음 칸(212)으로 옮겨 Inspector에 남긴다.
+55·87·88·152·154·167·168·211·230~234 13개와, #509가 은퇴시켰지만 Inspector에 남아 있던 251~255 5개에 `HideInInspector`를 붙였다(229·241·242·244·245·246·247은 이미 숨김). `SerializeField`는 그대로라 `LabConfig.asset`의 저장값과 DEV 배열 값은 바뀌지 않는다. 211에 붙어 있던 `Yaguang stage schedule` 머리글은 다음 칸(212)으로 옮겨 Inspector에 남긴다. 253에 붙어 있던 `Jigwi B free extinguishing supplies` 머리글은 아직 쓰는 256(발화점 거리) 위로 옮기고 `Jigwi B fire target depth`로 이름을 바꿨다.
 
 근거: `LabConfig.InactiveDeveloperFields`·`IsInactiveDeveloperField`·`IsDeveloperFieldHidden`·`DeveloperCategories`, `LabDeveloperMode.BuildCategoryLayout`, `LabConfig.IsReplacedByJigwiTimeline`·`HiddenByJigwiTimelineInGame`, `LabDeveloperMode.RefreshJigwiTimelineRows`·`ShowCategory`, `GameStageSettings.IsFieldShown`·`IsFieldVisible`, `GameScreen.SelectDeveloperScope`·`RefreshJigwiTimelineRows`. 이 문서 갱신은 실행 검증을 뜻하지 않는다. 실행 결과는 `VALIDATION.md`의 2026-11-05 DEV 표시 정리 절을 따른다.

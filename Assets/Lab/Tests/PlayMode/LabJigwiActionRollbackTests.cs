@@ -45,6 +45,7 @@ namespace C6Lab.Tests
         }
 
 
+        [Category("Legacy")]
         [TestCase(true)]
         [TestCase(false)]
         public void SerializedPassiveContactUsesNormalImmediatePreviewWhileManualAttemptBurns(bool passive)
@@ -142,6 +143,7 @@ namespace C6Lab.Tests
             return packet;
         }
 
+        [Category("Legacy")]
         [TestCase("checkpoint")]
         [TestCase("ledger")]
         [TestCase("paused")]

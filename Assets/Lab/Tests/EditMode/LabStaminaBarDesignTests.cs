@@ -7,6 +7,7 @@ using UnityEngine.UI;
 
 namespace C6Lab.Tests
 {
+    [Category("LabOnly")]
     public sealed class LabStaminaBarDesignTests
     {
         [TestCase(0f)]

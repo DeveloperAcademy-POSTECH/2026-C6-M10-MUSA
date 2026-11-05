@@ -83,7 +83,8 @@ namespace C6Lab
             }
             if (latest.jigwiAB?.enabled == true)
             {
-                SyncJigwiABFireSurfaces();
+                // #509: B is judged on the boss itself; no fire/curtain colliders stand in front of it.
+                ClearJigwiFireSurfaces();
                 return;
             }
             var active = new HashSet<string>(StringComparer.Ordinal);
