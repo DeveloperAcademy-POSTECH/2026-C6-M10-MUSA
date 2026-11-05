@@ -1,5 +1,21 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-05 — DEV 표시 정리 (효과 없는 값·지귀 시간표·오색구슬 칠·Inspector·전투 DEV)
+
+`chore/dev-hide-inactive-fields` 브랜치의 별도 worktree에서 Unity 6000.6.5f1 batch mode(macOS)로 실행했다. 아래 표는 실제로 실행한 것만 적는다. 시간은 NUnit XML의 `duration`이고, Unity 시작·가져오기·컴파일은 포함하지 않는다.
+
+| 확인 | 결과 | 범위 |
+| --- | --- | --- |
+| EditMode 전체 — main `de1b56c5`(#509·#528·#529) 병합 뒤 최종 | **1976 PASS / 0 FAIL**, 23.5초 | 이 PR의 새 검사 7건 포함. `LabDeveloperConfigTests`: 효과 없는 10칸의 라벨·인덱스·저장값·폼 전달, 저장된 `Lab.unity` DEV 패널에서 묶음을 모두 펼쳐도 숨김·은퇴 행이 안 보이고 Lab 단독 장면은 228 ON에서도 `Jigwi` 묶음·205를 보임(`LabOnly`), 전투 DEV 숨김 규칙(228 ON이면 178~183·192~195, 지귀 스테이지에서만 205), 은퇴 25칸(#509의 244·245·251~255 포함)의 `HideInInspector`·`SerializeField`와 실제 폼 인덱스 대응. `GameStageSettingsTests`: 10칸이 어느 탭에도 표시되지 않고 공통 적용은 그대로, 지귀 탭이 폼의 228 ON에서 11칸을 접고 적용 범위는 그대로, 237이 공통 탭이고 세 스테이지에 들어감 |
+| PlayMode 전체 — 병합 뒤 최종 | **640건 중 637 PASS · 2 FAIL · 1 Inconclusive**, 415.2초 | DEV 관련 51건 모두 통과: `GameStageUiTests`(저장된 Home DEV 탭: 공통에서 10칸 숨김·237 표시, 야광귀에서 236 표시·237 숨김, 지귀에서 228 슬라이더·입력으로 APPLY 전 즉시 접기/펴기, APPLY 뒤 다시 열기), Lab DEV 패널 PlayMode 9개 파일, `GameSceneFlowTests` DEV 검사(실제 Battle의 전투 DEV를 1~3스테이지마다 열고 묶음을 펼쳐도 178~183·192~195와 `Jigwi` 제목이 숨고, 205는 3스테이지에서만 숨음) |
+| PlayMode 실패 2·Inconclusive 1 | 기존 실패 | `LabHangingRenderInterpolationTests.OutsideRenderingTheTransformsAlwaysHoldTheFixedPose`(batchmode에서 WaitForEndOfFrame 없음), `LabWatercolorPaintRuntimeTests.DescriptorBurstRespectsTheActiveCapAndConvergesToASettledCheckpoint`(색 1단계 차이), Inconclusive `LabHangingRenderInterpolationTests.DuringRealRenderingTheDrawnPoseLiesBetweenTheTwoFixedPoses`. 위 검사 시간 단축 절의 기존 실패 목록에 있는 항목이며 DEV 표시와 관계없다 |
+| 병합 전(main `25014885` 기준) | EditMode 1976·1977 PASS / 0 FAIL, PlayMode 673건 중 669 PASS · 3 FAIL · 1 Inconclusive(2회) | 첫 커밋 뒤와 전투 DEV 커밋 뒤에 각각 전체를 돌렸다. 실패 3건은 위 2건과 `LabJigwiABPresentationTests.SavedRawImagesRenderWarmAAndBAndBlueWaterIntoAnIsolatedPortraitUiTarget`(불꽃 픽셀 0)이다. 이 검사는 #509가 지귀 화면 검사를 다시 쓰면서 병합 트리에 없다 |
+
+미실행:
+
+- Editor GUI Test Runner, Inspector 화면 눈 확인(`HideInInspector`는 속성 검사로만 확인)
+- 다른 Mac, iOS, 실기기, 다인 LAN
+
 ## 2026-11-05 — Editor 메뉴 정리 (Battle 덮어쓰기·고장 메뉴 제거)
 
 `chore/editor-menu-cleanup` 브랜치에서 Unity 6000.6.5f1 batch mode(macOS)로 실행했다. 처음에는 main `25014885` 기준으로, 이어 main `683c6f27`(#528·#509 포함)을 병합한 뒤 다시 실행했다. EditMode는 `-nographics`, PlayMode는 그래픽을 켠 batch다. 아래 표는 실제로 실행한 것만 적는다.

@@ -47,6 +47,10 @@ namespace Hapio.Tests
             screen.developerButton.onClick.Invoke();
             Assert.That(screen.developerPanel.activeSelf, Is.True);
             AssertScope(screen, 0);
+            foreach (int index in LabConfig.InactiveDeveloperFields)
+                Assert.That(Row(screen, index).activeSelf, Is.False, "No effect in the current game: " + index);
+            Assert.That(Row(screen, 2).activeSelf, Is.True, "The battle time stays common.");
+            Assert.That(Row(screen, 237).activeSelf, Is.True, "Every stage's five-color orbs share one paint scale.");
             float[] initialYaguang = session.CaptureDeveloperSettings(2);
             int duration = Field("Battle Duration (seconds)");
             screen.developerScopeButtons[1].onClick.Invoke();
@@ -60,14 +64,34 @@ namespace Hapio.Tests
 
             screen.developerScopeButtons[3].onClick.Invoke();
             AssertScope(screen, 3);
+            // Jigwi's 120-second timeline (228) is on: the old fire, its cycle and the common interval are folded away.
+            int[] replaced = { 178, 179, 180, 181, 182, 183, 192, 193, 194, 195, 205 };
+            Assert.That(session.CaptureDeveloperSettings(3)[228], Is.EqualTo(1f));
+            foreach (int index in replaced)
+                Assert.That(Row(screen, index).activeSelf, Is.False, "Replaced by the timeline: " + index);
+            Assert.That(Row(screen, 228).activeSelf && Row(screen, 207).activeSelf, Is.True);
+            Assert.That(screen.developerFeedback.text, Does.Contain("228"));
+            screen.developerSliders[228].value = 0f; // Before APPLY, the form alone decides what shows.
+            Assert.That(screen.developerInputs[228].text, Is.EqualTo("0"));
+            foreach (int index in replaced)
+                Assert.That(Row(screen, index).activeSelf, Is.True, "Shown with the timeline off: " + index);
+            screen.developerInputs[228].text = "1";
+            foreach (int index in replaced)
+                Assert.That(Row(screen, index).activeSelf, Is.False, "Folded again: " + index);
+            screen.developerInputs[228].text = "0";
             screen.developerInputs[178].text = "2"; // Fire target count is local to Jigwi.
             screen.applyDeveloperButton.onClick.Invoke();
             Assert.That(session.CaptureDeveloperSettings(3)[178], Is.EqualTo(2f));
+            Assert.That(session.CaptureDeveloperSettings(3)[228], Is.Zero);
+            AssertScope(screen, 3);
+            Assert.That(Row(screen, 178).activeSelf, Is.True, "Reopened with the timeline off.");
             float[][] beforeTimeline = Enumerable.Range(0, GameStageSettings.TerritoryScope + 1)
                 .Select(session.CaptureDeveloperSettings).ToArray();
             screen.developerScopeButtons[2].onClick.Invoke();
             AssertScope(screen, 2);
             Assert.That(screen.developerSliders, Has.Length.EqualTo(259));
+            Assert.That(Row(screen, 236).activeSelf, Is.True, "The flash reward count stays the Yaguang's.");
+            Assert.That(Row(screen, 237).activeSelf, Is.False, "The paint scale moved to Common.");
             // Its own battle time (211) is retired (#328); the schedule's end (212) is the first timetable value.
             Assert.That(screen.developerInputs[211].transform.parent.gameObject.activeSelf, Is.False);
             Assert.That(screen.developerSliders[212].minValue, Is.EqualTo(0f));
@@ -182,13 +206,15 @@ namespace Hapio.Tests
 
         private static int Field(string label) => Enumerable.Range(0, LabConfig.DeveloperFields.Count)
             .Single(i => LabConfig.DeveloperFields[i].Label == label);
-        private static void AssertScope(GameScreen screen, int scope)
+        private static GameObject Row(GameScreen screen, int index) => screen.developerInputs[index].transform.parent.gameObject;
+        private void AssertScope(GameScreen screen, int scope)
         {
             Assert.That(screen.DeveloperScope, Is.EqualTo(scope));
             Assert.That(screen.developerInputs, Has.Length.EqualTo(259));
+            float[] values = session.CaptureDeveloperSettings(scope);
             for (int i = 0; i < screen.developerInputs.Length; i++)
-                Assert.That(screen.developerInputs[i].transform.parent.gameObject.activeSelf,
-                    Is.EqualTo(GameStageSettings.IsFieldVisible(scope, i)), "Field " + i + " in scope " + scope);
+                Assert.That(Row(screen, i).activeSelf,
+                    Is.EqualTo(GameStageSettings.IsFieldShown(scope, i, values)), "Field " + i + " in scope " + scope);
         }
     }
 }

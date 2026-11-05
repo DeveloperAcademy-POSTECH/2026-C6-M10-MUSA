@@ -1225,6 +1225,20 @@ namespace Hapio.Tests
                     Assert.That(dev.panel.activeInHierarchy, Is.True);
                     Assert.That(bindings.developerNextStageButton.gameObject.activeInHierarchy, Is.True);
                     Assert.That(bindings.developerNextStageButton.interactable, Is.EqualTo(stage < 3));
+                    // Jigwi's 120-second timeline (228) is on in every stage's profile, so battle DEV never offers the old
+                    // fire or its cycle, even expanded, and in Jigwi's own stage not the common gimmick interval either.
+                    Assert.That(network.config.JigwiStageTimelineEnabled, Is.True);
+                    Transform devContent = dev.valueInputs[2].transform.parent.parent;
+                    var jigwiHeader = devContent.Find("Category Jigwi").GetComponent<UnityEngine.UI.Button>();
+                    var gimmickHeader = devContent.Find("Category Gimmicks").GetComponent<UnityEngine.UI.Button>();
+                    Assert.That(jigwiHeader.gameObject.activeSelf, Is.False, "Stage " + stage + ": no header for the old fire");
+                    jigwiHeader.onClick.Invoke(); gimmickHeader.onClick.Invoke();
+                    foreach (int index in new[] { 178, 179, 180, 181, 182, 183, 192, 193, 194, 195 })
+                        Assert.That(dev.valueInputs[index].transform.parent.gameObject.activeSelf, Is.False, "Stage " + stage + ": " + index);
+                    Assert.That(dev.valueInputs[205].transform.parent.gameObject.activeSelf, Is.EqualTo(stage != 3),
+                        "Stage " + stage + ": the common gimmick interval");
+                    Assert.That(dev.valueInputs[207].transform.parent.gameObject.activeSelf, Is.True, "Stage " + stage);
+                    jigwiHeader.onClick.Invoke(); gimmickHeader.onClick.Invoke();
                     float[][] acceptedProfiles = Enumerable.Range(0, 4)
                         .Select(scope => session.CaptureDeveloperSettings(scope)).ToArray();
                     int hpField = Enumerable.Range(0, LabConfig.DeveloperFields.Count)

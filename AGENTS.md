@@ -275,3 +275,8 @@
 - 검사에는 NUnit `[Category]` `Slow`(fixture 5초 이상)·`GPU`·`Bonjour`·`LabOnly`·`Legacy`를 붙인다. 정의와 실행 묶음(빠른 묶음 `-testCategory "!Slow;!Legacy;!LabOnly"`)은 `docs/TEST_SUITE_REPORT.md`의 현재 구성 절을 따른다. 새 검사도 같은 기준으로 붙이며, 현재 경로를 지키는 유일한 검사에는 `Legacy`를 붙이지 않는다. 카테고리는 실행 범위 표시이고 검사 삭제가 아니다. PR 전에는 전체를 돌린다.
 - `GameSession.Start.cs`의 `GameStartTiming` 기본값(3초·1초·5초·0.5초)은 게임 코드에서 바꾸지 않는다. `Hapio.PlayModeTests`의 `GameTestStartTiming`(SetUpFixture)만 길이를 줄이며 #306의 순서·ACK·재예약·로드 한도는 같다. 카운트다운 길이에 기대는 검사는 기본값으로 되돌려 실행하고, 시작 직후 던지는 다시보기 검사는 `WaitReplayPoseWindow`로 자세 기록 창을 기다린다.
 - 실제 Host를 여는 PlayMode 검사는 고정 UDP 포트 대신 `LabSavedSceneNetworkFixture.UseAvailablePort`·`AvailableDualFamilyPort()`를 쓴다.
+
+## DEV 표시 정리 (2026-11-05)
+
+- 효과 없는 10칸(0·1·41·43·48·52·53·54·72·73)은 `LabConfig.InactiveDeveloperFields`다. 은퇴가 아니라 숨기기만 한다. 코드가 아직 읽으므로 라벨·저장값·Inspector·폼 전달은 그대로이고, Lab DEV 묶음에 넣지 않으며 Hapio는 `GameStageSettings.IsFieldShown`에서만 뺀다(`IsFieldVisible` 적용 범위는 공통 그대로).
+- Hapio 지귀 탭은 폼의 228이 켜져 있으면 178~183·192~195·205를 접는다(`LabConfig.IsReplacedByJigwiTimeline`). Hapio 전투 중 DEV(Lab 패널)도 228 ON이면 `Jigwi` 묶음을 숨기고, 지귀 스테이지에서만 205도 숨긴다(`HiddenByJigwiTimelineInGame`). Lab 단독 장면은 그대로 보인다. 237 오색구슬 칠 면적은 Hapio 공통 탭이다(236은 야광귀 탭). 은퇴 슬롯(#509까지 25개)은 모두 `HideInInspector`다. 설정 259개와 접속 묶음은 바꾸지 않았다(현재 기준은 위 #509 절). 상세는 `docs/DEVELOPER_MODE_PARAMETER_SPEC.md`의 같은 절을 따른다.

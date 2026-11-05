@@ -545,10 +545,11 @@ namespace C6Lab.Tests
                 }
             }
 
-            // Retired rows (#311) keep their index in the shared form but have no row.
+            // Retired rows (#311) and settings with no effect in the current game keep their index in the shared form
+            // but have no row.
             for (int i = 0; i < fieldCount; i++)
-                Assert.That(seen[i], Is.EqualTo(LabConfig.RetiredDeveloperFields.Contains(i) ? 0 : 1),
-                    LabConfig.DeveloperFields[i].Label + " (" + i + ") must be in exactly one category unless retired.");
+                Assert.That(seen[i], Is.EqualTo(LabConfig.IsDeveloperFieldHidden(i) ? 0 : 1),
+                    LabConfig.DeveloperFields[i].Label + " (" + i + ") must be in exactly one category unless hidden.");
         }
 
 
@@ -815,6 +816,143 @@ namespace C6Lab.Tests
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(values), "Carried unchanged, so every peer agrees on the form.");
             Assert.That(new[] { config.CommonGimmickInterval, config.UniqueGimmickInterval }, Is.EqualTo(new[] { 10f, 20f }));
+        }
+
+        [Test]
+        public void InactiveSettingsKeepTheirLabelsIndicesAndValuesButHaveNoRow()
+        {
+            // #315: a round is won only by painting 100% and lost only on time, so these change nothing in the game.
+            Assert.That(LabConfig.InactiveDeveloperFields, Is.EqualTo(new[] { 0, 1, 41, 43, 48, 52, 53, 54, 72, 73 }));
+            Assert.That(LabConfig.InactiveDeveloperFields.Select(index => LabConfig.DeveloperFields[index].Label), Is.EqualTo(new[]
+            {
+                "Monster Max HP", "Damage per Hit", "Relay Orb Chance (%)", "Potion Chance (%)", "Player Max HP",
+                "Potion Heal (HP)", "Relay x2 Damage Multiplier", "Relay MAX Damage Multiplier",
+                "Item Hit Haptic Style (0-4)", "Item Hit Haptic Intensity"
+            }), "Still read by the code, so they keep their labels instead of becoming reserved slots.");
+            Assert.That(LabConfig.InactiveDeveloperFields.Intersect(LabConfig.RetiredDeveloperFields), Is.Empty);
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(259), "The shared form keeps every index.");
+            for (int i = 0; i < LabConfig.DeveloperFields.Count; i++)
+                Assert.That(LabConfig.IsDeveloperFieldHidden(i), Is.EqualTo(LabConfig.RetiredDeveloperFields.Contains(i)
+                    || LabConfig.InactiveDeveloperFields.Contains(i)), "Field " + i);
+            Assert.That(LabConfig.IsDeveloperFieldHidden(-1) || LabConfig.IsDeveloperFieldHidden(259), Is.False);
+            foreach (LabDeveloperCategory category in LabConfig.DeveloperCategories)
+                Assert.That(category.FieldIndices.Intersect(LabConfig.InactiveDeveloperFields), Is.Empty, category.Title);
+            Assert.That(LabConfig.DeveloperCategories.Single(category => category.Title == "Battle").FieldIndices,
+                Is.EqualTo(new[] { 2 }), "Only the battle time decides a round now.");
+
+            LabConfig authored = Resources.Load<LabConfig>("LabConfig");
+            Assert.That(authored, Is.Not.Null);
+            foreach (LabConfig source in new[] { config, authored })
+                Assert.That(LabConfig.InactiveDeveloperFields.Select(index => source.CaptureDeveloperValues()[index]),
+                    Is.EqualTo(new[] { 1000f, 20f, 0f, 0f, 300f, 10f, 2f, 4f, 2f, 1f }), "Saved values are unchanged.");
+            Assert.That(authored.GenerationChances(), Is.EqualTo(new[] { 50, 50, 0, 0, 0, 0 }),
+                "The drum makes Yin and Yang only, so no relay orb or potion can appear (#177).");
+            Assert.That(LabModel.AttackValueFor(LabOrbKind.Combined, 0, authored.Damage, authored.RelayDoubleMultiplier,
+                authored.RelayMaxMultiplier), Is.EqualTo(authored.Damage), "Without relay orbs every hit is worth the same.");
+
+            float[] values = config.CaptureDeveloperValues();
+            values[0] = 500f; values[48] = 100f; values[52] = 20f; values[73] = .5f;
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(values),
+                "The form still carries them unchanged, so peers keep agreeing on the 259 values.");
+        }
+
+        [Test, Category("LabOnly")]
+        public void SavedLabPanelNeverShowsInactiveOrRetiredRowsEvenWithEveryGroupExpanded()
+        {
+            var scene = UnityEditor.SceneManagement.EditorSceneManager.OpenScene("Assets/Lab/Scenes/Lab.unity",
+                UnityEditor.SceneManagement.OpenSceneMode.Additive);
+            try
+            {
+                LabDeveloperMode ui = scene.GetRootGameObjects()
+                    .SelectMany(root => root.GetComponentsInChildren<LabDeveloperMode>(true)).Single();
+                Assert.That(ui.EnsureValueInputs(), Is.True);
+                Assert.That(ui.valueInputs, Has.Length.EqualTo(259));
+                typeof(LabDeveloperMode).GetMethod("BuildCategoryLayout",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Invoke(ui, null);
+                Transform content = ui.valueInputs[2].transform.parent.parent;
+                foreach (var header in content.GetComponentsInChildren<UnityEngine.UI.Button>(true)
+                    .Where(button => button.name.StartsWith("Category ")).ToArray())
+                    header.onClick.Invoke();
+                Assert.That(ui.valueInputs[2].transform.parent.gameObject.activeSelf, Is.True,
+                    "The battle time row really expanded, so this is not an all-folded check.");
+                Assert.That(ui.valueInputs[39].transform.parent.gameObject.activeSelf, Is.True);
+                for (int i = 0; i < ui.valueInputs.Length; i++)
+                    if (LabConfig.IsDeveloperFieldHidden(i))
+                        Assert.That(ui.valueInputs[i].transform.parent.gameObject.activeSelf, Is.False,
+                            LabConfig.DeveloperFields[i].Label + " (" + i + ") must stay hidden.");
+
+                // The standalone Lab never runs Jigwi's timeline, so its manual Jigwi rows stay with 228 on.
+                Assert.That(ui.network.GameFlowEnabled, Is.False);
+                ui.valueInputs[LabConfig.JigwiStageFirstField].text = "1";
+                typeof(LabDeveloperMode).GetMethod("RefreshJigwiTimelineRows",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Invoke(ui, null);
+                Assert.That(content.Find("Category Jigwi").gameObject.activeSelf, Is.True);
+                foreach (int index in new[] { 178, 183, 192, 195, 205 })
+                    Assert.That(ui.valueInputs[index].transform.parent.gameObject.activeSelf, Is.True, "Lab keeps " + index);
+            }
+            finally { UnityEditor.SceneManagement.EditorSceneManager.CloseScene(scene, true); }
+        }
+
+        [Test]
+        public void JigwiTimelineHidesTheOldFireInEveryGameStageAndTheCommonIntervalInJigwisAlone()
+        {
+            int[] replaced = Enumerable.Range(178, 6).Concat(Enumerable.Range(192, 4)).Concat(new[] { 205 }).ToArray();
+            for (int i = 0; i < LabConfig.DeveloperFields.Count; i++)
+                Assert.That(LabConfig.IsReplacedByJigwiTimeline(i), Is.EqualTo(replaced.Contains(i)), "Field " + i);
+            foreach (LabStageYokai stage in new[] { LabStageYokai.None, LabStageYokai.Gumiho, LabStageYokai.Yaguang, LabStageYokai.Jigwi })
+                for (int i = 0; i < LabConfig.DeveloperFields.Count; i++)
+                {
+                    Assert.That(LabConfig.HiddenByJigwiTimelineInGame(i, stage, false), Is.False, stage + " with 228 off: " + i);
+                    Assert.That(LabConfig.HiddenByJigwiTimelineInGame(i, stage, true),
+                        Is.EqualTo(replaced.Contains(i) && (i != 205 || stage == LabStageYokai.Jigwi)), stage + " with 228 on: " + i);
+                }
+        }
+
+        [Test]
+        public void RetiredSlotsAreHiddenInTheInspectorAndKeepTheirSavedValues()
+        {
+            // Index → serialized field, checked through the real form so a wrong name or index fails.
+            var fields = new (int index, string name)[]
+            {
+                (55, "bombMultiplier"), (87, "gourdBombIntervalMin"), (88, "gourdBombIntervalMax"),
+                (152, "swipeBlockInterval"), (154, "swipeBlockBombGap"), (167, "sabotageIntervalMin"),
+                (168, "sabotageIntervalMax"), (211, "yaguangTimelineBattleSeconds"), (229, "jigwiStageWarningSeconds"),
+                (230, "jigwiStageActiveSeconds"), (231, "jigwiStageRootAngleDegrees"), (232, "jigwiStageFireAngleDegrees"),
+                (233, "jigwiStageSpreadSeconds"), (234, "jigwiStageSpreadPatches"),
+                (241, "jigwiABPersonalRecoveryMultiplier"), (242, "jigwiABPersonalRequiredHits"),
+                (244, "jigwiABGroupFireCount"), (245, "jigwiABRelightSeconds"),
+                (246, "jigwiABShrinkDelaySeconds"), (247, "jigwiABShrinkScale"),
+                (251, "jigwiABRewardSizeScale"), (252, "jigwiABRewardPaintScale"),
+                (253, "jigwiABSupplyIntervalSeconds"), (254, "jigwiABSupplyInitialCount"), (255, "jigwiABSupplyLimit")
+            };
+            Assert.That(fields.Select(field => field.index), Is.EqualTo(LabConfig.RetiredDeveloperFields));
+            const System.Reflection.BindingFlags Private = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+            foreach (var (index, name) in fields)
+            {
+                System.Reflection.FieldInfo member = typeof(LabConfig).GetField(name, Private);
+                Assert.That(member, Is.Not.Null, name);
+                Assert.That(member.IsDefined(typeof(SerializeField), false), Is.True, name + " keeps its saved value.");
+                Assert.That(member.IsDefined(typeof(HideInInspector), false), Is.True, name + " (" + index + ") is not shown in the Inspector.");
+                Assert.That(member.IsDefined(typeof(HeaderAttribute), false), Is.False, name + " must not carry a section header away.");
+
+                LabDeveloperField field = LabConfig.DeveloperFields[index];
+                float[] values = config.CaptureDeveloperValues();
+                float before = values[index];
+                bool applied = false;
+                foreach (float candidate in new[] { field.Max, field.Min })
+                {
+                    if (candidate.Equals(before)) continue;
+                    values[index] = candidate;
+                    if (!config.TryApplyDeveloperValues(values, out _)) continue;
+                    Assert.That(System.Convert.ToSingle(member.GetValue(config)), Is.EqualTo(candidate), name + " is slot " + index);
+                    applied = true;
+                    break;
+                }
+                Assert.That(applied, Is.True, "Slot " + index + " accepts a new value.");
+                values[index] = before;
+                Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            }
         }
 
         [Test]
@@ -1634,7 +1772,7 @@ namespace C6Lab.Tests
             Assert.That(LabConfig.DeveloperFields.Skip(225).Take(3).Select(field => field.Min), Is.EqualTo(new[] { 0f, 0f, 1f }));
             Assert.That(LabConfig.DeveloperFields.Skip(225).Take(3).Select(field => field.Max), Is.EqualTo(new[] { 1f, 100f, 10f }));
             Assert.That(LabConfig.DeveloperCategories.Single(category => category.Title == "Generation chances").FieldIndices,
-                Is.EqualTo(new[] { 39, 40, 41, 42, 43, 44, 225, 226, 227 }));
+                Is.EqualTo(new[] { 39, 40, 42, 44, 225, 226, 227 }), "Relay (41) and potion (43) chances have no row.");
             foreach (LabConfig source in new[] { config, Resources.Load<LabConfig>("LabConfig") })
             {
                 Assert.That(source, Is.Not.Null);
