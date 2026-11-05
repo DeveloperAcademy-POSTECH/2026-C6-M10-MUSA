@@ -123,6 +123,8 @@ namespace C6Lab
                 if (now >= activation || actual != null && actual.resolution != LabJigwiABResolution.None)
                 { Consume(slot); continue; }
                 LabJigwiABKind kind = LabJigwiABTimeline.KindForSlot(slot);
+                // #479: a muted pattern (the A shout in the saved profile) is consumed silently, never queued.
+                if (!Profile.VoiceEnabledFor(kind)) { Consume(slot); continue; }
                 AudioClip clip = Profile.ClipFor(kind);
                 float cue = Profile.CueSecondsFor(kind);
                 double begins = activation - cue;

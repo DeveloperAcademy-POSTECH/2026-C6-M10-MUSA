@@ -1,11 +1,9 @@
-using System;
-using System.Globalization;
 using UnityEngine;
 
 namespace C6Lab
 {
     /// <summary>
-    /// A-target recovery fire and common approved-spend feedback on the existing stamina window.
+    /// Common approved-spend feedback on the existing stamina window (#479 removed Jigwi A's recovery fire).
     /// It owns only passive child graphics and never edits source colours, fill amount or layout.
     /// </summary>
     [DisallowMultipleComponent]
@@ -15,17 +13,12 @@ namespace C6Lab
         [SerializeField] private LabStaminaFeedbackProfile profile;
         private LabStaminaFeedbackProfile fallback;
         private LabNetwork network, subscribed;
-        private LabHud hud;
         private UnityEngine.UI.Image source, pulse;
         private RectTransform root;
-        private LabStaminaFlameGraphic rim;
-        private LabStaminaFlameArtGraphic flames;
-        private UnityEngine.UI.Text multiplier;
-        private LabJigwiRewardFireProfile fireArt;
-        private string eventId, session;
+        private string session;
         private uint round;
-        private bool hasIdentity, korean;
-        private float fireAge, pulseAge = -1f, pendingCost, pulseFraction;
+        private bool hasIdentity;
+        private float pulseAge = -1f, pendingCost, pulseFraction;
 
         public LabStaminaFeedbackProfile Profile
         {
@@ -43,22 +36,16 @@ namespace C6Lab
                 return fallback;
             }
         }
-        public bool FireVisible { get; private set; }
         public bool PulseVisible { get; private set; }
         public int ConsumptionPulseCount { get; private set; }
-        public float FireAnimationSeconds => fireAge;
-        public float FireFillFraction { get; private set; }
         public float PulseAlpha { get; private set; }
         public float PulseFillFraction => pulseFraction;
         public RectTransform EffectRoot => root;
         public UnityEngine.UI.Image ConsumptionImage => pulse;
-        public LabStaminaFlameGraphic FlameRim => rim;
-        public LabStaminaFlameArtGraphic FlameArtwork => flames;
-        public UnityEngine.UI.Text MultiplierLabel => multiplier;
 
         public void Bind(LabNetwork target, LabHud targetHud)
         {
-            Unsubscribe(); network = target; hud = targetHud;
+            Unsubscribe(); network = target;
             UnityEngine.UI.Image next = targetHud != null ? targetHud.staminaFill : null;
             if (source != next) { DestroyView(); source = next; }
             ResetPresentation(); hasIdentity = false; ConsumptionPulseCount = 0;
@@ -97,12 +84,11 @@ namespace C6Lab
             LabSnapshot snapshot = network.Snapshot;
             Present(snapshot, network.LocalPlayerId, network.JigwiABPresentationTime,
                 snapshot != null && (snapshot.paused || network.GameStartHeld), Time.unscaledDeltaTime,
-                network.config != null ? network.config.JigwiABPersonalRecoveryMultiplier : 4f,
                 network.config != null ? network.config.StaminaMax : 120f);
         }
         /// <summary>Explicit visual-clock entry point, also used for isolated UI verification.</summary>
         public void Present(LabSnapshot snapshot, ulong localPlayer, double now, bool clockHeld,
-            float deltaTime, float recoveryMultiplier, float staminaMaximum = 120f)
+            float deltaTime, float staminaMaximum = 120f)
         {
             if (source == null || source.transform.parent == null || !source.gameObject.activeInHierarchy
                 || snapshot == null || snapshot.phase != LabPhase.Playing
@@ -133,48 +119,11 @@ namespace C6Lab
             Color pulseTint = Profile.ConsumptionColor; pulseTint.a = PulseAlpha; pulse.color = pulseTint;
             pulse.gameObject.SetActive(PulseVisible);
 
-            LabJigwiABRound current = snapshot.jigwiAB?.Active(now);
-            bool personal = Profile.PersonalFireEnabled && snapshot.jigwiAB?.enabled == true
-                && current != null && current.kind == LabJigwiABKind.PersonalBurn
-                && current.targetPlayer == localPlayer && current.Active(now);
-            if (personal)
-            {
-                if (eventId != current.id)
-                {
-                    eventId = current.id;
-                    // A late first snapshot may already be paused well after ignition.
-                    // Seed from the battle clock so it shows the existing fire instead of
-                    // waiting forever at a zero-width sweep. Do not count this frame twice.
-                    fireAge = (float)Math.Max(0d, now - current.activeAt);
-                }
-                else fireAge += dt;
-            }
-            else { eventId = null; fireAge = 0f; }
-            FireVisible = personal;
-            FireFillFraction = personal ? fraction * IgnitionAmount(fireAge, Profile.IgnitionSeconds) : 0f;
-            rim.gameObject.SetActive(personal); flames.gameObject.SetActive(personal);
-            multiplier.gameObject.SetActive(personal);
-            if (personal)
-            {
-                rim.Configure(FireFillFraction, fireAge, Profile.BorderWidthRatio, Profile.FireOpacity);
-                if (fireArt == null)
-                    using (LabFirstUse.Measure(LabFirstUseKind.RewardFire))
-                        fireArt = Resources.Load<LabJigwiRewardFireProfile>(LabJigwiRewardFireProfile.ResourcesPath);
-                Texture2D texture = Profile.FlameAtlas != null ? Profile.FlameAtlas : fireArt != null ? fireArt.FlameTexture : null;
-                flames.Configure(texture, FireFillFraction, fireAge, Profile.FlameHeightRatio,
-                    Profile.AnimationFps, Profile.FireOpacity);
-                float value = float.IsNaN(recoveryMultiplier) || float.IsInfinity(recoveryMultiplier) ? 4f : Mathf.Max(1f, recoveryMultiplier);
-                string label = (korean ? "회복 " : "RECOVERY x") + value.ToString("0.#", CultureInfo.InvariantCulture) + (korean ? "배" : string.Empty);
-                if (multiplier.text != label) multiplier.text = label;
-                multiplier.color = new Color(1f, .88f, .39f, .92f + .08f * Mathf.Sin(fireAge * 8f));
-            }
-            root.gameObject.SetActive(personal || PulseVisible);
+            root.gameObject.SetActive(PulseVisible);
             // The parent's whole subtree remains below the existing orb foreground. A local
             // last sibling keeps the short spend flash visible over the separate fever colours.
             root.SetAsLastSibling();
         }
-        public static float IgnitionAmount(float age, float seconds) => Mathf.SmoothStep(0f, 1f,
-            Mathf.Clamp01(Mathf.Max(0f, age) / Mathf.Max(.001f, seconds)));
         public static float ConsumptionAmount(float age, float seconds) => age < 0f || age >= seconds
             ? 0f : 1f - Mathf.SmoothStep(0f, 1f, age / Mathf.Max(.001f, seconds));
         private static float Unit(float value) => float.IsNaN(value) || float.IsInfinity(value) ? 0f : Mathf.Clamp01(value);
@@ -186,33 +135,7 @@ namespace C6Lab
             root = Rect("Stamina Feedback", source.transform.parent);
             pulse = Rect("Approved Spend Blue Flash", root).gameObject.AddComponent<UnityEngine.UI.Image>();
             Stretch(pulse.rectTransform); pulse.raycastTarget = false;
-            rim = Rect("Jigwi A Fire Border", root).gameObject.AddComponent<LabStaminaFlameGraphic>();
-            Stretch(rim.rectTransform); rim.raycastTarget = false;
-            flames = Rect("Jigwi A Flame Artwork", root).gameObject.AddComponent<LabStaminaFlameArtGraphic>();
-            Stretch(flames.rectTransform); flames.raycastTarget = false;
-            multiplier = Rect("Jigwi A Recovery Multiplier", root).gameObject.AddComponent<UnityEngine.UI.Text>();
-            var label = multiplier.rectTransform;
-            label.anchorMin = new Vector2(.55f, 1f); label.anchorMax = Vector2.one;
-            label.pivot = new Vector2(1f, 0f); label.anchoredPosition = new Vector2(0f, 7f);
-            label.sizeDelta = new Vector2(0f, 26f);
-            Font font = FindFont(); korean = font != null && font.HasCharacter('회');
-            multiplier.font = font != null ? font : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            multiplier.fontSize = 20; multiplier.resizeTextForBestFit = true;
-            multiplier.resizeTextMinSize = 9; multiplier.resizeTextMaxSize = 20;
-            multiplier.alignment = TextAnchor.MiddleRight;
-            multiplier.raycastTarget = false;
-            var outline = multiplier.gameObject.AddComponent<UnityEngine.UI.Outline>();
-            outline.effectColor = new Color(.13f, .035f, .01f, .85f); outline.effectDistance = new Vector2(1f, -1f);
             SyncGeometry(); root.gameObject.SetActive(false);
-        }
-        private Font FindFont()
-        {
-            if (hud == null) return null;
-            Font candidate = hud.timeText != null ? hud.timeText.font : null;
-            if (candidate != null && candidate.HasCharacter('회')) return candidate;
-            foreach (UnityEngine.UI.Text text in hud.GetComponentsInChildren<UnityEngine.UI.Text>(true))
-                if (text.font != null && text.font.HasCharacter('회')) return text.font;
-            return candidate;
         }
         private RectTransform Rect(string name, Transform parent)
         {
@@ -238,8 +161,8 @@ namespace C6Lab
         }
         private void ResetPresentation()
         {
-            eventId = null; fireAge = 0f; pulseAge = -1f; pendingCost = 0f; pulseFraction = 0f;
-            FireVisible = PulseVisible = false; FireFillFraction = PulseAlpha = 0f;
+            pulseAge = -1f; pendingCost = 0f; pulseFraction = 0f;
+            PulseVisible = false; PulseAlpha = 0f;
             if (root != null) root.gameObject.SetActive(false);
         }
         private void DestroyView()
@@ -249,7 +172,7 @@ namespace C6Lab
                 root.gameObject.SetActive(false);
                 if (Application.isPlaying) Destroy(root.gameObject); else DestroyImmediate(root.gameObject);
             }
-            root = null; pulse = null; rim = null; flames = null; multiplier = null;
+            root = null; pulse = null;
         }
         private void OnDisable() { Unsubscribe(); ResetPresentation(); }
         private void OnDestroy()

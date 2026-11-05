@@ -18,3 +18,4 @@ MonoBehaviour:
   groupCueSeconds: 2.08
   personalVolume: 1
   groupVolume: 1
+  personalVoiceEnabled: 0

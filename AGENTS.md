@@ -166,10 +166,10 @@
 
 - Guest는 자기 투척의 시각 복제본 접촉(`LabProjectile.LaunchVisual`의 contact 콜백)으로 박 킥·명중 효과·타격음·진동 또는 빗나감 소리를 Host 판정 전에 한 번 낸다(`LabLocalHitPresentation`). Host `targetImpact`·`targetMiss`는 그 표현을 감쇠까지 고려해 보정하거나 되돌리며(`CorrectPredictedImpact`/`UndoPredictedImpact`), 판정이 없으면 전투 연출 시계로 시간이 지나면 되돌린다. 도색·피해·오색·막힘은 항상 Host 결과이고, 지귀 B 불장막·스테이지 불·legacy 불·공급 구슬 중에는 선반영하지 않는다. Host가 판정 패킷을 보내는 경우를 바꾸면 이 경로도 함께 확인한다.
 
-## #461 도색 페이로드 압축 — 최신 호환 기준
+## #461 도색 페이로드 압축
 
 - `LabPaintFrame.encoding`은 0 원본, 1 deflate다. Host의 피어별 발행자는 `LabPaintEncodingPolicy.Auto`(압축이 더 짧을 때만 1)를 쓰고, 기본 생성자는 `RawOnly`다. 해시·covered·`Revision`은 늘 풀어 놓은 지도 기준이다. 수신기는 헤더에서 정한 크기 상한(full `columns·rows·5 + 시각 바이트`, delta `columns·rows·7 + 시각 바이트`) 안에서만 풀고, 넘거나 깨지면 체크포인트를 요청한다. 빈 256×128 지도는 도색 프레임 1개(Bulk 2조각)다.
-- 공유 설정 257개·인덱스는 그대로이며 #461 당시 묶음은 **5683/Lab44/Game28**이었다(현재 기준은 아래 #506). 이전 5682 앱과 혼용하지 않으며, 병합 뒤에는 모든 기기가 새 빌드를 써야 한다. 실행한 검사만 `docs/VALIDATION.md`에 기록한다.
+- 공유 설정 257개·인덱스는 그대로이며 #461 당시 묶음은 **5683/Lab44/Game28**이었다(현재 기준은 아래 #479 절). 이전 5682 앱과 혼용하지 않으며, 병합 뒤에는 모든 기기가 새 빌드를 써야 한다. 실행한 검사만 `docs/VALIDATION.md`에 기록한다.
 
 ## #471 로비 연결 끊김 뒤 핸들러 재등록
 
@@ -197,7 +197,7 @@
 - 스테이지 박은 `GameStageDefinition.gourdVisualResource`(Resources 경로, 비면 흰 박)를 `GameBattleBindings.MountStageGourd`가 `LabGourdPaint.PrepareVisual`로 `Attach`보다 먼저 지정한다. 2:2·Lab 단판은 흰 박이다. 프리팹 직접 참조로 바꾸지 않는다.
 - `LabGourdVisualRig`가 없는 프리팹(흰 박)은 기존 경로를 글자 그대로 탄다. 흰 박의 마운트·판정·칠·요괴 자세는 `Assets/Lab/Tests/PlayMode/Golden/`의 main 기록과 같아야 하며, 골든은 흰 박이 바뀌는 의도된 변경에서만 `GOURD_GOLDEN_RECORD=1`로 다시 기록한다. 계약 검사 실패는 `C6_GOURD_RIG_FALLBACK`과 함께 흰 박으로 돌아간다. 상세는 `docs/GOURD_MODELS.md`.
 - 세 스테이지 모두 `gourdVisualResource = Hapio/Gourds/Stage0N_<요괴>_Battle`(구미호·야광귀·지귀 박)이며 판정·도색·요괴 반응·완성/결과/PNG까지 이 박을 쓴다. 경로는 굽기 도구만 설정하고 `GameStageAssets.EnsureAssets`는 건드리지 않는다. 아트 원본 프리팹은 고치지 않고 `Hapio > Gourds > Bake All Stage Gourds`(`GameGourdRigBaker`, 스테이지별 메뉴도 있음)로만 다시 굽는다. 미리보기 덧씌우기(`GameGourdModelPreview`·`GourdPreview` 리소스)는 삭제했으며 재생성하지 않는다.
-- 1·3스테이지 판정 모양까지 바뀌어 도입 당시 묶음은 **공유 설정 257개·5683/`C6PhysicsLab/44`/`C6HapioGame/30`**였다(현재 #506 묶음은 아래 기준)(2스테이지만 바뀐 묶음은 Game29). Game28·29 앱과 혼용하지 않는다.
+- 1·3스테이지 판정 모양까지 바뀌어 도입 당시 묶음은 **공유 설정 257개·5683/`C6PhysicsLab/44`/`C6HapioGame/30`**였다(현재 기준은 아래 #479 절)(2스테이지만 바뀐 묶음은 Game29). Game28·29 앱과 혼용하지 않는다.
 
 ## #507 연속 곡선 줄
 
@@ -239,3 +239,13 @@
 - 관람은색/P/높이를모두독립복사하고기본박Ready0을유지한다. 클레이해제는지연Destroy전에Renderer를즉시끈다. 빌드검사는읽기전용이며원본/데이터팩을자동베이크하지않는다. 실제실행결과만VALIDATION에기록하며iOS/실네트워크검증은이번범위에포함하지않았다.
 
 - #506 최신 main 통합: #507의 스테이지별 몸통/뚜껑 Rig·판정·연속 줄·요괴를 유지한다. 클레이는 각 paintShell/paintExtra의 identity 자식이며 결과 복제도 각 base의 Ready0과 coat의 Ready1을 유지한다. #482 도색 준비를 유지하고 새 클레이의 3브러시×색/높이 패스도 별도 작은 타깃에서 준비한다. 실제 지도·진행 순번·난수는 프리워밍으로 바꾸지 않는다.
+
+## #479 지귀 A 부적 — 최신 호환 기준
+
+- A는 5/40/70초에 **모든 자리**에서 동시에 열린다. 예전의 대상 한 명·박 3번 명중·회복 4배는 없다. 자리마다 스냅샷 `LabJigwiABPlayerFire.talismanAt`(아직 안 썼으면 음수)을 둔다.
+- 소각은 한꺼번에가 아니라 **한 개씩** 탄다. 첫 구슬은 DEV243(기본 1초) 뒤, 이후 Inspector `jigwiABBurnStaggerSeconds`(1초) 간격이며 소유자별 생성 순서(createdAt/id)를 따른다(`NextJigwiABBurnAt`).
+- 각 기기의 `LabJigwiTalismanOverlay`(`LabJigwiScreenPresentation.EnsureTalisman`이 만듦)가 조합판 위 **전투 영역**에 세로 한지 부적을 띄우고, 쓰는 동안 `board.SetUiInputBlocked`로 조합판 조작을 막는다. 신라문화체 모양의 점선 "물"(88점, `LabJigwiTalismanStroke.Water`)을 Inspector 기준 90% 덮으면 `jigwiTalisman` 요청(firstId)을 보내고 1초마다 다시 보낸다. 판정은 Host `TryCompleteJigwiTalisman`만 한다.
+- Host는 그 자리의 소각 예약을 지우고 `jigwiTalismanReward` Water 5개(수명 15초, 칠 1.5배, B 불 꼬리 없음)를 준다. 모든 자리가 쓰면 A를 Completed로 일찍 끝내고, 못 쓰면 15초에 벌점 없이 끝난다.
+- DEV241/242는 은퇴 슬롯("Reserved …(unused)", 인덱스 보존, Home/Lobby 저장 라벨도 맞춤)이다. A 스태미나 화염 테두리, 화면 붉은 기운/양옆 불기둥, 구슬 위 불꽃 그림은 지웠고(구슬은 마감 전 1초 동안 `LabJigwiOrbFlame`이 아래에서 위로 타 들어가고, 그 선 위에 먹선 불꽃이 따라 올라감), A 외침은 `PatternAudioProfile.personalVoiceEnabled`(0)로 꺼 두었다(B 외침은 유지).
+- 에디터 전용: `Hapio > DEV SOLO 시작 스테이지` 메뉴(EditorPrefs, Home에서 Play할 때만 적용). 빌드와 Test Runner에는 영향이 없다.
+- 현재 호환 묶음은 설정 259개(#506 클레이 257·258 포함)·**5687**·`C6PhysicsLab/48`·`C6HapioGame/32`다. main의 #466/#506/#507이 5684~5686·Lab45~47·Game29~31을 먼저 써서 #479는 그 위로 올렸다. 이전 빌드와 혼용하지 않는다.

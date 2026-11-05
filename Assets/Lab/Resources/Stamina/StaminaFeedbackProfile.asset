@@ -15,13 +15,6 @@ MonoBehaviour:
   consumptionEnabled: 0
   consumptionSeconds: 0.18
   consumptionColor: {r: 0.65, g: 0.95, b: 1, a: 0.9}
-  personalFireEnabled: 1
-  ignitionSeconds: 0.4
-  flameHeightRatio: 0.85
-  borderWidthRatio: 0.11
-  animationFps: 12
-  fireOpacity: 0.95
-  flameAtlas: {fileID: 0}
   shortEnabled: 1
   shortShakeSeconds: 0.32
   shortShakeRatio: 0.3

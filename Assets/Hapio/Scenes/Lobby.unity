@@ -8119,7 +8119,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\uC9C0\uADC0 A \uD574\uC81C \uBA85\uC911 \uC218"
+  m_Text: Reserved Jigwi A Required Hits (unused)
 --- !u!222 &75068788
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -52459,7 +52459,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\uC9C0\uADC0 A \uC790\uB3D9 \uD68C\uBCF5 \uBC30\uC728"
+  m_Text: Reserved Jigwi A Recovery Multiplier (unused)
 --- !u!222 &617588721
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -89522,7 +89522,7 @@ MonoBehaviour:
   m_CaretColor: {r: 0.19607843, g: 0.19607843, b: 0.19607843, a: 1}
   m_CustomCaretColor: 0
   m_SelectionColor: {r: 0.65882355, g: 0.80784315, b: 1, a: 0.7529412}
-  m_Text: 5
+  m_Text: 1
   m_CaretBlinkRate: 0.85
   m_CaretWidth: 1
   m_ReadOnly: 0
@@ -92519,7 +92519,7 @@ MonoBehaviour:
   m_MinValue: 0.5
   m_MaxValue: 30
   m_WholeNumbers: 0
-  m_Value: 5
+  m_Value: 1
   m_OnValueChanged:
     m_PersistentCalls:
       m_Calls: []
@@ -161528,7 +161528,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 1
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: 5
+  m_Text: 1
 --- !u!222 &1935134869
 CanvasRenderer:
   m_ObjectHideFlags: 0

@@ -139,6 +139,25 @@ namespace C6Lab
                     transform.SetSiblingIndex(Math.Max(0, pause.GetSiblingIndex()
                         - (transform.GetSiblingIndex() < pause.GetSiblingIndex() ? 1 : 0)));
             }
+            EnsureTalisman();
+        }
+
+        /// <summary>#479: the talisman that covers this player's board during A. Created at runtime, never saved in the prefab.</summary>
+        public LabJigwiTalismanOverlay Talisman { get; private set; }
+        private void EnsureTalisman()
+        {
+            if (!Application.isPlaying) return;
+            if (Talisman == null)
+            {
+                var go = new GameObject("Jigwi Talisman (#479)", typeof(RectTransform));
+                go.layer = gameObject.layer;
+                var rect = (RectTransform)go.transform; rect.SetParent(transform, false);
+                rect.anchorMin = Vector2.zero; rect.anchorMax = Vector2.one; rect.offsetMin = rect.offsetMax = Vector2.zero;
+                Talisman = go.AddComponent<LabJigwiTalismanOverlay>();
+            }
+            // #479: the talisman is written in the battle screen's Shilla Culture font (신라문화체).
+            Font shilla = canvas != null ? LabYaguangFeverHud.ShillaFont(canvas) : null;
+            Talisman.Bind(source, shilla != null ? shilla : font);
         }
 
         /// <summary>Used by the dedicated prefab builder; never rebuilds the existing battle Canvas.</summary>
@@ -440,17 +459,25 @@ namespace C6Lab
             // Active() can return the upcoming warning for instructions. Flames and the B loop
             // belong only to the real mission window, aligned with the voice's terminal shout.
             bool missionActive = active != null && active.Active(now);
-            bool personal = missionActive && active.kind == LabJigwiABKind.PersonalBurn && active.targetPlayer == localPlayer;
-            personalHeat.gameObject.SetActive(personal);
+            // #479: A no longer tints the screen or stands edge flames beside the board; the talisman and
+            // the orbs charring one by one carry it. The saved objects stay (prefab), always hidden.
+            personalHeat.gameObject.SetActive(false);
             float animationTime = missionActive ? (float)Math.Max(0d, now - active.activeAt) : 0f;
-            if (personalFlames != null) for (int i = 0; i < personalFlames.Length; i++)
-                AnimateFlame(personalFlames[i], animationTime, i * 2.13f, .9f);
             VisibleScreenFires = 0;
             if (missionActive && active.kind == LabJigwiABKind.GroupFire) DrawGroup(active, localPlayer, now, animationTime, held);
             else SetFiresHidden(held);
             DrawWater(now, held);
             DrawStatus(stage, active, snapshot, localPlayer, now, held);
             DrawFailure(now);
+        }
+
+        /// <summary>#479: true once this seat finished writing its talisman in this A.</summary>
+        public static bool TalismanWritten(LabJigwiABRound round, ulong player)
+        {
+            if (round == null || round.kind != LabJigwiABKind.PersonalBurn) return false;
+            foreach (var seat in round.players ?? Array.Empty<LabJigwiABPlayerFire>())
+                if (seat != null && seat.playerId == player) return seat.talismanAt >= 0d;
+            return false;
         }
 
         private void ObserveFailures(LabJigwiABSnapshot stage, double now, bool baseline)
@@ -485,12 +512,6 @@ namespace C6Lab
             foreach (LabJigwiABRound round in stage.rounds ?? Array.Empty<LabJigwiABRound>())
             {
                 if (round == null) continue;
-                if (round.kind == LabJigwiABKind.PersonalBurn && round.resolution == LabJigwiABResolution.Completed)
-                {
-                    bool first = seenDouses.Add(round.id + "/complete");
-                    if (first && !baseline && round.targetPlayer == localPlayer && Recent(round.resolvedAt, now))
-                        personalDousedAt = round.resolvedAt;
-                }
                 if (round.kind != LabJigwiABKind.GroupFire) continue;
                 foreach (var player in round.players ?? Array.Empty<LabJigwiABPlayerFire>())
                 {
@@ -704,21 +725,14 @@ namespace C6Lab
             if (active != null && active.kind == LabJigwiABKind.GroupFire) PositionGroupStatus(active, local, now);
             else RestoreStatusLayout();
             rows.Clear();
-            float personalMultiplier = source != null && source.config != null ? source.config.JigwiABPersonalRecoveryMultiplier : 4f;
             // 피버는 세 스테이지 공통 연출(#441, LabYaguangFeverHud)이 알린다.
             string words = string.Empty;
             if (active != null)
             {
                 string shout = active.Warning(now) ? (active.kind == LabJigwiABKind.PersonalBurn
                         ? "으아아 마음이 불타오른다!!!\n" : "화면에 불이 붙었어요!\n") : string.Empty;
-                if (active.kind == LabJigwiABKind.PersonalBurn)
-                {
-                    string player = PlayerLabel(snapshot, active.targetPlayer);
-                    words = shout + player + " 과열 · 명중 " + active.hitCount + "/" + active.requiredHits
-                        + " · " + Math.Max(0d, active.endsAt - now).ToString("0.0") + "초";
-                    rows.Append(active.targetPlayer == local ? "결합 구슬로 박을 맞혀 불을 끄세요 · 회복 "
-                        + personalMultiplier.ToString("0.#") + "배" : "동료의 과열이 끝날 때까지 함께 칠하세요");
-                }
+                // #479: A has no hit count or target text; only the warning shout remains.
+                if (active.kind == LabJigwiABKind.PersonalBurn) words = shout.TrimEnd('\n');
                 else
                 {
                     words = shout + "지급 물구슬로 불씨를 끄세요 · "
@@ -736,9 +750,9 @@ namespace C6Lab
             }
             if (active == null && !stage.fever)
                 foreach (var finished in stage.rounds ?? Array.Empty<LabJigwiABRound>())
-                    if (finished != null && finished.resolution == LabJigwiABResolution.Completed && Recent(finished.resolvedAt, now))
-                        words = finished.kind == LabJigwiABKind.GroupFire ? "모든 불을 함께 껐어요!"
-                            : PlayerLabel(snapshot, finished.targetPlayer) + "의 과열이 끝났어요";
+                    if (finished != null && finished.kind == LabJigwiABKind.GroupFire
+                        && finished.resolution == LabJigwiABResolution.Completed && Recent(finished.resolvedAt, now))
+                        words = "모든 불을 함께 껐어요!";
             LabJigwiABRound reward = stage.Reward(now);
             if (reward != null)
             {

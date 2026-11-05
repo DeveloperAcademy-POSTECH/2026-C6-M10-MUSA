@@ -1,5 +1,19 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-04 — #479 지귀 A 부적 쓰기
+
+`feat/#479-jigwi-talisman` 작업 브랜치에서 팀원이 Unity6000.6.5f1 Editor(macOS)로 직접 확인했다. 아래 표는 실제로 실행한 것만 적는다.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| EditMode 전체(Run All) | **1867 PASS / 1 FAIL / 0 skip** | Lab·Hapio EditMode 전체. 부적·소각 순서·DTO/복제 검증·접속 버전5684·DEV241/242 은퇴·Home/Lobby 저장 DEV 패널 포함 |
+| 실패 1개 | `GameSceneAssetTests.BattleCopy_PreservesTheCurrentSavedLabEnvironment` | Battle 바닥 텍스처 GUID가 Lab 저장값과 다름(Stage01 바닥 vs Lab HanjiSand). #479 변경과 무관한 배경 작업 쪽 기대값이며 담당 팀원에게 전달함 |
+| SOLO 지귀 Play(에디터) | **팀원 손 확인** | Home에서 `Hapio > DEV SOLO 시작 스테이지 > 3`으로 지귀 진입. 전투 영역의 세로 한지 부적, 조합판 막힘, 1초 간격 소각, 점선 "물"을 90% 이상 쓰면 통과·물방울 구슬 지급을 보며 화면/기준값을 조정함 |
+
+main `f40e028`(#507 박 모델·#515 조명 포함)을 합쳤다. 충돌은 게임 토큰 줄(`LabNetwork.GameFlow.cs`, `LabGameFlowBridgeTests`)과 `AGENTS.md` 절 추가뿐이었다. #507이 Game29·30을 먼저 써서 #479는 Game31로 올렸다. 이 병합 뒤 EditMode Run All·`GameJigwiStageIntegrationTests`·SOLO 지귀 Play를 팀원이 확인했다. 이어서 main `0681d25`(#506 클레이 스티커, 5686/Lab47/Game31·설정 259개)를 다시 합쳐 #479를 **5687/`C6PhysicsLab/48`/`C6HapioGame/32`**로 올렸다. 두 번째 병합 뒤 Test Runner 결과는 아직 다시 기록하지 않았다.
+
+실기기(iPhone)·iOS 빌드·2~5인 LAN/핫스팟·5683 앱과의 혼용 거부·모바일 성능은 **미실행**이다. Stage02 `YokaiBacking.mat`/`YokaiGround.mat`이 배경 도구로 바뀌는 것은 매번 되돌렸고 이번 작업에 넣지 않았다.
+
 ## 2026-10-29 — #386 미사용 Target·Target2·GourdCrack·PackageInstaller 정리
 
 기준 main `5c2ce667`에서 `chore/#386-unused-target-assets` 별도 작업 공간을 준비했다. 원래 프로젝트의 main·HEAD·tracked diff·작업 상태·사용자 미추적 파일 기준은 전환하거나 수정하지 않았다. Unity6000.6.5f1·macOS ARM64·Metal batch Editor 한 개에서 확인했다.

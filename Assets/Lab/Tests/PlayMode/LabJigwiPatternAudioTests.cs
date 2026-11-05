@@ -239,6 +239,19 @@ namespace C6Lab.Tests
             Assert.That(audio.PlaybackStartCount, Is.Zero);
         }
         [Test]
+        public void ADisabledPersonalShoutIsSkippedButBStillSpeaks()
+        {
+            // #479: the saved profile turns the A shout off; B's warning keeps its cue.
+            Set("personalVoiceEnabled", false);
+            audio.Observe(State(), Start(0) + .02d); audio.Observe(State(), Start(0) + .5d);
+            Assert.That(audio.PlaybackStartCount, Is.Zero);
+            audio.Observe(State(), Start(1) + .02d);
+            Assert.That(audio.PlaybackStartCount, Is.EqualTo(1));
+            var saved = Resources.Load<LabJigwiPatternAudioProfile>(LabJigwiPatternAudioProfile.ResourcesPath);
+            Assert.That(saved.VoiceEnabledFor(LabJigwiABKind.PersonalBurn), Is.False);
+            Assert.That(saved.VoiceEnabledFor(LabJigwiABKind.GroupFire), Is.True);
+        }
+        [Test]
         public void MutedSfxDoesNotDeferTheCueUntilAfterItIsUnmuted()
         {
             LabAudioSettings.SfxVolume = 0f;

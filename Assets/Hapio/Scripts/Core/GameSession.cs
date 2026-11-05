@@ -707,8 +707,23 @@ namespace Hapio
             if (IsCreatingRoom || state.phase != GameFlowPhase.Home || !network.PrepareDeveloperSoloGame()) return;
             hostMode = mode;
             hostFlow.EnterLobby(mode);
-            if (hostFlow.BeginRun(network.ConnectedPlayerIds)) PrepareStage();
+            if (!hostFlow.BeginRun(network.ConnectedPlayerIds)) return;
+#if UNITY_EDITOR
+            // #479 실험실: 메뉴 Hapio > DEV SOLO 시작 스테이지. 기본 1이면 지금과 같다.
+            // Home 씬에서 직접 Play한 경우에만 쓴다(Test Runner는 다른 씬에서 시작하므로 늘 1스테이지부터).
+            if (mode == GameMode.Story && developerSoloStartAllowed)
+                hostFlow.DeveloperStartAt(UnityEditor.EditorPrefs.GetInt(DeveloperSoloStartStageKey, 1));
+#endif
+            PrepareStage();
         }
+        /// <summary>#479 실험실: 에디터 전용 SOLO 시작 스테이지를 이 컴퓨터에만 저장하는 키.</summary>
+        public const string DeveloperSoloStartStageKey = "Hapio.DeveloperSoloStartStage";
+#if UNITY_EDITOR
+        private static bool developerSoloStartAllowed;
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+        private static void CaptureDeveloperSoloStart() =>
+            developerSoloStartAllowed = SceneManager.GetActiveScene().path == GameScenePaths.Home;
+#endif
 
         public void NextStage()
         {

@@ -643,7 +643,6 @@ namespace C6Lab
             element = orb.element;
             if (element >= LabOrbElement.Fire && element <= LabOrbElement.Earth)
                 TryExtinguishJigwiStageRoot(orb.owner, paintDirection, now, out _);
-            RecordJigwiABBossHit(orb, paintDirection, now);
             orbs.Remove(id);
             float areaScale = LaunchScaleOf(id);
             launchScales.Remove(id);
@@ -666,7 +665,7 @@ namespace C6Lab
             else
             {
                 float share = Mathf.Min(3f, (orb.small ? rules.SmallOrbPaintShare : 1f) * areaScale
-                    * (orb.jigwiABReward ? orb.jigwiABRewardPaintScale : 1f));
+                    * (orb.jigwiABReward || orb.jigwiTalismanReward ? orb.jigwiABRewardPaintScale : 1f));
                 // 오색구슬 (#329): 다섯 원소 색 얼룩으로, 정해 둔 배율만큼 넓게 칠한다. 도색 한 번은 최대 3배다.
                 if (orb.fiveColor) share = Mathf.Min(3f, share * rules.FiveColorOrbPaintScale);
                 bool paints = orb.fiveColor || element >= LabOrbElement.Fire && element <= LabOrbElement.Earth;
@@ -1445,7 +1444,7 @@ namespace C6Lab
                         + YaguangFeverSecondsBetween(lastTime, effectiveNow) * (rules.YaguangFeverStaminaMultiplier - 1d);
                     foreach (var player in players.Values)
                         player.stamina = Mathf.Min(rules.StaminaMax,
-                            (float)(player.stamina + (elapsed * JigwiABRecoveryMultiplier(player.id, lastTime)
+                            (float)(player.stamina + (elapsed * JigwiStageRecoveryMultiplier(lastTime)
                                 + feverRefill) * rules.StaminaRecoveryPerSecond));
                     // 결과 대시보드 기록: 이 사이에 북을 점유한 사람의 점유 시간 (북 점유율 계산용)
                     // (북은 넘길 때도 먼저 시간을 진행시키므로 넘기기 전 주인에게 쌓인다)

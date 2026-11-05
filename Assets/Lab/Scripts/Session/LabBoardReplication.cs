@@ -198,7 +198,7 @@ namespace C6Lab
             && a.jigwiABBurnEventId == b.jigwiABBurnEventId && a.jigwiABBurnAt == b.jigwiABBurnAt
             && a.jigwiABRadiusScale == b.jigwiABRadiusScale
             && a.jigwiABReward == b.jigwiABReward && a.jigwiABRewardSizeScale == b.jigwiABRewardSizeScale
-            && a.jigwiABRewardPaintScale == b.jigwiABRewardPaintScale
+            && a.jigwiABRewardPaintScale == b.jigwiABRewardPaintScale && a.jigwiTalismanReward == b.jigwiTalismanReward
             && a.jigwiABSupplyEventId == b.jigwiABSupplyEventId
             && a.jigwiSupply == b.jigwiSupply && a.jigwiGenerationBurn == b.jigwiGenerationBurn && a.fever == b.fever
             && a.fiveColor == b.fiveColor;
@@ -553,6 +553,7 @@ namespace C6Lab
                     || !Finite(state.jigwiABRewardSizeScale) || state.jigwiABRewardSizeScale < 1f || state.jigwiABRewardSizeScale > 3f
                     || !Finite(state.jigwiABRewardPaintScale) || state.jigwiABRewardPaintScale < 1f || state.jigwiABRewardPaintScale > 3f
                     || state.jigwiABReward && !state.inFlight
+                    || state.jigwiTalismanReward && (state.kind != LabOrbKind.Combined || state.element != LabOrbElement.Water || state.jigwiABReward)
                     || !string.IsNullOrEmpty(state.jigwiABBurnEventId)
                         && (string.IsNullOrWhiteSpace(state.jigwiABBurnEventId) || state.jigwiABBurnEventId.Length > 256)
                     || string.IsNullOrEmpty(state.jigwiABBurnEventId) != (state.jigwiABBurnAt < 0d)

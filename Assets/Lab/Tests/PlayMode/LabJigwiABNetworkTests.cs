@@ -504,25 +504,26 @@ namespace C6Lab.Tests
             float[] values = config.CaptureDeveloperValues(); values[243] = 30f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             model = Room(LabStageYokai.Jigwi);
-            ulong owner = model.Snapshot(4.2d).jigwiAB.Active(4.2d).targetPlayer;
+            ulong owner = 20ul; // #479: A ignites every seat, so any player owns burning orbs.
             LabOrbState orb = Add(model, owner, 4.2d, LabOrbElement.Fire);
             double expectedBurnAt = 5d + config.JigwiABPersonalBurnSeconds; // Activation applies fire to this pre-existing fixture orb.
             LabSnapshot snapshot = model.Snapshot(5.3d);
+            double aEndsAt = snapshot.jigwiAB.rounds[0].endsAt;
             var publisher = new LabBoardPublisher();
             var replica = new LabBoardReplica(); replica.SetActive(snapshot.sessionId, snapshot.round, owner);
             LabBoardFrame frame = publisher.Build(snapshot, owner, 1, 1);
             Assert.That(frame.states.Single(item => item.id == orb.id).jigwiABBurnAt, Is.EqualTo(expectedBurnAt));
-            snapshot.jigwiAB.rounds[0].hitCount = 2;
+            snapshot.jigwiAB.rounds[0].endsAt = 99d;
             snapshot.orbs.Single(item => item.id == orb.id).jigwiABBurnAt = 99d;
-            Assert.That(frame.jigwiAB.rounds[0].hitCount, Is.Zero);
+            Assert.That(frame.jigwiAB.rounds[0].endsAt, Is.EqualTo(aEndsAt));
             Assert.That(replica.TryApply(frame, out error), Is.True, error);
-            frame.jigwiAB.rounds[0].targetPlayer = 999;
+            frame.jigwiAB.rounds[0].endsAt = 999d;
             frame.states.Single(item => item.id == orb.id).jigwiABBurnAt = 999;
             Assert.That(replica.TryGetState(orb.id, out LabOrbState copied), Is.True);
             Assert.That(copied.jigwiABBurnAt, Is.EqualTo(expectedBurnAt));
             LabSnapshot oldPaint = new LabSnapshot { sessionId = snapshot.sessionId, round = snapshot.round,
                 phase = LabPhase.Playing, serverTime = 0d };
-            Assert.That(replica.Overlay(oldPaint).jigwiAB.rounds[0].targetPlayer, Is.EqualTo(owner));
+            Assert.That(replica.Overlay(oldPaint).jigwiAB.rounds[0].endsAt, Is.EqualTo(aEndsAt));
 
             LabBoardFrame malformed = publisher.Build(model.Snapshot(5.4d), owner, 2, 2, true);
             malformed.states.Single(item => item.id == orb.id).jigwiABBurnAt = double.NaN;
@@ -530,7 +531,7 @@ namespace C6Lab.Tests
             Assert.That(error, Is.EqualTo("INVALID_BOARD_FRAME"));
             Assert.That(replica.LatestSequence, Is.EqualTo(1));
             malformed = publisher.Build(model.Snapshot(5.4d), owner, 2, 2, true);
-            malformed.jigwiAB.rounds[0].targetPlayer = 999;
+            malformed.jigwiAB.rounds[0].rewardSizeScale = 2f; // A never carries a reward scale.
             Assert.That(replica.TryApply(malformed, out error), Is.False);
             Assert.That(replica.LatestSequence, Is.EqualTo(1));
 

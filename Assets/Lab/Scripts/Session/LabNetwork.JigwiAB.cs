@@ -26,6 +26,21 @@ namespace C6Lab
         /// extrapolated by <see cref="LabGuestBattleClock"/>, held while paused or start-held and never stepping back
         /// by less than half a second within a round (#451).
         /// </summary>
+        /// <summary>#479 지귀 부적 완료 요청 패킷 종류. firstId에 A 회차 id를 싣는다.</summary>
+        public const string JigwiTalismanPacket = "jigwiTalisman";
+
+        /// <summary>
+        /// #479 지귀 부적: 이 기기 플레이어가 "물"을 다 썼다고 Host에 한 번 알린다. 쓰는 동안의 판정은 이 기기만 하고,
+        /// 불 끄기와 물 구슬 지급은 Host가 `LabModel.TryCompleteJigwiTalisman`으로 확정해 스냅샷으로 알린다.
+        /// </summary>
+        public bool RequestJigwiTalismanDone(string roundId)
+        {
+            if (!IsConnected || !CanProcessBattleActions || latest == null || latest.phase != LabPhase.Playing
+                || latest.paused || string.IsNullOrEmpty(roundId) || roundId.Length > 256) return false;
+            Request(new LabNetworkPacket { type = JigwiTalismanPacket, requestId = ++requestSequence, firstId = roundId });
+            return true;
+        }
+
         public double BattlePresentationTime
         {
             get

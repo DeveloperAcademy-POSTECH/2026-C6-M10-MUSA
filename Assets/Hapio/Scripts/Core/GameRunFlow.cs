@@ -159,6 +159,18 @@ namespace Hapio
             return true;
         }
 
+        /// <summary>
+        /// #479 지귀 실험실 (에디터 전용 SOLO): 막 시작한 판을 뒤 스테이지부터 불러온다.
+        /// 1 이하이거나 범위 밖이면 아무것도 바꾸지 않는다.
+        /// </summary>
+        public bool DeveloperStartAt(int stageIndex)
+        {
+            if (state.phase != GameFlowPhase.LoadingBattle || state.stageIndex != 1
+                || stageIndex <= 1 || stageIndex > state.totalStages) return false;
+            state.stageIndex = stageIndex;
+            return true;
+        }
+
         public bool RestartCurrentStage(string runId, int stageIndex, uint revision)
         {
             if (!Matches(runId, stageIndex, revision)

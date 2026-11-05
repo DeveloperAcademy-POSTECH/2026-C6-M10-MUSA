@@ -130,7 +130,7 @@ namespace C6Lab.Tests
             group.players[0].targets[1].lit = true; view.ApplySnapshot(state, 42, 2.4d);
             Assert.That(view.audioView.PlaybackStartCount, Is.EqualTo(2));
             view.ApplySnapshot(state, 99, 2.5d); Assert.That(view.audioView.WantsLoop, Is.False, "An absent local owner cannot play another player's fire.");
-            group.kind = LabJigwiABKind.PersonalBurn; group.targetPlayer = 42;
+            group.kind = LabJigwiABKind.PersonalBurn;
             view.ApplySnapshot(state, 42, 2.6d); Assert.That(view.audioView.WantsLoop, Is.False);
             group.kind = LabJigwiABKind.GroupFire; view.ApplySnapshot(state, 42, 2.7d);
             Assert.That(view.audioView.WantsLoop, Is.True);
