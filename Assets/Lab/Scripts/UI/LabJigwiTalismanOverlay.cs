@@ -30,6 +30,12 @@ namespace C6Lab
         [SerializeField, Range(0f, .3f)] private float watercolorJitter = .12f;
         [Tooltip("#533: 한 획을 이만큼 쓰면 깜빡이는 안내 점이 다음 획으로 넘어간다 (0~1). 칠하기 자체는 순서와 상관없다.")]
         [SerializeField, Range(.3f, 1f)] private float strokeAdvance = .8f;
+        [Tooltip("#533: 글자에서 이만큼(글자 칸 대비) 떨어진 곳을 문지르면 '글자 밖'으로 센다.")]
+        [SerializeField, Range(.05f, .3f)] private float offDistance = .11f;
+        [Tooltip("#533: 글자 밖을 문지른 길이(글자 칸 폭 = 1)가 이만큼 쌓이면 '번졌다'며 처음부터 다시 쓴다. 아무렇게나 문지르기 막기. 클수록 너그럽다.")]
+        [SerializeField, Range(.5f, 6f)] private float smudgeBudget = 2f;
+        [Tooltip("#533: 번졌을 때 안내 문구를 바꿔 보여 주는 시간(초).")]
+        [SerializeField, Range(.3f, 3f)] private float smudgeHintSeconds = 1.4f;
         [Tooltip("#533: 다음에 쓸 곳을 알려 주는 깜빡이는 점 색.")]
         [SerializeField] private Color nextMarkerColor = new Color(.16f, .47f, .93f, .9f);
         [Tooltip("#533: 흐린 글자의 경계선 색 (칠하기 전부터 글자 모양이 보이게).")]
@@ -95,6 +101,11 @@ namespace C6Lab
         public float Coverage => stroke.Coverage;
         /// <summary>이 화면에서 부적을 다 쓴 횟수 (요청을 보낸 횟수, 다시 보낸 것은 빼고)</summary>
         public int CompletedCount { get; private set; }
+        /// <summary>#533: 글자 밖을 너무 문질러 처음부터 다시 쓰게 된 횟수.</summary>
+        public int SmudgeCount { get; private set; }
+        private const string HintText = "손가락으로 '물'을 적어\n부적을 완성하세요.";
+        private const string SmudgeText = "번졌어요!\n글자를 따라 다시 써 주세요.";
+        private float smudgeHintUntil = -1f;
         public LabJigwiTalismanStroke Stroke => stroke;
         /// <summary>#509: 다 쓴 부적이 빛나며 사라지는 중인지. 이때 조합판은 이미 풀려 있다.</summary>
         public bool Finishing => finishAge >= 0f;
@@ -139,6 +150,7 @@ namespace C6Lab
                 bool held = snapshot == null || snapshot.paused || source.GameStartHeld || source.BattlePresentationHeld;
                 if (held) hasLast = false; else ReadPointer();
                 UpdateNextMarker(Time.unscaledTime);
+                if (smudgeHintUntil >= 0f && Time.unscaledTime >= smudgeHintUntil) RestoreHint();
             }
             ResendIfLost(snapshot);
         }
@@ -167,6 +179,9 @@ namespace C6Lab
         {
             if (!Visible) return;
             fresh.Clear();
+            // #533: rubbing far from the letter (coin-scratch scribbling) smudges the talisman; it starts over.
+            stroke.AddOffGuide(from, to, offDistance);
+            if (stroke.OffLength > smudgeBudget) { Smudge(); return; }
             stroke.StrokeAdvance = strokeAdvance;
             stroke.Paint(from, to, Tolerance, fresh);
             for (int i = 0; i < fresh.Count; i++)
@@ -313,9 +328,25 @@ namespace C6Lab
             return true;
         }
 
+        private void Smudge()
+        {
+            SmudgeCount++;
+            ResetWriting();
+            if (hint == null) return;
+            hint.text = SmudgeText;
+            smudgeHintUntil = Time.unscaledTime + smudgeHintSeconds;
+        }
+
+        private void RestoreHint()
+        {
+            smudgeHintUntil = -1f;
+            if (hint != null) hint.text = HintText;
+        }
+
         private void ResetWriting()
         {
             stroke.Clear(); hasLast = false; writtenRound = null;
+            RestoreHint();
             for (int i = 0; i < dots.Length; i++)
             {
                 if (dots[i] == null) continue;
@@ -443,7 +474,7 @@ namespace C6Lab
             frameImage.color = new Color(0f, 0f, 0f, 0f); frameImage.raycastTarget = false;
             var outline = frame.gameObject.AddComponent<UnityEngine.UI.Outline>();
             outline.effectColor = inkColor; outline.effectDistance = new Vector2(3f, -3f);
-            hint = NewText("Talisman Hint", paper, "손가락으로 '물'을 적어\n부적을 완성하세요.", 22, inkColor);
+            hint = NewText("Talisman Hint", paper, HintText, 22, inkColor);
             var hintRect = hint.rectTransform;
             hintRect.anchorMin = new Vector2(.08f, .83f); hintRect.anchorMax = new Vector2(.92f, .96f);
             hintRect.offsetMin = hintRect.offsetMax = Vector2.zero;
@@ -711,9 +742,33 @@ namespace C6Lab
             }
         }
 
+        /// <summary>#533: 글자에서 떨어진 곳을 문지른 길이의 합 (글자 칸 폭 = 1).</summary>
+        public float OffLength { get; private set; }
+
+        /// <summary>
+        /// #533: 선분 from→to 중 어느 점에서도 offDistance보다 먼 부분의 길이를 OffLength에 더한다(잘게 나눠 잰다). 더한 길이를 돌려준다.
+        /// </summary>
+        public float AddOffGuide(Vector2 from, Vector2 to, float offDistance)
+        {
+            if (!Finite(from) || !Finite(to) || !(offDistance > 0f) || Samples.Length == 0) return 0f;
+            float length = Vector2.Distance(from, to);
+            if (length <= 1e-6f) return 0f;
+            int steps = Mathf.Clamp(Mathf.CeilToInt(length / .02f), 1, 200);
+            float piece = length / steps, limit = offDistance * offDistance, added = 0f;
+            for (int k = 0; k < steps; k++)
+            {
+                Vector2 at = Vector2.Lerp(from, to, (k + .5f) / steps);
+                bool near = false;
+                for (int i = 0; i < Samples.Length && !near; i++) near = (Samples[i] - at).sqrMagnitude <= limit;
+                if (!near) added += piece;
+            }
+            OffLength += added;
+            return added;
+        }
+
         public void Clear()
         {
-            Array.Clear(covered, 0, covered.Length); CoveredCount = 0;
+            Array.Clear(covered, 0, covered.Length); CoveredCount = 0; OffLength = 0f;
             Array.Clear(strokeCovered, 0, strokeCovered.Length); CurrentStroke = 0;
         }
 

@@ -116,6 +116,33 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void CoinScratchScribblingSmudgesAndStartsOver()
+        {
+            overlay.Present(Snapshot(-1d), Local, 11d);
+            // #533: rubbing back and forth over the whole paper, like scratching a lottery ticket.
+            for (int i = 0; i <= 40; i++)
+            {
+                float y = i / 40f;
+                overlay.PaintNormalized(new Vector2(.02f, y), new Vector2(.98f, y));
+            }
+            Assert.That(overlay.SmudgeCount, Is.GreaterThan(0));
+            Assert.That(overlay.CompletedCount, Is.Zero, "Scribbling never finishes the talisman.");
+            Assert.That(overlay.Visible, Is.True);
+        }
+
+        [Test]
+        public void TracingTheLetterNeverSmudges()
+        {
+            overlay.Present(Snapshot(-1d), Local, 11d);
+            Vector2[] points = LabJigwiTalismanStroke.Water;
+            // Writing each stroke as one continuous drag along the letter stays on the guide.
+            foreach (int[] order in LabJigwiTalismanStroke.WaterStrokes)
+                for (int i = 1; i < order.Length; i++) overlay.PaintNormalized(points[order[i - 1]], points[order[i]]);
+            Assert.That(overlay.SmudgeCount, Is.Zero);
+            Assert.That(overlay.CompletedCount, Is.EqualTo(1));
+        }
+
+        [Test]
         public void TheGuideIsEvenlySampledAndEveryPointBelongsToOneStroke()
         {
             Vector2[] points = LabJigwiTalismanStroke.Water;
