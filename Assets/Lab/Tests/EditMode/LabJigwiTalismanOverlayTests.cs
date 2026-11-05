@@ -118,6 +118,40 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void ALetterWithItsTailStillBlankDoesNotFinish()
+        {
+            overlay.Present(Snapshot(-1d), Local, 11d);
+            Vector2[] points = LabJigwiTalismanStroke.Water;
+            int[][] strokes = LabJigwiTalismanStroke.WaterStrokes;
+            int[] tail = strokes[strokes.Length - 1];
+            // #533: everything but the end of the ㄹ tail (the brush reach still covers two of the five skipped dots,
+            // so three stay blank) — enough dots counted, but the tail visibly blank.
+            for (int s = 0; s < strokes.Length; s++)
+                for (int i = 0; i < strokes[s].Length; i++)
+                    if (s < strokes.Length - 1 || i < tail.Length - 5) overlay.PaintNormalized(points[strokes[s][i]], points[strokes[s][i]]);
+            Assert.That(overlay.Coverage, Is.GreaterThan(.9f));
+            Assert.That(overlay.CompletedCount, Is.Zero, "A blank tail is not a finished letter.");
+            Assert.That(overlay.Stroke.LongestGap(strokes.Length - 1), Is.GreaterThan(1));
+            // Touching the tail end fills it and the letter finishes.
+            overlay.PaintNormalized(points[tail[tail.Length - 3]], points[tail[tail.Length - 3]]);
+            Assert.That(overlay.CompletedCount, Is.EqualTo(1));
+            Assert.That(overlay.Stroke.LongestGap(strokes.Length - 1), Is.LessThanOrEqualTo(1));
+        }
+
+        [Test]
+        public void TheFinishPlaysThreeEvenNotesThenTheAccent()
+        {
+            overlay.Present(Snapshot(-1d), Local, 11d);
+            Trace(overlay);
+            Assert.That(overlay.NotesPlayedCount, Is.EqualTo(1), "The first 둥 starts with the sweep.");
+            overlay.AdvanceFinish(overlay.FinishSeconds * .2f);
+            Assert.That(overlay.NotesPlayedCount, Is.InRange(2, 3));
+            overlay.AdvanceFinish(overlay.FinishSeconds * .2f);
+            Assert.That(overlay.NotesPlayedCount, Is.EqualTo(4), "Three notes, a breath, then the accented 둥!");
+            Assert.That(overlay.LastCue, Is.EqualTo("Burst"));
+        }
+
+        [Test]
         public void CoinScratchScribblingSmudgesAndStartsOver()
         {
             overlay.Present(Snapshot(-1d), Local, 11d);

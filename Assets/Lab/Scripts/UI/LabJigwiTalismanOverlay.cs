@@ -28,6 +28,8 @@ namespace C6Lab
         [SerializeField] private Color writtenColor = new Color(.16f, .47f, .93f, .5f);
         [Tooltip("#533: 수채화 점마다 색이 조금씩 흔들리는 정도 (0이면 모두 같은 색).")]
         [SerializeField, Range(0f, .3f)] private float watercolorJitter = .12f;
+        [Tooltip("#533: 완성으로 보는 기준 — 한 획 안에서 연달아 비어도 되는 점 수. 1이면 점 하나 빈 곳(붓 굵기에 가려 안 보임)까지만 봐준다. 획 끝도 이 기준을 따른다.")]
+        [SerializeField, Range(0, 4)] private int maxStrokeGap = 1;
         [Tooltip("#533: 한 획을 이만큼 쓰면 깜빡이는 안내 점이 다음 획으로 넘어간다 (0~1). 칠하기 자체는 순서와 상관없다.")]
         [SerializeField, Range(.3f, 1f)] private float strokeAdvance = .8f;
         [Tooltip("#533: 글자에서 이만큼(글자 칸 대비) 떨어진 곳을 문지르면 '글자 밖'으로 센다.")]
@@ -46,8 +48,10 @@ namespace C6Lab
         [SerializeField] private Color ghostColor = new Color(.88f, .76f, .48f, 1f);
         [Tooltip("#533: 먹 붓 굵기 (글자 칸 대비). 지나간 곳의 글자 획을 이만큼 채운다(글자 모양 밖으로는 안 번진다). 판정 거리와는 따로다.")]
         [SerializeField, Range(.06f, .3f)] private float brushWidth = .16f;
-        [Tooltip("#533: 다 쓰면 금빛이 획 순서대로 글자를 훑고 지나가는 시간(초). 빈 곳도 이때 채워진다.")]
-        [SerializeField, Range(.1f, 1.5f)] private float sweepSeconds = .5f;
+        [Tooltip("#533: 다 쓰면 금빛이 획 순서대로 글자를 훑고 지나가는 시간(초). 빈 곳도 이때 채워진다. 이 동안 \"둥 둥 둥\" 세 음이 고르게 난다.")]
+        [SerializeField, Range(.1f, 2f)] private float sweepSeconds = .9f;
+        [Tooltip("#533: 세 번째 음과 마지막 강세 음(\"둥!\") 사이에 숨 고르는 시간(초).")]
+        [SerializeField, Range(0f, .8f)] private float accentPauseSeconds = .2f;
         [Tooltip("#533: 훑기가 끝난 순간 부적이 \"쾅\" 하고 커지는 정도 (종이 크기 대비).")]
         [SerializeField, Range(0f, .25f)] private float burstPunch = .09f;
         [Tooltip("#533: 징을 친 뒤 부적이 \"웅~\" 울리며 떨리는 세기 (종이 높이 대비). 징 울림처럼 천천히 잦아든다.")]
@@ -72,11 +76,17 @@ namespace C6Lab
         [SerializeField, Range(0f, .5f)] private float writeVolumeJitter = .2f;
         [Tooltip("앞 연필 소리가 이만큼(0~1) 지나면 계속 칠할 때 다음 소리를 잇는다. 작을수록 촘촘하다.")]
         [SerializeField, Range(.3f, 1f)] private float writeChainAt = .7f;
-        [Tooltip("금빛이 획을 훑기 시작할 때. 기본 JigwiTalismanSweep(가야금 띠리링을 조금 느리게). 예: FiveColorHit, CharmRelease")]
-        [SerializeField] private string sweepSoundFolder = "JigwiTalismanSweep";
+        [Tooltip("#533 완성 가락: \"둥 둥 둥 .. 둥!\" 네 음. 폴더 안 파일을 이름순으로 1~4음에 쓴다. 파일이 4개보다 적으면 있는 파일을 높낮이를 올려(0/2/4/7반음) 채운다.")]
+        [SerializeField] private string noteSoundFolder = "ComboHit";
+        [Tooltip("앞 세 음 크기.")]
+        [SerializeField, Range(0f, 1f)] private float noteSoundVolume = .7f;
+        [Tooltip("마지막 강세 음(\"둥!\") 크기.")]
+        [SerializeField, Range(0f, 1f)] private float accentSoundVolume = 1f;
+        [Tooltip("(가락과 따로) 금빛이 획을 훑기 시작할 때 덧낼 소리. 비우면 없음. 예: JigwiTalismanSweep(가야금 띠리링을 조금 느리게). 예: FiveColorHit, CharmRelease")]
+        [SerializeField] private string sweepSoundFolder = "";
         [SerializeField, Range(0f, 1f)] private float sweepSoundVolume = .7f;
-        [Tooltip("\"쾅\" 순간. 기본 JigwiTalismanChime(띠리링을 한 음 높이고 긴 여운). 예: YaguangShakeBellFinal(방울), YaguangFlashBurst")]
-        [SerializeField] private string burstSoundFolder = "JigwiTalismanChime";
+        [Tooltip("(가락과 따로) \"쾅\" 순간 덧낼 소리. 비우면 없음. 예: JigwiTalismanChime(긴 여운), YaguangShakeBellFinal")]
+        [SerializeField] private string burstSoundFolder = "";
         [SerializeField, Range(0f, 1f)] private float burstSoundVolume = 1f;
         [Tooltip("번졌을 때. 예: Miss, ComboFail")]
         [SerializeField] private string smudgeSoundFolder = "Miss";
@@ -141,6 +151,9 @@ namespace C6Lab
         /// <summary>#533: 점마다 획 순서상 위치 (0~1). 완성 때 금빛이 이 순서로 훑는다.</summary>
         private float[] strokeRank = Array.Empty<float>();
         private AudioSource sfx, scratch;
+        private readonly AudioSource[] notePlayers = new AudioSource[4];
+        private int notesPlayed;
+        private static readonly int[] NoteSemitones = { 0, 2, 4, 7 };
         private AudioClip[] writeClips;
         private string writeClipsFolder;
         private int lastWriteClip = -1;
@@ -172,7 +185,7 @@ namespace C6Lab
         public LabJigwiTalismanStroke Stroke => stroke;
         /// <summary>#509: 다 쓴 부적이 빛나며 사라지는 중인지. 이때 조합판은 이미 풀려 있다.</summary>
         public bool Finishing => finishAge >= 0f;
-        public float FinishSeconds => sweepSeconds + glowSeconds + fadeSeconds;
+        public float FinishSeconds => sweepSeconds + accentPauseSeconds + glowSeconds + fadeSeconds;
         /// <summary>#509: 사라지는 동안의 부적 불투명도 (1 → 0).</summary>
         public float PaperAlpha => paperGroup != null ? paperGroup.alpha : 1f;
 
@@ -255,7 +268,9 @@ namespace C6Lab
                 lastWriteHaptic = Time.unscaledTime;
                 LabHaptics.PlayDirect(Config, LabHapticStyle.Light, writeHapticIntensity);
             }
-            if (stroke.Coverage + 1e-5f < Required) return;
+            // #533: finish only when the letter LOOKS whole — every stroke written end to end with no visible gap —
+            // not merely when enough dots are counted (that used to finish with the ㄹ tail still blank).
+            if (stroke.Coverage + 1e-5f < Required || !stroke.LooksComplete(maxStrokeGap)) return;
             writtenRound = RoundId;
             CompletedCount++;
             Send();
@@ -344,7 +359,7 @@ namespace C6Lab
             paper.gameObject.SetActive(true);
             if (hint != null) hint.gameObject.SetActive(false);
             if (nextMarker != null) nextMarker.gameObject.SetActive(false);
-            burstPlayed = false;
+            burstPlayed = false; notesPlayed = 0;
             Cue("Sweep", sweepSoundFolder, sweepSoundVolume);
             DrawFinish();
         }
@@ -366,16 +381,19 @@ namespace C6Lab
         {
             float sweep = Mathf.Max(.01f, sweepSeconds);
             float sweepT = Mathf.Clamp01(finishAge / sweep);
-            float after = finishAge - sweep;
+            // "둥 둥 둥" — three even notes across the sweep — then a short breath, then the accented "둥!" (the burst).
+            while (notesPlayed < 3 && finishAge >= notesPlayed * sweep / 3f) PlayNote(notesPlayed++);
+            float after = finishAge - sweep - Mathf.Max(0f, accentPauseSeconds);
             if (after >= 0f && !burstPlayed)
             {
                 burstPlayed = true;
+                PlayNote(3);
                 Cue("Burst", burstSoundFolder, burstSoundVolume);
                 LabHaptics.PlayDirect(Config, LabHapticStyle.Heavy, 1f, burstHapticSeconds, burstHapticIntensity, burstHapticSharpness);
             }
             float burst = after < 0f ? 0f : Mathf.Clamp01(after / .35f);
             float bump = after < 0f ? 0f : Mathf.Sin(Mathf.PI * burst);
-            float fade = Mathf.Clamp01((finishAge - sweep - glowSeconds) / Mathf.Max(.01f, fadeSeconds));
+            float fade = Mathf.Clamp01((after - glowSeconds) / Mathf.Max(.01f, fadeSeconds));
             float eased = fade * fade * (3f - 2f * fade);
             Color gold = new Color(glowColor.r, glowColor.g, glowColor.b, 1f);
             // #533 gong hum: after the strike everything trembles and pulses, dying away like a gong's ring.
@@ -484,6 +502,30 @@ namespace C6Lab
             scratch.Play();
             WriteSoundCount++;
         }
+
+        /// <summary>#533: 완성 가락의 index번째 음 (0~2 = "둥", 3 = 강세 "둥!"). 음마다 따로 재생해 앞 음 여운이 끊기지 않는다.</summary>
+        private void PlayNote(int index)
+        {
+            NotesPlayedCount++;
+            if (string.IsNullOrEmpty(noteSoundFolder)) return;
+            AudioClip[] clips = Resources.LoadAll<AudioClip>("Audio/" + noteSoundFolder);
+            if (clips == null || clips.Length == 0) return;
+            Array.Sort(clips, (a, b) => string.CompareOrdinal(a.name, b.name));
+            AudioClip clip; float pitch = 1f;
+            if (clips.Length >= 4) clip = clips[index];
+            else { clip = clips[index % clips.Length]; pitch = Mathf.Pow(2f, NoteSemitones[index] / 12f); }
+            AudioSource player = notePlayers[index];
+            if (player == null)
+            {
+                player = notePlayers[index] = gameObject.AddComponent<AudioSource>();
+                player.playOnAwake = false; player.spatialBlend = 0f;
+            }
+            player.pitch = pitch;
+            player.PlayOneShot(clip, (index == 3 ? accentSoundVolume : noteSoundVolume) * LabAudioSettings.SfxVolume);
+        }
+
+        /// <summary>#533: 테스트용 — 완성 가락 음을 낸 횟수.</summary>
+        public int NotesPlayedCount { get; private set; }
 
         /// <summary>#533: Resources/Audio/폴더의 소리 하나를 이 기기에서만 낸다(파일이 없으면 조용히 넘어감).</summary>
         private void Cue(string name, string folder, float volume)
@@ -996,6 +1038,25 @@ namespace C6Lab
             }
             OffLength += added;
             return added;
+        }
+
+        /// <summary>#533: 획 하나에서 쓰는 방향으로 연달아 빈 점이 가장 길게 이어진 수 (획 끝의 빈 곳도 센다).</summary>
+        public int LongestGap(int strokeIndex)
+        {
+            int longest = 0, run = 0;
+            foreach (int index in strokes[strokeIndex])
+            {
+                run = covered[index] ? 0 : run + 1;
+                if (run > longest) longest = run;
+            }
+            return longest;
+        }
+
+        /// <summary>#533: 모든 획에서 연달아 빈 점이 maxGap 이하 — 눈으로 봐서 글자가 끊긴 곳 없이 다 쓰였는지.</summary>
+        public bool LooksComplete(int maxGap)
+        {
+            for (int s = 0; s < strokes.Length; s++) if (LongestGap(s) > maxGap) return false;
+            return true;
         }
 
         public void Clear()
