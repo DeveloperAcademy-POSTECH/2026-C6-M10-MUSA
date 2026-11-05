@@ -50,16 +50,24 @@ namespace C6Lab
         [SerializeField, Range(.1f, 1.5f)] private float sweepSeconds = .5f;
         [Tooltip("#533: 훑기가 끝난 순간 부적이 \"쾅\" 하고 커지는 정도 (종이 크기 대비).")]
         [SerializeField, Range(0f, .25f)] private float burstPunch = .09f;
-        [Tooltip("#533: 훑기가 끝난 순간 부적이 떨리는 세기 (종이 높이 대비).")]
-        [SerializeField, Range(0f, .05f)] private float burstShake = .012f;
-        [Tooltip("#533: 글자에서 퍼져 나가는 빛 고리가 퍼지는 시간(초).")]
-        [SerializeField, Range(.1f, 1.5f)] private float ringSeconds = .55f;
+        [Tooltip("#533: 징을 친 뒤 부적이 \"웅~\" 울리며 떨리는 세기 (종이 높이 대비). 징 울림처럼 천천히 잦아든다.")]
+        [SerializeField, Range(0f, .05f)] private float burstShake = .014f;
+        [Tooltip("#533: 징 울림 떨림이 잦아드는 빠르기. 클수록 빨리 멎는다.")]
+        [SerializeField, Range(.5f, 6f)] private float humDecay = 1.8f;
+        [Tooltip("#533: 징 울림 떨림/빛 맥박의 빠르기 (초당 번).")]
+        [SerializeField, Range(1f, 20f)] private float humHz = 7f;
+        [Tooltip("#533: 글자에서 퍼져 나가는 빛 고리 하나가 퍼지는 시간(초).")]
+        [SerializeField, Range(.1f, 2f)] private float ringSeconds = .9f;
+        [Tooltip("#533: 징 울림처럼 차례로 퍼지는 빛 고리 수.")]
+        [SerializeField, Range(1, 5)] private int ringCount = 3;
+        [Tooltip("#533: 빛 고리 사이 간격(초).")]
+        [SerializeField, Range(.05f, .8f)] private float ringGapSeconds = .28f;
         [Header("#533 소리 (Resources/Audio 아래 폴더 이름, 폴더 안 파일 중 무작위. 비우면 소리 없음)")]
         [Tooltip("금빛이 획을 훑기 시작할 때. 예: FiveColorHit(가야금 띠리링), CharmRelease, YaguangFlashGlow")]
         [SerializeField] private string sweepSoundFolder = "FiveColorHit";
         [SerializeField, Range(0f, 1f)] private float sweepSoundVolume = .7f;
-        [Tooltip("\"쾅\" 순간. 예: YaguangShakeBellFinal(방울), YaguangFlashBurst, ComboClear")]
-        [SerializeField] private string burstSoundFolder = "YaguangShakeBellFinal";
+        [Tooltip("\"쾅\" 순간. 기본 JigwiTalismanGong(징). 예: YaguangShakeBellFinal(방울), YaguangFlashBurst, ComboClear")]
+        [SerializeField] private string burstSoundFolder = "JigwiTalismanGong";
         [SerializeField, Range(0f, 1f)] private float burstSoundVolume = 1f;
         [Tooltip("번졌을 때. 예: Miss, ComboFail")]
         [SerializeField] private string smudgeSoundFolder = "Miss";
@@ -69,12 +77,16 @@ namespace C6Lab
         [SerializeField, Range(0f, 1f)] private float writeHapticIntensity = .35f;
         [Tooltip("칠하는 진동 사이 최소 간격(초). 너무 자주 울리지 않게.")]
         [SerializeField, Range(.02f, .3f)] private float writeHapticGapSeconds = .07f;
-        [Tooltip("\"쾅\" 진동: 센 탭 한 번 뒤 이만큼 이어지는 진동(초). 0이면 탭만.")]
-        [SerializeField, Range(0f, 1.5f)] private float burstHapticSeconds = .35f;
+        [Tooltip("\"쾅\" 진동: 센 탭 한 번 뒤 징 울림처럼 이만큼 이어지는 진동(초). 0이면 탭만.")]
+        [SerializeField, Range(0f, 2f)] private float burstHapticSeconds = 1f;
+        [Tooltip("이어지는 징 진동 세기 (0~1).")]
+        [SerializeField, Range(0f, 1f)] private float burstHapticIntensity = .6f;
+        [Tooltip("이어지는 징 진동 날카로움 (0 = 둥글고 묵직).")]
+        [SerializeField, Range(0f, 1f)] private float burstHapticSharpness = .15f;
         [Tooltip("번졌을 때 진동 세기. 0이면 끔.")]
         [SerializeField, Range(0f, 1f)] private float smudgeHapticIntensity = .9f;
         [Tooltip("#509: 다 쓴 글씨가 빛나는 시간(초). #533부터 훑기 뒤에 빛난 채 머무는 시간. 그다음 부적이 천천히 사라진다.")]
-        [SerializeField, Range(.1f, 2f)] private float glowSeconds = .6f;
+        [SerializeField, Range(.1f, 3f)] private float glowSeconds = 1.2f;
         [Tooltip("#509: 빛난 뒤 부적이 사라지는 시간(초).")]
         [SerializeField, Range(.2f, 3f)] private float fadeSeconds = 1.2f;
         [Tooltip("#509: 다 쓴 글씨가 빛날 때의 색 (금빛).")]
@@ -114,7 +126,8 @@ namespace C6Lab
         private string writtenRound;
         private float sentAt;
         private readonly LabJigwiTalismanStroke stroke = new LabJigwiTalismanStroke(LabJigwiTalismanStroke.Water, LabJigwiTalismanStroke.WaterStrokes);
-        private UnityEngine.UI.Image nextMarker, burstRing;
+        private UnityEngine.UI.Image nextMarker;
+        private UnityEngine.UI.Image[] burstRings = Array.Empty<UnityEngine.UI.Image>();
         private static Sprite ringSprite;
         /// <summary>#533: 점마다 획 순서상 위치 (0~1). 완성 때 금빛이 이 순서로 훑는다.</summary>
         private float[] strokeRank = Array.Empty<float>();
@@ -343,13 +356,18 @@ namespace C6Lab
             {
                 burstPlayed = true;
                 Cue("Burst", burstSoundFolder, burstSoundVolume);
-                LabHaptics.PlayDirect(Config, LabHapticStyle.Heavy, 1f, burstHapticSeconds, .7f, .3f);
+                LabHaptics.PlayDirect(Config, LabHapticStyle.Heavy, 1f, burstHapticSeconds, burstHapticIntensity, burstHapticSharpness);
             }
             float burst = after < 0f ? 0f : Mathf.Clamp01(after / .35f);
             float bump = after < 0f ? 0f : Mathf.Sin(Mathf.PI * burst);
             float fade = Mathf.Clamp01((finishAge - sweep - glowSeconds) / Mathf.Max(.01f, fadeSeconds));
             float eased = fade * fade * (3f - 2f * fade);
             Color gold = new Color(glowColor.r, glowColor.g, glowColor.b, 1f);
+            // #533 gong hum: after the strike everything trembles and pulses, dying away like a gong's ring.
+            float ring = after < 0f ? 0f : Mathf.Exp(-after * humDecay);
+            float wave = Mathf.Sin(after * humHz * 2f * Mathf.PI);
+            Color hot = Color.Lerp(gold, new Color(1f, .99f, .88f, 1f), .5f + .5f * wave);
+            Color shine = Color.Lerp(gold, hot, ring);
             for (int i = 0; i < dots.Length; i++)
             {
                 if (dots[i] == null) continue;
@@ -364,8 +382,8 @@ namespace C6Lab
                     continue;
                 }
                 if (InkMode && !dots[i].gameObject.activeSelf) dots[i].gameObject.SetActive(true);
-                dots[i].color = Color.Lerp(InkColor(i), gold, lit);
-                float pop = 1f + .35f * Mathf.Sin(Mathf.PI * lit) * (1f - lit * .5f) + .12f * bump;
+                dots[i].color = Color.Lerp(InkColor(i), shine, lit);
+                float pop = 1f + .35f * Mathf.Sin(Mathf.PI * lit) * (1f - lit * .5f) + .12f * bump + .06f * ring * wave;
                 dots[i].rectTransform.localScale = Vector3.one * pop;
             }
             if (ghost != null) ghost.color = Color.Lerp(ghostColor, new Color(1f, .94f, .62f, ghostColor.a), burst);
@@ -375,25 +393,31 @@ namespace C6Lab
                 ghostEdge.color = edge;
                 if (ghostOutline != null) ghostOutline.effectColor = edge;
             }
-            DrawRing(after, gold);
+            DrawRings(after, gold);
             if (paperImage != null) paperImage.color = Color.Lerp(paperColor, new Color(1f, .97f, .85f, paperColor.a), Mathf.Max(burst * .8f, sweepT * .3f));
             if (paperGroup != null) paperGroup.alpha = 1f - eased;
             paper.localScale = Vector3.one * (1f + burstPunch * bump + .05f * eased);
-            float shake = after < 0f ? 0f : burstShake * paper.rect.height * (1f - burst);
-            var jitter = new Vector3(Mathf.Sin(finishAge * 93f) * shake, Mathf.Cos(finishAge * 71f) * shake, 0f);
+            float shake = burstShake * paper.rect.height * ring;
+            var jitter = new Vector3(wave * shake, Mathf.Cos(after * humHz * 1.37f * 2f * Mathf.PI) * shake * .35f, 0f);
             paper.localPosition = finishFrom + jitter + Vector3.up * (paper.rect.height * .06f * eased);
         }
 
-        private void DrawRing(float after, Color gold)
+        /// <summary>#533: 징 울림처럼 빛 고리가 차례로 퍼진다. 뒤 고리일수록 옅고 크게.</summary>
+        private void DrawRings(float after, Color gold)
         {
-            if (burstRing == null) return;
-            float t = after < 0f ? -1f : after / Mathf.Max(.01f, ringSeconds);
-            bool show = t >= 0f && t < 1f;
-            if (burstRing.gameObject.activeSelf != show) burstRing.gameObject.SetActive(show);
-            if (!show) return;
-            float grow = 1f - (1f - t) * (1f - t);
-            burstRing.rectTransform.localScale = Vector3.one * (.35f + 1.9f * grow);
-            Color c = gold; c.a = (1f - t) * .9f; burstRing.color = c;
+            for (int k = 0; k < burstRings.Length; k++)
+            {
+                UnityEngine.UI.Image ringImage = burstRings[k];
+                if (ringImage == null) continue;
+                float local = after - k * ringGapSeconds;
+                float t = after < 0f || local < 0f ? -1f : local / Mathf.Max(.01f, ringSeconds);
+                bool show = k < ringCount && t >= 0f && t < 1f;
+                if (ringImage.gameObject.activeSelf != show) ringImage.gameObject.SetActive(show);
+                if (!show) continue;
+                float grow = 1f - (1f - t) * (1f - t);
+                ringImage.rectTransform.localScale = Vector3.one * (.35f + (1.9f + .5f * k) * grow);
+                Color c = gold; c.a = (1f - t) * .9f / (1f + k * .6f); ringImage.color = c;
+            }
         }
 
         private void EndFinish()
@@ -408,7 +432,7 @@ namespace C6Lab
             if (ghost != null) ghost.color = ghostColor;
             if (ghostEdge != null) ghostEdge.color = ghostOutlineColor;
             if (ghostOutline != null) ghostOutline.effectColor = ghostOutlineColor;
-            if (burstRing != null) burstRing.gameObject.SetActive(false);
+            foreach (UnityEngine.UI.Image ringImage in burstRings) if (ringImage != null) ringImage.gameObject.SetActive(false);
             paper.gameObject.SetActive(Visible);
         }
 
@@ -555,7 +579,8 @@ namespace C6Lab
             glyphArea.sizeDelta = new Vector2(side, side);
             float dot = Mathf.Max(4f, side * (InkMode ? brushWidth : strokeWidth));
             if (nextMarker != null) nextMarker.rectTransform.sizeDelta = Vector2.one * Mathf.Max(6f, side * .07f);
-            if (burstRing != null) { burstRing.rectTransform.sizeDelta = Vector2.one * side * .8f; burstRing.rectTransform.anchoredPosition = Vector2.zero; }
+            foreach (UnityEngine.UI.Image ringImage in burstRings)
+                if (ringImage != null) { ringImage.rectTransform.sizeDelta = Vector2.one * side * .8f; ringImage.rectTransform.anchoredPosition = Vector2.zero; }
             if (InkMode && FitGhost(side, dot)) return;
             for (int i = 0; i < dots.Length; i++)
                 if (dots[i] != null) dots[i].rectTransform.sizeDelta = new Vector2(dot, dot);
@@ -663,12 +688,17 @@ namespace C6Lab
             nextMarker = NewRect("Talisman Next Stroke", glyphArea).gameObject.AddComponent<UnityEngine.UI.Image>();
             nextMarker.raycastTarget = false; nextMarker.sprite = RoundDot(); nextMarker.color = nextMarkerColor;
             nextMarker.gameObject.SetActive(false);
-            // #533: the light ring that bursts out of the finished letter.
-            burstRing = NewRect("Talisman Burst Ring", glyphArea).gameObject.AddComponent<UnityEngine.UI.Image>();
-            burstRing.raycastTarget = false; burstRing.sprite = RingSprite();
+            // #533: light rings that ripple out of the finished letter with the gong (up to the slider's maximum).
             Vector2 heart = InkMode ? GlyphInkRect.center : SampleBounds(stroke.Samples).center;
-            burstRing.rectTransform.anchorMin = burstRing.rectTransform.anchorMax = heart;
-            burstRing.gameObject.SetActive(false);
+            burstRings = new UnityEngine.UI.Image[5];
+            for (int k = 0; k < burstRings.Length; k++)
+            {
+                var ringImage = NewRect("Talisman Burst Ring " + k, glyphArea).gameObject.AddComponent<UnityEngine.UI.Image>();
+                ringImage.raycastTarget = false; ringImage.sprite = RingSprite();
+                ringImage.rectTransform.anchorMin = ringImage.rectTransform.anchorMax = heart;
+                ringImage.gameObject.SetActive(false);
+                burstRings[k] = ringImage;
+            }
             BuildStrokeRank();
             LayoutGlyph();
             paper.gameObject.SetActive(false);
