@@ -828,8 +828,8 @@ namespace Hapio
 
         public void ExitRun()
         {
-            // Quitting the tutorial (#477) is not a lost game: it leaves for the room list.
-            if (tutorialRun) { FinishTutorial(); return; }
+            // Quitting the tutorial (#477) is not a lost game: the pause menu's 나가기 goes back to the title screen.
+            if (tutorialRun) { QuitTutorialToTitle(); return; }
             if (state.phase == GameFlowPhase.Home || state.phase == GameFlowPhase.Lobby
                 || state.phase == GameFlowPhase.Completed || state.phase == GameFlowPhase.GameOver)
             { GoHome(); return; }

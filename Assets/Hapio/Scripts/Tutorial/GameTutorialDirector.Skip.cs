@@ -109,6 +109,10 @@ namespace Hapio
             Label(rect, label, art.dialogueFont, art.skipChoiceFontSize);
             Button button = frame.gameObject.AddComponent<Button>();
             button.onClick.AddListener(pressed);
+            // A finger on it lifts it a little.
+            GameTutorialPressScale lift = frame.gameObject.AddComponent<GameTutorialPressScale>();
+            lift.pressedScale = art.skipChoicePressScale;
+            lift.seconds = art.skipChoicePressSeconds;
             return button;
         }
 

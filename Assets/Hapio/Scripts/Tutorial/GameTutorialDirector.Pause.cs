@@ -9,11 +9,14 @@ namespace Hapio
     /// - 일시정지 중에는 튜토리얼 화면 전체가 투명해지고 눌림을 받지 않아, 원래 일시정지 메뉴(계속·나가기)가 보이고 눌린다.
     ///   튜토리얼 시계도 멈추고, 계속하면 그대로 이어진다.
     /// - 일시정지 메뉴의 DEV 설정(개발 빌드 전용)은 혼자 판을 다시 시작할 수 있어 튜토리얼에서는 숨긴다.
+    /// - 메뉴에 RESTART를 더한다: QUIT RUN 자리에 놓고 QUIT RUN은 한 칸 아래(숨긴 DEV 자리)로 내린다. 누르면 연습 판이 처음부터
+    ///   다시 열린다. QUIT RUN은 튜토리얼에서 타이틀 화면으로 간다.
     /// </summary>
     public sealed partial class GameTutorialDirector
     {
         private CanvasGroup overlayGroup;
         private Image pauseProxy;
+        private Button restartButton;
 
         /// <summary>The battle is paused: the tutorial screen has stepped aside for the pause menu.</summary>
         public bool IsSteppedAsideForPause { get; private set; }
@@ -41,6 +44,7 @@ namespace Hapio
         private bool UpdatePause()
         {
             bool paused = BattlePaused && !finishing;
+            if (paused) EnsureRestartButton();
             if (paused != IsSteppedAsideForPause)
             {
                 IsSteppedAsideForPause = paused;
@@ -53,6 +57,37 @@ namespace Hapio
             if (paused) return true;
             PlacePauseProxy();
             return false;
+        }
+
+        /// <summary>The pause menu's RESTART, made once from its QUIT RUN button: in QUIT RUN's place, which moves one row down.</summary>
+        private void EnsureRestartButton()
+        {
+            if (restartButton != null || hud.returnLobbyButton == null || hud.resumeButton == null) return;
+            var quit = (RectTransform)hud.returnLobbyButton.transform;
+            var resume = (RectTransform)hud.resumeButton.transform;
+            GameObject copy = Instantiate(hud.returnLobbyButton.gameObject, quit.parent, false);
+            copy.name = "Tutorial Restart Button";
+            restartButton = copy.GetComponent<Button>();
+            restartButton.onClick = new Button.ButtonClickedEvent();
+            restartButton.onClick.AddListener(PressRestart);
+            restartButton.interactable = true;
+            foreach (Text label in copy.GetComponentsInChildren<Text>(true)) label.text = GameTutorialScript.RestartLabel;
+            copy.SetActive(true);
+            copy.transform.SetSiblingIndex(quit.GetSiblingIndex());
+            if (resume.parent == quit.parent)
+            {
+                Vector2 row = quit.anchoredPosition - resume.anchoredPosition;
+                ((RectTransform)copy.transform).anchoredPosition = quit.anchoredPosition;
+                quit.anchoredPosition += row;
+            }
+        }
+
+        /// <summary>The practice board starts over from its loading cover and first line.</summary>
+        private void PressRestart()
+        {
+            if (restartButton == null || !restartButton.interactable || !session.RestartTutorial()) return;
+            restartButton.interactable = false;
+            Debug.Log("C6_LAB_TUTORIAL_RESTART step=" + stepIndex + " beat=" + beatIndex);
         }
 
         /// <summary>The invisible button lies exactly over the HUD's pause button, above the screen-wide tap catcher.</summary>

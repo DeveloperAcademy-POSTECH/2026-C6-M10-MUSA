@@ -5,7 +5,8 @@ namespace Hapio
     /// <summary>
     /// 튜토리얼 (#477). 오프닝이 끝나면 방 목록 전에 이 기기 혼자 3자리 연습 판을 연다. 나(불이)는 가운데, 왼쪽 묵이와 오른쪽
     /// 금옥이는 화면에만 있는 가상 이웃이다. 앱을 켤 때마다 첫 게임 시작에 한 번이며 저장하지 않는다(오프닝과 같은 규칙).
-    /// 끝나거나 그만두거나 준비에 실패하면 결과·Game Over 없이 Home의 방 목록으로 간다.
+    /// 끝나거나 건너뛰거나 준비에 실패하면 결과·Game Over 없이 Home의 방 목록으로 간다. 일시정지 메뉴의 나가기는 타이틀
+    /// 화면으로, RESTART는 연습 판을 처음부터 다시 연다.
     /// </summary>
     public sealed partial class GameSession
     {
@@ -53,18 +54,36 @@ namespace Hapio
             return true;
         }
 
-        /// <summary>Leave the practice board straight for Home's room list, with no result or Game Over.</summary>
-        public void FinishTutorial()
+        /// <summary>Leave the practice board straight for Home's room list, with no result or Game Over (the end, or 건너뛰기).</summary>
+        public void FinishTutorial() => LeaveTutorial(true);
+
+        /// <summary>The pause menu's 나가기 on the practice board: back to the title screen, not the room list.</summary>
+        public void QuitTutorialToTitle() => LeaveTutorial(false);
+
+        private void LeaveTutorial(bool toRooms)
         {
             if (!tutorialRun) return;
             tutorialRun = false;
             goingHome = true;
+            if (!toRooms) roomBrowserVisible = false;
             network.Stop();
             network.UnbindBattleReferences();
             ResetRoomFlow();
             SetLocalState(new GameFlowState());
             goingHome = false;
-            EnterRoomBrowser();
+            if (toRooms) EnterRoomBrowser();
+            else Changed?.Invoke();
+        }
+
+        /// <summary>
+        /// The pause menu's RESTART on the practice board: it starts over from its first line, through the same loading
+        /// cover as the first time (the stage restart the DEV panel uses). Host only, while it is being played.
+        /// </summary>
+        public bool RestartTutorial()
+        {
+            if (!tutorialRun || !network.IsHost || state.phase != GameFlowPhase.Playing || restartPending) return false;
+            restartPending = true;
+            return true;
         }
 
         /// <summary>The tutorial's closing fade (#477): the persistent cover darkens Battle and lifts once Home is drawn.</summary>

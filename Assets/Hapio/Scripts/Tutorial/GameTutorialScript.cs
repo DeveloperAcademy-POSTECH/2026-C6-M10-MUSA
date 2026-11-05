@@ -50,8 +50,11 @@ namespace Hapio
         /// (왼쪽은 되튕김). 폭탄은 무거워 더 세게 밀어야 해서 손 안내가 더 빠르다.
         /// </summary>
         PassBomb,
-        /// <summary>금옥이가 돌려준 폭탄(자물쇠 1→0)이 내 판에서 멈춰 공격 구슬 두 개로 열릴 때까지 기다린다. 화면은 누를 수 없다.</summary>
-        WaitBombOpen,
+        /// <summary>
+        /// 금옥이가 돌려준 폭탄(자물쇠 1→0, 무지개색)이 내 판에 들어와 멈출 때까지 기다린다. 폭탄은 아직 열리지 않는다.
+        /// 화면은 누를 수 없다. 다음 대사 "풀렸다!"와 함께 공격 구슬 두 개로 열린다.
+        /// </summary>
+        WaitBombBack,
         /// <summary>
         /// 요괴가 내 판 오른쪽 끝을 막는다(실제 박의 넘기기 막기). 막힌 가장자리가 빨갛게 세 번 번쩍이는 동안 기다리고,
         /// 그다음 대사가 뜬다. 화면은 누를 수 없다. 막기는 시간이 흐르지 않고, 북을 묵이에게 넘길 때 풀린다.
@@ -72,8 +75,13 @@ namespace Hapio
         GiveBack,
         /// <summary>박이 내 판에 자물쇠 2짜리 폭탄을 떨어뜨린다 (5단계, 박 폭탄 경고·요괴 연출과 함께).</summary>
         DropBomb,
-        /// <summary>금옥이가 받은 폭탄을 "앗 뜨거!" 하며 도로 넘겨준다. 넘어오며 자물쇠가 0이 된다 (5단계).</summary>
-        ReturnBomb
+        /// <summary>
+        /// 금옥이가 받은 폭탄을 "앗 뜨거!" 하며 도로 넘겨준다. 넘어오며 자물쇠가 0이 되어 무지개색이 되지만, 내 판에 멈춰도
+        /// 아직 열리지 않는다 (5단계).
+        /// </summary>
+        ReturnBomb,
+        /// <summary>"풀렸다!": 멈춰 기다리던 무지개 폭탄이 이 대사와 함께 공격 구슬 두 개로 열린다 (5단계).</summary>
+        OpenBomb
     }
 
     /// <summary>
@@ -157,6 +165,8 @@ namespace Hapio
         public const string SkipBody = "튜토리얼을 건너뛰면 구슬 전달과 조합 등\n기본 조작을 익히지 못해\n협동 플레이에 어려움이 있을 수 있소.";
         public const string SkipStay = "계속 배우기";
         public const string SkipLeave = "건너뛰기";
+        /// <summary>튜토리얼 일시정지 메뉴에 더하는 버튼: 연습 판을 처음부터 다시 연다. 메뉴의 다른 버튼(CONTINUE·QUIT RUN)과 같은 말투.</summary>
+        public const string RestartLabel = "RESTART";
 
         /// <summary>1단계에서 북을 세 번 치면 나오는 구슬: 음 2개·양 1개라 2단계에서 한 쌍을 합치고 음 하나가 남는다.</summary>
         public static readonly IReadOnlyList<LabOrbKind> DrumResults =
@@ -317,8 +327,8 @@ namespace Hapio
             Geumok("요괴가 던진 폭탄이야!\n적힌 숫자만큼 옆으로 넘기면 풀려.", GameTutorialFocus.Bomb),
             GameTutorialBeat.Do(GameTutorialAction.PassBomb, "폭탄을 오른쪽 금옥이에게 넘기시오", GameTutorialFocus.None),
             Geumok("앗 뜨거! 도로 받아!", cue: GameTutorialCue.ReturnBomb),
-            GameTutorialBeat.Do(GameTutorialAction.WaitBombOpen, string.Empty, GameTutorialFocus.None),
-            Geumok("풀렸다!"),
+            GameTutorialBeat.Do(GameTutorialAction.WaitBombBack, string.Empty, GameTutorialFocus.None),
+            Geumok("풀렸다!", cue: GameTutorialCue.OpenBomb),
             Geumok("풀린 폭탄은 오행 구슬 두 개가 돼."),
             Bul("가만히 냅두면 터지니까\n얼른얼른 넘겨야겠네!"));
 

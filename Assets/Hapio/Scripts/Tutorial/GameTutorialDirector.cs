@@ -67,10 +67,6 @@ namespace Hapio
         // The tease stays up even while an orb is held, and the word that follows it once it ends.
         private bool remarkHolds;
         private string remarkThen;
-        private RectTransform mirror;
-        private CanvasGroup mirrorGroup;
-        private Image mirrorDrum;
-        private float mirrorAt = -1f;
         private int giveBackStage;
         private float giveBackAt = -1f;
         private float wrongSideReturnAt = -1f;
@@ -559,8 +555,15 @@ namespace Hapio
                 // The yokai drops a two-lock bomb on my board, with the gourd's warning.
                 if (beat.Cue == GameTutorialCue.DropBomb)
                     session.Network.TutorialDropGourdBomb(GameTutorialScript.BombLanding, GameTutorialScript.BombLocks);
-                // "앗 뜨거! 도로 받아!": 금옥이 passes the bomb back, and its last lock comes off on the way.
-                if (beat.Cue == GameTutorialCue.ReturnBomb) bombReturnAt = Now + art.bombReturnDelay;
+                // "앗 뜨거! 도로 받아!": 금옥이 passes the bomb back, and its last lock comes off on the way. It turns rainbow but
+                // waits on my board, unopened, for "풀렸다!".
+                if (beat.Cue == GameTutorialCue.ReturnBomb)
+                {
+                    board.SetBombOpeningHeld(true);
+                    bombReturnAt = Now + art.bombReturnDelay;
+                }
+                // "풀렸다!": now it opens into its two attack orbs.
+                if (beat.Cue == GameTutorialCue.OpenBomb) board.SetBombOpeningHeld(false);
                 return;
             }
             BeginAction(beat);
@@ -682,7 +685,7 @@ namespace Hapio
                     hand.gameObject.SetActive(art.hand != null);
                     arrow.gameObject.SetActive(true);
                     break;
-                case GameTutorialAction.WaitBombOpen:
+                case GameTutorialAction.WaitBombBack:
                     board.SetAllowedGestures(LabBoardGestures.None);
                     break;
                 case GameTutorialAction.WatchBlock:
@@ -830,89 +833,6 @@ namespace Hapio
             hand.color = new Color(1f, 1f, 1f, alpha);
         }
 
-        private void BuildMirror()
-        {
-            mirror = new GameObject("Geumok Mirror", typeof(RectTransform), typeof(CanvasGroup), typeof(RectMask2D))
-                .GetComponent<RectTransform>();
-            mirror.SetParent(overlay, false);
-            Center(mirror);
-            mirror.sizeDelta = art.mirrorSize;
-            mirrorGroup = mirror.GetComponent<CanvasGroup>();
-            mirrorGroup.blocksRaycasts = mirrorGroup.interactable = false;
-            Image paper = AddImage("Her Board", mirror, art.mirrorColor, null, false);
-            Stretch(paper.rectTransform);
-            Outline border = paper.gameObject.AddComponent<Outline>();
-            border.effectColor = art.mirrorBorderColor;
-            border.effectDistance = new Vector2(2f, -2f);
-            LabDrumMinimap minimap = FindInBattle<LabDrumMinimap>();
-            mirrorDrum = AddImage("Arriving Drum", mirror, Color.white,
-                art.mirrorDrum != null ? art.mirrorDrum : minimap != null ? minimap.drumIconSprite : null, false);
-            mirrorDrum.preserveAspect = true;
-            mirrorDrum.rectTransform.sizeDelta = Vector2.one * art.mirrorDrumSize;
-            Image face = AddImage("Geumok", mirror, Color.white, art.geumok, false);
-            face.preserveAspect = true;
-            face.rectTransform.sizeDelta = Vector2.one * art.mirrorFaceSize;
-            face.rectTransform.anchoredPosition = new Vector2(art.mirrorSize.x * .5f - art.mirrorFaceSize * .45f,
-                -art.mirrorSize.y * .5f + art.mirrorFaceSize * .45f);
-            mirror.gameObject.SetActive(false);
-        }
-
-        /// <summary>
-        /// The mirror over one showing (t = 0..1): it slides in from the right edge, the drum slides into 금옥이's board
-        /// from its left and settles with a little overshoot, it holds, then slides back out. offset is 1 fully outside.
-        /// </summary>
-        public static void MirrorPose(float t, out float offset, out float alpha, out float drumTravel)
-        {
-            t = Mathf.Clamp01(t);
-            if (t < .15f)
-            {
-                float u = t / .15f;
-                offset = 1f - u * (2f - u);
-                alpha = u;
-                drumTravel = 0f;
-                return;
-            }
-            if (t < .85f)
-            {
-                offset = 0f;
-                alpha = 1f;
-                float v = Mathf.Clamp01((t - .15f) / .4f) - 1f;
-                const float back = 1.70158f;
-                drumTravel = 1f + (back + 1f) * v * v * v + back * v * v;
-                return;
-            }
-            // InverseLerp divides the same difference by itself at the end, so the window is exactly gone at t = 1.
-            float w = Mathf.InverseLerp(.85f, 1f, t);
-            offset = w * w;
-            alpha = 1f - w;
-            drumTravel = 1f;
-        }
-
-        private void PlaceMirror()
-        {
-            if (mirrorAt < 0f) return;
-            float t = (Now - mirrorAt) / art.mirrorSeconds;
-            if (t >= 1f)
-            {
-                mirrorAt = -1f;
-                mirror.gameObject.SetActive(false);
-                return;
-            }
-            MirrorPose(t, out float offset, out float alpha, out float drumTravel);
-            Rect bounds = overlay.rect;
-            Vector2 size = art.mirrorSize;
-            // Just above 금옥이's face, against the right edge, like a rear-view glimpse of her screen.
-            float bottom = portraits[GameTutorialScript.SeatOf(GameTutorialSpeaker.Geumok)] != null
-                && TryOverlayRect(portraits[GameTutorialScript.SeatOf(GameTutorialSpeaker.Geumok)].rectTransform, out Rect face)
-                ? face.yMax + 6f : bounds.center.y;
-            float restX = bounds.xMax - art.screenMargin - size.x * .5f;
-            mirror.anchoredPosition = new Vector2(restX + offset * (size.x + art.screenMargin * 2f), bottom + size.y * .5f);
-            mirrorGroup.alpha = alpha;
-            float startX = -size.x * .5f - art.mirrorDrumSize * .5f;
-            mirrorDrum.rectTransform.anchoredPosition = new Vector2(Mathf.LerpUnclamped(startX, 0f, drumTravel), 0f);
-        }
-
-        /// <summary>4단계: the hand drags the drum to the right edge along the arrow, again and again.</summary>
         /// <summary>4·6단계: the hand drags the drum to one side's edge (+1 right to 금옥이, -1 left to 묵이).</summary>
         private void PlacePassGuide(int side)
         {
@@ -941,7 +861,7 @@ namespace Hapio
             {
                 float wait = successAt >= 0f ? art.afterActionSeconds : art.afterRefillSeconds;
                 // The drum is seen arriving in 금옥이's mirror before she thanks.
-                if (beat.Action == GameTutorialAction.PassDrum) wait = Mathf.Max(wait, art.mirrorSeconds);
+                if (beat.Action == GameTutorialAction.PassDrum) wait = Mathf.Max(wait, mirrorDuration);
                 if (Now - actionDoneAt >= wait) Advance();
                 return;
             }
@@ -985,10 +905,11 @@ namespace Hapio
                         CompleteAction(true);
                     }
                     break;
-                case GameTutorialAction.WaitBombOpen:
-                    // Done once no bomb is left anywhere: it opened into its two orbs, in the same snapshot. It may
-                    // already have opened while "앗 뜨거!" was still up, so nothing is counted from this beat's start.
-                    if (!TryBomb(out _) && Now - shownAt >= .3f) CompleteAction(false);
+                case GameTutorialAction.WaitBombBack:
+                    // Done once the unlocked bomb is back on my board and has come to rest (held unopened), or if no bomb
+                    // is left at all.
+                    if (Now - shownAt >= .3f && (!TryBomb(out LabOrbState back) || back.owner == session.Network.LocalPlayerId
+                        && back.lockSwipes == 0 && board.IsBombAtRest(back.id))) CompleteAction(false);
                     break;
                 case GameTutorialAction.WatchBlock:
                     if (Now - shownAt >= art.blockWarningSeconds) CompleteAction(false);
@@ -1008,9 +929,7 @@ namespace Hapio
                     {
                         actionProgress = 1;
                         CompleteAction(true);
-                        mirrorAt = Now;
-                        mirror.gameObject.SetActive(true);
-                        PlaceMirror();
+                        StartMirror(drum);
                     }
                     else if (drum.owner == LabNetwork.TutorialLeftSeatId && wrongSideReturnAt < 0f)
                     {
@@ -1057,6 +976,7 @@ namespace Hapio
         private void BeginFinish()
         {
             finishing = true;
+            board.SetBombOpeningHeld(false);
             ListenToThrows(false);
             board.SetAllowedGestures(LabBoardGestures.None);
             session.Network.TutorialAllowPasses();
@@ -1164,15 +1084,33 @@ namespace Hapio
                 copy.sizeDelta = faceRect.size;
             }
             else tip = new Vector2(bounds.center.x, bounds.yMin + bounds.height * .3f);
+            bubbleRoot.anchoredPosition = KeepOnScreen(tip, bubbleRoot.pivot, art.bubbleSize);
+        }
 
-            Vector2 size = art.bubbleSize, pivot = bubbleRoot.pivot;
+        /// <summary>The bubble's tail point, moved only as far as needed to keep the whole bubble on screen.</summary>
+        private Vector2 KeepOnScreen(Vector2 tip, Vector2 pivot, Vector2 size)
+        {
+            Rect bounds = overlay.rect;
             float margin = art.screenMargin;
             float left = tip.x - pivot.x * size.x, right = left + size.x;
             float top = tip.y + (1f - pivot.y) * size.y;
             if (left < bounds.xMin + margin) tip.x += bounds.xMin + margin - left;
             else if (right > bounds.xMax - margin) tip.x -= right - (bounds.xMax - margin);
             if (top > bounds.yMax - margin) tip.y -= top - (bounds.yMax - margin);
-            bubbleRoot.anchoredPosition = tip;
+            return tip;
+        }
+
+        /// <summary>Where a speaker's bubble tail touches their face (the upper inner shoulder), or a fallback.</summary>
+        private Vector2 TailTip(GameTutorialSpeaker speaker)
+        {
+            Image face = portraits[GameTutorialScript.SeatOf(speaker)];
+            bool fromRight = speaker == GameTutorialSpeaker.Geumok;
+            if (face == null || !TryOverlayRect(face.rectTransform, out Rect faceRect))
+                return new Vector2(overlay.rect.center.x, overlay.rect.yMin + overlay.rect.height * .3f);
+            float shoulder = .15f * Mathf.Min(faceRect.width, faceRect.height);
+            return fromRight
+                ? new Vector2(faceRect.xMin + shoulder - art.tailGap.x, faceRect.yMax - shoulder + art.tailGap.y)
+                : new Vector2(faceRect.xMax - shoulder + art.tailGap.x, faceRect.yMax - shoulder + art.tailGap.y);
         }
 
         private void PlaceHand()

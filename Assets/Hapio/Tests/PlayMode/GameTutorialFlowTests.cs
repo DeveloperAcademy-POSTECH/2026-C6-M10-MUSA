@@ -335,12 +335,17 @@ namespace Hapio.Tests
             Assert.That(director.CurrentBeat.Cue, Is.EqualTo(GameTutorialCue.ReturnBomb));
             yield return Until(() => network.Snapshot.orbs.Any(orb => orb.kind == LabOrbKind.Bomb
                 && orb.owner == network.LocalPlayerId && orb.lockSwipes == 0), "금옥이 sends it back, the last lock off", 10f);
-            // Left up a while, the bubble does not stop the step: the bomb may open before the tap.
+            // Unlocked (rainbow) it rests on my board but does not open while "앗 뜨거!" is up, however long.
             yield return new WaitForSecondsRealtime(2.5f);
+            LabOrbState waiting = network.Snapshot.orbs.Single(orb => orb.kind == LabOrbKind.Bomb);
+            Assert.That((waiting.owner, waiting.lockSwipes), Is.EqualTo((network.LocalPlayerId, 0)), "Still a bomb, unopened.");
+            Assert.That((board.BombOpeningHeld, board.IsBombAtRest(waiting.id)), Is.EqualTo((true, true)));
             yield return TapThrough(director, tap, art);
-            yield return Until(() => director.CurrentBeat.IsLine, "It opens and \"풀렸다!\"", 15f);
+            yield return Until(() => director.CurrentBeat.IsLine, "\"풀렸다!\" once it is back and still", 15f);
+            Assert.That(director.CurrentBeat.Cue, Is.EqualTo(GameTutorialCue.OpenBomb));
+            // With "풀렸다!" it opens into its two attack orbs.
+            yield return Until(() => !network.Snapshot.orbs.Any(orb => orb.kind == LabOrbKind.Bomb), "It opens with \"풀렸다!\"", 3f);
             LabOrbState[] opened = network.Snapshot.orbs.Where(orb => orb.owner == network.LocalPlayerId).ToArray();
-            Assert.That(opened.Any(orb => orb.kind == LabOrbKind.Bomb), Is.False);
             Assert.That(opened.Count(orb => orb.kind == LabOrbKind.Combined && orb.element != LabOrbElement.None),
                 Is.GreaterThanOrEqualTo(2), "Two elemental orbs for 6단계.");
             for (int line = 0; line < 3; line++) yield return TapThrough(director, tap, art);
@@ -394,7 +399,9 @@ namespace Hapio.Tests
                 && director.IsShowingLine, "The practice board plays its first line", 30f);
             session.ExitRun();
             Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.Home), "Quitting is not a Game Over.");
-            yield return Until(() => !session.IsLoadingScene && session.RoomBrowserVisible, "Room list after quitting", 30f);
+            yield return Until(() => !session.IsLoadingScene && SceneManager.GetActiveScene().path == GameScenePaths.Home,
+                "Home after quitting", 30f);
+            Assert.That(session.RoomBrowserVisible, Is.False, "The pause menu's 나가기 goes back to the title screen.");
             Assert.That(session.IsTutorial, Is.False);
             Assert.That(session.TryStartTutorial(), Is.False, "The tutorial does not come back in the same run.");
         }
@@ -431,6 +438,61 @@ namespace Hapio.Tests
                 && session.RoomBrowserVisible, "Skipping leaves for the room list", 30f);
             Assert.That(session.IsTutorial, Is.False);
             Assert.That(session.TryStartTutorial(), Is.False, "The tutorial does not come back in the same run.");
+        }
+
+        [UnityTest]
+        public IEnumerator PauseMenuRestartStartsThePracticeBoardOverAndQuitGoesToTheTitle()
+        {
+            yield return SceneManager.LoadSceneAsync(GameScenePaths.Home, LoadSceneMode.Single);
+            yield return Until(() => GameSession.Instance != null && !GameSession.Instance.IsLoadingScene, "Saved Home bootstrap");
+            session = GameSession.Instance;
+            session.Network.port = AvailablePort();
+            yield return null;
+            Assert.That(session.TryStartTutorial(), Is.True);
+            GameTutorialDirector first = null;
+            yield return Until(() => (first = Object.FindFirstObjectByType<GameTutorialDirector>()) != null && first.IsShowingLine,
+                "The practice board plays its first line", 30f);
+            GameTutorialArt art = GameTutorialArt.Load();
+            var buttons = first.GetComponentsInChildren<UnityEngine.UI.Button>(true);
+            yield return new WaitForSecondsRealtime(art.tapCooldown + .05f);
+            buttons.Single(button => button.name == "Tap To Continue").onClick.Invoke();
+            Assert.That(first.BeatIndex, Is.EqualTo(1));
+            yield return null;
+            buttons.Single(button => button.name == "Pause").onClick.Invoke();
+            yield return Until(() => session.Network.IsBattlePaused && first.IsSteppedAsideForPause, "Paused", 5f);
+
+            // RESTART sits where QUIT RUN was; QUIT RUN moves one row down into the hidden DEV row.
+            LabHud hud = Object.FindFirstObjectByType<GameBattleBindings>().hud;
+            var restart = hud.pauseMenu.GetComponentsInChildren<UnityEngine.UI.Button>(true)
+                .Single(button => button.name == "Tutorial Restart Button");
+            var resume = (RectTransform)hud.resumeButton.transform;
+            var quit = (RectTransform)hud.returnLobbyButton.transform;
+            var restartRect = (RectTransform)restart.transform;
+            Assert.That(restart.gameObject.activeInHierarchy && restart.interactable, Is.True);
+            Assert.That(restart.GetComponentInChildren<UnityEngine.UI.Text>(true).text, Is.EqualTo(GameTutorialScript.RestartLabel));
+            float row = restartRect.anchoredPosition.y - resume.anchoredPosition.y;
+            Assert.That(row, Is.LessThan(0f), "Below CONTINUE.");
+            Assert.That(quit.anchoredPosition.y - restartRect.anchoredPosition.y, Is.EqualTo(row).Within(.01f), "QUIT RUN one row lower.");
+            LogAssert.Expect(LogType.Log, new System.Text.RegularExpressions.Regex("^C6_LAB_TUTORIAL_RESTART step=0 beat=1$"));
+            restart.onClick.Invoke();
+            restart.onClick.Invoke();
+            GameTutorialDirector again = null;
+            yield return Until(() => (again = Object.FindFirstObjectByType<GameTutorialDirector>()) != null && again != first
+                && again.IsShowingLine, "The practice board opens again on its first line", 30f);
+            Assert.That((again.StepIndex, again.BeatIndex), Is.EqualTo((0, 0)), "From the very start.");
+            Assert.That(session.IsTutorial, Is.True);
+            Assert.That(session.Network.IsBattlePaused, Is.False, "Not paused any more.");
+            Assert.That(session.Network.Snapshot.drums[0].owner, Is.EqualTo(session.Network.LocalPlayerId), "A fresh board.");
+
+            // QUIT RUN from the pause menu goes back to the title screen.
+            yield return null;
+            again.GetComponentsInChildren<UnityEngine.UI.Button>(true).Single(button => button.name == "Pause").onClick.Invoke();
+            yield return Until(() => session.Network.IsBattlePaused && again.IsSteppedAsideForPause, "Paused again", 5f);
+            Object.FindFirstObjectByType<GameBattleBindings>().hud.returnLobbyButton.onClick.Invoke();
+            yield return Until(() => session.State.phase == GameFlowPhase.Home && !session.IsLoadingScene
+                && SceneManager.GetActiveScene().path == GameScenePaths.Home, "Home after QUIT RUN", 30f);
+            Assert.That(session.RoomBrowserVisible, Is.False, "The title screen, not the room list.");
+            Assert.That(session.IsTutorial, Is.False);
         }
 
         /// <summary>Wait out the tap cooldown, tap once, and check the next beat came.</summary>

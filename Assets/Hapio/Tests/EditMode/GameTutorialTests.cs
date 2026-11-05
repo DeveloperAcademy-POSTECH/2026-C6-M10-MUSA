@@ -477,7 +477,7 @@ namespace Hapio.Tests
             CollectionAssert.AreEqual(new[]
             {
                 GameTutorialAction.None, GameTutorialAction.None, GameTutorialAction.PassBomb, GameTutorialAction.None,
-                GameTutorialAction.WaitBombOpen, GameTutorialAction.None, GameTutorialAction.None, GameTutorialAction.None
+                GameTutorialAction.WaitBombBack, GameTutorialAction.None, GameTutorialAction.None, GameTutorialAction.None
             }, beats.Select(beat => beat.Action).ToArray());
             CollectionAssert.AreEqual(new[]
             {
@@ -494,7 +494,8 @@ namespace Hapio.Tests
             Assert.That(beats[1].Focus, Is.EqualTo(GameTutorialFocus.Bomb), "The bomb is lit while 금옥이 explains it.");
             Assert.That(beats[3].Cue, Is.EqualTo(GameTutorialCue.ReturnBomb), "\"앗 뜨거!\" passes it straight back.");
             Assert.That(GameTutorialDirector.BannerText(beats[2], 0), Is.EqualTo("폭탄을 오른쪽 금옥이에게 넘기시오"));
-            Assert.That(string.IsNullOrEmpty(beats[4].Text), Is.True, "Waiting for it to open shows no banner.");
+            Assert.That(string.IsNullOrEmpty(beats[4].Text), Is.True, "Waiting for it to come back shows no banner.");
+            Assert.That(beats[5].Cue, Is.EqualTo(GameTutorialCue.OpenBomb), "It opens with \"풀렸다!\", not before.");
             // Two locks: one comes off going to 금옥이, the last coming back, so it opens on my board.
             Assert.That(GameTutorialScript.BombLocks, Is.EqualTo(2));
             var art = ScriptableObject.CreateInstance<GameTutorialArt>();
@@ -663,18 +664,43 @@ namespace Hapio.Tests
         }
 
         [Test]
-        public void MirrorSlidesInShowsTheDrumArriveAndSlidesOut()
+        public void MirrorPopsLikeABubbleThenTheDrumBrakesEvenlyToRestThenFades()
         {
-            GameTutorialDirector.MirrorPose(0f, out float offset, out float alpha, out float drum);
-            Assert.That((offset, alpha, drum), Is.EqualTo((1f, 0f, 0f)), "Starts outside the right edge.");
-            GameTutorialDirector.MirrorPose(.15f, out offset, out alpha, out drum);
-            Assert.That((offset, alpha, drum), Is.EqualTo((0f, 1f, 0f)));
-            GameTutorialDirector.MirrorPose(.45f, out _, out _, out drum);
-            Assert.That(drum, Is.GreaterThan(1f), "Overshoots a little as it lands.");
-            GameTutorialDirector.MirrorPose(.7f, out offset, out _, out drum);
-            Assert.That((offset, drum), Is.EqualTo((0f, 1f)));
-            GameTutorialDirector.MirrorPose(1f, out offset, out alpha, out _);
-            Assert.That((offset, alpha), Is.EqualTo((1f, 0f)), "Gone again.");
+            const float pop = .28f, glide = 1f, hold = .5f, fade = .15f, overshoot = 1.1f;
+            GameTutorialDirector.MirrorWindow(0f, pop, glide, hold, fade, overshoot, out float scale, out float alpha, out float drum);
+            Assert.That((scale, alpha, drum), Is.EqualTo((0f, 1f, 0f)), "Pops up from nothing; the drum waits at the edge.");
+            GameTutorialDirector.MirrorWindow(pop, pop, glide, hold, fade, overshoot, out scale, out _, out drum);
+            Assert.That((scale, drum), Is.EqualTo((1f, 0f)), "Popped to size, then the drum comes in.");
+            GameTutorialDirector.MirrorWindow(pop + glide * .5f, pop, glide, hold, fade, overshoot, out _, out _, out drum);
+            Assert.That(drum, Is.EqualTo(.75f).Within(1e-4f), "Even braking: three quarters of the way at half the time.");
+            GameTutorialDirector.MirrorWindow(pop + glide, pop, glide, hold, fade, overshoot, out _, out alpha, out drum);
+            Assert.That((drum, alpha), Is.EqualTo((1f, 1f)), "At rest on its spot, still shown.");
+            GameTutorialDirector.MirrorWindow(pop + glide + hold + fade * .5f, pop, glide, hold, fade, overshoot, out _, out alpha, out _);
+            Assert.That(alpha, Is.EqualTo(.5f).Within(1e-4f), "Fades after holding.");
+            Assert.That(GameTutorialDirector.MirrorTotal(pop, glide, hold, fade), Is.EqualTo(pop + glide + hold + fade).Within(1e-5f));
+
+            // The same arrival as a real board: a gentle pass is sped up to rest within 1.2 s, a hard one capped.
+            Assert.That(GameTutorialDirector.MirrorGlideSeconds(.5f, LabOrbBoard.StopArrivalSpeed(.01f, .5f)),
+                Is.EqualTo(1.2f).Within(1e-4f));
+            float hard = LabOrbBoard.StopArrivalSpeed(50f, .5f);
+            Assert.That(hard, Is.EqualTo(Mathf.Sqrt(2f * 8f * .5f)).Within(1e-4f), "Brakes no harder than a real board.");
+            Assert.That(LabOrbBoard.StopArrivalSpeed(-3f, .5f), Is.EqualTo(3f).Within(1e-4f), "Either way it was swiped.");
+            var art = ScriptableObject.CreateInstance<GameTutorialArt>();
+            try { Assert.That(art.mirrorViewMinWidth, Is.GreaterThan(.5f), "The window reaches past the middle, where it rests."); }
+            finally { Object.DestroyImmediate(art); }
+        }
+
+        [Test]
+        public void ChoiceButtonsLiftALittleUnderAFingerAndSettleBack()
+        {
+            Assert.That(GameTutorialPressScale.Approach(1f, 1.08f, 1.08f, .08f, .04f), Is.EqualTo(1.04f).Within(1e-4f),
+                "Half way in half the time.");
+            Assert.That(GameTutorialPressScale.Approach(1.04f, 1.08f, 1.08f, .08f, .1f), Is.EqualTo(1.08f).Within(1e-4f),
+                "Then holds.");
+            Assert.That(GameTutorialPressScale.Approach(1.08f, 1f, 1.08f, .08f, .1f), Is.EqualTo(1f).Within(1e-4f), "And back.");
+            var art = ScriptableObject.CreateInstance<GameTutorialArt>();
+            try { Assert.That(art.skipChoicePressScale, Is.InRange(1.02f, 1.15f), "A little, not a jump."); }
+            finally { Object.DestroyImmediate(art); }
         }
 
         [Test]

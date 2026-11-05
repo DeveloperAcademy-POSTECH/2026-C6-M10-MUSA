@@ -4923,3 +4923,61 @@ Consolidated three byte-identical textures into shared material references; conf
   - 1초 동안 장면이 안 넘어가는지.
   - "계속"으로 같은 대사로 돌아오는지.
 - **미실행:** Play에서 일시정지 → 계속 / 나가기, iPhone 실기기.
+
+### #477 튜토리얼 폭탄 열리는 시점 · 일시정지 메뉴 나가기·RESTART — 2026-11-05
+
+- **폭탄 시점 (사용자 지적):** 지금까지는 "앗 뜨거! 도로 받아!"와 함께 돌아온 폭탄이 바로 열렸다. 그래서 "풀렸다!" 대사와 시점이 어긋나 보였다.
+  - "앗 뜨거! 도로 받아!": 금옥이가 폭탄을 돌려주며 마지막 잠금이 풀려 **무지개색(해금) 폭탄**이 된다. 내 판에 들어와 멈추지만 열리지 않고 기다린다.
+    - 판에 "해금 폭탄 열기 멈춤"을 더했다: `LabOrbBoard.SetBombOpeningHeld`. 판을 정리하거나 튜토리얼이 끝날 때 풀린다.
+  - 이 대사를 빨리 넘기면, 폭탄이 돌아와 멈출 때까지 화면을 막고 기다린다. 이 장면이 `WaitBombOpen`에서 바뀐 `WaitBombBack`다.
+  - **"풀렸다!"**: 이 대사와 함께 멈춤을 풀어, 0.2초 뒤 연기와 함께 공격 구슬 두 개로 열린다. 열리는 방식은 실제 게임과 같다.
+- **일시정지 메뉴 (튜토리얼에서만):**
+  - **QUIT RUN → 타이틀 화면.** 방 목록 대신 Home 첫 화면("게임 시작")으로 간다(`QuitTutorialToTitle`). 끝까지 하거나 건너뛰면 지금처럼 방 목록이다.
+  - **RESTART 추가.** 실행 중에 QUIT RUN 버튼을 복제해 QUIT RUN 자리에 놓고, QUIT RUN은 한 칸 아래(튜토리얼에서 숨긴 DEV 자리, 70pt 아래)로 내린다.
+    - 누르면 기존 스테이지 다시 시작과 같은 길(`restartPending` → Battle 다시 불러오기)로 연습 판이 처음부터, "튜토리얼 준비 중…" 가림막과 함께 다시 열린다.
+    - 여러 번 눌러도 한 번만 처리하고, 로그 `C6_LAB_TUTORIAL_RESTART step=N beat=M`을 남긴다.
+    - 씬 파일은 바꾸지 않았다.
+  - 글자는 메뉴의 다른 버튼과 같이 영어로 썼다("RESTART").
+
+| 실행한 확인 | 결과 |
+| --- | --- |
+| 컴파일 · Console 오류 | **PASS**: compilationFailed=false, 오류 0, 튜토리얼 스크립트 경고 0 |
+| 일시정지 메뉴 배치 (씬 파일 읽기) | **PASS**: CONTINUE −107, QUIT RUN −177, DEV −247, 같은 부모·고정 위치(줄 간격 70). RESTART는 −177, QUIT RUN은 −247로 간다 |
+
+- **새·수정 검사 (NOT_RUN):**
+  - EditMode: 5단계 장면 `WaitBombBack`, "풀렸다!"의 여는 신호.
+  - PlayMode 흐름 검사: 돌아온 폭탄이 2.5초 동안 열리지 않고 멈춰 있는지, "풀렸다!"와 함께 열리는지.
+  - PlayMode 나가기 검사: 이제 타이틀 화면(방 목록 아님)으로 가는지.
+  - PlayMode 새 검사: RESTART의 위치·글자, 두 번 눌러도 한 번, 연습 판이 0단계 첫 대사부터 새 판으로 다시 열리고 일시정지가 풀리는지. 그다음 QUIT RUN으로 타이틀 화면에 가는지.
+- **미실행:** Play에서 무지개 폭탄이 기다리는 모습과 "풀렸다!" 시점, RESTART·QUIT RUN 흐름, iPhone 실기기.
+
+### #477 튜토리얼 경고 창 버튼 커짐 · 금옥이 미니 창을 실제 판으로 — 2026-11-05
+
+- **버튼:** 건너뛰기 경고 창의 "계속 배우기"·"건너뛰기"에 손가락을 대고 있는 동안(마우스는 올려 둔 동안) 1.08배로 0.08초 만에 커진다. 떼거나 벗어나면 돌아온다(`GameTutorialPressScale`).
+  - 크기만 바꾸고 눌림 처리는 버튼이 그대로 한다. 누를 수 없는 상태에서는 커지지 않는다.
+  - 값은 `TutorialArt`의 `skipChoicePressScale`·`skipChoicePressSeconds`에서 고친다.
+- **금옥이 미니 창 (사용자 시안: 금옥이 화면에서 북이 들어오는 모습):** 4단계에서 북이 금옥이에게 넘어가면 다음 순서로 보인다.
+  1. 금옥이 말풍선과 같은 그림·자리(꼬리가 금옥이 얼굴)에 창이 말풍선처럼 커지며 뜬다. 뒤이은 "고마워!" 말풍선이 같은 자리에 뜬다.
+  2. 창 안은 실제 판 그림(`OrbBoardPlate`의 `CombinationBoard`)에서 금옥이 판의 북이 들어오는 쪽을 잘라 보여 준다.
+     - 가로: 왼쪽 끝부터 멈출 자리 너머 판 너비 0.25까지, 최소 0.6.
+     - 세로: 넘긴 높이. 북은 창 아래에서 35% 높이를 지나, 위쪽(판 테두리 쪽)이 더 보인다.
+     - 판 그림의 실제 위치(렌더러 범위)와 판 영역(CenterBounds)으로 그림 좌표를 계산한다.
+  3. 북은 실제 판의 북 그림(`GenerateButton`)이다. 실제 판이 넘겨받은 북을 멈추는 것과 같은 계산으로 움직인다(`LabOrbBoard.StopArrivalSpeed`로 공개, 실제 판도 이 함수를 쓴다).
+     - 넘긴 빠르기로 들어오되, 1.2초 안에 서도록 빠르게 하고, 판 너비 8/s²보다 세게 서지 않게 한다.
+     - 들어온 뒤 고르게 감속해 금옥이 판의 멈출 자리(모델의 stopAt, 48~52%)에 선다.
+  4. 0.5초 머문 뒤 0.15초 동안 사라진다. 창이 떠 있는 시간은 정해진 1.8초가 아니라 이 길이를 다 더한 값이다. "성공!" 뒤 다음 대사도 그만큼 기다린다.
+  - 예전의 그린 창(색 상자 + 미니맵 북 + 금옥이 얼굴, 오른쪽에서 밀려 들어옴)과 그 값 5개(`mirrorSize`·`mirrorSeconds`·`mirrorBorderColor`·`mirrorDrumSize`·`mirrorFaceSize`)를 지웠다.
+  - 새 값: `mirrorViewPastStop` 0.25, `mirrorViewMinWidth` 0.6, `mirrorDrumHeightInView` 0.35, `mirrorHoldSeconds` 0.5, `mirrorFadeSeconds` 0.15. `mirrorColor`는 판 그림이 없을 때만 쓴다.
+  - 코드는 `GameTutorialDirector.Mirror.cs`로 옮겼다.
+
+| 실행한 확인 | 결과 |
+| --- | --- |
+| 컴파일 · Console 오류 (`mirrorDrumHeightInView` 추가 전) | **PASS**: compilationFailed=false, 오류 0 |
+| 판 그림·북 그림 (Editor 안) | **PASS**: 판 재질 셰이더 Sprites/Default, 주 텍스처 `CombinationBoard`. 북 그림 `GenerateButton` |
+| `mirrorDrumHeightInView` 추가 뒤 컴파일 · 에셋 저장 | **NOT_RUN**: 그사이 사용자가 Play를 시작해 멈춤. Play가 끝난 뒤 한다 |
+
+- **새 검사 (NOT_RUN):**
+  - EditMode 미니 창 시간표: 커지며 뜸 → 북이 반 시간에 3/4 지점 → 멈춘 뒤 머묾 → 사라짐.
+  - EditMode 실제 판과 같은 들어오는 빠르기: 느리면 1.2초, 세면 상한, 방향 무관.
+  - EditMode 버튼 커지기·돌아오기.
+- **미실행:** Play에서 미니 창 모양(시안 비교)·판 그림 자른 위치·북 크기, 버튼 커짐 느낌, iPhone 실기기.

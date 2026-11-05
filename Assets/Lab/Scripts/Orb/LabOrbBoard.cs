@@ -998,11 +998,22 @@ namespace C6Lab
             else
             {
                 float distance = Mathf.Max(0f, (entry.ArrivalStopX - XY(body.position).x) * entry.ArrivalDirection);
-                float slowest = 2f * distance / ArrivalMaxSeconds;
-                float fastest = Mathf.Sqrt(2f * ArrivalMaxBrake * bounds.width * distance);
-                along = Mathf.Clamp(along, slowest, Mathf.Max(slowest, fastest));
+                along = StopArrivalSpeed(along / bounds.width, distance / bounds.width) * bounds.width;
             }
             body.linearVelocity = OnPlane(new Vector2(entry.ArrivalDirection * along, velocity.y));
+        }
+
+        /// <summary>
+        /// The speed (board widths per second) a drum handed over at <paramref name="along"/> enters with to stop
+        /// <paramref name="distance"/> board widths in: sped up to arrive within ArrivalMaxSeconds, slowed to brake no
+        /// harder than ArrivalMaxBrake. It then brakes evenly, so it rests after 2 × distance ÷ speed seconds.
+        /// </summary>
+        public static float StopArrivalSpeed(float along, float distance)
+        {
+            distance = Mathf.Max(0f, distance);
+            float slowest = 2f * distance / ArrivalMaxSeconds;
+            float fastest = Mathf.Sqrt(2f * ArrivalMaxBrake * distance);
+            return Mathf.Clamp(Mathf.Abs(along), slowest, Mathf.Max(slowest, fastest));
         }
 
         /// <summary>
@@ -1388,6 +1399,7 @@ namespace C6Lab
         {
             CancelDrag();
             LiftSwipeBlock();
+            bombOpeningHeld = false;
             SetTeamWall(0);
             charmed = false;
             jigwiOverheat = false;
@@ -1829,13 +1841,28 @@ namespace C6Lab
         private static bool UnlockedBomb(Entry entry) => entry.View != null && entry.View.Kind == LabOrbKind.Bomb
             && entry.View.LockSwipes == 0;
 
+        private bool bombOpeningHeld;
+
+        /// <summary>
+        /// 튜토리얼 (#477): while held, an unlocked bomb that came to rest stays a (rainbow) bomb instead of opening; released,
+        /// it opens as usual a moment later. Cleared with the board.
+        /// </summary>
+        public void SetBombOpeningHeld(bool held) => bombOpeningHeld = held;
+
+        public bool BombOpeningHeld => bombOpeningHeld;
+
+        /// <summary>This board's own unlocked bomb has arrived and come to rest: it would open now unless held.</summary>
+        public bool IsBombAtRest(string id) => id != null && entries.TryGetValue(id, out Entry entry) && UnlockedBomb(entry)
+            && entry.LocalOwner && !entry.Provisional && entry.Arrival == LabDrumArrival.None && !entry.Dropping
+            && !entry.Held && !entry.Locked && !entry.EdgePending && !entry.HiddenForPending;
+
         /// <summary>
         /// 해금 폭탄 (#328): 잠금이 풀린 폭탄이 이 판에 미끄러져 들어와 멈추면 잠깐 뒤 연기와 함께 사라지고, 그 자리를 Host에
         /// 알려 공격 구슬 두 개로 연다. 열 수 없다는 답이 오면 잠시 뒤 다시 묻는다. 잠금이 풀린 폭탄은 잡을 수 없다.
         /// </summary>
         private void OpenRestingBombs()
         {
-            if (!interactionEnabled) return;
+            if (!interactionEnabled || bombOpeningHeld) return;
             updateEntries.Clear();
             updateEntries.AddRange(entries.Values);
             foreach (Entry entry in updateEntries)

@@ -97,14 +97,18 @@ namespace Hapio
         [Tooltip("구슬 중심이 판 옆 끝에서 떨어져 멈추는 최소 거리 (판 너비 비율). 더 미끄러져도 이 안쪽에서 멈춘다.")]
         [Range(.05f, .4f)] public float drumLaunchEdgeMargin = .1f;
 
-        [Header("금옥이 화면 미니 창 (4단계: 넘긴 북을 받는 모습)")]
-        [Tooltip("비워 두면 북 미니맵의 태극 북 그림을 쓴다")] public Sprite mirrorDrum;
-        public Vector2 mirrorSize = new Vector2(150f, 100f);
-        [Min(.5f)] public float mirrorSeconds = 1.8f;
-        public Color mirrorColor = new Color(.96f, .91f, .8f, 1f);
-        public Color mirrorBorderColor = new Color(.33f, .24f, .17f, 1f);
-        [Min(10f)] public float mirrorDrumSize = 46f;
-        [Min(10f)] public float mirrorFaceSize = 42f;
+        [Header("금옥이 화면 미니 창 (4단계: 넘긴 북이 금옥이 판에 들어오는 모습)")]
+        [Tooltip("금옥이 말풍선 자리에 뜨는 창. 안에는 실제 판 그림에서 금옥이 판의 북이 들어오는 쪽을 잘라 보여 주고, 실제 북 그림이 " +
+            "실제 판과 같은 빠르기·감속으로 미끄러져 들어와 멈춘다. 비워 두면 판의 북 그림을 쓴다.")]
+        public Sprite mirrorDrum;
+        [Tooltip("창이 보여 주는 판의 폭: 북이 멈출 자리보다 판 너비의 이 비율만큼 더 (오른쪽 여유)")]
+        [Range(0f, 1f)] public float mirrorViewPastStop = .25f;
+        [Tooltip("창이 보여 주는 판의 최소 폭 (판 너비 비율)")] [Range(.2f, 1f)] public float mirrorViewMinWidth = .6f;
+        [Tooltip("창 안에서 북이 지나가는 높이 (아래 0 ~ 위 1). 낮을수록 위쪽 판 테두리 쪽이 더 보인다. 판 그림 밖으로는 넘지 않는다.")]
+        [Range(.1f, .9f)] public float mirrorDrumHeightInView = .35f;
+        [Tooltip("북이 멈춘 뒤 창이 머무는 시간")] [Min(0f)] public float mirrorHoldSeconds = .5f;
+        [Tooltip("창이 사라지는 시간")] [Min(.01f)] public float mirrorFadeSeconds = .15f;
+        [Tooltip("판 그림이 없을 때 창 안을 채우는 색")] public Color mirrorColor = new Color(.96f, .91f, .8f, 1f);
 
         [Header("돌려주기 (4·5단계)")]
         [Tooltip("\"고마워!\" 대사가 뜬 뒤 금옥이가 양구슬을 돌려줄 때까지")] [Min(0f)] public float giveBackDelay = .35f;
@@ -138,6 +142,8 @@ namespace Hapio
         [Tooltip("두 버튼 사이")] [Min(0f)] public float skipChoiceGap = 12f;
         [Tooltip("창 아래 끝에서 버튼까지")] [Min(0f)] public float skipChoiceDrop = 10f;
         [Min(8)] public int skipChoiceFontSize = 16;
+        [Tooltip("\"계속 배우기\"·\"건너뛰기\"에 손가락을 대고 있는 동안의 크기 (제 크기 1)")] [Min(1f)] public float skipChoicePressScale = 1.08f;
+        [Tooltip("커지거나 돌아오는 데 걸리는 시간")] [Min(.01f)] public float skipChoicePressSeconds = .08f;
         [Tooltip("\"계속 배우기\"를 누른 뒤 창이 사라지는 시간 (빠르게)")] [Min(.01f)] public float skipCloseSeconds = .12f;
 
         [Header("화살표 (끌어 놓을 방향)")]
