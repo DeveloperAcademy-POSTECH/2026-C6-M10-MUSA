@@ -24,8 +24,12 @@ namespace C6Lab
         [SerializeField] private Color inkColor = new Color(.72f, .11f, .07f, 1f);
         [Tooltip("#533: 아직 안 쓴 글자 획 색. 둥근 점이 겹치므로 불투명으로 둔다(반투명이면 겹친 곳이 얼룩진다).")]
         [SerializeField] private Color guideColor = new Color(.79f, .67f, .4f, 1f);
-        [Tooltip("#479: 손가락이 지나가 칠해진 점선 색 (물빛 파랑).")]
-        [SerializeField] private Color writtenColor = new Color(.1f, .42f, .95f, 1f);
+        [Tooltip("#479/#533: 손가락이 지나가 칠해진 획 색. #533부터 먹색(붓글씨).")]
+        [SerializeField] private Color writtenColor = new Color(.16f, .08f, .1f, 1f);
+        [Tooltip("#533: 아직 안 쓴 \"물\" 글자(실제 글꼴)를 흐리게 깔아 두는 색.")]
+        [SerializeField] private Color ghostColor = new Color(.88f, .76f, .48f, 1f);
+        [Tooltip("#533: 먹 붓 굵기 (글자 칸 대비). 지나간 곳의 글자 획을 이만큼 채운다(글자 모양 밖으로는 안 번진다). 판정 거리와는 따로다.")]
+        [SerializeField, Range(.06f, .3f)] private float brushWidth = .16f;
         [Tooltip("#509: 다 쓴 글씨가 빛나는 시간(초). 그다음 부적이 천천히 사라진다.")]
         [SerializeField, Range(.1f, 2f)] private float glowSeconds = .6f;
         [Tooltip("#509: 빛난 뒤 부적이 사라지는 시간(초).")]
@@ -48,6 +52,11 @@ namespace C6Lab
         private UnityEngine.UI.Image frameImage;
         private static Texture2D hanji;
         private static Sprite roundDot;
+        /// <summary>#533: 신라문화체 굵은 "물"의 글자 모양 범위 (판정 점과 같은 글자 칸 0~1 좌표, 위가 1). 점선에 맞춰 잰 값.</summary>
+        private static readonly Rect GlyphInkRect = Rect.MinMaxRect(.149f, .081f, .848f, .92f);
+        private LabJigwiTalismanGlyph glyph;
+        /// <summary>#533: 실제 글꼴 글자 위에 먹으로 쓰는 모양인지 (신라문화체가 없으면 예전 점선 모양).</summary>
+        public bool InkMode => glyph != null;
         private UnityEngine.UI.Image[] dots = Array.Empty<UnityEngine.UI.Image>();
         private UnityEngine.UI.Text hint;
         private Font font;
@@ -82,6 +91,7 @@ namespace C6Lab
             if (labelFont != null) font = labelFont;
             EnsureWidgets();
             if (labelFont != null && hint != null) hint.font = labelFont;
+            if (glyph != null && IsShilla(labelFont)) glyph.GlyphFont = labelFont;
         }
 
         /// <summary>아직 부적을 안 쓴 내 자리가 있는 진행 중인 A. 없으면 null.</summary>
@@ -136,7 +146,7 @@ namespace C6Lab
             fresh.Clear();
             stroke.Paint(from, to, Tolerance, fresh);
             for (int i = 0; i < fresh.Count; i++)
-                if (fresh[i] < dots.Length && dots[fresh[i]] != null) dots[fresh[i]].color = writtenColor;
+                if (fresh[i] < dots.Length && dots[fresh[i]] != null) ShowWritten(dots[fresh[i]]);
             if (stroke.Coverage + 1e-5f < Required) return;
             writtenRound = RoundId;
             CompletedCount++;
@@ -145,6 +155,12 @@ namespace C6Lab
             SetBoardBlocked(false);
             // #509: the written "물" glows, then the talisman slowly fades away (the board is already free).
             BeginFinish();
+        }
+
+        private void ShowWritten(UnityEngine.UI.Image dot)
+        {
+            dot.color = writtenColor;
+            if (InkMode) dot.gameObject.SetActive(true);
         }
 
         private void BeginFinish()
@@ -242,7 +258,12 @@ namespace C6Lab
         private void ResetWriting()
         {
             stroke.Clear(); hasLast = false; writtenRound = null;
-            for (int i = 0; i < dots.Length; i++) if (dots[i] != null) dots[i].color = guideColor;
+            for (int i = 0; i < dots.Length; i++)
+            {
+                if (dots[i] == null) continue;
+                if (InkMode) { dots[i].gameObject.SetActive(false); dots[i].color = writtenColor; }
+                else dots[i].color = guideColor;
+            }
         }
 
         private void SetBoardBlocked(bool value)
@@ -286,15 +307,17 @@ namespace C6Lab
         {
             if (glyphArea == null || paper == null) return;
             Vector2 size = paper.rect.size;
-            Rect bounds = SampleBounds(stroke.Samples);
-            float spanX = Mathf.Max(.05f, bounds.width + strokeWidth), spanY = Mathf.Max(.05f, bounds.height + strokeWidth);
+            // #533: with the real glyph the letter's own outline sets the size; the old dotted look pads by its stroke width.
+            Rect bounds = InkMode ? GlyphInkRect : SampleBounds(stroke.Samples);
+            float pad = InkMode ? 0f : strokeWidth;
+            float spanX = Mathf.Max(.05f, bounds.width + pad), spanY = Mathf.Max(.05f, bounds.height + pad);
             float side = Mathf.Max(1f, Mathf.Min(size.x * glyphWidthShare / spanX, size.y * .72f / spanY));
             glyphArea.anchorMin = glyphArea.anchorMax = glyphArea.pivot = new Vector2(.5f, .5f);
             // Put the letter's own centre (not the box centre) a little below the paper centre, under the hint.
             Vector2 centre = bounds.center;
             glyphArea.anchoredPosition = new Vector2((.5f - centre.x) * side, -size.y * .06f + (.5f - centre.y) * side);
             glyphArea.sizeDelta = new Vector2(side, side);
-            float dot = Mathf.Max(4f, side * strokeWidth);
+            float dot = Mathf.Max(4f, side * (InkMode ? brushWidth : strokeWidth));
             for (int i = 0; i < dots.Length; i++)
                 if (dots[i] != null) dots[i].rectTransform.sizeDelta = new Vector2(dot, dot);
         }
@@ -323,13 +346,29 @@ namespace C6Lab
             hintRect.offsetMin = hintRect.offsetMax = Vector2.zero;
             hint.resizeTextForBestFit = true; hint.resizeTextMinSize = 10; hint.resizeTextMaxSize = 28;
             glyphArea = NewRect("Talisman Glyph (물)", paper);
+            // #533: the real Shilla Culture "물" lies faintly on the paper and masks the ink, so written ink only shows
+            // inside the letter's shape (a brush, not sausage dots). Without the font it falls back to the dotted guide.
+            RectTransform dotParent = glyphArea;
+            if (IsShilla(font))
+            {
+                glyph = NewRect("Talisman Ghost Glyph (물)", glyphArea).gameObject.AddComponent<LabJigwiTalismanGlyph>();
+                glyph.raycastTarget = false; glyph.color = ghostColor; glyph.GlyphFont = font;
+                RectTransform g = glyph.rectTransform;
+                g.anchorMin = GlyphInkRect.min; g.anchorMax = GlyphInkRect.max; g.offsetMin = g.offsetMax = Vector2.zero;
+                glyph.gameObject.AddComponent<UnityEngine.UI.Mask>().showMaskGraphic = true;
+                dotParent = g;
+            }
             dots = new UnityEngine.UI.Image[stroke.Samples.Length];
             for (int i = 0; i < dots.Length; i++)
             {
-                var dot = NewRect("Dot " + i, glyphArea).gameObject.AddComponent<UnityEngine.UI.Image>();
-                dot.raycastTarget = false; dot.color = guideColor; dot.sprite = RoundDot();
-                dot.rectTransform.anchorMin = dot.rectTransform.anchorMax = stroke.Samples[i];
+                var dot = NewRect("Dot " + i, dotParent).gameObject.AddComponent<UnityEngine.UI.Image>();
+                dot.raycastTarget = false; dot.sprite = RoundDot();
+                Vector2 at = stroke.Samples[i];
+                if (InkMode) at = new Vector2((at.x - GlyphInkRect.xMin) / GlyphInkRect.width, (at.y - GlyphInkRect.yMin) / GlyphInkRect.height);
+                dot.rectTransform.anchorMin = dot.rectTransform.anchorMax = at;
                 dot.rectTransform.anchoredPosition = Vector2.zero;
+                dot.color = InkMode ? writtenColor : guideColor;
+                if (InkMode) dot.gameObject.SetActive(false);
                 dots[i] = dot;
             }
             LayoutGlyph();
@@ -375,6 +414,9 @@ namespace C6Lab
             hanji.SetPixels(pixels); hanji.Apply(false, true);
             return hanji;
         }
+
+        private static bool IsShilla(Font candidate) =>
+            candidate != null && candidate.name.IndexOf("Shilla", StringComparison.OrdinalIgnoreCase) >= 0;
 
         private static Rect SampleBounds(Vector2[] samples)
         {
