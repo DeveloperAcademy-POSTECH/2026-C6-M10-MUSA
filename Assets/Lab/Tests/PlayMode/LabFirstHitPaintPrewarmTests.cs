@@ -22,6 +22,7 @@ namespace C6Lab.Tests
         [TearDown]
         public void ReleaseSharedFields() => LabWatercolorBrushDistance.ReleaseShared();
 
+        [Category("GPU")]
         [UnityTest]
         public IEnumerator TheSharedDistanceFieldMatchesAFreshBuildAndOutlivesItsRuntime()
         {
@@ -47,6 +48,7 @@ namespace C6Lab.Tests
             Assert.Throws<ArgumentOutOfRangeException>(() => LabWatercolorBrushDistance.GetOrCreate(LabPaintPattern.Legacy, brush));
         }
 
+        [Category("GPU")]
         [UnityTest]
         public IEnumerator AfterPrewarmTheFirstStampLoadsNoBrushAndBuildsNoDistanceField()
         {
@@ -68,6 +70,7 @@ namespace C6Lab.Tests
             yield return null;
         }
 
+        [Category("GPU")]
         [UnityTest]
         public IEnumerator PrewarmLeavesTheRuntimesAndTheirImagesExactlyAsWithout()
         {

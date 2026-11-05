@@ -11,6 +11,7 @@ using Object = UnityEngine.Object;
 namespace C6Lab.Tests
 {
     /// <summary>Saved shell/shader comparison fixtures, separate from real projectile/network validation.</summary>
+    [Category("GPU")]
     public sealed class LabPaintClusterRenderTests
     {
         private static readonly Color Earlier = new Color(32f / 255f, 49f / 255f, 79f / 255f);

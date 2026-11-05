@@ -6,6 +6,7 @@ using UnityEngine;
 namespace C6Lab.Tests
 {
     /// <summary>Host surface admission/ledger tests, not device or LAN verification.</summary>
+    [Category("Legacy")]
     public sealed class LabPaintBlockingTests
     {
         private const float OneCellShare = .390625f;

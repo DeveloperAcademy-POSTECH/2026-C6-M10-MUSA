@@ -15,6 +15,7 @@ namespace C6Lab.Tests
     /// Explicit map-growth/render fixtures using the saved WhiteGourd mesh and production
     /// shader. No projectile, collision, network approval, or actual game victory is claimed.
     /// </summary>
+    [Category("GPU"), Category("Legacy")]
     public sealed class LabPaintSpreadFlowRenderTests
     {
         private const uint Seed = 198u;

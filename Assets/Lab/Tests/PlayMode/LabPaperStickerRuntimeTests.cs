@@ -11,6 +11,7 @@ using Object = UnityEngine.Object;
 namespace C6Lab.Tests
 {
     /// <summary>Real GPU checks for the opaque path; not device or aesthetic approval.</summary>
+    [Category("Slow"), Category("GPU"), Category("Legacy")]
     public sealed class LabPaperStickerRuntimeTests
     {
         const int Columns = 64, Rows = 32, OutputColumns = 1024;

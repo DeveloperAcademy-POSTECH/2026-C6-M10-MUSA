@@ -125,6 +125,7 @@ namespace C6Lab.Tests
                 LabRoomPresence.Encode("bad;protocol", true, true, 1, 2, false));
         }
 
+        [Category("Bonjour")]
         [Test]
         public void PendingTwoPlayerRoomReservesUniquePortsUntilDisposedWithoutStartingAHost()
         {

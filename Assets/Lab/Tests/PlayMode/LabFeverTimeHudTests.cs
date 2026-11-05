@@ -10,6 +10,7 @@ namespace C6Lab.Tests
     /// Fever time (#334) on screen: the "두배" bubble out of a puff above the stamina bar's right end, the start banner,
     /// the red breathing screen edges and the time left in red.
     /// </summary>
+    [Category("Legacy")]
     public sealed class LabFeverTimeHudTests
     {
         private GameObject root;

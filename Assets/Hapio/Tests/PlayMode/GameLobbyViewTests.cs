@@ -14,6 +14,7 @@ using Object = UnityEngine.Object;
 namespace Hapio.Tests
 {
     /// <summary>Saved Figma controls exercise the persistent game session; a pointer-click is dispatched only after raycast verification.</summary>
+    [Category("Slow")]
     public sealed class GameLobbyViewTests
     {
         private GameSession session;
@@ -93,6 +94,7 @@ namespace Hapio.Tests
             Assert.That(view.directConnectionPanel.activeSelf, Is.False);
         }
 
+        [Category("Bonjour")]
         [UnityTest]
         public IEnumerator CreatingARoomAutomaticallyEntersTheGameLobbyAndHostCanChooseClearAndCreateAnotherRoom()
         {
@@ -175,6 +177,7 @@ namespace Hapio.Tests
             Assert.That(session.PendingRooms, Is.Empty);
         }
 
+        [Category("Bonjour")]
         [UnityTest]
         public IEnumerator EnteringAndLeavingACreatedRoomDarkenOverTheHeldScreenThenBrightenOnTheNextOne()
         {
@@ -236,6 +239,7 @@ namespace Hapio.Tests
             Assert.That(view.browserPage.activeInHierarchy, Is.True);
         }
 
+        [Category("Bonjour")]
         [UnityTest]
         public IEnumerator PendingAutomaticCreationCanBeCanceledOrTimedOutWithoutLeavingAnAdvertisedRoom()
         {
@@ -269,6 +273,7 @@ namespace Hapio.Tests
             Assert.That(session.PendingRooms, Is.Empty);
         }
 
+        [Category("Bonjour")]
         [UnityTest]
         public IEnumerator TerritoryCreateButtonAlsoEntersItsFourPlayerLobbyAutomatically()
         {
@@ -291,6 +296,7 @@ namespace Hapio.Tests
             Assert.That(View().teamLayout.activeInHierarchy, Is.True);
         }
 
+        [Category("Bonjour")]
         [UnityTest]
         public IEnumerator TerritoryLobbyKeepsFourPlayerReadinessAndRestoresStoryTypography()
         {
@@ -346,6 +352,7 @@ namespace Hapio.Tests
             Assert.That(view.sealButton.GetComponentInChildren<UnityEngine.UI.Text>().fontSize, Is.EqualTo(storySealSize));
         }
 
+        [Category("Bonjour")]
         [UnityTest]
         public IEnumerator OneOnOneRoomShowsOneSeatInEachTeamBoxWithoutTeamLines()
         {
@@ -366,6 +373,7 @@ namespace Hapio.Tests
             Assert.That(view.sealButton.GetComponentInChildren<UnityEngine.UI.Text>().text, Is.EqualTo("땅따먹기 대기"));
         }
 
+        [Category("Bonjour")]
         [UnityTest]
         public IEnumerator ThreeOnThreeRoomShowsOneTeamPageAtATimeStartingWithBlue()
         {
@@ -416,6 +424,7 @@ namespace Hapio.Tests
             session.State.mode = GameMode.Territory;
         }
 
+        [Category("Bonjour")]
         [UnityTest]
         public IEnumerator DevSoloAfterLeavingASixPlayerRoomStartsAloneInsteadOfReopeningIt()
         {
@@ -476,6 +485,7 @@ namespace Hapio.Tests
             }
         }
 
+        [Category("Bonjour")]
         [UnityTest]
         public IEnumerator ALobbyThatLosesItsConnectionLeavesLikeTheLeaveButtonAndShowsWhy()
         {
@@ -499,6 +509,7 @@ namespace Hapio.Tests
             Assert.That(View().message.text, Is.EqualTo("방과의 연결이 끊어졌소."));
         }
 
+        [Category("Bonjour")]
         [UnityTest]
         public IEnumerator DirectGameHostKeepsItsGuidNameAndAdvertisesTheGameFamilyBeforeEnteringTheLobby()
         {

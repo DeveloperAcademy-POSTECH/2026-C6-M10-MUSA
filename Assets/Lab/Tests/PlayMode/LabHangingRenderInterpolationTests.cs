@@ -65,6 +65,7 @@ namespace C6Lab.Tests
             }
         }
 
+        [Category("GPU")]
         [UnityTest]
         public IEnumerator DuringRealRenderingTheDrawnPoseLiesBetweenTheTwoFixedPoses()
         {

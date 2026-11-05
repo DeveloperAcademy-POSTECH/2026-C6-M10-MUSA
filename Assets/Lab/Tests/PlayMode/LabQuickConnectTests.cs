@@ -16,6 +16,7 @@ namespace C6Lab.Tests
     /// </summary>
     public sealed class LabQuickConnectTests
     {
+        [Category("LabOnly")]
         [UnityTest]
         public IEnumerator SavedBrowserOpensAutomaticallyAndKeepsHostSizeDirectAndDeveloperControlsUsable()
         {
@@ -136,6 +137,7 @@ namespace C6Lab.Tests
             }
         }
 
+        [Category("LabOnly")]
         [UnityTest]
         public IEnumerator EmptyDirectAddressKeepsTheRoomBrowserAndItsFailureReasonVisible()
         {
@@ -164,6 +166,7 @@ namespace C6Lab.Tests
             finally { network.Stop(); }
         }
 
+        [Category("LabOnly")]
         [UnityTest]
         public IEnumerator HostEndpointFailureIsShownInTheBrowserInsteadOfOnlyTheHiddenLegacyStatus()
         {

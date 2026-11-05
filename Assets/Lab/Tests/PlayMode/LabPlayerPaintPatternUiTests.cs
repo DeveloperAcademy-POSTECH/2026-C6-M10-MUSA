@@ -24,7 +24,7 @@ namespace C6Lab.Tests
             hud = SceneManager.GetActiveScene().GetRootGameObjects()
                 .SelectMany(root => root.GetComponentsInChildren<LabHud>(true)).Single();
             network = hud.network;
-            network.port = 18260;
+            network.port = LabSavedSceneNetworkFixture.AvailableDualFamilyPort();
         }
 
         [UnityTearDown]
@@ -39,6 +39,7 @@ namespace C6Lab.Tests
             yield return null;
         }
 
+        [Category("LabOnly")]
         [UnityTest]
         public IEnumerator SavedSamplesStayOnExistingControlsAndFollowLobbyAndDeveloperVisibility()
         {
@@ -100,6 +101,7 @@ namespace C6Lab.Tests
             }
         }
 
+        [Category("LabOnly")]
         [UnityTest]
         public IEnumerator DeveloperRoomApplyHidesAndRestoresAllSamplesWithoutChangingPlayerIdentity()
         {

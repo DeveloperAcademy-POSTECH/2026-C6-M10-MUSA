@@ -12,6 +12,7 @@ using UnityEngine.UI;
 namespace C6Lab.Tests
 {
     /// <summary>Saved Scene UI and local runtime-copy flow; no claim of a remote Client ACK.</summary>
+    [Category("LabOnly")]
     public sealed class LabPaintGrainDeveloperTests
     {
         private readonly LabSavedSceneNetworkFixture fixture = new LabSavedSceneNetworkFixture();

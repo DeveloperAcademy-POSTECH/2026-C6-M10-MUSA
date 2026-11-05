@@ -14,6 +14,7 @@ namespace C6Lab.Tests
     /// Native macOS Bonjour recovery (#476). Failures are forced through the discovery's own Fail path; a real phone
     /// suspension, lock or Local Network denial is not reproduced here.
     /// </summary>
+    [Category("Slow"), Category("Bonjour")]
     public sealed class LabDiscoveryRecoveryTests
     {
         private const BindingFlags Private = BindingFlags.Instance | BindingFlags.NonPublic;
@@ -28,6 +29,7 @@ namespace C6Lab.Tests
             {
                 var log = new List<string>();
                 browser.Diagnostic += log.Add;
+                // Advertised number only: no socket binds it, so it stays fixed. Real Host binds below use a free port.
                 Assert.That(host.StartAdvertise(name, 19491, true, true, 1, 2), Is.True, host.LastError);
                 Assert.That(browser.StartBrowse(), Is.True, browser.LastError);
                 yield return TickUntil(() => browser.Targets.Any(t => t.ServiceName == name), 20d, host, browser);
@@ -87,7 +89,7 @@ namespace C6Lab.Tests
             if (!LabBonjourDiscovery.IsSupported) Assert.Ignore("Native Bonjour supports macOS/iOS.");
             LabNetwork network = null;
             yield return LoadLab(value => network = value);
-            network.port = 18291;
+            network.port = LabSavedSceneNetworkFixture.AvailableDualFamilyPort();
             try
             {
                 network.Host();
@@ -120,7 +122,7 @@ namespace C6Lab.Tests
             if (!LabBonjourDiscovery.IsSupported) Assert.Ignore("Native Bonjour supports macOS/iOS.");
             LabNetwork network = null;
             yield return LoadLab(value => network = value);
-            network.port = 18292;
+            network.port = LabSavedSceneNetworkFixture.AvailableDualFamilyPort();
             // Let the Lab HUD's one automatic first search run, so only this test restarts the search below.
             yield return Until(() => network.IsSearchingRooms, 5d);
             try
@@ -182,7 +184,7 @@ namespace C6Lab.Tests
             if (!LabBonjourDiscovery.IsSupported) Assert.Ignore("Native Bonjour supports macOS/iOS.");
             LabNetwork network = null;
             yield return LoadLab(value => network = value);
-            network.port = 18293;
+            network.port = LabSavedSceneNetworkFixture.AvailableDualFamilyPort();
             try
             {
                 network.Host();
