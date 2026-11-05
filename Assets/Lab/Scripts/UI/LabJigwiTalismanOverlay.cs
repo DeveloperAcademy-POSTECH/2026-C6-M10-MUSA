@@ -22,7 +22,8 @@ namespace C6Lab
         [Tooltip("전투 영역 위쪽에서 비워 둘 높이 (전투 영역 대비). 시간·체력 HUD를 가리지 않게.")]
         [SerializeField, Range(0f, .4f)] private float topInset = .14f;
         [SerializeField] private Color inkColor = new Color(.72f, .11f, .07f, 1f);
-        [SerializeField] private Color guideColor = new Color(.45f, .3f, .12f, .35f);
+        [Tooltip("#533: 아직 안 쓴 글자 획 색. 둥근 점이 겹치므로 불투명으로 둔다(반투명이면 겹친 곳이 얼룩진다).")]
+        [SerializeField] private Color guideColor = new Color(.79f, .67f, .4f, 1f);
         [Tooltip("#479: 손가락이 지나가 칠해진 점선 색 (물빛 파랑).")]
         [SerializeField] private Color writtenColor = new Color(.1f, .42f, .95f, 1f);
         [Tooltip("#509: 다 쓴 글씨가 빛나는 시간(초). 그다음 부적이 천천히 사라진다.")]
@@ -31,6 +32,10 @@ namespace C6Lab
         [SerializeField, Range(.2f, 3f)] private float fadeSeconds = 1.2f;
         [Tooltip("#509: 다 쓴 글씨가 빛날 때의 색 (금빛).")]
         [SerializeField] private Color glowColor = new Color(1f, .86f, .32f, 1f);
+        [Tooltip("#533: \"물\" 글자의 가로 폭이 부적 종이 폭에서 차지하는 비율. 클수록 글자가 크다(세로는 종이 높이의 72%까지).")]
+        [SerializeField, Range(.4f, .95f)] private float glyphWidthShare = .82f;
+        [Tooltip("#533: 글자 획 굵기 (글자 칸 대비). 점끼리 겹쳐 이어진 굵은 획으로 보인다. 판정 거리와는 따로다.")]
+        [SerializeField, Range(.03f, .15f)] private float strokeWidth = .085f;
         /// <summary>요청이 사라졌을 때 다시 보내기까지 (초)</summary>
         private const float ResendSeconds = 1f;
         private CanvasGroup paperGroup;
@@ -42,6 +47,7 @@ namespace C6Lab
         private UnityEngine.UI.RawImage paperImage;
         private UnityEngine.UI.Image frameImage;
         private static Texture2D hanji;
+        private static Sprite roundDot;
         private UnityEngine.UI.Image[] dots = Array.Empty<UnityEngine.UI.Image>();
         private UnityEngine.UI.Text hint;
         private Font font;
@@ -168,7 +174,7 @@ namespace C6Lab
             {
                 if (dots[i] == null || !stroke.IsCovered(i)) continue;
                 dots[i].color = Color.Lerp(writtenColor, glowColor, glow);
-                float pulse = 1f + .55f * glow + .15f * Mathf.Sin(finishAge * 14f) * (1f - fade);
+                float pulse = 1f + .25f * glow + .08f * Mathf.Sin(finishAge * 14f) * (1f - fade);
                 dots[i].rectTransform.localScale = Vector3.one * pulse;
             }
             if (paperImage != null) paperImage.color = Color.Lerp(paperColor, new Color(1f, .97f, .85f, paperColor.a), glow);
@@ -271,16 +277,24 @@ namespace C6Lab
             LayoutGlyph();
         }
 
-        /// <summary>"물" 칸은 늘 정사각형으로, 안내 문구 아래 가운데에 둔다.</summary>
+        /// <summary>
+        /// "물" 칸은 늘 정사각형이다. #533: 칸 크기를 칸 전체가 아니라 실제 글자 획이 놓인 범위에 맞춰,
+        /// 글자가 종이 폭의 glyphWidthShare만큼 차지하게 키우고 글자 가운데를 안내 문구 아래에 둔다.
+        /// 판정 좌표(칸 기준 0~1)는 그대로라 점선과 판정은 함께 커진다.
+        /// </summary>
         private void LayoutGlyph()
         {
             if (glyphArea == null || paper == null) return;
             Vector2 size = paper.rect.size;
-            float side = Mathf.Max(1f, Mathf.Min(size.x * .84f, size.y * .62f));
+            Rect bounds = SampleBounds(stroke.Samples);
+            float spanX = Mathf.Max(.05f, bounds.width + strokeWidth), spanY = Mathf.Max(.05f, bounds.height + strokeWidth);
+            float side = Mathf.Max(1f, Mathf.Min(size.x * glyphWidthShare / spanX, size.y * .72f / spanY));
             glyphArea.anchorMin = glyphArea.anchorMax = glyphArea.pivot = new Vector2(.5f, .5f);
-            glyphArea.anchoredPosition = new Vector2(0f, -size.y * .04f);
+            // Put the letter's own centre (not the box centre) a little below the paper centre, under the hint.
+            Vector2 centre = bounds.center;
+            glyphArea.anchoredPosition = new Vector2((.5f - centre.x) * side, -size.y * .06f + (.5f - centre.y) * side);
             glyphArea.sizeDelta = new Vector2(side, side);
-            float dot = Mathf.Max(4f, side * .045f);
+            float dot = Mathf.Max(4f, side * strokeWidth);
             for (int i = 0; i < dots.Length; i++)
                 if (dots[i] != null) dots[i].rectTransform.sizeDelta = new Vector2(dot, dot);
         }
@@ -313,7 +327,7 @@ namespace C6Lab
             for (int i = 0; i < dots.Length; i++)
             {
                 var dot = NewRect("Dot " + i, glyphArea).gameObject.AddComponent<UnityEngine.UI.Image>();
-                dot.raycastTarget = false; dot.color = guideColor;
+                dot.raycastTarget = false; dot.color = guideColor; dot.sprite = RoundDot();
                 dot.rectTransform.anchorMin = dot.rectTransform.anchorMax = stroke.Samples[i];
                 dot.rectTransform.anchoredPosition = Vector2.zero;
                 dots[i] = dot;
@@ -360,6 +374,35 @@ namespace C6Lab
             for (int i = 0; i < pixels.Length; i++) pixels[i].a = 1f;
             hanji.SetPixels(pixels); hanji.Apply(false, true);
             return hanji;
+        }
+
+        private static Rect SampleBounds(Vector2[] samples)
+        {
+            if (samples == null || samples.Length == 0) return new Rect(0f, 0f, 1f, 1f);
+            Vector2 min = samples[0], max = samples[0];
+            for (int i = 1; i < samples.Length; i++) { min = Vector2.Min(min, samples[i]); max = Vector2.Max(max, samples[i]); }
+            return Rect.MinMaxRect(min.x, min.y, max.x, max.y);
+        }
+
+        /// <summary>#533: 획 점용 둥근 무늬 (런타임에 한 번 만든다). 둥근 점이 겹쳐 매끈한 굵은 획이 된다.</summary>
+        private static Sprite RoundDot()
+        {
+            if (roundDot != null) return roundDot;
+            const int size = 64;
+            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
+            { name = "Talisman Round Dot (#533 runtime)", hideFlags = HideFlags.DontSave, wrapMode = TextureWrapMode.Clamp };
+            var pixels = new Color[size * size];
+            float r = size * .5f;
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float d = Vector2.Distance(new Vector2(x + .5f, y + .5f), new Vector2(r, r));
+                    pixels[y * size + x] = new Color(1f, 1f, 1f, Mathf.Clamp01(r - d));
+                }
+            texture.SetPixels(pixels); texture.Apply(false, true);
+            roundDot = Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(.5f, .5f), 100f);
+            roundDot.hideFlags = HideFlags.DontSave;
+            return roundDot;
         }
 
         private UnityEngine.UI.Text NewText(string name, RectTransform parent, string value, int size, Color color)
