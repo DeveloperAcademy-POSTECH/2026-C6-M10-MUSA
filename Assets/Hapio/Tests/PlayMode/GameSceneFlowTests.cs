@@ -94,7 +94,7 @@ namespace Hapio.Tests
             Assert.That(network.IsGameInitialStateReady(session.State.battleSessionId, session.State.battleRound), Is.True);
             Assert.That(UnityEngine.Object.FindFirstObjectByType<GameBattleBindings>().IsPresentationReady, Is.True);
             var watercolorPaint = UnityEngine.Object.FindFirstObjectByType<LabGourdPaint>();
-            Assert.That(watercolorPaint.WatercolorActive, Is.True, watercolorPaint.WatercolorError);
+            Assert.That(network.PinnedWatercolorSettings.UsesClayStickers ? watercolorPaint.ClayStickersActive : watercolorPaint.WatercolorStampsActive, Is.True, watercolorPaint.WatercolorStampError);
             var watercolorBlock = new MaterialPropertyBlock();
             watercolorPaint.Shell.GetComponent<Renderer>().GetPropertyBlock(watercolorBlock);
             Assert.That(watercolorBlock.GetTexture("_PaintMap"), Is.SameAs(watercolorPaint.VisualPaintTexture),
@@ -155,6 +155,42 @@ namespace Hapio.Tests
             Assert.That(session.State.endReason, Does.Contain("preparing"));
             Assert.That(session.StartOverlay.Visible, Is.False);
             Assert.That(network.Snapshot.playedSeconds, Is.Zero);
+        }
+
+        [UnityTest]
+        public IEnumerator PreparedRoundEntersSynchronizationEvenWhenInitialArtworkIsNotReadyOnTheCreationFrame()
+        {
+            FieldInfo mismatch = typeof(LabNetwork).GetField("paintArtVersionMismatch", BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(mismatch, Is.Not.Null);
+            bool heldOneFrame = false;
+            Action holdInitialReadiness = () =>
+            {
+                if (heldOneFrame || network.Snapshot == null || !network.GameStartHeld
+                    || network.Snapshot.phase != LabPhase.Playing) return;
+                heldOneFrame = true;
+                mismatch.SetValue(network, true);
+            };
+            network.Changed += holdInitialReadiness;
+            try
+            {
+                session.StartSolo();
+                yield return Until(() => heldOneFrame, "The first held round must be created.");
+                Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.SynchronizingBattle),
+                    "Creating a held round must advance to synchronization even if presentation needs another frame.");
+                Assert.That(network.IsGameInitialStateReady(session.State.battleSessionId, session.State.battleRound), Is.False);
+                Assert.That(network.GameStartHeld, Is.True);
+                network.Generate();
+                Assert.That(network.Snapshot.orbs, Is.Empty);
+                mismatch.SetValue(network, false);
+                yield return Until(() => session.State.phase == GameFlowPhase.Countdown,
+                    "The existing synchronization barrier must reserve a countdown after readiness recovers.");
+                Assert.That(network.GameStartHeld, Is.True);
+            }
+            finally
+            {
+                network.Changed -= holdInitialReadiness;
+                mismatch.SetValue(network, false);
+            }
         }
 
         [UnityTest]
@@ -370,15 +406,121 @@ namespace Hapio.Tests
         [UnityTest]
         public IEnumerator SavedHomeRunsThreeFreshBattlesWithOneRoomAndKeepsCompletedMapAfterUnload()
         {
+            bool UsesShader(Renderer renderer, string shaderName) => renderer != null
+                && renderer.sharedMaterials.Any(material => material != null && material.shader != null
+                    && material.shader.name == shaderName);
+
+            int[] PartPath(Transform part, Transform visualRoot)
+            {
+                var path = new System.Collections.Generic.List<int>();
+                for (Transform current = part; current != visualRoot; current = current.parent)
+                {
+                    Assert.That(current, Is.Not.Null, "Every paintable part belongs to the live visual instance.");
+                    path.Add(current.GetSiblingIndex());
+                }
+                path.Reverse();
+                return path.ToArray();
+            }
+
+            void AssertStampSurfaceBindings(Transform visualRoot, int[][] partPaths, Mesh[] partMeshes,
+                LabWatercolorStampSettings expected, Texture[] maps, string context)
+            {
+                Assert.That(visualRoot, Is.Not.Null, context + ": a gourd model must exist.");
+                Renderer[] shells = partPaths.Select(path =>
+                {
+                    Transform part = visualRoot;
+                    foreach (int child in path) part = part.GetChild(child);
+                    return part.GetComponent<Renderer>();
+                }).ToArray();
+                Assert.That(visualRoot.GetComponentsInChildren<Renderer>(true)
+                    .Where(renderer => UsesShader(renderer, "C6Lab/GourdPaint")), Is.EquivalentTo(shells),
+                    context + ": paint sources are the mounted shell and extras, not rope or unpainted art.");
+                Assert.That(visualRoot.GetComponentsInChildren<Renderer>(true)
+                    .Count(renderer => UsesShader(renderer, "C6Lab/ClayStickerSurface")),
+                    Is.EqualTo(expected.UsesClayStickers ? shells.Length : 0),
+                    context + ": every paintable part owns exactly one clay coat, without orphan layers.");
+                var block = new MaterialPropertyBlock();
+                for (int i = 0; i < shells.Length; i++)
+                {
+                    Renderer shell = shells[i];
+                    string partContext = context + ": " + shell.name;
+                    Assert.That(shell.GetComponent<MeshFilter>().sharedMesh, Is.SameAs(partMeshes[i]), partContext);
+                    if (expected.UsesClayStickers)
+                    {
+                        Renderer[] coats = shell.transform.Cast<Transform>().Select(child => child.GetComponent<Renderer>())
+                            .Where(renderer => UsesShader(renderer, "C6Lab/ClayStickerSurface")).ToArray();
+                        Assert.That(coats, Has.Length.EqualTo(1), partContext + ": preserve the part's direct coat.");
+                        Renderer coat = coats[0];
+                        Assert.That(coat.name, Is.EqualTo("Clay Sticker Overlay"), partContext);
+                        Assert.That(coat.enabled, Is.True, partContext);
+                        Assert.That(coat.GetComponent<MeshFilter>().sharedMesh, Is.SameAs(partMeshes[i]), partContext);
+                        Assert.That(coat.transform.localPosition, Is.EqualTo(Vector3.zero), partContext);
+                        Assert.That(Quaternion.Angle(coat.transform.localRotation, Quaternion.identity), Is.LessThan(.0001f), partContext);
+                        Assert.That(coat.transform.localScale, Is.EqualTo(Vector3.one), partContext);
+                        coat.GetPropertyBlock(block);
+                        Assert.That(block.GetTexture("_PaintMap"), Is.SameAs(maps[0]), partContext);
+                        Assert.That(block.GetTexture("_PainterMap"), Is.SameAs(maps[1]), partContext);
+                        Assert.That(block.GetTexture("_HeightMap"), Is.SameAs(maps[2]), partContext);
+                        Assert.That(maps[2], Is.Not.Null, partContext + ": the relief remains owned and available.");
+                        Assert.That(block.GetFloat("_PaintMapReady"), Is.EqualTo(1f), partContext);
+                    }
+                    shell.GetPropertyBlock(block);
+                    Assert.That(block.GetTexture("_PaintMap"), Is.SameAs(maps[0]), partContext);
+                    Assert.That(block.GetTexture("_PainterMap"), Is.SameAs(maps[1]), partContext);
+                    if (expected.UsesClayStickers)
+                        Assert.That(block.GetFloat("_PaintMapReady"), Is.Zero, partContext + ": the base must not duplicate its coat.");
+                    Assert.That(block.GetFloat("_WatercolorV2Enabled"), Is.EqualTo(expected.UsesPaperStickers || expected.UsesClayStickers ? 0f : 1f),
+                        partContext + ": use this round's captured rendering mode independently of the raw paint map.");
+                    Assert.That(block.GetFloat("_PaperStickerEnabled"), Is.EqualTo(expected.UsesPaperStickers ? 1f : 0f), partContext);
+                    Assert.That(block.GetFloat("_PaperStickerGrainStrength"), Is.EqualTo(expected.paperSticker.grainStrength), partContext);
+                    Assert.That(block.GetFloat("_WatercolorGranulationStrength"), Is.EqualTo(expected.granulationStrength), partContext);
+                    Assert.That(block.GetFloat("_WatercolorGranulationScale"), Is.EqualTo(expected.granulationScale), partContext);
+                }
+            }
+
+            string MapHash(Texture map)
+            {
+                if (map == null || SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Null) return null;
+                var target = map as RenderTexture;
+                Assert.That(target, Is.Not.Null, "The high-resolution completed maps must be GPU copies.");
+                Assert.That(target.IsCreated(), Is.True);
+                var pixels = new Texture2D(target.width, target.height,
+                    target.format == RenderTextureFormat.ARGBHalf ? TextureFormat.RGBAHalf : TextureFormat.RGBA32, false, true);
+                RenderTexture previous = RenderTexture.active;
+                try
+                {
+                    RenderTexture.active = target;
+                    pixels.ReadPixels(new Rect(0, 0, target.width, target.height), 0, 0, false);
+                    pixels.Apply(false, false);
+                    using (var hash = System.Security.Cryptography.SHA256.Create())
+                        return Convert.ToBase64String(hash.ComputeHash(pixels.GetRawTextureData<byte>().ToArray()));
+                }
+                finally { RenderTexture.active = previous; Object.DestroyImmediate(pixels); }
+            }
+
+            void AssertPreviewReleased(LabGourdResultPreview preview, Texture[] maps)
+            {
+                if (preview == null) return;
+                Assert.That(preview.IsDisposed, Is.True, "The next stage/Home must release its previous completed copy.");
+                foreach (Texture map in maps)
+                    Assert.That(map == null || (map is RenderTexture rt && !rt.IsCreated()), Is.True,
+                        "Previous color, P-number and height copies must not accumulate across stages.");
+            }
+
+            LabWatercolorStampSettings defaultWatercolor = LabWatercolorStampSettings.CaptureDefault();
+            Assert.That(defaultWatercolor.enabled, Is.True, "Saved Home must start with the default watercolor presentation.");
             GameSession persistent = session;
             LabNetwork persistentNetwork = network;
             string previousBattleId = null;
             LabOrbBoard previousBoard = null;
+            LabGourdResultPreview previousPreview = null;
+            Texture[] previousPreviewMaps = null;
             session.StartSolo();
 
             for (int stage = 1; stage <= 3; stage++)
             {
                 yield return WaitPlaying(stage);
+                AssertPreviewReleased(previousPreview, previousPreviewMaps);
                 Assert.That(GameSession.Instance, Is.SameAs(persistent));
                 Assert.That(session.Network, Is.SameAs(persistentNetwork));
                 Assert.That(network.IsConnected, Is.True);
@@ -436,6 +578,24 @@ namespace Hapio.Tests
                     yield return null;
                 }
 
+                Assert.That(network.PinnedWatercolorSettings, Is.Not.Null);
+                LabWatercolorStampSettings roundWatercolor = network.PinnedWatercolorSettings.Clone();
+                Assert.That(roundWatercolor.Version, Is.EqualTo(defaultWatercolor.Version),
+                    "Each fresh Battle must capture the saved default V2 appearance, not inherit a previous round's settings.");
+                LabGourdPaint livePaint = network.target.GetComponent<LabGourdPaint>();
+                Assert.That(livePaint, Is.Not.Null);
+                Assert.That(roundWatercolor.UsesClayStickers ? livePaint.ClayStickersActive : livePaint.WatercolorStampsActive, Is.True, livePaint.WatercolorStampError);
+                Transform liveVisualRoot = livePaint.VisualInstance.transform;
+                Renderer[] paintParts = new[] { livePaint.Shell.GetComponent<Renderer>() }
+                    .Concat(livePaint.PaintExtras).Distinct().ToArray();
+                Assert.That(paintParts, Is.Not.Empty);
+                Assert.That(paintParts.All(part => part != null), Is.True);
+                int[][] paintPartPaths = paintParts.Select(part => PartPath(part.transform, liveVisualRoot)).ToArray();
+                Mesh[] paintPartMeshes = paintParts.Select(part => part.GetComponent<MeshFilter>().sharedMesh).ToArray();
+                Texture[] liveMaps = { livePaint.VisualPaintTexture, livePaint.VisualPainterTexture, livePaint.VisualHeightTexture };
+                AssertStampSurfaceBindings(liveVisualRoot, paintPartPaths, paintPartMeshes, roundWatercolor, liveMaps,
+                    "Live Battle stage " + stage);
+
                 LabOrbBoard thisBoard = network.board;
                 network.Generate();
                 yield return Until(() => network.Snapshot.players.Single().generatedTotal == 1,
@@ -456,10 +616,26 @@ namespace Hapio.Tests
                     BindingFlags.Instance | BindingFlags.NonPublic).GetValue(session);
                 Texture preparedTexture = session.PreviewTexture;
                 Texture preparedVisualPaint = preparedPreview.VisualPaintTexture;
+                Texture[] preparedMaps = { preparedVisualPaint, preparedPreview.VisualPainterTexture, preparedPreview.VisualHeightTexture };
+                liveMaps = new[] { livePaint.VisualPaintTexture, livePaint.VisualPainterTexture, livePaint.VisualHeightTexture };
+                string[] preparedMapHashes = preparedMaps.Select(MapHash).ToArray();
+                for (int i = 0; i < preparedMaps.Length; i++)
+                {
+                    if (liveMaps[i] == null) continue;
+                    Assert.That(preparedMaps[i], Is.Not.Null, "Every live visual map has an independent completed copy.");
+                    Assert.That(preparedMaps[i], Is.Not.SameAs(liveMaps[i]), "Completed color, P-number and relief do not borrow live maps.");
+                    Assert.That(MapHash(liveMaps[i]), Is.EqualTo(preparedMapHashes[i]), "Freezing must preserve each visual map's pixels.");
+                }
+                string completedCpuHash = preparedPreview.PaintPixelHash;
+                Color32[] completedCpuPixels = preparedPreview.PaintTexture.GetPixels32();
+                Transform copiedVisualRoot = preparedPreview.ModelRoot.Find("Centered model").GetChild(0);
+                Assert.That(copiedVisualRoot.name, Is.EqualTo(liveVisualRoot.name));
                 Assert.That(network.HasBattleReferences, Is.True, "Pre-capture uses the live Battle before unlink/unload.");
                 Assert.That(thisBoard != null, Is.True);
                 Assert.That(preparedPreview.SessionId, Is.EqualTo(previousBattleId));
                 Assert.That(preparedPreview.Round, Is.EqualTo(session.State.battleRound));
+                AssertStampSurfaceBindings(copiedVisualRoot, paintPartPaths, paintPartMeshes, roundWatercolor, preparedMaps,
+                    "Prepared result stage " + stage);
                 if (SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null)
                 {
                     Assert.That(preparedVisualPaint, Is.InstanceOf<RenderTexture>());
@@ -485,6 +661,18 @@ namespace Hapio.Tests
                 Assert.That(typeof(GameSession).GetField("preview", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(session),
                     Is.SameAs(preparedPreview), "Scene navigation reuses the same completed-result copy.");
                 Assert.That(preparedPreview.VisualPaintTexture, Is.SameAs(preparedVisualPaint));
+                AssertStampSurfaceBindings(copiedVisualRoot, paintPartPaths, paintPartMeshes, roundWatercolor, preparedMaps,
+                    "Result after Battle unload stage " + stage);
+                Assert.That(preparedPreview.VisualPainterTexture, Is.SameAs(preparedMaps[1]));
+                Assert.That(preparedPreview.VisualHeightTexture, Is.SameAs(preparedMaps[2]));
+                Assert.That(preparedMaps.Select(MapHash).ToArray(), Is.EqualTo(preparedMapHashes),
+                    "All painted parts retain the exact frozen color, P-number and height after the live Battle is destroyed.");
+                Assert.That(preparedPreview.PaintPixelHash, Is.EqualTo(completedCpuHash));
+                Assert.That(preparedPreview.PaintTexture.GetPixels32(), Is.EqualTo(completedCpuPixels));
+                Assert.That(livePaint == null, Is.True, "The result cannot still be using a live paint component.");
+                foreach (Texture map in liveMaps)
+                    Assert.That(map == null || (map is RenderTexture rt && !rt.IsCreated()), Is.True,
+                        "Completed copies stay valid after their source GPU maps are released.");
                 if (SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null)
                 {
                     var captured = (LabGourdResultPreview)typeof(GameSession).GetField("preview",
@@ -515,6 +703,8 @@ namespace Hapio.Tests
                     Assert.That(session.PreviewTexture, Is.SameAs(preparedTexture), "Record recovery keeps the existing optional preview.");
                 }
                 previousBoard = thisBoard;
+                previousPreview = preparedPreview;
+                previousPreviewMaps = preparedMaps;
                 if (stage < 3)
                 {
                     yield return Until(() => session.CanAdvanceStage,
@@ -531,6 +721,7 @@ namespace Hapio.Tests
             yield return null;
             session.ExitRun(); // Normal final completion exits without creating GameOver.
             yield return WaitHome();
+            AssertPreviewReleased(previousPreview, previousPreviewMaps);
             Assert.That(GameSession.Instance, Is.SameAs(persistent));
             Assert.That(session.State.endReason, Is.Empty);
             Assert.That(session.ResultSnapshot, Is.Null);
@@ -930,6 +1121,56 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
+        public IEnumerator PausedBattleClayPreviewPersistsOnlyItsTwoCommonValuesIntoTheNextStage()
+        {
+            session.StartSolo();
+            yield return WaitPlaying(1);
+            LabConfig source = Resources.Load<LabConfig>("LabConfig");
+            string saved = JsonUtility.ToJson(source);
+            float[][] before = Enumerable.Range(0, 4).Select(session.CaptureDeveloperSettings).ToArray();
+            LabConfig acceptedConfig = network.config;
+            float[] accepted = acceptedConfig.CaptureDeveloperValues();
+            session.Pause();
+            yield return null;
+            Assert.That(network.IsBattlePaused, Is.True);
+            string oldBattle = session.State.battleSessionId;
+            uint flowRevision = session.State.revision;
+            int settingsRevision = network.SessionConfigRevision;
+            string fingerprint = network.SessionConfigFingerprint;
+
+            // Battle's LabDeveloperMode calls this API directly. Do not use the Home/
+            // Lobby GameSession wrapper: the event bridge must persist these values.
+            Assert.That(network.TryPreviewClayAppearance(.018f, .83f), Is.True);
+            Assert.That(network.ClayThickness, Is.EqualTo(.018f));
+            Assert.That(network.ClayGloss, Is.EqualTo(.83f));
+            Assert.That(network.config, Is.SameAs(acceptedConfig));
+            Assert.That(network.config.CaptureDeveloperValues(), Is.EqualTo(accepted),
+                "Cosmetic preview must not replace or alter the accepted battle config.");
+            Assert.That(network.SessionConfigRevision, Is.EqualTo(settingsRevision));
+            Assert.That(network.SessionConfigFingerprint, Is.EqualTo(fingerprint));
+            Assert.That(session.State.revision, Is.EqualTo(flowRevision));
+            Assert.That(session.State.battleSessionId, Is.EqualTo(oldBattle));
+            for (int scope = 0; scope < 4; scope++)
+            {
+                float[] remembered = session.CaptureDeveloperSettings(scope);
+                Assert.That(remembered[LabConfig.ClayThicknessField], Is.EqualTo(.018f), "Scope " + scope);
+                Assert.That(remembered[LabConfig.ClayGlossField], Is.EqualTo(.83f), "Scope " + scope);
+                Assert.That(remembered.Take(LabConfig.ClayThicknessField), Is.EqualTo(before[scope].Take(LabConfig.ClayThicknessField)),
+                    "The battle event must not apply an unrelated DEV draft in scope " + scope);
+            }
+            Assert.That(session.DeveloperNextStage(), Is.True);
+            yield return WaitPlaying(2);
+            Assert.That(session.State.battleSessionId, Is.Not.EqualTo(oldBattle));
+            Assert.That(network.config, Is.Not.SameAs(acceptedConfig));
+            Assert.That(network.config.ClayThickness, Is.EqualTo(.018f));
+            Assert.That(network.config.ClayGloss, Is.EqualTo(.83f));
+            Assert.That(network.ClayThickness, Is.EqualTo(.018f));
+            Assert.That(network.ClayGloss, Is.EqualTo(.83f));
+            Assert.That(network.PaintSurface.CoveredCount, Is.Zero);
+            Assert.That(JsonUtility.ToJson(source), Is.EqualTo(saved));
+        }
+
+        [UnityTest]
         public IEnumerator PausedDeveloperNextStageUsesSavedButtonAndFreshBattlesWithoutApplyingUnsavedFields()
         {
             Assert.That(session.CanDeveloperAdvanceStage, Is.False);
@@ -1242,7 +1483,7 @@ namespace Hapio.Tests
         private void AssertDeveloperSettings(float[] expected)
         {
             float[] actual = network.config.CaptureDeveloperValues();
-            Assert.That(actual.Length, Is.EqualTo(257), "The persistent game session must use the current shared schema.");
+            Assert.That(actual.Length, Is.EqualTo(259), "The persistent game session must use the current shared schema.");
             Assert.That(actual, Is.EqualTo(expected),
                 "All approved values, including the gimmick group fields (#311), must survive Scene-owned DEV cleanup.");
         }

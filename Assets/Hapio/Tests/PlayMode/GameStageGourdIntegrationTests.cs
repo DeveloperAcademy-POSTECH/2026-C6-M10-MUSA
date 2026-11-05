@@ -105,14 +105,25 @@ namespace Hapio.Tests
             // Paint binding on the body and the lid.
             paint.RefreshCommittedMap();
             Assert.That(paint.PaintExtras.Count, Is.EqualTo(1), label);
-            foreach (Renderer renderer in new Renderer[] { rig.paintShell, paint.PaintExtras[0] })
+            Assert.That(network.PinnedWatercolorSettings, Is.Not.Null, label);
+            Assert.That(network.PinnedWatercolorSettings.UsesClayStickers, Is.True,
+                label + "the saved cooperative default must exercise clay, not a legacy fallback.");
+            Assert.That(paint.ClayStickersActive, Is.True, label + paint.ClayError);
+            Assert.That(paint.VisualHeightTexture, Is.Not.Null, label + "rounded clay height is bound.");
+            Renderer[] paintedParts = new Renderer[] { rig.paintShell }.Concat(paint.PaintExtras).ToArray();
+            foreach (Renderer renderer in paintedParts)
             {
                 var block = new MaterialPropertyBlock();
                 renderer.GetPropertyBlock(block);
-                Assert.That(block.GetFloat("_PaintMapReady"), Is.EqualTo(1f), label + renderer.name);
+                Assert.That(block.GetFloat("_PaintMapReady"), Is.Zero,
+                    label + renderer.name + " keeps its underpaint below a separate clay coat.");
                 Assert.That(block.GetTexture("_PaintMap"), Is.SameAs(paint.VisualPaintTexture), label + renderer.name);
+                Assert.That(block.GetTexture("_PainterMap"), Is.SameAs(paint.VisualPainterTexture), label + renderer.name);
                 Assert.That(renderer.sharedMaterial.IsKeywordEnabled("_UNDERPAINT_MAP"), Is.True, label + renderer.name);
+                AssertClayCoat(paint, renderer, label);
             }
+            Assert.That(paint.VisualInstance.GetComponentsInChildren<MeshRenderer>(true).Count(IsClayCoat),
+                Is.EqualTo(paintedParts.Length), label + "exactly one active coat per painted part.");
 
             // The yokai: closed at rest, out for a game event (same triggers as the black yokai).
             var yokai = paint.VisualInstance.GetComponent<LabGourdYokai>();
@@ -144,9 +155,48 @@ namespace Hapio.Tests
                 Assert.That(copied.Any(n => n.StartsWith("Paint Shell")), Is.True, label);
                 Assert.That(copied.Any(n => n.StartsWith("Lid Paint")), Is.True, label);
                 Assert.That(copied.Any(n => n.StartsWith("Rear_Rope")), Is.False, label);
+                MeshRenderer[] copiedCoats = copy.GetComponentsInChildren<MeshRenderer>(true).Where(IsClayCoat).ToArray();
+                Assert.That(copiedCoats, Has.Length.EqualTo(paintedParts.Length),
+                    label + "the finish copy must retain both body and lid clay layers.");
+                foreach (MeshRenderer coat in copiedCoats)
+                {
+                    var block = new MaterialPropertyBlock(); coat.GetPropertyBlock(block);
+                    Assert.That(block.GetFloat("_PaintMapReady"), Is.EqualTo(1f), label + coat.name);
+                    Assert.That(block.GetTexture("_PaintMap"), Is.SameAs(paint.VisualPaintTexture), label + coat.name);
+                    Assert.That(block.GetTexture("_HeightMap"), Is.SameAs(paint.VisualHeightTexture), label + coat.name);
+                    Assert.That(block.GetTexture("_PainterMap"), Is.SameAs(paint.VisualPainterTexture), label + coat.name);
+                }
             }
             finally { Object.Destroy(copy.gameObject); }
         }
+
+        private void AssertClayCoat(LabGourdPaint paint, Renderer source, string label)
+        {
+            MeshRenderer[] coats = source.transform.Cast<Transform>().Select(t => t.GetComponent<MeshRenderer>())
+                .Where(IsClayCoat).ToArray();
+            Assert.That(coats, Has.Length.EqualTo(1), label + source.name + " owns one direct clay layer.");
+            MeshRenderer coat = coats[0];
+            Assert.That(coat.name, Is.EqualTo("Clay Sticker Overlay"), label + source.name);
+            Assert.That(coat.GetComponent<MeshFilter>().sharedMesh,
+                Is.SameAs(source.GetComponent<MeshFilter>().sharedMesh), label + "the rig's baked mesh is preserved.");
+            Assert.That(coat.transform.localPosition, Is.EqualTo(Vector3.zero), label + source.name);
+            Assert.That(Quaternion.Angle(coat.transform.localRotation, Quaternion.identity), Is.LessThan(1e-4f), label + source.name);
+            Assert.That(coat.transform.localScale, Is.EqualTo(Vector3.one), label + source.name);
+            Assert.That(coat.gameObject.layer, Is.EqualTo(source.gameObject.layer), label + source.name);
+            var block = new MaterialPropertyBlock(); coat.GetPropertyBlock(block);
+            Assert.That(block.GetFloat("_PaintMapReady"), Is.EqualTo(1f), label + source.name);
+            Assert.That(block.GetTexture("_PaintMap"), Is.SameAs(paint.VisualPaintTexture), label + source.name);
+            Assert.That(block.GetTexture("_HeightMap"), Is.SameAs(paint.VisualHeightTexture), label + source.name);
+            Assert.That(block.GetTexture("_PainterMap"), Is.SameAs(paint.VisualPainterTexture), label + source.name);
+            Assert.That(block.GetFloat("_ClayThickness"), Is.EqualTo(network.ClayThickness), label + source.name);
+            Assert.That(block.GetFloat("_ClayGloss"), Is.EqualTo(network.ClayGloss), label + source.name);
+            Assert.That(block.GetFloat("_PlayerPaintPatternsEnabled"),
+                Is.EqualTo(network.config.PlayerPaintPatternsEnabled ? 1f : 0f), label + source.name);
+        }
+
+        private static bool IsClayCoat(MeshRenderer renderer) => renderer != null && renderer.enabled
+            && renderer.sharedMaterial != null && renderer.sharedMaterial.shader != null
+            && renderer.sharedMaterial.shader.name == "C6Lab/ClayStickerSurface";
 
         private IEnumerator WaitPlaying(int stage) => Until(() => session.State.phase == GameFlowPhase.Playing
             && session.State.stageIndex == stage && !session.IsLoadingScene && network.HasBattleReferences

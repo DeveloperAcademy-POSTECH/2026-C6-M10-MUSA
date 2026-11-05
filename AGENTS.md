@@ -197,11 +197,48 @@
 - 스테이지 박은 `GameStageDefinition.gourdVisualResource`(Resources 경로, 비면 흰 박)를 `GameBattleBindings.MountStageGourd`가 `LabGourdPaint.PrepareVisual`로 `Attach`보다 먼저 지정한다. 2:2·Lab 단판은 흰 박이다. 프리팹 직접 참조로 바꾸지 않는다.
 - `LabGourdVisualRig`가 없는 프리팹(흰 박)은 기존 경로를 글자 그대로 탄다. 흰 박의 마운트·판정·칠·요괴 자세는 `Assets/Lab/Tests/PlayMode/Golden/`의 main 기록과 같아야 하며, 골든은 흰 박이 바뀌는 의도된 변경에서만 `GOURD_GOLDEN_RECORD=1`로 다시 기록한다. 계약 검사 실패는 `C6_GOURD_RIG_FALLBACK`과 함께 흰 박으로 돌아간다. 상세는 `docs/GOURD_MODELS.md`.
 - 세 스테이지 모두 `gourdVisualResource = Hapio/Gourds/Stage0N_<요괴>_Battle`(구미호·야광귀·지귀 박)이며 판정·도색·요괴 반응·완성/결과/PNG까지 이 박을 쓴다. 경로는 굽기 도구만 설정하고 `GameStageAssets.EnsureAssets`는 건드리지 않는다. 아트 원본 프리팹은 고치지 않고 `Hapio > Gourds > Bake All Stage Gourds`(`GameGourdRigBaker`, 스테이지별 메뉴도 있음)로만 다시 굽는다. 미리보기 덧씌우기(`GameGourdModelPreview`·`GourdPreview` 리소스)는 삭제했으며 재생성하지 않는다.
-- 1·3스테이지 판정 모양까지 바뀌어 #507 당시 묶음은 **공유 설정 257개·5683/`C6PhysicsLab/44`/`C6HapioGame/30`**였다(현재 기준은 아래 #479 절)(2스테이지만 바뀐 묶음은 Game29). Game28·29 앱과 혼용하지 않는다.
+- 1·3스테이지 판정 모양까지 바뀌어 도입 당시 묶음은 **공유 설정 257개·5683/`C6PhysicsLab/44`/`C6HapioGame/30`**였다(현재 기준은 아래 #479 절)(2스테이지만 바뀐 묶음은 Game29). Game28·29 앱과 혼용하지 않는다.
 
 ## #507 연속 곡선 줄
 
 - Hapio 전투는 `GameBattleBindings.Awake`가 모든 스테이지의 `LabHangingTarget`에 `LabRopeStyle.Curved`를 런타임으로 지정한다. 고정점에서 박 연결점까지 피벗을 제어점으로 둔 베지어 한 줄이며, 물리·피벗 높이·판정·접속 규약은 바꾸지 않는다. Lab Scene과 Battle.unity 저장값은 `Segmented`이며 YAML을 고치지 않는다. 기존 `Rope`·`Upper Rope`는 transform을 계속 계산하고 렌더러만 끈다. 상세는 `docs/PINATA_TUNING_GUIDE.md`.
+
+## #466 수채 브러시 누적 작품
+
+- 일반 협동은 `WatercolorStampProfile` V2 기본 ON·농도0.9, 기존 수채는 프로필 OFF의 비교 경로다. CPU 패턴·실제 셀/P지도·성장/건조·난수·면적·투척 규칙은 그대로이며 땅따먹기는 기존 청홍 표현이다. 원본은 Editor `BrushMasters`, 512² 표현 데이터는 `GourdPaint/WatercolorBrushes`다. 베이크 해시/설정을 라운드에 고정하고, 판정용 패턴 텍스처를 표현 목적으로 교체하지 않는다.
+- Host `LabPaintArtJournal`은 실제 셀 추가/삭제 지점만 별도 기록한다. 128개 기존 힌트/`paint_cells` 압축 형식을 바꾸거나 Guest 예측 명중을 확정 도색으로 기록하지 않는다. 4KiB 원본 페이지·피어당1개 미확인 페이지·게임 상태 우선·64MiB 원본/2MiB 페이지 캐시를 유지한다. 현재 라운드/관람 뒤 소유한 임시 파일만 정리한다.
+- 수신·적용·GPU 완료는 별도다. `LabGourdPaint`는 GPU 완료 콜백 후 새 순번도 세션에 전달해야 한다. 정확한 관람은 최종 기록/지도/렌더 일치가 필요하나 작품 오류를 게임 판정 실패로 바꾸지 않는다. GPU 재생성은 같은 기록을 재생하며, 연출은 `BattlePresentationTime`을 쓴다.
+- V2는 원본 대비/광학 농도·색역을 보존하는 채도·seed 고정의 끊긴 테두리를 누적 지도에 적용한다. 미세 안료는 경계 보간 뒤 셸 셰이더에서 물체 로컬 방향·실제 종이결로 표시하고 지도 Alpha/P/미도색 종이를 바꾸지 않는다. 최종 표면 입자를 `VisualPaintTexture`에 다시 쌓거나 등장 연출 아래층에 이중 누적하지 않는다. 전투/관람/관람PNG는 같은 지도와 전체 표현 블록을 사용한다. V1 당시 이미지는 이력으로 보존한다.
+- 최신 호환 묶음은 **5684/Lab45/Game29**, 공유 설정257개 그대로이며 표현 버전은 `watercolor-stamps-v2`다. 새 안료 대비1.6·채도1.15·입자0.25/120·테두리 끊김0.45와 기존 농도/테두리 조절을 표현 지문과 라운드 고정에 포함한다. 구현/비교는 `docs/WATERCOLOR_BRUSH_STAMPS.md`, 실제 실행 결과는 `docs/VALIDATION.md`를 따른다.
+
+- #466 V3는 `Assets/Editor/WatercolorPaint/V3`의 비교 전용 시제품이다. 게임 기본값은 V2를 유지하며 시각 승인 전 V3를 Resources/Scene/실제 라운드 준비에 연결하지 않는다. 별도 셰이더/브러시 주입은 UNITY_EDITOR에서만 컴파일하고 기본 생성자를 보존한다. V3는 원본 V2 기록을 읽는 비교 ID이며 게임 접속 버전과 혼동하지 않는다. 원본 브러시/한지·V2 베이크/프로필을 덮어쓰지 않는다.
+
+
+## #466 최신 승인 — 불투명 한지 얼룩 스티커
+
+- 일반 협동의 저장 프로필은 `PaperSticker`·`paper-stickers-v1`이 기본이다. 기존 Watercolor 생성자/자료/V3 실험은 비교용으로 보존한다. 최신 표현은 `docs/PAPER_STICKER_PAINT.md`를 따르며 위 수채 관련 문장은 해당 중간 버전 이력이다. Scene·Prefab·박 모델을 새 시안 모양으로 자동 교체하지 않는다.
+- 새 CPU/GPU 공통 Splatter 마스크는 `GourdPaint/PaperSticker`에 별도 보관한다. Host/Solo는 빈 라운드에서 명시적으로 선택한다. 기존 패턴 캐시와 Broad/Flow/Legacy·땅따먹기는 유지한다. 초기/반복 예산은 유지하지만 새 외곽의 실제 셀 위치·색/P해시는 의도적으로 달라진다.
+- 새 지급 셀은 도장 UV 범위와 무관하게 Alpha1로 채우고, 기존 칠 위 겹침은 새 마스크 안에서 불투명 덮기다. 종이결·얇은 경계는 RGB만 바꾸며 P지도/면적/건조 판정으로 역산하지 않는다. 보조 최상층 ID 자원도 복구와 GPU 작업 예산에 포함한다.
+- 저널/4KiB증분/Bulk/압축 형식과 공유 설정257개를 보존한다. 새 모드·설정·베이크 버전은 라운드에 고정하며 접속은 **5685/Lab46/Game30**이다. 모든 기기가 같은 새 빌드를 사용한다. 빌드 전 새 데이터 검사는 읽기 전용이고 자동 재베이크하지 않는다. 실제 실행 결과만 VALIDATION에 기록한다.
+
+
+## #466 별도 곡면 스티커 시제품 — 외형 승인 대기
+
+- `Assets/Editor/WatercolorPaint/SurfaceSticker`는 실제 박 곡면에 별도 MeshRenderer로 RGBA 에셋을 붙이는 Editor-only 비교다. 게임 기본 PaperSticker/저널/프로토콜/판정/Scene은 변경하지 않는다. 실행·열별 의미·한계는 `docs/SURFACE_STICKER_PROTOTYPE.md`를 따른다.
+- raw 열은 에셋 원형을 보여주는 외형 비교이며 실제 도색 면적 일치를 보장하지 않는다. fitted 열은 기존 지급 셀을 유지하되 에셋 Alpha 대신 실제 영역을 쓰므로 셀 윤곽이 남는다. 외형과 판정의 대응을 승인받기 전 기본 게임에 연결하지 않는다. 기존 칠 위 재덮기·성장 중 UV 고정·실시간 누적·관람/PNG/네트워크 연결 완료로 해석하지 않는다.
+- 원본 박/한지/생성 에셋과 이전 #466 작업을 보존한다. `LabPaintStudyRenderer`의 선택적 `configureStudyInstance`는 Preview Scene 복사본만 조작한다. 검증 앱과 실기기는 이번 범위에서 실행하지 않는다.
+
+
+## #506 현재 기본 표현 — 곡면 클레이 스티커
+
+- 사용자 원형 부착 승인과 #506에 따라 저장 프로필은 `ClaySticker`·`clay-stickers-v1`이다. 이전 Paper/Watercolor와 Editor 비교 자료를 보존하며 현재 연결·범위는 `docs/CLAY_STICKER_PAINT.md`가 우선한다. 원본 박 재질은 색 지도 Ready0, 별도 `Clay Sticker Overlay`가 원본 메시를 공유해 누적 색/높이를 표시한다. 도장마다 메시·GameObject를 생성하지 않는다. 한지 내부결 대신 둥근 클레이 표면/겹침 음영을 쓴다.
+- 실제 Host 접촉 법선/속도의 정면 속도를 초기0~20m/s 기준으로 정규화해 `LabPaintVisualStamp.impact01` 예약 바이트에 보존한다. 0은legacy0.5, 44바이트 크기는 유지한다. 농도는흰클레이→같은오행색 .65~1, Alpha/면적/성장/물리/스태미나/P판정을바꾸지않는다.
+- 원형 표현은 고정2셀 시각여유를 허용하며 면적에는포함하지않는다. 100%는 실제셀판정이고마지막표시빈틈은별도클레이바탕으로채운다. 건조는모든누적색/높이를제거하며0셀에서시각여유까지비운다. 저널/페이지/캐시/과거자국보존정책은유지한다.
+- DEV257(두께0~.02, 기본.006)·258(광택0~1, 기본.25)을뒤에붙여259개다. Host Pause중즉시미리보기는 `clay_appearance`의session/round/config/sequence를검사한다. 실제렌더는 `network.ClayThickness/ClayGloss`, sourceConfig를재저장하지않는다. HapioCommon프로필은두값을다음stage에도기억한다. 새접속묶음5686/Lab47/Game31, 원격main5683과혼용금지.
+- 최초준비는라운드생성성공→Synchronizing→기존ready/Countdown gate순서다. 첫프레임표시미준비를라운드생성실패로간주해Loading에갇히게하지않는다. 기존입력차단/전원시작확인은우회하지않는다.
+- 관람은색/P/높이를모두독립복사하고기본박Ready0을유지한다. 클레이해제는지연Destroy전에Renderer를즉시끈다. 빌드검사는읽기전용이며원본/데이터팩을자동베이크하지않는다. 실제실행결과만VALIDATION에기록하며iOS/실네트워크검증은이번범위에포함하지않았다.
+
+- #506 최신 main 통합: #507의 스테이지별 몸통/뚜껑 Rig·판정·연속 줄·요괴를 유지한다. 클레이는 각 paintShell/paintExtra의 identity 자식이며 결과 복제도 각 base의 Ready0과 coat의 Ready1을 유지한다. #482 도색 준비를 유지하고 새 클레이의 3브러시×색/높이 패스도 별도 작은 타깃에서 준비한다. 실제 지도·진행 순번·난수는 프리워밍으로 바꾸지 않는다.
 
 ## #479 지귀 A 부적 — 최신 호환 기준
 
@@ -211,4 +248,4 @@
 - Host는 그 자리의 소각 예약을 지우고 `jigwiTalismanReward` Water 5개(수명 15초, 칠 1.5배, B 불 꼬리 없음)를 준다. 모든 자리가 쓰면 A를 Completed로 일찍 끝내고, 못 쓰면 15초에 벌점 없이 끝난다.
 - DEV241/242는 은퇴 슬롯("Reserved …(unused)", 인덱스 보존, Home/Lobby 저장 라벨도 맞춤)이다. A 스태미나 화염 테두리, 화면 붉은 기운/양옆 불기둥, 구슬 위 불꽃 그림은 지웠고(구슬은 마감 전 1초 동안 `LabJigwiOrbFlame`이 아래에서 위로 타 들어가고, 그 선 위에 먹선 불꽃이 따라 올라감), A 외침은 `PatternAudioProfile.personalVoiceEnabled`(0)로 꺼 두었다(B 외침은 유지).
 - 에디터 전용: `Hapio > DEV SOLO 시작 스테이지` 메뉴(EditorPrefs, Home에서 Play할 때만 적용). 빌드와 Test Runner에는 영향이 없다.
-- 현재 호환 묶음은 설정 257개·5684·`C6PhysicsLab/45`·`C6HapioGame/31`다. main의 #507이 Game29·30을 먼저 써서 #479는 Game31로 올렸다. 이전 5683 앱, Game29·30 앱과 혼용하지 않는다.
+- 현재 호환 묶음은 설정 259개(#506 클레이 257·258 포함)·**5687**·`C6PhysicsLab/48`·`C6HapioGame/32`다. main의 #466/#506/#507이 5684~5686·Lab45~47·Game29~31을 먼저 써서 #479는 그 위로 올렸다. 이전 빌드와 혼용하지 않는다.

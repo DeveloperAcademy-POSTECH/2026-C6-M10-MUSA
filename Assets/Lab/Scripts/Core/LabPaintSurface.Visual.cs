@@ -36,7 +36,8 @@ namespace C6Lab
         private static bool SameStamp(LabPaintVisualStamp a, LabPaintVisualStamp b)
             => a.sequence == b.sequence && SameVectorBits(a.center, b.center) && SameVectorBits(a.right, b.right)
                 && SameFloatBits(a.radius, b.radius)
-                && a.color.Equals(b.color) && a.painterSlot == b.painterSlot && a.pattern == b.pattern && a.seed == b.seed;
+                && a.color.Equals(b.color) && a.painterSlot == b.painterSlot && a.pattern == b.pattern && a.seed == b.seed
+                && a.impact01 == b.impact01;
 
         private static bool SameVectorBits(Vector3 a, Vector3 b) => SameFloatBits(a.x, b.x)
             && SameFloatBits(a.y, b.y) && SameFloatBits(a.z, b.z);
@@ -48,10 +49,10 @@ namespace C6Lab
             unchecked { VisualVersion++; }
         }
 
-        private void RecordVisualStamp(PatternPatch patch, Color32 color, byte painterSlot)
+        private void RecordVisualStamp(PatternPatch patch, Color32 color, byte painterSlot, byte impact01 = 0)
         {
             if (patch == null || nextVisualSequence == uint.MaxValue) return;
-            LabPaintVisualStamp stamp = patch.VisualStamp(++nextVisualSequence, color, painterSlot, pattern);
+            LabPaintVisualStamp stamp = patch.VisualStamp(++nextVisualSequence, color, painterSlot, pattern, impact01);
             if (visualStamps.Count == LabPaintVisualStamp.MaximumCount) visualStamps.RemoveAt(0);
             visualStamps.Add(stamp);
             unchecked { VisualVersion++; }
@@ -69,7 +70,7 @@ namespace C6Lab
                 pattern == LabPaintPattern.Flow ? 0f : (StableUnit(salt) - .5f) * Mathf.PI * 2f, salt);
             patch.Radius = Mathf.Max(Mathf.Sqrt(4f * Mathf.PI / CellCount),
                 Mathf.Sqrt((float)(ink.VisualBudget / CellCount) * Mathf.PI / patternMask.FootprintFraction));
-            RecordVisualStamp(patch, ink.Color, ink.PainterSlot);
+            RecordVisualStamp(patch, ink.Color, ink.PainterSlot, ink.Impact01);
         }
     }
 }

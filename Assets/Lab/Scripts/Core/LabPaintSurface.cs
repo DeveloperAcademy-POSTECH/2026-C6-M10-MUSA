@@ -111,11 +111,21 @@ namespace C6Lab
             // deserializes a scene. Resource APIs are illegal there; resolve the mask only for
             // an actual new impact, before that impact changes authoritative state.
             patternMask = null;
+            paperStickerContour = false;
             flowStyle = settings.Style;
             raggedness = settings.Raggedness;
             initialSeed = seed;
             ConfigureDrying(settings);
             Clear();
+        }
+
+        /// <summary>
+        /// Resolve the judgment mask behind the preparing overlay, instead of on the first hit (#482).
+        /// An already selected paper/clay contour remains pinned to this round.
+        /// </summary>
+        public void PreloadPatternMask()
+        {
+            if (pattern != LabPaintPattern.Legacy && patternMask == null) patternMask = LabPaintPatternMask.Load(pattern);
         }
 
         /// <summary>
@@ -128,16 +138,7 @@ namespace C6Lab
         /// orb paints less (#213). A share of 0 paints nothing. 박 색상 콤보(#222)의 페널티(1보다 작음)/보상(1보다 큼)
         /// 배율도 여기에 곱해서 들어오므로 최대 3까지 받는다.
         /// </summary>
-        /// <summary>
-        /// Resolves the judgment mask now instead of on the first hit (#482). The Host calls this right after a round
-        /// begins, behind the preparing overlay; the mask and every hit it judges are the same as before.
-        /// </summary>
-        public void PreloadPatternMask()
-        {
-            if (pattern != LabPaintPattern.Legacy && patternMask == null) patternMask = LabPaintPatternMask.Load(pattern);
-        }
-
-        public bool RegisterHit(Vector3 direction, Color color, ulong attackerId, int painterSlot = 0, float share = 1f)
+        public bool RegisterHit(Vector3 direction, Color color, ulong attackerId, int painterSlot = 0, float share = 1f, float impactStrength = .5f)
         {
             if (painterSlot < 0 || painterSlot > MaxPainterSlot) return false;
             if (!Finite(share) || share <= 0f || share > 3f) return false;
@@ -150,26 +151,27 @@ namespace C6Lab
             RefreshNearbyPaint(direction.normalized);
             if (PaintCount < int.MaxValue) PaintCount++;
             Color32 opaque = Opaque(color);
+            byte impact01 = LabPaintVisualStamp.EncodeImpactStrength(impactStrength);
             if (pixels[cell].a != 0)
             {
                 Region existing = Root(cellRegions[cell]);
-                Supply(existing, repeat, opaque, attackerId, (byte)painterSlot, true);
+                Supply(existing, repeat, opaque, attackerId, (byte)painterSlot, true, impact01: impact01);
                 RefreshActive(existing);
                 return true;
             }
             if (pattern != LabPaintPattern.Legacy)
             {
-                RegisterPatternHit(direction.normalized, cell, opaque, attackerId, (byte)painterSlot, initial);
+                RegisterPatternHit(direction.normalized, cell, opaque, attackerId, (byte)painterSlot, initial, impact01);
                 return true;
             }
             if (paintBlocker != null)
             {
-                RegisterBlockedLegacyHit(direction.normalized, cell, opaque, attackerId, (byte)painterSlot, initial);
+                RegisterBlockedLegacyHit(direction.normalized, cell, opaque, attackerId, (byte)painterSlot, initial, impact01);
                 return true;
             }
             var region = new Region(regions.Count);
             regions.Add(region);
-            Ink initialInk = Supply(region, initial, opaque, attackerId, (byte)painterSlot);
+            Ink initialInk = Supply(region, initial, opaque, attackerId, (byte)painterSlot, impact01: impact01);
             int immediate = (int)Math.Min(decimal.Floor(initial), CellCount - CoveredCount);
             region = PaintFundedCell(region, cell, initialInk);
             InitialPatch patch = flowStyle == 1 ? new InitialPatch(this, direction.normalized, cell) : null;
@@ -224,14 +226,14 @@ namespace C6Lab
         }
 
         private Ink Supply(Region region, decimal amount, Color32 color, ulong owner, byte painterSlot,
-            bool chooseClusterAnchor = false, int clusterAnchor = -1)
+            bool chooseClusterAnchor = false, int clusterAnchor = -1, byte impact01 = 0)
         {
             // Cap each component independently: a global cap can strand separate cell fractions.
             amount = Math.Max(0m, Math.Min(amount, CellCount - CoveredCount - region.Budget));
             if (amount == 0m) return null;
             ulong sequence = ++supplySequence;
             var ink = new Ink { Sequence = sequence, Remaining = amount, Color = color, Owner = owner,
-                PainterSlot = painterSlot, VisualBudget = amount };
+                PainterSlot = painterSlot, VisualBudget = amount, Impact01 = impact01 };
             // Existing fill/vertical weights choose a boundary once per accepted repeat hit.
             // Overlap credit instead stays centered on its own initial impact. Subsequent
             // cells use the frozen job's geometry rather than another global boundary draw.
@@ -303,6 +305,7 @@ namespace C6Lab
             CoveredCount++;
             LastPainter = ink.Owner;
             unchecked { Revision++; }
+            RecordArtPaint(ink, cell);
             for (int side = 0; side < 4; side++)
             {
                 int other = Neighbor(cell, side);
@@ -443,6 +446,7 @@ namespace C6Lab
 
         public void Clear()
         {
+            ArtJournal = null;
             paintBlocker = null;
             blockSupplies.Clear(); blockFunding.Clear();
             Array.Clear(pixels, 0, pixels.Length);
@@ -590,12 +594,14 @@ namespace C6Lab
         {
             public int Anchor = -1;
             public ulong Sequence;
+            public uint ArtStroke;
             public decimal Remaining;
             public decimal VisualBudget;
             public bool VisualRecorded;
             public Color32 Color;
             public ulong Owner;
             public byte PainterSlot;
+            public byte Impact01;
             public GrowthCluster Cluster;
         }
         private sealed class Region

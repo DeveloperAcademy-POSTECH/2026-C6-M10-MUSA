@@ -1,0 +1,6 @@
+{
+  "name": "Hapio.ClayPreview.Runtime",
+  "rootNamespace": "Hapio.Experiments",
+  "references": [],
+  "autoReferenced": true
+}

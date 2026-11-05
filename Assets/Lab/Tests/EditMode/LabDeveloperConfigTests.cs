@@ -41,7 +41,7 @@ namespace C6Lab.Tests
         public void DeveloperFormCoversEveryTuningValueAndAppliesValidChanges()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(257));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(259));
             Assert.That(values[89], Is.EqualTo(50f), "The fuse sizzle starts at the Inspector volume.");
             Assert.That(new[] { values[90], values[91], values[92], values[93] }, Is.EqualTo(new[] { 20f, 40f, 60f, 80f }),
                 "A handed-on drum stops 20-40, 40-60 or 60-80% of the board in from where it entered.");
@@ -561,7 +561,7 @@ namespace C6Lab.Tests
         [Test]
         public void RetiredGourdModeKeepsIndex79FixedWithoutShiftingAnyTuningValue()
         {
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(257));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(259));
             Assert.That(LabConfig.DeveloperFields[78].Label, Is.EqualTo("Drum Spin Strength"));
             Assert.That(LabConfig.DeveloperFields[80].Label, Is.EqualTo("Bomb Blast Radius (board widths)"));
             LabDeveloperField field = LabConfig.DeveloperFields[79];
@@ -621,7 +621,7 @@ namespace C6Lab.Tests
             string acceptedFingerprint = LabSessionSettings.Fingerprint(values, 3, protocol);
             string json = JsonUtility.ToJson(new SharedModeSettings { values = values });
             float[] received = JsonUtility.FromJson<SharedModeSettings>(json).values;
-            Assert.That(received.Length, Is.EqualTo(257));
+            Assert.That(received.Length, Is.EqualTo(259));
             Assert.That(received[79], Is.Zero);
             Assert.That(LabSessionSettings.Fingerprint(received, 3, protocol), Is.EqualTo(acceptedFingerprint));
             var clientConfig = ScriptableObject.CreateInstance<LabConfig>();
@@ -768,7 +768,7 @@ namespace C6Lab.Tests
                 "Completed Gourd Viewer (0 off, 1 on)"
             };
             Assert.That(previousLabels.Length, Is.EqualTo(111));
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(257));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(259));
             for (int i = 0; i < previousLabels.Length; i++)
                 Assert.That(LabConfig.DeveloperFields[i].Label, Is.EqualTo(previousLabels[i]), "Index " + i);
             Assert.That(LabConfig.DefaultPaintVictoryPercent, Is.EqualTo(100));
@@ -804,7 +804,7 @@ namespace C6Lab.Tests
             foreach (LabDeveloperCategory category in LabConfig.DeveloperCategories)
                 Assert.That(category.FieldIndices.Intersect(LabConfig.RetiredDeveloperFields), Is.Empty, category.Title);
             Assert.That(LabConfig.DeveloperCategories.Single(category => category.Title == "Gourd").FieldIndices,
-                Is.EqualTo(new[] { 140, 79, 104, 105, 106, 138, 139, 107, 108, 109, 110, 137, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 134, 132, 133, 148, 149, 150, 151, 200, 201 }));
+                Is.EqualTo(new[] { 140, 79, 104, 105, 106, 138, 139, 107, 108, 109, 110, 137, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 134, 132, 133, 148, 149, 150, 151, 200, 201, LabConfig.ClayThicknessField, LabConfig.ClayGlossField }));
 
             float[] values = config.CaptureDeveloperValues();
             values[87] = 5f; values[88] = 6f; values[152] = 0f; values[154] = 1f; values[167] = 2f; values[168] = 3f;
@@ -877,7 +877,7 @@ namespace C6Lab.Tests
             Assert.That(LabConfig.DeveloperFields[104].WholeNumber, Is.True);
             for (int i = 105; i <= 109; i++) Assert.That(LabConfig.DeveloperFields[i].WholeNumber, Is.False);
             var gourd = LabConfig.DeveloperCategories.Single(category => category.Title == "Gourd");
-            Assert.That(gourd.FieldIndices, Is.EqualTo(new[] { 140, 79, 104, 105, 106, 138, 139, 107, 108, 109, 110, 137, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 134, 132, 133, 148, 149, 150, 151, 200, 201 }));
+            Assert.That(gourd.FieldIndices, Is.EqualTo(new[] { 140, 79, 104, 105, 106, 138, 139, 107, 108, 109, 110, 137, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 134, 132, 133, 148, 149, 150, 151, 200, 201, LabConfig.ClayThicknessField, LabConfig.ClayGlossField }));
         }
 
         [TestCase(104, 0f, 2f)]
@@ -998,7 +998,7 @@ namespace C6Lab.Tests
         public void CompletedGourdViewerDefaultsOnAtItsPreservedIndexWithoutChangingTheFixedGoal()
         {
             float[] values = config.CaptureDeveloperValues();
-            Assert.That(values.Length, Is.EqualTo(257));
+            Assert.That(values.Length, Is.EqualTo(259));
             Assert.That(config.CompletedGourdViewerEnabled, Is.True);
             Assert.That(values[110], Is.EqualTo(1f));
             LabDeveloperField field = LabConfig.DeveloperFields[110];
@@ -1093,7 +1093,7 @@ namespace C6Lab.Tests
                 "The room must acknowledge the Host's viewing permission with its other settings.");
             string json = JsonUtility.ToJson(new SharedModeSettings { values = values });
             float[] received = JsonUtility.FromJson<SharedModeSettings>(json).values;
-            Assert.That(received.Length, Is.EqualTo(257));
+            Assert.That(received.Length, Is.EqualTo(259));
             var client = ScriptableObject.CreateInstance<LabConfig>();
             try
             {
@@ -1434,7 +1434,7 @@ namespace C6Lab.Tests
         public void YaguangScheduleAppendsWithoutAnEngineSwitchAndRoundTripsEverySlot()
         {
             float[] before = config.CaptureDeveloperValues();
-            Assert.That(before.Length, Is.EqualTo(257));
+            Assert.That(before.Length, Is.EqualTo(259));
             Assert.That(before.Skip(211).Take(14), Is.EqualTo(new[] { 120f, 100f, 10f, 0f, 35f, 1f, 60f, 0f, 75f, 1f, 25f, 40f, 60f, 80f }));
             Assert.That(LabConfig.DeveloperFields.Skip(211).Take(14).Any(field => field.IsToggle), Is.False,
                 "Stage identity chooses this policy; no parallel timeline engine switch exists.");
@@ -1563,7 +1563,7 @@ namespace C6Lab.Tests
             LabConfig authored = Resources.Load<LabConfig>("LabConfig");
             Assert.That(authored, Is.Not.Null);
             Assert.That(authored.RecordGimmickStats, Is.False, "The saved Config does not record either.");
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(257), "The switch adds no DEV row and no shared value.");
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(259), "The switch adds no DEV row and no shared value.");
             Assert.That(LabConfig.DeveloperFields.Any(field => field.Label.IndexOf("stat", System.StringComparison.OrdinalIgnoreCase) >= 0),
                 Is.False);
 
@@ -1589,7 +1589,7 @@ namespace C6Lab.Tests
         {
             float[] before = config.CaptureDeveloperValues();
             float[] values = (float[])before.Clone();
-            Assert.That(values, Has.Length.EqualTo(257));
+            Assert.That(values, Has.Length.EqualTo(259));
             values[202] = 0f; values[203] = 10f; values[204] = 4.5f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
             Assert.That(config.YaguangFlashShakeRelease, Is.False);
@@ -1619,7 +1619,7 @@ namespace C6Lab.Tests
         [Test]
         public void RawStreakSettingsAppendThreeRowsToGenerationAndKeepNewSavedAndRuntimeDefaults()
         {
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(257));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(259));
             Assert.That(LabConfig.DeveloperFields.Skip(225).Take(3).Select(field => field.Label), Is.EqualTo(new[]
             {
                 "Raw Streak Correction (0 off, 1 on)", "Opposite Chance After 2 Raw (%)", "Maximum Consecutive Raw"

@@ -33,8 +33,7 @@ namespace Hapio.Tests
             yield return Until(() => GameSession.Instance != null && !GameSession.Instance.IsLoadingScene, "Saved Home");
             session = GameSession.Instance; network = session.Network;
             yield return null;
-            var probe = new TcpListener(IPAddress.Loopback, 0);
-            probe.Start(); network.port = (ushort)((IPEndPoint)probe.LocalEndpoint).Port; probe.Stop();
+            network.port = AvailableDualFamilyPort();
         }
 
         [UnityTearDown]
@@ -218,6 +217,32 @@ namespace Hapio.Tests
         {
             int index = Enumerable.Range(0, LabConfig.DeveloperFields.Count).Single(i => LabConfig.DeveloperFields[i].Label == label);
             values[index] = value;
+        }
+
+        private static ushort AvailableDualFamilyPort()
+        {
+            // The real Host binds UDP in both address families. A TCP loopback probe
+            // does not establish that the same number is free for either UDP listener.
+            for (int attempt = 0; attempt < 16; attempt++)
+                using (var ipv4 = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp))
+                {
+                    ipv4.Bind(new IPEndPoint(IPAddress.Any, 0));
+                    int port = ((IPEndPoint)ipv4.LocalEndPoint).Port;
+                    try
+                    {
+                        if (Socket.OSSupportsIPv6)
+                            using (var ipv6 = new Socket(AddressFamily.InterNetworkV6, SocketType.Dgram, ProtocolType.Udp))
+                            {
+                                ipv6.DualMode = false;
+                                ipv6.Bind(new IPEndPoint(IPAddress.IPv6Any, port));
+                            }
+                        // Only the disposable probes retry. Production starts once with
+                        // both probe sockets released, and real bind errors stay visible.
+                        return checked((ushort)port);
+                    }
+                    catch (SocketException error) when (error.SocketErrorCode == SocketError.AddressAlreadyInUse) { }
+                }
+            throw new InvalidOperationException("The test could not reserve a dual-family UDP Host port.");
         }
 
         private IEnumerator WaitPlaying(int stage) => Until(() => session.State.phase == GameFlowPhase.Playing

@@ -61,8 +61,8 @@ namespace C6Lab.Tests
         [UnityTest]
         public IEnumerator GourdToggleAndThreeSlidersApplyToSoloRestartWithoutEditingTheSource()
         {
-            Assert.That(developer.valueInputs.Length, Is.EqualTo(257));
-            Assert.That(developer.valueSliders.Length, Is.EqualTo(257));
+            Assert.That(developer.valueInputs.Length, Is.EqualTo(259));
+            Assert.That(developer.valueSliders.Length, Is.EqualTo(259));
             Assert.That(network.config.PaintDryingEnabled, Is.True, "Fresh game sessions enable drying by default.");
             developer.Open();
             developer.panel.GetComponentsInChildren<Button>(true)
@@ -193,6 +193,9 @@ namespace C6Lab.Tests
             Assert.That(paint.PaintTexture.GetPixels32(), Is.EqualTo(frozen));
             Assert.That(Slots(model.PaintSurface), Is.EqualTo(owners));
             double finishDeadline = Time.realtimeSinceStartupAsDouble + 3d;
+            // This test retains the new default: let ordinary presentation updates report
+            // history/GPU readiness without forcing a capture or restarting the finish budget.
+            yield return LabPaintPresentationTestFixture.SettleRecordedArtwork(network, paint);
             while (!finish.Complete && Time.realtimeSinceStartupAsDouble < finishDeadline) yield return null;
             Assert.That(finish.Complete, Is.True, "The real-time completion presentation must finish within its bounded budget.");
             Assert.That(LabPaintFinishPresentation.DelayResult(network, network.Snapshot), Is.False);
@@ -236,6 +239,8 @@ namespace C6Lab.Tests
             settings.RepeatPercent = 0f; settings.GrowthPercentPerSecond = 0f;
             model.PaintSurface.Reset(settings, 225u);
             typeof(LabNetwork).GetField("model", Private).SetValue(network, model);
+            typeof(LabNetwork).GetField("sessionId", Private).SetValue(network, "drying-presentation");
+            typeof(LabNetwork).GetMethod("BeginPaintArt", Private).Invoke(network, null);
             return model;
         }
         private LabModel Model() => (LabModel)typeof(LabNetwork).GetField("model", Private).GetValue(network);
@@ -250,6 +255,7 @@ namespace C6Lab.Tests
         {
             LabSnapshot snapshot = model.Snapshot(now);
             typeof(LabNetwork).GetField("latest", Private).SetValue(network, snapshot);
+            typeof(LabNetwork).GetMethod("CommitPaintArt", Private).Invoke(network, new object[] { snapshot });
             typeof(LabNetwork).GetMethod("CopyPaintToDisplay", Private)
                 .Invoke(network, new object[] { model.PaintSurface, snapshot });
             paint.RefreshCommittedMap();
