@@ -8,6 +8,7 @@ namespace C6Lab
     /// Text와 달리 줄 높이·여백 없이 글자 모양 범위만 칸에 맞추므로, 판정 점선(글자 칸 0~1 좌표)과 정확히 겹친다.
     /// Mask의 그림으로 쓰면 자식(먹 붓 점)이 글자 모양 안에만 보인다.
     /// </summary>
+    [RequireComponent(typeof(CanvasRenderer))]
     public sealed class LabJigwiTalismanGlyph : MaskableGraphic
     {
         private Font font;

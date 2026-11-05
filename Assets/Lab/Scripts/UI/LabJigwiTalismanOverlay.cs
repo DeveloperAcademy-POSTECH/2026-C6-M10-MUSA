@@ -351,7 +351,10 @@ namespace C6Lab
             RectTransform dotParent = glyphArea;
             if (IsShilla(font))
             {
-                glyph = NewRect("Talisman Ghost Glyph (물)", glyphArea).gameObject.AddComponent<LabJigwiTalismanGlyph>();
+                GameObject ghost = NewRect("Talisman Ghost Glyph (물)", glyphArea).gameObject;
+                // A runtime-added custom Graphic needs its CanvasRenderer in place before it enables.
+                if (ghost.GetComponent<CanvasRenderer>() == null) ghost.AddComponent<CanvasRenderer>();
+                glyph = ghost.AddComponent<LabJigwiTalismanGlyph>();
                 glyph.raycastTarget = false; glyph.color = ghostColor; glyph.GlyphFont = font;
                 RectTransform g = glyph.rectTransform;
                 g.anchorMin = GlyphInkRect.min; g.anchorMax = GlyphInkRect.max; g.offsetMin = g.offsetMax = Vector2.zero;
