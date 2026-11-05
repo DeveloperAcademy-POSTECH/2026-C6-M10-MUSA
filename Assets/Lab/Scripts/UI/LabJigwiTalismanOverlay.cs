@@ -24,8 +24,14 @@ namespace C6Lab
         [SerializeField] private Color inkColor = new Color(.72f, .11f, .07f, 1f);
         [Tooltip("#533: 아직 안 쓴 글자 획 색. 둥근 점이 겹치므로 불투명으로 둔다(반투명이면 겹친 곳이 얼룩진다).")]
         [SerializeField] private Color guideColor = new Color(.79f, .67f, .4f, 1f);
-        [Tooltip("#479/#533: 손가락이 지나가 칠해진 획 색. #533부터 먹색(붓글씨).")]
-        [SerializeField] private Color writtenColor = new Color(.16f, .08f, .1f, 1f);
+        [Tooltip("#479/#533: 손가락이 지나가 칠해진 획 색. #533부터 수채화 파랑(반투명 점이 겹쳐 물감처럼 고인다). 알파가 낮을수록 묽다.")]
+        [SerializeField] private Color writtenColor = new Color(.16f, .47f, .93f, .34f);
+        [Tooltip("#533: 수채화 점마다 색이 조금씩 흔들리는 정도 (0이면 모두 같은 색).")]
+        [SerializeField, Range(0f, .3f)] private float watercolorJitter = .12f;
+        [Tooltip("#533: 흐린 글자의 경계선 색 (칠하기 전부터 글자 모양이 보이게).")]
+        [SerializeField] private Color ghostOutlineColor = new Color(.62f, .45f, .22f, 1f);
+        [Tooltip("#533: 흐린 글자 경계선 두께 (화면 픽셀).")]
+        [SerializeField, Range(0f, 6f)] private float ghostOutlineWidth = 2.5f;
         [Tooltip("#533: 아직 안 쓴 \"물\" 글자(실제 글꼴)를 흐리게 깔아 두는 색.")]
         [SerializeField] private Color ghostColor = new Color(.88f, .76f, .48f, 1f);
         [Tooltip("#533: 먹 붓 굵기 (글자 칸 대비). 지나간 곳의 글자 획을 이만큼 채운다(글자 모양 밖으로는 안 번진다). 판정 거리와는 따로다.")]
@@ -55,7 +61,10 @@ namespace C6Lab
         /// <summary>#533: 신라문화체 굵은 "물"의 글자 모양 범위 (판정 점과 같은 글자 칸 0~1 좌표, 위가 1). 점선에 맞춰 잰 값.</summary>
         private static readonly Rect GlyphInkRect = Rect.MinMaxRect(.149f, .081f, .848f, .92f);
         /// <summary>#533: 흐린 "물" 글자(보통 Text). 먹 붓 점을 글자 모양 안에만 보이게 가리는 Mask 그림이기도 하다.</summary>
-        private UnityEngine.UI.Text ghost;
+        private UnityEngine.UI.Text ghost, ghostEdge;
+        private UnityEngine.UI.Outline ghostOutline;
+        private static Sprite watercolorDot;
+        private Color[] inkColors = Array.Empty<Color>();
         private const int GhostFontSize = 200;
         private readonly TextGenerator ghostGenerator = new TextGenerator();
         /// <summary>#533: 실제 글꼴 글자 위에 먹으로 쓰는 모양인지 (신라문화체가 없으면 예전 점선 모양).</summary>
@@ -94,7 +103,12 @@ namespace C6Lab
             if (labelFont != null) font = labelFont;
             EnsureWidgets();
             if (labelFont != null && hint != null) hint.font = labelFont;
-            if (ghost != null && IsShilla(labelFont) && ghost.font != labelFont) { ghost.font = labelFont; LayoutGlyph(); }
+            if (ghost != null && IsShilla(labelFont) && ghost.font != labelFont)
+            {
+                ghost.font = labelFont;
+                if (ghostEdge != null) ghostEdge.font = labelFont;
+                LayoutGlyph();
+            }
         }
 
         /// <summary>아직 부적을 안 쓴 내 자리가 있는 진행 중인 A. 없으면 null.</summary>
@@ -149,7 +163,7 @@ namespace C6Lab
             fresh.Clear();
             stroke.Paint(from, to, Tolerance, fresh);
             for (int i = 0; i < fresh.Count; i++)
-                if (fresh[i] < dots.Length && dots[fresh[i]] != null) ShowWritten(dots[fresh[i]]);
+                if (fresh[i] < dots.Length && dots[fresh[i]] != null) ShowWritten(dots[fresh[i]], fresh[i]);
             if (stroke.Coverage + 1e-5f < Required) return;
             writtenRound = RoundId;
             CompletedCount++;
@@ -160,10 +174,28 @@ namespace C6Lab
             BeginFinish();
         }
 
-        private void ShowWritten(UnityEngine.UI.Image dot)
+        private void ShowWritten(UnityEngine.UI.Image dot, int index)
         {
-            dot.color = writtenColor;
+            dot.color = InkColor(index);
             if (InkMode) dot.gameObject.SetActive(true);
+        }
+
+        private Color InkColor(int index) => InkMode && index < inkColors.Length ? inkColors[index] : writtenColor;
+
+        /// <summary>#533: 점마다 정해 둔(매번 같은) 수채화 색 흔들림. 물감이 고르게 안 먹은 느낌.</summary>
+        private void BuildInkColors()
+        {
+            inkColors = new Color[dots.Length];
+            var random = new System.Random(533);
+            Color.RGBToHSV(writtenColor, out float h, out float sat, out float v);
+            for (int i = 0; i < inkColors.Length; i++)
+            {
+                float a = (float)random.NextDouble() * 2f - 1f, b = (float)random.NextDouble() * 2f - 1f, c = (float)random.NextDouble() * 2f - 1f;
+                Color tint = Color.HSVToRGB(Mathf.Repeat(h + a * watercolorJitter * .12f, 1f),
+                    Mathf.Clamp01(sat + b * watercolorJitter * .5f), Mathf.Clamp01(v + c * watercolorJitter * .4f));
+                tint.a = Mathf.Clamp01(writtenColor.a * (1f + c * watercolorJitter * 1.5f));
+                inkColors[i] = tint;
+            }
         }
 
         private void BeginFinish()
@@ -192,7 +224,7 @@ namespace C6Lab
             for (int i = 0; i < dots.Length; i++)
             {
                 if (dots[i] == null || !stroke.IsCovered(i)) continue;
-                dots[i].color = Color.Lerp(writtenColor, glowColor, glow);
+                dots[i].color = Color.Lerp(InkColor(i), glowColor, glow);
                 float pulse = 1f + .25f * glow + .08f * Mathf.Sin(finishAge * 14f) * (1f - fade);
                 dots[i].rectTransform.localScale = Vector3.one * pulse;
             }
@@ -264,7 +296,7 @@ namespace C6Lab
             for (int i = 0; i < dots.Length; i++)
             {
                 if (dots[i] == null) continue;
-                if (InkMode) { dots[i].gameObject.SetActive(false); dots[i].color = writtenColor; }
+                if (InkMode) { dots[i].gameObject.SetActive(false); dots[i].color = InkColor(i); }
                 else dots[i].color = guideColor;
             }
         }
@@ -349,6 +381,14 @@ namespace C6Lab
             Vector2 offset = target.center - Vector2.Scale((min + max) * .5f, scale);
             g.localScale = new Vector3(scale.x, scale.y, 1f);
             g.anchoredPosition = offset;
+            if (ghostEdge != null)
+            {
+                RectTransform e = ghostEdge.rectTransform;
+                e.anchorMin = e.anchorMax = e.pivot = g.pivot; e.sizeDelta = g.sizeDelta;
+                e.localScale = g.localScale; e.anchoredPosition = g.anchoredPosition;
+                // The outline offset is in the text's own units, so undo the scale to keep it a steady screen width.
+                if (ghostOutline != null) ghostOutline.effectDistance = new Vector2(ghostOutlineWidth / scale.x, -ghostOutlineWidth / scale.y);
+            }
             for (int i = 0; i < dots.Length; i++)
             {
                 if (dots[i] == null) continue;
@@ -390,6 +430,13 @@ namespace C6Lab
             RectTransform dotParent = glyphArea;
             if (IsShilla(font))
             {
+                // #533: a copy underneath carries the outline, so the letter's edge shows before any writing
+                // and the watercolour (masked by the ghost on top) never paints over it.
+                ghostEdge = NewText("Talisman Ghost Edge (물)", glyphArea, "물", GhostFontSize, ghostOutlineColor);
+                ghostEdge.horizontalOverflow = HorizontalWrapMode.Overflow; ghostEdge.verticalOverflow = VerticalWrapMode.Overflow;
+                ghostEdge.alignment = TextAnchor.MiddleCenter;
+                ghostOutline = ghostEdge.gameObject.AddComponent<UnityEngine.UI.Outline>();
+                ghostOutline.effectColor = ghostOutlineColor; ghostOutline.useGraphicAlpha = true;
                 ghost = NewText("Talisman Ghost Glyph (물)", glyphArea, "물", GhostFontSize, ghostColor);
                 ghost.horizontalOverflow = HorizontalWrapMode.Overflow; ghost.verticalOverflow = VerticalWrapMode.Overflow;
                 ghost.alignment = TextAnchor.MiddleCenter;
@@ -400,7 +447,7 @@ namespace C6Lab
             for (int i = 0; i < dots.Length; i++)
             {
                 var dot = NewRect("Dot " + i, dotParent).gameObject.AddComponent<UnityEngine.UI.Image>();
-                dot.raycastTarget = false; dot.sprite = RoundDot();
+                dot.raycastTarget = false; dot.sprite = InkMode ? WatercolorDot() : RoundDot();
                 // In ink mode FitGhost places the dots inside the scaled glyph.
                 dot.rectTransform.anchorMin = dot.rectTransform.anchorMax = stroke.Samples[i];
                 dot.rectTransform.anchoredPosition = Vector2.zero;
@@ -408,6 +455,7 @@ namespace C6Lab
                 if (InkMode) dot.gameObject.SetActive(false);
                 dots[i] = dot;
             }
+            BuildInkColors();
             LayoutGlyph();
             paper.gameObject.SetActive(false);
         }
@@ -464,6 +512,35 @@ namespace C6Lab
         }
 
         /// <summary>#533: 획 점용 둥근 무늬 (런타임에 한 번 만든다). 둥근 점이 겹쳐 매끈한 굵은 획이 된다.</summary>
+        /// <summary>
+        /// #533: 수채화 점. 가운데는 묽고 가장자리가 조금 진하며(물감이 마르며 테두리에 고이는 느낌), 테두리가 살짝 울퉁불퉁하다.
+        /// </summary>
+        private static Sprite WatercolorDot()
+        {
+            if (watercolorDot != null) return watercolorDot;
+            const int size = 96;
+            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
+            { name = "Talisman Watercolor Dot (#533 runtime)", hideFlags = HideFlags.DontSave, wrapMode = TextureWrapMode.Clamp };
+            var pixels = new Color[size * size];
+            float half = size * .5f;
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    Vector2 d = new Vector2(x + .5f - half, y + .5f - half) / half;
+                    float angle = Mathf.Atan2(d.y, d.x);
+                    float edge = .86f + .07f * Mathf.Sin(angle * 5f + 1.3f) + .05f * Mathf.Sin(angle * 11f + .4f);
+                    float r = d.magnitude / edge;
+                    float body = .55f + .45f * Mathf.SmoothStep(.55f, .95f, r);
+                    float cut = Mathf.Clamp01((1f - r) * half * .6f);
+                    float grain = .85f + .15f * Mathf.PerlinNoise(x * .18f + 11f, y * .18f + 5f);
+                    pixels[y * size + x] = new Color(1f, 1f, 1f, Mathf.Clamp01(body * cut * grain));
+                }
+            texture.SetPixels(pixels); texture.Apply(false, true);
+            watercolorDot = Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(.5f, .5f), 100f);
+            watercolorDot.hideFlags = HideFlags.DontSave;
+            return watercolorDot;
+        }
+
         private static Sprite RoundDot()
         {
             if (roundDot != null) return roundDot;
