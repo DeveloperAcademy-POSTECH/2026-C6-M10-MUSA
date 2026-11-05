@@ -12,6 +12,7 @@ using Object = UnityEngine.Object;
 namespace C6Lab.Tests
 {
     /// <summary>Real GPU replay checks; these do not claim device/network performance validation.</summary>
+    [Category("Slow"), Category("GPU"), Category("Legacy")]
     public sealed class LabWatercolorStampRuntimeTests
     {
         [UnityTest]

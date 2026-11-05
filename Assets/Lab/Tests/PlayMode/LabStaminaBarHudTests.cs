@@ -19,7 +19,7 @@ namespace C6Lab.Tests
             Assert.That(hud.battleUi.transform.Find("FigmaPlayerHpBar").gameObject.activeSelf, Is.False);
             Assert.That(hud.battleUi.transform.Find("BottomHudBackground").gameObject.activeSelf, Is.False);
             var network = hud.network;
-            network.port = 18271;
+            network.port = LabSavedSceneNetworkFixture.AvailableDualFamilyPort();
             const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
             try
             {

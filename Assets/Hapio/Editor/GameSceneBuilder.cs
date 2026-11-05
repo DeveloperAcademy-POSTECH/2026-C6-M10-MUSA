@@ -131,51 +131,22 @@ namespace Hapio.Editor
             });
         }
 
-        /// <summary>Explicitly refresh the separate Battle copy and extend only the menu DEV settings.</summary>
-        [MenuItem("Hapio/Upgrade Existing Game Scenes From Current Lab")]
-        public static void UpgradeScenesForCurrentLab()
+        /// <summary>
+        /// Targeted refresh of the separate menu Scenes: Home/Lobby DEV rows and the result/game-over fonts.
+        /// Battle is never opened or saved. It used to be re-copied from the saved Lab here, but Battle now
+        /// owns content Lab does not have (stage backgrounds, floors, decorations, lighting), so a whole-Scene
+        /// copy would erase it. Carry a Lab change into Battle by editing Battle itself or a targeted upgrade.
+        /// </summary>
+        public static void UpgradeMenusWithoutBattle()
         {
-            UpgradeBattleFromSavedLab();
             UpgradeMenuDeveloperSchema();
             UpgradeScene(GameScenePaths.StageResult, UpgradeFonts);
             UpgradeScene(GameScenePaths.GameOver, UpgradeFonts);
         }
 
-        /// <summary>Copy the current saved Lab through Unity while keeping the existing Battle asset identity.</summary>
-        public static void UpgradeBattleFromSavedLab()
-        {
-            if (!File.Exists(GameScenePaths.Battle))
-                throw new InvalidOperationException("Create the separate game Scenes before upgrading Battle.");
-            Scene loadedBattle = SceneManager.GetSceneByPath(GameScenePaths.Battle);
-            if (loadedBattle.IsValid() && loadedBattle.isLoaded)
-                throw new InvalidOperationException("Close Battle before refreshing its saved Lab copy.");
-            string guid = AssetDatabase.AssetPathToGUID(GameScenePaths.Battle);
-            Scene previous = SceneManager.GetActiveScene();
-            Scene source = SceneManager.GetSceneByPath(SourceBattle);
-            bool owned = !source.IsValid() || !source.isLoaded;
-            if (!owned && source.isDirty)
-                throw new InvalidOperationException("Save the current Lab edits before copying its saved Scene.");
-            if (owned) source = EditorSceneManager.OpenScene(SourceBattle, OpenSceneMode.Additive);
-            try
-            {
-                // saveAsCopy leaves the loaded source path and Lab file untouched. Saving over the
-                // existing destination preserves its .meta/GUID, unlike deleting and copying an asset.
-                if (!EditorSceneManager.SaveScene(source, GameScenePaths.Battle, true))
-                    throw new InvalidOperationException("Could not refresh the separate Battle copy.");
-            }
-            finally
-            {
-                if (owned && source.IsValid() && source.isLoaded) EditorSceneManager.CloseScene(source, true);
-                if (previous.IsValid() && previous.isLoaded) SceneManager.SetActiveScene(previous);
-            }
-            if (AssetDatabase.AssetPathToGUID(GameScenePaths.Battle) != guid)
-                throw new InvalidOperationException("Refreshing Battle unexpectedly changed its asset GUID.");
-            UpgradeScene(GameScenePaths.Battle, ConfigureBattle);
-        }
-
         /// <summary>
-        /// Append only the new DEV rows (#281: 2:2 territory 196-199, #301: flash shake release 202-203; #305: charm warning 204) to Home and Lobby. Unlike the Lab upgrade
-        /// above, this never copies Battle again, so Battle-only edits and the lobby layout stay as they are.
+        /// Append only the new DEV rows (#281: 2:2 territory 196-199, #301: flash shake release 202-203; #305: charm warning 204) to Home and Lobby.
+        /// This never copies or saves Battle, so Battle-only edits and the lobby layout stay as they are.
         /// </summary>
         [MenuItem("Hapio/Upgrade Menu DEV Rows")]
         public static void UpgradeMenuDeveloperRows()
@@ -229,7 +200,7 @@ namespace Hapio.Editor
             for (int i = existing; i < count; i++)
             {
                 CreateDeveloperRow(screen, scroll.content, i, values[i]);
-                screen.developerInputs[i].transform.parent.gameObject.SetActive(GameStageSettings.IsFieldVisible(0, i));
+                screen.developerInputs[i].transform.parent.gameObject.SetActive(GameStageSettings.IsFieldShown(0, i, null));
             }
             EditorUtility.SetDirty(screen);
         }
@@ -323,7 +294,7 @@ namespace Hapio.Editor
                 rect.anchorMax = new Vector2(rect.anchorMax.x, .82f);
             }
             for (int i = 0; i < screen.developerInputs.Length; i++)
-                screen.developerInputs[i].transform.parent.gameObject.SetActive(GameStageSettings.IsFieldVisible(0, i));
+                screen.developerInputs[i].transform.parent.gameObject.SetActive(GameStageSettings.IsFieldShown(0, i, null));
         }
 
         private static void UpgradeScene(string path, Action<Scene> change)

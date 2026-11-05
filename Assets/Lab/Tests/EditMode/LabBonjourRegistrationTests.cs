@@ -81,6 +81,7 @@ namespace C6Lab.Tests
             }
         }
 
+        [Category("Bonjour")]
         [Test]
         public void LocalConflictFailsBeforeCreatingANativeOperation()
         {
@@ -144,6 +145,7 @@ namespace C6Lab.Tests
             }
         }
 
+        [Category("Bonjour")]
         [Test]
         public void LocalCollisionsDoNotSpendNativeRetryBudgetAndTheLastNumberCannotWrap()
         {

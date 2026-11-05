@@ -43,6 +43,7 @@ namespace C6Lab.Tests
             return result;
         }
 
+        [Category("Legacy")]
         [Test]
         public void SmallHeaderCarriesWarningActiveExtinguishedAndFeverWithoutPaintCheckpoint()
         {
@@ -86,6 +87,7 @@ namespace C6Lab.Tests
             Assert.That(fever.paintRevision, Is.EqualTo(oldPaint.paintRevision));
         }
 
+        [Category("Legacy")]
         [Test]
         public void PublisherReplicaAndOverlayEachOwnNestedGroupAndPatchArrays()
         {
@@ -112,6 +114,7 @@ namespace C6Lab.Tests
             Assert.That(next.jigwiStage.groups[0].resolution, Is.EqualTo(LabJigwiStageResolution.None));
         }
 
+        [Category("Legacy")]
         [Test]
         public void SharedSnapshotCopyOwnsGroupArrayAndItsIndividualPatchArrays()
         {
@@ -127,6 +130,7 @@ namespace C6Lab.Tests
             Assert.That(source.jigwiStage.groups[0].affectedPlayer, Is.Zero);
         }
 
+        [Category("Legacy")]
         [Test]
         public void OlderControlHeaderCannotOverwriteNewerSharedStateOrTerminalResult()
         {
@@ -148,6 +152,7 @@ namespace C6Lab.Tests
             Assert.That(replica.Overlay(terminal).phase, Is.EqualTo(LabPhase.Defeat));
         }
 
+        [Category("Legacy")]
         [Test]
         public void HeaderJsonRoundTripRetainsCrossPlayerRelationshipAndSurfaceGeometry()
         {

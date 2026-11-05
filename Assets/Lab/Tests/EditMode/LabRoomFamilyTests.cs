@@ -33,6 +33,7 @@ namespace C6Lab.Tests
             }
         }
 
+        [Category("Bonjour")]
         [TestCase(LabRoomFamily.Game, false)]
         [TestCase(LabRoomFamily.Lab, true)]
         public void ReadyPendingRoomCannotTransferToTheWrongFamilyOrReleaseItsReservation(LabRoomFamily family,
@@ -68,6 +69,7 @@ namespace C6Lab.Tests
             finally { pending.Dispose(); UnityEngine.Object.DestroyImmediate(root); }
         }
 
+        [Category("Bonjour")]
         [Test]
         public void LegacyPendingFactoryStaysLabAndUnknownFamilyAllocatesNothing()
         {

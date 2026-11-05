@@ -18,6 +18,7 @@ namespace C6Lab.Tests
     /// These are not projectile, session, movement or device play tests. Their full maps expose
     /// hidden-side fragmentation which a front-view screenshot alone cannot establish.
     /// </summary>
+    [Category("Slow"), Category("GPU")]
     public sealed class LabPaintSplatterConsistencyRenderTests
     {
         private const BindingFlags Private = BindingFlags.Instance | BindingFlags.NonPublic;

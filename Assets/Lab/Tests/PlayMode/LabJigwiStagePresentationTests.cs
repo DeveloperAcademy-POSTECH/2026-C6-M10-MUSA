@@ -6,6 +6,7 @@ using UnityEngine.TestTools;
 
 namespace C6Lab.Tests
 {
+    [Category("Legacy")]
     public sealed class LabJigwiStagePresentationTests
     {
         private GameObject root;
@@ -138,6 +139,7 @@ namespace C6Lab.Tests
             Assert.That(hud.stageNotice.gameObject.activeSelf, Is.False);
         }
 
+        [Category("GPU")]
         [Test]
         public void SurfaceFlamesUseTheDedicatedInkMaterialAndItsRealTransparentTexture()
         {

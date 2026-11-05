@@ -4,6 +4,7 @@ using UnityEngine;
 
 namespace C6Lab.Tests
 {
+    [Category("Legacy")]
     public sealed class LabHighResolutionPaintTests
     {
         private static LabPaintStudyMask Mask()

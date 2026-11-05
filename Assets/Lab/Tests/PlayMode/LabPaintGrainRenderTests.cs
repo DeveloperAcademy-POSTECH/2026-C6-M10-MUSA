@@ -13,6 +13,7 @@ using Object = UnityEngine.Object;
 namespace C6Lab.Tests
 {
     /// <summary>Render-only map fixtures, not projectile or network approval tests.</summary>
+    [Category("LabOnly")]
     public sealed class LabPaintGrainRenderTests
     {
         [UnityTearDown]
@@ -24,6 +25,7 @@ namespace C6Lab.Tests
             yield return SceneManager.UnloadSceneAsync(scene);
         }
 
+        [Category("GPU")]
         [UnityTest]
         public IEnumerator SavedGourdShaderChangesOnlyPigmentAndZeroStrengthMatchesOffExactly()
         {
@@ -133,7 +135,7 @@ namespace C6Lab.Tests
                 Assert.That(paint.PaintTexture.GetPixels32(), Is.EqualTo(before));
 
                 // A fixture creates a matching complete result; this does not claim a real hit.
-                network.port = 17896;
+                network.port = LabSavedSceneNetworkFixture.AvailableDualFamilyPort();
                 Assert.That(network.StartDeveloperSolo(), Is.True, network.Notice);
                 LabPaintPresentationTestFixture.SelectRetainedStyleForSyntheticMap(network);
                 LabPaintSurface map = network.PaintSurface;

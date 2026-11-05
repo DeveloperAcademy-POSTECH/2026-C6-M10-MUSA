@@ -168,7 +168,7 @@ Lab/
 ```text
 Assets/
 ├── Editor/                     Lab용 에디터 도구 (Scene 업그레이드 · 빌드 · 비교 창)
-│   ├── Bootstrap/   30개       LabBuild, LabSceneBuilder, LabIosPostprocess,
+│   ├── Bootstrap/   28개       LabBuild, LabSceneBuilder, LabIosPostprocess,
 │   │                           LabMobileBuildValidation, Lab*Upgrade(Scene 업그레이드) 등
 │   └── BackgroundStudio · ElementTrailComparison · GourdExport ·
 │       HighResolutionPaint · PaintStyleComparison · WatercolorPaint   표현 비교 창·박 PNG 내보내기

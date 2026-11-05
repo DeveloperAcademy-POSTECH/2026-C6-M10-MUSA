@@ -40,7 +40,7 @@ Figma `2527:7760`의 위치 표시는(323,402),75.5×71 영역이다. 제공된 
 
 ## TemporaryBattleBackground (#227)
 
-사용자 제공804×1162 배경 PNG를 그대로 보존한다. `C6 Lab/Apply Temporary Battle Background`로 BattleCamera 아래의 `Temporary Battle Background`에 적용한다. 조명의 영향을 받지 않는 SpriteRenderer를 카메라 뒤쪽 원경에 배치하고, 원본 비율을 유지한 채 화면 너비에 맞춰 상단 정렬한다. 넓은 화면에서는 빈 공간이 없도록 세로도 채운다. 카메라 시점·FOV·화면 비율 변경에 맞춰 갱신하며 박·줄·투척 구슬은 앞에 표시한다.
+사용자 제공804×1162 배경 PNG를 그대로 보존한다. 이 임시 배경은 이후 Stage1 3D 배경으로 교체되어 Lab Scene에서 제거되었고, 다시 붙이던 `C6 Lab/Apply Temporary Battle Background` 메뉴도 삭제했다. 아래는 당시 연결 방식의 기록이다. 당시에는 BattleCamera 아래의 `Temporary Battle Background`에 적용했다. 조명의 영향을 받지 않는 SpriteRenderer를 카메라 뒤쪽 원경에 배치하고, 원본 비율을 유지한 채 화면 너비에 맞춰 상단 정렬한다. 넓은 화면에서는 빈 공간이 없도록 세로도 채운다. 카메라 시점·FOV·화면 비율 변경에 맞춰 갱신하며 박·줄·투척 구슬은 앞에 표시한다.
 
 기존 BattleFloor는 MeshRenderer만 끄고 빗나간 투척의 Collider는 유지한다. 이후 3D 배경으로 교체할 때 `Temporary Battle Background`를 비활성화하거나 제거하면 된다. 3D 환경에서 기존 바닥이 필요하면 BattleFloor의 MeshRenderer를 다시 켠다. 물리·네트워크·Config 수치는 변경하지 않는다.
 

@@ -162,7 +162,9 @@ namespace C6Lab.Tests
                 Assert.That(shot.GetComponentsInChildren<Collider>(true), Has.Length.EqualTo(1));
             }
             var originalPath = predicted.JigwiWaterFlightPath;
-            yield return new WaitForFixedUpdate(); yield return null;
+            // The first LateUpdate after the first physics step can draw the interpolated body within 0.1 mm of the
+            // launch point (batch frames are ~0.1 ms long), which the path rightly drops. Await the real second point.
+            yield return Until(() => originalPath.Count >= 2, "The predicted Water must record its actual flight before approval.");
             Assert.That(originalPath.Count, Is.GreaterThanOrEqualTo(2));
             int before = originalPath.Count;
             predicted.ReconcileVisual(LabOrbElement.Water, 1f, 1f);
@@ -298,6 +300,7 @@ namespace C6Lab.Tests
             root.SetActive(false); Assert.That(LabJigwiWaterFlightPath.ActivePathCount, Is.Zero);
         }
 
+        [Category("GPU")]
         [UnityTest]
         public IEnumerator ActualWaterInkAndHeadRenderOnTopOfAnOpaqueRedCurtainWithoutChangingWorldMotion()
         {

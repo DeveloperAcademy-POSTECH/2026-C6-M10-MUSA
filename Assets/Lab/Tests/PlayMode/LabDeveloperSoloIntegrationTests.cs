@@ -12,6 +12,7 @@ namespace C6Lab.Tests
     /// Exercises the saved Scene's actual Host, board gesture events and 3D projectile.
     /// No synthetic network packet or direct LabModel mutation is used after starting Solo.
     /// </summary>
+    [Category("Slow"), Category("LabOnly")]
     public sealed class LabDeveloperSoloIntegrationTests
     {
         private readonly LabSavedSceneNetworkFixture fixture = new LabSavedSceneNetworkFixture();

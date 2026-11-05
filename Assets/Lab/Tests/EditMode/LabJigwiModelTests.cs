@@ -6,6 +6,7 @@ using Object = UnityEngine.Object;
 
 namespace C6Lab.Tests
 {
+    [Category("LabOnly")]
     public sealed class LabJigwiModelTests
     {
         private LabConfig config;

@@ -7,6 +7,7 @@ using UnityEngine.UI;
 namespace C6Lab.Tests
 {
     /// <summary>2:2 청홍 땅따먹기 (#281) 전투 화면: 판의 바깥쪽 벽과 위쪽 청·홍 막대, 내 팀 고리.</summary>
+    [Category("Slow")]
     public sealed class LabTeamBattleScreenTests
     {
         private static readonly Rect Bounds = new Rect(-4f, -2f, 8f, 4f);
