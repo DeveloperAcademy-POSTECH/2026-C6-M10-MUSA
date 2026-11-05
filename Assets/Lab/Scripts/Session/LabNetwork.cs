@@ -2010,6 +2010,7 @@ namespace C6Lab
             SyncJigwiFireSurfaces();
             projectile.SetFireSurfaces(JigwiFireSurfacesFor(orb.owner));
             projectile.Launch(orb.id, orb.owner, velocity, config, target, OnProjectileResolved);
+            RememberReplayLaunch(orb, projectile, model != null ? model.LaunchScaleOf(orb.id) : 1f);
             var notice = new LabNetworkPacket { type = "projectile", sessionId = sessionId,
                 round = model.Round, requestId = actionId,
                 firstId = orb.id, owner = orb.owner, element = (int)orb.element, small = orb.small, fiveColor = orb.fiveColor,
@@ -2090,6 +2091,8 @@ namespace C6Lab
                             result.ImpactVelocity, false);
                     }
                     bool fiveColor = model.LastHitFiveColor;
+                    // The final-hit replay only shows a hit that painted (never a blocked or element-less one).
+                    if (!paintBlocked && (element != LabOrbElement.None || fiveColor)) RememberReplayHit(result);
                     if (fiveColor && !paintBlocked) PresentFiveColorHit(targetLocalPoint, result.OwnerPlayerId);
                     if (!paintBlocked && result.OwnerPlayerId == LocalPlayerId)
                     {
