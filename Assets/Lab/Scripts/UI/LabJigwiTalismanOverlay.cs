@@ -46,7 +46,15 @@ namespace C6Lab
         [SerializeField] private Color ghostColor = new Color(.88f, .76f, .48f, 1f);
         [Tooltip("#533: 먹 붓 굵기 (글자 칸 대비). 지나간 곳의 글자 획을 이만큼 채운다(글자 모양 밖으로는 안 번진다). 판정 거리와는 따로다.")]
         [SerializeField, Range(.06f, .3f)] private float brushWidth = .16f;
-        [Tooltip("#509: 다 쓴 글씨가 빛나는 시간(초). 그다음 부적이 천천히 사라진다.")]
+        [Tooltip("#533: 다 쓰면 금빛이 획 순서대로 글자를 훑고 지나가는 시간(초). 빈 곳도 이때 채워진다.")]
+        [SerializeField, Range(.1f, 1.5f)] private float sweepSeconds = .5f;
+        [Tooltip("#533: 훑기가 끝난 순간 부적이 \"쾅\" 하고 커지는 정도 (종이 크기 대비).")]
+        [SerializeField, Range(0f, .25f)] private float burstPunch = .09f;
+        [Tooltip("#533: 훑기가 끝난 순간 부적이 떨리는 세기 (종이 높이 대비).")]
+        [SerializeField, Range(0f, .05f)] private float burstShake = .012f;
+        [Tooltip("#533: 글자에서 퍼져 나가는 빛 고리가 퍼지는 시간(초).")]
+        [SerializeField, Range(.1f, 1.5f)] private float ringSeconds = .55f;
+        [Tooltip("#509: 다 쓴 글씨가 빛나는 시간(초). #533부터 훑기 뒤에 빛난 채 머무는 시간. 그다음 부적이 천천히 사라진다.")]
         [SerializeField, Range(.1f, 2f)] private float glowSeconds = .6f;
         [Tooltip("#509: 빛난 뒤 부적이 사라지는 시간(초).")]
         [SerializeField, Range(.2f, 3f)] private float fadeSeconds = 1.2f;
@@ -87,7 +95,10 @@ namespace C6Lab
         private string writtenRound;
         private float sentAt;
         private readonly LabJigwiTalismanStroke stroke = new LabJigwiTalismanStroke(LabJigwiTalismanStroke.Water, LabJigwiTalismanStroke.WaterStrokes);
-        private UnityEngine.UI.Image nextMarker;
+        private UnityEngine.UI.Image nextMarker, burstRing;
+        private static Sprite ringSprite;
+        /// <summary>#533: 점마다 획 순서상 위치 (0~1). 완성 때 금빛이 이 순서로 훑는다.</summary>
+        private float[] strokeRank = Array.Empty<float>();
         private readonly List<int> fresh = new List<int>();
 
         /// <summary>부적이 보이는지</summary>
@@ -109,7 +120,7 @@ namespace C6Lab
         public LabJigwiTalismanStroke Stroke => stroke;
         /// <summary>#509: 다 쓴 부적이 빛나며 사라지는 중인지. 이때 조합판은 이미 풀려 있다.</summary>
         public bool Finishing => finishAge >= 0f;
-        public float FinishSeconds => glowSeconds + fadeSeconds;
+        public float FinishSeconds => sweepSeconds + glowSeconds + fadeSeconds;
         /// <summary>#509: 사라지는 동안의 부적 불투명도 (1 → 0).</summary>
         public float PaperAlpha => paperGroup != null ? paperGroup.alpha : 1f;
 
@@ -218,6 +229,38 @@ namespace C6Lab
             Color c = nextMarkerColor; c.a *= .45f + .55f * pulse; nextMarker.color = c;
         }
 
+        private void BuildStrokeRank()
+        {
+            strokeRank = new float[dots.Length];
+            int total = Mathf.Max(1, stroke.Samples.Length - 1), n = 0;
+            for (int s = 0; s < stroke.StrokeCount; s++)
+                foreach (int index in stroke.StrokePoints(s))
+                    if (index < strokeRank.Length) strokeRank[index] = n++ / (float)total;
+        }
+
+        /// <summary>#533: 빛 고리 무늬 (런타임에 한 번 만든다). 가운데가 빈 부드러운 고리.</summary>
+        private static Sprite RingSprite()
+        {
+            if (ringSprite != null) return ringSprite;
+            const int size = 128;
+            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
+            { name = "Talisman Burst Ring (#533 runtime)", hideFlags = HideFlags.DontSave, wrapMode = TextureWrapMode.Clamp };
+            var pixels = new Color[size * size];
+            float half = size * .5f;
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float r = Vector2.Distance(new Vector2(x + .5f, y + .5f), new Vector2(half, half)) / half;
+                    float band = Mathf.Clamp01(1f - Mathf.Abs(r - .82f) / .14f);
+                    float glow = Mathf.Clamp01(1f - Mathf.Abs(r - .8f) / .4f) * .35f;
+                    pixels[y * size + x] = new Color(1f, 1f, 1f, Mathf.Clamp01(band * band + glow) * (r < 1f ? 1f : 0f));
+                }
+            texture.SetPixels(pixels); texture.Apply(false, true);
+            ringSprite = Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(.5f, .5f), 100f);
+            ringSprite.hideFlags = HideFlags.DontSave;
+            return ringSprite;
+        }
+
         private Color InkColor(int index) => InkMode && index < inkColors.Length ? inkColors[index] : writtenColor;
 
         /// <summary>#533: 점마다 정해 둔(매번 같은) 수채화 색 흔들림. 물감이 고르게 안 먹은 느낌.</summary>
@@ -242,6 +285,7 @@ namespace C6Lab
             finishAge = 0f; finishFrom = paper.localPosition;
             paper.gameObject.SetActive(true);
             if (hint != null) hint.gameObject.SetActive(false);
+            if (nextMarker != null) nextMarker.gameObject.SetActive(false);
             DrawFinish();
         }
 
@@ -254,22 +298,64 @@ namespace C6Lab
             DrawFinish();
         }
 
+        /// <summary>
+        /// #533 완성 연출: ① 금빛이 획 순서대로 글자를 훑으며 빈 곳까지 채움 → ② "쾅": 부적이 커졌다 돌아오며 떨리고,
+        /// 글자에서 빛 고리가 퍼지고, 흐린 글자·경계선도 금빛으로 → ③ 빛난 채 잠깐 머문 뒤 위로 떠오르며 사라짐.
+        /// </summary>
         private void DrawFinish()
         {
-            float glow = Mathf.Clamp01(finishAge / Mathf.Max(.01f, glowSeconds));
-            float fade = Mathf.Clamp01((finishAge - glowSeconds) / Mathf.Max(.01f, fadeSeconds));
+            float sweep = Mathf.Max(.01f, sweepSeconds);
+            float sweepT = Mathf.Clamp01(finishAge / sweep);
+            float after = finishAge - sweep;
+            float burst = after < 0f ? 0f : Mathf.Clamp01(after / .35f);
+            float bump = after < 0f ? 0f : Mathf.Sin(Mathf.PI * burst);
+            float fade = Mathf.Clamp01((finishAge - sweep - glowSeconds) / Mathf.Max(.01f, fadeSeconds));
             float eased = fade * fade * (3f - 2f * fade);
+            Color gold = new Color(glowColor.r, glowColor.g, glowColor.b, 1f);
             for (int i = 0; i < dots.Length; i++)
             {
-                if (dots[i] == null || !stroke.IsCovered(i)) continue;
-                dots[i].color = Color.Lerp(InkColor(i), glowColor, glow);
-                float pulse = 1f + .25f * glow + .08f * Mathf.Sin(finishAge * 14f) * (1f - fade);
-                dots[i].rectTransform.localScale = Vector3.one * pulse;
+                if (dots[i] == null) continue;
+                bool written = stroke.IsCovered(i);
+                if (!InkMode && !written) continue;
+                float rank = i < strokeRank.Length ? strokeRank[i] : 0f;
+                float lit = Mathf.Clamp01((sweepT * 1.12f - rank) / .12f);
+                if (lit <= 0f)
+                {
+                    // Not reached yet: written ink stays as written, gaps stay empty.
+                    if (written) { dots[i].color = InkColor(i); dots[i].rectTransform.localScale = Vector3.one; }
+                    continue;
+                }
+                if (InkMode && !dots[i].gameObject.activeSelf) dots[i].gameObject.SetActive(true);
+                dots[i].color = Color.Lerp(InkColor(i), gold, lit);
+                float pop = 1f + .35f * Mathf.Sin(Mathf.PI * lit) * (1f - lit * .5f) + .12f * bump;
+                dots[i].rectTransform.localScale = Vector3.one * pop;
             }
-            if (paperImage != null) paperImage.color = Color.Lerp(paperColor, new Color(1f, .97f, .85f, paperColor.a), glow);
+            if (ghost != null) ghost.color = Color.Lerp(ghostColor, new Color(1f, .94f, .62f, ghostColor.a), burst);
+            if (ghostEdge != null)
+            {
+                Color edge = Color.Lerp(ghostOutlineColor, gold, burst);
+                ghostEdge.color = edge;
+                if (ghostOutline != null) ghostOutline.effectColor = edge;
+            }
+            DrawRing(after, gold);
+            if (paperImage != null) paperImage.color = Color.Lerp(paperColor, new Color(1f, .97f, .85f, paperColor.a), Mathf.Max(burst * .8f, sweepT * .3f));
             if (paperGroup != null) paperGroup.alpha = 1f - eased;
-            paper.localScale = Vector3.one * (1f + .05f * eased);
-            paper.localPosition = finishFrom + Vector3.up * (paper.rect.height * .06f * eased);
+            paper.localScale = Vector3.one * (1f + burstPunch * bump + .05f * eased);
+            float shake = after < 0f ? 0f : burstShake * paper.rect.height * (1f - burst);
+            var jitter = new Vector3(Mathf.Sin(finishAge * 93f) * shake, Mathf.Cos(finishAge * 71f) * shake, 0f);
+            paper.localPosition = finishFrom + jitter + Vector3.up * (paper.rect.height * .06f * eased);
+        }
+
+        private void DrawRing(float after, Color gold)
+        {
+            if (burstRing == null) return;
+            float t = after < 0f ? -1f : after / Mathf.Max(.01f, ringSeconds);
+            bool show = t >= 0f && t < 1f;
+            if (burstRing.gameObject.activeSelf != show) burstRing.gameObject.SetActive(show);
+            if (!show) return;
+            float grow = 1f - (1f - t) * (1f - t);
+            burstRing.rectTransform.localScale = Vector3.one * (.35f + 1.9f * grow);
+            Color c = gold; c.a = (1f - t) * .9f; burstRing.color = c;
         }
 
         private void EndFinish()
@@ -281,6 +367,10 @@ namespace C6Lab
             if (paperImage != null) paperImage.color = paperColor;
             if (hint != null) hint.gameObject.SetActive(true);
             for (int i = 0; i < dots.Length; i++) if (dots[i] != null) dots[i].rectTransform.localScale = Vector3.one;
+            if (ghost != null) ghost.color = ghostColor;
+            if (ghostEdge != null) ghostEdge.color = ghostOutlineColor;
+            if (ghostOutline != null) ghostOutline.effectColor = ghostOutlineColor;
+            if (burstRing != null) burstRing.gameObject.SetActive(false);
             paper.gameObject.SetActive(Visible);
         }
 
@@ -408,6 +498,7 @@ namespace C6Lab
             glyphArea.sizeDelta = new Vector2(side, side);
             float dot = Mathf.Max(4f, side * (InkMode ? brushWidth : strokeWidth));
             if (nextMarker != null) nextMarker.rectTransform.sizeDelta = Vector2.one * Mathf.Max(6f, side * .07f);
+            if (burstRing != null) { burstRing.rectTransform.sizeDelta = Vector2.one * side * .8f; burstRing.rectTransform.anchoredPosition = Vector2.zero; }
             if (InkMode && FitGhost(side, dot)) return;
             for (int i = 0; i < dots.Length; i++)
                 if (dots[i] != null) dots[i].rectTransform.sizeDelta = new Vector2(dot, dot);
@@ -515,6 +606,13 @@ namespace C6Lab
             nextMarker = NewRect("Talisman Next Stroke", glyphArea).gameObject.AddComponent<UnityEngine.UI.Image>();
             nextMarker.raycastTarget = false; nextMarker.sprite = RoundDot(); nextMarker.color = nextMarkerColor;
             nextMarker.gameObject.SetActive(false);
+            // #533: the light ring that bursts out of the finished letter.
+            burstRing = NewRect("Talisman Burst Ring", glyphArea).gameObject.AddComponent<UnityEngine.UI.Image>();
+            burstRing.raycastTarget = false; burstRing.sprite = RingSprite();
+            Vector2 heart = InkMode ? GlyphInkRect.center : SampleBounds(stroke.Samples).center;
+            burstRing.rectTransform.anchorMin = burstRing.rectTransform.anchorMax = heart;
+            burstRing.gameObject.SetActive(false);
+            BuildStrokeRank();
             LayoutGlyph();
             paper.gameObject.SetActive(false);
         }
