@@ -48,8 +48,10 @@ MonoBehaviour:
   bannerTopFraction: 0.3
   bannerHeight: 46
   bannerFontSize: 20
-  successColor: {r: 0.78, g: 0.15, b: 0.1, a: 1}
-  successFontSize: 28
+  successColor: {r: 1, g: 1, b: 1, a: 1}
+  successFontSize: 36
+  successStroke: 0.2
+  successStrokeColor: {r: 0, g: 0, b: 0, a: 1}
   afterActionSeconds: 0.9
   afterRefillSeconds: 0.4
   shortStaminaShareOfTap: 0.25

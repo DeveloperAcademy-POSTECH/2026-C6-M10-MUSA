@@ -395,15 +395,23 @@ namespace Hapio
 
             successText = AddText("Success", overlay, art.bannerFont, art.successFontSize, art.successColor);
             RectTransform success = successText.rectTransform;
-            success.pivot = new Vector2(.5f, 1f);
+            success.pivot = new Vector2(.5f, .5f);
             success.sizeDelta = new Vector2(240f, art.successFontSize * 1.6f);
             successText.resizeTextForBestFit = false;
             successText.text = GameTutorialScript.SuccessText;
+            if (art.successStroke > 0f)
+            {
+                // Figma's stroke, drawn as an outline that far out on every side.
+                Outline stroke = successText.gameObject.AddComponent<Outline>();
+                stroke.effectColor = art.successStrokeColor;
+                stroke.effectDistance = new Vector2(art.successStroke, -art.successStroke);
+                stroke.useGraphicAlpha = true;
+            }
             successText.gameObject.SetActive(false);
             PlaceBanner(art.bannerTopFraction);
         }
 
-        /// <summary>The guide banner, and "성공!" just under it, centered this far down the screen (0 top, 1 bottom).</summary>
+        /// <summary>The guide banner, and "성공!" in its place, centered this far down the screen (0 top, 1 bottom).</summary>
         private void PlaceBanner(float topFraction)
         {
             float y = 1f - Mathf.Clamp01(topFraction);
@@ -413,7 +421,7 @@ namespace Hapio
             banner.anchoredPosition = Vector2.zero;
             RectTransform success = successText.rectTransform;
             success.anchorMin = success.anchorMax = new Vector2(.5f, y);
-            success.anchoredPosition = new Vector2(0f, -art.bannerHeight * .5f - 6f);
+            success.anchoredPosition = Vector2.zero;
         }
 
         private Text AddText(string name, Transform parent, Font font, int size, Color color)
@@ -959,6 +967,8 @@ namespace Hapio
                 session.Network.TutorialCapStamina(ShortStaminaFor(session.Network.config.GenerateCost, art.shortStaminaShareOfTap));
             if (!success) return;
             successAt = actionDoneAt;
+            // The task is done: its banner goes and "성공!" pops up where it was.
+            banner.gameObject.SetActive(false);
             successText.gameObject.SetActive(true);
             successText.rectTransform.localScale = Vector3.zero;
         }

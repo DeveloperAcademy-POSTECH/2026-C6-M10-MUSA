@@ -1012,6 +1012,9 @@ namespace Hapio.Tests
             Assert.That(art.bannerTextColor, Is.EqualTo(Color.black), "Black Shilla guide text.");
             Assert.That(art.hand, Is.Not.Null, "The pointing hand.");
             Assert.That(art.tapHint, Is.Not.Null, "The ▽ that says tap to go on.");
+            // 성공! replaces the banner: black #000000 with Figma's 0.2 stroke.
+            Assert.That(art.successColor, Is.EqualTo(Color.black));
+            Assert.That((art.successStroke, art.successStrokeColor), Is.EqualTo((.2f, Color.black)));
             Assert.That(art.minFontSize, Is.LessThanOrEqualTo(art.maxFontSize));
         }
 

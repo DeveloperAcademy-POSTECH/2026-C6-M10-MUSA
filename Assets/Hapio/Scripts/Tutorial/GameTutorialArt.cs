@@ -65,8 +65,11 @@ namespace Hapio
         [Tooltip("띠 가운데가 화면 위에서 얼마나 내려와 있는지 (화면 높이 비율)")] [Range(0f, 1f)] public float bannerTopFraction = .3f;
         [Min(10f)] public float bannerHeight = 46f;
         [Min(8)] public int bannerFontSize = 20;
-        [Tooltip("동작을 해냈을 때 띠 아래에 잠깐 뜨는 \"성공!\"")] public Color successColor = new Color(.78f, .15f, .1f, 1f);
-        [Min(8)] public int successFontSize = 28;
+        [Tooltip("동작을 해냈을 때 안내 띠가 사라지고 그 자리에 뜨는 \"성공!\"의 색 (시안: 검정 #000000)")]
+        public Color successColor = Color.black;
+        [Min(8)] public int successFontSize = 36;
+        [Tooltip("\"성공!\" 글자 테두리 두께 (pt, 피그마 stroke 값). 0이면 테두리 없음.")] [Min(0f)] public float successStroke = .2f;
+        [Tooltip("\"성공!\" 글자 테두리 색 (글자와 같은 검정이면 조금 더 굵어 보인다)")] public Color successStrokeColor = Color.black;
         [Tooltip("동작을 해낸 뒤 다음 장면까지 (\"성공!\"이 보이는 시간)")] [Min(0f)] public float afterActionSeconds = .9f;
         [Tooltip("기운이 다 차오른 뒤 다음 장면까지")] [Min(0f)] public float afterRefillSeconds = .4f;
         [Tooltip("북을 다 친 뒤 기운이 이만큼만 살짝 차고 멈춘다 (북 한 번 비용 대비). 1보다 작아 여전히 부족하고, 기운 부족 빨간 빛이 이 부분에 보인다.")]

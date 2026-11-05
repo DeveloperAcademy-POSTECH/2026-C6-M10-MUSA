@@ -179,6 +179,12 @@ namespace Hapio.Tests
                 network.Generate();
                 yield return Until(() => director.ActionProgress == press + 1, "Tap " + (press + 1) + " counted");
             }
+            // Done: the banner goes and a black 성공! pops up where it was.
+            var guide = director.GetComponentsInChildren<RectTransform>(true).Single(rect => rect.name == "Guide Banner");
+            var success = director.GetComponentsInChildren<UnityEngine.UI.Text>(true).Single(text => text.name == "Success");
+            Assert.That((guide.gameObject.activeSelf, success.gameObject.activeSelf), Is.EqualTo((false, true)));
+            Assert.That(Vector3.Distance(success.rectTransform.position, guide.position), Is.LessThan(.01f), "In the banner's place.");
+            Assert.That(success.color, Is.EqualTo(Color.black));
             // 성공! is up; with the dialog open its wait does not run out, however long the dialog stays.
             skip.onClick.Invoke();
             Assert.That(board.AllowedGestures, Is.EqualTo(LabBoardGestures.None), "The board waits behind the dialog.");

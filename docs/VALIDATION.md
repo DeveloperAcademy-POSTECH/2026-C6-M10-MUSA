@@ -5002,3 +5002,20 @@ Consolidated three byte-identical textures into shared material references; conf
   - EditMode 자리별 각도: 0°·120°·240°, 팀 자리는 반대 방향. 120° 돌린 첫 자리 카메라 위치가 둘째 자리 카메라 위치와 같은지.
   - PlayMode 흐름 검사: 첫 대사 때 요괴가 120° 돌아 나를 보고, 흰 박 몸통은 그대로인지.
 - **미실행:** Play에서 요괴가 정면으로 보이는지 눈으로 확인, iPhone 실기기.
+
+### #477 튜토리얼 "성공!"이 안내 띠 자리에 — 2026-11-05
+
+- **바꾼 것 (사용자 시안):** 동작을 해내면 안내 띠("북을 오른쪽 끝으로 밀어 …")가 사라지고, **그 자리(띠 가운데)**에 "성공!"이 살짝 커졌다 자리 잡으며 뜬다. 예전에는 띠를 둔 채 그 아래에 떴다.
+  - 색: 검정 #000000 (예전 빨강).
+  - 테두리: 피그마 stroke 0.2 = 390pt 기준 화면 0.2pt. 같은 검정으로 사방에 그려 조금 더 굵어 보인다(UI `Outline`). 시안에 테두리 색이 따로 없어 글자와 같은 검정으로 했다.
+  - 글자 크기: 시안 비율에 맞춰 28 → 36.
+  - 값: `TutorialArt`의 `successColor`·`successFontSize`·`successStroke`·`successStrokeColor`.
+  - 던지기(3단계)처럼 띠가 판 바로 위로 내려가는 장면에서는 "성공!"도 그 자리에 뜬다.
+
+| 실행한 확인 | 결과 |
+| --- | --- |
+| 컴파일 · Console 오류 (Play가 끝난 뒤) | **PASS**: compilationFailed=false, 오류 0 |
+| 에셋 값 저장 | **PASS**: `successColor` 빨강 → 검정(0,0,0,1), `successFontSize` 28 → 36, `successStroke` 0.2, `successStrokeColor` 검정 |
+
+- **새·수정 검사 (NOT_RUN):** EditMode "성공!" 검정·테두리 0.2·검정. PlayMode 1단계 성공 때 띠가 꺼지고 "성공!"이 띠와 같은 자리에 검정으로 뜨는지.
+- **미실행:** Play에서 크기·굵기 시안 비교, iPhone 실기기.
