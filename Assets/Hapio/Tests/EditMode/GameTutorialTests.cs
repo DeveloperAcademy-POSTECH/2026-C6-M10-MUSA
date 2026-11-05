@@ -403,18 +403,23 @@ namespace Hapio.Tests
             CollectionAssert.AreEqual(new[]
             {
                 GameTutorialAction.None, GameTutorialAction.None, GameTutorialAction.PassDrum, GameTutorialAction.None,
-                GameTutorialAction.None
+                GameTutorialAction.None, GameTutorialAction.None, GameTutorialAction.None
             }, beats.Select(beat => beat.Action).ToArray());
             CollectionAssert.AreEqual(new[]
             {
                 "나만 너무 열심히 하고 있는 거 아니야?",
                 "맞아! 너가 북을 줘야지... \n북은 몇 개 없어서 같이 써야 해! 옆으로 밀면 넘어가. ",
-                "고마워!\n대신 내가 만든 구슬과 북 줄게~", "짝이 안 맞는 구슬은\n이렇게 친구한테 넘기면 돼."
+                "고마워!\n대신 내가 만든 구슬과 북 줄게~", "짝이 안 맞는 구슬은\n이렇게 친구한테 넘기면 돼.",
+                "지금 북이 어디에 있는지는\n우측 지도에서 볼 수 있어!", "오호! 누가 북을 안 주고 있는지\n실시간으로 확인할 수 있겠군!"
             }, pass.Lines.Select(line => line.Text).ToArray());
             CollectionAssert.AreEqual(new[]
             {
-                GameTutorialSpeaker.Bul, GameTutorialSpeaker.Geumok, GameTutorialSpeaker.Geumok, GameTutorialSpeaker.Geumok
+                GameTutorialSpeaker.Bul, GameTutorialSpeaker.Geumok, GameTutorialSpeaker.Geumok, GameTutorialSpeaker.Geumok,
+                GameTutorialSpeaker.Geumok, GameTutorialSpeaker.Bul
             }, pass.Lines.Select(line => line.Speaker).ToArray());
+            // The drum map: only it is lit while 금옥이 shows where the drum is and 불이 answers.
+            CollectionAssert.AreEqual(new[] { false, false, false, false, false, true, true },
+                beats.Select(beat => beat.Focus == GameTutorialFocus.Minimap).ToArray());
             Assert.That(beats[3].Cue, Is.EqualTo(GameTutorialCue.GiveBack), "\"고마워!\" gives the yang and the drum back.");
             Assert.That(GameTutorialDirector.BannerText(beats[2], 0), Is.EqualTo("북을 오른쪽 끝으로 밀어 금옥이에게 넘기시오"));
             Assert.That(GameTutorialScript.WrongSideLine, Is.EqualTo("이건 금옥이한테 줘."));
@@ -1015,6 +1020,8 @@ namespace Hapio.Tests
             // 성공! replaces the banner: black #000000 with Figma's 0.2 stroke.
             Assert.That(art.successColor, Is.EqualTo(Color.black));
             Assert.That((art.successStroke, art.successStrokeColor), Is.EqualTo((.2f, Color.black)));
+            Assert.That(typeof(GameTutorialArt).GetField("throwBannerTopFraction"), Is.Null,
+                "One banner height for every action; the throw no longer has its own.");
             Assert.That(art.minFontSize, Is.LessThanOrEqualTo(art.maxFontSize));
         }
 

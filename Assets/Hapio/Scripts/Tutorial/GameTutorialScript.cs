@@ -22,7 +22,9 @@ namespace Hapio
         /// <summary>위쪽 박 칠하기 진행률 막대와 그 옆 % 글자.</summary>
         Progress,
         /// <summary>내 판의 폭탄 (자물쇠 숫자가 보이게).</summary>
-        Bomb
+        Bomb,
+        /// <summary>오른쪽 위 북 위치 지도(미니맵). 둥근 네모로 밝히고, 말풍선이 지도를 가리면 얼굴 아래로 내려 단다.</summary>
+        Minimap
     }
 
     /// <summary>다음으로 넘어가기 전에 기다리는 일. None은 화면을 눌러 넘기는 대사다.</summary>
@@ -308,7 +310,9 @@ namespace Hapio
             Geumok("맞아! 너가 북을 줘야지... \n북은 몇 개 없어서 같이 써야 해! 옆으로 밀면 넘어가. "),
             GameTutorialBeat.Do(GameTutorialAction.PassDrum, "북을 오른쪽 끝으로 밀어 금옥이에게 넘기시오", GameTutorialFocus.None),
             Geumok("고마워!\n대신 내가 만든 구슬과 북 줄게~", cue: GameTutorialCue.GiveBack),
-            Geumok("짝이 안 맞는 구슬은\n이렇게 친구한테 넘기면 돼."));
+            Geumok("짝이 안 맞는 구슬은\n이렇게 친구한테 넘기면 돼."),
+            Geumok("지금 북이 어디에 있는지는\n우측 지도에서 볼 수 있어!", GameTutorialFocus.Minimap),
+            Bul("오호! 누가 북을 안 주고 있는지\n실시간으로 확인할 수 있겠군!", GameTutorialFocus.Minimap));
 
         /// <summary>5단계 폭탄의 자물쇠 수: 내가 넘기면 1, 금옥이가 돌려주면 0이 되어 내 판에서 열린다.</summary>
         public const int BombLocks = 2;

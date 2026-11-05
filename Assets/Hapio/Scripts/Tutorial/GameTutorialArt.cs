@@ -62,7 +62,7 @@ namespace Hapio
         public Font bannerFont;
         public Color bannerTextColor = Color.black;
         public Color bannerColor = new Color(.98f, .95f, .88f, .94f);
-        [Tooltip("띠 가운데가 화면 위에서 얼마나 내려와 있는지 (화면 높이 비율)")] [Range(0f, 1f)] public float bannerTopFraction = .3f;
+        [Tooltip("띠 가운데가 화면 위에서 얼마나 내려와 있는지 (화면 높이 비율). 모든 동작 장면이 이 한 자리를 쓰고, \"성공!\"도 여기 뜬다.")] [Range(0f, 1f)] public float bannerTopFraction = .3f;
         [Min(10f)] public float bannerHeight = 46f;
         [Min(8)] public int bannerFontSize = 20;
         [Tooltip("동작을 해냈을 때 안내 띠가 사라지고 그 자리에 뜨는 \"성공!\"의 색 (시안: 검정 #000000)")]
@@ -87,12 +87,12 @@ namespace Hapio
         [Tooltip("끌어 놓기 안내(2단계)에서 손이 한 번 끌고 떼는 데 걸리는 시간")] [Min(.4f)] public float handDragSeconds = 1.6f;
         [Tooltip("던지기 안내(3단계)에서 손이 한 번 쓸어 올리는 주기")] [Min(.4f)] public float handSwipeSeconds = 1.4f;
         [Tooltip("던지기 안내 화살표·손이 구슬에서 박 쪽으로 가는 길이")] [Min(10f)] public float throwGuideLength = 150f;
-        [Tooltip("던지기를 기다리는 동안 안내 띠 가운데의 높이 (화면 위에서 화면 높이 비율). 박을 가리지 않게 판 바로 위.")]
-        [Range(0f, 1f)] public float throwBannerTopFraction = .47f;
         [Tooltip("빗나갔을 때 \"다시 해 봐!\" 말풍선이 떠 있는 시간")] [Min(.3f)] public float remarkSeconds = 2f;
         [Tooltip("다섯 번째로 빗나갔을 때 \"너 일부러 그러는 거지?\" 말풍선이 떠 있는 시간. 구슬을 잡아도 사라지지 않고, 끝나면 \"다시 해 봐!\"가 이어서 뜬다.")]
         [Min(.3f)] public float teaseSeconds = 2.4f;
         [Tooltip("진행률 막대를 밝히는 곳을 막대보다 사방으로 얼마나 크게")] [Min(0f)] public float progressSpotlightPadding = 8f;
+        [Tooltip("북 위치 지도(4단계)를 밝히는 곳을 지도보다 사방으로 얼마나 크게")] [Min(0f)] public float minimapSpotlightPadding = 6f;
+        [Tooltip("북 위치 지도를 밝히는 둥근 네모의 모서리 반지름")] [Min(0f)] public float minimapSpotlightCorner = 14f;
 
         [Header("북에서 나오는 구슬 (1단계)")]
         [Tooltip("세 구슬이 시안 자리보다 더 미끄러지는 거리 (판 너비 비율). 클수록 북에서 멀리 튀어나간다.")]

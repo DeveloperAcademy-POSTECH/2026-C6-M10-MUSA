@@ -64,10 +64,11 @@ MonoBehaviour:
   handDragSeconds: 1.6
   handSwipeSeconds: 1.4
   throwGuideLength: 150
-  throwBannerTopFraction: 0.47
   remarkSeconds: 2
   teaseSeconds: 2.4
   progressSpotlightPadding: 8
+  minimapSpotlightPadding: 6
+  minimapSpotlightCorner: 14
   drumLaunchExtra: 0.06
   drumLaunchEdgeMargin: 0.1
   mirrorDrum: {fileID: 0}

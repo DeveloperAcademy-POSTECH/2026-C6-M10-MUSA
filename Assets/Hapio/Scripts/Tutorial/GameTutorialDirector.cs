@@ -43,6 +43,8 @@ namespace Hapio
         private RectTransform bubbleArt;
         private Text bubbleText;
         private Image tapHint;
+        // The bubble hangs below its speaker's face (tail up) to keep a lit area above clear.
+        private bool bubbleBelow;
         private RectTransform banner;
         private Text bannerText;
         private Text successText;
@@ -608,17 +610,8 @@ namespace Hapio
         {
             bool fromRight = speaker == GameTutorialSpeaker.Geumok;
             bubbleText.text = text;
-            // The art's tail points down-left; the right neighbor's bubble is mirrored, its words are not.
-            bubbleArt.localScale = new Vector3(fromRight ? -1f : 1f, 1f, 1f);
-            Vector4 inset = art.textInset;
-            RectTransform words = bubbleText.rectTransform;
-            words.anchorMin = new Vector2(fromRight ? inset.z : inset.x, inset.y);
-            words.anchorMax = new Vector2(1f - (fromRight ? inset.x : inset.z), 1f - inset.w);
-            words.offsetMin = words.offsetMax = Vector2.zero;
-            RectTransform hint = tapHint.rectTransform;
-            hint.anchorMin = hint.anchorMax = new Vector2(words.anchorMax.x, words.anchorMin.y);
+            LayoutBubble(fromRight, false);
             tapHint.gameObject.SetActive(false);
-            bubbleRoot.pivot = fromRight ? new Vector2(1f - art.tailTip.x, art.tailTip.y) : art.tailTip;
             bubbleRoot.sizeDelta = art.bubbleSize;
             Image face = portraits[GameTutorialScript.SeatOf(speaker)];
             speakerPortrait.sprite = face != null ? face.sprite : null;
@@ -626,6 +619,28 @@ namespace Hapio
             bubbleRoot.localScale = Vector3.zero;
             popStartedAt = Now;
             PlaceBubble(speaker);
+        }
+
+        /// <summary>
+        /// The bubble's art, words and tail for a speaker on the left or right. Normally it rises from the face with its tail
+        /// down; <paramref name="below"/> hangs it from the face with the art turned upside down (tail up), its words still
+        /// upright, so it keeps clear of a lit area above the face (the drum map).
+        /// </summary>
+        private void LayoutBubble(bool fromRight, bool below)
+        {
+            bubbleBelow = below;
+            // The art's tail points down-left; the right neighbor's bubble is mirrored, its words are not.
+            bubbleArt.localScale = new Vector3(fromRight ? -1f : 1f, below ? -1f : 1f, 1f);
+            Vector4 inset = art.textInset;
+            float bottom = below ? inset.w : inset.y, top = below ? inset.y : inset.w;
+            RectTransform words = bubbleText.rectTransform;
+            words.anchorMin = new Vector2(fromRight ? inset.z : inset.x, bottom);
+            words.anchorMax = new Vector2(1f - (fromRight ? inset.x : inset.z), 1f - top);
+            words.offsetMin = words.offsetMax = Vector2.zero;
+            RectTransform hint = tapHint.rectTransform;
+            hint.anchorMin = hint.anchorMax = new Vector2(words.anchorMax.x, words.anchorMin.y);
+            Vector2 tail = fromRight ? new Vector2(1f - art.tailTip.x, art.tailTip.y) : art.tailTip;
+            bubbleRoot.pivot = below ? new Vector2(tail.x, 1f - tail.y) : tail;
         }
 
         private void BeginAction(GameTutorialBeat beat)
@@ -709,8 +724,6 @@ namespace Hapio
                     arrow.gameObject.SetActive(true);
                     break;
                 case GameTutorialAction.ThrowOrb:
-                    // The banner moves down to just above the board so the gourd stays in sight.
-                    PlaceBanner(art.throwBannerTopFraction);
                     board.SetAllowedGestures(LabBoardGestures.Throw);
                     throwHit = false;
                     ListenToThrows(true);
@@ -1093,9 +1106,48 @@ namespace Hapio
                 RectTransform copy = speakerPortrait.rectTransform;
                 copy.anchoredPosition = faceRect.center;
                 copy.sizeDelta = faceRect.size;
+                // A line that lights the drum map must not cover it: if rising from the face would, hang it below instead,
+                // beside the face (its tail up at the face's upper side), clear of the face itself.
+                bool below = HasBeat && CurrentBeat.IsLine && CurrentBeat.Speaker == speaker && remarkAt < 0f
+                    && KeepsClear(CurrentBeat.Focus, out Rect lit)
+                    && RiseRect(tip, fromRight).Overlaps(lit);
+                if (below != bubbleBelow) LayoutBubble(fromRight, below);
+                if (below)
+                {
+                    float reach = art.tailTip.x * art.bubbleSize.x;
+                    tip = fromRight
+                        ? new Vector2(faceRect.xMin - art.tailGap.x - reach, faceRect.yMax - shoulder)
+                        : new Vector2(faceRect.xMax + art.tailGap.x + reach, faceRect.yMax - shoulder);
+                }
             }
             else tip = new Vector2(bounds.center.x, bounds.yMin + bounds.height * .3f);
             bubbleRoot.anchoredPosition = KeepOnScreen(tip, bubbleRoot.pivot, art.bubbleSize);
+        }
+
+        /// <summary>Where the bubble would lie rising from <paramref name="tip"/> as usual (tail down).</summary>
+        private Rect RiseRect(Vector2 tip, bool fromRight)
+        {
+            Vector2 pivot = fromRight ? new Vector2(1f - art.tailTip.x, art.tailTip.y) : art.tailTip;
+            tip = KeepOnScreen(tip, pivot, art.bubbleSize);
+            return new Rect(tip.x - pivot.x * art.bubbleSize.x, tip.y - pivot.y * art.bubbleSize.y, art.bubbleSize.x, art.bubbleSize.y);
+        }
+
+        /// <summary>The lit area a line's bubble must keep clear of: only the drum map for now.</summary>
+        private bool KeepsClear(GameTutorialFocus focus, out Rect lit)
+        {
+            lit = default;
+            return focus == GameTutorialFocus.Minimap && TryMinimapRect(out lit);
+        }
+
+        /// <summary>The drum map at the top right, with the light's padding.</summary>
+        private bool TryMinimapRect(out Rect rect)
+        {
+            rect = default;
+            LabDrumMinimap minimap = FindInBattle<LabDrumMinimap>();
+            if (minimap == null || !minimap.IsShowing || !TryOverlayRect(minimap.Panel, out Rect panel)) return false;
+            float pad = art.minimapSpotlightPadding;
+            rect = new Rect(panel.xMin - pad, panel.yMin - pad, panel.width + pad * 2f, panel.height + pad * 2f);
+            return true;
         }
 
         /// <summary>The bubble's tail point, moved only as far as needed to keep the whole bubble on screen.</summary>
@@ -1239,6 +1291,13 @@ namespace Hapio
                 float pad = art.barSpotlightPadding;
                 target = new Rect(bar.xMin - pad, bar.yMin - pad, bar.width + pad * 2f, bar.height + pad * 2f);
                 corner = Mathf.Min(target.width, target.height) * .5f;
+            }
+            else if (focus == GameTutorialFocus.Minimap && TryMinimapRect(out Rect map))
+            {
+                // The drum map: one rounded box around it.
+                target = map;
+                corner = Mathf.Min(art.minimapSpotlightCorner, Mathf.Min(map.width, map.height) * .5f);
+                degrees = 0f;
             }
             else if (focus == GameTutorialFocus.Progress && TryProgressRect(out Rect progress))
             {

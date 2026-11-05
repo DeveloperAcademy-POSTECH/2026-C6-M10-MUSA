@@ -258,6 +258,9 @@ namespace Hapio.Tests
             Assert.That(director.StepIndex, Is.EqualTo(3));
             yield return TapThrough(director, tap, art);
             Assert.That(director.CurrentBeat.Action, Is.EqualTo(GameTutorialAction.ThrowOrb));
+            Assert.That(guide.gameObject.activeSelf, Is.True);
+            Assert.That(guide.anchorMin.y, Is.EqualTo(1f - art.bannerTopFraction).Within(1e-4f),
+                "Throwing too: every banner, and its 성공!, sits in the one place.");
             Assert.That(board.AllowedGestures, Is.EqualTo(LabBoardGestures.Throw), "Only throwing is open.");
             for (int attempt = 0; attempt < 5 && director.IsWaitingForAction; attempt++)
             {
@@ -312,6 +315,17 @@ namespace Hapio.Tests
             Assert.That(network.Snapshot.orbs.Count(orb => orb.owner == network.LocalPlayerId && orb.kind == LabOrbKind.Yin),
                 Is.EqualTo(1), "The yin left from 2단계 is still there.");
             yield return TapThrough(director, tap, art);
+            yield return TapThrough(director, tap, art);
+            // Where the drum is: only the map at the top right is lit, and 금옥이's bubble does not cover it.
+            Assert.That(director.CurrentBeat.Focus, Is.EqualTo(GameTutorialFocus.Minimap));
+            yield return new WaitForSecondsRealtime(art.dimFadeSeconds + art.popSeconds + .1f);
+            Assert.That(dim.alpha, Is.EqualTo(1f).Within(.01f), "The rest is dark.");
+            var map = Object.FindFirstObjectByType<LabDrumMinimap>();
+            var bubble = director.GetComponentsInChildren<RectTransform>(true).Single(rect => rect.name == "Bubble");
+            Assert.That(ScreenRect(bubble).Overlaps(ScreenRect(map.Panel)), Is.False, "The map stays in plain sight.");
+            yield return TapThrough(director, tap, art);
+            Assert.That(director.CurrentBeat.Speaker, Is.EqualTo(GameTutorialSpeaker.Bul));
+            Assert.That(director.CurrentBeat.Focus, Is.EqualTo(GameTutorialFocus.Minimap), "Still lit as 불이 answers.");
             yield return TapThrough(director, tap, art);
 
             // 5단계: the gourd drops a two-lock bomb; I push it right to 금옥이, she sends it back unlocked and it opens
@@ -551,6 +565,18 @@ namespace Hapio.Tests
                 yield return null;
             }
             board.EndDragAtWorld(end, Time.realtimeSinceStartupAsDouble);
+        }
+
+        /// <summary>A UI rectangle on the screen (screen-space overlay canvases), whatever its anchors and scale.</summary>
+        private static Rect ScreenRect(RectTransform rect)
+        {
+            var corners = new Vector3[4];
+            rect.GetWorldCorners(corners);
+            Canvas canvas = rect.GetComponentInParent<Canvas>();
+            Camera eye = canvas == null || canvas.rootCanvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.rootCanvas.worldCamera;
+            Vector2 min = RectTransformUtility.WorldToScreenPoint(eye, corners[0]);
+            Vector2 max = RectTransformUtility.WorldToScreenPoint(eye, corners[2]);
+            return Rect.MinMaxRect(Mathf.Min(min.x, max.x), Mathf.Min(min.y, max.y), Mathf.Max(min.x, max.x), Mathf.Max(min.y, max.y));
         }
 
         private static LabPlayerState LocalPlayer(LabNetwork network) =>
