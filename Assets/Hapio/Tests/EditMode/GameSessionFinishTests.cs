@@ -102,6 +102,59 @@ namespace Hapio.Tests
             }
         }
 
+        [Test]
+        public void TheReplayRecordIsAdoptedOnlyWhenItDecodes()
+        {
+            using (var fixture = new Fixture())
+            {
+                fixture.Invoke("AdoptFinishReplay", Record(LabFinishReplayShot.MaximumPoses).Encode());
+                Assert.That(fixture.Session.FinishUsesReplay, Is.True);
+                fixture.Invoke("AdoptFinishReplay", "not a record");
+                Assert.That(fixture.Session.FinishUsesReplay, Is.False, "A malformed record keeps the fixed finish.");
+                fixture.Invoke("AdoptFinishReplay", string.Empty);
+                Assert.That(fixture.Session.FinishUsesReplay, Is.False, "The Host's empty record means the fixed finish.");
+                fixture.Invoke("AdoptFinishReplay", Record(LabFinishReplayShot.MaximumPoses).Encode());
+                fixture.Invoke("ResetPaintFinish");
+                Assert.That(fixture.Session.FinishUsesReplay, Is.False, "The next battle starts without the old record.");
+            }
+        }
+
+        [Test]
+        public void TheLargestReplayRecordFitsTheFinishControlLimit()
+        {
+            Type type = typeof(GameSession).GetNestedType("PaintFinishControl", BindingFlags.NonPublic);
+            Assert.That(type, Is.Not.Null);
+            object control = Activator.CreateInstance(type, true);
+            Set(control, "kind", "paint_finish_commit");
+            Set(control, "runId", Guid.NewGuid().ToString("N"));
+            Set(control, "sessionId", Guid.NewGuid().ToString("N"));
+            Set(control, "stageIndex", 3); Set(control, "paintCount", 32768);
+            Set(control, "columns", 256); Set(control, "rows", 128);
+            Set(control, "revision", uint.MaxValue); Set(control, "round", uint.MaxValue);
+            Set(control, "paintRevision", uint.MaxValue); Set(control, "visualVersion", uint.MaxValue);
+            Set(control, "generation", uint.MaxValue);
+            Set(control, "startsAt", 123456.789012345d); Set(control, "deadline", 123468.789012345d);
+            Set(control, "replay", Record(LabFinishReplayShot.MaximumPoses).Encode());
+            string json = JsonUtility.ToJson(control);
+            // ReceivePaintFinishControl refuses anything longer than 4096 characters.
+            Assert.That(json.Length, Is.LessThan(4096), json.Length.ToString());
+        }
+
+        private static LabFinishReplayShot Record(int poses)
+        {
+            var shot = new LabFinishReplayShot
+            {
+                Owner = ulong.MaxValue, Slot = 5, Element = LabOrbElement.Earth, Radius = .165f, FlightSeconds = .8f,
+                Gravity = 30f, LaunchPosition = new Vector3(-123.456f, 0.85f, 14.123f), LaunchVelocity = new Vector3(1.2345f, 7.89f, -6.54f),
+                HitPoint = new Vector3(0.1234f, 1.5678f, 10.4321f), HitNormal = Vector3.forward, ImpactVelocity = new Vector3(1f, -3f, -6f),
+                PoseStart = -LabFinishReplayShot.PoseBefore, Poses = new LabHangingTarget.RigState[poses]
+            };
+            for (int i = 0; i < poses; i++)
+                shot.Poses[i] = new LabHangingTarget.RigState
+                    { Swing = new Vector2(-12.3456f, 23.4567f), Yaw = -12345.678f, RopeOffset = .0123f, PivotHeight = 1.75f };
+            return shot;
+        }
+
         private sealed class Fixture : IDisposable
         {
             private readonly GameObject root;

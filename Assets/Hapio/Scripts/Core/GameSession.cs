@@ -227,6 +227,7 @@ namespace Hapio
             double now = Time.realtimeSinceStartupAsDouble;
             UpdateBattleStart(now);
             UpdatePaintFinish(now);
+            UpdateReplayCover();
             if (network.IsHost && network.IsConnected && now >= nextStateAt)
             {
                 BroadcastState();

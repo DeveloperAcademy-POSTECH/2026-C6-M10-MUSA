@@ -114,6 +114,18 @@ namespace C6Lab
         private RigState previousPose, currentPose;
         private bool posesReady, drawingInterpolated;
         private float pivotHeight;
+        // Final-hit replay: the last fixed poses with their fixed time, read only by the replay record, and a
+        // pose drawn instead of the interpolated one while a replay presents. Neither changes physics or hits.
+        public const int PoseHistoryCapacity = 256;
+        private readonly double[] historyTimes = new double[PoseHistoryCapacity];
+        private readonly RigState[] historyPoses = new RigState[PoseHistoryCapacity];
+        private int historyCount, historyNext;
+        private RigState presentationPose;
+        private bool presentationPoseActive;
+        /// <summary>The fixed pose every script and physics query reads.</summary>
+        public RigState FixedPose => currentPose;
+        public bool PresentationPoseActive => presentationPoseActive;
+        public int PoseHistoryCount => historyCount;
         public bool SimulationHeld => simulationHeld;
         /// <summary>Freeze physical swing, rope cycle and spin without changing global UI time.</summary>
         public void SetSimulationHeld(bool held) => simulationHeld = held;
@@ -479,7 +491,7 @@ namespace C6Lab
         {
             // The last frame drew an interpolated pose. Physics and every later FixedUpdate read the fixed one.
             if (posesReady) WritePose(currentPose);
-            if (simulationHeld) return;
+            if (simulationHeld) { RecordPose(currentPose); return; }
             // A snapshot can pause during NetworkEarlyUpdate after this frame's fixed ticks
             // were queued. Do not integrate that last queued callback after the pose is pinned.
             if (pivot == null || Time.timeScale <= 0f) return;
@@ -507,7 +519,69 @@ namespace C6Lab
             ApplyRopeLength();
             previousPose = currentPose;
             currentPose = Capture();
+            RecordPose(currentPose);
         }
+
+        private void RecordPose(RigState pose)
+        {
+            if (!posesReady) return;
+            historyTimes[historyNext] = Time.fixedTimeAsDouble;
+            historyPoses[historyNext] = pose;
+            historyNext = (historyNext + 1) % PoseHistoryCapacity;
+            historyCount = Mathf.Min(historyCount + 1, PoseHistoryCapacity);
+        }
+
+        /// <summary>
+        /// The fixed pose at a past fixed time (Time.fixedTimeAsDouble), interpolated between recorded steps and
+        /// clamped to the kept history. False before any step is recorded.
+        /// </summary>
+        public bool TrySamplePose(double fixedTime, out RigState pose)
+        {
+            pose = currentPose;
+            if (historyCount == 0 || double.IsNaN(fixedTime) || double.IsInfinity(fixedTime)) return false;
+            int oldest = (historyNext - historyCount + PoseHistoryCapacity) % PoseHistoryCapacity;
+            if (fixedTime <= historyTimes[oldest]) { pose = historyPoses[oldest]; return true; }
+            for (int i = 1; i < historyCount; i++)
+            {
+                int index = (oldest + i) % PoseHistoryCapacity, before = (index - 1 + PoseHistoryCapacity) % PoseHistoryCapacity;
+                if (fixedTime > historyTimes[index]) continue;
+                double span = historyTimes[index] - historyTimes[before];
+                float alpha = span > 1e-9 ? (float)((fixedTime - historyTimes[before]) / span) : 1f;
+                pose = RigState.Lerp(historyPoses[before], historyPoses[index], alpha);
+                return true;
+            }
+            pose = historyPoses[(historyNext - 1 + PoseHistoryCapacity) % PoseHistoryCapacity];
+            return true;
+        }
+
+        /// <summary>The oldest recorded fixed time, or negative before any step.</summary>
+        public double OldestPoseTime => historyCount > 0
+            ? historyTimes[(historyNext - historyCount + PoseHistoryCapacity) % PoseHistoryCapacity] : -1d;
+
+        /// <summary>The newest recorded fixed time, or negative before any step.</summary>
+        public double LatestPoseTime => historyCount > 0
+            ? historyTimes[(historyNext - 1 + PoseHistoryCapacity) % PoseHistoryCapacity] : -1d;
+
+        /// <summary>
+        /// Draw this pose instead of the interpolated one, for presentation only. Physics, colliders and every script
+        /// keep reading the fixed pose; the override exists only between the render pipeline's begin and end callbacks.
+        /// </summary>
+        public void SetPresentationPose(RigState pose)
+        {
+            if (!FiniteVector(pose.Swing) || !Finite(pose.Yaw) || !Finite(pose.RopeOffset) || !Finite(pose.PivotHeight)) return;
+            presentationPose = pose;
+            presentationPoseActive = true;
+        }
+
+        public void ClearPresentationPose() => presentationPoseActive = false;
+
+        /// <summary>The hanging body's frame (the twist pivot) for a pose, without moving anything.</summary>
+        public Matrix4x4 PoseMatrix(RigState pose) => pivot != null && twistPivot != null
+            ? TwistMatrix(pose) : transform.localToWorldMatrix;
+
+        /// <summary>Where a point fixed to the body at pose <paramref name="from"/> is at pose <paramref name="to"/>.</summary>
+        public Vector3 MovePosedPoint(Vector3 worldPoint, RigState from, RigState to) =>
+            PoseMatrix(to).MultiplyPoint3x4(PoseMatrix(from).inverse.MultiplyPoint3x4(worldPoint));
 
         private void Update()
         {
@@ -533,6 +607,12 @@ namespace C6Lab
         private void OnBeginRendering(ScriptableRenderContext context, List<Camera> cameras)
         {
             if (!posesReady) return;
+            if (presentationPoseActive)
+            {
+                WritePose(presentationPose);
+                drawingInterpolated = true;
+                return;
+            }
             // Held or paused: one pose, and nothing to step back to when time resumes.
             if (simulationHeld || Time.timeScale <= 0f) { SnapPose(); return; }
             ApplyRenderPose(RenderAlpha());
@@ -565,6 +645,8 @@ namespace C6Lab
         /// </summary>
         public Vector3 DrawnPoint(Vector3 worldPoint)
         {
+            if (presentationPoseActive && posesReady && pivot != null && twistPivot != null)
+                return MovePosedPoint(worldPoint, currentPose, presentationPose);
             if (!posesReady || pivot == null || twistPivot == null || simulationHeld || Time.timeScale <= 0f) return worldPoint;
             Matrix4x4 drawn = TwistMatrix(RigState.Lerp(previousPose, currentPose, RenderAlpha()));
             return drawn.MultiplyPoint3x4(TwistMatrix(currentPose).inverse.MultiplyPoint3x4(worldPoint));
