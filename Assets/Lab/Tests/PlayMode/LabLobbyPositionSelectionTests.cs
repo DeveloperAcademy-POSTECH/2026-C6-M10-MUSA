@@ -31,7 +31,7 @@ namespace C6Lab.Tests
             network = hud.network;
             view = hud.GetComponentInParent<Canvas>().GetComponentInChildren<LabLobbyView>(true);
             Assert.That(view, Is.Not.Null);
-            network.port = 18204;
+            network.port = LabSavedSceneNetworkFixture.AvailableDualFamilyPort();
         }
 
         [UnityTearDown]
@@ -55,7 +55,8 @@ namespace C6Lab.Tests
                     yield return null;
                 Assert.That(network.CanChooseConnection, Is.True);
                 Assert.That(network.SetTargetParticipantCount(capacity), Is.True);
-                network.port = (ushort)(18204 + capacity);
+                // Each Host session takes its own free port instead of a fixed base + capacity.
+                network.port = LabSavedSceneNetworkFixture.AvailableDualFamilyPort();
                 network.Host();
                 Assert.That(network.IsHost, Is.True, network.Notice);
                 yield return null;
@@ -153,6 +154,7 @@ namespace C6Lab.Tests
             Assert.That(view.slotButtons[1].interactable, Is.True);
         }
 
+        [Category("LabOnly")]
         [UnityTest]
         public IEnumerator DeveloperRestartKeepsPositionsButLocksChoicesUntilTheRestartGateClears()
         {

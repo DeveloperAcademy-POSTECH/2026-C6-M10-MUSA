@@ -12,6 +12,7 @@ using Object = UnityEngine.Object;
 
 namespace C6Lab.Tests
 {
+    [Category("GPU")]
     public sealed class LabElementTrailRenderTests
     {
         [UnityTearDown]

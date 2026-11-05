@@ -21,6 +21,7 @@ namespace Hapio.Tests
     /// with its own camera over a hidden HUD, then opens the result under the cover. A new tap skips it on this device;
     /// a 100% with no recent throw keeps the fixed 1.2 s finish. Saved Home → DEV solo, real board gestures and physics.
     /// </summary>
+    [Category("Slow")]
     public sealed class GameFinishReplayTests
     {
         private const BindingFlags Private = BindingFlags.Instance | BindingFlags.NonPublic;
@@ -263,6 +264,7 @@ namespace Hapio.Tests
                     yield return Until(() => network.Snapshot.orbs.Count(orb => orb.kind == LabOrbKind.Combined) >= 2, "Box opens");
                     foreach (string shot in network.Snapshot.orbs.Where(orb => orb.kind == LabOrbKind.Combined).Select(orb => orb.id).ToArray())
                     {
+                        yield return WaitReplayPoseWindow(target.GetComponent<LabHangingTarget>());
                         target.GetComponent<LabHangingTarget>().ResetSwing();
                         yield return Until(() => network.board.GetComponentsInChildren<LabOrbView>().Any(v => v.OrbId == shot), "Orb on board");
                         Launch(network.board, shot, Time.timeAsDouble, flicks[throws++ % flicks.Length]);
@@ -338,6 +340,16 @@ namespace Hapio.Tests
                 }
             throw new InvalidOperationException("The test could not reserve a dual-family UDP Host port.");
         }
+
+        /// <summary>
+        /// The replay only keeps a hit whose pose window (PoseBefore before impact) is still recorded. The gourd starts
+        /// its pose history around the start of play, so with the short test start (GameTestStartTiming) a throw right
+        /// after Playing can land before that window exists. A real final hit cannot come that early.
+        /// </summary>
+        internal static IEnumerator WaitReplayPoseWindow(LabHangingTarget hanging) =>
+            Until(() => hanging.PoseHistoryCount > 1
+                && Time.fixedTimeAsDouble - hanging.OldestPoseTime >= LabFinishReplayShot.PoseBefore + .1d,
+                "The gourd keeps the replay's pre-impact pose window", 5d);
 
         private IEnumerator WaitPlaying(int stage) => Until(() => session.State.phase == GameFlowPhase.Playing
             && session.State.stageIndex == stage && !session.IsLoadingScene && network.HasBattleReferences

@@ -8,6 +8,7 @@ using UnityEngine.TestTools;
 namespace Hapio.Tests
 {
     /// <summary>Decorative replacement operates beneath the animated slot and never owns the target's physical shell.</summary>
+    [Category("Legacy")]
     public sealed class GameYokaiPresentationTests
     {
         [UnityTest]

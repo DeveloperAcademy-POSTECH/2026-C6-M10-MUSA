@@ -13,6 +13,7 @@ namespace C6Lab.Tests
     /// Completed-result viewer checks. The source uses the saved board's actual Host
     /// projectile collision with explicit low-resolution/100%-initial DEV tuning.
     /// </summary>
+    [Category("Slow"), Category("LabOnly")]
     public sealed class GourdResultViewerPlayModeTests
     {
         [UnityTearDown]
@@ -51,6 +52,7 @@ namespace C6Lab.Tests
                 "The initial Scene has no eligible result entry or preview camera.");
         }
 
+        [Category("GPU")]
         [UnityTest]
         public IEnumerator ActualPaintVictoryCanBeInspectedLocallyAndRetryClosesTheViewer()
         {
@@ -66,7 +68,7 @@ namespace C6Lab.Tests
             network.config = fixture;
             controller.config = fixture;
             controller.ReconfigureBoard();
-            network.port = 17891;
+            network.port = LabSavedSceneNetworkFixture.AvailableDualFamilyPort();
             LabGourdResultViewer viewer = null;
             LabDeveloperMode developer = Resources.FindObjectsOfTypeAll<LabDeveloperMode>()
                 .Single(item => item.gameObject.scene == SceneManager.GetActiveScene());
@@ -264,7 +266,7 @@ namespace C6Lab.Tests
             float[] savedValues = savedNetwork.CaptureDeveloperValues();
             LabConfig fixture = CollisionFixture(savedNetwork);
             LabGourdResultViewer viewer = LabGourdResultViewer.Attach(network);
-            network.port = 17892;
+            network.port = LabSavedSceneNetworkFixture.AvailableDualFamilyPort();
             try
             {
                 // Use all four accepted DEV configurations on real fresh Solo rounds.

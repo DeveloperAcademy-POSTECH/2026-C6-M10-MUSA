@@ -20,6 +20,7 @@ namespace Hapio.Tests
     /// and the result preview copies the baked body and lid. Saved Home → DEV solo → Stage 2, real board gestures and
     /// physics; solo production binding only. The fixed copy finish without a recent hit is in GameFinishReplayTests.
     /// </summary>
+    [Category("Slow")]
     public sealed class GameStage2GourdHitFinishTests
     {
         private const BindingFlags Private = BindingFlags.Instance | BindingFlags.NonPublic;
@@ -114,6 +115,7 @@ namespace Hapio.Tests
                     yield return Until(() => network.Snapshot.orbs.Count(orb => orb.kind == LabOrbKind.Combined) >= 2, "Box opens");
                     foreach (string shot in network.Snapshot.orbs.Where(orb => orb.kind == LabOrbKind.Combined).Select(orb => orb.id).ToArray())
                     {
+                        yield return GameFinishReplayTests.WaitReplayPoseWindow(target.GetComponent<LabHangingTarget>());
                         target.GetComponent<LabHangingTarget>().ResetSwing();
                         yield return Until(() => network.board.GetComponentsInChildren<LabOrbView>().Any(v => v.OrbId == shot), "Orb on board");
                         int hits = approved.Count;

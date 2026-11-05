@@ -82,6 +82,28 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void AFinishedTalismanGlowsThenFadesWithoutBlockingTheBoard()
+        {
+            overlay.Present(Snapshot(-1d), Local, 11d);
+            Trace(overlay);
+            // #509: the written "물" glows first, then the talisman fades out; the board is already free.
+            Assert.That(overlay.Visible, Is.False); Assert.That(overlay.WantsBoardBlocked, Is.False);
+            Assert.That(overlay.Finishing, Is.True);
+            Assert.That(overlay.Paper.gameObject.activeSelf, Is.True, "It does not vanish at once.");
+            Assert.That(overlay.PaperAlpha, Is.EqualTo(1f));
+            overlay.AdvanceFinish(overlay.FinishSeconds * .8f);
+            Assert.That(overlay.PaperAlpha, Is.GreaterThan(0f).And.LessThan(1f), "Fading away slowly.");
+            overlay.Present(Snapshot(-1d), Local, 11.5d);
+            Assert.That(overlay.Paper.gameObject.activeSelf, Is.True, "The Host has not confirmed yet; it keeps fading.");
+            overlay.AdvanceFinish(overlay.FinishSeconds);
+            Assert.That(overlay.Finishing, Is.False);
+            Assert.That(overlay.Paper.gameObject.activeSelf, Is.False);
+            Assert.That(overlay.PaperAlpha, Is.EqualTo(1f), "Reset for the next A.");
+            foreach (var graphic in overlay.GetComponentsInChildren<UnityEngine.UI.Graphic>(true))
+                Assert.That(graphic.raycastTarget, Is.False);
+        }
+
+        [Test]
         public void ScribblesAwayFromTheGuideNeverCount()
         {
             overlay.Present(Snapshot(-1d), Local, 11d);

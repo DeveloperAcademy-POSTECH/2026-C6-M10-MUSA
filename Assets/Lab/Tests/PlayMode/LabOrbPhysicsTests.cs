@@ -8,6 +8,7 @@ using UnityEngine.TestTools;
 namespace C6Lab.Tests
 {
     /// <summary>Real 3D Rigidbody/SphereCollider integration, not a mocked movement calculator.</summary>
+    [Category("Slow")]
     public sealed class LabOrbPhysicsTests
     {
         private const float Width = 8f;

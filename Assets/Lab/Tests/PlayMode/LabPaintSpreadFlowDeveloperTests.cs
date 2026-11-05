@@ -12,6 +12,7 @@ using UnityEngine.UI;
 namespace C6Lab.Tests
 {
     /// <summary>Saved DEV controls and local round application; no remote Client ACK claim.</summary>
+    [Category("LabOnly")]
     public sealed class LabPaintSpreadFlowDeveloperTests
     {
         private LabDeveloperMode ui;
@@ -113,7 +114,7 @@ namespace C6Lab.Tests
         [UnityTest]
         public IEnumerator SoloRestartAppliesSpreadFlowThenReturnsToOriginalWithoutChangingTheSourceAsset()
         {
-            ui.network.port = 19198;
+            ui.network.port = LabSavedSceneNetworkFixture.AvailableDualFamilyPort();
             ui.Open(); ui.valueInputs[134].text = "0";
             string[] profile = { "1", "0.8" };
             for (int index = 132; index <= 133; index++) ui.valueInputs[index].text = profile[index - 132];

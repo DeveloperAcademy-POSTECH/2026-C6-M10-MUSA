@@ -256,13 +256,15 @@ namespace C6Lab
         // #506: clay appearance, live DEV fields and impact density hints.
         // 5687: #479 Jigwi A talisman: A carries every seat's talismanAt (no target/hit count), the
         //       "jigwiTalisman" request and the talisman water orb flag (5684~5686 were taken on main).
-        internal const ushort LabProtocolVersion = 5687;
+        // 5688: #509 Jigwi B lists only the picked seats, lasts 15 s and is judged by simultaneous Water boss hits;
+        //       success splashes the boss, failure sets every board on fire (boardFireUntil). A2 starts at 42 s.
+        internal const ushort LabProtocolVersion = 5688;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Double-tap a blue fox orb to clear it, and keep your Yin and Yang away.";
         /// <summary>More fox orbs than one fox fire ever drops; a longer list is ignored (#251).</summary>
         private const int MaximumFoxFireOrbs = 10;
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/48");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/49");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;
@@ -2164,6 +2166,7 @@ namespace C6Lab
                 current.Add(orb.id);
                 if (board.IsSnapshotSuppressed(orb.id)) continue;
                 bool showSpawn = ShowsDrumSpawn(orb, LocalPlayerId);
+                if (orb.jigwiTalismanReward && latest.serverTime - orb.createdAt < .5d) board.ExpectDrop(orb.id); // #509 부적 물구슬은 위에서 하나씩 떨어짐
                 // Every screen derives a locked bomb's fuse from the shared Host clock in the snapshot.
                 float fuse = orb.kind == LabOrbKind.Bomb && orb.lockSwipes > 0 && config != null
                     ? Mathf.Max(0f, (float)(orb.createdAt + config.ItemLifetimeSeconds - latest.serverTime)) : -1f;
@@ -2185,7 +2188,7 @@ namespace C6Lab
                     arrival: orb.kind == LabOrbKind.Bomb && orb.JustArrived(latest.serverTime) ? orb.arrival : LabDrumArrival.None,
                     stopAt: orb.stopAt);
                 view?.SetJigwiSupplyWaterArt(!string.IsNullOrEmpty(orb.jigwiABSupplyEventId) || orb.jigwiTalismanReward,
-                    latest.paused || GameStartHeld);
+                    latest.paused || GameStartHeld, special: !string.IsNullOrEmpty(orb.jigwiABSupplyEventId)); // #509 특수 물구슬
             }
             foreach (var drum in latest.drums ?? Array.Empty<LabOrbState>())
             {

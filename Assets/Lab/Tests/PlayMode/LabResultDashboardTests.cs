@@ -7,6 +7,7 @@ using UnityEngine.TestTools;
 namespace C6Lab.Tests
 {
     /// <summary>Passive presentation checks: no transport, room, battle model or saved Scene is started.</summary>
+    [Category("LabOnly")]
     public sealed class LabResultDashboardTests
     {
         private GameObject root;

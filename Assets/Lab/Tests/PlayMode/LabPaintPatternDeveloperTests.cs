@@ -10,6 +10,7 @@ using UnityEngine.UI;
 namespace C6Lab.Tests
 {
     /// <summary>Saved Canvas and real local Host boundaries; no synthetic remote ACK or device claim.</summary>
+    [Category("LabOnly")]
     public sealed class LabPaintPatternDeveloperTests
     {
         private const int ViewerField = 110;
