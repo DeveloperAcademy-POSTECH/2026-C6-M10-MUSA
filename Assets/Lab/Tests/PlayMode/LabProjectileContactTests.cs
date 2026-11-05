@@ -89,6 +89,11 @@ namespace C6Lab.Tests
             Shot("fast-small-center", 0f, 3f, .5f, .3f, -240f, hit);
             yield return Await(hit);
             Assert.That(hit.Result.Hit, Is.True, "Sweeping the actual small sphere must retain fast real hits.");
+            Assert.That(hit.Result.HitNormal.sqrMagnitude, Is.EqualTo(1f).Within(.002f),
+                "The selected physics contact must carry its actual outward surface normal.");
+            Assert.That(Vector3.Dot(hit.Result.ImpactVelocity, hit.Result.HitNormal), Is.LessThan(0f));
+            Assert.That(LabPaintImpact.Normalize(hit.Result.ImpactVelocity, hit.Result.HitNormal), Is.EqualTo(1f),
+                "Fast normal contact reaches the presentation calibration cap without changing hit adjudication.");
             yield return AssertNoFurtherReceipts(hit);
 
             Collider obstruction = Wall("Earlier registered miss surface", 1.5f, .04f);
@@ -113,6 +118,9 @@ namespace C6Lab.Tests
             yield return Await(overlap);
             Assert.That(overlap.Result.Hit, Is.True,
                 "A zero-length sweep must not discard a sphere already overlapping the shell.");
+            Assert.That(overlap.Result.HitNormal.sqrMagnitude, Is.EqualTo(1f).Within(.002f));
+            Assert.That(LabPaintImpact.Normalize(overlap.Result.ImpactVelocity, overlap.Result.HitNormal), Is.Zero.Within(.001f),
+                "A stationary overlap still hits but has no incoming normal speed for visual concentration.");
             yield return AssertNoFurtherReceipts(overlap);
         }
 

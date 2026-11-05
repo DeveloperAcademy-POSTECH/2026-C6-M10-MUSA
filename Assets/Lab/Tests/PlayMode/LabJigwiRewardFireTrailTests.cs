@@ -73,7 +73,13 @@ namespace C6Lab.Tests
             }
             Assert.That(shots[0].ElementFlightTrail.Profile, Is.SameAs(ordinaryFire.ElementFlightTrail.Profile),
                 "Normal Fire stays unchanged; the additional reward layer is the distinguishing effect.");
-            yield return new WaitForFixedUpdate(); yield return null;
+            // Projectile transforms are interpolated; trails sample them in LateUpdate.
+            // One physics step plus a coroutine's next Update does not guarantee that
+            // either trail has observed its second rendered position yet. Await the actual
+            // histories, retaining every physics/profile assertion above and below.
+            yield return Until(() => shots.TrueForAll(shot => shot != null
+                && shot.ElementFlightTrail.PathCount >= 2 && shot.JigwiRewardFireTrail.PathCount >= 2),
+                "All five physically moving projectiles must record elemental and reward trail segments.", 2f);
             foreach (LabProjectile shot in shots)
             {
                 Assert.That(shot.ElementFlightTrail.PathCount, Is.GreaterThanOrEqualTo(2));

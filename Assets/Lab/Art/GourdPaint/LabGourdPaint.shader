@@ -27,6 +27,11 @@ Shader "C6Lab/GourdPaint"
         [HideInInspector] _PaintGrainSize("Paint grain size", Float) = 1
         [HideInInspector] _PaintGrainStrength("Paint grain strength", Float) = .3
         [HideInInspector] _PaintMottleStrength("Paint mottle strength", Float) = .18
+        [HideInInspector] _PaperStickerEnabled("Opaque paper sticker surface", Float) = 0
+        [HideInInspector] _PaperStickerGrainStrength("Opaque paper fiber strength", Float) = 0
+        [HideInInspector] _WatercolorV2Enabled("Watercolor V2 surface", Float) = 0
+        [HideInInspector] _WatercolorGranulationStrength("Watercolor pigment granulation", Float) = 0
+        [HideInInspector] _WatercolorGranulationScale("Watercolor pigment grain scale", Float) = 120
     }
     SubShader
     {
@@ -75,6 +80,8 @@ Shader "C6Lab/GourdPaint"
                 float _PaintGrainSize;
                 float _PaintGrainStrength;
                 float _PaintMottleStrength;
+                float _PaperStickerEnabled, _PaperStickerGrainStrength;
+                float _WatercolorV2Enabled, _WatercolorGranulationStrength, _WatercolorGranulationScale;
                 float _UnderpaintFiber;
             CBUFFER_END
 
@@ -167,6 +174,35 @@ Shader "C6Lab/GourdPaint"
                 return saturate(paintColor * brightness);
             }
 
+            float ResolvedPigmentNoise(float3 position)
+            {
+                // Object coordinates determine the marks; derivatives only attenuate an
+                // unresolved frequency so rotation/zoom does not turn it into sparkling.
+                float3 footprint=fwidth(position);
+                float resolved=1-smoothstep(.35,1.25,max(footprint.x,max(footprint.y,footprint.z)));
+                return (GrainNoise(position)-.5)*resolved;
+            }
+
+            half3 WatercolorPigmentGrain(half4 paint, float3 direction, half paperLuma)
+            {
+                float scale=max(_WatercolorGranulationScale,1);
+                float fine=ResolvedPigmentNoise(direction*scale+float3(19.3,7.1,31.7));
+                float middle=ResolvedPigmentNoise(direction*(scale*.29)+float3(2.1,47.3,11.9));
+                // The existing Hanji asset has mipmaps. Its final 1x1 mip supplies the
+                // actual paper mean, preserving fiber detail under rich pigment without
+                // baking a paper brightness assumption into the effect.
+                float3 averagePaper=SAMPLE_TEXTURE2D_LOD(_PaperTex,sampler_PaperTex,float2(.5,.5),16).rgb;
+                float mean=max(dot(averagePaper,float3(.2126,.7152,.0722)),.01);
+                float fiber=clamp((paperLuma/mean-1)*4,-1,1);
+                float variation=fine*2.2+middle*.8+fiber*.8;
+                float brightness=max(.2,1+saturate(_WatercolorGranulationStrength)*variation);
+                // One scalar preserves the pigment hue. The alpha and uncovered paper
+                // remain exact; headroom limiting preserves premultiplied RGB<=alpha.
+                float maximum=max(paint.r,max(paint.g,paint.b));
+                brightness=min(brightness,paint.a/max(maximum,.000001));
+                return paint.rgb*brightness;
+            }
+
             float PeriodicLine(float coordinate, float width)
             {
                 float distance = abs(frac(coordinate + .5) - .5);
@@ -219,7 +255,8 @@ Shader "C6Lab/GourdPaint"
                 half4 paint = SAMPLE_TEXTURE2D(_PaintMap, sampler_PaintMap, uv) * saturate(_PaintMapReady);
                 // Modulate only premultiplied pigment RGB: coverage, alpha and unpainted
                 // paper retain the original map. OFF and both strengths zero bypass exactly.
-                if (_PaintGrainEnabled > .5 && (_PaintGrainStrength > 0 || _PaintMottleStrength > 0))
+                if (_WatercolorV2Enabled < .5 && _PaintGrainEnabled > .5
+                    && (_PaintGrainStrength > 0 || _PaintMottleStrength > 0))
                     paint.rgb = GrainColor(paint.rgb, direction);
                 // Ownership changes brightness only. It cannot punch holes into pigment,
                 // alter coverage, replace element hues, or touch unpainted paper.
@@ -230,6 +267,17 @@ Shader "C6Lab/GourdPaint"
                 }
                 half3 paper = PaperSample(input.positionOS, normalize(input.normalOS));
                 half paperLuma = dot(paper, half3(.2126,.7152,.0722));
+                // This runs after the map's boundary reconstruction, so its fine grain
+                // is not blurred across cells or fed into a later reveal's base image.
+                if (_WatercolorV2Enabled > .5 && _WatercolorGranulationStrength > 0)
+                    paint.rgb = WatercolorPigmentGrain(paint,direction,paperLuma);
+                // Opaque colored paper: existing surface fibers modulate RGB only.
+                // Never make the sticker translucent or reveal a previous paint layer.
+                if (_PaperStickerEnabled > .5 && _PaperStickerGrainStrength > 0)
+                {
+                    float fiberTone = clamp(paperLuma / .8, .65, 1.25);
+                    paint.rgb = min(paint.aaa, paint.rgb * lerp(1, fiberTone, saturate(_PaperStickerGrainStrength * 4)));
+                }
                 paper = lerp(paperLuma.xxx, paper, _PaperSaturation);
                 half3 paperColor = saturate(1.0 + (paper - 1.0) * _PaperContrast);
                 // Derive surface gradients from the same PNG, without a separate normal map.

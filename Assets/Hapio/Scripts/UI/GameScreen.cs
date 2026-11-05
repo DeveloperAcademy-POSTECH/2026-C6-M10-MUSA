@@ -63,6 +63,7 @@ namespace Hapio
         private void Awake()
         {
             session = GameSession.EnsureExists();
+            EnsureClayDeveloperRows();
             if (!UsesExternalNavigation)
             {
                 Click(hostButton, () => { if (ApplyPort()) session.Host(); });
@@ -591,6 +592,7 @@ namespace Hapio
             syncingDeveloper = true;
             developerSliders[index].SetValueWithoutNotify(value);
             syncingDeveloper = false;
+            PreviewClayField(index);
         }
         private void SyncInput(int index, float value)
         {
@@ -598,7 +600,54 @@ namespace Hapio
             syncingDeveloper = true;
             developerInputs[index].SetTextWithoutNotify(value.ToString("0.######", CultureInfo.InvariantCulture));
             syncingDeveloper = false;
+            PreviewClayField(index);
         }
+        /// <summary>Append only the two new rows to older saved panels; retain all edited rows and layout.</summary>
+        public bool EnsureClayDeveloperRows()
+        {
+            int count = LabConfig.DeveloperFields.Count;
+            if (developerInputs == null || developerSliders == null || developerInputs.Length == 0) return false;
+            if (developerInputs.Length == count && developerSliders.Length == count) return true;
+            if (developerInputs.Length != LabConfig.ClayThicknessField || developerSliders.Length != LabConfig.ClayThicknessField) return false;
+            var template = developerInputs[developerInputs.Length - 1];
+            if (template == null || template.transform.parent == null || template.transform.parent.parent == null) return false;
+            Transform row = template.transform.parent, content = row.parent;
+            if (row.Find("Label") == null || row.Find("Value") == null || row.Find("Slider") == null) return false;
+            Array.Resize(ref developerInputs, count); Array.Resize(ref developerSliders, count);
+            float[] defaults = session != null ? session.CaptureDeveloperSettings(0) : new float[count];
+            for (int i = LabConfig.ClayThicknessField; i < count; i++)
+            {
+                var copy = Instantiate(row.gameObject, content); copy.name = "Setting" + i.ToString("000");
+                copy.transform.SetAsLastSibling();
+                LabDeveloperField field = LabConfig.DeveloperFields[i];
+                var label = copy.transform.Find("Label").GetComponent<UnityEngine.UI.Text>();
+                var input = copy.transform.Find("Value").GetComponent<UnityEngine.UI.InputField>();
+                var slider = copy.transform.Find("Slider").GetComponent<UnityEngine.UI.Slider>();
+                if (label == null || input == null || slider == null) return false;
+                label.text = field.Label; input.contentType = UnityEngine.UI.InputField.ContentType.DecimalNumber;
+                input.onValueChanged = new UnityEngine.UI.InputField.OnChangeEvent();
+                slider.onValueChanged = new UnityEngine.UI.Slider.SliderEvent();
+                slider.minValue = field.Min; slider.maxValue = field.Max; slider.wholeNumbers = field.WholeNumber;
+                input.SetTextWithoutNotify(defaults[i].ToString("0.######", CultureInfo.InvariantCulture));
+                slider.SetValueWithoutNotify(defaults[i]);
+                developerInputs[i] = input; developerSliders[i] = slider;
+                copy.SetActive(GameStageSettings.IsFieldVisible(0, i));
+            }
+            return true;
+        }
+
+        private void PreviewClayField(int index)
+        {
+            if (!LabConfig.IsClayPresentationField(index) || session == null || DeveloperScope != 0
+                || developerInputs == null || developerInputs.Length <= LabConfig.ClayGlossField) return;
+            if (!float.TryParse(developerInputs[LabConfig.ClayThicknessField].text, NumberStyles.Float, CultureInfo.InvariantCulture, out float thickness)
+                || !float.TryParse(developerInputs[LabConfig.ClayGlossField].text, NumberStyles.Float, CultureInfo.InvariantCulture, out float gloss)
+                || !LabConfig.ValidClayAppearance(thickness, gloss)) return;
+            if (session.PreviewClayAppearance(thickness, gloss, out string error))
+                Text(developerFeedback, "클레이 두께·광택은 즉시 적용됩니다. 다른 설정은 APPLY가 필요합니다.");
+            else Text(developerFeedback, error);
+        }
+
         private static void Click(UnityEngine.UI.Button button, UnityEngine.Events.UnityAction action) { if (button != null) button.onClick.AddListener(action); }
         private static void Label(UnityEngine.UI.Button button, string text) { if (button != null) Text(button.GetComponentInChildren<UnityEngine.UI.Text>(true), text); }
         private static void Text(UnityEngine.UI.Text label, string value) { if (label != null && label.text != value) label.text = value ?? string.Empty; }

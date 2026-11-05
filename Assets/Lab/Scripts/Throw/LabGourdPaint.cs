@@ -9,7 +9,7 @@ namespace C6Lab
     /// state survives visual disable/reinitialization; direct painting is an offline preview only.
     /// </summary>
     [DisallowMultipleComponent]
-    public sealed class LabGourdPaint : MonoBehaviour
+    public sealed partial class LabGourdPaint : MonoBehaviour
     {
         public const string ResourceFolder = "GourdPaint/";
 
@@ -18,6 +18,7 @@ namespace C6Lab
         public GameObject visualPrefab;
         public Material paintMaterial;
         public LabWatercolorPaintProfile watercolorProfile;
+        public LabWatercolorStampProfile stampProfile;
         [Tooltip("Offline preview brush only. Real session growth uses the Host round settings.")]
         [Range(.05f, .3f)] public float splatRadius = LabPaintSurface.DefaultRadius;
 
@@ -29,6 +30,10 @@ namespace C6Lab
         private Texture2D painterTexture;
         private LabHighResolutionPaintRuntime highResolution;
         private LabWatercolorPaintRuntime watercolor;
+        private LabWatercolorStampRuntime watercolorStamps;
+        private bool appliedStampEnabled;
+        private int appliedStampFingerprint;
+        private ulong reportedStampApplied, reportedStampRendered;
         // Each runtime prewarms its round's brush once, while the battle is still behind the preparing overlay (#482).
         private object prewarmedHighResolution, prewarmedWatercolor;
         private LabPaintPattern prewarmedHighResolutionPattern, prewarmedWatercolorPattern;
@@ -67,13 +72,16 @@ namespace C6Lab
         public Texture2D PaintTexture => paintTexture;
         public Texture2D PainterTexture => painterTexture;
         /// <summary>Actually bound render maps. Authoritative Texture2D observation APIs stay unchanged.</summary>
-        public Texture VisualPaintTexture => WatercolorActive ? watercolor.PaintTexture
+        public Texture VisualPaintTexture => ClayStickersActive ? clayStickers.PaintTexture : WatercolorStampsActive ? watercolorStamps.PaintTexture : WatercolorActive ? watercolor.PaintTexture
             : HighResolutionActive ? highResolution.PaintTexture : paintTexture;
         public Texture VisualPainterTexture => HighResolutionActive ? highResolution.PainterTexture : painterTexture;
         public bool HighResolutionActive => appliedHighResolutionEnabled && highResolution != null && highResolution.Ready;
         public string HighResolutionError => highResolution != null ? highResolution.Error : null;
         public bool WatercolorActive => appliedWatercolorEnabled && HighResolutionActive
             && watercolor != null && watercolor.Ready;
+        public bool WatercolorStampsActive => appliedStampEnabled && watercolorStamps != null
+            && watercolorStamps.PaintTexture != null && watercolorStamps.Error == null;
+        public string WatercolorStampError => clayStickers?.Error ?? watercolorStamps?.Error ?? network?.PaintArtError;
         public string WatercolorError => watercolor != null ? watercolor.Error : null;
         /// <summary>True only after the final authoritative map and all bounded high-resolution batches are installed.</summary>
         public bool CompletionVisualReady => IsReady && hasUploadedSurface && uploadedSurface == Surface
@@ -82,7 +90,10 @@ namespace C6Lab
             && (network.config == null || !network.config.HighResolutionPaintEnabled
                 || highResolution != null && highResolution.Ready && !highResolution.HasPendingWork && highResolution.Error == null)
             && (!appliedWatercolorEnabled || watercolor == null || watercolor.Error != null
-                || watercolor.Ready && !watercolor.HasPendingWork && !watercolor.IsAnimating);
+                || watercolor.Ready && !watercolor.HasPendingWork && !watercolor.IsAnimating)
+            && (network == null || !network.RequiresPaintArt || network.PaintArtCompletionReady
+                && (ClayStickersActive ? clayStickers.Ready && clayStickers.Error == null
+                    : watercolorStamps != null && watercolorStamps.Ready && watercolorStamps.Error == null));
         public Transform Shell => shell != null ? shell.transform : null;
         /// <summary>마운트한 박의 모델 계약(#507). 흰 박이거나 계약 검사에 실패해 흰 박으로 돌아갔으면 null.</summary>
         public LabGourdVisualRig Rig => rig;
@@ -130,6 +141,8 @@ namespace C6Lab
                 paint.paintMaterial = Resources.Load<Material>(ResourceFolder + "WhiteGourd");
             if (paint.watercolorProfile == null)
                 paint.watercolorProfile = Resources.Load<LabWatercolorPaintProfile>(ResourceFolder + "WatercolorProfile");
+            if (paint.stampProfile == null)
+                paint.stampProfile = Resources.Load<LabWatercolorStampProfile>(ResourceFolder + "WatercolorStampProfile");
             paint.ApplyMode();
             LabPaintFinishPresentation.Attach(network);
             return paint;
@@ -407,7 +420,20 @@ namespace C6Lab
             LabWatercolorPaintSettings watercolorSettings = watercolorProfile != null ? watercolorProfile.settings : null;
             // 2:2 땅따먹기 (#293)는 청·홍이 한눈에 갈려야 해서 반투명한 수채(#369) 대신 기존 선명한 고해상도 칠을 쓴다.
             bool teamTerritory = network != null && network.Snapshot != null && network.Snapshot.teamTerritory;
-            bool watercolorEnabled = highResolutionEnabled && !teamTerritory
+            LabWatercolorStampSettings stampSettings = network != null && network.PinnedWatercolorSettings != null
+                ? network.PinnedWatercolorSettings : stampProfile != null ? stampProfile.settings.SanitizedCopy()
+                : LabWatercolorStampSettings.CaptureDefault();
+            bool stampsEnabled = network != null && network.IsConnected && highResolutionEnabled && !teamTerritory
+                && stampSettings.enabled;
+            bool stampsChanged = appliedStampEnabled != stampsEnabled || appliedStampFingerprint != stampSettings.Fingerprint;
+            // The received journal can advance without a new cell revision (overlap, final commit, replay).
+            bool pendingStamps = stampsEnabled && network.PaintArtJournal != null
+                && (stampSettings.UsesClayStickers ? ClayPending(network.PaintArtJournal)
+                    : watercolorStamps == null || watercolorStamps.Error == null
+                    && (!watercolorStamps.Ready || watercolorStamps.AppliedThrough != network.PaintArtJournal.LastSequence
+                        || reportedStampApplied != watercolorStamps.AppliedThrough
+                        || reportedStampRendered != watercolorStamps.RenderedThrough));
+            bool watercolorEnabled = !stampsEnabled && highResolutionEnabled && !teamTerritory
                 && watercolorSettings != null && watercolorSettings.enabled;
             int watercolorSettingsHash = watercolorSettings != null ? watercolorSettings.Fingerprint : 0;
             bool watercolorChanged = appliedWatercolorEnabled != watercolorEnabled
@@ -424,7 +450,8 @@ namespace C6Lab
                 || appliedMottleStrength != mottleStrength;
             bool patternsChanged = !grainSettingsApplied || appliedPlayerPaintPatternsEnabled != playerPaintPatternsEnabled;
             if (!uploadMap && !grainChanged && !patternsChanged && !highResolutionChanged
-                && !visualChanged && !pendingVisual && !watercolorChanged && !pendingWatercolor && !completeRebuild) return;
+                && !visualChanged && !pendingVisual && !watercolorChanged && !pendingWatercolor
+                && !stampsChanged && !pendingStamps && !completeRebuild && !ClaySettingsChanged()) return;
             if (block == null) block = new MaterialPropertyBlock();
             shell.GetPropertyBlock(block);
             if (uploadMap)
@@ -487,18 +514,47 @@ namespace C6Lab
             {
                 watercolor.Dispose(); watercolor = null;
             }
+            if ((generationChanged || highResolutionChanged || stampsChanged) && watercolorStamps != null)
+            { watercolorStamps.Dispose(); watercolorStamps = null; }
+            if ((generationChanged || highResolutionChanged || stampsChanged) && clayStickers != null) ReleaseClay();
+            if (stampsEnabled && stampSettings.UsesClayStickers && network.PaintArtJournal != null)
+            {
+                UpdateClay(network.PaintArtJournal, stampSettings, highResolutionColumns, completeRebuild);
+            }
+            else if (stampsEnabled && network.PaintArtJournal != null)
+            {
+                watercolorStamps ??= new LabWatercolorStampRuntime();
+                watercolorStamps.Update(network.PaintArtJournal, HighResolutionActive ? highResolution.PaintTexture : paintTexture, highResolutionColumns, stampSettings,
+                    network.BattlePresentationTime, completeRebuild);
+                if (watercolorStamps.Error != null || watercolorStamps.Ready)
+                    network.ReportPaintArtRenderingError(watercolorStamps.Error);
+                network.ReportPaintArtRendered(watercolorStamps.AppliedThrough, watercolorStamps.RenderedThrough);
+                reportedStampApplied = watercolorStamps.AppliedThrough; reportedStampRendered = watercolorStamps.RenderedThrough;
+            }
+            else if ((!stampsEnabled || stampSettings.UsesClayStickers) && watercolorStamps != null)
+            { watercolorStamps.Dispose(); watercolorStamps = null; }
+            if (!stampsEnabled && clayStickers != null) ReleaseClay();
+            appliedStampEnabled = stampsEnabled; appliedStampFingerprint = stampSettings.Fingerprint;
             appliedWatercolorEnabled = watercolorEnabled;
             appliedWatercolorSettings = watercolorSettingsHash;
             block.SetTexture("_PaintMap", VisualPaintTexture);
             block.SetTexture("_PainterMap", VisualPainterTexture);
-            block.SetFloat("_PaintGrainEnabled", grainEnabled ? 1f : 0f);
+            block.SetFloat("_WatercolorV2Enabled", WatercolorStampsActive && !stampSettings.UsesPaperStickers ? 1f : 0f);
+            block.SetFloat("_PaperStickerEnabled", WatercolorStampsActive && stampSettings.UsesPaperStickers ? 1f : 0f);
+            block.SetFloat("_PaperStickerGrainStrength", stampSettings.paperSticker.grainStrength);
+            block.SetFloat("_WatercolorGranulationStrength", stampSettings.granulationStrength);
+            block.SetFloat("_WatercolorGranulationScale", stampSettings.granulationScale);
+            block.SetFloat("_PaintGrainEnabled", grainEnabled && !(WatercolorStampsActive && stampSettings.UsesPaperStickers) ? 1f : 0f);
             block.SetFloat("_PaintGrainSize", grainSize);
             block.SetFloat("_PaintGrainStrength", grainStrength);
             block.SetFloat("_PaintMottleStrength", mottleStrength);
             // This is a presentation switch. Keep both authoritative maps intact while OFF.
             block.SetFloat("_PlayerPaintPatternsEnabled", playerPaintPatternsEnabled ? 1f : 0f);
-            shell.SetPropertyBlock(block);
-            foreach (Renderer extra in extras) if (extra != null) extra.SetPropertyBlock(block);
+            // The neutral body and the clay coat are separate renderers. No saved base asset is edited.
+            bool clayActive=ClayStickersActive;
+            BindClay(clayActive,playerPaintPatternsEnabled);
+            BindClayBase(shell,clayActive);
+            foreach (Renderer extra in extras) if (extra != null) BindClayBase(extra,clayActive);
             appliedPlayerPaintPatternsEnabled = playerPaintPatternsEnabled;
             appliedGrainEnabled = grainEnabled; appliedGrainSize = grainSize;
             appliedGrainStrength = grainStrength; appliedMottleStrength = mottleStrength;
@@ -542,10 +598,15 @@ namespace C6Lab
             }
             if (mountedTarget != null && VisualInstance != null && mountedTarget.MountedVisual == VisualInstance)
                 mountedTarget.SetVisualPrefab(null);
+            ReleaseClay();
             if (highResolution != null) highResolution.Dispose();
             highResolution = null;
             if (watercolor != null) watercolor.Dispose();
             watercolor = null;
+            watercolorStamps?.Dispose(); watercolorStamps = null;
+            if (network != null) network.ReportPaintArtRendered(0, 0);
+            appliedStampEnabled = false; appliedStampFingerprint = 0;
+            reportedStampApplied = reportedStampRendered = 0;
             appliedWatercolorEnabled = false;
             appliedWatercolorSettings = 0;
             appliedHighResolutionEnabled = false;

@@ -14,6 +14,8 @@ namespace C6Lab
     {
         internal const float Threshold = .15f;
         private static readonly LabPaintPatternMask[] Cache = new LabPaintPatternMask[4];
+        private static LabPaintPatternMask paperStickerCache;
+        private static string paperStickerVersion;
         private readonly byte[] luminance;
         private readonly int width, height;
         internal readonly float FootprintFraction;
@@ -37,6 +39,16 @@ namespace C6Lab
             FootprintFraction = covered / (float)colors.Length;
         }
 
+#if UNITY_EDITOR
+        /// <summary>Local immutable Editor comparison mask. Never replaces the global Resources cache.</summary>
+        internal static LabPaintPatternMask FromAppearanceStudy(Texture2D source)
+        {
+            if (source == null) throw new ArgumentNullException(nameof(source));
+            if (!source.isReadable) throw new ArgumentException("A readable appearance mask is required.", nameof(source));
+            return new LabPaintPatternMask(source);
+        }
+#endif
+
         internal static LabPaintPatternMask Load(LabPaintPattern pattern)
         {
             if (pattern < LabPaintPattern.Broad || pattern > LabPaintPattern.Flow)
@@ -53,6 +65,18 @@ namespace C6Lab
                 Cache[index] = mask;
                 return mask;
             }
+        }
+
+        internal static LabPaintPatternMask LoadPaperSticker()
+        {
+            string version = LabPaperStickerSettings.BakedBrushVersion;
+            if (paperStickerCache != null && paperStickerVersion == version) return paperStickerCache;
+            Texture2D source = Resources.Load<Texture2D>(LabPaperStickerSettings.MaskResource);
+            if (source == null || !source.isReadable)
+                throw new InvalidOperationException("Missing readable paper sticker contour.");
+            var value = new LabPaintPatternMask(source);
+            paperStickerCache = value; paperStickerVersion = version;
+            return value;
         }
 
         /// <summary>Bilinear alpha-weighted luminance. V=0 is the texture's bottom edge.</summary>

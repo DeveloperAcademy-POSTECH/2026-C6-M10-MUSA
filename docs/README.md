@@ -26,6 +26,9 @@
 | 도색 패턴과 투척자 무늬 | [런타임 도색 패턴](PAINT_PATTERN_RUNTIME.md) |
 | 도색 건조·근처 재타격 | [페인트 건조](PAINT_DRYING.md) |
 | 실제 전투·완성 박의 고해상도 표현 | [런타임 고해상도 도색](RUNTIME_HIGH_RESOLUTION_PAINT.md) |
+| 승인된 채색 표현 기준과 후속 구현 목표 | [박 채색 표현 명세](PAINT_PRESENTATION_SPEC.md) |
+| 일반 협동의 클레이·충돌 농도·DEV 두께/광택·Mac 실험 앱 사용법 | [박 클레이 스티커](CLAY_STICKER_PAINT.md) |
+| 누적 수채 브러시 구현·조절·비교 방법 | [수채 브러시 채색](WATERCOLOR_BRUSH_STAMPS.md) |
 | 투척 수치·물리 조정 | [투척 조정](THROW_TUNING_GUIDE.md) · [박 물리 조정](PINATA_TUNING_GUIDE.md) |
 | 오행 비행 트레일·조합판 물감 방울 | [트레일 안내](ELEMENT_FLIGHT_TRAILS.md) |
 | 현재 지귀 개인 발화·전원 불장막 | [지귀 화면 패턴](JIGWI_SCREEN_PATTERNS.md) |
@@ -39,6 +42,8 @@
 
 ## 실험·과거 구현 자료
 
+- [곡면 스티커 에셋 시제품](SURFACE_STICKER_PROTOTYPE.md): 클레이 도입 전 원형 부착과 영역 제한형을 비교한 Editor 시제품 이력.
+- [이전 한지 얼룩 스티커](PAPER_STICKER_PAINT.md): 클레이 전환 전 표현의 구현·검증 이력.
 - [수채 질감과 번짐](WATERCOLOR_PAINT_EXPERIMENT.md): 실제 전투의 수채 표현·Inspector 설정과 파란 정적 비교 도구.
 - [고해상도 도색 비교 실험](HIGH_RESOLUTION_PAINT_EXPERIMENT.md): 실제 박에 최초 명중1회·재타격3회를 적용한 표현 비교. 현행 런타임 적용은 위 고해상도 도색 문서를 따른다.
 - [도색 스타일 비교](PAINT_STYLE_COMPARISON_EXPERIMENT.md): 패턴 비교 실험의 기준과 결과.

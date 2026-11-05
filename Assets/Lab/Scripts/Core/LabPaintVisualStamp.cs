@@ -23,6 +23,14 @@ namespace C6Lab
         public byte painterSlot;
         public LabPaintPattern pattern;
         public uint seed;
+        /// <summary>0 preserves legacy mid-strength; 1..255 encode the normalized impact range.</summary>
+        public byte impact01;
+        public float ImpactStrength => impact01 == 0 ? .5f : (impact01 - 1) / 254f;
+        public static byte EncodeImpactStrength(float value)
+        {
+            value = float.IsFinite(value) ? Mathf.Clamp01(value) : .5f;
+            return Mathf.Abs(value - .5f) < .000001f ? (byte)0 : (byte)(1 + Mathf.RoundToInt(value * 254f));
+        }
         public Vector3 Up => Vector3.Cross(center, right);
 
         public static bool Valid(LabPaintVisualStamp[] stamps)
@@ -58,7 +66,10 @@ namespace C6Lab
                     writer.Write(s.right.x); writer.Write(s.right.y); writer.Write(s.right.z);
                     writer.Write(s.radius);
                     writer.Write(s.color.r); writer.Write(s.color.g); writer.Write(s.color.b); writer.Write(s.color.a);
-                    writer.Write(s.painterSlot); writer.Write((byte)s.pattern); writer.Write((ushort)0);
+                    writer.Write(s.painterSlot); writer.Write((byte)s.pattern);
+                    // Reuse one former reserved byte. The record stays 44 bytes and legacy
+                    // default records remain byte-identical; mixed app versions still need a handshake bump.
+                    writer.Write(s.impact01); writer.Write((byte)0);
                     writer.Write(s.seed);
                 }
                 return stream.ToArray();
@@ -80,7 +91,8 @@ namespace C6Lab
                     s.radius = reader.ReadSingle();
                     s.color = new Color32(reader.ReadByte(), reader.ReadByte(), reader.ReadByte(), reader.ReadByte());
                     s.painterSlot = reader.ReadByte(); s.pattern = (LabPaintPattern)reader.ReadByte();
-                    if (reader.ReadUInt16() != 0) return false;
+                    s.impact01 = reader.ReadByte();
+                    if (reader.ReadByte() != 0) return false;
                     s.seed = reader.ReadUInt32(); result[i] = s;
                 }
             }
