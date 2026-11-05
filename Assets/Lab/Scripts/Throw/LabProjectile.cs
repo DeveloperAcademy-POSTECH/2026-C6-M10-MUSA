@@ -127,6 +127,8 @@ namespace C6Lab
         private bool jigwiABReward;
         private bool authoritative;
         private bool resolved;
+        // The final-hit replay's ghost: same look, no physics, moved by its presenter. It never launches or resolves.
+        private bool puppet;
 
         public string ProjectileId => projectileId;
         public ulong OwnerPlayerId => ownerPlayerId;
@@ -334,6 +336,43 @@ namespace C6Lab
             body = GetComponent<Rigidbody>();
             sphere = GetComponent<SphereCollider>();
         }
+
+        /// <summary>
+        /// Presentation-only flight look for the final-hit replay: the orb, colour, ink trail and B reward fire of a real
+        /// shot, with a kinematic body that detects nothing. The caller moves the transform and ends it with
+        /// <see cref="EndPuppet"/>. It never launches, never reports contact and never resolves.
+        /// </summary>
+        internal void BeginPuppet(LabConfig tuning, bool jigwiReward)
+        {
+            if (launched || puppet || resolved || tuning == null) return;
+            config = tuning;
+            if (body == null) body = GetComponent<Rigidbody>();
+            if (sphere == null) sphere = GetComponent<SphereCollider>();
+            body.isKinematic = true;
+            body.useGravity = false;
+            body.detectCollisions = false;
+            body.interpolation = RigidbodyInterpolation.None;
+            sphere.enabled = false;
+            puppet = true;
+            ConfigureAppearance(tuning.OrbAppearance);
+            EnsureDefaultVisual(ScaledRadius);
+            EnsureFlightTrail(ScaledRadius);
+            if (elementFlightTrail != null) elementFlightTrail.Begin(transform, ScaledTrailProfile());
+            if (flightTrail != null) { flightTrail.Clear(); flightTrail.emitting = true; }
+            jigwiABReward = jigwiReward;
+            ConfigureJigwiRewardFireTrail();
+        }
+
+        /// <summary>The ghost reached the gourd: leave its trails fading, like a real contact, and remove it.</summary>
+        internal void EndPuppet()
+        {
+            if (!puppet || resolved) return;
+            resolved = true;
+            LeaveFadingTrail();
+            Destroy(gameObject);
+        }
+
+        internal bool IsPuppet => puppet;
 
         private void Prepare(Vector3 velocity, LabConfig tuning, bool visualOnly)
         {
@@ -710,7 +749,7 @@ namespace C6Lab
                 jigwiRewardFireTrail = null;
                 return;
             }
-            if (!launched || resolved) return;
+            if ((!launched && !puppet) || resolved) return;
             if (jigwiRewardFireTrail != null)
             {
                 if (jigwiRewardFireTrail.IsEmitting) jigwiRewardFireTrail.Reconfigure(ScaledRadius);

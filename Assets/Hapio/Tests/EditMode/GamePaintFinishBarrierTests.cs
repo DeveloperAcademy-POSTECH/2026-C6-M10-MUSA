@@ -138,6 +138,32 @@ namespace Hapio.Tests
             Assert.That(barrier.Expire(100d), Is.False);
         }
         [Test]
+        public void AReplayReleasesWhenEveryoneFinishedOrSkippedButNeverBeforeEveryone()
+        {
+            // The final-hit replay passes no minimum: a skip ends that device's part, never another device's.
+            var barrier = new GamePaintFinishBarrier(new ulong[] { 0, 7 }, 0d);
+            Assert.That(barrier.Schedule(10d), Is.True);
+            barrier.ReadyForSchedule(0, 1); barrier.ReadyForSchedule(7, 1);
+            Assert.That(barrier.Commit(10d), Is.True);
+            Assert.That(barrier.Completed(7, 1), Is.True, "Device 7 skipped its replay right after the start.");
+            Assert.That(barrier.TryRelease(barrier.StartsAt + .2d, 0d), Is.False, "The Host is still watching.");
+            Assert.That(barrier.Completed(0, 1), Is.True);
+            Assert.That(barrier.TryRelease(barrier.StartsAt - .01d, 0d), Is.False, "Never before the shared start.");
+            Assert.That(barrier.TryRelease(barrier.StartsAt + .2d, 0d), Is.True);
+        }
+        [Test]
+        public void ANegativeOrNonFiniteMinimumNeverReleases()
+        {
+            var barrier = new GamePaintFinishBarrier(new ulong[] { 4 }, 0d);
+            barrier.Prepared(4);
+            Assert.That(barrier.BeginLocal(4, 1d), Is.True);
+            Assert.That(barrier.Completed(4, 1), Is.True);
+            Assert.That(barrier.TryRelease(9d, -1d), Is.False);
+            Assert.That(barrier.TryRelease(9d, double.NaN), Is.False);
+            Assert.That(barrier.TryRelease(9d, double.PositiveInfinity), Is.False);
+            Assert.That(barrier.TryRelease(9d, 0d), Is.True);
+        }
+        [Test]
         public void MultipleParticipantsCannotUseTheImmediateLocalStart()
         {
             var barrier = new GamePaintFinishBarrier(new ulong[] { 0, 7 }, 0d);

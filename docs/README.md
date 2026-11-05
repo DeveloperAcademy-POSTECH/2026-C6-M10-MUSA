@@ -22,6 +22,7 @@
 | 개인 조합판·Host 검증·전달·공동 전투 동기화 | [개인 조합판 권한 구조](LOCAL_BOARD_AUTHORITY.md) |
 | 공유 수치·음양 연속 보정·스태미나·기믹·피버 조정 | [개발자 모드 설정](DEVELOPER_MODE_PARAMETER_SPEC.md) |
 | 방 자동 입장·완료 연출·HUD 위계·결과 박 비율 | [세션 완료와 UI](SESSION_FINISH_UI.md) |
+| 스토리 100% 뒤 마지막 일격 다시보기 | [마지막 일격 다시보기](FINAL_HIT_REPLAY.md) |
 | 스테이지 결과 화면 | [결과 UI](STAGE_RESULT_UI.md) |
 | 도색 패턴과 투척자 무늬 | [런타임 도색 패턴](PAINT_PATTERN_RUNTIME.md) |
 | 도색 건조·근처 재타격 | [페인트 건조](PAINT_DRYING.md) |

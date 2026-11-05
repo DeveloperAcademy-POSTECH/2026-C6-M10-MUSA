@@ -21,6 +21,8 @@ namespace C6Lab
         private int createdCount;
 
         public int ActiveBurstCount => active.Count;
+        /// <summary>The authored burst, for the final-hit replay's own copies (it never borrows this pool).</summary>
+        internal LabImpactParticleBurst EffectPrefab => effectPrefab;
 
         private struct ActiveBurst
         {

@@ -71,10 +71,15 @@ namespace Hapio
             Committed = true;
             return true;
         }
-        public bool TryRelease(double serverNow, double duration)
+        /// <summary>
+        /// Releases once every participant has finished and <paramref name="minimumDuration"/> has run since the start.
+        /// The fixed 1.2 s finish passes its length; the final-hit replay passes 0, because a device that skipped its own
+        /// replay has finished, while release still waits for every participant (the replay's skip is local).
+        /// </summary>
+        public bool TryRelease(double serverNow, double minimumDuration)
         {
-            if (Released || !Committed || !EveryoneCompleted || !Finite(serverNow) || !Finite(duration)
-                || duration <= 0d || serverNow < StartsAt + duration) return false;
+            if (Released || !Committed || !EveryoneCompleted || !Finite(serverNow) || !Finite(minimumDuration)
+                || minimumDuration < 0d || serverNow < StartsAt + minimumDuration) return false;
             Released = true;
             return true;
         }

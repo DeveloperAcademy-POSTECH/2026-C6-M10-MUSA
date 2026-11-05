@@ -15,6 +15,20 @@
 
 #479 브랜치(main `0681d25` #506까지 병합)를 합쳤다. 충돌은 접속 번호 줄, `LabModel.cs` 칠하기 줄(main의 `paintImpactStrength` + #509 승리 1회 조건), `AGENTS.md`/`JIGWI_SCREEN_PATTERNS.md` 절이었다. #509는 **5688/`C6PhysicsLab/49`/`C6HapioGame/33`**, 설정 259개다. 병합 뒤 결과는 아직 기록하지 않았다.
 
+## 2026-11-05 — 마지막 일격 다시보기 (스토리 1·2·3)
+
+`feat/final-hit-replay` 브랜치에서 Unity 6000.6.5f1 batch mode(macOS)로 실행했다. 아래 표는 실제로 실행한 것만 적는다.
+
+| 확인 | 결과 | 범위 |
+| --- | --- | --- |
+| EditMode 전체 | **1970 PASS / 0 FAIL** | 새 `LabFinishReplayShotTests`(기록 왕복·크기·거절·비행 경로·자세 보간·장면 시간표·짧은 비행 맞춤), `GamePaintFinishBarrierTests` 다시보기 release 2개, `GameSessionFinishTests` 기록 채택·패킷 4096자 한도 2개, 토큰 `C6HapioGame/33` |
+| PlayMode 다시보기·회귀(검토 수정 뒤) | **36 PASS / 0 FAIL** | `GameFinishReplayTests`(1·3스테이지 실제 투척 → 세 장면·명중 3회·ghost 물리 없음·HUD/전투 카메라 꺼짐·실제 박 표시·통계/칠 불변·한지 막 아래 결과, 새 탭 건너뛰기 → 솔로 결과, 최근 명중 없는 100% → 기존 1.2초 복사본), `GameStage2GourdHitFinishTests`(2스테이지 실제 투척 → 다시보기·결과 미리보기), `GameSceneFlowTests`, `LabWhiteGourdGoldenTests`, `LabContinuousRopeTests`, `GameStageGourdIntegrationTests` |
+| PlayMode 회귀(검토 수정 전) | **56 PASS / 0 FAIL** | 위 항목에 더해 `LabGourdPaintTests`, `LabPaintDryingPlayModeTests`, `GourdResultViewerPlayModeTests`, `GameJigwiStageIntegrationTests`, `LabGourdVisualRigTests` |
+| 세 스테이지 장면 캡처 | 임시 PlayMode(커밋 안 함) | 휴대폰 세로 비율 RT로 장면당 6프레임 확인. 레터박스 막대는 이미지에 직접 그렸고 캡션·컷 번쩍임은 화면 오버레이라 캡처에 없음 |
+| 코드 검토 | 독립 검토 3관점 + 반박 검증 | 확인된 2건 수정: 늦은 재예약에서 12초 안에 들지 않으면 commit 전에 기존 연출로 내림, 자세 기록 256스텝으로 늘리고 창이 다 남지 않은 명중 제외 |
+
+미실행: iOS·Mac 앱 실기기(세로 화면 구도·성능), 다인 Host/Guest 동시 재생·Guest 건너뛰기·늦은 재예약 내림. 검토 수정 뒤에는 `LabGourdPaintTests` 등 위 56개 중 나머지 PlayMode를 다시 돌리지 않았다.
+
 ## 2026-11-04 — #479 지귀 A 부적 쓰기
 
 `feat/#479-jigwi-talisman` 작업 브랜치에서 팀원이 Unity6000.6.5f1 Editor(macOS)로 직접 확인했다. 아래 표는 실제로 실행한 것만 적는다.
