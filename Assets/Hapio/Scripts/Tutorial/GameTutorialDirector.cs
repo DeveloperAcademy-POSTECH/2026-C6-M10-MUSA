@@ -383,6 +383,7 @@ namespace Hapio
             tapHint.gameObject.SetActive(false);
             bubbleRoot.gameObject.SetActive(false);
             BuildSkip();
+            BuildPause(root);
         }
 
         private void BuildBanner()
@@ -493,8 +494,8 @@ namespace Hapio
                 return;
             }
             if (finishing) return;
-            // The skip dialog stops the tutorial where it is: no line, action or neighbor moves on behind it.
-            if (skipOpen) return;
+            // The skip dialog and the pause menu stop the tutorial where it is: nothing moves on behind them.
+            if (skipOpen || BattlePaused) return;
             UpdateHandOvers();
             if (beatIndex < 0)
             {
@@ -1088,6 +1089,7 @@ namespace Hapio
             if (unavailable || hud == null || overlay == null) return;
             ApplyHudDressing();
             UpdateKeepOut();
+            if (UpdatePause()) return;
             if (UpdateSkip()) return;
             bool line = HasBeat && CurrentBeat.IsLine;
             if (remarkAt >= 0f && (Now - remarkAt > remarkSeconds || !remarkHolds && board.IsHolding))

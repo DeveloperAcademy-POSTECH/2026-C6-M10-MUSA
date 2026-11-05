@@ -128,6 +128,24 @@ namespace Hapio.Tests
             Assert.That((director.StepIndex, director.BeatIndex), Is.EqualTo((0, 1)), "Back where it was.");
             Assert.That(director.IsShowingLine, Is.True, "The same line again.");
             Assert.That(director.Skipped, Is.False);
+            // The pause button works over a line too: the tutorial steps aside for the usual pause menu, then comes back.
+            var pause = buttons.Single(button => button.name == "Pause");
+            yield return null;
+            Assert.That(pause.gameObject.activeInHierarchy, Is.True, "An invisible press lies over the HUD pause button.");
+            pause.onClick.Invoke();
+            yield return Until(() => network.IsBattlePaused && director.IsSteppedAsideForPause, "Paused from a line", 5f);
+            var overlayGroup = director.GetComponentsInChildren<CanvasGroup>(true).Single(group => group.name == "Tutorial Overlay");
+            Assert.That((overlayGroup.alpha, overlayGroup.blocksRaycasts), Is.EqualTo((0f, false)),
+                "The tutorial screen is clear and lets every touch through to the pause menu.");
+            Assert.That(hud.pauseMenu.activeInHierarchy, Is.True);
+            Assert.That(hud.developerSettingsButton == null || !hud.developerSettingsButton.gameObject.activeInHierarchy, Is.True,
+                "No DEV restart from the tutorial.");
+            yield return new WaitForSecondsRealtime(1f);
+            Assert.That((director.StepIndex, director.BeatIndex), Is.EqualTo((0, 1)), "Nothing moved on while paused.");
+            hud.resumeButton.onClick.Invoke();
+            yield return Until(() => !network.IsBattlePaused && !director.IsSteppedAsideForPause, "Back from the pause menu", 10f);
+            Assert.That((overlayGroup.alpha, overlayGroup.blocksRaycasts), Is.EqualTo((1f, true)));
+            Assert.That(director.IsShowingLine, Is.True, "The same line again.");
             for (int line = 2; line < lines; line++)
             {
                 Assert.That(director.StepIndex, Is.EqualTo(0));
