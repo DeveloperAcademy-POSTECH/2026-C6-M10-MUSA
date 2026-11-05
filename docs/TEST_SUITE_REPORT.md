@@ -1,6 +1,74 @@
 # C6 테스트 구성과 검증 범위 보고서
 
-## 현재 구성 — 2026-10-29, #380
+## 현재 구성 — 2026-11-05, 검사 시간 단축과 카테고리
+
+기준은 main `25014885`(#525 포함)에 이번 변경을 더한 것이다. 검사 C# 파일 255개, 어셈블리 6개다. 실제 실행 결과는 [VALIDATION](VALIDATION.md)의 2026-11-05 "검사 시간 단축" 절에 있다.
+
+| 어셈블리 | C# 파일 | 실행 케이스 |
+| --- | ---: | ---: |
+| C6Lab.EditModeTests | 128 | 1,785 |
+| Hapio.EditModeTests | 20 | 185 |
+| C6Lab.PlayModeTests | 90 (helper 2 포함) | 580 |
+| Hapio.PlayModeTests | 12 (SetUpFixture 1 포함) | 58 |
+| Hapio.Story.PlayModeTests | 4 | 28 |
+| Hapio.ClayPreview.PlayModeTests | 1 | 5 |
+
+### 카테고리
+
+NUnit `[Category]`로 실행 범위를 고른다. 검사를 지우는 표시가 아니다. 한 검사에 여러 카테고리가 붙을 수 있어 아래 시간 합계는 서로 겹친다.
+
+| 카테고리 | 뜻 | PlayMode | EditMode |
+| --- | --- | ---: | ---: |
+| `Slow` | fixture 하나가 5초 이상(2026-11-05 측정, 클래스 단위) | 249건 · 350.5초 | 0건 |
+| `GPU` | 실제 렌더링·픽셀 읽기가 필요하다 | 59건 · 77.1초 | 0건 |
+| `Bonjour` | macOS Bonjour 등록·검색이 필요하다 | 22건 · 49.9초 | 8건 |
+| `LabOnly` | Lab.unity, Lab DEV 패널, Development 솔로, 기본 OFF인 DEV 대안 기능만 검사한다 | 76건 · 62.7초 | 85건 |
+| `Legacy` | 도달할 수 없거나 대체된 기능, Editor 비교 도구를 검사한다 | 36건 · 35.9초 | 61건 |
+
+현재 경로를 지키는 유일한 검사에는 `Legacy`·`LabOnly`를 붙이지 않았다. `LabJigwiStageReplicationTests`의 빈 jigwiStage 호환·잘못된 헤더 거절, `LabJigwiActionRollbackTests`의 `CONTACT_COMBINE_DISABLED` 거절, `LabWatercolorV3IsolationTests`의 저장 프로필(클레이) 가드가 그렇다. Hapio도 쓰는 접속 취소(`LabQuickConnectTests.CancelingALocalPendingJoin…`), P번호 선택 승인·시간 초과(`LabLobbyPositionSelectionTests`), 실제 P 자리 매핑(`LabPlayerPaintPatternUiTests.BattleSamplesUseActualPSeats…`)도 Lab Scene에서 돌지만 `LabOnly`를 붙이지 않아 빠른 묶음에 남는다. 새 검사도 같은 기준으로 붙인다.
+
+### 실행 묶음
+
+| 묶음 | 인자 | 2026-11-05 결과 |
+| --- | --- | --- |
+| EditMode 전체 | `-testPlatform EditMode` | 1,970건 · 19.4초 |
+| EditMode 빠른 묶음 | `-testPlatform EditMode -testCategory "!Legacy;!LabOnly"` | 1,824건 · 18.1초 |
+| PlayMode 전체 | `-testPlatform PlayMode` | 671건 · 430.4초 |
+| PlayMode 빠른 묶음 | `-testPlatform PlayMode -testCategory "!Slow;!Legacy;!LabOnly"` | 358건 · 58.7초 |
+
+예: `<Unity> -batchmode -projectPath . -runTests -testPlatform PlayMode -testCategory "!Slow;!Legacy;!LabOnly" -testResults <저장소 밖 경로>/play.xml`. `!`를 여러 개 쓰면 모두 제외된다. 빠른 묶음 결과 XML에 제외한 카테고리가 0건임을 확인했다. 평소에는 빠른 묶음을, PR 전에는 전체를 돌린다. Hapio 흐름 검사(`GameSceneFlowTests` 등)는 `Slow`라 빠른 묶음에서 빠진다. 흐름을 고쳤다면 해당 fixture를 `-testFilter`로 따로 돌린다.
+
+### 줄인 시간
+
+같은 worktree·같은 Mac에서 변경 전후를 잰 값이다.
+
+| 항목 | 전 | 후 | 방법 |
+| --- | ---: | ---: | --- |
+| EditMode 전체 | 47.7초 | 19.4초 | `LabPaintSplatterConsistencyTests`(14.69→1.41초)와 `LabPaintSpreadFlowTests`(12.79→0.25초)에서 칸마다 하던 NUnit 단언과 큰 배열 `Is.EqualTo`를 수동 비교로 바꾸고, 첫 불일치에서만 단언한다(실패 조건은 같음) |
+| PlayMode 전체 | 639.4초 | 430.4초 | 그중 Hapio PlayMode가 362.6→152.1초 |
+| `GameSceneFlowTests` | 223.5초(23건) | 83.3초(21건) | 검사 전용 시작 대기 단축, 같은 경로를 다시 돌던 2건을 짝 검사에 합침(단언 유지) |
+| `GameFinishReplayTests` | 63.5초 | 32.7초 | 시작 대기 단축 |
+| `GameStage2GourdHitFinishTests` | 21.0초 | 10.6초 | 시작 대기 단축 |
+| `GameJigwiStageIntegrationTests`·`GameStageGourdIntegrationTests` | 각 13.5초 | 각 2.3~2.8초 | 시작 대기 단축 |
+
+- **검사 전용 시작 대기:** `GameSession.Start.cs`의 `GameStartTiming` 기본값(3초·1초·5초·0.5초)은 게임에서 그대로다. `Hapio.PlayModeTests`의 `GameTestStartTiming`([SetUpFixture])만 0.3초·0.1초·5초·0.1초로 줄이고 끝나면 되돌린다. 카운트다운 자체를 보는 `SharedCountdown…`은 기본값으로 돈다.
+- **다시보기 검사:** 다시보기는 박 자세 기록이 명중 0.8초 전부터 있어야 하므로, 던지기 전에 그 기록이 쌓일 때까지 기다린다(`GameFinishReplayTests.WaitReplayPoseWindow`).
+- **합친 검사:** `StageTwoDefeatShowsYaguang…`는 `ResultEntryRequiresEveryHeldMouse…`에, `StageThreeVictoryShowsFinalVictory…`는 `FigmaResultsWaitForHostNext…`에 단언을 옮겨 합쳤다.
+- **남긴 대기:** `GameSceneFlowTests`의 10.5초 대기는 #367 자동 진행이 없는지 확인하는 것이라 그대로 두었다.
+- **고정 UDP 포트:** Lab PlayMode 15개 파일이 고정 번호 대신 `LabSavedSceneNetworkFixture.AvailableDualFamilyPort()`로 빈 IPv4/IPv6 포트를 고른다. Bonjour 광고 번호는 bind하지 않으므로 그대로 두었다. 포트를 고른 뒤 실제 bind 전에 짧은 틈이 있어 동시 실행 안전을 완전히 보장하지는 않는다.
+
+### batch 실행에서 원래 실패하던 검사
+
+변경 전 main `25014885` 실행부터 실패했고, 이번 변경과는 관계없다.
+
+- 매번 실패:
+  - `LabHangingRenderInterpolationTests.OutsideRenderingTheTransformsAlwaysHoldTheFixedPose`: batchmode에서 WaitForEndOfFrame이 호출되지 않는다.
+  - `LabJigwiABPresentationTests.SavedRawImagesRenderWarmAAndBAndBlueWaterIntoAnIsolatedPortraitUiTarget`: 불꽃 픽셀이 0이다.
+  - `LabWatercolorPaintRuntimeTests.DescriptorBurstRespectsTheActiveCapAndConvergesToASettledCheckpoint`: 색이 1단계 다르다.
+- 때때로 실패: `LabJigwiWaterTrailTests`, `LabPlayerPaintPatternRenderTests`의 여섯 P 구분, `LabWatercolorSurfaceGrainTests`의 정적 입자.
+- 매번 Inconclusive: `LabHangingRenderInterpolationTests.DuringRealRenderingTheDrawnPoseLiesBetweenTheTwoFixedPoses`.
+
+## 2026-10-29 구성 — #380 (당시 기록)
 
 기준 main `688947cd`에는 #369 수채 구현·#375 테스트 공통화·#378 오프닝 입력 격리와 #381 요괴 콘텐츠 제작 구조가 포함돼 있다. #380은 도색 소유권의 고정 위치 픽셀 비교와 이동 안정성 검사를 분리하고 촬영 자원 복원 범위를 보완한다. 현재 테스트 C#은 **188파일**이며, 테스트가 들어 있는187파일과 저장 Scene용 공통 helper1파일로 구성된다. 테스트 assembly는5개다. #381의 카탈로그 검사1파일이 포함됐으며, 이전 `8d3cd58d` 기준187파일 집계와 구분한다.
 
@@ -121,7 +189,7 @@
 
 CLI: `unity test <프로젝트 경로> --mode EditMode --output <저장소 밖 XML 경로> --timeout 480 --format json` 완료 후 PlayMode로 바꿔 순차 실행한다. Editor에서는 Test Runner의 두 탭을 이용한다.
 
-같은 Mac에서 네트워크 PlayMode를 동시에 실행하지 않는다. 사본이 달라도 일부 fixture는 같은 고정 UDP 포트를 사용한다. 선행 main은 저장 Scene 솔로/도색 검사에 사용 가능한 IPv4·IPv6 포트를 찾고 자신이 만든 persistent NetworkManager를 정리하는 helper를 추가했다. 모든 fixture의 포트가 동적으로 바뀐 것은 아니므로 동시 실행 안전을 보장하지 않는다. 파일 조회만으로 이 포트 충돌은 생기지 않는다.
+같은 Mac에서 네트워크 PlayMode를 동시에 실행하지 않는다. 사본이 달라도 일부 fixture는 같은 고정 UDP 포트를 사용한다. 선행 main은 저장 Scene 솔로/도색 검사에 사용 가능한 IPv4·IPv6 포트를 찾고 자신이 만든 persistent NetworkManager를 정리하는 helper를 추가했다. 모든 fixture의 포트가 동적으로 바뀐 것은 아니므로 동시 실행 안전을 보장하지 않는다. 2026-11-05에 남은 고정 포트 15개 파일도 같은 탐색으로 바꿨다(맨 위 현재 구성 참고). 파일 조회만으로 이 포트 충돌은 생기지 않는다.
 
 #246 첫 실행의 bind3건은 다른 채팅의 포트 점유와 대조했고 단독 실행으로 확인했다. 선행 오디오 복구도 보존해 생성된 클립이 오디오 장치 재설정 후 유효한 샘플로 다시 연결되는지 검사한다. 실패를 무시하거나 기대값을 낮추지 않았다.
 

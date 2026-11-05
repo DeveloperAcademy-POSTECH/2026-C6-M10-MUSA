@@ -13,6 +13,7 @@ using UnityEngine.UI;
 namespace C6Lab.Tests
 {
     /// <summary>Saved DEV controls and actual local Solo/Host boundaries; no remote Client ACK claim.</summary>
+    [Category("LabOnly")]
     public sealed class LabPaintClusterDeveloperTests
     {
         private const int CompactnessField = 138;

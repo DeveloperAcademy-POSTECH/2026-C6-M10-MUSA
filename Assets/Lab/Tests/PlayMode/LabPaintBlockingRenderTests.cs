@@ -9,6 +9,7 @@ using Object = UnityEngine.Object;
 
 namespace C6Lab.Tests
 {
+    [Category("GPU"), Category("Legacy")]
     public sealed class LabPaintBlockingRenderTests
     {
         [UnityTest]

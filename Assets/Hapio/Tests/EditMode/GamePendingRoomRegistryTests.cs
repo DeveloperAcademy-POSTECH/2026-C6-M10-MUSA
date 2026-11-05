@@ -26,6 +26,7 @@ namespace Hapio.Tests
             Assert.DoesNotThrow(registry.Dispose);
         }
 
+        [Category("Bonjour")]
         [Test]
         public void CreationHandleCanCancelOnlyItsOwnUnconfirmedRoomAndReleasesItsPort()
         {
@@ -83,6 +84,7 @@ namespace Hapio.Tests
             }
         }
 
+        [Category("Bonjour")]
         [Test]
         public void PendingCardsReserveIndependentPortsAndDisposeReleasesEveryReservation()
         {

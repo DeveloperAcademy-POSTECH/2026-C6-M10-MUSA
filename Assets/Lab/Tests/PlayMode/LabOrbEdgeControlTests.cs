@@ -11,6 +11,7 @@ namespace C6Lab.Tests
     /// the tests independent of the Editor's current Game view and physical iOS safe insets.
     /// These synthetic gestures are not evidence of iPhone system-gesture behavior.
     /// </summary>
+    [Category("Slow")]
     public sealed class LabOrbEdgeControlTests
     {
         private static readonly Rect Bounds = new Rect(-4f, -2f, 8f, 4f);

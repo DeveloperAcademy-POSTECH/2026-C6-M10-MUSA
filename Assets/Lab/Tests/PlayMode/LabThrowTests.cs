@@ -5,6 +5,7 @@ using UnityEngine.TestTools;
 
 namespace C6Lab.Tests
 {
+    [Category("Slow")]
     public sealed class LabThrowTests
     {
         [Test]

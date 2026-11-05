@@ -8,6 +8,7 @@ using UnityEngine;
 
 namespace C6Lab.Tests
 {
+    [Category("LabOnly")]
     public sealed class LabPlayerCircleTests
     {
         [TestCase(2)]

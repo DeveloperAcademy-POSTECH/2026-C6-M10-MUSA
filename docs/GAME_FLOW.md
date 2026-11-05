@@ -247,6 +247,7 @@ Home/Lobby DEV의 `공통 / 구미호 / 야광귀 / 지귀`에서 해당 값만 
 - 각 기기는 정확한 session/round의 snapshot·확정 도색·자기 owner-board checkpoint·실제 표시 객체·설정·카메라/HUD·박 표현을 확인한다. 표시 초기화에 한 프레임을 준 뒤 `initial_ready`를 보낸다. snapshot만 받은 상태는 완료가 아니다.
 - 전원 완료 후 NGO `ServerTime.Time` 기준 미래 시각을 예약한다. 예약 수신 ACK가 모두 오면 작은 game-flow control의 `countdown_commit`으로 확정한다. 시작 시각은 밀리초로 정규화하고 ACK/확정의 식별은 판·설정·정수 revision으로 검증한다. JSON 왕복 소수점 값을 응답 식별자로 직접 비교하지 않는다. 숫자 표시 전에 예약이 확정되지 않으면 준비 화면을 유지하고 여유 시간을 늘려 다시 예약한다. 각 기기의 기동 시각이나 멈춘 전투 시계로 카운트다운하지 않는다.
 - 공통 시작 시각의 3초 전부터 3/2/1, 해당 시각에 시작!을 표시한다. Host만 실제 판정 시계를 해제하고 참가자는 확정된 예약/Playing과 초기 상태가 맞을 때 조작을 연다. 시작! 표시는 0.5초 후 사라지며 그동안 터치를 가로막지 않는다.
+- 시간 길이(3/2/1 3초, 첫 예약 여유 1초, 재예약 상한 5초, 시작! 0.5초)는 `GameSession.Start.cs`의 `GameStartTiming` 기본값이다. 게임 코드는 이 값을 바꾸지 않는다. `Hapio.PlayModeTests`만 `GameTestStartTiming`([SetUpFixture])으로 0.3초·0.1초·5초·0.1초로 줄였다가 끝나면 되돌린다. 순서·ACK·재예약·로드 한도는 같고 길이만 다르다. 카운트다운 자체를 보는 검사(`SharedCountdown…`)는 기본값으로 실행한다.
 - Scene 로딩·초기 동기화·예약 확정까지 합쳐 기존 30초 한도를 적용하고 확정된 3초 표시는 별도로 마친다. 구세대·중복 ACK는 판/설정/revision으로 거부하며 재예약하면 이전 예약 ACK를 지운다. 실패·이탈은 기존 Story GameOver와 2:2 같은 방 로비 복귀 정책을 따른다.
 - 전환 UI는 `Resources/Hapio/GameStartOverlay.prefab`의 실제 Canvas·Background·SafeArea·Caption 객체다. 영속 GameSession이 소유하므로 Scene 언로드 중에도 남는다. 기존 Scene 배치를 다시 생성하지 않는다. `Hapio/Create Missing Battle Start Overlay`는 이 새 프리팹이 없을 때만 생성한다.
 

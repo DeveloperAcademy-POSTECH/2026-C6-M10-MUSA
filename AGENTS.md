@@ -257,3 +257,9 @@
 - 표현 전용이다. 실제 박은 숨기지 않고 렌더 콜백 사이에서만 기록 자세로 그린다(`LabHangingTarget.SetPresentationPose`). 구슬은 물리 없는 ghost, 카메라는 전용 연출 카메라다. 판정·통계·네트워크 상태·BattleCamera 자세·전역 `Time.timeScale`을 바꾸지 않는다.
 - 새 탭은 그 기기만 건너뛴다. release는 모든 참가자의 done(끝남·건너뜀)을 기다린다(`TryRelease` 최소 0, 기존 연출은 1.2초 유지). 솔로는 건너뛰면 바로 결과로 간다.
 - 현재 호환 묶음은 설정 259개·**5687**·`C6PhysicsLab/48`·**`C6HapioGame/33`**이며 Game32 앱과 혼용하지 않는다. 상세는 `docs/FINAL_HIT_REPLAY.md`, 실행한 검사는 `docs/VALIDATION.md`를 따른다.
+
+## 검사 카테고리와 검사 전용 시작 단축 (2026-11-05)
+
+- 검사에는 NUnit `[Category]` `Slow`(fixture 5초 이상)·`GPU`·`Bonjour`·`LabOnly`·`Legacy`를 붙인다. 정의와 실행 묶음(빠른 묶음 `-testCategory "!Slow;!Legacy;!LabOnly"`)은 `docs/TEST_SUITE_REPORT.md`의 현재 구성 절을 따른다. 새 검사도 같은 기준으로 붙이며, 현재 경로를 지키는 유일한 검사에는 `Legacy`를 붙이지 않는다. 카테고리는 실행 범위 표시이고 검사 삭제가 아니다. PR 전에는 전체를 돌린다.
+- `GameSession.Start.cs`의 `GameStartTiming` 기본값(3초·1초·5초·0.5초)은 게임 코드에서 바꾸지 않는다. `Hapio.PlayModeTests`의 `GameTestStartTiming`(SetUpFixture)만 길이를 줄이며 #306의 순서·ACK·재예약·로드 한도는 같다. 카운트다운 길이에 기대는 검사는 기본값으로 되돌려 실행하고, 시작 직후 던지는 다시보기 검사는 `WaitReplayPoseWindow`로 자세 기록 창을 기다린다.
+- 실제 Host를 여는 PlayMode 검사는 고정 UDP 포트 대신 `LabSavedSceneNetworkFixture.UseAvailablePort`·`AvailableDualFamilyPort()`를 쓴다.

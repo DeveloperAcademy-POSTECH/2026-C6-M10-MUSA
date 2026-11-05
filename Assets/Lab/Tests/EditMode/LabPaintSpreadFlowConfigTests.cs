@@ -9,6 +9,7 @@ using Object = UnityEngine.Object;
 namespace C6Lab.Tests
 {
     /// <summary>Round tuning/schema checks, not rendered or real Client connection results.</summary>
+    [Category("LabOnly")]
     public sealed class LabPaintSpreadFlowConfigTests
     {
         private LabConfig config;

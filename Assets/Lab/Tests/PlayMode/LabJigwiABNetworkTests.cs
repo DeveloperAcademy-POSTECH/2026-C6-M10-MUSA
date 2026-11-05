@@ -11,6 +11,7 @@ using Object = UnityEngine.Object;
 namespace C6Lab.Tests
 {
     /// <summary>Real owner-filtered projectile queries and replication fixtures, not remote sockets or device playability.</summary>
+    [Category("Slow")]
     public sealed class LabJigwiABNetworkTests
     {
         private const BindingFlags Private = BindingFlags.Instance | BindingFlags.NonPublic;

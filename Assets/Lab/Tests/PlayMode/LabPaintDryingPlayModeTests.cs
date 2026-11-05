@@ -36,7 +36,7 @@ namespace C6Lab.Tests
             paint = Object.FindFirstObjectByType<LabGourdPaint>();
             hud = Object.FindFirstObjectByType<LabHud>();
             sourceJson = JsonUtility.ToJson(developer.sourceConfig);
-            network.port = 19325;
+            network.port = LabSavedSceneNetworkFixture.AvailableDualFamilyPort();
             Assert.That(paint.IsReady, Is.True, paint.InitializationError);
         }
 
@@ -163,6 +163,7 @@ namespace C6Lab.Tests
                 "The following presentation frame cannot restore obsolete colored cells.");
         }
 
+        [Category("GPU")]
         [UnityTest]
         public IEnumerator CompletedGourdViewerRetainsTheFrozenOneHundredPercentMapWithDryingEnabled()
         {

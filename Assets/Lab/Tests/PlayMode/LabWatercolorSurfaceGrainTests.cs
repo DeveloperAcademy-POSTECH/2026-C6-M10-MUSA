@@ -11,6 +11,7 @@ namespace C6Lab.Tests
 {
     /// <summary>Saved-gourd surface checks. A one-byte RGB bound accommodates the existing Metal shell's rounding;
     /// alpha, input maps and unpainted regions are never inferred from a visual threshold.</summary>
+    [Category("GPU"), Category("Legacy")]
     public sealed class LabWatercolorSurfaceGrainTests
     {
         [UnityTest]

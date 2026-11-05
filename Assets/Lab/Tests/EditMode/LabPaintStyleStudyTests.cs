@@ -10,6 +10,7 @@ namespace C6Lab.Tests
 {
     // This is an isolated visual study. These fixtures do not create a battle,
     // authorize a hit, or claim that the production Host paint map was changed.
+    [Category("Legacy")]
     public sealed class LabPaintStyleStudyTests
     {
         private const string AssetRoot = "Assets/Lab/Art/GourdPaint/Experiments/StyleComparison/";

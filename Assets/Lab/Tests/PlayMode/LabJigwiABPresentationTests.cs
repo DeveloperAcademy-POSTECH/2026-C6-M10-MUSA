@@ -472,6 +472,7 @@ namespace C6Lab.Tests
             Assert.That(orb.activeSelf, Is.True, "The presentation itself cannot expire or destroy the actual orb.");
         }
 
+        [Category("GPU")]
         [Test]
         public void SavedRawImagesRenderWarmAAndBAndBlueWaterIntoAnIsolatedPortraitUiTarget()
         {

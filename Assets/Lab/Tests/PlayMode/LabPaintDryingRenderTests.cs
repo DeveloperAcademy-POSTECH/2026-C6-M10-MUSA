@@ -15,6 +15,7 @@ namespace C6Lab.Tests
     /// GPU comparison of production CPU maps on the saved WhiteGourd mesh and paint shader.
     /// The clock/map are controlled fixtures; this is not projectile or remote-device evidence.
     /// </summary>
+    [Category("GPU")]
     public sealed class LabPaintDryingRenderTests
     {
         [UnityTearDown]

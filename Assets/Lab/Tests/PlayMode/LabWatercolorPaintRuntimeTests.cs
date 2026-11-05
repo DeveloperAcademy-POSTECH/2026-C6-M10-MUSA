@@ -10,6 +10,7 @@ using Object = UnityEngine.Object;
 namespace C6Lab.Tests
 {
     /// <summary>GPU appearance invariants; these are not real-device or networking performance tests.</summary>
+    [Category("Slow"), Category("GPU"), Category("LabOnly")]
     public sealed class LabWatercolorPaintRuntimeTests
     {
         [UnityTest]
