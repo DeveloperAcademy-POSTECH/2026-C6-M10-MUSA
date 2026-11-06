@@ -155,6 +155,44 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void AnUnfinishedTalismanBurnsAwayWhenTheARunsOut()
+        {
+            LabSnapshot snapshot = Snapshot(-1d);
+            overlay.Present(snapshot, Local, 11d);
+            Vector2 point = LabJigwiTalismanStroke.Water[0];
+            overlay.PaintNormalized(point, point);
+            // #533: the A ends with this seat still writing — Jigwi's fire burns the talisman.
+            overlay.Present(snapshot, Local, 26d);
+            Assert.That(overlay.Visible, Is.False); Assert.That(overlay.WantsBoardBlocked, Is.False);
+            Assert.That(overlay.Burning, Is.True);
+            Assert.That(overlay.BurnCount, Is.EqualTo(1));
+            Assert.That(overlay.LastCue, Is.EqualTo("Burn"));
+            Assert.That(overlay.Paper.gameObject.activeSelf, Is.True, "It burns where it was, not vanishing at once.");
+            overlay.Present(snapshot, Local, 26.5d);
+            Assert.That(overlay.BurnCount, Is.EqualTo(1), "It burns once.");
+            overlay.AdvanceBurn(overlay.BurnTotalSeconds * .9f);
+            Assert.That(overlay.PaperAlpha, Is.LessThan(1f), "The ash scatters away.");
+            overlay.AdvanceBurn(overlay.BurnTotalSeconds);
+            Assert.That(overlay.Burning, Is.False);
+            Assert.That(overlay.Paper.gameObject.activeSelf, Is.False);
+            Assert.That(overlay.Coverage, Is.Zero, "The next A starts from a clean talisman.");
+            foreach (var graphic in overlay.GetComponentsInChildren<UnityEngine.UI.Graphic>(true))
+                Assert.That(graphic.raycastTarget, Is.False);
+        }
+
+        [Test]
+        public void AFinishedOrEndedGameNeverBurnsTheTalisman()
+        {
+            overlay.Present(Snapshot(-1d), Local, 11d);
+            LabSnapshot over = Snapshot(-1d); over.phase = LabPhase.Victory;
+            overlay.Present(over, Local, 26d);
+            Assert.That(overlay.Burning, Is.False, "The battle ending is not a failed talisman.");
+            overlay.Present(Snapshot(-1d), Local, 11d);
+            overlay.Present(Snapshot(11.5d), Local, 26d);
+            Assert.That(overlay.Burning, Is.False, "A talisman the Host already counted never burns.");
+        }
+
+        [Test]
         public void CoinScratchScribblingSmudgesAndStartsOver()
         {
             overlay.Present(Snapshot(-1d), Local, 11d);

@@ -52,8 +52,22 @@ namespace C6Lab
         [SerializeField, Range(.1f, 3f)] private float sweepSeconds = 1.5f;
         [Tooltip("#533 완성 가락 한 박자 (초).")]
         [SerializeField, Range(.1f, .8f)] private float beatSeconds = .3f;
-        [Tooltip("#533 완성 가락 네 음이 나는 박자 (0부터). 기본 0·2·4·8 = 솔 (쉼) 도 (쉼) 시 (쉼 쉼 쉼) 라♭. 마지막 음과 함께 도장이 찍힌다.")]
+        [Tooltip("#533 완성 가락 네 음이 나는 박자 (0부터). 기본 0·2·4·8 = 솔 (쉼) 도 (쉼) 시 (쉼 쉼 쉼) 라. 마지막 음과 함께 도장이 찍힌다.")]
         [SerializeField] private int[] noteBeats = { 0, 2, 4, 8 };
+        [Header("#533 못 다 쓴 부적 (A가 끝날 때까지 못 쓰면 지귀 불에 타 버림)")]
+        [Tooltip("불이 아래에서 위로 부적을 다 태우는 시간(초).")]
+        [SerializeField, Range(.3f, 3f)] private float burnSeconds = 1.2f;
+        [Tooltip("다 탄 재가 흩어지며 사라지는 시간(초).")]
+        [SerializeField, Range(.1f, 2f)] private float ashSeconds = .6f;
+        [Tooltip("탄 자리 색 (그을린 한지).")]
+        [SerializeField] private Color charColor = new Color(.13f, .07f, .05f, .92f);
+        [Tooltip("타들어 가는 불 테두리 색.")]
+        [SerializeField] private Color emberColor = new Color(1f, .5f, .12f, 1f);
+        [Tooltip("타는 소리 (Resources 경로). 기본은 지귀 불 소리.")]
+        [SerializeField] private string burnSoundPath = "Jigwi/GroupFireLoop";
+        [SerializeField, Range(0f, 1f)] private float burnSoundVolume = .8f;
+        [Tooltip("타는 동안 지글지글 이어지는 진동 세기 (0이면 끔).")]
+        [SerializeField, Range(0f, 1f)] private float burnHapticIntensity = .5f;
         [Header("#533 도장 (완성하면 \"쾅\" 찍힘)")]
         [Tooltip("도장 글자.")]
         [SerializeField] private string stampText = "칙\n령";
@@ -167,8 +181,23 @@ namespace C6Lab
         private AudioSource sfx, scratch;
         private readonly AudioSource[] notePlayers = new AudioSource[4];
         private int notesPlayed;
-        [Tooltip("#533 완성 가락 음높이 (파일 원래 음에서 반음 수). 기본 ComboHit는 라(A4)라서 솔 도 시 라♭ = -2, +3, +2, -1. 파일이 4개 이상이면 쓰지 않는다.")]
-        [SerializeField] private int[] noteSemitones = { -2, 3, 2, -1 };
+        [Tooltip("#533 완성 가락 음높이 (파일 원래 음에서 반음 수). 기본 ComboHit는 라(A4)라서 솔 도 시 라 = -2, +3, +2, 0. 파일이 4개 이상이면 쓰지 않는다.")]
+        [SerializeField] private int[] noteSemitones = { -2, 3, 2, 0 };
+        private float burnAge = -1f;
+        private Vector3 burnFrom;
+        private UnityEngine.UI.Image charFill;
+        private RectTransform emberBand;
+        private UnityEngine.UI.Image emberGlow;
+        private UnityEngine.UI.Image[] flames = Array.Empty<UnityEngine.UI.Image>();
+        private UnityEngine.UI.Image[] sparks = Array.Empty<UnityEngine.UI.Image>();
+        private Sprite[] flameFrames;
+        private static Sprite whiteSprite;
+        private AudioSource burnAudio;
+        /// <summary>#533: 못 다 쓴 부적이 타는 중인지. 이때 조합판은 이미 풀려 있다.</summary>
+        public bool Burning => burnAge >= 0f;
+        public float BurnTotalSeconds => burnSeconds + ashSeconds;
+        /// <summary>#533: 못 다 써서 탄 횟수 (테스트용).</summary>
+        public int BurnCount { get; private set; }
         private RectTransform stampRoot;
         private UnityEngine.UI.Image stampImage;
         private UnityEngine.UI.Text stampLabel;
@@ -247,6 +276,7 @@ namespace C6Lab
             LabSnapshot snapshot = source.Snapshot;
             Present(snapshot, source.LocalPlayerId, source.JigwiABPresentationTime);
             if (Finishing) AdvanceFinish(Time.unscaledDeltaTime);
+            if (Burning) AdvanceBurn(Time.unscaledDeltaTime);
             if (Visible)
             {
                 FitToBattle(source.board != null ? source.board.ViewCamera : null);
@@ -263,15 +293,164 @@ namespace C6Lab
         {
             EnsureWidgets();
             LabJigwiABRound round = PendingTalisman(snapshot, localPlayer, now);
-            // A new talisman cuts a still-fading old one short.
+            // #533: the A ran out before this seat finished — Jigwi's fire burns the unfinished talisman away.
+            if (Visible && round == null && !Finishing && !Burning && RanOut(snapshot, RoundId, localPlayer, now)) BeginBurn();
+            // A new talisman cuts a still-fading (or still-burning) old one short.
             if (round != null && round.id != writtenRound && Finishing) EndFinish();
-            if (round?.id != RoundId && round?.id != writtenRound && !Finishing) ResetWriting();
+            if (round != null && round.id != writtenRound && Burning) EndBurn();
+            if (round?.id != RoundId && round?.id != writtenRound && !Finishing && !Burning) ResetWriting();
             // A talisman this screen already finished stays hidden while the Host confirms it.
             Visible = round != null && round.id != writtenRound;
             RoundId = Visible ? round.id : null;
-            if (paper != null) paper.gameObject.SetActive(Visible || Finishing);
+            if (paper != null) paper.gameObject.SetActive(Visible || Finishing || Burning);
             if (!Visible) hasLast = false;
             SetBoardBlocked(Visible);
+        }
+
+        /// <summary>#533: 이 회차 A가 (시간이 다 돼) 끝났는데 내 자리 부적은 아직 안 쓴 상태인지. 게임이 끝난 경우는 빼고.</summary>
+        private static bool RanOut(LabSnapshot snapshot, string roundId, ulong localPlayer, double now)
+        {
+            if (snapshot == null || snapshot.phase != LabPhase.Playing || snapshot.jigwiAB?.rounds == null || roundId == null) return false;
+            foreach (LabJigwiABRound round in snapshot.jigwiAB.rounds)
+            {
+                if (round == null || round.id != roundId) continue;
+                if (round.Active(now)) return false;
+                foreach (LabJigwiABPlayerFire seat in round.players ?? Array.Empty<LabJigwiABPlayerFire>())
+                    if (seat != null && seat.playerId == localPlayer) return seat.talismanAt < 0d;
+                return false;
+            }
+            return false;
+        }
+
+        private void BeginBurn()
+        {
+            if (paper == null) return;
+            BurnCount++;
+            burnAge = 0f; burnFrom = paper.localPosition;
+            paper.gameObject.SetActive(true);
+            if (hint != null) hint.gameObject.SetActive(false);
+            if (nextMarker != null) nextMarker.gameObject.SetActive(false);
+            LastCue = "Burn"; CueCount++;
+            AudioClip clip = string.IsNullOrEmpty(burnSoundPath) ? null : Resources.Load<AudioClip>(burnSoundPath);
+            if (clip != null && burnSoundVolume > 0f)
+            {
+                if (burnAudio == null)
+                {
+                    burnAudio = gameObject.AddComponent<AudioSource>();
+                    burnAudio.playOnAwake = false; burnAudio.spatialBlend = 0f; burnAudio.loop = true;
+                }
+                burnAudio.clip = clip; burnAudio.time = 0f;
+                burnAudio.volume = burnSoundVolume * LabAudioSettings.SfxVolume;
+                burnAudio.Play();
+            }
+            LabHaptics.PlayDirect(Config, LabHapticStyle.Medium, .7f, burnSeconds, burnHapticIntensity, .65f);
+            DrawBurn();
+        }
+
+        /// <summary>#533: LateUpdate와 테스트가 같이 쓰는 타기 진행.</summary>
+        public void AdvanceBurn(float seconds)
+        {
+            if (!Burning || float.IsNaN(seconds) || seconds < 0f) return;
+            burnAge += seconds;
+            if (burnAge >= BurnTotalSeconds) { EndBurn(); return; }
+            DrawBurn();
+        }
+
+        /// <summary>
+        /// #533 못 다 쓴 부적: 아래에서 불이 붙어 그을린 자국이 위로 번지고, 그 경계에서 불꽃이 일렁이며 불티가 날린다.
+        /// 쓰다 만 물빛 획도 불이 지나가면 잿빛이 된다. 다 타면 재가 되어 살짝 가라앉으며 흩어진다. 지귀 불 소리가 함께 타오르다 잦아든다.
+        /// </summary>
+        private void DrawBurn()
+        {
+            float front = Mathf.Clamp01(burnAge / Mathf.Max(.01f, burnSeconds));
+            float edge = front * 1.08f; // the flame line, a little ahead of the char
+            float ash = Mathf.Clamp01((burnAge - burnSeconds) / Mathf.Max(.01f, ashSeconds));
+            Rect r = paper.rect;
+            if (charFill != null)
+            {
+                charFill.gameObject.SetActive(true);
+                charFill.fillAmount = front;
+                charFill.color = charColor;
+            }
+            if (emberBand != null)
+            {
+                bool lit = front < 1f;
+                emberBand.gameObject.SetActive(lit);
+                emberBand.anchorMin = new Vector2(0f, edge); emberBand.anchorMax = new Vector2(1f, edge);
+                emberBand.sizeDelta = new Vector2(0f, r.height * .07f);
+                emberBand.anchoredPosition = Vector2.zero;
+                if (emberGlow != null)
+                {
+                    Color glow = emberColor; glow.a *= .75f + .25f * Mathf.Sin(burnAge * 31f);
+                    emberGlow.color = glow;
+                }
+                for (int k = 0; k < flames.Length; k++)
+                {
+                    if (flames[k] == null) continue;
+                    if (flameFrames != null && flameFrames.Length > 0)
+                        flames[k].sprite = flameFrames[(int)(burnAge * 14f + k * 2) % flameFrames.Length];
+                    float flicker = .8f + .3f * Mathf.Sin(burnAge * (17f + k * 3f) + k);
+                    RectTransform f = flames[k].rectTransform;
+                    f.anchorMin = f.anchorMax = new Vector2((k + .5f) / flames.Length, .5f);
+                    float h = r.height * .16f * flicker;
+                    f.sizeDelta = new Vector2(h * .8f, h);
+                    f.anchoredPosition = new Vector2(Mathf.Sin(burnAge * 7f + k * 1.7f) * r.width * .02f, h * .35f);
+                    flames[k].color = new Color(1f, 1f, 1f, .95f);
+                }
+            }
+            for (int k = 0; k < sparks.Length; k++)
+            {
+                if (sparks[k] == null) continue;
+                // Each spark leaves the flame line at its own time and drifts up, fading.
+                float life = .6f, born = (k * .137f) % 1f * Mathf.Max(.01f, burnSeconds);
+                float t = (burnAge - born) / life;
+                bool on = t >= 0f && t < 1f;
+                if (sparks[k].gameObject.activeSelf != on) sparks[k].gameObject.SetActive(on);
+                if (!on) continue;
+                RectTransform sp = sparks[k].rectTransform;
+                float x = (k * .618034f) % 1f, startY = Mathf.Clamp01(born / Mathf.Max(.01f, burnSeconds)) * 1.08f;
+                sp.anchorMin = sp.anchorMax = new Vector2(x, startY);
+                sp.anchoredPosition = new Vector2(Mathf.Sin(t * 6f + k) * r.width * .03f, t * r.height * .22f);
+                float size = r.width * (.018f + .012f * ((k * .414f) % 1f)) * (1f - t * .5f);
+                sp.sizeDelta = new Vector2(size, size);
+                Color c = Color.Lerp(new Color(1f, .9f, .5f, 1f), emberColor, t); c.a = 1f - t; sparks[k].color = c;
+            }
+            // Written strokes the fire has passed turn to ash.
+            Color ashColor = new Color(.32f, .3f, .3f, .85f);
+            float glyphBottom = glyphArea != null ? (glyphArea.anchoredPosition.y - glyphArea.rect.height * .5f + r.height * .5f) / Mathf.Max(1f, r.height) : 0f;
+            float glyphHeight = glyphArea != null ? glyphArea.rect.height / Mathf.Max(1f, r.height) : 1f;
+            for (int i = 0; i < dots.Length; i++)
+            {
+                if (dots[i] == null || !stroke.IsCovered(i)) continue;
+                float y = glyphBottom + stroke.Samples[i].y * glyphHeight;
+                float burnt = Mathf.Clamp01((front * 1.08f - y) / .08f);
+                dots[i].color = Color.Lerp(InkColor(i), ashColor, burnt);
+            }
+            if (ghost != null) ghost.color = Color.Lerp(ghostColor, new Color(.35f, .27f, .2f, ghostColor.a), front);
+            if (burnAudio != null && burnAudio.isPlaying)
+                burnAudio.volume = burnSoundVolume * LabAudioSettings.SfxVolume * (1f - ash) * Mathf.Clamp01(burnAge / .08f);
+            float sink = ash * ash;
+            if (paperGroup != null) paperGroup.alpha = 1f - sink;
+            paper.localScale = Vector3.one * (1f - .04f * sink);
+            float tremble = front < 1f ? r.height * .004f : 0f;
+            paper.localPosition = burnFrom + new Vector3(Mathf.Sin(burnAge * 53f) * tremble, -r.height * .04f * sink, 0f);
+        }
+
+        private void EndBurn()
+        {
+            if (!Burning) return;
+            burnAge = -1f;
+            if (burnAudio != null) burnAudio.Stop();
+            if (paper == null) return;
+            if (paperGroup != null) paperGroup.alpha = 1f;
+            paper.localScale = Vector3.one; paper.localPosition = burnFrom;
+            if (charFill != null) charFill.gameObject.SetActive(false);
+            if (emberBand != null) emberBand.gameObject.SetActive(false);
+            foreach (UnityEngine.UI.Image spark in sparks) if (spark != null) spark.gameObject.SetActive(false);
+            if (ghost != null) ghost.color = ghostColor;
+            if (hint != null) hint.gameObject.SetActive(true);
+            ResetWriting();
+            paper.gameObject.SetActive(Visible);
         }
 
         /// <summary>
@@ -336,6 +515,19 @@ namespace C6Lab
             for (int s = 0; s < stroke.StrokeCount; s++)
                 foreach (int index in stroke.StrokePoints(s))
                     if (index < strokeRank.Length) strokeRank[index] = n++ / (float)total;
+        }
+
+        private static Sprite WhiteSprite()
+        {
+            if (whiteSprite != null) return whiteSprite;
+            var texture = new Texture2D(4, 4, TextureFormat.RGBA32, false)
+            { name = "Talisman White (#533 runtime)", hideFlags = HideFlags.DontSave };
+            var pixels = new Color[16];
+            for (int i = 0; i < pixels.Length; i++) pixels[i] = Color.white;
+            texture.SetPixels(pixels); texture.Apply(false, true);
+            whiteSprite = Sprite.Create(texture, new Rect(0f, 0f, 4f, 4f), new Vector2(.5f, .5f), 100f);
+            whiteSprite.hideFlags = HideFlags.DontSave;
+            return whiteSprite;
         }
 
         /// <summary>#533: 도장 테두리 무늬 (런타임에 한 번 만든다). 굵은 네모 테두리에 인주가 고르지 않게 묻은 결.</summary>
@@ -435,7 +627,7 @@ namespace C6Lab
         {
             float sweep = Mathf.Max(.01f, sweepSeconds);
             float sweepT = Mathf.Clamp01(finishAge / sweep);
-            // 솔 (rest) 도 (rest) 시 (rest rest rest) 라♭! — the last, accented note lands with the seal.
+            // 솔 (rest) 도 (rest) 시 (rest rest rest) 라! — the last, accented note lands with the seal.
             while (notesPlayed < 3 && finishAge >= NoteAt(notesPlayed)) PlayNote(notesPlayed++);
             float after = finishAge - AccentAt;
             DrawStamp(after);
@@ -927,6 +1119,38 @@ namespace C6Lab
                 burstRings[k] = ringImage;
             }
             stampRoot.gameObject.SetActive(false);
+            // #533: the burn layers sit on top of everything on the paper.
+            charFill = NewRect("Talisman Char", paper).gameObject.AddComponent<UnityEngine.UI.Image>();
+            charFill.raycastTarget = false; charFill.sprite = WhiteSprite();
+            charFill.type = UnityEngine.UI.Image.Type.Filled;
+            charFill.fillMethod = UnityEngine.UI.Image.FillMethod.Vertical;
+            charFill.fillOrigin = (int)UnityEngine.UI.Image.OriginVertical.Bottom;
+            charFill.fillAmount = 0f;
+            Stretch(charFill.rectTransform, 0f);
+            charFill.gameObject.SetActive(false);
+            emberBand = NewRect("Talisman Burn Edge", paper);
+            emberGlow = NewRect("Burn Glow", emberBand).gameObject.AddComponent<UnityEngine.UI.Image>();
+            emberGlow.raycastTarget = false; emberGlow.sprite = WatercolorDot();
+            Stretch(emberGlow.rectTransform, 0f);
+            flameFrames = Resources.LoadAll<Sprite>("Bomb/BlastFire");
+            if (flameFrames != null) Array.Sort(flameFrames, (a, b) => string.CompareOrdinal(a.name, b.name));
+            flames = new UnityEngine.UI.Image[6];
+            for (int k = 0; k < flames.Length; k++)
+            {
+                var flame = NewRect("Burn Flame " + k, emberBand).gameObject.AddComponent<UnityEngine.UI.Image>();
+                flame.raycastTarget = false; flame.preserveAspect = true;
+                flame.sprite = flameFrames != null && flameFrames.Length > 0 ? flameFrames[0] : WatercolorDot();
+                flames[k] = flame;
+            }
+            emberBand.gameObject.SetActive(false);
+            sparks = new UnityEngine.UI.Image[14];
+            for (int k = 0; k < sparks.Length; k++)
+            {
+                var spark = NewRect("Burn Spark " + k, paper).gameObject.AddComponent<UnityEngine.UI.Image>();
+                spark.raycastTarget = false; spark.sprite = RoundDot();
+                spark.gameObject.SetActive(false);
+                sparks[k] = spark;
+            }
             BuildStrokeRank();
             LayoutGlyph();
             paper.gameObject.SetActive(false);
@@ -1055,7 +1279,7 @@ namespace C6Lab
             rect.offsetMin = rect.offsetMax = Vector2.zero;
         }
 
-        private void OnDisable() { SetBoardBlocked(false); Visible = false; RoundId = null; hasLast = false; EndFinish(); if (paper != null) paper.gameObject.SetActive(false); }
+        private void OnDisable() { SetBoardBlocked(false); Visible = false; RoundId = null; hasLast = false; EndFinish(); EndBurn(); if (paper != null) paper.gameObject.SetActive(false); }
         private void OnDestroy() => SetBoardBlocked(false);
     }
 
