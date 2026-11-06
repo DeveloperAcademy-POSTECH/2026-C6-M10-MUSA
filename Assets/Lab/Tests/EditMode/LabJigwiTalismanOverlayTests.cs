@@ -145,10 +145,11 @@ namespace C6Lab.Tests
             Trace(overlay);
             Assert.That(overlay.NotesPlayedCount, Is.EqualTo(1), "The first 둥 starts with the sweep.");
             Assert.That(overlay.StampVisible, Is.False, "The seal waits for the accent.");
-            overlay.AdvanceFinish(overlay.FinishSeconds * .2f);
-            Assert.That(overlay.NotesPlayedCount, Is.InRange(2, 3));
-            overlay.AdvanceFinish(overlay.FinishSeconds * .2f);
-            Assert.That(overlay.NotesPlayedCount, Is.EqualTo(4), "Three notes, a rest beat, then the accented 둥!");
+            overlay.AdvanceFinish(overlay.AccentSeconds * .6f);
+            Assert.That(overlay.NotesPlayedCount, Is.EqualTo(3), "솔, 도, 시 with rests between.");
+            Assert.That(overlay.StampVisible, Is.False, "Still resting before the accent.");
+            overlay.AdvanceFinish(overlay.AccentSeconds * .5f);
+            Assert.That(overlay.NotesPlayedCount, Is.EqualTo(4), "Three notes, rests, then the accented 라♭.");
             Assert.That(overlay.StampVisible, Is.True, "The seal lands with the accent.");
             Assert.That(overlay.LastCue, Is.EqualTo("Burst"));
         }

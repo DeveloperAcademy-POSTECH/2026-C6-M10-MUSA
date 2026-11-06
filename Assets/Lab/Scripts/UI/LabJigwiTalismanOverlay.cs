@@ -48,10 +48,12 @@ namespace C6Lab
         [SerializeField] private Color ghostColor = new Color(.88f, .76f, .48f, 1f);
         [Tooltip("#533: 먹 붓 굵기 (글자 칸 대비). 지나간 곳의 글자 획을 이만큼 채운다(글자 모양 밖으로는 안 번진다). 판정 거리와는 따로다.")]
         [SerializeField, Range(.06f, .3f)] private float brushWidth = .16f;
-        [Tooltip("#533: 다 쓰면 금빛이 획 순서대로 글자를 훑고 지나가는 시간(초). 빈 곳도 이때 채워진다. 이 동안 \"둥 둥 둥\" 세 음이 고르게 난다.")]
-        [SerializeField, Range(.1f, 2f)] private float sweepSeconds = .9f;
-        [Tooltip("#533: 세 번째 음 뒤 쉬는 박자 수. 한 박자 = 훑는 시간 / 3. 쉰 뒤 마지막 강세 음(\"둥!\")과 함께 도장이 찍힌다.")]
-        [SerializeField, Range(0, 3)] private int restBeats = 1;
+        [Tooltip("#533: 다 쓰면 금빛이 획 순서대로 글자를 훑고 지나가는 시간(초). 빈 곳도 이때 채워진다. 솔·도·시가 나는 동안 훑는다.")]
+        [SerializeField, Range(.1f, 3f)] private float sweepSeconds = 1.5f;
+        [Tooltip("#533 완성 가락 한 박자 (초).")]
+        [SerializeField, Range(.1f, .8f)] private float beatSeconds = .3f;
+        [Tooltip("#533 완성 가락 네 음이 나는 박자 (0부터). 기본 0·2·4·8 = 솔 (쉼) 도 (쉼) 시 (쉼 쉼 쉼) 라♭. 마지막 음과 함께 도장이 찍힌다.")]
+        [SerializeField] private int[] noteBeats = { 0, 2, 4, 8 };
         [Header("#533 도장 (완성하면 \"쾅\" 찍힘)")]
         [Tooltip("도장 글자.")]
         [SerializeField] private string stampText = "칙\n령";
@@ -165,8 +167,8 @@ namespace C6Lab
         private AudioSource sfx, scratch;
         private readonly AudioSource[] notePlayers = new AudioSource[4];
         private int notesPlayed;
-        [Tooltip("#533 완성 가락 음높이 (파일 원래 음에서 반음 수). 기본 ComboHit는 라(A4)라서 솔 도 시 라# = -2, +3, +2, +1. 파일이 4개 이상이면 쓰지 않는다.")]
-        [SerializeField] private int[] noteSemitones = { -2, 3, 2, 1 };
+        [Tooltip("#533 완성 가락 음높이 (파일 원래 음에서 반음 수). 기본 ComboHit는 라(A4)라서 솔 도 시 라♭ = -2, +3, +2, -1. 파일이 4개 이상이면 쓰지 않는다.")]
+        [SerializeField] private int[] noteSemitones = { -2, 3, 2, -1 };
         private RectTransform stampRoot;
         private UnityEngine.UI.Image stampImage;
         private UnityEngine.UI.Text stampLabel;
@@ -205,7 +207,11 @@ namespace C6Lab
         public LabJigwiTalismanStroke Stroke => stroke;
         /// <summary>#509: 다 쓴 부적이 빛나며 사라지는 중인지. 이때 조합판은 이미 풀려 있다.</summary>
         public bool Finishing => finishAge >= 0f;
-        private float AccentAt => Mathf.Max(.01f, sweepSeconds) * (1f + restBeats / 3f);
+        private float NoteAt(int index) => Mathf.Max(.01f, beatSeconds)
+            * (noteBeats != null && index < noteBeats.Length ? Mathf.Max(0, noteBeats[index]) : index * 2);
+        private float AccentAt => Mathf.Max(.01f, NoteAt(3));
+        /// <summary>#533: 마지막 강세 음(도장)이 나는 때 (완성 연출 시작부터 초).</summary>
+        public float AccentSeconds => AccentAt;
         public float FinishSeconds => AccentAt + glowSeconds + fadeSeconds;
         /// <summary>#509: 사라지는 동안의 부적 불투명도 (1 → 0).</summary>
         public float PaperAlpha => paperGroup != null ? paperGroup.alpha : 1f;
@@ -429,8 +435,8 @@ namespace C6Lab
         {
             float sweep = Mathf.Max(.01f, sweepSeconds);
             float sweepT = Mathf.Clamp01(finishAge / sweep);
-            // "둥 둥 둥" — three even beats across the sweep — a rest beat, then the accented "둥!" as the seal lands.
-            while (notesPlayed < 3 && finishAge >= notesPlayed * sweep / 3f) PlayNote(notesPlayed++);
+            // 솔 (rest) 도 (rest) 시 (rest rest rest) 라♭! — the last, accented note lands with the seal.
+            while (notesPlayed < 3 && finishAge >= NoteAt(notesPlayed)) PlayNote(notesPlayed++);
             float after = finishAge - AccentAt;
             DrawStamp(after);
             if (after >= 0f && !burstPlayed)
