@@ -1129,7 +1129,9 @@ namespace C6Lab
             target?.GetComponent<LabHangingTarget>()?.ResetSwing();
             model = new LabModel();
             double beginAt = Time.realtimeSinceStartupAsDouble;
-            model.BeginSolo(sessionId, LocalPlayerId, beginAt, config,
+            // The tutorial (#477) seats two virtual neighbors around this one device.
+            if (tutorialSeats) BeginTutorialModel(beginAt);
+            else model.BeginSolo(sessionId, LocalPlayerId, beginAt, config,
                 stageYokai: gameFlowEnabled ? gameStageYokai : LabStageYokai.None);
             BeginPaintArt();
             if (GameStartHeld) battleClock.Pause(beginAt);
@@ -1138,8 +1140,9 @@ namespace C6Lab
             impactReceipts.SetActive(sessionId, model.Round);
             SetNotice(string.Empty);
             PublishSnapshot(true);
-            SetStatus("DEVELOPER SOLO: 1 / 1");
-            Debug.Log("C6_LAB_SOLO_START session=" + sessionId + " player=" + LocalPlayerId);
+            SetStatus(tutorialSeats ? "TUTORIAL: 1 / 3" : "DEVELOPER SOLO: 1 / 1");
+            Debug.Log((tutorialSeats ? "C6_LAB_TUTORIAL_START session=" : "C6_LAB_SOLO_START session=")
+                + sessionId + " player=" + LocalPlayerId);
         }
 
         /// <summary>Generate from the first drum on this player's board.</summary>
@@ -2229,7 +2232,8 @@ namespace C6Lab
         private void OnEdgeCrossed(LabOrbEdgeCrossing edge)
         {
             if (latest == null || latest.phase != LabPhase.Playing || latest.paused) return;
-            if (developerSolo)
+            // The tutorial's practice board (#477) passes to its story neighbors only what its step passes.
+            if (developerSolo && !TutorialCrossingAllowed(edge.OrbId, edge.ToRight))
             {
                 // The single player has no neighbor. Restore the stopped edge orb immediately.
                 board.RejectEdge(edge.OrbId);
@@ -2787,6 +2791,8 @@ namespace C6Lab
 
         private bool Send(ulong receiver, LabNetworkPacket packet, NetworkDelivery delivery = NetworkDelivery.ReliableFragmentedSequenced)
         {
+            // A tutorial neighbor (#477) has no device: its share of the board lives only in the Host model.
+            if (IsVirtualSeat(receiver)) return true;
             if (manager == null || !manager.IsListening || manager.ShutdownInProgress || manager.CustomMessagingManager == null) return false;
             try
             {
@@ -2871,6 +2877,9 @@ namespace C6Lab
             if (target != null) target.GetComponent<LabHangingTarget>()?.ResetSwing();
             model = null;
             developerSolo = false;
+            tutorialSeats = false;
+            tutorialPassKinds.Clear();
+            if (board != null) board.SetSwipeBlockCountdown(true);
             latest = null;
             sessionId = null;
             configRevision = 0;

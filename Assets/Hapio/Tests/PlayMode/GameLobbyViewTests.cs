@@ -32,6 +32,8 @@ namespace Hapio.Tests
             var opening = Object.FindFirstObjectByType<GameOpeningController>();
             if (opening != null && !GameOpeningController.HasPlayedThisRun)
             {
+                // Menu checks start from the room list, so the tutorial (#477) after the opening is skipped here.
+                GameSession.SkipTutorialThisRun();
                 opening.lobbyView.enterButton.onClick.Invoke();
                 yield return Until(() => opening.IsPlaying, "First Start opens the story");
                 opening.player.Skip();

@@ -197,6 +197,7 @@
 - 스테이지 박은 `GameStageDefinition.gourdVisualResource`(Resources 경로, 비면 흰 박)를 `GameBattleBindings.MountStageGourd`가 `LabGourdPaint.PrepareVisual`로 `Attach`보다 먼저 지정한다. 2:2·Lab 단판은 흰 박이다. 프리팹 직접 참조로 바꾸지 않는다.
 - `LabGourdVisualRig`가 없는 프리팹(흰 박)은 기존 경로를 글자 그대로 탄다. 흰 박의 마운트·판정·칠·요괴 자세는 `Assets/Lab/Tests/PlayMode/Golden/`의 main 기록과 같아야 하며, 골든은 흰 박이 바뀌는 의도된 변경에서만 `GOURD_GOLDEN_RECORD=1`로 다시 기록한다. 계약 검사 실패는 `C6_GOURD_RIG_FALLBACK`과 함께 흰 박으로 돌아간다. 상세는 `docs/GOURD_MODELS.md`.
 - 세 스테이지 모두 `gourdVisualResource = Hapio/Gourds/Stage0N_<요괴>_Battle`(구미호·야광귀·지귀 박)이며 판정·도색·요괴 반응·완성/결과/PNG까지 이 박을 쓴다. 경로는 굽기 도구만 설정하고 `GameStageAssets.EnsureAssets`는 건드리지 않는다. 아트 원본 프리팹은 고치지 않고 `Hapio > Gourds > Bake All Stage Gourds`(`GameGourdRigBaker`, 스테이지별 메뉴도 있음)로만 다시 굽는다. 미리보기 덧씌우기(`GameGourdModelPreview`·`GourdPreview` 리소스)는 삭제했으며 재생성하지 않는다.
+- #526: 2스테이지 굽기 원본은 경량 `Yagwanggwi_Gourd_100K_GameReady`(`Spec.SourceVariant`, 전투 박 71,011삼각형)다. 원본 FBX·GameReady는 보존하고, 다른 경량 재출력도 같은 방식으로 새 GameReady를 추가해 굽는다.
 - 1·3스테이지 판정 모양까지 바뀌어 도입 당시 묶음은 **공유 설정 257개·5683/`C6PhysicsLab/44`/`C6HapioGame/30`**였다(현재 기준은 아래 #509 절)(2스테이지만 바뀐 묶음은 Game29). Game28·29 앱과 혼용하지 않는다.
 
 ## #507 연속 곡선 줄
@@ -257,7 +258,7 @@
 - 새 탭은 그 기기만 건너뛴다. release는 모든 참가자의 done(끝남·건너뜀)을 기다린다(`TryRelease` 최소 0, 기존 연출은 1.2초 유지). 솔로는 건너뛰면 바로 결과로 간다.
 - #525 당시 호환 묶음은 설정 259개·**5687**·`C6PhysicsLab/48`·**`C6HapioGame/33`**이며 Game32 앱과 혼용하지 않는다. 상세는 `docs/FINAL_HIT_REPLAY.md`, 실행한 검사는 `docs/VALIDATION.md`를 따른다.
 
-## #509 지귀 B 지목 동시 명중 — 최신 호환 기준
+## #509 지귀 B 지목 동시 명중
 
 - 시간표: A 5/42/70초, B 25/55/85초. A2는 공통 폭탄(40초)과 겹치지 않게 42초로 옮겼고, B는 15초(`LabJigwiABTimeline.GroupMissionSeconds`)다. B3는 100초 정리로 벌점 없이 취소된다.
 - 예고는 활성 2초 전(`LabJigwiABTimeline.WarningSeconds`, 이전 1초)이고 상단에 지귀 도발만 띄운다: A "타올라라, 모두 재가 되어라!", B "흩어진 물방울로는 어림없다!". 파훼법은 문구로 설명하지 않는다.
@@ -268,7 +269,8 @@
 - 무료 물 구슬은 도우미 판에만 준다(도우미가 없으면 지목된 자리). 이 물은 진행에만 쓰이고 칠하지 않는다.
 - 화면은 `LabJigwiSyncPillarView`(클래스 이름만 예전 그대로, 물방울 3칸·1초 막대·빨간 흔들림·iOS 기본 진동, 글자 없음)와 글자 없는 붉은 실패 오버레이다. B 동안 화면 글자는 예고 2초의 지귀 도발뿐이다(지목 이름/진행/안내/결과/다음 기믹 문구 없음). 지귀 A/B 외침 목소리는 지웠다.
 - DEV244/245/251/252는 은퇴 슬롯(인덱스·저장값 보존, Home/Lobby 라벨도 맞춤)이다.
-- 현재 호환 묶음은 설정 259개·**5688**·`C6PhysicsLab/49`·`C6HapioGame/34`다. main #525가 Game33을 먼저 써서 34로 올렸다. 5687/Game33(#479·#525) 앱과 혼용하지 않는다.
+- #509 당시 묶음은 설정 259개·**5688**·`C6PhysicsLab/49`·`C6HapioGame/34`였다. main #525가 Game33을 먼저 써서 34로 올렸다. 5687/Game33(#479·#525) 앱과 혼용하지 않는다.
+- 현재 호환 묶음은 설정 259개·**5688**·`C6PhysicsLab/49`·**`C6HapioGame/35`**다. #526에서 2스테이지 박의 칠·판정 껍데기를 100K 모델로 다시 구워 Game만 올렸다. Game34 앱과 혼용하지 않는다.
 
 ## 검사 카테고리와 검사 전용 시작 단축 (2026-11-05)
 
@@ -279,4 +281,4 @@
 ## DEV 표시 정리 (2026-11-05)
 
 - 효과 없는 10칸(0·1·41·43·48·52·53·54·72·73)은 `LabConfig.InactiveDeveloperFields`다. 은퇴가 아니라 숨기기만 한다. 코드가 아직 읽으므로 라벨·저장값·Inspector·폼 전달은 그대로이고, Lab DEV 묶음에 넣지 않으며 Hapio는 `GameStageSettings.IsFieldShown`에서만 뺀다(`IsFieldVisible` 적용 범위는 공통 그대로).
-- Hapio 지귀 탭은 폼의 228이 켜져 있으면 178~183·192~195·205를 접는다(`LabConfig.IsReplacedByJigwiTimeline`). Hapio 전투 중 DEV(Lab 패널)도 228 ON이면 `Jigwi` 묶음을 숨기고, 지귀 스테이지에서만 205도 숨긴다(`HiddenByJigwiTimelineInGame`). Lab 단독 장면은 그대로 보인다. 237 오색구슬 칠 면적은 Hapio 공통 탭이다(236은 야광귀 탭). 은퇴 슬롯(#509까지 25개)은 모두 `HideInInspector`다. 설정 259개와 접속 묶음은 바꾸지 않았다(현재 기준은 위 #509 절). 상세는 `docs/DEVELOPER_MODE_PARAMETER_SPEC.md`의 같은 절을 따른다.
+- Hapio 지귀 탭은 폼의 228이 켜져 있으면 178~183·192~195·205를 접는다(`LabConfig.IsReplacedByJigwiTimeline`). Hapio 전투 중 DEV(Lab 패널)도 228 ON이면 `Jigwi` 묶음을 숨기고, 지귀 스테이지에서만 205도 숨긴다(`HiddenByJigwiTimelineInGame`). Lab 단독 장면은 그대로 보인다. 237 오색구슬 칠 면적은 Hapio 공통 탭이다(236은 야광귀 탭). 은퇴 슬롯(#509까지 25개)은 모두 `HideInInspector`다. 설정 259개와 접속 묶음은 바꾸지 않았다(현재 기준은 위 #509 절의 마지막 줄). 상세는 `docs/DEVELOPER_MODE_PARAMETER_SPEC.md`의 같은 절을 따른다.

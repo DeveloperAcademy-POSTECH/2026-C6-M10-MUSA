@@ -418,6 +418,7 @@ namespace C6Lab
             player.stamina = Mathf.Max(0f, player.stamina - rules.GenerateCost);
             var kind = GeneratedKindFor(seed, sender, generated, rules.GenerationChances);
             kind = CorrectRawGenerationKind(kind, sender, generated);
+            TutorialTakeGeneration(sender, ref kind, out Vector2? scriptedLaunch);
             int lockSwipes = kind.IsItem() ? LockSwipesFor(seed, sender, generated) : 0;
             int relayStage = kind == LabOrbKind.Relay && lockSwipes == 0 ? 1 : 0;
             generatedCounts[sender] = generated + 1;
@@ -427,7 +428,8 @@ namespace C6Lab
                 reason = "JIGWI_BURNED";
                 return true;
             }
-            Vector2 launch = SpawnVelocityFor(seed, sender, generated, position.x);
+            // The tutorial (#477) sends each scripted orb its own way so it always rests in the same place.
+            Vector2 launch = scriptedLaunch ?? SpawnVelocityFor(seed, sender, generated, position.x);
             orb = new LabOrbState
             {
                 id = NewOrbId(), owner = sender, kind = kind, lockSwipes = lockSwipes, relayStage = relayStage,
@@ -475,6 +477,7 @@ namespace C6Lab
 
             orbs.Remove(firstId); orbs.Remove(secondId);
             var element = CombinedElementFor(sender);
+            element = TutorialScriptedElement(sender, element);
             Vector2 velocity = Vector2.ClampMagnitude(normalizedVelocity, rules.MaximumMotionSpeed);
             orb = new LabOrbState
             {
@@ -1446,9 +1449,15 @@ namespace C6Lab
                         // 야광귀 피버타임 (#343)은 야광귀 스테이지만의 것이라 구미호의 피버 타임과 겹치지 않는다.
                         + YaguangFeverSecondsBetween(lastTime, effectiveNow) * (rules.YaguangFeverStaminaMultiplier - 1d);
                     foreach (var player in players.Values)
-                        player.stamina = Mathf.Min(rules.StaminaMax,
+                    {
+                        float refilled = Mathf.Min(rules.StaminaMax,
                             (float)(player.stamina + (elapsed * JigwiStageRecoveryMultiplier(lastTime)
                                 + feverRefill) * rules.StaminaRecoveryPerSecond));
+                        // The tutorial (#477) may stop the refill at a ceiling (0 holds it). Nothing above it is taken
+                        // away, and nothing held back is owed afterwards. Every other round refills exactly as before.
+                        player.stamina = float.IsPositiveInfinity(tutorialStaminaCeiling) ? refilled
+                            : Mathf.Max(player.stamina, Mathf.Min(refilled, tutorialStaminaCeiling));
+                    }
                     // 결과 대시보드 기록: 이 사이에 북을 점유한 사람의 점유 시간 (북 점유율 계산용)
                     // (북은 넘길 때도 먼저 시간을 진행시키므로 넘기기 전 주인에게 쌓인다)
                     foreach (var holder in drums.Values.Select(drum => drum.owner).Distinct())

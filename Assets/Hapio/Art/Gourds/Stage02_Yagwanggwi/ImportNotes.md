@@ -20,4 +20,8 @@ Byte-identical duplicate color, normal and metallic/smoothness images share the 
 
 ## Battle bake (#507)
 
-The game uses `Resources/Hapio/Gourds/Stage02_Yagwanggwi_Battle.prefab`, baked from the GameReady prefab by `Hapio > Gourds > Bake Stage 2 Yagwanggwi Gourd` (`Hapio.Editor.GameGourdRigBaker`). The art prefab, FBX and materials are not modified. The bake writes `Generated/` (outer-wall paint shell, closed-lid paint mesh, 48 x 24 hit shell, legacy 2 s yokai clip, yokai timeline, two paint materials with the body art under the paint) and `Generated/BakeReport.txt`. It removes the model's own hanging rope (`Rear_Rope_*`) and the looping Animator. When a lighter re-export arrives, replace the art and run only the bake again.
+The game uses `Resources/Hapio/Gourds/Stage02_Yagwanggwi_Battle.prefab`, baked from the GameReady prefab by `Hapio > Gourds > Bake Stage 2 Yagwanggwi Gourd` (`Hapio.Editor.GameGourdRigBaker`). The art prefab, FBX and materials are not modified. The bake writes `Generated/` (outer-wall paint shell, closed-lid paint mesh, 48 x 24 hit shell, legacy 2 s yokai clip, yokai timeline, two paint materials with the body art under the paint) and `Generated/BakeReport.txt`. It removes the model's own hanging rope (`Rear_Rope_*`) and the looping Animator. When a lighter re-export arrives, keep the original art, add a new `*_GameReady` wrapper for it, point `GameGourdRigBake.Spec.SourceVariant` at it and run only the bake again (see #526 below).
+
+## 100K re-export (#526)
+
+`Models/Yagwanggwi_Gourd_100K.fbx` (22 renderers, 99,865 triangles) is wrapped by `Prefabs/Yagwanggwi_Gourd_100K_GameReady.prefab` with the same root scale, model offset and Animator controller as the original GameReady prefab. The battle bake now reads this prefab (`SourceVariant = "_100K"`); the battle gourd has 71,011 triangles (was 311,442). The original FBX and GameReady prefab are kept unchanged.

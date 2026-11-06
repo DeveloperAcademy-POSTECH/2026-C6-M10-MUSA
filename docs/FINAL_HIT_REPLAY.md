@@ -29,7 +29,7 @@
 - **구슬:** 물리 없는 ghost(`LabProjectile.BeginPuppet`: kinematic, `detectCollisions` 꺼짐, Collider 꺼짐)다. 판정·피해·도색·통계·전역 `Time.timeScale`을 바꾸지 않는다.
 - **화면:** 전용 연출 카메라(전체 화면, 재생 중에만 `MainCamera` 태그)를 쓴다. 재생 중에는 BattleCamera·OrbCamera와 Battle Scene의 루트 Canvas를 끄고 레터박스(sorting 29000)를 얹는다. Reset/씬 해제 때 원래대로 돌린다.
 - **건너뛰기:** 재생 시작 0.15초 뒤의 새 터치·클릭만 받는다. 내 기기만 건너뛰며, 결과 진행은 모두를 기다린다. 솔로는 바로 결과로 간다.
-- 기록 형식이나 장면 시간표를 바꾸면 게임 토큰을 올린다. 현재 `C6HapioGame/33`이며 설정 259개·5687·`C6PhysicsLab/48`은 그대로다.
+- 기록 형식이나 장면 시간표를 바꾸면 게임 토큰을 올린다. 도입 당시(#525)는 `C6HapioGame/33`·설정 259개·5687·`C6PhysicsLab/48`이었다. 현재 호환 묶음은 `AGENTS.md`(#509 절 마지막 줄)를 따른다.
 
 ## 대체 조건
 
