@@ -17,8 +17,8 @@ namespace Hapio.Tests
     {
         private readonly GameGourdRigBake.Spec spec;
         private string Prefab => spec.PrefabPath;
-        /// <summary>Triangles in the battle gourd. Stage 2 is before its lighter art re-export (lower to 60k when it arrives).</summary>
-        private int TriangleBudget => spec.Stage == 2 ? 320000 : 90000;
+        /// <summary>Triangles in the battle gourd. Stage 2 bakes the 100K re-export (#526, about 71k).</summary>
+        private const int TriangleBudget = 90000;
 
         private GameGourdRigBake.Result result;
 

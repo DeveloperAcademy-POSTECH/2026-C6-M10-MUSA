@@ -55,10 +55,15 @@ Material:
     - _PaperSaturation: 0.85
     - _PaperScale: 0.85
     - _PaperSmoothness: 0.015
+    - _PaperStickerEnabled: 0
+    - _PaperStickerGrainStrength: 0
     - _PaperUnderPaint: 0.3
     - _PlayerPaintPatternsEnabled: 1
     - _UnderpaintFiber: 0.35
     - _UnderpaintMap: 1
+    - _WatercolorGranulationScale: 120
+    - _WatercolorGranulationStrength: 0
+    - _WatercolorV2Enabled: 0
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
     - _PaperLightDirection: {r: -0.65, g: 0.8, b: 0.6, a: 0}
