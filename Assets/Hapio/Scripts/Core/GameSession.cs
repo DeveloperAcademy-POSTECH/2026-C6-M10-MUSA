@@ -181,11 +181,10 @@ namespace Hapio
 
         private void Start()
         {
-            // The app's first screen (#478): the loading screen covers Home until it has drawn. Start runs before that
-            // first frame is drawn, and by then the loaded scene is the active one.
-            if (SceneManager.GetActiveScene().path == GameScenePaths.Home) BeginLoading(GameScenePaths.Home);
-            // Directly opening a menu in the Editor still has one explicit initial state.
-            else if (!network.IsConnected) QueueScene(GameScenePaths.Home);
+            // Directly opening a menu in the Editor still has one explicit initial state. The app's own first screen
+            // shows at once, with no loading screen (#478, user decision).
+            if (SceneManager.GetActiveScene().path != GameScenePaths.Home && !network.IsConnected)
+                QueueScene(GameScenePaths.Home);
         }
 
         private void Update()
@@ -421,8 +420,10 @@ namespace Hapio
             // Never unload a terminal Battle before its actual committed paint map is copied.
             yield return null;
             if (quitting) { sceneRoutine = null; yield break; }
-            // #478: outside a run every scene change is covered by the loading screen (drawn above the fade below).
-            if (ShowsLoading(SceneManager.GetActiveScene().path, wantedScene)) BeginLoading(wantedScene);
+            // #478: outside a run every scene change is covered by the loading screen (drawn above the fade below),
+            // except the opening's hand-over to the tutorial, which gets its own transition later.
+            if (ShowsLoading(SceneManager.GetActiveScene().path, wantedScene, TutorialStarting(wantedScene)))
+                BeginLoading(wantedScene);
             if (holdForFade) yield return FadeOutOfScene();
             while (SceneManager.GetActiveScene().path != wantedScene || forceBattleReload)
             {

@@ -4,14 +4,14 @@ using UnityEngine.SceneManagement;
 namespace Hapio
 {
     /// <summary>
-    /// 공용 로딩 화면 (#478). 판(인게임) 밖에서 기다려야 하는 순간이면 언제나 같은 로딩 화면을 씌운다.
-    /// - 앱을 켜서 첫 화면(Home)을 불러올 때.
-    /// - 화면을 바꿀 때: 타이틀·방 목록 ↔ 자리 고르기, 자리 고르기 → 첫 전투, 오프닝 → 튜토리얼, 튜토리얼 → 방 목록·타이틀,
-    ///   결과·게임오버 → 타이틀·방, 튜토리얼 RESTART.
-    /// - 판 안의 전환(전투 → 스테이지 결과 → 다음 전투, 전투 → 게임오버)은 씌우지 않는다. 스테이지 사이는 따로 만든다.
+    /// 공용 로딩 화면 (#478). 판(인게임) 밖에서 화면을 바꾸느라 기다려야 하는 순간에 같은 로딩 화면을 씌운다:
+    /// 타이틀·방 목록 ↔ 자리 고르기, 자리 고르기 → 첫 전투, 튜토리얼 → 방 목록·타이틀, 결과·게임오버 → 타이틀·방,
+    /// 튜토리얼 RESTART.
+    /// 씌우지 않는 곳(사용자 결정): 앱을 켜서 첫 화면이 뜰 때(바로 메인 화면), 오프닝 → 튜토리얼(나중에 따로 만든다),
+    /// 판 안의 전환(전투 → 스테이지 결과 → 다음 전투, 전투 → 게임오버, 스테이지 사이는 따로 만든다).
     /// 막대는 씬 불러오기로 60%까지 차고, 그다음 준비로 나머지가 찬다:
     /// Home·자리 고르기는 화면이 다 그려지면, 첫 전투는 3·2·1이 시작되면(그동안 "준비 n/m"), 튜토리얼은 첫 대사를 띄울 수 있게
-    /// 되면 100%다. 아무리 짧아도 0.8초는 보이고(0→100%가 한 번 차 보임), 100%를 잠깐 보여 준 뒤 살짝 사라진다.
+    /// 되면 100%다. 아무리 짧아도 1초는 보이고(0→100%가 한 번 차 보임), 100%를 잠깐 보여 준 뒤 살짝 사라진다.
     /// 화면 전환 막(#418)·시작 가림막은 그대로 돌고, 로딩 화면이 그 위에 그려진다.
     /// </summary>
     public sealed partial class GameSession
@@ -52,11 +52,17 @@ namespace Hapio
         /// except between the screens of one run (battle, stage result, game over), which keep their own presentation.
         /// Reloading the same battle (a restart) shows it.
         /// </summary>
-        public static bool ShowsLoading(string from, string to)
+        public static bool ShowsLoading(string from, string to, bool tutorialStarting = false)
         {
+            // The opening's hand-over to the practice board gets its own transition later (user decision).
+            if (tutorialStarting) return false;
             bool fromRun = InRun(from), toRun = InRun(to);
             return !(fromRun && toRun && from != to);
         }
+
+        /// <summary>Home is handing over to the practice board (the opening → tutorial), not restarting it.</summary>
+        private bool TutorialStarting(string destination) => tutorialRun && destination == GameScenePaths.Battle
+            && SceneManager.GetActiveScene().path == GameScenePaths.Home;
 
         private static bool InRun(string scene) => scene == GameScenePaths.Battle || scene == GameScenePaths.StageResult
             || scene == GameScenePaths.GameOver;
