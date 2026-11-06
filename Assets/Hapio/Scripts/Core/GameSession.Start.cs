@@ -106,7 +106,8 @@ namespace Hapio
                         countdownCommitted = false;
                     }
                 }
-                if (tutorialRun) startOverlay?.ShowPreparing(TutorialPreparingText);
+                // The practice board has no cover of its own (#478): the loading screen covers it.
+                if (tutorialRun) startOverlay?.Hide();
                 else startOverlay?.ShowPreparing(StartReadyCount, StartParticipantCount);
             }
             else if (state.phase == GameFlowPhase.Playing)
@@ -250,11 +251,9 @@ namespace Hapio
             if (startOverlay == null) return;
             if (tutorialRun)
             {
-                // No ready count, countdown or "시작!" on the practice board: one plain cover until it is playable.
-                bool playable = state.phase == GameFlowPhase.Playing && countdownCommitted && !network.GameStartHeld;
-                if (IsPreparingBattle || state.phase == GameFlowPhase.Playing && !playable)
-                    startOverlay.ShowPreparing(TutorialPreparingText);
-                else startOverlay.Hide();
+                // No ready count, countdown or "시작!" on the practice board, and no cover of its own any more (#478):
+                // the shared loading screen covers it until its first line can come.
+                startOverlay.Hide();
                 return;
             }
             if (state.phase == GameFlowPhase.LoadingBattle || state.phase == GameFlowPhase.SynchronizingBattle)

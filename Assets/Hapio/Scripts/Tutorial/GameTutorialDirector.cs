@@ -522,7 +522,9 @@ namespace Hapio
 
         private bool BattlePlayable() => session.IsTutorial && session.State.phase == GameFlowPhase.Playing
             && session.Network != null && !session.Network.GameStartHeld
-            && (session.StartOverlay == null || !session.StartOverlay.Visible);
+            && (session.StartOverlay == null || !session.StartOverlay.Visible)
+            // The first line waits until the loading screen (#478) has gone.
+            && !session.IsLoadingScreenUp;
 
         private void OnTap()
         {

@@ -10,7 +10,6 @@ namespace Hapio
     /// </summary>
     public sealed partial class GameSession
     {
-        private const string TutorialPreparingText = "튜토리얼 준비 중…";
         private static bool tutorialConsumed;
         private bool tutorialRun;
 
