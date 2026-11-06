@@ -40,6 +40,18 @@ MonoBehaviour:
     landingFrames: 0100000004000000i
     scale: 1
     offset: {x: 0, y: 0}
+  - name: "\uC194\uC774"
+    frames:
+    - {fileID: 21300000, guid: 64e0d0220b75c40958f583b02775a916, type: 3}
+    - {fileID: 21300000, guid: 86aa60cc8435e4e01a0caf0a8439e5c4, type: 3}
+    - {fileID: 21300000, guid: 2b7d1114fdf534397b31e8a85df30b00, type: 3}
+    - {fileID: 21300000, guid: a32b9f29144164dda97679d50ba737ce, type: 3}
+    - {fileID: 21300000, guid: fd1da5d7377744685add34bf09cf7f5d, type: 3}
+    - {fileID: 21300000, guid: c5ce04af53381442983e66fb4cebd919, type: 3}
+    frameSeconds: 0.14
+    landingFrames: 0100000004000000i
+    scale: 1
+    offset: {x: 0, y: 0}
   runnerHeight: 182
   runnerCenterFromTop: 0.356
   landingSquash: 0.04
