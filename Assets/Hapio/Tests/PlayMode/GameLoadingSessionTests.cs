@@ -12,8 +12,9 @@ using Object = UnityEngine.Object;
 namespace Hapio.Tests
 {
     /// <summary>
-    /// 로딩 화면 (#478) 2단계: GameSession이 공용 로딩 화면을 띄우는 순간. 앱 첫 화면(Home), 오프닝 → 튜토리얼(예전 "튜토리얼 준비 중"
-    /// 가림막 대신), 튜토리얼 → 방 목록. 아무리 짧아도 0.8초는 보이고, 100%까지 찬 뒤 닫힌다.
+    /// 로딩 화면 (#478) 2단계: GameSession이 공용 로딩 화면을 띄우는 순간. 튜토리얼 → 방 목록 같은 화면 전환에는 뜨고(아무리 짧아도
+    /// 1초, 100%까지 찬 뒤 닫힘), 앱을 켜서 첫 화면이 뜰 때와 오프닝 → 튜토리얼에는 뜨지 않는다(사용자 결정). 오프닝 → 튜토리얼은
+    /// 따로 만들 때까지 예전 "튜토리얼 준비 중" 가림막이 덮는다.
     /// </summary>
     public sealed class GameLoadingSessionTests
     {
@@ -49,54 +50,62 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
-        public IEnumerator TheAppsFirstScreenOpensBehindTheLoadingScreenForAtLeastEightTenths()
+        public IEnumerator TheAppsFirstScreenShowsAtOnceWithoutTheLoadingScreen()
         {
             yield return SceneManager.LoadSceneAsync(GameScenePaths.Home, LoadSceneMode.Single);
             yield return Until(() => GameSession.Instance != null, "The session is made with Home");
             session = GameSession.Instance;
-            yield return null;
-            Assert.That(session.IsLoadingScreenUp, Is.True, "Home's first frames are covered.");
-            float shownAt = Time.realtimeSinceStartup;
-            GameLoadingView view = session.LoadingView;
-            Assert.That(view.RunnerName, Is.EqualTo("불이"));
-            yield return Until(() => !session.IsLoadingScreenUp, "It closes once Home has drawn", 5f);
-            Assert.That(Time.realtimeSinceStartup - shownAt, Is.GreaterThanOrEqualTo(.8f - .05f), "Never shorter than 0.8 s.");
-            Assert.That(view.DisplayedProgress, Is.EqualTo(1f), "It filled to 100% before closing.");
+            Assert.That(session.LoadingView, Is.Not.Null, "The shared loading screen is ready for later.");
+            float until = Time.realtimeSinceStartup + 1.2f;
+            bool shown = false;
+            while (Time.realtimeSinceStartup < until)
+            {
+                shown |= session.IsLoadingScreenUp;
+                yield return null;
+            }
+            Assert.That(shown, Is.False, "The main screen comes straight away.");
             Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.Home));
         }
 
         [UnityTest]
-        public IEnumerator TheTutorialOpensAndLeavesBehindTheLoadingScreenNotItsOldCover()
+        public IEnumerator TheTutorialOpensWithoutItButLeavesBehindItForAtLeastASecond()
         {
             yield return SceneManager.LoadSceneAsync(GameScenePaths.Home, LoadSceneMode.Single);
             yield return Until(() => GameSession.Instance != null && !GameSession.Instance.IsLoadingScene, "Saved Home bootstrap");
             session = GameSession.Instance;
             session.Network.port = AvailablePort();
-            yield return Until(() => !session.IsLoadingScreenUp, "The first screen's loading has closed", 5f);
+            yield return null;
 
+            // The opening's hand-over to the practice board gets its own transition later: no loading screen, only the old
+            // "튜토리얼 준비 중" cover for now.
             Assert.That(session.TryStartTutorial(), Is.True);
-            yield return Until(() => session.IsLoadingScreenUp, "Going to the practice board shows the loading screen", 2f);
-            bool oldCover = false, lineUnderLoading = false;
+            bool shown = false, oldCover = false, coverText = false;
             GameTutorialDirector director = null;
             float until = Time.realtimeSinceStartup + 30f;
             while (Time.realtimeSinceStartup < until)
             {
+                shown |= session.IsLoadingScreenUp;
                 oldCover |= session.StartOverlay != null && session.StartOverlay.Visible;
+                coverText |= session.StartOverlay != null && session.StartOverlay.Visible
+                    && session.StartOverlay.DisplayText == "튜토리얼 준비 중…";
                 director = Object.FindFirstObjectByType<GameTutorialDirector>();
-                lineUnderLoading |= director != null && director.IsShowingLine && session.IsLoadingScreenUp;
-                if (director != null && director.IsShowingLine && !session.IsLoadingScreenUp) break;
+                if (director != null && director.IsShowingLine) break;
                 yield return null;
             }
             Assert.That(director != null && director.IsShowingLine, Is.True, "The first line comes");
-            Assert.That(oldCover, Is.False, "No \"튜토리얼 준비 중\" cover any more.");
-            Assert.That(lineUnderLoading, Is.False, "The first line waits for the loading screen to go.");
-            Assert.That(session.LoadingView.DisplayedProgress, Is.EqualTo(1f));
+            Assert.That(shown, Is.False, "No loading screen between the opening and the tutorial.");
+            Assert.That(oldCover && coverText, Is.True, "The old \"튜토리얼 준비 중\" cover covers it for now.");
+            Assert.That(session.StartOverlay.Visible, Is.False, "And it is gone once the first line is up.");
 
-            // Leaving for the room list goes behind it too.
+            // Leaving for the room list goes behind it, for at least a second, filled to 100%.
             session.FinishTutorial();
             yield return Until(() => session.IsLoadingScreenUp, "Leaving the practice board shows the loading screen", 2f);
+            float shownAt = Time.realtimeSinceStartup;
+            Assert.That(session.LoadingView.RunnerName, Is.EqualTo("불이"));
             yield return Until(() => !session.IsLoadingScreenUp && SceneManager.GetActiveScene().path == GameScenePaths.Home,
                 "It closes once the room list is up", 30f);
+            Assert.That(Time.realtimeSinceStartup - shownAt, Is.GreaterThanOrEqualTo(1f - .05f), "Never shorter than a second.");
+            Assert.That(session.LoadingView.DisplayedProgress, Is.EqualTo(1f), "It filled to 100% before closing.");
             Assert.That(session.RoomBrowserVisible, Is.True);
         }
 
@@ -111,6 +120,8 @@ namespace Hapio.Tests
                 Assert.That(GameSession.ShowsLoading(from, to), Is.True, from + " → " + to);
             foreach ((string from, string to) in new[] { (battle, result), (result, battle), (battle, over), (result, over) })
                 Assert.That(GameSession.ShowsLoading(from, to), Is.False, from + " → " + to + " stays inside the run");
+            Assert.That(GameSession.ShowsLoading(home, battle, tutorialStarting: true), Is.False,
+                "The opening → tutorial gets its own transition later.");
         }
 
         private static void ResetRunState(Type owner, string method)
