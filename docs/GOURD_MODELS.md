@@ -10,7 +10,7 @@
 | `LabGourdYokaiProfile` | 요괴 클립 안의 시각표·움찔 대상·들썩임. `Legacy`는 흰 박의 기존 상수다. |
 | `LabGourdPaint.PrepareVisual(target, prefab)` | `Attach`보다 먼저 스테이지 박을 지정한다. `Attach`는 비어 있을 때만 흰 박을 채운다. |
 | `GameStageDefinition.gourdVisualResource` | 스테이지 박 프리팹의 Resources 경로. 비우면 흰 박이다. |
-| `GameBattleBindings.MountStageGourd` | Story 모드 현재 스테이지의 경로를 읽어 `PrepareVisual`을 부른다(`Awake` -500, `LabSceneController.Awake` -100보다 먼저). 2:2와 Lab 단판은 흰 박이다. Development 빌드에서 `C6_GOURD_MOUNT ms=`를 남긴다. |
+| `GameBattleBindings.MountStageGourd` | Story 모드 현재 스테이지의 경로를 읽어 `PrepareVisual`을 부른다(`Awake` -500, `LabSceneController.Awake` -100보다 먼저). 2:2·Lab 단판·튜토리얼(#477, 1스테이지 설정을 쓰지만 요괴를 내 자리로 돌리는 흰 박 전용 연출)은 흰 박이다. Development 빌드에서 `C6_GOURD_MOUNT ms=`를 남긴다. |
 
 프리팹을 직접 참조하지 않고 경로 문자열로 두는 이유: StageCatalog를 읽을 때 모든 스테이지의 모델이 메모리에 올라가지 않게 하기 위해서다.
 
@@ -44,7 +44,7 @@
 - 흰 박의 마운트·판정·칠 binding·요괴 자세는 main에서 기록한 골든(`Assets/Lab/Tests/PlayMode/Golden/`)과 같아야 한다.
 - 1스테이지: `Hapio/Gourds/Stage01_Gumiho_Battle`, 2스테이지: `Stage02_Yagwanggwi_Battle`, 3스테이지: `Stage03_Jigwi_Battle`. 게임 토큰 `C6HapioGame/30`(도입 당시, 현재 기준은 `AGENTS.md`).
 - 2스테이지는 #526부터 경량 재출력 `Models/Yagwanggwi_Gourd_100K.fbx`(22렌더러·99,865삼각형, 원본 446,594)를 감싼 `Prefabs/Yagwanggwi_Gourd_100K_GameReady.prefab`에서 굽는다(`GameGourdRigBake.Spec.SourceVariant = "_100K"`). 원본 FBX·GameReady 프리팹은 그대로 보존한다. 새 GameReady는 원본과 같은 루트 배율·모델 위치·Animator 컨트롤러를 쓴다. 두 FBX의 노드 29개와 공연 클립 커브 280개가 같다(최대 차 1.5e-5).
-- 흰 박은 Lab 단판과 2:2 땅따먹기(스토리 스테이지 정의가 없음)에만 쓰인다.
+- 흰 박은 Lab 단판, 2:2 땅따먹기(스토리 스테이지 정의가 없음), 튜토리얼 연습 판에만 쓰인다.
 
 ## 스테이지 박 굽기 (#507)
 
