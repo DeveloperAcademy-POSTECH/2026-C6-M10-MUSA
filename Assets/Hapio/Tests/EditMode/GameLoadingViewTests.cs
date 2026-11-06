@@ -115,8 +115,8 @@ namespace Hapio.Tests
         {
             GameLoadingArt art = GameLoadingArt.Load();
             Assert.That(art, Is.Not.Null, GameLoadingArt.ResourcePath);
-            Assert.That(art.runners.Select(runner => runner.name), Is.EqualTo(new[] { "불이", "묵이" }),
-                "불이 and 묵이 for now; more join the draw later.");
+            Assert.That(art.runners.Select(runner => runner.name), Is.EqualTo(new[] { "불이", "묵이", "솔이" }),
+                "불이, 묵이 and 솔이 for now; more join the draw later.");
             foreach (GameLoadingArt.Runner runner in art.runners)
             {
                 Assert.That((runner.frames.Length, runner.Usable), Is.EqualTo((6, true)), runner.name);
@@ -127,9 +127,10 @@ namespace Hapio.Tests
             }
             Assert.That(art.runners[0].landingFrames, Is.EqualTo(new[] { 2, 5 }), "불이 lands in pictures 3 and 6.");
             Assert.That(art.runners[1].landingFrames, Is.EqualTo(new[] { 1, 4 }), "묵이 lands in pictures 2 and 5.");
+            Assert.That(art.runners[2].landingFrames, Is.EqualTo(new[] { 1, 4 }), "솔이 lands in pictures 2 and 5.");
             string[] drawn = Enumerable.Range(0, 200).Select(seed => GameLoadingView.PickRunner(art.runners, new System.Random(seed)).name)
                 .Distinct().OrderBy(name => name).ToArray();
-            Assert.That(drawn, Is.EquivalentTo(new[] { "불이", "묵이" }), "Either one comes up at random.");
+            Assert.That(drawn, Is.EquivalentTo(art.runners.Select(runner => runner.name)), "Every one of them comes up at random.");
             Assert.That(art.paperTexture, Is.Not.Null, "The hanji grain.");
             Assert.That(art.captionFont != null ? art.captionFont.name : null, Is.EqualTo("ShillaCultureBold"));
             Assert.That(art.caption, Is.EqualTo("로딩중"));
