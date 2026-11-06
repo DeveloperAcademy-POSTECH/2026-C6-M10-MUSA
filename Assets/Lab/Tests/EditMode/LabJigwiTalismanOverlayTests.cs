@@ -195,6 +195,20 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void TheWarningSweepsTheTalismanSpotClearBeforeItArrives()
+        {
+            LabSnapshot snapshot = Snapshot(-1d); // warning 10 s → active 11 s
+            overlay.Present(snapshot, Local, 9.9d);
+            Assert.That(overlay.SweepLevel, Is.Zero, "Nothing is coming yet.");
+            overlay.Present(snapshot, Local, 10.375d);
+            Assert.That(overlay.SweepLevel, Is.EqualTo(.5f).Within(.02f), "#540: halfway through clearing the spot.");
+            overlay.Present(snapshot, Local, 11d);
+            Assert.That(overlay.SweepLevel, Is.EqualTo(1f), "The talisman lies on a clear spot.");
+            overlay.Present(snapshot, 99, 10.375d);
+            Assert.That(overlay.SweepLevel, Is.Zero, "A seat outside the A keeps its board as it is.");
+        }
+
+        [Test]
         public void JigwiTauntsOnceWhenTheAWarningAppears()
         {
             LabSnapshot snapshot = Snapshot(-1d); // warning at 10 s

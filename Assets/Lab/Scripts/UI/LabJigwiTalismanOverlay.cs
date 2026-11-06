@@ -19,8 +19,12 @@ namespace C6Lab
         [SerializeField] private Color paperColor = new Color(1f, 1f, 1f, .98f);
         [Tooltip("부적 종이의 가로/세로 비율. 작을수록 좁고 길다.")]
         [SerializeField, Range(.35f, 1f)] private float paperAspect = .55f;
-        [Tooltip("전투 영역 위쪽에서 비워 둘 높이 (전투 영역 대비). 시간·체력 HUD를 가리지 않게.")]
-        [SerializeField, Range(0f, .4f)] private float topInset = .14f;
+        [Tooltip("#540: 부적은 조합판 위에 놓인다. 조합판 위쪽(둥근 테두리)에서 비워 둘 높이 (조합판 높이 대비).")]
+        [SerializeField, Range(0f, .4f)] private float topInset = .07f;
+        [Tooltip("#540: 조합판 아래쪽(내 이름·기운 막대)에서 비워 둘 높이 (조합판 높이 대비).")]
+        [SerializeField, Range(0f, .4f)] private float bottomInset = .13f;
+        [Tooltip("#540: 예고 동안 부적 자리의 구슬을 판 양옆으로 밀어내는 데 걸리는 시간 (예고 길이 대비, 1 = 예고 내내). 밀린 구슬이 부적 옆에서 타는 게 보인다.")]
+        [SerializeField, Range(.2f, 1f)] private float sweepShare = .75f;
         [SerializeField] private Color inkColor = new Color(.72f, .11f, .07f, 1f);
         [Tooltip("#533: 아직 안 쓴 글자 획 색. 둥근 점이 겹치므로 불투명으로 둔다(반투명이면 겹친 곳이 얼룩진다).")]
         [SerializeField] private Color guideColor = new Color(.79f, .67f, .4f, 1f);
@@ -170,7 +174,7 @@ namespace C6Lab
         [SerializeField, Range(.1f, 3f)] private float glowSeconds = .6f;
         [Tooltip("#540: 부적이 접히며 부적 구슬로 오므라드는 시간(초).")]
         [SerializeField, Range(.1f, 1.5f)] private float foldSeconds = .45f;
-        [Tooltip("#540: 부적 구슬이 아래 조합판으로 떨어지는 시간(초). Host가 보상 구슬을 주는 때(LabConfig '부적 보상 지연')와 맞춘다.")]
+        [Tooltip("#540: 부적 구슬이 조합판 위로 툭 떨어지는 시간(초). Host가 보상 구슬을 주는 때(LabConfig '부적 보상 지연')와 맞춘다.")]
         [SerializeField, Range(.1f, 1.5f)] private float fallSeconds = .35f;
         [Tooltip("#509: 다 쓴 글씨가 빛날 때의 색 (금빛).")]
         [SerializeField] private Color glowColor = new Color(1f, .86f, .32f, 1f);
@@ -359,9 +363,10 @@ namespace C6Lab
             bool paused = snapshot == null || snapshot.paused || source.GameStartHeld || source.BattlePresentationHeld;
             UpdateFireLoop(Visible && !paused, Time.unscaledDeltaTime);
             UpdateCrackle(CrackleTarget(paused), Time.unscaledDeltaTime);
+            UpdateKeepOut(source.board);
             if (Visible)
             {
-                FitToBattle(source.board != null ? source.board.ViewCamera : null);
+                FitToBoard(source.board != null ? source.board.ViewCamera : null);
                 bool held = paused;
                 if (held) hasLast = false; else ReadPointer();
                 UpdateNextMarker(Time.unscaledTime);
@@ -386,6 +391,7 @@ namespace C6Lab
             // A talisman this screen already finished stays hidden while the Host confirms it.
             Visible = round != null && round.id != writtenRound;
             RoundId = Visible ? round.id : null;
+            SweepLevel = Visible || Finishing || Burning ? 1f : WarningSweep(snapshot, localPlayer, now);
             float left = Visible ? (float)(round.endsAt - now) : float.PositiveInfinity;
             TimeLeft = left;
             WarnLevel = 0f;
@@ -978,7 +984,8 @@ namespace C6Lab
             paper.localRotation = Quaternion.Euler(0f, 0f, folded * 12f);
             float shake = burstShake * paper.rect.height * ring * (1f - folded);
             var jitter = new Vector3(wave * shake, Mathf.Cos(after * humHz * 1.37f * 2f * Mathf.PI) * shake * .35f, 0f);
-            paper.localPosition = finishFrom + jitter + Vector3.down * (fall * fall * paper.rect.height * .95f);
+            // #540: the talisman lies on the board, so the orb only drops a little onto the board surface.
+            paper.localPosition = finishFrom + jitter + Vector3.down * (fall * fall * paper.rect.height * .2f);
             DrawFoldOrb(folded, paperScale, gold);
         }
 
@@ -1268,29 +1275,72 @@ namespace C6Lab
             if (source != null && source.board != null) source.board.SetUiInputBlocked(value);
         }
 
+        /// <summary>#540: 0 → 1 while the A warning sweeps this seat's talisman spot clear (0 when no A is coming for it).</summary>
+        public float SweepLevel { get; private set; }
+        private bool keepOutSet;
+
+        private float WarningSweep(LabSnapshot snapshot, ulong localPlayer, double now)
+        {
+            if (snapshot == null || snapshot.phase != LabPhase.Playing || snapshot.jigwiAB?.rounds == null) return 0f;
+            foreach (LabJigwiABRound item in snapshot.jigwiAB.rounds)
+            {
+                if (item == null || item.kind != LabJigwiABKind.PersonalBurn || !item.Warning(now)) continue;
+                foreach (LabJigwiABPlayerFire seat in item.players ?? Array.Empty<LabJigwiABPlayerFire>())
+                    if (seat != null && seat.playerId == localPlayer && seat.talismanAt < 0d)
+                    {
+                        double span = Math.Max(.01d, (item.activeAt - item.warningAt) * Mathf.Clamp(sweepShare, .2f, 1f));
+                        return Mathf.Clamp01((float)((now - item.warningAt) / span));
+                    }
+            }
+            return 0f;
+        }
+
         /// <summary>
-        /// 조합판 위쪽 전투 영역(박이 보이는 칸)에 부적 종이를 놓는다. 아래 조합판은 가리지 않아 구슬이 타는 게 보인다.
-        /// 위쪽 HUD(시간·체력)는 topInset만큼 비운다.
+        /// #540: 부적은 조합판 위에 놓인다. 판 안쪽(위 둥근 테두리와 아래 이름·기운 막대는 비움) 가운데에 세로로 긴 부적을 둔다.
+        /// 화면 픽셀 기준 부적 자리를 돌려준다(구슬 밀어내기 벽에도 쓴다).
         /// </summary>
-        private void FitToBattle(Camera boardCamera)
+        private Rect PaperScreenRect(Camera boardCamera)
+        {
+            Rect board = boardCamera != null ? boardCamera.pixelRect : new Rect(0f, 0f, Screen.width, Screen.height * .46f);
+            float inset = Mathf.Min(board.width, board.height) * margin;
+            float bottom = board.yMin + board.height * bottomInset, top = board.yMax - board.height * topInset;
+            float height = Mathf.Max(1f, top - bottom);
+            float width = Mathf.Min(board.width - inset * 2f, height * paperAspect);
+            return new Rect(board.center.x - width * .5f, bottom, width, height);
+        }
+
+        private void FitToBoard(Camera boardCamera)
         {
             if (paper == null || root == null) return;
             Canvas canvas = GetComponentInParent<Canvas>();
-            float boardTop = boardCamera != null ? boardCamera.pixelRect.yMax : Screen.height * .46f;
-            var pixels = new Rect(0f, boardTop, Screen.width, Mathf.Max(1f, Screen.height - boardTop));
+            Rect pixels = PaperScreenRect(boardCamera);
             Camera eye = canvas == null || canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
-            float inset = Mathf.Min(pixels.width, pixels.height) * margin;
-            if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(root,
-                    new Vector2(pixels.xMin + inset, pixels.yMin + inset), eye, out Vector2 low)
-                || !RectTransformUtility.ScreenPointToLocalPointInRectangle(root,
-                    new Vector2(pixels.xMax - inset, pixels.yMax - pixels.height * topInset), eye, out Vector2 high)) return;
+            if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(root, pixels.min, eye, out Vector2 low)
+                || !RectTransformUtility.ScreenPointToLocalPointInRectangle(root, pixels.max, eye, out Vector2 high)) return;
             // Local points are relative to the root's pivot, which is what localPosition uses.
             paper.anchorMin = paper.anchorMax = paper.pivot = new Vector2(.5f, .5f);
             paper.localPosition = new Vector3((low.x + high.x) * .5f, (low.y + high.y) * .5f, 0f);
-            // A tall, narrow talisman inside the board area.
-            float height = Mathf.Abs(high.y - low.y), width = Mathf.Min(Mathf.Abs(high.x - low.x), height * paperAspect);
-            paper.sizeDelta = new Vector2(width, height);
+            paper.sizeDelta = new Vector2(Mathf.Abs(high.x - low.x), Mathf.Abs(high.y - low.y));
             LayoutGlyph();
+        }
+
+        /// <summary>
+        /// #540: 부적이 오기 전(예고 동안) 부적 자리에 보이지 않는 벽을 가운데에서 양옆으로 넓혀 세워, 그 자리 구슬을 판 양옆으로
+        /// 밀어낸다. 부적 옆으로 밀린 구슬이 타는 게 보인다. 부적이 있는 동안(쓰기·완성·탐) 벽을 유지하고, 부적이 사라지면 치운다.
+        /// </summary>
+        private void UpdateKeepOut(LabOrbBoard board)
+        {
+            if (board == null) return;
+            if (SweepLevel <= 0f)
+            {
+                if (keepOutSet) { board.SetKeepOut(null, null); keepOutSet = false; }
+                return;
+            }
+            Rect spot = PaperScreenRect(board.ViewCamera);
+            float width = spot.width * Mathf.SmoothStep(.08f, 1f, SweepLevel);
+            var wall = new Rect(spot.center.x - width * .5f, spot.yMin, width, spot.height);
+            board.SetKeepOut(null, new[] { wall });
+            keepOutSet = true;
         }
 
         /// <summary>
@@ -1651,7 +1701,7 @@ namespace C6Lab
             rect.offsetMin = rect.offsetMax = Vector2.zero;
         }
 
-        private void OnDisable() { SetBoardBlocked(false); Visible = false; RoundId = null; hasLast = false; EndFinish(); EndBurn(); if (paper != null) paper.gameObject.SetActive(false); }
+        private void OnDisable() { if (keepOutSet && source != null && source.board != null) { source.board.SetKeepOut(null, null); keepOutSet = false; } SetBoardBlocked(false); Visible = false; RoundId = null; hasLast = false; EndFinish(); EndBurn(); if (paper != null) paper.gameObject.SetActive(false); }
         private void OnDestroy() => SetBoardBlocked(false);
     }
 
