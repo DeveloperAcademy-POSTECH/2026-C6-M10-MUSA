@@ -1,5 +1,7 @@
 <p align="center">
-  <img width="1188" height="792" alt="합이오 플레이 화면" src="https://github.com/user-attachments/assets/5aaa314f-b56a-4eec-949f-9f68744b3f6d" />
+
+  <img width="1188" height="792" alt="스크린샷 2026-11-06 오전 11 56 22" src="https://github.com/user-attachments/assets/85ca58d4-e67b-41ff-bb6a-c6797987312b" />
+
 </p>
 
 <h1 align="center">합이오</h1>
