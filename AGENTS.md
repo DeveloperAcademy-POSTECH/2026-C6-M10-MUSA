@@ -194,7 +194,7 @@
 
 ## #507 박 모델 계약
 
-- 스테이지 박은 `GameStageDefinition.gourdVisualResource`(Resources 경로, 비면 흰 박)를 `GameBattleBindings.MountStageGourd`가 `LabGourdPaint.PrepareVisual`로 `Attach`보다 먼저 지정한다. 2:2·Lab 단판은 흰 박이다. 프리팹 직접 참조로 바꾸지 않는다.
+- 스테이지 박은 `GameStageDefinition.gourdVisualResource`(Resources 경로, 비면 흰 박)를 `GameBattleBindings.MountStageGourd`가 `LabGourdPaint.PrepareVisual`로 `Attach`보다 먼저 지정한다. 2:2·Lab 단판·튜토리얼(#477)은 흰 박이다. 프리팹 직접 참조로 바꾸지 않는다.
 - `LabGourdVisualRig`가 없는 프리팹(흰 박)은 기존 경로를 글자 그대로 탄다. 흰 박의 마운트·판정·칠·요괴 자세는 `Assets/Lab/Tests/PlayMode/Golden/`의 main 기록과 같아야 하며, 골든은 흰 박이 바뀌는 의도된 변경에서만 `GOURD_GOLDEN_RECORD=1`로 다시 기록한다. 계약 검사 실패는 `C6_GOURD_RIG_FALLBACK`과 함께 흰 박으로 돌아간다. 상세는 `docs/GOURD_MODELS.md`.
 - 세 스테이지 모두 `gourdVisualResource = Hapio/Gourds/Stage0N_<요괴>_Battle`(구미호·야광귀·지귀 박)이며 판정·도색·요괴 반응·완성/결과/PNG까지 이 박을 쓴다. 경로는 굽기 도구만 설정하고 `GameStageAssets.EnsureAssets`는 건드리지 않는다. 아트 원본 프리팹은 고치지 않고 `Hapio > Gourds > Bake All Stage Gourds`(`GameGourdRigBaker`, 스테이지별 메뉴도 있음)로만 다시 굽는다. 미리보기 덧씌우기(`GameGourdModelPreview`·`GourdPreview` 리소스)는 삭제했으며 재생성하지 않는다.
 - #526: 2스테이지 굽기 원본은 경량 `Yagwanggwi_Gourd_100K_GameReady`(`Spec.SourceVariant`, 전투 박 71,011삼각형)다. 원본 FBX·GameReady는 보존하고, 다른 경량 재출력도 같은 방식으로 새 GameReady를 추가해 굽는다.

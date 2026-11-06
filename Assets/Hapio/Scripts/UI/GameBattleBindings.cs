@@ -65,10 +65,12 @@ namespace Hapio
 
         /// <summary>
         /// #507: the story stage's own gourd, set before LabSceneController.Awake (-100) attaches the paint, which only
-        /// fills an empty prefab with the white gourd. 2:2 and stages without a path keep the white gourd.
+        /// fills an empty prefab with the white gourd. 2:2, the tutorial (#477) and stages without a path keep the white gourd.
         /// </summary>
         private void MountStageGourd(GameSession session)
         {
+            // The practice board turns the white gourd's yokai details to face the middle seat.
+            if (session != null && session.IsTutorial) return;
             GameStageDefinition stage = session != null ? session.CurrentStageDefinition : null;
             string path = stage != null ? stage.gourdVisualResource : null;
             if (string.IsNullOrEmpty(path) || target == null) return;

@@ -52,6 +52,8 @@ namespace Hapio
                 overlayGroup.blocksRaycasts = !paused;
                 if (paused) board.CancelDrag();
             }
+            // The HUD itself keeps DEV hidden, so its Update and this LateUpdate do not toggle it every frame.
+            hud.developerSettingsHidden = true;
             if (hud.developerSettingsButton != null && hud.developerSettingsButton.gameObject.activeSelf)
                 hud.developerSettingsButton.gameObject.SetActive(false);
             if (paused) return true;

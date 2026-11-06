@@ -1,5 +1,26 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-06 — #477 튜토리얼 검사 실패 정리 (#534 병합 후)
+
+main `a8ddda75` 위의 `fix/#477-tutorial-test-expectations`에서 Unity 6000.6.5f1 batch mode(macOS)로 실행했다. 아래는 실제로 실행한 것만 적는다.
+
+| 원인 | 고친 것 |
+| --- | --- |
+| EditMode `MirrorPops…`가 `StopArrivalSpeed(-3, .5)`에 3을 기대했지만, 같은 검사가 앞 줄에서 확인하는 상한 √8≈2.83에 잘린다 | 검사만: 상한 안의 -2 → 2로 바꿨다(음수 방향의 절댓값 처리는 그대로 검사) |
+| "성공!" 색: asset만 흰 글자(검정 테두리 0.2)이고 코드 기본값·검사는 검정이었다 | 사용자 결정으로 흰 글자 유지. `GameTutorialArt` 기본값·tooltip, EditMode·PlayMode 검사를 흰색으로 맞췄다. asset과 화면은 그대로다 |
+| PlayMode 이름표: 화면 아래에 붙은 경우의 허용치에 `nameScreenMargin`(2)이 빠져 있었다 | 검사만: 화면 배율을 곱한 여백을 허용치에 넣었다 |
+| 튜토리얼 박(실제 결함): #521(#507, 11-04 병합)의 스테이지 박이 튜토리얼에도 달려 구미호 박이 됐다. #534의 요괴 돌리기(흰 박 `GourdYokai_Details` 기준)는 #521이 없는 브랜치에서 만들어져 돌 대상을 못 찾았다 | `GameBattleBindings.MountStageGourd`가 튜토리얼에서는 스테이지 박을 달지 않는다(흰 박). 요괴가 가운데 자리로 120° 돈다 |
+| DEV 버튼: `LabHud.Update`가 켜고 튜토리얼 `LateUpdate`가 끄기를 매 프레임 반복했다 | `LabHud.developerSettingsHidden`(직렬화 안 함)을 두고 튜토리얼이 켠다. 튜토리얼이 없어지면 되돌린다 |
+| PlayMode 손동작: 던지기·북 밀기가 고정 world 거리라 batch의 넓은 판(폭 13.97)에서 최소 거리 0.12판폭에 못 미쳤고, 폭탄 끌기는 여러 프레임에 걸쳐 판의 실제 마우스 확인이 끌기를 취소했다 | 검사만: 판 폭 기준 거리(던지기 0.2판폭, 북은 판 옆 끝 너머에서 놓기)와 한 프레임 안 합성 시간 끌기로 바꿨다 |
+
+| 확인 | 결과 |
+| --- | --- |
+| EditMode `Hapio.Tests.GameTutorialTests` | 39건 모두 PASS |
+| PlayMode `Hapio.Tests.GameTutorialFlowTests` | 4건 모두 PASS |
+| EditMode 전체 | **2015건 모두 PASS** |
+| PlayMode 전체 | **644건 모두 PASS**, 462.1초 |
+| 미실행 | iOS·Mac 실기기에서 튜토리얼 화면(흰 박·요괴 정면·"성공!"·DEV 숨김) 확인 |
+
 ## 2026-11-06 — #526 2스테이지 야광귀 박 100K 모델 굽기
 
 main `59d0400d`(#535 병합) 위의 `feat/#526-stage2-gourd-100k-bake`에서 Unity 6000.6.5f1 batch mode(macOS)로 실행했다. 아래는 실제로 실행한 것만 적는다.
