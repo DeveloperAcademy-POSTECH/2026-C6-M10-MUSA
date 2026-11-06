@@ -75,8 +75,8 @@ namespace C6Lab
         [Tooltip("타는 동안 지글지글 이어지는 진동 세기 (0이면 끔).")]
         [SerializeField, Range(0f, 1f)] private float burnHapticIntensity = .5f;
         [Header("#533 도장 (완성하면 \"쾅\" 찍힘)")]
-        [Tooltip("도장 글자.")]
-        [SerializeField] private string stampText = "칙\n령";
+        [Tooltip("#540 도장 글자. 비우면(기본) 글자 대신 물방울과 물결 그림을 찍는다. 글자를 쓰면 그림 대신 글자(두 글자면 줄바꿈 \\n으로 세로).")]
+        [SerializeField] private string stampText = "";
         [SerializeField] private Color stampColor = new Color(.78f, .09f, .07f, .95f);
         [Tooltip("도장 크기 (종이 폭 대비).")]
         [SerializeField, Range(.15f, .6f)] private float stampSize = .34f;
@@ -243,6 +243,8 @@ namespace C6Lab
         private RectTransform stampRoot;
         private UnityEngine.UI.Image stampImage;
         private UnityEngine.UI.Text stampLabel;
+        private UnityEngine.UI.Image stampEmblem;
+        private static Sprite stampEmblemSprite;
         private UnityEngine.UI.Image[] stampSpecks = Array.Empty<UnityEngine.UI.Image>();
         private static Sprite stampSprite;
         /// <summary>#533: 도장이 찍혀 보이는지 (테스트용).</summary>
@@ -694,6 +696,46 @@ namespace C6Lab
                     if (index < strokeRank.Length) strokeRank[index] = n++ / (float)total;
         }
 
+        /// <summary>
+        /// #540: 도장 안 그림 (런타임에 한 번 만든다). 위에 물방울 하나(가운데 작은 빛 구멍), 아래에 물결 두 줄.
+        /// 인주가 고르지 않게 묻은 결은 테두리와 같다.
+        /// </summary>
+        private static Sprite StampEmblemSprite()
+        {
+            if (stampEmblemSprite != null) return stampEmblemSprite;
+            const int size = 128;
+            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
+            { name = "Talisman Stamp Emblem (#540 runtime)", hideFlags = HideFlags.DontSave, wrapMode = TextureWrapMode.Clamp };
+            var pixels = new Color[size * size];
+            const float cx = .5f, cy = .55f, radius = .17f, tip = .9f;
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float u = (x + .5f) / size, v = (y + .5f) / size;
+                    float ink = 0f;
+                    // The drop: a circle with a pointed top.
+                    float dx = u - cx, dy = v - cy;
+                    bool drop = dx * dx + dy * dy <= radius * radius
+                        || v > cy && v < tip && Mathf.Abs(dx) <= radius * Mathf.Sqrt(Mathf.Max(0f, (tip - v) / (tip - cy)));
+                    // A small slanted shine near the upper left of the drop.
+                    float hx = (u - (cx - .075f)) / .022f, hy = (v - (cy + .06f)) / .05f;
+                    if (drop && hx * hx + hy * hy > 1f) ink = 1f;
+                    // Two waves underneath.
+                    if (u > .14f && u < .86f)
+                        for (int w = 0; w < 2; w++)
+                        {
+                            float line = .27f - w * .13f + .035f * Mathf.Sin((u - .14f) * Mathf.PI * 2f * 2f);
+                            if (Mathf.Abs(v - line) < .028f) ink = 1f;
+                        }
+                    float grain = Mathf.PerlinNoise(x * .35f + 23f, y * .35f + 5f);
+                    pixels[y * size + x] = new Color(1f, 1f, 1f, ink * Mathf.Clamp01(.55f + grain * .9f));
+                }
+            texture.SetPixels(pixels); texture.Apply(false, true);
+            stampEmblemSprite = Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(.5f, .5f), 100f);
+            stampEmblemSprite.hideFlags = HideFlags.DontSave;
+            return stampEmblemSprite;
+        }
+
         /// <summary>#533: 도장 테두리 무늬 (런타임에 한 번 만든다). 굵은 네모 테두리에 인주가 고르지 않게 묻은 결.</summary>
         private static Sprite StampSprite()
         {
@@ -879,6 +921,7 @@ namespace C6Lab
             Color c = stampColor; c.a *= alpha;
             if (stampImage != null) stampImage.color = c;
             if (stampLabel != null) stampLabel.color = c;
+            if (stampEmblem != null) stampEmblem.color = c;
             float splat = after < 0f ? 0f : Mathf.Clamp01(after / .12f);
             for (int k = 0; k < stampSpecks.Length; k++)
             {
@@ -1136,7 +1179,9 @@ namespace C6Lab
                 stampRoot.anchorMin = stampRoot.anchorMax = stampAnchor;
                 stampRoot.anchoredPosition = Vector2.zero;
                 stampRoot.sizeDelta = new Vector2(seal, seal);
-                if (stampLabel != null) stampLabel.fontSize = Mathf.Max(8, Mathf.RoundToInt(seal * .36f));
+                // #540: one syllable fills the seal; two stacked syllables share it.
+                int lines = string.IsNullOrEmpty(stampText) ? 1 : stampText.Split('\n').Length;
+                if (stampLabel != null) stampLabel.fontSize = Mathf.Max(8, Mathf.RoundToInt(seal * (lines > 1 ? .36f : .58f)));
                 for (int k = 0; k < stampSpecks.Length; k++)
                 {
                     if (stampSpecks[k] == null) continue;
@@ -1275,6 +1320,12 @@ namespace C6Lab
             Stretch(stampLabel.rectTransform, .1f);
             stampLabel.lineSpacing = .85f;
             stampLabel.horizontalOverflow = HorizontalWrapMode.Overflow; stampLabel.verticalOverflow = VerticalWrapMode.Overflow;
+            // #540: by default the seal carries a picture (a water drop over waves) instead of words.
+            stampEmblem = NewRect("Stamp Emblem", stampRoot).gameObject.AddComponent<UnityEngine.UI.Image>();
+            stampEmblem.raycastTarget = false; stampEmblem.sprite = StampEmblemSprite();
+            Stretch(stampEmblem.rectTransform, .1f);
+            bool words = !string.IsNullOrEmpty(stampText);
+            stampLabel.gameObject.SetActive(words); stampEmblem.gameObject.SetActive(!words);
             burstRings = new UnityEngine.UI.Image[5];
             for (int k = 0; k < burstRings.Length; k++)
             {
