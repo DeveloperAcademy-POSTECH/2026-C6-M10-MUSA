@@ -101,7 +101,7 @@ namespace Hapio.Tests
             session.FinishTutorial();
             yield return Until(() => session.IsLoadingScreenUp, "Leaving the practice board shows the loading screen", 2f);
             float shownAt = Time.realtimeSinceStartup;
-            Assert.That(session.LoadingView.RunnerName, Is.EqualTo("불이"));
+            Assert.That(new[] { "불이", "묵이" }, Has.Member(session.LoadingView.RunnerName), "One of the runners, at random.");
             yield return Until(() => !session.IsLoadingScreenUp && SceneManager.GetActiveScene().path == GameScenePaths.Home,
                 "It closes once the room list is up", 30f);
             Assert.That(Time.realtimeSinceStartup - shownAt, Is.GreaterThanOrEqualTo(1f - .05f), "Never shorter than a second.");

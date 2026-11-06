@@ -111,16 +111,25 @@ namespace Hapio.Tests
         }
 
         [Test]
-        public void LoadingArtHoldsBulsSixStridePicturesPaperAndMockupColors()
+        public void LoadingArtHoldsEachRunnersSixStridePicturesPaperAndMockupColors()
         {
             GameLoadingArt art = GameLoadingArt.Load();
             Assert.That(art, Is.Not.Null, GameLoadingArt.ResourcePath);
-            Assert.That(art.runners.Length, Is.EqualTo(1), "Only 불이 for now; more join the draw later.");
-            GameLoadingArt.Runner bul = art.runners[0];
-            Assert.That((bul.name, bul.frames.Length, bul.Usable), Is.EqualTo(("불이", 6, true)));
-            Assert.That(bul.frames.Select(frame => frame.rect.size).Distinct().Count(), Is.EqualTo(1),
-                "One crop for all six, so they keep their places.");
-            Assert.That(bul.frameSeconds * bul.frames.Length, Is.EqualTo(.84f).Within(1e-4f), "One stride every 0.84 s (slowed from 0.6 s).");
+            Assert.That(art.runners.Select(runner => runner.name), Is.EqualTo(new[] { "불이", "묵이" }),
+                "불이 and 묵이 for now; more join the draw later.");
+            foreach (GameLoadingArt.Runner runner in art.runners)
+            {
+                Assert.That((runner.frames.Length, runner.Usable), Is.EqualTo((6, true)), runner.name);
+                Assert.That(runner.frames.Select(frame => frame.rect.size).Distinct().Count(), Is.EqualTo(1),
+                    runner.name + ": one crop for all six, so they keep their places.");
+                Assert.That(runner.frameSeconds * runner.frames.Length, Is.EqualTo(.84f).Within(1e-4f),
+                    runner.name + ": one stride every 0.84 s (slowed from 0.6 s).");
+            }
+            Assert.That(art.runners[0].landingFrames, Is.EqualTo(new[] { 2, 5 }), "불이 lands in pictures 3 and 6.");
+            Assert.That(art.runners[1].landingFrames, Is.EqualTo(new[] { 1, 4 }), "묵이 lands in pictures 2 and 5.");
+            string[] drawn = Enumerable.Range(0, 200).Select(seed => GameLoadingView.PickRunner(art.runners, new System.Random(seed)).name)
+                .Distinct().OrderBy(name => name).ToArray();
+            Assert.That(drawn, Is.EquivalentTo(new[] { "불이", "묵이" }), "Either one comes up at random.");
             Assert.That(art.paperTexture, Is.Not.Null, "The hanji grain.");
             Assert.That(art.captionFont != null ? art.captionFont.name : null, Is.EqualTo("ShillaCultureBold"));
             Assert.That(art.caption, Is.EqualTo("로딩중"));

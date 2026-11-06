@@ -27,7 +27,10 @@ namespace Hapio.Tests
             Assert.That(view.Visible, Is.False, "Made hidden.");
             view.Show(0f);
             Assert.That(view.Visible, Is.True);
-            Assert.That((view.PercentText, view.RunnerName, view.RunnerFrame), Is.EqualTo(("0%", "불이", 0)),
+            GameLoadingArt art = GameLoadingArt.Load();
+            GameLoadingArt.Runner drawn = Array.Find(art.runners, runner => runner.name == view.RunnerName);
+            Assert.That(drawn, Is.Not.Null, "One of the runners is drawn: " + view.RunnerName);
+            Assert.That((view.PercentText, view.RunnerFrame), Is.EqualTo(("0%", 0)),
                 "The first picture is up at once, no blank frame.");
             yield return null;
             AssertBubbleClearOfCaptionAndOnTheBar(view);
@@ -55,8 +58,7 @@ namespace Hapio.Tests
             while (!view.RunnerResting && Time.realtimeSinceStartup < until) yield return null;
             Assert.That(view.PercentText, Is.EqualTo("100%"));
             Assert.That(view.RunnerResting, Is.True, "At 100% the runner lands and stands.");
-            GameLoadingArt art = GameLoadingArt.Load();
-            Assert.That(GameLoadingView.IsLanding(art.runners[0], view.RunnerFrame), Is.True, "On a landing picture.");
+            Assert.That(GameLoadingView.IsLanding(drawn, view.RunnerFrame), Is.True, "On one of its own landing pictures.");
             int standing = view.RunnerFrame;
             yield return new WaitForSecondsRealtime(.5f);
             Assert.That(view.RunnerFrame, Is.EqualTo(standing), "Stays standing.");
