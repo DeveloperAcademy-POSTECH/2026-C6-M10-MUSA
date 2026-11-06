@@ -296,7 +296,15 @@ namespace C6Lab.Tests
             // #533: writing the last stroke (ㄹ bottom) first still paints; the guide keeps pointing at the first stroke.
             int[] last = LabJigwiTalismanStroke.WaterStrokes[LabJigwiTalismanStroke.WaterStrokes.Length - 1];
             foreach (int index in last) ordered.Paint(points[index], points[index], .07f);
-            Assert.That(ordered.CoveredCount, Is.EqualTo(last.Length));
+            // The brush also touches nearby points on other strokes in free-order mode.
+            int expectedCount = 0;
+            for (int i = 0; i < points.Length; i++)
+            {
+                bool touched = System.Array.Exists(last, index => Vector2.Distance(points[index], points[i]) <= .07f);
+                Assert.That(ordered.IsCovered(i), Is.EqualTo(touched), "The brush footprint at point " + i);
+                if (touched) expectedCount++;
+            }
+            Assert.That(ordered.CoveredCount, Is.EqualTo(expectedCount));
             Assert.That(ordered.CurrentStroke, Is.Zero);
             Assert.That(ordered.NextPoint, Is.EqualTo(LabJigwiTalismanStroke.WaterStrokes[0][0]), "The guide points at the first stroke's start.");
             // Once the first stroke is written the guide jumps past strokes already written to the next unwritten one.
