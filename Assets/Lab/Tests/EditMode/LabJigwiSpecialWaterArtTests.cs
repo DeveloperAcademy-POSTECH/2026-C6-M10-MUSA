@@ -25,5 +25,19 @@ namespace C6Lab.Tests
             art.Clear();
             Assert.That(art.Shown, Is.False); Assert.That(art.VisibleSparkles, Is.Zero);
         }
+
+        [Test]
+        public void TheTalismanOrbShowsTheRedSealWithAGoldGlowInsteadOfTheDrop()
+        {
+            // #540: the folded talisman becomes a talisman orb: hanji body, red seal, gold glow and sparkles.
+            var art = LabJigwiSupplyWaterArt.Create(root.transform);
+            art.Show(.3f, false, null, talismanOrb: true);
+            Assert.That(art.Talisman, Is.True);
+            Assert.That(art.Special, Is.False, "It is not B's special Water.");
+            Assert.That(art.VisibleSparkles, Is.EqualTo(3));
+            Assert.That(art.AddedColliderCount, Is.Zero);
+            art.Clear();
+            Assert.That(art.Talisman, Is.False);
+        }
     }
 }

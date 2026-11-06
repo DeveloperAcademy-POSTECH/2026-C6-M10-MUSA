@@ -89,12 +89,12 @@ namespace C6Lab.Tests
             // #509: the written "물" glows first, then the talisman fades out; the board is already free.
             Assert.That(overlay.Visible, Is.False); Assert.That(overlay.WantsBoardBlocked, Is.False);
             Assert.That(overlay.Finishing, Is.True);
-            Assert.That(overlay.LastCue, Is.EqualTo("Sweep"), "The gold sweep starts with its sound.");
+            Assert.That(overlay.LastCue, Is.EqualTo("Steam"), "#540: first the fire goes out with a hiss.");
             Assert.That(overlay.Paper.gameObject.activeSelf, Is.True, "It does not vanish at once.");
             Assert.That(overlay.PaperAlpha, Is.EqualTo(1f));
-            overlay.AdvanceFinish(overlay.FinishSeconds * .8f);
+            overlay.AdvanceFinish(overlay.FinishSeconds - .15f);
             Assert.That(overlay.LastCue, Is.EqualTo("Burst"), "The burst sounds once after the sweep.");
-            Assert.That(overlay.PaperAlpha, Is.GreaterThan(0f).And.LessThan(1f), "Fading away slowly.");
+            Assert.That(overlay.PaperAlpha, Is.GreaterThan(0f).And.LessThan(1f), "#540: the folded talisman orb is dropping to the board.");
             overlay.Present(Snapshot(-1d), Local, 11.5d);
             Assert.That(overlay.Paper.gameObject.activeSelf, Is.True, "The Host has not confirmed yet; it keeps fading.");
             overlay.AdvanceFinish(overlay.FinishSeconds);
@@ -143,12 +143,12 @@ namespace C6Lab.Tests
         {
             overlay.Present(Snapshot(-1d), Local, 11d);
             Trace(overlay);
-            Assert.That(overlay.NotesPlayedCount, Is.EqualTo(1), "The first 둥 starts with the sweep.");
+            Assert.That(overlay.NotesPlayedCount, Is.Zero, "#540: the fire goes out and a breath passes before the melody.");
             Assert.That(overlay.StampVisible, Is.False, "The seal waits for the accent.");
-            overlay.AdvanceFinish(overlay.AccentSeconds * .6f);
+            overlay.AdvanceFinish(overlay.AccentSeconds - .3f);
             Assert.That(overlay.NotesPlayedCount, Is.EqualTo(3), "솔, 도, 시 with rests between.");
             Assert.That(overlay.StampVisible, Is.False, "Still resting before the accent.");
-            overlay.AdvanceFinish(overlay.AccentSeconds * .5f);
+            overlay.AdvanceFinish(.4f);
             Assert.That(overlay.NotesPlayedCount, Is.EqualTo(4), "Three notes, rests, then the accented 라♭.");
             Assert.That(overlay.StampVisible, Is.True, "The seal lands with the accent.");
             Assert.That(overlay.LastCue, Is.EqualTo("Burst"));

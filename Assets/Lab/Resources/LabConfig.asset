@@ -52,6 +52,9 @@ MonoBehaviour:
   jigwiABGroupFireCount: 3
   jigwiABRelightSeconds: 12
   jigwiABBurnStaggerSeconds: 2
+  jigwiTalismanWaterCount: 1
+  jigwiTalismanWaterPaintScale: 3
+  jigwiTalismanRewardDelaySeconds: 4.5
   jigwiABShrinkDelaySeconds: 12
   jigwiABShrinkScale: 0.65
   jigwiABFireMoveAmount: 0.03

@@ -158,10 +158,20 @@ namespace C6Lab
         [SerializeField, Range(0f, 1f)] private float burstHapticSharpness = .15f;
         [Tooltip("번졌을 때 진동 세기. 0이면 끔.")]
         [SerializeField, Range(0f, 1f)] private float smudgeHapticIntensity = .9f;
-        [Tooltip("#509: 다 쓴 글씨가 빛나는 시간(초). #533부터 훑기 뒤에 빛난 채 머무는 시간. 그다음 부적이 천천히 사라진다.")]
-        [SerializeField, Range(.1f, 3f)] private float glowSeconds = 1.2f;
-        [Tooltip("#509: 빛난 뒤 부적이 사라지는 시간(초).")]
-        [SerializeField, Range(.2f, 3f)] private float fadeSeconds = 1.2f;
+        [Header("#540 완성 흐름: 불 꺼짐 → 숨 고르기 → 금빛 훑기·가락 → 도장 → 접혀 부적 구슬로 → 판으로 떨어짐")]
+        [Tooltip("다 쓰면 타던 가장자리에 김이 오르며 불이 꺼지는 시간(초).")]
+        [SerializeField, Range(0f, 1.5f)] private float extinguishSeconds = .45f;
+        [Tooltip("불이 꺼진 뒤 가락이 시작하기 전 숨 고르는 시간(초).")]
+        [SerializeField, Range(0f, 1f)] private float breathSeconds = .25f;
+        [Tooltip("불 꺼질 때 \"치익\" 김 소리 폴더 (Resources/Audio). 비우면 없음.")]
+        [SerializeField] private string steamSoundFolder = "JigwiTalismanSteam";
+        [SerializeField, Range(0f, 1f)] private float steamSoundVolume = .8f;
+        [Tooltip("#509/#540: 도장이 찍힌 뒤 빛난 채 머무는 시간(초). 그다음 부적이 접혀 구슬이 된다.")]
+        [SerializeField, Range(.1f, 3f)] private float glowSeconds = .6f;
+        [Tooltip("#540: 부적이 접히며 부적 구슬로 오므라드는 시간(초).")]
+        [SerializeField, Range(.1f, 1.5f)] private float foldSeconds = .45f;
+        [Tooltip("#540: 부적 구슬이 아래 조합판으로 떨어지는 시간(초). Host가 보상 구슬을 주는 때(LabConfig '부적 보상 지연')와 맞춘다.")]
+        [SerializeField, Range(.1f, 1.5f)] private float fallSeconds = .35f;
         [Tooltip("#509: 다 쓴 글씨가 빛날 때의 색 (금빛).")]
         [SerializeField] private Color glowColor = new Color(1f, .86f, .32f, 1f);
         [Tooltip("#533: \"물\" 글자의 가로 폭이 부적 종이 폭에서 차지하는 비율. 클수록 글자가 크다(세로는 종이 높이의 72%까지).")]
@@ -217,6 +227,10 @@ namespace C6Lab
         [Tooltip("#533 완성 가락 음높이 (파일 원래 음에서 반음 수). 기본 ComboHit는 라(A4)라서 솔 도 시 라 = -2, +3, +2, 0. 파일이 4개 이상이면 쓰지 않는다.")]
         [SerializeField] private int[] noteSemitones = { -2, 3, 2, 0 };
         private float burnAge = -1f;
+        private float extinguishFrom;
+        private bool sweepCued;
+        private UnityEngine.UI.Image[] steam = Array.Empty<UnityEngine.UI.Image>();
+        private UnityEngine.UI.Image foldOrb, foldSeal;
         private UnityEngine.UI.Image scorch;
         private Texture2D burnTexture;
         private Color32[] burnPixels;
@@ -302,8 +316,11 @@ namespace C6Lab
             * (noteBeats != null && index < noteBeats.Length ? Mathf.Max(0, noteBeats[index]) : index * 2);
         private float AccentAt => Mathf.Max(.01f, NoteAt(3));
         /// <summary>#533: 마지막 강세 음(도장)이 나는 때 (완성 연출 시작부터 초).</summary>
-        public float AccentSeconds => AccentAt;
-        public float FinishSeconds => AccentAt + glowSeconds + fadeSeconds;
+        public float AccentSeconds => IntroSeconds + AccentAt;
+        /// <summary>#540: 다 쓴 뒤 가락이 시작하기까지 (불 꺼짐 + 숨 고르기).</summary>
+        public float IntroSeconds => Mathf.Max(0f, extinguishSeconds) + Mathf.Max(0f, breathSeconds);
+        /// <summary>#540: 다 쓴 뒤 부적 구슬이 판에 닿기까지. LabConfig의 부적 보상 지연과 같아야 한다.</summary>
+        public float FinishSeconds => IntroSeconds + AccentAt + glowSeconds + foldSeconds + fallSeconds;
         /// <summary>#509: 사라지는 동안의 부적 불투명도 (1 → 0).</summary>
         public float PaperAlpha => paperGroup != null ? paperGroup.alpha : 1f;
 
@@ -763,7 +780,7 @@ namespace C6Lab
         /// #540: 도장 안 그림 (런타임에 한 번 만든다). 위에 물방울 하나(가운데 작은 빛 구멍), 아래에 물결 두 줄.
         /// 인주가 고르지 않게 묻은 결은 테두리와 같다.
         /// </summary>
-        private static Sprite StampEmblemSprite()
+        internal static Sprite StampEmblemSprite()
         {
             if (stampEmblemSprite != null) return stampEmblemSprite;
             const int size = 128;
@@ -800,7 +817,7 @@ namespace C6Lab
         }
 
         /// <summary>#533: 도장 테두리 무늬 (런타임에 한 번 만든다). 굵은 네모 테두리에 인주가 고르지 않게 묻은 결.</summary>
-        private static Sprite StampSprite()
+        internal static Sprite StampSprite()
         {
             if (stampSprite != null) return stampSprite;
             const int size = 128;
@@ -874,10 +891,12 @@ namespace C6Lab
             if (hint != null) hint.gameObject.SetActive(false);
             if (nextMarker != null) nextMarker.gameObject.SetActive(false);
             if (stampRoot != null) stampRoot.gameObject.SetActive(false);
-            if (scorch != null) scorch.gameObject.SetActive(false);
+            // #540: the fire goes out — the flames and sparks stop at once, the scorch cools away under steam.
+            if (emberBand != null) emberBand.gameObject.SetActive(false);
             foreach (UnityEngine.UI.Image spark in sparks) if (spark != null) spark.gameObject.SetActive(false);
-            burstPlayed = false; notesPlayed = 0;
-            Cue("Sweep", sweepSoundFolder, sweepSoundVolume);
+            extinguishFrom = BurnFront;
+            burstPlayed = false; notesPlayed = 0; sweepCued = false;
+            Cue("Steam", steamSoundFolder, steamSoundVolume);
             DrawFinish();
         }
 
@@ -896,11 +915,15 @@ namespace C6Lab
         /// </summary>
         private void DrawFinish()
         {
+            DrawExtinguish(finishAge);
+            // After the fire is out and a breath, the melody and the gold sweep begin.
+            float t = finishAge - IntroSeconds;
+            if (t >= 0f && !sweepCued) { sweepCued = true; Cue("Sweep", sweepSoundFolder, sweepSoundVolume); }
             float sweep = Mathf.Max(.01f, sweepSeconds);
-            float sweepT = Mathf.Clamp01(finishAge / sweep);
+            float sweepT = t < 0f ? 0f : Mathf.Clamp01(t / sweep);
             // 솔 (rest) 도 (rest) 시 (rest rest rest) 라! — the last, accented note lands with the seal.
-            while (notesPlayed < 3 && finishAge >= NoteAt(notesPlayed)) PlayNote(notesPlayed++);
-            float after = finishAge - AccentAt;
+            while (t >= 0f && notesPlayed < 3 && t >= NoteAt(notesPlayed)) PlayNote(notesPlayed++);
+            float after = t - AccentAt;
             DrawStamp(after);
             if (after >= 0f && !burstPlayed)
             {
@@ -911,8 +934,10 @@ namespace C6Lab
             }
             float burst = after < 0f ? 0f : Mathf.Clamp01(after / .35f);
             float bump = after < 0f ? 0f : Mathf.Sin(Mathf.PI * burst);
-            float fade = Mathf.Clamp01((after - glowSeconds) / Mathf.Max(.01f, fadeSeconds));
-            float eased = fade * fade * (3f - 2f * fade);
+            // #540: after the glow the talisman folds into a talisman orb, which then drops down to the board.
+            float fold = Mathf.Clamp01((after - glowSeconds) / Mathf.Max(.01f, foldSeconds));
+            float fall = Mathf.Clamp01((after - glowSeconds - foldSeconds) / Mathf.Max(.01f, fallSeconds));
+            float folded = fold * fold * (3f - 2f * fold);
             Color gold = new Color(glowColor.r, glowColor.g, glowColor.b, 1f);
             // #533 gong hum: after the strike everything trembles and pulses, dying away like a gong's ring.
             float ring = after < 0f ? 0f : Mathf.Exp(-after * humDecay);
@@ -946,12 +971,15 @@ namespace C6Lab
             }
             DrawRings(after, gold);
             if (paperImage != null) paperImage.color = Color.Lerp(paperColor, new Color(1f, .97f, .85f, paperColor.a), Mathf.Max(burst * .8f, sweepT * .3f));
-            if (paperGroup != null) paperGroup.alpha = 1f - eased;
-            // #533: the talisman stays put (no floating away); the seal's slam punches it, then it fades in place.
-            paper.localScale = Vector3.one * (1f + burstPunch * bump);
-            float shake = burstShake * paper.rect.height * ring;
+            if (paperGroup != null) paperGroup.alpha = 1f - fall * .9f;
+            // #533/#540: the seal's slam punches the talisman; then it crumples into an orb and drops to the board.
+            float paperScale = (1f + burstPunch * bump) * Mathf.Lerp(1f, .1f, folded);
+            paper.localScale = Vector3.one * paperScale;
+            paper.localRotation = Quaternion.Euler(0f, 0f, folded * 12f);
+            float shake = burstShake * paper.rect.height * ring * (1f - folded);
             var jitter = new Vector3(wave * shake, Mathf.Cos(after * humHz * 1.37f * 2f * Mathf.PI) * shake * .35f, 0f);
-            paper.localPosition = finishFrom + jitter;
+            paper.localPosition = finishFrom + jitter + Vector3.down * (fall * fall * paper.rect.height * .95f);
+            DrawFoldOrb(folded, paperScale, gold);
         }
 
         /// <summary>
@@ -1015,12 +1043,62 @@ namespace C6Lab
             }
         }
 
+        /// <summary>
+        /// #540 불 꺼짐: 다 쓴 순간 타던 그을음이 김 아래 식어 사라지고, 가장자리 둘레에서 하얀 김이 피어오른다.
+        /// </summary>
+        private void DrawExtinguish(float age)
+        {
+            float e = Mathf.Clamp01(age / Mathf.Max(.01f, extinguishSeconds));
+            bool cooling = extinguishFrom > 0f && e < 1f;
+            if (scorch != null)
+            {
+                if (scorch.gameObject.activeSelf != cooling) scorch.gameObject.SetActive(cooling);
+                if (cooling) scorch.color = new Color(1f, 1f, 1f, 1f - e);
+            }
+            if (paper == null) return;
+            Rect r = paper.rect;
+            float inset = Mathf.Clamp01(extinguishFrom) * r.width * .5f;
+            float w = Mathf.Max(0f, r.width - inset * 2f), h = Mathf.Max(0f, r.height - inset * 2f);
+            for (int k = 0; k < steam.Length; k++)
+            {
+                if (steam[k] == null) continue;
+                float local = (age - k * .04f) / Mathf.Max(.01f, extinguishSeconds + .3f);
+                bool on = extinguishFrom > 0f && local >= 0f && local < 1f;
+                if (steam[k].gameObject.activeSelf != on) steam[k].gameObject.SetActive(on);
+                if (!on) continue;
+                RectTransform puff = steam[k].rectTransform;
+                puff.anchorMin = puff.anchorMax = new Vector2(.5f, .5f);
+                puff.anchoredPosition = Perimeter((k + .5f) / steam.Length, w, h) + Vector2.up * local * r.height * .12f;
+                float size = r.width * (.12f + .18f * local);
+                puff.sizeDelta = new Vector2(size, size);
+                steam[k].color = new Color(1f, 1f, 1f, .7f * Mathf.Sin(Mathf.PI * local));
+            }
+        }
+
+        /// <summary>#540: 오므라드는 부적 가운데에서 금빛 부적 구슬이 자라난다 (종이가 작아져도 구슬은 제 크기).</summary>
+        private void DrawFoldOrb(float folded, float paperScale, Color gold)
+        {
+            if (foldOrb == null) return;
+            bool on = folded > 0f;
+            if (foldOrb.gameObject.activeSelf != on) foldOrb.gameObject.SetActive(on);
+            if (!on || paper == null) return;
+            float size = paper.rect.width * .3f;
+            foldOrb.rectTransform.sizeDelta = new Vector2(size, size);
+            foldOrb.rectTransform.anchoredPosition = Vector2.zero;
+            foldOrb.rectTransform.localScale = Vector3.one * (folded / Mathf.Max(.05f, paperScale));
+            foldOrb.color = new Color(gold.r, gold.g, gold.b, folded);
+            if (foldSeal != null) foldSeal.color = new Color(stampColor.r, stampColor.g, stampColor.b, folded);
+        }
+
         private void EndFinish()
         {
             finishAge = -1f;
             if (paper == null) return;
             if (paperGroup != null) paperGroup.alpha = 1f;
-            paper.localScale = Vector3.one; paper.localPosition = finishFrom;
+            paper.localScale = Vector3.one; paper.localPosition = finishFrom; paper.localRotation = Quaternion.identity;
+            if (foldOrb != null) foldOrb.gameObject.SetActive(false);
+            foreach (UnityEngine.UI.Image puff in steam) if (puff != null) puff.gameObject.SetActive(false);
+            if (scorch != null) { scorch.color = Color.white; scorch.gameObject.SetActive(false); }
             if (paperImage != null) paperImage.color = paperColor;
             if (hint != null) hint.gameObject.SetActive(true);
             for (int i = 0; i < dots.Length; i++) if (dots[i] != null) dots[i].rectTransform.localScale = Vector3.one;
@@ -1429,6 +1507,22 @@ namespace C6Lab
                 spark.gameObject.SetActive(false);
                 sparks[k] = spark;
             }
+            // #540: steam puffs for the fire going out, and the talisman orb the folded talisman becomes.
+            steam = new UnityEngine.UI.Image[8];
+            for (int k = 0; k < steam.Length; k++)
+            {
+                var puff = NewRect("Talisman Steam " + k, paper).gameObject.AddComponent<UnityEngine.UI.Image>();
+                puff.raycastTarget = false; puff.sprite = WatercolorDot();
+                puff.gameObject.SetActive(false);
+                steam[k] = puff;
+            }
+            foldOrb = NewRect("Talisman Orb", paper).gameObject.AddComponent<UnityEngine.UI.Image>();
+            foldOrb.raycastTarget = false; foldOrb.sprite = RoundDot();
+            foldOrb.rectTransform.anchorMin = foldOrb.rectTransform.anchorMax = new Vector2(.5f, .5f);
+            foldSeal = NewRect("Talisman Orb Seal", foldOrb.rectTransform).gameObject.AddComponent<UnityEngine.UI.Image>();
+            foldSeal.raycastTarget = false; foldSeal.sprite = StampEmblemSprite();
+            Stretch(foldSeal.rectTransform, .2f);
+            foldOrb.gameObject.SetActive(false);
             BuildStrokeRank();
             LayoutGlyph();
             paper.gameObject.SetActive(false);

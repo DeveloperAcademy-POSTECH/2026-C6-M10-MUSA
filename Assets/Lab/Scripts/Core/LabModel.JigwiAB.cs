@@ -25,7 +25,7 @@ namespace C6Lab
         /// <summary>#509: talisman Water drops in one at a time; each pending orb's owner, index and Host due time.</summary>
         private readonly List<(ulong owner, int index, double dueAt)> jigwiTalismanDrops = new List<(ulong, int, double)>();
         public const double JigwiTalismanDropSeconds = .3d;
-        private float jigwiTalismanWaterLifetime, jigwiTalismanWaterPaint;
+        private float jigwiTalismanWaterLifetime, jigwiTalismanWaterPaint, jigwiTalismanRewardDelay;
         private float jigwiABDuration, jigwiABBurnSeconds, jigwiABBurnStagger,
             jigwiABMoveAmount, jigwiABMovePeriod, jigwiABTargetRadius;
         private ulong jigwiABFailureRevision;
@@ -52,6 +52,7 @@ namespace C6Lab
             jigwiABDuration = Mathf.Min(15f, config.JigwiABPersonalDurationSeconds);
             jigwiABBurnSeconds = config.JigwiABPersonalBurnSeconds; jigwiABBurnStagger = config.JigwiABBurnStaggerSeconds;
             jigwiTalismanWaterCount = config.JigwiTalismanWaterCount; jigwiTalismanWaterLifetime = config.JigwiTalismanWaterLifetimeSeconds;
+            jigwiTalismanRewardDelay = config.JigwiTalismanRewardDelaySeconds;
             jigwiTalismanWaterPaint = config.JigwiTalismanWaterPaintScale;
             jigwiSplashShare = config.JigwiBSplashPaintShare; jigwiBoardFireSeconds = config.JigwiBBoardFireSeconds;
             jigwiSyncDirections.Clear();
@@ -388,7 +389,7 @@ namespace C6Lab
         {
             // #509: one at a time, every 0.3 s, so each drop falls in with its own moment.
             for (int i = 0; i < jigwiTalismanWaterCount; i++)
-                jigwiTalismanDrops.Add((owner, i, now + i * JigwiTalismanDropSeconds));
+                jigwiTalismanDrops.Add((owner, i, now + jigwiTalismanRewardDelay + i * JigwiTalismanDropSeconds));
             GrantDueJigwiTalismanWater(now);
         }
         private void GrantDueJigwiTalismanWater(double now)
