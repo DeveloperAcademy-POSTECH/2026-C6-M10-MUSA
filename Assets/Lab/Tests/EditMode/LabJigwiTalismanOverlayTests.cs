@@ -181,13 +181,15 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void TheTalismanBurnsInFromItsEdgesOnlyInTheLastFiveSeconds()
+        public void TheTalismanBurnsInFromItsEdgesSlowlyFromTheStart()
         {
-            LabSnapshot snapshot = Snapshot(-1d); // the A ends at 26 s
-            overlay.Present(snapshot, Local, 12d);
-            Assert.That(overlay.WarnLevel, Is.Zero, "Plenty of time: no warning yet.");
-            overlay.Present(snapshot, Local, 24.5d);
-            Assert.That(overlay.WarnLevel, Is.EqualTo(.7f).Within(.01f), "1.5 s left of the last five: the edges have burned 70% inward.");
+            LabSnapshot snapshot = Snapshot(-1d); // the A runs 11 s → 26 s
+            overlay.Present(snapshot, Local, 11d);
+            Assert.That(overlay.WarnLevel, Is.Zero, "Nothing burned at the very start.");
+            overlay.Present(snapshot, Local, 18.5d);
+            Assert.That(overlay.WarnLevel, Is.GreaterThan(0f).And.LessThan(.5f), "Halfway through, it has burned slowly — less than half.");
+            overlay.Present(snapshot, Local, 26d - .001d);
+            Assert.That(overlay.WarnLevel, Is.EqualTo(1f).Within(.01f), "At the end it has burned to the middle.");
             overlay.Present(snapshot, 99, 24.5d);
             Assert.That(overlay.WarnLevel, Is.Zero, "No talisman, no warning.");
         }

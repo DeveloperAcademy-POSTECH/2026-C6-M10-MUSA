@@ -55,8 +55,12 @@ namespace C6Lab
         [Tooltip("#533 완성 가락 네 음이 나는 박자 (0부터). 기본 0·2·4·8 = 솔 (쉼) 도 (쉼) 시 (쉼 쉼 쉼) 라. 마지막 음과 함께 도장이 찍힌다.")]
         [SerializeField] private int[] noteBeats = { 0, 2, 4, 8 };
         [Header("#533 못 다 쓴 부적 (A가 끝날 때까지 못 쓰면 지귀 불에 타 버림)")]
-        [Tooltip("#540: A가 끝나기 이만큼(초) 전부터 부적이 겉(가장자리)에서부터 안쪽으로 타들어 간다. A 10초면 5초가 지났을 때부터. 끝나는 순간 한가운데까지 다 탄다. 0이면 끔.")]
-        [SerializeField, Range(0f, 10f)] private float burnWarnSeconds = 5f;
+        [Tooltip("#540: A가 끝나기 이만큼(초) 전부터 부적이 겉(가장자리)에서부터 안쪽으로 타들어 간다. A보다 길면 A가 시작하자마자(0초부터). 끝나는 순간 한가운데까지 다 탄다. 0이면 끔.")]
+        [SerializeField, Range(0f, 15f)] private float burnWarnSeconds = 15f;
+        [Tooltip("#540: 타들어 가는 빠르기 곡선. 1이면 일정하게, 클수록 처음엔 아주 천천히 타다가 끝으로 갈수록 빨라진다.")]
+        [SerializeField, Range(1f, 4f)] private float burnEase = 2f;
+        [Tooltip("#540: A가 끝나기 이만큼(초) 남았을 때부터 1초마다 톡 하는 진동.")]
+        [SerializeField, Range(0f, 10f)] private float warnHapticSeconds = 3f;
         [Tooltip("#540: 타들어 가는 불 테두리 두께 (부적 폭 대비).")]
         [SerializeField, Range(.01f, .15f)] private float burnEdgeWidth = .045f;
         [Tooltip("예고 동안 1초마다 톡 하는 진동 세기 (0이면 끔).")]
@@ -224,6 +228,8 @@ namespace C6Lab
         private int lastWarnTick = -1;
         /// <summary>#533: A가 끝나 가는 정도 (0 = 아직, 1 = 끝나는 순간). 부적 가장자리 그을림 예고에 쓴다.</summary>
         public float WarnLevel { get; private set; }
+        /// <summary>#540: 지금 A가 끝나기까지 남은 시간(초). 부적이 없으면 무한대.</summary>
+        public float TimeLeft { get; private set; } = float.PositiveInfinity;
         private Vector3 burnFrom;
         private RectTransform emberBand;
         private UnityEngine.UI.Image[] flames = Array.Empty<UnityEngine.UI.Image>();
@@ -362,7 +368,16 @@ namespace C6Lab
             Visible = round != null && round.id != writtenRound;
             RoundId = Visible ? round.id : null;
             float left = Visible ? (float)(round.endsAt - now) : float.PositiveInfinity;
-            WarnLevel = Visible && burnWarnSeconds > 0f ? Mathf.Clamp01(1f - left / burnWarnSeconds) : 0f;
+            TimeLeft = left;
+            WarnLevel = 0f;
+            if (Visible && burnWarnSeconds > 0f)
+            {
+                // #540: from the A's start (or burnWarnSeconds before its end), slow at first and faster near the end.
+                double start = Math.Max(round.activeAt, round.endsAt - burnWarnSeconds);
+                double span = Math.Max(.01d, round.endsAt - start);
+                float linear = Mathf.Clamp01((float)((now - start) / span));
+                WarnLevel = Mathf.Pow(linear, Mathf.Max(1f, burnEase));
+            }
             if (paper != null) paper.gameObject.SetActive(Visible || Finishing || Burning);
             if (!Visible) hasLast = false;
             SetBoardBlocked(Visible);
@@ -426,13 +441,13 @@ namespace C6Lab
             if (Burning) return;
             float level = Finishing ? 0f : WarnLevel;
             DrawEdgeBurn(level * 1.02f, time, level);
-            int tick = level > 0f ? Mathf.FloorToInt(time) : -1;
+            int tick = level > 0f && TimeLeft <= warnHapticSeconds ? Mathf.FloorToInt(time) : -1;
             if (tick >= 0 && tick != lastWarnTick)
             {
                 lastWarnTick = tick;
                 LabHaptics.PlayDirect(Config, LabHapticStyle.Light, warnHapticIntensity * (.5f + .5f * level));
             }
-            if (level <= 0f) lastWarnTick = -1;
+            if (tick < 0) lastWarnTick = -1;
         }
 
         /// <summary>
