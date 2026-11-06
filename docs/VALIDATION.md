@@ -1,5 +1,19 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-06 — #526 2스테이지 야광귀 박 100K 모델 굽기
+
+main `59d0400d`(#535 병합) 위의 `feat/#526-stage2-gourd-100k-bake`에서 Unity 6000.6.5f1 batch mode(macOS)로 실행했다. 아래는 실제로 실행한 것만 적는다.
+
+| 확인 | 결과 | 범위 |
+| --- | --- | --- |
+| 100K 원본 대조(일회성 Editor 코드, 커밋 안 함) | 노드 29개 동일, 공연 클립 커브 280개 동일(0~96프레임 최대 차 1.5e-5), 재질 누락 0, 렌더러 22·99,865삼각형(원본 446,594) | 원본 GameReady의 루트 배율 17.09628·모델 위치·Animator 컨트롤러로 `Yagwanggwi_Gourd_100K_GameReady.prefab`을 새로 저장했다. 원본 FBX·GameReady는 바뀌지 않았다 |
+| 2스테이지 굽기(`GameGourdRigBaker.BakeStage2`) | star-shaped 100%, 판정 편차 평균 0.0131·최대 0.0449(이전 0.0130·0.0455), 시간표 15/26/29/38/45/47·주기 48(이전과 같음), 배율 0.99992, 렌더러 17·71,011삼각형(이전 311,442) | 바뀐 파일은 `Generated/Stage02_*`(같은 GUID)·`BakeReport.txt`·`Stage02_Yagwanggwi_Battle.prefab`뿐이고 1·3스테이지 파일·`YokaiPeek.anim`·`YokaiProfile`은 그대로다. 두 칠 재질에는 셰이더 기본값과 같은 속성 5개가 새로 기록됐다 |
+| EditMode 전체 | **2015건 중 2013 PASS · 2 FAIL** | `GameGourdRigBakeTests`(1~3스테이지 저장본=재계산, 삼각형 상한 90,000)·`LabGameFlowBridgeTests`(Game35) 통과. 실패 2건은 `GameTutorialTests.MirrorPopsLikeABubble…`·`TutorialArtHoldsTheThreeFaces…`다 |
+| PlayMode 전체 | **644건 중 643 PASS · 1 FAIL**, 427.8초 | `GameStage2GourdHitFinishTests` 1·`GameStageGourdIntegrationTests` 1·`GameFinishReplayTests` 4·`LabWhiteGourdGoldenTests` 2(흰 박 불변)·`LabContinuousRopeTests` 5·`GourdResultViewerPlayModeTests` 3 모두 통과. 실패 1건은 `GameTutorialFlowTests.FinishedOpeningOpensThePracticeBoardOnceThenTheRoomList`(불이 얼굴 위치 19.51 > 18.58)다 |
+| 위 실패 3건의 main 대조 | main `59d0400d`(이 변경 없이)에서도 같은 3건 실패 | 이 변경을 잠시 빼고 `GameTutorialTests`(39건 중 2 FAIL)·`GameTutorialFlowTests`(4건 중 1 FAIL)를 다시 돌렸다. #534 튜토리얼 검사이며 이 변경과 관계없다 |
+| 화면 캡처(임시, 커밋 안 함) | 원본·100K 아트 옆모습 동일, 전투 박 앞·옆 정상 | 정적 자세 Editor 렌더. 이전 굽기 전투 박과의 직접 비교는 하지 않았다 |
+| 미실행 | — | iOS·Mac 실기기 성능·화면, 다인 실기기 |
+
 ## 2026-11-05 — DEV 표시 정리 (효과 없는 값·지귀 시간표·오색구슬 칠·Inspector·전투 DEV)
 
 `chore/dev-hide-inactive-fields` 브랜치의 별도 worktree에서 Unity 6000.6.5f1 batch mode(macOS)로 실행했다. 아래 표는 실제로 실행한 것만 적는다. 시간은 NUnit XML의 `duration`이고, Unity 시작·가져오기·컴파일은 포함하지 않는다.
