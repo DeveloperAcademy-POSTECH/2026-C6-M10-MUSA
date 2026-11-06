@@ -55,6 +55,12 @@ namespace C6Lab
         [Tooltip("#533 완성 가락 네 음이 나는 박자 (0부터). 기본 0·2·4·8 = 솔 (쉼) 도 (쉼) 시 (쉼 쉼 쉼) 라. 마지막 음과 함께 도장이 찍힌다.")]
         [SerializeField] private int[] noteBeats = { 0, 2, 4, 8 };
         [Header("#533 못 다 쓴 부적 (A가 끝날 때까지 못 쓰면 지귀 불에 타 버림)")]
+        [Tooltip("A가 끝나기 이만큼(초) 전부터 부적 가장자리가 그을리고 불티가 날린다 (곧 탈 것 같은 예고). 0이면 끔.")]
+        [SerializeField, Range(0f, 6f)] private float burnWarnSeconds = 3f;
+        [Tooltip("예고 때 가장자리 그을음 색.")]
+        [SerializeField] private Color scorchColor = new Color(.3f, .12f, .03f, .9f);
+        [Tooltip("예고 동안 1초마다 톡 하는 진동 세기 (0이면 끔).")]
+        [SerializeField, Range(0f, 1f)] private float warnHapticIntensity = .3f;
         [Tooltip("불이 아래에서 위로 부적을 다 태우는 시간(초).")]
         [SerializeField, Range(.3f, 3f)] private float burnSeconds = 1.2f;
         [Tooltip("다 탄 재가 흩어지며 사라지는 시간(초).")]
@@ -184,6 +190,11 @@ namespace C6Lab
         [Tooltip("#533 완성 가락 음높이 (파일 원래 음에서 반음 수). 기본 ComboHit는 라(A4)라서 솔 도 시 라 = -2, +3, +2, 0. 파일이 4개 이상이면 쓰지 않는다.")]
         [SerializeField] private int[] noteSemitones = { -2, 3, 2, 0 };
         private float burnAge = -1f;
+        private UnityEngine.UI.Image scorch;
+        private static Sprite scorchSprite;
+        private int lastWarnTick = -1;
+        /// <summary>#533: A가 끝나 가는 정도 (0 = 아직, 1 = 끝나는 순간). 부적 가장자리 그을림 예고에 쓴다.</summary>
+        public float WarnLevel { get; private set; }
         private Vector3 burnFrom;
         private UnityEngine.UI.Image charFill;
         private RectTransform emberBand;
@@ -283,6 +294,7 @@ namespace C6Lab
                 bool held = snapshot == null || snapshot.paused || source.GameStartHeld || source.BattlePresentationHeld;
                 if (held) hasLast = false; else ReadPointer();
                 UpdateNextMarker(Time.unscaledTime);
+                DrawWarning(Time.unscaledTime);
                 if (smudgeHintUntil >= 0f && Time.unscaledTime >= smudgeHintUntil) RestoreHint();
             }
             ResendIfLost(snapshot);
@@ -302,6 +314,8 @@ namespace C6Lab
             // A talisman this screen already finished stays hidden while the Host confirms it.
             Visible = round != null && round.id != writtenRound;
             RoundId = Visible ? round.id : null;
+            float left = Visible ? (float)(round.endsAt - now) : float.PositiveInfinity;
+            WarnLevel = Visible && burnWarnSeconds > 0f ? Mathf.Clamp01(1f - left / burnWarnSeconds) : 0f;
             if (paper != null) paper.gameObject.SetActive(Visible || Finishing || Burning);
             if (!Visible) hasLast = false;
             SetBoardBlocked(Visible);
@@ -320,6 +334,48 @@ namespace C6Lab
                 return false;
             }
             return false;
+        }
+
+        /// <summary>
+        /// #533 실패 예고: A가 끝나기 몇 초 전부터 부적 가장자리(특히 아래)가 점점 그을리고, 아래 가장자리에서 불티가 날린다.
+        /// 끝날 때가 가까울수록 진해지고 불티가 많아진다. 1초마다 약한 진동이 톡.
+        /// </summary>
+        private void DrawWarning(float time)
+        {
+            float level = Burning || Finishing ? 0f : WarnLevel;
+            if (scorch != null && !Burning)
+            {
+                bool on = level > 0f;
+                if (scorch.gameObject.activeSelf != on) scorch.gameObject.SetActive(on);
+                if (on)
+                {
+                    Color c = scorchColor; c.a *= level * (.85f + .15f * Mathf.Sin(time * 9f));
+                    scorch.color = c;
+                }
+            }
+            if (Burning || paper == null) return;
+            Rect r = paper.rect;
+            for (int k = 0; k < sparks.Length; k++)
+            {
+                if (sparks[k] == null) continue;
+                bool on = level > 0f && k < Mathf.CeilToInt(sparks.Length * level);
+                if (sparks[k].gameObject.activeSelf != on) sparks[k].gameObject.SetActive(on);
+                if (!on) continue;
+                float cycle = time / .9f + k * .37f, t = Mathf.Repeat(cycle, 1f);
+                RectTransform sp = sparks[k].rectTransform;
+                sp.anchorMin = sp.anchorMax = new Vector2((k * .618034f + Mathf.Floor(cycle) * .29f) % 1f, .02f);
+                sp.anchoredPosition = new Vector2(Mathf.Sin(t * 5f + k) * r.width * .03f, t * r.height * .18f);
+                float size = r.width * (.014f + .01f * ((k * .414f) % 1f)) * (1f - t * .5f);
+                sp.sizeDelta = new Vector2(size, size);
+                Color c = Color.Lerp(new Color(1f, .9f, .5f, 1f), emberColor, t); c.a = (1f - t) * level; sparks[k].color = c;
+            }
+            int tick = level > 0f ? Mathf.FloorToInt(time) : -1;
+            if (tick >= 0 && tick != lastWarnTick)
+            {
+                lastWarnTick = tick;
+                LabHaptics.PlayDirect(Config, LabHapticStyle.Light, warnHapticIntensity * (.5f + .5f * level));
+            }
+            if (level <= 0f) lastWarnTick = -1;
         }
 
         private void BeginBurn()
@@ -366,6 +422,11 @@ namespace C6Lab
             float edge = front * 1.08f; // the flame line, a little ahead of the char
             float ash = Mathf.Clamp01((burnAge - burnSeconds) / Mathf.Max(.01f, ashSeconds));
             Rect r = paper.rect;
+            if (scorch != null)
+            {
+                scorch.gameObject.SetActive(true);
+                Color sc = scorchColor; sc.a *= Mathf.Max(WarnLevel, Mathf.Clamp01(front * 2f)); scorch.color = sc;
+            }
             if (charFill != null)
             {
                 charFill.gameObject.SetActive(true);
@@ -445,6 +506,7 @@ namespace C6Lab
             if (paperGroup != null) paperGroup.alpha = 1f;
             paper.localScale = Vector3.one; paper.localPosition = burnFrom;
             if (charFill != null) charFill.gameObject.SetActive(false);
+            if (scorch != null) scorch.gameObject.SetActive(false);
             if (emberBand != null) emberBand.gameObject.SetActive(false);
             foreach (UnityEngine.UI.Image spark in sparks) if (spark != null) spark.gameObject.SetActive(false);
             if (ghost != null) ghost.color = ghostColor;
@@ -515,6 +577,30 @@ namespace C6Lab
             for (int s = 0; s < stroke.StrokeCount; s++)
                 foreach (int index in stroke.StrokePoints(s))
                     if (index < strokeRank.Length) strokeRank[index] = n++ / (float)total;
+        }
+
+        /// <summary>#533: 그을린 가장자리 무늬 (런타임에 한 번 만든다). 가운데는 비고 가장자리, 특히 아래가 불규칙하게 탄 결.</summary>
+        private static Sprite ScorchSprite()
+        {
+            if (scorchSprite != null) return scorchSprite;
+            const int width = 128, height = 256;
+            var texture = new Texture2D(width, height, TextureFormat.RGBA32, false)
+            { name = "Talisman Scorch (#533 runtime)", hideFlags = HideFlags.DontSave, wrapMode = TextureWrapMode.Clamp };
+            var pixels = new Color[width * height];
+            for (int y = 0; y < height; y++)
+                for (int x = 0; x < width; x++)
+                {
+                    float u = (x + .5f) / width, v = (y + .5f) / height;
+                    float side = Mathf.Min(u, 1f - u) / .16f, top = (1f - v) / .1f, bottom = v / .28f;
+                    float edge = Mathf.Min(Mathf.Min(side, top), bottom);
+                    float noise = Mathf.PerlinNoise(x * .09f + 5f, y * .09f + 13f) * .7f + Mathf.PerlinNoise(x * .3f, y * .3f + 7f) * .3f;
+                    float a = Mathf.Clamp01(1.25f - edge - noise * .55f);
+                    pixels[y * width + x] = new Color(1f, 1f, 1f, a * a);
+                }
+            texture.SetPixels(pixels); texture.Apply(false, true);
+            scorchSprite = Sprite.Create(texture, new Rect(0f, 0f, width, height), new Vector2(.5f, .5f), 100f);
+            scorchSprite.hideFlags = HideFlags.DontSave;
+            return scorchSprite;
         }
 
         private static Sprite WhiteSprite()
@@ -605,6 +691,8 @@ namespace C6Lab
             if (hint != null) hint.gameObject.SetActive(false);
             if (nextMarker != null) nextMarker.gameObject.SetActive(false);
             if (stampRoot != null) stampRoot.gameObject.SetActive(false);
+            if (scorch != null) scorch.gameObject.SetActive(false);
+            foreach (UnityEngine.UI.Image spark in sparks) if (spark != null) spark.gameObject.SetActive(false);
             burstPlayed = false; notesPlayed = 0;
             Cue("Sweep", sweepSoundFolder, sweepSoundVolume);
             DrawFinish();
@@ -1119,7 +1207,11 @@ namespace C6Lab
                 burstRings[k] = ringImage;
             }
             stampRoot.gameObject.SetActive(false);
-            // #533: the burn layers sit on top of everything on the paper.
+            // #533: the burn layers sit on top of everything on the paper; the scorched edge comes first.
+            scorch = NewRect("Talisman Scorch", paper).gameObject.AddComponent<UnityEngine.UI.Image>();
+            scorch.raycastTarget = false; scorch.sprite = ScorchSprite();
+            Stretch(scorch.rectTransform, 0f);
+            scorch.gameObject.SetActive(false);
             charFill = NewRect("Talisman Char", paper).gameObject.AddComponent<UnityEngine.UI.Image>();
             charFill.raycastTarget = false; charFill.sprite = WhiteSprite();
             charFill.type = UnityEngine.UI.Image.Type.Filled;

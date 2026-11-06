@@ -181,6 +181,18 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void TheEdgesScorchOnlyInTheLastSecondsOfTheA()
+        {
+            LabSnapshot snapshot = Snapshot(-1d); // the A ends at 26 s
+            overlay.Present(snapshot, Local, 12d);
+            Assert.That(overlay.WarnLevel, Is.Zero, "Plenty of time: no warning yet.");
+            overlay.Present(snapshot, Local, 24.5d);
+            Assert.That(overlay.WarnLevel, Is.EqualTo(.5f).Within(.01f), "Halfway into the last three seconds.");
+            overlay.Present(snapshot, 99, 24.5d);
+            Assert.That(overlay.WarnLevel, Is.Zero, "No talisman, no warning.");
+        }
+
+        [Test]
         public void AFinishedOrEndedGameNeverBurnsTheTalisman()
         {
             overlay.Present(Snapshot(-1d), Local, 11d);
