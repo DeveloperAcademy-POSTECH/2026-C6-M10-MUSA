@@ -1,0 +1,63 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ae9442ae00ac94b9199b823cb9cecd94, type: 3}
+  m_Name: LoadingArt
+  m_EditorClassIdentifier: Hapio.Runtime::Hapio.GameLoadingArt
+  backgroundColor: {r: 0.976, g: 0.898, b: 0.788, a: 1}
+  paperTexture: {fileID: 2800000, guid: 35b15acfe93d492ba7bc02f831ec670d, type: 3}
+  paperStrength: 0.55
+  runners:
+  - name: "\uBD88\uC774"
+    frames:
+    - {fileID: 21300000, guid: 8e9b8b16a31a14ea89cc57c625427cc0, type: 3}
+    - {fileID: 21300000, guid: 7831f8d93ed2544de8cc73e845bd03a3, type: 3}
+    - {fileID: 21300000, guid: 5594fc2f873574cc59796394a12f823b, type: 3}
+    - {fileID: 21300000, guid: 45628ae8336454259910eb4e2c423626, type: 3}
+    - {fileID: 21300000, guid: fa1d0a86b23e84256ae1d0c27e1f0014, type: 3}
+    - {fileID: 21300000, guid: 74845f5f6de7a4fc690cf7160bc07ba0, type: 3}
+    frameSeconds: 0.14
+    landingFrames: 0200000005000000i
+    scale: 1
+    offset: {x: 0, y: 0}
+  runnerHeight: 182
+  runnerCenterFromTop: 0.356
+  landingSquash: 0.04
+  landingSquashSeconds: 0.08
+  caption: "\uB85C\uB529\uC911"
+  captionFont: {fileID: 12800000, guid: 5f76b20538a6c4b1caa80654c9df48f1, type: 3}
+  captionFontSize: 20
+  captionColor: {r: 0, g: 0, b: 0, a: 1}
+  captionGapBelowRunner: 4
+  barWidth: 262
+  barHeight: 16
+  barBorder: 1.5
+  fillInset: 2.5
+  trackEdgeColor: {r: 0.808, g: 0.765, b: 0.702, a: 1}
+  trackColor: {r: 0.89, g: 0.847, b: 0.792, a: 1}
+  fillColor: {r: 0.424, g: 0.275, b: 0.149, a: 1}
+  bubbleGapBelowCaption: 8
+  bubbleSize: {x: 36, y: 20}
+  bubbleTail: 5
+  bubbleTailWidth: 8
+  bubbleCorner: 6
+  bubbleGapAboveBar: 2
+  bubbleColor: {r: 0.569, g: 0.404, b: 0.271, a: 1}
+  percentFont: {fileID: 12800000, guid: 5f76b20538a6c4b1caa80654c9df48f1, type: 3}
+  percentFontSize: 11
+  percentColor: {r: 1, g: 1, b: 1, a: 1}
+  bubbleTiltPerSpeed: 60
+  bubbleMaxTilt: 14
+  bubbleTiltFollow: 10
+  displayFollow: 6
+  displayMaxSpeed: 0.8
+  previewSeconds: 5
+  previewHoldSeconds: 0.8
