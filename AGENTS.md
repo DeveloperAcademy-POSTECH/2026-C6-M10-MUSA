@@ -288,7 +288,7 @@
 
 - 현재 클레이 표현은 `clay-stickers-v2`다. 높이 R은 기존 변위, GB는 커버리지와 함께 인코딩한 공통 표면 기준 조명 기울기(최대25도), A는 실제 스티커 커버리지다. 완료용 바탕층은 색만 채우며 광택 마스크를 채우지 않는다. Gloss는 기존 공통0~1이고 두께와 독립적이다. 색/R/판정/통신 형식은 유지한다.
 - 관람/PNG는 전체 높이 채널을 복사한다. Mac 실험은 `clay-preview-sample-v2`와 Scene에 고정된 메타데이터를 검사하며 구형 EXR를 거절한다. Prepare/Rebake에서만 샘플을 재생성하고 Build는 읽기 전용으로 검사한다. 일반 Scene/원본 모델은 바꾸지 않는다.
-- Editor 전용 v1 reference shader 2개는 실제 GPU 결과의 독립 회귀 기준이다. Player 의존성에 넣지 않는다. 현재 접속 묶음5687/Lab48/Game32·설정259개는 그대로다. 사용법은 CLAY_STICKER_PAINT, 실제 실행 결과만 VALIDATION에 기록한다.
+- Editor 전용 v1 reference shader 2개는 실제 GPU 결과의 독립 회귀 기준이다. Player 의존성에 넣지 않는다. 최신 main 통합 후 접속 묶음5688/Lab49/Game35·설정259개를 유지한다. #524는 표현 버전만 v2로 바꾸며 이 접속 번호를 되돌리지 않는다. 사용법은 CLAY_STICKER_PAINT, 실제 실행 결과만 VALIDATION에 기록한다.
 
 
 ## #527 둥근 클레이 비교 실험
