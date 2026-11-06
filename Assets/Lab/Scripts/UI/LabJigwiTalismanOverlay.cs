@@ -55,23 +55,23 @@ namespace C6Lab
         [Tooltip("#533 완성 가락 네 음이 나는 박자 (0부터). 기본 0·2·4·8 = 솔 (쉼) 도 (쉼) 시 (쉼 쉼 쉼) 라. 마지막 음과 함께 도장이 찍힌다.")]
         [SerializeField] private int[] noteBeats = { 0, 2, 4, 8 };
         [Header("#533 못 다 쓴 부적 (A가 끝날 때까지 못 쓰면 지귀 불에 타 버림)")]
-        [Tooltip("A가 끝나기 이만큼(초) 전부터 부적 가장자리가 그을리고 불티가 날린다 (곧 탈 것 같은 예고). 0이면 끔.")]
-        [SerializeField, Range(0f, 6f)] private float burnWarnSeconds = 3f;
-        [Tooltip("예고 때 가장자리 그을음 색.")]
-        [SerializeField] private Color scorchColor = new Color(.3f, .12f, .03f, .9f);
+        [Tooltip("#540: A가 끝나기 이만큼(초) 전부터 부적이 겉(가장자리)에서부터 안쪽으로 타들어 간다. A 10초면 5초가 지났을 때부터. 끝나는 순간 한가운데까지 다 탄다. 0이면 끔.")]
+        [SerializeField, Range(0f, 10f)] private float burnWarnSeconds = 5f;
+        [Tooltip("#540: 타들어 가는 불 테두리 두께 (부적 폭 대비).")]
+        [SerializeField, Range(.01f, .15f)] private float burnEdgeWidth = .045f;
         [Tooltip("예고 동안 1초마다 톡 하는 진동 세기 (0이면 끔).")]
         [SerializeField, Range(0f, 1f)] private float warnHapticIntensity = .3f;
-        [Tooltip("불이 아래에서 위로 부적을 다 태우는 시간(초).")]
-        [SerializeField, Range(.3f, 3f)] private float burnSeconds = 1.2f;
+        [Tooltip("#540: 다 못 쓰고 A가 끝난 뒤, 남은 불길이 마저 다 태우는 시간(초).")]
+        [SerializeField, Range(.1f, 3f)] private float burnSeconds = .5f;
         [Tooltip("다 탄 재가 흩어지며 사라지는 시간(초).")]
         [SerializeField, Range(.1f, 2f)] private float ashSeconds = .6f;
         [Tooltip("탄 자리 색 (그을린 한지).")]
         [SerializeField] private Color charColor = new Color(.13f, .07f, .05f, .92f);
         [Tooltip("타들어 가는 불 테두리 색.")]
         [SerializeField] private Color emberColor = new Color(1f, .5f, .12f, 1f);
-        [Tooltip("타는 소리 (Resources 경로). 기본은 지귀 불 소리.")]
-        [SerializeField] private string burnSoundPath = "Jigwi/GroupFireLoop";
-        [SerializeField, Range(0f, 1f)] private float burnSoundVolume = .8f;
+        [Tooltip("#540: 타들어 가는 동안 나는 타닥타닥 소리 (Resources/Audio 폴더, 반복). 타들어 갈수록 커진다.")]
+        [SerializeField] private string crackleFolder = "JigwiTalismanCrackle";
+        [SerializeField, Range(0f, 1f)] private float crackleVolume = 1f;
         [Tooltip("타는 동안 지글지글 이어지는 진동 세기 (0이면 끔).")]
         [SerializeField, Range(0f, 1f)] private float burnHapticIntensity = .5f;
         [Header("#533 도장 (완성하면 \"쾅\" 찍힘)")]
@@ -202,24 +202,44 @@ namespace C6Lab
         [SerializeField] private int[] noteSemitones = { -2, 3, 2, 0 };
         private float burnAge = -1f;
         private UnityEngine.UI.Image scorch;
-        private static Sprite scorchSprite;
+        private Texture2D burnTexture;
+        private Color32[] burnPixels;
+        private float[] burnDistance;
+        private int burnWidth, burnHeight;
+        private float burnShownFront = -1f;
+        private AudioSource crackle;
+        private float crackleLevel;
+        /// <summary>#540: 지금 타들어 간 정도 (0 = 안 탐, 1 = 한가운데까지). 테스트용.</summary>
+        public float BurnFront { get; private set; }
         private int lastWarnTick = -1;
         /// <summary>#533: A가 끝나 가는 정도 (0 = 아직, 1 = 끝나는 순간). 부적 가장자리 그을림 예고에 쓴다.</summary>
         public float WarnLevel { get; private set; }
         private Vector3 burnFrom;
-        private UnityEngine.UI.Image charFill;
         private RectTransform emberBand;
-        private UnityEngine.UI.Image emberGlow;
         private UnityEngine.UI.Image[] flames = Array.Empty<UnityEngine.UI.Image>();
         private UnityEngine.UI.Image[] sparks = Array.Empty<UnityEngine.UI.Image>();
         private Sprite[] flameFrames;
-        private static Sprite whiteSprite;
-        private AudioSource burnAudio;
         /// <summary>#533: 못 다 쓴 부적이 타는 중인지. 이때 조합판은 이미 풀려 있다.</summary>
         public bool Burning => burnAge >= 0f;
         public float BurnTotalSeconds => burnSeconds + ashSeconds;
+
+        /// <summary>
+        /// #540: 타닥타닥 크기 — 겉에서부터 타들어 가는 동안 탄 만큼 커지고, 끝나서 마저 다 탈 때 가장 크며, 재가 되면 잦아든다.
+        /// 다 써서 완성하거나 일시정지 중이면 없다.
+        /// </summary>
+        public float CrackleTarget(bool paused)
+        {
+            if (Burning)
+            {
+                float ash = Mathf.Clamp01((burnAge - burnSeconds) / Mathf.Max(.01f, ashSeconds));
+                return crackleVolume * (1f - ash);
+            }
+            if (!Visible || paused || Finishing) return 0f;
+            return crackleVolume * Mathf.Clamp01(WarnLevel * 1.5f);
+        }
         /// <summary>#533: 못 다 써서 탄 횟수 (테스트용).</summary>
         public int BurnCount { get; private set; }
+        private float burnStartFront;
         private RectTransform stampRoot;
         private UnityEngine.UI.Image stampImage;
         private UnityEngine.UI.Text stampLabel;
@@ -301,6 +321,7 @@ namespace C6Lab
             if (Burning) AdvanceBurn(Time.unscaledDeltaTime);
             bool paused = snapshot == null || snapshot.paused || source.GameStartHeld || source.BattlePresentationHeld;
             UpdateFireLoop(Visible && !paused, Time.unscaledDeltaTime);
+            UpdateCrackle(CrackleTarget(paused), Time.unscaledDeltaTime);
             if (Visible)
             {
                 FitToBattle(source.board != null ? source.board.ViewCamera : null);
@@ -350,38 +371,14 @@ namespace C6Lab
         }
 
         /// <summary>
-        /// #533 실패 예고: A가 끝나기 몇 초 전부터 부적 가장자리(특히 아래)가 점점 그을리고, 아래 가장자리에서 불티가 날린다.
-        /// 끝날 때가 가까울수록 진해지고 불티가 많아진다. 1초마다 약한 진동이 톡.
+        /// #540 실패 예고: A가 끝나기 몇 초 전부터 부적이 겉(가장자리)에서부터 안쪽으로 타들어 간다. 끝나는 순간 한가운데까지 다 탄다.
+        /// 타는 경계는 들쭉날쭉하게 빛나고, 그 위로 불꽃이 일렁이며 불티가 날린다. 1초마다 약한 진동이 톡.
         /// </summary>
         private void DrawWarning(float time)
         {
-            float level = Burning || Finishing ? 0f : WarnLevel;
-            if (scorch != null && !Burning)
-            {
-                bool on = level > 0f;
-                if (scorch.gameObject.activeSelf != on) scorch.gameObject.SetActive(on);
-                if (on)
-                {
-                    Color c = scorchColor; c.a *= level * (.85f + .15f * Mathf.Sin(time * 9f));
-                    scorch.color = c;
-                }
-            }
-            if (Burning || paper == null) return;
-            Rect r = paper.rect;
-            for (int k = 0; k < sparks.Length; k++)
-            {
-                if (sparks[k] == null) continue;
-                bool on = level > 0f && k < Mathf.CeilToInt(sparks.Length * level);
-                if (sparks[k].gameObject.activeSelf != on) sparks[k].gameObject.SetActive(on);
-                if (!on) continue;
-                float cycle = time / .9f + k * .37f, t = Mathf.Repeat(cycle, 1f);
-                RectTransform sp = sparks[k].rectTransform;
-                sp.anchorMin = sp.anchorMax = new Vector2((k * .618034f + Mathf.Floor(cycle) * .29f) % 1f, .02f);
-                sp.anchoredPosition = new Vector2(Mathf.Sin(t * 5f + k) * r.width * .03f, t * r.height * .18f);
-                float size = r.width * (.014f + .01f * ((k * .414f) % 1f)) * (1f - t * .5f);
-                sp.sizeDelta = new Vector2(size, size);
-                Color c = Color.Lerp(new Color(1f, .9f, .5f, 1f), emberColor, t); c.a = (1f - t) * level; sparks[k].color = c;
-            }
+            if (Burning) return;
+            float level = Finishing ? 0f : WarnLevel;
+            DrawEdgeBurn(level * 1.02f, time, level);
             int tick = level > 0f ? Mathf.FloorToInt(time) : -1;
             if (tick >= 0 && tick != lastWarnTick)
             {
@@ -389,6 +386,116 @@ namespace C6Lab
                 LabHaptics.PlayDirect(Config, LabHapticStyle.Light, warnHapticIntensity * (.5f + .5f * level));
             }
             if (level <= 0f) lastWarnTick = -1;
+        }
+
+        /// <summary>
+        /// #540 겉에서부터 타들어 가기: front(0~1, 1 = 한가운데)까지 그을린 자국, 그 경계에 빛나는 불 테두리, 테두리를 따라 불꽃과 불티.
+        /// 그을린 모양은 미리 잰 "가장자리에서 떨어진 정도"(들쭉날쭉한 결 포함)로 정해서 매번 같다. strength는 불꽃·불티 세기.
+        /// </summary>
+        private void DrawEdgeBurn(float front, float time, float strength)
+        {
+            BurnFront = Mathf.Max(0f, front);
+            bool on = front > 0f;
+            if (scorch != null)
+            {
+                if (scorch.gameObject.activeSelf != on) scorch.gameObject.SetActive(on);
+                if (on) PaintBurnTexture(front);
+            }
+            bool flamesOn = on && front < 1f && paper != null;
+            if (emberBand != null && emberBand.gameObject.activeSelf != flamesOn) emberBand.gameObject.SetActive(flamesOn);
+            if (paper == null) return;
+            Rect r = paper.rect;
+            float inset = Mathf.Clamp01(front) * r.width * .5f;
+            float w = Mathf.Max(0f, r.width - inset * 2f), h = Mathf.Max(0f, r.height - inset * 2f);
+            if (flamesOn)
+                for (int k = 0; k < flames.Length; k++)
+                {
+                    if (flames[k] == null) continue;
+                    if (flameFrames != null && flameFrames.Length > 0)
+                        flames[k].sprite = flameFrames[(int)(time * 14f + k * 2) % flameFrames.Length];
+                    float flicker = .75f + .35f * Mathf.Sin(time * (17f + k * 3f) + k);
+                    float size = r.width * .13f * flicker * Mathf.Lerp(.6f, 1f, strength);
+                    RectTransform f = flames[k].rectTransform;
+                    f.anchorMin = f.anchorMax = new Vector2(.5f, .5f);
+                    f.sizeDelta = new Vector2(size * .8f, size);
+                    f.anchoredPosition = Perimeter((k + .5f) / flames.Length + time * .02f, w, h) + Vector2.up * size * .3f;
+                    flames[k].color = new Color(1f, 1f, 1f, .95f);
+                }
+            for (int k = 0; k < sparks.Length; k++)
+            {
+                if (sparks[k] == null) continue;
+                bool lit = flamesOn && k < Mathf.CeilToInt(sparks.Length * Mathf.Clamp01(strength + .2f));
+                if (sparks[k].gameObject.activeSelf != lit) sparks[k].gameObject.SetActive(lit);
+                if (!lit) continue;
+                float cycle = time / .8f + k * .37f, t = Mathf.Repeat(cycle, 1f);
+                RectTransform sp = sparks[k].rectTransform;
+                sp.anchorMin = sp.anchorMax = new Vector2(.5f, .5f);
+                Vector2 from = Perimeter((k * .618034f + Mathf.Floor(cycle) * .29f) % 1f, w, h);
+                sp.anchoredPosition = from + new Vector2(Mathf.Sin(t * 5f + k) * r.width * .03f, t * r.height * .14f);
+                float size = r.width * (.016f + .01f * ((k * .414f) % 1f)) * (1f - t * .5f);
+                sp.sizeDelta = new Vector2(size, size);
+                Color c = Color.Lerp(new Color(1f, .9f, .5f, 1f), emberColor, t); c.a = 1f - t; sparks[k].color = c;
+            }
+        }
+
+        /// <summary>#540: 가운데 기준 w×h 직사각형 둘레 위 한 점 (s = 0~1, 둘레를 한 바퀴).</summary>
+        private static Vector2 Perimeter(float s, float w, float h)
+        {
+            float total = Mathf.Max(.001f, 2f * (w + h)), d = Mathf.Repeat(s, 1f) * total;
+            float hw = w * .5f, hh = h * .5f;
+            if (d < w) return new Vector2(-hw + d, hh);
+            d -= w; if (d < h) return new Vector2(hw, hh - d);
+            d -= h; if (d < w) return new Vector2(hw - d, -hh);
+            d -= w; return new Vector2(-hw, -hh + d);
+        }
+
+        /// <summary>#540: 부적 크기의 "가장자리에서 떨어진 정도" 지도 (0 = 가장자리, 1 = 한가운데, 들쭉날쭉한 결 포함). 한 번만 잰다.</summary>
+        private void BuildBurnMap()
+        {
+            burnWidth = 96; burnHeight = Mathf.RoundToInt(96f / Mathf.Max(.2f, paperAspect));
+            burnDistance = new float[burnWidth * burnHeight];
+            burnPixels = new Color32[burnDistance.Length];
+            float half = burnWidth * .5f;
+            for (int y = 0; y < burnHeight; y++)
+                for (int x = 0; x < burnWidth; x++)
+                {
+                    float dx = Mathf.Min(x + .5f, burnWidth - x - .5f), dy = Mathf.Min(y + .5f, burnHeight - y - .5f);
+                    float d = Mathf.Min(dx, dy) / half;
+                    float noise = Mathf.PerlinNoise(x * .11f + 3f, y * .11f + 17f) * .7f + Mathf.PerlinNoise(x * .35f + 9f, y * .35f) * .3f;
+                    burnDistance[y * burnWidth + x] = Mathf.Clamp01(d * .9f + (noise - .5f) * .16f + .02f);
+                }
+            burnTexture = new Texture2D(burnWidth, burnHeight, TextureFormat.RGBA32, false)
+            { name = "Talisman Edge Burn (#540 runtime)", hideFlags = HideFlags.DontSave, wrapMode = TextureWrapMode.Clamp };
+            burnShownFront = -1f;
+        }
+
+        private void PaintBurnTexture(float front)
+        {
+            if (burnTexture == null || burnDistance == null) return;
+            if (Mathf.Abs(front - burnShownFront) < .003f) return;
+            burnShownFront = front;
+            float band = Mathf.Max(.005f, burnEdgeWidth), halo = band * .6f;
+            Color32 clear = new Color32(0, 0, 0, 0), hot = new Color(1f, .88f, .45f, 1f);
+            for (int i = 0; i < burnDistance.Length; i++)
+            {
+                float d = burnDistance[i];
+                if (d < front - band)
+                {
+                    float shade = .85f + .15f * ((i * 7919) % 97) / 97f;
+                    Color c = charColor; c.r *= shade; c.g *= shade; c.b *= shade;
+                    burnPixels[i] = c;
+                }
+                else if (d < front)
+                    burnPixels[i] = Color.Lerp(hot, emberColor, (front - d) / band);
+                else if (d < front + halo)
+                {
+                    Color c = emberColor; c.a = .45f * (1f - (d - front) / halo);
+                    burnPixels[i] = c;
+                }
+                else burnPixels[i] = clear;
+            }
+            burnTexture.SetPixels32(burnPixels);
+            burnTexture.Apply(false, false);
         }
 
         /// <summary>
@@ -421,6 +528,31 @@ namespace C6Lab
             fireLoop.volume = fireLoopLevel * LabAudioSettings.SfxVolume;
         }
 
+        /// <summary>#540: 타들어 가는 동안 타닥타닥 소리. 타들어 갈수록 커지고, 다 타서 재가 되면 잦아든다.</summary>
+        private void UpdateCrackle(float target, float dt)
+        {
+            crackleLevel = Mathf.MoveTowards(crackleLevel, target, dt / .2f);
+            if (crackleLevel <= 0f)
+            {
+                if (crackle != null && crackle.isPlaying) crackle.Stop();
+                return;
+            }
+            if (crackle == null)
+            {
+                AudioClip clip = string.IsNullOrEmpty(crackleFolder) ? null
+                    : Array.Find(Resources.LoadAll<AudioClip>("Audio/" + crackleFolder), value => value != null);
+                if (clip == null) return;
+                crackle = gameObject.AddComponent<AudioSource>();
+                crackle.playOnAwake = false; crackle.spatialBlend = 0f; crackle.loop = true; crackle.clip = clip;
+            }
+            if (!crackle.isPlaying)
+            {
+                crackle.time = UnityEngine.Random.Range(0f, Mathf.Max(0f, crackle.clip.length - .05f));
+                crackle.Play();
+            }
+            crackle.volume = crackleLevel * LabAudioSettings.SfxVolume;
+        }
+
         private void BeginBurn()
         {
             if (paper == null) return;
@@ -430,18 +562,7 @@ namespace C6Lab
             if (hint != null) hint.gameObject.SetActive(false);
             if (nextMarker != null) nextMarker.gameObject.SetActive(false);
             LastCue = "Burn"; CueCount++;
-            AudioClip clip = string.IsNullOrEmpty(burnSoundPath) ? null : Resources.Load<AudioClip>(burnSoundPath);
-            if (clip != null && burnSoundVolume > 0f)
-            {
-                if (burnAudio == null)
-                {
-                    burnAudio = gameObject.AddComponent<AudioSource>();
-                    burnAudio.playOnAwake = false; burnAudio.spatialBlend = 0f; burnAudio.loop = true;
-                }
-                burnAudio.clip = clip; burnAudio.time = 0f;
-                burnAudio.volume = burnSoundVolume * LabAudioSettings.SfxVolume;
-                burnAudio.Play();
-            }
+            burnStartFront = Mathf.Clamp01(BurnFront);
             LabHaptics.PlayDirect(Config, LabHapticStyle.Medium, .7f, burnSeconds, burnHapticIntensity, .65f);
             DrawBurn();
         }
@@ -456,83 +577,25 @@ namespace C6Lab
         }
 
         /// <summary>
-        /// #533 못 다 쓴 부적: 아래에서 불이 붙어 그을린 자국이 위로 번지고, 그 경계에서 불꽃이 일렁이며 불티가 날린다.
-        /// 쓰다 만 물빛 획도 불이 지나가면 잿빛이 된다. 다 타면 재가 되어 살짝 가라앉으며 흩어진다. 지귀 불 소리가 함께 타오르다 잦아든다.
+        /// #540 못 다 쓴 부적: 겉에서부터 타들어 가던 불이 남은 곳까지 마저 다 태우고(쓰다 만 물빛 획도 불이 닿으면 잿빛),
+        /// 다 탄 부적은 재가 되어 살짝 가라앉으며 흩어진다. 타닥타닥 소리는 재가 되며 잦아든다.
         /// </summary>
         private void DrawBurn()
         {
-            float front = Mathf.Clamp01(burnAge / Mathf.Max(.01f, burnSeconds));
-            float edge = front * 1.08f; // the flame line, a little ahead of the char
+            float t = Mathf.Clamp01(burnAge / Mathf.Max(.01f, burnSeconds));
+            float front = Mathf.Lerp(burnStartFront, 1.08f, t);
             float ash = Mathf.Clamp01((burnAge - burnSeconds) / Mathf.Max(.01f, ashSeconds));
             Rect r = paper.rect;
-            if (scorch != null)
-            {
-                scorch.gameObject.SetActive(true);
-                Color sc = scorchColor; sc.a *= Mathf.Max(WarnLevel, Mathf.Clamp01(front * 2f)); scorch.color = sc;
-            }
-            if (charFill != null)
-            {
-                charFill.gameObject.SetActive(true);
-                charFill.fillAmount = front;
-                charFill.color = charColor;
-            }
-            if (emberBand != null)
-            {
-                bool lit = front < 1f;
-                emberBand.gameObject.SetActive(lit);
-                emberBand.anchorMin = new Vector2(0f, edge); emberBand.anchorMax = new Vector2(1f, edge);
-                emberBand.sizeDelta = new Vector2(0f, r.height * .07f);
-                emberBand.anchoredPosition = Vector2.zero;
-                if (emberGlow != null)
-                {
-                    Color glow = emberColor; glow.a *= .75f + .25f * Mathf.Sin(burnAge * 31f);
-                    emberGlow.color = glow;
-                }
-                for (int k = 0; k < flames.Length; k++)
-                {
-                    if (flames[k] == null) continue;
-                    if (flameFrames != null && flameFrames.Length > 0)
-                        flames[k].sprite = flameFrames[(int)(burnAge * 14f + k * 2) % flameFrames.Length];
-                    float flicker = .8f + .3f * Mathf.Sin(burnAge * (17f + k * 3f) + k);
-                    RectTransform f = flames[k].rectTransform;
-                    f.anchorMin = f.anchorMax = new Vector2((k + .5f) / flames.Length, .5f);
-                    float h = r.height * .16f * flicker;
-                    f.sizeDelta = new Vector2(h * .8f, h);
-                    f.anchoredPosition = new Vector2(Mathf.Sin(burnAge * 7f + k * 1.7f) * r.width * .02f, h * .35f);
-                    flames[k].color = new Color(1f, 1f, 1f, .95f);
-                }
-            }
-            for (int k = 0; k < sparks.Length; k++)
-            {
-                if (sparks[k] == null) continue;
-                // Each spark leaves the flame line at its own time and drifts up, fading.
-                float life = .6f, born = (k * .137f) % 1f * Mathf.Max(.01f, burnSeconds);
-                float t = (burnAge - born) / life;
-                bool on = t >= 0f && t < 1f;
-                if (sparks[k].gameObject.activeSelf != on) sparks[k].gameObject.SetActive(on);
-                if (!on) continue;
-                RectTransform sp = sparks[k].rectTransform;
-                float x = (k * .618034f) % 1f, startY = Mathf.Clamp01(born / Mathf.Max(.01f, burnSeconds)) * 1.08f;
-                sp.anchorMin = sp.anchorMax = new Vector2(x, startY);
-                sp.anchoredPosition = new Vector2(Mathf.Sin(t * 6f + k) * r.width * .03f, t * r.height * .22f);
-                float size = r.width * (.018f + .012f * ((k * .414f) % 1f)) * (1f - t * .5f);
-                sp.sizeDelta = new Vector2(size, size);
-                Color c = Color.Lerp(new Color(1f, .9f, .5f, 1f), emberColor, t); c.a = 1f - t; sparks[k].color = c;
-            }
-            // Written strokes the fire has passed turn to ash.
+            DrawEdgeBurn(front, burnAge + 100f, 1f - ash);
+            // Written strokes the fire has reached turn to ash.
             Color ashColor = new Color(.32f, .3f, .3f, .85f);
-            float glyphBottom = glyphArea != null ? (glyphArea.anchoredPosition.y - glyphArea.rect.height * .5f + r.height * .5f) / Mathf.Max(1f, r.height) : 0f;
-            float glyphHeight = glyphArea != null ? glyphArea.rect.height / Mathf.Max(1f, r.height) : 1f;
             for (int i = 0; i < dots.Length; i++)
             {
                 if (dots[i] == null || !stroke.IsCovered(i)) continue;
-                float y = glyphBottom + stroke.Samples[i].y * glyphHeight;
-                float burnt = Mathf.Clamp01((front * 1.08f - y) / .08f);
+                float burnt = Mathf.Clamp01((front - DotBurnDistance(i)) / .06f);
                 dots[i].color = Color.Lerp(InkColor(i), ashColor, burnt);
             }
-            if (ghost != null) ghost.color = Color.Lerp(ghostColor, new Color(.35f, .27f, .2f, ghostColor.a), front);
-            if (burnAudio != null && burnAudio.isPlaying)
-                burnAudio.volume = burnSoundVolume * LabAudioSettings.SfxVolume * (1f - ash) * Mathf.Clamp01(burnAge / .08f);
+            if (ghost != null) ghost.color = Color.Lerp(ghostColor, new Color(.35f, .27f, .2f, ghostColor.a), Mathf.Clamp01(front));
             float sink = ash * ash;
             if (paperGroup != null) paperGroup.alpha = 1f - sink;
             paper.localScale = Vector3.one * (1f - .04f * sink);
@@ -540,15 +603,24 @@ namespace C6Lab
             paper.localPosition = burnFrom + new Vector3(Mathf.Sin(burnAge * 53f) * tremble, -r.height * .04f * sink, 0f);
         }
 
+        /// <summary>#540: 글자 점 자리가 가장자리에서 떨어진 정도 (타들어 가는 지도에서 읽음).</summary>
+        private float DotBurnDistance(int index)
+        {
+            if (burnDistance == null || glyphArea == null || paper == null) return 1f;
+            Rect r = paper.rect; float side = glyphArea.rect.width;
+            Vector2 local = glyphArea.anchoredPosition + (stroke.Samples[index] - new Vector2(.5f, .5f)) * side;
+            float u = Mathf.Clamp01(local.x / Mathf.Max(1f, r.width) + .5f), v = Mathf.Clamp01(local.y / Mathf.Max(1f, r.height) + .5f);
+            int x = Mathf.Clamp((int)(u * burnWidth), 0, burnWidth - 1), y = Mathf.Clamp((int)(v * burnHeight), 0, burnHeight - 1);
+            return burnDistance[y * burnWidth + x];
+        }
+
         private void EndBurn()
         {
             if (!Burning) return;
             burnAge = -1f;
-            if (burnAudio != null) burnAudio.Stop();
             if (paper == null) return;
             if (paperGroup != null) paperGroup.alpha = 1f;
             paper.localScale = Vector3.one; paper.localPosition = burnFrom;
-            if (charFill != null) charFill.gameObject.SetActive(false);
             if (scorch != null) scorch.gameObject.SetActive(false);
             if (emberBand != null) emberBand.gameObject.SetActive(false);
             foreach (UnityEngine.UI.Image spark in sparks) if (spark != null) spark.gameObject.SetActive(false);
@@ -620,43 +692,6 @@ namespace C6Lab
             for (int s = 0; s < stroke.StrokeCount; s++)
                 foreach (int index in stroke.StrokePoints(s))
                     if (index < strokeRank.Length) strokeRank[index] = n++ / (float)total;
-        }
-
-        /// <summary>#533: 그을린 가장자리 무늬 (런타임에 한 번 만든다). 가운데는 비고 가장자리, 특히 아래가 불규칙하게 탄 결.</summary>
-        private static Sprite ScorchSprite()
-        {
-            if (scorchSprite != null) return scorchSprite;
-            const int width = 128, height = 256;
-            var texture = new Texture2D(width, height, TextureFormat.RGBA32, false)
-            { name = "Talisman Scorch (#533 runtime)", hideFlags = HideFlags.DontSave, wrapMode = TextureWrapMode.Clamp };
-            var pixels = new Color[width * height];
-            for (int y = 0; y < height; y++)
-                for (int x = 0; x < width; x++)
-                {
-                    float u = (x + .5f) / width, v = (y + .5f) / height;
-                    float side = Mathf.Min(u, 1f - u) / .16f, top = (1f - v) / .1f, bottom = v / .28f;
-                    float edge = Mathf.Min(Mathf.Min(side, top), bottom);
-                    float noise = Mathf.PerlinNoise(x * .09f + 5f, y * .09f + 13f) * .7f + Mathf.PerlinNoise(x * .3f, y * .3f + 7f) * .3f;
-                    float a = Mathf.Clamp01(1.25f - edge - noise * .55f);
-                    pixels[y * width + x] = new Color(1f, 1f, 1f, a * a);
-                }
-            texture.SetPixels(pixels); texture.Apply(false, true);
-            scorchSprite = Sprite.Create(texture, new Rect(0f, 0f, width, height), new Vector2(.5f, .5f), 100f);
-            scorchSprite.hideFlags = HideFlags.DontSave;
-            return scorchSprite;
-        }
-
-        private static Sprite WhiteSprite()
-        {
-            if (whiteSprite != null) return whiteSprite;
-            var texture = new Texture2D(4, 4, TextureFormat.RGBA32, false)
-            { name = "Talisman White (#533 runtime)", hideFlags = HideFlags.DontSave };
-            var pixels = new Color[16];
-            for (int i = 0; i < pixels.Length; i++) pixels[i] = Color.white;
-            texture.SetPixels(pixels); texture.Apply(false, true);
-            whiteSprite = Sprite.Create(texture, new Rect(0f, 0f, 4f, 4f), new Vector2(.5f, .5f), 100f);
-            whiteSprite.hideFlags = HideFlags.DontSave;
-            return whiteSprite;
         }
 
         /// <summary>#533: 도장 테두리 무늬 (런타임에 한 번 만든다). 굵은 네모 테두리에 인주가 고르지 않게 묻은 결.</summary>
@@ -1251,22 +1286,16 @@ namespace C6Lab
             }
             stampRoot.gameObject.SetActive(false);
             // #533: the burn layers sit on top of everything on the paper; the scorched edge comes first.
-            scorch = NewRect("Talisman Scorch", paper).gameObject.AddComponent<UnityEngine.UI.Image>();
-            scorch.raycastTarget = false; scorch.sprite = ScorchSprite();
+            // #540: the paper burns in from its edges — a runtime texture repainted as the fire creeps inward.
+            BuildBurnMap();
+            scorch = NewRect("Talisman Edge Burn", paper).gameObject.AddComponent<UnityEngine.UI.Image>();
+            scorch.raycastTarget = false;
+            scorch.sprite = Sprite.Create(burnTexture, new Rect(0f, 0f, burnWidth, burnHeight), new Vector2(.5f, .5f), 100f);
+            scorch.sprite.hideFlags = HideFlags.DontSave;
             Stretch(scorch.rectTransform, 0f);
             scorch.gameObject.SetActive(false);
-            charFill = NewRect("Talisman Char", paper).gameObject.AddComponent<UnityEngine.UI.Image>();
-            charFill.raycastTarget = false; charFill.sprite = WhiteSprite();
-            charFill.type = UnityEngine.UI.Image.Type.Filled;
-            charFill.fillMethod = UnityEngine.UI.Image.FillMethod.Vertical;
-            charFill.fillOrigin = (int)UnityEngine.UI.Image.OriginVertical.Bottom;
-            charFill.fillAmount = 0f;
-            Stretch(charFill.rectTransform, 0f);
-            charFill.gameObject.SetActive(false);
-            emberBand = NewRect("Talisman Burn Edge", paper);
-            emberGlow = NewRect("Burn Glow", emberBand).gameObject.AddComponent<UnityEngine.UI.Image>();
-            emberGlow.raycastTarget = false; emberGlow.sprite = WatercolorDot();
-            Stretch(emberGlow.rectTransform, 0f);
+            emberBand = NewRect("Talisman Burn Flames", paper);
+            Stretch(emberBand, 0f);
             flameFrames = Resources.LoadAll<Sprite>("Bomb/BlastFire");
             if (flameFrames != null) Array.Sort(flameFrames, (a, b) => string.CompareOrdinal(a.name, b.name));
             flames = new UnityEngine.UI.Image[6];
@@ -1281,7 +1310,7 @@ namespace C6Lab
             sparks = new UnityEngine.UI.Image[14];
             for (int k = 0; k < sparks.Length; k++)
             {
-                var spark = NewRect("Burn Spark " + k, paper).gameObject.AddComponent<UnityEngine.UI.Image>();
+                var spark = NewRect("Burn Spark " + k, emberBand).gameObject.AddComponent<UnityEngine.UI.Image>();
                 spark.raycastTarget = false; spark.sprite = RoundDot();
                 spark.gameObject.SetActive(false);
                 sparks[k] = spark;

@@ -520,12 +520,8 @@ namespace C6Lab
             {
                 if (round != null && round.kind == LabJigwiABKind.GroupFire && round.resolution == LabJigwiABResolution.Expired
                     && now >= round.resolvedAt && now < round.boardFireUntil) fireUntil = Math.Max(fireUntil, round.boardFireUntil);
-                // #540: an unfinished talisman sets only this seat's board on fire.
-                if (round != null && round.kind == LabJigwiABKind.PersonalBurn && round.resolution == LabJigwiABResolution.Expired
-                    && now >= round.resolvedAt)
-                    foreach (var seat in round.players ?? Array.Empty<LabJigwiABPlayerFire>())
-                        if (seat != null && seat.playerId == localPlayer && now < seat.boardFireUntil)
-                            fireUntil = Math.Max(fireUntil, seat.boardFireUntil);
+                // #540: an unfinished talisman's own board fire (Host rule) shows no extra fire overlay;
+                // the talisman burning in from its edges and the orbs burning carry it.
             }
             BoardFireVisible = fireUntil > now;
             bool flash = failedAt >= 0d && now >= failedAt && now - failedAt < FailureFlashSeconds;
