@@ -89,9 +89,11 @@ namespace C6Lab.Tests
             // #509: the written "물" glows first, then the talisman fades out; the board is already free.
             Assert.That(overlay.Visible, Is.False); Assert.That(overlay.WantsBoardBlocked, Is.False);
             Assert.That(overlay.Finishing, Is.True);
+            Assert.That(overlay.LastCue, Is.EqualTo("Sweep"), "The gold sweep starts with its sound.");
             Assert.That(overlay.Paper.gameObject.activeSelf, Is.True, "It does not vanish at once.");
             Assert.That(overlay.PaperAlpha, Is.EqualTo(1f));
             overlay.AdvanceFinish(overlay.FinishSeconds * .8f);
+            Assert.That(overlay.LastCue, Is.EqualTo("Burst"), "The burst sounds once after the sweep.");
             Assert.That(overlay.PaperAlpha, Is.GreaterThan(0f).And.LessThan(1f), "Fading away slowly.");
             overlay.Present(Snapshot(-1d), Local, 11.5d);
             Assert.That(overlay.Paper.gameObject.activeSelf, Is.True, "The Host has not confirmed yet; it keeps fading.");
@@ -116,22 +118,163 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void TheGuideIsEvenlySampledAndOrderFree()
+        public void ALetterWithItsTailStillBlankDoesNotFinish()
         {
-            var forward = new LabJigwiTalismanStroke(LabJigwiTalismanStroke.Water);
-            var backward = new LabJigwiTalismanStroke(LabJigwiTalismanStroke.Water);
+            overlay.Present(Snapshot(-1d), Local, 11d);
             Vector2[] points = LabJigwiTalismanStroke.Water;
-            Assert.That(forward.Samples.Length, Is.InRange(60, 200));
+            int[][] strokes = LabJigwiTalismanStroke.WaterStrokes;
+            int[] tail = strokes[strokes.Length - 1];
+            // #533: everything but the end of the ㄹ tail (the brush reach still covers two of the five skipped dots,
+            // so three stay blank) — enough dots counted, but the tail visibly blank.
+            for (int s = 0; s < strokes.Length; s++)
+                for (int i = 0; i < strokes[s].Length; i++)
+                    if (s < strokes.Length - 1 || i < tail.Length - 5) overlay.PaintNormalized(points[strokes[s][i]], points[strokes[s][i]]);
+            Assert.That(overlay.Coverage, Is.GreaterThan(.9f));
+            Assert.That(overlay.CompletedCount, Is.Zero, "A blank tail is not a finished letter.");
+            Assert.That(overlay.Stroke.LongestGap(strokes.Length - 1), Is.GreaterThan(1));
+            // Touching the tail end fills it and the letter finishes.
+            overlay.PaintNormalized(points[tail[tail.Length - 3]], points[tail[tail.Length - 3]]);
+            Assert.That(overlay.CompletedCount, Is.EqualTo(1));
+            Assert.That(overlay.Stroke.LongestGap(strokes.Length - 1), Is.LessThanOrEqualTo(1));
+        }
+
+        [Test]
+        public void TheFinishPlaysThreeEvenNotesThenTheAccent()
+        {
+            overlay.Present(Snapshot(-1d), Local, 11d);
+            Trace(overlay);
+            Assert.That(overlay.NotesPlayedCount, Is.EqualTo(1), "The first 둥 starts with the sweep.");
+            Assert.That(overlay.StampVisible, Is.False, "The seal waits for the accent.");
+            overlay.AdvanceFinish(overlay.AccentSeconds * .6f);
+            Assert.That(overlay.NotesPlayedCount, Is.EqualTo(3), "솔, 도, 시 with rests between.");
+            Assert.That(overlay.StampVisible, Is.False, "Still resting before the accent.");
+            overlay.AdvanceFinish(overlay.AccentSeconds * .5f);
+            Assert.That(overlay.NotesPlayedCount, Is.EqualTo(4), "Three notes, rests, then the accented 라♭.");
+            Assert.That(overlay.StampVisible, Is.True, "The seal lands with the accent.");
+            Assert.That(overlay.LastCue, Is.EqualTo("Burst"));
+        }
+
+        [Test]
+        public void AnUnfinishedTalismanBurnsAwayWhenTheARunsOut()
+        {
+            LabSnapshot snapshot = Snapshot(-1d);
+            overlay.Present(snapshot, Local, 11d);
+            Vector2 point = LabJigwiTalismanStroke.Water[0];
+            overlay.PaintNormalized(point, point);
+            // #533: the A ends with this seat still writing — Jigwi's fire burns the talisman.
+            overlay.Present(snapshot, Local, 26d);
+            Assert.That(overlay.Visible, Is.False); Assert.That(overlay.WantsBoardBlocked, Is.False);
+            Assert.That(overlay.Burning, Is.True);
+            Assert.That(overlay.BurnCount, Is.EqualTo(1));
+            Assert.That(overlay.LastCue, Is.EqualTo("Burn"));
+            Assert.That(overlay.Paper.gameObject.activeSelf, Is.True, "It burns where it was, not vanishing at once.");
+            overlay.Present(snapshot, Local, 26.5d);
+            Assert.That(overlay.BurnCount, Is.EqualTo(1), "It burns once.");
+            overlay.AdvanceBurn(overlay.BurnTotalSeconds * .9f);
+            Assert.That(overlay.PaperAlpha, Is.LessThan(1f), "The ash scatters away.");
+            overlay.AdvanceBurn(overlay.BurnTotalSeconds);
+            Assert.That(overlay.Burning, Is.False);
+            Assert.That(overlay.Paper.gameObject.activeSelf, Is.False);
+            Assert.That(overlay.Coverage, Is.Zero, "The next A starts from a clean talisman.");
+            foreach (var graphic in overlay.GetComponentsInChildren<UnityEngine.UI.Graphic>(true))
+                Assert.That(graphic.raycastTarget, Is.False);
+        }
+
+        [Test]
+        public void AFinishedOrEndedGameNeverBurnsTheTalisman()
+        {
+            overlay.Present(Snapshot(-1d), Local, 11d);
+            LabSnapshot over = Snapshot(-1d); over.phase = LabPhase.Victory;
+            overlay.Present(over, Local, 26d);
+            Assert.That(overlay.Burning, Is.False, "The battle ending is not a failed talisman.");
+            overlay.Present(Snapshot(-1d), Local, 11d);
+            overlay.Present(Snapshot(11.5d), Local, 26d);
+            Assert.That(overlay.Burning, Is.False, "A talisman the Host already counted never burns.");
+        }
+
+        [Test]
+        public void CoinScratchScribblingSmudgesAndStartsOver()
+        {
+            overlay.Present(Snapshot(-1d), Local, 11d);
+            // #533: rubbing back and forth over the whole paper, like scratching a lottery ticket.
+            for (int i = 0; i <= 40; i++)
+            {
+                float y = i / 40f;
+                overlay.PaintNormalized(new Vector2(.02f, y), new Vector2(.98f, y));
+            }
+            Assert.That(overlay.SmudgeCount, Is.GreaterThan(0));
+            Assert.That(overlay.LastCue, Is.EqualTo("Smudge"));
+            Assert.That(overlay.CompletedCount, Is.Zero, "Scribbling never finishes the talisman.");
+            Assert.That(overlay.Visible, Is.True);
+        }
+
+        [Test]
+        public void TracingTheLetterNeverSmudges()
+        {
+            overlay.Present(Snapshot(-1d), Local, 11d);
+            Vector2[] points = LabJigwiTalismanStroke.Water;
+            // Writing each stroke as one continuous drag along the letter stays on the guide.
+            foreach (int[] order in LabJigwiTalismanStroke.WaterStrokes)
+                for (int i = 1; i < order.Length; i++) overlay.PaintNormalized(points[order[i - 1]], points[order[i]]);
+            Assert.That(overlay.SmudgeCount, Is.Zero);
+            Assert.That(overlay.CompletedCount, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void TheGuideIsEvenlySampledAndEveryPointBelongsToOneStroke()
+        {
+            Vector2[] points = LabJigwiTalismanStroke.Water;
+            Assert.That(points.Length, Is.InRange(60, 200));
             foreach (Vector2 point in points) Assert.That(point.x >= 0f && point.x <= 1f && point.y >= 0f && point.y <= 1f, Is.True);
-            for (int i = 0; i < points.Length; i++) forward.Paint(points[i], points[i], .07f);
-            for (int i = points.Length - 1; i >= 0; i--) backward.Paint(points[i], points[i], .07f);
-            Assert.That(forward.Coverage, Is.EqualTo(1f)); Assert.That(backward.Coverage, Is.EqualTo(1f));
-            forward.Clear(); Assert.That(forward.CoveredCount, Is.Zero);
+            var seen = new bool[points.Length];
+            foreach (int[] order in LabJigwiTalismanStroke.WaterStrokes)
+                foreach (int index in order)
+                {
+                    Assert.That(index, Is.InRange(0, points.Length - 1));
+                    Assert.That(seen[index], Is.False, "Point " + index + " is listed twice.");
+                    seen[index] = true;
+                }
+            Assert.That(System.Array.TrueForAll(seen, x => x), Is.True, "Every point belongs to a stroke.");
+        }
+
+        [Test]
+        public void TheGuideFollowsStrokeOrderButAnyOrderStillPaints()
+        {
+            Vector2[] points = LabJigwiTalismanStroke.Water;
+            var ordered = new LabJigwiTalismanStroke(points, LabJigwiTalismanStroke.WaterStrokes);
+            foreach (int[] order in LabJigwiTalismanStroke.WaterStrokes)
+                foreach (int index in order) ordered.Paint(points[index], points[index], .07f);
+            Assert.That(ordered.Coverage, Is.EqualTo(1f));
+            Assert.That(ordered.NextPoint, Is.EqualTo(-1));
+            ordered.Clear();
+            Assert.That(ordered.CoveredCount, Is.Zero); Assert.That(ordered.CurrentStroke, Is.Zero);
+
+            // #533: writing the last stroke (ㄹ bottom) first still paints; the guide keeps pointing at the first stroke.
+            int[] last = LabJigwiTalismanStroke.WaterStrokes[LabJigwiTalismanStroke.WaterStrokes.Length - 1];
+            foreach (int index in last) ordered.Paint(points[index], points[index], .07f);
+            Assert.That(ordered.CoveredCount, Is.EqualTo(last.Length));
+            Assert.That(ordered.CurrentStroke, Is.Zero);
+            Assert.That(ordered.NextPoint, Is.EqualTo(LabJigwiTalismanStroke.WaterStrokes[0][0]), "The guide points at the first stroke's start.");
+            // Once the first stroke is written the guide jumps past strokes already written to the next unwritten one.
+            foreach (int index in LabJigwiTalismanStroke.WaterStrokes[0]) ordered.Paint(points[index], points[index], .07f);
+            Assert.That(ordered.NextPoint, Is.EqualTo(LabJigwiTalismanStroke.WaterStrokes[1][0]));
+
+            // The strict mode (kept for later tuning) still blocks a later stroke.
+            var strict = new LabJigwiTalismanStroke(points, LabJigwiTalismanStroke.WaterStrokes) { EnforceOrder = true };
+            foreach (int index in last) strict.Paint(points[index], points[index], .07f);
+            Assert.That(strict.CoveredCount, Is.Zero);
+
+            // Without a stroke order any point can be painted (the old behaviour).
+            var free = new LabJigwiTalismanStroke(points);
+            for (int i = points.Length - 1; i >= 0; i--) free.Paint(points[i], points[i], .07f);
+            Assert.That(free.Coverage, Is.EqualTo(1f));
         }
 
         private static void Trace(LabJigwiTalismanOverlay target)
         {
-            foreach (Vector2 point in LabJigwiTalismanStroke.Water) target.PaintNormalized(point, point);
+            Vector2[] points = LabJigwiTalismanStroke.Water;
+            foreach (int[] order in LabJigwiTalismanStroke.WaterStrokes)
+                foreach (int index in order) target.PaintNormalized(points[index], points[index]);
         }
 
         private static LabSnapshot Snapshot(double localTalismanAt) => new LabSnapshot
