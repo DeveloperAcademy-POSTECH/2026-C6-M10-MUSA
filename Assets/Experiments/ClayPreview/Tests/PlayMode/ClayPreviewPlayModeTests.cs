@@ -17,6 +17,7 @@ using Object = UnityEngine.Object;
 namespace Hapio.Experiments.Tests
 {
     /// <summary>Saved experiment assets and actual runtime UI/rendering; no gameplay session is started.</summary>
+    [Category("GPU"), Category("Legacy"), Category("Slow")]
     public sealed class ClayPreviewPlayModeTests
     {
         const string Root = "Assets/Experiments/ClayPreview/";
@@ -30,6 +31,7 @@ namespace Hapio.Experiments.Tests
         ClayPreviewController preview;
         Scene scene;
         string colorHash, heightHash, configHash, prefabHash;
+        int[] existingSessionIds;
         int previousFrameRate, previousVSync;
         bool previousBackground;
 
@@ -44,6 +46,7 @@ namespace Hapio.Experiments.Tests
             previousFrameRate = Application.targetFrameRate;
             previousVSync = QualitySettings.vSyncCount;
             previousBackground = Application.runInBackground;
+            existingSessionIds = FindSessions().Select(x => x.GetInstanceID()).ToArray();
             yield return EditorSceneManager.LoadSceneAsyncInPlayMode(ScenePath,
                 new LoadSceneParameters(LoadSceneMode.Single));
             scene = SceneManager.GetSceneByPath(ScenePath);
@@ -753,6 +756,7 @@ namespace Hapio.Experiments.Tests
             if (SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null || !SystemInfo.supportsAsyncGPUReadback)
                 Assert.Ignore("This palette rendering test needs a real graphics device with asynchronous readback.");
             yield return LoadComparison(CoatingScenePath);
+            AssertNoNewSessions();
             Assert.That(preview.PaletteAvailable, Is.True); yield return WaitPaletteReady();
             string[] sourcePaths = PaletteSourcePaths(); string[] sourceHashes = sourcePaths.Select(FileHash).ToArray();
             string sourceData = EditorJsonUtility.ToJson(preview.paletteData);
@@ -798,9 +802,18 @@ namespace Hapio.Experiments.Tests
                 "Returning to the native frozen map releases the owned palette replay maps.");
             Assert.That(EditorJsonUtility.ToJson(preview.paletteData), Is.EqualTo(sourceData));
             Assert.That(sourcePaths.Select(FileHash).ToArray(), Is.EqualTo(sourceHashes), "Palette replay cannot rewrite frozen files, the recorded journal or saved metadata.");
-            Assert.That(Object.FindObjectsByType<MonoBehaviour>(FindObjectsInactive.Include, FindObjectsSortMode.None)
-                .Any(component => component != null && (component.GetType().FullName == "C6Lab.LabNetwork" || component.GetType().FullName == "Hapio.GameSession")), Is.False,
-                "Local palette inspection must not start a game room or network session.");
+            AssertNoNewSessions();
+        }
+
+        static MonoBehaviour[] FindSessions() => Object.FindObjectsByType<MonoBehaviour>(FindObjectsInactive.Include, FindObjectsSortMode.None)
+            .Where(component => component != null && (component.GetType().FullName == "C6Lab.LabNetwork" || component.GetType().FullName == "Hapio.GameSession")).ToArray();
+
+        void AssertNoNewSessions()
+        {
+            // A previous fixture may own a DontDestroyOnLoad session. Do not delete it or mistake it for ours.
+            string[] added = FindSessions().Where(component => !existingSessionIds.Contains(component.GetInstanceID()))
+                .Select(component => component.GetType().FullName + " / " + component.name + " / " + component.gameObject.scene.name).ToArray();
+            Assert.That(added, Is.Empty, "Local palette inspection must not create a game room or network session.");
         }
 
         IEnumerator WaitPaletteReady()
