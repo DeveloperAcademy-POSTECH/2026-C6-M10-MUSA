@@ -184,16 +184,27 @@ namespace C6Lab.Tests
             Assert.That(s.jigwiAB.Active(6).resolution,Is.EqualTo(LabJigwiABResolution.None));
             Assert.That(s.orbs.Single(o=>o.id==burning.id).jigwiABBurnAt,Is.EqualTo(10));
         }
-        [Test] public void NaturalAEndClearsPendingDeadlinesWithoutResurrectingBurnedOrbs()
+        [Test] public void AnUnfinishedTalismanBurnsThatSeatsOrbsAndSetsOnlyItsBoardOnFire()
         {
-            var m=Room();var a=Current(m,11);
-            Assert.That(m.TryGenerate(Players[0],Request(),11,out var old,out var e),Is.True,e);m.Tick(16);
-            Assert.That(m.Snapshot(16).orbs.Any(o=>o.id==old.id),Is.False);
-            Assert.That(m.TryGenerate(Players[0],Request(),19,out var late,out e),Is.True,e);
-            Assert.That(late.jigwiABBurnAt,Is.EqualTo(24));var done=m.Snapshot(20);
-            Assert.That(done.jigwiAB.rounds.Single().resolution,Is.EqualTo(LabJigwiABResolution.Expired));
-            Assert.That(done.orbs.Single(o=>o.id==late.id).jigwiABBurnAt,Is.EqualTo(-1));
-            Assert.That(done.orbs.Single(o=>o.id==late.id).expiresAt,Is.EqualTo(-1));
+            // #540: the A runs out with seat 0 still writing — every orb left on its board burns (one after another)
+            // and only its board catches fire for 3 s. Seat 1 wrote its talisman and keeps everything.
+            var m=Room();var a=Current(m,5);
+            Assert.That(m.TryCompleteJigwiTalisman(Players[1],a.id,6),Is.True);
+            Assert.That(m.TryGenerate(Players[0],Request(),19,out var mine,out var e),Is.True,e);
+            Assert.That(m.TryGenerate(Players[0],Request(),19.1,out var mine2,out e),Is.True,e);
+            Assert.That(m.TryGenerate(Players[1],Request(),19,out var theirs,out e),Is.True,e);
+            var done=m.Snapshot(20);var round=done.jigwiAB.rounds.Single(r=>r.id==a.id);
+            Assert.That(round.resolution,Is.EqualTo(LabJigwiABResolution.Expired));
+            Assert.That(round.players.Single(p=>p.playerId==Players[0]).boardFireUntil,Is.EqualTo(23));
+            Assert.That(round.players.Single(p=>p.playerId==Players[1]).boardFireUntil,Is.EqualTo(-1),"A finished seat is never punished.");
+            Assert.That(LabJigwiABNetworkValidation.Valid(done.jigwiAB,done.players,m.Revision),Is.True);
+            var later=m.Snapshot(20.5);
+            Assert.That(later.orbs.Any(o=>o.id==mine.id||o.id==mine2.id),Is.False,"The unfinished board's orbs burned.");
+            Assert.That(later.orbs.Single(o=>o.id==theirs.id).jigwiABBurnAt,Is.EqualTo(-1),"The finished board keeps its orbs.");
+            Assert.That(m.TryGenerate(Players[0],Request(),21,out _,out var blocked),Is.False);
+            Assert.That(blocked,Is.EqualTo("JIGWI_BOARD_FIRE"));
+            Assert.That(m.TryGenerate(Players[1],Request(),21,out _,out e),Is.True,"Only the failed seat's board is on fire. "+e);
+            Assert.That(m.TryGenerate(Players[0],Request(),23,out _,out e),Is.True,"The fire ends on time. "+e);
         }
         [Test] public void BGivesEachPickedSeatOneSpecialWaterWhileOrdinaryRawPairsKeepTheirNormalElement()
         {

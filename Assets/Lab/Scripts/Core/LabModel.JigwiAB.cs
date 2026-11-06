@@ -15,7 +15,9 @@ namespace C6Lab
         private const uint JigwiGroupPickSalt = 0x509B1C4Bu;
         // #509: where each picked seat's last counted Water hit the boss, for the success splash.
         private readonly Dictionary<ulong, Vector3> jigwiSyncDirections = new Dictionary<ulong, Vector3>();
-        private float jigwiSplashShare, jigwiBoardFireSeconds;
+        private float jigwiSplashShare, jigwiBoardFireSeconds, jigwiTalismanFailFire;
+        /// <summary>#540: an unfinished talisman's remaining orbs burn one after another this far apart (fire spreading).</summary>
+        public const double JigwiTalismanFailBurnStepSeconds = .12d;
         // #479: A burns each owner's orbs one at a time. The last queued deadline per owner for the running A.
         private readonly Dictionary<ulong, double> jigwiABLastBurnAt = new Dictionary<ulong, double>();
         private string jigwiABBurnQueueId;
@@ -52,6 +54,7 @@ namespace C6Lab
             jigwiTalismanWaterCount = config.JigwiTalismanWaterCount; jigwiTalismanWaterLifetime = config.JigwiTalismanWaterLifetimeSeconds;
             jigwiTalismanWaterPaint = config.JigwiTalismanWaterPaintScale;
             jigwiSplashShare = config.JigwiBSplashPaintShare; jigwiBoardFireSeconds = config.JigwiBBoardFireSeconds;
+            jigwiTalismanFailFire = config.JigwiTalismanFailFireSeconds;
             jigwiSyncDirections.Clear();
             jigwiABMoveAmount = config.JigwiABFireMoveAmount; jigwiABMovePeriod = config.JigwiABFireMovePeriodSeconds;
             jigwiABTargetRadius = config.JigwiABFireTargetRadius;
@@ -79,6 +82,8 @@ namespace C6Lab
                         Include(item.syncWindowAt + LabJigwiABTimeline.GroupSyncWindowSeconds);
                 }
                 Include(item.boardFireUntil); // #509: the board fire ends exactly on time
+                foreach (var seat in item.players ?? Array.Empty<LabJigwiABPlayerFire>())
+                    if (seat != null) Include(seat.boardFireUntil); // #540: a failed talisman's own board fire too
 
             }
             return next;
@@ -172,8 +177,28 @@ namespace C6Lab
         {
             if (item == null || item.resolution != LabJigwiABResolution.None) return;
             item.resolution = result; item.resolvedAt = Math.Max(item.warningAt, at);
-            foreach (var orb in orbs.Values)
+            // #540: an A that runs out punishes every seat that did not finish its talisman: its board catches fire
+            // (no drum presses for a few seconds) and every orb left on it burns, one after another.
+            var failed = new HashSet<ulong>();
+            if (item.kind == LabJigwiABKind.PersonalBurn && result == LabJigwiABResolution.Expired)
+                foreach (var seat in item.players ?? Array.Empty<LabJigwiABPlayerFire>())
+                {
+                    if (seat == null || seat.talismanAt >= 0d) continue;
+                    failed.Add(seat.playerId);
+                    if (jigwiTalismanFailFire > 0f)
+                        seat.boardFireUntil = Math.Max(item.resolvedAt, Math.Min(jigwiStageCutoffAt, item.resolvedAt + jigwiTalismanFailFire));
+                }
+            var burnSteps = new Dictionary<ulong, int>();
+            foreach (var orb in orbs.Values.OrderBy(value => value.createdAt).ThenBy(value => value.id, StringComparer.Ordinal))
             {
+                if (failed.Contains(orb.owner) && !orb.inFlight && (orb.kind.IsRaw() || orb.kind == LabOrbKind.Combined))
+                {
+                    burnSteps.TryGetValue(orb.owner, out int step); burnSteps[orb.owner] = step + 1;
+                    double burnAt = item.resolvedAt + step * JigwiTalismanFailBurnStepSeconds;
+                    if (orb.jigwiABBurnAt < 0d || burnAt < orb.jigwiABBurnAt)
+                    { orb.jigwiABBurnAt = burnAt; orb.jigwiABBurnEventId = item.id; orb.revision = ++revision; }
+                    continue;
+                }
                 if (item.kind == LabJigwiABKind.PersonalBurn && orb.jigwiABBurnEventId == item.id)
                 { orb.jigwiABBurnEventId = null; orb.jigwiABBurnAt = -1d; orb.revision = ++revision; }
                 if (item.kind == LabJigwiABKind.GroupFire && !orb.inFlight && orb.jigwiABRadiusScale != 1f)
@@ -282,6 +307,10 @@ namespace C6Lab
         public bool JigwiBoardOnFire(double now) => jigwiABEnabled && jigwiABRounds.Any(value =>
             value.kind == LabJigwiABKind.GroupFire && value.resolution == LabJigwiABResolution.Expired
             && value.boardFireUntil > now);
+        /// <summary>#540: this player's board is on fire — every board after a failed B, or only theirs after an unfinished talisman.</summary>
+        public bool JigwiBoardOnFire(double now, ulong owner) => JigwiBoardOnFire(now) || jigwiABEnabled && jigwiABRounds.Any(value =>
+            value.kind == LabJigwiABKind.PersonalBurn && value.resolution == LabJigwiABResolution.Expired
+            && value.players != null && value.players.Any(seat => seat != null && seat.playerId == owner && seat.boardFireUntil > now));
         private void ConsumeJigwiABWaterImpact(LabOrbState orb, LabJigwiABPlayerFire owner, double now)
         {
             orbs.Remove(orb.id); launchScales.Remove(orb.id);

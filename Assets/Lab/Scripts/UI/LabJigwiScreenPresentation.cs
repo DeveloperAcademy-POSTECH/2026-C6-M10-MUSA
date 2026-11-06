@@ -484,7 +484,7 @@ namespace C6Lab
             else SetFiresHidden(held);
             DrawWater(now, held);
             DrawStatus(stage, active, snapshot, localPlayer, now, held);
-            DrawFailure(stage, now);
+            DrawFailure(stage, localPlayer, now);
         }
 
         /// <summary>#479: true once this seat finished writing its talisman in this A.</summary>
@@ -512,13 +512,21 @@ namespace C6Lab
 
         /// <summary>#509: true while a failed B keeps the boards on fire (drums blocked).</summary>
         public bool BoardFireVisible { get; private set; }
-        private void DrawFailure(LabJigwiABSnapshot stage, double now)
+        private void DrawFailure(LabJigwiABSnapshot stage, ulong localPlayer, double now)
         {
             if (failureOverlay == null) return;
             double fireUntil = -1d;
             foreach (var round in stage?.rounds ?? Array.Empty<LabJigwiABRound>())
+            {
                 if (round != null && round.kind == LabJigwiABKind.GroupFire && round.resolution == LabJigwiABResolution.Expired
                     && now >= round.resolvedAt && now < round.boardFireUntil) fireUntil = Math.Max(fireUntil, round.boardFireUntil);
+                // #540: an unfinished talisman sets only this seat's board on fire.
+                if (round != null && round.kind == LabJigwiABKind.PersonalBurn && round.resolution == LabJigwiABResolution.Expired
+                    && now >= round.resolvedAt)
+                    foreach (var seat in round.players ?? Array.Empty<LabJigwiABPlayerFire>())
+                        if (seat != null && seat.playerId == localPlayer && now < seat.boardFireUntil)
+                            fireUntil = Math.Max(fireUntil, seat.boardFireUntil);
+            }
             BoardFireVisible = fireUntil > now;
             bool flash = failedAt >= 0d && now >= failedAt && now - failedAt < FailureFlashSeconds;
             bool visible = flash || BoardFireVisible;

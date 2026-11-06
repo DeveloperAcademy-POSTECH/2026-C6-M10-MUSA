@@ -602,6 +602,8 @@ namespace C6Lab
         [SerializeField, Range(0f, 3f)] private float jigwiBSplashPaintShare = 3f;
         [Tooltip("#509 Inspector 전용(Host): B 실패 때 모든 조합판에 불이 붙어 북을 못 누르는 시간(초). 0이면 벌점 없음.")]
         [SerializeField, Range(0f, 10f)] private float jigwiBBoardFireSeconds = 3f;
+        [Tooltip("#540 Inspector 전용(Host): A가 끝날 때까지 부적을 못 쓴 사람 판에만 불이 붙어 북을 못 누르는 시간(초). 남은 구슬도 모두 탄다. 0이면 불바다 없음(구슬 소각만).")]
+        [SerializeField, Range(0f, 10f)] private float jigwiTalismanFailFireSeconds = 3f;
         [HideInInspector, SerializeField, Range(0f, 60f)] private float jigwiABShrinkDelaySeconds = 12f;
         [HideInInspector, SerializeField, Range(.2f, 1f)] private float jigwiABShrinkScale = .65f;
         [SerializeField, Range(0f, .1f)] private float jigwiABFireMoveAmount = .03f;
@@ -1182,6 +1184,7 @@ namespace C6Lab
         public float JigwiTalismanTolerance => Mathf.Clamp(Finite(jigwiTalismanTolerance, .07f), .02f, .2f);
         public float JigwiBSplashPaintShare => Mathf.Clamp(Finite(jigwiBSplashPaintShare, 3f), 0f, 3f);
         public float JigwiBBoardFireSeconds => Mathf.Clamp(Finite(jigwiBBoardFireSeconds, 3f), 0f, 10f);
+        public float JigwiTalismanFailFireSeconds => Mathf.Clamp(Finite(jigwiTalismanFailFireSeconds, 3f), 0f, 10f);
         public int JigwiABGroupFireCount => Mathf.Clamp(jigwiABGroupFireCount, 1, 6);
         public float JigwiABRelightSeconds => Mathf.Clamp(Finite(jigwiABRelightSeconds, 12f), 1f, 60f);
         public float JigwiABShrinkDelaySeconds => Mathf.Clamp(Finite(jigwiABShrinkDelaySeconds, 12f), 0f, 60f);
