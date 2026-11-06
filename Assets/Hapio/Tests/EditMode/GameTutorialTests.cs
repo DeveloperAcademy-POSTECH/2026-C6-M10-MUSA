@@ -1075,6 +1075,25 @@ namespace Hapio.Tests
         }
 
         [Test]
+        public void TapOffTheBubbleMakesTheHintJumpOnceAndSettle()
+        {
+            const float seconds = .3f, peak = 1.35f;
+            Assert.That(GameTutorialDirector.TapHintNudge(-1f, seconds, peak), Is.EqualTo(1f), "Before any tap.");
+            Assert.That(GameTutorialDirector.TapHintNudge(0f, seconds, peak), Is.EqualTo(1f).Within(1e-5f));
+            Assert.That(GameTutorialDirector.TapHintNudge(seconds * .5f, seconds, peak), Is.EqualTo(peak).Within(1e-4f),
+                "Biggest halfway.");
+            Assert.That(GameTutorialDirector.TapHintNudge(seconds, seconds, peak), Is.EqualTo(1f), "Back to size.");
+            Assert.That(GameTutorialDirector.TapHintNudge(5f, seconds, peak), Is.EqualTo(1f), "Only once.");
+            var art = ScriptableObject.CreateInstance<GameTutorialArt>();
+            try
+            {
+                Assert.That(art.lineTapPadding, Is.EqualTo(8f), "The bubble and 8pt around it move a line on (#536).");
+                Assert.That(art.tapHintNudgeScale, Is.GreaterThan(1f));
+            }
+            finally { Object.DestroyImmediate(art); }
+        }
+
+        [Test]
         public void TapHintStartsAtRestEasesDownAndBackUpEachPeriod()
         {
             const float period = .8f, depth = 4f;
