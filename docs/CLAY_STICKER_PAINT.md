@@ -22,6 +22,18 @@
 
 건조는 해당 위치의 누적 색·높이 전체를 지운다. 전체 셀이 마르면 시각 여유까지 비워 오래된 얼룩이 떠 있지 않게 하며, 재도색 시 삭제된 아래색을 복원하지 않는다.
 
+## 스티커별 코팅 광택 (#524, v2)
+
+현재 표현 버전은 `clay-stickers-v2`다. Gloss는 모든 스티커의 공통 강도이지만, 반짝임 방향은 각 도장의 완만한 돔형 면을 따른다. 도장마다 광택 값을 무작위로 만들지 않는다. 박 곡면을 따라 넓게 이어지던 하이라이트는 제거했다. 겹친 곳에서는 최상층 스티커의 조명용 법선을 사용하며, 기울기는 최대 25도다.
+
+높이 Half 지도의 R은 기존 물리적 높이를 그대로 보존한다. G/B는 공통 표면 좌표계에서 조명용 기울기를 커버리지와 함께 인코딩하고, A는 실제 스티커 커버리지를 보존한다. 100% 완료 시 색 Alpha는 기존처럼 모두 채우지만 높이 A는 강제로 채우지 않는다. 따라서 완료용 얇은 바탕층은 무광이며, 법선을 부드럽게 읽더라도 바탕층으로 광택이 새지 않게 최종 광택 마스크는 원래 위치의 커버리지를 쓴다.
+
+Gloss 0에서는 추가 반짝임이 0이며 기존 확산 음영·색·접촉 음영을 유지한다. 실제 두께와 조명용 법선은 별개이므로 두께/광택 슬라이더는 독립적이다. 색 지도·높이 R·도색 판정·소유권·건조·통신 메시지·렌더 타깃 수는 유지한다. 건조는 새 G/B/A까지 함께 지우고 기록 재생으로 복원한다. 전투·완성 관람·PNG·Mac 앱은 같은 표면 셰이더를 사용한다.
+
+Editor의 `LabClayVisualStudy.ExportLocalGlossComparison(절대 출력 폴더)`로 최초/재타격3회/같은색·다른색 겹침과 Gloss 0/0.35/1, 5색 완성 6방향을 비교한다. `LabClayLegacyRuntimeReference`·`LabClayLegacySurfaceReference`는 최신 구현과 독립적으로 색/R·무광 출력 동일성을 검사하는 고정 v1 GPU 기준이며 Editor 폴더에만 있다. 일반 Player의 의존성이나 런타임 비교 모드는 아니다.
+
+실제 Unity 비교: [기존/개선](images/clay-local-gloss-before-after.png)(위 기존·아래 개선, 왼쪽부터 Gloss 0/0.35/1), [최초·재타격·겹침](images/clay-local-gloss-first-rehits-overlaps.png), [6방향 0.35](images/clay-local-gloss-completed-six-views-035.png), [6방향 1](images/clay-local-gloss-completed-six-views-1.png).
+
 ## 충돌 강도와 농도
 
 실제 Host 접촉 지점의 법선과 충돌 직전 속도를 사용한다. `LabPaintImpact`가 법선 방향 속도를 0~20 m/s의 **초기 테스트 범위**로 정규화한다. 빗겨 맞은 접선 속도를 정면 충격으로 세지 않는다. 투척 입력·탄도·충돌·피해량·도색량은 변경하지 않는다.
@@ -61,7 +73,7 @@ Hapio에서는 `GameSession`이 전투 DEV의 `ClayAppearanceChanged`를 구독�
 
 통신·예술 기록의 기존 4KiB 페이지·한 피어당 미확인 1페이지·게임 상태 우선·64MiB 기록·2MiB 페이지 캐시는 유지한다. 화면용 descriptor 캐시 128개를 넘으면 디스크에서 찾으며 옛 자국을 임의로 제거하지 않는다. 한 번의 갱신은 연산/그리기 예산으로 나누고 GPU 완료와 수신·적용을 따로 기록한다. 초기 준비에서는 원본 3종의 색·높이 합성 패스를 작은 전용 타깃에 미리 그린다. 실제 도색 지도와 순번은 건드리지 않으며, 기존 main의 도색·오디오 준비 경로도 유지한다.
 
-새 접속 묶음은 **5686 / Lab47 / Game31 / 공유 설정259개**다. 이전 5683~5685 앱과 혼용하지 않는다.
+최신 main의 접속 묶음 **5688 / Lab49 / Game35 / 공유 설정259개**를 유지한다. 이번 수정은 메시지 형식을 바꾸지 않으며, 도색 기록의 표현 버전은 v2로 확인한다. 참가자들은 같은 표현 버전의 앱을 사용한다.
 
 ## 직접 확인
 
@@ -78,7 +90,7 @@ Hapio에서는 `GameSession`이 전투 DEV의 `ClayAppearanceChanged`를 구독�
 ### 처음 실행하기
 
 1. Unity 6000.6.5f1에서 프로젝트를 열고 컴파일이 끝나면 Play를 중지한다. 미저장 Scene은 도구가 자동 저장하지 않는다.
-2. 상단 `C6 Lab → Experiments → Clay Sticker → Build Mac Preview App`을 선택한다. 완성 샘플이 없을 때만 생성한 뒤 Mac 앱을 빌드한다.
+2. 상단 `C6 Lab → Experiments → Clay Sticker → Prepare Mac Preview Scene`으로 v2 샘플을 준비한 뒤 `Build Mac Preview App`을 선택한다. 이미 v2로 준비됐다면 바로 빌드할 수 있다. 빌드 자체는 샘플을 자동 재생성하지 않는다.
 3. 빌드가 끝나면 같은 메뉴의 `Open Last Mac Preview Build`로 폴더를 열고 `Hapio-Clay-Experiment.app`을 실행한다. 기존 빌드 파일을 받은 경우에는 앱 실행부터 시작한다.
 4. 우측 슬라이더를 움직여 두께·광택을 조절한다. 숫자 표시는 현재 값이며, 박 위 드래그는 회전, 마우스 휠은 확대·축소다.
 5. `Front / Right / Back / Left / Diagonal / Above`는 6방향 보기다. `Reset defaults`는 두께 **0.01**·광택 **0.35**·정면·기본 배율로 복원하고, `Quit`는 앱을 종료한다.
@@ -93,6 +105,6 @@ Hapio에서는 `GameSession`이 전투 DEV의 `ClayAppearanceChanged`를 구독�
 
 새 전용 Scene과 `Assets/Experiments/ClayPreview/Sample`의 색 PNG·높이 Half EXR를 직접 참조한다. 샘플은 기존 실제 도색 규칙과 seed 123으로 생성하며 1024×512 Linear 값을 유지한다. 현재 샘플은 67회 명중으로 32768/32768셀을 채운 결과다. 숫자 67을 고정된 완성 조건으로 사용하지 않는다. 샘플 생성과 임포트의 왕복 오차·해시·원본 보존 결과는 `SampleInfo.json`에 기록한다.
 
-`Prepare Mac Preview Scene`은 샘플이 없을 때만 생성한다. 이후 무늬는 고정하며, 의도적으로 새 도안을 만들 때만 `Rebake Completed Preview Sample`을 사용한다. 슬라이더는 기존 실제 `ClayStickerSurface` 셰이더의 두 수치만 바꾸며 도색을 다시 실행하지 않는다. 배경에 회전 이미지 한 장을 표시하는 방식이 아니라, 원본 박의 메시·로컬 변환을 유지한 렌더 전용 복사본을 표시한다. 물리·네트워크·게임 세션 컴포넌트는 복제하지 않는다.
+`Prepare Mac Preview Scene`과 `Rebake Completed Preview Sample`은 같은 seed·명중 순서로 현재 버전의 샘플을 명시적으로 재생성한다. 슬라이더 조작만으로는 무늬가 바뀌지 않는다. v1 EXR에는 새 법선/커버리지가 없으므로 그대로 사용하지 않는다. 준비 도구는 v2 메타데이터와 실험 Scene의 참조·해시만 갱신하며, 빌드 검사는 버전·색/높이 파일·물리 높이 R·Scene 연결을 읽기 전용으로 확인한다. 슬라이더는 기존 실제 `ClayStickerSurface` 셰이더의 두 수치만 바꾸며 도색을 다시 실행하지 않는다. 배경에 회전 이미지 한 장을 표시하는 방식이 아니라, 원본 박의 메시·로컬 변환을 유지한 렌더 전용 복사본을 표시한다. 물리·네트워크·게임 세션 컴포넌트는 복제하지 않는다.
 
 카메라는 30fps 제한으로 동작하고 자동 회전하지 않는다. 앱이 포커스를 잃으면 카메라를 멈추며, 종료 시 소유한 재질·렌더 타깃·모델 복사본을 해제한다. 앱 내 UI는 실험 전용 UI Toolkit 패널이다. 일반 전투 HUD와 DEV의 두께·광택 설정은 변경하지 않는다.

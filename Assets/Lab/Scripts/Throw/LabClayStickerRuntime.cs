@@ -24,6 +24,34 @@ namespace C6Lab
         readonly Queue<uint> descriptorOrder = new Queue<uint>();
         readonly HashSet<int> pendingCells = new HashSet<int>();
         readonly Texture2D[] brushes = new Texture2D[3];
+        readonly LabClayStickerSettings presentationPigment;
+        readonly Shader presentationCompositor;
+        readonly Func<Color32, Color32> presentationColorResolver;
+        /// <summary>Default game renderer uses its round-pinned production assets and pigment.</summary>
+        public LabClayStickerRuntime() { }
+        /// <summary>Explicit isolated comparison dependencies; never installed into the shared game profile.</summary>
+        public LabClayStickerRuntime(Texture2D[] presentationBrushes, LabClayStickerSettings presentationPigment = null,
+            Shader presentationCompositor = null, Func<Color32, Color32> presentationColorResolver = null)
+        {
+            if (presentationCompositor != null && !presentationCompositor.isSupported)
+                throw new ArgumentException("The isolated presentation compositor is unsupported.", nameof(presentationCompositor));
+            this.presentationCompositor = presentationCompositor;
+            this.presentationColorResolver = presentationColorResolver;
+            if (presentationBrushes != null)
+            {
+                if (presentationBrushes.Length != 3) throw new ArgumentException("Exactly three presentation brushes are required.", nameof(presentationBrushes));
+                for (int i = 0; i < 3; i++)
+                {
+                    if (presentationBrushes[i] == null) throw new ArgumentException("A presentation brush is missing.", nameof(presentationBrushes));
+                    brushes[i] = presentationBrushes[i];
+                }
+            }
+            if (presentationPigment != null)
+            {
+                presentationPigment.Validate();
+                this.presentationPigment = presentationPigment.SanitizedCopy();
+            }
+        }
         LabPaintArtJournal source;
         LabWatercolorStampSettings applied;
         Material material;
@@ -223,8 +251,8 @@ namespace C6Lab
         }
         Color Pigment(LabPaintVisualStamp stamp)
         {
-            float density = applied.claySticker.Density(stamp.ImpactStrength);
-            Color pigment = stamp.color;
+            float density = (presentationPigment ?? applied.claySticker).Density(stamp.ImpactStrength);
+            Color pigment = presentationColorResolver != null ? presentationColorResolver(stamp.color) : stamp.color;
             // Density alters opaque clay pigment value, never the sticker's opacity.
             Color value = Color.Lerp(new Color(.82f,.82f,.82f,1),pigment,density);value.a=1;return value;
         }
@@ -263,7 +291,7 @@ namespace C6Lab
         }
         void EnsureResources(int columns)
         {
-            Shader shader=Resources.Load<Shader>(ShaderResource);
+            Shader shader=presentationCompositor != null ? presentationCompositor : Resources.Load<Shader>(ShaderResource);
             if(shader==null || !shader.isSupported || SystemInfo.graphicsDeviceType==GraphicsDeviceType.Null)
                 throw new InvalidOperationException("The graphics device or clay compositing shader is unavailable.");
             if(material==null) material=new Material(shader){name="Ordered clay sticker compositor",hideFlags=HideFlags.DontSave};

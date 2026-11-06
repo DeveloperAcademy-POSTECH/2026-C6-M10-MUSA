@@ -282,3 +282,31 @@
 
 - 효과 없는 10칸(0·1·41·43·48·52·53·54·72·73)은 `LabConfig.InactiveDeveloperFields`다. 은퇴가 아니라 숨기기만 한다. 코드가 아직 읽으므로 라벨·저장값·Inspector·폼 전달은 그대로이고, Lab DEV 묶음에 넣지 않으며 Hapio는 `GameStageSettings.IsFieldShown`에서만 뺀다(`IsFieldVisible` 적용 범위는 공통 그대로).
 - Hapio 지귀 탭은 폼의 228이 켜져 있으면 178~183·192~195·205를 접는다(`LabConfig.IsReplacedByJigwiTimeline`). Hapio 전투 중 DEV(Lab 패널)도 228 ON이면 `Jigwi` 묶음을 숨기고, 지귀 스테이지에서만 205도 숨긴다(`HiddenByJigwiTimelineInGame`). Lab 단독 장면은 그대로 보인다. 237 오색구슬 칠 면적은 Hapio 공통 탭이다(236은 야광귀 탭). 은퇴 슬롯(#509까지 25개)은 모두 `HideInInspector`다. 설정 259개와 접속 묶음은 바꾸지 않았다(현재 기준은 위 #509 절의 마지막 줄). 상세는 `docs/DEVELOPER_MODE_PARAMETER_SPEC.md`의 같은 절을 따른다.
+
+
+## #524 스티커별 코팅 광택 v2
+
+- 현재 클레이 표현은 `clay-stickers-v2`다. 높이 R은 기존 변위, GB는 커버리지와 함께 인코딩한 공통 표면 기준 조명 기울기(최대25도), A는 실제 스티커 커버리지다. 완료용 바탕층은 색만 채우며 광택 마스크를 채우지 않는다. Gloss는 기존 공통0~1이고 두께와 독립적이다. 색/R/판정/통신 형식은 유지한다.
+- 관람/PNG는 전체 높이 채널을 복사한다. Mac 실험은 `clay-preview-sample-v2`와 Scene에 고정된 메타데이터를 검사하며 구형 EXR를 거절한다. Prepare/Rebake에서만 샘플을 재생성하고 Build는 읽기 전용으로 검사한다. 일반 Scene/원본 모델은 바꾸지 않는다.
+- Editor 전용 v1 reference shader 2개는 실제 GPU 결과의 독립 회귀 기준이다. Player 의존성에 넣지 않는다. 최신 main 통합 후 접속 묶음5688/Lab49/Game35·설정259개를 유지한다. #524는 표현 버전만 v2로 바꾸며 이 접속 번호를 되돌리지 않는다. 사용법은 CLAY_STICKER_PAINT, 실제 실행 결과만 VALIDATION에 기록한다.
+
+
+## #527 둥근 클레이 비교 실험
+
+- `Assets/Experiments/ClayPreview/Rounded/Scenes/RoundedClayPreview.unity`는 원본 #524·기존 윤곽 개선 재질·둥근 윤곽 개선 재질의 Mac 전용 비교다. 일반 Home/Lab 실행 Scene 목록과 게임의 v2 표현 기본값을 변경하지 않는다.
+- 표현용 브러시/색 농도는 `LabClayStickerRuntime`의 명시적 생성자에만 주입한다. 게임 기본 생성자는 기존 Resources와 라운드 프로필을 유지한다. 실험 v3 metadata와 원래 v2 게임 기록 형식을 혼동하지 않는다.
+- 원본 생성 PNG는 보존하고 Alpha에서 순백색 마스크·20px 둥근 높이를 베이크한다. 같은 seed123·실제 67회 명중 저널의 판정/기록 해시를 세 프리셋에서 유지한다. 기존 v2 샘플을 자동 갱신해 비교 기준을 바꾸지 않는다.
+- 준비는 `C6 Lab/Experiments/Rounded Clay/Prepare Imported Comparison`, 빌드는 `Build Mac Comparison App`이다. 준비는 명시적으로만 수행하고 빌드 검증은 샘플을 다시 굽지 않는다. 사용법/한계는 `docs/ROUNDED_CLAY_STICKER_EXPERIMENT.md`, 수행 결과는 `docs/VALIDATION.md`를 따른다.
+
+
+## #527 네 번째 스티커 코팅 V4 실험
+
+- V4는 별도 `Assets/Experiments/ClayPreview/Rounded/Scenes/CoatingClayPreview.unity`의 네 번째 기본 프리셋이다. 기존 3종 Scene과 `OriginalV2/OriginalV3/RoundedV3`의 색·높이·JSON 파일은 내용·수정 시각까지 보존하며 자동 재베이크하지 않는다. 일반 게임 기본값·Resources·Scene 목록·판정·통신 규약에는 연결하지 않는다.
+- 샘플은 `clay-preview-sample-v4` / `clay-stickers-v4`, 높이 계약은 `R:physical-height;GB:oct-object-normal;A:actual-coverage`다. GB는 `A × Oct01(normalOS)`이며 3D 법선을 혼합한 뒤 재인코딩한다. 박의 법선을 중복 가산하지 않는다. 동일 저널의 둥근 V3와 색 RGBA·높이 R·커버리지 A를 유지하고 완료 바탕은 코팅 반사에서 제외한다.
+- 준비는 `C6 Lab/Experiments/Rounded Clay/Prepare Coating Comparison`, 빌드는 `Build Coating Mac App`이다. 새 자료는 `Rounded/CoatingV4`에만 추가한다. compositor/surface 소스 SHA256이 바뀌거나 누락되면 명시적인 재준비 전 빌드를 거부하며, 준비 후 새 Scene 메타데이터 연결을 갱신한다. 기존 3종 준비·빌드 메뉴는 유지한다.
+- V3/V4 반사 비교는 같은 두께·카메라·조명·Gloss에서 Linear Half RT→Float 차분 `G−0`으로 만들고 PNG 저장 시에만 sRGB로 변환한다. 배율을 숨기거나 LDR clamp로 NaN/Inf를 가리지 않는다. 전체 보기·확대 크롭과 내부 `_SpecularOnly` 출력을 구분한다. 사용법은 `docs/ROUNDED_CLAY_STICKER_EXPERIMENT.md`, 실제 수행 결과만 `docs/VALIDATION.md`에 기록한다.
+
+- #527 이동 광원: 비교 앱의 복제 재질만 `_ClayPreviewLighting=1`로 설정한다. 세 surface 셰이더의 기본0과 일반 게임 설정을 유지하고 전용 Directional Light만 조절한다. 기존 도안을 그대로 두는 surface-only 조명 변경은 명시적 `Refresh Preview Lighting Metadata`로 검증 후 surfaceSHA/Coating Scene 연결만 갱신할 수 있다. compositor·브러시·자료규약 변경은 전체 Prepare가 필요하며 Build는 어느 갱신도 자동 실행하지 않는다.
+
+
+- #527 팔레트 실험: CoatingClayPreview의 선택적 paletteData만 원래67회 저널을 보관한다. sRGB RGB0~255/HEX6자리 입력은 실험의 색 resolver로만 치환하며 게임 팔레트·설정·판정·기록은 저장하지 않는다. 기본색은 고정지도를 직접 쓰고 변경색은 제한된 재생/GPU 완료 후에만 표시한다. Prepare Palette Preview는 명시적 준비, Build는 읽기 전용 검사다. LIGHT 메타데이터 갱신은 연결된 palette의 V4핀도 검증·복구하며 원본 지도/저널/브러시를 다시 굽지 않는다.

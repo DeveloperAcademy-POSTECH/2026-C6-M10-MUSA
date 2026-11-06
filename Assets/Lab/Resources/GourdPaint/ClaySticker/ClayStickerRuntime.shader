@@ -34,15 +34,40 @@ Shader "Hidden/C6Lab/ClayStickerRuntime"
             float y=1-2*uv.y,ring=sqrt(max(0,1-y*y)),angle=(uv.x-.5)*2*PI;
             return float3(cos(angle)*ring,y,sin(angle)*ring);
         }
-        float4 Brush(float2 uv)
+        float4 Brush(float2 uv,out float2 p)
         {
+            p=.5;
             float3 d=Direction(uv);float cosine=clamp(dot(d,_Center.xyz),-1,1);
             if(cosine<=0 || _Radius<=0)return 0;
             float sine=sqrt(max(0,1-cosine*cosine));
             float factor=sine>.000001?acos(cosine)/sine:1;
-            float2 p=.5+float2(dot(d,_Right.xyz),dot(d,_Up.xyz))*factor/(2*_Radius);
+            p=.5+float2(dot(d,_Right.xyz),dot(d,_Up.xyz))*factor/(2*_Radius);
             if(any(p<0)||any(p>1))return 0;
             return SAMPLE_TEXTURE2D_LOD(_Brush,sampler_Brush,p,0);
+        }
+        float4 Brush(float2 uv)
+        {float2 p;return Brush(uv,p);}
+        float2 StickerDomeSlope(float2 uv,float2 p)
+        {
+            // A broad shading-only dome, independent of physical thickness and the
+            // original brush's flat interior. Each stamp resets this normal field.
+            const float maxSlope=.466307658; // tan(25 degrees)
+            float3 d=Direction(uv);
+            float cosine=clamp(dot(d,_Center.xyz),-1,1);
+            float3 away=cosine*d-_Center.xyz;
+            float awayLength=length(away);
+            if(!(awayLength>.000001))return 0;
+            float ring=sqrt(max(0,1-d.y*d.y));
+            // Longitude is singular at the poles; smoothly remove the correction
+            // only within the tiny cap instead of introducing a rotating seam.
+            float poleFade=smoothstep(.0005,.02,ring);
+            float magnitude=maxSlope*saturate(length((p-.5)*2))*poleFade;
+            float angle=(uv.x-.5)*2*PI;
+            float3 u=float3(-sin(angle),0,cos(angle));
+            float3 v=float3(d.y*cos(angle),-ring,d.y*sin(angle));
+            float3 tilt=away*(magnitude/awayLength);
+            float2 slope=float2(dot(tilt,u),dot(tilt,v));
+            return all(abs(slope)<1)?slope:float2(0,0);
         }
         half4 StampColor(Varyings input):SV_Target
         {
@@ -55,11 +80,15 @@ Shader "Hidden/C6Lab/ClayStickerRuntime"
         half4 StampHeight(Varyings input):SV_Target
         {
             float4 old=SAMPLE_TEXTURE2D(_MainTex,sampler_MainTex,input.uv);
-            float4 brush=Brush(input.uv);float coverage=smoothstep(.12,.88,brush.r);
+            float2 p;float4 brush=Brush(input.uv,p);float coverage=smoothstep(.12,.88,brush.r);
             // Rounded source rim plus a small, bounded lift over the previous sheet.
             // Hundreds of layers never increase displacement without bound.
             float shape=saturate(brush.b),raised=saturate(shape*.88+min(old.r*.12,.12));
-            return float4(lerp(old.r,raised,coverage),0,0,coverage+old.a*(1-coverage));
+            // GB stores a common spherical-tangent slope in coverage-premultiplied
+            // UNorm form. Neutral is .5*A, empty is 0; this also survives ARGB32.
+            float2 slope=coverage>0?StickerDomeSlope(input.uv,p):float2(0,0);
+            float2 encoded=(.5+.5*slope/.466307658)*coverage;
+            return float4(lerp(old.r,raised,coverage),encoded+old.gb*(1-coverage),coverage+old.a*(1-coverage));
         }
         int2 Cell(float2 uv)
         {return int2(min(floor(frac(uv.x)*_Cells.x),_Cells.x-1),clamp(floor(uv.y*_Cells.y),0,_Cells.y-1));}
@@ -88,7 +117,9 @@ Shader "Hidden/C6Lab/ClayStickerRuntime"
         half4 FinalHeight(Varyings input):SV_Target
         {
             float4 h=SAMPLE_TEXTURE2D(_BuiltHeight,sampler_BuiltHeight,input.uv);
-            if(_Complete>.5)return float4(max(h.r,.16*(1-h.a)),0,0,1);
+            // R still fills the complete picture's thin base. GB/A keep only real
+            // stickers, so that completion undercoat cannot acquire their gloss.
+            if(_Complete>.5)return float4(max(h.r,.16*(1-h.a)),h.gba);
             return h*Support(input.uv);
         }
         ENDHLSL

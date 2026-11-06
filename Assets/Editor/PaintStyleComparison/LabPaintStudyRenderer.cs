@@ -35,13 +35,15 @@ namespace C6Lab.Experiments.Editor
         private readonly List<Material> materialCopies = new List<Material>();
         private bool disposed;
         private readonly bool frameSavedGourd;
+        private readonly bool linearCapture;
         private readonly Action<Material> configureStudySurface;
         private Renderer body;
 
         public LabPaintStudyRenderer(bool frameSavedGourd = false, Shader studyShader = null,
-            Action<Material> configureStudySurface = null, Action<GameObject> configureStudyInstance = null)
+            Action<Material> configureStudySurface = null, Action<GameObject> configureStudyInstance = null, bool linearCapture = false)
         {
             this.frameSavedGourd = frameSavedGourd;
+            this.linearCapture = linearCapture;
             this.configureStudySurface = configureStudySurface;
             if (SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null)
                 throw new InvalidOperationException("The paint comparison requires a real graphics device.");
@@ -114,8 +116,8 @@ namespace C6Lab.Experiments.Editor
                 light.cullingMask = 1 << 30;
                 lightObject.transform.rotation = Quaternion.Euler(35f, -35f, 0f);
 
-                target = new RenderTexture(RenderSize, RenderSize, 24, RenderTextureFormat.ARGB32,
-                    RenderTextureReadWrite.sRGB) { hideFlags = HideFlags.HideAndDontSave };
+                target = new RenderTexture(RenderSize, RenderSize, 24, linearCapture ? RenderTextureFormat.ARGBHalf : RenderTextureFormat.ARGB32,
+                    linearCapture ? RenderTextureReadWrite.Linear : RenderTextureReadWrite.sRGB) { hideFlags = HideFlags.HideAndDontSave };
                 if (!target.Create()) throw new InvalidOperationException("Could not create the paint comparison render target.");
                 camera.targetTexture = target;
                 // Editor-only attachment hook; default callers retain identical behavior.
@@ -221,7 +223,7 @@ namespace C6Lab.Experiments.Editor
             {
                 camera.Render();
                 RenderTexture.active = target;
-                image = new Texture2D(RenderSize, RenderSize, TextureFormat.RGBA32, false, false)
+                image = new Texture2D(RenderSize, RenderSize, linearCapture ? TextureFormat.RGBAFloat : TextureFormat.RGBA32, false, linearCapture)
                     { hideFlags = HideFlags.HideAndDontSave };
                 image.ReadPixels(new Rect(0, 0, RenderSize, RenderSize), 0, 0);
                 image.Apply(false, false);
@@ -407,6 +409,8 @@ namespace C6Lab.Experiments.Editor
             combined.Apply(false, false);
             return combined;
         }
+
+        internal void SetBackgroundColor(Color color) { if (camera != null) camera.backgroundColor = color; }
 
         public void ClearMapCache()
         {

@@ -1,0 +1,11 @@
+{
+    "name": "Broad",
+    "sourceHash": "22c90205c8c7e4637f50e5c2cdf3ecc111229538c9e866784c58e409d8ce3d1c",
+    "whiteMaskHash": "19d9650e16ea0d9a1515341880c276bb5a4bd2996facc56a69a0c2a8af7c596e",
+    "retainedPixels": 98776,
+    "removedTinyComponents": 0,
+    "alphaThreshold": 0.8999999761581421,
+    "transparentPadding": 0.10000000149011612,
+    "closingRadius": 1,
+    "minimumComponentPixels": 24
+}
