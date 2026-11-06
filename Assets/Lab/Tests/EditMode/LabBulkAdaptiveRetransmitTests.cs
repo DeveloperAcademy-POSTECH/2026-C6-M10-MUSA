@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using NUnit.Framework;
 
@@ -143,6 +146,107 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void BeforeAnySampleATimeoutDoublesTheQuarterSecondForNewChunksUpToOneSecond()
+        {
+            var sender = new LabBulkSender();
+            sender.Enqueue("a", 0d);
+            sender.GetDue(0d, 100);
+            Assert.That(sender.GetDue(.25d, 100).Length, Is.EqualTo(1));
+            Assert.That(sender.HasRttSample, Is.False);
+            Assert.That(sender.RetryTimeoutSeconds, Is.EqualTo(.5d).Within(1e-9), "RFC 6298 5.5: the timer backs off before a sample too.");
+            Assert.That(sender.Ack(1, .3d), Is.True);
+            Assert.That(sender.HasRttSample, Is.False, "Karn: the ACK may answer either send.");
+            Assert.That(sender.RetryTimeoutSeconds, Is.EqualTo(.5d).Within(1e-9), "Only a valid sample resets the backoff.");
+
+            sender.Enqueue("b", 1d);
+            sender.GetDue(1d, 100);
+            Assert.That(sender.GetDue(1.499d, 100), Is.Empty, "A new chunk waits the backed-off half second.");
+            Assert.That(sender.GetDue(1.5d, 100).Length, Is.EqualTo(1));
+            Assert.That(sender.RetryTimeoutSeconds, Is.EqualTo(LabBulkSender.MaximumRetrySeconds));
+            sender.Ack(2, 1.6d);
+            sender.Enqueue("c", 2d);
+            sender.GetDue(2d, 100);
+            Assert.That(sender.GetDue(2.999d, 100), Is.Empty);
+            Assert.That(sender.GetDue(3d, 100).Length, Is.EqualTo(1));
+            Assert.That(sender.RetryTimeoutSeconds, Is.EqualTo(LabBulkSender.MaximumRetrySeconds), "Further timeouts stay at the one-second cap.");
+            sender.Ack(3, 3.1d);
+            Assert.That(sender.HasRttSample, Is.False);
+
+            sender.Enqueue("d", 4d);
+            sender.GetDue(4d, 100);
+            Assert.That(sender.Ack(4, 4.1d), Is.True);
+            Assert.That(sender.HasRttSample, Is.True);
+            Assert.That(sender.RetryTimeoutSeconds, Is.EqualTo(.3d).Within(1e-9), "The first clean sample resets the backoff: srtt .1 + 4 x rttvar .05.");
+
+            var replaced = new LabBulkSender();
+            replaced.Enqueue("x", 0d);
+            replaced.GetDue(0d, 100);
+            replaced.GetDue(.25d, 100);
+            replaced.Clear();
+            Assert.That(replaced.RetryTimeoutSeconds, Is.EqualTo(LabBulkSender.InitialRetrySeconds), "A replaced connection starts from the quarter second again.");
+        }
+
+        /// <summary>
+        /// A round trip that is longer than the quarter second from the very first chunk: before the pre-sample backoff, every
+        /// chunk was resent before its ACK, Karn discarded every ACK, and the sender never measured the link (about two sends
+        /// per chunk forever). The .1 s case is the ordinary link that measured itself even then.
+        /// </summary>
+        [TestCase(.1d)]
+        [TestCase(.3d)]
+        [TestCase(.6d)]
+        public void AFixedRoundTripLinkGetsASampleAndConvergesToAboutOneSendPerChunk(double roundTrip)
+        {
+            var sender = new LabBulkSender();
+            Dictionary<long, int> sends = RunFixedDelayLink(sender, (int)Math.Round(roundTrip * 30d), 20 * 60, out double firstSampleAt);
+            double sendsPerChunk = sends.Values.Sum() / (double)sends.Count;
+            string observed = string.Format(CultureInfo.InvariantCulture, "{0:0.###} sends per chunk, first sample at {1:0.###} s",
+                sendsPerChunk, firstSampleAt);
+            TestContext.WriteLine(observed);
+            Assert.That(sender.HasRttSample, Is.True, "The link is measured: " + observed);
+            Assert.That(firstSampleAt, Is.LessThan(2d));
+            Assert.That(sender.SmoothedRttSeconds, Is.EqualTo(roundTrip).Within(1d / 60d));
+            Assert.That(sendsPerChunk, Is.LessThanOrEqualTo(1.1d), "Only the chunks before the first sample were resent: " + observed);
+            long half = sender.LastEnqueued / 2;
+            Assert.That(sends.Where(item => item.Key > half).Select(item => item.Value).Distinct(), Is.EqualTo(new[] { 1 }),
+                "After convergence every chunk is sent exactly once.");
+        }
+
+        /// <summary>
+        /// A lossless link with a fixed one-way delay, driven like the game at 60 frames a second: the Host takes the ACKs
+        /// that arrived, publishes three chunks every 100 ms and flushes, and the Guest acknowledges every datagram cumulatively.
+        /// Returns how many times each chunk went out.
+        /// </summary>
+        private static Dictionary<long, int> RunFixedDelayLink(LabBulkSender sender, int oneWayFrames, int frames, out double firstSampleAt)
+        {
+            var receiver = new LabBulkReceiver();
+            var toGuest = new List<KeyValuePair<int, LabBulkFrame>>();
+            var toHost = new List<KeyValuePair<int, long>>();
+            var sends = new Dictionary<long, int>();
+            firstSampleAt = double.NaN;
+            for (int frame = 0; frame <= frames; frame++)
+            {
+                double now = frame / 60d;
+                for (int i = 0; i < toHost.Count; i++)
+                    if (toHost[i].Key <= frame) { sender.Ack(toHost[i].Value, now); toHost.RemoveAt(i--); }
+                if (sender.HasRttSample && double.IsNaN(firstSampleAt)) firstSampleAt = now;
+                if (frame % 6 == 0) for (int i = 0; i < 3; i++) Assert.That(sender.Enqueue("chunk", now), Is.True);
+                foreach (LabBulkFrame sent in sender.GetDue(now, 16384))
+                {
+                    sends[sent.sequence] = sends.TryGetValue(sent.sequence, out int count) ? count + 1 : 1;
+                    toGuest.Add(new KeyValuePair<int, LabBulkFrame>(frame + oneWayFrames, sent));
+                }
+                for (int i = 0; i < toGuest.Count; i++)
+                    if (toGuest[i].Key <= frame)
+                    {
+                        receiver.Receive(toGuest[i].Value.sequence, toGuest[i].Value.payload, out _);
+                        toHost.Add(new KeyValuePair<int, long>(frame + oneWayFrames, receiver.AckThrough));
+                        toGuest.RemoveAt(i--);
+                    }
+            }
+            return sends;
+        }
+
+        [Test]
         public void RetriesOfOneChunkStillReachTheOneSecondCapFromAShortMeasuredTimeout()
         {
             var sender = new LabBulkSender();
@@ -259,9 +363,9 @@ namespace C6Lab.Tests
             late.Ack(1, .3d);
             late.Enqueue("y", .3d); late.Enqueue("z", .3d);
             late.GetDue(.3d, 10000);
-            // The resent copy of x was lost; after its deadline (.25 + .25) a real gap counts in full.
-            late.Ack(1, .52d); late.Ack(1, .52d); late.Ack(1, .52d);
-            Assert.That(late.GetDue(.52d, 10000).Select(frame => frame.sequence), Is.EqualTo(new long[] { 2 }));
+            // The resent copy of x was lost; after its deadline (.25 + the backed-off .5) a real gap counts in full.
+            late.Ack(1, .77d); late.Ack(1, .77d); late.Ack(1, .77d);
+            Assert.That(late.GetDue(.77d, 10000).Select(frame => frame.sequence), Is.EqualTo(new long[] { 2 }));
         }
 
         [Test]
