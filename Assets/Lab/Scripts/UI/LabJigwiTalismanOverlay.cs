@@ -50,8 +50,20 @@ namespace C6Lab
         [SerializeField, Range(.06f, .3f)] private float brushWidth = .16f;
         [Tooltip("#533: 다 쓰면 금빛이 획 순서대로 글자를 훑고 지나가는 시간(초). 빈 곳도 이때 채워진다. 이 동안 \"둥 둥 둥\" 세 음이 고르게 난다.")]
         [SerializeField, Range(.1f, 2f)] private float sweepSeconds = .9f;
-        [Tooltip("#533: 세 번째 음과 마지막 강세 음(\"둥!\") 사이에 숨 고르는 시간(초).")]
-        [SerializeField, Range(0f, .8f)] private float accentPauseSeconds = .2f;
+        [Tooltip("#533: 세 번째 음 뒤 쉬는 박자 수. 한 박자 = 훑는 시간 / 3. 쉰 뒤 마지막 강세 음(\"둥!\")과 함께 도장이 찍힌다.")]
+        [SerializeField, Range(0, 3)] private int restBeats = 1;
+        [Header("#533 도장 (완성하면 \"쾅\" 찍힘)")]
+        [Tooltip("도장 글자.")]
+        [SerializeField] private string stampText = "칙\n령";
+        [SerializeField] private Color stampColor = new Color(.78f, .09f, .07f, .95f);
+        [Tooltip("도장 크기 (종이 폭 대비).")]
+        [SerializeField, Range(.15f, .6f)] private float stampSize = .34f;
+        [Tooltip("도장 자리 (종이 안 0~1, 아래가 0). 부적 오른쪽 아래에 글자와 살짝 겹치게.")]
+        [SerializeField] private Vector2 stampAnchor = new Vector2(.7f, .17f);
+        [Tooltip("도장 기울기 (도).")]
+        [SerializeField, Range(-30f, 30f)] private float stampTilt = -7f;
+        [Tooltip("도장이 내려와 찍히기까지 (초). 강세 음 순간에 닿는다.")]
+        [SerializeField, Range(.05f, .5f)] private float stampDropSeconds = .14f;
         [Tooltip("#533: 훑기가 끝난 순간 부적이 \"쾅\" 하고 커지는 정도 (종이 크기 대비).")]
         [SerializeField, Range(0f, .25f)] private float burstPunch = .09f;
         [Tooltip("#533: 징을 친 뒤 부적이 \"웅~\" 울리며 떨리는 세기 (종이 높이 대비). 징 울림처럼 천천히 잦아든다.")]
@@ -153,7 +165,15 @@ namespace C6Lab
         private AudioSource sfx, scratch;
         private readonly AudioSource[] notePlayers = new AudioSource[4];
         private int notesPlayed;
-        private static readonly int[] NoteSemitones = { 0, 2, 4, 7 };
+        [Tooltip("#533 완성 가락 음높이 (파일 원래 음에서 반음 수). 기본 ComboHit는 라(A4)라서 솔 도 시 라# = -2, +3, +2, +1. 파일이 4개 이상이면 쓰지 않는다.")]
+        [SerializeField] private int[] noteSemitones = { -2, 3, 2, 1 };
+        private RectTransform stampRoot;
+        private UnityEngine.UI.Image stampImage;
+        private UnityEngine.UI.Text stampLabel;
+        private UnityEngine.UI.Image[] stampSpecks = Array.Empty<UnityEngine.UI.Image>();
+        private static Sprite stampSprite;
+        /// <summary>#533: 도장이 찍혀 보이는지 (테스트용).</summary>
+        public bool StampVisible => stampRoot != null && stampRoot.gameObject.activeSelf;
         private AudioClip[] writeClips;
         private string writeClipsFolder;
         private int lastWriteClip = -1;
@@ -185,7 +205,8 @@ namespace C6Lab
         public LabJigwiTalismanStroke Stroke => stroke;
         /// <summary>#509: 다 쓴 부적이 빛나며 사라지는 중인지. 이때 조합판은 이미 풀려 있다.</summary>
         public bool Finishing => finishAge >= 0f;
-        public float FinishSeconds => sweepSeconds + accentPauseSeconds + glowSeconds + fadeSeconds;
+        private float AccentAt => Mathf.Max(.01f, sweepSeconds) * (1f + restBeats / 3f);
+        public float FinishSeconds => AccentAt + glowSeconds + fadeSeconds;
         /// <summary>#509: 사라지는 동안의 부적 불투명도 (1 → 0).</summary>
         public float PaperAlpha => paperGroup != null ? paperGroup.alpha : 1f;
 
@@ -311,6 +332,32 @@ namespace C6Lab
                     if (index < strokeRank.Length) strokeRank[index] = n++ / (float)total;
         }
 
+        /// <summary>#533: 도장 테두리 무늬 (런타임에 한 번 만든다). 굵은 네모 테두리에 인주가 고르지 않게 묻은 결.</summary>
+        private static Sprite StampSprite()
+        {
+            if (stampSprite != null) return stampSprite;
+            const int size = 128;
+            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
+            { name = "Talisman Stamp (#533 runtime)", hideFlags = HideFlags.DontSave, wrapMode = TextureWrapMode.Clamp };
+            var pixels = new Color[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float u = (x + .5f) / size, v = (y + .5f) / size;
+                    float edge = Mathf.Min(Mathf.Min(u, 1f - u), Mathf.Min(v, 1f - v));
+                    float wobble = .012f * Mathf.PerlinNoise(x * .21f + 3f, y * .21f + 9f);
+                    float outer = Mathf.Clamp01((edge - .02f - wobble) * size * .5f);
+                    float inner = Mathf.Clamp01((.14f + wobble - edge) * size * .5f);
+                    float grain = Mathf.PerlinNoise(x * .35f + 17f, y * .35f + 41f);
+                    float ink = outer * inner * Mathf.Clamp01(.55f + grain * .9f);
+                    pixels[y * size + x] = new Color(1f, 1f, 1f, Mathf.Clamp01(ink));
+                }
+            texture.SetPixels(pixels); texture.Apply(false, true);
+            stampSprite = Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(.5f, .5f), 100f);
+            stampSprite.hideFlags = HideFlags.DontSave;
+            return stampSprite;
+        }
+
         /// <summary>#533: 빛 고리 무늬 (런타임에 한 번 만든다). 가운데가 빈 부드러운 고리.</summary>
         private static Sprite RingSprite()
         {
@@ -359,6 +406,7 @@ namespace C6Lab
             paper.gameObject.SetActive(true);
             if (hint != null) hint.gameObject.SetActive(false);
             if (nextMarker != null) nextMarker.gameObject.SetActive(false);
+            if (stampRoot != null) stampRoot.gameObject.SetActive(false);
             burstPlayed = false; notesPlayed = 0;
             Cue("Sweep", sweepSoundFolder, sweepSoundVolume);
             DrawFinish();
@@ -381,9 +429,10 @@ namespace C6Lab
         {
             float sweep = Mathf.Max(.01f, sweepSeconds);
             float sweepT = Mathf.Clamp01(finishAge / sweep);
-            // "둥 둥 둥" — three even notes across the sweep — then a short breath, then the accented "둥!" (the burst).
+            // "둥 둥 둥" — three even beats across the sweep — a rest beat, then the accented "둥!" as the seal lands.
             while (notesPlayed < 3 && finishAge >= notesPlayed * sweep / 3f) PlayNote(notesPlayed++);
-            float after = finishAge - sweep - Mathf.Max(0f, accentPauseSeconds);
+            float after = finishAge - AccentAt;
+            DrawStamp(after);
             if (after >= 0f && !burstPlayed)
             {
                 burstPlayed = true;
@@ -429,10 +478,53 @@ namespace C6Lab
             DrawRings(after, gold);
             if (paperImage != null) paperImage.color = Color.Lerp(paperColor, new Color(1f, .97f, .85f, paperColor.a), Mathf.Max(burst * .8f, sweepT * .3f));
             if (paperGroup != null) paperGroup.alpha = 1f - eased;
-            paper.localScale = Vector3.one * (1f + burstPunch * bump + .05f * eased);
+            // #533: the talisman stays put (no floating away); the seal's slam punches it, then it fades in place.
+            paper.localScale = Vector3.one * (1f + burstPunch * bump);
             float shake = burstShake * paper.rect.height * ring;
             var jitter = new Vector3(wave * shake, Mathf.Cos(after * humHz * 1.37f * 2f * Mathf.PI) * shake * .35f, 0f);
-            paper.localPosition = finishFrom + jitter + Vector3.up * (paper.rect.height * .06f * eased);
+            paper.localPosition = finishFrom + jitter;
+        }
+
+        /// <summary>
+        /// #533 도장: 강세 음 stampDropSeconds 전에 크고 옅게 나타나 기울며 내려와 강세 음 순간 "쾅" 닿고, 살짝 눌렸다 돌아온다.
+        /// 닿는 순간 붉은 인주 방울이 둘레에 튄다. 그 뒤로는 찍힌 채 부적과 함께 사라진다.
+        /// </summary>
+        private void DrawStamp(float after)
+        {
+            if (stampRoot == null) return;
+            float drop = Mathf.Max(.01f, stampDropSeconds);
+            float t = (after + drop) / drop; // 0 → 1 while descending, ≥ 1 once stamped
+            bool show = t >= 0f;
+            if (stampRoot.gameObject.activeSelf != show) stampRoot.gameObject.SetActive(show);
+            if (!show) return;
+            float scale, alpha;
+            if (t < 1f)
+            {
+                float fall = t * t; // accelerate into the paper
+                scale = Mathf.Lerp(2.4f, 1f, fall);
+                alpha = Mathf.Lerp(.15f, 1f, fall);
+            }
+            else
+            {
+                float settle = Mathf.Clamp01(after / .22f);
+                scale = 1f - .08f * Mathf.Sin(Mathf.PI * settle) * (1f - settle);
+                alpha = 1f;
+            }
+            stampRoot.localScale = Vector3.one * scale;
+            stampRoot.localRotation = Quaternion.Euler(0f, 0f, stampTilt + (t < 1f ? (1f - t) * -10f : 0f));
+            Color c = stampColor; c.a *= alpha;
+            if (stampImage != null) stampImage.color = c;
+            if (stampLabel != null) stampLabel.color = c;
+            float splat = after < 0f ? 0f : Mathf.Clamp01(after / .12f);
+            for (int k = 0; k < stampSpecks.Length; k++)
+            {
+                if (stampSpecks[k] == null) continue;
+                bool on = after >= 0f;
+                if (stampSpecks[k].gameObject.activeSelf != on) stampSpecks[k].gameObject.SetActive(on);
+                if (!on) continue;
+                stampSpecks[k].rectTransform.localScale = Vector3.one * (.3f + .7f * splat);
+                Color speck = stampColor; speck.a *= .85f; stampSpecks[k].color = speck;
+            }
         }
 
         /// <summary>#533: 징 울림처럼 빛 고리가 차례로 퍼진다. 뒤 고리일수록 옅고 크게.</summary>
@@ -466,6 +558,7 @@ namespace C6Lab
             if (ghostEdge != null) ghostEdge.color = ghostOutlineColor;
             if (ghostOutline != null) ghostOutline.effectColor = ghostOutlineColor;
             foreach (UnityEngine.UI.Image ringImage in burstRings) if (ringImage != null) ringImage.gameObject.SetActive(false);
+            if (stampRoot != null) stampRoot.gameObject.SetActive(false);
             paper.gameObject.SetActive(Visible);
         }
 
@@ -513,7 +606,12 @@ namespace C6Lab
             Array.Sort(clips, (a, b) => string.CompareOrdinal(a.name, b.name));
             AudioClip clip; float pitch = 1f;
             if (clips.Length >= 4) clip = clips[index];
-            else { clip = clips[index % clips.Length]; pitch = Mathf.Pow(2f, NoteSemitones[index] / 12f); }
+            else
+            {
+                clip = clips[index % clips.Length];
+                int semitone = noteSemitones != null && index < noteSemitones.Length ? noteSemitones[index] : 0;
+                pitch = Mathf.Pow(2f, semitone / 12f);
+            }
             AudioSource player = notePlayers[index];
             if (player == null)
             {
@@ -668,8 +766,25 @@ namespace C6Lab
             glyphArea.sizeDelta = new Vector2(side, side);
             float dot = Mathf.Max(4f, side * (InkMode ? brushWidth : strokeWidth));
             if (nextMarker != null) nextMarker.rectTransform.sizeDelta = Vector2.one * Mathf.Max(6f, side * .07f);
+            float seal = Mathf.Max(8f, size.x * stampSize);
+            if (stampRoot != null)
+            {
+                stampRoot.anchorMin = stampRoot.anchorMax = stampAnchor;
+                stampRoot.anchoredPosition = Vector2.zero;
+                stampRoot.sizeDelta = new Vector2(seal, seal);
+                if (stampLabel != null) stampLabel.fontSize = Mathf.Max(8, Mathf.RoundToInt(seal * .36f));
+                for (int k = 0; k < stampSpecks.Length; k++)
+                {
+                    if (stampSpecks[k] == null) continue;
+                    // Fixed splatter around the seal (same every time).
+                    float angle = k * 2.399963f + .7f, reach = .62f + .18f * ((k * .618034f) % 1f);
+                    stampSpecks[k].rectTransform.anchoredPosition = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * seal * reach;
+                    float speck = seal * (.035f + .03f * ((k * .414214f) % 1f));
+                    stampSpecks[k].rectTransform.sizeDelta = new Vector2(speck, speck);
+                }
+            }
             foreach (UnityEngine.UI.Image ringImage in burstRings)
-                if (ringImage != null) { ringImage.rectTransform.sizeDelta = Vector2.one * side * .8f; ringImage.rectTransform.anchoredPosition = Vector2.zero; }
+                if (ringImage != null) { ringImage.rectTransform.sizeDelta = Vector2.one * seal * 1.3f; ringImage.rectTransform.anchoredPosition = Vector2.zero; }
             if (InkMode && FitGhost(side, dot)) return;
             for (int i = 0; i < dots.Length; i++)
                 if (dots[i] != null) dots[i].rectTransform.sizeDelta = new Vector2(dot, dot);
@@ -777,17 +892,35 @@ namespace C6Lab
             nextMarker = NewRect("Talisman Next Stroke", glyphArea).gameObject.AddComponent<UnityEngine.UI.Image>();
             nextMarker.raycastTarget = false; nextMarker.sprite = RoundDot(); nextMarker.color = nextMarkerColor;
             nextMarker.gameObject.SetActive(false);
-            // #533: light rings that ripple out of the finished letter with the gong (up to the slider's maximum).
-            Vector2 heart = InkMode ? GlyphInkRect.center : SampleBounds(stroke.Samples).center;
+            // #533: the red seal that slams onto the finished talisman, with ink specks and light rings from where it lands.
+            stampRoot = NewRect("Talisman Stamp", paper);
+            stampRoot.pivot = new Vector2(.5f, .5f);
+            stampSpecks = new UnityEngine.UI.Image[9];
+            for (int k = 0; k < stampSpecks.Length; k++)
+            {
+                var speck = NewRect("Stamp Speck " + k, stampRoot).gameObject.AddComponent<UnityEngine.UI.Image>();
+                speck.raycastTarget = false; speck.sprite = WatercolorDot();
+                speck.rectTransform.anchorMin = speck.rectTransform.anchorMax = new Vector2(.5f, .5f);
+                speck.gameObject.SetActive(false);
+                stampSpecks[k] = speck;
+            }
+            stampImage = NewRect("Stamp Seal", stampRoot).gameObject.AddComponent<UnityEngine.UI.Image>();
+            stampImage.raycastTarget = false; stampImage.sprite = StampSprite();
+            Stretch(stampImage.rectTransform, 0f);
+            stampLabel = NewText("Stamp Text", stampRoot, stampText, 0, stampColor);
+            Stretch(stampLabel.rectTransform, .1f);
+            stampLabel.lineSpacing = .85f;
+            stampLabel.horizontalOverflow = HorizontalWrapMode.Overflow; stampLabel.verticalOverflow = VerticalWrapMode.Overflow;
             burstRings = new UnityEngine.UI.Image[5];
             for (int k = 0; k < burstRings.Length; k++)
             {
-                var ringImage = NewRect("Talisman Burst Ring " + k, glyphArea).gameObject.AddComponent<UnityEngine.UI.Image>();
+                var ringImage = NewRect("Talisman Burst Ring " + k, stampRoot).gameObject.AddComponent<UnityEngine.UI.Image>();
                 ringImage.raycastTarget = false; ringImage.sprite = RingSprite();
-                ringImage.rectTransform.anchorMin = ringImage.rectTransform.anchorMax = heart;
+                ringImage.rectTransform.anchorMin = ringImage.rectTransform.anchorMax = new Vector2(.5f, .5f);
                 ringImage.gameObject.SetActive(false);
                 burstRings[k] = ringImage;
             }
+            stampRoot.gameObject.SetActive(false);
             BuildStrokeRank();
             LayoutGlyph();
             paper.gameObject.SetActive(false);
