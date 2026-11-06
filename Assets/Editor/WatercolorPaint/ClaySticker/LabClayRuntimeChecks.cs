@@ -235,6 +235,7 @@ namespace C6Lab.Experiments.Editor
             Require(shader!=null&&shader.isSupported,"Current clay compositor is unavailable.");
             var material=new Material(shader){hideFlags=HideFlags.HideAndDontSave};
             RenderTexture blank=null,lower=null,onlyTop=null,overlap=null;
+            RenderTexture savedActive=RenderTexture.active;
             try
             {
                 blank=Target();lower=Target();onlyTop=Target();overlap=Target();
@@ -273,6 +274,8 @@ namespace C6Lab.Experiments.Editor
             }
             finally
             {
+                // Direct Blit fixtures leave their destination bound; unbind before disposal.
+                RenderTexture.active=savedActive;
                 foreach(var texture in new[]{blank,lower,onlyTop,overlap})if(texture!=null){texture.Release();Object.DestroyImmediate(texture);}
                 Object.DestroyImmediate(material);
             }
@@ -322,7 +325,9 @@ namespace C6Lab.Experiments.Editor
         {
             for(int i=0;i<4096;i++)
             {
-                runtime.Update(journal,null,null,1024,settings,i*.016,full);
+                RenderTexture previous=RenderTexture.active;
+                try{runtime.Update(journal,null,null,1024,settings,i*.016,full);}
+                finally{RenderTexture.active=previous;}
                 Require(runtime.Error==null,runtime.Error??"Clay error.");
                 if(runtime.Ready)return;
                 // This is a stopped-Editor contract runner only. The actual runtime uses

@@ -188,7 +188,7 @@ namespace C6Lab.Experiments.Editor
         {if(!condition)throw new InvalidOperationException("Rounded clay GPU check: "+message);}
 
         /// <summary>Private actual-prefab renderer with a float target, so NaN/Inf cannot hide in an LDR PNG.</summary>
-        sealed class FloatPreview : IDisposable
+        internal sealed class FloatPreview : IDisposable
         {
             Scene scene;
             GameObject instance;
@@ -196,6 +196,10 @@ namespace C6Lab.Experiments.Editor
             Camera camera;
             RenderTexture target;
             Material clay;
+            MeshRenderer coating;
+            int captureSize=RenderSize;
+            readonly Dictionary<Renderer,bool> savedRendererStates=new Dictionary<Renderer,bool>();
+            internal Material Material => clay;
             readonly List<Material> materials=new List<Material>();
             public FloatPreview(Shader shader,Texture paint,Texture height)
             {
@@ -231,7 +235,7 @@ namespace C6Lab.Experiments.Editor
                     var coat=new GameObject("Rounded clay float GPU check"){hideFlags=HideFlags.HideAndDontSave,layer=30};
                     coat.transform.SetParent(body.transform,false);
                     coat.AddComponent<MeshFilter>().sharedMesh=body.GetComponent<MeshFilter>().sharedMesh;
-                    var draw=coat.AddComponent<MeshRenderer>();draw.sharedMaterial=clay;
+                    var draw=coat.AddComponent<MeshRenderer>();coating=draw;draw.sharedMaterial=clay;
                     draw.shadowCastingMode=ShadowCastingMode.Off;draw.receiveShadows=false;
                     Bounds expanded=draw.GetComponent<MeshFilter>().sharedMesh.bounds;expanded.Expand(.05f);draw.localBounds=expanded;
                     var cameraObject=new GameObject("Rounded clay check camera"){hideFlags=HideFlags.HideAndDontSave};
@@ -249,6 +253,26 @@ namespace C6Lab.Experiments.Editor
                 }
                 catch{Dispose();throw;}
             }
+            internal void SetCaptureSize(int size)
+            {
+                Require(size>=64&&size<=RenderSize,"Unsupported isolated capture size.");
+                if(size==captureSize)return;
+                var replacement=new RenderTexture(size,size,24,RenderTextureFormat.ARGBFloat,RenderTextureReadWrite.Linear)
+                    {hideFlags=HideFlags.HideAndDontSave};
+                if(!replacement.Create()){Object.DestroyImmediate(replacement);throw new InvalidOperationException("Float capture resize failed.");}
+                camera.targetTexture=replacement;
+                if(RenderTexture.active==target)RenderTexture.active=null;
+                target.Release();Object.DestroyImmediate(target);target=replacement;captureSize=size;
+            }
+            internal void SetBackground(Color color) => camera.backgroundColor=color;
+            internal void SetCoatingOnly(bool only)
+            {
+                foreach(Renderer renderer in instance.GetComponentsInChildren<Renderer>(true))
+                {
+                    if(!savedRendererStates.ContainsKey(renderer))savedRendererStates.Add(renderer,renderer.enabled);
+                    renderer.enabled=only?renderer==coating:savedRendererStates[renderer];
+                }
+            }
             public Color[] Render(float thickness,float gloss,float contact,float detail,float yaw=20,float pitch=10)
             {
                 clay.SetFloat("_ClayThickness",thickness);clay.SetFloat("_ClayGloss",gloss);
@@ -262,8 +286,8 @@ namespace C6Lab.Experiments.Editor
                 try
                 {
                     camera.Render();RenderTexture.active=target;
-                    copy=new Texture2D(RenderSize,RenderSize,TextureFormat.RGBAFloat,false,true){hideFlags=HideFlags.HideAndDontSave};
-                    copy.ReadPixels(new Rect(0,0,RenderSize,RenderSize),0,0);copy.Apply(false,false);
+                    copy=new Texture2D(captureSize,captureSize,TextureFormat.RGBAFloat,false,true){hideFlags=HideFlags.HideAndDontSave};
+                    copy.ReadPixels(new Rect(0,0,captureSize,captureSize),0,0);copy.Apply(false,false);
                     Color[] pixels=copy.GetPixels();
                     foreach(Color pixel in pixels)
                         Require(float.IsFinite(pixel.r)&&float.IsFinite(pixel.g)&&float.IsFinite(pixel.b)&&float.IsFinite(pixel.a)
@@ -276,7 +300,11 @@ namespace C6Lab.Experiments.Editor
             public void Dispose()
             {
                 if(camera!=null)camera.targetTexture=null;
-                if(target!=null){target.Release();Object.DestroyImmediate(target);target=null;}
+                if(target!=null)
+                {
+                    if(RenderTexture.active==target)RenderTexture.active=null;
+                    target.Release();Object.DestroyImmediate(target);target=null;
+                }
                 if(scene.IsValid())EditorSceneManager.ClosePreviewScene(scene);
                 foreach(Material material in materials)if(material!=null)Object.DestroyImmediate(material);
                 materials.Clear();if(clay!=null)Object.DestroyImmediate(clay);clay=null;

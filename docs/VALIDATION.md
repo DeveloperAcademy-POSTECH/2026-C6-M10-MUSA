@@ -5147,3 +5147,38 @@ PR-1(`feat/#507-gourd-rig-contract`) 위에서 Unity 6000.6.5f1 macOS batch Edit
 - iOS, LAN/핫스팟, 실제 창 크기 수동변경·Quit 버튼은 이번에 실행하지 않았다. 실험 앱의 입력/해제/프레이밍 자동 검사와 실제 조작을 구분한다.
 
 - 최종 보존: 작업 전 보호파일244개는 빌드 후 바이트 해시가 모두 일치한다. 빌드가 자동 정리한 무관한 지귀 Ribbon 머터리얼의 `_NORMALMAP` 키워드만 Editor 종료 후 기준 상태로 복원했다. 원래 데스크탑 프로젝트는 이번 작업에서 읽기만 했으며 수정하지 않았다.
+
+
+## 2026-11-05 · #527 스티커 자체 코팅 광택 V4
+
+- 기준: `experiment/#527-rounded-clay-stickers`, 기존 V3 보존 커밋 `79c64789`. Unity6000.6.5f1 / macOS / Metal. WhiteGourd 비교 모델만 대상으로 하는 네 번째 실험 프리셋이다. 일반 게임의 Resources·표현 기본값·라운드 설정·통신 버전을 바꾸지 않았다. 기존 3종 샘플·Scene과 보존 대상392개 파일의 SHA256이 작업 전과 같으며 원래 작업 폴더의 사용자 수정 재질6개와 Git 상태도 그대로다.
+- 전체 EditMode **1958/1958 PASS**, 건너뜀0(48.30초). 관련 PlayMode **30/30 PASS**: ClayPreview12(3.53초), LabGourdPaint9(11.84초), LabGourdVisualRig4(0.86초), WhiteGourdGolden2(0.28초), GameStageGourdIntegration1(13.85초), Stage2HitFinish1(16.94초), Home의 세 스테이지·완성 지도 보존1(18.41초). 전체 PlayMode 실행 결과로 표현하지 않는다. Golden 이미지를 새로 기록하지 않았다.
+- GPU 계약 **45/45 PASS**: 기존 Runtime15 + V3표면6 + 세 변형 기록재생14 + 새 V4법선/표면10. 새 법선의 oct fold·극점·반구, 불투명 최상층, 부분 커버리지의 decoded3D 혼합, 무광 완료바탕, Gloss0, 160px 소형 출력, U이음새/극점 유한성을 검사했다. 실제 저널의 색RGBA·Half 높이R/A는 비트 일치했고, V3/V4 Gloss0 전체 렌더 차이는 최대2.39e-7, 바탕/인접 fringe 반사 차이는0이었다. 저장 법선 최대 기울기25.212도는 Half 양자화 포함 실측값이며 셰이더의25도 제한·검사허용25.5도 이내다. 미세 주름의 별도3도 변화와 구분한다.
+- 129개 이후 자국·오래된 도장 성장·전체/분할 재생·건조/재도색·높이 자원 유실 후 복원·관람 복사 검사는 전체 높이 채널과 기록/판정 해시를 포함했다. 최초1타/재타격3회/분리2개/같은색·다른색 겹침/5색완성의6개 fixture에서 V3/V4 색과 높이R/A가 모두 같았다. V4는 GB 반사 방향만 바꾼다.
+- 마지막 검사 중 임시RT가 active인 채 해제되는 경고를 발견해 검사 도우미의 이전 타깃 복원·해제 전 unbind를 보완했다. 게임 Runtime 동작은 변경하지 않았다. 수정 후45개 GPU 계약을 다시 실행했고 실행 중 새 Warning은0이었다. 이 도우미 정리 후 전체 EditMode/PlayMode를 다시 실행하지는 않았다.
+- 새 전용 Scene으로 Mac Development 앱 빌드 성공(보고서 약457MB). Build Settings·활성 플랫폼·PlayerSettings 메모리/디스크를 복원했다. 기존 앱과 Editor는 종료했고 새 앱1개만 열어 두었다. 실제 UI에서 네 번째 기본값(.014/.08/.15/1), V3/V4 전환, Gloss0/1, 우측면 버튼, 휠 확대, Reset 후 정면/기본 배율을 확인했다. 드래그 입력은 자동 조작에서 회전 결과를 확정하지 못했으므로 수동 통과로 기록하지 않는다. 창 크기 변경·Quit은 이번 수동 검증에서 미수행이다.
+- 같은 두께.014·Gloss0/.35/1·카메라·조명에서 전체/확대 및 반사차분을 출력했고6방향을 생성했다. 양쪽 반사 행은 Linear Half RT→Float readback의 전체G−전체0, 동일 배율, PNG 직전에만sRGB로 변환한다. V4전용 debug는 별도로 보관한다. [색 비교](images/coating-complete-detail-color.png), [반사만 비교](images/coating-complete-detail-reflection-only.png), [완성6방향](images/coating-six-views-v4-gloss-035.png). 넓은 공통 반사 대신 도장 내부에 좁은 반사가 생겼지만, ‘스티커마다 코팅됐다’는 최종 미적 승인으로 간주하지 않는다.
+- 정지Editor에서 재생 경과시간 V3 65.51ms/V4 41.66ms, 예열 뒤5회 렌더·읽기 평균4.04/2.62ms. 이는 GPU 대기·CPU 읽기를 포함한 단일 측정이며 성능 향상을 보장하지 않는다. 생성RT 크기 증분 약18.01/18.01MiB, 픽셀 payload 추정은 양쪽18MiB로 추가RT가 없다. 실제 GPU프레임 시간·물리GPU상주 메모리·실제 게임 중 성능·iOS는 미측정/미실행이다.
+- 남은 범위: 기존 지원셀 잘림·높이 유령 윤곽·얼룩 크기/배치, 최대Gloss 확대에서 보이는 일부 경계 거칠음은 후속 검토다. 장시간 회전의 시간적 반짝임·다른 스테이지 모델·실제 LAN/핫스팟/iOS는 이번 PASS에 포함하지 않는다. 사용법과 빌드/자료 버전은 [실험 문서](ROUNDED_CLAY_STICKER_EXPERIMENT.md)를 따른다.
+
+
+## 2026-11-06 · #527 Mac 비교 앱 이동 광원
+
+- 범위: 기존 #527 작업·고정 도안·일반 게임 기본값을 보존하고 Mac 비교 앱에 좌우방위각−180~180·고도각−80~80·직접광강도0~2 슬라이더와 Reset light를 추가했다. 프리셋 변경은 조명을 유지하고 Reset preset은 모두 초기화한다. 같은 공통 조명을 세 surface 셰이더의 복제 재질에서만 켠다. 일반 게임의 `_ClayPreviewLighting` 기본값은0이다.
+- 환경: Unity6000.6.5f1 / macOS / Metal. 열려 있던 저장 Coating Scene의 Play 종료·스크립트 재로딩 중 `ADTM: Attempting to update control while a mix is ongoing, but realtime thread is disabled will lead to a deadlock` Fatal 창을 관찰했다. Editor를 종료하고 이번 그래픽 검사만 `-noaudio`로 재시작했다. 프로젝트 Audio 설정은 바꾸지 않았다. 이후 컴파일·검사·Player 빌드는 완료했으며 이 관찰만으로 장기적인 Editor 오디오 안정성을 판정하지 않는다.
+- 전체 EditMode **1958/1958 PASS**(33.95초), 관련 PlayMode **16/16 PASS**: ClayPreview14(6.03초)·WhiteGourdGolden2(1.02초). 새2건은 실제 슬라이더/독립Reset/프리셋유지/유한값·범위제한, 실제 GPU 좌우광 변화·배경/도안·환경광 불변을 포함한다. 전체 PlayMode 실행 결과는 아니다. 새 항목으로 기존 패널 제목이 압축되는 현상을 실제 앱에서 발견해 내용의 intrinsic높이를 유지하도록 고쳤고, 겹침 단언을 포함한 ClayPreview14건을 **다시 PASS**(5.26초)했다. 이 낮은 위험의 레이아웃 보완 후 전체 EditMode·Golden2를 재실행한 것은 아니다.
+- 기존 GPU **31/31 PASS**: Runtime15·RoundedSurface6·Coating10. 추가로 수정 직전의 세 surface 소스를 메모리 Shader로 컴파일해 동일 실제 박/지도/조명/시점·Gloss0/.35/1에서 opt-in0과 비교했다. **3/3셰이더·9렌더비교 모두 최대차이0**. 방향/강도값만 바꾸고 override가 꺼진 경우도 포함한다. 이 비교는 임시 도구의 일회성 검증이며 별도 영구Golden은 만들지 않았다. 이전14개 기록재생 묶음은 조명 변경에서 재실행하지 않았고 이번 수치에 합산하지 않는다.
+- 명시적 Refresh Preview Lighting Metadata는 compositor pin·원래3종·현재도안 파일·Scene연결을 검증한 뒤 V4 JSON의 surface sourceSHA와 Coating Scene의 해당 metadataHash2곳만 갱신했다. 4종 Color/Height PNG·EXR의 byte/mtime와 기존3종 메타데이터·Scene을 유지했다. 다시 굽거나 기록·색·높이·판정·성능값을 갱신하지 않았다. 빌드의 검증은 읽기 전용으로 남겼다.
+- 최종 Mac Development 앱 빌드 성공(약457MB). Build Settings·활성플랫폼·PlayerSettings 메모리/디스크는 복원됐다. 이전 앱과 임시 Editor는 종료하고 새 앱 하나만 제공했다. 실제 Player에서 LIGHT가 겹치지 않고 패널이 스크롤되는 것, 좌우각도를 −43도에서159도로 바꿀 때의 화면 변화, Reset light 후 −41도/70도/강도1 복원을 관찰했다. 수동으로 위아래·강도 끝값을 모두 조작한 것은 아니며 해당 범위는 위 자동 검사로 구분한다. iOS·실기기·실제 LAN/핫스팟·GPU성능 프로파일링·오디오 검증은 이번 범위에서 미실행이다.
+
+
+## 2026-11-06 · #527 Mac 비교 앱 RGB·6자리 HEX 팔레트
+
+- 범위: 같은 #527 실험 브랜치에서 화·수·목·금·토의 sRGB 입력 15개와 6자리 HEX 입력 5개를 추가했다. 입력은 Enter/Tab/포커스 이탈에 확정하고 HEX는 선택적 #·대소문자를 허용한다. 잘못된 길이/문자는 오류 표시만 하며 기존 색을 유지한다. 입력/견본은 상호 동기화하고 Reset palette·Reset light·프리셋의 독립성을 유지한다. 게임 팔레트·DEV·Scene 목록·통신/판정 기본값에 저장하지 않는다.
+- 원래 67회 명중의 192페이지·780,170바이트 기록을 별도 실험 자료에 고정했다. 4KiB 이하 페이지·최종 순번32904·저널/표현/브러시/compositor 핀을 검사한다. 같은 기록을 선택 프리셋에서 분할 재생하며 색만 치환한다. 원래 다섯 색은 기존 고정 지도를 직접 표시한다. 기본색 재생 시 네 프리셋의 색 RGBA와 높이 RGBA가 기존 지도와 정확히 같고 판정/기록 해시·원본 자료를 보존했다. 마지막 GPU 완료 전에는 이전 완성 그림을 유지하고 빠른 재입력의 오래된 결과를 게시하지 않는다.
+- 환경: Unity6000.6.5f1 / macOS / Metal, 그래픽 검사 Editor는 -noaudio로 실행했다. RGB 구현에서 전체 EditMode **1958/1958 PASS**(47.24초), 비교 앱 PlayMode **16/16 PASS**(14.76초), 흰 박 Golden **2/2 PASS**(0.87초), 생산 경로 실제 GPU 계약 **15/15 PASS**를 실행했다. 이후 HEX 확장 및 Editor 자료 검증 보완 뒤 비교 앱 **16/16을 재실행해 PASS**(18.47초)했다. 이 마지막 UI 변경 뒤 전체 EditMode/Golden/GPU를 다시 실행한 수치는 아니다. 전체 PlayMode·iOS·실네트워크·GPU 프레임 성능 검사는 미실행이다.
+- HEX 검사는 6자리 대소문자·앞 #·외부 공백·흑/백·전5색 편집, 잘못된 3/8자리·비16진수·빈값/null·전각문자, 범위 밖 슬롯, UI 오류/복구·RGB 동기화·초기화, 실제 GPU 색 변경·높이 전체/기록/설정/자료 해시 불변과 자원 해제를 포함한다.
+- 팔레트 연결 후 명시적 조명 메타데이터 갱신도 기존 팔레트 검증과 네 번째 핀의 트랜잭션을 사용한다. 현재 소스가 같은 no-op 경로는 실행해 metadataUpdated=false·paletteMetadataUpdated=false·mapsAndOriginalFilesPreserved=true를 확인했다. 소스를 일부러 바꿔 갱신/롤백을 유도하는 실패 주입 검사는 이번에 실행하지 않았다.
+- 최종 HEX Mac Development 빌드 성공(**464,054,538바이트**). Build Settings·활성 플랫폼·PlayerSettings 메모리/디스크 보존 플래그는 모두 true다. 작업 전 보존 대상으로 기록한 452개 중 CoatingClayPreview Scene의 명시적 paletteData 참조 추가만 달라졌고 누락은0이었다. 기존 PNG·EXR·메타데이터·게임 설정은 유지했다. 사용법은 ROUNDED_CLAY_STICKER_EXPERIMENT의 PALETTE 절을 따른다.
+
+- 최종 Mac Player를 실행해 RGB/HEX 전5색 입력칸이 겹침 없이 표시됨을 확인했다. 화 HEX에 `645736`을 직접 입력하고 Enter로 확정해 RGB100/87/54·색 견본·실제 박 색이 함께 바뀌는 것을 관찰했다. 이 값은 열린 실험 앱의 임시값이며 저장된 기본값은 D85736이다. 이전 앱과 임시 Editor를 종료하고 최신 앱 하나를 열어 두었다. 잘못된 HEX와 전5색 끝값/복구는 위 자동 검사 범위이며 이번 수동 Player에서 모두 반복하지 않았다.

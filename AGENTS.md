@@ -264,3 +264,16 @@
 - 표현용 브러시/색 농도는 `LabClayStickerRuntime`의 명시적 생성자에만 주입한다. 게임 기본 생성자는 기존 Resources와 라운드 프로필을 유지한다. 실험 v3 metadata와 원래 v2 게임 기록 형식을 혼동하지 않는다.
 - 원본 생성 PNG는 보존하고 Alpha에서 순백색 마스크·20px 둥근 높이를 베이크한다. 같은 seed123·실제 67회 명중 저널의 판정/기록 해시를 세 프리셋에서 유지한다. 기존 v2 샘플을 자동 갱신해 비교 기준을 바꾸지 않는다.
 - 준비는 `C6 Lab/Experiments/Rounded Clay/Prepare Imported Comparison`, 빌드는 `Build Mac Comparison App`이다. 준비는 명시적으로만 수행하고 빌드 검증은 샘플을 다시 굽지 않는다. 사용법/한계는 `docs/ROUNDED_CLAY_STICKER_EXPERIMENT.md`, 수행 결과는 `docs/VALIDATION.md`를 따른다.
+
+
+## #527 네 번째 스티커 코팅 V4 실험
+
+- V4는 별도 `Assets/Experiments/ClayPreview/Rounded/Scenes/CoatingClayPreview.unity`의 네 번째 기본 프리셋이다. 기존 3종 Scene과 `OriginalV2/OriginalV3/RoundedV3`의 색·높이·JSON 파일은 내용·수정 시각까지 보존하며 자동 재베이크하지 않는다. 일반 게임 기본값·Resources·Scene 목록·판정·통신 규약에는 연결하지 않는다.
+- 샘플은 `clay-preview-sample-v4` / `clay-stickers-v4`, 높이 계약은 `R:physical-height;GB:oct-object-normal;A:actual-coverage`다. GB는 `A × Oct01(normalOS)`이며 3D 법선을 혼합한 뒤 재인코딩한다. 박의 법선을 중복 가산하지 않는다. 동일 저널의 둥근 V3와 색 RGBA·높이 R·커버리지 A를 유지하고 완료 바탕은 코팅 반사에서 제외한다.
+- 준비는 `C6 Lab/Experiments/Rounded Clay/Prepare Coating Comparison`, 빌드는 `Build Coating Mac App`이다. 새 자료는 `Rounded/CoatingV4`에만 추가한다. compositor/surface 소스 SHA256이 바뀌거나 누락되면 명시적인 재준비 전 빌드를 거부하며, 준비 후 새 Scene 메타데이터 연결을 갱신한다. 기존 3종 준비·빌드 메뉴는 유지한다.
+- V3/V4 반사 비교는 같은 두께·카메라·조명·Gloss에서 Linear Half RT→Float 차분 `G−0`으로 만들고 PNG 저장 시에만 sRGB로 변환한다. 배율을 숨기거나 LDR clamp로 NaN/Inf를 가리지 않는다. 전체 보기·확대 크롭과 내부 `_SpecularOnly` 출력을 구분한다. 사용법은 `docs/ROUNDED_CLAY_STICKER_EXPERIMENT.md`, 실제 수행 결과만 `docs/VALIDATION.md`에 기록한다.
+
+- #527 이동 광원: 비교 앱의 복제 재질만 `_ClayPreviewLighting=1`로 설정한다. 세 surface 셰이더의 기본0과 일반 게임 설정을 유지하고 전용 Directional Light만 조절한다. 기존 도안을 그대로 두는 surface-only 조명 변경은 명시적 `Refresh Preview Lighting Metadata`로 검증 후 surfaceSHA/Coating Scene 연결만 갱신할 수 있다. compositor·브러시·자료규약 변경은 전체 Prepare가 필요하며 Build는 어느 갱신도 자동 실행하지 않는다.
+
+
+- #527 팔레트 실험: CoatingClayPreview의 선택적 paletteData만 원래67회 저널을 보관한다. sRGB RGB0~255/HEX6자리 입력은 실험의 색 resolver로만 치환하며 게임 팔레트·설정·판정·기록은 저장하지 않는다. 기본색은 고정지도를 직접 쓰고 변경색은 제한된 재생/GPU 완료 후에만 표시한다. Prepare Palette Preview는 명시적 준비, Build는 읽기 전용 검사다. LIGHT 메타데이터 갱신은 연결된 palette의 V4핀도 검증·복구하며 원본 지도/저널/브러시를 다시 굽지 않는다.

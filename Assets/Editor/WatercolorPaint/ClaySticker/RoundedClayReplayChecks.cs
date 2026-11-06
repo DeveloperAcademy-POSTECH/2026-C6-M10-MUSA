@@ -30,7 +30,9 @@ namespace C6Lab.Experiments.Editor
             public List<Variant> variants = new List<Variant>();
         }
 
-        public static string Run()
+        public static string Run() => RunVariants(false);
+        public static string RunCoating() => RunVariants(true);
+        static string RunVariants(bool includeCoating)
         {
             ClayPreviewBuild.RequireStopped();
             Require(SystemInfo.graphicsDeviceType != GraphicsDeviceType.Null, "Rounded replay checks need a real graphics device.");
@@ -54,15 +56,22 @@ namespace C6Lab.Experiments.Editor
                 fixture.Seal(); fixture.Finish();
                 string authority = SurfaceHash(fixture.Surface), record = fixture.Journal.PrefixHash;
 
-                foreach (string set in Sets)
+                foreach (string set in includeCoating ? Sets.Concat(new[] { "CoatingV4" }) : Sets)
                 {
-                    string[] paths = Brushes.Select(name => RoundedClayExperiment.Root + "/" + set + "/" + name + "Data.png").ToArray();
+                    string brushSet = set == "CoatingV4" ? "RoundedBevel" : set;
+                    string[] paths = Brushes.Select(name => RoundedClayExperiment.Root + "/" + brushSet + "/" + name + "Data.png").ToArray();
+                    Shader compositor = null;
+                    if (set == "CoatingV4")
+                    {
+                        compositor = AssetDatabase.LoadAssetAtPath<Shader>("Assets/Experiments/ClayPreview/Runtime/Shaders/StickerCoatingRuntime.shader");
+                        Require(compositor != null && compositor.isSupported, "The v4 compositor is missing or unsupported.");
+                    }
                     Texture2D[] brushes = paths.Select(AssetDatabase.LoadAssetAtPath<Texture2D>).ToArray();
                     Require(brushes.All(texture => texture != null && texture.width == 512 && texture.height == 512),
                         "Prepare all three presentation brushes for " + set + " before running replay checks.");
                     string[] assetHashes = paths.Select(path => AssetDatabase.GetAssetDependencyHash(path).ToString()).ToArray();
                     Func<LabClayStickerRuntime> factory = () => new LabClayStickerRuntime(brushes,
-                        new LabClayStickerSettings { minimumDensity = .9f, maximumDensity = 1f });
+                        new LabClayStickerSettings { minimumDensity = .9f, maximumDensity = 1f }, compositor);
                     var inherited = new List<string>();
                     LabClayRuntimeChecks.CheckErase(settings, inherited, factory);
                     LabClayRuntimeChecks.CheckOldStrokes(settings, inherited, factory);
@@ -118,7 +127,9 @@ namespace C6Lab.Experiments.Editor
         {
             for (int i = 0; i < 4096; i++)
             {
-                runtime.Update(journal, null, null, 1024, settings, i * .016, capture);
+                RenderTexture previous = RenderTexture.active;
+                try { runtime.Update(journal, null, null, 1024, settings, i * .016, capture); }
+                finally { RenderTexture.active = previous; }
                 Require(runtime.Error == null, runtime.Error ?? "Injected clay replay failed.");
                 if (runtime.Ready) return i + 1;
                 AsyncGPUReadback.WaitAllRequests();

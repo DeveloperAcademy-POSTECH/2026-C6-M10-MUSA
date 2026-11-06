@@ -1,6 +1,8 @@
 {
   "name": "Hapio.ClayPreview.Runtime",
   "rootNamespace": "Hapio.Experiments",
-  "references": [],
+  "references": [
+    "C6Lab.Runtime"
+  ],
   "autoReferenced": true
 }

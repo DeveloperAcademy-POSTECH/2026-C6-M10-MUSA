@@ -328,7 +328,9 @@ namespace C6Lab.Experiments.Editor
                 originalHash=Hash(Surface);
                 for(int i=0;i<4096;i++)
                 {
-                    Runtime.Update(Journal,null,null,1024,settings,i*.016,true);
+                    RenderTexture previous=RenderTexture.active;
+                    try{Runtime.Update(Journal,null,null,1024,settings,i*.016,true);}
+                    finally{RenderTexture.active=previous;}
                     Require(Runtime.Error==null,Runtime.Error??"Clay runtime error.");
                     if(Runtime.Ready)return;
                     // Bounded stopped-Editor still export only. The live renderer remains asynchronous.
@@ -349,7 +351,7 @@ namespace C6Lab.Experiments.Editor
             readonly LabPaintStudyRenderer renderer;
             Material clay;
             public Preview(Fixture study):this(study.Runtime.PaintTexture,study.Runtime.HeightTexture){}
-            public Preview(Texture paint,Texture height,Shader surfaceShader=null)
+            public Preview(Texture paint,Texture height,Shader surfaceShader=null,bool linearCapture=false)
             {
                 try
                 {
@@ -367,9 +369,15 @@ namespace C6Lab.Experiments.Editor
                         var go=new GameObject("Actual curved clay overlay"){hideFlags=HideFlags.HideAndDontSave,layer=body.gameObject.layer};
                         go.transform.SetParent(body.transform,false);go.AddComponent<MeshFilter>().sharedMesh=body.GetComponent<MeshFilter>().sharedMesh;
                         var draw=go.AddComponent<MeshRenderer>();draw.sharedMaterial=clay;draw.shadowCastingMode=ShadowCastingMode.Off;draw.receiveShadows=false;
-                    });
+                    },linearCapture:linearCapture);
                 }
                 catch{Dispose();throw;}
+            }
+            public void SetBackground(Color color)=>renderer.SetBackgroundColor(color);
+            public void SetSpecularOnly(bool enabled)
+            {
+                Require(!enabled||clay.HasProperty("_SpecularOnly"),"This comparison shader has no reflection-only output.");
+                if(clay.HasProperty("_SpecularOnly"))clay.SetFloat("_SpecularOnly",enabled?1:0);
             }
             public Texture2D Render(float thickness,float gloss,float yaw=0,float zoom=1,float pitch=0)
             {Set(thickness,gloss);return renderer.RenderVisual(Texture2D.blackTexture,yaw,zoom,pitch);}

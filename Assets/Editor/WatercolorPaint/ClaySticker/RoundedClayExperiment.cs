@@ -252,13 +252,13 @@ namespace C6Lab.Experiments.Editor
             platform.format = TextureImporterFormat.RGBA32; platform.textureCompression = TextureImporterCompression.Uncompressed;
             platform.maxTextureSize = 512; importer.SetPlatformTextureSettings(platform); importer.SaveAndReimport();
         }
-        static Texture2D[] Brushes(string set) => Names.Select(n => AssetDatabase.LoadAssetAtPath<Texture2D>(Root + "/" + set + "/" + n + "Data.png")).ToArray();
-        static LabWatercolorStampSettings Settings()
+        internal static Texture2D[] Brushes(string set) => Names.Select(n => AssetDatabase.LoadAssetAtPath<Texture2D>(Root + "/" + set + "/" + n + "Data.png")).ToArray();
+        internal static LabWatercolorStampSettings Settings()
         { var settings = new LabWatercolorStampSettings { mode = LabPaintStampMode.ClaySticker, revealSeconds = 0 }; settings.Validate(); return settings; }
         static LabClayStickerRuntime NewVariant(int variant)
             => new LabClayStickerRuntime(Brushes(variant == 1 ? "OriginalBevel" : "RoundedBevel"),
                 new LabClayStickerSettings { minimumDensity = .9f, maximumDensity = 1 });
-        static void Finish(LabClayStickerRuntime runtime, LabPaintArtJournal journal, LabWatercolorStampSettings settings)
+        internal static void Finish(LabClayStickerRuntime runtime, LabPaintArtJournal journal, LabWatercolorStampSettings settings)
         {
             for (int i = 0; i < 4096; i++)
             {
@@ -268,7 +268,7 @@ namespace C6Lab.Experiments.Editor
             }
             throw new InvalidOperationException("Comparison replay exceeded its bounded Editor budget.");
         }
-        static void Complete(LabClayVisualStudy.Fixture fixture)
+        internal static void Complete(LabClayVisualStudy.Fixture fixture)
         {
             const int samples = 256;
             for (int i = 0; i < samples && !fixture.Surface.IsComplete; i++)
@@ -432,7 +432,7 @@ namespace C6Lab.Experiments.Editor
             }
             Require(before == ClayPreviewBuild.SceneState() && build == ClayPreviewBuild.BuildScenesState(), "Comparison Scene creation changed unrelated Scene/build state.");
         }
-        static ClayPreviewPreset LoadPreset(int index)
+        internal static ClayPreviewPreset LoadPreset(int index)
         {
             string folder = Root + "/" + Keys[index]; var text = AssetDatabase.LoadAssetAtPath<TextAsset>(folder + "/SampleInfo.json");
             Require(text != null, "Prepare the three frozen comparison maps first.");
@@ -514,7 +514,7 @@ namespace C6Lab.Experiments.Editor
         }
         static string ExistingSampleHash() => ClayPreviewBuild.Hash(File.ReadAllBytes(ClayPreviewBuild.ColorPath)
             .Concat(File.ReadAllBytes(ClayPreviewBuild.HeightPath)).Concat(File.ReadAllBytes(ClayPreviewBuild.SampleInfoPath)).ToArray());
-        static string SurfaceHash(LabPaintSurface surface)
+        internal static string SurfaceHash(LabPaintSurface surface)
         {
             var colors = new Color32[surface.CellCount]; var owners = new byte[surface.CellCount]; surface.CopyPixels(colors); surface.CopyPainterSlots(owners);
             return LabPaintPublisher.Hash(colors, owners);

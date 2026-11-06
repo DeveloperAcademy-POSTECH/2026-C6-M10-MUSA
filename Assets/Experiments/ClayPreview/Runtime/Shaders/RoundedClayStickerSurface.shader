@@ -10,6 +10,9 @@ Shader "C6Lab/Experiments/RoundedClayStickerSurface"
         _ClayGloss("Clay Gloss",Range(0,1))=.08
         _ClayContactStrength("Soft Sticker Contact",Range(0,.5))=.15
         _ClayDetailStrength("Shallow Clay Wrinkles (Max 3 Degrees)",Range(0,1))=1
+        [HideInInspector] _ClayPreviewLighting("Preview Light Override",Float)=0
+        [HideInInspector] _ClayPreviewLightDirection("Preview World Direction To Light",Vector)=(0,0,1,0)
+        [HideInInspector] _ClayPreviewLightIntensity("Preview Direct Light Intensity",Float)=1
         [Toggle] _PlayerPaintPatternsEnabled("Player Ownership Patterns",Float)=1
     }
     SubShader
@@ -38,6 +41,8 @@ Shader "C6Lab/Experiments/RoundedClayStickerSurface"
             CBUFFER_START(UnityPerMaterial)
                 float _PaintMapReady,_ClayThickness,_ClayGloss,_PlayerPaintPatternsEnabled;
                 float _ClayContactStrength,_ClayDetailStrength;
+                float _ClayPreviewLighting,_ClayPreviewLightIntensity;
+                float4 _ClayPreviewLightDirection;
             CBUFFER_END
             struct Attributes {float4 positionOS:POSITION;float3 normalOS:NORMAL;};
             struct Varyings
@@ -206,12 +211,26 @@ Shader "C6Lab/Experiments/RoundedClayStickerSurface"
                 // scenes deliberately point their actual key away from the paint face;
                 // letting it dominate would flatten both relief and DEV gloss previews.
                 float3 keyDirection=SafeNormalize(lerp(fallbackKey,sceneKey.direction,hasKey*.25));
+                // Only cloned comparison materials opt into this full world-space key.
+                // The disabled branch leaves the original game's lighting math intact.
+                float previewIntensity=1;
+                [branch] if(_ClayPreviewLighting>.5)
+                {
+                    float3 suppliedDirection=_ClayPreviewLightDirection.xyz;
+                    if(!(dot(suppliedDirection,suppliedDirection)>.000001)||!all(abs(suppliedDirection)<1000000))
+                        suppliedDirection=float3(0,0,1);
+                    keyDirection=SafeNormalize(suppliedDirection);
+                    previewIntensity=clamp(_ClayPreviewLightIntensity,0,2);
+                    if(!(previewIntensity>=0))previewIntensity=1;
+                }
                 // This is an art-directed lit clay surface. A controlled fill preserves
                 // recorded pigment hue/value even in the existing custom-lit scenes;
                 // URP key direction, shadow and SH still influence form and highlights.
                 float ambient=dot(max(SampleSH(n),0),float3(.2126,.7152,.0722));
                 float fill=lerp(.96,1.04,saturate(ambient));
                 float diffuse=(.68+.32*saturate(dot(n,keyDirection)))*fill;
+                [branch] if(_ClayPreviewLighting>.5)
+                    diffuse=(.68+.32*saturate(dot(n,keyDirection))*previewIntensity)*fill;
                 diffuse*=lerp(1,lerp(.92,1,sceneKey.shadowAttenuation),hasKey);
                 float3 specularNormal=StickerSpecularNormal(input.sourceOS,baseNormal,stickerData);
                 specularNormal=ClayWrinkleNormal(input.sourceOS,specularNormal,specularCoverage);
@@ -226,6 +245,7 @@ Shader "C6Lab/Experiments/RoundedClayStickerSurface"
                 float highlight=pow(saturate(dot(specularNormal,halfway)),exponent)
                     *gloss*.3*(1-unresolved*.5)*saturate(dot(specularNormal,keyDirection))
                     *specularCoverage;
+                [branch] if(_ClayPreviewLighting>.5)highlight*=previewIntensity;
                 // Matte contact and microdetail are independent of the gloss slider.
                 // Both disappear at thickness zero; receiver coverage remains paint.a.
                 float contact=StickerContact(uv,normalizedHeight);

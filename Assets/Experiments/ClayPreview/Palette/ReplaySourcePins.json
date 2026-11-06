@@ -1,0 +1,95 @@
+{
+    "format": "clay-preview-palette-source-pins-v1",
+    "journalSha256": "0e67d57c3ef2a559c9c05a846e472ce6349a18134dd2ef659ea817672156b6d8",
+    "recordHash": "a7b1b0f37231ed590bec96a310fc44994f88365f5bf2c23de772dbe8db9d9ba7",
+    "sources": [
+        {
+            "path": "Assets/Experiments/ClayPreview/Rounded/OriginalBevel/BroadData.png",
+            "sha256": "56a998480dcd10dfb387ca97b26bd6f7837dc2e5f4e61be6851201da5b7f75d6"
+        },
+        {
+            "path": "Assets/Experiments/ClayPreview/Rounded/OriginalBevel/BroadData.png.meta",
+            "sha256": "8aeb2c1af92a991ed060a2a384722c8a2ecb28f30799abc0aa2fb4de11f66882"
+        },
+        {
+            "path": "Assets/Experiments/ClayPreview/Rounded/OriginalBevel/ClusterData.png",
+            "sha256": "8335c1473dc44dc40c7d9d7e3bcd685ca0dc54e8a3ffecb1228a6c930f0bc843"
+        },
+        {
+            "path": "Assets/Experiments/ClayPreview/Rounded/OriginalBevel/ClusterData.png.meta",
+            "sha256": "d9cc9b013d0742a21dc10335d08e44916f5068f1ed1f75a3ba72a9e71df228b0"
+        },
+        {
+            "path": "Assets/Experiments/ClayPreview/Rounded/OriginalBevel/LongData.png",
+            "sha256": "a52fab40d255384d382bd839ca62b5df14d1a7375ac437b36b3fbdea0c11387e"
+        },
+        {
+            "path": "Assets/Experiments/ClayPreview/Rounded/OriginalBevel/LongData.png.meta",
+            "sha256": "90eb17510cf41e311590cf4c24f43f5d84a7b12255489645d33203b5b66fef15"
+        },
+        {
+            "path": "Assets/Experiments/ClayPreview/Rounded/RoundedBevel/BroadData.png",
+            "sha256": "a4d357827da77da3adfcbecba550ad0e9419dd980b5011e5cc5b65245813a59a"
+        },
+        {
+            "path": "Assets/Experiments/ClayPreview/Rounded/RoundedBevel/BroadData.png.meta",
+            "sha256": "2f5f96bfc30c472f0c307c3c220689586e9fca8a5eb697e67c35e30ced76bcba"
+        },
+        {
+            "path": "Assets/Experiments/ClayPreview/Rounded/RoundedBevel/ClusterData.png",
+            "sha256": "3193f03efbf9d29477fc164c09a01afb02b8c79c3bf44630ed57027cb69edcd8"
+        },
+        {
+            "path": "Assets/Experiments/ClayPreview/Rounded/RoundedBevel/ClusterData.png.meta",
+            "sha256": "352c0a3ac88bfe946e9558ac7fc2bc3c9608aba9390e9fcafdb4bd0f2476c0ed"
+        },
+        {
+            "path": "Assets/Experiments/ClayPreview/Rounded/RoundedBevel/LongData.png",
+            "sha256": "d6a6252c89948a219341afce08760c6051d26537c6c29eedc72eec7fb2014c23"
+        },
+        {
+            "path": "Assets/Experiments/ClayPreview/Rounded/RoundedBevel/LongData.png.meta",
+            "sha256": "b51021b7b3936ca11b7305d2c5199dc0178c92065db9e2d1c8d7ad48bdae7d9f"
+        },
+        {
+            "path": "Assets/Experiments/ClayPreview/Runtime/Shaders/StickerCoatingRuntime.shader",
+            "sha256": "ff98f7a0fa953f204846b71597aefb42a19793216958e8bdacf437179d162daf"
+        },
+        {
+            "path": "Assets/Experiments/ClayPreview/Runtime/Shaders/StickerCoatingRuntime.shader.meta",
+            "sha256": "299d9017995a1b664699c83f68a95bc14c3e6bf788481c8d6a0e8691329fed42"
+        },
+        {
+            "path": "Assets/Lab/Resources/GourdPaint/ClaySticker/BroadData.png",
+            "sha256": "8af37a47adce8f8e0ec0b81a0fc9a41052da876611c092742f001ec2b6a07787"
+        },
+        {
+            "path": "Assets/Lab/Resources/GourdPaint/ClaySticker/BroadData.png.meta",
+            "sha256": "668d73fa285875456c2d76f8b13a1e01dcdc03170a5cceb4f845f11aa8f28730"
+        },
+        {
+            "path": "Assets/Lab/Resources/GourdPaint/ClaySticker/ClayStickerRuntime.shader",
+            "sha256": "6d91785c7ff32a9397749cbdd06ee1a50c9115b1c5c3396430d1ea47da0bdd3a"
+        },
+        {
+            "path": "Assets/Lab/Resources/GourdPaint/ClaySticker/ClayStickerRuntime.shader.meta",
+            "sha256": "6b61467bc8ac250b1ce93692e959ac9333c551711d13c8e25948430f19cbf56f"
+        },
+        {
+            "path": "Assets/Lab/Resources/GourdPaint/ClaySticker/ClusterData.png",
+            "sha256": "c4f913cec9ac8efd2ee63cbb2d858b81919e39478c614e1614bea137be326b60"
+        },
+        {
+            "path": "Assets/Lab/Resources/GourdPaint/ClaySticker/ClusterData.png.meta",
+            "sha256": "b1f64f70f7bb18a80c39f3f395fdf47385119278b98359e5c723120c1f359146"
+        },
+        {
+            "path": "Assets/Lab/Resources/GourdPaint/ClaySticker/LongData.png",
+            "sha256": "ee5ea322e91211e331abb67c6a27268ef2c2195a33618af8173b4881b89c9e84"
+        },
+        {
+            "path": "Assets/Lab/Resources/GourdPaint/ClaySticker/LongData.png.meta",
+            "sha256": "e29cc66652c13f4948b449089a1fd8ee7363b53d5724a12b2115b69d74805fe5"
+        }
+    ]
+}
