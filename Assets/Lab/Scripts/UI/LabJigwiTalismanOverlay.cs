@@ -57,6 +57,8 @@ namespace C6Lab
         [Header("#533 못 다 쓴 부적 (A가 끝날 때까지 못 쓰면 지귀 불에 타 버림)")]
         [Tooltip("#540: A가 끝나기 이만큼(초) 전부터 부적이 겉(가장자리)에서부터 안쪽으로 타들어 간다. A보다 길면 A가 시작하자마자(0초부터). 끝나는 순간 한가운데까지 다 탄다. 0이면 끔.")]
         [SerializeField, Range(0f, 15f)] private float burnWarnSeconds = 15f;
+        [Tooltip("#540: 쓰는 동안에는 이만큼(0~1, 1 = 한가운데)까지만 탄다. 글자에 닿지 않는 가장자리에서 머물러 쓰기를 방해하지 않고, 다 못 쓰고 끝나면 그때 한가운데까지 마저 탄다.")]
+        [SerializeField, Range(0f, 1f)] private float burnWriteLimit = .14f;
         [Tooltip("#540: 타들어 가는 빠르기 곡선. 1이면 일정하게, 클수록 처음엔 아주 천천히 타다가 끝으로 갈수록 빨라진다.")]
         [SerializeField, Range(1f, 4f)] private float burnEase = 2f;
         [Tooltip("#540: A가 끝나기 이만큼(초) 남았을 때부터 1초마다 톡 하는 진동.")]
@@ -440,7 +442,8 @@ namespace C6Lab
         {
             if (Burning) return;
             float level = Finishing ? 0f : WarnLevel;
-            DrawEdgeBurn(level * 1.02f, time, level);
+            // #540: while writing, the fire only eats the margin outside the letter so it never hides the strokes.
+            DrawEdgeBurn(level * burnWriteLimit, time, level);
             int tick = level > 0f && TimeLeft <= warnHapticSeconds ? Mathf.FloorToInt(time) : -1;
             if (tick >= 0 && tick != lastWarnTick)
             {

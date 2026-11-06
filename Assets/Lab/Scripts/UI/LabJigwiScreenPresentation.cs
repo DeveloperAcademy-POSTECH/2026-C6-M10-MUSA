@@ -719,14 +719,8 @@ namespace C6Lab
             // 피버는 세 스테이지 공통 연출(#441, LabYaguangFeverHud)이 알린다.
             // #509: the only words on screen are Jigwi's two-second taunts (no progress, guide, result or next-gimmick
             // lines). The drops, the "now" vibration and the failure overlay carry the rest without text.
+            // #540: the taunts are spoken by Jigwi's voice now (LabJigwiTalismanOverlay); no warning words on screen.
             string words = string.Empty;
-            if (active != null && active.Warning(now)) words = Taunt(active.kind);
-            foreach (var upcoming in stage.rounds ?? Array.Empty<LabJigwiABRound>())
-            {
-                if (upcoming == null || upcoming == active || !upcoming.Warning(now)) continue;
-                words = words.Length > 0 ? words + "\n" + Taunt(upcoming.kind) : Taunt(upcoming.kind);
-                break;
-            }
             status.text = words; playerStatus.text = rows.ToString();
             statusPanel.gameObject.SetActive(words.Length > 0);
             playerStatus.gameObject.SetActive(rows.Length > 0);
