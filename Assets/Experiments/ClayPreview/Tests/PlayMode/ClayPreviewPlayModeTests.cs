@@ -31,7 +31,7 @@ namespace Hapio.Experiments.Tests
         ClayPreviewController preview;
         Scene scene;
         string colorHash, heightHash, configHash, prefabHash;
-        int[] existingSessionIds;
+        MonoBehaviour[] existingSessions;
         int previousFrameRate, previousVSync;
         bool previousBackground;
 
@@ -46,7 +46,7 @@ namespace Hapio.Experiments.Tests
             previousFrameRate = Application.targetFrameRate;
             previousVSync = QualitySettings.vSyncCount;
             previousBackground = Application.runInBackground;
-            existingSessionIds = FindSessions().Select(x => x.GetInstanceID()).ToArray();
+            existingSessions = FindSessions();
             yield return EditorSceneManager.LoadSceneAsyncInPlayMode(ScenePath,
                 new LoadSceneParameters(LoadSceneMode.Single));
             scene = SceneManager.GetSceneByPath(ScenePath);
@@ -811,7 +811,7 @@ namespace Hapio.Experiments.Tests
         void AssertNoNewSessions()
         {
             // A previous fixture may own a DontDestroyOnLoad session. Do not delete it or mistake it for ours.
-            string[] added = FindSessions().Where(component => !existingSessionIds.Contains(component.GetInstanceID()))
+            string[] added = FindSessions().Where(component => !existingSessions.Any(existing => ReferenceEquals(existing, component)))
                 .Select(component => component.GetType().FullName + " / " + component.name + " / " + component.gameObject.scene.name).ToArray();
             Assert.That(added, Is.Empty, "Local palette inspection must not create a game room or network session.");
         }
