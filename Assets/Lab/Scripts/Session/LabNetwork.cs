@@ -258,8 +258,7 @@ namespace C6Lab
         //       "jigwiTalisman" request and the talisman water orb flag (5684~5686 were taken on main).
         // 5688: #509 Jigwi B lists only the picked seats, lasts 15 s and is judged by simultaneous Water boss hits;
         //       success splashes the boss, failure sets every board on fire (boardFireUntil). A2 starts at 42 s.
-        // 5689: #540 Jigwi A: an unfinished talisman sets that seat's board on fire (LabJigwiABPlayerFire.boardFireUntil)
-        //       and burns its remaining orbs.
+        // 5689: #540 Jigwi A: an unfinished talisman burns that seat's remaining orbs (A 10 s, burn stagger 2 s).
         internal const ushort LabProtocolVersion = 5689;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";

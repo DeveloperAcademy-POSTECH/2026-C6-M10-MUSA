@@ -400,7 +400,7 @@ namespace C6Lab
         {
             orb = null;
             if (!BeginRequest(sender, requestId, now, out reason)) return false;
-            if (JigwiBoardOnFire(now, sender)) return Reject("JIGWI_BOARD_FIRE", out reason); // #509 B 실패 / #540 A 부적 실패: 잠깐 북을 못 누름
+            if (JigwiBoardOnFire(now)) return Reject("JIGWI_BOARD_FIRE", out reason); // #509 지귀 B 실패: 잠깐 북을 못 누름
             // Without a tapped drum, use the sender's earliest placed one (drums are never removed).
             LabOrbState drum = drumId == null
                 ? drums.Values.FirstOrDefault(candidate => candidate.owner == sender)

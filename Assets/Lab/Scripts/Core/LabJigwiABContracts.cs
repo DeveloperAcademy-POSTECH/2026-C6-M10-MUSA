@@ -70,12 +70,10 @@ namespace C6Lab
         public double lastWaterSplashAt = -1d;
         /// <summary>#479 A only: when this player finished writing the talisman; -1 while still burning.</summary>
         public double talismanAt = -1d;
-        /// <summary>#540 A only: an unfinished talisman sets this player's board on fire (no drum presses) until then; -1 otherwise.</summary>
-        public double boardFireUntil = -1d;
         public LabJigwiABFireTarget[] targets = Array.Empty<LabJigwiABFireTarget>();
         public LabJigwiABPlayerFire Copy() => new LabJigwiABPlayerFire
         {
-            playerId = playerId, lastWaterSplashAt = lastWaterSplashAt, talismanAt = talismanAt, boardFireUntil = boardFireUntil,
+            playerId = playerId, lastWaterSplashAt = lastWaterSplashAt, talismanAt = talismanAt,
             targets = (targets ?? Array.Empty<LabJigwiABFireTarget>()).Select(value => value?.Copy()).ToArray()
         };
     }
@@ -172,10 +170,7 @@ namespace C6Lab
                     foreach (var player in round.players)
                         if (player == null || !seats.Add(player.playerId) || memberIds != null && !memberIds.Contains(player.playerId)
                             || player.targets == null || player.targets.Length != 0 || player.lastWaterSplashAt != -1d
-                            || player.talismanAt != -1d && !Range(player.talismanAt, round.activeAt, round.endsAt)
-                            // #540: only an expired A sets an unfinished seat's board on fire, for at most 10 s.
-                            || player.boardFireUntil != -1d && (round.resolution != LabJigwiABResolution.Expired || player.talismanAt != -1d
-                                || !Range(player.boardFireUntil, round.resolvedAt, round.resolvedAt + 10d))) return false;
+                            || player.talismanAt != -1d && !Range(player.talismanAt, round.activeAt, round.endsAt)) return false;
                     if (round.resolution != LabJigwiABResolution.Skipped && round.players.Length == 0
                         || memberIds != null && round.resolution != LabJigwiABResolution.Skipped && !seats.SetEquals(memberIds)) return false;
                     bool everyoneWrote = round.players.Length > 0 && round.players.All(player => player.talismanAt >= 0d);
@@ -183,8 +178,7 @@ namespace C6Lab
                         || round.resolution == LabJigwiABResolution.None && everyoneWrote) return false;
                     continue;
                 }
-                if (round.shrinkAt < round.activeAt
-                    || round.players.Any(player => player != null && (player.talismanAt != -1d || player.boardFireUntil != -1d))
+                if (round.shrinkAt < round.activeAt || round.players.Any(player => player != null && player.talismanAt != -1d)
                     || Math.Abs(round.endsAt - Math.Min(state.cutoffAt, round.activeAt + LabJigwiABTimeline.GroupMissionSeconds)) > .00001d
                     || round.resolution != LabJigwiABResolution.Skipped && round.players.Length == 0) return false;
                 // #509 sync progress: 0..2 while running/failed, exactly 3 once completed; a window only while running.
