@@ -62,7 +62,7 @@ MonoBehaviour:
   detailGapBelowBar: 10
   displayFollow: 10
   displayMaxSpeed: 1.6
-  minimumSeconds: 0.8
+  minimumSeconds: 1
   fullHoldSeconds: 0.2
   fadeOutSeconds: 0.15
   previewSeconds: 5

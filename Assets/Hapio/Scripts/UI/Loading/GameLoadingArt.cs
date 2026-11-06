@@ -83,7 +83,7 @@ namespace Hapio
         [Min(.05f)] public float displayMaxSpeed = 1.6f;
 
         [Header("보이고 닫히기 (GameSession이 띄울 때)")]
-        [Tooltip("아무리 짧은 전환도 이만큼은 보인다 (사용자 결정 0.8초)")] [Min(0f)] public float minimumSeconds = .8f;
+        [Tooltip("아무리 짧은 전환도 이만큼은 보인다 (사용자 결정 1초)")] [Min(0f)] public float minimumSeconds = 1f;
         [Tooltip("100%가 된 뒤 닫히기 전까지 100%를 보여 주는 시간")] [Min(0f)] public float fullHoldSeconds = .2f;
         [Tooltip("닫힐 때 사라지는 시간")] [Min(0f)] public float fadeOutSeconds = .15f;
 
