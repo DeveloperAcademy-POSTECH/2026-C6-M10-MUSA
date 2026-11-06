@@ -171,6 +171,7 @@ namespace Hapio
             DontDestroyOnLoad(gameObject);
             startOverlay = GameStartOverlay.Create(transform);
             sceneFade = GameSceneFade.Create(transform, lobbyFadeColor);
+            CreateLoadingView();
             network.GameFlowMessage += ReceiveControl;
             network.GameFlowDisconnected += OnPeerDisconnected;
             network.GameFlowDeveloperRestartRequested += OnDeveloperRestart;
@@ -180,14 +181,17 @@ namespace Hapio
 
         private void Start()
         {
+            // The app's first screen (#478): the loading screen covers Home until it has drawn. Start runs before that
+            // first frame is drawn, and by then the loaded scene is the active one.
+            if (SceneManager.GetActiveScene().path == GameScenePaths.Home) BeginLoading(GameScenePaths.Home);
             // Directly opening a menu in the Editor still has one explicit initial state.
-            if (SceneManager.GetActiveScene().path != GameScenePaths.Home && !network.IsConnected)
-                QueueScene(GameScenePaths.Home);
+            else if (!network.IsConnected) QueueScene(GameScenePaths.Home);
         }
 
         private void Update()
         {
             if (Instance != this || network == null) return;
+            UpdateLoading();
             // The browse that resumes behind the title after a game must not keep the phone awake there (#476).
             network.RoomSearchKeepsAwake = roomBrowserVisible;
             pendingRooms.Tick(out string pendingError);
@@ -417,6 +421,8 @@ namespace Hapio
             // Never unload a terminal Battle before its actual committed paint map is copied.
             yield return null;
             if (quitting) { sceneRoutine = null; yield break; }
+            // #478: outside a run every scene change is covered by the loading screen (drawn above the fade below).
+            if (ShowsLoading(SceneManager.GetActiveScene().path, wantedScene)) BeginLoading(wantedScene);
             if (holdForFade) yield return FadeOutOfScene();
             while (SceneManager.GetActiveScene().path != wantedScene || forceBattleReload)
             {
@@ -446,7 +452,12 @@ namespace Hapio
                     if (quitting) break;
                     throw new InvalidOperationException("Could not load " + destination);
                 }
-                yield return load;
+                while (!load.isDone)
+                {
+                    ReportSceneLoad(load.progress);
+                    yield return null;
+                }
+                ReportSceneLoad(1f);
                 yield return null;
             }
             sceneRoutine = null;

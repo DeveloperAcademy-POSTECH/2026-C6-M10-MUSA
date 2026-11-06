@@ -15,8 +15,11 @@ namespace Hapio
     [DisallowMultipleComponent]
     public sealed class GameLoadingView : MonoBehaviour
     {
-        /// <summary>Above the start cover (30000), below the scene fade (30100).</summary>
-        public const int SortingOrder = 30050;
+        /// <summary>
+        /// Above the start cover (30000) and the scene fade (30100): while a screen loads, the loading screen is what shows,
+        /// not the black cover under it.
+        /// </summary>
+        public const int SortingOrder = 30150;
 
         private GameLoadingArt art;
         private System.Random random;
@@ -29,7 +32,8 @@ namespace Hapio
         private GameLoadingShape trackEdge, track, fill, bubble;
         private RectTransform bubbleRoot;
         private Text percent;
-        private Coroutine preview;
+        private Text detail;
+        private Coroutine preview, fading;
 
         private GameLoadingArt.Runner current;
         private float target, displayed, previousDisplayed;
@@ -50,6 +54,9 @@ namespace Hapio
         public RectTransform Bar => trackEdge != null ? trackEdge.rectTransform : null;
         public RectTransform Bubble => bubbleRoot;
         public RectTransform Caption => caption != null ? caption.rectTransform : null;
+        /// <summary>The line under the bar (the ready count while a battle is prepared), empty when none.</summary>
+        public string DetailText => detail != null && detail.gameObject.activeSelf ? detail.text : string.Empty;
+        public bool FadingOut => fading != null;
 
         public static GameLoadingView Create(Transform parent, GameLoadingArt art = null, System.Random random = null)
         {
@@ -126,12 +133,53 @@ namespace Hapio
             percent.alignment = TextAnchor.MiddleCenter;
             percent.horizontalOverflow = HorizontalWrapMode.Overflow;
             percent.raycastTarget = false;
+
+            detail = Add<Text>("Detail", root);
+            detail.font = caption.font;
+            detail.fontSize = art.detailFontSize;
+            detail.color = art.detailColor;
+            detail.alignment = TextAnchor.MiddleCenter;
+            detail.horizontalOverflow = HorizontalWrapMode.Overflow;
+            detail.verticalOverflow = VerticalWrapMode.Overflow;
+            detail.raycastTarget = false;
+            detail.gameObject.SetActive(false);
+        }
+
+        /// <summary>A short line under the bar ("준비 2/3"); empty hides it.</summary>
+        public void SetDetail(string text)
+        {
+            bool shown = !string.IsNullOrEmpty(text);
+            if (detail.gameObject.activeSelf != shown) detail.gameObject.SetActive(shown);
+            if (shown && detail.text != text) detail.text = text;
+        }
+
+        /// <summary>Close with a short fade (<see cref="GameLoadingArt.fadeOutSeconds"/>); showing again cancels it.</summary>
+        public void FadeOut()
+        {
+            if (!Visible || fading != null) return;
+            group.blocksRaycasts = group.interactable = false;
+            if (art.fadeOutSeconds <= 0f || !isActiveAndEnabled) { Hide(); return; }
+            fading = StartCoroutine(Fade());
+        }
+
+        private IEnumerator Fade()
+        {
+            float started = Time.unscaledTime;
+            while (Time.unscaledTime - started < art.fadeOutSeconds)
+            {
+                group.alpha = 1f - (Time.unscaledTime - started) / art.fadeOutSeconds;
+                yield return null;
+            }
+            fading = null;
+            Hide();
         }
 
         /// <summary>Show from <paramref name="progress"/> (0..1) with a newly drawn runner.</summary>
         public void Show(float progress = 0f)
         {
             if (preview != null) { StopCoroutine(preview); preview = null; }
+            if (fading != null) { StopCoroutine(fading); fading = null; }
+            SetDetail(string.Empty);
             target = displayed = previousDisplayed = Mathf.Clamp01(progress);
             tilt = 0f;
             runClock = 0f;
@@ -160,6 +208,7 @@ namespace Hapio
         public void Hide()
         {
             if (preview != null) { StopCoroutine(preview); preview = null; }
+            if (fading != null) { StopCoroutine(fading); fading = null; }
             if (group == null) return;
             group.alpha = 0f;
             group.blocksRaycasts = group.interactable = false;
@@ -186,7 +235,7 @@ namespace Hapio
             while (displayed < 1f) yield return null;
             yield return new WaitForSecondsRealtime(art.previewHoldSeconds);
             preview = null;
-            Hide();
+            FadeOut();
         }
 
         private void Update()
@@ -264,6 +313,10 @@ namespace Hapio
             bubbleRoot.sizeDelta = new Vector2(art.bubbleSize.x, art.bubbleSize.y + art.bubbleTail);
             bubbleRoot.anchoredPosition = new Vector2(tipX, barCenter + art.barHeight * .5f + art.bubbleGapAboveBar);
             bubbleRoot.localEulerAngles = new Vector3(0f, 0f, tilt);
+            float detailHeight = art.detailFontSize * 1.3f;
+            detail.rectTransform.sizeDelta = new Vector2(area.width, detailHeight);
+            detail.rectTransform.anchoredPosition = new Vector2(0f,
+                barCenter - art.barHeight * .5f - art.detailGapBelowBar - detailHeight * .5f);
             string label = PercentLabel(displayed);
             if (percent.text != label) percent.text = label;
             if (paper.texture != null) paper.uvRect = CoverUv(area.size, paper.texture.width / (float)Mathf.Max(1, paper.texture.height));
@@ -294,7 +347,8 @@ namespace Hapio
             float step = (target - shown) * (1f - Mathf.Exp(-Mathf.Max(0f, follow) * deltaTime));
             step = Mathf.Min(step, Mathf.Max(0f, maxSpeed) * deltaTime);
             float next = shown + step;
-            return target - next < .001f ? target : next;
+            // The last half percent snaps, so an instant load fills 0→100% in about 0.8 s instead of creeping.
+            return target - next < .005f ? target : next;
         }
 
         /// <summary>How far the bubble leans back while moving at <paramref name="speed"/> bar widths per second.</summary>

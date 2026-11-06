@@ -57,7 +57,13 @@ MonoBehaviour:
   bubbleTiltPerSpeed: 60
   bubbleMaxTilt: 14
   bubbleTiltFollow: 10
-  displayFollow: 6
-  displayMaxSpeed: 0.8
+  detailFontSize: 13
+  detailColor: {r: 0.36, g: 0.27, b: 0.2, a: 1}
+  detailGapBelowBar: 10
+  displayFollow: 10
+  displayMaxSpeed: 1.6
+  minimumSeconds: 0.8
+  fullHoldSeconds: 0.2
+  fadeOutSeconds: 0.15
   previewSeconds: 5
   previewHoldSeconds: 0.8

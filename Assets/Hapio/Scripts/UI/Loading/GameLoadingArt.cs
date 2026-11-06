@@ -71,10 +71,21 @@ namespace Hapio
         [Tooltip("가장 많이 기우는 각도")] [Range(0f, 45f)] public float bubbleMaxTilt = 14f;
         [Tooltip("기울기가 바뀌는 빠르기 (클수록 빨리 따라감)")] [Min(.1f)] public float bubbleTiltFollow = 10f;
 
+        [Header("준비 인원 (첫 전투 준비 때 막대 아래 \"준비 n/m\")")]
+        [Min(6)] public int detailFontSize = 13;
+        public Color detailColor = new Color(.36f, .27f, .2f, 1f);
+        [Tooltip("막대 아래 끝에서 글자 위 끝까지")] public float detailGapBelowBar = 10f;
+
         [Header("진행 표시")]
         [Tooltip("보이는 진행이 실제 진행을 따라가는 빠르기 (클수록 빨리 따라감). 뒤로는 가지 않는다.")]
-        [Min(.1f)] public float displayFollow = 6f;
-        [Tooltip("보이는 진행이 1초에 갈 수 있는 최대 거리 (막대 폭 비율)")] [Min(.05f)] public float displayMaxSpeed = .8f;
+        [Min(.1f)] public float displayFollow = 10f;
+        [Tooltip("보이는 진행이 1초에 갈 수 있는 최대 거리 (막대 폭 비율). 바로 끝나는 전환도 0→100%가 한 번 차 보인다.")]
+        [Min(.05f)] public float displayMaxSpeed = 1.6f;
+
+        [Header("보이고 닫히기 (GameSession이 띄울 때)")]
+        [Tooltip("아무리 짧은 전환도 이만큼은 보인다 (사용자 결정 0.8초)")] [Min(0f)] public float minimumSeconds = .8f;
+        [Tooltip("100%가 된 뒤 닫히기 전까지 100%를 보여 주는 시간")] [Min(0f)] public float fullHoldSeconds = .2f;
+        [Tooltip("닫힐 때 사라지는 시간")] [Min(0f)] public float fadeOutSeconds = .15f;
 
         [Header("미리보기 (Editor Play 중 Hapio 메뉴)")]
         [Min(.5f)] public float previewSeconds = 5f;
