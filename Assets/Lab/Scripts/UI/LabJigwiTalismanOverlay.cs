@@ -121,6 +121,12 @@ namespace C6Lab
         [SerializeField, Range(0f, 1f)] private float sweepSoundVolume = .7f;
         [Tooltip("(가락과 따로) \"쾅\" 순간 덧낼 소리. 기본 JigwiTalismanSplash(시원한 물벼락). 비우면 없음. 예: JigwiTalismanChime(긴 여운), YaguangShakeBellFinal")]
         [SerializeField] private string burstSoundFolder = "JigwiTalismanSplash";
+        [Header("#540 지귀 목소리 (A/B 예고가 뜨는 순간, 각 기기에서)")]
+        [Tooltip("A(부적) 예고 때 지귀 대사 폴더. 예: \"다 태워버리겠어!\". 비우면 없음.")]
+        [SerializeField] private string voiceAFolder = "JigwiVoiceA";
+        [Tooltip("B(물구슬 동시 명중) 예고 때 지귀 대사 폴더. 예: \"물방울로는 어림도 없지!\". 비우면 없음.")]
+        [SerializeField] private string voiceBFolder = "JigwiVoiceB";
+        [SerializeField, Range(0f, 1f)] private float voiceVolume = 1f;
         [Tooltip("#540 부적을 쓰는 동안 깔리는 구슬 타는 소리(츠츠츠, 반복). 끝나 갈수록 커진다. 비우면 없음.")]
         [SerializeField] private string fireLoopFolder = "JigwiTalismanFireLoop";
         [Tooltip("쓰기 시작할 때 타는 소리 크기.")]
@@ -192,7 +198,11 @@ namespace C6Lab
         private static Sprite ringSprite;
         /// <summary>#533: 점마다 획 순서상 위치 (0~1). 완성 때 금빛이 이 순서로 훑는다.</summary>
         private float[] strokeRank = Array.Empty<float>();
-        private AudioSource sfx, scratch, fireLoop;
+        private AudioSource sfx, scratch, fireLoop, voice;
+        private readonly HashSet<string> voicedRounds = new HashSet<string>();
+        /// <summary>#540: 지귀 예고 대사를 낸 횟수와 마지막 대사 종류(A/B). 테스트용.</summary>
+        public int VoiceCount { get; private set; }
+        public string LastVoice { get; private set; }
         private float fireLoopLevel;
         /// <summary>#540: 지금 깔리는 타는 소리 크기 (0~1, 설정 크기 곱하기 전). 테스트용.</summary>
         public float FireLoopTarget { get; private set; }
@@ -340,6 +350,7 @@ namespace C6Lab
         public void Present(LabSnapshot snapshot, ulong localPlayer, double now)
         {
             EnsureWidgets();
+            ObserveTaunts(snapshot, now);
             LabJigwiABRound round = PendingTalisman(snapshot, localPlayer, now);
             // #533: the A ran out before this seat finished — Jigwi's fire burns the unfinished talisman away.
             if (Visible && round == null && !Finishing && !Burning && RanOut(snapshot, RoundId, localPlayer, now)) BeginBurn();
@@ -355,6 +366,40 @@ namespace C6Lab
             if (paper != null) paper.gameObject.SetActive(Visible || Finishing || Burning);
             if (!Visible) hasLast = false;
             SetBoardBlocked(Visible);
+        }
+
+        /// <summary>
+        /// #540 지귀 목소리: A/B 예고가 뜨는 순간 한 번씩 대사를 낸다(공유 연출 시계 기준이라 기기마다 같은 때).
+        /// 늦게 들어와 이미 지난 예고는 다시 틀지 않는다.
+        /// </summary>
+        private void ObserveTaunts(LabSnapshot snapshot, double now)
+        {
+            if (snapshot == null || snapshot.phase != LabPhase.Playing || snapshot.jigwiAB?.enabled != true || snapshot.jigwiAB.rounds == null) return;
+            foreach (LabJigwiABRound item in snapshot.jigwiAB.rounds)
+            {
+                if (item == null || item.id == null || now < item.warningAt || now - item.warningAt > .6d) continue;
+                if (item.resolution == LabJigwiABResolution.Skipped || item.resolution == LabJigwiABResolution.Cancelled) continue;
+                if (!voicedRounds.Add(item.id)) continue;
+                bool a = item.kind == LabJigwiABKind.PersonalBurn;
+                PlayVoice(a ? "A" : "B", a ? voiceAFolder : voiceBFolder);
+            }
+        }
+
+        private void PlayVoice(string name, string folder)
+        {
+            VoiceCount++; LastVoice = name;
+            if (string.IsNullOrEmpty(folder) || voiceVolume <= 0f) return;
+            AudioClip[] clips = Resources.LoadAll<AudioClip>("Audio/" + folder);
+            if (clips == null || clips.Length == 0) return;
+            if (voice == null)
+            {
+                voice = gameObject.AddComponent<AudioSource>();
+                voice.playOnAwake = false; voice.spatialBlend = 0f;
+            }
+            voice.Stop();
+            voice.clip = clips[UnityEngine.Random.Range(0, clips.Length)];
+            voice.volume = voiceVolume * LabAudioSettings.SfxVolume;
+            voice.Play();
         }
 
         /// <summary>#533: 이 회차 A가 (시간이 다 돼) 끝났는데 내 자리 부적은 아직 안 쓴 상태인지. 게임이 끝난 경우는 빼고.</summary>

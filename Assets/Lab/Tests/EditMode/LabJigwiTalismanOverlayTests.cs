@@ -193,6 +193,22 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void JigwiTauntsOnceWhenTheAWarningAppears()
+        {
+            LabSnapshot snapshot = Snapshot(-1d); // warning at 10 s
+            overlay.Present(snapshot, Local, 9.5d);
+            Assert.That(overlay.VoiceCount, Is.Zero);
+            overlay.Present(snapshot, Local, 10.1d);
+            Assert.That(overlay.VoiceCount, Is.EqualTo(1)); Assert.That(overlay.LastVoice, Is.EqualTo("A"));
+            overlay.Present(snapshot, Local, 10.3d);
+            Assert.That(overlay.VoiceCount, Is.EqualTo(1), "Once per warning.");
+            var late = new GameObject("late", typeof(RectTransform)).AddComponent<LabJigwiTalismanOverlay>();
+            late.transform.SetParent(root.transform, false); late.Bind(null, null);
+            late.Present(snapshot, Local, 12d);
+            Assert.That(late.VoiceCount, Is.Zero, "A screen that joins late does not replay a past warning.");
+        }
+
+        [Test]
         public void AFinishedOrEndedGameNeverBurnsTheTalisman()
         {
             overlay.Present(Snapshot(-1d), Local, 11d);
