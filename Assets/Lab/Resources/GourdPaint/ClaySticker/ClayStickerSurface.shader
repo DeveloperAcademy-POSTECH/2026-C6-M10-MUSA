@@ -8,6 +8,9 @@ Shader "C6Lab/ClayStickerSurface"
         _PaintMapReady("Artwork Ready",Float)=0
         _ClayThickness("Clay Thickness",Range(0,.02))=.006
         _ClayGloss("Clay Gloss",Range(0,1))=.25
+        [HideInInspector] _ClayPreviewLighting("Preview Light Override",Float)=0
+        [HideInInspector] _ClayPreviewLightDirection("Preview World Direction To Light",Vector)=(0,0,1,0)
+        [HideInInspector] _ClayPreviewLightIntensity("Preview Direct Light Intensity",Float)=1
         [Toggle] _PlayerPaintPatternsEnabled("Player Ownership Patterns",Float)=1
     }
     SubShader
@@ -35,6 +38,8 @@ Shader "C6Lab/ClayStickerSurface"
             float4 _HeightMap_TexelSize;
             CBUFFER_START(UnityPerMaterial)
                 float _PaintMapReady,_ClayThickness,_ClayGloss,_PlayerPaintPatternsEnabled;
+                float _ClayPreviewLighting,_ClayPreviewLightIntensity;
+                float4 _ClayPreviewLightDirection;
             CBUFFER_END
             struct Attributes {float4 positionOS:POSITION;float3 normalOS:NORMAL;};
             struct Varyings
@@ -59,6 +64,46 @@ Shader "C6Lab/ClayStickerSurface"
                 value+=SAMPLE_TEXTURE2D_LOD(_HeightMap,sampler_HeightMap,uv+float2(0,step.y),0).r*.125;
                 value+=SAMPLE_TEXTURE2D_LOD(_HeightMap,sampler_HeightMap,uv-float2(0,step.y),0).r*.125;
                 return saturate(value);
+            }
+            float4 SoftStickerData(float2 uv,float radius,out float specularCoverage)
+            {
+                // Filter premultiplied slopes and their real coverage together.
+                // Unpremultiplying before filtering would pull empty texels toward
+                // a false normal and put a glossy ring around the complete base.
+                float2 step=_HeightMap_TexelSize.xy*radius;
+                float4 center=SAMPLE_TEXTURE2D_LOD(_HeightMap,sampler_HeightMap,uv,0);
+                // Filtering may borrow a neighbour's normal but must not extend its
+                // specular support onto the completion-only undercoat.
+                specularCoverage=saturate(center.a);
+                float4 value=center*.5;
+                value+=SAMPLE_TEXTURE2D_LOD(_HeightMap,sampler_HeightMap,uv+float2(step.x,0),0)*.125;
+                value+=SAMPLE_TEXTURE2D_LOD(_HeightMap,sampler_HeightMap,uv-float2(step.x,0),0)*.125;
+                value+=SAMPLE_TEXTURE2D_LOD(_HeightMap,sampler_HeightMap,uv+float2(0,step.y),0)*.125;
+                value+=SAMPLE_TEXTURE2D_LOD(_HeightMap,sampler_HeightMap,uv-float2(0,step.y),0)*.125;
+                return value;
+            }
+            float3 StickerSpecularNormal(float3 source,float3 baseNormal,float4 data)
+            {
+                const float maxSlope=.466307658; // tan(25 degrees)
+                float support=saturate(data.a);
+                if(!(support>.0001))return baseNormal;
+                float2 encoded=data.gb/max(support,.0001);
+                if(!all(abs(encoded)<2))return baseNormal;
+                float2 slope=(saturate(encoded)*2-1)*maxSlope;
+                slope*=min(1,maxSlope/max(length(slope),.0001));
+                float3 d=SafeNormalize(source);float angle=atan2(d.z,d.x);
+                float ring=sqrt(max(0,1-d.y*d.y));
+                float3 uOS=float3(-sin(angle),0,cos(angle));
+                float3 vOS=float3(d.y*cos(angle),-ring,d.y*sin(angle));
+                float3 u=TransformObjectToWorldDir(uOS);
+                u=SafeNormalize(u-baseNormal*dot(u,baseNormal));
+                float3 v=SafeNormalize(cross(baseNormal,u));
+                if(dot(v,TransformObjectToWorldDir(vOS))<0)v=-v;
+                float3 tilt=u*slope.x+v*slope.y;
+                // Keep finite, bounded normals even at a degenerate model tangent.
+                if(!all(abs(tilt)<2))return baseNormal;
+                tilt*=min(1,maxSlope/max(length(tilt),.0001));
+                return SafeNormalize(baseNormal+tilt);
             }
             Varyings Vert(Attributes input)
             {
@@ -91,9 +136,12 @@ Shader "C6Lab/ClayStickerSurface"
                 if(_PlayerPaintPatternsEnabled>.5)
                 {float painter=round(SAMPLE_TEXTURE2D(_PainterMap,sampler_PainterMap,uv).r*255);pigment*=1-.32*PainterInk(painter,uv);}
                 float footprint=max(length(ddx(uv)*_HeightMap_TexelSize.zw),length(ddy(uv)*_HeightMap_TexelSize.zw));
-                float normalizedHeight=SoftHeight(uv,clamp(footprint,2,5));
+                float specularCoverage;
+                float4 stickerData=SoftStickerData(uv,clamp(footprint,2,5),specularCoverage);
+                float normalizedHeight=saturate(stickerData.r);
                 float height=normalizedHeight*clamp(_ClayThickness,0,.02);
-                float3 n=normalize(input.normalWS),dx=ddx(input.positionWS),dy=ddy(input.positionWS);
+                float3 baseNormal=normalize(input.normalWS);
+                float3 n=baseNormal,dx=ddx(input.positionWS),dy=ddy(input.positionWS);
                 float3 a=cross(dy,n),b=cross(n,dx);float determinant=dot(dx,a);
                 float3 gradient=(ddx(height)*a+ddy(height)*b)*sign(determinant)/max(abs(determinant),1e-8);
                 // A quantized/overlapping height transition must never turn its normal
@@ -111,27 +159,40 @@ Shader "C6Lab/ClayStickerSurface"
                 // scenes deliberately point their actual key away from the paint face;
                 // letting it dominate would flatten both relief and DEV gloss previews.
                 float3 keyDirection=SafeNormalize(lerp(fallbackKey,sceneKey.direction,hasKey*.25));
+                // Only cloned comparison materials opt into this full world-space key.
+                // The disabled branch leaves the original game's lighting math intact.
+                float previewIntensity=1;
+                [branch] if(_ClayPreviewLighting>.5)
+                {
+                    float3 suppliedDirection=_ClayPreviewLightDirection.xyz;
+                    if(!(dot(suppliedDirection,suppliedDirection)>.000001)||!all(abs(suppliedDirection)<1000000))
+                        suppliedDirection=float3(0,0,1);
+                    keyDirection=SafeNormalize(suppliedDirection);
+                    previewIntensity=clamp(_ClayPreviewLightIntensity,0,2);
+                    if(!(previewIntensity>=0))previewIntensity=1;
+                }
                 // This is an art-directed lit clay surface. A controlled fill preserves
                 // recorded pigment hue/value even in the existing custom-lit scenes;
                 // URP key direction, shadow and SH still influence form and highlights.
                 float ambient=dot(max(SampleSH(n),0),float3(.2126,.7152,.0722));
                 float fill=lerp(.96,1.04,saturate(ambient));
                 float diffuse=(.78+.22*saturate(dot(n,keyDirection)))*fill;
+                [branch] if(_ClayPreviewLighting>.5)
+                    diffuse=(.78+.22*saturate(dot(n,keyDirection))*previewIntensity)*fill;
                 diffuse*=lerp(1,lerp(.92,1,sceneKey.shadowAttenuation),hasKey);
+                float3 specularNormal=StickerSpecularNormal(input.sourceOS,baseNormal,stickerData);
                 float gloss=saturate(_ClayGloss);
                 float exponent=lerp(12,64,gloss);
-                float unresolved=saturate(length(fwidth(n))*2);
+                float unresolved=saturate(length(fwidth(specularNormal))*2);
                 exponent=lerp(exponent,12,unresolved);
                 float3 halfway=SafeNormalize(keyDirection+view);
-                float highlight=pow(saturate(dot(n,halfway)),exponent)
-                    *gloss*.1*(1-unresolved*.5)*saturate(dot(n,keyDirection));
-                // Broad, soft wax/clay lobe stays legible during the short front view,
-                // independent of a scene's backward key. This is not a wet clear-coat
-                // reflection and adds no high-frequency environment texture.
-                float3 softKey=SafeNormalize(float3(-.25,.45,.86));
-                float3 softHalf=SafeNormalize(softKey+view);
-                highlight+=pow(saturate(dot(n,softHalf)),lerp(8,26,gloss))
-                    *gloss*.2*(1-unresolved*.5);
+                // One coated-sticker lobe uses the stamp's own dome normal. The
+                // original body-wide soft lobe is gone, and the completion-only
+                // undercoat has no specular support. Gloss zero adds exactly zero.
+                float highlight=pow(saturate(dot(specularNormal,halfway)),exponent)
+                    *gloss*.3*(1-unresolved*.5)*saturate(dot(specularNormal,keyDirection))
+                    *specularCoverage;
+                [branch] if(_ClayPreviewLighting>.5)highlight*=previewIntensity;
                 // A few nearby higher samples make an overlap/contact crease readable.
                 // The factor is exactly zero at DEV thickness zero and does not depend
                 // on gloss. Filtering and a small dead-zone suppress map quantization.

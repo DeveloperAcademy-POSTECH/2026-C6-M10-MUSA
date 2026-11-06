@@ -8,7 +8,7 @@ namespace C6Lab
     public sealed class LabClayStickerSettings
     {
         public const string ResourceFolder = "GourdPaint/ClaySticker/";
-        public const string StyleVersion = "clay-stickers-v1";
+        public const string StyleVersion = "clay-stickers-v2";
         [Range(.1f,1f)] public float minimumDensity = .65f;
         [Range(.1f,1f)] public float maximumDensity = 1f;
         public LabClayStickerSettings SanitizedCopy()

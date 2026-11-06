@@ -1,0 +1,11 @@
+{
+    "name": "Long",
+    "sourceHash": "698004eadec54a882434179abe1ee475b7334c3f7df957d4f514c3ab2ee632a4",
+    "whiteMaskHash": "787d0f6e6f9e93d279f922c63ff79e57350cb2aaf18fde9638450a09aafdec70",
+    "retainedPixels": 77106,
+    "removedTinyComponents": 0,
+    "alphaThreshold": 0.8999999761581421,
+    "transparentPadding": 0.10000000149011612,
+    "closingRadius": 1,
+    "minimumComponentPixels": 24
+}

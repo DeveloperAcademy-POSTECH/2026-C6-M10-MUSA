@@ -1,0 +1,77 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 879747588d42943298b3eec091384fd4, type: 3}
+  m_Name: PaletteReplayData
+  m_EditorClassIdentifier: Hapio.ClayPreview.Runtime::Hapio.Experiments.ClayPreviewPaletteData
+  format: clay-preview-palette-v1
+  epoch: clay-visual-standalone-frozen-five-color
+  styleVersion: clay-stickers-v2/a4281797f526821c1d37e797b76ae9e60bf77e9cd52d4f21c94f97b713d172e3/78efd5a7
+  recordHash: a7b1b0f37231ed590bec96a310fc44994f88365f5bf2c23de772dbe8db9d9ba7
+  journalSha256: 0e67d57c3ef2a559c9c05a846e472ce6349a18134dd2ef659ea817672156b6d8
+  settingsJson: '{"mode":2,"paperSticker":{"grainStrength":0.11999999731779099,"edgeStrength":0.07999999821186066,"grainScale":2.0},"claySticker":{"minimumDensity":0.6499999761581421,"maximumDensity":1.0},"enabled":true,"density":0.8999999761581421,"overlap":0.7799999713897705,"edgeStrength":0.550000011920929,"edgeWidth":0.02500000037252903,"pigmentContrast":1.600000023841858,"pigmentSaturation":1.149999976158142,"granulationStrength":0.25,"granulationScale":120.0,"rimBreakup":0.44999998807907104,"revealSeconds":0.0}'
+  columns: 256
+  rows: 128
+  pageCount: 192
+  lastSequence: 32904
+  journal: {fileID: 4900000, guid: 1e52eebf0857642d4a1624120dd58640, type: 3}
+  sourceSrgb:
+  - serializedVersion: 2
+    rgba: 4281751512
+  - serializedVersion: 2
+    rgba: 4289163540
+  - serializedVersion: 2
+    rgba: 4283990589
+  - serializedVersion: 2
+    rgba: 4280989688
+  - serializedVersion: 2
+    rgba: 4281485935
+  presets:
+  - brushes:
+    - {fileID: 2800000, guid: 773763a6133ec43f999c6692cb6323be, type: 3}
+    - {fileID: 2800000, guid: 15e593332555f4290ad06b7c0fd57bc4, type: 3}
+    - {fileID: 2800000, guid: 28f56a1fac6df459f8329b78f767922e, type: 3}
+    compositor: {fileID: 4800000, guid: 3e2cd90b4665b4493984406789178043, type: 3}
+    minimumDensity: 0.65
+    maximumDensity: 1
+    sampleMetadataHash: dd906773c04e7db4000edbcc1d49466abb2958f04d56236d3674f8f37220f220
+    colorRawHash: 3e15ff0a264b0043cd9926a64d836a355dc3554cd46ff64c86946305be509ffd
+    heightRawHash: 6388ad865c54a97719a6e9a9ed47d42561eb63a391b5b0573e6c3bf665a1e23c
+  - brushes:
+    - {fileID: 2800000, guid: 2937e93526bbb49aaad52816ca9430cb, type: 3}
+    - {fileID: 2800000, guid: 96a07a9bbee674148bb5b917e8b4bec4, type: 3}
+    - {fileID: 2800000, guid: 21f0641d87bf5484384bddaf4567e5ab, type: 3}
+    compositor: {fileID: 4800000, guid: 3e2cd90b4665b4493984406789178043, type: 3}
+    minimumDensity: 0.9
+    maximumDensity: 1
+    sampleMetadataHash: 7949fcec5a84734c17a618cc73ebe60f211140d6a4036680db7c76b00640911c
+    colorRawHash: 2496cbfcc5dc2ad4ae29167b969dbf58565868959d40d0d98bc0c321d046b0bf
+    heightRawHash: 4fb059786363c9d0de17e9fae06c4d87ebcc4505082856057c2315e6d5f6d6ea
+  - brushes:
+    - {fileID: 2800000, guid: e2dfec84ec12a42e5972beaadbe6f06a, type: 3}
+    - {fileID: 2800000, guid: 28dc55e1c75e44c30beb258360bec8ac, type: 3}
+    - {fileID: 2800000, guid: b6bdd8c87a7e84ad588ecd4ae8c321c5, type: 3}
+    compositor: {fileID: 4800000, guid: 3e2cd90b4665b4493984406789178043, type: 3}
+    minimumDensity: 0.9
+    maximumDensity: 1
+    sampleMetadataHash: 0924d801a182cac9eb7846cbb2d8499df9e10cd1165f67d0e29e73575eed866d
+    colorRawHash: 59578fb0471a80bd7f33592f43809b9919d124d20de036159d558c94b3b0ce51
+    heightRawHash: 49b85c2d26fd53ba11345b3650075e924ece2402f87f874be3834d71cd11b865
+  - brushes:
+    - {fileID: 2800000, guid: e2dfec84ec12a42e5972beaadbe6f06a, type: 3}
+    - {fileID: 2800000, guid: 28dc55e1c75e44c30beb258360bec8ac, type: 3}
+    - {fileID: 2800000, guid: b6bdd8c87a7e84ad588ecd4ae8c321c5, type: 3}
+    compositor: {fileID: 4800000, guid: d990d10dd722411cb4748d850a106f82, type: 3}
+    minimumDensity: 0.9
+    maximumDensity: 1
+    sampleMetadataHash: e187be76e2e195fc1161c5e965bcf315f2150ac89d73a403772e54cd1f1a112c
+    colorRawHash: 59578fb0471a80bd7f33592f43809b9919d124d20de036159d558c94b3b0ce51
+    heightRawHash: b9eee0e6638b58c2c2139b84d6fb367ba723d311a5eb3fd1423fb5ee1ef7f347
