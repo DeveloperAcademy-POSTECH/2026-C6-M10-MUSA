@@ -119,8 +119,16 @@ namespace C6Lab
         [Tooltip("(가락과 따로) 금빛이 획을 훑기 시작할 때 덧낼 소리. 비우면 없음. 예: JigwiTalismanSweep(가야금 띠리링을 조금 느리게). 예: FiveColorHit, CharmRelease")]
         [SerializeField] private string sweepSoundFolder = "";
         [SerializeField, Range(0f, 1f)] private float sweepSoundVolume = .7f;
-        [Tooltip("(가락과 따로) \"쾅\" 순간 덧낼 소리. 비우면 없음. 예: JigwiTalismanChime(긴 여운), YaguangShakeBellFinal")]
-        [SerializeField] private string burstSoundFolder = "";
+        [Tooltip("(가락과 따로) \"쾅\" 순간 덧낼 소리. 기본 JigwiTalismanSplash(시원한 물벼락). 비우면 없음. 예: JigwiTalismanChime(긴 여운), YaguangShakeBellFinal")]
+        [SerializeField] private string burstSoundFolder = "JigwiTalismanSplash";
+        [Tooltip("#540 부적을 쓰는 동안 깔리는 구슬 타는 소리(츠츠츠, 반복). 끝나 갈수록 커진다. 비우면 없음.")]
+        [SerializeField] private string fireLoopFolder = "JigwiTalismanFireLoop";
+        [Tooltip("쓰기 시작할 때 타는 소리 크기.")]
+        [SerializeField, Range(0f, 1f)] private float fireLoopVolume = .45f;
+        [Tooltip("A가 끝나는 순간(그을림 예고 끝)의 타는 소리 크기.")]
+        [SerializeField, Range(0f, 1f)] private float fireLoopWarnVolume = 1f;
+        [Tooltip("타는 소리가 커지고 줄어드는 빠르기(초).")]
+        [SerializeField, Range(.05f, 1f)] private float fireLoopFadeSeconds = .25f;
         [SerializeField, Range(0f, 1f)] private float burstSoundVolume = 1f;
         [Tooltip("번졌을 때. 예: Miss, ComboFail")]
         [SerializeField] private string smudgeSoundFolder = "Miss";
@@ -184,7 +192,10 @@ namespace C6Lab
         private static Sprite ringSprite;
         /// <summary>#533: 점마다 획 순서상 위치 (0~1). 완성 때 금빛이 이 순서로 훑는다.</summary>
         private float[] strokeRank = Array.Empty<float>();
-        private AudioSource sfx, scratch;
+        private AudioSource sfx, scratch, fireLoop;
+        private float fireLoopLevel;
+        /// <summary>#540: 지금 깔리는 타는 소리 크기 (0~1, 설정 크기 곱하기 전). 테스트용.</summary>
+        public float FireLoopTarget { get; private set; }
         private readonly AudioSource[] notePlayers = new AudioSource[4];
         private int notesPlayed;
         [Tooltip("#533 완성 가락 음높이 (파일 원래 음에서 반음 수). 기본 ComboHit는 라(A4)라서 솔 도 시 라 = -2, +3, +2, 0. 파일이 4개 이상이면 쓰지 않는다.")]
@@ -288,10 +299,12 @@ namespace C6Lab
             Present(snapshot, source.LocalPlayerId, source.JigwiABPresentationTime);
             if (Finishing) AdvanceFinish(Time.unscaledDeltaTime);
             if (Burning) AdvanceBurn(Time.unscaledDeltaTime);
+            bool paused = snapshot == null || snapshot.paused || source.GameStartHeld || source.BattlePresentationHeld;
+            UpdateFireLoop(Visible && !paused, Time.unscaledDeltaTime);
             if (Visible)
             {
                 FitToBattle(source.board != null ? source.board.ViewCamera : null);
-                bool held = snapshot == null || snapshot.paused || source.GameStartHeld || source.BattlePresentationHeld;
+                bool held = paused;
                 if (held) hasLast = false; else ReadPointer();
                 UpdateNextMarker(Time.unscaledTime);
                 DrawWarning(Time.unscaledTime);
@@ -376,6 +389,36 @@ namespace C6Lab
                 LabHaptics.PlayDirect(Config, LabHapticStyle.Light, warnHapticIntensity * (.5f + .5f * level));
             }
             if (level <= 0f) lastWarnTick = -1;
+        }
+
+        /// <summary>
+        /// #540 쓰는 동안 구슬 타는 소리(츠츠츠)를 깐다. A가 끝나 갈수록(그을림 예고와 같이) 커져 초조하게,
+        /// 다 쓰거나(완성) 끝나면(불에 탐) 짧게 줄어든다. 반복 소리라 시작 위치를 매번 달리 한다.
+        /// </summary>
+        private void UpdateFireLoop(bool writing, float dt)
+        {
+            FireLoopTarget = writing ? Mathf.Lerp(fireLoopVolume, fireLoopWarnVolume, WarnLevel) : 0f;
+            float step = dt / Mathf.Max(.01f, fireLoopFadeSeconds);
+            fireLoopLevel = Mathf.MoveTowards(fireLoopLevel, FireLoopTarget, step);
+            if (fireLoopLevel <= 0f)
+            {
+                if (fireLoop != null && fireLoop.isPlaying) fireLoop.Stop();
+                return;
+            }
+            if (fireLoop == null)
+            {
+                AudioClip clip = string.IsNullOrEmpty(fireLoopFolder) ? null
+                    : Array.Find(Resources.LoadAll<AudioClip>("Audio/" + fireLoopFolder), value => value != null);
+                if (clip == null) return;
+                fireLoop = gameObject.AddComponent<AudioSource>();
+                fireLoop.playOnAwake = false; fireLoop.spatialBlend = 0f; fireLoop.loop = true; fireLoop.clip = clip;
+            }
+            if (!fireLoop.isPlaying)
+            {
+                fireLoop.time = UnityEngine.Random.Range(0f, Mathf.Max(0f, fireLoop.clip.length - .05f));
+                fireLoop.Play();
+            }
+            fireLoop.volume = fireLoopLevel * LabAudioSettings.SfxVolume;
         }
 
         private void BeginBurn()
