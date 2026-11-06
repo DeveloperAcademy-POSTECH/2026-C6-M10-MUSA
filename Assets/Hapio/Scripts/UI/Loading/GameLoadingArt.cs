@@ -23,6 +23,8 @@ namespace Hapio
             public int[] landingFrames = { 2, 5 };
             [Tooltip("이 캐릭터만 키우거나 줄이기 (1 = 기본 높이)")] [Min(.1f)] public float scale = 1f;
             [Tooltip("이 캐릭터만 옮기기 (pt, 오른쪽 +x, 위 +y)")] public Vector2 offset = Vector2.zero;
+            [Tooltip("그림별 앞머리 끝 위치 (그림의 왼쪽 위가 0,0). 바람 연출을 쓰지 않으면 비워 둔다.")]
+            public Vector2[] forelockTips = Array.Empty<Vector2>();
 
             public bool Usable => frames != null && frames.Length > 0 && Array.TrueForAll(frames, frame => frame != null);
         }

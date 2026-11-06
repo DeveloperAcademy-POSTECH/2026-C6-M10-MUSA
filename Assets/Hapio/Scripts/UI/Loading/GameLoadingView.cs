@@ -6,7 +6,7 @@ using UnityEngine.UI;
 namespace Hapio
 {
     /// <summary>
-    /// 공용 로딩 화면 (#478). 위에서부터 한지 배경, 가운데에서 제자리로 달리는 캐릭터(뜰 때마다 무작위, 지금은 불이·묵이·솔이), "로딩중",
+    /// 공용 로딩 화면 (#478). 위에서부터 한지 배경, 가운데에서 제자리로 달리는 캐릭터(뜰 때마다 무작위), "로딩중",
     /// 진행 막대. 막대의 차오르는 끝 위에 % 말풍선이 붙어 따라가고, 움직이는 동안 살짝 뒤로 기울었다가 멈추면(100%) 똑바로 선다.
     /// 말풍선은 "로딩중" 아래 끝보다 아래에 오도록 막대 자리를 정한다(겹치지 않게).
     /// 보이는 진행은 실제 진행을 부드럽게 따라가고 뒤로 가지 않는다. 100%가 되면 캐릭터는 다음 착지에서 멈춰 선다.
@@ -27,7 +27,7 @@ namespace Hapio
         private CanvasGroup group;
         private RectTransform root;
         private RawImage paper;
-        private Image runner;
+        private GameLoadingRunnerImage runner;
         private Text caption;
         private GameLoadingShape trackEdge, track, fill, bubble;
         private RectTransform bubbleRoot;
@@ -95,7 +95,7 @@ namespace Hapio
             paper.color = new Color(1f, 1f, 1f, art.paperTexture != null ? art.paperStrength : 0f);
             paper.raycastTarget = false;
 
-            runner = Add<Image>("Runner", root);
+            runner = Add<GameLoadingRunnerImage>("Runner", root);
             runner.preserveAspect = true;
             runner.raycastTarget = false;
             runner.rectTransform.pivot = new Vector2(.5f, 0f);
@@ -191,6 +191,7 @@ namespace Hapio
             bool drawn = current != null && current.Usable;
             runner.enabled = drawn;
             runner.sprite = drawn ? current.frames[0] : null;
+            runner.SetForelockWind(Vector2.zero, 0f);
             frame = drawn ? 0 : -1;
             runner.rectTransform.localScale = Vector3.one;
             group.alpha = 1f;
@@ -270,8 +271,20 @@ namespace Hapio
                     if (displayed >= 1f) resting = true;
                 }
             }
-            float squash = LandingSquash(Time.unscaledTime - squashAt, art.landingSquashSeconds, art.landingSquash);
+            float sinceLanding = Time.unscaledTime - squashAt;
+            float squash = LandingSquash(sinceLanding, art.landingSquashSeconds, art.landingSquash);
             runner.rectTransform.localScale = new Vector3(1f + squash, 1f - squash, 1f);
+
+            if (current.forelockTips?.Length == count)
+            {
+                float wind = .5f - .5f * Mathf.Cos(runClock * (2.2f * 2f * Mathf.PI));
+                if (resting) wind *= 1f - Mathf.SmoothStep(0f, 1f, sinceLanding / .14f);
+                runner.SetForelockWind(current.forelockTips[frame], wind);
+            }
+            else
+            {
+                runner.SetForelockWind(Vector2.zero, 0f);
+            }
         }
 
         private void Layout()
