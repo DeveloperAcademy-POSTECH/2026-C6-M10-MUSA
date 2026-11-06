@@ -400,6 +400,7 @@ namespace C6Lab
         {
             orb = null;
             if (!BeginRequest(sender, requestId, now, out reason)) return false;
+            if (JigwiBoardOnFire(now)) return Reject("JIGWI_BOARD_FIRE", out reason); // #509 지귀 B 실패: 잠깐 북을 못 누름
             // Without a tapped drum, use the sender's earliest placed one (drums are never removed).
             LabOrbState drum = drumId == null
                 ? drums.Values.FirstOrDefault(candidate => candidate.owner == sender)
@@ -417,6 +418,7 @@ namespace C6Lab
             player.stamina = Mathf.Max(0f, player.stamina - rules.GenerateCost);
             var kind = GeneratedKindFor(seed, sender, generated, rules.GenerationChances);
             kind = CorrectRawGenerationKind(kind, sender, generated);
+            TutorialTakeGeneration(sender, ref kind, out Vector2? scriptedLaunch);
             int lockSwipes = kind.IsItem() ? LockSwipesFor(seed, sender, generated) : 0;
             int relayStage = kind == LabOrbKind.Relay && lockSwipes == 0 ? 1 : 0;
             generatedCounts[sender] = generated + 1;
@@ -426,7 +428,8 @@ namespace C6Lab
                 reason = "JIGWI_BURNED";
                 return true;
             }
-            Vector2 launch = SpawnVelocityFor(seed, sender, generated, position.x);
+            // The tutorial (#477) sends each scripted orb its own way so it always rests in the same place.
+            Vector2 launch = scriptedLaunch ?? SpawnVelocityFor(seed, sender, generated, position.x);
             orb = new LabOrbState
             {
                 id = NewOrbId(), owner = sender, kind = kind, lockSwipes = lockSwipes, relayStage = relayStage,
@@ -474,6 +477,7 @@ namespace C6Lab
 
             orbs.Remove(firstId); orbs.Remove(secondId);
             var element = CombinedElementFor(sender);
+            element = TutorialScriptedElement(sender, element);
             Vector2 velocity = Vector2.ClampMagnitude(normalizedVelocity, rules.MaximumMotionSpeed);
             orb = new LabOrbState
             {
@@ -636,8 +640,8 @@ namespace C6Lab
             if (!TryAdvance(now, out _) || phase != LabPhase.Playing
                 || !orbs.TryGetValue(id ?? string.Empty, out var orb) || !orb.inFlight
                 || !players.TryGetValue(orb.owner, out var attacker)) return false;
-            // One remaining local ignition keeps the entire B curtain closed. A bypassed
-            // physics contact is consumed here before any normal boss paint/reward/statistic.
+            // #509 지귀 B: a picked player's Water on the boss counts toward the simultaneous hit.
+            RecordJigwiBossSyncHit(orb, now, paintDirection);
             if (TryBlockJigwiABBossHit(orb, now)) return false;
             if (ConsumeJigwiABSupplyBossHit(orb, now)) return false;
             element = orb.element;
@@ -672,7 +676,7 @@ namespace C6Lab
                 bool painted = paints && (orb.fiveColor
                     ? PaintFiveColors(paintDirection, attacker, share, paintImpactStrength)
                     : paintSurface.RegisterHit(paintDirection, PaintColorFor(element), attacker.id, attacker.seat + 1, share, paintImpactStrength));
-                if (painted && paintSurface.IsComplete)
+                if (painted && paintSurface.IsComplete && phase == LabPhase.Playing) // #509: B 물벼락이 먼저 이겼으면 한 번만
                 {
                     phase = LabPhase.Victory;
                     if (players.TryGetValue(paintSurface.LastPainter, out var painter)) painter.lastHit = true;
@@ -1269,7 +1273,9 @@ namespace C6Lab
             if (countThrow && string.IsNullOrEmpty(orb.jigwiABSupplyEventId) && phase == LabPhase.Playing
                 && players.TryGetValue(orb.owner, out var thrower)) thrower.throwTotal++;
             launchScales.Remove(id);
-            return orbs.Remove(id);
+            bool removed = orbs.Remove(id);
+            if (removed) FailJigwiSyncOnMiss(orb, now); // #509 지귀 B: 특수 물구슬이 빗나가면 그 B는 바로 실패
+            return removed;
         }
 
         private bool BlockOn(double now) => phase == LabPhase.Playing && swipeBlockedUntil > now && now >= swipeBlockStartedAt;
@@ -1443,9 +1449,15 @@ namespace C6Lab
                         // 야광귀 피버타임 (#343)은 야광귀 스테이지만의 것이라 구미호의 피버 타임과 겹치지 않는다.
                         + YaguangFeverSecondsBetween(lastTime, effectiveNow) * (rules.YaguangFeverStaminaMultiplier - 1d);
                     foreach (var player in players.Values)
-                        player.stamina = Mathf.Min(rules.StaminaMax,
+                    {
+                        float refilled = Mathf.Min(rules.StaminaMax,
                             (float)(player.stamina + (elapsed * JigwiStageRecoveryMultiplier(lastTime)
                                 + feverRefill) * rules.StaminaRecoveryPerSecond));
+                        // The tutorial (#477) may stop the refill at a ceiling (0 holds it). Nothing above it is taken
+                        // away, and nothing held back is owed afterwards. Every other round refills exactly as before.
+                        player.stamina = float.IsPositiveInfinity(tutorialStaminaCeiling) ? refilled
+                            : Mathf.Max(player.stamina, Mathf.Min(refilled, tutorialStaminaCeiling));
+                    }
                     // 결과 대시보드 기록: 이 사이에 북을 점유한 사람의 점유 시간 (북 점유율 계산용)
                     // (북은 넘길 때도 먼저 시간을 진행시키므로 넘기기 전 주인에게 쌓인다)
                     foreach (var holder in drums.Values.Select(drum => drum.owner).Distinct())

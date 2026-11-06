@@ -14,6 +14,7 @@ namespace C6Lab.Tests
     /// Exercise the saved DEV panel and real local Host paths. The lobby test has no Client:
     /// it does not claim remote ACK, shared paused restart, or multi-device synchronization coverage.
     /// </summary>
+    [Category("LabOnly")]
     public sealed class LabGourdRopeDeveloperTests
     {
         private const int First = 118;
@@ -164,7 +165,7 @@ namespace C6Lab.Tests
         [UnityTest]
         public IEnumerator SoloButtonsApplyAllTenValuesAndRestartWithANewProfileWithoutEditingTheSource()
         {
-            testedNetwork.port = 19194;
+            testedNetwork.port = LabSavedSceneNetworkFixture.AvailableDualFamilyPort();
             ui.Open();
             SetForm(ProfileA);
             ui.applyStartButton.onClick.Invoke();
@@ -200,7 +201,7 @@ namespace C6Lab.Tests
         [UnityTest]
         public IEnumerator HostLobbyButtonsRetuneAllTenValuesButCannotBypassParticipantsOrPauseRequirements()
         {
-            testedNetwork.port = 19195;
+            testedNetwork.port = LabSavedSceneNetworkFixture.AvailableDualFamilyPort();
             ui.Open();
             ui.targetParticipantsSlider.value = 2f;
             SetForm(ProfileA);

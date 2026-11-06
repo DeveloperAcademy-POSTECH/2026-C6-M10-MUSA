@@ -34,6 +34,7 @@ namespace C6Lab
         private TextMesh seconds;
         private readonly TextMesh[] outline = new TextMesh[4];
         private bool right;
+        private bool secondsShown = true;
         private float age;
         private float flash;
         private Vector3 glowScale = Vector3.one;
@@ -42,6 +43,20 @@ namespace C6Lab
         /// <summary>The right edge is blocked; otherwise the left.</summary>
         public bool Right => right;
         public string SecondsText => seconds != null && seconds.gameObject.activeSelf ? seconds.text : string.Empty;
+
+        /// <summary>
+        /// Whether the seconds left are written on the edge. The tutorial's block (#477) holds until the player passes
+        /// the other way, so it shows no countdown; the glow, flashes and bounces stay the same.
+        /// </summary>
+        public bool SecondsShown
+        {
+            get => secondsShown;
+            set
+            {
+                secondsShown = value;
+                SetShown(Visible);
+            }
+        }
         /// <summary>Where the seconds and the glow's edge sit, in world space.</summary>
         public Vector3 SecondsPosition => seconds != null ? seconds.transform.position : Vector3.zero;
         public Vector3 GlowPosition => glow != null ? glow.transform.position : Vector3.zero;
@@ -159,8 +174,8 @@ namespace C6Lab
             if (glow == null) return;
             glow.gameObject.SetActive(shown);
             line.gameObject.SetActive(shown);
-            seconds.gameObject.SetActive(shown);
-            foreach (TextMesh copy in outline) copy.gameObject.SetActive(shown);
+            seconds.gameObject.SetActive(shown && secondsShown);
+            foreach (TextMesh copy in outline) copy.gameObject.SetActive(shown && secondsShown);
         }
 
         private SpriteRenderer CreateSprite(string label, Sprite sprite, int order)

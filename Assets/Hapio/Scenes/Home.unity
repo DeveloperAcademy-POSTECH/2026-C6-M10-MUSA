@@ -34449,7 +34449,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\uC9C0\uADC0 \uC131\uACF5 \uBCF4\uC0C1 \uCE60 \uBA74\uC801 (\uBC30)"
+  m_Text: Reserved Jigwi B Reward Paint (unused)
 --- !u!222 &398146536
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -59974,7 +59974,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\uC9C0\uADC0 B \uBB3C \uAD6C\uC2AC \uC9C0\uAE09 \uAC04\uACA9 (\uCD08)"
+  m_Text: Reserved Jigwi B Supply Interval (unused)
 --- !u!222 &659044462
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -100898,7 +100898,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\uC9C0\uADC0 B \uC2DC\uC791 \uBB3C \uAD6C\uC2AC \uC218"
+  m_Text: Reserved Jigwi B Supply Initial (unused)
 --- !u!222 &1117940063
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -104410,7 +104410,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\uC9C0\uADC0 B \uC18C\uD654 \uD6C4 \uC7AC\uC810\uD654 (\uCD08)"
+  m_Text: Reserved Jigwi B Relight (unused)
 --- !u!222 &1160439692
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -113341,7 +113341,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\uC9C0\uADC0 B \uBBF8\uC18C\uBAA8 \uC9C0\uAE09 \uC0C1\uD55C"
+  m_Text: Reserved Jigwi B Supply Limit (unused)
 --- !u!222 &1251170803
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -117669,7 +117669,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\uC9C0\uADC0 \uC131\uACF5 \uBCF4\uC0C1 \uAD6C\uC2AC \uD06C\uAE30 (\uBC30)"
+  m_Text: Reserved Jigwi B Reward Size (unused)
 --- !u!222 &1317399235
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -151759,7 +151759,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\uC9C0\uADC0 B \uAC1C\uC778 \uBD88 \uAC1C\uC218"
+  m_Text: Reserved Jigwi B Fire Count (unused)
 --- !u!222 &1724660159
 CanvasRenderer:
   m_ObjectHideFlags: 0

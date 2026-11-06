@@ -4,14 +4,69 @@ using UnityEngine;
 
 namespace Hapio
 {
+    /// <summary>
+    /// How long each step of the shared battle start (#306) lasts. The game never assigns these: every build runs
+    /// the defaults. Only the Hapio PlayMode test assembly shortens them for its own run (GameTestStartTiming) and
+    /// restores them afterwards. Only the lengths change, never the order (initial snapshot/paint readiness →
+    /// reservation → per-generation receipts → commit → 3/2/1 → Playing), the reschedules or the shared load budget.
+    /// </summary>
+    internal static class GameStartTiming
+    {
+        internal const double DefaultCountdownSeconds = 3d;
+        internal const double DefaultInitialLeadSeconds = 1d;
+        internal const double DefaultMaximumLeadSeconds = 5d;
+        internal const double DefaultStartedLabelSeconds = .5d;
+
+        /// <summary>The visible 3/2/1, from the first digit to Playing. The three digits split it evenly.</summary>
+        internal static double CountdownSeconds { get; private set; } = DefaultCountdownSeconds;
+        /// <summary>Time reserved before the visible countdown for every receipt of a fresh reservation.</summary>
+        internal static double InitialLeadSeconds { get; private set; } = DefaultInitialLeadSeconds;
+        /// <summary>Cap of the lead that each reschedule for a missing receipt doubles.</summary>
+        internal static double MaximumLeadSeconds { get; private set; } = DefaultMaximumLeadSeconds;
+        /// <summary>How long "시작!" stays after the shared start.</summary>
+        internal static double StartedLabelSeconds { get; private set; } = DefaultStartedLabelSeconds;
+
+        internal static bool IsDefault => CountdownSeconds == DefaultCountdownSeconds
+            && InitialLeadSeconds == DefaultInitialLeadSeconds && MaximumLeadSeconds == DefaultMaximumLeadSeconds
+            && StartedLabelSeconds == DefaultStartedLabelSeconds;
+
+        /// <summary>Test-only. A session reads the values at each use, so change them only between battle starts.</summary>
+        internal static void Configure(double countdownSeconds, double initialLeadSeconds, double maximumLeadSeconds,
+            double startedLabelSeconds)
+        {
+            if (!Finite(countdownSeconds) || countdownSeconds <= 0d)
+                throw new ArgumentOutOfRangeException(nameof(countdownSeconds));
+            if (!Finite(initialLeadSeconds) || initialLeadSeconds <= 0d)
+                throw new ArgumentOutOfRangeException(nameof(initialLeadSeconds));
+            if (!Finite(maximumLeadSeconds) || maximumLeadSeconds < initialLeadSeconds)
+                throw new ArgumentOutOfRangeException(nameof(maximumLeadSeconds));
+            if (!Finite(startedLabelSeconds) || startedLabelSeconds < 0d)
+                throw new ArgumentOutOfRangeException(nameof(startedLabelSeconds));
+            CountdownSeconds = countdownSeconds;
+            InitialLeadSeconds = initialLeadSeconds;
+            MaximumLeadSeconds = maximumLeadSeconds;
+            StartedLabelSeconds = startedLabelSeconds;
+        }
+
+        internal static void Reset() => Configure(DefaultCountdownSeconds, DefaultInitialLeadSeconds,
+            DefaultMaximumLeadSeconds, DefaultStartedLabelSeconds);
+
+        private static bool Finite(double value) => !double.IsNaN(value) && !double.IsInfinity(value);
+
+        // Entering Play Mode skips the domain reload in this project (EditorSettings), so statics survive it:
+        // never carry an interrupted test run's shortened start into the next Play session.
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetOnPlayModeEnter() => Reset();
+    }
+
     public sealed partial class GameSession
     {
-        private const double CountdownSeconds = 3d;
-        private const double StartedLabelSeconds = .5d;
+        private static double CountdownSeconds => GameStartTiming.CountdownSeconds;
+        private static double StartedLabelSeconds => GameStartTiming.StartedLabelSeconds;
         private GameStartOverlay startOverlay;
         private int startReadyCount, startParticipantCount, initialReadyFrame = -1;
         private double nextInitialReadyAt, nextCountdownReadyAt, nextCountdownCommitAt;
-        private double countdownLeadSeconds = 1d;
+        private double countdownLeadSeconds = GameStartTiming.InitialLeadSeconds;
         private bool countdownCommitted;
         private GameFrameSpikeProbe frameProbe;
 
@@ -43,7 +98,7 @@ namespace Hapio
                     {
                         countdownCommitted = false;
                         initialReadyFrame = -1;
-                        countdownLeadSeconds = 1d;
+                        countdownLeadSeconds = GameStartTiming.InitialLeadSeconds;
                     }
                     if (state.phase == GameFlowPhase.SynchronizingBattle) initialReadyFrame = -1;
                     if (state.phase == GameFlowPhase.Countdown)
@@ -51,7 +106,8 @@ namespace Hapio
                         countdownCommitted = false;
                     }
                 }
-                startOverlay?.ShowPreparing(StartReadyCount, StartParticipantCount);
+                if (tutorialRun) startOverlay?.ShowPreparing(TutorialPreparingText);
+                else startOverlay?.ShowPreparing(StartReadyCount, StartParticipantCount);
             }
             else if (state.phase == GameFlowPhase.Playing)
             {
@@ -90,7 +146,7 @@ namespace Hapio
         private void UpdateBattleStart(double realNow)
         {
             // One budget covers loading, initial synchronization and start reservation.
-            // A committed visible countdown is allowed to finish its own three seconds.
+            // A committed visible countdown is allowed to finish its own CountdownSeconds (three by default).
             if (network.IsHost && IsPreparingBattle && !countdownCommitted
                 && realNow - loadStartedAt > loadingTimeoutSeconds)
             {
@@ -143,10 +199,10 @@ namespace Hapio
                 }
                 if (network.IsHost)
                 {
-                    if (!countdownCommitted && countdownNow >= state.battleStartsAt - CountdownSeconds)
+                    if (!countdownCommitted && countdownNow >= state.battleStartsAt - ActiveCountdownSeconds)
                     {
                         // Reserve more lead time rather than ever starting with a missing schedule receipt.
-                        countdownLeadSeconds = Math.Min(5d, countdownLeadSeconds * 2d);
+                        countdownLeadSeconds = Math.Min(GameStartTiming.MaximumLeadSeconds, countdownLeadSeconds * 2d);
                         if (hostFlow.RescheduleCountdown(state.runId, state.stageIndex, state.revision,
                             ReserveStartAt(countdownNow))) SetHostState();
                     }
@@ -184,11 +240,23 @@ namespace Hapio
         // Integer-ms schedules are stable through Unity JSON on Editor and Player. Receipts
         // are identified by the monotonically increasing flow revision, never by double equality.
         private double ReserveStartAt(double serverNow) =>
-            Math.Ceiling((serverNow + CountdownSeconds + countdownLeadSeconds) * 1000d) / 1000d;
+            Math.Ceiling((serverNow + ActiveCountdownSeconds + countdownLeadSeconds) * 1000d) / 1000d;
+
+        /// <summary>The tutorial (#477) opens on its first line instead of a 3-2-1 countdown.</summary>
+        private double ActiveCountdownSeconds => tutorialRun ? 0d : CountdownSeconds;
 
         private void RefreshStartOverlay()
         {
             if (startOverlay == null) return;
+            if (tutorialRun)
+            {
+                // No ready count, countdown or "시작!" on the practice board: one plain cover until it is playable.
+                bool playable = state.phase == GameFlowPhase.Playing && countdownCommitted && !network.GameStartHeld;
+                if (IsPreparingBattle || state.phase == GameFlowPhase.Playing && !playable)
+                    startOverlay.ShowPreparing(TutorialPreparingText);
+                else startOverlay.Hide();
+                return;
+            }
             if (state.phase == GameFlowPhase.LoadingBattle || state.phase == GameFlowPhase.SynchronizingBattle)
             {
                 startOverlay.ShowPreparing(StartReadyCount, StartParticipantCount);
@@ -202,7 +270,9 @@ namespace Hapio
                 if (remaining > CountdownSeconds || !countdownCommitted)
                     startOverlay.ShowPreparing(StartParticipantCount, StartParticipantCount);
                 else if (remaining > 0d)
-                    startOverlay.ShowCountdown(Mathf.Clamp((int)Math.Ceiling(remaining), 1, 3));
+                    // Each digit is a third of the countdown: CountdownSeconds / 3 is exactly 1 for the default, so the
+                    // default still shows ceil(remaining) seconds.
+                    startOverlay.ShowCountdown(Mathf.Clamp((int)Math.Ceiling(remaining / (CountdownSeconds / 3d)), 1, 3));
                 else if (!countdownCommitted || network.GameStartHeld)
                     startOverlay.ShowPreparing(StartParticipantCount, StartParticipantCount);
                 else if (now - state.battleStartsAt < StartedLabelSeconds) startOverlay.ShowStarted();

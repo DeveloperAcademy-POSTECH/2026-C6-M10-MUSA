@@ -91,8 +91,6 @@ namespace C6Lab
             // 야광귀 섬광 예고(눈 뜸/빛남/3·2·1)와 번쩍 소리 (#395)
             if (boardNetwork != null && GetComponent<LabYaguangSound>() == null)
                 gameObject.AddComponent<LabYaguangSound>().Bind(boardNetwork);
-            // 지귀 음성 예고는 영속 네트워크에 하나만 둬 UI 재연결로 같은 대사를 반복하지 않는다.
-            if (boardNetwork != null) LabJigwiPatternAudio.Attach(boardNetwork);
             // 햅틱 (내 구슬 생성, 내가 던진 구슬 타격)
             if (boardNetwork != null && GetComponent<LabHaptics>() == null)
                 gameObject.AddComponent<LabHaptics>().Bind(boardNetwork, board);

@@ -28,7 +28,7 @@
 
 #354의 `GameOpeningController`는 Home의 독립 `GameOpening.prefab`과 기존 StoryPlayer를 연결한다. #359부터 타이틀 게임 시작에서 재생하고, 오프닝 중 메뉴·DEV 입력을 막고 완료/스킵 시 입력 해제 뒤 방 목록을 연다. 게임 진행 상태는 Home을 유지하며 네트워크 상태를 추가하지 않는다. 에셋 편집·실패 복구·실행 내 재생 정책은 [앱 시작 오프닝](APP_START_OPENING.md)을 따른다.
 
-이번 main 동기화에서는 최신 Lab의 3D 배경·미니맵 배치를 별도 Battle에 반영했다. Battle은 저장된 복사본이므로 이후 Lab Scene 수정이 자동으로 전달되지는 않는다. `Hapio > Upgrade Existing Game Scenes From Current Lab`은 명시적인 동기화 도구이며 Battle의 전투 구성을 다시 복사한다. Battle 전용 수정은 먼저 차이를 확인해 반영한다. 같은 도구의 Home/Lobby 설정 확장은 기존 객체와 배치를 유지하면서 새 DEV 행을 추가한다. 일반 Play·빌드는 이 도구를 자동 호출하지 않는다.
+Battle은 처음 만들 때만 저장된 Lab에서 복사했고(`CreateMissing`, Battle이 없을 때), 지금은 Lab에 없는 스테이지 배경(`GameStageBackgrounds`, #446/#447)·바닥·장식(#485/#487/#490)·주광(#515)을 가진 독립 Scene이다. 이후 Lab Scene 수정은 자동으로 전달되지 않으며, Lab 전체를 Battle 위에 다시 복사하는 도구는 없다(예전 `Hapio > Upgrade Existing Game Scenes From Current Lab`은 Battle 전용 구성을 지워서 제거했다). Lab 변경을 Battle에 옮길 때는 Battle을 직접 편집하거나 해당 객체만 고치는 대상 갱신을 쓴다. Home/Lobby의 새 DEV 행은 `Hapio > Upgrade Menu DEV Rows`가 기존 객체와 배치를 유지하면서 추가한다. 일반 Play·빌드는 이 도구들을 자동 호출하지 않는다.
 
 ## 세션과 전투의 수명
 
@@ -100,7 +100,7 @@ Home/Lobby DEV의 `공통 / 구미호 / 야광귀 / 지귀`에서 해당 값만 
 - 야광귀: 콤보155~164, 섬광184~190, 셈법191. 최초 기본값은 콤보·섬광·셈법 ON이다.
 - 지귀: 수동 패턴178~183, 자동 간격192/193(기본20~30초), 소화/생성 화상 가중치194/195(기본1:1). 가중치0은 해당 자동 선택에서 제외하고 둘 다0이면 지귀 자동만 멈춘다. 공통 패턴은 계속된다.
 
-새 Scene·카탈로그 생성/명시적 갱신은 `Hapio > Upgrade Three Yokai Stages`를 사용한다. 이 도구는 별도 Battle을 현재 저장 Lab에서 복사하므로 Battle 전용 수동 수정이 있다면 먼저 차이를 확인한다. 일반 Play/빌드에서는 자동 실행하지 않는다.
+없는 Scene 생성은 `Hapio > Create Missing Development Game Scenes`, 스테이지 카탈로그·정의 생성/명시적 갱신은 `Hapio > Upgrade Three Yokai Stages`를 사용한다. 후자는 없는 정의만 만들고 Home/Lobby DEV 행과 StageResult/GameOver 글꼴을 갱신하며, Battle은 열거나 저장하지 않는다. 일반 Play/빌드에서는 자동 실행하지 않는다.
 
 ## 검증 상태
 
@@ -247,6 +247,7 @@ Home/Lobby DEV의 `공통 / 구미호 / 야광귀 / 지귀`에서 해당 값만 
 - 각 기기는 정확한 session/round의 snapshot·확정 도색·자기 owner-board checkpoint·실제 표시 객체·설정·카메라/HUD·박 표현을 확인한다. 표시 초기화에 한 프레임을 준 뒤 `initial_ready`를 보낸다. snapshot만 받은 상태는 완료가 아니다.
 - 전원 완료 후 NGO `ServerTime.Time` 기준 미래 시각을 예약한다. 예약 수신 ACK가 모두 오면 작은 game-flow control의 `countdown_commit`으로 확정한다. 시작 시각은 밀리초로 정규화하고 ACK/확정의 식별은 판·설정·정수 revision으로 검증한다. JSON 왕복 소수점 값을 응답 식별자로 직접 비교하지 않는다. 숫자 표시 전에 예약이 확정되지 않으면 준비 화면을 유지하고 여유 시간을 늘려 다시 예약한다. 각 기기의 기동 시각이나 멈춘 전투 시계로 카운트다운하지 않는다.
 - 공통 시작 시각의 3초 전부터 3/2/1, 해당 시각에 시작!을 표시한다. Host만 실제 판정 시계를 해제하고 참가자는 확정된 예약/Playing과 초기 상태가 맞을 때 조작을 연다. 시작! 표시는 0.5초 후 사라지며 그동안 터치를 가로막지 않는다.
+- 시간 길이(3/2/1 3초, 첫 예약 여유 1초, 재예약 상한 5초, 시작! 0.5초)는 `GameSession.Start.cs`의 `GameStartTiming` 기본값이다. 게임 코드는 이 값을 바꾸지 않는다. `Hapio.PlayModeTests`만 `GameTestStartTiming`([SetUpFixture])으로 0.3초·0.1초·5초·0.1초로 줄였다가 끝나면 되돌린다. 순서·ACK·재예약·로드 한도는 같고 길이만 다르다. 카운트다운 자체를 보는 검사(`SharedCountdown…`)는 기본값으로 실행한다.
 - Scene 로딩·초기 동기화·예약 확정까지 합쳐 기존 30초 한도를 적용하고 확정된 3초 표시는 별도로 마친다. 구세대·중복 ACK는 판/설정/revision으로 거부하며 재예약하면 이전 예약 ACK를 지운다. 실패·이탈은 기존 Story GameOver와 2:2 같은 방 로비 복귀 정책을 따른다.
 - 전환 UI는 `Resources/Hapio/GameStartOverlay.prefab`의 실제 Canvas·Background·SafeArea·Caption 객체다. 영속 GameSession이 소유하므로 Scene 언로드 중에도 남는다. 기존 Scene 배치를 다시 생성하지 않는다. `Hapio/Create Missing Battle Start Overlay`는 이 새 프리팹이 없을 때만 생성한다.
 
@@ -256,7 +257,7 @@ Home/Lobby DEV의 `공통 / 구미호 / 야광귀 / 지귀`에서 해당 값만 
 
 크랙 모드는 제거하고 페인트만 사용한다. DEV79는 숨긴 고정0 예약 슬롯이며 다른 설정은205개 순서를 유지한다. 일반 협동 자리는 위에서 내려다본 시계방향으로 로비/전투/미니맵/카메라/전달을 통일한다. 스태미나 위치는 유지하고 구슬이 앞에 그려지도록 기존 합성을 복구한다. 결과 관람 이미지는 저장된 viewport 안에서 원본 비율에 맞춘다.
 
-100% 승리는 최종 지도 확정 → 예약 시각을 포함한 prepare → 각 기기의 최종 고해상도 표현·지도 준비와 예약 수신을 한 ACK로 확인 → 공통 시각 확정 →1.2초·표현0.2배의 시각 전용 완료 연출 → 전원 완료 → 결과 전환 순서다(#367). 멀티의 예약 여유0.75초는 유지하고 솔로는 이 여유만 생략한다. 판정·기여도·원본 물리·Time.timeScale을 재실행하지 않는다. Host 최초 Victory의 12초 deadline을 prepare와 상태 메시지로 공유하며, 연출 중 확보한 결과 캐시를 재사용해 Story 결과에서 추가30초를 기다리지 않는다. 연출 시간초과와 결과 지도 미동기화는 구분하며, 중간 결과의 지도 불일치는 GameOver, 최종 Completed는 클리어 보존·안내 정책을 따른다. 세부 구현·예외·확인 순서는 [완료 연출 안내](SESSION_FINISH_UI.md)를 참조한다.
+100% 승리는 최종 지도 확정 → 예약 시각을 포함한 prepare → 각 기기의 최종 고해상도 표현·지도 준비와 예약 수신을 한 ACK로 확인 → 공통 시각 확정 → 시각 전용 완료 연출 → 전원 완료 → 결과 전환 순서다(#367). 스토리 1~3의 기본 완료 연출은 마지막 일격을 세 각도로 보여 주는 약 5.1초 다시보기이고(게임 토큰 `C6HapioGame/33`, [마지막 일격 다시보기](FINAL_HIT_REPLAY.md)), 후보가 없거나 한도에 들지 않으면 1.2초·표현0.2배 연출로 대체한다. 멀티의 예약 여유0.75초는 유지하고 솔로는 이 여유만 생략한다. 판정·기여도·원본 물리·Time.timeScale을 재실행하지 않는다. Host 최초 Victory의 12초 deadline을 prepare와 상태 메시지로 공유하며, 연출 중 확보한 결과 캐시를 재사용해 Story 결과에서 추가30초를 기다리지 않는다. 연출 시간초과와 결과 지도 미동기화는 구분하며, 중간 결과의 지도 불일치는 GameOver, 최종 Completed는 클리어 보존·안내 정책을 따른다. 세부 구현·예외·확인 순서는 [완료 연출 안내](SESSION_FINISH_UI.md)를 참조한다.
 
 ## #311/#314 통합 기믹 정책
 

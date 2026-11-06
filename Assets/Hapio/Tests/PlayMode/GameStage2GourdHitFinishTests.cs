@@ -16,9 +16,11 @@ namespace Hapio.Tests
 {
     /// <summary>
     /// #507: on the Stage 2 Yagwanggwi gourd, a real thrown orb that the Host approves paints the cell in the direction it
-    /// hit, and the 100% finish copies the baked body and lid into both the finish presentation and the result preview.
-    /// Saved Home → DEV solo → Stage 2, real board gestures and physics; solo production binding only.
+    /// hit. The 100% right after it replays that throw on the live gourd (body and lid drawn, never hidden behind a copy),
+    /// and the result preview copies the baked body and lid. Saved Home → DEV solo → Stage 2, real board gestures and
+    /// physics; solo production binding only. The fixed copy finish without a recent hit is in GameFinishReplayTests.
     /// </summary>
+    [Category("Slow")]
     public sealed class GameStage2GourdHitFinishTests
     {
         private const BindingFlags Private = BindingFlags.Instance | BindingFlags.NonPublic;
@@ -113,6 +115,7 @@ namespace Hapio.Tests
                     yield return Until(() => network.Snapshot.orbs.Count(orb => orb.kind == LabOrbKind.Combined) >= 2, "Box opens");
                     foreach (string shot in network.Snapshot.orbs.Where(orb => orb.kind == LabOrbKind.Combined).Select(orb => orb.id).ToArray())
                     {
+                        yield return GameFinishReplayTests.WaitReplayPoseWindow(target.GetComponent<LabHangingTarget>());
                         target.GetComponent<LabHangingTarget>().ResetSwing();
                         yield return Until(() => network.board.GetComponentsInChildren<LabOrbView>().Any(v => v.OrbId == shot), "Orb on board");
                         int hits = approved.Count;
@@ -143,7 +146,7 @@ namespace Hapio.Tests
             }
             finally { target.ApprovedHit -= onHit; }
 
-            // 100%: the finish presentation and the result preview copy the baked body and lid.
+            // 100%: the final-hit replay draws the live body and lid; the result preview copies them.
             LabModel model = (LabModel)typeof(LabNetwork).GetField("model", Private).GetValue(network);
             // Real Host paint hits spread over the sphere until every cell is covered (no forged victory snapshot).
             ulong painter = model.CopyPlayers().Single().id;
@@ -154,16 +157,16 @@ namespace Hapio.Tests
                     model.PaintColorFor(LabOrbElement.Fire), painter, 1);
             }
             // Paint grows from each hit over the Host's ticks; wait for it to cover the gourd.
-            yield return Until(() => model.PaintSurface.IsComplete || session.IsFinishingBattle
-                || GameObject.Find("Completed paint · presentation only") != null, "Real paint hits cover the gourd", 60d);
-            GameObject finishCopy = null;
-            yield return Until(() => (finishCopy = GameObject.Find("Completed paint · presentation only")) != null
-                || session.State.phase == GameFlowPhase.StageResult, "The finish presentation starts");
-            Assert.That(finishCopy, Is.Not.Null, "The finish presentation copied the gourd.");
-            string[] finishParts = finishCopy.GetComponentsInChildren<MeshRenderer>(true).Select(r => r.name).ToArray();
-            Assert.That(finishParts.Any(n => n.StartsWith("Paint Shell")), Is.True);
-            Assert.That(finishParts.Any(n => n.StartsWith("Lid Paint")), Is.True);
-            Assert.That(finishParts.Any(n => n.StartsWith("Rear_Rope")), Is.False);
+            yield return Until(() => model.PaintSurface.IsComplete || session.IsFinishingBattle,
+                "Real paint hits cover the gourd", 60d);
+            LabFinishReplay replay = null;
+            yield return Until(() => (replay = session.FinishReplay) != null && replay.Running
+                || session.State.phase == GameFlowPhase.StageResult, "The final-hit replay starts");
+            Assert.That(session.FinishUsesReplay && replay.Running, Is.True, "The real hit just before 100% is replayed.");
+            Assert.That(GameObject.Find("Completed paint · presentation only"), Is.Null);
+            foreach (Renderer renderer in new Renderer[] { paint.Rig.paintShell, paint.PaintExtras[0] })
+                Assert.That(renderer.forceRenderingOff || !renderer.enabled, Is.False, "The live " + renderer.name + " draws.");
+            Assert.That(target.GetComponentsInChildren<Renderer>().Any(r => r.name.StartsWith("Rear_Rope")), Is.False);
 
             yield return Until(() => session.IsFinishingBattle && session.PreviewTexture != null, "Completed preview capture");
             var preview = (LabGourdResultPreview)typeof(GameSession).GetField("preview", Private).GetValue(session);

@@ -256,13 +256,15 @@ namespace C6Lab
         // #506: clay appearance, live DEV fields and impact density hints.
         // 5687: #479 Jigwi A talisman: A carries every seat's talismanAt (no target/hit count), the
         //       "jigwiTalisman" request and the talisman water orb flag (5684~5686 were taken on main).
-        internal const ushort LabProtocolVersion = 5687;
+        // 5688: #509 Jigwi B lists only the picked seats, lasts 15 s and is judged by simultaneous Water boss hits;
+        //       success splashes the boss, failure sets every board on fire (boardFireUntil). A2 starts at 42 s.
+        internal const ushort LabProtocolVersion = 5688;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Double-tap a blue fox orb to clear it, and keep your Yin and Yang away.";
         /// <summary>More fox orbs than one fox fire ever drops; a longer list is ignored (#251).</summary>
         private const int MaximumFoxFireOrbs = 10;
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/48");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/49");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;
@@ -1127,7 +1129,9 @@ namespace C6Lab
             target?.GetComponent<LabHangingTarget>()?.ResetSwing();
             model = new LabModel();
             double beginAt = Time.realtimeSinceStartupAsDouble;
-            model.BeginSolo(sessionId, LocalPlayerId, beginAt, config,
+            // The tutorial (#477) seats two virtual neighbors around this one device.
+            if (tutorialSeats) BeginTutorialModel(beginAt);
+            else model.BeginSolo(sessionId, LocalPlayerId, beginAt, config,
                 stageYokai: gameFlowEnabled ? gameStageYokai : LabStageYokai.None);
             BeginPaintArt();
             if (GameStartHeld) battleClock.Pause(beginAt);
@@ -1136,8 +1140,9 @@ namespace C6Lab
             impactReceipts.SetActive(sessionId, model.Round);
             SetNotice(string.Empty);
             PublishSnapshot(true);
-            SetStatus("DEVELOPER SOLO: 1 / 1");
-            Debug.Log("C6_LAB_SOLO_START session=" + sessionId + " player=" + LocalPlayerId);
+            SetStatus(tutorialSeats ? "TUTORIAL: 1 / 3" : "DEVELOPER SOLO: 1 / 1");
+            Debug.Log((tutorialSeats ? "C6_LAB_TUTORIAL_START session=" : "C6_LAB_SOLO_START session=")
+                + sessionId + " player=" + LocalPlayerId);
         }
 
         /// <summary>Generate from the first drum on this player's board.</summary>
@@ -2010,6 +2015,7 @@ namespace C6Lab
             SyncJigwiFireSurfaces();
             projectile.SetFireSurfaces(JigwiFireSurfacesFor(orb.owner));
             projectile.Launch(orb.id, orb.owner, velocity, config, target, OnProjectileResolved);
+            RememberReplayLaunch(orb, projectile, model != null ? model.LaunchScaleOf(orb.id) : 1f);
             var notice = new LabNetworkPacket { type = "projectile", sessionId = sessionId,
                 round = model.Round, requestId = actionId,
                 firstId = orb.id, owner = orb.owner, element = (int)orb.element, small = orb.small, fiveColor = orb.fiveColor,
@@ -2090,6 +2096,8 @@ namespace C6Lab
                             result.ImpactVelocity, false);
                     }
                     bool fiveColor = model.LastHitFiveColor;
+                    // The final-hit replay only shows a hit that painted (never a blocked or element-less one).
+                    if (!paintBlocked && (element != LabOrbElement.None || fiveColor)) RememberReplayHit(result);
                     if (fiveColor && !paintBlocked) PresentFiveColorHit(targetLocalPoint, result.OwnerPlayerId);
                     if (!paintBlocked && result.OwnerPlayerId == LocalPlayerId)
                     {
@@ -2161,6 +2169,7 @@ namespace C6Lab
                 current.Add(orb.id);
                 if (board.IsSnapshotSuppressed(orb.id)) continue;
                 bool showSpawn = ShowsDrumSpawn(orb, LocalPlayerId);
+                if (orb.jigwiTalismanReward && latest.serverTime - orb.createdAt < .5d) board.ExpectDrop(orb.id); // #509 부적 물구슬은 위에서 하나씩 떨어짐
                 // Every screen derives a locked bomb's fuse from the shared Host clock in the snapshot.
                 float fuse = orb.kind == LabOrbKind.Bomb && orb.lockSwipes > 0 && config != null
                     ? Mathf.Max(0f, (float)(orb.createdAt + config.ItemLifetimeSeconds - latest.serverTime)) : -1f;
@@ -2182,7 +2191,7 @@ namespace C6Lab
                     arrival: orb.kind == LabOrbKind.Bomb && orb.JustArrived(latest.serverTime) ? orb.arrival : LabDrumArrival.None,
                     stopAt: orb.stopAt);
                 view?.SetJigwiSupplyWaterArt(!string.IsNullOrEmpty(orb.jigwiABSupplyEventId) || orb.jigwiTalismanReward,
-                    latest.paused || GameStartHeld);
+                    latest.paused || GameStartHeld, special: !string.IsNullOrEmpty(orb.jigwiABSupplyEventId)); // #509 특수 물구슬
             }
             foreach (var drum in latest.drums ?? Array.Empty<LabOrbState>())
             {
@@ -2223,7 +2232,8 @@ namespace C6Lab
         private void OnEdgeCrossed(LabOrbEdgeCrossing edge)
         {
             if (latest == null || latest.phase != LabPhase.Playing || latest.paused) return;
-            if (developerSolo)
+            // The tutorial's practice board (#477) passes to its story neighbors only what its step passes.
+            if (developerSolo && !TutorialCrossingAllowed(edge.OrbId, edge.ToRight))
             {
                 // The single player has no neighbor. Restore the stopped edge orb immediately.
                 board.RejectEdge(edge.OrbId);
@@ -2781,6 +2791,8 @@ namespace C6Lab
 
         private bool Send(ulong receiver, LabNetworkPacket packet, NetworkDelivery delivery = NetworkDelivery.ReliableFragmentedSequenced)
         {
+            // A tutorial neighbor (#477) has no device: its share of the board lives only in the Host model.
+            if (IsVirtualSeat(receiver)) return true;
             if (manager == null || !manager.IsListening || manager.ShutdownInProgress || manager.CustomMessagingManager == null) return false;
             try
             {
@@ -2865,6 +2877,9 @@ namespace C6Lab
             if (target != null) target.GetComponent<LabHangingTarget>()?.ResetSwing();
             model = null;
             developerSolo = false;
+            tutorialSeats = false;
+            tutorialPassKinds.Clear();
+            if (board != null) board.SetSwipeBlockCountdown(true);
             latest = null;
             sessionId = null;
             configRevision = 0;

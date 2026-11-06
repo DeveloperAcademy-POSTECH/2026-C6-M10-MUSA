@@ -7,6 +7,7 @@ using Object = UnityEngine.Object;
 namespace C6Lab.Tests
 {
     /// <summary>CPU contour fixtures: changed geometry, unchanged funded area and instance isolation.</summary>
+    [Category("Legacy")]
     public sealed class LabWatercolorContourOverrideTests
     {
         private static LabPaintGrowthSettings Settings() => new LabPaintGrowthSettings

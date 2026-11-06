@@ -33,7 +33,7 @@
 
 - #315: 페인트만 사용한다. DEV79는 고정0 예약 슬롯으로 숨겨 후속 설정 번호/총205개를 유지한다. 구형 Crack/분리 연출/실험 Scene은 삭제했고 재생성하지 않는다. 도입 당시 프로토콜5666·Lab27/Game10이며 현재 통합 규약은 아래 #311/#314 항목을 따른다. 일반 협동의 P번호 순환은 위에서 내려다본 시계방향(내가 아래일 때 다음 P=왼쪽)이고, 팀전은 기존 팀별 링·벽 규칙을 유지한다.
 - #311 기믹 묶음은 공용(박 폭탄·넘기기 막기)·고유(구미호 여우불·매혹)로 구분한다. 일반 주기는 공용10초·고유20초이며 스테이지별로 조정한다. 야광귀는 아래 #314 시간표 정책을 같은 실행 경로에 공급한다. DEV205~210을 보존하고 시간표211~224를 더해 통합 당시225개였다. 87·88·152·154·167·168은 79처럼 숨긴 예약 슬롯이다. 당시 규약은5668·Lab29/Game12이며 현재 규약은 아래 #324를 따른다. 판별 기록은 Inspector `Record Gimmick Stats` 기본OFF를 유지한다.
-- 페인트 완료는 Host의100% 판정·최종 지도를 확정한 뒤 별도 표현 clock으로1.2초/.2배 연출한다. 전역 Time.timeScale/충돌/기여도를 재실행하지 않는다. Hapio는 전원 준비/공유 예약/완료 확인 후 결과 이동하며12초 한도에서 연출을 건너뛸 수 있다. 결과 지도 미동기화의 중간/최종 처리 차이는 아래 #367을 따른다. Lab은 동일 표현의 로컬 대기를 쓴다.
+- 페인트 완료는 Host의100% 판정·최종 지도를 확정한 뒤 별도 표현 clock으로1.2초/.2배 연출한다(스토리 1~3은 아래 마지막 일격 다시보기로 대체, 2:2·Lab은 이 1.2초 유지). 전역 Time.timeScale/충돌/기여도를 재실행하지 않는다. Hapio는 전원 준비/공유 예약/완료 확인 후 결과 이동하며12초 한도에서 연출을 건너뛸 수 있다. 결과 지도 미동기화의 중간/최종 처리 차이는 아래 #367을 따른다. Lab은 동일 표현의 로컬 대기를 쓴다.
 
 - #320 도입 당시 결과 UI는 게임 연결 토큰 `C6HapioGame/11`을 사용했고 이후 #311/#314 통합 당시에는 Game12였다. 결과 준비 heartbeat와 관람 알림은 같은 run/stage/revision/설정 세대를 검증한다. 당시 일반 중간 결과는 전원 준비 뒤10초 자동 진행하며 관람 중 누적을 멈췄고, 최종/2:2는 자동 진행하지 않았다. 이10초 정책은 아래 #367에서 제거한다. 당시 Lab27·프로토콜5666·공유 설정205개였으며 현재 규약은 아래 #367을 따른다.
 
@@ -71,7 +71,7 @@
 ## #367 결과 수동 진행과 완료 대기
 
 - 일반 중간 결과는 전원 결과 수신 ACK 후 누구도 박을 관람하지 않을 때 Host가 다음 스테이지 버튼으로 진행한다. 별도 Ready 입력과10초 자동 진행은 없다. OnEnable에서 결과를 초기화하며 최소 다음 프레임·모든 마우스/터치 해제 전에는 NEXT/HOME/관람 버튼과 콜백을 차단한다. 이후 새 입력을 받으며 고정 초 대기는 없다. Hapio Battle에는 독립 Lab 결과 카드·대시보드를 표시하지 않으며 공유 통계·관람, 독립 Lab 단판과2:2 결과·기존 로비 복귀 API는 유지한다. 현재 2:2 디자인 결과의 버튼 정책은 위 #293/PR #382 항목을 따른다.
-- 완료 연출1.2초/.2배는 유지한다. 예약을 포함한 prepare에 최종 지도 준비·예약 수신을 한 ACK로 확인하고, Host 최초 Victory의12초 서버 deadline을 prepare/상태로 공유한다. 연출 중 확보한 결과·관람 캐시를 재사용하며 Story 결과에서 추가30초를 기다리지 않는다. 솔로의 예약 여유0.75초만 생략하고 멀티는 유지한다. 한도에서 연출을 생략해도 최종 지도 불일치가 남은 중간 StageResult는 GameOver가 되며, 최종 Completed만 클리어를 보존하고 지도 미동기화 안내를 표시한다. CPU 지도가 일치해도 GPU 관람 사본 생성 실패 시 별도 오류 안내 없이 관람이 비활성화될 수 있는 기존 제약은 남아 있다.
+- 2:2·Lab과 다시보기 대체 경로의 완료 연출1.2초/.2배는 유지한다(스토리 1~3 기본은 아래 마지막 일격 다시보기). 예약을 포함한 prepare에 최종 지도 준비·예약 수신을 한 ACK로 확인하고, Host 최초 Victory의12초 서버 deadline을 prepare/상태로 공유한다. 연출 중 확보한 결과·관람 캐시를 재사용하며 Story 결과에서 추가30초를 기다리지 않는다. 솔로의 예약 여유0.75초만 생략하고 멀티는 유지한다. 한도에서 연출을 생략해도 최종 지도 불일치가 남은 중간 StageResult는 GameOver가 되며, 최종 Completed만 클리어를 보존하고 지도 미동기화 안내를 표시한다. CPU 지도가 일치해도 GPU 관람 사본 생성 실패 시 별도 오류 안내 없이 관람이 비활성화될 수 있는 기존 제약은 남아 있다.
 - #367 도입 당시 게임 연결 토큰만 **`C6HapioGame/22`**로 올렸다. 당시 **프로토콜5677·`C6PhysicsLab/38`·공유 설정251개**와 기존 인덱스를 유지했으며 현재 호환 기준은 아래 #388을 따른다. 구현 설명은 `docs/GAME_FLOW.md`·`docs/STAGE_RESULT_UI.md`·`docs/SESSION_FINISH_UI.md`, 실제 수행 여부는 `docs/VALIDATION.md`에서 구분한다.
 
 ## #369 수채 질감과 로컬 번짐
@@ -169,7 +169,7 @@
 ## #461 도색 페이로드 압축
 
 - `LabPaintFrame.encoding`은 0 원본, 1 deflate다. Host의 피어별 발행자는 `LabPaintEncodingPolicy.Auto`(압축이 더 짧을 때만 1)를 쓰고, 기본 생성자는 `RawOnly`다. 해시·covered·`Revision`은 늘 풀어 놓은 지도 기준이다. 수신기는 헤더에서 정한 크기 상한(full `columns·rows·5 + 시각 바이트`, delta `columns·rows·7 + 시각 바이트`) 안에서만 풀고, 넘거나 깨지면 체크포인트를 요청한다. 빈 256×128 지도는 도색 프레임 1개(Bulk 2조각)다.
-- 공유 설정 257개·인덱스는 그대로이며 #461 당시 묶음은 **5683/Lab44/Game28**이었다(현재 기준은 아래 #479 절). 이전 5682 앱과 혼용하지 않으며, 병합 뒤에는 모든 기기가 새 빌드를 써야 한다. 실행한 검사만 `docs/VALIDATION.md`에 기록한다.
+- 공유 설정 257개·인덱스는 그대로이며 #461 당시 묶음은 **5683/Lab44/Game28**이었다(현재 기준은 아래 #509 절). 이전 5682 앱과 혼용하지 않으며, 병합 뒤에는 모든 기기가 새 빌드를 써야 한다. 실행한 검사만 `docs/VALIDATION.md`에 기록한다.
 
 ## #471 로비 연결 끊김 뒤 핸들러 재등록
 
@@ -194,10 +194,11 @@
 
 ## #507 박 모델 계약
 
-- 스테이지 박은 `GameStageDefinition.gourdVisualResource`(Resources 경로, 비면 흰 박)를 `GameBattleBindings.MountStageGourd`가 `LabGourdPaint.PrepareVisual`로 `Attach`보다 먼저 지정한다. 2:2·Lab 단판은 흰 박이다. 프리팹 직접 참조로 바꾸지 않는다.
+- 스테이지 박은 `GameStageDefinition.gourdVisualResource`(Resources 경로, 비면 흰 박)를 `GameBattleBindings.MountStageGourd`가 `LabGourdPaint.PrepareVisual`로 `Attach`보다 먼저 지정한다. 2:2·Lab 단판·튜토리얼(#477)은 흰 박이다. 프리팹 직접 참조로 바꾸지 않는다.
 - `LabGourdVisualRig`가 없는 프리팹(흰 박)은 기존 경로를 글자 그대로 탄다. 흰 박의 마운트·판정·칠·요괴 자세는 `Assets/Lab/Tests/PlayMode/Golden/`의 main 기록과 같아야 하며, 골든은 흰 박이 바뀌는 의도된 변경에서만 `GOURD_GOLDEN_RECORD=1`로 다시 기록한다. 계약 검사 실패는 `C6_GOURD_RIG_FALLBACK`과 함께 흰 박으로 돌아간다. 상세는 `docs/GOURD_MODELS.md`.
 - 세 스테이지 모두 `gourdVisualResource = Hapio/Gourds/Stage0N_<요괴>_Battle`(구미호·야광귀·지귀 박)이며 판정·도색·요괴 반응·완성/결과/PNG까지 이 박을 쓴다. 경로는 굽기 도구만 설정하고 `GameStageAssets.EnsureAssets`는 건드리지 않는다. 아트 원본 프리팹은 고치지 않고 `Hapio > Gourds > Bake All Stage Gourds`(`GameGourdRigBaker`, 스테이지별 메뉴도 있음)로만 다시 굽는다. 미리보기 덧씌우기(`GameGourdModelPreview`·`GourdPreview` 리소스)는 삭제했으며 재생성하지 않는다.
-- 1·3스테이지 판정 모양까지 바뀌어 도입 당시 묶음은 **공유 설정 257개·5683/`C6PhysicsLab/44`/`C6HapioGame/30`**였다(현재 기준은 아래 #479 절)(2스테이지만 바뀐 묶음은 Game29). Game28·29 앱과 혼용하지 않는다.
+- #526: 2스테이지 굽기 원본은 경량 `Yagwanggwi_Gourd_100K_GameReady`(`Spec.SourceVariant`, 전투 박 71,011삼각형)다. 원본 FBX·GameReady는 보존하고, 다른 경량 재출력도 같은 방식으로 새 GameReady를 추가해 굽는다.
+- 1·3스테이지 판정 모양까지 바뀌어 도입 당시 묶음은 **공유 설정 257개·5683/`C6PhysicsLab/44`/`C6HapioGame/30`**였다(현재 기준은 아래 #509 절)(2스테이지만 바뀐 묶음은 Game29). Game28·29 앱과 혼용하지 않는다.
 
 ## #507 연속 곡선 줄
 
@@ -240,7 +241,7 @@
 
 - #506 최신 main 통합: #507의 스테이지별 몸통/뚜껑 Rig·판정·연속 줄·요괴를 유지한다. 클레이는 각 paintShell/paintExtra의 identity 자식이며 결과 복제도 각 base의 Ready0과 coat의 Ready1을 유지한다. #482 도색 준비를 유지하고 새 클레이의 3브러시×색/높이 패스도 별도 작은 타깃에서 준비한다. 실제 지도·진행 순번·난수는 프리워밍으로 바꾸지 않는다.
 
-## #479 지귀 A 부적 — 최신 호환 기준
+## #479 지귀 A 부적
 
 - A는 5/40/70초에 **모든 자리**에서 동시에 열린다. 예전의 대상 한 명·박 3번 명중·회복 4배는 없다. 자리마다 스냅샷 `LabJigwiABPlayerFire.talismanAt`(아직 안 썼으면 음수)을 둔다.
 - 소각은 한꺼번에가 아니라 **한 개씩** 탄다. 첫 구슬은 DEV243(기본 1초) 뒤, 이후 Inspector `jigwiABBurnStaggerSeconds`(1초) 간격이며 소유자별 생성 순서(createdAt/id)를 따른다(`NextJigwiABBurnAt`).
@@ -248,7 +249,39 @@
 - Host는 그 자리의 소각 예약을 지우고 `jigwiTalismanReward` Water 5개(수명 15초, 칠 1.5배, B 불 꼬리 없음)를 준다. 모든 자리가 쓰면 A를 Completed로 일찍 끝내고, 못 쓰면 15초에 벌점 없이 끝난다.
 - DEV241/242는 은퇴 슬롯("Reserved …(unused)", 인덱스 보존, Home/Lobby 저장 라벨도 맞춤)이다. A 스태미나 화염 테두리, 화면 붉은 기운/양옆 불기둥, 구슬 위 불꽃 그림은 지웠고(구슬은 마감 전 1초 동안 `LabJigwiOrbFlame`이 아래에서 위로 타 들어가고, 그 선 위에 먹선 불꽃이 따라 올라감), A 외침은 `PatternAudioProfile.personalVoiceEnabled`(0)로 꺼 두었다(B 외침은 유지).
 - 에디터 전용: `Hapio > DEV SOLO 시작 스테이지` 메뉴(EditorPrefs, Home에서 Play할 때만 적용). 빌드와 Test Runner에는 영향이 없다.
-- 현재 호환 묶음은 설정 259개(#506 클레이 257·258 포함)·**5687**·`C6PhysicsLab/48`·`C6HapioGame/32`다. main의 #466/#506/#507이 5684~5686·Lab45~47·Game29~31을 먼저 써서 #479는 그 위로 올렸다. 이전 빌드와 혼용하지 않는다.
+- #479 당시 호환 묶음은 설정 259개(#506 클레이 257·258 포함)·**5687**·`C6PhysicsLab/48`·`C6HapioGame/32`였다(현재 기준은 아래 #509 절). main의 #466/#506/#507이 5684~5686·Lab45~47·Game29~31을 먼저 써서 #479는 그 위로 올렸다. 이전 빌드와 혼용하지 않는다.
+
+## 마지막 일격 다시보기 (스토리 1·2·3)
+
+- 100% 뒤 Host가 마지막 일격(결과의 `LastPainter`가 최근 4초 안에 던진 칠 명중, 없으면 최근 명중) 기록 `LabFinishReplayShot`을 finish prepare/commit의 `replay` 문자열에 싣는다. 모든 기기가 공통 `StartsAt`부터 세 각도(던진 사람·옆면·확대, 1.31/1.5/1.8초, 점점 느리게)와 전환 0.5초, 총 5.11초를 재생한 뒤 한지색 `GameSceneFade` 아래에서 결과로 간다. 후보가 없거나 12초 한도에 들어가지 않으면 기존 1.2초 연출이다. 2:2·Lab은 바꾸지 않는다.
+- 표현 전용이다. 실제 박은 숨기지 않고 렌더 콜백 사이에서만 기록 자세로 그린다(`LabHangingTarget.SetPresentationPose`). 구슬은 물리 없는 ghost, 카메라는 전용 연출 카메라다. 판정·통계·네트워크 상태·BattleCamera 자세·전역 `Time.timeScale`을 바꾸지 않는다.
+- 새 탭은 그 기기만 건너뛴다. release는 모든 참가자의 done(끝남·건너뜀)을 기다린다(`TryRelease` 최소 0, 기존 연출은 1.2초 유지). 솔로는 건너뛰면 바로 결과로 간다.
+- #525 당시 호환 묶음은 설정 259개·**5687**·`C6PhysicsLab/48`·**`C6HapioGame/33`**이며 Game32 앱과 혼용하지 않는다. 상세는 `docs/FINAL_HIT_REPLAY.md`, 실행한 검사는 `docs/VALIDATION.md`를 따른다.
+
+## #509 지귀 B 지목 동시 명중
+
+- 시간표: A 5/42/70초, B 25/55/85초. A2는 공통 폭탄(40초)과 겹치지 않게 42초로 옮겼고, B는 15초(`LabJigwiABTimeline.GroupMissionSeconds`)다. B3는 100초 정리로 벌점 없이 취소된다.
+- 예고는 활성 2초 전(`LabJigwiABTimeline.WarningSeconds`, 이전 1초)이고 상단에 지귀 도발만 띄운다: A "타올라라, 모두 재가 되어라!", B "흩어진 물방울로는 어림없다!". 파훼법은 문구로 설명하지 않는다.
+- B는 1~2인 1명 / 3인 2명 / 4·5인 3명을 seed로 뽑는다(`GroupPickCount`, `JigwiGroupPicks`). `round.players`에는 지목된 자리만 있다. 아무도 막히지 않고(`JigwiABBlocksBoss` false), 불기둥/장막/콜라이더가 없다.
+- 지목된 전원이 첫 명중부터 1초 안에 **박**을 Water Combined로 맞히면(`RecordJigwiBossSyncHit` → `RecordJigwiSyncHit`) `syncCount`+1, 늦으면 0으로 초기화(`syncResetAt`). 혼자면 1번 = 1회. 3회면 성공.
+- 성공(물벼락): 3번째 동시 명중 순간 지목된 사람마다 마지막으로 맞힌 자리에 Water 칠을 한 번 더(Inspector `jigwiBSplashPaintShare`, 기본 3 = 한 타격 최대). 5초 발사 보상은 없다(`rewardUntil` -1, DEV251/252 은퇴).
+- 실패(조합판 불바다): 15초 만료 시 `boardFireUntil` = 만료+Inspector `jigwiBBoardFireSeconds`(기본 3초, 100초 정리에서 자름)까지 모든 자리의 `TryGenerate`가 `JIGWI_BOARD_FIRE`로 거절된다. 판 구슬/스태미나는 그대로이고 판 비우기 fence(`clearedThroughRevision`)는 늘 0이다.
+- 무료 물 구슬은 도우미 판에만 준다(도우미가 없으면 지목된 자리). 이 물은 진행에만 쓰이고 칠하지 않는다.
+- 화면은 `LabJigwiSyncPillarView`(클래스 이름만 예전 그대로, 물방울 3칸·1초 막대·빨간 흔들림·iOS 기본 진동, 글자 없음)와 글자 없는 붉은 실패 오버레이다. B 동안 화면 글자는 예고 2초의 지귀 도발뿐이다(지목 이름/진행/안내/결과/다음 기믹 문구 없음). 지귀 A/B 외침 목소리는 지웠다.
+- DEV244/245/251/252는 은퇴 슬롯(인덱스·저장값 보존, Home/Lobby 라벨도 맞춤)이다.
+- #509 당시 묶음은 설정 259개·**5688**·`C6PhysicsLab/49`·`C6HapioGame/34`였다. main #525가 Game33을 먼저 써서 34로 올렸다. 5687/Game33(#479·#525) 앱과 혼용하지 않는다.
+- 현재 호환 묶음은 설정 259개·**5688**·`C6PhysicsLab/49`·**`C6HapioGame/35`**다. #526에서 2스테이지 박의 칠·판정 껍데기를 100K 모델로 다시 구워 Game만 올렸다. Game34 앱과 혼용하지 않는다.
+
+## 검사 카테고리와 검사 전용 시작 단축 (2026-11-05)
+
+- 검사에는 NUnit `[Category]` `Slow`(fixture 5초 이상)·`GPU`·`Bonjour`·`LabOnly`·`Legacy`를 붙인다. 정의와 실행 묶음(빠른 묶음 `-testCategory "!Slow;!Legacy;!LabOnly"`)은 `docs/TEST_SUITE_REPORT.md`의 현재 구성 절을 따른다. 새 검사도 같은 기준으로 붙이며, 현재 경로를 지키는 유일한 검사에는 `Legacy`를 붙이지 않는다. 카테고리는 실행 범위 표시이고 검사 삭제가 아니다. PR 전에는 전체를 돌린다.
+- `GameSession.Start.cs`의 `GameStartTiming` 기본값(3초·1초·5초·0.5초)은 게임 코드에서 바꾸지 않는다. `Hapio.PlayModeTests`의 `GameTestStartTiming`(SetUpFixture)만 길이를 줄이며 #306의 순서·ACK·재예약·로드 한도는 같다. 카운트다운 길이에 기대는 검사는 기본값으로 되돌려 실행하고, 시작 직후 던지는 다시보기 검사는 `WaitReplayPoseWindow`로 자세 기록 창을 기다린다.
+- 실제 Host를 여는 PlayMode 검사는 고정 UDP 포트 대신 `LabSavedSceneNetworkFixture.UseAvailablePort`·`AvailableDualFamilyPort()`를 쓴다.
+
+## DEV 표시 정리 (2026-11-05)
+
+- 효과 없는 10칸(0·1·41·43·48·52·53·54·72·73)은 `LabConfig.InactiveDeveloperFields`다. 은퇴가 아니라 숨기기만 한다. 코드가 아직 읽으므로 라벨·저장값·Inspector·폼 전달은 그대로이고, Lab DEV 묶음에 넣지 않으며 Hapio는 `GameStageSettings.IsFieldShown`에서만 뺀다(`IsFieldVisible` 적용 범위는 공통 그대로).
+- Hapio 지귀 탭은 폼의 228이 켜져 있으면 178~183·192~195·205를 접는다(`LabConfig.IsReplacedByJigwiTimeline`). Hapio 전투 중 DEV(Lab 패널)도 228 ON이면 `Jigwi` 묶음을 숨기고, 지귀 스테이지에서만 205도 숨긴다(`HiddenByJigwiTimelineInGame`). Lab 단독 장면은 그대로 보인다. 237 오색구슬 칠 면적은 Hapio 공통 탭이다(236은 야광귀 탭). 은퇴 슬롯(#509까지 25개)은 모두 `HideInInspector`다. 설정 259개와 접속 묶음은 바꾸지 않았다(현재 기준은 위 #509 절의 마지막 줄). 상세는 `docs/DEVELOPER_MODE_PARAMETER_SPEC.md`의 같은 절을 따른다.
 
 
 ## #524 스티커별 코팅 광택 v2

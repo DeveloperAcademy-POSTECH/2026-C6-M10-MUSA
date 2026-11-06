@@ -38,8 +38,10 @@ namespace Hapio
             public string Id;
             public string Creature;
             public string StageAsset;
+            /// <summary>Suffix of a lighter re-export the bake reads instead (e.g. "_100K"); the original art stays.</summary>
+            public string SourceVariant = "";
             public string ArtFolder => "Assets/Hapio/Art/Gourds/" + Id;
-            public string SourcePrefab => ArtFolder + "/Prefabs/" + Creature + "_Gourd_GameReady.prefab";
+            public string SourcePrefab => ArtFolder + "/Prefabs/" + Creature + "_Gourd" + SourceVariant + "_GameReady.prefab";
             public string ModelName => Creature + "_Gourd";
             public string GeneratedFolder => ArtFolder + "/Generated";
             public string FilePrefix => Id.Substring(0, 7) + "_"; // Stage02_
@@ -52,7 +54,7 @@ namespace Hapio
         public static readonly Spec Stage1 = new Spec { Stage = 1, Id = "Stage01_Gumiho", Creature = "Gumiho",
             StageAsset = "Assets/Hapio/Resources/Hapio/Stages/Stage01_gumiho.asset" };
         public static readonly Spec Stage2 = new Spec { Stage = 2, Id = "Stage02_Yagwanggwi", Creature = "Yagwanggwi",
-            StageAsset = "Assets/Hapio/Resources/Hapio/Stages/Stage02_yaguang.asset" };
+            SourceVariant = "_100K", StageAsset = "Assets/Hapio/Resources/Hapio/Stages/Stage02_yaguang.asset" };
         public static readonly Spec Stage3 = new Spec { Stage = 3, Id = "Stage03_Jigwi", Creature = "Jigwi",
             StageAsset = "Assets/Hapio/Resources/Hapio/Stages/Stage03_jigwi.asset" };
         public static readonly Spec[] All = { Stage1, Stage2, Stage3 };

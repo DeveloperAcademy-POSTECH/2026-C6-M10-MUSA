@@ -1,5 +1,166 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-06 — #477 튜토리얼 검사 실패 정리 (#534 병합 후)
+
+main `a8ddda75` 위의 `fix/#477-tutorial-test-expectations`에서 Unity 6000.6.5f1 batch mode(macOS)로 실행했다. 아래는 실제로 실행한 것만 적는다.
+
+| 원인 | 고친 것 |
+| --- | --- |
+| EditMode `MirrorPops…`가 `StopArrivalSpeed(-3, .5)`에 3을 기대했지만, 같은 검사가 앞 줄에서 확인하는 상한 √8≈2.83에 잘린다 | 검사만: 상한 안의 -2 → 2로 바꿨다(음수 방향의 절댓값 처리는 그대로 검사) |
+| "성공!" 색: asset만 흰 글자(검정 테두리 0.2)이고 코드 기본값·검사는 검정이었다 | 사용자 결정으로 흰 글자 유지. `GameTutorialArt` 기본값·tooltip, EditMode·PlayMode 검사를 흰색으로 맞췄다. asset과 화면은 그대로다 |
+| PlayMode 이름표: 화면 아래에 붙은 경우의 허용치에 `nameScreenMargin`(2)이 빠져 있었다 | 검사만: 화면 배율을 곱한 여백을 허용치에 넣었다 |
+| 튜토리얼 박(실제 결함): #521(#507, 11-04 병합)의 스테이지 박이 튜토리얼에도 달려 구미호 박이 됐다. #534의 요괴 돌리기(흰 박 `GourdYokai_Details` 기준)는 #521이 없는 브랜치에서 만들어져 돌 대상을 못 찾았다 | `GameBattleBindings.MountStageGourd`가 튜토리얼에서는 스테이지 박을 달지 않는다(흰 박). 요괴가 가운데 자리로 120° 돈다 |
+| DEV 버튼: `LabHud.Update`가 켜고 튜토리얼 `LateUpdate`가 끄기를 매 프레임 반복했다 | `LabHud.developerSettingsHidden`(직렬화 안 함)을 두고 튜토리얼이 켠다. 튜토리얼이 없어지면 되돌린다 |
+| PlayMode 손동작: 던지기·북 밀기가 고정 world 거리라 batch의 넓은 판(폭 13.97)에서 최소 거리 0.12판폭에 못 미쳤고, 폭탄 끌기는 여러 프레임에 걸쳐 판의 실제 마우스 확인이 끌기를 취소했다 | 검사만: 판 폭 기준 거리(던지기 0.2판폭, 북은 판 옆 끝 너머에서 놓기)와 한 프레임 안 합성 시간 끌기로 바꿨다 |
+
+| 확인 | 결과 |
+| --- | --- |
+| EditMode `Hapio.Tests.GameTutorialTests` | 39건 모두 PASS |
+| PlayMode `Hapio.Tests.GameTutorialFlowTests` | 4건 모두 PASS |
+| EditMode 전체 | **2015건 모두 PASS** |
+| PlayMode 전체 | **644건 모두 PASS**, 462.1초 |
+| 미실행 | iOS·Mac 실기기에서 튜토리얼 화면(흰 박·요괴 정면·"성공!"·DEV 숨김) 확인 |
+
+## 2026-11-06 — #526 2스테이지 야광귀 박 100K 모델 굽기
+
+main `59d0400d`(#535 병합) 위의 `feat/#526-stage2-gourd-100k-bake`에서 Unity 6000.6.5f1 batch mode(macOS)로 실행했다. 아래는 실제로 실행한 것만 적는다.
+
+| 확인 | 결과 | 범위 |
+| --- | --- | --- |
+| 100K 원본 대조(일회성 Editor 코드, 커밋 안 함) | 노드 29개 동일, 공연 클립 커브 280개 동일(0~96프레임 최대 차 1.5e-5), 재질 누락 0, 렌더러 22·99,865삼각형(원본 446,594) | 원본 GameReady의 루트 배율 17.09628·모델 위치·Animator 컨트롤러로 `Yagwanggwi_Gourd_100K_GameReady.prefab`을 새로 저장했다. 원본 FBX·GameReady는 바뀌지 않았다 |
+| 2스테이지 굽기(`GameGourdRigBaker.BakeStage2`) | star-shaped 100%, 판정 편차 평균 0.0131·최대 0.0449(이전 0.0130·0.0455), 시간표 15/26/29/38/45/47·주기 48(이전과 같음), 배율 0.99992, 렌더러 17·71,011삼각형(이전 311,442) | 바뀐 파일은 `Generated/Stage02_*`(같은 GUID)·`BakeReport.txt`·`Stage02_Yagwanggwi_Battle.prefab`뿐이고 1·3스테이지 파일·`YokaiPeek.anim`·`YokaiProfile`은 그대로다. 두 칠 재질에는 셰이더 기본값과 같은 속성 5개가 새로 기록됐다 |
+| EditMode 전체 | **2015건 중 2013 PASS · 2 FAIL** | `GameGourdRigBakeTests`(1~3스테이지 저장본=재계산, 삼각형 상한 90,000)·`LabGameFlowBridgeTests`(Game35) 통과. 실패 2건은 `GameTutorialTests.MirrorPopsLikeABubble…`·`TutorialArtHoldsTheThreeFaces…`다 |
+| PlayMode 전체 | **644건 중 643 PASS · 1 FAIL**, 427.8초 | `GameStage2GourdHitFinishTests` 1·`GameStageGourdIntegrationTests` 1·`GameFinishReplayTests` 4·`LabWhiteGourdGoldenTests` 2(흰 박 불변)·`LabContinuousRopeTests` 5·`GourdResultViewerPlayModeTests` 3 모두 통과. 실패 1건은 `GameTutorialFlowTests.FinishedOpeningOpensThePracticeBoardOnceThenTheRoomList`(불이 얼굴 위치 19.51 > 18.58)다 |
+| 위 실패 3건의 main 대조 | main `59d0400d`(이 변경 없이)에서도 같은 3건 실패 | 이 변경을 잠시 빼고 `GameTutorialTests`(39건 중 2 FAIL)·`GameTutorialFlowTests`(4건 중 1 FAIL)를 다시 돌렸다. #534 튜토리얼 검사이며 이 변경과 관계없다 |
+| 화면 캡처(임시, 커밋 안 함) | 원본·100K 아트 옆모습 동일, 전투 박 앞·옆 정상 | 정적 자세 Editor 렌더. 이전 굽기 전투 박과의 직접 비교는 하지 않았다 |
+| 미실행 | — | iOS·Mac 실기기 성능·화면, 다인 실기기 |
+
+## 2026-11-05 — DEV 표시 정리 (효과 없는 값·지귀 시간표·오색구슬 칠·Inspector·전투 DEV)
+
+`chore/dev-hide-inactive-fields` 브랜치의 별도 worktree에서 Unity 6000.6.5f1 batch mode(macOS)로 실행했다. 아래 표는 실제로 실행한 것만 적는다. 시간은 NUnit XML의 `duration`이고, Unity 시작·가져오기·컴파일은 포함하지 않는다.
+
+| 확인 | 결과 | 범위 |
+| --- | --- | --- |
+| EditMode 전체 — main `de1b56c5`(#509·#528·#529) 병합 뒤 최종 | **1976 PASS / 0 FAIL**, 23.5초 | 이 PR의 새 검사 7건 포함. `LabDeveloperConfigTests`: 효과 없는 10칸의 라벨·인덱스·저장값·폼 전달, 저장된 `Lab.unity` DEV 패널에서 묶음을 모두 펼쳐도 숨김·은퇴 행이 안 보이고 Lab 단독 장면은 228 ON에서도 `Jigwi` 묶음·205를 보임(`LabOnly`), 전투 DEV 숨김 규칙(228 ON이면 178~183·192~195, 지귀 스테이지에서만 205), 은퇴 25칸(#509의 244·245·251~255 포함)의 `HideInInspector`·`SerializeField`와 실제 폼 인덱스 대응. `GameStageSettingsTests`: 10칸이 어느 탭에도 표시되지 않고 공통 적용은 그대로, 지귀 탭이 폼의 228 ON에서 11칸을 접고 적용 범위는 그대로, 237이 공통 탭이고 세 스테이지에 들어감 |
+| PlayMode 전체 — 병합 뒤 최종 | **640건 중 637 PASS · 2 FAIL · 1 Inconclusive**, 415.2초 | DEV 관련 51건 모두 통과: `GameStageUiTests`(저장된 Home DEV 탭: 공통에서 10칸 숨김·237 표시, 야광귀에서 236 표시·237 숨김, 지귀에서 228 슬라이더·입력으로 APPLY 전 즉시 접기/펴기, APPLY 뒤 다시 열기), Lab DEV 패널 PlayMode 9개 파일, `GameSceneFlowTests` DEV 검사(실제 Battle의 전투 DEV를 1~3스테이지마다 열고 묶음을 펼쳐도 178~183·192~195와 `Jigwi` 제목이 숨고, 205는 3스테이지에서만 숨음) |
+| PlayMode 실패 2·Inconclusive 1 | 기존 실패 | `LabHangingRenderInterpolationTests.OutsideRenderingTheTransformsAlwaysHoldTheFixedPose`(batchmode에서 WaitForEndOfFrame 없음), `LabWatercolorPaintRuntimeTests.DescriptorBurstRespectsTheActiveCapAndConvergesToASettledCheckpoint`(색 1단계 차이), Inconclusive `LabHangingRenderInterpolationTests.DuringRealRenderingTheDrawnPoseLiesBetweenTheTwoFixedPoses`. 위 검사 시간 단축 절의 기존 실패 목록에 있는 항목이며 DEV 표시와 관계없다 |
+| 병합 전(main `25014885` 기준) | EditMode 1976·1977 PASS / 0 FAIL, PlayMode 673건 중 669 PASS · 3 FAIL · 1 Inconclusive(2회) | 첫 커밋 뒤와 전투 DEV 커밋 뒤에 각각 전체를 돌렸다. 실패 3건은 위 2건과 `LabJigwiABPresentationTests.SavedRawImagesRenderWarmAAndBAndBlueWaterIntoAnIsolatedPortraitUiTarget`(불꽃 픽셀 0)이다. 이 검사는 #509가 지귀 화면 검사를 다시 쓰면서 병합 트리에 없다 |
+
+미실행:
+
+- Editor GUI Test Runner, Inspector 화면 눈 확인(`HideInInspector`는 속성 검사로만 확인)
+- 다른 Mac, iOS, 실기기, 다인 LAN
+
+## 2026-11-05 — Editor 메뉴 정리 (Battle 덮어쓰기·고장 메뉴 제거)
+
+`chore/editor-menu-cleanup` 브랜치에서 Unity 6000.6.5f1 batch mode(macOS)로 실행했다. 처음에는 main `25014885` 기준으로, 이어 main `683c6f27`(#528·#509 포함)을 병합한 뒤 다시 실행했다. EditMode는 `-nographics`, PlayMode는 그래픽을 켠 batch다. 아래 표는 실제로 실행한 것만 적는다.
+
+| 확인 | 결과 | 범위 |
+| --- | --- | --- |
+| 컴파일 | **PASS** | batch 실행 중 Runtime·Editor(`Assembly-CSharp-Editor`)·EditMode/PlayMode 검사 묶음 전체 컴파일, 오류 0. `LabSceneBuilder.cs`의 경고는 남은 기존 줄의 `FindFirstObjectByType` 폐기 경고(CS0618)뿐이다. |
+| EditMode 전체(병합 뒤) | **1969 PASS / 0 FAIL / 0 skip** (21.7초) | main `683c6f27`의 1,967건(C6Lab 1,782 · Hapio 185)과 새 검사 2건. |
+| EditMode 전체(병합 전, main `25014885` 기준) | **1972 PASS / 0 FAIL / 0 skip** (48.6초) | Lab·Hapio EditMode 전체. 새 `GameEditorMenuCleanupTests` 2건 포함: 다시 만든 Stage02 기본값(`GameStageAssets.YaguangDefaults`)이 야광귀 탭에 보이는 칸만 쓰고 저장 Stage02와 같으며 카탈로그 `Validate`를 통과함, 지운 메뉴 6개와 `UpgradeBattleFromSavedLab`이 Editor 어셈블리에 다시 등록되지 않음. 두 검사 모두 밀리초 단위이고 GPU·Lab 전용·대체 기능 검사가 아니라 `[Category]`를 붙이지 않았다. |
+| PlayMode `Hapio.PlayModeTests` 전체(병합 뒤) | **58 PASS / 0 FAIL / 0 skip** (143.8초) | 바뀐 Editor 코드를 직접 부르는 PlayMode 검사는 없다. 저장된 스테이지 카탈로그·Battle·Home/Lobby DEV 행을 읽는 가장 가까운 묶음(`GameSceneFlowTests` 21, `GameLobbyViewTests` 13, `GameOpeningControllerTests` 10, `GameFinishReplayTests` 4, `GameStageUiTests` 2, `GameYokaiPresentationTests` 2 등)을 실행했다. |
+| 참조 검색 | **없음** | `git grep`으로 지운 메뉴 이름·메서드·클래스를 찾았다. 남은 언급은 고친 `docs/GAME_FLOW.md`·`Assets/Lab/Art/UI/README.md`의 제거 안내, 과거 실행 기록(이 문서의 「#262 최신 main 동기화 및 Draft 준비 — 2026-10-21」 등)과 새 검사뿐이다. |
+
+변경: `Hapio/Upgrade Existing Game Scenes From Current Lab`과 Lab 전체를 Battle 위에 저장하던 `UpgradeBattleFromSavedLab`을 지웠다. `Hapio/Upgrade Three Yokai Stages`는 정의·카탈로그 생성과 Home/Lobby DEV 행·StageResult/GameOver 글꼴 갱신만 하고 Battle을 열거나 저장하지 않는다. `YaguangDefaults`에서 은퇴 슬롯 211을 뺐다. `C6 Lab/Build Editable Lab Scene`·`Migrate Legacy Throw Tuning`·`Remove Unused Template Samples`(그 메서드와 Build 전용 보조 함수)와 `LabDeveloperPanelUpgrade.cs`(`Upgrade Developer Controls`)·`LabTemporaryBackdropUpgrade.cs`(`Apply Temporary Battle Background`)를 지웠다. Scene·Prefab·에셋 YAML은 바꾸지 않았다. batch 가져오기가 실행 때마다 Lobby PNG `.meta` 20개에 WebGL 플랫폼 항목을 덧붙였으나 이번 변경과 무관해 매번 되돌렸다. 접속 번호(5688/`C6PhysicsLab/49`/`C6HapioGame/34`)와 공유 설정 수는 바꾸지 않았다.
+
+미실행: Lab·Story·ClayPreview PlayMode, 메뉴 자체 실행(`Upgrade Three Yokai Stages`는 Home/Lobby/StageResult/GameOver를 저장하므로 실행하지 않았다), Editor 화면에서 메뉴 목록 육안 확인, iOS·Mac 앱.
+
+## 2026-11-05 — 검사 시간 단축·카테고리
+
+`chore/test-suite-speedup` 브랜치(main `25014885` 기준)의 별도 worktree에서 실행했다. 표 끝의 "병합 뒤" 행은 main `d12f4f84`(#509)를 병합한 트리에서 실행했다. Unity 6000.6.5f1 batch mode, macOS, 같은 Mac이다. 아래 표는 실제로 실행한 것만 적는다. 시간은 NUnit XML의 `duration`이고, Unity 시작·가져오기·컴파일은 포함하지 않는다.
+
+| 확인 | 결과 | 범위 |
+| --- | --- | --- |
+| 변경 전 EditMode 전체 | **1970 PASS / 0 FAIL**, 47.7초 | 기준 측정. main 그대로 |
+| 변경 전 PlayMode 전체 | **673건 중 667 PASS · 5 FAIL · 1 Inconclusive**, 639.4초 | 기준 측정. 실패 5건은 아래 기존 실패이며 변경 전부터 있었다 |
+| 1차 변경 뒤 PlayMode 전체 | **671건 중 662 PASS · 8 FAIL · 1 Inconclusive**, 410.0초 | 새 실패 4건(다시보기 `GameFinishReplayTests` 3건, `GameStage2GourdHitFinishTests` 1건)을 찾았다. 짧아진 시작 대기 때문에 박 자세 기록이 명중 0.8초 전까지 쌓이기 전에 던져 다시보기 후보에서 빠졌다. 진단 출력으로 확인했다(명중 2.46초, 가장 오래된 자세 1.68초) |
+| 다시보기 검사 수정 뒤 | **5/5 PASS** | `GameFinishReplayTests` 4건, `GameStage2GourdHitFinishTests` 1건. 던지기 전 자세 기록 창을 기다린다. 런타임은 고치지 않았다 |
+| 최종 EditMode 전체 | **1970 PASS / 0 FAIL**, 19.4초 | `LabPaintSplatterConsistencyTests` 1.41초, `LabPaintSpreadFlowTests` 0.25초 |
+| 카테고리 적용 뒤 PlayMode 전체 | **671건 중 667 PASS · 3 FAIL · 1 Inconclusive**, 424.0초 | 실패 3건은 모두 기존 실패다 |
+| 카테고리 적용 뒤 빠른 묶음 | PlayMode **352건 중 349 PASS · 2 FAIL · 1 Inconclusive**, 57.0초 / EditMode **1824 PASS**, 18.1초 | PlayMode는 `-testCategory "!Slow;!Legacy;!LabOnly"`, EditMode는 `"!Legacy;!LabOnly"`. 결과 XML에 제외 카테고리 0건 |
+| 코드 검토 | 독립 검토 3관점 + 반박 검증 | 확인된 4건 수정: 다시보기 검사의 대기를 `ResetSwing` 앞으로 옮겨 첫 투척이 리셋 자세에서 출발하게 함, Hapio도 쓰는 공용 경로 검사 3파일(`LabQuickConnectTests`, `LabLobbyPositionSelectionTests`, `LabPlayerPaintPatternUiTests`)의 `LabOnly`를 메서드 단위로 좁힘. 기각 3건(Slow 클래스 안의 짧은 동기 검사는 클래스 단위 유지) |
+| 검토 수정 뒤 최종 PlayMode 전체 | **671건 중 666 PASS · 4 FAIL · 1 Inconclusive**, 430.4초 | Hapio PlayMode 152.1초(전 362.6초), `GameSceneFlowTests` 83.3초(전 223.5초), 다시보기 5건 통과. 실패 4건은 모두 기존 실패다(아래 3건 + `LabWatercolorSurfaceGrainTests` 정적 입자, 1차 변경 뒤에도 같은 실패) |
+| 검토 수정 뒤 최종 PlayMode 빠른 묶음 | **358건 중 355 PASS · 2 FAIL · 1 Inconclusive**, 58.7초 | 제외 카테고리 0건. 실패 2건은 기존 실패다. EditMode는 r3 이후 바뀌지 않아 다시 돌리지 않았다 |
+| 병합 뒤 EditMode 전체 | **1967 PASS / 0 FAIL**, 25.1초 | 빠른 묶음(`"!Legacy;!LabOnly"`) **1821 PASS**, 19.2초, 제외 카테고리 0건 |
+| 병합 뒤 PlayMode 전체 | **640건 중 635 PASS · 4 FAIL · 1 Inconclusive**, 435.9초 | Hapio PlayMode 156.4초, `GameJigwiStageIntegrationTests` 3.4초(검사 전용 시작 단축 아래 #509 A·B 통과). 실패 중 3건은 기존 실패(`LabHangingRenderInterpolationTests` 렌더 밖 자세, `LabWatercolorPaintRuntimeTests` Descriptor, `LabWatercolorSurfaceGrainTests` 종이 영향 2). `LabPaintSpreadFlowRenderTests.SavedShellComparesLegacyAndSpreadFlow…`는 경계 반올림 3으로 한 번 실패했다. 단독 3회 재실행과 GPU 묶음 재실행에서 모두 통과했고 그 전 4회 전체 실행에서도 통과했다 |
+| 병합 뒤 GPU 묶음 | **58건 중 56 PASS · 1 FAIL · 1 Inconclusive**, 75.4초 | 실패는 기존 `LabWatercolorPaintRuntimeTests` Descriptor다 |
+| 병합 검토 | 독립 검토 3관점 + 반박 검증 | 수정 3건: 자동 병합이 #509가 지운 검사의 `GPU`를 다른 검사(`BMaskUsesTheBattleViewport…`)로 옮긴 것을 되돌림, 0.55초가 된 `LabJigwiABNetworkTests`의 `Slow` 제거, 보고서 현재 구성 건수 갱신. #509로 안 쓰이게 된 경로를 보는 검사의 `Legacy` 정리는 하지 않았다(보고서에 적음) |
+| 병합 뒤 PlayMode 빠른 묶음(`Slow` 제거 후) | **340건 중 338 PASS · 1 FAIL · 1 Inconclusive**, 61.0초 | 제외 카테고리 0건. 실패와 Inconclusive는 기존 `LabHangingRenderInterpolationTests` 2건이다 |
+
+기존 실패(변경 전 기준 실행부터 있었고 이번 변경과 관계없음):
+
+- 매번 실패:
+  - `LabHangingRenderInterpolationTests.OutsideRenderingTheTransformsAlwaysHoldTheFixedPose`: batchmode에서 WaitForEndOfFrame이 호출되지 않는다.
+  - `LabJigwiABPresentationTests.SavedRawImagesRenderWarmAAndBAndBlueWaterIntoAnIsolatedPortraitUiTarget`: 불꽃 픽셀이 0이다.
+  - `LabWatercolorPaintRuntimeTests.DescriptorBurstRespectsTheActiveCapAndConvergesToASettledCheckpoint`: 색이 1단계 다르다.
+- 실행마다 다르게 실패: `LabJigwiWaterTrailTests.AuthoritativeAndPredictedWater…`, `LabPlayerPaintPatternRenderTests.ActualSavedShaderDistinguishesAllSixPainters…`, `LabWatercolorSurfaceGrainTests.PigmentTextureIsStatic…`
+- 매번 Inconclusive: `LabHangingRenderInterpolationTests.DuringRealRenderingTheDrawnPoseLiesBetweenTheTwoFixedPoses`
+
+미실행:
+
+- Editor GUI Test Runner
+- 다른 Mac, iOS, 실기기
+- 동시에 여러 실행을 돌려 포트 충돌을 확인하는 검사
+- 실제 게임의 시작 대기: 기본값을 바꾸지 않았으므로 앱 실행 확인은 하지 않았다
+
+구성·카테고리·실행 묶음은 [검사 모음 보고서](TEST_SUITE_REPORT.md)의 현재 구성 절에 있다.
+
+## 2026-11-04~05 — #509 지귀 B 지목 동시 명중
+
+`feat/#509-jigwi-group-sync`(#479 브랜치 위) 작업 중 팀원이 Unity6000.6.5f1 Editor(macOS)로 확인한 것만 적는다.
+
+| 확인 | 이번 결과 | 범위 |
+| --- | --- | --- |
+| (1/5) Host 규칙 EditMode | **팀원 PASS 보고** | `LabJigwiABModelTests`·`LabJigwiABSupplyModelTests`·`LabJigwiStageModelTests`·`LabJigwiStageBlastTests`·`LabJigwiSupplyReplicationTests`·`LabBoardReplicationTests`·`LabSharedSettingsSchemaTests`·`LabGameFlowBridgeTests` (테스트 픽스처 실수 4건을 고친 뒤) |
+| (3/5) DEV 은퇴 EditMode | **팀원 PASS 보고** | `LabDeveloperConfigTests`·`LabJigwiABConfigTests`·`LabJigwiStageConfigTests`·`GameStageSettingsTests`·`MenuScreens_HaveSavedEditableCanvasAndInput` |
+
+(2/5) `LabJigwiSyncPillarViewTests`와 (4/5) PlayMode(`LabJigwiABPresentationTests`·`LabJigwiABNetworkTests`·`LabJigwiGroupFireAudioTests`·`GameJigwiStageIntegrationTests`), EditMode 전체 Run All, SOLO/2인 이상 Play, 실기기 진동·iOS 빌드·LAN/핫스팟은 이 기록 시점에 **결과를 받지 못했거나 미실행**이다. 확인하면 이 절에 덧붙인다.
+
+이후 단계: (6/9) 지귀 A/B 외침 목소리 삭제와 (7/9) 불기둥 대신 박 동시 명중으로 바꾼 뒤 팀원이 Test Runner를 돌려 실패 2개를 보고했고, 테스트 픽스처(동기 명중에 지급 물 구슬 사용)를 고쳤다. (8/9) 성공 물벼락 / 실패 조합판 불바다 3초 / 5초 보상과 DEV251/252 은퇴는 커밋만 했고 **Test Runner 결과는 아직 받지 못했다**.
+
+#479 브랜치(main `0681d25` #506까지 병합)를 합쳤다. 충돌은 접속 번호 줄, `LabModel.cs` 칠하기 줄(main의 `paintImpactStrength` + #509 승리 1회 조건), `AGENTS.md`/`JIGWI_SCREEN_PATTERNS.md` 절이었다. #509는 **5688/`C6PhysicsLab/49`/`C6HapioGame/33`**, 설정 259개다. 병합 뒤 결과는 아직 기록하지 않았다.
+
+## 2026-11-05 — 마지막 일격 다시보기 (스토리 1·2·3)
+
+`feat/final-hit-replay` 브랜치에서 Unity 6000.6.5f1 batch mode(macOS)로 실행했다. 아래 표는 실제로 실행한 것만 적는다.
+
+| 확인 | 결과 | 범위 |
+| --- | --- | --- |
+| EditMode 전체 | **1970 PASS / 0 FAIL** | 새 `LabFinishReplayShotTests`(기록 왕복·크기·거절·비행 경로·자세 보간·장면 시간표·짧은 비행 맞춤), `GamePaintFinishBarrierTests` 다시보기 release 2개, `GameSessionFinishTests` 기록 채택·패킷 4096자 한도 2개, 토큰 `C6HapioGame/33` |
+| PlayMode 다시보기·회귀(검토 수정 뒤) | **36 PASS / 0 FAIL** | `GameFinishReplayTests`(1·3스테이지 실제 투척 → 세 장면·명중 3회·ghost 물리 없음·HUD/전투 카메라 꺼짐·실제 박 표시·통계/칠 불변·한지 막 아래 결과, 새 탭 건너뛰기 → 솔로 결과, 최근 명중 없는 100% → 기존 1.2초 복사본), `GameStage2GourdHitFinishTests`(2스테이지 실제 투척 → 다시보기·결과 미리보기), `GameSceneFlowTests`, `LabWhiteGourdGoldenTests`, `LabContinuousRopeTests`, `GameStageGourdIntegrationTests` |
+| PlayMode 회귀(검토 수정 전) | **56 PASS / 0 FAIL** | 위 항목에 더해 `LabGourdPaintTests`, `LabPaintDryingPlayModeTests`, `GourdResultViewerPlayModeTests`, `GameJigwiStageIntegrationTests`, `LabGourdVisualRigTests` |
+| 세 스테이지 장면 캡처 | 임시 PlayMode(커밋 안 함) | 휴대폰 세로 비율 RT로 장면당 6프레임 확인. 레터박스 막대는 이미지에 직접 그렸고 캡션·컷 번쩍임은 화면 오버레이라 캡처에 없음 |
+| 코드 검토 | 독립 검토 3관점 + 반박 검증 | 확인된 2건 수정: 늦은 재예약에서 12초 안에 들지 않으면 commit 전에 기존 연출로 내림, 자세 기록 256스텝으로 늘리고 창이 다 남지 않은 명중 제외 |
+
+미실행: iOS·Mac 앱 실기기(세로 화면 구도·성능), 다인 Host/Guest 동시 재생·Guest 건너뛰기·늦은 재예약 내림. 검토 수정 뒤에는 `LabGourdPaintTests` 등 위 56개 중 나머지 PlayMode를 다시 돌리지 않았다.
+
+## 2026-11-05 — batch PlayMode 기존 실패 7건 원인과 수정
+
+`fix/batch-playmode-failures` 브랜치(main `25014885` 기준)에서 Unity 6000.6.5f1 batch mode(`-runTests`, `-nographics` 없음)로 실행했다. macOS, Apple M3 Pro, Metal, batch의 품질 레벨은 Mobile이다. 아래 표는 실제로 실행한 것만 적는다. 원인 확인용 임시 진단 검사와 셰이더 사본(float RT 분해)은 커밋하지 않았다. 일부 실행 동안 같은 Mac에서 다른 worktree의 Unity batch가 함께 돌았다.
+
+| 검사 | 확인한 원인 | 수정 |
+| --- | --- | --- |
+| `LabHangingRenderInterpolationTests.OutsideRenderingTheTransformsAlwaysHoldTheFixedPose` | batch에서는 Editor가 player loop 렌더를 하지 않아 `WaitForEndOfFrame`이 없고 Test Framework가 그 yield를 실패로 처리한다. 검사 환경 문제 | 매 프레임 검사가 `camera.Render()`(64px RT)로 실제 URP 패스를 돌린 뒤 고정 자세 복귀를 본다. 패스 안에서 보간 자세가 실제로 그려졌는지(>0회)를 새로 단언한다. GUI Editor에서만 기존 `WaitForEndOfFrame` 확인을 이어서 한다 |
+| `…DuringRealRenderingTheDrawnPoseLiesBetweenTheTwoFixedPoses`(Inconclusive) | 같은 이유로 batch에서 `beginContextRendering`이 0회였다 | 매 프레임 `camera.Render()`. batch 프레임은 약 0.1ms라 40프레임 동안 물리 스텝이 없을 수 있어 고정 스텝 2번 뒤 시작한다 |
+| `LabJigwiABPresentationTests.SavedRawImagesRenderWarmAAndBAndBlueWaterIntoAnIsolatedPortraitUiTarget` | #479(`82708df7`)이 A의 화면 붉은 기운·양옆 불기둥을 지웠는데 이 GPU 캡처 검사만 A 따뜻한 픽셀 >64를 그대로 기대했다. 환경과 무관한 낡은 기대값 | 브랜치에서는 A 따뜻한 픽셀 0·`PersonalHeatVisible == false`로 고쳤다. main(#509 `d12f4f84`)이 이 검사를 지웠으므로 병합 뒤에는 없다(되살리지 않았다) |
+| `LabWatercolorPaintRuntimeTests.DescriptorBurstRespectsTheActiveCapAndConvergesToASettledCheckpoint` | **런타임 버그.** `CommitFinished`가 남은 활성 얼룩을 역순으로 확정해 체크포인트(대기열 순서)와 순서가 달랐다. ARGB32 `Blend One One` 누적은 이 GPU에서 순서에 따라 반올림이 달라진다(진단: 같은 순서 반복 0차이, 마지막 두 도장만 바꾸면 54px ±1, 전부 뒤집으면 258px 최대 ±3) | `LabWatercolorPaintRuntime`이 오래된 것부터 확정한다. 표현 전용 경로이며 판정·통신은 바뀌지 않는다 |
+| `LabJigwiWaterTrailTests.AuthoritativeAndPredictedWater…`(간헐) | batch 프레임은 약 0.12ms라 첫 물리 스텝 직후 LateUpdate의 보간 alpha가 0에 가깝고 0.1mm 미만 이동은 경로가 버린다. 고정 대기 뒤 바로 `Count >= 2`를 단언했다(진단: 같은 시나리오 40회 중 4회 1점, 모두 이동 0) | 같은 파일의 다른 검사처럼 `Until(…, 2초)`로 실제 두 번째 점을 기다린다 |
+| `LabWatercolorSurfaceGrainTests.PigmentTextureIsStatic…`(간헐) | 시간에 따른 변화가 아니다. 셰이더에 시간 입력이 없고, 같은 프레임의 연속 렌더 사이에서도 가끔 한 번의 렌더만 화면 전체에 흩어진 약 420px이 ±1~2 다르다(진단: 입자 ON 렌더의 약 7%, 불투명 안료라 종이가 가려지는 OFF는 0%). float RT로 항을 나눠 보면 위치·SV_Position·미분·종이 1×1 밉은 비트 동일했고 `C6Lab/GourdPaint`의 한지 종이 샘플(`PaperSample`)만 달랐다(점 필터에서도 인접 텍셀 값, 같은 내용의 GPU 복사 텍스처에서도 발생). 이 값이 입자의 fiber 항으로 안료에 들어간다. **어느 계산·자원이 그 렌더에서 달라지는지는 확정하지 못했다.** 진단용 셰이더 사본을 다시 컴파일한 두 실행에서는 1,800번 렌더 동안 한 번도 나타나지 않았다 | 바꾸지 않았다. 아래 반복 실행에서 같은 종이 변동이 이 클래스의 다른 단언(`SurfaceGrainChangesPigmentDetail…`의 "Unpainted paper…" 2 > 1)도 깨뜨려, 한 단언만 고치는 것은 의미가 없었다 |
+| `LabPlayerPaintPatternRenderTests.ActualSavedShaderDistinguishesAllSixPainters…`(간헐) | 같은 셰이더·같은 종이 샘플 변동으로 본다. 반복 실행에서 이 검사의 "Neutral owner 0 must retain the original shader arithmetic"(같은 상태 두 렌더의 정확 비교)가 한지 종이색 픽셀 `RGBA(134,118,96)`→`95`로 1 달라 실패했고, 원래 증상("modulate pigment brightness only")도 한 번 나왔다. 저수준 원인은 위와 같이 **확정하지 못했다** | 바꾸지 않았다 |
+
+| 확인 | 결과 | 범위 |
+| --- | --- | --- |
+| 변경 전 단독 재현 | 26건 중 22 PASS · 3 FAIL · 1 Inconclusive | 4개 클래스 전체와 JigwiAB·수채 버스트 메서드 지정. 매번 실패 3건과 Inconclusive 1건이 그대로 나왔다 |
+| 변경 전 간헐 3건 단독 10회(별도 실행 10번) | 정적 입자 **2/10 실패**, 물 경로 0/10, 소유권 렌더 0/10 | 메서드 3개만 지정 |
+| 변경 뒤 6개 클래스 10회(별도 실행 10번, 55건씩) | 매달린 박 10/10, JigwiAB 10/10, 수채 런타임 10/10, 물 경로 10/10 통과. 종이 셰이더 두 클래스는 **3/10 실행에서 1건씩 실패**(정적 입자 클래스 1번, 소유권 렌더 2번) | 위 수정 대상 4건 포함. 종이 셰이더 두 클래스는 바꾸지 않은 상태 그대로다. 이 10회 뒤 매달린 박 검사에 그래픽 장치 없음(`-nographics`) Ignore 가드만 더했다 |
+| 변경 뒤 PlayMode 전체 1회 | **673건 중 673 PASS · 0 FAIL · 0 Inconclusive**, 642.3초 | 가드 추가 뒤 최종 코드. 이번 1회에서는 종이 셰이더 두 클래스의 간헐 실패가 나오지 않았다. 바꾸지 않았으므로 다음 실행에서 다시 나올 수 있다 |
+| main `84afd2f8`(#509·#528·#529·#530) 병합 뒤 EditMode 전체 1회 | **1976 PASS / 0 FAIL**, 22.6초 | 런타임 `LabWatercolorPaintRuntime` 변경을 포함한 병합 트리 |
+| 같은 병합 뒤 PlayMode 전체 1회 | **640건 중 640 PASS · 0 FAIL · 0 Inconclusive**, 429.0초 | #509가 지운 JigwiAB 검사는 되살리지 않았다. #528 `[Category]`는 그대로 두고 렌더를 하게 된 `OutsideRendering…`에 `GPU`를 더했다. 이 1회에서도 종이 셰이더 간헐 실패는 나오지 않았다 |
+
+미실행: Editor GUI Test Runner(바꾼 매달린 박 검사의 GUI 분기와 Editor 자체 렌더 경로 포함), 다른 Mac·GPU, iOS 실기기, EditMode(이번에 EditMode 코드는 바꾸지 않았다).
+
 ## 2026-11-04 — #479 지귀 A 부적 쓰기
 
 `feat/#479-jigwi-talisman` 작업 브랜치에서 팀원이 Unity6000.6.5f1 Editor(macOS)로 직접 확인했다. 아래 표는 실제로 실행한 것만 적는다.
@@ -5121,6 +5282,499 @@ PR-1(`feat/#507-gourd-rig-contract`) 위에서 Unity 6000.6.5f1 macOS batch Edit
 - 통합본 클레이 GPU 검사 **9/9 PASS**. 실제 최초 명중 655셀·재타격 3회 후 2129셀·100% 완료 32768셀, 제한/전체 재생의 색·높이 일치, 높이 자원 유실 복원, 129개 자국/옛 도장 성장, 전층 건조·재도색, 표시 여유의 이음새/극점, 게임 지도·Unity RNG·원본 설정 보존을 확인했다. 읽기 전용 빌드 데이터 검사도 통과했다.
 - Mac 실험 앱 빌드·실제 조작은 위의 통합 전 #506 버전에서 수행했고 사용자도 동작을 확인했다. 최신 main 통합본은 위 Editor 검사로 확인했으며, 통합 후 Mac Player 재빌드·재실행은 수행하지 않았다. 실험 앱은 WhiteGourd 고정 완성 도안의 재질 비교용이며 스테이지별 모델 선택 도구가 아니다. 빌드/실행·두께/광택·6방향·Reset·게임 DEV에 값 적용하는 방법은 [사용법](CLAY_STICKER_PAINT.md)에 정리했다.
 - iOS, 실제 기기 간 일반 Wi-Fi/핫스팟, CPU/GPU 시간·메모리·복원 시간의 성능 실측은 이번 검증에서 수행하지 않았다. 소스/문서 차이의 공백 검사와 문서 링크를 확인했으며 원시 로그·개인 경로·실행 파일을 PR에 포함하지 않는다.
+## #477 튜토리얼 0단계: 연습 판·캐릭터 얼굴·말풍선·목표 — 2026-11-04
+
+- **기준:** main `afaee674` → `feat/#477-tutoria`. 연결된 Editor에서 컴파일, Editor API 에셋 작업, Editor 안 계산만 했다. Play·Test Runner·앱 빌드·iPhone 실기기는 실행하지 않았다.
+- **흐름:** 첫 게임 시작 → 오프닝 → **튜토리얼** → 방 목록. 앱 실행당 한 번이며 저장하지 않는다. 튜토리얼을 그만두거나 준비에 실패해도 Game Over 없이 방 목록으로 간다.
+- **연습 판:** 이 기기 혼자 여는 3자리 판이다. 오른쪽 금옥이(P1)·나 불이(P2)·왼쪽 묵이(P3)이며(게임 규칙상 오른쪽 이웃이 앞 번호, 왼쪽 이웃이 다음 번호), 양옆은 기기가 없는 가상 자리라 그쪽으로는 패킷을 보내지 않는다(`LabNetwork.Send`). 북 하나를 내 판 가운데(0.5, 0.5)에 둔다.
+- **설정:** 1스테이지 값에서 DEV 항목 25개만 바꾼다(`GameStageSettings.TutorialOverrides`).
+  - 제한 시간·구슬 수명·아이템 수명을 86,400초로 둬서 끝나거나 사라지거나 터지지 않는다.
+  - 음·양만 나오게 하고, 북은 1개이며 떠다니지 않는다.
+  - 무작위 방해공작·박 폭탄·넘기기 막기·섬광·콤보·피버·칠 마름을 끈다.
+- **화면:**
+  - P1·P2·P3 동그라미를 캐릭터 얼굴로 바꾼다. 내 얼굴은 1.2배, 이웃은 1.8배다. 원래 이웃 동그라미는 화면 끝에 반쯤 걸쳐 있어서, 키운 얼굴이 잘리지 않도록 가장자리에서 6만큼 안쪽으로 옮긴다(사용자 확인 뒤 수정).
+  - 북 미니맵도 얼굴로 그리고, 타이머 틀은 숨긴다. 위 글씨는 "튜토리얼"로 바꾼다.
+  - 3-2-1 카운트다운과 "시작!" 대신 "튜토리얼 준비 중…" 화면 하나만 보인다.
+- **말풍선:** 말하는 사람 자리의 얼굴에서 뜬다. 금옥이는 좌우를 뒤집은 말풍선이다. 0 → 110% → 100%로 0.28초 동안 커졌다가 자리 잡고, 화면을 누르면 다음 대사로 넘어간다(연타 방지 0.2초). 마지막 대사는 화면을 어둡게 하고 박만 동그랗게 밝힌다. 0단계 마지막 대사 뒤에는 0.6초 동안 어두워지며 방 목록으로 간다.
+- **값 조절:** `Assets/Hapio/Resources/Hapio/Tutorial/TutorialArt.asset`에서 얼굴 배율, 말풍선 크기·글자 여백·글자 크기, 등장 시간, 어둡게 하는 색·밝히는 원 크기를 조절한다.
+
+| 실행한 확인 | 결과 |
+| --- | --- |
+| 컴파일 · Console 오류 | **PASS** (compilationFailed=false, errors 0) |
+| 그림 가져오기 | **PASS** — 얼굴 3장·말풍선을 투명 여백만 잘라 Sprite로 가져왔고, `TutorialArt`에 신라문화체 M(대사)·Bold(안내 띠용)와 함께 연결했다 |
+| 튜토리얼 설정 계산 | **PASS** — 시간·구슬·아이템 86,400초, 북 1개·떠다님 0, 방해공작 스위치 모두 꺼짐, 공통·고유 간격 0, 피버 0, 콤보·마름 꺼짐. 바꾼 25개가 모두 들어감 |
+| 3자리 모델 6판 | **PASS** — 매번 북 1개가 내 판 (0.5, 0.5)에 있고 남은 시간은 86,400초. 판에 없는 사람에게는 북을 줄 수 없음 |
+| 얼굴 화면 안 맞춤 (390×844 · 430×765 · 372×885) | **PASS** — 금옥이 335~416 → 303~384, 묵이 −24~57 → 6~87 (390 폭 기준, 폭 81). 내 얼굴은 원래 화면 안이라 그대로. 세 비율 모두 양옆 6 안쪽 |
+| 박 밝히기 네모 테두리 수정 (Editor 안 그리기 780×1688) | **PASS** — 구멍 그림 1장과 네모 막 4장을 1씩 겹쳐 붙이던 방식은 겹친 줄이 두 번 어두워져 박 둘레에 네모 선이 보였다(사용자 확인). 구멍 뚫린 메시 한 장(`GameTutorialSpotlight`)으로 바꾼 뒤 구멍 밖 밝기가 화면 전체에서 한 값(166), 구멍 안은 원래 밝기(255), 덮이지 않은 곳 0 |
+| 좌우 자리 수정 후 3자리 모델 | **PASS** — HUD 이웃 표시가 왼쪽 P3(묵이)·오른쪽 P1(금옥이). 처음에는 P1을 왼쪽으로 잘못 알아 묵이·금옥이가 뒤바뀌어 보였다(사용자 확인) |
+| HUD 위치 계산 (390×844) | **PASS** — 이웃 얼굴 중심 y≈357, 내 얼굴 (84, 40). 1.8배·1.2배로 키운 얼굴과 236×150 말풍선이 가로로 화면 안에 들어감. 금옥이 말풍선은 박 아래쪽과 조금 겹침 |
+
+- **새 검사 (NOT_RUN):**
+  - EditMode `GameTutorialTests` 9개: 밝히기 막이 한 장이며 화면 네 모서리까지 덮는지, 얼굴을 화면 안으로 옮기는 거리, 대본·화자·밝힐 곳, 자리 번호(게임의 이웃 규칙과 HUD 왼쪽 P3·오른쪽 P1), 설정 항목 번호 확인, 튜토리얼 설정 값, 3자리 모델의 북, 말풍선 등장 크기, 그림 연결
+  - PlayMode `GameTutorialFlowTests` 2개: 오프닝 → 연습 판 → 대사 6개 → 방 목록, 그만두기 → Game Over 없이 방 목록
+  - `GameOpeningControllerTests`·`GameLobbyViewTests`는 원래 확인하던 "오프닝 → 방 목록"을 지키도록 시작할 때 튜토리얼을 본 것으로 둔다
+- **미실행:** Play에서 실제 화면·느낌, 말풍선이 박을 가리는 정도, 일시정지 버튼(대사 중에는 화면 전체가 눌림을 받아 눌리지 않음), iPhone 실기기(혼자 Host를 열 때 로컬 네트워크 권한 창이 뜨는지 포함).
+
+### #477 튜토리얼 1단계: 북 치기 — 2026-11-04
+
+- **기준:** `7aabd18f`(0단계 커밋) 위. 연결된 Editor에서 컴파일, Editor API 에셋 작업, Editor 안 계산·그리기만 했다. Play·Test Runner·실기기는 실행하지 않았다.
+- **흐름 (금옥이 오른쪽에서 말함):**
+  1. 북만 밝히고 "먼저 북을 쳐 봐." → "음구슬이나 양구슬이 튀어나올 거야."
+  2. **동작:** 안내 띠 "북을 눌러 구슬을 만드시오 (0/3)"와 누르는 손 그림을 보여 준다. 세 번 누르면 음·양·음이 나오고 "성공!"이 뜬다.
+  3. 불이 "오, 나온다 나와!"
+  4. 기운 막대만 알약 모양으로 밝힌 채 "북을 칠 때마다 기운이 줄어." → "바닥나면 잠깐 숨을 골라야 해."(기운 부족 흔들림·빨간 빛·소리, #418 재사용)
+  5. 회복을 풀어 막대가 다 찰 때까지 보여 준 뒤 다음 단계로 간다. 지금은 2단계가 없어 어두워지며 방 목록으로 간다.
+  - (사용자 확인 뒤 수정) 기운이 0이면 부족 연출의 빨간 빛(차 있는 부분을 따라 그림)이 보이지 않았다. 세 번 친 뒤 기운이 북 한 번 비용의 절반(10, 막대의 1/6)까지만 살짝 차고 멈추게 했다. 여전히 한 번 칠 만큼이 안 되어 부족하고, 빨간 빛이 그 부분에 보인다.
+- **바꾼 것:**
+  - 판에 "지금 받는 손동작" 설정을 추가했다(`LabOrbBoard.SetAllowedGestures`, 보통 판은 All). 대사 중에는 None이고, 북 치기 동안은 DrumTap만 연다. 북을 옮기는 동작이 닫혀 있으면 북은 눌러도 제자리에 있고, 짧게 누를 때만 구슬이 나온다. 구슬·던지기도 닫힌다.
+  - 모델이 다음 생성 종류를 정해 둘 수 있게 했다(음·양·음). 기운 회복은 판을 열 때부터 멈췄다가 4번 뒤에 푼다. 멈춘 동안의 회복은 나중에 한꺼번에 들어오지 않는다.
+  - 튜토리얼 설정: 기운 최대·시작 = 생성 비용 × 3(지금 60). 닿으면 저절로 합쳐지는 기능은 끈다(튀어나온 음·양이 1단계에서 합쳐지지 않게). 끌어다 놓아 합치기는 그대로다.
+  - 화면 밝히기를 둥근 모서리 사각형 구멍으로 넓혔다(박·북은 동그라미, 기운 막대는 알약). 밝힐 곳이 바뀌면 어두운 채로 옮겨 간다.
+  - 손 그림은 사용자가 준 그림(투명 여백만 자름)을 쓴다. 손가락 끝이 북 오른쪽 아래 12에서 쉬다가 0.9초마다 북 가운데를 누른다.
+
+| 실행한 확인 | 결과 |
+| --- | --- |
+| 컴파일 · Console 오류 | **PASS** |
+| 튜토리얼 설정 | **PASS** — 기운 최대·시작 60, 비용 20, 초당 회복 20, 닿아 합치기 끔, 끌어 놓아 합치기 켬 |
+| 모델 4판 | **PASS** — 매번 음·양·음, 세 번 뒤 기운 0, 네 번째는 기운 부족으로 거절, 멈춘 5초 동안 0, 풀고 1초 뒤 20, 4초 뒤 60 |
+| 살짝 충전 (모델) | **PASS** — 세 번 뒤 0 → 0.25초 5 → 0.5초 10에서 멈춤(2초 더 지나도 10, 막대 0.167) → 그때 눌러도 기운 부족 → 풀면 1초 뒤 30, 4초 뒤 60 |
+| Editor 안 그리기 (목업, 780×1688) | **PASS** — 북 동그라미 밝히기·손(쉬기/누르기)·안내 띠·"성공!"·기운 막대 알약 밝히기. 네모 선 없음 |
+
+- **새·수정 검사 (NOT_RUN):** EditMode `GameTutorialTests` 13개(살짝 충전 값, 1단계 장면 순서·화자·밝힐 곳·신호·횟수·안내 띠 숫자, 음·양·음과 기운 멈춤, 알약·동그라미 구멍 막이 화면 네 모서리를 덮는지, 손 누르기 주기 포함), PlayMode `GameTutorialFlowTests`(0단계 대사 → 1단계 북 세 번 → 음·양·음 → 기운 0 유지 → 회복 → 방 목록, 대사 중 판 손동작 None·북 치기 중 DrumTap)
+- **미실행:** Play에서 실제 북 누르기(손가락으로 북이 안 움직이는지), 손 그림 크기 느낌, iPhone 실기기.
+
+### #477 튜토리얼 2단계: 조합 + 1단계 보완 — 2026-11-04
+
+- **기준:** `9100965f`(1단계 커밋) 위. 연결된 Editor에서 컴파일·Editor 안 계산만 했다. 사용자가 Editor에서 Play 중일 때 컴파일을 강제로 요청해, 그 Play에서 `LabSceneController`·`LabCharmBubbles` NullReferenceException이 났다(Play 중 스크립트 재로드 때문이며 코드 결함 아님). 이후 Play 중에는 컴파일을 요청하지 않는다.
+- **2단계 흐름:**
+  1. 합칠 음·양 한 쌍을 원 하나로 밝히고 금옥이 "검은 음구슬과 하얀 양구슬을 / 맞붙여 봐." → 검은 음구슬 두 개만(흰 구슬 제외) 둘을 잇는 방향으로 기울어진 알약 모양으로 밝히고 불이 "검은 거 두 개는 안 돼?" → 금옥이 "같은 색끼리는 안 붙어!"
+  2. **동작:** 안내 띠 "음구슬을 끌어 양구슬 위에 놓으시오", 초록 한 방향 화살표(음 → 양), 손이 음을 눌러 양까지 끌고 놓는 안내가 1.6초마다 반복된다. 손가락으로 구슬을 잡고 있는 동안에는 손·화살표를 숨긴다. 판은 구슬 옮기기만 열고 북·던지기는 막는다.
+  3. 합치면 결과는 언제나 화(빨강)이고 "성공!"이 뜬다. 음 하나는 남는다(4단계용).
+  4. 어둡게 하지 않고 불이 "우와, 색이 변했어!" → 금옥이 "그게 오행구슬이야." → "화·수·목·금·토 중 하나가 나와." 지금은 3단계가 없어 어두워지며 방 목록으로 간다.
+- **1단계 보완 (사용자 확인 뒤):**
+  - 기운 부족 연출 때 남기는 기운을 북 한 번 비용의 1/4(5, 막대 6칸 중 반 칸)로 줄였다. 1/2(10)일 때는 한 칸이 찬 것처럼 보였다.
+  - 북에서 나오는 구슬의 자리를 사용자 시안대로 고정했다. 방향(바로 위에서 −79.1°·74.8°·38.5°)과 멈출 거리(판 너비의 0.36·0.259·0.25)에서 속도² = 2 × 바닥 감속 × 거리로 나가는 속도를 정한다. 첫 음은 북 왼쪽, 양은 북 오른쪽(같은 높이), 둘째 음은 양의 왼쪽 위에 멈추고, 2단계 짝은 언제나 양과 그 옆 음이다. 짝이 가까워 화살표는 머리가 길이의 60%를 넘지 않게 줄어든다.
+  - 북에서 나온 구슬이 캐릭터 얼굴·기운 막대를 가리지 않도록, 튜토리얼에서만 그 자리(가장자리 4 여유)에 보이지 않는 물리 벽을 세운다(`LabOrbBoard.SetKeepOut`). 얼굴 3개는 동그란 벽, 기운 막대는 상자 벽이다. 위·아래 종이 테두리 벽과 같은 재질이라 부딪히면 튕긴다. 기운 부족 연출로 막대가 흔들리는 동안에는 벽을 옮기지 않는다.
+- **새·바꾼 부품:** 모델의 정해 둔 오행(`TutorialScriptCombinations`)·정해 둔 발사 속도, 판의 구슬 화면 원(`TryGetScreenCircle`)·잡고 있는지(`IsHolding`)·보이지 않는 벽, 화살표 그래픽(`GameTutorialArrow`), 구슬 밝히기(음·양 전체, 짝).
+
+| 실행한 확인 | 결과 |
+| --- | --- |
+| 컴파일 (구슬 자리 고정 전까지) | **PASS** — compilationFailed=false, Console 오류 0 |
+| 컴파일 (구슬 자리 고정·짝 원·검은 구슬 알약) | **PASS** — Play가 꺼진 뒤 요청, compilationFailed=false. 그 사이 07:14:50 Play 중 재로드로 보이는 NullReferenceException(`TryResizeArea`·`LabCharmBubbles`·Netcode 종료)이 다시 찍힘 |
+| 구슬 자리 계산 | **PASS** — 발사 속도로 멈출 자리: 음 (−0.354, 0.068), 양 (0.250, 0.068), 음 (0.156, 0.196) 판 너비. 시안 측정값과 같음 |
+| 밝힐 곳 계산 | **PASS** — 검은 두 구슬 알약 14° 기울기, 흰 구슬은 알약 축에서 0.159 떨어져 밝은 영역 밖. 짝 원 중심 (0.203, 0.132)·반지름 0.125 |
+| 합치기 모델 5판 | **PASS** — 음+음은 거절(POLARITY_MISMATCH), 음+양은 언제나 화, 음 1개 남음, combinedTotal 1 |
+| 살짝 충전 값 | 0.25 × 비용 20 = 5 (막대 1/12) |
+
+- **새·수정 검사 (NOT_RUN):** EditMode 조합 장면 순서·화자·밝힐 곳·안내 띠, 정해 둔 화·남는 음, 끌기 안내 시간표, 구슬 발사 속도·멈출 자리·짝, 짝 원·기울어진 알약·밝힐 곳 회전; PlayMode 흐름 검사를 2단계까지(얼굴·막대 벽 4개, 세 구슬 자리, 실제 판에서 음을 양 위로 끌어 놓기 → 화 1개·음 1개).
+- **미실행:** Play에서 실제 끌어 놓기·화살표·손 느낌, 구슬이 벽에 튕기는 모습, iPhone 실기기.
+
+### #477 튜토리얼 3단계: 던지기 — 2026-11-04
+
+- **기준:** `5bf31685`(2단계 커밋) 위. Play가 꺼진 것을 확인한 뒤에만 컴파일을 요청했다. Editor 안 계산만 했고 Play·Test Runner·실기기는 실행하지 않았다.
+- **흐름:**
+  1. 금옥이 "이제 오행구슬을 위로 휙! / 박을 향해 던져 봐." (어둡게 하지 않음)
+  2. **동작:** 안내 띠 "빨간 구슬을 위로 밀어 박에 던지시오". 이 장면만 띠를 판 바로 위(화면 위에서 47%)로 내려 박을 가리지 않는다. 손이 빨간 구슬을 눌러 박 쪽으로 빠르게 쓸어 올리고, 화살표가 구슬에서 박 쪽을 가리킨다. 판은 던지기만 연다(북·넘기기·합치기 없음).
+     - 빗나가면(`LocalThrowMissed`) 금옥이 말풍선 "다시 해 봐!"가 화면을 막지 않고 2초 뜨거나 다시 구슬을 잡을 때까지 떠 있다. 빨간(화) 구슬은 판 오른쪽(0.72, 0.6)에 위에서 떨어지는 모습으로 다시 생긴다(박 폭탄과 같은 `ExpectDrop` 연출, 기운 쓰지 않음).
+     - 맞으면(`LocalThrowHit`) "성공!"
+  3. 불이 "맞았다! 박에 색이 묻었어!"
+  4. 위쪽 칠하기 진행률 막대와 % 글자만 알약 모양으로 밝히고 금옥이 "박이 100% 칠해질 때까지 / 계속 칠하면 돼!" 지금은 4단계가 없어 어두워지며 방 목록으로 간다.
+     - (사용자 확인 뒤 수정) % 글자 칸(폭 66)이 실제 글자보다 넓어 오른쪽에 빈 공간이 밝혀졌다. 칸 대신 그려진 글자 폭(왼쪽 정렬, "1.9%" 35.5 · "100.0%" 55.3)까지만 밝힌다.
+
+| 실행한 확인 | 결과 |
+| --- | --- |
+| 컴파일 · Console 오류 | **PASS** — compilationFailed=false, 오류 0 |
+| 다시 주는 구슬 (모델) | **PASS** — 화 오행구슬이 (0.72, 0.6)에 생김. 다섯 오행이 아닌 것·북·판 밖 자리·판에 없는 사람은 거절 |
+| % 글자 폭 측정 (Battle 미리보기, 저장 안 함) | **PASS** — 칸 66, "1.9%" 35.5, "100.0%" 55.3, 왼쪽 정렬 → 오른쪽 빈 공간 약 30 줄어듦 |
+| 컴파일 (% 글자 폭 수정) | **NOT_RUN** — Editor가 Play 중이라 요청하지 않음 |
+
+- **새·수정 검사 (NOT_RUN):** EditMode 던지기 장면 순서·화자·밝힐 곳·안내 띠·다시 주기 문구와 자리, 다시 주는 구슬(기운 그대로), 쓸어 올리기 안내 시간표; PlayMode 흐름 검사를 3단계까지 — 실제 판에서 빨간 구슬을 위로 튕겨 최대 5번 안에 맞히고, 빗나가면 "다시 해 봐!"와 빨간 구슬 1개를 확인.
+- **미실행:** Play에서 실제로 맞는 비율·손과 화살표 방향 느낌, 다시 떨어지는 연출, iPhone 실기기.
+
+### #477 튜토리얼 4단계: 넘기기 — 2026-11-04
+
+- **기준:** `de45ef5a`(3단계 커밋) 위. Play가 꺼진 것을 확인한 뒤 컴파일했고 Editor 안 계산만 했다. Play·Test Runner·실기기는 실행하지 않았다.
+- **흐름:**
+  1. 불이 "나만 너무 열심히 하고 있는 거 아니야?" → 금옥이 "북은 같이 써야 해. / 옆으로 밀면 넘어가."
+  2. **동작:** 안내 띠 "북을 오른쪽 끝으로 밀어 금옥이에게 넘기시오", 손이 북을 오른쪽 끝까지 끄는 안내와 화살표. 판은 북 옮기기만 연다(북을 눌러도 구슬이 나오지 않고 구슬은 잡히지 않는다).
+     - 왼쪽(묵이)으로 넘어가면 묵이 말풍선 "이건 금옥이한테 줘."(화면을 막지 않음)와 함께 0.8초 뒤 묵이가 북을 내 판 왼쪽 끝으로 돌려준다. 다시 넘길 때까지 기다린다.
+     - 금옥이가 받으면 "성공!"과 함께 금옥이 얼굴 위에 금옥이 화면 미니 창이 오른쪽에서 밀려 들어오고, 태극 북이 그 판 왼쪽에서 미끄러져 들어와 살짝 넘쳤다 자리 잡은 뒤 창이 빠진다(1.8초, 카트라이더 뒤 화면처럼). 실제 판을 비추는 카메라가 아니라 그림으로 만든 연출이다.
+  3. 금옥이 "고마워! / 대신 내가 만든 거 줄게~" — 0.35초 뒤 금옥이가 만든 양구슬이, 다시 0.35초 뒤 북이 내 판 오른쪽 끝에서 들어온다. 북은 판 가운데(들어온 쪽에서 48~52%)에서 멈춘다.
+  4. 금옥이 "짝이 안 맞는 구슬은 / 이렇게 친구한테 넘기면 돼." 지금은 5단계가 없어 어두워지며 방 목록으로 간다.
+- **바꾼 것:**
+  - 혼자 판은 가장자리로 넘기면 되튕기던 것을, 튜토리얼에서만 실제로 넘기게 했다(`OnEdgeCrossed`).
+  - 가상 이웃이 내게 넘기는 것은 실제 넘기기와 같은 경로(`TryTransferAt`)를 이웃 자리에서 부른다(`TutorialHandOver`). 그래서 북 도착·잠긴 폭탄의 자물쇠 줄기(5단계)도 실제와 같다.
+  - 튜토리얼 설정: 넘겨받은 북이 판 가운데(48~52%)에서 멈추고 통과하지 않도록 북 멈춤 구간·확률 8개를 정했다.
+
+| 실행한 확인 | 결과 |
+| --- | --- |
+| 컴파일 · Console 오류 | **PASS** — compilationFailed=false, 오류 0 |
+| 튜토리얼 설정 | **PASS** — 멈춤 구간 20/48/52/80, 확률 가까이 0·가운데 100·멀리 0·통과 0 |
+| 넘기기·돌려주기 (모델) | **PASS** — 오른쪽으로 넘기면 금옥이 소유·도착 Stop. 금옥이가 만든 양구슬과 북이 내 판 x=1에서 왼쪽으로(vx −1) 들어오고 북 도착 Stop |
+
+- **새·수정 검사 (NOT_RUN):** EditMode 넘기기 장면 순서·화자·돌려주기 신호·안내 띠·묵이 말, 이웃이 북·양구슬을 공유 가장자리로 돌려주기(왼쪽 묵이 포함), 미니 창 시간표, 설정 항목 번호 8개 추가; PlayMode 흐름 검사를 4단계까지 — 북을 실제 판에서 왼쪽으로 튕겨 묵이가 돌려주는지, 오른쪽으로 튕겨 미니 창·양구슬·북이 돌아오는지, 2단계의 음이 남아 있는지.
+- **미실행:** Play에서 실제로 북을 밀어 넘기는 느낌, 미니 창 크기·위치, 돌아오는 구슬과 북의 움직임, iPhone 실기기.
+- **버그 수정 (사용자 확인, 1단계):** 북에서 왼쪽으로 나온 음구슬이 판 끝을 넘어 묵이에게 넘어갔다.
+  - 원인 ①: 4단계를 위해 튜토리얼에서 가장자리 넘기기를 열었는데, 단계와 상관없이 늘 열려 있었다.
+  - 원인 ②: 판은 새 구슬을 북 중심이 아니라 북 가장자리 바로 바깥(북 반지름 + 구슬 반지름)에서 출발시키는데, 발사 거리를 북 중심 기준으로 계산했다. 그만큼 더 멀리 미끄러져 왼쪽 음구슬이 판 끝에 닿았다.
+  - 수정: 넘기기는 그 장면이 넘기는 종류만 연다(`TutorialAllowPasses`, 4단계 동작 중에는 북만). 그 밖에는 혼자 판처럼 판 끝에서 되튕긴다. 발사 거리는 시안 자리(북 중심 기준)에서 출발 거리(북+구슬 반지름 ÷ 판 너비)를 빼고 계산한다(`DrumClearance`·`SlideAfterDrum`). 시안 비율로 보면 출발 거리는 판 너비의 약 0.16이다.
+  - 확인: 컴파일 **PASS**(compilationFailed=false, 오류 0). PlayMode 흐름 검사에 "북 치기 중 넘기기 닫힘, 1.5초 뒤 세 구슬 모두 내 판" 확인을 추가했다(**NOT_RUN**).
+- **조정 (사용자 확인):** 출발 거리를 뺀 뒤 구슬이 너무 조금 움직여, 세 구슬 모두 판 너비의 0.06(약 23pt)을 더 미끄러지게 했다(`drumLaunchExtra`). 판 옆 끝에서 0.1 안쪽에서는 멈추게 상한을 둔다(`drumLaunchEdgeMargin`). 계산상 미끄러지는 거리는 왼쪽 음 0.196→0.243(상한에 걸림, 멈춤 x 0.100), 양 0.095→0.155(x 0.808), 위 음 0.086→0.146(x 0.693). 컴파일 **PASS**(오류 0). Play 확인 **NOT_RUN**.
+
+### #477 튜토리얼 5단계: 폭탄 — 2026-11-04
+
+- **기준:** `9656b673`(4단계 커밋) 위. Play가 꺼진 것을 확인한 뒤 컴파일했고, Editor API로 에셋을 저장했으며, Editor 안 계산만 했다. Play·Test Runner·실기기는 실행하지 않았다.
+- **흐름:**
+  1. 불이 "으악! 박에서 뭐가 떨어졌어!" — 이 대사와 함께 박에서 잠금 2개짜리 폭탄이 내 판(가로 0.42, 세로 0.72)에 떨어진다. 실제 박 폭탄과 같은 경로라 박 경고와 함께 위에서 떨어진다.
+  2. 금옥이 "요괴가 던진 폭탄이야! / 적힌 숫자만큼 옆으로 넘기면 풀려." — 화면이 어두워지고 폭탄만 밝힌다.
+  3. **동작:** 안내 띠 "폭탄을 오른쪽 금옥이에게 넘기시오", 손이 폭탄을 오른쪽 끝까지 끄는 안내와 화살표. 손은 북 안내(1.6초)보다 빠르게 1.1초에 한 번 끈다.
+     - 판은 구슬 옮기기만 연다(북은 고정, 던지기 없음).
+     - 폭탄만 넘어가고, 오른쪽 가장자리로만 넘어간다. 왼쪽 끝이나 다른 구슬은 판 끝에서 되튕긴다.
+     - 금옥이가 받으면 "성공!" (잠금 2→1).
+  4. 금옥이 "앗 뜨거! 도로 받아!" — 0.35초 뒤 금옥이가 폭탄을 실제 넘기기 경로로 돌려준다. 마지막 잠금이 풀리며(1→0) 내 판 오른쪽 끝에서 들어와 가까운 구간에서 멈추고, 판이 스스로 열어 오행 구슬 두 개가 된다. 이 두 구슬은 6단계에서 쓴다.
+  5. 폭탄이 어디에도 없으면 금옥이 "풀렸다!" → "풀린 폭탄은 오행 구슬 두 개가 돼." → 불이 "가만히 냅두면 터지니까 / 얼른얼른 넘겨야겠네!" 지금은 6단계가 없어 어두워지며 방 목록으로 간다.
+- **바꾼 것:**
+  - 모델: 정한 자리·잠금 수로 박 폭탄을 떨어뜨린다(`TutorialDropGourdBomb`). 실제 박 폭탄과 같은 목록에 올려 떨어지는 연출을 그대로 쓴다.
+  - 네트워크: 넘기기를 한쪽 가장자리로만 열 수 있게 했다(`TutorialAllowPasses(side, kinds)`). 4단계 북은 기존대로 양쪽을 연다.
+  - 연출 값 2개를 `TutorialArt.asset`에 저장했다: `bombReturnDelay` 0.35초, `bombHandDragSeconds` 1.1초.
+- **작성 중 고친 것:** 처음에는 "열림 기다리기"가 시작할 때의 오행 구슬 수에 2를 더해 기다렸다. 그런데 "앗 뜨거!" 말풍선을 오래 두면 그 사이 폭탄이 돌아와 먼저 열려, 다 열린 뒤에 센 기준이 되어 끝나지 않았다. 지금은 "폭탄이 어디에도 없음"만 본다. 폭탄이 열릴 때 두 구슬은 같은 스냅샷에서 생긴다.
+
+| 실행한 확인 | 결과 |
+| --- | --- |
+| 컴파일 · Console 오류 | **PASS** — compilationFailed=false, 오류 0 (검사 파일 포함) |
+| 연출 값 저장 | **PASS** — `bombReturnDelay` 0.35, `bombHandDragSeconds` 1.1 (에셋 diff는 이 두 줄 추가만) |
+| 폭탄 흐름 (모델, Editor 안 계산) | **PASS** — 떨어뜨림 잠금 2·알림 1번 → 바로 열기 `ITEM_LOCKED` → 오른쪽으로 넘기면 금옥이 소유·잠금 1 → 금옥이가 돌려주면 내 소유·잠금 0·x=1·도착 Stop·멈춤 0.301 → 열기 `BOMB_OPENED`, 폭탄 0개, 오행 구슬 2개(Fire·Wood) |
+
+- **새·수정 검사 (NOT_RUN):**
+  - EditMode: 5단계 장면 순서·대사·화자·신호(떨어뜨림·돌려주기)·밝히기·안내 띠, 잠금 2, 폭탄 손이 북 손보다 빠름. 박 폭탄의 잠금이 넘길 때마다 하나씩 풀리고 내 판에서 두 구슬로 열리는지.
+  - PlayMode: 흐름 검사를 5단계까지 늘렸다. 실제 판에서 폭탄을 오른쪽 끝으로 끌어 넘기고, 금옥이가 돌려준 폭탄이 열려 오행 구슬 2개가 생기는지 본다. "앗 뜨거!"를 2.5초 둬도 막히지 않는지도 본다.
+- **미실행:** Play에서 폭탄을 밀어 넘기는 느낌(폭탄은 손을 늦게 따라오고 덜 미끄러진다), 손 안내 빠르기, 폭탄 밝히기 크기, iPhone 실기기.
+
+### #477 튜토리얼 6단계: 막기 + 마무리 — 2026-11-04
+
+- **기준:** `f2a681b7`(5단계 커밋) 위. Play가 꺼진 것을 확인한 뒤 컴파일했고, Editor API로 에셋을 저장했으며, Editor 안 계산만 했다. Play·Test Runner·실기기는 실행하지 않았다.
+- **흐름:**
+  1. 단계가 시작되면 요괴가 내 판 **오른쪽 끝**을 막는다. 실제 게임의 넘기기 막기(#215)와 같은 연출이다: 가장자리가 빨갛게 세 번 번쩍인 뒤 은은한 빨강으로 남고, 박 옆에 막기 알림이 뜬다. 번쩍이는 1.05초 동안은 말풍선 없이 기다리며 화면을 누를 수 없다.
+  2. 불이 "어? 오른쪽이 빨개졌어!" → 금옥이 "요괴가 오른쪽을 막은 것 같아!" → 금옥이 "막힌 쪽은 튕겨 나와. / 반대쪽 묵이한테 북을 넘겨!" → 묵이 "드디어 내 차례가 왔네 / 기다리느라 힘들었어..." (사용자 추가 대사)
+  3. **동작:** 안내 띠 "북을 왼쪽 끝으로 밀어 묵이에게 넘기시오". 손이 북을 왼쪽 끝까지 끄는 안내와 화살표가 나온다. 판은 북 옮기기만 연다.
+     - 오른쪽으로 밀면 빨간 가장자리에서 튕겨 나오고 가장자리가 한 번 밝아진다. 세게 밀면 튕겨 나온 북이 그대로 왼쪽 끝까지 가서 묵이에게 넘어갈 수도 있다.
+     - 막기는 시간이 흐르지 않는다. 가장자리에 남은 초(숫자)도 쓰지 않는다. 묵이가 북을 받을 때 풀린다.
+  4. "성공!" → 묵이 "받았어. 고마워." → 금옥이 "좋아, 이 정도면 / 잡을 수 있겠어!" → 금옥이 "앞으로 나올 요괴들이 어떤 방해를 할지 모르니, / 조심하자!" → 불이 "이번엔 진짜다! / 다 같이 가자!" → 묵이 "가보자!" → 어두워지며 방 목록으로 간다.
+- **바꾼 것:**
+  - 처음 계획은 6단계에서 공격 구슬을 넘기는 것이었다. 사용자 대사("반대쪽 묵이한테 북을 넘겨!")에 맞춰 **북**을 넘긴다. 5단계에서 열린 오행 구슬 두 개는 판에 그대로 남는다.
+  - 모델: 튜토리얼이 풀 때까지 한쪽을 막는다(`TutorialBlockSwipe`). 실제 막기와 같은 값을 쓰므로 판의 빨간 가장자리, 튕김, 박 알림이 그대로 동작한다. 끝 시각은 24시간 뒤로 둔다.
+  - 판: 막기 가장자리의 남은 초 표시를 끌 수 있게 했다(`SetSwipeBlockCountdown`, `LabOrbEdgeBlock.SecondsShown`). 튜토리얼에서만 끄고, 판을 정리할 때 다시 켠다. 실제 게임의 막기는 그대로 초를 센다.
+  - 4단계 넘기기 안내(손·화살표)를 양쪽에 쓸 수 있게 했다.
+  - 연출 값 1개를 `TutorialArt.asset`에 저장했다: `blockWarningSeconds` 1.05초(가장자리가 처음 세 번 번쩍이는 시간과 같음).
+
+| 실행한 확인 | 결과 |
+| --- | --- |
+| 컴파일 · Console 오류 | **PASS**: compilationFailed=false, 오류 0 (검사 파일 포함) |
+| 연출 값 저장 | **PASS**: `blockWarningSeconds` 1.05 (에셋 diff는 이 한 줄 추가만) |
+| 막기 (모델, Editor 안 계산) | **PASS**: 막기 켬 → 1시간 뒤에도 켜짐·오른쪽·82,800초 남음 → 오른쪽 넘기기 `SWIPE_BLOCKED` → 왼쪽 넘기기 `TRANSFERRED`, 묵이 소유 → 풀기 → 꺼짐·끝 시각 −1 |
+
+- **새·수정 검사 (NOT_RUN):**
+  - EditMode: 6단계 장면 순서·대사 9개·화자·안내 띠·막는 쪽, 번쩍이는 시간 = 가장자리 처음 번쩍임. 막기가 풀 때까지 유지되고 내 오른쪽 넘기기만 막는지. 남은 초를 끈 가장자리에 숫자가 없고, 켜면 다시 보이는지.
+  - PlayMode: 흐름 검사를 6단계 끝까지 늘렸다. 번쩍이는 동안 말풍선 없음·숫자 없음, 오른쪽으로 민 북이 튕김, 왼쪽으로 넘기면 묵이 소유·막기 풀림, 마지막 대사 뒤 종료를 본다.
+- **미실행:** Play에서 빨간 가장자리·박 알림이 말풍선과 겹치는지, 튕겨 나오는 느낌, 마지막 대사 뒤 방 목록으로 가는 흐름, iPhone 실기기.
+
+### #477 튜토리얼 검사 실행 결과와 수정 — 2026-11-04
+
+- **사용자 실행 (Test Runner):** EditMode `GameTutorialTests` 중 3개 실패, PlayMode `GameTutorialFlowTests` 2개 모두 실패.
+- **사용자 Play (콘솔 기록):** 0~6단계를 끝까지 진행했다. 북 3번 → 조합 → 던지기(빗나감 2·맞힘 1) → 북 넘기기 → 박 폭탄 → 폭탄 넘기기 → 폭탄 열림(`BOMB_OPENED`) → 묵이에게 북 넘기기 → 방 목록. 오류 로그는 없었다.
+- **EditMode 실패 3개와 수정:**
+  1. `MirrorSlidesInShowsTheDrumArriveAndSlidesOut`: 미니 창이 끝나는 시각(t=1)에 계산 오차로 (0.9999996, 1.8e-7)이 나왔다. 화면으로는 보이지 않는 차이다. `MirrorPose` 끝 구간을 `Mathf.InverseLerp`로 바꿔 끝에서 정확히 (1, 0)이 되게 했다.
+  2. `PairLightIsTheSmallestCircleAroundBothOrbs`: **검사 기댓값이 틀렸다.** 반지름 1(0,0)과 반지름 2(0,3)를 모두 감싸는 가장 작은 원의 중심은 y=2다(아래 끝 −1, 위 끝 5). 함수가 낸 2가 맞아 기댓값을 고쳤다.
+  3. `SpotlightIsOneSheetWhoseOuterRingReachesEveryScreenCorner`: 둥근 구멍에서 윤곽선의 마지막 점(360°)과 첫 점(0°)이 계산 오차만큼 어긋났다. 그래서 길이가 거의 0인 변이 생겨 방향이 무작위로 나왔고, 화면 모서리 판정이 틀어졌다. 어둡게 덮는 판에도 보이지 않을 만큼 가는 조각이 생겼다. 윤곽선이 같은 점을 두 번 만들지 않게 고쳤다: 모서리 호는 끝점 바로 앞에서 멈추고, 이어지는 직선 변이 그 끝점에서 시작한다. 검사에 "이웃한 두 점 사이 0.1 이상"을 추가했다.
+  - 확인: 컴파일 **PASS**(오류 0). Editor 안 계산 **PASS**:
+    - 미니 창(t=1) = (1, 0).
+    - 두 구슬 원 = 중심 y 2, 반지름 3.
+    - 덮는 판 5종(둥근 구멍 3, 기운 막대 1, 기울인 캡슐 1)은 모두 화면 네 모서리를 덮는다.
+    - 이웃 점 최소 간격 0.174~8.7, 가장자리 오차 3e-5 이하.
+    - Test Runner 재실행은 **NOT_RUN**.
+- **PlayMode 실패 2개 (튜토리얼과 무관):** 두 검사 모두 Battle 씬을 여는 순간 Unity 오류 로그로 실패했다. 오류는 "Problem detected while opening the Scene file: `Assets/Hapio/Scenes/Battle.unity`"와 "Restored Transform child parent pointer from NULL" ×30이다. 검사 도구는 예상하지 않은 오류 로그를 실패로 친다.
+  - 원인: 씬 파일에서 배경 장식 30개(나비·발자국·산 그림 등)가 문제다. 부모의 자식 목록에는 들어 있는데 자식의 `m_Father`가 0이다. Unity는 열 때마다 부모를 되살리며 오류를 낸다. 읽기만 해서 확인했다.
+  - 이 브랜치는 Battle 씬을 바꾸지 않았다. 마지막 변경은 main의 `7f35211a`(#447 환경 작업 병합)다. Battle 씬을 여는 다른 PlayMode 검사도 같은 이유로 실패한다.
+  - 처리: Editor로 Battle 씬을 열고 저장해, Unity가 바로잡은 부모를 파일에 쓰게 했다(YAML 손수정 안 함). 커밋은 별도 fix 브랜치에서 한다.
+    - 저장 전 파일을 따로 보관해 두고 객체 단위로 비교했다. 객체 4,416개 중 추가·삭제는 없다. 내용이 바뀐 것은 31개뿐이다: 장식 30개의 `m_Father`가 0에서 자기를 목록에 둔 부모로 채워졌고, 같은 30개가 씬 최상위 목록(`SceneRoots`)에서 빠졌다.
+    - 나머지 줄 변화(약 1만 줄)는 순서뿐이다. 손으로 합친 파일은 객체가 번호 순이 아니었고, Unity는 저장할 때 번호 순으로 다시 쓴다. 누가 Editor에서 이 씬을 저장해도 같은 정렬이 일어난다.
+    - 확인 **PASS**: 다시 열 때 Console 오류 0, 부모·자식 불일치 0, 최상위 객체 6개. 작업 뒤 Editor 화면은 원래 열려 있던 Home 씬으로 되돌렸다. 튜토리얼 PlayMode 재실행은 **NOT_RUN**.
+
+### #477 튜토리얼 이스터에그 + 4단계 대사 수정 — 2026-11-04
+
+- **이스터에그 (사용자 제안):** 3단계에서 던진 구슬이 **다섯 번째로 빗나가면** 금옥이가 "...... / 너 일부러 그러는 거지?"라고 먼저 말한다. 한 번만 나온다.
+  - 이 말풍선은 2.4초(`teaseSeconds`) 동안 떠 있고, 그사이 구슬을 잡아도 사라지지 않는다. 끝나면 이어서 평소처럼 "다시 해 봐!"가 뜬다.
+  - 여섯 번째부터는 다시 "다시 해 봐!"만 나온다.
+  - 이 말풍선이 떠 있는 동안 맞히면 말풍선은 거기서 끝나고 "다시 해 봐!"는 뜨지 않는다.
+  - 빨간 구슬은 평소처럼 위에서 다시 떨어진다.
+- **4단계 대사 (사용자 수정):** 금옥이 대사 두 개.
+  - "맞아! 너가 북을 줘야지... / 북은 몇 개 없어서 같이 써야 해! 옆으로 밀면 넘어가."
+  - "고마워! / 대신 내가 만든 구슬과 북 줄게~"
+  - EditMode 기댓값을 새 대사로 맞췄다.
+- 말풍선 맞춤 (Editor 안 계산): 새 대사·이스터에그 대사 모두 최대 크기 17pt 그대로 들어간다. 4단계 두 대사는 자동 줄바꿈으로 3줄, 이스터에그는 2줄이다.
+
+| 실행한 확인 | 결과 |
+| --- | --- |
+| 컴파일 · Console 오류 | **PASS**: compilationFailed=false, 오류 0 |
+| 연출 값 저장 | **PASS**: `teaseSeconds` 2.4 (에셋 diff는 이 한 줄 추가만) |
+| 빗나감 대사 (Editor 안 계산) | **PASS**: 5번째 = 이스터에그, 6번째 = "다시 해 봐!" |
+
+- **새·수정 검사 (NOT_RUN):** EditMode 1~9번째 빗나감의 첫 대사(5번째만 이스터에그), 이스터에그 대사·2줄 이하, 이스터에그 시간 > 평소 말풍선 시간. 4단계 대사 기대값.
+- **미실행:** Play에서 다섯 번 일부러 빗나가 보기, iPhone 실기기.
+
+### #477 튜토리얼 말풍선 누르기 표시(▽) — 2026-11-05
+
+- **동작:** 화면을 눌러 넘기는 대사의 말풍선 안 **글자 영역 오른쪽 아래**에 ▽가 뜬다.
+  - 말하는 사람과 관계없이 늘 오른쪽 아래다. 말풍선 그림이 좌우로 뒤집히는 금옥이도 같다.
+  - 말풍선이 다 커지고(0.28초) 연타 방지 시간(0.2초)이 지나 실제로 누를 수 있게 된 순간부터 보인다.
+  - 보이는 동안 위에서 아래로 4pt 내려갔다 다시 올라오기를 0.8초마다 되풀이한다. 내려갈 때와 올라올 때 모두 부드럽게 속도가 바뀐다.
+  - 동작을 기다리는 장면과 잠깐 뜨는 말("다시 해 봐!", "이건 금옥이한테 줘.", 이스터에그)에는 뜨지 않는다.
+- **그림:** 사용자가 준 ▽(1818×1818 webp)의 빈 여백을 잘라 `Assets/Hapio/Art/Tutorial/TutorialTapHint.png`(256×223)로 넣었다. 화면 크기는 16×14pt다. 가져오기 설정은 기존 말풍선 그림과 같고, 최대 크기만 256이다. `TutorialArt`에 연결했다.
+- **값 (`TutorialArt`):** `tapHintSize` 16×14, `tapHintOffset` 0·0, `tapHintDepth` 4, `tapHintSeconds` 0.8.
+
+| 실행한 확인 | 결과 |
+| --- | --- |
+| 컴파일 · Console 오류 | **PASS**: compilationFailed=false, 오류 0 |
+| 그림 가져오기 · 연결 | **PASS**: 스프라이트 256×223, `TutorialArt.tapHint` 연결 (에셋 diff는 새 값 5줄) |
+| 움직임 계산 (Editor 안) | **PASS**: 0초 0, 0.4초 −4(가장 아래), 0.8초 0 |
+
+- **새·수정 검사 (NOT_RUN):** EditMode ▽ 움직임(처음 제자리, 반 주기에 가장 아래, 한 주기에 제자리, 위로는 안 감), 그림 연결. PlayMode 첫 대사에서 ▽가 뜨고 누르면 다음 대사는 ▽ 없이 시작했다가 다시 뜨는지, 동작 기다릴 때·"다시 해 봐!"에는 없는지.
+- **미실행:** Play에서 ▽ 크기·위치가 글자와 겹치지 않는지, iPhone 실기기.
+
+### #477 튜토리얼 건너뛰기 버튼·경고 창 — 2026-11-05
+
+- **나타나기:** 튜토리얼 화면을 **한 번이라도 누르면**(대사 넘기기 탭, 연타 방지 시간 안의 탭 포함) 왼쪽 위에 "건너뛰기"가 0.5초 동안 서서히 나타난다(사용자 결정, 처음 안의 "2단계부터"를 바꿈).
+  - 위치는 화면 왼쪽 끝에서 16pt, 높이는 오른쪽 위 일시정지 버튼과 같다.
+  - 마지막 장면 뒤 어두워지는 동안에는 숨는다.
+- **경고 창:** 버튼을 누르면 뒤가 어두워지고(검정 55%), 창이 말풍선처럼 살짝 커졌다 자리 잡는다.
+  - 제목: "튜토리얼을 건너뛰겠소?" (굵은 신라문화체)
+  - 본문 3줄: "튜토리얼을 건너뛰면 구슬 전달과 조합 등 / 기본 조작을 익히지 못해 / 협동 플레이에 어려움이 있을 수 있소."
+  - 창 아래 버튼: "계속 배우기" / "건너뛰기"
+  - 창이 떠 있는 동안:
+    - 튜토리얼 시계가 멈춘다. 대사 넘기기, "성공!" 뒤 기다림, 이웃이 돌려주기, 손 안내가 모두 멈춘다.
+    - 판 조작을 막는다. 잡고 있던 구슬은 놓는다.
+    - 말풍선·▽·안내 띠·손·화살표·"성공!"·밝히기·미니 창은 창 뒤로 숨는다.
+    - 이미 미끄러지던 구슬은 멈출 때까지 움직인다.
+    - 어둠이 화면 전체의 눌림을 받으므로 일시정지 버튼도 눌리지 않는다.
+  - **계속 배우기:** 창이 0.12초 만에 사라지고, 숨긴 것과 판 조작을 그대로 되살려 하던 곳부터 잇는다.
+  - **건너뛰기:** 로그 `C6_LAB_TUTORIAL_SKIP step=N beat=M`을 남긴다. 마지막 장면 뒤와 같은 길(화면 어두워짐 → 방 목록)로 나간다. 여러 번 눌러도 한 번만 처리하고, 이번 실행에서 튜토리얼은 다시 나오지 않는다.
+- **구현:**
+  - 튜토리얼 진행기의 시간 읽기 30곳을 진행기 자체 시계로 바꿨다. 이 시계는 실제 시간과 같이 가다가 경고 창이 떠 있는 동안만 멈춘다.
+  - 건너뛰기는 `GameTutorialDirector.Skip.cs`(같은 클래스의 나눈 파일)에 있다.
+- **그림:** 사용자가 준 창 틀(1056×553)과 작은 버튼 틀(391×180)을 한 장에서 잘라 넣었다.
+  - 파일: `Assets/Hapio/Art/Tutorial/TutorialSkipPanel.png`, `TutorialSkipButton.png`
+  - 9분할 가장자리: 창 72px, 버튼 34px. 실제 모서리 둥근 부분을 픽셀로 재서 정했다. 3배 그림이라 화면에서는 24pt·11pt다.
+  - 작은 버튼 틀은 왼쪽 위 건너뛰기와 창의 두 버튼이 함께 쓴다. 건너뛰기 버튼 글자는 그림이 아니라 글꼴이다(보내준 71×29 그림은 작아서 흐려짐).
+- 글자 맞춤 (Editor 안 계산): 제목 21pt 1줄, 본문 14pt 3줄(높이 48/86pt), 버튼 16pt, 건너뛰기 14pt. 모두 줄어들지 않고 들어간다.
+
+| 실행한 확인 | 결과 |
+| --- | --- |
+| 컴파일 · Console 오류 | **PASS**: compilationFailed=false, 오류 0 |
+| 그림 가져오기 · 연결 | **PASS**: 창 1056×553 가장자리 72, 버튼 391×180 가장자리 34, `TutorialArt` 연결 |
+| 글자 맞춤 (Editor 안) | **PASS**: 위 값 |
+
+- **새·수정 검사 (NOT_RUN):**
+  - EditMode: 창 문구·본문 3줄·버튼 문구, 틀 그림과 9분할, 창과 버튼이 자기 모서리보다 큼, 닫힘이 열림보다 빠름, 0.5초 서서히 나타남.
+  - PlayMode 흐름 검사:
+    - 첫 탭 전에는 버튼이 없고, 첫 탭 뒤 나타나는지.
+    - 대사 위에서 창을 열면 말풍선이 숨고 탭이 넘어가지 않는지, "계속 배우기"로 같은 대사로 돌아오는지.
+    - 1단계 "성공!" 뒤에 창을 열면 1.7초가 지나도 다음 장면으로 안 가는지.
+  - PlayMode 새 검사: 건너뛰기를 두 번 눌러도 한 번만 처리하고, 로그를 남기고, 방 목록으로 가고, 튜토리얼이 다시 안 나오는지.
+- **미실행:** Play에서 창·버튼 모양과 위치(시안 비교), 일시정지 버튼과 높이가 맞는지, iPhone 실기기.
+
+### #477 튜토리얼 일시정지 버튼 살리기 — 2026-11-05
+
+- **문제 (사용자 확인):** 오른쪽 위 일시정지 버튼은 전투 HUD에 있고, 튜토리얼 화면(정렬 20000)이 그 위에 덮여 있다.
+  - 대사가 떠 있을 때는 화면 전체를 받는 탭 받이가 버튼을 가려 눌리지 않았다.
+  - 동작 중에 눌러도 일시정지 메뉴가 튜토리얼 말풍선·안내 띠 밑에 깔렸다.
+- **고친 것 (`GameTutorialDirector.Pause.cs`):**
+  - 튜토리얼 화면 안, HUD 일시정지 버튼과 같은 자리·크기에 보이지 않는 버튼을 매 프레임 맞춰 둔다. 누르면 HUD 버튼의 눌림을 그대로 부르므로 대사가 떠 있을 때도 일시정지된다. 건너뛰기 창이 떠 있거나 마지막에 어두워지는 중에는 없다.
+  - 일시정지 중에는 튜토리얼 화면 전체가 투명해지고 눌림을 받지 않는다(맨 위 CanvasGroup). 그래서 원래 일시정지 메뉴(계속·나가기)가 그대로 보이고 눌린다.
+  - 튜토리얼 시계도 멈추고, 잡고 있던 구슬은 놓는다. "계속"을 누르면 화면이 돌아오고 하던 곳부터 잇는다. "나가기"는 원래대로 방 목록으로 간다.
+  - 일시정지 메뉴의 DEV 설정 버튼(개발 빌드 전용)은 튜토리얼에서 숨긴다. 혼자 판을 다시 시작할 수 있어 튜토리얼 상태가 깨질 수 있다.
+
+| 실행한 확인 | 결과 |
+| --- | --- |
+| 컴파일 · Console 오류 | **PASS**: compilationFailed=false, 오류 0, 튜토리얼 스크립트 경고 0 |
+
+- **새 검사 (NOT_RUN):** PlayMode 흐름 검사, 0단계 대사 위에서 확인한다.
+  - 보이지 않는 버튼이 있는지.
+  - 누르면 일시정지되고 튜토리얼 화면이 투명해지며 눌림이 통과하는지, 일시정지 메뉴가 보이고 DEV 설정이 없는지.
+  - 1초 동안 장면이 안 넘어가는지.
+  - "계속"으로 같은 대사로 돌아오는지.
+- **미실행:** Play에서 일시정지 → 계속 / 나가기, iPhone 실기기.
+
+### #477 튜토리얼 폭탄 열리는 시점 · 일시정지 메뉴 나가기·RESTART — 2026-11-05
+
+- **폭탄 시점 (사용자 지적):** 지금까지는 "앗 뜨거! 도로 받아!"와 함께 돌아온 폭탄이 바로 열렸다. 그래서 "풀렸다!" 대사와 시점이 어긋나 보였다.
+  - "앗 뜨거! 도로 받아!": 금옥이가 폭탄을 돌려주며 마지막 잠금이 풀려 **무지개색(해금) 폭탄**이 된다. 내 판에 들어와 멈추지만 열리지 않고 기다린다.
+    - 판에 "해금 폭탄 열기 멈춤"을 더했다: `LabOrbBoard.SetBombOpeningHeld`. 판을 정리하거나 튜토리얼이 끝날 때 풀린다.
+  - 이 대사를 빨리 넘기면, 폭탄이 돌아와 멈출 때까지 화면을 막고 기다린다. 이 장면이 `WaitBombOpen`에서 바뀐 `WaitBombBack`다.
+  - **"풀렸다!"**: 이 대사와 함께 멈춤을 풀어, 0.2초 뒤 연기와 함께 공격 구슬 두 개로 열린다. 열리는 방식은 실제 게임과 같다.
+- **일시정지 메뉴 (튜토리얼에서만):**
+  - **QUIT RUN → 타이틀 화면.** 방 목록 대신 Home 첫 화면("게임 시작")으로 간다(`QuitTutorialToTitle`). 끝까지 하거나 건너뛰면 지금처럼 방 목록이다.
+  - **RESTART 추가.** 실행 중에 QUIT RUN 버튼을 복제해 QUIT RUN 자리에 놓고, QUIT RUN은 한 칸 아래(튜토리얼에서 숨긴 DEV 자리, 70pt 아래)로 내린다.
+    - 누르면 기존 스테이지 다시 시작과 같은 길(`restartPending` → Battle 다시 불러오기)로 연습 판이 처음부터, "튜토리얼 준비 중…" 가림막과 함께 다시 열린다.
+    - 여러 번 눌러도 한 번만 처리하고, 로그 `C6_LAB_TUTORIAL_RESTART step=N beat=M`을 남긴다.
+    - 씬 파일은 바꾸지 않았다.
+  - 글자는 메뉴의 다른 버튼과 같이 영어로 썼다("RESTART").
+
+| 실행한 확인 | 결과 |
+| --- | --- |
+| 컴파일 · Console 오류 | **PASS**: compilationFailed=false, 오류 0, 튜토리얼 스크립트 경고 0 |
+| 일시정지 메뉴 배치 (씬 파일 읽기) | **PASS**: CONTINUE −107, QUIT RUN −177, DEV −247, 같은 부모·고정 위치(줄 간격 70). RESTART는 −177, QUIT RUN은 −247로 간다 |
+
+- **새·수정 검사 (NOT_RUN):**
+  - EditMode: 5단계 장면 `WaitBombBack`, "풀렸다!"의 여는 신호.
+  - PlayMode 흐름 검사: 돌아온 폭탄이 2.5초 동안 열리지 않고 멈춰 있는지, "풀렸다!"와 함께 열리는지.
+  - PlayMode 나가기 검사: 이제 타이틀 화면(방 목록 아님)으로 가는지.
+  - PlayMode 새 검사: RESTART의 위치·글자, 두 번 눌러도 한 번, 연습 판이 0단계 첫 대사부터 새 판으로 다시 열리고 일시정지가 풀리는지. 그다음 QUIT RUN으로 타이틀 화면에 가는지.
+- **미실행:** Play에서 무지개 폭탄이 기다리는 모습과 "풀렸다!" 시점, RESTART·QUIT RUN 흐름, iPhone 실기기.
+
+### #477 튜토리얼 경고 창 버튼 커짐 · 금옥이 미니 창을 실제 판으로 — 2026-11-05
+
+- **버튼:** 건너뛰기 경고 창의 "계속 배우기"·"건너뛰기"에 손가락을 대고 있는 동안(마우스는 올려 둔 동안) 1.08배로 0.08초 만에 커진다. 떼거나 벗어나면 돌아온다(`GameTutorialPressScale`).
+  - 크기만 바꾸고 눌림 처리는 버튼이 그대로 한다. 누를 수 없는 상태에서는 커지지 않는다.
+  - 값은 `TutorialArt`의 `skipChoicePressScale`·`skipChoicePressSeconds`에서 고친다.
+- **금옥이 미니 창 (사용자 시안: 금옥이 화면에서 북이 들어오는 모습):** 4단계에서 북이 금옥이에게 넘어가면 다음 순서로 보인다.
+  1. 금옥이 말풍선과 같은 그림·자리(꼬리가 금옥이 얼굴)에 창이 말풍선처럼 커지며 뜬다. 뒤이은 "고마워!" 말풍선이 같은 자리에 뜬다.
+  2. 창 안은 실제 판 그림(`OrbBoardPlate`의 `CombinationBoard`)에서 금옥이 판의 북이 들어오는 쪽을 잘라 보여 준다.
+     - 가로: 왼쪽 끝부터 멈출 자리 너머 판 너비 0.25까지, 최소 0.6.
+     - 세로: 넘긴 높이. 북은 창 아래에서 35% 높이를 지나, 위쪽(판 테두리 쪽)이 더 보인다.
+     - 판 그림의 실제 위치(렌더러 범위)와 판 영역(CenterBounds)으로 그림 좌표를 계산한다.
+  3. 북은 실제 판의 북 그림(`GenerateButton`)이다. 실제 판이 넘겨받은 북을 멈추는 것과 같은 계산으로 움직인다(`LabOrbBoard.StopArrivalSpeed`로 공개, 실제 판도 이 함수를 쓴다).
+     - 넘긴 빠르기로 들어오되, 1.2초 안에 서도록 빠르게 하고, 판 너비 8/s²보다 세게 서지 않게 한다.
+     - 들어온 뒤 고르게 감속해 금옥이 판의 멈출 자리(모델의 stopAt, 48~52%)에 선다.
+  4. 0.5초 머문 뒤 0.15초 동안 사라진다. 창이 떠 있는 시간은 정해진 1.8초가 아니라 이 길이를 다 더한 값이다. "성공!" 뒤 다음 대사도 그만큼 기다린다.
+  - 예전의 그린 창(색 상자 + 미니맵 북 + 금옥이 얼굴, 오른쪽에서 밀려 들어옴)과 그 값 5개(`mirrorSize`·`mirrorSeconds`·`mirrorBorderColor`·`mirrorDrumSize`·`mirrorFaceSize`)를 지웠다.
+  - 새 값: `mirrorViewPastStop` 0.25, `mirrorViewMinWidth` 0.6, `mirrorDrumHeightInView` 0.35, `mirrorHoldSeconds` 0.5, `mirrorFadeSeconds` 0.15. `mirrorColor`는 판 그림이 없을 때만 쓴다.
+  - 코드는 `GameTutorialDirector.Mirror.cs`로 옮겼다.
+
+| 실행한 확인 | 결과 |
+| --- | --- |
+| 컴파일 · Console 오류 (`mirrorDrumHeightInView` 추가 전) | **PASS**: compilationFailed=false, 오류 0 |
+| 판 그림·북 그림 (Editor 안) | **PASS**: 판 재질 셰이더 Sprites/Default, 주 텍스처 `CombinationBoard`. 북 그림 `GenerateButton` |
+| `mirrorDrumHeightInView` 추가 뒤 컴파일 · 에셋 저장 | **NOT_RUN**: 그사이 사용자가 Play를 시작해 멈춤. Play가 끝난 뒤 한다 |
+
+- **새 검사 (NOT_RUN):**
+  - EditMode 미니 창 시간표: 커지며 뜸 → 북이 반 시간에 3/4 지점 → 멈춘 뒤 머묾 → 사라짐.
+  - EditMode 실제 판과 같은 들어오는 빠르기: 느리면 1.2초, 세면 상한, 방향 무관.
+  - EditMode 버튼 커지기·돌아오기.
+- **미실행:** Play에서 미니 창 모양(시안 비교)·판 그림 자른 위치·북 크기, 버튼 커짐 느낌, iPhone 실기기.
+
+### #477 튜토리얼 박 요괴가 나를 보게 — 2026-11-05
+
+- **문제 (사용자 확인):** 연습 판에서 나는 가운데 자리(P2)다. 금옥이가 오른쪽 = 앞 번호 P1이라서다. 자리 카메라는 박 둘레를 자리 순서대로 돈다(3명: 0°·120°·240°). 그래서 나는 박을 120° 돌아서 보는데, 박 요괴는 첫 자리(P1, +Z) 쪽을 보고 있어 옆·뒷모습만 보였다.
+  - 근거: `WhiteGourd.prefab`의 요괴 눈이 장식 묶음 안에서 −Y에 있다. 묶음의 −90° X 회전으로 월드 +Z 쪽이 되고, 첫 자리 카메라가 +Z에서 −Z를 본다.
+- **고친 것 (튜토리얼에서만, `GameTutorialDirector.Yokai.cs`):** 박 위 장식 묶음 `GourdYokai_Details`(요괴·눈·뚜껑·손잡이·끈)를 박의 세로축으로 내 자리 각도만큼 돌린다(3명 중 둘째 자리 = 120°).
+  - 장식 애니메이션 6개는 그 안쪽(`YokaiRoot`·`LidPivot`·눈)만 움직이므로 돌린 값이 유지된다. 스테이지 요괴 모델도 `YokaiRoot` 안에 들어가 함께 돈다.
+  - 색이 묻는 흰 박 몸통(`White Gourd`)과 맞히기는 그대로다.
+  - 박 그림이 바뀌면(다시 시작 등) 새 박에 다시 맞춘다.
+  - 실제 3인 게임은 바꾸지 않았다. 둘째·셋째 자리 사람에게는 지금도 요괴가 옆을 보고 있다.
+
+| 실행한 확인 | 결과 |
+| --- | --- |
+| 컴파일 · Console 오류 | **PASS**: compilationFailed=false, 오류 0 |
+| 돌릴 각도 (Editor 안) | **PASS**: 3명 중 둘째 자리 120° |
+| 앞 단계 남은 일: `mirrorDrumHeightInView` 컴파일·에셋 저장 | **PASS**: 0.35 저장 (에셋 diff는 이 한 줄) |
+
+- **새 검사 (NOT_RUN):**
+  - EditMode 자리별 각도: 0°·120°·240°, 팀 자리는 반대 방향. 120° 돌린 첫 자리 카메라 위치가 둘째 자리 카메라 위치와 같은지.
+  - PlayMode 흐름 검사: 첫 대사 때 요괴가 120° 돌아 나를 보고, 흰 박 몸통은 그대로인지.
+- **미실행:** Play에서 요괴가 정면으로 보이는지 눈으로 확인, iPhone 실기기.
+
+### #477 튜토리얼 "성공!"이 안내 띠 자리에 — 2026-11-05
+
+- **바꾼 것 (사용자 시안):** 동작을 해내면 안내 띠("북을 오른쪽 끝으로 밀어 …")가 사라지고, **그 자리(띠 가운데)**에 "성공!"이 살짝 커졌다 자리 잡으며 뜬다. 예전에는 띠를 둔 채 그 아래에 떴다.
+  - 색: 검정 #000000 (예전 빨강).
+  - 테두리: 피그마 stroke 0.2 = 390pt 기준 화면 0.2pt. 같은 검정으로 사방에 그려 조금 더 굵어 보인다(UI `Outline`). 시안에 테두리 색이 따로 없어 글자와 같은 검정으로 했다.
+  - 글자 크기: 시안 비율에 맞춰 28 → 36.
+  - 값: `TutorialArt`의 `successColor`·`successFontSize`·`successStroke`·`successStrokeColor`.
+  - 던지기(3단계)처럼 띠가 판 바로 위로 내려가는 장면에서는 "성공!"도 그 자리에 뜬다.
+
+| 실행한 확인 | 결과 |
+| --- | --- |
+| 컴파일 · Console 오류 (Play가 끝난 뒤) | **PASS**: compilationFailed=false, 오류 0 |
+| 에셋 값 저장 | **PASS**: `successColor` 빨강 → 검정(0,0,0,1), `successFontSize` 28 → 36, `successStroke` 0.2, `successStrokeColor` 검정 |
+
+- **새·수정 검사 (NOT_RUN):** EditMode "성공!" 검정·테두리 0.2·검정. PlayMode 1단계 성공 때 띠가 꺼지고 "성공!"이 띠와 같은 자리에 검정으로 뜨는지.
+- **미실행:** Play에서 크기·굵기 시안 비교, iPhone 실기기.
+
+### #477 튜토리얼 안내 띠 위치 통일 — 2026-11-05
+
+- **바꾼 것 (사용자 결정):** 안내 띠는 모든 동작 장면에서 한 자리(화면 위에서 30%, `bannerTopFraction` 0.3, 사용자 시안과 같은 높이)에 뜬다. "성공!"도 그 자리에 뜬다.
+  - 예전에는 3단계 던지기만 박을 덜 가리려고 47%(`throwBannerTopFraction`)로 내려 썼다. 그 값과 코드를 지웠다.
+  - 던지기 동안에는 띠가 박 윗부분에 걸친다(시안과 같음).
+
+| 실행한 확인 | 결과 |
+| --- | --- |
+| 컴파일 · Console 오류 | **PASS**: compilationFailed=false, 오류 0 |
+| 에셋 다시 저장 | **PASS**: `throwBannerTopFraction: 0.47` 한 줄만 빠짐, `bannerTopFraction` 0.3 그대로 |
+
+- **새·수정 검사 (NOT_RUN):** EditMode 던지기 전용 높이 값이 없는지. PlayMode 3단계 던지기 띠가 다른 장면과 같은 높이(위에서 30%)인지.
+- **미실행:** Play에서 던지기 중 띠가 박을 얼마나 가리는지, iPhone 실기기.
+
+### #477 튜토리얼 4단계 끝에 북 위치 지도 장면 — 2026-11-05
+
+- **더한 것 (사용자 시안):** 4단계 "짝이 안 맞는 구슬은 / 이렇게 친구한테 넘기면 돼." 다음에 두 대사를 더했다.
+  1. 금옥이 "지금 북이 어디에 있는지는 / 우측 지도에서 볼 수 있어!"
+  2. 불이 "오호! 누가 북을 안 주고 있는지 / 실시간으로 확인할 수 있겠군!"
+  - 두 대사 동안 화면이 어두워지고, 오른쪽 위 북 위치 지도(`LabDrumMinimap.Panel`)만 둥근 네모로 밝힌다(새 밝히기 `Minimap`). 여백은 6pt, 모서리는 14pt다.
+  - 띄어쓰기: "안주고"를 "안 주고"로 썼다.
+- **말풍선 자리:** 금옥이 말풍선은 평소 얼굴 왼쪽 위로 솟는다. 사용자 화면을 재 보니 그러면 지도 왼쪽 아래(약 60×50pt)를 가린다.
+  - 그래서 밝힌 곳이 지도이고 평소 자리가 지도와 겹치면, 말풍선을 **얼굴 왼쪽 아래로 내려 단다**. 그림은 위아래를 뒤집어 꼬리가 위로 얼굴을 향하고, 글자와 ▽는 바로 선다.
+  - 이 규칙은 지도 밝히기에만 쓴다. 다른 장면의 말풍선은 그대로다.
+- 말풍선 맞춤 (Editor 안 계산, 17pt):
+  - 금옥이 대사는 2줄로 들어간다.
+  - 불이 대사는 첫 줄이 한 줄에 다 들어가지 않아 [오호! 누가 북을 안 주고] [있는지] [실시간으로 확인할 수 있겠군!] 3줄로 접힌다. "있는지"가 한 줄에 혼자 남는다.
+
+| 실행한 확인 | 결과 |
+| --- | --- |
+| 컴파일 · Console 오류 | **PASS**: compilationFailed=false, 오류 0 |
+| 에셋 저장 | **PASS**: `minimapSpotlightPadding` 6, `minimapSpotlightCorner` 14 추가 |
+| 말풍선 맞춤 (Editor 안) | **PASS**: 위 결과(불이 대사 3줄) |
+
+- **새·수정 검사 (NOT_RUN):** EditMode 4단계 장면 7개·대사 6개·화자, 마지막 두 대사만 지도 밝히기. PlayMode 4단계 끝에서 지도만 밝고 금옥이 말풍선이 지도와 겹치지 않는지, 불이 대사 때도 지도가 밝은지.
+- **미실행:** Play에서 내려 단 말풍선 모양·자리, 지도 밝히는 크기, iPhone 실기기(화면 비율에 따라 겹침 판단이 달라질 수 있음).
+
+### #477 튜토리얼 캐릭터 이름 — 2026-11-05
+
+- **더한 것 (사용자 시안):** 세 캐릭터 얼굴 바로 아래 가운데에 이름을 쓴다: 왼쪽 **묵이**, 오른쪽 **금옥**, 아래 **불이**. 시안 그대로 "금옥"(이 없이)이다.
+  - 얼굴이 옮겨지거나 커져도 매 프레임 따라간다. 화면 아래 끝은 넘지 않는다(불이 이름).
+  - 글꼴은 굵은 신라문화체(안내 띠와 같음), 14pt, 검정이다.
+  - 화면을 어둡게 하는 막보다 아래에 그려 얼굴과 함께 어두워진다.
+  - 구슬이 얼굴을 넘지 못하게 세운 벽에 이름 세 개를 더했다. 벽은 4개에서 7개가 된다.
+  - 값: `TutorialArt`의 "캐릭터 이름" 구역(`nameFont`, `nameFontSize`, `nameColor`, `nameGap`, `nameScreenMargin`).
+
+| 실행한 확인 | 결과 |
+| --- | --- |
+| 컴파일 · Console 오류 | **PASS**: compilationFailed=false, 오류 0 |
+| 자리별 이름 (Editor 안) | **PASS**: P1 금옥, P2 불이, P3 묵이 |
+| 에셋 저장 | **PASS**: 이름 값 5개 추가 |
+
+- **새·수정 검사 (NOT_RUN):**
+  - EditMode 이름 세 개, 자리 ↔ 화자 되돌리기, 기본 글자 색·크기.
+  - PlayMode 첫 대사 때 이름 세 개가 각 얼굴 아래 가운데에 있고 화면 안인지. 벽 개수 7.
+- **미실행:** Play에서 크기·위치 시안 비교, iPhone 실기기(화면 아래 안전 영역에서 불이 이름이 잘리지 않는지).
+- **추가 (같은 날):** 튜토리얼에서만 아래 내 얼굴(불이)을 옮길 수 있게 `TutorialArt.localPortraitOffset`을 더했다. pt 단위로 오른쪽이 +x, 위가 +y이고 기본값은 0·0이다.
+  - 원래 자리(Battle 씬 HUD)에 이 값을 더한 뒤 화면 안쪽으로 맞추므로 화면 밖으로는 나가지 않는다. 매 프레임 적용되어 Play 중에도 바로 보인다.
+  - 이름·말풍선 꼬리·구슬 벽이 얼굴을 따라간다. 실제 게임 HUD는 바뀌지 않는다.
+  - 확인: 컴파일 **PASS**(오류 0), 에셋 저장 **PASS**(기본값 0·0). Play 확인은 **NOT_RUN**.
+
+### #477 튜토리얼 main 반영 (병합) — 2026-11-05
+
+- 원격 main `25014885`(84개 커밋 앞섬)을 합쳤다. 충돌은 두 파일이다.
+  - `LabModel.cs`: 기운 회복 줄 한 곳. main이 회복 배수를 `JigwiABRecoveryMultiplier(player.id, …)`에서 `JigwiStageRecoveryMultiplier(lastTime)`로 바꿨고, 튜토리얼은 같은 줄을 기운 상한으로 감쌌다. 튜토리얼 감싸기는 두고, 배수는 main 것을 썼다.
+  - 이 문서: 양쪽이 새 절만 더했다.
+    - 끝 부분은 main 절 다음에 튜토리얼 절을 이어 둘 다 남겼다.
+    - 맨 위의 "화 캐릭터 로딩 달리기 에셋 1차 시안" 절은 튜토리얼 작업이 아니다. 같은 작업 폴더에서 다른 작업이 이 문서에 써 둔 것이 5단계 커밋(`f2a681b7`)에 섞여 들어왔다. 저장소에 없는 `output/` 파일을 기록하므로 이 PR에서는 빼고 main 쪽을 따랐다(내용은 `f2a681b7`에 남아 있다).
+- Battle 씬 부모 연결 깨짐은 main의 #485(위 절)로 이미 고쳐져 있다(원격 main 씬 불일치 0). 앞서 이 브랜치 작업 폴더에서 다시 저장한 씬은 쓰지 않는다.
+- 확인 (병합 뒤, Editor 안):
+  - 컴파일 **PASS**(compilationFailed=false, 오류 0).
+  - 폭탄 흐름 **PASS**(병합 전과 같은 값: 잠금 2→1→0, `BOMB_OPENED`, 오행 구슬 2개).
+  - 한쪽 막기 **PASS**(1시간 뒤에도 유지, 오른쪽 `SWIPE_BLOCKED`, 왼쪽 묵이에게 넘어감, 풀기).
+  - 충돌 난 기운 회복 줄 **PASS**: 최대 60, 북 3번에 0, 멈춘 10초 동안 0, 상한 5에서 멈춤, 풀면 60.
+  - Test Runner는 **NOT_RUN**.
 
 
 ## 2026-11-05 · #524 스티커별 코팅 광택 v2

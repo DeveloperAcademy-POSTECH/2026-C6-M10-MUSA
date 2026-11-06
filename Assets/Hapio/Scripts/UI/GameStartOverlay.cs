@@ -68,6 +68,14 @@ namespace Hapio
                 preparingFontSize, preparingBackground, true);
         }
 
+        /// <summary>A preparing cover with its own words instead of the ready count (the tutorial, #477).</summary>
+        public void ShowPreparing(string message)
+        {
+            if (mode == DisplayMode.Preparing && lastReady < 0 && caption != null && caption.text == message) return;
+            lastReady = lastTotal = -1;
+            Apply(DisplayMode.Preparing, message ?? string.Empty, preparingFontSize, preparingBackground, true);
+        }
+
         public void ShowCountdown(int seconds)
         {
             if (seconds < 1 || seconds > 3) throw new ArgumentOutOfRangeException(nameof(seconds));

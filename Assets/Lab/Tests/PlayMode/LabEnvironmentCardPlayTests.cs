@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.TestTools;
 namespace C6Lab.Tests
 {
+ [Category("GPU")]
  public sealed class LabEnvironmentCardPlayTests
  {
   [UnityTest] public IEnumerator GrassWindChangesRenderedSilhouetteWhileTransformStaysFixed()

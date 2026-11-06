@@ -77,6 +77,8 @@ namespace C6Lab
         public Button resumeButton;
         public Button returnLobbyButton;
         public Button developerSettingsButton;
+        /// <summary>Keeps the pause menu's DEV button hidden (the Hapio tutorial has no DEV restart).</summary>
+        [System.NonSerialized] public bool developerSettingsHidden;
         public Text pauseStatusText;
         public LabDeveloperMode developerMode;
         [Header("Saved battle result controls")]
@@ -252,7 +254,7 @@ namespace C6Lab
             if (returnLobbyButton != null) returnLobbyButton.interactable = network.CanReturnAllToLobby;
             SetVisible(returnLobbyButton == null ? null : returnLobbyButton.gameObject, network.IsHost);
             SetVisible(developerSettingsButton == null ? null : developerSettingsButton.gameObject,
-                network.IsHost && network.DeveloperBuildAvailable);
+                network.IsHost && network.DeveloperBuildAvailable && !developerSettingsHidden);
             if (developerSettingsButton != null)
                 developerSettingsButton.interactable = network.DeveloperBuildAvailable
                     && network.IsBattlePaused && network.IsHost

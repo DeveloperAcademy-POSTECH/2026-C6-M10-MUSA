@@ -379,18 +379,18 @@ namespace C6Lab
             new LabDeveloperField("Reserved Jigwi A Recovery Multiplier (unused)", 1f, 10f),
             new LabDeveloperField("Reserved Jigwi A Required Hits (unused)", 1f, 10f, true),
             new LabDeveloperField("지귀 A 구슬 소각 대기 (초)", .5f, 30f),
-            new LabDeveloperField("지귀 B 개인 불 개수", 1f, 6f, true),
-            new LabDeveloperField("지귀 B 소화 후 재점화 (초)", 1f, 60f),
+            new LabDeveloperField("Reserved Jigwi B Fire Count (unused)", 1f, 6f, true),
+            new LabDeveloperField("Reserved Jigwi B Relight (unused)", 1f, 60f),
             new LabDeveloperField("Reserved Jigwi B Shrink Delay (unused)", 0f, 60f),
             new LabDeveloperField("Reserved Jigwi B Shrink Scale (unused)", .2f, 1f),
             new LabDeveloperField("지귀 B 불 이동 폭", 0f, .1f),
             new LabDeveloperField("지귀 B 불 이동 주기 (초)", 1f, 20f),
             new LabDeveloperField("지귀 B 소화 표적 반경", .1f, 1f),
-            new LabDeveloperField("지귀 성공 보상 구슬 크기 (배)", 1f, 3f),
-            new LabDeveloperField("지귀 성공 보상 칠 면적 (배)", 1f, 3f),
-            new LabDeveloperField("지귀 B 물 구슬 지급 간격 (초)", .25f, 10f),
-            new LabDeveloperField("지귀 B 시작 물 구슬 수", 0f, 5f, true),
-            new LabDeveloperField("지귀 B 미소모 지급 상한", 1f, 12f, true),
+            new LabDeveloperField("Reserved Jigwi B Reward Size (unused)", 1f, 3f),
+            new LabDeveloperField("Reserved Jigwi B Reward Paint (unused)", 1f, 3f),
+            new LabDeveloperField("Reserved Jigwi B Supply Interval (unused)", .25f, 10f),
+            new LabDeveloperField("Reserved Jigwi B Supply Initial (unused)", 0f, 5f, true),
+            new LabDeveloperField("Reserved Jigwi B Supply Limit (unused)", 1f, 12f, true),
             new LabDeveloperField("지귀 B 발화점 거리 (박까지 비율)", .4f, .9f),
             new LabDeveloperField("Clay Thickness (body units)", 0f, .02f),
             new LabDeveloperField("Clay Gloss", 0f, 1f)
@@ -410,6 +410,22 @@ namespace C6Lab
         public static bool IsJigwiStageField(int index) => index >= JigwiStageFirstField && index <= JigwiStageLastField
             || index >= JigwiABFirstField && index <= JigwiABLastField;
 
+        /// <summary>
+        /// What Jigwi's 120-second timeline (228) replaces while it is on: the old water-only surface fire (178~183), its
+        /// automatic cycle (192~195) and, in Jigwi's own stage, the common gimmick interval (205; the common gimmicks
+        /// come at 20/40/60/80 s). The standalone Lab never runs the timeline and keeps them for its manual tests.
+        /// </summary>
+        public static bool IsReplacedByJigwiTimeline(int index) =>
+            index >= 178 && index <= 183 || index >= 192 && index <= 195 || index == 205;
+
+        /// <summary>
+        /// The rows Battle DEV hides in a Hapio game stage while the form has the timeline on. Outside Jigwi's stage the
+        /// old fire and its cycle never run either (manual controls belong to Jigwi's stage alone), but the common
+        /// gimmick interval does, so it stays.
+        /// </summary>
+        public static bool HiddenByJigwiTimelineInGame(int index, LabStageYokai stage, bool timelineOn) =>
+            timelineOn && IsReplacedByJigwiTimeline(index) && (index != 205 || stage == LabStageYokai.Jigwi);
+
         /// <summary>Fever time (#334) DEV slots: when it starts (seconds left) and how much faster stamina refills.</summary>
         public const int FeverTimeSecondsField = 238;
         public const int FeverTimeRecoveryField = 239;
@@ -427,9 +443,43 @@ namespace C6Lab
         /// common battle time). They keep their places in the shared form so every other index stays put, but nothing
         /// reads them and DEV never shows them. #388 also retires the fixed warning slot and screen-B shrink delay/scale while preserving their stored values.
         /// #479 retires Jigwi A's recovery multiplier and required hits: A is now cleared by a talisman, not by boss hits.
+        /// #509 retires Jigwi B's fire count and relight: each picked seat has one pillar that never relights.
+        /// #509 also retires B's 5-second launch reward size/paint: success is now one big water splash on the boss.
+        /// #509 also retires B's free-water interval/initial count/cap: each picked seat gets one special Water orb instead.
         /// </summary>
         public static IReadOnlyCollection<int> RetiredDeveloperFields { get; } =
-            Array.AsReadOnly(new[] { 55, 87, 88, 152, 154, 167, 168, 211, 229, 230, 231, 232, 233, 234, 241, 242, 246, 247 });
+            Array.AsReadOnly(new[] { 55, 87, 88, 152, 154, 167, 168, 211, 229, 230, 231, 232, 233, 234, 241, 242, 244, 245, 246, 247, 251, 252, 253, 254, 255 });
+
+        /// <summary>
+        /// Settings that change nothing in the current game. Since #315 a round is won only by painting the whole gourd
+        /// and lost only when time runs out, so the yokai's HP (0) and personal HP (48) never decide it, nothing lowers
+        /// personal HP outside tests, and the potion's heal (52) has nothing to restore. The drum makes Yin and Yang only
+        /// (#177), so relay (41) and potion (43) chances stay 0; only a relay orb at ×2/MAX (53, 54) hits harder than one
+        /// Damage per Hit, which is what picks the item-hit haptics (72, 73), and a relay orb has no element and does not
+        /// paint. Damage per Hit (1) still multiplies the result board's 딜왕 number, but every hit is worth the same, so
+        /// the winner never changes. Unlike RetiredDeveloperFields the code still reads them, so they keep their labels,
+        /// indices, saved values and the shared form (APPLY and Hapio's Common scope still carry them); only the Lab DEV
+        /// panel and Hapio's DEV tabs stop showing them.
+        /// </summary>
+        public static IReadOnlyCollection<int> InactiveDeveloperFields { get; } =
+            Array.AsReadOnly(new[] { 0, 1, 41, 43, 48, 52, 53, 54, 72, 73 });
+
+        private static readonly bool[] RetiredDeveloperRows = DeveloperRows(RetiredDeveloperFields);
+        private static readonly bool[] InactiveDeveloperRows = DeveloperRows(InactiveDeveloperFields);
+        private static bool[] DeveloperRows(IReadOnlyCollection<int> indices)
+        {
+            var rows = new bool[DeveloperFields.Count];
+            foreach (int index in indices) rows[index] = true;
+            return rows;
+        }
+
+        /// <summary>One of <see cref="InactiveDeveloperFields"/>: still read, still carried and applied, never shown.</summary>
+        public static bool IsInactiveDeveloperField(int index) =>
+            index >= 0 && index < InactiveDeveloperRows.Length && InactiveDeveloperRows[index];
+
+        /// <summary>A row neither DEV screen shows: a retired slot or an inactive setting. Its value still travels in the form.</summary>
+        public static bool IsDeveloperFieldHidden(int index) =>
+            index >= 0 && index < RetiredDeveloperRows.Length && (RetiredDeveloperRows[index] || InactiveDeveloperRows[index]);
 
         /// <summary>Kinds a GENERATE press can create, in the same order as GenerationChances.</summary>
         public static IReadOnlyList<LabOrbKind> GeneratedKinds { get; } = Array.AsReadOnly(new[]
@@ -439,12 +489,13 @@ namespace C6Lab
         });
 
         // 화면 표시용 묶음. 새 DEV 항목을 추가하면 여기 한 곳에 번호를 넣는다.
+        // 은퇴한 칸(RetiredDeveloperFields)과 지금 게임에서 효과가 없는 칸(InactiveDeveloperFields)은 넣지 않는다.
         public static IReadOnlyList<LabDeveloperCategory> DeveloperCategories { get; } = Array.AsReadOnly(new[]
         {
-            new LabDeveloperCategory("Battle", 0, 1, 2, 48),
+            new LabDeveloperCategory("Battle", 2),
             new LabDeveloperCategory("Stamina and generation", 3, 4, 5, 6, 7, 8, 9),
-            new LabDeveloperCategory("Generation chances", 39, 40, 41, 42, 43, 44, 225, 226, 227),
-            new LabDeveloperCategory("Item orbs", 45, 46, 47, 52, 53, 54, 80, 81, 141, 142, 143, 144, 145, 146, 147),
+            new LabDeveloperCategory("Generation chances", 39, 40, 42, 44, 225, 226, 227),
+            new LabDeveloperCategory("Item orbs", 45, 46, 47, 80, 81, 141, 142, 143, 144, 145, 146, 147),
             new LabDeveloperCategory("Orb lifetime", 10),
             new LabDeveloperCategory("Flat orb board", 11, 12, 13, 14, 15, 16, 165),
             new LabDeveloperCategory("Orb combine", 49, 50, 51),
@@ -454,14 +505,14 @@ namespace C6Lab
             new LabDeveloperCategory("Throw flight", 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38),
             new LabDeveloperCategory("Throw form", 111, 112, 113, 114, 115, 116, 117),
             new LabDeveloperCategory("Target spin", 57, 58, 59),
-            new LabDeveloperCategory("Sound and haptics", 63, 64, 135, 136, 65, 66, 67, 68, 69, 70, 71, 72, 73, 82, 83, 84, 85, 86, 89, 102, 103),
+            new LabDeveloperCategory("Sound and haptics", 63, 64, 135, 136, 65, 66, 67, 68, 69, 70, 71, 82, 83, 84, 85, 86, 89, 102, 103),
             new LabDeveloperCategory("Drum", 74, 75, 76, 77, 78, 90, 91, 92, 93, 94, 95, 96, 97),
             new LabDeveloperCategory("Gourd", 140, 79, 104, 105, 106, 138, 139, 107, 108, 109, 110, 137,
                 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131,
                 134, 132, 133, 148, 149, 150, 151, 200, 201, ClayThicknessField, ClayGlossField),
             new LabDeveloperCategory("Minimap", 98, 99, 100, 101),
             new LabDeveloperCategory("Jigwi", 178, 179, 180, 181, 182, 183, 192, 193, 194, 195),
-            new LabDeveloperCategory("지귀 120초 (Hapio 전용)", 228, 235, 240, 243, 244, 245, 248, 249, 250, 251, 252, 253, 254, 255, 256),
+            new LabDeveloperCategory("지귀 120초 (Hapio 전용)", 228, 235, 240, 243, 248, 249, 250, 256),
             // 기믹 묶음 (#311): 공용(폭탄·넘기기 막기)과 고유(구미호: 여우불·매혹)를 나눠 간격·켜기·비율·세부값을 모은다.
             new LabDeveloperCategory("Gimmicks", 205, 207, 169, 208, 170, 153,
                 166, 206, 209, 171, 210, 172, 173, 174, 175, 176, 204, 177)
@@ -521,11 +572,11 @@ namespace C6Lab
         [Header("Jigwi surface fire timeline (#332)")]
         [SerializeField] private bool jigwiStageTimelineEnabled = true;
         [HideInInspector, SerializeField, Range(0f, 3f)] private float jigwiStageWarningSeconds = 1f;
-        [SerializeField, Range(1f, 20f)] private float jigwiStageActiveSeconds = 7f;
-        [SerializeField, Range(5f, 30f)] private float jigwiStageRootAngleDegrees = 18f;
-        [SerializeField, Range(10f, 45f)] private float jigwiStageFireAngleDegrees = 30f;
-        [SerializeField, Range(.1f, 3f)] private float jigwiStageSpreadSeconds = 1f;
-        [SerializeField, Range(1, 3)] private int jigwiStageSpreadPatches = 3;
+        [HideInInspector, SerializeField, Range(1f, 20f)] private float jigwiStageActiveSeconds = 7f;
+        [HideInInspector, SerializeField, Range(5f, 30f)] private float jigwiStageRootAngleDegrees = 18f;
+        [HideInInspector, SerializeField, Range(10f, 45f)] private float jigwiStageFireAngleDegrees = 30f;
+        [HideInInspector, SerializeField, Range(.1f, 3f)] private float jigwiStageSpreadSeconds = 1f;
+        [HideInInspector, SerializeField, Range(1, 3)] private int jigwiStageSpreadPatches = 3;
         [SerializeField, Range(1f, 4f)] private float jigwiStageFeverMultiplier = 2f;
 
         [Header("Jigwi screen patterns (#341)")]
@@ -533,8 +584,8 @@ namespace C6Lab
         [HideInInspector, SerializeField, Range(1f, 10f)] private float jigwiABPersonalRecoveryMultiplier = 4f;
         [HideInInspector, SerializeField, Range(1, 10)] private int jigwiABPersonalRequiredHits = 3;
         [SerializeField, Range(.5f, 30f)] private float jigwiABPersonalBurnSeconds = 5f;
-        [SerializeField, Range(1, 6)] private int jigwiABGroupFireCount = 3;
-        [SerializeField, Range(1f, 60f)] private float jigwiABRelightSeconds = 12f;
+        [HideInInspector, SerializeField, Range(1, 6)] private int jigwiABGroupFireCount = 3;
+        [HideInInspector, SerializeField, Range(1f, 60f)] private float jigwiABRelightSeconds = 12f;
         [Tooltip("#479 Inspector 전용: A 동안 한 사람 판의 구슬이 하나씩 차례로 탈 때의 간격(초). 첫 구슬은 DEV '지귀 A 구슬 소각 대기' 뒤에 탄다. 0이면 모두 한꺼번에. Host 값만 쓴다.")]
         [SerializeField, Range(0f, 5f)] private float jigwiABBurnStaggerSeconds = 1f;
         [Tooltip("#479 Inspector 전용: 부적(\"물\")을 다 쓴 사람 판에 생기는 물방울 무늬 물 구슬 수. 0이면 보상 없음. Host 값만 쓴다.")]
@@ -547,17 +598,23 @@ namespace C6Lab
         [SerializeField, Range(.3f, 1f)] private float jigwiTalismanCoverage = .9f;
         [Tooltip("#479 Inspector 전용(각 기기): 손가락이 점선에서 이만큼(글자 칸 크기 대비) 떨어져도 칠한다. 클수록 쉽다.")]
         [SerializeField, Range(.02f, .2f)] private float jigwiTalismanTolerance = .07f;
+        [Tooltip("#509 Inspector 전용(Host): B 성공 때 지목된 사람마다 박에 떨어지는 물벼락의 칠 크기(한 번 맞힘 대비, 최대 3).")]
+        [SerializeField, Range(0f, 3f)] private float jigwiBSplashPaintShare = 3f;
+        [Tooltip("#509 Inspector 전용(Host): B 실패 때 모든 조합판에 불이 붙어 북을 못 누르는 시간(초). 0이면 벌점 없음.")]
+        [SerializeField, Range(0f, 10f)] private float jigwiBBoardFireSeconds = 3f;
         [HideInInspector, SerializeField, Range(0f, 60f)] private float jigwiABShrinkDelaySeconds = 12f;
         [HideInInspector, SerializeField, Range(.2f, 1f)] private float jigwiABShrinkScale = .65f;
         [SerializeField, Range(0f, .1f)] private float jigwiABFireMoveAmount = .03f;
         [SerializeField, Range(1f, 20f)] private float jigwiABFireMovePeriodSeconds = 4f;
         [SerializeField, Range(.1f, 1f)] private float jigwiABFireTargetRadius = .3f;
-        [SerializeField, Range(1f, 3f)] private float jigwiABRewardSizeScale = 1.3f;
-        [SerializeField, Range(1f, 3f)] private float jigwiABRewardPaintScale = 1.5f;
-        [Header("Jigwi B free extinguishing supplies (#412)")]
-        [SerializeField, Range(.25f, 10f)] private float jigwiABSupplyIntervalSeconds = 2f;
-        [SerializeField, Range(0, 5)] private int jigwiABSupplyInitialCount = 1;
-        [SerializeField, Range(1, 12)] private int jigwiABSupplyLimit = 5;
+        // 은퇴 (#509): B의 5초 발사 보상 크기·칠 면적(251·252)과 무료 물 구슬 간격·시작 수·상한(253~255).
+        // 공유 설정의 자리와 저장값만 지키고 Inspector에는 보이지 않는다.
+        [HideInInspector, SerializeField, Range(1f, 3f)] private float jigwiABRewardSizeScale = 1.3f;
+        [HideInInspector, SerializeField, Range(1f, 3f)] private float jigwiABRewardPaintScale = 1.5f;
+        [HideInInspector, SerializeField, Range(.25f, 10f)] private float jigwiABSupplyIntervalSeconds = 2f;
+        [HideInInspector, SerializeField, Range(0, 5)] private int jigwiABSupplyInitialCount = 1;
+        [HideInInspector, SerializeField, Range(1, 12)] private int jigwiABSupplyLimit = 5;
+        [Header("Jigwi B fire target depth (#412)")]
         [Tooltip("Fire targets on the ordinary legal throw path, as a fraction from launch to the boss front. Curtain stays behind them.")]
         [SerializeField, Range(.4f, .9f)] private float jigwiABFireDepth = .8f;
 
@@ -568,7 +625,7 @@ namespace C6Lab
         [SerializeField, Range(0, 300)] private int potionHeal = 10;
         [SerializeField, Range(1f, 20f)] private float relayDoubleMultiplier = 2f;
         [SerializeField, Range(1f, 20f)] private float relayMaxMultiplier = 4f;
-        [SerializeField, Range(1f, 20f)] private float bombMultiplier = 3f;
+        [HideInInspector, SerializeField, Range(1f, 20f)] private float bombMultiplier = 3f;
         [Tooltip("잠긴 폭탄이 터질 때 구슬을 밀어내는 범위 (보드 너비 대비). 0이면 밀지 않는다.")]
         [SerializeField, Range(0f, 2f)] private float bombBlastRadius = .4f;
         [Tooltip("폭탄 바로 옆 구슬이 밀려나는 속도 (보드 너비/초). 범위 끝으로 갈수록 약해진다.")]
@@ -722,21 +779,21 @@ namespace C6Lab
         [Tooltip("퍼짐 경계의 불규칙한 정도. 도색 면적 예산과는 별개다.")]
         [SerializeField, Range(0f, 1f)] private float paintEdgeRaggedness = .55f;
         [Tooltip("#311부터 쓰지 않는다 (공용 기믹 간격이 대신한다). 예전: 박 폭탄 간격의 최소·최대 (초).")]
-        [SerializeField, Min(0f)] private float gourdBombIntervalMin = 20f;
-        [SerializeField, Min(0f)] private float gourdBombIntervalMax = 30f;
+        [HideInInspector, SerializeField, Min(0f)] private float gourdBombIntervalMin = 20f;
+        [HideInInspector, SerializeField, Min(0f)] private float gourdBombIntervalMax = 30f;
         [Tooltip("#311부터 쓰지 않는다 (공용 기믹 간격이 대신한다). 예전: 넘기기 막기 간격 (초).")]
-        [SerializeField, Range(0f, 600f)] private float swipeBlockInterval = 40f;
+        [HideInInspector, SerializeField, Range(0f, 600f)] private float swipeBlockInterval = 40f;
         [Tooltip("넘기기 막기가 이어지는 시간 (초).")]
         [SerializeField, Range(1f, 60f)] private float swipeBlockSeconds = 10f;
         [Tooltip("#311부터 쓰지 않는다 (폭탄과 막기가 한 타이머에서 나온다). 예전: 막기와 폭탄 사이 최소 간격 (초).")]
-        [SerializeField, Range(0f, 15f)] private float swipeBlockBombGap = 4f;
+        [HideInInspector, SerializeField, Range(0f, 15f)] private float swipeBlockBombGap = 4f;
 
         [Header("Gimmick groups (#311, was the sabotage mix #251)")]
         [Tooltip("Lab 단독 장면(요괴 없음)에서도 고유 기믹(구미호: 여우불·매혹)을 쓸지. Hapio 스테이지는 요괴가 정한다. 기본은 끔.")]
         [SerializeField] private bool sabotageMixEnabled;
         [Tooltip("#311부터 쓰지 않는다 (공용·고유 기믹 간격이 대신한다). 예전: 통합 추첨 간격의 최소·최대 (초).")]
-        [SerializeField, Range(1f, 600f)] private float sabotageIntervalMin = 20f;
-        [SerializeField, Range(1f, 600f)] private float sabotageIntervalMax = 30f;
+        [HideInInspector, SerializeField, Range(1f, 600f)] private float sabotageIntervalMin = 20f;
+        [HideInInspector, SerializeField, Range(1f, 600f)] private float sabotageIntervalMax = 30f;
         [Tooltip("기믹 비율 (%): 공용(폭탄·넘기기 막기)끼리 합 100, 고유(여우불·매혹)끼리 합 100. 꺼졌거나 걸 수 없는 기믹은 빼고 남은 것끼리 이 비율로 뽑는다.")]
         [SerializeField, Range(0, 100)] private int sabotageWeightGourdBomb = 50;
         [SerializeField, Range(0, 100)] private int sabotageWeightSwipeBlock = 50;
@@ -766,9 +823,9 @@ namespace C6Lab
         [Tooltip("매혹 예고 (#305): 매혹이 걸리기 이 시간 (초) 전부터 모두에게 \"구미호가 P2에게 매혹을 걸려고 한다!\"를 보여 준다. 0이면 예고 없이 바로 걸린다.")]
         [SerializeField, Range(0f, 10f)] private float charmWarningSeconds = 3f;
 
+        // 은퇴 (#328): 야광귀도 공용 전투 시간을 쓴다. 공유 설정의 자리만 지키고 Inspector에는 보이지 않는다.
+        [HideInInspector, SerializeField, Range(60f, 180f)] private float yaguangTimelineBattleSeconds = 120f;
         [Header("Yaguang stage schedule (#314 integrated into #311)")]
-        [Tooltip("은퇴 (#328): 야광귀도 공용 전투 시간을 쓴다. 공유 설정의 자리만 지킨다.")]
-        [SerializeField, Range(60f, 180f)] private float yaguangTimelineBattleSeconds = 120f;
         [Tooltip("방해 정리 시각. 0은 정리 없이 전투 끝까지 유지한다.")]
         [SerializeField, Range(0f, 180f)] private float yaguangTimelineSabotageEndSeconds = 100f;
         [Tooltip("고유 기믹 예고 시작 시각. 0인 칸은 비운다. 종류 0=섬광, 1=콤보.")]
@@ -1123,6 +1180,8 @@ namespace C6Lab
         public float JigwiTalismanWaterPaintScale => Mathf.Clamp(Finite(jigwiTalismanWaterPaintScale, 1.5f), 1f, 3f);
         public float JigwiTalismanCoverage => Mathf.Clamp(Finite(jigwiTalismanCoverage, .9f), .3f, 1f);
         public float JigwiTalismanTolerance => Mathf.Clamp(Finite(jigwiTalismanTolerance, .07f), .02f, .2f);
+        public float JigwiBSplashPaintShare => Mathf.Clamp(Finite(jigwiBSplashPaintShare, 3f), 0f, 3f);
+        public float JigwiBBoardFireSeconds => Mathf.Clamp(Finite(jigwiBBoardFireSeconds, 3f), 0f, 10f);
         public int JigwiABGroupFireCount => Mathf.Clamp(jigwiABGroupFireCount, 1, 6);
         public float JigwiABRelightSeconds => Mathf.Clamp(Finite(jigwiABRelightSeconds, 12f), 1f, 60f);
         public float JigwiABShrinkDelaySeconds => Mathf.Clamp(Finite(jigwiABShrinkDelaySeconds, 12f), 0f, 60f);

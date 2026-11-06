@@ -13,6 +13,7 @@ namespace C6Lab.Tests
     /// Connected approval events refresh already-owned state; they never inject Host paint.
     /// Physics fixtures open deterministic SecretBoxes through the saved board gestures.
     /// </summary>
+    [Category("Slow")]
     public sealed class LabGourdPaintTests
     {
         private readonly LabSavedSceneNetworkFixture fixture = new LabSavedSceneNetworkFixture();

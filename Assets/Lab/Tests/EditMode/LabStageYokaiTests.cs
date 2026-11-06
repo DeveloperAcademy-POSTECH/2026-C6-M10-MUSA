@@ -357,8 +357,8 @@ namespace C6Lab.Tests
             Assert.That(config.TryApplyDeveloperValues(invalid, out _), Is.False);
             Assert.That(config.CaptureDeveloperValues(), Is.EqualTo(baseline));
             Assert.That(LabConfig.DeveloperCategories.SelectMany(category => category.FieldIndices).OrderBy(index => index),
-                Is.EqualTo(Enumerable.Range(0, LabConfig.DeveloperFields.Count).Except(LabConfig.RetiredDeveloperFields)),
-                "Every live row has a category; retired rows (#311) keep their index but no row.");
+                Is.EqualTo(Enumerable.Range(0, LabConfig.DeveloperFields.Count).Where(index => !LabConfig.IsDeveloperFieldHidden(index))),
+                "Every live row has a category; retired rows (#311) and inactive settings keep their index but no row.");
         }
     }
 }

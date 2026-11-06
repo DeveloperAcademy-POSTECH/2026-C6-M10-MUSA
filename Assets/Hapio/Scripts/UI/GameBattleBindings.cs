@@ -59,14 +59,18 @@ namespace Hapio
                     + " ms=" + ((Time.realtimeSinceStartup - warmupStarted) * 1000f).ToString("0"));
             session.NotifyBattleBound(board);
             network.ConfigApplied += OnConfigApplied;
+            // The practice board (#477) dresses this Battle for the tutorial and runs its script.
+            if (session.IsTutorial) gameObject.AddComponent<GameTutorialDirector>().Bind(session, this);
         }
 
         /// <summary>
         /// #507: the story stage's own gourd, set before LabSceneController.Awake (-100) attaches the paint, which only
-        /// fills an empty prefab with the white gourd. 2:2 and stages without a path keep the white gourd.
+        /// fills an empty prefab with the white gourd. 2:2, the tutorial (#477) and stages without a path keep the white gourd.
         /// </summary>
         private void MountStageGourd(GameSession session)
         {
+            // The practice board turns the white gourd's yokai details to face the middle seat.
+            if (session != null && session.IsTutorial) return;
             GameStageDefinition stage = session != null ? session.CurrentStageDefinition : null;
             string path = stage != null ? stage.gourdVisualResource : null;
             if (string.IsNullOrEmpty(path) || target == null) return;
@@ -141,7 +145,8 @@ namespace Hapio
             if (session == null) return;
             GameStageDefinition stage = session.CurrentStageDefinition;
             if (yokaiPresentation != null) yokaiPresentation.Bind(target, stage);
-            if (stageLabel != null)
+            if (stageLabel != null && session.IsTutorial) stageLabel.text = GameTutorialScript.StageLabel;
+            else if (stageLabel != null)
                 stageLabel.text = (session.IsTerritory ? (session.TerritoryMatchLabel + " 땅따먹기").TrimStart()
                         : "STAGE " + session.State.stageIndex + " / " + session.State.totalStages
                             + (stage != null ? " · " + stage.displayName : string.Empty))

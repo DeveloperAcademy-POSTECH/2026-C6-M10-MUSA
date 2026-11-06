@@ -191,6 +191,7 @@ namespace C6Lab
         private Rect bounds;
         private int blockedSide;
         private float blockSecondsLeft;
+        private bool swipeBlockCountdown = true;
         private LabOrbEdgeBlock edgeBlock;
         // 땅따먹기: the closed edge of this board for the whole battle: -1 left, +1 right, LabTeams.BothSides (1:1, #394).
         private int teamWallSide;
@@ -738,9 +739,20 @@ namespace C6Lab
             if (edgeBlock != null) edgeBlock.Hide();
         }
 
+        /// <summary>Whether the swipe block writes its seconds left on the edge (false for the tutorial's held block).</summary>
+        public void SetSwipeBlockCountdown(bool shown)
+        {
+            swipeBlockCountdown = shown;
+            if (edgeBlock != null) edgeBlock.SecondsShown = shown;
+        }
+
         private void ShowSwipeBlock()
         {
-            if (edgeBlock == null) edgeBlock = LabOrbEdgeBlock.Create(transform);
+            if (edgeBlock == null)
+            {
+                edgeBlock = LabOrbEdgeBlock.Create(transform);
+                edgeBlock.SecondsShown = swipeBlockCountdown;
+            }
             // The side planes are the board's visible side edges; the area gives the edge's height there.
             float edgeX = blockedSide > 0 ? bounds.xMax : bounds.xMin;
             Vector2 range = areaShape.VerticalRange(edgeX, 0f);
@@ -807,6 +819,21 @@ namespace C6Lab
             if (point.z < 0f) return false;
             screen = point;
             return true;
+        }
+
+        /// <summary>#477 이 판에 보이는 구슬 orbId의 화면 중심과 반지름 (픽셀). 튜토리얼이 구슬을 밝히고 손으로 가리킬 때 쓴다.</summary>
+        public bool TryGetScreenCircle(string orbId, out Vector2 center, out float radiusPixels)
+        {
+            center = default;
+            radiusPixels = 0f;
+            if (!TryGetScreenPoint(orbId, out center) || !entries.TryGetValue(orbId, out Entry entry)
+                || entry.View.HitSphere == null) return false;
+            Vector3 middle = entry.View.transform.position;
+            float radius = entry.View.HitSphere.radius * Mathf.Abs(entry.View.HitSphere.transform.lossyScale.x);
+            Vector3 edge = inputCamera.WorldToScreenPoint(middle + inputCamera.transform.right * radius);
+            if (edge.z < 0f) return false;
+            radiusPixels = Vector2.Distance(center, edge);
+            return radiusPixels > 0f;
         }
 
         private float flashGlare;
@@ -971,11 +998,22 @@ namespace C6Lab
             else
             {
                 float distance = Mathf.Max(0f, (entry.ArrivalStopX - XY(body.position).x) * entry.ArrivalDirection);
-                float slowest = 2f * distance / ArrivalMaxSeconds;
-                float fastest = Mathf.Sqrt(2f * ArrivalMaxBrake * bounds.width * distance);
-                along = Mathf.Clamp(along, slowest, Mathf.Max(slowest, fastest));
+                along = StopArrivalSpeed(along / bounds.width, distance / bounds.width) * bounds.width;
             }
             body.linearVelocity = OnPlane(new Vector2(entry.ArrivalDirection * along, velocity.y));
+        }
+
+        /// <summary>
+        /// The speed (board widths per second) a drum handed over at <paramref name="along"/> enters with to stop
+        /// <paramref name="distance"/> board widths in: sped up to arrive within ArrivalMaxSeconds, slowed to brake no
+        /// harder than ArrivalMaxBrake. It then brakes evenly, so it rests after 2 × distance ÷ speed seconds.
+        /// </summary>
+        public static float StopArrivalSpeed(float along, float distance)
+        {
+            distance = Mathf.Max(0f, distance);
+            float slowest = 2f * distance / ArrivalMaxSeconds;
+            float fastest = Mathf.Sqrt(2f * ArrivalMaxBrake * distance);
+            return Mathf.Clamp(Mathf.Abs(along), slowest, Mathf.Max(slowest, fastest));
         }
 
         /// <summary>
@@ -1361,6 +1399,7 @@ namespace C6Lab
         {
             CancelDrag();
             LiftSwipeBlock();
+            bombOpeningHeld = false;
             SetTeamWall(0);
             charmed = false;
             jigwiOverheat = false;
@@ -1474,7 +1513,7 @@ namespace C6Lab
             foreach (var entry in entries.Values)
             {
                 if (!entry.LocalOwner || entry.Locked || entry.EdgePending || entry.Held || entry.Dropping
-                    || entry.HiddenForPending || UnlockedBomb(entry)) continue;
+                    || entry.HiddenForPending || UnlockedBomb(entry) || !MayHold(entry)) continue;
                 float radius = entry.View.HitSphere.radius;
                 float originalReach = radius * 1.25f;
                 float reach = GripReach(entry);
@@ -1518,6 +1557,13 @@ namespace C6Lab
         {
             if (heldId == null || !entries.TryGetValue(heldId, out var entry) || !Finite(worldPoint) || !Finite(now))
                 return false;
+            if (DrumPinned(entry))
+            {
+                // Only the finger is followed, for the tap check; the drum itself stays put (#477).
+                entry.LastDragAt = now;
+                AddSample(worldPoint, now);
+                return true;
+            }
             Vector2 target = Clamp(worldPoint + entry.GrabOffset, entry.View.HitSphere.radius);
             // A heavy bomb (#212) trails the finger, closing the gap at a rate set by its drag lag
             // for however long passed since it last followed; anything else sticks to the finger.
@@ -1563,7 +1609,16 @@ namespace C6Lab
 
             // A tap is short and nearly still. Two taps on the same unlocked item use it in place.
             bool tapped = now - pressTime <= TapMaxSeconds && (worldPoint - pressPoint).magnitude <= config.OrbRadius * .5f;
-            if (tapped && entry.View.Kind.IsDrum())
+            if (DrumPinned(entry))
+            {
+                // A drum that may not move (#477) is only a button: a tap generates, any other release does nothing.
+                StopMotion(entry.View.Body);
+                SetBodyMode(entry);
+                lastTapId = null;
+                if (tapped && Allows(LabBoardGestures.DrumTap)) DrumTapped?.Invoke(id);
+                return true;
+            }
+            if (tapped && entry.View.Kind.IsDrum() && Allows(LabBoardGestures.DrumTap))
             {
                 // Every tap generates, so rapid taps fire in a burst. The drum keeps drifting the way
                 // it was going; only a drag or a flick moves it.
@@ -1627,7 +1682,7 @@ namespace C6Lab
                 || (worldPoint.x >= bounds.xMax && inputVelocity.x > 0f);
             // Charmed (#251), an upward swipe is no throw: the orb slides up like any flick and bounces off the top.
             if (!charmed && entry.View.Kind.CanThrow(entry.View.LockSwipes) && !outwardSide
-                && LabThrowMath.IsThrowGesture(inputVelocity, swipeDistance, config))
+                && Allows(LabBoardGestures.Throw) && LabThrowMath.IsThrowGesture(inputVelocity, swipeDistance, config))
             {
                 entry.BeforeRequest = CaptureMotion(entry);
                 entry.Locked = true;
@@ -1786,13 +1841,28 @@ namespace C6Lab
         private static bool UnlockedBomb(Entry entry) => entry.View != null && entry.View.Kind == LabOrbKind.Bomb
             && entry.View.LockSwipes == 0;
 
+        private bool bombOpeningHeld;
+
+        /// <summary>
+        /// 튜토리얼 (#477): while held, an unlocked bomb that came to rest stays a (rainbow) bomb instead of opening; released,
+        /// it opens as usual a moment later. Cleared with the board.
+        /// </summary>
+        public void SetBombOpeningHeld(bool held) => bombOpeningHeld = held;
+
+        public bool BombOpeningHeld => bombOpeningHeld;
+
+        /// <summary>This board's own unlocked bomb has arrived and come to rest: it would open now unless held.</summary>
+        public bool IsBombAtRest(string id) => id != null && entries.TryGetValue(id, out Entry entry) && UnlockedBomb(entry)
+            && entry.LocalOwner && !entry.Provisional && entry.Arrival == LabDrumArrival.None && !entry.Dropping
+            && !entry.Held && !entry.Locked && !entry.EdgePending && !entry.HiddenForPending;
+
         /// <summary>
         /// 해금 폭탄 (#328): 잠금이 풀린 폭탄이 이 판에 미끄러져 들어와 멈추면 잠깐 뒤 연기와 함께 사라지고, 그 자리를 Host에
         /// 알려 공격 구슬 두 개로 연다. 열 수 없다는 답이 오면 잠시 뒤 다시 묻는다. 잠금이 풀린 폭탄은 잡을 수 없다.
         /// </summary>
         private void OpenRestingBombs()
         {
-            if (!interactionEnabled) return;
+            if (!interactionEnabled || bombOpeningHeld) return;
             updateEntries.Clear();
             updateEntries.AddRange(entries.Values);
             foreach (Entry entry in updateEntries)

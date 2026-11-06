@@ -22,17 +22,149 @@ namespace C6Lab
         [Tooltip("전투 영역 위쪽에서 비워 둘 높이 (전투 영역 대비). 시간·체력 HUD를 가리지 않게.")]
         [SerializeField, Range(0f, .4f)] private float topInset = .14f;
         [SerializeField] private Color inkColor = new Color(.72f, .11f, .07f, 1f);
-        [SerializeField] private Color guideColor = new Color(.45f, .3f, .12f, .35f);
-        [Tooltip("#479: 손가락이 지나가 칠해진 점선 색 (물빛 파랑).")]
-        [SerializeField] private Color writtenColor = new Color(.1f, .42f, .95f, 1f);
+        [Tooltip("#533: 아직 안 쓴 글자 획 색. 둥근 점이 겹치므로 불투명으로 둔다(반투명이면 겹친 곳이 얼룩진다).")]
+        [SerializeField] private Color guideColor = new Color(.79f, .67f, .4f, 1f);
+        [Tooltip("#479/#533: 손가락이 지나가 칠해진 획 색. #533부터 수채화 파랑(반투명 점이 겹쳐 물감처럼 고인다). 알파가 낮을수록 묽다.")]
+        [SerializeField] private Color writtenColor = new Color(.16f, .47f, .93f, .5f);
+        [Tooltip("#533: 수채화 점마다 색이 조금씩 흔들리는 정도 (0이면 모두 같은 색).")]
+        [SerializeField, Range(0f, .3f)] private float watercolorJitter = .12f;
+        [Tooltip("#533: 완성으로 보는 기준 — 한 획 안에서 연달아 비어도 되는 점 수. 1이면 점 하나 빈 곳(붓 굵기에 가려 안 보임)까지만 봐준다. 획 끝도 이 기준을 따른다.")]
+        [SerializeField, Range(0, 4)] private int maxStrokeGap = 1;
+        [Tooltip("#533: 한 획을 이만큼 쓰면 깜빡이는 안내 점이 다음 획으로 넘어간다 (0~1). 칠하기 자체는 순서와 상관없다.")]
+        [SerializeField, Range(.3f, 1f)] private float strokeAdvance = .8f;
+        [Tooltip("#533: 글자에서 이만큼(글자 칸 대비) 떨어진 곳을 문지르면 '글자 밖'으로 센다.")]
+        [SerializeField, Range(.05f, .3f)] private float offDistance = .11f;
+        [Tooltip("#533: 글자 밖을 문지른 길이(글자 칸 폭 = 1)가 이만큼 쌓이면 '번졌다'며 처음부터 다시 쓴다. 아무렇게나 문지르기 막기. 클수록 너그럽다.")]
+        [SerializeField, Range(.5f, 6f)] private float smudgeBudget = 2f;
+        [Tooltip("#533: 번졌을 때 안내 문구를 바꿔 보여 주는 시간(초).")]
+        [SerializeField, Range(.3f, 3f)] private float smudgeHintSeconds = 1.4f;
+        [Tooltip("#533: 다음에 쓸 곳을 알려 주는 깜빡이는 점 색.")]
+        [SerializeField] private Color nextMarkerColor = new Color(.16f, .47f, .93f, .9f);
+        [Tooltip("#533: 흐린 글자의 경계선 색 (칠하기 전부터 글자 모양이 보이게).")]
+        [SerializeField] private Color ghostOutlineColor = new Color(.62f, .45f, .22f, 1f);
+        [Tooltip("#533: 흐린 글자 경계선 두께 (화면 픽셀).")]
+        [SerializeField, Range(0f, 6f)] private float ghostOutlineWidth = 2.5f;
+        [Tooltip("#533: 아직 안 쓴 \"물\" 글자(실제 글꼴)를 흐리게 깔아 두는 색.")]
+        [SerializeField] private Color ghostColor = new Color(.88f, .76f, .48f, 1f);
+        [Tooltip("#533: 먹 붓 굵기 (글자 칸 대비). 지나간 곳의 글자 획을 이만큼 채운다(글자 모양 밖으로는 안 번진다). 판정 거리와는 따로다.")]
+        [SerializeField, Range(.06f, .3f)] private float brushWidth = .16f;
+        [Tooltip("#533: 다 쓰면 금빛이 획 순서대로 글자를 훑고 지나가는 시간(초). 빈 곳도 이때 채워진다. 솔·도·시가 나는 동안 훑는다.")]
+        [SerializeField, Range(.1f, 3f)] private float sweepSeconds = 1.5f;
+        [Tooltip("#533 완성 가락 한 박자 (초).")]
+        [SerializeField, Range(.1f, .8f)] private float beatSeconds = .3f;
+        [Tooltip("#533 완성 가락 네 음이 나는 박자 (0부터). 기본 0·2·4·8 = 솔 (쉼) 도 (쉼) 시 (쉼 쉼 쉼) 라. 마지막 음과 함께 도장이 찍힌다.")]
+        [SerializeField] private int[] noteBeats = { 0, 2, 4, 8 };
+        [Header("#533 못 다 쓴 부적 (A가 끝날 때까지 못 쓰면 지귀 불에 타 버림)")]
+        [Tooltip("불이 아래에서 위로 부적을 다 태우는 시간(초).")]
+        [SerializeField, Range(.3f, 3f)] private float burnSeconds = 1.2f;
+        [Tooltip("다 탄 재가 흩어지며 사라지는 시간(초).")]
+        [SerializeField, Range(.1f, 2f)] private float ashSeconds = .6f;
+        [Tooltip("탄 자리 색 (그을린 한지).")]
+        [SerializeField] private Color charColor = new Color(.13f, .07f, .05f, .92f);
+        [Tooltip("타들어 가는 불 테두리 색.")]
+        [SerializeField] private Color emberColor = new Color(1f, .5f, .12f, 1f);
+        [Tooltip("타는 소리 (Resources 경로). 기본은 지귀 불 소리.")]
+        [SerializeField] private string burnSoundPath = "Jigwi/GroupFireLoop";
+        [SerializeField, Range(0f, 1f)] private float burnSoundVolume = .8f;
+        [Tooltip("타는 동안 지글지글 이어지는 진동 세기 (0이면 끔).")]
+        [SerializeField, Range(0f, 1f)] private float burnHapticIntensity = .5f;
+        [Header("#533 도장 (완성하면 \"쾅\" 찍힘)")]
+        [Tooltip("도장 글자.")]
+        [SerializeField] private string stampText = "칙\n령";
+        [SerializeField] private Color stampColor = new Color(.78f, .09f, .07f, .95f);
+        [Tooltip("도장 크기 (종이 폭 대비).")]
+        [SerializeField, Range(.15f, .6f)] private float stampSize = .34f;
+        [Tooltip("도장 자리 (종이 안 0~1, 아래가 0). 부적 오른쪽 아래에 글자와 살짝 겹치게.")]
+        [SerializeField] private Vector2 stampAnchor = new Vector2(.7f, .17f);
+        [Tooltip("도장 기울기 (도).")]
+        [SerializeField, Range(-30f, 30f)] private float stampTilt = -7f;
+        [Tooltip("도장이 내려와 찍히기까지 (초). 강세 음 순간에 닿는다.")]
+        [SerializeField, Range(.05f, .5f)] private float stampDropSeconds = .14f;
+        [Tooltip("#533: 훑기가 끝난 순간 부적이 \"쾅\" 하고 커지는 정도 (종이 크기 대비).")]
+        [SerializeField, Range(0f, .25f)] private float burstPunch = .09f;
+        [Tooltip("#533: 징을 친 뒤 부적이 \"웅~\" 울리며 떨리는 세기 (종이 높이 대비). 징 울림처럼 천천히 잦아든다.")]
+        [SerializeField, Range(0f, .05f)] private float burstShake = .014f;
+        [Tooltip("#533: 징 울림 떨림이 잦아드는 빠르기. 클수록 빨리 멎는다.")]
+        [SerializeField, Range(.5f, 6f)] private float humDecay = 1.8f;
+        [Tooltip("#533: 징 울림 떨림/빛 맥박의 빠르기 (초당 번).")]
+        [SerializeField, Range(1f, 20f)] private float humHz = 7f;
+        [Tooltip("#533: 글자에서 퍼져 나가는 빛 고리 하나가 퍼지는 시간(초).")]
+        [SerializeField, Range(.1f, 2f)] private float ringSeconds = .9f;
+        [Tooltip("#533: 징 울림처럼 차례로 퍼지는 빛 고리 수.")]
+        [SerializeField, Range(1, 5)] private int ringCount = 3;
+        [Tooltip("#533: 빛 고리 사이 간격(초).")]
+        [SerializeField, Range(.05f, .8f)] private float ringGapSeconds = .28f;
+        [Header("#533 소리 (Resources/Audio 아래 폴더 이름, 폴더 안 파일 중 무작위. 비우면 소리 없음)")]
+        [Tooltip("글자를 칠하는 동안 이어지는 연필 사각 소리. 파일 중 무작위(같은 파일 연속 X)에 높낮이·크기를 조금씩 흔든다.")]
+        [SerializeField] private string writeSoundFolder = "JigwiTalismanWrite";
+        [SerializeField, Range(0f, 1f)] private float writeSoundVolume = .6f;
+        [Tooltip("연필 소리 높낮이 흔들림 (0.08 = ±8%).")]
+        [SerializeField, Range(0f, .3f)] private float writePitchJitter = .08f;
+        [Tooltip("연필 소리 크기 흔들림 (0.2 = ±20%).")]
+        [SerializeField, Range(0f, .5f)] private float writeVolumeJitter = .2f;
+        [Tooltip("앞 연필 소리가 이만큼(0~1) 지나면 계속 칠할 때 다음 소리를 잇는다. 작을수록 촘촘하다.")]
+        [SerializeField, Range(.3f, 1f)] private float writeChainAt = .7f;
+        [Tooltip("#533 완성 가락: \"둥 둥 둥 .. 둥!\" 네 음. 폴더 안 파일을 이름순으로 1~4음에 쓴다. 파일이 4개보다 적으면 있는 파일을 높낮이를 올려(0/2/4/7반음) 채운다.")]
+        [SerializeField] private string noteSoundFolder = "ComboHit";
+        [Tooltip("앞 세 음 크기.")]
+        [SerializeField, Range(0f, 1f)] private float noteSoundVolume = .7f;
+        [Tooltip("마지막 강세 음(\"둥!\") 크기.")]
+        [SerializeField, Range(0f, 1f)] private float accentSoundVolume = 1f;
+        [Tooltip("(가락과 따로) 금빛이 획을 훑기 시작할 때 덧낼 소리. 비우면 없음. 예: JigwiTalismanSweep(가야금 띠리링을 조금 느리게). 예: FiveColorHit, CharmRelease")]
+        [SerializeField] private string sweepSoundFolder = "";
+        [SerializeField, Range(0f, 1f)] private float sweepSoundVolume = .7f;
+        [Tooltip("(가락과 따로) \"쾅\" 순간 덧낼 소리. 비우면 없음. 예: JigwiTalismanChime(긴 여운), YaguangShakeBellFinal")]
+        [SerializeField] private string burstSoundFolder = "";
+        [SerializeField, Range(0f, 1f)] private float burstSoundVolume = 1f;
+        [Tooltip("번졌을 때. 예: Miss, ComboFail")]
+        [SerializeField] private string smudgeSoundFolder = "Miss";
+        [SerializeField, Range(0f, 1f)] private float smudgeSoundVolume = .8f;
+        [Header("#533 진동 (아이폰 빌드에서만, 설정의 진동 끄기를 따름)")]
+        [Tooltip("글자를 칠할 때 사각사각 짧은 진동 세기. 0이면 끔.")]
+        [SerializeField, Range(0f, 1f)] private float writeHapticIntensity = .35f;
+        [Tooltip("칠하는 진동 사이 최소 간격(초). 너무 자주 울리지 않게.")]
+        [SerializeField, Range(.02f, .3f)] private float writeHapticGapSeconds = .07f;
+        [Tooltip("\"쾅\" 진동: 센 탭 한 번 뒤 징 울림처럼 이만큼 이어지는 진동(초). 0이면 탭만.")]
+        [SerializeField, Range(0f, 2f)] private float burstHapticSeconds = 1f;
+        [Tooltip("이어지는 징 진동 세기 (0~1).")]
+        [SerializeField, Range(0f, 1f)] private float burstHapticIntensity = .6f;
+        [Tooltip("이어지는 징 진동 날카로움 (0 = 둥글고 묵직).")]
+        [SerializeField, Range(0f, 1f)] private float burstHapticSharpness = .15f;
+        [Tooltip("번졌을 때 진동 세기. 0이면 끔.")]
+        [SerializeField, Range(0f, 1f)] private float smudgeHapticIntensity = .9f;
+        [Tooltip("#509: 다 쓴 글씨가 빛나는 시간(초). #533부터 훑기 뒤에 빛난 채 머무는 시간. 그다음 부적이 천천히 사라진다.")]
+        [SerializeField, Range(.1f, 3f)] private float glowSeconds = 1.2f;
+        [Tooltip("#509: 빛난 뒤 부적이 사라지는 시간(초).")]
+        [SerializeField, Range(.2f, 3f)] private float fadeSeconds = 1.2f;
+        [Tooltip("#509: 다 쓴 글씨가 빛날 때의 색 (금빛).")]
+        [SerializeField] private Color glowColor = new Color(1f, .86f, .32f, 1f);
+        [Tooltip("#533: \"물\" 글자의 가로 폭이 부적 종이 폭에서 차지하는 비율. 클수록 글자가 크다(세로는 종이 높이의 72%까지).")]
+        [SerializeField, Range(.4f, .95f)] private float glyphWidthShare = .82f;
+        [Tooltip("#533: 글자 획 굵기 (글자 칸 대비). 점끼리 겹쳐 이어진 굵은 획으로 보인다. 판정 거리와는 따로다.")]
+        [SerializeField, Range(.03f, .15f)] private float strokeWidth = .085f;
         /// <summary>요청이 사라졌을 때 다시 보내기까지 (초)</summary>
         private const float ResendSeconds = 1f;
+        private CanvasGroup paperGroup;
+        private float finishAge = -1f;
+        private Vector3 finishFrom;
 
         private LabNetwork source;
         private RectTransform root, paper, frame, glyphArea;
         private UnityEngine.UI.RawImage paperImage;
         private UnityEngine.UI.Image frameImage;
         private static Texture2D hanji;
+        private static Sprite roundDot;
+        /// <summary>#533: 신라문화체 굵은 "물"의 글자 모양 범위 (판정 점과 같은 글자 칸 0~1 좌표, 위가 1). 점선에 맞춰 잰 값.</summary>
+        private static readonly Rect GlyphInkRect = Rect.MinMaxRect(.149f, .081f, .848f, .92f);
+        /// <summary>#533: 흐린 "물" 글자(보통 Text). 먹 붓 점을 글자 모양 안에만 보이게 가리는 Mask 그림이기도 하다.</summary>
+        private UnityEngine.UI.Text ghost, ghostEdge;
+        private UnityEngine.UI.Outline ghostOutline;
+        private static Sprite watercolorDot;
+        private Color[] inkColors = Array.Empty<Color>();
+        private const int GhostFontSize = 200;
+        private readonly TextGenerator ghostGenerator = new TextGenerator();
+        /// <summary>#533: 실제 글꼴 글자 위에 먹으로 쓰는 모양인지 (신라문화체가 없으면 예전 점선 모양).</summary>
+        public bool InkMode => ghost != null;
         private UnityEngine.UI.Image[] dots = Array.Empty<UnityEngine.UI.Image>();
         private UnityEngine.UI.Text hint;
         private Font font;
@@ -40,7 +172,49 @@ namespace C6Lab
         private Vector2 last;
         private string writtenRound;
         private float sentAt;
-        private readonly LabJigwiTalismanStroke stroke = new LabJigwiTalismanStroke(LabJigwiTalismanStroke.Water);
+        private readonly LabJigwiTalismanStroke stroke = new LabJigwiTalismanStroke(LabJigwiTalismanStroke.Water, LabJigwiTalismanStroke.WaterStrokes);
+        private UnityEngine.UI.Image nextMarker;
+        private UnityEngine.UI.Image[] burstRings = Array.Empty<UnityEngine.UI.Image>();
+        private static Sprite ringSprite;
+        /// <summary>#533: 점마다 획 순서상 위치 (0~1). 완성 때 금빛이 이 순서로 훑는다.</summary>
+        private float[] strokeRank = Array.Empty<float>();
+        private AudioSource sfx, scratch;
+        private readonly AudioSource[] notePlayers = new AudioSource[4];
+        private int notesPlayed;
+        [Tooltip("#533 완성 가락 음높이 (파일 원래 음에서 반음 수). 기본 ComboHit는 라(A4)라서 솔 도 시 라 = -2, +3, +2, 0. 파일이 4개 이상이면 쓰지 않는다.")]
+        [SerializeField] private int[] noteSemitones = { -2, 3, 2, 0 };
+        private float burnAge = -1f;
+        private Vector3 burnFrom;
+        private UnityEngine.UI.Image charFill;
+        private RectTransform emberBand;
+        private UnityEngine.UI.Image emberGlow;
+        private UnityEngine.UI.Image[] flames = Array.Empty<UnityEngine.UI.Image>();
+        private UnityEngine.UI.Image[] sparks = Array.Empty<UnityEngine.UI.Image>();
+        private Sprite[] flameFrames;
+        private static Sprite whiteSprite;
+        private AudioSource burnAudio;
+        /// <summary>#533: 못 다 쓴 부적이 타는 중인지. 이때 조합판은 이미 풀려 있다.</summary>
+        public bool Burning => burnAge >= 0f;
+        public float BurnTotalSeconds => burnSeconds + ashSeconds;
+        /// <summary>#533: 못 다 써서 탄 횟수 (테스트용).</summary>
+        public int BurnCount { get; private set; }
+        private RectTransform stampRoot;
+        private UnityEngine.UI.Image stampImage;
+        private UnityEngine.UI.Text stampLabel;
+        private UnityEngine.UI.Image[] stampSpecks = Array.Empty<UnityEngine.UI.Image>();
+        private static Sprite stampSprite;
+        /// <summary>#533: 도장이 찍혀 보이는지 (테스트용).</summary>
+        public bool StampVisible => stampRoot != null && stampRoot.gameObject.activeSelf;
+        private AudioClip[] writeClips;
+        private string writeClipsFolder;
+        private int lastWriteClip = -1;
+        /// <summary>#533: 테스트용 — 연필 소리를 낸 횟수.</summary>
+        public int WriteSoundCount { get; private set; }
+        private float lastWriteHaptic = -1f;
+        private bool burstPlayed;
+        /// <summary>#533: 테스트용 — 마지막으로 낸 효과 이름(Sweep/Burst/Smudge)과 횟수.</summary>
+        public string LastCue { get; private set; }
+        public int CueCount { get; private set; }
         private readonly List<int> fresh = new List<int>();
 
         /// <summary>부적이 보이는지</summary>
@@ -54,7 +228,22 @@ namespace C6Lab
         public float Coverage => stroke.Coverage;
         /// <summary>이 화면에서 부적을 다 쓴 횟수 (요청을 보낸 횟수, 다시 보낸 것은 빼고)</summary>
         public int CompletedCount { get; private set; }
+        /// <summary>#533: 글자 밖을 너무 문질러 처음부터 다시 쓰게 된 횟수.</summary>
+        public int SmudgeCount { get; private set; }
+        private const string HintText = "손가락으로 '물'을 적어\n부적을 완성하세요.";
+        private const string SmudgeText = "번졌어요!\n글자를 따라 다시 써 주세요.";
+        private float smudgeHintUntil = -1f;
         public LabJigwiTalismanStroke Stroke => stroke;
+        /// <summary>#509: 다 쓴 부적이 빛나며 사라지는 중인지. 이때 조합판은 이미 풀려 있다.</summary>
+        public bool Finishing => finishAge >= 0f;
+        private float NoteAt(int index) => Mathf.Max(.01f, beatSeconds)
+            * (noteBeats != null && index < noteBeats.Length ? Mathf.Max(0, noteBeats[index]) : index * 2);
+        private float AccentAt => Mathf.Max(.01f, NoteAt(3));
+        /// <summary>#533: 마지막 강세 음(도장)이 나는 때 (완성 연출 시작부터 초).</summary>
+        public float AccentSeconds => AccentAt;
+        public float FinishSeconds => AccentAt + glowSeconds + fadeSeconds;
+        /// <summary>#509: 사라지는 동안의 부적 불투명도 (1 → 0).</summary>
+        public float PaperAlpha => paperGroup != null ? paperGroup.alpha : 1f;
 
         public void Bind(LabNetwork network, Font labelFont)
         {
@@ -62,6 +251,12 @@ namespace C6Lab
             if (labelFont != null) font = labelFont;
             EnsureWidgets();
             if (labelFont != null && hint != null) hint.font = labelFont;
+            if (ghost != null && IsShilla(labelFont) && ghost.font != labelFont)
+            {
+                ghost.font = labelFont;
+                if (ghostEdge != null) ghostEdge.font = labelFont;
+                LayoutGlyph();
+            }
         }
 
         /// <summary>아직 부적을 안 쓴 내 자리가 있는 진행 중인 A. 없으면 null.</summary>
@@ -80,11 +275,15 @@ namespace C6Lab
             if (source == null) { Present(null, ulong.MaxValue, 0d); return; }
             LabSnapshot snapshot = source.Snapshot;
             Present(snapshot, source.LocalPlayerId, source.JigwiABPresentationTime);
+            if (Finishing) AdvanceFinish(Time.unscaledDeltaTime);
+            if (Burning) AdvanceBurn(Time.unscaledDeltaTime);
             if (Visible)
             {
                 FitToBattle(source.board != null ? source.board.ViewCamera : null);
                 bool held = snapshot == null || snapshot.paused || source.GameStartHeld || source.BattlePresentationHeld;
                 if (held) hasLast = false; else ReadPointer();
+                UpdateNextMarker(Time.unscaledTime);
+                if (smudgeHintUntil >= 0f && Time.unscaledTime >= smudgeHintUntil) RestoreHint();
             }
             ResendIfLost(snapshot);
         }
@@ -94,13 +293,164 @@ namespace C6Lab
         {
             EnsureWidgets();
             LabJigwiABRound round = PendingTalisman(snapshot, localPlayer, now);
-            if (round?.id != RoundId && round?.id != writtenRound) ResetWriting();
+            // #533: the A ran out before this seat finished — Jigwi's fire burns the unfinished talisman away.
+            if (Visible && round == null && !Finishing && !Burning && RanOut(snapshot, RoundId, localPlayer, now)) BeginBurn();
+            // A new talisman cuts a still-fading (or still-burning) old one short.
+            if (round != null && round.id != writtenRound && Finishing) EndFinish();
+            if (round != null && round.id != writtenRound && Burning) EndBurn();
+            if (round?.id != RoundId && round?.id != writtenRound && !Finishing && !Burning) ResetWriting();
             // A talisman this screen already finished stays hidden while the Host confirms it.
             Visible = round != null && round.id != writtenRound;
             RoundId = Visible ? round.id : null;
-            if (paper != null) paper.gameObject.SetActive(Visible);
+            if (paper != null) paper.gameObject.SetActive(Visible || Finishing || Burning);
             if (!Visible) hasLast = false;
             SetBoardBlocked(Visible);
+        }
+
+        /// <summary>#533: 이 회차 A가 (시간이 다 돼) 끝났는데 내 자리 부적은 아직 안 쓴 상태인지. 게임이 끝난 경우는 빼고.</summary>
+        private static bool RanOut(LabSnapshot snapshot, string roundId, ulong localPlayer, double now)
+        {
+            if (snapshot == null || snapshot.phase != LabPhase.Playing || snapshot.jigwiAB?.rounds == null || roundId == null) return false;
+            foreach (LabJigwiABRound round in snapshot.jigwiAB.rounds)
+            {
+                if (round == null || round.id != roundId) continue;
+                if (round.Active(now)) return false;
+                foreach (LabJigwiABPlayerFire seat in round.players ?? Array.Empty<LabJigwiABPlayerFire>())
+                    if (seat != null && seat.playerId == localPlayer) return seat.talismanAt < 0d;
+                return false;
+            }
+            return false;
+        }
+
+        private void BeginBurn()
+        {
+            if (paper == null) return;
+            BurnCount++;
+            burnAge = 0f; burnFrom = paper.localPosition;
+            paper.gameObject.SetActive(true);
+            if (hint != null) hint.gameObject.SetActive(false);
+            if (nextMarker != null) nextMarker.gameObject.SetActive(false);
+            LastCue = "Burn"; CueCount++;
+            AudioClip clip = string.IsNullOrEmpty(burnSoundPath) ? null : Resources.Load<AudioClip>(burnSoundPath);
+            if (clip != null && burnSoundVolume > 0f)
+            {
+                if (burnAudio == null)
+                {
+                    burnAudio = gameObject.AddComponent<AudioSource>();
+                    burnAudio.playOnAwake = false; burnAudio.spatialBlend = 0f; burnAudio.loop = true;
+                }
+                burnAudio.clip = clip; burnAudio.time = 0f;
+                burnAudio.volume = burnSoundVolume * LabAudioSettings.SfxVolume;
+                burnAudio.Play();
+            }
+            LabHaptics.PlayDirect(Config, LabHapticStyle.Medium, .7f, burnSeconds, burnHapticIntensity, .65f);
+            DrawBurn();
+        }
+
+        /// <summary>#533: LateUpdate와 테스트가 같이 쓰는 타기 진행.</summary>
+        public void AdvanceBurn(float seconds)
+        {
+            if (!Burning || float.IsNaN(seconds) || seconds < 0f) return;
+            burnAge += seconds;
+            if (burnAge >= BurnTotalSeconds) { EndBurn(); return; }
+            DrawBurn();
+        }
+
+        /// <summary>
+        /// #533 못 다 쓴 부적: 아래에서 불이 붙어 그을린 자국이 위로 번지고, 그 경계에서 불꽃이 일렁이며 불티가 날린다.
+        /// 쓰다 만 물빛 획도 불이 지나가면 잿빛이 된다. 다 타면 재가 되어 살짝 가라앉으며 흩어진다. 지귀 불 소리가 함께 타오르다 잦아든다.
+        /// </summary>
+        private void DrawBurn()
+        {
+            float front = Mathf.Clamp01(burnAge / Mathf.Max(.01f, burnSeconds));
+            float edge = front * 1.08f; // the flame line, a little ahead of the char
+            float ash = Mathf.Clamp01((burnAge - burnSeconds) / Mathf.Max(.01f, ashSeconds));
+            Rect r = paper.rect;
+            if (charFill != null)
+            {
+                charFill.gameObject.SetActive(true);
+                charFill.fillAmount = front;
+                charFill.color = charColor;
+            }
+            if (emberBand != null)
+            {
+                bool lit = front < 1f;
+                emberBand.gameObject.SetActive(lit);
+                emberBand.anchorMin = new Vector2(0f, edge); emberBand.anchorMax = new Vector2(1f, edge);
+                emberBand.sizeDelta = new Vector2(0f, r.height * .07f);
+                emberBand.anchoredPosition = Vector2.zero;
+                if (emberGlow != null)
+                {
+                    Color glow = emberColor; glow.a *= .75f + .25f * Mathf.Sin(burnAge * 31f);
+                    emberGlow.color = glow;
+                }
+                for (int k = 0; k < flames.Length; k++)
+                {
+                    if (flames[k] == null) continue;
+                    if (flameFrames != null && flameFrames.Length > 0)
+                        flames[k].sprite = flameFrames[(int)(burnAge * 14f + k * 2) % flameFrames.Length];
+                    float flicker = .8f + .3f * Mathf.Sin(burnAge * (17f + k * 3f) + k);
+                    RectTransform f = flames[k].rectTransform;
+                    f.anchorMin = f.anchorMax = new Vector2((k + .5f) / flames.Length, .5f);
+                    float h = r.height * .16f * flicker;
+                    f.sizeDelta = new Vector2(h * .8f, h);
+                    f.anchoredPosition = new Vector2(Mathf.Sin(burnAge * 7f + k * 1.7f) * r.width * .02f, h * .35f);
+                    flames[k].color = new Color(1f, 1f, 1f, .95f);
+                }
+            }
+            for (int k = 0; k < sparks.Length; k++)
+            {
+                if (sparks[k] == null) continue;
+                // Each spark leaves the flame line at its own time and drifts up, fading.
+                float life = .6f, born = (k * .137f) % 1f * Mathf.Max(.01f, burnSeconds);
+                float t = (burnAge - born) / life;
+                bool on = t >= 0f && t < 1f;
+                if (sparks[k].gameObject.activeSelf != on) sparks[k].gameObject.SetActive(on);
+                if (!on) continue;
+                RectTransform sp = sparks[k].rectTransform;
+                float x = (k * .618034f) % 1f, startY = Mathf.Clamp01(born / Mathf.Max(.01f, burnSeconds)) * 1.08f;
+                sp.anchorMin = sp.anchorMax = new Vector2(x, startY);
+                sp.anchoredPosition = new Vector2(Mathf.Sin(t * 6f + k) * r.width * .03f, t * r.height * .22f);
+                float size = r.width * (.018f + .012f * ((k * .414f) % 1f)) * (1f - t * .5f);
+                sp.sizeDelta = new Vector2(size, size);
+                Color c = Color.Lerp(new Color(1f, .9f, .5f, 1f), emberColor, t); c.a = 1f - t; sparks[k].color = c;
+            }
+            // Written strokes the fire has passed turn to ash.
+            Color ashColor = new Color(.32f, .3f, .3f, .85f);
+            float glyphBottom = glyphArea != null ? (glyphArea.anchoredPosition.y - glyphArea.rect.height * .5f + r.height * .5f) / Mathf.Max(1f, r.height) : 0f;
+            float glyphHeight = glyphArea != null ? glyphArea.rect.height / Mathf.Max(1f, r.height) : 1f;
+            for (int i = 0; i < dots.Length; i++)
+            {
+                if (dots[i] == null || !stroke.IsCovered(i)) continue;
+                float y = glyphBottom + stroke.Samples[i].y * glyphHeight;
+                float burnt = Mathf.Clamp01((front * 1.08f - y) / .08f);
+                dots[i].color = Color.Lerp(InkColor(i), ashColor, burnt);
+            }
+            if (ghost != null) ghost.color = Color.Lerp(ghostColor, new Color(.35f, .27f, .2f, ghostColor.a), front);
+            if (burnAudio != null && burnAudio.isPlaying)
+                burnAudio.volume = burnSoundVolume * LabAudioSettings.SfxVolume * (1f - ash) * Mathf.Clamp01(burnAge / .08f);
+            float sink = ash * ash;
+            if (paperGroup != null) paperGroup.alpha = 1f - sink;
+            paper.localScale = Vector3.one * (1f - .04f * sink);
+            float tremble = front < 1f ? r.height * .004f : 0f;
+            paper.localPosition = burnFrom + new Vector3(Mathf.Sin(burnAge * 53f) * tremble, -r.height * .04f * sink, 0f);
+        }
+
+        private void EndBurn()
+        {
+            if (!Burning) return;
+            burnAge = -1f;
+            if (burnAudio != null) burnAudio.Stop();
+            if (paper == null) return;
+            if (paperGroup != null) paperGroup.alpha = 1f;
+            paper.localScale = Vector3.one; paper.localPosition = burnFrom;
+            if (charFill != null) charFill.gameObject.SetActive(false);
+            if (emberBand != null) emberBand.gameObject.SetActive(false);
+            foreach (UnityEngine.UI.Image spark in sparks) if (spark != null) spark.gameObject.SetActive(false);
+            if (ghost != null) ghost.color = ghostColor;
+            if (hint != null) hint.gameObject.SetActive(true);
+            ResetWriting();
+            paper.gameObject.SetActive(Visible);
         }
 
         /// <summary>
@@ -111,16 +461,381 @@ namespace C6Lab
         {
             if (!Visible) return;
             fresh.Clear();
+            // #533: rubbing far from the letter (coin-scratch scribbling) smudges the talisman; it starts over.
+            stroke.AddOffGuide(from, to, offDistance);
+            if (stroke.OffLength > smudgeBudget) { Smudge(); return; }
+            stroke.StrokeAdvance = strokeAdvance;
             stroke.Paint(from, to, Tolerance, fresh);
             for (int i = 0; i < fresh.Count; i++)
-                if (fresh[i] < dots.Length && dots[fresh[i]] != null) dots[fresh[i]].color = writtenColor;
-            if (stroke.Coverage + 1e-5f < Required) return;
+                if (fresh[i] < dots.Length && dots[fresh[i]] != null) ShowWritten(dots[fresh[i]], fresh[i]);
+            if (fresh.Count > 0) Scratch();
+            if (fresh.Count > 0 && Time.unscaledTime - lastWriteHaptic >= writeHapticGapSeconds)
+            {
+                lastWriteHaptic = Time.unscaledTime;
+                LabHaptics.PlayDirect(Config, LabHapticStyle.Light, writeHapticIntensity);
+            }
+            // #533: finish only when the letter LOOKS whole — every stroke written end to end with no visible gap —
+            // not merely when enough dots are counted (that used to finish with the ㄹ tail still blank).
+            if (stroke.Coverage + 1e-5f < Required || !stroke.LooksComplete(maxStrokeGap)) return;
             writtenRound = RoundId;
             CompletedCount++;
             Send();
             Visible = false; RoundId = null; hasLast = false;
-            if (paper != null) paper.gameObject.SetActive(false);
             SetBoardBlocked(false);
+            // #509: the written "물" glows, then the talisman slowly fades away (the board is already free).
+            BeginFinish();
+        }
+
+        private void ShowWritten(UnityEngine.UI.Image dot, int index)
+        {
+            dot.color = InkColor(index);
+            if (InkMode) dot.gameObject.SetActive(true);
+        }
+
+        /// <summary>#533: 지금 써야 할 획의 다음 빈 점에서 깜빡이는 표시. 획 순서를 알려 줄 뿐, 다른 곳을 칠해도 된다.</summary>
+        private void UpdateNextMarker(float time)
+        {
+            if (nextMarker == null) return;
+            int next = stroke.NextPoint;
+            bool show = Visible && next >= 0;
+            if (nextMarker.gameObject.activeSelf != show) nextMarker.gameObject.SetActive(show);
+            if (!show) return;
+            RectTransform m = nextMarker.rectTransform;
+            m.anchorMin = m.anchorMax = stroke.Samples[next];
+            m.anchoredPosition = Vector2.zero;
+            float pulse = .5f + .5f * Mathf.Sin(time * 6f);
+            m.localScale = Vector3.one * (.75f + .35f * pulse);
+            Color c = nextMarkerColor; c.a *= .45f + .55f * pulse; nextMarker.color = c;
+        }
+
+        private void BuildStrokeRank()
+        {
+            strokeRank = new float[dots.Length];
+            int total = Mathf.Max(1, stroke.Samples.Length - 1), n = 0;
+            for (int s = 0; s < stroke.StrokeCount; s++)
+                foreach (int index in stroke.StrokePoints(s))
+                    if (index < strokeRank.Length) strokeRank[index] = n++ / (float)total;
+        }
+
+        private static Sprite WhiteSprite()
+        {
+            if (whiteSprite != null) return whiteSprite;
+            var texture = new Texture2D(4, 4, TextureFormat.RGBA32, false)
+            { name = "Talisman White (#533 runtime)", hideFlags = HideFlags.DontSave };
+            var pixels = new Color[16];
+            for (int i = 0; i < pixels.Length; i++) pixels[i] = Color.white;
+            texture.SetPixels(pixels); texture.Apply(false, true);
+            whiteSprite = Sprite.Create(texture, new Rect(0f, 0f, 4f, 4f), new Vector2(.5f, .5f), 100f);
+            whiteSprite.hideFlags = HideFlags.DontSave;
+            return whiteSprite;
+        }
+
+        /// <summary>#533: 도장 테두리 무늬 (런타임에 한 번 만든다). 굵은 네모 테두리에 인주가 고르지 않게 묻은 결.</summary>
+        private static Sprite StampSprite()
+        {
+            if (stampSprite != null) return stampSprite;
+            const int size = 128;
+            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
+            { name = "Talisman Stamp (#533 runtime)", hideFlags = HideFlags.DontSave, wrapMode = TextureWrapMode.Clamp };
+            var pixels = new Color[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float u = (x + .5f) / size, v = (y + .5f) / size;
+                    float edge = Mathf.Min(Mathf.Min(u, 1f - u), Mathf.Min(v, 1f - v));
+                    float wobble = .012f * Mathf.PerlinNoise(x * .21f + 3f, y * .21f + 9f);
+                    float outer = Mathf.Clamp01((edge - .02f - wobble) * size * .5f);
+                    float inner = Mathf.Clamp01((.14f + wobble - edge) * size * .5f);
+                    float grain = Mathf.PerlinNoise(x * .35f + 17f, y * .35f + 41f);
+                    float ink = outer * inner * Mathf.Clamp01(.55f + grain * .9f);
+                    pixels[y * size + x] = new Color(1f, 1f, 1f, Mathf.Clamp01(ink));
+                }
+            texture.SetPixels(pixels); texture.Apply(false, true);
+            stampSprite = Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(.5f, .5f), 100f);
+            stampSprite.hideFlags = HideFlags.DontSave;
+            return stampSprite;
+        }
+
+        /// <summary>#533: 빛 고리 무늬 (런타임에 한 번 만든다). 가운데가 빈 부드러운 고리.</summary>
+        private static Sprite RingSprite()
+        {
+            if (ringSprite != null) return ringSprite;
+            const int size = 128;
+            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
+            { name = "Talisman Burst Ring (#533 runtime)", hideFlags = HideFlags.DontSave, wrapMode = TextureWrapMode.Clamp };
+            var pixels = new Color[size * size];
+            float half = size * .5f;
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float r = Vector2.Distance(new Vector2(x + .5f, y + .5f), new Vector2(half, half)) / half;
+                    float band = Mathf.Clamp01(1f - Mathf.Abs(r - .82f) / .14f);
+                    float glow = Mathf.Clamp01(1f - Mathf.Abs(r - .8f) / .4f) * .35f;
+                    pixels[y * size + x] = new Color(1f, 1f, 1f, Mathf.Clamp01(band * band + glow) * (r < 1f ? 1f : 0f));
+                }
+            texture.SetPixels(pixels); texture.Apply(false, true);
+            ringSprite = Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(.5f, .5f), 100f);
+            ringSprite.hideFlags = HideFlags.DontSave;
+            return ringSprite;
+        }
+
+        private Color InkColor(int index) => InkMode && index < inkColors.Length ? inkColors[index] : writtenColor;
+
+        /// <summary>#533: 점마다 정해 둔(매번 같은) 수채화 색 흔들림. 물감이 고르게 안 먹은 느낌.</summary>
+        private void BuildInkColors()
+        {
+            inkColors = new Color[dots.Length];
+            var random = new System.Random(533);
+            Color.RGBToHSV(writtenColor, out float h, out float sat, out float v);
+            for (int i = 0; i < inkColors.Length; i++)
+            {
+                float a = (float)random.NextDouble() * 2f - 1f, b = (float)random.NextDouble() * 2f - 1f, c = (float)random.NextDouble() * 2f - 1f;
+                Color tint = Color.HSVToRGB(Mathf.Repeat(h + a * watercolorJitter * .12f, 1f),
+                    Mathf.Clamp01(sat + b * watercolorJitter * .5f), Mathf.Clamp01(v + c * watercolorJitter * .4f));
+                tint.a = Mathf.Clamp01(writtenColor.a * (1f + c * watercolorJitter * 1.5f));
+                inkColors[i] = tint;
+            }
+        }
+
+        private void BeginFinish()
+        {
+            if (paper == null) return;
+            finishAge = 0f; finishFrom = paper.localPosition;
+            paper.gameObject.SetActive(true);
+            if (hint != null) hint.gameObject.SetActive(false);
+            if (nextMarker != null) nextMarker.gameObject.SetActive(false);
+            if (stampRoot != null) stampRoot.gameObject.SetActive(false);
+            burstPlayed = false; notesPlayed = 0;
+            Cue("Sweep", sweepSoundFolder, sweepSoundVolume);
+            DrawFinish();
+        }
+
+        /// <summary>#509: LateUpdate와 테스트가 같이 쓰는 빛남/사라짐 진행.</summary>
+        public void AdvanceFinish(float seconds)
+        {
+            if (!Finishing || float.IsNaN(seconds) || seconds < 0f) return;
+            finishAge += seconds;
+            if (finishAge >= FinishSeconds) { EndFinish(); return; }
+            DrawFinish();
+        }
+
+        /// <summary>
+        /// #533 완성 연출: ① 금빛이 획 순서대로 글자를 훑으며 빈 곳까지 채움 → ② "쾅": 부적이 커졌다 돌아오며 떨리고,
+        /// 글자에서 빛 고리가 퍼지고, 흐린 글자·경계선도 금빛으로 → ③ 빛난 채 잠깐 머문 뒤 위로 떠오르며 사라짐.
+        /// </summary>
+        private void DrawFinish()
+        {
+            float sweep = Mathf.Max(.01f, sweepSeconds);
+            float sweepT = Mathf.Clamp01(finishAge / sweep);
+            // 솔 (rest) 도 (rest) 시 (rest rest rest) 라! — the last, accented note lands with the seal.
+            while (notesPlayed < 3 && finishAge >= NoteAt(notesPlayed)) PlayNote(notesPlayed++);
+            float after = finishAge - AccentAt;
+            DrawStamp(after);
+            if (after >= 0f && !burstPlayed)
+            {
+                burstPlayed = true;
+                PlayNote(3);
+                Cue("Burst", burstSoundFolder, burstSoundVolume);
+                LabHaptics.PlayDirect(Config, LabHapticStyle.Heavy, 1f, burstHapticSeconds, burstHapticIntensity, burstHapticSharpness);
+            }
+            float burst = after < 0f ? 0f : Mathf.Clamp01(after / .35f);
+            float bump = after < 0f ? 0f : Mathf.Sin(Mathf.PI * burst);
+            float fade = Mathf.Clamp01((after - glowSeconds) / Mathf.Max(.01f, fadeSeconds));
+            float eased = fade * fade * (3f - 2f * fade);
+            Color gold = new Color(glowColor.r, glowColor.g, glowColor.b, 1f);
+            // #533 gong hum: after the strike everything trembles and pulses, dying away like a gong's ring.
+            float ring = after < 0f ? 0f : Mathf.Exp(-after * humDecay);
+            float wave = Mathf.Sin(after * humHz * 2f * Mathf.PI);
+            Color hot = Color.Lerp(gold, new Color(1f, .99f, .88f, 1f), .5f + .5f * wave);
+            Color shine = Color.Lerp(gold, hot, ring);
+            for (int i = 0; i < dots.Length; i++)
+            {
+                if (dots[i] == null) continue;
+                bool written = stroke.IsCovered(i);
+                if (!InkMode && !written) continue;
+                float rank = i < strokeRank.Length ? strokeRank[i] : 0f;
+                float lit = Mathf.Clamp01((sweepT * 1.12f - rank) / .12f);
+                if (lit <= 0f)
+                {
+                    // Not reached yet: written ink stays as written, gaps stay empty.
+                    if (written) { dots[i].color = InkColor(i); dots[i].rectTransform.localScale = Vector3.one; }
+                    continue;
+                }
+                if (InkMode && !dots[i].gameObject.activeSelf) dots[i].gameObject.SetActive(true);
+                dots[i].color = Color.Lerp(InkColor(i), shine, lit);
+                float pop = 1f + .35f * Mathf.Sin(Mathf.PI * lit) * (1f - lit * .5f) + .12f * bump + .06f * ring * wave;
+                dots[i].rectTransform.localScale = Vector3.one * pop;
+            }
+            if (ghost != null) ghost.color = Color.Lerp(ghostColor, new Color(1f, .94f, .62f, ghostColor.a), burst);
+            if (ghostEdge != null)
+            {
+                Color edge = Color.Lerp(ghostOutlineColor, gold, burst);
+                ghostEdge.color = edge;
+                if (ghostOutline != null) ghostOutline.effectColor = edge;
+            }
+            DrawRings(after, gold);
+            if (paperImage != null) paperImage.color = Color.Lerp(paperColor, new Color(1f, .97f, .85f, paperColor.a), Mathf.Max(burst * .8f, sweepT * .3f));
+            if (paperGroup != null) paperGroup.alpha = 1f - eased;
+            // #533: the talisman stays put (no floating away); the seal's slam punches it, then it fades in place.
+            paper.localScale = Vector3.one * (1f + burstPunch * bump);
+            float shake = burstShake * paper.rect.height * ring;
+            var jitter = new Vector3(wave * shake, Mathf.Cos(after * humHz * 1.37f * 2f * Mathf.PI) * shake * .35f, 0f);
+            paper.localPosition = finishFrom + jitter;
+        }
+
+        /// <summary>
+        /// #533 도장: 강세 음 stampDropSeconds 전에 크고 옅게 나타나 기울며 내려와 강세 음 순간 "쾅" 닿고, 살짝 눌렸다 돌아온다.
+        /// 닿는 순간 붉은 인주 방울이 둘레에 튄다. 그 뒤로는 찍힌 채 부적과 함께 사라진다.
+        /// </summary>
+        private void DrawStamp(float after)
+        {
+            if (stampRoot == null) return;
+            float drop = Mathf.Max(.01f, stampDropSeconds);
+            float t = (after + drop) / drop; // 0 → 1 while descending, ≥ 1 once stamped
+            bool show = t >= 0f;
+            if (stampRoot.gameObject.activeSelf != show) stampRoot.gameObject.SetActive(show);
+            if (!show) return;
+            float scale, alpha;
+            if (t < 1f)
+            {
+                float fall = t * t; // accelerate into the paper
+                scale = Mathf.Lerp(2.4f, 1f, fall);
+                alpha = Mathf.Lerp(.15f, 1f, fall);
+            }
+            else
+            {
+                float settle = Mathf.Clamp01(after / .22f);
+                scale = 1f - .08f * Mathf.Sin(Mathf.PI * settle) * (1f - settle);
+                alpha = 1f;
+            }
+            stampRoot.localScale = Vector3.one * scale;
+            stampRoot.localRotation = Quaternion.Euler(0f, 0f, stampTilt + (t < 1f ? (1f - t) * -10f : 0f));
+            Color c = stampColor; c.a *= alpha;
+            if (stampImage != null) stampImage.color = c;
+            if (stampLabel != null) stampLabel.color = c;
+            float splat = after < 0f ? 0f : Mathf.Clamp01(after / .12f);
+            for (int k = 0; k < stampSpecks.Length; k++)
+            {
+                if (stampSpecks[k] == null) continue;
+                bool on = after >= 0f;
+                if (stampSpecks[k].gameObject.activeSelf != on) stampSpecks[k].gameObject.SetActive(on);
+                if (!on) continue;
+                stampSpecks[k].rectTransform.localScale = Vector3.one * (.3f + .7f * splat);
+                Color speck = stampColor; speck.a *= .85f; stampSpecks[k].color = speck;
+            }
+        }
+
+        /// <summary>#533: 징 울림처럼 빛 고리가 차례로 퍼진다. 뒤 고리일수록 옅고 크게.</summary>
+        private void DrawRings(float after, Color gold)
+        {
+            for (int k = 0; k < burstRings.Length; k++)
+            {
+                UnityEngine.UI.Image ringImage = burstRings[k];
+                if (ringImage == null) continue;
+                float local = after - k * ringGapSeconds;
+                float t = after < 0f || local < 0f ? -1f : local / Mathf.Max(.01f, ringSeconds);
+                bool show = k < ringCount && t >= 0f && t < 1f;
+                if (ringImage.gameObject.activeSelf != show) ringImage.gameObject.SetActive(show);
+                if (!show) continue;
+                float grow = 1f - (1f - t) * (1f - t);
+                ringImage.rectTransform.localScale = Vector3.one * (.35f + (1.9f + .5f * k) * grow);
+                Color c = gold; c.a = (1f - t) * .9f / (1f + k * .6f); ringImage.color = c;
+            }
+        }
+
+        private void EndFinish()
+        {
+            finishAge = -1f;
+            if (paper == null) return;
+            if (paperGroup != null) paperGroup.alpha = 1f;
+            paper.localScale = Vector3.one; paper.localPosition = finishFrom;
+            if (paperImage != null) paperImage.color = paperColor;
+            if (hint != null) hint.gameObject.SetActive(true);
+            for (int i = 0; i < dots.Length; i++) if (dots[i] != null) dots[i].rectTransform.localScale = Vector3.one;
+            if (ghost != null) ghost.color = ghostColor;
+            if (ghostEdge != null) ghostEdge.color = ghostOutlineColor;
+            if (ghostOutline != null) ghostOutline.effectColor = ghostOutlineColor;
+            foreach (UnityEngine.UI.Image ringImage in burstRings) if (ringImage != null) ringImage.gameObject.SetActive(false);
+            if (stampRoot != null) stampRoot.gameObject.SetActive(false);
+            paper.gameObject.SetActive(Visible);
+        }
+
+        private LabConfig Config => source != null ? source.config : null;
+
+        /// <summary>
+        /// #533: 칠하는 동안 연필 사각 소리를 잇는다. 앞 소리가 거의 끝났을 때만 다음 소리를 내서 겹쳐 쌓이지 않고,
+        /// 손을 멈추면 지금 소리까지만 난다. 매번 다른 파일·높낮이·크기로 단조롭지 않게.
+        /// </summary>
+        private void Scratch()
+        {
+            if (string.IsNullOrEmpty(writeSoundFolder) || writeSoundVolume <= 0f) return;
+            if (writeClips == null || writeClipsFolder != writeSoundFolder)
+            {
+                writeClipsFolder = writeSoundFolder;
+                writeClips = Resources.LoadAll<AudioClip>("Audio/" + writeSoundFolder);
+                lastWriteClip = -1;
+            }
+            if (writeClips == null || writeClips.Length == 0) return;
+            if (scratch == null)
+            {
+                scratch = gameObject.AddComponent<AudioSource>();
+                scratch.playOnAwake = false; scratch.spatialBlend = 0f; scratch.loop = false;
+            }
+            if (scratch.isPlaying && scratch.clip != null && scratch.time < scratch.clip.length * writeChainAt) return;
+            int index = UnityEngine.Random.Range(0, writeClips.Length);
+            if (writeClips.Length > 1 && index == lastWriteClip)
+                index = (index + 1 + UnityEngine.Random.Range(0, writeClips.Length - 1)) % writeClips.Length;
+            lastWriteClip = index;
+            scratch.clip = writeClips[index];
+            scratch.pitch = 1f + UnityEngine.Random.Range(-writePitchJitter, writePitchJitter);
+            scratch.volume = Mathf.Clamp01(writeSoundVolume * (1f + UnityEngine.Random.Range(-writeVolumeJitter, writeVolumeJitter)))
+                * LabAudioSettings.SfxVolume;
+            scratch.Play();
+            WriteSoundCount++;
+        }
+
+        /// <summary>#533: 완성 가락의 index번째 음 (0~2 = "둥", 3 = 강세 "둥!"). 음마다 따로 재생해 앞 음 여운이 끊기지 않는다.</summary>
+        private void PlayNote(int index)
+        {
+            NotesPlayedCount++;
+            if (string.IsNullOrEmpty(noteSoundFolder)) return;
+            AudioClip[] clips = Resources.LoadAll<AudioClip>("Audio/" + noteSoundFolder);
+            if (clips == null || clips.Length == 0) return;
+            Array.Sort(clips, (a, b) => string.CompareOrdinal(a.name, b.name));
+            AudioClip clip; float pitch = 1f;
+            if (clips.Length >= 4) clip = clips[index];
+            else
+            {
+                clip = clips[index % clips.Length];
+                int semitone = noteSemitones != null && index < noteSemitones.Length ? noteSemitones[index] : 0;
+                pitch = Mathf.Pow(2f, semitone / 12f);
+            }
+            AudioSource player = notePlayers[index];
+            if (player == null)
+            {
+                player = notePlayers[index] = gameObject.AddComponent<AudioSource>();
+                player.playOnAwake = false; player.spatialBlend = 0f;
+            }
+            player.pitch = pitch;
+            player.PlayOneShot(clip, (index == 3 ? accentSoundVolume : noteSoundVolume) * LabAudioSettings.SfxVolume);
+        }
+
+        /// <summary>#533: 테스트용 — 완성 가락 음을 낸 횟수.</summary>
+        public int NotesPlayedCount { get; private set; }
+
+        /// <summary>#533: Resources/Audio/폴더의 소리 하나를 이 기기에서만 낸다(파일이 없으면 조용히 넘어감).</summary>
+        private void Cue(string name, string folder, float volume)
+        {
+            LastCue = name; CueCount++;
+            if (string.IsNullOrEmpty(folder) || volume <= 0f) return;
+            AudioClip[] clips = Resources.LoadAll<AudioClip>("Audio/" + folder);
+            if (clips == null || clips.Length == 0) return;
+            if (sfx == null)
+            {
+                sfx = gameObject.AddComponent<AudioSource>();
+                sfx.playOnAwake = false; sfx.spatialBlend = 0f;
+            }
+            sfx.PlayOneShot(clips[UnityEngine.Random.Range(0, clips.Length)], volume * LabAudioSettings.SfxVolume);
         }
 
         private float Tolerance => source != null && source.config != null ? source.config.JigwiTalismanTolerance : .07f;
@@ -167,10 +882,33 @@ namespace C6Lab
             return true;
         }
 
+        private void Smudge()
+        {
+            SmudgeCount++;
+            ResetWriting();
+            Cue("Smudge", smudgeSoundFolder, smudgeSoundVolume);
+            LabHaptics.PlayDirect(Config, LabHapticStyle.Rigid, smudgeHapticIntensity);
+            if (hint == null) return;
+            hint.text = SmudgeText;
+            smudgeHintUntil = Time.unscaledTime + smudgeHintSeconds;
+        }
+
+        private void RestoreHint()
+        {
+            smudgeHintUntil = -1f;
+            if (hint != null) hint.text = HintText;
+        }
+
         private void ResetWriting()
         {
             stroke.Clear(); hasLast = false; writtenRound = null;
-            for (int i = 0; i < dots.Length; i++) if (dots[i] != null) dots[i].color = guideColor;
+            RestoreHint();
+            for (int i = 0; i < dots.Length; i++)
+            {
+                if (dots[i] == null) continue;
+                if (InkMode) { dots[i].gameObject.SetActive(false); dots[i].color = InkColor(i); }
+                else dots[i].color = guideColor;
+            }
         }
 
         private void SetBoardBlocked(bool value)
@@ -205,18 +943,92 @@ namespace C6Lab
             LayoutGlyph();
         }
 
-        /// <summary>"물" 칸은 늘 정사각형으로, 안내 문구 아래 가운데에 둔다.</summary>
+        /// <summary>
+        /// "물" 칸은 늘 정사각형이다. #533: 칸 크기를 칸 전체가 아니라 실제 글자 획이 놓인 범위에 맞춰,
+        /// 글자가 종이 폭의 glyphWidthShare만큼 차지하게 키우고 글자 가운데를 안내 문구 아래에 둔다.
+        /// 판정 좌표(칸 기준 0~1)는 그대로라 점선과 판정은 함께 커진다.
+        /// </summary>
         private void LayoutGlyph()
         {
             if (glyphArea == null || paper == null) return;
             Vector2 size = paper.rect.size;
-            float side = Mathf.Max(1f, Mathf.Min(size.x * .84f, size.y * .62f));
+            // #533: with the real glyph the letter's own outline sets the size; the old dotted look pads by its stroke width.
+            Rect bounds = InkMode ? GlyphInkRect : SampleBounds(stroke.Samples);
+            float pad = InkMode ? 0f : strokeWidth;
+            float spanX = Mathf.Max(.05f, bounds.width + pad), spanY = Mathf.Max(.05f, bounds.height + pad);
+            float side = Mathf.Max(1f, Mathf.Min(size.x * glyphWidthShare / spanX, size.y * .72f / spanY));
             glyphArea.anchorMin = glyphArea.anchorMax = glyphArea.pivot = new Vector2(.5f, .5f);
-            glyphArea.anchoredPosition = new Vector2(0f, -size.y * .04f);
+            // Put the letter's own centre (not the box centre) a little below the paper centre, under the hint.
+            Vector2 centre = bounds.center;
+            glyphArea.anchoredPosition = new Vector2((.5f - centre.x) * side, -size.y * .06f + (.5f - centre.y) * side);
             glyphArea.sizeDelta = new Vector2(side, side);
-            float dot = Mathf.Max(4f, side * .045f);
+            float dot = Mathf.Max(4f, side * (InkMode ? brushWidth : strokeWidth));
+            if (nextMarker != null) nextMarker.rectTransform.sizeDelta = Vector2.one * Mathf.Max(6f, side * .07f);
+            float seal = Mathf.Max(8f, size.x * stampSize);
+            if (stampRoot != null)
+            {
+                stampRoot.anchorMin = stampRoot.anchorMax = stampAnchor;
+                stampRoot.anchoredPosition = Vector2.zero;
+                stampRoot.sizeDelta = new Vector2(seal, seal);
+                if (stampLabel != null) stampLabel.fontSize = Mathf.Max(8, Mathf.RoundToInt(seal * .36f));
+                for (int k = 0; k < stampSpecks.Length; k++)
+                {
+                    if (stampSpecks[k] == null) continue;
+                    // Fixed splatter around the seal (same every time).
+                    float angle = k * 2.399963f + .7f, reach = .62f + .18f * ((k * .618034f) % 1f);
+                    stampSpecks[k].rectTransform.anchoredPosition = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * seal * reach;
+                    float speck = seal * (.035f + .03f * ((k * .414214f) % 1f));
+                    stampSpecks[k].rectTransform.sizeDelta = new Vector2(speck, speck);
+                }
+            }
+            foreach (UnityEngine.UI.Image ringImage in burstRings)
+                if (ringImage != null) { ringImage.rectTransform.sizeDelta = Vector2.one * seal * 1.3f; ringImage.rectTransform.anchoredPosition = Vector2.zero; }
+            if (InkMode && FitGhost(side, dot)) return;
             for (int i = 0; i < dots.Length; i++)
                 if (dots[i] != null) dots[i].rectTransform.sizeDelta = new Vector2(dot, dot);
+        }
+
+        /// <summary>
+        /// #533: 흐린 "물" Text의 실제 글자 사각형을 재서, 그 사각형이 GlyphInkRect(판정 점과 같은 칸 좌표)에 꼭 맞게
+        /// Text를 늘이고 옮긴다. 먹 붓 점은 Text의 자식이라 같은 비율을 되돌려 놓는다.
+        /// </summary>
+        private bool FitGhost(float side, float dot)
+        {
+            RectTransform g = ghost.rectTransform;
+            g.anchorMin = g.anchorMax = g.pivot = new Vector2(.5f, .5f);
+            g.sizeDelta = new Vector2(GhostFontSize * 2f, GhostFontSize * 2f);
+            TextGenerationSettings settings = ghost.GetGenerationSettings(g.rect.size);
+            if (!ghostGenerator.Populate(ghost.text, settings) || ghostGenerator.vertexCount < 4) return false;
+            IList<UIVertex> verts = ghostGenerator.verts;
+            float unit = 1f / Mathf.Max(.0001f, ghost.pixelsPerUnit);
+            Vector2 min = new Vector2(float.MaxValue, float.MaxValue), max = new Vector2(float.MinValue, float.MinValue);
+            for (int i = 0; i < 4; i++) { Vector2 v = verts[i].position * unit; min = Vector2.Min(min, v); max = Vector2.Max(max, v); }
+            Vector2 quad = max - min;
+            if (quad.x <= .001f || quad.y <= .001f) return false;
+            var target = Rect.MinMaxRect((GlyphInkRect.xMin - .5f) * side, (GlyphInkRect.yMin - .5f) * side,
+                (GlyphInkRect.xMax - .5f) * side, (GlyphInkRect.yMax - .5f) * side);
+            var scale = new Vector2(target.width / quad.x, target.height / quad.y);
+            Vector2 offset = target.center - Vector2.Scale((min + max) * .5f, scale);
+            g.localScale = new Vector3(scale.x, scale.y, 1f);
+            g.anchoredPosition = offset;
+            if (ghostEdge != null)
+            {
+                RectTransform e = ghostEdge.rectTransform;
+                e.anchorMin = e.anchorMax = e.pivot = g.pivot; e.sizeDelta = g.sizeDelta;
+                e.localScale = g.localScale; e.anchoredPosition = g.anchoredPosition;
+                // The outline offset is in the text's own units, so undo the scale to keep it a steady screen width.
+                if (ghostOutline != null) ghostOutline.effectDistance = new Vector2(ghostOutlineWidth / scale.x, -ghostOutlineWidth / scale.y);
+            }
+            for (int i = 0; i < dots.Length; i++)
+            {
+                if (dots[i] == null) continue;
+                Vector2 at = (stroke.Samples[i] - new Vector2(.5f, .5f)) * side;
+                RectTransform d = dots[i].rectTransform;
+                d.anchorMin = d.anchorMax = new Vector2(.5f, .5f);
+                d.anchoredPosition = new Vector2((at.x - offset.x) / scale.x, (at.y - offset.y) / scale.y);
+                d.sizeDelta = new Vector2(dot / scale.x, dot / scale.y);
+            }
+            return true;
         }
 
         private void EnsureWidgets()
@@ -227,6 +1039,8 @@ namespace C6Lab
             if (font == null) font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             paper = NewRect("Talisman Paper", root);
             paper.sizeDelta = new Vector2(200f, 360f);
+            paperGroup = paper.gameObject.AddComponent<CanvasGroup>();
+            paperGroup.blocksRaycasts = false; paperGroup.interactable = false;
             paperImage = paper.gameObject.AddComponent<UnityEngine.UI.RawImage>();
             paperImage.texture = HanjiTexture(); paperImage.color = paperColor; paperImage.raycastTarget = false;
             frame = NewRect("Talisman Frame", paper);
@@ -235,21 +1049,109 @@ namespace C6Lab
             frameImage.color = new Color(0f, 0f, 0f, 0f); frameImage.raycastTarget = false;
             var outline = frame.gameObject.AddComponent<UnityEngine.UI.Outline>();
             outline.effectColor = inkColor; outline.effectDistance = new Vector2(3f, -3f);
-            hint = NewText("Talisman Hint", paper, "손가락으로 '물'을 적어\n부적을 완성하세요.", 22, inkColor);
+            hint = NewText("Talisman Hint", paper, HintText, 22, inkColor);
             var hintRect = hint.rectTransform;
             hintRect.anchorMin = new Vector2(.08f, .83f); hintRect.anchorMax = new Vector2(.92f, .96f);
             hintRect.offsetMin = hintRect.offsetMax = Vector2.zero;
             hint.resizeTextForBestFit = true; hint.resizeTextMinSize = 10; hint.resizeTextMaxSize = 28;
             glyphArea = NewRect("Talisman Glyph (물)", paper);
+            // #533: the real Shilla Culture "물" lies faintly on the paper and masks the ink, so written ink only shows
+            // inside the letter's shape (a brush, not sausage dots). Without the font it falls back to the dotted guide.
+            RectTransform dotParent = glyphArea;
+            if (IsShilla(font))
+            {
+                // #533: a copy underneath carries the outline, so the letter's edge shows before any writing
+                // and the watercolour (masked by the ghost on top) never paints over it.
+                ghostEdge = NewText("Talisman Ghost Edge (물)", glyphArea, "물", GhostFontSize, ghostOutlineColor);
+                ghostEdge.horizontalOverflow = HorizontalWrapMode.Overflow; ghostEdge.verticalOverflow = VerticalWrapMode.Overflow;
+                ghostEdge.alignment = TextAnchor.MiddleCenter;
+                ghostOutline = ghostEdge.gameObject.AddComponent<UnityEngine.UI.Outline>();
+                ghostOutline.effectColor = ghostOutlineColor; ghostOutline.useGraphicAlpha = true;
+                ghost = NewText("Talisman Ghost Glyph (물)", glyphArea, "물", GhostFontSize, ghostColor);
+                ghost.horizontalOverflow = HorizontalWrapMode.Overflow; ghost.verticalOverflow = VerticalWrapMode.Overflow;
+                ghost.alignment = TextAnchor.MiddleCenter;
+                ghost.gameObject.AddComponent<UnityEngine.UI.Mask>().showMaskGraphic = true;
+                dotParent = ghost.rectTransform;
+            }
             dots = new UnityEngine.UI.Image[stroke.Samples.Length];
             for (int i = 0; i < dots.Length; i++)
             {
-                var dot = NewRect("Dot " + i, glyphArea).gameObject.AddComponent<UnityEngine.UI.Image>();
-                dot.raycastTarget = false; dot.color = guideColor;
+                var dot = NewRect("Dot " + i, dotParent).gameObject.AddComponent<UnityEngine.UI.Image>();
+                dot.raycastTarget = false; dot.sprite = InkMode ? WatercolorDot() : RoundDot();
+                // In ink mode FitGhost places the dots inside the scaled glyph.
                 dot.rectTransform.anchorMin = dot.rectTransform.anchorMax = stroke.Samples[i];
                 dot.rectTransform.anchoredPosition = Vector2.zero;
+                dot.color = InkMode ? writtenColor : guideColor;
+                if (InkMode) dot.gameObject.SetActive(false);
                 dots[i] = dot;
             }
+            BuildInkColors();
+            // #533: drawn last so it sits above the ghost letter and the ink.
+            nextMarker = NewRect("Talisman Next Stroke", glyphArea).gameObject.AddComponent<UnityEngine.UI.Image>();
+            nextMarker.raycastTarget = false; nextMarker.sprite = RoundDot(); nextMarker.color = nextMarkerColor;
+            nextMarker.gameObject.SetActive(false);
+            // #533: the red seal that slams onto the finished talisman, with ink specks and light rings from where it lands.
+            stampRoot = NewRect("Talisman Stamp", paper);
+            stampRoot.pivot = new Vector2(.5f, .5f);
+            stampSpecks = new UnityEngine.UI.Image[9];
+            for (int k = 0; k < stampSpecks.Length; k++)
+            {
+                var speck = NewRect("Stamp Speck " + k, stampRoot).gameObject.AddComponent<UnityEngine.UI.Image>();
+                speck.raycastTarget = false; speck.sprite = WatercolorDot();
+                speck.rectTransform.anchorMin = speck.rectTransform.anchorMax = new Vector2(.5f, .5f);
+                speck.gameObject.SetActive(false);
+                stampSpecks[k] = speck;
+            }
+            stampImage = NewRect("Stamp Seal", stampRoot).gameObject.AddComponent<UnityEngine.UI.Image>();
+            stampImage.raycastTarget = false; stampImage.sprite = StampSprite();
+            Stretch(stampImage.rectTransform, 0f);
+            stampLabel = NewText("Stamp Text", stampRoot, stampText, 0, stampColor);
+            Stretch(stampLabel.rectTransform, .1f);
+            stampLabel.lineSpacing = .85f;
+            stampLabel.horizontalOverflow = HorizontalWrapMode.Overflow; stampLabel.verticalOverflow = VerticalWrapMode.Overflow;
+            burstRings = new UnityEngine.UI.Image[5];
+            for (int k = 0; k < burstRings.Length; k++)
+            {
+                var ringImage = NewRect("Talisman Burst Ring " + k, stampRoot).gameObject.AddComponent<UnityEngine.UI.Image>();
+                ringImage.raycastTarget = false; ringImage.sprite = RingSprite();
+                ringImage.rectTransform.anchorMin = ringImage.rectTransform.anchorMax = new Vector2(.5f, .5f);
+                ringImage.gameObject.SetActive(false);
+                burstRings[k] = ringImage;
+            }
+            stampRoot.gameObject.SetActive(false);
+            // #533: the burn layers sit on top of everything on the paper.
+            charFill = NewRect("Talisman Char", paper).gameObject.AddComponent<UnityEngine.UI.Image>();
+            charFill.raycastTarget = false; charFill.sprite = WhiteSprite();
+            charFill.type = UnityEngine.UI.Image.Type.Filled;
+            charFill.fillMethod = UnityEngine.UI.Image.FillMethod.Vertical;
+            charFill.fillOrigin = (int)UnityEngine.UI.Image.OriginVertical.Bottom;
+            charFill.fillAmount = 0f;
+            Stretch(charFill.rectTransform, 0f);
+            charFill.gameObject.SetActive(false);
+            emberBand = NewRect("Talisman Burn Edge", paper);
+            emberGlow = NewRect("Burn Glow", emberBand).gameObject.AddComponent<UnityEngine.UI.Image>();
+            emberGlow.raycastTarget = false; emberGlow.sprite = WatercolorDot();
+            Stretch(emberGlow.rectTransform, 0f);
+            flameFrames = Resources.LoadAll<Sprite>("Bomb/BlastFire");
+            if (flameFrames != null) Array.Sort(flameFrames, (a, b) => string.CompareOrdinal(a.name, b.name));
+            flames = new UnityEngine.UI.Image[6];
+            for (int k = 0; k < flames.Length; k++)
+            {
+                var flame = NewRect("Burn Flame " + k, emberBand).gameObject.AddComponent<UnityEngine.UI.Image>();
+                flame.raycastTarget = false; flame.preserveAspect = true;
+                flame.sprite = flameFrames != null && flameFrames.Length > 0 ? flameFrames[0] : WatercolorDot();
+                flames[k] = flame;
+            }
+            emberBand.gameObject.SetActive(false);
+            sparks = new UnityEngine.UI.Image[14];
+            for (int k = 0; k < sparks.Length; k++)
+            {
+                var spark = NewRect("Burn Spark " + k, paper).gameObject.AddComponent<UnityEngine.UI.Image>();
+                spark.raycastTarget = false; spark.sprite = RoundDot();
+                spark.gameObject.SetActive(false);
+                sparks[k] = spark;
+            }
+            BuildStrokeRank();
             LayoutGlyph();
             paper.gameObject.SetActive(false);
         }
@@ -294,6 +1196,67 @@ namespace C6Lab
             return hanji;
         }
 
+        private static bool IsShilla(Font candidate) =>
+            candidate != null && candidate.name.IndexOf("Shilla", StringComparison.OrdinalIgnoreCase) >= 0;
+
+        private static Rect SampleBounds(Vector2[] samples)
+        {
+            if (samples == null || samples.Length == 0) return new Rect(0f, 0f, 1f, 1f);
+            Vector2 min = samples[0], max = samples[0];
+            for (int i = 1; i < samples.Length; i++) { min = Vector2.Min(min, samples[i]); max = Vector2.Max(max, samples[i]); }
+            return Rect.MinMaxRect(min.x, min.y, max.x, max.y);
+        }
+
+        /// <summary>#533: 획 점용 둥근 무늬 (런타임에 한 번 만든다). 둥근 점이 겹쳐 매끈한 굵은 획이 된다.</summary>
+        /// <summary>
+        /// #533: 수채화 점. 가운데는 묽고 가장자리가 조금 진하며(물감이 마르며 테두리에 고이는 느낌), 테두리가 살짝 울퉁불퉁하다.
+        /// </summary>
+        private static Sprite WatercolorDot()
+        {
+            if (watercolorDot != null) return watercolorDot;
+            const int size = 96;
+            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
+            { name = "Talisman Watercolor Dot (#533 runtime)", hideFlags = HideFlags.DontSave, wrapMode = TextureWrapMode.Clamp };
+            var pixels = new Color[size * size];
+            float half = size * .5f;
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    Vector2 d = new Vector2(x + .5f - half, y + .5f - half) / half;
+                    float angle = Mathf.Atan2(d.y, d.x);
+                    float edge = .86f + .07f * Mathf.Sin(angle * 5f + 1.3f) + .05f * Mathf.Sin(angle * 11f + .4f);
+                    float r = d.magnitude / edge;
+                    float body = .55f + .45f * Mathf.SmoothStep(.55f, .95f, r);
+                    float cut = Mathf.Clamp01((1f - r) * half * .6f);
+                    float grain = .85f + .15f * Mathf.PerlinNoise(x * .18f + 11f, y * .18f + 5f);
+                    pixels[y * size + x] = new Color(1f, 1f, 1f, Mathf.Clamp01(body * cut * grain));
+                }
+            texture.SetPixels(pixels); texture.Apply(false, true);
+            watercolorDot = Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(.5f, .5f), 100f);
+            watercolorDot.hideFlags = HideFlags.DontSave;
+            return watercolorDot;
+        }
+
+        private static Sprite RoundDot()
+        {
+            if (roundDot != null) return roundDot;
+            const int size = 64;
+            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
+            { name = "Talisman Round Dot (#533 runtime)", hideFlags = HideFlags.DontSave, wrapMode = TextureWrapMode.Clamp };
+            var pixels = new Color[size * size];
+            float r = size * .5f;
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float d = Vector2.Distance(new Vector2(x + .5f, y + .5f), new Vector2(r, r));
+                    pixels[y * size + x] = new Color(1f, 1f, 1f, Mathf.Clamp01(r - d));
+                }
+            texture.SetPixels(pixels); texture.Apply(false, true);
+            roundDot = Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(.5f, .5f), 100f);
+            roundDot.hideFlags = HideFlags.DontSave;
+            return roundDot;
+        }
+
         private UnityEngine.UI.Text NewText(string name, RectTransform parent, string value, int size, Color color)
         {
             var text = NewRect(name, parent).gameObject.AddComponent<UnityEngine.UI.Text>();
@@ -316,7 +1279,7 @@ namespace C6Lab
             rect.offsetMin = rect.offsetMax = Vector2.zero;
         }
 
-        private void OnDisable() { SetBoardBlocked(false); Visible = false; RoundId = null; hasLast = false; if (paper != null) paper.gameObject.SetActive(false); }
+        private void OnDisable() { SetBoardBlocked(false); Visible = false; RoundId = null; hasLast = false; EndFinish(); EndBurn(); if (paper != null) paper.gameObject.SetActive(false); }
         private void OnDestroy() => SetBoardBlocked(false);
     }
 
@@ -346,32 +1309,144 @@ namespace C6Lab
             new Vector2(0.338f, 0.863f), new Vector2(0.530f, 0.859f), new Vector2(0.557f, 0.865f), new Vector2(0.601f, 0.868f)
         };
 
+        /// <summary>
+        /// #533 "물"의 획 순서. 각 획은 Water 점 번호를 쓰는 방향대로 나열한다.
+        /// ㅁ(왼쪽 세로 → 위·오른쪽 → 아래) → ㅜ(가로 → 세로) → ㄹ(위·오른쪽 → 가운데 → 왼쪽·아래).
+        /// </summary>
+        public static readonly int[][] WaterStrokes =
+        {
+            new[] { 84, 80, 78, 76, 74, 72, 68 },
+            new[] { 81, 83, 85, 86, 87, 82, 79, 77, 75, 73, 71 },
+            new[] { 64, 66, 65, 63, 67, 69, 70 },
+            new[] { 40, 41, 42, 44, 45, 46, 47, 48, 49, 50, 52, 54, 55, 53, 57, 58, 59, 61, 62, 60, 56 },
+            new[] { 51, 43, 38, 39, 37, 36 },
+            new[] { 25, 26, 27, 28, 31, 32, 33, 34, 35, 29, 30, 24, 23, 22 },
+            new[] { 16, 14, 17, 18, 19, 20, 21 },
+            new[] { 15, 13, 12, 9, 5, 2, 0, 1, 3, 4, 6, 7, 8, 10, 11 }
+        };
+
         public readonly Vector2[] Samples;
         private readonly bool[] covered;
+        private readonly int[][] strokes;
+        private readonly int[] strokeOf, strokeCovered;
         public int CoveredCount { get; private set; }
         public float Coverage => Samples.Length == 0 ? 0f : CoveredCount / (float)Samples.Length;
+        /// <summary>#533: 안내할 획 번호 (아직 StrokeAdvance만큼 쓰지 않은 첫 획). EnforceOrder면 이보다 뒤 획은 칠해지지 않는다.</summary>
+        public int CurrentStroke { get; private set; }
+        public int StrokeCount => strokes.Length;
+        /// <summary>#533: 한 획을 이 비율만큼 쓰면 다음 획이 열린다.</summary>
+        public float StrokeAdvance { get; set; } = .8f;
+        /// <summary>#533: 켜면 안내 획보다 뒤 획은 칠해지지 않는다. 직접 해 보니 너무 엄격해 기본은 끔(순서는 안내만).</summary>
+        public bool EnforceOrder { get; set; }
 
-        public LabJigwiTalismanStroke(Vector2[] samples)
+        /// <summary>strokes가 없으면 획 순서 없이 아무 점이나 칠한다.</summary>
+        public LabJigwiTalismanStroke(Vector2[] samples, int[][] strokeOrder = null)
         {
             Samples = (Vector2[])samples.Clone();
             covered = new bool[Samples.Length];
+            strokeOf = new int[Samples.Length];
+            var listed = new bool[Samples.Length];
+            var built = new List<int[]>();
+            if (strokeOrder != null)
+                foreach (int[] order in strokeOrder)
+                {
+                    var keep = new List<int>();
+                    foreach (int index in order ?? Array.Empty<int>())
+                        if (index >= 0 && index < Samples.Length && !listed[index]) { listed[index] = true; keep.Add(index); }
+                    if (keep.Count > 0) built.Add(keep.ToArray());
+                }
+            // Points no stroke lists join the last stroke, so a guide is always finishable.
+            var rest = new List<int>();
+            for (int i = 0; i < Samples.Length; i++) if (!listed[i]) rest.Add(i);
+            if (rest.Count > 0 || built.Count == 0) built.Add(rest.ToArray());
+            strokes = built.ToArray();
+            for (int s = 0; s < strokes.Length; s++) foreach (int index in strokes[s]) strokeOf[index] = s;
+            strokeCovered = new int[strokes.Length];
         }
 
         public bool IsCovered(int index) => covered[index];
+        public int StrokeOf(int index) => strokeOf[index];
+        public int[] StrokePoints(int stroke) => (int[])strokes[stroke].Clone();
 
-        public void Clear() { Array.Clear(covered, 0, covered.Length); CoveredCount = 0; }
+        /// <summary>#533: 지금 획에서 쓰는 방향으로 다음에 칠할 빈 점 번호. 다 썼으면 -1.</summary>
+        public int NextPoint
+        {
+            get
+            {
+                for (int s = CurrentStroke; s < strokes.Length; s++)
+                    foreach (int index in strokes[s]) if (!covered[index]) return index;
+                return -1;
+            }
+        }
 
-        /// <summary>선분 from→to에서 tolerance 안에 든 점을 칠하고, 새로 칠한 점 번호를 fresh에 담는다.</summary>
+        /// <summary>#533: 글자에서 떨어진 곳을 문지른 길이의 합 (글자 칸 폭 = 1).</summary>
+        public float OffLength { get; private set; }
+
+        /// <summary>
+        /// #533: 선분 from→to 중 어느 점에서도 offDistance보다 먼 부분의 길이를 OffLength에 더한다(잘게 나눠 잰다). 더한 길이를 돌려준다.
+        /// </summary>
+        public float AddOffGuide(Vector2 from, Vector2 to, float offDistance)
+        {
+            if (!Finite(from) || !Finite(to) || !(offDistance > 0f) || Samples.Length == 0) return 0f;
+            float length = Vector2.Distance(from, to);
+            if (length <= 1e-6f) return 0f;
+            int steps = Mathf.Clamp(Mathf.CeilToInt(length / .02f), 1, 200);
+            float piece = length / steps, limit = offDistance * offDistance, added = 0f;
+            for (int k = 0; k < steps; k++)
+            {
+                Vector2 at = Vector2.Lerp(from, to, (k + .5f) / steps);
+                bool near = false;
+                for (int i = 0; i < Samples.Length && !near; i++) near = (Samples[i] - at).sqrMagnitude <= limit;
+                if (!near) added += piece;
+            }
+            OffLength += added;
+            return added;
+        }
+
+        /// <summary>#533: 획 하나에서 쓰는 방향으로 연달아 빈 점이 가장 길게 이어진 수 (획 끝의 빈 곳도 센다).</summary>
+        public int LongestGap(int strokeIndex)
+        {
+            int longest = 0, run = 0;
+            foreach (int index in strokes[strokeIndex])
+            {
+                run = covered[index] ? 0 : run + 1;
+                if (run > longest) longest = run;
+            }
+            return longest;
+        }
+
+        /// <summary>#533: 모든 획에서 연달아 빈 점이 maxGap 이하 — 눈으로 봐서 글자가 끊긴 곳 없이 다 쓰였는지.</summary>
+        public bool LooksComplete(int maxGap)
+        {
+            for (int s = 0; s < strokes.Length; s++) if (LongestGap(s) > maxGap) return false;
+            return true;
+        }
+
+        public void Clear()
+        {
+            Array.Clear(covered, 0, covered.Length); CoveredCount = 0; OffLength = 0f;
+            Array.Clear(strokeCovered, 0, strokeCovered.Length); CurrentStroke = 0;
+        }
+
+        /// <summary>선분 from→to에서 tolerance 안에 든 점을 칠하고, 새로 칠한 점 번호를 fresh에 담는다. #533: EnforceOrder일 때만 아직 열리지 않은 획을 건너뛴다.</summary>
         public void Paint(Vector2 from, Vector2 to, float tolerance, List<int> fresh = null)
         {
             if (!Finite(from) || !Finite(to) || !(tolerance > 0f)) return;
             float limit = tolerance * tolerance;
             for (int i = 0; i < Samples.Length; i++)
             {
-                if (covered[i] || DistanceSquared(Samples[i], from, to) > limit) continue;
-                covered[i] = true; CoveredCount++;
+                if (covered[i] || (EnforceOrder && strokeOf[i] > CurrentStroke) || DistanceSquared(Samples[i], from, to) > limit) continue;
+                covered[i] = true; CoveredCount++; strokeCovered[strokeOf[i]]++;
                 fresh?.Add(i);
+                Advance();
             }
+        }
+
+        private void Advance()
+        {
+            float need = Mathf.Clamp01(StrokeAdvance);
+            while (CurrentStroke < strokes.Length - 1
+                   && strokeCovered[CurrentStroke] >= Mathf.CeilToInt(strokes[CurrentStroke].Length * need - 1e-4f)) CurrentStroke++;
         }
 
         private static bool Finite(Vector2 v) => !float.IsNaN(v.x) && !float.IsNaN(v.y) && !float.IsInfinity(v.x) && !float.IsInfinity(v.y);

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using C6Lab;
 using UnityEngine;
 
@@ -59,6 +60,23 @@ namespace Hapio
         private static readonly int[] RetiredFields = System.Linq.Enumerable.ToArray(LabConfig.RetiredDeveloperFields);
         /// <summary>The common gimmick group's settings (#311), which each of the three stages keeps for itself.</summary>
         public static bool IsStageCommonGimmick(int index) => index == 169 || index == 170 || index == 205 || index == 207 || index == 208;
+        /// <summary>Jigwi's 120-second timeline switch (#332): on by default, it schedules A/B and the common gimmicks itself.</summary>
+        public const int JigwiTimelineField = LabConfig.JigwiStageFirstField;
+        /// <summary>
+        /// What Jigwi's timeline (228) replaces while it is on (<see cref="LabConfig.IsReplacedByJigwiTimeline"/>). They
+        /// stay editable in Jigwi's tab, which only shows them while the form has the timeline off.
+        /// </summary>
+        public static bool IsReplacedByJigwiTimeline(int index) => LabConfig.IsReplacedByJigwiTimeline(index);
+        /// <summary>
+        /// A DEV tab row for this form: the fields the scope may edit (<see cref="IsFieldVisible"/>), less the settings
+        /// with no effect in the current game (<see cref="LabConfig.InactiveDeveloperFields"/>) and the rows Jigwi's
+        /// timeline replaces while the form has it on. Hiding a row never changes which values a scope may apply.
+        /// </summary>
+        public static bool IsFieldShown(int scope, int index, float[] values) => IsFieldVisible(scope, index)
+            && !LabConfig.IsInactiveDeveloperField(index)
+            && !(scope == 3 && IsReplacedByJigwiTimeline(index) && values != null && values.Length > JigwiTimelineField
+                && values[JigwiTimelineField] >= .5f);
+        /// <summary>The fields a scope may edit, apply and carry; the tab shows them through <see cref="IsFieldShown"/>.</summary>
         public static bool IsFieldVisible(int scope, int index)
         {
             if (scope < 0 || scope > TerritoryScope || index < 0 || index >= LabConfig.DeveloperFields.Count) return false;
@@ -71,7 +89,9 @@ namespace Hapio
                 || index == 186 || index == 187)) return false;
             if (index == 79) return false; // Retired crack-mode selector; numeric slot stays reserved.
             if (scope == TerritoryScope) return index >= 197 && index <= 199 || IsTerritoryOwned(index);
-            bool yaguang = index >= 155 && index <= 164 || index >= 184 && index <= 191 || index >= 202 && index <= 203 || index >= 236 && index <= 237;
+            // The flash's five-color reward count (236) is the Yaguang's; their paint scale (237) is Common, because every
+            // stage's fever turns the drum's orbs into five-color orbs too (#441).
+            bool yaguang = index >= 155 && index <= 164 || index >= 184 && index <= 191 || index >= 202 && index <= 203 || index == 236;
             // The game always flashes everyone (#301); Lab alone can select a single target.
             if (index == FlashTargetOneField) return false;
             // Lab's own switch for borrowing the fox's gimmicks (#311); a game stage's yokai decides them instead.
@@ -128,6 +148,74 @@ namespace Hapio
 
         /// <summary>The 2:2 battle profile: Common values with the team territory switch on (#281).</summary>
         public LabConfig CreateTerritoryConfig() => CreateStageConfig(TerritoryScope);
+
+        /// <summary>
+        /// 튜토리얼 (#477) 연습 판이 1스테이지(구미호) 값에서 바꾸는 DEV 항목 번호와 값. 시간은 끝나지 않고(화면에도 숨김),
+        /// 구슬·폭탄은 대사를 읽는 동안 사라지거나 터지지 않으며, 무작위 방해공작·아이템·피버·콤보·칠 마름은 모두 끈다.
+        /// 방해공작은 튜토리얼이 정한 단계에서만 직접 일으킨다.
+        /// </summary>
+        public static readonly IReadOnlyList<KeyValuePair<int, float>> TutorialOverrides = new[]
+        {
+            new KeyValuePair<int, float>(2, 86400f),   // Battle Duration: never runs out
+            new KeyValuePair<int, float>(10, 86400f),  // Orb Lifetime: orbs wait while lines are read
+            new KeyValuePair<int, float>(45, 86400f),  // Item Lifetime: a locked bomb never goes off
+            new KeyValuePair<int, float>(39, 50f),     // Yin
+            new KeyValuePair<int, float>(40, 50f),     // Yang
+            new KeyValuePair<int, float>(41, 0f),      // Relay
+            new KeyValuePair<int, float>(42, 0f),      // Secret Box
+            new KeyValuePair<int, float>(43, 0f),      // Potion
+            new KeyValuePair<int, float>(44, 0f),      // Bomb
+            new KeyValuePair<int, float>(51, 0f),      // Contact Combine: orbs flying out of the drum never merge by touch
+            new KeyValuePair<int, float>(74, 1f),      // one drum for the three seats
+            new KeyValuePair<int, float>(76, 0f),      // the drum does not wander
+            new KeyValuePair<int, float>(77, 0f),
+            // A drum passed back always eases to the middle of the board, never passing through (4단계).
+            new KeyValuePair<int, float>(90, 20f),     // Drum Stop Near From
+            new KeyValuePair<int, float>(91, 48f),     // Near To / Middle From
+            new KeyValuePair<int, float>(92, 52f),     // Middle To / Far From
+            new KeyValuePair<int, float>(93, 80f),     // Far To
+            new KeyValuePair<int, float>(94, 0f),      // Near chance
+            new KeyValuePair<int, float>(95, 100f),    // Middle chance
+            new KeyValuePair<int, float>(96, 0f),      // Far chance
+            new KeyValuePair<int, float>(97, 0f),      // Pass-through chance
+            new KeyValuePair<int, float>(87, 0f),      // no timed gourd bombs
+            new KeyValuePair<int, float>(88, 0f),
+            new KeyValuePair<int, float>(148, 0f),     // paint does not dry
+            new KeyValuePair<int, float>(152, 0f),     // no timed swipe block
+            new KeyValuePair<int, float>(155, 0f),     // no gourd color combo
+            new KeyValuePair<int, float>(184, 0f),     // no yaguang flash
+            new KeyValuePair<int, float>(205, 0f),     // no common gimmick draws
+            new KeyValuePair<int, float>(206, 0f),     // no unique gimmick draws
+            new KeyValuePair<int, float>(207, 0f),     // gimmick switches
+            new KeyValuePair<int, float>(208, 0f),
+            new KeyValuePair<int, float>(209, 0f),
+            new KeyValuePair<int, float>(210, 0f),
+            new KeyValuePair<int, float>(238, 0f),     // no fever time
+        };
+
+        /// <summary>1단계 북 치기: 기운은 북을 딱 이만큼 칠 수 있게 가득 차서 시작하고, 그만큼이 최대다.</summary>
+        public const int TutorialDrumTaps = 3;
+        private const int MaximumStaminaField = 3, StartingStaminaField = 4, GenerateCostField = 5,
+            RecoveryAmountField = 6, HitRewardField = 8;
+
+        /// <summary>
+        /// The tutorial practice board (#477): stage 1 with <see cref="TutorialOverrides"/>, and a full gauge that holds
+        /// exactly <see cref="TutorialDrumTaps"/> generations so the third tap empties it.
+        /// </summary>
+        public LabConfig CreateTutorialConfig()
+        {
+            float[] values = Capture(1);
+            foreach (KeyValuePair<int, float> item in TutorialOverrides) values[item.Key] = item.Value;
+            float gauge = values[GenerateCostField] * TutorialDrumTaps;
+            values[MaximumStaminaField] = values[StartingStaminaField] = gauge;
+            values[RecoveryAmountField] = Mathf.Min(values[RecoveryAmountField], gauge);
+            values[HitRewardField] = Mathf.Min(values[HitRewardField], gauge);
+            var result = UnityEngine.Object.Instantiate(template);
+            result.name = "Hapio Tutorial Settings";
+            if (result.TryApplyDeveloperValues(values, out string error)) return result;
+            Release(result);
+            throw new InvalidOperationException(error);
+        }
         /// <summary>Legacy Battle DEV edits Common and the current yokai atomically, never another stage.</summary>
         public bool TryApplyBattle(int stage, float[] values, out string error, bool commit = true)
         {

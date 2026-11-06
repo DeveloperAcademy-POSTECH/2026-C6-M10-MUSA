@@ -7,6 +7,7 @@ using UnityEngine.TestTools;
 
 namespace C6Lab.Tests
 {
+    [Category("Bonjour")]
     public sealed class LabRoomFamilyDiscoveryTests
     {
         [UnityTest]

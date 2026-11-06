@@ -8,6 +8,7 @@ using UnityEngine.UI;
 
 namespace C6Lab.Tests
 {
+    [Category("LabOnly")]
     public sealed class LabStraightThrowDeveloperTests
     {
         private LabNetwork testedNetwork;
@@ -76,7 +77,7 @@ namespace C6Lab.Tests
             testedNetwork = ui.network;
             LabNetwork network = ui.network;
             float[] original = ui.sourceConfig.CaptureDeveloperValues();
-            network.port = 19190;
+            network.port = LabSavedSceneNetworkFixture.AvailableDualFamilyPort();
             try
             {
                 ui.Open();
