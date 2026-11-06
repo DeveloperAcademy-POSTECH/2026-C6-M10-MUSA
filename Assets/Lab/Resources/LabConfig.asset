@@ -45,7 +45,7 @@ MonoBehaviour:
   jigwiStageSpreadSeconds: 1
   jigwiStageSpreadPatches: 3
   jigwiStageFeverMultiplier: 2
-  jigwiABPersonalDurationSeconds: 15
+  jigwiABPersonalDurationSeconds: 7
   jigwiABPersonalRecoveryMultiplier: 4
   jigwiABPersonalRequiredHits: 3
   jigwiABPersonalBurnSeconds: 1
