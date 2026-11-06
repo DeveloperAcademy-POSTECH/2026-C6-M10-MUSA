@@ -28,6 +28,7 @@ MonoBehaviour:
     landingFrames: 0200000005000000i
     scale: 1
     offset: {x: 0, y: 0}
+    forelockTips: []
   - name: "\uBB35\uC774"
     frames:
     - {fileID: 21300000, guid: 360a29bb4e9e34f708009ad95724ab55, type: 3}
@@ -40,6 +41,7 @@ MonoBehaviour:
     landingFrames: 0100000004000000i
     scale: 1
     offset: {x: 0, y: 0}
+    forelockTips: []
   - name: "\uC194\uC774"
     frames:
     - {fileID: 21300000, guid: 64e0d0220b75c40958f583b02775a916, type: 3}
@@ -52,6 +54,39 @@ MonoBehaviour:
     landingFrames: 0100000004000000i
     scale: 1
     offset: {x: 0, y: 0}
+    forelockTips:
+    - {x: 0.516, y: 0.084}
+    - {x: 0.51, y: 0.11}
+    - {x: 0.496, y: 0.118}
+    - {x: 0.516, y: 0.084}
+    - {x: 0.508, y: 0.112}
+    - {x: 0.494, y: 0.118}
+  - name: "\uAE08\uC625\uC774"
+    frames:
+    - {fileID: 21300000, guid: 39f9f76f8fd7e49098e33f8cc9b2e743, type: 3}
+    - {fileID: 21300000, guid: 0481f441b310e4e01bffdb7667b1397c, type: 3}
+    - {fileID: 21300000, guid: 4f025d5c65e9041df968666a21877739, type: 3}
+    - {fileID: 21300000, guid: 45e2942924bef44f8a6fdb334f0a69cb, type: 3}
+    - {fileID: 21300000, guid: 70c10dfff8b8348258a187a54b2be6e5, type: 3}
+    - {fileID: 21300000, guid: c693752e970c94646b55c3f515735f27, type: 3}
+    frameSeconds: 0.14
+    landingFrames: 0100000004000000i
+    scale: 1
+    offset: {x: 0, y: 0}
+    forelockTips: []
+  - name: "\uB9CC\uBCF5\uC774"
+    frames:
+    - {fileID: 21300000, guid: 2b2bd7fb7daa54571a2b1331b85cc7c0, type: 3}
+    - {fileID: 21300000, guid: cdb274ef9e6b04afab6f54dc54b13f92, type: 3}
+    - {fileID: 21300000, guid: 1784c1a4759e8440189cc1d506d136fa, type: 3}
+    - {fileID: 21300000, guid: c3ef952542d4b4d5fb2fedacb70cdfb2, type: 3}
+    - {fileID: 21300000, guid: 0f496e5e5d3b5477d97002f51f18c8b1, type: 3}
+    - {fileID: 21300000, guid: adee26a14000e428b964aec3176e5fe3, type: 3}
+    frameSeconds: 0.14
+    landingFrames: 0100000004000000i
+    scale: 1
+    offset: {x: 0, y: 0}
+    forelockTips: []
   runnerHeight: 182
   runnerCenterFromTop: 0.356
   landingSquash: 0.04

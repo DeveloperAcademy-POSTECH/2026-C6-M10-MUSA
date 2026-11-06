@@ -5933,3 +5933,16 @@ PR-1(`feat/#507-gourd-rig-contract`) 위에서 Unity 6000.6.5f1 macOS batch Edit
 - Unity 6000.6.5f1에서 컴파일 오류 0건. EditMode `GameLoadingViewTests` 9개, PlayMode `GameLoadingViewFlowTests` 2개 통과.
 - Editor에서 390×844 로딩 화면을 렌더링해 솔이 6장 각각의 정지·최대 흔들림을 비교했다. 눈에 보이는 픽셀 변화는 앞머리 주변에 한정됐고, 100% 착지 이후 흔들림이 0으로 돌아오는 것을 별도로 확인했다. iPhone 실기기 미실행.
 - 후속 조정에서 위로 들리는 폭을 그림 높이의 1.4%에서 2.5%로 키웠다. 같은 해상도에서 6장을 다시 렌더링했다. 메시의 실제 최대 이동량은 4.44~4.54pt였고, 앞머리 주변에만 픽셀 변화가 있었으며 메시 뒤집힘 없이 착지 후 정지했다. 컴파일 오류 0건, 위 EditMode 9개와 PlayMode 2개를 다시 실행해 모두 통과했다.
+
+### #478 로딩 화면 금옥이 — 2026-11-06
+
+- 사용자가 준 금옥이 달리기 6장(460×488, 투명 배경, 여섯 장 모두 같은 크기)을 그대로 `Assets/Hapio/Art/Loading/Characters/Geumok/GeumokRun01~06.png`로 가져왔다. 받은 파일과 프로젝트 파일이 바이트까지 같은 것을 확인했다. `LoadingArt`의 네 번째 후보이며, 그림당 0.14초이고 2·5번 그림에서 착지한다(그림 1·4는 두 발이 다 뜨고, 2·5에서 앞발이 땅에 닿는다).
+- Unity 6000.6.5f1에서 컴파일 오류 0건. EditMode `GameLoadingViewTests` 9개 통과. 금옥이의 그림 순서·착지 프레임과 네 캐릭터의 무작위 선택을 검사했다.
+- PlayMode `GameLoadingViewFlowTests` 2개 통과. `GameLoadingSessionTests`를 포함한 실행은 테스트 씬 정리 중 대기 상태가 이어져 취소했다. 화면 전환 테스트 결과는 미확정이다.
+- Editor에서 390×844 로딩 화면을 렌더링했다. 여섯 장 모두 투명 여백과 182pt 배치가 적용됐고, ‘로딩중’과 겹치지 않으며 100% 착지에서 멈췄다. iPhone 실기기 미실행.
+
+### #478 로딩 화면 만복이 — 2026-11-06
+
+- 첨부 그림으로 만든 달리기 6장을 같은 483×433 투명 스프라이트로 가져왔다. `LoadingArt`의 다섯 번째 후보이며, 그림당 0.14초이고 2·5번 그림에서 착지한다.
+- Unity 6000.6.5f1에서 컴파일 오류 0건. EditMode `GameLoadingViewTests` 9개와 PlayMode `GameLoadingViewFlowTests` 2개 통과. 만복이 그림 순서·착지와 다섯 캐릭터의 무작위 선택을 검사했다.
+- Editor에서 390×844 화면에 여섯 장을 렌더링했다. 182pt 배치에서 ‘로딩중’과 겹치지 않고 100%에서 착지 자세를 유지했다. 내보낸 PNG ZIP 6개 항목의 무결성을 확인했다. iPhone 실기기 미실행.
