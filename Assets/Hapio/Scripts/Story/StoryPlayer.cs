@@ -39,6 +39,9 @@ namespace Hapio
         public StoryCutView CurrentView => currentView;
 
         private StoryCutView currentView;
+        private bool shownCardHint;
+        private AudioSource musicSource;
+        private float musicTarget;
         private float elapsed;
         private float readElapsed;
         private int lastInputFrame = -1;
@@ -106,6 +109,7 @@ namespace Hapio
         {
             if (touchOnly && StoryTapAdvance.PressedTouchCount > 1) suppressMultiTouch = true;
             AdvanceTime(Time.unscaledDeltaTime);
+            UpdateMusic(Time.unscaledDeltaTime);
         }
 
         private void LateUpdate()
@@ -219,6 +223,18 @@ namespace Hapio
             nextView.Sample(0f);
             CurrentCutIndex = index;
             currentView = nextView;
+            var card = currentView.GetComponentInChildren<StoryCardFlip>();
+            if (card != null && card.swipeHint != null)
+            {
+                card.SetHintVisible(!shownCardHint);
+                shownCardHint = true;
+            }
+            if (currentView.continueButton != null)
+            {
+                currentView.continueButton.gameObject.SetActive(false);
+                currentView.continueButton.onClick.AddListener(RequestNext);
+            }
+            SetMusic(currentView.music, currentView.musicVolume);
             ApplyDialogueLayout();
             elapsed = readElapsed = 0f;
             CurrentPageIndex = 0;
@@ -233,6 +249,7 @@ namespace Hapio
         private void BeginReading()
         {
             IsReading = true;
+            if (currentView.continueButton != null) currentView.continueButton.gameObject.SetActive(true);
             readElapsed = 0f;
             SetDialogueVisible(!currentView.hideEmptyDialogue ||
                 !string.IsNullOrWhiteSpace(currentPage.dialogue) || !string.IsNullOrWhiteSpace(currentPage.speaker));
@@ -382,12 +399,39 @@ namespace Hapio
             dialogueGroup.blocksRaycasts = visible;
         }
 
+        private void SetMusic(AudioClip clip, float volume)
+        {
+            musicTarget = clip != null ? Mathf.Clamp01(volume) : 0;
+            if (!Application.isPlaying || clip == null) return;
+            if (musicSource == null)
+            {
+                var music = new GameObject("Story Music");
+                music.transform.SetParent(transform, false);
+                musicSource = music.AddComponent<AudioSource>();
+                musicSource.playOnAwake = false;
+                musicSource.loop = true;
+                musicSource.spatialBlend = 0;
+            }
+            if (musicSource.clip == clip && musicSource.isPlaying) return;
+            musicSource.clip = clip;
+            musicSource.volume = 0;
+            musicSource.Play();
+        }
+
+        private void UpdateMusic(float seconds)
+        {
+            if (musicSource == null || !musicSource.isPlaying) return;
+            musicSource.volume = Mathf.MoveTowards(musicSource.volume, musicTarget, seconds * .36f);
+            if (musicTarget == 0 && musicSource.volume == 0) musicSource.Stop();
+        }
+
         private void Finish(StoryExitReason reason)
         {
             // Clear state before invoking callbacks, so repeated clicks cannot finish twice.
             IsPlaying = false;
             UpdatePreviousButton();
             if (voiceSource != null) voiceSource.Stop();
+            musicTarget = 0;
             if (reason == StoryExitReason.Completed) onCompleted.Invoke();
             else onSkipped.Invoke();
             Finished?.Invoke(reason);
@@ -396,6 +440,8 @@ namespace Hapio
         public void Cancel()
         {
             IsPlaying = IsReading = false;
+            musicTarget = 0;
+            if (musicSource != null) musicSource.Stop();
             UpdatePreviousButton();
             ReleaseView();
             SetDialogueVisible(false);
