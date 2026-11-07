@@ -510,26 +510,34 @@ namespace C6Lab
             }
         }
 
-        /// <summary>#540: how long my screen flares after my unfinished talisman's fireball lands.</summary>
-        public const float ABlazeSeconds = 1.6f;
-        private double blazeFrom = -1d;
-        /// <summary>#540: true while my screen flares for my unfinished talisman.</summary>
-        public bool ABlazeVisible { get; private set; }
-
-        /// <summary>
-        /// #540: 내 부적을 못 써 판이 탄 뒤(불덩이가 판에 닿은 때부터) seconds 동안 내 북에 불이 붙어 있는지.
-        /// </summary>
-        public static bool DrumsAlight(LabSnapshot snapshot, ulong player, double now, float seconds)
+        /// <summary>#540: 내 부적을 못 써 판이 탄 뒤(불덩이가 판에 닿은 때부터) seconds 동안 내 북에 붙은 불이 꺼지기까지 남은 초 (없으면 0).</summary>
+        public static float DrumFireSecondsLeft(LabSnapshot snapshot, ulong player, double now, float seconds)
         {
-            if (seconds <= 0f || snapshot == null || snapshot.phase != LabPhase.Playing || snapshot.jigwiAB?.rounds == null) return false;
+            if (seconds <= 0f || snapshot == null || snapshot.phase != LabPhase.Playing || snapshot.jigwiAB?.rounds == null) return 0f;
             foreach (var round in snapshot.jigwiAB.rounds)
             {
                 if (round == null || round.kind != LabJigwiABKind.PersonalBurn || round.resolution != LabJigwiABResolution.Expired
                     || round.resolvedAt < 0d || !SeatFailed(round, player)) continue;
                 double from = round.resolvedAt + LabModel.JigwiTalismanFailBurnDelaySeconds;
-                if (now >= from && now < from + seconds) return true;
+                if (now >= from && now < from + seconds) return (float)(from + seconds - now);
             }
-            return false;
+            return 0f;
+        }
+
+        /// <summary>
+        /// #540: 부적을 못 써 타는 구슬의 남은 초 (Host 소각 시각까지). 그 A가 시간이 다 돼 끝난 소각만, 아니면 0.
+        /// 불덩이가 판에 닿는 순간부터 구슬은 코드로 그린 불(`LabJigwiBlaze`)로 크게 타오른다.
+        /// </summary>
+        public static float FailBlazeSecondsLeft(LabSnapshot snapshot, LabOrbState orb, double serverTime)
+        {
+            if (orb == null || orb.jigwiABBurnAt < 0d || string.IsNullOrEmpty(orb.jigwiABBurnEventId) || snapshot?.jigwiAB?.rounds == null) return 0f;
+            foreach (var round in snapshot.jigwiAB.rounds)
+                if (round != null && round.id == orb.jigwiABBurnEventId && round.kind == LabJigwiABKind.PersonalBurn
+                    && round.resolution == LabJigwiABResolution.Expired
+                    // They catch the moment the fireball lands on the board.
+                    && serverTime >= round.resolvedAt + LabModel.JigwiTalismanFailBurnDelaySeconds)
+                    return Mathf.Max(0f, (float)(orb.jigwiABBurnAt - serverTime));
+            return 0f;
         }
 
         private static bool SeatFailed(LabJigwiABRound round, ulong player)
@@ -549,28 +557,15 @@ namespace C6Lab
             {
                 if (round != null && round.kind == LabJigwiABKind.GroupFire && round.resolution == LabJigwiABResolution.Expired
                     && now >= round.resolvedAt && now < round.boardFireUntil) fireUntil = Math.Max(fireUntil, round.boardFireUntil);
-                // #540: my unfinished talisman — once the fireball lands, my screen flares with fire while my board blazes.
-                if (round != null && round.kind == LabJigwiABKind.PersonalBurn && round.resolution == LabJigwiABResolution.Expired
-                    && round.resolvedAt >= 0d && SeatFailed(round, localPlayer))
-                {
-                    double from = round.resolvedAt + LabModel.JigwiTalismanFailBurnDelaySeconds;
-                    if (now >= from && now < from + ABlazeSeconds) blazeFrom = from;
-                }
+                // #540: an unfinished talisman shows no screen fire; the orbs and drums blazing carry it.
             }
             BoardFireVisible = fireUntil > now;
             bool flash = failedAt >= 0d && now >= failedAt && now - failedAt < FailureFlashSeconds;
-            bool blaze = blazeFrom >= 0d && now >= blazeFrom && now < blazeFrom + ABlazeSeconds;
-            ABlazeVisible = blaze;
-            bool visible = flash || BoardFireVisible || blaze;
+            bool visible = flash || BoardFireVisible;
             failureOverlay.gameObject.SetActive(visible);
             if (!visible) return;
-            float elapsed = (float)(now - Math.Max(0d, blaze ? blazeFrom : failedAt));
-            float opacity = flash ? 1f - (float)(now - Math.Max(0d, failedAt)) / (float)FailureFlashSeconds : 0f;
-            if (blaze)
-            {
-                float t = elapsed / ABlazeSeconds;
-                opacity = Mathf.Max(opacity, t < .08f ? t / .08f : 1f - Mathf.SmoothStep(.45f, 1f, t));
-            }
+            float elapsed = (float)(now - Math.Max(0d, failedAt));
+            float opacity = flash ? 1f - elapsed / (float)FailureFlashSeconds : 0f;
             if (BoardFireVisible) opacity = Mathf.Max(opacity, .55f);
             if (failureStatus != null) failureStatus.text = string.Empty; // #509: no failure / board-fire words
             failureOverlay.color = new Color(1f, .13f, .01f, .22f * opacity);

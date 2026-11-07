@@ -30,6 +30,11 @@ namespace C6Lab
         private string jigwiABBurnQueueId;
         /// <summary>#540: no orb burns while the talisman is being written; only an A that runs out burns the board.</summary>
         private bool jigwiAHoldBurn;
+        /// <summary>
+        /// #540: orbs whose lifetime is paused while their seat writes the talisman (orb id → seat). Host memory only;
+        /// the pause shows in the snapshot as a later expiresAt.
+        /// </summary>
+        private readonly Dictionary<string, ulong> jigwiAPausedOrbs = new Dictionary<string, ulong>(StringComparer.Ordinal);
         private int jigwiTalismanWaterCount;
         /// <summary>#509: talisman Water drops in one at a time; each pending orb's owner, index and Host due time.</summary>
         private readonly List<(ulong owner, int index, double dueAt)> jigwiTalismanDrops = new List<(ulong, int, double)>();
@@ -55,7 +60,7 @@ namespace C6Lab
             jigwiAHoldBurn = config.JigwiAHoldBurnUntilEnd;
             jigwiCommonStart = config.JigwiCommonStartSeconds; jigwiCommonInterval = config.JigwiCommonIntervalSeconds;
             jigwiABRounds.Clear(); jigwiABActivated.Clear(); jigwiABFailureRevision = 0;
-            jigwiABLastBurnAt.Clear(); jigwiABBurnQueueId = null; jigwiTalismanDrops.Clear();
+            jigwiABLastBurnAt.Clear(); jigwiABBurnQueueId = null; jigwiTalismanDrops.Clear(); jigwiAPausedOrbs.Clear();
             ResetJigwiABSupply(config);
             if (!jigwiABEnabled) return;
             // Preserve the old code as an inactive migration path, never run two policies together.
@@ -147,6 +152,7 @@ namespace C6Lab
                 // A stable order so each owner's orbs catch fire one after another in creation order.
                 foreach (var orb in orbs.Values.OrderBy(value => value.createdAt).ThenBy(value => value.id, StringComparer.Ordinal).ToArray())
                     ApplyJigwiABOrb(orb, active.activeAt);
+                if (active.kind == LabJigwiABKind.PersonalBurn && jigwiAHoldBurn) PauseJigwiAOrbLifetimes(active);
                 revision++;
             }
             if (active.kind != LabJigwiABKind.GroupFire) return;
@@ -401,6 +407,7 @@ namespace C6Lab
             var player = active.players.FirstOrDefault(value => value.playerId == sender);
             if (player == null || player.talismanAt >= 0d) return false;
             player.talismanAt = now;
+            ResumeJigwiAOrbLifetimes(sender, active.endsAt - now);
             foreach (var orb in orbs.Values)
                 if (orb.owner == sender && orb.jigwiABBurnEventId == active.id)
                 { orb.jigwiABBurnEventId = null; orb.jigwiABBurnAt = -1d; orb.revision = ++revision; }
@@ -408,6 +415,38 @@ namespace C6Lab
             revision++;
             if (active.players.All(value => value.talismanAt >= 0d)) ResolveJigwiAB(active, LabJigwiABResolution.Completed, now);
             return true;
+        }
+        /// <summary>
+        /// #540: while a seat writes its talisman, the orbs already on its board stop ageing (their lifetime is paused),
+        /// so an unfinished talisman's penalty burns a full board. The pause is booked up front as the A's whole length
+        /// and the unused part is handed back when the seat finishes early.
+        /// </summary>
+        private void PauseJigwiAOrbLifetimes(LabJigwiABRound active)
+        {
+            jigwiAPausedOrbs.Clear();
+            double hold = Math.Max(0d, active.endsAt - active.activeAt);
+            if (hold <= 0d) return;
+            foreach (var orb in orbs.Values)
+            {
+                if (orb.inFlight || orb.jigwiTalismanReward || orb.createdAt > active.activeAt
+                    || (!orb.kind.IsRaw() && orb.kind != LabOrbKind.Combined)) continue;
+                if (!active.players.Any(seat => seat.playerId == orb.owner && seat.talismanAt < 0d)) continue;
+                double ordinary = orb.expiresAt >= 0d ? orb.expiresAt : orb.createdAt + LifetimeOf(orb);
+                if (ordinary <= active.activeAt) continue;
+                orb.expiresAt = ordinary + hold;
+                orb.revision = ++revision;
+                jigwiAPausedOrbs[orb.id] = orb.owner;
+            }
+        }
+        private void ResumeJigwiAOrbLifetimes(ulong seat, double unused)
+        {
+            if (jigwiAPausedOrbs.Count == 0) return;
+            foreach (var pair in jigwiAPausedOrbs.Where(value => value.Value == seat).ToArray())
+            {
+                jigwiAPausedOrbs.Remove(pair.Key);
+                if (unused > 0d && orbs.TryGetValue(pair.Key, out var orb))
+                { orb.expiresAt -= unused; orb.revision = ++revision; }
+            }
         }
         private void GrantJigwiTalismanWater(ulong owner, double now)
         {

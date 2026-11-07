@@ -236,6 +236,18 @@ namespace C6Lab.Tests
             Assert.That(m.Snapshot(20.5).orbs.Count(o=>o.id==mine.id||o.id==fresh.id),Is.EqualTo(2),"They blaze together first…");
             Assert.That(m.Snapshot(22).orbs.Any(o=>o.id==mine.id||o.id==fresh.id),Is.False,"…then the whole board burns away.");
         }
+        [Test] public void WritingPausesTheLifetimeOfOrbsAlreadyOnThatBoard()
+        {
+            // #540: the A runs 5 → 20. Orbs already on a writing board stop ageing; a finished seat gets the unused part back.
+            JsonUtility.FromJsonOverwrite("{\"jigwiAHoldBurnUntilEnd\":true}",config);
+            var m=Room();
+            var mine=Add(m,Players[0],4);mine.expiresAt=8;var theirs=Add(m,Players[1],4);theirs.expiresAt=8;
+            var a=Current(m,5);
+            Assert.That(m.Snapshot(9).orbs.Single(o=>o.id==mine.id).expiresAt,Is.EqualTo(23),"Paused for the whole A while writing.");
+            Assert.That(m.TryCompleteJigwiTalisman(Players[1],a.id,10),Is.True);
+            Assert.That(m.Snapshot(10).orbs.Single(o=>o.id==theirs.id).expiresAt,Is.EqualTo(13),"Paused only while that seat wrote (5 → 10).");
+            Assert.That(m.Snapshot(12).orbs.Any(o=>o.id==mine.id),Is.True,"Still on the board after its old lifetime.");
+        }
         [Test] public void BGivesEachPickedSeatOneSpecialWaterWhileOrdinaryRawPairsKeepTheirNormalElement()
         {
             // #509: two players → both picked; each gets exactly one special Water on its own board.

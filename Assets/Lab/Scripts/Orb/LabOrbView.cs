@@ -455,7 +455,6 @@ namespace C6Lab
         /// <summary>Host-approved A deadline feedback only; held means the battle clock is paused/counting down.</summary>
         public void SetJigwiABBurn(float secondsLeft, bool held = false)
         {
-            if (kind.IsDrum()) return; // #540 a drum's flame is SetJigwiDrumFire's
             if (!kind.IsRaw() && kind != LabOrbKind.Combined) secondsLeft = 0f;
             if (jigwiABFlame == null)
             {
@@ -465,17 +464,18 @@ namespace C6Lab
             jigwiABFlame.Show(secondsLeft, visualRadius, held);
         }
 
-        /// <summary>#540: a drum set alight by an unfinished talisman (its board burned). Flame only; the drum never burns away.</summary>
-        public void SetJigwiDrumFire(bool on)
+        private LabJigwiBlaze jigwiBlaze;
+        /// <summary>
+        /// #540 지귀 A 실패: 구슬·북이 코드로 그린 불(`LabJigwiBlaze`)로 크게 타오른다. 구슬은 끝에 그을려 사라지고, 북은 잦아든다.
+        /// </summary>
+        public void SetJigwiBlaze(float secondsLeft)
         {
-            if (!kind.IsDrum()) on = false;
-            if (jigwiABFlame == null)
+            if (jigwiBlaze == null)
             {
-                if (!on) return;
-                jigwiABFlame = LabJigwiOrbFlame.Create(transform);
+                if (!(secondsLeft > 0f)) return;
+                jigwiBlaze = LabJigwiBlaze.Create(transform);
             }
-            // A far-off deadline keeps the flame burning without ever charring the drum.
-            jigwiABFlame.Show(on ? 99f : 0f, visualRadius);
+            jigwiBlaze.Show(secondsLeft, visualRadius, !kind.IsDrum());
         }
 
         /// <summary>Only tagged free B water gets the drop/ripple; ordinary Water art stays unchanged.</summary>

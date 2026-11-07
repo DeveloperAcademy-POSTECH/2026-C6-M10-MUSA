@@ -274,7 +274,6 @@ namespace C6Lab
         private RectTransform emberBand;
         private UnityEngine.UI.Image[] flames = Array.Empty<UnityEngine.UI.Image>();
         private UnityEngine.UI.Image[] sparks = Array.Empty<UnityEngine.UI.Image>();
-        private Sprite[] flameFrames;
         /// <summary>#533: 못 다 쓴 부적이 타는 중인지. 이때 조합판은 이미 풀려 있다.</summary>
         public bool Burning => burnAge >= 0f;
         public float BurnTotalSeconds => burnSeconds + ashSeconds;
@@ -534,8 +533,7 @@ namespace C6Lab
                 for (int k = 0; k < flames.Length; k++)
                 {
                     if (flames[k] == null) continue;
-                    if (flameFrames != null && flameFrames.Length > 0)
-                        flames[k].sprite = flameFrames[(int)(time * 14f + k * 2) % flameFrames.Length];
+                    flames[k].sprite = LabProceduralFire.Flame((int)(time * 12f) + k * 2); // #540 code-drawn fire
                     float flicker = .75f + .35f * Mathf.Sin(time * (17f + k * 3f) + k);
                     float size = r.width * .13f * flicker * Mathf.Lerp(.6f, 1f, strength);
                     RectTransform f = flames[k].rectTransform;
@@ -1738,14 +1736,12 @@ namespace C6Lab
             scorch.gameObject.SetActive(false);
             emberBand = NewRect("Talisman Burn Flames", paper);
             Stretch(emberBand, 0f);
-            flameFrames = Resources.LoadAll<Sprite>("Bomb/BlastFire");
-            if (flameFrames != null) Array.Sort(flameFrames, (a, b) => string.CompareOrdinal(a.name, b.name));
             flames = new UnityEngine.UI.Image[6];
             for (int k = 0; k < flames.Length; k++)
             {
                 var flame = NewRect("Burn Flame " + k, emberBand).gameObject.AddComponent<UnityEngine.UI.Image>();
                 flame.raycastTarget = false; flame.preserveAspect = true;
-                flame.sprite = flameFrames != null && flameFrames.Length > 0 ? flameFrames[0] : WatercolorDot();
+                flame.sprite = LabProceduralFire.Flame(k);
                 flames[k] = flame;
             }
             emberBand.gameObject.SetActive(false);

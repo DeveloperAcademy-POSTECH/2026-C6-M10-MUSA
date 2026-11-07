@@ -2181,6 +2181,7 @@ namespace C6Lab
                 // Every screen derives a locked bomb's fuse from the shared Host clock in the snapshot.
                 float fuse = orb.kind == LabOrbKind.Bomb && orb.lockSwipes > 0 && config != null
                     ? Mathf.Max(0f, (float)(orb.createdAt + config.ItemLifetimeSeconds - latest.serverTime)) : -1f;
+                float blaze = LabJigwiScreenPresentation.FailBlazeSecondsLeft(latest, orb, latest.serverTime);
                 LabOrbView view = board.UpsertOrb(orb.id, orb.kind, new Vector2(orb.x, orb.y),
                     new Vector2(orb.vx, orb.vy), true, showSpawn, orb.element, orb.lockSwipes, orb.relayStage, fuse,
                     orb.JustUnlocked(latest.serverTime), small: orb.small,
@@ -2193,15 +2194,20 @@ namespace C6Lab
                         : orb.LifeSecondsLeft(latest.serverTime, config.OrbLifetimeSeconds, config.ItemLifetimeSeconds),
                     jigwiScale: orb.jigwiRadiusScale, fever: orb.fever, fiveColor: orb.fiveColor,
                     jigwiABScale: orb.jigwiABRadiusScale,
-                    jigwiABBurnSeconds: orb.jigwiABBurnAt >= 0d ? Mathf.Max(0f, (float)(orb.jigwiABBurnAt - latest.serverTime)) : 0f,
+                    // #540: an unfinished talisman's blaze replaces the A char on those orbs.
+                    jigwiABBurnSeconds: orb.jigwiABBurnAt >= 0d && blaze <= 0f ? Mathf.Max(0f, (float)(orb.jigwiABBurnAt - latest.serverTime)) : 0f,
                     jigwiABHeld: latest.paused || GameStartHeld,
                     // An unlocked bomb (#328) glides in to the Host's spot like a drum, then opens there.
                     arrival: orb.kind == LabOrbKind.Bomb && orb.JustArrived(latest.serverTime) ? orb.arrival : LabDrumArrival.None,
                     stopAt: orb.stopAt);
+                view?.SetJigwiBlaze(blaze); // #540 an unfinished talisman's board blazes up (code-drawn fire)
                 view?.SetJigwiSupplyWaterArt(!string.IsNullOrEmpty(orb.jigwiABSupplyEventId) || orb.jigwiTalismanReward,
                     latest.paused || GameStartHeld, special: !string.IsNullOrEmpty(orb.jigwiABSupplyEventId), // #509 특수 물구슬
                     talisman: orb.jigwiTalismanReward); // #540 부적 구슬
             }
+            // #540: my unfinished talisman set my drums alight — they burn (bomb fire) and turn light and slippery.
+            float drumFire = config != null ? LabJigwiScreenPresentation.DrumFireSecondsLeft(latest, LocalPlayerId,
+                JigwiABPresentationTime, config.JigwiAFailDrumSlipSeconds) : 0f;
             foreach (var drum in latest.drums ?? Array.Empty<LabOrbState>())
             {
                 if (drum.owner != LocalPlayerId) continue;
@@ -2209,7 +2215,8 @@ namespace C6Lab
                 // A drum just handed to this player arrives the way the Host drew it (#178); an older
                 // handoff, seen late after a reconnect, is not replayed.
                 board.UpsertOrb(drum.id, drum.kind, new Vector2(drum.x, drum.y), new Vector2(drum.vx, drum.vy),
-                    arrival: drum.JustArrived(latest.serverTime) ? drum.arrival : LabDrumArrival.None, stopAt: drum.stopAt);
+                    arrival: drum.JustArrived(latest.serverTime) ? drum.arrival : LabDrumArrival.None, stopAt: drum.stopAt,
+                    burnSeconds: drumFire); // #540 a burning drum wears the bomb fire
             }
             foreach (string id in board.OrbIds)
                 if (!current.Contains(id) && !board.ShouldPreserveFromSnapshot(id)) board.RemoveOrb(id);
@@ -2230,8 +2237,7 @@ namespace C6Lab
             board.SetJigwiOverheat(latest.phase == LabPhase.Playing
                 && latest.JigwiFor(LocalPlayerId)?.Overheated(latest.serverTime) == true);
             // #540: my unfinished talisman set my drums alight — light and slippery for a while.
-            board.SetJigwiDrumSlip(config != null && LabJigwiScreenPresentation.DrumsAlight(latest, LocalPlayerId,
-                JigwiABPresentationTime, config.JigwiAFailDrumSlipSeconds) ? config.JigwiAFailDrumSlipBoost : 1f);
+            board.SetJigwiDrumSlip(drumFire > 0f ? config.JigwiAFailDrumSlipBoost : 1f);
             if (blockedHere && (latest.round != announcedBlockRound || latest.swipeBlockStartedAt != announcedBlockStart))
             {
                 announcedBlockRound = latest.round;

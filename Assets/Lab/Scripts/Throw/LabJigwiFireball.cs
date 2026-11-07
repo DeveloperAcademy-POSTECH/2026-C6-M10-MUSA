@@ -8,6 +8,7 @@ namespace C6Lab
     /// #540 지귀 A "다 태워버리겠어" 불덩이 (3D, 그 자리 사람 전투 화면에만). 판의 구슬은 쓰는 동안 건드리지 않고,
     /// 남은 시간은 박 위 불덩이 크기로 보인다.
     /// - 예고(2초): 박 위에 불씨가 탁 튀고 작은 불덩이로 붙는다 (Kindle).
+    /// 불꽃은 모두 코드로 그린다(`LabProceduralFire`).
     /// - A 동안: 불덩이가 점점 커지며 더 빠르게 일렁이고, 끝이 다가오면 떨린다 (Grow).
     /// - 다 쓰면: 불덩이가 그 자리에 그대로 멈추고(흔들림·불꽃 움직임 없음) 푸른 가루와 함께 조용히 사라진다 (Douse).
     /// - 못 쓰고 끝나면: 불덩이가 화면 아래(내 조합판)로 떨어진다 (Fall). 그때 판의 구슬이 모두 탄다(Host 규칙).
@@ -27,7 +28,6 @@ namespace C6Lab
         private SpriteRenderer halo, ball, core;
         private readonly SpriteRenderer[] tongues = new SpriteRenderer[TongueCount];
         private readonly SpriteRenderer[] embers = new SpriteRenderer[EmberCount];
-        private Sprite[] fireFrames;
         private Camera view;
         private float frozenTime = -1f, frozenSize;
         private bool dousedBurst;
@@ -84,14 +84,12 @@ namespace C6Lab
         }
 
         /// <summary>A 진행(0~1) → 불덩이 크기(0~1). 처음 작은 불씨에서 끝으로 갈수록 빨리 커진다.</summary>
-        public static float Grown(float t) => Mathf.Lerp(.18f, 1f, Mathf.Pow(Mathf.Clamp01(t), 1.4f));
+        public static float Grown(float t) => Mathf.Lerp(.27f, 1f, Mathf.Pow(Mathf.Clamp01(t), 1.4f)); // #540 starts 1.5× the first spark
 
         public static LabJigwiFireball Create()
         {
             var root = new GameObject("Jigwi Fireball (#540)");
             var fire = root.AddComponent<LabJigwiFireball>();
-            fire.fireFrames = Resources.LoadAll<Sprite>("Bomb/BlastFire");
-            if (fire.fireFrames != null) Array.Sort(fire.fireFrames, (a, b) => string.CompareOrdinal(a.name, b.name));
             fire.halo = fire.Part("Fireball Halo", GlowSprite(), Outer, 37);
             for (int i = 0; i < TongueCount; i++)
                 fire.tongues[i] = fire.Part("Fireball Tongue", fire.FireFrame(i), Color.white, 38);
@@ -104,8 +102,8 @@ namespace C6Lab
             return fire;
         }
 
-        private Sprite FireFrame(int index) =>
-            fireFrames != null && fireFrames.Length > 0 ? fireFrames[((index % fireFrames.Length) + fireFrames.Length) % fireFrames.Length] : GlowSprite();
+        // #540: every Jigwi fire is drawn in code (no picture files).
+        private Sprite FireFrame(int index) => LabProceduralFire.Flame(index);
 
         private SpriteRenderer Part(string label, Sprite sprite, Color color, int order)
         {
@@ -209,7 +207,7 @@ namespace C6Lab
                 float angle = Mathf.Lerp(-110f, 110f, (i + .5f) / TongueCount) + Mathf.Sin(time * 3f + i) * 8f;
                 float rad = (angle + 90f) * Mathf.Deg2Rad;
                 float reach = radius * (.75f + .15f * Mathf.Sin(time * 11f + i * 1.7f));
-                tongue.sprite = FireFrame((int)(time * 14f) + i * 2);
+                tongue.sprite = FireFrame((int)(time * 12f) + i * 2);
                 Vector2 tongueSize = tongue.sprite.bounds.size;
                 float height = radius * Mathf.Lerp(1.1f, 1.5f, heat) * (1f - Mathf.Abs(angle) / 260f);
                 tongue.transform.localScale = Vector3.one * height / Mathf.Max(.0001f, tongueSize.y);

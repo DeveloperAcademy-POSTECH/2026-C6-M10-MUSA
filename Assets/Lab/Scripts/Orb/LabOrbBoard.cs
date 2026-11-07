@@ -284,16 +284,9 @@ namespace C6Lab
         public void SetJigwiOverheat(bool active) => jigwiOverheat = active;
         /// <summary>
         /// #540 지귀 A 실패: 이 판의 북에 불이 붙어 가벼워진다(1 = 그대로). 옆으로 살짝만 밀어도 이 배 빠르게 나가고,
-        /// 미끄러지며 느려지는 정도는 1/이 배라 훨씬 멀리 간다. 북에 불꽃도 보인다. 이 기기 판 물리·그림만 바꾼다.
+        /// 미끄러지며 느려지는 정도는 1/이 배라 훨씬 멀리 간다. 이 기기 판 물리만 바꾼다(불꽃 그림은 UpsertOrb의 burnSeconds).
         /// </summary>
-        public void SetJigwiDrumSlip(float boost)
-        {
-            boost = float.IsNaN(boost) || boost < 1f ? 1f : boost;
-            bool changed = !Mathf.Approximately(boost, jigwiDrumSlip);
-            jigwiDrumSlip = boost;
-            foreach (var entry in entries.Values)
-                if (entry.View != null && entry.View.Kind.IsDrum() && (changed || boost > 1f)) entry.View.SetJigwiDrumFire(boost > 1f);
-        }
+        public void SetJigwiDrumSlip(float boost) => jigwiDrumSlip = float.IsNaN(boost) || boost < 1f ? 1f : boost;
         public float JigwiDrumSlip => jigwiDrumSlip;
         private float jigwiDrumSlip = 1f;
 
