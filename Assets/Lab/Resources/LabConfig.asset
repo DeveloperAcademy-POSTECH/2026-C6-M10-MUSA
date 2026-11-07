@@ -59,6 +59,7 @@ MonoBehaviour:
   jigwiTalismanWaterCount: 1
   jigwiTalismanWaterPaintScale: 3
   jigwiTalismanRewardDelaySeconds: 2.9
+  jigwiBBoardFireSeconds: 0
   jigwiAFailDrumSlipSeconds: 15
   jigwiAFailDrumSlipBoost: 2
   jigwiABShrinkDelaySeconds: 12
