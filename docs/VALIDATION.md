@@ -5862,8 +5862,13 @@ PR-1(`feat/#507-gourd-rig-contract`) 위에서 Unity 6000.6.5f1 macOS batch Edit
 | EditMode `LabBulkAdaptiveRetransmitTests`·`LabBulkChannelTests` — 수정 전 송신기 + 새 검사 | 33개 중 **30 PASS / 3 FAIL**(새 검사 3개, 아래) | 0.12초 |
 | 같은 두 클래스 — 수정 후 | **33/33 PASS** | 0.11초 |
 | 전체 EditMode — 수정 후 | **2026/2026 PASS** | 25.32초 |
+| 전체 PlayMode — 수정 후 `50c023d9`, 2026-11-07 | **654/655 PASS / 1 FAIL**(Bulk와 무관, 아래) | 502.73초 |
 
 - 각 실행의 skip/inconclusive는 0이다.
+- **전체 PlayMode의 실패 1개:** `Hapio.Experiments.Tests.ClayPreviewPlayModeTests.PackedSampleKeepsAllFourHalfChannelsAndActualCoatingCoverage`(Category `GPU`·`Legacy`·`Slow`, Mac 클레이 재질 실험)다.
+  - 가져온 `Sample/Height.exr`의 GPU 읽기 해시(`73e0cbd6…`)가 `SampleInfo.json`의 값(`6388ad86…`)과 달랐다. `46ae9987`의 이전 값(`e2f68190…`)과도 다르다.
+  - 이 변경은 Bulk 송신기·EditMode 검사·문서만 바꾸며 이 경로와 겹치는 코드가 없다. 이 worktree의 Library는 main 폴더(`46ae9987`)의 Library를 복제해 썼다.
+  - Bulk·네트워크 관련 PlayMode는 모두 통과했다: `LabLocalBoardNetworkIntegrationTests` 21/21, `GameSceneFlowTests` 21/21, `LabJigwiABNetworkTests` 9/9, `LabMessageHandlerReconnectTests` 1/1, `LabDeveloperSoloIntegrationTests` 14/14.
 - **새 검사 4개(`LabBulkAdaptiveRetransmitTests`):**
   - 표본 전 백오프 단위 검사: 표본 전 시간 초과가 0.25→0.5→1초로 늘고 1초에서 멈춘다. Karn으로 표본이 없는 ACK 뒤에도 백오프가 남는다. 첫 깨끗한 표본에서 srtt+4·rttvar(0.3초)로 돌아가고, Clear 뒤에는 0.25초다.
   - 고정 왕복 링크 .1/.3/.6초: 60 fps, 100 ms마다 3조각, 매 데이터그램 누적 ACK로 20초를 돈다. 표본을 얻고, srtt가 1프레임 안에 들고, 조각당 송신이 1.1회 이하이며, 후반부 조각은 모두 1회만 나가야 한다.
