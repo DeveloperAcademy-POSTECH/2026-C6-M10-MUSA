@@ -131,7 +131,7 @@
 
 ## #437 Bulk 재전송과 백로그
 
-- `LabBulkSender`의 재전송 대기는 RTT 측정값(RFC 6298, 0.08~1초)이며, 측정은 덮은 조각을 모두 한 번만 보낸 ACK에서만 한다(Karn). 시간 초과 재전송은 공유 백오프를 늘리고 다음 유효 측정에서 되돌린다. 같은 누적 ACK가 세 번 더 오면 선두 조각을 바로 다시 보내되, 이미 재전송한 사본이 만드는 반복 ACK는 빼고 센다. Guest는 매 데이터그램마다 누적 ACK를 보내야 이 동작이 성립한다.
+- `LabBulkSender`의 재전송 대기는 RTT 측정값(RFC 6298, 0.08~1초)이며, 측정은 덮은 조각을 모두 한 번만 보낸 ACK에서만 한다(Karn). 시간 초과 재전송은 공유 백오프를 늘리고 다음 유효 측정에서 되돌린다. 같은 누적 ACK가 세 번 더 오면 선두 조각을 바로 다시 보내되, 이미 재전송한 사본이 만드는 반복 ACK는 빼고 센다. Guest는 매 데이터그램마다 누적 ACK를 보내야 이 동작이 성립한다. 중복 ACK 빠른 재전송과 표본 규칙의 현재 기준은 아래 `Bulk 선택 ACK와 창 64` 절이다.
 - Host는 피어 백로그가 `BulkBacklogLimitBytes`(64 KiB) 이상일 때만 그 피어의 스냅샷·도색 발행을 건너뛴다. 미확인 조각이 있다는 이유만으로 건너뛰지 않는다. `paint_resync`는 백로그가 가득 찼거나 직전 전체 도색 지도가 미확인일 때만 거절하고, Guest는 받는 중인 도색 프레임이 1초 동안 새 조각을 못 받았을 때만 재요청한다. 실행한 검사만 `docs/VALIDATION.md`에 기록한다.
 
 ## #439 Host 도색 발행 캡처 공유
@@ -270,7 +270,7 @@
 - 화면은 `LabJigwiSyncPillarView`(클래스 이름만 예전 그대로, 물방울 3칸·1초 막대·빨간 흔들림·iOS 기본 진동, 글자 없음)와 글자 없는 붉은 실패 오버레이다. B 동안 화면 글자는 예고 2초의 지귀 도발뿐이다(지목 이름/진행/안내/결과/다음 기믹 문구 없음). 지귀 A/B 외침 목소리는 지웠다.
 - DEV244/245/251/252는 은퇴 슬롯(인덱스·저장값 보존, Home/Lobby 라벨도 맞춤)이다.
 - #509 당시 묶음은 설정 259개·**5688**·`C6PhysicsLab/49`·`C6HapioGame/34`였다. main #525가 Game33을 먼저 써서 34로 올렸다. 5687/Game33(#479·#525) 앱과 혼용하지 않는다.
-- 현재 호환 묶음은 설정 259개·**5688**·`C6PhysicsLab/49`·**`C6HapioGame/35`**다. #526에서 2스테이지 박의 칠·판정 껍데기를 100K 모델로 다시 구워 Game만 올렸다. Game34 앱과 혼용하지 않는다.
+- #526 당시 호환 묶음은 설정 259개·**5688**·`C6PhysicsLab/49`·**`C6HapioGame/35`**였다. #526에서 2스테이지 박의 칠·판정 껍데기를 100K 모델로 다시 구워 Game만 올렸다. Game34 앱과 혼용하지 않는다. 현재 기준은 아래 `Bulk 선택 ACK와 창 64` 절이다.
 
 ## 검사 카테고리와 검사 전용 시작 단축 (2026-11-05)
 
@@ -281,14 +281,14 @@
 ## DEV 표시 정리 (2026-11-05)
 
 - 효과 없는 10칸(0·1·41·43·48·52·53·54·72·73)은 `LabConfig.InactiveDeveloperFields`다. 은퇴가 아니라 숨기기만 한다. 코드가 아직 읽으므로 라벨·저장값·Inspector·폼 전달은 그대로이고, Lab DEV 묶음에 넣지 않으며 Hapio는 `GameStageSettings.IsFieldShown`에서만 뺀다(`IsFieldVisible` 적용 범위는 공통 그대로).
-- Hapio 지귀 탭은 폼의 228이 켜져 있으면 178~183·192~195·205를 접는다(`LabConfig.IsReplacedByJigwiTimeline`). Hapio 전투 중 DEV(Lab 패널)도 228 ON이면 `Jigwi` 묶음을 숨기고, 지귀 스테이지에서만 205도 숨긴다(`HiddenByJigwiTimelineInGame`). Lab 단독 장면은 그대로 보인다. 237 오색구슬 칠 면적은 Hapio 공통 탭이다(236은 야광귀 탭). 은퇴 슬롯(#509까지 25개)은 모두 `HideInInspector`다. 설정 259개와 접속 묶음은 바꾸지 않았다(현재 기준은 위 #509 절의 마지막 줄). 상세는 `docs/DEVELOPER_MODE_PARAMETER_SPEC.md`의 같은 절을 따른다.
+- Hapio 지귀 탭은 폼의 228이 켜져 있으면 178~183·192~195·205를 접는다(`LabConfig.IsReplacedByJigwiTimeline`). Hapio 전투 중 DEV(Lab 패널)도 228 ON이면 `Jigwi` 묶음을 숨기고, 지귀 스테이지에서만 205도 숨긴다(`HiddenByJigwiTimelineInGame`). Lab 단독 장면은 그대로 보인다. 237 오색구슬 칠 면적은 Hapio 공통 탭이다(236은 야광귀 탭). 은퇴 슬롯(#509까지 25개)은 모두 `HideInInspector`다. 설정 259개와 접속 묶음은 바꾸지 않았다(현재 기준은 아래 `Bulk 선택 ACK와 창 64` 절). 상세는 `docs/DEVELOPER_MODE_PARAMETER_SPEC.md`의 같은 절을 따른다.
 
 
 ## #524 스티커별 코팅 광택 v2
 
 - 현재 클레이 표현은 `clay-stickers-v2`다. 높이 R은 기존 변위, GB는 커버리지와 함께 인코딩한 공통 표면 기준 조명 기울기(최대25도), A는 실제 스티커 커버리지다. 완료용 바탕층은 색만 채우며 광택 마스크를 채우지 않는다. Gloss는 기존 공통0~1이고 두께와 독립적이다. 색/R/판정/통신 형식은 유지한다.
 - 관람/PNG는 전체 높이 채널을 복사한다. Mac 실험은 `clay-preview-sample-v2`와 Scene에 고정된 메타데이터를 검사하며 구형 EXR를 거절한다. Prepare/Rebake에서만 샘플을 재생성하고 Build는 읽기 전용으로 검사한다. 일반 Scene/원본 모델은 바꾸지 않는다.
-- Editor 전용 v1 reference shader 2개는 실제 GPU 결과의 독립 회귀 기준이다. Player 의존성에 넣지 않는다. 최신 main 통합 후 접속 묶음5688/Lab49/Game35·설정259개를 유지한다. #524는 표현 버전만 v2로 바꾸며 이 접속 번호를 되돌리지 않는다. 사용법은 CLAY_STICKER_PAINT, 실제 실행 결과만 VALIDATION에 기록한다.
+- Editor 전용 v1 reference shader 2개는 실제 GPU 결과의 독립 회귀 기준이다. Player 의존성에 넣지 않는다. 최신 main 통합 후 접속 묶음5688/Lab49/Game35·설정259개를 유지했다(현재 기준은 아래 Bulk 선택 ACK 절). #524는 표현 버전만 v2로 바꾸며 이 접속 번호를 되돌리지 않는다. 사용법은 CLAY_STICKER_PAINT, 실제 실행 결과만 VALIDATION에 기록한다.
 
 
 ## #527 둥근 클레이 비교 실험
@@ -310,3 +310,12 @@
 
 
 - #527 팔레트 실험: CoatingClayPreview의 선택적 paletteData만 원래67회 저널을 보관한다. sRGB RGB0~255/HEX6자리 입력은 실험의 색 resolver로만 치환하며 게임 팔레트·설정·판정·기록은 저장하지 않는다. 기본색은 고정지도를 직접 쓰고 변경색은 제한된 재생/GPU 완료 후에만 표시한다. Prepare Palette Preview는 명시적 준비, Build는 읽기 전용 검사다. LIGHT 메타데이터 갱신은 연결된 palette의 V4핀도 검증·복구하며 원본 지도/저널/브러시를 다시 굽지 않는다.
+
+## Bulk 선택 ACK와 창 64 (2026-11-06)
+
+- Guest의 Bulk ACK(`LabBulkEnvelope`)는 누적 `ack`와 함께 `sack`(64비트)을 싣는다. bit i는 `ack + 2 + i` 조각을 버퍼에 가졌다는 뜻이다(`LabBulkReceiver.SelectiveAck`). 데이터그램마다 보내며, ACK가 사라져도 다음 ACK가 같은 상태를 다시 싣는다.
+- `LabBulkSender`는 선택 ACK된 조각을 다시 보내지 않고 그 바이트를 바로 `QueuedBytes`(64 KiB 백로그 판정)에서 뺀다. 순번 창은 그대로 누적 ACK 기준이다. 수신기는 버퍼에 넣은 조각을 지우지 않으므로 되돌림이 없다.
+- 손실 판정: 모든 송신에 순번을 매기고, 확인된 조각의 첫 송신보다 앞서 마지막으로 나간 미확인 조각을 바로 다시 보낸다(공유 백오프 없음). 창 안의 모든 구멍에 적용하며, 다시 보낸 뒤에는 그보다 뒤에 보낸 조각이 도착해야 다시 손실로 본다. #437의 중복 ACK 3회 빠른 재전송과 에코 할인은 지웠다. 경로가 순서를 지킨다는 가정이며, 순서가 뒤바뀌면 조각 하나를 한 번 더 보낼 뿐이다.
+- RTT 표본은 이번 ACK가 새로 확인한 조각(선택 ACK 포함) 중 가장 최근에 보낸 조각이 한 번만 보낸 조각일 때 잰다(Karn). RTO 식·0.08~1초·시간 초과 공유 백오프는 #437 그대로다. 표본 전 RTO(0.25초 고정)와 그 백오프는 이 절의 범위 밖이다.
+- 창은 32→64조각(수신 버퍼 128), 공동 스냅샷 조각은 512→4000자다(`LabSessionSettings.SnapshotChunkCharacters`). 문자당 6바이트 escape에서도 한 조각이 Bulk 논리 본문 32,768자 안에 든다는 것을 검사로 고정했다. 선택 ACK 비트가 `AckThrough + 65`까지만 덮으므로 창을 65보다 키우려면 비트맵도 넓혀야 한다.
+- 현재 호환 묶음은 설정 259개·**5690**·`C6PhysicsLab/51`·**`C6HapioGame/37`**이다. 5689/Lab50/Game36은 `feat/#540` 브랜치가 먼저 썼다. 5688 이하·5689 앱과 혼용하지 않는다. 동작과 대안 비교는 `docs/LOCAL_BOARD_AUTHORITY.md`의 Bulk 절, 실행한 검사·측정은 `docs/VALIDATION.md`에만 기록한다.

@@ -1,11 +1,110 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using NUnit.Framework;
+using UnityEngine;
 
 namespace C6Lab.Tests
 {
     public sealed class LabBulkChannelTests
     {
+        [Test]
+        public void TheReceiverReportsEachChunkHeldAfterTheGapAsOneBit()
+        {
+            var receiver = new LabBulkReceiver();
+            Assert.That(receiver.SelectiveAck, Is.Zero);
+            receiver.Receive(1, "a");
+            Assert.That(receiver.SelectiveAck, Is.Zero, "In-order delivery holds nothing.");
+            // 2 is missing; 3, 4 and 7 wait behind it. Bit i is chunk AckThrough + 2 + i.
+            receiver.Receive(3, "c"); receiver.Receive(4, "d"); receiver.Receive(7, "g");
+            Assert.That(receiver.AckThrough, Is.EqualTo(1));
+            Assert.That(receiver.SelectiveAck, Is.EqualTo((1L << 0) | (1L << 1) | (1L << 4)));
+            Assert.That(receiver.Receive(2, "b"), Is.EqualTo(new[] { "b", "c", "d" }));
+            Assert.That(receiver.SelectiveAck, Is.EqualTo(1L << 1), "The bits follow the new gap at 5: 7 is 4 + 2 + 1.");
+            // The last bit is chunk AckThrough + 65; the one after it is outside the window and not reported.
+            receiver.Receive(4 + 2 + 63, "last");
+            receiver.Receive(4 + 2 + 64, "past");
+            Assert.That(receiver.SelectiveAck, Is.EqualTo((1L << 1) | long.MinValue));
+        }
+
+        [Test]
+        public void TheSelectiveAckCoversTheWholeDefaultWindow()
+        {
+            // The sender never goes past its acknowledged chunk + window, and the receiver's AckThrough is never behind
+            // that chunk, so the bits reach every chunk the sender may still have to resend.
+            Assert.That(LabBulkSender.DefaultWindowSize, Is.LessThanOrEqualTo(LabBulkReceiver.SelectiveAckBits + 1));
+            var sender = new LabBulkSender();
+            var receiver = new LabBulkReceiver();
+            for (int i = 0; i < LabBulkSender.DefaultWindowSize + 10; i++) sender.Enqueue("c" + i, 0d);
+            LabBulkFrame[] sent = sender.GetDue(0d, 100000);
+            Assert.That(sent.Length, Is.EqualTo(LabBulkSender.DefaultWindowSize), "The window, not the budget, ends the flush.");
+            foreach (LabBulkFrame frame in sent.Skip(1)) receiver.Receive(frame.sequence, frame.payload);
+            Assert.That(sender.Ack(receiver.AckThrough, receiver.SelectiveAck, .03d), Is.True);
+            Assert.That(sender.GetDue(.03d, 100000).Select(frame => frame.sequence), Is.EqualTo(new long[] { 1 }),
+                "Only the first chunk is missing, and the window cannot move past it yet.");
+            Assert.That(receiver.Receive(1, sent[0].payload).Length, Is.EqualTo(LabBulkSender.DefaultWindowSize));
+            Assert.That(sender.Ack(receiver.AckThrough, receiver.SelectiveAck, .06d), Is.True);
+            Assert.That(sender.GetDue(.06d, 100000).Length, Is.EqualTo(10));
+        }
+
+        [Test]
+        public void OverALossyOrderedLinkOnlyLostSendsAreSentAgainAndEverythingArrivesInOrder()
+        {
+            var sender = new LabBulkSender();
+            var receiver = new LabBulkReceiver();
+            const int total = 400;
+            for (int i = 0; i < total; i++) Assert.That(sender.Enqueue("chunk" + i, 0d), Is.True);
+            var toReceiver = new Queue<(double at, LabBulkFrame frame)>();
+            var toSender = new Queue<(double at, long ack, long held)>();
+            var delivered = new List<string>();
+            int sends = 0, lost = 0;
+            const double oneWay = .02d, frameSeconds = 1d / 60d;
+            for (int step = 0; step < 600 && sender.Count > 0; step++)
+            {
+                double now = step * frameSeconds;
+                while (toSender.Count > 0 && toSender.Peek().at <= now)
+                {
+                    var ack = toSender.Dequeue();
+                    sender.Ack(ack.ack, ack.held, now);
+                }
+                foreach (LabBulkFrame sent in sender.GetDue(now, 16384))
+                {
+                    // Every seventh datagram, first sends and resends alike, is lost on the way.
+                    if (++sends % 7 == 0) { lost++; continue; }
+                    toReceiver.Enqueue((now + oneWay, sent));
+                }
+                while (toReceiver.Count > 0 && toReceiver.Peek().at <= now)
+                {
+                    LabBulkFrame arrived = toReceiver.Dequeue().frame;
+                    Assert.That(receiver.Receive(arrived.sequence, arrived.payload, out string[] ready), Is.True);
+                    delivered.AddRange(ready);
+                    toSender.Enqueue((now + oneWay, receiver.AckThrough, receiver.SelectiveAck));
+                }
+            }
+            Assert.That(delivered, Is.EqualTo(Enumerable.Range(0, total).Select(i => "chunk" + i)));
+            Assert.That(lost, Is.GreaterThan(total / 8));
+            Assert.That(sends - total, Is.EqualTo(lost), "Every resend replaced a lost send; none repeated a chunk that had arrived.");
+            Assert.That(sender.QueuedBytes, Is.Zero);
+        }
+
+        [Test]
+        public void TheBulkEnvelopeKeepsEverySelectiveAckBitAndStaysWithinTheWireLimit()
+        {
+            Type envelopeType = typeof(LabNetwork).Assembly.GetType("C6Lab.LabBulkEnvelope", true);
+            foreach (long held in new[] { -1L, long.MinValue | 5L, 1L })
+            {
+                object envelope = Activator.CreateInstance(envelopeType, true);
+                envelopeType.GetField("ack").SetValue(envelope, long.MaxValue);
+                envelopeType.GetField("sack").SetValue(envelope, held);
+                string json = JsonUtility.ToJson(envelope);
+                object restored = JsonUtility.FromJson(json, envelopeType);
+                Assert.That(envelopeType.GetField("sack").GetValue(restored), Is.EqualTo(held), json);
+                Assert.That(envelopeType.GetField("ack").GetValue(restored), Is.EqualTo(long.MaxValue));
+                Assert.That(Encoding.UTF8.GetByteCount(json) + 4, Is.LessThanOrEqualTo(1200),
+                    "Bulk wire messages must fit NGO's nonfragmented message budget.");
+            }
+        }
         [Test]
         public void LostFirstChunkDoesNotApplyLaterChunksUntilRetryAndDuplicatesNeverReapply()
         {
