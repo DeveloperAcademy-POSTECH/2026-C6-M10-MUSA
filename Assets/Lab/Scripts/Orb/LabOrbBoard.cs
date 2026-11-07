@@ -456,8 +456,9 @@ namespace C6Lab
             small &= !kind.IsDrum();
             jigwiScale = kind.IsRaw() && !float.IsNaN(jigwiScale) && !float.IsInfinity(jigwiScale)
                 ? Mathf.Clamp(jigwiScale, .1f, 1f) : 1f;
+            // #540: up to 1.5 for the talisman orb (bigger); below 1 is B's shrink.
             jigwiABScale = (kind.IsRaw() || kind == LabOrbKind.Combined) && Finite(jigwiABScale)
-                ? Mathf.Clamp(jigwiABScale, .2f, 1f) : 1f;
+                ? Mathf.Clamp(jigwiABScale, .2f, 1.5f) : 1f;
             if (string.IsNullOrWhiteSpace(id) || !Finite(normalizedPosition) || !Finite(velocityInBoardWidthsPerSecond))
                 throw new ArgumentException("A finite orb identity, position and velocity are required.");
             if (entries.TryGetValue(id, out var existing))
@@ -2321,8 +2322,9 @@ namespace C6Lab
         {
             if (kind.IsDrum()) return config.DrumRadius;
             float existing = (small ? config.BlastShrinkScale : 1f) * (kind.IsRaw() ? jigwiScale : 1f);
-            float size = jigwiABScale < 1f && (kind.IsRaw() || kind == LabOrbKind.Combined)
-                ? Mathf.Min(existing, jigwiABScale) : existing;
+            bool scaled = kind.IsRaw() || kind == LabOrbKind.Combined;
+            float size = jigwiABScale < 1f && scaled ? Mathf.Min(existing, jigwiABScale)
+                : jigwiABScale > 1f && scaled ? existing * jigwiABScale : existing; // #540 talisman orb
             return config.OrbRadius * size;
         }
 

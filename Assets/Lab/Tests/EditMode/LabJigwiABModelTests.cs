@@ -263,6 +263,24 @@ namespace C6Lab.Tests
             Assert.That(m.Snapshot(10).orbs.Single(o=>o.id==theirs.id).expiresAt,Is.EqualTo(13),"Paused only while that seat wrote (5 → 10).");
             Assert.That(m.Snapshot(12).orbs.Any(o=>o.id==mine.id),Is.True,"Still on the board after its old lifetime.");
         }
+        [Test] public void AThrownTalismanOrbFliesAsThreeAndEachShardPaints()
+        {
+            // #540: the talisman orb leaves with two Water shards beside it; each shard that reaches the gourd paints once.
+            var m=Room();var a=Current(m,5);
+            Assert.That(m.TryCompleteJigwiTalisman(Players[0],a.id,6),Is.True);
+            var water=m.Snapshot(6+config.JigwiTalismanRewardDelaySeconds).orbs.First(o=>o.jigwiTalismanReward);
+            string left=LabModel.JigwiTalismanShardId(water.id,1),right=LabModel.JigwiTalismanShardId(water.id,2);
+            Assert.That(m.ConfirmJigwiTalismanShardHit(left,6.9,Vector3.forward),Is.False,"No shard before the throw.");
+            Launch(m,Orbs(m)[water.id],7);
+            Assert.That(LabModel.IsJigwiTalismanShard(left),Is.True);Assert.That(LabModel.IsJigwiTalismanShard(water.id),Is.False);
+            int before=m.PaintSurface.CoveredCount;
+            Assert.That(m.ConfirmJigwiTalismanShardHit(left,7.2,Vector3.forward),Is.True);
+            Assert.That(m.PaintSurface.CoveredCount,Is.GreaterThan(before),"A shard paints Water.");
+            Assert.That(m.LastHitTalisman,Is.True);
+            Assert.That(m.ConfirmJigwiTalismanShardHit(left,7.3,Vector3.forward),Is.False,"Each shard paints once.");
+            Assert.That(m.DropJigwiTalismanShard(right),Is.True);
+            Assert.That(m.ConfirmJigwiTalismanShardHit(right,7.3,Vector3.right),Is.False,"A missed shard paints nothing.");
+        }
         [Test] public void OrbsAboutToRunOutWaitUntilTheTalismanOrbHasLanded()
         {
             // #540: none of the writer's orbs runs out while the talisman turns into its orb and for a moment after it lands.

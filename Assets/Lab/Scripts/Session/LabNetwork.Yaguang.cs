@@ -84,6 +84,9 @@ namespace C6Lab
             float radius = config != null ? config.OrbRadius : .3f;
             LabFiveColorSparkle.DustBurst(point, radius, LabFiveColorSparkle.DefaultDustPuffScale * 1.3f, LabFiveColorSparkle.BlueTones);
             LabFiveColorSparkle.Burst(point, radius, LabFiveColorSparkle.BlueTones);
+            // #540: a big splash of water bursts out from the gourd where it hit.
+            if (config != null) LabJigwiWaterVolley.Splash(point, point - hitbox.position,
+                config.ThrowRadius * LabJigwiWaterVolley.SizeScale, target.gameObject.layer);
             TalismanHit?.Invoke(owner);
         }
     }

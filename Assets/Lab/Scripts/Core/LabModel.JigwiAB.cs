@@ -46,6 +46,14 @@ namespace C6Lab
         public const double JigwiTalismanDropSeconds = .3d;
         /// <summary>#540: after the talisman orb lands, the seat's other orbs stay at least this long so the reward is not lost in smoke.</summary>
         public const double JigwiTalismanCalmSeconds = 1d;
+        /// <summary>#540: a thrown talisman orb flies as this many Water orbs side by side (itself + shards); each paints.</summary>
+        public const int JigwiTalismanVolleyCount = 3;
+        /// <summary>#540: the projectile id of the k-th shard (1, 2) flying beside talisman orb orbId.</summary>
+        public static string JigwiTalismanShardId(string orbId, int k) => orbId + "/talisman-" + k;
+        public static bool IsJigwiTalismanShard(string id) => id != null && id.Contains("/talisman-");
+        // #540: shards in the air → (thrower, paint share). The Host's projectiles resolve them like the orb itself.
+        private readonly Dictionary<string, (ulong owner, float paint)> jigwiTalismanShards
+            = new Dictionary<string, (ulong, float)>(StringComparer.Ordinal);
         /// <summary>#540: where the i-th talisman Water appears on its owner's board (the folded talisman drops right there).</summary>
         public static Vector2 JigwiTalismanWaterSpot(int i) =>
             new Vector2(.15f + .7f * ((i * .61803398875f + .5f) % 1f), .22f + .1f * (i % 3));
@@ -70,7 +78,7 @@ namespace C6Lab
             jigwiAHoldBurn = config.JigwiAHoldBurnUntilEnd;
             jigwiCommonStart = config.JigwiCommonStartSeconds; jigwiCommonInterval = config.JigwiCommonIntervalSeconds;
             jigwiABRounds.Clear(); jigwiABActivated.Clear(); jigwiABFailureRevision = 0;
-            jigwiABLastBurnAt.Clear(); jigwiABBurnQueueId = null; jigwiTalismanDrops.Clear(); jigwiFailBurns.Clear(); jigwiAPausedOrbs.Clear();
+            jigwiABLastBurnAt.Clear(); jigwiABBurnQueueId = null; jigwiTalismanDrops.Clear(); jigwiFailBurns.Clear(); jigwiAPausedOrbs.Clear(); jigwiTalismanShards.Clear();
             ResetJigwiABSupply(config);
             if (!jigwiABEnabled) return;
             // Preserve the old code as an inactive migration path, never run two policies together.
@@ -467,6 +475,38 @@ namespace C6Lab
                 orb.expiresAt = until; orb.revision = ++revision;
             }
         }
+        /// <summary>#540: a talisman orb leaves the board — its two shards take off with it.</summary>
+        private void LaunchJigwiTalismanShards(LabOrbState orb)
+        {
+            if (orb == null || !orb.jigwiTalismanReward) return;
+            for (int k = 1; k < JigwiTalismanVolleyCount; k++)
+                jigwiTalismanShards[JigwiTalismanShardId(orb.id, k)] = (orb.owner, orb.jigwiABRewardPaintScale);
+        }
+        /// <summary>
+        /// #540: a talisman shard reached the gourd. It paints Water like the talisman orb itself (same share), but
+        /// deals no damage and gives no other reward. False when unknown, already resolved or blocked.
+        /// </summary>
+        public bool ConfirmJigwiTalismanShardHit(string id, double now, Vector3 paintDirection, float paintImpactStrength = .5f)
+        {
+            if (id == null || !jigwiTalismanShards.TryGetValue(id, out var shard)) return false;
+            jigwiTalismanShards.Remove(id);
+            if (!TryAdvance(now, out _) || phase != LabPhase.Playing || !players.TryGetValue(shard.owner, out var attacker)) return false;
+            if (JigwiABBlocksBoss(shard.owner, now)) return false;
+            TryExtinguishJigwiStageRoot(shard.owner, paintDirection, now, out _);
+            LastHitFiveColor = false; LastHitTalisman = true;
+            bool painted = paintSurface.RegisterHit(paintDirection, PaintColorFor(LabOrbElement.Water), attacker.id, attacker.seat + 1,
+                Mathf.Min(3f, shard.paint), paintImpactStrength);
+            if (painted && paintSurface.IsComplete && phase == LabPhase.Playing)
+            {
+                phase = LabPhase.Victory;
+                if (players.TryGetValue(paintSurface.LastPainter, out var painter)) painter.lastHit = true;
+                AdvanceJigwiStage(now);
+            }
+            revision++;
+            return true;
+        }
+        /// <summary>#540: a talisman shard missed (floor, fire, gone). Forget it.</summary>
+        public bool DropJigwiTalismanShard(string id) => id != null && jigwiTalismanShards.Remove(id);
         private void GrantJigwiTalismanWater(ulong owner, double now)
         {
             // #509: one at a time, every 0.3 s, so each drop falls in with its own moment.

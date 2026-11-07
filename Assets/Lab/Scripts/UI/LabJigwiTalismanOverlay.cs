@@ -1446,7 +1446,7 @@ namespace C6Lab
             Camera eye = canvas == null || canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
             if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(root, screen, eye, out local)
                 || !RectTransformUtility.ScreenPointToLocalPointInRectangle(root, screen + Vector2.right * radius, eye, out Vector2 edge)) return false;
-            side = 2f * Vector2.Distance(local, edge);
+            side = 2f * Vector2.Distance(local, edge) * LabJigwiWaterVolley.SizeScale; // the talisman orb is 1.5× an orb
             return side > 1f;
         }
 

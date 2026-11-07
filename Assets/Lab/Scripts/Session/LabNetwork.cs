@@ -2007,10 +2007,12 @@ namespace C6Lab
                 orb.small ? config.BlastShrinkScale : 1f);
             if (orb.fiveColor) LabFiveColorSparkle.AttachArt(projectile.transform, config.OrbRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined), true);
             else if (orb.jigwiTalismanReward) LabFiveColorSparkle.AttachArt(projectile.transform,
-                config.OrbRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined), true, LabFiveColorSparkle.BlueTones); // #540
+                config.OrbRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined) * LabJigwiWaterVolley.SizeScale, true,
+                LabFiveColorSparkle.BlueTones); // #540
             projectile.name = "Projectile " + orb.id;
             float sizeScale = (model != null ? model.LaunchScaleOf(orb.id) : 1f)
-                * (orb.jigwiABReward ? orb.jigwiABRewardSizeScale : 1f);
+                * (orb.jigwiABReward ? orb.jigwiABRewardSizeScale : 1f)
+                * (orb.jigwiTalismanReward ? LabJigwiWaterVolley.SizeScale : 1f); // #540 부적 구슬은 1.5배
             projectile.SetRadiusScale(sizeScale);
             projectile.SetJigwiABRadiusScale(orb.jigwiABRadiusScale);
             projectile.SetJigwiABReward(orb.jigwiABReward);
@@ -2020,6 +2022,8 @@ namespace C6Lab
             SyncJigwiFireSurfaces();
             projectile.SetFireSurfaces(JigwiFireSurfacesFor(orb.owner));
             projectile.Launch(orb.id, orb.owner, velocity, config, target, OnProjectileResolved);
+            if (orb.jigwiTalismanReward) LaunchTalismanVolley(projectile, orb.id, orb.owner, launchPosition, velocity, sizeScale,
+                orb.element, true); // #540 3갈래 물구슬
             RememberReplayLaunch(orb, projectile, model != null ? model.LaunchScaleOf(orb.id) : 1f);
             var notice = new LabNetworkPacket { type = "projectile", sessionId = sessionId,
                 round = model.Round, requestId = actionId,
@@ -2056,6 +2060,7 @@ namespace C6Lab
         {
             if (!IsHost || model == null) return;
             double now = battleClock.Now(Time.realtimeSinceStartupAsDouble);
+            if (LabModel.IsJigwiTalismanShard(result.ProjectileId)) { ResolveTalismanShard(result, now); return; } // #540
             bool blockedByCurtain = false;
             if (result.Kind == LabProjectileHitKind.Fire)
             {
@@ -2193,7 +2198,7 @@ namespace C6Lab
                     lifeSeconds: config == null || (orb.kind == LabOrbKind.Bomb && orb.lockSwipes > 0) ? -1f
                         : orb.LifeSecondsLeft(latest.serverTime, config.OrbLifetimeSeconds, config.ItemLifetimeSeconds),
                     jigwiScale: orb.jigwiRadiusScale, fever: orb.fever, fiveColor: orb.fiveColor,
-                    jigwiABScale: orb.jigwiABRadiusScale,
+                    jigwiABScale: orb.jigwiABRadiusScale * (orb.jigwiTalismanReward ? LabJigwiWaterVolley.SizeScale : 1f), // #540 부적 구슬 1.5배
                     // #540: an unfinished talisman's orbs show no A fire at all (they burn to ash in turn instead).
                     jigwiABBurnSeconds: orb.jigwiABBurnAt >= 0d && !LabJigwiScreenPresentation.FailBurnPending(latest, orb)
                         ? Mathf.Max(0f, (float)(orb.jigwiABBurnAt - latest.serverTime)) : 0f,
@@ -2548,7 +2553,8 @@ namespace C6Lab
                             packet.small ? config.BlastShrinkScale : 1f);
                         if (packet.fiveColor) LabFiveColorSparkle.AttachArt(visual.transform, config.OrbRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined), true);
                         else if (packet.talisman) LabFiveColorSparkle.AttachArt(visual.transform,
-                            config.OrbRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined), true, LabFiveColorSparkle.BlueTones); // #540
+                            config.OrbRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined) * LabJigwiWaterVolley.SizeScale, true,
+                            LabFiveColorSparkle.BlueTones); // #540
                         if (packet.sizeScale > 0f && packet.sizeScale != 1f) visual.SetRadiusScale(packet.sizeScale);
                         visual.SetJigwiABRadiusScale(packet.jigwiABRadiusScale);
                         visual.SetJigwiABReward(packet.jigwiABReward);
@@ -2558,6 +2564,8 @@ namespace C6Lab
                         SyncJigwiFireSurfaces();
                         visual.SetFireSurfaces(JigwiFireSurfacesFor(packet.owner));
                         visual.LaunchVisual(velocity, config, target);
+                        if (packet.talisman) LaunchTalismanVolley(visual, packet.firstId, packet.owner, position, velocity,
+                            packet.sizeScale > 0f ? packet.sizeScale : 1f, element, false); // #540 3갈래 물구슬
                     }
                     break;
             }
