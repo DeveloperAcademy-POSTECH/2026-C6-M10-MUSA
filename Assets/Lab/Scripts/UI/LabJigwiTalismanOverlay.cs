@@ -173,6 +173,11 @@ namespace C6Lab
         [SerializeField, Range(0f, 1f)] private float fallSoundVolume = .9f;
         [Tooltip("#540 못 쓰고 끝나 불덩이가 떨어질 때 지귀 목소리(\"모두 재가 되어라!\") 폴더. 비우면 없음.")]
         [SerializeField] private string failVoiceFolder = "JigwiVoiceAFail";
+        [Tooltip("#540 부적 구슬이 박에 맞을 때 지귀가 울부짖는 \"너무 차가워..!\" 폴더 (모든 기기). 한 번 던진 3갈래가 연달아 맞아도 한 번만. 비우면 없음.")]
+        [SerializeField] private string coldVoiceFolder = "JigwiVoiceCold";
+        [SerializeField, Range(0f, 1f)] private float coldVoiceVolume = 1f;
+        [Tooltip("#540 \"너무 차가워\"가 다시 나오기까지 최소 간격(초). 3갈래 명중이 겹쳐 여러 번 나지 않게.")]
+        [SerializeField, Range(.5f, 5f)] private float coldVoiceGapSeconds = 2f;
         [Tooltip("#540 불덩이가 조합판에 닿아 불이 확 번질 때 소리 폴더. 비우면 없음.")]
         [SerializeField] private string spreadSoundFolder = "JigwiFireSpread";
         [Tooltip("#540 부적을 쓰는 동안 공격 영역 붉은 경보가 번쩍일 때마다 나는 경보음 폴더. 끝이 다가올수록 빨라지고 커진다. 비우면 없음.")]
@@ -386,7 +391,9 @@ namespace C6Lab
 
         public void Bind(LabNetwork network, Font labelFont)
         {
+            if (source != null) source.TalismanHit -= OnTalismanHit;
             source = network;
+            if (source != null) source.TalismanHit += OnTalismanHit;
             if (labelFont != null) font = labelFont;
             EnsureWidgets();
             if (labelFont != null && hint != null) hint.font = labelFont;
@@ -483,6 +490,33 @@ namespace C6Lab
                 bool a = item.kind == LabJigwiABKind.PersonalBurn;
                 PlayVoice(a ? "A" : "B", a ? voiceAFolder : voiceBFolder);
             }
+        }
+
+        /// <summary>#540 테스트용: "너무 차가워"가 난 횟수.</summary>
+        public int ColdVoiceCount { get; private set; }
+        private float lastColdVoice = float.NegativeInfinity;
+        private AudioSource coldVoice;
+
+        /// <summary>
+        /// #540: 부적 구슬(3갈래 중 어느 것이든)이 박에 맞으면 지귀가 "너무 차가워..!" 하고 울부짖는다. 한 번 던진 세 갈래가
+        /// 연달아 맞아도 coldVoiceGapSeconds 안에는 한 번만. 예고 대사를 끊지 않게 따로 낸다.
+        /// </summary>
+        public void OnTalismanHit(ulong owner)
+        {
+            if (Time.unscaledTime - lastColdVoice < coldVoiceGapSeconds) return;
+            lastColdVoice = Time.unscaledTime;
+            ColdVoiceCount++;
+            if (string.IsNullOrEmpty(coldVoiceFolder) || coldVoiceVolume <= 0f) return;
+            AudioClip[] clips = Resources.LoadAll<AudioClip>("Audio/" + coldVoiceFolder);
+            if (clips == null || clips.Length == 0) return;
+            if (coldVoice == null)
+            {
+                coldVoice = gameObject.AddComponent<AudioSource>();
+                coldVoice.playOnAwake = false; coldVoice.spatialBlend = 0f;
+            }
+            coldVoice.clip = clips[UnityEngine.Random.Range(0, clips.Length)];
+            coldVoice.volume = coldVoiceVolume * LabAudioSettings.SfxVolume;
+            coldVoice.Play();
         }
 
         private void PlayVoice(string name, string folder)
@@ -2130,7 +2164,7 @@ namespace C6Lab
         }
 
         private void OnDisable() { if (fireball != null) fireball.Hide(); fireballSeen = LabJigwiFireball.Phase.None; SetBoardBlocked(false); Visible = false; RoundId = null; hasLast = false; EndFinish(); EndBurn(); if (paper != null) paper.gameObject.SetActive(false); }
-        private void OnDestroy() { SetBoardBlocked(false); if (fireball != null) Destroy(fireball.gameObject); }
+        private void OnDestroy() { SetBoardBlocked(false); if (fireball != null) Destroy(fireball.gameObject); if (source != null) source.TalismanHit -= OnTalismanHit; }
     }
 
     /// <summary>

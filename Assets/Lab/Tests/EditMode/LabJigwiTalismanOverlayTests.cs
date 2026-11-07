@@ -82,6 +82,16 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void ATalismanVolleyHitCriesTooColdOnlyOnce()
+        {
+            // #540: the three water orbs of one throw land together; Jigwi wails "너무 차가워" once.
+            overlay.OnTalismanHit(Local);
+            overlay.OnTalismanHit(Local);
+            overlay.OnTalismanHit(Local);
+            Assert.That(overlay.ColdVoiceCount, Is.EqualTo(1));
+        }
+
+        [Test]
         public void AFinishedTalismanGlowsThenFadesWithoutBlockingTheBoard()
         {
             overlay.Present(Snapshot(-1d), Local, 11d);
