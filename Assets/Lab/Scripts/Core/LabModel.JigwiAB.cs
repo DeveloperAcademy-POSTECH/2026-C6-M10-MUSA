@@ -20,11 +20,16 @@ namespace C6Lab
         private int jigwiSchedule;
         private double jigwiCommonStart = 40d, jigwiCommonInterval = 15d;
         /// <summary>#540: after the fireball lands, an unfinished talisman's orbs burn one at a time; each one blazes this long, then burns away.</summary>
-        public const double JigwiTalismanFailBlazeSeconds = 1.5d;
+        public const double JigwiTalismanFailBlazeSeconds = 2.5d;
         /// <summary>#540: the next orb catches fire as the previous one burns away (one at a time, easy to follow).</summary>
         public const double JigwiTalismanFailBurnStepSeconds = JigwiTalismanFailBlazeSeconds;
-        /// <summary>#540: a failed seat's orbs start burning this long after the A ends (the fireball falling onto the board).</summary>
+        /// <summary>#540: the fireball falls onto a failed seat's board this long after the A ends.</summary>
         public const double JigwiTalismanFailBurnDelaySeconds = .45d;
+        /// <summary>
+        /// #540: the first orb catches fire this long after the A ends — once Jigwi's "모두 재가 되어라!" (`JigwiVoiceAFail`, 3.1 s,
+        /// played as the fireball falls) has finished.
+        /// </summary>
+        public const double JigwiTalismanFailFirstBurnSeconds = 3.15d;
         // #479: A burns each owner's orbs one at a time. The last queued deadline per owner for the running A.
         private readonly Dictionary<ulong, double> jigwiABLastBurnAt = new Dictionary<ulong, double>();
         private string jigwiABBurnQueueId;
@@ -215,8 +220,8 @@ namespace C6Lab
                 if (failed.Contains(orb.owner) && !orb.inFlight && !orb.jigwiTalismanReward && (orb.kind.IsRaw() || orb.kind == LabOrbKind.Combined))
                 {
                     burnSteps.TryGetValue(orb.owner, out int step); burnSteps[orb.owner] = step + 1;
-                    // #540: the fireball falls onto the board, then its orbs burn one at a time (oldest first), each for the blaze time.
-                    double burnAt = item.resolvedAt + JigwiTalismanFailBurnDelaySeconds + JigwiTalismanFailBlazeSeconds
+                    // #540: the fireball falls onto the board; after Jigwi's line its orbs burn one at a time (oldest first), each for the blaze time.
+                    double burnAt = item.resolvedAt + JigwiTalismanFailFirstBurnSeconds + JigwiTalismanFailBlazeSeconds
                         + step * JigwiTalismanFailBurnStepSeconds;
                     if (orb.jigwiABBurnAt < 0d || burnAt < orb.jigwiABBurnAt)
                     { orb.jigwiABBurnAt = burnAt; orb.jigwiABBurnEventId = item.id; orb.revision = ++revision; }

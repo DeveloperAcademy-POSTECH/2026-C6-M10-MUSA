@@ -118,7 +118,7 @@ namespace C6Lab
         [SerializeField, Range(0f, .5f)] private float writeVolumeJitter = .2f;
         [Tooltip("앞 연필 소리가 이만큼(0~1) 지나면 계속 칠할 때 다음 소리를 잇는다. 작을수록 촘촘하다.")]
         [SerializeField, Range(.3f, 1f)] private float writeChainAt = .7f;
-        [Tooltip("#533 완성 가락: \"둥 둥 둥 .. 둥!\" 네 음. 폴더 안 파일을 이름순으로 1~4음에 쓴다. 파일이 4개보다 적으면 있는 파일을 높낮이를 올려(noteSemitones) 채운다. #540: 가야금 추성(JigwiTalismanNote, 양금 ComboHit와 같은 440Hz라 음은 그대로).")]
+        [Tooltip("#533 완성 가락: \"둥 둥 둥 .. 둥!\" 네 음. 폴더 안 파일을 이름순으로 1~4음에 쓴다. 파일이 4개보다 적으면 있는 파일을 높낮이를 올려(noteSemitones) 채운다. #540: 가야금 추성(JigwiTalismanNote, 라 220Hz, 양금 ComboHit보다 한 옥타브 아래).")]
         [SerializeField] private string noteSoundFolder = "JigwiTalismanNote";
         [Tooltip("앞 세 음 크기.")]
         [SerializeField, Range(0f, 1f)] private float noteSoundVolume = .7f;
@@ -178,7 +178,7 @@ namespace C6Lab
         [Tooltip("#540 부적을 쓰는 동안 공격 영역 붉은 경보가 번쩍일 때마다 나는 경보음 폴더. 끝이 다가올수록 빨라지고 커진다. 비우면 없음.")]
         [SerializeField] private string alarmSoundFolder = "JigwiAlarmPulse";
         [SerializeField, Range(0f, 1f)] private float alarmSoundVolume = .7f;
-        [Tooltip("#540 못 쓴 판의 구슬이 하나씩 차례로 1.5초 동안 재가 되어 사라질 때, 구슬마다 타기 시작하는 순간 나는 타는 소리 폴더 (1.5초). 비우면 없음.")]
+        [Tooltip("#540 못 쓴 판의 구슬이 하나씩 차례로 2.5초 동안 재가 되어 사라질 때, 구슬마다 타기 시작하는 순간 나는 타는 소리 폴더 (2.5초). 비우면 없음.")]
         [SerializeField] private string orbBurnSoundFolder = "JigwiOrbBurn";
         [SerializeField, Range(0f, 1f)] private float orbBurnSoundVolume = 1f;
         [SerializeField, Range(0f, 1f)] private float spreadSoundVolume = 1f;
@@ -243,7 +243,7 @@ namespace C6Lab
         public float FireLoopTarget { get; private set; }
         private readonly AudioSource[] notePlayers = new AudioSource[4];
         private int notesPlayed;
-        [Tooltip("#533 완성 가락 음높이 (파일 원래 음에서 반음 수). 기본 ComboHit는 라(A4)라서 솔 도 시 라 = -2, +3, +2, 0. 파일이 4개 이상이면 쓰지 않는다.")]
+        [Tooltip("#533 완성 가락 음높이 (파일 원래 음에서 반음 수). 기본 JigwiTalismanNote는 라(A3)라서 솔 도 시 라 = -2, +3, +2, 0. 파일이 4개 이상이면 쓰지 않는다.")]
         [SerializeField] private int[] noteSemitones = { -2, 3, 2, 0 };
         private float burnAge = -1f;
         // #540 effects that live outside the paper (board dim, landing splash, flying embers) and the 3D fireball.
@@ -741,7 +741,7 @@ namespace C6Lab
         private readonly HashSet<string> orbBurnsCued = new HashSet<string>(StringComparer.Ordinal);
 
         /// <summary>
-        /// #540: 못 쓴 판의 구슬은 하나씩 차례로 1.5초 동안 재가 되어 사라진다. 구슬마다 타기 시작하는 순간 1.5초짜리 타는 소리를 한 번 낸다.
+        /// #540: 못 쓴 판의 구슬은 하나씩 차례로 2.5초 동안 재가 되어 사라진다. 구슬마다 타기 시작하는 순간 2.5초짜리 타는 소리를 한 번 낸다.
         /// 차례 중간에 끼어든 구슬(합쳐져 새로 생긴 구슬 등)은 소리 없이 탄다.
         /// </summary>
         private void CueOrbBurns(LabSnapshot snapshot)

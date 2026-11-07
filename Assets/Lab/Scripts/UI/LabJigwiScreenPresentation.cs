@@ -535,7 +535,7 @@ namespace C6Lab
 
         /// <summary>
         /// #540: 부적을 못 써 타는 구슬이 지금 타오르는 중이면 남은 초, 아니면 0. 구슬은 하나씩 차례로
-        /// `LabModel.JigwiTalismanFailBlazeSeconds`(1.5초) 동안 아래부터 재가 되어(`LabJigwiAshBurn`) 없어진다.
+        /// `LabModel.JigwiTalismanFailBlazeSeconds`(2.5초) 동안 아래부터 재가 되어(`LabJigwiAshBurn`) 없어진다.
         /// 아직 차례가 안 온 구슬은 0(그대로 보임).
         /// </summary>
         public static float FailBlazeSecondsLeft(LabSnapshot snapshot, LabOrbState orb, double serverTime)
