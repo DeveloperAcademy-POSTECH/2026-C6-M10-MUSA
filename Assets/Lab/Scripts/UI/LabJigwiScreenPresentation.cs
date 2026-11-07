@@ -792,10 +792,6 @@ namespace C6Lab
             playerStatus.gameObject.SetActive(rows.Length > 0);
         }
 
-        /// <summary>#509 지귀 도발(파훼법은 말하지 않음). 예고 2초 동안만 보인다.</summary>
-        public static string Taunt(LabJigwiABKind kind) =>
-            kind == LabJigwiABKind.PersonalBurn ? "타올라라, 모두 재가 되어라!" : "흩어진 물방울로는 어림없다!";
-
         private void PositionGroupStatus(LabJigwiABRound round, ulong owner, double now)
         {
             if (statusPanel == null || fireLayer == null || BattleFireClipRect.height <= 0f) return;

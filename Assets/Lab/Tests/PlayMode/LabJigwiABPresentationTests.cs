@@ -299,7 +299,7 @@ namespace C6Lab.Tests
             view.ApplySnapshot(snapshot, Local, 11d);
             Assert.That(view.status.text, Is.Empty, "#509: no countdown text.");
             view.ApplySnapshot(snapshot, Local, 20.5d);
-            Assert.That(view.status.text, Is.EqualTo("타올라라, 모두 재가 되어라!"), "The next A shows only its own taunt.");
+            Assert.That(view.status.text, Is.Empty, "#540: Jigwi speaks the taunt; no warning words on screen.");
             Assert.That(view.SyncPillar.DropsVisible, Is.True, "The upcoming A warning must not hide B before its deadline.");
             group.resolution = LabJigwiABResolution.Expired; group.resolvedAt = 21d;
             view.ApplySnapshot(snapshot, Local, 21d);
