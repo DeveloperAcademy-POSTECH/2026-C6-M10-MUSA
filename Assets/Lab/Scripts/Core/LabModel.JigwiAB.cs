@@ -24,10 +24,10 @@ namespace C6Lab
         /// <summary>#540: the fireball falls onto a failed seat's board this long after the A ends.</summary>
         public const double JigwiTalismanFailBurnDelaySeconds = .45d;
         /// <summary>
-        /// #540: the first orb catches fire this long after the A ends — once Jigwi's "모두 재가 되어라!" (`JigwiVoiceAFail`, 3.1 s,
+        /// #540: the first orb catches fire this long after the A ends — once Jigwi's "모두 재가 되어라!" (`JigwiVoiceAFail`, 3.64 s,
         /// played as the fireball falls) has finished.
         /// </summary>
-        public const double JigwiTalismanFailFirstBurnSeconds = 3.15d;
+        public const double JigwiTalismanFailFirstBurnSeconds = 3.7d;
         // #479: A burns each owner's orbs one at a time. The last queued deadline per owner for the running A.
         private readonly Dictionary<ulong, double> jigwiABLastBurnAt = new Dictionary<ulong, double>();
         private string jigwiABBurnQueueId;
