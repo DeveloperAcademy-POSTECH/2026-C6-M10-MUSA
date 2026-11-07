@@ -17,6 +17,7 @@ namespace Hapio.Tests
     /// 튜토리얼 (#477) 0단계 흐름: 첫 게임 시작의 오프닝 → 3자리 연습 판(나 불이 가운데, 묵이·금옥이 양옆) → 대사 → 방 목록.
     /// 저장된 Home·Battle Scene과 실제 세션으로 확인한다. 기기·네이티브 빌드 검사가 아니다.
     /// </summary>
+    [Category("Slow")]
     public sealed class GameTutorialFlowTests
     {
         private GameSession session;

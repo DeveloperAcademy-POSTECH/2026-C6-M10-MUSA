@@ -6072,8 +6072,17 @@ PR-1(`feat/#507-gourd-rig-contract`) 위에서 Unity 6000.6.5f1 macOS batch Edit
 | 에셋 저장 | **PASS**: 값 3개 추가 |
 | ▽ 커짐 계산 (Editor 안) | **PASS**: 0.15초에 1.35, 0.3초에 1 |
 
-- **새·수정 검사 (NOT_RUN):**
+- **새·수정 검사:** 아래 2026-11-07 실행에서 돌렸다.
   - EditMode ▽ 커짐 시간표, 기본값 8pt.
   - PlayMode 0단계 대사에서 넘기는 곳이 말풍선 + 8pt(화면 전체 아님)인지.
   - PlayMode 말풍선 밖을 누르면 장면이 그대로이고 ▽가 한 번 커지며 판이 막혀 있는지.
+- **main 병합 뒤 실행 (2026-11-07):** 이 브랜치에 main `3f693056`(#541 튜토리얼 검사 수정 포함)을 병합한 `515b45f1` 위에, 열린 PR #544(공용 로딩 화면)까지 임시로 합친 검사용 트리 `5bd160e7`에서 Unity 6000.6.5f1 batch(macOS)로 돌렸다. 병합 충돌은 이 문서뿐이었고 두 절을 모두 살렸다.
+
+| 실행한 검사 | 결과 |
+| --- | --- |
+| EditMode 전체 | **2046/2046 PASS**(`GameTutorialTests` 40/40, ▽ 커짐 검사 포함) |
+| PlayMode `GameTutorialFlowTests` | **4/4 PASS**, 50.8초(말풍선 + 8pt·말풍선 밖 탭 확인 포함) |
+| PlayMode 전체 | 666건 중 659 PASS. 실패 7건은 이 변경과 무관하다: `GameLobbyViewTests` 6건은 함께 합친 #544의 로딩 화면이 자리 화면 버튼을 덮어서 났고(#544 쪽에서 고친다), `ClayPreviewPlayModeTests` 1건은 main에서도 같은 해시로 실패한다 |
+
+- `GameTutorialFlowTests`는 fixture 하나가 5초를 넘으므로(50.8초) 2026-11-05 기준대로 `[Category("Slow")]`를 붙였다. 동작은 바꾸지 않는다.
 - **미실행:** Play·iPhone에서 손가락으로 말풍선 가장자리를 눌러 보는 느낌, 8pt 여유가 충분한지.
