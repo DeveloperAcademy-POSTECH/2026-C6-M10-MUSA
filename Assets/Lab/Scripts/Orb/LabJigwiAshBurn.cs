@@ -41,6 +41,7 @@ namespace C6Lab
         private readonly SpriteRenderer[] sparks = new SpriteRenderer[SparkCount], ash = new SpriteRenderer[AshCount];
         private SpriteRenderer[] masked = Array.Empty<SpriteRenderer>();
         private Transform shrinking;
+        private bool diagnosed;
         private Vector3 shrinkFrom = Vector3.one;
         private Color[] maskedColors = Array.Empty<Color>();
 
@@ -73,7 +74,7 @@ namespace C6Lab
                 return;
             }
             Ensure();
-            if (left <= 0f) { age = 0f; lastPaint = -1f; consume = consumeOrb; if (consume) Mask(visuals, true); }
+            if (left <= 0f) { age = 0f; lastPaint = -1f; diagnosed = false; consume = consumeOrb; if (consume) Mask(visuals, true); }
             total = Mathf.Max(.01f, totalSeconds);
             if (left <= 0f || Mathf.Abs(left - secondsLeft) > .3f) left = secondsLeft;
             SetShown(true);
@@ -168,7 +169,9 @@ namespace C6Lab
             float ring = Mathf.Max(0f, 1f - front) * r; // where the burning line is
             float flicker = .8f + .2f * Mathf.PerlinNoise(age * 9f, .3f);
             float fade = 1f - Mathf.SmoothStep(.94f, 1f, p);
-            const float depth = 0f; // like the old blaze: drawn above the orb by sorting order
+            // The board camera looks from -z and the orb picture sits one radius toward it (z = -radius), so the
+            // burning edge goes a little further toward the camera or the picture hides it.
+            float depth = -r * 1.15f;
 
             // The ball itself shrinks from the rim in as it burns (no mask needed), and darkens a little.
             float share = Mathf.Clamp01(remaining / Mathf.Max(.0001f, r));
@@ -189,6 +192,7 @@ namespace C6Lab
             if (scorch != null) scorch.enabled = false;
 
             bool burning = ring > r * .06f;
+            Diagnose(p);
             for (int i = 0; i < FlameCount; i++)
             {
                 // Small flames stand on the burning ring, like the talisman's edge flames.
@@ -220,6 +224,23 @@ namespace C6Lab
                 Place(ash[i], from + new Vector3(Mathf.Sin(t * 4f + i) * r * .06f, -t * r * .6f, 0f), r * .1f);
                 Tint(ash[i], AshColor, (1f - t) * fade * (burning ? 1f : 0f));
             }
+        }
+
+        /// <summary>#540 진단(임시): 구슬이 반쯤 탔을 때 불 그림이 실제로 그려질 상태인지 한 줄로 남긴다.</summary>
+        private void Diagnose(float p)
+        {
+            if (diagnosed || p < .5f) return;
+            diagnosed = true;
+            string Of(Renderer x) => x == null ? "null" : x.name + "(on=" + x.enabled + " vis=" + x.isVisible + " layer="
+                + LayerMask.LayerToName(x.gameObject.layer) + " sort=" + x.sortingLayerName + "/" + x.sortingOrder
+                + " q=" + (x.sharedMaterial != null ? x.sharedMaterial.renderQueue + ":" + x.sharedMaterial.shader.name : "nomat")
+                + " pos=" + x.transform.position.ToString("F3") + " size=" + x.bounds.size.ToString("F3")
+                + " a=" + (x is SpriteRenderer sr ? sr.color.a.ToString("F2") : "-") + ")";
+            Camera board = null;
+            foreach (Camera c in Camera.allCameras) if ((c.cullingMask & (1 << gameObject.layer)) != 0 && c.orthographic) board = c;
+            Debug.Log("C6_JIGWI_ASH mid edge=" + Of(edge) + " flame=" + Of(flames[0]) + " spark=" + Of(sparks[0])
+                + " art=" + (masked.Length > 0 ? Of(masked[0]) : "none") + " active=" + gameObject.activeInHierarchy
+                + " cam=" + (board != null ? board.name + " z=" + board.transform.position.z.ToString("F2") : "none"));
         }
 
         /// <summary>
@@ -271,7 +292,9 @@ namespace C6Lab
             float front = DrumDepth * (1f - (1f - caught) * (1f - caught)) + .015f * Mathf.Sin(age * 2.3f) * caught;
             EnsureScorch();
             if (lastPaint < 0f || age - lastPaint >= PaintGap) { lastPaint = age; PaintScorch(front, fade); }
-            scorch.transform.localPosition = new Vector3(0f, 0f, -.01f);
+            // The drum art sits at z = -1.02 × radius (toward the board camera at -z); the scorch goes just in front of it.
+            float near = -r * 1.1f;
+            scorch.transform.localPosition = new Vector3(0f, 0f, near);
             scorch.transform.localScale = Vector3.one * Scale(scorch, r * 2.04f);
             scorch.enabled = fade > .002f;
             if (edge != null) edge.enabled = false;
@@ -284,7 +307,7 @@ namespace C6Lab
                 // Sparks flick off the burning line all round the drum and drift up.
                 float cycle = age / .85f + i * .41f, t = Mathf.Repeat(cycle, 1f);
                 float angle = Hash(i, Mathf.Floor(cycle)) * Mathf.PI * 2f;
-                var from = new Vector3(Mathf.Cos(angle) * inner, Mathf.Sin(angle) * inner, -.03f);
+                var from = new Vector3(Mathf.Cos(angle) * inner, Mathf.Sin(angle) * inner, near - .02f);
                 Place(sparks[i], from + new Vector3(Mathf.Sin(t * 5f + i) * r * .08f, t * r * .55f, 0f), r * .13f * (1f - .7f * t));
                 Tint(sparks[i], Color.Lerp(HotColor, EmberColor, t), (1f - t) * fade * caught);
             }
