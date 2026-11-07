@@ -5849,7 +5849,7 @@ PR-1(`feat/#507-gourd-rig-contract`) 위에서 Unity 6000.6.5f1 macOS batch Edit
 - iOS·실제 Wi-Fi/핫스팟·모바일 성능·장시간 반사 떨림·다른 모델의V4 미적 승인·실제 surface 핀 변경/실패 롤백 주입은 미실행이다. 기존 no-op 조명 메타데이터 검사만으로 이 경로를 PASS 처리하지 않는다.
 
 
-## 2026-11-06 · Bulk 첫 RTT 표본 전 재전송 백오프
+## 2026-11-06 · Bulk 첫 RTT 표본 전 재전송 백오프 (PR #545)
 
 - **기준:** main `f6d4ab29` → `fix/bulk-presample-rto-backoff`. Unity 6000.6.5f1/macOS batchmode, 이 worktree에서 실행했다(연결된 Editor 없음). 새 Mac·iOS 빌드는 만들지 않았다.
 - **배경:** 네트워크 간섭 체감 보고서의 약한 고리 4번. `LabBulkSender.RetryTimeoutSeconds`는 첫 RTT 표본 전에 0.25초 고정이었고, 공유 백오프는 표본이 있을 때만 걸렸다. Bulk 왕복이 처음부터 0.25초를 넘으면 모든 조각이 ACK 전에 한 번 더 나간다. 그러면 Karn 규칙이 그 ACK를 모두 측정에서 빼므로 표본이 끝내 생기지 않는다. 보고서 측정(main `46ae9987`, 같은 하네스)에서는 RTT 300 ms Guest 연결 10개 중 7개가 끝까지 표본 0개였다.
@@ -5868,6 +5868,7 @@ PR-1(`feat/#507-gourd-rig-contract`) 위에서 Unity 6000.6.5f1 macOS batch Edit
 - **전체 PlayMode의 실패 1개:** `Hapio.Experiments.Tests.ClayPreviewPlayModeTests.PackedSampleKeepsAllFourHalfChannelsAndActualCoatingCoverage`(Category `GPU`·`Legacy`·`Slow`, Mac 클레이 재질 실험)다.
   - 가져온 `Sample/Height.exr`의 GPU 읽기 해시(`73e0cbd6…`)가 `SampleInfo.json`의 값(`6388ad86…`)과 달랐다. `46ae9987`의 이전 값(`e2f68190…`)과도 다르다.
   - 이 변경은 Bulk 송신기·EditMode 검사·문서만 바꾸며 이 경로와 겹치는 코드가 없다. 이 worktree의 Library는 main 폴더(`46ae9987`)의 Library를 복제해 썼다.
+  - 2026-11-07에 이 검사만 따로 두 번 더 돌렸다. 수정 후 `7cbbbc8f`에서 실패했고, `Assets`를 기준 커밋 `f6d4ab29`와 같게 되돌린 상태(Bulk 파일 3개 복원)에서도 같은 해시(`73e0cbd6…`)로 실패했다(각 0.8초). 따라서 이 변경 전부터 이 worktree 환경에서 나는 실패이며, 원인(복제 Library·GPU 읽기 등)은 조사하지 않았다.
   - Bulk·네트워크 관련 PlayMode는 모두 통과했다: `LabLocalBoardNetworkIntegrationTests` 21/21, `GameSceneFlowTests` 21/21, `LabJigwiABNetworkTests` 9/9, `LabMessageHandlerReconnectTests` 1/1, `LabDeveloperSoloIntegrationTests` 14/14.
 - **새 검사 4개(`LabBulkAdaptiveRetransmitTests`):**
   - 표본 전 백오프 단위 검사: 표본 전 시간 초과가 0.25→0.5→1초로 늘고 1초에서 멈춘다. Karn으로 표본이 없는 ACK 뒤에도 백오프가 남는다. 첫 깨끗한 표본에서 srtt+4·rttvar(0.3초)로 돌아가고, Clear 뒤에는 0.25초다.
