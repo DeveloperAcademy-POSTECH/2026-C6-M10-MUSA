@@ -13,6 +13,8 @@ namespace C6Lab
     {
         public bool enabled, fever;
         public double startedAt = -1d, cutoffAt = -1d;
+        /// <summary>#540: which fixed timetable the Host runs (LabJigwiABTimeline.LegacySchedule / FlowSchedule).</summary>
+        public int schedule;
         public LabJigwiABRound[] rounds = Array.Empty<LabJigwiABRound>();
         /// <summary>The running mission takes priority over a following mission's overlapping warning.</summary>
         public LabJigwiABRound Active(double now) => (rounds ?? Array.Empty<LabJigwiABRound>())
@@ -24,7 +26,7 @@ namespace C6Lab
             .LastOrDefault(value => value != null && value.RewardActive(now));
         public LabJigwiABSnapshot Copy() => new LabJigwiABSnapshot
         {
-            enabled = enabled, fever = fever, startedAt = startedAt, cutoffAt = cutoffAt,
+            enabled = enabled, fever = fever, startedAt = startedAt, cutoffAt = cutoffAt, schedule = schedule,
             rounds = (rounds ?? Array.Empty<LabJigwiABRound>()).Select(value => value?.Copy()).ToArray()
         };
     }
@@ -113,8 +115,9 @@ namespace C6Lab
         public static bool Valid(LabJigwiABSnapshot state, LabPlayerState[] members = null, ulong? modelRevision = null)
         {
             if (state == null) return true; // Legacy/standalone snapshots have no AB payload.
-            if (state.rounds == null || state.rounds.Length > MaximumRounds) return false;
+            if (state.rounds == null || state.rounds.Length > MaximumRounds || !LabJigwiABTimeline.ValidSchedule(state.schedule)) return false;
             if (!state.enabled) return !state.fever && state.rounds.Length == 0 && state.startedAt == -1d && state.cutoffAt == -1d;
+            if (state.rounds.Length > LabJigwiABTimeline.SlotCountFor(state.schedule)) return false;
             if (!Range(state.startedAt, 0d, double.MaxValue) || !Finite(state.cutoffAt)
                 || Math.Abs(state.cutoffAt - state.startedAt - 100d) > .00001d) return false;
             var ids = new HashSet<string>(StringComparer.Ordinal);
@@ -125,7 +128,7 @@ namespace C6Lab
             foreach (var round in state.rounds)
             {
                 if (round == null || string.IsNullOrEmpty(round.id) || round.id.Length > 256 || !ids.Add(round.id)
-                    || round.slot < 0 || round.slot >= MaximumRounds || !slots.Add(round.slot)
+                    || round.slot < 0 || round.slot >= LabJigwiABTimeline.SlotCountFor(state.schedule) || !slots.Add(round.slot)
                     || round.kind < LabJigwiABKind.PersonalBurn || round.kind > LabJigwiABKind.GroupFire
                     || round.resolution < LabJigwiABResolution.None || round.resolution > LabJigwiABResolution.Skipped
                     || !Range(round.warningAt, state.startedAt, state.cutoffAt)
@@ -138,7 +141,7 @@ namespace C6Lab
                     || !Range(round.rewardSizeScale, 1d, 3d) || !Range(round.rewardPaintScale, 1d, 3d)
                     || !Range(round.rewardUntil, -1d, state.cutoffAt)
                     || round.players == null || round.players.Length > MaximumPlayers) return false;
-                double scheduled = state.startedAt + LabJigwiABTimeline.ActiveOffset(round.slot);
+                double scheduled = state.startedAt + LabJigwiABTimeline.ActiveOffset(round.slot, state.schedule);
                 if (Math.Abs(round.activeAt - scheduled) > .00001d
                     || Math.Abs(round.warningAt - (scheduled - LabJigwiABTimeline.WarningSeconds)) > .00001d
                     || round.kind != LabJigwiABTimeline.KindForSlot(round.slot)) return false;

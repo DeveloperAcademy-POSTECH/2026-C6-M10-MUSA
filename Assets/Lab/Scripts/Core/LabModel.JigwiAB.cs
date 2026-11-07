@@ -16,6 +16,9 @@ namespace C6Lab
         // #509: where each picked seat's last counted Water hit the boss, for the success splash.
         private readonly Dictionary<ulong, Vector3> jigwiSyncDirections = new Dictionary<ulong, Vector3>();
         private float jigwiSplashShare, jigwiBoardFireSeconds;
+        /// <summary>#540: the timetable this battle runs and, for the flow timetable, the common gimmick rhythm.</summary>
+        private int jigwiSchedule;
+        private double jigwiCommonStart = 40d, jigwiCommonInterval = 15d;
         /// <summary>#540: an unfinished talisman's remaining orbs burn one after another this far apart (fire spreading).</summary>
         public const double JigwiTalismanFailBurnStepSeconds = .12d;
         // #479: A burns each owner's orbs one at a time. The last queued deadline per owner for the running A.
@@ -40,6 +43,8 @@ namespace C6Lab
         private void ResetJigwiAB(LabConfig config, double now)
         {
             jigwiABEnabled = !teamMode && StageYokai == LabStageYokai.Jigwi && config.JigwiStageTimelineEnabled;
+            jigwiSchedule = config.JigwiFlowSchedule ? LabJigwiABTimeline.FlowSchedule : LabJigwiABTimeline.LegacySchedule;
+            jigwiCommonStart = config.JigwiCommonStartSeconds; jigwiCommonInterval = config.JigwiCommonIntervalSeconds;
             jigwiABRounds.Clear(); jigwiABActivated.Clear(); jigwiABFailureRevision = 0;
             jigwiABLastBurnAt.Clear(); jigwiABBurnQueueId = null; jigwiTalismanDrops.Clear();
             ResetJigwiABSupply(config);
@@ -62,8 +67,15 @@ namespace C6Lab
             nextCommonGimmickAt = NextJigwiABCommonAt(0u);
             nextUniqueGimmickAt = nextComboAt = nextFlashAt = nextStageJigwiAt = double.PositiveInfinity;
         }
-        private double NextJigwiABCommonAt(uint index) => !jigwiStageCutoffReached && index < JigwiStageCommonSlots.Length
-            ? jigwiStageStartedAt + JigwiStageCommonSlots[index] : double.PositiveInfinity;
+        private double NextJigwiABCommonAt(uint index)
+        {
+            if (jigwiStageCutoffReached) return double.PositiveInfinity;
+            if (jigwiSchedule != LabJigwiABTimeline.FlowSchedule)
+                return index < JigwiStageCommonSlots.Length ? jigwiStageStartedAt + JigwiStageCommonSlots[index] : double.PositiveInfinity;
+            // #540: from the start of the middle phase, every interval, until the fever.
+            double offset = jigwiCommonStart + index * Math.Max(3d, jigwiCommonInterval);
+            return offset < jigwiStageCutoffAt - jigwiStageStartedAt ? jigwiStageStartedAt + offset : double.PositiveInfinity;
+        }
         private double NextJigwiABBoundary(double requested)
         {
             if (phase != LabPhase.Playing || jigwiStageCutoffReached) return requested;
@@ -71,8 +83,8 @@ namespace C6Lab
             void Include(double at) { if (at > lastTime && at < next) next = at; }
             Include(jigwiStageCutoffAt);
             foreach (var drop in jigwiTalismanDrops) Include(drop.dueAt); // #509 talisman Water, one at a time
-            if (jigwiStageNextSlot < LabJigwiABTimeline.SlotCount)
-                Include(jigwiStageStartedAt + LabJigwiABTimeline.ActiveOffset(jigwiStageNextSlot) - LabJigwiABTimeline.WarningSeconds);
+            if (jigwiStageNextSlot < LabJigwiABTimeline.SlotCountFor(jigwiSchedule))
+                Include(jigwiStageStartedAt + LabJigwiABTimeline.ActiveOffset(jigwiStageNextSlot, jigwiSchedule) - LabJigwiABTimeline.WarningSeconds);
             foreach (var item in jigwiABRounds)
             {
                 if (item.resolution == LabJigwiABResolution.None)
@@ -109,11 +121,11 @@ namespace C6Lab
             // Resolve an ending A before activating B at the same instant. Its warning may already be visible.
             foreach (var item in jigwiABRounds.Where(value => value.resolution == LabJigwiABResolution.None).ToArray())
                 if (now >= item.endsAt) ResolveJigwiAB(item, LabJigwiABResolution.Expired, item.endsAt);
-            while (jigwiStageNextSlot < LabJigwiABTimeline.SlotCount
-                && jigwiStageStartedAt + LabJigwiABTimeline.ActiveOffset(jigwiStageNextSlot) - LabJigwiABTimeline.WarningSeconds <= now)
+            while (jigwiStageNextSlot < LabJigwiABTimeline.SlotCountFor(jigwiSchedule)
+                && jigwiStageStartedAt + LabJigwiABTimeline.ActiveOffset(jigwiStageNextSlot, jigwiSchedule) - LabJigwiABTimeline.WarningSeconds <= now)
             {
                 int slot = jigwiStageNextSlot++;
-                BeginJigwiABSlot(slot, jigwiStageStartedAt + LabJigwiABTimeline.ActiveOffset(slot));
+                BeginJigwiABSlot(slot, jigwiStageStartedAt + LabJigwiABTimeline.ActiveOffset(slot, jigwiSchedule));
             }
             var active = ActiveJigwiABRound(now);
             if (active != null) AdvanceJigwiABActive(active, now);
@@ -142,7 +154,7 @@ namespace C6Lab
                 kind = kind,
                 warningAt = activeAt - LabJigwiABTimeline.WarningSeconds, activeAt = activeAt,
                 endsAt = Math.Min(jigwiStageCutoffAt, personal
-                    ? Math.Min(activeAt + jigwiABDuration, jigwiStageStartedAt + LabJigwiABTimeline.ActiveOffset(slot + 1))
+                    ? Math.Min(activeAt + jigwiABDuration, jigwiStageStartedAt + LabJigwiABTimeline.NextOffset(slot, jigwiSchedule))
                     : activeAt + JigwiABMissionSeconds),
                 // Reserved shrink fields remain on the wire, but the timed mission never shrinks an orb.
                 shrinkAt = activeAt, shrinkScale = 1f,
@@ -413,7 +425,7 @@ namespace C6Lab
         }
         private LabJigwiABSnapshot CopyJigwiABSnapshot(double now) => !jigwiABEnabled ? new LabJigwiABSnapshot()
             : new LabJigwiABSnapshot { enabled = true, fever = phase == LabPhase.Playing && now >= jigwiStageCutoffAt,
-                startedAt = jigwiStageStartedAt, cutoffAt = jigwiStageCutoffAt,
+                startedAt = jigwiStageStartedAt, cutoffAt = jigwiStageCutoffAt, schedule = jigwiSchedule,
                 rounds = jigwiABRounds.Select(item => item.Copy()).ToArray() };
     }
 }

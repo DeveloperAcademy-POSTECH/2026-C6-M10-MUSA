@@ -571,6 +571,12 @@ namespace C6Lab
 
         [Header("Jigwi surface fire timeline (#332)")]
         [SerializeField] private bool jigwiStageTimelineEnabled = true;
+        [Tooltip("#540 Inspector 전용(Host): 켜면 야광귀와 같은 흐름의 지귀 시간표 — 초반 40초는 개별 기믹 1개(A1 10초), 중반 60초는 공통 기믹 위에 B-A-B(B1 45, A2 66, B2 83), 후반 20초 피버. 끄면 #509 시간표(A 5/B 25/A 42/B 55/A 70/B 85).")]
+        [SerializeField] private bool jigwiFlowSchedule = false;
+        [Tooltip("#540 Inspector 전용(Host, 새 시간표만): 지귀 공통 기믹이 처음 나오는 때(초).")]
+        [SerializeField, Range(0f, 99f)] private float jigwiCommonStartSeconds = 40f;
+        [Tooltip("#540 Inspector 전용(Host, 새 시간표만): 지귀 공통 기믹 간격(초). 피버(100초) 전까지 되풀이.")]
+        [SerializeField, Range(3f, 60f)] private float jigwiCommonIntervalSeconds = 15f;
         [HideInInspector, SerializeField, Range(0f, 3f)] private float jigwiStageWarningSeconds = 1f;
         [HideInInspector, SerializeField, Range(1f, 20f)] private float jigwiStageActiveSeconds = 7f;
         [HideInInspector, SerializeField, Range(5f, 30f)] private float jigwiStageRootAngleDegrees = 18f;
@@ -1165,6 +1171,9 @@ namespace C6Lab
         public int RawStreakOppositeChancePercent => Mathf.Clamp(rawStreakOppositeChancePercent, 0, 100);
         public int RawStreakMaximum => Mathf.Clamp(rawStreakMaximum, 1, 10);
         public bool JigwiStageTimelineEnabled => jigwiStageTimelineEnabled;
+        public bool JigwiFlowSchedule => jigwiFlowSchedule;
+        public float JigwiCommonStartSeconds => Mathf.Clamp(Finite(jigwiCommonStartSeconds, 40f), 0f, 99f);
+        public float JigwiCommonIntervalSeconds => Mathf.Clamp(Finite(jigwiCommonIntervalSeconds, 15f), 3f, 60f);
         public float JigwiStageWarningSeconds => Mathf.Clamp(Finite(jigwiStageWarningSeconds, 1f), 0f, 3f);
         public float JigwiStageActiveSeconds => Mathf.Clamp(Finite(jigwiStageActiveSeconds, 7f), 1f, 20f);
         public float JigwiStageRootAngleDegrees => Mathf.Clamp(Finite(jigwiStageRootAngleDegrees, 18f), 5f, 30f);

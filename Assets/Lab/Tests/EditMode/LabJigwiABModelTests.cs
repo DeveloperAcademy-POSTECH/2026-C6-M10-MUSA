@@ -184,6 +184,26 @@ namespace C6Lab.Tests
             Assert.That(s.jigwiAB.Active(6).resolution,Is.EqualTo(LabJigwiABResolution.None));
             Assert.That(s.orbs.Single(o=>o.id==burning.id).jigwiABBurnAt,Is.EqualTo(10));
         }
+        [Test] public void FlowScheduleRunsOneAFirstThenBABOverCommonGimmicksEvery15Seconds()
+        {
+            // #540: like Yaguang — the first 40 s carry one unique gimmick (A1), the middle 60 s overlay B-A-B on the
+            // common gimmicks (40, 55, 70, 85), the last 20 s are fever.
+            JsonUtility.FromJsonOverwrite("{\"jigwiFlowSchedule\":true,\"jigwiABPersonalDurationSeconds\":10}",config);
+            var m=Room();
+            var next=typeof(LabModel).GetMethod("NextJigwiABCommonAt",BindingFlags.Instance|BindingFlags.NonPublic);
+            Assert.That(Enumerable.Range(0,5).Select(i=>(double)next.Invoke(m,new object[]{(uint)i})),
+                Is.EqualTo(new[]{40d,55d,70d,85d,double.PositiveInfinity}));
+            for(int t=1;t<=99;t++){m.Tick(t);var mid=m.Snapshot(t);
+                Assert.That(LabJigwiABNetworkValidation.Valid(mid.jigwiAB,mid.players,m.Revision),Is.True,"Valid at "+t+" s");}
+            var s=m.Snapshot(99);var r=s.jigwiAB.rounds.OrderBy(x=>x.slot).ToArray();
+            Assert.That(s.jigwiAB.schedule,Is.EqualTo(LabJigwiABTimeline.FlowSchedule));
+            Assert.That(r.Select(x=>x.activeAt),Is.EqualTo(new[]{10d,45d,66d,83d}));
+            Assert.That(r.Select(x=>x.kind),Is.EqualTo(new[]{LabJigwiABKind.PersonalBurn,LabJigwiABKind.GroupFire,
+                LabJigwiABKind.PersonalBurn,LabJigwiABKind.GroupFire}));
+            Assert.That(r[0].endsAt,Is.EqualTo(20d));Assert.That(r[2].endsAt,Is.EqualTo(76d));
+            Assert.That(r[1].endsAt,Is.EqualTo(60d));Assert.That(r[3].endsAt,Is.EqualTo(98d));
+            Assert.That(r.Count(x=>x.activeAt<40d),Is.EqualTo(1),"Only one unique gimmick in the first 40 s.");
+        }
         [Test] public void AnUnfinishedTalismanBurnsThatSeatsOrbsButNeverBlocksItsDrums()
         {
             // #540: the A runs out with seat 0 still writing — every orb left on its board burns (one after another).
