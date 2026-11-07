@@ -213,8 +213,9 @@ namespace C6Lab.Experiments.Editor
 
         /// <summary>
         /// With iOS active (this project's usual Editor target), a Half EXR that only follows Default is
-        /// RGBM-encoded on import: its alpha then holds the RGBM scale instead of the stamp coverage.
-        /// An explicit iOS RGBA Half override keeps all four channels exactly as saved.
+        /// RGBM-encoded on import: RGB is divided by an 8-bit multiplier that replaces the stamp coverage in A,
+        /// so height R, normal GB and coverage A all change. An explicit iOS RGBA Half override keeps all four
+        /// channels exactly as saved.
         /// </summary>
         private static TextureImporterPlatformSettings ExactHeightOnIos(TextureImporter importer)
         {
@@ -226,11 +227,14 @@ namespace C6Lab.Experiments.Editor
             return ios;
         }
 
-        internal static bool KeepsHeightExactOnIos(TextureImporter importer)
+        /// <summary>
+        /// Compression is not checked: with an explicit format it selects nothing, and the iOS Inspector tab
+        /// keeps whatever value was stored. A max size below the 1024 map width would downscale the map.
+        /// </summary>
+        private static bool KeepsHeightExactOnIos(TextureImporter importer)
         {
             var ios = importer.GetPlatformTextureSettings(IosPlatform);
-            return ios.overridden && ios.format == TextureImporterFormat.RGBAHalf
-                && ios.textureCompression == TextureImporterCompression.Uncompressed;
+            return ios.overridden && ios.format == TextureImporterFormat.RGBAHalf && ios.maxTextureSize >= 1024;
         }
 
         public static void CreateSceneIfMissing()
@@ -390,7 +394,7 @@ namespace C6Lab.Experiments.Editor
             Require(importer.GetDefaultPlatformTextureSettings().format == expected,
                 "The frozen map no longer preserves its source precision.");
             Require(!height || KeepsHeightExactOnIos(importer),
-                "The frozen height map needs its iOS RGBA Half override; without it iOS RGBM-encodes the map and loses coverage A.");
+                "The frozen height map needs an iOS override with RGBA Half format and a max size of 1024 or more; without it iOS RGBM-encodes the map on import.");
         }
 
         [MenuItem("C6 Lab/Experiments/Clay Sticker/Build Mac Preview App")]
