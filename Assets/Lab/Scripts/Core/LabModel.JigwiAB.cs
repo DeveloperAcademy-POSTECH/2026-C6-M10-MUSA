@@ -19,10 +19,8 @@ namespace C6Lab
         /// <summary>#540: the timetable this battle runs and, for the flow timetable, the common gimmick rhythm.</summary>
         private int jigwiSchedule;
         private double jigwiCommonStart = 40d, jigwiCommonInterval = 15d;
-        /// <summary>#540: after the fireball lands, an unfinished talisman's orbs burn one at a time; each one blazes this long, then burns away.</summary>
+        /// <summary>#540: once Jigwi's line is over, every orb on an unfinished talisman's board burns away together in this long.</summary>
         public const double JigwiTalismanFailBlazeSeconds = 1d;
-        /// <summary>#540: the next orb catches fire as the previous one burns away (one at a time, easy to follow).</summary>
-        public const double JigwiTalismanFailBurnStepSeconds = JigwiTalismanFailBlazeSeconds;
         /// <summary>#540: the fireball falls onto a failed seat's board this long after the A ends.</summary>
         public const double JigwiTalismanFailBurnDelaySeconds = .45d;
         /// <summary>
@@ -43,6 +41,8 @@ namespace C6Lab
         private int jigwiTalismanWaterCount;
         /// <summary>#509: talisman Water drops in one at a time; each pending orb's owner, index and Host due time.</summary>
         private readonly List<(ulong owner, int index, double dueAt)> jigwiTalismanDrops = new List<(ulong, int, double)>();
+        /// <summary>#540: boards whose talisman failed, and when (the end of Jigwi's line) every orb then on them catches fire.</summary>
+        private readonly List<(ulong owner, string roundId, double dueAt)> jigwiFailBurns = new List<(ulong, string, double)>();
         public const double JigwiTalismanDropSeconds = .3d;
         private float jigwiTalismanWaterPaint, jigwiTalismanRewardDelay;
         /// <summary>#540: 부적 구슬은 수명이 없다(오색구슬처럼 만든 시각부터 아주 멀리 끝을 둔다). 던질 때까지 남는다.</summary>
@@ -65,7 +65,7 @@ namespace C6Lab
             jigwiAHoldBurn = config.JigwiAHoldBurnUntilEnd;
             jigwiCommonStart = config.JigwiCommonStartSeconds; jigwiCommonInterval = config.JigwiCommonIntervalSeconds;
             jigwiABRounds.Clear(); jigwiABActivated.Clear(); jigwiABFailureRevision = 0;
-            jigwiABLastBurnAt.Clear(); jigwiABBurnQueueId = null; jigwiTalismanDrops.Clear(); jigwiAPausedOrbs.Clear();
+            jigwiABLastBurnAt.Clear(); jigwiABBurnQueueId = null; jigwiTalismanDrops.Clear(); jigwiFailBurns.Clear(); jigwiAPausedOrbs.Clear();
             ResetJigwiABSupply(config);
             if (!jigwiABEnabled) return;
             // Preserve the old code as an inactive migration path, never run two policies together.
@@ -102,6 +102,7 @@ namespace C6Lab
             void Include(double at) { if (at > lastTime && at < next) next = at; }
             Include(jigwiStageCutoffAt);
             foreach (var drop in jigwiTalismanDrops) Include(drop.dueAt); // #509 talisman Water, one at a time
+            foreach (var burn in jigwiFailBurns) Include(burn.dueAt); // #540 the failed boards catch fire right on time
             if (jigwiStageNextSlot < LabJigwiABTimeline.SlotCountFor(jigwiSchedule))
                 Include(jigwiStageStartedAt + LabJigwiABTimeline.ActiveOffset(jigwiStageNextSlot, jigwiSchedule) - LabJigwiABTimeline.WarningSeconds);
             foreach (var item in jigwiABRounds)
@@ -126,11 +127,12 @@ namespace C6Lab
         {
             if (phase != LabPhase.Playing)
             {
-                jigwiTalismanDrops.Clear();
+                jigwiTalismanDrops.Clear(); jigwiFailBurns.Clear();
                 CancelJigwiABForBattleEnd(now);
                 return;
             }
             GrantDueJigwiTalismanWater(now);
+            IgniteDueJigwiFailBurns(now);
             if (!jigwiStageCutoffReached && now >= jigwiStageCutoffAt)
             {
                 CancelJigwiABForBattleEnd(jigwiStageCutoffAt);
@@ -208,25 +210,16 @@ namespace C6Lab
             if (item == null || item.resolution != LabJigwiABResolution.None) return;
             item.resolution = result; item.resolvedAt = Math.Max(item.warningAt, at);
             // #540: an A that runs out punishes every seat that did not finish its talisman (each seat for itself):
-            // every orb left on its board burns, one after another. Drums keep working.
+            // when Jigwi's line is over, every orb then on its board burns away at once. Drums keep working.
             var failed = new HashSet<ulong>();
             if (item.kind == LabJigwiABKind.PersonalBurn && result == LabJigwiABResolution.Expired)
                 foreach (var seat in item.players ?? Array.Empty<LabJigwiABPlayerFire>())
                     if (seat != null && seat.talismanAt < 0d) failed.Add(seat.playerId);
-            var burnSteps = new Dictionary<ulong, int>();
-            foreach (var orb in orbs.Values.OrderBy(value => value.createdAt).ThenBy(value => value.id, StringComparer.Ordinal))
+            // #540: which orbs burn is decided when Jigwi's line ends (see IgniteDueJigwiFailBurns), so orbs made meanwhile burn too.
+            foreach (ulong owner in failed) jigwiFailBurns.Add((owner, item.id, item.resolvedAt + JigwiTalismanFailFirstBurnSeconds));
+            foreach (var orb in orbs.Values)
             {
-                // #540: a talisman orb never burns (it has no lifetime either).
-                if (failed.Contains(orb.owner) && !orb.inFlight && !orb.jigwiTalismanReward && (orb.kind.IsRaw() || orb.kind == LabOrbKind.Combined))
-                {
-                    burnSteps.TryGetValue(orb.owner, out int step); burnSteps[orb.owner] = step + 1;
-                    // #540: the fireball falls onto the board; after Jigwi's line its orbs burn one at a time (oldest first), each for the blaze time.
-                    double burnAt = item.resolvedAt + JigwiTalismanFailFirstBurnSeconds + JigwiTalismanFailBlazeSeconds
-                        + step * JigwiTalismanFailBurnStepSeconds;
-                    if (orb.jigwiABBurnAt < 0d || burnAt < orb.jigwiABBurnAt)
-                    { orb.jigwiABBurnAt = burnAt; orb.jigwiABBurnEventId = item.id; orb.revision = ++revision; }
-                    continue;
-                }
+                if (failed.Contains(orb.owner)) continue;
                 if (item.kind == LabJigwiABKind.PersonalBurn && orb.jigwiABBurnEventId == item.id)
                 { orb.jigwiABBurnEventId = null; orb.jigwiABBurnAt = -1d; orb.revision = ++revision; }
                 if (item.kind == LabJigwiABKind.GroupFire && !orb.inFlight && orb.jigwiABRadiusScale != 1f)
@@ -459,6 +452,27 @@ namespace C6Lab
             for (int i = 0; i < jigwiTalismanWaterCount; i++)
                 jigwiTalismanDrops.Add((owner, i, now + jigwiTalismanRewardDelay + i * JigwiTalismanDropSeconds));
             GrantDueJigwiTalismanWater(now);
+        }
+        /// <summary>
+        /// #540: the moment Jigwi's "모두 재가 되어라!" ends, every orb on a failed board (element and combined orbs on the board,
+        /// not in flight; a talisman orb never burns) catches fire and burns away together in JigwiTalismanFailBlazeSeconds.
+        /// </summary>
+        private void IgniteDueJigwiFailBurns(double now)
+        {
+            for (int k = 0; k < jigwiFailBurns.Count; k++)
+            {
+                var (owner, roundId, dueAt) = jigwiFailBurns[k];
+                if (dueAt > now) continue;
+                jigwiFailBurns.RemoveAt(k--);
+                double burnAt = dueAt + JigwiTalismanFailBlazeSeconds;
+                foreach (var orb in orbs.Values)
+                {
+                    if (orb.owner != owner || orb.inFlight || orb.jigwiTalismanReward || (!orb.kind.IsRaw() && orb.kind != LabOrbKind.Combined)) continue;
+                    if (orb.jigwiABBurnAt < 0d || burnAt < orb.jigwiABBurnAt)
+                    { orb.jigwiABBurnAt = burnAt; orb.jigwiABBurnEventId = roundId; orb.revision = ++revision; }
+                }
+                revision++;
+            }
         }
         private void GrantDueJigwiTalismanWater(double now)
         {

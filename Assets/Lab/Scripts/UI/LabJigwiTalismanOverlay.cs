@@ -180,7 +180,7 @@ namespace C6Lab
         [SerializeField, Range(0f, 1f)] private float alarmSoundVolume = .7f;
         [Tooltip("#540 붉은 경보가 번쩍일 때마다 오는 진동 세기 (끝이 다가올수록 이 값까지 세짐). 0이면 끔. 붓 쓰는 진동(Light)과 구분되게 Rigid로 툭.")]
         [SerializeField, Range(0f, 1f)] private float alarmHapticIntensity = .6f;
-        [Tooltip("#540 못 쓴 판의 구슬이 하나씩 차례로 1초 동안 재가 되어 사라질 때, 구슬마다 타기 시작하는 순간 나는 타는 소리 폴더 (1초). 비우면 없음.")]
+        [Tooltip("#540 못 쓴 판의 구슬이 모두 함께 1초 동안 재가 되어 사라질 때, 타기 시작하는 순간 한 번 나는 타는 소리 폴더 (1초). 비우면 없음.")]
         [SerializeField] private string orbBurnSoundFolder = "JigwiOrbBurn";
         [SerializeField, Range(0f, 1f)] private float orbBurnSoundVolume = 1f;
         [SerializeField, Range(0f, 1f)] private float spreadSoundVolume = 1f;
@@ -747,10 +747,11 @@ namespace C6Lab
         /// <summary>#540: 경보 진동을 낸 횟수 (테스트용, 설정에서 진동을 꺼도 센다).</summary>
         public int AlarmHapticCount { get; private set; }
         private readonly HashSet<string> orbBurnsCued = new HashSet<string>(StringComparer.Ordinal);
+        private float lastOrbBurnCue = -10f;
 
         /// <summary>
-        /// #540: 못 쓴 판의 구슬은 하나씩 차례로 1초 동안 재가 되어 사라진다. 구슬마다 타기 시작하는 순간 1초짜리 타는 소리를 한 번 낸다.
-        /// 차례 중간에 끼어든 구슬(합쳐져 새로 생긴 구슬 등)은 소리 없이 탄다.
+        /// #540: 지귀 대사가 끝나는 순간 못 쓴 판의 구슬이 모두 함께 1초 동안 재가 되어 사라진다. 그 순간 1초짜리 타는 소리를 한 번만 낸다
+        /// (구슬이 여러 개라도 한 번). 늦게 보인 구슬(합쳐져 새로 생긴 구슬 등)은 소리 없이 탄다.
         /// </summary>
         private void CueOrbBurns(LabSnapshot snapshot)
         {
@@ -763,8 +764,12 @@ namespace C6Lab
                 float left = LabJigwiScreenPresentation.FailBlazeSecondsLeft(snapshot, orb, now);
                 if (left <= 0f) continue;
                 orbBurnsCued.Add(orb.id);
-                if (left >= (float)LabModel.JigwiTalismanFailBlazeSeconds - lateSeconds)
+                if (left >= (float)LabModel.JigwiTalismanFailBlazeSeconds - lateSeconds
+                    && Time.unscaledTime - lastOrbBurnCue >= (float)LabModel.JigwiTalismanFailBlazeSeconds)
+                {
+                    lastOrbBurnCue = Time.unscaledTime;
                     Cue("OrbBurn", orbBurnSoundFolder, orbBurnSoundVolume);
+                }
             }
             // Forget old ones (a new round, or a stalled clock).
             if (orbBurnsCued.Count > 64) orbBurnsCued.Clear();
