@@ -175,6 +175,12 @@ namespace C6Lab
         [SerializeField] private string failVoiceFolder = "JigwiVoiceAFail";
         [Tooltip("#540 불덩이가 조합판에 닿아 불이 확 번질 때 소리 폴더. 비우면 없음.")]
         [SerializeField] private string spreadSoundFolder = "JigwiFireSpread";
+        [Tooltip("#540 부적을 쓰는 동안 공격 영역 붉은 경보가 번쩍일 때마다 나는 경보음 폴더. 끝이 다가올수록 빨라지고 커진다. 비우면 없음.")]
+        [SerializeField] private string alarmSoundFolder = "JigwiAlarmPulse";
+        [SerializeField, Range(0f, 1f)] private float alarmSoundVolume = .7f;
+        [Tooltip("#540 못 쓴 판의 구슬이 하나씩 타 없어질 때마다 나는 소리 폴더 (\"퍽\"). 비우면 없음.")]
+        [SerializeField] private string burnOutSoundFolder = "JigwiOrbBurnOut";
+        [SerializeField, Range(0f, 1f)] private float burnOutSoundVolume = .8f;
         [SerializeField, Range(0f, 1f)] private float spreadSoundVolume = 1f;
         [Tooltip("#540 부적 구슬이 판에 닿을 때 \"퐁\" 소리 폴더. 비우면 없음.")]
         [SerializeField] private string landSoundFolder = "JigwiTalismanLand";
@@ -404,6 +410,7 @@ namespace C6Lab
             bool paused = snapshot == null || snapshot.paused || source.GameStartHeld || source.BattlePresentationHeld;
             DriveFireball(snapshot);
             DriveBubble(snapshot);
+            CueBurnOuts(snapshot);
             UpdateFireLoop(!paused, Time.unscaledDeltaTime);
             UpdateCrackle(CrackleTarget(paused), Time.unscaledDeltaTime);
             Camera boardView = source.board != null ? source.board.ViewCamera : null;
@@ -725,8 +732,44 @@ namespace C6Lab
             PlaceScreenRect(alarm.rectTransform, new Rect(0f, board.yMax, Screen.width, Mathf.Max(1f, Screen.height - board.yMax)));
             float urgency = Mathf.Clamp01(WarnLevel);
             float rate = Mathf.Lerp(1.1f, 2.6f, urgency);
-            float pulse = .5f - .5f * Mathf.Cos(Time.unscaledTime * rate * Mathf.PI * 2f);
+            bool running = Visible && source != null && source.Snapshot != null && !source.Snapshot.paused;
+            float before = alarmPhase;
+            if (running) alarmPhase += dt * rate;
+            // The alarm sounds at each flash's brightest moment, louder as time runs out.
+            if (running && Mathf.Floor(before + .5f) != Mathf.Floor(alarmPhase + .5f))
+                Cue("Alarm", alarmSoundFolder, alarmSoundVolume * Mathf.Lerp(.55f, 1f, urgency));
+            float pulse = .5f - .5f * Mathf.Cos(alarmPhase * Mathf.PI * 2f);
             alarm.color = new Color(1f, 1f, 1f, alarmLevel * Mathf.Lerp(.18f, .5f, urgency) * pulse);
+        }
+
+        private float alarmPhase;
+        private readonly Dictionary<string, double> burnOuts = new Dictionary<string, double>(StringComparer.Ordinal);
+        private readonly List<string> burnOutsDue = new List<string>();
+        private float lastBurnOutCue = -1f;
+
+        /// <summary>
+        /// #540: 못 쓴 판의 구슬이 타 없어지는 순간(Host 소각 시각)마다 "퍽" 소리를 하나씩 낸다. 너무 붙으면 0.04초씩 띄운다.
+        /// </summary>
+        private void CueBurnOuts(LabSnapshot snapshot)
+        {
+            if (source == null || snapshot == null) return;
+            double now = source.JigwiABPresentationTime;
+            foreach (LabOrbState orb in snapshot.orbs ?? Array.Empty<LabOrbState>())
+                if (orb != null && orb.owner == source.LocalPlayerId && !orb.inFlight && !burnOuts.ContainsKey(orb.id)
+                    && LabJigwiScreenPresentation.FailBlazeSecondsLeft(snapshot, orb, now) > 0f)
+                    burnOuts[orb.id] = orb.jigwiABBurnAt;
+            if (burnOuts.Count == 0) return;
+            burnOutsDue.Clear();
+            foreach (var pair in burnOuts) if (now >= pair.Value) burnOutsDue.Add(pair.Key);
+            foreach (string id in burnOutsDue)
+            {
+                if (Time.unscaledTime - lastBurnOutCue < .04f) break;
+                burnOuts.Remove(id);
+                lastBurnOutCue = Time.unscaledTime;
+                Cue("BurnOut", burnOutSoundFolder, burnOutSoundVolume);
+            }
+            // Forget old ones (a new round, or a stalled clock).
+            if (burnOuts.Count > 64) burnOuts.Clear();
         }
 
         /// <summary>
