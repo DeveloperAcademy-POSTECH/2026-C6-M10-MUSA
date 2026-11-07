@@ -1,0 +1,128 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ae9442ae00ac94b9199b823cb9cecd94, type: 3}
+  m_Name: LoadingArt
+  m_EditorClassIdentifier: Hapio.Runtime::Hapio.GameLoadingArt
+  backgroundColor: {r: 0.976, g: 0.898, b: 0.788, a: 1}
+  paperTexture: {fileID: 2800000, guid: 35b15acfe93d492ba7bc02f831ec670d, type: 3}
+  paperStrength: 0.55
+  runners:
+  - name: "\uBD88\uC774"
+    frames:
+    - {fileID: 21300000, guid: 8e9b8b16a31a14ea89cc57c625427cc0, type: 3}
+    - {fileID: 21300000, guid: 7831f8d93ed2544de8cc73e845bd03a3, type: 3}
+    - {fileID: 21300000, guid: 5594fc2f873574cc59796394a12f823b, type: 3}
+    - {fileID: 21300000, guid: 45628ae8336454259910eb4e2c423626, type: 3}
+    - {fileID: 21300000, guid: fa1d0a86b23e84256ae1d0c27e1f0014, type: 3}
+    - {fileID: 21300000, guid: 74845f5f6de7a4fc690cf7160bc07ba0, type: 3}
+    frameSeconds: 0.14
+    landingFrames: 0200000005000000i
+    scale: 1
+    offset: {x: 0, y: 0}
+    forelockTips: []
+  - name: "\uBB35\uC774"
+    frames:
+    - {fileID: 21300000, guid: 360a29bb4e9e34f708009ad95724ab55, type: 3}
+    - {fileID: 21300000, guid: 33810f8725c6945078e5ce3954542d99, type: 3}
+    - {fileID: 21300000, guid: 08c624f2d0e8b4d189e4c06e67423acf, type: 3}
+    - {fileID: 21300000, guid: c0338b61bbf2146bd8a985318f4c9678, type: 3}
+    - {fileID: 21300000, guid: 37a69a088ce4148c3b9136293f604483, type: 3}
+    - {fileID: 21300000, guid: ed3fd52268cdc4f6984799c3a420a25b, type: 3}
+    frameSeconds: 0.14
+    landingFrames: 0100000004000000i
+    scale: 1
+    offset: {x: 0, y: 0}
+    forelockTips: []
+  - name: "\uC194\uC774"
+    frames:
+    - {fileID: 21300000, guid: 64e0d0220b75c40958f583b02775a916, type: 3}
+    - {fileID: 21300000, guid: 86aa60cc8435e4e01a0caf0a8439e5c4, type: 3}
+    - {fileID: 21300000, guid: 2b7d1114fdf534397b31e8a85df30b00, type: 3}
+    - {fileID: 21300000, guid: a32b9f29144164dda97679d50ba737ce, type: 3}
+    - {fileID: 21300000, guid: fd1da5d7377744685add34bf09cf7f5d, type: 3}
+    - {fileID: 21300000, guid: c5ce04af53381442983e66fb4cebd919, type: 3}
+    frameSeconds: 0.14
+    landingFrames: 0100000004000000i
+    scale: 1
+    offset: {x: 0, y: 0}
+    forelockTips:
+    - {x: 0.516, y: 0.084}
+    - {x: 0.51, y: 0.11}
+    - {x: 0.496, y: 0.118}
+    - {x: 0.516, y: 0.084}
+    - {x: 0.508, y: 0.112}
+    - {x: 0.494, y: 0.118}
+  - name: "\uAE08\uC625\uC774"
+    frames:
+    - {fileID: 21300000, guid: 39f9f76f8fd7e49098e33f8cc9b2e743, type: 3}
+    - {fileID: 21300000, guid: 0481f441b310e4e01bffdb7667b1397c, type: 3}
+    - {fileID: 21300000, guid: 4f025d5c65e9041df968666a21877739, type: 3}
+    - {fileID: 21300000, guid: 45e2942924bef44f8a6fdb334f0a69cb, type: 3}
+    - {fileID: 21300000, guid: 70c10dfff8b8348258a187a54b2be6e5, type: 3}
+    - {fileID: 21300000, guid: c693752e970c94646b55c3f515735f27, type: 3}
+    frameSeconds: 0.14
+    landingFrames: 0100000004000000i
+    scale: 1
+    offset: {x: 0, y: 0}
+    forelockTips: []
+  - name: "\uB9CC\uBCF5\uC774"
+    frames:
+    - {fileID: 21300000, guid: 2b2bd7fb7daa54571a2b1331b85cc7c0, type: 3}
+    - {fileID: 21300000, guid: cdb274ef9e6b04afab6f54dc54b13f92, type: 3}
+    - {fileID: 21300000, guid: 1784c1a4759e8440189cc1d506d136fa, type: 3}
+    - {fileID: 21300000, guid: c3ef952542d4b4d5fb2fedacb70cdfb2, type: 3}
+    - {fileID: 21300000, guid: 0f496e5e5d3b5477d97002f51f18c8b1, type: 3}
+    - {fileID: 21300000, guid: adee26a14000e428b964aec3176e5fe3, type: 3}
+    frameSeconds: 0.14
+    landingFrames: 0100000004000000i
+    scale: 1
+    offset: {x: 0, y: 0}
+    forelockTips: []
+  runnerHeight: 182
+  runnerCenterFromTop: 0.356
+  landingSquash: 0.04
+  landingSquashSeconds: 0.08
+  caption: "\uB85C\uB529\uC911"
+  captionFont: {fileID: 12800000, guid: 5f76b20538a6c4b1caa80654c9df48f1, type: 3}
+  captionFontSize: 20
+  captionColor: {r: 0, g: 0, b: 0, a: 1}
+  captionGapBelowRunner: 4
+  barWidth: 262
+  barHeight: 16
+  barBorder: 1.5
+  fillInset: 2.5
+  trackEdgeColor: {r: 0.808, g: 0.765, b: 0.702, a: 1}
+  trackColor: {r: 0.89, g: 0.847, b: 0.792, a: 1}
+  fillColor: {r: 0.424, g: 0.275, b: 0.149, a: 1}
+  bubbleGapBelowCaption: 8
+  bubbleSize: {x: 36, y: 20}
+  bubbleTail: 5
+  bubbleTailWidth: 8
+  bubbleCorner: 6
+  bubbleGapAboveBar: 2
+  bubbleColor: {r: 0.569, g: 0.404, b: 0.271, a: 1}
+  percentFont: {fileID: 12800000, guid: 5f76b20538a6c4b1caa80654c9df48f1, type: 3}
+  percentFontSize: 11
+  percentColor: {r: 1, g: 1, b: 1, a: 1}
+  bubbleTiltPerSpeed: 60
+  bubbleMaxTilt: 14
+  bubbleTiltFollow: 10
+  detailFontSize: 13
+  detailColor: {r: 0.36, g: 0.27, b: 0.2, a: 1}
+  detailGapBelowBar: 10
+  displayFollow: 10
+  displayMaxSpeed: 1.6
+  minimumSeconds: 1
+  fullHoldSeconds: 0.2
+  fadeOutSeconds: 0.15
+  previewSeconds: 5
+  previewHoldSeconds: 0.8

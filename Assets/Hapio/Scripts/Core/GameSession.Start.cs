@@ -106,6 +106,7 @@ namespace Hapio
                         countdownCommitted = false;
                     }
                 }
+                // The practice board keeps its own plain cover for now (#478: the opening → tutorial transition comes later).
                 if (tutorialRun) startOverlay?.ShowPreparing(TutorialPreparingText);
                 else startOverlay?.ShowPreparing(StartReadyCount, StartParticipantCount);
             }
@@ -250,7 +251,8 @@ namespace Hapio
             if (startOverlay == null) return;
             if (tutorialRun)
             {
-                // No ready count, countdown or "시작!" on the practice board: one plain cover until it is playable.
+                // No ready count, countdown or "시작!" on the practice board: one plain cover until it is playable. It stays
+                // for now between the opening and the tutorial (#478, user decision); a RESTART's loading screen draws above it.
                 bool playable = state.phase == GameFlowPhase.Playing && countdownCommitted && !network.GameStartHeld;
                 if (IsPreparingBattle || state.phase == GameFlowPhase.Playing && !playable)
                     startOverlay.ShowPreparing(TutorialPreparingText);
