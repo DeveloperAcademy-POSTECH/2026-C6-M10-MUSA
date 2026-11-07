@@ -149,11 +149,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bc7ddd8cbd64a4280ad5b61fffe11e70, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Hapio.ClayPreview.Runtime::Hapio.Experiments.ClayPreviewController
+  enableImageFilePreview: 0
+  imageBackgroundShader: {fileID: 0}
+  surfaceTextureSamples: []
+  surfaceTextureSampleNames: []
   sourcePrefab: {fileID: 6151071249947848590, guid: c7eb5fc42d3b947889d3a4430f8bf04b, type: 3}
   colorMap: {fileID: 2800000, guid: 4da8aa5d79b1b4463b32d1adf5e07601, type: 3}
   heightMap: {fileID: 2800000, guid: 8d0a71cb24fad43c2894bfb9f344ab14, type: 3}
   sampleInfo: {fileID: 4900000, guid: 864265e3a574c4b719c949006079bfa8, type: 3}
-  sampleMetadataHash: e187be76e2e195fc1161c5e965bcf315f2150ac89d73a403772e54cd1f1a112c
+  sampleMetadataHash: 66b0e7418f856631e23536a0ae650f3f2568eb5da0cc6951c26434b7f427dd75
   clayShader: {fileID: 4800000, guid: 99a332dd35f042779cb164a378159348, type: 3}
   uiFont: {fileID: 12800000, guid: fd14532f91d8a4659ae355392f330bc2, type: 3}
   styleSheet: {fileID: 7433441132597879392, guid: 67145d6122888415d891037353affe86, type: 3}
@@ -183,7 +187,7 @@ MonoBehaviour:
     colorMap: {fileID: 2800000, guid: 4da8aa5d79b1b4463b32d1adf5e07601, type: 3}
     heightMap: {fileID: 2800000, guid: 8d0a71cb24fad43c2894bfb9f344ab14, type: 3}
     sampleInfo: {fileID: 4900000, guid: 864265e3a574c4b719c949006079bfa8, type: 3}
-    sampleMetadataHash: e187be76e2e195fc1161c5e965bcf315f2150ac89d73a403772e54cd1f1a112c
+    sampleMetadataHash: 66b0e7418f856631e23536a0ae650f3f2568eb5da0cc6951c26434b7f427dd75
     shader: {fileID: 4800000, guid: 99a332dd35f042779cb164a378159348, type: 3}
     improvedMaterial: 1
   defaultPreset: 3

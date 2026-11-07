@@ -43,6 +43,7 @@
 
 ## 실험·과거 구현 자료
 
+- [Mac 스티커 질감·배경 비교 앱 상세 사용법](CLAY_PREVIEW_IMAGE_USER_GUIDE.md): 샘플3종·외부 PNG/JPG·질감/배경·4프리셋·광원·RGB/HEX·초기화·빌드·문제 해결.
 - [곡면 스티커 에셋 시제품](SURFACE_STICKER_PROTOTYPE.md): 클레이 도입 전 원형 부착과 영역 제한형을 비교한 Editor 시제품 이력.
 - [이전 한지 얼룩 스티커](PAPER_STICKER_PAINT.md): 클레이 전환 전 표현의 구현·검증 이력.
 - [수채 질감과 번짐](WATERCOLOR_PAINT_EXPERIMENT.md): 실제 전투의 수채 표현·Inspector 설정과 파란 정적 비교 도구.
