@@ -1,0 +1,11 @@
+{
+    "name": "Cluster",
+    "sourceHash": "dc793636d46482325e0dd7ec5a5d695a4d5f41e16de1f09fe480e3b03b6322f1",
+    "whiteMaskHash": "04cdb024fdb51b53719162a6d3d38e701a269b3730836e84077c2d59f7953824",
+    "retainedPixels": 95293,
+    "removedTinyComponents": 0,
+    "alphaThreshold": 0.8999999761581421,
+    "transparentPadding": 0.10000000149011612,
+    "closingRadius": 1,
+    "minimumComponentPixels": 24
+}

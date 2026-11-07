@@ -1,0 +1,55 @@
+{
+    "format": "clay-preview-image-files-v1",
+    "samples": [
+        {
+            "key": "FineMatteClay",
+            "label": "Fine clay",
+            "source": "Assets/Experiments/ClayPreview/ImageSamples/Sources/FineMatteClay.png",
+            "encoded": "Assets/Experiments/ClayPreview/ImageSamples/Encoded/FineMatteClay.bytes",
+            "sha256": "e27af060ef2e5253dcc050a402b24775fad104df92fc4c42f79d58ad441e7496",
+            "width": 1254,
+            "height": 1254
+        },
+        {
+            "key": "HandKneadedClay",
+            "label": "Hand-made",
+            "source": "Assets/Experiments/ClayPreview/ImageSamples/Sources/HandKneadedClay.png",
+            "encoded": "Assets/Experiments/ClayPreview/ImageSamples/Encoded/HandKneadedClay.bytes",
+            "sha256": "b256c4b04df18e57853faac7f4420a31ee388651a1ed00ba05057d65f262defd",
+            "width": 1254,
+            "height": 1254
+        },
+        {
+            "key": "FineHanjiFiber",
+            "label": "Fine fiber",
+            "source": "Assets/Experiments/ClayPreview/ImageSamples/Sources/FineHanjiFiber.png",
+            "encoded": "Assets/Experiments/ClayPreview/ImageSamples/Encoded/FineHanjiFiber.bytes",
+            "sha256": "415b3e0b26c669e32e9b2408cd2af0f8823ad963c46e26fc37945a46ee1adc48",
+            "width": 1254,
+            "height": 1254
+        }
+    ],
+    "renderSources": [
+        {
+            "path": "Assets/Lab/Resources/GourdPaint/ClaySticker/ClayStickerSurface.shader",
+            "sha256": "9f8fd7b294bdcd53f74ff7062dd2dd8edb023b028892b607de73d1392a341ebb"
+        },
+        {
+            "path": "Assets/Experiments/ClayPreview/Runtime/Shaders/RoundedClayStickerSurface.shader",
+            "sha256": "0640ce6662b93d82884fa4f58b8ec3fa10f0584c1ae702bbaa755c464954727d"
+        },
+        {
+            "path": "Assets/Experiments/ClayPreview/Runtime/Shaders/StickerCoatingSurface.shader",
+            "sha256": "0cb72e7441cf78935feaf2108d6323da81f37cc88e13af215cae0ab6f6188402"
+        },
+        {
+            "path": "Assets/Lab/Resources/GourdPaint/ClaySticker/ClayPreviewTexture.hlsl",
+            "sha256": "6daafd172a8d04bfee91a04499575c498e5d4444ac2b1234a6e445aa3e4abd62"
+        },
+        {
+            "path": "Assets/Experiments/ClayPreview/Runtime/Shaders/ClayPreviewBackground.shader",
+            "sha256": "02d3e9b023d3b61cb3323631ee9d74fd567548a853394ec8e6fb03d610cfc9f7"
+        }
+    ],
+    "scope": "Mac comparison only. External surface grain and unlit 2D background; no gameplay/journal changes."
+}

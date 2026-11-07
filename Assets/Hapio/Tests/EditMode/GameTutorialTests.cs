@@ -689,7 +689,7 @@ namespace Hapio.Tests
                 Is.EqualTo(1.2f).Within(1e-4f));
             float hard = LabOrbBoard.StopArrivalSpeed(50f, .5f);
             Assert.That(hard, Is.EqualTo(Mathf.Sqrt(2f * 8f * .5f)).Within(1e-4f), "Brakes no harder than a real board.");
-            Assert.That(LabOrbBoard.StopArrivalSpeed(-3f, .5f), Is.EqualTo(3f).Within(1e-4f), "Either way it was swiped.");
+            Assert.That(LabOrbBoard.StopArrivalSpeed(-2f, .5f), Is.EqualTo(2f).Within(1e-4f), "Either way it was swiped.");
             var art = ScriptableObject.CreateInstance<GameTutorialArt>();
             try { Assert.That(art.mirrorViewMinWidth, Is.GreaterThan(.5f), "The window reaches past the middle, where it rests."); }
             finally { Object.DestroyImmediate(art); }
@@ -1030,8 +1030,8 @@ namespace Hapio.Tests
             Assert.That(art.bannerTextColor, Is.EqualTo(Color.black), "Black Shilla guide text.");
             Assert.That(art.hand, Is.Not.Null, "The pointing hand.");
             Assert.That(art.tapHint, Is.Not.Null, "The ▽ that says tap to go on.");
-            // 성공! replaces the banner: black #000000 with Figma's 0.2 stroke.
-            Assert.That(art.successColor, Is.EqualTo(Color.black));
+            // 성공! replaces the banner: white letters with a black 0.2 stroke.
+            Assert.That(art.successColor, Is.EqualTo(Color.white));
             Assert.That((art.successStroke, art.successStrokeColor), Is.EqualTo((.2f, Color.black)));
             Assert.That(typeof(GameTutorialArt).GetField("throwBannerTopFraction"), Is.Null,
                 "One banner height for every action; the throw no longer has its own.");

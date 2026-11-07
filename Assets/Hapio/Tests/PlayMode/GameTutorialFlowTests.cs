@@ -108,7 +108,9 @@ namespace Hapio.Tests
                 UnityEngine.UI.Image faceImage = seat == 0 ? hud.rightPlayerCircle : seat == 1 ? hud.localPlayerCircle : hud.leftPlayerCircle;
                 Rect face = ScreenRect(faceImage.rectTransform), label = ScreenRect(name.rectTransform);
                 Assert.That(Mathf.Abs(label.center.x - face.center.x), Is.LessThan(1f), names[seat] + " is centered under the face.");
-                Assert.That(label.yMax, Is.LessThanOrEqualTo(face.yMin + 1f).Or.LessThanOrEqualTo(label.height + 1f),
+                // Held at the bottom it sits nameScreenMargin above the screen's edge, scaled like the label itself.
+                float held = (art.nameScreenMargin + name.rectTransform.rect.height) * label.height / name.rectTransform.rect.height;
+                Assert.That(label.yMax, Is.LessThanOrEqualTo(face.yMin + 1f).Or.LessThanOrEqualTo(held + 1f),
                     names[seat] + " is under the face (or held at the bottom of the screen).");
                 Assert.That(label.yMin, Is.GreaterThanOrEqualTo(-1f), names[seat] + " stays on screen.");
             }
@@ -212,12 +214,12 @@ namespace Hapio.Tests
                 network.Generate();
                 yield return Until(() => director.ActionProgress == press + 1, "Tap " + (press + 1) + " counted");
             }
-            // Done: the banner goes and a black 성공! pops up where it was.
+            // Done: the banner goes and a white 성공! (black stroke) pops up where it was.
             var guide = director.GetComponentsInChildren<RectTransform>(true).Single(rect => rect.name == "Guide Banner");
             var success = director.GetComponentsInChildren<UnityEngine.UI.Text>(true).Single(text => text.name == "Success");
             Assert.That((guide.gameObject.activeSelf, success.gameObject.activeSelf), Is.EqualTo((false, true)));
             Assert.That(Vector3.Distance(success.rectTransform.position, guide.position), Is.LessThan(.01f), "In the banner's place.");
-            Assert.That(success.color, Is.EqualTo(Color.black));
+            Assert.That(success.color, Is.EqualTo(Color.white));
             // 성공! is up; with the dialog open its wait does not run out, however long the dialog stays.
             skip.onClick.Invoke();
             Assert.That(board.AllowedGestures, Is.EqualTo(LabBoardGestures.None), "The board waits behind the dialog.");
@@ -304,7 +306,8 @@ namespace Hapio.Tests
                 yield return new WaitForSecondsRealtime(.6f);
                 int misses = director.ThrowMisses;
                 Vector2 start = fire.transform.position;
-                Vector2 flick = new Vector2(-.15f, 1f) * 1.5f;
+                // In board widths, like the throw gesture itself (.2 > ThrowSwipeMinDistance .12), whatever the screen's shape.
+                Vector2 flick = new Vector2(-.15f, 1f) * (board.CenterBounds.width * .2f);
                 double began = Time.realtimeSinceStartupAsDouble;
                 Assert.That(board.TryBeginDragAtWorld(start, began), Is.True, "The red orb can be picked up.");
                 board.DragToWorld(start + flick * .5f, began + .04d);
@@ -573,7 +576,12 @@ namespace Hapio.Tests
                 .FirstOrDefault(view => view.Kind == LabOrbKind.Drum)) != null, "My drum is on the board");
             yield return new WaitForSecondsRealtime(.5f);
             Vector2 start = drum.transform.position;
-            var flick = new Vector2(side * 2f, 0f);
+            // Let go just past that side of the board (as a finger leaving the screen would), whatever the screen's shape:
+            // a fixed world-space flick stops short on a wide batch-mode board.
+            Rect area = board.CenterBounds;
+            float endX = side > 0f ? Mathf.Max(start.x + area.width * .3f, area.xMax + area.width * .1f)
+                : Mathf.Min(start.x - area.width * .3f, area.xMin - area.width * .1f);
+            var flick = new Vector2(endX - start.x, 0f);
             double began = Time.realtimeSinceStartupAsDouble;
             Assert.That(board.TryBeginDragAtWorld(start, began), Is.True, "The drum can be picked up.");
             board.DragToWorld(start + flick * .5f, began + .04d);
@@ -581,23 +589,27 @@ namespace Hapio.Tests
         }
 
         /// <summary>
-        /// Hold <paramref name="view"/> and walk the finger past one side of the board (+1 right, -1 left) over a few
-        /// frames, so even a heavy bomb that trails the finger reaches the pass strip, then let go there.
+        /// Hold <paramref name="view"/> and walk the finger past one side of the board (+1 right, -1 left) over
+        /// <paramref name="seconds"/> of given finger time, so even a heavy bomb that trails the finger reaches the pass
+        /// strip, then let go there. It all runs in one frame like <see cref="FlickDrum"/>: across real frames the
+        /// board's own Update sees no pressed mouse or touch and cancels the drag.
         /// </summary>
         private static IEnumerator DragOffSide(LabOrbBoard board, LabOrbView view, float side, float seconds = .7f)
         {
             Vector2 start = view.transform.position;
             Rect area = board.CenterBounds;
             var end = new Vector2(side > 0f ? area.xMax + area.width * .2f : area.xMin - area.width * .2f, start.y);
-            Assert.That(board.TryBeginDragAtWorld(start, Time.realtimeSinceStartupAsDouble), Is.True, view.Kind + " can be picked up.");
-            float began = Time.realtimeSinceStartup;
-            while (Time.realtimeSinceStartup - began < seconds)
+            double began = Time.realtimeSinceStartupAsDouble;
+            Assert.That(board.TryBeginDragAtWorld(start, began), Is.True, view.Kind + " can be picked up.");
+            const int steps = 42;
+            for (int step = 1; step <= steps; step++)
             {
-                float reach = Mathf.Clamp01((Time.realtimeSinceStartup - began) / (seconds * .5f));
-                board.DragToWorld(Vector2.Lerp(start, end, reach), Time.realtimeSinceStartupAsDouble);
-                yield return null;
+                float elapsed = seconds * step / steps;
+                float reach = Mathf.Clamp01(elapsed / (seconds * .5f));
+                Assert.That(board.DragToWorld(Vector2.Lerp(start, end, reach), began + elapsed), Is.True, "Still held.");
             }
-            board.EndDragAtWorld(end, Time.realtimeSinceStartupAsDouble);
+            Assert.That(board.EndDragAtWorld(end, began + seconds + .01d), Is.True, view.Kind + " is let go off the side.");
+            yield return null;
         }
 
         /// <summary>A UI rectangle on the screen (screen-space overlay canvases), whatever its anchors and scale.</summary>

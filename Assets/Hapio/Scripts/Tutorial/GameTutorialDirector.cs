@@ -803,7 +803,11 @@ namespace Hapio
             else ShowRemark(GameTutorialScript.RetrySpeaker, first);
         }
 
-        private void OnDestroy() => ListenToThrows(false);
+        private void OnDestroy()
+        {
+            ListenToThrows(false);
+            if (hud != null) hud.developerSettingsHidden = false;
+        }
 
         // ---------- 4단계: passing with the story neighbors ----------
 
