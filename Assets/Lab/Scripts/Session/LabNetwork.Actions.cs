@@ -566,6 +566,8 @@ namespace C6Lab
                 element, small ? config.BlastShrinkScale : 1f);
             bool fiveColor = orb != null ? orb.fiveColor : board != null && board.IsFiveColor(request.firstId);
             if (fiveColor) LabFiveColorSparkle.AttachArt(visual.transform, config.OrbRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined), true);
+            else if (orb != null && orb.jigwiTalismanReward) LabFiveColorSparkle.AttachArt(visual.transform,
+                config.OrbRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined), true, LabFiveColorSparkle.BlueTones); // #540 부적 구슬
             float scale = player.comboPenaltyUntil > latest.serverTime ? config.ComboPenaltySizeScale
                 : player.comboRewardUntil > latest.serverTime ? config.ComboRewardSizeScale : 1f;
             if (!config.GourdColorComboEnabled) scale = 1f;

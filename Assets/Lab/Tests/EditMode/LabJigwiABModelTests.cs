@@ -129,6 +129,8 @@ namespace C6Lab.Tests
             var m=Room();var control=Room();Current(m,5);Current(control,5);
             Assert.That(m.TryCompleteJigwiTalisman(Players[0],Current(m,6).id,6),Is.True);
             var water=m.Snapshot(6).orbs.First(o=>o.jigwiTalismanReward);
+            Assert.That(water.expiresAt-water.createdAt,Is.GreaterThanOrEqualTo(LabModel.JigwiTalismanOrbLifetimeSeconds),"#540: a talisman orb has no lifetime.");
+            Assert.That(water.jigwiABBurnAt,Is.LessThan(0d),"#540: a talisman orb never burns.");
             var ordinary=Add(control,Players[0],6,element:LabOrbElement.Water);
             Launch(m,Orbs(m)[water.id],7);Launch(control,ordinary,7);
             var flying=m.Snapshot(7).orbs.Single(o=>o.id==water.id);

@@ -16,6 +16,8 @@ namespace C6Lab
 
         /// <summary>마지막으로 확정한 명중이 오색구슬이었는지 (#329). 다섯 색 별가루·진동을 알릴 때 쓴다.</summary>
         public bool LastHitFiveColor { get; private set; }
+        /// <summary>#540: the last confirmed hit was a Jigwi talisman orb.</summary>
+        public bool LastHitTalisman { get; private set; }
 
         /// <summary>
         /// 이번 섬광(generation)에서 끝까지 흔든 사람에게 오색구슬을 준다. 이미 받았거나, 이번 섬광을 맞지 않았거나,

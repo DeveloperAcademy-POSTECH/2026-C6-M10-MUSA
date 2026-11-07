@@ -45,7 +45,8 @@ namespace C6Lab
             Ensure(profile); shown = true; special = specialWater && !talismanOrb; talisman = talismanOrb;
             EnsureSpecial();
             // #540: the talisman orb shows the folded talisman's red seal instead of the water drop.
-            drop.enabled = ownedSprite != null && !talisman; ripple.enabled = true;
+            // #540: the talisman orb's shimmering blue body is LabFiveColorSparkle (BlueTones); this art adds only the red seal.
+            drop.enabled = ownedSprite != null && !talisman; ripple.enabled = !talisman;
             if (ownedSprite != null)
             {
                 drop.transform.localPosition = new Vector3(0f, radius * .05f, -.04f);
@@ -69,10 +70,10 @@ namespace C6Lab
             }
             if (seal == null)
             {
-                seal = Child("Talisman seal", LabJigwiTalismanOverlay.StampSprite(), 12);
-                emblem = Child("Talisman seal emblem", LabJigwiTalismanOverlay.StampEmblemSprite(), 13);
+                seal = Child("Talisman seal", LabJigwiTalismanOverlay.StampSprite(), 17);
+                emblem = Child("Talisman seal emblem", LabJigwiTalismanOverlay.StampEmblemSprite(), 18);
             }
-            bool fancy = special || talisman;
+            bool fancy = special;
             tint.enabled = glow.enabled = fancy;
             seal.enabled = emblem.enabled = talisman;
             foreach (var sparkle in sparkles) sparkle.enabled = fancy;
@@ -181,7 +182,17 @@ namespace C6Lab
         /// <summary>#509: darker body, a breathing glow and three sparkles circling and twinkling.</summary>
         private void DrawSpecial()
         {
-            if (tint == null || !(special || talisman)) { VisibleSparkles = 0; return; }
+            if (talisman && seal != null)
+            {
+                // The red seal sits square on the shimmering orb, slightly tilted like the stamp on the talisman.
+                float sealScale = radius * 1.15f / Mathf.Max(.01f, seal.sprite.bounds.size.x);
+                seal.transform.localPosition = emblem.transform.localPosition = new Vector3(0f, 0f, -.07f);
+                seal.transform.localRotation = emblem.transform.localRotation = Quaternion.Euler(0f, 0f, -7f);
+                seal.transform.localScale = Vector3.one * sealScale;
+                emblem.transform.localScale = Vector3.one * sealScale * .8f;
+                seal.color = emblem.color = SealRed;
+            }
+            if (tint == null || !special) { VisibleSparkles = 0; return; }
             tint.transform.localPosition = new Vector3(0f, 0f, -.02f);
             tint.transform.localScale = Vector3.one * radius * 2.02f;
             tint.color = talisman ? TalismanTint : SpecialTint;

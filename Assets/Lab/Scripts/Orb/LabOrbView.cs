@@ -473,6 +473,8 @@ namespace C6Lab
             float artRadius = visualRadius * (orbSpriteArt != null && orbSpriteArt.gameObject.activeSelf
                 ? LabOrbSpriteArt.SizeScaleFor(kind) : 1f);
             jigwiSupplyWaterArt.Show(artRadius, held, ExpiryLook.ElementTrailFor(LabOrbElement.Water), special, talisman);
+            // #540: the talisman orb shimmers like the five-colour orb, through blue tones.
+            if (talisman) fiveColor = LabFiveColorSparkle.AttachArt(transform, FiveColorArtRadius, false, LabFiveColorSparkle.BlueTones);
         }
 
         /// <summary>Current shared B reward, never a burn deadline or a persistent launch flag.</summary>

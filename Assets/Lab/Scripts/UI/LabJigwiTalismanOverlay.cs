@@ -23,8 +23,6 @@ namespace C6Lab
         [SerializeField, Range(0f, .4f)] private float topInset = .07f;
         [Tooltip("#540: 조합판 아래쪽(내 이름·기운 막대)에서 비워 둘 높이 (조합판 높이 대비).")]
         [SerializeField, Range(0f, .4f)] private float bottomInset = .13f;
-        [Tooltip("#540: 예고 동안 부적 자리의 구슬을 판 양옆으로 밀어내는 데 걸리는 시간 (예고 길이 대비, 1 = 예고 내내). 밀린 구슬이 부적 옆에서 타는 게 보인다.")]
-        [SerializeField, Range(.2f, 1f)] private float sweepShare = .75f;
         [SerializeField] private Color inkColor = new Color(.72f, .11f, .07f, 1f);
         [Tooltip("#533: 아직 안 쓴 글자 획 색. 둥근 점이 겹치므로 불투명으로 둔다(반투명이면 겹친 곳이 얼룩진다).")]
         [SerializeField] private Color guideColor = new Color(.79f, .67f, .4f, 1f);
@@ -64,7 +62,7 @@ namespace C6Lab
         [Tooltip("#540: 쓰는 동안에는 이만큼(0~1, 1 = 한가운데)까지만 탄다. 글자에 닿지 않는 가장자리에서 머물러 쓰기를 방해하지 않고, 다 못 쓰고 끝나면 그때 한가운데까지 마저 탄다.")]
         [SerializeField, Range(0f, 1f)] private float burnWriteLimit = .14f;
         [Tooltip("#540: 타들어 가는 빠르기 곡선. 1이면 일정하게, 클수록 처음엔 아주 천천히 타다가 끝으로 갈수록 빨라진다.")]
-        [SerializeField, Range(1f, 4f)] private float burnEase = 2f;
+        [SerializeField, Range(1f, 4f)] private float burnEase = 1.2f;
         [Tooltip("#540: A가 끝나기 이만큼(초) 남았을 때부터 1초마다 톡 하는 진동.")]
         [SerializeField, Range(0f, 10f)] private float warnHapticSeconds = 3f;
         [Tooltip("#540: 타들어 가는 불 테두리 두께 (부적 폭 대비).")]
@@ -72,9 +70,9 @@ namespace C6Lab
         [Tooltip("예고 동안 1초마다 톡 하는 진동 세기 (0이면 끔).")]
         [SerializeField, Range(0f, 1f)] private float warnHapticIntensity = .3f;
         [Tooltip("#540: 다 못 쓰고 A가 끝난 뒤, 남은 불길이 마저 다 태우는 시간(초).")]
-        [SerializeField, Range(.1f, 3f)] private float burnSeconds = .5f;
+        [SerializeField, Range(.1f, 3f)] private float burnSeconds = .3f;
         [Tooltip("다 탄 재가 흩어지며 사라지는 시간(초).")]
-        [SerializeField, Range(.1f, 2f)] private float ashSeconds = .6f;
+        [SerializeField, Range(.1f, 2f)] private float ashSeconds = .45f;
         [Tooltip("탄 자리 색 (그을린 한지).")]
         [SerializeField] private Color charColor = new Color(.13f, .07f, .05f, .92f);
         [Tooltip("타들어 가는 불 테두리 색.")]
@@ -167,10 +165,19 @@ namespace C6Lab
         [SerializeField, Range(0f, 1.5f)] private float extinguishSeconds = .45f;
         [Tooltip("불이 꺼진 뒤 가락이 시작하기 전 숨 고르는 시간(초).")]
         [SerializeField, Range(0f, 1f)] private float breathSeconds = .25f;
+        [Tooltip("#540 3D 예고: 박에서 부적이 튀어나올 때 소리 폴더. 비우면 없음.")]
+        [SerializeField] private string omenSoundFolder = "JigwiTalismanOmen";
+        [SerializeField, Range(0f, 1f)] private float omenSoundVolume = .8f;
+        [Tooltip("#540 3D 예고: 부적이 화면 쪽으로 휙 날아올 때 소리 폴더. 비우면 없음.")]
+        [SerializeField] private string swoopSoundFolder = "JigwiTalismanSwoop";
+        [SerializeField, Range(0f, 1f)] private float swoopSoundVolume = .9f;
+        [Tooltip("#540 부적 구슬이 판에 닿을 때 \"퐁\" 소리 폴더. 비우면 없음.")]
+        [SerializeField] private string landSoundFolder = "JigwiTalismanLand";
+        [SerializeField, Range(0f, 1f)] private float landSoundVolume = .9f;
         [Tooltip("불 꺼질 때 \"치익\" 김 소리 폴더 (Resources/Audio). 비우면 없음.")]
         [SerializeField] private string steamSoundFolder = "JigwiTalismanSteam";
         [SerializeField, Range(0f, 1f)] private float steamSoundVolume = .8f;
-        [Tooltip("#509/#540: 도장이 찍힌 뒤 빛난 채 머무는 시간(초). 그다음 부적이 접혀 구슬이 된다.")]
+        [Tooltip("#509/#540: 도장이 찍힌 뒤 빛난 채 머무는 시간(초). LabConfig '부적 보상 지연'이 0보다 크면 그 값에 맞춰 자동으로 정해져 이 값은 쓰지 않는다.")]
         [SerializeField, Range(.1f, 3f)] private float glowSeconds = .6f;
         [Tooltip("#540: 부적이 접히며 부적 구슬로 오므라드는 시간(초).")]
         [SerializeField, Range(.1f, 1.5f)] private float foldSeconds = .45f;
@@ -231,6 +238,15 @@ namespace C6Lab
         [Tooltip("#533 완성 가락 음높이 (파일 원래 음에서 반음 수). 기본 ComboHit는 라(A4)라서 솔 도 시 라 = -2, +3, +2, 0. 파일이 4개 이상이면 쓰지 않는다.")]
         [SerializeField] private int[] noteSemitones = { -2, 3, 2, 0 };
         private float burnAge = -1f;
+        // #540 effects that live outside the paper (board dim, landing splash, flying embers) and the 3D omen.
+        private UnityEngine.UI.Image boardDim, landRing;
+        private LabJigwiTalismanOmen omen;
+        private int omenStage;
+        private UnityEngine.UI.Image[] landDrops = Array.Empty<UnityEngine.UI.Image>(), flyEmbers = Array.Empty<UnityEngine.UI.Image>();
+        private float dimLevel, landAge = -1f, flyAge = -1f;
+        private Vector2 landAt, flyFrom;
+        private bool landed;
+        public float BoardDim => dimLevel;
         private float extinguishFrom;
         private bool sweepCued;
         private UnityEngine.UI.Image[] steam = Array.Empty<UnityEngine.UI.Image>();
@@ -324,7 +340,20 @@ namespace C6Lab
         /// <summary>#540: 다 쓴 뒤 가락이 시작하기까지 (불 꺼짐 + 숨 고르기).</summary>
         public float IntroSeconds => Mathf.Max(0f, extinguishSeconds) + Mathf.Max(0f, breathSeconds);
         /// <summary>#540: 다 쓴 뒤 부적 구슬이 판에 닿기까지. LabConfig의 부적 보상 지연과 같아야 한다.</summary>
-        public float FinishSeconds => IntroSeconds + AccentAt + glowSeconds + foldSeconds + fallSeconds;
+        public float FinishSeconds => IntroSeconds + AccentAt + HoldSeconds + foldSeconds + fallSeconds;
+        /// <summary>
+        /// #540 (L9): 도장 뒤 빛난 채 머무는 시간. LabConfig의 부적 보상 지연(Host)이 있으면 그 값에 맞춰 늘고 줄어,
+        /// 부적 구슬이 판에 닿는 때와 보상 구슬이 생기는 때가 늘 같다. 설정은 그 값 하나만 바꾸면 된다.
+        /// </summary>
+        public float HoldSeconds
+        {
+            get
+            {
+                float delay = source != null && source.config != null ? source.config.JigwiTalismanRewardDelaySeconds : 0f;
+                if (delay <= 0f) return glowSeconds;
+                return Mathf.Max(.1f, delay - (IntroSeconds + AccentAt + foldSeconds + fallSeconds));
+            }
+        }
         /// <summary>#509: 사라지는 동안의 부적 불투명도 (1 → 0).</summary>
         public float PaperAlpha => paperGroup != null ? paperGroup.alpha : 1f;
 
@@ -363,7 +392,9 @@ namespace C6Lab
             bool paused = snapshot == null || snapshot.paused || source.GameStartHeld || source.BattlePresentationHeld;
             UpdateFireLoop(Visible && !paused, Time.unscaledDeltaTime);
             UpdateCrackle(CrackleTarget(paused), Time.unscaledDeltaTime);
-            UpdateKeepOut(source.board);
+            DriveOmen(paused);
+            Camera boardView = source.board != null ? source.board.ViewCamera : null;
+            DrawEffects(boardView, Time.unscaledDeltaTime);
             if (Visible)
             {
                 FitToBoard(source.board != null ? source.board.ViewCamera : null);
@@ -391,7 +422,7 @@ namespace C6Lab
             // A talisman this screen already finished stays hidden while the Host confirms it.
             Visible = round != null && round.id != writtenRound;
             RoundId = Visible ? round.id : null;
-            SweepLevel = Visible || Finishing || Burning ? 1f : WarningSweep(snapshot, localPlayer, now);
+            OmenLevel = Visible || Finishing || Burning ? 0f : WarningOmen(snapshot, localPlayer, now);
             float left = Visible ? (float)(round.endsAt - now) : float.PositiveInfinity;
             TimeLeft = left;
             WarnLevel = 0f;
@@ -641,6 +672,122 @@ namespace C6Lab
             crackle.volume = crackleLevel * LabAudioSettings.SfxVolume;
         }
 
+        /// <summary>
+        /// #540 부적 밖 연출: (V3) 예고·판이 막히는 동안 판이 살짝 어두워짐, (V8) 부적 구슬이 판에 닿을 때 물 튐,
+        /// (V10) 못 다 쓴 부적이 탈 때 불티가 양옆(타는 구슬 쪽)으로 날아감.
+        /// </summary>
+        public void DrawEffects(Camera boardView, float dt)
+        {
+            if (paper == null || root == null) return;
+            if (!Finishing && !Burning) paper.localScale = Vector3.one;
+            // V3: the board dims while the talisman holds it.
+            float dimTarget = Visible || Burning ? 1f : OmenLevel;
+            dimLevel = Mathf.MoveTowards(dimLevel, dimTarget, dt * 3f);
+            if (boardDim != null)
+            {
+                bool on = dimLevel > .001f;
+                if (boardDim.gameObject.activeSelf != on) boardDim.gameObject.SetActive(on);
+                if (on)
+                {
+                    Rect board = boardView != null ? boardView.pixelRect : new Rect(0f, 0f, Screen.width, Screen.height * .46f);
+                    PlaceScreenRect(boardDim.rectTransform, board);
+                    boardDim.color = new Color(.05f, .02f, .02f, .32f * dimLevel);
+                }
+            }
+            AdvanceLanding(dt);
+            AdvanceFlyEmbers(dt);
+        }
+
+        /// <summary>화면 픽셀 사각형을 root 기준 위치·크기로 옮긴다.</summary>
+        private void PlaceScreenRect(RectTransform target, Rect pixels)
+        {
+            Canvas canvas = GetComponentInParent<Canvas>();
+            Camera eye = canvas == null || canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
+            if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(root, pixels.min, eye, out Vector2 low)
+                || !RectTransformUtility.ScreenPointToLocalPointInRectangle(root, pixels.max, eye, out Vector2 high)) return;
+            target.anchorMin = target.anchorMax = target.pivot = new Vector2(.5f, .5f);
+            target.localPosition = new Vector3((low.x + high.x) * .5f, (low.y + high.y) * .5f, 0f);
+            target.sizeDelta = new Vector2(Mathf.Abs(high.x - low.x), Mathf.Abs(high.y - low.y));
+        }
+
+        /// <summary>#540 (V8): 부적 구슬이 판에 닿는 자리에서 물이 튄다 (둥근 물결 + 물방울).</summary>
+        private void BeginLanding()
+        {
+            landAge = 0f;
+            landAt = paper != null ? (Vector2)paper.localPosition : Vector2.zero;
+            Cue("Land", landSoundFolder, landSoundVolume);
+            AdvanceLanding(0f);
+        }
+
+        private void AdvanceLanding(float dt)
+        {
+            if (landAge < 0f) return;
+            landAge += dt;
+            const float life = .55f;
+            float t = landAge / life;
+            bool on = t < 1f;
+            float unit = paper != null ? paper.rect.width : 100f;
+            if (landRing != null)
+            {
+                if (landRing.gameObject.activeSelf != on) landRing.gameObject.SetActive(on);
+                if (on)
+                {
+                    float grow = 1f - (1f - t) * (1f - t);
+                    landRing.rectTransform.localPosition = landAt;
+                    landRing.rectTransform.sizeDelta = Vector2.one * unit * (.2f + .7f * grow);
+                    landRing.color = new Color(.35f, .75f, 1f, .9f * (1f - t));
+                }
+            }
+            for (int k = 0; k < landDrops.Length; k++)
+            {
+                if (landDrops[k] == null) continue;
+                if (landDrops[k].gameObject.activeSelf != on) landDrops[k].gameObject.SetActive(on);
+                if (!on) continue;
+                float angle = (k + .5f) / landDrops.Length * Mathf.PI + Mathf.PI * .05f;
+                Vector2 v = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * unit * (.45f + .2f * (k % 3));
+                landDrops[k].rectTransform.localPosition = landAt + v * t + Vector2.down * unit * 1.2f * t * t;
+                float size = unit * .05f * (1f - t * .5f);
+                landDrops[k].rectTransform.sizeDelta = new Vector2(size, size);
+                landDrops[k].color = new Color(.45f, .82f, 1f, 1f - t);
+            }
+            if (!on) landAge = -1f;
+        }
+
+        /// <summary>#540 (V10): 부적이 탈 때 불티가 양옆(타는 구슬 쪽)으로 포물선을 그리며 날아간다.</summary>
+        private void BeginFlyEmbers()
+        {
+            flyAge = 0f;
+            flyFrom = paper != null ? (Vector2)paper.localPosition : Vector2.zero;
+            AdvanceFlyEmbers(0f);
+        }
+
+        private void AdvanceFlyEmbers(float dt)
+        {
+            if (flyAge < 0f) return;
+            flyAge += dt;
+            const float life = .8f;
+            float unit = paper != null ? paper.rect.width : 100f, height = paper != null ? paper.rect.height : 200f;
+            bool any = false;
+            for (int k = 0; k < flyEmbers.Length; k++)
+            {
+                if (flyEmbers[k] == null) continue;
+                float t = (flyAge - (k % 4) * .08f) / life;
+                bool on = t >= 0f && t < 1f;
+                any |= t < 1f;
+                if (flyEmbers[k].gameObject.activeSelf != on) flyEmbers[k].gameObject.SetActive(on);
+                if (!on) continue;
+                float side = k % 2 == 0 ? -1f : 1f;
+                float startY = (((k * .618f) % 1f) - .5f) * height * .8f;
+                Vector2 start = flyFrom + new Vector2(side * unit * .5f, startY);
+                Vector2 reach = new Vector2(side * unit * (.55f + .25f * ((k * .414f) % 1f)), unit * .35f);
+                flyEmbers[k].rectTransform.localPosition = start + new Vector2(reach.x * t, reach.y * t - unit * 1.1f * t * t);
+                float size = unit * (.035f + .02f * ((k * .27f) % 1f)) * (1f - t * .4f);
+                flyEmbers[k].rectTransform.sizeDelta = new Vector2(size, size);
+                Color c = Color.Lerp(new Color(1f, .92f, .55f, 1f), emberColor, t); c.a = 1f - t * t; flyEmbers[k].color = c;
+            }
+            if (!any) flyAge = -1f;
+        }
+
         private void BeginBurn()
         {
             if (paper == null) return;
@@ -650,6 +797,7 @@ namespace C6Lab
             if (hint != null) hint.gameObject.SetActive(false);
             if (nextMarker != null) nextMarker.gameObject.SetActive(false);
             LastCue = "Burn"; CueCount++;
+            BeginFlyEmbers();
             burnStartFront = Mathf.Clamp01(BurnFront);
             LabHaptics.PlayDirect(Config, LabHapticStyle.Medium, .7f, burnSeconds, burnHapticIntensity, .65f);
             DrawBurn();
@@ -783,8 +931,8 @@ namespace C6Lab
         }
 
         /// <summary>
-        /// #540: 도장 안 그림 (런타임에 한 번 만든다). 위에 물방울 하나(가운데 작은 빛 구멍), 아래에 물결 두 줄.
-        /// 인주가 고르지 않게 묻은 결은 테두리와 같다.
+        /// #540: 도장 안 그림 (런타임에 한 번 만든다). 낙관처럼 전서체(篆書) "水" 모양을 그림으로 판다 — 가운데 물결치는 긴 획과
+        /// 양옆 두 개씩 굽은 획. 글꼴이 아니라 그림이라 어느 기기에서나 같고, 인주가 고르지 않게 묻은 결은 테두리와 같다.
         /// </summary>
         internal static Sprite StampEmblemSprite()
         {
@@ -793,26 +941,25 @@ namespace C6Lab
             var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
             { name = "Talisman Stamp Emblem (#540 runtime)", hideFlags = HideFlags.DontSave, wrapMode = TextureWrapMode.Clamp };
             var pixels = new Color[size * size];
-            const float cx = .5f, cy = .55f, radius = .17f, tip = .9f;
+            var centre = new Vector2[25];
+            for (int i = 0; i < centre.Length; i++)
+            {
+                float v = .08f + i * .84f / (centre.Length - 1);
+                centre[i] = new Vector2(.5f + .05f * Mathf.Sin(v * Mathf.PI * 3f), v);
+            }
+            Vector2[] leftTop = { new Vector2(.38f, .86f), new Vector2(.28f, .8f), new Vector2(.22f, .7f), new Vector2(.23f, .58f), new Vector2(.29f, .52f) };
+            Vector2[] leftLow = { new Vector2(.38f, .46f), new Vector2(.28f, .4f), new Vector2(.22f, .3f), new Vector2(.23f, .18f), new Vector2(.29f, .12f) };
+            Vector2[][] strokes = { centre, leftTop, leftLow, Mirror(leftTop), Mirror(leftLow) };
             for (int y = 0; y < size; y++)
                 for (int x = 0; x < size; x++)
                 {
-                    float u = (x + .5f) / size, v = (y + .5f) / size;
-                    float ink = 0f;
-                    // The drop: a circle with a pointed top.
-                    float dx = u - cx, dy = v - cy;
-                    bool drop = dx * dx + dy * dy <= radius * radius
-                        || v > cy && v < tip && Mathf.Abs(dx) <= radius * Mathf.Sqrt(Mathf.Max(0f, (tip - v) / (tip - cy)));
-                    // A small slanted shine near the upper left of the drop.
-                    float hx = (u - (cx - .075f)) / .022f, hy = (v - (cy + .06f)) / .05f;
-                    if (drop && hx * hx + hy * hy > 1f) ink = 1f;
-                    // Two waves underneath.
-                    if (u > .14f && u < .86f)
-                        for (int w = 0; w < 2; w++)
-                        {
-                            float line = .27f - w * .13f + .035f * Mathf.Sin((u - .14f) * Mathf.PI * 2f * 2f);
-                            if (Mathf.Abs(v - line) < .028f) ink = 1f;
-                        }
+                    var p = new Vector2((x + .5f) / size, (y + .5f) / size);
+                    float nearest = float.MaxValue;
+                    foreach (Vector2[] line in strokes)
+                        for (int i = 1; i < line.Length; i++) nearest = Mathf.Min(nearest, SegmentDistance(p, line[i - 1], line[i]));
+                    // Carved strokes with slightly worn edges.
+                    float wear = .006f * Mathf.PerlinNoise(x * .4f + 7f, y * .4f + 3f);
+                    float ink = Mathf.Clamp01((.047f - wear - nearest) * size * .6f);
                     float grain = Mathf.PerlinNoise(x * .35f + 23f, y * .35f + 5f);
                     pixels[y * size + x] = new Color(1f, 1f, 1f, ink * Mathf.Clamp01(.55f + grain * .9f));
                 }
@@ -820,6 +967,20 @@ namespace C6Lab
             stampEmblemSprite = Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(.5f, .5f), 100f);
             stampEmblemSprite.hideFlags = HideFlags.DontSave;
             return stampEmblemSprite;
+        }
+
+        private static Vector2[] Mirror(Vector2[] line)
+        {
+            var mirrored = new Vector2[line.Length];
+            for (int i = 0; i < line.Length; i++) mirrored[i] = new Vector2(1f - line[i].x, line[i].y);
+            return mirrored;
+        }
+
+        private static float SegmentDistance(Vector2 p, Vector2 a, Vector2 b)
+        {
+            Vector2 ab = b - a;
+            float t = ab.sqrMagnitude <= 1e-8f ? 0f : Mathf.Clamp01(Vector2.Dot(p - a, ab) / ab.sqrMagnitude);
+            return Vector2.Distance(p, a + ab * t);
         }
 
         /// <summary>#533: 도장 테두리 무늬 (런타임에 한 번 만든다). 굵은 네모 테두리에 인주가 고르지 않게 묻은 결.</summary>
@@ -901,7 +1062,7 @@ namespace C6Lab
             if (emberBand != null) emberBand.gameObject.SetActive(false);
             foreach (UnityEngine.UI.Image spark in sparks) if (spark != null) spark.gameObject.SetActive(false);
             extinguishFrom = BurnFront;
-            burstPlayed = false; notesPlayed = 0; sweepCued = false;
+            burstPlayed = false; notesPlayed = 0; sweepCued = false; landed = false;
             Cue("Steam", steamSoundFolder, steamSoundVolume);
             DrawFinish();
         }
@@ -941,8 +1102,10 @@ namespace C6Lab
             float burst = after < 0f ? 0f : Mathf.Clamp01(after / .35f);
             float bump = after < 0f ? 0f : Mathf.Sin(Mathf.PI * burst);
             // #540: after the glow the talisman folds into a talisman orb, which then drops down to the board.
-            float fold = Mathf.Clamp01((after - glowSeconds) / Mathf.Max(.01f, foldSeconds));
-            float fall = Mathf.Clamp01((after - glowSeconds - foldSeconds) / Mathf.Max(.01f, fallSeconds));
+            float hold = HoldSeconds;
+            float fold = Mathf.Clamp01((after - hold) / Mathf.Max(.01f, foldSeconds));
+            float fall = Mathf.Clamp01((after - hold - foldSeconds) / Mathf.Max(.01f, fallSeconds));
+            if (fall >= 1f && !landed) { landed = true; BeginLanding(); }
             float folded = fold * fold * (3f - 2f * fold);
             Color gold = new Color(glowColor.r, glowColor.g, glowColor.b, 1f);
             // #533 gong hum: after the strike everything trembles and pulses, dying away like a gong's ring.
@@ -1275,11 +1438,10 @@ namespace C6Lab
             if (source != null && source.board != null) source.board.SetUiInputBlocked(value);
         }
 
-        /// <summary>#540: 0 → 1 while the A warning sweeps this seat's talisman spot clear (0 when no A is coming for it).</summary>
-        public float SweepLevel { get; private set; }
-        private bool keepOutSet;
+        /// <summary>#540: 0 → 1 across the A warning when a talisman is coming for this seat (0 otherwise). Drives the 3D omen.</summary>
+        public float OmenLevel { get; private set; }
 
-        private float WarningSweep(LabSnapshot snapshot, ulong localPlayer, double now)
+        private static float WarningOmen(LabSnapshot snapshot, ulong localPlayer, double now)
         {
             if (snapshot == null || snapshot.phase != LabPhase.Playing || snapshot.jigwiAB?.rounds == null) return 0f;
             foreach (LabJigwiABRound item in snapshot.jigwiAB.rounds)
@@ -1287,17 +1449,39 @@ namespace C6Lab
                 if (item == null || item.kind != LabJigwiABKind.PersonalBurn || !item.Warning(now)) continue;
                 foreach (LabJigwiABPlayerFire seat in item.players ?? Array.Empty<LabJigwiABPlayerFire>())
                     if (seat != null && seat.playerId == localPlayer && seat.talismanAt < 0d)
-                    {
-                        double span = Math.Max(.01d, (item.activeAt - item.warningAt) * Mathf.Clamp(sweepShare, .2f, 1f));
-                        return Mathf.Clamp01((float)((now - item.warningAt) / span));
-                    }
+                        return Mathf.Clamp01((float)((now - item.warningAt) / Math.Max(.01d, item.activeAt - item.warningAt)));
             }
             return 0f;
         }
 
         /// <summary>
+        /// #540 3D 예고: 박에서 부적이 튀어나와 불이 붙은 채 돌다가 화면 쪽으로 날아온다(`LabJigwiTalismanOmen`).
+        /// 튀어나올 때 "톡", 날아올 때 "쿵" 진동과 소리.
+        /// </summary>
+        private void DriveOmen(bool paused)
+        {
+            if (!Application.isPlaying) return;
+            if (omen == null) omen = LabJigwiTalismanOmen.Create();
+            float level = paused ? 0f : OmenLevel;
+            omen.Show(level, source != null ? source.target : null, Time.unscaledTime);
+            if (level <= 0f) { omenStage = 0; return; }
+            if (omenStage == 0)
+            {
+                omenStage = 1;
+                Cue("Omen", omenSoundFolder, omenSoundVolume);
+                LabHaptics.PlayDirect(Config, LabHapticStyle.Light, .55f);
+            }
+            if (omenStage == 1 && level >= LabJigwiTalismanOmen.SwoopAt)
+            {
+                omenStage = 2;
+                Cue("Swoop", swoopSoundFolder, swoopSoundVolume);
+                LabHaptics.PlayDirect(Config, LabHapticStyle.Heavy, .85f);
+            }
+        }
+
+        /// <summary>
         /// #540: 부적은 조합판 위에 놓인다. 판 안쪽(위 둥근 테두리와 아래 이름·기운 막대는 비움) 가운데에 세로로 긴 부적을 둔다.
-        /// 화면 픽셀 기준 부적 자리를 돌려준다(구슬 밀어내기 벽에도 쓴다).
+        /// 화면 픽셀 기준 부적 자리를 돌려준다.
         /// </summary>
         private Rect PaperScreenRect(Camera boardCamera)
         {
@@ -1322,25 +1506,6 @@ namespace C6Lab
             paper.localPosition = new Vector3((low.x + high.x) * .5f, (low.y + high.y) * .5f, 0f);
             paper.sizeDelta = new Vector2(Mathf.Abs(high.x - low.x), Mathf.Abs(high.y - low.y));
             LayoutGlyph();
-        }
-
-        /// <summary>
-        /// #540: 부적이 오기 전(예고 동안) 부적 자리에 보이지 않는 벽을 가운데에서 양옆으로 넓혀 세워, 그 자리 구슬을 판 양옆으로
-        /// 밀어낸다. 부적 옆으로 밀린 구슬이 타는 게 보인다. 부적이 있는 동안(쓰기·완성·탐) 벽을 유지하고, 부적이 사라지면 치운다.
-        /// </summary>
-        private void UpdateKeepOut(LabOrbBoard board)
-        {
-            if (board == null) return;
-            if (SweepLevel <= 0f)
-            {
-                if (keepOutSet) { board.SetKeepOut(null, null); keepOutSet = false; }
-                return;
-            }
-            Rect spot = PaperScreenRect(board.ViewCamera);
-            float width = spot.width * Mathf.SmoothStep(.08f, 1f, SweepLevel);
-            var wall = new Rect(spot.center.x - width * .5f, spot.yMin, width, spot.height);
-            board.SetKeepOut(null, new[] { wall });
-            keepOutSet = true;
         }
 
         /// <summary>
@@ -1573,6 +1738,31 @@ namespace C6Lab
             foldSeal.raycastTarget = false; foldSeal.sprite = StampEmblemSprite();
             Stretch(foldSeal.rectTransform, .2f);
             foldOrb.gameObject.SetActive(false);
+            // #540: effects outside the paper. The board dim sits behind everything; the rest sit on top.
+            boardDim = NewRect("Talisman Board Dim", root).gameObject.AddComponent<UnityEngine.UI.Image>();
+            boardDim.raycastTarget = false; boardDim.transform.SetAsFirstSibling(); boardDim.gameObject.SetActive(false);
+            landRing = NewRect("Talisman Landing Ring", root).gameObject.AddComponent<UnityEngine.UI.Image>();
+            landRing.raycastTarget = false; landRing.sprite = RingSprite();
+            landRing.rectTransform.anchorMin = landRing.rectTransform.anchorMax = landRing.rectTransform.pivot = new Vector2(.5f, .5f);
+            landRing.gameObject.SetActive(false);
+            landDrops = new UnityEngine.UI.Image[8];
+            for (int k = 0; k < landDrops.Length; k++)
+            {
+                var drop = NewRect("Talisman Landing Drop " + k, root).gameObject.AddComponent<UnityEngine.UI.Image>();
+                drop.raycastTarget = false; drop.sprite = RoundDot();
+                drop.rectTransform.anchorMin = drop.rectTransform.anchorMax = drop.rectTransform.pivot = new Vector2(.5f, .5f);
+                drop.gameObject.SetActive(false);
+                landDrops[k] = drop;
+            }
+            flyEmbers = new UnityEngine.UI.Image[12];
+            for (int k = 0; k < flyEmbers.Length; k++)
+            {
+                var ember = NewRect("Talisman Flying Ember " + k, root).gameObject.AddComponent<UnityEngine.UI.Image>();
+                ember.raycastTarget = false; ember.sprite = RoundDot();
+                ember.rectTransform.anchorMin = ember.rectTransform.anchorMax = ember.rectTransform.pivot = new Vector2(.5f, .5f);
+                ember.gameObject.SetActive(false);
+                flyEmbers[k] = ember;
+            }
             BuildStrokeRank();
             LayoutGlyph();
             paper.gameObject.SetActive(false);
@@ -1701,8 +1891,8 @@ namespace C6Lab
             rect.offsetMin = rect.offsetMax = Vector2.zero;
         }
 
-        private void OnDisable() { if (keepOutSet && source != null && source.board != null) { source.board.SetKeepOut(null, null); keepOutSet = false; } SetBoardBlocked(false); Visible = false; RoundId = null; hasLast = false; EndFinish(); EndBurn(); if (paper != null) paper.gameObject.SetActive(false); }
-        private void OnDestroy() => SetBoardBlocked(false);
+        private void OnDisable() { if (omen != null) omen.Hide(); SetBoardBlocked(false); Visible = false; RoundId = null; hasLast = false; EndFinish(); EndBurn(); if (paper != null) paper.gameObject.SetActive(false); }
+        private void OnDestroy() { SetBoardBlocked(false); if (omen != null) Destroy(omen.gameObject); }
     }
 
     /// <summary>

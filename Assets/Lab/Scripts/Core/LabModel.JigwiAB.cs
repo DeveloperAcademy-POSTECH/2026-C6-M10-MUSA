@@ -28,7 +28,9 @@ namespace C6Lab
         /// <summary>#509: talisman Water drops in one at a time; each pending orb's owner, index and Host due time.</summary>
         private readonly List<(ulong owner, int index, double dueAt)> jigwiTalismanDrops = new List<(ulong, int, double)>();
         public const double JigwiTalismanDropSeconds = .3d;
-        private float jigwiTalismanWaterLifetime, jigwiTalismanWaterPaint, jigwiTalismanRewardDelay;
+        private float jigwiTalismanWaterPaint, jigwiTalismanRewardDelay;
+        /// <summary>#540: 부적 구슬은 수명이 없다(오색구슬처럼 만든 시각부터 아주 멀리 끝을 둔다). 던질 때까지 남는다.</summary>
+        public const double JigwiTalismanOrbLifetimeSeconds = 1e6d;
         private float jigwiABDuration, jigwiABBurnSeconds, jigwiABBurnStagger,
             jigwiABMoveAmount, jigwiABMovePeriod, jigwiABTargetRadius;
         private ulong jigwiABFailureRevision;
@@ -56,7 +58,7 @@ namespace C6Lab
             jigwiStageWarning = (float)LabJigwiABTimeline.WarningSeconds; jigwiStageFever = config.JigwiStageFeverMultiplier;
             jigwiABDuration = Mathf.Min(15f, config.JigwiABPersonalDurationSeconds);
             jigwiABBurnSeconds = config.JigwiABPersonalBurnSeconds; jigwiABBurnStagger = config.JigwiABBurnStaggerSeconds;
-            jigwiTalismanWaterCount = config.JigwiTalismanWaterCount; jigwiTalismanWaterLifetime = config.JigwiTalismanWaterLifetimeSeconds;
+            jigwiTalismanWaterCount = config.JigwiTalismanWaterCount;
             jigwiTalismanRewardDelay = config.JigwiTalismanRewardDelaySeconds;
             jigwiTalismanWaterPaint = config.JigwiTalismanWaterPaintScale;
             jigwiSplashShare = config.JigwiBSplashPaintShare; jigwiBoardFireSeconds = config.JigwiBBoardFireSeconds;
@@ -196,7 +198,8 @@ namespace C6Lab
             var burnSteps = new Dictionary<ulong, int>();
             foreach (var orb in orbs.Values.OrderBy(value => value.createdAt).ThenBy(value => value.id, StringComparer.Ordinal))
             {
-                if (failed.Contains(orb.owner) && !orb.inFlight && (orb.kind.IsRaw() || orb.kind == LabOrbKind.Combined))
+                // #540: a talisman orb never burns (it has no lifetime either).
+                if (failed.Contains(orb.owner) && !orb.inFlight && !orb.jigwiTalismanReward && (orb.kind.IsRaw() || orb.kind == LabOrbKind.Combined))
                 {
                     burnSteps.TryGetValue(orb.owner, out int step); burnSteps[orb.owner] = step + 1;
                     double burnAt = item.resolvedAt + step * JigwiTalismanFailBurnStepSeconds;
@@ -221,7 +224,7 @@ namespace C6Lab
         }
         private void ApplyJigwiABOrb(LabOrbState orb, double now)
         {
-            if (!jigwiABEnabled || orb.inFlight || (!orb.kind.IsRaw() && orb.kind != LabOrbKind.Combined)) return;
+            if (!jigwiABEnabled || orb.inFlight || orb.jigwiTalismanReward || (!orb.kind.IsRaw() && orb.kind != LabOrbKind.Combined)) return;
             var active = ActiveJigwiABRound(now);
             if (active == null || !active.Active(now)) return;
             if (active.kind == LabJigwiABKind.PersonalBurn)
@@ -417,7 +420,7 @@ namespace C6Lab
                     id = NewOrbId(), owner = owner, kind = LabOrbKind.Combined, element = LabOrbElement.Water,
                     origin = LabOrbOrigin.Gourd, originOwner = owner,
                     x = .15f + .7f * ((i * .61803398875f + .5f) % 1f), y = .22f + .1f * (i % 3),
-                    createdAt = dueAt, expiresAt = dueAt + jigwiTalismanWaterLifetime,
+                    createdAt = dueAt, expiresAt = dueAt + JigwiTalismanOrbLifetimeSeconds,
                     jigwiTalismanReward = true, jigwiABRewardPaintScale = jigwiTalismanWaterPaint, revision = ++revision
                 };
                 orbs.Add(water.id, water);

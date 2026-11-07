@@ -195,17 +195,20 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void TheWarningSweepsTheTalismanSpotClearBeforeItArrives()
+        public void TheWarningDrivesTheOmenBeforeTheTalismanArrives()
         {
             LabSnapshot snapshot = Snapshot(-1d); // warning 10 s → active 11 s
             overlay.Present(snapshot, Local, 9.9d);
-            Assert.That(overlay.SweepLevel, Is.Zero, "Nothing is coming yet.");
-            overlay.Present(snapshot, Local, 10.375d);
-            Assert.That(overlay.SweepLevel, Is.EqualTo(.5f).Within(.02f), "#540: halfway through clearing the spot.");
+            Assert.That(overlay.OmenLevel, Is.Zero, "Nothing is coming yet.");
+            overlay.Present(snapshot, Local, 10.5d);
+            Assert.That(overlay.OmenLevel, Is.EqualTo(.5f).Within(.02f), "#540: halfway through the 3D omen.");
+            Assert.That(overlay.Paper.gameObject.activeSelf, Is.False, "#540: the paper only lands on the board when the A starts.");
+            Assert.That(overlay.WantsBoardBlocked, Is.False, "The board is not blocked until the A starts.");
             overlay.Present(snapshot, Local, 11d);
-            Assert.That(overlay.SweepLevel, Is.EqualTo(1f), "The talisman lies on a clear spot.");
-            overlay.Present(snapshot, 99, 10.375d);
-            Assert.That(overlay.SweepLevel, Is.Zero, "A seat outside the A keeps its board as it is.");
+            Assert.That(overlay.OmenLevel, Is.Zero, "The omen is over once the talisman lies on the board.");
+            Assert.That(overlay.Paper.gameObject.activeSelf, Is.True);
+            overlay.Present(snapshot, 99, 10.5d);
+            Assert.That(overlay.OmenLevel, Is.Zero, "A seat outside the A sees no omen.");
         }
 
         [Test]

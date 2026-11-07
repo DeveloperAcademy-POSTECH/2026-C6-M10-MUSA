@@ -277,6 +277,10 @@
 - A가 끝날 때까지 부적을 못 쓴 자리는 그 판에 남은 구슬(원소·결합)이 만든 순서대로 0.12초 간격으로 모두 탄다(기존 `jigwiABBurnAt` 소각 경로). 북은 막지 않는다. 다 쓴 자리와 게임 종료로 취소된 A는 벌을 받지 않는다. 보상·벌 모두 자리별이다.
 - A 제한 시간은 LabConfig 에셋에서 10초, 구슬 소각 간격은 2초다(코드 기본값은 그대로).
 - #540 시간표(야광귀와 같은 흐름): LabConfig `jigwiFlowSchedule`(Host, 에셋에서 켬)이면 A1 10~20초 / B1 45~60 / A2 66~76 / B2 83~98, 공통 기믹은 40초부터 15초마다(40·55·70·85, `jigwiCommonStartSeconds`·`jigwiCommonIntervalSeconds`), 100초부터 피버. 스냅샷 `jigwiAB.schedule`(0 = #509 시간표, 1 = 새 시간표)로 검증한다. 코드 기본값은 #509 시간표라 기존 모델 테스트는 그 시간표를 쓴다.
+- 부적 구슬(A 보상, `jigwiTalismanReward`): 판·비행 중 모두 오색구슬 모습(LabFiveColorSparkle)을 푸른 톤(`BlueTones`)으로 쓰고 붉은 도장을 얹는다. 명중은 Host `LastHitTalisman` → 타격 패킷 `talisman`으로 모든 기기에 알리고, 맞은 자리에 부적이 붙고 도장이 찍히는 `LabTalismanSealSlap`과 푸른 가루·별가루를 낸다(칠은 3배 그대로).
+- 부적 구슬은 수명이 없고(`JigwiTalismanOrbLifetimeSeconds`, 오색구슬과 같은 방식) A 소각·실패 벌에도 타지 않는다. `jigwiTalismanWaterLifetimeSeconds` 설정은 지웠다.
+- A 예고(2초)는 숫자·두루마리·구슬 밀어내기 없이 3D로만 보인다: 그 자리 사람 전투 화면에서 박 위로 부적이 튀어나와 불이 붙은 채 돌다가 화면 아래(조합판)로 날아온다(`LabJigwiTalismanOmen`, `LabJigwiTalismanOverlay.OmenLevel`). 판 위 부적은 A가 시작할 때 놓인다.
+- 부적 완성 연출 길이는 LabConfig `jigwiTalismanRewardDelaySeconds`(Host) 하나로 맞춘다. 부적 화면이 도장 뒤 머무는 시간을 그 값에 맞춰 늘이고 줄인다.
 - 현재 호환 묶음은 설정 259개·**5689**·`C6PhysicsLab/50`·**`C6HapioGame/36`**다. 5688(#509·#526) 앱과 혼용하지 않는다.
 
 ## 검사 카테고리와 검사 전용 시작 단축 (2026-11-05)

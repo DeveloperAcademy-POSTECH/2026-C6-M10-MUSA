@@ -44,6 +44,8 @@ namespace C6Lab
         public bool paintBlocked;
         /// <summary>A five-colour orb projectile or hit (#329).</summary>
         public bool fiveColor;
+        /// <summary>#540: a Jigwi talisman orb projectile or hit (blue shimmer; its hit slaps the red seal on the gourd).</summary>
+        public bool talisman;
         /// <summary>Why a transferred body crossed its edge (LabEdgeCrossingKind).</summary>
         public int crossing;
         public uint round;
@@ -2004,6 +2006,8 @@ namespace C6Lab
             var projectile = LabProjectile.Create(launchPosition, config, projectileRoot, orb.element,
                 orb.small ? config.BlastShrinkScale : 1f);
             if (orb.fiveColor) LabFiveColorSparkle.AttachArt(projectile.transform, config.OrbRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined), true);
+            else if (orb.jigwiTalismanReward) LabFiveColorSparkle.AttachArt(projectile.transform,
+                config.OrbRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined), true, LabFiveColorSparkle.BlueTones); // #540
             projectile.name = "Projectile " + orb.id;
             float sizeScale = (model != null ? model.LaunchScaleOf(orb.id) : 1f)
                 * (orb.jigwiABReward ? orb.jigwiABRewardSizeScale : 1f);
@@ -2020,6 +2024,7 @@ namespace C6Lab
             var notice = new LabNetworkPacket { type = "projectile", sessionId = sessionId,
                 round = model.Round, requestId = actionId,
                 firstId = orb.id, owner = orb.owner, element = (int)orb.element, small = orb.small, fiveColor = orb.fiveColor,
+                talisman = orb.jigwiTalismanReward,
                 x = launchPosition.x, y = launchPosition.y, z = launchPosition.z,
                 wx = velocity.x, wy = velocity.y, wz = velocity.z, sizeScale = sizeScale,
                 jigwiABRadiusScale = orb.jigwiABRadiusScale, jigwiABReward = orb.jigwiABReward,
@@ -2100,6 +2105,8 @@ namespace C6Lab
                     // The final-hit replay only shows a hit that painted (never a blocked or element-less one).
                     if (!paintBlocked && (element != LabOrbElement.None || fiveColor)) RememberReplayHit(result);
                     if (fiveColor && !paintBlocked) PresentFiveColorHit(targetLocalPoint, result.OwnerPlayerId);
+                    bool talismanHit = model.LastHitTalisman;
+                    if (talismanHit && !paintBlocked) PresentTalismanHit(targetLocalPoint, result.OwnerPlayerId);
                     if (!paintBlocked && result.OwnerPlayerId == LocalPlayerId)
                     {
                         LastLocalHitOffset = LabThrowSound.HitOffset(targetLocalPoint,
@@ -2118,7 +2125,7 @@ namespace C6Lab
                         paintB = Mathf.Clamp01(paintColor.b), paintA = Mathf.Clamp01(paintColor.a),
                         x = targetLocalPoint.x, y = targetLocalPoint.y, z = targetLocalPoint.z,
                         wx = result.ImpactVelocity.x, wy = result.ImpactVelocity.y, wz = result.ImpactVelocity.z,
-                        spinImpulse = signedYawImpulse, fiveColor = fiveColor, sizeScale = launchScale };
+                        spinImpulse = signedYawImpulse, fiveColor = fiveColor, talisman = talismanHit, sizeScale = launchScale };
                     foreach (ulong id in order) if (id != LocalPlayerId) Send(id, impact);
                 }
             }
@@ -2490,6 +2497,7 @@ namespace C6Lab
                                     (LabOrbElement)packet.element, packet.damage,
                                     new Vector3(packet.wx, packet.wy, packet.wz), false);
                             if (packet.fiveColor) PresentFiveColorHit(new Vector3(packet.x, packet.y, packet.z), packet.owner);
+                            if (packet.talisman) PresentTalismanHit(new Vector3(packet.x, packet.y, packet.z), packet.owner);
                         }
                         // 같은 타격은 위에서 한 번만 받아들이므로 소리·햅틱도 한 번만 난다.
                         if (!packet.paintBlocked && packet.owner == LocalPlayerId && !presentedBefore)
@@ -2529,6 +2537,8 @@ namespace C6Lab
                         LabProjectile visual = LabProjectile.Create(position, config, projectileRoot, element,
                             packet.small ? config.BlastShrinkScale : 1f);
                         if (packet.fiveColor) LabFiveColorSparkle.AttachArt(visual.transform, config.OrbRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined), true);
+                        else if (packet.talisman) LabFiveColorSparkle.AttachArt(visual.transform,
+                            config.OrbRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined), true, LabFiveColorSparkle.BlueTones); // #540
                         if (packet.sizeScale > 0f && packet.sizeScale != 1f) visual.SetRadiusScale(packet.sizeScale);
                         visual.SetJigwiABRadiusScale(packet.jigwiABRadiusScale);
                         visual.SetJigwiABReward(packet.jigwiABReward);

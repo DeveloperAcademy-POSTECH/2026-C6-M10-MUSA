@@ -664,6 +664,7 @@ namespace C6Lab
                 (long)attacker.damageTotal + attackValue);
 
             LastHitFiveColor = orb.fiveColor;
+            LastHitTalisman = orb.jigwiTalismanReward;
             if (teamMode)
                 ConfirmTeamHit(attacker, element, paintDirection, (orb.small ? rules.SmallOrbPaintShare : 1f) * areaScale, now);
             else
