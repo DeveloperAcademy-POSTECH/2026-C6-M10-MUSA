@@ -29,6 +29,16 @@ namespace C6Lab
         private float lastPaint = -1f;
         private SpriteMask mask;
         private SpriteRenderer lineHalo, lineCore;
+        /// <summary>
+        /// 구슬이 타는 가장자리 그림 (부적이 탈 때와 같은 그림을 구슬 모양에 맞춰): 타 들어가는 줄은 밝은 불씨(깜빡임),
+        /// 그 바로 위는 검게 그을린 띠, 줄 둘레로 주황 빛. 줄 아래는 비어 있다(가림막이 구슬을 지움).
+        /// </summary>
+        private SpriteRenderer edge;
+        private Texture2D edgeTexture;
+        private Color32[] edgePixels;
+        private const int EdgeSize = 64, FlameCount = 4;
+        private const float EdgeBand = .09f, EdgeChar = .3f, EdgeHalo = .12f;
+        private readonly SpriteRenderer[] flames = new SpriteRenderer[FlameCount];
         private readonly SpriteRenderer[] sparks = new SpriteRenderer[SparkCount], ash = new SpriteRenderer[AshCount];
         private SpriteRenderer[] masked = Array.Empty<SpriteRenderer>();
         private Color[] maskedColors = Array.Empty<Color>();
@@ -88,6 +98,13 @@ namespace C6Lab
             lineCore = Part("Ash Burn Line Core", LabProceduralFire.Glow(), HotColor, 11);
             for (int i = 0; i < AshCount; i++) ash[i] = Part("Ash Burn Ash " + i, LabProceduralFire.Glow(), AshColor, 11);
             for (int i = 0; i < SparkCount; i++) sparks[i] = Part("Ash Burn Spark " + i, LabProceduralFire.Glow(), HotColor, 12);
+            edgeTexture = new Texture2D(EdgeSize, EdgeSize, TextureFormat.RGBA32, false)
+            { name = "Jigwi Orb Burn Edge (#540 runtime)", hideFlags = HideFlags.DontSave, wrapMode = TextureWrapMode.Clamp };
+            edgePixels = new Color32[EdgeSize * EdgeSize];
+            var edgeSprite = Sprite.Create(edgeTexture, new Rect(0f, 0f, EdgeSize, EdgeSize), new Vector2(.5f, .5f), EdgeSize);
+            edgeSprite.hideFlags = HideFlags.DontSave;
+            edge = Part("Ash Burn Edge", edgeSprite, Color.white, 10);
+            for (int i = 0; i < FlameCount; i++) flames[i] = Part("Ash Burn Flame " + i, LabProceduralFire.Flame(i), Color.white, 12);
         }
 
         private SpriteRenderer Part(string label, Sprite sprite, Color color, int order)
@@ -148,9 +165,10 @@ namespace C6Lab
         private void SortParts(int layer)
         {
             void Put(SpriteRenderer part, int extra) { if (part != null) { part.sortingLayerID = layer; part.sortingOrder = partOrder + extra; } }
-            Put(lineHalo, 0); Put(lineCore, 1);
-            foreach (SpriteRenderer flake in ash) Put(flake, 1);
-            foreach (SpriteRenderer spark in sparks) Put(spark, 2);
+            Put(edge, 0); Put(lineHalo, 1); Put(lineCore, 2);
+            foreach (SpriteRenderer flake in ash) Put(flake, 2);
+            foreach (SpriteRenderer flame in flames) Put(flame, 3);
+            foreach (SpriteRenderer spark in sparks) Put(spark, 4);
         }
 
         private void SetShown(bool on)
@@ -182,16 +200,19 @@ namespace C6Lab
             float p = Mathf.Clamp01(1f - left / total);
             Front = p;
             float r = radius;
-            // The burning line climbs from just under the ball to just over it.
-            float y = Mathf.Lerp(-1.08f, 1.08f, p) * r;
+            // Like the talisman's edge: a glowing line climbs from just under the ball to just over it. Below the line the
+            // ball is gone (the mask); right above it a charred band; small flames lick up along it; sparks fly, ash drops.
+            float lineAt = Mathf.Lerp(-1.1f, 1.1f, p); // in ball radii
+            float y = lineAt * r;
             float half = Mathf.Sqrt(Mathf.Max(0f, r * r - y * y));
             float flicker = .8f + .2f * Mathf.PerlinNoise(age * 9f, .3f);
             float fade = 1f - Mathf.SmoothStep(.94f, 1f, p);
+            float front = -r * 1.1f; // in front of the orb picture (it sits one radius toward the camera)
 
-            mask.transform.localPosition = new Vector3(Mathf.Sin(age * 3f) * r * .04f, y, 0f);
+            mask.transform.localPosition = new Vector3(0f, y - r * EdgeBand * .5f, 0f);
             mask.transform.localScale = new Vector3(r * 2.6f, r * 1.2f, 1f);
-            // Above the line the ball chars darker as the fire climbs.
-            float charring = Mathf.SmoothStep(0f, 1f, p) * .55f;
+            // The whole ball darkens a little as the fire climbs.
+            float charring = Mathf.SmoothStep(0f, 1f, p) * .4f;
             for (int i = 0; i < masked.Length; i++)
             {
                 if (masked[i] == null) continue;
@@ -199,30 +220,85 @@ namespace C6Lab
                 masked[i].color = Color.Lerp(c, new Color(c.r * .3f, c.g * .2f, c.b * .16f, c.a), charring);
             }
 
+            if (lastPaint < 0f || age - lastPaint >= .03f) { lastPaint = age; PaintEdge(lineAt, fade); }
+            edge.transform.localPosition = new Vector3(0f, 0f, front);
+            edge.transform.localScale = Vector3.one * (r * 2f);
+            edge.enabled = fade > .002f;
+
             float width = half * 2.15f + r * .12f;
-            float front = -r * 1.1f; // in front of the orb picture (it sits one radius toward the camera)
-            Stretch(lineHalo, width * 1.15f, r * .42f, new Vector3(0f, y, front));
-            Tint(lineHalo, EmberColor, .75f * flicker * fade);
-            Stretch(lineCore, width, r * .12f, new Vector3(0f, y, front - .01f));
-            Tint(lineCore, HotColor, flicker * fade);
+            Stretch(lineHalo, width * 1.2f, r * .5f, new Vector3(0f, y, front - .005f));
+            Tint(lineHalo, EmberColor, .6f * flicker * fade);
+            Tint(lineCore, HotColor, 0f);
             if (scorch != null) scorch.enabled = false;
 
+            for (int i = 0; i < FlameCount; i++)
+            {
+                // Small flames lick up along the burning line, like the talisman's edge flames.
+                SpriteRenderer flame = flames[i];
+                flame.sprite = LabProceduralFire.Flame((int)(age * 12f) + i * 2);
+                float along = (i + .5f) / FlameCount * 2f - 1f;
+                float lick = .75f + .35f * Mathf.Sin(age * (17f + i * 3f) + i);
+                float height = r * .55f * lick * Mathf.Clamp01(half / (r * .35f));
+                Vector2 size = flame.sprite.bounds.size;
+                flame.transform.localScale = new Vector3(height * .7f / Mathf.Max(.0001f, size.x), height / Mathf.Max(.0001f, size.y), 1f);
+                flame.transform.localPosition = new Vector3(along * half * .8f, y + height * .35f, front - .015f);
+                Tint(flame, Color.white, .95f * fade * (half > r * .08f ? 1f : 0f));
+            }
             for (int i = 0; i < SparkCount; i++)
             {
                 // Sparks flick up off the burning line.
-                float rate = 1f / .75f, cycle = age * rate + i * .37f, t = Mathf.Repeat(cycle, 1f);
+                float rate = 1f / .6f, cycle = age * rate + i * .37f, t = Mathf.Repeat(cycle, 1f);
                 float x = (Hash(i, Mathf.Floor(cycle)) * 2f - 1f) * half;
-                Place(sparks[i], new Vector3(x + Mathf.Sin(t * 6f + i) * r * .1f, y + t * r * .9f, front - .02f), r * .16f * (1f - .7f * t));
+                Place(sparks[i], new Vector3(x + Mathf.Sin(t * 6f + i) * r * .1f, y + t * r * 1.1f, front - .02f), r * .14f * (1f - .7f * t));
                 Tint(sparks[i], Color.Lerp(HotColor, EmberColor, t), (1f - t) * fade * (half > r * .05f ? 1f : 0f));
             }
             for (int i = 0; i < AshCount; i++)
             {
                 // Grey ash flakes drop away under the line.
-                float cycle = age / .9f + i * .53f, t = Mathf.Repeat(cycle, 1f);
+                float cycle = age / .7f + i * .53f, t = Mathf.Repeat(cycle, 1f);
                 float x = (Hash(i + 17, Mathf.Floor(cycle)) * 2f - 1f) * half;
-                Place(ash[i], new Vector3(x + Mathf.Sin(t * 4f + i) * r * .08f, y - t * r * .7f, front - .02f), r * .11f);
+                Place(ash[i], new Vector3(x + Mathf.Sin(t * 4f + i) * r * .08f, y - t * r * .7f, front - .02f), r * .1f);
                 Tint(ash[i], AshColor, (1f - t) * fade * (half > r * .05f ? 1f : 0f));
             }
+        }
+
+        /// <summary>
+        /// 부적이 탈 때와 같은 그림을 구슬 모양(원) 안에 그린다. lineAt은 타 들어가는 줄 높이(구슬 반지름 단위, 아래 -1 ~ 위 1).
+        /// 줄은 조금 들쭉날쭉하고 깜빡인다. 줄 아래는 비우고, 줄은 밝은 불씨, 그 위는 그을린 띠와 주황 빛.
+        /// </summary>
+        private void PaintEdge(float lineAt, float fade)
+        {
+            Color32 clear = new Color32(0, 0, 0, 0);
+            for (int y = 0; y < EdgeSize; y++)
+                for (int x = 0; x < EdgeSize; x++)
+                {
+                    int i = y * EdgeSize + x;
+                    float u = (x + .5f) / EdgeSize * 2f - 1f, v = (y + .5f) / EdgeSize * 2f - 1f;
+                    if (u * u + v * v > 1f) { edgePixels[i] = clear; continue; }
+                    float jag = .045f * Mathf.Sin(u * 9f + age * 5f) + .03f * Mathf.Sin(u * 21f - age * 7f);
+                    float d = v - (lineAt + jag); // height above the burning line
+                    Color c;
+                    if (d < -EdgeBand * .5f) { edgePixels[i] = clear; continue; }
+                    if (d < EdgeBand)
+                    {
+                        float glow = .75f + .25f * Mathf.Sin(u * 13f + age * 11f);
+                        c = Color.Lerp(EdgeHot, EmberColor, Mathf.Clamp01((d + EdgeBand * .5f) / (EdgeBand * 1.5f)));
+                        c.r *= glow; c.g *= glow; c.b *= glow;
+                    }
+                    else if (d < EdgeBand + EdgeChar)
+                    {
+                        float k = (d - EdgeBand) / EdgeChar;
+                        float shade = .85f + .15f * ((i * 7919) % 97) / 97f;
+                        c = Color.Lerp(CharColor, EmberColor, Mathf.Max(0f, .35f - k)); c.r *= shade; c.g *= shade; c.b *= shade;
+                        c.a = .92f * (1f - k * k);
+                    }
+                    else if (d < EdgeBand + EdgeChar + EdgeHalo) { c = EmberColor; c.a = .3f * (1f - (d - EdgeBand - EdgeChar) / EdgeHalo); }
+                    else { edgePixels[i] = clear; continue; }
+                    c.a *= fade;
+                    edgePixels[i] = c;
+                }
+            edgeTexture.SetPixels32(edgePixels);
+            edgeTexture.Apply(false, false);
         }
 
         private void PoseDrum()
@@ -238,6 +314,8 @@ namespace C6Lab
             scorch.transform.localPosition = new Vector3(0f, 0f, -.01f);
             scorch.transform.localScale = Vector3.one * Scale(scorch, r * 2.04f);
             scorch.enabled = fade > .002f;
+            if (edge != null) edge.enabled = false;
+            foreach (SpriteRenderer flame in flames) Tint(flame, Color.white, 0f);
             Tint(lineHalo, EmberColor, 0f); Tint(lineCore, HotColor, 0f);
             for (int i = 0; i < AshCount; i++) Tint(ash[i], AshColor, 0f);
             float inner = r * (1f - front);
@@ -333,6 +411,7 @@ namespace C6Lab
         {
             Mask(null, false);
             if (scorchTexture != null) Destroy(scorchTexture);
+            if (edgeTexture != null) Destroy(edgeTexture);
         }
     }
 }

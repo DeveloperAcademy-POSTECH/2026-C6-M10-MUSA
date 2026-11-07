@@ -1376,7 +1376,10 @@ namespace C6Lab
         {
             if (id == null || !entries.TryGetValue(id, out var entry) || entry.View == null) return false;
             // It goes up in a puff of smoke where this screen shows it (#235); a fox orb's is blue (#251).
-            if (entry.View.Kind == LabOrbKind.FoxFire) PlayFoxSmoke(entry);
+            // #540: an orb that burned away to ash from the bottom up (Jigwi's failed talisman) is already gone — no puff.
+            bool ashed = entry.View.JigwiAsh != null && entry.View.JigwiAsh.Consumes;
+            if (ashed) { }
+            else if (entry.View.Kind == LabOrbKind.FoxFire) PlayFoxSmoke(entry);
             else LabOrbVanishSmoke.Play(transform, entry.View.transform.position, entry.View.HitSphere.radius,
                 config != null ? config.OrbAppearance : null);
             RemoveOrb(id);

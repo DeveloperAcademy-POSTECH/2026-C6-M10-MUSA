@@ -477,7 +477,10 @@ namespace C6Lab
                 if (!(secondsLeft > 0f)) return;
                 jigwiAsh = LabJigwiAshBurn.Create(transform);
             }
-            jigwiAsh.Show(secondsLeft, totalSeconds, visualRadius, !kind.IsDrum(), visual);
+            // The burning edge follows the picture's size (element art is drawn 20% larger than the ball).
+            float artRadius = !kind.IsDrum() && orbSpriteArt != null && orbSpriteArt.gameObject.activeSelf
+                ? visualRadius * LabOrbSpriteArt.SizeScaleFor(kind) : visualRadius;
+            jigwiAsh.Show(secondsLeft, totalSeconds, artRadius, !kind.IsDrum(), visual);
         }
 
         /// <summary>Only tagged free B water gets the drop/ripple; ordinary Water art stays unchanged.</summary>
