@@ -529,6 +529,8 @@ namespace C6Lab
                 foreach (var orb in orbs.Values)
                 {
                     if (orb.owner != owner || orb.inFlight || orb.jigwiTalismanReward || (!orb.kind.IsRaw() && orb.kind != LabOrbKind.Combined)) continue;
+                    // B's special Water is the next mission's ammunition (it can arrive while Jigwi is still speaking): never burn it.
+                    if (!string.IsNullOrEmpty(orb.jigwiABSupplyEventId) || orb.jigwiSupply) continue;
                     if (orb.jigwiABBurnAt < 0d || burnAt < orb.jigwiABBurnAt)
                     { orb.jigwiABBurnAt = burnAt; orb.jigwiABBurnEventId = roundId; orb.revision = ++revision; }
                 }
