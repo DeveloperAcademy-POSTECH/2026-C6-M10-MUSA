@@ -102,6 +102,12 @@ namespace Hapio.Experiments.Tests
             }
             Assert.That(preview.heightMap.format, Is.EqualTo(TextureFormat.RGBAHalf),
                 "The saved height map must not be reduced to an eight-bit color texture.");
+            // Checked whatever the active target is: with iOS active, a Half EXR that only follows Default is
+            // RGBM-encoded on import and its coverage A is lost (the packed-sample readback test then fails).
+            var ios = ((TextureImporter)AssetImporter.GetAtPath(HeightPath)).GetPlatformTextureSettings("iPhone");
+            Assert.That(ios.overridden, Is.True, "The height map keeps an explicit iOS override.");
+            Assert.That(ios.format, Is.EqualTo(TextureImporterFormat.RGBAHalf), "iOS imports the height map as RGBA Half.");
+            Assert.That(ios.textureCompression, Is.EqualTo(TextureImporterCompression.Uncompressed));
             Assert.That(preview.clayShader.name, Is.EqualTo("C6Lab/ClayStickerSurface"));
             string[] experimentDependencies = AssetDatabase.GetDependencies(ScenePath, true);
             Assert.That(experimentDependencies, Does.Contain(AssetDatabase.GetAssetPath(preview.clayShader)),

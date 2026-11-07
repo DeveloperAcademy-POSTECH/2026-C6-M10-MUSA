@@ -105,6 +105,8 @@ Hapio에서는 `GameSession`이 전투 DEV의 `ClayAppearanceChanged`를 구독�
 
 새 전용 Scene과 `Assets/Experiments/ClayPreview/Sample`의 색 PNG·높이 Half EXR를 직접 참조한다. 샘플은 기존 실제 도색 규칙과 seed 123으로 생성하며 1024×512 Linear 값을 유지한다. 현재 샘플은 67회 명중으로 32768/32768셀을 채운 결과다. 숫자 67을 고정된 완성 조건으로 사용하지 않는다. 샘플 생성과 임포트의 왕복 오차·해시·원본 보존 결과는 `SampleInfo.json`에 기록한다.
 
+높이 EXR는 Default(RGBA Half·무압축)와 함께 iOS도 같은 값으로 명시 override한다. 이 프로젝트의 Editor는 보통 iOS가 활성인데, 그때 Default만 따르는 Half EXR는 가져올 때 RGBM(배율 5)으로 인코딩된다. 그러면 A에 커버리지 대신 1/255 단위 배율이 들어가 저장한 값과 달라진다. `ClayPreviewBuild.ImportMap`이 이 override를 쓰고 빌드·준비 검사의 `ValidateMap`이 확인한다. 둥근·코팅 비교의 높이 EXR 4개도 같은 경로를 쓴다. 색 PNG는 iOS에서도 그대로 들어오므로 override하지 않는다.
+
 `Prepare Mac Preview Scene`과 `Rebake Completed Preview Sample`은 같은 seed·명중 순서로 현재 버전의 샘플을 명시적으로 재생성한다. 슬라이더 조작만으로는 무늬가 바뀌지 않는다. v1 EXR에는 새 법선/커버리지가 없으므로 그대로 사용하지 않는다. 준비 도구는 v2 메타데이터와 실험 Scene의 참조·해시만 갱신하며, 빌드 검사는 버전·색/높이 파일·물리 높이 R·Scene 연결을 읽기 전용으로 확인한다. 슬라이더는 기존 실제 `ClayStickerSurface` 셰이더의 두 수치만 바꾸며 도색을 다시 실행하지 않는다. 배경에 회전 이미지 한 장을 표시하는 방식이 아니라, 원본 박의 메시·로컬 변환을 유지한 렌더 전용 복사본을 표시한다. 물리·네트워크·게임 세션 컴포넌트는 복제하지 않는다.
 
 카메라는 30fps 제한으로 동작하고 자동 회전하지 않는다. 앱이 포커스를 잃으면 카메라를 멈추며, 종료 시 소유한 재질·렌더 타깃·모델 복사본을 해제한다. 앱 내 UI는 실험 전용 UI Toolkit 패널이다. 일반 전투 HUD와 DEV의 두께·광택 설정은 변경하지 않는다.
