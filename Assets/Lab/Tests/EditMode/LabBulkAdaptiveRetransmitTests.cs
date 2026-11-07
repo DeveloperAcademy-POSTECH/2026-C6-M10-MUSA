@@ -6,7 +6,10 @@ using NUnit.Framework;
 
 namespace C6Lab.Tests
 {
-    /// <summary>Bulk retries follow the measured RTT, a repeated ACK resends a gap at once, and a backlog limit replaces the any-pending skip (#437).</summary>
+    /// <summary>
+    /// Bulk retries follow the measured RTT and a backlog limit replaces the any-pending skip (#437). The selective
+    /// ACK resends exactly the missing chunks, every gap at once, and never the ones the receiver holds.
+    /// </summary>
     public sealed class LabBulkAdaptiveRetransmitTests
     {
         [Test]
@@ -81,28 +84,25 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void TheThirdRepeatedAckResendsOnlyTheFirstMissingChunkOncePerGap()
+        public void AGapIsResentAsSoonAsALaterChunkIsHeldAndRepeatsOfTheSameAckResendNothing()
         {
             var sender = new LabBulkSender();
             for (int i = 0; i < 5; i++) sender.Enqueue("chunk" + i, 0d);
             Assert.That(sender.GetDue(0d, 10000).Length, Is.EqualTo(5));
-            // Chunk 1 is lost; chunks 2..5 each make the receiver repeat ACK 0.
-            Assert.That(sender.Ack(0, .02d), Is.False);
-            Assert.That(sender.Ack(0, .02d), Is.False);
-            Assert.That(sender.GetDue(.02d, 10000), Is.Empty, "Two repeats are not enough.");
-            sender.Ack(0, .03d);
-            Assert.That(sender.GetDue(.03d, 10000).Select(frame => frame.sequence), Is.EqualTo(new long[] { 1 }));
-            sender.Ack(0, .04d); sender.Ack(0, .04d); sender.Ack(0, .04d); sender.Ack(0, .04d);
-            Assert.That(sender.GetDue(.04d, 10000), Is.Empty, "One fast resend per gap; the timeout covers the rest.");
-
-            Assert.That(sender.Ack(2, .06d), Is.True, "The resend filled the gap up to a later loss of chunk 3.");
-            Assert.That(sender.HasRttSample, Is.False, "The ACK waited on resent chunk 1, so it times the recovery, not the path.");
-            // Chunk 1's lost original cannot echo, but its one extra copy is assumed in flight and discounted first.
-            sender.Ack(2, .07d); sender.Ack(2, .07d); sender.Ack(2, .07d);
-            Assert.That(sender.GetDue(.07d, 10000), Is.Empty);
-            sender.Ack(2, .08d);
-            Assert.That(sender.GetDue(.08d, 10000).Select(frame => frame.sequence), Is.EqualTo(new long[] { 3 }),
-                "A new gap can be resent fast again.");
+            // Chunk 1 is lost. The ACK for the first of 2..5 to arrive already shows the gap: ack 0, holding 2 (bit 0).
+            Assert.That(sender.Ack(0, 1L << 0, .02d), Is.True);
+            Assert.That(sender.GetDue(.02d, 10000).Select(frame => frame.sequence), Is.EqualTo(new long[] { 1 }),
+                "No three repeats needed, and the held chunk is not sent again.");
+            Assert.That(sender.HasRttSample, Is.True, "Chunk 2 was sent once, so its arrival times the path.");
+            Assert.That(sender.Ack(0, 0b1111L, .03d), Is.True, "3..5 arrive too.");
+            sender.Ack(0, 0b1111L, .04d); sender.Ack(0, 0b1111L, .04d);
+            Assert.That(sender.GetDue(.04d, 10000), Is.Empty,
+                "They were sent before the resend of 1, so they say nothing about whether that resend arrived.");
+            double sampled = sender.SmoothedRttSeconds;
+            Assert.That(sender.Ack(5, 0L, .06d), Is.True, "The resend filled the gap.");
+            Assert.That(sender.SmoothedRttSeconds, Is.EqualTo(sampled), "The ACK answered resent chunk 1: no sample (Karn).");
+            Assert.That(sender.Count, Is.Zero);
+            Assert.That(sender.QueuedBytes, Is.Zero);
         }
 
         [Test]
@@ -328,44 +328,123 @@ namespace C6Lab.Tests
             Assert.That(sender.RetryTimeoutSeconds, Is.EqualTo(.15d).Within(1e-9));
             sender.Enqueue("a", 1d); sender.Enqueue("b", 1d);
             sender.GetDue(1d, 10000);
-            // A gap repeat resends a fast; that is not a timeout and does not back off.
-            sender.Ack(1, 1.02d); sender.Ack(1, 1.02d); sender.Ack(1, 1.02d);
-            Assert.That(sender.GetDue(1.02d, 10000).Select(frame => frame.sequence), Is.EqualTo(new long[] { 2 }));
-            Assert.That(sender.RetryTimeoutSeconds, Is.EqualTo(.15d).Within(1e-9));
-            // b times out while a, resent, is still the oldest: it backs off the shared timer too.
-            Assert.That(sender.GetDue(1.151d, 10000).Select(frame => frame.sequence), Is.EqualTo(new long[] { 3 }));
+            // Nothing arrives: a and b expire in one flush, and the timer doubles once, not twice.
+            Assert.That(sender.GetDue(1.151d, 10000).Select(frame => frame.sequence), Is.EqualTo(new long[] { 2, 3 }));
             Assert.That(sender.RetryTimeoutSeconds, Is.EqualTo(.3d).Within(1e-9));
-            sender.Enqueue("c", 1.2d); sender.Enqueue("d", 1.2d);
+            // c is newer than both, which still wait for their second timeout; its own timeout backs off too.
+            sender.Enqueue("c", 1.2d);
             sender.GetDue(1.2d, 10000);
-            // a, c and d expire in one flush: the timer doubles once, not three times.
-            Assert.That(sender.GetDue(1.501d, 10000).Select(frame => frame.sequence), Is.EqualTo(new long[] { 2, 4, 5 }));
+            Assert.That(sender.GetDue(1.501d, 10000).Select(frame => frame.sequence), Is.EqualTo(new long[] { 4 }));
             Assert.That(sender.RetryTimeoutSeconds, Is.EqualTo(.6d).Within(1e-9));
         }
 
         [Test]
-        public void TheEchoDiscountAccumulatesAcrossAdvancesAndExpiresAfterATimeout()
+        public void EchoesOfResentCopiesSayNothingNewButALaterArrivalStillRevealsAGapAtOnce()
         {
             var sender = new LabBulkSender();
             for (int i = 0; i < 4; i++) sender.Enqueue("early" + i, 0d);
             sender.GetDue(0d, 10000);
             Assert.That(sender.GetDue(.25d, 10000).Length, Is.EqualTo(4), "All four time out once.");
-            // The originals are acknowledged one by one; each advance adds its chunk's extra copy.
             sender.Ack(1, .3d); sender.Ack(2, .3d); sender.Ack(3, .3d); sender.Ack(4, .3d);
             sender.Enqueue("next0", .3d); sender.Enqueue("next1", .3d);
             sender.GetDue(.3d, 10000);
-            sender.Ack(4, .31d); sender.Ack(4, .31d); sender.Ack(4, .31d); sender.Ack(4, .31d);
-            Assert.That(sender.GetDue(.31d, 10000), Is.Empty, "Four echoes from four separate advances are all discounted.");
+            // The four resent copies arrive now; each only repeats ACK 4 with nothing held after it.
+            for (int i = 0; i < 4; i++) Assert.That(sender.Ack(4, 0L, .31d), Is.False);
+            Assert.That(sender.GetDue(.31d, 10000), Is.Empty, "Repeats of the same state resend nothing.");
+            // next0 (5) was lost: next1 (6, bit 0) was sent after it and arrives, which shows the gap at once.
+            Assert.That(sender.Ack(4, 1L << 0, .33d), Is.True);
+            Assert.That(sender.GetDue(.33d, 10000).Select(frame => frame.sequence), Is.EqualTo(new long[] { 5 }));
+        }
 
-            var late = new LabBulkSender();
-            late.Enqueue("x", 0d);
-            late.GetDue(0d, 100);
-            late.GetDue(.25d, 100);
-            late.Ack(1, .3d);
-            late.Enqueue("y", .3d); late.Enqueue("z", .3d);
-            late.GetDue(.3d, 10000);
-            // The resent copy of x was lost; after its deadline (.25 + the backed-off .5) a real gap counts in full.
-            late.Ack(1, .77d); late.Ack(1, .77d); late.Ack(1, .77d);
-            Assert.That(late.GetDue(.77d, 10000).Select(frame => frame.sequence), Is.EqualTo(new long[] { 2 }));
+        [Test]
+        public void HeldChunksAreNeverResentAndReleaseTheirBytesAtOnce()
+        {
+            var sender = new LabBulkSender();
+            for (int i = 0; i < 5; i++) sender.Enqueue("chunk" + i, 0d);
+            sender.GetDue(0d, 10000);
+            Assert.That(sender.QueuedBytes, Is.EqualTo(5 * 6));
+            // Chunk 1 is lost; the receiver holds 2..5 (bits 0..3).
+            Assert.That(sender.Ack(0, 0b1111L, .02d), Is.True);
+            Assert.That(sender.QueuedBytes, Is.EqualTo(6), "Only the missing chunk still counts toward the backlog limit.");
+            Assert.That(sender.Count, Is.EqualTo(5), "The window still starts at the gap.");
+            Assert.That(sender.Acknowledged, Is.Zero);
+            Assert.That(sender.GetDue(.02d, 10000).Select(frame => frame.sequence), Is.EqualTo(new long[] { 1 }));
+            Assert.That(sender.GetDue(5d, 10000).Select(frame => frame.sequence), Is.EqualTo(new long[] { 1 }),
+                "When the gap times out, the held chunks still do not go out again.");
+            Assert.That(sender.Ack(5, 0L, 5.05d), Is.True);
+            Assert.That(sender.QueuedBytes, Is.Zero, "Held bytes are not released twice.");
+            Assert.That(sender.Count, Is.Zero);
+        }
+
+        [Test]
+        public void EveryGapInTheWindowIsResentAtOnceWithoutBackingOff()
+        {
+            var sender = new LabBulkSender();
+            for (int i = 0; i < 8; i++) sender.Enqueue("chunk" + i, 0d);
+            sender.GetDue(0d, 10000);
+            Assert.That(sender.Ack(1, 0L, .05d), Is.True, "A timed sample: a timeout resend would now back off.");
+            // 2, 5 and 6 are lost; 3, 4, 7 and 8 arrive (bit i = chunk 1 + 2 + i).
+            long held = (1L << 0) | (1L << 1) | (1L << 4) | (1L << 5);
+            Assert.That(sender.Ack(1, held, .05d), Is.True);
+            double timeout = sender.RetryTimeoutSeconds;
+            Assert.That(sender.GetDue(.05d, 10000).Select(frame => frame.sequence), Is.EqualTo(new long[] { 2, 5, 6 }),
+                "Not only the first gap: every chunk sent before an arrival and still missing is lost.");
+            Assert.That(sender.RetryTimeoutSeconds, Is.EqualTo(timeout), "A resend after a later arrival is not a timeout.");
+            Assert.That(sender.GetDue(.06d, 10000), Is.Empty);
+        }
+
+        [Test]
+        public void ALostResendIsSentAgainOnlyAfterAChunkSentLaterArrives()
+        {
+            var sender = new LabBulkSender();
+            for (int i = 0; i < 3; i++) sender.Enqueue("a" + i, 0d);
+            sender.GetDue(0d, 10000);
+            sender.Ack(0, 0b11L, .02d);
+            Assert.That(sender.GetDue(.02d, 10000).Select(frame => frame.sequence), Is.EqualTo(new long[] { 1 }));
+            // Another copy of an old ACK: nothing sent after the resend has arrived yet.
+            Assert.That(sender.Ack(0, 0b11L, .03d), Is.False);
+            Assert.That(sender.GetDue(.03d, 10000), Is.Empty, "No burst of resends while the resend is in flight.");
+            sender.Enqueue("later", .05d);
+            Assert.That(sender.GetDue(.05d, 10000).Select(frame => frame.sequence), Is.EqualTo(new long[] { 4 }));
+            // The resend of 1 was lost too, but 4, sent after it, arrived (bit 2).
+            Assert.That(sender.Ack(0, 0b111L, .07d), Is.True);
+            Assert.That(sender.GetDue(.07d, 10000).Select(frame => frame.sequence), Is.EqualTo(new long[] { 1 }));
+        }
+
+        [Test]
+        public void AnOlderAckStillAddsWhatItHeldAndAckingAnUnsentChunkChangesNothing()
+        {
+            var sender = new LabBulkSender();
+            for (int i = 0; i < 6; i++) sender.Enqueue("c" + i, 0d);
+            sender.GetDue(0d, 10000);
+            Assert.That(sender.Ack(2, 0L, .02d), Is.True);
+            // An older ACK arrives late: through 1, holding 4 (bit 1) and 6 (bit 3).
+            Assert.That(sender.Ack(1, (1L << 1) | (1L << 3), .03d), Is.True);
+            Assert.That(sender.Acknowledged, Is.EqualTo(2), "The cumulative point never moves back.");
+            Assert.That(sender.QueuedBytes, Is.EqualTo(2 * 2), "3 and 5 are still missing.");
+            Assert.That(sender.Ack(7, 0L, .04d), Is.False, "7 was never sent.");
+            Assert.That(sender.Ack(2, 1L << 10, .04d), Is.False, "A bit for chunk 14, never sent, is ignored.");
+            Assert.That(sender.QueuedBytes, Is.EqualTo(2 * 2));
+            Assert.That(sender.GetDue(.04d, 10000).Select(frame => frame.sequence), Is.EqualTo(new long[] { 3, 5 }),
+                "4 and 6, sent after them, arrived.");
+        }
+
+        [Test]
+        public void AHeldChunkSentOnceGivesAnRttSampleEvenWhenTheGapBeforeItWasResent()
+        {
+            var sender = new LabBulkSender();
+            for (int i = 0; i < 3; i++) sender.Enqueue("x" + i, 0d);
+            sender.GetDue(0d, 10000);
+            sender.Ack(0, 0b11L, .04d);
+            Assert.That(sender.SmoothedRttSeconds, Is.EqualTo(.04d).Within(1e-9), "3 was sent once at 0.");
+            sender.GetDue(.04d, 10000);
+            sender.Ack(3, 0L, .08d);
+            Assert.That(sender.SmoothedRttSeconds, Is.EqualTo(.04d).Within(1e-9), "Filling the gap answers a resend.");
+            sender.Enqueue("y0", 1d); sender.Enqueue("y1", 1d);
+            sender.GetDue(1d, 10000);
+            // 4 is lost and 5 arrives. A cumulative-only ACK would wait for the resend of 4 and give no sample.
+            sender.Ack(3, 1L << 0, 1.03d);
+            Assert.That(sender.SmoothedRttSeconds, Is.EqualTo(.875d * .04d + .125d * .03d).Within(1e-9));
         }
 
         [Test]
