@@ -148,7 +148,7 @@ namespace C6Lab
         }
 
         private static readonly Sprite[] cartoonFlames = new Sprite[FlameVariants];
-        private static Sprite cartoonSpark, burnMask, emberRing;
+        private static Sprite cartoonSpark, burnMask;
 
         /// <summary>
         /// #540 박 위 불덩이 (말풍선 그림과 같은 만화풍 2D, 얼굴 없음): 굵은 먹색 테두리, 주황 겉불 안에 노란 속불, 양옆 작은 불꽃 둘.
@@ -242,28 +242,6 @@ namespace C6Lab
             burnMask = Sprite.Create(texture, new Rect(0f, 0f, width, height), new Vector2(.5f, 1f), width);
             burnMask.hideFlags = HideFlags.DontSave;
             return burnMask;
-        }
-
-        /// <summary>
-        /// #540 북 테두리에 붙은 불씨 띠 (흰색, 색은 곱해서 쓴다): 가장자리를 따라 밝은 곳과 어두운 곳이 번갈아 있는 고리.
-        /// 천천히 돌리면 불씨가 테두리를 따라 기어가는 것처럼 보인다.
-        /// </summary>
-        public static Sprite EmberRing()
-        {
-            if (emberRing != null) return emberRing;
-            const int size = 128;
-            var pixels = new Color[size * size];
-            for (int y = 0; y < size; y++)
-                for (int x = 0; x < size; x++)
-                {
-                    float dx = (x + .5f) / size * 2f - 1f, dy = (y + .5f) / size * 2f - 1f;
-                    float d = Mathf.Sqrt(dx * dx + dy * dy), angle = Mathf.Atan2(dy, dx);
-                    float band = Mathf.Exp(-Mathf.Pow((d - .86f) / .07f, 2f));
-                    float hot = .45f + .55f * Mathf.Clamp01(.5f + .35f * Mathf.Sin(angle * 5f) + .25f * Mathf.Sin(angle * 11f + 2f));
-                    pixels[y * size + x] = new Color(1f, 1f, 1f, band * hot);
-                }
-            emberRing = Make(pixels, size, size, "Jigwi Ember Ring");
-            return emberRing;
         }
 
         /// <summary>

@@ -83,8 +83,8 @@ namespace C6Lab
             return Phase.None;
         }
 
-        /// <summary>A 진행(0~1) → 불덩이 크기(0~1). 처음 작은 불씨에서 끝으로 갈수록 빨리 커진다.</summary>
-        public static float Grown(float t) => Mathf.Lerp(.27f, 1f, Mathf.Pow(Mathf.Clamp01(t), 1.4f)); // #540 starts 1.5× the first spark
+        /// <summary>A 진행(0~1) → 불덩이 크기(0~1). 처음 작은 불씨에서 시작해 초반부터 빠르게 커진다(절반쯤에 이미 3/4 크기).</summary>
+        public static float Grown(float t) => Mathf.Lerp(.27f, 1f, Mathf.Pow(Mathf.Clamp01(t), .6f)); // #540 starts 1.5× the first spark
 
         public static LabJigwiFireball Create()
         {

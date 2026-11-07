@@ -7,7 +7,8 @@ namespace C6Lab
     /// #540 지귀 A 실패 뒤 불티 (부적 가장자리가 타 들어갈 때와 같은 느낌, 큰 불꽃 없음). 코드로만 그린다.
     /// - 구슬: 아래에서 위로 타 들어가는 선(밝은 불씨 줄 + 주황 빛)이 올라가며, 선 아래는 사라지고(가림막) 선 위는 점점 그을린다.
     ///   선에서 불티가 튀어 오르고 재가 떨어진다. 남은 초가 0이 되는 순간 맨 위까지 다 타 없어진다.
-    /// - 북: 패널티 동안 테두리를 따라 불씨 띠가 기어가며 깜빡이고, 테두리에서 불티가 오른다(북은 그대로 보인다).
+    /// - 북: 부적이 탈 때와 같이 겉 테두리부터 안쪽으로 그을림과 불씨 줄이 번져 들어오다 테두리 쪽 일부에서 멈추고,
+    ///   패널티 동안 그 모습(그을린 테두리 + 깜빡이는 불씨 줄 + 오르는 불티)이 그대로 유지된다. 북은 타 없어지지 않는다.
     /// Host가 준 남은 초만 따른다(그림만, 판정 없음). 구슬 뿌리에 붙어 공이 굴러도 돌지 않는다. 일시정지(시간 0)면 멈춘다.
     /// </summary>
     public sealed class LabJigwiAshBurn : MonoBehaviour
@@ -16,8 +17,18 @@ namespace C6Lab
         private const float FadeSeconds = .3f;
         private static readonly Color EmberColor = new Color(1f, .5f, .12f, 1f), HotColor = new Color(1f, .9f, .5f, 1f);
         private static readonly Color AshColor = new Color(.32f, .3f, .3f, .85f);
+        /// <summary>부적이 탈 때와 같은 색 (그을린 자리, 불 테두리 안쪽의 밝은 불씨).</summary>
+        private static readonly Color CharColor = new Color(.13f, .07f, .05f, .92f), EdgeHot = new Color(1f, .88f, .45f, 1f);
+        /// <summary>북: 겉에서 안쪽으로 이만큼(반지름 비율)까지 타 들어오는 데 걸리는 시간과 멈추는 깊이, 불씨 줄 두께.</summary>
+        private const float DrumCatchSeconds = 1.2f, DrumDepth = .24f, DrumBand = .07f, DrumHalo = .05f, PaintGap = .05f;
+        private const int ScorchSize = 64;
+        private SpriteRenderer scorch;
+        private Texture2D scorchTexture;
+        private Color32[] scorchPixels;
+        private float[] scorchDepth, scorchAngle;
+        private float lastPaint = -1f;
         private SpriteMask mask;
-        private SpriteRenderer lineHalo, lineCore, ringHalo, ringCore;
+        private SpriteRenderer lineHalo, lineCore;
         private readonly SpriteRenderer[] sparks = new SpriteRenderer[SparkCount], ash = new SpriteRenderer[AshCount];
         private SpriteRenderer[] masked = Array.Empty<SpriteRenderer>();
         private Color[] maskedColors = Array.Empty<Color>();
@@ -50,7 +61,7 @@ namespace C6Lab
                 return;
             }
             Ensure();
-            if (left <= 0f) { age = 0f; consume = consumeOrb; if (consume) Mask(visuals, true); }
+            if (left <= 0f) { age = 0f; lastPaint = -1f; consume = consumeOrb; if (consume) Mask(visuals, true); }
             total = Mathf.Max(.01f, totalSeconds);
             if (left <= 0f || Mathf.Abs(left - secondsLeft) > .3f) left = secondsLeft;
             SetShown(true);
@@ -65,8 +76,6 @@ namespace C6Lab
             mask = maskObject.AddComponent<SpriteMask>();
             mask.sprite = LabProceduralFire.BurnMask();
             mask.enabled = false;
-            ringHalo = Part("Ash Burn Ring Halo", LabProceduralFire.EmberRing(), EmberColor, 9);
-            ringCore = Part("Ash Burn Ring Core", LabProceduralFire.EmberRing(), HotColor, 10);
             lineHalo = Part("Ash Burn Line Halo", LabProceduralFire.Glow(), EmberColor, 10);
             lineCore = Part("Ash Burn Line Core", LabProceduralFire.Glow(), HotColor, 11);
             for (int i = 0; i < AshCount; i++) ash[i] = Part("Ash Burn Ash " + i, LabProceduralFire.Glow(), AshColor, 11);
@@ -155,7 +164,7 @@ namespace C6Lab
             Tint(lineHalo, EmberColor, .75f * flicker * fade);
             Stretch(lineCore, width, r * .12f, new Vector3(0f, y, -.02f));
             Tint(lineCore, HotColor, flicker * fade);
-            Ring(false);
+            if (scorch != null) scorch.enabled = false;
 
             for (int i = 0; i < SparkCount; i++)
             {
@@ -179,34 +188,79 @@ namespace C6Lab
         {
             Front = 0f;
             float r = radius;
-            float fade = Mathf.Clamp01(age / FadeSeconds) * Mathf.Clamp01(left / FadeSeconds);
-            float flicker = .75f + .25f * Mathf.PerlinNoise(age * 7f, 1.7f);
-            Ring(true);
-            ringHalo.transform.localPosition = new Vector3(0f, 0f, -.01f);
-            ringHalo.transform.localRotation = Quaternion.Euler(0f, 0f, age * 25f);
-            ringHalo.transform.localScale = Vector3.one * Scale(ringHalo, r * 2.45f);
-            Tint(ringHalo, EmberColor, .8f * flicker * fade);
-            ringCore.transform.localPosition = new Vector3(0f, 0f, -.02f);
-            ringCore.transform.localRotation = Quaternion.Euler(0f, 0f, -age * 18f + 40f);
-            ringCore.transform.localScale = Vector3.one * Scale(ringCore, r * 2.3f);
-            Tint(ringCore, HotColor, .9f * (1.1f - flicker) * fade + .3f * fade);
+            float fade = Mathf.Clamp01(left / FadeSeconds);
+            // Like the talisman: the burn creeps in from the rim, then holds at a charred band near the edge.
+            float caught = Mathf.Clamp01(age / DrumCatchSeconds);
+            float front = DrumDepth * (1f - (1f - caught) * (1f - caught)) + .015f * Mathf.Sin(age * 2.3f) * caught;
+            EnsureScorch();
+            if (lastPaint < 0f || age - lastPaint >= PaintGap) { lastPaint = age; PaintScorch(front, fade); }
+            scorch.transform.localPosition = new Vector3(0f, 0f, -.01f);
+            scorch.transform.localScale = Vector3.one * Scale(scorch, r * 2.04f);
+            scorch.enabled = fade > .002f;
             Tint(lineHalo, EmberColor, 0f); Tint(lineCore, HotColor, 0f);
             for (int i = 0; i < AshCount; i++) Tint(ash[i], AshColor, 0f);
+            float inner = r * (1f - front);
             for (int i = 0; i < SparkCount; i++)
             {
-                // Sparks lift off the rim (mostly its upper half) and drift up.
+                // Sparks flick off the burning line all round the drum and drift up.
                 float cycle = age / .85f + i * .41f, t = Mathf.Repeat(cycle, 1f);
-                float angle = Mathf.Lerp(-.2f, Mathf.PI + .2f, Hash(i, Mathf.Floor(cycle)));
-                var from = new Vector3(Mathf.Cos(angle) * r * 1.02f, Mathf.Sin(angle) * r * 1.02f, -.03f);
-                Place(sparks[i], from + new Vector3(Mathf.Sin(t * 5f + i) * r * .1f, t * r * .8f, 0f), r * .15f * (1f - .7f * t));
-                Tint(sparks[i], Color.Lerp(HotColor, EmberColor, t), (1f - t) * fade);
+                float angle = Hash(i, Mathf.Floor(cycle)) * Mathf.PI * 2f;
+                var from = new Vector3(Mathf.Cos(angle) * inner, Mathf.Sin(angle) * inner, -.03f);
+                Place(sparks[i], from + new Vector3(Mathf.Sin(t * 5f + i) * r * .08f, t * r * .55f, 0f), r * .13f * (1f - .7f * t));
+                Tint(sparks[i], Color.Lerp(HotColor, EmberColor, t), (1f - t) * fade * caught);
             }
         }
 
-        private void Ring(bool on)
+        private void EnsureScorch()
         {
-            if (on) return;
-            Tint(ringHalo, EmberColor, 0f); Tint(ringCore, HotColor, 0f);
+            if (scorch != null) return;
+            scorchTexture = new Texture2D(ScorchSize, ScorchSize, TextureFormat.RGBA32, false)
+            { name = "Jigwi Drum Scorch (#540 runtime)", hideFlags = HideFlags.DontSave, wrapMode = TextureWrapMode.Clamp };
+            scorchPixels = new Color32[ScorchSize * ScorchSize];
+            scorchDepth = new float[ScorchSize * ScorchSize];
+            scorchAngle = new float[ScorchSize * ScorchSize];
+            for (int y = 0; y < ScorchSize; y++)
+                for (int x = 0; x < ScorchSize; x++)
+                {
+                    float dx = (x + .5f) / ScorchSize * 2f - 1f, dy = (y + .5f) / ScorchSize * 2f - 1f;
+                    float d = Mathf.Sqrt(dx * dx + dy * dy), a = Mathf.Atan2(dy, dx);
+                    int i = y * ScorchSize + x;
+                    scorchAngle[i] = a;
+                    // How far in from the rim, with a ragged burnt-paper edge. Outside the drum stays clear.
+                    scorchDepth[i] = d > 1f ? -1f : 1f - d + .025f * (Mathf.Sin(a * 7f) + .6f * Mathf.Sin(a * 13f + 1.7f));
+                }
+            var sprite = Sprite.Create(scorchTexture, new Rect(0f, 0f, ScorchSize, ScorchSize), new Vector2(.5f, .5f), 100f);
+            sprite.hideFlags = HideFlags.DontSave;
+            scorch = Part("Ash Burn Drum Scorch", sprite, Color.white, 9);
+        }
+
+        /// <summary>부적이 탈 때와 같은 그림: 테두리~불 줄 안쪽은 그을림, 줄은 밝은 불씨(깜빡임), 줄 안쪽으로 옅은 주황 빛.</summary>
+        private void PaintScorch(float front, float fade)
+        {
+            Color32 clear = new Color32(0, 0, 0, 0);
+            for (int i = 0; i < scorchDepth.Length; i++)
+            {
+                float d = scorchDepth[i];
+                Color c;
+                if (d < 0f) { scorchPixels[i] = clear; continue; }
+                if (d < front - DrumBand)
+                {
+                    float shade = .85f + .15f * ((i * 7919) % 97) / 97f;
+                    c = CharColor; c.r *= shade; c.g *= shade; c.b *= shade;
+                }
+                else if (d < front)
+                {
+                    float glow = .7f + .3f * Mathf.Sin(scorchAngle[i] * 5f + age * 6f) * Mathf.Sin(scorchAngle[i] * 3f - age * 4f);
+                    c = Color.Lerp(EdgeHot, EmberColor, (front - d) / DrumBand);
+                    c.r *= glow; c.g *= glow; c.b *= glow;
+                }
+                else if (d < front + DrumHalo) { c = EmberColor; c.a = .45f * (1f - (d - front) / DrumHalo); }
+                else { scorchPixels[i] = clear; continue; }
+                c.a *= fade;
+                scorchPixels[i] = c;
+            }
+            scorchTexture.SetPixels32(scorchPixels);
+            scorchTexture.Apply(false, false);
         }
 
         private static float Hash(int i, float n) => Mathf.Repeat(Mathf.Sin(i * 12.9898f + n * 78.233f) * 43758.5453f, 1f);
@@ -234,6 +288,10 @@ namespace C6Lab
             renderer.enabled = color.a > .002f;
         }
 
-        private void OnDestroy() => Mask(null, false);
+        private void OnDestroy()
+        {
+            Mask(null, false);
+            if (scorchTexture != null) Destroy(scorchTexture);
+        }
     }
 }

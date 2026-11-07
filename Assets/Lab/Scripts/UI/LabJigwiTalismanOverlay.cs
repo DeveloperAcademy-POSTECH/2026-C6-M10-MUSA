@@ -178,7 +178,7 @@ namespace C6Lab
         [Tooltip("#540 부적을 쓰는 동안 공격 영역 붉은 경보가 번쩍일 때마다 나는 경보음 폴더. 끝이 다가올수록 빨라지고 커진다. 비우면 없음.")]
         [SerializeField] private string alarmSoundFolder = "JigwiAlarmPulse";
         [SerializeField, Range(0f, 1f)] private float alarmSoundVolume = .7f;
-        [Tooltip("#540 못 쓴 판의 구슬이 하나씩 차례로 3초 동안 타오를 때, 구슬마다 불이 붙는 순간 나는 타는 소리 폴더 (3초). 비우면 없음.")]
+        [Tooltip("#540 못 쓴 판의 구슬이 하나씩 차례로 1.5초 동안 재가 되어 사라질 때, 구슬마다 타기 시작하는 순간 나는 타는 소리 폴더 (1.5초). 비우면 없음.")]
         [SerializeField] private string orbBurnSoundFolder = "JigwiOrbBurn";
         [SerializeField, Range(0f, 1f)] private float orbBurnSoundVolume = .8f;
         [Tooltip("#540 못 쓰고 끝나 불덩이가 떨어질 때 지귀 울부짖음 폴더. 비우면 없음.")]
@@ -749,14 +749,14 @@ namespace C6Lab
         private readonly HashSet<string> orbBurnsCued = new HashSet<string>(StringComparer.Ordinal);
 
         /// <summary>
-        /// #540: 못 쓴 판의 구슬은 하나씩 차례로 3초 동안 타오른다. 구슬마다 불이 붙는 순간 3초짜리 타는 소리를 한 번 낸다.
+        /// #540: 못 쓴 판의 구슬은 하나씩 차례로 1.5초 동안 재가 되어 사라진다. 구슬마다 타기 시작하는 순간 1.5초짜리 타는 소리를 한 번 낸다.
         /// 차례 중간에 끼어든 구슬(합쳐져 새로 생긴 구슬 등)은 소리 없이 탄다.
         /// </summary>
         private void CueOrbBurns(LabSnapshot snapshot)
         {
             if (source == null || snapshot == null) return;
             double now = source.JigwiABPresentationTime;
-            const float lateSeconds = .5f;
+            const float lateSeconds = .3f;
             foreach (LabOrbState orb in snapshot.orbs ?? Array.Empty<LabOrbState>())
             {
                 if (orb == null || orb.owner != source.LocalPlayerId || orb.inFlight || orbBurnsCued.Contains(orb.id)) continue;
