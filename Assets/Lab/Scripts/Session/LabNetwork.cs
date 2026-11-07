@@ -2194,19 +2194,19 @@ namespace C6Lab
                         : orb.LifeSecondsLeft(latest.serverTime, config.OrbLifetimeSeconds, config.ItemLifetimeSeconds),
                     jigwiScale: orb.jigwiRadiusScale, fever: orb.fever, fiveColor: orb.fiveColor,
                     jigwiABScale: orb.jigwiABRadiusScale,
-                    // #540: an unfinished talisman's blaze replaces the A char on those orbs (also while they wait their turn).
-                    jigwiABBurnSeconds: orb.jigwiABBurnAt >= 0d && LabJigwiScreenPresentation.FailBurnSecondsLeft(latest, orb, latest.serverTime) <= 0f
+                    // #540: an unfinished talisman's orbs show no A fire at all (they burn to ash in turn instead).
+                    jigwiABBurnSeconds: orb.jigwiABBurnAt >= 0d && !LabJigwiScreenPresentation.FailBurnPending(latest, orb)
                         ? Mathf.Max(0f, (float)(orb.jigwiABBurnAt - latest.serverTime)) : 0f,
                     jigwiABHeld: latest.paused || GameStartHeld,
                     // An unlocked bomb (#328) glides in to the Host's spot like a drum, then opens there.
                     arrival: orb.kind == LabOrbKind.Bomb && orb.JustArrived(latest.serverTime) ? orb.arrival : LabDrumArrival.None,
                     stopAt: orb.stopAt);
-                view?.SetJigwiBlaze(blaze); // #540 an unfinished talisman's board blazes up (code-drawn fire)
+                view?.SetJigwiAsh(blaze, (float)LabModel.JigwiTalismanFailBlazeSeconds); // #540 burns to ash from the bottom up
                 view?.SetJigwiSupplyWaterArt(!string.IsNullOrEmpty(orb.jigwiABSupplyEventId) || orb.jigwiTalismanReward,
                     latest.paused || GameStartHeld, special: !string.IsNullOrEmpty(orb.jigwiABSupplyEventId), // #509 특수 물구슬
                     talisman: orb.jigwiTalismanReward); // #540 부적 구슬
             }
-            // #540: my unfinished talisman set my drums alight — they burn (bomb fire) and turn light and slippery.
+            // #540: my unfinished talisman left embers on my drums — they smoulder and turn light and slippery.
             float drumFire = config != null ? LabJigwiScreenPresentation.DrumFireSecondsLeft(latest, LocalPlayerId,
                 JigwiABPresentationTime, config.JigwiAFailDrumSlipSeconds) : 0f;
             foreach (var drum in latest.drums ?? Array.Empty<LabOrbState>())
@@ -2215,9 +2215,9 @@ namespace C6Lab
                 current.Add(drum.id);
                 // A drum just handed to this player arrives the way the Host drew it (#178); an older
                 // handoff, seen late after a reconnect, is not replayed.
-                board.UpsertOrb(drum.id, drum.kind, new Vector2(drum.x, drum.y), new Vector2(drum.vx, drum.vy),
-                    arrival: drum.JustArrived(latest.serverTime) ? drum.arrival : LabDrumArrival.None, stopAt: drum.stopAt,
-                    burnSeconds: drumFire); // #540 a burning drum wears the bomb fire
+                LabOrbView drumView = board.UpsertOrb(drum.id, drum.kind, new Vector2(drum.x, drum.y), new Vector2(drum.vx, drum.vy),
+                    arrival: drum.JustArrived(latest.serverTime) ? drum.arrival : LabDrumArrival.None, stopAt: drum.stopAt);
+                drumView?.SetJigwiAsh(drumFire, config != null ? config.JigwiAFailDrumSlipSeconds : 0f); // #540 embers on the rim (no fire)
             }
             foreach (string id in board.OrbIds)
                 if (!current.Contains(id) && !board.ShouldPreserveFromSnapshot(id)) board.RemoveOrb(id);

@@ -147,6 +147,125 @@ namespace C6Lab
             return (Mathf.Abs(u - center) - half) * (1f - .5f * t);
         }
 
+        private static readonly Sprite[] cartoonFlames = new Sprite[FlameVariants];
+        private static Sprite cartoonSpark, burnMask, emberRing;
+
+        /// <summary>
+        /// #540 박 위 불덩이 (말풍선 그림과 같은 만화풍 2D, 얼굴 없음): 굵은 먹색 테두리, 주황 겉불 안에 노란 속불, 양옆 작은 불꽃 둘.
+        /// 프레임마다 끝이 휘는 방향과 높이가 조금씩 달라 번갈아 보이면 일렁인다.
+        /// </summary>
+        public static Sprite CartoonFlame(int variant)
+        {
+            variant = ((variant % FlameVariants) + FlameVariants) % FlameVariants;
+            if (cartoonFlames[variant] != null) return cartoonFlames[variant];
+            const int size = 128, samples = 3;
+            float curl = new[] { .16f, -.1f, .12f, -.14f }[variant], top = new[] { .92f, .86f, .96f, .88f }[variant];
+            float left = new[] { .6f, .7f, .52f, .66f }[variant], right = new[] { .66f, .54f, .72f, .58f }[variant];
+            Color outerFill = new Color32(255, 112, 28, 255), innerFill = new Color32(255, 214, 64, 255), shine = new Color32(255, 246, 200, 255);
+            var pixels = new Color[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    Color sum = Color.clear;
+                    for (int sy = 0; sy < samples; sy++)
+                        for (int sx = 0; sx < samples; sx++)
+                        {
+                            float u = (x + (sx + .5f) / samples) / size * 2f - 1f;
+                            float v = (y + (sy + .5f) / samples) / size;
+                            sum += CartoonFlameSample(u, v, curl, top, left, right, outerFill, innerFill, shine);
+                        }
+                    Color c = sum / (samples * samples);
+                    if (c.a > .001f) { c.r /= c.a; c.g /= c.a; c.b /= c.a; }
+                    pixels[y * size + x] = c;
+                }
+            cartoonFlames[variant] = Make(pixels, size, size, "Jigwi Cartoon Flame " + variant);
+            return cartoonFlames[variant];
+        }
+
+        private static Color CartoonFlameSample(float u, float v, float curl, float top, float left, float right,
+            Color outerFill, Color innerFill, Color shine)
+        {
+            const float ink = .06f;
+            u /= .9f; v = (v - .05f) / .92f;
+            float body = Mathf.Min(FlameDistance(u, v, 0f, .38f, .36f, top, curl),
+                Mathf.Min(FlameDistance(u, v, -.37f, .24f, .15f, left, -.1f), FlameDistance(u, v, .37f, .24f, .15f, right, .1f)));
+            if (body > ink) return Color.clear;
+            Color c = Ink;
+            if (body <= 0f)
+            {
+                c = outerFill;
+                if (FlameDistance(u, v, .02f, .3f, .21f, top * .72f, curl * .6f) <= 0f) c = innerFill;
+                float sx = u + .15f, sy = v - .28f;
+                if (sx * sx / (.05f * .05f) + sy * sy / (.12f * .12f) <= 1f) c = shine;
+            }
+            c.r *= c.a; c.g *= c.a; c.b *= c.a;
+            return c;
+        }
+
+        /// <summary>#540 만화풍 불티: 먹색 테두리를 두른 노란 점 (불덩이 둘레에 튄다).</summary>
+        public static Sprite CartoonSpark()
+        {
+            if (cartoonSpark != null) return cartoonSpark;
+            const int size = 32;
+            var pixels = new Color[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float dx = (x + .5f) / size * 2f - 1f, dy = (y + .5f) / size * 2f - 1f, d = Mathf.Sqrt(dx * dx + dy * dy);
+                    Color c = d <= .62f ? (Color)new Color32(255, 214, 64, 255) : Ink;
+                    c.a = Mathf.Clamp01((.9f - d) * size * .5f);
+                    pixels[y * size + x] = c;
+                }
+            cartoonSpark = Make(pixels, size, size, "Jigwi Cartoon Spark");
+            return cartoonSpark;
+        }
+
+        /// <summary>
+        /// #540 구슬이 아래부터 타 없어질 때 쓰는 가림막 (SpriteMask): 위 가장자리가 불탄 종이처럼 들쭉날쭉한 세로로 긴 판.
+        /// 피벗이 위 가운데라 위치가 곧 타 들어가는 선이다. 1×2 단위.
+        /// </summary>
+        public static Sprite BurnMask()
+        {
+            if (burnMask != null) return burnMask;
+            const int width = 64, height = 128;
+            var pixels = new Color[width * height];
+            for (int x = 0; x < width; x++)
+            {
+                float u = (x + .5f) / width;
+                float edge = 1f - .035f - .025f * (Mathf.Sin(u * 31f) * .6f + Mathf.Sin(u * 67f + 1.3f) * .4f);
+                for (int y = 0; y < height; y++)
+                    pixels[y * width + x] = new Color(1f, 1f, 1f, (y + .5f) / height <= edge ? 1f : 0f);
+            }
+            var texture = new Texture2D(width, height, TextureFormat.RGBA32, false)
+            { name = "Jigwi Burn Mask (#540 runtime)", hideFlags = HideFlags.DontSave, wrapMode = TextureWrapMode.Clamp };
+            texture.SetPixels(pixels); texture.Apply(false, true);
+            burnMask = Sprite.Create(texture, new Rect(0f, 0f, width, height), new Vector2(.5f, 1f), width);
+            burnMask.hideFlags = HideFlags.DontSave;
+            return burnMask;
+        }
+
+        /// <summary>
+        /// #540 북 테두리에 붙은 불씨 띠 (흰색, 색은 곱해서 쓴다): 가장자리를 따라 밝은 곳과 어두운 곳이 번갈아 있는 고리.
+        /// 천천히 돌리면 불씨가 테두리를 따라 기어가는 것처럼 보인다.
+        /// </summary>
+        public static Sprite EmberRing()
+        {
+            if (emberRing != null) return emberRing;
+            const int size = 128;
+            var pixels = new Color[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float dx = (x + .5f) / size * 2f - 1f, dy = (y + .5f) / size * 2f - 1f;
+                    float d = Mathf.Sqrt(dx * dx + dy * dy), angle = Mathf.Atan2(dy, dx);
+                    float band = Mathf.Exp(-Mathf.Pow((d - .86f) / .07f, 2f));
+                    float hot = .45f + .55f * Mathf.Clamp01(.5f + .35f * Mathf.Sin(angle * 5f) + .25f * Mathf.Sin(angle * 11f + 2f));
+                    pixels[y * size + x] = new Color(1f, 1f, 1f, band * hot);
+                }
+            emberRing = Make(pixels, size, size, "Jigwi Ember Ring");
+            return emberRing;
+        }
+
         /// <summary>
         /// #540 공격 영역 경보 빛: 가장자리가 붉게 짙고 가운데로 옅어지는 사각 빛 (늘여서 쓴다).
         /// </summary>

@@ -560,6 +560,16 @@ namespace C6Lab
             return 0f;
         }
 
+        /// <summary>#540: 이 구슬이 부적을 못 써 끝난 A 때문에 타기로 정해졌는지 (불덩이가 닿기 전 포함). 이런 구슬엔 A 불을 붙이지 않는다.</summary>
+        public static bool FailBurnPending(LabSnapshot snapshot, LabOrbState orb)
+        {
+            if (orb == null || orb.jigwiABBurnAt < 0d || string.IsNullOrEmpty(orb.jigwiABBurnEventId) || snapshot?.jigwiAB?.rounds == null) return false;
+            foreach (var round in snapshot.jigwiAB.rounds)
+                if (round != null && round.id == orb.jigwiABBurnEventId)
+                    return round.kind == LabJigwiABKind.PersonalBurn && round.resolution == LabJigwiABResolution.Expired;
+            return false;
+        }
+
         private static bool SeatFailed(LabJigwiABRound round, ulong player)
         {
             foreach (var seat in round.players ?? Array.Empty<LabJigwiABPlayerFire>())

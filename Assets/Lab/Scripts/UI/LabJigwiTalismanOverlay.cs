@@ -183,7 +183,7 @@ namespace C6Lab
         [SerializeField, Range(0f, 1f)] private float orbBurnSoundVolume = .8f;
         [Tooltip("#540 못 쓰고 끝나 불덩이가 떨어질 때 지귀 울부짖음 폴더. 비우면 없음.")]
         [SerializeField] private string failWailFolder = "JigwiWailAFail";
-        [SerializeField, Range(0f, 1f)] private float failWailVolume = .9f;
+        [SerializeField, Range(0f, 1f)] private float failWailVolume = 1f;
         [SerializeField, Range(0f, 1f)] private float spreadSoundVolume = 1f;
         [Tooltip("#540 부적 구슬이 판에 닿을 때 \"퐁\" 소리 폴더. 비우면 없음.")]
         [SerializeField] private string landSoundFolder = "JigwiTalismanLand";

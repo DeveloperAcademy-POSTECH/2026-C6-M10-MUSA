@@ -5,8 +5,8 @@ using UnityEngine.Rendering;
 namespace C6Lab
 {
     /// <summary>
-    /// #540 지귀 A "다 태워버리겠어" 불덩이 (3D, 그 자리 사람 전투 화면에만). 판의 구슬은 쓰는 동안 건드리지 않고,
-    /// 남은 시간은 박 위 불덩이 크기로 보인다.
+    /// #540 지귀 A "다 태워버리겠어" 불덩이 (그 자리 사람 전투 화면에만). 예고 말풍선 그림처럼 굵은 먹색 테두리의 만화풍 2D 불꽃이다.
+    /// 판의 구슬은 쓰는 동안 건드리지 않고, 남은 시간은 박 위 불덩이 크기로 보인다.
     /// - 예고(2초): 박 위에 불씨가 탁 튀고 작은 불덩이로 붙는다 (Kindle).
     /// 불꽃은 모두 코드로 그린다(`LabProceduralFire`).
     /// - A 동안: 불덩이가 점점 커지며 더 빠르게 일렁이고, 끝이 다가오면 떨린다 (Grow).
@@ -23,11 +23,11 @@ namespace C6Lab
         /// <summary>불꽃이 일렁이고 불티가 오르는 빠르기 (1 = 처음 만든 빠르기).</summary>
         public const float FireSpeed = 1.3f;
         public const float FallSeconds = (float)LabModel.JigwiTalismanFailBurnDelaySeconds;
-        private const int TongueCount = 7, EmberCount = 10;
-        private static readonly Color Outer = new Color(1f, .38f, .06f, 1f), Core = new Color(1f, .86f, .45f, 1f);
-        private SpriteRenderer halo, ball, core;
-        private readonly SpriteRenderer[] tongues = new SpriteRenderer[TongueCount];
-        private readonly SpriteRenderer[] embers = new SpriteRenderer[EmberCount];
+        private const int SparkCount = 6;
+        /// <summary>끝에 가까울수록 불꽃이 붉게 달아오르는 색 (곱함).</summary>
+        private static readonly Color Hot = new Color(1f, .62f, .5f, 1f);
+        private SpriteRenderer body;
+        private readonly SpriteRenderer[] sparks = new SpriteRenderer[SparkCount];
         private Camera view;
         private float frozenTime = -1f, frozenSize;
         private bool dousedBurst;
@@ -90,20 +90,13 @@ namespace C6Lab
         {
             var root = new GameObject("Jigwi Fireball (#540)");
             var fire = root.AddComponent<LabJigwiFireball>();
-            fire.halo = fire.Part("Fireball Halo", GlowSprite(), Outer, 37);
-            for (int i = 0; i < TongueCount; i++)
-                fire.tongues[i] = fire.Part("Fireball Tongue", fire.FireFrame(i), Color.white, 38);
-            fire.ball = fire.Part("Fireball Body", GlowSprite(), Outer, 39);
-            fire.core = fire.Part("Fireball Core", GlowSprite(), Core, 40);
-            for (int i = 0; i < EmberCount; i++)
-                fire.embers[i] = fire.Part("Fireball Ember", GlowSprite(), Core, 41);
+            fire.body = fire.Part("Fireball Body", LabProceduralFire.CartoonFlame(0), Color.white, 39);
+            for (int i = 0; i < SparkCount; i++)
+                fire.sparks[i] = fire.Part("Fireball Spark", LabProceduralFire.CartoonSpark(), Color.white, 40);
             RenderPipelineManager.beginCameraRendering += fire.Face;
             fire.Hide();
             return fire;
         }
-
-        // #540: every Jigwi fire is drawn in code (no picture files).
-        private Sprite FireFrame(int index) => LabProceduralFire.Flame(index);
 
         private SpriteRenderer Part(string label, Sprite sprite, Color color, int order)
         {
@@ -118,7 +111,7 @@ namespace C6Lab
         {
             Shown = Phase.None;
             frozenTime = -1f; dousedBurst = false;
-            if (ball == null) return;
+            if (body == null) return;
             foreach (SpriteRenderer part in GetComponentsInChildren<SpriteRenderer>(true)) part.enabled = false;
         }
 
@@ -192,46 +185,29 @@ namespace C6Lab
             transform.localScale = Vector3.one;
 
             float heat = phase == Phase.Grow ? progress : phase == Phase.Kindle ? 0f : 1f;
-            float flicker = .85f + .15f * Mathf.PerlinNoise(time * 8f, .7f);
-            Place(halo, radius * 3.2f * flicker, 0f, 0f, .02f);
-            Tint(halo, Outer, alpha * Mathf.Lerp(.25f, .55f, heat));
-            Place(ball, radius * 2.1f, 0f, 0f, 0f);
-            Tint(ball, Color.Lerp(Outer, new Color(1f, .55f, .12f, 1f), heat), alpha);
-            Place(core, radius * 1.3f * flicker, 0f, 0f, -.01f);
-            Tint(core, Color.Lerp(Core, Color.white, heat * .6f), alpha);
+            // #540: a flat cartoon flame (like the warning bubble's picture). Frames swap on a beat and it squashes
+            // and stretches, so it flickers like a hand-drawn fire; near the end it glows redder.
+            body.sprite = LabProceduralFire.CartoonFlame((int)(time * Mathf.Lerp(6f, 12f, heat)));
+            float stretch = 1f + Mathf.Lerp(.05f, .1f, heat) * Mathf.Sin(time * Mathf.Lerp(9f, 18f, heat));
+            float width = radius * 2.6f;
+            Vector2 bodySize = body.sprite.bounds.size;
+            float unit = width / Mathf.Max(.0001f, bodySize.x);
+            body.transform.localScale = new Vector3(unit / Mathf.Sqrt(stretch), unit * stretch, 1f);
+            body.transform.localPosition = Vector3.zero;
+            Tint(body, Color.Lerp(Color.white, Hot, heat * heat * .6f), alpha);
 
-            for (int i = 0; i < TongueCount; i++)
+            for (int i = 0; i < SparkCount; i++)
             {
-                SpriteRenderer tongue = tongues[i];
-                // Tongues lick upward around the ball; more lean up than down.
-                float angle = Mathf.Lerp(-110f, 110f, (i + .5f) / TongueCount) + Mathf.Sin(time * 3f + i) * 8f;
-                float rad = (angle + 90f) * Mathf.Deg2Rad;
-                float reach = radius * (.75f + .15f * Mathf.Sin(time * 11f + i * 1.7f));
-                tongue.sprite = FireFrame((int)(time * 12f) + i * 2);
-                Vector2 tongueSize = tongue.sprite.bounds.size;
-                float height = radius * Mathf.Lerp(1.1f, 1.5f, heat) * (1f - Mathf.Abs(angle) / 260f);
-                tongue.transform.localScale = Vector3.one * height / Mathf.Max(.0001f, tongueSize.y);
-                tongue.transform.localPosition = new Vector3(Mathf.Cos(rad) * reach, Mathf.Sin(rad) * reach, .01f);
-                tongue.transform.localRotation = Quaternion.Euler(0f, 0f, angle);
-                Tint(tongue, Color.white, alpha * .95f);
+                // Little ink-ringed sparks pop off the flame and drift up.
+                SpriteRenderer spark = sparks[i];
+                float t = Mathf.Repeat(time * Mathf.Lerp(.8f, 1.5f, heat) + i * .61803398875f, 1f);
+                float side = Mathf.Sin(i * 2.4f + Mathf.Floor(time * Mathf.Lerp(.8f, 1.5f, heat) + i * .61803398875f) * 1.7f);
+                spark.transform.localPosition = new Vector3(side * radius * .9f + Mathf.Sin(t * 6f + i) * radius * .15f,
+                    radius * (.4f + 1.4f * t), -.02f);
+                float sparkSize = radius * .22f * (1f - .6f * t);
+                spark.transform.localScale = Vector3.one * sparkSize / Mathf.Max(.0001f, spark.sprite.bounds.size.x);
+                Tint(spark, Color.white, alpha * (1f - t * t) * Mathf.Lerp(.5f, 1f, heat));
             }
-            for (int i = 0; i < EmberCount; i++)
-            {
-                SpriteRenderer ember = embers[i];
-                float t = Mathf.Repeat(time * Mathf.Lerp(.7f, 1.4f, heat) + i * .61803398875f, 1f);
-                float side = Mathf.Sin(i * 2.4f) * radius;
-                ember.transform.localPosition = new Vector3(side + Mathf.Sin(t * 7f + i) * radius * .2f, radius * (.6f + 1.8f * t), -.02f);
-                float s = radius * .14f * (1f - t);
-                ember.transform.localScale = Vector3.one * s / Mathf.Max(.0001f, ember.sprite.bounds.size.x);
-                Tint(ember, Color.Lerp(Core, Outer, t), alpha * (1f - t) * Mathf.Lerp(.4f, 1f, heat));
-            }
-        }
-
-        private static void Place(SpriteRenderer renderer, float width, float x, float y, float z)
-        {
-            Vector2 size = renderer.sprite.bounds.size;
-            renderer.transform.localScale = Vector3.one * width / Mathf.Max(.0001f, size.x);
-            renderer.transform.localPosition = new Vector3(x, y, z);
         }
 
         private static void Tint(SpriteRenderer renderer, Color color, float alpha)
@@ -245,28 +221,6 @@ namespace C6Lab
         {
             if (this == null || camera == null || camera != view) return;
             transform.rotation = camera.transform.rotation;
-        }
-
-        private static Sprite glowSprite;
-        /// <summary>A soft round glow (runtime).</summary>
-        private static Sprite GlowSprite()
-        {
-            if (glowSprite != null) return glowSprite;
-            const int size = 64;
-            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
-            { name = "Jigwi Fireball Glow (#540 runtime)", hideFlags = HideFlags.DontSave, wrapMode = TextureWrapMode.Clamp };
-            var pixels = new Color[size * size];
-            for (int y = 0; y < size; y++)
-                for (int x = 0; x < size; x++)
-                {
-                    float dx = (x + .5f) / size * 2f - 1f, dy = (y + .5f) / size * 2f - 1f;
-                    float a = Mathf.Clamp01(1f - Mathf.Sqrt(dx * dx + dy * dy));
-                    pixels[y * size + x] = new Color(1f, 1f, 1f, a * a);
-                }
-            texture.SetPixels(pixels); texture.Apply(false, true);
-            glowSprite = Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(.5f, .5f), 100f);
-            glowSprite.hideFlags = HideFlags.DontSave;
-            return glowSprite;
         }
 
         private void OnDestroy() => RenderPipelineManager.beginCameraRendering -= Face;

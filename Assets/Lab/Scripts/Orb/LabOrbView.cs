@@ -464,18 +464,20 @@ namespace C6Lab
             jigwiABFlame.Show(secondsLeft, visualRadius, held);
         }
 
-        private LabJigwiBlaze jigwiBlaze;
+        private LabJigwiAshBurn jigwiAsh;
+        public LabJigwiAshBurn JigwiAsh => jigwiAsh;
         /// <summary>
-        /// #540 지귀 A 실패: 구슬·북이 코드로 그린 불(`LabJigwiBlaze`)로 크게 타오른다. 구슬은 끝에 그을려 사라지고, 북은 잦아든다.
+        /// #540 지귀 A 실패 불티 (`LabJigwiAshBurn`, 부적 가장자리가 타는 느낌): 구슬은 totalSeconds 동안 아래부터 위로 재가 되며 사라지고,
+        /// 북은 남은 초 동안 테두리에 불티가 붙는다. 0이면 멈춤.
         /// </summary>
-        public void SetJigwiBlaze(float secondsLeft)
+        public void SetJigwiAsh(float secondsLeft, float totalSeconds)
         {
-            if (jigwiBlaze == null)
+            if (jigwiAsh == null)
             {
                 if (!(secondsLeft > 0f)) return;
-                jigwiBlaze = LabJigwiBlaze.Create(transform);
+                jigwiAsh = LabJigwiAshBurn.Create(transform);
             }
-            jigwiBlaze.Show(secondsLeft, visualRadius, !kind.IsDrum());
+            jigwiAsh.Show(secondsLeft, totalSeconds, visualRadius, !kind.IsDrum(), visual);
         }
 
         /// <summary>Only tagged free B water gets the drop/ripple; ordinary Water art stays unchanged.</summary>
