@@ -62,6 +62,8 @@ namespace Hapio
 #endif
         private string wantedScene;
         private bool forceBattleReload, goingHome, battleReadyPending, localBattleReady;
+        // #478: a forced Battle reload that keeps the stage is a restart (loading screen); one into the next stage is not.
+        private bool reloadKeepsStage;
         private bool restartPending;
         private double loadStartedAt, nextStateAt, nextReadyAt, nextResultReadyAt;
         private LabGourdResultPreview preview;
@@ -171,6 +173,7 @@ namespace Hapio
             DontDestroyOnLoad(gameObject);
             startOverlay = GameStartOverlay.Create(transform);
             sceneFade = GameSceneFade.Create(transform, lobbyFadeColor);
+            CreateLoadingView();
             network.GameFlowMessage += ReceiveControl;
             network.GameFlowDisconnected += OnPeerDisconnected;
             network.GameFlowDeveloperRestartRequested += OnDeveloperRestart;
@@ -180,7 +183,8 @@ namespace Hapio
 
         private void Start()
         {
-            // Directly opening a menu in the Editor still has one explicit initial state.
+            // Directly opening a menu in the Editor still has one explicit initial state. The app's own first screen
+            // shows at once, with no loading screen (#478, user decision).
             if (SceneManager.GetActiveScene().path != GameScenePaths.Home && !network.IsConnected)
                 QueueScene(GameScenePaths.Home);
         }
@@ -188,6 +192,7 @@ namespace Hapio
         private void Update()
         {
             if (Instance != this || network == null) return;
+            UpdateLoading();
             // The browse that resumes behind the title after a game must not keep the phone awake there (#476).
             network.RoomSearchKeepsAwake = roomBrowserVisible;
             pendingRooms.Tick(out string pendingError);
@@ -376,6 +381,7 @@ namespace Hapio
                 loadStartedAt = Time.realtimeSinceStartupAsDouble;
                 localBattleReady = battleReadyPending = false;
                 forceBattleReload = SceneManager.GetActiveScene().path == GameScenePaths.Battle;
+                reloadKeepsStage = previous.stageIndex == state.stageIndex;
             }
             if (state.phase == GameFlowPhase.StageResult || state.phase == GameFlowPhase.Completed)
                 CacheResultSnapshot();
@@ -417,6 +423,11 @@ namespace Hapio
             // Never unload a terminal Battle before its actual committed paint map is copied.
             yield return null;
             if (quitting) { sceneRoutine = null; yield break; }
+            // #478: outside a run every scene change is covered by the loading screen (drawn above the fade below),
+            // except the opening's hand-over to the tutorial, which gets its own transition later.
+            if (ShowsLoading(SceneManager.GetActiveScene().path, wantedScene, TutorialStarting(wantedScene),
+                forceBattleReload && !reloadKeepsStage))
+                BeginLoading(wantedScene);
             if (holdForFade) yield return FadeOutOfScene();
             while (SceneManager.GetActiveScene().path != wantedScene || forceBattleReload)
             {
@@ -446,7 +457,12 @@ namespace Hapio
                     if (quitting) break;
                     throw new InvalidOperationException("Could not load " + destination);
                 }
-                yield return load;
+                while (!load.isDone)
+                {
+                    ReportSceneLoad(load.progress);
+                    yield return null;
+                }
+                ReportSceneLoad(1f);
                 yield return null;
             }
             sceneRoutine = null;

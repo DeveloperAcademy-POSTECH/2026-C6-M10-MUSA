@@ -119,6 +119,31 @@ namespace Hapio.Experiments.Tests
                 Is.False, "The experiment must not create a room or a gameplay session.");
         }
 
+        [Test]
+        public void EveryExperimentHeightExrKeepsAnExactIosImport()
+        {
+            // With iOS active (this project's usual Editor target), a Half EXR that only follows Default is RGBM-encoded on
+            // import: RGB is divided by an 8-bit multiplier that replaces coverage A. Checked from the importer settings so the
+            // guard holds whatever target is active; compression is not checked because an explicit format ignores it.
+            string[] heightMaps = AssetDatabase.FindAssets("t:Texture2D", new[] { Root.TrimEnd('/') })
+                .Select(AssetDatabase.GUIDToAssetPath)
+                .Where(path => path.EndsWith(".exr", StringComparison.OrdinalIgnoreCase)).ToArray();
+            Assert.That(heightMaps, Is.SupersetOf(new[]
+            {
+                HeightPath, Root + "Rounded/OriginalV2/Height.exr", Root + "Rounded/OriginalV3/Height.exr",
+                Root + "Rounded/RoundedV3/Height.exr", Root + "Rounded/CoatingV4/Height.exr",
+            }));
+            foreach (string path in heightMaps)
+            {
+                var importer = (TextureImporter)AssetImporter.GetAtPath(path);
+                Assert.That(importer.GetDefaultPlatformTextureSettings().format, Is.EqualTo(TextureImporterFormat.RGBAHalf), path);
+                TextureImporterPlatformSettings ios = importer.GetPlatformTextureSettings("iPhone");
+                Assert.That(ios.overridden, Is.True, path + " keeps an explicit iOS override.");
+                Assert.That(ios.format, Is.EqualTo(TextureImporterFormat.RGBAHalf), path + " imports as RGBA Half on iOS.");
+                Assert.That(ios.maxTextureSize, Is.GreaterThanOrEqualTo(1024), path + " is not downscaled on iOS.");
+            }
+        }
+
         [UnityTest]
         public IEnumerator LegacyOrChangedSampleMetadataIsRejectedBeforeCreatingMaterials()
         {

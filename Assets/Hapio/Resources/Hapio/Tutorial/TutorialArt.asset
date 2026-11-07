@@ -40,6 +40,9 @@ MonoBehaviour:
   tapHintOffset: {x: 0, y: 5}
   tapHintDepth: 4
   tapHintSeconds: 0.8
+  lineTapPadding: 8
+  tapHintNudgeScale: 1.35
+  tapHintNudgeSeconds: 0.3
   popSeconds: 0.28
   popOvershoot: 1.1
   dimColor: {r: 0, g: 0, b: 0, a: 0.62}

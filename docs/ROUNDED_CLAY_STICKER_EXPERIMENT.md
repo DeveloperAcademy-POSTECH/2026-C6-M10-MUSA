@@ -79,6 +79,7 @@ V3의 둥근 윤곽·색 농도·두께 지도를 유지하면서, 반사 방향
 - V4는 둥근 V3와 같은 색 농도 0.9~1, 두께 0.014, 광택 0.08, 접촉 음영 0.15, 미세 질감 1로 시작한다. 다른 프리셋의 기존 기본값은 유지한다.
 - 색 RGBA, 표시 변위 높이 R, 실제 스티커 커버리지 A는 둥근 V3와 같은 비트를 유지한다. 변경 대상은 코팅 반사용 GB 법선과 이를 해석하는 실험 재질이다. 실제 충돌 메시·명중·도색 면적·성장·건조·소유권·승패 규칙은 바꾸지 않는다.
 - 모든 지도는 1024×512이며 색은 Linear PNG, 높이·법선·커버리지는 RGBA Half EXR다. 도장마다 별도 메시를 만들거나 법선용 RT를 추가하지 않는다.
+- 높이 EXR는 iOS에도 RGBA Half·무압축 override를 둔다. iOS가 활성인 Editor에서 Default만 따르면 가져올 때 RGBM으로 바뀌어 높이·법선·커버리지가 모두 달라진다(`CLAY_STICKER_PAINT.md`의 샘플과 빌드 관리 절).
 
 ### 준비·실행 방법
 
@@ -182,3 +183,23 @@ RGB 또는 HEX를 입력하고 **Enter를 누르거나 Tab·다른 항목 클릭
 편집한 팔레트는 네 프리셋에 공통으로 유지되어 같은 색 조합으로 재질·윤곽을 비교할 수 있다. `Reset palette`는 다섯 색만 위 표의 원래 값으로 되돌리고, 시점·재질·조명은 유지한다. `Reset light`는 팔레트를 유지한다. `Reset preset`은 팔레트·시점·재질·조명을 함께 기본값으로 되돌린다.
 
 이 기능은 **Mac 비교 앱 안에서만 쓰는 임시 표현 설정**이다. 원래 속성의 위치·도장 순서·높이·면적·소유권·게임 판정은 바꾸지 않으며, 게임 팔레트·DEV 설정·원본 에셋에 저장하지 않는다. 앱을 다시 실행하면 원래 다섯 색으로 시작한다. 준비 검사의 통과와 실제 앱에서의 입력·외형 수동 확인은 구분하며, 실행 결과는 [검증 기록](VALIDATION.md)의 해당 범위를 따른다.
+
+
+## #543 스티커 질감·배경 파일을 직접 불러오는 Mac 실험
+
+실행·파일 준비·샘플3종·슬라이더·배경·팔레트·광원·초기화·빌드·문제 해결은 별도 [상세 사용법](CLAY_PREVIEW_IMAGE_USER_GUIDE.md)에 모았다. 실제 수행 결과와 미실행 범위는 [검증 기록](VALIDATION.md)의2026-11-07 #543 절을 따른다.
+
+이 기능은 `ImageSamples/Scenes/ImageClayPreview.unity`만 켠다. 기존 네 프리셋·고정 도안·일반 게임 기본값은 유지하며, 파일 이미지로 도색 지도·윤곽·물리 두께·판정·저널을 대체하지 않는다. 표면 질감은 Linear 중립0.5 Half/mipmap 데이터로 실제 스티커 A지원에만 적용한다. 배경은 sRGB/알파를 유지하는 카메라 고정 Unlit 층이다.
+
+유지보수 연결은 다음과 같다.
+
+| 역할 | 구현 |
+|---|---|
+| 파일 UI·임시 상태·개별 원복 | `Runtime/ClayPreviewController.Images.cs` |
+| 재질·배경 연결과 소유 자원 해제 | `Runtime/ClayPreviewImagePresentation.cs` |
+| PNG/JPEG 사전검사·중립 질감 변환·파일 선택 | `Runtime/ClayPreviewImageImport.cs` |
+| 샘플·Scene·표현 소스 핀의 명시적 준비와 읽기 전용 빌드 검사 | `Assets/Editor/WatercolorPaint/ClaySticker/ClayPreviewImageExperiment.cs` |
+| Mac 네이티브 파일 선택기 소스 | `tools/ClayPreviewNative/ClayPreviewMacImagePicker.mm` |
+| 실험 빌드의 임시 네이티브 stage·일반 빌드 잔재 차단 | `Assets/Editor/WatercolorPaint/ClaySticker/ClayPreviewMacImagePickerBuild.cs` |
+
+Runtime 경로는 `Assets/Experiments/ClayPreview` 아래다. `Prepare`는 기존 색/높이 지도를 다시 굽지 않고 표현 소스 핀과 이미지 전용 연결을 갱신한다. `Build`는 자료를 자동 갱신하지 않는다. 임시 네이티브 번들은 실험 Mac 빌드의 `using` 범위에서만 Assets에 들어가며 추가 UPM 패키지는 없다.

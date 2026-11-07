@@ -28,6 +28,7 @@ namespace C6Lab.Experiments.Editor
         private const string FontPath = "Assets/Lab/Art/Fonts/Shilla_Culture(M).otf";
         private const string LastBuildKey = "Hapio.ClayPreview.LastBuild";
         private const string ResultPath = "Temp/clay_preview_build_result.json";
+        private const string IosPlatform = "iPhone";
 
         [Serializable]
         public sealed class SampleInfo : ClayPreviewSampleInfo { }
@@ -206,7 +207,34 @@ namespace C6Lab.Experiments.Editor
             platform.textureCompression = TextureImporterCompression.Uncompressed;
             platform.maxTextureSize = 1024;
             importer.SetPlatformTextureSettings(platform);
+            if (height) importer.SetPlatformTextureSettings(ExactHeightOnIos(importer));
             importer.SaveAndReimport();
+        }
+
+        /// <summary>
+        /// With iOS active (this project's usual Editor target), a Half EXR that only follows Default is
+        /// RGBM-encoded on import: RGB is divided by an 8-bit multiplier that replaces the stamp coverage in A,
+        /// so height R, normal GB and coverage A all change. An explicit iOS RGBA Half override keeps all four
+        /// channels exactly as saved.
+        /// </summary>
+        private static TextureImporterPlatformSettings ExactHeightOnIos(TextureImporter importer)
+        {
+            var ios = importer.GetPlatformTextureSettings(IosPlatform);
+            ios.overridden = true;
+            ios.format = TextureImporterFormat.RGBAHalf;
+            ios.textureCompression = TextureImporterCompression.Uncompressed;
+            ios.maxTextureSize = 1024;
+            return ios;
+        }
+
+        /// <summary>
+        /// Compression is not checked: with an explicit format it selects nothing, and the iOS Inspector tab
+        /// keeps whatever value was stored. A max size below the 1024 map width would downscale the map.
+        /// </summary>
+        private static bool KeepsHeightExactOnIos(TextureImporter importer)
+        {
+            var ios = importer.GetPlatformTextureSettings(IosPlatform);
+            return ios.overridden && ios.format == TextureImporterFormat.RGBAHalf && ios.maxTextureSize >= 1024;
         }
 
         public static void CreateSceneIfMissing()
@@ -365,6 +393,8 @@ namespace C6Lab.Experiments.Editor
             TextureImporterFormat expected = height ? TextureImporterFormat.RGBAHalf : TextureImporterFormat.RGBA32;
             Require(importer.GetDefaultPlatformTextureSettings().format == expected,
                 "The frozen map no longer preserves its source precision.");
+            Require(!height || KeepsHeightExactOnIos(importer),
+                "The frozen height map needs an iOS override with RGBA Half format and a max size of 1024 or more; without it iOS RGBM-encodes the map on import.");
         }
 
         [MenuItem("C6 Lab/Experiments/Clay Sticker/Build Mac Preview App")]
@@ -395,7 +425,7 @@ namespace C6Lab.Experiments.Editor
         public static string BuildMac() => BuildMac(ScenePath, ValidatePreparedSample);
 
         // Comparison Scenes opt in explicitly; the ordinary game and v2 build stay unchanged.
-        internal static string BuildMac(string scenePath, Func<string> validateSample)
+        internal static string BuildMac(string scenePath, Func<string> validateSample, Func<IDisposable> stageNative = null)
         {
             RequireStopped();
             string output = Path.Combine(ProjectRoot, "Builds", "Experiments", "ClayPreview",
@@ -420,11 +450,15 @@ namespace C6Lab.Experiments.Editor
                 Require(!File.Exists(output) && !Directory.Exists(output), "The preview build destination already exists.");
                 Directory.CreateDirectory(Path.GetDirectoryName(output));
                 player.ApplyPreviewDefaults();
-                BuildReport report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
+                BuildReport report;
+                using (stageNative?.Invoke())
                 {
-                    scenes = new[] { scenePath }, locationPathName = output,
-                    target = BuildTarget.StandaloneOSX, options = BuildOptions.Development
-                });
+                    report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
+                    {
+                        scenes = new[] { scenePath }, locationPathName = output,
+                        target = BuildTarget.StandaloneOSX, options = BuildOptions.Development
+                    });
+                }
                 Require(report != null && report.summary.result == BuildResult.Succeeded,
                     "The standalone clay preview build did not succeed.");
                 status.bytes = report.summary.totalSize;

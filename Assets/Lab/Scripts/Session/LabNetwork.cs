@@ -260,14 +260,16 @@ namespace C6Lab
         //       "jigwiTalisman" request and the talisman water orb flag (5684~5686 were taken on main).
         // 5688: #509 Jigwi B lists only the picked seats, lasts 15 s and is judged by simultaneous Water boss hits;
         //       success splashes the boss, failure sets every board on fire (boardFireUntil). A2 starts at 42 s.
-        // 5689: #540 Jigwi A: an unfinished talisman burns that seat's remaining orbs (A 10 s, burn stagger 2 s).
-        internal const ushort LabProtocolVersion = 5689;
+        // 5690: Bulk ACKs carry the receiver's selective ACK (LabBulkEnvelope.sack), the Bulk window is 64 and
+        //       snapshot chunks are 4000 characters (5689 is taken by the #540 branch).
+        // 5691: #540 Jigwi A: an unfinished talisman burns that seat's remaining orbs; talisman orb volley (on top of 5690).
+        internal const ushort LabProtocolVersion = 5691;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Double-tap a blue fox orb to clear it, and keep your Yin and Yang away.";
         /// <summary>More fox orbs than one fox fire ever drops; a longer list is ignored (#251).</summary>
         private const int MaximumFoxFireOrbs = 10;
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/50");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/52");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;
