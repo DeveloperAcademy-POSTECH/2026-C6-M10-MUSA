@@ -178,6 +178,8 @@ namespace C6Lab
         [Tooltip("#540 부적을 쓰는 동안 공격 영역 붉은 경보가 번쩍일 때마다 나는 경보음 폴더. 끝이 다가올수록 빨라지고 커진다. 비우면 없음.")]
         [SerializeField] private string alarmSoundFolder = "JigwiAlarmPulse";
         [SerializeField, Range(0f, 1f)] private float alarmSoundVolume = .7f;
+        [Tooltip("#540 붉은 경보가 번쩍일 때마다 오는 진동 세기 (끝이 다가올수록 이 값까지 세짐). 0이면 끔. 붓 쓰는 진동(Light)과 구분되게 Rigid로 툭.")]
+        [SerializeField, Range(0f, 1f)] private float alarmHapticIntensity = .6f;
         [Tooltip("#540 못 쓴 판의 구슬이 하나씩 차례로 2.5초 동안 재가 되어 사라질 때, 구슬마다 타기 시작하는 순간 나는 타는 소리 폴더 (2.5초). 비우면 없음.")]
         [SerializeField] private string orbBurnSoundFolder = "JigwiOrbBurn";
         [SerializeField, Range(0f, 1f)] private float orbBurnSoundVolume = 1f;
@@ -730,14 +732,20 @@ namespace C6Lab
             bool running = Visible && source != null && source.Snapshot != null && !source.Snapshot.paused;
             float before = alarmPhase;
             if (running) alarmPhase += dt * rate;
-            // The alarm sounds at each flash's brightest moment, louder as time runs out.
+            // The alarm sounds — and the phone knocks — at each flash's brightest moment, stronger as time runs out.
             if (running && Mathf.Floor(before + .5f) != Mathf.Floor(alarmPhase + .5f))
+            {
                 Cue("Alarm", alarmSoundFolder, alarmSoundVolume * Mathf.Lerp(.55f, 1f, urgency));
+                AlarmHapticCount++;
+                LabHaptics.PlayDirect(Config, LabHapticStyle.Rigid, alarmHapticIntensity * Mathf.Lerp(.5f, 1f, urgency));
+            }
             float pulse = .5f - .5f * Mathf.Cos(alarmPhase * Mathf.PI * 2f);
             alarm.color = new Color(1f, 1f, 1f, alarmLevel * Mathf.Lerp(.18f, .5f, urgency) * pulse);
         }
 
         private float alarmPhase;
+        /// <summary>#540: 경보 진동을 낸 횟수 (테스트용, 설정에서 진동을 꺼도 센다).</summary>
+        public int AlarmHapticCount { get; private set; }
         private readonly HashSet<string> orbBurnsCued = new HashSet<string>(StringComparer.Ordinal);
 
         /// <summary>
