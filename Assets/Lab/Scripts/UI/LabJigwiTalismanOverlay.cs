@@ -160,11 +160,11 @@ namespace C6Lab
         [SerializeField, Range(0f, 1f)] private float burstHapticSharpness = .15f;
         [Tooltip("번졌을 때 진동 세기. 0이면 끔.")]
         [SerializeField, Range(0f, 1f)] private float smudgeHapticIntensity = .9f;
-        [Header("#540 완성 흐름: 불 꺼짐 → 숨 고르기 → 금빛 훑기·가락 → 도장 → 접혀 부적 구슬로 → 판으로 떨어짐")]
-        [Tooltip("다 쓰면 타던 가장자리에 김이 오르며 불이 꺼지는 시간(초).")]
+        [Header("#540 완성 흐름: 숨 고르기 → 금빛 훑기·가락(불은 그동안 꺼짐) → 도장 → 빙글 말려 부적 구슬로 → 구슬 자리로 톡")]
+        [Tooltip("다 쓰면 타던 가장자리 불이 그 자리에 멈춰 옅어지는 시간(초). 가락과 겹쳐 흐른다.")]
         [SerializeField, Range(0f, 1.5f)] private float extinguishSeconds = .45f;
-        [Tooltip("불이 꺼진 뒤 가락이 시작하기 전 숨 고르는 시간(초).")]
-        [SerializeField, Range(0f, 1f)] private float breathSeconds = .25f;
+        [Tooltip("다 쓴 뒤 가락이 시작하기 전 숨 고르는 시간(초). 불 꺼짐은 이 뒤로도 가락과 함께 이어진다.")]
+        [SerializeField, Range(0f, 1f)] private float breathSeconds = .1f;
         [Tooltip("#540 3D 불덩이: 예고 때 박 위에 불씨가 붙는 \"화르륵\" 소리 폴더. 비우면 없음.")]
         [SerializeField] private string igniteSoundFolder = "JigwiFireballIgnite";
         [SerializeField, Range(0f, 1f)] private float igniteSoundVolume = .8f;
@@ -189,10 +189,10 @@ namespace C6Lab
         [SerializeField, Range(0f, 1f)] private float landSoundVolume = .9f;
         [Tooltip("#509/#540: 도장이 찍힌 뒤 빛난 채 머무는 시간(초). LabConfig '부적 보상 지연'이 0보다 크면 그 값에 맞춰 자동으로 정해져 이 값은 쓰지 않는다.")]
         [SerializeField, Range(.1f, 3f)] private float glowSeconds = .6f;
-        [Tooltip("#540: 부적이 접히며 부적 구슬로 오므라드는 시간(초).")]
-        [SerializeField, Range(.1f, 1.5f)] private float foldSeconds = .45f;
-        [Tooltip("#540: 부적 구슬이 조합판 위로 툭 떨어지는 시간(초). Host가 보상 구슬을 주는 때(LabConfig '부적 보상 지연')와 맞춘다.")]
-        [SerializeField, Range(.1f, 1.5f)] private float fallSeconds = .35f;
+        [Tooltip("#540: 부적이 한 바퀴 빙글 말리며 부적 구슬로 오므라드는 시간(초).")]
+        [SerializeField, Range(.1f, 1.5f)] private float foldSeconds = .3f;
+        [Tooltip("#540: 부적 구슬이 진짜 부적 구슬이 생길 자리로 톡 떨어지는 시간(초). Host가 보상 구슬을 주는 때(LabConfig '부적 보상 지연')와 맞춘다.")]
+        [SerializeField, Range(.1f, 1.5f)] private float fallSeconds = .3f;
         [Tooltip("#509: 다 쓴 글씨가 빛날 때의 색 (금빛).")]
         [SerializeField] private Color glowColor = new Color(1f, .86f, .32f, 1f);
         [Tooltip("#533: \"물\" 글자의 가로 폭이 부적 종이 폭에서 차지하는 비율. 클수록 글자가 크다(세로는 종이 높이의 72%까지).")]
@@ -267,7 +267,11 @@ namespace C6Lab
         private bool sweepCued;
         // #540: at completion the flames and sparks freeze where they are and fade (no steam).
         private Color[] frozenFlames = Array.Empty<Color>(), frozenSparks = Array.Empty<Color>();
-        private UnityEngine.UI.Image foldOrb, foldSeal;
+        private UnityEngine.UI.Image foldOrb, foldGlyph;
+        // #540: the folded orb stays on its landing spot until the Host's talisman orb shows up there (or a moment passes).
+        private float foldLingerUntil = -1f;
+        private int rewardOrbsBefore;
+        private static Sprite glyphSprite;
         private UnityEngine.UI.Image scorch;
         private Texture2D burnTexture;
         private Color32[] burnPixels;
@@ -320,6 +324,8 @@ namespace C6Lab
         private static Sprite stampEmblemSprite;
         private UnityEngine.UI.Image[] stampSpecks = Array.Empty<UnityEngine.UI.Image>();
         private static Sprite stampSprite;
+        /// <summary>#540: 부적이 말려 된 구슬이 보이는지 (테스트용).</summary>
+        public bool FoldOrbVisible => foldOrb != null && foldOrb.gameObject.activeSelf;
         /// <summary>#533: 도장이 찍혀 보이는지 (테스트용).</summary>
         public bool StampVisible => stampRoot != null && stampRoot.gameObject.activeSelf;
         private AudioClip[] writeClips;
@@ -358,8 +364,8 @@ namespace C6Lab
         private float AccentAt => Mathf.Max(.01f, NoteAt(3));
         /// <summary>#533: 마지막 강세 음(도장)이 나는 때 (완성 연출 시작부터 초).</summary>
         public float AccentSeconds => IntroSeconds + AccentAt;
-        /// <summary>#540: 다 쓴 뒤 가락이 시작하기까지 (불 꺼짐 + 숨 고르기).</summary>
-        public float IntroSeconds => Mathf.Max(0f, extinguishSeconds) + Mathf.Max(0f, breathSeconds);
+        /// <summary>#540: 다 쓴 뒤 가락이 시작하기까지 (숨 고르기만; 불 꺼짐은 가락과 겹쳐 흐른다).</summary>
+        public float IntroSeconds => Mathf.Max(0f, breathSeconds);
         /// <summary>#540: 다 쓴 뒤 부적 구슬이 판에 닿기까지. LabConfig의 부적 보상 지연과 같아야 한다.</summary>
         public float FinishSeconds => IntroSeconds + AccentAt + HoldSeconds + foldSeconds + fallSeconds;
         /// <summary>
@@ -409,6 +415,7 @@ namespace C6Lab
             LabSnapshot snapshot = source.Snapshot;
             Present(snapshot, source.LocalPlayerId, source.JigwiABPresentationTime);
             if (Finishing) AdvanceFinish(Time.unscaledDeltaTime);
+            AdvanceFoldLinger(snapshot);
             if (Burning) AdvanceBurn(Time.unscaledDeltaTime);
             bool paused = snapshot == null || snapshot.paused || source.GameStartHeld || source.BattlePresentationHeld;
             DriveFireball(snapshot);
@@ -796,7 +803,8 @@ namespace C6Lab
         private void BeginLanding()
         {
             landAge = 0f;
-            landAt = paper != null ? (Vector2)paper.localPosition : Vector2.zero;
+            landAt = foldOrb != null && foldOrb.gameObject.activeSelf ? (Vector2)foldOrb.rectTransform.localPosition
+                : paper != null ? (Vector2)paper.localPosition : Vector2.zero;
             Cue("Land", landSoundFolder, landSoundVolume);
             AdvanceLanding(0f);
         }
@@ -1037,6 +1045,51 @@ namespace C6Lab
         }
 
         /// <summary>
+        /// #540: 부적 구슬 안에 비치는 "물" (런타임에 한 번 만든다). 부적에 쓰는 획 순서 점(LabJigwiTalismanStroke)을 굵은 붓 획으로
+        /// 이어 그려, 쓴 글자와 같은 모양이 된다. 흰색이라 색은 쓰는 곳에서 입힌다.
+        /// </summary>
+        internal static Sprite GlyphSprite()
+        {
+            if (glyphSprite != null) return glyphSprite;
+            const int size = 96;
+            Vector2[] points = LabJigwiTalismanStroke.Water;
+            Vector2 min = points[0], max = points[0];
+            foreach (Vector2 p in points) { min = Vector2.Min(min, p); max = Vector2.Max(max, p); }
+            Vector2 middle = (min + max) * .5f;
+            float span = Mathf.Max(max.x - min.x, max.y - min.y) * 1.2f;
+            var segments = new List<(Vector2 a, Vector2 b)>();
+            foreach (int[] line in LabJigwiTalismanStroke.WaterStrokes)
+                for (int k = 0; k < line.Length; k++)
+                {
+                    Vector2 a = (points[line[k]] - middle) / span + new Vector2(.5f, .5f);
+                    Vector2 b = k + 1 < line.Length ? (points[line[k + 1]] - middle) / span + new Vector2(.5f, .5f) : a;
+                    if (Vector2.Distance(a, b) > .09f) b = a; // a jump between parts of a stroke is not inked
+                    segments.Add((a, b));
+                }
+            const float brush = .055f;
+            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
+            { name = "Talisman Orb Glyph (#540 runtime)", hideFlags = HideFlags.DontSave, wrapMode = TextureWrapMode.Clamp };
+            var pixels = new Color[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    var q = new Vector2((x + .5f) / size, (y + .5f) / size);
+                    float nearest = 1f;
+                    foreach (var (a, b) in segments)
+                    {
+                        Vector2 ab = b - a;
+                        float t = ab.sqrMagnitude < 1e-8f ? 0f : Mathf.Clamp01(Vector2.Dot(q - a, ab) / ab.sqrMagnitude);
+                        nearest = Mathf.Min(nearest, Vector2.Distance(q, a + ab * t));
+                    }
+                    pixels[y * size + x] = new Color(1f, 1f, 1f, Mathf.Clamp01((brush - nearest) * size * .8f));
+                }
+            texture.SetPixels(pixels); texture.Apply(false, true);
+            glyphSprite = Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(.5f, .5f), size);
+            glyphSprite.name = texture.name; glyphSprite.hideFlags = HideFlags.DontSave;
+            return glyphSprite;
+        }
+
+        /// <summary>
         /// #540: 도장 안 그림 (런타임에 한 번 만든다). 낙관처럼 전서체(篆書) "水" 모양을 그림으로 판다 — 가운데 물결치는 긴 획과
         /// 양옆 두 개씩 굽은 획. 글꼴이 아니라 그림이라 어느 기기에서나 같고, 인주가 고르지 않게 묻은 결은 테두리와 같다.
         /// </summary>
@@ -1169,6 +1222,7 @@ namespace C6Lab
             frozenFlames = Freeze(flames); frozenSparks = Freeze(sparks);
             extinguishFrom = BurnFront;
             burstPlayed = false; notesPlayed = 0; sweepCued = false; landed = false;
+            foldLingerUntil = -1f; rewardOrbsBefore = RewardOrbCount(source != null ? source.Snapshot : null);
             DrawFinish();
         }
 
@@ -1245,16 +1299,19 @@ namespace C6Lab
             }
             DrawRings(after, gold);
             if (paperImage != null) paperImage.color = Color.Lerp(paperColor, new Color(1f, .97f, .85f, paperColor.a), Mathf.Max(burst * .8f, sweepT * .3f));
-            if (paperGroup != null) paperGroup.alpha = 1f - fall * .9f;
-            // #533/#540: the seal's slam punches the talisman; then it crumples into an orb and drops to the board.
-            float paperScale = (1f + burstPunch * bump) * Mathf.Lerp(1f, .1f, folded);
+            // #533/#540: the seal's slam punches the talisman; then it spins once as it rolls up to the orb's size and
+            // fades into the orb growing in its middle — one object, no cut. The orb then hops down onto its spot.
+            bool spot = TryRewardSpot(out Vector2 landing, out float orbSide);
+            if (!spot) { orbSide = paper.rect.width * .3f; landing = (Vector2)finishFrom + Vector2.down * paper.rect.height * .35f; }
+            float small = paper.rect.width > 1f ? Mathf.Clamp(orbSide / paper.rect.width, .05f, 1f) : .2f;
+            float paperScale = (1f + burstPunch * bump) * Mathf.Lerp(1f, small, folded);
             paper.localScale = Vector3.one * paperScale;
-            paper.localRotation = Quaternion.Euler(0f, 0f, folded * 12f);
+            paper.localRotation = Quaternion.Euler(0f, 0f, -360f * folded);
+            if (paperGroup != null) paperGroup.alpha = 1f - Mathf.Clamp01((fold - .5f) / .5f);
             float shake = burstShake * paper.rect.height * ring * (1f - folded);
             var jitter = new Vector3(wave * shake, Mathf.Cos(after * humHz * 1.37f * 2f * Mathf.PI) * shake * .35f, 0f);
-            // #540: the talisman lies on the board, so the orb only drops a little onto the board surface.
-            paper.localPosition = finishFrom + jitter + Vector3.down * (fall * fall * paper.rect.height * .2f);
-            DrawFoldOrb(folded, paperScale, gold);
+            paper.localPosition = finishFrom + jitter;
+            DrawFoldOrb(fold, folded, fall, landing, orbSide);
         }
 
         /// <summary>
@@ -1353,19 +1410,62 @@ namespace C6Lab
             }
         }
 
-        /// <summary>#540: 오므라드는 부적 가운데에서 금빛 부적 구슬이 자라난다 (종이가 작아져도 구슬은 제 크기).</summary>
-        private void DrawFoldOrb(float folded, float paperScale, Color gold)
+        /// <summary>
+        /// #540: 말려 드는 부적 가운데에서 부적 구슬(물빛 구슬 + 금빛 "물")이 자라나 부적과 함께 돌고, 부적이 다 스며들면
+        /// 진짜 부적 구슬이 생길 판 위 자리로 살짝 튀어 올랐다가 톡 떨어진다. 크기는 판 위 구슬과 같다.
+        /// </summary>
+        private void DrawFoldOrb(float fold, float folded, float fall, Vector2 landing, float side)
         {
             if (foldOrb == null) return;
-            bool on = folded > 0f;
-            if (foldOrb.gameObject.activeSelf != on) foldOrb.gameObject.SetActive(on);
-            if (!on || paper == null) return;
-            float size = paper.rect.width * .3f;
-            foldOrb.rectTransform.sizeDelta = new Vector2(size, size);
-            foldOrb.rectTransform.anchoredPosition = Vector2.zero;
-            foldOrb.rectTransform.localScale = Vector3.one * (folded / Mathf.Max(.05f, paperScale));
-            foldOrb.color = new Color(gold.r, gold.g, gold.b, folded);
-            if (foldSeal != null) foldSeal.color = new Color(stampColor.r, stampColor.g, stampColor.b, folded);
+            bool on = fold > .2f || fall > 0f;
+            if (foldOrb.gameObject.activeSelf != on)
+            {
+                foldOrb.gameObject.SetActive(on);
+                if (on) foldOrb.rectTransform.SetAsLastSibling(); // above the paper it grows out of
+            }
+            if (!on) return;
+            float grow = Mathf.Clamp01((fold - .2f) / .8f); grow = grow * grow * (3f - 2f * grow);
+            Vector2 from = finishFrom;
+            Vector2 at = Vector2.Lerp(from, landing, fall * fall) + Vector2.up * (Mathf.Sin(Mathf.PI * fall) * side * .6f);
+            RectTransform rect = foldOrb.rectTransform;
+            rect.localPosition = at;
+            rect.sizeDelta = new Vector2(side, side);
+            rect.localScale = Vector3.one * Mathf.Max(.01f, grow);
+            rect.localRotation = Quaternion.Euler(0f, 0f, -360f * folded);
+            foldOrb.color = new Color(.42f, .74f, 1f, 1f);
+            if (foldGlyph != null) foldGlyph.color = new Color(glowColor.r, glowColor.g, glowColor.b, 1f);
+        }
+
+        /// <summary>#540: 진짜 부적 구슬이 생길 판 위 자리(root 기준)와 그 구슬의 지름. 판이 없으면 false.</summary>
+        private bool TryRewardSpot(out Vector2 local, out float side)
+        {
+            local = default; side = 0f;
+            if (source == null || source.board == null || root == null) return false;
+            if (!source.board.TryGetScreenSpot(LabModel.JigwiTalismanWaterSpot(0), out Vector2 screen, out float radius)) return false;
+            Canvas canvas = GetComponentInParent<Canvas>();
+            Camera eye = canvas == null || canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
+            if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(root, screen, eye, out local)
+                || !RectTransformUtility.ScreenPointToLocalPointInRectangle(root, screen + Vector2.right * radius, eye, out Vector2 edge)) return false;
+            side = 2f * Vector2.Distance(local, edge);
+            return side > 1f;
+        }
+
+        /// <summary>#540: 이 화면 사람의 판에 있는 부적 구슬 수.</summary>
+        private int RewardOrbCount(LabSnapshot snapshot)
+        {
+            if (snapshot?.orbs == null || source == null) return 0;
+            int count = 0;
+            foreach (var orb in snapshot.orbs) if (orb != null && orb.jigwiTalismanReward && orb.owner == source.LocalPlayerId) count++;
+            return count;
+        }
+
+        /// <summary>#540: 떨어진 구슬은 진짜 부적 구슬이 그 자리에 나타나면(또는 잠깐 뒤) 사라진다 — 두 개로 보이거나 빈틈이 없게.</summary>
+        private void AdvanceFoldLinger(LabSnapshot snapshot)
+        {
+            if (foldLingerUntil < 0f) return;
+            if (Time.unscaledTime < foldLingerUntil && RewardOrbCount(snapshot) <= rewardOrbsBefore) return;
+            foldLingerUntil = -1f;
+            if (foldOrb != null) foldOrb.gameObject.SetActive(false);
         }
 
         private void EndFinish()
@@ -1374,7 +1474,8 @@ namespace C6Lab
             if (paper == null) return;
             if (paperGroup != null) paperGroup.alpha = 1f;
             paper.localScale = Vector3.one; paper.localPosition = finishFrom; paper.localRotation = Quaternion.identity;
-            if (foldOrb != null) foldOrb.gameObject.SetActive(false);
+            if (foldOrb != null && landed && foldOrb.gameObject.activeSelf) foldLingerUntil = Time.unscaledTime + .6f;
+            else if (foldOrb != null) foldOrb.gameObject.SetActive(false);
             if (emberBand != null) emberBand.gameObject.SetActive(false);
             foreach (UnityEngine.UI.Image spark in sparks) if (spark != null) spark.gameObject.SetActive(false);
             frozenFlames = frozenSparks = Array.Empty<Color>();
@@ -1863,13 +1964,14 @@ namespace C6Lab
                 spark.gameObject.SetActive(false);
                 sparks[k] = spark;
             }
-            // #540: the talisman orb the folded talisman becomes.
-            foldOrb = NewRect("Talisman Orb", paper).gameObject.AddComponent<UnityEngine.UI.Image>();
+            // #540: the talisman orb the rolled-up talisman becomes: a water-blue orb with the written "물" in gold.
+            // It sits on the root (not the paper) so it can drop to the board on its own while the paper fades into it.
+            foldOrb = NewRect("Talisman Orb", root).gameObject.AddComponent<UnityEngine.UI.Image>();
             foldOrb.raycastTarget = false; foldOrb.sprite = RoundDot();
-            foldOrb.rectTransform.anchorMin = foldOrb.rectTransform.anchorMax = new Vector2(.5f, .5f);
-            foldSeal = NewRect("Talisman Orb Seal", foldOrb.rectTransform).gameObject.AddComponent<UnityEngine.UI.Image>();
-            foldSeal.raycastTarget = false; foldSeal.sprite = StampEmblemSprite();
-            Stretch(foldSeal.rectTransform, .2f);
+            foldOrb.rectTransform.anchorMin = foldOrb.rectTransform.anchorMax = foldOrb.rectTransform.pivot = new Vector2(.5f, .5f);
+            foldGlyph = NewRect("Talisman Orb Glyph", foldOrb.rectTransform).gameObject.AddComponent<UnityEngine.UI.Image>();
+            foldGlyph.raycastTarget = false; foldGlyph.sprite = GlyphSprite();
+            Stretch(foldGlyph.rectTransform, .1f);
             foldOrb.gameObject.SetActive(false);
             // #540: effects outside the paper. The board dim sits behind everything; the rest sit on top.
             boardDim = NewRect("Talisman Board Dim", root).gameObject.AddComponent<UnityEngine.UI.Image>();

@@ -263,6 +263,22 @@ namespace C6Lab.Tests
             Assert.That(m.Snapshot(10).orbs.Single(o=>o.id==theirs.id).expiresAt,Is.EqualTo(13),"Paused only while that seat wrote (5 → 10).");
             Assert.That(m.Snapshot(12).orbs.Any(o=>o.id==mine.id),Is.True,"Still on the board after its old lifetime.");
         }
+        [Test] public void OrbsAboutToRunOutWaitUntilTheTalismanOrbHasLanded()
+        {
+            // #540: none of the writer's orbs runs out while the talisman turns into its orb and for a moment after it lands.
+            var m=Room();
+            var soon=Add(m,Players[0],4);soon.expiresAt=6.2;var later=Add(m,Players[0],4);later.expiresAt=30;
+            var theirs=Add(m,Players[1],4);theirs.expiresAt=6.2;
+            var a=Current(m,5);
+            Assert.That(m.TryCompleteJigwiTalisman(Players[0],a.id,6),Is.True);
+            double until=6+config.JigwiTalismanRewardDelaySeconds+LabModel.JigwiTalismanCalmSeconds;
+            var s=m.Snapshot(6);
+            Assert.That(s.orbs.Single(o=>o.id==soon.id).expiresAt,Is.EqualTo(until).Within(1e-6),"Held until the reward has settled.");
+            Assert.That(s.orbs.Single(o=>o.id==later.id).expiresAt,Is.EqualTo(30),"A longer lifetime is untouched.");
+            Assert.That(s.orbs.Single(o=>o.id==theirs.id).expiresAt,Is.EqualTo(6.2).Within(1e-6),"Only the writer's board.");
+            var water=m.Snapshot(6+config.JigwiTalismanRewardDelaySeconds).orbs.First(o=>o.jigwiTalismanReward);
+            Assert.That(new Vector2(water.x,water.y),Is.EqualTo(LabModel.JigwiTalismanWaterSpot(0)),"It appears where the folded talisman drops.");
+        }
         [Test] public void BGivesEachPickedSeatOneSpecialWaterWhileOrdinaryRawPairsKeepTheirNormalElement()
         {
             // #509: two players → both picked; each gets exactly one special Water on its own board.

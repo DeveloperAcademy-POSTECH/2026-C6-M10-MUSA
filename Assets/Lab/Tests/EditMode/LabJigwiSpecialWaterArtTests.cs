@@ -27,9 +27,9 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void TheTalismanOrbShowsTheRedSealInsteadOfTheDrop()
+        public void TheTalismanOrbShowsTheWrittenLetterInsteadOfTheDrop()
         {
-            // #540: the talisman orb carries the red seal; its shimmering blue body is the five-colour look in blue tones.
+            // #540: the talisman orb carries the gold "물" from the talisman; its shimmering blue body is the five-colour look in blue tones.
             var art = LabJigwiSupplyWaterArt.Create(root.transform);
             art.Show(.3f, false, null, talismanOrb: true);
             Assert.That(art.Talisman, Is.True);

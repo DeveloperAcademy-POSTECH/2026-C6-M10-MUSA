@@ -817,6 +817,22 @@ namespace C6Lab
             return false;
         }
 
+        /// <summary>
+        /// #540 판 위 자리(0~1)의 화면 좌표와, 그 자리에 놓인 보통 크기 구슬의 화면 반지름(픽셀).
+        /// 접힌 부적이 진짜 부적 구슬이 생길 자리로 떨어지게 하려고 쓴다. 카메라가 없으면 false.
+        /// </summary>
+        public bool TryGetScreenSpot(Vector2 normalized01, out Vector2 screen, out float pixelRadius)
+        {
+            screen = default; pixelRadius = 0f;
+            if (inputCamera == null || config == null) return false;
+            Vector3 center = OnPlane(ToWorld(normalized01, config.OrbRadius));
+            Vector3 a = inputCamera.WorldToScreenPoint(center);
+            Vector3 b = inputCamera.WorldToScreenPoint(center + inputCamera.transform.right * config.OrbRadius);
+            if (a.z < 0f || b.z < 0f) return false;
+            screen = a; pixelRadius = Vector2.Distance(a, b);
+            return true;
+        }
+
         /// <summary>#414 이 판에 보이는 북 orbId의 화면 좌표 (연타 숫자를 북 옆에 띄우려고). 없으면 false.</summary>
         public bool TryGetScreenPoint(string orbId, out Vector2 screen)
         {

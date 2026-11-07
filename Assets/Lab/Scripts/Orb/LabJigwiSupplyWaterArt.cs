@@ -12,7 +12,7 @@ namespace C6Lab
         private static readonly Color SpecialTint = new Color(.05f, .22f, .78f, .55f);
         private readonly Vector3[] points = new Vector3[Segments + 1];
         private SpriteRenderer drop, tint, glow, seal, emblem;
-        private static readonly Color TalismanTint = new Color(.98f, .86f, .5f, .96f), SealRed = new Color(.78f, .09f, .07f, .95f);
+        private static readonly Color TalismanTint = new Color(.98f, .86f, .5f, .96f), GlyphGold = new Color(1f, .86f, .32f, 1f), GlyphShadow = new Color(.05f, .16f, .38f, .85f);
         private readonly SpriteRenderer[] sparkles = new SpriteRenderer[SparkleCount];
         private static Sprite discSprite, glowSprite, starSprite;
         private LineRenderer ripple;
@@ -24,7 +24,7 @@ namespace C6Lab
         public bool Shown => shown;
         /// <summary>#509: B's special Water look (darker body, glow, sparkles) is on.</summary>
         public bool Special => shown && special;
-        /// <summary>#540: the talisman orb look (hanji body, red seal, gold glow and sparkles) is on.</summary>
+        /// <summary>#540: the talisman orb look (blue shimmer with the gold "물" written on the talisman) is on.</summary>
         public bool Talisman => shown && talisman;
         public int VisibleSparkles { get; private set; }
         public float AnimationTime => age;
@@ -44,8 +44,8 @@ namespace C6Lab
             if (!shown) age = 0f;
             Ensure(profile); shown = true; special = specialWater && !talismanOrb; talisman = talismanOrb;
             EnsureSpecial();
-            // #540: the talisman orb shows the folded talisman's red seal instead of the water drop.
-            // #540: the talisman orb's shimmering blue body is LabFiveColorSparkle (BlueTones); this art adds only the red seal.
+            // #540: the talisman orb shows the "물" written on the talisman, in gold, instead of the water drop.
+            // Its shimmering blue body is LabFiveColorSparkle (BlueTones); this art adds only the letter.
             drop.enabled = ownedSprite != null && !talisman; ripple.enabled = !talisman;
             if (ownedSprite != null)
             {
@@ -70,8 +70,9 @@ namespace C6Lab
             }
             if (seal == null)
             {
-                seal = Child("Talisman seal", LabJigwiTalismanOverlay.StampSprite(), 17);
-                emblem = Child("Talisman seal emblem", LabJigwiTalismanOverlay.StampEmblemSprite(), 18);
+                // seal = the letter's dark shadow, emblem = the gold letter on top.
+                seal = Child("Talisman glyph shadow", LabJigwiTalismanOverlay.GlyphSprite(), 17);
+                emblem = Child("Talisman glyph", LabJigwiTalismanOverlay.GlyphSprite(), 18);
             }
             bool fancy = special;
             tint.enabled = glow.enabled = fancy;
@@ -184,13 +185,7 @@ namespace C6Lab
         {
             if (talisman && seal != null)
             {
-                // The red seal sits square on the shimmering orb, slightly tilted like the stamp on the talisman.
-                float sealScale = radius * 1.15f / Mathf.Max(.01f, seal.sprite.bounds.size.x);
-                seal.transform.localPosition = emblem.transform.localPosition = new Vector3(0f, 0f, -.07f);
-                seal.transform.localRotation = emblem.transform.localRotation = Quaternion.Euler(0f, 0f, -7f);
-                seal.transform.localScale = Vector3.one * sealScale;
-                emblem.transform.localScale = Vector3.one * sealScale * .8f;
-                seal.color = emblem.color = SealRed;
+                PlaceGlyph();
             }
             if (tint == null || !special) { VisibleSparkles = 0; return; }
             tint.transform.localPosition = new Vector3(0f, 0f, -.02f);
@@ -203,13 +198,7 @@ namespace C6Lab
                 : new Color(.35f, .65f, 1f, Mathf.Lerp(.35f, .7f, breath));
             if (talisman && seal != null)
             {
-                // The red seal sits square on the orb, slightly tilted like the stamp on the talisman.
-                float sealScale = radius * 1.25f / Mathf.Max(.01f, seal.sprite.bounds.size.x);
-                seal.transform.localPosition = emblem.transform.localPosition = new Vector3(0f, 0f, -.045f);
-                seal.transform.localRotation = emblem.transform.localRotation = Quaternion.Euler(0f, 0f, -7f);
-                seal.transform.localScale = Vector3.one * sealScale;
-                emblem.transform.localScale = Vector3.one * sealScale * .8f;
-                seal.color = emblem.color = SealRed;
+                PlaceGlyph();
             }
             VisibleSparkles = 0;
             for (int i = 0; i < SparkleCount; i++)
@@ -224,6 +213,17 @@ namespace C6Lab
                     : new Color(.9f, .97f, 1f, Mathf.Lerp(.35f, 1f, twinkle));
                 VisibleSparkles++;
             }
+        }
+        /// <summary>#540: the gold "물" fills most of the orb, with a soft dark shadow so it reads on the shimmering blue.</summary>
+        private void PlaceGlyph()
+        {
+            float scale = radius * 1.7f / Mathf.Max(.01f, emblem.sprite.bounds.size.x);
+            emblem.transform.localPosition = new Vector3(0f, 0f, -.07f);
+            seal.transform.localPosition = new Vector3(radius * .04f, -radius * .05f, -.065f);
+            seal.transform.localRotation = emblem.transform.localRotation = Quaternion.identity;
+            emblem.transform.localScale = Vector3.one * scale;
+            seal.transform.localScale = Vector3.one * scale * 1.04f;
+            emblem.color = GlyphGold; seal.color = GlyphShadow;
         }
         public void Clear()
         {

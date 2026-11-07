@@ -94,9 +94,10 @@ namespace C6Lab.Tests
             Assert.That(overlay.PaperAlpha, Is.EqualTo(1f));
             overlay.AdvanceFinish(overlay.FinishSeconds - .15f);
             Assert.That(overlay.LastCue, Is.EqualTo("Burst"), "The burst sounds once after the sweep.");
-            Assert.That(overlay.PaperAlpha, Is.GreaterThan(0f).And.LessThan(1f), "#540: the folded talisman orb is dropping to the board.");
+            Assert.That(overlay.PaperAlpha, Is.Zero, "#540: the talisman has rolled up into its orb…");
+            Assert.That(overlay.FoldOrbVisible, Is.True, "…which is dropping onto its spot on the board.");
             overlay.Present(Snapshot(-1d), Local, 11.5d);
-            Assert.That(overlay.Paper.gameObject.activeSelf, Is.True, "The Host has not confirmed yet; it keeps fading.");
+            Assert.That(overlay.FoldOrbVisible, Is.True, "The Host has not confirmed yet; the orb keeps dropping.");
             overlay.AdvanceFinish(overlay.FinishSeconds);
             Assert.That(overlay.Finishing, Is.False);
             Assert.That(overlay.Paper.gameObject.activeSelf, Is.False);

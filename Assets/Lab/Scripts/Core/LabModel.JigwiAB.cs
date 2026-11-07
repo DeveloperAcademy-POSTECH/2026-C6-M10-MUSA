@@ -44,6 +44,11 @@ namespace C6Lab
         /// <summary>#540: boards whose talisman failed, and when (the end of Jigwi's line) every orb then on them catches fire.</summary>
         private readonly List<(ulong owner, string roundId, double dueAt)> jigwiFailBurns = new List<(ulong, string, double)>();
         public const double JigwiTalismanDropSeconds = .3d;
+        /// <summary>#540: after the talisman orb lands, the seat's other orbs stay at least this long so the reward is not lost in smoke.</summary>
+        public const double JigwiTalismanCalmSeconds = 1d;
+        /// <summary>#540: where the i-th talisman Water appears on its owner's board (the folded talisman drops right there).</summary>
+        public static Vector2 JigwiTalismanWaterSpot(int i) =>
+            new Vector2(.15f + .7f * ((i * .61803398875f + .5f) % 1f), .22f + .1f * (i % 3));
         private float jigwiTalismanWaterPaint, jigwiTalismanRewardDelay;
         /// <summary>#540: 부적 구슬은 수명이 없다(오색구슬처럼 만든 시각부터 아주 멀리 끝을 둔다). 던질 때까지 남는다.</summary>
         public const double JigwiTalismanOrbLifetimeSeconds = 1e6d;
@@ -410,6 +415,7 @@ namespace C6Lab
                 if (orb.owner == sender && orb.jigwiABBurnEventId == active.id)
                 { orb.jigwiABBurnEventId = null; orb.jigwiABBurnAt = -1d; orb.revision = ++revision; }
             GrantJigwiTalismanWater(sender, now);
+            HoldJigwiOrbsForTalismanReward(sender, now);
             revision++;
             if (active.players.All(value => value.talismanAt >= 0d)) ResolveJigwiAB(active, LabJigwiABResolution.Completed, now);
             return true;
@@ -444,6 +450,21 @@ namespace C6Lab
                 jigwiAPausedOrbs.Remove(pair.Key);
                 if (unused > 0d && orbs.TryGetValue(pair.Key, out var orb))
                 { orb.expiresAt -= unused; orb.revision = ++revision; }
+            }
+        }
+        /// <summary>
+        /// #540: none of the seat's orbs runs out while the talisman turns into its orb and for a moment after it lands
+        /// (JigwiTalismanCalmSeconds); anything due in that window goes when the window ends.
+        /// </summary>
+        private void HoldJigwiOrbsForTalismanReward(ulong owner, double now)
+        {
+            double until = now + jigwiTalismanRewardDelay + JigwiTalismanCalmSeconds;
+            foreach (var orb in orbs.Values)
+            {
+                if (orb.owner != owner || orb.inFlight || orb.jigwiTalismanReward || (!orb.kind.IsRaw() && orb.kind != LabOrbKind.Combined)) continue;
+                double ordinary = orb.expiresAt >= 0d ? orb.expiresAt : orb.createdAt + LifetimeOf(orb);
+                if (ordinary >= until) continue;
+                orb.expiresAt = until; orb.revision = ++revision;
             }
         }
         private void GrantJigwiTalismanWater(ulong owner, double now)
@@ -486,7 +507,7 @@ namespace C6Lab
                 {
                     id = NewOrbId(), owner = owner, kind = LabOrbKind.Combined, element = LabOrbElement.Water,
                     origin = LabOrbOrigin.Gourd, originOwner = owner,
-                    x = .15f + .7f * ((i * .61803398875f + .5f) % 1f), y = .22f + .1f * (i % 3),
+                    x = JigwiTalismanWaterSpot(i).x, y = JigwiTalismanWaterSpot(i).y,
                     createdAt = dueAt, expiresAt = dueAt + JigwiTalismanOrbLifetimeSeconds,
                     jigwiTalismanReward = true, jigwiABRewardPaintScale = jigwiTalismanWaterPaint, revision = ++revision
                 };
