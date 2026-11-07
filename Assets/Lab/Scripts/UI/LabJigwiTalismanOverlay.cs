@@ -250,6 +250,8 @@ namespace C6Lab
         private float alarmLevel;
         private LabGourdAlert gourdAlert;
         private string bubbledRound;
+        [Tooltip("#540 예고 말풍선(불꽃 도깨비)이 A가 시작된 뒤에도 더 떠 있는 시간(초).")]
+        [SerializeField, Range(0f, 6f)] private float bubbleLingerSeconds = 2.5f;
         /// <summary>#540: how strongly the attack-area alarm shows right now (0 = off).</summary>
         public float AlarmLevel => alarmLevel;
         private UnityEngine.UI.Image[] landDrops = Array.Empty<UnityEngine.UI.Image>(), flyEmbers = Array.Empty<UnityEngine.UI.Image>();
@@ -728,7 +730,8 @@ namespace C6Lab
         }
 
         /// <summary>
-        /// #540: 예고 때 야광귀처럼 박 옆 말풍선에 그림(성난 불꽃 도깨비)을 띄운다. 부적이 올 사람 화면에서만, 불씨가 붙을 때부터 A 시작까지.
+        /// #540: 예고 때 야광귀처럼 박 옆 말풍선에 그림(성난 불꽃 도깨비)을 띄운다. 부적이 올 사람 화면에서만,
+        /// 지귀 목소리가 나오는 예고 시작부터 A가 시작되고 bubbleLingerSeconds 뒤까지.
         /// </summary>
         private void DriveBubble(LabSnapshot snapshot)
         {
@@ -739,11 +742,11 @@ namespace C6Lab
             foreach (LabJigwiABRound item in snapshot.jigwiAB.rounds)
             {
                 if (item == null || item.kind != LabJigwiABKind.PersonalBurn || !item.Warning(now) || item.id == bubbledRound) continue;
-                if (fireballSeen != LabJigwiFireball.Phase.Kindle) continue;
+                if (OmenLevel <= 0f) continue; // only the seats a talisman is coming for
                 bubbledRound = item.id;
-                gourdAlert.ShowPicture(source.target, LabProceduralFire.Spirit(), (float)(item.activeAt - now));
+                gourdAlert.ShowPicture(source.target, LabProceduralFire.Spirit(), (float)(item.activeAt - now) + bubbleLingerSeconds);
             }
-            if (gourdAlert.ShowingPicture) gourdAlert.SetPictureScale(1f + .08f * Mathf.Sin(Time.unscaledTime * 14f));
+            if (gourdAlert.ShowingPicture) gourdAlert.SetPictureScale(1f + .06f * Mathf.Sin(Time.unscaledTime * 9f));
         }
 
         /// <summary>화면 픽셀 사각형을 root 기준 위치·크기로 옮긴다.</summary>
