@@ -5883,8 +5883,10 @@ PR-1(`feat/#507-gourd-rig-contract`) 위에서 Unity 6000.6.5f1 macOS batch Edit
 | 같은 두 클래스 — 수정 후 | **33/33 PASS** | 0.11초 |
 | 전체 EditMode — 수정 후 | **2026/2026 PASS** | 25.32초 |
 | 전체 PlayMode — 수정 후 `50c023d9`, 2026-11-07 | **654/655 PASS / 1 FAIL**(Bulk와 무관, 아래) | 502.73초 |
+| 전체 EditMode — main `3f118e40` 병합 뒤 `6f03b4ba`, 2026-11-07 | **2026/2026 PASS** | 20.53초 |
 
 - 각 실행의 skip/inconclusive는 0이다.
+- main 병합은 #546의 Mac 비교 실험 파일과 문서만 가져왔고, `docs/VALIDATION.md` 끝의 두 기록이 겹친 충돌만 둘 다 살려 풀었다. 병합 뒤 전체 PlayMode는 다시 돌리지 않았다.
 - **전체 PlayMode의 실패 1개:** `Hapio.Experiments.Tests.ClayPreviewPlayModeTests.PackedSampleKeepsAllFourHalfChannelsAndActualCoatingCoverage`(Category `GPU`·`Legacy`·`Slow`, Mac 클레이 재질 실험)다.
   - 가져온 `Sample/Height.exr`의 GPU 읽기 해시(`73e0cbd6…`)가 `SampleInfo.json`의 값(`6388ad86…`)과 달랐다. `46ae9987`의 이전 값(`e2f68190…`)과도 다르다.
   - 이 변경은 Bulk 송신기·EditMode 검사·문서만 바꾸며 이 경로와 겹치는 코드가 없다. 이 worktree의 Library는 main 폴더(`46ae9987`)의 Library를 복제해 썼다.
