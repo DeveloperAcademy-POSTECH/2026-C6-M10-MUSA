@@ -174,9 +174,6 @@ namespace C6Lab
         [Tooltip("#540 부적 구슬이 판에 닿을 때 \"퐁\" 소리 폴더. 비우면 없음.")]
         [SerializeField] private string landSoundFolder = "JigwiTalismanLand";
         [SerializeField, Range(0f, 1f)] private float landSoundVolume = .9f;
-        [Tooltip("불 꺼질 때 \"치익\" 김 소리 폴더 (Resources/Audio). 비우면 없음.")]
-        [SerializeField] private string steamSoundFolder = "JigwiTalismanSteam";
-        [SerializeField, Range(0f, 1f)] private float steamSoundVolume = .8f;
         [Tooltip("#509/#540: 도장이 찍힌 뒤 빛난 채 머무는 시간(초). LabConfig '부적 보상 지연'이 0보다 크면 그 값에 맞춰 자동으로 정해져 이 값은 쓰지 않는다.")]
         [SerializeField, Range(.1f, 3f)] private float glowSeconds = .6f;
         [Tooltip("#540: 부적이 접히며 부적 구슬로 오므라드는 시간(초).")]
@@ -249,7 +246,8 @@ namespace C6Lab
         public float BoardDim => dimLevel;
         private float extinguishFrom;
         private bool sweepCued;
-        private UnityEngine.UI.Image[] steam = Array.Empty<UnityEngine.UI.Image>();
+        // #540: at completion the flames and sparks freeze where they are and fade (no steam).
+        private Color[] frozenFlames = Array.Empty<Color>(), frozenSparks = Array.Empty<Color>();
         private UnityEngine.UI.Image foldOrb, foldSeal;
         private UnityEngine.UI.Image scorch;
         private Texture2D burnTexture;
@@ -1058,12 +1056,11 @@ namespace C6Lab
             if (hint != null) hint.gameObject.SetActive(false);
             if (nextMarker != null) nextMarker.gameObject.SetActive(false);
             if (stampRoot != null) stampRoot.gameObject.SetActive(false);
-            // #540: the fire goes out — the flames and sparks stop at once, the scorch cools away under steam.
-            if (emberBand != null) emberBand.gameObject.SetActive(false);
-            foreach (UnityEngine.UI.Image spark in sparks) if (spark != null) spark.gameObject.SetActive(false);
+            // #540: the fire stops dead — the flames and sparks freeze right where they are, then quietly fade
+            // with the scorch (no steam).
+            frozenFlames = Freeze(flames); frozenSparks = Freeze(sparks);
             extinguishFrom = BurnFront;
             burstPlayed = false; notesPlayed = 0; sweepCued = false; landed = false;
-            Cue("Steam", steamSoundFolder, steamSoundVolume);
             DrawFinish();
         }
 
@@ -1214,7 +1211,7 @@ namespace C6Lab
         }
 
         /// <summary>
-        /// #540 불 꺼짐: 다 쓴 순간 타던 그을음이 김 아래 식어 사라지고, 가장자리 둘레에서 하얀 김이 피어오른다.
+        /// #540 불 꺼짐: 다 쓴 순간 불꽃과 불티가 그 자리에 그대로 멈추고(흔들림·움직임 없음), 그을음과 함께 조용히 옅어진다. 김은 없다.
         /// </summary>
         private void DrawExtinguish(float age)
         {
@@ -1225,23 +1222,26 @@ namespace C6Lab
                 if (scorch.gameObject.activeSelf != cooling) scorch.gameObject.SetActive(cooling);
                 if (cooling) scorch.color = new Color(1f, 1f, 1f, 1f - e);
             }
-            if (paper == null) return;
-            Rect r = paper.rect;
-            float inset = Mathf.Clamp01(extinguishFrom) * r.width * .5f;
-            float w = Mathf.Max(0f, r.width - inset * 2f), h = Mathf.Max(0f, r.height - inset * 2f);
-            for (int k = 0; k < steam.Length; k++)
+            float keep = 1f - e * e * (3f - 2f * e);
+            Fade(flames, frozenFlames, keep);
+            Fade(sparks, frozenSparks, keep);
+            if (e >= 1f && emberBand != null && emberBand.gameObject.activeSelf) emberBand.gameObject.SetActive(false);
+        }
+
+        private static Color[] Freeze(UnityEngine.UI.Image[] parts)
+        {
+            var colors = new Color[parts.Length];
+            for (int k = 0; k < parts.Length; k++)
+                colors[k] = parts[k] != null && parts[k].gameObject.activeInHierarchy ? parts[k].color : Color.clear;
+            return colors;
+        }
+
+        private static void Fade(UnityEngine.UI.Image[] parts, Color[] from, float keep)
+        {
+            for (int k = 0; k < parts.Length && k < from.Length; k++)
             {
-                if (steam[k] == null) continue;
-                float local = (age - k * .04f) / Mathf.Max(.01f, extinguishSeconds + .3f);
-                bool on = extinguishFrom > 0f && local >= 0f && local < 1f;
-                if (steam[k].gameObject.activeSelf != on) steam[k].gameObject.SetActive(on);
-                if (!on) continue;
-                RectTransform puff = steam[k].rectTransform;
-                puff.anchorMin = puff.anchorMax = new Vector2(.5f, .5f);
-                puff.anchoredPosition = Perimeter((k + .5f) / steam.Length, w, h) + Vector2.up * local * r.height * .12f;
-                float size = r.width * (.12f + .18f * local);
-                puff.sizeDelta = new Vector2(size, size);
-                steam[k].color = new Color(1f, 1f, 1f, .7f * Mathf.Sin(Mathf.PI * local));
+                if (parts[k] == null || from[k].a <= 0f) continue;
+                Color c = from[k]; c.a *= keep; parts[k].color = c;
             }
         }
 
@@ -1267,7 +1267,9 @@ namespace C6Lab
             if (paperGroup != null) paperGroup.alpha = 1f;
             paper.localScale = Vector3.one; paper.localPosition = finishFrom; paper.localRotation = Quaternion.identity;
             if (foldOrb != null) foldOrb.gameObject.SetActive(false);
-            foreach (UnityEngine.UI.Image puff in steam) if (puff != null) puff.gameObject.SetActive(false);
+            if (emberBand != null) emberBand.gameObject.SetActive(false);
+            foreach (UnityEngine.UI.Image spark in sparks) if (spark != null) spark.gameObject.SetActive(false);
+            frozenFlames = frozenSparks = Array.Empty<Color>();
             if (scorch != null) { scorch.color = Color.white; scorch.gameObject.SetActive(false); }
             if (paperImage != null) paperImage.color = paperColor;
             if (hint != null) hint.gameObject.SetActive(true);
@@ -1722,15 +1724,7 @@ namespace C6Lab
                 spark.gameObject.SetActive(false);
                 sparks[k] = spark;
             }
-            // #540: steam puffs for the fire going out, and the talisman orb the folded talisman becomes.
-            steam = new UnityEngine.UI.Image[8];
-            for (int k = 0; k < steam.Length; k++)
-            {
-                var puff = NewRect("Talisman Steam " + k, paper).gameObject.AddComponent<UnityEngine.UI.Image>();
-                puff.raycastTarget = false; puff.sprite = WatercolorDot();
-                puff.gameObject.SetActive(false);
-                steam[k] = puff;
-            }
+            // #540: the talisman orb the folded talisman becomes.
             foldOrb = NewRect("Talisman Orb", paper).gameObject.AddComponent<UnityEngine.UI.Image>();
             foldOrb.raycastTarget = false; foldOrb.sprite = RoundDot();
             foldOrb.rectTransform.anchorMin = foldOrb.rectTransform.anchorMax = new Vector2(.5f, .5f);

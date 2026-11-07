@@ -34,7 +34,7 @@ namespace C6Lab
             var root = new GameObject("Jigwi Talisman Omen (#540)");
             var omen = root.AddComponent<LabJigwiTalismanOmen>();
             omen.glow = omen.Part("Omen Fire Glow", GlowSprite(), Fire, 38);
-            omen.paper = omen.Part("Omen Paper", LabTalismanSealSlap.PaperSprite(), Paper, 39);
+            omen.paper = omen.Part("Omen Paper", PaperSprite(), Paper, 39);
             omen.seal = omen.Part("Omen Seal", LabJigwiTalismanOverlay.StampSprite(), Seal, 40);
             omen.emblem = omen.Part("Omen Seal Emblem", LabJigwiTalismanOverlay.StampEmblemSprite(), Seal, 41);
             for (int i = 0; i < EmberCount; i++)
@@ -160,6 +160,29 @@ namespace C6Lab
         {
             if (this == null || camera == null || camera != view) return;
             transform.rotation = camera.transform.rotation * Quaternion.Euler(spin);
+        }
+
+        private static Sprite paperSprite;
+        /// <summary>A soft-edged hanji sheet (runtime).</summary>
+        private static Sprite PaperSprite()
+        {
+            if (paperSprite != null) return paperSprite;
+            const int width = 64, height = 102;
+            var texture = new Texture2D(width, height, TextureFormat.RGBA32, false)
+            { name = "Talisman Slap Paper (#540 runtime)", hideFlags = HideFlags.DontSave, wrapMode = TextureWrapMode.Clamp };
+            var pixels = new Color[width * height];
+            for (int y = 0; y < height; y++)
+                for (int x = 0; x < width; x++)
+                {
+                    float edge = Mathf.Min(Mathf.Min(x + .5f, width - x - .5f), Mathf.Min(y + .5f, height - y - .5f));
+                    float fiber = .85f + .15f * Mathf.PerlinNoise(x * .2f + 3f, y * .2f + 11f);
+                    float a = Mathf.Clamp01((edge - 1f - 2f * Mathf.PerlinNoise(x * .3f, y * .3f)) / 2f);
+                    pixels[y * width + x] = new Color(fiber, fiber, fiber, a);
+                }
+            texture.SetPixels(pixels); texture.Apply(false, true);
+            paperSprite = Sprite.Create(texture, new Rect(0f, 0f, width, height), new Vector2(.5f, .5f), 100f);
+            paperSprite.hideFlags = HideFlags.DontSave;
+            return paperSprite;
         }
 
         private static Sprite glowSprite;

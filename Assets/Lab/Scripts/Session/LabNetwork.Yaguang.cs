@@ -84,7 +84,6 @@ namespace C6Lab
             float radius = config != null ? config.OrbRadius : .3f;
             LabFiveColorSparkle.DustBurst(point, radius, LabFiveColorSparkle.DefaultDustPuffScale * 1.3f, LabFiveColorSparkle.BlueTones);
             LabFiveColorSparkle.Burst(point, radius, LabFiveColorSparkle.BlueTones);
-            LabTalismanSealSlap.Create(point, radius);
             TalismanHit?.Invoke(owner);
         }
     }

@@ -89,7 +89,7 @@ namespace C6Lab.Tests
             // #509: the written "물" glows first, then the talisman fades out; the board is already free.
             Assert.That(overlay.Visible, Is.False); Assert.That(overlay.WantsBoardBlocked, Is.False);
             Assert.That(overlay.Finishing, Is.True);
-            Assert.That(overlay.LastCue, Is.EqualTo("Steam"), "#540: first the fire goes out with a hiss.");
+            Assert.That(overlay.LastCue, Is.Not.EqualTo("Steam"), "#540: the fire just stops — no steam hiss.");
             Assert.That(overlay.Paper.gameObject.activeSelf, Is.True, "It does not vanish at once.");
             Assert.That(overlay.PaperAlpha, Is.EqualTo(1f));
             overlay.AdvanceFinish(overlay.FinishSeconds - .15f);
