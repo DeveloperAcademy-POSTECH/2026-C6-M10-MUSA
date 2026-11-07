@@ -82,6 +82,16 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void ATalismanVolleyHitHissesOnlyOnce()
+        {
+            // #540: the three water orbs of one throw land together; Jigwi's fire hisses out once.
+            overlay.OnTalismanHit(Local);
+            overlay.OnTalismanHit(Local);
+            overlay.OnTalismanHit(Local);
+            Assert.That(overlay.DouseCount, Is.EqualTo(1));
+        }
+
+        [Test]
         public void AFinishedTalismanGlowsThenFadesWithoutBlockingTheBoard()
         {
             overlay.Present(Snapshot(-1d), Local, 11d);
@@ -89,14 +99,15 @@ namespace C6Lab.Tests
             // #509: the written "물" glows first, then the talisman fades out; the board is already free.
             Assert.That(overlay.Visible, Is.False); Assert.That(overlay.WantsBoardBlocked, Is.False);
             Assert.That(overlay.Finishing, Is.True);
-            Assert.That(overlay.LastCue, Is.EqualTo("Sweep"), "The gold sweep starts with its sound.");
+            Assert.That(overlay.LastCue, Is.Not.EqualTo("Steam"), "#540: the fire just stops — no steam hiss.");
             Assert.That(overlay.Paper.gameObject.activeSelf, Is.True, "It does not vanish at once.");
             Assert.That(overlay.PaperAlpha, Is.EqualTo(1f));
-            overlay.AdvanceFinish(overlay.FinishSeconds * .8f);
+            overlay.AdvanceFinish(overlay.FinishSeconds - .15f);
             Assert.That(overlay.LastCue, Is.EqualTo("Burst"), "The burst sounds once after the sweep.");
-            Assert.That(overlay.PaperAlpha, Is.GreaterThan(0f).And.LessThan(1f), "Fading away slowly.");
+            Assert.That(overlay.PaperAlpha, Is.Zero, "#540: the talisman has rolled up into its orb…");
+            Assert.That(overlay.FoldOrbVisible, Is.True, "…which is dropping onto its spot on the board.");
             overlay.Present(Snapshot(-1d), Local, 11.5d);
-            Assert.That(overlay.Paper.gameObject.activeSelf, Is.True, "The Host has not confirmed yet; it keeps fading.");
+            Assert.That(overlay.FoldOrbVisible, Is.True, "The Host has not confirmed yet; the orb keeps dropping.");
             overlay.AdvanceFinish(overlay.FinishSeconds);
             Assert.That(overlay.Finishing, Is.False);
             Assert.That(overlay.Paper.gameObject.activeSelf, Is.False);
@@ -143,12 +154,12 @@ namespace C6Lab.Tests
         {
             overlay.Present(Snapshot(-1d), Local, 11d);
             Trace(overlay);
-            Assert.That(overlay.NotesPlayedCount, Is.EqualTo(1), "The first 둥 starts with the sweep.");
+            Assert.That(overlay.NotesPlayedCount, Is.Zero, "#540: the fire goes out and a breath passes before the melody.");
             Assert.That(overlay.StampVisible, Is.False, "The seal waits for the accent.");
-            overlay.AdvanceFinish(overlay.AccentSeconds * .6f);
+            overlay.AdvanceFinish(overlay.AccentSeconds - .3f);
             Assert.That(overlay.NotesPlayedCount, Is.EqualTo(3), "솔, 도, 시 with rests between.");
             Assert.That(overlay.StampVisible, Is.False, "Still resting before the accent.");
-            overlay.AdvanceFinish(overlay.AccentSeconds * .5f);
+            overlay.AdvanceFinish(.4f);
             Assert.That(overlay.NotesPlayedCount, Is.EqualTo(4), "Three notes, rests, then the accented 라♭.");
             Assert.That(overlay.StampVisible, Is.True, "The seal lands with the accent.");
             Assert.That(overlay.LastCue, Is.EqualTo("Burst"));
@@ -178,6 +189,96 @@ namespace C6Lab.Tests
             Assert.That(overlay.Coverage, Is.Zero, "The next A starts from a clean talisman.");
             foreach (var graphic in overlay.GetComponentsInChildren<UnityEngine.UI.Graphic>(true))
                 Assert.That(graphic.raycastTarget, Is.False);
+        }
+
+        [Test]
+        public void TheTalismanBurnsInFromItsEdgesSlowlyFromTheStart()
+        {
+            LabSnapshot snapshot = Snapshot(-1d); // the A runs 11 s → 26 s
+            overlay.Present(snapshot, Local, 11d);
+            Assert.That(overlay.WarnLevel, Is.Zero, "Nothing burned at the very start.");
+            overlay.Present(snapshot, Local, 18.5d);
+            Assert.That(overlay.WarnLevel, Is.GreaterThan(0f).And.LessThan(.5f), "Halfway through, it has burned slowly — less than half.");
+            overlay.Present(snapshot, Local, 26d - .001d);
+            Assert.That(overlay.WarnLevel, Is.EqualTo(1f).Within(.01f), "At the end it has burned to the middle.");
+            overlay.Present(snapshot, 99, 24.5d);
+            Assert.That(overlay.WarnLevel, Is.Zero, "No talisman, no warning.");
+        }
+
+        [Test]
+        public void BurningDrumsStayLightUntilTheNextGimmickWarns()
+        {
+            // #540: the A (11 → 26 s) ran out unwritten; the fireball lands at 26.45 s and the drums burn up to 15 s.
+            LabSnapshot snapshot = Snapshot(-1d);
+            LabJigwiABRound a = snapshot.jigwiAB.rounds[0];
+            a.resolution = LabJigwiABResolution.Expired; a.resolvedAt = 26d;
+            Assert.That(LabJigwiScreenPresentation.DrumFireSecondsLeft(snapshot, Local, 26.2d, 15f), Is.Zero, "Not before the fireball lands.");
+            Assert.That(LabJigwiScreenPresentation.DrumFireSecondsLeft(snapshot, Local, 27d, 15f), Is.EqualTo(14.45f).Within(.001f));
+            Assert.That(LabJigwiScreenPresentation.DrumFireSecondsLeft(snapshot, 99, 27d, 15f), Is.Zero, "Only the seat that failed.");
+            var next = new LabJigwiABRound { id = "ab-b", slot = 1, kind = LabJigwiABKind.GroupFire, warningAt = 30d, activeAt = 32d, endsAt = 40d };
+            snapshot.jigwiAB.rounds = new[] { a, next };
+            Assert.That(LabJigwiScreenPresentation.DrumFireSecondsLeft(snapshot, Local, 27d, 15f), Is.EqualTo(3f).Within(.001f),
+                "It goes out when the next gimmick warns, so it never overlaps it.");
+            Assert.That(LabJigwiScreenPresentation.DrumFireSecondsLeft(snapshot, Local, 30d, 15f), Is.Zero);
+        }
+
+        [Test]
+        public void TheFireballKindlesGrowsAndThenStopsOrFalls()
+        {
+            // #540: warning 10 s → active 11 s → ends 26 s. The orbs are untouched; only the fireball shows the time.
+            LabSnapshot snapshot = Snapshot(-1d);
+            Assert.That(LabJigwiFireball.Evaluate(snapshot, Local, 9.9d, out _, out _), Is.EqualTo(LabJigwiFireball.Phase.None));
+            Assert.That(LabJigwiFireball.Evaluate(snapshot, Local, 10.5d, out _, out _), Is.EqualTo(LabJigwiFireball.Phase.None),
+                "#540: it catches when Jigwi's voice says 타올라라, not at the very start of the warning.");
+            Assert.That(LabJigwiFireball.Evaluate(snapshot, Local, 10.85d, out float p, out _), Is.EqualTo(LabJigwiFireball.Phase.Kindle));
+            Assert.That(p, Is.EqualTo(.5f).Within(.01f));
+            LabJigwiFireball.Evaluate(snapshot, Local, 12d, out _, out float early);
+            Assert.That(LabJigwiFireball.Evaluate(snapshot, Local, 24d, out _, out float late), Is.EqualTo(LabJigwiFireball.Phase.Grow));
+            Assert.That(late, Is.GreaterThan(early), "It grows as time runs out.");
+            Assert.That(LabJigwiFireball.Evaluate(snapshot, 99, 24d, out _, out _), Is.EqualTo(LabJigwiFireball.Phase.None), "Only my own.");
+            LabSnapshot written = Snapshot(20d);
+            Assert.That(LabJigwiFireball.Evaluate(written, Local, 20.2d, out _, out float stopped), Is.EqualTo(LabJigwiFireball.Phase.Douse),
+                "Writing it stops the fire where it is.");
+            Assert.That(stopped, Is.EqualTo(LabJigwiFireball.Grown(9f / 15f)).Within(.001f), "It stops at the size it had.");
+            Assert.That(LabJigwiFireball.Evaluate(written, Local, 21d, out _, out _), Is.EqualTo(LabJigwiFireball.Phase.None));
+            LabJigwiABRound round = snapshot.jigwiAB.rounds[0];
+            round.resolution = LabJigwiABResolution.Expired; round.resolvedAt = 26d;
+            Assert.That(LabJigwiFireball.Evaluate(snapshot, Local, 26.2d, out _, out _), Is.EqualTo(LabJigwiFireball.Phase.Fall),
+                "Not written in time: it falls onto the board.");
+            Assert.That(LabJigwiFireball.Evaluate(snapshot, Local, 27d, out _, out _), Is.EqualTo(LabJigwiFireball.Phase.None));
+        }
+
+        [Test]
+        public void TheWarningDrivesTheOmenBeforeTheTalismanArrives()
+        {
+            LabSnapshot snapshot = Snapshot(-1d); // warning 10 s → active 11 s
+            overlay.Present(snapshot, Local, 9.9d);
+            Assert.That(overlay.OmenLevel, Is.Zero, "Nothing is coming yet.");
+            overlay.Present(snapshot, Local, 10.5d);
+            Assert.That(overlay.OmenLevel, Is.EqualTo(.5f).Within(.02f), "#540: halfway through the 3D omen.");
+            Assert.That(overlay.Paper.gameObject.activeSelf, Is.False, "#540: the paper only lands on the board when the A starts.");
+            Assert.That(overlay.WantsBoardBlocked, Is.False, "The board is not blocked until the A starts.");
+            overlay.Present(snapshot, Local, 11d);
+            Assert.That(overlay.OmenLevel, Is.Zero, "The omen is over once the talisman lies on the board.");
+            Assert.That(overlay.Paper.gameObject.activeSelf, Is.True);
+            overlay.Present(snapshot, 99, 10.5d);
+            Assert.That(overlay.OmenLevel, Is.Zero, "A seat outside the A sees no omen.");
+        }
+
+        [Test]
+        public void JigwiTauntsOnceWhenTheAWarningAppears()
+        {
+            LabSnapshot snapshot = Snapshot(-1d); // warning at 10 s
+            overlay.Present(snapshot, Local, 9.5d);
+            Assert.That(overlay.VoiceCount, Is.Zero);
+            overlay.Present(snapshot, Local, 10.1d);
+            Assert.That(overlay.VoiceCount, Is.EqualTo(1)); Assert.That(overlay.LastVoice, Is.EqualTo("A"));
+            overlay.Present(snapshot, Local, 10.3d);
+            Assert.That(overlay.VoiceCount, Is.EqualTo(1), "Once per warning.");
+            var late = new GameObject("late", typeof(RectTransform)).AddComponent<LabJigwiTalismanOverlay>();
+            late.transform.SetParent(root.transform, false); late.Bind(null, null);
+            late.Present(snapshot, Local, 12d);
+            Assert.That(late.VoiceCount, Is.Zero, "A screen that joins late does not replay a past warning.");
         }
 
         [Test]

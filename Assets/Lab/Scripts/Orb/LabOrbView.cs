@@ -464,15 +464,36 @@ namespace C6Lab
             jigwiABFlame.Show(secondsLeft, visualRadius, held);
         }
 
+        private LabJigwiAshBurn jigwiAsh;
+        public LabJigwiAshBurn JigwiAsh => jigwiAsh;
+        /// <summary>
+        /// #540 지귀 A 실패 불티 (`LabJigwiAshBurn`, 부적 가장자리가 타는 느낌): 구슬은 totalSeconds 동안 아래부터 위로 재가 되며 사라지고,
+        /// 북은 남은 초 동안 테두리에 불티가 붙는다. 0이면 멈춤.
+        /// </summary>
+        public void SetJigwiAsh(float secondsLeft, float totalSeconds)
+        {
+            if (jigwiAsh == null)
+            {
+                if (!(secondsLeft > 0f)) return;
+                jigwiAsh = LabJigwiAshBurn.Create(transform);
+            }
+            // The burning edge follows the picture's size (element art is drawn 20% larger than the ball).
+            float artRadius = !kind.IsDrum() && orbSpriteArt != null && orbSpriteArt.gameObject.activeSelf
+                ? visualRadius * LabOrbSpriteArt.SizeScaleFor(kind) : visualRadius;
+            jigwiAsh.Show(secondsLeft, totalSeconds, artRadius, !kind.IsDrum(), visual);
+        }
+
         /// <summary>Only tagged free B water gets the drop/ripple; ordinary Water art stays unchanged.</summary>
-        public void SetJigwiSupplyWaterArt(bool active, bool held = false, bool special = false)
+        public void SetJigwiSupplyWaterArt(bool active, bool held = false, bool special = false, bool talisman = false)
         {
             if (!isActiveAndEnabled || kind != LabOrbKind.Combined || element != LabOrbElement.Water) active = false;
             if (!active) { if (jigwiSupplyWaterArt != null) jigwiSupplyWaterArt.Clear(); return; }
             if (jigwiSupplyWaterArt == null) jigwiSupplyWaterArt = LabJigwiSupplyWaterArt.Create(visual);
             float artRadius = visualRadius * (orbSpriteArt != null && orbSpriteArt.gameObject.activeSelf
                 ? LabOrbSpriteArt.SizeScaleFor(kind) : 1f);
-            jigwiSupplyWaterArt.Show(artRadius, held, ExpiryLook.ElementTrailFor(LabOrbElement.Water), special);
+            jigwiSupplyWaterArt.Show(artRadius, held, ExpiryLook.ElementTrailFor(LabOrbElement.Water), special, talisman);
+            // #540: the talisman orb shimmers like the five-colour orb, through blue tones.
+            if (talisman) fiveColor = LabFiveColorSparkle.AttachArt(transform, FiveColorArtRadius, false, LabFiveColorSparkle.BlueTones);
         }
 
         /// <summary>Current shared B reward, never a burn deadline or a persistent launch flag.</summary>

@@ -44,6 +44,8 @@ namespace C6Lab
         public bool paintBlocked;
         /// <summary>A five-colour orb projectile or hit (#329).</summary>
         public bool fiveColor;
+        /// <summary>#540: a Jigwi talisman orb projectile or hit (blue shimmer; its hit slaps the red seal on the gourd).</summary>
+        public bool talisman;
         /// <summary>Why a transferred body crossed its edge (LabEdgeCrossingKind).</summary>
         public int crossing;
         public uint round;
@@ -260,13 +262,14 @@ namespace C6Lab
         //       success splashes the boss, failure sets every board on fire (boardFireUntil). A2 starts at 42 s.
         // 5690: Bulk ACKs carry the receiver's selective ACK (LabBulkEnvelope.sack), the Bulk window is 64 and
         //       snapshot chunks are 4000 characters (5689 is taken by the #540 branch).
-        internal const ushort LabProtocolVersion = 5690;
+        // 5691: #540 Jigwi A: an unfinished talisman burns that seat's remaining orbs; talisman orb volley (on top of 5690).
+        internal const ushort LabProtocolVersion = 5691;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Double-tap a blue fox orb to clear it, and keep your Yin and Yang away.";
         /// <summary>More fox orbs than one fox fire ever drops; a longer list is ignored (#251).</summary>
         private const int MaximumFoxFireOrbs = 10;
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/51");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/52");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;
@@ -2005,9 +2008,13 @@ namespace C6Lab
             var projectile = LabProjectile.Create(launchPosition, config, projectileRoot, orb.element,
                 orb.small ? config.BlastShrinkScale : 1f);
             if (orb.fiveColor) LabFiveColorSparkle.AttachArt(projectile.transform, config.OrbRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined), true);
+            else if (orb.jigwiTalismanReward) LabFiveColorSparkle.AttachArt(projectile.transform,
+                config.OrbRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined) * LabJigwiWaterVolley.SizeScale, true,
+                LabFiveColorSparkle.BlueTones); // #540
             projectile.name = "Projectile " + orb.id;
             float sizeScale = (model != null ? model.LaunchScaleOf(orb.id) : 1f)
-                * (orb.jigwiABReward ? orb.jigwiABRewardSizeScale : 1f);
+                * (orb.jigwiABReward ? orb.jigwiABRewardSizeScale : 1f)
+                * (orb.jigwiTalismanReward ? LabJigwiWaterVolley.SizeScale : 1f); // #540 부적 구슬은 1.5배
             projectile.SetRadiusScale(sizeScale);
             projectile.SetJigwiABRadiusScale(orb.jigwiABRadiusScale);
             projectile.SetJigwiABReward(orb.jigwiABReward);
@@ -2017,10 +2024,13 @@ namespace C6Lab
             SyncJigwiFireSurfaces();
             projectile.SetFireSurfaces(JigwiFireSurfacesFor(orb.owner));
             projectile.Launch(orb.id, orb.owner, velocity, config, target, OnProjectileResolved);
+            if (orb.jigwiTalismanReward) LaunchTalismanVolley(projectile, orb.id, orb.owner, launchPosition, velocity, sizeScale,
+                orb.element, true); // #540 3갈래 물구슬
             RememberReplayLaunch(orb, projectile, model != null ? model.LaunchScaleOf(orb.id) : 1f);
             var notice = new LabNetworkPacket { type = "projectile", sessionId = sessionId,
                 round = model.Round, requestId = actionId,
                 firstId = orb.id, owner = orb.owner, element = (int)orb.element, small = orb.small, fiveColor = orb.fiveColor,
+                talisman = orb.jigwiTalismanReward,
                 x = launchPosition.x, y = launchPosition.y, z = launchPosition.z,
                 wx = velocity.x, wy = velocity.y, wz = velocity.z, sizeScale = sizeScale,
                 jigwiABRadiusScale = orb.jigwiABRadiusScale, jigwiABReward = orb.jigwiABReward,
@@ -2052,6 +2062,7 @@ namespace C6Lab
         {
             if (!IsHost || model == null) return;
             double now = battleClock.Now(Time.realtimeSinceStartupAsDouble);
+            if (LabModel.IsJigwiTalismanShard(result.ProjectileId)) { ResolveTalismanShard(result, now); return; } // #540
             bool blockedByCurtain = false;
             if (result.Kind == LabProjectileHitKind.Fire)
             {
@@ -2101,6 +2112,8 @@ namespace C6Lab
                     // The final-hit replay only shows a hit that painted (never a blocked or element-less one).
                     if (!paintBlocked && (element != LabOrbElement.None || fiveColor)) RememberReplayHit(result);
                     if (fiveColor && !paintBlocked) PresentFiveColorHit(targetLocalPoint, result.OwnerPlayerId);
+                    bool talismanHit = model.LastHitTalisman;
+                    if (talismanHit && !paintBlocked) PresentTalismanHit(targetLocalPoint, result.OwnerPlayerId);
                     if (!paintBlocked && result.OwnerPlayerId == LocalPlayerId)
                     {
                         LastLocalHitOffset = LabThrowSound.HitOffset(targetLocalPoint,
@@ -2119,7 +2132,7 @@ namespace C6Lab
                         paintB = Mathf.Clamp01(paintColor.b), paintA = Mathf.Clamp01(paintColor.a),
                         x = targetLocalPoint.x, y = targetLocalPoint.y, z = targetLocalPoint.z,
                         wx = result.ImpactVelocity.x, wy = result.ImpactVelocity.y, wz = result.ImpactVelocity.z,
-                        spinImpulse = signedYawImpulse, fiveColor = fiveColor, sizeScale = launchScale };
+                        spinImpulse = signedYawImpulse, fiveColor = fiveColor, talisman = talismanHit, sizeScale = launchScale };
                     foreach (ulong id in order) if (id != LocalPlayerId) Send(id, impact);
                 }
             }
@@ -2171,10 +2184,11 @@ namespace C6Lab
                 current.Add(orb.id);
                 if (board.IsSnapshotSuppressed(orb.id)) continue;
                 bool showSpawn = ShowsDrumSpawn(orb, LocalPlayerId);
-                if (orb.jigwiTalismanReward && latest.serverTime - orb.createdAt < .5d) board.ExpectDrop(orb.id); // #509 부적 물구슬은 위에서 하나씩 떨어짐
+                // #540: the talisman orb appears right where the folded talisman dropped (LabJigwiTalismanOverlay), no drop from above.
                 // Every screen derives a locked bomb's fuse from the shared Host clock in the snapshot.
                 float fuse = orb.kind == LabOrbKind.Bomb && orb.lockSwipes > 0 && config != null
                     ? Mathf.Max(0f, (float)(orb.createdAt + config.ItemLifetimeSeconds - latest.serverTime)) : -1f;
+                float blaze = LabJigwiScreenPresentation.FailBlazeSecondsLeft(latest, orb, latest.serverTime);
                 LabOrbView view = board.UpsertOrb(orb.id, orb.kind, new Vector2(orb.x, orb.y),
                     new Vector2(orb.vx, orb.vy), true, showSpawn, orb.element, orb.lockSwipes, orb.relayStage, fuse,
                     orb.JustUnlocked(latest.serverTime), small: orb.small,
@@ -2186,23 +2200,31 @@ namespace C6Lab
                     lifeSeconds: config == null || (orb.kind == LabOrbKind.Bomb && orb.lockSwipes > 0) ? -1f
                         : orb.LifeSecondsLeft(latest.serverTime, config.OrbLifetimeSeconds, config.ItemLifetimeSeconds),
                     jigwiScale: orb.jigwiRadiusScale, fever: orb.fever, fiveColor: orb.fiveColor,
-                    jigwiABScale: orb.jigwiABRadiusScale,
-                    jigwiABBurnSeconds: orb.jigwiABBurnAt >= 0d ? Mathf.Max(0f, (float)(orb.jigwiABBurnAt - latest.serverTime)) : 0f,
+                    jigwiABScale: orb.jigwiABRadiusScale * (orb.jigwiTalismanReward ? LabJigwiWaterVolley.SizeScale : 1f), // #540 부적 구슬 1.5배
+                    // #540: an unfinished talisman's orbs show no A fire at all (they burn to ash in turn instead).
+                    jigwiABBurnSeconds: orb.jigwiABBurnAt >= 0d && !LabJigwiScreenPresentation.FailBurnPending(latest, orb)
+                        ? Mathf.Max(0f, (float)(orb.jigwiABBurnAt - latest.serverTime)) : 0f,
                     jigwiABHeld: latest.paused || GameStartHeld,
                     // An unlocked bomb (#328) glides in to the Host's spot like a drum, then opens there.
                     arrival: orb.kind == LabOrbKind.Bomb && orb.JustArrived(latest.serverTime) ? orb.arrival : LabDrumArrival.None,
                     stopAt: orb.stopAt);
+                view?.SetJigwiAsh(blaze, (float)LabModel.JigwiTalismanFailBlazeSeconds); // #540 burns to ash from the bottom up
                 view?.SetJigwiSupplyWaterArt(!string.IsNullOrEmpty(orb.jigwiABSupplyEventId) || orb.jigwiTalismanReward,
-                    latest.paused || GameStartHeld, special: !string.IsNullOrEmpty(orb.jigwiABSupplyEventId)); // #509 특수 물구슬
+                    latest.paused || GameStartHeld, special: !string.IsNullOrEmpty(orb.jigwiABSupplyEventId), // #509 특수 물구슬
+                    talisman: orb.jigwiTalismanReward); // #540 부적 구슬
             }
+            // #540: my unfinished talisman left embers on my drums — they smoulder and turn light and slippery.
+            float drumFire = config != null ? LabJigwiScreenPresentation.DrumFireSecondsLeft(latest, LocalPlayerId,
+                JigwiABPresentationTime, config.JigwiAFailDrumSlipSeconds) : 0f;
             foreach (var drum in latest.drums ?? Array.Empty<LabOrbState>())
             {
                 if (drum.owner != LocalPlayerId) continue;
                 current.Add(drum.id);
                 // A drum just handed to this player arrives the way the Host drew it (#178); an older
                 // handoff, seen late after a reconnect, is not replayed.
-                board.UpsertOrb(drum.id, drum.kind, new Vector2(drum.x, drum.y), new Vector2(drum.vx, drum.vy),
+                LabOrbView drumView = board.UpsertOrb(drum.id, drum.kind, new Vector2(drum.x, drum.y), new Vector2(drum.vx, drum.vy),
                     arrival: drum.JustArrived(latest.serverTime) ? drum.arrival : LabDrumArrival.None, stopAt: drum.stopAt);
+                drumView?.SetJigwiAsh(drumFire, config != null ? config.JigwiAFailDrumSlipSeconds : 0f); // #540 embers on the rim (no fire)
             }
             foreach (string id in board.OrbIds)
                 if (!current.Contains(id) && !board.ShouldPreserveFromSnapshot(id)) board.RemoveOrb(id);
@@ -2222,6 +2244,8 @@ namespace C6Lab
             board.SetCharm(charmedHere ? (float)(latest.charmUntil - latest.serverTime) : 0f);
             board.SetJigwiOverheat(latest.phase == LabPhase.Playing
                 && latest.JigwiFor(LocalPlayerId)?.Overheated(latest.serverTime) == true);
+            // #540: my unfinished talisman set my drums alight — light and slippery for a while.
+            board.SetJigwiDrumSlip(drumFire > 0f ? config.JigwiAFailDrumSlipBoost : 1f);
             if (blockedHere && (latest.round != announcedBlockRound || latest.swipeBlockStartedAt != announcedBlockStart))
             {
                 announcedBlockRound = latest.round;
@@ -2490,6 +2514,7 @@ namespace C6Lab
                                     (LabOrbElement)packet.element, packet.damage,
                                     new Vector3(packet.wx, packet.wy, packet.wz), false);
                             if (packet.fiveColor) PresentFiveColorHit(new Vector3(packet.x, packet.y, packet.z), packet.owner);
+                            if (packet.talisman) PresentTalismanHit(new Vector3(packet.x, packet.y, packet.z), packet.owner);
                         }
                         // 같은 타격은 위에서 한 번만 받아들이므로 소리·햅틱도 한 번만 난다.
                         if (!packet.paintBlocked && packet.owner == LocalPlayerId && !presentedBefore)
@@ -2529,6 +2554,9 @@ namespace C6Lab
                         LabProjectile visual = LabProjectile.Create(position, config, projectileRoot, element,
                             packet.small ? config.BlastShrinkScale : 1f);
                         if (packet.fiveColor) LabFiveColorSparkle.AttachArt(visual.transform, config.OrbRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined), true);
+                        else if (packet.talisman) LabFiveColorSparkle.AttachArt(visual.transform,
+                            config.OrbRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined) * LabJigwiWaterVolley.SizeScale, true,
+                            LabFiveColorSparkle.BlueTones); // #540
                         if (packet.sizeScale > 0f && packet.sizeScale != 1f) visual.SetRadiusScale(packet.sizeScale);
                         visual.SetJigwiABRadiusScale(packet.jigwiABRadiusScale);
                         visual.SetJigwiABReward(packet.jigwiABReward);
@@ -2538,6 +2566,8 @@ namespace C6Lab
                         SyncJigwiFireSurfaces();
                         visual.SetFireSurfaces(JigwiFireSurfacesFor(packet.owner));
                         visual.LaunchVisual(velocity, config, target);
+                        if (packet.talisman) LaunchTalismanVolley(visual, packet.firstId, packet.owner, position, velocity,
+                            packet.sizeScale > 0f ? packet.sizeScale : 1f, element, false); // #540 3갈래 물구슬
                     }
                     break;
             }

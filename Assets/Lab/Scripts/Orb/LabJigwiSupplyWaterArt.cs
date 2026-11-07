@@ -11,7 +11,8 @@ namespace C6Lab
         private const int Segments = 48, SparkleCount = 3;
         private static readonly Color SpecialTint = new Color(.05f, .22f, .78f, .55f);
         private readonly Vector3[] points = new Vector3[Segments + 1];
-        private SpriteRenderer drop, tint, glow;
+        private SpriteRenderer drop, tint, glow, seal, emblem;
+        private static readonly Color TalismanTint = new Color(.98f, .86f, .5f, .96f), GlyphGold = new Color(1f, .86f, .32f, 1f), GlyphShadow = new Color(.05f, .16f, .38f, .85f);
         private readonly SpriteRenderer[] sparkles = new SpriteRenderer[SparkleCount];
         private static Sprite discSprite, glowSprite, starSprite;
         private LineRenderer ripple;
@@ -19,10 +20,12 @@ namespace C6Lab
         private Material fallback;
         private Texture texture;
         private float radius = .32f, age;
-        private bool shown, held, special;
+        private bool shown, held, special, talisman;
         public bool Shown => shown;
         /// <summary>#509: B's special Water look (darker body, glow, sparkles) is on.</summary>
         public bool Special => shown && special;
+        /// <summary>#540: the talisman orb look (blue shimmer with the gold "물" written on the talisman) is on.</summary>
+        public bool Talisman => shown && talisman;
         public int VisibleSparkles { get; private set; }
         public float AnimationTime => age;
         public int AddedColliderCount => GetComponentsInChildren<Collider>(true).Length;
@@ -34,14 +37,16 @@ namespace C6Lab
             root.layer = visual.gameObject.layer; root.transform.SetParent(visual, false);
             return root.AddComponent<LabJigwiSupplyWaterArt>();
         }
-        public void Show(float artRadius, bool clockHeld, LabElementTrailProfile profile, bool specialWater = false)
+        public void Show(float artRadius, bool clockHeld, LabElementTrailProfile profile, bool specialWater = false, bool talismanOrb = false)
         {
             radius = float.IsNaN(artRadius) || float.IsInfinity(artRadius) ? .32f : Mathf.Max(.001f, artRadius);
             held = clockHeld;
             if (!shown) age = 0f;
-            Ensure(profile); shown = true; special = specialWater;
+            Ensure(profile); shown = true; special = specialWater && !talismanOrb; talisman = talismanOrb;
             EnsureSpecial();
-            drop.enabled = ownedSprite != null; ripple.enabled = true;
+            // #540: the talisman orb shows the "물" written on the talisman, in gold, instead of the water drop.
+            // Its shimmering blue body is LabFiveColorSparkle (BlueTones); this art adds only the letter.
+            drop.enabled = ownedSprite != null && !talisman; ripple.enabled = !talisman;
             if (ownedSprite != null)
             {
                 drop.transform.localPosition = new Vector3(0f, radius * .05f, -.04f);
@@ -63,9 +68,17 @@ namespace C6Lab
                 glow = Child("Special glow", glowSprite, 7);
                 for (int i = 0; i < SparkleCount; i++) sparkles[i] = Child("Special sparkle " + (i + 1), starSprite, 11);
             }
-            tint.enabled = glow.enabled = special;
-            foreach (var sparkle in sparkles) sparkle.enabled = special;
-            if (!special) VisibleSparkles = 0;
+            if (seal == null)
+            {
+                // seal = the letter's dark shadow, emblem = the gold letter on top.
+                seal = Child("Talisman glyph shadow", LabJigwiTalismanOverlay.GlyphSprite(), 17);
+                emblem = Child("Talisman glyph", LabJigwiTalismanOverlay.GlyphSprite(), 18);
+            }
+            bool fancy = special;
+            tint.enabled = glow.enabled = fancy;
+            seal.enabled = emblem.enabled = talisman;
+            foreach (var sparkle in sparkles) sparkle.enabled = fancy;
+            if (!fancy) VisibleSparkles = 0;
         }
         private SpriteRenderer Child(string name, Sprite sprite, int order)
         {
@@ -161,23 +174,32 @@ namespace C6Lab
                 float a = i * Mathf.PI * 2f / Segments;
                 points[i] = new Vector3(Mathf.Cos(a) * r, Mathf.Sin(a) * r, -.025f);
             }
-            ripple.SetPositions(points); ripple.widthMultiplier = radius * (special ? .1f : .07f);
-            ripple.startColor = ripple.endColor = special
-                ? new Color(.35f, .7f, 1f, Mathf.Lerp(.95f, .2f, phase))
+            ripple.SetPositions(points); ripple.widthMultiplier = radius * (special || talisman ? .1f : .07f);
+            ripple.startColor = ripple.endColor = talisman ? new Color(1f, .84f, .3f, Mathf.Lerp(.95f, .2f, phase))
+                : special ? new Color(.35f, .7f, 1f, Mathf.Lerp(.95f, .2f, phase))
                 : new Color(.33f, .88f, 1f, Mathf.Lerp(.85f, .15f, phase));
             DrawSpecial();
         }
         /// <summary>#509: darker body, a breathing glow and three sparkles circling and twinkling.</summary>
         private void DrawSpecial()
         {
+            if (talisman && seal != null)
+            {
+                PlaceGlyph();
+            }
             if (tint == null || !special) { VisibleSparkles = 0; return; }
             tint.transform.localPosition = new Vector3(0f, 0f, -.02f);
             tint.transform.localScale = Vector3.one * radius * 2.02f;
-            tint.color = SpecialTint;
+            tint.color = talisman ? TalismanTint : SpecialTint;
             float breath = .5f + .5f * Mathf.Sin(age * Mathf.PI * 2f / 1.4f);
             glow.transform.localPosition = new Vector3(0f, 0f, .01f);
             glow.transform.localScale = Vector3.one * radius * Mathf.Lerp(3.1f, 3.6f, breath);
-            glow.color = new Color(.35f, .65f, 1f, Mathf.Lerp(.35f, .7f, breath));
+            glow.color = talisman ? new Color(1f, .82f, .3f, Mathf.Lerp(.4f, .8f, breath))
+                : new Color(.35f, .65f, 1f, Mathf.Lerp(.35f, .7f, breath));
+            if (talisman && seal != null)
+            {
+                PlaceGlyph();
+            }
             VisibleSparkles = 0;
             for (int i = 0; i < SparkleCount; i++)
             {
@@ -187,9 +209,21 @@ namespace C6Lab
                     + new Vector3(0f, 0f, -.05f);
                 sparkles[i].transform.localScale = Vector3.one * radius * Mathf.Lerp(.25f, .55f, twinkle);
                 sparkles[i].transform.localRotation = Quaternion.Euler(0f, 0f, age * 90f + i * 30f);
-                sparkles[i].color = new Color(.9f, .97f, 1f, Mathf.Lerp(.35f, 1f, twinkle));
+                sparkles[i].color = talisman ? new Color(1f, .93f, .6f, Mathf.Lerp(.35f, 1f, twinkle))
+                    : new Color(.9f, .97f, 1f, Mathf.Lerp(.35f, 1f, twinkle));
                 VisibleSparkles++;
             }
+        }
+        /// <summary>#540: the gold "물" fills most of the orb, with a soft dark shadow so it reads on the shimmering blue.</summary>
+        private void PlaceGlyph()
+        {
+            float scale = radius * 1.7f / Mathf.Max(.01f, emblem.sprite.bounds.size.x);
+            emblem.transform.localPosition = new Vector3(0f, 0f, -.07f);
+            seal.transform.localPosition = new Vector3(radius * .04f, -radius * .05f, -.065f);
+            seal.transform.localRotation = emblem.transform.localRotation = Quaternion.identity;
+            emblem.transform.localScale = Vector3.one * scale;
+            seal.transform.localScale = Vector3.one * scale * 1.04f;
+            emblem.color = GlyphGold; seal.color = GlyphShadow;
         }
         public void Clear()
         {
@@ -198,6 +232,9 @@ namespace C6Lab
             if (ripple != null) ripple.enabled = false;
             if (tint != null) tint.enabled = false;
             if (glow != null) glow.enabled = false;
+            if (seal != null) seal.enabled = false;
+            if (emblem != null) emblem.enabled = false;
+            talisman = false;
             foreach (var sparkle in sparkles) if (sparkle != null) sparkle.enabled = false;
         }
         private void OnDisable() => Clear();

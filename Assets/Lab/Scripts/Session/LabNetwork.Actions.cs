@@ -566,12 +566,17 @@ namespace C6Lab
                 element, small ? config.BlastShrinkScale : 1f);
             bool fiveColor = orb != null ? orb.fiveColor : board != null && board.IsFiveColor(request.firstId);
             if (fiveColor) LabFiveColorSparkle.AttachArt(visual.transform, config.OrbRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined), true);
+            else if (orb != null && orb.jigwiTalismanReward) LabFiveColorSparkle.AttachArt(visual.transform,
+                config.OrbRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined) * LabJigwiWaterVolley.SizeScale, true,
+                LabFiveColorSparkle.BlueTones); // #540 부적 구슬
             float scale = player.comboPenaltyUntil > latest.serverTime ? config.ComboPenaltySizeScale
                 : player.comboRewardUntil > latest.serverTime ? config.ComboRewardSizeScale : 1f;
             if (!config.GourdColorComboEnabled) scale = 1f;
             float comboScale = scale;
             bool rewarded = JigwiRewardAt(latest.serverTime);
             if (rewarded) scale *= config.JigwiABRewardSizeScale;
+            bool talisman = orb != null && orb.jigwiTalismanReward;
+            if (talisman) scale *= LabJigwiWaterVolley.SizeScale; // #540 부적 구슬 1.5배
             visual.SetRadiusScale(scale);
             visual.SetJigwiABReward(rewarded);
             visual.SetJigwiABRadiusScale(orb != null ? orb.jigwiABRadiusScale : board != null ? board.JigwiABRadiusScaleFor(request.firstId) : 1f);
@@ -586,6 +591,7 @@ namespace C6Lab
             localHits.Register(requestId, id);
             visual.LaunchVisual(velocity, config, target,
                 contact => OnPredictedShotContact(requestId, contact, element, attack, comboScale, fiveColor, supply));
+            if (talisman) LaunchTalismanVolley(visual, id, LocalPlayerId, position, velocity, scale, element, false); // #540
             predictedShots[request.requestId] = visual;
             presentedShots.Add(request.requestId);
         }

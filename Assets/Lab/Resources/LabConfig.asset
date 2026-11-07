@@ -38,6 +38,10 @@ MonoBehaviour:
   feverTimeSeconds: 20
   feverTimeRecoveryMultiplier: 2
   jigwiStageTimelineEnabled: 1
+  jigwiFlowSchedule: 1
+  jigwiAHoldBurnUntilEnd: 1
+  jigwiCommonStartSeconds: 40
+  jigwiCommonIntervalSeconds: 15
   jigwiStageWarningSeconds: 1
   jigwiStageActiveSeconds: 7
   jigwiStageRootAngleDegrees: 18
@@ -45,12 +49,18 @@ MonoBehaviour:
   jigwiStageSpreadSeconds: 1
   jigwiStageSpreadPatches: 3
   jigwiStageFeverMultiplier: 2
-  jigwiABPersonalDurationSeconds: 15
+  jigwiABPersonalDurationSeconds: 10
   jigwiABPersonalRecoveryMultiplier: 4
   jigwiABPersonalRequiredHits: 3
   jigwiABPersonalBurnSeconds: 1
   jigwiABGroupFireCount: 3
   jigwiABRelightSeconds: 12
+  jigwiABBurnStaggerSeconds: 2
+  jigwiTalismanWaterCount: 1
+  jigwiTalismanWaterPaintScale: 3
+  jigwiTalismanRewardDelaySeconds: 2.9
+  jigwiAFailDrumSlipSeconds: 15
+  jigwiAFailDrumSlipBoost: 2
   jigwiABShrinkDelaySeconds: 12
   jigwiABShrinkScale: 0.65
   jigwiABFireMoveAmount: 0.03

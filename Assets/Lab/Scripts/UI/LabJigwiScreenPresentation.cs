@@ -484,7 +484,7 @@ namespace C6Lab
             else SetFiresHidden(held);
             DrawWater(now, held);
             DrawStatus(stage, active, snapshot, localPlayer, now, held);
-            DrawFailure(stage, now);
+            DrawFailure(stage, localPlayer, now);
         }
 
         /// <summary>#479: true once this seat finished writing its talisman in this A.</summary>
@@ -510,15 +510,85 @@ namespace C6Lab
             }
         }
 
+        /// <summary>
+        /// #540: 내 부적을 못 써 판이 탄 뒤(불덩이가 판에 닿은 때부터) 내 북에 붙은 불이 꺼지기까지 남은 초 (없으면 0).
+        /// 길어야 seconds이고, 다른 기믹(A·B·공통 불)의 예고가 뜨거나 피버가 시작되면 그때 꺼져 다른 기믹과 겹치지 않는다.
+        /// </summary>
+        public static float DrumFireSecondsLeft(LabSnapshot snapshot, ulong player, double now, float seconds)
+        {
+            if (seconds <= 0f || snapshot == null || snapshot.phase != LabPhase.Playing || snapshot.jigwiAB?.rounds == null) return 0f;
+            foreach (var round in snapshot.jigwiAB.rounds)
+            {
+                if (round == null || round.kind != LabJigwiABKind.PersonalBurn || round.resolution != LabJigwiABResolution.Expired
+                    || round.resolvedAt < 0d || !SeatFailed(round, player)) continue;
+                double from = round.resolvedAt + LabModel.JigwiTalismanFailBurnDelaySeconds;
+                double until = from + seconds;
+                if (snapshot.jigwiAB.cutoffAt > from) until = Math.Min(until, snapshot.jigwiAB.cutoffAt);
+                foreach (var other in snapshot.jigwiAB.rounds)
+                    if (other != null && other.warningAt > from) until = Math.Min(until, other.warningAt);
+                foreach (var group in snapshot.jigwiStage?.groups ?? Array.Empty<LabJigwiStageGroup>())
+                    if (group != null && group.warningAt > from) until = Math.Min(until, group.warningAt);
+                if (now >= from && now < until) return (float)(until - now);
+            }
+            return 0f;
+        }
+
+        /// <summary>
+        /// #540: 부적을 못 써 타는 구슬이 지금 타오르는 중이면 남은 초, 아니면 0. 지귀 대사가 끝나면 판의 구슬이 모두 함께
+        /// `LabModel.JigwiTalismanFailBlazeSeconds`(1초) 동안 아래부터 재가 되어(`LabJigwiAshBurn`) 없어진다.
+        /// 불이 붙기 전 구슬은 0(그대로 보임).
+        /// </summary>
+        public static float FailBlazeSecondsLeft(LabSnapshot snapshot, LabOrbState orb, double serverTime)
+        {
+            float left = FailBurnSecondsLeft(snapshot, orb, serverTime);
+            return left <= (float)LabModel.JigwiTalismanFailBlazeSeconds + .01f ? left : 0f;
+        }
+
+        /// <summary>
+        /// #540: 부적을 못 써 타기로 정해진 구슬이 없어지기까지 남은 초 (Host 소각 시각까지, 차례를 기다리는 시간 포함).
+        /// 그 A가 시간이 다 돼 끝나고 불덩이가 판에 닿은 뒤의 소각만, 아니면 0.
+        /// </summary>
+        public static float FailBurnSecondsLeft(LabSnapshot snapshot, LabOrbState orb, double serverTime)
+        {
+            if (orb == null || orb.jigwiABBurnAt < 0d || string.IsNullOrEmpty(orb.jigwiABBurnEventId) || snapshot?.jigwiAB?.rounds == null) return 0f;
+            foreach (var round in snapshot.jigwiAB.rounds)
+                if (round != null && round.id == orb.jigwiABBurnEventId && round.kind == LabJigwiABKind.PersonalBurn
+                    && round.resolution == LabJigwiABResolution.Expired
+                    // They catch the moment the fireball lands on the board.
+                    && serverTime >= round.resolvedAt + LabModel.JigwiTalismanFailBurnDelaySeconds)
+                    return Mathf.Max(0f, (float)(orb.jigwiABBurnAt - serverTime));
+            return 0f;
+        }
+
+        /// <summary>#540: 이 구슬이 부적을 못 써 끝난 A 때문에 타기로 정해졌는지 (불덩이가 닿기 전 포함). 이런 구슬엔 A 불을 붙이지 않는다.</summary>
+        public static bool FailBurnPending(LabSnapshot snapshot, LabOrbState orb)
+        {
+            if (orb == null || orb.jigwiABBurnAt < 0d || string.IsNullOrEmpty(orb.jigwiABBurnEventId) || snapshot?.jigwiAB?.rounds == null) return false;
+            foreach (var round in snapshot.jigwiAB.rounds)
+                if (round != null && round.id == orb.jigwiABBurnEventId)
+                    return round.kind == LabJigwiABKind.PersonalBurn && round.resolution == LabJigwiABResolution.Expired;
+            return false;
+        }
+
+        private static bool SeatFailed(LabJigwiABRound round, ulong player)
+        {
+            foreach (var seat in round.players ?? Array.Empty<LabJigwiABPlayerFire>())
+                if (seat != null && seat.playerId == player) return seat.talismanAt < 0d;
+            return false;
+        }
+
         /// <summary>#509: true while a failed B keeps the boards on fire (drums blocked).</summary>
         public bool BoardFireVisible { get; private set; }
-        private void DrawFailure(LabJigwiABSnapshot stage, double now)
+        private void DrawFailure(LabJigwiABSnapshot stage, ulong localPlayer, double now)
         {
             if (failureOverlay == null) return;
             double fireUntil = -1d;
             foreach (var round in stage?.rounds ?? Array.Empty<LabJigwiABRound>())
+            {
                 if (round != null && round.kind == LabJigwiABKind.GroupFire && round.resolution == LabJigwiABResolution.Expired
                     && now >= round.resolvedAt && now < round.boardFireUntil) fireUntil = Math.Max(fireUntil, round.boardFireUntil);
+                // #540: an unfinished talisman shows no screen fire; the orbs and drums blazing carry it.
+            }
             BoardFireVisible = fireUntil > now;
             bool flash = failedAt >= 0d && now >= failedAt && now - failedAt < FailureFlashSeconds;
             bool visible = flash || BoardFireVisible;
@@ -715,22 +785,12 @@ namespace C6Lab
             // 피버는 세 스테이지 공통 연출(#441, LabYaguangFeverHud)이 알린다.
             // #509: the only words on screen are Jigwi's two-second taunts (no progress, guide, result or next-gimmick
             // lines). The drops, the "now" vibration and the failure overlay carry the rest without text.
+            // #540: the taunts are spoken by Jigwi's voice now (LabJigwiTalismanOverlay); no warning words on screen.
             string words = string.Empty;
-            if (active != null && active.Warning(now)) words = Taunt(active.kind);
-            foreach (var upcoming in stage.rounds ?? Array.Empty<LabJigwiABRound>())
-            {
-                if (upcoming == null || upcoming == active || !upcoming.Warning(now)) continue;
-                words = words.Length > 0 ? words + "\n" + Taunt(upcoming.kind) : Taunt(upcoming.kind);
-                break;
-            }
             status.text = words; playerStatus.text = rows.ToString();
             statusPanel.gameObject.SetActive(words.Length > 0);
             playerStatus.gameObject.SetActive(rows.Length > 0);
         }
-
-        /// <summary>#509 지귀 도발(파훼법은 말하지 않음). 예고 2초 동안만 보인다.</summary>
-        public static string Taunt(LabJigwiABKind kind) =>
-            kind == LabJigwiABKind.PersonalBurn ? "타올라라, 모두 재가 되어라!" : "흩어진 물방울로는 어림없다!";
 
         private void PositionGroupStatus(LabJigwiABRound round, ulong owner, double now)
         {

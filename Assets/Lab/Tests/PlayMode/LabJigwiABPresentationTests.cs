@@ -156,14 +156,14 @@ namespace C6Lab.Tests
             snapshot = Snapshot(personal); SetSnapshot(snapshot);
             view.ApplySnapshot(snapshot, Local, personal.warningAt);
             Assert.That(view.PersonalHeatVisible, Is.False, "The voice warning must not apply active heat early.");
-            Assert.That(view.status.text, Does.Contain("타올라라, 모두 재가 되어라"));
+            Assert.That(view.status.text, Is.Empty, "#540: the taunt is spoken, not written.");
             Assert.That(view.playerStatus.text, Does.Not.Contain("결합 구슬로 박을 맞혀"), "#479 removed A's boss-hit instruction.");
             view.ApplySnapshot(snapshot, Local, activeAt - .001d);
             Assert.That(view.PersonalHeatVisible, Is.False);
             Assert.That(view.VisibleScreenFires, Is.Zero);
             view.ApplySnapshot(snapshot, Local, activeAt);
             Assert.That(view.PersonalHeatVisible, Is.False, "#479: A never tints the screen or shows edge flames.");
-            Assert.That(view.status.text, Does.Not.Contain("타올라라, 모두 재가 되어라"), "The warning text still ends at activeAt.");
+            Assert.That(view.status.text, Is.Empty);
             view.ApplySnapshot(snapshot, Other, activeAt + .01d);
             Assert.That(view.PersonalHeatVisible, Is.False);
             view.ApplySnapshot(snapshot, Local, personal.endsAt);
@@ -180,8 +180,9 @@ namespace C6Lab.Tests
             snapshot = Snapshot(group); SetSnapshot(snapshot);
             view.audioView.Source.mute = true;
             view.ApplySnapshot(snapshot, Local, group.warningAt);
-            // #509: the warning shows only Jigwi's taunt; no picked names, guide or progress.
-            Assert.That(view.status.text, Is.EqualTo("흩어진 물방울로는 어림없다!"));
+            // #540: the warning shows no words at all (Jigwi says the taunt); no picked names, guide or progress.
+            Assert.That(view.status.text, Is.Empty);
+            Assert.That(view.statusPanel.gameObject.activeSelf, Is.False);
             Assert.That(view.playerStatus.gameObject.activeSelf, Is.False);
             Assert.That(view.SyncPillar.DropsVisible, Is.False, "The drops start with the mission, not the warning.");
             view.ApplySnapshot(snapshot, Local, activeAt);
@@ -298,7 +299,7 @@ namespace C6Lab.Tests
             view.ApplySnapshot(snapshot, Local, 11d);
             Assert.That(view.status.text, Is.Empty, "#509: no countdown text.");
             view.ApplySnapshot(snapshot, Local, 20.5d);
-            Assert.That(view.status.text, Is.EqualTo("타올라라, 모두 재가 되어라!"), "The next A shows only its own taunt.");
+            Assert.That(view.status.text, Is.Empty, "#540: Jigwi speaks the taunt; no warning words on screen.");
             Assert.That(view.SyncPillar.DropsVisible, Is.True, "The upcoming A warning must not hide B before its deadline.");
             group.resolution = LabJigwiABResolution.Expired; group.resolvedAt = 21d;
             view.ApplySnapshot(snapshot, Local, 21d);

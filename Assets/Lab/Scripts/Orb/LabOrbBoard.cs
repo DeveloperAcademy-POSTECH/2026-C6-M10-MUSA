@@ -282,6 +282,13 @@ namespace C6Lab
         public event Action<string, string> JigwiBurnRequested;
         public bool JigwiOverheated => jigwiOverheat;
         public void SetJigwiOverheat(bool active) => jigwiOverheat = active;
+        /// <summary>
+        /// #540 지귀 A 실패: 이 판의 북에 불이 붙어 가벼워진다(1 = 그대로). 옆으로 살짝만 밀어도 이 배 빠르게 나가고,
+        /// 미끄러지며 느려지는 정도는 1/이 배라 훨씬 멀리 간다. 이 기기 판 물리만 바꾼다(불꽃 그림은 UpsertOrb의 burnSeconds).
+        /// </summary>
+        public void SetJigwiDrumSlip(float boost) => jigwiDrumSlip = float.IsNaN(boost) || boost < 1f ? 1f : boost;
+        public float JigwiDrumSlip => jigwiDrumSlip;
+        private float jigwiDrumSlip = 1f;
 
         /// <summary>The shared reward window also lights existing and locally predicted board orbs.</summary>
         public void SetJigwiRewardFire(bool active, bool held = false)
@@ -449,8 +456,9 @@ namespace C6Lab
             small &= !kind.IsDrum();
             jigwiScale = kind.IsRaw() && !float.IsNaN(jigwiScale) && !float.IsInfinity(jigwiScale)
                 ? Mathf.Clamp(jigwiScale, .1f, 1f) : 1f;
+            // #540: up to 1.5 for the talisman orb (bigger); below 1 is B's shrink.
             jigwiABScale = (kind.IsRaw() || kind == LabOrbKind.Combined) && Finite(jigwiABScale)
-                ? Mathf.Clamp(jigwiABScale, .2f, 1f) : 1f;
+                ? Mathf.Clamp(jigwiABScale, .2f, 1.5f) : 1f;
             if (string.IsNullOrWhiteSpace(id) || !Finite(normalizedPosition) || !Finite(velocityInBoardWidthsPerSecond))
                 throw new ArgumentException("A finite orb identity, position and velocity are required.");
             if (entries.TryGetValue(id, out var existing))
@@ -808,6 +816,22 @@ namespace C6Lab
                 return pixels > 0f;
             }
             return false;
+        }
+
+        /// <summary>
+        /// #540 판 위 자리(0~1)의 화면 좌표와, 그 자리에 놓인 보통 크기 구슬의 화면 반지름(픽셀).
+        /// 접힌 부적이 진짜 부적 구슬이 생길 자리로 떨어지게 하려고 쓴다. 카메라가 없으면 false.
+        /// </summary>
+        public bool TryGetScreenSpot(Vector2 normalized01, out Vector2 screen, out float pixelRadius)
+        {
+            screen = default; pixelRadius = 0f;
+            if (inputCamera == null || config == null) return false;
+            Vector3 center = OnPlane(ToWorld(normalized01, config.OrbRadius));
+            Vector3 a = inputCamera.WorldToScreenPoint(center);
+            Vector3 b = inputCamera.WorldToScreenPoint(center + inputCamera.transform.right * config.OrbRadius);
+            if (a.z < 0f || b.z < 0f) return false;
+            screen = a; pixelRadius = Vector2.Distance(a, b);
+            return true;
         }
 
         /// <summary>#414 이 판에 보이는 북 orbId의 화면 좌표 (연타 숫자를 북 옆에 띄우려고). 없으면 false.</summary>
@@ -1369,7 +1393,10 @@ namespace C6Lab
         {
             if (id == null || !entries.TryGetValue(id, out var entry) || entry.View == null) return false;
             // It goes up in a puff of smoke where this screen shows it (#235); a fox orb's is blue (#251).
-            if (entry.View.Kind == LabOrbKind.FoxFire) PlayFoxSmoke(entry);
+            // #540: an orb that burned away to ash from the bottom up (Jigwi's failed talisman) is already gone — no puff.
+            bool ashed = entry.View.JigwiAsh != null && entry.View.JigwiAsh.Consumes;
+            if (ashed) { }
+            else if (entry.View.Kind == LabOrbKind.FoxFire) PlayFoxSmoke(entry);
             else LabOrbVanishSmoke.Play(transform, entry.View.transform.position, entry.View.HitSphere.radius,
                 config != null ? config.OrbAppearance : null);
             RemoveOrb(id);
@@ -1403,6 +1430,7 @@ namespace C6Lab
             SetTeamWall(0);
             charmed = false;
             jigwiOverheat = false;
+            jigwiDrumSlip = 1f;
             jigwiRewardFire = jigwiRewardHeld = false;
             flashGlare = 0f;
             flashRevealed.Clear();
@@ -1696,6 +1724,7 @@ namespace C6Lab
             SetBodyMode(entry);
             // A heavy bomb leaves the finger slower, so it takes a harder swipe to pass it on (#212).
             float heft = entry.View.Kind == LabOrbKind.Bomb ? config.BombReleaseSpeed : 1f;
+            if (entry.View.Kind.IsDrum()) heft *= jigwiDrumSlip; // #540 a burning drum is light
             Vector2 worldVelocity = inputVelocity * bounds.width * heft;
             entry.View.Body.linearVelocity = OnPlane(Vector2.ClampMagnitude(worldVelocity,
                 config.OrbMaxReleaseSpeed * bounds.width * heft));
@@ -1917,6 +1946,7 @@ namespace C6Lab
                 // A heavy bomb slides to a stop sooner than a drum or an orb (#212).
                 float slowing = config.OrbFloorDeceleration
                     * (entry.View.Kind == LabOrbKind.Bomb ? config.BombSlideDeceleration : 1f);
+                if (entry.View.Kind.IsDrum()) slowing /= jigwiDrumSlip; // #540 a burning drum glides on
                 return velocity.normalized * Mathf.Max(driftSpeed, speed - slowing * bounds.width * step);
             }
 
@@ -2111,7 +2141,10 @@ namespace C6Lab
                 var old = wallRoot.transform.GetChild(0);
                 var collider = old.GetComponent<Collider>();
                 if (collider != null) collider.enabled = false;
-                old.SetParent(null);
+                // Out of the wall root (Destroy waits for the frame end), but still under this board: an old wall
+                // moved to the scene root was left behind when the battle scene closed right after a resize.
+                old.gameObject.SetActive(false);
+                old.SetParent(transform, false);
                 Destroy(old.gameObject);
             }
             foreach (Mesh mesh in areaWallMeshes) if (mesh != null) Destroy(mesh);
@@ -2289,8 +2322,9 @@ namespace C6Lab
         {
             if (kind.IsDrum()) return config.DrumRadius;
             float existing = (small ? config.BlastShrinkScale : 1f) * (kind.IsRaw() ? jigwiScale : 1f);
-            float size = jigwiABScale < 1f && (kind.IsRaw() || kind == LabOrbKind.Combined)
-                ? Mathf.Min(existing, jigwiABScale) : existing;
+            bool scaled = kind.IsRaw() || kind == LabOrbKind.Combined;
+            float size = jigwiABScale < 1f && scaled ? Mathf.Min(existing, jigwiABScale)
+                : jigwiABScale > 1f && scaled ? existing * jigwiABScale : existing; // #540 talisman orb
             return config.OrbRadius * size;
         }
 

@@ -603,6 +603,7 @@ namespace C6Lab
             if (Charmed(sender, now)) return Reject("CHARMED", out reason);
             ApplyJigwiABOrb(current, now);
             CaptureJigwiABLaunchReward(current, now);
+            LaunchJigwiTalismanShards(current); // #540 부적 구슬은 3갈래로 날아간다
             current.inFlight = true;
             current.vx = current.vy = 0f;
             current.revision = ++revision;
@@ -664,6 +665,7 @@ namespace C6Lab
                 (long)attacker.damageTotal + attackValue);
 
             LastHitFiveColor = orb.fiveColor;
+            LastHitTalisman = orb.jigwiTalismanReward;
             if (teamMode)
                 ConfirmTeamHit(attacker, element, paintDirection, (orb.small ? rules.SmallOrbPaintShare : 1f) * areaScale, now);
             else

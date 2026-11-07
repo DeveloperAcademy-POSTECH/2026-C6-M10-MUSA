@@ -43,6 +43,18 @@ namespace C6Lab
             new Color32(255, 206, 0, 255), new Color32(30, 178, 76, 255), new Color32(18, 98, 232, 255),
             new Color32(232, 38, 38, 255), new Color32(140, 82, 38, 255)
         };
+        /// <summary>
+        /// #540 지귀 부적 구슬: 오색구슬과 같은 영롱한 모습을 쓰되, 다섯 색 대신 푸른 빛의 여러 톤(남·하늘·청록·쪽·옥빛)을 건너간다.
+        /// </summary>
+        public static readonly Color32[] BlueTones =
+        {
+            new Color32(24, 52, 168, 255), new Color32(38, 132, 240, 255), new Color32(46, 200, 232, 255),
+            new Color32(70, 64, 210, 255), new Color32(36, 170, 190, 255)
+        };
+        /// <summary>이 구슬·가루가 건너가는 색들 (기본 다섯 색).</summary>
+        private Color32[] colors = FiveColors;
+        private Color Col(float seconds) => ColorAt(seconds, colors);
+        private Color Star(int index) => StarColor(index, colors);
         private static Sprite shadeSprite, sparkleSprite, glowSprite, rimSprite, discSprite;
         private static int attachCount;
 
@@ -88,13 +100,13 @@ namespace C6Lab
         public bool Shown => body != null && body.gameObject.activeSelf;
 
         /// <summary>지금 몸통 색 (다섯 색 사이를 건너가는 중의 색)</summary>
-        public Color BodyColor => ColorAt(age);
+        public Color BodyColor => Col(age);
 
         /// <summary>
         /// 이 구슬에 오색구슬 그림을 얹는다(이미 있으면 그것을 쓴다). faceCamera는 투사체처럼 3D로 날아가는 구슬용으로,
         /// 이때는 그림을 얹지 않고 구슬의 3D 공 색을 다섯 색 사이로 바꾼다.
         /// </summary>
-        public static LabFiveColorSparkle AttachArt(Transform orbRoot, float orbRadius, bool faceCamera)
+        public static LabFiveColorSparkle AttachArt(Transform orbRoot, float orbRadius, bool faceCamera, Color32[] palette = null)
         {
             if (orbRoot == null) return null;
             Transform found = orbRoot.Find(ArtName);
@@ -110,17 +122,19 @@ namespace C6Lab
                 if (faceCamera) look.flightRoot = orbRoot;
                 else look.Build();
             }
+            look.colors = palette != null && palette.Length > 1 ? palette : FiveColors;
             look.SetRadius(orbRadius);
             look.Show(true);
             return look;
         }
 
         /// <summary>박에 맞은 자리에서 다섯 색 별가루를 한 번 터뜨린다. 스스로 사라진다.</summary>
-        public static LabFiveColorSparkle Burst(Vector3 worldPoint, float orbRadius)
+        public static LabFiveColorSparkle Burst(Vector3 worldPoint, float orbRadius, Color32[] palette = null)
         {
             var root = new GameObject("Five Color Sparkle Burst");
             root.transform.position = worldPoint;
             var look = root.AddComponent<LabFiveColorSparkle>();
+            if (palette != null && palette.Length > 1) look.colors = palette;
             look.burst = true;
             look.radius = orbRadius > 0f ? orbRadius : .3f;
             RenderPipelineManager.beginCameraRendering += look.FaceRenderingCamera;
@@ -130,7 +144,7 @@ namespace C6Lab
             {
                 float angle = (i + .37f * (i % 3)) / BurstCount * Mathf.PI * 2f;
                 look.burstDirections[i] = new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), 0f) * (.75f + .25f * ((i * 7) % 4) / 3f);
-                look.burstStars[i] = look.Part("Five Color Burst Star " + i, SparkleSprite(), StarColor(i), BurstOrder);
+                look.burstStars[i] = look.Part("Five Color Burst Star " + i, SparkleSprite(), look.Star(i), BurstOrder);
             }
             look.Update();
             return look;
@@ -140,11 +154,13 @@ namespace C6Lab
         /// 박에 맞은 자리에서 다섯 색 가루 먼지가 털리듯 퍼진다. 부드러운 뭉게구름이 확 퍼졌다 느려지며 커지고 살짝 떠오르며
         /// 흐려지고, 작은 알갱이는 더 멀리 튀었다 떨어진다. 스스로 사라진다.
         /// </summary>
-        public static LabFiveColorSparkle DustBurst(Vector3 worldPoint, float orbRadius, float puffScale = DefaultDustPuffScale)
+        public static LabFiveColorSparkle DustBurst(Vector3 worldPoint, float orbRadius, float puffScale = DefaultDustPuffScale,
+            Color32[] palette = null)
         {
             var root = new GameObject("Five Color Dust Burst");
             root.transform.position = worldPoint;
             var look = root.AddComponent<LabFiveColorSparkle>();
+            if (palette != null && palette.Length > 1) look.colors = palette;
             look.dust = true;
             look.radius = orbRadius > 0f ? orbRadius : .3f;
             look.puffScale = puffScale > 0f && !float.IsInfinity(puffScale) ? puffScale : DefaultDustPuffScale;
@@ -158,7 +174,7 @@ namespace C6Lab
                 look.puffDirections[i] = new Vector3(Mathf.Cos(angle), Mathf.Sin(angle) * .75f + .15f, 0f) * Random.Range(.55f, 1f);
                 look.puffSizes[i] = Random.Range(.9f, 1.4f);
                 look.dustPuffs[i] = look.Part("Five Color Dust Puff " + i, GlowSprite(),
-                    Color.Lerp(StarColor(i), DustTone, .55f), BurstOrder - 2); // 별가루 아래
+                    Color.Lerp(look.Star(i), DustTone, .55f), BurstOrder - 2); // 별가루 아래
             }
             look.dustSpecks = new SpriteRenderer[DustSpeckCount];
             look.speckDirections = new Vector3[DustSpeckCount];
@@ -169,7 +185,7 @@ namespace C6Lab
                 look.speckDirections[i] = new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), 0f) * Random.Range(.6f, 1.1f);
                 look.speckSizes[i] = Random.Range(.08f, .16f);
                 look.dustSpecks[i] = look.Part("Five Color Dust Speck " + i, DiscSprite(),
-                    Color.Lerp(StarColor(i), DustTone, .3f), BurstOrder - 1);
+                    Color.Lerp(look.Star(i), DustTone, .3f), BurstOrder - 1);
             }
             look.Update();
             return look;
@@ -248,7 +264,7 @@ namespace C6Lab
                     float ease = 1f - (1f - u) * (1f - u);
                     star.transform.localPosition = burstDirections[i] * (BurstReach * radius * ease);
                     star.transform.localScale = Vector3.one * (radius * (1.1f - .7f * u));
-                    Color color = StarColor(i);
+                    Color color = Star(i);
                     color.a = 1f - u * u;
                     star.color = color;
                     star.transform.localRotation = Quaternion.Euler(0f, 0f, 180f * u + i * 30f);
@@ -268,7 +284,7 @@ namespace C6Lab
         {
             if (flightRoot == null) return;
             if (tintBlock == null) tintBlock = new MaterialPropertyBlock();
-            Color color = ColorAt(age);
+            Color color = Col(age);
             flightRoot.GetComponentsInChildren(false, tinted);
             foreach (MeshRenderer surface in tinted)
             {
@@ -311,7 +327,7 @@ namespace C6Lab
             if (trailGradient == null) trailGradient = new Gradient();
             float flow = age * TrailFlowSpeed;
             for (int i = 0; i < trailColors.Length; i++)
-                trailColors[i] = new GradientColorKey(ColorAt(flow + (trailColors.Length - 1 - i) * ColorSeconds), i / (trailColors.Length - 1f));
+                trailColors[i] = new GradientColorKey(Col(flow + (trailColors.Length - 1 - i) * ColorSeconds), i / (trailColors.Length - 1f));
             trailGradient.SetKeys(trailColors, TrailAlphas);
             flightTrail.colorGradient = trailGradient;
         }
@@ -333,7 +349,7 @@ namespace C6Lab
             float shine = 1f - dim;
 
             // 몸통: 다섯 색 사이를 쉬지 않고 건너간다.
-            Color bodyColor = ColorAt(age);
+            Color bodyColor = Col(age);
             bodyColor.a = shine;
             body.color = bodyColor;
             body.transform.localScale = Vector3.one * (2f * BodySize * radius);
@@ -343,7 +359,7 @@ namespace C6Lab
             for (int i = 0; i < SwirlCount; i++)
             {
                 float angle = (SwirlDegreesPerSecond * age + 180f * i) * Mathf.Deg2Rad;
-                Color swirlColor = Color.Lerp(ColorAt(age + ColorSeconds * (.6f + .5f * i)), Color.white, SwirlWhite);
+                Color swirlColor = Color.Lerp(Col(age + ColorSeconds * (.6f + .5f * i)), Color.white, SwirlWhite);
                 swirlColor.a = SwirlAlpha * shine;
                 swirls[i].color = swirlColor;
                 swirls[i].transform.localScale = Vector3.one * (SwirlSize * radius);
@@ -359,7 +375,7 @@ namespace C6Lab
             shade.color = new Color(1f, 1f, 1f, shine);
 
             // 빛무리: 몸통과 같은 색으로 숨 쉰다.
-            Color haloColor = ColorAt(age);
+            Color haloColor = Col(age);
             haloColor.a = shine * Mathf.Lerp(HaloMinAlpha, HaloMaxAlpha, .5f + .5f * Mathf.Sin(age * HaloPulseHz * Mathf.PI * 2f));
             halo.color = haloColor;
             halo.transform.localScale = Vector3.one * (2f * HaloSize * radius);
@@ -385,7 +401,7 @@ namespace C6Lab
                 twinkle.localPosition = new Vector3(Mathf.Cos(angle) * reach, Mathf.Sin(angle) * reach, -1.09f * radius);
                 twinkle.localScale = Vector3.one * (TwinkleSize * radius * glow);
                 twinkle.localRotation = Quaternion.Euler(0f, 0f, 90f * phase);
-                Color color = Color.Lerp(Color.white, StarColor(i + round), .35f);
+                Color color = Color.Lerp(Color.white, Star(i + round), .35f);
                 color.a = glow * shine;
                 twinkles[i].color = color;
             }
@@ -404,15 +420,22 @@ namespace C6Lab
         }
 
         /// <summary>seconds 시각의 몸통 색: ColorSeconds마다 다음 색으로, 사이는 부드럽게 섞는다.</summary>
-        public static Color ColorAt(float seconds)
+        public static Color ColorAt(float seconds) => ColorAt(seconds, FiveColors);
+
+        public static Color ColorAt(float seconds, Color32[] palette)
         {
             float step = Mathf.Max(0f, seconds) / ColorSeconds;
             int from = Mathf.FloorToInt(step);
-            return Color.Lerp(StarColor(from), StarColor(from + 1), Mathf.SmoothStep(0f, 1f, step - from));
+            return Color.Lerp(StarColor(from, palette), StarColor(from + 1, palette), Mathf.SmoothStep(0f, 1f, step - from));
         }
 
         /// <summary>별가루 별 하나의 색: 다섯 색이 차례로 돈다.</summary>
-        private static Color StarColor(int index) => FiveColors[((index % FiveColors.Length) + FiveColors.Length) % FiveColors.Length];
+        private static Color StarColor(int index) => StarColor(index, FiveColors);
+        private static Color StarColor(int index, Color32[] palette)
+        {
+            Color32[] set = palette != null && palette.Length > 0 ? palette : FiveColors;
+            return set[((index % set.Length) + set.Length) % set.Length];
+        }
 
         /// <summary>가운데가 밝고 바깥으로 부드럽게 사라지는 흰 원 (빛무리·안쪽 빛용, 색은 코드에서 입힌다).</summary>
         private static Sprite GlowSprite() => glowSprite != null ? glowSprite : glowSprite = Generated("Lab five color glow", 64, (u, v) =>

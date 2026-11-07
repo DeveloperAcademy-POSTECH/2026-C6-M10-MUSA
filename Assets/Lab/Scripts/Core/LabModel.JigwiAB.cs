@@ -16,14 +16,50 @@ namespace C6Lab
         // #509: where each picked seat's last counted Water hit the boss, for the success splash.
         private readonly Dictionary<ulong, Vector3> jigwiSyncDirections = new Dictionary<ulong, Vector3>();
         private float jigwiSplashShare, jigwiBoardFireSeconds;
+        /// <summary>#540: the timetable this battle runs and, for the flow timetable, the common gimmick rhythm.</summary>
+        private int jigwiSchedule;
+        private double jigwiCommonStart = 40d, jigwiCommonInterval = 15d;
+        /// <summary>#540: once Jigwi's line is over, every orb on an unfinished talisman's board burns away together in this long.</summary>
+        public const double JigwiTalismanFailBlazeSeconds = 1d;
+        /// <summary>#540: the fireball falls onto a failed seat's board this long after the A ends.</summary>
+        public const double JigwiTalismanFailBurnDelaySeconds = .45d;
+        /// <summary>
+        /// #540: the first orb catches fire this long after the A ends — once Jigwi's "모두 재가 되어라!" (`JigwiVoiceAFail`, 3.64 s,
+        /// played as the fireball falls) has finished.
+        /// </summary>
+        public const double JigwiTalismanFailFirstBurnSeconds = 3.7d;
         // #479: A burns each owner's orbs one at a time. The last queued deadline per owner for the running A.
         private readonly Dictionary<ulong, double> jigwiABLastBurnAt = new Dictionary<ulong, double>();
         private string jigwiABBurnQueueId;
+        /// <summary>#540: no orb burns while the talisman is being written; only an A that runs out burns the board.</summary>
+        private bool jigwiAHoldBurn;
+        /// <summary>
+        /// #540: orbs whose lifetime is paused while their seat writes the talisman (orb id → seat). Host memory only;
+        /// the pause shows in the snapshot as a later expiresAt.
+        /// </summary>
+        private readonly Dictionary<string, ulong> jigwiAPausedOrbs = new Dictionary<string, ulong>(StringComparer.Ordinal);
         private int jigwiTalismanWaterCount;
         /// <summary>#509: talisman Water drops in one at a time; each pending orb's owner, index and Host due time.</summary>
         private readonly List<(ulong owner, int index, double dueAt)> jigwiTalismanDrops = new List<(ulong, int, double)>();
+        /// <summary>#540: boards whose talisman failed, and when (the end of Jigwi's line) every orb then on them catches fire.</summary>
+        private readonly List<(ulong owner, string roundId, double dueAt)> jigwiFailBurns = new List<(ulong, string, double)>();
         public const double JigwiTalismanDropSeconds = .3d;
-        private float jigwiTalismanWaterLifetime, jigwiTalismanWaterPaint;
+        /// <summary>#540: after the talisman orb lands, the seat's other orbs stay at least this long so the reward is not lost in smoke.</summary>
+        public const double JigwiTalismanCalmSeconds = 1d;
+        /// <summary>#540: a thrown talisman orb flies as this many Water orbs side by side (itself + shards); each paints.</summary>
+        public const int JigwiTalismanVolleyCount = 3;
+        /// <summary>#540: the projectile id of the k-th shard (1, 2) flying beside talisman orb orbId.</summary>
+        public static string JigwiTalismanShardId(string orbId, int k) => orbId + "/talisman-" + k;
+        public static bool IsJigwiTalismanShard(string id) => id != null && id.Contains("/talisman-");
+        // #540: shards in the air → (thrower, paint share). The Host's projectiles resolve them like the orb itself.
+        private readonly Dictionary<string, (ulong owner, float paint)> jigwiTalismanShards
+            = new Dictionary<string, (ulong, float)>(StringComparer.Ordinal);
+        /// <summary>#540: where the i-th talisman Water appears on its owner's board (the folded talisman drops right there).</summary>
+        public static Vector2 JigwiTalismanWaterSpot(int i) =>
+            new Vector2(.15f + .7f * ((i * .61803398875f + .5f) % 1f), .22f + .1f * (i % 3));
+        private float jigwiTalismanWaterPaint, jigwiTalismanRewardDelay;
+        /// <summary>#540: 부적 구슬은 수명이 없다(오색구슬처럼 만든 시각부터 아주 멀리 끝을 둔다). 던질 때까지 남는다.</summary>
+        public const double JigwiTalismanOrbLifetimeSeconds = 1e6d;
         private float jigwiABDuration, jigwiABBurnSeconds, jigwiABBurnStagger,
             jigwiABMoveAmount, jigwiABMovePeriod, jigwiABTargetRadius;
         private ulong jigwiABFailureRevision;
@@ -38,8 +74,11 @@ namespace C6Lab
         private void ResetJigwiAB(LabConfig config, double now)
         {
             jigwiABEnabled = !teamMode && StageYokai == LabStageYokai.Jigwi && config.JigwiStageTimelineEnabled;
+            jigwiSchedule = config.JigwiFlowSchedule ? LabJigwiABTimeline.FlowSchedule : LabJigwiABTimeline.LegacySchedule;
+            jigwiAHoldBurn = config.JigwiAHoldBurnUntilEnd;
+            jigwiCommonStart = config.JigwiCommonStartSeconds; jigwiCommonInterval = config.JigwiCommonIntervalSeconds;
             jigwiABRounds.Clear(); jigwiABActivated.Clear(); jigwiABFailureRevision = 0;
-            jigwiABLastBurnAt.Clear(); jigwiABBurnQueueId = null; jigwiTalismanDrops.Clear();
+            jigwiABLastBurnAt.Clear(); jigwiABBurnQueueId = null; jigwiTalismanDrops.Clear(); jigwiFailBurns.Clear(); jigwiAPausedOrbs.Clear(); jigwiTalismanShards.Clear();
             ResetJigwiABSupply(config);
             if (!jigwiABEnabled) return;
             // Preserve the old code as an inactive migration path, never run two policies together.
@@ -49,7 +88,8 @@ namespace C6Lab
             jigwiStageWarning = (float)LabJigwiABTimeline.WarningSeconds; jigwiStageFever = config.JigwiStageFeverMultiplier;
             jigwiABDuration = Mathf.Min(15f, config.JigwiABPersonalDurationSeconds);
             jigwiABBurnSeconds = config.JigwiABPersonalBurnSeconds; jigwiABBurnStagger = config.JigwiABBurnStaggerSeconds;
-            jigwiTalismanWaterCount = config.JigwiTalismanWaterCount; jigwiTalismanWaterLifetime = config.JigwiTalismanWaterLifetimeSeconds;
+            jigwiTalismanWaterCount = config.JigwiTalismanWaterCount;
+            jigwiTalismanRewardDelay = config.JigwiTalismanRewardDelaySeconds;
             jigwiTalismanWaterPaint = config.JigwiTalismanWaterPaintScale;
             jigwiSplashShare = config.JigwiBSplashPaintShare; jigwiBoardFireSeconds = config.JigwiBBoardFireSeconds;
             jigwiSyncDirections.Clear();
@@ -59,8 +99,15 @@ namespace C6Lab
             nextCommonGimmickAt = NextJigwiABCommonAt(0u);
             nextUniqueGimmickAt = nextComboAt = nextFlashAt = nextStageJigwiAt = double.PositiveInfinity;
         }
-        private double NextJigwiABCommonAt(uint index) => !jigwiStageCutoffReached && index < JigwiStageCommonSlots.Length
-            ? jigwiStageStartedAt + JigwiStageCommonSlots[index] : double.PositiveInfinity;
+        private double NextJigwiABCommonAt(uint index)
+        {
+            if (jigwiStageCutoffReached) return double.PositiveInfinity;
+            if (jigwiSchedule != LabJigwiABTimeline.FlowSchedule)
+                return index < JigwiStageCommonSlots.Length ? jigwiStageStartedAt + JigwiStageCommonSlots[index] : double.PositiveInfinity;
+            // #540: from the start of the middle phase, every interval, until the fever.
+            double offset = jigwiCommonStart + index * Math.Max(3d, jigwiCommonInterval);
+            return offset < jigwiStageCutoffAt - jigwiStageStartedAt ? jigwiStageStartedAt + offset : double.PositiveInfinity;
+        }
         private double NextJigwiABBoundary(double requested)
         {
             if (phase != LabPhase.Playing || jigwiStageCutoffReached) return requested;
@@ -68,8 +115,9 @@ namespace C6Lab
             void Include(double at) { if (at > lastTime && at < next) next = at; }
             Include(jigwiStageCutoffAt);
             foreach (var drop in jigwiTalismanDrops) Include(drop.dueAt); // #509 talisman Water, one at a time
-            if (jigwiStageNextSlot < LabJigwiABTimeline.SlotCount)
-                Include(jigwiStageStartedAt + LabJigwiABTimeline.ActiveOffset(jigwiStageNextSlot) - LabJigwiABTimeline.WarningSeconds);
+            foreach (var burn in jigwiFailBurns) Include(burn.dueAt); // #540 the failed boards catch fire right on time
+            if (jigwiStageNextSlot < LabJigwiABTimeline.SlotCountFor(jigwiSchedule))
+                Include(jigwiStageStartedAt + LabJigwiABTimeline.ActiveOffset(jigwiStageNextSlot, jigwiSchedule) - LabJigwiABTimeline.WarningSeconds);
             foreach (var item in jigwiABRounds)
             {
                 if (item.resolution == LabJigwiABResolution.None)
@@ -92,11 +140,12 @@ namespace C6Lab
         {
             if (phase != LabPhase.Playing)
             {
-                jigwiTalismanDrops.Clear();
+                jigwiTalismanDrops.Clear(); jigwiFailBurns.Clear();
                 CancelJigwiABForBattleEnd(now);
                 return;
             }
             GrantDueJigwiTalismanWater(now);
+            IgniteDueJigwiFailBurns(now);
             if (!jigwiStageCutoffReached && now >= jigwiStageCutoffAt)
             {
                 CancelJigwiABForBattleEnd(jigwiStageCutoffAt);
@@ -106,11 +155,11 @@ namespace C6Lab
             // Resolve an ending A before activating B at the same instant. Its warning may already be visible.
             foreach (var item in jigwiABRounds.Where(value => value.resolution == LabJigwiABResolution.None).ToArray())
                 if (now >= item.endsAt) ResolveJigwiAB(item, LabJigwiABResolution.Expired, item.endsAt);
-            while (jigwiStageNextSlot < LabJigwiABTimeline.SlotCount
-                && jigwiStageStartedAt + LabJigwiABTimeline.ActiveOffset(jigwiStageNextSlot) - LabJigwiABTimeline.WarningSeconds <= now)
+            while (jigwiStageNextSlot < LabJigwiABTimeline.SlotCountFor(jigwiSchedule)
+                && jigwiStageStartedAt + LabJigwiABTimeline.ActiveOffset(jigwiStageNextSlot, jigwiSchedule) - LabJigwiABTimeline.WarningSeconds <= now)
             {
                 int slot = jigwiStageNextSlot++;
-                BeginJigwiABSlot(slot, jigwiStageStartedAt + LabJigwiABTimeline.ActiveOffset(slot));
+                BeginJigwiABSlot(slot, jigwiStageStartedAt + LabJigwiABTimeline.ActiveOffset(slot, jigwiSchedule));
             }
             var active = ActiveJigwiABRound(now);
             if (active != null) AdvanceJigwiABActive(active, now);
@@ -123,6 +172,7 @@ namespace C6Lab
                 // A stable order so each owner's orbs catch fire one after another in creation order.
                 foreach (var orb in orbs.Values.OrderBy(value => value.createdAt).ThenBy(value => value.id, StringComparer.Ordinal).ToArray())
                     ApplyJigwiABOrb(orb, active.activeAt);
+                if (active.kind == LabJigwiABKind.PersonalBurn && jigwiAHoldBurn) PauseJigwiAOrbLifetimes(active);
                 revision++;
             }
             if (active.kind != LabJigwiABKind.GroupFire) return;
@@ -139,7 +189,7 @@ namespace C6Lab
                 kind = kind,
                 warningAt = activeAt - LabJigwiABTimeline.WarningSeconds, activeAt = activeAt,
                 endsAt = Math.Min(jigwiStageCutoffAt, personal
-                    ? Math.Min(activeAt + jigwiABDuration, jigwiStageStartedAt + LabJigwiABTimeline.ActiveOffset(slot + 1))
+                    ? Math.Min(activeAt + jigwiABDuration, jigwiStageStartedAt + LabJigwiABTimeline.NextOffset(slot, jigwiSchedule))
                     : activeAt + JigwiABMissionSeconds),
                 // Reserved shrink fields remain on the wire, but the timed mission never shrinks an orb.
                 shrinkAt = activeAt, shrinkScale = 1f,
@@ -172,8 +222,17 @@ namespace C6Lab
         {
             if (item == null || item.resolution != LabJigwiABResolution.None) return;
             item.resolution = result; item.resolvedAt = Math.Max(item.warningAt, at);
+            // #540: an A that runs out punishes every seat that did not finish its talisman (each seat for itself):
+            // when Jigwi's line is over, every orb then on its board burns away at once. Drums keep working.
+            var failed = new HashSet<ulong>();
+            if (item.kind == LabJigwiABKind.PersonalBurn && result == LabJigwiABResolution.Expired)
+                foreach (var seat in item.players ?? Array.Empty<LabJigwiABPlayerFire>())
+                    if (seat != null && seat.talismanAt < 0d) failed.Add(seat.playerId);
+            // #540: which orbs burn is decided when Jigwi's line ends (see IgniteDueJigwiFailBurns), so orbs made meanwhile burn too.
+            foreach (ulong owner in failed) jigwiFailBurns.Add((owner, item.id, item.resolvedAt + JigwiTalismanFailFirstBurnSeconds));
             foreach (var orb in orbs.Values)
             {
+                if (failed.Contains(orb.owner)) continue;
                 if (item.kind == LabJigwiABKind.PersonalBurn && orb.jigwiABBurnEventId == item.id)
                 { orb.jigwiABBurnEventId = null; orb.jigwiABBurnAt = -1d; orb.revision = ++revision; }
                 if (item.kind == LabJigwiABKind.GroupFire && !orb.inFlight && orb.jigwiABRadiusScale != 1f)
@@ -191,10 +250,10 @@ namespace C6Lab
         }
         private void ApplyJigwiABOrb(LabOrbState orb, double now)
         {
-            if (!jigwiABEnabled || orb.inFlight || (!orb.kind.IsRaw() && orb.kind != LabOrbKind.Combined)) return;
+            if (!jigwiABEnabled || orb.inFlight || orb.jigwiTalismanReward || (!orb.kind.IsRaw() && orb.kind != LabOrbKind.Combined)) return;
             var active = ActiveJigwiABRound(now);
             if (active == null || !active.Active(now)) return;
-            if (active.kind == LabJigwiABKind.PersonalBurn)
+            if (active.kind == LabJigwiABKind.PersonalBurn && !jigwiAHoldBurn)
             {
                 // An orb already burning in this A (combined or passed on) keeps its place in the queue.
                 if (orb.jigwiABBurnAt >= 0d && orb.jigwiABBurnEventId == active.id) return;
@@ -359,20 +418,124 @@ namespace C6Lab
             var player = active.players.FirstOrDefault(value => value.playerId == sender);
             if (player == null || player.talismanAt >= 0d) return false;
             player.talismanAt = now;
+            ResumeJigwiAOrbLifetimes(sender, active.endsAt - now);
             foreach (var orb in orbs.Values)
                 if (orb.owner == sender && orb.jigwiABBurnEventId == active.id)
                 { orb.jigwiABBurnEventId = null; orb.jigwiABBurnAt = -1d; orb.revision = ++revision; }
             GrantJigwiTalismanWater(sender, now);
+            HoldJigwiOrbsForTalismanReward(sender, now);
             revision++;
             if (active.players.All(value => value.talismanAt >= 0d)) ResolveJigwiAB(active, LabJigwiABResolution.Completed, now);
             return true;
         }
+        /// <summary>
+        /// #540: while a seat writes its talisman, the orbs already on its board stop ageing (their lifetime is paused),
+        /// so an unfinished talisman's penalty burns a full board. The pause is booked up front as the A's whole length
+        /// and the unused part is handed back when the seat finishes early.
+        /// </summary>
+        private void PauseJigwiAOrbLifetimes(LabJigwiABRound active)
+        {
+            jigwiAPausedOrbs.Clear();
+            double hold = Math.Max(0d, active.endsAt - active.activeAt);
+            if (hold <= 0d) return;
+            foreach (var orb in orbs.Values)
+            {
+                if (orb.inFlight || orb.jigwiTalismanReward || orb.createdAt > active.activeAt
+                    || (!orb.kind.IsRaw() && orb.kind != LabOrbKind.Combined)) continue;
+                if (!active.players.Any(seat => seat.playerId == orb.owner && seat.talismanAt < 0d)) continue;
+                double ordinary = orb.expiresAt >= 0d ? orb.expiresAt : orb.createdAt + LifetimeOf(orb);
+                if (ordinary <= active.activeAt) continue;
+                orb.expiresAt = ordinary + hold;
+                orb.revision = ++revision;
+                jigwiAPausedOrbs[orb.id] = orb.owner;
+            }
+        }
+        private void ResumeJigwiAOrbLifetimes(ulong seat, double unused)
+        {
+            if (jigwiAPausedOrbs.Count == 0) return;
+            foreach (var pair in jigwiAPausedOrbs.Where(value => value.Value == seat).ToArray())
+            {
+                jigwiAPausedOrbs.Remove(pair.Key);
+                if (unused > 0d && orbs.TryGetValue(pair.Key, out var orb))
+                { orb.expiresAt -= unused; orb.revision = ++revision; }
+            }
+        }
+        /// <summary>
+        /// #540: none of the seat's orbs runs out while the talisman turns into its orb and for a moment after it lands
+        /// (JigwiTalismanCalmSeconds); anything due in that window goes when the window ends.
+        /// </summary>
+        private void HoldJigwiOrbsForTalismanReward(ulong owner, double now)
+        {
+            double until = now + jigwiTalismanRewardDelay + JigwiTalismanCalmSeconds;
+            foreach (var orb in orbs.Values)
+            {
+                if (orb.owner != owner || orb.inFlight || orb.jigwiTalismanReward || (!orb.kind.IsRaw() && orb.kind != LabOrbKind.Combined)) continue;
+                double ordinary = orb.expiresAt >= 0d ? orb.expiresAt : orb.createdAt + LifetimeOf(orb);
+                if (ordinary >= until) continue;
+                orb.expiresAt = until; orb.revision = ++revision;
+            }
+        }
+        /// <summary>#540: a talisman orb leaves the board — its two shards take off with it.</summary>
+        private void LaunchJigwiTalismanShards(LabOrbState orb)
+        {
+            if (orb == null || !orb.jigwiTalismanReward) return;
+            for (int k = 1; k < JigwiTalismanVolleyCount; k++)
+                jigwiTalismanShards[JigwiTalismanShardId(orb.id, k)] = (orb.owner, orb.jigwiABRewardPaintScale);
+        }
+        /// <summary>
+        /// #540: a talisman shard reached the gourd. It paints Water like the talisman orb itself (same share), but
+        /// deals no damage and gives no other reward. False when unknown, already resolved or blocked.
+        /// </summary>
+        public bool ConfirmJigwiTalismanShardHit(string id, double now, Vector3 paintDirection, float paintImpactStrength = .5f)
+        {
+            if (id == null || !jigwiTalismanShards.TryGetValue(id, out var shard)) return false;
+            jigwiTalismanShards.Remove(id);
+            if (!TryAdvance(now, out _) || phase != LabPhase.Playing || !players.TryGetValue(shard.owner, out var attacker)) return false;
+            if (JigwiABBlocksBoss(shard.owner, now)) return false;
+            TryExtinguishJigwiStageRoot(shard.owner, paintDirection, now, out _);
+            LastHitFiveColor = false; LastHitTalisman = true;
+            bool painted = paintSurface.RegisterHit(paintDirection, PaintColorFor(LabOrbElement.Water), attacker.id, attacker.seat + 1,
+                Mathf.Min(3f, shard.paint), paintImpactStrength);
+            if (painted && paintSurface.IsComplete && phase == LabPhase.Playing)
+            {
+                phase = LabPhase.Victory;
+                if (players.TryGetValue(paintSurface.LastPainter, out var painter)) painter.lastHit = true;
+                AdvanceJigwiStage(now);
+            }
+            revision++;
+            return true;
+        }
+        /// <summary>#540: a talisman shard missed (floor, fire, gone). Forget it.</summary>
+        public bool DropJigwiTalismanShard(string id) => id != null && jigwiTalismanShards.Remove(id);
         private void GrantJigwiTalismanWater(ulong owner, double now)
         {
             // #509: one at a time, every 0.3 s, so each drop falls in with its own moment.
             for (int i = 0; i < jigwiTalismanWaterCount; i++)
-                jigwiTalismanDrops.Add((owner, i, now + i * JigwiTalismanDropSeconds));
+                jigwiTalismanDrops.Add((owner, i, now + jigwiTalismanRewardDelay + i * JigwiTalismanDropSeconds));
             GrantDueJigwiTalismanWater(now);
+        }
+        /// <summary>
+        /// #540: the moment Jigwi's "모두 재가 되어라!" ends, every orb on a failed board (element and combined orbs on the board,
+        /// not in flight; a talisman orb never burns) catches fire and burns away together in JigwiTalismanFailBlazeSeconds.
+        /// </summary>
+        private void IgniteDueJigwiFailBurns(double now)
+        {
+            for (int k = 0; k < jigwiFailBurns.Count; k++)
+            {
+                var (owner, roundId, dueAt) = jigwiFailBurns[k];
+                if (dueAt > now) continue;
+                jigwiFailBurns.RemoveAt(k--);
+                double burnAt = dueAt + JigwiTalismanFailBlazeSeconds;
+                foreach (var orb in orbs.Values)
+                {
+                    if (orb.owner != owner || orb.inFlight || orb.jigwiTalismanReward || (!orb.kind.IsRaw() && orb.kind != LabOrbKind.Combined)) continue;
+                    // B's special Water is the next mission's ammunition (it can arrive while Jigwi is still speaking): never burn it.
+                    if (!string.IsNullOrEmpty(orb.jigwiABSupplyEventId) || orb.jigwiSupply) continue;
+                    if (orb.jigwiABBurnAt < 0d || burnAt < orb.jigwiABBurnAt)
+                    { orb.jigwiABBurnAt = burnAt; orb.jigwiABBurnEventId = roundId; orb.revision = ++revision; }
+                }
+                revision++;
+            }
         }
         private void GrantDueJigwiTalismanWater(double now)
         {
@@ -386,8 +549,8 @@ namespace C6Lab
                 {
                     id = NewOrbId(), owner = owner, kind = LabOrbKind.Combined, element = LabOrbElement.Water,
                     origin = LabOrbOrigin.Gourd, originOwner = owner,
-                    x = .15f + .7f * ((i * .61803398875f + .5f) % 1f), y = .22f + .1f * (i % 3),
-                    createdAt = dueAt, expiresAt = dueAt + jigwiTalismanWaterLifetime,
+                    x = JigwiTalismanWaterSpot(i).x, y = JigwiTalismanWaterSpot(i).y,
+                    createdAt = dueAt, expiresAt = dueAt + JigwiTalismanOrbLifetimeSeconds,
                     jigwiTalismanReward = true, jigwiABRewardPaintScale = jigwiTalismanWaterPaint, revision = ++revision
                 };
                 orbs.Add(water.id, water);
@@ -395,7 +558,7 @@ namespace C6Lab
         }
         private LabJigwiABSnapshot CopyJigwiABSnapshot(double now) => !jigwiABEnabled ? new LabJigwiABSnapshot()
             : new LabJigwiABSnapshot { enabled = true, fever = phase == LabPhase.Playing && now >= jigwiStageCutoffAt,
-                startedAt = jigwiStageStartedAt, cutoffAt = jigwiStageCutoffAt,
+                startedAt = jigwiStageStartedAt, cutoffAt = jigwiStageCutoffAt, schedule = jigwiSchedule,
                 rounds = jigwiABRounds.Select(item => item.Copy()).ToArray() };
     }
 }

@@ -109,7 +109,8 @@ namespace C6Lab.Tests
             Assert.That(water,Has.Length.EqualTo(5));
             Assert.That(water.Select(o=>o.createdAt).ToArray(),Is.EqualTo(new[]{6d,6.3d,6.6d,6.9d,7.2d}).Within(1e-9));
             Assert.That(water.All(o=>o.owner==Players[0]&&o.kind==LabOrbKind.Combined&&o.element==LabOrbElement.Water),Is.True);
-            Assert.That(water.All(o=>System.Math.Abs(o.expiresAt-(o.createdAt+15))<1e-9&&o.jigwiABBurnAt==-1&&o.jigwiABRewardPaintScale==1.5f),Is.True);
+            // #540: a talisman orb has no lifetime (it never runs out) and never burns.
+            Assert.That(water.All(o=>System.Math.Abs(o.expiresAt-(o.createdAt+LabModel.JigwiTalismanOrbLifetimeSeconds))<1e-9&&o.jigwiABBurnAt==-1&&o.jigwiABRewardPaintScale==1.5f),Is.True);
             Assert.That(string.IsNullOrEmpty(water[0].jigwiABSupplyEventId),Is.True,"Talisman water paints; it is not B ammunition.");
             Assert.That(m.TryGenerate(Players[0],Request(),7.3,out var fresh,out var e),Is.True,e);
             Assert.That(fresh.jigwiABBurnAt,Is.EqualTo(-1),"A finished seat no longer catches fire.");
@@ -129,6 +130,8 @@ namespace C6Lab.Tests
             var m=Room();var control=Room();Current(m,5);Current(control,5);
             Assert.That(m.TryCompleteJigwiTalisman(Players[0],Current(m,6).id,6),Is.True);
             var water=m.Snapshot(6).orbs.First(o=>o.jigwiTalismanReward);
+            Assert.That(water.expiresAt-water.createdAt,Is.GreaterThanOrEqualTo(LabModel.JigwiTalismanOrbLifetimeSeconds),"#540: a talisman orb has no lifetime.");
+            Assert.That(water.jigwiABBurnAt,Is.LessThan(0d),"#540: a talisman orb never burns.");
             var ordinary=Add(control,Players[0],6,element:LabOrbElement.Water);
             Launch(m,Orbs(m)[water.id],7);Launch(control,ordinary,7);
             var flying=m.Snapshot(7).orbs.Single(o=>o.id==water.id);
@@ -184,16 +187,115 @@ namespace C6Lab.Tests
             Assert.That(s.jigwiAB.Active(6).resolution,Is.EqualTo(LabJigwiABResolution.None));
             Assert.That(s.orbs.Single(o=>o.id==burning.id).jigwiABBurnAt,Is.EqualTo(10));
         }
-        [Test] public void NaturalAEndClearsPendingDeadlinesWithoutResurrectingBurnedOrbs()
+        [Test] public void FlowScheduleRunsOneAFirstThenBABOverCommonGimmicksEvery15Seconds()
         {
-            var m=Room();var a=Current(m,11);
-            Assert.That(m.TryGenerate(Players[0],Request(),11,out var old,out var e),Is.True,e);m.Tick(16);
-            Assert.That(m.Snapshot(16).orbs.Any(o=>o.id==old.id),Is.False);
-            Assert.That(m.TryGenerate(Players[0],Request(),19,out var late,out e),Is.True,e);
-            Assert.That(late.jigwiABBurnAt,Is.EqualTo(24));var done=m.Snapshot(20);
-            Assert.That(done.jigwiAB.rounds.Single().resolution,Is.EqualTo(LabJigwiABResolution.Expired));
-            Assert.That(done.orbs.Single(o=>o.id==late.id).jigwiABBurnAt,Is.EqualTo(-1));
-            Assert.That(done.orbs.Single(o=>o.id==late.id).expiresAt,Is.EqualTo(-1));
+            // #540: like Yaguang — the first 40 s carry one unique gimmick (A1), the middle 60 s overlay B-A-B on the
+            // common gimmicks (40, 55, 70, 85), the last 20 s are fever.
+            JsonUtility.FromJsonOverwrite("{\"jigwiFlowSchedule\":true,\"jigwiABPersonalDurationSeconds\":10}",config);
+            var m=Room();
+            var next=typeof(LabModel).GetMethod("NextJigwiABCommonAt",BindingFlags.Instance|BindingFlags.NonPublic);
+            Assert.That(Enumerable.Range(0,5).Select(i=>(double)next.Invoke(m,new object[]{(uint)i})),
+                Is.EqualTo(new[]{40d,55d,70d,85d,double.PositiveInfinity}));
+            for(int t=1;t<=99;t++){m.Tick(t);var mid=m.Snapshot(t);
+                Assert.That(LabJigwiABNetworkValidation.Valid(mid.jigwiAB,mid.players,m.Revision),Is.True,"Valid at "+t+" s");}
+            var s=m.Snapshot(99);var r=s.jigwiAB.rounds.OrderBy(x=>x.slot).ToArray();
+            Assert.That(s.jigwiAB.schedule,Is.EqualTo(LabJigwiABTimeline.FlowSchedule));
+            Assert.That(r.Select(x=>x.activeAt),Is.EqualTo(new[]{10d,45d,66d,83d}));
+            Assert.That(r.Select(x=>x.kind),Is.EqualTo(new[]{LabJigwiABKind.PersonalBurn,LabJigwiABKind.GroupFire,
+                LabJigwiABKind.PersonalBurn,LabJigwiABKind.GroupFire}));
+            Assert.That(r[0].endsAt,Is.EqualTo(20d));Assert.That(r[2].endsAt,Is.EqualTo(76d));
+            Assert.That(r[1].endsAt,Is.EqualTo(60d));Assert.That(r[3].endsAt,Is.EqualTo(98d));
+            Assert.That(r.Count(x=>x.activeAt<40d),Is.EqualTo(1),"Only one unique gimmick in the first 40 s.");
+        }
+        [Test] public void AnUnfinishedTalismanBurnsThatSeatsOrbsButNeverBlocksItsDrums()
+        {
+            // #540: the A runs out with seat 0 still writing — every orb left on its board burns (one after another).
+            // Its drums keep working. Seat 1 wrote its talisman and keeps everything.
+            var m=Room();var a=Current(m,5);
+            Assert.That(m.TryCompleteJigwiTalisman(Players[1],a.id,6),Is.True);
+            Assert.That(m.TryGenerate(Players[0],Request(),19,out var mine,out var e),Is.True,e);
+            Assert.That(m.TryGenerate(Players[0],Request(),19.1,out var mine2,out e),Is.True,e);
+            Assert.That(m.TryGenerate(Players[1],Request(),19.2,out var theirs,out e),Is.True,e);
+            var done=m.Snapshot(20);var round=done.jigwiAB.rounds.Single(r=>r.id==a.id);
+            Assert.That(round.resolution,Is.EqualTo(LabJigwiABResolution.Expired));
+            Assert.That(LabJigwiABNetworkValidation.Valid(done.jigwiAB,done.players,m.Revision),Is.True);
+            Assert.That(m.Snapshot(22).orbs.Single(o=>o.id==theirs.id).jigwiABBurnAt,Is.EqualTo(-1),"The finished board keeps its orbs.");
+            // #540: when Jigwi's line is over, every orb on the board burns away together in 1 s.
+            double gone=20+LabModel.JigwiTalismanFailFirstBurnSeconds+LabModel.JigwiTalismanFailBlazeSeconds+.01;
+            var later=m.Snapshot(gone);
+            Assert.That(later.orbs.Any(o=>o.id==mine.id||o.id==mine2.id),Is.False,"The unfinished board's orbs burned.");
+            // The clock has moved on to the end of the burn, so the drum is tried after that (an earlier time is rejected as INVALID_TIME).
+            Assert.That(m.TryGenerate(Players[0],Request(),gone+.1,out _,out e),Is.True,"#540: a failed talisman never blocks the drums. "+e);
+        }
+        [Test] public void HoldingTheBurnKeepsEveryOrbUntilTheARunsOut()
+        {
+            // #540: while the talisman is being written the orbs are untouched (only the fireball grows);
+            // an A that runs out then burns every orb left on the unfinished board.
+            JsonUtility.FromJsonOverwrite("{\"jigwiAHoldBurnUntilEnd\":true}",config);
+            var m=Room();var a=Current(m,5);var mine=Add(m,Players[0],4);
+            Assert.That(m.Snapshot(6).orbs.Single(o=>o.id==mine.id).jigwiABBurnAt,Is.EqualTo(-1),"Nothing burns while writing.");
+            Assert.That(m.TryGenerate(Players[0],Request(),19,out var fresh,out var e),Is.True,e);
+            Assert.That(m.Snapshot(19.5).orbs.Single(o=>o.id==fresh.id).jigwiABBurnAt,Is.EqualTo(-1),"A new orb is safe too.");
+            Assert.That(m.Snapshot(20).jigwiAB.rounds.Single(r=>r.id==a.id).resolution,Is.EqualTo(LabJigwiABResolution.Expired));
+            // #540: once Jigwi's "모두 재가 되어라!" is over, every orb then on the board — even one made while Jigwi spoke —
+            // catches fire at once and is gone 1 s later. An orb made after that moment is safe.
+            double landed=20+LabModel.JigwiTalismanFailFirstBurnSeconds, blaze=LabModel.JigwiTalismanFailBlazeSeconds;
+            Assert.That(m.TryGenerate(Players[0],Request(),21,out var during,out e),Is.True,e);
+            var speaking=m.Snapshot(landed-.01).orbs.Where(o=>o.id==mine.id||o.id==fresh.id||o.id==during.id).ToArray();
+            Assert.That(speaking,Has.Length.EqualTo(3),"Nothing burns while Jigwi speaks.");
+            Assert.That(speaking.All(o=>o.jigwiABBurnAt==-1),Is.True,"Not even marked yet.");
+            var lit=m.Snapshot(landed+.01).orbs.Where(o=>o.id==mine.id||o.id==fresh.id||o.id==during.id).ToArray();
+            Assert.That(lit,Has.Length.EqualTo(3));
+            Assert.That(lit.All(o=>System.Math.Abs(o.jigwiABBurnAt-(landed+blaze))<1e-6),Is.True,"They all catch fire together.");
+            Assert.That(m.Snapshot(landed+blaze+.01).orbs.Any(o=>o.id==mine.id||o.id==fresh.id||o.id==during.id),Is.False,"…and are gone together.");
+            Assert.That(m.TryGenerate(Players[0],Request(),landed+blaze+.1,out var after,out e),Is.True,e);
+            Assert.That(m.Snapshot(landed+blaze+.2).orbs.Single(o=>o.id==after.id).jigwiABBurnAt,Is.EqualTo(-1),"A new orb after the burn is safe.");
+        }
+        [Test] public void WritingPausesTheLifetimeOfOrbsAlreadyOnThatBoard()
+        {
+            // #540: the A runs 5 → 20. Orbs already on a writing board stop ageing; a finished seat gets the unused part back.
+            JsonUtility.FromJsonOverwrite("{\"jigwiAHoldBurnUntilEnd\":true}",config);
+            var m=Room();
+            var mine=Add(m,Players[0],4);mine.expiresAt=8;var theirs=Add(m,Players[1],4);theirs.expiresAt=8;
+            var a=Current(m,5);
+            Assert.That(m.Snapshot(9).orbs.Single(o=>o.id==mine.id).expiresAt,Is.EqualTo(23),"Paused for the whole A while writing.");
+            Assert.That(m.TryCompleteJigwiTalisman(Players[1],a.id,10),Is.True);
+            Assert.That(m.Snapshot(10).orbs.Single(o=>o.id==theirs.id).expiresAt,Is.EqualTo(13),"Paused only while that seat wrote (5 → 10).");
+            Assert.That(m.Snapshot(12).orbs.Any(o=>o.id==mine.id),Is.True,"Still on the board after its old lifetime.");
+        }
+        [Test] public void AThrownTalismanOrbFliesAsThreeAndEachShardPaints()
+        {
+            // #540: the talisman orb leaves with two Water shards beside it; each shard that reaches the gourd paints once.
+            var m=Room();var a=Current(m,5);
+            Assert.That(m.TryCompleteJigwiTalisman(Players[0],a.id,6),Is.True);
+            var water=m.Snapshot(6+config.JigwiTalismanRewardDelaySeconds).orbs.First(o=>o.jigwiTalismanReward);
+            string left=LabModel.JigwiTalismanShardId(water.id,1),right=LabModel.JigwiTalismanShardId(water.id,2);
+            Assert.That(m.ConfirmJigwiTalismanShardHit(left,6.9,Vector3.forward),Is.False,"No shard before the throw.");
+            Launch(m,Orbs(m)[water.id],7);
+            Assert.That(LabModel.IsJigwiTalismanShard(left),Is.True);Assert.That(LabModel.IsJigwiTalismanShard(water.id),Is.False);
+            int before=m.PaintSurface.CoveredCount;
+            Assert.That(m.ConfirmJigwiTalismanShardHit(left,7.2,Vector3.forward),Is.True);
+            Assert.That(m.PaintSurface.CoveredCount,Is.GreaterThan(before),"A shard paints Water.");
+            Assert.That(m.LastHitTalisman,Is.True);
+            Assert.That(m.ConfirmJigwiTalismanShardHit(left,7.3,Vector3.forward),Is.False,"Each shard paints once.");
+            Assert.That(m.DropJigwiTalismanShard(right),Is.True);
+            Assert.That(m.ConfirmJigwiTalismanShardHit(right,7.3,Vector3.right),Is.False,"A missed shard paints nothing.");
+        }
+        [Test] public void OrbsAboutToRunOutWaitUntilTheTalismanOrbHasLanded()
+        {
+            // #540: none of the writer's orbs runs out while the talisman turns into its orb and for a moment after it lands.
+            var m=Room();
+            var soon=Add(m,Players[0],4);soon.expiresAt=6.2;var later=Add(m,Players[0],4);later.expiresAt=30;
+            var theirs=Add(m,Players[1],4);theirs.expiresAt=6.2;
+            var a=Current(m,5);
+            Assert.That(m.TryCompleteJigwiTalisman(Players[0],a.id,6),Is.True);
+            double until=6+config.JigwiTalismanRewardDelaySeconds+LabModel.JigwiTalismanCalmSeconds;
+            var s=m.Snapshot(6);
+            Assert.That(s.orbs.Single(o=>o.id==soon.id).expiresAt,Is.EqualTo(until).Within(1e-6),"Held until the reward has settled.");
+            Assert.That(s.orbs.Single(o=>o.id==later.id).expiresAt,Is.EqualTo(30),"A longer lifetime is untouched.");
+            Assert.That(s.orbs.Single(o=>o.id==theirs.id).expiresAt,Is.EqualTo(6.2).Within(1e-6),"Only the writer's board.");
+            var water=m.Snapshot(6+config.JigwiTalismanRewardDelaySeconds).orbs.First(o=>o.jigwiTalismanReward);
+            Assert.That(new Vector2(water.x,water.y),Is.EqualTo(LabModel.JigwiTalismanWaterSpot(0)),"It appears where the folded talisman drops.");
         }
         [Test] public void BGivesEachPickedSeatOneSpecialWaterWhileOrdinaryRawPairsKeepTheirNormalElement()
         {

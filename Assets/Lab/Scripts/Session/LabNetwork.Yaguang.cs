@@ -68,5 +68,26 @@ namespace C6Lab
             LabFiveColorSparkle.Burst(point, radius);
             if (owner == LocalPlayerId) LocalFiveColorHit?.Invoke();
         }
+
+        /// <summary>#540 지귀 부적 구슬 명중 이벤트 (맞은 자리 박 기준 좌표, 던진 사람). 소리·진동이 듣는다.</summary>
+        public event System.Action<ulong> TalismanHit;
+
+        /// <summary>
+        /// #540 부적 구슬 명중: 맞은 자리에 붉은 도장이 찍힌 부적이 "철썩" 붙고, 푸른 빛 가루와 물방울 별이 함께 터진다.
+        /// 모든 기기에서 보인다.
+        /// </summary>
+        private void PresentTalismanHit(Vector3 targetLocalPoint, ulong owner)
+        {
+            if (target == null) return;
+            Transform hitbox = target.Hitbox != null ? target.Hitbox.transform : target.transform;
+            Vector3 point = hitbox.TransformPoint(targetLocalPoint);
+            float radius = config != null ? config.OrbRadius : .3f;
+            LabFiveColorSparkle.DustBurst(point, radius, LabFiveColorSparkle.DefaultDustPuffScale * 1.3f, LabFiveColorSparkle.BlueTones);
+            LabFiveColorSparkle.Burst(point, radius, LabFiveColorSparkle.BlueTones);
+            // #540: a big splash of water bursts out from the gourd where it hit.
+            if (config != null) LabJigwiWaterVolley.Splash(point, point - hitbox.position,
+                config.ThrowRadius * LabJigwiWaterVolley.SizeScale, target.gameObject.layer);
+            TalismanHit?.Invoke(owner);
+        }
     }
 }

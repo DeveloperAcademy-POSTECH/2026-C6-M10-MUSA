@@ -25,5 +25,19 @@ namespace C6Lab.Tests
             art.Clear();
             Assert.That(art.Shown, Is.False); Assert.That(art.VisibleSparkles, Is.Zero);
         }
+
+        [Test]
+        public void TheTalismanOrbShowsTheWrittenLetterInsteadOfTheDrop()
+        {
+            // #540: the talisman orb carries the gold "물" from the talisman; its shimmering blue body is the five-colour look in blue tones.
+            var art = LabJigwiSupplyWaterArt.Create(root.transform);
+            art.Show(.3f, false, null, talismanOrb: true);
+            Assert.That(art.Talisman, Is.True);
+            Assert.That(art.Special, Is.False, "It is not B's special Water.");
+            Assert.That(art.VisibleSparkles, Is.Zero, "The blue shimmer (LabFiveColorSparkle) carries the sparkle.");
+            Assert.That(art.AddedColliderCount, Is.Zero);
+            art.Clear();
+            Assert.That(art.Talisman, Is.False);
+        }
     }
 }
