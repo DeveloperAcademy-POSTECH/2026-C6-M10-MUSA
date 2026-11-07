@@ -17,6 +17,7 @@ namespace Hapio.Tests
     /// 튜토리얼 (#477) 0단계 흐름: 첫 게임 시작의 오프닝 → 3자리 연습 판(나 불이 가운데, 묵이·금옥이 양옆) → 대사 → 방 목록.
     /// 저장된 Home·Battle Scene과 실제 세션으로 확인한다. 기기·네이티브 빌드 검사가 아니다.
     /// </summary>
+    [Category("Slow")]
     public sealed class GameTutorialFlowTests
     {
         private GameSession session;
@@ -169,6 +170,24 @@ namespace Hapio.Tests
             yield return Until(() => !network.IsBattlePaused && !director.IsSteppedAsideForPause, "Back from the pause menu", 10f);
             Assert.That((overlayGroup.alpha, overlayGroup.blocksRaycasts), Is.EqualTo((1f, true)));
             Assert.That(director.IsShowingLine, Is.True, "The same line again.");
+            // #536: only the bubble moves a line on. A tap anywhere else keeps the board still, moves nothing on and makes
+            // the ▽ jump once to show where to tap.
+            var blocker = director.GetComponentsInChildren<UnityEngine.UI.Button>(true).Single(button => button.name == "Screen Blocker");
+            var bubbleRect = director.GetComponentsInChildren<RectTransform>(true).Single(rect => rect.name == "Bubble");
+            yield return Until(() => director.IsShowingTapHint, "The ▽ is up", 2f);
+            Rect area = ScreenRect(tap.GetComponent<RectTransform>()), drawn = ScreenRect(bubbleRect);
+            float pad = art.lineTapPadding * overlayGroup.GetComponent<Canvas>().scaleFactor;
+            Assert.That(area.xMin, Is.EqualTo(drawn.xMin - pad).Within(1f), "The bubble and a little around it, no more.");
+            Assert.That(area.yMax, Is.EqualTo(drawn.yMax + pad).Within(1f));
+            Assert.That(area.width, Is.LessThan(Screen.width * .9f), "Not the whole screen any more.");
+            int missed = director.ScreenTapsOffBubble;
+            blocker.onClick.Invoke();
+            Assert.That((director.StepIndex, director.BeatIndex), Is.EqualTo((0, 1)), "A tap off the bubble moves nothing on.");
+            Assert.That(director.ScreenTapsOffBubble, Is.EqualTo(missed + 1));
+            Assert.That(director.IsNudgingTapHint, Is.True, "The ▽ jumps to show where to tap.");
+            Assert.That(board.AllowedGestures, Is.EqualTo(LabBoardGestures.None), "The board stays still under the line.");
+            yield return new WaitForSecondsRealtime(art.tapHintNudgeSeconds + .05f);
+            Assert.That(director.IsNudgingTapHint, Is.False, "Once.");
             for (int line = 2; line < lines; line++)
             {
                 Assert.That(director.StepIndex, Is.EqualTo(0));

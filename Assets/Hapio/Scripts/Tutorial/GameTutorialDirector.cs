@@ -43,6 +43,8 @@ namespace Hapio
         private RectTransform bubbleArt;
         private Text bubbleText;
         private Image tapHint;
+        private Image lineTapArea;
+        private float hintNudgeAt = -1f;
         // The bubble hangs below its speaker's face (tail up) to keep a lit area above clear.
         private bool bubbleBelow;
         private RectTransform banner;
@@ -102,6 +104,10 @@ namespace Hapio
         public bool IsShowingLine => HasBeat && CurrentBeat.IsLine && bubbleRoot != null && bubbleRoot.gameObject.activeSelf;
         /// <summary>The ▽ on the bubble: up only on a line that a tap moves on from, once it can.</summary>
         public bool IsShowingTapHint => tapHint != null && tapHint.gameObject.activeInHierarchy;
+        /// <summary>The ▽ is jumping because the screen was tapped off the bubble.</summary>
+        public bool IsNudgingTapHint => hintNudgeAt >= 0f && Now - hintNudgeAt < art.tapHintNudgeSeconds;
+        /// <summary>Taps off the bubble while a line was up (they never move it on).</summary>
+        public int ScreenTapsOffBubble { get; private set; }
         /// <summary>Waiting for the player (or the gauge) to finish the current action.</summary>
         public bool IsWaitingForAction => HasBeat && !CurrentBeat.IsLine && actionDoneAt < 0f;
         /// <summary>How many times the current action has been done.</summary>
@@ -329,12 +335,13 @@ namespace Hapio
             CopyHudScaler(root.GetComponent<CanvasScaler>());
             overlay = (RectTransform)root.transform;
 
-            // While a line is read every touch lands here, so the board under it never moves.
-            tapCatcher = AddImage("Tap To Continue", overlay, Color.clear, null, true);
+            // While a line is read every touch lands here, so the board under it never moves. It no longer moves the line
+            // on (#536): only the bubble does; a tap here nudges the ▽ to show where.
+            tapCatcher = AddImage("Screen Blocker", overlay, Color.clear, null, true);
             Stretch(tapCatcher.rectTransform);
-            Button tap = tapCatcher.gameObject.AddComponent<Button>();
-            tap.transition = Selectable.Transition.None;
-            tap.onClick.AddListener(OnTap);
+            Button blocker = tapCatcher.gameObject.AddComponent<Button>();
+            blocker.transition = Selectable.Transition.None;
+            blocker.onClick.AddListener(OnScreenTap);
             // Names go under the dim, so they darken with the faces.
             BuildNames();
 
@@ -378,6 +385,16 @@ namespace Hapio
             Image bubbleImage = AddImage("Bubble Art", bubbleRoot, Color.white, art.bubble, false);
             bubbleArt = bubbleImage.rectTransform;
             Stretch(bubbleArt);
+            // The line moves on from the bubble only: the bubble and a little around it, following it wherever it hangs.
+            lineTapArea = AddImage("Tap To Continue", bubbleRoot, Color.clear, null, true);
+            RectTransform area = lineTapArea.rectTransform;
+            Stretch(area);
+            area.offsetMin = -Vector2.one * art.lineTapPadding;
+            area.offsetMax = Vector2.one * art.lineTapPadding;
+            area.SetAsFirstSibling();
+            Button next = lineTapArea.gameObject.AddComponent<Button>();
+            next.transition = Selectable.Transition.None;
+            next.onClick.AddListener(OnTap);
             bubbleText = AddText("Line", bubbleRoot, art.dialogueFont, art.maxFontSize, art.textColor);
             bubbleText.resizeTextMinSize = Mathf.Min(art.minFontSize, art.maxFontSize);
             // ▽ at the words' bottom-right corner: on the bubble, not its (mirrored) art, so it is never flipped.
@@ -524,12 +541,22 @@ namespace Hapio
             && session.Network != null && !session.Network.GameStartHeld
             && (session.StartOverlay == null || !session.StartOverlay.Visible);
 
+        /// <summary>A tap on the bubble: the line moves on.</summary>
         private void OnTap()
         {
             NoteTap();
             if (skipOpen) return;
             if (!HasBeat || !CurrentBeat.IsLine || Now - shownAt < art.tapCooldown) return;
             Advance();
+        }
+
+        /// <summary>A tap anywhere else while a line is up: nothing moves on, and the ▽ jumps once to show where to tap.</summary>
+        private void OnScreenTap()
+        {
+            NoteTap();
+            if (skipOpen || !HasBeat || !CurrentBeat.IsLine) return;
+            ScreenTapsOffBubble++;
+            if (tapHint.gameObject.activeSelf) hintNudgeAt = Now;
         }
 
         private void Advance()
@@ -619,6 +646,7 @@ namespace Hapio
             bubbleText.text = text;
             LayoutBubble(fromRight, false);
             tapHint.gameObject.SetActive(false);
+            hintNudgeAt = -1f;
             bubbleRoot.sizeDelta = art.bubbleSize;
             Image face = portraits[GameTutorialScript.SeatOf(speaker)];
             speakerPortrait.sprite = face != null ? face.sprite : null;
@@ -1084,11 +1112,26 @@ namespace Hapio
         /// <summary>The ▽ shows on a line (never on a remark) from the moment a tap moves it on, bobbing down and up.</summary>
         private void PlaceTapHint(bool line)
         {
+            // Only a line's bubble moves it on; a remark's bubble lets touches through to the board as before.
+            if (lineTapArea.raycastTarget != line) lineTapArea.raycastTarget = line;
             bool shown = line && art.tapHint != null && Now >= TapReadyAt;
             if (tapHint.gameObject.activeSelf != shown) tapHint.gameObject.SetActive(shown);
             if (!shown) return;
             tapHint.rectTransform.anchoredPosition = art.tapHintOffset
                 + new Vector2(0f, TapHintDrop(Now - TapReadyAt, art.tapHintSeconds, art.tapHintDepth));
+            float nudge = hintNudgeAt >= 0f
+                ? TapHintNudge(Now - hintNudgeAt, art.tapHintNudgeSeconds, art.tapHintNudgeScale) : 1f;
+            tapHint.rectTransform.localScale = Vector3.one * nudge;
+        }
+
+        /// <summary>
+        /// The ▽'s size <paramref name="t"/> seconds after a tap off the bubble: it swells to <paramref name="peak"/> and back
+        /// once over <paramref name="seconds"/>, then stays at 1.
+        /// </summary>
+        public static float TapHintNudge(float t, float seconds, float peak)
+        {
+            if (t < 0f || seconds <= 0f || t >= seconds) return 1f;
+            return 1f + (peak - 1f) * Mathf.Sin(Mathf.PI * t / seconds);
         }
 
         /// <summary>
