@@ -896,7 +896,7 @@ DEV 행이 없는 고정 규칙(`LabJigwiABTimeline`): 예고 2초(`WarningSecon
 
 ## DEV 표시 정리 (2026-11-05)
 
-설정 259개의 번호·저장값과 접속 묶음은 그대로다(현재 기준은 5688·`C6PhysicsLab/49`·`C6HapioGame/35`, #526에서 Game만 올림). 화면에 보이는 칸만 줄였다. 배열 형식이 같아 접속 묶음은 올리지 않았다.
+설정 259개의 번호·저장값과 접속 묶음은 그대로다(당시 기준은 5688·`C6PhysicsLab/49`·`C6HapioGame/35`, #526에서 Game만 올림. 현재는 Bulk 선택 ACK로 5690·`C6PhysicsLab/51`·`C6HapioGame/37`이며 설정 배열은 같다). 화면에 보이는 칸만 줄였다. 배열 형식이 같아 접속 묶음은 올리지 않았다.
 
 ### 효과 없는 10칸 — `LabConfig.InactiveDeveloperFields`
 

@@ -25,18 +25,23 @@ namespace C6Lab
     /// Reliable ordered bulk delivery above an unreliable transport pipeline. A lost paint chunk
     /// blocks only this channel, never NGO's separate reliable control/action stream. Unacknowledged
     /// chunks are retained until acknowledged or explicitly cleared on connection shutdown.
+    /// The receiver also reports the chunks it already holds after a gap (selective ACK), so only
+    /// chunks that are really missing go out again.
     /// </summary>
     public sealed class LabBulkSender
     {
         public const int MaximumPayloadBytes = 5000;
         public const int DefaultMaximumQueuedBytes = 4 * 1024 * 1024;
-        public const int DefaultWindowSize = 32;
+        /// <summary>
+        /// Chunks after the cumulative ACK that may be in flight. A gap holds the window for about two round trips,
+        /// so 32 stalled a 3-player peer from about 230 ms RTT even without loss. <see cref="LabBulkReceiver.SelectiveAck"/>
+        /// covers the whole window.
+        /// </summary>
+        public const int DefaultWindowSize = 64;
         public const double InitialRetrySeconds = .25d;
         public const double MaximumRetrySeconds = 1d;
         /// <summary>Floor of the measured retry timeout; below it a 30 fps receiver's ACK frame alone could cause spurious resends (#437).</summary>
         public const double MinimumRetrySeconds = .08d;
-        /// <summary>Repeats of the same cumulative ACK that resend the first unacknowledged chunk without waiting for its timeout.</summary>
-        public const int DuplicateAckThreshold = 3;
         private const int MaximumAttempts = 8;
         private const int MaximumBackoff = 16;
         private sealed class Pending
@@ -46,8 +51,13 @@ namespace C6Lab
             public int bytes;
             public int attempts;
             public double dueAt;
-            public double sentAt, lastSentAt;
+            public double sentAt;
+            /// <summary>Send order of the first and of the latest transmission; one counter numbers every chunk sent.</summary>
+            public long firstOrder, lastOrder;
+            /// <summary>Lost: a chunk first sent after this one's latest send has arrived. Due at once, not a timeout.</summary>
             public bool fastResend;
+            /// <summary>Held by the receiver after a gap. It is never sent again and its bytes are released.</summary>
+            public bool delivered;
         }
 
         private readonly LinkedList<Pending> pending = new LinkedList<Pending>();
@@ -60,10 +70,12 @@ namespace C6Lab
         private bool hasRttSample;
         private int backoff = 1;
         private double lastBackoffAt = double.NegativeInfinity;
-        private int duplicateAcks, expectedDuplicateAcks;
-        private double expectedDuplicatesUntil;
-        private bool fastRetransmitUsed;
+        private long sendOrder;
+        /// <summary>The latest first-send order among confirmed chunks; a chunk last sent before it was lost.</summary>
+        private long deliveredOrder;
+        /// <summary>Chunks not yet acknowledged cumulatively, including the ones the receiver already holds after a gap.</summary>
         public int Count => pending.Count;
+        /// <summary>Bytes of chunks the receiver has not confirmed yet, cumulatively or selectively.</summary>
         public int QueuedBytes { get; private set; }
         public long LastEnqueued => lastEnqueued;
         public long Acknowledged => acknowledged;
@@ -114,7 +126,7 @@ namespace C6Lab
             foreach (Pending entry in pending)
             {
                 if (++eligible > windowSize) break;
-                if (now < entry.dueAt) continue;
+                if (entry.delivered || (!entry.fastResend && now < entry.dueAt)) continue;
                 if (entry.bytes > byteBudget) break;
                 byteBudget -= entry.bytes;
                 result.Add(new LabBulkFrame(entry.sequence, entry.payload, entry.bytes));
@@ -126,7 +138,8 @@ namespace C6Lab
                     backoff = Math.Min(MaximumBackoff, backoff * 2);
                     lastBackoffAt = now;
                 }
-                entry.lastSentAt = now;
+                entry.lastOrder = ++sendOrder;
+                if (entry.attempts == 0) entry.firstOrder = entry.lastOrder;
                 entry.fastResend = false;
                 // Attempts and the exponent saturate; the one-second cap is reached long before either does.
                 entry.attempts = Math.Min(MaximumAttempts, entry.attempts + 1);
@@ -137,54 +150,70 @@ namespace C6Lab
         }
 
         /// <summary>A cumulative acknowledgement cannot discard chunks that have never been sent.</summary>
-        public bool Ack(long highestContiguous) => Ack(highestContiguous, double.NaN);
+        public bool Ack(long highestContiguous) => Ack(highestContiguous, 0L, double.NaN);
+
+        /// <summary>A cumulative acknowledgement from a receiver that holds nothing after its first gap.</summary>
+        public bool Ack(long highestContiguous, double now) => Ack(highestContiguous, 0L, now);
 
         /// <summary>
-        /// Same as <see cref="Ack(long)"/>. With a valid <paramref name="now"/> it also measures the RTT, but only
-        /// when every chunk this ACK covers was sent once (Karn). An ACK that waited on a resent chunk would time
-        /// the recovery, not the path. It also counts repeats of the current ACK, which the receiver sends for every
-        /// datagram after a gap, so the third repeat resends the first missing chunk immediately, once per gap (#437).
+        /// Applies one receiver acknowledgement. Every chunk through <paramref name="highestContiguous"/> arrived in
+        /// order, and bit i of <paramref name="selective"/> says the receiver holds chunk highestContiguous + 2 + i
+        /// after the gap (<see cref="LabBulkReceiver.SelectiveAck"/>). Held chunks are never sent again. An older
+        /// ACK still adds what it held. An ACK of a chunk never sent is invalid as a whole.
+        /// <para>
+        /// The path keeps order, so a chunk whose latest send went out before a chunk that has now arrived was lost:
+        /// it is due again at once, without backing off the timer like a timeout. That covers every gap in the window
+        /// at once, not only the first. After that resend, only the arrival of a chunk sent later marks it lost again.
+        /// </para>
+        /// With a valid <paramref name="now"/> it also measures the RTT, but only when the most recently sent chunk
+        /// this ACK newly confirms was sent once (Karn). An ACK answering a resend would time the recovery, not the path.
         /// </summary>
-        public bool Ack(long highestContiguous, double now)
+        public bool Ack(long highestContiguous, long selective, double now)
         {
-            bool timed = ValidTime(now);
-            if (highestContiguous == acknowledged && timed) CountDuplicate(now);
-            if (highestContiguous <= acknowledged || highestContiguous > highestSent) return false;
-            acknowledged = highestContiguous;
-            duplicateAcks = 0;
-            fastRetransmitUsed = false;
+            if (highestContiguous < 0 || highestContiguous > highestSent) return false;
             Pending newest = null;
-            bool resent = false;
-            while (pending.First != null && pending.First.Value.sequence <= highestContiguous)
+            bool changed = false;
+            if (highestContiguous > acknowledged)
             {
-                newest = pending.First.Value;
-                if (newest.attempts > 1)
+                acknowledged = highestContiguous;
+                changed = true;
+                while (pending.First != null && pending.First.Value.sequence <= highestContiguous)
                 {
-                    // Copies of a resent chunk may still be in flight. Each one makes the receiver repeat the current
-                    // ACK, which says nothing about a gap after it, so that many repeats are discounted. The discount
-                    // expires one timeout after the last copy left, so copies that were lost cannot hide a later gap.
-                    resent = true;
-                    expectedDuplicateAcks = Math.Min(4 * windowSize, expectedDuplicateAcks + newest.attempts - 1);
-                    if (timed) expectedDuplicatesUntil = Math.Max(expectedDuplicatesUntil, newest.lastSentAt + RetryTimeoutSeconds);
+                    Pending entry = pending.First.Value;
+                    if (!entry.delivered) Confirm(entry, ref newest);
+                    pending.RemoveFirst();
                 }
-                QueuedBytes -= newest.bytes;
-                pending.RemoveFirst();
             }
-            if (timed && newest != null && !resent && now >= newest.sentAt) Sample(now - newest.sentAt);
-            return true;
+            if (selective != 0L)
+                foreach (Pending entry in pending)
+                {
+                    long bit = entry.sequence - highestContiguous - 2;
+                    if (bit < 0L) continue;
+                    if (bit >= LabBulkReceiver.SelectiveAckBits || entry.sequence > highestSent) break;
+                    if (entry.delivered || (selective & (1L << (int)bit)) == 0L) continue;
+                    entry.delivered = true;
+                    // The receiver keeps a held chunk until the gap before it fills, so the copy is no longer needed.
+                    entry.payload = null;
+                    Confirm(entry, ref newest);
+                    changed = true;
+                }
+            if (newest == null) return changed;
+            if (ValidTime(now) && newest.attempts == 1 && now >= newest.sentAt) Sample(now - newest.sentAt);
+            int eligible = 0;
+            foreach (Pending entry in pending)
+            {
+                if (++eligible > windowSize) break;
+                if (entry.attempts > 0 && !entry.delivered && entry.lastOrder < deliveredOrder) entry.fastResend = true;
+            }
+            return changed;
         }
 
-        private void CountDuplicate(double now)
+        private void Confirm(Pending entry, ref Pending newest)
         {
-            if (now > expectedDuplicatesUntil) expectedDuplicateAcks = 0;
-            if (expectedDuplicateAcks > 0) { expectedDuplicateAcks--; return; }
-            Pending first = pending.First?.Value;
-            // Only a gap the receiver can see: the first chunk was sent and something after it went out too.
-            if (first == null || first.attempts == 0 || highestSent <= first.sequence || fastRetransmitUsed) return;
-            if (++duplicateAcks < DuplicateAckThreshold) return;
-            first.dueAt = Math.Min(first.dueAt, now);
-            first.fastResend = true;
-            fastRetransmitUsed = true;
+            QueuedBytes -= entry.bytes;
+            // Whichever copy arrived was sent no earlier than the first one.
+            deliveredOrder = Math.Max(deliveredOrder, entry.firstOrder);
+            if (newest == null || entry.lastOrder > newest.lastOrder) newest = entry;
         }
 
         private void Sample(double rtt)
@@ -205,19 +234,39 @@ namespace C6Lab
             pending.Clear(); QueuedBytes = 0;
             lastEnqueued = highestSent = acknowledged = 0;
             smoothedRtt = rttVariance = 0d; hasRttSample = false; backoff = 1; lastBackoffAt = double.NegativeInfinity;
-            duplicateAcks = expectedDuplicateAcks = 0; expectedDuplicatesUntil = 0d; fastRetransmitUsed = false;
+            sendOrder = deliveredOrder = 0;
         }
 
         private static bool ValidTime(double value) => !double.IsNaN(value) && !double.IsInfinity(value) && value >= 0d;
     }
 
-    /// <summary>Per-connection bounded reordering buffer with cumulative acknowledgements.</summary>
+    /// <summary>Per-connection bounded reordering buffer with cumulative and selective acknowledgements.</summary>
     public sealed class LabBulkReceiver
     {
+        /// <summary>Bits in <see cref="SelectiveAck"/>. They reach AckThrough + 65, past the sender's whole default window.</summary>
+        public const int SelectiveAckBits = 64;
         private readonly Dictionary<long, string> buffered = new Dictionary<long, string>();
         private readonly int maximumBuffered;
         public long AckThrough { get; private set; }
         public int BufferedCount => buffered.Count;
+
+        /// <summary>
+        /// Bit i is set when this receiver holds chunk AckThrough + 2 + i. AckThrough + 1 is the gap itself, so it has no
+        /// bit. A held chunk stays until the gap fills, so a sender may stop resending it. Sent with every ACK.
+        /// </summary>
+        public long SelectiveAck
+        {
+            get
+            {
+                long bits = 0L;
+                foreach (long sequence in buffered.Keys)
+                {
+                    long bit = sequence - AckThrough - 2;
+                    if (bit >= 0L && bit < SelectiveAckBits) bits |= 1L << (int)bit;
+                }
+                return bits;
+            }
+        }
 
         public LabBulkReceiver(int windowSize = LabBulkSender.DefaultWindowSize)
         {

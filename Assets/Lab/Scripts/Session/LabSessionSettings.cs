@@ -11,9 +11,11 @@ namespace C6Lab
     {
         public const int MaximumSnapshotCharacters = 512 * 1024;
         public const int MaximumSnapshotBytes = 512 * 1024;
-        // A JSON character can expand to a six-byte escape in the outer packet. 4096 keeps
-        // that worst case plus packet metadata below LabNetwork's 32 KiB receive bound.
-        public const int SnapshotChunkCharacters = 512;
+        // A JSON character can expand to a six-byte escape in the outer packet. 4000 keeps that worst case plus the
+        // other LabBulkPayload fields within one Bulk logical message after Base64
+        // (LabBulkMessageChunks.MaximumEncodedCharacters) and below LabNetwork's 32 KiB receive bound. 512 made
+        // every chunk two datagrams, the second almost empty; a usual shared snapshot is now one message.
+        public const int SnapshotChunkCharacters = 4000;
 
         /// <summary>Which room this is follows from ValidRoomSize before here; this only bounds the count (3:3 has six, #394).</summary>
         public static string Fingerprint(float[] values, int participants, ushort protocol)
