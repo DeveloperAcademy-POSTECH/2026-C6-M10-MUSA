@@ -2124,7 +2124,10 @@ namespace C6Lab
                 var old = wallRoot.transform.GetChild(0);
                 var collider = old.GetComponent<Collider>();
                 if (collider != null) collider.enabled = false;
-                old.SetParent(null);
+                // Out of the wall root (Destroy waits for the frame end), but still under this board: an old wall
+                // moved to the scene root was left behind when the battle scene closed right after a resize.
+                old.gameObject.SetActive(false);
+                old.SetParent(transform, false);
                 Destroy(old.gameObject);
             }
             foreach (Mesh mesh in areaWallMeshes) if (mesh != null) Destroy(mesh);

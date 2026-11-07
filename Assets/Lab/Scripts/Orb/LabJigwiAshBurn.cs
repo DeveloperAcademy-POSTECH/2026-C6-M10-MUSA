@@ -27,7 +27,6 @@ namespace C6Lab
         private Color32[] scorchPixels;
         private float[] scorchDepth, scorchAngle;
         private float lastPaint = -1f;
-        private SpriteMask mask;
         private SpriteRenderer lineHalo, lineCore;
         /// <summary>
         /// 구슬이 타는 가장자리 그림 (부적이 탈 때와 같은 그림을 구슬 모양에 맞춰): 타 들어가는 줄은 밝은 불씨(깜빡임),
@@ -41,15 +40,10 @@ namespace C6Lab
         private readonly SpriteRenderer[] flames = new SpriteRenderer[FlameCount];
         private readonly SpriteRenderer[] sparks = new SpriteRenderer[SparkCount], ash = new SpriteRenderer[AshCount];
         private SpriteRenderer[] masked = Array.Empty<SpriteRenderer>();
+        private Transform shrinking;
+        private Vector3 shrinkFrom = Vector3.one;
         private Color[] maskedColors = Array.Empty<Color>();
-        private int[] maskedOrders = Array.Empty<int>();
-        /// <summary>
-        /// 이 구슬만의 정렬 번호 칸. 가림막(SpriteMask)은 원래 그 아래 모든 구슬 그림을 가리므로, 타는 동안 이 구슬 그림만
-        /// 이 칸으로 옮기고 가림막도 이 칸에만 듣게 한다 (여러 구슬이 함께 탈 때 옆 구슬이 잘려 보이지 않게).
-        /// </summary>
-        private const int SlotBase = 200, SlotStride = 40, SlotCount = 200;
-        private static int nextSlot;
-        private int slotOrder, partOrder;
+
         private float left, total = 3f, radius = .3f, age;
         private bool consume, shown;
 
@@ -89,11 +83,6 @@ namespace C6Lab
         private void Ensure()
         {
             if (lineHalo != null) return;
-            var maskObject = new GameObject("Ash Burn Mask") { layer = gameObject.layer };
-            maskObject.transform.SetParent(transform, false);
-            mask = maskObject.AddComponent<SpriteMask>();
-            mask.sprite = LabProceduralFire.BurnRingMask();
-            mask.enabled = false;
             lineHalo = Part("Ash Burn Line Halo", LabProceduralFire.Glow(), EmberColor, 10);
             lineCore = Part("Ash Burn Line Core", LabProceduralFire.Glow(), HotColor, 11);
             for (int i = 0; i < AshCount; i++) ash[i] = Part("Ash Burn Ash " + i, LabProceduralFire.Glow(), AshColor, 11);
@@ -103,7 +92,7 @@ namespace C6Lab
             edgePixels = new Color32[EdgeSize * EdgeSize];
             var edgeSprite = Sprite.Create(edgeTexture, new Rect(0f, 0f, EdgeSize, EdgeSize), new Vector2(.5f, .5f), EdgeSize);
             edgeSprite.hideFlags = HideFlags.DontSave;
-            edge = Part("Ash Burn Edge", edgeSprite, Color.white, 10);
+            edge = Part("Ash Burn Edge", edgeSprite, Color.white, 9);
             for (int i = 0; i < FlameCount; i++) flames[i] = Part("Ash Burn Flame " + i, LabProceduralFire.Flame(i), Color.white, 12);
         }
 
@@ -117,58 +106,28 @@ namespace C6Lab
             return renderer;
         }
 
-        /// <summary>구슬 그림(스프라이트)이 가림막 밖에서만 보이게 한다. 끄면 원래대로.</summary>
+        /// <summary>
+        /// #540 타기 시작할 때 구슬 그림(visuals)을 잡아 둔다: 그림 전체가 둘레부터 줄어들게(크기) 하고, 색을 조금씩 그을린다.
+        /// 끄면 원래 크기·색으로 되돌린다. (가림막 SpriteMask는 구슬 그림 재질에 따라 듣지 않아 쓰지 않는다.)
+        /// </summary>
         private void Mask(Transform visuals, bool on)
         {
             if (on)
             {
+                shrinking = visuals;
+                shrinkFrom = visuals != null ? visuals.localScale : Vector3.one;
                 masked = visuals != null ? visuals.GetComponentsInChildren<SpriteRenderer>(true) : Array.Empty<SpriteRenderer>();
                 maskedColors = new Color[masked.Length];
-                maskedOrders = new int[masked.Length];
-                int low = int.MaxValue, high = int.MinValue, layer = 0;
-                foreach (SpriteRenderer part in masked) { low = Mathf.Min(low, part.sortingOrder); high = Mathf.Max(high, part.sortingOrder); layer = part.sortingLayerID; }
-                if (masked.Length == 0) { low = high = 0; }
-                slotOrder = SlotBase + (nextSlot++ % SlotCount) * SlotStride;
-                int span = Mathf.Clamp(high - low, 0, SlotStride - 8);
-                for (int i = 0; i < masked.Length; i++)
-                {
-                    maskedColors[i] = masked[i].color;
-                    maskedOrders[i] = masked[i].sortingOrder;
-                    // Keep the orb's own layering, just moved into its private slot.
-                    masked[i].sortingOrder = slotOrder + Mathf.Clamp(masked[i].sortingOrder - low, 0, span);
-                    masked[i].maskInteraction = SpriteMaskInteraction.VisibleOutsideMask;
-                }
-                if (mask != null)
-                {
-                    mask.isCustomRangeActive = true;
-                    mask.frontSortingLayerID = mask.backSortingLayerID = layer;
-                    mask.backSortingOrder = slotOrder - 1;
-                    mask.frontSortingOrder = slotOrder + span;
-                    mask.enabled = true;
-                }
-                // The burning line, sparks and ash draw just above this orb's slot.
-                partOrder = slotOrder + span + 1;
-                SortParts(layer);
+                for (int i = 0; i < masked.Length; i++) maskedColors[i] = masked[i].color;
+                Debug.Log("C6_JIGWI_ASH start orb=" + (transform.parent != null ? transform.parent.name : "?")
+                    + " pictures=" + masked.Length);
                 return;
             }
             for (int i = 0; i < masked.Length; i++)
-                if (masked[i] != null)
-                {
-                    masked[i].maskInteraction = SpriteMaskInteraction.None;
-                    masked[i].color = maskedColors[i];
-                    masked[i].sortingOrder = maskedOrders[i];
-                }
+                if (masked[i] != null) masked[i].color = maskedColors[i];
             masked = Array.Empty<SpriteRenderer>();
-            if (mask != null) mask.enabled = false;
-        }
-
-        private void SortParts(int layer)
-        {
-            void Put(SpriteRenderer part, int extra) { if (part != null) { part.sortingLayerID = layer; part.sortingOrder = partOrder + extra; } }
-            Put(edge, 0); Put(lineHalo, 1); Put(lineCore, 2);
-            foreach (SpriteRenderer flake in ash) Put(flake, 2);
-            foreach (SpriteRenderer flame in flames) Put(flame, 3);
-            foreach (SpriteRenderer spark in sparks) Put(spark, 4);
+            if (shrinking != null) shrinking.localScale = shrinkFrom;
+            shrinking = null;
         }
 
         private void SetShown(bool on)
@@ -209,21 +168,17 @@ namespace C6Lab
             float ring = Mathf.Max(0f, 1f - front) * r; // where the burning line is
             float flicker = .8f + .2f * Mathf.PerlinNoise(age * 9f, .3f);
             float fade = 1f - Mathf.SmoothStep(.94f, 1f, p);
-            float depth = -r * 1.1f; // in front of the orb picture (it sits one radius toward the camera)
+            const float depth = 0f; // like the old blaze: drawn above the orb by sorting order
 
-            // The mask's hole is the part still unburnt; its cover reaches far enough to hide the whole picture.
-            float scale = Mathf.Max(.0001f, remaining / LabProceduralFire.BurnRingHole);
-            mask.transform.localPosition = Vector3.zero;
-            mask.transform.localScale = new Vector3(scale, scale, 1f);
-            bool tiny = remaining < r * 1.4f * LabProceduralFire.BurnRingHole * 2f; // the cover no longer reaches the rim
+            // The ball itself shrinks from the rim in as it burns (no mask needed), and darkens a little.
+            float share = Mathf.Clamp01(remaining / Mathf.Max(.0001f, r));
+            if (shrinking != null) shrinking.localScale = shrinkFrom * share;
             float charring = Mathf.SmoothStep(0f, 1f, p) * .4f;
             for (int i = 0; i < masked.Length; i++)
             {
                 if (masked[i] == null) continue;
                 Color c = maskedColors[i];
-                c = Color.Lerp(c, new Color(c.r * .3f, c.g * .2f, c.b * .16f, c.a), charring);
-                if (tiny || remaining <= 0f) c.a = 0f;
-                masked[i].color = c;
+                masked[i].color = Color.Lerp(c, new Color(c.r * .3f, c.g * .2f, c.b * .16f, c.a), charring);
             }
 
             if (lastPaint < 0f || age - lastPaint >= .03f) { lastPaint = age; PaintEdge(front, fade); }

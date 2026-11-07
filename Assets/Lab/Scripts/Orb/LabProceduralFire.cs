@@ -81,7 +81,7 @@ namespace C6Lab
         }
 
         private static readonly Sprite[] cartoonFlames = new Sprite[FlameVariants];
-        private static Sprite cartoonSpark, burnMask;
+        private static Sprite cartoonSpark;
 
         /// <summary>
         /// #540 박 위 불덩이 (먹색 테두리의 만화풍 2D, 얼굴 없음): 굵은 먹색 테두리, 주황 겉불 안에 노란 속불, 양옆 작은 불꽃 둘.
@@ -152,34 +152,6 @@ namespace C6Lab
             cartoonSpark = Make(pixels, size, size, "Jigwi Cartoon Spark");
             return cartoonSpark;
         }
-
-        /// <summary>
-        /// #540 구슬이 가장자리부터 타 들어갈 때 쓰는 가림막 (SpriteMask): 가운데 작은 구멍(반지름 = 한 변의 2.5%, 탄 종이처럼
-        /// 들쭉날쭉) 바깥을 모두 덮는 판. 구멍 반지름이 남은 구슬 반지름이 되도록 크기를 바꿔 쓴다. 1×1 단위.
-        /// </summary>
-        public static Sprite BurnRingMask()
-        {
-            if (burnMask != null) return burnMask;
-            const int size = 256;
-            var pixels = new Color[size * size];
-            for (int y = 0; y < size; y++)
-                for (int x = 0; x < size; x++)
-                {
-                    float dx = (x + .5f) / size - .5f, dy = (y + .5f) / size - .5f;
-                    float d = Mathf.Sqrt(dx * dx + dy * dy), a = Mathf.Atan2(dy, dx);
-                    float hole = BurnRingHole * (1f + .12f * Mathf.Sin(a * 7f) + .08f * Mathf.Sin(a * 13f + 1.7f));
-                    pixels[y * size + x] = new Color(1f, 1f, 1f, d > hole ? 1f : 0f);
-                }
-            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
-            { name = "Jigwi Burn Ring Mask (#540 runtime)", hideFlags = HideFlags.DontSave, wrapMode = TextureWrapMode.Clamp };
-            texture.SetPixels(pixels); texture.Apply(false, true);
-            burnMask = Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(.5f, .5f), size);
-            burnMask.hideFlags = HideFlags.DontSave;
-            return burnMask;
-        }
-
-        /// <summary>#540 <see cref="BurnRingMask"/> 구멍 반지름 (한 변 대비).</summary>
-        public const float BurnRingHole = .025f;
 
         /// <summary>
         /// #540 공격 영역 경보 빛: 가장자리가 붉게 짙고 가운데로 옅어지는 사각 빛 (늘여서 쓴다).
