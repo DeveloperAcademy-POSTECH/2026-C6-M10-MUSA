@@ -218,10 +218,23 @@ namespace C6Lab.Tests
             var done=m.Snapshot(20);var round=done.jigwiAB.rounds.Single(r=>r.id==a.id);
             Assert.That(round.resolution,Is.EqualTo(LabJigwiABResolution.Expired));
             Assert.That(LabJigwiABNetworkValidation.Valid(done.jigwiAB,done.players,m.Revision),Is.True);
-            var later=m.Snapshot(20.5);
+            var later=m.Snapshot(22);
             Assert.That(later.orbs.Any(o=>o.id==mine.id||o.id==mine2.id),Is.False,"The unfinished board's orbs burned.");
             Assert.That(later.orbs.Single(o=>o.id==theirs.id).jigwiABBurnAt,Is.EqualTo(-1),"The finished board keeps its orbs.");
-            Assert.That(m.TryGenerate(Players[0],Request(),21,out _,out e),Is.True,"#540: a failed talisman never blocks the drums. "+e);
+            Assert.That(m.TryGenerate(Players[0],Request(),22,out _,out e),Is.True,"#540: a failed talisman never blocks the drums. "+e);
+        }
+        [Test] public void HoldingTheBurnKeepsEveryOrbUntilTheARunsOut()
+        {
+            // #540: while the talisman is being written the orbs are untouched (only the fireball grows);
+            // an A that runs out then burns every orb left on the unfinished board.
+            JsonUtility.FromJsonOverwrite("{\"jigwiAHoldBurnUntilEnd\":true}",config);
+            var m=Room();var a=Current(m,5);var mine=Add(m,Players[0],4);
+            Assert.That(m.Snapshot(6).orbs.Single(o=>o.id==mine.id).jigwiABBurnAt,Is.EqualTo(-1),"Nothing burns while writing.");
+            Assert.That(m.TryGenerate(Players[0],Request(),19,out var fresh,out var e),Is.True,e);
+            Assert.That(m.Snapshot(19.5).orbs.Single(o=>o.id==fresh.id).jigwiABBurnAt,Is.EqualTo(-1),"A new orb is safe too.");
+            Assert.That(m.Snapshot(20).jigwiAB.rounds.Single(r=>r.id==a.id).resolution,Is.EqualTo(LabJigwiABResolution.Expired));
+            Assert.That(m.Snapshot(20.5).orbs.Count(o=>o.id==mine.id||o.id==fresh.id),Is.EqualTo(2),"They blaze together first…");
+            Assert.That(m.Snapshot(22).orbs.Any(o=>o.id==mine.id||o.id==fresh.id),Is.False,"…then the whole board burns away.");
         }
         [Test] public void BGivesEachPickedSeatOneSpecialWaterWhileOrdinaryRawPairsKeepTheirNormalElement()
         {

@@ -19,11 +19,17 @@ namespace C6Lab
         /// <summary>#540: the timetable this battle runs and, for the flow timetable, the common gimmick rhythm.</summary>
         private int jigwiSchedule;
         private double jigwiCommonStart = 40d, jigwiCommonInterval = 15d;
-        /// <summary>#540: an unfinished talisman's remaining orbs burn one after another this far apart (fire spreading).</summary>
-        public const double JigwiTalismanFailBurnStepSeconds = .12d;
+        /// <summary>#540: an unfinished talisman's remaining orbs burn one after another this far apart (fire spreading fast).</summary>
+        public const double JigwiTalismanFailBurnStepSeconds = .05d;
+        /// <summary>#540: after the fireball lands, every orb on that board blazes together this long before they burn away.</summary>
+        public const double JigwiTalismanFailBlazeSeconds = .8d;
+        /// <summary>#540: a failed seat's orbs start burning this long after the A ends (the fireball falling onto the board).</summary>
+        public const double JigwiTalismanFailBurnDelaySeconds = .45d;
         // #479: A burns each owner's orbs one at a time. The last queued deadline per owner for the running A.
         private readonly Dictionary<ulong, double> jigwiABLastBurnAt = new Dictionary<ulong, double>();
         private string jigwiABBurnQueueId;
+        /// <summary>#540: no orb burns while the talisman is being written; only an A that runs out burns the board.</summary>
+        private bool jigwiAHoldBurn;
         private int jigwiTalismanWaterCount;
         /// <summary>#509: talisman Water drops in one at a time; each pending orb's owner, index and Host due time.</summary>
         private readonly List<(ulong owner, int index, double dueAt)> jigwiTalismanDrops = new List<(ulong, int, double)>();
@@ -46,6 +52,7 @@ namespace C6Lab
         {
             jigwiABEnabled = !teamMode && StageYokai == LabStageYokai.Jigwi && config.JigwiStageTimelineEnabled;
             jigwiSchedule = config.JigwiFlowSchedule ? LabJigwiABTimeline.FlowSchedule : LabJigwiABTimeline.LegacySchedule;
+            jigwiAHoldBurn = config.JigwiAHoldBurnUntilEnd;
             jigwiCommonStart = config.JigwiCommonStartSeconds; jigwiCommonInterval = config.JigwiCommonIntervalSeconds;
             jigwiABRounds.Clear(); jigwiABActivated.Clear(); jigwiABFailureRevision = 0;
             jigwiABLastBurnAt.Clear(); jigwiABBurnQueueId = null; jigwiTalismanDrops.Clear();
@@ -202,7 +209,9 @@ namespace C6Lab
                 if (failed.Contains(orb.owner) && !orb.inFlight && !orb.jigwiTalismanReward && (orb.kind.IsRaw() || orb.kind == LabOrbKind.Combined))
                 {
                     burnSteps.TryGetValue(orb.owner, out int step); burnSteps[orb.owner] = step + 1;
-                    double burnAt = item.resolvedAt + step * JigwiTalismanFailBurnStepSeconds;
+                    // #540: the fireball falls onto the board, the whole board blazes together, then the orbs burn away fast.
+                    double burnAt = item.resolvedAt + JigwiTalismanFailBurnDelaySeconds + JigwiTalismanFailBlazeSeconds
+                        + step * JigwiTalismanFailBurnStepSeconds;
                     if (orb.jigwiABBurnAt < 0d || burnAt < orb.jigwiABBurnAt)
                     { orb.jigwiABBurnAt = burnAt; orb.jigwiABBurnEventId = item.id; orb.revision = ++revision; }
                     continue;
@@ -227,7 +236,7 @@ namespace C6Lab
             if (!jigwiABEnabled || orb.inFlight || orb.jigwiTalismanReward || (!orb.kind.IsRaw() && orb.kind != LabOrbKind.Combined)) return;
             var active = ActiveJigwiABRound(now);
             if (active == null || !active.Active(now)) return;
-            if (active.kind == LabJigwiABKind.PersonalBurn)
+            if (active.kind == LabJigwiABKind.PersonalBurn && !jigwiAHoldBurn)
             {
                 // An orb already burning in this A (combined or passed on) keeps its place in the queue.
                 if (orb.jigwiABBurnAt >= 0d && orb.jigwiABBurnEventId == active.id) return;

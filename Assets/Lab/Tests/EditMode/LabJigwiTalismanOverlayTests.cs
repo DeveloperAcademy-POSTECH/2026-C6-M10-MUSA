@@ -195,6 +195,32 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void TheFireballKindlesGrowsAndThenStopsOrFalls()
+        {
+            // #540: warning 10 s → active 11 s → ends 26 s. The orbs are untouched; only the fireball shows the time.
+            LabSnapshot snapshot = Snapshot(-1d);
+            Assert.That(LabJigwiFireball.Evaluate(snapshot, Local, 9.9d, out _, out _), Is.EqualTo(LabJigwiFireball.Phase.None));
+            Assert.That(LabJigwiFireball.Evaluate(snapshot, Local, 10.5d, out _, out _), Is.EqualTo(LabJigwiFireball.Phase.None),
+                "#540: it catches when Jigwi's voice says 타올라라, not at the very start of the warning.");
+            Assert.That(LabJigwiFireball.Evaluate(snapshot, Local, 10.85d, out float p, out _), Is.EqualTo(LabJigwiFireball.Phase.Kindle));
+            Assert.That(p, Is.EqualTo(.5f).Within(.01f));
+            LabJigwiFireball.Evaluate(snapshot, Local, 12d, out _, out float early);
+            Assert.That(LabJigwiFireball.Evaluate(snapshot, Local, 24d, out _, out float late), Is.EqualTo(LabJigwiFireball.Phase.Grow));
+            Assert.That(late, Is.GreaterThan(early), "It grows as time runs out.");
+            Assert.That(LabJigwiFireball.Evaluate(snapshot, 99, 24d, out _, out _), Is.EqualTo(LabJigwiFireball.Phase.None), "Only my own.");
+            LabSnapshot written = Snapshot(20d);
+            Assert.That(LabJigwiFireball.Evaluate(written, Local, 20.2d, out _, out float stopped), Is.EqualTo(LabJigwiFireball.Phase.Douse),
+                "Writing it stops the fire where it is.");
+            Assert.That(stopped, Is.EqualTo(LabJigwiFireball.Grown(9f / 15f)).Within(.001f), "It stops at the size it had.");
+            Assert.That(LabJigwiFireball.Evaluate(written, Local, 21d, out _, out _), Is.EqualTo(LabJigwiFireball.Phase.None));
+            LabJigwiABRound round = snapshot.jigwiAB.rounds[0];
+            round.resolution = LabJigwiABResolution.Expired; round.resolvedAt = 26d;
+            Assert.That(LabJigwiFireball.Evaluate(snapshot, Local, 26.2d, out _, out _), Is.EqualTo(LabJigwiFireball.Phase.Fall),
+                "Not written in time: it falls onto the board.");
+            Assert.That(LabJigwiFireball.Evaluate(snapshot, Local, 27d, out _, out _), Is.EqualTo(LabJigwiFireball.Phase.None));
+        }
+
+        [Test]
         public void TheWarningDrivesTheOmenBeforeTheTalismanArrives()
         {
             LabSnapshot snapshot = Snapshot(-1d); // warning 10 s → active 11 s

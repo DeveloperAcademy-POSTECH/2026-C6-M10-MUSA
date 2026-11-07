@@ -573,6 +573,8 @@ namespace C6Lab
         [SerializeField] private bool jigwiStageTimelineEnabled = true;
         [Tooltip("#540 Inspector 전용(Host): 켜면 야광귀와 같은 흐름의 지귀 시간표 — 초반 40초는 개별 기믹 1개(A1 10초), 중반 60초는 공통 기믹 위에 B-A-B(B1 45, A2 66, B2 83), 후반 20초 피버. 끄면 #509 시간표(A 5/B 25/A 42/B 55/A 70/B 85).")]
         [SerializeField] private bool jigwiFlowSchedule = false;
+        [Tooltip("#540 Inspector 전용(Host): 켜면 A 동안(부적을 쓰는 동안) 판의 구슬은 타지 않는다. 박 위 불덩이만 차오르고, 끝날 때까지 못 쓰면 그제서야 그 판 구슬이 모두 탄다. 끄면 #479처럼 A가 시작되자마자 구슬이 하나씩 탄다.")]
+        [SerializeField] private bool jigwiAHoldBurnUntilEnd = false;
         [Tooltip("#540 Inspector 전용(Host, 새 시간표만): 지귀 공통 기믹이 처음 나오는 때(초).")]
         [SerializeField, Range(0f, 99f)] private float jigwiCommonStartSeconds = 40f;
         [Tooltip("#540 Inspector 전용(Host, 새 시간표만): 지귀 공통 기믹 간격(초). 피버(100초) 전까지 되풀이.")]
@@ -1170,6 +1172,7 @@ namespace C6Lab
         public int RawStreakMaximum => Mathf.Clamp(rawStreakMaximum, 1, 10);
         public bool JigwiStageTimelineEnabled => jigwiStageTimelineEnabled;
         public bool JigwiFlowSchedule => jigwiFlowSchedule;
+        public bool JigwiAHoldBurnUntilEnd => jigwiAHoldBurnUntilEnd;
         public float JigwiCommonStartSeconds => Mathf.Clamp(Finite(jigwiCommonStartSeconds, 40f), 0f, 99f);
         public float JigwiCommonIntervalSeconds => Mathf.Clamp(Finite(jigwiCommonIntervalSeconds, 15f), 3f, 60f);
         public float JigwiStageWarningSeconds => Mathf.Clamp(Finite(jigwiStageWarningSeconds, 1f), 0f, 3f);

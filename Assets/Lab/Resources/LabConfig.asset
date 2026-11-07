@@ -39,6 +39,7 @@ MonoBehaviour:
   feverTimeRecoveryMultiplier: 2
   jigwiStageTimelineEnabled: 1
   jigwiFlowSchedule: 1
+  jigwiAHoldBurnUntilEnd: 1
   jigwiCommonStartSeconds: 40
   jigwiCommonIntervalSeconds: 15
   jigwiStageWarningSeconds: 1

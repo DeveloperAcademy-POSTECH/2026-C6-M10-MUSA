@@ -79,7 +79,7 @@ namespace C6Lab
         [SerializeField] private Color emberColor = new Color(1f, .5f, .12f, 1f);
         [Tooltip("#540: 타들어 가는 동안 나는 타닥타닥 소리 (Resources/Audio 폴더, 반복). 타들어 갈수록 커진다.")]
         [SerializeField] private string crackleFolder = "JigwiTalismanCrackle";
-        [SerializeField, Range(0f, 1f)] private float crackleVolume = 1f;
+        [SerializeField, Range(0f, 1f)] private float crackleVolume = .35f;
         [Tooltip("타는 동안 지글지글 이어지는 진동 세기 (0이면 끔).")]
         [SerializeField, Range(0f, 1f)] private float burnHapticIntensity = .5f;
         [Header("#533 도장 (완성하면 \"쾅\" 찍힘)")]
@@ -135,11 +135,11 @@ namespace C6Lab
         [Tooltip("B(물구슬 동시 명중) 예고 때 지귀 대사 폴더. 예: \"물방울로는 어림도 없지!\". 비우면 없음.")]
         [SerializeField] private string voiceBFolder = "JigwiVoiceB";
         [SerializeField, Range(0f, 1f)] private float voiceVolume = 1f;
-        [Tooltip("#540 부적을 쓰는 동안 깔리는 구슬 타는 소리(츠츠츠, 반복). 끝나 갈수록 커진다. 비우면 없음.")]
-        [SerializeField] private string fireLoopFolder = "JigwiTalismanFireLoop";
-        [Tooltip("쓰기 시작할 때 타는 소리 크기.")]
-        [SerializeField, Range(0f, 1f)] private float fireLoopVolume = .45f;
-        [Tooltip("A가 끝나는 순간(그을림 예고 끝)의 타는 소리 크기.")]
+        [Tooltip("#540 불덩이가 타는 소리(반복). 불씨가 붙을 때부터 불덩이가 커질수록 점점 커진다. 비우면 없음.")]
+        [SerializeField] private string fireLoopFolder = "JigwiFireballLoop";
+        [Tooltip("불씨가 막 붙었을 때 타는 소리 크기.")]
+        [SerializeField, Range(0f, 1f)] private float fireLoopVolume = .12f;
+        [Tooltip("A가 끝나는 순간(불덩이가 가장 클 때)의 타는 소리 크기.")]
         [SerializeField, Range(0f, 1f)] private float fireLoopWarnVolume = 1f;
         [Tooltip("타는 소리가 커지고 줄어드는 빠르기(초).")]
         [SerializeField, Range(.05f, 1f)] private float fireLoopFadeSeconds = .25f;
@@ -165,12 +165,17 @@ namespace C6Lab
         [SerializeField, Range(0f, 1.5f)] private float extinguishSeconds = .45f;
         [Tooltip("불이 꺼진 뒤 가락이 시작하기 전 숨 고르는 시간(초).")]
         [SerializeField, Range(0f, 1f)] private float breathSeconds = .25f;
-        [Tooltip("#540 3D 예고: 박에서 부적이 튀어나올 때 소리 폴더. 비우면 없음.")]
-        [SerializeField] private string omenSoundFolder = "JigwiTalismanOmen";
-        [SerializeField, Range(0f, 1f)] private float omenSoundVolume = .8f;
-        [Tooltip("#540 3D 예고: 부적이 화면 쪽으로 휙 날아올 때 소리 폴더. 비우면 없음.")]
-        [SerializeField] private string swoopSoundFolder = "JigwiTalismanSwoop";
-        [SerializeField, Range(0f, 1f)] private float swoopSoundVolume = .9f;
+        [Tooltip("#540 3D 불덩이: 예고 때 박 위에 불씨가 붙는 \"화르륵\" 소리 폴더. 비우면 없음.")]
+        [SerializeField] private string igniteSoundFolder = "JigwiFireballIgnite";
+        [SerializeField, Range(0f, 1f)] private float igniteSoundVolume = .8f;
+        [Tooltip("#540 3D 불덩이: 못 쓰고 끝나 불덩이가 조합판으로 떨어질 때 소리 폴더. 비우면 없음.")]
+        [SerializeField] private string fallSoundFolder = "JigwiFireballFall";
+        [SerializeField, Range(0f, 1f)] private float fallSoundVolume = .9f;
+        [Tooltip("#540 못 쓰고 끝나 불덩이가 떨어질 때 지귀 목소리(\"모두 재가 되어라!\") 폴더. 비우면 없음.")]
+        [SerializeField] private string failVoiceFolder = "JigwiVoiceAFail";
+        [Tooltip("#540 불덩이가 조합판에 닿아 불이 확 번질 때 소리 폴더. 비우면 없음.")]
+        [SerializeField] private string spreadSoundFolder = "JigwiFireSpread";
+        [SerializeField, Range(0f, 1f)] private float spreadSoundVolume = 1f;
         [Tooltip("#540 부적 구슬이 판에 닿을 때 \"퐁\" 소리 폴더. 비우면 없음.")]
         [SerializeField] private string landSoundFolder = "JigwiTalismanLand";
         [SerializeField, Range(0f, 1f)] private float landSoundVolume = .9f;
@@ -235,10 +240,11 @@ namespace C6Lab
         [Tooltip("#533 완성 가락 음높이 (파일 원래 음에서 반음 수). 기본 ComboHit는 라(A4)라서 솔 도 시 라 = -2, +3, +2, 0. 파일이 4개 이상이면 쓰지 않는다.")]
         [SerializeField] private int[] noteSemitones = { -2, 3, 2, 0 };
         private float burnAge = -1f;
-        // #540 effects that live outside the paper (board dim, landing splash, flying embers) and the 3D omen.
+        // #540 effects that live outside the paper (board dim, landing splash, flying embers) and the 3D fireball.
         private UnityEngine.UI.Image boardDim, landRing;
-        private LabJigwiTalismanOmen omen;
-        private int omenStage;
+        private LabJigwiFireball fireball;
+        private LabJigwiFireball.Phase fireballSeen;
+        private LabJigwiScreenPresentation presentation;
         private UnityEngine.UI.Image[] landDrops = Array.Empty<UnityEngine.UI.Image>(), flyEmbers = Array.Empty<UnityEngine.UI.Image>();
         private float dimLevel, landAge = -1f, flyAge = -1f;
         private Vector2 landAt, flyFrom;
@@ -388,9 +394,9 @@ namespace C6Lab
             if (Finishing) AdvanceFinish(Time.unscaledDeltaTime);
             if (Burning) AdvanceBurn(Time.unscaledDeltaTime);
             bool paused = snapshot == null || snapshot.paused || source.GameStartHeld || source.BattlePresentationHeld;
-            UpdateFireLoop(Visible && !paused, Time.unscaledDeltaTime);
+            DriveFireball(snapshot);
+            UpdateFireLoop(!paused, Time.unscaledDeltaTime);
             UpdateCrackle(CrackleTarget(paused), Time.unscaledDeltaTime);
-            DriveOmen(paused);
             Camera boardView = source.board != null ? source.board.ViewCamera : null;
             DrawEffects(boardView, Time.unscaledDeltaTime);
             if (Visible)
@@ -616,12 +622,12 @@ namespace C6Lab
         }
 
         /// <summary>
-        /// #540 쓰는 동안 구슬 타는 소리(츠츠츠)를 깐다. A가 끝나 갈수록(그을림 예고와 같이) 커져 초조하게,
-        /// 다 쓰거나(완성) 끝나면(불에 탐) 짧게 줄어든다. 반복 소리라 시작 위치를 매번 달리 한다.
+        /// #540 불덩이가 타는 소리를 깐다. 불씨가 붙으면 작게 시작해 불덩이가 커질수록 점점 커지고(초조하게),
+        /// 다 쓰면 불과 함께 멈추며, 떨어질 때는 가장 크게. 반복 소리라 시작 위치를 매번 달리 한다.
         /// </summary>
-        private void UpdateFireLoop(bool writing, float dt)
+        private void UpdateFireLoop(bool running, float dt)
         {
-            FireLoopTarget = writing ? Mathf.Lerp(fireLoopVolume, fireLoopWarnVolume, WarnLevel) : 0f;
+            FireLoopTarget = running ? FireballLoudness(fireballSeen, fireballProgress, fireLoopVolume, fireLoopWarnVolume) : 0f;
             float step = dt / Mathf.Max(.01f, fireLoopFadeSeconds);
             fireLoopLevel = Mathf.MoveTowards(fireLoopLevel, FireLoopTarget, step);
             if (fireLoopLevel <= 0f)
@@ -1440,7 +1446,7 @@ namespace C6Lab
             if (source != null && source.board != null) source.board.SetUiInputBlocked(value);
         }
 
-        /// <summary>#540: 0 → 1 across the A warning when a talisman is coming for this seat (0 otherwise). Drives the 3D omen.</summary>
+        /// <summary>#540: 0 → 1 across the A warning when a talisman is coming for this seat (0 otherwise). Dims the board.</summary>
         public float OmenLevel { get; private set; }
 
         private static float WarningOmen(LabSnapshot snapshot, ulong localPlayer, double now)
@@ -1457,27 +1463,54 @@ namespace C6Lab
         }
 
         /// <summary>
-        /// #540 3D 예고: 박에서 부적이 튀어나와 불이 붙은 채 돌다가 화면 쪽으로 날아온다(`LabJigwiTalismanOmen`).
-        /// 튀어나올 때 "톡", 날아올 때 "쿵" 진동과 소리.
+        /// #540 "다 태워버리겠어" 3D 불덩이(`LabJigwiFireball`): 예고에 박 위에 불씨가 붙고, 쓰는 동안 커지고, 다 쓰면 그대로 멈춰
+        /// 사라지고, 못 쓰면 조합판으로 떨어진다. 불씨가 붙을 때 "톡", 떨어질 때 "쿵" 진동과 소리.
         /// </summary>
-        private void DriveOmen(bool paused)
+        /// <summary>#540: 불덩이 단계·진행 → 불 소리 크기 (start = 불씨, full = 가장 클 때).</summary>
+        public static float FireballLoudness(LabJigwiFireball.Phase phase, float progress, float start, float full)
         {
-            if (!Application.isPlaying) return;
-            if (omen == null) omen = LabJigwiTalismanOmen.Create();
-            float level = paused ? 0f : OmenLevel;
-            omen.Show(level, source != null ? source.target : null, Time.unscaledTime);
-            if (level <= 0f) { omenStage = 0; return; }
-            if (omenStage == 0)
+            switch (phase)
             {
-                omenStage = 1;
-                Cue("Omen", omenSoundFolder, omenSoundVolume);
-                LabHaptics.PlayDirect(Config, LabHapticStyle.Light, .55f);
+                case LabJigwiFireball.Phase.Kindle: return start * Mathf.Clamp01(progress * 2f);
+                case LabJigwiFireball.Phase.Grow: return Mathf.Lerp(start, full, Mathf.Pow(Mathf.Clamp01(progress), 1.3f));
+                case LabJigwiFireball.Phase.Fall: return full;
+                default: return 0f;
             }
-            if (omenStage == 1 && level >= LabJigwiTalismanOmen.SwoopAt)
+        }
+
+        private float fireballProgress, spreadAt = -1f;
+
+        private void DriveFireball(LabSnapshot snapshot)
+        {
+            if (!Application.isPlaying || source == null) return;
+            if (fireball == null) fireball = LabJigwiFireball.Create();
+            double now = source.JigwiABPresentationTime;
+            LabJigwiFireball.Phase phase = LabJigwiFireball.Evaluate(snapshot, source.LocalPlayerId, now, out float progress, out float size);
+            if (presentation == null) presentation = GetComponentInParent<LabJigwiScreenPresentation>();
+            fireball.Show(phase, progress, size, source.target, presentation != null ? presentation.battleCamera : null, (float)now);
+            fireballProgress = progress;
+            // The fireball lands on the board: fire spreads over it with a whoosh and a heavy thud.
+            if (spreadAt >= 0f && Time.unscaledTime >= spreadAt)
             {
-                omenStage = 2;
-                Cue("Swoop", swoopSoundFolder, swoopSoundVolume);
-                LabHaptics.PlayDirect(Config, LabHapticStyle.Heavy, .85f);
+                spreadAt = -1f;
+                Cue("Spread", spreadSoundFolder, spreadSoundVolume);
+                LabHaptics.PlayDirect(Config, LabHapticStyle.Heavy, 1f, .6f, .8f, .4f);
+            }
+            if (phase != fireballSeen)
+            {
+                if (phase == LabJigwiFireball.Phase.Kindle)
+                {
+                    Cue("Ignite", igniteSoundFolder, igniteSoundVolume);
+                    LabHaptics.PlayDirect(Config, LabHapticStyle.Light, .55f);
+                }
+                else if (phase == LabJigwiFireball.Phase.Fall)
+                {
+                    Cue("Fall", fallSoundFolder, fallSoundVolume);
+                    PlayVoice("AFail", failVoiceFolder);
+                    LabHaptics.PlayDirect(Config, LabHapticStyle.Heavy, .9f);
+                    spreadAt = Time.unscaledTime + (1f - progress) * LabJigwiFireball.FallSeconds;
+                }
+                fireballSeen = phase;
             }
         }
 
@@ -1885,8 +1918,8 @@ namespace C6Lab
             rect.offsetMin = rect.offsetMax = Vector2.zero;
         }
 
-        private void OnDisable() { if (omen != null) omen.Hide(); SetBoardBlocked(false); Visible = false; RoundId = null; hasLast = false; EndFinish(); EndBurn(); if (paper != null) paper.gameObject.SetActive(false); }
-        private void OnDestroy() { SetBoardBlocked(false); if (omen != null) Destroy(omen.gameObject); }
+        private void OnDisable() { if (fireball != null) fireball.Hide(); fireballSeen = LabJigwiFireball.Phase.None; SetBoardBlocked(false); Visible = false; RoundId = null; hasLast = false; EndFinish(); EndBurn(); if (paper != null) paper.gameObject.SetActive(false); }
+        private void OnDestroy() { SetBoardBlocked(false); if (fireball != null) Destroy(fireball.gameObject); }
     }
 
     /// <summary>
