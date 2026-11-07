@@ -50,12 +50,13 @@ namespace Hapio
         /// <summary>
         /// Whether moving from scene <paramref name="from"/> to <paramref name="to"/> shows the loading screen: always,
         /// except between the screens of one run (battle, stage result, game over), which keep their own presentation.
-        /// Reloading the same battle (a restart) shows it.
+        /// Reloading the same battle (a restart) shows it; reloading it into another stage (the DEV panel's next stage,
+        /// <paramref name="stageChanges"/>) is a change between stages and does not.
         /// </summary>
-        public static bool ShowsLoading(string from, string to, bool tutorialStarting = false)
+        public static bool ShowsLoading(string from, string to, bool tutorialStarting = false, bool stageChanges = false)
         {
             // The opening's hand-over to the practice board gets its own transition later (user decision).
-            if (tutorialStarting) return false;
+            if (tutorialStarting || stageChanges) return false;
             bool fromRun = InRun(from), toRun = InRun(to);
             return !(fromRun && toRun && from != to);
         }

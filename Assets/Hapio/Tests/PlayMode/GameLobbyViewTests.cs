@@ -211,13 +211,15 @@ namespace Hapio.Tests
                 { position = RectTransformUtility.WorldToScreenPoint(null, refresh.transform.position) };
             var hits = new System.Collections.Generic.List<RaycastResult>(); EventSystem.current.RaycastAll(data, hits);
             Assert.That(hits, Is.Not.Empty);
-            Assert.That(hits[0].gameObject.transform.IsChildOf(session.SceneFade.transform), Is.True,
-                "A second tap while darkening lands on the cover, not on the browser.");
+            // #478: the shared loading screen (30150) is drawn above the fade (30100) on a room change.
+            Assert.That(hits[0].gameObject.transform.IsChildOf(session.LoadingView.transform), Is.True,
+                "A second tap while darkening lands on the loading screen above the cover, not on the browser.");
 
             yield return Until(() => !session.IsLoadingScene && SceneManager.GetActiveScene().path == GameScenePaths.Lobby,
                 "The seat screen after darkening");
             Assert.That(session.HoldsSceneForFade(GameScenePaths.Home), Is.False);
-            Assert.That(session.SceneFade.BlocksInput, Is.False, "The seat screen can be tapped while it brightens.");
+            Assert.That(session.SceneFade.BlocksInput, Is.False,
+                "The fade itself does not block while it brightens; the #478 loading screen above it does until it closes.");
             yield return Until(() => !session.SceneFade.Visible, "The cover clears", 3f);
             view = View();
             Assert.That(view.positionPage.activeInHierarchy, Is.True);
@@ -637,6 +639,9 @@ namespace Hapio.Tests
 
         private static IEnumerator Click(UnityEngine.UI.Button button)
         {
+            // #478: a room change is covered by the shared loading screen, which takes every tap until it closes.
+            yield return Until(() => GameSession.Instance == null || !GameSession.Instance.IsLoadingScreenUp,
+                "The loading screen closes before " + button.name + " is tapped", 5f);
             DispatchClick(button);
             yield return null; yield return null;
         }

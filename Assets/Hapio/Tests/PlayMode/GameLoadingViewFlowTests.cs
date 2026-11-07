@@ -8,6 +8,7 @@ using Object = UnityEngine.Object;
 namespace Hapio.Tests
 {
     /// <summary>로딩 화면 (#478) 1단계: 실제로 띄워 진행을 채워 보고, 말풍선·캐릭터가 규칙대로 움직이는지.</summary>
+    [Category("Slow")]
     public sealed class GameLoadingViewFlowTests
     {
         private GameObject holder;

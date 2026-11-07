@@ -123,6 +123,8 @@ namespace Hapio.Tests
                 Assert.That(GameSession.ShowsLoading(from, to), Is.False, from + " → " + to + " stays inside the run");
             Assert.That(GameSession.ShowsLoading(home, battle, tutorialStarting: true), Is.False,
                 "The opening → tutorial gets its own transition later.");
+            Assert.That(GameSession.ShowsLoading(battle, battle, stageChanges: true), Is.False,
+                "The DEV panel's next stage reloads Battle into another stage, which stays inside the run like NEXT.");
         }
 
         private static void ResetRunState(Type owner, string method)
@@ -139,13 +141,27 @@ namespace Hapio.Tests
             Assert.That(predicate(), Is.True, message);
         }
 
+        /// <summary>The real Host binds the same port on 0.0.0.0 and [::] (AGENTS.md 2026-11-05), so both must be free.</summary>
         private static ushort AvailablePort()
         {
-            using (var socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp))
-            {
-                socket.Bind(new IPEndPoint(IPAddress.Loopback, 0));
-                return checked((ushort)((IPEndPoint)socket.LocalEndPoint).Port);
-            }
+            for (int attempt = 0; attempt < 16; attempt++)
+                using (var ipv4 = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp))
+                {
+                    ipv4.Bind(new IPEndPoint(IPAddress.Any, 0));
+                    int port = ((IPEndPoint)ipv4.LocalEndPoint).Port;
+                    try
+                    {
+                        if (Socket.OSSupportsIPv6)
+                            using (var ipv6 = new Socket(AddressFamily.InterNetworkV6, SocketType.Dgram, ProtocolType.Udp))
+                            {
+                                ipv6.DualMode = false;
+                                ipv6.Bind(new IPEndPoint(IPAddress.IPv6Any, port));
+                            }
+                        return checked((ushort)port);
+                    }
+                    catch (SocketException error) when (error.SocketErrorCode == SocketError.AddressAlreadyInUse) { }
+                }
+            throw new InvalidOperationException("The test could not reserve a dual-family UDP Host port.");
         }
     }
 }
