@@ -311,3 +311,6 @@
 
 
 - #527 팔레트 실험: CoatingClayPreview의 선택적 paletteData만 원래67회 저널을 보관한다. sRGB RGB0~255/HEX6자리 입력은 실험의 색 resolver로만 치환하며 게임 팔레트·설정·판정·기록은 저장하지 않는다. 기본색은 고정지도를 직접 쓰고 변경색은 제한된 재생/GPU 완료 후에만 표시한다. Prepare Palette Preview는 명시적 준비, Build는 읽기 전용 검사다. LIGHT 메타데이터 갱신은 연결된 palette의 V4핀도 검증·복구하며 원본 지도/저널/브러시를 다시 굽지 않는다.
+
+
+- #543 이미지 파일 실험은 `ImageSamples/Scenes/ImageClayPreview.unity`만 켠다. 표면 질감은 Linear 중립0.5 Half/mipmap 데이터로 실제 스티커 A지원에만, 배경은 sRGB Unlit 카메라 고정 층에 적용한다. PNG/JPEG·2048px·16MiB 사전검사, 소유 결과 교체/해제, 취소·실패의 이전값 보존을 유지한다. 게임 지도·저널·기본 재질을 파일로 교체하지 않는다. Native picker는 `tools/ClayPreviewNative` 소스에서 비교 Mac 빌드 때만 임시 stage하며 일반 빌드에 남은 stage가 있으면 중단한다. 이미지 전용 Prepare/Build는 기존 Coating 메뉴와 구분하고 Build는 샘플·소스 핀을 자동 갱신하지 않는다.
