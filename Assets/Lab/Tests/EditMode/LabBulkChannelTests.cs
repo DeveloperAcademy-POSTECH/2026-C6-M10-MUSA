@@ -153,12 +153,14 @@ namespace C6Lab.Tests
             Assert.That(sender.GetDue(0d, 100).Length, Is.EqualTo(1));
             Assert.That(sender.GetDue(.249d, 100), Is.Empty);
             Assert.That(sender.GetDue(.25d, 100).Length, Is.EqualTo(1));
-            Assert.That(sender.GetDue(.749d, 100), Is.Empty);
-            Assert.That(sender.GetDue(.75d, 100).Length, Is.EqualTo(1));
-            Assert.That(sender.GetDue(1.749d, 100), Is.Empty);
-            Assert.That(sender.GetDue(1.75d, 100).Length, Is.EqualTo(1));
-            Assert.That(sender.GetDue(2.749d, 100), Is.Empty);
-            Assert.That(sender.GetDue(2.75d, 100).Length, Is.EqualTo(1));
+            // That timeout backs the shared quarter second off to .5 even before a sample, and the chunk's own
+            // second wait doubles it to the one-second cap.
+            Assert.That(sender.GetDue(1.249d, 100), Is.Empty);
+            Assert.That(sender.GetDue(1.25d, 100).Length, Is.EqualTo(1));
+            Assert.That(sender.GetDue(2.249d, 100), Is.Empty);
+            Assert.That(sender.GetDue(2.25d, 100).Length, Is.EqualTo(1));
+            Assert.That(sender.GetDue(3.249d, 100), Is.Empty);
+            Assert.That(sender.GetDue(3.25d, 100).Length, Is.EqualTo(1));
             Assert.That(sender.GetDue(100d, 100).Single().payload, Is.EqualTo("retain"));
             Assert.That(sender.Count, Is.EqualTo(1));
         }

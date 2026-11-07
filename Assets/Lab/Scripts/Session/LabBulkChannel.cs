@@ -83,15 +83,16 @@ namespace C6Lab
         public double SmoothedRttSeconds => smoothedRtt;
 
         /// <summary>
-        /// The delay before a chunk's first resend. Until an RTT sample exists it is the fixed quarter second.
-        /// After that it is RFC 6298's srtt + 4·rttvar, kept at 0.08 s or more, times a shared backoff, capped at one second.
+        /// The delay before a chunk's first resend: a base times a shared backoff, capped at one second. The base is the
+        /// quarter second until an RTT sample exists, then RFC 6298's srtt + 4·rttvar, kept at 0.08 s or more.
         /// The backoff doubles on a timeout resend, at most once per current timeout, and resets on the next valid
-        /// sample. So new chunks wait longer too after the RTT jumps above a stale timeout (Karn). Without it, every
-        /// send would be resent before its ACK and no sample would ever recover the estimate. Each further resend of
-        /// the same chunk doubles its own wait, up to one second.
+        /// sample. It applies before the first sample too (RFC 6298 5.5). So new chunks wait longer whenever the round
+        /// trip outgrows the timeout, whether the RTT jumped above a stale estimate or the link was slower than the
+        /// quarter second from the start (Karn). Without it, every send would be resent before its ACK and no sample
+        /// would ever arrive. Each further resend of the same chunk doubles its own wait, up to one second.
         /// </summary>
-        public double RetryTimeoutSeconds => !hasRttSample ? InitialRetrySeconds
-            : Math.Min(MaximumRetrySeconds, Math.Max(MinimumRetrySeconds, smoothedRtt + 4d * rttVariance) * backoff);
+        public double RetryTimeoutSeconds => Math.Min(MaximumRetrySeconds, backoff * (hasRttSample
+            ? Math.Max(MinimumRetrySeconds, smoothedRtt + 4d * rttVariance) : InitialRetrySeconds));
 
         public LabBulkSender(int maximumQueuedBytes = DefaultMaximumQueuedBytes, int windowSize = DefaultWindowSize)
         {
@@ -132,8 +133,8 @@ namespace C6Lab
                 result.Add(new LabBulkFrame(entry.sequence, entry.payload, entry.bytes));
                 highestSent = Math.Max(highestSent, entry.sequence);
                 if (entry.attempts == 0) entry.sentAt = now;
-                // A timeout of any chunk backs off the shared timer, but a window of chunks expiring together counts once.
-                else if (!entry.fastResend && hasRttSample && now - lastBackoffAt >= RetryTimeoutSeconds)
+                // A timeout of any chunk backs off the shared timer, sampled or not, but a window of chunks expiring together counts once.
+                else if (!entry.fastResend && now - lastBackoffAt >= RetryTimeoutSeconds)
                 {
                     backoff = Math.Min(MaximumBackoff, backoff * 2);
                     lastBackoffAt = now;
