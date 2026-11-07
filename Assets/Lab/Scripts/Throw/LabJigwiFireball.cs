@@ -168,7 +168,7 @@ namespace C6Lab
                 // Faster, bigger breathing as time runs out; it trembles near the end.
                 float rate = Mathf.Lerp(1.5f, 7f, progress);
                 radius *= 1f + Mathf.Lerp(.04f, .12f, progress) * Mathf.Sin(time * rate * Mathf.PI * 2f);
-                float shake = Mathf.SmoothStep(.75f, 1f, progress) * scale * .08f;
+                float shake = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.75f, 1f, progress)) * scale * .08f;
                 position += view.transform.right * (Mathf.PerlinNoise(time * 23f, 1.3f) - .5f) * 2f * shake
                     + view.transform.up * (Mathf.PerlinNoise(4.1f, time * 23f) - .5f) * 2f * shake;
             }
@@ -179,7 +179,7 @@ namespace C6Lab
                 float e = progress * progress;
                 position = Vector3.Lerp(hover, exit, e);
                 radius *= Mathf.Lerp(1f, .8f, e); // nearer the camera, so it still looks bigger
-                alpha = 1f - Mathf.SmoothStep(.85f, 1f, progress);
+                alpha = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.85f, 1f, progress));
             }
             transform.position = position;
             transform.localScale = Vector3.one;

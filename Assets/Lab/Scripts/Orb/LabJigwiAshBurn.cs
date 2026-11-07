@@ -41,7 +41,6 @@ namespace C6Lab
         private readonly SpriteRenderer[] sparks = new SpriteRenderer[SparkCount], ash = new SpriteRenderer[AshCount];
         private SpriteRenderer[] masked = Array.Empty<SpriteRenderer>();
         private Transform shrinking;
-        private bool diagnosed;
         private Vector3 shrinkFrom = Vector3.one;
         private Color[] maskedColors = Array.Empty<Color>();
 
@@ -74,7 +73,7 @@ namespace C6Lab
                 return;
             }
             Ensure();
-            if (left <= 0f) { age = 0f; lastPaint = -1f; diagnosed = false; consume = consumeOrb; if (consume) Mask(visuals, true); }
+            if (left <= 0f) { age = 0f; lastPaint = -1f; consume = consumeOrb; if (consume) Mask(visuals, true); }
             total = Mathf.Max(.01f, totalSeconds);
             if (left <= 0f || Mathf.Abs(left - secondsLeft) > .3f) left = secondsLeft;
             SetShown(true);
@@ -120,8 +119,6 @@ namespace C6Lab
                 masked = visuals != null ? visuals.GetComponentsInChildren<SpriteRenderer>(true) : Array.Empty<SpriteRenderer>();
                 maskedColors = new Color[masked.Length];
                 for (int i = 0; i < masked.Length; i++) maskedColors[i] = masked[i].color;
-                Debug.Log("C6_JIGWI_ASH start orb=" + (transform.parent != null ? transform.parent.name : "?")
-                    + " pictures=" + masked.Length);
                 return;
             }
             for (int i = 0; i < masked.Length; i++)
@@ -168,7 +165,7 @@ namespace C6Lab
             float remaining = Mathf.Max(0f, 1f - cut) * r;
             float ring = Mathf.Max(0f, 1f - front) * r; // where the burning line is
             float flicker = .8f + .2f * Mathf.PerlinNoise(age * 9f, .3f);
-            float fade = 1f - Mathf.SmoothStep(.94f, 1f, p);
+            float fade = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.94f, 1f, p)); // fades out over the last 6%
             // The board camera looks from -z and the orb picture sits one radius toward it (z = -radius), so the
             // burning edge goes a little further toward the camera or the picture hides it.
             float depth = -r * 1.15f;
@@ -192,7 +189,6 @@ namespace C6Lab
             if (scorch != null) scorch.enabled = false;
 
             bool burning = ring > r * .06f;
-            Diagnose(p);
             for (int i = 0; i < FlameCount; i++)
             {
                 // Small flames stand on the burning ring, like the talisman's edge flames.
@@ -224,23 +220,6 @@ namespace C6Lab
                 Place(ash[i], from + new Vector3(Mathf.Sin(t * 4f + i) * r * .06f, -t * r * .6f, 0f), r * .1f);
                 Tint(ash[i], AshColor, (1f - t) * fade * (burning ? 1f : 0f));
             }
-        }
-
-        /// <summary>#540 진단(임시): 구슬이 반쯤 탔을 때 불 그림이 실제로 그려질 상태인지 한 줄로 남긴다.</summary>
-        private void Diagnose(float p)
-        {
-            if (diagnosed || p < .5f) return;
-            diagnosed = true;
-            string Of(Renderer x) => x == null ? "null" : x.name + "(on=" + x.enabled + " vis=" + x.isVisible + " layer="
-                + LayerMask.LayerToName(x.gameObject.layer) + " sort=" + x.sortingLayerName + "/" + x.sortingOrder
-                + " q=" + (x.sharedMaterial != null ? x.sharedMaterial.renderQueue + ":" + x.sharedMaterial.shader.name : "nomat")
-                + " pos=" + x.transform.position.ToString("F3") + " size=" + x.bounds.size.ToString("F3")
-                + " a=" + (x is SpriteRenderer sr ? sr.color.a.ToString("F2") : "-") + ")";
-            Camera board = null;
-            foreach (Camera c in Camera.allCameras) if ((c.cullingMask & (1 << gameObject.layer)) != 0 && c.orthographic) board = c;
-            Debug.Log("C6_JIGWI_ASH mid edge=" + Of(edge) + " flame=" + Of(flames[0]) + " spark=" + Of(sparks[0])
-                + " art=" + (masked.Length > 0 ? Of(masked[0]) : "none") + " active=" + gameObject.activeInHierarchy
-                + " cam=" + (board != null ? board.name + " z=" + board.transform.position.z.ToString("F2") : "none"));
         }
 
         /// <summary>
