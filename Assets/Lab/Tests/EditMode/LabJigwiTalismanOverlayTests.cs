@@ -195,6 +195,23 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void BurningDrumsStayLightUntilTheNextGimmickWarns()
+        {
+            // #540: the A (11 → 26 s) ran out unwritten; the fireball lands at 26.45 s and the drums burn up to 15 s.
+            LabSnapshot snapshot = Snapshot(-1d);
+            LabJigwiABRound a = snapshot.jigwiAB.rounds[0];
+            a.resolution = LabJigwiABResolution.Expired; a.resolvedAt = 26d;
+            Assert.That(LabJigwiScreenPresentation.DrumFireSecondsLeft(snapshot, Local, 26.2d, 15f), Is.Zero, "Not before the fireball lands.");
+            Assert.That(LabJigwiScreenPresentation.DrumFireSecondsLeft(snapshot, Local, 27d, 15f), Is.EqualTo(14.45f).Within(.001f));
+            Assert.That(LabJigwiScreenPresentation.DrumFireSecondsLeft(snapshot, 99, 27d, 15f), Is.Zero, "Only the seat that failed.");
+            var next = new LabJigwiABRound { id = "ab-b", slot = 1, kind = LabJigwiABKind.GroupFire, warningAt = 30d, activeAt = 32d, endsAt = 40d };
+            snapshot.jigwiAB.rounds = new[] { a, next };
+            Assert.That(LabJigwiScreenPresentation.DrumFireSecondsLeft(snapshot, Local, 27d, 15f), Is.EqualTo(3f).Within(.001f),
+                "It goes out when the next gimmick warns, so it never overlaps it.");
+            Assert.That(LabJigwiScreenPresentation.DrumFireSecondsLeft(snapshot, Local, 30d, 15f), Is.Zero);
+        }
+
+        [Test]
         public void TheFireballKindlesGrowsAndThenStopsOrFalls()
         {
             // #540: warning 10 s → active 11 s → ends 26 s. The orbs are untouched; only the fireball shows the time.

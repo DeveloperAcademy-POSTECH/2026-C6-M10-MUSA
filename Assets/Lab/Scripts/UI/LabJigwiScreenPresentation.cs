@@ -510,7 +510,10 @@ namespace C6Lab
             }
         }
 
-        /// <summary>#540: 내 부적을 못 써 판이 탄 뒤(불덩이가 판에 닿은 때부터) seconds 동안 내 북에 붙은 불이 꺼지기까지 남은 초 (없으면 0).</summary>
+        /// <summary>
+        /// #540: 내 부적을 못 써 판이 탄 뒤(불덩이가 판에 닿은 때부터) 내 북에 붙은 불이 꺼지기까지 남은 초 (없으면 0).
+        /// 길어야 seconds이고, 다른 기믹(A·B·공통 불)의 예고가 뜨거나 피버가 시작되면 그때 꺼져 다른 기믹과 겹치지 않는다.
+        /// </summary>
         public static float DrumFireSecondsLeft(LabSnapshot snapshot, ulong player, double now, float seconds)
         {
             if (seconds <= 0f || snapshot == null || snapshot.phase != LabPhase.Playing || snapshot.jigwiAB?.rounds == null) return 0f;
@@ -519,7 +522,13 @@ namespace C6Lab
                 if (round == null || round.kind != LabJigwiABKind.PersonalBurn || round.resolution != LabJigwiABResolution.Expired
                     || round.resolvedAt < 0d || !SeatFailed(round, player)) continue;
                 double from = round.resolvedAt + LabModel.JigwiTalismanFailBurnDelaySeconds;
-                if (now >= from && now < from + seconds) return (float)(from + seconds - now);
+                double until = from + seconds;
+                if (snapshot.jigwiAB.cutoffAt > from) until = Math.Min(until, snapshot.jigwiAB.cutoffAt);
+                foreach (var other in snapshot.jigwiAB.rounds)
+                    if (other != null && other.warningAt > from) until = Math.Min(until, other.warningAt);
+                foreach (var group in snapshot.jigwiStage?.groups ?? Array.Empty<LabJigwiStageGroup>())
+                    if (group != null && group.warningAt > from) until = Math.Min(until, group.warningAt);
+                if (now >= from && now < until) return (float)(until - now);
             }
             return 0f;
         }

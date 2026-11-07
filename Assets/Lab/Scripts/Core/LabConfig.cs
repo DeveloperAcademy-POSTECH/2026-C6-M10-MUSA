@@ -602,7 +602,7 @@ namespace C6Lab
         [SerializeField, Range(1f, 3f)] private float jigwiTalismanWaterPaintScale = 1.5f;
         [Tooltip("#540 Inspector 전용(Host): 부적을 다 쓴 뒤 보상 구슬이 판에 생기기까지 (초). 부적 완성 연출(불 꺼짐 → 가락 → 도장 → 접혀 떨어짐)이 판에 닿는 때와 맞춘다. 0이면 바로.")]
         [SerializeField, Range(0f, 8f)] private float jigwiTalismanRewardDelaySeconds = 0f;
-        [Tooltip("#540 Inspector 전용(각 기기): 부적을 못 써 판이 탄 뒤, 그 사람 북에 불이 붙어 가벼워지는 시간(초). 0이면 끔.")]
+        [Tooltip("#540 Inspector 전용(각 기기): 부적을 못 써 판이 탄 뒤, 그 사람 북에 불이 붙어 가벼워지는 가장 긴 시간(초). 다른 기믹 예고나 피버가 오면 그 전에 꺼진다. 0이면 끔.")]
         [SerializeField, Range(0f, 15f)] private float jigwiAFailDrumSlipSeconds = 0f;
         [Tooltip("#540 Inspector 전용(각 기기): 불붙은 북이 얼마나 가벼운지. 옆으로 밀 때 빠르기는 이 배, 미끄러지며 느려지는 정도는 1/이 배 (2면 같은 스와이프로 약 8배 멀리).")]
         [SerializeField, Range(1f, 4f)] private float jigwiAFailDrumSlipBoost = 2f;

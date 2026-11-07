@@ -77,6 +77,7 @@ namespace C6Lab
         private Image eyesHalo;
         private Image eyesLit;
         private bool showingEyes;
+        private Image picture;
         private float eyeGlow;
         private bool showingWord;
         private Outline markOutline;
@@ -238,6 +239,26 @@ namespace C6Lab
             Begin(gourd, Mathf.Max(.2f, seconds));
         }
 
+        /// <summary>
+        /// #540 지귀 예고처럼, 말풍선에 그림 하나를 seconds 동안 띄운다(그림은 부르는 쪽이 코드로 그려 넘긴다).
+        /// </summary>
+        public void ShowPicture(LabTarget gourd, Sprite sprite, float seconds)
+        {
+            if (gourd == null || sprite == null || !EnsureBubble()) return;
+            showingBlock = showingHeart = false;
+            picture.sprite = sprite;
+            ShowOnly(picture.gameObject);
+            Begin(gourd, Mathf.Max(.2f, seconds));
+        }
+
+        /// <summary>#540: 말풍선에 그림(<see cref="ShowPicture"/>)을 띄우고 있는지.</summary>
+        public bool ShowingPicture => Active && picture != null && picture.gameObject.activeSelf;
+        /// <summary>#540: 말풍선 그림의 크기 배수 (1 = 그대로). 부르는 쪽이 일렁이게 할 때 쓴다.</summary>
+        public void SetPictureScale(float scale)
+        {
+            if (picture != null) picture.rectTransform.localScale = Vector3.one * (float.IsNaN(scale) ? 1f : scale);
+        }
+
         /// <summary>야광귀 눈이 빛나는 정도 (0~1). 노란 눈동자가 겹쳐 나오고 둘레 빛이 커진다.</summary>
         public void SetEyeGlow(float glow)
         {
@@ -281,6 +302,11 @@ namespace C6Lab
             blockMark.gameObject.SetActive(shown == blockMark.gameObject);
             heartMark.gameObject.SetActive(shown == heartMark.gameObject);
             eyesRect.gameObject.SetActive(shown == eyesRect.gameObject);
+            if (picture != null)
+            {
+                picture.gameObject.SetActive(shown == picture.gameObject);
+                picture.rectTransform.localScale = Vector3.one;
+            }
         }
 
         private void Begin(LabTarget gourd, float seconds)
@@ -435,6 +461,15 @@ namespace C6Lab
             EyesLayer("Gourd Alert Eyes Plain", EyesSprite(false));
             eyesLit = EyesLayer("Gourd Alert Eyes Lit", EyesSprite(true));
             eyesRect.gameObject.SetActive(false);
+
+            // #540: a picture the caller draws (Jigwi's warning flame).
+            RectTransform pictureRect = NewRect("Gourd Alert Picture", bubble);
+            pictureRect.anchorMin = pictureRect.anchorMax = center;
+            pictureRect.sizeDelta = new Vector2(bubbleSize * .6f, bubbleSize * .6f);
+            picture = pictureRect.gameObject.AddComponent<Image>();
+            picture.preserveAspect = true;
+            picture.raycastTarget = false;
+            pictureRect.gameObject.SetActive(false);
             bubble.gameObject.SetActive(false);
             return true;
         }

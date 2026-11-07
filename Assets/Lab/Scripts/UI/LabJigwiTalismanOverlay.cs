@@ -245,6 +245,13 @@ namespace C6Lab
         private LabJigwiFireball fireball;
         private LabJigwiFireball.Phase fireballSeen;
         private LabJigwiScreenPresentation presentation;
+        // #540: the attack area flashes red like an alarm while I write; Jigwi's bubble shows a fire spirit at the warning.
+        private UnityEngine.UI.Image alarm;
+        private float alarmLevel;
+        private LabGourdAlert gourdAlert;
+        private string bubbledRound;
+        /// <summary>#540: how strongly the attack-area alarm shows right now (0 = off).</summary>
+        public float AlarmLevel => alarmLevel;
         private UnityEngine.UI.Image[] landDrops = Array.Empty<UnityEngine.UI.Image>(), flyEmbers = Array.Empty<UnityEngine.UI.Image>();
         private float dimLevel, landAge = -1f, flyAge = -1f;
         private Vector2 landAt, flyFrom;
@@ -394,6 +401,7 @@ namespace C6Lab
             if (Burning) AdvanceBurn(Time.unscaledDeltaTime);
             bool paused = snapshot == null || snapshot.paused || source.GameStartHeld || source.BattlePresentationHeld;
             DriveFireball(snapshot);
+            DriveBubble(snapshot);
             UpdateFireLoop(!paused, Time.unscaledDeltaTime);
             UpdateCrackle(CrackleTarget(paused), Time.unscaledDeltaTime);
             Camera boardView = source.board != null ? source.board.ViewCamera : null;
@@ -696,8 +704,46 @@ namespace C6Lab
                     boardDim.color = new Color(.05f, .02f, .02f, .32f * dimLevel);
                 }
             }
+            DrawAlarm(boardView, dt);
             AdvanceLanding(dt);
             AdvanceFlyEmbers(dt);
+        }
+
+        /// <summary>
+        /// #540: 부적을 쓰는 동안 공격 영역(조합판 위 전투 화면)이 경보처럼 붉게 번쩍번쩍한다. 끝이 다가올수록 더 빠르고 진하게.
+        /// </summary>
+        private void DrawAlarm(Camera boardView, float dt)
+        {
+            if (alarm == null) return;
+            alarmLevel = Mathf.MoveTowards(alarmLevel, Visible ? 1f : 0f, dt * 4f);
+            bool on = alarmLevel > .001f;
+            if (alarm.gameObject.activeSelf != on) alarm.gameObject.SetActive(on);
+            if (!on) return;
+            Rect board = boardView != null ? boardView.pixelRect : new Rect(0f, 0f, Screen.width, Screen.height * .46f);
+            PlaceScreenRect(alarm.rectTransform, new Rect(0f, board.yMax, Screen.width, Mathf.Max(1f, Screen.height - board.yMax)));
+            float urgency = Mathf.Clamp01(WarnLevel);
+            float rate = Mathf.Lerp(1.1f, 2.6f, urgency);
+            float pulse = .5f - .5f * Mathf.Cos(Time.unscaledTime * rate * Mathf.PI * 2f);
+            alarm.color = new Color(1f, 1f, 1f, alarmLevel * Mathf.Lerp(.18f, .5f, urgency) * pulse);
+        }
+
+        /// <summary>
+        /// #540: 예고 때 야광귀처럼 박 옆 말풍선에 그림(성난 불꽃 도깨비)을 띄운다. 부적이 올 사람 화면에서만, 불씨가 붙을 때부터 A 시작까지.
+        /// </summary>
+        private void DriveBubble(LabSnapshot snapshot)
+        {
+            if (!Application.isPlaying || source == null || snapshot == null || snapshot.jigwiAB?.rounds == null) return;
+            if (gourdAlert == null) gourdAlert = FindAnyObjectByType<LabGourdAlert>();
+            if (gourdAlert == null) return;
+            double now = source.JigwiABPresentationTime;
+            foreach (LabJigwiABRound item in snapshot.jigwiAB.rounds)
+            {
+                if (item == null || item.kind != LabJigwiABKind.PersonalBurn || !item.Warning(now) || item.id == bubbledRound) continue;
+                if (fireballSeen != LabJigwiFireball.Phase.Kindle) continue;
+                bubbledRound = item.id;
+                gourdAlert.ShowPicture(source.target, LabProceduralFire.Spirit(), (float)(item.activeAt - now));
+            }
+            if (gourdAlert.ShowingPicture) gourdAlert.SetPictureScale(1f + .08f * Mathf.Sin(Time.unscaledTime * 14f));
         }
 
         /// <summary>화면 픽셀 사각형을 root 기준 위치·크기로 옮긴다.</summary>
@@ -1764,6 +1810,9 @@ namespace C6Lab
             // #540: effects outside the paper. The board dim sits behind everything; the rest sit on top.
             boardDim = NewRect("Talisman Board Dim", root).gameObject.AddComponent<UnityEngine.UI.Image>();
             boardDim.raycastTarget = false; boardDim.transform.SetAsFirstSibling(); boardDim.gameObject.SetActive(false);
+            alarm = NewRect("Jigwi Attack Area Alarm", root).gameObject.AddComponent<UnityEngine.UI.Image>();
+            alarm.raycastTarget = false; alarm.sprite = LabProceduralFire.Alarm(); alarm.transform.SetAsFirstSibling();
+            alarm.gameObject.SetActive(false);
             landRing = NewRect("Talisman Landing Ring", root).gameObject.AddComponent<UnityEngine.UI.Image>();
             landRing.raycastTarget = false; landRing.sprite = RingSprite();
             landRing.rectTransform.anchorMin = landRing.rectTransform.anchorMax = landRing.rectTransform.pivot = new Vector2(.5f, .5f);
