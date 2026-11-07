@@ -87,7 +87,7 @@ namespace C6Lab
             shownCount = hits;
             if (round.syncResetAt != lastResetAt && round.syncResetAt >= 0d) { resetAt = now; lastResetAt = round.syncResetAt; }
             bool mineHit = mine != null && mine.targets != null && mine.targets.Length > 0 && mine.targets[0].extinguishedAt >= 0d;
-            bool windowOpen = round.syncWindowAt >= 0d && now < round.syncWindowAt + LabJigwiABTimeline.GroupSyncWindowSeconds;
+            bool windowOpen = round.syncWindowAt >= 0d && now < round.syncWindowAt + round.SyncWindow;
             if (round.syncWindowAt != lastWindowAt) { lastWindowAt = round.syncWindowAt; vibrateForWindow = windowOpen && picked && !mineHit; }
             NowCueVisible = picked && windowOpen && !mineHit;
             if (NowCueVisible && vibrateForWindow && !held)
@@ -125,8 +125,7 @@ namespace C6Lab
             barBack.anchoredPosition = new Vector2(0f, -size * .85f);
             if (windowOpen)
             {
-                float left = Mathf.Clamp01((float)((round.syncWindowAt + LabJigwiABTimeline.GroupSyncWindowSeconds - now)
-                    / LabJigwiABTimeline.GroupSyncWindowSeconds));
+                float left = Mathf.Clamp01((float)((round.syncWindowAt + round.SyncWindow - now) / round.SyncWindow));
                 bar.rectTransform.anchorMax = new Vector2(left, 1f);
             }
             cue.fontSize = Mathf.RoundToInt(size * .62f);

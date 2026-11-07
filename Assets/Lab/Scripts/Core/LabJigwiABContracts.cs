@@ -52,6 +52,14 @@ namespace C6Lab
         public double syncWindowAt = -1d, syncResetAt = -1d;
         /// <summary>#509 B failure: nobody can press a drum until this battle time (-1 = no board fire).</summary>
         public double boardFireUntil = -1d;
+        /// <summary>#551 B countdown: when every picked seat was holding its special Water (-1 = not all ready).</summary>
+        public double countdownAt = -1d;
+        /// <summary>#551: this B's sync window in seconds (0 = the #509 one second).</summary>
+        public float syncWindowSeconds;
+        /// <summary>#551: how long after the first picked hit the others may land.</summary>
+        public double SyncWindow => syncWindowSeconds > 0f ? syncWindowSeconds : LabJigwiABTimeline.GroupSyncWindowSeconds;
+        /// <summary>#551: the "지금!" moment (-1 while the 3-2-1 has not started).</summary>
+        public double GoAt => countdownAt < 0d ? -1d : countdownAt + LabJigwiABTimeline.CountdownSeconds;
         public bool Warning(double now) => resolution == LabJigwiABResolution.None && now >= warningAt && now < activeAt;
         public bool Active(double now) => resolution == LabJigwiABResolution.None && now >= activeAt && now < endsAt;
         public bool RewardActive(double now) => kind == LabJigwiABKind.GroupFire
@@ -72,10 +80,12 @@ namespace C6Lab
         public double lastWaterSplashAt = -1d;
         /// <summary>#479 A only: when this player finished writing the talisman; -1 while still burning.</summary>
         public double talismanAt = -1d;
+        /// <summary>#551 B only: since when this picked seat holds its special Water (-1 = not holding); when it threw it.</summary>
+        public double readyAt = -1d, launchedAt = -1d;
         public LabJigwiABFireTarget[] targets = Array.Empty<LabJigwiABFireTarget>();
         public LabJigwiABPlayerFire Copy() => new LabJigwiABPlayerFire
         {
-            playerId = playerId, lastWaterSplashAt = lastWaterSplashAt, talismanAt = talismanAt,
+            playerId = playerId, lastWaterSplashAt = lastWaterSplashAt, talismanAt = talismanAt, readyAt = readyAt, launchedAt = launchedAt,
             targets = (targets ?? Array.Empty<LabJigwiABFireTarget>()).Select(value => value?.Copy()).ToArray()
         };
     }
@@ -191,13 +201,18 @@ namespace C6Lab
                     || round.syncWindowAt != -1d && (round.resolution != LabJigwiABResolution.None
                         || !Range(round.syncWindowAt, round.activeAt, round.endsAt))
                     || round.syncResetAt != -1d && !Range(round.syncResetAt, round.activeAt,
-                        round.endsAt + LabJigwiABTimeline.GroupSyncWindowSeconds)) return false;
+                        round.endsAt + round.SyncWindow)) return false;
+                // #551 countdown: a start time only inside the B, a known window length.
+                if (round.countdownAt != -1d && !Range(round.countdownAt, round.activeAt, round.endsAt)
+                    || round.syncWindowSeconds != 0f && !Range(round.syncWindowSeconds, .5d, 3d)) return false;
                 var owners = new HashSet<ulong>();
                 var targets = new HashSet<string>(StringComparer.Ordinal);
                 foreach (var player in round.players)
                 {
                     if (player == null || !owners.Add(player.playerId) || memberIds != null && !memberIds.Contains(player.playerId)
                         || player.lastWaterSplashAt != -1d && !Range(player.lastWaterSplashAt, round.activeAt, round.endsAt)
+                        || player.readyAt != -1d && !Range(player.readyAt, round.activeAt, round.endsAt)
+                        || player.launchedAt != -1d && !Range(player.launchedAt, round.activeAt, round.endsAt)
                         || player.targets == null || player.targets.Length < 1 || player.targets.Length > MaximumFires) return false;
                     foreach (var target in player.targets)
                     {
@@ -207,7 +222,7 @@ namespace C6Lab
                         // A hit time exists only inside the open window.
                         if (target.extinguishedAt != -1d && (round.syncWindowAt < 0d
                             || target.extinguishedAt < round.syncWindowAt
-                            || target.extinguishedAt >= round.syncWindowAt + LabJigwiABTimeline.GroupSyncWindowSeconds)) return false;
+                            || target.extinguishedAt >= round.syncWindowAt + round.SyncWindow)) return false;
                     }
                 }
                 // #509: only the picked seats are listed (helpers are everyone else).

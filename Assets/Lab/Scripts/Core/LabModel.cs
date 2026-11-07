@@ -601,9 +601,11 @@ namespace C6Lab
             if (!current.kind.CanThrow(current.lockSwipes)) return Reject("RAW_CANNOT_ATTACK", out reason);
             // Charmed (#251): too dazed to attack until it ends or the players beside wake them.
             if (Charmed(sender, now)) return Reject("CHARMED", out reason);
+            if (JigwiBHoldsLaunch(current, now)) return Reject("JIGWI_B_WAIT", out reason); // #551 "지금!" 전에는 못 던짐
             ApplyJigwiABOrb(current, now);
             CaptureJigwiABLaunchReward(current, now);
             LaunchJigwiTalismanShards(current); // #540 부적 구슬은 3갈래로 날아간다
+            MarkJigwiBLaunch(current, now); // #551
             current.inFlight = true;
             current.vx = current.vy = 0f;
             current.revision = ++revision;

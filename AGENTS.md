@@ -289,7 +289,16 @@
 - 부적 완성 연출 길이는 LabConfig `jigwiTalismanRewardDelaySeconds`(Host) 하나로 맞춘다. 부적 화면이 도장 뒤 머무는 시간을 그 값에 맞춰 늘이고 줄인다.
 - 부적 완성 흐름(약 2.9초, 에셋 `jigwiTalismanRewardDelaySeconds` 2.9): 숨 고르기 0.1초 → 금빛 훑기와 가락 "솔 도 시 라"(불은 그동안 그 자리에 멈춰 옅어짐) → "라!"에 도장 → 부적이 한 바퀴 빙글 말리며 구슬 크기로 오므라들고 가운데서 자라난 부적 구슬(물빛 + 금빛 "물")에 스며듦 → 구슬이 살짝 튀었다가 Host가 진짜 부적 구슬을 놓는 자리(`LabModel.JigwiTalismanWaterSpot`, 화면 위치는 `LabOrbBoard.TryGetScreenSpot`)로 톡 떨어짐. 진짜 부적 구슬은 위에서 떨어지지 않고 그 자리에 나타나며, 떨어진 구슬은 그것이 보이면(최대 0.6초) 사라진다. 부적을 다 쓰면 그 사람 판 구슬은 보상이 판에 닿고 1초(`LabModel.JigwiTalismanCalmSeconds`)까지는 수명이 다하지 않는다.
 - #540부터 지귀 불 연출(불덩이·부적 테두리 불·구슬이 타오르는 불, 북 불은 예외로 폭탄 불)은 그림 파일(Bomb/BlastFire 등)을 쓰지 않고 `LabProceduralFire`로 코드에서 그린다.
-- 현재 호환 묶음은 설정 259개·**5691**·`C6PhysicsLab/52`·**`C6HapioGame/38`**다. main의 Bulk 선택 ACK(5690·Lab51·Game37)를 받은 위에 #540을 올렸다. 5690·5689 이하 앱과 혼용하지 않는다.
+- #540 머지 당시 호환 묶음은 설정 259개·**5691**·`C6PhysicsLab/52`·**`C6HapioGame/38`**였다(main의 Bulk 선택 ACK 5690·Lab51·Game37 위). 현재 기준은 아래 #551 절이다.
+
+## #551 지귀 B 3-2-1 동시 던지기
+
+- LabConfig `jigwiBCountdown`(Host, 에셋에서 켬): 지목된 사람이 **모두** 자기 특수 물구슬을 손가락으로 잡고 있으면 Host가 3-2-1을 시작한다(`round.countdownAt`, 요청 `jigwiBReady`, `LabModel.TrySetJigwiBReady`). "지금!"은 `countdownAt + LabJigwiABTimeline.CountdownSeconds`(1.8초).
+- "지금!" 전에는 특수 물구슬이 던져지지 않는다(판 `LabOrbBoard.ThrowGate`가 미끄러지기만 하게, Host도 `JIGWI_B_WAIT`로 거절). 그 전에 누가 놓으면 3-2-1이 취소되고 다시 모두 잡으면 다시 시작한다.
+- "지금!" 뒤 `ReleaseSeconds`(0.7초) 안에 지목된 사람이 모두 던져야 한다(`seat.launchedAt`). 늦으면 그 자리에서 실패(`FailLateJigwiBRelease`). 첫 명중부터 `round.syncWindowSeconds`(1.5초) 안에 모두 맞히면 성공. 빗나가면 실패(한 번의 기회).
+- 실패 벌(조합판 불바다)은 에셋 `jigwiBBoardFireSeconds` 0으로 껐다(코드 기본값 3초 그대로, 새 벌은 나중에 정함).
+- 끄면(코드 기본값) #509 규칙 그대로: 아무 때나 던지고 1초 안에 모두 맞히기.
+- 현재 호환 묶음은 설정 259개·**5692**·`C6PhysicsLab/53`·**`C6HapioGame/39`**다. 5691 이하 앱과 혼용하지 않는다.
 
 ## 검사 카테고리와 검사 전용 시작 단축 (2026-11-05)
 

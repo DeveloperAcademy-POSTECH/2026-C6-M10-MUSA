@@ -297,6 +297,47 @@ namespace C6Lab.Tests
             var water=m.Snapshot(6+config.JigwiTalismanRewardDelaySeconds).orbs.First(o=>o.jigwiTalismanReward);
             Assert.That(new Vector2(water.x,water.y),Is.EqualTo(LabModel.JigwiTalismanWaterSpot(0)),"It appears where the folded talisman drops.");
         }
+        [Test] public void BCountdownStartsOnlyWhileEveryPickedSeatHoldsItsSpecialWater()
+        {
+            // #551: both picked seats hold their special Water → 3-2-1; letting go before "지금!" stops it; no throw before.
+            JsonUtility.FromJsonOverwrite("{\"jigwiBCountdown\":true}",config);
+            var m=Room();var b=Current(m,31);
+            var specials=m.Snapshot(31).orbs.Where(o=>o.jigwiABSupplyEventId==b.id).ToArray();
+            Assert.That(specials,Has.Length.EqualTo(2));
+            Assert.That(m.TryLaunch(specials[0].owner,specials[0].id,Request(),31.2,out _,out var reason),Is.False);
+            Assert.That(reason,Is.EqualTo("JIGWI_B_WAIT"),"No throw before the countdown.");
+            Assert.That(m.TrySetJigwiBReady(Players[0],b.id,true,31.3),Is.True);
+            Assert.That(B(m,b.id,31.3).countdownAt,Is.EqualTo(-1d),"Not everyone holds yet.");
+            Assert.That(m.TrySetJigwiBReady(Players[1],b.id,true,31.4),Is.True);
+            Assert.That(B(m,b.id,31.4).countdownAt,Is.EqualTo(31.4).Within(1e-9));
+            Assert.That(m.TryLaunch(specials[0].owner,specials[0].id,Request(),31.5,out _,out reason),Is.False,"Still counting.");
+            Assert.That(m.TrySetJigwiBReady(Players[0],b.id,false,31.6),Is.True);
+            Assert.That(B(m,b.id,31.6).countdownAt,Is.EqualTo(-1d),"Letting go before 지금 stops the 3-2-1.");
+            Assert.That(m.TrySetJigwiBReady(Players[0],b.id,true,32),Is.True);
+            double go=32+LabJigwiABTimeline.CountdownSeconds;
+            foreach(var special in specials) Launch(m,Orbs(m)[special.id],go+.1);
+            Assert.That(B(m,b.id,go+.1).players.All(p=>p.launchedAt>=0d),Is.True);
+            Assert.That(LabJigwiABNetworkValidation.Valid(m.Snapshot(go+.1).jigwiAB,m.Snapshot(go+.1).players,m.Revision),Is.True);
+            // With the countdown the second hit may land up to 1.5 s after the first.
+            m.ConfirmHit(specials[0].id,go+.4,Vector3.back,out _,out _,out _);
+            m.ConfirmHit(specials[1].id,go+1.7,Vector3.back,out _,out _,out _);
+            Assert.That(B(m,b.id,go+1.7).resolution,Is.EqualTo(LabJigwiABResolution.Completed));
+        }
+        [Test] public void BFailsWhenAPickedSeatStillHoldsAfterTheReleaseMoment()
+        {
+            // #551: "지금!" then everyone must let go within 0.7 s; one late seat loses the single chance.
+            JsonUtility.FromJsonOverwrite("{\"jigwiBCountdown\":true}",config);
+            var m=Room();var b=Current(m,31);
+            var specials=m.Snapshot(31).orbs.Where(o=>o.jigwiABSupplyEventId==b.id).ToArray();
+            Assert.That(m.TrySetJigwiBReady(Players[0],b.id,true,32),Is.True);
+            Assert.That(m.TrySetJigwiBReady(Players[1],b.id,true,32),Is.True);
+            double go=32+LabJigwiABTimeline.CountdownSeconds;
+            Launch(m,Orbs(m)[specials[0].id],go+.1);
+            Assert.That(B(m,b.id,go+LabJigwiABTimeline.ReleaseSeconds-.01).resolution,Is.EqualTo(LabJigwiABResolution.None));
+            var late=B(m,b.id,go+LabJigwiABTimeline.ReleaseSeconds+.01);
+            Assert.That(late.resolution,Is.EqualTo(LabJigwiABResolution.Expired));
+        }
+        LabJigwiABRound B(LabModel m,string id,double at)=>m.Snapshot(at).jigwiAB.rounds.Single(r=>r.id==id);
         [Test] public void BGivesEachPickedSeatOneSpecialWaterWhileOrdinaryRawPairsKeepTheirNormalElement()
         {
             // #509: two players → both picked; each gets exactly one special Water on its own board.

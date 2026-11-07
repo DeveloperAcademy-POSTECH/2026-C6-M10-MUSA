@@ -29,6 +29,12 @@ namespace C6Lab
         public const double GroupMissionSeconds = 15d;
         /// <summary>#509: every picked player's special Water must hit the boss within this many seconds of the first hit.</summary>
         public const double GroupSyncWindowSeconds = 1d;
+        /// <summary>#551 B countdown: 3-2-1 beats from the moment every picked seat holds its special Water to "지금!".</summary>
+        public const double CountdownSeconds = 1.8d;
+        /// <summary>#551: after "지금!" every picked seat must let go (throw) within this long, or B fails.</summary>
+        public const double ReleaseSeconds = .7d;
+        /// <summary>#551: with the countdown, every picked hit must land within this long of the first.</summary>
+        public const float CountdownSyncWindowSeconds = 1.5f;
         /// <summary>#509: one synchronized hit by every picked seat is the whole B (one chance; a miss fails it).</summary>
         public const int GroupSyncRequired = 1;
 
