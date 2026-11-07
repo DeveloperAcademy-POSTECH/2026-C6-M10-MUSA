@@ -118,7 +118,7 @@ namespace C6Lab
         [SerializeField, Range(0f, .5f)] private float writeVolumeJitter = .2f;
         [Tooltip("앞 연필 소리가 이만큼(0~1) 지나면 계속 칠할 때 다음 소리를 잇는다. 작을수록 촘촘하다.")]
         [SerializeField, Range(.3f, 1f)] private float writeChainAt = .7f;
-        [Tooltip("#533 완성 가락: \"둥 둥 둥 .. 둥!\" 네 음. 폴더 안 파일을 이름순으로 1~4음에 쓴다. 파일이 4개보다 적으면 있는 파일을 높낮이를 올려(noteSemitones) 채운다. #540: 가야금 추성(JigwiTalismanNote, 라 220Hz, 양금 ComboHit보다 한 옥타브 아래).")]
+        [Tooltip("#533 완성 가락: \"둥 둥 둥 .. 둥!\" 네 음. 폴더 안 파일을 이름순으로 1~4음에 쓴다. 파일이 4개보다 적으면 있는 파일을 높낮이를 올려(noteSemitones) 채운다. #540: 가야금 추성(JigwiTalismanNote, 라 110Hz, 양금 ComboHit보다 두 옥타브 아래).")]
         [SerializeField] private string noteSoundFolder = "JigwiTalismanNote";
         [Tooltip("앞 세 음 크기.")]
         [SerializeField, Range(0f, 1f)] private float noteSoundVolume = .7f;
@@ -243,7 +243,7 @@ namespace C6Lab
         public float FireLoopTarget { get; private set; }
         private readonly AudioSource[] notePlayers = new AudioSource[4];
         private int notesPlayed;
-        [Tooltip("#533 완성 가락 음높이 (파일 원래 음에서 반음 수). 기본 JigwiTalismanNote는 라(A3)라서 솔 도 시 라 = -2, +3, +2, 0. 파일이 4개 이상이면 쓰지 않는다.")]
+        [Tooltip("#533 완성 가락 음높이 (파일 원래 음에서 반음 수). 기본 JigwiTalismanNote는 라(A2)라서 솔 도 시 라 = -2, +3, +2, 0. 파일이 4개 이상이면 쓰지 않는다.")]
         [SerializeField] private int[] noteSemitones = { -2, 3, 2, 0 };
         private float burnAge = -1f;
         // #540 effects that live outside the paper (board dim, landing splash, flying embers) and the 3D fireball.
