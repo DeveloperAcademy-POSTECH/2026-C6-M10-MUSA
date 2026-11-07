@@ -69,8 +69,8 @@ namespace C6Lab
         [SerializeField, Range(.01f, .15f)] private float burnEdgeWidth = .045f;
         [Tooltip("예고 동안 1초마다 톡 하는 진동 세기 (0이면 끔).")]
         [SerializeField, Range(0f, 1f)] private float warnHapticIntensity = .3f;
-        [Tooltip("#540: 다 못 쓰고 A가 끝난 뒤, 남은 불길이 마저 다 태우는 시간(초).")]
-        [SerializeField, Range(.1f, 3f)] private float burnSeconds = .3f;
+        [Tooltip("#540: 다 못 쓰고 A가 끝난 뒤, 부적 아래에서 불씨가 붙어 위로 타 올라가며 다 태우는 시간(초).")]
+        [SerializeField, Range(.1f, 3f)] private float burnSeconds = 1.2f;
         [Tooltip("다 탄 재가 흩어지며 사라지는 시간(초).")]
         [SerializeField, Range(.1f, 2f)] private float ashSeconds = .45f;
         [Tooltip("탄 자리 색 (그을린 한지).")]
@@ -272,6 +272,13 @@ namespace C6Lab
         private Texture2D burnTexture;
         private Color32[] burnPixels;
         private float[] burnDistance;
+        /// <summary>#540: 부적 높이 지도 (0 = 아래 끝, 1 = 위 끝, 들쭉날쭉한 결 포함). 못 쓰고 끝나면 아래에서부터 타 올라간다.</summary>
+        private float[] burnRise;
+        /// <summary>#540: 부적을 담는 자르개. 아래에서 타 올라갈 때 탄 아래쪽을 잘라 없앤다(평소에는 꺼 둠).</summary>
+        private RectTransform paperClip;
+        private UnityEngine.UI.RectMask2D paperClipMask;
+        /// <summary>#540: 타 올라가는 불 줄 바로 아래 그을린 띠의 두께 (부적 높이 비율).</summary>
+        private const float RiseCharBand = .07f;
         private int burnWidth, burnHeight;
         private float burnShownFront = -1f;
         private AudioSource crackle;
@@ -589,6 +596,7 @@ namespace C6Lab
         {
             burnWidth = 96; burnHeight = Mathf.RoundToInt(96f / Mathf.Max(.2f, paperAspect));
             burnDistance = new float[burnWidth * burnHeight];
+            burnRise = new float[burnWidth * burnHeight];
             burnPixels = new Color32[burnDistance.Length];
             float half = burnWidth * .5f;
             for (int y = 0; y < burnHeight; y++)
@@ -598,6 +606,7 @@ namespace C6Lab
                     float d = Mathf.Min(dx, dy) / half;
                     float noise = Mathf.PerlinNoise(x * .11f + 3f, y * .11f + 17f) * .7f + Mathf.PerlinNoise(x * .35f + 9f, y * .35f) * .3f;
                     burnDistance[y * burnWidth + x] = Mathf.Clamp01(d * .9f + (noise - .5f) * .16f + .02f);
+                    burnRise[y * burnWidth + x] = (y + .5f) / burnHeight + (noise - .5f) * .05f;
                 }
             burnTexture = new Texture2D(burnWidth, burnHeight, TextureFormat.RGBA32, false)
             { name = "Talisman Edge Burn (#540 runtime)", hideFlags = HideFlags.DontSave, wrapMode = TextureWrapMode.Clamp };
@@ -895,25 +904,130 @@ namespace C6Lab
         /// </summary>
         private void DrawBurn()
         {
+            // #540: embers catch at the bottom of the talisman and the fire climbs to the top, like a burning edge:
+            // below the line the paper is gone, right under the line a charred band, the line glows, small flames
+            // lick up along it and sparks fly. The edge already scorched during the A stays charred.
             float t = Mathf.Clamp01(burnAge / Mathf.Max(.01f, burnSeconds));
-            float front = Mathf.Lerp(burnStartFront, 1.08f, t);
+            float rise = Mathf.Lerp(-.04f, 1.12f, t * t * (3f - 2f * t) * .35f + t * .65f);
             float ash = Mathf.Clamp01((burnAge - burnSeconds) / Mathf.Max(.01f, ashSeconds));
             Rect r = paper.rect;
-            DrawEdgeBurn(front, burnAge + 100f, 1f - ash);
+            float time = burnAge + 100f;
+            PaintRiseTexture(rise, burnStartFront, time);
+            ClipBelow(rise - RiseCharBand - Mathf.Max(.005f, burnEdgeWidth));
+            DrawRiseFlames(rise, time, 1f - ash);
             // Written strokes the fire has reached turn to ash.
             Color ashColor = new Color(.32f, .3f, .3f, .85f);
             for (int i = 0; i < dots.Length; i++)
             {
                 if (dots[i] == null || !stroke.IsCovered(i)) continue;
-                float burnt = Mathf.Clamp01((front - DotBurnDistance(i)) / .06f);
+                float burnt = Mathf.Clamp01((rise + RiseCharBand - DotRise(i)) / .06f);
                 dots[i].color = Color.Lerp(InkColor(i), ashColor, burnt);
             }
-            if (ghost != null) ghost.color = Color.Lerp(ghostColor, new Color(.35f, .27f, .2f, ghostColor.a), Mathf.Clamp01(front));
-            float sink = ash * ash;
-            if (paperGroup != null) paperGroup.alpha = 1f - sink;
-            paper.localScale = Vector3.one * (1f - .04f * sink);
-            float tremble = front < 1f ? r.height * .004f : 0f;
-            paper.localPosition = burnFrom + new Vector3(Mathf.Sin(burnAge * 53f) * tremble, -r.height * .04f * sink, 0f);
+            if (ghost != null) ghost.color = Color.Lerp(ghostColor, new Color(.35f, .27f, .2f, ghostColor.a), Mathf.Clamp01(rise));
+            if (paperGroup != null) paperGroup.alpha = 1f - ash;
+            paper.localScale = Vector3.one;
+            float tremble = rise < 1f ? r.height * .004f : 0f;
+            paper.localPosition = burnFrom + new Vector3(Mathf.Sin(burnAge * 53f) * tremble, 0f, 0f);
+        }
+
+        /// <summary>#540: 부적에서 이 높이(0 = 아래, 1 = 위)보다 아래를 잘라 없앤다. 음수면 자르지 않는다.</summary>
+        private void ClipBelow(float height)
+        {
+            if (paperClipMask == null || paper == null || paperClip == null) return;
+            if (height <= 0f) { paperClipMask.enabled = false; return; }
+            var corners = new Vector3[4];
+            paper.GetWorldCorners(corners);
+            Vector3 bottom = paperClip.InverseTransformPoint(corners[0]), top = paperClip.InverseTransformPoint(corners[1]);
+            float line = Mathf.Lerp(bottom.y, top.y, height);
+            paperClipMask.padding = new Vector4(0f, Mathf.Max(0f, line - paperClip.rect.yMin), 0f, 0f);
+            paperClipMask.softness = new Vector2Int(0, Mathf.RoundToInt(Mathf.Abs(top.y - bottom.y) * .015f));
+            paperClipMask.enabled = true;
+        }
+
+        /// <summary>
+        /// #540: 아래에서 타 올라가는 그림. 타 올라가는 줄(rise) 바로 아래는 그을린 띠, 줄은 밝은 불씨(깜빡임), 줄 위로 옅은 주황 빛.
+        /// A 동안 가장자리가 그을린 자리(edgeFront까지)는 그대로 그을려 있다. 줄 아래 더 먼 곳은 잘려 없어진다.
+        /// </summary>
+        private void PaintRiseTexture(float rise, float edgeFront, float time)
+        {
+            if (burnTexture == null || burnRise == null) return;
+            if (scorch != null && !scorch.gameObject.activeSelf) scorch.gameObject.SetActive(true);
+            float band = Mathf.Max(.005f, burnEdgeWidth), halo = band * 1.2f;
+            Color32 clear = new Color32(0, 0, 0, 0);
+            Color hot = new Color(1f, .88f, .45f, 1f);
+            for (int i = 0; i < burnRise.Length; i++)
+            {
+                float h = burnRise[i];
+                int x = i % burnWidth;
+                float glow = .75f + .25f * Mathf.Sin(x * .45f + time * 9f);
+                Color c;
+                if (h < rise - band)
+                {
+                    float shade = .85f + .15f * ((i * 7919) % 97) / 97f;
+                    c = charColor; c.r *= shade; c.g *= shade; c.b *= shade;
+                }
+                else if (h < rise)
+                {
+                    c = Color.Lerp(hot, emberColor, (rise - h) / band);
+                    c.r *= glow; c.g *= glow; c.b *= glow;
+                }
+                else if (burnDistance[i] < edgeFront - band)
+                {
+                    float shade = .85f + .15f * ((i * 7919) % 97) / 97f;
+                    c = charColor; c.r *= shade; c.g *= shade; c.b *= shade;
+                }
+                else if (h < rise + halo) { c = emberColor; c.a = .45f * (1f - (h - rise) / halo); }
+                else { burnPixels[i] = clear; continue; }
+                burnPixels[i] = c;
+            }
+            burnTexture.SetPixels32(burnPixels);
+            burnTexture.Apply(false, false);
+            burnShownFront = -1f; // the edge painter repaints next time
+        }
+
+        /// <summary>#540: 타 올라가는 줄을 따라 작은 불꽃이 일렁이고 불티가 튀어 오른다.</summary>
+        private void DrawRiseFlames(float rise, float time, float strength)
+        {
+            bool on = rise > -.02f && rise < 1.08f && strength > 0f && paper != null;
+            if (emberBand != null && emberBand.gameObject.activeSelf != on) emberBand.gameObject.SetActive(on);
+            if (!on) return;
+            Rect r = paper.rect;
+            float y = (Mathf.Clamp01(rise) - .5f) * r.height;
+            for (int k = 0; k < flames.Length; k++)
+            {
+                if (flames[k] == null) continue;
+                flames[k].sprite = LabProceduralFire.Flame((int)(time * 12f) + k * 2);
+                float flicker = .75f + .35f * Mathf.Sin(time * (17f + k * 3f) + k);
+                float size = r.width * .2f * flicker;
+                RectTransform f = flames[k].rectTransform;
+                f.anchorMin = f.anchorMax = new Vector2(.5f, .5f);
+                f.sizeDelta = new Vector2(size * .8f, size);
+                float along = ((k + .5f) / flames.Length - .5f) * r.width * .92f + Mathf.Sin(time * 2f + k) * r.width * .02f;
+                f.anchoredPosition = new Vector2(along, y + size * .32f);
+                flames[k].color = new Color(1f, 1f, 1f, .95f * strength);
+            }
+            for (int k = 0; k < sparks.Length; k++)
+            {
+                if (sparks[k] == null) continue;
+                if (!sparks[k].gameObject.activeSelf) sparks[k].gameObject.SetActive(true);
+                float cycle = time / .7f + k * .37f, t = Mathf.Repeat(cycle, 1f);
+                RectTransform sp = sparks[k].rectTransform;
+                sp.anchorMin = sp.anchorMax = new Vector2(.5f, .5f);
+                float x = ((k * .618034f + Mathf.Floor(cycle) * .29f) % 1f - .5f) * r.width;
+                sp.anchoredPosition = new Vector2(x + Mathf.Sin(t * 5f + k) * r.width * .03f, y + t * r.height * .18f);
+                float size = r.width * (.018f + .01f * ((k * .414f) % 1f)) * (1f - t * .5f);
+                sp.sizeDelta = new Vector2(size, size);
+                Color c = Color.Lerp(new Color(1f, .9f, .5f, 1f), emberColor, t); c.a = (1f - t) * strength; sparks[k].color = c;
+            }
+        }
+
+        /// <summary>#540: 글자 점 자리의 높이 (0 = 부적 아래 끝, 1 = 위 끝).</summary>
+        private float DotRise(int index)
+        {
+            if (glyphArea == null || paper == null) return 1f;
+            Rect r = paper.rect; float side = glyphArea.rect.width;
+            Vector2 local = glyphArea.anchoredPosition + (stroke.Samples[index] - new Vector2(.5f, .5f)) * side;
+            return Mathf.Clamp01(local.y / Mathf.Max(1f, r.height) + .5f);
         }
 
         /// <summary>#540: 글자 점 자리가 가장자리에서 떨어진 정도 (타들어 가는 지도에서 읽음).</summary>
@@ -931,6 +1045,7 @@ namespace C6Lab
         {
             if (!Burning) return;
             burnAge = -1f;
+            if (paperClipMask != null) { paperClipMask.enabled = false; paperClipMask.padding = Vector4.zero; }
             if (paper == null) return;
             if (paperGroup != null) paperGroup.alpha = 1f;
             paper.localScale = Vector3.one; paper.localPosition = burnFrom;
@@ -1712,7 +1827,13 @@ namespace C6Lab
             root = transform as RectTransform;
             if (root == null) return;
             if (font == null) font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            paper = NewRect("Talisman Paper", root);
+            // #540: the paper sits in a clipper so a failed talisman can burn away from the bottom up.
+            paperClip = NewRect("Talisman Paper Clip", root);
+            paperClip.anchorMin = Vector2.zero; paperClip.anchorMax = Vector2.one; paperClip.pivot = root.pivot;
+            paperClip.offsetMin = paperClip.offsetMax = Vector2.zero;
+            paperClipMask = paperClip.gameObject.AddComponent<UnityEngine.UI.RectMask2D>();
+            paperClipMask.enabled = false;
+            paper = NewRect("Talisman Paper", paperClip);
             paper.sizeDelta = new Vector2(200f, 360f);
             paperGroup = paper.gameObject.AddComponent<CanvasGroup>();
             paperGroup.blocksRaycasts = false; paperGroup.interactable = false;
