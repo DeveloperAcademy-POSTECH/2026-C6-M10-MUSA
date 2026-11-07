@@ -87,7 +87,7 @@ namespace Hapio.Experiments
 
     /// <summary>A local material study. It never creates a session, physics target or paint model.</summary>
     [RequireComponent(typeof(UIDocument))]
-    public sealed class ClayPreviewController : MonoBehaviour
+    public sealed partial class ClayPreviewController : MonoBehaviour
     {
         public const float DefaultThickness = .01f;
         public const float DefaultGloss = .35f;
@@ -192,6 +192,7 @@ namespace Hapio.Experiments
                 CaptureGlobals();
                 if (!Application.isEditor) Screen.SetResolution(1280, 800, FullScreenMode.Windowed);
                 BuildPresentation();
+                InitializeImagePresentation();
                 BuildUi();
                 initialized = true;
                 ResizeTarget(900, 800);
@@ -202,6 +203,7 @@ namespace Hapio.Experiments
                 Error = exception.Message;
                 if (status != null) { status.text = Error; status.AddToClassList("clay-error"); }
                 Debug.LogError("CLAY_PREVIEW_FAILED: " + Error, this);
+                ReleaseImages();
                 ReleasePresentation();
                 ReleasePalette();
                 RestoreGlobals();
@@ -436,6 +438,7 @@ namespace Hapio.Experiments
                 button.AddToClassList("clay-preset");
                 presetButtons.Add(button);
             }
+            BuildImagesUi(panel);
             if (PaletteAvailable) BuildPaletteUi(panel);
             thicknessSlider = AddSlider(panel, "THICKNESS", "thicknessSlider", 0, .02f, out thicknessValue);
             glossSlider = AddSlider(panel, "GLOSS", "glossSlider", 0, 1, out glossValue);
@@ -639,6 +642,7 @@ namespace Hapio.Experiments
             if (clayMaterial.HasProperty("_SpecularOnly")) clayMaterial.SetFloat("_SpecularOnly", 0f);
             SetAppearance(Thickness, Gloss); SetSurfaceDetails(ContactStrength, DetailStrength);
             SetLighting(LightAzimuth, LightElevation, LightIntensity);
+            ApplyImageSettings();
         }
         private void ReleasePalette()
         {
@@ -765,6 +769,7 @@ namespace Hapio.Experiments
             previewCamera.transform.SetPositionAndRotation(bounds.center + Vector3.forward * distance, Quaternion.Euler(0, 180f, 0));
             previewCamera.farClipPlane = distance + Mathf.Max(10f, bounds.size.magnitude * 3f);
             previewCamera.orthographicSize = Mathf.Max(bounds.extents.y, bounds.extents.x / Mathf.Max(.1f, previewCamera.aspect)) * 1.12f / Zoom;
+            imagePresentation?.UpdateLayout();
         }
 
         private void OnApplicationFocus(bool focus)
@@ -784,6 +789,7 @@ namespace Hapio.Experiments
             }
             manipulation = null;
             uiRoot?.Clear();
+            ReleaseImages();
             ReleasePresentation();
             ReleasePalette();
             RestoreGlobals();

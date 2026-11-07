@@ -395,7 +395,7 @@ namespace C6Lab.Experiments.Editor
         public static string BuildMac() => BuildMac(ScenePath, ValidatePreparedSample);
 
         // Comparison Scenes opt in explicitly; the ordinary game and v2 build stay unchanged.
-        internal static string BuildMac(string scenePath, Func<string> validateSample)
+        internal static string BuildMac(string scenePath, Func<string> validateSample, Func<IDisposable> stageNative = null)
         {
             RequireStopped();
             string output = Path.Combine(ProjectRoot, "Builds", "Experiments", "ClayPreview",
@@ -420,11 +420,15 @@ namespace C6Lab.Experiments.Editor
                 Require(!File.Exists(output) && !Directory.Exists(output), "The preview build destination already exists.");
                 Directory.CreateDirectory(Path.GetDirectoryName(output));
                 player.ApplyPreviewDefaults();
-                BuildReport report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
+                BuildReport report;
+                using (stageNative?.Invoke())
                 {
-                    scenes = new[] { scenePath }, locationPathName = output,
-                    target = BuildTarget.StandaloneOSX, options = BuildOptions.Development
-                });
+                    report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
+                    {
+                        scenes = new[] { scenePath }, locationPathName = output,
+                        target = BuildTarget.StandaloneOSX, options = BuildOptions.Development
+                    });
+                }
                 Require(report != null && report.summary.result == BuildResult.Succeeded,
                     "The standalone clay preview build did not succeed.");
                 status.bytes = report.summary.totalSize;

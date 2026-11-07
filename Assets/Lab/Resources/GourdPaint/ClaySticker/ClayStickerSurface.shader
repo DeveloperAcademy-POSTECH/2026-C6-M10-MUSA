@@ -8,6 +8,11 @@ Shader "C6Lab/ClayStickerSurface"
         _PaintMapReady("Artwork Ready",Float)=0
         _ClayThickness("Clay Thickness",Range(0,.02))=.006
         _ClayGloss("Clay Gloss",Range(0,1))=.25
+        [HideInInspector] [NoScaleOffset] _ClayPreviewTexture("Preview Neutral Texture",2D)="gray"{}
+        [HideInInspector] _ClayPreviewTextureEnabled("Preview Texture Override",Float)=0
+        [HideInInspector] _ClayPreviewTextureScale("Preview Texture Scale",Float)=1
+        [HideInInspector] _ClayPreviewTextureColorStrength("Preview Texture Color Strength",Float)=.5
+        [HideInInspector] _ClayPreviewTextureNormalStrength("Preview Texture Normal Strength",Float)=.2
         [HideInInspector] _ClayPreviewLighting("Preview Light Override",Float)=0
         [HideInInspector] _ClayPreviewLightDirection("Preview World Direction To Light",Vector)=(0,0,1,0)
         [HideInInspector] _ClayPreviewLightIntensity("Preview Direct Light Intensity",Float)=1
@@ -40,7 +45,10 @@ Shader "C6Lab/ClayStickerSurface"
                 float _PaintMapReady,_ClayThickness,_ClayGloss,_PlayerPaintPatternsEnabled;
                 float _ClayPreviewLighting,_ClayPreviewLightIntensity;
                 float4 _ClayPreviewLightDirection;
+                float _ClayPreviewTextureEnabled,_ClayPreviewTextureScale;
+                float _ClayPreviewTextureColorStrength,_ClayPreviewTextureNormalStrength;
             CBUFFER_END
+            #include "Assets/Lab/Resources/GourdPaint/ClaySticker/ClayPreviewTexture.hlsl"
             struct Attributes {float4 positionOS:POSITION;float3 normalOS:NORMAL;};
             struct Varyings
             {
@@ -150,6 +158,14 @@ Shader "C6Lab/ClayStickerSurface"
                 gradient*=min(1,.55/max(length(gradient),.0001));
                 gradient*=smoothstep(.2,.9,paint.a);
                 n=SafeNormalize(n-gradient);
+                ClayPreviewTextureData importedTexture;
+                importedTexture.value=0;importedTexture.coverage=0;
+                [branch] if(_ClayPreviewTextureEnabled>.5)
+                {
+                    importedTexture=ClayPreviewReadTexture(input.sourceOS,uv);
+                    pigment=ClayPreviewTexturePigment(pigment,importedTexture);
+                    n=ClayPreviewTextureNormal(input.positionWS,n,importedTexture);
+                }
                 float3 view=GetWorldSpaceNormalizeViewDir(input.positionWS);
                 Light sceneKey=GetMainLight(TransformWorldToShadowCoord(input.positionWS));
                 float keyEnergy=dot(sceneKey.color,float3(.2126,.7152,.0722));
@@ -181,6 +197,8 @@ Shader "C6Lab/ClayStickerSurface"
                     diffuse=(.78+.22*saturate(dot(n,keyDirection))*previewIntensity)*fill;
                 diffuse*=lerp(1,lerp(.92,1,sceneKey.shadowAttenuation),hasKey);
                 float3 specularNormal=StickerSpecularNormal(input.sourceOS,baseNormal,stickerData);
+                [branch] if(_ClayPreviewTextureEnabled>.5)
+                    specularNormal=ClayPreviewTextureNormal(input.positionWS,specularNormal,importedTexture);
                 float gloss=saturate(_ClayGloss);
                 float exponent=lerp(12,64,gloss);
                 float unresolved=saturate(length(fwidth(specularNormal))*2);

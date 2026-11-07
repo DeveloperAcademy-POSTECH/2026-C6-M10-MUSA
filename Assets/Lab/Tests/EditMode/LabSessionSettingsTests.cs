@@ -209,5 +209,37 @@ namespace C6Lab.Tests
             Assert.That(restored.targetYawDegrees, Is.EqualTo(475.25f));
             Assert.That(restored.targetYawSpeedDegreesPerSecond, Is.EqualTo(-320.5f));
         }
+
+        [Test]
+        public void AWorstCaseSnapshotChunkStillFitsOneBulkMessage()
+        {
+            // The real compact Bulk DTO with the longest header values the Host can write.
+            Type bodyType = typeof(LabNetwork).Assembly.GetType("C6Lab.LabBulkPayload", true);
+            object Body(string chunkData)
+            {
+                object body = Activator.CreateInstance(bodyType, true);
+                bodyType.GetField("type").SetValue(body, "snapshot_chunk");
+                bodyType.GetField("sessionId").SetValue(body, Guid.NewGuid().ToString("N"));
+                bodyType.GetField("configFingerprint").SetValue(body, new string('f', 64));
+                bodyType.GetField("round").SetValue(body, uint.MaxValue);
+                bodyType.GetField("configRevision").SetValue(body, int.MaxValue);
+                bodyType.GetField("snapshotSequence").SetValue(body, long.MaxValue);
+                bodyType.GetField("chunkIndex").SetValue(body, 1023);
+                bodyType.GetField("chunkCount").SetValue(body, 1024);
+                bodyType.GetField("chunkData").SetValue(body, chunkData);
+                return body;
+            }
+            int header = System.Text.Encoding.UTF8.GetByteCount(JsonUtility.ToJson(Body(string.Empty)));
+            // Whatever JsonUtility escapes, one character is at most a six-byte escape.
+            Assert.That(4 * ((header + 6 * LabSessionSettings.SnapshotChunkCharacters + 2) / 3),
+                Is.LessThanOrEqualTo(LabBulkMessageChunks.MaximumEncodedCharacters));
+            foreach (char worst in new[] { '"', '\\', '\u0001', '한' })
+            {
+                string json = JsonUtility.ToJson(Body(new string(worst, LabSessionSettings.SnapshotChunkCharacters)));
+                string encoded = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(json));
+                Assert.That(encoded.Length, Is.LessThanOrEqualTo(LabBulkMessageChunks.MaximumEncodedCharacters), "U+" + ((int)worst).ToString("X4"));
+                Assert.DoesNotThrow(() => LabBulkMessageChunks.Split(encoded));
+            }
+        }
     }
 }

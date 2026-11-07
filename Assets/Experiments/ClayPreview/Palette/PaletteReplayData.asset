@@ -72,6 +72,6 @@ MonoBehaviour:
     compositor: {fileID: 4800000, guid: d990d10dd722411cb4748d850a106f82, type: 3}
     minimumDensity: 0.9
     maximumDensity: 1
-    sampleMetadataHash: e187be76e2e195fc1161c5e965bcf315f2150ac89d73a403772e54cd1f1a112c
+    sampleMetadataHash: 66b0e7418f856631e23536a0ae650f3f2568eb5da0cc6951c26434b7f427dd75
     colorRawHash: 59578fb0471a80bd7f33592f43809b9919d124d20de036159d558c94b3b0ce51
     heightRawHash: b9eee0e6638b58c2c2139b84d6fb367ba723d311a5eb3fd1423fb5ee1ef7f347

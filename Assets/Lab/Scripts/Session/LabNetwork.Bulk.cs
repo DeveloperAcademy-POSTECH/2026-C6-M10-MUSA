@@ -11,6 +11,8 @@ namespace C6Lab
     internal sealed class LabBulkEnvelope
     {
         public long sequence, ack;
+        /// <summary>Guest ACKs only: <see cref="LabBulkReceiver.SelectiveAck"/>, the chunks held after the gap at ack + 1.</summary>
+        public long sack;
         public string payload;
     }
 
@@ -36,6 +38,8 @@ namespace C6Lab
         private readonly Dictionary<ulong, string> peerSharedRounds = new Dictionary<ulong, string>();
         private readonly LabBulkReceiver bulkReceiver = new LabBulkReceiver();
         private readonly LabBulkMessageAssembler bulkMessages = new LabBulkMessageAssembler();
+        /// <summary>The frame of the Guest's latest Bulk ACK, repeated once on the first frame without Bulk data.</summary>
+        private int bulkAckRepeatFrame = -1;
         public long SentControlBytes { get; private set; }
         public long SentBulkBytes { get; private set; }
 
@@ -92,7 +96,8 @@ namespace C6Lab
 
         private void FlushBulkPackets()
         {
-            if (!IsHost || !IsConnected) return;
+            if (!IsConnected) return;
+            if (!IsHost) { RepeatBulkAck(); return; }
             double now = Time.realtimeSinceStartupAsDouble;
             foreach (ulong peer in order)
             {
@@ -101,6 +106,21 @@ namespace C6Lab
                     SendBulkWire(peer, new LabBulkEnvelope { sequence = frame.sequence, payload = frame.payload });
             }
         }
+
+        /// <summary>
+        /// NGO sends one frame's messages together, so losing that packet loses every Bulk ACK of the frame. While chunks
+        /// keep arriving, the next frame's ACKs carry the same state. After the last frame of a burst nothing does until
+        /// the next publish, which is later than the Host's timeout, so the first frame without Bulk data repeats it once.
+        /// </summary>
+        private void RepeatBulkAck()
+        {
+            if (bulkAckRepeatFrame < 0 || Time.frameCount <= bulkAckRepeatFrame) return;
+            bulkAckRepeatFrame = -1;
+            SendBulkAck();
+        }
+
+        private void SendBulkAck() => SendBulkWire(NetworkManager.ServerClientId, new LabBulkEnvelope
+            { ack = bulkReceiver.AckThrough, sack = bulkReceiver.SelectiveAck });
 
         private bool SendBulkWire(ulong receiver, LabBulkEnvelope envelope)
         {
@@ -143,7 +163,7 @@ namespace C6Lab
                 {
                     if (order.Contains(sender) && string.IsNullOrEmpty(wire.payload)
                         && bulkSenders.TryGetValue(sender, out var outgoing))
-                        outgoing.Ack(wire.ack, Time.realtimeSinceStartupAsDouble);
+                        outgoing.Ack(wire.ack, wire.sack, Time.realtimeSinceStartupAsDouble);
                     return;
                 }
                 if (sender != NetworkManager.ServerClientId || !clientConfigReady) return;
@@ -163,8 +183,10 @@ namespace C6Lab
                         else if (packet.type == "snapshot_chunk") ReceiveSnapshotChunk(packet);
                     }
                 }
-                // A duplicate may mean the previous acknowledgement was lost. Always repeat the cumulative ACK.
-                SendBulkWire(NetworkManager.ServerClientId, new LabBulkEnvelope { ack = bulkReceiver.AckThrough });
+                // A duplicate may mean the previous acknowledgement was lost. Always repeat the cumulative ACK and
+                // the chunks held after its gap, so the Host resends only what is missing.
+                SendBulkAck();
+                bulkAckRepeatFrame = Time.frameCount;
             }
             catch (Exception exception) when (exception is FormatException || exception is ArgumentException)
             {
@@ -176,7 +198,7 @@ namespace C6Lab
         {
             bulkSenders.Clear(); peerPaintPublishers.Clear(); paintPublishCache.Clear();
             peerSharedRounds.Clear(); bulkReceiver.Clear(); bulkMessages.Clear();
-            paintCheckpointThrough.Clear();
+            paintCheckpointThrough.Clear(); bulkAckRepeatFrame = -1;
         }
     }
 }
