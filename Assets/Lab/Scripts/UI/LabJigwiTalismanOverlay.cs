@@ -132,7 +132,7 @@ namespace C6Lab
         [Header("#540 지귀 목소리 (A/B 예고가 뜨는 순간, 각 기기에서)")]
         [Tooltip("A(부적) 예고 때 지귀 대사 폴더. 예: \"다 태워버리겠어!\". 비우면 없음.")]
         [SerializeField] private string voiceAFolder = "JigwiVoiceA";
-        [Tooltip("B(물구슬 동시 명중) 예고 때 지귀 대사 폴더. 예: \"물방울로는 어림도 없지!\". 비우면 없음.")]
+        [Tooltip("B(물구슬 동시 명중) 예고 때 지귀 대사 폴더. 예: \"물방울로는 어림도 없다!\". 비우면 없음.")]
         [SerializeField] private string voiceBFolder = "JigwiVoiceB";
         [SerializeField, Range(0f, 1f)] private float voiceVolume = 1f;
         [Tooltip("#540 부적을 쓰는 동안 깔리는 소리(반복). 불씨가 붙을 때부터 불덩이가 커질수록 점점 커진다. 비우면 없음.")]
