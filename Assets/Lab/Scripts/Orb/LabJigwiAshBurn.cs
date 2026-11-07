@@ -32,6 +32,14 @@ namespace C6Lab
         private readonly SpriteRenderer[] sparks = new SpriteRenderer[SparkCount], ash = new SpriteRenderer[AshCount];
         private SpriteRenderer[] masked = Array.Empty<SpriteRenderer>();
         private Color[] maskedColors = Array.Empty<Color>();
+        private int[] maskedOrders = Array.Empty<int>();
+        /// <summary>
+        /// 이 구슬만의 정렬 번호 칸. 가림막(SpriteMask)은 원래 그 아래 모든 구슬 그림을 가리므로, 타는 동안 이 구슬 그림만
+        /// 이 칸으로 옮기고 가림막도 이 칸에만 듣게 한다 (여러 구슬이 함께 탈 때 옆 구슬이 잘려 보이지 않게).
+        /// </summary>
+        private const int SlotBase = 200, SlotStride = 40, SlotCount = 200;
+        private static int nextSlot;
+        private int slotOrder, partOrder;
         private float left, total = 3f, radius = .3f, age;
         private bool consume, shown;
 
@@ -99,18 +107,50 @@ namespace C6Lab
             {
                 masked = visuals != null ? visuals.GetComponentsInChildren<SpriteRenderer>(true) : Array.Empty<SpriteRenderer>();
                 maskedColors = new Color[masked.Length];
+                maskedOrders = new int[masked.Length];
+                int low = int.MaxValue, high = int.MinValue, layer = 0;
+                foreach (SpriteRenderer part in masked) { low = Mathf.Min(low, part.sortingOrder); high = Mathf.Max(high, part.sortingOrder); layer = part.sortingLayerID; }
+                if (masked.Length == 0) { low = high = 0; }
+                slotOrder = SlotBase + (nextSlot++ % SlotCount) * SlotStride;
+                int span = Mathf.Clamp(high - low, 0, SlotStride - 8);
                 for (int i = 0; i < masked.Length; i++)
                 {
                     maskedColors[i] = masked[i].color;
+                    maskedOrders[i] = masked[i].sortingOrder;
+                    // Keep the orb's own layering, just moved into its private slot.
+                    masked[i].sortingOrder = slotOrder + Mathf.Clamp(masked[i].sortingOrder - low, 0, span);
                     masked[i].maskInteraction = SpriteMaskInteraction.VisibleOutsideMask;
                 }
-                if (mask != null) mask.enabled = true;
+                if (mask != null)
+                {
+                    mask.isCustomRangeActive = true;
+                    mask.frontSortingLayerID = mask.backSortingLayerID = layer;
+                    mask.backSortingOrder = slotOrder - 1;
+                    mask.frontSortingOrder = slotOrder + span;
+                    mask.enabled = true;
+                }
+                // The burning line, sparks and ash draw just above this orb's slot.
+                partOrder = slotOrder + span + 1;
+                SortParts(layer);
                 return;
             }
             for (int i = 0; i < masked.Length; i++)
-                if (masked[i] != null) { masked[i].maskInteraction = SpriteMaskInteraction.None; masked[i].color = maskedColors[i]; }
+                if (masked[i] != null)
+                {
+                    masked[i].maskInteraction = SpriteMaskInteraction.None;
+                    masked[i].color = maskedColors[i];
+                    masked[i].sortingOrder = maskedOrders[i];
+                }
             masked = Array.Empty<SpriteRenderer>();
             if (mask != null) mask.enabled = false;
+        }
+
+        private void SortParts(int layer)
+        {
+            void Put(SpriteRenderer part, int extra) { if (part != null) { part.sortingLayerID = layer; part.sortingOrder = partOrder + extra; } }
+            Put(lineHalo, 0); Put(lineCore, 1);
+            foreach (SpriteRenderer flake in ash) Put(flake, 1);
+            foreach (SpriteRenderer spark in sparks) Put(spark, 2);
         }
 
         private void SetShown(bool on)
@@ -151,7 +191,7 @@ namespace C6Lab
             mask.transform.localPosition = new Vector3(Mathf.Sin(age * 3f) * r * .04f, y, 0f);
             mask.transform.localScale = new Vector3(r * 2.6f, r * 1.2f, 1f);
             // Above the line the ball chars darker as the fire climbs.
-            float charring = Mathf.SmoothStep(0f, 1f, p) * .75f;
+            float charring = Mathf.SmoothStep(0f, 1f, p) * .55f;
             for (int i = 0; i < masked.Length; i++)
             {
                 if (masked[i] == null) continue;
@@ -160,9 +200,10 @@ namespace C6Lab
             }
 
             float width = half * 2.15f + r * .12f;
-            Stretch(lineHalo, width * 1.15f, r * .42f, new Vector3(0f, y, -.01f));
+            float front = -r * 1.1f; // in front of the orb picture (it sits one radius toward the camera)
+            Stretch(lineHalo, width * 1.15f, r * .42f, new Vector3(0f, y, front));
             Tint(lineHalo, EmberColor, .75f * flicker * fade);
-            Stretch(lineCore, width, r * .12f, new Vector3(0f, y, -.02f));
+            Stretch(lineCore, width, r * .12f, new Vector3(0f, y, front - .01f));
             Tint(lineCore, HotColor, flicker * fade);
             if (scorch != null) scorch.enabled = false;
 
@@ -171,7 +212,7 @@ namespace C6Lab
                 // Sparks flick up off the burning line.
                 float rate = 1f / .75f, cycle = age * rate + i * .37f, t = Mathf.Repeat(cycle, 1f);
                 float x = (Hash(i, Mathf.Floor(cycle)) * 2f - 1f) * half;
-                Place(sparks[i], new Vector3(x + Mathf.Sin(t * 6f + i) * r * .1f, y + t * r * .9f, -.03f), r * .16f * (1f - .7f * t));
+                Place(sparks[i], new Vector3(x + Mathf.Sin(t * 6f + i) * r * .1f, y + t * r * .9f, front - .02f), r * .16f * (1f - .7f * t));
                 Tint(sparks[i], Color.Lerp(HotColor, EmberColor, t), (1f - t) * fade * (half > r * .05f ? 1f : 0f));
             }
             for (int i = 0; i < AshCount; i++)
@@ -179,7 +220,7 @@ namespace C6Lab
                 // Grey ash flakes drop away under the line.
                 float cycle = age / .9f + i * .53f, t = Mathf.Repeat(cycle, 1f);
                 float x = (Hash(i + 17, Mathf.Floor(cycle)) * 2f - 1f) * half;
-                Place(ash[i], new Vector3(x + Mathf.Sin(t * 4f + i) * r * .08f, y - t * r * .7f, -.03f), r * .11f);
+                Place(ash[i], new Vector3(x + Mathf.Sin(t * 4f + i) * r * .08f, y - t * r * .7f, front - .02f), r * .11f);
                 Tint(ash[i], AshColor, (1f - t) * fade * (half > r * .05f ? 1f : 0f));
             }
         }
