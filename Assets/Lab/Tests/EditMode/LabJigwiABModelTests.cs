@@ -221,9 +221,11 @@ namespace C6Lab.Tests
             Assert.That(LabJigwiABNetworkValidation.Valid(done.jigwiAB,done.players,m.Revision),Is.True);
             Assert.That(m.Snapshot(22).orbs.Single(o=>o.id==theirs.id).jigwiABBurnAt,Is.EqualTo(-1),"The finished board keeps its orbs.");
             // #540: after Jigwi's line the orbs burn one at a time, 2.5 s each.
-            var later=m.Snapshot(20+LabModel.JigwiTalismanFailFirstBurnSeconds+2*LabModel.JigwiTalismanFailBlazeSeconds+.01);
+            double gone=20+LabModel.JigwiTalismanFailFirstBurnSeconds+2*LabModel.JigwiTalismanFailBlazeSeconds+.01;
+            var later=m.Snapshot(gone);
             Assert.That(later.orbs.Any(o=>o.id==mine.id||o.id==mine2.id),Is.False,"The unfinished board's orbs burned.");
-            Assert.That(m.TryGenerate(Players[0],Request(),22,out _,out e),Is.True,"#540: a failed talisman never blocks the drums. "+e);
+            // The clock has moved on to the end of the burn, so the drum is tried after that (an earlier time is rejected as INVALID_TIME).
+            Assert.That(m.TryGenerate(Players[0],Request(),gone+.1,out _,out e),Is.True,"#540: a failed talisman never blocks the drums. "+e);
         }
         [Test] public void HoldingTheBurnKeepsEveryOrbUntilTheARunsOut()
         {
