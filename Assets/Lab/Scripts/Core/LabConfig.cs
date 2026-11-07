@@ -575,7 +575,7 @@ namespace C6Lab
         [SerializeField] private bool jigwiFlowSchedule = false;
         [Tooltip("#540 Inspector 전용(Host): 켜면 A 동안(부적을 쓰는 동안) 판의 구슬은 타지 않는다. 박 위 불덩이만 차오르고, 끝날 때까지 못 쓰면 그제서야 그 판 구슬이 모두 탄다. 끄면 #479처럼 A가 시작되자마자 구슬이 하나씩 탄다.")]
         [SerializeField] private bool jigwiAHoldBurnUntilEnd = false;
-        [Tooltip("#551 Inspector 전용(Host): 켜면 지귀 B는 지목된 사람이 모두 특수 물구슬을 잡고 있을 때 3-2-1이 울리고 \"지금!\"에 함께 던진다. \"지금!\" 전에는 던져지지 않고(놓으면 카운트 취소), \"지금!\" 뒤 0.7초 안에 모두 놓아야 하며, 첫 명중부터 1.5초 안에 모두 맞혀야 성공. 끄면 #509처럼 아무 때나 던져 1초 안에 모두 맞히기.")]
+        [Tooltip("#551 Inspector 전용(Host): 켜면 지귀 B는 지목된 사람이 모두 특수 물구슬을 잡고 있을 때 3-2-1이 울리고 \"던져!\"에 함께 위로 휙 던진다. \"던져!\" 전에는 던져지지 않고(놓으면 카운트 취소), \"던져!\" 뒤 1초 안에 모두 던져야 하며, 첫 명중부터 1.5초 안에 모두 맞혀야 성공. 끄면 #509처럼 아무 때나 던져 1초 안에 모두 맞히기.")]
         [SerializeField] private bool jigwiBCountdown = false;
         [Tooltip("#540 Inspector 전용(Host, 새 시간표만): 지귀 공통 기믹이 처음 나오는 때(초).")]
         [SerializeField, Range(0f, 99f)] private float jigwiCommonStartSeconds = 40f;

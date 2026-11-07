@@ -6,8 +6,9 @@ namespace C6Lab
 {
     /// <summary>
     /// #551 지귀 B 3-2-1 화면 (모든 기기). 지목된 사람마다 P번호 동그라미가 뜨고, 특수 물구슬을 잡고 있으면 파랗게 빛난다
-    /// (내 동그라미는 테두리가 굵다). 아직 안 잡은 자리 동그라미 위에는 손가락이 꾹 누르는 모양이 되풀이되고, 내 판의 특수
-    /// 물구슬 위에도 "꾹!" 손가락과 퍼지는 고리가 떠서 꾹 잡고 있어야 한다는 걸 모두가 안다. 잡으면 구슬 둘레가 파랗게 차오른다.
+    /// (내 동그라미는 테두리가 굵다). 아직 안 잡은 자리 동그라미는 빈 고리가 두근거리고, 내 판의 특수 물구슬 둘레에도 빈 고리가
+    /// 두근거리며 "꾹!"이 떠서 꾹 잡고 있어야 한다는 걸 모두가 안다. 잡으면 고리가 파랗게 한 바퀴 차오른다(게이지).
+    /// "던져!" 뒤에는 내 구슬에서 위로 솟는 화살표가 위로 휙 던지라고 알린다.
     /// 모두 잡으면 가운데에 큰 "3 → 2 → 1 → 지금!"이 북소리와 함께 박자마다 쿵 하고
     /// 커졌다 줄어든다. 지목된 사람 폰은 박자마다 진동하고 "지금!"에 크게 진동한다. 판정은 Host(`LabModel.TrySetJigwiBReady`).
     /// </summary>
@@ -38,13 +39,16 @@ namespace C6Lab
         private string countedRound;
         private double countedFrom = -1d;
         private int lastBeat = -1;
-        private static Sprite disc, ring, finger;
-        // #551 "꾹" hints: a finger pressing over each waiting seat circle, and over my special Water on the board.
-        private readonly Image[] seatFingers = new Image[LabJigwiABTimeline.SlotCount];
-        private Image orbFinger, orbRipple, orbRippleB, orbCharge;
+        private static Sprite disc, ring, arrow;
+        // #551 "꾹" hints: an empty ring breathing round each waiting seat and round my special Water; holding fills it.
+        private Image orbRing, orbRipple, orbCharge;
         private Text orbLabel;
-        /// <summary>테스트용: 내 특수 물구슬 위 "꾹!" 안내가 보이는지.</summary>
-        public bool HoldHintVisible => orbFinger != null && orbFinger.gameObject.activeSelf;
+        private readonly Image[] throwArrows = new Image[3];
+        private float holdStartedAt = -1f;
+        /// <summary>테스트용: 내 특수 물구슬 둘레 "꾹!" 안내가 보이는지.</summary>
+        public bool HoldHintVisible => orbLabel != null && orbLabel.gameObject.activeSelf;
+        /// <summary>테스트용: "던져!" 화살표가 보이는지.</summary>
+        public bool ThrowHintVisible => throwArrows[0] != null && throwArrows[0].gameObject.activeSelf;
 
         /// <summary>테스트용: 지금 크게 보이는 글자 ("" = 없음).</summary>
         public string Shown => big != null && big.gameObject.activeSelf ? big.text : string.Empty;
@@ -79,18 +83,22 @@ namespace C6Lab
                 chipLabels[i].rectTransform.anchorMin = Vector2.zero; chipLabels[i].rectTransform.anchorMax = Vector2.one;
                 chipLabels[i].rectTransform.offsetMin = chipLabels[i].rectTransform.offsetMax = Vector2.zero;
                 rings[i].gameObject.SetActive(false); chips[i].gameObject.SetActive(false);
-                seatFingers[i] = NewImage("Jigwi B Seat Finger " + i, root, Finger());
-                seatFingers[i].gameObject.SetActive(false);
             }
             orbRipple = NewImage("Jigwi B Hold Ripple", root, Ring());
-            orbRippleB = NewImage("Jigwi B Hold Ripple 2", root, Ring());
-            orbCharge = NewImage("Jigwi B Hold Charge", root, Ring());
-            orbFinger = NewImage("Jigwi B Hold Finger", root, Finger());
+            orbRing = NewImage("Jigwi B Hold Ring", root, Ring());
+            orbCharge = NewImage("Jigwi B Hold Gauge", root, Ring());
+            orbCharge.type = Image.Type.Filled; orbCharge.fillMethod = Image.FillMethod.Radial360;
+            orbCharge.fillOrigin = (int)Image.Origin360.Top; orbCharge.fillClockwise = true;
+            for (int i = 0; i < throwArrows.Length; i++)
+            {
+                throwArrows[i] = NewImage("Jigwi B Throw Arrow " + i, root, Arrow());
+                throwArrows[i].gameObject.SetActive(false);
+            }
             orbLabel = NewText("Jigwi B Hold Label", root, 64);
             orbLabel.text = "꾹!";
             var labelOutline = orbLabel.gameObject.AddComponent<Outline>();
             labelOutline.effectColor = new Color(.1f, .06f, .02f, .9f); labelOutline.effectDistance = new Vector2(3f, -3f);
-            foreach (Graphic part in new Graphic[] { orbRipple, orbRippleB, orbCharge, orbFinger, orbLabel }) part.gameObject.SetActive(false);
+            foreach (Graphic part in new Graphic[] { orbRipple, orbRing, orbCharge, orbLabel }) part.gameObject.SetActive(false);
         }
 
         private void LateUpdate()
@@ -114,6 +122,7 @@ namespace C6Lab
             bool afterGo = round.countdownAt >= 0d && now >= round.GoAt;
             DrawSeats(snapshot, round, localPlayer, now, !afterGo);
             DrawHoldHint(round, localPlayer, now, picked && !afterGo);
+            DrawThrowHint(round, localPlayer, now, picked && afterGo);
             if (round.countdownAt < 0d)
             {
                 // Waiting for everyone to hold: no number; a cancelled count simply disappears.
@@ -129,7 +138,7 @@ namespace C6Lab
             if (big.gameObject.activeSelf != showing) big.gameObject.SetActive(showing);
             if (!showing) return;
             double since = beat < 3 ? t - beat * beatSeconds : t - LabJigwiABTimeline.CountdownSeconds;
-            big.text = beat < 3 ? (3 - beat).ToString() : "지금!";
+            big.text = beat < 3 ? (3 - beat).ToString() : "던져!";
             big.color = beat < 3 ? numberColor : goColor;
             // Each beat lands big and settles (a drum hit you can see).
             float punch = Mathf.Exp(-(float)since * 9f);
@@ -155,7 +164,7 @@ namespace C6Lab
                 LabJigwiABPlayerFire seat = show && round.players != null && i < round.players.Length ? round.players[i] : null;
                 bool on = seat != null;
                 if (chips[i].gameObject.activeSelf != on) { chips[i].gameObject.SetActive(on); rings[i].gameObject.SetActive(on); }
-                if (!on) { if (seatFingers[i].gameObject.activeSelf) seatFingers[i].gameObject.SetActive(false); continue; }
+                if (!on) continue;
                 count++;
                 bool ready = seat.readyAt >= 0d;
                 bool mine = seat.playerId == localPlayer;
@@ -177,20 +186,10 @@ namespace C6Lab
                     rect.anchoredPosition = at;
                 }
                 chips[i].rectTransform.sizeDelta = Vector2.one * size * (ready ? 1f + .06f * pulse : 1f);
-                // A finger keeps pressing down on every seat that is not holding yet ("꾹 잡아!").
-                Image hand = seatFingers[i];
-                if (hand.gameObject.activeSelf == ready) hand.gameObject.SetActive(!ready);
-                if (!ready)
-                {
-                    float press = Press((float)now);
-                    hand.rectTransform.anchorMin = hand.rectTransform.anchorMax = new Vector2(.5f, .6f);
-                    hand.rectTransform.anchoredPosition = at + new Vector2(size * .28f, size * (.75f - .3f * press));
-                    hand.rectTransform.sizeDelta = new Vector2(size * .5f, size * .75f);
-                    hand.rectTransform.localRotation = Quaternion.Euler(0f, 0f, 18f);
-                    hand.color = new Color(1f, 1f, 1f, .95f);
-                    chips[i].rectTransform.localScale = Vector3.one * (1f - .08f * press);
-                }
-                else chips[i].rectTransform.localScale = Vector3.one;
+                // A seat not holding yet: its empty ring breathes in and out ("꾹 잡아!"); a holding seat stays still.
+                float press = ready ? 0f : Press((float)now);
+                chips[i].rectTransform.localScale = Vector3.one * (1f - .08f * press);
+                rings[i].rectTransform.localScale = Vector3.one * (ready ? 1f : 1f + .18f * (1f - press));
                 rings[i].rectTransform.sizeDelta = Vector2.one * size * (round.players[i].playerId == localPlayer ? 1.3f : 1.12f);
             }
         }
@@ -206,44 +205,69 @@ namespace C6Lab
         }
 
         /// <summary>
-        /// 내 판의 특수 물구슬 위: 잡기 전에는 손가락이 꾹 누르고 "꾹!"과 고리가 퍼진다. 잡고 있으면 손가락은 사라지고
-        /// 구슬 둘레가 파랗게 빛나며 차오른다(모두 잡기를 기다리는 중).
+        /// 내 판의 특수 물구슬 둘레: 잡기 전에는 빈 고리가 두근거리고 "꾹!"이 뜨며 고리가 하나 퍼진다. 잡으면 고리가 파랗게
+        /// 한 바퀴 차오르고(게이지) 차오른 채 빛난다(모두 잡기를 기다리는 중).
         /// </summary>
         private void DrawHoldHint(LabJigwiABRound round, ulong localPlayer, double now, bool show)
         {
-            string orbId = null;
-            if (show && source != null && source.Snapshot?.orbs != null)
-                foreach (var orb in source.Snapshot.orbs)
-                    if (orb != null && orb.jigwiABSupplyEventId == round.id && orb.originOwner == localPlayer && !orb.inFlight) orbId = orb.id;
+            string orbId = MyOrb(round, localPlayer, show);
             Vector2 at = default; float radius = 0f;
             bool placed = orbId != null && TryOrbOnScreen(orbId, out at, out radius);
             bool holding = placed && source.board != null && source.board.HeldOrbId == orbId;
+            if (!holding) holdStartedAt = -1f; else if (holdStartedAt < 0f) holdStartedAt = Time.unscaledTime;
             bool hint = placed && !holding;
-            foreach (Graphic part in new Graphic[] { orbFinger, orbLabel, orbRipple, orbRippleB })
+            foreach (Graphic part in new Graphic[] { orbLabel, orbRipple })
                 if (part.gameObject.activeSelf != hint) part.gameObject.SetActive(hint);
+            if (orbRing.gameObject.activeSelf != placed) orbRing.gameObject.SetActive(placed);
             if (orbCharge.gameObject.activeSelf != holding) orbCharge.gameObject.SetActive(holding);
             if (!placed) return;
             float t = (float)now;
+            float press = Press(t);
+            Place(orbRing.rectTransform, at, Vector2.one * radius * (holding ? 2.6f : 2.6f + .5f * (1f - press)));
+            orbRing.color = holding ? new Color(1f, 1f, 1f, .35f) : new Color(1f, .95f, .7f, .95f);
             if (hint)
             {
-                float press = Press(t);
-                Place(orbFinger.rectTransform, at + new Vector2(radius * .55f, radius * (1.9f - .75f * press)), new Vector2(radius * 1.1f, radius * 1.65f));
-                orbFinger.rectTransform.localRotation = Quaternion.Euler(0f, 0f, 18f);
-                orbFinger.color = Color.white;
-                Place(orbLabel.rectTransform, at + new Vector2(-radius * 1.5f, radius * 1.5f), new Vector2(radius * 3f, radius * 1.4f));
+                Place(orbLabel.rectTransform, at + new Vector2(0f, radius * 2.2f), new Vector2(radius * 3f, radius * 1.4f));
                 orbLabel.color = new Color(1f, .9f, .45f, 1f);
-                orbLabel.rectTransform.localScale = Vector3.one * (1f + .15f * press);
-                // Two ripples spread from the orb each time the finger presses.
-                float u = Mathf.Repeat(t, 1.1f) / 1.1f;
-                Ripple(orbRipple, at, radius, u);
-                Ripple(orbRippleB, at, radius, Mathf.Repeat(u + .5f, 1f));
+                orbLabel.rectTransform.localScale = Vector3.one * (1f + .18f * press);
+                Ripple(orbRipple, at, radius, Mathf.Repeat(t, 1.1f) / 1.1f);
             }
             else
             {
+                // The gauge fills once round in 0.4 s, then glows full while waiting for the others.
+                float fill = Mathf.Clamp01((Time.unscaledTime - holdStartedAt) / .4f);
                 float breath = .5f + .5f * Mathf.Sin(t * 10f);
-                Place(orbCharge.rectTransform, at, Vector2.one * radius * (2.5f + .2f * breath));
-                orbCharge.color = new Color(.35f, .75f, 1f, .7f + .3f * breath);
+                Place(orbCharge.rectTransform, at, Vector2.one * radius * 2.6f);
+                orbCharge.fillAmount = fill;
+                orbCharge.color = new Color(.35f, .75f, 1f, fill < 1f ? 1f : .75f + .25f * breath);
             }
+        }
+
+        /// <summary>"던져!" 동안 내 구슬에서 위로 솟는 화살표 세 개 (아직 안 던졌을 때만).</summary>
+        private void DrawThrowHint(LabJigwiABRound round, ulong localPlayer, double now, bool show)
+        {
+            bool launched = false;
+            foreach (var seat in round.players) if (seat != null && seat.playerId == localPlayer && seat.launchedAt >= 0d) launched = true;
+            string orbId = MyOrb(round, localPlayer, show && !launched);
+            Vector2 at = default; float radius = 0f;
+            bool placed = orbId != null && TryOrbOnScreen(orbId, out at, out radius);
+            for (int i = 0; i < throwArrows.Length; i++)
+            {
+                Image arrowImage = throwArrows[i];
+                if (arrowImage.gameObject.activeSelf != placed) arrowImage.gameObject.SetActive(placed);
+                if (!placed) continue;
+                float u = Mathf.Repeat((float)now * 2.2f + i / 3f, 1f);
+                Place(arrowImage.rectTransform, at + new Vector2(0f, radius * (1.4f + 3.2f * u)), new Vector2(radius * 1.6f, radius * 1.1f));
+                arrowImage.color = new Color(.45f, .85f, 1f, Mathf.Sin(Mathf.PI * u));
+            }
+        }
+
+        private string MyOrb(LabJigwiABRound round, ulong localPlayer, bool show)
+        {
+            if (!show || source == null || source.Snapshot?.orbs == null) return null;
+            foreach (var orb in source.Snapshot.orbs)
+                if (orb != null && orb.jigwiABSupplyEventId == round.id && orb.originOwner == localPlayer && !orb.inFlight) return orb.id;
+            return null;
         }
 
         private static void Ripple(Image image, Vector2 at, float radius, float u)
@@ -293,8 +317,8 @@ namespace C6Lab
                 if (rings[i] != null && rings[i].gameObject.activeSelf) rings[i].gameObject.SetActive(false);
             }
             countedRound = null; lastBeat = -1;
-            foreach (Image hand in seatFingers) if (hand != null && hand.gameObject.activeSelf) hand.gameObject.SetActive(false);
-            foreach (Graphic part in new Graphic[] { orbFinger, orbLabel, orbRipple, orbRippleB, orbCharge })
+            foreach (Image hint in throwArrows) if (hint != null && hint.gameObject.activeSelf) hint.gameObject.SetActive(false);
+            foreach (Graphic part in new Graphic[] { orbRing, orbLabel, orbRipple, orbCharge })
                 if (part != null && part.gameObject.activeSelf) part.gameObject.SetActive(false);
         }
 
@@ -329,32 +353,35 @@ namespace C6Lab
         }
 
         private static Sprite Disc() => disc != null ? disc : disc = Make("Jigwi B seat disc", d => Mathf.Clamp01((.48f - d) * 60f));
-        /// <summary>#551: a simple pointing finger (fingertip down) with a dark outline, like a "press here" icon.</summary>
-        private static Sprite Finger()
+        /// <summary>#551: a fat upward chevron ("위로 휙!") with a dark outline.</summary>
+        private static Sprite Arrow()
         {
-            if (finger != null) return finger;
-            const int w = 64, h = 96;
+            if (arrow != null) return arrow;
+            const int w = 96, h = 64;
             var texture = new Texture2D(w, h, TextureFormat.RGBA32, false)
-            { name = "Jigwi B finger (#551 runtime)", hideFlags = HideFlags.DontSave, wrapMode = TextureWrapMode.Clamp };
+            { name = "Jigwi B throw arrow (#551 runtime)", hideFlags = HideFlags.DontSave, wrapMode = TextureWrapMode.Clamp };
             var pixels = new Color[w * h];
             for (int y = 0; y < h; y++)
                 for (int x = 0; x < w; x++)
                 {
                     float u = (x + .5f) / w, v = (y + .5f) / h;
-                    // Finger: a capsule from the fingertip (bottom) up; palm: a rounded block at the top.
-                    float digit = Capsule(u, v, .5f, .12f, .5f, .62f, .16f);
-                    float palm = Capsule(u, v, .5f, .72f, .5f, .86f, .3f);
-                    float d = Mathf.Min(digit, palm);
-                    float fill = Mathf.Clamp01(-d * 120f), edge = Mathf.Clamp01((-d + .045f) * 120f);
-                    Color skin = new Color(1f, .93f, .82f, 1f), ink = new Color(.12f, .08f, .05f, 1f);
-                    Color c = Color.Lerp(ink, skin, Mathf.Clamp01((-d - .035f) * 120f));
-                    c.a = Mathf.Max(fill, edge);
+                    // Two thick strokes meeting at the top centre.
+                    float d = Mathf.Min(Capsule(u, v, .14f, .22f, .5f, .78f, .11f), Capsule(u, v, .86f, .22f, .5f, .78f, .11f));
+                    Color c = Color.Lerp(new Color(.08f, .2f, .4f, 1f), Color.white, Mathf.Clamp01((-d - .03f) * 150f));
+                    c.a = Mathf.Clamp01((-d + .03f) * 150f);
                     pixels[y * w + x] = c;
                 }
             texture.SetPixels(pixels); texture.Apply(false, true);
-            finger = Sprite.Create(texture, new Rect(0f, 0f, w, h), new Vector2(.5f, .5f), w);
-            finger.name = texture.name; finger.hideFlags = HideFlags.DontSave;
-            return finger;
+            arrow = Sprite.Create(texture, new Rect(0f, 0f, w, h), new Vector2(.5f, .5f), w);
+            arrow.name = texture.name; arrow.hideFlags = HideFlags.DontSave;
+            return arrow;
+        }
+
+        /// <summary>Distance to a rounded box (x0..x1, y0..y1, corner radius r); negative inside.</summary>
+        private static float Box(float x, float y, float x0, float y0, float x1, float y1, float r)
+        {
+            float cx = Mathf.Clamp(x, x0 + r, x1 - r), cy = Mathf.Clamp(y, y0 + r, y1 - r);
+            return Vector2.Distance(new Vector2(x, y), new Vector2(cx, cy)) - r;
         }
 
         /// <summary>Signed distance (in texture units) to a capsule from (ax, ay) to (bx, by) with radius r; negative inside.</summary>
