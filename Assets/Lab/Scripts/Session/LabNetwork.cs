@@ -2229,6 +2229,9 @@ namespace C6Lab
             board.SetCharm(charmedHere ? (float)(latest.charmUntil - latest.serverTime) : 0f);
             board.SetJigwiOverheat(latest.phase == LabPhase.Playing
                 && latest.JigwiFor(LocalPlayerId)?.Overheated(latest.serverTime) == true);
+            // #540: my unfinished talisman set my drums alight — light and slippery for a while.
+            board.SetJigwiDrumSlip(config != null && LabJigwiScreenPresentation.DrumsAlight(latest, LocalPlayerId,
+                JigwiABPresentationTime, config.JigwiAFailDrumSlipSeconds) ? config.JigwiAFailDrumSlipBoost : 1f);
             if (blockedHere && (latest.round != announcedBlockRound || latest.swipeBlockStartedAt != announcedBlockStart))
             {
                 announcedBlockRound = latest.round;

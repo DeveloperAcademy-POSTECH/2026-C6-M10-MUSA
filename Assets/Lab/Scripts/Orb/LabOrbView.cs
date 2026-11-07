@@ -455,6 +455,7 @@ namespace C6Lab
         /// <summary>Host-approved A deadline feedback only; held means the battle clock is paused/counting down.</summary>
         public void SetJigwiABBurn(float secondsLeft, bool held = false)
         {
+            if (kind.IsDrum()) return; // #540 a drum's flame is SetJigwiDrumFire's
             if (!kind.IsRaw() && kind != LabOrbKind.Combined) secondsLeft = 0f;
             if (jigwiABFlame == null)
             {
@@ -462,6 +463,19 @@ namespace C6Lab
                 jigwiABFlame = LabJigwiOrbFlame.Create(transform);
             }
             jigwiABFlame.Show(secondsLeft, visualRadius, held);
+        }
+
+        /// <summary>#540: a drum set alight by an unfinished talisman (its board burned). Flame only; the drum never burns away.</summary>
+        public void SetJigwiDrumFire(bool on)
+        {
+            if (!kind.IsDrum()) on = false;
+            if (jigwiABFlame == null)
+            {
+                if (!on) return;
+                jigwiABFlame = LabJigwiOrbFlame.Create(transform);
+            }
+            // A far-off deadline keeps the flame burning without ever charring the drum.
+            jigwiABFlame.Show(on ? 99f : 0f, visualRadius);
         }
 
         /// <summary>Only tagged free B water gets the drop/ripple; ordinary Water art stays unchanged.</summary>

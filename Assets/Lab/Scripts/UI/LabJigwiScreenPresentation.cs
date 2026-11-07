@@ -516,6 +516,22 @@ namespace C6Lab
         /// <summary>#540: true while my screen flares for my unfinished talisman.</summary>
         public bool ABlazeVisible { get; private set; }
 
+        /// <summary>
+        /// #540: 내 부적을 못 써 판이 탄 뒤(불덩이가 판에 닿은 때부터) seconds 동안 내 북에 불이 붙어 있는지.
+        /// </summary>
+        public static bool DrumsAlight(LabSnapshot snapshot, ulong player, double now, float seconds)
+        {
+            if (seconds <= 0f || snapshot == null || snapshot.phase != LabPhase.Playing || snapshot.jigwiAB?.rounds == null) return false;
+            foreach (var round in snapshot.jigwiAB.rounds)
+            {
+                if (round == null || round.kind != LabJigwiABKind.PersonalBurn || round.resolution != LabJigwiABResolution.Expired
+                    || round.resolvedAt < 0d || !SeatFailed(round, player)) continue;
+                double from = round.resolvedAt + LabModel.JigwiTalismanFailBurnDelaySeconds;
+                if (now >= from && now < from + seconds) return true;
+            }
+            return false;
+        }
+
         private static bool SeatFailed(LabJigwiABRound round, ulong player)
         {
             foreach (var seat in round.players ?? Array.Empty<LabJigwiABPlayerFire>())

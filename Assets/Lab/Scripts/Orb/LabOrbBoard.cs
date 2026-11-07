@@ -282,6 +282,20 @@ namespace C6Lab
         public event Action<string, string> JigwiBurnRequested;
         public bool JigwiOverheated => jigwiOverheat;
         public void SetJigwiOverheat(bool active) => jigwiOverheat = active;
+        /// <summary>
+        /// #540 지귀 A 실패: 이 판의 북에 불이 붙어 가벼워진다(1 = 그대로). 옆으로 살짝만 밀어도 이 배 빠르게 나가고,
+        /// 미끄러지며 느려지는 정도는 1/이 배라 훨씬 멀리 간다. 북에 불꽃도 보인다. 이 기기 판 물리·그림만 바꾼다.
+        /// </summary>
+        public void SetJigwiDrumSlip(float boost)
+        {
+            boost = float.IsNaN(boost) || boost < 1f ? 1f : boost;
+            bool changed = !Mathf.Approximately(boost, jigwiDrumSlip);
+            jigwiDrumSlip = boost;
+            foreach (var entry in entries.Values)
+                if (entry.View != null && entry.View.Kind.IsDrum() && (changed || boost > 1f)) entry.View.SetJigwiDrumFire(boost > 1f);
+        }
+        public float JigwiDrumSlip => jigwiDrumSlip;
+        private float jigwiDrumSlip = 1f;
 
         /// <summary>The shared reward window also lights existing and locally predicted board orbs.</summary>
         public void SetJigwiRewardFire(bool active, bool held = false)
@@ -1403,6 +1417,7 @@ namespace C6Lab
             SetTeamWall(0);
             charmed = false;
             jigwiOverheat = false;
+            jigwiDrumSlip = 1f;
             jigwiRewardFire = jigwiRewardHeld = false;
             flashGlare = 0f;
             flashRevealed.Clear();
@@ -1696,6 +1711,7 @@ namespace C6Lab
             SetBodyMode(entry);
             // A heavy bomb leaves the finger slower, so it takes a harder swipe to pass it on (#212).
             float heft = entry.View.Kind == LabOrbKind.Bomb ? config.BombReleaseSpeed : 1f;
+            if (entry.View.Kind.IsDrum()) heft *= jigwiDrumSlip; // #540 a burning drum is light
             Vector2 worldVelocity = inputVelocity * bounds.width * heft;
             entry.View.Body.linearVelocity = OnPlane(Vector2.ClampMagnitude(worldVelocity,
                 config.OrbMaxReleaseSpeed * bounds.width * heft));
@@ -1917,6 +1933,7 @@ namespace C6Lab
                 // A heavy bomb slides to a stop sooner than a drum or an orb (#212).
                 float slowing = config.OrbFloorDeceleration
                     * (entry.View.Kind == LabOrbKind.Bomb ? config.BombSlideDeceleration : 1f);
+                if (entry.View.Kind.IsDrum()) slowing /= jigwiDrumSlip; // #540 a burning drum glides on
                 return velocity.normalized * Mathf.Max(driftSpeed, speed - slowing * bounds.width * step);
             }
 
