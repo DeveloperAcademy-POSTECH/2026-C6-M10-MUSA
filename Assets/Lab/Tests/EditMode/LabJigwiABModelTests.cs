@@ -109,7 +109,8 @@ namespace C6Lab.Tests
             Assert.That(water,Has.Length.EqualTo(5));
             Assert.That(water.Select(o=>o.createdAt).ToArray(),Is.EqualTo(new[]{6d,6.3d,6.6d,6.9d,7.2d}).Within(1e-9));
             Assert.That(water.All(o=>o.owner==Players[0]&&o.kind==LabOrbKind.Combined&&o.element==LabOrbElement.Water),Is.True);
-            Assert.That(water.All(o=>System.Math.Abs(o.expiresAt-(o.createdAt+15))<1e-9&&o.jigwiABBurnAt==-1&&o.jigwiABRewardPaintScale==1.5f),Is.True);
+            // #540: a talisman orb has no lifetime (it never runs out) and never burns.
+            Assert.That(water.All(o=>System.Math.Abs(o.expiresAt-(o.createdAt+LabModel.JigwiTalismanOrbLifetimeSeconds))<1e-9&&o.jigwiABBurnAt==-1&&o.jigwiABRewardPaintScale==1.5f),Is.True);
             Assert.That(string.IsNullOrEmpty(water[0].jigwiABSupplyEventId),Is.True,"Talisman water paints; it is not B ammunition.");
             Assert.That(m.TryGenerate(Players[0],Request(),7.3,out var fresh,out var e),Is.True,e);
             Assert.That(fresh.jigwiABBurnAt,Is.EqualTo(-1),"A finished seat no longer catches fire.");
