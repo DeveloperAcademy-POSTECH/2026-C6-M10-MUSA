@@ -59,75 +59,8 @@ namespace C6Lab
             return flames[variant] = sprite;
         }
 
-        private static Sprite spirit, alarm;
+        private static Sprite alarm;
         private static readonly Color Ink = new Color32(43, 36, 32, 255);
-
-        /// <summary>
-        /// #540 지귀 예고 말풍선 그림 (야광귀 눈처럼 만화풍): 굵은 먹색 테두리를 두른 큰 불꽃 하나와 양옆 작은 불꽃 둘 — 주황 겉불 안에
-        /// 노란 속불, 끝이 살짝 휘어 오르고 — 가운데 성난 두 눈(먹색 눈, 흰 반짝임, 가운데로 내려간 눈썹). 색은 면으로 또렷하게 칠한다.
-        /// </summary>
-        public static Sprite Spirit()
-        {
-            if (spirit != null) return spirit;
-            const int size = 128, samples = 4;
-            Color outerFill = new Color32(255, 112, 28, 255), innerFill = new Color32(255, 214, 64, 255);
-            Color shine = new Color32(255, 246, 200, 255), white = Color.white;
-            var pixels = new Color[size * size];
-            for (int y = 0; y < size; y++)
-                for (int x = 0; x < size; x++)
-                {
-                    Color sum = Color.clear;
-                    for (int sy = 0; sy < samples; sy++)
-                        for (int sx = 0; sx < samples; sx++)
-                        {
-                            float u = (x + (sx + .5f) / samples) / size * 2f - 1f;
-                            float v = (y + (sy + .5f) / samples) / size;
-                            sum += SpiritSample(u, v, outerFill, innerFill, shine, white);
-                        }
-                    Color c = sum / (samples * samples);
-                    // Un-premultiply so soft edges keep their colour.
-                    if (c.a > .001f) { c.r /= c.a; c.g /= c.a; c.b /= c.a; }
-                    pixels[y * size + x] = c;
-                }
-            spirit = Make(pixels, size, size, "Jigwi Bubble Spirit");
-            return spirit;
-        }
-
-        // One premultiplied sample of the spirit at (u: -1..1, v: 0 bottom..1 top).
-        private static Color SpiritSample(float u, float v, Color outerFill, Color innerFill, Color shine, Color white)
-        {
-            const float ink = .065f;
-            u /= .9f; v = (v - .07f) / .9f; // a margin all round
-            // A big flame with two small ones licking up at its sides.
-            float body = Mathf.Min(FlameDistance(u, v, 0f, .4f, .35f, .9f, .16f),
-                Mathf.Min(FlameDistance(u, v, -.36f, .24f, .15f, .6f, -.1f), FlameDistance(u, v, .36f, .24f, .15f, .6f, .1f)));
-            if (body > ink) return Color.clear;
-            Color c = Ink;
-            if (body <= 0f)
-            {
-                c = outerFill;
-                if (FlameDistance(u, v, .03f, .3f, .2f, .68f, .1f) <= 0f) c = innerFill;
-                // A soft shine low on the left.
-                float sx = u + .16f, sy = v - .3f;
-                if (sx * sx / (.05f * .05f) + sy * sy / (.12f * .12f) <= 1f) c = shine;
-                for (int side = -1; side <= 1; side += 2)
-                {
-                    // Eyes: dark ovals with a white glint.
-                    float ex = u - side * .12f, ey = v - .38f;
-                    if (ex * ex / (.055f * .055f) + ey * ey / (.08f * .08f) <= 1f)
-                    {
-                        c = Ink;
-                        float gx = ex + .02f, gy = ey - .035f;
-                        if (gx * gx + gy * gy <= .022f * .022f) c = white;
-                    }
-                    // Angry brows slanting down toward the middle.
-                    float bx = u - side * .13f, by = v - .51f;
-                    if (Mathf.Abs(bx) <= .07f && Mathf.Abs(by - side * bx * .55f) < .022f) c = Ink;
-                }
-            }
-            c.r *= c.a; c.g *= c.a; c.b *= c.a;
-            return c;
-        }
 
         /// <summary>
         /// Signed distance-ish to a cartoon flame: a round bulb (centre cy, radius r) rising to a tip at height top that
@@ -151,7 +84,7 @@ namespace C6Lab
         private static Sprite cartoonSpark, burnMask;
 
         /// <summary>
-        /// #540 박 위 불덩이 (말풍선 그림과 같은 만화풍 2D, 얼굴 없음): 굵은 먹색 테두리, 주황 겉불 안에 노란 속불, 양옆 작은 불꽃 둘.
+        /// #540 박 위 불덩이 (먹색 테두리의 만화풍 2D, 얼굴 없음): 굵은 먹색 테두리, 주황 겉불 안에 노란 속불, 양옆 작은 불꽃 둘.
         /// 프레임마다 끝이 휘는 방향과 높이가 조금씩 달라 번갈아 보이면 일렁인다.
         /// </summary>
         public static Sprite CartoonFlame(int variant)

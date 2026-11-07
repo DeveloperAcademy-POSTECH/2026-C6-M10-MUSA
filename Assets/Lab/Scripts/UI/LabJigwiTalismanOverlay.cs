@@ -54,8 +54,8 @@ namespace C6Lab
         [SerializeField, Range(.1f, 3f)] private float sweepSeconds = 1.5f;
         [Tooltip("#533 완성 가락 한 박자 (초).")]
         [SerializeField, Range(.1f, .8f)] private float beatSeconds = .3f;
-        [Tooltip("#533 완성 가락 네 음이 나는 박자 (0부터). 기본 0·2·4·8 = 솔 (쉼) 도 (쉼) 시 (쉼 쉼 쉼) 라. 마지막 음과 함께 도장이 찍힌다.")]
-        [SerializeField] private int[] noteBeats = { 0, 2, 4, 8 };
+        [Tooltip("#533 완성 가락 네 음이 나는 박자 (0부터). 기본 0·2·4·7 = 솔 (쉼) 도 (쉼) 시 (쉼 쉼) 라. 마지막 음과 함께 도장이 찍힌다.")]
+        [SerializeField] private int[] noteBeats = { 0, 2, 4, 7 };
         [Header("#533 못 다 쓴 부적 (A가 끝날 때까지 못 쓰면 지귀 불에 타 버림)")]
         [Tooltip("#540: A가 끝나기 이만큼(초) 전부터 부적이 겉(가장자리)에서부터 안쪽으로 타들어 간다. A보다 길면 A가 시작하자마자(0초부터). 끝나는 순간 한가운데까지 다 탄다. 0이면 끔.")]
         [SerializeField, Range(0f, 15f)] private float burnWarnSeconds = 15f;
@@ -118,8 +118,8 @@ namespace C6Lab
         [SerializeField, Range(0f, .5f)] private float writeVolumeJitter = .2f;
         [Tooltip("앞 연필 소리가 이만큼(0~1) 지나면 계속 칠할 때 다음 소리를 잇는다. 작을수록 촘촘하다.")]
         [SerializeField, Range(.3f, 1f)] private float writeChainAt = .7f;
-        [Tooltip("#533 완성 가락: \"둥 둥 둥 .. 둥!\" 네 음. 폴더 안 파일을 이름순으로 1~4음에 쓴다. 파일이 4개보다 적으면 있는 파일을 높낮이를 올려(0/2/4/7반음) 채운다.")]
-        [SerializeField] private string noteSoundFolder = "ComboHit";
+        [Tooltip("#533 완성 가락: \"둥 둥 둥 .. 둥!\" 네 음. 폴더 안 파일을 이름순으로 1~4음에 쓴다. 파일이 4개보다 적으면 있는 파일을 높낮이를 올려(noteSemitones) 채운다. #540: 가야금 추성(JigwiTalismanNote, 양금 ComboHit와 같은 440Hz라 음은 그대로).")]
+        [SerializeField] private string noteSoundFolder = "JigwiTalismanNote";
         [Tooltip("앞 세 음 크기.")]
         [SerializeField, Range(0f, 1f)] private float noteSoundVolume = .7f;
         [Tooltip("마지막 강세 음(\"둥!\") 크기.")]
@@ -180,10 +180,7 @@ namespace C6Lab
         [SerializeField, Range(0f, 1f)] private float alarmSoundVolume = .7f;
         [Tooltip("#540 못 쓴 판의 구슬이 하나씩 차례로 1.5초 동안 재가 되어 사라질 때, 구슬마다 타기 시작하는 순간 나는 타는 소리 폴더 (1.5초). 비우면 없음.")]
         [SerializeField] private string orbBurnSoundFolder = "JigwiOrbBurn";
-        [SerializeField, Range(0f, 1f)] private float orbBurnSoundVolume = .8f;
-        [Tooltip("#540 못 쓰고 끝나 불덩이가 떨어질 때 지귀 울부짖음 폴더. 비우면 없음.")]
-        [SerializeField] private string failWailFolder = "JigwiWailAFail";
-        [SerializeField, Range(0f, 1f)] private float failWailVolume = 1f;
+        [SerializeField, Range(0f, 1f)] private float orbBurnSoundVolume = 1f;
         [SerializeField, Range(0f, 1f)] private float spreadSoundVolume = 1f;
         [Tooltip("#540 부적 구슬이 판에 닿을 때 \"퐁\" 소리 폴더. 비우면 없음.")]
         [SerializeField] private string landSoundFolder = "JigwiTalismanLand";
@@ -254,13 +251,9 @@ namespace C6Lab
         private LabJigwiFireball fireball;
         private LabJigwiFireball.Phase fireballSeen;
         private LabJigwiScreenPresentation presentation;
-        // #540: the attack area flashes red like an alarm while I write; Jigwi's bubble shows a fire spirit at the warning.
+        // #540: the attack area flashes red like an alarm while I write.
         private UnityEngine.UI.Image alarm;
         private float alarmLevel;
-        private LabGourdAlert gourdAlert;
-        private string bubbledRound;
-        [Tooltip("#540 예고 말풍선(불꽃 도깨비)이 A가 시작된 뒤에도 더 떠 있는 시간(초).")]
-        [SerializeField, Range(0f, 6f)] private float bubbleLingerSeconds = 2.5f;
         /// <summary>#540: how strongly the attack-area alarm shows right now (0 = off).</summary>
         public float AlarmLevel => alarmLevel;
         private UnityEngine.UI.Image[] landDrops = Array.Empty<UnityEngine.UI.Image>(), flyEmbers = Array.Empty<UnityEngine.UI.Image>();
@@ -412,7 +405,6 @@ namespace C6Lab
             if (Burning) AdvanceBurn(Time.unscaledDeltaTime);
             bool paused = snapshot == null || snapshot.paused || source.GameStartHeld || source.BattlePresentationHeld;
             DriveFireball(snapshot);
-            DriveBubble(snapshot);
             CueOrbBurns(snapshot);
             UpdateFireLoop(!paused, Time.unscaledDeltaTime);
             UpdateCrackle(CrackleTarget(paused), Time.unscaledDeltaTime);
@@ -768,26 +760,6 @@ namespace C6Lab
             }
             // Forget old ones (a new round, or a stalled clock).
             if (orbBurnsCued.Count > 64) orbBurnsCued.Clear();
-        }
-
-        /// <summary>
-        /// #540: 예고 때 야광귀처럼 박 옆 말풍선에 그림(성난 불꽃 도깨비)을 띄운다. 부적이 올 사람 화면에서만,
-        /// 지귀 목소리가 나오는 예고 시작부터 A가 시작되고 bubbleLingerSeconds 뒤까지.
-        /// </summary>
-        private void DriveBubble(LabSnapshot snapshot)
-        {
-            if (!Application.isPlaying || source == null || snapshot == null || snapshot.jigwiAB?.rounds == null) return;
-            if (gourdAlert == null) gourdAlert = FindAnyObjectByType<LabGourdAlert>();
-            if (gourdAlert == null) return;
-            double now = source.JigwiABPresentationTime;
-            foreach (LabJigwiABRound item in snapshot.jigwiAB.rounds)
-            {
-                if (item == null || item.kind != LabJigwiABKind.PersonalBurn || !item.Warning(now) || item.id == bubbledRound) continue;
-                if (OmenLevel <= 0f) continue; // only the seats a talisman is coming for
-                bubbledRound = item.id;
-                gourdAlert.ShowPicture(source.target, LabProceduralFire.Spirit(), (float)(item.activeAt - now) + bubbleLingerSeconds);
-            }
-            if (gourdAlert.ShowingPicture) gourdAlert.SetPictureScale(1f + .06f * Mathf.Sin(Time.unscaledTime * 9f));
         }
 
         /// <summary>화면 픽셀 사각형을 root 기준 위치·크기로 옮긴다.</summary>
@@ -1594,7 +1566,6 @@ namespace C6Lab
                 else if (phase == LabJigwiFireball.Phase.Fall)
                 {
                     Cue("Fall", fallSoundFolder, fallSoundVolume);
-                    Cue("Wail", failWailFolder, failWailVolume);
                     PlayVoice("AFail", failVoiceFolder);
                     LabHaptics.PlayDirect(Config, LabHapticStyle.Heavy, .9f);
                     spreadAt = Time.unscaledTime + (1f - progress) * LabJigwiFireball.FallSeconds;

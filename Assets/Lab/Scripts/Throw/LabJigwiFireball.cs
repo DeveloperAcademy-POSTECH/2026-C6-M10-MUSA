@@ -185,7 +185,7 @@ namespace C6Lab
             transform.localScale = Vector3.one;
 
             float heat = phase == Phase.Grow ? progress : phase == Phase.Kindle ? 0f : 1f;
-            // #540: a flat cartoon flame (like the warning bubble's picture). Frames swap on a beat and it squashes
+            // #540: a flat cartoon flame with a thick ink outline. Frames swap on a beat and it squashes
             // and stretches, so it flickers like a hand-drawn fire; near the end it glows redder.
             body.sprite = LabProceduralFire.CartoonFlame((int)(time * Mathf.Lerp(6f, 12f, heat)));
             float stretch = 1f + Mathf.Lerp(.05f, .1f, heat) * Mathf.Sin(time * Mathf.Lerp(9f, 18f, heat));
