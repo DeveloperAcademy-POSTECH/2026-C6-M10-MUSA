@@ -337,6 +337,19 @@ namespace C6Lab.Tests
             var late=B(m,b.id,go+LabJigwiABTimeline.ReleaseSeconds+.01);
             Assert.That(late.resolution,Is.EqualTo(LabJigwiABResolution.Expired));
         }
+        [Test] public void BTestOnlyRunsJustBFromFourSecondsAndStillValidates()
+        {
+            // #551 시험용: B만 4초부터 17초마다, A와 공통 기믹 없음.
+            JsonUtility.FromJsonOverwrite("{\"jigwiBTestOnly\":true}",config);
+            var m=Room();
+            Assert.That(Current(m,5).kind,Is.EqualTo(LabJigwiABKind.GroupFire));
+            var s=m.Snapshot(5);
+            Assert.That(s.jigwiAB.schedule,Is.EqualTo(LabJigwiABTimeline.BTestSchedule));
+            Assert.That(LabJigwiABNetworkValidation.Valid(s.jigwiAB,s.players,m.Revision),Is.True);
+            Assert.That(Current(m,22).kind,Is.EqualTo(LabJigwiABKind.GroupFire),"The next one is B again.");
+            var failed=m.Snapshot(22);
+            Assert.That(LabJigwiABNetworkValidation.Valid(failed.jigwiAB,failed.players,m.Revision),Is.True,"A failed B with no board fire still validates.");
+        }
         LabJigwiABRound B(LabModel m,string id,double at)=>m.Snapshot(at).jigwiAB.rounds.Single(r=>r.id==id);
         [Test] public void BGivesEachPickedSeatOneSpecialWaterWhileOrdinaryRawPairsKeepTheirNormalElement()
         {

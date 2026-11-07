@@ -74,7 +74,8 @@ namespace C6Lab
         private void ResetJigwiAB(LabConfig config, double now)
         {
             jigwiABEnabled = !teamMode && StageYokai == LabStageYokai.Jigwi && config.JigwiStageTimelineEnabled;
-            jigwiSchedule = config.JigwiFlowSchedule ? LabJigwiABTimeline.FlowSchedule : LabJigwiABTimeline.LegacySchedule;
+            jigwiSchedule = config.JigwiBTestOnly ? LabJigwiABTimeline.BTestSchedule // #551 시험용: B만
+                : config.JigwiFlowSchedule ? LabJigwiABTimeline.FlowSchedule : LabJigwiABTimeline.LegacySchedule;
             jigwiAHoldBurn = config.JigwiAHoldBurnUntilEnd;
             jigwiBCountdown = config.JigwiBCountdown;
             jigwiCommonStart = config.JigwiCommonStartSeconds; jigwiCommonInterval = config.JigwiCommonIntervalSeconds;
@@ -102,7 +103,7 @@ namespace C6Lab
         }
         private double NextJigwiABCommonAt(uint index)
         {
-            if (jigwiStageCutoffReached) return double.PositiveInfinity;
+            if (jigwiStageCutoffReached || jigwiSchedule == LabJigwiABTimeline.BTestSchedule) return double.PositiveInfinity; // #551 B만 시험
             if (jigwiSchedule != LabJigwiABTimeline.FlowSchedule)
                 return index < JigwiStageCommonSlots.Length ? jigwiStageStartedAt + JigwiStageCommonSlots[index] : double.PositiveInfinity;
             // #540: from the start of the middle phase, every interval, until the fever.
@@ -186,7 +187,7 @@ namespace C6Lab
         }
         private void BeginJigwiABSlot(int slot, double activeAt)
         {
-            LabJigwiABKind kind = LabJigwiABTimeline.KindForSlot(slot);
+            LabJigwiABKind kind = LabJigwiABTimeline.KindForSlot(slot, jigwiSchedule);
             bool personal = kind == LabJigwiABKind.PersonalBurn;
             var item = new LabJigwiABRound
             {

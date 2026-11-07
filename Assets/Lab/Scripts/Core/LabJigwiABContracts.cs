@@ -154,7 +154,7 @@ namespace C6Lab
                 double scheduled = state.startedAt + LabJigwiABTimeline.ActiveOffset(round.slot, state.schedule);
                 if (Math.Abs(round.activeAt - scheduled) > .00001d
                     || Math.Abs(round.warningAt - (scheduled - LabJigwiABTimeline.WarningSeconds)) > .00001d
-                    || round.kind != LabJigwiABTimeline.KindForSlot(round.slot)) return false;
+                    || round.kind != LabJigwiABTimeline.KindForSlot(round.slot, state.schedule)) return false;
                 if (round.resolution != LabJigwiABResolution.Skipped)
                 {
                     if (intervals.Any(other => round.activeAt < other.endsAt && other.activeAt < round.endsAt)) return false;
@@ -165,7 +165,9 @@ namespace C6Lab
                 if (round.clearedThroughRevision != 0
                     || modelRevision.HasValue && round.clearedThroughRevision > modelRevision.Value) return false;
                 if (round.rewardUntil != -1d) return false;
-                if (failed ? !Range(round.boardFireUntil, round.resolvedAt, round.resolvedAt + 10d) : round.boardFireUntil != -1d) return false;
+                // #551: a failed B may have no board fire at all (the punishment is off in the asset).
+                if (failed ? round.boardFireUntil != -1d && !Range(round.boardFireUntil, round.resolvedAt, round.resolvedAt + 10d)
+                    : round.boardFireUntil != -1d) return false;
                 if (round.resolution == LabJigwiABResolution.None)
                 {
                     // A may still be running during the next B's one-second warning.

@@ -577,6 +577,8 @@ namespace C6Lab
         [SerializeField] private bool jigwiAHoldBurnUntilEnd = false;
         [Tooltip("#551 Inspector 전용(Host): 켜면 지귀 B는 지목된 사람이 모두 특수 물구슬을 잡고 있을 때 3-2-1이 울리고 \"던져!\"에 함께 위로 휙 던진다. \"던져!\" 전에는 던져지지 않고(놓으면 카운트 취소), \"던져!\" 뒤 1초 안에 모두 던져야 하며, 첫 명중부터 1.5초 안에 모두 맞혀야 성공. 끄면 #509처럼 아무 때나 던져 1초 안에 모두 맞히기.")]
         [SerializeField] private bool jigwiBCountdown = false;
+        [Tooltip("#551 시험용 Inspector 전용(Host): 켜면 지귀 스테이지에서 B만 4초부터 17초마다(4/21/38/55/72초) 나오고 A와 공통 기믹(폭탄 등)은 나오지 않는다. 시험이 끝나면 끈다.")]
+        [SerializeField] private bool jigwiBTestOnly = false;
         [Tooltip("#540 Inspector 전용(Host, 새 시간표만): 지귀 공통 기믹이 처음 나오는 때(초).")]
         [SerializeField, Range(0f, 99f)] private float jigwiCommonStartSeconds = 40f;
         [Tooltip("#540 Inspector 전용(Host, 새 시간표만): 지귀 공통 기믹 간격(초). 피버(100초) 전까지 되풀이.")]
@@ -1180,6 +1182,7 @@ namespace C6Lab
         public bool JigwiFlowSchedule => jigwiFlowSchedule;
         public bool JigwiAHoldBurnUntilEnd => jigwiAHoldBurnUntilEnd;
         public bool JigwiBCountdown => jigwiBCountdown;
+        public bool JigwiBTestOnly => jigwiBTestOnly;
         public float JigwiCommonStartSeconds => Mathf.Clamp(Finite(jigwiCommonStartSeconds, 40f), 0f, 99f);
         public float JigwiCommonIntervalSeconds => Mathf.Clamp(Finite(jigwiCommonIntervalSeconds, 15f), 3f, 60f);
         public float JigwiStageWarningSeconds => Mathf.Clamp(Finite(jigwiStageWarningSeconds, 1f), 0f, 3f);

@@ -15,12 +15,20 @@ namespace C6Lab
         /// B-A-B on the common gimmicks (B1 45, A2 66, B2 83), the last 20 s are fever.
         /// </summary>
         public const int FlowSchedule = 1;
+        /// <summary>#551 시험용: 지귀 B만 4초부터 17초마다 (4 / 21 / 38 / 55 / 72), A와 공통 기믹 없음.</summary>
+        public const int BTestSchedule = 2;
+        private static readonly double[] BTestOffsets = { 4d, 21d, 38d, 55d, 72d };
         public const double WarningSeconds = 2d; // #509: 2초 예고(지귀 도발 문구를 읽을 시간)
         /// <summary>#509: A2 moved 40 → 42 so it never starts with the common bomb at 40.</summary>
         private static readonly double[] ActivationOffsets = { 5d, 25d, 42d, 55d, 70d, 85d };
         private static readonly double[] FlowOffsets = { 10d, 45d, 66d, 83d };
-        private static double[] Offsets(int schedule) => schedule == FlowSchedule ? FlowOffsets : ActivationOffsets;
-        public static bool ValidSchedule(int schedule) => schedule == LegacySchedule || schedule == FlowSchedule;
+        private static double[] Offsets(int schedule) => schedule == FlowSchedule ? FlowOffsets
+            : schedule == BTestSchedule ? BTestOffsets : ActivationOffsets;
+        public static bool ValidSchedule(int schedule) => schedule == LegacySchedule || schedule == FlowSchedule || schedule == BTestSchedule;
+        /// <summary>#551: the kind of a slot in this schedule (the B test schedule is all B).</summary>
+        public static LabJigwiABKind KindForSlot(int slot, int schedule) => schedule == BTestSchedule
+            ? (slot >= 0 && slot < SlotCount ? LabJigwiABKind.GroupFire : throw new ArgumentOutOfRangeException(nameof(slot)))
+            : KindForSlot(slot);
         public static int SlotCountFor(int schedule) => Offsets(schedule).Length;
         /// <summary>The next slot's activation, or +∞ after the last one (an A never runs into the next mission).</summary>
         public static double NextOffset(int slot, int schedule) => slot + 1 < SlotCountFor(schedule)
