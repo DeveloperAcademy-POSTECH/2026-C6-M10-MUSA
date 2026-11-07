@@ -192,7 +192,7 @@ namespace C6Lab.Tests
             Assert.That(m.TryCompleteJigwiTalisman(Players[1],a.id,6),Is.True);
             Assert.That(m.TryGenerate(Players[0],Request(),19,out var mine,out var e),Is.True,e);
             Assert.That(m.TryGenerate(Players[0],Request(),19.1,out var mine2,out e),Is.True,e);
-            Assert.That(m.TryGenerate(Players[1],Request(),19,out var theirs,out e),Is.True,e);
+            Assert.That(m.TryGenerate(Players[1],Request(),19.2,out var theirs,out e),Is.True,e);
             var done=m.Snapshot(20);var round=done.jigwiAB.rounds.Single(r=>r.id==a.id);
             Assert.That(round.resolution,Is.EqualTo(LabJigwiABResolution.Expired));
             Assert.That(LabJigwiABNetworkValidation.Valid(done.jigwiAB,done.players,m.Revision),Is.True);
