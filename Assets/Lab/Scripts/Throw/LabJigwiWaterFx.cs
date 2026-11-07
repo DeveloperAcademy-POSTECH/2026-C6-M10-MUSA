@@ -212,7 +212,7 @@ namespace C6Lab
             if (view != null && shaken.TryGetValue(view, out Vector3 home)) { view.transform.position = home; shaken.Remove(view); }
         }
 
-        private static Sprite DropSprite() => dropSprite != null ? dropSprite : dropSprite = Make("Jigwi water drop", 48, (x, y) =>
+        internal static Sprite DropSprite() => dropSprite != null ? dropSprite : dropSprite = Make("Jigwi water drop", 48, (x, y) =>
         {
             float d = Mathf.Sqrt(x * x + y * y);
             float body = Mathf.Clamp01((.48f - d) * 30f);
@@ -220,13 +220,13 @@ namespace C6Lab
             return new Color(1f, 1f, 1f, body * (.75f + .25f * shine) + shine * .2f);
         });
 
-        private static Sprite MistSprite() => mistSprite != null ? mistSprite : mistSprite = Make("Jigwi water mist", 64, (x, y) =>
+        internal static Sprite MistSprite() => mistSprite != null ? mistSprite : mistSprite = Make("Jigwi water mist", 64, (x, y) =>
         {
             float d = Mathf.Sqrt(x * x + y * y) * 2f;
             return new Color(1f, 1f, 1f, Mathf.Pow(Mathf.Clamp01(1f - d), 2f));
         });
 
-        private static Sprite RingSprite() => ringSprite != null ? ringSprite : ringSprite = Make("Jigwi water ring", 128, (x, y) =>
+        internal static Sprite RingSprite() => ringSprite != null ? ringSprite : ringSprite = Make("Jigwi water ring", 128, (x, y) =>
         {
             float d = Mathf.Sqrt(x * x + y * y);
             return new Color(1f, 1f, 1f, Mathf.Clamp01(1f - Mathf.Abs(d - .42f) * 22f));
