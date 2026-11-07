@@ -28,6 +28,7 @@ namespace C6Lab.Experiments.Editor
         private const string FontPath = "Assets/Lab/Art/Fonts/Shilla_Culture(M).otf";
         private const string LastBuildKey = "Hapio.ClayPreview.LastBuild";
         private const string ResultPath = "Temp/clay_preview_build_result.json";
+        private const string IosPlatform = "iPhone";
 
         [Serializable]
         public sealed class SampleInfo : ClayPreviewSampleInfo { }
@@ -206,7 +207,34 @@ namespace C6Lab.Experiments.Editor
             platform.textureCompression = TextureImporterCompression.Uncompressed;
             platform.maxTextureSize = 1024;
             importer.SetPlatformTextureSettings(platform);
+            if (height) importer.SetPlatformTextureSettings(ExactHeightOnIos(importer));
             importer.SaveAndReimport();
+        }
+
+        /// <summary>
+        /// With iOS active (this project's usual Editor target), a Half EXR that only follows Default is
+        /// RGBM-encoded on import: RGB is divided by an 8-bit multiplier that replaces the stamp coverage in A,
+        /// so height R, normal GB and coverage A all change. An explicit iOS RGBA Half override keeps all four
+        /// channels exactly as saved.
+        /// </summary>
+        private static TextureImporterPlatformSettings ExactHeightOnIos(TextureImporter importer)
+        {
+            var ios = importer.GetPlatformTextureSettings(IosPlatform);
+            ios.overridden = true;
+            ios.format = TextureImporterFormat.RGBAHalf;
+            ios.textureCompression = TextureImporterCompression.Uncompressed;
+            ios.maxTextureSize = 1024;
+            return ios;
+        }
+
+        /// <summary>
+        /// Compression is not checked: with an explicit format it selects nothing, and the iOS Inspector tab
+        /// keeps whatever value was stored. A max size below the 1024 map width would downscale the map.
+        /// </summary>
+        private static bool KeepsHeightExactOnIos(TextureImporter importer)
+        {
+            var ios = importer.GetPlatformTextureSettings(IosPlatform);
+            return ios.overridden && ios.format == TextureImporterFormat.RGBAHalf && ios.maxTextureSize >= 1024;
         }
 
         public static void CreateSceneIfMissing()
@@ -365,6 +393,8 @@ namespace C6Lab.Experiments.Editor
             TextureImporterFormat expected = height ? TextureImporterFormat.RGBAHalf : TextureImporterFormat.RGBA32;
             Require(importer.GetDefaultPlatformTextureSettings().format == expected,
                 "The frozen map no longer preserves its source precision.");
+            Require(!height || KeepsHeightExactOnIos(importer),
+                "The frozen height map needs an iOS override with RGBA Half format and a max size of 1024 or more; without it iOS RGBM-encodes the map on import.");
         }
 
         [MenuItem("C6 Lab/Experiments/Clay Sticker/Build Mac Preview App")]

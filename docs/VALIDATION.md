@@ -1,5 +1,42 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-07 — ClayPreview 높이 EXR의 iOS 가져오기 (main에서 계속 실패하던 검사 1건)
+
+- **기준:** main `d640e0ef` 위의 `fix/clay-preview-exr-hash`(수정 `9fdf0996`, 검토 반영 `5f62e01d`). Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). Library는 끝난 worktree에서 복제했고, 원래 폴더처럼 활성 플랫폼이 iOS다. 같은 Mac에서 다른 폴더의 Unity Editor가 열려 있었다.
+- **증상:** #542(`f6d4ab29`)가 #524의 v2 샘플을 main에 들인 뒤, 원래 폴더의 Library를 복제한 worktree에서 돌린 전체 PlayMode는 모두 `ClayPreviewPlayModeTests.PackedSampleKeepsAllFourHalfChannelsAndActualCoatingCoverage` 1건이 실패했다. 가져온 `Sample/Height.exr`의 GPU 읽기 해시가 `73e0cbd6…`로 기대값 `6388ad86…`과 달랐다. 위 #544 절과 아래 Bulk 절들에 적힌 실패 1건이 이것이다. 다른 작업 위치에서는 통과했다(#543의 `e45468c4` 기록, 전체 PlayMode 661/661 PASS).
+- **원인:** 높이 EXR의 가져오기 설정은 Default(RGBA Half·무압축·최대 1024)만 있고 iOS override가 없었다. iOS가 활성이면 Unity가 이 Half EXR를 선형 공간 RGBM(범위 5, 복원 배율 5^2.2≈34.49)으로 인코딩해 가져온다. 형식은 RGBA Half 그대로다. 하지만 A가 k/255(k=7~51) 배율로 바뀌고 RGB는 그 배율로 나뉘어, 높이 R·법선 GB·커버리지 A가 모두 달라진다.
+  - 이 모델로 계산하면 A 524,288개 전부, RGB 1,572,864개 중 1,572,850개가 덤프와 비트 단위로 같다. 모델은 RGB를 sRGB 곡선으로 선형화해 배율로 나눈 뒤 다시 sRGB로 저장한다. 나머지 14개는 반올림 1 ULP 차이다. 검토 에이전트가 원본 EXR과 GPU 덤프만 보고 독립적으로 찾았다. 알파 곱하기·나누기, sRGB 변환 한 번, 비정규수 버림, 채널 순서 바꿈, LDR 자르기, 다른 RGBM 범위(2·4·6·8)는 맞지 않았다.
+  - 파일과 `SampleInfo.json`은 맞다. 무압축 Half EXR을 직접 풀어 아래→위 행 순서로 해시하면 `heightRawHash`와 같고, R만 해시하면 `physicalHeightRawHash`와 같다(5개 모두).
+  - Library 문제가 아니다. 같은 조건에서 강제로 다시 가져와도 `73e0cbd6…`였다.
+  - Standalone(Mac)은 Default를 따라 정확히 들어온다(아래). 그래서 통과한 기록들은 Standalone이 활성인 Library에서 나왔을 것으로 본다. 그 작업 위치의 Library는 확인하지 않았다.
+- **고친 것:**
+  - 높이 EXR 5개(`Sample`, `Rounded`의 `OriginalV2`·`OriginalV3`·`RoundedV3`·`CoatingV4`)의 `.meta`에서 iOS 블록만 override(RGBA Half·무압축·최대 1024)로 바꿨다. 색 PNG는 iOS에서도 그대로 들어와 바꾸지 않았다. PNG·EXR·JSON·Scene 파일 내용은 그대로다.
+  - `ClayPreviewBuild.ImportMap`이 높이 지도에 같은 override를 쓴다. 세 실험의 빌드·준비 검사가 쓰는 `ValidateMap`은 iOS override의 RGBA Half 형식과 최대 크기 1024 이상을 요구한다. 형식을 직접 고르면 압축 항목은 쓰이지 않고 iOS 탭에서 바꿀 수도 없으므로 확인하지 않는다(검토에서 찾았고 아래 대조로 확인했다).
+  - PlayMode `EveryExperimentHeightExrKeepsAnExactIosImport`가 실험 폴더의 모든 EXR(지금은 높이 지도 5개)에서 같은 조건을 확인한다. 활성 플랫폼과 무관하다.
+  - `CLAY_STICKER_PAINT.md`·`ROUNDED_CLAY_STICKER_EXPERIMENT.md`·AGENTS.md #524 절에 이유를 적었다.
+- **검토:** 읽기 전용 검토 3갈래(Unity 가져오기·호출 경로·검사와 문서)와 독립 재현 1개를 돌리고, 지적마다 반박 검토를 붙였다. 남은 지적 8건은 `5f62e01d`에서 고쳤다: 압축 검사가 지나치고 최대 크기를 안 봄, 다섯 EXR 중 `Sample`만 검사함, VALIDATION 기록이 없음, 문서가 A만 바뀐다고 씀. "iOS 지원 모듈이 없는 Editor에서 검사가 막힌다"는 지적은 반박 검토에서 기각됐다.
+
+| 확인(따로 적지 않으면 iOS 활성) | 결과 |
+| --- | --- |
+| 고치기 전: 다섯 세트를 GPU로 읽어 `SampleInfo.json`과 비교 | 높이 EXR 5개 모두 다름(RGBM), 색 PNG 5개 같음 |
+| 같은 조건에서 `Sample/Height.exr` 강제 다시 가져오기 | 전후 모두 `73e0cbd6…` |
+| iOS override를 넣은 뒤 | 높이 5개·색 5개 모두 같음, `ValidateMap` 10개 통과 |
+| Standalone(Mac) 활성, 고친 뒤 | 높이 5개·색 5개 모두 같음 |
+| iOS override를 압축 Compressed·최대 2048로 둠(Inspector에서 다시 켠 경우) | 정확히 들어옴(`6388ad86…`) |
+| iOS override 최대 512 | 512×256으로 줄어 다름 |
+| `9fdf0996`: ClayPreview PlayMode 두 fixture | 22/22 PASS |
+| `9fdf0996`: `Sample/Height.exr.meta`만 main 것으로 되돌린 대조 | 16건 중 14 PASS. `PackedSample…`이 같은 `73e0cbd6…`로, 새 iOS override 단언이 실패 |
+| `9fdf0996`: 전체 EditMode / 전체 PlayMode | 2046/2046 PASS(20.1초) / 666/666 PASS(520.5초) |
+| `5f62e01d` 대조 1: `Sample`은 Compressed·2048, `RoundedV3`은 main `.meta` | `ValidateMap`은 `RoundedV3` 높이만 거절. PlayMode 17건 중 16 PASS, 새 검사만 `RoundedV3`에서 실패 |
+| `5f62e01d` 대조 2: `Sample` iOS 최대 512 | 실험 컨트롤러가 "The sample maps must both be 1024 x 512."로 시작을 거부해 17건 모두 SetUp에서 실패 |
+| `5f62e01d`: ClayPreview PlayMode 두 fixture | 23/23 PASS(17·6) |
+| `5f62e01d`: 전체 EditMode / 전체 PlayMode | 2046/2046 PASS(19.5초) / 667/667 PASS(507.7초) |
+
+- 각 실행의 skip·inconclusive는 0이다. 대조에 쓴 `.meta` 변경과 임시 진단 스크립트는 되돌렸고 커밋하지 않았다.
+- **미실행:**
+  - 샘플을 다시 굽는 Prepare/Rebake 메뉴. `ImportMap`은 이 메뉴에서만 실행되므로 직접 실행하지 않았다. 같은 API 순서를 임시 진단 스크립트로 실행해 같은 iOS 설정값과 정확한 가져오기를 확인했다.
+  - Mac 실험 앱 빌드·실행, 실기기. 이 실험은 iOS 앱에 들어가지 않는다.
+
 ## 2026-11-07 — #478 공용 로딩 화면 main 통합 (PR #544)
 
 - **기준:** `feat/#478-loading-view`(`38deec81`)에 main `3f693056`(#541·#545·#547 포함)을 병합하고(`969e2937`, 충돌 없음) 아래를 고쳤다(`0b69fe50`). 검사는 열린 PR #538(`b4977e94`)까지 임시로 합친 트리 `2f524035`에서 Unity 6000.6.5f1 batch(macOS)로 돌렸다. 같은 Mac에서 다른 폴더의 Unity Editor가 열려 있었다.
