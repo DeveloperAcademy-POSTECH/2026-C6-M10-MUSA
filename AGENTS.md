@@ -296,7 +296,8 @@
 - LabConfig `jigwiBCountdown`(Host, 에셋에서 켬): 지목된 사람이 **모두** 자기 특수 물구슬을 손가락으로 잡고 있으면 Host가 3-2-1을 시작한다(`round.countdownAt`, 요청 `jigwiBReady`, `LabModel.TrySetJigwiBReady`). "지금!"은 `countdownAt + LabJigwiABTimeline.CountdownSeconds`(1.8초).
 - "지금!" 전에는 특수 물구슬이 던져지지 않는다(판 `LabOrbBoard.ThrowGate`가 미끄러지기만 하게, Host도 `JIGWI_B_WAIT`로 거절). 그 전에 누가 놓으면 3-2-1이 취소되고 다시 모두 잡으면 다시 시작한다.
 - "지금!" 뒤 `ReleaseSeconds`(0.7초) 안에 지목된 사람이 모두 던져야 한다(`seat.launchedAt`). 늦으면 그 자리에서 실패(`FailLateJigwiBRelease`). 첫 명중부터 `round.syncWindowSeconds`(1.5초) 안에 모두 맞히면 성공. 빗나가면 실패(한 번의 기회).
-- 실패 벌(조합판 불바다)은 에셋 `jigwiBBoardFireSeconds` 0으로 껐다(코드 기본값 3초 그대로, 새 벌은 나중에 정함).
+- 실패 벌(조합판 불바다)은 에셋 `jigwiBBoardFireSeconds` 0으로 껐다(코드 기본값 3초 그대로, 새 벌은 나중에 정함). 실패 순간의 화면 불꽃도 판 불바다가 켜졌을 때만 보이고, 지금은 짧은 붉은 기운만 남는다(`LabJigwiScreenPresentation.DrawFailure`).
+- 3-2-1 화면(`LabJigwiBCountdownView`, 모든 기기): 지목된 자리마다 P번호 동그라미(잡고 있으면 파랗게, 내 자리는 굵은 금색 테두리), 모두 잡으면 가운데 큰 "3·2·1"(박자마다 `JigwiBBeat` 북소리) → "지금!"(`JigwiBGo`), 지목된 사람 폰은 박자마다 진동. "꾹 잡아" 안내: 아직 안 잡은 자리 동그라미 위에서 손가락이 되풀이해 꾹 누르고(모두가 봄), 내 판의 특수 물구슬 위에는 손가락 + "꾹!" + 퍼지는 고리가 뜬다. 잡고 있으면 손가락은 사라지고 구슬 둘레가 파랗게 차오른다.
 - 끄면(코드 기본값) #509 규칙 그대로: 아무 때나 던지고 1초 안에 모두 맞히기.
 - 현재 호환 묶음은 설정 259개·**5692**·`C6PhysicsLab/53`·**`C6HapioGame/39`**다. 5691 이하 앱과 혼용하지 않는다.
 

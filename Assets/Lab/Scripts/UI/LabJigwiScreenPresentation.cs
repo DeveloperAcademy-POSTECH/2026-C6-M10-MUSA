@@ -174,7 +174,20 @@ namespace C6Lab
             // #479: the talisman is written in the battle screen's Shilla Culture font (신라문화체).
             Font shilla = canvas != null ? LabYaguangFeverHud.ShillaFont(canvas) : null;
             Talisman.Bind(source, shilla != null ? shilla : font);
+            // #551: the B 3-2-1 (seat circles, big numbers and "지금!") on every screen.
+            if (Countdown == null)
+            {
+                var go = new GameObject("Jigwi B Countdown (#551)", typeof(RectTransform));
+                go.layer = gameObject.layer;
+                var rect = (RectTransform)go.transform; rect.SetParent(transform, false);
+                rect.anchorMin = Vector2.zero; rect.anchorMax = Vector2.one; rect.offsetMin = rect.offsetMax = Vector2.zero;
+                Countdown = go.AddComponent<LabJigwiBCountdownView>();
+            }
+            Countdown.Bind(source, shilla != null ? shilla : font);
         }
+
+        /// <summary>#551: the B 3-2-1. Created at runtime with the talisman.</summary>
+        public LabJigwiBCountdownView Countdown { get; private set; }
 
         /// <summary>Used by the dedicated prefab builder; never rebuilds the existing battle Canvas.</summary>
         public void EnsureWidgets()
@@ -599,8 +612,11 @@ namespace C6Lab
             if (BoardFireVisible) opacity = Mathf.Max(opacity, .55f);
             if (failureStatus != null) failureStatus.text = string.Empty; // #509: no failure / board-fire words
             failureOverlay.color = new Color(1f, .13f, .01f, .22f * opacity);
+            // #551: no fire on a failed B unless the board-fire punishment is on (it is off in the asset for now);
+            // the short red tint alone marks the failure until a new failure look is decided.
+            float flames = BoardFireVisible ? opacity : 0f;
             if (failureFlames != null) for (int i = 0; i < failureFlames.Length; i++)
-                AnimateFlame(failureFlames[i], elapsed, i * 1.73f, .95f * opacity);
+                AnimateFlame(failureFlames[i], elapsed, i * 1.73f, .95f * flames);
             if (failureStatus != null) failureStatus.color = new Color(1f, .97f, .83f, BoardFireVisible ? 1f : opacity);
         }
 
