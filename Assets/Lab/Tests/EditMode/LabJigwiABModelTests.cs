@@ -218,7 +218,8 @@ namespace C6Lab.Tests
             var done=m.Snapshot(20);var round=done.jigwiAB.rounds.Single(r=>r.id==a.id);
             Assert.That(round.resolution,Is.EqualTo(LabJigwiABResolution.Expired));
             Assert.That(LabJigwiABNetworkValidation.Valid(done.jigwiAB,done.players,m.Revision),Is.True);
-            var later=m.Snapshot(22);
+            // #540: the fireball lands 0.45 s later, then the orbs burn one at a time, 3 s each.
+            var later=m.Snapshot(20+LabModel.JigwiTalismanFailBurnDelaySeconds+2*LabModel.JigwiTalismanFailBlazeSeconds+.01);
             Assert.That(later.orbs.Any(o=>o.id==mine.id||o.id==mine2.id),Is.False,"The unfinished board's orbs burned.");
             Assert.That(later.orbs.Single(o=>o.id==theirs.id).jigwiABBurnAt,Is.EqualTo(-1),"The finished board keeps its orbs.");
             Assert.That(m.TryGenerate(Players[0],Request(),22,out _,out e),Is.True,"#540: a failed talisman never blocks the drums. "+e);
@@ -233,8 +234,13 @@ namespace C6Lab.Tests
             Assert.That(m.TryGenerate(Players[0],Request(),19,out var fresh,out var e),Is.True,e);
             Assert.That(m.Snapshot(19.5).orbs.Single(o=>o.id==fresh.id).jigwiABBurnAt,Is.EqualTo(-1),"A new orb is safe too.");
             Assert.That(m.Snapshot(20).jigwiAB.rounds.Single(r=>r.id==a.id).resolution,Is.EqualTo(LabJigwiABResolution.Expired));
-            Assert.That(m.Snapshot(20.5).orbs.Count(o=>o.id==mine.id||o.id==fresh.id),Is.EqualTo(2),"They blaze together first…");
-            Assert.That(m.Snapshot(22).orbs.Any(o=>o.id==mine.id||o.id==fresh.id),Is.False,"…then the whole board burns away.");
+            // #540: the fireball lands 0.45 s after the A, then the orbs burn one at a time (oldest first), 3 s each.
+            double landed=20+LabModel.JigwiTalismanFailBurnDelaySeconds, blaze=LabModel.JigwiTalismanFailBlazeSeconds;
+            Assert.That(m.Snapshot(landed+blaze-.01).orbs.Count(o=>o.id==mine.id||o.id==fresh.id),Is.EqualTo(2),"The first orb is still blazing…");
+            var oneGone=m.Snapshot(landed+blaze+.01).orbs;
+            Assert.That(oneGone.Any(o=>o.id==mine.id),Is.False,"…the oldest burns away first…");
+            Assert.That(oneGone.Single(o=>o.id==fresh.id).jigwiABBurnAt,Is.EqualTo(landed+2*blaze).Within(1e-6),"…the next one takes its turn…");
+            Assert.That(m.Snapshot(landed+2*blaze+.01).orbs.Any(o=>o.id==mine.id||o.id==fresh.id),Is.False,"…until the whole board is gone.");
         }
         [Test] public void WritingPausesTheLifetimeOfOrbsAlreadyOnThatBoard()
         {

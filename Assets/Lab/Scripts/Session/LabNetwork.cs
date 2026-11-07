@@ -2194,8 +2194,9 @@ namespace C6Lab
                         : orb.LifeSecondsLeft(latest.serverTime, config.OrbLifetimeSeconds, config.ItemLifetimeSeconds),
                     jigwiScale: orb.jigwiRadiusScale, fever: orb.fever, fiveColor: orb.fiveColor,
                     jigwiABScale: orb.jigwiABRadiusScale,
-                    // #540: an unfinished talisman's blaze replaces the A char on those orbs.
-                    jigwiABBurnSeconds: orb.jigwiABBurnAt >= 0d && blaze <= 0f ? Mathf.Max(0f, (float)(orb.jigwiABBurnAt - latest.serverTime)) : 0f,
+                    // #540: an unfinished talisman's blaze replaces the A char on those orbs (also while they wait their turn).
+                    jigwiABBurnSeconds: orb.jigwiABBurnAt >= 0d && LabJigwiScreenPresentation.FailBurnSecondsLeft(latest, orb, latest.serverTime) <= 0f
+                        ? Mathf.Max(0f, (float)(orb.jigwiABBurnAt - latest.serverTime)) : 0f,
                     jigwiABHeld: latest.paused || GameStartHeld,
                     // An unlocked bomb (#328) glides in to the Host's spot like a drum, then opens there.
                     arrival: orb.kind == LabOrbKind.Bomb && orb.JustArrived(latest.serverTime) ? orb.arrival : LabDrumArrival.None,

@@ -534,10 +534,21 @@ namespace C6Lab
         }
 
         /// <summary>
-        /// #540: 부적을 못 써 타는 구슬의 남은 초 (Host 소각 시각까지). 그 A가 시간이 다 돼 끝난 소각만, 아니면 0.
-        /// 불덩이가 판에 닿는 순간부터 구슬은 코드로 그린 불(`LabJigwiBlaze`)로 크게 타오른다.
+        /// #540: 부적을 못 써 타는 구슬이 지금 타오르는 중이면 남은 초, 아니면 0. 구슬은 하나씩 차례로
+        /// `LabModel.JigwiTalismanFailBlazeSeconds`(3초) 동안 코드로 그린 불(`LabJigwiBlaze`)로 타오른 뒤 없어진다.
+        /// 아직 차례가 안 온 구슬은 0(그대로 보임).
         /// </summary>
         public static float FailBlazeSecondsLeft(LabSnapshot snapshot, LabOrbState orb, double serverTime)
+        {
+            float left = FailBurnSecondsLeft(snapshot, orb, serverTime);
+            return left <= (float)LabModel.JigwiTalismanFailBlazeSeconds + .01f ? left : 0f;
+        }
+
+        /// <summary>
+        /// #540: 부적을 못 써 타기로 정해진 구슬이 없어지기까지 남은 초 (Host 소각 시각까지, 차례를 기다리는 시간 포함).
+        /// 그 A가 시간이 다 돼 끝나고 불덩이가 판에 닿은 뒤의 소각만, 아니면 0.
+        /// </summary>
+        public static float FailBurnSecondsLeft(LabSnapshot snapshot, LabOrbState orb, double serverTime)
         {
             if (orb == null || orb.jigwiABBurnAt < 0d || string.IsNullOrEmpty(orb.jigwiABBurnEventId) || snapshot?.jigwiAB?.rounds == null) return 0f;
             foreach (var round in snapshot.jigwiAB.rounds)

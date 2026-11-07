@@ -19,10 +19,10 @@ namespace C6Lab
         /// <summary>#540: the timetable this battle runs and, for the flow timetable, the common gimmick rhythm.</summary>
         private int jigwiSchedule;
         private double jigwiCommonStart = 40d, jigwiCommonInterval = 15d;
-        /// <summary>#540: an unfinished talisman's remaining orbs burn one after another this far apart (fire spreading fast).</summary>
-        public const double JigwiTalismanFailBurnStepSeconds = .05d;
-        /// <summary>#540: after the fireball lands, every orb on that board blazes together this long before they burn away.</summary>
-        public const double JigwiTalismanFailBlazeSeconds = .8d;
+        /// <summary>#540: after the fireball lands, an unfinished talisman's orbs burn one at a time; each one blazes this long, then burns away.</summary>
+        public const double JigwiTalismanFailBlazeSeconds = 3d;
+        /// <summary>#540: the next orb catches fire as the previous one burns away (one at a time, easy to follow).</summary>
+        public const double JigwiTalismanFailBurnStepSeconds = JigwiTalismanFailBlazeSeconds;
         /// <summary>#540: a failed seat's orbs start burning this long after the A ends (the fireball falling onto the board).</summary>
         public const double JigwiTalismanFailBurnDelaySeconds = .45d;
         // #479: A burns each owner's orbs one at a time. The last queued deadline per owner for the running A.
@@ -215,7 +215,7 @@ namespace C6Lab
                 if (failed.Contains(orb.owner) && !orb.inFlight && !orb.jigwiTalismanReward && (orb.kind.IsRaw() || orb.kind == LabOrbKind.Combined))
                 {
                     burnSteps.TryGetValue(orb.owner, out int step); burnSteps[orb.owner] = step + 1;
-                    // #540: the fireball falls onto the board, the whole board blazes together, then the orbs burn away fast.
+                    // #540: the fireball falls onto the board, then its orbs burn one at a time (oldest first), each for the blaze time.
                     double burnAt = item.resolvedAt + JigwiTalismanFailBurnDelaySeconds + JigwiTalismanFailBlazeSeconds
                         + step * JigwiTalismanFailBurnStepSeconds;
                     if (orb.jigwiABBurnAt < 0d || burnAt < orb.jigwiABBurnAt)

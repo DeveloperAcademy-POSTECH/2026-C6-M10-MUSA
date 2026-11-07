@@ -135,10 +135,10 @@ namespace C6Lab
         [Tooltip("B(물구슬 동시 명중) 예고 때 지귀 대사 폴더. 예: \"물방울로는 어림도 없지!\". 비우면 없음.")]
         [SerializeField] private string voiceBFolder = "JigwiVoiceB";
         [SerializeField, Range(0f, 1f)] private float voiceVolume = 1f;
-        [Tooltip("#540 불덩이가 타는 소리(반복). 불씨가 붙을 때부터 불덩이가 커질수록 점점 커진다. 비우면 없음.")]
+        [Tooltip("#540 부적을 쓰는 동안 깔리는 소리(반복). 불씨가 붙을 때부터 불덩이가 커질수록 점점 커진다. 비우면 없음.")]
         [SerializeField] private string fireLoopFolder = "JigwiFireballLoop";
         [Tooltip("불씨가 막 붙었을 때 타는 소리 크기.")]
-        [SerializeField, Range(0f, 1f)] private float fireLoopVolume = .12f;
+        [SerializeField, Range(0f, 1f)] private float fireLoopVolume = .25f;
         [Tooltip("A가 끝나는 순간(불덩이가 가장 클 때)의 타는 소리 크기.")]
         [SerializeField, Range(0f, 1f)] private float fireLoopWarnVolume = 1f;
         [Tooltip("타는 소리가 커지고 줄어드는 빠르기(초).")]
@@ -178,9 +178,12 @@ namespace C6Lab
         [Tooltip("#540 부적을 쓰는 동안 공격 영역 붉은 경보가 번쩍일 때마다 나는 경보음 폴더. 끝이 다가올수록 빨라지고 커진다. 비우면 없음.")]
         [SerializeField] private string alarmSoundFolder = "JigwiAlarmPulse";
         [SerializeField, Range(0f, 1f)] private float alarmSoundVolume = .7f;
-        [Tooltip("#540 못 쓴 판의 구슬이 하나씩 타 없어질 때마다 나는 소리 폴더 (\"퍽\"). 비우면 없음.")]
-        [SerializeField] private string burnOutSoundFolder = "JigwiOrbBurnOut";
-        [SerializeField, Range(0f, 1f)] private float burnOutSoundVolume = .8f;
+        [Tooltip("#540 못 쓴 판의 구슬이 하나씩 차례로 3초 동안 타오를 때, 구슬마다 불이 붙는 순간 나는 타는 소리 폴더 (3초). 비우면 없음.")]
+        [SerializeField] private string orbBurnSoundFolder = "JigwiOrbBurn";
+        [SerializeField, Range(0f, 1f)] private float orbBurnSoundVolume = .8f;
+        [Tooltip("#540 못 쓰고 끝나 불덩이가 떨어질 때 지귀 울부짖음 폴더. 비우면 없음.")]
+        [SerializeField] private string failWailFolder = "JigwiWailAFail";
+        [SerializeField, Range(0f, 1f)] private float failWailVolume = .9f;
         [SerializeField, Range(0f, 1f)] private float spreadSoundVolume = 1f;
         [Tooltip("#540 부적 구슬이 판에 닿을 때 \"퐁\" 소리 폴더. 비우면 없음.")]
         [SerializeField] private string landSoundFolder = "JigwiTalismanLand";
@@ -410,7 +413,7 @@ namespace C6Lab
             bool paused = snapshot == null || snapshot.paused || source.GameStartHeld || source.BattlePresentationHeld;
             DriveFireball(snapshot);
             DriveBubble(snapshot);
-            CueBurnOuts(snapshot);
+            CueOrbBurns(snapshot);
             UpdateFireLoop(!paused, Time.unscaledDeltaTime);
             UpdateCrackle(CrackleTarget(paused), Time.unscaledDeltaTime);
             Camera boardView = source.board != null ? source.board.ViewCamera : null;
@@ -743,33 +746,28 @@ namespace C6Lab
         }
 
         private float alarmPhase;
-        private readonly Dictionary<string, double> burnOuts = new Dictionary<string, double>(StringComparer.Ordinal);
-        private readonly List<string> burnOutsDue = new List<string>();
-        private float lastBurnOutCue = -1f;
+        private readonly HashSet<string> orbBurnsCued = new HashSet<string>(StringComparer.Ordinal);
 
         /// <summary>
-        /// #540: 못 쓴 판의 구슬이 타 없어지는 순간(Host 소각 시각)마다 "퍽" 소리를 하나씩 낸다. 너무 붙으면 0.04초씩 띄운다.
+        /// #540: 못 쓴 판의 구슬은 하나씩 차례로 3초 동안 타오른다. 구슬마다 불이 붙는 순간 3초짜리 타는 소리를 한 번 낸다.
+        /// 차례 중간에 끼어든 구슬(합쳐져 새로 생긴 구슬 등)은 소리 없이 탄다.
         /// </summary>
-        private void CueBurnOuts(LabSnapshot snapshot)
+        private void CueOrbBurns(LabSnapshot snapshot)
         {
             if (source == null || snapshot == null) return;
             double now = source.JigwiABPresentationTime;
+            const float lateSeconds = .5f;
             foreach (LabOrbState orb in snapshot.orbs ?? Array.Empty<LabOrbState>())
-                if (orb != null && orb.owner == source.LocalPlayerId && !orb.inFlight && !burnOuts.ContainsKey(orb.id)
-                    && LabJigwiScreenPresentation.FailBlazeSecondsLeft(snapshot, orb, now) > 0f)
-                    burnOuts[orb.id] = orb.jigwiABBurnAt;
-            if (burnOuts.Count == 0) return;
-            burnOutsDue.Clear();
-            foreach (var pair in burnOuts) if (now >= pair.Value) burnOutsDue.Add(pair.Key);
-            foreach (string id in burnOutsDue)
             {
-                if (Time.unscaledTime - lastBurnOutCue < .04f) break;
-                burnOuts.Remove(id);
-                lastBurnOutCue = Time.unscaledTime;
-                Cue("BurnOut", burnOutSoundFolder, burnOutSoundVolume);
+                if (orb == null || orb.owner != source.LocalPlayerId || orb.inFlight || orbBurnsCued.Contains(orb.id)) continue;
+                float left = LabJigwiScreenPresentation.FailBlazeSecondsLeft(snapshot, orb, now);
+                if (left <= 0f) continue;
+                orbBurnsCued.Add(orb.id);
+                if (left >= (float)LabModel.JigwiTalismanFailBlazeSeconds - lateSeconds)
+                    Cue("OrbBurn", orbBurnSoundFolder, orbBurnSoundVolume);
             }
             // Forget old ones (a new round, or a stalled clock).
-            if (burnOuts.Count > 64) burnOuts.Clear();
+            if (orbBurnsCued.Count > 64) orbBurnsCued.Clear();
         }
 
         /// <summary>
@@ -1596,6 +1594,7 @@ namespace C6Lab
                 else if (phase == LabJigwiFireball.Phase.Fall)
                 {
                     Cue("Fall", fallSoundFolder, fallSoundVolume);
+                    Cue("Wail", failWailFolder, failWailVolume);
                     PlayVoice("AFail", failVoiceFolder);
                     LabHaptics.PlayDirect(Config, LabHapticStyle.Heavy, .9f);
                     spreadAt = Time.unscaledTime + (1f - progress) * LabJigwiFireball.FallSeconds;
