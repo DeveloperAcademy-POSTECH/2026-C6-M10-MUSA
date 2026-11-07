@@ -20,7 +20,7 @@ namespace C6Lab
         private int jigwiSchedule;
         private double jigwiCommonStart = 40d, jigwiCommonInterval = 15d;
         /// <summary>#540: after the fireball lands, an unfinished talisman's orbs burn one at a time; each one blazes this long, then burns away.</summary>
-        public const double JigwiTalismanFailBlazeSeconds = 2.5d;
+        public const double JigwiTalismanFailBlazeSeconds = 1d;
         /// <summary>#540: the next orb catches fire as the previous one burns away (one at a time, easy to follow).</summary>
         public const double JigwiTalismanFailBurnStepSeconds = JigwiTalismanFailBlazeSeconds;
         /// <summary>#540: the fireball falls onto a failed seat's board this long after the A ends.</summary>

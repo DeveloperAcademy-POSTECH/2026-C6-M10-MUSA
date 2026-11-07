@@ -180,7 +180,7 @@ namespace C6Lab
         [SerializeField, Range(0f, 1f)] private float alarmSoundVolume = .7f;
         [Tooltip("#540 붉은 경보가 번쩍일 때마다 오는 진동 세기 (끝이 다가올수록 이 값까지 세짐). 0이면 끔. 붓 쓰는 진동(Light)과 구분되게 Rigid로 툭.")]
         [SerializeField, Range(0f, 1f)] private float alarmHapticIntensity = .6f;
-        [Tooltip("#540 못 쓴 판의 구슬이 하나씩 차례로 2.5초 동안 재가 되어 사라질 때, 구슬마다 타기 시작하는 순간 나는 타는 소리 폴더 (2.5초). 비우면 없음.")]
+        [Tooltip("#540 못 쓴 판의 구슬이 하나씩 차례로 1초 동안 재가 되어 사라질 때, 구슬마다 타기 시작하는 순간 나는 타는 소리 폴더 (1초). 비우면 없음.")]
         [SerializeField] private string orbBurnSoundFolder = "JigwiOrbBurn";
         [SerializeField, Range(0f, 1f)] private float orbBurnSoundVolume = 1f;
         [SerializeField, Range(0f, 1f)] private float spreadSoundVolume = 1f;
@@ -749,7 +749,7 @@ namespace C6Lab
         private readonly HashSet<string> orbBurnsCued = new HashSet<string>(StringComparer.Ordinal);
 
         /// <summary>
-        /// #540: 못 쓴 판의 구슬은 하나씩 차례로 2.5초 동안 재가 되어 사라진다. 구슬마다 타기 시작하는 순간 2.5초짜리 타는 소리를 한 번 낸다.
+        /// #540: 못 쓴 판의 구슬은 하나씩 차례로 1초 동안 재가 되어 사라진다. 구슬마다 타기 시작하는 순간 1초짜리 타는 소리를 한 번 낸다.
         /// 차례 중간에 끼어든 구슬(합쳐져 새로 생긴 구슬 등)은 소리 없이 탄다.
         /// </summary>
         private void CueOrbBurns(LabSnapshot snapshot)

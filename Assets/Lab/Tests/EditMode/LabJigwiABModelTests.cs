@@ -220,7 +220,7 @@ namespace C6Lab.Tests
             Assert.That(round.resolution,Is.EqualTo(LabJigwiABResolution.Expired));
             Assert.That(LabJigwiABNetworkValidation.Valid(done.jigwiAB,done.players,m.Revision),Is.True);
             Assert.That(m.Snapshot(22).orbs.Single(o=>o.id==theirs.id).jigwiABBurnAt,Is.EqualTo(-1),"The finished board keeps its orbs.");
-            // #540: after Jigwi's line the orbs burn one at a time, 2.5 s each.
+            // #540: after Jigwi's line the orbs burn one at a time, 1 s each.
             double gone=20+LabModel.JigwiTalismanFailFirstBurnSeconds+2*LabModel.JigwiTalismanFailBlazeSeconds+.01;
             var later=m.Snapshot(gone);
             Assert.That(later.orbs.Any(o=>o.id==mine.id||o.id==mine2.id),Is.False,"The unfinished board's orbs burned.");
@@ -237,7 +237,7 @@ namespace C6Lab.Tests
             Assert.That(m.TryGenerate(Players[0],Request(),19,out var fresh,out var e),Is.True,e);
             Assert.That(m.Snapshot(19.5).orbs.Single(o=>o.id==fresh.id).jigwiABBurnAt,Is.EqualTo(-1),"A new orb is safe too.");
             Assert.That(m.Snapshot(20).jigwiAB.rounds.Single(r=>r.id==a.id).resolution,Is.EqualTo(LabJigwiABResolution.Expired));
-            // #540: once Jigwi's "모두 재가 되어라!" is over, the orbs burn one at a time (oldest first), 2.5 s each.
+            // #540: once Jigwi's "모두 재가 되어라!" is over, the orbs burn one at a time (oldest first), 1 s each.
             double landed=20+LabModel.JigwiTalismanFailFirstBurnSeconds, blaze=LabModel.JigwiTalismanFailBlazeSeconds;
             Assert.That(m.Snapshot(landed-.01).orbs.Count(o=>o.id==mine.id||o.id==fresh.id),Is.EqualTo(2),"Nothing burns while Jigwi speaks.");
             Assert.That(m.Snapshot(landed+blaze-.01).orbs.Count(o=>o.id==mine.id||o.id==fresh.id),Is.EqualTo(2),"The first orb is still blazing…");
