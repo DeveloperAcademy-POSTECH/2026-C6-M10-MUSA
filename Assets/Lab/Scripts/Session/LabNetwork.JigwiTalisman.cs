@@ -3,8 +3,8 @@ using UnityEngine;
 namespace C6Lab
 {
     /// <summary>
-    /// #540 부적 구슬(물) 3갈래 발사. 던지면 가운데 구슬 양옆으로 물구슬 둘이 같이 날아가고(모든 기기가 같은 자리·속도로
-    /// 그린다), Host에서는 셋 모두 진짜 투사체라 각각 박에 맞으면 각각 칠한다. 옆 물구슬은 피해·다른 보상이 없다.
+    /// #540 부적 구슬(물) 발사: 구슬 하나가 넓은 파도를 타고 간다. 파도 폭 안에는 보이지 않는 옆 갈래 둘이 함께 날아가
+    /// (모든 기기가 같은 자리·속도로 계산) Host에서는 셋 모두 진짜 투사체라 각각 박에 맞으면 각각 칠한다. 옆 갈래는 피해·다른 보상이 없다.
     /// </summary>
     public sealed partial class LabNetwork
     {
@@ -18,22 +18,20 @@ namespace C6Lab
             if (main == null || config == null || target == null || string.IsNullOrEmpty(orbId)) return;
             float radius = config.ThrowRadius * Mathf.Max(.1f, sizeScale);
             LabJigwiWaterVolley.Launch(position, velocity, radius, main.gameObject.layer);
-            LabJigwiWaterVolley.Follow(main, radius);
+            LabJigwiWaveRide.Follow(main.transform, radius, velocity, main.gameObject.layer); // the orb rides a wave
             for (int k = 1; k < LabModel.JigwiTalismanVolleyCount; k++)
             {
                 string id = LabModel.JigwiTalismanShardId(orbId, k);
                 Vector3 at = LabJigwiWaterVolley.ShardPosition(position, velocity, k, radius);
                 Vector3 shardVelocity = LabJigwiWaterVolley.ShardVelocity(velocity, k);
                 LabProjectile shard = LabProjectile.Create(at, config, projectileRoot, element, 1f);
-                LabFiveColorSparkle.AttachArt(shard.transform, config.OrbRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined)
-                    * LabJigwiWaterVolley.SizeScale, true, LabFiveColorSparkle.BlueTones);
                 shard.name = "Projectile " + id;
                 shard.SetRadiusScale(sizeScale);
                 shard.SetMissSurface(battleFloor);
                 shard.SetFireSurfaces(JigwiFireSurfacesFor(owner));
                 if (authoritative) shard.Launch(id, owner, shardVelocity, config, target, OnProjectileResolved);
                 else shard.LaunchVisual(shardVelocity, config, target);
-                LabJigwiWaterVolley.Follow(shard, radius);
+                shard.gameObject.AddComponent<LabJigwiHiddenShard>(); // only the wave shows where it flies
             }
         }
 

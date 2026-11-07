@@ -7,7 +7,7 @@ namespace C6Lab
     /// <summary>#540: 물 연출 알갱이(물방울·소용돌이·물안개·물결 고리·번쩍임)를 한곳에서 움직이고 그리는 카메라 쪽으로 세운다.</summary>
     public sealed class LabJigwiWaterFx : MonoBehaviour
     {
-        private enum Kind { Drop, Swirl, Mist, Ring, Flash }
+        private enum Kind { Drop, Swirl, Mist, Ring, Flash, Steam }
 
         private sealed class Bit
         {
@@ -15,6 +15,7 @@ namespace C6Lab
             public Kind Kind;
             public Vector3 Position, Velocity, Center;
             public float Age, Life, Size, EndSize, Delay, Angle, Spin, Lift, Radial;
+            public Color Tint;
         }
 
         private const int Capacity = 600;
@@ -38,8 +39,16 @@ namespace C6Lab
             return fx;
         }
 
-        private void OnEnable() => RenderPipelineManager.beginCameraRendering += Face;
-        private void OnDisable() => RenderPipelineManager.beginCameraRendering -= Face;
+        private void OnEnable()
+        {
+            RenderPipelineManager.beginCameraRendering += Face;
+            RenderPipelineManager.endCameraRendering += Unshake;
+        }
+        private void OnDisable()
+        {
+            RenderPipelineManager.beginCameraRendering -= Face;
+            RenderPipelineManager.endCameraRendering -= Unshake;
+        }
         private void OnDestroy() { foreach (var pair in new List<KeyValuePair<int, LabJigwiWaterFx>>(byLayer)) if (pair.Value == this) byLayer.Remove(pair.Key); }
 
         public void Drop(Vector3 at, Vector3 velocity, float size, float life)
@@ -68,10 +77,32 @@ namespace C6Lab
             bit.Position = at; bit.Size = size; bit.EndSize = endSize; bit.Life = life; bit.Delay = delay;
         }
 
-        public void Flash(Vector3 at, float size, float life)
+        public void Flash(Vector3 at, float size, float life) => Flash(at, size, life, new Color(.95f, 1f, 1f, .9f));
+
+        /// <summary>A bright burst that quickly fades; a huge one washes over the whole view (screen flash).</summary>
+        public void Flash(Vector3 at, float size, float life, Color tint)
         {
-            Bit bit = Take(Kind.Flash, MistSprite(), 22); if (bit == null) return;
-            bit.Position = at; bit.Size = size * .6f; bit.EndSize = size; bit.Life = life;
+            Bit bit = Take(Kind.Flash, MistSprite(), 23); if (bit == null) return;
+            bit.Position = at; bit.Size = size * .6f; bit.EndSize = size; bit.Life = life; bit.Tint = tint;
+        }
+
+        /// <summary>#540: a thick white puff of steam that rises, swells and slowly thins (fire put out by water).</summary>
+        public void Steam(Vector3 at, Vector3 velocity, float size, float endSize, float life, float delay)
+        {
+            Bit bit = Take(Kind.Steam, MistSprite(), 20); if (bit == null) return;
+            bit.Position = at; bit.Velocity = velocity; bit.Size = size; bit.EndSize = endSize; bit.Life = life; bit.Delay = delay;
+        }
+
+        // #540: a short camera shake on every perspective camera, applied only while it renders (no rig is moved).
+        private static float shakeUntil, shakeStrength, shakeSeconds;
+        private static readonly Dictionary<Camera, Vector3> shaken = new Dictionary<Camera, Vector3>();
+
+        /// <summary>Shakes the 3D view for seconds, by strength world units at the start, easing out.</summary>
+        public static void Shake(float strength, float seconds)
+        {
+            shakeStrength = Mathf.Max(shakeStrength * Mathf.Clamp01((shakeUntil - Time.unscaledTime) / Mathf.Max(.01f, shakeSeconds)), strength);
+            shakeSeconds = Mathf.Max(.01f, seconds);
+            shakeUntil = Time.unscaledTime + shakeSeconds;
         }
 
         private Bit Take(Kind kind, Sprite sprite, int order)
@@ -142,8 +173,14 @@ namespace C6Lab
                         size = Mathf.Lerp(bit.Size, bit.EndSize, 1f - (1f - t) * (1f - t));
                         color = new Color(.7f, .93f, 1f, .9f * (1f - t));
                         break;
+                    case Kind.Steam:
+                        bit.Velocity *= Mathf.Exp(-1.4f * dt);
+                        bit.Position += bit.Velocity * dt;
+                        size = Mathf.Lerp(bit.Size, bit.EndSize, 1f - (1f - t) * (1f - t));
+                        color = new Color(1f, 1f, 1f, .8f * Mathf.Clamp01(t * 5f) * (1f - t) * (1f - t * .3f));
+                        break;
                     default:
-                        color = new Color(.95f, 1f, 1f, .9f * (1f - t));
+                        color = bit.Tint; color.a *= 1f - t;
                         break;
                 }
                 bit.Renderer.transform.position = bit.Position;
@@ -156,8 +193,23 @@ namespace C6Lab
         private void Face(ScriptableRenderContext context, Camera view)
         {
             if (this == null || view == null) return;
+            if (!view.orthographic && Time.unscaledTime < shakeUntil && !shaken.ContainsKey(view))
+            {
+                float left = (shakeUntil - Time.unscaledTime) / shakeSeconds;
+                float amount = shakeStrength * left * left;
+                float time = Time.unscaledTime * 38f;
+                Vector3 offset = view.transform.right * (Mathf.PerlinNoise(time, .3f) - .5f) * 2f * amount
+                    + view.transform.up * (Mathf.PerlinNoise(.7f, time) - .5f) * 2f * amount;
+                shaken[view] = view.transform.position;
+                view.transform.position += offset;
+            }
             Quaternion facing = view.transform.rotation;
             for (int i = 0; i < live.Count; i++) if (live[i].Renderer != null) live[i].Renderer.transform.rotation = facing;
+        }
+
+        private void Unshake(ScriptableRenderContext context, Camera view)
+        {
+            if (view != null && shaken.TryGetValue(view, out Vector3 home)) { view.transform.position = home; shaken.Remove(view); }
         }
 
         private static Sprite DropSprite() => dropSprite != null ? dropSprite : dropSprite = Make("Jigwi water drop", 48, (x, y) =>

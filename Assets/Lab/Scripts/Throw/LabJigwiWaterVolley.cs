@@ -84,6 +84,14 @@ namespace C6Lab
                     Random.Range(.5f, .85f));
             }
             for (int i = 0; i < 3; i++) fx.Ring(point + n * r * .2f, r * 1.5f, r * (7f + i * 3f), .4f + i * .1f, i * .06f);
+            // #540: the fire spirit is doused — thick white steam boils up from where it hit, the view shakes and
+            // flashes pale blue.
+            for (int i = 0; i < 16; i++)
+                fx.Steam(point + n * r * .6f + Random.insideUnitSphere * r,
+                    Vector3.up * r * Random.Range(4f, 8f) + n * r * Random.Range(1f, 3f) + Random.insideUnitSphere * r * 1.5f,
+                    r * Random.Range(1.5f, 2.5f), r * Random.Range(7f, 12f), Random.Range(1.3f, 2.1f), i * .03f);
+            fx.Flash(point, r * 70f, .3f, new Color(.55f, .85f, 1f, .5f));
+            LabJigwiWaterFx.Shake(r * .9f, .35f);
             for (int i = 0; i < 9; i++)
                 fx.Mist(point + n * r * .5f + Random.insideUnitSphere * r * 1.2f,
                     (n + Random.insideUnitSphere * .6f).normalized * r * Random.Range(2f, 5f) + Vector3.up * r * 1.5f,

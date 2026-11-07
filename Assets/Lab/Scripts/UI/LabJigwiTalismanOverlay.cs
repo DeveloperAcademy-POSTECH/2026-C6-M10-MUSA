@@ -173,11 +173,20 @@ namespace C6Lab
         [SerializeField, Range(0f, 1f)] private float fallSoundVolume = .9f;
         [Tooltip("#540 못 쓰고 끝나 불덩이가 떨어질 때 지귀 목소리(\"모두 재가 되어라!\") 폴더. 비우면 없음.")]
         [SerializeField] private string failVoiceFolder = "JigwiVoiceAFail";
-        [Tooltip("#540 부적 구슬이 박에 맞을 때 지귀가 울부짖는 \"너무 차가워..!\" 폴더 (모든 기기). 한 번 던진 3갈래가 연달아 맞아도 한 번만. 비우면 없음.")]
-        [SerializeField] private string coldVoiceFolder = "JigwiVoiceCold";
-        [SerializeField, Range(0f, 1f)] private float coldVoiceVolume = 1f;
-        [Tooltip("#540 \"너무 차가워\"가 다시 나오기까지 최소 간격(초). 3갈래 명중이 겹쳐 여러 번 나지 않게.")]
-        [SerializeField, Range(.5f, 5f)] private float coldVoiceGapSeconds = 2f;
+        [Tooltip("#540 부적 구슬이 박(불귀신 지귀)에 맞을 때 물에 불이 꺼지는 \"치이익\" 소리 폴더 (모든 기기). 한 번 던진 3갈래가 연달아 맞아도 한 번만. 비우면 없음.")]
+        [SerializeField] private string douseSoundFolder = "JigwiFireDouse";
+        [SerializeField, Range(0f, 1f)] private float douseSoundVolume = .9f;
+        [Tooltip("#540 불 꺼지는 소리가 다시 나기까지 최소 간격(초). 3갈래 명중이 겹쳐 여러 번 나지 않게.")]
+        [SerializeField, Range(.5f, 5f)] private float douseGapSeconds = 1.5f;
+        [Tooltip("#540 내 부적 구슬이 박에 맞을 때 내 폰 진동 세기(던진 사람만). 0이면 끔.")]
+        [SerializeField, Range(0f, 1f)] private float talismanHitHapticIntensity = 1f;
+        [Tooltip("#540 부적 구슬 명중 진동이 이어지는 시간(초).")]
+        [SerializeField, Range(0f, 1.5f)] private float talismanHitHapticSeconds = .45f;
+        [Tooltip("#540 부적을 다 쓴 순간 불이 꺼지며 숨 돌리는 \"안도\" 소리 폴더 (김 빠지는 소리 + 따뜻한 화음). 비우면 없음.")]
+        [SerializeField] private string reliefSoundFolder = "JigwiTalismanRelief";
+        [SerializeField, Range(0f, 1f)] private float reliefSoundVolume = .7f;
+        [Tooltip("#540 부적을 다 썼을 때 불덩이 반복 소리·타닥 소리가 잦아드는 시간(초). 뚝 끊겨 소리가 비어 보이지 않게.")]
+        [SerializeField, Range(.1f, 3f)] private float finishFadeSeconds = 1.2f;
         [Tooltip("#540 불덩이가 조합판에 닿아 불이 확 번질 때 소리 폴더. 비우면 없음.")]
         [SerializeField] private string spreadSoundFolder = "JigwiFireSpread";
         [Tooltip("#540 부적을 쓰는 동안 공격 영역 붉은 경보가 번쩍일 때마다 나는 경보음 폴더. 끝이 다가올수록 빨라지고 커진다. 비우면 없음.")]
@@ -236,6 +245,18 @@ namespace C6Lab
         private float sentAt;
         private readonly LabJigwiTalismanStroke stroke = new LabJigwiTalismanStroke(LabJigwiTalismanStroke.Water, LabJigwiTalismanStroke.WaterStrokes);
         private UnityEngine.UI.Image nextMarker;
+        // #540 stroke guide: the stroke to write now glows inside the letter, and an arrow runs along it in writing order.
+        private UnityEngine.UI.Image[] guideDots = Array.Empty<UnityEngine.UI.Image>();
+        private UnityEngine.UI.Image strokeArrow;
+        private static Sprite arrowSprite;
+        [Tooltip("#540 획 안내: 지금 써야 할 획이 글자 안에서 빛나는 색.")]
+        [SerializeField] private Color strokeGuideColor = new Color(1f, .93f, .6f, .75f);
+        [Tooltip("#540 획 안내: 지금 획을 따라 움직이는 화살표 색.")]
+        [SerializeField] private Color strokeArrowColor = new Color(.16f, .47f, .93f, 1f);
+        /// <summary>#540 테스트용: 지금 안내 중인 획 번호 (안내가 없으면 -1).</summary>
+        public int GuidedStroke { get; private set; } = -1;
+        /// <summary>#540 테스트용: 획 안내로 빛나는 점 수.</summary>
+        public int GuideDotsShown { get; private set; }
         private UnityEngine.UI.Image[] burstRings = Array.Empty<UnityEngine.UI.Image>();
         private static Sprite ringSprite;
         /// <summary>#533: 점마다 획 순서상 위치 (0~1). 완성 때 금빛이 이 순서로 훑는다.</summary>
@@ -492,31 +513,39 @@ namespace C6Lab
             }
         }
 
-        /// <summary>#540 테스트용: "너무 차가워"가 난 횟수.</summary>
-        public int ColdVoiceCount { get; private set; }
-        private float lastColdVoice = float.NegativeInfinity;
-        private AudioSource coldVoice;
+        /// <summary>#540 테스트용: 불 꺼지는 소리가 난 횟수.</summary>
+        public int DouseCount { get; private set; }
+        /// <summary>#540 테스트용: 내 부적 구슬 명중 진동 횟수.</summary>
+        public int TalismanHitHapticCount { get; private set; }
+        private float lastDouse = float.NegativeInfinity;
+        private AudioSource douse;
 
         /// <summary>
-        /// #540: 부적 구슬(3갈래 중 어느 것이든)이 박에 맞으면 지귀가 "너무 차가워..!" 하고 울부짖는다. 한 번 던진 세 갈래가
-        /// 연달아 맞아도 coldVoiceGapSeconds 안에는 한 번만. 예고 대사를 끊지 않게 따로 낸다.
+        /// #540: 부적 구슬(3갈래 중 어느 것이든)이 박에 맞으면 불귀신 지귀의 불이 물에 꺼지는 "치이익" 소리가 난다. 한 번 던진
+        /// 세 갈래가 연달아 맞아도 douseGapSeconds 안에는 한 번만. 대사를 끊지 않게 따로 낸다.
         /// </summary>
         public void OnTalismanHit(ulong owner)
         {
-            if (Time.unscaledTime - lastColdVoice < coldVoiceGapSeconds) return;
-            lastColdVoice = Time.unscaledTime;
-            ColdVoiceCount++;
-            if (string.IsNullOrEmpty(coldVoiceFolder) || coldVoiceVolume <= 0f) return;
-            AudioClip[] clips = Resources.LoadAll<AudioClip>("Audio/" + coldVoiceFolder);
-            if (clips == null || clips.Length == 0) return;
-            if (coldVoice == null)
+            if (Time.unscaledTime - lastDouse < douseGapSeconds) return;
+            lastDouse = Time.unscaledTime;
+            DouseCount++;
+            // #540: the thrower feels their talisman orb crash into Jigwi — a strong, long thump.
+            if (source != null && owner == source.LocalPlayerId && talismanHitHapticIntensity > 0f)
             {
-                coldVoice = gameObject.AddComponent<AudioSource>();
-                coldVoice.playOnAwake = false; coldVoice.spatialBlend = 0f;
+                TalismanHitHapticCount++;
+                LabHaptics.PlayDirect(Config, LabHapticStyle.Heavy, 1f, talismanHitHapticSeconds, talismanHitHapticIntensity, .7f);
             }
-            coldVoice.clip = clips[UnityEngine.Random.Range(0, clips.Length)];
-            coldVoice.volume = coldVoiceVolume * LabAudioSettings.SfxVolume;
-            coldVoice.Play();
+            if (string.IsNullOrEmpty(douseSoundFolder) || douseSoundVolume <= 0f) return;
+            AudioClip[] clips = Resources.LoadAll<AudioClip>("Audio/" + douseSoundFolder);
+            if (clips == null || clips.Length == 0) return;
+            if (douse == null)
+            {
+                douse = gameObject.AddComponent<AudioSource>();
+                douse.playOnAwake = false; douse.spatialBlend = 0f;
+            }
+            douse.clip = clips[UnityEngine.Random.Range(0, clips.Length)];
+            douse.volume = douseSoundVolume * LabAudioSettings.SfxVolume;
+            douse.Play();
         }
 
         private void PlayVoice(string name, string folder)
@@ -686,7 +715,8 @@ namespace C6Lab
         private void UpdateFireLoop(bool running, float dt)
         {
             FireLoopTarget = running ? FireballLoudness(fireballSeen, fireballProgress, fireLoopVolume, fireLoopWarnVolume) : 0f;
-            float step = dt / Mathf.Max(.01f, fireLoopFadeSeconds);
+            // #540: when the talisman is finished the hum dies away slowly (with the relief sound), not cut dead.
+            float step = dt / Mathf.Max(.01f, Finishing ? finishFadeSeconds : fireLoopFadeSeconds);
             fireLoopLevel = Mathf.MoveTowards(fireLoopLevel, FireLoopTarget, step);
             if (fireLoopLevel <= 0f)
             {
@@ -712,7 +742,7 @@ namespace C6Lab
         /// <summary>#540: 타들어 가는 동안 타닥타닥 소리. 타들어 갈수록 커지고, 다 타서 재가 되면 잦아든다.</summary>
         private void UpdateCrackle(float target, float dt)
         {
-            crackleLevel = Mathf.MoveTowards(crackleLevel, target, dt / .2f);
+            crackleLevel = Mathf.MoveTowards(crackleLevel, target, dt / (Finishing ? Mathf.Max(.2f, finishFadeSeconds) : .2f));
             if (crackleLevel <= 0f)
             {
                 if (crackle != null && crackle.isPlaying) crackle.Stop();
@@ -920,6 +950,7 @@ namespace C6Lab
             paper.gameObject.SetActive(true);
             if (hint != null) hint.gameObject.SetActive(false);
             if (nextMarker != null) nextMarker.gameObject.SetActive(false);
+            HideStrokeGuide();
             LastCue = "Burn"; CueCount++;
             BeginFlyEmbers();
             burnStartFront = Mathf.Clamp01(BurnFront);
@@ -1060,13 +1091,100 @@ namespace C6Lab
             int next = stroke.NextPoint;
             bool show = Visible && next >= 0;
             if (nextMarker.gameObject.activeSelf != show) nextMarker.gameObject.SetActive(show);
-            if (!show) return;
+            if (!show) { HideStrokeGuide(); return; }
             RectTransform m = nextMarker.rectTransform;
             m.anchorMin = m.anchorMax = stroke.Samples[next];
             m.anchoredPosition = Vector2.zero;
             float pulse = .5f + .5f * Mathf.Sin(time * 6f);
             m.localScale = Vector3.one * (.75f + .35f * pulse);
             Color c = nextMarkerColor; c.a *= .45f + .55f * pulse; nextMarker.color = c;
+            DrawStrokeGuide(time);
+        }
+
+        /// <summary>
+        /// #540 획 순서 안내: 지금 써야 할 획만 글자 안에서 은은하게 빛나고(나머지 획은 흐린 글자 그대로), 화살표가 그 획의
+        /// 아직 안 쓴 첫 점에서 끝까지 쓰는 방향으로 되풀이해 달린다. 한 획을 쓰면 다음 획으로 넘어간다.
+        /// </summary>
+        private void DrawStrokeGuide(float time)
+        {
+            int next = stroke.NextPoint;
+            if (!Visible || next < 0) { HideStrokeGuide(); return; }
+            int current = stroke.StrokeOf(next);
+            GuidedStroke = current;
+            float glow = .6f + .4f * Mathf.Sin(time * 4f);
+            int shown = 0;
+            for (int i = 0; i < guideDots.Length; i++)
+            {
+                if (guideDots[i] == null) continue;
+                bool on = stroke.StrokeOf(i) == current && !stroke.IsCovered(i);
+                if (guideDots[i].gameObject.activeSelf != on) guideDots[i].gameObject.SetActive(on);
+                if (!on) continue;
+                shown++;
+                Color c = strokeGuideColor; c.a *= glow; guideDots[i].color = c;
+            }
+            GuideDotsShown = shown;
+            if (strokeArrow == null) return;
+            // The path: this stroke's points from the first unwritten one to its end, in writing order.
+            int[] points = stroke.StrokePoints(current);
+            int from = Array.IndexOf(points, next);
+            if (from < 0) from = 0;
+            float length = 0f;
+            for (int k = from + 1; k < points.Length; k++) length += Vector2.Distance(stroke.Samples[points[k - 1]], stroke.Samples[points[k]]);
+            if (length < .0001f) { if (strokeArrow.gameObject.activeSelf) strokeArrow.gameObject.SetActive(false); return; }
+            if (!strokeArrow.gameObject.activeSelf) strokeArrow.gameObject.SetActive(true);
+            float cycle = .5f + length * 2.2f; // seconds per run: steady speed along the letter
+            float u = Mathf.Repeat(time, cycle + .25f) / cycle; // a short pause at the end before running again
+            float travel = Mathf.Clamp01(u) * length;
+            Vector2 at = stroke.Samples[points[from]], direction = Vector2.right;
+            for (int k = from + 1; k < points.Length; k++)
+            {
+                Vector2 a = stroke.Samples[points[k - 1]], b = stroke.Samples[points[k]];
+                float piece = Vector2.Distance(a, b);
+                if (piece <= .0001f) continue;
+                direction = (b - a) / piece;
+                if (travel <= piece) { at = a + direction * travel; break; }
+                travel -= piece; at = b;
+            }
+            RectTransform r = strokeArrow.rectTransform;
+            r.anchorMin = r.anchorMax = at;
+            r.anchoredPosition = Vector2.zero;
+            r.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg);
+            Color arrow = strokeArrowColor;
+            arrow.a *= Mathf.Clamp01(Mathf.Min(u * 6f, (1f - Mathf.Clamp01(u)) * 6f) + (u > 1f ? 0f : .15f));
+            strokeArrow.color = arrow;
+        }
+
+        private void HideStrokeGuide()
+        {
+            GuidedStroke = -1; GuideDotsShown = 0;
+            foreach (UnityEngine.UI.Image guide in guideDots) if (guide != null && guide.gameObject.activeSelf) guide.gameObject.SetActive(false);
+            if (strokeArrow != null && strokeArrow.gameObject.activeSelf) strokeArrow.gameObject.SetActive(false);
+        }
+
+        /// <summary>#540: 오른쪽을 가리키는 둥근 화살촉 (런타임에 한 번 만든다).</summary>
+        private static Sprite ArrowSprite()
+        {
+            if (arrowSprite != null) return arrowSprite;
+            const int size = 64;
+            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
+            { name = "Talisman Stroke Arrow (#540 runtime)", hideFlags = HideFlags.DontSave, wrapMode = TextureWrapMode.Clamp };
+            var pixels = new Color[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float u = (x + .5f) / size, v = (y + .5f) / size - .5f;
+                    // A chevron head pointing +x: inside the triangle (.15,±.42) → (.9,0), with a notch cut from the back.
+                    float half = .42f * Mathf.Clamp01((.9f - u) / .75f);
+                    float notch = .42f * Mathf.Clamp01((.45f - u) / .3f);
+                    float cut = notch > 0f ? Mathf.Abs(v) - notch : 1f;
+                    float inside = Mathf.Min(Mathf.Min(half - Mathf.Abs(v), cut), u - .1f);
+                    float edge = Mathf.Clamp01(inside * size * .8f);
+                    pixels[y * size + x] = new Color(1f, 1f, 1f, u > .9f ? 0f : edge);
+                }
+            texture.SetPixels(pixels); texture.Apply(false, true);
+            arrowSprite = Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(.5f, .5f), size);
+            arrowSprite.name = texture.name; arrowSprite.hideFlags = HideFlags.DontSave;
+            return arrowSprite;
         }
 
         private void BuildStrokeRank()
@@ -1250,6 +1368,7 @@ namespace C6Lab
             paper.gameObject.SetActive(true);
             if (hint != null) hint.gameObject.SetActive(false);
             if (nextMarker != null) nextMarker.gameObject.SetActive(false);
+            HideStrokeGuide();
             if (stampRoot != null) stampRoot.gameObject.SetActive(false);
             // #540: the fire stops dead — the flames and sparks freeze right where they are, then quietly fade
             // with the scorch (no steam).
@@ -1257,6 +1376,8 @@ namespace C6Lab
             extinguishFrom = BurnFront;
             burstPlayed = false; notesPlayed = 0; sweepCued = false; landed = false;
             foldLingerUntil = -1f; rewardOrbsBefore = RewardOrbCount(source != null ? source.Snapshot : null);
+            // #540: the alarm stops and the fire hum fades out; a steam sigh and a warm chord fill the gap (relief).
+            Cue("Relief", reliefSoundFolder, reliefSoundVolume);
             DrawFinish();
         }
 
@@ -1801,6 +1922,7 @@ namespace C6Lab
             glyphArea.sizeDelta = new Vector2(side, side);
             float dot = Mathf.Max(4f, side * (InkMode ? brushWidth : strokeWidth));
             if (nextMarker != null) nextMarker.rectTransform.sizeDelta = Vector2.one * Mathf.Max(6f, side * .07f);
+            if (strokeArrow != null) strokeArrow.rectTransform.sizeDelta = Vector2.one * Mathf.Max(10f, side * .11f);
             float seal = Mathf.Max(8f, size.x * stampSize);
             if (stampRoot != null)
             {
@@ -1825,6 +1947,8 @@ namespace C6Lab
             if (InkMode && FitGhost(side, dot)) return;
             for (int i = 0; i < dots.Length; i++)
                 if (dots[i] != null) dots[i].rectTransform.sizeDelta = new Vector2(dot, dot);
+            for (int i = 0; i < guideDots.Length; i++)
+                if (guideDots[i] != null) guideDots[i].rectTransform.sizeDelta = new Vector2(dot, dot) * 1.15f;
         }
 
         /// <summary>
@@ -1866,6 +1990,12 @@ namespace C6Lab
                 d.anchorMin = d.anchorMax = new Vector2(.5f, .5f);
                 d.anchoredPosition = new Vector2((at.x - offset.x) / scale.x, (at.y - offset.y) / scale.y);
                 d.sizeDelta = new Vector2(dot / scale.x, dot / scale.y);
+                if (i < guideDots.Length && guideDots[i] != null)
+                {
+                    RectTransform h = guideDots[i].rectTransform;
+                    h.anchorMin = h.anchorMax = d.anchorMin; h.anchoredPosition = d.anchoredPosition;
+                    h.sizeDelta = d.sizeDelta * 1.15f;
+                }
             }
             return true;
         }
@@ -1918,6 +2048,16 @@ namespace C6Lab
                 ghost.gameObject.AddComponent<UnityEngine.UI.Mask>().showMaskGraphic = true;
                 dotParent = ghost.rectTransform;
             }
+            guideDots = new UnityEngine.UI.Image[stroke.Samples.Length];
+            for (int i = 0; i < guideDots.Length; i++)
+            {
+                var guide = NewRect("Stroke Guide " + i, dotParent).gameObject.AddComponent<UnityEngine.UI.Image>();
+                guide.raycastTarget = false; guide.sprite = RoundDot();
+                guide.rectTransform.anchorMin = guide.rectTransform.anchorMax = stroke.Samples[i];
+                guide.rectTransform.anchoredPosition = Vector2.zero;
+                guide.gameObject.SetActive(false);
+                guideDots[i] = guide;
+            }
             dots = new UnityEngine.UI.Image[stroke.Samples.Length];
             for (int i = 0; i < dots.Length; i++)
             {
@@ -1935,6 +2075,9 @@ namespace C6Lab
             nextMarker = NewRect("Talisman Next Stroke", glyphArea).gameObject.AddComponent<UnityEngine.UI.Image>();
             nextMarker.raycastTarget = false; nextMarker.sprite = RoundDot(); nextMarker.color = nextMarkerColor;
             nextMarker.gameObject.SetActive(false);
+            strokeArrow = NewRect("Talisman Stroke Arrow", glyphArea).gameObject.AddComponent<UnityEngine.UI.Image>();
+            strokeArrow.raycastTarget = false; strokeArrow.sprite = ArrowSprite(); strokeArrow.color = strokeArrowColor;
+            strokeArrow.gameObject.SetActive(false);
             // #533: the red seal that slams onto the finished talisman, with ink specks and light rings from where it lands.
             stampRoot = NewRect("Talisman Stamp", paper);
             stampRoot.pivot = new Vector2(.5f, .5f);

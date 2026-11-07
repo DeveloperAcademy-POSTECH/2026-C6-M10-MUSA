@@ -82,13 +82,13 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void ATalismanVolleyHitCriesTooColdOnlyOnce()
+        public void ATalismanVolleyHitHissesOnlyOnce()
         {
-            // #540: the three water orbs of one throw land together; Jigwi wails "너무 차가워" once.
+            // #540: the three water orbs of one throw land together; Jigwi's fire hisses out once.
             overlay.OnTalismanHit(Local);
             overlay.OnTalismanHit(Local);
             overlay.OnTalismanHit(Local);
-            Assert.That(overlay.ColdVoiceCount, Is.EqualTo(1));
+            Assert.That(overlay.DouseCount, Is.EqualTo(1));
         }
 
         [Test]
