@@ -1,5 +1,62 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-09 — #501 로비에서 끊긴 게스트의 같은 방·같은 P번호 재입장, #502 전투 중 백그라운드 현재 동작 유지
+
+- **기준:** `feat/#501-background-reconnect`. main `e15f61f0` 위에서 만들고 검사했다. 커밋은 `27ccc99d`(기능)와 `be8f280e`·`d6111aa3`·`3f8c3846`·`3d27c6f1`·`f8e593b3`(독립 검토 1~5차 반영), 그 뒤의 기록 커밋이다. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal), `-buildTarget iOS`. Library는 다른 worktree에서 복제했다. 같은 Mac에서 다른 폴더의 Unity Editor가 열려 있었다.
+- **바꾼 것:** 동작은 `GAME_FLOW.md`의 "로비 재입장(#501)" 항목과 `AGENTS.md` #501 절에 적었다. 코드는 `LabNetwork.LobbyRejoin.cs`(새 파일)와 `LabNetwork.cs`·`LabNetwork.Recovery.cs`·`LabNetwork.GameFlow.cs`·`GameSession.cs`·`GameLobbyView.cs`·`GameLobbySeatDesign.cs`다. 게스트의 lobby 받기는 동작을 바꾸지 않고 `ReceiveLobby`로 옮겼다(검사에서 직접 부르기 위해). Game 토큰만 `C6HapioGame/45`로 올렸다.
+- **#502:** 코드를 바꾸지 않았다. 결정과 현재 동작을 `GAME_FLOW.md` "종료·정지·DEV"에 적었다.
+
+| 확인 | 결과 |
+| --- | --- |
+| 새 EditMode `LabLobbyRejoinTests`(21건)와 `LabGameFlowBridgeTests`·`LabJoinRejectionTests` | 50/50 PASS |
+| PlayMode `LabLobbyRejoinNetworkTests`(새 5건), `GameLobbyViewTests`(새 2건 포함 19건), `GameSceneFlowTests`(새 1건 포함 25건) | 49/49 PASS(138초, `3d27c6f1`) |
+| 대조 실험 17가지(아래) | 17가지 모두 해당 새 검사가 실패 |
+| `3d27c6f1` 전체 EditMode / 전체 PlayMode | 2109/2109 PASS(22.0초) / 714/714 PASS(585초) |
+| `f8e593b3`(최종 코드) 전체 EditMode / 전체 PlayMode | 2110/2110 PASS(21.2초) / 714/714 PASS(570초) |
+
+- `LabLobbyRejoinNetworkTests`는 한 Editor 프로세스 안에서 진짜 NGO·UTP 방장과 게스트를 loopback으로 연결한다. 전송 제한 시간은 2초로 줄였다. 끊김은 게스트의 NGO 갱신 단계를 멈춰(하트비트가 끊김) 만들었다. 다섯 경우를 본다.
+  - 시간 초과로 끊긴 게스트가 같은 방에 새 연결로 P2를 되찾는다. 그 사이 매 프레임 "연결됨" 또는 "들어가는 중"이었다.
+  - 제한 시간보다 긴 정지 뒤 복귀하면 바로 다시 들어간다.
+  - 나가기는 P를 바로 비우고 표를 버린다.
+  - 방장이 방을 닫으면 다시 들어가지 않는다.
+  - 응답 없는 방장에게는 30초 한도에서 진행 중인 시도까지 끝낸다(한도는 검사에서 2초로 줄임).
+- 대조 실험: 수정한 코드를 하나씩 예전처럼 되돌리고, 대응하는 새 검사가 실패하는지 확인했다. 매번 원래 코드로 되돌렸다.
+  - 자리 맡기 없음: EditMode 6건과 실제 연결 검사가 실패.
+  - 승인 대기 중인 재입장을 새 자리로 셈: "같은 프레임 두 명" 검사가 실패.
+  - P 기억을 예전 방식으로: "P를 취소한 채 끊김" 검사가 실패.
+  - 30초에 진행 중인 시도를 끊지 않음: 한도 검사가 실패.
+  - 나가기 뒤에도 표를 유지: 나가기 검사가 실패.
+  - "자리 비움" 표시를 지움: 로비 화면 검사가 실패.
+  - 받아 주지 않은 표로도 정원 찬 카드를 엶: EditMode·PlayMode 카드 검사가 실패.
+  - 정원 찬 카드를 늘 막음: EditMode 카드 검사가 실패.
+  - 카드 문구가 표를 무시: PlayMode 카드 검사가 실패.
+  - 소식 없는 게스트도 자리를 맡음: 해당 검사가 실패.
+  - 전투 중 나가기를 떠남으로 표시하지 않음: 해당 PlayMode 검사가 실패.
+  - Direct IP 표를 방 카드에 묶지 않음: 해당 검사가 실패.
+  - 같은 포트 Direct IP가 표를 새로 만듦: 카드 검사의 Direct IP 단언이 실패.
+  - 자리를 되찾은 새 연결을 확인된 것으로 치지 않음: "첫 패킷 전에 다시 끊김"·"확인된 연결을 바꾼 새 연결" 검사가 실패.
+  - 2:2 로비 복귀 때 확인 목록을 비우지 않음: "2:2 로비 복귀" 검사가 실패.
+  - 지금 판의 나가기 신호만 떠남으로 표시: 다른 판을 가리키는 나가기 단언이 실패.
+  - 기억해 둔 P로 돌아온 연결을 확인된 것으로 치지 않음: 해당 검사가 실패.
+- 앞선 커밋의 전체 실행:
+  - `27ccc99d`: EditMode 2096/2096, PlayMode 711건 중 710 PASS. 실패는 `LabPlayerPaintPatternRenderTests.PatternToggleChangesOnlyRenderedInkWithoutReuploadingOrRevisingMaps`(픽셀 하나 122 → 123)였다. 그 fixture만 두 번 다시 돌려 5/5, 5/5 PASS.
+  - `d6111aa3`: EditMode 2103/2103, PlayMode 713건 중 712 PASS. 실패는 `LabPlayerPaintPatternRenderTests.ActualSavedShaderDistinguishesAllSixPaintersWithoutChangingPaperAlphaOrCoverage`였다.
+  - `3f8c3846`: EditMode 2106/2106, PlayMode 714/714 PASS.
+  - 두 실패 모두 이 문서 앞쪽에 "실행마다 다르게 실패"로 기록된 GPU 화면 비교다.
+- 새 네트워크 검사가 그 GPU 검사에 영향을 주는지 따로 확인했다.
+  - 같은 순서(새 네트워크 검사 → GPU 두 fixture)로 두 번 돌렸다. 한 번은 기록된 간헐 실패 2건(`ActualSavedShader…`, `LabWatercolorSurfaceGrainTests.SurfaceGrainChanges…`)이 났고, 한 번은 모두 통과했다.
+  - 이어서 GPU fixture만 돌리기와 새 검사 뒤에 돌리기를 번갈아 네 번씩, 모두 8회 돌렸다. 8회 모두 PASS였다.
+  - 새 검사와 관계없는 기존 간헐 실패로 본다.
+- **독립 검토:** 읽기 전용 검토자와 반박 검증자를 네 차례 돌렸다.
+  - 1차: 검토자 4명. #501에서 6건이 확인됐고 1건은 반박됐다. #473에서는 흰 박 바닥 묻힘 1건이 확인됐다(그 PR의 확인 사항).
+  - 2차: 실제 문제 2건과 검사 빈틈 2건.
+  - 3차: 3건이 확인됐고(중간 1) 1건은 반박됐다.
+  - 4차: 3건이 확인됐다(중간 1: 2:2 로비 복귀 뒤 처리된 전투 중 끊김을 맡음).
+  - 5차: 처음부터 다시 훑은 검토자는 중간 이상을 찾지 못했다. 4차 수정의 작은 빈틈 1건이 확인됐다.
+  - 확인된 것은 모두 고쳤고, 고칠 때마다 검사를 더하고 대조 실험으로 그 검사가 문제를 잡는지 확인했다.
+- 각 실행의 skip·inconclusive는 0이다. batch 가져오기가 덧붙인 Lobby PNG `.meta` 20개의 WebGL 항목은 매번 되돌렸다.
+- **미실행:** iPhone의 실제 화면 잠금·백그라운드(멈춘 시간을 재는 벽시계와 복귀 처리는 Editor에서 그 함수를 직접 불러 확인했다), 실제 Wi-Fi 끊김, 두 대 이상의 실기기, Bonjour 방 카드로 정원 찬 방에 실제로 다시 들어가기(카드 문구는 꾸민 방 목록으로, 입장 가능 판단은 EditMode로만 확인했다), Mac·iOS 앱.
+
 ## 2026-11-08 — DEV 행 Editor 메뉴가 Home·Lobby의 저장 257행을 지키게 (PR #561 후속)
 
 - **기준:** `fix/menu-dev-row-240`, 바로 아래 절의 커밋 위(main `92d511ee`)에서 고치고 검사했다. 그 뒤 main `488104e7`(#562)을 rebase가 아니라 merge(`a434b800`)로 받아 다시 검사했다(표의 "병합 뒤"). Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal), `-buildTarget iOS`. 같은 Mac에서 다른 폴더의 Unity Editor가 열려 있었다.
