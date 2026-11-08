@@ -180,6 +180,7 @@ namespace Hapio
             BindNavigation(closeDirectConnectionButton, () => SetDirectConnection(false));
             BindNavigation(directJoinButton, JoinDirect);
             BindNavigation(soloButton, () => session.StartSolo());
+            GameDeveloperAccess.MoveSoloIntoSettings(screen, soloButton, teamSoloButton);
             // GameScreen owns the existing scoped DEV panel and wires developerButton once.
             for (int i = 0; i < countButtons.Length; i++)
             {
@@ -258,7 +259,7 @@ namespace Hapio
             if (!visible) return;
             modePanel.transform.SetAsLastSibling();
             RefreshModes();
-            teamSoloButton.gameObject.SetActive(Network.DeveloperBuildAvailable);
+            teamSoloButton.gameObject.SetActive(false);
         }
 
         private void EnterRoom(int index)
@@ -279,6 +280,17 @@ namespace Hapio
             bool home = screen.kind == GameScreenKind.Home && session.State.phase == GameFlowPhase.Home;
             bool lobby = screen.kind == GameScreenKind.Lobby && session.State.phase == GameFlowPhase.Lobby;
             bool developerOpen = screen.developerPanel != null && screen.developerPanel.activeInHierarchy;
+            bool developerSolo = home && developerOpen && Network.DeveloperBuildAvailable;
+            if (soloButton != null)
+            {
+                soloButton.gameObject.SetActive(developerSolo);
+                soloButton.interactable = developerSolo && Network.CanChooseConnection && !session.IsCreatingRoom;
+            }
+            if (teamSoloButton != null)
+            {
+                teamSoloButton.gameObject.SetActive(developerSolo);
+                teamSoloButton.interactable = developerSolo && Network.CanChooseConnection && !session.IsCreatingRoom;
+            }
             bool visible = (home || lobby) && !developerOpen;
             background.gameObject.SetActive(visible); design.gameObject.SetActive(visible);
             if (!visible) return;
@@ -291,8 +303,6 @@ namespace Hapio
             background.uvRect = paperBackground && browserBackground != null
                 ? BrowserBackgroundUv(background.rectTransform.rect.size)
                 : LabLobbyView.BackgroundUv(home && !browser, background.rectTransform.rect.size);
-            soloButton.gameObject.SetActive(home && Network.DeveloperBuildAvailable);
-            soloButton.interactable = home && Network.CanChooseConnection && !session.IsCreatingRoom;
             developerButton.interactable = !session.IsCreatingRoom
                 && (Network.CanChooseConnection || (Network.IsHost && Network.Snapshot == null));
             if (Network.IsConnected || Network.IsJoiningRoom || session.IsCreatingRoom) SetDirectConnection(false);
