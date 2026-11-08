@@ -246,6 +246,7 @@
 - 관람은색/P/높이를모두독립복사하고기본박Ready0을유지한다. 클레이해제는지연Destroy전에Renderer를즉시끈다. 빌드검사는읽기전용이며원본/데이터팩을자동베이크하지않는다. 실제실행결과만VALIDATION에기록하며iOS/실네트워크검증은이번범위에포함하지않았다.
 
 - #506 최신 main 통합: #507의 스테이지별 몸통/뚜껑 Rig·판정·연속 줄·요괴를 유지한다. 클레이는 각 paintShell/paintExtra의 identity 자식이며 결과 복제도 각 base의 Ready0과 coat의 Ready1을 유지한다. #482 도색 준비를 유지하고 새 클레이의 3브러시×색/높이 패스도 별도 작은 타깃에서 준비한다. 실제 지도·진행 순번·난수는 프리워밍으로 바꾸지 않는다.
+- Home·Lobby에 저장된 DEV 패널은 257행(`LabConfig.ClayThicknessField`)이고 257·258은 실행 중 `GameScreen.EnsureClayDeveloperRows`가 붙인다. Editor 도구(`Hapio/Upgrade Menu DEV Rows`·`Upgrade Three Yokai Stages`·`Upgrade 2v2 Lobby UI`·`Upgrade Figma Game Lobby`, 새 메뉴 생성)는 `GameSceneBuilder.SavedDeveloperRowCount`까지만 저장·확인하고, 예전 도구가 저장한 257행부터는 지운다. 글꼴 갱신은 Prefab 인스턴스(공통 로비·오프닝)에 덮어쓰기를 만들지 않는다. `LabConfig.asset`의 DEV 기본값을 바꾸면 `Upgrade Menu DEV Rows`로 저장 행을 다시 맞춘다.
 
 ## #479 지귀 A 부적
 

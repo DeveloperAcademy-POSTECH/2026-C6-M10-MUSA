@@ -1,9 +1,13 @@
 using System;
+using System.Globalization;
 using System.Linq;
 using System.Reflection;
+using C6Lab;
 using NUnit.Framework;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace Hapio.Tests
 {
@@ -11,6 +15,69 @@ namespace Hapio.Tests
     public sealed class GameEditorMenuCleanupTests
     {
         private const string EditorAssembly = "Assembly-CSharp-Editor";
+
+        [Test]
+        public void MenuDeveloperRowUpgrade_KeepsTheSavedRowsAndPrefabFonts()
+        {
+            // Upgrade a copy: a test must not re-save Home or dirty a Home Scene that is open in the Editor.
+            string copy = AssetDatabase.GenerateUniqueAssetPath("Assets/HapioMenuDeveloperRowsTest.unity");
+            Assert.That(AssetDatabase.CopyAsset(GameScenePaths.Home, copy), Is.True);
+            Scene previous = SceneManager.GetActiveScene();
+            Scene scene = default;
+            try
+            {
+                scene = EditorSceneManager.OpenScene(copy, OpenSceneMode.Additive);
+                GameScreen screen = scene.GetRootGameObjects()
+                    .SelectMany(root => root.GetComponentsInChildren<GameScreen>(true)).Single();
+                int saved = LabConfig.ClayThicknessField;
+                Assert.That(screen.developerInputs, Has.Length.EqualTo(saved));
+                Transform content = screen.developerInputs[0].transform.parent.parent;
+                int rows = content.childCount;
+                // What an older tool left behind: the runtime-only clay rows saved, and a stale default.
+                Assert.That(screen.EnsureClayDeveloperRows(), Is.True);
+                Assert.That(screen.developerInputs, Has.Length.EqualTo(LabConfig.DeveloperFields.Count));
+                float[] defaults = AssetDatabase.LoadAssetAtPath<LabConfig>("Assets/Lab/Resources/LabConfig.asset").CaptureDeveloperValues();
+                const int stale = 240;
+                LabDeveloperField field = LabConfig.DeveloperFields[stale];
+                float wrong = defaults[stale] == field.Min ? field.Max : field.Min;
+                screen.developerInputs[stale].SetTextWithoutNotify(wrong.ToString(CultureInfo.InvariantCulture));
+                screen.developerSliders[stale].SetValueWithoutNotify(wrong);
+                var prefabFonts = scene.GetRootGameObjects()
+                    .SelectMany(root => root.GetComponentsInChildren<UnityEngine.UI.Text>(true))
+                    .Where(text => PrefabUtility.IsPartOfPrefabInstance(text))
+                    .ToDictionary(text => text, text => text.font);
+                Assert.That(prefabFonts, Is.Not.Empty, "Home holds the shared lobby and opening prefab instances.");
+
+                Type.GetType("Hapio.Editor.GameSceneBuilder, " + EditorAssembly, true)
+                    .GetMethod("UpgradeDeveloperRows", BindingFlags.NonPublic | BindingFlags.Static)
+                    .Invoke(null, new object[] { scene });
+
+                Assert.That(screen.developerInputs, Has.Length.EqualTo(saved), "The clay rows stay runtime-only (#506).");
+                Assert.That(screen.developerSliders, Has.Length.EqualTo(saved));
+                Assert.That(content.childCount, Is.EqualTo(rows));
+                Assert.That(content.Find("Setting" + saved.ToString("000")), Is.Null);
+                Assert.That(float.Parse(screen.developerInputs[stale].text, CultureInfo.InvariantCulture), Is.EqualTo(defaults[stale]));
+                Assert.That(screen.developerSliders[stale].value, Is.EqualTo(defaults[stale]));
+                foreach (var pair in prefabFonts)
+                    Assert.That(pair.Key.font, Is.SameAs(pair.Value), "Prefab instance text keeps its font: " + pair.Key.name);
+            }
+            finally
+            {
+                if (scene.IsValid() && scene.isLoaded) EditorSceneManager.CloseScene(scene, true);
+                if (previous.IsValid() && previous.isLoaded) SceneManager.SetActiveScene(previous);
+                AssetDatabase.DeleteAsset(copy);
+            }
+        }
+
+        [Test]
+        public void TeamLobbyUpgrade_TreatsTheSavedMenuDeveloperPanelsAsCurrent()
+        {
+            // Otherwise Hapio/Upgrade 2v2 Lobby UI re-runs the DEV row upgrade and re-saves Home and Lobby.
+            MethodInfo check = Type.GetType("Hapio.Editor.GameTeamLobbyUpgrade, " + EditorAssembly, true)
+                .GetMethod("MenuDeveloperSchemaIsCurrent", BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.That(check, Is.Not.Null);
+            Assert.That((bool)check.Invoke(null, null), Is.True);
+        }
 
         [Test]
         public void RecreatedYaguangDefaults_PassCatalogValidationAndMatchTheSavedStage()

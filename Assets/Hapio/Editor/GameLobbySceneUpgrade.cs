@@ -84,7 +84,7 @@ namespace Hapio.Editor
             {
                 GameScreen screen = scene.GetRootGameObjects().SelectMany(root => root.GetComponentsInChildren<GameScreen>(true)).Single();
                 Canvas canvas = screen.GetComponent<Canvas>();
-                if (canvas == null || screen.developerPanel == null || screen.developerInputs.Length != LabConfig.DeveloperFields.Count)
+                if (canvas == null || screen.developerPanel == null || screen.developerInputs.Length != GameSceneBuilder.SavedDeveloperRowCount)
                     throw new InvalidOperationException("The existing Canvas and complete scoped DEV panel must be retained.");
                 GameLobbyView[] views = scene.GetRootGameObjects().SelectMany(root => root.GetComponentsInChildren<GameLobbyView>(true)).ToArray();
                 if (views.Length > 1) throw new InvalidOperationException("A menu must have one shared lobby view.");

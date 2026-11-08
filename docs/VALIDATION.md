@@ -1,5 +1,34 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-08 — DEV 행 Editor 메뉴가 Home·Lobby의 저장 257행을 지키게 (PR #561 후속)
+
+- **기준:** `fix/menu-dev-row-240`, 바로 아래 절의 커밋 위(main `92d511ee`). Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal), `-buildTarget iOS`. 같은 Mac에서 다른 폴더의 Unity Editor가 열려 있었다.
+- **문제:**
+  - `Hapio/Upgrade Menu DEV Rows`·`Upgrade Three Yokai Stages`·`Upgrade 2v2 Lobby UI`(저장 패널이 259행이 아니면 같은 갱신을 부름)는 저장 패널을 `DeveloperFields.Count`(259)행으로 늘려 클레이 257·258행을 장면에 저장했다. #506 이후 `GameSceneAssetTests`는 저장 패널을 257행으로 요구하므로, 메뉴를 돌리면 Home·Lobby 검사가 실패했다.
+  - `Upgrade Figma Game Lobby`는 저장 패널이 259행이 아니면 멈춰, 지금 장면에서는 실행되지 않았다.
+  - 같은 메뉴들의 글꼴 갱신(`UpgradeFonts`)이 Home의 오프닝 Prefab 인스턴스(`GameOpening.prefab`, #354) Text 8개에 `ShillaCultureBold` 덮어쓰기를 장면에 저장했다. 예를 들어 `Speaker`는 원래 `Shilla_Culture(M)`이다.
+- **고친 것:**
+  - 저장 행 수를 `GameSceneBuilder.SavedDeveloperRowCount`(= `LabConfig.ClayThicknessField`, 257) 하나로 정했다. DEV 행 갱신·추가, 새 메뉴 생성, `Upgrade 2v2 Lobby UI`의 스키마 확인(`MenuDeveloperSchemaIsCurrent`), `Upgrade Figma Game Lobby`의 확인이 이 값을 쓴다.
+  - DEV 행 갱신은 257행부터의 저장 행(예전 도구가 저장한 것)을 지운다.
+  - 글꼴 갱신은 Prefab 인스턴스의 Text를 건너뛴다. 기존에 건너뛰던 `GameLobbyView` 아래에 더한 것이다.
+  - 고친 `Upgrade Menu DEV Rows`의 결과를 장면에 저장했다. Home·Lobby 각 11줄로, DEV 행 0·1·41·43·48·52·53·54·72·73은 숨기고 237은 보인다. 2026-11-05 DEV 표시 정리의 공통 탭 규칙(`GameStageSettings.IsFieldShown`)이다. 실행 중에는 패널을 열 때 다시 정하므로 게임 동작은 같다.
+  - `GameEditorMenuCleanupTests`에 검사 2개를 더했다. ① Home 복사본에 실행 중 클레이 행과 틀린 240 기본값을 넣은 뒤 DEV 행 갱신을 부르면 257행·원본 기본값으로 돌아오고, Prefab 인스턴스 Text의 글꼴은 그대로다. 복사본은 검사 뒤 지운다. ② `MenuDeveloperSchemaIsCurrent`가 저장된 Home·Lobby를 현재 형식으로 본다.
+  - `AGENTS.md` #506 절과 `GAME_FLOW.md`(Battle 절, 에디터 도구 절)에 저장 행 규칙을 적었다.
+
+| 확인 | 결과 |
+| --- | --- |
+| 대조: 고치기 전 `Upgrade Menu DEV Rows` 실행 | Home·Lobby가 259행(행 오브젝트 62개씩 추가). 같은 11행 보이기 변경과 Home 오프닝 글꼴 덮어쓰기 8개. 이어서 `GameSceneAssetTests` 9건 중 7 PASS(Home·Lobby가 행 수 257 기대, 실제 259) |
+| 대조: 고치기 전 `Upgrade Figma Game Lobby` 실행 | `The existing Canvas and complete scoped DEV panel must be retained.`로 멈춤(종료 코드 1), 바뀐 파일 없음 |
+| 대조: 새 검사 + 고치기 전 Editor 코드 | 4건 중 2 PASS. 새 2건 실패(행 수 259, 스키마 확인 False) |
+| 대조: 새 검사 + Prefab 글꼴 건너뛰기만 뺀 코드 | 4건 중 3 PASS. ①이 `Speaker`(기대 `Shilla_Culture(M)`, 실제 `ShillaCultureBold`)에서 실패 |
+| 고친 뒤 `Upgrade Menu DEV Rows` 두 번 | 1번째: Home·Lobby 각 11줄(위 보이기)만 바뀜. 2번째: 바뀐 것 없음 |
+| 이어서 `Upgrade Three Yokai Stages` → `Upgrade 2v2 Lobby UI` → `Upgrade Figma Game Lobby` | 모두 예외 없이 끝남. Home·Lobby·`GameLobby.prefab`·StageResult·스테이지 자료는 그대로. 무관한 재저장 두 가지는 되돌렸다: `GameOver.unity`에 `FigmaStageResult`의 새 필드 2줄(`blueTeamBackground`·`redTeamBackground`, 값 없음), Team 그림 `.meta` 9개의 WebGL 항목 |
+| `GameSceneAssetTests`+`GameEditorMenuCleanupTests` / 전체 EditMode | 13/13 PASS(1.2초) / 2064/2064 PASS(20.7초). 늘어난 2건이 새 검사다 |
+| PlayMode `GameSceneFlowTests`·`GameLobbyViewTests`·`GameOpeningControllerTests`·`GameStageUiTests` | 48/48 PASS(107.8초; 21·15·10·2) |
+
+- 각 실행의 skip·inconclusive는 0이다. 대조용 코드 되돌림과 메뉴 실행의 무관한 재저장은 되돌렸고 커밋하지 않았다. batch 가져오기가 덧붙인 Lobby PNG `.meta` 20개의 WebGL 항목도 매번 되돌렸다.
+- **미실행:** Editor 화면에서 메뉴를 직접 누르는 확인, `Create Missing Development Game Scenes`(장면이 모두 있어 새로 만들지 않는다. 바꾼 줄은 컴파일만 확인), 전체 PlayMode, Mac·iOS 앱·실기기.
+
 ## 2026-11-08 — Home·Lobby 저장 DEV 240행을 원본 기본값 10으로 맞춤 (main EditMode 실패 2건)
 
 - **기준:** `fix/menu-dev-row-240`. main `886e65db`에서 고치고 검사한 뒤, #559·#560이 들어온 main `92d511ee` 위로 rebase해 다시 검사했다. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal), `-buildTarget iOS`. Library는 다른 worktree에서 복제했다. 같은 Mac에서 다른 폴더의 Unity Editor가 열려 있었다.
@@ -19,7 +48,7 @@
 | `92d511ee`로 rebase 뒤: `GameSceneAssetTests` / 전체 EditMode | 9/9 PASS(0.9초) / 2062/2062 PASS(20.4초). 늘어난 4건은 #504가 더한 검사다 |
 
 - 각 실행의 skip·inconclusive는 0이다.
-- **남은 것:** `Hapio/Upgrade Menu DEV Rows`·`Hapio/Upgrade Three Yokai Stages`·`Hapio/Upgrade 2v2 Lobby UI`(저장 패널이 259행이 아니면 같은 갱신을 부름)는 여전히 259행을 현재 형식으로 본다. 그대로 실행하면 257·258행이 장면에 저장되어 위 검사의 행 수 단언이 실패한다. `docs/GAME_FLOW.md`는 새 DEV 행을 이 메뉴로 추가한다고 적고 있다. 이번에는 도구를 고치지 않았다.
+- **남은 것:** `Hapio/Upgrade Menu DEV Rows`·`Hapio/Upgrade Three Yokai Stages`·`Hapio/Upgrade 2v2 Lobby UI`(저장 패널이 259행이 아니면 같은 갱신을 부름)는 여전히 259행을 현재 형식으로 본다. 그대로 실행하면 257·258행이 장면에 저장되어 위 검사의 행 수 단언이 실패한다. `docs/GAME_FLOW.md`는 새 DEV 행을 이 메뉴로 추가한다고 적고 있다. 이 커밋에서는 도구를 고치지 않았고, 같은 PR의 위 절에서 고쳤다.
 - **미실행:** 위 메뉴 자체 실행, PlayMode(장면 값 3줄만 바뀌고 위 영향 참고), Editor 화면 확인, Mac·iOS 앱·실기기.
 
 ## 2026-11-08 — #503 방장 입장 전 대기 방 공개 실패 재시도

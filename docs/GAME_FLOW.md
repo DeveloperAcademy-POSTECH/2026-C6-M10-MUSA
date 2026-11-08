@@ -28,7 +28,7 @@
 
 #354의 `GameOpeningController`는 Home의 독립 `GameOpening.prefab`과 기존 StoryPlayer를 연결한다. #359부터 타이틀 게임 시작에서 재생하고, 오프닝 중 메뉴·DEV 입력을 막고 완료/스킵 시 입력 해제 뒤 방 목록을 연다. 게임 진행 상태는 Home을 유지하며 네트워크 상태를 추가하지 않는다. 에셋 편집·실패 복구·실행 내 재생 정책은 [앱 시작 오프닝](APP_START_OPENING.md)을 따른다.
 
-Battle은 처음 만들 때만 저장된 Lab에서 복사했고(`CreateMissing`, Battle이 없을 때), 지금은 Lab에 없는 스테이지 배경(`GameStageBackgrounds`, #446/#447)·바닥·장식(#485/#487/#490)·주광(#515)을 가진 독립 Scene이다. 이후 Lab Scene 수정은 자동으로 전달되지 않으며, Lab 전체를 Battle 위에 다시 복사하는 도구는 없다(예전 `Hapio > Upgrade Existing Game Scenes From Current Lab`은 Battle 전용 구성을 지워서 제거했다). Lab 변경을 Battle에 옮길 때는 Battle을 직접 편집하거나 해당 객체만 고치는 대상 갱신을 쓴다. Home/Lobby의 새 DEV 행은 `Hapio > Upgrade Menu DEV Rows`가 기존 객체와 배치를 유지하면서 추가한다. 일반 Play·빌드는 이 도구들을 자동 호출하지 않는다.
+Battle은 처음 만들 때만 저장된 Lab에서 복사했고(`CreateMissing`, Battle이 없을 때), 지금은 Lab에 없는 스테이지 배경(`GameStageBackgrounds`, #446/#447)·바닥·장식(#485/#487/#490)·주광(#515)을 가진 독립 Scene이다. 이후 Lab Scene 수정은 자동으로 전달되지 않으며, Lab 전체를 Battle 위에 다시 복사하는 도구는 없다(예전 `Hapio > Upgrade Existing Game Scenes From Current Lab`은 Battle 전용 구성을 지워서 제거했다). Lab 변경을 Battle에 옮길 때는 Battle을 직접 편집하거나 해당 객체만 고치는 대상 갱신을 쓴다. Home/Lobby에 저장된 DEV 행(0~256)은 `Hapio > Upgrade Menu DEV Rows`가 기존 객체와 배치를 유지하면서 원본에 맞추고, 257번부터는 실행 중에 붙는다(아래 에디터 도구 절). 일반 Play·빌드는 이 도구들을 자동 호출하지 않는다.
 
 ## 세션과 전투의 수명
 
@@ -188,7 +188,7 @@ Home/Lobby DEV의 `공통 / 구미호 / 야광귀 / 지귀`에서 해당 값만 
 
 ### 에디터 도구
 
-- `Hapio > Upgrade Menu DEV Rows`: 홈·로비에 새 DEV 줄만 추가한다. Battle은 다시 복사하지 않는다.
+- `Hapio > Upgrade Menu DEV Rows`: 홈·로비에 저장된 DEV 줄(0~256)의 이름·슬라이더 범위·기본값을 원본 `LabConfig.asset`에 맞추고, 빠진 줄이 있으면 더한다. 257번부터(클레이 두께·광택)는 실행 중 `GameScreen.EnsureClayDeveloperRows`가 붙이므로 저장하지 않고, 예전 도구가 저장한 줄은 지운다(#506). 줄 보이기는 공통 탭 규칙(`GameStageSettings.IsFieldShown`)을 따르고, Prefab 인스턴스(공통 로비·오프닝)의 글꼴은 바꾸지 않는다. Battle은 다시 복사하지 않는다. `LabConfig.asset`의 DEV 기본값을 바꾼 뒤 실행한다.
 - `Hapio > Upgrade 2v2 Lobby UI`: `Assets/Hapio/Art/UI/Team/`의 그림 4장을 Sprite로 설정하고, 공통 로비 Prefab에 모드 팝업·팀 자리 화면·편집용 위치를 추가한 뒤 DEV 2:2 탭을 붙인다. 이미 있는 객체와 편집은 유지한다.
 
 ### 아직 없는 것
