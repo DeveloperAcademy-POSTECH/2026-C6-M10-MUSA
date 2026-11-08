@@ -554,7 +554,8 @@ namespace Hapio
             if (resultView != null)
             {
                 RefreshDesignedResult(session.Network, true);
-                GameStageResultView.Label(resultView.nextButton, "봉인 카드로 돌아가기");
+                GameStageResultView.Label(resultView.nextButton, "결과로 돌아가기");
+                GameStageResultView.Label(resultView.homeButton, "엔딩 보기");
                 Show(resultView.nextButton.gameObject, true);
                 Interactable(resultView.nextButton, !ResultActionsBlocked);
             }

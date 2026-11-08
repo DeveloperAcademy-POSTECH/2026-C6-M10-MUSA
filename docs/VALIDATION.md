@@ -6635,3 +6635,30 @@ PR-1(`feat/#507-gourd-rig-contract`) 위에서 Unity 6000.6.5f1 macOS batch Edit
 
 - 원격 main `ae4aa87e`(#561)의 저장 DEV 257행·240번 기본값·Prefab 글꼴 보존 수정을 반영한 뒤 macOS 기본 batch 환경에서 재검사했다. **EditMode `GameEditorMenuCleanupTests` 4/4 PASS(0.60초), 관련 PlayMode 37/37 PASS(36.24초)**이며 실행 건수가 0이 아닌 NUnit 결과를 확인했다.
 - main 대비 PR 변경은 DEV 코드·해당 검사·사용법/검증 문서 13개 파일뿐이다. Scene·Prefab·머터리얼·패키지·ProjectSettings와 결과 화면 전환 코드는 변경하지 않았다. `git diff --check`와 검사 후 깨끗한 작업 트리를 확인했다. 추가 iOS·실네트워크·전체 검사 모음은 실행하지 않았다.
+
+
+## 2026-11-08 — #566 결과 화면 중복·봉인 카드 재등장 정리
+
+- 기준: main `fbe6f67c`에서 분리한 `fix/#566-result-flow-cleanup`. 환경은 Unity 6000.6.5f1 / macOS 기본 batch다. #564 숨김 DEV, 기존 전투/로비/네트워크 규칙과 제작용 Story 미리보기는 유지했다.
+- 범위: 게임 결과 어댑터·Story의 게임 전용 진행 버튼 숨기기·조용한 완료 자세, 결과 버튼 배치와 저장 Canvas/StageResult/GameOver 연결, 관련 검사·동작 문서. 화면 배치 원본과 카드·후일담 순서는 재제작하지 않았다.
+
+| 수행한 확인 | 실제 결과 |
+| --- | --- |
+| 저장 UI 연결·컴파일 | PASS — `GameStageStoryUpgrade.Connect` 최종 batch 실행 종료 코드0. 같은 StoryPageFit 아래 결과 버튼·새 관람 버튼과 두 Scene의 참조를 Unity API로 저장. Scene/Prefab YAML 수동 수정 없음. |
+| EditMode | **26/26 PASS, 실패0, 건너뜀0**(0.78초). `GameStageStoryAssetTests`, `StageStoryAssetTests`, `GameStageResultViewTests`. 저장 참조·비활성 Next·게임용 인라인 숨김과 제작용 미리보기 유지 확인. |
+| PlayMode | **48/48 PASS, 실패0, 건너뜀0**(97.24초). `GameSceneFlowTests`25개, `GameStageRetryPlayModeTests`2개, `GameStageStoryPresentationTests`5개, `StoryResultPresentationTests`9개, `GameDeveloperTapTargetTests`7개. |
+| 승리·SKIP·관람 | 정상 후일담 끝의 같은 마지막 컷 유지, 후일담 중간 SKIP 시 같은 인스턴스 유지, 인라인 Next 숨김, 원본 카드 관람/관람 복귀·전체 기록 복귀와 엔딩 단일 버튼 확인. 봉인 카드를 다시 Play하지 않음. |
+| 빠른 SKIP 입력·효과음 | 실제 카드의 입장0.42초·클릭 허용0.63초 경계를 반영해 조용한 완료 자세 뒤 Raycast로 카드 뒤집기·관람 클릭 확인. 새 AudioSource와 지연 cue 재생 없음. 일반 재생의 cue는 유지. |
+| 진행 권한·재도전 | 결과/타 참가자 이야기/관람 대기, 마지막 포인터 해제, Host 진행 권한·중복 전환 차단, 원본 실패 재도전/나가기 경로, 같은 방·참가자·설정·이전 성공 기록 유지 검사를 통과. 이 항목의 다중 참가자는 자동 검사 상태/메시지 조건이며 실제 여러 Mac 프로세스 연결 검증은 아님. |
+| Mac 개발 빌드 | PASS — `GameBuild.Mac`의 Development 빌드 성공, `Builds/Hapio/20261108-191346-dad8f4fc/macOS/Hapio-Development.app`. 임시 백그라운드 실행은 빌드에만 켜고 원본 PlayerSettings는 false로 저장·복원. 앱은 실행하지 않음. |
+| 변경 범위·정리 | C#/Markdown `git diff --check` 통과. 전체 변경은 Unity가 만든 빈 `m_Name: `6줄을 제외한 공백 검사(`core.whitespace=-blank-at-eol`을 명령에만 적용) 통과. Home/Lobby/Battle·Lab·머터리얼·패키지·ProjectSettings는 변경 없음. 검증용 Editor 종료 확인. |
+
+실행 이력: 첫 Connect는 저장 이후 빈 초기 batch Scene 설정 복원에서 `Invalid SceneManagerSetup`으로 종료했다. 빈 경로 setup을 복원하지 않고 원래 active Scene을 보존하도록 수정한 뒤 최종 Connect를 다시 실행해 성공했다. 실패한 최초 실행은 PASS에 포함하지 않았다. NUnit 결과의 실제 실행 건수와 실패0을 확인했으며 검사 파일의 존재만으로 통과를 기록하지 않았다.
+
+미실행: 사용자가 **자동 검사까지만 진행**을 선택하여 Mac 다중 프로세스 연결·화면 비교를 실행하지 않았다. iOS 빌드·실기기 터치·일반 Wi-Fi/핫스팟 및 전체 프로젝트 EditMode/PlayMode 모음도 미실행이다. 저장 연결·자동 입력 검사는 실제 기기 화면의 미관/레이아웃 검증을 대신하지 않는다.
+
+
+### #566 PR 전 전체 회귀 검사
+
+- 기준 main은 원격 재확인 후에도 `fbe6f67c`였다. Unity6000.6.5f1 / macOS 기본 batch에서 필터 없이 **전체 EditMode 2089/2089 PASS(16.28초), 전체 PlayMode 706/706 PASS(528.52초)**를 확인했다. 두 실행 모두 실패·생략·Inconclusive0이며 앞 절 초기 관련 검사 집계와 중복 합산하지 않는다. 위 초기 범위의 전체 모음 미실행 상태는 이 추가 실행으로 갱신한다.
+- 최종 독립 리뷰에서 원본 관람 캡션의 실제 문구가 `봉인 박 둘러보기`인데 비활성 표시 바인딩이 `봉인 박 관람`으로 찾던 오류를 발견했다. 기능 권한은 유지한 채 검색 문구만 맞췄다. 전체 검사 이후의 이 한 줄 수정에는 `SavedStorySkipAndEndingButtonsReceiveRealMouseClicksAtTheirVisibleScreenPositions`와 `StoryResultPresentationTests`를 다시 실행해 **10/10 PASS(5.09초), 실패·생략·Inconclusive0**를 확인했다. Mac 빌드 성공 기록은 이 캡션 문구 보완 이전 소스에서의 결과이며 재빌드·앱 실행을 추가하지 않았다.

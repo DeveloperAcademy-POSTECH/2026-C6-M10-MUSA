@@ -103,7 +103,16 @@ namespace Hapio.Tests
             Assert.That(network.IsConnected, Is.True, "A normal defeat retains the room transport.");
             Assert.That(session.IsStageRetryAvailable, Is.True);
             yield return FinishStory(() => session.CanRetryStage);
-            Assert.That(session.RetryStage(), Is.True);
+            var presentation = Object.FindFirstObjectByType<GameStageStoryPresentation>();
+            var actions = presentation.player.CurrentView.GetComponent<StoryResultActions>();
+            var retry = actions.GetComponentsInChildren<UnityEngine.UI.Button>(true).Single(button =>
+                Enumerable.Range(0, button.onClick.GetPersistentEventCount()).Any(i =>
+                    button.onClick.GetPersistentTarget(i) == actions && button.onClick.GetPersistentMethodName(i) == "Retry"));
+            yield return Until(() => retry.gameObject.activeInHierarchy && retry.interactable,
+                "The authored retry button reflects the released Host action permission.");
+            Assert.That(presentation.advanceButton.gameObject.activeInHierarchy, Is.False,
+                "The original picture has the sole retry action; no footer duplicate remains.");
+            retry.onClick.Invoke();
             Assert.That(session.RetryStage(), Is.False, "A duplicate click cannot prepare another retry generation.");
             Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.LoadingBattle));
             Assert.That(session.State.battleSessionId, Is.Empty);

@@ -24,7 +24,12 @@ namespace Hapio
         private Quaternion rotation;
         private bool played;
 
-        public void Sample(float elapsed)
+        public void Sample(float elapsed) => Sample(elapsed, false);
+
+        /// <summary>Settle a skipped cut without starting a cue, and consume cues already passed.</summary>
+        public void SampleWithoutSound(float elapsed) => Sample(elapsed, true);
+
+        private void Sample(float elapsed, bool silent)
         {
             if (rect == null)
             {
@@ -40,7 +45,7 @@ namespace Hapio
             if (!played && elapsed > 0 && elapsed >= (motion == Motion.PaperDrop ? Duration : delay))
             {
                 played = true;
-                PlaySound(gameObject, sound, volume);
+                if (!silent) PlaySound(gameObject, sound, volume);
             }
 
             if (motion == Motion.PaperDrop)
