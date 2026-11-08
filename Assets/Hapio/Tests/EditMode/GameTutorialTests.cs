@@ -18,10 +18,10 @@ namespace Hapio.Tests
             {
                 "잠깐! 무작정 가면 안 돼.",
                 "사용법부터 익히고 가자.",
-                "에이~ 그냥 던지면 되는 거 아냐?",
+                "에이~\n그냥 던지면 되는 거 아냐?",
                 "그러다 또 사고 칠래?",
-                "마침 박 속에 작은 요괴가 남아 있네.\n얘로 연습하자!",
-                "봉인박을 오행의 기운으로\n빈틈없이 칠하면 요괴를 가둘 수 있어."
+                "마침 박 속에 작은 요괴가\n남아 있네. 얘로 연습하자!",
+                "봉인박을 오행의 기운으로\n빈틈없이 칠하면\n요괴를 가둘 수 있어."
             }, words);
             CollectionAssert.AreEqual(new[]
             {
@@ -51,8 +51,8 @@ namespace Hapio.Tests
             }, beats.Select(beat => beat.Action).ToArray());
             CollectionAssert.AreEqual(new[]
             {
-                "먼저 북을 쳐 봐.", "음구슬이나 양구슬이 튀어나올 거야.", "오, 나온다 나와!",
-                "북을 칠 때마다 기운이 줄어.", "바닥나면 잠깐 숨을 골라야 해."
+                "먼저 북을 쳐 봐.", "음구슬이나 양구슬이\n튀어나올 거야.", "오, 나온다 나와!",
+                "북을 칠 때마다 기운이 줄어.", "바닥나면 잠깐\n숨을 골라야 해."
             }, drum.Lines.Select(line => line.Text).ToArray());
             CollectionAssert.AreEqual(new[]
             {
@@ -84,7 +84,7 @@ namespace Hapio.Tests
             CollectionAssert.AreEqual(new[]
             {
                 "검은 음구슬과 하얀 양구슬을\n맞붙여 봐.", "검은 거 두 개는 안 돼?", "같은 색끼리는 안 붙어!",
-                "우와, 색이 변했어!", "그게 오행구슬이야.", "화·수·목·금·토 중 하나가 나와."
+                "우와, 색이 변했어!", "그게 오행구슬이야.", "화·수·목·금·토 중\n하나가 나와."
             }, combine.Lines.Select(line => line.Text).ToArray());
             CollectionAssert.AreEqual(new[]
             {
@@ -403,27 +403,100 @@ namespace Hapio.Tests
             CollectionAssert.AreEqual(new[]
             {
                 GameTutorialAction.None, GameTutorialAction.None, GameTutorialAction.PassDrum, GameTutorialAction.None,
+                GameTutorialAction.None, GameTutorialAction.None, GameTutorialAction.None, GameTutorialAction.None,
                 GameTutorialAction.None, GameTutorialAction.None, GameTutorialAction.None
             }, beats.Select(beat => beat.Action).ToArray());
             CollectionAssert.AreEqual(new[]
             {
-                "나만 너무 열심히 하고 있는 거 아니야?",
-                "맞아! 너가 북을 줘야지... \n북은 몇 개 없어서 같이 써야 해! 옆으로 밀면 넘어가. ",
-                "고마워!\n대신 내가 만든 구슬과 북 줄게~", "짝이 안 맞는 구슬은\n이렇게 친구한테 넘기면 돼.",
-                "지금 북이 어디에 있는지는\n우측 지도에서 볼 수 있어!", "오호! 누가 북을 안 주고 있는지\n실시간으로 확인할 수 있겠군!"
+                "나만 너무 열심히\n하고 있는 거 아니야?",
+                "맞아! 너가 북을 줘야지...\n북은 몇 개 없어서 같이 써야 해!\n옆으로 밀면 넘어가.",
+                "고마워! 대신 내가 만든\n구슬과 북 줄게~", "짝이 안 맞는 구슬은\n이렇게 친구한테 넘기면 돼.",
+                "지금 북이 어디에 있는지는\n우측 지도에서 볼 수 있어!", "오호! 누가 북을\n안 주고 있는지 실시간으로\n확인할 수 있겠군!",
+                // #552: orbs run out if kept too long; one glows and goes, then the advice.
+                "어? 구슬이 빛나는데?", "구슬은 오래 두면 사라져.\n빛이 나기 시작하면 곧 없어져!",
+                "못 쓰는 구슬은 쥐고 있지 말고\n바로바로 넘겨 줘!", "오호! 알겠어"
             }, pass.Lines.Select(line => line.Text).ToArray());
             CollectionAssert.AreEqual(new[]
             {
                 GameTutorialSpeaker.Bul, GameTutorialSpeaker.Geumok, GameTutorialSpeaker.Geumok, GameTutorialSpeaker.Geumok,
+                GameTutorialSpeaker.Geumok, GameTutorialSpeaker.Bul, GameTutorialSpeaker.Bul, GameTutorialSpeaker.Geumok,
                 GameTutorialSpeaker.Geumok, GameTutorialSpeaker.Bul
             }, pass.Lines.Select(line => line.Speaker).ToArray());
             // The drum map: only it is lit while 금옥이 shows where the drum is and 불이 answers.
-            CollectionAssert.AreEqual(new[] { false, false, false, false, false, true, true },
+            CollectionAssert.AreEqual(new[] { false, false, false, false, false, true, true, false, false, false, false },
                 beats.Select(beat => beat.Focus == GameTutorialFocus.Minimap).ToArray());
+            // Then only the orb that runs out, while it glows and while it goes.
+            CollectionAssert.AreEqual(new[] { false, false, false, false, false, false, false, true, true, false, false },
+                beats.Select(beat => beat.Focus == GameTutorialFocus.FadingOrb).ToArray());
             Assert.That(beats[3].Cue, Is.EqualTo(GameTutorialCue.GiveBack), "\"고마워!\" gives the yang and the drum back.");
+            Assert.That(beats[7].Cue, Is.EqualTo(GameTutorialCue.OrbGlow), "\"어? 구슬이 빛나는데?\" starts the glow.");
+            Assert.That(beats[8].Cue, Is.EqualTo(GameTutorialCue.OrbVanish), "\"…곧 없어져!\" lets it run out.");
+            Assert.That(beats.Count(beat => beat.Cue != GameTutorialCue.None), Is.EqualTo(3));
+            Assert.That(GameTutorialScript.Steps[5], Is.SameAs(GameTutorialScript.Bomb), "\"오호! 알겠어\" leads straight to the bomb.");
             Assert.That(GameTutorialDirector.BannerText(beats[2], 0), Is.EqualTo("북을 오른쪽 끝으로 밀어 금옥이에게 넘기시오"));
             Assert.That(GameTutorialScript.WrongSideLine, Is.EqualTo("이건 금옥이한테 줘."));
             Assert.That(GameTutorialScript.WrongSideSpeaker, Is.EqualTo(GameTutorialSpeaker.Muk));
+        }
+
+        [Test]
+        public void FadeDemoTakesTheLeftYinFirstThenAYangThenAnElementalOrbNeverADrumOrBomb()
+        {
+            Assert.That(GameTutorialDirector.FadeRank(LabOrbKind.Yin), Is.EqualTo(0));
+            Assert.That(GameTutorialDirector.FadeRank(LabOrbKind.Yang), Is.EqualTo(1));
+            Assert.That(GameTutorialDirector.FadeRank(LabOrbKind.Combined), Is.EqualTo(2));
+            foreach (LabOrbKind kind in new[] { LabOrbKind.Drum, LabOrbKind.Bomb })
+                Assert.That(GameTutorialDirector.FadeRank(kind), Is.EqualTo(-1), kind.ToString());
+            Vector2 landing = GameTutorialScript.FadeDemoLanding;
+            Assert.That(landing.x, Is.InRange(0f, 1f));
+            Assert.That(landing.y, Is.InRange(0f, 1f));
+        }
+
+        [Test]
+        public void OneOrbCanBeLetRunOutWhileTheTutorialKeepsTheRestForever()
+        {
+            using (var settings = new GameStageSettings(Resources.Load<LabConfig>("LabConfig"), GameStageCatalog.RequireDefault()))
+            {
+                LabConfig tutorial = settings.CreateTutorialConfig();
+                try
+                {
+                    const ulong me = 0UL;
+                    var model = new LabModel();
+                    double now = 10d;
+                    model.Begin("tutorial-fade", new[] { LabNetwork.TutorialRightSeatId, me, LabNetwork.TutorialLeftSeatId },
+                        now, tutorial, LabStageYokai.Gumiho);
+                    now += 1d;
+                    Assert.That(model.TutorialDropOrb(me, LabOrbKind.Yin, LabOrbElement.None, new Vector2(.4f, .6f), now,
+                        out LabOrbState fading), Is.True);
+                    Assert.That(model.TutorialDropOrb(me, LabOrbKind.Yang, LabOrbElement.None, new Vector2(.6f, .6f), now,
+                        out LabOrbState kept), Is.True);
+
+                    // Wound back while it glows: it never runs out however long the line is read.
+                    for (int i = 0; i < 20; i++)
+                    {
+                        now += .2d;
+                        Assert.That(model.TutorialSetOrbLife(me, fading.id, 3f, now), Is.True);
+                    }
+                    LabOrbState shown = model.Snapshot(now).orbs.Single(orb => orb.id == fading.id);
+                    Assert.That(shown.LifeSecondsLeft(now, tutorial.OrbLifetimeSeconds, tutorial.ItemLifetimeSeconds),
+                        Is.EqualTo(3f).Within(1e-3f), "Every screen sees the last three seconds: the white flashes.");
+
+                    // Let go: it runs out three seconds later, the ordinary way, and the other orb stays.
+                    Assert.That(model.Snapshot(now + 2.9d).orbs.Any(orb => orb.id == fading.id), Is.True);
+                    LabSnapshot after = model.Snapshot(now + 3.1d);
+                    Assert.That(after.orbs.Any(orb => orb.id == fading.id), Is.False, "It has gone.");
+                    Assert.That(after.orbs.Any(orb => orb.id == kept.id), Is.True, "The tutorial keeps every other orb.");
+                    Assert.That(model.DrainOrbExpiries().Any(expiry => expiry.OrbId == fading.id && expiry.Owner == me), Is.True,
+                        "Reported like a real run-out, so the board plays the smoke (#235).");
+
+                    Assert.That(model.TutorialSetOrbLife(me, fading.id, 3f, now + 3.2d), Is.False, "Gone.");
+                    Assert.That(model.TutorialSetOrbLife(me, "no-such-orb", 3f, now + 3.2d), Is.False);
+                    Assert.That(model.TutorialSetOrbLife(99UL, kept.id, 3f, now + 3.2d), Is.False, "Not a player's orb.");
+                    Assert.That(model.TutorialSetOrbLife(me, kept.id, -1f, now + 3.2d), Is.False);
+                    string drum = model.Snapshot(now + 3.2d).drums[0].id;
+                    Assert.That(model.TutorialSetOrbLife(me, drum, 3f, now + 3.2d), Is.False, "A drum never runs out.");
+                }
+                finally { Object.DestroyImmediate(tutorial); }
+            }
         }
 
         [Test]
@@ -486,8 +559,8 @@ namespace Hapio.Tests
             }, beats.Select(beat => beat.Action).ToArray());
             CollectionAssert.AreEqual(new[]
             {
-                "으악! 박에서 뭐가 떨어졌어!", "요괴가 던진 폭탄이야!\n적힌 숫자만큼 옆으로 넘기면 풀려.",
-                "앗 뜨거! 도로 받아!", "풀렸다!", "풀린 폭탄은 오행 구슬 두 개가 돼.",
+                "으악! 박에서 뭐가 떨어졌어!", "요괴가 던진 폭탄이야!\n적힌 숫자만큼 옆으로\n넘기면 풀려.",
+                "앗 뜨거! 도로 받아!", "풀렸다!", "풀린 폭탄은\n오행 구슬 두 개가 돼.",
                 "가만히 냅두면 터지니까\n얼른얼른 넘겨야겠네!"
             }, bomb.Lines.Select(line => line.Text).ToArray());
             CollectionAssert.AreEqual(new[]
@@ -584,9 +657,9 @@ namespace Hapio.Tests
             }, beats.Select(beat => beat.Action).ToArray());
             CollectionAssert.AreEqual(new[]
             {
-                "어? 오른쪽이 빨개졌어!", "요괴가 오른쪽을 막은 것 같아!", "막힌 쪽은 튕겨 나와.\n반대쪽 묵이한테 북을 넘겨!",
+                "어? 오른쪽이 빨개졌어!", "요괴가 오른쪽을\n막은 것 같아!", "막힌 쪽은 튕겨 나와.\n반대쪽 묵이한테 북을 넘겨!",
                 "드디어 내 차례가 왔네\n기다리느라 힘들었어...", "받았어. 고마워.", "좋아, 이 정도면\n잡을 수 있겠어!",
-                "앞으로 나올 요괴들이 어떤 방해를 할지 모르니,\n조심하자!", "이번엔 진짜다!\n다 같이 가자!", "가보자!"
+                "앞으로 나올 요괴들이\n어떤 방해를 할지 모르니,\n조심하자!", "이번엔 진짜다!\n다 같이 가자!", "가보자!"
             }, block.Lines.Select(line => line.Text).ToArray());
             CollectionAssert.AreEqual(new[]
             {
@@ -1115,6 +1188,57 @@ namespace Hapio.Tests
                 Assert.That(art.tapHintSize.x / art.tapHintSize.y, Is.EqualTo(256f / 223f).Within(.05f), "The art's own shape.");
             }
             finally { Object.DestroyImmediate(art); }
+        }
+
+        /// <summary>
+        /// #552: every line breaks only where the script says (\n), at full size, in at most three lines, and every guide
+        /// banner stays on one line, measured with the bubble's and banner's own fonts and boxes (reference 390 pt screen).
+        /// A line the bubble would wrap by itself can leave a word or a "?" alone on the next line.
+        /// </summary>
+        [Test]
+        public void EveryLineBreaksWhereWrittenAndFitsItsBubble()
+        {
+            GameTutorialArt art = GameTutorialArt.Load();
+            Assert.That(art, Is.Not.Null);
+            Assert.That(art.dialogueFont, Is.Not.Null);
+            Assert.That(art.bannerFont, Is.Not.Null);
+            var bubble = new Vector2(art.bubbleSize.x * (1f - art.textInset.x - art.textInset.z),
+                art.bubbleSize.y * (1f - art.textInset.y - art.textInset.w));
+            var banner = new Vector2(390f - 24f, art.bannerHeight);
+            var probe = new GameObject("Tutorial line probe");
+            try
+            {
+                var text = probe.AddComponent<UnityEngine.UI.Text>();
+                var lines = GameTutorialScript.Steps.SelectMany(step => step.Beats.Where(beat => !string.IsNullOrEmpty(beat.Text))
+                    .Select(beat => (step.Name, beat.IsLine, beat.Text))).ToList();
+                foreach (string extra in new[] { GameTutorialScript.RetryLine, GameTutorialScript.TeaseLine, GameTutorialScript.WrongSideLine })
+                    lines.Add(("remark", true, extra));
+                foreach ((string step, bool isLine, string words) in lines)
+                {
+                    Font font = isLine ? art.dialogueFont : art.bannerFont;
+                    int size = isLine ? art.maxFontSize : art.bannerFontSize;
+                    Vector2 box = isLine ? bubble : banner;
+                    text.font = font;
+                    text.fontSize = size;
+                    text.resizeTextForBestFit = true;
+                    text.resizeTextMaxSize = size;
+                    text.resizeTextMinSize = 8;
+                    text.alignment = TextAnchor.MiddleCenter;
+                    text.horizontalOverflow = HorizontalWrapMode.Wrap;
+                    text.verticalOverflow = VerticalWrapMode.Truncate;
+                    text.supportRichText = false;
+                    var generator = new TextGenerator();
+                    generator.PopulateWithErrors(words, text.GetGenerationSettings(box), probe);
+                    int written = words.Split('\n').Length;
+                    string label = step + ": " + words.Replace("\n", " / ");
+                    Assert.That(generator.fontSizeUsedForBestFit, Is.EqualTo(size), label + " keeps its full size");
+                    Assert.That(generator.lineCount, Is.EqualTo(written), label + " breaks only where written");
+                    Assert.That(written, Is.LessThanOrEqualTo(isLine ? 3 : 1), label);
+                    Assert.That(words, Does.Not.StartWith(" ").And.Not.EndWith(" ").And.Not.Contain(" \n").And.Not.Contain("\n "),
+                        label + " has no stray space at a break");
+                }
+            }
+            finally { Object.DestroyImmediate(probe); }
         }
     }
 }

@@ -365,6 +365,36 @@ namespace Hapio.Tests
             Assert.That(director.CurrentBeat.Focus, Is.EqualTo(GameTutorialFocus.Minimap), "Still lit as 불이 answers.");
             yield return TapThrough(director, tap, art);
 
+            // #552: "어? 구슬이 빛나는데?" — the yin left from 2단계 starts its last flashes and keeps glowing while the line is up.
+            Assert.That(director.CurrentBeat.Cue, Is.EqualTo(GameTutorialCue.OrbGlow));
+            Assert.That(director.CurrentBeat.Focus, Is.EqualTo(GameTutorialFocus.FadingOrb), "Only that orb is lit.");
+            string fading = director.FadeDemoOrbId;
+            Assert.That(fading, Is.Not.Null, "An orb was picked for the demo.");
+            Assert.That(network.Snapshot.orbs.Single(orb => orb.id == fading).kind, Is.EqualTo(LabOrbKind.Yin), "The yin left from 2단계.");
+            string keptYang = network.Snapshot.orbs.Single(orb => orb.owner == network.LocalPlayerId && orb.kind == LabOrbKind.Yang).id;
+            LabOrbView fadingView = Object.FindObjectsByType<LabOrbView>(FindObjectsSortMode.None).Single(view => view.OrbId == fading);
+            yield return new WaitForSecondsRealtime(4f);
+            Assert.That(network.Snapshot.orbs.Any(orb => orb.id == fading), Is.True, "Read slowly, it is still there.");
+            Assert.That(fadingView.ExpiryWarning, Is.True, "Flashing white like an orb in its last seconds (#235).");
+            string vanished = null;
+            board.OrbVanished += id => vanished = id;
+            yield return TapThrough(director, tap, art);
+
+            // "…빛이 나기 시작하면 곧 없어져!" — it runs out in smoke; the line waits for that.
+            Assert.That(director.CurrentBeat.Cue, Is.EqualTo(GameTutorialCue.OrbVanish));
+            yield return new WaitForSecondsRealtime(art.tapCooldown + .05f);
+            tap.onClick.Invoke();
+            Assert.That(director.CurrentBeat.Cue, Is.EqualTo(GameTutorialCue.OrbVanish), "No moving on before it has gone.");
+            yield return Until(() => vanished == fading, "It goes up in smoke like a real run-out", 8f);
+            Assert.That(director.FadeDemoGone, Is.True);
+            Assert.That(network.Snapshot.orbs.Any(orb => orb.id == keptYang), Is.True, "The yang is untouched: nothing else runs out.");
+            yield return new WaitForSecondsRealtime(art.popSeconds);
+            yield return TapThrough(director, tap, art);
+            Assert.That(director.CurrentBeat.Focus, Is.EqualTo(GameTutorialFocus.None));
+            yield return TapThrough(director, tap, art);
+            Assert.That(director.CurrentBeat.Speaker, Is.EqualTo(GameTutorialSpeaker.Bul), "\"오호! 알겠어\"");
+            yield return TapThrough(director, tap, art);
+
             // 5단계: the gourd drops a two-lock bomb; I push it right to 금옥이, she sends it back unlocked and it opens
             // into two elemental orbs on my board.
             Assert.That(director.StepIndex, Is.EqualTo(5));
