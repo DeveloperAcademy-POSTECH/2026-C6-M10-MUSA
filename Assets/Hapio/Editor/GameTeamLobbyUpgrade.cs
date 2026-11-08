@@ -47,6 +47,8 @@ namespace Hapio.Editor
                 PrefabUtility.SaveAsPrefabAsset(root, GameLobbySceneUpgrade.PrefabPath);
             }
             finally { PrefabUtility.UnloadPrefabContents(root); }
+            GameMenuDesignUpgrade.Upgrade();
+            GameSeatDesignUpgrade.Upgrade();
             // The DEV panel gains its "2:2" tab in the same pass; Battle is never copied again here.
             if (!MenuDeveloperSchemaIsCurrent()) GameSceneBuilder.UpgradeMenuDeveloperSchema();
             AssetDatabase.SaveAssets();
@@ -390,6 +392,8 @@ namespace Hapio.Editor
         /// <summary>"어떤 걸로 동지를 부르겠소?" over the dimmed room browser, opened by "새 방 만들기 +".</summary>
         private static void BuildModePanel(GameLobbyView view)
         {
+            // The newer shared card already owns its native rounded graphics and footer layout.
+            if (view.modeCard != null) return;
             Font brush = view.heading.font, medium = view.mediumFont != null ? view.mediumFont : view.subheading.font;
             RectTransform panel = Child(view.design, "ModeSelect");
             Stretch(panel);

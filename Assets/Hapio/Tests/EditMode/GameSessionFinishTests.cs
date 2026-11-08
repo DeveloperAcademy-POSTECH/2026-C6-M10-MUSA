@@ -140,6 +140,70 @@ namespace Hapio.Tests
             Assert.That(json.Length, Is.LessThan(4096), json.Length.ToString());
         }
 
+        [Test]
+        public void MatchingFailureIsCopiedWithoutReplacingPreviousSuccessfulStageRecords()
+        {
+            using (var fixture = new Fixture())
+            {
+                fixture.CaptureMetadataResult();
+                Assert.That(fixture.Session.StageResults.Count, Is.EqualTo(1));
+                fixture.Session.State.stageIndex = 3;
+                fixture.Session.State.battleRound++;
+                fixture.Session.State.phase = GameFlowPhase.GameOver;
+                fixture.Session.State.retryableDefeat = true;
+                var failed = new LabSnapshot { phase = LabPhase.Defeat, paintCoverage = .78f,
+                    sessionId = fixture.Session.State.battleSessionId, round = fixture.Session.State.battleRound,
+                    players = Array.Empty<LabPlayerState>() };
+                Set(fixture.Network, "latest", failed);
+                fixture.Invoke("CacheResultSnapshot");
+                Assert.That(fixture.Session.ResultSnapshot, Is.Not.SameAs(failed));
+                Assert.That(fixture.Session.ResultSnapshot.phase, Is.EqualTo(LabPhase.Defeat));
+                Assert.That(fixture.Session.ResultSnapshot.paintCoverage, Is.EqualTo(.78f));
+                Assert.That(fixture.Session.StageResults.Count, Is.EqualTo(1), "Failed attempts are not completed stages.");
+                failed.paintCoverage = 0;
+                Assert.That(fixture.Session.ResultSnapshot.paintCoverage, Is.EqualTo(.78f));
+                Assert.That(fixture.HasCapturedResult, Is.False, "Failure never fabricates a completed-gourd preview.");
+                Assert.That(fixture.Session.CanRetryStage, Is.False, "A disconnected passive fixture cannot retry.");
+            }
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void AnUnrelatedOrAbandonedFailureSnapshotCannotSupplyResultData(bool normalDefeat)
+        {
+            using (var fixture = new Fixture())
+            {
+                fixture.Session.State.phase = GameFlowPhase.GameOver;
+                fixture.Session.State.retryableDefeat = normalDefeat;
+                Set(fixture.Network, "latest", new LabSnapshot { phase = LabPhase.Defeat,
+                    sessionId = fixture.Session.State.battleSessionId,
+                    round = normalDefeat ? fixture.Session.State.battleRound + 1 : fixture.Session.State.battleRound });
+                fixture.Invoke("CacheResultSnapshot");
+                Assert.That(fixture.Session.ResultSnapshot, Is.Null);
+                Assert.That(fixture.Session.StageResults, Is.Empty);
+            }
+        }
+
+        [Test]
+        public void ResultPresentationBusyIsLocalAndClearedAtTheNextGeneration()
+        {
+            using (var fixture = new Fixture())
+            {
+                fixture.Session.State.phase = GameFlowPhase.StageResult;
+                fixture.Session.SetResultPresentationBusy(true);
+                Assert.That(fixture.Session.IsAnyResultPresentationBusy, Is.True);
+                Assert.That(fixture.Session.IsViewerOpen, Is.False, "Reading a story must not open a gourd preview.");
+                fixture.Session.SetResultPresentationBusy(false);
+                Assert.That(fixture.Session.IsAnyResultPresentationBusy, Is.False);
+                fixture.Session.SetResultPresentationBusy(true);
+                fixture.Invoke("ResetResultAdvance");
+                Assert.That(fixture.Session.IsAnyResultPresentationBusy, Is.False);
+                fixture.Session.State.phase = GameFlowPhase.Playing;
+                fixture.Session.SetResultPresentationBusy(true);
+                Assert.That(fixture.Session.IsAnyResultPresentationBusy, Is.False);
+            }
+        }
+
         private static LabFinishReplayShot Record(int poses)
         {
             var shot = new LabFinishReplayShot
