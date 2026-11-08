@@ -112,6 +112,8 @@ MonoBehaviour:
   skipChoicePressScale: 1.08
   skipChoicePressSeconds: 0.08
   skipCloseSeconds: 0.12
+  logButtonSize: {x: 54, y: 30}
+  logButtonGap: 6
   arrowColor: {r: 0.36, g: 0.66, b: 0.29, a: 1}
   arrowWidth: 7
   arrowHeadLength: 18

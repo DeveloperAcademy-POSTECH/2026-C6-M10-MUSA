@@ -162,6 +162,10 @@ namespace Hapio
         [Tooltip("커지거나 돌아오는 데 걸리는 시간")] [Min(.01f)] public float skipChoicePressSeconds = .08f;
         [Tooltip("\"계속 배우기\"를 누른 뒤 창이 사라지는 시간 (빠르게)")] [Min(.01f)] public float skipCloseSeconds = .12f;
 
+        [Header("대화 기록 (#567)")]
+        [Tooltip("건너뛰기 옆 \"기록\" 버튼 크기. 그림과 글자 크기는 건너뛰기 버튼과 같고, 높이도 같다.")] public Vector2 logButtonSize = new Vector2(54f, 30f);
+        [Tooltip("건너뛰기 버튼과 기록 버튼 사이")] [Min(0f)] public float logButtonGap = 6f;
+
         [Header("화살표 (끌어 놓을 방향)")]
         public Color arrowColor = new Color(.36f, .66f, .29f, 1f);
         [Min(1f)] public float arrowWidth = 7f;

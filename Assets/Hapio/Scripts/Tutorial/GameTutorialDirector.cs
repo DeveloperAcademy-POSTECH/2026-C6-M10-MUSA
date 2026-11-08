@@ -405,6 +405,7 @@ namespace Hapio
             tapHint.gameObject.SetActive(false);
             bubbleRoot.gameObject.SetActive(false);
             BuildSkip();
+            BuildLogButton();
             BuildPause(root);
         }
 
@@ -563,6 +564,7 @@ namespace Hapio
 
         private void Advance()
         {
+            NoteLinePassed();
             IReadOnlyList<GameTutorialStep> steps = GameTutorialScript.Steps;
             beatIndex++;
             while (stepIndex < steps.Count && beatIndex >= steps[stepIndex].Beats.Count)
@@ -1076,7 +1078,9 @@ namespace Hapio
             PlaceNames();
             UpdateKeepOut();
             if (UpdatePause()) return;
-            if (UpdateSkip()) return;
+            bool skipDialogUp = UpdateSkip();
+            UpdateLogButton();
+            if (skipDialogUp) return;
             bool line = HasBeat && CurrentBeat.IsLine;
             if (remarkAt >= 0f && (Now - remarkAt > remarkSeconds || !remarkHolds && board.IsHolding))
             {
