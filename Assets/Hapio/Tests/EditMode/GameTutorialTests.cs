@@ -1045,7 +1045,7 @@ namespace Hapio.Tests
             Assert.That(GameTutorialScript.SkipTitle, Is.EqualTo("튜토리얼을 건너뛰겠소?"));
             Assert.That(GameTutorialScript.SkipBody.Split('\n'), Is.EqualTo(new[]
             {
-                "튜토리얼을 건너뛰면 구슬 전달과 조합 등", "기본 조작을 익히지 못해", "협동 플레이에 어려움이 있을 수 있소."
+                "튜토리얼을 건너뛰면 기본 조작을 익히지 못해", "협동 플레이에 어려움이 있을 수 있소."
             }));
             Assert.That((GameTutorialScript.SkipStay, GameTutorialScript.SkipLeave), Is.EqualTo(("계속 배우기", "건너뛰기")));
             GameTutorialArt art = GameTutorialArt.Load();
