@@ -301,8 +301,9 @@
 - 끄면(코드 기본값) #509 규칙 그대로: 아무 때나 던지고 1초 안에 모두 맞히기.
 - B만 시험: LabConfig `jigwiBTestOnly`(Host, Inspector, 에셋 기본 끔)를 켜면 지귀 스테이지가 B만 4초부터 17초마다(4/21/38/55/72초, `LabJigwiABTimeline.BTestSchedule` = 스냅샷 `schedule` 2) 내고 A와 공통 기믹은 없다. 시험 뒤 끄고, 켠 에셋은 커밋하지 않는다.
 - 실패한 B의 `boardFireUntil`은 불바다가 꺼져 있으면 -1이어도 검증을 통과한다(전에는 Guest가 실패한 B 스냅샷을 거절할 수 있었음).
-- LabConfig `jigwiBBucket`(Host, 에셋에서 켬) — **다 같이 드는 나무 물통**: B에 지목이 없고 모두 참여한다(`round.bucket`, 특수 물구슬 없음). 판의 손잡이를 꾹 누르고 있으면 `jigwiBReady`(잡음/놓음)를 보내고, 모두 잡으면 3-2-1, "당겨!"(`GoAt`) 뒤 `ReleaseSeconds`(1초) 안에 손잡이를 잡은 채 폰을 내 쪽으로 홱 젖히면 `jigwiBPull`(`LabModel.TryJigwiBPull`, `seat.launchedAt`). 모두 당기면 성공해 박의 각자 쪽에 큰 물 칠(`jigwiBSplashPaintShare`). 한 명이라도 늦거나 15초 안에 못 하면(물이 다 졸음) 실패. 켜면 3-2-1도 켜진다. 화면(물통/밧줄/손잡이/기울기)은 아직 만드는 중.
-- 현재 호환 묶음은 설정 259개·**5693**·`C6PhysicsLab/54`·**`C6HapioGame/40`**다. 5692 이하 앱과 혼용하지 않는다.
+- LabConfig `jigwiBBucket`(Host, 에셋에서 켬) — **다 같이 드는 나무 물통**: B에 지목이 없고 모두 참여한다(`round.bucket`, 특수 물구슬 없음, **누르기 없음**). 물통이 내려앉으면(`activeAt`) `BucketLiftSeconds`(0.8초) 뒤 게임이 스스로 3-2-1(`BucketCountdownSeconds` 2.4초, 박자 0.8초) → "당겨!"(`GoAt`) 뒤 `BucketPullSeconds`(1.5초) 안에 모두 폰을 내 쪽으로 홱 젖히면 `jigwiBPull`(`LabModel.TryJigwiBPull`, `seat.launchedAt`). 모두 당기면 성공해 박의 각자 쪽에 큰 물 칠(`jigwiBSplashPaintShare`). 누가 늦으면 `round.attempts`+1, 당김을 지우고 `BucketRetrySeconds`(1.2초) 뒤 다시 3-2-1(끝까지 들어갈 시간이 없으면 `countdownAt` -1). 15초가 다 지나면(물이 다 졸음) 실패. 켜면 3-2-1(`jigwiBCountdown`)도 켜진다. 물통/밧줄(3D)은 아직 만드는 중.
+- 물통 화면 `LabJigwiBucketHandleView`: 진행바 바로 아래 한 줄 안내("다 같이 밧줄을 당겨!" → "\"당겨!\"에 폰을 내 쪽으로 홱!" → "지금! … (2/4)" → "누가 늦었어! 다시!" → "물벼락!"/"물이 다 졸았다…"), 내 판 먼 끝(판 자리 (.5, .88))의 밧줄 끝 그림(누르지 않음, 구슬은 평소처럼). 당기기 = 중력 방향으로 일어선 각도가 `tiltWindowSeconds` 0.3초 안에 `tiltDegrees` 25° 이상 커짐, Editor/DEV 빌드는 **K를 0.2초**(`keyHoldSeconds`). "당겨!" 전에 젖히면 세지 않고 "아직!". 3-2-1 숫자와 "당겨!"는 오른쪽 위에 작게.
+- 현재 호환 묶음은 설정 259개·**5694**·`C6PhysicsLab/55`·**`C6HapioGame/41`**다. 5693 이하 앱과 혼용하지 않는다.
 
 ## 검사 카테고리와 검사 전용 시작 단축 (2026-11-05)
 

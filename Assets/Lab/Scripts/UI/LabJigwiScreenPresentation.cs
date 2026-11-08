@@ -184,7 +184,20 @@ namespace C6Lab
                 Countdown = go.AddComponent<LabJigwiBCountdownView>();
             }
             Countdown.Bind(source, shilla != null ? shilla : font);
+            // #551 나무 물통: my handle and rope on my board.
+            if (BucketHandle == null)
+            {
+                var go = new GameObject("Jigwi B Bucket Handle (#551)", typeof(RectTransform));
+                go.layer = gameObject.layer;
+                var rect = (RectTransform)go.transform; rect.SetParent(transform, false);
+                rect.anchorMin = Vector2.zero; rect.anchorMax = Vector2.one; rect.offsetMin = rect.offsetMax = Vector2.zero;
+                BucketHandle = go.AddComponent<LabJigwiBucketHandleView>();
+            }
+            BucketHandle.Bind(source, shilla != null ? shilla : font);
         }
+
+        /// <summary>#551 나무 물통: my handle. Created at runtime with the talisman.</summary>
+        public LabJigwiBucketHandleView BucketHandle { get; private set; }
 
         /// <summary>#551: the B 3-2-1. Created at runtime with the talisman.</summary>
         public LabJigwiBCountdownView Countdown { get; private set; }

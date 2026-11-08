@@ -120,10 +120,13 @@ namespace C6Lab
             bool picked = false;
             foreach (var seat in round.players) if (seat != null && seat.playerId == localPlayer) picked = true;
             bool afterGo = round.countdownAt >= 0d && now >= round.GoAt;
-            DrawSeats(snapshot, round, localPlayer, now, !afterGo);
-            DrawHoldHint(round, localPlayer, now, picked && !afterGo);
-            DrawThrowHint(round, localPlayer, now, picked && afterGo);
-            if (round.countdownAt < 0d)
+            // #551 나무 물통: the bucket and ropes show who holds; the handle view has its own hints.
+            DrawSeats(snapshot, round, localPlayer, now, !afterGo && !round.bucket);
+            DrawHoldHint(round, localPlayer, now, picked && !afterGo && !round.bucket);
+            DrawThrowHint(round, localPlayer, now, picked && afterGo && !round.bucket);
+            big.rectTransform.anchorMin = big.rectTransform.anchorMax = round.bucket ? new Vector2(.74f, .76f) : new Vector2(.5f, .74f);
+            big.fontSize = round.bucket ? (afterGo ? 110 : 130) : 220;
+            if (round.countdownAt < 0d || now < round.countdownAt)
             {
                 // Waiting for everyone to hold: no number; a cancelled count simply disappears.
                 if (big.gameObject.activeSelf) big.gameObject.SetActive(false);
@@ -132,13 +135,13 @@ namespace C6Lab
             }
             if (countedRound != round.id || Math.Abs(countedFrom - round.countdownAt) > 1e-6) { countedRound = round.id; countedFrom = round.countdownAt; lastBeat = -1; }
             double t = now - round.countdownAt;
-            double beatSeconds = LabJigwiABTimeline.CountdownSeconds / 3d;
-            int beat = t < LabJigwiABTimeline.CountdownSeconds ? Mathf.Clamp((int)(t / beatSeconds), 0, 2) : 3;
-            bool showing = beat < 3 || t < LabJigwiABTimeline.CountdownSeconds + LabJigwiABTimeline.ReleaseSeconds + .3d;
+            double beatSeconds = round.CountdownLength / 3d;
+            int beat = t < round.CountdownLength ? Mathf.Clamp((int)(t / beatSeconds), 0, 2) : 3;
+            bool showing = beat < 3 || t < round.CountdownLength + (round.bucket ? .8d : LabJigwiABTimeline.ReleaseSeconds + .3d);
             if (big.gameObject.activeSelf != showing) big.gameObject.SetActive(showing);
             if (!showing) return;
-            double since = beat < 3 ? t - beat * beatSeconds : t - LabJigwiABTimeline.CountdownSeconds;
-            big.text = beat < 3 ? (3 - beat).ToString() : "던져!";
+            double since = beat < 3 ? t - beat * beatSeconds : t - round.CountdownLength;
+            big.text = beat < 3 ? (3 - beat).ToString() : round.bucket ? "당겨!" : "던져!";
             big.color = beat < 3 ? numberColor : goColor;
             // Each beat lands big and settles (a drum hit you can see).
             float punch = Mathf.Exp(-(float)since * 9f);

@@ -130,7 +130,7 @@ namespace C6Lab
                         Include(item.syncWindowAt + item.SyncWindow);
                     // #551: "지금!" and the moment everyone must have let go.
                     if (item.kind == LabJigwiABKind.GroupFire && item.countdownAt >= 0d)
-                    { Include(item.GoAt); Include(item.GoAt + LabJigwiABTimeline.ReleaseSeconds); }
+                    { Include(item.countdownAt); Include(item.GoAt); Include(item.GoAt + item.PullSeconds); }
                 }
                 Include(item.boardFireUntil); // #509: the board fire ends exactly on time
 
@@ -207,6 +207,8 @@ namespace C6Lab
                 syncWindowSeconds = !personal && jigwiBCountdown ? LabJigwiABTimeline.CountdownSyncWindowSeconds : 0f,
                 bucket = !personal && jigwiBBucket
             };
+            // #551 나무 물통: nobody presses anything — the game lifts the bucket and counts 3-2-1 by itself.
+            if (item.bucket) item.countdownAt = activeAt + LabJigwiABTimeline.BucketLiftSeconds;
             // #479: A ignites every seat at once; each seat clears its own fire with a talisman.
             if (personal) item.players = seats.Take(activeSeatCount).Select(owner => new LabJigwiABPlayerFire
             {
@@ -429,7 +431,7 @@ namespace C6Lab
             var active = ActiveJigwiABRound(now);
             if (active == null || active.kind != LabJigwiABKind.GroupFire || !active.Active(now) || active.id != roundId) return false;
             var seat = active.players.FirstOrDefault(value => value.playerId == sender);
-            if (seat == null || active.countdownAt >= 0d && now >= active.GoAt) return false;
+            if (seat == null || active.bucket || active.countdownAt >= 0d && now >= active.GoAt) return false;
             if (holding)
             {
                 if (seat.readyAt >= 0d) return false;
@@ -463,17 +465,27 @@ namespace C6Lab
             var seat = active.players.FirstOrDefault(value => value.playerId == orb.originOwner);
             if (seat != null && seat.launchedAt < 0d) { seat.launchedAt = now; revision++; }
         }
-        /// <summary>#551: someone still held on ReleaseSeconds after "지금!" — the one chance is gone, B fails.</summary>
+        /// <summary>
+        /// #551: someone had not thrown <see cref="LabJigwiABRound.PullSeconds"/> after "지금!" — the one chance is gone, B fails.
+        /// 나무 물통: someone had not pulled — another 3-2-1 while water is left.
+        /// </summary>
         private void FailLateJigwiBRelease(LabJigwiABRound active, double now)
         {
             if (active.resolution != LabJigwiABResolution.None || active.countdownAt < 0d) return;
-            double due = active.GoAt + LabJigwiABTimeline.ReleaseSeconds;
+            double due = active.GoAt + active.PullSeconds;
             if (now < due || active.players.All(value => value.launchedAt >= 0d)) return;
-            FailJigwiSync(active, due);
+            if (!active.bucket) { FailJigwiSync(active, due); return; }
+            // #551 나무 물통: someone was late. The bucket clunks down and, while there is time (water) for a whole
+            // 3-2-1 and pull, it is lifted again. Otherwise everyone just watches the water boil away (expires at endsAt).
+            active.attempts++;
+            foreach (var seat in active.players) seat.launchedAt = -1d;
+            double next = due + LabJigwiABTimeline.BucketRetrySeconds;
+            active.countdownAt = next + active.CountdownLength + active.PullSeconds <= active.endsAt && active.attempts < 10 ? next : -1d;
+            revision++;
         }
         /// <summary>
         /// #551 나무 물통: a seat pulled its handle (tilted the phone toward itself while holding). Counts only after "당겨!"
-        /// and within <see cref="LabJigwiABTimeline.ReleaseSeconds"/>, once per seat, while still holding. When every seat
+        /// and within <see cref="LabJigwiABRound.PullSeconds"/>, once per seat and 3-2-1. When every seat
         /// has pulled the bucket flips: B succeeds and each seat paints one big Water splash on its own side of the boss.
         /// </summary>
         public bool TryJigwiBPull(ulong sender, string roundId, double now)
@@ -482,9 +494,9 @@ namespace C6Lab
                 || phase != LabPhase.Playing) return false;
             var active = ActiveJigwiABRound(now);
             if (active == null || !active.bucket || !active.Active(now) || active.id != roundId || active.countdownAt < 0d) return false;
-            if (now < active.GoAt || now > active.GoAt + LabJigwiABTimeline.ReleaseSeconds) return false;
+            if (now < active.GoAt || now > active.GoAt + active.PullSeconds) return false;
             var seat = active.players.FirstOrDefault(value => value.playerId == sender);
-            if (seat == null || seat.readyAt < 0d || seat.launchedAt >= 0d) return false;
+            if (seat == null || seat.launchedAt >= 0d) return false;
             seat.launchedAt = now;
             revision++;
             if (active.players.All(value => value.launchedAt >= 0d)) SucceedJigwiBucket(active, now);

@@ -265,13 +265,14 @@ namespace C6Lab
         // 5691: #540 Jigwi A: an unfinished talisman burns that seat's remaining orbs; talisman orb volley (on top of 5690).
         // 5692: #551 Jigwi B countdown: "jigwiBReady" request, round countdownAt/syncWindowSeconds, seat readyAt/launchedAt.
         // 5693: #551 Jigwi B bucket: every seat takes part, round.bucket, "jigwiBPull" request.
-        internal const ushort LabProtocolVersion = 5693;
+        // 5694: #551 Jigwi B bucket: no holding, the 3-2-1 starts by itself and repeats after a miss (round.attempts).
+        internal const ushort LabProtocolVersion = 5694;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Double-tap a blue fox orb to clear it, and keep your Yin and Yang away.";
         /// <summary>More fox orbs than one fox fire ever drops; a longer list is ignored (#251).</summary>
         private const int MaximumFoxFireOrbs = 10;
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/54");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/55");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;

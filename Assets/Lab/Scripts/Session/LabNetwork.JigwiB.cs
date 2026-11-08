@@ -16,8 +16,7 @@ namespace C6Lab
         private float jigwiBReadySentAt = float.NegativeInfinity;
         /// <summary>#551 나무 물통: 당기기 요청 패킷 종류. firstId에 B 회차 id.</summary>
         public const string JigwiBPullPacket = "jigwiBPull";
-        private bool jigwiBucketHolding;
-        private string jigwiBucketPulledRound;
+        private string jigwiBucketPulledRound; // round id + 3-2-1 start: one pull per 3-2-1
         private float jigwiBucketPullSentAt = float.NegativeInfinity;
 
         /// <summary>#551 나무 물통: 지금 내가 참여 중인 물통 B (아니면 null). 화면이 손잡이/밧줄을 그릴 때 쓴다.</summary>
@@ -26,24 +25,24 @@ namespace C6Lab
             get { LabJigwiABRound round = MyJigwiB(JigwiABPresentationTime); return round != null && round.bucket ? round : null; }
         }
 
-        /// <summary>#551 나무 물통: 판의 손잡이를 꾹 누르고 있는지(화면이 매 프레임 알려 줌). Host 알림은 UpdateJigwiBReady가 한다.</summary>
-        public void SetJigwiBucketHolding(bool holding) => jigwiBucketHolding = holding;
-
         /// <summary>
-        /// #551 나무 물통: 손잡이를 잡은 채 폰을 내 쪽으로 홱 젖혔다. "당겨!" 뒤 당기기 시간 안에서만 Host에 보낸다.
-        /// 한 회차에 한 번. 보냈으면 true.
+        /// #551 나무 물통: 폰을 내 쪽으로 홱 젖혔다. "당겨!" 뒤 당기기 시간 안에서만 Host에 보낸다.
+        /// 3-2-1 한 번에 한 번. 보냈으면 true.
         /// </summary>
         public bool RequestJigwiBucketPull()
         {
             if (!IsConnected || !CanProcessBattleActions || latest == null || latest.paused) return false;
             double now = JigwiABPresentationTime;
             LabJigwiABRound round = MyJigwiBucket;
-            if (round == null || !jigwiBucketHolding || round.countdownAt < 0d || now < round.GoAt
-                || now > round.GoAt + LabJigwiABTimeline.ReleaseSeconds || jigwiBucketPulledRound == round.id) return false;
-            jigwiBucketPulledRound = round.id;
+            if (round == null || round.countdownAt < 0d || now < round.GoAt
+                || now > round.GoAt + round.PullSeconds || jigwiBucketPulledRound == PullKey(round)) return false;
+            jigwiBucketPulledRound = PullKey(round);
             SendJigwiBucketPull(round.id);
             return true;
         }
+        private static string PullKey(LabJigwiABRound round) => round.id + "@" + round.countdownAt.ToString("R");
+        /// <summary>#551 나무 물통: 이번 3-2-1에서 이 기기가 이미 당겼는지.</summary>
+        public bool JigwiBucketPulledThisCount(LabJigwiABRound round) => round != null && jigwiBucketPulledRound == PullKey(round);
         private void SendJigwiBucketPull(string roundId)
         {
             jigwiBucketPullSentAt = Time.unscaledTime;
@@ -89,9 +88,9 @@ namespace C6Lab
             if (board == null || !IsConnected || !CanProcessBattleActions || latest == null || latest.paused) return;
             double now = JigwiABPresentationTime;
             LabJigwiABRound round = MyJigwiB(now);
-            if (round != null && round.bucket) ResendJigwiBucketPull(round, now);
+            if (round != null && round.bucket) { ResendJigwiBucketPull(round, now); return; } // the bucket has no holding
             if (round == null || round.countdownAt >= 0d && now >= round.GoAt) { jigwiBReadyRound = null; return; }
-            bool holding = round.bucket ? jigwiBucketHolding : IsMyJigwiBWater(round, board.HeldOrbId);
+            bool holding = IsMyJigwiBWater(round, board.HeldOrbId);
             bool hostThinks = false;
             foreach (var seat in round.players)
                 if (seat != null && seat.playerId == LocalPlayerId) hostThinks = seat.readyAt >= 0d;
@@ -106,8 +105,8 @@ namespace C6Lab
         /// <summary>#551: a pull the Host has not counted yet is sent again every 0.2 s while the pull window lasts.</summary>
         private void ResendJigwiBucketPull(LabJigwiABRound round, double now)
         {
-            if (jigwiBucketPulledRound != round.id || round.countdownAt < 0d
-                || now > round.GoAt + LabJigwiABTimeline.ReleaseSeconds || Time.unscaledTime - jigwiBucketPullSentAt < .2f) return;
+            if (jigwiBucketPulledRound != PullKey(round) || round.countdownAt < 0d
+                || now > round.GoAt + round.PullSeconds || Time.unscaledTime - jigwiBucketPullSentAt < .2f) return;
             foreach (var seat in round.players)
                 if (seat != null && seat.playerId == LocalPlayerId && seat.launchedAt < 0d) { SendJigwiBucketPull(round.id); return; }
         }
