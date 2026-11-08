@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -122,9 +123,10 @@ namespace Hapio.Tests
             }
         }
 
-        // #504: the Editor rewrites a URP material's hidden _MainTex/_Color from _BaseMap/_BaseColor when it imports one,
-        // so a saved file that disagrees becomes a stray .mat change on the next save. A material imported this session
-        // may already show the rewritten values, so read the saved file itself.
+        // #504: when the Editor first reads a URP material's properties, URP rewrites its hidden _MainTex/_Color from
+        // _BaseMap/_BaseColor. A different texture copy dirties the material, so the next save changes the .mat; a different
+        // color copy is written with the next save for any other reason. A material read this session may already show
+        // the rewritten values, so read the saved file itself.
         [TestCase(GameScenePaths.Battle)]
         [TestCase("Assets/Lab/Scenes/Lab.unity", Category = "LabOnly")]
         public void EveryStudioMaterialIsAppliedAndSavedWithTheCopiesTheEditorRewrites(string path)
@@ -148,7 +150,8 @@ namespace Hapio.Tests
                             file + " keeps the URP Lit/Unlit hidden copies");
                         string text = File.ReadAllText(file).Replace("\r\n", "\n");
                         Assert.That(SavedTexture(text, "_MainTex", file), Is.EqualTo(SavedTexture(text, "_BaseMap", file)), file);
-                        Assert.That(SavedColor(text, "_Color", file), Is.EqualTo(SavedColor(text, "_BaseColor", file)), file);
+                        Assert.That(SavedColor(text, "_Color", file), Is.EqualTo(UrpColorCopy(material.shader, SavedColor(text, "_BaseColor", file))),
+                            file + " _Color");
                     }
                 }
             }
@@ -160,33 +163,40 @@ namespace Hapio.Tests
         }
 
         [Test]
-        public void ApplyImageAlsoWritesTheHiddenCopiesTheEditorRewrites()
+        public void ApplyImageWritesTheHiddenCopiesSoUrpsOwnCopyChangesNothing()
         {
             var png = new Texture2D(2, 2);
-            var color = new Color(.8f, .7f, .6f, 1f);
+            // GetColor returns the first two a float step away from what SetColor stored; the last comes back exactly.
+            Color[] colors = { new Color(.55f, .29f, .81f, 1f), new Color(.17923617f, .4977885f, .5250866f, 1f), new Color(.8f, .7f, .6f, 1f) };
             try
             {
                 foreach (string shaderName in new[] { "Universal Render Pipeline/Lit", "Universal Render Pipeline/Unlit" })
-                {
-                    var material = new Material(Shader.Find(shaderName));
-                    try
+                    foreach (Color color in colors)
                     {
-                        // Stale copies, the way the image button used to leave them.
-                        material.SetTexture("_MainTex", Texture2D.blackTexture);
-                        material.SetTextureScale("_MainTex", Vector2.one);
-                        material.SetColor("_Color", Color.red);
-                        LabBackgroundStudio.ApplyImage(material, png, color, new Vector2(5, 4), new Vector2(.25f, .5f));
-                        foreach (string property in new[] { "_BaseMap", "_MainTex" })
+                        var material = new Material(Shader.Find(shaderName));
+                        string context = shaderName + " " + color.ToString("F7");
+                        try
                         {
-                            Assert.That(material.GetTexture(property), Is.SameAs(png), shaderName + " " + property);
-                            Assert.That(material.GetTextureScale(property), Is.EqualTo(new Vector2(5, 4)), shaderName + " " + property);
-                            Assert.That(material.GetTextureOffset(property), Is.EqualTo(new Vector2(.25f, .5f)), shaderName + " " + property);
+                            // Stale copies, the way the image button used to leave them.
+                            material.SetTexture("_MainTex", Texture2D.blackTexture);
+                            material.SetTextureScale("_MainTex", Vector2.one);
+                            material.SetColor("_Color", Color.red);
+                            LabBackgroundStudio.ApplyImage(material, png, color, new Vector2(5, 4), new Vector2(.25f, .5f));
+                            foreach (string property in new[] { "_BaseMap", "_MainTex" })
+                            {
+                                Assert.That(material.GetTexture(property), Is.SameAs(png), context + " " + property);
+                                Assert.That(material.GetTextureScale(property), Is.EqualTo(new Vector2(5, 4)), context + " " + property);
+                                Assert.That(material.GetTextureOffset(property), Is.EqualTo(new Vector2(.25f, .5f)), context + " " + property);
+                            }
+                            Color before = material.GetColor("_Color");
+                            Assert.That(before.r, Is.EqualTo(color.r).Within(1e-5f), context);
+                            // The copy URP's BaseShaderGUI.SetMaterialKeywords makes when the Editor first reads the material.
+                            // Had ApplyImage written `color` itself, this would change the drifting colors and dirty the asset.
+                            material.SetColor("_Color", material.GetColor("_BaseColor"));
+                            Assert.That(Bits(material.GetColor("_Color")), Is.EqualTo(Bits(before)), context);
                         }
-                        Assert.That(material.GetColor("_BaseColor"), Is.EqualTo(color), shaderName);
-                        Assert.That(material.GetColor("_Color"), Is.EqualTo(color), shaderName);
+                        finally { Object.DestroyImmediate(material); }
                     }
-                    finally { Object.DestroyImmediate(material); }
-                }
             }
             finally { Object.DestroyImmediate(png); }
         }
@@ -234,11 +244,27 @@ namespace Hapio.Tests
             return match.Groups[1].Value + " " + match.Groups[2].Value + " " + match.Groups[3].Value;
         }
 
-        private static string SavedColor(string text, string name, string file)
+        /// <summary>The `_Color` URP copies from this saved `_BaseColor`: what GetColor returns after SetColor (#504).</summary>
+        private static float[] UrpColorCopy(Shader shader, float[] baseColor)
         {
-            Match match = Regex.Match(text, "\n    - " + name + ": (\\{[^}]*\\})\n");
+            var probe = new Material(shader);
+            try
+            {
+                probe.SetColor("_BaseColor", new Color(baseColor[0], baseColor[1], baseColor[2], baseColor[3]));
+                Color copy = probe.GetColor("_BaseColor");
+                return new[] { copy.r, copy.g, copy.b, copy.a };
+            }
+            finally { Object.DestroyImmediate(probe); }
+        }
+
+        private static int[] Bits(Color color) => new[] { color.r, color.g, color.b, color.a }
+            .Select(channel => System.BitConverter.ToInt32(System.BitConverter.GetBytes(channel), 0)).ToArray();
+
+        private static float[] SavedColor(string text, string name, string file)
+        {
+            Match match = Regex.Match(text, "\n    - " + name + ": \\{r: ([^,]+), g: ([^,]+), b: ([^,]+), a: ([^}]+)\\}\n");
             Assert.That(match.Success, Is.True, file + " saves " + name);
-            return match.Groups[1].Value;
+            return Enumerable.Range(1, 4).Select(group => float.Parse(match.Groups[group].Value, CultureInfo.InvariantCulture)).ToArray();
         }
     }
 }

@@ -345,4 +345,4 @@
 
 ## #504 배경 재질의 숨은 사본
 
-- 배경 Studio의 바닥·한지 배경·보드 뒤 재질(URP Lit/Unlit)은 `_BaseMap`·`_BaseColor`와 숨은 `_MainTex`·`_Color`를 같은 값으로 저장한다. Editor는 재질을 가져올 때 사본을 맞춘다. 값이 다르면 가져온 재질이 dirty가 되고, 다음 저장 때 .mat이 바뀐다. Editor 스크립트로 바꿀 때도 `LabBackgroundStudio.ApplyImage`(Editor 전용)를 쓴다. `GameStageBackgroundAssetTests`가 재질 파일을 읽어 확인한다. 상세는 `docs/STAGE_BACKGROUNDS.md`를 따른다.
+- 배경 Studio의 바닥·한지 배경·보드 뒤 재질(URP Lit/Unlit)은 숨은 `_MainTex`·`_Color`를 URP가 `_BaseMap`·`_BaseColor`에서 복사하는 값 그대로 저장한다. Editor가 재질 속성을 처음 읽을 때 URP가 다시 복사하고, 결과가 다르면 재질이 dirty가 되어 다음 저장 때 .mat이 바뀐다. 일부 색은 `GetColor`가 float 한두 단계 다르게 돌려주므로 `_Color`에 같은 숫자를 쓰면 안 된다. Editor 스크립트로 바꿀 때도 `LabBackgroundStudio.ApplyImage`(Editor 전용)를 쓴다. `GameStageBackgroundAssetTests`가 재질 파일을 읽어 확인한다. 상세는 `docs/STAGE_BACKGROUNDS.md`를 따른다.

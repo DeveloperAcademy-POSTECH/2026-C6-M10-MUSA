@@ -3,21 +3,20 @@
 ## 2026-11-08 — #504 배경 재질 `_MainTex`·`_Color` 사본 맞추기
 
 - **기준:** main `886e65db` 위의 `chore/#504-background-material-sync`. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro), iOS 활성. Library는 다른 worktree에서 복제했다.
-- **원인 확인(임시 진단 스크립트, 커밋 안 함):**
-  - URP `BaseShaderGUI.SetMaterialKeywords`는 `_MainTex`와 `_BaseMap`이 모두 있으면 `_BaseMap`의 텍스처·타일링·오프셋을 `_MainTex`에, `_BaseColor`를 `_Color`에 복사한다.
-  - Stage02 `YokaiGround` 복사본의 `_MainTex` 텍스처와 `_Color`만 다르게 저장하고 가져왔다. 불러온 재질의 두 값은 이미 `_BaseMap`·`_BaseColor`와 같았고, 재질은 dirty였다. 저장하자 파일도 그렇게 바뀌었다.
-  - 고치기 전 `이미지만 적용`의 재질 쓰기(`_BaseMap`·`_BaseColor`만)를 다른 복사본에 실행하고 저장했다. `_MainTex`의 타일링·오프셋이 옛 값(3×3, 0)으로 남았다. 다시 불러오자 dirty였고, 저장하자 `_MainTex`가 바뀌었다.
-  - 다시 가져오지 않고 불러오기만 한 재질은 바뀌지 않았다. `_Color`가 `_BaseColor`와 소수 마지막 자리만 다른 구운 박 재질 하나로 확인했다.
-  - 고친 뒤 `ApplyImage`로 쓰고 저장한 파일은 두 사본이 같고, 다시 불러와도 dirty가 아니다.
-  - 지금 저장된 Studio 재질 12개(Battle Studio 3개·Lab Studio 1개 × 바닥·한지 배경·보드 뒤)는 이미 일치한다. 이번 변경은 재질·Scene 파일을 바꾸지 않는다.
+- **원인 확인(임시 진단 스크립트 7개, 커밋 안 함):**
+  - URP `BaseShaderGUI.SetMaterialKeywords`는 `_MainTex`와 `_BaseMap`이 모두 있으면 `_BaseMap`의 텍스처·타일링·오프셋을 `_MainTex`에, `GetColor("_BaseColor")`를 `_Color`에 복사한다.
+  - 이 복사는 가져오기·불러오기가 아니라 재질 속성을 처음 읽을 때 일어났다. Stage02 `YokaiGround` 복사본의 `_MainTex` 텍스처만 다르게 저장해 가져왔다. 불러오기만 했을 때는 dirty가 아니었다. `GetTexture`·`HasProperty`로 처음 읽자 사본이 `_BaseMap` 값이 되고 dirty가 됐고, 저장하자 파일도 바뀌었다. `shader`·`SerializedObject` 접근만으로는 바뀌지 않았다.
+  - 색 사본도 같다. `_Color`만 흰색인 `Eye pupils` 복사본은 처음 읽은 뒤 dirty였고, 저장하자 `_Color`가 `_BaseColor` 값으로 바뀌었다.
+  - `GetColor`는 시험한 6색 중 3색을 `SetColor`로 넣은 값보다 float 1~2단계 작게 돌려줬다(예: 0.55 → 0.54999995). 이 3색을 `_Color`에 같은 숫자로 저장한 파일은 다시 가져와 처음 읽을 때 dirty가 됐다. `_BaseColor`를 다시 읽어 복사하면(URP와 같은 방식) 6색 모두 dirty가 아니었다. `-nographics` 유무와 관계없이 같았다.
+  - 고치기 전 `이미지만 적용`의 재질 쓰기(`_BaseMap`·`_BaseColor`만)를 복사본에 실행하고 저장했다. `_MainTex`의 타일링·오프셋이 옛 값(3×3, 0)으로 남았고, 다시 불러와 읽자 dirty였다.
+  - 지금 저장된 Studio 재질 12개는 복사본을 다시 가져와 처음 읽어도 dirty가 아니다. 이번 변경은 재질·Scene 파일을 바꾸지 않는다.
 - **고친 것:**
-  - `LabBackgroundStudio.ApplyImage`가 사본까지 쓴다.
+  - `LabBackgroundStudio.ApplyImage`가 URP와 같은 방식(기본값을 다시 읽어 복사)으로 사본까지 쓴다.
   - Studio Inspector는 저장 재질이 Studio 값과 다르면 경고한다.
   - `GameStageBackgroundAssetTests`에 EditMode 검사 3개(TestCase 포함 4건)를 더했다.
-- **남은 것(바꾸지 않음):** 검토 중 저장소의 URP Lit/Unlit 재질 74개를 모두 다시 확인했다. `_MainTex`가 `_BaseMap`과 다른 파일은 없고, `_Color`가 `_BaseColor`와 다른 파일은 28개다. 모두 배경 Studio 밖이다. 다시 가져오고 저장하면 같은 방식으로 바뀔 수 있지만 그대로 뒀다.
-  - 구운 박 14개(`Assets/Hapio/Art/Gourds/Stage0N_*/Materials`): 소수 마지막 자리만 다르다.
-  - `Assets/Hapio/Art/Yagwanggwi/Materials` 10개: 7개는 마지막 자리 차이다. `Eye ivory`·`Eye pupils`·`Inner ivory` 3개는 `_Color`가 흰색이라 값 자체가 다르다.
-  - Lab 4개(`Art/Orbs/OrbBoardPlate`·`OrbCombined`·`OrbYin`, `Resources/GourdPaint/Stem`): 마지막 자리 차이다.
+- **남은 것(바꾸지 않음):** 검토 중 저장소의 URP Lit/Unlit 재질 74개를 모두 다시 확인했다. `_MainTex`가 `_BaseMap`과 다른 파일은 없다. `_Color`의 글자가 `_BaseColor`와 다른 파일은 28개이고, 모두 배경 Studio 밖이다.
+  - 25개는 소수 마지막 자리만 다르다: 구운 박 14개(`Assets/Hapio/Art/Gourds/Stage0N_*/Materials`), `Assets/Hapio/Art/Yagwanggwi/Materials` 7개, Lab 4개(`Art/Orbs/OrbBoardPlate`·`OrbCombined`·`OrbYin`, `Resources/GourdPaint/Stem`). 위 `GetColor` 차이로 URP가 복사한 값이다. `Hanbok_gold_edging`·`Hanbok_long_robe_teal`·`OrbCombined` 복사본은 처음 읽어도 dirty가 아니었고, 다른 속성을 바꿔 저장해도 `_Color`가 그대로였다.
+  - `Assets/Hapio/Art/Yagwanggwi/Materials`의 `Eye ivory`·`Eye pupils`·`Inner ivory` 3개는 `_Color`가 흰색이다. Editor가 처음 읽으면 dirty가 되어, 다음 저장 때 `_Color` 줄이 `_BaseColor` 값으로 바뀐다(`Eye pupils`로 확인). 세 재질을 참조하는 Prefab·Scene·에셋은 없어서 평소에는 읽히지 않는다. 다른 작업의 에셋이라 그대로 뒀다.
 
 | 확인 | 결과 |
 | --- | --- |

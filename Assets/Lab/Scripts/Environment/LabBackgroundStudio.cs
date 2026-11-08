@@ -166,17 +166,18 @@ namespace C6Lab
         Texture2D BoardBackingPng{get{return boardBackgroundPng!=null?boardBackgroundPng:groundPng;}}
 
         /// <summary>
-        /// Writes one studio image into a URP material. URP Lit/Unlit also keep hidden `_MainTex`/`_Color` copies, and
-        /// the Editor rewrites them from `_BaseMap`/`_BaseColor` when it imports the material. Writing both keeps the
-        /// saved file the way that check leaves it, so a later import does not dirty the .mat (#504).
+        /// Writes one studio image into a URP material. URP Lit/Unlit also keep hidden `_MainTex`/`_Color` copies, which
+        /// URP rewrites from `_BaseMap`/`_BaseColor` when the Editor first reads the material, dirtying it if they differ.
+        /// Making the same copy here keeps the saved file the way that rewrite leaves it, so no stray .mat change follows (#504).
         /// </summary>
         public static void ApplyImage(Material m,Texture2D png,Color color,Vector2 tiling,Vector2 offset)
         {
             m.SetTexture("_BaseMap",png); m.SetColor("_BaseColor",color);
             m.SetTextureScale("_BaseMap",tiling);m.SetTextureOffset("_BaseMap",offset);
-            // The same condition URP's BaseShaderGUI uses before it copies the base map.
-            if(m.HasProperty("_MainTex")&&m.HasProperty("_BaseMap")){m.SetTexture("_MainTex",png);m.SetTextureScale("_MainTex",tiling);m.SetTextureOffset("_MainTex",offset);}
-            if(m.HasProperty("_Color")&&m.HasProperty("_BaseColor"))m.SetColor("_Color",color);
+            // URP BaseShaderGUI.SetMaterialKeywords' own copy, read back from the base values. GetColor can return some
+            // colors a float step away from what SetColor stored, so writing `color` itself would differ from URP's copy.
+            if(m.HasProperty("_MainTex")&&m.HasProperty("_BaseMap")){m.SetTexture("_MainTex",m.GetTexture("_BaseMap"));m.SetTextureScale("_MainTex",m.GetTextureScale("_BaseMap"));m.SetTextureOffset("_MainTex",m.GetTextureOffset("_BaseMap"));}
+            if(m.HasProperty("_Color")&&m.HasProperty("_BaseColor"))m.SetColor("_Color",m.GetColor("_BaseColor"));
         }
 
         /// <summary>The saved materials the image button writes: ground, Hanji surround and board backing, where present.</summary>
