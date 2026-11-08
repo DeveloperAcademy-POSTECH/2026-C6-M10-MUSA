@@ -666,31 +666,6 @@ namespace C6Lab
         });
         private static Sprite Pixel() => pixel != null ? pixel : pixel = Build("Jigwi bucket rope", 4, 4, (u, v) => Color.white);
 
-        /// <summary>A wooden toggle: a fat rounded bar with dark ink outline, grain lines and two rope wraps.</summary>
-        private static Sprite Bar() => barSprite != null ? barSprite : barSprite = Build("Jigwi bucket handle", 192, 72, (u, v) =>
-        {
-            float x = u * 192f, y = v * 72f;
-            float d = RoundBox(x, y, 6f, 10f, 186f, 62f, 26f);
-            if (d > 0f) return Color.clear;
-            if (d > -6f) return new Color(.12f, .07f, .03f, 1f);
-            bool wrap = Mathf.Abs(x - 60f) < 9f || Mathf.Abs(x - 132f) < 9f;
-            if (wrap) return Mathf.Repeat(y + x * .6f, 10f) < 5f ? new Color(.93f, .83f, .62f, 1f) : new Color(.78f, .66f, .45f, 1f);
-            float grain = .9f + .1f * Mathf.Sin(y * .55f + Mathf.Sin(x * .05f) * 3f);
-            float light = y > 44f ? 1.12f : 1f;
-            return new Color(grain * light, grain * light, grain * light, 1f);
-        });
-
-        /// <summary>A small phone outline with a lit screen.</summary>
-        private static Sprite Phone() => phoneSprite != null ? phoneSprite : phoneSprite = Build("Jigwi bucket phone", 64, 112, (u, v) =>
-        {
-            float x = u * 64f, y = v * 112f;
-            float d = RoundBox(x, y, 3f, 3f, 61f, 109f, 12f);
-            if (d > 0f) return Color.clear;
-            if (d > -5f) return new Color(.5f, .87f, 1f, 1f);
-            if (RoundBox(x, y, 10f, 12f, 54f, 100f, 4f) < 0f) return new Color(.5f, .87f, 1f, .45f);
-            return new Color(.08f, .06f, .05f, 1f);
-        });
-
         private static float RoundBox(float x, float y, float x0, float y0, float x1, float y1, float r)
         {
             float cx = Mathf.Clamp(x, x0 + r, x1 - r), cy = Mathf.Clamp(y, y0 + r, y1 - r);
