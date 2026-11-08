@@ -69,7 +69,8 @@ namespace C6Lab
         private Texture2D steamTexture;
         private readonly float[] steamAlpha = new float[SteamW * SteamH];
         private Color32[] steamPixels;
-        private Text steamLabel;
+        private Image steamHand; // a small hand rubbing back and forth: "wipe it" without words
+        private static Sprite handSprite;
         private string steamRound;
         private bool steamOn, steamBlocking, rubbing;
         private float steamAt, steamClearedAt = -1f, steamLeft, lastTickLeft;
@@ -86,7 +87,7 @@ namespace C6Lab
             source = network;
             if (labelFont != null) font = labelFont;
             Ensure();
-            if (font != null) { banner.font = font; cueLabel.font = font; steamLabel.font = font; }
+            if (font != null) { banner.font = font; cueLabel.font = font; }
         }
 
         private void Ensure()
@@ -113,7 +114,9 @@ namespace C6Lab
             var steamObject = new GameObject("Jigwi Bucket Steam", typeof(RectTransform));
             steamObject.layer = gameObject.layer; steamObject.transform.SetParent(root, false);
             steam = steamObject.AddComponent<RawImage>(); steam.raycastTarget = false;
-            steamLabel = NewText("Jigwi Bucket Steam Label", 56, root); steamLabel.text = "문질러 닦아라!";
+            steamHand = NewImage("Jigwi Bucket Steam Hand", Hand(), root);
+            // Both start hidden: they appear only when this seat's bucket ran out.
+            steam.gameObject.SetActive(false); steamHand.gameObject.SetActive(false);
             flash = NewImage("Jigwi Bucket Flash", Vignette(), root);
             flash.rectTransform.anchorMin = Vector2.zero; flash.rectTransform.anchorMax = Vector2.one;
             flash.rectTransform.offsetMin = flash.rectTransform.offsetMax = Vector2.zero;
@@ -343,9 +346,13 @@ namespace C6Lab
             // Left, right, left… with a pause at each side (like the rhythm it asks for).
             float u = Mathf.Repeat(t / 1.4f, 1f);
             float swing = Mathf.Sin(u * Mathf.PI * 2f);
-            float lean = Mathf.Sign(swing) * Mathf.Pow(Mathf.Abs(swing), .5f) * 28f;
-            Place(cuePhone.rectTransform, new Vector2(0f, size * .15f), new Vector2(size * .58f, size), -lean);
-            cuePhone.color = new Color(1f, 1f, 1f, .9f);
+            float lean = Mathf.Sign(swing) * Mathf.Pow(Mathf.Abs(swing), .5f); // -1 (left side down) … 1 (right side down)
+            // The whole phone tilts (like Temple Run): it turns about its upright middle, so it narrows and slides to that side,
+            // the far edge darkening, instead of spinning like a steering wheel.
+            Place(cuePhone.rectTransform, new Vector2(lean * size * .12f, size * .15f), new Vector2(size * .58f, size), 0f);
+            cuePhone.rectTransform.localScale = new Vector3(1f - .45f * Mathf.Abs(lean), 1f, 1f);
+            float shade = 1f - .2f * Mathf.Abs(lean);
+            cuePhone.color = new Color(shade, shade, shade, .95f);
             cueLabel.text = sloshes == 0 ? "좌우로 기울여!" : "출렁 " + sloshes + "/" + sloshesToPour;
             cueLabel.fontSize = Mathf.RoundToInt(size * .26f);
             cueLabel.color = sloshes == 0 ? new Color(1f, .93f, .7f, 1f) : new Color(.55f, .88f, 1f, 1f);
@@ -470,7 +477,7 @@ namespace C6Lab
             if (steamClearedAt >= 0f)
             {
                 if (fadeOut <= 0f) EndSteam();
-                Show(steamLabel, false);
+                Show(steamHand, false);
                 return;
             }
             // Rub: every finger (or mouse) drag over the board wipes a stroke out of the fog.
@@ -481,10 +488,18 @@ namespace C6Lab
                 lastRub = uv; rubbing = true;
             }
             else rubbing = false;
-            Show(steamLabel, true);
-            PlaceScreenRect(steamLabel.rectTransform, new Rect(board.xMin, board.center.y - board.height * .08f, board.width, board.height * .16f));
-            steamLabel.color = new Color(.35f, .22f, .15f, Mathf.Clamp01(steamLeft * 1.4f) * fadeIn);
-            steamLabel.rectTransform.localScale = Vector3.one * (1f + .06f * Mathf.Sin(t * 6f));
+            // A small hand rubs back and forth in the middle of the fog (hidden while a finger is already rubbing).
+            bool hint = !rubbing;
+            Show(steamHand, hint);
+            if (hint)
+            {
+                float hand = board.width * .14f;
+                float u = Mathf.Sin(t * 7f);
+                Vector2 centre = new Vector2(board.center.x + u * board.width * .12f, board.center.y + Mathf.Abs(u) * hand * .12f);
+                PlaceScreenRect(steamHand.rectTransform, new Rect(centre.x - hand * .4f, centre.y - hand * .5f, hand * .8f, hand));
+                steamHand.rectTransform.localEulerAngles = new Vector3(0f, 0f, -u * 12f);
+                steamHand.color = new Color(1f, 1f, 1f, Mathf.Clamp01(steamLeft * 1.6f) * fadeIn);
+            }
         }
 
         private void Wipe(Vector2 from, Vector2 to, Rect board)
@@ -530,7 +545,7 @@ namespace C6Lab
         {
             steamOn = false; rubbing = false;
             if (steam != null && steam.gameObject.activeSelf) steam.gameObject.SetActive(false);
-            Show(steamLabel, false);
+            Show(steamHand, false);
             if (steamBlocking && source != null && source.board != null) source.board.SetUiInputBlocked(false);
             steamBlocking = false;
         }
@@ -650,6 +665,24 @@ namespace C6Lab
             float e = Mathf.Min(Mathf.Min(u, 1f - u) * 2f, Mathf.Min(v, 1f - v) * 4f);
             return new Color(1f, 1f, 1f, Mathf.Clamp01(1f - e / .35f));
         });
+        /// <summary>A small pointing hand (👆-like): palm, index finger up, thumb, ink outline — the "rub here" hint.</summary>
+        private static Sprite Hand() => handSprite != null ? handSprite : handSprite = Build("Jigwi steam hand", 64, 88, (u, v) =>
+        {
+            float x = u * 64f, y = v * 88f;
+            float palm = RoundBox(x, y, 14f, 6f, 52f, 46f, 10f);
+            float finger = Capsule(x, y, 28f, 40f, 28f, 80f, 7f);
+            float thumb = Capsule(x, y, 16f, 26f, 6f, 38f, 5.5f);
+            float d = Mathf.Min(palm, Mathf.Min(finger, thumb));
+            if (d > 3f) return Color.clear;
+            if (d > -1.5f) return new Color(.17f, .14f, .12f, 1f);
+            return new Color(1f, .86f, .72f, 1f);
+        });
+        private static float Capsule(float x, float y, float ax, float ay, float bx, float by, float r)
+        {
+            var p = new Vector2(x, y); var a = new Vector2(ax, ay); var ab = new Vector2(bx, by) - a;
+            float k = Mathf.Clamp01(Vector2.Dot(p - a, ab) / Mathf.Max(1e-6f, ab.sqrMagnitude));
+            return Vector2.Distance(p, a + ab * k) - r;
+        }
         private static Sprite Disc() => discSprite != null ? discSprite : discSprite = Build("Jigwi bucket drop", 48, 48, (u, v) =>
         {
             float d = Vector2.Distance(new Vector2(u, v), new Vector2(.5f, .5f));
