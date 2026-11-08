@@ -95,10 +95,12 @@ namespace C6Lab
         [SerializeField] private string rubSoundFolder = "JigwiBucketFan";
         [Tooltip("출렁할 때마다 찰랑 소리 폴더(기운 쪽 스피커로 치우쳐 난다).")]
         [SerializeField] private string sloshSoundFolder = "JigwiBucketSlosh";
+        [Tooltip("연기를 90% 문질러 완전히 걷힌 순간 나는 소리 폴더.")]
+        [SerializeField] private string clearSoundFolder = "JigwiBucketClear";
         [Tooltip("실패 연기가 화면을 다 덮는 순간 쿵 하는 소리 폴더.")]
         [SerializeField] private string fogHitSoundFolder = "JigwiBucketFogHit";
         [SerializeField, Range(0f, 1f)] private float heatVolume = .6f, pourVolume = .9f, smokeVolume = .9f, rubVolume = .8f,
-            sloshVolume = .8f, fogHitVolume = 1f;
+            sloshVolume = .8f, fogHitVolume = 1f, clearVolume = .9f;
         [Tooltip("\"앗 차가!!\" 때 햅틱 세기.")]
         [SerializeField, Range(0f, 1f)] private float pourVoiceHapticIntensity = 1f;
         [Tooltip("쏟기 시작(양동이가 다 뒤집힘)부터 물줄기가 박에 닿을 때까지(초). 닿는 순간 불 꺼지는 소리/흔들림/햅틱.")]
@@ -772,6 +774,7 @@ namespace C6Lab
             {
                 steamClearedAt = Time.unscaledTime;
                 if (source != null) LabHaptics.PlayDirect(source.config, LabHapticStyle.Medium, .7f);
+                Play(clearSoundFolder, clearVolume);
                 if (steamBlocking && source != null && source.board != null) source.board.SetUiInputBlocked(false);
                 steamBlocking = false;
             }

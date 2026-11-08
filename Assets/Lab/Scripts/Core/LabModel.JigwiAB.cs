@@ -219,7 +219,7 @@ namespace C6Lab
             {
                 playerId = owner, targets = new[] { new LabJigwiABFireTarget { id = item.id + "/" + owner + "/0", x = .5f, y = .62f } },
                 // #551 나무 물통: buckets arrive one seat after another (the draw order), like fox fire.
-                readyAt = item.bucket ? activeAt + order * LabJigwiABTimeline.BucketStaggerSeconds : -1d
+                readyAt = item.bucket ? activeAt + LabJigwiABTimeline.BucketLeadSeconds + order * LabJigwiABTimeline.BucketStaggerSeconds : -1d
             }).ToArray();
             jigwiABRounds.Add(item); revision++;
         }

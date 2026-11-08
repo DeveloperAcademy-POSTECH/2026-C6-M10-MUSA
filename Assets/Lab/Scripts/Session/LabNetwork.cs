@@ -268,13 +268,14 @@ namespace C6Lab
         // 5694: #551 Jigwi B bucket: no holding, the 3-2-1 starts by itself and repeats after a miss (round.attempts).
         // 5695: #551 Jigwi B bucket: two picked seats, 2.5 s to pull, slower 3-2-1.
         // 5696: #551 Jigwi B bucket is personal: every seat pours its own bucket by rocking the phone (no 3-2-1, no attempts).
-        internal const ushort LabProtocolVersion = 5696;
+        // 5697: #551 Jigwi B bucket: the first bucket comes 3.5 s after B starts, 1 s apart, 7 s each.
+        internal const ushort LabProtocolVersion = 5697;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Double-tap a blue fox orb to clear it, and keep your Yin and Yang away.";
         /// <summary>More fox orbs than one fox fire ever drops; a longer list is ignored (#251).</summary>
         private const int MaximumFoxFireOrbs = 10;
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/57");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/58");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;

@@ -244,8 +244,8 @@ namespace C6Lab
                 // #551 나무 물통: no 3-2-1; each bucket arrives inside the stagger and is poured inside its own time.
                 if (round.bucket && (round.countdownAt != -1d
                     || round.resolution == LabJigwiABResolution.Completed && round.players.Any(player => player.launchedAt < 0d)
-                    || round.players.Any(player => !Range(player.readyAt, round.activeAt,
-                        round.activeAt + LabJigwiABTimeline.BucketStaggerSeconds * (MaximumPlayers - 1) + .00001d)
+                    || round.players.Any(player => !Range(player.readyAt, round.activeAt + LabJigwiABTimeline.BucketLeadSeconds - .00001d,
+                        round.activeAt + LabJigwiABTimeline.BucketLeadSeconds + LabJigwiABTimeline.BucketStaggerSeconds * (MaximumPlayers - 1) + .00001d)
                         || player.launchedAt != -1d && !Range(player.launchedAt, player.readyAt - .00001d,
                             player.readyAt + LabJigwiABTimeline.BucketSeatSeconds + .00001d)))) return false;
                 bool allOff = round.players.Length > 0 && round.players.All(player => player.targets.All(target => !target.lit));

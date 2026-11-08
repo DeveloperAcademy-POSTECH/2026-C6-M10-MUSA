@@ -43,10 +43,15 @@ namespace C6Lab
         public const double ReleaseSeconds = 1d;
         /// <summary>#551: with the countdown, every picked hit must land within this long of the first.</summary>
         public const float CountdownSyncWindowSeconds = 1.5f;
+        /// <summary>
+        /// #551 나무 물통: the first bucket arrives this long after B starts, so Jigwi's taunt (from the 2 s warning) is heard and the
+        /// boss has heated up (threat lead) before any bucket shows. Lead + stagger × 4 + seat time stays inside the 15 s B.
+        /// </summary>
+        public const double BucketLeadSeconds = 3.5d;
         /// <summary>#551 나무 물통 (개별, 여우구슬처럼): each seat's bucket arrives this long after the previous seat's (random order).</summary>
-        public const double BucketStaggerSeconds = 1.5d;
-        /// <summary>#551 나무 물통: each seat has this long from its bucket's arrival to pour it; after that its board steams over.</summary>
-        public const double BucketSeatSeconds = 8d;
+        public const double BucketStaggerSeconds = 1d;
+        /// <summary>#551 나무 물통: each seat has this long from its bucket's arrival to pour it; after that the screen smokes over.</summary>
+        public const double BucketSeatSeconds = 7d;
         /// <summary>#551: 쏟은 물은 위에서 떨어지니 박 윗부분(그 사람 쪽으로 기운 위쪽)에 칠한다. 적도 0°, 꼭대기 90°.</summary>
         public const float BucketPourPitch = 58f;
         /// <summary>#509: one synchronized hit by every picked seat is the whole B (one chance; a miss fails it).</summary>

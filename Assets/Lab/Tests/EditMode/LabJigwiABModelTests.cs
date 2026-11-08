@@ -360,7 +360,7 @@ namespace C6Lab.Tests
             Assert.That(b.players.Select(p=>p.playerId),Is.EquivalentTo(Three),"Everyone has a bucket.");
             Assert.That(b.countdownAt,Is.EqualTo(-1d),"No 3-2-1.");
             Assert.That(b.players.Select(p=>p.readyAt).OrderBy(x=>x),
-                Is.EqualTo(new[]{b.activeAt,b.activeAt+LabJigwiABTimeline.BucketStaggerSeconds,b.activeAt+2*LabJigwiABTimeline.BucketStaggerSeconds}).Within(1e-9),
+                Is.EqualTo(new[]{0d,1d,2d}.Select(k=>b.activeAt+LabJigwiABTimeline.BucketLeadSeconds+k*LabJigwiABTimeline.BucketStaggerSeconds).ToArray()).Within(1e-9),
                 "One bucket after another.");
             Assert.That(m.Snapshot(25.1).orbs.Any(o=>o.jigwiABSupplyEventId==b.id),Is.False,"No special Water orb.");
             Assert.That(m.TrySetJigwiBReady(Three[0],b.id,true,25.2),Is.False,"Holding means nothing here.");

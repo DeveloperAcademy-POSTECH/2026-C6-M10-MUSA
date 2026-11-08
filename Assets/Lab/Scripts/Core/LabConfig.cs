@@ -577,7 +577,7 @@ namespace C6Lab
         [SerializeField] private bool jigwiAHoldBurnUntilEnd = false;
         [Tooltip("#551 Inspector 전용(Host): 켜면 지귀 B는 지목된 사람이 모두 특수 물구슬을 잡고 있을 때 3-2-1이 울리고 \"던져!\"에 함께 위로 휙 던진다. \"던져!\" 전에는 던져지지 않고(놓으면 카운트 취소), \"던져!\" 뒤 1초 안에 모두 던져야 하며, 첫 명중부터 1.5초 안에 모두 맞혀야 성공. 끄면 #509처럼 아무 때나 던져 1초 안에 모두 맞히기.")]
         [SerializeField] private bool jigwiBCountdown = false;
-        [Tooltip("#551 Inspector 전용(Host): 켜면 지귀 B는 개별 \"나무 물통\"이다(여우구슬처럼 따로따로). 1.5초 간격으로 한 사람씩 박 위에 자기 양동이가 생기고, 8초 안에 폰을 좌우로 기울여 3번 출렁이면 쏟아져 박의 자기 쪽에 크게 물을 칠한다. 못 쏟으면 지귀 김이 그 사람 조합판을 뒤덮어 문질러 닦아야 다시 쓸 수 있다. 특수 물구슬과 3-2-1은 없다.")]
+        [Tooltip("#551 Inspector 전용(Host): 켜면 지귀 B는 개별 \"나무 물통\"이다(여우구슬처럼 따로따로). B 시작 3.5초 뒤부터 1초 간격으로 한 사람씩 박 위에 자기 양동이가 생기고, 7초 안에 폰을 좌우로 기울여 3번 출렁이면 쏟아져 박 윗부분에 크게 물을 칠한다. 못 쏟으면 지귀 연기가 그 사람 화면 전체를 덮어 90% 문질러야 걷히고 그동안 조합판을 쓸 수 없다. 특수 물구슬과 3-2-1은 없다.")]
         [SerializeField] private bool jigwiBBucket = false;
         [Tooltip("#551 시험용 Inspector 전용(Host): 켜면 지귀 스테이지에서 B만 4초부터 17초마다(4/21/38/55/72초) 나오고 A와 공통 기믹(폭탄 등)은 나오지 않는다. 시험이 끝나면 끈다.")]
         [SerializeField] private bool jigwiBTestOnly = false;
