@@ -1,11 +1,13 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using C6Lab;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using Object = UnityEngine.Object;
@@ -15,9 +17,20 @@ namespace Hapio.Tests
     public sealed class GameBattleUiPresentationTests
     {
         private GameSession session;
+#if UNITY_EDITOR
+        private bool soloStagePreferenceOverridden, hadSoloStagePreference;
+        private int savedSoloStagePreference;
+#endif
         [UnityTest]
         public IEnumerator StoryThemesPreserveStageSceneryAndBindExistingHudAndBoard()
         {
+#if UNITY_EDITOR
+            // This scenario covers stages 1→2→3 even if the developer last previewed a later stage.
+            hadSoloStagePreference = UnityEditor.EditorPrefs.HasKey(GameSession.DeveloperSoloStartStageKey);
+            savedSoloStagePreference = UnityEditor.EditorPrefs.GetInt(GameSession.DeveloperSoloStartStageKey, 1);
+            soloStagePreferenceOverridden = true;
+            UnityEditor.EditorPrefs.SetInt(GameSession.DeveloperSoloStartStageKey, 1);
+#endif
             yield return SceneManager.LoadSceneAsync(GameScenePaths.Home);
             yield return Until(() => GameSession.Instance != null && !GameSession.Instance.IsLoadingScene);
             session = GameSession.Instance;
@@ -64,6 +77,34 @@ namespace Hapio.Tests
                 Assert.That(bindings.hud.staminaFill.sprite,Is.SameAs(ui.Theme.staminaCells));
                 Assert.That(bindings.hud.staminaFill.transform.parent.parent,Is.SameAs(bindings.hud.battleUi.transform),"Orb composition keeps the stamina root directly under Battle UI.");
                 Assert.That(bindings.sceneController.GetComponent<LabDrumMinimap>().compactGamePresentation,Is.True);
+                yield return Until(() => !session.IsLoadingScreenUp && !session.IsPreparingBattle);
+                yield return null; // The invisible hit target refreshes availability after the start cover closes.
+                Assert.That(bindings.hud.developerSettingsHidden, Is.True);
+                Assert.That(bindings.hud.developerSettingsButton.gameObject.activeInHierarchy, Is.False,
+                    "DEV must not appear as a pause-menu button in the real game presentation.");
+                var hiddenDev = bindings.GetComponent<GameDeveloperTapTarget>();
+                Assert.That(hiddenDev, Is.Not.Null);
+                Assert.That(hiddenDev.TapArea, Is.Not.Null);
+                var events = EventSystem.current;
+                Assert.That(events, Is.Not.Null);
+                var targetRect = (RectTransform)hiddenDev.TapArea.transform;
+                Vector2 tapPosition = RectTransformUtility.WorldToScreenPoint(null, targetRect.TransformPoint(targetRect.rect.center));
+                var tap = new PointerEventData(events) { position = tapPosition, button = PointerEventData.InputButton.Left };
+                var hits = new List<RaycastResult>();
+                events.RaycastAll(tap, hits);
+                Assert.That(hits.Count, Is.GreaterThan(0));
+                Assert.That(ExecuteEvents.GetEventHandler<IPointerClickHandler>(hits[0].gameObject), Is.SameAs(hiddenDev.TapArea),
+                    "The real top-centre hit area must receive the click before other HUD graphics.");
+                ExecuteEvents.Execute(hiddenDev.TapArea, tap, ExecuteEvents.pointerClickHandler);
+                ExecuteEvents.Execute(hiddenDev.TapArea, tap, ExecuteEvents.pointerClickHandler);
+                Assert.That(bindings.developerMode.panel.activeInHierarchy, Is.False, "One or two taps must not open settings.");
+                Assert.That(session.Network.IsBattlePaused, Is.False, "An incomplete gesture must not pause the session.");
+                ExecuteEvents.Execute(hiddenDev.TapArea, tap, ExecuteEvents.pointerClickHandler);
+                yield return null;
+                Assert.That(session.Network.IsBattlePaused, Is.True, "The third tap pauses the Host's real battle.");
+                Assert.That(bindings.developerMode.panel.activeInHierarchy, Is.True, "The existing DEV form opens after pausing.");
+                bindings.developerMode.Close();
+                session.Resume(); yield return null;
                 bindings.hud.pauseButton.onClick.Invoke(); yield return null;
                 Assert.That(session.Network.Snapshot.paused,Is.True,"Existing pause routing remains live.");
                 session.Resume(); yield return null;
@@ -154,6 +195,14 @@ namespace Hapio.Tests
         [UnityTearDown]
         public IEnumerator Cleanup()
         {
+#if UNITY_EDITOR
+            if (soloStagePreferenceOverridden)
+            {
+                if (hadSoloStagePreference) UnityEditor.EditorPrefs.SetInt(GameSession.DeveloperSoloStartStageKey, savedSoloStagePreference);
+                else UnityEditor.EditorPrefs.DeleteKey(GameSession.DeveloperSoloStartStageKey);
+                soloStagePreferenceOverridden = false;
+            }
+#endif
             Time.timeScale=1;
             if (session!=null) { session.Network.Stop(); Object.Destroy(session.gameObject); yield return null; }
             var previous=SceneManager.GetActiveScene(); var empty=SceneManager.CreateScene("Battle UI cleanup"); SceneManager.SetActiveScene(empty);

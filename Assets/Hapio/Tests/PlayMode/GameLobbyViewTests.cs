@@ -60,7 +60,7 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
-        public IEnumerator TitleBrowserDirectIpAndScopedDevUseTheSavedVisibleControlsWithoutLegacyDoubleBindings()
+        public IEnumerator TitleBrowserDirectIpAndHiddenScopedDevAvoidLegacyDoubleBindings()
         {
             GameLobbyView view = View();
             Assert.That(view.titlePage.activeSelf, Is.True);
@@ -70,7 +70,11 @@ namespace Hapio.Tests
             view.screen.hostButton.onClick.Invoke();
             Assert.That(session.Network.IsConnected, Is.False, "Hidden legacy navigation must have no game listeners.");
 
-            yield return Click(view.developerButton);
+            Assert.That(view.developerButton.gameObject.activeInHierarchy, Is.False,
+                "The developer entry must not add a visible control to the authored Home UI.");
+            Assert.That(view.soloButton.gameObject.activeInHierarchy, Is.False);
+            Assert.That(view.teamSoloButton.gameObject.activeInHierarchy, Is.False);
+            yield return OpenHiddenDeveloper(view);
             Assert.That(view.screen.developerPanel.activeInHierarchy, Is.True);
             Assert.That(view.design.gameObject.activeSelf, Is.False);
             AssertTouchable(view.screen.developerScopeButtons[3]);
@@ -80,6 +84,8 @@ namespace Hapio.Tests
             Assert.That(session.CaptureDeveloperSettings(3)[178], Is.EqualTo(2f));
             yield return Click(view.screen.closeDeveloperButton);
             Assert.That(view.titlePage.activeInHierarchy, Is.True);
+            Assert.That(view.soloButton.gameObject.activeInHierarchy, Is.False, "Closing DEV hides its solo entry.");
+            Assert.That(view.teamSoloButton.gameObject.activeInHierarchy, Is.False);
             yield return Click(view.enterButton);
             Assert.That(session.RoomBrowserVisible, Is.True);
             Assert.That(view.browserPage.activeInHierarchy, Is.True);
@@ -94,6 +100,65 @@ namespace Hapio.Tests
             Assert.That(view.directFeedback.text, Does.Contain("포트"));
             yield return Click(view.closeDirectConnectionButton);
             Assert.That(view.directConnectionPanel.activeSelf, Is.False);
+        }
+
+        [UnityTest]
+        public IEnumerator HostLobbyHiddenDeveloperEntrySurvivesSceneTransition()
+        {
+            GameObject homeTapArea = View().screen.GetComponent<GameDeveloperTapTarget>().TapArea;
+            session.Host();
+            yield return Until(() => session.State.phase == GameFlowPhase.Lobby && !session.IsLoadingScene
+                && SceneManager.GetActiveScene().path == GameScenePaths.Lobby && session.Network.IsHost,
+                "The Host enters the separate game lobby Scene", 15f);
+            GameLobbyView view = View();
+            var target = view.screen.GetComponent<GameDeveloperTapTarget>();
+            Assert.That(target, Is.Not.Null, "The newly loaded lobby installs its own hidden DEV entry.");
+            Assert.That(target.TapArea, Is.Not.Null);
+            Assert.That(target.TapArea.scene, Is.EqualTo(view.screen.gameObject.scene),
+                "The hit-area Canvas must share the new owner's Scene lifetime.");
+            Assert.That(homeTapArea == null, Is.True, "The departing Home hit area must not survive over the lobby.");
+            var image = target.TapArea.GetComponent<UnityEngine.UI.Image>();
+            yield return Until(() => !session.IsLoadingScreenUp && image.raycastTarget && image.gameObject.activeInHierarchy,
+                "The lobby loading overlay closes and Host permission enables the new target", 5f);
+            Assert.That(view.screen.developerPanel.activeInHierarchy, Is.False);
+            Assert.That(view.developerButton.gameObject.activeInHierarchy, Is.False);
+            Assert.That(view.soloButton.gameObject.activeInHierarchy, Is.False);
+            Assert.That(view.teamSoloButton.gameObject.activeInHierarchy, Is.False);
+            for (int tap = 1; tap <= GameDeveloperTapTarget.RequiredTaps; tap++)
+            {
+                Canvas.ForceUpdateCanvases();
+                var rect = (RectTransform)target.TapArea.transform;
+                var data = new PointerEventData(EventSystem.current)
+                {
+                    button = PointerEventData.InputButton.Left,
+                    position = RectTransformUtility.WorldToScreenPoint(null, rect.TransformPoint(rect.rect.center))
+                };
+                var hits = new System.Collections.Generic.List<RaycastResult>();
+                EventSystem.current.RaycastAll(data, hits);
+                Assert.That(hits, Is.Not.Empty, "Lobby hidden DEV tap " + tap);
+                GameObject clicked = ExecuteEvents.GetEventHandler<IPointerClickHandler>(hits[0].gameObject);
+                Assert.That(clicked, Is.SameAs(target.TapArea), "The new lobby's actual topmost hit receives tap " + tap);
+                ExecuteEvents.Execute(clicked, data, ExecuteEvents.pointerClickHandler);
+                if (tap < GameDeveloperTapTarget.RequiredTaps)
+                    Assert.That(view.screen.developerPanel.activeInHierarchy, Is.False,
+                        "One or two taps must not open the lobby's DEV panel.");
+                Assert.That(view.soloButton.gameObject.activeInHierarchy, Is.False);
+                Assert.That(view.teamSoloButton.gameObject.activeInHierarchy, Is.False);
+            }
+            yield return null; yield return null;
+            Assert.That(view.screen.developerPanel.activeInHierarchy, Is.True);
+            Assert.That(view.design.gameObject.activeInHierarchy, Is.False);
+            Assert.That(view.developerButton.gameObject.activeInHierarchy, Is.False);
+            Assert.That(view.soloButton.gameObject.activeInHierarchy, Is.False, "A connected lobby never exposes solo launch.");
+            Assert.That(view.teamSoloButton.gameObject.activeInHierarchy, Is.False);
+            view.screen.closeDeveloperButton.onClick.Invoke();
+            yield return null; yield return null;
+            Assert.That(view.screen.developerPanel.activeInHierarchy, Is.False);
+            Assert.That(view.positionPage.activeInHierarchy, Is.True);
+            Assert.That(view.developerButton.gameObject.activeInHierarchy, Is.False);
+            Assert.That(view.soloButton.gameObject.activeInHierarchy, Is.False);
+            Assert.That(view.teamSoloButton.gameObject.activeInHierarchy, Is.False);
+            Assert.That(image.raycastTarget, Is.True, "Closing settings restores the same lobby's hidden entry.");
         }
 
         [Category("Bonjour")]
@@ -493,6 +558,8 @@ namespace Hapio.Tests
             Assert.That(session.Network.IsConnected, Is.False, "Nothing may be left half-open.");
             Assert.That(session.Network.CanChooseConnection, Is.True);
             GameLobbyView view = View();
+            Assert.That(view.soloButton.gameObject.activeInHierarchy, Is.False);
+            yield return OpenHiddenDeveloper(view);
             yield return Click(view.soloButton);
             yield return Until(() => session.State.phase == GameFlowPhase.Playing && !session.IsLoadingScene
                 && SceneManager.GetActiveScene().path == GameScenePaths.Battle, "DEV solo battle after a 3:3 room", 15f);
@@ -606,10 +673,12 @@ namespace Hapio.Tests
         public IEnumerator DevelopmentSoloButtonStartsTheThreeStageFlowAndGameOverReturnsToTheTitle()
         {
             GameLobbyView view = View();
-            Assert.That(view.soloButton.gameObject.activeInHierarchy, Is.True);
+            Assert.That(view.soloButton.gameObject.activeInHierarchy, Is.False,
+                "Solo is available inside DEV rather than on the authored Home page.");
+            yield return OpenHiddenDeveloper(view);
             yield return Click(view.soloButton);
             yield return Until(() => session.State.phase == GameFlowPhase.Playing && !session.IsLoadingScene
-                && SceneManager.GetActiveScene().path == GameScenePaths.Battle, "Actual first game stage from the visible Solo button");
+                && SceneManager.GetActiveScene().path == GameScenePaths.Battle, "Actual first game stage from the Solo button inside hidden DEV");
             Assert.That(session.Network.IsDeveloperSolo, Is.True);
             Assert.That(session.State.stageIndex, Is.EqualTo(1));
             Assert.That(Object.FindObjectsByType<GameLobbyView>(FindObjectsSortMode.None), Is.Empty);
@@ -664,6 +733,51 @@ namespace Hapio.Tests
 
         private static GameLobbyView View() => SceneManager.GetActiveScene().GetRootGameObjects()
             .SelectMany(root => root.GetComponentsInChildren<GameLobbyView>(true)).Single();
+
+        private static IEnumerator OpenHiddenDeveloper(GameLobbyView view)
+        {
+            yield return Until(() => GameSession.Instance == null || !GameSession.Instance.IsLoadingScreenUp,
+                "The loading screen closes before the hidden DEV entry is tapped", 5f);
+            Assert.That(view.screen.developerPanel.activeInHierarchy, Is.False);
+            var target = view.screen.GetComponent<GameDeveloperTapTarget>();
+            Assert.That(target, Is.Not.Null, "The active game menu owns its hidden entry.");
+            Assert.That(target.TapArea, Is.Not.Null);
+            var image = target.TapArea.GetComponent<UnityEngine.UI.Image>();
+            yield return Until(() => image.raycastTarget && image.gameObject.activeInHierarchy,
+                "The hidden entry receives the refreshed menu permission", 5f);
+            Assert.That(image.color.a, Is.Zero, "The entry has no visible button artwork.");
+            for (int tap = 1; tap <= GameDeveloperTapTarget.RequiredTaps; tap++)
+            {
+                Canvas.ForceUpdateCanvases();
+                var rect = (RectTransform)target.TapArea.transform;
+                var data = new PointerEventData(EventSystem.current)
+                {
+                    button = PointerEventData.InputButton.Left,
+                    position = RectTransformUtility.WorldToScreenPoint(null, rect.TransformPoint(rect.rect.center))
+                };
+                var hits = new System.Collections.Generic.List<RaycastResult>();
+                EventSystem.current.RaycastAll(data, hits);
+                Assert.That(hits, Is.Not.Empty, "Hidden DEV tap " + tap);
+                GameObject clicked = ExecuteEvents.GetEventHandler<IPointerClickHandler>(hits[0].gameObject);
+                Assert.That(clicked, Is.SameAs(target.TapArea), "The actual topmost UI hit must reach hidden DEV at tap " + tap
+                    + "; area=" + rect.rect + "; depth=" + image.depth + "; raycast=" + image.raycastTarget
+                    + "; canvas=" + image.canvas.sortingOrder + "; hits=" + string.Join(",", hits.Select(hit => hit.gameObject.name + "[" + hit.sortingOrder + "]")));
+                ExecuteEvents.Execute(clicked, data, ExecuteEvents.pointerClickHandler);
+                if (tap < GameDeveloperTapTarget.RequiredTaps)
+                {
+                    Assert.That(view.screen.developerPanel.activeInHierarchy, Is.False,
+                        "One or two ordinary taps must not open DEV.");
+                    Assert.That(view.soloButton.gameObject.activeInHierarchy, Is.False);
+                    Assert.That(view.teamSoloButton.gameObject.activeInHierarchy, Is.False);
+                }
+            }
+            yield return null; yield return null;
+            Assert.That(view.screen.developerPanel.activeInHierarchy, Is.True, "Three taps within the entry window open DEV.");
+            Assert.That(view.soloButton.transform.parent, Is.SameAs(view.screen.developerPanel.transform));
+            Assert.That(view.teamSoloButton.transform.parent, Is.SameAs(view.screen.developerPanel.transform));
+            Assert.That(view.soloButton.gameObject.activeInHierarchy, Is.True);
+            Assert.That(view.teamSoloButton.gameObject.activeInHierarchy, Is.True);
+        }
 
         private static void AssertTouchable(UnityEngine.UI.Button button)
         {

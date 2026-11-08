@@ -49,6 +49,7 @@ namespace Hapio
             session = GameSession.EnsureExists();
             MountStageGourd(session);
             LabNetwork network = session.Network;
+            GameDeveloperAccess.BindBattle(this);
             network.BindBattleReferences(board, target, battleCamera, battleFloor, impactFeedback, projectileRoot);
             RebindScene(network);
             if (!session.IsTutorial) gameObject.AddComponent<GameBattleUiPresentation>().Bind(this, session);

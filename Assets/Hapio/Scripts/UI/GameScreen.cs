@@ -92,6 +92,7 @@ namespace Hapio
             Click(resetViewerButton, () => session.ResetPreview());
             GamePreviewAspect.Attach(viewerImage);
             Click(developerButton, OpenDeveloper);
+            if (kind == GameScreenKind.Home || kind == GameScreenKind.Lobby) GameDeveloperAccess.BindMenu(this);
             for (int i = 0; developerScopeButtons != null && i < developerScopeButtons.Length; i++)
             {
                 int scope = i;
@@ -187,7 +188,7 @@ namespace Hapio
                 case GameScreenKind.GameOver: RefreshGameOver(net); break;
             }
             ApplyResultInputGate();
-            Show(developerButton == null ? null : developerButton.gameObject, net.DeveloperBuildAvailable);
+            Show(developerButton == null ? null : developerButton.gameObject, false);
             Interactable(developerButton, net.CanChooseConnection || (net.IsHost && net.Snapshot == null));
             if (developerPanel != null && developerPanel.activeSelf)
                 Interactable(applyDeveloperButton, net.CanChooseConnection || (net.IsHost && net.Snapshot == null));
@@ -610,7 +611,7 @@ namespace Hapio
 
         public void OpenDeveloper()
         {
-            if (OpeningBlocked) return;
+            if (!GameDeveloperAccess.AvailableInThisBuild || OpeningBlocked) return;
             if (session == null || session.IsCreatingRoom) return;
             // A 2:2 room (#281) opens on its own tab; story rooms keep Common first.
             SelectDeveloperScope(session.IsTerritory ? GameStageSettings.TerritoryScope : 0);

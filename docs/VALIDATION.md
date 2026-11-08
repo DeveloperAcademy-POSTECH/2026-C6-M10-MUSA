@@ -6610,3 +6610,28 @@ PR-1(`feat/#507-gourd-rig-contract`) 위에서 Unity 6000.6.5f1 macOS batch Edit
 | 작업 트리 검사 | PASS — `git diff --check`, 이번 작업의 Scene/Lab 저장 변경 없음. 임시 렌더 도구·원시 로그·캡처는 커밋 대상에서 제외 |
 
 미실행: 전체 프로젝트 검사 모음, 새 Mac/iOS 빌드, iPhone/iPad 실기기 터치·가로세로 비율, 여러 기기의 LAN·핫스팟 실제 연결. 자동 검사는 macOS Editor에서 실행했으며 실기기 검증으로 해석하지 않는다.
+
+
+## 2026-11-08 — #564 숨김 개발 설정 진입
+
+- 기준: main `488104e7`에서 분리한 `feat/#564-hidden-developer-entry`. GameScreen·GameLobbyView·GameBattleBindings의 진입 연결과 새 GameDeveloperAccess/TapTarget만 변경했다. Scene·Prefab·원본 에셋·패키지·Lab 단독 화면·게임 규칙·접속 규약은 유지했다.
+- 환경: Unity 6000.6.5f1, macOS Editor 및 로컬 Mac 플레이어. 사용법은 `HIDDEN_DEVELOPER_ACCESS.md`를 따른다.
+
+| 수행한 확인 | 실제 결과 |
+| --- | --- |
+| PlayMode 관련 검사 | **37개 PASS**. 메뉴 기존 15/15(42.02초), 추가 Host 로비 전환 1/1(2.25초), Battle UI 2/2(4.77초), 숨김 입력 7/7(1.32초), 오프닝 10/10(2.57초), DEV 범위 설정 2/2(0.57초). 전체 프로젝트 모음 실행 결과가 아니다. |
+| 입력과 씬 전환 | 1·2회 미진입/3회 진입, 1.2초 초과 초기화, 우클릭·드래그·권한 해제·비활성 초기화, 배경 클릭이 소유 Canvas에 전달되지 않음, 실제 Home→Host Lobby 전환 후 새 입력 영역의 수명과 실제 최상위 Raycast 확인. |
+| 전투 설정 | 1~3스테이지에서 실제 입력 영역 3회 포인터 이벤트로 Host 정지→기존 DEV 열기, 닫기·Resume와 기존 Pause 버튼 유지. 사용자 Editor SOLO 시작 스테이지 값 3은 검사 후 복원했다. |
+| Mac Development Build | `BuildOptions.Development` 빌드 성공. `Builds/Hapio/20261108-175052-688d2218/macOS/Hapio-Development.app`. 일반 화면 DEV·SOLO 표시 숨김, 같은 Mac의 실제 3개 프로세스가 한 방에 연결되어 P1/P2/P3 로비·시작 대기를 표시함. 3인 비교용 앱에만 백그라운드 실행을 켰으며 원본 PlayerSettings는 false로 복원했다. |
+| Release 차단 | `BuildOptions.None`으로 별도 Mac Release 확인용 빌드 성공(`20261108-175020-release-check`). 빌드된 런타임 어셈블리를 읽어 `AvailableInThisBuild`가 Release=false, Development=true임을 확인. Release 화면에서 상단 3회 클릭 후 Home을 유지하고 DEV가 열리지 않음을 관찰했다. App Store 업로드·서명·iOS 배포 검증을 의미하지 않는다. |
+| Mac 실제 클릭 | 사용자가 개발용 앱 상단 중앙을 직접 3회 클릭해 **‘설정창 열림’**으로 확인했다. 자동 클릭 도구에서는 동일한 진입을 확인하지 못했으므로 자동 마우스 PASS로 기록하지 않는다. 이를 구분하기 위한 임시 입력 진단 코드는 최종 소스에서 제거했다. |
+| 변경 보존 | `git diff --check` 통과. 저장된 Scene·Prefab·머터리얼·패키지와 ProjectSettings 차이 없음. 검사기가 만든 임시 InitTestScene만 정리했고 기존 로컬 stash·별도 작업 폴더는 유지했다. |
+
+검사 이력: 초기 메뉴 검사에서 입력 준비/클릭 경로 1건이 실패했으나 소유 Canvas의 포인터 인터페이스 제거와 입력 준비 대기 반영 후 15/15로 재검사했다. 스크립트 갱신과 겹쳐 Test Framework가 중단된 실행, 추가 검사 import 전 0개 실행은 PASS 집계에서 제외했다. 새 로비 전환 검사는 import·컴파일 목록 존재를 확인한 후 실제 1개 실행/통과를 별도로 확인했다.
+
+미실행: iPhone/iPad 실제 터치, iOS Release 빌드·App Store 배포, 일반 Wi-Fi·핫스팟 기기간 연결, 전체 EditMode·PlayMode 모음. 결과 화면의 ‘다음/다음 스테이지’ 중복과 봉인 카드 재등장 구조는 조사만 했고 이번 변경에 포함하지 않았다.
+
+### #564 PR 병합 전 최신 main 통합 확인
+
+- 원격 main `ae4aa87e`(#561)의 저장 DEV 257행·240번 기본값·Prefab 글꼴 보존 수정을 반영한 뒤 macOS 기본 batch 환경에서 재검사했다. **EditMode `GameEditorMenuCleanupTests` 4/4 PASS(0.60초), 관련 PlayMode 37/37 PASS(36.24초)**이며 실행 건수가 0이 아닌 NUnit 결과를 확인했다.
+- main 대비 PR 변경은 DEV 코드·해당 검사·사용법/검증 문서 13개 파일뿐이다. Scene·Prefab·머터리얼·패키지·ProjectSettings와 결과 화면 전환 코드는 변경하지 않았다. `git diff --check`와 검사 후 깨끗한 작업 트리를 확인했다. 추가 iOS·실네트워크·전체 검사 모음은 실행하지 않았다.
