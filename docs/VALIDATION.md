@@ -2,7 +2,7 @@
 
 ## 2026-11-08 — DEV 행 Editor 메뉴가 Home·Lobby의 저장 257행을 지키게 (PR #561 후속)
 
-- **기준:** `fix/menu-dev-row-240`, 바로 아래 절의 커밋 위(main `92d511ee`). Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal), `-buildTarget iOS`. 같은 Mac에서 다른 폴더의 Unity Editor가 열려 있었다.
+- **기준:** `fix/menu-dev-row-240`, 바로 아래 절의 커밋 위(main `92d511ee`)에서 고치고 검사했다. 그 뒤 main `488104e7`(#562)을 rebase가 아니라 merge(`a434b800`)로 받아 다시 검사했다(표의 "병합 뒤"). Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal), `-buildTarget iOS`. 같은 Mac에서 다른 폴더의 Unity Editor가 열려 있었다.
 - **문제:**
   - `Hapio/Upgrade Menu DEV Rows`·`Upgrade Three Yokai Stages`·`Upgrade 2v2 Lobby UI`(저장 패널이 259행이 아니면 같은 갱신을 부름)는 저장 패널을 `DeveloperFields.Count`(259)행으로 늘려 클레이 257·258행을 장면에 저장했다. #506 이후 `GameSceneAssetTests`는 저장 패널을 257행으로 요구하므로, 메뉴를 돌리면 Home·Lobby 검사가 실패했다.
   - `Upgrade Figma Game Lobby`는 저장 패널이 259행이 아니면 멈춰, 지금 장면에서는 실행되지 않았다.
@@ -25,6 +25,9 @@
 | 이어서 `Upgrade Three Yokai Stages` → `Upgrade 2v2 Lobby UI` → `Upgrade Figma Game Lobby` | 모두 예외 없이 끝남. Home·Lobby·`GameLobby.prefab`·StageResult·스테이지 자료는 그대로. 무관한 재저장 두 가지는 되돌렸다: `GameOver.unity`에 `FigmaStageResult`의 새 필드 2줄(`blueTeamBackground`·`redTeamBackground`, 값 없음), Team 그림 `.meta` 9개의 WebGL 항목 |
 | `GameSceneAssetTests`+`GameEditorMenuCleanupTests` / 전체 EditMode | 13/13 PASS(1.2초) / 2064/2064 PASS(20.7초). 늘어난 2건이 새 검사다 |
 | PlayMode `GameSceneFlowTests`·`GameLobbyViewTests`·`GameOpeningControllerTests`·`GameStageUiTests` | 48/48 PASS(107.8초; 21·15·10·2) |
+| 병합 뒤: 네 메뉴를 차례로 실행(`Upgrade Menu DEV Rows` → `Three Yokai Stages` → `2v2 Lobby UI` → `Figma Game Lobby`) | 모두 예외 없이 끝남. Home·Lobby는 네 메뉴 모두에서 그대로. `Upgrade 2v2 Lobby UI`만 main이 새로 부르는 디자인 단계(`GameMenuDesignUpgrade`·`GameSeatDesignUpgrade`)로 `GameLobby.prefab`의 Sprite 1개(`Lab/Art/Lobby/4ba8d.png` → `Hapio/Art/UI/Seats/5089e.png`)와 빈 이름 36줄을 다시 저장하고 그림 `.meta` 30개에 WebGL 항목을 붙였다. 이 PR이 바꾸지 않은 경로라 되돌렸다 |
+| 병합 뒤: `GameSceneAssetTests`+`GameEditorMenuCleanupTests` / 전체 EditMode | 13/13 PASS(1.6초) / 2087/2087 PASS(21.5초) |
+| 병합 뒤: PlayMode 위 네 fixture | 50/50 PASS(125.0초; 23·15·10·2). `GameSceneFlowTests`는 main 병합으로 23건이 됐다 |
 
 - 각 실행의 skip·inconclusive는 0이다. 대조용 코드 되돌림과 메뉴 실행의 무관한 재저장은 되돌렸고 커밋하지 않았다. batch 가져오기가 덧붙인 Lobby PNG `.meta` 20개의 WebGL 항목도 매번 되돌렸다.
 - **미실행:** Editor 화면에서 메뉴를 직접 누르는 확인, `Create Missing Development Game Scenes`(장면이 모두 있어 새로 만들지 않는다. 바꾼 줄은 컴파일만 확인), 전체 PlayMode, Mac·iOS 앱·실기기.
@@ -36,6 +39,7 @@
 - **원인:** #540이 `jigwiABPersonalDurationSeconds`(DEV 240, 지귀 A 제한 시간)를 15→7(`14813416`)→10(`5413486d`)으로 바꾸면서 Home·Lobby의 저장 DEV 행은 다시 저장하지 않았다.
 - **고친 것:**
   - 두 장면의 `Setting240`만 10으로 저장했다. 장면마다 3줄이다: `Value` InputField의 `m_Text`, 그 자식 `Text`의 `m_Text`, `Slider`의 `m_Value`(모두 15→10). 라벨·슬라이더 범위(1~15)와 다른 오브젝트·Transform·참조는 그대로다. 바뀐 줄마다 소속 오브젝트를 장면 계층 경로로 확인했다.
+  - 그 사이 main의 #562(`d3bf68a2`)도 같은 세 줄을 10으로 저장했다. 그래서 main을 merge(`a434b800`)한 뒤 이 PR에는 `Setting240` 변경분이 남지 않는다.
   - 메뉴 `Hapio/Upgrade Menu DEV Rows`는 쓰지 않았다. 이 도구(`GameSceneBuilder.UpgradeDeveloperRows`)는 저장 패널을 `DeveloperFields.Count`(259)행으로 늘려 클레이 257·258행까지 장면에 써 넣는다. 같은 검사는 #506 이후 저장 패널이 257행(`ClayThicknessField`)이고 클레이 두 행은 실행 중에 붙는다고(`GameScreen.EnsureClayDeveloperRows`) 요구하므로, 메뉴를 그대로 돌리면 행 수 단언에서 실패한다. 대신 그 도구의 행 갱신(라벨, `SetTextWithoutNotify`, 슬라이더 범위·`SetValueWithoutNotify`)을 저장된 257행 중 원본과 다른 행에만 적용하는 임시 Editor 스크립트를 `-executeMethod`로 실행해 Unity가 저장하게 했다. Scene YAML은 손으로 고치지 않았고 스크립트는 커밋하지 않았다.
   - batch 가져오기가 실행할 때마다 Lobby PNG `.meta` 20개에 WebGL 플랫폼 항목을 덧붙여 매번 되돌렸다.
 - **영향:** 게임 동작은 바뀌지 않는다. 실행 중 DEV 패널을 열면 `GameScreen.SelectDeveloperScope`가 모든 칸을 세션 값으로 다시 채운다(코드로 확인했고 실행 검사는 아니다).
