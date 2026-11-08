@@ -2,6 +2,7 @@ using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Globalization;
+using UnityEngine;
 
 namespace C6Lab
 {
@@ -10,8 +11,9 @@ namespace C6Lab
     {
         private LabBonjourDiscovery advertisement;
         private Socket ipv4, ipv6;
-        private bool registrationStarted;
-        private int candidateNumber = 1, registrationAttempts;
+        private bool registrationStarted, retriesExhausted;
+        private int candidateNumber = 1, registrationAttempts, retryAttempts;
+        private double retryAt = double.NaN;
         public int Capacity { get; private set; }
         /// <summary>A 2:2 team territory room (#281), advertised before its creator enters.</summary>
         public bool Team { get; private set; }
@@ -20,7 +22,14 @@ namespace C6Lab
         public string Name => advertisement?.RegisteredServiceName ?? string.Empty;
         public string Key => LabRoomCatalog.Key(Name, Port);
         public bool Ready => advertisement != null && advertisement.IsAdvertising && advertisement.AdvertisingConfirmed;
-        public bool Failed => registrationStarted && (advertisement == null || !advertisement.IsAdvertising);
+        public bool Failed => retriesExhausted || (registrationStarted && (advertisement == null || !advertisement.IsAdvertising));
+        /// <summary>
+        /// A registration that failed for a reason other than its name waits here, then registers again (#503). It
+        /// keeps its port reservation and card, and is neither ready nor failed meanwhile.
+        /// </summary>
+        public bool RetryPending => !double.IsNaN(retryAt);
+        /// <summary>Retries since the last confirmed registration. After <see cref="LabDiscoveryBackoff.MaximumAttempts"/> the room fails.</summary>
+        public int RetryAttempts => retryAttempts;
 
         private LabPendingRoom() { Family = LabRoomFamily.Lab; }
         private LabPendingRoom(LabRoomFamily family) { Family = family; }
@@ -93,7 +102,9 @@ namespace C6Lab
 
         public void Tick(bool allowRegistration = true, int firstNumber = 1)
         {
-            if (!registrationStarted && allowRegistration && advertisement != null)
+            double now = Time.realtimeSinceStartupAsDouble;
+            if (RetryPending && now >= retryAt) retryAt = double.NaN;
+            if (!registrationStarted && !RetryPending && allowRegistration && advertisement != null)
             {
                 registrationStarted = true;
                 candidateNumber = Math.Max(candidateNumber, firstNumber);
@@ -102,10 +113,34 @@ namespace C6Lab
                 bool accepted = advertisement.StartAdvertise(requestedName, Port, ipv4 != null, ipv6 != null, 1, Capacity, false, true, false);
                 // Local owners are known immediately and did not spend a native conflict attempt.
                 if (!advertisement.LocalRegistrationNameConflict) registrationAttempts++;
-                if (!accepted && !RetryNameConflict()) { Dispose(); return; }
+                // A name that cannot move on fails as before; any other refusal waits and tries again (#503).
+                if (!accepted && !RetryNameConflict() && (advertisement.RegistrationNameConflict || !ScheduleRetry(now)))
+                { Dispose(); return; }
             }
             advertisement?.Tick();
-            RetryNameConflict();
+            if (RetryNameConflict()) return;
+            if (Ready) retryAttempts = 0;
+            // A registration that died later (an error reply, a timeout, or one lost after it was confirmed).
+            else if (registrationStarted && advertisement != null && !advertisement.IsAdvertising && !advertisement.RegistrationNameConflict)
+                ScheduleRetry(now);
+        }
+
+        /// <summary>Waits 1, 2, 4, 8, 16, then 30 s, like the Host's own advertisement (#476); false once those run out.</summary>
+        private bool ScheduleRetry(double now)
+        {
+            string reason = advertisement?.LastError ?? "unknown";
+            if (!LabDiscoveryBackoff.CanRetry(retryAttempts, LabDiscoveryBackoff.MaximumAttempts))
+            {
+                retriesExhausted = true;
+                Debug.LogWarning("C6_LAB_PENDING_ROOM_RETRY result=stopped reason=" + reason);
+                return false;
+            }
+            double delay = LabDiscoveryBackoff.Delay(retryAttempts++);
+            registrationStarted = false;
+            retryAt = now + delay;
+            Debug.Log("C6_LAB_PENDING_ROOM_RETRY attempt=" + retryAttempts.ToString(CultureInfo.InvariantCulture)
+                + " delay=" + delay.ToString("0", CultureInfo.InvariantCulture) + " reason=" + reason);
+            return true;
         }
 
         private bool RetryNameConflict()
@@ -136,6 +171,7 @@ namespace C6Lab
         public void Dispose()
         {
             advertisement?.Dispose(); advertisement = null;
+            retryAt = double.NaN;
             ReleasePort();
         }
     }

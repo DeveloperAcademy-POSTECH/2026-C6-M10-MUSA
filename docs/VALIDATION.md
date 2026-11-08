@@ -1,5 +1,33 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-08 — #503 방장 입장 전 대기 방 공개 실패 재시도
+
+- **기준:** main `886e65db` 위의 `fix/#503-pending-room-register-retry`. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro), iOS 활성, 실제 macOS Bonjour(dns_sd). Library는 다른 worktree에서 복제했다.
+- **강제 실패 방법:**
+  - 진행 중인 등록은 discovery 자신의 `Fail`로 끝냈다. 오류 응답·시간 초과와 같은 경로다.
+  - 시작 거절은 예약 소켓 두 개를 한 번만 숨겨 `StartAdvertise`가 바로 false를 돌려주게 했다.
+  - 실제 로컬 네트워크 권한 창·거부, Wi-Fi 끊김은 재현하지 않았다.
+
+| 확인 | 결과 |
+| --- | --- |
+| 관련 EditMode(`LabBonjourRegistrationTests`·`LabDiscoveryBackoffTests`·`LabRoomPresenceTests`·`GamePendingRoomRegistryTests`) | 58/58 PASS. 이름 충돌 재시도와 마지막 번호 실패 검사를 포함한다 |
+| 새 PlayMode `LabPendingRoomRetryTests` 4건 | 4/4 PASS(5.7초): 첫 등록이 실패해도 같은 포트로 확정, 시작 거절 뒤에도 재시도, 확정 뒤 끊기면 같은 이름으로 복구, 대기 1초→2초, 6회 뒤 실패와 포트 해제 |
+| 새 PlayMode `GamePendingRoomRetryTests` 1건 | PASS: 기다리는 카드가 다음 카드를 막지 않음, 마지막 재시도가 실패한 뒤에만 카드가 빠지고 기존 안내가 뜸 |
+| `GameLobbyViewTests` 새 2건 | PASS: 실패한 방이 재시도 안내 뒤 예약 포트로 자동 입장, 실패 뒤 한도에 닿으면 권한 안내, 재시도를 다 쓰면 기존 안내 |
+| 관련 기존 PlayMode(`GameLobbyViewTests` 13건·`LabFigmaLobbyTests` 11건·`LabDiscoveryRecoveryTests` 5건) | 모두 PASS |
+| 대조 1: 재시도를 끔(이름 충돌이 아닌 실패는 바로 실패, 이전 동작) | 새 7건 모두 실패 |
+| 대조 2: 기다리는 카드가 다음 카드를 다시 막게 함 | `GamePendingRoomRetryTests`만 "A waiting card does not hold back the next one."에서 실패 |
+| 전체 EditMode | 2056/2058 PASS(21.8초). 실패 2건은 아래 main 실패다 |
+| 전체 PlayMode | 666/674 PASS(527.0초). 실패 8건은 아래 main 실패다 |
+
+- 각 실행의 skip·inconclusive는 0이다. 대조 변경은 되돌렸고 커밋하지 않았다.
+- 첫 실행에서 새 `GamePendingRoomRetryTests`가 한 번 실패했다. 검사는 첫 Tick에서 항상 native 등록이 시작된다고 가정했다. 실제로는 다른 카드가 그 이름을 먼저 가져가, 지역 이름 충돌(-65548)로 다음 번호로 넘어갔다. 제품 동작이 맞으므로, 등록이 실제로 시작될 때까지 Tick하도록 검사를 고쳤다. 위 결과는 고친 뒤의 것이다.
+- **이 PR과 무관하게 실패한 검사(main `886e65db`):**
+  - EditMode `GameSceneAssetTests.MenuScreens_HaveSavedEditableCanvasAndInput`의 Home·Lobby 2건. 저장된 DEV 패널 240행은 15인데 `LabConfig.asset`은 10이다. #540이 이 값을 15→7(`14813416`)→10(`5413486d`)으로 바꿀 때 Home·Lobby의 DEV 행을 다시 저장하지 않았다.
+  - PlayMode `LabJigwiABNetworkTests` 7건과 `GameJigwiStageIntegrationTests.SavedHomeReachesJigwiWithScreenAThenScreenBAndPreservesTheRealPaintShell` 1건. 대부분 지귀 B 장막·발화점 관련 NullReference·IndexOutOfRange다.
+  - 지귀·DEV 코드를 바꾸지 않는 다른 브랜치(#504, 같은 main 기준)에서도 같은 10건이 실패했다. 지귀 실패의 원인은 조사하지 않았다.
+- **미실행:** iPhone의 로컬 네트워크 권한 창·거부, Wi-Fi 끊김, 여러 기기에서 카드가 보이는지 확인. 앱 복귀 때 재시도를 앞당기는 동작은 만들지 않았다.
+
 ## 2026-11-07 — ClayPreview 높이 EXR의 iOS 가져오기 (main에서 계속 실패하던 검사 1건)
 
 - **기준:** main `d640e0ef` 위의 `fix/clay-preview-exr-hash`(수정 `9fdf0996`, 검토 반영 `5f62e01d`). Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). Library는 끝난 worktree에서 복제했고, 원래 폴더처럼 활성 플랫폼이 iOS다. 같은 Mac에서 다른 폴더의 Unity Editor가 열려 있었다.
