@@ -527,6 +527,7 @@ namespace Hapio
             if (finishing) return;
             // The skip dialog and the pause menu stop the tutorial where it is: nothing moves on behind them.
             if (skipOpen || BattlePaused) return;
+            if (logOpen) return;
             UpdateHandOvers();
             if (beatIndex < 0)
             {
@@ -1080,7 +1081,7 @@ namespace Hapio
             if (UpdatePause()) return;
             bool skipDialogUp = UpdateSkip();
             UpdateLogButton();
-            if (skipDialogUp) return;
+            if (skipDialogUp || UpdateLogScreen()) return;
             bool line = HasBeat && CurrentBeat.IsLine;
             if (remarkAt >= 0f && (Now - remarkAt > remarkSeconds || !remarkHolds && board.IsHolding))
             {
