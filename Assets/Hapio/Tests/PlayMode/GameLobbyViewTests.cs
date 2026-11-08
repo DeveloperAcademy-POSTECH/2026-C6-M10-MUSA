@@ -153,7 +153,7 @@ namespace Hapio.Tests
             Assert.That(((RectTransform)view.slotButtons[1].transform).anchoredPosition, Is.EqualTo(view.seats3[1].anchoredPosition),
                 "The saved Canvas anchor, rather than a hardcoded slot point, controls the game view.");
             view.seats3[1].anchoredPosition = anchor;
-            yield return Click(view.clearSlotButton);
+            yield return Click(view.slotButtons[1]);
             Assert.That(session.Network.LocalSlotNumber, Is.Zero);
             yield return Click(view.slotButtons[0]);
             Assert.That(session.Network.LocalSlotNumber, Is.EqualTo(1));
@@ -326,7 +326,7 @@ namespace Hapio.Tests
             Assert.That(session.Network.TargetParticipantCount, Is.EqualTo(4), "Four chosen players open a 2:2 room (#394).");
             Assert.That(view.heading.fontSize, Is.EqualTo(view.teamHeadingFontSize));
             Assert.That(view.sealButton.interactable, Is.False);
-            Assert.That(view.sealButton.GetComponentInChildren<UnityEngine.UI.Text>().text, Is.EqualTo("땅따먹기 대기"));
+            Assert.That(view.sealButton.GetComponentInChildren<UnityEngine.UI.Text>().text, Is.EqualTo("땅따먹기 대기 중"));
             yield return Click(view.slotButtons[2]);
             Assert.That(session.Network.LocalSlotNumber, Is.EqualTo(3), "Host may freely choose the red team's P3.");
             Assert.That(view.localLabels[2].text, Does.Contain("방장"));
@@ -364,7 +364,7 @@ namespace Hapio.Tests
             yield return EnterTerritoryRoom(0, 2);
             GameLobbyView view = View();
             Assert.That(view.teamLayout.activeInHierarchy, Is.True);
-            Assert.That(view.teamPairParts.All(part => part.activeSelf), Is.True, "Both team boxes and names.");
+            Assert.That(view.seatDesign.teamColumns[0].activeInHierarchy, Is.True, "Both team boxes and names.");
             Assert.That(view.teamPairLines.Any(line => line.activeSelf), Is.False, "No teammate, so no line inside a box.");
             Assert.That(view.teamTrio.activeSelf, Is.False);
             Assert.That(VisibleSeats(view), Is.EqualTo(new[] { 1, 2 }));
@@ -374,57 +374,41 @@ namespace Hapio.Tests
             Assert.That(session.Network.LocalSlotNumber, Is.EqualTo(2));
             Assert.That(view.slotImages[1].sprite, Is.SameAs(view.redTeamFilledSlot), "A taken Red seat is filled in Red.");
             Assert.That(((RectTransform)view.slotButtons[1].transform).anchoredPosition, Is.EqualTo(view.seatsOneOnOne[1].anchoredPosition));
-            Assert.That(view.sealButton.GetComponentInChildren<UnityEngine.UI.Text>().text, Is.EqualTo("땅따먹기 대기"));
+            Assert.That(view.sealButton.GetComponentInChildren<UnityEngine.UI.Text>().text, Is.EqualTo("땅따먹기 대기 중"));
         }
 
         [Category("Bonjour")]
         [UnityTest]
-        public IEnumerator ThreeOnThreeRoomShowsOneTeamPageAtATimeStartingWithBlue()
+        public IEnumerator ThreeOnThreeRoomShowsBothTeamsAndAllowsEverySeatWithoutPaging()
         {
             if (!LabBonjourDiscovery.IsSupported) Assert.Ignore("Native game-room advertisement requires macOS or iOS.");
             yield return EnterTerritoryRoom(4, 6);
             GameLobbyView view = View();
-            Assert.That(view.teamTrio.activeInHierarchy, Is.True);
+            Assert.That(view.seatDesign.teamColumns[2].activeInHierarchy, Is.True);
+            Assert.That(view.teamTrio.activeInHierarchy, Is.False);
             Assert.That(view.teamPairParts.Concat(view.teamPairLines).Any(part => part.activeSelf), Is.False);
-            Assert.That(view.TeamPage, Is.Zero, "A 3:3 room opens on the Blue page.");
-            Assert.That(VisibleSeats(view), Is.EqualTo(new[] { 1, 2, 3 }));
-            Assert.That(view.teamTrioName.text, Is.EqualTo("청팀"));
-            Assert.That(view.teamTrioBox.sprite, Is.SameAs(view.blueTrioBox));
-            Assert.That(view.teamPreviousPage.gameObject.activeSelf, Is.False);
+            Assert.That(VisibleSeats(view), Is.EqualTo(new[] { 1, 2, 3, 4, 5, 6 }));
             Assert.That(view.subheading.text, Is.EqualTo("3명씩 함께 앉아, 준비하시오."));
             Assert.That(view.joinedCount.text, Is.EqualTo("1 / 6명 입장"));
-            yield return Click(view.teamNextPage);
-            Assert.That(view.TeamPage, Is.EqualTo(1));
-            Assert.That(VisibleSeats(view), Is.EqualTo(new[] { 4, 5, 6 }));
-            Assert.That(view.teamTrioName.text, Is.EqualTo("홍팀"));
-            Assert.That(view.teamTrioBox.sprite, Is.SameAs(view.redTrioBox));
-            Assert.That(view.teamNextPage.gameObject.activeSelf, Is.False);
-            Assert.That(((RectTransform)view.slotButtons[5].transform).anchoredPosition, Is.EqualTo(view.seatsThreeOnThree[5].anchoredPosition));
-            yield return Click(view.slotButtons[5]);
-            Assert.That(session.Network.LocalSlotNumber, Is.EqualTo(6), "P6 can be chosen in a six-player room.");
-            Assert.That(view.slotImages[5].sprite, Is.SameAs(view.redTeamFilledSlot));
-            Assert.That(view.localLabels[5].text, Does.Contain("방장"));
-            yield return Click(view.teamPreviousPage);
-            Assert.That(view.TeamPage, Is.Zero, "The other team's page can still be looked at.");
-            Assert.That(VisibleSeats(view), Is.EqualTo(new[] { 1, 2, 3 }));
-            // A sideways swipe on the team box turns the page; a short or vertical drag does not.
-            var drag = new PointerEventData(EventSystem.current)
-                { pressPosition = new Vector2(Screen.width * .7f, Screen.height * .5f), position = new Vector2(Screen.width * .66f, Screen.height * .4f) };
-            view.teamSwipe.OnEndDrag(drag);
-            yield return null;
-            Assert.That(view.TeamPage, Is.Zero);
-            drag.position = new Vector2(Screen.width * .3f, Screen.height * .5f);
-            view.teamSwipe.OnEndDrag(drag);
-            yield return null;
-            Assert.That(view.TeamPage, Is.EqualTo(1));
-            Assert.That(VisibleSeats(view), Is.EqualTo(new[] { 4, 5, 6 }));
-            // A guest may still hold the story mode until the Host's flow state arrives (a direct-IP join or one waiting
-            // for approval). Six players only exist in 3:3, so the room keeps its team page and never draws story seats.
+            // Actual raycasts must reach all six saved controls, including the bottom row in each team.
+            for (int i = 0; i < 6; i++)
+            {
+                yield return Click(view.slotButtons[i]);
+                Assert.That(session.Network.LocalSlotNumber, Is.EqualTo(i + 1));
+                Assert.That(view.slotImages[i].sprite, Is.SameAs(i < 3 ? view.blueTeamFilledSlot : view.redTeamFilledSlot));
+                Assert.That(view.localLabels[i].text, Does.Contain("방장"));
+                Assert.That(VisibleSeats(view), Has.Length.EqualTo(6));
+                yield return Click(view.slotButtons[i]);
+                Assert.That(session.Network.LocalSlotNumber, Is.Zero, "The own-seat click still clears the choice.");
+            }
+            view.sealButton.onClick.Invoke();
+            Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.Lobby), "UI cannot bypass six-player readiness.");
+            // Six players still identifies territory before the Host's game-flow state arrives.
             session.State.mode = GameMode.Story;
             yield return null; yield return null;
-            Assert.That(view.teamTrio.activeInHierarchy, Is.True);
+            Assert.That(view.seatDesign.teamColumns[2].activeInHierarchy, Is.True);
             Assert.That(view.connectionLines.gameObject.activeSelf, Is.False);
-            Assert.That(VisibleSeats(view), Is.EqualTo(new[] { 4, 5, 6 }));
+            Assert.That(VisibleSeats(view), Is.EqualTo(new[] { 1, 2, 3, 4, 5, 6 }));
             session.State.mode = GameMode.Territory;
         }
 
@@ -455,21 +439,19 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
-        public IEnumerator ChosenPlayerCountBlocksTheModeItCannotOpenAndShowsWhyUnderThatButton()
+        public IEnumerator ChosenPlayerCountBlocksTheModeItCannotOpenAndShowsWhyInTheCardFooter()
         {
             GameLobbyView view = View();
             yield return Click(view.enterButton);
-            var chips = view.countButtons[0].GetComponentInParent<UnityEngine.UI.ScrollRect>();
             string[] basicReasons = { "2명은 땅따먹기 1:1만 할 수 있소.", "", "", "", "6명은 땅따먹기 3:3만 할 수 있소." };
-            string[] teamReasons = { "", "땅따먹기는 2·4·6명만 할 수 있소.", "", "땅따먹기는 2·4·6명만 할 수 있소.", "" };
+            string[] teamReasons = { "", "땅따먹기는 짝수 인원만 가능하오..", "", "땅따먹기는 짝수 인원만 가능하오..", "" };
             for (int i = 0; i < view.countButtons.Length; i++)
             {
-                // The 6 chip only peeks out at the edge until the row is pushed sideways.
-                chips.horizontalNormalizedPosition = i < 4 ? 0f : 1f;
                 yield return Click(view.countButtons[i]);
                 Assert.That(view.CreationCapacity, Is.EqualTo(i + 2));
                 yield return Click(view.createButton);
                 Assert.That(view.modePanel.activeInHierarchy, Is.True);
+                Assert.That(view.modeCard.rect.height, Is.EqualTo(i == 2 ? 266f : 292f));
                 Assert.That(view.basicModeButton.interactable, Is.EqualTo(basicReasons[i].Length == 0), (i + 2) + " players, basic");
                 Assert.That(view.teamModeButton.interactable, Is.EqualTo(teamReasons[i].Length == 0), (i + 2) + " players, territory");
                 Assert.That(view.basicModeReason.gameObject.activeSelf, Is.EqualTo(basicReasons[i].Length > 0));
