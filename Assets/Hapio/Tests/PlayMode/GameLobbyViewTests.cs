@@ -279,6 +279,70 @@ namespace Hapio.Tests
 
         [Category("Bonjour")]
         [UnityTest]
+        public IEnumerator APublishThatFailsIsRetriedAndTheRoomStillOpensByItselfOnItsReservedPort()
+        {
+            if (!LabBonjourDiscovery.IsSupported) Assert.Ignore("Native game-room advertisement requires macOS or iOS.");
+            session.EnterRoomBrowser();
+            Assert.That(session.CreateAndEnterRoom(2), Is.True, session.UiNotice);
+            ushort reservedPort = session.PendingRooms.Single().Port;
+            LabPendingRoom room = CreatingRoom();
+            yield return Until(() => GamePendingRoomRetryTests.Advertisement(room).IsAdvertising, "The session starts the registration");
+            Assert.That(session.PendingRooms.Single().Ready, Is.False);
+            GamePendingRoomRetryTests.FailRegistration(room, "forced registration failure");
+            yield return null;
+            Assert.That(session.IsCreatingRoom, Is.True, "A publish that will be retried keeps the request (#503).");
+            Assert.That(session.PendingRooms.Single().RetryPending, Is.True);
+            Assert.That(session.UiNotice, Is.EqualTo("방을 공개하지 못해 다시 시도하고 있소..."));
+            yield return Until(() => session.State.phase == GameFlowPhase.Lobby && !session.IsLoadingScene
+                && session.Network.IsHost, "The retried room still opens without a card click", 20f);
+            Assert.That(session.IsCreatingRoom, Is.False);
+            Assert.That(session.PendingRooms, Is.Empty);
+            Assert.That(session.Network.port, Is.EqualTo(reservedPort), "The retry keeps the reserved advertised port.");
+            Assert.That(session.Network.ConnectedRoomName, Does.StartWith(LabRoomNames.GameServiceBase));
+        }
+
+        [Category("Bonjour")]
+        [UnityTest]
+        public IEnumerator APublishThatKeepsFailingEndsAtTheDeadlineOrItsLastRetryWithThePublishNotice()
+        {
+            if (!LabBonjourDiscovery.IsSupported) Assert.Ignore("Native game-room advertisement requires macOS or iOS.");
+            session.EnterRoomBrowser();
+            Assert.That(session.CreateAndEnterRoom(3), Is.True, session.UiNotice);
+            LabPendingRoom room = CreatingRoom();
+            ushort port = room.Port;
+            yield return Until(() => GamePendingRoomRetryTests.Advertisement(room).IsAdvertising, "The session starts the registration");
+            GamePendingRoomRetryTests.FailRegistration(room, "forced registration failure");
+            yield return null;
+            Assert.That(session.PendingRooms.Single().RetryPending, Is.True);
+            // The request keeps its 30-second deadline (#503); expire it while the retry waits.
+            typeof(GameSession).GetField("roomCreationDeadline", System.Reflection.BindingFlags.Instance
+                | System.Reflection.BindingFlags.NonPublic).SetValue(session, Time.realtimeSinceStartupAsDouble - 1d);
+            yield return null;
+            Assert.That(session.IsCreatingRoom, Is.False);
+            Assert.That(session.PendingRooms, Is.Empty);
+            Assert.That(session.UiNotice, Is.EqualTo("방을 공개하지 못했소. 네트워크 권한을 확인하고 다시 눌러주시오."),
+                "A request that never got published does not blame a slow room.");
+            using (var released = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp))
+                Assert.DoesNotThrow(() => released.Bind(new IPEndPoint(IPAddress.Any, port)));
+
+            // With no retry left, the request ends at once with the registry's notice.
+            Assert.That(session.CreateAndEnterRoom(2), Is.True, session.UiNotice);
+            room = CreatingRoom();
+            yield return Until(() => GamePendingRoomRetryTests.Advertisement(room).IsAdvertising, "The session starts the registration");
+            GamePendingRoomRetryTests.Field(room, "retryAttempts").SetValue(room, LabDiscoveryBackoff.MaximumAttempts);
+            GamePendingRoomRetryTests.FailRegistration(room, "forced last failure");
+            LogAssert.Expect(LogType.Warning, "C6_LAB_PENDING_ROOM_RETRY result=stopped reason=forced last failure");
+            yield return null;
+            Assert.That(session.IsCreatingRoom, Is.False);
+            Assert.That(session.PendingRooms, Is.Empty);
+            Assert.That(session.UiNotice, Is.EqualTo("방을 공개하지 못했소. 같은 Wi-Fi와 네트워크 권한을 확인해주시오."));
+        }
+
+        private LabPendingRoom CreatingRoom() => ((GamePendingRoomHandle)typeof(GameSession).GetField("roomCreationHandle",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(session)).Room;
+
+        [Category("Bonjour")]
+        [UnityTest]
         public IEnumerator TerritoryCreateButtonAlsoEntersItsFourPlayerLobbyAutomatically()
         {
             if (!LabBonjourDiscovery.IsSupported) Assert.Ignore("Native game-room advertisement requires macOS or iOS.");

@@ -127,7 +127,8 @@ namespace C6Lab
                 room.Tick(canRegister, nextNumber);
                 if (room.Ready && LabRoomNames.TryNumber(room.Name, out int number)) nextNumber = Math.Max(nextNumber, number + 1);
                 // Confirm one name before registering the next so rapid creation cannot swap numbers.
-                if (!room.Ready && !room.Failed) canRegister = false;
+                // A room waiting to retry its publish has no registration running (#503).
+                if (!room.Ready && !room.Failed && !room.RetryPending) canRegister = false;
             }
             for (int i = createdRooms.Count - 1; i >= 0; i--)
                 if (createdRooms[i].Failed)

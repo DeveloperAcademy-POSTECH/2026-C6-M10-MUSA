@@ -183,6 +183,11 @@
 - `LabNetwork.Recovery.cs`가 검색 재시작(1~30초, 최대 6회)·방장 공개 재등록(같은 요청 이름, 이관 방은 이름 고정)·모바일 복귀 처리를 맡는다. `DisposeDiscovery`가 대기 중인 재시도를 지우므로 실패 경로는 그 뒤에 예약한다. 살아 있는 등록은 복귀 때 다시 만들지 않는다.
 - iPhone만 연결·입장 중·검색 중(`RoomSearchKeepsAwake`, Hapio는 방 목록이 보일 때만)·재시도 대기에 `SleepTimeout.NeverSleep`이다. NGO·전송 소켓 재생성, 전투 중 백그라운드 처리, 접속 규약·TXT·설정 수·Scene/Prefab은 바꾸지 않는다.
 
+## #503 대기 방 공개 재시도
+
+- 방장 입장 전 대기 방(`LabPendingRoom`)은 이름 충돌이 아닌 등록 실패를 `LabDiscoveryBackoff`의 1~30초 간격, 최대 6회로 다시 등록한다(`RetryPending`·`RetryAttempts`). 기다리는 동안 예약 포트와 카드를 유지하고, 다른 카드의 등록 순서를 막지 않으며, `Failed`는 6회가 끝난 뒤에만 참이다. 이름 충돌은 기존 다음 번호 재시도를 그대로 쓴다. 확정된 카드는 자기 번호를 다시 요청하고, 확정될 때마다 재시도 횟수와 이름 충돌 예산을 초기화한다.
+- Hapio 방 만들기의 30초 한도는 그대로다. 재시도 중 안내와 한도 도달 안내만 바꿨다. 상세는 `docs/GAME_FLOW.md`의 같은 항목을 따른다. 접속 규약·TXT·설정 수는 바꾸지 않는다.
+
 ## #481 전투 초반 프레임 계측
 
 - Development/Editor(`Debug.isDebugBuild`)에서만 `GameSession`이 `GameFrameSpikeProbe`를 런타임에 붙인다. 전투 단계(LoadingBattle~Playing)의 25 ms 초과 프레임과 그 프레임에 처음 실행된 일(`LabFirstUse`의 `Hapio.FirstUse.*` 마커)을 미리 할당한 배열에만 담고, 스테이지가 끝나거나 같은 스테이지를 다시 불러올 때 `HAPIO_FRAME_SPIKE`·`HAPIO_FRAME_SUMMARY`로 스택 없이 한 번 출력한다. 출력한 프레임은 다음 스테이지 측정에서 뺀다.
