@@ -1,5 +1,38 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-08 — #504 배경 재질 `_MainTex`·`_Color` 사본 맞추기
+
+- **기준:** main `886e65db` 위의 `chore/#504-background-material-sync`. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro), iOS 활성. Library는 다른 worktree에서 복제했다.
+- **원인 확인(임시 진단 스크립트, 커밋 안 함):**
+  - URP `BaseShaderGUI.SetMaterialKeywords`는 `_MainTex`와 `_BaseMap`이 모두 있으면 `_BaseMap`의 텍스처·타일링·오프셋을 `_MainTex`에, `_BaseColor`를 `_Color`에 복사한다.
+  - Stage02 `YokaiGround` 복사본의 `_MainTex` 텍스처와 `_Color`만 다르게 저장하고 가져왔다. 불러온 재질의 두 값은 이미 `_BaseMap`·`_BaseColor`와 같았고, 재질은 dirty였다. 저장하자 파일도 그렇게 바뀌었다.
+  - 고치기 전 `이미지만 적용`의 재질 쓰기(`_BaseMap`·`_BaseColor`만)를 다른 복사본에 실행하고 저장했다. `_MainTex`의 타일링·오프셋이 옛 값(3×3, 0)으로 남았다. 다시 불러오자 dirty였고, 저장하자 `_MainTex`가 바뀌었다.
+  - 다시 가져오지 않고 불러오기만 한 재질은 바뀌지 않았다. `_Color`가 `_BaseColor`와 소수 마지막 자리만 다른 구운 박 재질 하나로 확인했다.
+  - 고친 뒤 `ApplyImage`로 쓰고 저장한 파일은 두 사본이 같고, 다시 불러와도 dirty가 아니다.
+  - 지금 저장된 Studio 재질 12개(Battle Studio 3개·Lab Studio 1개 × 바닥·한지 배경·보드 뒤)는 이미 일치한다. 이번 변경은 재질·Scene 파일을 바꾸지 않는다.
+- **고친 것:**
+  - `LabBackgroundStudio.ApplyImage`가 사본까지 쓴다.
+  - Studio Inspector는 저장 재질이 Studio 값과 다르면 경고한다.
+  - `GameStageBackgroundAssetTests`에 EditMode 검사 3개(TestCase 포함 4건)를 더했다.
+- **남은 것(바꾸지 않음):** 검토 중 저장소의 URP Lit/Unlit 재질 74개를 모두 다시 확인했다. `_MainTex`가 `_BaseMap`과 다른 파일은 없고, `_Color`가 `_BaseColor`와 다른 파일은 28개다. 모두 배경 Studio 밖이다. 다시 가져오고 저장하면 같은 방식으로 바뀔 수 있지만 그대로 뒀다.
+  - 구운 박 14개(`Assets/Hapio/Art/Gourds/Stage0N_*/Materials`): 소수 마지막 자리만 다르다.
+  - `Assets/Hapio/Art/Yagwanggwi/Materials` 10개: 7개는 마지막 자리 차이다. `Eye ivory`·`Eye pupils`·`Inner ivory` 3개는 `_Color`가 흰색이라 값 자체가 다르다.
+  - Lab 4개(`Art/Orbs/OrbBoardPlate`·`OrbCombined`·`OrbYin`, `Resources/GourdPaint/Stem`): 마지막 자리 차이다.
+
+| 확인 | 결과 |
+| --- | --- |
+| 배경 EditMode 3 fixture(`GameStageBackgroundAssetTests`·`GameBackgroundAnimationAssetTests`·`GameSceneAssetTests`) | 16건 중 14 PASS. 새 4건과 기존 배경 검사가 통과했다. 실패 2건은 아래 main 실패다 |
+| 대조 A: Stage02 `YokaiGround.mat`의 `_MainTex` GUID만 HanjiSand로 바꿈 | 새 파일 검사(Battle)만 실패: `YokaiGround.mat`의 `_MainTex`가 `_BaseMap`과 다름 |
+| 대조 B: `ApplyImage`에서 사본을 쓰는 두 줄을 뺌 | 새 `ApplyImageAlsoWritesTheHiddenCopiesTheEditorRewrites`만 실패: Lit `_MainTex`가 옛 텍스처 |
+| 전체 EditMode | 2060/2062 PASS(22.5초). 실패 2건은 아래 main 실패다 |
+| 전체 PlayMode | 659/667 PASS(518.9초). 실패 8건은 아래 main 실패다. 이 변경은 Editor 전용이라 PlayMode 경로에 닿지 않는다 |
+
+- 각 실행의 skip·inconclusive는 0이다. 대조 변경과 진단 스크립트는 되돌렸고 커밋하지 않았다.
+- **이 PR과 무관하게 실패한 검사:**
+  - EditMode `GameSceneAssetTests.MenuScreens_HaveSavedEditableCanvasAndInput`의 Home·Lobby 2건. 저장된 DEV 패널 240행은 15인데 `LabConfig.asset`은 10이다. #540이 이 값을 15→7(`14813416`)→10(`5413486d`)으로 바꿀 때 Home·Lobby의 DEV 행을 다시 저장하지 않았다.
+  - PlayMode `LabJigwiABNetworkTests` 7건과 `GameJigwiStageIntegrationTests.SavedHomeReachesJigwiWithScreenAThenScreenBAndPreservesTheRealPaintShell` 1건. 대부분 지귀 B 장막·발화점 관련 NullReference·IndexOutOfRange다. 지귀 코드를 바꾸지 않는 #503 브랜치(같은 main 기준)에서도 같은 8건이 실패해 main `886e65db`의 실패로 본다. 원인은 조사하지 않았다.
+- **미실행:** Editor 화면에서 Inspector 경고를 직접 보는 확인, 실기기. 이 변경은 Editor 전용이다.
+
 ## 2026-11-07 — ClayPreview 높이 EXR의 iOS 가져오기 (main에서 계속 실패하던 검사 1건)
 
 - **기준:** main `d640e0ef` 위의 `fix/clay-preview-exr-hash`(수정 `9fdf0996`, 검토 반영 `5f62e01d`). Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). Library는 끝난 worktree에서 복제했고, 원래 폴더처럼 활성 플랫폼이 iOS다. 같은 Mac에서 다른 폴더의 Unity Editor가 열려 있었다.

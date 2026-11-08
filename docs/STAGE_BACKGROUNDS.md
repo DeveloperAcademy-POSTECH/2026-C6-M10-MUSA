@@ -65,6 +65,15 @@ Stage 1 바닥·조합판 뒤는 Stage01_Ground_SandBeige다(#490에서 사용�
 
 2스테이지는 #487에서 Stage02 Background Studio의 ground·board backing PNG와 Stage02 YokaiGround·YokaiBacking 재질의 `_BaseMap`을 모두 Stage02_Ground_Yagwanggwi로 연결했다. 기기는 저장된 재질의 `_BaseMap`을 그리므로 studio 값과 재질 값이 같아야 하며 `GameStageBackgroundAssetTests`가 세 스테이지 모두 이를 검사한다.
 
+## 저장 재질과 숨은 사본 (#504)
+
+바닥·한지 배경·보드 뒤 재질은 URP Lit/Unlit이다. 이 셰이더는 쓰지 않는 `_MainTex`·`_Color` 사본도 저장한다. Editor는 재질을 가져올 때 이 사본을 `_BaseMap`(텍스처·타일링·오프셋)과 `_BaseColor` 값으로 맞춘다. 그래서 파일 안의 두 값이 다르면 재질이 저장 대상이 되고, 다음 저장 때 의도하지 않은 .mat 변경이 생긴다.
+
+- `이미지만 적용`(`LabBackgroundStudio.ApplyImage`)은 세 재질에 이 사본까지 같은 값으로 쓴다. 장식 카드의 InkCard 셰이더에는 사본이 없다.
+- 저장된 재질이 Studio의 PNG·색·타일링과 다르면 Studio Inspector가 경고한다. 바닥은 노멀 맵·강도·부드러움도 비교한다. 게임은 재질을 그리므로, 경고가 보이면 `이미지만 적용`을 누르고 Scene을 저장한다.
+- `GameStageBackgroundAssetTests`는 Battle의 세 Studio와 Lab Studio의 재질 12개를 확인한다. 모두 적용된 상태인지 보고, 재질 파일을 직접 읽어 `_MainTex`·`_Color`가 `_BaseMap`·`_BaseColor`와 같은지 본다. 불러온 재질에는 이미 맞춰진 값이 보일 수 있어서 파일을 읽는다.
+- 재질을 Editor 스크립트로 바꿀 때도 `_BaseMap`만 바꾸지 않는다. Editor 전용인 `ApplyImage`를 쓰거나 사본도 같이 바꾼다.
+
 ## 조명 작업실
 
 Hapio > 배틀 조명 작업실에서 Battle Scene 조명 색·강도·방향과 환경광·반사를 조절한다. 편집 모드에서 스테이지 미리보기와 씬 저장을 지원하고 플레이 중 변경은 임시다. 창을 열었을 때 상태 복원 및 현재 상태를 복원 기준으로 지정할 수 있다. 복원 기준은 창 세션 안에서 유지하며 플레이 상태 전환 시 새로 잡는다. 조명은 세 스테이지 공통이고 하늘 PNG는 별도 Unlit 재질이다.

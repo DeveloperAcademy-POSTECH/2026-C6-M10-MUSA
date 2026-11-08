@@ -342,3 +342,7 @@
 - RTT 표본은 이번 ACK가 새로 확인한 조각(선택 ACK 포함) 중 가장 최근에 보낸 조각이 한 번만 보낸 조각일 때 잰다(Karn). RTO 식·0.08~1초·시간 초과 공유 백오프는 #437 그대로다. 표본 전 RTO는 0.25초 기준에 같은 공유 백오프가 걸린다(위 #437 절, PR #545).
 - 창은 32→64조각(수신 버퍼 128), 공동 스냅샷 조각은 512→4000자다(`LabSessionSettings.SnapshotChunkCharacters`). 문자당 6바이트 escape에서도 한 조각이 Bulk 논리 본문 32,768자 안에 든다는 것을 검사로 고정했다. 선택 ACK 비트가 `AckThrough + 65`까지만 덮으므로 창을 65보다 키우려면 비트맵도 넓혀야 한다.
 - 이 절이 들어올 때 호환 묶음은 설정 259개·**5690**·`C6PhysicsLab/51`·**`C6HapioGame/37`**이었다(5689/Lab50/Game36은 `feat/#540` 브랜치가 먼저 썼다). #540이 이 위에 올라가 지금은 **5691**·`C6PhysicsLab/52`·**`C6HapioGame/38`**이다. 5690 이하 앱과 혼용하지 않는다. 동작과 대안 비교는 `docs/LOCAL_BOARD_AUTHORITY.md`의 Bulk 절, 실행한 검사·측정은 `docs/VALIDATION.md`에만 기록한다.
+
+## #504 배경 재질의 숨은 사본
+
+- 배경 Studio의 바닥·한지 배경·보드 뒤 재질(URP Lit/Unlit)은 `_BaseMap`·`_BaseColor`와 숨은 `_MainTex`·`_Color`를 같은 값으로 저장한다. Editor는 재질을 가져올 때 사본을 맞춘다. 값이 다르면 가져온 재질이 dirty가 되고, 다음 저장 때 .mat이 바뀐다. Editor 스크립트로 바꿀 때도 `LabBackgroundStudio.ApplyImage`(Editor 전용)를 쓴다. `GameStageBackgroundAssetTests`가 재질 파일을 읽어 확인한다. 상세는 `docs/STAGE_BACKGROUNDS.md`를 따른다.

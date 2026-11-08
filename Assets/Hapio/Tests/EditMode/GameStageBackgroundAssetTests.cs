@@ -1,4 +1,7 @@
+using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using C6Lab;
 using NUnit.Framework;
 using UnityEditor;
@@ -117,6 +120,125 @@ namespace Hapio.Tests
                 EditorSceneManager.CloseScene(scene, true);
                 if (previous.IsValid() && previous.isLoaded) SceneManager.SetActiveScene(previous);
             }
+        }
+
+        // #504: the Editor rewrites a URP material's hidden _MainTex/_Color from _BaseMap/_BaseColor when it imports one,
+        // so a saved file that disagrees becomes a stray .mat change on the next save. A material imported this session
+        // may already show the rewritten values, so read the saved file itself.
+        [TestCase(GameScenePaths.Battle)]
+        [TestCase("Assets/Lab/Scenes/Lab.unity", Category = "LabOnly")]
+        public void EveryStudioMaterialIsAppliedAndSavedWithTheCopiesTheEditorRewrites(string path)
+        {
+            Scene previous = SceneManager.GetActiveScene();
+            Scene scene = EditorSceneManager.OpenScene(path, OpenSceneMode.Additive);
+            try
+            {
+                LabBackgroundStudio[] studios = scene.GetRootGameObjects()
+                    .SelectMany(root => root.GetComponentsInChildren<LabBackgroundStudio>(true)).ToArray();
+                Assert.That(studios, Has.Length.EqualTo(path == GameScenePaths.Battle ? 3 : 1));
+                foreach (LabBackgroundStudio studio in studios)
+                {
+                    Assert.That(studio.UnappliedImages(), Is.Empty, studio.name);
+                    List<Material> materials = studio.ImageMaterials();
+                    Assert.That(materials, Has.Count.EqualTo(3), studio.name + ": ground, surround and board backing");
+                    foreach (Material material in materials)
+                    {
+                        string file = AssetDatabase.GetAssetPath(material);
+                        Assert.That(material.HasProperty("_MainTex") && material.HasProperty("_Color"), Is.True,
+                            file + " keeps the URP Lit/Unlit hidden copies");
+                        string text = File.ReadAllText(file).Replace("\r\n", "\n");
+                        Assert.That(SavedTexture(text, "_MainTex", file), Is.EqualTo(SavedTexture(text, "_BaseMap", file)), file);
+                        Assert.That(SavedColor(text, "_Color", file), Is.EqualTo(SavedColor(text, "_BaseColor", file)), file);
+                    }
+                }
+            }
+            finally
+            {
+                EditorSceneManager.CloseScene(scene, true);
+                if (previous.IsValid() && previous.isLoaded) SceneManager.SetActiveScene(previous);
+            }
+        }
+
+        [Test]
+        public void ApplyImageAlsoWritesTheHiddenCopiesTheEditorRewrites()
+        {
+            var png = new Texture2D(2, 2);
+            var color = new Color(.8f, .7f, .6f, 1f);
+            try
+            {
+                foreach (string shaderName in new[] { "Universal Render Pipeline/Lit", "Universal Render Pipeline/Unlit" })
+                {
+                    var material = new Material(Shader.Find(shaderName));
+                    try
+                    {
+                        // Stale copies, the way the image button used to leave them.
+                        material.SetTexture("_MainTex", Texture2D.blackTexture);
+                        material.SetTextureScale("_MainTex", Vector2.one);
+                        material.SetColor("_Color", Color.red);
+                        LabBackgroundStudio.ApplyImage(material, png, color, new Vector2(5, 4), new Vector2(.25f, .5f));
+                        foreach (string property in new[] { "_BaseMap", "_MainTex" })
+                        {
+                            Assert.That(material.GetTexture(property), Is.SameAs(png), shaderName + " " + property);
+                            Assert.That(material.GetTextureScale(property), Is.EqualTo(new Vector2(5, 4)), shaderName + " " + property);
+                            Assert.That(material.GetTextureOffset(property), Is.EqualTo(new Vector2(.25f, .5f)), shaderName + " " + property);
+                        }
+                        Assert.That(material.GetColor("_BaseColor"), Is.EqualTo(color), shaderName);
+                        Assert.That(material.GetColor("_Color"), Is.EqualTo(color), shaderName);
+                    }
+                    finally { Object.DestroyImmediate(material); }
+                }
+            }
+            finally { Object.DestroyImmediate(png); }
+        }
+
+        [Test]
+        public void TheStudioListsOnlyTheSlotsWhoseSavedMaterialDiffers()
+        {
+            Scene previous = SceneManager.GetActiveScene();
+            Scene scene = EditorSceneManager.OpenScene(GameScenePaths.Battle, OpenSceneMode.Additive);
+            try
+            {
+                LabBackgroundStudio studio = scene.GetRootGameObjects()
+                    .SelectMany(root => root.GetComponentsInChildren<GameStageBackgrounds>(true)).Single().Resolve(2).studio;
+                Assert.That(studio.UnappliedImages(), Is.Empty);
+                Texture2D ground = studio.groundPng, backing = studio.boardBackgroundPng;
+                Vector2 paperTiling = studio.paperTiling;
+                Color backingColor = studio.boardBackgroundColor;
+                // #487's case: the studio names a floor that the saved ground material does not show.
+                studio.groundPng = studio.paperPng;
+                Assert.That(studio.UnappliedImages(), Is.EqualTo(new[] { LabBackgroundStudio.GroundSlot }));
+                studio.groundPng = ground;
+                studio.paperTiling = paperTiling + Vector2.one;
+                Assert.That(studio.UnappliedImages(), Is.EqualTo(new[] { LabBackgroundStudio.SurroundSlot }));
+                studio.paperTiling = paperTiling;
+                studio.boardBackgroundColor = Color.red;
+                Assert.That(studio.UnappliedImages(), Is.EqualTo(new[] { LabBackgroundStudio.BoardBackingSlot }));
+                studio.boardBackgroundColor = backingColor;
+                // Without its own PNG the backing falls back to the ground PNG, exactly as the image button does.
+                Assert.That(backing, Is.SameAs(ground));
+                studio.boardBackgroundPng = null;
+                Assert.That(studio.UnappliedImages(), Is.Empty);
+            }
+            finally
+            {
+                EditorSceneManager.CloseScene(scene, true);
+                if (previous.IsValid() && previous.isLoaded) SceneManager.SetActiveScene(previous);
+            }
+        }
+
+        private static string SavedTexture(string text, string name, string file)
+        {
+            Match match = Regex.Match(text, "\n    - " + name
+                + ":\n        m_Texture: (\\{[^}]*\\})\n        m_Scale: (\\{[^}]*\\})\n        m_Offset: (\\{[^}]*\\})\n");
+            Assert.That(match.Success, Is.True, file + " saves " + name);
+            return match.Groups[1].Value + " " + match.Groups[2].Value + " " + match.Groups[3].Value;
+        }
+
+        private static string SavedColor(string text, string name, string file)
+        {
+            Match match = Regex.Match(text, "\n    - " + name + ": (\\{[^}]*\\})\n");
+            Assert.That(match.Success, Is.True, file + " saves " + name);
+            return match.Groups[1].Value;
         }
     }
 }

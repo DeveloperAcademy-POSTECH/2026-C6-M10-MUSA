@@ -88,19 +88,19 @@ namespace C6Lab
             {
                 UnityEditor.Undo.RecordObject(generatedGround.gameObject,"Ground visibility");generatedGround.gameObject.SetActive(showGround);
                 var mat=generatedGround.GetComponent<Renderer>().sharedMaterial;UnityEditor.Undo.RecordObject(mat,"Update ground");
-                SetTexture(mat,groundPng,groundColor,groundTiling,groundOffset);mat.SetFloat("_Smoothness",smoothness);mat.SetTexture("_BumpMap",groundNormal);mat.SetFloat("_BumpScale",normalStrength);
+                ApplyImage(mat,groundPng,groundColor,groundTiling,groundOffset);mat.SetFloat("_Smoothness",smoothness);mat.SetTexture("_BumpMap",groundNormal);mat.SetFloat("_BumpScale",normalStrength);
                 if(groundNormal!=null)mat.EnableKeyword("_NORMALMAP");else mat.DisableKeyword("_NORMALMAP");UnityEditor.EditorUtility.SetDirty(mat);
             }
             var surround=DirectChild(generated,"Hanji Surround");
             if(surround!=null)
             {
                 UnityEditor.Undo.RecordObject(surround.gameObject,"Surround visibility");surround.gameObject.SetActive(showSurround);
-                var mat=surround.GetComponent<Renderer>().sharedMaterial;UnityEditor.Undo.RecordObject(mat,"Update paper");SetTexture(mat,paperPng,paperColor,paperTiling,Vector2.zero);UnityEditor.EditorUtility.SetDirty(mat);
+                var mat=surround.GetComponent<Renderer>().sharedMaterial;UnityEditor.Undo.RecordObject(mat,"Update paper");ApplyImage(mat,paperPng,paperColor,paperTiling,Vector2.zero);UnityEditor.EditorUtility.SetDirty(mat);
             }
             if(generatedBoardBacking!=null)
             {
                 UnityEditor.Undo.RecordObject(generatedBoardBacking.gameObject,"Backing visibility");generatedBoardBacking.gameObject.SetActive(fillBoardBackground);
-                var mat=generatedBoardBacking.GetComponent<Renderer>().sharedMaterial;UnityEditor.Undo.RecordObject(mat,"Update backing");SetTexture(mat,boardBackgroundPng!=null?boardBackgroundPng:groundPng,boardBackgroundColor,new Vector2(20,20),Vector2.zero);UnityEditor.EditorUtility.SetDirty(mat);
+                var mat=generatedBoardBacking.GetComponent<Renderer>().sharedMaterial;UnityEditor.Undo.RecordObject(mat,"Update backing");ApplyImage(mat,BoardBackingPng,boardBackgroundColor,BoardBackingTiling,Vector2.zero);UnityEditor.EditorUtility.SetDirty(mat);
             }
             if(layout)
             {
@@ -161,10 +161,60 @@ namespace C6Lab
             UnityEditor.EditorUtility.SetDirty(m);
             return m;
         }
-        static void SetTexture(Material m,Texture2D png,Color color,Vector2 tiling,Vector2 offset)
+        public const string GroundSlot="바닥 / Ground",SurroundSlot="한지 배경 / Surround",BoardBackingSlot="보드 위 빈틈 채우기 / Board Backing";
+        static readonly Vector2 BoardBackingTiling=new Vector2(20,20);
+        Texture2D BoardBackingPng{get{return boardBackgroundPng!=null?boardBackgroundPng:groundPng;}}
+
+        /// <summary>
+        /// Writes one studio image into a URP material. URP Lit/Unlit also keep hidden `_MainTex`/`_Color` copies, and
+        /// the Editor rewrites them from `_BaseMap`/`_BaseColor` when it imports the material. Writing both keeps the
+        /// saved file the way that check leaves it, so a later import does not dirty the .mat (#504).
+        /// </summary>
+        public static void ApplyImage(Material m,Texture2D png,Color color,Vector2 tiling,Vector2 offset)
         {
             m.SetTexture("_BaseMap",png); m.SetColor("_BaseColor",color);
             m.SetTextureScale("_BaseMap",tiling);m.SetTextureOffset("_BaseMap",offset);
+            // The same condition URP's BaseShaderGUI uses before it copies the base map.
+            if(m.HasProperty("_MainTex")&&m.HasProperty("_BaseMap")){m.SetTexture("_MainTex",png);m.SetTextureScale("_MainTex",tiling);m.SetTextureOffset("_MainTex",offset);}
+            if(m.HasProperty("_Color")&&m.HasProperty("_BaseColor"))m.SetColor("_Color",color);
+        }
+
+        /// <summary>The saved materials the image button writes: ground, Hanji surround and board backing, where present.</summary>
+        public List<Material> ImageMaterials()
+        {
+            var materials=new List<Material>();
+            foreach(var material in new[]{MaterialOf(generatedGround),MaterialOf(DirectChild(generated,"Hanji Surround")),MaterialOf(generatedBoardBacking)})
+                if(material!=null)materials.Add(material);
+            return materials;
+        }
+
+        /// <summary>
+        /// Image slots whose saved material does not show the studio fields yet (#504). A player draws the material, not
+        /// these fields, so each one needs ‘이미지만 적용’ and a scene save.
+        /// </summary>
+        public List<string> UnappliedImages()
+        {
+            var slots=new List<string>();
+            var ground=MaterialOf(generatedGround);
+            if(ground!=null&&!(Shows(ground,groundPng,groundColor,groundTiling,groundOffset)
+                &&(!ground.HasProperty("_BumpMap")||ground.GetTexture("_BumpMap")==groundNormal)
+                &&(!ground.HasProperty("_BumpScale")||Mathf.Approximately(ground.GetFloat("_BumpScale"),normalStrength))
+                &&(!ground.HasProperty("_Smoothness")||Mathf.Approximately(ground.GetFloat("_Smoothness"),smoothness))))
+                slots.Add(GroundSlot);
+            var surround=MaterialOf(DirectChild(generated,"Hanji Surround"));
+            if(surround!=null&&!Shows(surround,paperPng,paperColor,paperTiling,Vector2.zero))slots.Add(SurroundSlot);
+            var backing=MaterialOf(generatedBoardBacking);
+            if(backing!=null&&!Shows(backing,BoardBackingPng,boardBackgroundColor,BoardBackingTiling,Vector2.zero))slots.Add(BoardBackingSlot);
+            return slots;
+        }
+        static Material MaterialOf(Transform target)
+        {
+            var renderer=target!=null?target.GetComponent<Renderer>():null;return renderer!=null?renderer.sharedMaterial:null;
+        }
+        static bool Shows(Material m,Texture png,Color color,Vector2 tiling,Vector2 offset)
+        {
+            return m.HasProperty("_BaseMap")&&m.HasProperty("_BaseColor")&&m.GetTexture("_BaseMap")==png&&m.GetColor("_BaseColor")==color
+                &&m.GetTextureScale("_BaseMap")==tiling&&m.GetTextureOffset("_BaseMap")==offset;
         }
         static void Cutout(Material m,float cutoff)
         {
