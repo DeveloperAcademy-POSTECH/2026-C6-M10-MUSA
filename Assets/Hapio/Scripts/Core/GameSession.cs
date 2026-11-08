@@ -316,7 +316,11 @@ namespace Hapio
                     SetResultPresentation(control.sender, control.resultPresentationBusy);
                 else if (control.kind == "exit" && state.IsRunActive && control.runId == state.runId
                     && control.stageIndex == state.stageIndex)
+                {
+                    // #501: a player that quit is not held if it drops in the lobby a 2:2 room returns to.
+                    network.MarkLobbyLeaver(control.sender);
                     AbortHost("A player left the game.", "한 명이 나가 판을 멈추고 로비로 돌아왔소.");
+                }
                 return;
             }
             if (control.kind == "countdown_commit")

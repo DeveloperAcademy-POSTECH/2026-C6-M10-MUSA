@@ -209,6 +209,31 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
+        public IEnumerator AGuestExitDuringTheRunMarksItAsLeavingSoItsLaterDropIsNotHeld()
+        {
+            session.StartSolo();
+            yield return WaitPlaying(1);
+            const System.Reflection.BindingFlags flags = System.Reflection.BindingFlags.Instance
+                | System.Reflection.BindingFlags.NonPublic;
+            // #501: a guest that quits the run sends "exit". In a 2:2 room the Host then returns to its lobby with that
+            // guest still connected; if it drops there later, its place must not be held for 90 s. A fake member stands
+            // in for the guest in this solo run.
+            var order = (System.Collections.Generic.List<ulong>)typeof(LabNetwork).GetField("order", flags).GetValue(network);
+            var leavers = (System.Collections.Generic.HashSet<ulong>)typeof(LabNetwork).GetField("lobbyLeavers", flags)
+                .GetValue(network);
+            order.Add(77);
+            object control = typeof(GameSession).GetMethod("MakeControl", flags).Invoke(session, new object[] { "exit", null });
+            control.GetType().GetField("sender").SetValue(control, 77UL);
+            typeof(GameSession).GetMethod("ApplyControl", flags).Invoke(session, new[] { control });
+            Assert.That(leavers, Does.Contain(77UL));
+            order.Remove(77);
+            leavers.Remove(77);
+            yield return WaitGameOver();
+            session.GoHome();
+            yield return WaitHome();
+        }
+
+        [UnityTest]
         public IEnumerator LeavingDuringCountdownCancelsThePreparedRoundAndClearsTheOverlay()
         {
             session.StartSolo();

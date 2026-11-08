@@ -38,6 +38,8 @@ namespace C6Lab
         private readonly Dictionary<ulong, string> approvedTickets = new Dictionary<ulong, string>();
         private readonly List<LobbySeatHold> lobbySeatHolds = new List<LobbySeatHold>();
         private readonly HashSet<ulong> lobbyLeavers = new HashSet<ulong>();
+        /// <summary>Members the Host has had a packet from, so they saw their admission and know their ticket was let in.</summary>
+        private readonly HashSet<ulong> heardLobbyMembers = new HashSet<ulong>();
         private readonly HashSet<ulong> replacedMembers = new HashSet<ulong>();
         private readonly Dictionary<string, int> rememberedSlots = new Dictionary<string, int>();
         // Guest: the lobby's held seats, and this device's ticket and rejoin state, which outlive ResetLocal.
@@ -45,6 +47,7 @@ namespace C6Lab
         private readonly List<string> lobbyRejoinRoutes = new List<string>();
         private string rejoinTicket;
         private string rejoinTicketRoom;
+        private ushort rejoinTicketPort;
         /// <summary>The Host let this ticket into its lobby, so it may be holding the place now.</summary>
         private bool rejoinTicketAdmitted;
         private bool hostClosedLobby;
@@ -109,21 +112,38 @@ namespace C6Lab
             return true;
         }
 
-        /// <summary>A new ticket for a new room. Joining the same room again keeps it, so a held or remembered P returns.</summary>
-        private void PrepareRejoinTicket(string room)
+        /// <summary>
+        /// A new ticket for a new room. Joining the same room again keeps it, so a held or remembered P returns. A room
+        /// card is known by "port:name" and a Direct IP join by "address:port"; a Direct IP join to the port of an
+        /// admitted ticket keeps that ticket too (the Host decides).
+        /// </summary>
+        private void PrepareRejoinTicket(string room, ushort roomPort, bool direct)
         {
             if (!gameFlowEnabled)
             {
                 rejoinTicket = null;
                 rejoinTicketRoom = null;
+                rejoinTicketPort = 0;
                 rejoinTicketAdmitted = false;
                 return;
             }
             if (!string.IsNullOrEmpty(rejoinTicket)
-                && string.Equals(rejoinTicketRoom, room, StringComparison.OrdinalIgnoreCase)) return;
+                && (string.Equals(rejoinTicketRoom, room, StringComparison.OrdinalIgnoreCase)
+                    || direct && rejoinTicketAdmitted && rejoinTicketPort == roomPort)) return;
             rejoinTicket = Guid.NewGuid().ToString("N");
             rejoinTicketRoom = room;
+            rejoinTicketPort = roomPort;
             rejoinTicketAdmitted = false;
+        }
+
+        /// <summary>
+        /// The Host's lobby names the room, so a ticket from a Direct IP join also matches its room card ("port:name").
+        /// </summary>
+        private void NameRejoinTicketRoom(string roomName)
+        {
+            if (!gameFlowEnabled || string.IsNullOrEmpty(rejoinTicket) || string.IsNullOrEmpty(roomName)
+                || rejoinTicketPort != port) return;
+            rejoinTicketRoom = LabRoomCatalog.Key(roomName, port);
         }
 
         /// <summary>
@@ -236,6 +256,16 @@ namespace C6Lab
             configAcknowledgements.Remove(id);
             memberTickets.Remove(id);
             lobbyLeavers.Remove(id);
+            heardLobbyMembers.Remove(id);
+        }
+
+        /// <summary>
+        /// A guest that left the run on purpose (its "exit" control) gave its place up too: if the room returns to its
+        /// lobby (2:2) and that guest then drops, its place is freed instead of held for a device that will not return.
+        /// </summary>
+        public void MarkLobbyLeaver(ulong id)
+        {
+            if (gameFlowEnabled && IsHost && order.Contains(id)) lobbyLeavers.Add(id);
         }
 
         /// <summary>
@@ -255,6 +285,14 @@ namespace C6Lab
             {
                 rememberedSlots.Remove(ticket);
                 Debug.Log("C6_LAB_LOBBY_HOLD result=left id=" + id + " p=" + slot);
+                return false;
+            }
+            if (!heardLobbyMembers.Contains(id))
+            {
+                // Never heard from since its admission: the device may not know it got in (a join canceled at that
+                // moment), so it could not come back for the place. Free it at once.
+                rememberedSlots.Remove(ticket);
+                Debug.Log("C6_LAB_LOBBY_HOLD result=unconfirmed id=" + id);
                 return false;
             }
             if (slot > 0) rememberedSlots[ticket] = slot;
@@ -318,6 +356,7 @@ namespace C6Lab
                 // A guest that said goodbye gave its place up; a later join to this room is a new player.
                 rejoinTicket = null;
                 rejoinTicketRoom = null;
+                rejoinTicketPort = 0;
                 rejoinTicketAdmitted = false;
             }
         }
@@ -329,6 +368,7 @@ namespace C6Lab
             approvedTickets.Clear();
             lobbySeatHolds.Clear();
             lobbyLeavers.Clear();
+            heardLobbyMembers.Clear();
             replacedMembers.Clear();
             rememberedSlots.Clear();
             heldSeatOwners.Clear();

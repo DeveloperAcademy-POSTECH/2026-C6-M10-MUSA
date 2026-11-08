@@ -126,6 +126,7 @@ namespace C6Lab.Tests
                 Assert.That(room.Network.HeldSeatCount, Is.Zero);
                 Assert.That(room.Approve(9, TicketA), Is.True);
                 room.Connect(9);
+                room.Hear(9);
                 Assert.That(room.Network.GetSlotOwner(2), Is.EqualTo(9UL), "The P it left with is still free.");
                 room.Drop(9);
                 room.Expire(Time.realtimeSinceStartupAsDouble + LabNetwork.LobbySeatHoldSeconds + 1d);
@@ -146,9 +147,11 @@ namespace C6Lab.Tests
                 room.Drop(5);
                 Assert.That(room.Approve(9, TicketA), Is.True);
                 room.Connect(9);
+                room.Hear(9);
                 Assert.That(room.Network.GetSlotOwner(2), Is.EqualTo(9UL));
                 Assert.That(room.Slots.TrySelect(9, 0, out _), Is.True, "The player clears its own choice.");
                 room.Drop(9);
+                Assert.That(room.Network.HeldSeatCount, Is.EqualTo(1), "Held with no P.");
                 Assert.That(room.Approve(10, TicketA), Is.True);
                 room.Connect(10);
                 Assert.That(room.Slots.GetSlot(10), Is.Zero, "It left with no P, so it comes back with none.");
@@ -182,7 +185,7 @@ namespace C6Lab.Tests
                 Assert.That(room.Network.HoldsRoomTicket(key), Is.False, "No ticket before joining.");
                 Assert.That(Open(room, open), Is.True);
                 Assert.That(Open(room, full), Is.False);
-                room.Invoke("PrepareRejoinTicket", key);
+                room.Invoke("PrepareRejoinTicket", key, (ushort)7777, false);
                 string ticket = (string)room.Get("rejoinTicket");
                 Assert.That(ticket, Does.Match("^[0-9a-f]{32}$"));
                 Assert.That(room.Network.HoldsRoomTicket(key), Is.False, "A join the Host never let in holds no place.");
@@ -194,8 +197,10 @@ namespace C6Lab.Tests
                 Assert.That(Open(room, full), Is.True, "The full room may be holding this device's place.");
                 Assert.That(Open(room, other), Is.False, "Only the room the ticket was made for.");
                 Assert.That(Open(room, playing), Is.False);
-                room.Invoke("PrepareRejoinTicket", key);
+                room.Invoke("PrepareRejoinTicket", key, (ushort)7777, false);
                 Assert.That(room.Get("rejoinTicket"), Is.EqualTo(ticket), "Joining the same room again keeps the ticket.");
+                room.Invoke("PrepareRejoinTicket", "192.168.0.10:7777", (ushort)7777, true);
+                Assert.That(room.Get("rejoinTicket"), Is.EqualTo(ticket), "Direct IP to the same Host port keeps an admitted ticket.");
                 Assert.That(room.Network.HoldsRoomTicket(key), Is.True);
                 // Lost outside a lobby (here: no lobby to return to): the Host holds nothing for it.
                 room.Network.LobbyRejoinAllowed = false;
@@ -235,6 +240,7 @@ namespace C6Lab.Tests
                 room.Drop(5);
                 Assert.That(room.Approve(9, TicketA), Is.True);
                 room.Connect(9);
+                room.Hear(9);
                 Assert.That(room.Slots.TrySelect(9, 3, out _), Is.True, "It moves from P2 to P3.");
                 room.Network.LockGameRoster();
                 room.Drop(9);
@@ -244,6 +250,62 @@ namespace C6Lab.Tests
                 Assert.That(room.Approve(10, TicketA), Is.True);
                 room.Connect(10);
                 Assert.That(room.Slots.GetSlot(10), Is.Zero, "#502: a drop in a run gets no P back, old or new.");
+            }
+        }
+
+        [Test]
+        public void AMemberTheHostNeverHeardFromIsNotHeld()
+        {
+            using (var room = new HostRoom(2))
+            {
+                // A join canceled just as the Host let it in: the device never learned it got in.
+                Assert.That(room.Approve(5, TicketA), Is.True);
+                room.Connect(5);
+                room.Drop(5);
+                Assert.That(room.Network.HeldSeatCount, Is.Zero);
+                Assert.That(room.Approve(7, null), Is.True, "The place is free at once.");
+            }
+        }
+
+        [Test]
+        public void AGuestThatQuitTheRunIsNotHeldWhenTheRoomReturnsToItsLobby()
+        {
+            using (var room = new HostRoom(4))
+            {
+                room.Join(5, TicketA, 2);
+                room.Network.LockGameRoster();
+                // Its "exit" control during the battle (GameSession marks it), then the 2:2 room returns to its lobby.
+                room.Network.MarkLobbyLeaver(5);
+                room.Network.UnlockGameRoster();
+                room.Drop(5);
+                Assert.That(room.Network.HeldSeatCount, Is.Zero, "It quit on purpose; its place is not held.");
+                Assert.That(room.Network.GetSlotOwner(2), Is.EqualTo(ulong.MaxValue));
+            }
+        }
+
+        [Test]
+        public void ADirectIpTicketAlsoOpensTheRoomCardOnceTheLobbyNamesTheRoom()
+        {
+            using (var room = new HostRoom(3, host: false))
+            {
+                room.Network.port = 54321;
+                room.Invoke("PrepareRejoinTicket", "192.168.0.10:54321", (ushort)54321, true);
+                room.Set("joinInProgress", true);
+                room.Connect(0);
+                Assert.That(room.Network.HoldsRoomTicket("54321:합이오 1"), Is.False, "The room name is not known yet.");
+                Type type = typeof(LabNetwork).Assembly.GetType("C6Lab.LabNetworkPacket", true);
+                object packet = Activator.CreateInstance(type);
+                void Field(string name, object value) => type.GetField(name).SetValue(packet, value);
+                Field("type", "lobby");
+                Field("targetParticipants", 3);
+                Field("seats", new ulong[] { 0 });
+                Field("slotAssignments", new[] { new LabPlayerSlotAssignment { playerId = 0, slotNumber = 1 } });
+                Field("lobbyRevision", 1L);
+                Field("roomName", "합이오 1");
+                room.Invoke("ReceiveLobby", packet);
+                Assert.That(room.Network.HoldsRoomTicket("54321:합이오 1"), Is.True, "The room card of the same room.");
+                Assert.That(Open(room, Room("합이오 1", 54321, 3, 3)), Is.True);
+                Assert.That(Open(room, Room("합이오 2", 54322, 3, 3)), Is.False);
             }
         }
 
@@ -391,8 +453,12 @@ namespace C6Lab.Tests
                 Assert.That(Approve(id, ticket), Is.True);
                 Connect(id);
                 Assert.That(Order, Does.Contain(id));
+                Hear(id);
                 Assert.That(Slots.TrySelect(id, slot, out string reason), Is.True, reason);
             }
+
+            /// <summary>The Host received a packet from the member (its config_ack), so it saw its admission.</summary>
+            public void Hear(ulong id) => ((HashSet<ulong>)Get("heardLobbyMembers")).Add(id);
 
             public void SayGoodbye(ulong id) =>
                 ((HashSet<ulong>)typeof(LabNetwork).GetField("lobbyLeavers", Private).GetValue(Network)).Add(id);

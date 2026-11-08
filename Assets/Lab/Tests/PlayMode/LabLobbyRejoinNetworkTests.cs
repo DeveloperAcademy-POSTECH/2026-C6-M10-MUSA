@@ -80,10 +80,9 @@ namespace C6Lab.Tests
         public IEnumerator AGuestThatLeavesFreesItsPAtOnce()
         {
             yield return StartRoom();
-            string room = "127.0.0.1:" + guest.Network.port;
-            Assert.That(guest.Network.HoldsRoomTicket(room), Is.True);
+            Assert.That(Ticket(guest), Is.Not.Null);
             guest.Network.Stop();
-            Assert.That(guest.Network.HoldsRoomTicket(room), Is.False, "A guest that said goodbye gave its ticket up.");
+            Assert.That(Ticket(guest), Is.Null, "A guest that said goodbye gave its ticket up.");
             yield return Until(() => host.Network.ParticipantCount == 1, 10d, "The Host never saw the guest leave.");
             Assert.That(host.Network.HeldSeatCount, Is.Zero, "나가기 does not hold the place.");
             Assert.That(host.Network.GetSlotOwner(2), Is.EqualTo(ulong.MaxValue));
@@ -139,8 +138,13 @@ namespace C6Lab.Tests
             Assert.That(host.Network.ParticipantCount, Is.EqualTo(2));
             Assert.That(host.Network.GetSlotOwner(2), Is.EqualTo(guest.Network.LocalPlayerId));
             Assert.That(guest.Network.IsSlotHeld(2), Is.False);
-            Assert.That(guest.Network.HoldsRoomTicket("127.0.0.1:" + guest.Network.port), Is.True, "A rejoin keeps the room's ticket.");
+            Assert.That(Ticket(guest), Is.Not.Null, "A rejoin keeps the room's ticket.");
+            Assert.That(typeof(LabNetwork).GetField("rejoinTicketAdmitted", BindingFlags.Instance | BindingFlags.NonPublic)
+                .GetValue(guest.Network), Is.True);
         }
+
+        private static string Ticket(Peer peer) => (string)typeof(LabNetwork)
+            .GetField("rejoinTicket", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(peer.Network);
 
         private static IEnumerator Until(Func<bool> condition, double seconds, string failure)
         {

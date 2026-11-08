@@ -646,7 +646,8 @@ namespace Hapio.Tests
                 typeof(LabNetwork).GetField("discoveredRooms", flags).SetValue(network, full);
                 yield return null; yield return null;
                 Assert.That(RoomAction(view), Is.EqualTo("정원 마감"));
-                typeof(LabNetwork).GetMethod("PrepareRejoinTicket", flags).Invoke(network, new object[] { full[0].Key });
+                typeof(LabNetwork).GetMethod("PrepareRejoinTicket", flags).Invoke(network,
+                    new object[] { full[0].Key, full[0].Port, false });
                 yield return null; yield return null;
                 Assert.That(RoomAction(view), Is.EqualTo("정원 마감"), "A ticket the Host never let in holds no place there.");
                 typeof(LabNetwork).GetField("rejoinTicketAdmitted", flags).SetValue(network, true);

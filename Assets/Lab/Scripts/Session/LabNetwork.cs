@@ -797,7 +797,7 @@ namespace C6Lab
                 StartRoomSearchInternal(true);
                 return;
             }
-            PrepareRejoinTicket(hostAddress + ":" + port.ToString(CultureInfo.InvariantCulture));
+            PrepareRejoinTicket(hostAddress + ":" + port.ToString(CultureInfo.InvariantCulture), port, true);
             BeginJoinCandidates(addresses);
         }
 
@@ -882,7 +882,7 @@ namespace C6Lab
             // Keep browsing and showing the current list while one selected room connects.
             discoveryJoinActive = true;
             discoveryRoomKey = room.Key;
-            PrepareRejoinTicket(room.Key);
+            PrepareRejoinTicket(room.Key, room.Port, false);
             BeginJoinCandidates(targets.Select(item => item.Address));
             return IsJoiningRoom;
         }
@@ -1593,6 +1593,7 @@ namespace C6Lab
                     configAcknowledgements.Remove(id);
                     memberTickets.Remove(id);
                     lobbyLeavers.Remove(id);
+                    heardLobbyMembers.Remove(id);
                     pendingDeveloperRestart = false;
                     if (model == null && !gameBattleFrozen) BroadcastLobby();
                     return;
@@ -1685,6 +1686,7 @@ namespace C6Lab
             if (!newSlots.TryReplace(packet.slotAssignments, packet.seats)) return;
             receivedLobbyRevision = packet.lobbyRevision;
             connectedRoomName = packet.roomName ?? string.Empty;
+            NameRejoinTicketRoom(connectedRoomName);
             lobbySnapshotSequenceFloor = packet.snapshotSequence;
             incomingSequence = Math.Max(incomingSequence, packet.snapshotSequence);
             incomingChunks = null;
@@ -2400,6 +2402,8 @@ namespace C6Lab
             if (IsHost)
             {
                 if (sender == LocalPlayerId || !order.Contains(sender)) return;
+                // #501: this member has seen its admission (its first packet is the automatic config_ack).
+                heardLobbyMembers.Add(sender);
                 if (packet.type == "slot_select")
                 {
                     HandleSlotSelectionRequest(sender, packet);
