@@ -123,10 +123,9 @@ namespace Hapio.Tests
             }
         }
 
-        // #504: when the Editor first reads a URP material's properties, URP rewrites its hidden _MainTex/_Color from
-        // _BaseMap/_BaseColor. A different texture copy dirties the material, so the next save changes the .mat; a different
-        // color copy is written with the next save for any other reason. A material read this session may already show
-        // the rewritten values, so read the saved file itself.
+        // #504: when the Editor first reads a URP material's properties, URP copies its hidden _MainTex/_Color again from
+        // _BaseMap/_BaseColor. A copy that comes out different dirties the material, so the next save changes the .mat.
+        // A material read this session may already show the copied values, so read the saved file itself.
         [TestCase(GameScenePaths.Battle)]
         [TestCase("Assets/Lab/Scenes/Lab.unity", Category = "LabOnly")]
         public void EveryStudioMaterialIsAppliedAndSavedWithTheCopiesTheEditorRewrites(string path)
@@ -166,7 +165,7 @@ namespace Hapio.Tests
         public void ApplyImageWritesTheHiddenCopiesSoUrpsOwnCopyChangesNothing()
         {
             var png = new Texture2D(2, 2);
-            // GetColor returns the first two a float step away from what SetColor stored; the last comes back exactly.
+            // GetColor returns the first two a float step or two away from what SetColor stored; the last comes back exactly.
             Color[] colors = { new Color(.55f, .29f, .81f, 1f), new Color(.17923617f, .4977885f, .5250866f, 1f), new Color(.8f, .7f, .6f, 1f) };
             try
             {
@@ -188,12 +187,11 @@ namespace Hapio.Tests
                                 Assert.That(material.GetTextureScale(property), Is.EqualTo(new Vector2(5, 4)), context + " " + property);
                                 Assert.That(material.GetTextureOffset(property), Is.EqualTo(new Vector2(.25f, .5f)), context + " " + property);
                             }
-                            Color before = material.GetColor("_Color");
-                            Assert.That(before.r, Is.EqualTo(color.r).Within(1e-5f), context);
-                            // The copy URP's BaseShaderGUI.SetMaterialKeywords makes when the Editor first reads the material.
-                            // Had ApplyImage written `color` itself, this would change the drifting colors and dirty the asset.
-                            material.SetColor("_Color", material.GetColor("_BaseColor"));
-                            Assert.That(Bits(material.GetColor("_Color")), Is.EqualTo(Bits(before)), context);
+                            // URP's BaseShaderGUI.SetMaterialKeywords stores GetColor("_BaseColor") as _Color. SerializedObject
+                            // shows what is stored; GetColor can return it a float step away. Storing `color` itself would
+                            // differ for the first two colors, and URP's copy would then dirty the asset.
+                            Assert.That(Bits(Stored(material, "_BaseColor")), Is.EqualTo(Bits(color)), context + " _BaseColor");
+                            Assert.That(Bits(Stored(material, "_Color")), Is.EqualTo(Bits(material.GetColor("_BaseColor"))), context + " _Color");
                         }
                         finally { Object.DestroyImmediate(material); }
                     }
@@ -255,6 +253,19 @@ namespace Hapio.Tests
                 return new[] { copy.r, copy.g, copy.b, copy.a };
             }
             finally { Object.DestroyImmediate(probe); }
+        }
+
+        /// <summary>The color a material stores under this name, exactly as SetColor received it.</summary>
+        private static Color Stored(Material material, string name)
+        {
+            SerializedProperty colors = new SerializedObject(material).FindProperty("m_SavedProperties.m_Colors");
+            for (int index = 0; index < colors.arraySize; index++)
+            {
+                SerializedProperty entry = colors.GetArrayElementAtIndex(index);
+                if (entry.FindPropertyRelative("first").stringValue == name) return entry.FindPropertyRelative("second").colorValue;
+            }
+            Assert.Fail(material.name + " stores no " + name);
+            return default;
         }
 
         private static int[] Bits(Color color) => new[] { color.r, color.g, color.b, color.a }

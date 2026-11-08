@@ -3,11 +3,11 @@
 ## 2026-11-08 — #504 배경 재질 `_MainTex`·`_Color` 사본 맞추기
 
 - **기준:** main `886e65db` 위의 `chore/#504-background-material-sync`. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro), iOS 활성. Library는 다른 worktree에서 복제했다.
-- **원인 확인(임시 진단 스크립트 7개, 커밋 안 함):**
+- **원인 확인(임시 진단 스크립트 8개, 커밋 안 함):**
   - URP `BaseShaderGUI.SetMaterialKeywords`는 `_MainTex`와 `_BaseMap`이 모두 있으면 `_BaseMap`의 텍스처·타일링·오프셋을 `_MainTex`에, `GetColor("_BaseColor")`를 `_Color`에 복사한다.
   - 이 복사는 가져오기·불러오기가 아니라 재질 속성을 처음 읽을 때 일어났다. Stage02 `YokaiGround` 복사본의 `_MainTex` 텍스처만 다르게 저장해 가져왔다. 불러오기만 했을 때는 dirty가 아니었다. `GetTexture`·`HasProperty`로 처음 읽자 사본이 `_BaseMap` 값이 되고 dirty가 됐고, 저장하자 파일도 바뀌었다. `shader`·`SerializedObject` 접근만으로는 바뀌지 않았다.
   - 색 사본도 같다. `_Color`만 흰색인 `Eye pupils` 복사본은 처음 읽은 뒤 dirty였고, 저장하자 `_Color`가 `_BaseColor` 값으로 바뀌었다.
-  - `GetColor`는 시험한 6색 중 3색을 `SetColor`로 넣은 값보다 float 1~2단계 작게 돌려줬다(예: 0.55 → 0.54999995). 이 3색을 `_Color`에 같은 숫자로 저장한 파일은 다시 가져와 처음 읽을 때 dirty가 됐다. `_BaseColor`를 다시 읽어 복사하면(URP와 같은 방식) 6색 모두 dirty가 아니었다. `-nographics` 유무와 관계없이 같았다.
+  - `GetColor`는 시험한 6색 중 3색을 `SetColor`로 넣은 값보다 float 1~2단계 작게 돌려줬다(예: 0.55 → 0.54999995). `SerializedObject`로 보면 저장값은 `SetColor`에 넣은 그대로였다. 이 3색을 `_Color`에 같은 숫자로 저장한 파일은 다시 가져와 처음 읽을 때 dirty가 됐다. `_BaseColor`를 다시 읽어 복사하면(URP와 같은 방식) 6색 모두 dirty가 아니었다. `-nographics` 유무와 관계없이 같았다.
   - 고치기 전 `이미지만 적용`의 재질 쓰기(`_BaseMap`·`_BaseColor`만)를 복사본에 실행하고 저장했다. `_MainTex`의 타일링·오프셋이 옛 값(3×3, 0)으로 남았고, 다시 불러와 읽자 dirty였다.
   - 지금 저장된 Studio 재질 12개는 복사본을 다시 가져와 처음 읽어도 dirty가 아니다. 이번 변경은 재질·Scene 파일을 바꾸지 않는다.
 - **고친 것:**
@@ -15,21 +15,21 @@
   - Studio Inspector는 저장 재질이 Studio 값과 다르면 경고한다.
   - `GameStageBackgroundAssetTests`에 EditMode 검사 3개(TestCase 포함 4건)를 더했다.
 - **남은 것(바꾸지 않음):** 검토 중 저장소의 URP Lit/Unlit 재질 74개를 모두 다시 확인했다. `_MainTex`가 `_BaseMap`과 다른 파일은 없다. `_Color`의 글자가 `_BaseColor`와 다른 파일은 28개이고, 모두 배경 Studio 밖이다.
-  - 25개는 소수 마지막 자리만 다르다: 구운 박 14개(`Assets/Hapio/Art/Gourds/Stage0N_*/Materials`), `Assets/Hapio/Art/Yagwanggwi/Materials` 7개, Lab 4개(`Art/Orbs/OrbBoardPlate`·`OrbCombined`·`OrbYin`, `Resources/GourdPaint/Stem`). 위 `GetColor` 차이로 URP가 복사한 값이다. `Hanbok_gold_edging`·`Hanbok_long_robe_teal`·`OrbCombined` 복사본은 처음 읽어도 dirty가 아니었고, 다른 속성을 바꿔 저장해도 `_Color`가 그대로였다.
+  - 25개는 채널마다 float 1~6단계만 작다: 구운 박 14개(`Assets/Hapio/Art/Gourds/Stage0N_*/Materials`), `Assets/Hapio/Art/Yagwanggwi/Materials` 7개, Lab 4개(`Art/Orbs/OrbBoardPlate`·`OrbCombined`·`OrbYin`, `Resources/GourdPaint/Stem`). 25개 모두 URP가 저장된 `_BaseColor`에서 복사할 값과 비트 단위로 같았다(새 파일 검사와 같은 계산). `Hanbok_gold_edging`·`Hanbok_long_robe_teal`·`OrbCombined` 복사본은 처음 읽어도 dirty가 아니었고, 다른 속성을 바꿔 저장해도 `_Color`가 그대로였다.
   - `Assets/Hapio/Art/Yagwanggwi/Materials`의 `Eye ivory`·`Eye pupils`·`Inner ivory` 3개는 `_Color`가 흰색이다. Editor가 처음 읽으면 dirty가 되어, 다음 저장 때 `_Color` 줄이 `_BaseColor` 값으로 바뀐다(`Eye pupils`로 확인). 세 재질을 참조하는 Prefab·Scene·에셋은 없어서 평소에는 읽히지 않는다. 다른 작업의 에셋이라 그대로 뒀다.
 - **검토:** 독립 검토 2갈래(코드·검사, 문서)를 돌리고 지적마다 반박 검증을 붙였다.
   - 인정된 지적은 1건이다. "남은 것" 목록이 14개로 불완전했고, 저장소 전체를 다시 확인해 28개로 고쳤다.
   - 기각된 2건도 문구는 다듬었다. `ApplyImage`가 Editor 전용이라는 점과 "저절로 바뀐다"는 표현이다.
   - 검토의 부수 관찰은 "불러온 색이 파일 값과 1단계 다르다"였다. 이것을 직접 확인하다가, 첫 커밋처럼 `_Color`에 같은 숫자를 쓰면 일부 색에서 다시 dirty가 되는 것을 찾았다. `fbb7d820`에서 URP와 같은 방식으로 고쳤다.
 
-| 확인(검토 반영 `fbb7d820` 기준, 괄호는 첫 커밋 `bc97169f`) | 결과 |
+| 확인(검토 반영 기준, 괄호는 첫 커밋 `bc97169f`) | 결과 |
 | --- | --- |
 | 배경 EditMode 3 fixture(`GameStageBackgroundAssetTests`·`GameBackgroundAnimationAssetTests`·`GameSceneAssetTests`) | 16건 중 14 PASS. 새 4건과 기존 배경 검사가 통과했다. 실패 2건은 아래 main 실패다 |
 | 대조 A: Stage02 `YokaiGround.mat`의 `_MainTex` GUID만 HanjiSand로 바꿈 | 새 파일 검사(Battle)만 실패: `YokaiGround.mat`의 `_MainTex`가 `_BaseMap`과 다름 |
 | 대조 B: `ApplyImage`에서 사본을 쓰는 두 줄을 뺌 | 새 `ApplyImageWritesTheHiddenCopiesSoUrpsOwnCopyChangesNothing`만 실패: Lit `_MainTex`가 옛 텍스처 |
-| 대조 C: `ApplyImage`가 `_Color`에 `color`를 그대로 씀(첫 커밋의 방식) | 같은 검사만 실패: 0.55·0.29·0.81에서 URP가 다시 복사하자 g 채널이 1비트 달라짐 |
+| 대조 C: `ApplyImage`가 `_Color`에 `color`를 그대로 씀(첫 커밋의 방식) | 같은 검사만 실패: 0.55·0.29·0.81에서 저장된 `_Color`(r)가 URP가 복사할 값과 다름 |
 | 대조 D: Stage01 `YokaiGround.mat`의 `_Color` r만 float 1단계 낮춤(1.015 → 1.0149999) | 새 파일 검사(Battle)만 실패: URP가 복사할 값은 1.015 |
-| 전체 EditMode | 2060/2062 PASS(20.9초; 첫 커밋 2060/2062, 22.5초). 실패 2건은 아래 main 실패다 |
+| 전체 EditMode | 2060/2062 PASS(20.1초; 첫 커밋 2060/2062, 22.5초). 실패 2건은 아래 main 실패다 |
 | 전체 PlayMode | 659/667 PASS(512.0초; 첫 커밋 659/667, 518.9초). 실패 8건은 아래 main 실패다. 이 변경은 Editor 전용이라 PlayMode 경로에 닿지 않는다 |
 
 - 각 실행의 skip·inconclusive는 0이다. 대조 변경과 진단 스크립트는 되돌렸고 커밋하지 않았다.
