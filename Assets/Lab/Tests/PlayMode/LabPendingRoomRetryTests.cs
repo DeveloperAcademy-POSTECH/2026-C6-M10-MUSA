@@ -45,6 +45,8 @@ namespace C6Lab.Tests
                 Assert.That(room.Name, Is.EqualTo(NumberedName(number)));
                 Assert.That(room.Port, Is.EqualTo(port), "The retried room keeps its reserved port and join key.");
                 Assert.That(room.RetryAttempts, Is.Zero, "A confirmed room starts any later failure from the first delay.");
+                Assert.That((int)Field(room, "registrationAttempts").GetValue(room), Is.Zero,
+                    "Retries do not use up the budget a later name conflict needs.");
             }
             finally { room.Dispose(); }
         }
@@ -81,7 +83,7 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
-        public IEnumerator AConfirmedRoomThatLosesItsRegistrationGetsTheSameNameBack()
+        public IEnumerator AConfirmedRoomThatLosesItsRegistrationAsksForItsOwnNameAgain()
         {
             if (!LabBonjourDiscovery.IsSupported) Assert.Ignore("Native Bonjour supports macOS/iOS.");
             int number = UniqueNumber();
@@ -96,7 +98,8 @@ namespace C6Lab.Tests
                 Assert.That(room.RetryPending, Is.True);
                 Assert.That(room.Ready, Is.False, "A creator cannot enter while the room is not advertised.");
                 Assert.That(room.Failed, Is.False);
-                yield return TickUntil(() => room.Ready || room.Failed, 15d, number, room);
+                // Cards confirmed before it may now ask it to start later; a confirmed room keeps its own free name.
+                yield return TickUntil(() => room.Ready || room.Failed, 15d, number + 7, room);
                 Assert.That(room.Ready, Is.True, Advertisement(room).LastError);
                 Assert.That(room.Name, Is.EqualTo(name));
                 Assert.That(room.Key, Is.EqualTo(key));
@@ -105,7 +108,7 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
-        public IEnumerator WaitsDoubleFromOneSecondAndTheRoomFailsAfterTheSixthRetryReleasingItsPort()
+        public IEnumerator WaitsDoubleFromOneSecondAndTheRoomFailsAfterTheSixthRetry()
         {
             if (!LabBonjourDiscovery.IsSupported) Assert.Ignore("Native Bonjour supports macOS/iOS.");
             int number = UniqueNumber();
@@ -134,6 +137,8 @@ namespace C6Lab.Tests
                 room.Tick(true, number);
                 Assert.That(room.Failed, Is.True, "The card is removed only now.");
                 Assert.That(room.RetryPending, Is.False);
+                // The owner (lobby or registry) releases the port when it removes the failed card.
+                AssertPortReserved(port);
                 room.Dispose();
                 using (var released = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp))
                     Assert.DoesNotThrow(() => released.Bind(new IPEndPoint(IPAddress.Any, port)));

@@ -11,7 +11,7 @@ namespace C6Lab
     {
         private LabBonjourDiscovery advertisement;
         private Socket ipv4, ipv6;
-        private bool registrationStarted, retriesExhausted;
+        private bool registrationStarted, retriesExhausted, confirmed;
         private int candidateNumber = 1, registrationAttempts, retryAttempts;
         private double retryAt = double.NaN;
         public int Capacity { get; private set; }
@@ -107,7 +107,8 @@ namespace C6Lab
             if (!registrationStarted && !RetryPending && allowRegistration && advertisement != null)
             {
                 registrationStarted = true;
-                candidateNumber = Math.Max(candidateNumber, firstNumber);
+                // A room still being numbered follows the cards before it; a confirmed one asks for its own name again.
+                if (!confirmed) candidateNumber = Math.Max(candidateNumber, firstNumber);
                 string requestedName = LabRoomNames.ServiceBaseFor(Family) + (candidateNumber == 1 ? string.Empty
                     : " (" + candidateNumber.ToString(CultureInfo.InvariantCulture) + ")");
                 bool accepted = advertisement.StartAdvertise(requestedName, Port, ipv4 != null, ipv6 != null, 1, Capacity, false, true, false);
@@ -119,7 +120,8 @@ namespace C6Lab
             }
             advertisement?.Tick();
             if (RetryNameConflict()) return;
-            if (Ready) retryAttempts = 0;
+            // A confirmed room starts any later failure, and any later name conflict, with a full budget.
+            if (Ready) { confirmed = true; retryAttempts = 0; registrationAttempts = 0; }
             // A registration that died later (an error reply, a timeout, or one lost after it was confirmed).
             else if (registrationStarted && advertisement != null && !advertisement.IsAdvertising && !advertisement.RegistrationNameConflict)
                 ScheduleRetry(now);
