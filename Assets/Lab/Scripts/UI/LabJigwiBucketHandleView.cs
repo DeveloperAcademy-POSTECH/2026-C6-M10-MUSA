@@ -89,7 +89,7 @@ namespace C6Lab
         [SerializeField] private string pourSoundFolder = "JigwiBucketPour";
         [Tooltip("실패 때 연기가 판으로 뿜어져 뒤덮는 소리 폴더.")]
         [SerializeField] private string smokeSoundFolder = "JigwiBucketSmoke";
-        [Tooltip("내가 쏟아 박이 식을 때 지귀 대사 \"이럴수가!\" 폴더(강한 햅틱과 함께).")]
+        [Tooltip("내가 쏟아 박이 식을 때 지귀 비명 \"앗 차가!!\" 폴더(강한 햅틱과 함께).")]
         [SerializeField] private string pourVoiceFolder = "JigwiVoiceBucketPour";
         [Tooltip("연기를 문질러 걷어낼 때 부채질 휘익 소리 폴더(여러 개면 무작위).")]
         [SerializeField] private string rubSoundFolder = "JigwiBucketFan";
@@ -99,7 +99,7 @@ namespace C6Lab
         [SerializeField] private string fogHitSoundFolder = "JigwiBucketFogHit";
         [SerializeField, Range(0f, 1f)] private float heatVolume = .6f, pourVolume = .9f, smokeVolume = .9f, rubVolume = .8f,
             sloshVolume = .8f, fogHitVolume = 1f;
-        [Tooltip("\"이럴수가!\" 때 햅틱 세기.")]
+        [Tooltip("\"앗 차가!!\" 때 햅틱 세기.")]
         [SerializeField, Range(0f, 1f)] private float pourVoiceHapticIntensity = 1f;
         [Tooltip("쏟을 때 화면 흔들림 세기(박 크기 대비).")]
         [SerializeField, Range(0f, .3f)] private float pourShake = .08f;
