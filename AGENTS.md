@@ -11,6 +11,13 @@
 - 이 저장소는 공개다. 인증 정보, 서명 파일, 개인 경로·기기 식별자, 원시 실행 로그와 빌드 산출물을 커밋하지 않는다.
 - 소스 존재, 테스트 코드 존재, 과거 로컬 실행 결과와 이 브랜치에서의 검증 결과를 구분한다. 실행하지 않은 Mac·iOS·실기기 항목은 PASS로 쓰지 않는다.
 
+## 합이오 UI 컬러 시스템
+
+- 앞으로 Hapio UI를 새로 만들거나 수정할 때 색상 기준은 `Assets/Hapio/Art/UI/Source/Hapio.tokens.json`이다. 전체 팔레트와 사용 안내는 `docs/COLOR_SYSTEM.md`에서 확인한다.
+- Figma 변수 ID·토큰 경로와 UI 역할을 맞춰 기존 토큰을 적용한다. 임의의 유사 HEX를 새로 만들지 않고, 코드·Prefab에 적용한 색의 토큰 경로를 추적할 수 있게 남긴다. 별도 색상이 명시된 요청은 그 요청을 따른다.
+- 색과 투명도는 원본의 `$value.components`·`colorSpace`·`alpha`를 함께 따른다. 이름에 붙은 `%`로 alpha를 추측하지 않는다. 특히 `DarkIvory/500***70%`의 실제 alpha는 0.5다.
+- 이 규칙은 앞으로 작업하는 UI에 적용한다. UI 작업을 이유로 게임 판정용 팔레트·네트워크 설정·기존 화면 전체를 일괄 치환하지 않는다.
+
 ## 별도 개발용 게임 흐름 (#262)
 
 - 기존 Lab Scene과 빌드 경로는 보존한다. 새 게임 진입점은 `Assets/Hapio/Scenes/Home.unity`이며 Home·Lobby·Battle·StageResult·GameOver를 분리한다. 1~3스테이지 전투는 같은 Battle Scene을 재사용한다.

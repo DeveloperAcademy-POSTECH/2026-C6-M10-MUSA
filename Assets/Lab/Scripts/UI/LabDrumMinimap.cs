@@ -44,8 +44,13 @@ namespace C6Lab
         public Sprite[] playerSprites;
         public Sprite drumIconSprite;
         public Sprite soloDrumSprite;
+        [Header("Optional game HUD presentation; standalone Lab keeps its existing layout")]
+        public bool compactGamePresentation;
+        public Sprite teamBlueMarker, teamRedMarker;
+        public Sprite teamPairConnector, teamTrioConnector;
         private bool HasConceptArt => playerSprites != null && playerSprites.Length >= 5
             && playerSprites.All(sprite => sprite != null) && drumIconSprite != null;
+        private readonly Dictionary<ulong, Text> teamLabels = new Dictionary<ulong, Text>();
         private readonly Dictionary<ulong, Image> seatImages = new Dictionary<ulong, Image>();
         private readonly Dictionary<ulong, int> seatNumbers = new Dictionary<ulong, int>();
 
@@ -108,11 +113,13 @@ namespace C6Lab
             if (panel == null) return;
             if (!panel.gameObject.activeSelf) panel.gameObject.SetActive(true);
             float scale = network != null && network.config != null ? network.config.MinimapSizePercent / 100f : 1f;
+            // DEV99 keeps its saved 50% default; the compact artwork is authored at that baseline.
+            if (compactGamePresentation) scale *= 2f;
             if (!Mathf.Approximately(panel.localScale.x, scale)) panel.localScale = new Vector3(scale, scale, 1f);
+            Rebuild(LabTeams.VisibleTeammates(snapshot, network.LocalPlayerId), network.LocalPlayerId);
             Vector2 move = network != null && network.config != null ? network.config.MinimapMove : Vector2.zero;
             if (panel.anchoredPosition != homePosition + move) panel.anchoredPosition = homePosition + move;
             // 2:2 (#281): only my team shares boards, so only its two players and its drum are shown.
-            Rebuild(LabTeams.VisibleTeammates(snapshot, network.LocalPlayerId), network.LocalPlayerId);
             SyncDrums(snapshot.drums);
             Advance(Time.unscaledDeltaTime);
         }
@@ -135,12 +142,14 @@ namespace C6Lab
             EnsurePanel();
             if (panel == null) return;
             var seats = (players ?? new LabPlayerState[0]).Where(p => p != null).OrderBy(p => p.seat).ToArray();
-            string key = localId + ":" + string.Join(",", seats.Select(p => p.id + "@" + p.seat));
+            bool teamColumn = compactGamePresentation && network != null && network.Snapshot != null && network.Snapshot.teamTerritory;
+            string key = localId + ":" + teamColumn + ":" + string.Join(",", seats.Select(p => p.id + "@" + p.seat));
             if (key == layoutKey) return;
             layoutKey = key;
             for (int i = content.childCount - 1; i >= 0; i--) Remove(content.GetChild(i).gameObject);
             seatPositions.Clear();
             seatImages.Clear();
+            teamLabels.Clear();
             seatNumbers.Clear();
             ringOrder.Clear();
             drums.Clear();
@@ -174,12 +183,31 @@ namespace C6Lab
 
             var points = new Vector2[n];
             for (int k = 0; k < n; k++) points[k] = (unit[k] - center) * scale;
+            if (compactGamePresentation)
+            {
+                if (teamColumn)
+                {
+                    float gap = n == 2 ? 42f : 26f;
+                    for (int k = 0; k < n; k++) points[k] = new Vector2(0, ((n - 1) * .5f - k) * gap);
+                    homePosition = n >= 3 ? new Vector2(-1, -1) : new Vector2(0, 2);
+                }
+                else if (n == 3) points = new[] { new Vector2(0,-23), new Vector2(-26,24), new Vector2(26,24) };
+                else if (n == 4) points = new[] { new Vector2(0,-23), new Vector2(-27,0), new Vector2(0,24), new Vector2(27,0) };
+                else if (n == 5) points = new[] { new Vector2(1,-23), new Vector2(-24,-5), new Vector2(-17,23), new Vector2(19,23), new Vector2(24,-5) };
+                if (!teamColumn) homePosition = Vector2.zero;
+                panel.sizeDelta = teamColumn ? new Vector2(64, n >= 3 ? 78 : 72) : size;
+            }
             // 선 먼저 (원 아래에 깔리도록). 2인은 선 하나, 3인 이상은 이웃끼리 둘레를 잇는다.
-            if (n == 2) AddLine(points[0], points[1]);
-            else if (n > 2) for (int k = 0; k < n; k++) AddLine(points[k], points[(k + 1) % n]);
+            Sprite connector = teamColumn ? (n == 2 ? teamPairConnector : teamTrioConnector) : null;
+            if (n > 1 && connector != null)
+            {
+                AddTeamConnector(connector);
+            }
+            else if (n == 2) AddLine(points[0], points[1]);
+            else if (n > 2) for (int k = 0; k < (teamColumn ? n - 1 : n); k++) AddLine(points[k], points[(k + 1) % n]);
             for (int k = 0; k < n; k++)
             {
-                LabPlayerState player = seats[(mine + k) % n];
+                LabPlayerState player = seats[teamColumn ? k : (mine + k) % n];
                 bool me = player.id == localId;
                 seatPositions[player.id] = points[k];
                 ringOrder.Add(player.id);
@@ -187,7 +215,14 @@ namespace C6Lab
                 Image circle = AddCircle(points[k], radius, me ? meColor : otherColor);
                 seatImages[player.id] = circle;
                 seatNumbers[player.id] = number;
-                if (HasConceptArt && number >= 1 && number <= playerSprites.Length)
+                if (teamColumn && teamBlueMarker != null && teamRedMarker != null)
+                {
+                    circle.sprite = LabTeams.TeamOf(network.Snapshot, player.id) == LabTeam.Blue ? teamBlueMarker : teamRedMarker;
+                    circle.color = Color.white;
+                    circle.rectTransform.sizeDelta = Vector2.one * 18.947f;
+                    teamLabels[player.id] = AddLabel("P" + number, points[k], radius, otherTextColor);
+                }
+                else if (HasConceptArt && number >= 1 && number <= playerSprites.Length)
                 {
                     circle.sprite = playerSprites[number - 1];
                     circle.color = Color.white;
@@ -223,7 +258,7 @@ namespace C6Lab
                 marker.Progress = 0f;
                 marker.Owner = drum.owner;
             }
-            if (HasConceptArt && ringOrder.Count == 1 && soloDrumSprite != null)
+            if (HasConceptArt && ringOrder.Count == 1 && soloDrumSprite != null && teamLabels.Count == 0)
             {
                 ulong owner = ringOrder[0];
                 seatImages[owner].sprite = drums.Any(pair => pair.Value.Owner == owner && seen.Contains(pair.Key)) ? soloDrumSprite : playerSprites[seatNumbers[owner] - 1];
@@ -253,6 +288,19 @@ namespace C6Lab
                 float t = Mathf.SmoothStep(0f, 1f, marker.Progress - index);
                 marker.Rect.anchoredPosition = Vector2.Lerp(marker.Path[index], marker.Path[index + 1], t);
             }
+            // The drum artwork replaces the holder badge at rest, as in the Figma component.
+            foreach (var label in teamLabels)
+            {
+                bool occupied = false;
+                foreach (var drum in drums.Values)
+                {
+                    if (drum.Owner != label.Key || drum.Path.Count > 0) continue;
+                    occupied = true;
+                    break;
+                }
+                seatImages[label.Key].enabled = !occupied;
+                label.Value.enabled = !occupied;
+            }
         }
 
         /// <summary>
@@ -274,7 +322,7 @@ namespace C6Lab
             }
         }
 
-        private float CircleRadius(int count) => HasConceptArt
+        private float CircleRadius(int count) => compactGamePresentation ? 12f : HasConceptArt
             ? (count <= 1 ? 35.5f : 18.5f)
             : count <= 3 ? 17f : count == 4 ? 15f : 13f;
 
@@ -291,6 +339,11 @@ namespace C6Lab
             homePosition = anchor.anchoredPosition
                 + new Vector2(anchor.sizeDelta.x * (1f - anchor.pivot.x) - insetFromBadgeRight,
                     anchor.sizeDelta.y * (1f - anchor.pivot.y) + gapAboveBadge);
+            if (compactGamePresentation)
+            {
+                panel.anchorMin = panel.anchorMax = new Vector2(1f, 1f - 462f / 874f);
+                homePosition = Vector2.zero;
+            }
             panel.anchoredPosition = homePosition;
             panel.sizeDelta = size;
             if (!HasConceptArt)
@@ -316,6 +369,17 @@ namespace C6Lab
             content.anchorMin = content.anchorMax = new Vector2(.5f, .5f);
             content.sizeDelta = Vector2.zero;
             panel.gameObject.SetActive(false);
+        }
+
+        private void AddTeamConnector(Sprite sprite)
+        {
+            var go = new GameObject("Team Connector", typeof(RectTransform), typeof(Image));
+            var rect = (RectTransform)go.transform;
+            rect.SetParent(lineLayer, false);
+            rect.sizeDelta = sprite == teamPairConnector ? new Vector2(4,28) : new Vector2(4,52);
+            var image = go.GetComponent<Image>();
+            image.sprite = sprite;
+            image.raycastTarget = false;
         }
 
         private void AddLine(Vector2 from, Vector2 to)
@@ -363,10 +427,10 @@ namespace C6Lab
             var rect = (RectTransform)go.transform;
             rect.SetParent(drumLayer, false);
             rect.anchoredPosition = at;
-            rect.sizeDelta = Vector2.one * (CircleRadius(ringOrder.Count) * 2f * (HasConceptArt ? .746f : 1f));
+            rect.sizeDelta = Vector2.one * (CircleRadius(ringOrder.Count) * 2f * (HasConceptArt && !compactGamePresentation ? .746f : 1f));
             var image = go.GetComponent<Image>();
             image.sprite = HasConceptArt ? drumIconSprite : TaegeukSprite();
-            image.enabled = !(HasConceptArt && ringOrder.Count == 1 && soloDrumSprite != null);
+            image.enabled = !(HasConceptArt && ringOrder.Count == 1 && soloDrumSprite != null && teamLabels.Count == 0);
             image.color = image.sprite != null ? Color.white : new Color(.8f, .18f, .23f, 1f);
             image.preserveAspect = true;
             image.raycastTarget = false;
@@ -386,23 +450,24 @@ namespace C6Lab
         }
 
         /// <summary>원 안쪽 위에 "P1" 같은 번호</summary>
-        private void AddLabel(string value, Vector2 at, float radius, Color color)
+        private Text AddLabel(string value, Vector2 at, float radius, Color color)
         {
             var go = new GameObject("Label", typeof(RectTransform), typeof(Text));
             var rect = (RectTransform)go.transform;
             rect.SetParent(labelLayer, false);
-            rect.anchoredPosition = at + new Vector2(0f, radius * .42f);
+            rect.anchoredPosition = compactGamePresentation ? at : at + new Vector2(0f, radius * .42f);
             rect.sizeDelta = new Vector2(radius * 2f, labelSize + 4f);
             var text = go.GetComponent<Text>();
             text.font = font;
             text.fontSize = labelSize;
-            text.fontStyle = FontStyle.Bold;
+            text.fontStyle = compactGamePresentation ? FontStyle.Normal : FontStyle.Bold;
             text.alignment = TextAnchor.MiddleCenter;
             text.horizontalOverflow = HorizontalWrapMode.Overflow;
             text.verticalOverflow = VerticalWrapMode.Overflow;
             text.color = color;
             text.raycastTarget = false;
             text.text = value;
+            return text;
         }
 
         /// <summary>테두리가 부드러운 흰 원 (코드로 한 번만 만든다)</summary>

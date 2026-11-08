@@ -114,6 +114,34 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
+        public IEnumerator TransparentGameBackdropSkipsPaperPassButRetainsInputProjectionAndRestoresCamera()
+        {
+            RequireGraphics();
+            CreateFixture(out LabHud hud,out LabOrbBoard board,out Camera camera,out _,out _);
+            Matrix4x4 projection=camera.projectionMatrix;
+            Rect viewport=camera.pixelRect;
+            Ray input=camera.ScreenPointToRay(viewport.center);
+            int mask=camera.cullingMask;
+            var artwork=new GameObject("Game board artwork",typeof(RectTransform),typeof(UnityEngine.UI.RawImage));
+            artwork.transform.SetParent(hud.battleUi.transform,false);
+            LabOrbHudComposition.Attach(hud,board,camera);
+            var composition=hud.GetComponent<LabOrbHudComposition>();
+            composition.presentationBackdrop=(RectTransform)artwork.transform;
+            yield return null; yield return null;
+            Assert.That(composition.IsCompositing,Is.True,composition.InitializationError);
+            Assert.That(camera.enabled,Is.False,"No lower-camera clear or backing may overwrite the stage.");
+            Assert.That(composition.ForegroundCamera.enabled,Is.True);
+            Assert.That(camera.pixelRect,Is.EqualTo(viewport));
+            Assert.That(camera.projectionMatrix,Is.EqualTo(projection));
+            Assert.That(camera.ScreenPointToRay(viewport.center).direction,Is.EqualTo(input.direction));
+            Assert.That(artwork.transform.GetSiblingIndex(),Is.LessThan(hud.staminaFill.transform.parent.GetSiblingIndex()));
+            composition.enabled=false;
+            yield return null;
+            Assert.That(camera.enabled,Is.True);
+            Assert.That(camera.cullingMask,Is.EqualTo(mask));
+        }
+
+        [UnityTest]
         public IEnumerator LocalBadgeAndPatternStayEditableBelowOrbsWithoutChangingOtherControls()
         {
             RequireGraphics();
