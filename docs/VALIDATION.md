@@ -1,5 +1,29 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-08 — #540 뒤 지귀 PlayMode 검사 8건을 저장된 흐름 시간표에 맞추기
+
+- **기준:** main `92d511ee` 위의 `fix/jigwi-playmode-saved-schedule`. Unity 6000.6.5f1 batch(macOS), iOS 활성. Library는 다른 worktree에서 복제했다. 검사 코드만 바꿨고 게임 코드, `LabConfig.asset`, Scene은 그대로다.
+- **원인:** 두 fixture가 저장된 `LabConfig.asset`을 읽는데, #540(PR #550)이 그 값을 의도적으로 바꿨다. 지귀 B 규칙은 바뀌지 않았다.
+  - `81f6b063`이 `jigwiFlowSchedule: 1`을 켜서 A1은 10~20초, B1은 45~60초가 됐다(이전 A 5초, B 25~40초). 검사는 B를 31.1/31.2초에서, A를 5.3초에서 찾았고 그 시각에는 회차가 없었다.
+  - `LabJigwiABNetworkTests.BurnDeadlinesAndABHeadersDeepCopyValidateAndClearThroughOwnerDeltas`는 다른 두 변경에도 걸린다. `d5229336`부터는 부적을 못 쓴 A가 끝나면 그 자리 구슬이 타서 21초에 구슬이 없다. `8ce2674d`의 `jigwiAHoldBurnUntilEnd: 1` 때문에 A 동안 구슬별 소각 시각도 없다.
+- **고친 내용:**
+  - `LabJigwiABNetworkTests`: 설정 복사본에서 `jigwiFlowSchedule`와 `jigwiAHoldBurnUntilEnd`를 끈다. 즉 코드 기본값인 #509 시간표와 #479 구슬별 소각을 쓴다. 소각 지우기는 A가 끝나기를 기다리지 않고, 6초에 그 자리 부적을 완성한 뒤 6.1초 프레임에서 확인한다.
+  - `GameJigwiStageIntegrationTests`: 저장된 실행 경로를 검사하므로 설정을 고정하지 않는다. B 시각을 실행 중인 시간표(`LabJigwiABTimeline.ActiveOffset(1, schedule) + 6.2`, 지금은 51.2초)에서 읽는다.
+
+| 확인 | 결과 |
+| --- | --- |
+| 수정 전 검사, 두 fixture, 커밋별 | `069cb49e`(#550 직전 main) 10/10 PASS. `ed4c0749` Lab 9/9. `d5229336` Lab 8/9(`BurnDeadlines…` :298). `96cbd74b` 9/10(같은 1건). `81f6b063` 2/10(보고된 8건, 줄 번호도 같음). `886e65db`·`92d511ee` 2/10 |
+| 수정 전 검사, `886e65db`에서 asset만 임시로 `jigwiFlowSchedule: 0`(커밋 안 함) | 9/10. `BurnDeadlines…`만 :274(35 대신 -1) |
+| 위 상태에서 `jigwiAHoldBurnUntilEnd: 0`까지(커밋 안 함) | Lab 8/9. `BurnDeadlines…`만 :298 |
+| 이 수정, 두 fixture | 10/10 PASS. Hapio 기록 `A11.2/B51.2` |
+| `origin/feat/#551-jigwi-b-sync-flow` `2f6150c5`에서 | 수정 전 2/10(같은 8건). 수정 후 6/10. 수정에 `jigwiBCountdown`·`jigwiBBucket` 고정까지 더하면 9/10. 남은 1건은 Hapio 저장 B가 물통 B를 만나 특수 물 지급이 없는 것이다 |
+| 전체 EditMode | 2060/2062 PASS(20.7초). 실패 2건은 이 수정과 무관한 main 실패다. `GameSceneAssetTests.MenuScreens_HaveSavedEditableCanvasAndInput`의 Home·Lobby에서 저장된 DEV 240행이 15인데 asset은 10이다. #561에서 고친다 |
+| 전체 PlayMode | 675/675 PASS(518.8초) |
+
+- 각 실행의 skip·inconclusive는 0이다. 임시 asset 변경은 되돌렸고 커밋하지 않았다.
+- Unity가 가져올 때마다 `Assets/Lab/Art/Lobby/*.png.meta` 20개에 기본 WebGL 항목을 더한다. 매번 되돌렸고 커밋하지 않았다.
+- **미실행:** iPhone, 실기기, 여러 기기. #551의 물통 B에 맞춘 Hapio 검사 갱신은 #551 범위다.
+
 ## 2026-11-08 — #503 방장 입장 전 대기 방 공개 실패 재시도
 
 - **기준:** main `886e65db` 위의 `fix/#503-pending-room-register-retry`. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro), iOS 활성, 실제 macOS Bonjour(dns_sd). Library는 다른 worktree에서 복제했다.

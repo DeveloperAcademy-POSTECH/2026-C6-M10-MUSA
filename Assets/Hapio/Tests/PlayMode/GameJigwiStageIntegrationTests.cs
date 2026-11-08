@@ -131,6 +131,9 @@ namespace Hapio.Tests
             clock = (LabBattleClock)Field("battleClock").GetValue(network);
             model = (LabModel)Field("model").GetValue(network);
             startedAt = before.jigwiAB.startedAt;
+            // #540: the saved LabConfig runs the flow timetable (A1 10-20 s, B1 45-60 s). 11.2 s is inside A1 on either
+            // timetable; B is read from the running schedule, 6.2 s in as before (31.2 s on the old #509 timetable).
+            double bAt = LabJigwiABTimeline.ActiveOffset(1, before.jigwiAB.schedule) + 6.2d;
             HoldAt(11.2d);
             yield return null;
             Assert.That(network.Snapshot.paused, Is.True);
@@ -146,12 +149,12 @@ namespace Hapio.Tests
             Assert.That(hud.testToggle.gameObject.activeInHierarchy, Is.False);
             AssertNoOldSurfacePresentation();
 
-            HoldAt(31.2d);
+            HoldAt(bAt);
             // The same clock stays held across the forward seek; no real-time Update can roll it back.
             Method("SyncJigwiFireSurfaces").Invoke(network, null);
             yield return null;
             LabSnapshot current = network.Snapshot;
-            LabJigwiABRound b = current.jigwiAB.Active(startedAt + 31.2d);
+            LabJigwiABRound b = current.jigwiAB.Active(startedAt + bAt);
             Assert.That(b, Is.Not.Null); Assert.That(b.kind, Is.EqualTo(LabJigwiABKind.GroupFire));
             // #509: a solo room picks its only seat; B is judged on the boss itself, with no fire art or colliders.
             Assert.That(b.players.Single().playerId, Is.EqualTo(network.LocalPlayerId));
@@ -179,7 +182,7 @@ namespace Hapio.Tests
             // #509: solo is the test room — its one special Water on the boss is the whole B.
             ThrowSpecialWaterAtBoss(b.id);
             PublishFireState(); yield return null;
-            HoldAt(31.4d); yield return null;
+            HoldAt(bAt + .2d); yield return null;
             CaptureScreenEvidence("2"); yield return null;
             Assert.That(network.Snapshot.jigwiAB.rounds.Single(round => round.id == b.id).resolution,
                 Is.EqualTo(LabJigwiABResolution.Completed));
@@ -188,9 +191,9 @@ namespace Hapio.Tests
             Assert.That(model.PaintSurface.CoveredCount, Is.GreaterThan(paintedBefore), "The success splash paints the boss.");
             Assert.That(target.Hitbox.sharedMesh, Is.SameAs(shell));
             network.LocalStaminaSpent -= onSpent;
-            HoldAt(35d); yield return null;
+            HoldAt(bAt + 3.8d); yield return null;
             CaptureScreenEvidence("0"); yield return null;
-            TestContext.WriteLine("JIGWI_AB_SAVED_STAGE3: Home/DEV skips/A11.2/B31.2/no B colliders/one special Water clears solo B. "
+            TestContext.WriteLine("JIGWI_AB_SAVED_STAGE3: Home/DEV skips/A11.2/B" + bAt + "/no B colliders/one special Water clears solo B. "
                 + "Screen Space Overlay GPU pixels are not sampled by camera.Render; device/GPU visual review is separate.");
         }
 
