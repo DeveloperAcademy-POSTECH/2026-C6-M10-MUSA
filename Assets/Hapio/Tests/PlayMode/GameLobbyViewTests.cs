@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -624,6 +625,50 @@ namespace Hapio.Tests
             Assert.That(session.Network.ParticipantCount, Is.Zero, "Stop cleared the old room.");
             Assert.That(session.UiNotice, Is.EqualTo("방과의 연결이 끊어졌소."));
             Assert.That(View().message.text, Is.EqualTo("방과의 연결이 끊어졌소."));
+        }
+
+        [UnityTest]
+        public IEnumerator AFullRoomCardOpensOnlyForThisDevicesAdmittedTicket()
+        {
+            GameLobbyView view = View();
+            yield return Click(view.enterButton);
+            yield return Until(() => view.browserPage.activeInHierarchy, "Room list");
+            LabNetwork network = session.Network;
+            const System.Reflection.BindingFlags flags = System.Reflection.BindingFlags.Instance
+                | System.Reflection.BindingFlags.NonPublic;
+            // #501: a full room may be holding this device's own place. The network is paused so the browse cannot
+            // replace the room list set here, as LabFigmaLobbyTests does.
+            network.enabled = false;
+            try
+            {
+                IReadOnlyList<LabDiscoveredRoom> full = LabRoomCatalog.GroupTargets(new[]
+                    { new LabBonjourTarget("127.0.0.1", 19123, 1, "Hapio-501a0b1c", 3, 3) });
+                typeof(LabNetwork).GetField("discoveredRooms", flags).SetValue(network, full);
+                yield return null; yield return null;
+                Assert.That(RoomAction(view), Is.EqualTo("정원 마감"));
+                typeof(LabNetwork).GetMethod("PrepareRejoinTicket", flags).Invoke(network, new object[] { full[0].Key });
+                yield return null; yield return null;
+                Assert.That(RoomAction(view), Is.EqualTo("정원 마감"), "A ticket the Host never let in holds no place there.");
+                typeof(LabNetwork).GetField("rejoinTicketAdmitted", flags).SetValue(network, true);
+                yield return null; yield return null;
+                Assert.That(RoomAction(view), Is.EqualTo("입장 →"), "The Host may be holding this device's place.");
+            }
+            finally
+            {
+                typeof(LabNetwork).GetField("rejoinTicket", flags).SetValue(network, null);
+                typeof(LabNetwork).GetField("rejoinTicketAdmitted", flags).SetValue(network, false);
+                typeof(LabNetwork).GetField("discoveredRooms", flags).SetValue(network, Array.Empty<LabDiscoveredRoom>());
+                network.enabled = true;
+            }
+        }
+
+        private static string RoomAction(GameLobbyView view)
+        {
+            UnityEngine.UI.Button[] rows = view.roomContent.GetComponentsInChildren<UnityEngine.UI.Button>()
+                .Where(row => row != view.roomTemplate && row.gameObject.activeInHierarchy && row.transform.Find("Action") != null)
+                .ToArray();
+            Assert.That(rows.Length, Is.EqualTo(1), "The one listed room.");
+            return rows[0].transform.Find("Action").GetComponent<UnityEngine.UI.Text>().text;
         }
 
         [Category("Bonjour")]

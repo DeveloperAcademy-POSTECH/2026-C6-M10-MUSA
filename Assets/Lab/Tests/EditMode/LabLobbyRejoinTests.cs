@@ -172,19 +172,78 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void ARoomCardWithThisDevicesTicketMayBeTriedWhenItLooksFull()
+        public void AFullRoomCardOpensOnlyForATicketItsHostLetIn()
         {
             using (var room = new HostRoom(3, host: false))
             {
-                Assert.That(room.Network.HoldsRoomTicket("7777:합이오 방"), Is.False, "No ticket before joining.");
-                typeof(LabNetwork).GetMethod("PrepareRejoinTicket", Private).Invoke(room.Network, new object[] { "7777:합이오 방" });
-                Assert.That(room.Network.HoldsRoomTicket("7777:합이오 방"), Is.True);
-                Assert.That(room.Network.HoldsRoomTicket("7778:합이오 방"), Is.False, "Only the room it was made for.");
-                string ticket = (string)typeof(LabNetwork).GetField("rejoinTicket", Private).GetValue(room.Network);
+                const string key = "7777:합이오 방";
+                LabDiscoveredRoom full = Room("합이오 방", 7777, 3, 3), other = Room("다른 방", 7778, 3, 3);
+                LabDiscoveredRoom open = Room("다른 방", 7778, 2, 3), playing = Room("합이오 방", 7777, 3, 3, playing: true);
+                Assert.That(room.Network.HoldsRoomTicket(key), Is.False, "No ticket before joining.");
+                Assert.That(Open(room, open), Is.True);
+                Assert.That(Open(room, full), Is.False);
+                room.Invoke("PrepareRejoinTicket", key);
+                string ticket = (string)room.Get("rejoinTicket");
                 Assert.That(ticket, Does.Match("^[0-9a-f]{32}$"));
-                typeof(LabNetwork).GetMethod("PrepareRejoinTicket", Private).Invoke(room.Network, new object[] { "7777:합이오 방" });
-                Assert.That(typeof(LabNetwork).GetField("rejoinTicket", Private).GetValue(room.Network), Is.EqualTo(ticket),
-                    "Joining the same room again keeps the ticket.");
+                Assert.That(room.Network.HoldsRoomTicket(key), Is.False, "A join the Host never let in holds no place.");
+                Assert.That(Open(room, full), Is.False);
+                // The Host lets this device into its lobby.
+                room.Set("joinInProgress", true);
+                room.Connect(0);
+                Assert.That(room.Network.HoldsRoomTicket(key), Is.True);
+                Assert.That(Open(room, full), Is.True, "The full room may be holding this device's place.");
+                Assert.That(Open(room, other), Is.False, "Only the room the ticket was made for.");
+                Assert.That(Open(room, playing), Is.False);
+                room.Invoke("PrepareRejoinTicket", key);
+                Assert.That(room.Get("rejoinTicket"), Is.EqualTo(ticket), "Joining the same room again keeps the ticket.");
+                Assert.That(room.Network.HoldsRoomTicket(key), Is.True);
+                // Lost outside a lobby (here: no lobby to return to): the Host holds nothing for it.
+                room.Network.LobbyRejoinAllowed = false;
+                room.Drop(0);
+                Assert.That(room.Network.HoldsRoomTicket(key), Is.False);
+                Assert.That(Open(room, full), Is.False);
+            }
+        }
+
+        [Test]
+        public void AReplacedConnectionThatClearedItsPComesBackWithoutTheOldP()
+        {
+            using (var room = new HostRoom(3))
+            {
+                room.Join(5, TicketA, 2);
+                room.Drop(5);
+                Assert.That(room.Approve(9, TicketA), Is.True);
+                room.Connect(9);
+                Assert.That(room.Network.GetSlotOwner(2), Is.EqualTo(9UL));
+                Assert.That(room.Slots.TrySelect(9, 0, out _), Is.True, "The player clears its own choice.");
+                // It comes back again while the Host still has connection 9.
+                Assert.That(room.Approve(10, TicketA), Is.True);
+                room.Connect(10);
+                Assert.That(room.Slots.GetSlot(10), Is.Zero, "The connection it replaced had no P.");
+                Assert.That(room.Network.GetSlotOwner(2), Is.EqualTo(ulong.MaxValue));
+                room.Drop(9);
+                Assert.That(room.Order, Is.EquivalentTo(new[] { 0UL, 10UL }));
+            }
+        }
+
+        [Test]
+        public void ADropDuringARunIsNeitherHeldNorRemembered()
+        {
+            using (var room = new HostRoom(3))
+            {
+                room.Join(5, TicketA, 2);
+                room.Drop(5);
+                Assert.That(room.Approve(9, TicketA), Is.True);
+                room.Connect(9);
+                Assert.That(room.Slots.TrySelect(9, 3, out _), Is.True, "It moves from P2 to P3.");
+                room.Network.LockGameRoster();
+                room.Drop(9);
+                Assert.That(room.Network.HeldSeatCount, Is.Zero);
+                // The room comes back to its lobby (2:2 #281), and the player returns from the room list.
+                room.Network.UnlockGameRoster();
+                Assert.That(room.Approve(10, TicketA), Is.True);
+                room.Connect(10);
+                Assert.That(room.Slots.GetSlot(10), Is.Zero, "#502: a drop in a run gets no P back, old or new.");
             }
         }
 
@@ -255,6 +314,12 @@ namespace C6Lab.Tests
             }
         }
 
+        private static LabDiscoveredRoom Room(string name, ushort port, int participants, int capacity, bool playing = false) =>
+            LabRoomCatalog.GroupTargets(new[] { new LabBonjourTarget("127.0.0.1", port, 1, name, participants, capacity, playing) })[0];
+
+        private static bool Open(HostRoom room, LabDiscoveredRoom listed) =>
+            (bool)typeof(LabNetwork).GetMethod("RoomOpenToThisDevice", Private).Invoke(room.Network, new object[] { listed });
+
         private static bool Read(byte[] payload, byte[] token, bool game, out string ticket)
         {
             object[] arguments = { payload, token, game, null };
@@ -312,6 +377,11 @@ namespace C6Lab.Tests
                 approve.Invoke(Network, new[] { request, response });
                 return (bool)responseType.GetField("Approved").GetValue(response);
             }
+
+            public object Get(string field) => typeof(LabNetwork).GetField(field, Private).GetValue(Network);
+            public void Set(string field, object value) => typeof(LabNetwork).GetField(field, Private).SetValue(Network, value);
+            public void Invoke(string method, params object[] arguments) =>
+                typeof(LabNetwork).GetMethod(method, Private).Invoke(Network, arguments);
 
             public void Connect(ulong id) => typeof(LabNetwork).GetMethod("OnConnected", Private).Invoke(Network, new object[] { id });
             public void Drop(ulong id) => typeof(LabNetwork).GetMethod("OnDisconnected", Private).Invoke(Network, new object[] { id });

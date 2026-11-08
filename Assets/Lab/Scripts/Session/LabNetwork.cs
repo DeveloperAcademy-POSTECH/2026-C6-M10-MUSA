@@ -859,8 +859,8 @@ namespace C6Lab
         {
             // A full room may still be holding this device's own place (#501): let the Host decide.
             return IsSearchingRooms && CanBeginConnection && !string.IsNullOrEmpty(roomKey)
-                && discoveredRooms.Any(item => string.Equals(item.Key, roomKey, StringComparison.OrdinalIgnoreCase) && !item.Playing
-                    && (!item.IsFull || HoldsRoomTicket(item.Key)) && !item.WaitingForHost)
+                && discoveredRooms.Any(item => string.Equals(item.Key, roomKey, StringComparison.OrdinalIgnoreCase)
+                    && RoomOpenToThisDevice(item))
                 && LabRoomCatalog.RoutesForRoom(discovery.Targets, roomKey).Length > 0;
         }
 
@@ -871,7 +871,7 @@ namespace C6Lab
             LabDiscoveredRoom room = discoveredRooms.FirstOrDefault(item =>
                 string.Equals(item.Key, roomKey, StringComparison.OrdinalIgnoreCase));
             LabBonjourTarget[] targets = LabRoomCatalog.RoutesForRoom(discovery.Targets, roomKey);
-            if (room == null || room.Playing || room.IsFull && !HoldsRoomTicket(room.Key) || room.WaitingForHost || targets.Length == 0)
+            if (!RoomOpenToThisDevice(room) || targets.Length == 0)
             {
                 RefreshDiscoveredRooms();
                 SetRoomSearchMessage("That room is no longer available. Choose another room or refresh.", true);
@@ -947,6 +947,8 @@ namespace C6Lab
             string rejection = manager == null ? string.Empty : manager.DisconnectReason;
             if (IsTerminalJoinRejection(rejection))
             {
+                // The Host is not holding a place for this ticket now (#501).
+                rejoinTicketAdmitted = false;
                 EndLobbyRejoin("rejected");
                 FinishJoin("Join rejected: " + rejection, true);
                 return;
@@ -1558,6 +1560,7 @@ namespace C6Lab
                 joinInProgress = false;
                 joinRetryPending = false;
                 EndLobbyRejoin("connected");
+                MarkRejoinTicketAdmitted();
                 clientSessionConnected = true;
                 discoveryJoinActive = false;
                 DisposeDiscovery();
@@ -1581,7 +1584,7 @@ namespace C6Lab
                     // GameSession owns the GameOver transition; never clear the result or
                     // publish a legacy lobby that would erase it on the remaining peers.
                     if (stopping || manager == null || !manager.IsHost) return;
-                    bool held = lobbyDrop && HoldLobbyPlace(id, playerSlots?.GetSlot(id) ?? 0);
+                    bool held = HoldLobbyPlace(id, playerSlots?.GetSlot(id) ?? 0, lobbyDrop);
                     order.Remove(id);
                     bulkSenders.Remove(id); peerPaintPublishers.Remove(id); peerSharedRounds.Remove(id); paintCheckpointThrough.Remove(id);
                     boardSequences.Remove(id);
@@ -1618,8 +1621,10 @@ namespace C6Lab
                 if (!clientSessionConnected) return; // Ignore a retired attempt's late shutdown callback.
                 if (gameFlowEnabled)
                 {
-                    // #501: a lobby guest stays in the Lobby and gets back into the same room.
+                    // #501: a lobby guest stays in the Lobby and gets back into the same room. Any other loss (a run, a
+                    // closed room) is not held by the Host, so the ticket no longer opens a full room card.
                     if (TryBeginLobbyRejoin(false)) return;
+                    rejoinTicketAdmitted = false;
                     GameFlowDisconnected?.Invoke(id, true);
                     clientSessionConnected = false;
                     UnregisterHandler();

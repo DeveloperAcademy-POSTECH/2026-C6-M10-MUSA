@@ -45,6 +45,8 @@ namespace C6Lab
         private readonly List<string> lobbyRejoinRoutes = new List<string>();
         private string rejoinTicket;
         private string rejoinTicketRoom;
+        /// <summary>The Host let this ticket into its lobby, so it may be holding the place now.</summary>
+        private bool rejoinTicketAdmitted;
         private bool hostClosedLobby;
         private bool lobbyRejoinActive;
         private double lobbyRejoinUntil;
@@ -114,20 +116,32 @@ namespace C6Lab
             {
                 rejoinTicket = null;
                 rejoinTicketRoom = null;
+                rejoinTicketAdmitted = false;
                 return;
             }
             if (!string.IsNullOrEmpty(rejoinTicket)
                 && string.Equals(rejoinTicketRoom, room, StringComparison.OrdinalIgnoreCase)) return;
             rejoinTicket = Guid.NewGuid().ToString("N");
             rejoinTicketRoom = room;
+            rejoinTicketAdmitted = false;
         }
 
         /// <summary>
         /// This device has a ticket for the room, so the Host may be holding its place: a full card is worth trying, and
         /// the Host's approval decides (#501).
         /// </summary>
-        public bool HoldsRoomTicket(string roomKey) => gameFlowEnabled && !string.IsNullOrEmpty(rejoinTicket)
+        public bool HoldsRoomTicket(string roomKey) => gameFlowEnabled && rejoinTicketAdmitted && !string.IsNullOrEmpty(rejoinTicket)
             && !string.IsNullOrEmpty(roomKey) && string.Equals(rejoinTicketRoom, roomKey, StringComparison.OrdinalIgnoreCase);
+
+        /// <summary>A listed room this device may try: open, or full while possibly holding this device's place.</summary>
+        internal bool RoomOpenToThisDevice(LabDiscoveredRoom room) => room != null && !room.Playing && !room.WaitingForHost
+            && (!room.IsFull || HoldsRoomTicket(room.Key));
+
+        /// <summary>The Host admitted this device's ticket into its lobby (#501).</summary>
+        private void MarkRejoinTicketAdmitted()
+        {
+            if (gameFlowEnabled && !string.IsNullOrEmpty(rejoinTicket)) rejoinTicketAdmitted = true;
+        }
 
         /// <summary>The held or still-connected place this ticket would take over.</summary>
         private int ReclaimablePlaces(string ticket)
@@ -193,8 +207,9 @@ namespace C6Lab
                 DisconnectReplacedMember(stale);
             }
             // A held or replaced place brings back exactly the P it had (none if its choice was cleared); only a return
-            // after its hold ended falls back to the P it left with.
+            // after its hold ended falls back to the P it left with. Either way the memory is used up.
             if (!found && rememberedSlots.TryGetValue(ticket, out int remembered)) slot = remembered;
+            rememberedSlots.Remove(ticket);
             return slot;
         }
 
@@ -226,11 +241,16 @@ namespace C6Lab
         /// <summary>
         /// A lobby member with a ticket that did not say goodbye keeps its place and P (still owned by its old id). Its
         /// P at departure is also remembered, so a return after the hold ended gets it back if it is still free.
-        /// 나가기 gives both up.
+        /// 나가기 gives both up, and so does a drop during a run (#502), which is never held.
         /// </summary>
-        private bool HoldLobbyPlace(ulong id, int slot)
+        private bool HoldLobbyPlace(ulong id, int slot, bool lobbyDrop)
         {
             if (!memberTickets.TryGetValue(id, out string ticket)) return false;
+            if (!lobbyDrop)
+            {
+                rememberedSlots.Remove(ticket);
+                return false;
+            }
             if (lobbyLeavers.Contains(id))
             {
                 rememberedSlots.Remove(ticket);
@@ -298,6 +318,7 @@ namespace C6Lab
                 // A guest that said goodbye gave its place up; a later join to this room is a new player.
                 rejoinTicket = null;
                 rejoinTicketRoom = null;
+                rejoinTicketAdmitted = false;
             }
         }
 
