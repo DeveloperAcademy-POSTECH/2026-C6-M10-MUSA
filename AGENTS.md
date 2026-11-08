@@ -11,6 +11,13 @@
 - 이 저장소는 공개다. 인증 정보, 서명 파일, 개인 경로·기기 식별자, 원시 실행 로그와 빌드 산출물을 커밋하지 않는다.
 - 소스 존재, 테스트 코드 존재, 과거 로컬 실행 결과와 이 브랜치에서의 검증 결과를 구분한다. 실행하지 않은 Mac·iOS·실기기 항목은 PASS로 쓰지 않는다.
 
+## 합이오 UI 컬러 시스템
+
+- 앞으로 Hapio UI를 새로 만들거나 수정할 때 색상 기준은 `Assets/Hapio/Art/UI/Source/Hapio.tokens.json`이다. 전체 팔레트와 사용 안내는 `docs/COLOR_SYSTEM.md`에서 확인한다.
+- Figma 변수 ID·토큰 경로와 UI 역할을 맞춰 기존 토큰을 적용한다. 임의의 유사 HEX를 새로 만들지 않고, 코드·Prefab에 적용한 색의 토큰 경로를 추적할 수 있게 남긴다. 별도 색상이 명시된 요청은 그 요청을 따른다.
+- 색과 투명도는 원본의 `$value.components`·`colorSpace`·`alpha`를 함께 따른다. 이름에 붙은 `%`로 alpha를 추측하지 않는다. 특히 `DarkIvory/500***70%`의 실제 alpha는 0.5다.
+- 이 규칙은 앞으로 작업하는 UI에 적용한다. UI 작업을 이유로 게임 판정용 팔레트·네트워크 설정·기존 화면 전체를 일괄 치환하지 않는다.
+
 ## 별도 개발용 게임 흐름 (#262)
 
 - 기존 Lab Scene과 빌드 경로는 보존한다. 새 게임 진입점은 `Assets/Hapio/Scenes/Home.unity`이며 Home·Lobby·Battle·StageResult·GameOver를 분리한다. 1~3스테이지 전투는 같은 Battle Scene을 재사용한다.
@@ -183,6 +190,11 @@
 - `LabNetwork.Recovery.cs`가 검색 재시작(1~30초, 최대 6회)·방장 공개 재등록(같은 요청 이름, 이관 방은 이름 고정)·모바일 복귀 처리를 맡는다. `DisposeDiscovery`가 대기 중인 재시도를 지우므로 실패 경로는 그 뒤에 예약한다. 살아 있는 등록은 복귀 때 다시 만들지 않는다.
 - iPhone만 연결·입장 중·검색 중(`RoomSearchKeepsAwake`, Hapio는 방 목록이 보일 때만)·재시도 대기에 `SleepTimeout.NeverSleep`이다. NGO·전송 소켓 재생성, 전투 중 백그라운드 처리, 접속 규약·TXT·설정 수·Scene/Prefab은 바꾸지 않는다.
 
+## #503 대기 방 공개 재시도
+
+- 방장 입장 전 대기 방(`LabPendingRoom`)은 이름 충돌이 아닌 등록 실패를 `LabDiscoveryBackoff`의 1~30초 간격, 최대 6회로 다시 등록한다(`RetryPending`·`RetryAttempts`). 기다리는 동안 예약 포트와 카드를 유지하고, 다른 카드의 등록 순서를 막지 않으며, `Failed`는 6회가 끝난 뒤에만 참이다. 이름 충돌은 기존 다음 번호 재시도를 그대로 쓴다. 확정된 카드는 자기 번호를 다시 요청하고, 확정될 때마다 재시도 횟수와 이름 충돌 예산을 초기화한다.
+- Hapio 방 만들기의 30초 한도는 그대로다. 재시도 중 안내와 한도 도달 안내만 바꿨다. 상세는 `docs/GAME_FLOW.md`의 같은 항목을 따른다. 접속 규약·TXT·설정 수는 바꾸지 않는다.
+
 ## #481 전투 초반 프레임 계측
 
 - Development/Editor(`Debug.isDebugBuild`)에서만 `GameSession`이 `GameFrameSpikeProbe`를 런타임에 붙인다. 전투 단계(LoadingBattle~Playing)의 25 ms 초과 프레임과 그 프레임에 처음 실행된 일(`LabFirstUse`의 `Hapio.FirstUse.*` 마커)을 미리 할당한 배열에만 담고, 스테이지가 끝나거나 같은 스테이지를 다시 불러올 때 `HAPIO_FRAME_SPIKE`·`HAPIO_FRAME_SUMMARY`로 스택 없이 한 번 출력한다. 출력한 프레임은 다음 스테이지 측정에서 뺀다.
@@ -241,6 +253,7 @@
 - 관람은색/P/높이를모두독립복사하고기본박Ready0을유지한다. 클레이해제는지연Destroy전에Renderer를즉시끈다. 빌드검사는읽기전용이며원본/데이터팩을자동베이크하지않는다. 실제실행결과만VALIDATION에기록하며iOS/실네트워크검증은이번범위에포함하지않았다.
 
 - #506 최신 main 통합: #507의 스테이지별 몸통/뚜껑 Rig·판정·연속 줄·요괴를 유지한다. 클레이는 각 paintShell/paintExtra의 identity 자식이며 결과 복제도 각 base의 Ready0과 coat의 Ready1을 유지한다. #482 도색 준비를 유지하고 새 클레이의 3브러시×색/높이 패스도 별도 작은 타깃에서 준비한다. 실제 지도·진행 순번·난수는 프리워밍으로 바꾸지 않는다.
+- Home·Lobby에 저장된 DEV 패널은 257행(`LabConfig.ClayThicknessField`)이고 257·258은 실행 중 `GameScreen.EnsureClayDeveloperRows`가 붙인다. Editor 도구(`Hapio/Upgrade Menu DEV Rows`·`Upgrade Three Yokai Stages`·`Upgrade 2v2 Lobby UI`·`Upgrade Figma Game Lobby`, 새 메뉴 생성)는 `GameSceneBuilder.SavedDeveloperRowCount`까지만 저장·확인하고, 예전 도구가 저장한 257행부터는 지운다. 글꼴 갱신은 Prefab 인스턴스(공통 로비·오프닝)에 덮어쓰기를 만들지 않는다. `LabConfig.asset`의 DEV 기본값을 바꾸면 `Upgrade Menu DEV Rows`로 저장 행을 다시 맞춘다.
 
 ## #479 지귀 A 부적
 
@@ -273,7 +286,7 @@
 - #509 당시 묶음은 설정 259개·**5688**·`C6PhysicsLab/49`·`C6HapioGame/34`였다. main #525가 Game33을 먼저 써서 34로 올렸다. 5687/Game33(#479·#525) 앱과 혼용하지 않는다.
 - #526 당시 호환 묶음은 설정 259개·**5688**·`C6PhysicsLab/49`·**`C6HapioGame/35`**였다. #526에서 2스테이지 박의 칠·판정 껍데기를 100K 모델로 다시 구워 Game만 올렸다. Game34 앱과 혼용하지 않는다. 현재 기준은 아래 `Bulk 선택 ACK와 창 64` 절이다.
 
-## #540 지귀 A 부적 실패 벌 — 최신 호환 기준
+## #540 지귀 A 부적 실패 벌 — 도입 당시 호환 이력
 
 - A가 끝날 때까지 부적을 못 쓴 자리는 그 판에 남은 구슬(원소·결합)이 만든 순서대로 0.12초 간격으로 모두 탄다(기존 `jigwiABBurnAt` 소각 경로). 북은 막지 않는다. 다 쓴 자리와 게임 종료로 취소된 A는 벌을 받지 않는다. 보상·벌 모두 자리별이다.
 - A 제한 시간은 LabConfig 에셋에서 10초, 구슬 소각 간격은 2초다(코드 기본값은 그대로).
@@ -289,7 +302,7 @@
 - 부적 완성 연출 길이는 LabConfig `jigwiTalismanRewardDelaySeconds`(Host) 하나로 맞춘다. 부적 화면이 도장 뒤 머무는 시간을 그 값에 맞춰 늘이고 줄인다.
 - 부적 완성 흐름(약 2.9초, 에셋 `jigwiTalismanRewardDelaySeconds` 2.9): 숨 고르기 0.1초 → 금빛 훑기와 가락 "솔 도 시 라"(불은 그동안 그 자리에 멈춰 옅어짐) → "라!"에 도장 → 부적이 한 바퀴 빙글 말리며 구슬 크기로 오므라들고 가운데서 자라난 부적 구슬(물빛 + 금빛 "물")에 스며듦 → 구슬이 살짝 튀었다가 Host가 진짜 부적 구슬을 놓는 자리(`LabModel.JigwiTalismanWaterSpot`, 화면 위치는 `LabOrbBoard.TryGetScreenSpot`)로 톡 떨어짐. 진짜 부적 구슬은 위에서 떨어지지 않고 그 자리에 나타나며, 떨어진 구슬은 그것이 보이면(최대 0.6초) 사라진다. 부적을 다 쓰면 그 사람 판 구슬은 보상이 판에 닿고 1초(`LabModel.JigwiTalismanCalmSeconds`)까지는 수명이 다하지 않는다.
 - #540부터 지귀 불 연출(불덩이·부적 테두리 불·구슬이 타오르는 불, 북 불은 예외로 폭탄 불)은 그림 파일(Bomb/BlastFire 등)을 쓰지 않고 `LabProceduralFire`로 코드에서 그린다.
-- 현재 호환 묶음은 설정 259개·**5691**·`C6PhysicsLab/52`·**`C6HapioGame/38`**다. main의 Bulk 선택 ACK(5690·Lab51·Game37)를 받은 위에 #540을 올렸다. 5690·5689 이하 앱과 혼용하지 않는다.
+- #540 당시 호환 묶음은 설정 259개·**5691**·`C6PhysicsLab/52`·**`C6HapioGame/38`**였다. main의 Bulk 선택 ACK(5690·Lab51·Game37)를 받은 위에 #540을 올렸다. 현재 Game 기준은 아래 #558 절이다. 5690·5689 이하 앱과 혼용하지 않는다.
 
 ## 검사 카테고리와 검사 전용 시작 단축 (2026-11-05)
 
@@ -341,4 +354,17 @@
 - 손실 판정: 모든 송신에 순번을 매기고, 확인된 조각의 첫 송신보다 앞서 마지막으로 나간 미확인 조각을 바로 다시 보낸다(공유 백오프 없음). 창 안의 모든 구멍에 적용하며, 다시 보낸 뒤에는 그보다 뒤에 보낸 조각이 도착해야 다시 손실로 본다. #437의 중복 ACK 3회 빠른 재전송과 에코 할인은 지웠다. 경로가 순서를 지킨다는 가정이며, 순서가 뒤바뀌면 조각 하나를 한 번 더 보낼 뿐이다.
 - RTT 표본은 이번 ACK가 새로 확인한 조각(선택 ACK 포함) 중 가장 최근에 보낸 조각이 한 번만 보낸 조각일 때 잰다(Karn). RTO 식·0.08~1초·시간 초과 공유 백오프는 #437 그대로다. 표본 전 RTO는 0.25초 기준에 같은 공유 백오프가 걸린다(위 #437 절, PR #545).
 - 창은 32→64조각(수신 버퍼 128), 공동 스냅샷 조각은 512→4000자다(`LabSessionSettings.SnapshotChunkCharacters`). 문자당 6바이트 escape에서도 한 조각이 Bulk 논리 본문 32,768자 안에 든다는 것을 검사로 고정했다. 선택 ACK 비트가 `AckThrough + 65`까지만 덮으므로 창을 65보다 키우려면 비트맵도 넓혀야 한다.
-- 이 절이 들어올 때 호환 묶음은 설정 259개·**5690**·`C6PhysicsLab/51`·**`C6HapioGame/37`**이었다(5689/Lab50/Game36은 `feat/#540` 브랜치가 먼저 썼다). #540이 이 위에 올라가 지금은 **5691**·`C6PhysicsLab/52`·**`C6HapioGame/38`**이다. 5690 이하 앱과 혼용하지 않는다. 동작과 대안 비교는 `docs/LOCAL_BOARD_AUTHORITY.md`의 Bulk 절, 실행한 검사·측정은 `docs/VALIDATION.md`에만 기록한다.
+- 이 절이 들어올 때 호환 묶음은 설정 259개·**5690**·`C6PhysicsLab/51`·**`C6HapioGame/37`**이었다(5689/Lab50/Game36은 `feat/#540` 브랜치가 먼저 썼다). #540이 이 위에 올라간 당시에는 **5691**·`C6PhysicsLab/52`·**`C6HapioGame/38`**이었다. 현재 Game 기준은 아래 #558 절이다. 5690 이하 앱과 혼용하지 않는다. 동작과 대안 비교는 `docs/LOCAL_BOARD_AUTHORITY.md`의 Bulk 절, 실행한 검사·측정은 `docs/VALIDATION.md`에만 기록한다.
+
+## #558 Story 결과 통합과 같은 방 재도전
+
+- 현재 호환 묶음은 설정259개·**5691**·`C6PhysicsLab/52`·**`C6HapioGame/39`**다. Lab/Bulk 형식은 유지하고 Game38 이하와 혼용하지 않는다. `GameFlowState.retryableDefeat`와 결과 이야기 확인 제어가 추가됐다.
+- 저장 StageResult/GameOver의 `GameStageStoryPresentation`은 실제 일치하는 Victory/Defeat 복사본만 카드·게이지에 연결한다. 제작용 예시값이나 앞선 성공 결과로 실패를 표시하지 않는다. 로컬 컷·카드 뒤집기는 공유하지 않고 결과/이야기 확인·관람 상태만 Host 진행 조건에 쓴다.
+- 정상 Story 패배만 Host가 같은 방·스테이지를 재시도한다. 원래 참가자·P·승인 설정·이전 성공 기록은 유지하고 기존 prepare/start 장벽으로 새 전투를 만든다. 이탈·연결 끊김·로드 실패는 Home만 남기며 오래된 ACK/중복/Guest 요청으로 재도전하지 않는다.
+- GameOver 동결 뒤에도 마지막 terminal 발행에서 Bulk 백로그로 빠진 피어에게는 대기열이 줄면 기존 paint+snapshot 트랜잭션을 한 번 큐에 넣는다. 실제 terminal 상태를 헤더에서 추정하거나 게임 시뮬레이션을 재개하지 않는다.
+- 실제 연결·에셋·종료 수명은 `docs/STAGE_STORY_UI_INTEGRATION.md`, 과거 제작용 미리보기는 `docs/STAGE_STORY_PRESENTATION.md`, 실행 결과는 `docs/VALIDATION.md`를 따른다.
+
+## #504 배경 재질의 숨은 사본
+
+- 배경 Studio의 바닥·한지 배경·보드 뒤 재질(URP Lit/Unlit)은 숨은 `_MainTex`·`_Color`를 URP가 `_BaseMap`·`_BaseColor`에서 복사하는 값 그대로 저장한다. Editor가 재질 속성을 처음 읽을 때 URP가 다시 복사하고, 결과가 다르면 재질이 dirty가 되어 다음 저장 때 .mat이 바뀐다. 일부 색은 `GetColor`가 float 몇 단계 다르게 돌려주므로 `_Color`에 같은 숫자를 쓰면 안 된다. Editor 스크립트로 바꿀 때도 `LabBackgroundStudio.ApplyImage`(Editor 전용)를 쓴다. `GameStageBackgroundAssetTests`가 재질 파일을 읽어 확인한다. 상세는 `docs/STAGE_BACKGROUNDS.md`를 따른다.
+

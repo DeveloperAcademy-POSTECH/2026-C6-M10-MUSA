@@ -14,6 +14,10 @@ namespace Hapio
         public int Capacity { get; }
         public bool Ready { get; }
         public bool Failed { get; }
+        /// <summary>The publish failed and will be tried again shortly; the card stays and cannot be entered yet (#503).</summary>
+        public bool RetryPending { get; }
+        /// <summary>Publish retries so far for this room (#503).</summary>
+        public int RetryAttempts { get; }
         /// <summary>The team territory mode (1:1, 2:2 or 3:3 by capacity; #281, #394) or the three-yokai story.</summary>
         public GameMode Mode { get; }
 
@@ -21,6 +25,7 @@ namespace Hapio
         {
             Key = room.Key; Name = room.Name; Port = room.Port; Capacity = room.Capacity;
             Ready = room.Ready; Failed = room.Failed; Mode = room.Team ? GameMode.Territory : GameMode.Story;
+            RetryPending = room.RetryPending; RetryAttempts = room.RetryAttempts;
         }
     }
 
@@ -101,7 +106,8 @@ namespace Hapio
                 room.Tick(allowRegistration, nextNumber);
                 if (room.Ready && LabRoomNames.TryNumber(room.Name, out int number, LabRoomNames.GameServiceBase)
                     && number < int.MaxValue) nextNumber = Math.Max(nextNumber, number + 1);
-                if (!room.Ready && !room.Failed) allowRegistration = false;
+                // One registration at a time keeps numbers in order; a room waiting to retry has none running (#503).
+                if (!room.Ready && !room.Failed && !room.RetryPending) allowRegistration = false;
             }
             for (int i = rooms.Count - 1; i >= 0; i--)
                 if (rooms[i].Failed)

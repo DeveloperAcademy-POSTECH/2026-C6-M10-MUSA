@@ -18,6 +18,7 @@ namespace Hapio
     {
         public GameScreenKind kind;
         public GameStageResultView resultView;
+        public GameStageStoryPresentation stageStory;
         public GameObject legacyResultContent;
         [Tooltip("The saved Figma view owns Home/Lobby navigation; this component keeps the scoped DEV panel.")]
         public bool externalNavigation;
@@ -57,12 +58,15 @@ namespace Hapio
         private Coroutine resultEntryRoutine;
         private bool IsResultScreen => kind == GameScreenKind.StageResult || kind == GameScreenKind.GameOver;
         private bool ResultActionsBlocked => IsResultScreen && (resultAwaitingPointerRelease || resultAdvancePending);
+        internal bool StoryActionsBlocked => ResultActionsBlocked;
         private bool UsesExternalNavigation => externalNavigation && (kind == GameScreenKind.Home || kind == GameScreenKind.Lobby);
         private bool OpeningBlocked => kind == GameScreenKind.Home && GameOpeningController.IsPresenting;
 
         private void Awake()
         {
             session = GameSession.EnsureExists();
+            if (stageStory == null) stageStory = GetComponent<GameStageStoryPresentation>();
+            if (stageStory != null) stageStory.Initialize(this, session);
             EnsureClayDeveloperRows();
             if (!UsesExternalNavigation)
             {
@@ -88,6 +92,7 @@ namespace Hapio
             Click(resetViewerButton, () => session.ResetPreview());
             GamePreviewAspect.Attach(viewerImage);
             Click(developerButton, OpenDeveloper);
+            if (kind == GameScreenKind.Home || kind == GameScreenKind.Lobby) GameDeveloperAccess.BindMenu(this);
             for (int i = 0; developerScopeButtons != null && i < developerScopeButtons.Length; i++)
             {
                 int scope = i;
@@ -183,7 +188,7 @@ namespace Hapio
                 case GameScreenKind.GameOver: RefreshGameOver(net); break;
             }
             ApplyResultInputGate();
-            Show(developerButton == null ? null : developerButton.gameObject, net.DeveloperBuildAvailable);
+            Show(developerButton == null ? null : developerButton.gameObject, false);
             Interactable(developerButton, net.CanChooseConnection || (net.IsHost && net.Snapshot == null));
             if (developerPanel != null && developerPanel.activeSelf)
                 Interactable(applyDeveloperButton, net.CanChooseConnection || (net.IsHost && net.Snapshot == null));
@@ -191,6 +196,9 @@ namespace Hapio
 
         private void RefreshGameOver(LabNetwork net)
         {
+            if (stageStory != null && stageStory.TryRefresh(false)) return;
+            SetStoryContentVisible(true);
+            session.SetResultPresentationBusy(false);
             if (resultView != null) { RefreshDesignedResult(net, false); return; }
             Text(title, "GAME OVER");
             Text(status, session.State.endReason);
@@ -250,6 +258,9 @@ namespace Hapio
         {
             // Keep this result intact until the accepted next-stage Scene replaces it.
             if (resultAdvancePending) return;
+            if (stageStory != null && stageStory.TryRefresh(true)) return;
+            SetStoryContentVisible(true);
+            session.SetResultPresentationBusy(false);
             if (resultView != null)
             {
                 // 2:2 (#293) uses the same designed result page, with team records instead of awards.
@@ -489,6 +500,7 @@ namespace Hapio
         private void OnNextButton()
         {
             if (ResultActionsBlocked) return;
+            if (stageStory != null && stageStory.IsShowingOverall) { stageStory.CloseOverall(); return; }
             if (session.State.phase == GameFlowPhase.Completed && !session.IsTerritory)
             {
                 showOverall = !showOverall;
@@ -505,12 +517,81 @@ namespace Hapio
 
         private void OnHomeButton()
         {
-            if (!ResultActionsBlocked) session.GoHome();
+            if (ResultActionsBlocked) return;
+            if (stageStory != null && stageStory.IsPresenting) stageStory.RequestExit();
+            else session.GoHome();
         }
 
         private void OnViewerButton()
         {
             if (!ResultActionsBlocked) session.OpenGourdViewer();
+        }
+
+
+        internal void SetStoryContentVisible(bool visible)
+        {
+            Show(legacyResultContent, visible);
+            if (resultView != null) Show(resultView.gameObject, visible);
+            if (resultTable != null) Show(resultTable.gameObject, visible);
+            foreach (var item in new[] { title, status, details })
+                if (item != null && (legacyResultContent == null || !item.transform.IsChildOf(legacyResultContent.transform))) Show(item.gameObject, visible);
+            foreach (var item in new[] { nextButton, homeButton, viewerButton })
+                if (item != null && (legacyResultContent == null || !item.transform.IsChildOf(legacyResultContent.transform))) Show(item.gameObject, visible);
+        }
+
+        internal void RefreshStoryViewer()
+        {
+            Texture texture = session.PreviewTexture;
+            Show(viewerPanel, session.IsViewerOpen && texture != null);
+            if (viewerImage != null) viewerImage.texture = texture;
+        }
+
+        internal void ShowStoryOverall()
+        {
+            showOverall = true;
+            overallRunId = session.State.runId;
+            SetStoryContentVisible(true);
+            if (resultView != null)
+            {
+                RefreshDesignedResult(session.Network, true);
+                GameStageResultView.Label(resultView.nextButton, "봉인 카드로 돌아가기");
+                Show(resultView.nextButton.gameObject, true);
+                Interactable(resultView.nextButton, !ResultActionsBlocked);
+            }
+        }
+
+        internal bool TryStoryAdvance()
+        {
+            if (ResultActionsBlocked || !session.CanAdvanceStage) return false;
+            uint revision = session.State.revision;
+            resultAdvancePending = true;
+            ApplyResultInputGate();
+            session.NextStage();
+            if (session.State.revision == revision) resultAdvancePending = false;
+            return resultAdvancePending;
+        }
+
+        internal bool TryStoryRetry()
+        {
+            if (ResultActionsBlocked || !session.CanRetryStage) return false;
+            resultAdvancePending = true;
+            ApplyResultInputGate();
+            if (session.RetryStage()) return true;
+            resultAdvancePending = false;
+            return false;
+        }
+
+        internal bool TryStoryViewer()
+        {
+            if (ResultActionsBlocked || session.PreviewTexture == null) return false;
+            session.OpenGourdViewer(); RefreshStoryViewer(); return session.IsViewerOpen;
+        }
+
+        internal bool TryStoryHome()
+        {
+            if (ResultActionsBlocked) return false;
+            if (!session.State.IsRunActive && !session.CanReturnHome) return false;
+            session.GoHome(); return true;
         }
 
         private void ChangePlayers(int delta)
@@ -530,7 +611,7 @@ namespace Hapio
 
         public void OpenDeveloper()
         {
-            if (OpeningBlocked) return;
+            if (!GameDeveloperAccess.AvailableInThisBuild || OpeningBlocked) return;
             if (session == null || session.IsCreatingRoom) return;
             // A 2:2 room (#281) opens on its own tab; story rooms keep Common first.
             SelectDeveloperScope(session.IsTerritory ? GameStageSettings.TerritoryScope : 0);

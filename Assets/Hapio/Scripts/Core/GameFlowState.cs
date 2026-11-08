@@ -30,6 +30,8 @@ namespace Hapio
         public GameMode mode;
         public GameFlowPhase phase = GameFlowPhase.Home;
         public string endReason = string.Empty;
+        /// <summary>Only a matched normal Story defeat may restart this stage in the same room.</summary>
+        public bool retryableDefeat;
         public string battleSessionId = string.Empty;
         public uint battleRound;
         /// <summary>Shared NGO server-time deadline; never a per-device realtime value.</summary>

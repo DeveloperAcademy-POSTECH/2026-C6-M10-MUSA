@@ -60,7 +60,7 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
-        public IEnumerator TitleBrowserDirectIpAndScopedDevUseTheSavedVisibleControlsWithoutLegacyDoubleBindings()
+        public IEnumerator TitleBrowserDirectIpAndHiddenScopedDevAvoidLegacyDoubleBindings()
         {
             GameLobbyView view = View();
             Assert.That(view.titlePage.activeSelf, Is.True);
@@ -70,7 +70,11 @@ namespace Hapio.Tests
             view.screen.hostButton.onClick.Invoke();
             Assert.That(session.Network.IsConnected, Is.False, "Hidden legacy navigation must have no game listeners.");
 
-            yield return Click(view.developerButton);
+            Assert.That(view.developerButton.gameObject.activeInHierarchy, Is.False,
+                "The developer entry must not add a visible control to the authored Home UI.");
+            Assert.That(view.soloButton.gameObject.activeInHierarchy, Is.False);
+            Assert.That(view.teamSoloButton.gameObject.activeInHierarchy, Is.False);
+            yield return OpenHiddenDeveloper(view);
             Assert.That(view.screen.developerPanel.activeInHierarchy, Is.True);
             Assert.That(view.design.gameObject.activeSelf, Is.False);
             AssertTouchable(view.screen.developerScopeButtons[3]);
@@ -80,6 +84,8 @@ namespace Hapio.Tests
             Assert.That(session.CaptureDeveloperSettings(3)[178], Is.EqualTo(2f));
             yield return Click(view.screen.closeDeveloperButton);
             Assert.That(view.titlePage.activeInHierarchy, Is.True);
+            Assert.That(view.soloButton.gameObject.activeInHierarchy, Is.False, "Closing DEV hides its solo entry.");
+            Assert.That(view.teamSoloButton.gameObject.activeInHierarchy, Is.False);
             yield return Click(view.enterButton);
             Assert.That(session.RoomBrowserVisible, Is.True);
             Assert.That(view.browserPage.activeInHierarchy, Is.True);
@@ -94,6 +100,65 @@ namespace Hapio.Tests
             Assert.That(view.directFeedback.text, Does.Contain("포트"));
             yield return Click(view.closeDirectConnectionButton);
             Assert.That(view.directConnectionPanel.activeSelf, Is.False);
+        }
+
+        [UnityTest]
+        public IEnumerator HostLobbyHiddenDeveloperEntrySurvivesSceneTransition()
+        {
+            GameObject homeTapArea = View().screen.GetComponent<GameDeveloperTapTarget>().TapArea;
+            session.Host();
+            yield return Until(() => session.State.phase == GameFlowPhase.Lobby && !session.IsLoadingScene
+                && SceneManager.GetActiveScene().path == GameScenePaths.Lobby && session.Network.IsHost,
+                "The Host enters the separate game lobby Scene", 15f);
+            GameLobbyView view = View();
+            var target = view.screen.GetComponent<GameDeveloperTapTarget>();
+            Assert.That(target, Is.Not.Null, "The newly loaded lobby installs its own hidden DEV entry.");
+            Assert.That(target.TapArea, Is.Not.Null);
+            Assert.That(target.TapArea.scene, Is.EqualTo(view.screen.gameObject.scene),
+                "The hit-area Canvas must share the new owner's Scene lifetime.");
+            Assert.That(homeTapArea == null, Is.True, "The departing Home hit area must not survive over the lobby.");
+            var image = target.TapArea.GetComponent<UnityEngine.UI.Image>();
+            yield return Until(() => !session.IsLoadingScreenUp && image.raycastTarget && image.gameObject.activeInHierarchy,
+                "The lobby loading overlay closes and Host permission enables the new target", 5f);
+            Assert.That(view.screen.developerPanel.activeInHierarchy, Is.False);
+            Assert.That(view.developerButton.gameObject.activeInHierarchy, Is.False);
+            Assert.That(view.soloButton.gameObject.activeInHierarchy, Is.False);
+            Assert.That(view.teamSoloButton.gameObject.activeInHierarchy, Is.False);
+            for (int tap = 1; tap <= GameDeveloperTapTarget.RequiredTaps; tap++)
+            {
+                Canvas.ForceUpdateCanvases();
+                var rect = (RectTransform)target.TapArea.transform;
+                var data = new PointerEventData(EventSystem.current)
+                {
+                    button = PointerEventData.InputButton.Left,
+                    position = RectTransformUtility.WorldToScreenPoint(null, rect.TransformPoint(rect.rect.center))
+                };
+                var hits = new System.Collections.Generic.List<RaycastResult>();
+                EventSystem.current.RaycastAll(data, hits);
+                Assert.That(hits, Is.Not.Empty, "Lobby hidden DEV tap " + tap);
+                GameObject clicked = ExecuteEvents.GetEventHandler<IPointerClickHandler>(hits[0].gameObject);
+                Assert.That(clicked, Is.SameAs(target.TapArea), "The new lobby's actual topmost hit receives tap " + tap);
+                ExecuteEvents.Execute(clicked, data, ExecuteEvents.pointerClickHandler);
+                if (tap < GameDeveloperTapTarget.RequiredTaps)
+                    Assert.That(view.screen.developerPanel.activeInHierarchy, Is.False,
+                        "One or two taps must not open the lobby's DEV panel.");
+                Assert.That(view.soloButton.gameObject.activeInHierarchy, Is.False);
+                Assert.That(view.teamSoloButton.gameObject.activeInHierarchy, Is.False);
+            }
+            yield return null; yield return null;
+            Assert.That(view.screen.developerPanel.activeInHierarchy, Is.True);
+            Assert.That(view.design.gameObject.activeInHierarchy, Is.False);
+            Assert.That(view.developerButton.gameObject.activeInHierarchy, Is.False);
+            Assert.That(view.soloButton.gameObject.activeInHierarchy, Is.False, "A connected lobby never exposes solo launch.");
+            Assert.That(view.teamSoloButton.gameObject.activeInHierarchy, Is.False);
+            view.screen.closeDeveloperButton.onClick.Invoke();
+            yield return null; yield return null;
+            Assert.That(view.screen.developerPanel.activeInHierarchy, Is.False);
+            Assert.That(view.positionPage.activeInHierarchy, Is.True);
+            Assert.That(view.developerButton.gameObject.activeInHierarchy, Is.False);
+            Assert.That(view.soloButton.gameObject.activeInHierarchy, Is.False);
+            Assert.That(view.teamSoloButton.gameObject.activeInHierarchy, Is.False);
+            Assert.That(image.raycastTarget, Is.True, "Closing settings restores the same lobby's hidden entry.");
         }
 
         [Category("Bonjour")]
@@ -153,7 +218,7 @@ namespace Hapio.Tests
             Assert.That(((RectTransform)view.slotButtons[1].transform).anchoredPosition, Is.EqualTo(view.seats3[1].anchoredPosition),
                 "The saved Canvas anchor, rather than a hardcoded slot point, controls the game view.");
             view.seats3[1].anchoredPosition = anchor;
-            yield return Click(view.clearSlotButton);
+            yield return Click(view.slotButtons[1]);
             Assert.That(session.Network.LocalSlotNumber, Is.Zero);
             yield return Click(view.slotButtons[0]);
             Assert.That(session.Network.LocalSlotNumber, Is.EqualTo(1));
@@ -279,6 +344,70 @@ namespace Hapio.Tests
 
         [Category("Bonjour")]
         [UnityTest]
+        public IEnumerator APublishThatFailsIsRetriedAndTheRoomStillOpensByItselfOnItsReservedPort()
+        {
+            if (!LabBonjourDiscovery.IsSupported) Assert.Ignore("Native game-room advertisement requires macOS or iOS.");
+            session.EnterRoomBrowser();
+            Assert.That(session.CreateAndEnterRoom(2), Is.True, session.UiNotice);
+            ushort reservedPort = session.PendingRooms.Single().Port;
+            LabPendingRoom room = CreatingRoom();
+            yield return Until(() => GamePendingRoomRetryTests.Advertisement(room).IsAdvertising, "The session starts the registration");
+            Assert.That(session.PendingRooms.Single().Ready, Is.False);
+            GamePendingRoomRetryTests.FailRegistration(room, "forced registration failure");
+            yield return null;
+            Assert.That(session.IsCreatingRoom, Is.True, "A publish that will be retried keeps the request (#503).");
+            Assert.That(session.PendingRooms.Single().RetryPending, Is.True);
+            Assert.That(session.UiNotice, Is.EqualTo("방을 공개하지 못해 다시 시도하고 있소..."));
+            yield return Until(() => session.State.phase == GameFlowPhase.Lobby && !session.IsLoadingScene
+                && session.Network.IsHost, "The retried room still opens without a card click", 20f);
+            Assert.That(session.IsCreatingRoom, Is.False);
+            Assert.That(session.PendingRooms, Is.Empty);
+            Assert.That(session.Network.port, Is.EqualTo(reservedPort), "The retry keeps the reserved advertised port.");
+            Assert.That(session.Network.ConnectedRoomName, Does.StartWith(LabRoomNames.GameServiceBase));
+        }
+
+        [Category("Bonjour")]
+        [UnityTest]
+        public IEnumerator APublishThatKeepsFailingEndsAtTheDeadlineOrItsLastRetryWithThePublishNotice()
+        {
+            if (!LabBonjourDiscovery.IsSupported) Assert.Ignore("Native game-room advertisement requires macOS or iOS.");
+            session.EnterRoomBrowser();
+            Assert.That(session.CreateAndEnterRoom(3), Is.True, session.UiNotice);
+            LabPendingRoom room = CreatingRoom();
+            ushort port = room.Port;
+            yield return Until(() => GamePendingRoomRetryTests.Advertisement(room).IsAdvertising, "The session starts the registration");
+            GamePendingRoomRetryTests.FailRegistration(room, "forced registration failure");
+            yield return null;
+            Assert.That(session.PendingRooms.Single().RetryPending, Is.True);
+            // The request keeps its 30-second deadline (#503); expire it while the retry waits.
+            typeof(GameSession).GetField("roomCreationDeadline", System.Reflection.BindingFlags.Instance
+                | System.Reflection.BindingFlags.NonPublic).SetValue(session, Time.realtimeSinceStartupAsDouble - 1d);
+            yield return null;
+            Assert.That(session.IsCreatingRoom, Is.False);
+            Assert.That(session.PendingRooms, Is.Empty);
+            Assert.That(session.UiNotice, Is.EqualTo("방을 공개하지 못했소. 네트워크 권한을 확인하고 다시 눌러주시오."),
+                "A request that never got published does not blame a slow room.");
+            using (var released = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp))
+                Assert.DoesNotThrow(() => released.Bind(new IPEndPoint(IPAddress.Any, port)));
+
+            // With no retry left, the request ends at once with the registry's notice.
+            Assert.That(session.CreateAndEnterRoom(2), Is.True, session.UiNotice);
+            room = CreatingRoom();
+            yield return Until(() => GamePendingRoomRetryTests.Advertisement(room).IsAdvertising, "The session starts the registration");
+            GamePendingRoomRetryTests.Field(room, "retryAttempts").SetValue(room, LabDiscoveryBackoff.MaximumAttempts);
+            GamePendingRoomRetryTests.FailRegistration(room, "forced last failure");
+            LogAssert.Expect(LogType.Warning, "C6_LAB_PENDING_ROOM_RETRY result=stopped reason=forced last failure");
+            yield return null;
+            Assert.That(session.IsCreatingRoom, Is.False);
+            Assert.That(session.PendingRooms, Is.Empty);
+            Assert.That(session.UiNotice, Is.EqualTo("방을 공개하지 못했소. 같은 Wi-Fi와 네트워크 권한을 확인해주시오."));
+        }
+
+        private LabPendingRoom CreatingRoom() => ((GamePendingRoomHandle)typeof(GameSession).GetField("roomCreationHandle",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(session)).Room;
+
+        [Category("Bonjour")]
+        [UnityTest]
         public IEnumerator TerritoryCreateButtonAlsoEntersItsFourPlayerLobbyAutomatically()
         {
             if (!LabBonjourDiscovery.IsSupported) Assert.Ignore("Native game-room advertisement requires macOS or iOS.");
@@ -326,7 +455,7 @@ namespace Hapio.Tests
             Assert.That(session.Network.TargetParticipantCount, Is.EqualTo(4), "Four chosen players open a 2:2 room (#394).");
             Assert.That(view.heading.fontSize, Is.EqualTo(view.teamHeadingFontSize));
             Assert.That(view.sealButton.interactable, Is.False);
-            Assert.That(view.sealButton.GetComponentInChildren<UnityEngine.UI.Text>().text, Is.EqualTo("땅따먹기 대기"));
+            Assert.That(view.sealButton.GetComponentInChildren<UnityEngine.UI.Text>().text, Is.EqualTo("땅따먹기 대기 중"));
             yield return Click(view.slotButtons[2]);
             Assert.That(session.Network.LocalSlotNumber, Is.EqualTo(3), "Host may freely choose the red team's P3.");
             Assert.That(view.localLabels[2].text, Does.Contain("방장"));
@@ -364,7 +493,7 @@ namespace Hapio.Tests
             yield return EnterTerritoryRoom(0, 2);
             GameLobbyView view = View();
             Assert.That(view.teamLayout.activeInHierarchy, Is.True);
-            Assert.That(view.teamPairParts.All(part => part.activeSelf), Is.True, "Both team boxes and names.");
+            Assert.That(view.seatDesign.teamColumns[0].activeInHierarchy, Is.True, "Both team boxes and names.");
             Assert.That(view.teamPairLines.Any(line => line.activeSelf), Is.False, "No teammate, so no line inside a box.");
             Assert.That(view.teamTrio.activeSelf, Is.False);
             Assert.That(VisibleSeats(view), Is.EqualTo(new[] { 1, 2 }));
@@ -374,57 +503,41 @@ namespace Hapio.Tests
             Assert.That(session.Network.LocalSlotNumber, Is.EqualTo(2));
             Assert.That(view.slotImages[1].sprite, Is.SameAs(view.redTeamFilledSlot), "A taken Red seat is filled in Red.");
             Assert.That(((RectTransform)view.slotButtons[1].transform).anchoredPosition, Is.EqualTo(view.seatsOneOnOne[1].anchoredPosition));
-            Assert.That(view.sealButton.GetComponentInChildren<UnityEngine.UI.Text>().text, Is.EqualTo("땅따먹기 대기"));
+            Assert.That(view.sealButton.GetComponentInChildren<UnityEngine.UI.Text>().text, Is.EqualTo("땅따먹기 대기 중"));
         }
 
         [Category("Bonjour")]
         [UnityTest]
-        public IEnumerator ThreeOnThreeRoomShowsOneTeamPageAtATimeStartingWithBlue()
+        public IEnumerator ThreeOnThreeRoomShowsBothTeamsAndAllowsEverySeatWithoutPaging()
         {
             if (!LabBonjourDiscovery.IsSupported) Assert.Ignore("Native game-room advertisement requires macOS or iOS.");
             yield return EnterTerritoryRoom(4, 6);
             GameLobbyView view = View();
-            Assert.That(view.teamTrio.activeInHierarchy, Is.True);
+            Assert.That(view.seatDesign.teamColumns[2].activeInHierarchy, Is.True);
+            Assert.That(view.teamTrio.activeInHierarchy, Is.False);
             Assert.That(view.teamPairParts.Concat(view.teamPairLines).Any(part => part.activeSelf), Is.False);
-            Assert.That(view.TeamPage, Is.Zero, "A 3:3 room opens on the Blue page.");
-            Assert.That(VisibleSeats(view), Is.EqualTo(new[] { 1, 2, 3 }));
-            Assert.That(view.teamTrioName.text, Is.EqualTo("청팀"));
-            Assert.That(view.teamTrioBox.sprite, Is.SameAs(view.blueTrioBox));
-            Assert.That(view.teamPreviousPage.gameObject.activeSelf, Is.False);
+            Assert.That(VisibleSeats(view), Is.EqualTo(new[] { 1, 2, 3, 4, 5, 6 }));
             Assert.That(view.subheading.text, Is.EqualTo("3명씩 함께 앉아, 준비하시오."));
             Assert.That(view.joinedCount.text, Is.EqualTo("1 / 6명 입장"));
-            yield return Click(view.teamNextPage);
-            Assert.That(view.TeamPage, Is.EqualTo(1));
-            Assert.That(VisibleSeats(view), Is.EqualTo(new[] { 4, 5, 6 }));
-            Assert.That(view.teamTrioName.text, Is.EqualTo("홍팀"));
-            Assert.That(view.teamTrioBox.sprite, Is.SameAs(view.redTrioBox));
-            Assert.That(view.teamNextPage.gameObject.activeSelf, Is.False);
-            Assert.That(((RectTransform)view.slotButtons[5].transform).anchoredPosition, Is.EqualTo(view.seatsThreeOnThree[5].anchoredPosition));
-            yield return Click(view.slotButtons[5]);
-            Assert.That(session.Network.LocalSlotNumber, Is.EqualTo(6), "P6 can be chosen in a six-player room.");
-            Assert.That(view.slotImages[5].sprite, Is.SameAs(view.redTeamFilledSlot));
-            Assert.That(view.localLabels[5].text, Does.Contain("방장"));
-            yield return Click(view.teamPreviousPage);
-            Assert.That(view.TeamPage, Is.Zero, "The other team's page can still be looked at.");
-            Assert.That(VisibleSeats(view), Is.EqualTo(new[] { 1, 2, 3 }));
-            // A sideways swipe on the team box turns the page; a short or vertical drag does not.
-            var drag = new PointerEventData(EventSystem.current)
-                { pressPosition = new Vector2(Screen.width * .7f, Screen.height * .5f), position = new Vector2(Screen.width * .66f, Screen.height * .4f) };
-            view.teamSwipe.OnEndDrag(drag);
-            yield return null;
-            Assert.That(view.TeamPage, Is.Zero);
-            drag.position = new Vector2(Screen.width * .3f, Screen.height * .5f);
-            view.teamSwipe.OnEndDrag(drag);
-            yield return null;
-            Assert.That(view.TeamPage, Is.EqualTo(1));
-            Assert.That(VisibleSeats(view), Is.EqualTo(new[] { 4, 5, 6 }));
-            // A guest may still hold the story mode until the Host's flow state arrives (a direct-IP join or one waiting
-            // for approval). Six players only exist in 3:3, so the room keeps its team page and never draws story seats.
+            // Actual raycasts must reach all six saved controls, including the bottom row in each team.
+            for (int i = 0; i < 6; i++)
+            {
+                yield return Click(view.slotButtons[i]);
+                Assert.That(session.Network.LocalSlotNumber, Is.EqualTo(i + 1));
+                Assert.That(view.slotImages[i].sprite, Is.SameAs(i < 3 ? view.blueTeamFilledSlot : view.redTeamFilledSlot));
+                Assert.That(view.localLabels[i].text, Does.Contain("방장"));
+                Assert.That(VisibleSeats(view), Has.Length.EqualTo(6));
+                yield return Click(view.slotButtons[i]);
+                Assert.That(session.Network.LocalSlotNumber, Is.Zero, "The own-seat click still clears the choice.");
+            }
+            view.sealButton.onClick.Invoke();
+            Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.Lobby), "UI cannot bypass six-player readiness.");
+            // Six players still identifies territory before the Host's game-flow state arrives.
             session.State.mode = GameMode.Story;
             yield return null; yield return null;
-            Assert.That(view.teamTrio.activeInHierarchy, Is.True);
+            Assert.That(view.seatDesign.teamColumns[2].activeInHierarchy, Is.True);
             Assert.That(view.connectionLines.gameObject.activeSelf, Is.False);
-            Assert.That(VisibleSeats(view), Is.EqualTo(new[] { 4, 5, 6 }));
+            Assert.That(VisibleSeats(view), Is.EqualTo(new[] { 1, 2, 3, 4, 5, 6 }));
             session.State.mode = GameMode.Territory;
         }
 
@@ -445,6 +558,8 @@ namespace Hapio.Tests
             Assert.That(session.Network.IsConnected, Is.False, "Nothing may be left half-open.");
             Assert.That(session.Network.CanChooseConnection, Is.True);
             GameLobbyView view = View();
+            Assert.That(view.soloButton.gameObject.activeInHierarchy, Is.False);
+            yield return OpenHiddenDeveloper(view);
             yield return Click(view.soloButton);
             yield return Until(() => session.State.phase == GameFlowPhase.Playing && !session.IsLoadingScene
                 && SceneManager.GetActiveScene().path == GameScenePaths.Battle, "DEV solo battle after a 3:3 room", 15f);
@@ -455,21 +570,19 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
-        public IEnumerator ChosenPlayerCountBlocksTheModeItCannotOpenAndShowsWhyUnderThatButton()
+        public IEnumerator ChosenPlayerCountBlocksTheModeItCannotOpenAndShowsWhyInTheCardFooter()
         {
             GameLobbyView view = View();
             yield return Click(view.enterButton);
-            var chips = view.countButtons[0].GetComponentInParent<UnityEngine.UI.ScrollRect>();
             string[] basicReasons = { "2명은 땅따먹기 1:1만 할 수 있소.", "", "", "", "6명은 땅따먹기 3:3만 할 수 있소." };
-            string[] teamReasons = { "", "땅따먹기는 2·4·6명만 할 수 있소.", "", "땅따먹기는 2·4·6명만 할 수 있소.", "" };
+            string[] teamReasons = { "", "땅따먹기는 짝수 인원만 가능하오..", "", "땅따먹기는 짝수 인원만 가능하오..", "" };
             for (int i = 0; i < view.countButtons.Length; i++)
             {
-                // The 6 chip only peeks out at the edge until the row is pushed sideways.
-                chips.horizontalNormalizedPosition = i < 4 ? 0f : 1f;
                 yield return Click(view.countButtons[i]);
                 Assert.That(view.CreationCapacity, Is.EqualTo(i + 2));
                 yield return Click(view.createButton);
                 Assert.That(view.modePanel.activeInHierarchy, Is.True);
+                Assert.That(view.modeCard.rect.height, Is.EqualTo(i == 2 ? 266f : 292f));
                 Assert.That(view.basicModeButton.interactable, Is.EqualTo(basicReasons[i].Length == 0), (i + 2) + " players, basic");
                 Assert.That(view.teamModeButton.interactable, Is.EqualTo(teamReasons[i].Length == 0), (i + 2) + " players, territory");
                 Assert.That(view.basicModeReason.gameObject.activeSelf, Is.EqualTo(basicReasons[i].Length > 0));
@@ -560,10 +673,12 @@ namespace Hapio.Tests
         public IEnumerator DevelopmentSoloButtonStartsTheThreeStageFlowAndGameOverReturnsToTheTitle()
         {
             GameLobbyView view = View();
-            Assert.That(view.soloButton.gameObject.activeInHierarchy, Is.True);
+            Assert.That(view.soloButton.gameObject.activeInHierarchy, Is.False,
+                "Solo is available inside DEV rather than on the authored Home page.");
+            yield return OpenHiddenDeveloper(view);
             yield return Click(view.soloButton);
             yield return Until(() => session.State.phase == GameFlowPhase.Playing && !session.IsLoadingScene
-                && SceneManager.GetActiveScene().path == GameScenePaths.Battle, "Actual first game stage from the visible Solo button");
+                && SceneManager.GetActiveScene().path == GameScenePaths.Battle, "Actual first game stage from the Solo button inside hidden DEV");
             Assert.That(session.Network.IsDeveloperSolo, Is.True);
             Assert.That(session.State.stageIndex, Is.EqualTo(1));
             Assert.That(Object.FindObjectsByType<GameLobbyView>(FindObjectsSortMode.None), Is.Empty);
@@ -618,6 +733,51 @@ namespace Hapio.Tests
 
         private static GameLobbyView View() => SceneManager.GetActiveScene().GetRootGameObjects()
             .SelectMany(root => root.GetComponentsInChildren<GameLobbyView>(true)).Single();
+
+        private static IEnumerator OpenHiddenDeveloper(GameLobbyView view)
+        {
+            yield return Until(() => GameSession.Instance == null || !GameSession.Instance.IsLoadingScreenUp,
+                "The loading screen closes before the hidden DEV entry is tapped", 5f);
+            Assert.That(view.screen.developerPanel.activeInHierarchy, Is.False);
+            var target = view.screen.GetComponent<GameDeveloperTapTarget>();
+            Assert.That(target, Is.Not.Null, "The active game menu owns its hidden entry.");
+            Assert.That(target.TapArea, Is.Not.Null);
+            var image = target.TapArea.GetComponent<UnityEngine.UI.Image>();
+            yield return Until(() => image.raycastTarget && image.gameObject.activeInHierarchy,
+                "The hidden entry receives the refreshed menu permission", 5f);
+            Assert.That(image.color.a, Is.Zero, "The entry has no visible button artwork.");
+            for (int tap = 1; tap <= GameDeveloperTapTarget.RequiredTaps; tap++)
+            {
+                Canvas.ForceUpdateCanvases();
+                var rect = (RectTransform)target.TapArea.transform;
+                var data = new PointerEventData(EventSystem.current)
+                {
+                    button = PointerEventData.InputButton.Left,
+                    position = RectTransformUtility.WorldToScreenPoint(null, rect.TransformPoint(rect.rect.center))
+                };
+                var hits = new System.Collections.Generic.List<RaycastResult>();
+                EventSystem.current.RaycastAll(data, hits);
+                Assert.That(hits, Is.Not.Empty, "Hidden DEV tap " + tap);
+                GameObject clicked = ExecuteEvents.GetEventHandler<IPointerClickHandler>(hits[0].gameObject);
+                Assert.That(clicked, Is.SameAs(target.TapArea), "The actual topmost UI hit must reach hidden DEV at tap " + tap
+                    + "; area=" + rect.rect + "; depth=" + image.depth + "; raycast=" + image.raycastTarget
+                    + "; canvas=" + image.canvas.sortingOrder + "; hits=" + string.Join(",", hits.Select(hit => hit.gameObject.name + "[" + hit.sortingOrder + "]")));
+                ExecuteEvents.Execute(clicked, data, ExecuteEvents.pointerClickHandler);
+                if (tap < GameDeveloperTapTarget.RequiredTaps)
+                {
+                    Assert.That(view.screen.developerPanel.activeInHierarchy, Is.False,
+                        "One or two ordinary taps must not open DEV.");
+                    Assert.That(view.soloButton.gameObject.activeInHierarchy, Is.False);
+                    Assert.That(view.teamSoloButton.gameObject.activeInHierarchy, Is.False);
+                }
+            }
+            yield return null; yield return null;
+            Assert.That(view.screen.developerPanel.activeInHierarchy, Is.True, "Three taps within the entry window open DEV.");
+            Assert.That(view.soloButton.transform.parent, Is.SameAs(view.screen.developerPanel.transform));
+            Assert.That(view.teamSoloButton.transform.parent, Is.SameAs(view.screen.developerPanel.transform));
+            Assert.That(view.soloButton.gameObject.activeInHierarchy, Is.True);
+            Assert.That(view.teamSoloButton.gameObject.activeInHierarchy, Is.True);
+        }
 
         private static void AssertTouchable(UnityEngine.UI.Button button)
         {

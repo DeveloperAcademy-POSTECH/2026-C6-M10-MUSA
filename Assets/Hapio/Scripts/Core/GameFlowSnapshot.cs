@@ -28,6 +28,9 @@ namespace Hapio
                 return Reject("unexpected battle start time", out reason);
             if (value.phase == GameFlowPhase.Countdown && value.battleStartsAt <= 0d)
                 return Reject("countdown needs a start time", out reason);
+            if (value.retryableDefeat && (value.phase != GameFlowPhase.GameOver || value.mode != GameMode.Story
+                || string.IsNullOrEmpty(value.battleSessionId) || value.battleRound == 0))
+                return Reject("invalid retryable defeat", out reason);
             if (value.phase == GameFlowPhase.Home || value.phase == GameFlowPhase.Lobby)
             {
                 if (value.stageIndex != 0 || !string.IsNullOrEmpty(value.runId)
@@ -82,7 +85,17 @@ namespace Hapio
                 return Reject("duplicate or stale revision", out reason);
             if (incoming.stageIndex < current.stageIndex)
                 return Reject("previous stage", out reason);
-            if (current.phase == GameFlowPhase.GameOver || current.phase == GameFlowPhase.Completed)
+            if (current.phase == GameFlowPhase.GameOver)
+            {
+                if (IsDefeatRetryLoad(current, incoming)) return true;
+                // A post-defeat disconnect may close the retry window, but cannot reopen it.
+                if (current.retryableDefeat && !incoming.retryableDefeat
+                    && incoming.phase == GameFlowPhase.GameOver && incoming.stageIndex == current.stageIndex
+                    && incoming.battleSessionId == current.battleSessionId && incoming.battleRound == current.battleRound)
+                    return true;
+                return Reject("terminal run", out reason);
+            }
+            if (current.phase == GameFlowPhase.Completed)
                 return Reject("terminal run", out reason);
             if (incoming.stageIndex > current.stageIndex + 1)
                 return Reject("skipped stage", out reason);
@@ -116,6 +129,16 @@ namespace Hapio
             }
             return true;
         }
+
+        /// <summary>The sole nonterminal exception to GameOver; old rounds and abandoned runs remain fenced.</summary>
+        public static bool IsDefeatRetryLoad(GameFlowState current, GameFlowState incoming) =>
+            current != null && incoming != null && current.phase == GameFlowPhase.GameOver
+            && current.retryableDefeat && current.mode == GameMode.Story && incoming.mode == GameMode.Story
+            && current.runId == incoming.runId && !string.IsNullOrEmpty(current.runId)
+            && incoming.stageIndex == current.stageIndex && incoming.revision > current.revision
+            && incoming.phase == GameFlowPhase.LoadingBattle && !incoming.retryableDefeat
+            && string.IsNullOrEmpty(incoming.battleSessionId) && incoming.battleRound == 0
+            && incoming.battleStartsAt == 0d && string.IsNullOrEmpty(incoming.endReason);
 
         private static bool Reject(string message, out string reason)
         {

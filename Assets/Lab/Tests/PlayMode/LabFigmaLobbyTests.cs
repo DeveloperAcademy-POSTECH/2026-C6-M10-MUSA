@@ -202,6 +202,73 @@ namespace C6Lab.Tests
             Assert.That(VisibleRows().Length,Is.EqualTo(2));
             yield return ClickPointer(view.countButtons[0]);Assert.That(view.createButton.interactable,Is.True);
         }
+        // #503: a created card whose publish failed waits to retry without holding back later cards.
+        [Category("Bonjour")]
+        [UnityTest]public IEnumerator ACreatedRoomWaitingToRetryKeepsItsCardWithoutHoldingBackTheNextAndLeavesOnlyAfterItsLastRetry()
+        {
+            if(!LabBonjourDiscovery.IsSupported)Assert.Ignore("Bonjour is macOS/iOS only.");
+            const BindingFlags Private=BindingFlags.NonPublic|BindingFlags.Instance;
+            var created=(List<LabPendingRoom>)typeof(LabLobbyView).GetField("createdRooms",Private).GetValue(view);
+            string CreationError()=>(string)typeof(LabLobbyView).GetField("creationError",Private).GetValue(view);
+            view.EnterLobby();yield return null;
+            foreach(int count in new[]{3,4})
+            {
+                yield return ClickPointer(view.countButtons[count-2]);
+                yield return ClickPointer(view.createButton);
+            }
+            Assert.That(created.Count,Is.EqualTo(2));
+            LabPendingRoom first=created[0],second=created[1];
+            // mDNS probing takes most of a second, so the first card is still registering here; a local name conflict
+            // only moves it to the next number on the next frame.
+            double deadline=Time.realtimeSinceStartupAsDouble+5;
+            while(!PendingAdvertisement(first).IsAdvertising&&!first.Ready&&Time.realtimeSinceStartupAsDouble<deadline)yield return null;
+            Assert.That(first.Ready,Is.False,"The first card is still being confirmed.");
+            Assert.That(PendingAdvertisement(first).IsAdvertising,Is.True,PendingAdvertisement(first).LastError);
+            Assert.That(PendingAdvertisement(second).IsAdvertising,Is.False,"Cards register one at a time.");
+            FailPendingRegistration(first,"forced registration failure");
+            yield return null;
+            Assert.That(first.RetryPending,Is.True);
+            Assert.That(created,Has.Member(first),"The waiting card stays.");
+            Assert.That(CreationError(),Is.Empty,"No failure notice while the card waits to retry.");
+            // Keep the first card waiting while the second one is confirmed.
+            typeof(LabPendingRoom).GetField("retryAt",Private).SetValue(first,Time.realtimeSinceStartupAsDouble+600d);
+            deadline=Time.realtimeSinceStartupAsDouble+20;
+            while(!second.Ready&&Time.realtimeSinceStartupAsDouble<deadline)yield return null;
+            Assert.That(second.Ready,Is.True,"A waiting card does not hold back the next one. "+PendingAdvertisement(second).LastError);
+            Assert.That(first.RetryPending,Is.True);
+            yield return null;
+            Assert.That(VisibleRows().Length,Is.EqualTo(2),"Both cards stay listed.");
+            Assert.That(VisibleRows().Count(row=>row.interactable),Is.EqualTo(1),"Only the confirmed card can be entered.");
+
+            // The sixth and last retry fails too: only now does the card leave, with the usual notice, and free its port.
+            ushort port=first.Port;
+            typeof(LabPendingRoom).GetField("retryAttempts",Private).SetValue(first,LabDiscoveryBackoff.MaximumAttempts);
+            typeof(LabPendingRoom).GetField("retryAt",Private).SetValue(first,0d);
+            deadline=Time.realtimeSinceStartupAsDouble+5;
+            while(!PendingAdvertisement(first).IsAdvertising&&Time.realtimeSinceStartupAsDouble<deadline)yield return null;
+            Assert.That(PendingAdvertisement(first).IsAdvertising,Is.True,PendingAdvertisement(first).LastError);
+            FailPendingRegistration(first,"forced last failure");
+            LogAssert.Expect(LogType.Warning,"C6_LAB_PENDING_ROOM_RETRY result=stopped reason=forced last failure");
+            yield return null;
+            Assert.That(created,Is.EqualTo(new[]{second}),"Only the failed card is removed.");
+            Assert.That(CreationError(),Is.EqualTo("방을 공개하지 못했소. 같은 Wi-Fi와 네트워크 권한을 확인해주시오."));
+            using(var released=new System.Net.Sockets.Socket(System.Net.Sockets.AddressFamily.InterNetwork,System.Net.Sockets.SocketType.Dgram,System.Net.Sockets.ProtocolType.Udp))
+                Assert.DoesNotThrow(()=>released.Bind(new System.Net.IPEndPoint(System.Net.IPAddress.Any,port)),"The lobby frees the failed card's port.");
+            yield return null;
+            Assert.That(VisibleRows().Length,Is.EqualTo(1));
+            Assert.That(second.Ready,Is.True);
+        }
+        private static LabBonjourDiscovery PendingAdvertisement(LabPendingRoom room)=>
+            (LabBonjourDiscovery)typeof(LabPendingRoom).GetField("advertisement",BindingFlags.NonPublic|BindingFlags.Instance).GetValue(room);
+        /// <summary>Ends the card's running registration the way a native error or timeout does.</summary>
+        private static void FailPendingRegistration(LabPendingRoom room,string reason)
+        {
+            var discovery=PendingAdvertisement(room);
+            object operation=typeof(LabBonjourDiscovery).GetField("advertisement",BindingFlags.NonPublic|BindingFlags.Instance).GetValue(discovery);
+            Assert.That(operation,Is.Not.Null,"A registration is running.");
+            typeof(LabBonjourDiscovery).GetMethod("Fail",BindingFlags.NonPublic|BindingFlags.Instance).Invoke(discovery,new[]{operation,reason});
+            Assert.That(discovery.IsAdvertising,Is.False);
+        }
         [Category("Bonjour")]
         [UnityTest]public IEnumerator NativeBonjourPublishesLiveCountAndBattleChanges()
         {
