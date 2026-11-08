@@ -64,7 +64,7 @@ namespace C6Lab
         [SerializeField, Range(.05f, .8f)] private float steamClearLeft = .1f;
         [Tooltip("문지르는 손가락 굵기(판 폭 비율).")]
         [SerializeField, Range(.03f, .3f)] private float steamBrush = .14f;
-        private const int SteamW = 48, SteamH = 104; // the whole screen
+        private const int SteamW = 144, SteamH = 312; // the whole screen, fine enough that wiped edges stay smooth
         private RawImage steam;
         private Texture2D steamTexture;
         private readonly float[] steamAlpha = new float[SteamW * SteamH];
@@ -108,8 +108,6 @@ namespace C6Lab
         private readonly Image[] gaugeTicks = new Image[5];
         private readonly Image[] blow = new Image[16]; // the smoke Jigwi blows onto my board when I fail
         private readonly Vector2[] blowTo = new Vector2[16];
-        private LabGourdAlert gourdBubble;
-        private static Sprite smokeEmojiSprite;
         private readonly Image[] smoke = new Image[10];
         private static Sprite glowSprite;
         private float heat, failAt = -1f, quenchAt = -1f;
@@ -567,7 +565,7 @@ namespace C6Lab
         }
 
         /// <summary>
-        /// 실패: 야광귀 말풍선과 같은 자리(박 옆, `LabGourdAlert`)에 지귀 연기 이모지 + 지귀 목소리 → 1초 뒤 박이 부풀었다 뿜으면
+        /// 실패: 지귀 목소리 → 1초 뒤 박이 부풀었다 뿜으면
         /// 달아오를 때 박 위에 피어오르던 그 연기가 그대로 부풀어 화면 전체(3D 영역과 판)로 퍼져 회색으로 채우고 → 그 위에 두꺼운 연기 막이 깔린다.
         /// </summary>
         private void DrawFail(float t)
@@ -579,8 +577,6 @@ namespace C6Lab
                 failSpoken = true;
                 Play(failVoiceFolder, voiceVolume);
                 if (source != null) LabHaptics.PlayDirect(source.config, LabHapticStyle.Rigid, .6f);
-                if (gourdBubble == null) gourdBubble = FindFirstObjectByType<LabGourdAlert>();
-                if (gourdBubble != null && source != null) gourdBubble.ShowPicture(source.target, SmokeEmoji(), 1.3f);
                 // Where each billow ends up: spread over the whole screen, more of them over the 3D area (upper half).
                 for (int i = 0; i < blow.Length; i++)
                 {
@@ -938,22 +934,6 @@ namespace C6Lab
         {
             float d = Vector2.Distance(new Vector2(u, v), new Vector2(.5f, .5f)) * 2f;
             return new Color(1f, 1f, 1f, Mathf.Clamp01(1f - d) * Mathf.Clamp01(1f - d));
-        });
-        /// <summary>💨 Jigwi's smoke emoji: a lumpy dark-grey cloud with an ink outline and two angry white eyes.</summary>
-        private static Sprite SmokeEmoji() => smokeEmojiSprite != null ? smokeEmojiSprite : smokeEmojiSprite = Build("Jigwi smoke emoji", 96, 80, (u, v) =>
-        {
-            float x = u * 96f, y = v * 80f;
-            float d = Mathf.Min(Mathf.Min(Vector2.Distance(new Vector2(x, y), new Vector2(30f, 34f)) - 22f,
-                Vector2.Distance(new Vector2(x, y), new Vector2(54f, 46f)) - 26f),
-                Mathf.Min(Vector2.Distance(new Vector2(x, y), new Vector2(72f, 30f)) - 19f, RoundBox(x, y, 12f, 10f, 86f, 34f, 12f)));
-            if (d > 2.5f) return Color.clear;
-            if (d > -2.5f) return new Color(.14f, .12f, .11f, 1f);
-            // Angry eyes: slanted white slits.
-            bool eye = Mathf.Abs(y - 40f - (x - 42f) * .35f) < 3.5f && x > 34f && x < 48f
-                || Mathf.Abs(y - 40f + (x - 62f) * .35f) < 3.5f && x > 56f && x < 70f;
-            if (eye) return new Color(1f, .95f, .85f, 1f);
-            float shade = .38f + .12f * Mathf.Clamp01((y - 10f) / 60f);
-            return new Color(shade, shade * .97f, shade * .95f, 1f);
         });
         private static Sprite puffSprite;
         /// <summary>A soft round smoke puff (white, tinted by colour): solid middle, feathered edge.</summary>
