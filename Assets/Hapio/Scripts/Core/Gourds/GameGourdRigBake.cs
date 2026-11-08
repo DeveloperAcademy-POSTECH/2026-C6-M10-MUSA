@@ -19,9 +19,13 @@ namespace Hapio
     /// </summary>
     public static class GameGourdRigBake
     {
-        /// <summary>The white gourd's in-battle height (hitbox AABB at the default Gourd Visual Size).</summary>
+        /// <summary>The white gourd's hitbox AABB height at Gourd Visual Size 1.4. Each stage body is baked to it.</summary>
         public const float TargetBodyHeight = 2.390325f;
-        /// <summary>The Gourd Visual Size at which the baked prefab is used at scale 1 (LabConfig default).</summary>
+        /// <summary>
+        /// The Gourd Visual Size at which a baked prefab is drawn at scale 1. This is the bake's reference, not the
+        /// LabConfig default: since #473 the default is 1.54, so stage gourds mount at 1.1 like the white gourd. Keep
+        /// both constants at 1.4; changing them means a rebake that changes the saved hit shells.
+        /// </summary>
         public const float ReferenceVisualSize = 1.4f;
         public const int HitColumns = 48, HitRows = 24;
         public const string Vessel = "Vessel_Forward_Tilt", Body = "model_part0", LidHinge = "Lid_Hinge", Lid = "model_part3",

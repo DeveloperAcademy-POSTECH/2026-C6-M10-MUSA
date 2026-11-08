@@ -1,5 +1,47 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-08 — #473 모든 박 1.1배 (Gourd Visual Size 1.4 → 1.54)
+
+- **기준:** `feat/#473-gourd-size`. main `e15f61f0`에서 고치고 검사했다. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal), `-buildTarget iOS`. Library는 다른 worktree에서 복제했다. 같은 Mac에서 다른 폴더의 Unity Editor가 열려 있었다.
+- **바꾼 것:**
+  - `LabConfig.asset`의 `gourdVisualSize`와 코드 기본값을 1.4에서 1.54로 올렸다. 코드 기본값은 `LabConfig.DefaultGourdVisualSize`이며, 실행 중 설정이 없을 때 `LabGourdPaint`도 이 값을 쓴다. 흰 박은 크기/1.8, 스테이지 박은 크기/1.4배로 그리므로 모든 박이 이전의 1.1배다. 판정 충돌체는 기존 동작대로 보이는 껍데기를 따라 커진다.
+  - 굽기 기준(`GameGourdRigBake.ReferenceVisualSize` 1.4, `TargetBodyHeight` 2.390325)은 그대로 두고 주석만 고쳤다. 박을 다시 굽지 않았다.
+  - `Hapio/Upgrade Menu DEV Rows`(batch `-executeMethod`)로 Home·Lobby의 저장 DEV 140행을 1.54로 저장했다. 장면마다 6줄이 바뀌었다.
+    - 입력의 `m_Text`, 슬라이더의 `m_Value`.
+    - 입력 자식의 표시 글자(`1.` → `1.5`).
+    - 슬라이더 Fill·Handle의 구동 앵커 3줄(0.36 → 0). 저장할 때 Unity가 구동 값을 비운다. 저장 257행 중 107행이 이미 이 상태였다.
+  - 흰 박 마운트 골든을 `GOURD_GOLDEN_RECORD=1`로 다시 기록했다. 바뀐 줄은 예상한 4줄이다.
+    - `visual.position` y: 0.186667 → 0.121333.
+    - `visual.scale`: 0.777778 → 0.855556.
+    - `shellInMount`·`hitboxInMount`: 대각 1.4 → 1.54, y −0.334444 → −0.451889.
+    - 요괴 골든(`WhiteGourdYokai.txt`)은 바이트 단위로 같다.
+  - `LabDeveloperConfigTests`의 기본값 단언을 1.54로 바꿨다.
+  - 문서: `AGENTS.md` #473 절, `DEVELOPER_MODE_PARAMETER_SPEC.md`, `GOURD_MODELS.md`.
+    - `DEVELOPER_MODE_PARAMETER_SPEC.md`에는 기본값과 충돌체가 따라 커지는 현재 동작을 적었다.
+- **접속 묶음:** Host가 보내는 공유값(인덱스 140)만 바뀐다. 그래서 설정 259개·5691·`C6PhysicsLab/52`·`C6HapioGame/39`를 그대로 둔다. #211·#225·#266의 기본값 변경과 같은 처리다.
+
+| 확인 | 결과 |
+| --- | --- |
+| 골든 기록 실행(마운트 검사만) | 1/1 PASS. `WhiteGourdMount.txt` 4줄 변경, `WhiteGourdYokai.txt`는 그대로 |
+| 기록 없이 `LabWhiteGourdGoldenTests` | 2/2 PASS |
+| EditMode 관련 5 fixture | 151/151 PASS |
+| PlayMode `LabGourdHitboxTests`·`LabGourdVisualRigTests`·`GameStageGourdIntegrationTests` | 12/12 PASS |
+| 전체 EditMode | 2089/2089 PASS(22.5초) |
+| 전체 PlayMode | 706건 중 705 PASS(575초). 실패 1건은 아래 |
+| 실패 1건만 다시: `LabWatercolorSurfaceGrainTests` fixture 두 번 | 2/2 PASS, 2/2 PASS |
+
+- EditMode 관련 5 fixture는 `LabDeveloperConfigTests`·`GameSceneAssetTests`·`GameGourdRigBakeTests`·`GameEditorMenuCleanupTests`·`LabPaintDryingConfigTests`다.
+- 전체 PlayMode의 실패 1건은 `LabWatercolorSurfaceGrainTests.PigmentTextureIsStaticAndFollowsTheObjectAcrossScreenTranslationAndRigRotation`이다.
+  - 0.12초 간격으로 찍은 두 화면의 RGB 차이가 최대 2였다(한도 1).
+  - 이 검사는 흰 박 프리팹을 크기 설정 없이 따로 그리므로 이번 변경과 무관한 일시적 실패로 본다.
+- 각 실행의 skip·inconclusive는 0이다. batch 가져오기가 덧붙인 Lobby PNG `.meta` 20개의 WebGL 항목은 매번 되돌렸다.
+- **계산만 했고 실행하지 않은 것:** 장면 값과 설정으로 계산했다.
+  - 흰 박(2:2·3:3·Lab 단판·튜토리얼)은 줄이 위아래로 출렁일 때(±0.45) 가장 낮은 지점에서 보이는 바닥 아래로 약 8cm 들어간다. 1.4에서는 16cm 위였다.
+  - 스테이지 박은 그 지점에서도 바닥 위에 남는다.
+  - 세게 맞아 박이 더 내려가면, 아래쪽을 노린 공이 바닥에 먼저 닿아 빗나감이 되는 경우가 드물게 생길 수 있다.
+  - 전투 카메라와 다시보기 카메라의 거리는 박 크기를 따라 바뀌지 않는다.
+- **미실행:** Editor·기기 화면 확인, 실기기의 판정과 프레임 비용, Mac·iOS 앱.
+
 ## 2026-11-08 — DEV 행 Editor 메뉴가 Home·Lobby의 저장 257행을 지키게 (PR #561 후속)
 
 - **기준:** `fix/menu-dev-row-240`, 바로 아래 절의 커밋 위(main `92d511ee`)에서 고치고 검사했다. 그 뒤 main `488104e7`(#562)을 rebase가 아니라 merge(`a434b800`)로 받아 다시 검사했다(표의 "병합 뒤"). Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal), `-buildTarget iOS`. 같은 Mac에서 다른 폴더의 Unity Editor가 열려 있었다.

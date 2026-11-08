@@ -13,6 +13,7 @@ namespace C6Lab.Tests
     /// <summary>
     /// #507 PR-1: the white gourd's mount, hitbox, paint binding and yokai poses are pinned to values recorded on main
     /// (6524427b) before the gourd model contract (`LabGourdVisualRig`) was added. Stages 1 and 3 must not change.
+    /// #473 re-recorded only the mount golden, at the new default Gourd Visual Size 1.54; the yokai golden is unchanged.
     /// Set GOURD_GOLDEN_RECORD=1 to rewrite the golden files, only from a commit whose white gourd is known good.
     /// </summary>
     public sealed class LabWhiteGourdGoldenTests

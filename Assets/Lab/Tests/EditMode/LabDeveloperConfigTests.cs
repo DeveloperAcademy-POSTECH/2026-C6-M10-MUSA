@@ -18,7 +18,7 @@ namespace C6Lab.Tests
         public void GourdSizeRoundTripsAndRejectsInvalidValuesAtomically()
         {
             var baseline = config.CaptureDeveloperValues();
-            Assert.That(baseline[140], Is.EqualTo(1.4f));
+            Assert.That(baseline[140], Is.EqualTo(1.54f), "#473: every gourd is 1.1 times the earlier 1.4.");
             foreach (float size in new[] { .5f, 1f, 1.8f, 3f })
             {
                 var values = (float[])baseline.Clone();

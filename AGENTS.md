@@ -217,6 +217,11 @@
 
 - Hapio 전투는 `GameBattleBindings.Awake`가 모든 스테이지의 `LabHangingTarget`에 `LabRopeStyle.Curved`를 런타임으로 지정한다. 고정점에서 박 연결점까지 피벗을 제어점으로 둔 베지어 한 줄이며, 물리·피벗 높이·판정·접속 규약은 바꾸지 않는다. Lab Scene과 Battle.unity 저장값은 `Segmented`이며 YAML을 고치지 않는다. 기존 `Rope`·`Upper Rope`는 transform을 계속 계산하고 렌더러만 끈다. 상세는 `docs/PINATA_TUNING_GUIDE.md`.
 
+## #473 모든 박 1.1배
+
+- `Gourd Visual Size`(DEV 140) 기본값은 1.54(`LabConfig.DefaultGourdVisualSize`, 이전 1.4)다. 흰 박(크기/1.8)과 세 스테이지 박(크기/`referenceVisualSize` 1.4)이 모두 1.1배가 되고 판정 충돌체도 같은 배율로 따라간다. 굽기 기준 `GameGourdRigBake.ReferenceVisualSize`·`TargetBodyHeight`(크기 1.4 기준)는 바꾸지 않으며 박을 다시 굽지 않는다.
+- 흰 박 마운트 골든(`WhiteGourdMount.txt`)은 이 변경으로 다시 기록했다(요괴 골든은 그대로). Home·Lobby의 저장 DEV 140행은 `Hapio/Upgrade Menu DEV Rows`로 저장했다. Host가 보내는 공유값만 바뀌므로 설정 259개와 접속 묶음은 그대로다.
+
 ## #466 수채 브러시 누적 작품
 
 - 일반 협동은 `WatercolorStampProfile` V2 기본 ON·농도0.9, 기존 수채는 프로필 OFF의 비교 경로다. CPU 패턴·실제 셀/P지도·성장/건조·난수·면적·투척 규칙은 그대로이며 땅따먹기는 기존 청홍 표현이다. 원본은 Editor `BrushMasters`, 512² 표현 데이터는 `GourdPaint/WatercolorBrushes`다. 베이크 해시/설정을 라운드에 고정하고, 판정용 패턴 텍스처를 표현 목적으로 교체하지 않는다.
