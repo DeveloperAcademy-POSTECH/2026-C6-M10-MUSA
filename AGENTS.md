@@ -182,7 +182,7 @@
 ## #471 로비 연결 끊김 뒤 핸들러 재등록
 
 - `LabNetwork`는 패킷 핸들러를 등록한 `CustomMessagingManager` 인스턴스를 기억하고, NGO가 새 세션에서 새 인스턴스를 만들면 다시 등록한다. `Stop`을 거치지 않고 끝난 세션(방장 이탈·화면 잠김·Wi-Fi 끊김)이 다음 방의 패킷 수신을 막지 않아야 한다. 게임 흐름 게스트 끊김도 핸들러를 풀고 `C6_LAB_DISCONNECTED`를 남긴다.
-- Hapio Lobby에서 연결이 끊기면 `GameSession`이 나가기와 같은 `GoHome`(`network.Stop` 포함)으로 방 목록에 돌아가고 끊김 안내를 표시한다. 게스트가 Host 로비를 받기 전(`LobbyInfoPending`)에는 지난 방 인원·자리 대신 "방 정보를 받고 있소..."를 표시하고, 고를 수 없는 빈 자리는 흐리게 그린다. 자리 선택 규칙·접속 규약·설정 수·Scene/Prefab은 바꾸지 않는다.
+- Hapio Lobby에서 연결이 끊기면 `GameSession`이 나가기와 같은 `GoHome`(`network.Stop` 포함)으로 방 목록에 돌아가고 끊김 안내를 표시한다. #501부터 게스트는 먼저 같은 방에 다시 들어가고, 그게 끝내 안 될 때만 이 경로로 간다. 게스트가 Host 로비를 받기 전(`LobbyInfoPending`)에는 지난 방 인원·자리 대신 "방 정보를 받고 있소..."를 표시하고, 고를 수 없는 빈 자리는 흐리게 그린다. 자리 선택 규칙·접속 규약·설정 수·Scene/Prefab은 바꾸지 않는다.
 
 ## #476 방 검색·방 공개 자동 복구와 화면 잠금
 
@@ -358,7 +358,7 @@
 
 ## #558 Story 결과 통합과 같은 방 재도전
 
-- 현재 호환 묶음은 설정259개·**5691**·`C6PhysicsLab/52`·**`C6HapioGame/39`**다. Lab/Bulk 형식은 유지하고 Game38 이하와 혼용하지 않는다. `GameFlowState.retryableDefeat`와 결과 이야기 확인 제어가 추가됐다.
+- #558 당시 호환 묶음은 설정259개·**5691**·`C6PhysicsLab/52`·**`C6HapioGame/39`**였다(현재 Game 기준은 아래 #501 절). Lab/Bulk 형식은 유지하고 Game38 이하와 혼용하지 않는다. `GameFlowState.retryableDefeat`와 결과 이야기 확인 제어가 추가됐다.
 - 저장 StageResult/GameOver의 `GameStageStoryPresentation`은 실제 일치하는 Victory/Defeat 복사본만 카드·게이지에 연결한다. 제작용 예시값이나 앞선 성공 결과로 실패를 표시하지 않는다. 로컬 컷·카드 뒤집기는 공유하지 않고 결과/이야기 확인·관람 상태만 Host 진행 조건에 쓴다.
 - 정상 Story 패배만 Host가 같은 방·스테이지를 재시도한다. 원래 참가자·P·승인 설정·이전 성공 기록은 유지하고 기존 prepare/start 장벽으로 새 전투를 만든다. 이탈·연결 끊김·로드 실패는 Home만 남기며 오래된 ACK/중복/Guest 요청으로 재도전하지 않는다.
 - GameOver 동결 뒤에도 마지막 terminal 발행에서 Bulk 백로그로 빠진 피어에게는 대기열이 줄면 기존 paint+snapshot 트랜잭션을 한 번 큐에 넣는다. 실제 terminal 상태를 헤더에서 추정하거나 게임 시뮬레이션을 재개하지 않는다.
@@ -368,3 +368,9 @@
 
 - 배경 Studio의 바닥·한지 배경·보드 뒤 재질(URP Lit/Unlit)은 숨은 `_MainTex`·`_Color`를 URP가 `_BaseMap`·`_BaseColor`에서 복사하는 값 그대로 저장한다. Editor가 재질 속성을 처음 읽을 때 URP가 다시 복사하고, 결과가 다르면 재질이 dirty가 되어 다음 저장 때 .mat이 바뀐다. 일부 색은 `GetColor`가 float 몇 단계 다르게 돌려주므로 `_Color`에 같은 숫자를 쓰면 안 된다. Editor 스크립트로 바꿀 때도 `LabBackgroundStudio.ApplyImage`(Editor 전용)를 쓴다. `GameStageBackgroundAssetTests`가 재질 파일을 읽어 확인한다. 상세는 `docs/STAGE_BACKGROUNDS.md`를 따른다.
 
+## #501 로비 재입장과 #502 전투 중 백그라운드
+
+- Hapio 로비 게스트가 끊기면 같은 방·같은 P번호로 다시 들어간다(`LabNetwork.LobbyRejoin.cs`). 게스트는 방마다 무작위 표(16진수 32자리, 저장 안 함)를 연결 토큰 뒤에 붙이고(`token|ticket`, 게임 방만), 방장은 나가기 신호(`lobby_leave`) 없이 끊긴 로비 게스트의 자리와 P를 90초(`LobbySeatHoldSeconds`) 맡아 같은 표에 돌려준다. 맡아 둔 자리는 옛 연결 id로 `seats`에 남고 lobby 패킷의 `ids`가 맡아 둔 자리를 알린다(새 필드 없음). 정원·Bonjour 인원에는 세고 `ParticipantCount`·시작 조건에는 세지 않는다.
+- 게스트는 끊기거나, iPhone이 전송 제한 시간 이상 멈췄다 돌아오면(벽시계) `IsJoiningRoom`을 유지한 채 30초(`LobbyRejoinBudgetSeconds`) 동안 다시 시도하고, 끝내 안 되면 #471 경로로 방 목록에 간다. 방장이 방을 닫으면(`lobby_closed`) 다시 들어가지 않는다. `GameSession`이 로비 단계에서만 `LobbyRejoinAllowed`를 켠다.
+- 전투 중 백그라운드(#502)는 현재 동작 유지로 정했다. 신호·일시정지 제안·표시는 없고, 30초 뒤 끊기면 기존 게임 오버·2:2 로비 복귀를 따른다. 전투 중에는 재입장을 하지 않으며 방장 앱의 백그라운드와 방장 소켓 재생성도 다루지 않는다.
+- 현재 호환 묶음은 설정259개·**5691**·`C6PhysicsLab/52`·**`C6HapioGame/45`**다(40~44는 `feat/#551` 브랜치가 먼저 썼다). Lab 방의 토큰·패킷은 그대로다. Game39 이하와 혼용하지 않는다. 동작은 `docs/GAME_FLOW.md`의 같은 항목, 실행한 검사는 `docs/VALIDATION.md`만 따른다.

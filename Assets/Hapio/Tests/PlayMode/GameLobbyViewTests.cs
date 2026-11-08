@@ -628,6 +628,56 @@ namespace Hapio.Tests
 
         [Category("Bonjour")]
         [UnityTest]
+        public IEnumerator AHeldSeatShowsAwayAndARejoiningLobbySaysItIsGettingBackIn()
+        {
+            if (!LabBonjourDiscovery.IsSupported) Assert.Ignore("Native game-room advertisement requires macOS or iOS.");
+            session.Network.SetTargetParticipantCount(3);
+            session.Host();
+            yield return Until(() => session.State.phase == GameFlowPhase.Lobby && !session.IsLoadingScene
+                && SceneManager.GetActiveScene().path == GameScenePaths.Lobby && session.Network.IsHost,
+                "Host lobby", 15f);
+            yield return null;
+            GameLobbyView view = View();
+            LabNetwork network = session.Network;
+            const System.Reflection.BindingFlags flags = System.Reflection.BindingFlags.Instance
+                | System.Reflection.BindingFlags.NonPublic;
+            // #501: the Host holds P2 for a dropped guest. It is set here by hand to read the screen; the real
+            // drop and return are covered by C6Lab's LabLobbyRejoinNetworkTests.
+            var slots = (LabPlayerSlots)typeof(LabNetwork).GetField("playerSlots", flags).GetValue(network);
+            Assert.That(slots.TrySelect(77, 2, out string reason), Is.True, reason);
+            Type holdType = typeof(LabNetwork).GetNestedType("LobbySeatHold", System.Reflection.BindingFlags.NonPublic);
+            object hold = Activator.CreateInstance(holdType);
+            holdType.GetField("ticket").SetValue(hold, new string('a', 32));
+            holdType.GetField("playerId").SetValue(hold, 77UL);
+            holdType.GetField("slot").SetValue(hold, 2);
+            holdType.GetField("until").SetValue(hold, Time.realtimeSinceStartupAsDouble + 60d);
+            var holds = (IList)typeof(LabNetwork).GetField("lobbySeatHolds", flags).GetValue(network);
+            holds.Add(hold);
+            yield return null; yield return null;
+            Assert.That(network.HeldSeatCount, Is.EqualTo(1));
+            Assert.That(view.localLabels[1].text, Is.EqualTo(GameLobbyView.HeldSeatLabel));
+            Assert.That(view.subheading.text, Is.EqualTo(GameLobbyView.HeldSeatHint));
+            Assert.That(view.joinedCount.text, Is.EqualTo("1 / 3명 입장"), "A held seat is not counted as joined.");
+            Assert.That(view.slotImages[1].color.a, Is.LessThan(.5f), "The held seat is faded.");
+            Assert.That(view.slotButtons[1].interactable, Is.False, "Nobody else can take the held seat.");
+            holds.Clear();
+            slots.Release(77);
+            // A guest that is getting back in shows the pending lobby and its own message. The flag is set by hand on
+            // this Host only to read the screen.
+            System.Reflection.FieldInfo rejoining = typeof(LabNetwork).GetField("lobbyRejoinActive", flags);
+            rejoining.SetValue(network, true);
+            try
+            {
+                yield return null; yield return null;
+                Assert.That(view.heading.text, Is.EqualTo("방 정보를 받고 있소..."));
+                Assert.That(view.message.text, Is.EqualTo("방에 다시 들어가고 있소..."));
+                Assert.That(view.slotButtons.Count(button => button.gameObject.activeSelf), Is.Zero);
+            }
+            finally { rejoining.SetValue(network, false); }
+        }
+
+        [Category("Bonjour")]
+        [UnityTest]
         public IEnumerator DirectGameHostKeepsItsGuidNameAndAdvertisesTheGameFamilyBeforeEnteringTheLobby()
         {
             if (!LabBonjourDiscovery.IsSupported) Assert.Ignore("Native game-room advertisement requires macOS or iOS.");

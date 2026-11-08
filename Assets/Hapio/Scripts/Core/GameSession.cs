@@ -373,6 +373,8 @@ namespace Hapio
         {
             GameFlowState previous = state;
             state = value.Copy();
+            // #501: only a lobby guest that loses its Host stays here and gets back into the same room.
+            network.LobbyRejoinAllowed = state.phase == GameFlowPhase.Lobby;
             // A Guest's network learns the stage's yokai here (#351); the Host's installed it when preparing the stage.
             Identity(state, out _, out LabStageYokai yokai);
             network.ObserveGameStage(yokai);

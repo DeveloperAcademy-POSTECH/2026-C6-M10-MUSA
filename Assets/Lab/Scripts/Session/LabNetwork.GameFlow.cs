@@ -11,7 +11,9 @@ namespace C6Lab
     /// </summary>
     public sealed partial class LabNetwork
     {
-        private static readonly byte[] GameConnectionToken = Encoding.ASCII.GetBytes("C6HapioGame/39");
+        // 45: #501 lobby rejoin: a room ticket after the token, held lobby seats (lobby ids) and lobby_leave/lobby_closed.
+        //     40~44 were taken by the feat/#551 branch.
+        private static readonly byte[] GameConnectionToken = Encoding.ASCII.GetBytes("C6HapioGame/45");
         private const int MaximumGameFlowBytes = 8192;
         private bool gameFlowEnabled;
         private bool gameBattleFrozen;
