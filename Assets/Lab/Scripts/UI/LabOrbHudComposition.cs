@@ -16,6 +16,9 @@ namespace C6Lab
         public const string CompositeShaderResource = "OrbHud/OrbHudComposite";
         private const string ForegroundName = "OrbHudForeground";
 
+        // Optional presentation-only backdrop below HUD decorations and the existing orb foreground.
+        public RectTransform presentationBackdrop;
+
         private LabHud hud;
         private LabOrbBoard board;
         private Camera source;
@@ -27,6 +30,7 @@ namespace C6Lab
         private readonly List<Transform> rearDecorations = new List<Transform>();
         private readonly Dictionary<GameObject, int> rearLayers = new Dictionary<GameObject, int>();
         private int sourceMask, battleMask, foregroundMask;
+        private bool sourceEnabled;
         private Camera capturedBattleCamera;
         private bool captured, failed;
         private string initializationError;
@@ -59,7 +63,7 @@ namespace C6Lab
         private void LateUpdate()
         {
             if (failed) return;
-            if (hud == null || board == null || source == null || !source.isActiveAndEnabled
+            if (hud == null || board == null || source == null || (!source.isActiveAndEnabled && !(captured && presentationBackdrop != null && source.gameObject.activeInHierarchy))
                 || hud.battleUi == null || !hud.battleUi.activeInHierarchy)
             {
                 Release();
@@ -110,6 +114,7 @@ namespace C6Lab
 
             // Capture before any mutation, so allocation and rendering failures leave the normal board usable.
             sourceMask = source.cullingMask;
+            sourceEnabled = source.enabled;
             capturedBattleCamera = hud.battleCamera;
             if (capturedBattleCamera != null) battleMask = capturedBattleCamera.cullingMask;
             foregroundMask = sourceMask & ~(1 << paperLayer);
@@ -168,6 +173,8 @@ namespace C6Lab
             Transform ring = hud.TeamBar != null && hud.TeamBar.LocalRing != null
                 ? hud.TeamBar.LocalRing.transform : null;
             int next = 0;
+            if (presentationBackdrop != null && presentationBackdrop.parent == hud.battleUi.transform)
+                PlaceSibling(presentationBackdrop, next++);
             foreach (Transform decoration in rearDecorations)
             {
                 if (decoration == null) continue;
@@ -231,6 +238,10 @@ namespace C6Lab
             foreground.allowMSAA = false;
             foreground.depth = source.depth - 1f;
             foreground.enabled = true;
+            // A game-authored transparent backdrop must reveal the stage, not the old lower-camera paper.
+            // Keep its object/projection for input. Skip its on-screen paper pass entirely; mobile URP
+            // can still clear colour for CameraClearFlags.Nothing, so a zero mask alone is insufficient.
+            source.enabled = sourceEnabled && presentationBackdrop == null;
         }
 
         private void PlaceDisplay()
@@ -273,7 +284,7 @@ namespace C6Lab
             material = null;
             if (captured)
             {
-                if (source != null) source.cullingMask = sourceMask;
+                if (source != null) { source.cullingMask = sourceMask; source.enabled = sourceEnabled; }
                 if (capturedBattleCamera != null) capturedBattleCamera.cullingMask = battleMask;
                 foreach (var entry in rearLayers)
                     if (entry.Key != null) entry.Key.layer = entry.Value;

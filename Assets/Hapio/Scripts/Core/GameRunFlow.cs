@@ -171,6 +171,39 @@ namespace Hapio
             return true;
         }
 
+        public bool MarkDefeat(string battleSessionId, uint battleRound, string reason)
+        {
+            if (state.mode != GameMode.Story || state.phase != GameFlowPhase.Playing
+                || state.battleSessionId != battleSessionId || state.battleRound != battleRound
+                || string.IsNullOrWhiteSpace(reason) || reason.Length > 256) return false;
+            state.phase = GameFlowPhase.GameOver;
+            state.endReason = reason;
+            state.retryableDefeat = true;
+            state.revision++;
+            ClearReadiness();
+            return true;
+        }
+
+        public bool RetryFailedStage(string runId, int stageIndex, uint revision)
+        {
+            if (!Matches(runId, stageIndex, revision) || state.mode != GameMode.Story
+                || state.phase != GameFlowPhase.GameOver || !state.retryableDefeat) return false;
+            BeginLoad();
+            return true;
+        }
+
+        /// <summary>A room member leaving after defeat permanently removes retry for this generation.</summary>
+        public bool EndDefeatRetry(string reason)
+        {
+            if (state.phase != GameFlowPhase.GameOver || !state.retryableDefeat
+                || string.IsNullOrWhiteSpace(reason) || reason.Length > 256) return false;
+            state.retryableDefeat = false;
+            state.endReason = reason;
+            state.revision++;
+            ClearReadiness();
+            return true;
+        }
+
         public bool RestartCurrentStage(string runId, int stageIndex, uint revision)
         {
             if (!Matches(runId, stageIndex, revision)
@@ -185,6 +218,7 @@ namespace Hapio
             if (!state.IsRunActive || string.IsNullOrWhiteSpace(reason) || reason.Length > 256) return false;
             state.phase = GameFlowPhase.GameOver;
             state.endReason = reason;
+            state.retryableDefeat = false;
             state.revision++;
             ClearReadiness();
             return true;
@@ -243,6 +277,7 @@ namespace Hapio
             state.battleRound = 0;
             state.battleStartsAt = 0d;
             state.endReason = string.Empty;
+            state.retryableDefeat = false;
             state.revision++;
             ClearReadiness();
         }

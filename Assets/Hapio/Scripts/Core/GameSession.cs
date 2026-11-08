@@ -88,6 +88,7 @@ namespace Hapio
             public int readyCount;
             public int participantCount;
             public bool resultViewerOpen;
+            public bool resultPresentationBusy;
             public double finishDeadline;
             [NonSerialized] public ulong sender;
         }
@@ -113,8 +114,9 @@ namespace Hapio
         public bool IsLoadingScene => sceneRoutine != null || IsPreparingBattle;
         public bool PendingSettingsApply => network != null && network.IsConnected && !network.SessionConfigReady;
         public bool CanAdvanceStage => network != null && network.IsHost && !IsLoadingScene && AllResultsReady
+            && (state.phase == GameFlowPhase.StageResult || state.phase == GameFlowPhase.Completed)
             && (!IsTerritory || !network.IsDeveloperSolo)
-            && (IsTerritory || !IsAnyResultViewerOpen);
+            && (IsTerritory || !IsAnyResultViewerOpen && !IsAnyResultPresentationBusy);
         // The run's own stage count: 2:2 (#281) plays one battle, so it has no next stage to skip to.
         public bool CanDeveloperAdvanceStage => network != null && network.DeveloperBuildAvailable
             && network.IsConnected && network.IsHost && !goingHome && !IsLoadingScene && !restartPending
@@ -240,21 +242,32 @@ namespace Hapio
             }
             // A terminal flow state can precede its battle snapshot. Keep recovering the required
             // record on the result screen even if the optional gourd preview has timed out.
-            bool showingResult = state.phase == GameFlowPhase.StageResult || state.phase == GameFlowPhase.Completed;
+            bool showingResult = IsResultPresentationPhase;
             if (showingResult) CacheResultSnapshot();
-            if (showingResult && HasResultSnapshot
-                && SceneManager.GetActiveScene().path == GameScenePaths.StageResult && sceneRoutine == null
+            bool resultSnapshotReady = state.retryableDefeat ? HasFailedStageSnapshot : HasResultSnapshot;
+            string resultScene = state.retryableDefeat ? GameScenePaths.GameOver : GameScenePaths.StageResult;
+            if (showingResult && resultSnapshotReady
+                && SceneManager.GetActiveScene().path == resultScene && sceneRoutine == null
                 && now >= nextResultReadyAt)
             {
                 nextResultReadyAt = now + .5d;
-                if (network.IsHost) { resultReady.Add(network.LocalPlayerId); SetResultViewer(network.LocalPlayerId, IsViewerOpen); }
+                if (network.IsHost)
+                {
+                    resultReady.Add(network.LocalPlayerId);
+                    SetResultViewer(network.LocalPlayerId, IsViewerOpen);
+                    SetResultPresentation(network.LocalPlayerId, localResultPresentationBusy);
+                }
                 else network.SendGameFlowToHost(JsonUtility.ToJson(MakeControl("result_ready")));
             }
             LabSnapshot snapshot = network.Snapshot;
             if (network.IsHost && state.phase == GameFlowPhase.Playing && MatchesBattle(snapshot))
             {
                 if (snapshot.phase == LabPhase.Defeat)
-                    AbortHost(snapshot.remaining <= 0d ? "Time ran out." : "All players are down.");
+                {
+                    string reason = snapshot.remaining <= 0d ? "Time ran out." : "All players are down.";
+                    if (tutorialRun || IsTerritory) AbortHost(reason);
+                    else if (hostFlow.MarkDefeat(snapshot.sessionId, snapshot.round, reason)) SetHostState();
+                }
                 else if (snapshot.phase == LabPhase.Victory && CanLeavePaintFinish(snapshot)
                     && hostFlow.MarkVictory(snapshot.sessionId, snapshot.round)) SetHostState();
             }
@@ -291,13 +304,16 @@ namespace Hapio
                     hostFlow.MarkCountdownReady(control.sender, control.runId, control.stageIndex, control.revision);
                 else if (control.kind == "result_ready" && control.runId == state.runId
                     && control.stageIndex == state.stageIndex && control.revision == state.revision
-                    && (state.phase == GameFlowPhase.StageResult || state.phase == GameFlowPhase.Completed))
+                    && IsResultPresentationPhase)
                 {
                     resultReady.Add(control.sender);
                     SetResultViewer(control.sender, control.resultViewerOpen);
+                    SetResultPresentation(control.sender, control.resultPresentationBusy);
                 }
-                else if (control.kind == "result_viewer" && state.phase == GameFlowPhase.StageResult)
+                else if (control.kind == "result_viewer" && IsResultPresentationPhase)
                     SetResultViewer(control.sender, control.resultViewerOpen);
+                else if (control.kind == "result_presentation" && IsResultPresentationPhase)
+                    SetResultPresentation(control.sender, control.resultPresentationBusy);
                 else if (control.kind == "exit" && state.IsRunActive && control.runId == state.runId
                     && control.stageIndex == state.stageIndex)
                     AbortHost("A player left the game.", "한 명이 나가 판을 멈추고 로비로 돌아왔소.");
@@ -315,7 +331,12 @@ namespace Hapio
                 ReadStartProgress(control);
                 ReadFinishDeadline(control);
             }
-            if (state.phase == GameFlowPhase.GameOver && control.state.phase != GameFlowPhase.GameOver) return;
+            if (state.phase == GameFlowPhase.GameOver)
+            {
+                if (!state.retryableDefeat && control.state.retryableDefeat) return;
+                if (control.state.phase != GameFlowPhase.GameOver
+                    && !GameFlowSnapshot.IsDefeatRetryLoad(state, control.state)) return;
+            }
             bool newRun = state.phase == GameFlowPhase.Home || state.phase == GameFlowPhase.Lobby
                 || BackToLobby(control.state);
             if (replica.Apply(control.state, newRun, out _))
@@ -383,8 +404,7 @@ namespace Hapio
                 forceBattleReload = SceneManager.GetActiveScene().path == GameScenePaths.Battle;
                 reloadKeepsStage = previous.stageIndex == state.stageIndex;
             }
-            if (state.phase == GameFlowPhase.StageResult || state.phase == GameFlowPhase.Completed)
-                CacheResultSnapshot();
+            if (IsResultPresentationPhase) CacheResultSnapshot();
             if (state.phase == GameFlowPhase.GameOver) network.FreezeGameBattle();
             QueueScene(SceneFor(state.phase));
             Changed?.Invoke();
@@ -520,10 +540,11 @@ namespace Hapio
         {
             if (ResultSnapshot != null && ResultSnapshot.sessionId == state.battleSessionId
                 && ResultSnapshot.round == state.battleRound) return;
-            if (MatchesBattle(network.Snapshot) && network.Snapshot.phase == LabPhase.Victory)
+            if (MatchesBattle(network.Snapshot) && (network.Snapshot.phase == LabPhase.Victory
+                || state.retryableDefeat && network.Snapshot.phase == LabPhase.Defeat))
             {
                 ResultSnapshot = JsonUtility.FromJson<LabSnapshot>(JsonUtility.ToJson(network.Snapshot));
-                RecordStageResult(ResultSnapshot);
+                if (ResultSnapshot.phase == LabPhase.Victory) RecordStageResult(ResultSnapshot);
             }
         }
 
@@ -556,6 +577,7 @@ namespace Hapio
                 settingsFingerprint = network.IsHost ? network.SessionConfigFingerprint : expectedSettingsFingerprint,
                 readyCount = StartReadyCount, participantCount = StartParticipantCount,
                 resultViewerOpen = IsViewerOpen,
+                resultPresentationBusy = localResultPresentationBusy,
                 finishDeadline = finishServerDeadline
             };
         }
@@ -907,7 +929,25 @@ namespace Hapio
         private void OnPeerDisconnected(ulong _, bool lostHost)
         {
             if (state.phase == GameFlowPhase.Completed) { CacheResultSnapshot(); return; }
-            if (goingHome || !state.IsRunActive) return;
+            if (goingHome) return;
+            if (state.phase == GameFlowPhase.GameOver && state.retryableDefeat)
+            {
+                string reason = lostHost ? "The Host disconnected." : "A player disconnected.";
+                if (network.IsHost)
+                {
+                    if (hostFlow.EndDefeatRetry(reason)) SetHostState();
+                }
+                else
+                {
+                    GameFlowState ended = state.Copy();
+                    ended.retryableDefeat = false;
+                    ended.endReason = reason;
+                    ended.revision++;
+                    SetLocalState(ended);
+                }
+                return;
+            }
+            if (!state.IsRunActive) return;
             if (network.IsHost) AbortHost("A player disconnected.", "한 명이 나가 판을 멈추고 로비로 돌아왔소.");
             else
             {
