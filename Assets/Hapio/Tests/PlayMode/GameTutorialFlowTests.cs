@@ -470,6 +470,60 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
+        public IEnumerator LinesMovedOnFromGoIntoTheLogAndItsButtonComesBesideSkip()
+        {
+            yield return SceneManager.LoadSceneAsync(GameScenePaths.Home, LoadSceneMode.Single);
+            yield return Until(() => GameSession.Instance != null && !GameSession.Instance.IsLoadingScene, "Saved Home bootstrap");
+            session = GameSession.Instance;
+            session.Network.port = AvailablePort();
+            yield return null;
+            Assert.That(session.TryStartTutorial(), Is.True);
+            GameTutorialDirector director = null;
+            yield return Until(() => (director = Object.FindFirstObjectByType<GameTutorialDirector>()) != null
+                && director.IsShowingLine, "The practice board plays its first line", 30f);
+            GameTutorialArt art = GameTutorialArt.Load();
+            var buttons = director.GetComponentsInChildren<UnityEngine.UI.Button>(true);
+            var tap = buttons.Single(button => button.name == "Tap To Continue");
+            var skip = buttons.Single(button => button.name == "Skip Button");
+            var log = buttons.Single(button => button.name == "Log Button");
+
+            // The first line is only on the screen: nothing has been moved on from yet.
+            yield return new WaitForSecondsRealtime(art.tapCooldown + .05f);
+            Assert.That(director.DialogueLog, Is.Empty);
+            Assert.That(log.gameObject.activeInHierarchy, Is.False, "No log, no button.");
+
+            tap.onClick.Invoke();
+            GameTutorialBeat[] lines = GameTutorialScript.Goal.Lines.ToArray();
+            Assert.That(director.DialogueLog.Select(entry => (entry.Speaker, entry.Text)).ToArray(),
+                Is.EqualTo(new[] { (lines[0].Speaker, lines[0].Text) }), "The line just moved on from.");
+            yield return Until(() => director.LogButtonAlpha >= .999f && director.SkipButtonAlpha >= .999f,
+                "기록 fades in with 건너뛰기", art.skipFadeSeconds + 1f);
+            Rect skipRect = ScreenRect((RectTransform)skip.transform), logRect = ScreenRect((RectTransform)log.transform);
+            float scale = skipRect.width / art.skipButtonSize.x;
+            Assert.That(logRect.center.y, Is.EqualTo(skipRect.center.y).Within(1f), "Level with 건너뛰기.");
+            Assert.That(logRect.xMin - skipRect.xMax, Is.EqualTo(art.logButtonGap * scale).Within(1f), "Right beside it.");
+            Assert.That(logRect.height, Is.EqualTo(skipRect.height).Within(1f), "As tall as it.");
+            var logFrame = log.GetComponent<UnityEngine.UI.Image>();
+            var logLabel = log.GetComponentInChildren<UnityEngine.UI.Text>(true);
+            Assert.That(logFrame.sprite, Is.SameAs(skip.GetComponent<UnityEngine.UI.Image>().sprite), "The same frame as 건너뛰기.");
+            Assert.That(logFrame.type, Is.EqualTo(UnityEngine.UI.Image.Type.Sliced));
+            Assert.That(logLabel.text, Is.EqualTo("기록"));
+            Assert.That(logLabel.font, Is.SameAs(skip.GetComponentInChildren<UnityEngine.UI.Text>(true).font));
+
+            // A touch on it lands on the button, not on whatever moves the line on.
+            var hits = new System.Collections.Generic.List<UnityEngine.EventSystems.RaycastResult>();
+            log.GetComponentInParent<UnityEngine.UI.GraphicRaycaster>().Raycast(
+                new UnityEngine.EventSystems.PointerEventData(UnityEngine.EventSystems.EventSystem.current) { position = logRect.center }, hits);
+            Assert.That(hits.Count, Is.GreaterThan(0));
+            Assert.That(hits[0].gameObject, Is.SameAs(log.gameObject), "The button takes the touch.");
+
+            yield return new WaitForSecondsRealtime(art.tapCooldown + .05f);
+            tap.onClick.Invoke();
+            Assert.That(director.DialogueLog.Select(entry => entry.Text).ToArray(),
+                Is.EqualTo(new[] { lines[0].Text, lines[1].Text }), "Oldest first.");
+        }
+
+        [UnityTest]
         public IEnumerator SkippingAsksFirstThenLeavesForTheRoomList()
         {
             yield return SceneManager.LoadSceneAsync(GameScenePaths.Home, LoadSceneMode.Single);
@@ -520,6 +574,7 @@ namespace Hapio.Tests
             yield return new WaitForSecondsRealtime(art.tapCooldown + .05f);
             buttons.Single(button => button.name == "Tap To Continue").onClick.Invoke();
             Assert.That(first.BeatIndex, Is.EqualTo(1));
+            Assert.That(first.DialogueLog.Count, Is.EqualTo(1));
             yield return null;
             buttons.Single(button => button.name == "Pause").onClick.Invoke();
             yield return Until(() => session.Network.IsBattlePaused && first.IsSteppedAsideForPause, "Paused", 5f);
@@ -543,6 +598,7 @@ namespace Hapio.Tests
             yield return Until(() => (again = Object.FindFirstObjectByType<GameTutorialDirector>()) != null && again != first
                 && again.IsShowingLine, "The practice board opens again on its first line", 30f);
             Assert.That((again.StepIndex, again.BeatIndex), Is.EqualTo((0, 0)), "From the very start.");
+            Assert.That(again.DialogueLog, Is.Empty, "The log starts over too.");
             Assert.That(session.IsTutorial, Is.True);
             Assert.That(session.Network.IsBattlePaused, Is.False, "Not paused any more.");
             Assert.That(session.Network.Snapshot.drums[0].owner, Is.EqualTo(session.Network.LocalPlayerId), "A fresh board.");

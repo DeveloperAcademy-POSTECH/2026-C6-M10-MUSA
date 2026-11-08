@@ -6662,3 +6662,21 @@ PR-1(`feat/#507-gourd-rig-contract`) 위에서 Unity 6000.6.5f1 macOS batch Edit
 
 - 기준 main은 원격 재확인 후에도 `fbe6f67c`였다. Unity6000.6.5f1 / macOS 기본 batch에서 필터 없이 **전체 EditMode 2089/2089 PASS(16.28초), 전체 PlayMode 706/706 PASS(528.52초)**를 확인했다. 두 실행 모두 실패·생략·Inconclusive0이며 앞 절 초기 관련 검사 집계와 중복 합산하지 않는다. 위 초기 범위의 전체 모음 미실행 상태는 이 추가 실행으로 갱신한다.
 - 최종 독립 리뷰에서 원본 관람 캡션의 실제 문구가 `봉인 박 둘러보기`인데 비활성 표시 바인딩이 `봉인 박 관람`으로 찾던 오류를 발견했다. 기능 권한은 유지한 채 검색 문구만 맞췄다. 전체 검사 이후의 이 한 줄 수정에는 `SavedStorySkipAndEndingButtonsReceiveRealMouseClicksAtTheirVisibleScreenPositions`와 `StoryResultPresentationTests`를 다시 실행해 **10/10 PASS(5.09초), 실패·생략·Inconclusive0**를 확인했다. Mac 빌드 성공 기록은 이 캡션 문구 보완 이전 소스에서의 결과이며 재빌드·앱 실행을 추가하지 않았다.
+
+## #567 튜토리얼 대화 기록 1단계: 기록 버튼과 기록 모으기 — 2026-11-08
+
+- **기준:** 최신 main `e15f61f0` → `feat/#567-tutorial-dialogue-log`. #552가 머지되기 전 main에서 시작했다. Play가 꺼진 것을 확인한 뒤 컴파일과 Editor API 에셋 작업만 했다.
+- **기록 모으기 (`GameTutorialDirector.Log.cs`):** 대본 대사를 넘긴 순간 말한 사람과 대사를 기록에 쌓는다. 동작 장면, 동작 중에 잠깐 뜨는 말("다시 해 봐!"), 안내 띠, "성공!"은 담지 않는다. RESTART는 Battle을 다시 불러 새 기록으로 시작한다.
+- **기록 버튼:** 기록이 하나라도 생기면 건너뛰기 바로 오른쪽(6pt 간격), 같은 높이에 건너뛰기와 같은 빠르기로 서서히 나타난다. 54×30pt, 높이는 건너뛰기와 같다. 아직 눌러도 열리는 화면은 없다(2단계).
+- **그림 (사용자 결정):** 건너뛰기 버튼과 같은 틀(`TutorialSkipButton`)에 같은 글꼴·크기로 "기록"을 쓴다. 처음 받은 검은 테두리 그림은 건너뛰기와 모양이 달라 쓰지 않았다.
+
+| 실행한 확인 | 결과 |
+| --- | --- |
+| 컴파일 · Console 컴파일 오류 | **PASS**: compilationFailed=false, error CS 0 |
+| 버튼 그려 보기 (Editor 안, 화면 밖) | **PASS**: 건너뛰기와 같은 틀·글꼴, 글자가 틀 안에 들어감 |
+| `TutorialArt.asset` 변경 범위 | **PASS**: 기록 버튼 값 2줄 추가만 |
+
+- **추가 검사 (NOT_RUN):**
+  - EditMode `GameTutorialLogTests`: 버튼 자리 계산, 글자, 건너뛰기와 같은 높이.
+  - PlayMode `GameTutorialFlowTests`: 첫 대사를 넘기기 전에는 기록·버튼이 없는지, 넘기면 그 대사가 기록되고 건너뛰기 옆 같은 높이에 같은 틀·글꼴로 뜨는지, 터치가 버튼에 닿는지, 오래된 대사가 먼저인지, RESTART 뒤 기록이 비는지.
+- **미실행:** Play·iPhone 화면 확인.
