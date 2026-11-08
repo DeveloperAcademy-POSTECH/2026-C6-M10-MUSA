@@ -52,7 +52,7 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
-        public IEnumerator AStartTheDaemonRefusesAtOnceAlsoWaitsAndRetries()
+        public IEnumerator AStartRefusedAtOnceAlsoWaitsAndRetries()
         {
             if (!LabBonjourDiscovery.IsSupported) Assert.Ignore("Native Bonjour supports macOS/iOS.");
             int number = UniqueNumber();
@@ -60,7 +60,8 @@ namespace C6Lab.Tests
             Socket ipv4 = null, ipv6 = null;
             try
             {
-                // Hide both reservations for one start: StartAdvertise refuses it right away, not as a name conflict.
+                // Hide both reservations for one start: StartAdvertise returns false at once, not as a name conflict. A
+                // synchronous native refusal takes the same branch in LabPendingRoom.Tick.
                 ipv4 = (Socket)Field(room, "ipv4").GetValue(room); ipv6 = (Socket)Field(room, "ipv6").GetValue(room);
                 Field(room, "ipv4").SetValue(room, null); Field(room, "ipv6").SetValue(room, null);
                 room.Tick(true, number);

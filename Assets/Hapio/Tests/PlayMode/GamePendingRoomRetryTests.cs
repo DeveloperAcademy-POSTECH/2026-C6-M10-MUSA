@@ -36,7 +36,8 @@ namespace Hapio.Tests
                 Assert.That(waiting.RetryPending, Is.True);
                 Assert.That(waiting.RetryAttempts, Is.EqualTo(1));
                 Assert.That(waiting.Ready || waiting.Failed, Is.False);
-                // A name the first card still held moves the second one to the next number first.
+                // The failed registration released its name, so the second card may take it; any local name conflict
+                // only moves a card to the next number on its next tick.
                 StartRegistration(registry, second, "A waiting card does not hold back the next one.");
 
                 // Keep the first card waiting while the second one is confirmed.

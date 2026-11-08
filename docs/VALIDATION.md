@@ -8,20 +8,29 @@
   - 시작 거절은 예약 소켓 두 개를 한 번만 숨겨 `StartAdvertise`가 바로 false를 돌려주게 했다.
   - 실제 로컬 네트워크 권한 창·거부, Wi-Fi 끊김은 재현하지 않았다.
 
-| 확인 | 결과 |
+| 확인(검토 반영 `0e8edb42` 기준, 괄호는 첫 커밋 `4faa3c93`) | 결과 |
 | --- | --- |
-| 관련 EditMode(`LabBonjourRegistrationTests`·`LabDiscoveryBackoffTests`·`LabRoomPresenceTests`·`GamePendingRoomRegistryTests`) | 58/58 PASS. 이름 충돌 재시도와 마지막 번호 실패 검사를 포함한다 |
-| 새 PlayMode `LabPendingRoomRetryTests` 4건 | 4/4 PASS(5.7초): 첫 등록이 실패해도 같은 포트로 확정, 시작 거절 뒤에도 재시도, 확정 뒤 끊기면 같은 이름으로 복구, 대기 1초→2초, 6회 뒤 실패와 포트 해제 |
-| 새 PlayMode `GamePendingRoomRetryTests` 1건 | PASS: 기다리는 카드가 다음 카드를 막지 않음, 마지막 재시도가 실패한 뒤에만 카드가 빠지고 기존 안내가 뜸 |
+| 관련 EditMode(`LabBonjourRegistrationTests`·`LabDiscoveryBackoffTests`·`LabRoomPresenceTests`·`GamePendingRoomRegistryTests`) | 58/58 PASS(첫 커밋 58/58). 이름 충돌 재시도와 마지막 번호 실패 검사를 포함한다 |
+| 새 PlayMode `LabPendingRoomRetryTests` 4건 | 4/4 PASS: 첫 등록이 실패해도 같은 포트로 확정되고 이름 충돌 예산은 0으로 돌아감, 시작 거절 뒤에도 재시도, 확정 뒤 끊기면 뒤 번호를 요청받아도 자기 이름으로 복구, 대기 1초→2초와 6회 뒤 실패(포트는 주인이 정리할 때까지 예약) |
+| 새 PlayMode `GamePendingRoomRetryTests` 1건 | PASS: 기다리는 카드가 다음 카드를 막지 않음, 마지막 재시도가 실패한 뒤에만 카드가 빠지고 기존 안내가 뜨며 포트가 풀림 |
+| 새 PlayMode `LabFigmaLobbyTests.ACreatedRoomWaitingToRetry…` 1건(`0e8edb42`에서 추가) | PASS: Lab 로비의 실제 카드 두 개로 같은 동작(기다리는 카드 유지·다음 카드 확정·입장 가능 카드 1개, 마지막 실패 뒤 카드 제거·`creationError`·포트 해제) |
 | `GameLobbyViewTests` 새 2건 | PASS: 실패한 방이 재시도 안내 뒤 예약 포트로 자동 입장, 실패 뒤 한도에 닿으면 권한 안내, 재시도를 다 쓰면 기존 안내 |
-| 관련 기존 PlayMode(`GameLobbyViewTests` 13건·`LabFigmaLobbyTests` 11건·`LabDiscoveryRecoveryTests` 5건) | 모두 PASS |
-| 대조 1: 재시도를 끔(이름 충돌이 아닌 실패는 바로 실패, 이전 동작) | 새 7건 모두 실패 |
-| 대조 2: 기다리는 카드가 다음 카드를 다시 막게 함 | `GamePendingRoomRetryTests`만 "A waiting card does not hold back the next one."에서 실패 |
-| 전체 EditMode | 2056/2058 PASS(21.8초). 실패 2건은 아래 main 실패다 |
-| 전체 PlayMode | 666/674 PASS(527.0초). 실패 8건은 아래 main 실패다 |
+| 관련 PlayMode 묶음(새 검사 포함 `LabPendingRoomRetryTests`·`GamePendingRoomRetryTests`·`GameLobbyViewTests`·`LabFigmaLobbyTests`·`LabDiscoveryRecoveryTests`) | 37/37 PASS(65.4초; 첫 커밋 36/36) |
+| 대조 1(첫 커밋): 재시도를 끔(이름 충돌이 아닌 실패는 바로 실패, 이전 동작) | 새 7건 모두 실패 |
+| 대조 2(첫 커밋): 기다리는 카드가 다음 카드를 다시 막게 함(등록부) | `GamePendingRoomRetryTests`만 "A waiting card does not hold back the next one."에서 실패 |
+| 대조 3: 확정된 방도 재시도 때 앞 카드 번호를 따르게 되돌림 | `AConfirmedRoomThatLosesItsRegistrationAsksForItsOwnNameAgain`만 실패: 자기 번호 대신 +7 번호로 등록 |
+| 대조 4: 확정 때 이름 충돌 예산을 초기화하지 않음 | `AFirstRegistrationThatFails…`만 실패: 예산 사용 2 |
+| 대조 5: Lab 로비가 기다리는 카드에서 다음 카드를 다시 막게 함 | 새 Lab 로비 검사만 "A waiting card does not hold back the next one."에서 실패 |
+| 전체 EditMode | 2056/2058 PASS(20.7초; 첫 커밋 2056/2058, 21.8초). 실패 2건은 아래 main 실패다 |
+| 전체 PlayMode | 667/675 PASS(521.5초; 첫 커밋 666/674, 527.0초). 실패 8건은 아래 main 실패다 |
 
 - 각 실행의 skip·inconclusive는 0이다. 대조 변경은 되돌렸고 커밋하지 않았다.
 - 첫 실행에서 새 `GamePendingRoomRetryTests`가 한 번 실패했다. 검사는 첫 Tick에서 항상 native 등록이 시작된다고 가정했다. 실제로는 다른 카드가 그 이름을 먼저 가져가, 지역 이름 충돌(-65548)로 다음 번호로 넘어갔다. 제품 동작이 맞으므로, 등록이 실제로 시작될 때까지 Tick하도록 검사를 고쳤다. 위 결과는 고친 뒤의 것이다.
+- **검토:** 독립 검토 3갈래(상태 전환, 호출부 정책·UI, 검사·문서)를 돌리고 지적마다 반박 검증을 붙였다. 인정된 3건을 `0e8edb42`에서 고쳤다.
+  - 확정된 카드도 재시도 때 앞 카드 번호를 따라, 이름 충돌이 없어도 번호가 바뀔 수 있었다.
+  - 재시도가 이름 충돌 예산을 계속 썼다. 오래 떠 있는 Lab 카드라면, 나중의 이름 충돌 때 다음 번호로 가지 못하고 실패할 수 있었다.
+  - Lab 로비의 차례 규칙에 검사가 없었고, 포트 해제 단언은 검사가 직접 정리한 뒤라 의미가 없었다.
+  - 기각된 7건은 의도한 정책이거나 이미 문서에 있는 내용이었다. 기다리는 카드의 이름·번호가 비는 것, 재시도 중 Lab 안내가 없는 것, 30초 한도로 Hapio 재시도가 4번쯤에서 끊기는 것 등이다.
 - **이 PR과 무관하게 실패한 검사(main `886e65db`):**
   - EditMode `GameSceneAssetTests.MenuScreens_HaveSavedEditableCanvasAndInput`의 Home·Lobby 2건. 저장된 DEV 패널 240행은 15인데 `LabConfig.asset`은 10이다. #540이 이 값을 15→7(`14813416`)→10(`5413486d`)으로 바꿀 때 Home·Lobby의 DEV 행을 다시 저장하지 않았다.
   - PlayMode `LabJigwiABNetworkTests` 7건과 `GameJigwiStageIntegrationTests.SavedHomeReachesJigwiWithScreenAThenScreenBAndPreservesTheRealPaintShell` 1건. 대부분 지귀 B 장막·발화점 관련 NullReference·IndexOutOfRange다.
