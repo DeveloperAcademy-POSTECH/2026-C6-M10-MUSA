@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4485ab5ed52da49dd8b525f3743f1721, type: 3}
+  m_Name: Ending_03
+  m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryCutDefinition
+  cutId: Ending_03
+  viewPrefab: {fileID: 7987463736739574092, guid: 9301228b549b14458bf2b652a391df26, type: 3}
+  pages:
+  - speaker: 
+    dialogue: 
+    autoReadSeconds: 4
+    voice: {fileID: 0}
+  direction: "\uD53C\uADF8\uB9C8 4210:3352 \uC6D0\uBCF8 \uBC30\uCE58. \uC2E4\uC81C \uC2A4\uD14C\uC774\uC9C0 \uC9C4\uC785\uC740 \uD300\uC6D0 \uC5F0\uACB0 \uC608\uC815."
+  speaker: 
+  dialogue: 
+  autoReadSeconds: 4
+  voice: {fileID: 0}

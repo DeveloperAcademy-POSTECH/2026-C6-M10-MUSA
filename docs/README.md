@@ -19,6 +19,7 @@
 | 스테이지별 배경·PNG 교체·미리보기 | [스테이지 배경 편집](STAGE_BACKGROUNDS.md) |
 | 오프닝 순서·진입 정책·터치 진행 | [앱 시작 오프닝](APP_START_OPENING.md) |
 | 오프닝 그림·대사·제작용 미리보기 편집 | [팝업북 스토리 제작](POPUP_STORY_WORKFLOW.md) |
+| 스테이지 사이·뒤집는 봉인 카드·실패 게이지·엔딩 | [스토리 화면 제작과 연결](STAGE_STORY_PRESENTATION.md) |
 | 구슬의 가장자리 전달·정체 보정·세로 방향·iOS 제스처 | [모바일 구슬 조작](MOBILE_ORB_CONTROLS.md) |
 | 개인 조합판·Host 검증·전달·공동 전투 동기화 | [개인 조합판 권한 구조](LOCAL_BOARD_AUTHORITY.md) |
 | 공유 수치·음양 연속 보정·스태미나·기믹·피버 조정 | [개발자 모드 설정](DEVELOPER_MODE_PARAMETER_SPEC.md) |
