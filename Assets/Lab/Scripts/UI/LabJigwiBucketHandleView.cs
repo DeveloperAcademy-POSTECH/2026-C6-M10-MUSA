@@ -101,6 +101,10 @@ namespace C6Lab
             sloshVolume = .8f, fogHitVolume = 1f;
         [Tooltip("\"앗 차가!!\" 때 햅틱 세기.")]
         [SerializeField, Range(0f, 1f)] private float pourVoiceHapticIntensity = 1f;
+        [Tooltip("쏟기 시작(양동이가 다 뒤집힘)부터 물줄기가 박에 닿을 때까지(초). 닿는 순간 불 꺼지는 소리/흔들림/햅틱.")]
+        [SerializeField, Range(.2f, 1f)] private float waterReachSeconds = .5f;
+        [Tooltip("물이 닿은 뒤 지귀 비명까지(초).")]
+        [SerializeField, Range(0f, 1f)] private float screamDelaySeconds = .2f;
         [Tooltip("쏟을 때 화면 흔들림 세기(박 크기 대비).")]
         [SerializeField, Range(0f, .3f)] private float pourShake = .08f;
         [SerializeField, Range(0f, 1f)] private float voiceVolume = 1f, douseVolume = .9f;
@@ -111,7 +115,7 @@ namespace C6Lab
         private readonly Image[] smoke = new Image[10];
         private static Sprite glowSprite;
         private float heat, failAt = -1f, quenchAt = -1f;
-        private bool failSpoken, pourSounded, smokeSounded;
+        private bool failSpoken, pourSounded, smokeSounded, screamed;
         private AudioSource heatSource;
         private float lastSqueakLeft = 1f, lastSqueakAt = -1f;
         private AudioSource sfx;
@@ -187,7 +191,7 @@ namespace C6Lab
             if (shownRound != round.id)
             {
                 shownRound = round.id; bucketAngle = 0f; dropIn = 1f; sloshes = 0; side = 0; poured = false; splashed = false;
-                pourAt = lastSloshAt = sloshAt = -1f; tiltStep = 0; heat = 0f; failAt = quenchAt = -1f; failSpoken = pourSounded = smokeSounded = false;
+                pourAt = lastSloshAt = sloshAt = -1f; tiltStep = 0; heat = 0f; failAt = quenchAt = -1f; failSpoken = pourSounded = smokeSounded = screamed = false;
             }
             if (!poured && (me.launchedAt >= 0d || source.JigwiBucketPulledThisCount(round)))
             { poured = true; if (pourAt < 0f) { pourAt = t; pourSide = side != 0 ? side : 1; } }
@@ -448,14 +452,17 @@ namespace C6Lab
         private void DrawWater(float t, float dt)
         {
             float sp = poured && pourAt >= 0f ? t - pourAt : 99f;
-            if (poured && !pourSounded) { pourSounded = true; Play(pourSoundFolder, pourVolume); }
-            Vector2 boss = new Vector2(0f, (gourdAnchorY - .5f) * root.rect.height);
-            if (poured && !splashed && sp >= .25f)
+            // The bucket tips over (.25 s), then the water falls and lands on the boss at waterReachSeconds.
+            const float tip = .25f;
+            float reach = Mathf.Max(tip + .1f, waterReachSeconds);
+            if (poured && !pourSounded && sp >= tip) { pourSounded = true; Play(pourSoundFolder, pourVolume); }
+            Vector2 boss = Boss;
+            if (poured && !screamed && splashed && sp >= reach + screamDelaySeconds) { screamed = true; Play(pourVoiceFolder, voiceVolume); }
+            if (poured && !splashed && sp >= reach)
             {
                 splashed = true; quenchAt = t;
                 Flash(new Color(.6f, .88f, 1f, .6f));
                 Play(douseSoundFolder, douseVolume);
-                Play(pourVoiceFolder, voiceVolume);
                 ShakeView(.35f);
                 if (source != null) LabHaptics.PlayDirect(source.config, LabHapticStyle.Heavy, pourVoiceHapticIntensity, .5f, pourVoiceHapticIntensity, 1f);
                 for (int k = 0; k < 24; k++)
@@ -468,15 +475,16 @@ namespace C6Lab
                 }
             }
             Vector2 mouth = bucketCenter + Rotate(new Vector2(0f, BucketSize * .24f), bucketDrawAngle);
-            bool sheetOn = sp >= .12f && sp < .9f;
+            bool sheetOn = sp >= tip && sp < reach + .65f;
             Show(sheet, sheetOn);
             if (sheetOn)
             {
-                float pour = Mathf.Clamp01((sp - .12f) / .15f);
+                float pour = Mathf.Clamp01((sp - tip) / (reach - tip));
+                pour *= pour; // falling: slow at first, fast at the end
                 float top = mouth.y, bottom = Mathf.Lerp(top, boss.y + root.rect.height * .03f, pour);
                 Place(sheet.rectTransform, new Vector2(Mathf.Lerp(mouth.x, boss.x, .4f), (top + bottom) * .5f),
                     new Vector2(BucketSize * .75f, Mathf.Max(20f, top - bottom + 30f)), 0f);
-                sheet.color = new Color(1f, 1f, 1f, 1f - Mathf.Clamp01((sp - .55f) / .35f));
+                sheet.color = new Color(1f, 1f, 1f, 1f - Mathf.Clamp01((sp - reach - .3f) / .35f));
             }
             for (int i = 0; i < drops.Length; i++)
             {
@@ -528,10 +536,10 @@ namespace C6Lab
         private void DrawThreat(double now, double arrive, double deadline, float t, float dt)
         {
             float target;
-            if (poured) target = 0f;
+            if (splashed) target = 0f; // stays hot until the water actually lands
             else if (now < arrive) target = .55f * Mathf.Clamp01((float)((now - (arrive - threatLeadSeconds)) / Mathf.Max(.01f, threatLeadSeconds)));
             else target = Mathf.Lerp(.55f, 1f, Mathf.Clamp01((float)((now - arrive) / LabJigwiABTimeline.BucketSeatSeconds)));
-            heat = Mathf.MoveTowards(heat, target, dt * (poured ? 2.5f : 2f));
+            heat = Mathf.MoveTowards(heat, target, dt * (splashed ? 2.5f : 2f));
             Vector2 boss = Boss;
             // Clearly hot from the start; by the end it throbs fast and glows white-hot in the middle.
             float size = root.rect.width * .7f, pulse = .88f + .12f * Mathf.Sin(t * (5f + 14f * heat * heat));
