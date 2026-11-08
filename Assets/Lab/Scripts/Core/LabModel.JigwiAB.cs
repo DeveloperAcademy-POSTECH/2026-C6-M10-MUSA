@@ -256,7 +256,8 @@ namespace C6Lab
                 ClearJigwiABSupplies(item);
                 // #509: failure sets every board on fire for a few seconds (no drum presses); orbs and stamina stay.
                 // It stops at the fever cutoff like every other yokai interference.
-                if (result == LabJigwiABResolution.Expired && jigwiBoardFireSeconds > 0f)
+                // #551: the bucket B is personal — a seat that did not pour only smokes its own screen; nobody else's board burns.
+                if (result == LabJigwiABResolution.Expired && jigwiBoardFireSeconds > 0f && !item.bucket)
                     item.boardFireUntil = Math.Max(item.resolvedAt, Math.Min(jigwiStageCutoffAt, item.resolvedAt + jigwiBoardFireSeconds));
             }
             revision++;

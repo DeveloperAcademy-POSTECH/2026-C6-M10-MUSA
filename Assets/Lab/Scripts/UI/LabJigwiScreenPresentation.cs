@@ -527,7 +527,8 @@ namespace C6Lab
             foreach (var round in stage.rounds ?? Array.Empty<LabJigwiABRound>())
             {
                 if (round == null || round.kind != LabJigwiABKind.GroupFire
-                    || round.resolution != LabJigwiABResolution.Expired) continue;
+                    || round.resolution != LabJigwiABResolution.Expired
+                    || round.bucket) continue; // #551: the bucket B is personal, no shared failure flash
                 string key = round.id + "/" + round.resolvedAt.ToString("R", CultureInfo.InvariantCulture);
                 if (!seenFailures.Add(key) || baseline || round.resolvedAt < 0d
                     || now < round.resolvedAt || now - round.resolvedAt >= FailureFlashSeconds) continue;

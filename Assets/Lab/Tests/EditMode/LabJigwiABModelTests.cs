@@ -390,6 +390,7 @@ namespace C6Lab.Tests
             Assert.That(m.TryJigwiBPull(order[1].playerId,b.id,order[1].readyAt+LabJigwiABTimeline.BucketSeatSeconds+.1),Is.False,"Its time ran out.");
             Assert.That(B(m,b.id,b.endsAt-.01).resolution,Is.EqualTo(LabJigwiABResolution.None));
             Assert.That(B(m,b.id,b.endsAt+.01).resolution,Is.EqualTo(LabJigwiABResolution.Expired),"Not everyone poured.");
+            Assert.That(m.JigwiBoardOnFire(b.endsAt+.5),Is.False,"Personal gimmick: a seat that did not pour never sets the others' boards on fire.");
             var end=m.Snapshot(b.endsAt+.01);
             Assert.That(LabJigwiABNetworkValidation.Valid(end.jigwiAB,end.players,m.Revision),Is.True);
         }
