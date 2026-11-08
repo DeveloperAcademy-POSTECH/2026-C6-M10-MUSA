@@ -371,6 +371,6 @@
 ## #501 로비 재입장과 #502 전투 중 백그라운드
 
 - Hapio 로비 게스트가 끊기면 같은 방·같은 P번호로 다시 들어간다(`LabNetwork.LobbyRejoin.cs`). 게스트는 방마다 무작위 표(16진수 32자리, 저장 안 함)를 연결 토큰 뒤에 붙이고(`token|ticket`, 게임 방만), 방장은 나가기 신호(`lobby_leave`) 없이 끊긴 로비 게스트의 자리와 P를 90초(`LobbySeatHoldSeconds`) 맡아 같은 표에 돌려준다. 맡아 둔 자리는 옛 연결 id로 `seats`에 남고 lobby 패킷의 `ids`가 맡아 둔 자리를 알린다(새 필드 없음). 정원·Bonjour 인원에는 세고 `ParticipantCount`·시작 조건에는 세지 않는다.
-- 게스트는 끊기거나, iPhone이 전송 제한 시간 이상 멈췄다 돌아오면(벽시계) `IsJoiningRoom`을 유지한 채 30초(`LobbyRejoinBudgetSeconds`) 동안 다시 시도하고, 끝내 안 되면 #471 경로로 방 목록에 간다. 방장이 방을 닫으면(`lobby_closed`) 다시 들어가지 않는다. `GameSession`이 로비 단계에서만 `LobbyRejoinAllowed`를 켠다.
+- 게스트는 끊기거나, iPhone이 전송 제한 시간 이상 멈췄다 돌아오면(벽시계) `IsJoiningRoom`을 유지한 채 30초(`LobbyRejoinBudgetSeconds`, 진행 중인 시도도 끊음) 동안 다시 시도하고, 끝내 안 되면 #471 경로로 방 목록에 간다. 방장이 방을 닫으면(`lobby_closed`) 다시 들어가지 않는다. `GameSession`이 로비 단계에서만 `LobbyRejoinAllowed`를 켠다. 표를 가진 방은 정원이 차 보여도 방 목록에서 들어갈 수 있고(`HoldsRoomTicket`, 판단은 방장의 승인), 나가기 신호를 보낸 게스트는 표를 버린다. 승인 대기 중인 연결 중 자기 자리를 되찾는 것은 새 자리로 세지 않는다(`PendingNewPlaces`).
 - 전투 중 백그라운드(#502)는 현재 동작 유지로 정했다. 신호·일시정지 제안·표시는 없고, 30초 뒤 끊기면 기존 게임 오버·2:2 로비 복귀를 따른다. 전투 중에는 재입장을 하지 않으며 방장 앱의 백그라운드와 방장 소켓 재생성도 다루지 않는다.
 - 현재 호환 묶음은 설정259개·**5691**·`C6PhysicsLab/52`·**`C6HapioGame/45`**다(40~44는 `feat/#551` 브랜치가 먼저 썼다). Lab 방의 토큰·패킷은 그대로다. Game39 이하와 혼용하지 않는다. 동작은 `docs/GAME_FLOW.md`의 같은 항목, 실행한 검사는 `docs/VALIDATION.md`만 따른다.

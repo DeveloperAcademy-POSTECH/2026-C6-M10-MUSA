@@ -59,10 +59,31 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
+        public IEnumerator ARejoinToAnUnreachableHostEndsAtItsBudgetEvenDuringAnAttempt()
+        {
+            yield return StartRoom();
+            host.Freeze(true);
+            yield return Until(() => guest.Network.IsRejoiningLobby, 10d, "The guest never noticed the silent Host.");
+            // The 30 s budget is shortened to end 2 s from now, inside the first 12 s attempt to the silent Host.
+            FieldInfo until = typeof(LabNetwork).GetField("lobbyRejoinUntil", BindingFlags.Instance | BindingFlags.NonPublic);
+            double deadline = Time.realtimeSinceStartupAsDouble + 2d;
+            until.SetValue(guest.Network, deadline);
+            yield return Until(() => !guest.Network.IsJoiningRoom, 8d, "The rejoin ran past its budget.");
+            Assert.That(Time.realtimeSinceStartupAsDouble - deadline, Is.LessThan(2d),
+                "It ended at its budget, not when its 12 s attempt ran out.");
+            Assert.That(guest.Network.IsRejoiningLobby, Is.False);
+            Assert.That(guest.Network.IsConnected, Is.False, "GameSession now takes the existing room-list path.");
+            host.Freeze(false);
+        }
+
+        [UnityTest]
         public IEnumerator AGuestThatLeavesFreesItsPAtOnce()
         {
             yield return StartRoom();
+            string room = "127.0.0.1:" + guest.Network.port;
+            Assert.That(guest.Network.HoldsRoomTicket(room), Is.True);
             guest.Network.Stop();
+            Assert.That(guest.Network.HoldsRoomTicket(room), Is.False, "A guest that said goodbye gave its ticket up.");
             yield return Until(() => host.Network.ParticipantCount == 1, 10d, "The Host never saw the guest leave.");
             Assert.That(host.Network.HeldSeatCount, Is.Zero, "나가기 does not hold the place.");
             Assert.That(host.Network.GetSlotOwner(2), Is.EqualTo(ulong.MaxValue));
@@ -118,6 +139,7 @@ namespace C6Lab.Tests
             Assert.That(host.Network.ParticipantCount, Is.EqualTo(2));
             Assert.That(host.Network.GetSlotOwner(2), Is.EqualTo(guest.Network.LocalPlayerId));
             Assert.That(guest.Network.IsSlotHeld(2), Is.False);
+            Assert.That(guest.Network.HoldsRoomTicket("127.0.0.1:" + guest.Network.port), Is.True, "A rejoin keeps the room's ticket.");
         }
 
         private static IEnumerator Until(Func<bool> condition, double seconds, string failure)

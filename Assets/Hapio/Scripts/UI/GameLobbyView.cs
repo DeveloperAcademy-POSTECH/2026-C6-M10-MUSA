@@ -388,7 +388,8 @@ namespace Hapio
                     + (room.capacity >= 2 ? room.participants + " / " + room.capacity + "명 모였소" : "인원 확인 중");
                 bool connecting = Network.IsJoiningRoom && Network.JoiningRoomKey == room.key;
                 string action = room.pending && !room.ready ? "준비 중..." : connecting ? "입장 중..."
-                    : !room.pending && room.waiting ? "방장 대기" : room.playing ? "봉인 중" : room.full ? "정원 마감" : "입장 →";
+                    : !room.pending && room.waiting ? "방장 대기" : room.playing ? "봉인 중"
+                    : room.full && !Network.HoldsRoomTicket(room.key) ? "정원 마감" : "입장 →";
                 var label = rows[i].transform.Find("Action").GetComponent<UnityEngine.UI.Text>();
                 label.text = action; label.fontSize = action == "입장 →" ? 20 : 14;
                 Transform arrow = rows[i].transform.Find("Arrow");

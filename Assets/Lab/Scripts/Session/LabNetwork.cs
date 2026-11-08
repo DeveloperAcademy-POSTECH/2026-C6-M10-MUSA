@@ -857,8 +857,10 @@ namespace C6Lab
 
         public bool CanJoinDiscoveredRoom(string roomKey)
         {
+            // A full room may still be holding this device's own place (#501): let the Host decide.
             return IsSearchingRooms && CanBeginConnection && !string.IsNullOrEmpty(roomKey)
-                && discoveredRooms.Any(item => string.Equals(item.Key, roomKey, StringComparison.OrdinalIgnoreCase) && !item.Playing && !item.IsFull && !item.WaitingForHost)
+                && discoveredRooms.Any(item => string.Equals(item.Key, roomKey, StringComparison.OrdinalIgnoreCase) && !item.Playing
+                    && (!item.IsFull || HoldsRoomTicket(item.Key)) && !item.WaitingForHost)
                 && LabRoomCatalog.RoutesForRoom(discovery.Targets, roomKey).Length > 0;
         }
 
@@ -869,7 +871,7 @@ namespace C6Lab
             LabDiscoveredRoom room = discoveredRooms.FirstOrDefault(item =>
                 string.Equals(item.Key, roomKey, StringComparison.OrdinalIgnoreCase));
             LabBonjourTarget[] targets = LabRoomCatalog.RoutesForRoom(discovery.Targets, roomKey);
-            if (room == null || room.Playing || room.IsFull || room.WaitingForHost || targets.Length == 0)
+            if (room == null || room.Playing || room.IsFull && !HoldsRoomTicket(room.Key) || room.WaitingForHost || targets.Length == 0)
             {
                 RefreshDiscoveredRooms();
                 SetRoomSearchMessage("That room is no longer available. Choose another room or refresh.", true);
@@ -1414,8 +1416,10 @@ namespace C6Lab
                     FinishJoin("No reachable route found. Use direct IP or check the Host network.", true);
                 }
             }
+            // A lobby rejoin also stops its attempt in flight when its budget ends (#501).
             if (joinInProgress && !joinRetryPending && !joinFinishPending && joinAttemptAt > 0
-                && now - joinAttemptAt >= JoinAttemptSeconds) AdvanceJoinCandidate();
+                && (now - joinAttemptAt >= JoinAttemptSeconds || lobbyRejoinActive && now >= lobbyRejoinUntil))
+                AdvanceJoinCandidate();
             UpdateLobbyRejoin(now);
             ApplyGameStartSimulationHold();
             if (IsHost && model != null && !gameBattleFrozen)
@@ -1481,7 +1485,6 @@ namespace C6Lab
 
         private void Approve(NetworkManager.ConnectionApprovalRequest request, NetworkManager.ConnectionApprovalResponse response)
         {
-            bool alreadyPending = pendingApprovals.ContainsKey(request.ClientNetworkId);
             bool validPayload = TryReadConnectionPayload(request.Payload, ActiveConnectionToken, gameFlowEnabled, out string ticket);
             // Held places count toward the room size; a returning ticket takes its own back (#501).
             string rejection = !manager.IsHost ? "The room is no longer hosted."
@@ -1489,7 +1492,7 @@ namespace C6Lab
                     ? "Lab version mismatch. Use the same game version."
                     : model != null || (gameFlowEnabled && gameRosterLocked)
                         ? "Battle already started. Wait for the Host to return to the lobby."
-                        : LobbyPlaceCount + pendingApprovals.Count - (alreadyPending ? 1 : 0) - ReclaimablePlaces(ticket)
+                        : LobbyPlaceCount + PendingNewPlaces(request.ClientNetworkId) - ReclaimablePlaces(ticket)
                           >= targetParticipantCount
                             ? "Room is full. Choose another room." : string.Empty;
             bool allowed = string.IsNullOrEmpty(rejection);

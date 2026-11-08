@@ -16,6 +16,7 @@ namespace C6Lab.Tests
         private const BindingFlags Private = BindingFlags.NonPublic | BindingFlags.Instance;
         private const string TicketA = "0123456789abcdef0123456789abcdef";
         private const string TicketB = "fedcba9876543210fedcba9876543210";
+        private const string TicketC = "00112233445566778899aabbccddeeff";
 
         [Test]
         public void AGameJoinMayAddARoomTicketAfterTheTokenButALabJoinMayNot()
@@ -47,7 +48,9 @@ namespace C6Lab.Tests
                 Assert.That(room.Network.ParticipantCount, Is.EqualTo(2), "A held place is not a connected participant.");
                 Assert.That(room.Network.CanStartBattle, Is.False);
                 Assert.That(room.Approve(7, null), Is.False, "A stranger cannot take the held place.");
-                Assert.That(room.Approve(8, TicketB + "x"), Is.False);
+                Assert.That(room.Approve(8, TicketC), Is.False, "Another device's ticket cannot take it either.");
+                Assert.That(room.Approve(11, TicketB + "x"), Is.False, "A malformed ticket is a version mismatch.");
+                Assert.That(room.Network.GetSlotOwner(2), Is.EqualTo(5UL));
                 Assert.That(room.Approve(9, TicketA), Is.True, "The same room ticket gets its place back.");
                 room.Connect(9);
                 Assert.That(room.Network.HeldSeatCount, Is.Zero);
@@ -57,7 +60,47 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void AGuestThatSaysGoodbyeFreesItsPAtOnceAndGetsItBackLaterOnlyIfStillFree()
+        public void AStrangerInARoomWithSpaceDoesNotTakeAHeldP()
+        {
+            using (var room = new HostRoom(4))
+            {
+                room.Join(5, TicketA, 2);
+                room.Drop(5);
+                Assert.That(room.Approve(8, TicketC), Is.True, "The room still has a free place.");
+                room.Connect(8);
+                Assert.That(room.Network.HeldSeatCount, Is.EqualTo(1));
+                Assert.That(room.Network.GetSlotOwner(2), Is.EqualTo(5UL));
+                Assert.That(room.Slots.GetSlot(8), Is.Zero);
+                Assert.That(room.Slots.TrySelect(8, 2, out string reason), Is.False, "The held P is taken.");
+                Assert.That(reason, Is.EqualTo("SLOT_TAKEN"));
+            }
+        }
+
+        [Test]
+        public void TwoReturnsApprovedInTheSameFrameBothGetTheirPlacesBack()
+        {
+            using (var room = new HostRoom(3))
+            {
+                room.Join(5, TicketA, 2);
+                room.Join(6, TicketB, 3);
+                room.Drop(5);
+                room.Drop(6);
+                Assert.That(room.Network.HeldSeatCount, Is.EqualTo(2));
+                // NGO approves every request polled in a frame before the first connect callback of the next frame.
+                Assert.That(room.Approve(9, TicketA), Is.True);
+                Assert.That(room.Approve(10, TicketB), Is.True, "A return waiting to connect is not a new place.");
+                Assert.That(room.Approve(7, null), Is.False, "Both places are still taken.");
+                room.Connect(9);
+                room.Connect(10);
+                Assert.That(room.Network.HeldSeatCount, Is.Zero);
+                Assert.That(room.Network.GetSlotOwner(2), Is.EqualTo(9UL));
+                Assert.That(room.Network.GetSlotOwner(3), Is.EqualTo(10UL));
+                Assert.That(room.Network.ParticipantCount, Is.EqualTo(3));
+            }
+        }
+
+        [Test]
+        public void AGuestThatSaysGoodbyeFreesItsPAtOnceAndComesBackAsANewPlayer()
         {
             using (var room = new HostRoom(3))
             {
@@ -68,14 +111,48 @@ namespace C6Lab.Tests
                 Assert.That(room.Network.GetSlotOwner(2), Is.EqualTo(ulong.MaxValue));
                 Assert.That(room.Approve(9, TicketA), Is.True);
                 room.Connect(9);
-                Assert.That(room.Network.GetSlotOwner(2), Is.EqualTo(9UL), "A free remembered P comes back.");
-                room.SayGoodbye(9);
+                Assert.That(room.Slots.GetSlot(9), Is.Zero, "A place given up does not bring its P back.");
+            }
+        }
+
+        [Test]
+        public void AReturnAfterTheHoldEndedGetsItsPBackOnlyIfStillFree()
+        {
+            using (var room = new HostRoom(3))
+            {
+                room.Join(5, TicketA, 2);
+                room.Drop(5);
+                room.Expire(Time.realtimeSinceStartupAsDouble + LabNetwork.LobbySeatHoldSeconds + 1d);
+                Assert.That(room.Network.HeldSeatCount, Is.Zero);
+                Assert.That(room.Approve(9, TicketA), Is.True);
+                room.Connect(9);
+                Assert.That(room.Network.GetSlotOwner(2), Is.EqualTo(9UL), "The P it left with is still free.");
                 room.Drop(9);
+                room.Expire(Time.realtimeSinceStartupAsDouble + LabNetwork.LobbySeatHoldSeconds + 1d);
                 room.Join(6, TicketB, 2);
                 Assert.That(room.Approve(10, TicketA), Is.True);
                 room.Connect(10);
                 Assert.That(room.Network.GetSlotOwner(2), Is.EqualTo(6UL), "A P someone else took stays theirs.");
                 Assert.That(room.Slots.GetSlot(10), Is.Zero);
+            }
+        }
+
+        [Test]
+        public void ADropAfterClearingItsPComesBackWithoutTheOldP()
+        {
+            using (var room = new HostRoom(3))
+            {
+                room.Join(5, TicketA, 2);
+                room.Drop(5);
+                Assert.That(room.Approve(9, TicketA), Is.True);
+                room.Connect(9);
+                Assert.That(room.Network.GetSlotOwner(2), Is.EqualTo(9UL));
+                Assert.That(room.Slots.TrySelect(9, 0, out _), Is.True, "The player clears its own choice.");
+                room.Drop(9);
+                Assert.That(room.Approve(10, TicketA), Is.True);
+                room.Connect(10);
+                Assert.That(room.Slots.GetSlot(10), Is.Zero, "It left with no P, so it comes back with none.");
+                Assert.That(room.Network.GetSlotOwner(2), Is.EqualTo(ulong.MaxValue));
             }
         }
 
@@ -91,6 +168,23 @@ namespace C6Lab.Tests
                 Assert.That(room.Network.HeldSeatCount, Is.Zero);
                 Assert.That(room.Network.GetSlotOwner(2), Is.EqualTo(ulong.MaxValue));
                 Assert.That(room.Approve(7, null), Is.True, "The place is open again.");
+            }
+        }
+
+        [Test]
+        public void ARoomCardWithThisDevicesTicketMayBeTriedWhenItLooksFull()
+        {
+            using (var room = new HostRoom(3, host: false))
+            {
+                Assert.That(room.Network.HoldsRoomTicket("7777:합이오 방"), Is.False, "No ticket before joining.");
+                typeof(LabNetwork).GetMethod("PrepareRejoinTicket", Private).Invoke(room.Network, new object[] { "7777:합이오 방" });
+                Assert.That(room.Network.HoldsRoomTicket("7777:합이오 방"), Is.True);
+                Assert.That(room.Network.HoldsRoomTicket("7778:합이오 방"), Is.False, "Only the room it was made for.");
+                string ticket = (string)typeof(LabNetwork).GetField("rejoinTicket", Private).GetValue(room.Network);
+                Assert.That(ticket, Does.Match("^[0-9a-f]{32}$"));
+                typeof(LabNetwork).GetMethod("PrepareRejoinTicket", Private).Invoke(room.Network, new object[] { "7777:합이오 방" });
+                Assert.That(typeof(LabNetwork).GetField("rejoinTicket", Private).GetValue(room.Network), Is.EqualTo(ticket),
+                    "Joining the same room again keeps the ticket.");
             }
         }
 

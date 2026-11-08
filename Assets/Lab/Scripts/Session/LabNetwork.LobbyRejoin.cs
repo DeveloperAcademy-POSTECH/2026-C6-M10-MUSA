@@ -122,6 +122,13 @@ namespace C6Lab
             rejoinTicketRoom = room;
         }
 
+        /// <summary>
+        /// This device has a ticket for the room, so the Host may be holding its place: a full card is worth trying, and
+        /// the Host's approval decides (#501).
+        /// </summary>
+        public bool HoldsRoomTicket(string roomKey) => gameFlowEnabled && !string.IsNullOrEmpty(rejoinTicket)
+            && !string.IsNullOrEmpty(roomKey) && string.Equals(rejoinTicketRoom, roomKey, StringComparison.OrdinalIgnoreCase);
+
         /// <summary>The held or still-connected place this ticket would take over.</summary>
         private int ReclaimablePlaces(string ticket)
         {
@@ -130,6 +137,22 @@ namespace C6Lab
             foreach (ulong member in order)
                 if (memberTickets.TryGetValue(member, out string known) && known == ticket) return 1;
             return 0;
+        }
+
+        /// <summary>
+        /// Other approved connections still on their way in that will take a new place. One that brings back a held or
+        /// still-connected ticket takes its own place, already counted, so two returns in one frame both fit.
+        /// </summary>
+        private int PendingNewPlaces(ulong requester)
+        {
+            int count = 0;
+            foreach (ulong pending in pendingApprovals.Keys)
+            {
+                if (pending == requester) continue;
+                string ticket = approvedTickets.TryGetValue(pending, out string known) ? known : null;
+                if (ReclaimablePlaces(ticket) == 0) count++;
+            }
+            return count;
         }
 
         private string TakeApprovedTicket(ulong id)
@@ -147,10 +170,12 @@ namespace C6Lab
         {
             if (ticket == null || !LobbyRosterOpen) return 0;
             int slot = 0;
+            bool found = false;
             for (int i = lobbySeatHolds.Count - 1; i >= 0; i--)
             {
                 LobbySeatHold hold = lobbySeatHolds[i];
                 if (hold.ticket != ticket) continue;
+                found = true;
                 lobbySeatHolds.RemoveAt(i);
                 playerSlots?.Release(hold.playerId);
                 if (hold.slot > 0) slot = hold.slot;
@@ -159,6 +184,7 @@ namespace C6Lab
             foreach (ulong stale in order.Where(member => member != id && member != NetworkManager.ServerClientId
                          && memberTickets.TryGetValue(member, out string known) && known == ticket).ToArray())
             {
+                found = true;
                 int staleSlot = playerSlots?.GetSlot(stale) ?? 0;
                 if (staleSlot > 0) slot = staleSlot;
                 ForgetLobbyMember(stale);
@@ -166,7 +192,9 @@ namespace C6Lab
                 Debug.Log("C6_LAB_LOBBY_REJOIN host=replaced old=" + stale + " new=" + id + " p=" + staleSlot);
                 DisconnectReplacedMember(stale);
             }
-            if (slot == 0 && rememberedSlots.TryGetValue(ticket, out int remembered)) slot = remembered;
+            // A held or replaced place brings back exactly the P it had (none if its choice was cleared); only a return
+            // after its hold ended falls back to the P it left with.
+            if (!found && rememberedSlots.TryGetValue(ticket, out int remembered)) slot = remembered;
             return slot;
         }
 
@@ -196,18 +224,21 @@ namespace C6Lab
         }
 
         /// <summary>
-        /// A lobby member with a ticket that did not say goodbye keeps its place and P (still owned by its old id).
-        /// Every departure remembers its P, so a later return gets it back if it is still free.
+        /// A lobby member with a ticket that did not say goodbye keeps its place and P (still owned by its old id). Its
+        /// P at departure is also remembered, so a return after the hold ended gets it back if it is still free.
+        /// 나가기 gives both up.
         /// </summary>
         private bool HoldLobbyPlace(ulong id, int slot)
         {
             if (!memberTickets.TryGetValue(id, out string ticket)) return false;
-            if (slot > 0) rememberedSlots[ticket] = slot;
             if (lobbyLeavers.Contains(id))
             {
+                rememberedSlots.Remove(ticket);
                 Debug.Log("C6_LAB_LOBBY_HOLD result=left id=" + id + " p=" + slot);
                 return false;
             }
+            if (slot > 0) rememberedSlots[ticket] = slot;
+            else rememberedSlots.Remove(ticket);
             lobbySeatHolds.Add(new LobbySeatHold { ticket = ticket, playerId = id, slot = slot,
                 until = Time.realtimeSinceStartupAsDouble + lobbySeatHoldSeconds });
             Debug.Log("C6_LAB_LOBBY_HOLD result=held id=" + id + " p=" + slot
@@ -262,7 +293,12 @@ namespace C6Lab
                 var closed = new LabNetworkPacket { type = "lobby_closed" };
                 foreach (ulong id in order) if (id != LocalPlayerId) Send(id, closed);
             }
-            else Send(NetworkManager.ServerClientId, new LabNetworkPacket { type = "lobby_leave" });
+            else if (Send(NetworkManager.ServerClientId, new LabNetworkPacket { type = "lobby_leave" }))
+            {
+                // A guest that said goodbye gave its place up; a later join to this room is a new player.
+                rejoinTicket = null;
+                rejoinTicketRoom = null;
+            }
         }
 
         /// <summary>The room's held seats and tickets. The guest's own ticket and rejoin state stay.</summary>
