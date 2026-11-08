@@ -61,10 +61,10 @@ namespace C6Lab
         private bool poured, splashed;
         // #551 failure: Jigwi's steam fogs my board until I rub it clear.
         [Tooltip("김이 이만큼(0~1) 남을 때까지 문지르면 닦인 것.")]
-        [SerializeField, Range(.05f, .8f)] private float steamClearLeft = .35f;
+        [SerializeField, Range(.05f, .8f)] private float steamClearLeft = .1f;
         [Tooltip("문지르는 손가락 굵기(판 폭 비율).")]
-        [SerializeField, Range(.03f, .3f)] private float steamBrush = .11f;
-        private const int SteamW = 48, SteamH = 64;
+        [SerializeField, Range(.03f, .3f)] private float steamBrush = .14f;
+        private const int SteamW = 48, SteamH = 104; // the whole screen
         private RawImage steam;
         private Texture2D steamTexture;
         private readonly float[] steamAlpha = new float[SteamW * SteamH];
@@ -93,7 +93,12 @@ namespace C6Lab
         [SerializeField] private string pourVoiceFolder = "JigwiVoiceBucketPour";
         [Tooltip("김을 문질러 닦을 때 뽀득뽀득 소리 폴더(여러 개면 무작위).")]
         [SerializeField] private string rubSoundFolder = "JigwiBucketRub";
-        [SerializeField, Range(0f, 1f)] private float heatVolume = .6f, pourVolume = .9f, smokeVolume = .9f, rubVolume = .8f;
+        [Tooltip("출렁할 때마다 찰랑 소리 폴더(기운 쪽 스피커로 치우쳐 난다).")]
+        [SerializeField] private string sloshSoundFolder = "JigwiBucketSlosh";
+        [Tooltip("실패 연기가 화면을 다 덮는 순간 쿵 하는 소리 폴더.")]
+        [SerializeField] private string fogHitSoundFolder = "JigwiBucketFogHit";
+        [SerializeField, Range(0f, 1f)] private float heatVolume = .6f, pourVolume = .9f, smokeVolume = .9f, rubVolume = .8f,
+            sloshVolume = .8f, fogHitVolume = 1f;
         [Tooltip("\"이럴수가!\" 때 햅틱 세기.")]
         [SerializeField, Range(0f, 1f)] private float pourVoiceHapticIntensity = 1f;
         [Tooltip("쏟을 때 화면 흔들림 세기(박 크기 대비).")]
@@ -147,10 +152,10 @@ namespace C6Lab
             cueLabel = NewText("Label", 44, cue);
             glow = NewImage("Jigwi Threat Glow", Glow(), root);
             glow.transform.SetAsFirstSibling(); // behind the bucket and ropes
-            for (int i = 0; i < smoke.Length; i++) smoke[i] = NewImage("Jigwi Threat Smoke " + i, Disc(), root);
+            for (int i = 0; i < smoke.Length; i++) smoke[i] = NewImage("Jigwi Threat Smoke " + i, Puff(), root);
             glowCore = NewImage("Jigwi Threat Glow Core", Glow(), root);
             glowCore.transform.SetSiblingIndex(1);
-            for (int i = 0; i < blow.Length; i++) blow[i] = NewImage("Jigwi Smoke Blow " + i, SmokeEmoji(), root);
+            for (int i = 0; i < blow.Length; i++) blow[i] = NewImage("Jigwi Smoke Billow " + i, Puff(), root);
             gaugeBack = NewImage("Jigwi Bucket Shake Gauge Back", Pixel(), root);
             gaugeFill = NewImage("Jigwi Bucket Shake Gauge", Pixel(), root);
             for (int i = 0; i < gaugeTicks.Length; i++) gaugeTicks[i] = NewImage("Jigwi Bucket Shake Tick " + i, Pixel(), root);
@@ -193,8 +198,8 @@ namespace C6Lab
             bool live = !poured && !failed && now >= arrive && round.resolution == LabJigwiABResolution.None;
             // Fail: Jigwi's bubble (and voice) first, then his smoke shoots down and fogs my board.
             if (failed && failAt < 0f) failAt = t;
-            if (failAt >= 0f && t - failAt >= 1.45f) StartSteam(round.id);
-            bool visible = now >= arrive - threatLeadSeconds - .1d && (poured ? t - pourAt < 1.9f : failAt < 0f || t - failAt < 2.4f);
+            if (failAt >= 0f && t - failAt >= 2f) StartSteam(round.id);
+            bool visible = now >= arrive - threatLeadSeconds - .1d && (poured ? t - pourAt < 1.9f : failAt < 0f || t - failAt < 3.4f);
             if (!visible) { Hide(); return; }
             ReadRoll(dt);
             if (live) Slosh(t);
@@ -276,6 +281,7 @@ namespace C6Lab
             int lean = roll >= sloshDegrees ? 1 : roll <= -sloshDegrees ? -1 : 0;
             if (lean == 0 || lean == side) return;
             side = lean; sloshes++; lastSloshAt = sloshAt = t;
+            PlayPanned(sloshSoundFolder, sloshVolume * (.75f + .25f * Mathf.Min(sloshes, sloshesToPour) / Mathf.Max(1f, sloshesToPour)), lean * .6f);
             SpillDrops(4 + 3 * sloshes);
             if (sloshes >= sloshesToPour)
             {
@@ -561,12 +567,13 @@ namespace C6Lab
         }
 
         /// <summary>
-        /// 실패: 야광귀 말풍선과 같은 자리(박 옆, `LabGourdAlert`)에 지귀 연기 이모지가 뜨고 지귀 목소리 → 1초 뒤 박이 크게 부풀며
-        /// 연기 덩어리들이 줄줄이 내 판으로 뿜어져 나와 퍼지고(화면이 흔들림) → 그대로 김이 서린다.
+        /// 실패: 야광귀 말풍선과 같은 자리(박 옆, `LabGourdAlert`)에 지귀 연기 이모지 + 지귀 목소리 → 1초 뒤 박이 부풀었다 뿜으면
+        /// 달아오를 때 박 위에 피어오르던 그 연기가 그대로 부풀어 화면 전체(3D 영역과 판)로 퍼져 회색으로 채우고 → 그 위에 두꺼운 연기 막이 깔린다.
         /// </summary>
         private void DrawFail(float t)
         {
             float since = failAt >= 0f ? t - failAt : -1f;
+            float w = root.rect.width, h = root.rect.height;
             if (since >= 0f && !failSpoken)
             {
                 failSpoken = true;
@@ -574,28 +581,36 @@ namespace C6Lab
                 if (source != null) LabHaptics.PlayDirect(source.config, LabHapticStyle.Rigid, .6f);
                 if (gourdBubble == null) gourdBubble = FindFirstObjectByType<LabGourdAlert>();
                 if (gourdBubble != null && source != null) gourdBubble.ShowPicture(source.target, SmokeEmoji(), 1.3f);
-                Vector2 boardCentre = new Vector2(0f, -root.rect.height * .25f);
+                // Where each billow ends up: spread over the whole screen, more of them over the 3D area (upper half).
                 for (int i = 0; i < blow.Length; i++)
-                    blowTo[i] = boardCentre + new Vector2(UnityEngine.Random.Range(-.42f, .42f) * root.rect.width, UnityEngine.Random.Range(-.18f, .18f) * root.rect.height);
+                {
+                    float col = (i % 4 + UnityEngine.Random.Range(.1f, .9f)) / 4f - .5f;
+                    float row = (i / 4 + UnityEngine.Random.Range(.1f, .9f)) / ((blow.Length + 3) / 4) - .5f;
+                    blowTo[i] = new Vector2(col * w * 1.05f, (row * .95f + .12f) * h);
+                }
             }
-            // Puffs leave the boss one after another (a cough of smoke), wobble down and spread over my board.
+            if (since < 0f) { foreach (Image puff in blow) Show(puff, false); return; }
             float s = since - 1f;
-            if (since >= 0f && s >= 0f && !smokeSounded) { smokeSounded = true; Play(smokeSoundFolder, smokeVolume); }
+            if (s >= 0f && !smokeSounded) { smokeSounded = true; Play(smokeSoundFolder, smokeVolume); ShakeView(.5f); }
+            // Billows start exactly where the threat smoke was rising (just above the boss) and swell outward until they meet.
+            Vector2 boss = Boss;
             for (int i = 0; i < blow.Length; i++)
             {
-                float start = i * .035f, k = s - start;
-                bool on = since >= 0f && k >= 0f && k < .9f;
+                float k = s - (i % 4) * .06f - (i / 4) * .04f;
+                bool on = k >= 0f && k < 2.2f;
                 Show(blow[i], on);
                 if (!on) continue;
-                float fly = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(k / .4f));
-                Vector2 from = Boss, to = blowTo[i];
-                Vector2 at = Vector2.Lerp(from, to, fly) + new Vector2(Mathf.Sin(k * 18f + i) * root.rect.width * .04f * (1f - fly), root.rect.height * .06f * Mathf.Sin(fly * Mathf.PI));
-                float grow = Mathf.Lerp(.12f, .34f + .06f * (i % 3), fly) * root.rect.width;
-                Place(blow[i].rectTransform, at, Vector2.one * grow, (i % 2 == 0 ? 1f : -1f) * k * 120f);
-                blow[i].color = new Color(1f, 1f, 1f, 1f - Mathf.Clamp01((k - .6f) / .3f));
+                float grow = 1f - Mathf.Pow(1f - Mathf.Clamp01(k / 1f), 3f); // fast out, slow in
+                Vector2 from = boss + new Vector2(Mathf.Sin(i * 2.3f) * w * .08f, w * (.08f + .12f * ((i * 7) % 5) / 5f));
+                Vector2 at = Vector2.Lerp(from, blowTo[i], grow) + new Vector2(Mathf.Sin(k * 3f + i) * w * .02f, Mathf.Cos(k * 2.5f + i) * w * .02f);
+                float size = Mathf.Lerp(.16f, .75f + .1f * (i % 3), grow) * w * (1f + .04f * Mathf.Sin(k * 4f + i));
+                Place(blow[i].rectTransform, at, Vector2.one * size, (i % 2 == 0 ? 1f : -1f) * k * 25f);
+                float grey = Mathf.Lerp(.3f, .52f, grow);
+                float alpha = Mathf.Lerp(.75f, .95f, grow) * (1f - Mathf.Clamp01((k - 1.7f) / .5f));
+                blow[i].color = new Color(grey, grey * .97f, grey * .95f, alpha);
             }
-            // The first puff hitting the board: a thump.
-            if (since >= 0f && s >= .4f && s - Time.unscaledDeltaTime < .4f && source != null)
+            // The smoke closing over the screen: a thump.
+            if (s >= .5f && s - Time.unscaledDeltaTime < .5f && source != null)
                 LabHaptics.PlayDirect(source.config, LabHapticStyle.Heavy, .9f, .25f, .6f, .4f);
         }
 
@@ -617,6 +632,18 @@ namespace C6Lab
 
         private void StopHeatSound() { if (heatSource != null && heatSource.isPlaying) heatSource.Stop(); }
 
+        private AudioSource panned;
+        /// <summary>한 번 나는 소리를 왼쪽(-1)~오른쪽(+1)으로 치우쳐 낸다.</summary>
+        private void PlayPanned(string folder, float volume, float pan)
+        {
+            if (string.IsNullOrEmpty(folder) || volume <= 0f) return;
+            AudioClip[] clips = Resources.LoadAll<AudioClip>("Audio/" + folder);
+            if (clips == null || clips.Length == 0) return;
+            if (panned == null) { panned = gameObject.AddComponent<AudioSource>(); panned.playOnAwake = false; panned.spatialBlend = 0f; }
+            panned.panStereo = Mathf.Clamp(pan, -1f, 1f);
+            panned.PlayOneShot(clips[UnityEngine.Random.Range(0, clips.Length)], volume * LabAudioSettings.SfxVolume);
+        }
+
         private void Play(string folder, float volume)
         {
             if (string.IsNullOrEmpty(folder) || volume <= 0f) return;
@@ -626,8 +653,8 @@ namespace C6Lab
             sfx.PlayOneShot(clips[UnityEngine.Random.Range(0, clips.Length)], volume * LabAudioSettings.SfxVolume);
         }
 
-        // ---------- failure: steam over my board ----------
-        /// <summary>내 양동이를 제시간에 못 쏟았다: 지귀 김이 조합판을 뒤덮는다(한 회차에 한 번). 판 입력이 막힌다.</summary>
+        // ---------- failure: Jigwi's smoke over the whole screen ----------
+        /// <summary>내 양동이를 제시간에 못 쏟았다: 지귀 연기가 화면 전체(3D 영역과 조합판)를 덮는다(한 회차에 한 번). 판 입력이 막히고, 90% 문질러야 걷힌다.</summary>
         private void StartSteam(string roundId)
         {
             if (steamRound == roundId) return;
@@ -640,17 +667,13 @@ namespace C6Lab
                 steamPixels = new Color32[SteamW * SteamH];
                 steam.texture = steamTexture;
             }
-            // Thick, uneven fog: pale grey with a warm (Jigwi) tint, clumpy so rubbing shows streaks.
-            for (int y = 0; y < SteamH; y++)
-                for (int x = 0; x < SteamW; x++)
-                {
-                    float n = .5f + .25f * Mathf.Sin(x * .41f + y * .17f) + .25f * Mathf.Sin(x * .13f - y * .37f + 1.7f);
-                    steamAlpha[y * SteamW + x] = Mathf.Lerp(.82f, 1f, n);
-                }
+            // Fully opaque until rubbed away: nothing of the boss or the board shows through.
+            for (int i = 0; i < steamAlpha.Length; i++) steamAlpha[i] = 1f;
             WriteSteam();
             steamLeft = lastTickLeft = 1f;
             if (source != null && source.board != null) { source.board.SetUiInputBlocked(true); steamBlocking = true; }
-            if (source != null) LabHaptics.PlayDirect(source.config, LabHapticStyle.Heavy, .8f, .3f, .5f, .3f);
+            if (source != null) LabHaptics.PlayDirect(source.config, LabHapticStyle.Heavy, 1f, .45f, .8f, .3f);
+            Play(fogHitSoundFolder, fogHitVolume);
         }
 
         private void WriteSteam()
@@ -659,8 +682,8 @@ namespace C6Lab
             {
                 int x = i % SteamW, y = i / SteamW;
                 float warm = .5f + .5f * Mathf.Sin(x * .3f + y * .2f);
-                byte a = (byte)Mathf.RoundToInt(255f * Mathf.Clamp01(steamAlpha[i]) * .93f);
-                steamPixels[i] = new Color32((byte)(222 + 18 * warm), (byte)(214 + 12 * warm), 205, a);
+                byte a = (byte)Mathf.RoundToInt(255f * Mathf.Clamp01(steamAlpha[i]));
+                steamPixels[i] = new Color32((byte)(128 + 14 * warm), (byte)(122 + 10 * warm), 118, a); // Jigwi's smoke grey
             }
             steamTexture.SetPixels32(steamPixels); steamTexture.Apply(false, false);
         }
@@ -673,11 +696,11 @@ namespace C6Lab
             float t = Time.unscaledTime;
             if (!battle) { EndSteam(); return; }
             Ensure();
-            Camera view = source.board != null ? source.board.ViewCamera : null;
-            Rect board = view != null ? view.pixelRect : new Rect(0f, 0f, Screen.width, Screen.height * .46f);
+            // The smoke covers the whole screen: the 3D view (so the boss is hidden) and my board (blocked) alike.
+            Rect board = new Rect(0f, 0f, Screen.width, Screen.height);
             PlaceScreenRect(steam.rectTransform, board);
             if (!steam.gameObject.activeSelf) steam.gameObject.SetActive(true);
-            float fadeIn = Mathf.Clamp01((t - steamAt) / .35f);
+            float fadeIn = Mathf.Clamp01((t - steamAt) / .5f);
             float fadeOut = steamClearedAt >= 0f ? 1f - Mathf.Clamp01((t - steamClearedAt) / .4f) : 1f;
             steam.color = new Color(1f, 1f, 1f, fadeIn * fadeOut);
             if (steamClearedAt >= 0f)
@@ -699,9 +722,9 @@ namespace C6Lab
             Show(steamHand, hint);
             if (hint)
             {
-                float hand = board.width * .14f;
+                float hand = board.width * .16f;
                 float u = Mathf.Sin(t * 7f);
-                Vector2 centre = new Vector2(board.center.x + u * board.width * .12f, board.center.y + Mathf.Abs(u) * hand * .12f);
+                Vector2 centre = new Vector2(board.center.x + u * board.width * .12f, board.yMin + board.height * .66f + Mathf.Abs(u) * hand * .12f);
                 PlaceScreenRect(steamHand.rectTransform, new Rect(centre.x - hand * .33f, centre.y - hand * .5f, hand * .67f, hand));
                 steamHand.rectTransform.localEulerAngles = new Vector3(0f, 0f, -u * 12f);
                 steamHand.color = new Color(1f, 1f, 1f, Mathf.Clamp01(steamLeft * 1.6f) * fadeIn);
@@ -727,7 +750,7 @@ namespace C6Lab
                         float d = dx * dx + dy * dy;
                         if (d > 1f) continue;
                         int i = y * SteamW + x;
-                        float next = Mathf.Min(steamAlpha[i], steamAlpha[i] * (.25f + .75f * d));
+                        float next = Mathf.Min(steamAlpha[i], steamAlpha[i] * (.08f + .92f * d));
                         if (next < steamAlpha[i] - .001f) { steamAlpha[i] = next; changed = true; }
                     }
             }
@@ -931,6 +954,14 @@ namespace C6Lab
             if (eye) return new Color(1f, .95f, .85f, 1f);
             float shade = .38f + .12f * Mathf.Clamp01((y - 10f) / 60f);
             return new Color(shade, shade * .97f, shade * .95f, 1f);
+        });
+        private static Sprite puffSprite;
+        /// <summary>A soft round smoke puff (white, tinted by colour): solid middle, feathered edge.</summary>
+        private static Sprite Puff() => puffSprite != null ? puffSprite : puffSprite = Build("Jigwi smoke puff", 64, 64, (u, v) =>
+        {
+            float d = Vector2.Distance(new Vector2(u, v), new Vector2(.5f, .5f)) * 2f;
+            float lump = .06f * Mathf.Sin(Mathf.Atan2(v - .5f, u - .5f) * 5f);
+            return new Color(1f, 1f, 1f, Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((1f + lump - d) / .35f)));
         });
         private static Sprite Disc() => discSprite != null ? discSprite : discSprite = Build("Jigwi bucket drop", 48, 48, (u, v) =>
         {
