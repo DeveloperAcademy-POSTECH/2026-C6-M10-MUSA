@@ -109,8 +109,9 @@ namespace Hapio.Editor
                 {
                     GameScreen screen = scene.GetRootGameObjects()
                         .SelectMany(root => root.GetComponentsInChildren<GameScreen>(true)).SingleOrDefault();
-                    current &= screen != null && screen.developerInputs?.Length == LabConfig.DeveloperFields.Count
-                        && screen.developerSliders?.Length == LabConfig.DeveloperFields.Count
+                    // The saved panel ends before the runtime-only clay rows (#506).
+                    current &= screen != null && screen.developerInputs?.Length == GameSceneBuilder.SavedDeveloperRowCount
+                        && screen.developerSliders?.Length == GameSceneBuilder.SavedDeveloperRowCount
                         && screen.developerScopeButtons?.Length == 5
                         && screen.developerInputs.All(input => input != null)
                         && screen.developerSliders.All(slider => slider != null)
