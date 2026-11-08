@@ -6630,3 +6630,8 @@ PR-1(`feat/#507-gourd-rig-contract`) 위에서 Unity 6000.6.5f1 macOS batch Edit
 검사 이력: 초기 메뉴 검사에서 입력 준비/클릭 경로 1건이 실패했으나 소유 Canvas의 포인터 인터페이스 제거와 입력 준비 대기 반영 후 15/15로 재검사했다. 스크립트 갱신과 겹쳐 Test Framework가 중단된 실행, 추가 검사 import 전 0개 실행은 PASS 집계에서 제외했다. 새 로비 전환 검사는 import·컴파일 목록 존재를 확인한 후 실제 1개 실행/통과를 별도로 확인했다.
 
 미실행: iPhone/iPad 실제 터치, iOS Release 빌드·App Store 배포, 일반 Wi-Fi·핫스팟 기기간 연결, 전체 EditMode·PlayMode 모음. 결과 화면의 ‘다음/다음 스테이지’ 중복과 봉인 카드 재등장 구조는 조사만 했고 이번 변경에 포함하지 않았다.
+
+### #564 PR 병합 전 최신 main 통합 확인
+
+- 원격 main `ae4aa87e`(#561)의 저장 DEV 257행·240번 기본값·Prefab 글꼴 보존 수정을 반영한 뒤 macOS 기본 batch 환경에서 재검사했다. **EditMode `GameEditorMenuCleanupTests` 4/4 PASS(0.60초), 관련 PlayMode 37/37 PASS(36.24초)**이며 실행 건수가 0이 아닌 NUnit 결과를 확인했다.
+- main 대비 PR 변경은 DEV 코드·해당 검사·사용법/검증 문서 13개 파일뿐이다. Scene·Prefab·머터리얼·패키지·ProjectSettings와 결과 화면 전환 코드는 변경하지 않았다. `git diff --check`와 검사 후 깨끗한 작업 트리를 확인했다. 추가 iOS·실네트워크·전체 검사 모음은 실행하지 않았다.
