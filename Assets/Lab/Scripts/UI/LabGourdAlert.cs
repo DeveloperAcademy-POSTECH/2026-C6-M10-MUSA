@@ -71,6 +71,7 @@ namespace C6Lab
         private UnityEngine.UI.Text mark;
         private Image blockMark;
         private Image heartMark;
+        private Image pictureMark; // #551: any small picture (e.g. Jigwi's smoke) drawn by the caller
         private bool showingHeart;
         private bool wasCharmed;
         private RectTransform eyesRect;
@@ -211,6 +212,18 @@ namespace C6Lab
         }
 
         /// <summary>
+        /// #551 지귀 B: 박 옆 말풍선에 그림 하나(예: 지귀 연기 이모지)를 seconds 동안 띄운다. 부른 화면에서만 보인다.
+        /// </summary>
+        public void ShowPicture(LabTarget gourd, Sprite picture, float seconds)
+        {
+            if (gourd == null || picture == null || !EnsureBubble()) return;
+            showingBlock = showingHeart = false;
+            pictureMark.sprite = picture;
+            ShowOnly(pictureMark.gameObject);
+            Begin(gourd, Mathf.Max(.3f, seconds));
+        }
+
+        /// <summary>
         /// 박이 이 사람의 한쪽 넘기기를 막았다고(#215) "← 🚫" 또는 "→ 🚫" 말풍선을 띄운다. 막힌 사람 화면에서만 부른다.
         /// </summary>
         public void ShowBlock(LabTarget gourd, bool right)
@@ -281,6 +294,7 @@ namespace C6Lab
             blockMark.gameObject.SetActive(shown == blockMark.gameObject);
             heartMark.gameObject.SetActive(shown == heartMark.gameObject);
             eyesRect.gameObject.SetActive(shown == eyesRect.gameObject);
+            pictureMark.gameObject.SetActive(shown == pictureMark.gameObject);
         }
 
         private void Begin(LabTarget gourd, float seconds)
@@ -426,6 +440,15 @@ namespace C6Lab
             heartMark.preserveAspect = true;
             heartMark.raycastTarget = false;
             heartRect.gameObject.SetActive(false);
+
+            // #551: a free picture slot (the caller passes the sprite), same size as the heart.
+            RectTransform pictureRect = NewRect("Gourd Alert Picture", bubble);
+            pictureRect.anchorMin = pictureRect.anchorMax = center;
+            pictureRect.sizeDelta = new Vector2(bubbleSize * .6f, bubbleSize * .6f);
+            pictureMark = pictureRect.gameObject.AddComponent<Image>();
+            pictureMark.preserveAspect = true;
+            pictureMark.raycastTarget = false;
+            pictureRect.gameObject.SetActive(false);
 
             // 야광귀 눈 (#268): 둘레 빛 → 보통 눈 → 빛나는 눈 순서로 겹친다.
             eyesRect = NewRect("Gourd Alert Eyes", bubble);

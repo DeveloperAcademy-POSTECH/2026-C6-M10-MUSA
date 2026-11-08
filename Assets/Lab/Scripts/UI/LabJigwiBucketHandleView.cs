@@ -34,7 +34,7 @@ namespace C6Lab
         [Tooltip("박(물을 맞는 곳)의 화면 높이(0~1).")]
         [SerializeField, Range(0f, 1f)] private float gourdAnchorY = .7f;
         [Tooltip("양동이 끈이 묶인 화면 자리(0~1)와 양동이 폭(화면 폭 비율). 박 바로 위.")]
-        [SerializeField] private Vector2 bucketHang = new Vector2(.5f, .85f);
+        [SerializeField] private Vector2 bucketHang = new Vector2(.5f, .93f);
         [SerializeField, Range(.1f, .4f)] private float bucketWidth = .2f;
         [Tooltip("좌우로 기울이라는 📱 그림의 화면 자리와 크기.")]
         [SerializeField] private Vector2 cueAnchor = new Vector2(.5f, .42f);
@@ -79,19 +79,31 @@ namespace C6Lab
         // #551 threat: the boss glows red-hot toward me while my bucket waits; failing = Jigwi's bubble, then his smoke on my board.
         [Tooltip("양동이가 오기 전 박이 달아오르기 시작하는 시간(초).")]
         [SerializeField, Range(0f, 3f)] private float threatLeadSeconds = 1.2f;
-        [Tooltip("실패 때 지귀 말풍선 글자.")]
-        [SerializeField] private string failLine = "연기로 덮어주마!";
         [Tooltip("실패 말풍선과 함께 나오는 지귀 목소리 폴더(지금은 기존 대사 재사용).")]
         [SerializeField] private string failVoiceFolder = "JigwiVoiceA";
         [Tooltip("박을 식혔을 때(쏟았을 때) 나는 소리 폴더.")]
         [SerializeField] private string douseSoundFolder = "JigwiFireDouse";
+        [Tooltip("박이 달아오르는 동안 반복되는 지글지글 소리 폴더(뜨거울수록 크고 높게). 없으면 조용히 넘어간다.")]
+        [SerializeField] private string heatLoopFolder = "JigwiBucketHeat";
+        [Tooltip("양동이를 쏟는 순간 물이 쏴아 쏟아지는 소리 폴더.")]
+        [SerializeField] private string pourSoundFolder = "JigwiBucketPour";
+        [Tooltip("실패 때 연기가 판으로 뿜어져 뒤덮는 소리 폴더.")]
+        [SerializeField] private string smokeSoundFolder = "JigwiBucketSmoke";
+        [SerializeField, Range(0f, 1f)] private float heatVolume = .6f, pourVolume = .9f, smokeVolume = .9f;
+        [Tooltip("쏟을 때 화면 흔들림 세기(박 크기 대비).")]
+        [SerializeField, Range(0f, .3f)] private float pourShake = .08f;
         [SerializeField, Range(0f, 1f)] private float voiceVolume = 1f, douseVolume = .9f;
-        private Image glow, bubble, smokeBurst;
-        private Text bubbleText;
+        private Image glow, glowCore, gaugeBack, gaugeFill;
+        private readonly Image[] gaugeTicks = new Image[5];
+        private readonly Image[] blow = new Image[16]; // the smoke Jigwi blows onto my board when I fail
+        private readonly Vector2[] blowTo = new Vector2[16];
+        private LabGourdAlert gourdBubble;
+        private static Sprite smokeEmojiSprite;
         private readonly Image[] smoke = new Image[10];
-        private static Sprite glowSprite, bubbleSprite;
+        private static Sprite glowSprite;
         private float heat, failAt = -1f, quenchAt = -1f;
-        private bool failSpoken;
+        private bool failSpoken, pourSounded, smokeSounded;
+        private AudioSource heatSource;
         private AudioSource sfx;
 
         /// <summary>테스트용: 지금 안내 한 줄 ("" = 없음) / 양동이가 보이는지 / 지금까지 출렁 수.</summary>
@@ -104,7 +116,7 @@ namespace C6Lab
             source = network;
             if (labelFont != null) font = labelFont;
             Ensure();
-            if (font != null) { banner.font = font; cueLabel.font = font; bubbleText.font = font; }
+            if (font != null) { banner.font = font; cueLabel.font = font; }
         }
 
         private void Ensure()
@@ -129,10 +141,12 @@ namespace C6Lab
             glow = NewImage("Jigwi Threat Glow", Glow(), root);
             glow.transform.SetAsFirstSibling(); // behind the bucket and ropes
             for (int i = 0; i < smoke.Length; i++) smoke[i] = NewImage("Jigwi Threat Smoke " + i, Disc(), root);
-            smokeBurst = NewImage("Jigwi Smoke Burst", Disc(), root);
-            bubble = NewImage("Jigwi Fail Bubble", Bubble(), root);
-            bubbleText = NewText("Jigwi Fail Bubble Text", 46, bubble.rectTransform);
-            bubbleText.GetComponent<Outline>().enabled = false;
+            glowCore = NewImage("Jigwi Threat Glow Core", Glow(), root);
+            glowCore.transform.SetSiblingIndex(1);
+            for (int i = 0; i < blow.Length; i++) blow[i] = NewImage("Jigwi Smoke Blow " + i, SmokeEmoji(), root);
+            gaugeBack = NewImage("Jigwi Bucket Shake Gauge Back", Pixel(), root);
+            gaugeFill = NewImage("Jigwi Bucket Shake Gauge", Pixel(), root);
+            for (int i = 0; i < gaugeTicks.Length; i++) gaugeTicks[i] = NewImage("Jigwi Bucket Shake Tick " + i, Pixel(), root);
             waterBack = NewImage("Jigwi Bucket Water Back", Pixel(), root);
             waterFill = NewImage("Jigwi Bucket Water", Pixel(), root);
             var steamObject = new GameObject("Jigwi Bucket Steam", typeof(RectTransform));
@@ -163,7 +177,7 @@ namespace C6Lab
             if (shownRound != round.id)
             {
                 shownRound = round.id; bucketAngle = 0f; dropIn = 1f; sloshes = 0; side = 0; poured = false; splashed = false;
-                pourAt = lastSloshAt = sloshAt = -1f; tiltStep = 0; heat = 0f; failAt = quenchAt = -1f; failSpoken = false;
+                pourAt = lastSloshAt = sloshAt = -1f; tiltStep = 0; heat = 0f; failAt = quenchAt = -1f; failSpoken = pourSounded = smokeSounded = false;
             }
             if (!poured && (me.launchedAt >= 0d || source.JigwiBucketPulledThisCount(round)))
             { poured = true; if (pourAt < 0f) { pourAt = t; pourSide = side != 0 ? side : 1; } }
@@ -172,15 +186,15 @@ namespace C6Lab
             bool live = !poured && !failed && now >= arrive && round.resolution == LabJigwiABResolution.None;
             // Fail: Jigwi's bubble (and voice) first, then his smoke shoots down and fogs my board.
             if (failed && failAt < 0f) failAt = t;
-            if (failAt >= 0f && t - failAt >= 1.35f) StartSteam(round.id);
-            bool visible = now >= arrive - threatLeadSeconds - .1d && (poured ? t - pourAt < 1.9f : failAt < 0f || t - failAt < 1.8f);
+            if (failAt >= 0f && t - failAt >= 1.45f) StartSteam(round.id);
+            bool visible = now >= arrive - threatLeadSeconds - .1d && (poured ? t - pourAt < 1.9f : failAt < 0f || t - failAt < 2.4f);
             if (!visible) { Hide(); return; }
             ReadRoll(dt);
             if (live) Slosh(t);
             Show(banner, false); // no words: the boss's glow, the bucket and the phone picture say it
             DrawThreat(now, arrive, deadline, t, dt);
             if (now >= arrive - .7d) DrawBucket(now, arrive, deadline, failed, t, dt, live);
-            else { Show(pail, false); Show(hangRope, false); foreach (Image pip in pips) Show(pip, false); Show(waterBack, false); Show(waterFill, false); }
+            else { Show(pail, false); Show(hangRope, false); HideGauge(); }
             DrawCue(live, t);
             DrawWater(t, dt);
             DrawFail(t);
@@ -339,30 +353,47 @@ namespace C6Lab
             Place(hangRope.rectTransform, (top + handle) * .5f, new Vector2(6f, Mathf.Max(1f, rope.magnitude)),
                 Mathf.Atan2(rope.y, rope.x) * Mathf.Rad2Deg + 90f);
             hangRope.color = new Color(.86f, .72f, .5f, alpha);
-            // Water left (my time) under the bucket.
-            float left = tilting ? Mathf.Clamp01((float)((deadline - now) / LabJigwiABTimeline.BucketSeatSeconds)) : 0f;
-            Show(waterBack, left > 0f); Show(waterFill, left > 0f);
-            if (left > 0f)
+            Show(waterBack, false); Show(waterFill, false);
+            foreach (Image pip in pips) Show(pip, false);
+            // Shake gauge just above the bucket: how much I have rocked it (sloshes so far + how far toward the next one).
+            if (!tilting || alpha <= 0f) { HideGauge(); return; }
+            int want = side == 0 ? 0 : -side; // the next slosh must go the other way
+            float toward = want == 0 ? Mathf.Clamp01(Mathf.Abs(roll) / sloshDegrees) : Mathf.Clamp01(roll * want / sloshDegrees);
+            float fill = Mathf.Clamp01((sloshes + toward * .95f) / Mathf.Max(1, sloshesToPour));
+            float width = size * 1.15f, height = size * .11f;
+            Vector2 gaugeAt = center + new Vector2(0f, size * .66f);
+            float pop = sloshAt >= 0f ? Mathf.Exp(-(t - sloshAt) * 8f) : 0f;
+            Show(gaugeBack, true); Show(gaugeFill, true);
+            Place(gaugeBack.rectTransform, gaugeAt, new Vector2(width + 8f, height + 8f) * (1f + .12f * pop), 0f);
+            gaugeBack.color = new Color(.12f, .08f, .05f, .85f);
+            Place(gaugeFill.rectTransform, gaugeAt + new Vector2(-width * (1f - fill) * .5f, 0f), new Vector2(width * fill, height), 0f);
+            gaugeFill.color = Color.Lerp(new Color(.45f, .78f, 1f, 1f), Color.white, pop * .6f);
+            for (int i = 0; i < gaugeTicks.Length; i++)
             {
-                float width = size * 1.1f, height = size * .08f;
-                Vector2 at = hang + new Vector2(0f, -size * 1.45f);
-                Place(waterBack.rectTransform, at, new Vector2(width + 6f, height + 6f), 0f);
-                waterBack.color = new Color(.1f, .06f, .02f, .8f);
-                Place(waterFill.rectTransform, at + new Vector2(-width * (1f - left) * .5f, 0f), new Vector2(width * left, height), 0f);
-                waterFill.color = Color.Lerp(new Color(1f, .45f, .3f, 1f), new Color(.45f, .8f, 1f, 1f), left);
-            }
-            // Slosh count under the bucket: ● filled per slosh.
-            for (int i = 0; i < pips.Length; i++)
-            {
-                bool on = i < sloshesToPour && tilting && !poured;
-                Show(pips[i], on);
+                bool on = i < sloshesToPour - 1;
+                Show(gaugeTicks[i], on);
                 if (!on) continue;
-                float x = (i - (sloshesToPour - 1) * .5f) * size * .22f;
-                bool lit = i < sloshes;
-                float pop = lit && i == sloshes - 1 && sloshAt >= 0f ? Mathf.Exp(-(t - sloshAt) * 8f) : 0f;
-                Place(pips[i].rectTransform, hang + new Vector2(x, -size * 1.25f), Vector2.one * size * (.15f + .1f * pop), 0f);
-                pips[i].color = lit ? new Color(.45f, .78f, 1f, 1f) : new Color(1f, 1f, 1f, .45f);
+                float x = -width * .5f + width * (i + 1f) / sloshesToPour;
+                Place(gaugeTicks[i].rectTransform, gaugeAt + new Vector2(x, 0f), new Vector2(3f, height + 4f), 0f);
+                gaugeTicks[i].color = new Color(.12f, .08f, .05f, .9f);
             }
+        }
+
+        /// <summary>박이 보이는 3D 화면을 잠깐 흔든다(지귀 물 맞을 때와 같은 `LabJigwiWaterFx.Shake`). 세기는 박 크기에 맞춘다.</summary>
+        private void ShakeView(float seconds)
+        {
+            Collider hitbox = source != null && source.target != null ? source.target.Hitbox : null;
+            if (hitbox == null) return;
+            LabJigwiWaterFx.Get(hitbox.gameObject.layer);
+            LabJigwiWaterFx.Shake(hitbox.bounds.extents.magnitude * pourShake, seconds);
+        }
+
+        private void HideGauge()
+        {
+            Show(gaugeBack, false); Show(gaugeFill, false);
+            foreach (Image tick in gaugeTicks) Show(tick, false);
+            Show(waterBack, false); Show(waterFill, false);
+            foreach (Image pip in pips) Show(pip, false);
         }
 
         /// <summary>판 가운데 📱: 좌우로 기울며 할 일을 보여 준다. 출렁 수가 아래에.</summary>
@@ -406,12 +437,14 @@ namespace C6Lab
         private void DrawWater(float t, float dt)
         {
             float sp = poured && pourAt >= 0f ? t - pourAt : 99f;
+            if (poured && !pourSounded) { pourSounded = true; Play(pourSoundFolder, pourVolume); }
             Vector2 boss = new Vector2(0f, (gourdAnchorY - .5f) * root.rect.height);
             if (poured && !splashed && sp >= .25f)
             {
                 splashed = true; quenchAt = t;
                 Flash(new Color(.6f, .88f, 1f, .6f));
                 Play(douseSoundFolder, douseVolume);
+                ShakeView(.35f);
                 for (int k = 0; k < 24; k++)
                 {
                     int i = nextDrop; nextDrop = (nextDrop + 1) % drops.Length;
@@ -449,7 +482,31 @@ namespace C6Lab
         }
 
         // ---------- threat: the boss heats up toward me ----------
-        private Vector2 Boss => new Vector2(0f, (gourdAnchorY - .5f) * root.rect.height);
+        /// <summary>박이 화면에서 있는 자리(이 화면 가운데 기준). 박 충돌체를 전투 카메라로 비춰 찾고, 못 찾으면 gourdAnchorY.</summary>
+        private Vector2 Boss
+        {
+            get
+            {
+                Collider hitbox = source != null && source.target != null ? source.target.Hitbox : null;
+                Camera eye = Camera.main;
+                if (hitbox != null && eye != null)
+                {
+                    Vector3 screen = eye.WorldToScreenPoint(LabHangingTarget.DrawnPoint(hitbox, hitbox.bounds.center));
+                    if (screen.z > 0f && TryLocalPoint(screen, out Vector2 local)) return local;
+                }
+                return new Vector2(0f, (gourdAnchorY - .5f) * root.rect.height);
+            }
+        }
+
+        private bool TryLocalPoint(Vector2 screen, out Vector2 local)
+        {
+            local = default;
+            Canvas canvas = GetComponentInParent<Canvas>();
+            Camera eye = canvas == null || canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
+            if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(root, screen, eye, out local)) return false;
+            local -= (new Vector2(.5f, .5f) - root.pivot) * root.rect.size;
+            return true;
+        }
 
         /// <summary>
         /// 위협: 내 양동이가 오기 조금 전부터 박이 내 쪽으로 시뻘겋게 달아오르고 연기가 모인다. 남은 시간이 줄수록 더 뜨겁다(이게 시간).
@@ -459,16 +516,24 @@ namespace C6Lab
         {
             float target;
             if (poured) target = 0f;
-            else if (now < arrive) target = .35f * Mathf.Clamp01((float)((now - (arrive - threatLeadSeconds)) / Mathf.Max(.01f, threatLeadSeconds)));
-            else target = Mathf.Lerp(.35f, 1f, Mathf.Clamp01((float)((now - arrive) / LabJigwiABTimeline.BucketSeatSeconds)));
-            heat = Mathf.MoveTowards(heat, target, dt * (poured ? 2.5f : 1.5f));
+            else if (now < arrive) target = .55f * Mathf.Clamp01((float)((now - (arrive - threatLeadSeconds)) / Mathf.Max(.01f, threatLeadSeconds)));
+            else target = Mathf.Lerp(.55f, 1f, Mathf.Clamp01((float)((now - arrive) / LabJigwiABTimeline.BucketSeatSeconds)));
+            heat = Mathf.MoveTowards(heat, target, dt * (poured ? 2.5f : 2f));
             Vector2 boss = Boss;
-            float size = root.rect.width * .5f, pulse = .85f + .15f * Mathf.Sin(t * (6f + 8f * heat));
-            Show(glow, heat > .01f);
+            // Clearly hot from the start; by the end it throbs fast and glows white-hot in the middle.
+            float size = root.rect.width * .7f, pulse = .88f + .12f * Mathf.Sin(t * (5f + 14f * heat * heat));
+            // On a fail the boss breathes in (swells, 0.6–1.0 s) and then coughs the smoke out (a short burst).
+            float since = failAt >= 0f ? t - failAt : -1f;
+            if (since >= .6f && since < 1f) pulse *= 1f + .5f * Mathf.SmoothStep(0f, 1f, (since - .6f) / .4f) + .04f * Mathf.Sin(t * 60f);
+            else if (since >= 1f && since < 1.3f) pulse *= 1.5f - 1.4f * (since - 1f);
+            UpdateHeatSound();
+            Show(glow, heat > .01f); Show(glowCore, heat > .01f);
             if (heat > .01f)
             {
-                Place(glow.rectTransform, boss, Vector2.one * size * (1f + .25f * heat) * pulse, 0f);
-                glow.color = new Color(1f, Mathf.Lerp(.55f, .25f, heat), .15f, Mathf.Clamp01(heat * .9f));
+                Place(glow.rectTransform, boss, Vector2.one * size * (.8f + .45f * heat) * pulse, 0f);
+                glow.color = new Color(1f, Mathf.Lerp(.5f, .18f, heat), .1f, Mathf.Clamp01(.35f + .65f * heat));
+                Place(glowCore.rectTransform, boss, Vector2.one * root.rect.width * .3f * (.9f + .2f * heat) * pulse, 0f);
+                glowCore.color = Color.Lerp(new Color(1f, .45f, .2f, .45f * heat), new Color(1f, .95f, .7f, .75f), Mathf.Clamp01((heat - .7f) / .3f));
             }
             // Smoke gathers and rises from the hot boss; after a pour the puffs turn white (steam) and blow away.
             bool quench = quenchAt >= 0f && t - quenchAt < 1.2f;
@@ -487,39 +552,61 @@ namespace C6Lab
         }
 
         /// <summary>
-        /// 실패: 박 옆에 지귀 말풍선("연기로 덮어주마!")과 지귀 목소리 → 1초 뒤 검은 연기 덩어리가 박에서 내 판으로 쏟아지고 → 김이 서린다.
+        /// 실패: 야광귀 말풍선과 같은 자리(박 옆, `LabGourdAlert`)에 지귀 연기 이모지가 뜨고 지귀 목소리 → 1초 뒤 박이 크게 부풀며
+        /// 연기 덩어리들이 줄줄이 내 판으로 뿜어져 나와 퍼지고(화면이 흔들림) → 그대로 김이 서린다.
         /// </summary>
         private void DrawFail(float t)
         {
             float since = failAt >= 0f ? t - failAt : -1f;
-            bool talking = since >= 0f && since < 1.5f;
-            Show(bubble, talking);
-            if (talking)
+            if (since >= 0f && !failSpoken)
             {
-                if (!failSpoken) { failSpoken = true; Play(failVoiceFolder, voiceVolume); if (source != null) LabHaptics.PlayDirect(source.config, LabHapticStyle.Rigid, .6f); }
-                float pop = Mathf.Clamp01(since / .12f), fade = 1f - Mathf.Clamp01((since - 1.2f) / .3f);
-                Vector2 at = Boss + new Vector2(root.rect.width * .2f, root.rect.width * .2f);
-                Place(bubble.rectTransform, at, new Vector2(root.rect.width * .52f, root.rect.width * .2f), 0f);
-                bubble.rectTransform.localScale = Vector3.one * (pop < 1f ? Mathf.Lerp(.6f, 1.08f, pop) : 1f);
-                bubble.color = new Color(1f, 1f, 1f, fade);
-                bubbleText.text = failLine;
-                bubbleText.color = new Color(.2f, .1f, .08f, fade);
-                bubbleText.fontSize = Mathf.RoundToInt(root.rect.width * .048f);
-                var r = bubbleText.rectTransform; r.anchorMin = Vector2.zero; r.anchorMax = Vector2.one;
-                r.offsetMin = new Vector2(12f, 14f); r.offsetMax = new Vector2(-12f, -8f);
+                failSpoken = true;
+                Play(failVoiceFolder, voiceVolume);
+                if (source != null) LabHaptics.PlayDirect(source.config, LabHapticStyle.Rigid, .6f);
+                if (gourdBubble == null) gourdBubble = FindFirstObjectByType<LabGourdAlert>();
+                if (gourdBubble != null && source != null) gourdBubble.ShowPicture(source.target, SmokeEmoji(), 1.3f);
+                Vector2 boardCentre = new Vector2(0f, -root.rect.height * .25f);
+                for (int i = 0; i < blow.Length; i++)
+                    blowTo[i] = boardCentre + new Vector2(UnityEngine.Random.Range(-.42f, .42f) * root.rect.width, UnityEngine.Random.Range(-.18f, .18f) * root.rect.height);
             }
-            // The smoke ball: from the boss down onto my board.
+            // Puffs leave the boss one after another (a cough of smoke), wobble down and spread over my board.
             float s = since - 1f;
-            bool burst = since >= 0f && s >= 0f && s < .55f;
-            Show(smokeBurst, burst);
-            if (burst)
+            if (since >= 0f && s >= 0f && !smokeSounded) { smokeSounded = true; Play(smokeSoundFolder, smokeVolume); }
+            for (int i = 0; i < blow.Length; i++)
             {
-                float k = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(s / .35f));
-                Vector2 board = new Vector2(0f, -root.rect.height * .25f);
-                Place(smokeBurst.rectTransform, Vector2.Lerp(Boss, board, k), Vector2.one * root.rect.width * Mathf.Lerp(.15f, .9f, k), 0f);
-                smokeBurst.color = new Color(.35f, .32f, .3f, .9f * (1f - Mathf.Clamp01((s - .35f) / .2f)));
+                float start = i * .035f, k = s - start;
+                bool on = since >= 0f && k >= 0f && k < .9f;
+                Show(blow[i], on);
+                if (!on) continue;
+                float fly = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(k / .4f));
+                Vector2 from = Boss, to = blowTo[i];
+                Vector2 at = Vector2.Lerp(from, to, fly) + new Vector2(Mathf.Sin(k * 18f + i) * root.rect.width * .04f * (1f - fly), root.rect.height * .06f * Mathf.Sin(fly * Mathf.PI));
+                float grow = Mathf.Lerp(.12f, .34f + .06f * (i % 3), fly) * root.rect.width;
+                Place(blow[i].rectTransform, at, Vector2.one * grow, (i % 2 == 0 ? 1f : -1f) * k * 120f);
+                blow[i].color = new Color(1f, 1f, 1f, 1f - Mathf.Clamp01((k - .6f) / .3f));
             }
+            // The first puff hitting the board: a thump.
+            if (since >= 0f && s >= .4f && s - Time.unscaledDeltaTime < .4f && source != null)
+                LabHaptics.PlayDirect(source.config, LabHapticStyle.Heavy, .9f, .25f, .6f, .4f);
         }
+
+        /// <summary>지글지글 반복: 열기(heat)에 따라 크기와 높이가 오르고, 식으면(heat 0) 멈춘다.</summary>
+        private void UpdateHeatSound()
+        {
+            if (heat <= .01f || heatVolume <= 0f) { StopHeatSound(); return; }
+            if (heatSource == null)
+            {
+                AudioClip[] clips = string.IsNullOrEmpty(heatLoopFolder) ? null : Resources.LoadAll<AudioClip>("Audio/" + heatLoopFolder);
+                if (clips == null || clips.Length == 0) return;
+                heatSource = gameObject.AddComponent<AudioSource>();
+                heatSource.playOnAwake = false; heatSource.spatialBlend = 0f; heatSource.loop = true; heatSource.clip = clips[0];
+            }
+            if (!heatSource.isPlaying) heatSource.Play();
+            heatSource.volume = Mathf.Pow(heat, 1.3f) * heatVolume * LabAudioSettings.SfxVolume;
+            heatSource.pitch = .9f + .3f * heat;
+        }
+
+        private void StopHeatSound() { if (heatSource != null && heatSource.isPlaying) heatSource.Stop(); }
 
         private void Play(string folder, float volume)
         {
@@ -605,7 +692,7 @@ namespace C6Lab
                 float hand = board.width * .14f;
                 float u = Mathf.Sin(t * 7f);
                 Vector2 centre = new Vector2(board.center.x + u * board.width * .12f, board.center.y + Mathf.Abs(u) * hand * .12f);
-                PlaceScreenRect(steamHand.rectTransform, new Rect(centre.x - hand * .4f, centre.y - hand * .5f, hand * .8f, hand));
+                PlaceScreenRect(steamHand.rectTransform, new Rect(centre.x - hand * .33f, centre.y - hand * .5f, hand * .67f, hand));
                 steamHand.rectTransform.localEulerAngles = new Vector3(0f, 0f, -u * 12f);
                 steamHand.color = new Color(1f, 1f, 1f, Mathf.Clamp01(steamLeft * 1.6f) * fadeIn);
             }
@@ -659,7 +746,7 @@ namespace C6Lab
             steamBlocking = false;
         }
 
-        private void OnDisable() => EndSteam();
+        private void OnDisable() { EndSteam(); StopHeatSound(); }
 
         private static bool TryPointer(out Vector2 screen)
         {
@@ -686,13 +773,16 @@ namespace C6Lab
         // ---------- layout ----------
         private void Hide()
         {
+            StopHeatSound();
             if (root == null) return;
             foreach (Graphic part in new Graphic[] { banner, flash, sheet, pail, hangRope, waterBack, waterFill }) Show(part, false);
             foreach (Image pip in pips) Show(pip, false);
             foreach (Image drop in drops) Show(drop, false);
             for (int i = 0; i < dropBorn.Length; i++) dropBorn[i] = 0f;
             if (cue != null && cue.gameObject.activeSelf) cue.gameObject.SetActive(false);
-            foreach (Graphic part in new Graphic[] { glow, bubble, smokeBurst }) Show(part, false);
+            foreach (Graphic part in new Graphic[] { glow, glowCore }) Show(part, false);
+            foreach (Image puff in blow) Show(puff, false);
+            HideGauge();
             foreach (Image puff in smoke) Show(puff, false);
         }
 
@@ -776,16 +866,22 @@ namespace C6Lab
             float e = Mathf.Min(Mathf.Min(u, 1f - u) * 2f, Mathf.Min(v, 1f - v) * 4f);
             return new Color(1f, 1f, 1f, Mathf.Clamp01(1f - e / .35f));
         });
-        /// <summary>A small pointing hand (👆-like): palm, index finger up, thumb, ink outline — the "rub here" hint.</summary>
-        private static Sprite Hand() => handSprite != null ? handSprite : handSprite = Build("Jigwi steam hand", 64, 88, (u, v) =>
+        /// <summary>👆 A small pointing hand: a closed fist with the index finger straight up (the rubbing fingertip), thumb tucked across, ink outline.</summary>
+        private static Sprite Hand() => handSprite != null ? handSprite : handSprite = Build("Jigwi steam hand", 64, 96, (u, v) =>
         {
-            float x = u * 64f, y = v * 88f;
-            float palm = RoundBox(x, y, 14f, 6f, 52f, 46f, 10f);
-            float finger = Capsule(x, y, 28f, 40f, 28f, 80f, 7f);
-            float thumb = Capsule(x, y, 16f, 26f, 6f, 38f, 5.5f);
-            float d = Mathf.Min(palm, Mathf.Min(finger, thumb));
+            float x = u * 64f, y = v * 96f;
+            float fist = RoundBox(x, y, 12f, 4f, 54f, 44f, 12f);
+            float finger = Capsule(x, y, 22f, 38f, 22f, 88f, 7.5f);
+            float d = Mathf.Min(fist, finger);
             if (d > 3f) return Color.clear;
             if (d > -1.5f) return new Color(.17f, .14f, .12f, 1f);
+            // Curled fingers: knuckle lines across the fist (right of the index finger), and the thumb lying across the front.
+            bool knuckle = x > 31f && x < 52f && (Mathf.Abs(y - 32f) < 1.1f || Mathf.Abs(y - 22f) < 1.1f || Mathf.Abs(y - 12f) < 1.1f);
+            float thumb = Capsule(x, y, 14f, 20f, 36f, 26f, 6f);
+            bool thumbEdge = Mathf.Abs(thumb) < 1.2f && y > 14f;
+            bool nail = Capsule(x, y, 22f, 80f, 22f, 86f, 4f) < 0f;
+            if (knuckle || thumbEdge) return new Color(.17f, .14f, .12f, 1f);
+            if (nail) return new Color(1f, .93f, .86f, 1f);
             return new Color(1f, .86f, .72f, 1f);
         });
         private static float Capsule(float x, float y, float ax, float ay, float bx, float by, float r)
@@ -800,16 +896,21 @@ namespace C6Lab
             float d = Vector2.Distance(new Vector2(u, v), new Vector2(.5f, .5f)) * 2f;
             return new Color(1f, 1f, 1f, Mathf.Clamp01(1f - d) * Mathf.Clamp01(1f - d));
         });
-        /// <summary>A speech bubble: white rounded box with an ink outline and a tail at the lower left (toward the boss).</summary>
-        private static Sprite Bubble() => bubbleSprite != null ? bubbleSprite : bubbleSprite = Build("Jigwi speech bubble", 200, 80, (u, v) =>
+        /// <summary>💨 Jigwi's smoke emoji: a lumpy dark-grey cloud with an ink outline and two angry white eyes.</summary>
+        private static Sprite SmokeEmoji() => smokeEmojiSprite != null ? smokeEmojiSprite : smokeEmojiSprite = Build("Jigwi smoke emoji", 96, 80, (u, v) =>
         {
-            float x = u * 200f, y = v * 80f;
-            float box = RoundBox(x, y, 4f, 16f, 196f, 76f, 18f);
-            float tail = Capsule(x, y, 34f, 20f, 16f, 3f, 5f);
-            float d = Mathf.Min(box, tail);
-            if (d > 2f) return Color.clear;
-            if (d > -3f) return new Color(.17f, .14f, .12f, 1f);
-            return new Color(1f, .98f, .94f, 1f);
+            float x = u * 96f, y = v * 80f;
+            float d = Mathf.Min(Mathf.Min(Vector2.Distance(new Vector2(x, y), new Vector2(30f, 34f)) - 22f,
+                Vector2.Distance(new Vector2(x, y), new Vector2(54f, 46f)) - 26f),
+                Mathf.Min(Vector2.Distance(new Vector2(x, y), new Vector2(72f, 30f)) - 19f, RoundBox(x, y, 12f, 10f, 86f, 34f, 12f)));
+            if (d > 2.5f) return Color.clear;
+            if (d > -2.5f) return new Color(.14f, .12f, .11f, 1f);
+            // Angry eyes: slanted white slits.
+            bool eye = Mathf.Abs(y - 40f - (x - 42f) * .35f) < 3.5f && x > 34f && x < 48f
+                || Mathf.Abs(y - 40f + (x - 62f) * .35f) < 3.5f && x > 56f && x < 70f;
+            if (eye) return new Color(1f, .95f, .85f, 1f);
+            float shade = .38f + .12f * Mathf.Clamp01((y - 10f) / 60f);
+            return new Color(shade, shade * .97f, shade * .95f, 1f);
         });
         private static Sprite Disc() => discSprite != null ? discSprite : discSprite = Build("Jigwi bucket drop", 48, 48, (u, v) =>
         {

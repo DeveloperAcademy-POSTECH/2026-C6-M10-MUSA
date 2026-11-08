@@ -76,7 +76,7 @@ namespace C6Lab
             double now, bool held, bool hapticsEnabled)
         {
             if (root == null) return;
-            if (round == null || !round.Active(now)) { Hide(); return; }
+            if (round == null || !round.Active(now) || round.bucket) { Hide(); return; } // #551: the bucket round has no shared water drops
             if (roundId != round.id)
             {
                 roundId = round.id; shownCount = Hits(round); lastWindowAt = round.syncWindowAt;
