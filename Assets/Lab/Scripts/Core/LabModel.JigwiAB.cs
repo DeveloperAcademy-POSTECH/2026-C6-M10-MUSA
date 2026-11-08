@@ -502,11 +502,11 @@ namespace C6Lab
             }
             return true;
         }
-        /// <summary>#551: one poured bucket = one big Water splash on that seat's side of the boss (can win the battle).</summary>
+        /// <summary>#551: one poured bucket = one big Water splash on the top of the boss, leaning to that seat's side (can win the battle).</summary>
         private void PaintJigwiBucketPour(ulong owner, double now)
         {
             if (teamMode || jigwiSplashShare <= 0f || !players.TryGetValue(owner, out var player)) return;
-            bool painted = paintSurface.RegisterHit(JigwiStageSeatDirection(player.seat, 0f, 12f), PaintColorFor(LabOrbElement.Water),
+            bool painted = paintSurface.RegisterHit(JigwiStageSeatDirection(player.seat, 0f, LabJigwiABTimeline.BucketPourPitch), PaintColorFor(LabOrbElement.Water),
                 player.id, player.seat + 1, Mathf.Min(3f, jigwiSplashShare));
             if (painted && paintSurface.IsComplete && phase == LabPhase.Playing)
             {

@@ -79,8 +79,8 @@ namespace C6Lab
         // #551 threat: the boss glows red-hot toward me while my bucket waits; failing = Jigwi's bubble, then his smoke on my board.
         [Tooltip("양동이가 오기 전 박이 달아오르기 시작하는 시간(초).")]
         [SerializeField, Range(0f, 3f)] private float threatLeadSeconds = 1.2f;
-        [Tooltip("실패 말풍선과 함께 나오는 지귀 목소리 폴더(지금은 기존 대사 재사용).")]
-        [SerializeField] private string failVoiceFolder = "JigwiVoiceA";
+        [Tooltip("실패 말풍선과 함께 나오는 지귀 대사 \"연기로 뒤덮어주마!\" 폴더.")]
+        [SerializeField] private string failVoiceFolder = "JigwiVoiceBucketFail";
         [Tooltip("박을 식혔을 때(쏟았을 때) 나는 소리 폴더.")]
         [SerializeField] private string douseSoundFolder = "JigwiFireDouse";
         [Tooltip("박이 달아오르는 동안 반복되는 지글지글 소리 폴더(뜨거울수록 크고 높게). 없으면 조용히 넘어간다.")]
@@ -89,7 +89,13 @@ namespace C6Lab
         [SerializeField] private string pourSoundFolder = "JigwiBucketPour";
         [Tooltip("실패 때 연기가 판으로 뿜어져 뒤덮는 소리 폴더.")]
         [SerializeField] private string smokeSoundFolder = "JigwiBucketSmoke";
-        [SerializeField, Range(0f, 1f)] private float heatVolume = .6f, pourVolume = .9f, smokeVolume = .9f;
+        [Tooltip("내가 쏟아 박이 식을 때 지귀 대사 \"이럴수가!\" 폴더(강한 햅틱과 함께).")]
+        [SerializeField] private string pourVoiceFolder = "JigwiVoiceBucketPour";
+        [Tooltip("김을 문질러 닦을 때 뽀득뽀득 소리 폴더(여러 개면 무작위).")]
+        [SerializeField] private string rubSoundFolder = "JigwiBucketRub";
+        [SerializeField, Range(0f, 1f)] private float heatVolume = .6f, pourVolume = .9f, smokeVolume = .9f, rubVolume = .8f;
+        [Tooltip("\"이럴수가!\" 때 햅틱 세기.")]
+        [SerializeField, Range(0f, 1f)] private float pourVoiceHapticIntensity = 1f;
         [Tooltip("쏟을 때 화면 흔들림 세기(박 크기 대비).")]
         [SerializeField, Range(0f, .3f)] private float pourShake = .08f;
         [SerializeField, Range(0f, 1f)] private float voiceVolume = 1f, douseVolume = .9f;
@@ -104,6 +110,7 @@ namespace C6Lab
         private float heat, failAt = -1f, quenchAt = -1f;
         private bool failSpoken, pourSounded, smokeSounded;
         private AudioSource heatSource;
+        private float lastSqueakLeft = 1f, lastSqueakAt = -1f;
         private AudioSource sfx;
 
         /// <summary>테스트용: 지금 안내 한 줄 ("" = 없음) / 양동이가 보이는지 / 지금까지 출렁 수.</summary>
@@ -444,7 +451,9 @@ namespace C6Lab
                 splashed = true; quenchAt = t;
                 Flash(new Color(.6f, .88f, 1f, .6f));
                 Play(douseSoundFolder, douseVolume);
+                Play(pourVoiceFolder, voiceVolume);
                 ShakeView(.35f);
+                if (source != null) LabHaptics.PlayDirect(source.config, LabHapticStyle.Heavy, pourVoiceHapticIntensity, .5f, pourVoiceHapticIntensity, 1f);
                 for (int k = 0; k < 24; k++)
                 {
                     int i = nextDrop; nextDrop = (nextDrop + 1) % drops.Length;
@@ -623,6 +632,7 @@ namespace C6Lab
         {
             if (steamRound == roundId) return;
             steamRound = roundId; steamOn = true; steamAt = Time.unscaledTime; steamClearedAt = -1f; rubbing = false;
+            lastSqueakLeft = 1f; lastSqueakAt = -1f;
             if (steamTexture == null)
             {
                 steamTexture = new Texture2D(SteamW, SteamH, TextureFormat.RGBA32, false)
@@ -728,6 +738,9 @@ namespace C6Lab
             // A light tick for every bit wiped away, a firm one when it is clear.
             if (lastTickLeft - steamLeft >= .06f && source != null)
             { lastTickLeft = steamLeft; LabHaptics.PlayDirect(source.config, LabHapticStyle.Light, .35f); }
+            // 뽀득: a squeak for every few percent rubbed away, at most every 0.12 s.
+            if (lastSqueakLeft - steamLeft >= .04f && Time.unscaledTime - lastSqueakAt >= .12f)
+            { lastSqueakLeft = steamLeft; lastSqueakAt = Time.unscaledTime; Play(rubSoundFolder, rubVolume); }
             if (steamLeft <= steamClearLeft)
             {
                 steamClearedAt = Time.unscaledTime;
@@ -866,23 +879,30 @@ namespace C6Lab
             float e = Mathf.Min(Mathf.Min(u, 1f - u) * 2f, Mathf.Min(v, 1f - v) * 4f);
             return new Color(1f, 1f, 1f, Mathf.Clamp01(1f - e / .35f));
         });
-        /// <summary>👆 A small pointing hand: a closed fist with the index finger straight up (the rubbing fingertip), thumb tucked across, ink outline.</summary>
+        /// <summary>
+        /// 👆 A small pointing hand (front view): a big round palm, the index finger straight up, the other three fingers folded
+        /// to short bumps, the thumb a low bump on the left, thin ink lines between the fingers.
+        /// </summary>
         private static Sprite Hand() => handSprite != null ? handSprite : handSprite = Build("Jigwi steam hand", 64, 96, (u, v) =>
         {
             float x = u * 64f, y = v * 96f;
-            float fist = RoundBox(x, y, 12f, 4f, 54f, 44f, 12f);
-            float finger = Capsule(x, y, 22f, 38f, 22f, 88f, 7.5f);
-            float d = Mathf.Min(fist, finger);
-            if (d > 3f) return Color.clear;
-            if (d > -1.5f) return new Color(.17f, .14f, .12f, 1f);
-            // Curled fingers: knuckle lines across the fist (right of the index finger), and the thumb lying across the front.
-            bool knuckle = x > 31f && x < 52f && (Mathf.Abs(y - 32f) < 1.1f || Mathf.Abs(y - 22f) < 1.1f || Mathf.Abs(y - 12f) < 1.1f);
-            float thumb = Capsule(x, y, 14f, 20f, 36f, 26f, 6f);
-            bool thumbEdge = Mathf.Abs(thumb) < 1.2f && y > 14f;
-            bool nail = Capsule(x, y, 22f, 80f, 22f, 86f, 4f) < 0f;
-            if (knuckle || thumbEdge) return new Color(.17f, .14f, .12f, 1f);
-            if (nail) return new Color(1f, .93f, .86f, 1f);
-            return new Color(1f, .86f, .72f, 1f);
+            float palm = RoundBox(x, y, 2.5f, 2.5f, 61.5f, 56f, 24f);
+            float index = Capsule(x, y, 19f, 40f, 19f, 86f, 8f);
+            float middle = Capsule(x, y, 32f, 44f, 32f, 64f, 5.5f);
+            float ring = Capsule(x, y, 43.5f, 44f, 43.5f, 62f, 6f);
+            float pinky = Capsule(x, y, 55f, 42f, 55f, 56f, 6f);
+            float thumb = Capsule(x, y, 6.5f, 36f, 6.5f, 52f, 5f);
+            float d = Mathf.Min(Mathf.Min(palm, Mathf.Min(index, thumb)), Mathf.Min(middle, Mathf.Min(ring, pinky)));
+            if (d > 2.5f) return Color.clear;
+            Color ink = new Color(.1f, .08f, .07f, 1f);
+            if (d > -1.2f) return ink;
+            // Lines between the fingers (and beside the index finger) reaching a little into the palm.
+            bool line = Mathf.Abs(x - 11f) < .9f && y > 36f && y < 56f
+                || Mathf.Abs(x - 26.5f) < .9f && y > 46f && y < 66f
+                || Mathf.Abs(x - 37.8f) < .9f && y > 46f && y < 63f
+                || Mathf.Abs(x - 49.5f) < .9f && y > 44f && y < 60f;
+            if (line) return ink;
+            return new Color(1f, .9f, .82f, 1f);
         });
         private static float Capsule(float x, float y, float ax, float ay, float bx, float by, float r)
         {

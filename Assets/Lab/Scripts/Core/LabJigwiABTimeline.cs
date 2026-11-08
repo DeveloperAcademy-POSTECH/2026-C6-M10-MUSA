@@ -47,6 +47,8 @@ namespace C6Lab
         public const double BucketStaggerSeconds = 1.5d;
         /// <summary>#551 나무 물통: each seat has this long from its bucket's arrival to pour it; after that its board steams over.</summary>
         public const double BucketSeatSeconds = 8d;
+        /// <summary>#551: 쏟은 물은 위에서 떨어지니 박 윗부분(그 사람 쪽으로 기운 위쪽)에 칠한다. 적도 0°, 꼭대기 90°.</summary>
+        public const float BucketPourPitch = 58f;
         /// <summary>#509: one synchronized hit by every picked seat is the whole B (one chance; a miss fails it).</summary>
         public const int GroupSyncRequired = 1;
 
