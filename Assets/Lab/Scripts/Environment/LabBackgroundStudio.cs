@@ -175,7 +175,7 @@ namespace C6Lab
             m.SetTexture("_BaseMap",png); m.SetColor("_BaseColor",color);
             m.SetTextureScale("_BaseMap",tiling);m.SetTextureOffset("_BaseMap",offset);
             // URP BaseShaderGUI.SetMaterialKeywords' own copy, read back from the base values. GetColor can return some
-            // colors a float step away from what SetColor stored, so writing `color` itself would differ from URP's copy.
+            // colors a few float steps away from what SetColor stored, so writing `color` itself would differ from URP's copy.
             if(m.HasProperty("_MainTex")&&m.HasProperty("_BaseMap")){m.SetTexture("_MainTex",m.GetTexture("_BaseMap"));m.SetTextureScale("_MainTex",m.GetTextureScale("_BaseMap"));m.SetTextureOffset("_MainTex",m.GetTextureOffset("_BaseMap"));}
             if(m.HasProperty("_Color")&&m.HasProperty("_BaseColor"))m.SetColor("_Color",m.GetColor("_BaseColor"));
         }
