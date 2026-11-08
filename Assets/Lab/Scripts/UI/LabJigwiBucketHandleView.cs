@@ -31,6 +31,9 @@ namespace C6Lab
         [SerializeField] private bool drawRopeStub = false;
         [Tooltip("물벼락이 떨어지는 박의 화면 높이(0~1). 물통 3D가 생기면 박 위치를 직접 쓴다.")]
         [SerializeField, Range(0f, 1f)] private float gourdAnchorY = .68f;
+        [Tooltip("\"당겨!\" 그림(젖히는 폰)의 화면 자리와 크기. 야광귀 흔들기 안내와 같은 자리.")]
+        [SerializeField] private Vector2 cueAnchor = new Vector2(.5f, .42f);
+        [SerializeField, Range(60f, 400f)] private float cueSize = 170f;
         [Tooltip("결과(물벼락!/다 졸았다) 안내가 남는 시간(초).")]
         [SerializeField, Range(.5f, 4f)] private float resultSeconds = 1.8f;
         [SerializeField, Range(0f, 1f)] private float pullHapticIntensity = 1f;
@@ -46,11 +49,17 @@ namespace C6Lab
         private Text banner, early, stamp;
         private static Sprite barSprite, phoneSprite, pixel, discSprite, sheetSprite;
         // #551 feedback: my pull ("좋아!" stamp + blue flash), the pull timer under the banner, and the success downpour.
-        private Image flash, sheet, timerBack, timerFill;
+        private Image flash, sheet, timerBack, timerFill, arrow;
+        // #551 "당겨!" picture (like Yaguang's shake cue): a phone tipping its top toward me, a curved arrow, a short label.
+        private RectTransform cue;
+        private LabJigwiTiltPhoneGraphic cuePhone;
+        private Text cueLabel;
+        private static Sprite arrowSprite, vignetteSprite;
         private readonly Image[] drops = new Image[40];
         private readonly Vector2[] dropAt = new Vector2[40], dropVelocity = new Vector2[40];
         private float stampAt = -1f, splashAt = -1f, flashAt = -1f; private Color flashColor;
         private string splashedRound;
+        private bool splashFlashed;
         private float keyHeld, pulledAt = -1f, earlyAt = -1f, cooldownUntil;
         private string countKey;
         private readonly float[] pitchTimes = new float[64];
@@ -67,7 +76,7 @@ namespace C6Lab
             source = network;
             if (labelFont != null) font = labelFont;
             Ensure();
-            if (font != null) { banner.font = font; early.font = font; stamp.font = font; }
+            if (font != null) { banner.font = font; early.font = font; stamp.font = font; cueLabel.font = font; }
         }
 
         private void Ensure()
@@ -88,7 +97,15 @@ namespace C6Lab
             timerFill = NewImage("Jigwi Bucket Pull Timer", Pixel());
             sheet = NewImage("Jigwi Bucket Downpour Sheet", Sheet());
             for (int i = 0; i < drops.Length; i++) drops[i] = NewImage("Jigwi Bucket Drop " + i, Disc());
-            flash = NewImage("Jigwi Bucket Flash", Pixel());
+            cue = new GameObject("Jigwi Bucket Tilt Cue", typeof(RectTransform)).GetComponent<RectTransform>();
+            cue.gameObject.layer = gameObject.layer; cue.SetParent(root, false); cue.sizeDelta = Vector2.zero;
+            var phoneObject = new GameObject("Phone", typeof(RectTransform));
+            phoneObject.layer = gameObject.layer; phoneObject.transform.SetParent(cue, false);
+            cuePhone = phoneObject.AddComponent<LabJigwiTiltPhoneGraphic>(); cuePhone.raycastTarget = false;
+            arrow = NewImage("Arrow", Arrow()); arrow.transform.SetParent(cue, false);
+            cueLabel = NewText("Label", 48); cueLabel.transform.SetParent(cue, false);
+            timerBack.transform.SetParent(cue, false); timerFill.transform.SetParent(cue, false);
+            flash = NewImage("Jigwi Bucket Flash", Vignette());
             flash.rectTransform.anchorMin = Vector2.zero; flash.rectTransform.anchorMax = Vector2.one;
             flash.rectTransform.offsetMin = flash.rectTransform.offsetMax = Vector2.zero;
             stamp = NewText("Jigwi Bucket Pulled Stamp", 120); stamp.text = "좋아!";
@@ -152,6 +169,52 @@ namespace C6Lab
             return false;
         }
 
+        /// <summary>
+        /// "당겨!" 그림: 3-2-1 동안 흐릿하게 천천히 젖혀 보이며 미리 알려 주고, "당겨!"에 또렷해지며 빠르게 홱홱 + 아래 남은 시간 게이지.
+        /// 지목된 사람에게만. 내가 당기면 사라지고 그 자리에 "좋아!"가 찍힌다.
+        /// </summary>
+        private void DrawCue(LabJigwiABRound round, double now, bool mine, bool pulled, int done, int total)
+        {
+            bool live = round.resolution == LabJigwiABResolution.None && round.countdownAt >= 0d && now >= round.countdownAt;
+            bool counting = live && now < round.GoAt;
+            bool window = live && now >= round.GoAt && now <= round.GoAt + round.PullSeconds;
+            bool show = mine && !pulled && (counting || window);
+            if (cue.gameObject.activeSelf != show) cue.gameObject.SetActive(show);
+            if (!show) return;
+            float t = Time.unscaledTime, size = cueSize;
+            cue.anchorMin = cue.anchorMax = cueAnchor; cue.anchoredPosition = Vector2.zero;
+            // Lean: rest upright a moment, tip toward me quickly, hold, come back (slow and faint while counting).
+            float period = window ? .7f : 1.6f, u = Mathf.Repeat(t / period, 1f);
+            float lean = u < .3f ? 0f : u < .45f ? Mathf.SmoothStep(0f, 1f, (u - .3f) / .15f) : u < .75f ? 1f : 1f - Mathf.SmoothStep(0f, 1f, (u - .75f) / .25f);
+            float alpha = window ? 1f : .55f;
+            var phoneRect = cuePhone.rectTransform;
+            phoneRect.anchorMin = phoneRect.anchorMax = new Vector2(.5f, .5f);
+            phoneRect.sizeDelta = new Vector2(size * .58f, size); phoneRect.anchoredPosition = new Vector2(0f, size * .2f);
+            phoneRect.localScale = Vector3.one * (window ? 1f + .08f * Mathf.Sin(t * 14f) : 1f);
+            cuePhone.SetLean(lean);
+            cuePhone.color = new Color(1f, 1f, 1f, alpha);
+            // The curved arrow beside the phone swings in as the phone tips.
+            Place(arrow.rectTransform, new Vector2(size * .55f, size * .3f), new Vector2(size * .55f, size * .7f), 0f);
+            arrow.color = new Color(1f, 1f, 1f, alpha * (.35f + .65f * lean));
+            arrow.rectTransform.localScale = Vector3.one * (.9f + .2f * lean);
+            cueLabel.text = window ? "홱! " + done + "/" + total : "준비…";
+            cueLabel.fontSize = Mathf.RoundToInt(size * .26f);
+            cueLabel.color = window ? new Color(.55f, .88f, 1f, 1f) : new Color(1f, .93f, .7f, alpha);
+            Place(cueLabel.rectTransform, new Vector2(0f, -size * .48f), new Vector2(size * 3f, size * .4f), 0f);
+            // Time left to pull.
+            float left = window ? Mathf.Clamp01((float)((round.GoAt + round.PullSeconds - now) / round.PullSeconds)) : 0f;
+            Show(timerBack, window); Show(timerFill, window);
+            if (window)
+            {
+                float width = size * 1.8f, height = size * .1f;
+                Vector2 at = new Vector2(0f, -size * .78f);
+                Place(timerBack.rectTransform, at, new Vector2(width + 8f, height + 8f), 0f);
+                timerBack.color = new Color(.1f, .06f, .02f, .8f);
+                Place(timerFill.rectTransform, at + new Vector2(-width * (1f - left) * .5f, 0f), new Vector2(width * left, height), 0f);
+                timerFill.color = Color.Lerp(new Color(1f, .45f, .3f, 1f), new Color(.45f, .85f, 1f, 1f), left);
+            }
+        }
+
         private void DrawBanner(LabJigwiABRound round, LabSnapshot snapshot, double now, bool pulled)
         {
             int total = round.players?.Length ?? 0, done = 0;
@@ -177,21 +240,15 @@ namespace C6Lab
             else if (now < round.countdownAt || now < round.activeAt)
                 text = round.attempts > 0 && now >= round.activeAt ? "늦었어! 한 번 더!" : call;
             else if (now < round.GoAt) text = mine ? "\"당겨!\" 하면 폰을 홱!" : everyone + " 준비!";
-            else if (mine && pulled) { text = "좋아! (" + done + "/" + total + ")"; color = new Color(.55f, .88f, 1f, 1f); }
-            else { text = (mine ? "지금! 폰을 홱! (" : "당겨라 " + everyone + "! (") + done + "/" + total + ")"; color = new Color(.55f, .88f, 1f, 1f); pop = Pop(now - round.GoAt); }
-            // The pull time running out, under the banner.
-            float left = window ? Mathf.Clamp01((float)((round.GoAt + round.PullSeconds - now) / round.PullSeconds)) : 0f;
-            bool timer = window && left > 0f;
-            Show(timerBack, timer); Show(timerFill, timer);
-            if (timer)
+            else
             {
-                float width = root.rect.width * .5f, height = 14f;
-                Vector2 at = new Vector2(0f, (bannerAnchor.y - .5f) * root.rect.height - bannerMaxFontSize * .95f);
-                Place(timerBack.rectTransform, at, new Vector2(width + 8f, height + 8f), 0f);
-                timerBack.color = new Color(.1f, .06f, .02f, .8f);
-                Place(timerFill.rectTransform, at + new Vector2(-width * (1f - left) * .5f, 0f), new Vector2(width * left, height), 0f);
-                timerFill.color = Color.Lerp(new Color(1f, .45f, .3f, 1f), new Color(.45f, .85f, 1f, 1f), left);
+                // "당겨!": the picture in the middle says how; this line only says who.
+                text = mine ? (others.Length > 0 ? "나와 " + others + ", 당겨!" : "당겨!") : "당겨라 " + everyone + "!";
+                color = new Color(.55f, .88f, 1f, 1f); pop = Pop(now - round.GoAt);
             }
+            if (round.resolution == LabJigwiABResolution.Completed && Time.unscaledTime < splashAt) { text = "좋아!"; pop = 0f; }
+            DrawCue(round, now, mine, pulled, done, total);
+
             if (round.resolution == LabJigwiABResolution.None && round.attempts > 0 && now < round.countdownAt) pop = Pop(now - (round.countdownAt - LabJigwiABTimeline.BucketRetrySeconds));
             Show(banner, true);
             banner.text = text; banner.color = color;
@@ -222,15 +279,19 @@ namespace C6Lab
             float t = Time.unscaledTime;
             if (round.resolution == LabJigwiABResolution.Completed && splashedRound != round.id)
             {
-                splashedRound = round.id; splashAt = t;
-                Flash(new Color(.6f, .88f, 1f, .55f));
+                // "좋아!" first (my pull), then the water half a second later.
+                splashedRound = round.id;
+                splashAt = stampAt >= 0f && t - stampAt < .5f ? stampAt + .5f : t;
+                splashFlashed = false;
                 for (int i = 0; i < drops.Length; i++)
                 {
-                    float a = UnityEngine.Random.Range(-Mathf.PI * .95f, -Mathf.PI * .05f) + Mathf.PI; // upward fan
-                    float speed = UnityEngine.Random.Range(.35f, 1f) * root.rect.height * .9f;
-                    dropAt[i] = Vector2.zero; dropVelocity[i] = new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * speed;
+                    float a = UnityEngine.Random.Range(.12f, .88f) * Mathf.PI; // a low fan around the boss
+                    float speed = UnityEngine.Random.Range(.12f, .32f) * root.rect.height;
+                    dropAt[i] = new Vector2(UnityEngine.Random.Range(-1f, 1f) * root.rect.width * .08f, 0f);
+                    dropVelocity[i] = new Vector2(Mathf.Cos(a) * 1.3f, Mathf.Sin(a)) * speed;
                 }
             }
+            if (splashAt >= 0f && !splashFlashed && t >= splashAt) { splashFlashed = true; Flash(new Color(.6f, .88f, 1f, .6f)); }
             // Flash.
             float f = flashAt >= 0f ? 1f - Mathf.Clamp01((t - flashAt) / .45f) : 0f;
             Show(flash, f > 0f);
@@ -241,23 +302,24 @@ namespace C6Lab
             Show(stamp, stamping);
             if (stamping)
             {
-                Place(stamp.rectTransform, new Vector2(0f, -root.rect.height * .05f), new Vector2(root.rect.width, 200f), -6f);
+                Place(stamp.rectTransform, new Vector2(0f, (cueAnchor.y - .5f) * root.rect.height + cueSize * .2f), new Vector2(root.rect.width, 200f), -6f);
                 stamp.color = new Color(.55f, .88f, 1f, 1f - Mathf.Clamp01((st - .6f) / .3f));
                 stamp.rectTransform.localScale = Vector3.one * (1f + .8f * Mathf.Exp(-st * 10f));
             }
             // Downpour: the sheet drops from above the screen to the boss in 0.3 s, then the drops burst out of the impact.
             float sp = splashAt >= 0f ? t - splashAt : 99f;
             Vector2 boss = new Vector2(0f, (gourdAnchorY - .5f) * root.rect.height);
-            bool sheetOn = sp < .7f;
+            // A short thick column of water pours from just above the boss onto it (the 3D bucket will be up there later).
+            bool sheetOn = sp >= 0f && sp < .75f;
             Show(sheet, sheetOn);
             if (sheetOn)
             {
-                float fall = Mathf.Clamp01(sp / .3f);
-                float top = root.rect.height * .55f, bottom = Mathf.Lerp(top, boss.y, fall);
-                Place(sheet.rectTransform, new Vector2(0f, (top + bottom) * .5f + 40f), new Vector2(root.rect.width * .55f, top - bottom + 120f), 0f);
-                sheet.color = new Color(1f, 1f, 1f, 1f - Mathf.Clamp01((sp - .35f) / .35f));
+                float fall = Mathf.Clamp01(sp / .22f);
+                float top = boss.y + root.rect.height * .16f, bottom = Mathf.Lerp(top, boss.y - root.rect.height * .02f, fall);
+                Place(sheet.rectTransform, new Vector2(0f, (top + bottom) * .5f), new Vector2(root.rect.width * .3f, top - bottom + 30f), 0f);
+                sheet.color = new Color(1f, 1f, 1f, 1f - Mathf.Clamp01((sp - .4f) / .35f));
             }
-            bool dropsOn = sp >= .28f && sp < 1.6f;
+            bool dropsOn = sp >= .2f && sp < 1.1f;
             float dt = Time.unscaledDeltaTime;
             for (int i = 0; i < drops.Length; i++)
             {
@@ -265,9 +327,9 @@ namespace C6Lab
                 if (!dropsOn) continue;
                 dropVelocity[i].y -= root.rect.height * 1.6f * dt;
                 dropAt[i] += dropVelocity[i] * dt;
-                float size = 26f + (i % 4) * 10f;
+                float size = 10f + (i % 4) * 5f;
                 Place(drops[i].rectTransform, boss + dropAt[i], Vector2.one * size, 0f);
-                drops[i].color = new Color(.55f, .82f, 1f, 1f - Mathf.Clamp01((sp - 1.1f) / .5f));
+                drops[i].color = new Color(.6f, .85f, 1f, 1f - Mathf.Clamp01((sp - .7f) / .4f));
             }
         }
 
@@ -293,16 +355,7 @@ namespace C6Lab
             rope.color = pulled ? pulledColor : new Color(ropeColor.r, ropeColor.g, ropeColor.b, taut ? 1f : .75f);
             Place(bar.rectTransform, at, new Vector2(r * 2.8f, r * 1.05f), 0f);
             bar.color = pulled ? Color.Lerp(woodColor, pulledColor, .55f) : woodColor;
-            // "당겨!" and I have not pulled: a little phone rocking its top edge toward me, beside the rope end.
-            bool tiltHint = window && !pulled && now <= round.GoAt + round.PullSeconds;
-            Show(phone, tiltHint);
-            if (tiltHint)
-            {
-                float rock = Mathf.Repeat(t * 2.4f, 1f), lean = rock < .35f ? rock / .35f : Mathf.Max(0f, 1f - (rock - .35f) / .4f);
-                Place(phone.rectTransform, handleAt + new Vector2(0f, -r * 1.5f), new Vector2(r * 1.6f, r * 2.8f), 0f);
-                phone.rectTransform.localScale = new Vector3(1f + .25f * lean, 1f - .45f * lean, 1f);
-                phone.color = Color.white;
-            }
+            Show(phone, false); // replaced by the big tilt cue (DrawCue)
             bool tooEarly = earlyAt >= 0f && t - earlyAt < .7f;
             Show(early, tooEarly);
             if (tooEarly)
@@ -364,6 +417,7 @@ namespace C6Lab
         {
             Show(banner, false); Show(early, false); HideRope();
             foreach (Graphic part in new Graphic[] { stamp, flash, sheet, timerBack, timerFill }) Show(part, false);
+            if (cue != null && cue.gameObject.activeSelf) cue.gameObject.SetActive(false);
             foreach (Image drop in drops) Show(drop, false);
             earlyAt = -1f;
         }
@@ -425,6 +479,31 @@ namespace C6Lab
         }
 
         // ---------- procedural sprites ----------
+        /// <summary>A fat curved arrow: from the phone's top, arcing toward the viewer (down), sky blue with an ink outline.</summary>
+        private static Sprite Arrow() => arrowSprite != null ? arrowSprite : arrowSprite = Build("Jigwi bucket tilt arrow", 96, 128, (u, v) =>
+        {
+            Vector2 p = new Vector2(u * 96f, v * 128f), c = new Vector2(8f, 64f);
+            const float R = 52f, end = -50f;
+            float r = Vector2.Distance(p, c), angle = Mathf.Atan2(p.y - c.y, p.x - c.x) * Mathf.Rad2Deg;
+            bool bodyInk = angle > end - 2f && angle < 72f && Mathf.Abs(r - R) < 13f;
+            bool bodyFill = angle > end && angle < 70f && Mathf.Abs(r - R) < 8f;
+            // Arrowhead at the lower end of the arc, pointing on along it (down and back toward me).
+            float th = end * Mathf.Deg2Rad;
+            Vector2 normal = new Vector2(Mathf.Cos(th), Mathf.Sin(th)), tangent = new Vector2(Mathf.Sin(th), -Mathf.Cos(th));
+            Vector2 local = p - (c + normal * R);
+            float along = Vector2.Dot(local, tangent), across = Mathf.Abs(Vector2.Dot(local, normal));
+            bool headInk = along > -4f && along < 28f && across < (28f - along) * .85f + 4f;
+            bool headFill = along > 0f && along < 24f && across < (24f - along) * .85f;
+            if (bodyFill || headFill) return new Color(.55f, .88f, 1f, 1f);
+            if (bodyInk || headInk) return new Color(.17f, .14f, .12f, 1f);
+            return Color.clear;
+        });
+        /// <summary>Screen-edge glow (clear in the middle) so a flash never hides the screen.</summary>
+        private static Sprite Vignette() => vignetteSprite != null ? vignetteSprite : vignetteSprite = Build("Jigwi bucket vignette", 64, 128, (u, v) =>
+        {
+            float e = Mathf.Min(Mathf.Min(u, 1f - u) * 2f, Mathf.Min(v, 1f - v) * 4f);
+            return new Color(1f, 1f, 1f, Mathf.Clamp01(1f - e / .35f));
+        });
         private static Sprite Disc() => discSprite != null ? discSprite : discSprite = Build("Jigwi bucket drop", 48, 48, (u, v) =>
         {
             float d = Vector2.Distance(new Vector2(u, v), new Vector2(.5f, .5f));

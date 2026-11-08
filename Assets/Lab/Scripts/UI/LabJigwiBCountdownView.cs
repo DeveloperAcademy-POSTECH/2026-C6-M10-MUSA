@@ -137,16 +137,10 @@ namespace C6Lab
             double t = now - round.countdownAt;
             double beatSeconds = round.CountdownLength / 3d;
             int beat = t < round.CountdownLength ? Mathf.Clamp((int)(t / beatSeconds), 0, 2) : 3;
-            bool showing = beat < 3 || t < round.CountdownLength + (round.bucket ? .8d : LabJigwiABTimeline.ReleaseSeconds + .3d);
+            // #551 나무 물통: no big "당겨!" — the tilt picture (LabJigwiBucketHandleView) shows how; the drum still sounds.
+            bool showing = beat < 3 || !round.bucket && t < round.CountdownLength + LabJigwiABTimeline.ReleaseSeconds + .3d;
             if (big.gameObject.activeSelf != showing) big.gameObject.SetActive(showing);
-            if (!showing) return;
-            double since = beat < 3 ? t - beat * beatSeconds : t - round.CountdownLength;
-            big.text = beat < 3 ? (3 - beat).ToString() : round.bucket ? "당겨!" : "던져!";
-            big.color = beat < 3 ? numberColor : goColor;
-            // Each beat lands big and settles (a drum hit you can see).
-            float punch = Mathf.Exp(-(float)since * 9f);
-            big.rectTransform.localScale = Vector3.one * (1f + (beat < 3 ? .45f : .7f) * punch);
-            if (beat > lastBeat)
+            if (beat > lastBeat && t < round.CountdownLength + 1d)
             {
                 lastBeat = beat;
                 BeatCount++;
@@ -155,6 +149,13 @@ namespace C6Lab
                     LabHaptics.PlayDirect(source.config, beat < 3 ? LabHapticStyle.Medium : LabHapticStyle.Heavy,
                         beat < 3 ? beatHapticIntensity : goHapticIntensity, beat < 3 ? 0f : .25f, goHapticIntensity, .8f);
             }
+            if (!showing) return;
+            double since = beat < 3 ? t - beat * beatSeconds : t - round.CountdownLength;
+            big.text = beat < 3 ? (3 - beat).ToString() : round.bucket ? "당겨!" : "던져!";
+            big.color = beat < 3 ? numberColor : goColor;
+            // Each beat lands big and settles (a drum hit you can see).
+            float punch = Mathf.Exp(-(float)since * 9f);
+            big.rectTransform.localScale = Vector3.one * (1f + (beat < 3 ? .45f : .7f) * punch);
         }
 
         /// <summary>지목된 자리마다 P번호 동그라미. 잡고 있으면 파랗게 빛나고, 내 자리는 테두리가 굵다.</summary>
