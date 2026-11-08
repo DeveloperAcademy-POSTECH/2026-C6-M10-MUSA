@@ -6679,3 +6679,22 @@ PR-1(`feat/#507-gourd-rig-contract`) 위에서 Unity 6000.6.5f1 macOS batch Edit
 
 - 원격 main `ae4aa87e`(#561)의 저장 DEV 257행·240번 기본값·Prefab 글꼴 보존 수정을 반영한 뒤 macOS 기본 batch 환경에서 재검사했다. **EditMode `GameEditorMenuCleanupTests` 4/4 PASS(0.60초), 관련 PlayMode 37/37 PASS(36.24초)**이며 실행 건수가 0이 아닌 NUnit 결과를 확인했다.
 - main 대비 PR 변경은 DEV 코드·해당 검사·사용법/검증 문서 13개 파일뿐이다. Scene·Prefab·머터리얼·패키지·ProjectSettings와 결과 화면 전환 코드는 변경하지 않았다. `git diff --check`와 검사 후 깨끗한 작업 트리를 확인했다. 추가 iOS·실네트워크·전체 검사 모음은 실행하지 않았다.
+
+### #552 튜토리얼 대사 넘기기를 화면 전체 터치로 되돌림 — 2026-11-08
+
+- **사용자 결정:** #536의 "말풍선과 둘레 8pt를 눌러야 대사가 넘어감"을 되돌려, 예전처럼 화면 어디를 눌러도 다음 대사로 넘어간다. 새 이슈를 파는 대신 #552 브랜치에서 함께 진행한다.
+- **되돌린 것 (#536이 넣은 부분만 직접 제거, `git revert` 아님):**
+  - 전체 화면 터치 층을 다시 `Tap To Continue`로 하고 `OnTap`에 연결했다.
+  - 말풍선 터치 영역, 말풍선 밖을 누르면 ▽가 커지는 동작(`OnScreenTap`, `TapHintNudge`)을 지웠다.
+  - `TutorialArt.asset` 값 3개(`lineTapPadding`, `tapHintNudgeScale`, `tapHintNudgeSeconds`)를 지웠다. Editor API로 다시 저장했고 이 3줄 외의 변경은 없다.
+- **그대로 둔 것:** ▽ 표시, 연타 방지 시간, 대사 중 판 잠금, #552의 "구슬이 사라지기 전에는 넘길 수 없음". 건너뛰기·일시정지 버튼을 누를 때는 대사가 넘어가지 않는다.
+
+| 실행한 확인 | 결과 |
+| --- | --- |
+| 컴파일 · Console 오류 | **PASS**: compilationFailed=false, 지운 멤버 참조 0 |
+| `TutorialArt.asset` 변경 범위 | **PASS**: 3줄 삭제만 |
+
+- **수정 검사 (NOT_RUN):**
+  - EditMode `GameTutorialTests`: ▽ 커짐 검사를 지웠다.
+  - PlayMode `GameTutorialFlowTests`: 말풍선 영역 검사를 지우고, 터치 영역이 화면 전체인지와 대사 중 판이 잠겨 있는지 확인하도록 바꿨다.
+- **미실행:** Play·iPhone에서 화면 아무 곳이나 눌러 대사가 넘어가는지, 건너뛰기·일시정지를 누를 때 대사가 넘어가지 않는지.

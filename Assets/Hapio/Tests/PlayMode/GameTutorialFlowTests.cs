@@ -170,24 +170,11 @@ namespace Hapio.Tests
             yield return Until(() => !network.IsBattlePaused && !director.IsSteppedAsideForPause, "Back from the pause menu", 10f);
             Assert.That((overlayGroup.alpha, overlayGroup.blocksRaycasts), Is.EqualTo((1f, true)));
             Assert.That(director.IsShowingLine, Is.True, "The same line again.");
-            // #536: only the bubble moves a line on. A tap anywhere else keeps the board still, moves nothing on and makes
-            // the ▽ jump once to show where to tap.
-            var blocker = director.GetComponentsInChildren<UnityEngine.UI.Button>(true).Single(button => button.name == "Screen Blocker");
-            var bubbleRect = director.GetComponentsInChildren<RectTransform>(true).Single(rect => rect.name == "Bubble");
-            yield return Until(() => director.IsShowingTapHint, "The ▽ is up", 2f);
-            Rect area = ScreenRect(tap.GetComponent<RectTransform>()), drawn = ScreenRect(bubbleRect);
-            float pad = art.lineTapPadding * overlayGroup.GetComponent<Canvas>().scaleFactor;
-            Assert.That(area.xMin, Is.EqualTo(drawn.xMin - pad).Within(1f), "The bubble and a little around it, no more.");
-            Assert.That(area.yMax, Is.EqualTo(drawn.yMax + pad).Within(1f));
-            Assert.That(area.width, Is.LessThan(Screen.width * .9f), "Not the whole screen any more.");
-            int missed = director.ScreenTapsOffBubble;
-            blocker.onClick.Invoke();
-            Assert.That((director.StepIndex, director.BeatIndex), Is.EqualTo((0, 1)), "A tap off the bubble moves nothing on.");
-            Assert.That(director.ScreenTapsOffBubble, Is.EqualTo(missed + 1));
-            Assert.That(director.IsNudgingTapHint, Is.True, "The ▽ jumps to show where to tap.");
+            // #552 (undoing #536): a tap anywhere on the screen moves a line on, and the board stays still under it.
+            Rect tapArea = ScreenRect(tap.GetComponent<RectTransform>());
+            Assert.That(tapArea.width, Is.EqualTo(Screen.width).Within(1f), "The whole screen across.");
+            Assert.That(tapArea.height, Is.EqualTo(Screen.height).Within(1f), "And from top to bottom.");
             Assert.That(board.AllowedGestures, Is.EqualTo(LabBoardGestures.None), "The board stays still under the line.");
-            yield return new WaitForSecondsRealtime(art.tapHintNudgeSeconds + .05f);
-            Assert.That(director.IsNudgingTapHint, Is.False, "Once.");
             for (int line = 2; line < lines; line++)
             {
                 Assert.That(director.StepIndex, Is.EqualTo(0));

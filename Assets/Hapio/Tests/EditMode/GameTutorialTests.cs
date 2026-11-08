@@ -1118,7 +1118,7 @@ namespace Hapio.Tests
             Assert.That(GameTutorialScript.SkipTitle, Is.EqualTo("튜토리얼을 건너뛰겠소?"));
             Assert.That(GameTutorialScript.SkipBody.Split('\n'), Is.EqualTo(new[]
             {
-                "튜토리얼을 건너뛰면 구슬 전달과 조합 등", "기본 조작을 익히지 못해", "협동 플레이에 어려움이 있을 수 있소."
+                "튜토리얼을 건너뛰면 기본 조작을 익히지 못해", "협동 플레이에 어려움이 있을 수 있소."
             }));
             Assert.That((GameTutorialScript.SkipStay, GameTutorialScript.SkipLeave), Is.EqualTo(("계속 배우기", "건너뛰기")));
             GameTutorialArt art = GameTutorialArt.Load();
@@ -1144,25 +1144,6 @@ namespace Hapio.Tests
             Assert.That(GameTutorialDirector.SkipFade(9f, .5f), Is.EqualTo(1f), "Then stays.");
             var art = ScriptableObject.CreateInstance<GameTutorialArt>();
             try { Assert.That(art.skipFadeSeconds, Is.EqualTo(.5f)); }
-            finally { Object.DestroyImmediate(art); }
-        }
-
-        [Test]
-        public void TapOffTheBubbleMakesTheHintJumpOnceAndSettle()
-        {
-            const float seconds = .3f, peak = 1.35f;
-            Assert.That(GameTutorialDirector.TapHintNudge(-1f, seconds, peak), Is.EqualTo(1f), "Before any tap.");
-            Assert.That(GameTutorialDirector.TapHintNudge(0f, seconds, peak), Is.EqualTo(1f).Within(1e-5f));
-            Assert.That(GameTutorialDirector.TapHintNudge(seconds * .5f, seconds, peak), Is.EqualTo(peak).Within(1e-4f),
-                "Biggest halfway.");
-            Assert.That(GameTutorialDirector.TapHintNudge(seconds, seconds, peak), Is.EqualTo(1f), "Back to size.");
-            Assert.That(GameTutorialDirector.TapHintNudge(5f, seconds, peak), Is.EqualTo(1f), "Only once.");
-            var art = ScriptableObject.CreateInstance<GameTutorialArt>();
-            try
-            {
-                Assert.That(art.lineTapPadding, Is.EqualTo(8f), "The bubble and 8pt around it move a line on (#536).");
-                Assert.That(art.tapHintNudgeScale, Is.GreaterThan(1f));
-            }
             finally { Object.DestroyImmediate(art); }
         }
 
