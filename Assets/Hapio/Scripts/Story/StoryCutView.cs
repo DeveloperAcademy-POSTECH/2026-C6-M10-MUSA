@@ -41,6 +41,17 @@ namespace Hapio
             }
         }
 
+        /// <summary>Keep this picture instance at rest when its remaining story is skipped.</summary>
+        public void ShowCompletedPose()
+        {
+            if (layers != null)
+                foreach (var layer in layers)
+                    if (layer != null) layer.Sample(layer.EntranceDuration);
+            if (beats != null)
+                foreach (var beat in beats)
+                    if (beat != null) beat.SampleWithoutSound(Mathf.Max(beat.Duration, beat.interactionDelay));
+        }
+
         public void Sample(float elapsed)
         {
             if (layers != null)
