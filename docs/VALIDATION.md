@@ -44,6 +44,85 @@
 - Mac 독립 실행 앱의 플레이, 실제 LAN/일반 Wi-Fi/핫스팟에서 여러 기기 연결과 원격 결과 확인.
 - 위 항목은 기존 검증 기록이나 코드 존재로 PASS를 대신하지 않는다. 현재 호환 묶음은 설정259개·5691·Lab52·**Game39**다.
 
+## 2026-11-08 — #503 방장 입장 전 대기 방 공개 실패 재시도
+
+- **기준:** main `886e65db` 위의 `fix/#503-pending-room-register-retry`. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro), iOS 활성, 실제 macOS Bonjour(dns_sd). Library는 다른 worktree에서 복제했다.
+- **강제 실패 방법:**
+  - 진행 중인 등록은 discovery 자신의 `Fail`로 끝냈다. 오류 응답·시간 초과와 같은 경로다.
+  - 시작 거절은 예약 소켓 두 개를 한 번만 숨겨 `StartAdvertise`가 바로 false를 돌려주게 했다.
+  - 실제 로컬 네트워크 권한 창·거부, Wi-Fi 끊김은 재현하지 않았다.
+
+| 확인(검토 반영 `0e8edb42` 기준, 괄호는 첫 커밋 `4faa3c93`) | 결과 |
+| --- | --- |
+| 관련 EditMode(`LabBonjourRegistrationTests`·`LabDiscoveryBackoffTests`·`LabRoomPresenceTests`·`GamePendingRoomRegistryTests`) | 58/58 PASS(첫 커밋 58/58). 이름 충돌 재시도와 마지막 번호 실패 검사를 포함한다 |
+| 새 PlayMode `LabPendingRoomRetryTests` 4건 | 4/4 PASS: 첫 등록이 실패해도 같은 포트로 확정되고 이름 충돌 예산은 0으로 돌아감, 시작 거절 뒤에도 재시도, 확정 뒤 끊기면 뒤 번호를 요청받아도 자기 이름으로 복구, 대기 1초→2초와 6회 뒤 실패(포트는 주인이 정리할 때까지 예약) |
+| 새 PlayMode `GamePendingRoomRetryTests` 1건 | PASS: 기다리는 카드가 다음 카드를 막지 않음, 마지막 재시도가 실패한 뒤에만 카드가 빠지고 기존 안내가 뜨며 포트가 풀림 |
+| 새 PlayMode `LabFigmaLobbyTests.ACreatedRoomWaitingToRetry…` 1건(`0e8edb42`에서 추가) | PASS: Lab 로비의 실제 카드 두 개로 같은 동작(기다리는 카드 유지·다음 카드 확정·입장 가능 카드 1개, 마지막 실패 뒤 카드 제거·`creationError`·포트 해제) |
+| `GameLobbyViewTests` 새 2건 | PASS: 실패한 방이 재시도 안내 뒤 예약 포트로 자동 입장, 실패 뒤 한도에 닿으면 권한 안내, 재시도를 다 쓰면 기존 안내 |
+| 관련 PlayMode 묶음(새 검사 포함 `LabPendingRoomRetryTests`·`GamePendingRoomRetryTests`·`GameLobbyViewTests`·`LabFigmaLobbyTests`·`LabDiscoveryRecoveryTests`) | 37/37 PASS(65.4초; 첫 커밋 36/36) |
+| 대조 1(첫 커밋): 재시도를 끔(이름 충돌이 아닌 실패는 바로 실패, 이전 동작) | 새 7건 모두 실패 |
+| 대조 2(첫 커밋): 기다리는 카드가 다음 카드를 다시 막게 함(등록부) | `GamePendingRoomRetryTests`만 "A waiting card does not hold back the next one."에서 실패 |
+| 대조 3: 확정된 방도 재시도 때 앞 카드 번호를 따르게 되돌림 | `AConfirmedRoomThatLosesItsRegistrationAsksForItsOwnNameAgain`만 실패: 자기 번호 대신 +7 번호로 등록 |
+| 대조 4: 확정 때 이름 충돌 예산을 초기화하지 않음 | `AFirstRegistrationThatFails…`만 실패: 예산 사용 2 |
+| 대조 5: Lab 로비가 기다리는 카드에서 다음 카드를 다시 막게 함 | 새 Lab 로비 검사만 "A waiting card does not hold back the next one."에서 실패 |
+| 전체 EditMode | 2056/2058 PASS(20.7초; 첫 커밋 2056/2058, 21.8초). 실패 2건은 아래 main 실패다 |
+| 전체 PlayMode | 667/675 PASS(521.5초; 첫 커밋 666/674, 527.0초). 실패 8건은 아래 main 실패다 |
+
+- 각 실행의 skip·inconclusive는 0이다. 대조 변경은 되돌렸고 커밋하지 않았다.
+- 첫 실행에서 새 `GamePendingRoomRetryTests`가 한 번 실패했다. 검사는 첫 Tick에서 항상 native 등록이 시작된다고 가정했다. 실제로는 다른 카드가 그 이름을 먼저 가져가, 지역 이름 충돌(-65548)로 다음 번호로 넘어갔다. 제품 동작이 맞으므로, 등록이 실제로 시작될 때까지 Tick하도록 검사를 고쳤다. 위 결과는 고친 뒤의 것이다.
+- **검토:** 독립 검토 3갈래(상태 전환, 호출부 정책·UI, 검사·문서)를 돌리고 지적마다 반박 검증을 붙였다. 인정된 3건을 `0e8edb42`에서 고쳤다.
+  - 확정된 카드도 재시도 때 앞 카드 번호를 따라, 이름 충돌이 없어도 번호가 바뀔 수 있었다.
+  - 재시도가 이름 충돌 예산을 계속 썼다. 오래 떠 있는 Lab 카드라면, 나중의 이름 충돌 때 다음 번호로 가지 못하고 실패할 수 있었다.
+  - Lab 로비의 차례 규칙에 검사가 없었고, 포트 해제 단언은 검사가 직접 정리한 뒤라 의미가 없었다.
+  - 기각된 7건은 의도한 정책이거나 이미 문서에 있는 내용이었다. 기다리는 카드의 이름·번호가 비는 것, 재시도 중 Lab 안내가 없는 것, 30초 한도로 Hapio 재시도가 4번쯤에서 끊기는 것 등이다.
+- **이 PR과 무관하게 실패한 검사(main `886e65db`):**
+  - EditMode `GameSceneAssetTests.MenuScreens_HaveSavedEditableCanvasAndInput`의 Home·Lobby 2건. 저장된 DEV 패널 240행은 15인데 `LabConfig.asset`은 10이다. #540이 이 값을 15→7(`14813416`)→10(`5413486d`)으로 바꿀 때 Home·Lobby의 DEV 행을 다시 저장하지 않았다.
+  - PlayMode `LabJigwiABNetworkTests` 7건과 `GameJigwiStageIntegrationTests.SavedHomeReachesJigwiWithScreenAThenScreenBAndPreservesTheRealPaintShell` 1건. 대부분 지귀 B 장막·발화점 관련 NullReference·IndexOutOfRange다.
+  - 지귀·DEV 코드를 바꾸지 않는 다른 브랜치(#504, 같은 main 기준)에서도 같은 10건이 실패했다. 지귀 실패의 원인은 조사하지 않았다.
+- **미실행:** iPhone의 로컬 네트워크 권한 창·거부, Wi-Fi 끊김, 여러 기기에서 카드가 보이는지 확인. `DNSServiceRegister`가 이름 충돌이 아닌 오류로 바로 거절하는 경우는 강제하지 못했다. `LabPendingRoom`에서 같은 분기를 타는 `StartAdvertise`의 이른 false 반환으로 대신 확인했다. 앱 복귀 때 재시도를 앞당기는 동작은 만들지 않았다.
+
+## 2026-11-08 — #504 배경 재질 `_MainTex`·`_Color` 사본 맞추기
+
+- **기준:** main `886e65db` 위의 `chore/#504-background-material-sync`. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro), iOS 활성. Library는 다른 worktree에서 복제했다.
+- **원인 확인(임시 진단 스크립트 8개, 커밋 안 함):**
+  - URP `BaseShaderGUI.SetMaterialKeywords`는 `_MainTex`와 `_BaseMap`이 모두 있으면 `_BaseMap`의 텍스처·타일링·오프셋을 `_MainTex`에, `GetColor("_BaseColor")`를 `_Color`에 복사한다.
+  - 이 복사는 가져오기·불러오기가 아니라 재질 속성을 처음 읽을 때 일어났다. Stage02 `YokaiGround` 복사본의 `_MainTex` 텍스처만 다르게 저장해 가져왔다. 불러오기만 했을 때는 dirty가 아니었다. `GetTexture`·`HasProperty`로 처음 읽자 사본이 `_BaseMap` 값이 되고 dirty가 됐고, 저장하자 파일도 바뀌었다. `shader`·`SerializedObject` 접근만으로는 바뀌지 않았다.
+  - 색 사본도 같다. `_Color`만 흰색인 `Eye pupils` 복사본은 처음 읽은 뒤 dirty였고, 저장하자 `_Color`가 `_BaseColor` 값으로 바뀌었다.
+  - `GetColor`는 시험한 6색 중 3색을 `SetColor`로 넣은 값보다 float 1~2단계 작게 돌려줬다(예: 0.55 → 0.54999995). `SerializedObject`로 보면 저장값은 `SetColor`에 넣은 그대로였다. 이 3색을 `_Color`에 같은 숫자로 저장한 파일은 다시 가져와 처음 읽을 때 dirty가 됐다. `_BaseColor`를 다시 읽어 복사하면(URP와 같은 방식) 6색 모두 dirty가 아니었다. `-nographics` 유무와 관계없이 같았다.
+  - 고치기 전 `이미지만 적용`의 재질 쓰기(`_BaseMap`·`_BaseColor`만)를 복사본에 실행하고 저장했다. `_MainTex`의 타일링·오프셋이 옛 값(3×3, 0)으로 남았고, 다시 불러와 읽자 dirty였다.
+  - 지금 저장된 Studio 재질 12개는 복사본을 다시 가져와 처음 읽어도 dirty가 아니다. 이번 변경은 재질·Scene 파일을 바꾸지 않는다.
+- **고친 것:**
+  - `LabBackgroundStudio.ApplyImage`가 URP와 같은 방식(기본값을 다시 읽어 복사)으로 사본까지 쓴다.
+  - Studio Inspector는 저장 재질이 Studio 값과 다르면 경고한다.
+  - `GameStageBackgroundAssetTests`에 EditMode 검사 3개(TestCase 포함 4건)를 더했다.
+- **남은 것(바꾸지 않음):** 검토 중 저장소의 URP Lit/Unlit 재질 74개를 모두 다시 확인했다. `_MainTex`가 `_BaseMap`과 다른 파일은 없다. `_Color`의 글자가 `_BaseColor`와 다른 파일은 28개이고, 모두 배경 Studio 밖이다.
+  - 25개는 채널마다 float 1~6단계만 작다: 구운 박 14개(`Assets/Hapio/Art/Gourds/Stage0N_*/Materials`), `Assets/Hapio/Art/Yagwanggwi/Materials` 7개, Lab 4개(`Art/Orbs/OrbBoardPlate`·`OrbCombined`·`OrbYin`, `Resources/GourdPaint/Stem`). 25개 모두 URP가 저장된 `_BaseColor`에서 복사할 값과 비트 단위로 같았다(새 파일 검사와 같은 계산). `Hanbok_gold_edging`·`Hanbok_long_robe_teal`·`OrbCombined` 복사본은 처음 읽어도 dirty가 아니었고, 다른 속성을 바꿔 저장해도 `_Color`가 그대로였다.
+  - `Assets/Hapio/Art/Yagwanggwi/Materials`의 `Eye ivory`·`Eye pupils`·`Inner ivory` 3개는 `_Color`가 흰색이다. Editor가 처음 읽으면 dirty가 되어, 다음 저장 때 `_Color` 줄이 `_BaseColor` 값으로 바뀐다(`Eye pupils`로 확인). 세 재질을 참조하는 Prefab·Scene·에셋은 없어서 평소에는 읽히지 않는다. 다른 작업의 에셋이라 그대로 뒀다.
+- **검토:** 독립 검토 2갈래(코드·검사, 문서)를 돌리고 지적마다 반박 검증을 붙였다.
+  - 인정된 지적은 1건이다. "남은 것" 목록이 14개로 불완전했고, 저장소 전체를 다시 확인해 28개로 고쳤다.
+  - 기각된 2건도 문구는 다듬었다. `ApplyImage`가 Editor 전용이라는 점과 "저절로 바뀐다"는 표현이다.
+  - 검토의 부수 관찰은 "불러온 색이 파일 값과 1단계 다르다"였다. 이것을 직접 확인하다가, 첫 커밋처럼 `_Color`에 같은 숫자를 쓰면 일부 색에서 다시 dirty가 되는 것을 찾았다. `fbb7d820`에서 URP와 같은 방식으로 고쳤다.
+  - 2차 검토는 두 PR을 함께 독립 4갈래로 보고 반박 검증을 붙였다. #504에서 인정된 지적은 문구 2가지였고 둘 다 고쳤다.
+    - 검사 주석이 색 사본은 dirty를 만들지 않는다고 썼다.
+    - 문서가 `GetColor` 차이를 "float 한두 단계"로 단정했다. 저장소 재질에서는 1~6단계였다.
+  - 단위 검사가 저장값을 직접 읽지 않는다는 지적은 기각됐다. 그래도 `SerializedObject`로 저장된 `_Color`를 읽어 비교하도록 바꿨다. 이후 대조 C는 0.55의 r 채널에서 바로 실패했다.
+
+| 확인(검토 반영 기준, 괄호는 첫 커밋 `bc97169f`) | 결과 |
+| --- | --- |
+| 배경 EditMode 3 fixture(`GameStageBackgroundAssetTests`·`GameBackgroundAnimationAssetTests`·`GameSceneAssetTests`) | 16건 중 14 PASS. 새 4건과 기존 배경 검사가 통과했다. 실패 2건은 아래 main 실패다 |
+| 대조 A: Stage02 `YokaiGround.mat`의 `_MainTex` GUID만 HanjiSand로 바꿈 | 새 파일 검사(Battle)만 실패: `YokaiGround.mat`의 `_MainTex`가 `_BaseMap`과 다름 |
+| 대조 B: `ApplyImage`에서 사본을 쓰는 두 줄을 뺌 | 새 `ApplyImageWritesTheHiddenCopiesSoUrpsOwnCopyChangesNothing`만 실패: Lit `_MainTex`가 옛 텍스처 |
+| 대조 C: `ApplyImage`가 `_Color`에 `color`를 그대로 씀(첫 커밋의 방식) | 같은 검사만 실패: 0.55·0.29·0.81에서 저장된 `_Color`(r)가 URP가 복사할 값과 다름 |
+| 대조 D: Stage01 `YokaiGround.mat`의 `_Color` r만 float 1단계 낮춤(1.015 → 1.0149999) | 새 파일 검사(Battle)만 실패: URP가 복사할 값은 1.015 |
+| 전체 EditMode | 2060/2062 PASS(20.1초; 첫 커밋 2060/2062, 22.5초). 실패 2건은 아래 main 실패다 |
+| 전체 PlayMode | 659/667 PASS(512.0초; 첫 커밋 659/667, 518.9초). 실패 8건은 아래 main 실패다. 이 변경은 Editor 전용이라 PlayMode 경로에 닿지 않는다 |
+
+- 각 실행의 skip·inconclusive는 0이다. 대조 변경과 진단 스크립트는 되돌렸고 커밋하지 않았다.
+- **이 PR과 무관하게 실패한 검사:**
+  - EditMode `GameSceneAssetTests.MenuScreens_HaveSavedEditableCanvasAndInput`의 Home·Lobby 2건. 저장된 DEV 패널 240행은 15인데 `LabConfig.asset`은 10이다. #540이 이 값을 15→7(`14813416`)→10(`5413486d`)으로 바꿀 때 Home·Lobby의 DEV 행을 다시 저장하지 않았다.
+  - PlayMode `LabJigwiABNetworkTests` 7건과 `GameJigwiStageIntegrationTests.SavedHomeReachesJigwiWithScreenAThenScreenBAndPreservesTheRealPaintShell` 1건. 대부분 지귀 B 장막·발화점 관련 NullReference·IndexOutOfRange다. 지귀 코드를 바꾸지 않는 #503 브랜치(같은 main 기준)에서도 같은 8건이 실패해 main `886e65db`의 실패로 본다. 원인은 조사하지 않았다.
+- **미실행:** Editor 화면에서 Inspector 경고를 직접 보는 확인, 실기기. 이 변경은 Editor 전용이다.
+
 
 ## 2026-11-07 — ClayPreview 높이 EXR의 iOS 가져오기 (main에서 계속 실패하던 검사 1건)
 

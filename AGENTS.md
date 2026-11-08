@@ -190,6 +190,11 @@
 - `LabNetwork.Recovery.cs`가 검색 재시작(1~30초, 최대 6회)·방장 공개 재등록(같은 요청 이름, 이관 방은 이름 고정)·모바일 복귀 처리를 맡는다. `DisposeDiscovery`가 대기 중인 재시도를 지우므로 실패 경로는 그 뒤에 예약한다. 살아 있는 등록은 복귀 때 다시 만들지 않는다.
 - iPhone만 연결·입장 중·검색 중(`RoomSearchKeepsAwake`, Hapio는 방 목록이 보일 때만)·재시도 대기에 `SleepTimeout.NeverSleep`이다. NGO·전송 소켓 재생성, 전투 중 백그라운드 처리, 접속 규약·TXT·설정 수·Scene/Prefab은 바꾸지 않는다.
 
+## #503 대기 방 공개 재시도
+
+- 방장 입장 전 대기 방(`LabPendingRoom`)은 이름 충돌이 아닌 등록 실패를 `LabDiscoveryBackoff`의 1~30초 간격, 최대 6회로 다시 등록한다(`RetryPending`·`RetryAttempts`). 기다리는 동안 예약 포트와 카드를 유지하고, 다른 카드의 등록 순서를 막지 않으며, `Failed`는 6회가 끝난 뒤에만 참이다. 이름 충돌은 기존 다음 번호 재시도를 그대로 쓴다. 확정된 카드는 자기 번호를 다시 요청하고, 확정될 때마다 재시도 횟수와 이름 충돌 예산을 초기화한다.
+- Hapio 방 만들기의 30초 한도는 그대로다. 재시도 중 안내와 한도 도달 안내만 바꿨다. 상세는 `docs/GAME_FLOW.md`의 같은 항목을 따른다. 접속 규약·TXT·설정 수는 바꾸지 않는다.
+
 ## #481 전투 초반 프레임 계측
 
 - Development/Editor(`Debug.isDebugBuild`)에서만 `GameSession`이 `GameFrameSpikeProbe`를 런타임에 붙인다. 전투 단계(LoadingBattle~Playing)의 25 ms 초과 프레임과 그 프레임에 처음 실행된 일(`LabFirstUse`의 `Hapio.FirstUse.*` 마커)을 미리 할당한 배열에만 담고, 스테이지가 끝나거나 같은 스테이지를 다시 불러올 때 `HAPIO_FRAME_SPIKE`·`HAPIO_FRAME_SUMMARY`로 스택 없이 한 번 출력한다. 출력한 프레임은 다음 스테이지 측정에서 뺀다.
@@ -357,3 +362,8 @@
 - 정상 Story 패배만 Host가 같은 방·스테이지를 재시도한다. 원래 참가자·P·승인 설정·이전 성공 기록은 유지하고 기존 prepare/start 장벽으로 새 전투를 만든다. 이탈·연결 끊김·로드 실패는 Home만 남기며 오래된 ACK/중복/Guest 요청으로 재도전하지 않는다.
 - GameOver 동결 뒤에도 마지막 terminal 발행에서 Bulk 백로그로 빠진 피어에게는 대기열이 줄면 기존 paint+snapshot 트랜잭션을 한 번 큐에 넣는다. 실제 terminal 상태를 헤더에서 추정하거나 게임 시뮬레이션을 재개하지 않는다.
 - 실제 연결·에셋·종료 수명은 `docs/STAGE_STORY_UI_INTEGRATION.md`, 과거 제작용 미리보기는 `docs/STAGE_STORY_PRESENTATION.md`, 실행 결과는 `docs/VALIDATION.md`를 따른다.
+
+## #504 배경 재질의 숨은 사본
+
+- 배경 Studio의 바닥·한지 배경·보드 뒤 재질(URP Lit/Unlit)은 숨은 `_MainTex`·`_Color`를 URP가 `_BaseMap`·`_BaseColor`에서 복사하는 값 그대로 저장한다. Editor가 재질 속성을 처음 읽을 때 URP가 다시 복사하고, 결과가 다르면 재질이 dirty가 되어 다음 저장 때 .mat이 바뀐다. 일부 색은 `GetColor`가 float 몇 단계 다르게 돌려주므로 `_Color`에 같은 숫자를 쓰면 안 된다. Editor 스크립트로 바꿀 때도 `LabBackgroundStudio.ApplyImage`(Editor 전용)를 쓴다. `GameStageBackgroundAssetTests`가 재질 파일을 읽어 확인한다. 상세는 `docs/STAGE_BACKGROUNDS.md`를 따른다.
+

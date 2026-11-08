@@ -8,8 +8,12 @@ public sealed class LabBackgroundStudioEditor : Editor
     public override void OnInspectorGUI()
     {
         EditorGUILayout.HelpBox("이미지·색·Opacity·두께·바람을 바꾼 뒤 ‘이미지만 적용’을 누르세요. 기존 오브젝트와 Transform은 유지됩니다. 원형 배치를 바꾸려면 별도 배치 버튼을 사용하세요. 두께는 이미지 층/교차면 표현이며 실제 조각형 3D 모델은 아닙니다.",MessageType.Info);
-        DrawDefaultInspector();
         var studio=(LabBackgroundStudio)target;
+        // #504: a player draws the saved material, not these fields.
+        var unapplied=studio.UnappliedImages();
+        if(unapplied.Count>0)
+            EditorGUILayout.HelpBox("아직 재질에 적용되지 않았습니다: "+string.Join(", ",unapplied)+"\n게임은 저장된 재질을 그립니다. ‘이미지만 적용’을 누른 뒤 Scene을 저장하세요.",MessageType.Warning);
+        DrawDefaultInspector();
         using(new EditorGUI.DisabledScope(EditorApplication.isPlayingOrWillChangePlaymode))
         {
             if(GUILayout.Button("이미지만 적용 / Preserve Layout",GUILayout.Height(32)))

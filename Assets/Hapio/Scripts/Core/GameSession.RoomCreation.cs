@@ -6,6 +6,9 @@ namespace Hapio
     public sealed partial class GameSession
     {
         private const string RoomCreationNotice = "방을 만들고 있소. 준비되면 바로 입장하오...";
+        // #503: a failed publish is retried; the request still ends at the same deadline.
+        private const string RoomRetryNotice = "방을 공개하지 못해 다시 시도하고 있소...";
+        private const string RoomPublishFailedNotice = "방을 공개하지 못했소. 네트워크 권한을 확인하고 다시 눌러주시오.";
         private GamePendingRoomHandle roomCreationHandle;
         private double roomCreationDeadline;
 
@@ -60,19 +63,26 @@ namespace Hapio
             {
                 // A failed registration was already disposed by the registry. Do not keep a stuck request.
                 CancelRoomCreation(false);
-                if (string.IsNullOrEmpty(UiNotice) || UiNotice == RoomCreationNotice)
-                    UiNotice = "방을 공개하지 못했소. 네트워크 권한을 확인하고 다시 눌러주시오.";
+                if (string.IsNullOrEmpty(UiNotice) || UiNotice == RoomCreationNotice || UiNotice == RoomRetryNotice)
+                    UiNotice = RoomPublishFailedNotice;
                 Changed?.Invoke();
                 return;
             }
+            bool publishFailed = room.RetryPending || room.RetryAttempts > 0;
             if (Time.realtimeSinceStartupAsDouble >= roomCreationDeadline)
             {
                 CancelRoomCreation(false);
-                UiNotice = "방 준비 시간이 초과됐소. 네트워크 연결을 확인하고 다시 눌러주시오.";
+                // Retries that never got through point at the publish, not at a slow room.
+                UiNotice = publishFailed ? RoomPublishFailedNotice
+                    : "방 준비 시간이 초과됐소. 네트워크 연결을 확인하고 다시 눌러주시오.";
                 Changed?.Invoke();
                 return;
             }
-            if (!room.Ready) return;
+            if (!room.Ready)
+            {
+                if (publishFailed && UiNotice == RoomCreationNotice) { UiNotice = RoomRetryNotice; Changed?.Invoke(); }
+                return;
+            }
 
             GamePendingRoomHandle readyHandle = roomCreationHandle;
             // Clear before EnterPendingRoom: its existing reset/guards must not cancel the room being handed over.
