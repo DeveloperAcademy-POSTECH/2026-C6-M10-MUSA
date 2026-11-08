@@ -77,7 +77,8 @@ namespace C6Lab
             jigwiSchedule = config.JigwiBTestOnly ? LabJigwiABTimeline.BTestSchedule // #551 시험용: B만
                 : config.JigwiFlowSchedule ? LabJigwiABTimeline.FlowSchedule : LabJigwiABTimeline.LegacySchedule;
             jigwiAHoldBurn = config.JigwiAHoldBurnUntilEnd;
-            jigwiBCountdown = config.JigwiBCountdown;
+            jigwiBBucket = config.JigwiBBucket;
+            jigwiBCountdown = config.JigwiBCountdown || jigwiBBucket; // the bucket runs on the 3-2-1
             jigwiCommonStart = config.JigwiCommonStartSeconds; jigwiCommonInterval = config.JigwiCommonIntervalSeconds;
             jigwiABRounds.Clear(); jigwiABActivated.Clear(); jigwiABFailureRevision = 0;
             jigwiABLastBurnAt.Clear(); jigwiABBurnQueueId = null; jigwiTalismanDrops.Clear(); jigwiFailBurns.Clear(); jigwiAPausedOrbs.Clear(); jigwiTalismanShards.Clear();
@@ -183,7 +184,7 @@ namespace C6Lab
             if (active.kind != LabJigwiABKind.GroupFire) return;
             CloseJigwiSyncWindow(active, now);
             FailLateJigwiBRelease(active, now);
-            if (firstActivation) StartJigwiABSupply(active, now);
+            if (firstActivation && !active.bucket) StartJigwiABSupply(active, now); // #551 물통엔 특수 물구슬이 없다
         }
         private void BeginJigwiABSlot(int slot, double activeAt)
         {
@@ -203,7 +204,8 @@ namespace C6Lab
                 // #509: B success no longer gives a timed launch reward.
                 rewardSizeScale = 1f, rewardPaintScale = 1f,
                 // #551: with the countdown the picked hits may land a little further apart.
-                syncWindowSeconds = !personal && jigwiBCountdown ? LabJigwiABTimeline.CountdownSyncWindowSeconds : 0f
+                syncWindowSeconds = !personal && jigwiBCountdown ? LabJigwiABTimeline.CountdownSyncWindowSeconds : 0f,
+                bucket = !personal && jigwiBBucket
             };
             // #479: A ignites every seat at once; each seat clears its own fire with a talisman.
             if (personal) item.players = seats.Take(activeSeatCount).Select(owner => new LabJigwiABPlayerFire
@@ -213,7 +215,7 @@ namespace C6Lab
             // #509: B picks a few seats; each picked screen gets one fire pillar in front of the boss.
             // The others are helpers. The draw is stable per seed/slot and differs between B rounds.
             if (!personal) jigwiSyncDirections.Clear();
-            if (!personal) item.players = JigwiGroupPicks(slot).Select(owner => new LabJigwiABPlayerFire
+            if (!personal) item.players = (item.bucket ? seats.Take(activeSeatCount).ToArray() : JigwiGroupPicks(slot)).Select(owner => new LabJigwiABPlayerFire
             {
                 playerId = owner, targets = new[] { new LabJigwiABFireTarget { id = item.id + "/" + owner + "/0", x = .5f, y = .62f } }
             }).ToArray();
@@ -414,7 +416,7 @@ namespace C6Lab
             if (active.syncWindowAt < 0d || now < active.syncWindowAt + active.SyncWindow) return;
             FailJigwiSync(active, active.syncWindowAt + active.SyncWindow);
         }
-        private bool jigwiBCountdown;
+        private bool jigwiBCountdown, jigwiBBucket;
         /// <summary>
         /// #551 B countdown: a picked seat starts or stops holding its special Water. When every picked seat holds it
         /// the 3-2-1 starts (countdownAt); anyone letting go before "지금!" stops it. After "지금!" holding no longer
@@ -468,6 +470,38 @@ namespace C6Lab
             double due = active.GoAt + LabJigwiABTimeline.ReleaseSeconds;
             if (now < due || active.players.All(value => value.launchedAt >= 0d)) return;
             FailJigwiSync(active, due);
+        }
+        /// <summary>
+        /// #551 나무 물통: a seat pulled its handle (tilted the phone toward itself while holding). Counts only after "당겨!"
+        /// and within <see cref="LabJigwiABTimeline.ReleaseSeconds"/>, once per seat, while still holding. When every seat
+        /// has pulled the bucket flips: B succeeds and each seat paints one big Water splash on its own side of the boss.
+        /// </summary>
+        public bool TryJigwiBPull(ulong sender, string roundId, double now)
+        {
+            if (!jigwiABEnabled || !jigwiBBucket || string.IsNullOrEmpty(roundId) || !TryAdvance(now, out _)
+                || phase != LabPhase.Playing) return false;
+            var active = ActiveJigwiABRound(now);
+            if (active == null || !active.bucket || !active.Active(now) || active.id != roundId || active.countdownAt < 0d) return false;
+            if (now < active.GoAt || now > active.GoAt + LabJigwiABTimeline.ReleaseSeconds) return false;
+            var seat = active.players.FirstOrDefault(value => value.playerId == sender);
+            if (seat == null || seat.readyAt < 0d || seat.launchedAt >= 0d) return false;
+            seat.launchedAt = now;
+            revision++;
+            if (active.players.All(value => value.launchedAt >= 0d)) SucceedJigwiBucket(active, now);
+            return true;
+        }
+        private void SucceedJigwiBucket(LabJigwiABRound active, double now)
+        {
+            active.syncCount = LabJigwiABTimeline.GroupSyncRequired;
+            active.syncWindowAt = -1d;
+            foreach (var target in active.players.SelectMany(p => p.targets)) { target.lit = false; target.extinguishedAt = -1d; }
+            ResolveJigwiAB(active, LabJigwiABResolution.Completed, now);
+            // The water lands on everyone's side of the boss, a little above the middle.
+            jigwiSyncDirections.Clear();
+            foreach (var picked in active.players)
+                if (players.TryGetValue(picked.playerId, out var player))
+                    jigwiSyncDirections[picked.playerId] = JigwiStageSeatDirection(player.seat, 0f, 12f);
+            SplashJigwiSuccess(active, now);
         }
         /// <summary>
         /// #479 지귀 부적: 이 회차 A에서 "물"을 다 쓴 사람의 불만 끄고(남은 구슬은 더 타지 않음) 그 판에 물 구슬을 준다.

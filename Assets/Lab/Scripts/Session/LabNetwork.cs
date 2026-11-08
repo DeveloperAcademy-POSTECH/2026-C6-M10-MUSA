@@ -264,13 +264,14 @@ namespace C6Lab
         //       snapshot chunks are 4000 characters (5689 is taken by the #540 branch).
         // 5691: #540 Jigwi A: an unfinished talisman burns that seat's remaining orbs; talisman orb volley (on top of 5690).
         // 5692: #551 Jigwi B countdown: "jigwiBReady" request, round countdownAt/syncWindowSeconds, seat readyAt/launchedAt.
-        internal const ushort LabProtocolVersion = 5692;
+        // 5693: #551 Jigwi B bucket: every seat takes part, round.bucket, "jigwiBPull" request.
+        internal const ushort LabProtocolVersion = 5693;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Double-tap a blue fox orb to clear it, and keep your Yin and Yang away.";
         /// <summary>More fox orbs than one fox fire ever drops; a longer list is ignored (#251).</summary>
         private const int MaximumFoxFireOrbs = 10;
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/53");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/54");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;
@@ -1964,6 +1965,13 @@ namespace C6Lab
                 // #551 지귀 B: 지목된 사람이 특수 물구슬을 잡았거나 놓음. 모두 잡으면 3-2-1 시작, 놓으면 취소.
                 if (battleClock.IsPaused || packet.requestId < 1) return;
                 if (model.TrySetJigwiBReady(sender, packet.firstId, packet.accepted, now)) PublishSnapshot(true);
+                return;
+            }
+            if (packet.type == JigwiBPullPacket)
+            {
+                // #551 지귀 B 나무 물통: 손잡이를 잡은 채 폰을 젖혀 당김. 모두 당기면 물통이 뒤집혀 성공.
+                if (battleClock.IsPaused || packet.requestId < 1) return;
+                if (model.TryJigwiBPull(sender, packet.firstId, now)) PublishSnapshot(true);
                 return;
             }
             if (packet.type == JigwiTalismanPacket)

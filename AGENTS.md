@@ -301,7 +301,8 @@
 - 끄면(코드 기본값) #509 규칙 그대로: 아무 때나 던지고 1초 안에 모두 맞히기.
 - B만 시험: LabConfig `jigwiBTestOnly`(Host, Inspector, 에셋 기본 끔)를 켜면 지귀 스테이지가 B만 4초부터 17초마다(4/21/38/55/72초, `LabJigwiABTimeline.BTestSchedule` = 스냅샷 `schedule` 2) 내고 A와 공통 기믹은 없다. 시험 뒤 끄고, 켠 에셋은 커밋하지 않는다.
 - 실패한 B의 `boardFireUntil`은 불바다가 꺼져 있으면 -1이어도 검증을 통과한다(전에는 Guest가 실패한 B 스냅샷을 거절할 수 있었음).
-- 현재 호환 묶음은 설정 259개·**5692**·`C6PhysicsLab/53`·**`C6HapioGame/39`**다. 5691 이하 앱과 혼용하지 않는다.
+- LabConfig `jigwiBBucket`(Host, 에셋에서 켬) — **다 같이 드는 나무 물통**: B에 지목이 없고 모두 참여한다(`round.bucket`, 특수 물구슬 없음). 판의 손잡이를 꾹 누르고 있으면 `jigwiBReady`(잡음/놓음)를 보내고, 모두 잡으면 3-2-1, "당겨!"(`GoAt`) 뒤 `ReleaseSeconds`(1초) 안에 손잡이를 잡은 채 폰을 내 쪽으로 홱 젖히면 `jigwiBPull`(`LabModel.TryJigwiBPull`, `seat.launchedAt`). 모두 당기면 성공해 박의 각자 쪽에 큰 물 칠(`jigwiBSplashPaintShare`). 한 명이라도 늦거나 15초 안에 못 하면(물이 다 졸음) 실패. 켜면 3-2-1도 켜진다. 화면(물통/밧줄/손잡이/기울기)은 아직 만드는 중.
+- 현재 호환 묶음은 설정 259개·**5693**·`C6PhysicsLab/54`·**`C6HapioGame/40`**다. 5692 이하 앱과 혼용하지 않는다.
 
 ## 검사 카테고리와 검사 전용 시작 단축 (2026-11-05)
 
