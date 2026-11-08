@@ -91,8 +91,8 @@ namespace C6Lab
         [SerializeField] private string smokeSoundFolder = "JigwiBucketSmoke";
         [Tooltip("내가 쏟아 박이 식을 때 지귀 대사 \"이럴수가!\" 폴더(강한 햅틱과 함께).")]
         [SerializeField] private string pourVoiceFolder = "JigwiVoiceBucketPour";
-        [Tooltip("김을 문질러 닦을 때 뽀득뽀득 소리 폴더(여러 개면 무작위).")]
-        [SerializeField] private string rubSoundFolder = "JigwiBucketRub";
+        [Tooltip("연기를 문질러 걷어낼 때 부채질 휘익 소리 폴더(여러 개면 무작위).")]
+        [SerializeField] private string rubSoundFolder = "JigwiBucketFan";
         [Tooltip("출렁할 때마다 찰랑 소리 폴더(기운 쪽 스피커로 치우쳐 난다).")]
         [SerializeField] private string sloshSoundFolder = "JigwiBucketSlosh";
         [Tooltip("실패 연기가 화면을 다 덮는 순간 쿵 하는 소리 폴더.")]
@@ -761,8 +761,8 @@ namespace C6Lab
             // A light tick for every bit wiped away, a firm one when it is clear.
             if (lastTickLeft - steamLeft >= .06f && source != null)
             { lastTickLeft = steamLeft; LabHaptics.PlayDirect(source.config, LabHapticStyle.Light, .35f); }
-            // 뽀득: a squeak for every few percent rubbed away, at most every 0.12 s.
-            if (lastSqueakLeft - steamLeft >= .04f && Time.unscaledTime - lastSqueakAt >= .12f)
+            // 휘익: a fanning whoosh for every few percent rubbed away, at most every 0.25 s.
+            if (lastSqueakLeft - steamLeft >= .04f && Time.unscaledTime - lastSqueakAt >= .25f)
             { lastSqueakLeft = steamLeft; lastSqueakAt = Time.unscaledTime; Play(rubSoundFolder, rubVolume); }
             if (steamLeft <= steamClearLeft)
             {
