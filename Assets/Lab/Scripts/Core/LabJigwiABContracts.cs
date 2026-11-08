@@ -239,7 +239,7 @@ namespace C6Lab
                 }
                 // #509: only the picked seats are listed (helpers are everyone else).
                 if (memberIds != null && round.resolution != LabJigwiABResolution.Skipped
-                    && owners.Count != (round.bucket ? memberIds.Count : LabJigwiABTimeline.GroupPickCount(memberIds.Count))) return false;
+                    && owners.Count != (round.bucket ? LabJigwiABTimeline.BucketPickCount(memberIds.Count) : LabJigwiABTimeline.GroupPickCount(memberIds.Count))) return false;
                 // #551 나무 물통: a pull only after "당겨!" and within the pull window.
                 if (round.bucket && round.players.Any(player => player.launchedAt != -1d && (round.countdownAt < 0d
                     || player.launchedAt < round.GoAt - .00001d

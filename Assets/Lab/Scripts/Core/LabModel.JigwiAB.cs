@@ -217,16 +217,17 @@ namespace C6Lab
             // #509: B picks a few seats; each picked screen gets one fire pillar in front of the boss.
             // The others are helpers. The draw is stable per seed/slot and differs between B rounds.
             if (!personal) jigwiSyncDirections.Clear();
-            if (!personal) item.players = (item.bucket ? seats.Take(activeSeatCount).ToArray() : JigwiGroupPicks(slot)).Select(owner => new LabJigwiABPlayerFire
+            if (!personal) item.players = JigwiGroupPicks(slot, item.bucket).Select(owner => new LabJigwiABPlayerFire
             {
                 playerId = owner, targets = new[] { new LabJigwiABFireTarget { id = item.id + "/" + owner + "/0", x = .5f, y = .62f } }
             }).ToArray();
             jigwiABRounds.Add(item); revision++;
         }
-        private ulong[] JigwiGroupPicks(int slot)
+        private ulong[] JigwiGroupPicks(int slot, bool bucket = false)
         {
             ulong[] all = seats.Take(activeSeatCount).ToArray();
-            int count = LabJigwiABTimeline.GroupPickCount(all.Length);
+            // #551 나무 물통: two ropes (one alone).
+            int count = bucket ? LabJigwiABTimeline.BucketPickCount(all.Length) : LabJigwiABTimeline.GroupPickCount(all.Length);
             return all.OrderBy(owner => DrawFor(seed ^ JigwiGroupPickSalt, owner, (uint)slot)).ThenBy(owner => owner)
                 .Take(count).ToArray();
         }

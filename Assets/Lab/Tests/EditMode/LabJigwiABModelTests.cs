@@ -353,25 +353,26 @@ namespace C6Lab.Tests
         LabJigwiABRound B(LabModel m,string id,double at)=>m.Snapshot(at).jigwiAB.rounds.Single(r=>r.id==id);
         [Test] public void BBucketCountsDownByItselfAndEveryonePullsTogether()
         {
-            // #551 나무 물통: no pick (all three), no special Water, no holding; the 3-2-1 starts by itself; all pull → success.
+            // #551 나무 물통: two of three pull, no special Water, no holding; the 3-2-1 starts by itself; both pull → success.
             JsonUtility.FromJsonOverwrite("{\"jigwiBBucket\":true}",config);
             var m=Room3();var b=Current(m,25.1);
             Assert.That(b.bucket,Is.True);
-            Assert.That(b.players.Select(p=>p.playerId),Is.EquivalentTo(Three),"Everyone takes part.");
+            Assert.That(b.players,Has.Length.EqualTo(2),"Two ropes.");
+            ulong first=b.players[0].playerId,second=b.players[1].playerId,helper=Helper(b,Three);
             Assert.That(m.Snapshot(31).orbs.Any(o=>o.jigwiABSupplyEventId==b.id),Is.False,"No special Water orb.");
             Assert.That(b.countdownAt,Is.EqualTo(b.activeAt+LabJigwiABTimeline.BucketLiftSeconds).Within(1e-9),"3-2-1 by itself.");
-            Assert.That(m.TrySetJigwiBReady(Three[0],b.id,false,b.countdownAt+.1),Is.False,"Holding means nothing here.");
+            Assert.That(m.TrySetJigwiBReady(first,b.id,false,b.countdownAt+.1),Is.False,"Holding means nothing here.");
             double go=b.GoAt;
             Assert.That(go,Is.EqualTo(b.countdownAt+LabJigwiABTimeline.BucketCountdownSeconds).Within(1e-9));
-            Assert.That(m.TryJigwiBPull(Three[0],b.id,go-.1),Is.False,"No pull before 당겨.");
+            Assert.That(m.TryJigwiBPull(first,b.id,go-.1),Is.False,"No pull before 당겨.");
             int painted=m.PaintSurface.PaintCount;
-            Assert.That(m.TryJigwiBPull(Three[0],b.id,go+.1),Is.True);
-            Assert.That(m.TryJigwiBPull(Three[0],b.id,go+.2),Is.False,"Once per seat.");
-            Assert.That(m.TryJigwiBPull(Three[1],b.id,go+.3),Is.True);
+            Assert.That(m.TryJigwiBPull(first,b.id,go+.1),Is.True);
+            Assert.That(m.TryJigwiBPull(first,b.id,go+.2),Is.False,"Once per seat.");
+            Assert.That(m.TryJigwiBPull(helper,b.id,go+.3),Is.False,"Only the two ropes count.");
             var mid=m.Snapshot(go+.3);
             Assert.That(LabJigwiABNetworkValidation.Valid(mid.jigwiAB,mid.players,m.Revision),Is.True);
-            Assert.That(m.TryJigwiBPull(Three[2],b.id,go+1.4),Is.True);
-            var done=m.Snapshot(go+1.4);
+            Assert.That(m.TryJigwiBPull(second,b.id,go+2.4),Is.True);
+            var done=m.Snapshot(go+2.4);
             Assert.That(done.jigwiAB.rounds.Single(r=>r.id==b.id).resolution,Is.EqualTo(LabJigwiABResolution.Completed));
             Assert.That(m.PaintSurface.PaintCount,Is.GreaterThan(painted),"The water paints the boss.");
             Assert.That(LabJigwiABNetworkValidation.Valid(done.jigwiAB,done.players,m.Revision),Is.True);
@@ -381,8 +382,7 @@ namespace C6Lab.Tests
             JsonUtility.FromJsonOverwrite("{\"jigwiBBucket\":true}",config);
             var m=Room3();var b=Current(m,25.1);
             double go=b.GoAt;
-            Assert.That(m.TryJigwiBPull(Three[0],b.id,go+.1),Is.True);
-            Assert.That(m.TryJigwiBPull(Three[1],b.id,go+.2),Is.True);
+            Assert.That(m.TryJigwiBPull(b.players[0].playerId,b.id,go+.1),Is.True,"Only one of the two pulls.");
             double due=go+LabJigwiABTimeline.BucketPullSeconds;
             var again=B(m,b.id,due+.01);
             Assert.That(again.resolution,Is.EqualTo(LabJigwiABResolution.None),"A miss is not the end while water is left.");
@@ -392,7 +392,7 @@ namespace C6Lab.Tests
             var s=m.Snapshot(due+.01);
             Assert.That(LabJigwiABNetworkValidation.Valid(s.jigwiAB,s.players,m.Revision),Is.True);
             // The second count: everyone pulls → success.
-            foreach(var id in Three) Assert.That(m.TryJigwiBPull(id,b.id,again.GoAt+.2),Is.True);
+            foreach(var seat in again.players) Assert.That(m.TryJigwiBPull(seat.playerId,b.id,again.GoAt+.2),Is.True);
             Assert.That(B(m,b.id,again.GoAt+.2).resolution,Is.EqualTo(LabJigwiABResolution.Completed));
             // Nobody ever pulls: counts repeat, then the water boils away at the end.
             var idle=Room3();var b2=Current(idle,25.1);

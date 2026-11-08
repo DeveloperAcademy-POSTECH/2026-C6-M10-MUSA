@@ -124,8 +124,8 @@ namespace C6Lab
             DrawSeats(snapshot, round, localPlayer, now, !afterGo && !round.bucket);
             DrawHoldHint(round, localPlayer, now, picked && !afterGo && !round.bucket);
             DrawThrowHint(round, localPlayer, now, picked && afterGo && !round.bucket);
-            big.rectTransform.anchorMin = big.rectTransform.anchorMax = round.bucket ? new Vector2(.74f, .76f) : new Vector2(.5f, .74f);
-            big.fontSize = round.bucket ? (afterGo ? 110 : 130) : 220;
+            big.rectTransform.anchorMin = big.rectTransform.anchorMax = round.bucket ? new Vector2(afterGo ? .7f : .76f, .66f) : new Vector2(.5f, .74f);
+            big.fontSize = round.bucket ? (afterGo ? 90 : 110) : 220;
             if (round.countdownAt < 0d || now < round.countdownAt)
             {
                 // Waiting for everyone to hold: no number; a cancelled count simply disappears.
