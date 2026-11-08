@@ -1,5 +1,27 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-08 — Home·Lobby 저장 DEV 240행을 원본 기본값 10으로 맞춤 (main EditMode 실패 2건)
+
+- **기준:** `fix/menu-dev-row-240`. main `886e65db`에서 고치고 검사한 뒤, #559·#560이 들어온 main `92d511ee` 위로 rebase해 다시 검사했다. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal), `-buildTarget iOS`. Library는 다른 worktree에서 복제했다. 같은 Mac에서 다른 폴더의 Unity Editor가 열려 있었다.
+- **증상:** EditMode `GameSceneAssetTests.MenuScreens_HaveSavedEditableCanvasAndInput`의 Home·Lobby 2건이 `Setting240`에서 실패했다. 저장된 DEV 패널의 입력·슬라이더는 15, `LabConfig.asset` 기본값은 10이다. PR #559·#560을 검사하다 main에서도 나는 실패로 찾았다.
+- **원인:** #540이 `jigwiABPersonalDurationSeconds`(DEV 240, 지귀 A 제한 시간)를 15→7(`14813416`)→10(`5413486d`)으로 바꾸면서 Home·Lobby의 저장 DEV 행은 다시 저장하지 않았다.
+- **고친 것:**
+  - 두 장면의 `Setting240`만 10으로 저장했다. 장면마다 3줄이다: `Value` InputField의 `m_Text`, 그 자식 `Text`의 `m_Text`, `Slider`의 `m_Value`(모두 15→10). 라벨·슬라이더 범위(1~15)와 다른 오브젝트·Transform·참조는 그대로다. 바뀐 줄마다 소속 오브젝트를 장면 계층 경로로 확인했다.
+  - 메뉴 `Hapio/Upgrade Menu DEV Rows`는 쓰지 않았다. 이 도구(`GameSceneBuilder.UpgradeDeveloperRows`)는 저장 패널을 `DeveloperFields.Count`(259)행으로 늘려 클레이 257·258행까지 장면에 써 넣는다. 같은 검사는 #506 이후 저장 패널이 257행(`ClayThicknessField`)이고 클레이 두 행은 실행 중에 붙는다고(`GameScreen.EnsureClayDeveloperRows`) 요구하므로, 메뉴를 그대로 돌리면 행 수 단언에서 실패한다. 대신 그 도구의 행 갱신(라벨, `SetTextWithoutNotify`, 슬라이더 범위·`SetValueWithoutNotify`)을 저장된 257행 중 원본과 다른 행에만 적용하는 임시 Editor 스크립트를 `-executeMethod`로 실행해 Unity가 저장하게 했다. Scene YAML은 손으로 고치지 않았고 스크립트는 커밋하지 않았다.
+  - batch 가져오기가 실행할 때마다 Lobby PNG `.meta` 20개에 WebGL 플랫폼 항목을 덧붙여 매번 되돌렸다.
+- **영향:** 게임 동작은 바뀌지 않는다. 실행 중 DEV 패널을 열면 `GameScreen.SelectDeveloperScope`가 모든 칸을 세션 값으로 다시 채운다(코드로 확인했고 실행 검사는 아니다).
+
+| 확인 | 결과 |
+| --- | --- |
+| `886e65db`, 고치기 전: 임시 스크립트로 저장 257행의 라벨·입력값·슬라이더 값·범위를 원본과 비교 | Home·Lobby 모두 240행만 다름(입력 `15`·슬라이더 15, 원본 10). 라벨·범위는 같음 |
+| `886e65db`, 대조: 두 장면만 main 것으로 되돌린 `GameSceneAssetTests` | 9건 중 7 PASS. Home·Lobby 2건이 `Setting240`(기대 10, 실제 15)에서 실패 |
+| `886e65db`, 고친 뒤: `GameSceneAssetTests` / 전체 EditMode | 9/9 PASS(1.0초) / 2058/2058 PASS(20.6초) |
+| `92d511ee`로 rebase 뒤: `GameSceneAssetTests` / 전체 EditMode | 9/9 PASS(0.9초) / 2062/2062 PASS(20.4초). 늘어난 4건은 #504가 더한 검사다 |
+
+- 각 실행의 skip·inconclusive는 0이다.
+- **남은 것:** `Hapio/Upgrade Menu DEV Rows`·`Hapio/Upgrade Three Yokai Stages`·`Hapio/Upgrade 2v2 Lobby UI`(저장 패널이 259행이 아니면 같은 갱신을 부름)는 여전히 259행을 현재 형식으로 본다. 그대로 실행하면 257·258행이 장면에 저장되어 위 검사의 행 수 단언이 실패한다. `docs/GAME_FLOW.md`는 새 DEV 행을 이 메뉴로 추가한다고 적고 있다. 이번에는 도구를 고치지 않았다.
+- **미실행:** 위 메뉴 자체 실행, PlayMode(장면 값 3줄만 바뀌고 위 영향 참고), Editor 화면 확인, Mac·iOS 앱·실기기.
+
 ## 2026-11-08 — #503 방장 입장 전 대기 방 공개 실패 재시도
 
 - **기준:** main `886e65db` 위의 `fix/#503-pending-room-register-retry`. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro), iOS 활성, 실제 macOS Bonjour(dns_sd). Library는 다른 worktree에서 복제했다.
