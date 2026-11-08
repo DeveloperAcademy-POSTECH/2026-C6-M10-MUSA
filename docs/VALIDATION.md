@@ -38,6 +38,14 @@
 - 네이티브 자동 클릭의 상하단 버튼 전달이 일관되지 않아, 위 추가 PlayMode 검사에서 실제 UI 입력 경로와 레이캐스트 대상으로 별도 확인했다. 실제 입력 검사는 6컷 엔딩 뒤 진짜 Home 복귀까지 통과했다.
 - 작업 완료 후 기존 Unity·Hub·검증 앱과 통합용 Editor를 종료했다. 빌드 앱을 추가 실행하지 않았다.
 
+### 게시 직전 최신 main 통합 확인
+
+- 작업 중 main에 추가된 #559(방 공개 재등록)·#560(배경 재질 동기화), 기준 `92d511ee`를 통합 커밋 `a09f66a4`로 보존했다. 충돌은 AGENTS·VALIDATION 문서뿐이며 양쪽 기록을 유지하고 현재 Game39와 새 배경 재질 규칙을 함께 남겼다.
+- 이 최신 통합본에서 **전체 EditMode 2,085/2,085 통과**(29.63초).
+- 관련 PlayMode **59/59 통과**: 두 PendingRoomRetry fixture 합계5, GameLobbyView15, LabFigmaLobby12, GameBattleUiPresentation2, GameStageRetry2, GameSceneFlow23. 마지막23개에는 실제 마우스의 스킵·엔딩·Home 검사도 포함된다. skip·inconclusive는 모두0이다.
+- 최신 통합본의 Mac 개발 빌드도 성공했다(호출16.3초). 최종 출력은 `Builds/Hapio/20261108-163016-39dd4b42/macOS/Hapio-Development.app`이며 독립 앱 실행은 하지 않았다.
+- 읽기 검토에서 방 공개 재등록은 Home의 입장 전 광고 수명이며 실패한 스테이지 재도전과 분리돼 있음을 확인했다. 배경 숨은 재질 동기화는 Editor 전용이고 새 UI의 조합대 런타임 복사본과 다른 저장 재질을 대상으로 한다.
+
 ### 이번에 실행하지 않은 항목
 
 - iPhone/iPad 설치·실기기 터치·노치/회전·오디오 청취.
