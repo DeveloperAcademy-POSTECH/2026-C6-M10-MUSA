@@ -35,7 +35,7 @@
   - EditMode `GameSceneAssetTests.MenuScreens_HaveSavedEditableCanvasAndInput`의 Home·Lobby 2건. 저장된 DEV 패널 240행은 15인데 `LabConfig.asset`은 10이다. #540이 이 값을 15→7(`14813416`)→10(`5413486d`)으로 바꿀 때 Home·Lobby의 DEV 행을 다시 저장하지 않았다.
   - PlayMode `LabJigwiABNetworkTests` 7건과 `GameJigwiStageIntegrationTests.SavedHomeReachesJigwiWithScreenAThenScreenBAndPreservesTheRealPaintShell` 1건. 대부분 지귀 B 장막·발화점 관련 NullReference·IndexOutOfRange다.
   - 지귀·DEV 코드를 바꾸지 않는 다른 브랜치(#504, 같은 main 기준)에서도 같은 10건이 실패했다. 지귀 실패의 원인은 조사하지 않았다.
-- **미실행:** iPhone의 로컬 네트워크 권한 창·거부, Wi-Fi 끊김, 여러 기기에서 카드가 보이는지 확인. 앱 복귀 때 재시도를 앞당기는 동작은 만들지 않았다.
+- **미실행:** iPhone의 로컬 네트워크 권한 창·거부, Wi-Fi 끊김, 여러 기기에서 카드가 보이는지 확인. `DNSServiceRegister`가 이름 충돌이 아닌 오류로 바로 거절하는 경우는 강제하지 못했다. `LabPendingRoom`에서 같은 분기를 타는 `StartAdvertise`의 이른 false 반환으로 대신 확인했다. 앱 복귀 때 재시도를 앞당기는 동작은 만들지 않았다.
 
 ## 2026-11-07 — ClayPreview 높이 EXR의 iOS 가져오기 (main에서 계속 실패하던 검사 1건)
 
