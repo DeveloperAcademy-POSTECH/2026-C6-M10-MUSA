@@ -521,6 +521,54 @@ namespace Hapio.Tests
             tap.onClick.Invoke();
             Assert.That(director.DialogueLog.Select(entry => entry.Text).ToArray(),
                 Is.EqualTo(new[] { lines[0].Text, lines[1].Text }), "Oldest first.");
+
+            // Pressing 기록: the screen darkens over everything and the tutorial waits, showing what has been said.
+            var dim = director.GetComponentsInChildren<RectTransform>(true).Single(rect => rect.name == "Log Screen");
+            var bar = dim.GetComponentInChildren<UnityEngine.UI.Scrollbar>(true);
+            var back = buttons.Single(button => button.name == "Log Back");
+            LabOrbBoard board = Object.FindFirstObjectByType<GameBattleBindings>().board;
+            log.onClick.Invoke();
+            Assert.That(director.IsDialogueLogOpen, Is.True);
+            yield return new WaitForSecondsRealtime(art.dimFadeSeconds + .1f);
+            Assert.That(dim.gameObject.activeInHierarchy, Is.True);
+            Assert.That(director.DialogueLogShownLines.ToArray(),
+                Is.EqualTo(new[] { GameTutorialScript.LogLine(lines[0].Text), GameTutorialScript.LogLine(lines[1].Text) }));
+            Assert.That(bar.gameObject.activeSelf, Is.False, "Two lines fit: no drag bar.");
+            Assert.That(board.AllowedGestures, Is.EqualTo(LabBoardGestures.None));
+
+            // A touch anywhere lands on the log, so the line behind stays where it was.
+            Rect screen = ScreenRect(dim);
+            hits.Clear();
+            dim.GetComponentInParent<UnityEngine.UI.GraphicRaycaster>().Raycast(
+                new UnityEngine.EventSystems.PointerEventData(UnityEngine.EventSystems.EventSystem.current) { position = new Vector2(screen.center.x, screen.height * .1f) }, hits);
+            Assert.That(hits.Count, Is.GreaterThan(0));
+            Assert.That(hits[0].gameObject, Is.SameAs(dim.gameObject), "The log takes the touch.");
+            int beat = director.BeatIndex;
+
+            // 뒤로 가기: closes and carries on from the same line.
+            back.onClick.Invoke();
+            yield return Until(() => !director.IsDialogueLogOpen, "뒤로 가기 closes the log", 2f);
+            Assert.That(dim.gameObject.activeInHierarchy, Is.False);
+            Assert.That(director.BeatIndex, Is.EqualTo(beat), "The same line again.");
+            Assert.That(director.IsShowingLine, Is.True);
+
+            // More lines than fit: it opens on the newest, and the drag bar shows.
+            for (int i = 2; i < lines.Length; i++)
+            {
+                yield return new WaitForSecondsRealtime(art.tapCooldown + .05f);
+                tap.onClick.Invoke();
+            }
+            Assert.That(director.DialogueLog.Count, Is.GreaterThan(art.logVisibleBars));
+            log.onClick.Invoke();
+            yield return new WaitForSecondsRealtime(art.dimFadeSeconds + .1f);
+            Assert.That(director.DialogueLogShownLines.Count(), Is.EqualTo(director.DialogueLog.Count));
+            Assert.That(bar.gameObject.activeSelf, Is.True, "Too many to fit: the drag bar shows.");
+            Assert.That(director.DialogueLogScroll, Is.EqualTo(0f).Within(.01f), "Opens at the newest line, at the bottom.");
+            bar.value = 1f;
+            yield return null;
+            Assert.That(director.DialogueLogScroll, Is.EqualTo(1f).Within(.01f), "The drag bar reaches the oldest line.");
+            back.onClick.Invoke();
+            yield return Until(() => !director.IsDialogueLogOpen, "Closed again", 2f);
         }
 
         [UnityTest]
