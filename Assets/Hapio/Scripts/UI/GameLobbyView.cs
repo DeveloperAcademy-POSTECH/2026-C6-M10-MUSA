@@ -29,6 +29,11 @@ namespace Hapio
         public RectTransform roomContent;
         public UnityEngine.UI.Button roomTemplate;
         public Font mediumFont;
+        [Header("Figma lobby / mode components (3905:101, 3908:186)")]
+        public Texture browserBackground;
+        public RectTransform modeCard;
+        public GameLobbySeatDesign seatDesign;
+        private Texture originalBackground;
         [Header("Editable seat layout anchors, one array for each room capacity")]
         public RectTransform[] seats2, seats3, seats4, seats5;
         public RectTransform[] lineLayouts;
@@ -126,6 +131,7 @@ namespace Hapio
 
         private void Awake()
         {
+            originalBackground = background.texture;
             session = GameSession.EnsureExists();
             if (screen == null) screen = GetComponentInParent<GameScreen>();
             if (screen == null || !screen.externalNavigation)
@@ -174,6 +180,7 @@ namespace Hapio
             BindNavigation(closeDirectConnectionButton, () => SetDirectConnection(false));
             BindNavigation(directJoinButton, JoinDirect);
             BindNavigation(soloButton, () => session.StartSolo());
+            GameDeveloperAccess.MoveSoloIntoSettings(screen, soloButton, teamSoloButton);
             // GameScreen owns the existing scoped DEV panel and wires developerButton once.
             for (int i = 0; i < countButtons.Length; i++)
             {
@@ -224,15 +231,23 @@ namespace Hapio
         {
             ModeButton(basicModeButton, basicModeReason, GameMode.Story);
             ModeButton(teamModeButton, teamModeReason, GameMode.Territory);
+            if (modeCard != null)
+            {
+                bool both = ModeAllowed(GameMode.Story, creationCapacity) && ModeAllowed(GameMode.Territory, creationCapacity);
+                LabLobbyView.Place(modeCard, 28, both ? 313 : creationCapacity == 3 || creationCapacity == 5 ? 287 : 291,
+                    345, both ? 266 : 292);
+            }
         }
 
         private void ModeButton(UnityEngine.UI.Button button, UnityEngine.UI.Text reason, GameMode mode)
         {
             bool allowed = ModeAllowed(mode, creationCapacity);
             button.interactable = allowed;
-            button.targetGraphic.color = ColorOf(allowed ? "3F3D38" : "9D9586");
+            button.targetGraphic.color = ColorOf(allowed ? "51473B" : "979189");
             if (reason == null) return;
             reason.text = ModeBlockedReason(mode, creationCapacity);
+            if (modeCard != null && mode == GameMode.Territory && !allowed)
+                reason.text = "땅따먹기는 짝수 인원만 가능하오..";
             reason.gameObject.SetActive(!allowed);
         }
 
@@ -244,7 +259,7 @@ namespace Hapio
             if (!visible) return;
             modePanel.transform.SetAsLastSibling();
             RefreshModes();
-            teamSoloButton.gameObject.SetActive(Network.DeveloperBuildAvailable);
+            teamSoloButton.gameObject.SetActive(false);
         }
 
         private void EnterRoom(int index)
@@ -265,6 +280,17 @@ namespace Hapio
             bool home = screen.kind == GameScreenKind.Home && session.State.phase == GameFlowPhase.Home;
             bool lobby = screen.kind == GameScreenKind.Lobby && session.State.phase == GameFlowPhase.Lobby;
             bool developerOpen = screen.developerPanel != null && screen.developerPanel.activeInHierarchy;
+            bool developerSolo = home && developerOpen && Network.DeveloperBuildAvailable;
+            if (soloButton != null)
+            {
+                soloButton.gameObject.SetActive(developerSolo);
+                soloButton.interactable = developerSolo && Network.CanChooseConnection && !session.IsCreatingRoom;
+            }
+            if (teamSoloButton != null)
+            {
+                teamSoloButton.gameObject.SetActive(developerSolo);
+                teamSoloButton.interactable = developerSolo && Network.CanChooseConnection && !session.IsCreatingRoom;
+            }
             bool visible = (home || lobby) && !developerOpen;
             background.gameObject.SetActive(visible); design.gameObject.SetActive(visible);
             if (!visible) return;
@@ -272,9 +298,11 @@ namespace Hapio
             bool browser = home && session.RoomBrowserVisible;
             titlePage.SetActive(home && !browser);
             browserPage.SetActive(browser); positionPage.SetActive(lobby);
-            background.uvRect = LabLobbyView.BackgroundUv(home && !browser, background.rectTransform.rect.size);
-            soloButton.gameObject.SetActive(home && Network.DeveloperBuildAvailable);
-            soloButton.interactable = home && Network.CanChooseConnection && !session.IsCreatingRoom;
+            bool paperBackground = browser || lobby && seatDesign != null;
+            background.texture = paperBackground && browserBackground != null ? browserBackground : originalBackground;
+            background.uvRect = paperBackground && browserBackground != null
+                ? BrowserBackgroundUv(background.rectTransform.rect.size)
+                : LabLobbyView.BackgroundUv(home && !browser, background.rectTransform.rect.size);
             developerButton.interactable = !session.IsCreatingRoom
                 && (Network.CanChooseConnection || (Network.IsHost && Network.Snapshot == null));
             if (Network.IsConnected || Network.IsJoiningRoom || session.IsCreatingRoom) SetDirectConnection(false);
@@ -298,6 +326,19 @@ namespace Hapio
             design.anchoredPosition = Vector2.zero;
         }
 
+        // 3908:190: 704x1041 paper at (-233,-125) inside the 402x874 frame.
+        // Keep that authored crop at the reference aspect; cover other screen aspects about its centre.
+        public static Rect BrowserBackgroundUv(Vector2 size)
+        {
+            var crop = new Rect(233f / 704f, 42f / 1041f, 402f / 704f, 874f / 1041f);
+            float aspect = size.x / Mathf.Max(1f, size.y), reference = 402f / 874f;
+            if (aspect > reference)
+            { float h = crop.height * reference / aspect; crop.y += (crop.height - h) * .5f; crop.height = h; }
+            else
+            { float w = crop.width * aspect / reference; crop.x += (crop.width - w) * .5f; crop.width = w; }
+            return crop;
+        }
+
         private void RefreshBrowser()
         {
             bool canChoose = Network.CanChooseConnection && !session.IsCreatingRoom;
@@ -311,8 +352,8 @@ namespace Hapio
             {
                 bool selected = creationCapacity == i + 2;
                 countButtons[i].interactable = canChoose;
-                countButtons[i].targetGraphic.color = ColorOf(selected ? "3F3D38" : "E8DFCB");
-                countButtons[i].GetComponentInChildren<UnityEngine.UI.Text>().color = ColorOf(selected ? "F3EBDD" : "3F3D38");
+                countButtons[i].targetGraphic.color = selected ? ColorOf("D5BEA5") : new Color(232f/255f, 210f/255f, 185f/255f, .7f);
+                countButtons[i].GetComponentInChildren<UnityEngine.UI.Text>().color = ColorOf("312B23");
             }
             RoomRow[] rooms = session.PendingRooms.Select(room => new RoomRow
                 { key = room.Key, name = room.Name, port = room.Port, participants = 1, capacity = room.Capacity,
@@ -338,7 +379,8 @@ namespace Hapio
                 if (!active) continue;
                 RoomRow room = rooms[i]; keys[i] = room.key;
                 rows[i].name = room.pending ? "CreatedRoom" : "DiscoveredRoom";
-                rows[i].targetGraphic.color = ColorOf(i % 2 == 0 ? "E9DFCA" : "EEE6D6");
+                rows[i].targetGraphic.color = i % 2 == 0 ? new Color(213f/255f, 190f/255f, 165f/255f, .5f)
+                    : new Color(232f/255f, 210f/255f, 185f/255f, .7f);
                 rows[i].transform.Find("Name").GetComponent<UnityEngine.UI.Text>().text = room.pending && string.IsNullOrEmpty(room.name)
                     ? "새 방 준비 중" : LabRoomNames.Display(room.name);
                 rows[i].transform.Find("Count").GetComponent<UnityEngine.UI.Text>().text = (room.team ? TeamRoomLabel(room.capacity) : "")
@@ -348,6 +390,8 @@ namespace Hapio
                     : !room.pending && room.waiting ? "방장 대기" : room.playing ? "봉인 중" : room.full ? "정원 마감" : "입장 →";
                 var label = rows[i].transform.Find("Action").GetComponent<UnityEngine.UI.Text>();
                 label.text = action; label.fontSize = action == "입장 →" ? 20 : 14;
+                Transform arrow = rows[i].transform.Find("Arrow");
+                if (arrow != null) arrow.gameObject.SetActive(action == "입장 →");
                 rows[i].interactable = canChoose && (room.pending ? room.ready : Network.CanJoinDiscoveredRoom(room.key));
             }
             roomTemplate.gameObject.SetActive(false);
@@ -392,6 +436,7 @@ namespace Hapio
 
         private void RefreshTeamPage(int count, int size)
         {
+            if (seatDesign != null) { teamPage = 0; pageSeat = -1; return; }
             if (size != 3) { teamPage = 0; pageSeat = -1; return; }
             int mine = Network.LocalSlotNumber;
             if (mine != pageSeat)
@@ -435,11 +480,11 @@ namespace Hapio
             bool team = teamAnchors != null;
             if (!team) size = 0;
             teamLayout?.SetActive(team);
-            foreach (GameObject part in teamPairParts ?? Array.Empty<GameObject>()) part.SetActive(size == 1 || size == 2);
-            foreach (GameObject line in teamPairLines ?? Array.Empty<GameObject>()) line.SetActive(size == 2);
-            teamTrio?.SetActive(size == 3);
+            foreach (GameObject part in teamPairParts ?? Array.Empty<GameObject>()) part.SetActive(seatDesign == null && (size == 1 || size == 2));
+            foreach (GameObject line in teamPairLines ?? Array.Empty<GameObject>()) line.SetActive(seatDesign == null && size == 2);
+            teamTrio?.SetActive(seatDesign == null && size == 3);
             RefreshTeamPage(count, size);
-            if (storyShifted != null)
+            if (seatDesign == null && storyShifted != null)
                 for (int i = 0; i < teamShifted.Length; i++) CopyRect(team ? teamShiftAnchors[i] : storyShifted[i], teamShifted[i]);
             heading.fontSize = team ? teamHeadingFontSize : storyHeadingFontSize;
             heading.text = waiting ? "방 정보를 받고 있소..." : allChosen ? (team ? "준비 완료!" : "요괴 봉인 준비 완료!") : "빈 자리를 고르시오.";
@@ -462,7 +507,7 @@ namespace Hapio
             {
                 // 3:3 shows only the seats of the team page on screen.
                 bool active = !waiting && i < count && i < anchors.Length
-                    && (size != 3 || (LabTeams.SeatTeam(i, count) == LabTeam.Red) == (teamPage == 1));
+                    && (seatDesign != null || size != 3 || (LabTeams.SeatTeam(i, count) == LabTeam.Red) == (teamPage == 1));
                 slotButtons[i].gameObject.SetActive(active); localLabels[i].gameObject.SetActive(active);
                 if (!active) continue;
                 CopyRect(anchors[i], (RectTransform)slotButtons[i].transform);
@@ -500,6 +545,7 @@ namespace Hapio
                 ? start ? "땅따먹기 시작" : allChosen && !Network.IsHost ? "방장의 시작을 기다리시오" : "땅따먹기 대기"
                 : start ? "요괴 봉인 시작 · 3스테이지" : allChosen && !Network.IsHost ? "방장의 봉인을 기다리시오" : "요괴 봉인 대기";
             text.color = ColorOf(start ? "FFF7E5" : "575750");
+            if (seatDesign != null) seatDesign.Present(this, count, team, waiting, allChosen, start);
         }
 
         private void SetDirectConnection(bool visible)

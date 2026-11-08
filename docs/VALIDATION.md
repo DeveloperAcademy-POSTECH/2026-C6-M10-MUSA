@@ -1,5 +1,192 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-08 — DEV 행 Editor 메뉴가 Home·Lobby의 저장 257행을 지키게 (PR #561 후속)
+
+- **기준:** `fix/menu-dev-row-240`, 바로 아래 절의 커밋 위(main `92d511ee`)에서 고치고 검사했다. 그 뒤 main `488104e7`(#562)을 rebase가 아니라 merge(`a434b800`)로 받아 다시 검사했다(표의 "병합 뒤"). Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal), `-buildTarget iOS`. 같은 Mac에서 다른 폴더의 Unity Editor가 열려 있었다.
+- **문제:**
+  - `Hapio/Upgrade Menu DEV Rows`·`Upgrade Three Yokai Stages`·`Upgrade 2v2 Lobby UI`(저장 패널이 259행이 아니면 같은 갱신을 부름)는 저장 패널을 `DeveloperFields.Count`(259)행으로 늘려 클레이 257·258행을 장면에 저장했다. #506 이후 `GameSceneAssetTests`는 저장 패널을 257행으로 요구하므로, 메뉴를 돌리면 Home·Lobby 검사가 실패했다.
+  - `Upgrade Figma Game Lobby`는 저장 패널이 259행이 아니면 멈춰, 지금 장면에서는 실행되지 않았다.
+  - 같은 메뉴들의 글꼴 갱신(`UpgradeFonts`)이 Home의 오프닝 Prefab 인스턴스(`GameOpening.prefab`, #354) Text 8개에 `ShillaCultureBold` 덮어쓰기를 장면에 저장했다. 예를 들어 `Speaker`는 원래 `Shilla_Culture(M)`이다.
+- **고친 것:**
+  - 저장 행 수를 `GameSceneBuilder.SavedDeveloperRowCount`(= `LabConfig.ClayThicknessField`, 257) 하나로 정했다. DEV 행 갱신·추가, 새 메뉴 생성, `Upgrade 2v2 Lobby UI`의 스키마 확인(`MenuDeveloperSchemaIsCurrent`), `Upgrade Figma Game Lobby`의 확인이 이 값을 쓴다.
+  - DEV 행 갱신은 257행부터의 저장 행(예전 도구가 저장한 것)을 지운다.
+  - 글꼴 갱신은 Prefab 인스턴스의 Text를 건너뛴다. 기존에 건너뛰던 `GameLobbyView` 아래에 더한 것이다.
+  - 고친 `Upgrade Menu DEV Rows`의 결과를 장면에 저장했다. Home·Lobby 각 11줄로, DEV 행 0·1·41·43·48·52·53·54·72·73은 숨기고 237은 보인다. 2026-11-05 DEV 표시 정리의 공통 탭 규칙(`GameStageSettings.IsFieldShown`)이다. 실행 중에는 패널을 열 때 다시 정하므로 게임 동작은 같다.
+  - `GameEditorMenuCleanupTests`에 검사 2개를 더했다. ① Home 복사본에 실행 중 클레이 행과 틀린 240 기본값을 넣은 뒤 DEV 행 갱신을 부르면 257행·원본 기본값으로 돌아오고, Prefab 인스턴스 Text의 글꼴은 그대로다. 복사본은 검사 뒤 지운다. ② `MenuDeveloperSchemaIsCurrent`가 저장된 Home·Lobby를 현재 형식으로 본다.
+  - `AGENTS.md` #506 절과 `GAME_FLOW.md`(Battle 절, 에디터 도구 절)에 저장 행 규칙을 적었다.
+
+| 확인 | 결과 |
+| --- | --- |
+| 대조: 고치기 전 `Upgrade Menu DEV Rows` 실행 | Home·Lobby가 259행(행 오브젝트 62개씩 추가). 같은 11행 보이기 변경과 Home 오프닝 글꼴 덮어쓰기 8개. 이어서 `GameSceneAssetTests` 9건 중 7 PASS(Home·Lobby가 행 수 257 기대, 실제 259) |
+| 대조: 고치기 전 `Upgrade Figma Game Lobby` 실행 | `The existing Canvas and complete scoped DEV panel must be retained.`로 멈춤(종료 코드 1), 바뀐 파일 없음 |
+| 대조: 새 검사 + 고치기 전 Editor 코드 | 4건 중 2 PASS. 새 2건 실패(행 수 259, 스키마 확인 False) |
+| 대조: 새 검사 + Prefab 글꼴 건너뛰기만 뺀 코드 | 4건 중 3 PASS. ①이 `Speaker`(기대 `Shilla_Culture(M)`, 실제 `ShillaCultureBold`)에서 실패 |
+| 고친 뒤 `Upgrade Menu DEV Rows` 두 번 | 1번째: Home·Lobby 각 11줄(위 보이기)만 바뀜. 2번째: 바뀐 것 없음 |
+| 이어서 `Upgrade Three Yokai Stages` → `Upgrade 2v2 Lobby UI` → `Upgrade Figma Game Lobby` | 모두 예외 없이 끝남. Home·Lobby·`GameLobby.prefab`·StageResult·스테이지 자료는 그대로. 무관한 재저장 두 가지는 되돌렸다: `GameOver.unity`에 `FigmaStageResult`의 새 필드 2줄(`blueTeamBackground`·`redTeamBackground`, 값 없음), Team 그림 `.meta` 9개의 WebGL 항목 |
+| `GameSceneAssetTests`+`GameEditorMenuCleanupTests` / 전체 EditMode | 13/13 PASS(1.2초) / 2064/2064 PASS(20.7초). 늘어난 2건이 새 검사다 |
+| PlayMode `GameSceneFlowTests`·`GameLobbyViewTests`·`GameOpeningControllerTests`·`GameStageUiTests` | 48/48 PASS(107.8초; 21·15·10·2) |
+| 병합 뒤: 네 메뉴를 차례로 실행(`Upgrade Menu DEV Rows` → `Three Yokai Stages` → `2v2 Lobby UI` → `Figma Game Lobby`) | 모두 예외 없이 끝남. Home·Lobby는 네 메뉴 모두에서 그대로. `Upgrade 2v2 Lobby UI`만 main이 새로 부르는 디자인 단계(`GameMenuDesignUpgrade`·`GameSeatDesignUpgrade`)로 `GameLobby.prefab`의 Sprite 1개(`Lab/Art/Lobby/4ba8d.png` → `Hapio/Art/UI/Seats/5089e.png`)와 빈 이름 36줄을 다시 저장하고 그림 `.meta` 30개에 WebGL 항목을 붙였다. 이 PR이 바꾸지 않은 경로라 되돌렸다 |
+| 병합 뒤: `GameSceneAssetTests`+`GameEditorMenuCleanupTests` / 전체 EditMode | 13/13 PASS(1.6초) / 2087/2087 PASS(21.5초) |
+| 병합 뒤: PlayMode 위 네 fixture | 50/50 PASS(125.0초; 23·15·10·2). `GameSceneFlowTests`는 main 병합으로 23건이 됐다 |
+
+- 각 실행의 skip·inconclusive는 0이다. 대조용 코드 되돌림과 메뉴 실행의 무관한 재저장은 되돌렸고 커밋하지 않았다. batch 가져오기가 덧붙인 Lobby PNG `.meta` 20개의 WebGL 항목도 매번 되돌렸다.
+- **미실행:** Editor 화면에서 메뉴를 직접 누르는 확인, `Create Missing Development Game Scenes`(장면이 모두 있어 새로 만들지 않는다. 바꾼 줄은 컴파일만 확인), 전체 PlayMode, Mac·iOS 앱·실기기.
+
+## 2026-11-08 — Home·Lobby 저장 DEV 240행을 원본 기본값 10으로 맞춤 (main EditMode 실패 2건)
+
+- **기준:** `fix/menu-dev-row-240`. main `886e65db`에서 고치고 검사한 뒤, #559·#560이 들어온 main `92d511ee` 위로 rebase해 다시 검사했다. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal), `-buildTarget iOS`. Library는 다른 worktree에서 복제했다. 같은 Mac에서 다른 폴더의 Unity Editor가 열려 있었다.
+- **증상:** EditMode `GameSceneAssetTests.MenuScreens_HaveSavedEditableCanvasAndInput`의 Home·Lobby 2건이 `Setting240`에서 실패했다. 저장된 DEV 패널의 입력·슬라이더는 15, `LabConfig.asset` 기본값은 10이다. PR #559·#560을 검사하다 main에서도 나는 실패로 찾았다.
+- **원인:** #540이 `jigwiABPersonalDurationSeconds`(DEV 240, 지귀 A 제한 시간)를 15→7(`14813416`)→10(`5413486d`)으로 바꾸면서 Home·Lobby의 저장 DEV 행은 다시 저장하지 않았다.
+- **고친 것:**
+  - 두 장면의 `Setting240`만 10으로 저장했다. 장면마다 3줄이다: `Value` InputField의 `m_Text`, 그 자식 `Text`의 `m_Text`, `Slider`의 `m_Value`(모두 15→10). 라벨·슬라이더 범위(1~15)와 다른 오브젝트·Transform·참조는 그대로다. 바뀐 줄마다 소속 오브젝트를 장면 계층 경로로 확인했다.
+  - 그 사이 main의 #562(`d3bf68a2`)도 같은 세 줄을 10으로 저장했다. 그래서 main을 merge(`a434b800`)한 뒤 이 PR에는 `Setting240` 변경분이 남지 않는다.
+  - 메뉴 `Hapio/Upgrade Menu DEV Rows`는 쓰지 않았다. 이 도구(`GameSceneBuilder.UpgradeDeveloperRows`)는 저장 패널을 `DeveloperFields.Count`(259)행으로 늘려 클레이 257·258행까지 장면에 써 넣는다. 같은 검사는 #506 이후 저장 패널이 257행(`ClayThicknessField`)이고 클레이 두 행은 실행 중에 붙는다고(`GameScreen.EnsureClayDeveloperRows`) 요구하므로, 메뉴를 그대로 돌리면 행 수 단언에서 실패한다. 대신 그 도구의 행 갱신(라벨, `SetTextWithoutNotify`, 슬라이더 범위·`SetValueWithoutNotify`)을 저장된 257행 중 원본과 다른 행에만 적용하는 임시 Editor 스크립트를 `-executeMethod`로 실행해 Unity가 저장하게 했다. Scene YAML은 손으로 고치지 않았고 스크립트는 커밋하지 않았다.
+  - batch 가져오기가 실행할 때마다 Lobby PNG `.meta` 20개에 WebGL 플랫폼 항목을 덧붙여 매번 되돌렸다.
+- **영향:** 게임 동작은 바뀌지 않는다. 실행 중 DEV 패널을 열면 `GameScreen.SelectDeveloperScope`가 모든 칸을 세션 값으로 다시 채운다(코드로 확인했고 실행 검사는 아니다).
+
+| 확인 | 결과 |
+| --- | --- |
+| `886e65db`, 고치기 전: 임시 스크립트로 저장 257행의 라벨·입력값·슬라이더 값·범위를 원본과 비교 | Home·Lobby 모두 240행만 다름(입력 `15`·슬라이더 15, 원본 10). 라벨·범위는 같음 |
+| `886e65db`, 대조: 두 장면만 main 것으로 되돌린 `GameSceneAssetTests` | 9건 중 7 PASS. Home·Lobby 2건이 `Setting240`(기대 10, 실제 15)에서 실패 |
+| `886e65db`, 고친 뒤: `GameSceneAssetTests` / 전체 EditMode | 9/9 PASS(1.0초) / 2058/2058 PASS(20.6초) |
+| `92d511ee`로 rebase 뒤: `GameSceneAssetTests` / 전체 EditMode | 9/9 PASS(0.9초) / 2062/2062 PASS(20.4초). 늘어난 4건은 #504가 더한 검사다 |
+
+- 각 실행의 skip·inconclusive는 0이다.
+- **남은 것:** `Hapio/Upgrade Menu DEV Rows`·`Hapio/Upgrade Three Yokai Stages`·`Hapio/Upgrade 2v2 Lobby UI`(저장 패널이 259행이 아니면 같은 갱신을 부름)는 여전히 259행을 현재 형식으로 본다. 그대로 실행하면 257·258행이 장면에 저장되어 위 검사의 행 수 단언이 실패한다. `docs/GAME_FLOW.md`는 새 DEV 행을 이 메뉴로 추가한다고 적고 있다. 이 커밋에서는 도구를 고치지 않았고, 같은 PR의 위 절에서 고쳤다.
+- **미실행:** 위 메뉴 자체 실행, PlayMode(장면 값 3줄만 바뀌고 위 영향 참고), Editor 화면 확인, Mac·iOS 앱·실기기.
+
+## 2026-11-08 — #558 스테이지 스토리·새 UI와 같은 방 재도전 통합
+
+- **기준:** main `886e65db`, #556 `dc2c0e82`, #553 `58079a69`. 두 PR의 원본 이력을 순서대로 병합하고 실제 게임 연결을 추가했다. 문서 충돌은 양쪽 검증 기록을 보존했다.
+- **환경:** Unity 6000.6.5f1, macOS·Metal, Standalone 활성 플랫폼의 live Editor. 기존 프로젝트와 분리한 작업 위치를 사용했으며 Editor는 `-noaudio`로 실행했다. 아래 결과는 이 작업에서 실제 실행한 검사이며 두 원본 PR의 작성자 기록과 구분한다.
+
+### 자동 검사
+
+| 실행 | 실제 결과 | 후속 처리 |
+| --- | --- | --- |
+| 첫 전체 EditMode | 2,081개 중 2,077 통과·4 실패 | 전송 검사 시계, 실패 Scene의 관람 참조 전제, Home/Lobby DEV240 표시값 차이 수정 |
+| 수정 후 전체 EditMode | **2,081/2,081 통과** | 실패 0·건너뜀 0 |
+| 첫 전체 PlayMode | 685개 중 676 통과·9 실패 | 지귀 검사 조건 8건과 클레이 검사 대기 1건을 아래처럼 구분해 재실행 |
+| `LabJigwiABNetworkTests` 최종 재실행 | **9/9 통과** | 복제 설정에서 구형 시간표·즉시 소각 정책을 명시. 소각 해제 복제는 실제 부적 완료 승인 경로로 확인 |
+| `GameJigwiStageIntegrationTests` | **1/1 통과** | 실제 저장 설정의 새 시간표에서 A·B 확인 시각을 계산. 게임 시간표는 되돌리지 않음 |
+| `GameBattleUiPresentationTests` | **2/2 통과** | 일반 세 스테이지에서도 조합판 합성 성공을 필수 단언하도록 강화 |
+| `ClayPreviewPlayModeTests.FiveActualRgbEditorsClampSrgbExactlyAndKeepPaletteAcrossPresetsWithIndependentReset` | **1/1 통과** | 첫 실행에서 Game 뷰가 비활성화돼 180초 제한을 넘김. 활성 Game 뷰에서 같은 검사는 9.79초에 완료 |
+| 추가 `GameSceneFlowTests.SavedStorySkipAndEndingButtonsReceiveRealMouseClicksAtTheirVisibleScreenPositions` | **1/1 통과** | 저장 결과 화면에서 GraphicRaycaster 최상위 대상과 실제 가상 마우스 이동·누름·뗌으로 Skip→카드→엔딩→Home 확인. 직접 이벤트 호출로 대체하지 않음 |
+
+첫 전체 PlayMode에서는 `GameSceneFlowTests` 22개, `GameStageRetryPlayModeTests` 2개, `GameStageStoryPresentationTests` 3개, `GameLobbyViewTests` 13개가 모두 통과했다. 기존 `StoryPlayerTests` 11개·`StoryResultPresentationTests` 9개·`StoryTapAdvanceTests` 4개도 통과했다. 여기에는 카드 실제 기록·실패 실제 봉인율·이전 성공 기록 보존·같은 방 재도전 초기화·전원 결과/관람 게이트·패배 뒤 연결 종료 fallback·최종 6컷 엔딩·입력 해제 보호가 포함된다.
+
+**수정 후 전체 PlayMode 685개를 다시 실행한 결과로 표현하지 않는다.** 전체 실행에서 발견한 실패를 관련 묶음으로 재검사했고, 마지막 실제 포인터 검사 1개를 별도로 추가했다. 현재 확인된 미해결 검사 실패는 없다.
+
+### 실패 원인과 보존 범위
+
+- `LabTerminalSnapshotCatchupTests`는 실제 큐 삽입 시각보다 이른 가상 시각 1초로 전송을 요청했다. 검사 시계를 실제 시각 이후로 맞췄다. 최종 전체 EditMode에서 비어 있지 않은 도색 지도·Defeat 스냅샷의 정확한 복구와 새 라운드 누출 방지를 확인했다.
+- GameOver에는 원래 완성 박 관람 참조가 없다. 실패 화면을 승리 화면과 같은 관람 참조 조건으로 검사하던 새 검사를 실제 연결에 맞췄다.
+- main의 실제 A 지속시간은 10초인데 Home/Lobby에 저장된 DEV240 표시값은 15였다. Unity API로 해당 Text/InputField/Slider만 10으로 맞췄다. 원본 설정과 Scene의 위치·크기는 변경하지 않았다.
+- 지귀의 구형 네트워크 검사는 저장 설정을 복제한 뒤 예전 시간표와 A 중 소각을 가정했다. 최신 main은 A10/B45/A66/B83과 A 중 소각 보류를 사용한다. 구형 호환 검사에만 해당 정책을 명시했고, 실제 게임 Scene 검사는 최신 시간표를 검증한다. 실패 만료는 소각 해제가 아니므로 마지막 owner-delta 해제 검사는 실제 부적 완료 승인을 사용한다.
+- 검사 중 자동 변경된 지귀 리본 재질의 `_NORMALMAP` 제거는 원본으로 복원해 통합에서 제외했다. Lab Scene·Battle Scene·Packages·ProjectSettings와 게임 판정·도색 압축·Bulk 선택 ACK 형식은 변경하지 않았다.
+
+### 빌드와 Editor 화면 확인
+
+- `Hapio > Development Build > Build Mac App` 경로로 **Mac 개발 빌드 성공**(빌드 호출 57.6초). 출력은 `Builds/Hapio/20261108-155628-5341e594/macOS/Hapio-Development.app`이다. Home·Lobby·공통 Battle·StageResult·GameOver 5개 Scene을 포함하며 제작용 StageStoryPreview Scene은 포함하지 않는다.
+- Editor의 C6 Portrait(390×844)에서 새 전투 UI와 지귀 봉인 카드의 앞·뒷면을 확인했다. 실제 종료 기록의 100%·남은 30초와 기록이 표시됐고, 카드의 박 관람 버튼으로 기존 3D 관람 화면을 열었다가 같은 카드 뒷면으로 복귀했다.
+- 이 시각 확인은 기존 Editor DEV 솔로 시작단계(3)를 유지하고, 임시 복사 설정의 최초 도색량100%·마르기OFF로 결과를 준비한 것이다. 실제 투척 명중이나 일반 경기 클리어 시험으로 기록하지 않는다. 원본 설정에 저장하지 않았다.
+- 네이티브 자동 클릭의 상하단 버튼 전달이 일관되지 않아, 위 추가 PlayMode 검사에서 실제 UI 입력 경로와 레이캐스트 대상으로 별도 확인했다. 실제 입력 검사는 6컷 엔딩 뒤 진짜 Home 복귀까지 통과했다.
+- 작업 완료 후 기존 Unity·Hub·검증 앱과 통합용 Editor를 종료했다. 빌드 앱을 추가 실행하지 않았다.
+
+### 게시 직전 최신 main 통합 확인
+
+- 작업 중 main에 추가된 #559(방 공개 재등록)·#560(배경 재질 동기화), 기준 `92d511ee`를 통합 커밋 `a09f66a4`로 보존했다. 충돌은 AGENTS·VALIDATION 문서뿐이며 양쪽 기록을 유지하고 현재 Game39와 새 배경 재질 규칙을 함께 남겼다.
+- 이 최신 통합본에서 **전체 EditMode 2,085/2,085 통과**(29.63초).
+- 관련 PlayMode **59/59 통과**: 두 PendingRoomRetry fixture 합계5, GameLobbyView15, LabFigmaLobby12, GameBattleUiPresentation2, GameStageRetry2, GameSceneFlow23. 마지막23개에는 실제 마우스의 스킵·엔딩·Home 검사도 포함된다. skip·inconclusive는 모두0이다.
+- 최신 통합본의 Mac 개발 빌드도 성공했다(호출16.3초). 최종 출력은 `Builds/Hapio/20261108-163016-39dd4b42/macOS/Hapio-Development.app`이며 독립 앱 실행은 하지 않았다.
+- 읽기 검토에서 방 공개 재등록은 Home의 입장 전 광고 수명이며 실패한 스테이지 재도전과 분리돼 있음을 확인했다. 배경 숨은 재질 동기화는 Editor 전용이고 새 UI의 조합대 런타임 복사본과 다른 저장 재질을 대상으로 한다.
+
+### 이번에 실행하지 않은 항목
+
+- iPhone/iPad 설치·실기기 터치·노치/회전·오디오 청취.
+- Mac 독립 실행 앱의 플레이, 실제 LAN/일반 Wi-Fi/핫스팟에서 여러 기기 연결과 원격 결과 확인.
+- 위 항목은 기존 검증 기록이나 코드 존재로 PASS를 대신하지 않는다. 현재 호환 묶음은 설정259개·5691·Lab52·**Game39**다.
+
+## 2026-11-08 — #503 방장 입장 전 대기 방 공개 실패 재시도
+
+- **기준:** main `886e65db` 위의 `fix/#503-pending-room-register-retry`. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro), iOS 활성, 실제 macOS Bonjour(dns_sd). Library는 다른 worktree에서 복제했다.
+- **강제 실패 방법:**
+  - 진행 중인 등록은 discovery 자신의 `Fail`로 끝냈다. 오류 응답·시간 초과와 같은 경로다.
+  - 시작 거절은 예약 소켓 두 개를 한 번만 숨겨 `StartAdvertise`가 바로 false를 돌려주게 했다.
+  - 실제 로컬 네트워크 권한 창·거부, Wi-Fi 끊김은 재현하지 않았다.
+
+| 확인(검토 반영 `0e8edb42` 기준, 괄호는 첫 커밋 `4faa3c93`) | 결과 |
+| --- | --- |
+| 관련 EditMode(`LabBonjourRegistrationTests`·`LabDiscoveryBackoffTests`·`LabRoomPresenceTests`·`GamePendingRoomRegistryTests`) | 58/58 PASS(첫 커밋 58/58). 이름 충돌 재시도와 마지막 번호 실패 검사를 포함한다 |
+| 새 PlayMode `LabPendingRoomRetryTests` 4건 | 4/4 PASS: 첫 등록이 실패해도 같은 포트로 확정되고 이름 충돌 예산은 0으로 돌아감, 시작 거절 뒤에도 재시도, 확정 뒤 끊기면 뒤 번호를 요청받아도 자기 이름으로 복구, 대기 1초→2초와 6회 뒤 실패(포트는 주인이 정리할 때까지 예약) |
+| 새 PlayMode `GamePendingRoomRetryTests` 1건 | PASS: 기다리는 카드가 다음 카드를 막지 않음, 마지막 재시도가 실패한 뒤에만 카드가 빠지고 기존 안내가 뜨며 포트가 풀림 |
+| 새 PlayMode `LabFigmaLobbyTests.ACreatedRoomWaitingToRetry…` 1건(`0e8edb42`에서 추가) | PASS: Lab 로비의 실제 카드 두 개로 같은 동작(기다리는 카드 유지·다음 카드 확정·입장 가능 카드 1개, 마지막 실패 뒤 카드 제거·`creationError`·포트 해제) |
+| `GameLobbyViewTests` 새 2건 | PASS: 실패한 방이 재시도 안내 뒤 예약 포트로 자동 입장, 실패 뒤 한도에 닿으면 권한 안내, 재시도를 다 쓰면 기존 안내 |
+| 관련 PlayMode 묶음(새 검사 포함 `LabPendingRoomRetryTests`·`GamePendingRoomRetryTests`·`GameLobbyViewTests`·`LabFigmaLobbyTests`·`LabDiscoveryRecoveryTests`) | 37/37 PASS(65.4초; 첫 커밋 36/36) |
+| 대조 1(첫 커밋): 재시도를 끔(이름 충돌이 아닌 실패는 바로 실패, 이전 동작) | 새 7건 모두 실패 |
+| 대조 2(첫 커밋): 기다리는 카드가 다음 카드를 다시 막게 함(등록부) | `GamePendingRoomRetryTests`만 "A waiting card does not hold back the next one."에서 실패 |
+| 대조 3: 확정된 방도 재시도 때 앞 카드 번호를 따르게 되돌림 | `AConfirmedRoomThatLosesItsRegistrationAsksForItsOwnNameAgain`만 실패: 자기 번호 대신 +7 번호로 등록 |
+| 대조 4: 확정 때 이름 충돌 예산을 초기화하지 않음 | `AFirstRegistrationThatFails…`만 실패: 예산 사용 2 |
+| 대조 5: Lab 로비가 기다리는 카드에서 다음 카드를 다시 막게 함 | 새 Lab 로비 검사만 "A waiting card does not hold back the next one."에서 실패 |
+| 전체 EditMode | 2056/2058 PASS(20.7초; 첫 커밋 2056/2058, 21.8초). 실패 2건은 아래 main 실패다 |
+| 전체 PlayMode | 667/675 PASS(521.5초; 첫 커밋 666/674, 527.0초). 실패 8건은 아래 main 실패다 |
+
+- 각 실행의 skip·inconclusive는 0이다. 대조 변경은 되돌렸고 커밋하지 않았다.
+- 첫 실행에서 새 `GamePendingRoomRetryTests`가 한 번 실패했다. 검사는 첫 Tick에서 항상 native 등록이 시작된다고 가정했다. 실제로는 다른 카드가 그 이름을 먼저 가져가, 지역 이름 충돌(-65548)로 다음 번호로 넘어갔다. 제품 동작이 맞으므로, 등록이 실제로 시작될 때까지 Tick하도록 검사를 고쳤다. 위 결과는 고친 뒤의 것이다.
+- **검토:** 독립 검토 3갈래(상태 전환, 호출부 정책·UI, 검사·문서)를 돌리고 지적마다 반박 검증을 붙였다. 인정된 3건을 `0e8edb42`에서 고쳤다.
+  - 확정된 카드도 재시도 때 앞 카드 번호를 따라, 이름 충돌이 없어도 번호가 바뀔 수 있었다.
+  - 재시도가 이름 충돌 예산을 계속 썼다. 오래 떠 있는 Lab 카드라면, 나중의 이름 충돌 때 다음 번호로 가지 못하고 실패할 수 있었다.
+  - Lab 로비의 차례 규칙에 검사가 없었고, 포트 해제 단언은 검사가 직접 정리한 뒤라 의미가 없었다.
+  - 기각된 7건은 의도한 정책이거나 이미 문서에 있는 내용이었다. 기다리는 카드의 이름·번호가 비는 것, 재시도 중 Lab 안내가 없는 것, 30초 한도로 Hapio 재시도가 4번쯤에서 끊기는 것 등이다.
+- **이 PR과 무관하게 실패한 검사(main `886e65db`):**
+  - EditMode `GameSceneAssetTests.MenuScreens_HaveSavedEditableCanvasAndInput`의 Home·Lobby 2건. 저장된 DEV 패널 240행은 15인데 `LabConfig.asset`은 10이다. #540이 이 값을 15→7(`14813416`)→10(`5413486d`)으로 바꿀 때 Home·Lobby의 DEV 행을 다시 저장하지 않았다.
+  - PlayMode `LabJigwiABNetworkTests` 7건과 `GameJigwiStageIntegrationTests.SavedHomeReachesJigwiWithScreenAThenScreenBAndPreservesTheRealPaintShell` 1건. 대부분 지귀 B 장막·발화점 관련 NullReference·IndexOutOfRange다.
+  - 지귀·DEV 코드를 바꾸지 않는 다른 브랜치(#504, 같은 main 기준)에서도 같은 10건이 실패했다. 지귀 실패의 원인은 조사하지 않았다.
+- **미실행:** iPhone의 로컬 네트워크 권한 창·거부, Wi-Fi 끊김, 여러 기기에서 카드가 보이는지 확인. `DNSServiceRegister`가 이름 충돌이 아닌 오류로 바로 거절하는 경우는 강제하지 못했다. `LabPendingRoom`에서 같은 분기를 타는 `StartAdvertise`의 이른 false 반환으로 대신 확인했다. 앱 복귀 때 재시도를 앞당기는 동작은 만들지 않았다.
+
+## 2026-11-08 — #504 배경 재질 `_MainTex`·`_Color` 사본 맞추기
+
+- **기준:** main `886e65db` 위의 `chore/#504-background-material-sync`. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro), iOS 활성. Library는 다른 worktree에서 복제했다.
+- **원인 확인(임시 진단 스크립트 8개, 커밋 안 함):**
+  - URP `BaseShaderGUI.SetMaterialKeywords`는 `_MainTex`와 `_BaseMap`이 모두 있으면 `_BaseMap`의 텍스처·타일링·오프셋을 `_MainTex`에, `GetColor("_BaseColor")`를 `_Color`에 복사한다.
+  - 이 복사는 가져오기·불러오기가 아니라 재질 속성을 처음 읽을 때 일어났다. Stage02 `YokaiGround` 복사본의 `_MainTex` 텍스처만 다르게 저장해 가져왔다. 불러오기만 했을 때는 dirty가 아니었다. `GetTexture`·`HasProperty`로 처음 읽자 사본이 `_BaseMap` 값이 되고 dirty가 됐고, 저장하자 파일도 바뀌었다. `shader`·`SerializedObject` 접근만으로는 바뀌지 않았다.
+  - 색 사본도 같다. `_Color`만 흰색인 `Eye pupils` 복사본은 처음 읽은 뒤 dirty였고, 저장하자 `_Color`가 `_BaseColor` 값으로 바뀌었다.
+  - `GetColor`는 시험한 6색 중 3색을 `SetColor`로 넣은 값보다 float 1~2단계 작게 돌려줬다(예: 0.55 → 0.54999995). `SerializedObject`로 보면 저장값은 `SetColor`에 넣은 그대로였다. 이 3색을 `_Color`에 같은 숫자로 저장한 파일은 다시 가져와 처음 읽을 때 dirty가 됐다. `_BaseColor`를 다시 읽어 복사하면(URP와 같은 방식) 6색 모두 dirty가 아니었다. `-nographics` 유무와 관계없이 같았다.
+  - 고치기 전 `이미지만 적용`의 재질 쓰기(`_BaseMap`·`_BaseColor`만)를 복사본에 실행하고 저장했다. `_MainTex`의 타일링·오프셋이 옛 값(3×3, 0)으로 남았고, 다시 불러와 읽자 dirty였다.
+  - 지금 저장된 Studio 재질 12개는 복사본을 다시 가져와 처음 읽어도 dirty가 아니다. 이번 변경은 재질·Scene 파일을 바꾸지 않는다.
+- **고친 것:**
+  - `LabBackgroundStudio.ApplyImage`가 URP와 같은 방식(기본값을 다시 읽어 복사)으로 사본까지 쓴다.
+  - Studio Inspector는 저장 재질이 Studio 값과 다르면 경고한다.
+  - `GameStageBackgroundAssetTests`에 EditMode 검사 3개(TestCase 포함 4건)를 더했다.
+- **남은 것(바꾸지 않음):** 검토 중 저장소의 URP Lit/Unlit 재질 74개를 모두 다시 확인했다. `_MainTex`가 `_BaseMap`과 다른 파일은 없다. `_Color`의 글자가 `_BaseColor`와 다른 파일은 28개이고, 모두 배경 Studio 밖이다.
+  - 25개는 채널마다 float 1~6단계만 작다: 구운 박 14개(`Assets/Hapio/Art/Gourds/Stage0N_*/Materials`), `Assets/Hapio/Art/Yagwanggwi/Materials` 7개, Lab 4개(`Art/Orbs/OrbBoardPlate`·`OrbCombined`·`OrbYin`, `Resources/GourdPaint/Stem`). 25개 모두 URP가 저장된 `_BaseColor`에서 복사할 값과 비트 단위로 같았다(새 파일 검사와 같은 계산). `Hanbok_gold_edging`·`Hanbok_long_robe_teal`·`OrbCombined` 복사본은 처음 읽어도 dirty가 아니었고, 다른 속성을 바꿔 저장해도 `_Color`가 그대로였다.
+  - `Assets/Hapio/Art/Yagwanggwi/Materials`의 `Eye ivory`·`Eye pupils`·`Inner ivory` 3개는 `_Color`가 흰색이다. Editor가 처음 읽으면 dirty가 되어, 다음 저장 때 `_Color` 줄이 `_BaseColor` 값으로 바뀐다(`Eye pupils`로 확인). 세 재질을 참조하는 Prefab·Scene·에셋은 없어서 평소에는 읽히지 않는다. 다른 작업의 에셋이라 그대로 뒀다.
+- **검토:** 독립 검토 2갈래(코드·검사, 문서)를 돌리고 지적마다 반박 검증을 붙였다.
+  - 인정된 지적은 1건이다. "남은 것" 목록이 14개로 불완전했고, 저장소 전체를 다시 확인해 28개로 고쳤다.
+  - 기각된 2건도 문구는 다듬었다. `ApplyImage`가 Editor 전용이라는 점과 "저절로 바뀐다"는 표현이다.
+  - 검토의 부수 관찰은 "불러온 색이 파일 값과 1단계 다르다"였다. 이것을 직접 확인하다가, 첫 커밋처럼 `_Color`에 같은 숫자를 쓰면 일부 색에서 다시 dirty가 되는 것을 찾았다. `fbb7d820`에서 URP와 같은 방식으로 고쳤다.
+  - 2차 검토는 두 PR을 함께 독립 4갈래로 보고 반박 검증을 붙였다. #504에서 인정된 지적은 문구 2가지였고 둘 다 고쳤다.
+    - 검사 주석이 색 사본은 dirty를 만들지 않는다고 썼다.
+    - 문서가 `GetColor` 차이를 "float 한두 단계"로 단정했다. 저장소 재질에서는 1~6단계였다.
+  - 단위 검사가 저장값을 직접 읽지 않는다는 지적은 기각됐다. 그래도 `SerializedObject`로 저장된 `_Color`를 읽어 비교하도록 바꿨다. 이후 대조 C는 0.55의 r 채널에서 바로 실패했다.
+
+| 확인(검토 반영 기준, 괄호는 첫 커밋 `bc97169f`) | 결과 |
+| --- | --- |
+| 배경 EditMode 3 fixture(`GameStageBackgroundAssetTests`·`GameBackgroundAnimationAssetTests`·`GameSceneAssetTests`) | 16건 중 14 PASS. 새 4건과 기존 배경 검사가 통과했다. 실패 2건은 아래 main 실패다 |
+| 대조 A: Stage02 `YokaiGround.mat`의 `_MainTex` GUID만 HanjiSand로 바꿈 | 새 파일 검사(Battle)만 실패: `YokaiGround.mat`의 `_MainTex`가 `_BaseMap`과 다름 |
+| 대조 B: `ApplyImage`에서 사본을 쓰는 두 줄을 뺌 | 새 `ApplyImageWritesTheHiddenCopiesSoUrpsOwnCopyChangesNothing`만 실패: Lit `_MainTex`가 옛 텍스처 |
+| 대조 C: `ApplyImage`가 `_Color`에 `color`를 그대로 씀(첫 커밋의 방식) | 같은 검사만 실패: 0.55·0.29·0.81에서 저장된 `_Color`(r)가 URP가 복사할 값과 다름 |
+| 대조 D: Stage01 `YokaiGround.mat`의 `_Color` r만 float 1단계 낮춤(1.015 → 1.0149999) | 새 파일 검사(Battle)만 실패: URP가 복사할 값은 1.015 |
+| 전체 EditMode | 2060/2062 PASS(20.1초; 첫 커밋 2060/2062, 22.5초). 실패 2건은 아래 main 실패다 |
+| 전체 PlayMode | 659/667 PASS(512.0초; 첫 커밋 659/667, 518.9초). 실패 8건은 아래 main 실패다. 이 변경은 Editor 전용이라 PlayMode 경로에 닿지 않는다 |
+
+- 각 실행의 skip·inconclusive는 0이다. 대조 변경과 진단 스크립트는 되돌렸고 커밋하지 않았다.
+- **이 PR과 무관하게 실패한 검사:**
+  - EditMode `GameSceneAssetTests.MenuScreens_HaveSavedEditableCanvasAndInput`의 Home·Lobby 2건. 저장된 DEV 패널 240행은 15인데 `LabConfig.asset`은 10이다. #540이 이 값을 15→7(`14813416`)→10(`5413486d`)으로 바꿀 때 Home·Lobby의 DEV 행을 다시 저장하지 않았다.
+  - PlayMode `LabJigwiABNetworkTests` 7건과 `GameJigwiStageIntegrationTests.SavedHomeReachesJigwiWithScreenAThenScreenBAndPreservesTheRealPaintShell` 1건. 대부분 지귀 B 장막·발화점 관련 NullReference·IndexOutOfRange다. 지귀 코드를 바꾸지 않는 #503 브랜치(같은 main 기준)에서도 같은 8건이 실패해 main `886e65db`의 실패로 본다. 원인은 조사하지 않았다.
+- **미실행:** Editor 화면에서 Inspector 경고를 직접 보는 확인, 실기기. 이 변경은 Editor 전용이다.
+
+
 ## 2026-11-07 — ClayPreview 높이 EXR의 iOS 가져오기 (main에서 계속 실패하던 검사 1건)
 
 - **기준:** main `d640e0ef` 위의 `fix/clay-preview-exr-hash`(수정 `9fdf0996`, 검토 반영 `5f62e01d`). Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). Library는 끝난 worktree에서 복제했고, 원래 폴더처럼 활성 플랫폼이 iOS다. 같은 Mac에서 다른 폴더의 Unity Editor가 열려 있었다.
@@ -36,6 +223,51 @@
 - **미실행:**
   - 샘플을 다시 굽는 Prepare/Rebake 메뉴. `ImportMap`은 이 메뉴에서만 실행되므로 직접 실행하지 않았다. 같은 API 순서를 임시 진단 스크립트로 실행해 같은 iOS 설정값과 정확한 가져오기를 확인했다.
   - Mac 실험 앱 빌드·실행, 실기기. 이 실험은 iOS 앱에 들어가지 않는다.
+
+
+## 2026-11-08 — 땅따먹기 달 숨김
+
+- Unity 6000.6.5f1 macOS PlayMode `GameBattleUiPresentationTests` **2/2 PASS**. 땅따먹기 SOLO에서는 야광귀 배경의 달 오브젝트가 숨겨지고, 스토리 2스테이지에서는 표시된다.
+
+
+## 2026-11-08 — 땅따먹기 2:2·3:3 전투 에셋과 야광귀 배경
+
+- Figma 4229:5583·4229:7267·4234:1028 기준으로 땅따먹기의 밝은 표제, 청·홍 점령 바, 팀 위치 연결선과 북 표시를 적용했다. 땅따먹기의 단판 규칙을 유지하고 표현만 야광귀 배경·조합대·스태미나 변형을 선택한다.
+- Unity 6000.6.5f1 macOS Game View에서 땅따먹기 SOLO에 4/6인 표시 데이터를 넣어 두 화면을 캡처했다. 야광귀 바닥이 조합대의 투명 영역까지 이어지는 모습을 확인했다.
+- PlayMode `GameBattleUiPresentationTests`·`LabOrbHudCompositionTests`·`LabTeamBattleScreenTests` **15/15 PASS**. 단판과 야광귀 표현 선택, 위·아래 배경 투영 일치, 두 팀의 2/3인 마커와 북 표시, 기존 팀 막대와 구슬 합성을 확인했다.
+- EditMode `GameBattleUiAssetTests`·`GameStageBackgroundAssetTests`·`LabDrumMinimapTests` **8/8 PASS**. iPhone과 4/6대 실제 멀티플레이는 미실행이다.
+
+
+## 2026-11-08 — 조합대 투명 영역의 배경 톤 경계 수정
+
+- **원인:** 세 BoardStage PNG 바깥 픽셀의 alpha는 0이었다. 확대된 타원의 투명한 모서리를 통해, 기존 OrbCamera가 하단 viewport에 별도의 Board Hanji Backing을 덧그리는 경로가 드러났다. 스테이지 배경과 이 한지의 질감·색이 달라 수평 경계가 생겼다.
+- **수정:** Hapio의 투명 조합대 합성이 활성일 때 원래 입력 카메라는 객체·Transform·pixelRect·투영을 입력 계산용으로 유지하고 화면 렌더만 끈다. 구슬은 기존 foreground 카메라로 계속 합성한다. `GameBoardBackgroundContinuation`은 원본 전투 카메라의 시점·투영을 하단으로 연장한다. 공유 경계에서 같은 view ray를 사용하며 원본 전투 카메라의 viewport/FOV와 스테이지 배경 PNG/색은 변경하지 않는다. 독립 Lab과 합성 fallback에서는 원래 카메라 렌더를 유지하고, Release에서 enabled·cullingMask를 복원한다. URP의 모바일 Nothing clear가 색을 지울 수 있어 단순 투명 clear 방식은 사용하지 않는다.
+- **실제 확인:** Unity 6000.6.5f1 macOS Editor Game View에서 세 스테이지를 순서대로 캡처하여 타원 위/양쪽의 수평 톤 경계가 사라지고 기존 낮·밤·노을 배경이 이어짐을 확인했다. 조합대 위치·구슬/북 합성·P/스태미나·기존 물리 윤곽은 유지했다. 캡처/임시 도구/원시 로그는 저장소에 포함하지 않는다.
+- **자동 검사:** PlayMode GameBattleUiPresentationTests 2 + LabOrbHudCompositionTests 8 = **10/10 PASS**. 하단 한지 패스 중지/원래 입력 투영 유지/카메라 복원, 배경 경계 위·아래 ray 일치, 기존 구슬 합성을 확인했다. EditMode GameBattleUiAssetTests·GameStageBackgroundAssetTests·LabDrumMinimapTests **8/8 PASS**.
+- **미실행:** iPhone 실기기·Mac/iOS 플레이어 빌드·실제 다기기. 하단 배경 연장 카메라의 실기기 렌더 비용은 측정하지 않았다.
+
+
+## 2026-11-08 — 조합대 Figma 배치 후속 수정
+
+- **문제:** 앞선 전투 UI 작업은 새 조합대 텍스처를 기존 화면 전체 크기의 판 Quad에 입혔다. 원 전체가 보이는 결과여서 Figma 4229:3949·4238·4282의 확대된 타원/화면 밖 잘림과 달랐다.
+- **수정:** 원본 부품의 732.850891×494.996063 크기, y=459, x=-162(1)/-165(2·3)를 402×874 화면 기준으로 적용한다. 원본 레이어를 합친 투명 PNG의 1.5 단위 여백을 보정한다. LabOrbHudComposition에 선택적 배경 슬롯을 추가하여 조합대→기존 스태미나/P→실제 구슬→나머지 HUD 순서로 합성한다. 정상 합성 중 기존 판 Renderer만 숨기며 판 Transform·메시·충돌 프로필·입력 카메라·배경 Scene은 바꾸지 않는다. 합성 fallback에서는 기존 렌더러를 유지한다.
+- **기준 링크:** 4212:2461은 조합대가 아닌 단색 사각형 노드였다. 1스테이지 조합대는 4229:3949, 2·3은 4229:4238·4282 및 4203:1039·1589를 기준으로 확인했다.
+- **실제 실행:** Unity 6000.6.5f1 macOS Editor Game View에서 세 스테이지를 순서대로 캡처하여 윗곡선·좌우/아래 잘림·스태미나/P/구슬 합성과 기존 낮·밤·노을 배경을 확인했다. 임시 캡처 코드/이미지/로그는 커밋 대상에 포함하지 않는다. PlayMode GameBattleUiPresentationTests 2건 + LabOrbHudCompositionTests 7건 = **9/9 PASS**. EditMode GameBattleUiAssetTests·GameStageBackgroundAssetTests·LabDrumMinimapTests **8/8 PASS**.
+- **미실행:** iPhone 실기기·Mac/iOS 플레이어 빌드·실제 4/6대 멀티플레이. 화면 그림 배치만 변경했으며 물리 판정 영역 확장은 이 작업에 포함하지 않는다.
+
+
+## 2026-11-08 — Figma 스테이지 전투 UI 컴포넌트
+
+- **범위:** Figma 4185:2672·4203:1039·4203:1589·4234:1028. Hapio의 시간/일시정지, 스테이지 표제, 박/팀 점령 바, P/북 위치, 오행 구슬/생성 북, 스태미나와 조합대 표현을 공용 테마로 구성했다. 1의 어두운 잉크/2·3의 밝은 잉크, 세 조합대·스태미나 외곽선, 2:2·3:3 위치 컴포넌트를 포함한다.
+- **보존 확인:** Scene, 기존 스테이지 환경 에셋, 원본 LabConfig와 LabOrbAppearance, 조합대 충돌 프로필, 공유 설정 수와 프로토콜은 변경하지 않았다. 원본 대신 런타임 복사본에 구슬 표현 override를 넣고 조합대 머티리얼을 로컬 복사한다. DEV99 기본 50%에서 위치 부품이 디자인 크기로 보이도록 표현 배율만 보정한다.
+- **Unity 6000.6.5f1 / macOS 실제 실행:**
+  - PlayMode `GameBattleUiPresentationTests` **2/2 PASS**: Home→SOLO→1·2·3, 실제 HUD/보드 테마·배경 활성·일시정지 연결·스태미나 합성 위계, 땅따먹기 SOLO에서 합성 4/6인 snapshot으로 2/3인 팀 마커·P번호·북 소유/위치 확인.
+  - PlayMode `LabOrbHudCompositionTests` **7/7 PASS**: 기존 구슬 합성 위계/합성 경로 회귀. 최종 선택 실행은 **9/9 PASS**.
+  - EditMode `GameBattleUiAssetTests`·`GameStageBackgroundAssetTests`·`LabDrumMinimapTests` **8/8 PASS**: 에셋 연결, 원본 설정/공유 수치 보존, 기존 스테이지 배경과 미니맵 회귀.
+  - 실제 Editor Game View에서 세 스테이지를 전환하여 전체 화면을 캡처·확인했다. 낮·밤·노을 배경은 기존 자료를 사용하며 새 표제/진행률/조합대/생성 북/스태미나 색과 위치 표시를 확인했다. 임시 캡처 도구와 이미지·원시 로그는 저장소에 넣지 않았다.
+- **검증 도구 조정:** batch의 ScreenCapture는 Game View 렌더 타깃이 없어 실패했고, 수동 카메라 합성은 완전한 화면을 담지 못해 시각 근거로 쓰지 않았다. 이후 실제 Editor Game View 캡처로 확인했다. 팀 마커 검사에서는 Destroy가 다음 프레임까지 남기는 이전 레이어를 제외하고 새 레이어를 검사하도록 고쳤다.
+- **미실행:** Mac/iOS 플레이어 빌드, iPhone 실기기, 실제 4/6대 멀티플레이. 합성 snapshot 검사를 실제 다기기 전투 성공으로 해석하지 않는다. 전체 EditMode/PlayMode 모음은 이 작업에서 재실행하지 않았다.
+
 
 ## 2026-11-07 — #478 공용 로딩 화면 main 통합 (PR #544)
 
@@ -4538,6 +4770,28 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 - 코드 검토 워크플로(세 관점 검토 + 지적별 반박 검증)에서 제품 코드 결함은 확인되지 않았다. 검사 공백 3건(칠해진 셀 수 증분이 실제로 바뀌는 경우, 음수 칠 횟수 거절이 다른 실패에 가려짐, 복제본이 아닌 표면의 전체 검사)을 지적받아 검사를 추가했다.
 - **미실행:** 호출 경로 연결과 Guest GC 측정은 다음 이슈에서 한다. iPhone 실기기는 실행하지 않았다.
 
+## #549 엔딩 첫 컷 만복 대사 추가 — 2026-11-07
+
+- Unity 6000.6.5f1 macOS Editor: 스테이지 스토리 EditMode 5개, 결과 화면 PlayMode 9개 통과.
+- `StageStoryPreview`에서 첫 컷의 그림이 유지되면서 화자가 불이에서 만복으로 바뀌고, 만복의 이름표 색과 대사 두 줄이 표시되는 것을 확인했다.
+
+## #549 카드·실패·엔딩 연출 보강 — 2026-11-08
+
+- Unity 6000.6.5f1 macOS Editor에서 스토리 관련 EditMode 19/19, PlayMode 22/22 통과.
+- `StageStoryPreview`에서 실패 배경·인물의 첫 프레임 표시, 제목의 지연 등장 및 효과음 재생, 0%에서 목표까지 차오른 뒤 숫자 강조, 채우는 동안 재도전 버튼 활성 상태를 확인했다.
+- 카드 기록에 테스트 값을 전달해 표시를 확인했다. 첫 카드의 뒤집기 안내, 카드 소리, 예고 뒤 다음 버튼, 만복 대사와 깨진 박 컷의 효과음, 솔이 컷부터 낮아지는 음악 설정도 확인했다.
+- 실경기 기록·스테이지 흐름 연결과 iOS 빌드·실기기는 미검증.
+
+### 원래 봉인 글자 사용
+
+- 기존 카드 3종의 원본 글자와 도장 이미지의 최종 좌표, 크기, 스프라이트가 교체 전과 같은지 확인했다. 별도 ‘봉인 완료’ 장식은 제거했다.
+- Unity Editor 재생에서 3종 모두 기존 도장이 낙하하고 닿는 순간 효과음이 난 뒤 원위치에서 멈추며, 정상적으로 뒤집히는 것을 확인했다. 관련 EditMode 5/5, PlayMode 9/9 통과.
+
+### 봉인 박 둘러보기 버튼 가운데 정렬
+
+- 봉인 카드 3종의 글자와 터치 영역을 버튼 프레임 가운데에 맞췄다. 구미호 카드 뒷면을 Unity에서 렌더링해 위치를 확인했다.
+- 최종 변경에서 스토리 관련 EditMode 19/19 및 PlayMode 22/22 통과. 카드 뒷면 버튼의 클릭이 카드를 다시 뒤집지 않는 것도 검사에 포함된다. iOS 빌드·실기기는 미실행.
+
 ## #449 Guest 도색 수신 제자리 적용·표시 복사 할당 제거 — 2026-11-03
 
 - **기준:** main `90b649ea` → `fix/#449-paint-receive-in-place`. Unity6000.6.5f1/macOS의 연결된 Editor에서 실행했다. 새 Mac·iOS 빌드는 만들지 않았다.
@@ -6314,3 +6568,97 @@ PR-1(`feat/#507-gourd-rig-contract`) 위에서 Unity 6000.6.5f1 macOS batch Edit
 
 - `GameTutorialFlowTests`는 fixture 하나가 5초를 넘으므로(50.8초) 2026-11-05 기준대로 `[Category("Slow")]`를 붙였다. 동작은 바꾸지 않는다.
 - **미실행:** Play·iPhone에서 손가락으로 말풍선 가장자리를 눌러 보는 느낌, 8pt 여유가 충분한지.
+
+
+## 2026-11-08 — Hapio 타이틀 버튼·방 목록·모드 선택 Figma 적용
+
+- 기준: `d640e0ef`, `orgin/feat/#555-ui-design-update`의 작업 트리. Unity 6000.6.5f1 / macOS batch mode에서 이 변경을 적용하고 실행했다.
+- 범위: 공통 `GameLobby.prefab`, `GameLobbyView`, 기존 로비 갱신 메뉴와 새 메뉴 디자인 적용 도구, 원본 한지·빈 목록 패널. Home/Lobby/Battle Scene의 저장 내용은 이번 UI 변경에 포함하지 않았다.
+
+| 실행한 확인 | 결과 |
+| --- | --- |
+| Unity 컴파일·에셋 적용 | PASS — 최종 적용 명령 종료 코드 0, `HAPIO_MENU_DESIGN_READY`, 컴파일 오류 없음 |
+| 기존 `Upgrade 2v2 Lobby UI` 메뉴 연결 | PASS — 기존 메뉴에서 새 디자인 도구 호출과 Prefab 저장 확인. 메뉴의 기존 DEV 스키마 갱신으로 생긴 Scene 변경은 이번 범위에서 제외하고 원래 저장본으로 복원 |
+| EditMode 관련 검사 | **18/18 PASS**, 0.81초 — `GameLobbyAssetTests`, `GameLobbyModeRulesTests`. Home/Lobby 공통 Prefab·DEV·Scene 참조와 전체 인원별 모드 제한 확인 |
+| PlayMode 로비 검사 전체 | **13/13 PASS**, 30.22초 — `GameLobbyViewTests`. 실제 raycast 클릭으로 타이틀/방 목록/Direct IP/DEV, 방 생성 후 자동 입장, 자리 선택·해제, 1:1·2:2·3:3, 이탈·방 목록 복귀, 인원별 비활성 모드·카드 높이 확인 |
+| 렌더 비교 | PASS — 임시 Editor 캡처 도구로 804×1748 렌더를 생성하여 타이틀·빈 목록·방 카드·2/3/4/5/6명 모드 카드를 확인. 최종 팝업 테두리 제거, 화살표 기본 폰트 분리, 원본 한지 NPOT 크기 유지 및 선형 렌더의 dim 밝기 보정 확인. 임시 도구·원시 로그·캡처는 커밋 대상에서 제외 |
+| 변경 파일 공백 검사 | PASS — `git diff --check` |
+
+미실행: 전체 프로젝트 EditMode/PlayMode 모음, 새 Mac 플레이어 빌드, iOS 빌드·실기기 터치/화면 비율, 여러 기기의 LAN·핫스팟 연결. 위 PlayMode는 같은 Mac의 자동 검사이며 실기기 검증을 대신하지 않는다.
+
+
+## 2026-11-08 — 합이오 컬러 시스템 원본 보관
+
+- `Assets/Hapio/Art/UI/Source/Hapio.tokens.json`에 전달된 Figma export를 원본 바이트 그대로 저장하고 `docs/COLOR_SYSTEM.md`에 전체 팔레트와 실제 alpha를 정리했다.
+- PASS: JSON 파싱, 색상 토큰 99개, 각 sRGB components 3개와 0~1 범위, alpha 0~1, HEX6 형식, 전달 파일과 저장 파일의 바이트 일치 확인. SHA-256: `a22601632c69e7936ad7313c4458ec9325f698829e0d822859ebe31f9425cd5a`.
+- 원본의 DarkIvory `500***70%`는 실제 alpha 0.5이며 이름과 값의 차이를 보존·문서화했다. `Stemina`/`Stemina 2` 중복 그룹도 보존했다.
+- 런타임 코드·표시 색·설정은 수정하지 않았다. 이번 원본 보관 작업에서는 Unity 실행·EditMode·PlayMode·빌드·실기기 검사를 실행하지 않았다.
+
+
+## 2026-11-08 — 자리 확인 UI: 기본·1:1·2:2·3:3 Figma 적용
+
+- 기준: `d640e0ef` 위의 `orgin/feat/#555-ui-design-update` 작업 트리. 앞선 타이틀/방 목록 UI와 컬러 원본 보관 변경을 포함한 상태에서 이번 자리 UI를 추가했다. 아래는 이번 변경 후 실제 수행 결과다.
+- 범위: 공통 GameLobby Prefab의 표시·에셋, GameLobbySeatDesign/Colors, 팀 점선 UI primitive, 기존 로비 갱신 메뉴 연결과 관련 검사. GameSession·LabNetwork·게임 판정·공유 설정·접속 규약·Scene 저장 내용은 이번 변경에 포함하지 않았다.
+
+| 수행한 확인 | 결과 |
+| --- | --- |
+| Unity 컴파일·UI 적용 | PASS — Unity 6000.6.5f1/macOS batch, 최종 적용 및 렌더 명령 종료 코드 0, `HAPIO_SEAT_DESIGN_READY`, 컴파일 오류 없음 |
+| EditMode 관련 검사 | **18/18 PASS**, 0.90초 — `GameLobbyAssetTests`, `GameLobbyModeRulesTests`. 새 카드·좌석 앵커·팀 열의 연결과 Home/Lobby 공통 Prefab·기존 DEV·모드 제한 확인 |
+| PlayMode 로비 검사 전체 | **13/13 PASS**, 30.10초 — `GameLobbyViewTests`. 일반 방·1:1·2:2·3:3 실제 raycast 클릭, 방 생성/입장/나가기, 방장 자유 P번호·자기 자리 선택 해제·부족 인원 시작 차단 확인. 새 3:3 검사는 양 팀 동시 표시에서 P1~P6을 모두 직접 선택하고 취소함 |
+| Figma 렌더 비교 | PASS — 지정된 24개 상태에 대응하는 804×1748 Unity 캡처 생성, 기본 3/4/5인 좌석도 및 팀전 1:1/2:2/3:3 대기/준비 배치·마커·연결선·카드·문구 비교. 원본의 일부 예시 인원 수와 준비/찬 자리 표시 불일치는 실제 게임 준비 조건으로 옮기지 않음 |
+| 원본 에셋·컬러 연결 | PASS — SVG/4×PNG 19쌍의 비어 있지 않은 파일과 SVG root 크기 확인. UI 색 11개가 컬러 원본의 sRGB components/alpha와 일치(오차 1e-8 미만). 사진 한지는 기존 동일 원본을 재사용 |
+| 작업 트리 검사 | PASS — `git diff --check`, 이번 작업의 Scene/Lab 저장 변경 없음. 임시 렌더 도구·원시 로그·캡처는 커밋 대상에서 제외 |
+
+미실행: 전체 프로젝트 검사 모음, 새 Mac/iOS 빌드, iPhone/iPad 실기기 터치·가로세로 비율, 여러 기기의 LAN·핫스팟 실제 연결. 자동 검사는 macOS Editor에서 실행했으며 실기기 검증으로 해석하지 않는다.
+
+
+## 2026-11-08 — #564 숨김 개발 설정 진입
+
+- 기준: main `488104e7`에서 분리한 `feat/#564-hidden-developer-entry`. GameScreen·GameLobbyView·GameBattleBindings의 진입 연결과 새 GameDeveloperAccess/TapTarget만 변경했다. Scene·Prefab·원본 에셋·패키지·Lab 단독 화면·게임 규칙·접속 규약은 유지했다.
+- 환경: Unity 6000.6.5f1, macOS Editor 및 로컬 Mac 플레이어. 사용법은 `HIDDEN_DEVELOPER_ACCESS.md`를 따른다.
+
+| 수행한 확인 | 실제 결과 |
+| --- | --- |
+| PlayMode 관련 검사 | **37개 PASS**. 메뉴 기존 15/15(42.02초), 추가 Host 로비 전환 1/1(2.25초), Battle UI 2/2(4.77초), 숨김 입력 7/7(1.32초), 오프닝 10/10(2.57초), DEV 범위 설정 2/2(0.57초). 전체 프로젝트 모음 실행 결과가 아니다. |
+| 입력과 씬 전환 | 1·2회 미진입/3회 진입, 1.2초 초과 초기화, 우클릭·드래그·권한 해제·비활성 초기화, 배경 클릭이 소유 Canvas에 전달되지 않음, 실제 Home→Host Lobby 전환 후 새 입력 영역의 수명과 실제 최상위 Raycast 확인. |
+| 전투 설정 | 1~3스테이지에서 실제 입력 영역 3회 포인터 이벤트로 Host 정지→기존 DEV 열기, 닫기·Resume와 기존 Pause 버튼 유지. 사용자 Editor SOLO 시작 스테이지 값 3은 검사 후 복원했다. |
+| Mac Development Build | `BuildOptions.Development` 빌드 성공. `Builds/Hapio/20261108-175052-688d2218/macOS/Hapio-Development.app`. 일반 화면 DEV·SOLO 표시 숨김, 같은 Mac의 실제 3개 프로세스가 한 방에 연결되어 P1/P2/P3 로비·시작 대기를 표시함. 3인 비교용 앱에만 백그라운드 실행을 켰으며 원본 PlayerSettings는 false로 복원했다. |
+| Release 차단 | `BuildOptions.None`으로 별도 Mac Release 확인용 빌드 성공(`20261108-175020-release-check`). 빌드된 런타임 어셈블리를 읽어 `AvailableInThisBuild`가 Release=false, Development=true임을 확인. Release 화면에서 상단 3회 클릭 후 Home을 유지하고 DEV가 열리지 않음을 관찰했다. App Store 업로드·서명·iOS 배포 검증을 의미하지 않는다. |
+| Mac 실제 클릭 | 사용자가 개발용 앱 상단 중앙을 직접 3회 클릭해 **‘설정창 열림’**으로 확인했다. 자동 클릭 도구에서는 동일한 진입을 확인하지 못했으므로 자동 마우스 PASS로 기록하지 않는다. 이를 구분하기 위한 임시 입력 진단 코드는 최종 소스에서 제거했다. |
+| 변경 보존 | `git diff --check` 통과. 저장된 Scene·Prefab·머터리얼·패키지와 ProjectSettings 차이 없음. 검사기가 만든 임시 InitTestScene만 정리했고 기존 로컬 stash·별도 작업 폴더는 유지했다. |
+
+검사 이력: 초기 메뉴 검사에서 입력 준비/클릭 경로 1건이 실패했으나 소유 Canvas의 포인터 인터페이스 제거와 입력 준비 대기 반영 후 15/15로 재검사했다. 스크립트 갱신과 겹쳐 Test Framework가 중단된 실행, 추가 검사 import 전 0개 실행은 PASS 집계에서 제외했다. 새 로비 전환 검사는 import·컴파일 목록 존재를 확인한 후 실제 1개 실행/통과를 별도로 확인했다.
+
+미실행: iPhone/iPad 실제 터치, iOS Release 빌드·App Store 배포, 일반 Wi-Fi·핫스팟 기기간 연결, 전체 EditMode·PlayMode 모음. 결과 화면의 ‘다음/다음 스테이지’ 중복과 봉인 카드 재등장 구조는 조사만 했고 이번 변경에 포함하지 않았다.
+
+### #564 PR 병합 전 최신 main 통합 확인
+
+- 원격 main `ae4aa87e`(#561)의 저장 DEV 257행·240번 기본값·Prefab 글꼴 보존 수정을 반영한 뒤 macOS 기본 batch 환경에서 재검사했다. **EditMode `GameEditorMenuCleanupTests` 4/4 PASS(0.60초), 관련 PlayMode 37/37 PASS(36.24초)**이며 실행 건수가 0이 아닌 NUnit 결과를 확인했다.
+- main 대비 PR 변경은 DEV 코드·해당 검사·사용법/검증 문서 13개 파일뿐이다. Scene·Prefab·머터리얼·패키지·ProjectSettings와 결과 화면 전환 코드는 변경하지 않았다. `git diff --check`와 검사 후 깨끗한 작업 트리를 확인했다. 추가 iOS·실네트워크·전체 검사 모음은 실행하지 않았다.
+
+
+## 2026-11-08 — #566 결과 화면 중복·봉인 카드 재등장 정리
+
+- 기준: main `fbe6f67c`에서 분리한 `fix/#566-result-flow-cleanup`. 환경은 Unity 6000.6.5f1 / macOS 기본 batch다. #564 숨김 DEV, 기존 전투/로비/네트워크 규칙과 제작용 Story 미리보기는 유지했다.
+- 범위: 게임 결과 어댑터·Story의 게임 전용 진행 버튼 숨기기·조용한 완료 자세, 결과 버튼 배치와 저장 Canvas/StageResult/GameOver 연결, 관련 검사·동작 문서. 화면 배치 원본과 카드·후일담 순서는 재제작하지 않았다.
+
+| 수행한 확인 | 실제 결과 |
+| --- | --- |
+| 저장 UI 연결·컴파일 | PASS — `GameStageStoryUpgrade.Connect` 최종 batch 실행 종료 코드0. 같은 StoryPageFit 아래 결과 버튼·새 관람 버튼과 두 Scene의 참조를 Unity API로 저장. Scene/Prefab YAML 수동 수정 없음. |
+| EditMode | **26/26 PASS, 실패0, 건너뜀0**(0.78초). `GameStageStoryAssetTests`, `StageStoryAssetTests`, `GameStageResultViewTests`. 저장 참조·비활성 Next·게임용 인라인 숨김과 제작용 미리보기 유지 확인. |
+| PlayMode | **48/48 PASS, 실패0, 건너뜀0**(97.24초). `GameSceneFlowTests`25개, `GameStageRetryPlayModeTests`2개, `GameStageStoryPresentationTests`5개, `StoryResultPresentationTests`9개, `GameDeveloperTapTargetTests`7개. |
+| 승리·SKIP·관람 | 정상 후일담 끝의 같은 마지막 컷 유지, 후일담 중간 SKIP 시 같은 인스턴스 유지, 인라인 Next 숨김, 원본 카드 관람/관람 복귀·전체 기록 복귀와 엔딩 단일 버튼 확인. 봉인 카드를 다시 Play하지 않음. |
+| 빠른 SKIP 입력·효과음 | 실제 카드의 입장0.42초·클릭 허용0.63초 경계를 반영해 조용한 완료 자세 뒤 Raycast로 카드 뒤집기·관람 클릭 확인. 새 AudioSource와 지연 cue 재생 없음. 일반 재생의 cue는 유지. |
+| 진행 권한·재도전 | 결과/타 참가자 이야기/관람 대기, 마지막 포인터 해제, Host 진행 권한·중복 전환 차단, 원본 실패 재도전/나가기 경로, 같은 방·참가자·설정·이전 성공 기록 유지 검사를 통과. 이 항목의 다중 참가자는 자동 검사 상태/메시지 조건이며 실제 여러 Mac 프로세스 연결 검증은 아님. |
+| Mac 개발 빌드 | PASS — `GameBuild.Mac`의 Development 빌드 성공, `Builds/Hapio/20261108-191346-dad8f4fc/macOS/Hapio-Development.app`. 임시 백그라운드 실행은 빌드에만 켜고 원본 PlayerSettings는 false로 저장·복원. 앱은 실행하지 않음. |
+| 변경 범위·정리 | C#/Markdown `git diff --check` 통과. 전체 변경은 Unity가 만든 빈 `m_Name: `6줄을 제외한 공백 검사(`core.whitespace=-blank-at-eol`을 명령에만 적용) 통과. Home/Lobby/Battle·Lab·머터리얼·패키지·ProjectSettings는 변경 없음. 검증용 Editor 종료 확인. |
+
+실행 이력: 첫 Connect는 저장 이후 빈 초기 batch Scene 설정 복원에서 `Invalid SceneManagerSetup`으로 종료했다. 빈 경로 setup을 복원하지 않고 원래 active Scene을 보존하도록 수정한 뒤 최종 Connect를 다시 실행해 성공했다. 실패한 최초 실행은 PASS에 포함하지 않았다. NUnit 결과의 실제 실행 건수와 실패0을 확인했으며 검사 파일의 존재만으로 통과를 기록하지 않았다.
+
+미실행: 사용자가 **자동 검사까지만 진행**을 선택하여 Mac 다중 프로세스 연결·화면 비교를 실행하지 않았다. iOS 빌드·실기기 터치·일반 Wi-Fi/핫스팟 및 전체 프로젝트 EditMode/PlayMode 모음도 미실행이다. 저장 연결·자동 입력 검사는 실제 기기 화면의 미관/레이아웃 검증을 대신하지 않는다.
+
+
+### #566 PR 전 전체 회귀 검사
+
+- 기준 main은 원격 재확인 후에도 `fbe6f67c`였다. Unity6000.6.5f1 / macOS 기본 batch에서 필터 없이 **전체 EditMode 2089/2089 PASS(16.28초), 전체 PlayMode 706/706 PASS(528.52초)**를 확인했다. 두 실행 모두 실패·생략·Inconclusive0이며 앞 절 초기 관련 검사 집계와 중복 합산하지 않는다. 위 초기 범위의 전체 모음 미실행 상태는 이 추가 실행으로 갱신한다.
+- 최종 독립 리뷰에서 원본 관람 캡션의 실제 문구가 `봉인 박 둘러보기`인데 비활성 표시 바인딩이 `봉인 박 관람`으로 찾던 오류를 발견했다. 기능 권한은 유지한 채 검색 문구만 맞췄다. 전체 검사 이후의 이 한 줄 수정에는 `SavedStorySkipAndEndingButtonsReceiveRealMouseClicksAtTheirVisibleScreenPositions`와 `StoryResultPresentationTests`를 다시 실행해 **10/10 PASS(5.09초), 실패·생략·Inconclusive0**를 확인했다. Mac 빌드 성공 기록은 이 캡션 문구 보완 이전 소스에서의 결과이며 재빌드·앱 실행을 추가하지 않았다.

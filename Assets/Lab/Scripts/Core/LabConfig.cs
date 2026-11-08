@@ -1489,7 +1489,10 @@ namespace C6Lab
         public int YaguangFlashShakeCount => Mathf.Clamp(yaguangFlashShakeCount, 2, 18);
         /// <summary>콤보를 야광귀 셈법(하나 둘 셋 넷)으로 보여주는지 (#271). 화면 표시만 바꾼다.</summary>
         public bool ComboYaguangCountEnabled => comboYaguangCountEnabled;
-        public LabOrbAppearance OrbAppearance => orbAppearance;
+        [System.NonSerialized] private LabOrbAppearance orbPresentationOverride;
+        public LabOrbAppearance OrbAppearance => orbPresentationOverride != null ? orbPresentationOverride : orbAppearance;
+        /// <summary>Local art override only; never serialized into the source asset or shared numeric settings.</summary>
+        public void SetOrbPresentationOverride(LabOrbAppearance value) => orbPresentationOverride = value;
         /// <summary>DEV 소리 크기의 기본값. 이 값이면 Inspector 값을 그대로 쓴다.</summary>
         public const float DevVolumeDefault = 50f;
 

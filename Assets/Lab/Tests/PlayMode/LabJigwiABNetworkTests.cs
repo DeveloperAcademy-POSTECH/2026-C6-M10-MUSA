@@ -30,6 +30,11 @@ namespace C6Lab.Tests
             LabConfig source = Resources.Load<LabConfig>("LabConfig");
             Assert.That(source, Is.Not.Null);
             config = Object.Instantiate(source); // Keep the actual saved game throw profile (g30 / speed12.5), not code defaults.
+            // These owner-header/projection fixtures retain the #509 A5/B25 policy and immediate A burn.
+            // Pin only the cloned policy; #540's saved Flow schedule and held-burn gameplay stay unchanged.
+            JsonUtility.FromJsonOverwrite("{\"jigwiFlowSchedule\":false,\"jigwiAHoldBurnUntilEnd\":false}", config);
+            Assert.That(config.JigwiFlowSchedule, Is.False);
+            Assert.That(config.JigwiAHoldBurnUntilEnd, Is.False);
             float[] values = config.CaptureDeveloperValues();
             values[3] = 1000f; values[4] = 100f; values[5] = 1f; values[6] = 0f; values[7] = 1f;
             values[9] = 100f; values[10] = 120f; values[155] = values[184] = values[166] = values[207] = values[208] = 0f;
@@ -294,7 +299,9 @@ namespace C6Lab.Tests
             Assert.That(replica.TryApply(malformed, out error), Is.False);
             Assert.That(replica.LatestSequence, Is.EqualTo(1));
 
-            LabBoardFrame cleared = publisher.Build(model.Snapshot(21d), owner, 2, 3);
+            // #540: only an approved talisman clears this owner's burn; failed A expiry schedules a later burn instead.
+            Assert.That(model.TryCompleteJigwiTalisman(owner, snapshot.jigwiAB.rounds[0].id, 5.5d), Is.True);
+            LabBoardFrame cleared = publisher.Build(model.Snapshot(5.5d), owner, 2, 3);
             Assert.That(cleared.states.Single(item => item.id == orb.id).jigwiABBurnAt, Is.EqualTo(-1d));
             Assert.That(replica.TryApply(cleared, out error), Is.True, error);
             Assert.That(replica.TryGetState(orb.id, out copied), Is.True);

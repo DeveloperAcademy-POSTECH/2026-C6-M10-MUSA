@@ -196,6 +196,7 @@ namespace C6Lab
 
         private void ResetBulkTransport()
         {
+            ClearDeferredTerminalSnapshots();
             bulkSenders.Clear(); peerPaintPublishers.Clear(); paintPublishCache.Clear();
             peerSharedRounds.Clear(); bulkReceiver.Clear(); bulkMessages.Clear();
             paintCheckpointThrough.Clear(); bulkAckRepeatFrame = -1;

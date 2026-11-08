@@ -30,6 +30,8 @@ namespace Hapio
             public BackgroundSet background = new BackgroundSet();
         }
 
+        public const int TerritoryArtStage = 2;
+
         public BackgroundSet defaultBackground = new BackgroundSet();
         public StageOverride[] stageOverrides = Array.Empty<StageOverride>();
         public int AppliedStage { get; private set; }
@@ -44,7 +46,13 @@ namespace Hapio
 
         private void RefreshFromSession()
         {
-            ApplyStage(session != null && !session.IsTerritory ? session.State.stageIndex : 1);
+            ApplyStage(PresentationStage(session));
+        }
+
+        internal static int PresentationStage(GameSession session)
+        {
+            if (session == null) return 1;
+            return session.IsTerritory ? TerritoryArtStage : session.State.stageIndex;
         }
 
         public BackgroundSet Resolve(int stageIndex)
@@ -63,6 +71,15 @@ namespace Hapio
             foreach (StageOverride entry in stageOverrides)
                 if (entry != null && entry.background != null && !ReferenceEquals(entry.background, defaultBackground))
                     entry.background.SetVisible(ReferenceEquals(chosen, entry.background));
+            if (stageIndex == TerritoryArtStage && session != null && chosen.studio != null)
+            {
+                foreach (var decoration in chosen.studio.decorations)
+                {
+                    if (decoration?.png == null || decoration.png.name != "Moon" || decoration.group == null) continue;
+                    decoration.group.gameObject.SetActive(decoration.visible && !session.IsTerritory);
+                    break;
+                }
+            }
             AppliedStage = stageIndex;
         }
 
