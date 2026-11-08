@@ -16,7 +16,7 @@ namespace C6Lab
         private float jigwiBReadySentAt = float.NegativeInfinity;
         /// <summary>#551 나무 물통: 당기기 요청 패킷 종류. firstId에 B 회차 id.</summary>
         public const string JigwiBPullPacket = "jigwiBPull";
-        private string jigwiBucketPulledRound; // round id + 3-2-1 start: one pull per 3-2-1
+        private string jigwiBucketPulledRound; // the bucket round this device already poured
         private float jigwiBucketPullSentAt = float.NegativeInfinity;
 
         /// <summary>#551 나무 물통: 지금 내가 참여 중인 물통 B (아니면 null). 화면이 손잡이/밧줄을 그릴 때 쓴다.</summary>
@@ -26,23 +26,19 @@ namespace C6Lab
         }
 
         /// <summary>
-        /// #551 나무 물통: 폰을 내 쪽으로 홱 젖혔다. "당겨!" 뒤 당기기 시간 안에서만 Host에 보낸다.
-        /// 3-2-1 한 번에 한 번. 보냈으면 true.
+        /// #551 나무 물통 (개별): 폰을 좌우로 3번 출렁여 내 양동이를 쏟았다. B가 진행 중일 때 한 번만 Host에 보낸다. 보냈으면 true.
         /// </summary>
         public bool RequestJigwiBucketPull()
         {
             if (!IsConnected || !CanProcessBattleActions || latest == null || latest.paused) return false;
-            double now = JigwiABPresentationTime;
             LabJigwiABRound round = MyJigwiBucket;
-            if (round == null || round.countdownAt < 0d || now < round.GoAt
-                || now > round.GoAt + round.PullSeconds || jigwiBucketPulledRound == PullKey(round)) return false;
-            jigwiBucketPulledRound = PullKey(round);
+            if (round == null || jigwiBucketPulledRound == round.id) return false;
+            jigwiBucketPulledRound = round.id;
             SendJigwiBucketPull(round.id);
             return true;
         }
-        private static string PullKey(LabJigwiABRound round) => round.id + "@" + round.countdownAt.ToString("R");
-        /// <summary>#551 나무 물통: 이번 3-2-1에서 이 기기가 이미 당겼는지.</summary>
-        public bool JigwiBucketPulledThisCount(LabJigwiABRound round) => round != null && jigwiBucketPulledRound == PullKey(round);
+        /// <summary>#551 나무 물통: 이 기기가 이 회차 양동이를 이미 쏟았는지(Host 스냅샷이 오기 전에도).</summary>
+        public bool JigwiBucketPulledThisCount(LabJigwiABRound round) => round != null && jigwiBucketPulledRound == round.id;
         private void SendJigwiBucketPull(string roundId)
         {
             jigwiBucketPullSentAt = Time.unscaledTime;
@@ -55,7 +51,7 @@ namespace C6Lab
             if (latest == null || latest.phase != LabPhase.Playing || latest.jigwiAB?.enabled != true) return null;
             LabJigwiABRound round = latest.jigwiAB.Active(now);
             if (round == null || round.kind != LabJigwiABKind.GroupFire || !round.Active(now)
-                || round.syncWindowSeconds <= 0f) return null; // the countdown rule runs only with the new window
+                || round.syncWindowSeconds <= 0f && !round.bucket) return null; // the countdown rule runs only with the new window
             foreach (var seat in round.players ?? System.Array.Empty<LabJigwiABPlayerFire>())
                 if (seat != null && seat.playerId == LocalPlayerId) return round;
             return null;
@@ -102,11 +98,10 @@ namespace C6Lab
             Request(new LabNetworkPacket { type = JigwiBReadyPacket, requestId = ++requestSequence, firstId = round.id, accepted = holding });
         }
 
-        /// <summary>#551: a pull the Host has not counted yet is sent again every 0.2 s while the pull window lasts.</summary>
+        /// <summary>#551: a pour the Host has not counted yet is sent again every 0.2 s while B runs.</summary>
         private void ResendJigwiBucketPull(LabJigwiABRound round, double now)
         {
-            if (jigwiBucketPulledRound != PullKey(round) || round.countdownAt < 0d
-                || now > round.GoAt + round.PullSeconds || Time.unscaledTime - jigwiBucketPullSentAt < .2f) return;
+            if (jigwiBucketPulledRound != round.id || Time.unscaledTime - jigwiBucketPullSentAt < .2f) return;
             foreach (var seat in round.players)
                 if (seat != null && seat.playerId == LocalPlayerId && seat.launchedAt < 0d) { SendJigwiBucketPull(round.id); return; }
         }

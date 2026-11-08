@@ -43,16 +43,10 @@ namespace C6Lab
         public const double ReleaseSeconds = 1d;
         /// <summary>#551: with the countdown, every picked hit must land within this long of the first.</summary>
         public const float CountdownSyncWindowSeconds = 1.5f;
-        /// <summary>#551 나무 물통: the bucket lands at activeAt and is lifted this long before the first 3-2-1.</summary>
-        public const double BucketLiftSeconds = 1.5d;
-        /// <summary>#551 나무 물통: 3-2-1 one beat every second, then "당겨!".</summary>
-        public const double BucketCountdownSeconds = 3d;
-        /// <summary>#551 나무 물통: after "당겨!" every picked seat must tilt within this long.</summary>
-        public const double BucketPullSeconds = 2.5d;
-        /// <summary>#551 나무 물통: how many seats pull the ropes (everyone at once was too hard): 2, or 1 when playing alone.</summary>
-        public static int BucketPickCount(int seats) => seats <= 0 ? 0 : Math.Min(2, seats);
-        /// <summary>#551 나무 물통: someone was late — the bucket clunks down, then the next 3-2-1 starts this long later.</summary>
-        public const double BucketRetrySeconds = 2d;
+        /// <summary>#551 나무 물통 (개별, 여우구슬처럼): each seat's bucket arrives this long after the previous seat's (random order).</summary>
+        public const double BucketStaggerSeconds = 1.5d;
+        /// <summary>#551 나무 물통: each seat has this long from its bucket's arrival to pour it; after that its board steams over.</summary>
+        public const double BucketSeatSeconds = 8d;
         /// <summary>#509: one synchronized hit by every picked seat is the whole B (one chance; a miss fails it).</summary>
         public const int GroupSyncRequired = 1;
 

@@ -108,7 +108,8 @@ namespace C6Lab
             double now = source.JigwiABPresentationTime;
             LabJigwiABRound round = snapshot != null && snapshot.phase == LabPhase.Playing && snapshot.jigwiAB?.enabled == true
                 ? snapshot.jigwiAB.Active(now) : null;
-            if (round == null || round.kind != LabJigwiABKind.GroupFire || !round.Active(now) || round.syncWindowSeconds <= 0f)
+            // #551 나무 물통 B has no 3-2-1 (LabJigwiBucketHandleView draws it).
+            if (round == null || round.kind != LabJigwiABKind.GroupFire || !round.Active(now) || round.syncWindowSeconds <= 0f || round.bucket)
             { Hide(); return; }
             Present(snapshot, round, source.LocalPlayerId, now);
         }
@@ -120,12 +121,9 @@ namespace C6Lab
             bool picked = false;
             foreach (var seat in round.players) if (seat != null && seat.playerId == localPlayer) picked = true;
             bool afterGo = round.countdownAt >= 0d && now >= round.GoAt;
-            // #551 나무 물통: the bucket and ropes show who holds; the handle view has its own hints.
-            DrawSeats(snapshot, round, localPlayer, now, !afterGo && !round.bucket);
-            DrawHoldHint(round, localPlayer, now, picked && !afterGo && !round.bucket);
-            DrawThrowHint(round, localPlayer, now, picked && afterGo && !round.bucket);
-            big.rectTransform.anchorMin = big.rectTransform.anchorMax = round.bucket ? new Vector2(afterGo ? .7f : .76f, .66f) : new Vector2(.5f, .74f);
-            big.fontSize = round.bucket ? (afterGo ? 90 : 110) : 220;
+            DrawSeats(snapshot, round, localPlayer, now, !afterGo);
+            DrawHoldHint(round, localPlayer, now, picked && !afterGo);
+            DrawThrowHint(round, localPlayer, now, picked && afterGo);
             if (round.countdownAt < 0d || now < round.countdownAt)
             {
                 // Waiting for everyone to hold: no number; a cancelled count simply disappears.
@@ -137,8 +135,7 @@ namespace C6Lab
             double t = now - round.countdownAt;
             double beatSeconds = round.CountdownLength / 3d;
             int beat = t < round.CountdownLength ? Mathf.Clamp((int)(t / beatSeconds), 0, 2) : 3;
-            // #551 나무 물통: no big "당겨!" — the tilt picture (LabJigwiBucketHandleView) shows how; the drum still sounds.
-            bool showing = beat < 3 || !round.bucket && t < round.CountdownLength + LabJigwiABTimeline.ReleaseSeconds + .3d;
+            bool showing = beat < 3 || t < round.CountdownLength + LabJigwiABTimeline.ReleaseSeconds + .3d;
             if (big.gameObject.activeSelf != showing) big.gameObject.SetActive(showing);
             if (beat > lastBeat && t < round.CountdownLength + 1d)
             {
@@ -151,7 +148,7 @@ namespace C6Lab
             }
             if (!showing) return;
             double since = beat < 3 ? t - beat * beatSeconds : t - round.CountdownLength;
-            big.text = beat < 3 ? (3 - beat).ToString() : round.bucket ? "당겨!" : "던져!";
+            big.text = beat < 3 ? (3 - beat).ToString() : "던져!";
             big.color = beat < 3 ? numberColor : goColor;
             // Each beat lands big and settles (a drum hit you can see).
             float punch = Mathf.Exp(-(float)since * 9f);

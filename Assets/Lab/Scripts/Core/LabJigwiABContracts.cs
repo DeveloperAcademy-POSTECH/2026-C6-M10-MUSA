@@ -56,14 +56,16 @@ namespace C6Lab
         public double countdownAt = -1d;
         /// <summary>#551: this B's sync window in seconds (0 = the #509 one second).</summary>
         public float syncWindowSeconds;
-        /// <summary>#551 나무 물통: every seat takes part, holds a handle (no special Water) and pulls together after "당겨!".</summary>
+        /// <summary>
+        /// #551 나무 물통 (개별, 여우구슬처럼 따로따로): every seat gets its own bucket at its own time (seat.readyAt = arrival,
+        /// staggered in a random order) and has BucketSeatSeconds to pour it by rocking the phone (launchedAt = when it poured).
+        /// No special Water, no 3-2-1. Everyone poured = completed; a seat that runs out gets its board steamed over (client).
+        /// </summary>
         public bool bucket;
-        /// <summary>#551 나무 물통: how many 3-2-1s were missed so far (each miss starts another while water is left).</summary>
-        public int attempts;
-        /// <summary>#551: 3-2-1 length (the bucket counts slower).</summary>
-        public double CountdownLength => bucket ? LabJigwiABTimeline.BucketCountdownSeconds : LabJigwiABTimeline.CountdownSeconds;
-        /// <summary>#551: how long after "던져!/당겨!" the action may come.</summary>
-        public double PullSeconds => bucket ? LabJigwiABTimeline.BucketPullSeconds : LabJigwiABTimeline.ReleaseSeconds;
+        /// <summary>#551: 3-2-1 length.</summary>
+        public double CountdownLength => LabJigwiABTimeline.CountdownSeconds;
+        /// <summary>#551: how long after "던져!" the throw may come.</summary>
+        public double PullSeconds => LabJigwiABTimeline.ReleaseSeconds;
         /// <summary>#551: how long after the first picked hit the others may land.</summary>
         public double SyncWindow => syncWindowSeconds > 0f ? syncWindowSeconds : LabJigwiABTimeline.GroupSyncWindowSeconds;
         /// <summary>#551: the "지금!" moment (-1 while the 3-2-1 has not started).</summary>
@@ -182,8 +184,7 @@ namespace C6Lab
                     if (round.resolvedAt != -1d || ++unresolved > 2) return false;
                 }
                 else if (round.resolvedAt < round.warningAt) return false;
-                if ((round.kind == LabJigwiABKind.PersonalBurn || !round.bucket) && round.attempts != 0
-                    || round.kind == LabJigwiABKind.PersonalBurn && round.bucket || round.attempts < 0 || round.attempts > 10) return false;
+                if (round.kind == LabJigwiABKind.PersonalBurn && round.bucket) return false;
                 if (round.kind == LabJigwiABKind.PersonalBurn
                     && (round.syncCount != 0 || round.syncWindowAt != -1d || round.syncResetAt != -1d)) return false;
                 if (round.kind == LabJigwiABKind.PersonalBurn)
@@ -239,11 +240,14 @@ namespace C6Lab
                 }
                 // #509: only the picked seats are listed (helpers are everyone else).
                 if (memberIds != null && round.resolution != LabJigwiABResolution.Skipped
-                    && owners.Count != (round.bucket ? LabJigwiABTimeline.BucketPickCount(memberIds.Count) : LabJigwiABTimeline.GroupPickCount(memberIds.Count))) return false;
-                // #551 나무 물통: a pull only after "당겨!" and within the pull window.
-                if (round.bucket && round.players.Any(player => player.launchedAt != -1d && (round.countdownAt < 0d
-                    || player.launchedAt < round.GoAt - .00001d
-                    || player.launchedAt > round.GoAt + round.PullSeconds + .00001d))) return false;
+                    && owners.Count != (round.bucket ? memberIds.Count : LabJigwiABTimeline.GroupPickCount(memberIds.Count))) return false;
+                // #551 나무 물통: no 3-2-1; each bucket arrives inside the stagger and is poured inside its own time.
+                if (round.bucket && (round.countdownAt != -1d
+                    || round.resolution == LabJigwiABResolution.Completed && round.players.Any(player => player.launchedAt < 0d)
+                    || round.players.Any(player => !Range(player.readyAt, round.activeAt,
+                        round.activeAt + LabJigwiABTimeline.BucketStaggerSeconds * (MaximumPlayers - 1) + .00001d)
+                        || player.launchedAt != -1d && !Range(player.launchedAt, player.readyAt - .00001d,
+                            player.readyAt + LabJigwiABTimeline.BucketSeatSeconds + .00001d)))) return false;
                 bool allOff = round.players.Length > 0 && round.players.All(player => player.targets.All(target => !target.lit));
                 if (round.resolution == LabJigwiABResolution.Completed && !allOff
                     || (round.resolution == LabJigwiABResolution.None || failed) && allOff) return false;
