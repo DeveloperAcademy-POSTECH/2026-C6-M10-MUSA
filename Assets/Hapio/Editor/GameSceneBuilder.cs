@@ -145,7 +145,15 @@ namespace Hapio.Editor
         }
 
         /// <summary>
-        /// Append only the new DEV rows (#281: 2:2 territory 196-199, #301: flash shake release 202-203; #305: charm warning 204) to Home and Lobby.
+        /// DEV rows saved in the Home/Lobby Scenes (#506). Fields from <see cref="LabConfig.ClayThicknessField"/> on
+        /// (clay thickness and gloss) are appended at runtime by <see cref="GameScreen.EnsureClayDeveloperRows"/>,
+        /// so no editor tool saves them.
+        /// </summary>
+        public static int SavedDeveloperRowCount => LabConfig.ClayThicknessField;
+
+        /// <summary>
+        /// Refresh the saved Home/Lobby DEV rows (labels, slider ranges, defaults) from the saved LabConfig and append
+        /// any saved row a Scene lacks. Rows from <see cref="SavedDeveloperRowCount"/> on stay runtime-only.
         /// This never copies or saves Battle, so Battle-only edits and the lobby layout stay as they are.
         /// </summary>
         [MenuItem("Hapio/Upgrade Menu DEV Rows")]
@@ -153,10 +161,11 @@ namespace Hapio.Editor
         {
             UpgradeMenuDeveloperSchema();
             AssetDatabase.SaveAssets();
-            Debug.Log("HAPIO_MENU_DEV_ROWS_READY: " + LabConfig.DeveloperFields.Count + " rows in Home and Lobby.");
+            Debug.Log("HAPIO_MENU_DEV_ROWS_READY: " + SavedDeveloperRowCount + " saved rows in Home and Lobby; "
+                + (LabConfig.DeveloperFields.Count - SavedDeveloperRowCount) + " more are added at runtime.");
         }
 
-        /// <summary>Append new DEV fields without regenerating either menu or its existing rows and layout.</summary>
+        /// <summary>Refresh the saved DEV rows without regenerating either menu or its layout.</summary>
         public static void UpgradeMenuDeveloperSchema()
         {
             UpgradeScene(GameScenePaths.Home, UpgradeDeveloperRows);
@@ -181,7 +190,7 @@ namespace Hapio.Editor
             var scroll = screen.developerPanel.GetComponentInChildren<UnityEngine.UI.ScrollRect>(true);
             if (scroll == null || scroll.content == null)
                 throw new InvalidOperationException("The saved menu DEV settings scroll is missing.");
-            int count = LabConfig.DeveloperFields.Count;
+            int count = SavedDeveloperRowCount;
             int existing = screen.developerInputs == null ? 0 : screen.developerInputs.Length;
             if (existing == 0 || existing > count || screen.developerSliders == null
                 || screen.developerSliders.Length != existing)
@@ -213,9 +222,9 @@ namespace Hapio.Editor
             var scroll = screen.developerPanel.GetComponentInChildren<UnityEngine.UI.ScrollRect>(true);
             if (scroll == null || scroll.content == null)
                 throw new InvalidOperationException("The saved menu DEV settings scroll is missing.");
-            int count = LabConfig.DeveloperFields.Count;
+            int count = SavedDeveloperRowCount;
             int existing = screen.developerInputs == null ? 0 : screen.developerInputs.Length;
-            if (existing > count || screen.developerSliders == null || screen.developerSliders.Length != existing)
+            if (screen.developerSliders == null || screen.developerSliders.Length != existing)
                 throw new InvalidOperationException("The saved DEV inputs and sliders have an incompatible schema.");
             // Validate first, so an unsupported custom row cannot leave a partially upgraded asset.
             for (int i = 0; i < existing; i++)
@@ -224,6 +233,9 @@ namespace Hapio.Editor
                     || screen.developerInputs[i].transform.parent.parent != scroll.content
                     || screen.developerInputs[i].transform.parent.Find("Label") == null)
                     throw new InvalidOperationException("The saved DEV row is incomplete: " + i);
+            // Rows from SavedDeveloperRowCount on are added at runtime; drop any that an older version of this tool saved.
+            for (int i = count; i < existing; i++)
+                UnityEngine.Object.DestroyImmediate(screen.developerInputs[i].transform.parent.gameObject);
             Array.Resize(ref screen.developerInputs, count);
             Array.Resize(ref screen.developerSliders, count);
             float[] values = AssetDatabase.LoadAssetAtPath<LabConfig>("Assets/Lab/Resources/LabConfig.asset").CaptureDeveloperValues();
@@ -253,7 +265,9 @@ namespace Hapio.Editor
             foreach (GameObject root in scene.GetRootGameObjects())
                 foreach (UnityEngine.UI.Text text in root.GetComponentsInChildren<UnityEngine.UI.Text>(true))
                 {
-                    if (text.GetComponentInParent<GameLobbyView>(true) != null) continue;
+                    // Prefab instances (the shared lobby, the Home opening) keep the fonts their prefab authored;
+                    // setting them here would save Scene overrides on that instance.
+                    if (text.GetComponentInParent<GameLobbyView>(true) != null || PrefabUtility.IsPartOfPrefabInstance(text)) continue;
                     text.font = font; EditorUtility.SetDirty(text);
                 }
         }
@@ -508,7 +522,7 @@ namespace Hapio.Editor
             var heading = Label("Title", panel, "DEVELOPMENT · SESSION SETTINGS", 19);
             Rect(heading.rectTransform, new Vector2(.05f, .9f), new Vector2(.95f, .97f), Vector2.zero, Vector2.zero);
             RectTransform content = Scroll("SettingsScroll", panel, .035f, .2f, .965f, .9f);
-            int count = LabConfig.DeveloperFields.Count;
+            int count = SavedDeveloperRowCount;
             s.developerInputs = new UnityEngine.UI.InputField[count]; s.developerSliders = new UnityEngine.UI.Slider[count];
             float[] values = AssetDatabase.LoadAssetAtPath<LabConfig>("Assets/Lab/Resources/LabConfig.asset").CaptureDeveloperValues();
             for (int i = 0; i < count; i++)
