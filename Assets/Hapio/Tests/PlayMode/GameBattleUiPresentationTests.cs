@@ -48,6 +48,7 @@ namespace Hapio.Tests
                 Assert.That(ui.BoardArtwork.texture,Is.SameAs(ui.Theme.BoardFor(stage)));
                 var composite=bindings.hud.GetComponent<LabOrbHudComposition>();
                 Assert.That(composite.presentationBackdrop,Is.SameAs(ui.BoardArtwork.rectTransform));
+                Assert.That(composite.IsCompositing,Is.True,composite.InitializationError);
                 if (composite.IsCompositing)
                 {
                     Assert.That(ui.BoardArtwork.enabled,Is.True);

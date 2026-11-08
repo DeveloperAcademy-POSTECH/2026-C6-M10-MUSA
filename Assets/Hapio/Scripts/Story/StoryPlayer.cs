@@ -30,6 +30,9 @@ namespace Hapio
         public UnityEvent onCompleted = new UnityEvent();
         public UnityEvent onSkipped = new UnityEvent();
         public event Action<StoryExitReason> Finished;
+        public event Action<StoryCutView> ViewChanged;
+        public bool UserInputBlocked { get; private set; }
+        public void SetInputBlocked(bool value) => UserInputBlocked = value;
 
         public int CurrentCutIndex { get; private set; } = -1;
         public int CurrentPageIndex { get; private set; } = -1;
@@ -145,7 +148,7 @@ namespace Hapio
 
         private bool AcceptUserInput()
         {
-            if (!IsPlaying) return false;
+            if (!IsPlaying || UserInputBlocked) return false;
             if (touchOnly)
             {
                 if (StoryTapAdvance.PressedTouchCount > 0) suppressMultiTouch = true;
@@ -244,6 +247,7 @@ namespace Hapio
             SetDialogueVisible(false);
             UpdatePreviousButton();
             ReleaseView(previousView);
+            ViewChanged?.Invoke(currentView);
         }
 
         private void BeginReading()

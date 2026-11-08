@@ -1,5 +1,50 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-08 — #558 스테이지 스토리·새 UI와 같은 방 재도전 통합
+
+- **기준:** main `886e65db`, #556 `dc2c0e82`, #553 `58079a69`. 두 PR의 원본 이력을 순서대로 병합하고 실제 게임 연결을 추가했다. 문서 충돌은 양쪽 검증 기록을 보존했다.
+- **환경:** Unity 6000.6.5f1, macOS·Metal, Standalone 활성 플랫폼의 live Editor. 기존 프로젝트와 분리한 작업 위치를 사용했으며 Editor는 `-noaudio`로 실행했다. 아래 결과는 이 작업에서 실제 실행한 검사이며 두 원본 PR의 작성자 기록과 구분한다.
+
+### 자동 검사
+
+| 실행 | 실제 결과 | 후속 처리 |
+| --- | --- | --- |
+| 첫 전체 EditMode | 2,081개 중 2,077 통과·4 실패 | 전송 검사 시계, 실패 Scene의 관람 참조 전제, Home/Lobby DEV240 표시값 차이 수정 |
+| 수정 후 전체 EditMode | **2,081/2,081 통과** | 실패 0·건너뜀 0 |
+| 첫 전체 PlayMode | 685개 중 676 통과·9 실패 | 지귀 검사 조건 8건과 클레이 검사 대기 1건을 아래처럼 구분해 재실행 |
+| `LabJigwiABNetworkTests` 최종 재실행 | **9/9 통과** | 복제 설정에서 구형 시간표·즉시 소각 정책을 명시. 소각 해제 복제는 실제 부적 완료 승인 경로로 확인 |
+| `GameJigwiStageIntegrationTests` | **1/1 통과** | 실제 저장 설정의 새 시간표에서 A·B 확인 시각을 계산. 게임 시간표는 되돌리지 않음 |
+| `GameBattleUiPresentationTests` | **2/2 통과** | 일반 세 스테이지에서도 조합판 합성 성공을 필수 단언하도록 강화 |
+| `ClayPreviewPlayModeTests.FiveActualRgbEditorsClampSrgbExactlyAndKeepPaletteAcrossPresetsWithIndependentReset` | **1/1 통과** | 첫 실행에서 Game 뷰가 비활성화돼 180초 제한을 넘김. 활성 Game 뷰에서 같은 검사는 9.79초에 완료 |
+| 추가 `GameSceneFlowTests.SavedStorySkipAndEndingButtonsReceiveRealMouseClicksAtTheirVisibleScreenPositions` | **1/1 통과** | 저장 결과 화면에서 GraphicRaycaster 최상위 대상과 실제 가상 마우스 이동·누름·뗌으로 Skip→카드→엔딩→Home 확인. 직접 이벤트 호출로 대체하지 않음 |
+
+첫 전체 PlayMode에서는 `GameSceneFlowTests` 22개, `GameStageRetryPlayModeTests` 2개, `GameStageStoryPresentationTests` 3개, `GameLobbyViewTests` 13개가 모두 통과했다. 기존 `StoryPlayerTests` 11개·`StoryResultPresentationTests` 9개·`StoryTapAdvanceTests` 4개도 통과했다. 여기에는 카드 실제 기록·실패 실제 봉인율·이전 성공 기록 보존·같은 방 재도전 초기화·전원 결과/관람 게이트·패배 뒤 연결 종료 fallback·최종 6컷 엔딩·입력 해제 보호가 포함된다.
+
+**수정 후 전체 PlayMode 685개를 다시 실행한 결과로 표현하지 않는다.** 전체 실행에서 발견한 실패를 관련 묶음으로 재검사했고, 마지막 실제 포인터 검사 1개를 별도로 추가했다. 현재 확인된 미해결 검사 실패는 없다.
+
+### 실패 원인과 보존 범위
+
+- `LabTerminalSnapshotCatchupTests`는 실제 큐 삽입 시각보다 이른 가상 시각 1초로 전송을 요청했다. 검사 시계를 실제 시각 이후로 맞췄다. 최종 전체 EditMode에서 비어 있지 않은 도색 지도·Defeat 스냅샷의 정확한 복구와 새 라운드 누출 방지를 확인했다.
+- GameOver에는 원래 완성 박 관람 참조가 없다. 실패 화면을 승리 화면과 같은 관람 참조 조건으로 검사하던 새 검사를 실제 연결에 맞췄다.
+- main의 실제 A 지속시간은 10초인데 Home/Lobby에 저장된 DEV240 표시값은 15였다. Unity API로 해당 Text/InputField/Slider만 10으로 맞췄다. 원본 설정과 Scene의 위치·크기는 변경하지 않았다.
+- 지귀의 구형 네트워크 검사는 저장 설정을 복제한 뒤 예전 시간표와 A 중 소각을 가정했다. 최신 main은 A10/B45/A66/B83과 A 중 소각 보류를 사용한다. 구형 호환 검사에만 해당 정책을 명시했고, 실제 게임 Scene 검사는 최신 시간표를 검증한다. 실패 만료는 소각 해제가 아니므로 마지막 owner-delta 해제 검사는 실제 부적 완료 승인을 사용한다.
+- 검사 중 자동 변경된 지귀 리본 재질의 `_NORMALMAP` 제거는 원본으로 복원해 통합에서 제외했다. Lab Scene·Battle Scene·Packages·ProjectSettings와 게임 판정·도색 압축·Bulk 선택 ACK 형식은 변경하지 않았다.
+
+### 빌드와 Editor 화면 확인
+
+- `Hapio > Development Build > Build Mac App` 경로로 **Mac 개발 빌드 성공**(빌드 호출 57.6초). 출력은 `Builds/Hapio/20261108-155628-5341e594/macOS/Hapio-Development.app`이다. Home·Lobby·공통 Battle·StageResult·GameOver 5개 Scene을 포함하며 제작용 StageStoryPreview Scene은 포함하지 않는다.
+- Editor의 C6 Portrait(390×844)에서 새 전투 UI와 지귀 봉인 카드의 앞·뒷면을 확인했다. 실제 종료 기록의 100%·남은 30초와 기록이 표시됐고, 카드의 박 관람 버튼으로 기존 3D 관람 화면을 열었다가 같은 카드 뒷면으로 복귀했다.
+- 이 시각 확인은 기존 Editor DEV 솔로 시작단계(3)를 유지하고, 임시 복사 설정의 최초 도색량100%·마르기OFF로 결과를 준비한 것이다. 실제 투척 명중이나 일반 경기 클리어 시험으로 기록하지 않는다. 원본 설정에 저장하지 않았다.
+- 네이티브 자동 클릭의 상하단 버튼 전달이 일관되지 않아, 위 추가 PlayMode 검사에서 실제 UI 입력 경로와 레이캐스트 대상으로 별도 확인했다. 실제 입력 검사는 6컷 엔딩 뒤 진짜 Home 복귀까지 통과했다.
+- 작업 완료 후 기존 Unity·Hub·검증 앱과 통합용 Editor를 종료했다. 빌드 앱을 추가 실행하지 않았다.
+
+### 이번에 실행하지 않은 항목
+
+- iPhone/iPad 설치·실기기 터치·노치/회전·오디오 청취.
+- Mac 독립 실행 앱의 플레이, 실제 LAN/일반 Wi-Fi/핫스팟에서 여러 기기 연결과 원격 결과 확인.
+- 위 항목은 기존 검증 기록이나 코드 존재로 PASS를 대신하지 않는다. 현재 호환 묶음은 설정259개·5691·Lab52·**Game39**다.
+
+
 ## 2026-11-07 — ClayPreview 높이 EXR의 iOS 가져오기 (main에서 계속 실패하던 검사 1건)
 
 - **기준:** main `d640e0ef` 위의 `fix/clay-preview-exr-hash`(수정 `9fdf0996`, 검토 반영 `5f62e01d`). Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). Library는 끝난 worktree에서 복제했고, 원래 폴더처럼 활성 플랫폼이 iOS다. 같은 Mac에서 다른 폴더의 Unity Editor가 열려 있었다.

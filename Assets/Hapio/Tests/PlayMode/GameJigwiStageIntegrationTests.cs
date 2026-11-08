@@ -131,11 +131,17 @@ namespace Hapio.Tests
             clock = (LabBattleClock)Field("battleClock").GetValue(network);
             model = (LabModel)Field("model").GetValue(network);
             startedAt = before.jigwiAB.startedAt;
-            HoldAt(11.2d);
+            Assert.That(before.jigwiAB.schedule, Is.EqualTo(LabJigwiABTimeline.FlowSchedule),
+                "The saved main profile runs #540's A10/B45/A66/B83 schedule.");
+            Assert.That(network.config.JigwiAHoldBurnUntilEnd, Is.True,
+                "The saved main profile preserves the board while the talisman is being written.");
+            double aProbe = LabJigwiABTimeline.ActiveOffset(0, before.jigwiAB.schedule) + 1.2d;
+            double bProbe = LabJigwiABTimeline.ActiveOffset(1, before.jigwiAB.schedule) + 6.2d;
+            HoldAt(aProbe);
             yield return null;
             Assert.That(network.Snapshot.paused, Is.True);
-            Assert.That(clock.Now(Time.realtimeSinceStartupAsDouble), Is.EqualTo(startedAt + 11.2d).Within(.00001d));
-            LabJigwiABRound a = network.Snapshot.jigwiAB.Active(startedAt + 11.2d);
+            Assert.That(clock.Now(Time.realtimeSinceStartupAsDouble), Is.EqualTo(startedAt + aProbe).Within(.00001d));
+            LabJigwiABRound a = network.Snapshot.jigwiAB.Active(startedAt + aProbe);
             Assert.That(a, Is.Not.Null); Assert.That(a.kind, Is.EqualTo(LabJigwiABKind.PersonalBurn));
             Assert.That(overlay.PersonalHeatVisible, Is.False, "#479: A has no screen heat or edge flames.");
             Assert.That(overlay.VisibleScreenFires, Is.Zero);
@@ -146,12 +152,12 @@ namespace Hapio.Tests
             Assert.That(hud.testToggle.gameObject.activeInHierarchy, Is.False);
             AssertNoOldSurfacePresentation();
 
-            HoldAt(31.2d);
+            HoldAt(bProbe);
             // The same clock stays held across the forward seek; no real-time Update can roll it back.
             Method("SyncJigwiFireSurfaces").Invoke(network, null);
             yield return null;
             LabSnapshot current = network.Snapshot;
-            LabJigwiABRound b = current.jigwiAB.Active(startedAt + 31.2d);
+            LabJigwiABRound b = current.jigwiAB.Active(startedAt + bProbe);
             Assert.That(b, Is.Not.Null); Assert.That(b.kind, Is.EqualTo(LabJigwiABKind.GroupFire));
             // #509: a solo room picks its only seat; B is judged on the boss itself, with no fire art or colliders.
             Assert.That(b.players.Single().playerId, Is.EqualTo(network.LocalPlayerId));
@@ -179,7 +185,7 @@ namespace Hapio.Tests
             // #509: solo is the test room — its one special Water on the boss is the whole B.
             ThrowSpecialWaterAtBoss(b.id);
             PublishFireState(); yield return null;
-            HoldAt(31.4d); yield return null;
+            HoldAt(bProbe + .2d); yield return null;
             CaptureScreenEvidence("2"); yield return null;
             Assert.That(network.Snapshot.jigwiAB.rounds.Single(round => round.id == b.id).resolution,
                 Is.EqualTo(LabJigwiABResolution.Completed));
@@ -188,9 +194,9 @@ namespace Hapio.Tests
             Assert.That(model.PaintSurface.CoveredCount, Is.GreaterThan(paintedBefore), "The success splash paints the boss.");
             Assert.That(target.Hitbox.sharedMesh, Is.SameAs(shell));
             network.LocalStaminaSpent -= onSpent;
-            HoldAt(35d); yield return null;
+            HoldAt(bProbe + 3.8d); yield return null;
             CaptureScreenEvidence("0"); yield return null;
-            TestContext.WriteLine("JIGWI_AB_SAVED_STAGE3: Home/DEV skips/A11.2/B31.2/no B colliders/one special Water clears solo B. "
+            TestContext.WriteLine("JIGWI_AB_SAVED_STAGE3: Home/DEV skips/#540 A10/B45 probes/no B colliders/one special Water clears solo B. "
                 + "Screen Space Overlay GPU pixels are not sampled by camera.Render; device/GPU visual review is separate.");
         }
 

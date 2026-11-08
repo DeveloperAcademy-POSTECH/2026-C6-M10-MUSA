@@ -12,6 +12,23 @@ namespace Hapio.Tests
     {
         private const string PrefabPath = "Assets/Hapio/Art/UI/GameLobby.prefab";
 
+        [TestCase(2, true, "땅따먹기 시작")]
+        [TestCase(4, true, "땅따먹기 시작")]
+        [TestCase(6, true, "땅따먹기 시작")]
+        [TestCase(3, false, "요괴 봉인 시작")]
+        public void ReadyHostUsesTheActualModeOnTheSavedSeatButton(int capacity, bool territory, string expected)
+        {
+            GameObject contents = PrefabUtility.LoadPrefabContents(PrefabPath);
+            try
+            {
+                GameLobbyView view = contents.GetComponent<GameLobbyView>();
+                foreach (var button in view.slotButtons) button.gameObject.SetActive(false);
+                view.seatDesign.Present(view, capacity, territory, false, true, true);
+                Assert.That(view.sealButton.GetComponentInChildren<UnityEngine.UI.Text>().text, Is.EqualTo(expected));
+            }
+            finally { PrefabUtility.UnloadPrefabContents(contents); }
+        }
+
         [Test]
         public void SharedFigmaPrefabOwnsOnlyEditablePresentationAndCompleteScrollAndSeatLayouts()
         {

@@ -57,7 +57,7 @@ namespace Hapio
             view.sealButton.targetGraphic.color = start ? GameLobbySeatColors.Ready : GameLobbySeatColors.Disabled;
             var text = view.sealButton.GetComponentInChildren<Text>();
             text.fontSize = 20; text.color = GameLobbySeatColors.LightText;
-            if (start) text.text = "요괴 봉인 시작";
+            if (start) text.text = team ? "땅따먹기 시작" : "요괴 봉인 시작";
             else if (!allChosen) text.text = team ? "땅따먹기 대기 중" : "요괴 봉인 대기";
         }
 
