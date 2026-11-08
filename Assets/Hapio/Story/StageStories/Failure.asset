@@ -1,0 +1,18 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4bae6e6b969784f88aaed65c04d155b1, type: 3}
+  m_Name: Failure
+  m_EditorClassIdentifier: Hapio.Runtime::Hapio.StorySequence
+  storyId: stage-story-Failure
+  cuts:
+  - {fileID: 11400000, guid: ab0c64e9a0a3440bca3bd13d17d820a8, type: 2}
+  - {fileID: 11400000, guid: d277b11a20da340819025071d5509895, type: 2}

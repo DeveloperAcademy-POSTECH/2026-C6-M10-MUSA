@@ -402,5 +402,121 @@ namespace Hapio.Tests
             Assert.That(flow.DeveloperStartAt(2), Is.False, "It moves only once, from stage 1.");
             Assert.That(GameFlowSnapshot.IsValid(flow.State, out _), Is.True);
         }
+        [Test]
+        public void NormalDefeatRetriesOnlyTheFailedStageWithFreshBarriersAndSameRoster()
+        {
+            var flow = Run(0, 42);
+            var first = Play(flow, "battle", 11);
+            Assert.That(flow.MarkVictory(first.battleSessionId, first.battleRound), Is.True);
+            var won = flow.State;
+            Assert.That(flow.NextStage(won.runId, won.stageIndex, won.revision), Is.True);
+            var second = Play(flow, "battle", 12);
+            Assert.That(flow.MarkDefeat("other", second.battleRound, "Time ran out."), Is.False);
+            Assert.That(flow.MarkDefeat(second.battleSessionId, second.battleRound + 1, "Time ran out."), Is.False);
+            Assert.That(flow.MarkDefeat(second.battleSessionId, second.battleRound, "Time ran out."), Is.True);
+            var failed = flow.State;
+            Assert.That(failed.retryableDefeat, Is.True);
+            Assert.That(GameFlowSnapshot.IsValid(failed, out _), Is.True);
+            Assert.That(flow.MarkDefeat(second.battleSessionId, second.battleRound, "again"), Is.False);
+            Assert.That(flow.RetryFailedStage("old-run", 2, failed.revision), Is.False);
+            Assert.That(flow.RetryFailedStage(failed.runId, 1, failed.revision), Is.False);
+            Assert.That(flow.RetryFailedStage(failed.runId, 2, failed.revision - 1), Is.False);
+            Assert.That(flow.RetryFailedStage(failed.runId, 2, failed.revision), Is.True);
+            var load = flow.State;
+            Assert.That(load.phase, Is.EqualTo(GameFlowPhase.LoadingBattle));
+            Assert.That(load.runId, Is.EqualTo(second.runId));
+            Assert.That(load.stageIndex, Is.EqualTo(2));
+            Assert.That(load.retryableDefeat, Is.False);
+            Assert.That(load.endReason, Is.Empty);
+            Assert.That(load.battleSessionId, Is.Empty);
+            Assert.That(load.battleRound, Is.Zero);
+            Assert.That(load.battleStartsAt, Is.Zero);
+            Assert.That(flow.ParticipantIds, Is.EquivalentTo(new ulong[] { 0, 42 }));
+            Assert.That(flow.ReadyCount + flow.InitialStateReadyCount + flow.CountdownReadyCount, Is.Zero);
+            Assert.That(GameFlowSnapshot.TryAccept(failed, load, false, out _), Is.True);
+            Assert.That(flow.RetryFailedStage(failed.runId, 2, failed.revision), Is.False);
+            Assert.That(flow.MarkBattleReady(42, failed.runId, 2, failed.revision), Is.False);
+            Assert.That(flow.MarkVictory(second.battleSessionId, second.battleRound), Is.False);
+            var retried = Play(flow, "battle", 13);
+            Assert.That(retried.stageIndex, Is.EqualTo(2));
+            Assert.That(retried.battleRound, Is.EqualTo(13));
+            Assert.That(GameFlowSnapshot.TryAccept(load, failed, false, out _), Is.False);
+            Assert.That(flow.MarkVictory(second.battleSessionId, second.battleRound), Is.False);
+            Assert.That(flow.MarkVictory(retried.battleSessionId, retried.battleRound), Is.True);
+        }
+
+        [Test]
+        public void AbandonedAndTerritoryRunsCannotBecomeRetryableDefeats()
+        {
+            var flow = Run(0);
+            var play = Play(flow, "battle");
+            Assert.That(flow.Abort("A player left the game."), Is.True);
+            var over = flow.State;
+            Assert.That(over.retryableDefeat, Is.False);
+            Assert.That(flow.RetryFailedStage(over.runId, over.stageIndex, over.revision), Is.False);
+            Assert.That(flow.MarkDefeat(play.battleSessionId, play.battleRound, "Time ran out."), Is.False);
+            var territory = new GameRunFlow();
+            Assert.That(territory.EnterLobby(GameMode.Territory), Is.True);
+            Assert.That(territory.BeginRun(new ulong[] { 0, 42 }), Is.True);
+            var teamPlay = Play(territory, "team");
+            Assert.That(territory.MarkDefeat(teamPlay.battleSessionId, teamPlay.battleRound, "Time ran out."), Is.False);
+            Assert.That(territory.State.phase, Is.EqualTo(GameFlowPhase.Playing));
+            Assert.That(territory.ReturnToLobby("한 판이 끝났소."), Is.True);
+        }
+
+        [Test]
+        public void DisconnectAfterDefeatPermanentlyClosesThisRetryWindow()
+        {
+            var flow = Run(0, 42);
+            var play = Play(flow, "battle");
+            Assert.That(flow.MarkDefeat(play.battleSessionId, play.battleRound, "Time ran out."), Is.True);
+            var failed = flow.State;
+            Assert.That(flow.EndDefeatRetry("A player disconnected."), Is.True);
+            var ended = flow.State;
+            Assert.That(ended.retryableDefeat, Is.False);
+            Assert.That(GameFlowSnapshot.TryAccept(failed, ended, false, out _), Is.True);
+            Assert.That(flow.EndDefeatRetry("again"), Is.False);
+            Assert.That(flow.RetryFailedStage(ended.runId, ended.stageIndex, ended.revision), Is.False);
+            var fakeLoad = new GameFlowState { runId = ended.runId, stageIndex = ended.stageIndex,
+                revision = ended.revision + 1, phase = GameFlowPhase.LoadingBattle };
+            Assert.That(GameFlowSnapshot.TryAccept(ended, fakeLoad, false, out _), Is.False);
+            var reopen = failed.Copy(); reopen.revision = ended.revision + 1;
+            Assert.That(GameFlowSnapshot.TryAccept(ended, reopen, false, out _), Is.False);
+        }
+
+        [Test]
+        public void DefeatRetryReplicaRejectsSkippedBattlePhasesAndMalformedRetryFlags()
+        {
+            var flow = Run(0);
+            var play = Play(flow, "battle");
+            Assert.That(flow.MarkDefeat(play.battleSessionId, play.battleRound, "All players are down."), Is.True);
+            var failed = flow.State;
+            var loading = new GameFlowState { runId = failed.runId, stageIndex = failed.stageIndex,
+                revision = failed.revision + 1, phase = GameFlowPhase.LoadingBattle };
+            foreach (string changed in new[] { "run", "stage", "revision", "phase", "identity" })
+            {
+                var bad = loading.Copy();
+                switch (changed)
+                {
+                    case "run": bad.runId = "another"; break;
+                    case "stage": bad.stageIndex++; break;
+                    case "revision": bad.revision = failed.revision; break;
+                    case "phase": bad.phase = GameFlowPhase.SynchronizingBattle; bad.battleSessionId = "next"; bad.battleRound = 2; break;
+                    case "identity": bad.battleSessionId = "old"; bad.battleRound = 1; break;
+                }
+                Assert.That(GameFlowSnapshot.TryAccept(failed, bad, false, out _), Is.False, changed);
+            }
+            var illegal = loading.Copy(); illegal.retryableDefeat = true;
+            Assert.That(GameFlowSnapshot.IsValid(illegal, out _), Is.False);
+            illegal = failed.Copy(); illegal.mode = GameMode.Territory; illegal.totalStages = 1;
+            Assert.That(GameFlowSnapshot.IsValid(illegal, out _), Is.False);
+            illegal = failed.Copy(); illegal.battleSessionId = ""; illegal.battleRound = 0;
+            Assert.That(GameFlowSnapshot.IsValid(illegal, out _), Is.False);
+            var replica = new GameFlowReplica();
+            Assert.That(replica.Apply(failed, true, out _), Is.True);
+            Assert.That(replica.Apply(loading, false, out _), Is.True);
+            Assert.That(replica.Apply(failed, false, out _), Is.False);
+        }
+
     }
 }

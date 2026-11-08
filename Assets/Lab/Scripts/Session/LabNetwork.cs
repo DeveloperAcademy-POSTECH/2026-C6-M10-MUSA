@@ -1412,6 +1412,7 @@ namespace C6Lab
                 FlushPendingBlastReports(now);
                 FlushBoardActions(now);
             }
+            FlushDeferredTerminalSnapshots();
             TickPaintArt(now);
             FlushBulkPackets();
             if (!IsHost && latest != null) ExpirePresentedHits(BattlePresentationTime);
@@ -1723,33 +1724,7 @@ namespace C6Lab
             ApplyLocalPause(latest.paused);
             SyncBoard();
             long sequence = ++snapshotSequence;
-            foreach (ulong id in order)
-            {
-                if (id == manager.LocalClientId || BulkBacklogFull(id)) continue;
-                // A slow peer coalesces to the newest shared state, without holding up board actions or other peers.
-                var shared = LabBoardReplica.CopySnapshot(latest);
-                string roundKey = latest.sessionId + "/" + latest.round;
-                if (peerSharedRounds.TryGetValue(id, out string sentRound) && sentRound == roundKey)
-                {
-                    shared.orbs = Array.Empty<LabOrbState>();
-                    shared.drums = Array.Empty<LabOrbState>();
-                }
-                string[] pieces;
-                try { pieces = LabSessionSettings.ChunkSnapshot(shared); }
-                catch (ArgumentException exception) { AbortOversizedSnapshot(exception.Message); return; }
-                LabPaintFrame[] paintFrames = PeerPaintPublisher(id).Publish(model.PaintSurface, sessionId, latest.round, sequence);
-                if (!SendPaintFrames(id, paintFrames))
-                { AbortOversizedSnapshot("Could not queue the complete paint transaction."); return; }
-                if (paintFrames.Length > 0 && paintFrames[0].full) MarkPaintFullQueued(id);
-                for (int i = 0; i < pieces.Length; i++)
-                {
-                    if (!QueueBulk(id, new LabNetworkPacket { type = "snapshot_chunk", sessionId = sessionId,
-                        round = latest.round, configRevision = configRevision, configFingerprint = configFingerprint,
-                        snapshotSequence = sequence, chunkIndex = i, chunkCount = pieces.Length, chunkData = pieces[i] }))
-                    { AbortOversizedSnapshot("Could not queue the complete battle state."); return; }
-                }
-                peerSharedRounds[id] = roundKey;
-            }
+            PublishSharedSnapshots(sequence);
             if (immediate) Debug.Log("C6_LAB_STATE phase=" + latest.phase + " hp=" + latest.hp + " remaining=" + latest.remaining.ToString("F1"));
             Changed?.Invoke();
         }
@@ -2804,6 +2779,7 @@ namespace C6Lab
         private void ResetPaintTransport()
         {
             ResetPaintArt();
+            ClearDeferredTerminalSnapshots();
             peerPaintPublishers.Clear();
             paintPublishCache.Clear();
             peerSharedRounds.Clear();

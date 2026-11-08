@@ -6,6 +6,11 @@ namespace Hapio
     public sealed class StoryCutView : MonoBehaviour
     {
         public StoryLayer[] layers;
+        public StoryVisualBeat[] beats;
+        public UnityEngine.UI.Button continueButton;
+        [Header("Optional music for this cut")]
+        public AudioClip music;
+        [Range(0, 1)] public float musicVolume;
         [Tooltip("Hide the dialogue panel on pages with no speaker or text.")]
         public bool hideEmptyDialogue;
         [Header("Source reference (Figma frame number)")]
@@ -29,15 +34,21 @@ namespace Hapio
                 if (layers != null)
                     foreach (var layer in layers)
                         if (layer != null) duration = Mathf.Max(duration, layer.EntranceDuration);
+                if (beats != null)
+                    foreach (var beat in beats)
+                        if (beat != null) duration = Mathf.Max(duration, beat.Duration);
                 return duration;
             }
         }
 
         public void Sample(float elapsed)
         {
-            if (layers == null) return;
-            foreach (var layer in layers)
-                if (layer != null) layer.Sample(elapsed);
+            if (layers != null)
+                foreach (var layer in layers)
+                    if (layer != null) layer.Sample(elapsed);
+            if (beats != null)
+                foreach (var beat in beats)
+                    if (beat != null) beat.Sample(elapsed);
         }
     }
 }

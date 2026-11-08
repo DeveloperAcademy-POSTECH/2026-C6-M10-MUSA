@@ -51524,6 +51524,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.GameScreen
   kind: 1
   resultView: {fileID: 0}
+  stageStory: {fileID: 0}
   legacyResultContent: {fileID: 0}
   externalNavigation: 1
   title: {fileID: 1715417319}

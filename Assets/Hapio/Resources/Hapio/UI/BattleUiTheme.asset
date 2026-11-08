@@ -1,0 +1,61 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d72371826c0644cf1ac832f261ada003, type: 3}
+  m_Name: BattleUiTheme
+  m_EditorClassIdentifier: Hapio.Runtime::Hapio.GameBattleUiTheme
+  orbAppearance: {fileID: 11400000, guid: e9780bf8ccd534d90965d591ccdc807e, type: 2}
+  boardTextures:
+  - {fileID: 2800000, guid: 47c4760dfcd2e44cdaf2533227602aef, type: 3}
+  - {fileID: 2800000, guid: e77d0cf8fcdf14b599a25d762b16f407, type: 3}
+  - {fileID: 2800000, guid: 22c4e2e31bd9f4dacadfa0e6d093e5b2, type: 3}
+  paper: {fileID: -1978975508318171825, guid: 7ddfdfedc1465411ab6140152d0c2d1c, type: 3}
+  underlineDark: {fileID: 21300000, guid: 34af188e497f143ac9a0ea62f5f40f05, type: 3}
+  underlineLight: {fileID: 21300000, guid: dd0cc8a7c420243b9a2739c4cad2378a, type: 3}
+  pauseStroke: {fileID: 21300000, guid: d6ed6ce54158942bb8d02b013d9b91aa, type: 3}
+  staminaCells: {fileID: 21300000, guid: 0d413890aa9ef44a4afbd21d4f5f005d, type: 3}
+  playerBadges:
+  - {fileID: 21300000, guid: 72751bbc8aed0455cacd57f704f41a74, type: 3}
+  - {fileID: 21300000, guid: c427c41dab7a7455d95136793e8d7e3f, type: 3}
+  - {fileID: 21300000, guid: bf8ea6f1ace3645b39964c6e501ed059, type: 3}
+  - {fileID: 21300000, guid: 7f9a0ef641ed6415880da5c2eb737b0a, type: 3}
+  - {fileID: 21300000, guid: 6bc1fb254db7d425ab600e10e2983240, type: 3}
+  - {fileID: 21300000, guid: fb3ef5f81cfdb4299850e1c9ceb241a4, type: 3}
+  minimapBadges:
+  - {fileID: 21300000, guid: d3cc39afb92bd49c2bc036ef029e6037, type: 3}
+  - {fileID: 21300000, guid: d797dea265d6c448bb2c0a97c23db97b, type: 3}
+  - {fileID: 21300000, guid: 867a466f0e45642c89288ae96c182de6, type: 3}
+  - {fileID: 21300000, guid: 3e9a802cb597046aea6538adbf58d835, type: 3}
+  - {fileID: 21300000, guid: 62c9d63bda03d4c9b8f7b3a6e166eb35, type: 3}
+  - {fileID: 21300000, guid: fb3ef5f81cfdb4299850e1c9ceb241a4, type: 3}
+  teamPositionArtwork:
+  - {fileID: 21300000, guid: 874256296a9d04a1a97ca9cef626aa33, type: 3}
+  - {fileID: 21300000, guid: b252671322b35470cb68393ebc5749e1, type: 3}
+  - {fileID: 21300000, guid: 01ec67716db1548aba207dc8bba71fdd, type: 3}
+  - {fileID: 21300000, guid: b9ad31454263e43bca1952e74cef4577, type: 3}
+  teamBlueMarker: {fileID: 21300000, guid: 5bb7faa683b6f4d94b1ffcccee32ba6f, type: 3}
+  teamRedMarker: {fileID: 21300000, guid: e57ae4d9eb17c43eb9a4f94617681205, type: 3}
+  drumIcon: {fileID: 21300000, guid: 4c7d7031ad2234ac984b862cd8fa7e58, type: 3}
+  teamPairConnector: {fileID: 21300000, guid: 028b7824efd254de99c723b8ca9b9116, type: 3}
+  teamTrioConnector: {fileID: 21300000, guid: 8b62622b0a760455192a0100aa1552ef, type: 3}
+  blueFlagDark: {fileID: 21300000, guid: 10f7ebd5fe27f423782dada427071e4f, type: 3}
+  redFlagDark: {fileID: 21300000, guid: 5cce18e931d7b437aa94953d107c1c2f, type: 3}
+  blueFlagLight: {fileID: 21300000, guid: b61b76219e88947a78cfdf26cc84f45a, type: 3}
+  redFlagLight: {fileID: 21300000, guid: 62f22c4c65bd44cb1a7ecc3b5aabbeed, type: 3}
+  tickDark: {fileID: 21300000, guid: 5045aa14c4ea9460d986deb6f2591233, type: 3}
+  tickLight: {fileID: 21300000, guid: 1b018cb24e41c4edb819212e04867f10, type: 3}
+  tickCenter: {fileID: 21300000, guid: f057772db2b684fd6a5eed8fbae1c2e6, type: 3}
+  medium: {fileID: 12800000, guid: fd14532f91d8a4659ae355392f330bc2, type: 3}
+  bold: {fileID: 12800000, guid: 5f76b20538a6c4b1caa80654c9df48f1, type: 3}
+  staminaBorders:
+  - {r: 0.93704927, g: 0.80267453, b: 0.6499759, a: 1}
+  - {r: 0.83231294, g: 0.7421581, b: 0.6441641, a: 1}
+  - {r: 0.81552356, g: 0.6451166, b: 0.45147243, a: 1}

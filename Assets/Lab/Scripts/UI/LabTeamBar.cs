@@ -28,6 +28,7 @@ namespace C6Lab
         private GameObject gauges, numbers;
         private RectTransform blueFlag, redFlag;
         private float blueShown, redShown;
+        private bool flagsPinned;
 
         /// <summary>Share of the whole gourd the bar shows for each team now (it eases toward the snapshot).</summary>
         public float BlueShare => blueShown;
@@ -233,12 +234,25 @@ namespace C6Lab
             return text;
         }
 
+        /// <summary>Keep the game HUD flags at the outer ends while the team fills change.</summary>
+        public void PinFlagsToEnds()
+        {
+            flagsPinned = true;
+            PlaceFlags();
+        }
+
         /// <summary>
         /// Each pole stands on the edge of its team's cells, so the flags march toward each other as the teams paint
         /// and fall back when they lose cells. They sit at the inner ends of the frame before anything is painted.
         /// </summary>
         private void PlaceFlags()
         {
+            if (flagsPinned)
+            {
+                blueFlag.anchorMin = blueFlag.anchorMax = new Vector2(0f, .5f);
+                redFlag.anchorMin = redFlag.anchorMax = new Vector2(1f, .5f);
+                return;
+            }
             float inner = Width - 2f * Inset;
             float blueAt = (Inset + blueShown * inner) / Width, redAt = 1f - (Inset + redShown * inner) / Width;
             blueFlag.anchorMin = blueFlag.anchorMax = new Vector2(blueAt, .5f);
