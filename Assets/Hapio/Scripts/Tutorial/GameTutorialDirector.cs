@@ -524,6 +524,8 @@ namespace Hapio
                 return;
             }
             if (finishing) return;
+            // 4단계 구슬 사라짐 시연 (#552): keeps the glowing orb glowing even behind the skip dialog or the pause menu.
+            UpdateFadeDemo();
             // The skip dialog and the pause menu stop the tutorial where it is: nothing moves on behind them.
             if (skipOpen || BattlePaused) return;
             UpdateHandOvers();
@@ -549,6 +551,8 @@ namespace Hapio
             NoteTap();
             if (skipOpen) return;
             if (!HasBeat || !CurrentBeat.IsLine || Now - shownAt < art.tapCooldown) return;
+            // "…곧 없어져!" moves on only once the orb has gone (#552).
+            if (FadeDemoHoldsTap) return;
             Advance();
         }
 
@@ -610,6 +614,9 @@ namespace Hapio
                 }
                 // "풀렸다!": now it opens into its two attack orbs.
                 if (beat.Cue == GameTutorialCue.OpenBomb) board.SetBombOpeningHeld(false);
+                // 4단계 (#552): "어? 구슬이 빛나는데?" one orb starts its last flashes; "…곧 없어져!" lets it run out in smoke.
+                if (beat.Cue == GameTutorialCue.OrbGlow) BeginOrbGlow();
+                if (beat.Cue == GameTutorialCue.OrbVanish) BeginOrbVanish();
                 return;
             }
             BeginAction(beat);
@@ -1109,7 +1116,7 @@ namespace Hapio
         }
 
         /// <summary>When a tap first moves the line on: the bubble has popped to size and the tap cooldown is over.</summary>
-        private float TapReadyAt => Mathf.Max(popStartedAt + art.popSeconds, shownAt + art.tapCooldown);
+        private float TapReadyAt => FadeTapReadyAt(Mathf.Max(popStartedAt + art.popSeconds, shownAt + art.tapCooldown));
 
         /// <summary>The ▽ shows on a line (never on a remark) from the moment a tap moves it on, bobbing down and up.</summary>
         private void PlaceTapHint(bool line)
@@ -1383,6 +1390,7 @@ namespace Hapio
                 float radius;
                 if (focus == GameTutorialFocus.Drum && TryDrumCircle(out center, out radius)) { }
                 else if (focus == GameTutorialFocus.Bomb && TryBomb(out LabOrbState lit) && TryOrbCircle(lit.id, out center, out radius)) { }
+                else if (focus == GameTutorialFocus.FadingOrb && TryFadeOrbCircle(out center, out radius)) { }
                 else if (TryGourdRect(out Rect gourd))
                 {
                     center = gourd.center;
