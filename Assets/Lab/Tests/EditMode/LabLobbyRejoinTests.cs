@@ -287,6 +287,24 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void AReturnWithItsRememberedPThatDropsBeforeItsFirstPacketKeepsThatP()
+        {
+            using (var room = new HostRoom(3))
+            {
+                room.Join(5, TicketA, 2);
+                room.Drop(5);
+                room.Expire(Time.realtimeSinceStartupAsDouble + LabNetwork.LobbySeatHoldSeconds + 1d);
+                Assert.That(room.Approve(9, TicketA), Is.True);
+                room.Connect(9);
+                Assert.That(room.Network.GetSlotOwner(2), Is.EqualTo(9UL), "The P it left with comes back from memory.");
+                // Lost again before its config_ack reached the Host.
+                room.Drop(9);
+                Assert.That(room.Network.HeldSeatCount, Is.EqualTo(1));
+                Assert.That(room.Network.GetSlotOwner(2), Is.EqualTo(9UL));
+            }
+        }
+
+        [Test]
         public void ANewConnectionThatReplacesAHeardOneIsHeardToo()
         {
             using (var room = new HostRoom(3))

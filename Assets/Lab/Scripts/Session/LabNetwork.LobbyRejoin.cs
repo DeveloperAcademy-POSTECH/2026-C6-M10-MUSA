@@ -233,7 +233,12 @@ namespace C6Lab
             }
             // A held or replaced place brings back exactly the P it had (none if its choice was cleared); only a return
             // after its hold ended falls back to the P it left with. Either way the memory is used up.
-            if (!found && rememberedSlots.TryGetValue(ticket, out int remembered)) slot = remembered;
+            if (!found && rememberedSlots.TryGetValue(ticket, out int remembered))
+            {
+                slot = remembered;
+                // Only a heard lobby drop is remembered, so this device knew it had been let in.
+                confirmed = true;
+            }
             rememberedSlots.Remove(ticket);
             return slot;
         }
