@@ -1,4 +1,8 @@
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using C6Lab;
 using NUnit.Framework;
 using UnityEditor;
@@ -117,6 +121,161 @@ namespace Hapio.Tests
                 EditorSceneManager.CloseScene(scene, true);
                 if (previous.IsValid() && previous.isLoaded) SceneManager.SetActiveScene(previous);
             }
+        }
+
+        // #504: when the Editor first reads a URP material's properties, URP copies its hidden _MainTex/_Color again from
+        // _BaseMap/_BaseColor. A copy that comes out different dirties the material, so the next save changes the .mat.
+        // A material read this session may already show the copied values, so read the saved file itself.
+        [TestCase(GameScenePaths.Battle)]
+        [TestCase("Assets/Lab/Scenes/Lab.unity", Category = "LabOnly")]
+        public void EveryStudioMaterialIsAppliedAndSavedWithTheCopiesTheEditorRewrites(string path)
+        {
+            Scene previous = SceneManager.GetActiveScene();
+            Scene scene = EditorSceneManager.OpenScene(path, OpenSceneMode.Additive);
+            try
+            {
+                LabBackgroundStudio[] studios = scene.GetRootGameObjects()
+                    .SelectMany(root => root.GetComponentsInChildren<LabBackgroundStudio>(true)).ToArray();
+                Assert.That(studios, Has.Length.EqualTo(path == GameScenePaths.Battle ? 3 : 1));
+                foreach (LabBackgroundStudio studio in studios)
+                {
+                    Assert.That(studio.UnappliedImages(), Is.Empty, studio.name);
+                    List<Material> materials = studio.ImageMaterials();
+                    Assert.That(materials, Has.Count.EqualTo(3), studio.name + ": ground, surround and board backing");
+                    foreach (Material material in materials)
+                    {
+                        string file = AssetDatabase.GetAssetPath(material);
+                        Assert.That(material.HasProperty("_MainTex") && material.HasProperty("_Color"), Is.True,
+                            file + " keeps the URP Lit/Unlit hidden copies");
+                        string text = File.ReadAllText(file).Replace("\r\n", "\n");
+                        Assert.That(SavedTexture(text, "_MainTex", file), Is.EqualTo(SavedTexture(text, "_BaseMap", file)), file);
+                        Assert.That(SavedColor(text, "_Color", file), Is.EqualTo(UrpColorCopy(material.shader, SavedColor(text, "_BaseColor", file))),
+                            file + " _Color");
+                    }
+                }
+            }
+            finally
+            {
+                EditorSceneManager.CloseScene(scene, true);
+                if (previous.IsValid() && previous.isLoaded) SceneManager.SetActiveScene(previous);
+            }
+        }
+
+        [Test]
+        public void ApplyImageWritesTheHiddenCopiesSoUrpsOwnCopyChangesNothing()
+        {
+            var png = new Texture2D(2, 2);
+            // GetColor returns the first two a float step or two away from what SetColor stored; the last comes back exactly.
+            Color[] colors = { new Color(.55f, .29f, .81f, 1f), new Color(.17923617f, .4977885f, .5250866f, 1f), new Color(.8f, .7f, .6f, 1f) };
+            try
+            {
+                foreach (string shaderName in new[] { "Universal Render Pipeline/Lit", "Universal Render Pipeline/Unlit" })
+                    foreach (Color color in colors)
+                    {
+                        var material = new Material(Shader.Find(shaderName));
+                        string context = shaderName + " " + color.ToString("F7");
+                        try
+                        {
+                            // Stale copies, the way the image button used to leave them.
+                            material.SetTexture("_MainTex", Texture2D.blackTexture);
+                            material.SetTextureScale("_MainTex", Vector2.one);
+                            material.SetColor("_Color", Color.red);
+                            LabBackgroundStudio.ApplyImage(material, png, color, new Vector2(5, 4), new Vector2(.25f, .5f));
+                            foreach (string property in new[] { "_BaseMap", "_MainTex" })
+                            {
+                                Assert.That(material.GetTexture(property), Is.SameAs(png), context + " " + property);
+                                Assert.That(material.GetTextureScale(property), Is.EqualTo(new Vector2(5, 4)), context + " " + property);
+                                Assert.That(material.GetTextureOffset(property), Is.EqualTo(new Vector2(.25f, .5f)), context + " " + property);
+                            }
+                            // URP's BaseShaderGUI.SetMaterialKeywords stores GetColor("_BaseColor") as _Color. SerializedObject
+                            // shows what is stored; GetColor can return it a float step away. Storing `color` itself would
+                            // differ for the first two colors, and URP's copy would then dirty the asset.
+                            Assert.That(Bits(Stored(material, "_BaseColor")), Is.EqualTo(Bits(color)), context + " _BaseColor");
+                            Assert.That(Bits(Stored(material, "_Color")), Is.EqualTo(Bits(material.GetColor("_BaseColor"))), context + " _Color");
+                        }
+                        finally { Object.DestroyImmediate(material); }
+                    }
+            }
+            finally { Object.DestroyImmediate(png); }
+        }
+
+        [Test]
+        public void TheStudioListsOnlyTheSlotsWhoseSavedMaterialDiffers()
+        {
+            Scene previous = SceneManager.GetActiveScene();
+            Scene scene = EditorSceneManager.OpenScene(GameScenePaths.Battle, OpenSceneMode.Additive);
+            try
+            {
+                LabBackgroundStudio studio = scene.GetRootGameObjects()
+                    .SelectMany(root => root.GetComponentsInChildren<GameStageBackgrounds>(true)).Single().Resolve(2).studio;
+                Assert.That(studio.UnappliedImages(), Is.Empty);
+                Texture2D ground = studio.groundPng, backing = studio.boardBackgroundPng;
+                Vector2 paperTiling = studio.paperTiling;
+                Color backingColor = studio.boardBackgroundColor;
+                // #487's case: the studio names a floor that the saved ground material does not show.
+                studio.groundPng = studio.paperPng;
+                Assert.That(studio.UnappliedImages(), Is.EqualTo(new[] { LabBackgroundStudio.GroundSlot }));
+                studio.groundPng = ground;
+                studio.paperTiling = paperTiling + Vector2.one;
+                Assert.That(studio.UnappliedImages(), Is.EqualTo(new[] { LabBackgroundStudio.SurroundSlot }));
+                studio.paperTiling = paperTiling;
+                studio.boardBackgroundColor = Color.red;
+                Assert.That(studio.UnappliedImages(), Is.EqualTo(new[] { LabBackgroundStudio.BoardBackingSlot }));
+                studio.boardBackgroundColor = backingColor;
+                // Without its own PNG the backing falls back to the ground PNG, exactly as the image button does.
+                Assert.That(backing, Is.SameAs(ground));
+                studio.boardBackgroundPng = null;
+                Assert.That(studio.UnappliedImages(), Is.Empty);
+            }
+            finally
+            {
+                EditorSceneManager.CloseScene(scene, true);
+                if (previous.IsValid() && previous.isLoaded) SceneManager.SetActiveScene(previous);
+            }
+        }
+
+        private static string SavedTexture(string text, string name, string file)
+        {
+            Match match = Regex.Match(text, "\n    - " + name
+                + ":\n        m_Texture: (\\{[^}]*\\})\n        m_Scale: (\\{[^}]*\\})\n        m_Offset: (\\{[^}]*\\})\n");
+            Assert.That(match.Success, Is.True, file + " saves " + name);
+            return match.Groups[1].Value + " " + match.Groups[2].Value + " " + match.Groups[3].Value;
+        }
+
+        /// <summary>The `_Color` URP copies from this saved `_BaseColor`: what GetColor returns after SetColor (#504).</summary>
+        private static float[] UrpColorCopy(Shader shader, float[] baseColor)
+        {
+            var probe = new Material(shader);
+            try
+            {
+                probe.SetColor("_BaseColor", new Color(baseColor[0], baseColor[1], baseColor[2], baseColor[3]));
+                Color copy = probe.GetColor("_BaseColor");
+                return new[] { copy.r, copy.g, copy.b, copy.a };
+            }
+            finally { Object.DestroyImmediate(probe); }
+        }
+
+        /// <summary>The color a material stores under this name, exactly as SetColor received it.</summary>
+        private static Color Stored(Material material, string name)
+        {
+            SerializedProperty colors = new SerializedObject(material).FindProperty("m_SavedProperties.m_Colors");
+            for (int index = 0; index < colors.arraySize; index++)
+            {
+                SerializedProperty entry = colors.GetArrayElementAtIndex(index);
+                if (entry.FindPropertyRelative("first").stringValue == name) return entry.FindPropertyRelative("second").colorValue;
+            }
+            Assert.Fail(material.name + " stores no " + name);
+            return default;
+        }
+
+        private static int[] Bits(Color color) => new[] { color.r, color.g, color.b, color.a }
+            .Select(channel => System.BitConverter.ToInt32(System.BitConverter.GetBytes(channel), 0)).ToArray();
+
+        private static float[] SavedColor(string text, string name, string file)
+        {
+            Match match = Regex.Match(text, "\n    - " + name + ": \\{r: ([^,]+), g: ([^,]+), b: ([^,]+), a: ([^}]+)\\}\n");
+            Assert.That(match.Success, Is.True, file + " saves " + name);
+            return Enumerable.Range(1, 4).Select(group => float.Parse(match.Groups[group].Value, CultureInfo.InvariantCulture)).ToArray();
         }
     }
 }
