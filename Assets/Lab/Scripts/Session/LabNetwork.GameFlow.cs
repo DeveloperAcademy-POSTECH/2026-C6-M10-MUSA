@@ -95,7 +95,11 @@ namespace C6Lab
             gameStageIndex = 0; gameStageId = null; gameStageYokai = LabStageYokai.None;
             EndBattleToLobby();
             UnlockGameRoster();
-            if (!developerSolo) BroadcastLobby();
+            if (!developerSolo)
+            {
+                BroadcastLobby();
+                ConfirmLobbyMembersAgain();
+            }
             return true;
         }
 

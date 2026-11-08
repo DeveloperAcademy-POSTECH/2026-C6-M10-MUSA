@@ -268,6 +268,59 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void AReturnThatDropsBeforeItsFirstPacketKeepsItsPlaceHeld()
+        {
+            using (var room = new HostRoom(3))
+            {
+                room.Join(5, TicketA, 2);
+                room.Drop(5);
+                Assert.That(room.Approve(9, TicketA), Is.True);
+                room.Connect(9);
+                // Lost again before its config_ack reached the Host: it took back a place the Host had confirmed.
+                room.Drop(9);
+                Assert.That(room.Network.HeldSeatCount, Is.EqualTo(1));
+                Assert.That(room.Network.GetSlotOwner(2), Is.EqualTo(9UL));
+                Assert.That(room.Approve(10, TicketA), Is.True);
+                room.Connect(10);
+                Assert.That(room.Network.GetSlotOwner(2), Is.EqualTo(10UL));
+            }
+        }
+
+        [Test]
+        public void ANewConnectionThatReplacesAHeardOneIsHeardToo()
+        {
+            using (var room = new HostRoom(3))
+            {
+                room.Join(5, TicketA, 2);
+                Assert.That(room.Approve(9, TicketA), Is.True);
+                room.Connect(9);
+                room.Drop(9);
+                Assert.That(room.Network.HeldSeatCount, Is.EqualTo(1), "It replaced a member the Host had heard from.");
+                Assert.That(room.Network.GetSlotOwner(2), Is.EqualTo(9UL));
+            }
+        }
+
+        [Test]
+        public void ATwoVsTwoLobbyReturnDoesNotHoldAPlayerLostDuringTheBattle()
+        {
+            using (var room = new HostRoom(4))
+            {
+                room.Join(5, TicketA, 2);
+                room.Join(6, TicketB, 3);
+                room.Network.LockGameRoster();
+                Assert.That(room.Network.ReturnGameToLobby(), Is.True, "The 2:2 battle ends and the room is a lobby again.");
+                // 5 answers the settings the Host sends again; 6 was lost during the battle and never answers.
+                room.Hear(5);
+                room.Drop(6);
+                Assert.That(room.Network.HeldSeatCount, Is.Zero, "#502: a player lost in the battle is not held.");
+                Assert.That(room.Network.GetSlotOwner(3), Is.EqualTo(ulong.MaxValue));
+                room.Drop(5);
+                Assert.That(room.Network.HeldSeatCount, Is.EqualTo(1), "A player still in the reopened lobby is held.");
+                Assert.That(room.Network.GetSlotOwner(2), Is.EqualTo(5UL));
+            }
+        }
+
+        [Test]
         public void AGuestThatQuitTheRunIsNotHeldWhenTheRoomReturnsToItsLobby()
         {
             using (var room = new HostRoom(4))

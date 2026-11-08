@@ -221,13 +221,22 @@ namespace Hapio.Tests
             var order = (System.Collections.Generic.List<ulong>)typeof(LabNetwork).GetField("order", flags).GetValue(network);
             var leavers = (System.Collections.Generic.HashSet<ulong>)typeof(LabNetwork).GetField("lobbyLeavers", flags)
                 .GetValue(network);
-            order.Add(77);
-            object control = typeof(GameSession).GetMethod("MakeControl", flags).Invoke(session, new object[] { "exit", null });
+            order.Add(77); order.Add(78);
+            System.Reflection.MethodInfo make = typeof(GameSession).GetMethod("MakeControl", flags);
+            System.Reflection.MethodInfo apply = typeof(GameSession).GetMethod("ApplyControl", flags);
+            // An exit naming another run (it arrived after a 2:2 room already returned to its lobby) still counts.
+            object stale = make.Invoke(session, new object[] { "exit", null });
+            stale.GetType().GetField("sender").SetValue(stale, 78UL);
+            stale.GetType().GetField("runId").SetValue(stale, "an-earlier-run");
+            apply.Invoke(session, new[] { stale });
+            Assert.That(leavers, Does.Contain(78UL));
+            Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.Playing), "It names no current run, so nothing stops.");
+            object control = make.Invoke(session, new object[] { "exit", null });
             control.GetType().GetField("sender").SetValue(control, 77UL);
-            typeof(GameSession).GetMethod("ApplyControl", flags).Invoke(session, new[] { control });
+            apply.Invoke(session, new[] { control });
             Assert.That(leavers, Does.Contain(77UL));
-            order.Remove(77);
-            leavers.Remove(77);
+            order.Remove(77); order.Remove(78);
+            leavers.Remove(77); leavers.Remove(78);
             yield return WaitGameOver();
             session.GoHome();
             yield return WaitHome();

@@ -198,10 +198,12 @@ namespace C6Lab
 
         /// <summary>
         /// The returning ticket's place: drop its hold, or replace its old connection the Host has not timed out yet.
-        /// Returns the P to give back (0 if none). The new connection is added afterwards.
+        /// Returns the P to give back (0 if none). The new connection is added afterwards. Confirmed means the place
+        /// belonged to a device the Host had heard from, so the new connection counts as heard too: it knows it got in.
         /// </summary>
-        private int ReclaimLobbyPlace(ulong id, string ticket)
+        private int ReclaimLobbyPlace(ulong id, string ticket, out bool confirmed)
         {
+            confirmed = false;
             if (ticket == null || !LobbyRosterOpen) return 0;
             int slot = 0;
             bool found = false;
@@ -210,6 +212,8 @@ namespace C6Lab
                 LobbySeatHold hold = lobbySeatHolds[i];
                 if (hold.ticket != ticket) continue;
                 found = true;
+                // Only a member the Host had heard from is ever held.
+                confirmed = true;
                 lobbySeatHolds.RemoveAt(i);
                 playerSlots?.Release(hold.playerId);
                 if (hold.slot > 0) slot = hold.slot;
@@ -219,6 +223,7 @@ namespace C6Lab
                          && memberTickets.TryGetValue(member, out string known) && known == ticket).ToArray())
             {
                 found = true;
+                if (heardLobbyMembers.Contains(stale)) confirmed = true;
                 int staleSlot = playerSlots?.GetSlot(stale) ?? 0;
                 if (staleSlot > 0) slot = staleSlot;
                 ForgetLobbyMember(stale);
@@ -257,6 +262,18 @@ namespace C6Lab
             memberTickets.Remove(id);
             lobbyLeavers.Remove(id);
             heardLobbyMembers.Remove(id);
+        }
+
+        /// <summary>
+        /// A 2:2 room back in its lobby (#281): only members that answer now are still there. One lost during the
+        /// battle, whose drop the Host notices only after the return, is then not held (#502). The unchanged settings
+        /// are sent again, and every live guest answers with its config_ack.
+        /// </summary>
+        private void ConfirmLobbyMembersAgain()
+        {
+            if (!gameFlowEnabled || !IsHost) return;
+            heardLobbyMembers.Clear();
+            foreach (ulong id in order) if (id != LocalPlayerId) SendSessionConfig(id);
         }
 
         /// <summary>

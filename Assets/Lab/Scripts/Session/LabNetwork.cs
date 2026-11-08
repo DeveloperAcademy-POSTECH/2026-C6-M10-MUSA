@@ -1540,7 +1540,7 @@ namespace C6Lab
             {
                 pendingApprovals.Remove(id);
                 string ticket = TakeApprovedTicket(id);
-                int returningSlot = ReclaimLobbyPlace(id, ticket);
+                int returningSlot = ReclaimLobbyPlace(id, ticket, out bool returningConfirmed);
                 if (!order.Contains(id) && LobbyPlaceCount < targetParticipantCount) order.Add(id);
                 else if (!order.Contains(id))
                 {
@@ -1548,6 +1548,7 @@ namespace C6Lab
                     return;
                 }
                 if (ticket != null) memberTickets[id] = ticket;
+                if (returningConfirmed) heardLobbyMembers.Add(id);
                 RestoreLobbySlot(id, returningSlot);
                 AssignAutomaticTestSlot(id);
                 Debug.Log("C6_LAB_PEER_JOIN id=" + id + " participants=" + order.Count);
