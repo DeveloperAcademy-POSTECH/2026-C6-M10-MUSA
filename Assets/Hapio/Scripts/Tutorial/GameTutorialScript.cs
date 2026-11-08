@@ -187,7 +187,7 @@ namespace Hapio
         /// </summary>
         public const string SkipButtonLabel = "건너뛰기";
         public const string SkipTitle = "튜토리얼을 건너뛰겠소?";
-        public const string SkipBody = "튜토리얼을 건너뛰면 구슬 전달과 조합 등\n기본 조작을 익히지 못해\n협동 플레이에 어려움이 있을 수 있소.";
+        public const string SkipBody = "튜토리얼을 건너뛰면 기본 조작을 익히지 못해\n협동 플레이에 어려움이 있을 수 있소.";
         public const string SkipStay = "계속 배우기";
         public const string SkipLeave = "건너뛰기";
         /// <summary>튜토리얼 일시정지 메뉴에 더하는 버튼: 연습 판을 처음부터 다시 연다. 메뉴의 다른 버튼(CONTINUE·QUIT RUN)과 같은 말투.</summary>

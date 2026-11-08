@@ -104,7 +104,7 @@ MonoBehaviour:
   skipPanelSize: {x: 336, y: 172}
   skipPanelTopFraction: 0.4
   skipTitleFontSize: 21
-  skipBodyFontSize: 14
+  skipBodyFontSize: 16
   skipChoiceSize: {x: 120, y: 48}
   skipChoiceGap: 12
   skipChoiceDrop: 10
