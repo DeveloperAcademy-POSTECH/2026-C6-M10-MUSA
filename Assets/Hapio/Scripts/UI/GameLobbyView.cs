@@ -583,6 +583,7 @@ namespace Hapio
         /// <summary>Addresses can change while a room waits (Wi-Fi, hotspot), so they are read again every second.</summary>
         private void RefreshHostAddress()
         {
+            if (HostAddressLine == null) return; // Saved-asset checks present the prefab without Awake.
             bool show = seatDesign != null && Network.IsHost && !Network.IsDeveloperSolo;
             if (HostAddressLine.gameObject.activeSelf != show) HostAddressLine.gameObject.SetActive(show);
             if (!show) { nextHostAddressReadAt = 0d; return; }

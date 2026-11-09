@@ -100,7 +100,7 @@ namespace Hapio.Tests
             view.directAddress.text = "127.0.0.1"; view.directPort.text = "";
             yield return Click(view.directJoinButton);
             Assert.That(session.Network.IsJoiningRoom || session.Network.IsConnected, Is.False, "An empty port is refused.");
-            Assert.That(view.directFeedback.text, Does.Contain("포트"));
+            Assert.That(view.directFeedback.text, Does.Contain("1~65535"), "The refusal says why.");
             view.directAddress.text = ""; view.directPort.text = "0";
             yield return Click(view.directJoinButton);
             Assert.That(session.Network.IsJoiningRoom || session.Network.IsConnected, Is.False);
