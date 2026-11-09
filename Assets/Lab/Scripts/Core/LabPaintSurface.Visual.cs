@@ -9,6 +9,8 @@ namespace C6Lab
         private readonly List<LabPaintVisualStamp> visualStamps = new List<LabPaintVisualStamp>();
         private uint nextVisualSequence;
         public uint VisualVersion { get; private set; }
+        /// <summary>The newest stamp's Host-assigned number. Unlike <see cref="VisualVersion"/>, every device has the same one.</summary>
+        public uint LastVisualSequence => nextVisualSequence;
 
         /// <summary>Owned snapshot. Mutating it cannot affect the Host ledger or its visual state.</summary>
         public LabPaintVisualStamp[] CopyVisualStamps() => visualStamps.ToArray();

@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Reflection;
 using C6Lab;
 using NUnit.Framework;
@@ -40,6 +41,48 @@ namespace Hapio.Tests
                 Assert.That(fixture.CaptureDeadline(61d), Is.EqualTo(62d));
             }
         }
+
+        [Test]
+        public void AGuestThatReceivedTheSameFinalStampsInOtherBatchesStillMatchesTheHost()
+        {
+            using (var fixture = new Fixture())
+            {
+                LabPaintSurface host = StampedSurface(Stamps(6)), guest = StampedSurface(Stamps(2), Stamps(4), Stamps(6));
+                Assert.That(guest.VisualVersion, Is.Not.EqualTo(host.VisualVersion), "Each device counts its own changes.");
+
+                fixture.UsePaint(host);
+                Set(fixture.Session, "finishIdentity", fixture.Invoke("MakeFinishIdentity", fixture.Network.Snapshot));
+                fixture.UsePaint(guest);
+                Assert.That((bool)fixture.Invoke("FinalPaintMatches"), Is.True);
+            }
+        }
+
+        [Test]
+        public void AGuestStillMissingTheFinalStampDoesNotMatchTheHost()
+        {
+            using (var fixture = new Fixture())
+            {
+                LabPaintSurface host = StampedSurface(Stamps(6)), guest = StampedSurface(Stamps(5));
+
+                fixture.UsePaint(host);
+                Set(fixture.Session, "finishIdentity", fixture.Invoke("MakeFinishIdentity", fixture.Network.Snapshot));
+                fixture.UsePaint(guest);
+                Assert.That((bool)fixture.Invoke("FinalPaintMatches"), Is.False);
+            }
+        }
+
+        private static LabPaintSurface StampedSurface(params LabPaintVisualStamp[][] batches)
+        {
+            var surface = new LabPaintSurface(new LabPaintGrowthSettings { Resolution = 2 }, 1);
+            foreach (LabPaintVisualStamp[] batch in batches) Assert.That(surface.ReplaceVisualStamps(batch), Is.True);
+            return surface;
+        }
+
+        private static LabPaintVisualStamp[] Stamps(int count) => Enumerable.Range(1, count).Select(i => new LabPaintVisualStamp
+        {
+            sequence = (uint)i, center = Vector3.forward, right = Vector3.right, radius = .1f,
+            color = new Color32(100, 110, 120, 255), painterSlot = 1, pattern = LabPaintPattern.Splatter
+        }).ToArray();
 
         [TestCase(double.NaN)]
         [TestCase(double.PositiveInfinity)]
@@ -131,7 +174,7 @@ namespace Hapio.Tests
             Set(control, "stageIndex", 3); Set(control, "paintCount", 32768);
             Set(control, "columns", 256); Set(control, "rows", 128);
             Set(control, "revision", uint.MaxValue); Set(control, "round", uint.MaxValue);
-            Set(control, "paintRevision", uint.MaxValue); Set(control, "visualVersion", uint.MaxValue);
+            Set(control, "paintRevision", uint.MaxValue); Set(control, "visualSequence", uint.MaxValue);
             Set(control, "generation", uint.MaxValue);
             Set(control, "startsAt", 123456.789012345d); Set(control, "deadline", 123468.789012345d);
             Set(control, "replay", Record(LabFinishReplayShot.MaximumPoses).Encode());
@@ -263,6 +306,17 @@ namespace Hapio.Tests
 
             public double CaptureDeadline(double now) => (double)Invoke("ResultCaptureDeadline", now);
             public bool HasCapturedResult => (bool)Invoke("HasCapturedResult");
+
+            public void UsePaint(LabPaintSurface surface)
+            {
+                Set(Network, "clientPaintSurface", surface);
+                Set(Network, "latest", new LabSnapshot
+                {
+                    phase = LabPhase.Victory, sessionId = Session.State.battleSessionId, round = Session.State.battleRound,
+                    paintRevision = 9, paintCount = 100, paintColumns = 256, paintRows = 128,
+                    players = Array.Empty<LabPlayerState>()
+                });
+            }
 
             public void CaptureMetadataResult()
             {

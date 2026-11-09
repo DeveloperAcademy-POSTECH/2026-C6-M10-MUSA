@@ -1,5 +1,23 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-09 — 멀티 완료 연출 준비 판정
+
+- **기준:** `fix/multiplayer-finish-visual-identity`, main `3a3ec9e3` 위 `8cf2c9a0`. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 그 뒤 커밋은 호환 기록·주석만 바꿨다.
+- **원인:** 게스트의 최종 칠 일치 판정이 기기마다 따로 세는 `VisualVersion`을 방장 값과 비교했다. 게스트가 준비를 보내지 못해 다시보기와 1.2초 연출이 모두 시작되지 않고 12초 한도로 결과에 갔다.
+- **바꾼 것:** 모든 기기가 같은 도장 마지막 순번(`LastVisualSequence`)으로 비교한다. 메시지 필드가 바뀌어 Game 토큰만 46으로 올렸다.
+
+| 확인 | 결과 |
+| --- | --- |
+| 수정 전 Mac 개발 앱 3개(방장 1·게스트 2, 127.0.0.1), 1스테이지 | 방장 49, 게스트 57·58로 불일치. 게스트 ready 0, 12초 동안 일정 23번 재예약, 연출 없음 |
+| 수정 후 같은 방식 | 세 기기 모두 113 일치. 게스트 약 0.2초 만에 ready, 확정 뒤 세 기기 1.2초 연출 재생, 한도 미사용 |
+| 새 EditMode 2건(묶음이 달라도 일치, 마지막 도장이 없으면 불일치) | 수정 전 2건 실패, 수정 후 통과 |
+| `GameSessionFinishTests`·`LabGameFlowBridgeTests`·`LabLobbyRejoinTests` | 63/63 PASS |
+| 전체 EditMode / 전체 PlayMode(`8cf2c9a0`) | 2139/2139, 729/729 PASS |
+
+- Mac 실행은 진단 로그와 임시 자동 진행을 넣은 별도 빌드로 했다(이 브랜치에는 없다). 자동 진행은 방장이 칠을 직접 넣어 100%를 만들었으므로 실제 투척과 마지막 일격 다시보기(`replay=0`)는 지나지 않았다.
+- 독립 검토에서 코드 문제는 없었고, Game 46 호환 기록 누락 1건을 고쳤다.
+- **미실행:** 실기기 멀티, 멀티에서의 마지막 일격 다시보기, 2·3스테이지의 실제 멀티 완료, Direct가 아닌 Bonjour 입장 경로.
+
 ## 2026-11-09 — #498 전투 첫 사용 렌더링 미리 그리기
 
 - **기준:** `perf/#498-battle-pso-prewarm`, main `56e9c79f` 위 `c3bae1d9`·`ef533273`·`b243db2f`. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal), `-buildTarget iOS`. 설정 수와 접속 묶음은 바꾸지 않았다.
