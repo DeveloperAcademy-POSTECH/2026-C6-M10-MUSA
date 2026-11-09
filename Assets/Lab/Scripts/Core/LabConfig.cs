@@ -981,7 +981,7 @@ namespace C6Lab
         [Tooltip("구미호 피버타임(마지막 20초) 곡 크기 (Resources/Audio/GumihoFever, 모든 기기). 파일이 없으면 야광귀 피버 곡을 이 크기로 튼다.")]
         [SerializeField, Range(0f, 1f)] private float gumihoFeverBgmVolume = .3f;
         [Tooltip("#577 지귀 스테이지 전투 BGM 크기 (Resources/Audio/JigwiBGM, 진고 북 중심 곡, 모든 기기). 파일이 없으면 기본 BGM.")]
-        [SerializeField, Range(0f, 1f)] private float jigwiBgmVolume = .35f;
+        [SerializeField, Range(0f, 1f)] private float jigwiBgmVolume = .525f; // QA 11-09: 50% 키움
         [Tooltip("#577 지귀 피버(마지막 20초) 곡 크기 (Resources/Audio/JigwiFever, 모든 기기). 파일이 없으면 지금처럼 구미호 피버 곡을 Gumiho Fever Bgm Volume으로 튼다.")]
         [SerializeField, Range(0f, 1f)] private float jigwiFeverBgmVolume = .3f;
         [Tooltip("매혹이 걸릴 때 소리 크기 (Resources/Audio/CharmCast, 모든 기기)")]
@@ -1517,7 +1517,7 @@ namespace C6Lab
         public float GumihoBgmVolume => Mathf.Clamp01(Finite(gumihoBgmVolume, .2f));
         public bool YaguangUseNewBgm => yaguangUseNewBgm;
         public float YaguangBgmVolume => Mathf.Clamp01(Finite(yaguangBgmVolume, .35f));
-        public float JigwiBgmVolume => Mathf.Clamp01(Finite(jigwiBgmVolume, .35f));
+        public float JigwiBgmVolume => Mathf.Clamp01(Finite(jigwiBgmVolume, .525f));
         public float JigwiFeverBgmVolume => Mathf.Clamp01(Finite(jigwiFeverBgmVolume, .3f));
         public float GumihoFeverBgmVolume => Mathf.Clamp01(Finite(gumihoFeverBgmVolume, .3f));
         public float CharmCastSoundVolume => Mathf.Clamp01(Finite(charmCastSoundVolume, .7f));
