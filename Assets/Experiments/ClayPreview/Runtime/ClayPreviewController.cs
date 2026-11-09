@@ -166,8 +166,8 @@ namespace Hapio.Experiments
         public bool IsReady => initialized && target != null && target.IsCreated();
         public string Error { get; private set; }
         public bool PaletteAvailable => paletteReplay != null;
-        public bool PaletteReady => !PaletteAvailable || IsDefaultPalette || paletteReplay.Ready;
-        public bool PaletteBusy => PaletteAvailable && !IsDefaultPalette && paletteReplay.Busy;
+        public bool PaletteReady => !PaletteAvailable || !UseReplay || paletteReplay.Ready;
+        public bool PaletteBusy => PaletteAvailable && UseReplay && paletteReplay.Busy;
         public string PaletteError => paletteReplay?.Error;
         private bool IsDefaultPalette
         {
@@ -279,6 +279,7 @@ namespace Hapio.Experiments
                 clayShader = preset.shader;
             }
             ActivePreset = index;
+            if (SplatterEnabled) ScheduleSplatter();
             SetAppearance(IsEnhanced ? EnhancedThickness : DefaultThickness, IsEnhanced ? EnhancedGloss : DefaultGloss);
             SetSurfaceDetails(DefaultContact, DefaultDetail);
             SetLighting(LightAzimuth, LightElevation, LightIntensity);
@@ -438,6 +439,7 @@ namespace Hapio.Experiments
                 button.AddToClassList("clay-preset");
                 presetButtons.Add(button);
             }
+            BuildSplatterUi(panel);
             BuildImagesUi(panel);
             if (PaletteAvailable) BuildPaletteUi(panel);
             thicknessSlider = AddSlider(panel, "THICKNESS", "thicknessSlider", 0, .02f, out thicknessValue);
@@ -601,20 +603,22 @@ namespace Hapio.Experiments
         }
         private void RefreshPalettePreview()
         {
-            if (!PaletteAvailable || IsDefaultPalette)
+            if (!PaletteAvailable || !UseReplay)
             {
                 paletteReplay?.Clear(); BindCurrentPreset();
             }
             else
             {
-                paletteReplay.Request(ActivePreset, (Color32[])paletteColors.Clone());
+                paletteReplay.Request(ActivePreset, (Color32[])paletteColors.Clone(), UseSplatter ? splatterBrushes : null);
                 if (paletteReplay.Ready) BindCurrentPreset();
             }
             RefreshPaletteStatus();
         }
         private void Update()
         {
-            if (!initialized || !PaletteAvailable || IsDefaultPalette) return;
+            if (!initialized) return;
+            TickSplatter();
+            if (!PaletteAvailable || !UseReplay) return;
             paletteReplay.Tick();
             if (paletteReplay.Ready && clayMaterial != null &&
                 (clayMaterial.GetTexture("_PaintMap") != paletteReplay.PaintTexture || clayMaterial.shader != clayShader)) BindCurrentPreset();
@@ -634,8 +638,8 @@ namespace Hapio.Experiments
         {
             if (clayMaterial == null) return;
             clayMaterial.shader = clayShader;
-            clayMaterial.SetTexture("_PaintMap", PaletteAvailable && !IsDefaultPalette && paletteReplay.Ready ? paletteReplay.PaintTexture : colorMap);
-            clayMaterial.SetTexture("_HeightMap", heightMap);
+            clayMaterial.SetTexture("_PaintMap", PaletteAvailable && UseReplay && paletteReplay.Ready ? paletteReplay.PaintTexture : colorMap);
+            clayMaterial.SetTexture("_HeightMap", UseSplatter && paletteReplay.Ready ? paletteReplay.HeightTexture : heightMap);
             clayMaterial.SetTexture("_PainterMap", Texture2D.blackTexture);
             clayMaterial.SetFloat("_PaintMapReady", 1f);
             clayMaterial.SetFloat("_PlayerPaintPatternsEnabled", 0f);
@@ -792,6 +796,7 @@ namespace Hapio.Experiments
             ReleaseImages();
             ReleasePresentation();
             ReleasePalette();
+            ReleaseSplatterTextures();
             RestoreGlobals();
         }
 

@@ -6662,3 +6662,26 @@ PR-1(`feat/#507-gourd-rig-contract`) 위에서 Unity 6000.6.5f1 macOS batch Edit
 
 - 기준 main은 원격 재확인 후에도 `fbe6f67c`였다. Unity6000.6.5f1 / macOS 기본 batch에서 필터 없이 **전체 EditMode 2089/2089 PASS(16.28초), 전체 PlayMode 706/706 PASS(528.52초)**를 확인했다. 두 실행 모두 실패·생략·Inconclusive0이며 앞 절 초기 관련 검사 집계와 중복 합산하지 않는다. 위 초기 범위의 전체 모음 미실행 상태는 이 추가 실행으로 갱신한다.
 - 최종 독립 리뷰에서 원본 관람 캡션의 실제 문구가 `봉인 박 둘러보기`인데 비활성 표시 바인딩이 `봉인 박 관람`으로 찾던 오류를 발견했다. 기능 권한은 유지한 채 검색 문구만 맞췄다. 전체 검사 이후의 이 한 줄 수정에는 `SavedStorySkipAndEndingButtonsReceiveRealMouseClicksAtTheirVisibleScreenPositions`와 `StoryResultPresentationTests`를 다시 실행해 **10/10 PASS(5.09초), 실패·생략·Inconclusive0**를 확인했다. Mac 빌드 성공 기록은 이 캡션 문구 보완 이전 소스에서의 결과이며 재빌드·앱 실행을 추가하지 않았다.
+
+
+## 2026-11-09 - #569 procedural splash preview
+
+- Unity 6000.6.5f1 Editor: compilation console had no errors after the final source refresh.
+- Runtime checks on the final tuned mask: seed 569 repeated pixel-exactly (0 differences); seed 570 changed 44,967 pixels; no covered pixels touched the 512px border.
+- UI Toolkit slider callbacks were exercised for core/length/width, confirming controller state updates. Coating preset replay reached PaletteReady=true with no replay error, with both generated color and generated height bound.
+- Final live setting: core .29, spikes 14, length .19, width .036, roundness 1, irregularity 1, droplets 0, seed 569. Hand-made texture .3/1/0 and supplied palette/material/light values were restored.
+- Scope: runtime-owned procedural brushes only; no saved game setting, source brush, frozen journal, original color/height map or gameplay shader was replaced.
+- Not run: full EditMode/PlayMode suites, extreme slider combinations, Mac standalone rebuild, iOS/device tests, six-view visual approval. No PR was created.
+
+
+## 2026-11-09 - organic clay outline prototype
+
+- Changed the splash partial and documentation only in this follow-up; material shaders/game rules were not changed.
+- Final Unity compile console: zero errors. Three preset masks inspected visually. Seed569 repeated with zero pixel differences; seed570 differed at 60,290 pixels. All three preset masks had zero covered border pixels.
+- BODY ASYMMETRY UI slider callback updated the field and was restored. Color/height replay completed without error. Existing appearance/texture/palette/light values were restored.
+- Not run: full automated test suites, exhaustive slider extremes, standalone Mac/iOS/device tests, measured reference similarity. The first preset is a style approximation, not a claim of 99-percent visual matching.
+
+
+### 2026-11-09 - seed 572 fixed repetition
+
+Compared twelve seed masks and selected 572. Changed only seed defaults and the three-slot seed binding in the splash partial. All three generated brush slots compared pixel-identically (0 differences). Editor compile console had 0 errors; replay completed ready with no error. Restored previous shape sliders and appearance after compilation. Mac rebuild/full suites not run.

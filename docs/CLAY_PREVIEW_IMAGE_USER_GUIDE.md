@@ -322,3 +322,30 @@ V4는 도장 자체의 표면 방향을 이용해 반사를 나누며, 스티커
 | 샘플 원본·같은 바이트의 런타임 자료·Manifest | [ImageSamples](../Assets/Experiments/ClayPreview/ImageSamples) |
 
 셰이더나 샘플을 수정하면 준비 자료와 소스 기준 검사를 함께 확인한다. 게임용 자료와 비교용 자료를 구분하고, 실행하지 않은 환경을 검증 완료로 기록하지 않는다.
+
+
+## 17. 스플래시 윤곽 실험 (#569)
+
+네 번째 `Sticker-local coating`에서 `SPLASH SHAPE`의 `Reference splash`를 누르면 긴 돌기와 둥근 끝을 가진 비교 모양을 적용한다. `Apply splash shape`를 끄면 원래 윤곽으로 돌아간다. 단일 파란색 미리보기와 실제 고정 기록 67회에 적용한 박을 함께 비교한다. 세 종류의 브러시는 같은 변수와 시드에서 파생되므로 모든 도장이 똑같은 모양은 아니다.
+
+- CORE SIZE(0.12~0.30), SPIKE COUNT(5~20), SPIKE LENGTH(0.05~0.30), SPIKE WIDTH(0.015~0.08), ROUND TIPS(0~1), IRREGULARITY(0~1). 길이·폭은 정규화 브러시 공간이며 자동 여백 맞춤 때문에 전체 크기도 보정된다.
+- DROPLET COUNT(0~12), DROPLET SIZE(0.005~0.04), DROPLET DISTANCE(0~0.15). 주변 방울은 본체와 겹칠 수 있으며 물리 시뮬레이션은 아니다. 참고 설정은 분리 방울 0개다.
+- SHAPE SEED는 같은 모양 재현용 정수다. New shape는 시드만 1 증가한다. Reference splash는 중앙0.22/돌기14/길이0.24/굵기0.043/둥글기1/불규칙성1/시드569로 맞춘다.
+- 슬라이더 변경을 0.25초 모은 뒤 512px 브러시를 생성하고 고정 기록을 기존 제한 작업량으로 재생한다. 색과 높이를 함께 교체하며 원본 PNG/EXR·게임 판정·기록·면적·팔레트 원본은 바꾸지 않는다. 기존 지원 범위에서 잘리는 부분은 남을 수 있다.
+- 설정은 실행 중 임시 상태다. 다른 프리셋에서는 새 윤곽을 적용하지 않는다. 배경/표면 질감과 윤곽은 별개다. Mac 앱에서 사용하려면 새 소스로 전용 빌드를 실행한다.
+
+
+## 18. Organic clay outlines - replaces section 17 shape controls
+
+The latest shape prototype uses smooth unions of offset masses and thick rounded lobes. It replaces the earlier circle-and-stem contour; it does not add motion animation or change gameplay. The old section 17 preset/control names describe the previous prototype.
+
+Controls: BODY FULLNESS (.12-.30) sets the sizes of offset body masses, not a fixed disk. LOBE COUNT (5-20), LOBE REACH (.05-.30), LOBE WIDTH (.015-.08), LOBE SOFTNESS (0-1), IRREGULARITY (0-1), BODY ASYMMETRY (0-1), plus the existing three droplet sliders and SHAPE SEED. Softness blends neighboring masses and changes round terminal volume. These variables change the runtime-owned brush only. Existing texture, palette, material, light and game settings remain independent.
+
+Starting buttons: Soft clay splash, Flowing clay, Broad splash. The first uses body .17, count 8, reach .21, width .048, softness .85, irregularity .85, asymmetry .75, droplets 4, droplet size .018, distance .07, seed 569. The second uses count 6/reach .22/width .075/asymmetry 1; the third uses count 11/reach .12/width .07/asymmetry .55. Slider settings and seed reproduce the masks; three seed-derived brush variants replay the fixed hit records.
+
+This approximates the reference silhouette style. It does not reproduce the reference gourd geometry, arrangement, underpainting, per-sticker depth, lighting or camera, and no 99-percent whole-image similarity has been measured. Existing logical-support clipping and frozen completion undercoat remain.
+
+
+### Fixed repeating pattern (seed 572)
+
+The three runtime brush slots now use the same seed rather than derived seeds. This supersedes the three-variant description above. Seed 572 was selected by comparing seeds 569-580. Current live shape: fullness .1625, lobes 9, reach .21, width .048, softness .85, irregularity 1, asymmetry 1, droplets 4, droplet size .04, distance .1438. Seed alone does not encode these sliders. Hit position, recorded rotation and overlap can still change the visible appearance. The supplied red reference image is approximated, not traced or reproduced exactly.

@@ -117,7 +117,7 @@ namespace Hapio.Experiments
             { error = replay.Error; return error == null; }
         }
 
-        public void Request(int preset, Color32[] srgb)
+        public void Request(int preset, Color32[] srgb, Texture2D[] brushOverride = null)
         {
             if (disposed) { Error = "Palette replay has been disposed."; return; }
             DisposeRuntime(ref pending); pendingPreset = -1;
@@ -142,7 +142,9 @@ namespace Hapio.Experiments
                     return replacement[index];
                 };
                 ClayPreviewPalettePreset selected = presets[preset];
-                pending = new LabClayStickerRuntime(selected.brushes,
+                if (brushOverride != null)
+                    Require(preset == 3 && brushOverride.Length == 3 && Array.TrueForAll(brushOverride, b => b != null && b.width == 512 && b.height == 512), "Splash brushes require three 512px coating masks.");
+                pending = new LabClayStickerRuntime(brushOverride ?? selected.brushes,
                     new LabClayStickerSettings { minimumDensity = selected.minimumDensity, maximumDensity = selected.maximumDensity },
                     selected.compositor, resolver);
                 pendingPreset = preset; ticks = 0;
