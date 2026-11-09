@@ -397,7 +397,7 @@ namespace C6Lab.Tests
             JsonUtility.FromJsonOverwrite("{\"jigwiSmokeFlow\":true,\"jigwiABPersonalDurationSeconds\":10,\"jigwiAHoldBurnUntilEnd\":true,\"jigwiTalismanWaterCount\":1}",config);
             return Room3();
         }
-        [Test] public void SharedTalismanRewardsEveryoneOnlyWhenAllHaveWrittenIt()
+        [Test] public void SharedTalismanPoursTheWaterfallOnlyWhenAllHaveWrittenIt()
         {
             // #595: 공용 부적 — 모두 써야 모두 보상.
             var m=SmokeFlowRoom3();var a=Current(m,45.1);
@@ -408,12 +408,13 @@ namespace C6Lab.Tests
             Assert.That(waiting.orbs.Any(o=>o.jigwiTalismanReward),Is.False,"Nobody is rewarded until everyone has written it.");
             Assert.That(waiting.jigwiAB.rounds.Single(r=>r.id==a.id).resolution,Is.EqualTo(LabJigwiABResolution.None));
             Assert.That(LabJigwiABNetworkValidation.Valid(waiting.jigwiAB,waiting.players,m.Revision),Is.True);
+            int painted=m.PaintSurface.PaintCount;
             Assert.That(m.TryCompleteJigwiTalisman(Three[2],a.id,52.5),Is.True);
+            Assert.That(m.PaintSurface.PaintCount,Is.GreaterThan(painted),"The waterfall paints the boss at once.");
             var done=m.Snapshot(52.5);
             Assert.That(done.jigwiAB.rounds.Single(r=>r.id==a.id).resolution,Is.EqualTo(LabJigwiABResolution.Completed));
             Assert.That(LabJigwiABNetworkValidation.Valid(done.jigwiAB,done.players,m.Revision),Is.True);
-            var later=m.Snapshot(58);
-            Assert.That(later.orbs.Where(o=>o.jigwiTalismanReward).Select(o=>o.owner),Is.EquivalentTo(Three),"Everyone gets the talisman Water together.");
+            Assert.That(m.Snapshot(58).orbs.Any(o=>o.jigwiTalismanReward),Is.False,"#595: no talisman orbs, the waterfall is the reward.");
         }
         [Test] public void SharedTalismanBurnsEveryBoardWhenOneSeatMissesIt()
         {

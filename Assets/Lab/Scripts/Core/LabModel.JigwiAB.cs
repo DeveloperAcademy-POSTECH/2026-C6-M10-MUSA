@@ -551,7 +551,7 @@ namespace C6Lab
         }
         /// <summary>
         /// #595 공용 부적: 쓴 사람의 판은 아직 타지 않게만 하고 보상은 미룬다. 마지막 사람이 쓰는 순간 모두의 멈춘 구슬 수명이
-        /// 돌아가고, 모두에게 같은 때 부적 물구슬이 내려와 A가 끝난다. 한 명이라도 못 쓰면 끝날 때 모두의 판이 탄다(ResolveJigwiAB).
+        /// 돌아가고, 박 위로 폭포가 쏟아져(자리마다 양동이 한 번만큼 물 칠) A가 끝난다. 한 명이라도 못 쓰면 끝날 때 모두의 판이 탄다(ResolveJigwiAB).
         /// </summary>
         private bool CompleteCommonJigwiTalisman(LabJigwiABRound active, ulong sender, double now)
         {
@@ -560,11 +560,11 @@ namespace C6Lab
                 { orb.jigwiABBurnEventId = null; orb.jigwiABBurnAt = -1d; orb.revision = ++revision; }
             revision++;
             if (!active.players.All(value => value.talismanAt >= 0d)) return true;
+            // #595: the reward is a waterfall on the boss (like each seat's poured bucket), not talisman orbs.
             foreach (var seat in active.players)
             {
                 ResumeJigwiAOrbLifetimes(seat.playerId, active.endsAt - now);
-                GrantJigwiTalismanWater(seat.playerId, now);
-                HoldJigwiOrbsForTalismanReward(seat.playerId, now);
+                PaintJigwiBucketPour(seat.playerId, now);
             }
             ResolveJigwiAB(active, LabJigwiABResolution.Completed, now);
             return true;

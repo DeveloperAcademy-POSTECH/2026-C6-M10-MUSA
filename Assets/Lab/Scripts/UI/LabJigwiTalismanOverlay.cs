@@ -229,6 +229,8 @@ namespace C6Lab
         private static readonly Rect GlyphInkRect = Rect.MinMaxRect(.149f, .081f, .848f, .92f);
         /// <summary>#533: 흐린 "물" 글자(보통 Text). 먹 붓 점을 글자 모양 안에만 보이게 가리는 Mask 그림이기도 하다.</summary>
         private UnityEngine.UI.Text ghost, ghostEdge;
+        /// <summary>#595: 부적의 "물" 글자 글꼴(신라문화체). 없으면 지금 글꼴.</summary>
+        public Font GlyphFont => ghost != null && ghost.font != null ? ghost.font : font;
         private UnityEngine.UI.Outline ghostOutline;
         private static Sprite watercolorDot;
         private Color[] inkColors = Array.Empty<Color>();
@@ -1395,9 +1397,8 @@ namespace C6Lab
             if (snapshot?.jigwiAB?.rounds == null || RoundId == null) return false;
             foreach (LabJigwiABRound round in snapshot.jigwiAB.rounds)
             {
-                if (round == null || round.id != RoundId || !round.common) continue;
-                foreach (LabJigwiABPlayerFire seat in round.players ?? Array.Empty<LabJigwiABPlayerFire>())
-                    if (seat != null && seat.playerId != source.LocalPlayerId && seat.talismanAt < 0d) return true;
+                // #595: a common talisman gives no orbs at all (the reward is the waterfall), so it never folds into one.
+                if (round != null && round.id == RoundId && round.common) return true;
             }
             return false;
         }

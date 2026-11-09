@@ -813,9 +813,20 @@ namespace C6Lab
             // lines). The drops, the "now" vibration and the failure overlay carry the rest without text.
             // #540: the taunts are spoken by Jigwi's voice now (LabJigwiTalismanOverlay); no warning words on screen.
             string words = string.Empty;
-            DrawTalismanProgress(LastCommonTalisman(stage, now) ?? active, now); // #595: icons, not words
-            DrawTalismanStamps(LastCommonTalisman(stage, now), snapshot, local, now); // #595: who has written it
-            DrawTalismanSeal(stage, now); // #595: all written — the talismans fly to the boss and seal it
+            LabJigwiABRound previewRound = AdvancePreview(now); // #595 editor preview (C6 Lab/Jigwi menu)
+            DrawPreviewMap(previewRound);
+            if (previewRound != null)
+            {
+                DrawTalismanProgress(previewRound, now);
+                MaybeBeginSeal(previewRound, now);
+                AnimateSeal();
+            }
+            else
+            {
+                DrawTalismanProgress(LastCommonTalisman(stage, now) ?? active, now); // #595: icons, not words
+                DrawTalismanStamps(LastCommonTalisman(stage, now), snapshot, local, now); // #595: who has written it
+                DrawTalismanSeal(stage, now); // #595: all written — the talismans fly to the boss, "물" bursts, a waterfall pours
+            }
             status.text = words; playerStatus.text = rows.ToString();
             statusPanel.gameObject.SetActive(words.Length > 0);
             playerStatus.gameObject.SetActive(rows.Length > 0);
@@ -1007,89 +1018,179 @@ namespace C6Lab
             return waitRingSprite;
         }
 
-        // ---------- #595 모두 썼다: 켜진 부적들이 박으로 휘릭 날아가 붙고, 큰 붉은 "봉" 도장이 쾅 (1초 남짓) ----------
+        // ---------- #595 모두 썼다: 켜진 부적들이 빛나다 박으로 휘릭 날아가고, 박에서 "물" 글자(신라문화체)가 확 커지며,
+        // 위에서 부적 구슬 꼬리처럼 먹 테두리·물·하이라이트 세 겹 폭포가 쏟아지고 물방울이 튄다 ----------
         private RectTransform sealRoot;
-        private UnityEngine.UI.Image sealStamp;
-        private UnityEngine.UI.Text sealGlyph;
+        private UnityEngine.UI.Text waterGlyph;
+        private UnityEngine.UI.RawImage waterfallBack, waterfall;
+        private UnityEngine.UI.Image splash;
+        private static Texture2D waterfallTexture;
+        private static Sprite dropSprite;
         private readonly UnityEngine.UI.Image[] flyers = new UnityEngine.UI.Image[LabJigwiABNetworkValidation.MaximumPlayers];
+        private readonly UnityEngine.UI.Image[] flyerGlows = new UnityEngine.UI.Image[LabJigwiABNetworkValidation.MaximumPlayers];
         private readonly Vector3[] flyFrom = new Vector3[LabJigwiABNetworkValidation.MaximumPlayers];
+        private readonly UnityEngine.UI.Image[] drops = new UnityEngine.UI.Image[24];
+        private readonly Vector2[] dropVelocity = new Vector2[24];
+        private readonly Vector3[] dropAt = new Vector3[24];
+        private readonly float[] dropBorn = new float[24];
         private string sealedRound;
         private float sealStartedAt = -1f;
-        private int flyCount;
+        private int flyCount, nextDrop;
+        private bool poured;
+        private float lastDropAt;
         private AudioSource sealAudio;
-        private const float FlySeconds = .45f, SealHoldSeconds = .6f, SealFadeSeconds = .35f;
-        /// <summary>테스트용: 봉인 연출이 도는 중인지.</summary>
+        private const float GlowSeconds = .45f, FlySeconds = .4f, GlyphSeconds = .7f, PourSeconds = 1.5f;
+        /// <summary>테스트용: 완성 연출이 도는 중인지 / 폭포가 보이는지.</summary>
         public bool SealPlaying => sealStartedAt >= 0f;
+        public bool WaterfallVisible => waterfall != null && waterfall.gameObject.activeInHierarchy;
 
         private void DrawTalismanSeal(LabJigwiABSnapshot stage, double now)
         {
-            foreach (var round in stage?.rounds ?? Array.Empty<LabJigwiABRound>())
-            {
-                if (round == null || !round.common || round.kind != LabJigwiABKind.PersonalBurn
-                    || round.resolution != LabJigwiABResolution.Completed || round.resolvedAt < 0d) continue;
-                if (round.id == sealedRound || now < round.resolvedAt || now - round.resolvedAt > 1d) continue;
-                BeginSeal(round);
-            }
+            foreach (var round in stage?.rounds ?? Array.Empty<LabJigwiABRound>()) MaybeBeginSeal(round, now);
+            AnimateSeal();
+        }
+
+        private void MaybeBeginSeal(LabJigwiABRound round, double now)
+        {
+            if (round == null || !round.common || round.kind != LabJigwiABKind.PersonalBurn
+                || round.resolution != LabJigwiABResolution.Completed || round.resolvedAt < 0d) return;
+            if (round.id == sealedRound || now < round.resolvedAt || now - round.resolvedAt > 1d) return;
+            BeginSeal(round);
+        }
+
+        private void AnimateSeal()
+        {
             if (sealStartedAt < 0f) return;
-            float age = Time.unscaledTime - sealStartedAt;
-            if (age >= FlySeconds + SealHoldSeconds + SealFadeSeconds) { sealStartedAt = -1f; sealRoot.gameObject.SetActive(false); return; }
+            float t = Time.unscaledTime, age = t - sealStartedAt;
+            if (age >= GlowSeconds + FlySeconds + PourSeconds + .6f) { sealStartedAt = -1f; sealRoot.gameObject.SetActive(false); return; }
             Vector3 boss = BossPoint();
-            float fly = Mathf.Clamp01(age / FlySeconds);
+            float unit = transform.lossyScale.y;
+            // ① All filled: the talismans glow gold together (a swelling pulse) before taking off.
+            float glow = Mathf.Clamp01(age / GlowSeconds);
+            float fly = Mathf.Clamp01((age - GlowSeconds) / FlySeconds);
             for (int i = 0; i < flyers.Length; i++)
             {
                 bool on = i < flyCount && fly < 1f;
                 if (flyers[i].gameObject.activeSelf != on) flyers[i].gameObject.SetActive(on);
+                if (flyerGlows[i].gameObject.activeSelf != on) flyerGlows[i].gameObject.SetActive(on);
                 if (!on) continue;
-                float k = Mathf.Clamp01((fly - i * .06f) / .8f);
-                float ease = k * k;
-                Vector3 arc = Vector3.up * Mathf.Sin(Mathf.PI * k) * 60f * transform.lossyScale.y;
-                flyers[i].rectTransform.position = Vector3.Lerp(flyFrom[i], boss, ease) + arc;
+                float k = Mathf.Clamp01((fly - i * .05f) / .8f), ease = k * k;
+                Vector3 arc = Vector3.up * Mathf.Sin(Mathf.PI * k) * 60f * unit;
+                Vector3 at = Vector3.Lerp(flyFrom[i], boss, ease) + arc;
+                float pulse = 1f + .25f * Mathf.Sin(Mathf.PI * glow) + .05f * Mathf.Sin(t * 30f) * (1f - fly);
+                flyers[i].rectTransform.position = at;
                 flyers[i].rectTransform.localEulerAngles = new Vector3(0f, 0f, 360f * ease * (i % 2 == 0 ? 1f : -1f));
-                flyers[i].rectTransform.localScale = Vector3.one * Mathf.Lerp(1f, .6f, ease);
+                flyers[i].rectTransform.localScale = Vector3.one * pulse * Mathf.Lerp(1f, .6f, ease);
+                flyers[i].color = Color.Lerp(Color.white, new Color(1f, .97f, .75f, 1f), glow);
+                flyerGlows[i].rectTransform.position = at;
+                flyerGlows[i].rectTransform.sizeDelta = flyers[i].rectTransform.sizeDelta * 2.4f;
+                flyerGlows[i].color = new Color(1f, .85f, .35f, .85f * Mathf.Sin(Mathf.PI * Mathf.Min(1f, glow * 1.4f)) * (1f - ease * .6f) + .2f * glow);
             }
-            float s = age - FlySeconds;
-            bool stamp = s >= 0f;
-            if (sealStamp.gameObject.activeSelf != stamp) sealStamp.gameObject.SetActive(stamp);
-            if (!stamp) return;
-            if (s - Time.unscaledDeltaTime < 0f) // the moment it lands
+            float s = age - GlowSeconds - FlySeconds;
+            // ② "물" (the talisman's own Shilla Culture letter) bursts out of the boss, growing big as it fades.
+            bool letter = s >= 0f && s < GlyphSeconds;
+            if (waterGlyph.gameObject.activeSelf != letter) waterGlyph.gameObject.SetActive(letter);
+            if (letter)
             {
-                if (source != null) LabHaptics.PlayDirect(source.config, LabHapticStyle.Heavy, 1f, .3f, .9f, .5f);
-                PlaySeal();
+                float g = s / GlyphSeconds;
+                waterGlyph.rectTransform.position = boss;
+                waterGlyph.rectTransform.localScale = Vector3.one * Mathf.Lerp(.6f, 3.4f, 1f - (1f - g) * (1f - g));
+                waterGlyph.color = new Color(.2f, .62f, 1f, 1f - g * g);
             }
-            float slam = Mathf.Clamp01(s / .16f);
-            float fade = 1f - Mathf.Clamp01((s - SealHoldSeconds) / SealFadeSeconds);
-            sealStamp.rectTransform.position = boss;
-            sealStamp.rectTransform.localScale = Vector3.one * Mathf.Lerp(2.6f, 1f, slam * slam);
-            sealStamp.color = new Color(.78f, .1f, .07f, .92f * fade * Mathf.Lerp(.4f, 1f, slam));
-            sealGlyph.color = new Color(1f, .96f, .88f, fade * slam);
+            // ③ The waterfall: an ink-edged water column (like the talisman orb's tail) in two layers rushing at different
+            // speeds, wobbling a little, with a splash and drops flying off where it hits the boss.
+            bool pour = s >= 0f && s < PourSeconds;
+            foreach (var part in new UnityEngine.UI.Graphic[] { waterfallBack, waterfall, splash })
+                if (part.gameObject.activeSelf != pour) part.gameObject.SetActive(pour);
+            AnimateDrops(t, unit);
+            if (!pour) return;
+            if (!poured)
+            {
+                poured = true;
+                PlayPour();
+                if (source != null) LabHaptics.PlayDirect(source.config, LabHapticStyle.Heavy, 1f, .5f, .9f, .5f);
+                Collider hitbox = source != null && source.target != null ? source.target.Hitbox : null;
+                if (hitbox != null) { LabJigwiWaterFx.Get(hitbox.gameObject.layer); LabJigwiWaterFx.Shake(hitbox.bounds.extents.magnitude * .1f, 1f); }
+            }
+            var rect = transform as RectTransform;
+            float top = rect != null ? rect.TransformPoint(new Vector3(0f, rect.rect.yMax, 0f)).y : boss.y + 1000f;
+            float width = (rect != null ? rect.rect.width : 600f) * .3f;
+            float grow = Mathf.Clamp01(s / .18f), fade = 1f - Mathf.Clamp01((s - (PourSeconds - .4f)) / .4f);
+            float wobble = 1f + .06f * Mathf.Sin(t * 17f) + .04f * Mathf.Sin(t * 29f);
+            PlaceColumn(waterfallBack, boss, top, width * 1.25f * wobble * Mathf.Lerp(.5f, 1f, grow), grow, t * 1.6f, .55f * fade, -.5f);
+            PlaceColumn(waterfall, boss, top, width * (2f - wobble) * Mathf.Lerp(.5f, 1f, grow), grow, t * 2.8f, .95f * fade, .3f);
+            splash.rectTransform.position = boss;
+            splash.rectTransform.sizeDelta = Vector2.one * width * 1.7f * (1f + .1f * Mathf.Sin(t * 30f));
+            splash.color = new Color(.8f, .94f, 1f, .8f * fade * grow);
+            // Drops fly off the splash all the time it pours.
+            if (fade > .2f && t - lastDropAt > .03f)
+            {
+                lastDropAt = t;
+                var d = drops[nextDrop]; int i2 = nextDrop; nextDrop = (nextDrop + 1) % drops.Length;
+                dropAt[i2] = boss + new Vector3(UnityEngine.Random.Range(-.4f, .4f) * width * unit, 0f, 0f);
+                dropVelocity[i2] = new Vector2(UnityEngine.Random.Range(-1f, 1f) * 520f, UnityEngine.Random.Range(380f, 720f));
+                dropBorn[i2] = t;
+                d.gameObject.SetActive(true);
+            }
+        }
+
+        private void PlaceColumn(UnityEngine.UI.RawImage column, Vector3 boss, float top, float width, float grow, float scroll, float alpha, float sway)
+        {
+            var fall = column.rectTransform;
+            fall.pivot = new Vector2(.5f, 1f);
+            fall.position = new Vector3(boss.x, top, boss.z);
+            float length = (top - boss.y) / Mathf.Max(.0001f, fall.lossyScale.y);
+            fall.sizeDelta = new Vector2(width, length * grow);
+            column.uvRect = new Rect(sway * .1f * Mathf.Sin(scroll), scroll, 1f, 1.4f);
+            column.color = new Color(1f, 1f, 1f, alpha);
+        }
+
+        private void AnimateDrops(float t, float unit)
+        {
+            for (int i = 0; i < drops.Length; i++)
+            {
+                var d = drops[i];
+                if (d == null || !d.gameObject.activeSelf) continue;
+                float life = t - dropBorn[i];
+                if (life > .6f) { d.gameObject.SetActive(false); continue; }
+                Vector2 v = dropVelocity[i];
+                d.rectTransform.position = dropAt[i] + new Vector3(v.x * life, v.y * life - 1400f * life * life, 0f) * unit;
+                float size = Mathf.Lerp(26f, 10f, life / .6f);
+                d.rectTransform.sizeDelta = new Vector2(size, size * 1.25f);
+                d.color = new Color(.75f, .92f, 1f, 1f - life / .6f);
+            }
         }
 
         private void BeginSeal(LabJigwiABRound round)
         {
-            sealedRound = round.id; sealStartedAt = Time.unscaledTime;
+            sealedRound = round.id; sealStartedAt = Time.unscaledTime; poured = false;
             if (sealRoot == null)
             {
                 sealRoot = new GameObject("TalismanSeal", typeof(RectTransform)).GetComponent<RectTransform>();
                 sealRoot.gameObject.layer = gameObject.layer; sealRoot.SetParent(transform, false);
                 sealRoot.anchorMin = Vector2.zero; sealRoot.anchorMax = Vector2.one; sealRoot.offsetMin = sealRoot.offsetMax = Vector2.zero;
+                waterfallBack = NewRaw("Talisman Waterfall Back"); waterfall = NewRaw("Talisman Waterfall");
+                splash = NewSealImage("Talisman Waterfall Splash", LabProceduralFire.Glow());
+                for (int i = 0; i < drops.Length; i++) { drops[i] = NewSealImage("Waterfall Drop " + i, Drop()); drops[i].gameObject.SetActive(false); }
                 for (int i = 0; i < flyers.Length; i++)
                 {
-                    flyers[i] = new GameObject("Flying Talisman " + i, typeof(RectTransform)).AddComponent<UnityEngine.UI.Image>();
-                    flyers[i].gameObject.layer = gameObject.layer; flyers[i].raycastTarget = false; flyers[i].preserveAspect = true;
-                    flyers[i].sprite = TalismanIcon(); flyers[i].transform.SetParent(sealRoot, false);
+                    flyerGlows[i] = NewSealImage("Talisman Glow " + i, LabProceduralFire.Glow());
+                    flyers[i] = NewSealImage("Flying Talisman " + i, TalismanIcon()); flyers[i].preserveAspect = true;
                 }
-                sealStamp = new GameObject("Seal Stamp", typeof(RectTransform)).AddComponent<UnityEngine.UI.Image>();
-                sealStamp.gameObject.layer = gameObject.layer; sealStamp.raycastTarget = false;
-                sealStamp.transform.SetParent(sealRoot, false);
-                sealStamp.rectTransform.sizeDelta = Vector2.one * 220f;
-                sealGlyph = Label("SealGlyph", sealStamp.transform, 120);
-                sealGlyph.text = "봉"; sealGlyph.alignment = TextAnchor.MiddleCenter;
-                var glyph = sealGlyph.rectTransform;
-                glyph.anchorMin = Vector2.zero; glyph.anchorMax = Vector2.one; glyph.offsetMin = glyph.offsetMax = Vector2.zero;
+                waterGlyph = Label("Talisman Water Glyph", sealRoot, 150);
+                waterGlyph.text = "물"; waterGlyph.alignment = TextAnchor.MiddleCenter;
+                waterGlyph.horizontalOverflow = HorizontalWrapMode.Overflow; waterGlyph.verticalOverflow = VerticalWrapMode.Overflow;
+                waterGlyph.rectTransform.sizeDelta = new Vector2(240f, 240f);
+                var outline = waterGlyph.GetComponent<UnityEngine.UI.Outline>();
+                if (outline == null) outline = waterGlyph.gameObject.AddComponent<UnityEngine.UI.Outline>();
+                outline.effectColor = new Color(.02f, .1f, .2f, .95f); outline.effectDistance = new Vector2(4f, -4f);
             }
+            // The talisman's own letter: Shilla Culture, as written on the paper.
+            Font glyphFont = Talisman != null ? Talisman.GlyphFont : null;
+            if (glyphFont != null) waterGlyph.font = glyphFont;
             sealRoot.gameObject.SetActive(true); sealRoot.SetAsLastSibling();
-            sealStamp.gameObject.SetActive(false);
-            sealStamp.rectTransform.localEulerAngles = new Vector3(0f, 0f, -8f);
+            waterGlyph.gameObject.SetActive(false);
+            foreach (var part in new UnityEngine.UI.Graphic[] { waterfallBack, waterfall, splash }) part.gameObject.SetActive(false);
             // The lit icons in the row take off from where they are.
             flyCount = 0;
             for (int i = 0; i < talismanIcons.Length && flyCount < flyers.Length; i++)
@@ -1101,6 +1202,185 @@ namespace C6Lab
                 flyCount++;
             }
             if (talismanRow != null) talismanRow.gameObject.SetActive(false);
+        }
+
+        private UnityEngine.UI.RawImage NewRaw(string name)
+        {
+            var raw = new GameObject(name, typeof(RectTransform)).AddComponent<UnityEngine.UI.RawImage>();
+            raw.gameObject.layer = gameObject.layer; raw.raycastTarget = false; raw.texture = WaterfallTexture();
+            raw.transform.SetParent(sealRoot, false);
+            return raw;
+        }
+
+        private UnityEngine.UI.Image NewSealImage(string name, Sprite sprite)
+        {
+            var image = new GameObject(name, typeof(RectTransform)).AddComponent<UnityEngine.UI.Image>();
+            image.gameObject.layer = gameObject.layer; image.raycastTarget = false; image.sprite = sprite;
+            image.transform.SetParent(sealRoot, false);
+            return image;
+        }
+
+        /// <summary>
+        /// Falling water like the talisman orb's tail: a dark ink edge, the blue body, and light highlight streaks
+        /// (tiles vertically for the rush).
+        /// </summary>
+        private static Texture2D WaterfallTexture()
+        {
+            if (waterfallTexture != null) return waterfallTexture;
+            const int w = 96, h = 192;
+            waterfallTexture = new Texture2D(w, h, TextureFormat.RGBA32, false)
+            { name = "Jigwi talisman waterfall (#595 runtime)", hideFlags = HideFlags.DontSave, wrapMode = TextureWrapMode.Repeat };
+            var pixels = new Color[w * h];
+            Color ink = new Color(.015f, .105f, .2f, .96f), body = new Color(.12f, .64f, .98f, .98f), light = new Color(.72f, .97f, 1f, .95f);
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                {
+                    float u = (x + .5f) / w, v = (y + .5f) / h;
+                    // The edge wobbles down the column so it reads as flowing water, not a bar.
+                    float edge = .43f + .035f * Mathf.Sin(v * Mathf.PI * 6f) + .02f * Mathf.Sin(v * Mathf.PI * 14f + 1.3f);
+                    float d = Mathf.Abs(u - .5f);
+                    Color c;
+                    if (d > edge + .05f) c = Color.clear;
+                    else if (d > edge) c = ink;
+                    else
+                    {
+                        float streak = Mathf.Pow(.5f + .5f * Mathf.Sin(u * 40f + Mathf.Sin(v * Mathf.PI * 4f) * 2f), 6f);
+                        float shine = Mathf.Clamp01(1f - Mathf.Abs(u - .36f) / .07f) * (.6f + .4f * Mathf.Sin(v * Mathf.PI * 8f));
+                        c = Color.Lerp(body, light, Mathf.Clamp01(streak * .7f + shine));
+                    }
+                    pixels[y * w + x] = c;
+                }
+            waterfallTexture.SetPixels(pixels); waterfallTexture.Apply(false, true);
+            return waterfallTexture;
+        }
+
+        private static Sprite Drop()
+        {
+            if (dropSprite != null) return dropSprite;
+            const int s = 32;
+            var texture = new Texture2D(s, s, TextureFormat.RGBA32, false)
+            { name = "Jigwi waterfall drop (#595 runtime)", hideFlags = HideFlags.DontSave, wrapMode = TextureWrapMode.Clamp };
+            var pixels = new Color[s * s];
+            for (int y = 0; y < s; y++)
+                for (int x = 0; x < s; x++)
+                {
+                    float d = new Vector2(x + .5f - s * .5f, y + .5f - s * .5f).magnitude / (s * .5f);
+                    pixels[y * s + x] = d > 1f ? Color.clear : d > .78f ? new Color(.015f, .105f, .2f, .9f)
+                        : d < .35f && x < s / 2 && y > s / 2 ? Color.white : new Color(.45f, .8f, 1f, 1f);
+                }
+            texture.SetPixels(pixels); texture.Apply(false, true);
+            dropSprite = Sprite.Create(texture, new Rect(0f, 0f, s, s), new Vector2(.5f, .5f), s);
+            dropSprite.hideFlags = HideFlags.DontSave;
+            return dropSprite;
+        }
+
+        private void PlayPour()
+        {
+            AudioClip[] clips = Resources.LoadAll<AudioClip>("Audio/JigwiBucketPour");
+            if (clips == null || clips.Length == 0) return;
+            if (sealAudio == null) { sealAudio = gameObject.AddComponent<AudioSource>(); sealAudio.playOnAwake = false; sealAudio.spatialBlend = 0f; }
+            sealAudio.PlayOneShot(clips[0], LabAudioSettings.SfxVolume);
+        }
+
+        // ---------- #595 미리보기(에디터 메뉴 C6 Lab/Jigwi): 혼자서도 N명이 차례로 부적을 쓰고 모두 완성되는 장면을 본다(보기만, Host 칠 없음) ----------
+        private LabJigwiABRound preview;
+        private double previewStart = -1d;
+        /// <summary>지귀 전투 중에 부르면 <paramref name="players"/>명이 0.6초 간격으로 부적을 쓰고 완성 연출까지 보여 준다.</summary>
+        public void PreviewCommonTalisman(int players)
+        {
+            players = Mathf.Clamp(players, 1, LabJigwiABNetworkValidation.MaximumPlayers);
+            previewStart = -1d;
+            preview = new LabJigwiABRound
+            {
+                id = "preview-" + Time.frameCount, kind = LabJigwiABKind.PersonalBurn, common = true,
+                players = new LabJigwiABPlayerFire[players], resolvedAt = -1d
+            };
+            for (int i = 0; i < players; i++) preview.players[i] = new LabJigwiABPlayerFire { playerId = 900ul + (ulong)i, talismanAt = -1d };
+        }
+
+        // 미리보기의 가짜 작은 지도(사람 수만큼 자리): 진짜 지도 자리에 덮어 그려 도장이 찍히는 모습을 본다.
+        private RectTransform previewMap;
+        private readonly RectTransform[] previewSeats = new RectTransform[LabJigwiABNetworkValidation.MaximumPlayers];
+        private static readonly Vector2[][] PreviewSeatPoints =
+        {
+            new[] { new Vector2(0, 0) },
+            new[] { new Vector2(0, -20), new Vector2(0, 20) },
+            new[] { new Vector2(0, -23), new Vector2(-26, 24), new Vector2(26, 24) },
+            new[] { new Vector2(0, -23), new Vector2(-27, 0), new Vector2(0, 24), new Vector2(27, 0) },
+            new[] { new Vector2(1, -23), new Vector2(-24, -5), new Vector2(-17, 23), new Vector2(19, 23), new Vector2(24, -5) },
+        };
+
+        private void DrawPreviewMap(LabJigwiABRound round)
+        {
+            int n = round != null ? round.players.Length : 0;
+            if (n == 0) { if (previewMap != null && previewMap.gameObject.activeSelf) previewMap.gameObject.SetActive(false); return; }
+            if (minimap == null) minimap = FindFirstObjectByType<LabDrumMinimap>();
+            if (previewMap == null)
+            {
+                previewMap = new GameObject("Talisman Preview Map", typeof(RectTransform)).GetComponent<RectTransform>();
+                previewMap.gameObject.layer = gameObject.layer; previewMap.SetParent(transform, false);
+                var back = previewMap.gameObject.AddComponent<UnityEngine.UI.Image>();
+                back.raycastTarget = false; back.color = new Color(.973f, .914f, .804f, .96f);
+                for (int i = 0; i < previewSeats.Length; i++)
+                {
+                    var seat = new GameObject("Preview Seat P" + (i + 1), typeof(RectTransform)).AddComponent<UnityEngine.UI.Image>();
+                    seat.gameObject.layer = gameObject.layer; seat.raycastTarget = false; seat.transform.SetParent(previewMap, false);
+                    seat.rectTransform.sizeDelta = Vector2.one * 24f;
+                    if (minimap != null && minimap.playerSprites != null && i < minimap.playerSprites.Length) seat.sprite = minimap.playerSprites[i];
+                    else seat.color = new Color(.851f, .824f, .773f, 1f);
+                    previewSeats[i] = seat.rectTransform;
+                }
+            }
+            previewMap.gameObject.SetActive(true); previewMap.SetAsLastSibling();
+            RectTransform real = minimap != null ? minimap.Panel : null;
+            previewMap.anchorMin = previewMap.anchorMax = previewMap.pivot = new Vector2(.5f, .5f);
+            if (real != null && real.gameObject.activeInHierarchy)
+            {
+                previewMap.position = real.TransformPoint(real.rect.center);
+                previewMap.sizeDelta = real.rect.size * real.lossyScale.x / Mathf.Max(.0001f, previewMap.lossyScale.x);
+            }
+            else
+            {
+                var rect = transform as RectTransform;
+                previewMap.anchoredPosition = rect != null ? new Vector2(rect.rect.width * .36f, rect.rect.height * .32f) : Vector2.zero;
+                previewMap.sizeDelta = new Vector2(128f, 116f);
+            }
+            float k = previewMap.sizeDelta.x / 128f;
+            stampsUsed.Clear(); StampsShown = StampsWaiting = 0;
+            for (int i = 0; i < previewSeats.Length; i++)
+            {
+                bool on = i < n;
+                if (previewSeats[i].gameObject.activeSelf != on) previewSeats[i].gameObject.SetActive(on);
+                if (!on) continue;
+                previewSeats[i].anchoredPosition = PreviewSeatPoints[n - 1][i] * k;
+                previewSeats[i].sizeDelta = Vector2.one * 24f * k;
+                Stamp(previewSeats[i], round.players[i].talismanAt >= 0d);
+            }
+            HideUnusedStamps();
+        }
+
+        private void HideUnusedStamps()
+        {
+            foreach (var pair in stamps)
+                if (!stampsUsed.Contains(pair.Key) && pair.Value != null && pair.Value.gameObject.activeSelf) pair.Value.gameObject.SetActive(false);
+        }
+
+        /// <summary>미리보기 회차를 지금 시각에 맞춰 진행시키고 돌려준다(없으면 null).</summary>
+        private LabJigwiABRound AdvancePreview(double now)
+        {
+            if (preview == null) return null;
+            if (previewStart < 0d) { previewStart = now; preview.warningAt = now - 2d; preview.activeAt = now; preview.endsAt = now + 10d; }
+            int done = 0;
+            for (int i = 0; i < preview.players.Length; i++)
+            {
+                double at = previewStart + .8d + .6d * i;
+                if (now >= at && preview.players[i].talismanAt < 0d) preview.players[i].talismanAt = at;
+                if (preview.players[i].talismanAt >= 0d) done++;
+            }
+            if (done == preview.players.Length && preview.resolution == LabJigwiABResolution.None)
+            { preview.resolution = LabJigwiABResolution.Completed; preview.resolvedAt = now; }
+            if (preview.resolvedAt >= 0d && now > preview.resolvedAt + 3d) { preview = null; return null; }
+            return preview;
         }
 
         /// <summary>The boss's centre on this canvas (the middle of the upper screen when it cannot be projected).</summary>
