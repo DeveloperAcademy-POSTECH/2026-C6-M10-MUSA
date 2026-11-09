@@ -1383,6 +1383,25 @@ namespace C6Lab
             }
         }
 
+        /// <summary>
+        /// #595 공용 부적: 내가 다 썼어도 아직 안 쓴 사람이 있으면 부적은 구슬로 접혀 떨어지지 않고 빛난 채 위로 사라진다.
+        /// 물구슬은 모두가 쓴 순간 Host가 모두에게 준다. 내가 마지막이면 예전처럼 접혀 떨어진다.
+        /// </summary>
+        public bool FinishWaits => finishWaits;
+        private bool finishWaits;
+        private bool OthersStillWriting()
+        {
+            LabSnapshot snapshot = source != null ? source.Snapshot : null;
+            if (snapshot?.jigwiAB?.rounds == null || RoundId == null) return false;
+            foreach (LabJigwiABRound round in snapshot.jigwiAB.rounds)
+            {
+                if (round == null || round.id != RoundId || !round.common) continue;
+                foreach (LabJigwiABPlayerFire seat in round.players ?? Array.Empty<LabJigwiABPlayerFire>())
+                    if (seat != null && seat.playerId != source.LocalPlayerId && seat.talismanAt < 0d) return true;
+            }
+            return false;
+        }
+
         private void BeginFinish()
         {
             if (paper == null) return;
@@ -1398,6 +1417,7 @@ namespace C6Lab
             extinguishFrom = BurnFront;
             burstPlayed = false; notesPlayed = 0; sweepCued = false; landed = false;
             foldLingerUntil = -1f; rewardOrbsBefore = RewardOrbCount(source != null ? source.Snapshot : null);
+            finishWaits = OthersStillWriting();
             // #540: the alarm stops and the fire hum fades out; a steam sigh and a warm chord fill the gap (relief).
             Cue("Relief", reliefSoundFolder, reliefSoundVolume);
             DrawFinish();
@@ -1441,6 +1461,7 @@ namespace C6Lab
             float hold = HoldSeconds;
             float fold = Mathf.Clamp01((after - hold) / Mathf.Max(.01f, foldSeconds));
             float fall = Mathf.Clamp01((after - hold - foldSeconds) / Mathf.Max(.01f, fallSeconds));
+            if (finishWaits) fall = 0f; // #595: no orb drops for me yet
             if (fall >= 1f && !landed) { landed = true; BeginLanding(); }
             float folded = fold * fold * (3f - 2f * fold);
             Color gold = new Color(glowColor.r, glowColor.g, glowColor.b, 1f);
@@ -1481,12 +1502,22 @@ namespace C6Lab
             bool spot = TryRewardSpot(out Vector2 landing, out float orbSide);
             if (!spot) { orbSide = paper.rect.width * .3f; landing = (Vector2)finishFrom + Vector2.down * paper.rect.height * .35f; }
             float small = paper.rect.width > 1f ? Mathf.Clamp(orbSide / paper.rect.width, .05f, 1f) : .2f;
+            float shake = burstShake * paper.rect.height * ring * (1f - folded);
+            var jitter = new Vector3(wave * shake, Mathf.Cos(after * humHz * 1.37f * 2f * Mathf.PI) * shake * .35f, 0f);
+            if (finishWaits)
+            {
+                // #595: others are still writing — the glowing talisman just rises and fades (no orb yet).
+                paper.localScale = Vector3.one * (1f + burstPunch * bump);
+                paper.localRotation = Quaternion.identity;
+                if (paperGroup != null) paperGroup.alpha = 1f - folded;
+                paper.localPosition = finishFrom + jitter + Vector3.up * paper.rect.height * .25f * folded;
+                DrawFoldOrb(0f, 0f, 0f, landing, orbSide);
+                return;
+            }
             float paperScale = (1f + burstPunch * bump) * Mathf.Lerp(1f, small, folded);
             paper.localScale = Vector3.one * paperScale;
             paper.localRotation = Quaternion.Euler(0f, 0f, -360f * folded);
             if (paperGroup != null) paperGroup.alpha = 1f - Mathf.Clamp01((fold - .5f) / .5f);
-            float shake = burstShake * paper.rect.height * ring * (1f - folded);
-            var jitter = new Vector3(wave * shake, Mathf.Cos(after * humHz * 1.37f * 2f * Mathf.PI) * shake * .35f, 0f);
             paper.localPosition = finishFrom + jitter;
             DrawFoldOrb(fold, folded, fall, landing, orbSide);
         }

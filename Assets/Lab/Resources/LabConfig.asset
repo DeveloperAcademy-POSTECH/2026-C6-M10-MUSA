@@ -41,7 +41,9 @@ MonoBehaviour:
   jigwiFlowSchedule: 1
   jigwiAHoldBurnUntilEnd: 1
   jigwiBCountdown: 1
-  jigwiBBucket: 1
+  jigwiBBucket: 0
+  jigwiBTestOnly: 0
+  jigwiATestOnly: 1
   jigwiSmokeFlow: 1
   jigwiCommonStartSeconds: 25
   jigwiCommonIntervalSeconds: 15
@@ -62,9 +64,12 @@ MonoBehaviour:
   jigwiTalismanWaterCount: 1
   jigwiTalismanWaterPaintScale: 3
   jigwiTalismanRewardDelaySeconds: 2.9
-  jigwiBBoardFireSeconds: 0
   jigwiAFailDrumSlipSeconds: 15
   jigwiAFailDrumSlipBoost: 2
+  jigwiTalismanCoverage: 0.9
+  jigwiTalismanTolerance: 0.07
+  jigwiBSplashPaintShare: 3
+  jigwiBBoardFireSeconds: 0
   jigwiABShrinkDelaySeconds: 12
   jigwiABShrinkScale: 0.65
   jigwiABFireMoveAmount: 0.03
@@ -221,6 +226,8 @@ MonoBehaviour:
   teamFeverTurnSeconds: 0.35
   teamWallFlashSeconds: 0.35
   teamWallFlashBoost: 0.4
+  clayThickness: 0.006
+  clayGloss: 0.25
   highResolutionPaintEnabled: 1
   highResolutionPaintQuality: 0
   yaguangFlashEnabled: 0
@@ -253,10 +260,13 @@ MonoBehaviour:
   bombSoundStyle: 1
   chuimsaeChancePercent: 15
   chuimsaeMinGap: 5
+  staminaShortSoundVolume: 1
   gumihoBgmVolume: 0.4
   yaguangUseNewBgm: 1
   yaguangBgmVolume: 0.35
   gumihoFeverBgmVolume: 0.4
+  jigwiBgmVolume: 0.35
+  jigwiFeverBgmVolume: 0.35
   charmCastSoundVolume: 0.4
   charmCheckSoundVolume: 0.8
   charmReleaseSoundVolume: 0.4
@@ -290,6 +300,17 @@ MonoBehaviour:
   yaguangComboBigEndSoundVolume: 0.7
   smallHitPitchSemitones: 6
   bigHitSoundVolume: 0.8
+  yaguangComboBigBgmSemitones: 2
+  yaguangComboSmallBgmSemitones: 2
+  yaguangComboBgmToneSeconds: 0.3
+  yaguangComboClearedDelaySeconds: 0.8
+  yaguangComboClearedSoundVolume: 0.9
+  yaguangComboWarningShade: 0.5
+  comboPopDrumRatio: 0.35
+  yaguangFeverDrumPulseScale: 0.12
+  yaguangFeverDrumPulseRate: 1.6
+  yaguangFeverTapComboSeconds: 0.8
+  yaguangFeverTapCountSize: 0.45
   hapticsEnabled: 1
   generateHapticStyle: 1
   generateHapticIntensity: 1
