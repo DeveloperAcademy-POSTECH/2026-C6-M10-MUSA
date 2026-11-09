@@ -1,5 +1,21 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-09 — 1~3스테이지 박 1.4배
+
+- **기준:** `feat/stage-gourd-size`, main `2427de5a` 위 `d3b4aaa9`. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 그 뒤 커밋은 코드 동작 없이 툴팁 위치·문서만 바꿨다.
+- **바꾼 것:** 스테이지 박(rig가 있는 박)만 `LabGourdVisualRig.StageSizeMultiplier` 1.4배로 그린다. 판정 껍데기가 함께 커져 Game 토큰만 47로 올렸다. 다시 굽지 않았고 흰 박은 그대로다. 크기는 실제 게임 화면 시안(현재·1.15·1.3·1.4·1.5배)에서 사용자가 골랐다.
+
+| 확인 | 결과 |
+| --- | --- |
+| 새 PlayMode `GameStageGourdSizeTests`(세 스테이지 배율·판정 껍데기), `LabGourdVisualRigTests`, `LabWhiteGourdGoldenTests` | 7/7 PASS |
+| 대조 실험(배율을 1로 되돌림) | 새 검사 실패(1.54 기대, 1.1 실제) |
+| `LabGameFlowBridgeTests`·`LabLobbyRejoinTests` | 43/43 PASS |
+| 전체 EditMode / 전체 PlayMode(`d3b4aaa9`) | 2139/2139, 730/730 PASS |
+
+- 바닥과의 관계: 로그의 판정 AABB 아래쪽은 −1.058, 바닥 윗면은 −0.8이다. AABB는 기울어진 메시의 느슨한 상자다. 독립 검토에서 1스테이지 판정 메시 정점으로 다시 계산한 정지 자세 바닥은 약 −0.53이다(실행 측정 아님). 줄 흔들림 아래쪽이나 명중 반동에서는 잠깐 땅과 겹칠 수 있다.
+- 독립 검토의 실제 지적 2건(툴팁이 상수에 붙음, 호환 기록 누락)을 고쳤다.
+- **미실행:** 실제 플레이로 100% 칠 도달 가능 여부 확인, 실기기 화면 비율별 확인, 멀티 실기기, 마지막 일격 다시보기·결과 화면의 1.4배 구도 육안 확인.
+
 ## 2026-11-09 — 멀티 완료 연출 준비 판정
 
 - **기준:** `fix/multiplayer-finish-visual-identity`, main `3a3ec9e3` 위 `8cf2c9a0`. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 그 뒤 커밋은 호환 기록·주석만 바꿨다.
