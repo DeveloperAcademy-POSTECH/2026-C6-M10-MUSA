@@ -942,7 +942,7 @@ namespace C6Lab
             itemMarker.SetFuse(kind == LabOrbKind.Bomb ? fuseSeconds : -1f, FuseTotalSeconds, appearance);
         }
 
-        private bool HasBombArt => kind == LabOrbKind.Bomb && appearance != null && appearance.BombArt != null;
+        private bool HasBombArt => kind == LabOrbKind.Bomb && appearance != null && (appearance.BombArt != null || appearance.BombVisualPrefab != null);
 
         private string BadgeText()
         {

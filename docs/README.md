@@ -34,6 +34,7 @@
 | 일반 협동의 클레이·충돌 농도·DEV 두께/광택·Mac 실험 앱 사용법 | [박 클레이 스티커](CLAY_STICKER_PAINT.md) |
 | 누적 수채 브러시 구현·조절·비교 방법 | [수채 브러시 채색](WATERCOLOR_BRUSH_STAMPS.md) |
 | 투척 수치·물리 조정 | [투척 조정](THROW_TUNING_GUIDE.md) · [박 물리 조정](PINATA_TUNING_GUIDE.md) |
+| 폭탄 부품 프리팹·숫자 PNG·기존 표시 상태 연결 | [폭탄 시각 부품](BOMB_VISUALS.md) |
 | 오행 비행 트레일·조합판 물감 방울 | [트레일 안내](ELEMENT_FLIGHT_TRAILS.md) |
 | 현재 지귀 개인 발화·전원 불장막 | [지귀 화면 패턴](JIGWI_SCREEN_PATTERNS.md) |
 | B 성공 보상 전용 화염·Inspector·일반/보상 비교 | [보상 불꽃 궤적](JIGWI_REWARD_FIRE_TRAIL.md) |

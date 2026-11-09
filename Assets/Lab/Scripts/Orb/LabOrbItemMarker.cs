@@ -82,6 +82,8 @@ namespace C6Lab
         private SpriteRenderer badge;
         private TextMesh badgeCount;
         private SpriteRenderer bombArt;
+        private LabBombVisual bombVisual;
+        public LabBombVisual BombVisual => bombVisual;
         private Transform fusePivot;
         private SpriteRenderer fuseArt;
         private Quaternion bombTurn = Quaternion.identity;
@@ -130,12 +132,12 @@ namespace C6Lab
         public bool BadgeVisible => badge != null && badge.gameObject.activeSelf;
         public string BadgeText => badgeCount != null ? badgeCount.text : string.Empty;
         /// <summary>The cartoon bomb art is drawn in place of the disc and icon.</summary>
-        public bool BombArtVisible => bombArt != null && bombArt.gameObject.activeSelf;
+        public bool BombArtVisible => bombVisual != null ? bombVisual.gameObject.activeSelf : bombArt != null && bombArt.gameObject.activeSelf;
         /// <summary>The bomb art's current tint; it turns red while the fuse warning flashes.</summary>
-        public Color BombArtColor => bombArt != null ? bombArt.color : Color.clear;
-        public bool BombCountVisible => bombCount != null && bombCount.gameObject.activeSelf;
+        public Color BombArtColor => bombVisual != null ? bombVisual.Tint : bombArt != null ? bombArt.color : Color.clear;
+        public bool BombCountVisible => bombVisual != null ? bombVisual.CountVisible : bombCount != null && bombCount.gameObject.activeSelf;
         /// <summary>The unlock handoffs left, written on the bomb art; empty once it is open.</summary>
-        public string BombCountText => BombCountVisible ? bombCount.text : string.Empty;
+        public string BombCountText => bombVisual != null ? bombVisual.CountText : BombCountVisible ? bombCount.text : string.Empty;
         public Color BombCountColor => bombCount != null ? bombCount.color : Color.clear;
         /// <summary>How much of the fuse rope is left, 1 unburnt to 0 burnt down to the cap.</summary>
         public float RopeShare => ropeShare;
@@ -154,13 +156,13 @@ namespace C6Lab
         /// <summary>The puff of smoke where the spark went out when the bomb unlocked.</summary>
         public bool SmokeVisible => smokeElapsed >= 0f;
         /// <summary>The spark flickering on the bomb art's fuse while a locked bomb burns.</summary>
-        public bool SparkVisible => spark != null && spark.gameObject.activeSelf;
-        public bool FuseArtVisible => fuseArt != null && fuseArt.gameObject.activeInHierarchy;
+        public bool SparkVisible => bombVisual != null ? bombVisual.FlameVisible : spark != null && spark.gameObject.activeSelf;
+        public bool FuseArtVisible => bombVisual != null ? bombVisual.gameObject.activeInHierarchy : fuseArt != null && fuseArt.gameObject.activeInHierarchy;
         /// <summary>How the bomb has rolled from the pose drawn in its images.</summary>
         public Quaternion BombTurn => bombTurn;
         /// <summary>Where the rolled cap points; it never turns away from the camera (z stays at or below 0).</summary>
         public Vector3 CapDirection { get; private set; }
-        public int FuseSortingOrder => fuseArt != null ? fuseArt.sortingOrder : 0;
+        public int FuseSortingOrder => bombVisual != null ? bombVisual.CapSortingOrder : fuseArt != null ? fuseArt.sortingOrder : 0;
         /// <summary>Where the rope burns (its end), from the ball centre: the spark sits here.</summary>
         public Vector2 FuseTipPosition { get; private set; }
 
@@ -225,13 +227,28 @@ namespace C6Lab
             radius = orbRadius;
             follow = followMount;
             FollowMount();
-            SetBombMode(look.BombArt != null);
+            if (bombVisual == null && look.BombVisualPrefab != null)
+            {
+                bombVisual = Instantiate(look.BombVisualPrefab, transform);
+                foreach (Transform part in bombVisual.GetComponentsInChildren<Transform>(true))
+                    part.gameObject.layer = gameObject.layer;
+            }
+            SetBombMode(look.BombArt != null || bombVisual != null);
             if (!bombMode) return;
 
             // Sprites are one unit wide; the ball image width is set in orb diameters and the fuse
             // canvas, centred on the ball, in ball image widths.
             float bodyWidth = look.BombBodySize * 2f * radius;
             ballRadius = .5f * bodyWidth;
+            if (bombVisual != null)
+            {
+                bombVisual.transform.localScale = Vector3.one * bodyWidth;
+                capAngle = look.BombCapAngle;
+                rainbow.transform.localScale = Vector3.one * (2.5f * ballRadius);
+                bombVisual.ShowCount(countText);
+                UpdateBombPose();
+                return;
+            }
             bombArt.sprite = SpriteFor(look.BombArt);
             bombArt.transform.localScale = Vector3.one * bodyWidth;
             bombArt.transform.localPosition = Vector3.zero;
@@ -279,8 +296,9 @@ namespace C6Lab
         {
             if (on && !bombMode) hasLastRootPosition = false;
             bombMode = on;
-            bombArt.gameObject.SetActive(on);
-            fusePivot.gameObject.SetActive(on);
+            bombArt.gameObject.SetActive(on && bombVisual == null);
+            fusePivot.gameObject.SetActive(on && bombVisual == null);
+            if (bombVisual != null) bombVisual.gameObject.SetActive(on);
             if (on)
             {
                 disc.gameObject.SetActive(false);
@@ -410,6 +428,7 @@ namespace C6Lab
             icon.color = new Color(tint.r, tint.g, tint.b, icon.color.a);
             bombArt.color = Color.Lerp(Color.white, red, .75f * WarningLevel);
             fuseArt.color = bombArt.color;
+            if (bombVisual != null) bombVisual.SetTint(bombArt.color);
             warningGlow.gameObject.SetActive(true);
             warningGlow.transform.localScale = Vector3.one * (2.4f * radius);
             warningGlow.color = new Color(red.r, red.g, red.b, .6f * WarningLevel);
@@ -424,6 +443,7 @@ namespace C6Lab
             icon.color = new Color(1f, 1f, 1f, icon.color.a);
             bombArt.color = Color.white;
             fuseArt.color = Color.white;
+            if (bombVisual != null) bombVisual.SetTint(Color.white);
             warningGlow.gameObject.SetActive(false);
         }
 
@@ -485,6 +505,13 @@ namespace C6Lab
             var across = new Vector2(CapDirection.x, CapDirection.y);
             float reach = Mathf.Max(across.magnitude, MinReach);
             float facing = across.sqrMagnitude > 1e-8f ? Mathf.Atan2(across.y, across.x) : authored;
+            if (bombVisual != null)
+            {
+                bombVisual.Pose(facing * Mathf.Rad2Deg, reach, capAngle, ropeShare);
+                FuseTipPosition = bombVisual.TipPosition;
+                sparkOffset = FuseTipPosition;
+                return;
+            }
             fusePivot.localPosition = new Vector3(0f, 0f, -.005f);
             fusePivot.localRotation = Quaternion.Euler(0f, 0f, facing * Mathf.Rad2Deg);
             fusePivot.localScale = new Vector3(reach, 1f, 1f);
@@ -573,6 +600,14 @@ namespace C6Lab
 
         private void SetSpark(bool lit)
         {
+            if (bombVisual != null)
+            {
+                bombVisual.SetLit(lit);
+                spark.gameObject.SetActive(false);
+                sparkHeart.gameObject.SetActive(false);
+                foreach (SpriteRenderer dot in sparkDots) dot.gameObject.SetActive(false);
+                return;
+            }
             spark.gameObject.SetActive(lit);
             sparkHeart.gameObject.SetActive(lit);
             foreach (SpriteRenderer dot in sparkDots) dot.gameObject.SetActive(lit);
@@ -634,6 +669,11 @@ namespace C6Lab
             sparkTime += step;
             float flicker = Mathf.PerlinNoise(sparkTime * 14f, .37f);
             float turn = Mathf.PerlinNoise(.91f, sparkTime * 6f) * 180f;
+            if (bombVisual != null)
+            {
+                bombVisual.AnimateFlame(flicker, turn);
+                return;
+            }
             // The picture's star at about 60%, so it marks where the rope burns without hiding how
             // much is left; it swells and shrinks as it burns.
             float size = (ballRadius > 0f ? ballRadius : radius) * Mathf.Lerp(.48f, .62f, flicker);

@@ -6989,3 +6989,46 @@ Compared twelve seed masks and selected 572. Changed only seed defaults and the 
 **기존 main 검사의 보정 범위:** 지귀 양동이 모델 검사는 마지막 자리의 도착 전 거절 검사를 첫 자리 처리 뒤로 옮겨 단조 증가 시각을 지켰다. PlayMode의 구형 특수 물구슬 명중·독립 반경 검사는 복제 설정에서만 옛 모드를 명시해 실제 물리 접촉·무도색 처리·반경·잡기 범위·면적 검사를 유지했다. 기본 양동이 모드의 포괄 범위 검사는5명 모두를 검사한다. 저장된 Home→스테이지3 검사는 현재 기본 양동이 표시·도착 창·옛 물방울/특수 구슬 없음·Host 쏟기/중복 거절·실제 도색·스태미나 무소모·원래 HitShell/Collider 유지로 맞췄다. 튜토리얼은 이미 승인된#552 대본의 최대3줄 기준만 검사에 반영했다. 게임 규칙·대본·UI 배치·설정 원본을 고치거나 실패 검사를 삭제/skip하지 않았다.
 
 **최종 확인 범위:** 자동 GPU/Scene/네트워크 fixture와 Mac 앱 빌드다. 실제 앱의 버튼·선택창 관찰은 위#569 UI 기록의 버전을 따른다. 새 PNG 원본의 미관 승인, 최종 새 앱의 사용자 직접 파일 선택/조작, iOS·실기기·LAN/핫스팟 실환경은 이번 최종 검사에서 실행하지 않았다. 양동이 통합 fixture는 실제 Host 모델 판정을 확인하지만 폰 기울기·키보드 조작을 실행한 검사는 아니다. 원시 로그·검증 캡처·임시 빌드 도구·앱 산출물은 커밋하지 않는다.
+
+
+## #584 폭탄 시각 부품 교체 — 2026-11-09
+
+브랜치 `fix/#584-bomb-visual`, Unity **6000.6.5f1 / macOS Editor**. `BombVisual-Latest.zip`의 Parts와 `Unity-layout.json`, Figma `4434:357`을 사용했다. Parts 9개(PNG 8개·SVG 1개)는 원본 SHA256과 일치한다. 프리팹은 공용 외형에 연결했으며, 모델·네트워크·설정 수치·전달/해금/만료 판정은 수정하지 않았다. 표시 연결은 [폭탄 시각 부품](BOMB_VISUALS.md)을 따른다.
+
+| 실제 수행 | 결과 | 범위 |
+| --- | --- | --- |
+| 스크립트 컴파일·심지 셰이더 컴파일 | PASS | Editor 컴파일 완료, 콘솔 오류 0, `ShaderHasError=false` |
+| EditMode 선택 실행 | **122/122 PASS**, 실패·건너뜀 0 | `LabDeveloperConfigTests`, `LabBattleAudioWarmupTests` 전체와 아래 모델 검사 4개. 약 1.68초. 전체 프로젝트 검사가 아니다. |
+| 최종 PlayMode 선택 실행 | **10/10 PASS**, 실패·건너뜀 0 | 새 `LabBombVisualTests` 2개, 아래 기존 폭탄 회귀 6개, `GameBattleRenderWarmupTests` 2개. 약 10.20초. |
+| Unity 카메라 렌더 | 확인 | 숫자 4/3/2/1/숨김, 넓은 꼭지·얇은 심지·불꽃 연결, 소진 비율 1/.75/.5/.25/0의 그림을 렌더해 시각 확인. |
+| Play 모드 실제 구슬판 표시 | **Fixture 확인** | 임시 `LabOrbBoard`·공용 저장 외형·실제 `UpsertOrb` 경로에 폭탄 9개 생성. 숫자·회전·심지·축소 불꽃·빨간 경고·무지개 링 캡처 확인. 정렬용 위치 고정은 Rigidbody constraints를 썼다. 일반 전투나 Host/Guest 전달 실행을 뜻하지 않는다. |
+| 최종 Fixture 콘솔 | 확인 | 오류·경고 0. 초기 캡처의 kinematic 위치 고정에서 난 속도 대입 경고는 Fixture를 constraints 고정으로 바꾼 뒤 발생하지 않았다. 게임 물리 코드는 수정하지 않았다. |
+| 저장 씬·Git 검사 | 확인 | Home 씬으로 복귀·Play 종료, 저장 씬 변경 없음, `git diff --check` 통과. |
+
+EditMode 모델 검사 4개:
+- `ALockedBombBlastsAtItsFuseButHandoffsDefuseItIntoAnAttackOrb`
+- `AnUnlockedBombOpensWhereItRestsIntoTwoAttackOrbsEvenOnAFullBoardAndIsNeverThrownOrPassed`
+- `ALockedBombCannotBeOpened`
+- `ExpiredItemsAndUnlockedBombsAreReportedButALockedBombBlastsInstead`
+
+기존 PlayMode 폭탄 회귀 6개(`LabOrbPhysicsTests`):
+- `ABombWithArtDrawsTheCartoonBombWithItsRedUnlockCountAndABurningFuse`
+- `TheFuseRopeBurnsDownTowardTheCapOverTheFuseLessItsWarningSeconds`
+- `AMovingBombRollsItsCapAndFuseAroundTheBallIn3D`
+- `ABombFlashesRedInItsLastSecondsFasterAsItRunsOut`
+- `ABombReceivedOnItsUnlockingHandoffSmokesOnceWithoutAPriorLocalFuse`
+- `ABombIsNeverThrownAndAnUnlockedOneGlidesInRestsThenAsksToOpenInSmoke`
+
+새 프리팹 검사는 저장 외형이 실제 프리팹을 생성하는지, 숫자 교체와 심지 값이 서로 독립적인지, 회전 중 숫자가 똑바른지, 기존 15초/3초 경고 계산·점멸·해금 연기·무지개가 유지되는지, 프리팹에 Collider/Rigidbody/게임 판정 스크립트가 없는지를 확인했다. 기존 테스트의 기대값은 변경하지 않았다.
+
+**미실행**: 전체 EditMode/PlayMode 모음, 일반 전투 한 판의 수동 조작, 실제 다인 Host/Guest 전달·해금·만료, Mac standalone 빌드, iOS·실기기, Metal 첫 사용 비용 측정. 공격 구슬 2개 전환·시간 초과 폭발은 위 자동 모델 검사 근거이며 다인 실행이나 시각 폭발 장면의 수동 확인으로 쓰지 않는다. 초기 심지 geometry 방식은 렌더 오류를 확인해 폐기하고 원본 PNG를 읽는 전용 머티리얼로 최종 검증했다.
+
+### #584 실제 Hapio 전투 연결 누락 수정 — 2026-11-09
+
+사용자 실제 플레이 캡처에서 이전 폭탄이 보이는 문제가 확인됐다. 앞선 122/10 검사와 임시 구슬판 캡처는 Lab 외형을 사용했으므로 Hapio 실제 적용을 증명하지 못했다. 실제 실행 중 GameSession.Network.config.OrbAppearance가 `Assets/Hapio/Resources/Hapio/UI/BattleOrbAppearance.asset`임을 조회했다. GameBattleUiPresentation.ApplyOrbAppearance()가 Lab 외형을 이 별도 에셋으로 덮어쓰며, 이 에셋에 새 프리팹 연결이 빠져 있었다.
+
+전투용 외형에 bombVisualPrefab 참조 1개만 추가했다. 모델·네트워크·게임 판정은 변경하지 않았다. 재발 방지를 위해 별도 테마 연결 검사와 저장 Home→솔로 시작→실제 Battle 씬의 구슬판 표시 검사를 추가했다.
+
+- EditMode GameBattleUiAssetTests: **2/2 PASS**, 실패·건너뜀 0. Lab/전투 외형이 별도 객체이고 두 곳 모두 같은 새 폭탄 프리팹을 참조함을 확인.
+- PlayMode GameBattleUiPresentationTests.SavedBattleThemeDrawsTheNewBombOnTheRealBoard: **1/1 PASS**, 실패·건너뜀 0. 실제 GameSession 시작 경로의 전투 외형과 로드된 Battle 구슬판에 표시 전용 폭탄 fixture를 넣어 새 컴포넌트·BombCount2 PNG·불꽃 표시를 확인. 모델의 자연 발생 폭탄이나 사용자의 수동 플레이 확인과 구분한다.
+- 스크립트 컴파일 오류 0, git diff --check 통과. 자연 발생 폭탄 수동 조작·다인 전달·실기기 검증은 여전히 미실행이다.

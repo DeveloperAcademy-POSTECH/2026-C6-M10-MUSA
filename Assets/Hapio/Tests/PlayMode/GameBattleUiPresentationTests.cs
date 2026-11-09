@@ -22,6 +22,30 @@ namespace Hapio.Tests
         private int savedSoloStagePreference;
 #endif
         [UnityTest]
+        public IEnumerator SavedBattleThemeDrawsTheNewBombOnTheRealBoard()
+        {
+            yield return SceneManager.LoadSceneAsync(GameScenePaths.Home);
+            yield return Until(() => GameSession.Instance != null && !GameSession.Instance.IsLoadingScene);
+            session = GameSession.Instance;
+            var port = new TcpListener(IPAddress.Loopback, 0); port.Start();
+            session.Network.port = (ushort)((IPEndPoint)port.LocalEndpoint).Port; port.Stop();
+            session.StartSolo();
+            yield return Until(() => session.State.phase == GameFlowPhase.Playing && !session.IsLoadingScene);
+            yield return Until(() => !session.SceneFade.BlocksInput);
+            var bindings = Object.FindFirstObjectByType<GameBattleBindings>();
+            var look = bindings.GetComponent<GameBattleUiPresentation>().Theme.orbAppearance;
+            Assert.That(session.Network.config.OrbAppearance, Is.SameAs(look));
+            Assert.That(look.BombVisualPrefab, Is.Not.Null);
+            // A presentation-only fixture on the real loaded Battle board; no model state is changed.
+            var bomb = bindings.board.UpsertOrb("bomb-visual-binding-test", LabOrbKind.Bomb,
+                new Vector2(.5f, .5f), lockSwipes: 2, fuseSeconds: 9f);
+            Assert.That(bomb.ItemMarker.BombVisual, Is.Not.Null);
+            Assert.That(bomb.ItemMarker.BombVisual.CountSprite.name, Is.EqualTo("BombCount2"));
+            Assert.That(bomb.ItemMarker.BombCountText, Is.EqualTo("2"));
+            Assert.That(bomb.ItemMarker.SparkVisible, Is.True);
+        }
+
+        [UnityTest]
         public IEnumerator StoryThemesPreserveStageSceneryAndBindExistingHudAndBoard()
         {
 #if UNITY_EDITOR

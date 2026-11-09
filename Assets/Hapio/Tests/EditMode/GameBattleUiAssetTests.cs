@@ -8,6 +8,19 @@ namespace Hapio.Tests
     public sealed class GameBattleUiAssetTests
     {
         [Test]
+        public void SavedBattleThemeUsesTheBombPrefabAsWellAsTheLabAppearance()
+        {
+            var theme = Resources.Load<GameBattleUiTheme>(GameBattleUiTheme.ResourcePath);
+            var prefab = AssetDatabase.LoadAssetAtPath<LabBombVisual>("Assets/Lab/Art/BombVisual/BombVisual.prefab");
+            var lab = AssetDatabase.LoadAssetAtPath<LabConfig>("Assets/Lab/Resources/LabConfig.asset");
+            Assert.That(prefab, Is.Not.Null);
+            Assert.That(theme.orbAppearance, Is.Not.SameAs(lab.OrbAppearance));
+            Assert.That(theme.orbAppearance.BombVisualPrefab, Is.SameAs(prefab),
+                "Hapio overrides the Lab appearance; updating only the Lab asset cannot update a real battle.");
+            Assert.That(lab.OrbAppearance.BombVisualPrefab, Is.SameAs(prefab));
+        }
+
+        [Test]
         public void ThemeContainsAllStageAndTeamVariantsAndDoesNotReplaceTheLabAppearance()
         {
             var theme=Resources.Load<GameBattleUiTheme>(GameBattleUiTheme.ResourcePath);
