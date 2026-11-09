@@ -1,5 +1,39 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-09 — 결과·Home·Lobby의 시안에 없는 안내 줄 숨기기
+
+- **기준:** `fix/hide-result-status-line`, main `d1ea7b12` 위 `f37b4443`·`79bc2e15`. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 접속 묶음과 설정 수는 그대로다.
+- **바꾼 것:** StageResult 이야기 화면의 `Status` 줄과 Home·Lobby의 `ConnectionMessage` 줄을 실행 중 숨긴다. 프리팹은 바꾸지 않았다. Lobby 문구는 계속 계산하지만 화면에는 나오지 않는다. Direct IP 창의 안내 문구는 그대로다.
+
+| 확인 | 결과 |
+| --- | --- |
+| `GameFinishReplayTests`·`GameStageStoryPresentationTests`(결과 화면 30프레임 숨김 포함) | 9/9 PASS |
+| `GameStageStoryAssetTests` | 5/5 PASS |
+| `GameLobbyViewTests` | 19/19 PASS |
+| 대조 실험(결과 줄 표시, Lobby 줄 표시) | 해당 검사 실패 |
+| 전체 EditMode(`79bc2e15`) | 2150/2150 PASS |
+| 전체 PlayMode(`79bc2e15`) 1회차 | 692/731 PASS, 39건 실패 |
+| 전체 PlayMode(`79bc2e15`) 2회차 | 731/731 PASS |
+
+- 1회차 실패 39건 중 38건은 실행 중 Mac 덮개가 닫혀 잠든 것이 원인이다(전원 로그 17:06:21 `Clamshell Sleep`, 이후 검사 지연과 시각이 일치). 멈춘 검사 2건이 세션을 정리하지 못해 뒤 검사 36건의 SetUp이 연쇄 실패했다. 나머지 1건은 잠들기 전의 `LabPaintSpreadFlowRenderTests` GPU 화면 비교(픽셀 차 3, 허용 1)이며 2회차에서 통과했고 원인은 조사하지 않았다.
+- **미실행:** 실기기 화면 확인, 방 입장 실패·연결 끊김을 실제로 겪을 때의 사용감.
+
+## 2026-11-09 — 전투 화면의 내부 거절 코드 숨기기
+
+- **기준:** `fix/hide-rejection-codes`, main `02a27205` 위 `a46fe72d`와 그 뒤 로비 자리 거절 문구 커밋. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal).
+- **바꾼 것:** Hapio 게임 흐름에서 거절 사유가 내부 코드(영문 대문자·숫자·밑줄 또는 빈 값)면 `Notice`를 바꾸지 않고 개발 빌드 로그에만 남긴다. 로비 자리 거절은 한국어 안내로 표시한다. 독립 Lab은 코드를 그대로 표시한다. 접속 묶음과 설정 수는 그대로다.
+
+| 확인 | 결과 |
+| --- | --- |
+| EditMode `LabRejectionNoticeTests`(11건)·`LabLobbyRejoinTests` | 32/32 PASS |
+| PlayMode 실제 솔로에서 스태미나를 다 쓰고 북 누르기, `GameLobbyViewTests`, `LabLobbyPositionSelectionTests` | 2/2, 24/24 PASS |
+| 대조 실험(코드 숨김 제거, 자리 안내 제거) | 해당 검사 실패 |
+| 전체 EditMode / 전체 PlayMode(`a46fe72d`) | 2149/2149, 731/731 PASS |
+
+- 자리 거절 문구는 전체 실행 뒤에 고쳤고, 위 표의 관련 검사만 다시 돌렸다.
+- 폭탄·여우불 등 영어 안내 문장과 DEV 솔로의 `SHOT HIT` 수치는 이번 범위가 아니어서 그대로 표시된다.
+- **미실행:** 실기기 화면 확인, 스테이지 결과 화면 하단 빨간 글씨의 원인 확인(코드 변경 없음).
+
 ## 2026-11-09 — 1~3스테이지 박 1.4배
 
 - **기준:** `feat/stage-gourd-size`, main `2427de5a` 위 `d3b4aaa9`. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 그 뒤 커밋은 코드 동작 없이 툴팁 위치·문서만 바꿨다.
@@ -7057,7 +7091,7 @@ Compared twelve seed masks and selected 572. Changed only seed defaults and the 
 **최종 확인 범위:** 자동 GPU/Scene/네트워크 fixture와 Mac 앱 빌드다. 실제 앱의 버튼·선택창 관찰은 위#569 UI 기록의 버전을 따른다. 새 PNG 원본의 미관 승인, 최종 새 앱의 사용자 직접 파일 선택/조작, iOS·실기기·LAN/핫스팟 실환경은 이번 최종 검사에서 실행하지 않았다. 양동이 통합 fixture는 실제 Host 모델 판정을 확인하지만 폰 기울기·키보드 조작을 실행한 검사는 아니다. 원시 로그·검증 캡처·임시 빌드 도구·앱 산출물은 커밋하지 않는다.
 
 
-## 2026-11-09 — PR #581 원본 클레이 통합·원소 해방 제거 (화면 승인 대기)
+## 2026-11-09 — PR #581 원본 클레이 통합·원소 해방 제거 (사용자 화면 확인 완료)
 
 - 기준: PR #581 `0bab495f`에 main `02a27205`를 통합한 변경본. 별도 #588의 미커밋 32개 파일은 SHA256 대조로 그대로 보존했고 이 통합에 넣지 않았다. 데스크톱 작업 폴더도 변경하지 않았다.
 - 일반 오행의 3D 구슬·실제 경로를 따르는 클레이 꼬리·눌림·퍼짐·작은 진흙 방울을 유지하고 원소별 해방 클래스/형상/셰이더를 제거했다. 기존 `.86초 / Lerp(.95,1.13,strength)` 접촉 수명을 `contactSeconds`로 분리해 전투의 `leaveMark:false`에서도 짧은 진흙이 보이도록 유지했다. 실제 도색·투척·통신 규약·부적/특수 보상·마지막 일격 다시보기는 기존 경로를 유지한다.
@@ -7080,6 +7114,8 @@ Compared twelve seed masks and selected 572. Changed only seed defaults and the 
 
 - 검증용 임시 촬영 도구의 `GetInstanceID` 구형 API 때문에 한 차례 Safe Mode가 발생했다. 창 유형 재조회로 수정해 일반 Editor로 다시 열었으며 임시 도구는 커밋에서 제외한다. 이 도구를 추가하기 전에 위 전체 검사는 통과했다.
 - 비교 이미지는 `docs/images/five-elements/clay-only-spread.png`·`clay-only-settled.png`다. 과거 원소 해방 이미지는 새 외형 기준에서 제외했다. 원시 로그·빌드·기기 식별자는 저장소에 올리지 않는다.
-- 아직 수행하지 않은 항목: 사용자 최종 외형 승인, iOS 실기기 GPU 비용·가독성, 실제 여러 기기 LAN/핫스팟 확인. Editor의 프레임/GC 측정은 기기 성능 PASS 근거로 쓰지 않는다. **사용자 화면 승인 전 PR을 Draft로 유지하며 main은 병합하지 않는다.**
+- 2026-11-09 사용자가 수정된 비교 화면을 확인하고 이상 없으면 main 병합을 승인했다. iOS 실기기 GPU 비용·가독성과 실제 여러 기기 LAN/핫스팟 확인은 이번에 수행하지 않았다. Editor의 프레임/GC 측정은 기기 성능 PASS 근거로 쓰지 않는다.
 
-**비교 창 재실행 보완:** 위 전체 검사 뒤 실제 GameView에서 UI Toolkit의 초기 NaN 좌표가 카메라와 lane padding에 전달되고 preview 높이가 0으로 접히는 문제를 발견했다. 비교용 UIDocument가 패널을 채우도록 하고 유효한 좌표일 때만 카메라를 갱신하며, 일시정지 중에도 레이아웃 복구를 재시도한다. 게임 Scene·VFX·물리·판정은 변경하지 않았다. 실제 비교 창에서 5종 진흙과 하단 조작을 확인했고, 새 실제 Scene 시작/일시정지 중 분리·재연결 검사를 포함한 접촉 PlayMode **5/5 통과**를 확인했다. 이 화면 보완 후 전체 검사를 다시 실행하지는 않았다.
+**비교 창 재실행 보완:** 위 전체 검사 뒤 실제 GameView에서 UI Toolkit의 초기 NaN 좌표가 카메라와 lane padding에 전달되고 preview 높이가 0으로 접히는 문제를 발견했다. 비교용 UIDocument가 패널을 채우도록 하고 유효한 좌표일 때만 카메라를 갱신하며, 일시정지 중에도 레이아웃 복구를 재시도한다. 게임 Scene·VFX·물리·판정은 변경하지 않았다. 실제 비교 창에서 5종 진흙과 하단 조작을 확인했고, 새 실제 Scene 시작/일시정지 중 분리·재연결 검사를 포함한 접촉 PlayMode **5/5 통과**를 확인했다. 이후 아래 최신 main 통합본의 전체 검사에서 이 화면 보완도 함께 확인했다.
+
+**화면 승인 후 최신 main 통합·병합 전 최종 검사:** `eb6c431a`에 main `2ee6c70f`(#592 내부 거절 코드 숨김·#596 시안에 없는 안내 줄 숨김)를 자동 병합했다. `LabNetwork`의 거절 안내와 클레이 비행/명중 처리가 함께 남는 것을 읽기로 확인했고 두 검토에서 병합 차단 결함을 찾지 못했다. Unity 6000.6.5f1 macOS/Metal의 독립 batch에서 전체 EditMode **2,150/2,150 통과**(17.28초), 전체 PlayMode **740/740 통과**(589.20초)했다. 필터·재시도·제외 없이 실행했으며 실패·skip 0건이다. 비교 창 시작/일시정지 중 레이아웃 복구와 최신 main의 검사도 포함한다. 사용자 외형 확인은 완료됐고 iOS 실기기·실제 다중 기기 네트워크 검증은 추가하지 않았다. #588 보존 대상 32개 파일의 SHA256과 데스크톱 작업 폴더의 변경 없음도 재확인했다.
