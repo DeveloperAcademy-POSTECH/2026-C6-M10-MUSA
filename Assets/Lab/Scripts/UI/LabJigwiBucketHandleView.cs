@@ -679,7 +679,7 @@ namespace C6Lab
             if (steamRound == roundId) return;
             steamRound = roundId; steamOn = true; steamAt = Time.unscaledTime; steamClearedAt = -1f; rubbing = false;
             lastSqueakLeft = 1f; lastSqueakAt = -1f;
-            thickestSpot = handSpot = new Vector2(.5f, .66f); WipeGauge = 0f; // #595
+            thickestSpot = handSpot = new Vector2(.5f, .66f); WipeGauge = 0f; touched = false; // #595
             if (steamTexture == null)
             {
                 steamTexture = new Texture2D(SteamW, SteamH, TextureFormat.RGBA32, false)
@@ -737,7 +737,7 @@ namespace C6Lab
             // Rub: every finger (or mouse) drag over the board wipes a stroke out of the fog.
             if (TryPointer(out Vector2 screen) && board.Contains(screen))
             {
-                lastPointer = screen;
+                lastPointer = screen; touched = true;
                 Vector2 uv = new Vector2((screen.x - board.xMin) / board.width, (screen.y - board.yMin) / board.height);
                 if (rubbing) Wipe(lastRub, uv, board); else Wipe(uv, uv, board);
                 lastRub = uv; rubbing = true;
@@ -756,10 +756,8 @@ namespace C6Lab
                 PlaceScreenRect(steamHand.rectTransform, new Rect(centre.x - hand * .33f, centre.y - hand * .5f, hand * .67f, hand));
                 steamHand.rectTransform.localEulerAngles = new Vector3(0f, 0f, -u * 12f);
                 steamHand.color = new Color(1f, 1f, 1f, Mathf.Clamp01(steamLeft * 1.6f) * fadeIn);
-                // Steady beside the swaying hand.
-                lastPointer = new Vector2(board.xMin + board.width * handSpot.x, board.yMin + board.height * handSpot.y);
             }
-            DrawWipeGauge(WipeGauge, 1f, fadeIn, board);
+            DrawWipeGauge(WipeGauge, 1f, touched ? fadeIn : 0f, board); // only once touched; it stays where the finger was
         }
 
         // ---------- #595 how much is left: throb, the hand goes to the thickest smoke, the rubbing sound rises ----------
@@ -767,15 +765,16 @@ namespace C6Lab
         private const float SmokeGrey = .55f;
         private Image ringBack, ringFill;
         private Vector2 lastPointer;
+        private bool touched;
         private static Sprite ringSprite;
 
-        /// <summary>#595: a ring up and to the right of the finger (or the hint hand), filling as the smoke is wiped.</summary>
+        /// <summary>#595: a ring around the touch (where the finger is, or was last), filling as the smoke is wiped.</summary>
         private void DrawWipeGauge(float wiped, float scale, float alpha, Rect board)
         {
             Show(ringBack, alpha > .01f); Show(ringFill, alpha > .01f);
             if (alpha <= .01f) return;
-            float size = board.width * .17f;
-            Vector2 at = lastPointer + new Vector2(size * .75f, size * .75f);
+            float size = board.width * .22f; // wider than a fingertip, so it shows around it
+            Vector2 at = lastPointer;
             at.x = Mathf.Clamp(at.x, board.xMin + size * .6f, board.xMax - size * .6f);
             at.y = Mathf.Clamp(at.y, board.yMin + size * .6f, board.yMax - size * .6f);
             Rect rect = new Rect(at.x - size * .5f, at.y - size * .5f, size, size);
