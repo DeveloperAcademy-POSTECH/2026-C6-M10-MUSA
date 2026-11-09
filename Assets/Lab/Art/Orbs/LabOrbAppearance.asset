@@ -38,10 +38,10 @@ MonoBehaviour:
   bombBodySize: 1.2
   bombFuseCanvasSize: 2.044
   bombCapAngle: 52
-  bombRopeLength: 2
+  bombRopeLength: 2.82
   bombRopeColor: {r: 0.686, g: 0.533, b: 0.435, a: 1}
   bombRopeThickness: 0.072
-  bombCountColor: {r: 1, g: 0.16, b: 0.1, a: 1}
+  bombCountColor: {r: 0.5450981, g: 0.2705882, b: 0.07450981, a: 1}
   bombCountSize: 1.1
   drumSprite: {fileID: 21300000, guid: 2732675626f72427387ada5d986dfa0f, type: 3}
   lockIcon: {fileID: 2800000, guid: 34345e2fb63124286a9d172adfb68664, type: 3}
@@ -58,7 +58,26 @@ MonoBehaviour:
   bombWarningSeconds: 3
   bombWarningSlowHz: 2
   bombWarningFastHz: 8
-  bombWarningColor: {r: 1, g: 0.12, b: 0.08, a: 1}
+  bombWarningColor: {r: 0.49803922, g: 0.10980392, b: 0.050980393, a: 1}
+  expiryWarningSeconds: 3
+  expiryFlashStartHz: 1.5
+  expiryFlashFastHz: 7
+  expiryFlashColor: {r: 1, g: 1, b: 1, a: 0.9}
+  expirySmokeSize: 1.1
+  expirySmokeSeconds: 0.6
+  expirySmokeColor: {r: 0.62, g: 0.6, b: 0.57, a: 0.75}
+  foxFireSprite: {fileID: 0}
+  foxFireGlowColor: {r: 0.35, g: 0.75, b: 1, a: 0.7}
+  foxFireGlowSize: 1.6
+  foxFireGlowHz: 1.5
+  foxFireSmokeColor: {r: 0.35, g: 0.62, b: 1, a: 0.8}
+  blastFireFrames: []
+  blastFireFramesPerSecond: 12
+  blastFireWidth: 3.2
+  blastFireOrbCentre: {x: 0.5, y: 0.0625}
+  blastFireOffset: {x: 0, y: 0}
+  blastFireHalo: 1
+  blastFireEmbers: 1
   dropFallSeconds: 0.45
   dropBounceSeconds: 0.45
   dropBounceHeight: 1

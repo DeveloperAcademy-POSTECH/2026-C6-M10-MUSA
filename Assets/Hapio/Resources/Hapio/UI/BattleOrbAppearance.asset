@@ -58,7 +58,7 @@ MonoBehaviour:
   bombWarningSeconds: 3
   bombWarningSlowHz: 2
   bombWarningFastHz: 8
-  bombWarningColor: {r: 1, g: 0.12, b: 0.08, a: 1}
+  bombWarningColor: {r: 0.49803922, g: 0.10980392, b: 0.050980393, a: 1}
   expiryWarningSeconds: 3
   expiryFlashStartHz: 1.5
   expiryFlashFastHz: 7
