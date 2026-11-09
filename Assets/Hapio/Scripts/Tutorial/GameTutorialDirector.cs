@@ -565,6 +565,8 @@ namespace Hapio
 
         private void Advance()
         {
+            // A finger already down when the log opened can still let go on the line behind it.
+            if (logOpen) return;
             NoteLinePassed();
             IReadOnlyList<GameTutorialStep> steps = GameTutorialScript.Steps;
             beatIndex++;

@@ -139,7 +139,7 @@ namespace Hapio
 
         private void OpenSkipDialog()
         {
-            if (skipOpen || finishing || !HasTappedOnce || skipButton == null) return;
+            if (skipOpen || logOpen || finishing || !HasTappedOnce || skipButton == null) return;
             skipOpen = true;
             skipClosing = false;
             skipOpenedAt = Time.unscaledTime;
