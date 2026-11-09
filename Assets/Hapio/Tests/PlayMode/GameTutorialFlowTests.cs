@@ -180,7 +180,7 @@ namespace Hapio.Tests
                 Assert.That(director.StepIndex, Is.EqualTo(0));
                 Assert.That(director.BeatIndex, Is.EqualTo(line - 1));
                 Assert.That(board.AllowedGestures, Is.EqualTo(LabBoardGestures.None), "Lines keep the board still.");
-                yield return new WaitForSecondsRealtime(art.tapCooldown + .05f);
+                yield return WaitForTapToCount(director, art);
                 tap.onClick.Invoke();
                 Assert.That(director.BeatIndex, Is.EqualTo(line), "Tap " + line);
             }
@@ -530,7 +530,7 @@ namespace Hapio.Tests
             var log = buttons.Single(button => button.name == "Log Button");
 
             // The first line is only on the screen: nothing has been moved on from yet.
-            yield return new WaitForSecondsRealtime(art.tapCooldown + .05f);
+            yield return WaitForTapToCount(director, art);
             Assert.That(director.DialogueLog, Is.Empty);
             Assert.That(log.gameObject.activeInHierarchy, Is.False, "No log, no button.");
 
@@ -559,7 +559,7 @@ namespace Hapio.Tests
             Assert.That(hits.Count, Is.GreaterThan(0));
             Assert.That(hits[0].gameObject, Is.SameAs(log.gameObject), "The button takes the touch.");
 
-            yield return new WaitForSecondsRealtime(art.tapCooldown + .05f);
+            yield return WaitForTapToCount(director, art);
             tap.onClick.Invoke();
             Assert.That(director.DialogueLog.Select(entry => entry.Text).ToArray(),
                 Is.EqualTo(new[] { lines[0].Text, lines[1].Text }), "Oldest first.");
@@ -608,7 +608,7 @@ namespace Hapio.Tests
             // More lines than fit: it opens on the newest, and the drag bar shows.
             for (int i = 2; i < lines.Length; i++)
             {
-                yield return new WaitForSecondsRealtime(art.tapCooldown + .05f);
+                yield return WaitForTapToCount(director, art);
                 tap.onClick.Invoke();
             }
             Assert.That(director.DialogueLog.Count, Is.GreaterThan(art.logVisibleBars));
@@ -674,7 +674,7 @@ namespace Hapio.Tests
                 "The practice board plays its first line", 30f);
             GameTutorialArt art = GameTutorialArt.Load();
             var buttons = first.GetComponentsInChildren<UnityEngine.UI.Button>(true);
-            yield return new WaitForSecondsRealtime(art.tapCooldown + .05f);
+            yield return WaitForTapToCount(first, art);
             buttons.Single(button => button.name == "Tap To Continue").onClick.Invoke();
             Assert.That(first.BeatIndex, Is.EqualTo(1));
             Assert.That(first.DialogueLog.Count, Is.EqualTo(1));
@@ -719,12 +719,19 @@ namespace Hapio.Tests
             Assert.That(session.IsTutorial, Is.False);
         }
 
+        /// <summary>
+        /// Waits on the tutorial's own clock, which is what decides whether a tap counts. That clock only moves at the
+        /// start of a frame, so after a slow frame a fixed wall-clock wait can end with the cooldown not over yet.
+        /// </summary>
+        private static IEnumerator WaitForTapToCount(GameTutorialDirector director, GameTutorialArt art) =>
+            Until(() => director.TapCooldownOver, "The tap cooldown passes", art.tapCooldown + 5f);
+
         /// <summary>Wait out the tap cooldown, tap once, and check the next beat came.</summary>
         private static IEnumerator TapThrough(GameTutorialDirector director, UnityEngine.UI.Button tap, GameTutorialArt art)
         {
             Assert.That(director.IsShowingLine, Is.True, "A line is waiting for a tap.");
             int step = director.StepIndex, beat = director.BeatIndex;
-            yield return new WaitForSecondsRealtime(art.tapCooldown + .05f);
+            yield return WaitForTapToCount(director, art);
             tap.onClick.Invoke();
             Assert.That(director.IsFinishing || director.StepIndex != step || director.BeatIndex == beat + 1, Is.True,
                 "Tap moved on from step " + step + " beat " + beat);
