@@ -1,5 +1,22 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-09 — 결과 카드에서 내가 받은 칭호만 붉게 강조
+
+- **기준:** `feat/result-my-title-highlight`, 커밋 `5f9fe518`. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 프리팹·Scene·접속 묶음·설정 수는 바꾸지 않았다. 최신 main `33762faf` 병합 뒤에는 아래 표의 관련 검사만 다시 돌렸다.
+- **바꾼 것:** 부적 카드 뒷면과 패배 대시보드에서 저장된 시안 띠(1·4행)를 끄고, 내가 받은 칭호 줄마다(동점 포함) 띠를 얹고 이름에 `(나)`를 붙인다. 패배 대시보드에 실제 기록을 넣는다. 동작은 `STAGE_STORY_PRESENTATION.md`의 "내 칭호 강조"를 따른다.
+
+| 확인 | 결과 |
+| --- | --- |
+| 새 EditMode `StoryRecordHighlightTests`(저장 프리팹 4종, 카드 앞면 제외, 패배 표 실제 기록) | 6/6 PASS |
+| PlayMode `GameStageStoryPresentationTests`(동점·`(나)`), `GameSceneFlowTests`(실제 결과 화면 경로) | 병합 뒤 32/32 PASS |
+| 대조 실험 5가지(시안 띠 유지, 패배 표 미기록, 내 칭호 판정 제거, 연결 제거, 카드 앞면 포함) | 모두 해당 검사 실패 |
+| 전체 EditMode / 전체 PlayMode(`5f9fe518`, 병합 전) | 2156/2156, 741/741 PASS |
+
+- 시안은 실제 프리팹을 Editor batch로 렌더링해 사용자가 `(나)` 포함 안을 골랐다.
+- 독립 검토에서 카드 앞면 도장 글자를 표로 잘못 잡는 문제와 문서 누락을 확인해 고쳤다.
+- 전체 기록·2:2 결과 표의 갈색 강조는 바꾸지 않았다.
+- **미실행:** 실기기 화면, 멀티 게스트 화면, 긴 공동 수상 이름(`P1, P2(나)`)의 실제 표시.
+
 ## 2026-11-09 — 결과·Home·Lobby의 시안에 없는 안내 줄 숨기기
 
 - **기준:** `fix/hide-result-status-line`, main `d1ea7b12` 위 `f37b4443`·`79bc2e15`. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 접속 묶음과 설정 수는 그대로다.
