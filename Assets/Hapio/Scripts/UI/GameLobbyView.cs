@@ -167,6 +167,7 @@ namespace Hapio
                     CopyRect(teamShifted[i], storyShifted[i]);
                 }
             }
+            CreateHostAddressLine();
             BindNavigation(refreshButton, () => Network.StartRoomSearch());
             BindNavigation(cancelButton, () =>
             {
@@ -457,6 +458,10 @@ namespace Hapio
         }
 
         private const float DisabledSeatAlpha = .45f;
+        /// <summary>#557: not serialized; created in Awake and placed by the seat design.</summary>
+        public UnityEngine.UI.Text HostAddressLine { get; private set; }
+        private string[] hostAddresses = Array.Empty<string>();
+        private double nextHostAddressReadAt;
         /// <summary>#501: the seat label and hint while the Host keeps a dropped player's seat.</summary>
         public const string HeldSeatLabel = "자리 비움";
         public const string HeldSeatHint = "자리를 비운 이가 돌아오길 기다리고 있소.";
@@ -500,6 +505,7 @@ namespace Hapio
             roomName.text = Network.HostRoomNamePending ? "방을 만들고 있소..." : LabRoomNames.Display(Network.ConnectedRoomName);
             joinedCount.text = waiting ? "인원 확인 중" : Network.ParticipantCount + " / " + count + "명 입장";
             selectedCount.text = waiting ? "" : Network.SelectedParticipantCount + " / " + count + "명 자리 확정";
+            RefreshHostAddress();
             // The story layouts stop at five; a larger room is always territory, so never index past them.
             int storyLines = Mathf.Min(count - 3, Mathf.Min(lines.Length, lineLayouts.Length) - 1);
             connectionLines.gameObject.SetActive(!waiting && storyLines >= 0 && !team);
@@ -558,6 +564,46 @@ namespace Hapio
             if (seatDesign != null) seatDesign.Present(this, count, team, waiting, allChosen, start);
         }
 
+        /// <summary>#557: made at runtime from an existing label, so the shared lobby prefab stays as saved.</summary>
+        private void CreateHostAddressLine()
+        {
+            HostAddressLine = Instantiate(selectedCount, positionPage.transform);
+            HostAddressLine.name = "HostDirectAddress";
+            HostAddressLine.alignment = TextAnchor.MiddleCenter;
+            HostAddressLine.color = GameLobbySeatColors.Muted;
+            HostAddressLine.horizontalOverflow = HorizontalWrapMode.Wrap;
+            HostAddressLine.verticalOverflow = VerticalWrapMode.Truncate;
+            HostAddressLine.resizeTextForBestFit = true;
+            HostAddressLine.resizeTextMinSize = 10;
+            HostAddressLine.resizeTextMaxSize = 14;
+            HostAddressLine.text = string.Empty;
+            HostAddressLine.gameObject.SetActive(false);
+        }
+
+        /// <summary>Addresses can change while a room waits (Wi-Fi, hotspot), so they are read again every second.</summary>
+        private void RefreshHostAddress()
+        {
+            if (HostAddressLine == null) return; // Saved-asset checks present the prefab without Awake.
+            bool show = seatDesign != null && Network.IsHost && !Network.IsDeveloperSolo;
+            if (HostAddressLine.gameObject.activeSelf != show) HostAddressLine.gameObject.SetActive(show);
+            if (!show) { nextHostAddressReadAt = 0d; return; }
+            double now = Time.realtimeSinceStartupAsDouble;
+            if (now >= nextHostAddressReadAt)
+            {
+                nextHostAddressReadAt = now + 1d;
+                hostAddresses = Network.HostListensOnIpv4 ? LabLocalAddresses.Read() : Array.Empty<string>();
+            }
+            string line = HostAddressText(hostAddresses, Network.port);
+            if (HostAddressLine.text != line) HostAddressLine.text = line;
+        }
+
+        public static string HostAddressText(IReadOnlyList<string> addresses, int port)
+        {
+            string portText = "포트 " + port.ToString(CultureInfo.InvariantCulture);
+            return addresses == null || addresses.Count == 0 ? "방장 IP 확인 불가 · " + portText
+                : "방장 IP " + string.Join(", ", addresses) + " · " + portText;
+        }
+
         private void SetDirectConnection(bool visible)
         {
             if (visible && (session.IsCreatingRoom || session.State.phase != GameFlowPhase.Home || !Network.CanChooseConnection)) return;
@@ -565,8 +611,9 @@ namespace Hapio
             if (!visible) return;
             directConnectionPanel.transform.SetAsLastSibling();
             directAddress.SetTextWithoutNotify(Network.hostAddress);
-            directPort.SetTextWithoutNotify(Network.port.ToString(CultureInfo.InvariantCulture));
-            directFeedback.text = "방장의 IP 주소와 포트를 입력하시오. 같은 Wi-Fi 또는 핫스팟에 연결해야 하오.";
+            // A guest's own port is never the Host's: every new room gets its own (#557).
+            directPort.SetTextWithoutNotify(string.Empty);
+            directFeedback.text = "방장 화면의 IP 주소와 포트를 입력하시오. 같은 Wi-Fi 또는 핫스팟에 연결해야 하오.";
         }
 
         private void JoinDirect()

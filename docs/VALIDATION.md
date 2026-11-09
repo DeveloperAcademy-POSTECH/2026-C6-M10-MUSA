@@ -74,6 +74,21 @@
 - 각 실행의 skip·inconclusive는 0이다. batch 가져오기가 덧붙인 Lobby PNG `.meta` 20개의 WebGL 항목은 매번 되돌렸다.
 - **미실행:** iPhone의 실제 화면 잠금·백그라운드(멈춘 시간을 재는 벽시계와 복귀 처리는 Editor에서 그 함수를 직접 불러 확인했다), 실제 Wi-Fi 끊김, 두 대 이상의 실기기, Bonjour 방 카드로 정원 찬 방에 실제로 다시 들어가기(카드 문구는 꾸민 방 목록으로, 입장 가능 판단은 EditMode로만 확인했다), Mac·iOS 앱.
 
+## 2026-11-09 — #557 방장 로비의 Direct IP 주소·포트 표시
+
+- **기준:** `fix/#557-direct-ip-host-address`, main `56e9c79f` 위 `28e82aef`·`fe7fae5e`. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal), `-buildTarget iOS`. 전체 실행은 `fe7fae5e`와 같은 내용의 작업 트리에서 돌렸다. 설정 수와 접속 묶음은 바꾸지 않았다.
+- **방법:** 주소는 `getifaddrs`로 읽는다. 관리 코드의 인터페이스 목록은 iOS IL2CPP 동작이 확인되지 않아 쓰지 않았다. 인터페이스 이름(`en0`, `bridge100`, `ap1`, `pdp_ip0` 등)의 의미는 일반 지식이며 실기기에서 확인하지 않았다.
+
+| 확인 | 결과 |
+| --- | --- |
+| EditMode `LabLocalAddressesTests`(새 14건: 표시 필터·정렬·이 Mac 읽기), `GameLobbyAssetTests` | 21/21 PASS |
+| PlayMode `GameLobbyViewTests`(새 1건, 기존 검사 2건 보강) | 19/19 PASS |
+| 대조 실험 5가지(포트 자동 입력 복원, 주소 줄 겹침, 주소 줄 숨김, 셀룰러 필터 제거, 169.254 필터 제거) | 모두 해당 검사 실패 |
+| 전체 EditMode / 전체 PlayMode | 2135/2137, 712/716 PASS(실패는 아래 기존 6건) |
+
+- 독립 검토에서 2건이 확인됐고 고쳤다: 저장 프리팹 검사·갱신 도구에서 Awake 전 주소 줄이 null이 되는 문제(첫 전체 실행의 `GameLobbyAssetTests` 4건 실패와 일치), 빈 포트 거절 문구 단언이 항상 통과하던 검사 빈틈.
+- **미실행:** iPhone의 실제 주소 표시(Wi-Fi·핫스팟·유선), 실기기 간 Direct IP 입장, Direct IP 게스트의 2:2·3:3 방 모드 수신, iOS IL2CPP에서의 `getifaddrs` 호출.
+
 ## 2026-11-08 — #473 모든 박 1.1배 (Gourd Visual Size 1.4 → 1.54)
 
 - **기준:** `feat/#473-gourd-size`. main `e15f61f0`에서 고치고 검사했다. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal), `-buildTarget iOS`. Library는 다른 worktree에서 복제했다. 같은 Mac에서 다른 폴더의 Unity Editor가 열려 있었다.
