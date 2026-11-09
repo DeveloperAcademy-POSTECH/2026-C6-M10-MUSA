@@ -9,17 +9,17 @@ namespace C6Lab
     /// - 일시정지: 멈춤 → 다시 시작하면 멈춘 지점부터 이어서
     /// - 승리/패배: 서서히 꺼짐
     /// 곡은 Resources/Audio/BGM 폴더의 첫 번째 소리 파일을 쓴다. 파일이 없으면 조용히 넘어간다.
-    /// - #577 라운드별 곡 (곡을 한 라운드씩 앞으로 당김): 1라운드 구미호 = 야광귀 곡(YaguangBGM, 크기 Yaguang Bgm Volume),
-    ///   2라운드 야광귀 = 기본 꽹과리 곡(BGM, 크기 BGM Volume), 3라운드 지귀 = 지귀 곡(JigwiBGM, 크기 Jigwi Bgm Volume).
-    ///   Yaguang Use New Bgm을 끄면 1라운드는 예전 구미호 곡(GumihoBGM, 크기 Gumiho Bgm Volume). 아래 #396/#351 설명은 그 전 기록이다.
+    /// - #577 라운드별 곡: 라운드마다 자기 폴더 곡을 튼다. 1라운드 구미호 = GumihoBGM(대금), 2라운드 야광귀 = YaguangBGM(꽹과리),
+    ///   3라운드 지귀 = JigwiBGM(진고 북). 크기는 각각 Gumiho / Yaguang / Jigwi Bgm Volume.
     /// - 야광귀 스테이지 (#396): Resources/Audio/YaguangBGM의 곡을 튼다(크기는 Yaguang Bgm Volume). LabConfig Inspector의
     ///   Yaguang Use New Bgm(기본 켜짐)을 끄면 기존 꽹과리 BGM. 전투 중에 바꾸면 바로 처음부터 바꿔 튼다.
     /// - 구미호 스테이지 (#351): Resources/Audio/GumihoBGM 폴더에 곡이 있으면 그 곡을 대신 튼다 (크기는 LabConfig의
     ///   Gumiho Bgm Volume). 땅따먹기 (#293)는 Resources/Audio/TerritoryBGM의 곡(#409에서 구미호 곡을 바꾸기 전의 곡)을
     ///   같은 크기로 틀고, 폴더가 비어 있으면 구미호 곡을 쓴다. 어느 곡을 틀지는 라운드가 시작될 때 정한다.
     ///   야광귀·지귀·Lab 단판은 기본 전투 BGM. 땅따먹기에는 피버타임 곡이 없다(팀 피버에도 곡을 바꾸지 않는다).
-    /// - 야광귀 피버타임 (#343): 피버가 시작되면 Resources/Audio/Fever 폴더의 첫 파일(휘모리처럼 점점 빨라지는 꽹과리 +
-    ///   태평소 능게, 피버 20초에 맞춘 곡)로 바꿔 처음부터 튼다. 늦게 들어온 기기는 피버가 흐른 만큼 건너뛰어 맞춘다.
+    /// - #577 피버 곡: 세 라운드 모두 그 라운드 곡을 반음 2개 높이고 점점 빠르게 한 20초 곡. 구미호 = GumihoFever, 야광귀 = Fever,
+    ///   지귀 = JigwiFever.
+    /// - 야광귀 피버타임 (#343): 피버가 시작되면 Resources/Audio/Fever 폴더의 첫 파일(피버 20초에 맞춘 곡)로 바꿔 처음부터 튼다. 늦게 들어온 기기는 피버가 흐른 만큼 건너뛰어 맞춘다.
     ///   전투 BGM은 그동안 줄여 둔다. 일시정지·승리/패배·새 라운드는 전투 BGM과 똑같이 다룬다.
     ///   피버가 시작되는 순간에는 콤보 성공 추임새 "좋다"(Resources/Audio/ComboClear)를 한 번 낸다. 늦게 들어와 이미 한참 지난
     ///   피버에서는 내지 않는다. 크기는 cueVolume × 일시정지 메뉴 효과음 설정.
@@ -195,9 +195,9 @@ namespace C6Lab
             }
         }
 
-        /// <summary>#577: 1라운드(구미호 스테이지)이고 Inspector에서 Yaguang Use New Bgm을 켰고 야광귀 곡 파일이 있으면 true.</summary>
+        /// <summary>#396: 야광귀 스테이지이고 Inspector에서 Yaguang Use New Bgm을 켰고 야광귀 곡 파일이 있으면 true.</summary>
         private bool WantsYaguangBgm() => yaguangClip != null && network != null && network.config != null
-            && network.config.YaguangUseNewBgm && network.GameStageYokai == LabStageYokai.Gumiho;
+            && network.config.YaguangUseNewBgm && network.GameStageYokai == LabStageYokai.Yaguang;
 
         private void Update()
         {
@@ -223,12 +223,12 @@ namespace C6Lab
                     fading = false;
                     StopFever();
                     SetTone(0f);
-                    // #577: 1라운드 구미호 = 야광귀 곡, 2라운드 야광귀 = 기본 꽹과리 곡, 3라운드 지귀 = 지귀 곡. 땅따먹기는 그대로.
-                    AudioClip stageClip = snapshot.teamTerritory ? (territoryClip != null ? territoryClip : gumihoClip) : null;
-                    jigwiBgm = stageClip == null && jigwiClip != null && network.GameStageYokai == LabStageYokai.Jigwi;
-                    yaguangBgm = stageClip == null && !jigwiBgm && WantsYaguangBgm();
-                    if (stageClip == null && !jigwiBgm && !yaguangBgm && network.GameStageYokai == LabStageYokai.Gumiho) stageClip = gumihoClip;
+                    // #577: 라운드마다 자기 곡. 구미호 = 구미호 곡, 야광귀 = 야광귀 곡, 지귀 = 지귀 곡. 땅따먹기는 그대로.
+                    AudioClip stageClip = snapshot.teamTerritory ? (territoryClip != null ? territoryClip : gumihoClip)
+                        : network.GameStageYokai == LabStageYokai.Gumiho ? gumihoClip : null;
                     gumihoBgm = stageClip != null;
+                    jigwiBgm = !gumihoBgm && jigwiClip != null && network.GameStageYokai == LabStageYokai.Jigwi;
+                    yaguangBgm = !gumihoBgm && !jigwiBgm && WantsYaguangBgm();
                     source.Stop();
                     source.clip = jigwiBgm ? jigwiClip : gumihoBgm ? stageClip : yaguangBgm ? yaguangClip : battleClip;
                     source.volume = TargetVolume;
@@ -237,13 +237,12 @@ namespace C6Lab
                         using (LabFirstUse.Measure(LabFirstUseKind.BattleMusic)) source.Play();
                     return;
                 }
-                // 1라운드 곡 토글 (#396 → #577): 전투 중에 Inspector 토글을 바꾸면 바로 야광귀 곡 ↔ 예전 구미호 곡으로 처음부터 바꿔 튼다.
-                if (!snapshot.teamTerritory && network.GameStageYokai == LabStageYokai.Gumiho && WantsYaguangBgm() != yaguangBgm && !FeverPlaying)
+                // 야광귀 새 BGM 후보 (#396): 전투 중에 Inspector 토글을 바꾸면 바로 다른 곡으로 처음부터 바꿔 들려준다.
+                if (!gumihoBgm && !jigwiBgm && WantsYaguangBgm() != yaguangBgm && !FeverPlaying)
                 {
                     yaguangBgm = !yaguangBgm;
-                    gumihoBgm = !yaguangBgm && gumihoClip != null;
                     source.Stop();
-                    source.clip = yaguangBgm ? yaguangClip : gumihoBgm ? gumihoClip : battleClip;
+                    source.clip = yaguangBgm ? yaguangClip : battleClip;
                     source.volume = TargetVolume;
                     source.time = 0f;
                     if (!snapshot.paused && source.clip != null) source.Play();

@@ -41,7 +41,7 @@ namespace C6Lab.Tests
             Assert.That(Resources.Load<LabConfig>("LabConfig").YaguangUseNewBgm, Is.True,
                 "The saved #396 default enables the Yaguang stage song.");
             var stages = new[] { LabStageYokai.Gumiho, LabStageYokai.Yaguang, LabStageYokai.Jigwi,
-                LabStageYokai.None, LabStageYokai.Gumiho, LabStageYokai.Gumiho };
+                LabStageYokai.None, LabStageYokai.Gumiho, LabStageYokai.Yaguang };
             for (int i = 0; i < stages.Length; i++)
             {
                 bool gameFlow = i != 4; // Case 4 is the unchanged Lab single-round path.
@@ -53,10 +53,11 @@ namespace C6Lab.Tests
                 fixture.SetSnapshot(snapshot);
                 yield return null;
                 yield return null;
-                // #577: songs move one round forward. Round 1 Gumiho plays the Yaguang song (the old Gumiho song when the
-                // toggle is off), round 2 Yaguang plays the usual song, round 3 Jigwi its own song. Territory and Lab unchanged.
+                // Territory keeps the Gumiho song from before #409; each stage plays its own folder (#577 adds Jigwi).
+                // Standalone Lab and an explicitly disabled Yaguang toggle keep the usual song.
                 AudioClip expected = territory ? territorySong
-                    : gameFlow && stages[i] == LabStageYokai.Gumiho ? (legacyYaguang ? gumiho : yaguang)
+                    : gameFlow && stages[i] == LabStageYokai.Gumiho ? gumiho
+                    : gameFlow && stages[i] == LabStageYokai.Yaguang && !legacyYaguang ? yaguang
                     : gameFlow && stages[i] == LabStageYokai.Jigwi ? jigwi : normal;
                 Assert.That(fixture.Bgm.BattleClip, Is.SameAs(expected),
                     "Game=" + gameFlow + ", yokai=" + stages[i] + ", territory=" + territory);
@@ -76,7 +77,7 @@ namespace C6Lab.Tests
             fixture = new Fixture(true, LabStageYokai.Gumiho);
             fixture.Bgm.feverCrossfadeSeconds = 0f;
             fixture.Bgm.fadeOutSeconds = 0f;
-            AudioClip battle = Resources.Load<AudioClip>("Audio/YaguangBGM/Yaguang_Stage"); // #577: round 1 plays the Yaguang song
+            AudioClip battle = Resources.Load<AudioClip>("Audio/GumihoBGM/Gumiho_Stage");
             AudioClip fever = Resources.Load<AudioClip>("Audio/GumihoFever/Gumiho_Fever");
             Assert.That(battle, Is.Not.Null);
             Assert.That(fever, Is.Not.Null);
@@ -147,7 +148,7 @@ namespace C6Lab.Tests
         {
             fixture = new Fixture(true, LabStageYokai.Yaguang);
             fixture.Bgm.feverCrossfadeSeconds = 0f;
-            AudioClip battle = Resources.Load<AudioClip>("Audio/BGM/Kkwaenggwari_13"); // #577: round 2 plays the usual song
+            AudioClip battle = Resources.Load<AudioClip>("Audio/YaguangBGM/Yaguang_Stage");
             Assert.That(battle, Is.Not.Null);
             fixture.SetSnapshot(Snapshot(105d));
             yield return null;

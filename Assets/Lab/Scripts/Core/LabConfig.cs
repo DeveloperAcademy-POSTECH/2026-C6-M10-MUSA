@@ -974,16 +974,16 @@ namespace C6Lab
         [Header("Sound · 구미호 스테이지 (#351, Inspector 전용. 소리 파일이 없으면 그 소리만 조용히 넘어간다)")]
         [Tooltip("구미호 스테이지 전투 BGM 크기 (Resources/Audio/GumihoBGM, 모든 기기). 파일이 없거나 다른 스테이지면 위의 BGM Volume으로 기본 전투 BGM을 튼다.")]
         [SerializeField, Range(0f, 1f)] private float gumihoBgmVolume = .2f;
-        [Tooltip("#577부터: 1라운드(구미호) 전투 BGM으로 야광귀 곡 쓰기 (Resources/Audio/YaguangBGM, 기본 켜짐). 끄면 예전 구미호 곡(GumihoBGM). 2라운드 야광귀는 기본 꽹과리 곡, 3라운드 지귀는 JigwiBGM. 전투 중에 바꾸면 바로 바뀐다.")]
+        [Tooltip("야광귀 스테이지 전투 BGM으로 새 곡 쓰기 (#396, Resources/Audio/YaguangBGM, 기본 켜짐). 끄면 기존 꽹과리 BGM. 전투 중에 바꾸면 바로 바뀐다.")]
         [SerializeField] private bool yaguangUseNewBgm = true;
         [Tooltip("야광귀 전투 BGM 크기 (모든 기기). 야광귀 피버 곡도 이 크기를 기준으로 한다.")]
         [SerializeField, Range(0f, 1f)] private float yaguangBgmVolume = .35f;
         [Tooltip("구미호 피버타임(마지막 20초) 곡 크기 (Resources/Audio/GumihoFever, 모든 기기). 파일이 없으면 야광귀 피버 곡을 이 크기로 튼다.")]
         [SerializeField, Range(0f, 1f)] private float gumihoFeverBgmVolume = .3f;
         [Tooltip("#577 지귀 스테이지 전투 BGM 크기 (Resources/Audio/JigwiBGM, 진고 북 중심 곡, 모든 기기). 파일이 없으면 기본 BGM.")]
-        [SerializeField, Range(0f, 1f)] private float jigwiBgmVolume = .79f; // QA 11-09: 50% 두 번 키움(.35 → .525 → .79)
-        [Tooltip("#577 지귀 피버(마지막 20초) 곡 크기 (Resources/Audio/JigwiFever, 모든 기기). 파일이 없으면 지금처럼 구미호 피버 곡을 Gumiho Fever Bgm Volume으로 튼다.")]
-        [SerializeField, Range(0f, 1f)] private float jigwiFeverBgmVolume = .3f;
+        [SerializeField, Range(0f, 1f)] private float jigwiBgmVolume = .35f; // #577: 세 라운드 곡을 같은 크기로 맞춰서 야광귀와 같은 값
+        [Tooltip("#577 지귀 피버(마지막 20초) 곡 크기 (Resources/Audio/JigwiFever, 모든 기기). 지귀 곡을 높이고 빠르게 한 곡. 파일이 없으면 구미호 피버 곡을 Gumiho Fever Bgm Volume으로 튼다.")]
+        [SerializeField, Range(0f, 1f)] private float jigwiFeverBgmVolume = .35f;
         [Tooltip("매혹이 걸릴 때 소리 크기 (Resources/Audio/CharmCast, 모든 기기)")]
         [SerializeField, Range(0f, 1f)] private float charmCastSoundVolume = .7f;
         [Tooltip("양옆 사람이 내 몫을 다 눌러 체크가 뜰 때 소리 크기 (Resources/Audio/CharmCheck, 누른 사람 기기만)")]
@@ -1517,8 +1517,8 @@ namespace C6Lab
         public float GumihoBgmVolume => Mathf.Clamp01(Finite(gumihoBgmVolume, .2f));
         public bool YaguangUseNewBgm => yaguangUseNewBgm;
         public float YaguangBgmVolume => Mathf.Clamp01(Finite(yaguangBgmVolume, .35f));
-        public float JigwiBgmVolume => Mathf.Clamp01(Finite(jigwiBgmVolume, .79f));
-        public float JigwiFeverBgmVolume => Mathf.Clamp01(Finite(jigwiFeverBgmVolume, .3f));
+        public float JigwiBgmVolume => Mathf.Clamp01(Finite(jigwiBgmVolume, .35f));
+        public float JigwiFeverBgmVolume => Mathf.Clamp01(Finite(jigwiFeverBgmVolume, .35f));
         public float GumihoFeverBgmVolume => Mathf.Clamp01(Finite(gumihoFeverBgmVolume, .3f));
         public float CharmCastSoundVolume => Mathf.Clamp01(Finite(charmCastSoundVolume, .7f));
         public float CharmCheckSoundVolume => Mathf.Clamp01(Finite(charmCheckSoundVolume, .8f));

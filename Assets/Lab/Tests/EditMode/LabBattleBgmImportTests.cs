@@ -25,6 +25,8 @@ namespace C6Lab.Tests
                 Is.EqualTo(new[] { "Kkwaenggwari_13" }));
             Assert.That(Resources.LoadAll<AudioClip>(LabBattleBgm.JigwiClipFolder).Select(clip => clip.name),
                 Is.EqualTo(new[] { "Jigwi_Stage" }));
+            Assert.That(Resources.LoadAll<AudioClip>(LabBattleBgm.JigwiFeverClipFolder).Select(clip => clip.name),
+                Is.EqualTo(new[] { "Jigwi_Fever" }));
             foreach (string folder in new[] { LabBattleBgm.FeverClipFolder, LabBattleBgm.GumihoFeverClipFolder, LabBattleBgm.JigwiFeverClipFolder })
                 foreach (AudioClip clip in Resources.LoadAll<AudioClip>(folder))
                     Assert.That(clip.loadType, Is.EqualTo(AudioClipLoadType.DecompressOnLoad),

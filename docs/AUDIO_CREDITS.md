@@ -6,13 +6,14 @@
 
 | 파일 | 용도 | 출처 | 이용 조건 | 가공 |
 | --- | --- | --- | --- | --- |
-| `Assets/Lab/Resources/Audio/BGM/Kkwaenggwari_13.wav` | 전투 BGM (반복 재생). #577부터 2라운드 야광귀 스테이지 곡(Lab 단판 등 기본 곡도 그대로) | 국립국악원, [국악 디지털 음원](https://www.gugak.go.kr/digitaleum) | 출처 표시 조건으로 누구나 이용 가능 | 반복 재생을 위해 앞 무음 약 0.34초, 끝 무음 약 0.22초 제거. 소리 자체는 변경 없음 |
-| `Assets/Lab/Resources/Audio/Fever/Fever_Whimori.wav` | 야광귀 피버타임 (#343, 방해가 끝난 뒤 20초, 모든 기기). 전투 BGM 대신 처음부터 한 번 튼다 | 국립국악원, [국악 디지털 음원](https://www.gugak.go.kr/digitaleum/front/monotone/list.do) — 전투 BGM의 "동살풀이"(꽹과리)와 태평소 "연주 - 능게" | 공공누리 제1유형 (출처표시, 상업적 이용·변경 가능) | 꽹과리: 20초 동안 빠르기 1.4배 → 1.9배로 점점 빨라지게(음 높이 유지). 태평소: +3반음 올리고 빠르기 1.25배 → 1.7배로 점점 빨라지게. 두 소리를 섞어(태평소 0.6) 압축·리미터로 크기를 맞추고 앞 0.2초/끝 0.8초를 줄임. 44.1kHz 스테레오 16bit wav, 20초. 만든 방법: ffmpeg rubberband(`asendcmd`로 빠르기 변화) |
-| `Assets/Lab/Resources/Audio/GumihoBGM/Gumiho_Stage.wav` | 구미호 스테이지 전투 BGM (#351, #409에서 새 곡으로 교체, 모든 기기, 반복 재생). #577부터는 Inspector `Yaguang Use New Bgm`을 껐을 때만 1라운드에서 쓰임(기본은 야광귀 곡). 땅따먹기는 아래 `TerritoryBGM` | AI 생성: [ElevenLabs Music](https://elevenlabs.io) (2026-11-02 생성, 파일에 ElevenLabs C2PA 출처 정보 포함). 원본 이름 `스테이지1배경음악.wav`. 프롬프트: 꽹과리가 앞장서는 전통 사물놀이, 빠른 휘모리 144BPM, 다급하고 정신없게, 노래 없음, 2분 | ElevenLabs 음악 이용약관: 유료 플랜은 대부분의 상업적 이용 가능, 플랜별로 다름 — **팀 플랜 확인 필요** ([music terms](https://elevenlabs.io/music-terms)) | 원본 wav(120초, 48kHz 스테레오 16bit) 그대로. 음량·길이·음색 변경 없음. 길어서 Unity에서 Streaming으로 불러온다. 이전 곡(Suno, 162.5초)은 땅따먹기 곡으로 옮겼다 |
+| `Assets/Lab/Resources/Audio/BGM/Kkwaenggwari_13.wav` | 기본 전투 BGM (반복 재생). Lab 단판, 그리고 야광귀 곡을 끈 경우 | 국립국악원, [국악 디지털 음원](https://www.gugak.go.kr/digitaleum) | 출처 표시 조건으로 누구나 이용 가능 | 반복 재생을 위해 앞 무음 약 0.34초, 끝 무음 약 0.22초 제거. 소리 자체는 변경 없음 |
+| `Assets/Lab/Resources/Audio/Fever/Fever_Whimori.wav` | 2라운드 야광귀 피버타임 (#343, #577에서 야광귀 곡을 높이고 빠르게 한 곡으로 교체, 방해가 끝난 뒤 20초, 모든 기기). 전투 BGM 대신 처음부터 한 번 튼다. 파일 이름은 예전 그대로 | 위 `YaguangBGM/Yaguang_Stage.wav`(AI 생성: ElevenLabs Music, Creator 플랜)을 가공 | ElevenLabs 유료(Creator) 플랜, 상업적 이용 가능 | 곡의 뒷부분(늘린 곡의 109초부터)를 반음 2개 올리고, 20초 동안 빠르기 1.15배 → 1.35배로 점점 빨라지게. 평균 크기 약 -15dB / 최대 -1dB로 맞춤. 앞 0.2초 페이드인, 끝 0.8초 페이드아웃. 44.1kHz 스테레오 16bit wav, 20초. 만든 방법: ffmpeg rubberband(`asendcmd`로 빠르기 변화) |
+| `Assets/Lab/Resources/Audio/GumihoBGM/Gumiho_Stage.wav` | 1라운드 구미호 스테이지 전투 BGM (#577에서 대금 곡으로 교체, 모든 기기, 반복 재생). 땅따먹기는 아래 `TerritoryBGM` | AI 생성: [ElevenLabs Music](https://elevenlabs.io) (2026-11-09, 원본 이름 `1R_gumiho_daegeum_2`). 대금이 앞장서는 캐주얼 전투 곡. 장단 참고: 국립국악원, [국악 디지털 음원](https://www.gugak.go.kr/digitaleum) – 산조대금을 듣고 장단을 프롬프트로 옮김(음원 자체는 넣지 않음) | ElevenLabs 음악 이용약관: 유료(Creator) 플랜으로 만든 곡은 상업적 이용 가능 ([music terms](https://elevenlabs.io/music-terms)). 장단 참고 음원은 공공누리 제1유형(출처 표시 조건으로 상업적 이용·변경 가능) | 원본(약 60초)의 마디가 맞는 두 지점을 이어 붙여 약 146.3초로 늘림(이음매 30ms 크로스페이드). 평균 크기를 -18.9dB로 맞추고(최대 -3.6dB), 끝 1.5초 페이드아웃. 44.1kHz 스테레오 16bit wav, Streaming. 이전 곡(ElevenLabs, 2026-11-02 `스테이지1배경음악`)은 저장소 기록에만 남김 |
 | `Assets/Lab/Resources/Audio/TerritoryBGM/Territory_Stage.wav` | 땅따먹기(1:1·2:2·3:3) 전투 BGM (#293, #409, 모든 기기, 반복 재생). #409 전까지 구미호 스테이지와 함께 쓰던 곡 | AI 생성: [Suno](https://suno.com) (2026-10-28 생성, 파일에 Suno 출처 정보 포함). 원본 이름 `구미호스테이지브금.m4a` | Suno 이용약관: 유료 플랜(Pro·Premier)으로 만든 곡은 만든 사람 소유·상업적 이용 가능, 무료 플랜 곡은 비상업적 이용만 — **팀 계정 플랜 확인 필요** | #351의 `GumihoBGM/Gumiho_Stage.wav`와 같은 파일(162.5초, 48kHz 스테레오 16bit)을 이름만 바꿔 옮김. 음량·길이·음색 변경 없음. Streaming |
-| `Assets/Lab/Resources/Audio/GumihoFever/Gumiho_Fever.wav` | 구미호 피버타임 (#334, #351, 마지막 20초, 모든 기기). 전투 BGM 대신 처음부터 한 번 튼다 | AI 생성: [Suno](https://suno.com) (2026-10-28 생성, 파일에 Suno 출처 정보 포함). 원본 이름 `피버타임시작시.m4a` | Suno 이용약관: 유료 플랜(Pro·Premier)으로 만든 곡은 만든 사람 소유·상업적 이용 가능, 무료 플랜 곡은 비상업적 이용만 — **팀 계정 플랜 확인 필요** | 원본 m4a(Opus, 19.97초, 스테레오 48kHz)를 48kHz 스테레오 16bit wav로 풀고, 가장 큰 순간이 -1dB가 되도록 음량만 키움(+5.1dB). 음색·길이 변경 없음 |
-| `Assets/Lab/Resources/Audio/YaguangBGM/Yaguang_Stage.wav` | #577부터 1라운드 구미호 스테이지 전투 BGM (원래 #396 야광귀 스테이지 곡, 모든 기기, 반복 재생). LabConfig Inspector `Yaguang Use New Bgm`(기본 켜짐)을 끄면 예전 구미호 곡 `GumihoBGM/Gumiho_Stage.wav` | AI 생성: [ElevenLabs Music](https://elevenlabs.io) (2026-11-01 생성, 원본 이름 `Goblin_Chase_Crew`). 프롬프트: 견습 도사들이 장난꾸러기 요괴와 싸우는 캐주얼 전투 곡, 약 140BPM, 장구/북/꽹과리/해금/피리/가야금, A 평조 | ElevenLabs 음악 이용약관: 유료 플랜은 대부분의 상업적 이용 가능, 플랜별로 다름 — **팀 플랜 확인 필요** ([music terms](https://elevenlabs.io/music-terms)) | 원본 wav(90초, 48kHz 스테레오 16bit)의 끝 무음 0.38초를 잘라 89.62초로 맞추고 끝 0.05초 페이드아웃. 기존 전투 BGM과 평균 크기를 맞추려고 음량만 줄임(-2.6dB). 음색 변경 없음 |
-| `Assets/Lab/Resources/Audio/JigwiBGM/Jigwi_Stage.wav` | 지귀 스테이지(#577) 전투 BGM (0~100초, 모든 기기, 반복) | AI 생성: [Suno](https://suno.com) (2026-11-09, 유료 플랜). 참고 소리로 국립국악원, [국악 디지털 음원 – 단음 다운로드](https://www.gugak.go.kr/digitaleum/front/monotone/list.do) – 진고 - 연주 - 10통을 업로드해 북 음색의 기준으로 씀 | Suno 유료 플랜으로 만든 곡은 만든 사람 소유(상업적 이용 가능). 참고 소리는 공공누리 제1유형(출처 표시 조건으로 상업적 이용·변경 가능) | 원본 wav(119.56초, 스테레오 48kHz)를 44.1kHz로 바꾸고 평균 크기를 야광귀 전투 곡과 같게 -18.9dB로 맞춤(-3.7dB, 최대 -6.5dB). 앞 0.05초 페이드인, 끝 1.5초 페이드아웃(반복 때 이음매가 튀지 않게). 44.1kHz 스테레오 16bit wav, Streaming |
+| `Assets/Lab/Resources/Audio/GumihoFever/Gumiho_Fever.wav` | 1라운드 구미호 피버타임 (#334, #351, #577에서 구미호 곡을 높이고 빠르게 한 곡으로 교체, 마지막 20초, 모든 기기). 전투 BGM 대신 처음부터 한 번 튼다 | 위 `GumihoBGM/Gumiho_Stage.wav`(AI 생성: ElevenLabs Music, Creator 플랜)을 가공 | ElevenLabs 유료(Creator) 플랜, 상업적 이용 가능 | 곡의 19.93초부터를 반음 2개 올리고, 20초 동안 빠르기 1.15배 → 1.35배로 점점 빨라지게. 평균 크기 약 -15dB / 최대 -1dB로 맞춤. 앞 0.2초 페이드인, 끝 0.8초 페이드아웃. 44.1kHz 스테레오 16bit wav, 20초. 만든 방법: ffmpeg rubberband(`asendcmd`로 빠르기 변화). 이전 곡(Suno `피버타임시작시`)은 저장소 기록에만 남김 |
+| `Assets/Lab/Resources/Audio/YaguangBGM/Yaguang_Stage.wav` | 2라운드 야광귀 스테이지 전투 BGM (#577에서 꽹과리 곡으로 교체, 모든 기기, 반복 재생). LabConfig Inspector `Yaguang Use New Bgm`(기본 켜짐)을 끄면 기본 꽹과리 BGM | AI 생성: [ElevenLabs Music](https://elevenlabs.io) (2026-11-09, Creator 플랜, 팀원이 직접 생성). 꽹과리 중심 곡. 장단 참고: 국립국악원, [국악 디지털 음원](https://www.gugak.go.kr/digitaleum) – 꽹과리 동살풀이을 듣고 장단을 프롬프트로 옮김(음원 자체는 넣지 않음) | ElevenLabs 음악 이용약관: 유료(Creator) 플랜으로 만든 곡은 상업적 이용 가능 ([music terms](https://elevenlabs.io/music-terms)). 장단 참고 음원은 공공누리 제1유형(출처 표시 조건으로 상업적 이용·변경 가능) | 원본(약 60초)의 마디가 맞는 두 지점을 이어 붙여 약 136.9초로 늘림(이음매 30ms 크로스페이드), 앞 도입 12.94초를 잘라냄. 평균 크기를 -18.9dB로 맞추고(최대 -2.4dB), 끝 1.5초 페이드아웃. 44.1kHz 스테레오 16bit wav, Streaming. 이전 곡(ElevenLabs, 2026-11-01 `Goblin_Chase_Crew`)은 저장소 기록에만 남김 |
+| `Assets/Lab/Resources/Audio/JigwiBGM/Jigwi_Stage.wav` | 3라운드 지귀 스테이지(#577) 전투 BGM (모든 기기, 반복 재생) | AI 생성: [ElevenLabs Music](https://elevenlabs.io) (2026-11-09, 원본 이름 `3R_jigwi_jingo_5`). 진고 북이 중심인 무거운 3박 곡. 장단 참고: 국립국악원, [국악 디지털 음원](https://www.gugak.go.kr/digitaleum) – 진고 - 연주 - 10통을 듣고 장단을 프롬프트로 옮김(음원 자체는 넣지 않음) | ElevenLabs 음악 이용약관: 유료(Creator) 플랜으로 만든 곡은 상업적 이용 가능 ([music terms](https://elevenlabs.io/music-terms)). 장단 참고 음원은 공공누리 제1유형(출처 표시 조건으로 상업적 이용·변경 가능) | 원본(약 60초)의 마디가 맞는 두 지점을 이어 붙여 약 138.4초로 늘림(이음매 30ms 크로스페이드), 앞 도입 17.86초를 잘라냄. 평균 크기를 -18.9dB로 맞추고(최대 -1.4dB), 끝 1.5초 페이드아웃. 44.1kHz 스테레오 16bit wav, Streaming. 이전 곡(Suno, 2026-11-09)은 저장소 기록에만 남김 |
+| `Assets/Lab/Resources/Audio/JigwiFever/Jigwi_Fever.wav` | 3라운드 지귀 피버타임 (#577, 마지막 20초, 모든 기기). 전투 BGM 대신 처음부터 한 번 튼다 | 위 `JigwiBGM/Jigwi_Stage.wav`(AI 생성: ElevenLabs Music, Creator 플랜)을 가공 | ElevenLabs 유료(Creator) 플랜, 상업적 이용 가능 | 곡의 8초부터를 반음 2개 올리고, 20초 동안 빠르기 1.15배 → 1.3배로 점점 빨라지게. 평균 크기 약 -15dB / 최대 -1dB로 맞춤. 앞 0.2초 페이드인, 끝 0.8초 페이드아웃. 44.1kHz 스테레오 16bit wav, 20초. 만든 방법: ffmpeg rubberband(`asendcmd`로 빠르기 변화) |
 
 ## 효과음
 
@@ -92,8 +93,6 @@
 
 > 본 저작물은 '국립국악원'에서 작성하여 공공누리 제1유형으로 개방한 '추임새(작성자: 정회석, 강효주, 이춘희, 염경애)'를 이용하였으며, 해당 저작물은 '국립국악원, https://www.gugak.go.kr/digitaleum/front/monotone/list.do'에서 무료로 다운받으실 수 있습니다.
 
-> 본 저작물은 '국립국악원'에서 작성하여 공공누리 제1유형으로 개방한 '연주 - 능게(태평소, 작성자: 국립국악원)'를 이용하였으며, 해당 저작물은 '국립국악원, https://www.gugak.go.kr/digitaleum/front/monotone/list.do'에서 무료로 다운받으실 수 있습니다.
-
 > 본 저작물은 '국립국악원'에서 작성하여 공공누리 제1유형으로 개방한 '양금 기본음 강(작성자: 국립국악원)'을 이용하였으며, 해당 저작물은 '국립국악원, https://www.gugak.go.kr/digitaleum/front/monotone/list.do'에서 무료로 다운받으실 수 있습니다.
 
 > 본 저작물은 '국립국악원'에서 작성하여 공공누리 제1유형으로 개방한 '25현 가야금 - 기본음계 - 강(작성자: 국립국악원)'을 이용하였으며, 해당 저작물은 '국립국악원, https://www.gugak.go.kr/digitaleum/front/monotone/list.do'에서 무료로 다운받으실 수 있습니다.
@@ -108,7 +107,6 @@
 | `ComboHit/ComboHit.wav` | 양금 기본음 강 |
 | `FiveColorHit/FiveColorHit_1.wav`, `FiveColorHit_2.wav` | 25현 가야금 - 기본음계 - 강 |
 | `JigwiTalismanSweep/JigwiTalismanSweep.wav`, `JigwiTalismanChime/JigwiTalismanChime.wav` | 25현 가야금 - 기본음계 - 강 (가공) |
-| `Fever/Fever_Whimori.wav` | 동살풀이 (꽹과리), 연주 - 능게 (태평소) |
 
 **CC BY 소리 (출처 표시 의무 있음)**
 
@@ -122,7 +120,7 @@ CC0 소리(Punch, Splat, Squelch, Combine, Miss, Boom, ComboFail)는 표시 의�
 
 **AI로 만든 소리 (#351)**
 
-`GumihoBGM/Gumiho_Stage.wav`, `GumihoFever/Gumiho_Fever.wav`, `CharmRelease/CharmRelease.wav`, `FoxFall/FoxFall.wav`, `FoxClear/FoxClear.wav`는 Suno로 만들었다. Suno는 **만든 계정이 유료 플랜일 때만** 상업적 이용(앱스토어 배포 포함)이 허용되고, 무료 플랜으로 만든 것은 비상업적 이용만 된다. 매혹이 걸릴 때 소리(`Audio/CharmCast`)는 출처가 확실하지 않아 빼 두었다(폴더가 비어 소리 없음, 나중에 넣는다). 출시 전에 만든 계정의 플랜을 확인해 위 표의 "팀 계정 플랜 확인 필요"를 고친다. 무료 플랜이었다면 유료 플랜에서 다시 만들거나 CC0 소리로 바꾼다. 크레딧 화면이 생기면 아래처럼 적는 것을 권장한다.
+`TerritoryBGM/Territory_Stage.wav`, `CharmRelease/CharmRelease.wav`, `FoxFall/FoxFall.wav`, `FoxClear/FoxClear.wav`는 Suno로 만들었다. Suno는 **만든 계정이 유료 플랜일 때만** 상업적 이용(앱스토어 배포 포함)이 허용되고, 무료 플랜으로 만든 것은 비상업적 이용만 된다. 매혹이 걸릴 때 소리(`Audio/CharmCast`)는 출처가 확실하지 않아 빼 두었다(폴더가 비어 소리 없음, 나중에 넣는다). 출시 전에 만든 계정의 플랜을 확인해 위 표의 "팀 계정 플랜 확인 필요"를 고친다. 무료 플랜이었다면 유료 플랜에서 다시 만들거나 CC0 소리로 바꾼다. 크레딧 화면이 생기면 아래처럼 적는 것을 권장한다.
 
 > 구미호 스테이지 음악·매혹 풀림·여우 구슬 소리: Suno로 제작
 
