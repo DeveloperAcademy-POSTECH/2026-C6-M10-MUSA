@@ -659,13 +659,17 @@ namespace C6Lab.Tests
                 MeshRenderer pressed = elementVfx.GetComponentsInChildren<MeshRenderer>()
                     .Single(renderer => renderer.name == "Contact squash");
                 Assert.That(pressed.sharedMaterial, Is.SameAs(elementVfx.Profile.OrbSurface(combined.element, false)));
-                Assert.That(elementVfx.GetComponentsInChildren<LabElementRelease>().Length, Is.EqualTo(1));
+                Assert.That(pressed.transform.parent.Find("Element release"), Is.Null,
+                    "A normal approved clay hit must not create the removed elemental explosion.");
+                MeshRenderer wetClay = pressed.transform.parent.Find("Wet surface mark").GetComponent<MeshRenderer>();
                 Transform impactLayer = network.impactFeedback.transform.Find("Impact Feedback");
                 Assert.That(impactLayer == null || impactLayer.GetComponentInChildren<UnityEngine.UI.Text>() == null, Is.True,
                     "Paint mode retains its approved hit effect without restoring the retired HP damage labels.");
                 var hanging = network.target.GetComponent<LabHangingTarget>();
                 Assert.That(hanging, Is.Not.Null, "The saved scene must expose Pinata tuning.");
                 for (int step = 0; step < 10; step++) yield return new WaitForFixedUpdate();
+                Assert.That(wetClay.enabled && wetClay.gameObject.activeInHierarchy, Is.True,
+                    "Battle uses leaveMark:false but must still display brief clay residue after the contact squash.");
                 Assert.That(hanging.SwingAngles.magnitude, Is.GreaterThan(.1f),
                     "A Host-confirmed hit should make the actual target swing.");
                 Assert.That(network.LastShotReport, Does.StartWith("SHOT HIT"));

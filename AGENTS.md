@@ -393,3 +393,18 @@
 - 게스트는 끊기거나, iPhone이 전송 제한 시간 이상 멈췄다 돌아오면(벽시계) `IsJoiningRoom`을 유지한 채 30초(`LobbyRejoinBudgetSeconds`, 진행 중인 시도도 끊음) 동안 다시 시도하고, 끝내 안 되면 #471 경로로 방 목록에 간다. 방장이 방을 닫으면(`lobby_closed`) 다시 들어가지 않는다. `GameSession`이 로비 단계에서만 `LobbyRejoinAllowed`를 켠다. 표를 가진 방은 정원이 차 보여도 방 목록에서 들어갈 수 있고(`HoldsRoomTicket`, 판단은 방장의 승인), 나가기 신호를 보낸 게스트는 표를 버린다. 승인 대기 중인 연결 중 자기 자리를 되찾는 것은 새 자리로 세지 않는다(`PendingNewPlaces`).
 - 전투 중 백그라운드(#502)는 현재 동작 유지로 정했다. 신호·일시정지 제안·표시는 없고, 30초 뒤 끊기면 기존 게임 오버·2:2 로비 복귀를 따른다. 전투 중에는 재입장을 하지 않으며 방장 앱의 백그라운드와 방장 소켓 재생성도 다루지 않는다.
 - 현재 호환 묶음은 설정259개·**5697**·`C6PhysicsLab/58`·**`C6HapioGame/45`**다(프로토콜·Lab 토큰은 #551 그대로, Game만 #501로 44에서 올림). Lab 방의 토큰·패킷은 #501로 바뀌지 않았다. Game44 이하와 혼용하지 않는다. 동작은 `docs/GAME_FLOW.md`의 같은 항목, 실행한 검사는 `docs/VALIDATION.md`만 따른다.
+
+## #498 전투 첫 사용 렌더링
+
+- `LabBattleRenderWarmup`은 준비 화면 아래에서 비공개 복사본만 그린다. 실제 보드·투사체 루트·명중 풀을 쓰지 않고, `GameSession.Start`의 `initial_ready` 조건으로만 기다린다(`IsPresentationReady`에 넣지 않는다). 첫 사용 비용이 있는 새 그림을 추가하면 여기에 실제 카메라·레이어로 함께 넣는다. 실기기 효과는 `docs/VALIDATION.md`에서 측정 여부를 구분한다.
+
+## 멀티 완료 연출 준비 판정
+
+- `GameSession.Finish`의 최종 칠 일치 판정은 기기마다 다른 `LabPaintSurface.VisualVersion`이 아니라 모든 기기가 같은 `LastVisualSequence`(`PaintFinishControl.visualSequence`)로 한다. `VisualVersion`은 같은 기기 안의 변경 감지에만 쓰고 기기 사이에 비교하지 않는다.
+- 이 수정 당시 Game 토큰은 46이었다(현재 기준은 아래 스테이지 박 크기 절).
+
+## 스토리 스테이지 박 크기
+
+- 1~3스테이지 박과 판정 껍데기는 Gourd Visual Size(DEV 140) 값에 더해 `LabGourdVisualRig.StageSizeMultiplier` 1.4배로 그린다(실제 화면 시안으로 승인). `LabGourdPaint`가 rig 기준 크기를 이 값으로 나눠 쓰므로 rig가 없는 흰 박(튜토리얼·2:2·Lab)과 그 골든은 바뀌지 않는다. 다시 굽지 않으며 프리팹의 `referenceVisualSize` 1.4도 그대로다.
+- 박은 줄 쪽 기준점을 유지한 채 아래로 커진다. 정지 자세의 실제 바닥은 땅 위지만 줄 흔들림의 아래쪽에서는 잠깐 땅과 겹칠 수 있다.
+- 현재 호환 묶음은 설정259개·5697·`C6PhysicsLab/58`·**`C6HapioGame/47`**다. 판정 모양이 달라져 Game46 이하 앱과 혼용하지 않는다.

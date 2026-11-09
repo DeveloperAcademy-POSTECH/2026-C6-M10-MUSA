@@ -502,7 +502,7 @@ namespace C6Lab.Experiments.Editor
         [MenuItem("C6 Lab/Experiments/Rounded Clay/Build Coating Mac App")]
         public static void ScheduleBuild() { ClayPreviewBuild.RequireStopped(); EditorApplication.delayCall += BuildScheduled; }
         static void BuildScheduled() { try { Debug.Log("STICKER_COATING_BUILD " + BuildMac()); } catch (Exception exception) { Debug.LogException(exception); } }
-        public static string BuildMac() => ClayPreviewBuild.BuildMac(ScenePath, ValidatePrepared);
+        public static string BuildMac() => ClayPreviewBuild.BuildMac(ScenePath, ValidatePrepared, ClayPreviewMacImagePickerBuild.StageForPreview);
         static void Preflight()
         {
             for (int i = 0; i < SceneManager.sceneCount; i++) Require(!SceneManager.GetSceneAt(i).isLoaded || !string.IsNullOrEmpty(SceneManager.GetSceneAt(i).path), "Open a saved Scene before preparing the coating experiment; unsaved Untitled content is preserved.");

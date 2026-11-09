@@ -27,7 +27,7 @@ Home/Lobby의 공통 `GameLobby.prefab`을 사용한다. 타이틀은 기존 애
 | Scene | 저장된 구성과 역할 |
 | --- | --- |
 | Home | 기존 타이틀 → 첫 게임 시작의 로컬 오프닝 → 방 목록, 방 생성·검색·Direct IP, 인원 조정, DEV 설정, 개발자 Solo |
-| Lobby | 방 이름·참가자·P번호 선택, Host START, 로비 나가기, Host DEV 설정 |
+| Lobby | 방 이름·참가자·P번호 선택, Direct IP용 방장 IP·포트 표시(#557), Host START, 로비 나가기, Host DEV 설정 |
 | Battle | 기존 Lab 전투를 복사한 독립 Scene. **1~3스테이지 모두 같은 경로를 로드**한다. 전투 UI·카메라·구슬·박·일시정지·기존 DEV 조작을 재사용한다. |
 | StageResult | Story: 실제 기록 봉인 카드·후일담·완성 박 관람·Host NEXT. 최종 카드에서 전체 기록·로컬 엔딩. Territory: 기존 단판 결과 |
 | GameOver | 정상 Story 패배: 실패 이야기·실제 봉인율·Host 같은 스테이지 재도전. 이탈·연결 끊김·준비 실패: 종료 사유와 HOME. 자동 복귀 없음 |
@@ -81,7 +81,7 @@ Battle은 처음 만들 때만 저장된 Lab에서 복사했고(`CreateMissing`,
 
 GameOver에서 전투 발행을 동결해도, 마지막 결과 발행 당시 Bulk 백로그 때문에 건너뛴 참가자에게는 `LabNetwork.TerminalSnapshots`가 대기열이 줄어든 뒤 기존 paint+snapshot 트랜잭션을 한 번 큐에 넣는다. 실제 지도·Defeat 스냅샷을 헤더로 추정하지 않고, 게임 시뮬레이션을 다시 시작하지도 않는다. 새 라운드·전송 초기화·이탈에서는 남은 대상이 폐기된다.
 
-#558 당시 호환 묶음은 **공유 설정259개 · 프로토콜5691 · `C6PhysicsLab/52` · `C6HapioGame/39`**였다. Story 실패 재도전 상태와 결과 이야기 확인 메시지 때문에 Game 토큰만 올렸다. 현재 Game 토큰은 아래 로비 재입장(#501)의 `C6HapioGame/45`다. 아래의 Game23~38 기록은 도입 당시 이력이며 Game38 이하 게임 앱을 현재 방에 혼용하지 않는다. Lab 프로토콜·Bulk 압축/선택 ACK 형식은 변경하지 않는다.
+#558 당시 호환 묶음은 **공유 설정259개 · 프로토콜5691 · `C6PhysicsLab/52` · `C6HapioGame/39`**였다. Story 실패 재도전 상태와 결과 이야기 확인 메시지 때문에 Game 토큰만 올렸다. 현재 Game 토큰은 47이다. 현재 Game 토큰은 아래 로비 재입장(#501)의 `C6HapioGame/45`다. 아래의 Game23~38 기록은 도입 당시 이력이며 Game38 이하 게임 앱을 현재 방에 혼용하지 않는다. Lab 프로토콜·Bulk 압축/선택 ACK 형식은 변경하지 않는다.
 
 연결된 에셋·실행 순서·복구 분기·재도전 권한은 [스토리 결과 통합](STAGE_STORY_UI_INTEGRATION.md), 제작용 부품 편집은 [스토리 화면 제작](STAGE_STORY_PRESENTATION.md), 실제 수행 환경과 결과는 [VALIDATION](VALIDATION.md)을 따른다.
 
@@ -374,3 +374,11 @@ B는 전원 동시에 자기 발화점을 소화하면 그 순간부터5초 보�
 - **시간과 눌림:** 아무리 짧은 전환도 최소 1초 보이고(`LoadingArt.minimumSeconds`), 100%를 0.2초 보여 준 뒤(`fullHoldSeconds`) 0.15초 동안 사라진다(`fadeOutSeconds`). 사라지기 시작할 때까지 화면 전체 눌림을 막으므로, 방에 들어가고 나온 뒤 자리 고르기·나가기 버튼은 그때부터 누를 수 있다.
 - **그림:** 달리는 캐릭터(불이·묵이·솔이·금옥이·만복이, 각 6장)는 뜰 때마다 하나를 무작위로 고른다. 그림·색·시간 값은 `Assets/Hapio/Resources/Hapio/Loading/LoadingArt.asset`이고, 목록에 한 줄을 더하면 캐릭터가 늘어난다. Editor Play 중 `Hapio/Loading/Preview Loading Screen (Play Mode)`로 0 → 100%를 볼 수 있다.
 - 실제 수행한 검사와 미실행 기기 확인은 [VALIDATION](VALIDATION.md)의 #478 기록을 따른다.
+
+## 전투 첫 사용 렌더링 미리 그리기(#498)
+
+`SynchronizingBattle`에서 표현 준비가 끝나면 `LabBattleRenderWarmup`이 불투명 준비 화면 아래에서 비공개 복사본을 4프레임 그린다. 월드에는 원소 5종과 무속성 비행 구슬·꼬리·명중 파티클을 BattleCamera 앞에, 조합판에는 스프라이트·접촉 그림자·Lit 구체·물감 방울을 조합판 합성 카메라 앞에 둔다. 복사본은 자기 루트만 쓰며 실제 보드·투사체 루트·명중 풀·도색을 건드리지 않는다. 이 완료가 그 기기의 `initial_ready` 조건이라 Host는 끝나기 전에 Countdown을 시작할 수 없다. 3초가 지나면(최소 2프레임 뒤) 멈추고, 공유 시작 예산의 절반을 이미 썼으면 그리지 않는다. Metal 파이프라인 생성 효과는 실기기로만 판단한다.
+
+## Direct IP 주소 표시(#557)
+
+Host 로비는 안내문과 방 카드 사이에 `방장 IP 192.168.0.12, 172.20.10.1 · 포트 50123` 형식으로 이 기기의 IPv4와 실제 방 포트를 표시한다. Wi-Fi·유선을 앞에, 핫스팟을 그 뒤에 놓고, 루프백·링크 로컬·셀룰러·VPN은 뺀다. 주소는 1초마다 다시 읽는다. 읽을 수 없으면 `방장 IP 확인 불가`로 표시한다. 게스트·개발자 솔로에는 표시하지 않는다. Direct IP 입력창의 포트는 비어서 열린다. 방마다 포트가 다르므로 게스트의 포트를 미리 넣지 않으며, 비어 있으면 입장을 거절한다. 표시 줄은 Awake에서 기존 라벨을 복제해 만들고 공용 Prefab은 바꾸지 않는다.

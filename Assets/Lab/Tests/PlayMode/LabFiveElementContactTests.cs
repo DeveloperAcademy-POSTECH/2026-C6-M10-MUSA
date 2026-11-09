@@ -5,6 +5,7 @@ using UnityEngine.TestTools;
 
 namespace C6Lab.Tests
 {
+    [Category("GPU")]
     public sealed class LabFiveElementContactTests
     {
         [UnityTest]
@@ -40,6 +41,17 @@ namespace C6Lab.Tests
                 Assert.AreEqual(0, pool.ActiveFlightCount);
                 pool.Advance(.32f);
                 Assert.AreEqual(1, pool.ActiveImpactCount);
+                Transform impact = pool.transform.Find("Impact 0");
+                var mark = impact.Find("Wet surface mark").GetComponent<MeshRenderer>();
+                Assert.IsTrue(mark.enabled && mark.gameObject.activeInHierarchy,
+                    "The real Battle contact path must retain brief clay even with leaveMark disabled.");
+                AssertClayOnly(impact);
+                Vector3 beforeMove = impact.position;
+                Vector3 movement = new Vector3(.2f, .1f, .3f);
+                target.transform.position += movement;
+                pool.Advance(0f);
+                Assert.That(Vector3.Distance(impact.position, beforeMove + movement), Is.LessThan(.0001f),
+                    "The retained clay must follow the hit target instead of floating at its old position.");
                 Object.Destroy(target.gameObject);
                 yield return null;
                 pool.Advance(.02f);
@@ -52,6 +64,72 @@ namespace C6Lab.Tests
                 Object.Destroy(pool.gameObject);
             }
             yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator AllFiveElementsKeepClayWithoutReleaseAndFadeBeforeSlotReuse()
+        {
+            var fixture = new GameObject("Clay-only lifetime fixture");
+            var pool = LabFiveElementVfx.ForScene(fixture.scene);
+            try
+            {
+                pool.ManualClock = true;
+                pool.MarkLifetimeOverride = 1.5f;
+                Transform reusedSlot = null;
+                for (int elementIndex = 1; elementIndex <= 5; elementIndex++)
+                {
+                    var element = (LabOrbElement)elementIndex;
+                    foreach (bool leaveMark in new[] { false, true })
+                    {
+                        Assert.IsTrue(pool.PlayImpact(element, Vector3.zero, Vector3.up, Vector3.down,
+                            .33f, .3f, leaveMark: leaveMark), element + " must acquire a clay impact.");
+                        Transform impact = pool.transform.Find("Impact 0");
+                        if (reusedSlot != null) Assert.AreSame(reusedSlot, impact, "Expired contacts should reuse their slot.");
+                        reusedSlot = impact;
+                        AssertClayOnly(impact);
+                        var squash = impact.Find("Contact squash").GetComponent<MeshRenderer>();
+                        var mark = impact.Find("Wet surface mark").GetComponent<MeshRenderer>();
+                        Assert.IsTrue(squash.enabled, "A reused slot must restart the contact squash.");
+                        Assert.IsFalse(mark.enabled, "The previous contact's residue must not flash on a reused slot.");
+
+                        pool.Advance(.32f);
+                        Assert.IsTrue(mark.enabled && mark.gameObject.activeInHierarchy,
+                            element + ": clay spread must remain after the squash, including leaveMark:false.");
+                        float spreadWidth = mark.transform.localScale.x;
+                        Assert.IsFalse(squash.enabled);
+                        Assert.IsTrue(impact.Find("Thrown clay 0").GetComponent<MeshRenderer>().enabled,
+                            "Removing the elemental burst must retain thrown clay drops.");
+
+                        // The game has a brief contact residue; the comparison can retain a longer mark.
+                        // Both must shrink visibly before the slot retires, rather than disappear at impact.
+                        pool.Advance(leaveMark ? 1.10f : .48f);
+                        Assert.AreEqual(1, pool.ActiveImpactCount);
+                        Assert.IsTrue(mark.enabled);
+                        Assert.That(mark.transform.localScale.x, Is.GreaterThan(0f).And.LessThan(spreadWidth),
+                            element + ": the retained clay should fade by shrinking near its own lifetime.");
+                        Assert.IsFalse(impact.Find("Thrown clay 0").GetComponent<MeshRenderer>().enabled);
+                        pool.Advance(.3f);
+                        Assert.AreEqual(0, pool.ActiveImpactCount);
+                        Assert.IsFalse(impact.gameObject.activeInHierarchy);
+                    }
+                }
+            }
+            finally
+            {
+                Object.Destroy(fixture);
+                Object.Destroy(pool.gameObject);
+            }
+            yield return null;
+        }
+
+        private static void AssertClayOnly(Transform impact)
+        {
+            Assert.IsNull(impact.Find("Element release"), "Clay contacts must not create the elemental release layer.");
+            foreach (var renderer in impact.GetComponentsInChildren<Renderer>(true))
+                foreach (var material in renderer.sharedMaterials)
+                    if (material != null)
+                        Assert.AreNotEqual("C6Lab/Five Elements/Release", material.shader.name,
+                            "The removed elemental explosion must not remain in an active or pooled renderer.");
         }
 
         [UnityTest]

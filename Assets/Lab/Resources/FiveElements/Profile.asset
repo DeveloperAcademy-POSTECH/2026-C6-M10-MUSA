@@ -62,19 +62,8 @@ MonoBehaviour:
   dropSpeed: 1
   gravityDiameters: 13
   tipSag: 0.115
+  contactSeconds: 0.86
   markSeconds: 2
-  release:
-    lifetime: 0.86
-    size: 1
-    highlight: 0.72
-    ribbons: 2
-    forms: 3
-    gravity: 1
-    escapeSpeed: 1
-    grainsPerClump: 17
-    earthGatherEnd: 0.31
-    earthCrumbleStart: 0.48
-    earthEdgeLead: 0.18
   maxFlights: 16
   maxImpacts: 24
   lowDetailImpacts: 10

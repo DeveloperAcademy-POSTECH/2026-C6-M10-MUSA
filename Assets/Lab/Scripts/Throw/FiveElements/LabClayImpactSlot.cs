@@ -5,7 +5,6 @@ namespace C6Lab
     internal sealed class LabClayImpactSlot
     {
         private readonly Transform root, pressed, spread;
-        private readonly LabElementRelease release;
         private readonly MeshRenderer pressRenderer, spreadRenderer;
         private readonly MeshFilter spreadFilter;
         private readonly Transform[] drops = new Transform[5];
@@ -20,7 +19,7 @@ namespace C6Lab
         private Quaternion contactRotation;
         private Color color;
         private int dropCount;
-        private float strength, diameter, markLife, energyLife, totalLife, oblique, spin;
+        private float strength, diameter, markLife, contactLife, totalLife, oblique, spin;
         private float pressEnd, spreadDuration;
         public float Age { get; private set; }
         public bool Active { get; private set; }
@@ -45,9 +44,6 @@ namespace C6Lab
                 dropRenderers[i]=shapes.Create(root,"Thrown clay " + i,shapes.ball);
                 drops[i]=dropRenderers[i].transform;
             }
-            var source = new GameObject("Element release");
-            source.transform.SetParent(root,false);
-            release = source.AddComponent<LabElementRelease>();
         }
 
         public void Begin(LabOrbElement element, Vector3 point, Vector3 surfaceNormal, Vector3 direction, float diameter,
@@ -56,10 +52,10 @@ namespace C6Lab
             this.diameter=diameter;
             this.strength=strength;
             markLife=markSeconds;
-            energyLife=Mathf.Max(.25f,art.release?.lifetime ?? .86f)/Mathf.Lerp(.95f,1.13f,strength);
+            contactLife=Mathf.Max(.25f,art.contactSeconds)/Mathf.Lerp(.95f,1.13f,strength);
             pressEnd=Mathf.Max(.012f,art.pressSeconds)*Mathf.Lerp(1.12f,.80f,strength);
             spreadDuration=Mathf.Max(.025f,art.spreadSeconds)*Mathf.Lerp(1.16f,.67f,strength);
-            totalLife=Mathf.Max(energyLife,markLife,art.dropLifetime+.035f);
+            totalLife=Mathf.Max(contactLife,markLife,art.dropLifetime+.035f);
             Age=0f;
             color=art.Pigment(element,monochrome);
             direction=LabFiveElementVfx.Direction(direction,Vector3.down);
@@ -98,7 +94,6 @@ namespace C6Lab
             }
             root.gameObject.SetActive(true);
             Active=true;
-            release.Begin(element,color,strength,monochrome,art.release,reduced);
             Tick(0f);
         }
 
@@ -139,7 +134,7 @@ namespace C6Lab
             }
 
             float growth=Mathf.Clamp01((Age-pressEnd*.58f)/spreadDuration);
-            float wetEnd=Mathf.Max(markLife,energyLife);
+            float wetEnd=Mathf.Max(markLife,contactLife);
             float fade=1f-Mathf.SmoothStep(0f,1f,Mathf.InverseLerp(wetEnd-.17f,wetEnd,Age));
             spreadRenderer.enabled=growth>0f && fade>.005f;
             if (spreadRenderer.enabled)
@@ -175,7 +170,6 @@ namespace C6Lab
                 drops[i].localScale= size*(resting ? new Vector3(1.18f,.67f,1.22f) : new Vector3(1.04f,.85f,1.47f));
                 drops[i].localRotation=Quaternion.Euler(resting ? 0f : elapsed*(175+30*i), spin*Mathf.Rad2Deg+i*74f,0f);
             }
-            release.Sample(Age);
         }
 
         public void Return()
@@ -184,7 +178,6 @@ namespace C6Lab
             Active=false;
             target=null;
             followsTarget=false;
-            release.Clear();
             root.gameObject.SetActive(false);
         }
     }

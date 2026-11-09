@@ -14,7 +14,7 @@ namespace C6Lab.Editor
         [Serializable]
         private sealed class Evidence
         {
-            public string scope = "Warm Unity Editor main thread, five concurrent impacts, 42 updates at 1/60s per volley; excludes rendering and HUD. Renderer and triangle counts are submitted geometry estimates, not measured GPU draw calls.";
+            public string scope = "Warm Unity Editor main thread, five concurrent clay-only impacts, 42 updates at 1/60s per volley; excludes rendering and HUD. Geometry is sampled at 0.35 seconds after contact. Renderer and triangle counts are submitted geometry estimates, not measured GPU draw calls.";
             public Sample normal, reduced;
         }
 
@@ -24,7 +24,7 @@ namespace C6Lab.Editor
             public int volleys = Volleys, updates = Volleys * Steps;
             public double medianUpdateMs, p95UpdateMs;
             public long managedBytesForUpdates;
-            public int activeMeshRenderersAtRelease, trianglesAtRelease, transparentMeshRenderersAtRelease;
+            public int activeMeshRenderersAtImpact, trianglesAtImpact, transparentMeshRenderersAtImpact;
         }
 
         internal static void Measure(LabFiveElementsDemo demo, string output)
@@ -86,11 +86,11 @@ namespace C6Lab.Editor
                 var filter = renderer.GetComponent<MeshFilter>();
                 Mesh mesh = filter != null ? filter.sharedMesh : null;
                 if (!mesh) continue;
-                sample.activeMeshRenderersAtRelease++;
-                if (renderer.sharedMaterial.renderQueue >= 2501) sample.transparentMeshRenderersAtRelease++;
+                sample.activeMeshRenderersAtImpact++;
+                if (renderer.sharedMaterial.renderQueue >= 2501) sample.transparentMeshRenderersAtImpact++;
                 for (int i = 0; i < mesh.subMeshCount; i++)
                     if (mesh.GetTopology(i) == MeshTopology.Triangles)
-                        sample.trianglesAtRelease += (int)(mesh.GetIndexCount(i) / 3);
+                        sample.trianglesAtImpact += (int)(mesh.GetIndexCount(i) / 3);
             }
         }
     }

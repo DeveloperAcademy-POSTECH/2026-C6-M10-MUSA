@@ -1,5 +1,55 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-09 — 1~3스테이지 박 1.4배
+
+- **기준:** `feat/stage-gourd-size`, main `2427de5a` 위 `d3b4aaa9`. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 그 뒤 커밋은 코드 동작 없이 툴팁 위치·문서만 바꿨다.
+- **바꾼 것:** 스테이지 박(rig가 있는 박)만 `LabGourdVisualRig.StageSizeMultiplier` 1.4배로 그린다. 판정 껍데기가 함께 커져 Game 토큰만 47로 올렸다. 다시 굽지 않았고 흰 박은 그대로다. 크기는 실제 게임 화면 시안(현재·1.15·1.3·1.4·1.5배)에서 사용자가 골랐다.
+
+| 확인 | 결과 |
+| --- | --- |
+| 새 PlayMode `GameStageGourdSizeTests`(세 스테이지 배율·판정 껍데기), `LabGourdVisualRigTests`, `LabWhiteGourdGoldenTests` | 7/7 PASS |
+| 대조 실험(배율을 1로 되돌림) | 새 검사 실패(1.54 기대, 1.1 실제) |
+| `LabGameFlowBridgeTests`·`LabLobbyRejoinTests` | 43/43 PASS |
+| 전체 EditMode / 전체 PlayMode(`d3b4aaa9`) | 2139/2139, 730/730 PASS |
+
+- 바닥과의 관계: 로그의 판정 AABB 아래쪽은 −1.058, 바닥 윗면은 −0.8이다. AABB는 기울어진 메시의 느슨한 상자다. 독립 검토에서 1스테이지 판정 메시 정점으로 다시 계산한 정지 자세 바닥은 약 −0.53이다(실행 측정 아님). 줄 흔들림 아래쪽이나 명중 반동에서는 잠깐 땅과 겹칠 수 있다.
+- 독립 검토의 실제 지적 2건(툴팁이 상수에 붙음, 호환 기록 누락)을 고쳤다.
+- **미실행:** 실제 플레이로 100% 칠 도달 가능 여부 확인, 실기기 화면 비율별 확인, 멀티 실기기, 마지막 일격 다시보기·결과 화면의 1.4배 구도 육안 확인.
+
+## 2026-11-09 — 멀티 완료 연출 준비 판정
+
+- **기준:** `fix/multiplayer-finish-visual-identity`, main `3a3ec9e3` 위 `8cf2c9a0`. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 그 뒤 커밋은 호환 기록·주석만 바꿨다.
+- **원인:** 게스트의 최종 칠 일치 판정이 기기마다 따로 세는 `VisualVersion`을 방장 값과 비교했다. 게스트가 준비를 보내지 못해 다시보기와 1.2초 연출이 모두 시작되지 않고 12초 한도로 결과에 갔다.
+- **바꾼 것:** 모든 기기가 같은 도장 마지막 순번(`LastVisualSequence`)으로 비교한다. 메시지 필드가 바뀌어 Game 토큰만 46으로 올렸다.
+
+| 확인 | 결과 |
+| --- | --- |
+| 수정 전 Mac 개발 앱 3개(방장 1·게스트 2, 127.0.0.1), 1스테이지 | 방장 49, 게스트 57·58로 불일치. 게스트 ready 0, 12초 동안 일정 23번 재예약, 연출 없음 |
+| 수정 후 같은 방식 | 세 기기 모두 113 일치. 게스트 약 0.2초 만에 ready, 확정 뒤 세 기기 1.2초 연출 재생, 한도 미사용 |
+| 새 EditMode 2건(묶음이 달라도 일치, 마지막 도장이 없으면 불일치) | 수정 전 2건 실패, 수정 후 통과 |
+| `GameSessionFinishTests`·`LabGameFlowBridgeTests`·`LabLobbyRejoinTests` | 63/63 PASS |
+| 전체 EditMode / 전체 PlayMode(`8cf2c9a0`) | 2139/2139, 729/729 PASS |
+
+- Mac 실행은 진단 로그와 임시 자동 진행을 넣은 별도 빌드로 했다(이 브랜치에는 없다). 자동 진행은 방장이 칠을 직접 넣어 100%를 만들었으므로 실제 투척과 마지막 일격 다시보기(`replay=0`)는 지나지 않았다.
+- 독립 검토에서 코드 문제는 없었고, Game 46 호환 기록 누락 1건을 고쳤다.
+- **미실행:** 실기기 멀티, 멀티에서의 마지막 일격 다시보기, 2·3스테이지의 실제 멀티 완료, Direct가 아닌 Bonjour 입장 경로.
+
+## 2026-11-09 — #498 전투 첫 사용 렌더링 미리 그리기
+
+- **기준:** `perf/#498-battle-pso-prewarm`, main `56e9c79f` 위 `c3bae1d9`·`ef533273`·`b243db2f`. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal), `-buildTarget iOS`. 설정 수와 접속 묶음은 바꾸지 않았다.
+- **한계:** 이 기록은 복사본이 실제로 그려지고 깨끗이 사라지는지를 확인한 것이다. iPhone에서 첫 투척·첫 명중의 끊김이 줄었는지는 **측정하지 않았다**(`HAPIO_FRAME_SPIKE` 실기기 비교 NOT_RUN). 화면이 없는 batch 실행에서는 화면용 BattleCamera가 렌더링되지 않아, 검사가 그 카메라에만 임시 RenderTexture를 준다.
+
+| 확인 | 결과 |
+| --- | --- |
+| PlayMode `GameBattleRenderWarmupTests`(새 2건) | 2/2 PASS |
+| PlayMode `GameTutorialFlowTests`·`LabFirstHitPaintPrewarmTests`, EditMode `GameFrameSpikePolicyTests`(`c3bae1d9`) | 11/11, 3/3 PASS |
+| 대조 실험 5가지(ACK 대기 제거, 복사본을 화면 밖에 둠, 복사본 미삭제, 보드 복사본 제거, 이동 거리 축소) | 모두 해당 검사 실패 |
+| 전체 EditMode / 전체 PlayMode(`b243db2f`) | 2121/2123, 713/717 PASS(실패는 아래 기존 6건) |
+
+- 독립 검토에서 1건이 확인됐고 고쳤다: 복사본 이동이 짧아 꼬리 붓 무늬 입자가 나오지 않던 문제.
+- **덮지 않은 첫 사용:** 조합판 TextMesh, 생성 미리보기 LineRenderer, 오색·지귀 전용 그림.
+- **미실행:** iPhone 측정, 2대 이상 실기기의 시작 시간, Mac·iOS 앱.
+
 ## 2026-11-09 — #501 로비에서 끊긴 게스트의 같은 방·같은 P번호 재입장, #502 전투 중 백그라운드 현재 동작 유지
 
 - **기준:** `feat/#501-background-reconnect`. main `e15f61f0` 위에서 만들고 검사했다. 커밋은 `27ccc99d`(기능)와 `be8f280e`·`d6111aa3`·`3f8c3846`·`3d27c6f1`·`f8e593b3`(독립 검토 1~5차 반영), 그 뒤의 기록 커밋이다. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal), `-buildTarget iOS`. Library는 다른 worktree에서 복제했다. 같은 Mac에서 다른 폴더의 Unity Editor가 열려 있었다.
@@ -57,6 +107,21 @@
 - **main `1823993d`(#551·#552·#567·#571·#573 포함) 병합 뒤:** `44e799da`에서 EditMode 2123건 중 2121 PASS, PlayMode 715건 중 711 PASS. 실패 6건은 `LabJigwiABModelTests.BBucketArrivesSeatBySeatAndEachPourPaintsAtOnce`, `GameTutorialTests.GoalStepPlaysTheApprovedLinesWithGeumokAndBul`, `LabJigwiABNetworkTests` 3건, `GameJigwiStageIntegrationTests` 1건이다. 같은 6건을 #501 없는 main `1823993d`에서 돌려 같은 메시지로 모두 실패함을 확인했다. 이 PR이 만든 실패가 아니며 고치지 않았다. Game 토큰은 #551의 44 위인 45, 프로토콜 5697·`C6PhysicsLab/58`은 #551 값이다.
 - 각 실행의 skip·inconclusive는 0이다. batch 가져오기가 덧붙인 Lobby PNG `.meta` 20개의 WebGL 항목은 매번 되돌렸다.
 - **미실행:** iPhone의 실제 화면 잠금·백그라운드(멈춘 시간을 재는 벽시계와 복귀 처리는 Editor에서 그 함수를 직접 불러 확인했다), 실제 Wi-Fi 끊김, 두 대 이상의 실기기, Bonjour 방 카드로 정원 찬 방에 실제로 다시 들어가기(카드 문구는 꾸민 방 목록으로, 입장 가능 판단은 EditMode로만 확인했다), Mac·iOS 앱.
+
+## 2026-11-09 — #557 방장 로비의 Direct IP 주소·포트 표시
+
+- **기준:** `fix/#557-direct-ip-host-address`, main `56e9c79f` 위 `28e82aef`·`fe7fae5e`. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal), `-buildTarget iOS`. 전체 실행은 `fe7fae5e`와 같은 내용의 작업 트리에서 돌렸다. 설정 수와 접속 묶음은 바꾸지 않았다.
+- **방법:** 주소는 `getifaddrs`로 읽는다. 관리 코드의 인터페이스 목록은 iOS IL2CPP 동작이 확인되지 않아 쓰지 않았다. 인터페이스 이름(`en0`, `bridge100`, `ap1`, `pdp_ip0` 등)의 의미는 일반 지식이며 실기기에서 확인하지 않았다.
+
+| 확인 | 결과 |
+| --- | --- |
+| EditMode `LabLocalAddressesTests`(새 14건: 표시 필터·정렬·이 Mac 읽기), `GameLobbyAssetTests` | 21/21 PASS |
+| PlayMode `GameLobbyViewTests`(새 1건, 기존 검사 2건 보강) | 19/19 PASS |
+| 대조 실험 5가지(포트 자동 입력 복원, 주소 줄 겹침, 주소 줄 숨김, 셀룰러 필터 제거, 169.254 필터 제거) | 모두 해당 검사 실패 |
+| 전체 EditMode / 전체 PlayMode | 2135/2137, 712/716 PASS(실패는 아래 기존 6건) |
+
+- 독립 검토에서 2건이 확인됐고 고쳤다: 저장 프리팹 검사·갱신 도구에서 Awake 전 주소 줄이 null이 되는 문제(첫 전체 실행의 `GameLobbyAssetTests` 4건 실패와 일치), 빈 포트 거절 문구 단언이 항상 통과하던 검사 빈틈.
+- **미실행:** iPhone의 실제 주소 표시(Wi-Fi·핫스팟·유선), 실기기 간 Direct IP 입장, Direct IP 게스트의 2:2·3:3 방 모드 수신, iOS IL2CPP에서의 `getifaddrs` 호출.
 
 ## 2026-11-08 — #473 모든 박 1.1배 (Gourd Visual Size 1.4 → 1.54)
 
@@ -6825,6 +6890,28 @@ PR-1(`feat/#507-gourd-rig-contract`) 위에서 Unity 6000.6.5f1 macOS batch Edit
 - 기준 main은 원격 재확인 후에도 `fbe6f67c`였다. Unity6000.6.5f1 / macOS 기본 batch에서 필터 없이 **전체 EditMode 2089/2089 PASS(16.28초), 전체 PlayMode 706/706 PASS(528.52초)**를 확인했다. 두 실행 모두 실패·생략·Inconclusive0이며 앞 절 초기 관련 검사 집계와 중복 합산하지 않는다. 위 초기 범위의 전체 모음 미실행 상태는 이 추가 실행으로 갱신한다.
 - 최종 독립 리뷰에서 원본 관람 캡션의 실제 문구가 `봉인 박 둘러보기`인데 비활성 표시 바인딩이 `봉인 박 관람`으로 찾던 오류를 발견했다. 기능 권한은 유지한 채 검색 문구만 맞췄다. 전체 검사 이후의 이 한 줄 수정에는 `SavedStorySkipAndEndingButtonsReceiveRealMouseClicksAtTheirVisibleScreenPositions`와 `StoryResultPresentationTests`를 다시 실행해 **10/10 PASS(5.09초), 실패·생략·Inconclusive0**를 확인했다. Mac 빌드 성공 기록은 이 캡션 문구 보완 이전 소스에서의 결과이며 재빌드·앱 실행을 추가하지 않았다.
 
+
+## 2026-11-09 - #569 procedural splash preview
+
+- Unity 6000.6.5f1 Editor: compilation console had no errors after the final source refresh.
+- Runtime checks on the final tuned mask: seed 569 repeated pixel-exactly (0 differences); seed 570 changed 44,967 pixels; no covered pixels touched the 512px border.
+- UI Toolkit slider callbacks were exercised for core/length/width, confirming controller state updates. Coating preset replay reached PaletteReady=true with no replay error, with both generated color and generated height bound.
+- Final live setting: core .29, spikes 14, length .19, width .036, roundness 1, irregularity 1, droplets 0, seed 569. Hand-made texture .3/1/0 and supplied palette/material/light values were restored.
+- Scope: runtime-owned procedural brushes only; no saved game setting, source brush, frozen journal, original color/height map or gameplay shader was replaced.
+- Not run: full EditMode/PlayMode suites, extreme slider combinations, Mac standalone rebuild, iOS/device tests, six-view visual approval. No PR was created.
+
+
+## 2026-11-09 - organic clay outline prototype
+
+- Changed the splash partial and documentation only in this follow-up; material shaders/game rules were not changed.
+- Final Unity compile console: zero errors. Three preset masks inspected visually. Seed569 repeated with zero pixel differences; seed570 differed at 60,290 pixels. All three preset masks had zero covered border pixels.
+- BODY ASYMMETRY UI slider callback updated the field and was restored. Color/height replay completed without error. Existing appearance/texture/palette/light values were restored.
+- Not run: full automated test suites, exhaustive slider extremes, standalone Mac/iOS/device tests, measured reference similarity. The first preset is a style approximation, not a claim of 99-percent visual matching.
+
+
+### 2026-11-09 - seed 572 fixed repetition
+
+Compared twelve seed masks and selected 572. Changed only seed defaults and the three-slot seed binding in the splash partial. All three generated brush slots compared pixel-identically (0 differences). Editor compile console had 0 errors; replay completed ready with no error. Restored previous shape sliders and appearance after compilation. Mac rebuild/full suites not run.
 ## #567 튜토리얼 대화 기록 1단계: 기록 버튼과 기록 모으기 — 2026-11-08
 
 - **기준:** 최신 main `e15f61f0` → `feat/#567-tutorial-dialogue-log`. #552가 머지되기 전 main에서 시작했다. Play가 꺼진 것을 확인한 뒤 컴파일과 Editor API 에셋 작업만 했다.
@@ -6914,3 +7001,83 @@ PR-1(`feat/#507-gourd-rig-contract`) 위에서 Unity 6000.6.5f1 macOS batch Edit
   - `GameJigwiStageIntegrationTests.SavedHomeReachesJigwiWithScreenAThenScreenBAndPreservesTheRealPaintShell`
 - `GameTutorialFlowTests.FinishedOpeningOpensThePracticeBoardOnceThenTheRoomList`는 전체 실행에서 실패했고, 원본 main과 이 브랜치의 선택 재실행에서는 각각 통과했다. 전체 실행 순서 또는 공유 상태의 영향은 아직 원인을 확정하지 못했다.
 - iPhone 실기기 GPU 비용, 실제 다중 기기 연결, 새 main의 실제 전투 화면 캡처, 전체 검사 잔여 실패 분석은 후속 확인 항목이다. 실행 가능한 소스와 에셋은 [Draft PR #581](https://github.com/DeveloperAcademy-POSTECH/2026-C6-M10-MUSA/pull/581)에 있다.
+
+
+## 2026-11-09 — #569 이미지 윤곽 교체·최대 허용 범위 명시
+
+- 기준: PR#580의 `experiment/#569-sticker-splatter-preview` / `2bc6ce1e` 위 작업 트리. 환경은 Unity6000.6.5f1 / macOS batch / 실제 Metal GPU다. 일반 게임의 규칙·저널·셰이더를 바꾸지 않고 비교 앱의 윤곽 입력·프로필·명중 시나리오·지원 진단을 추가했다.
+- 사용자는 특정 원본 파일을 고정하는 대신 앱에서 이미지를 계속 교체하며 확인하는 방향을 승인했다. 투명 PNG의 Alpha를 원형으로 사용하고 RGB는 기존 오행 팔레트로 표시한다. 입력512×512/최소32px여백과 실제 도색 셀+상하좌우·대각2셀의 최대 표시 허용 범위를 구분해 UI와 사용법에 적었다.
+
+| 수행한 확인 | 실제 결과 |
+| --- | --- |
+| 최초 이미지·프로필 검사 | **4/4 PASS, 실패/생략0**(0.62초). PNG RGB 독립·Alpha/비율/구멍/분리 방울 보존, 불투명/빈/잘못된/과대 파일 거절, 원본 경로 삭제 후 내장 PNG 복원, 해시 변조/NaN 저장 실패 시 기존 프로필 보존. |
+| 실제 Scene 신규 통합 검사 | 캡처 도구 수정 뒤 **4/4 PASS**(19.29초). 연속 PNG 교체의 마지막 선택만 발행, 외형 설정 유지, 파일 오류 시 직전 그림 유지, 원본 윤곽/절차 모드 복귀, 실제 최초1회/동일지점 재타격3회/67회 완성, 지원 범위 이음새·극점 확인. |
+| 최종 비교 기능 회귀 모음 | **32/32 PASS, 실패·생략·Inconclusive0**(49.87초). `ClayPreviewPlayModeTests`, `ClayPreviewImageFilesPlayModeTests`, `ClayPreviewShapeMaskTests`, `ClayPreviewShapeControllerTests` 전체. 기존 질감·배경·팔레트·광원·광택·파일 취소/독립 해제·원본 샘플 채널과 새 기능을 함께 실행. 앞선 부분 실행과 중복 합산하지 않는다. |
+| 실패/자원 복원 | 최종 검사에서 잘못된 재생 요청을 주입해 이전 그림/프로필/완료 상태를 복구한 뒤, 발행 RT를 Release해 원래 저널로 다시 만드는 경계를 확인. 실패한 요청의 옵션과 완료 상태를 새 성공으로 표시하지 않도록 명시적 이전 결과 수락 경로를 사용. |
+| 표시 범위 | 실제 셀과 같은 X순환/Y제한의 2셀 합집합. 일반 위치 단일셀25개, 위쪽 극점 단일셀15개 확인. 잘림 그림은 셰이더와 같은 곡면 투영의 셀 중심 샘플이며 픽셀 AA 잘림 비율로 기록하지 않음. 100% 완료는 지원 제한 우회/완료 바탕임을 별도 표시. |
+| 렌더 캡처 | 합성 테스트 PNG의 최초/재타격/완성/바탕OFF와 기존 `BroadWhiteMask.png`를 입력한 실제 박 6방향 캡처를 생성. 6방향에서 마스크 픽셀과 최종 지도 참조 불변 확인. 이는 기존 에셋을 사용한 기능 예시이며 새로운 아트 시안의 사용자 승인이 아님. |
+| Mac 앱 빌드 | **성공** — `Builds/Experiments/ClayPreview/20261109-112654-78a6d12c/Hapio-Clay-Experiment.app`. 실행 파일과 Native PNG 선택 플러그인 포함 확인. 저장 비교 Scene을 먼저 열고 기존 `ClayPreviewImageExperiment.BuildMenu` 실행. 앱은 실행하지 않음. |
+| 원본 보존 | LabConfig·WhiteGourd·일반 게임5개Scene·ProjectSettings/BuildSettings·원본 저널/팔레트·네 프리셋 PNG/EXR/metadata 등 **24개 파일 SHA256 동일**. 기존 프로필·표현 핀·게임셰이더 변경 없음. 새 바탕OFF 셰이더는 비교 Scene2곳에만 Unity API로 연결. |
+
+수정 이력: 최초 통합 검사1건은 읽기 불가로 해제된 진단 Texture를 캡처 도구가 직접 EncodeToPNG하려다 실패했다. 테스트 캡처를 GPU 복사 경로로 바꿔 재실행했다. 첫 기존 회귀 모음은32개 추가 전31개 중1개가 결과 생성자의 기존5인자 취소 fixture 연결에서 실패했고, 원래 생성 경로를 유지하는 overload를 복원해 최종32개를 통과했다. 첫 Mac batch 빌드는 빈 Untitled Scene 보존 가드에서 중단돼, 저장된 비교 Scene을 명시적으로 연 뒤 성공했다. 실패한 실행을 PASS로 합산하지 않았다.
+
+미실행: 실제 OS 파일 선택창 클릭·Mac 앱 직접 조작, 새 입력 이미지의 사용자 미관 승인, iOS/실기기·일반 게임 적용·전체 프로젝트 EditMode/PlayMode 모음. 자동 검사와 캡처는 파일 선택창 자체를 열지 않으며 원본 데이터 API와 동일한 수락/취소 경로를 검사했다. 임시 연결/빌드 도구·원시 로그·PNG 캡처·앱 산출물은 커밋 대상에서 제외했다.
+
+
+### #569 실제 Mac 앱의 세로 버튼 겹침 수정
+
+- 사용자가 실행한 이전 Mac 앱에서 `Choose outline PNG`와 프로필 저장/복원/초기화가 거의0높이로 눌려 겹친 화면을 직접 확인했다. 공통 `.clay-button`의 가로 분할용 `flex-grow:1 / flex-basis:0`이 중첩 세로 컨테이너에도 적용된 원인이었다.
+- 공통 버튼을 자연 높이·최소40px·축소 금지로 바꾸고 균등 너비 분할은 `.clay-button-row` 직계 버튼에만 적용했다. 버튼 글자14px·상하패딩·줄바꿈·간격을 보완했다. 입력/이미지/렌더/프로필 규칙과 기존 색·글꼴 에셋은 바꾸지 않았다.
+- Unity6000.6.5f1 / macOS batch 실제 UITK에서 1280×800와960×600 두 창 크기의 중첩 버튼 높이40px·세로 겹침 없음·스크롤 후 viewport 안의 중심 Pick 일치·가로 버튼 행 분할을 확인했다. 추가 검사1/1 PASS(4.23초), 최종 기존 비교 모음 **33/33 PASS(55.00초), 실패·생략0**.
+- 새 Mac 빌드 성공: `Builds/Experiments/ClayPreview/20261109-114203-6374842f/Hapio-Clay-Experiment.app`. 실제 새 창에서 PNG 선택 버튼과 프로필 저장·복원·초기화 버튼의 분리된 높이/간격을 스크롤해 관찰했다. OS 파일 선택창 제목이 표시되는 경로도 관찰했으며 이미지 파일 선택·적용 자체를 이번 UI 확인에서 반복하지 않았다.
+- 기존 앱의 현재 조정값을 잃지 않도록 원래 실행 앱은 종료하지 않았다. 동일 bundle ID의 두 창 때문에 자동 입력 대상이 모호해, 새 빌드의 복사본에만 검증용 식별자를 부여해 화면을 대조했고 검증 복사본은 종료했다. 별도 검증 창 연결에서 도구 응답이 장시간 지연됐으나 빌드·검사 소스 오류는 아니었다.
+- 보호 대상24개 원본 해시 동일, 임시 빌드 도구 제거. 실기기·전체 프로젝트 검사 모음은 미실행이며 검증한 것은 비교 앱 UI와 관련 검사다.
+
+
+### #569 PR 최종 통합·상세 사용법·샘플 PNG — 2026-11-09
+
+- 기준은 최신 main `cfbf65b2`를 통합한 `e9073308`이다. Direct IP 주소 표시(#557)·전투 첫 렌더 준비(#498)를 보존했다. 일반 게임 런타임·Scene·LabConfig·패키지·통신 규약은 이 PR에서 변경하지 않았다.
+- `Samples/ClayShapePNG/`에 투명 PNG3종(넓은형·흐름형·군집형)과 생성 프롬프트를 보관했다. 512×512 RGBA·실제 Alpha·사방 최소32px 원본 여백을 확인했다. RGB는 도색 색이 아니라 예제 구분용이며 입력은 Alpha만 사용한다. 샘플은 Assets 밖에 있어 게임에 자동 연결하지 않는다.
+- 사용법의17절을 앱/Scene 찾기→PNG 입력3종 구분→샘플 선택→명중1회/재타격3회/67회 비교→최대 범위/완료 바탕 해석→모드/절차 설정→프로필 저장·초기화→오류 대처 순서로 확장했다. 저장되는 윤곽과 저장되지 않는 재질·색·질감·배경을 구분하고 Finder에서 앱 전용 프로필을 확인하는 방법을 적었다. 문서의 로컬 링크 존재·개인 절대 경로 없음도 확인했다.
+- 최종 검토에서 큰 투명 캔버스의 아주 작은 점이512px 변환 중 사라져도 성공하던 입력 경계를 발견했다. 실제 합성기의 Alpha 임계값을 넘는 출력이 없으면 명확히 거절하도록 보완하고2048px 모서리1px 회귀 검사를 추가했다. 정상 입력의 모양·색·높이 계산은 유지했다.
+- 이미지 선택 UI가 있는 기존 Coating 앱 빌드에도 `StageForPreview`를 연결했다. 새 PNG 기능이 없는 일반 게임/초기 비교 빌드에는 연결하지 않으며 기존 stage 소유·배포 범위 가드와 종료 정리를 재사용한다.
+
+| 확인한 실행 | 실제 결과 |
+| --- | --- |
+| 최초 전체 EditMode | 2,137개 중2,135통과·2실패(18.11초). 지귀 검사 자체의 시간 역행과#552의 실제3줄 대사에 남은2줄 제한이었다. 실패를 통과로 기록하지 않았다. |
+| 보정 뒤 전체 EditMode | **2,137/2,137 PASS**, 실패·생략·Inconclusive0(17.33초). |
+| 최초 전체 PlayMode | 729개 중725통과·4실패(623.29초). 이 실행의 비교 앱34개는 모두 통과했다. 실패4개는 아래 지귀 검사 설정/기대 보정 대상이었다. |
+| 지귀 보정 회귀 | `LabJigwiABNetworkTests`·`GameJigwiStageIntegrationTests` **10/10 PASS**, 실패·생략0(4.35초). |
+| 최종 전체 PlayMode | **729/729 PASS**, 실패·생략·Inconclusive0(589.41초). 새 비교 앱34개도 포함한 전체 실행이며, 앞선 실패 실행·부분 실행과 합산하지 않는다. |
+| 최종 Mac 비교 앱 빌드 | **두 빌드 성공** — 코팅 `Builds/Experiments/ClayPreview/20261109-143324-70776723/Hapio-Clay-Experiment.app`, 이미지/질감/배경 `Builds/Experiments/ClayPreview/20261109-143341-cdb2c108/Hapio-Clay-Experiment.app`(권장). 각각 실행 파일과 `ClayPreviewMacImagePicker.bundle` 포함 확인. 전용 메뉴만 사용했으며 소스·샘플을 다시 베이크하지 않았다. 새 앱 직접 실행은 하지 않았다. |
+| 원본 자료 보존 | LabConfig·WhiteGourd·일반 게임5개Scene·ProjectSettings/BuildSettings·원본 저널/팔레트·네 프리셋 PNG/EXR/metadata 등 **24개 파일 SHA256 동일**. 두 빌드의 native stage와 임시 빌드 C#·meta 제거, 작업 트리에는 최종 문서 변경만 남음. |
+
+**기존 main 검사의 보정 범위:** 지귀 양동이 모델 검사는 마지막 자리의 도착 전 거절 검사를 첫 자리 처리 뒤로 옮겨 단조 증가 시각을 지켰다. PlayMode의 구형 특수 물구슬 명중·독립 반경 검사는 복제 설정에서만 옛 모드를 명시해 실제 물리 접촉·무도색 처리·반경·잡기 범위·면적 검사를 유지했다. 기본 양동이 모드의 포괄 범위 검사는5명 모두를 검사한다. 저장된 Home→스테이지3 검사는 현재 기본 양동이 표시·도착 창·옛 물방울/특수 구슬 없음·Host 쏟기/중복 거절·실제 도색·스태미나 무소모·원래 HitShell/Collider 유지로 맞췄다. 튜토리얼은 이미 승인된#552 대본의 최대3줄 기준만 검사에 반영했다. 게임 규칙·대본·UI 배치·설정 원본을 고치거나 실패 검사를 삭제/skip하지 않았다.
+
+**최종 확인 범위:** 자동 GPU/Scene/네트워크 fixture와 Mac 앱 빌드다. 실제 앱의 버튼·선택창 관찰은 위#569 UI 기록의 버전을 따른다. 새 PNG 원본의 미관 승인, 최종 새 앱의 사용자 직접 파일 선택/조작, iOS·실기기·LAN/핫스팟 실환경은 이번 최종 검사에서 실행하지 않았다. 양동이 통합 fixture는 실제 Host 모델 판정을 확인하지만 폰 기울기·키보드 조작을 실행한 검사는 아니다. 원시 로그·검증 캡처·임시 빌드 도구·앱 산출물은 커밋하지 않는다.
+
+
+## 2026-11-09 — PR #581 원본 클레이 통합·원소 해방 제거 (화면 승인 대기)
+
+- 기준: PR #581 `0bab495f`에 main `02a27205`를 통합한 변경본. 별도 #588의 미커밋 32개 파일은 SHA256 대조로 그대로 보존했고 이 통합에 넣지 않았다. 데스크톱 작업 폴더도 변경하지 않았다.
+- 일반 오행의 3D 구슬·실제 경로를 따르는 클레이 꼬리·눌림·퍼짐·작은 진흙 방울을 유지하고 원소별 해방 클래스/형상/셰이더를 제거했다. 기존 `.86초 / Lerp(.95,1.13,strength)` 접촉 수명을 `contactSeconds`로 분리해 전투의 `leaveMark:false`에서도 짧은 진흙이 보이도록 유지했다. 실제 도색·투척·통신 규약·부적/특수 보상·마지막 일격 다시보기는 기존 경로를 유지한다.
+- 최신 main의 전투 사전 렌더 준비에 별도 클레이 비행/명중 복사본을 추가했다. 실제 Scene 풀/seed/leases를 사용하지 않으며 준비가 끝나면 전용 메시·재질을 해제한다.
+
+| 실행 | 환경·결과 | 확인 범위 |
+| --- | --- | --- |
+| 컴파일 | Unity 6000.6.5f1 / macOS / Metal | 게임 코드 컴파일 오류 없음 |
+| 접촉 선택 검사 | PlayMode 4/4 통과 | 5속성 × 장기 흔적 ON/OFF, 실제 물리 명중, 원소 해방 부재, 진흙 잔존·축소·회수, 이동 대상·제거·슬롯 재사용 |
+| 사전 렌더 선택 검사 | PlayMode 2/2 통과 | 5종 실제 재질 draw, 실제 풀/seed 불변, 임시 리소스 해제 |
+| 전체 EditMode | 독립 batch **2,139/2,139 통과**, 18.31초 | 필터·재시도·제외 없이 실행 |
+| 전체 PlayMode | 독립 batch **738/738 통과**, 632.54초 | 필터·재시도·제외 없이 실행, graphics 활성 |
+| 비교 씬 그래픽 검사 | Metal 자동 재생 통과 | 30/60fps 설정에서 자연 접촉 각5개, pause/단색/resume 이벤트, 진흙 렌더, 소멸·중복·재사용·대상 회수 |
+
+선행 PlayMode 뒤 같은 Editor에서 EditMode를 실행했을 때는 6건이 실패했다. `LabConfig`의 저장된 `orbAppearance`는 원본이지만 `OrbAppearance` getter가 Battle용 override를 반환하는 상태였다. 기존 main의 `Stop → RestoreSourceConfig → ConfigApplied → ApplyOrbAppearance`가 종료 중 source의 비직렬화 override를 다시 설정하는 경로를 읽기로 확인했다. 새 Editor의 독립 전체 검사에서는 위와 같이 통과했다. 이번 VFX 변경을 위해 원본 에셋·종료 정책을 바꾸지 않았다.
+
+실제 전투 촬영은 저장된 `Home → GameSession.StartSolo(Story) → Battle` 경로에서 수행했다. 촬영용 런타임 복사본만 HP 100000·600초·초기/반복 도색 1%·기믹 주기 0·색 조합 보너스 OFF로 조정했고, 정상 Combined를 fixture로 준비한 뒤 실제 보드 드래그/손떼기·기존 투척 물리·Host 승인·도색·VFX를 실행했다. 화/수/목/금/토 **5개 모두 실제 물리 명중·승인 이벤트 1회·도색 증가**를 확인했다. 780×1688 실제 GameView에서 0.08/0.25/0.60초 진흙 접촉이 남고 0.95초에는 회수된 것을 캡처했다. 자동 입력·촬영 검증이며 사용자의 직접 플레이 또는 iOS 검증으로 표시하지 않는다.
+
+![실제 Battle의 금 속성 명중 후 0.25초](images/five-elements/clay-only-battle.png)
+
+- 검증용 임시 촬영 도구의 `GetInstanceID` 구형 API 때문에 한 차례 Safe Mode가 발생했다. 창 유형 재조회로 수정해 일반 Editor로 다시 열었으며 임시 도구는 커밋에서 제외한다. 이 도구를 추가하기 전에 위 전체 검사는 통과했다.
+- 비교 이미지는 `docs/images/five-elements/clay-only-spread.png`·`clay-only-settled.png`다. 과거 원소 해방 이미지는 새 외형 기준에서 제외했다. 원시 로그·빌드·기기 식별자는 저장소에 올리지 않는다.
+- 아직 수행하지 않은 항목: 사용자 최종 외형 승인, iOS 실기기 GPU 비용·가독성, 실제 여러 기기 LAN/핫스팟 확인. Editor의 프레임/GC 측정은 기기 성능 PASS 근거로 쓰지 않는다. **사용자 화면 승인 전 PR을 Draft로 유지하며 main은 병합하지 않는다.**

@@ -34,9 +34,9 @@ namespace C6Lab
         [Range(.2f, 2f)] public float dropSpeed = 1f;
         [Range(1f, 30f)] public float gravityDiameters = 13f;
         [Range(0f, .35f)] public float tipSag = .115f;
+        [Tooltip("Minimum clay contact duration before the persistent paint takes over; adjusted by impact strength.")]
+        [Min(.25f)] public float contactSeconds = .86f;
         [Min(0f)] public float markSeconds = 2f;
-        [Header("Element discharge")]
-        public LabElementReleaseSettings release = new LabElementReleaseSettings();
 
         [Header("Maximum visible slots per scene")]
         [Range(5, 48)] public int maxFlights = 16;

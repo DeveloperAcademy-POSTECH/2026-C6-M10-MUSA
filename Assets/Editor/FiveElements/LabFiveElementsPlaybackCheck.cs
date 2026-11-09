@@ -26,11 +26,11 @@ namespace C6Lab.Editor
         {
             public string unity, graphicsApi, graphicsDevice, scene;
             public int firstFrame, lastFrame, naturalHits, sampleFrames, recoveredImpacts;
-            public int sixtyFpsReleaseFrame, thirtyFpsReleaseFrame;
+            public int sixtyFpsClayFrame, thirtyFpsClayFrame;
             public bool duplicateHitSuppressed, staleLeaseIsolated, movingMarkFollowed, destroyedTargetReclaimed;
-            public bool hudPauseMonoResumeSubmitted;
+            public bool hudPauseMonoResumeSubmitted, clayOnlyImpacts;
             public int[] changedPixelsByLane;
-            public int earthChangedPixels, drawCallsPeak = -1, trianglesPeak = -1;
+            public int claySettlingChangedPixels, drawCallsPeak = -1, trianglesPeak = -1;
             public long editorGcBytesPeak = -1;
             public double cpuFrameMsPeak = -1, gpuFrameMsPeak = -1;
             public string timingScope = "Whole Editor frames, including startup. Zero/unsupported draw counters are -1. GPU timings from a batch graphics context cannot establish device performance.";
@@ -116,13 +116,13 @@ namespace C6Lab.Editor
                     demo.PlaybackTime < LabFiveElementsDemo.FlightSeconds + .45f) return;
                 if (fpsPass == 60)
                 {
-                    result.sixtyFpsReleaseFrame = Time.frameCount;
+                    result.sixtyFpsClayFrame = Time.frameCount;
                     fpsPass = 30;
                     demo.SetFrameRate(30);
                     demo.Replay();
                     return;
                 }
-                result.thirtyFpsReleaseFrame = Time.frameCount;
+                result.thirtyFpsClayFrame = Time.frameCount;
                 result.naturalHits = demo.VolleyHits;
                 result.lastFrame = Time.frameCount;
                 result.sampleFrames = samples;
@@ -159,7 +159,8 @@ namespace C6Lab.Editor
 
             demo.Seek(LabFiveElementsDemo.FlightSeconds + .38f);
             Require(demo.ActiveFlights == 0 && demo.ActiveImpacts == 5 && demo.VolleyHits == 5, "Missing active impacts.");
-            var release = Capture(demo, "02-release", 1400, 520);
+            var clay = Capture(demo, "02-clay-spread", 1400, 520);
+            CheckClayOnly(demo);
             demo.Seek(LabFiveElementsDemo.CycleSeconds);
             result.recoveredImpacts = demo.ActiveImpacts;
             Require(demo.ActiveImpacts == 0, "An effect survived its configured mark lifetime.");
@@ -167,16 +168,16 @@ namespace C6Lab.Editor
             result.changedPixelsByLane = new int[5];
             for (int i = 0; i < 5; i++)
             {
-                result.changedPixelsByLane[i] = Difference(release, empty, 1400, i * 280, (i + 1) * 280);
-                Require(result.changedPixelsByLane[i] > 50, "No rendered discharge in lane " + i);
+                result.changedPixelsByLane[i] = Difference(clay, empty, 1400, i * 280, (i + 1) * 280);
+                Require(result.changedPixelsByLane[i] > 50, "No rendered clay spread or drops in lane " + i);
             }
             demo.SelectLane(4);
-            demo.Seek(LabFiveElementsDemo.FlightSeconds + .31f);
-            var clump = Capture(demo, "03-earth-gather", 740, 500);
-            demo.Seek(LabFiveElementsDemo.FlightSeconds + .52f);
-            var crumble = Capture(demo, "04-earth-crumble", 740, 500);
-            result.earthChangedPixels = Difference(clump, crumble, 740, 0, 740);
-            Require(result.earthChangedPixels > 80, "Earth release frames have the same appearance.");
+            demo.Seek(LabFiveElementsDemo.FlightSeconds + .04f);
+            var squash = Capture(demo, "03-contact-squash", 740, 500);
+            demo.Seek(LabFiveElementsDemo.FlightSeconds + .75f);
+            var settled = Capture(demo, "04-settled-clay", 740, 500);
+            result.claySettlingChangedPixels = Difference(squash, settled, 740, 0, 740);
+            Require(result.claySettlingChangedPixels > 80, "The initial squash and settled clay have the same appearance.");
 
             demo.SelectLane(-1);
             demo.SetFrameRate(30);
@@ -192,6 +193,26 @@ namespace C6Lab.Editor
             Capture(demo, "07-game-distance-landscape", 840, 300);
             CheckLeases(demo);
             Require(firstError == null, firstError);
+        }
+
+        private static void CheckClayOnly(LabFiveElementsDemo demo)
+        {
+            var pool = LabFiveElementVfx.ForScene(demo.gameObject.scene);
+            int visibleMarks = 0;
+            foreach (Transform child in pool.transform)
+            {
+                if (!child.name.StartsWith("Impact ", StringComparison.Ordinal)) continue;
+                Require(child.Find("Element release") == null, "An elemental release layer survived in a clay impact.");
+                Transform mark = child.Find("Wet surface mark");
+                if (mark != null && mark.gameObject.activeInHierarchy && mark.GetComponent<MeshRenderer>().enabled)
+                    visibleMarks++;
+            }
+            foreach (var renderer in pool.GetComponentsInChildren<Renderer>(true))
+                foreach (var material in renderer.sharedMaterials)
+                    Require(material == null || material.shader.name != "C6Lab/Five Elements/Release",
+                        "The removed elemental explosion shader is still used by a pooled renderer.");
+            Require(visibleMarks == 5, "All five contacts must keep visible clay after their squash.");
+            result.clayOnlyImpacts = true;
         }
 
         private static void CheckHud(LabFiveElementsDemo demo)
@@ -231,7 +252,7 @@ namespace C6Lab.Editor
             try
             {
                 var a = pool.BeginFlight(LabOrbElement.Earth, Vector3.zero, Vector3.forward, .33f);
-                Require(a.IsActive && a.Hit(Vector3.zero, Vector3.back, Vector3.forward, target.transform),
+                Require(a.IsActive && a.Hit(Vector3.zero, Vector3.back, Vector3.forward, target.transform, leaveMark: false),
                     "A real flight failed to create its first impact.");
                 result.duplicateHitSuppressed = !a.Hit(Vector3.zero, Vector3.back, Vector3.forward, target.transform) &&
                     pool.ActiveImpactCount == 1 && pool.ActiveFlightCount == 0;
@@ -245,12 +266,14 @@ namespace C6Lab.Editor
                 Require(result.staleLeaseIsolated, "A returned flight interfered with a reused slot or its mark.");
                 b.Cancel();
 
-                var release = pool.GetComponentInChildren<LabElementRelease>();
-                Require(release != null, "Could not inspect the active impact transform.");
-                Transform anchor = release.transform.parent;
+                Transform anchor = pool.transform.Find("Impact 0");
+                Require(anchor != null && anchor.gameObject.activeInHierarchy, "Could not inspect the active clay impact transform.");
+                var mark = anchor.Find("Wet surface mark").GetComponent<MeshRenderer>();
                 Vector3 before = anchor.position;
                 target.transform.position = new Vector3(.13f, .24f, .32f);
                 pool.Advance(.16f);
+                Require(mark.enabled && mark.gameObject.activeInHierarchy,
+                    "The Battle contact path must retain brief clay after its squash even without a long-lived mark.");
                 result.movingMarkFollowed = (anchor.position - before - target.transform.position).sqrMagnitude < .00001f;
                 Require(result.movingMarkFollowed, "A mark detached from its moving rigid target.");
                 UnityEngine.Object.DestroyImmediate(target);

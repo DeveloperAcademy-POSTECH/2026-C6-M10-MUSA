@@ -359,7 +359,7 @@ namespace C6Lab
             progress.style.width = Length.Percent(PlaybackTime / CycleSeconds * 100);
             float t = PlaybackTime - FlightSeconds;
             clockLabel.text = t < 0 ? "비행  " + (-t).ToString("0.00") + " s" : "충돌  +" + t.ToString("0.00") + " s";
-            phaseLabel.text = t < 0 ? "비행" : t < .05f ? "눌림" : t < .15f ? "반죽 퍼짐" : t < .70f ? "기운 해방" :
+            phaseLabel.text = t < 0 ? "비행" : t < .05f ? "눌림" : t < .15f ? "반죽 퍼짐" : t < .70f ? "진흙 정착" :
                 t < markSeconds ? "젖은 흔적" : "회수";
         }
     }
