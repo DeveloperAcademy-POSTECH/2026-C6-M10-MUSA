@@ -1050,6 +1050,10 @@ namespace C6Lab
         private static Sprite dropSprite;
         private readonly UnityEngine.UI.Image[] flyers = new UnityEngine.UI.Image[LabJigwiABNetworkValidation.MaximumPlayers];
         private readonly UnityEngine.UI.Image[] flyerGlows = new UnityEngine.UI.Image[LabJigwiABNetworkValidation.MaximumPlayers];
+        private readonly UnityEngine.UI.Image[] flyerShines = new UnityEngine.UI.Image[LabJigwiABNetworkValidation.MaximumPlayers];
+        private const int SparklesEach = 4;
+        private readonly UnityEngine.UI.Image[] sparkles = new UnityEngine.UI.Image[LabJigwiABNetworkValidation.MaximumPlayers * SparklesEach];
+        private static Sprite sparkleSprite, shineSprite;
         private readonly Vector3[] flyFrom = new Vector3[LabJigwiABNetworkValidation.MaximumPlayers];
         private readonly UnityEngine.UI.Image[] drops = new UnityEngine.UI.Image[24];
         private readonly Vector2[] dropVelocity = new Vector2[24];
@@ -1088,14 +1092,27 @@ namespace C6Lab
             if (age >= GlowSeconds + FlySeconds + PourSeconds + .6f) { sealStartedAt = -1f; sealRoot.gameObject.SetActive(false); return; }
             Vector3 boss = BossPoint();
             float unit = transform.lossyScale.y;
-            // ① All filled: a white light fills the screen for about a second while the talismans glow, then they take off.
+            // ① All filled: the talismans themselves shine white for about a second (a soft halo breathing, sparkles
+            // twinkling around them), then their power is released and they take off. The screen itself stays as it is.
             float glow = Mathf.Clamp01(age / GlowSeconds);
-            bool white = age < GlowSeconds + .2f;
-            if (whiteFlash.gameObject.activeSelf != white) whiteFlash.gameObject.SetActive(white);
-            if (white)
+            if (whiteFlash.gameObject.activeSelf) whiteFlash.gameObject.SetActive(false);
+            float shine = Mathf.Clamp01(age / .2f) * (age < GlowSeconds ? 1f : 1f - Mathf.Clamp01((age - GlowSeconds) / .25f));
+            for (int i = 0; i < sparkles.Length; i++)
             {
-                float rise = Mathf.Clamp01(age / .25f), fall = 1f - Mathf.Clamp01((age - (GlowSeconds - .3f)) / .5f);
-                whiteFlash.color = new Color(1f, 1f, .97f, .75f * rise * fall);
+                int owner = i / SparklesEach;
+                bool on = owner < flyCount && shine > .01f;
+                if (sparkles[i].gameObject.activeSelf != on) sparkles[i].gameObject.SetActive(on);
+                if (!on) continue;
+                // Each sparkle blinks on its own beat at its own spot around its talisman.
+                float beat = Mathf.Repeat(t * 2.2f + i * .37f, 1f), twinkle = Mathf.Sin(Mathf.PI * beat);
+                float angle = (i % SparklesEach) * (360f / SparklesEach) + i * 23f;
+                Vector2 offset = new Vector2(Mathf.Cos(angle * Mathf.Deg2Rad), Mathf.Sin(angle * Mathf.Deg2Rad))
+                    * flyers[owner].rectTransform.sizeDelta.y * (.55f + .2f * beat);
+                sparkles[i].rectTransform.position = flyFrom[owner] + (Vector3)(offset * transform.lossyScale.x);
+                float size = flyers[owner].rectTransform.sizeDelta.x * (.35f + .45f * twinkle);
+                sparkles[i].rectTransform.sizeDelta = Vector2.one * size;
+                sparkles[i].rectTransform.localEulerAngles = new Vector3(0f, 0f, 45f * beat);
+                sparkles[i].color = new Color(1f, 1f, .95f, shine * twinkle);
             }
             float fly = Mathf.Clamp01((age - GlowSeconds) / FlySeconds);
             for (int i = 0; i < flyers.Length; i++)
@@ -1103,18 +1120,27 @@ namespace C6Lab
                 bool on = i < flyCount && fly < 1f;
                 if (flyers[i].gameObject.activeSelf != on) flyers[i].gameObject.SetActive(on);
                 if (flyerGlows[i].gameObject.activeSelf != on) flyerGlows[i].gameObject.SetActive(on);
-                if (!on) continue;
+                if (!on) { if (flyerShines[i].gameObject.activeSelf) flyerShines[i].gameObject.SetActive(false); continue; }
                 float k = Mathf.Clamp01((fly - i * .05f) / .8f), ease = k * k;
                 Vector3 arc = Vector3.up * Mathf.Sin(Mathf.PI * k) * 60f * unit;
                 Vector3 at = Vector3.Lerp(flyFrom[i], boss, ease) + arc;
-                float pulse = 1f + .25f * Mathf.Sin(Mathf.PI * glow) + .05f * Mathf.Sin(t * 30f) * (1f - fly);
+                float pulse = 1f + .12f * Mathf.Sin(Mathf.PI * glow) + .04f * Mathf.Sin(t * 9f) * (1f - fly);
                 flyers[i].rectTransform.position = at;
                 flyers[i].rectTransform.localEulerAngles = new Vector3(0f, 0f, 360f * ease * (i % 2 == 0 ? 1f : -1f));
                 flyers[i].rectTransform.localScale = Vector3.one * pulse * Mathf.Lerp(1f, .6f, ease);
-                flyers[i].color = Color.Lerp(Color.white, new Color(1f, .98f, .85f, 1f), glow);
+                // The paper itself turns luminous white (a white silhouette laid over it).
+                flyers[i].color = Color.white;
+                bool shining = shine > .01f;
+                if (flyerShines[i].gameObject.activeSelf != shining) flyerShines[i].gameObject.SetActive(shining);
+                flyerShines[i].rectTransform.position = at;
+                flyerShines[i].rectTransform.sizeDelta = flyers[i].rectTransform.sizeDelta;
+                flyerShines[i].rectTransform.localEulerAngles = flyers[i].rectTransform.localEulerAngles;
+                flyerShines[i].rectTransform.localScale = flyers[i].rectTransform.localScale;
+                flyerShines[i].color = new Color(1f, 1f, 1f, .75f * shine * (.75f + .25f * Mathf.Sin(t * 7f + i)));
+                float breathe = .85f + .15f * Mathf.Sin(t * 6f + i);
                 flyerGlows[i].rectTransform.position = at;
-                flyerGlows[i].rectTransform.sizeDelta = flyers[i].rectTransform.sizeDelta * 2.4f;
-                flyerGlows[i].color = new Color(1f, .95f, .75f, .9f * Mathf.Sin(Mathf.PI * Mathf.Min(1f, glow * 1.2f)) * (1f - ease * .6f) + .2f * glow);
+                flyerGlows[i].rectTransform.sizeDelta = Vector2.one * flyers[i].rectTransform.sizeDelta.y * 2.1f * breathe;
+                flyerGlows[i].color = new Color(1f, 1f, .96f, Mathf.Max(.95f * shine * breathe, .35f * (1f - ease)));
             }
             float s = age - GlowSeconds - FlySeconds;
             bool letter = false; // #595 QA: no "물" letter with the waterfall (kept off; the waterfall alone)
@@ -1214,7 +1240,10 @@ namespace C6Lab
                 {
                     flyerGlows[i] = NewSealImage("Talisman Glow " + i, LabProceduralFire.Glow());
                     flyers[i] = NewSealImage("Flying Talisman " + i, TalismanIcon()); flyers[i].preserveAspect = true;
+                    // A white silhouette of the talisman laid over it: the paper itself shines.
+                    flyerShines[i] = NewSealImage("Talisman Shine " + i, TalismanShine()); flyerShines[i].preserveAspect = true;
                 }
+                for (int i = 0; i < sparkles.Length; i++) sparkles[i] = NewSealImage("Talisman Sparkle " + i, Sparkle());
                 waterGlyph = Label("Talisman Water Glyph", sealRoot, 150);
                 waterGlyph.text = "물"; waterGlyph.alignment = TextAnchor.MiddleCenter;
                 waterGlyph.horizontalOverflow = HorizontalWrapMode.Overflow; waterGlyph.verticalOverflow = VerticalWrapMode.Overflow;
@@ -1240,6 +1269,43 @@ namespace C6Lab
                 flyCount++;
             }
             if (talismanRow != null) talismanRow.gameObject.SetActive(false);
+        }
+
+        /// <summary>The talisman's outline filled white (laid over it so it shines).</summary>
+        private static Sprite TalismanShine()
+        {
+            if (shineSprite != null) return shineSprite;
+            Texture2D source = TalismanIcon().texture;
+            var texture = new Texture2D(source.width, source.height, TextureFormat.RGBA32, false)
+            { name = "Jigwi talisman shine (#595 runtime)", hideFlags = HideFlags.DontSave, wrapMode = TextureWrapMode.Clamp };
+            Color[] pixels = source.GetPixels();
+            for (int i = 0; i < pixels.Length; i++) pixels[i] = new Color(1f, 1f, 1f, pixels[i].a);
+            texture.SetPixels(pixels); texture.Apply(false, true);
+            shineSprite = Sprite.Create(texture, new Rect(0f, 0f, source.width, source.height), new Vector2(.5f, .5f), 64f);
+            shineSprite.hideFlags = HideFlags.DontSave;
+            return shineSprite;
+        }
+
+        /// <summary>A four-pointed twinkle star.</summary>
+        private static Sprite Sparkle()
+        {
+            if (sparkleSprite != null) return sparkleSprite;
+            const int s = 48;
+            var texture = new Texture2D(s, s, TextureFormat.RGBA32, false)
+            { name = "Jigwi talisman sparkle (#595 runtime)", hideFlags = HideFlags.DontSave, wrapMode = TextureWrapMode.Clamp };
+            var pixels = new Color[s * s];
+            for (int y = 0; y < s; y++)
+                for (int x = 0; x < s; x++)
+                {
+                    float u = Mathf.Abs((x + .5f) / s * 2f - 1f), v = Mathf.Abs((y + .5f) / s * 2f - 1f);
+                    float star = Mathf.Clamp01(1f - Mathf.Sqrt(u) - Mathf.Sqrt(v) + .35f) * 1.6f;
+                    float core = Mathf.Clamp01(1f - new Vector2(u, v).magnitude * 3f);
+                    pixels[y * s + x] = new Color(1f, 1f, 1f, Mathf.Clamp01(star + core));
+                }
+            texture.SetPixels(pixels); texture.Apply(false, true);
+            sparkleSprite = Sprite.Create(texture, new Rect(0f, 0f, s, s), new Vector2(.5f, .5f), s);
+            sparkleSprite.hideFlags = HideFlags.DontSave;
+            return sparkleSprite;
         }
 
         private UnityEngine.UI.RawImage NewRaw(string name)
@@ -1463,7 +1529,7 @@ namespace C6Lab
                     pixels[y * w + x] = !inside ? Color.clear : edge ? new Color(.55f, .1f, .06f, 1f)
                         : stroke || bar || seal ? new Color(.82f, .13f, .08f, 1f) : new Color(1f, .9f, .55f, 1f);
                 }
-            texture.SetPixels(pixels); texture.Apply(false, true);
+            texture.SetPixels(pixels); texture.Apply(false, false); // kept readable: TalismanShine copies its outline
             talismanIconSprite = Sprite.Create(texture, new Rect(0f, 0f, w, h), new Vector2(.5f, .5f), 64f);
             talismanIconSprite.hideFlags = HideFlags.DontSave;
             return talismanIconSprite;
