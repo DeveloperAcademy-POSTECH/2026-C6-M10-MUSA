@@ -406,8 +406,8 @@ namespace Hapio.Tests
             Assert.That(session.IsTerritory, Is.True);
             Assert.That(session.State.totalStages, Is.EqualTo(1));
             Assert.That(network.Snapshot.teamTerritory, Is.True);
-            Assert.That(network.config.TeamBattleSeconds, Is.EqualTo(120f));
-            Assert.That(network.Snapshot.remaining, Is.InRange(110d, 120d));
+            Assert.That(network.config.TeamBattleSeconds, Is.EqualTo(90f));
+            Assert.That(network.Snapshot.remaining, Is.InRange(80d, 90d));
             var livePaint = Object.FindFirstObjectByType<LabGourdPaint>();
             Assert.That(livePaint.HighResolutionActive, Is.True);
             Assert.That(livePaint.WatercolorActive, Is.False, "Only the team battle uses the opaque high-resolution presentation.");
