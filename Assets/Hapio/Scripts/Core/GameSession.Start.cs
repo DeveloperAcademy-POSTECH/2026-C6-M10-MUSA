@@ -139,9 +139,22 @@ namespace Hapio
         {
             if (sceneRoutine != null || !StageConfigurationReady || !network.HasBattleReferences
                 || !network.IsGameInitialStateReady(state.battleSessionId, state.battleRound)) return false;
-            var bindings = network.board != null ? network.board.GetComponent<GameBattleBindings>() : null;
-            if (bindings == null) bindings = FindFirstObjectByType<GameBattleBindings>();
+            GameBattleBindings bindings = BattleBindings();
             return bindings != null && bindings.IsPresentationReady;
+        }
+
+        private GameBattleBindings BattleBindings()
+        {
+            var bindings = network.board != null ? network.board.GetComponent<GameBattleBindings>() : null;
+            return bindings != null ? bindings : FindFirstObjectByType<GameBattleBindings>();
+        }
+
+        // #498: part of this device's initial-ready only, so it always ends before the Host can begin the countdown. A start
+        // that has already used half the shared budget skips the drawing rather than risk aborting the room.
+        private bool RenderWarmupFinished(double realNow)
+        {
+            GameBattleBindings bindings = BattleBindings();
+            return bindings == null || bindings.FinishRenderWarmup(realNow - loadStartedAt <= loadingTimeoutSeconds * .5f);
         }
 
         private void UpdateBattleStart(double realNow)
@@ -172,7 +185,7 @@ namespace Hapio
             }
             if (state.phase == GameFlowPhase.SynchronizingBattle)
             {
-                if (!InitialPresentationReady()) initialReadyFrame = -1;
+                if (!InitialPresentationReady() || !RenderWarmupFinished(realNow)) initialReadyFrame = -1;
                 else if (initialReadyFrame < 0) initialReadyFrame = Time.frameCount;
                 // Give Start/LateUpdate/Canvas a frame to install the accepted initial presentation.
                 else if (Time.frameCount > initialReadyFrame && realNow >= nextInitialReadyAt)

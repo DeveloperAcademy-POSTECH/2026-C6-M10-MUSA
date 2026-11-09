@@ -22,6 +22,15 @@ namespace Hapio
         public UnityEngine.UI.Button developerNextStageButton;
         public GameYokaiPresentation yokaiPresentation;
         private GameSession session;
+        private LabBattleRenderWarmup renderWarmup;
+
+        /// <summary>#498: asked only once the presentation is ready, so the board's camera and the cover are in place.</summary>
+        public bool FinishRenderWarmup(bool mayDraw)
+        {
+            if (renderWarmup == null) return true;
+            renderWarmup.Request(mayDraw);
+            return renderWarmup.Finished;
+        }
 
         public bool IsPresentationReady
         {
@@ -59,6 +68,8 @@ namespace Hapio
             if (Debug.isDebugBuild)
                 Debug.Log("C6_AUDIO_WARMUP yokai=" + network.GameStageYokai + " loaded=" + warmed
                     + " ms=" + ((Time.realtimeSinceStartup - warmupStarted) * 1000f).ToString("0"));
+            renderWarmup = gameObject.AddComponent<LabBattleRenderWarmup>();
+            renderWarmup.Bind(network, battleCamera, hud);
             session.NotifyBattleBound(board);
             network.ConfigApplied += OnConfigApplied;
             // The practice board (#477) dresses this Battle for the tutorial and runs its script.

@@ -1,5 +1,21 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-09 — #498 전투 첫 사용 렌더링 미리 그리기
+
+- **기준:** `perf/#498-battle-pso-prewarm`, main `56e9c79f` 위 `c3bae1d9`·`ef533273`·`b243db2f`. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal), `-buildTarget iOS`. 설정 수와 접속 묶음은 바꾸지 않았다.
+- **한계:** 이 기록은 복사본이 실제로 그려지고 깨끗이 사라지는지를 확인한 것이다. iPhone에서 첫 투척·첫 명중의 끊김이 줄었는지는 **측정하지 않았다**(`HAPIO_FRAME_SPIKE` 실기기 비교 NOT_RUN). 화면이 없는 batch 실행에서는 화면용 BattleCamera가 렌더링되지 않아, 검사가 그 카메라에만 임시 RenderTexture를 준다.
+
+| 확인 | 결과 |
+| --- | --- |
+| PlayMode `GameBattleRenderWarmupTests`(새 2건) | 2/2 PASS |
+| PlayMode `GameTutorialFlowTests`·`LabFirstHitPaintPrewarmTests`, EditMode `GameFrameSpikePolicyTests`(`c3bae1d9`) | 11/11, 3/3 PASS |
+| 대조 실험 5가지(ACK 대기 제거, 복사본을 화면 밖에 둠, 복사본 미삭제, 보드 복사본 제거, 이동 거리 축소) | 모두 해당 검사 실패 |
+| 전체 EditMode / 전체 PlayMode(`b243db2f`) | 2121/2123, 713/717 PASS(실패는 아래 기존 6건) |
+
+- 독립 검토에서 1건이 확인됐고 고쳤다: 복사본 이동이 짧아 꼬리 붓 무늬 입자가 나오지 않던 문제.
+- **덮지 않은 첫 사용:** 조합판 TextMesh, 생성 미리보기 LineRenderer, 오색·지귀 전용 그림.
+- **미실행:** iPhone 측정, 2대 이상 실기기의 시작 시간, Mac·iOS 앱.
+
 ## 2026-11-09 — #501 로비에서 끊긴 게스트의 같은 방·같은 P번호 재입장, #502 전투 중 백그라운드 현재 동작 유지
 
 - **기준:** `feat/#501-background-reconnect`. main `e15f61f0` 위에서 만들고 검사했다. 커밋은 `27ccc99d`(기능)와 `be8f280e`·`d6111aa3`·`3f8c3846`·`3d27c6f1`·`f8e593b3`(독립 검토 1~5차 반영), 그 뒤의 기록 커밋이다. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal), `-buildTarget iOS`. Library는 다른 worktree에서 복제했다. 같은 Mac에서 다른 폴더의 Unity Editor가 열려 있었다.
