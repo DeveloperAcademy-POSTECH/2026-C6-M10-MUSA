@@ -1,0 +1,33 @@
+.app { width: 100%; height: 100%; color: #f3ebdc; font-size: 16px; }
+.header {
+    flex-direction: row; justify-content: space-between; align-items: center;
+    min-height: 58px; padding-left: 26px; padding-right: 26px;
+    background-color: #242523; border-bottom-width: 1px; border-bottom-color: #55534c;
+}
+.title { font-size: 27px; letter-spacing: 1px; }
+.phase { color: #cdbd9d; font-size: 17px; }
+.lanes { flex-direction: row; justify-content: center; background-color: #2b2c29; }
+.lane {
+    margin: 0; padding: 7px 4px; flex-basis: 0; flex-grow: 1; color: #f1eadd;
+    font-size: 20px; background-color: rgba(0,0,0,0); border-width: 0 0 3px 0;
+    border-radius: 0; -unity-text-align: middle-center;
+}
+.view { flex-grow: 1; }
+.transport { padding: 8px 22px 10px 22px; background-color: #242523; border-top-width: 1px; border-top-color: #55534c; }
+.row { flex-direction: row; flex-wrap: wrap; align-items: center; }
+.row Button {
+    margin: 3px; padding: 5px 11px; min-height: 32px; font-size: 15px;
+    background-color: #363832; color: #f4eee2; border-width: 1px; border-color: #53564d;
+    border-radius: 4px; -unity-text-align: middle-center;
+}
+.row Button:hover, .lane:hover { background-color: #4d5046; }
+.row Button:active, .row .primary { background-color: #e0c799; color: #252620; border-color: #e0c799; }
+.clock { flex-grow: 1; -unity-text-align: middle-right; color: #e0c799; font-size: 15px; padding-right: 5px; }
+.scrub { height: 23px; padding-left: 3px; padding-right: 3px; justify-content: center; }
+.track { height: 4px; background-color: #57594f; }
+.progress { height: 4px; background-color: #dcc596; }
+.tick { height: 12px; width: 2px; top: -4px; position: absolute; background-color: #f6eede; }
+.compact .title { font-size: 21px; }
+.compact .header { min-height: 42px; padding-left: 12px; padding-right: 12px; }
+.compact .transport { padding: 4px 6px; }
+.compact .row Button { margin: 2px; padding: 3px 6px; font-size: 14px; min-height: 28px; }

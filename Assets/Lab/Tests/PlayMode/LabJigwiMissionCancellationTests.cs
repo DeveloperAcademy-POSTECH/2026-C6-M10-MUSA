@@ -116,7 +116,7 @@ namespace C6Lab.Tests
             Assert.That(Presented(stale), Is.True);
         }
 
-        [Test]
+        [Test, Category("GPU")]
         public void HostProjectileCreationUsesTheCapturedRewardAndAcceptedRevision()
         {
             var model = new LabModel();
@@ -133,7 +133,9 @@ namespace C6Lab.Tests
             Assert.That(shot.AuthorityRevision, Is.EqualTo(42UL));
             Assert.That(shot.RadiusScale, Is.EqualTo(1.3f));
             Assert.That(shot.JigwiABRewardActive, Is.True);
-            Assert.That(shot.ElementFlightTrail.Element, Is.EqualTo(LabOrbElement.Wood));
+            // Ordinary elemental shots use the shared clay presentation; the reward still adds its own fire.
+            Assert.That(shot.VisualMount.gameObject.activeSelf, Is.False);
+            Assert.That(LabFiveElementVfx.ForScene(shot.gameObject.scene).ActiveFlightCount, Is.EqualTo(1));
             Assert.That(shot.JigwiRewardFireTrail, Is.Not.Null);
             Assert.That(shot.JigwiRewardFireTrail.IsEmitting, Is.True);
             Assert.That(typeof(LabProjectile).GetField("element", Private).GetValue(shot), Is.EqualTo(LabOrbElement.Wood));
