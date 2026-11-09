@@ -1918,7 +1918,12 @@ namespace Hapio.Tests
             Assert.That(card, Is.Not.Null, "The current stage's actual seal card must be visible.");
             Assert.That(card.sealRate.text, Is.EqualTo(Mathf.RoundToInt(snapshot.paintCoverage * 100) + "%"));
             Assert.That(card.timeRemaining.text, Is.EqualTo(Mathf.CeilToInt((float)snapshot.remaining) + "초"));
-            StoryCardRecords.Record[] records = GameStageStoryPresentation.CardRecords(snapshot);
+            StoryCardRecords.Record[] records = GameStageStoryPresentation.CardRecords(snapshot, GameSession.Instance.Network.LocalPlayerId);
+            var cardImages = story.player.CurrentView.GetComponentsInChildren<UnityEngine.UI.Image>(true);
+            Assert.That(cardImages.Count(image => image.name == StoryRecordHighlight.HighlightName && image.gameObject.activeSelf),
+                Is.EqualTo(records.Count(record => record.mine)), "Red marks exactly the awards this player earned.");
+            Assert.That(cardImages.Any(image => image.name.StartsWith("Rectangle 12") && image.gameObject.activeSelf), Is.False,
+                "The design's fixed sample strips are off on the real result path.");
             Assert.That(card.players, Has.Length.EqualTo(5));
             for (int row = 0; row < 5; row++)
             {

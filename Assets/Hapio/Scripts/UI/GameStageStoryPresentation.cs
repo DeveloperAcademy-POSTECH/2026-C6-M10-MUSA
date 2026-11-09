@@ -139,8 +139,12 @@ namespace Hapio
         {
             UnbindActions();
             if (view == null || boundResult == null) return;
-            foreach (var records in view.GetComponentsInChildren<StoryCardRecords>(true))
-                records.Bind(boundResult.paintCoverage, (float)boundResult.remaining, CardRecords(boundResult));
+            StoryCardRecords.Record[] rows = CardRecords(boundResult, session.Network.LocalPlayerId);
+            StoryCardRecords[] cards = view.GetComponentsInChildren<StoryCardRecords>(true);
+            foreach (var records in cards)
+                records.Bind(boundResult.paintCoverage, (float)boundResult.remaining, rows);
+            // The failure dashboard has no record component, so its table is filled here from the same rows.
+            StoryRecordHighlight.Apply(view.transform, rows, cards.Length == 0);
             var gauge = view.GetComponentInChildren<StorySealGauge>(true);
             if (gauge != null)
             {
@@ -158,7 +162,7 @@ namespace Hapio
             RefreshControls();
         }
 
-        public static StoryCardRecords.Record[] CardRecords(LabSnapshot snapshot)
+        public static StoryCardRecords.Record[] CardRecords(LabSnapshot snapshot, ulong localPlayerId = ulong.MaxValue)
         {
             var order = new[] { LabResultTitle.MostDamage, LabResultTitle.MostAccurate,
                 LabResultTitle.MostPassed, LabResultTitle.MostDrumPassed, LabResultTitle.MostDrum };
@@ -170,8 +174,9 @@ namespace Hapio
                 foreach (var award in awards)
                     if (award.Title == order[i])
                     {
-                        result[i] = new StoryCardRecords.Record { player = LabResultStats.WinnerNames(award),
-                            value = LabResultStats.Record(award, snapshot.playedSeconds) };
+                        result[i] = new StoryCardRecords.Record { player = LabResultStats.WinnerNames(award, localPlayerId),
+                            value = LabResultStats.Record(award, snapshot.playedSeconds),
+                            mine = award.Winners != null && award.Winners.Any(winner => winner != null && winner.id == localPlayerId) };
                         break;
                     }
             }
