@@ -438,7 +438,7 @@ namespace C6Lab
             NotifyLocalStaminaSpent(request, receipt, purged);
             if (!purged && receipt.accepted && !receipt.consumedWithoutOutput && request.type == "combine") LocalCombined?.Invoke();
             predictedJigwiBurns.Remove(receipt.requestId);
-            if (!receipt.accepted) SetNotice(receipt.reason ?? "Request rejected.");
+            if (!receipt.accepted) ShowRejection(receipt.reason);
             if (!IsHost)
             {
                 boardReplica.ApplyReceipt(receipt);
