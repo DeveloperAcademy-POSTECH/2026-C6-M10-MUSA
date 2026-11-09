@@ -22,14 +22,16 @@ namespace Hapio
         public static void Apply(Transform view, IReadOnlyList<StoryCardRecords.Record> records, bool writeCells)
         {
             if (view == null || records == null) return;
-            Text[] texts = view.GetComponentsInChildren<Text>(true);
-            Text[] titles = Titles.Select(title => texts.FirstOrDefault(text => text.text == title)).ToArray();
             Image[] strips = view.GetComponentsInChildren<Image>(true)
                 .Where(image => image.name.StartsWith(StripPrefix, StringComparison.Ordinal)).ToArray();
             Image sample = strips.FirstOrDefault(image => image.name.StartsWith(SampleStrip, StringComparison.Ordinal));
-            if (sample == null || titles.Any(title => title == null)) return;
-
+            if (sample == null) return;
             Transform parent = sample.transform.parent;
+            // Only the face holding the table: the card's front has lettering that can animate through a row's height.
+            Text[] texts = parent.GetComponentsInChildren<Text>(true);
+            Text[] titles = Titles.Select(title => texts.FirstOrDefault(text => text.text == title)).ToArray();
+            if (titles.Any(title => title == null)) return;
+
             foreach (Transform child in parent.Cast<Transform>().Where(item => item.name == HighlightName).ToArray())
                 Remove(child.gameObject);
             foreach (Image strip in strips) strip.gameObject.SetActive(false);

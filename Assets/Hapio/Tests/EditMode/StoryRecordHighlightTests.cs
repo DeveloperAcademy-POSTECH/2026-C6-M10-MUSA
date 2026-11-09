@@ -60,6 +60,25 @@ namespace Hapio.Tests
         }
 
         [Test]
+        public void TheCardFrontIsNotTreatedAsPartOfTheTable()
+        {
+            GameObject view = Object.Instantiate(AssetDatabase.LoadAssetAtPath<GameObject>(Views + "Gumiho_SealCard.prefab"));
+            try
+            {
+                Text stamp = view.GetComponentsInChildren<Text>(true).First(text => text.text == "봉\n인");
+                Color saved = stamp.color;
+                Vector3 position = stamp.rectTransform.position;
+                position.y += CenterY(Title(view, 4).rectTransform) - CenterY(stamp.rectTransform);
+                stamp.rectTransform.position = position; // The stamp's fall passes through this row's height.
+                StoryRecordHighlight.Apply(view.transform, Rows(4), false);
+                Assert.That(stamp.color, Is.EqualTo(saved));
+                Image highlight = Highlights(view).Single(item => item.gameObject.activeSelf);
+                Assert.That(highlight.transform.GetSiblingIndex(), Is.GreaterThan(0), "Above the card's paper.");
+            }
+            finally { Object.DestroyImmediate(view); }
+        }
+
+        [Test]
         public void TheFailureDashboardShowsRealRecordsInsteadOfTheDesignSample()
         {
             GameObject view = Object.Instantiate(AssetDatabase.LoadAssetAtPath<GameObject>(Views + "Failure_Dashboard.prefab"));
