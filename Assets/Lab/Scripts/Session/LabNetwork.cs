@@ -2651,7 +2651,7 @@ namespace C6Lab
             {
                 ClearPendingSlotSelection();
                 SetNotice(packet.reason == "SLOT_TAKEN" ? "That P number is already selected."
-                    : "P number selection was rejected: " + packet.reason);
+                    : SlotRejectionText(packet.reason, gameFlowEnabled));
                 return;
             }
             if (packet.lobbyRevision <= 0) return;
@@ -2888,7 +2888,7 @@ namespace C6Lab
         private void RejectLocally(string orbId, string reason)
         {
             if (!string.IsNullOrEmpty(orbId) && board != null) board.RejectEdge(orbId);
-            SetNotice(reason ?? "Request rejected.");
+            ShowRejection(reason);
             Debug.LogWarning("C6_LAB_REJECT orb=" + orbId + " reason=" + reason);
         }
 
@@ -3142,6 +3142,31 @@ namespace C6Lab
 
         private void SetStatus(string status) { Status = status; Changed?.Invoke(); }
         private void SetNotice(string notice) { Notice = notice; Changed?.Invoke(); }
+
+        /// <summary>The Lab shows the Host's reason; the game says it in words a player can act on.</summary>
+        public static string SlotRejectionText(string reason, bool game) => game
+            ? "자리를 고르지 못했소. 다시 골라주시오." : "P number selection was rejected: " + reason;
+
+        /// <summary>A Host reason such as INSUFFICIENT_STAMINA names a log entry, not something to tell a player.</summary>
+        public static bool IsInternalReasonCode(string reason)
+        {
+            if (string.IsNullOrEmpty(reason)) return true;
+            foreach (char c in reason)
+                if (!(c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_')) return false;
+            return true;
+        }
+
+        // The game explains a refusal with its own feedback (stamina shake, blocked edge). The Lab keeps the raw reason
+        // on screen because that is what a physics test reads.
+        private void ShowRejection(string reason)
+        {
+            if (gameFlowEnabled && IsInternalReasonCode(reason))
+            {
+                if (Debug.isDebugBuild) Debug.Log("C6_LAB_REJECT_HIDDEN reason=" + reason);
+                return;
+            }
+            SetNotice(reason ?? "Request rejected.");
+        }
 
         private void OnDestroy()
         {

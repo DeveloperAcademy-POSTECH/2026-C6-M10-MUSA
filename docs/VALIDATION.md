@@ -1,5 +1,21 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-09 — 전투 화면의 내부 거절 코드 숨기기
+
+- **기준:** `fix/hide-rejection-codes`, main `02a27205` 위 `a46fe72d`와 그 뒤 로비 자리 거절 문구 커밋. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal).
+- **바꾼 것:** Hapio 게임 흐름에서 거절 사유가 내부 코드(영문 대문자·숫자·밑줄 또는 빈 값)면 `Notice`를 바꾸지 않고 개발 빌드 로그에만 남긴다. 로비 자리 거절은 한국어 안내로 표시한다. 독립 Lab은 코드를 그대로 표시한다. 접속 묶음과 설정 수는 그대로다.
+
+| 확인 | 결과 |
+| --- | --- |
+| EditMode `LabRejectionNoticeTests`(11건)·`LabLobbyRejoinTests` | 32/32 PASS |
+| PlayMode 실제 솔로에서 스태미나를 다 쓰고 북 누르기, `GameLobbyViewTests`, `LabLobbyPositionSelectionTests` | 2/2, 24/24 PASS |
+| 대조 실험(코드 숨김 제거, 자리 안내 제거) | 해당 검사 실패 |
+| 전체 EditMode / 전체 PlayMode(`a46fe72d`) | 2149/2149, 731/731 PASS |
+
+- 자리 거절 문구는 전체 실행 뒤에 고쳤고, 위 표의 관련 검사만 다시 돌렸다.
+- 폭탄·여우불 등 영어 안내 문장과 DEV 솔로의 `SHOT HIT` 수치는 이번 범위가 아니어서 그대로 표시된다.
+- **미실행:** 실기기 화면 확인, 스테이지 결과 화면 하단 빨간 글씨의 원인 확인(코드 변경 없음).
+
 ## 2026-11-09 — 1~3스테이지 박 1.4배
 
 - **기준:** `feat/stage-gourd-size`, main `2427de5a` 위 `d3b4aaa9`. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 그 뒤 커밋은 코드 동작 없이 툴팁 위치·문서만 바꿨다.
