@@ -397,3 +397,8 @@
 ## #498 전투 첫 사용 렌더링
 
 - `LabBattleRenderWarmup`은 준비 화면 아래에서 비공개 복사본만 그린다. 실제 보드·투사체 루트·명중 풀을 쓰지 않고, `GameSession.Start`의 `initial_ready` 조건으로만 기다린다(`IsPresentationReady`에 넣지 않는다). 첫 사용 비용이 있는 새 그림을 추가하면 여기에 실제 카메라·레이어로 함께 넣는다. 실기기 효과는 `docs/VALIDATION.md`에서 측정 여부를 구분한다.
+
+## 멀티 완료 연출 준비 판정
+
+- `GameSession.Finish`의 최종 칠 일치 판정은 기기마다 다른 `LabPaintSurface.VisualVersion`이 아니라 모든 기기가 같은 `LastVisualSequence`(`PaintFinishControl.visualSequence`)로 한다. `VisualVersion`은 같은 기기 안의 변경 감지에만 쓰고 기기 사이에 비교하지 않는다.
+- 현재 호환 묶음은 설정259개·5697·`C6PhysicsLab/58`·**`C6HapioGame/46`**이며 위 #501 절의 Game45 기록은 당시 값이다. Game45 이하 앱과 혼용하지 않는다.

@@ -13,6 +13,7 @@ namespace C6Lab
     {
         // 45: #501 lobby rejoin: a room ticket after the token, held lobby seats (lobby ids) and lobby_leave/lobby_closed.
         //     (on top of #551's 44; protocol and Lab token unchanged by #501.)
+        // 46: the paint-finish control compares the shared last stamp sequence, not each device's own change count.
         private static readonly byte[] GameConnectionToken = Encoding.ASCII.GetBytes("C6HapioGame/46");
         private const int MaximumGameFlowBytes = 8192;
         private bool gameFlowEnabled;
