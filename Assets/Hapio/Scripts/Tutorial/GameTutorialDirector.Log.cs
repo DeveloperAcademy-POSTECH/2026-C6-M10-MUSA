@@ -21,7 +21,7 @@ namespace Hapio
     /// <summary>
     /// 튜토리얼 대화 기록 (#567).
     /// - 대본 대사를 넘긴 순간 그 대사가 기록에 쌓인다. 동작 중에 잠깐 뜨는 말("다시 해 봐!"), 안내 띠, "성공!"은 담지 않는다.
-    /// - 기록이 하나라도 생기면 건너뛰기 바로 오른쪽에 "기록" 버튼이 건너뛰기와 같은 빠르기로 서서히 나타난다.
+    /// - 기록이 하나라도 생기면 건너뛰기 바로 아래에 "기록" 버튼이 건너뛰기와 같은 빠르기로 서서히 나타난다.
     /// - 기록은 이 판의 것이다. RESTART는 Battle을 다시 불러와 새 기록으로 시작한다.
     /// - 기록 버튼을 누르면 뒤가 어두워지고 튜토리얼 시계와 판 조작이 멈춘다. 막대가 위에서 아래로 쌓이고(오래된 대사가 위),
     ///   막대마다 왼쪽에 얼굴과 이름, 가운데에 대사가 있다. 처음 열면 가장 최근 대사가 보이는 맨 아래다. 한 번에 3개쯤 보이고
@@ -78,7 +78,7 @@ namespace Hapio
 
         private void BuildLogButton()
         {
-            // The same frame and lettering as the skip button beside it.
+            // The same frame and lettering as the skip button above it.
             Image frame = AddImage("Log Button", overlay, Color.white, art.skipButton, true);
             Slice(frame);
             logButton = frame.rectTransform;
@@ -305,7 +305,7 @@ namespace Hapio
             return true;
         }
 
-        /// <summary>Shows the "기록" button once there is a log, right beside the skip button (laid out just before this).</summary>
+        /// <summary>Shows the "기록" button once there is a log, right under the skip button (laid out just before this).</summary>
         private void UpdateLogButton()
         {
             if (logButton == null) return;
@@ -313,12 +313,12 @@ namespace Hapio
             if (logButton.gameObject.activeSelf != up) logButton.gameObject.SetActive(up);
             if (!up) return;
             logButtonGroup.alpha = SkipFade(Time.unscaledTime - logShownAt, art.skipFadeSeconds);
-            logButton.anchoredPosition = LogButtonCenter(skipButton.anchoredPosition, art.skipButtonSize.x, art.logButtonSize.x,
+            logButton.anchoredPosition = LogButtonCenter(skipButton.anchoredPosition, art.skipButtonSize.y, art.logButtonSize.y,
                 art.logButtonGap);
         }
 
-        /// <summary>The "기록" button's center: level with the skip button, <paramref name="gap"/> to its right.</summary>
-        public static Vector2 LogButtonCenter(Vector2 skipCenter, float skipWidth, float logWidth, float gap) =>
-            new Vector2(skipCenter.x + skipWidth * .5f + gap + logWidth * .5f, skipCenter.y);
+        /// <summary>The "기록" button's center (#586): <paramref name="gap"/> under the skip button, on its middle, clear of the notch.</summary>
+        public static Vector2 LogButtonCenter(Vector2 skipCenter, float skipHeight, float logHeight, float gap) =>
+            new Vector2(skipCenter.x, skipCenter.y - skipHeight * .5f - gap - logHeight * .5f);
     }
 }

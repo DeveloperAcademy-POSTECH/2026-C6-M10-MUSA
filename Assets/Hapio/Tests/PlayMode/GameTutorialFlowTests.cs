@@ -542,8 +542,8 @@ namespace Hapio.Tests
                 "기록 fades in with 건너뛰기", art.skipFadeSeconds + 1f);
             Rect skipRect = ScreenRect((RectTransform)skip.transform), logRect = ScreenRect((RectTransform)log.transform);
             float scale = skipRect.width / art.skipButtonSize.x;
-            Assert.That(logRect.center.y, Is.EqualTo(skipRect.center.y).Within(1f), "Level with 건너뛰기.");
-            Assert.That(logRect.xMin - skipRect.xMax, Is.EqualTo(art.logButtonGap * scale).Within(1f), "Right beside it.");
+            Assert.That(logRect.center.x, Is.EqualTo(skipRect.center.x).Within(1f), "On 건너뛰기's middle.");
+            Assert.That(skipRect.yMin - logRect.yMax, Is.EqualTo(art.logButtonGap * scale).Within(1f), "Right under it.");
             Assert.That(logRect.height, Is.EqualTo(skipRect.height).Within(1f), "As tall as it.");
             var logFrame = log.GetComponent<UnityEngine.UI.Image>();
             var logLabel = log.GetComponentInChildren<UnityEngine.UI.Text>(true);

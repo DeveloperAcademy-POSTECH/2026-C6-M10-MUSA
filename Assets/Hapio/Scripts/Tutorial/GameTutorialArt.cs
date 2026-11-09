@@ -159,8 +159,8 @@ namespace Hapio
         [Tooltip("\"계속 배우기\"를 누른 뒤 창이 사라지는 시간 (빠르게)")] [Min(.01f)] public float skipCloseSeconds = .12f;
 
         [Header("대화 기록 (#567)")]
-        [Tooltip("건너뛰기 옆 \"기록\" 버튼 크기. 그림과 글자 크기는 건너뛰기 버튼과 같고, 높이도 같다.")] public Vector2 logButtonSize = new Vector2(54f, 30f);
-        [Tooltip("건너뛰기 버튼과 기록 버튼 사이")] [Min(0f)] public float logButtonGap = 6f;
+        [Tooltip("건너뛰기 아래 \"기록\" 버튼 크기. 그림과 글자 크기는 건너뛰기 버튼과 같고, 높이도 같다.")] public Vector2 logButtonSize = new Vector2(54f, 30f);
+        [Tooltip("건너뛰기 버튼 아래 끝과 기록 버튼 위 끝 사이")] [Min(0f)] public float logButtonGap = 6f;
         [Tooltip("대화 기록 한 줄의 막대 그림")] public Sprite logBar;
         [Tooltip("막대 하나의 크기")] public Vector2 logBarSize = new Vector2(321f, 55f);
         [Tooltip("막대 사이")] [Min(0f)] public float logBarGap = 22f;

@@ -7,11 +7,11 @@ namespace Hapio.Tests
     public sealed class GameTutorialLogTests
     {
         [Test]
-        public void LogButtonSitsRightBesideSkipAtItsHeight()
+        public void LogButtonSitsRightUnderSkipOnItsMiddle()
         {
-            Vector2 center = GameTutorialDirector.LogButtonCenter(new Vector2(-100f, 300f), 72f, 54f, 6f);
-            Assert.That(center.x, Is.EqualTo(-100f + 36f + 6f + 27f).Within(1e-4f));
-            Assert.That(center.y, Is.EqualTo(300f), "Level with the skip button.");
+            Vector2 center = GameTutorialDirector.LogButtonCenter(new Vector2(-100f, 300f), 30f, 30f, 6f);
+            Assert.That(center.x, Is.EqualTo(-100f).Within(1e-4f), "On the skip button's middle.");
+            Assert.That(center.y, Is.EqualTo(300f - 15f - 6f - 15f).Within(1e-4f), "The gap under the skip button.");
         }
 
         [Test]
