@@ -229,6 +229,8 @@ namespace C6Lab
         private static readonly Rect GlyphInkRect = Rect.MinMaxRect(.149f, .081f, .848f, .92f);
         /// <summary>#533: 흐린 "물" 글자(보통 Text). 먹 붓 점을 글자 모양 안에만 보이게 가리는 Mask 그림이기도 하다.</summary>
         private UnityEngine.UI.Text ghost, ghostEdge;
+        /// <summary>#595: 부적의 "물" 글자 글꼴(신라문화체). 없으면 지금 글꼴.</summary>
+        public Font GlyphFont => ghost != null && ghost.font != null ? ghost.font : font;
         private UnityEngine.UI.Outline ghostOutline;
         private static Sprite watercolorDot;
         private Color[] inkColors = Array.Empty<Color>();
@@ -573,9 +575,7 @@ namespace C6Lab
             {
                 if (round == null || round.id != roundId) continue;
                 if (round.Active(now)) return false;
-                foreach (LabJigwiABPlayerFire seat in round.players ?? Array.Empty<LabJigwiABPlayerFire>())
-                    if (seat != null && seat.playerId == localPlayer) return seat.talismanAt < 0d;
-                return false;
+                return round.TalismanFailed(localPlayer); // #595: a common talisman fails when anyone did not finish
             }
             return false;
         }
@@ -714,7 +714,10 @@ namespace C6Lab
         /// </summary>
         private void UpdateFireLoop(bool running, float dt)
         {
-            FireLoopTarget = running ? FireballLoudness(fireballSeen, fireballProgress, fireLoopVolume, fireLoopWarnVolume) : 0f;
+            // #595: while the talisman is being written the timer tick carries the time; the fireball hum stays silent
+            // and only roars when the fireball falls.
+            bool writing = fireballSeen == LabJigwiFireball.Phase.Kindle || fireballSeen == LabJigwiFireball.Phase.Grow;
+            FireLoopTarget = running && !writing ? FireballLoudness(fireballSeen, fireballProgress, fireLoopVolume, fireLoopWarnVolume) : 0f;
             // #540: when the talisman is finished the hum dies away slowly (with the relief sound), not cut dead.
             float step = dt / Mathf.Max(.01f, Finishing ? finishFadeSeconds : fireLoopFadeSeconds);
             fireLoopLevel = Mathf.MoveTowards(fireLoopLevel, FireLoopTarget, step);
@@ -804,14 +807,15 @@ namespace C6Lab
             Rect board = boardView != null ? boardView.pixelRect : new Rect(0f, 0f, Screen.width, Screen.height * .46f);
             PlaceScreenRect(alarm.rectTransform, new Rect(0f, board.yMax, Screen.width, Mathf.Max(1f, Screen.height - board.yMax)));
             float urgency = Mathf.Clamp01(WarnLevel);
-            float rate = Mathf.Lerp(1.1f, 2.6f, urgency);
+            // #595: a clock — one tick a second at first, faster (up to three a second) as the time runs out.
+            float rate = Mathf.Lerp(1f, 3f, urgency * urgency);
             bool running = Visible && source != null && source.Snapshot != null && !source.Snapshot.paused;
             float before = alarmPhase;
             if (running) alarmPhase += dt * rate;
             // The alarm sounds — and the phone knocks — at each flash's brightest moment, stronger as time runs out.
             if (running && Mathf.Floor(before + .5f) != Mathf.Floor(alarmPhase + .5f))
             {
-                Cue("Alarm", alarmSoundFolder, alarmSoundVolume * Mathf.Lerp(.55f, 1f, urgency));
+                Tick(alarmSoundVolume * Mathf.Lerp(.55f, 1f, urgency));
                 AlarmHapticCount++;
                 LabHaptics.PlayDirect(Config, LabHapticStyle.Rigid, alarmHapticIntensity * Mathf.Lerp(.5f, 1f, urgency));
             }
@@ -820,6 +824,26 @@ namespace C6Lab
         }
 
         private float alarmPhase;
+        private AudioSource tickSource;
+        /// <summary>#595 QA: 똑딱을 50% 크게.</summary>
+        private const float TickBoost = 1.5f;
+        private bool tock;
+        /// <summary>#595: 타이머처럼 똑-딱. 같은 소리를 번갈아 높게(똑)·낮게(딱) 낸다.</summary>
+        private void Tick(float volume)
+        {
+            LastCue = "Alarm"; CueCount++;
+            if (string.IsNullOrEmpty(alarmSoundFolder) || volume <= 0f) return;
+            AudioClip[] clips = Resources.LoadAll<AudioClip>("Audio/" + alarmSoundFolder);
+            if (clips == null || clips.Length == 0) return;
+            if (tickSource == null)
+            {
+                tickSource = gameObject.AddComponent<AudioSource>();
+                tickSource.playOnAwake = false; tickSource.spatialBlend = 0f;
+            }
+            tock = !tock;
+            tickSource.pitch = tock ? .8f : 1f;
+            tickSource.PlayOneShot(clips[0], Mathf.Min(1f, volume * TickBoost) * LabAudioSettings.SfxVolume);
+        }
         /// <summary>#540: 경보 진동을 낸 횟수 (테스트용, 설정에서 진동을 꺼도 센다).</summary>
         public int AlarmHapticCount { get; private set; }
         private readonly HashSet<string> orbBurnsCued = new HashSet<string>(StringComparer.Ordinal);
@@ -1361,6 +1385,24 @@ namespace C6Lab
             }
         }
 
+        /// <summary>
+        /// #595 공용 부적: 내가 다 썼어도 아직 안 쓴 사람이 있으면 부적은 구슬로 접혀 떨어지지 않고 빛난 채 위로 사라진다.
+        /// 물구슬은 모두가 쓴 순간 Host가 모두에게 준다. 내가 마지막이면 예전처럼 접혀 떨어진다.
+        /// </summary>
+        public bool FinishWaits => finishWaits;
+        private bool finishWaits;
+        private bool OthersStillWriting()
+        {
+            LabSnapshot snapshot = source != null ? source.Snapshot : null;
+            if (snapshot?.jigwiAB?.rounds == null || RoundId == null) return false;
+            foreach (LabJigwiABRound round in snapshot.jigwiAB.rounds)
+            {
+                // #595: a common talisman gives no orbs at all (the reward is the waterfall), so it never folds into one.
+                if (round != null && round.id == RoundId && round.common) return true;
+            }
+            return false;
+        }
+
         private void BeginFinish()
         {
             if (paper == null) return;
@@ -1376,6 +1418,7 @@ namespace C6Lab
             extinguishFrom = BurnFront;
             burstPlayed = false; notesPlayed = 0; sweepCued = false; landed = false;
             foldLingerUntil = -1f; rewardOrbsBefore = RewardOrbCount(source != null ? source.Snapshot : null);
+            finishWaits = OthersStillWriting();
             // #540: the alarm stops and the fire hum fades out; a steam sigh and a warm chord fill the gap (relief).
             Cue("Relief", reliefSoundFolder, reliefSoundVolume);
             DrawFinish();
@@ -1419,6 +1462,7 @@ namespace C6Lab
             float hold = HoldSeconds;
             float fold = Mathf.Clamp01((after - hold) / Mathf.Max(.01f, foldSeconds));
             float fall = Mathf.Clamp01((after - hold - foldSeconds) / Mathf.Max(.01f, fallSeconds));
+            if (finishWaits) fall = 0f; // #595: no orb drops for me yet
             if (fall >= 1f && !landed) { landed = true; BeginLanding(); }
             float folded = fold * fold * (3f - 2f * fold);
             Color gold = new Color(glowColor.r, glowColor.g, glowColor.b, 1f);
@@ -1459,12 +1503,22 @@ namespace C6Lab
             bool spot = TryRewardSpot(out Vector2 landing, out float orbSide);
             if (!spot) { orbSide = paper.rect.width * .3f; landing = (Vector2)finishFrom + Vector2.down * paper.rect.height * .35f; }
             float small = paper.rect.width > 1f ? Mathf.Clamp(orbSide / paper.rect.width, .05f, 1f) : .2f;
+            float shake = burstShake * paper.rect.height * ring * (1f - folded);
+            var jitter = new Vector3(wave * shake, Mathf.Cos(after * humHz * 1.37f * 2f * Mathf.PI) * shake * .35f, 0f);
+            if (finishWaits)
+            {
+                // #595: others are still writing — the glowing talisman just rises and fades (no orb yet).
+                paper.localScale = Vector3.one * (1f + burstPunch * bump);
+                paper.localRotation = Quaternion.identity;
+                if (paperGroup != null) paperGroup.alpha = 1f - folded;
+                paper.localPosition = finishFrom + jitter + Vector3.up * paper.rect.height * .25f * folded;
+                DrawFoldOrb(0f, 0f, 0f, landing, orbSide);
+                return;
+            }
             float paperScale = (1f + burstPunch * bump) * Mathf.Lerp(1f, small, folded);
             paper.localScale = Vector3.one * paperScale;
             paper.localRotation = Quaternion.Euler(0f, 0f, -360f * folded);
             if (paperGroup != null) paperGroup.alpha = 1f - Mathf.Clamp01((fold - .5f) / .5f);
-            float shake = burstShake * paper.rect.height * ring * (1f - folded);
-            var jitter = new Vector3(wave * shake, Mathf.Cos(after * humHz * 1.37f * 2f * Mathf.PI) * shake * .35f, 0f);
             paper.localPosition = finishFrom + jitter;
             DrawFoldOrb(fold, folded, fall, landing, orbSide);
         }

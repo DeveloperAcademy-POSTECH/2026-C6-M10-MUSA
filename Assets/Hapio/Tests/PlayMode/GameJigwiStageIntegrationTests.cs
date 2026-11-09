@@ -130,57 +130,40 @@ namespace Hapio.Tests
             clock = (LabBattleClock)Field("battleClock").GetValue(network);
             model = (LabModel)Field("model").GetValue(network);
             startedAt = before.jigwiAB.startedAt;
-            Assert.That(before.jigwiAB.schedule, Is.EqualTo(LabJigwiABTimeline.FlowSchedule),
-                "The saved main profile runs #540's A10/B45/A66/B83 schedule.");
+            Assert.That(before.jigwiAB.schedule, Is.EqualTo(LabJigwiABTimeline.SmokeFlowSchedule),
+                "The saved main profile runs #595's smoke 10 / talisman 45 / smoke 66 / talisman 83 schedule.");
             Assert.That(network.config.JigwiAHoldBurnUntilEnd, Is.True,
                 "The saved main profile preserves the board while the talisman is being written.");
-            double aProbe = LabJigwiABTimeline.ActiveOffset(0, before.jigwiAB.schedule) + 1.2d;
-            double bProbe = LabJigwiABTimeline.ActiveOffset(1, before.jigwiAB.schedule) + 6.2d;
-            HoldAt(aProbe);
-            yield return null;
-            Assert.That(network.Snapshot.paused, Is.True);
-            Assert.That(clock.Now(Time.realtimeSinceStartupAsDouble), Is.EqualTo(startedAt + aProbe).Within(.00001d));
-            LabJigwiABRound a = network.Snapshot.jigwiAB.Active(startedAt + aProbe);
-            Assert.That(a, Is.Not.Null); Assert.That(a.kind, Is.EqualTo(LabJigwiABKind.PersonalBurn));
-            Assert.That(overlay.PersonalHeatVisible, Is.False, "#479: A has no screen heat or edge flames.");
-            Assert.That(overlay.VisibleScreenFires, Is.Zero);
-            Assert.That(overlay.status.text, Does.Not.Contain("과열"), "#479 removed A's hit-count text.");
-            Assert.That(hud.heat.gameObject.activeInHierarchy, Is.False);
-            Assert.That(hud.effectText.gameObject.activeInHierarchy, Is.False);
-            Assert.That(hud.stageNotice == null || !hud.stageNotice.gameObject.activeInHierarchy, Is.True);
-            Assert.That(hud.testToggle.gameObject.activeInHierarchy, Is.False);
-            AssertNoOldSurfacePresentation();
-
-            HoldAt(bProbe);
+            double smokeProbe = LabJigwiABTimeline.ActiveOffset(0, before.jigwiAB.schedule) + LabJigwiABTimeline.SmokeLeadSeconds + .5d;
+            double aProbe = LabJigwiABTimeline.ActiveOffset(1, before.jigwiAB.schedule) + 1.2d;
+            HoldAt(smokeProbe);
             // The same clock stays held across the forward seek; no real-time Update can roll it back.
             Method("SyncJigwiFireSurfaces").Invoke(network, null);
             yield return null;
+            Assert.That(network.Snapshot.paused, Is.True);
             LabSnapshot current = network.Snapshot;
-            LabJigwiABRound b = current.jigwiAB.Active(startedAt + bProbe);
+            LabJigwiABRound b = current.jigwiAB.Active(startedAt + smokeProbe);
             Assert.That(b, Is.Not.Null); Assert.That(b.kind, Is.EqualTo(LabJigwiABKind.GroupFire));
-            // #551: the saved profile gives each seat its own bucket. Solo has one seat and no special Water token.
-            Assert.That(network.config.JigwiBBucket, Is.True, "Keep the saved main rule; do not opt back into the old sync-orb mode.");
-            Assert.That(b.bucket, Is.True);
-            Assert.That(b.countdownAt, Is.LessThan(0d), "Bucket rounds do not run the shared 3-2-1.");
-            LabJigwiABPlayerFire bucketSeat = b.players.Single();
-            Assert.That(bucketSeat.playerId, Is.EqualTo(network.LocalPlayerId));
-            Assert.That(bucketSeat.readyAt, Is.EqualTo(b.activeAt + LabJigwiABTimeline.BucketLeadSeconds).Within(.00001d));
-            Assert.That(current.serverTime, Is.InRange(bucketSeat.readyAt, bucketSeat.readyAt + LabJigwiABTimeline.BucketSeatSeconds));
+            // #595: the saved profile smokes every screen at once; there is no bucket to pour and no special Water.
+            Assert.That(network.config.JigwiSmokeFlow, Is.True, "Keep the saved main rule: smoke without a bucket.");
+            Assert.That(b.smoke && b.bucket, Is.True);
+            Assert.That(b.countdownAt, Is.LessThan(0d), "Smoke rounds do not run the shared 3-2-1.");
+            LabJigwiABPlayerFire smokeSeat = b.players.Single();
+            Assert.That(smokeSeat.playerId, Is.EqualTo(network.LocalPlayerId));
+            Assert.That(smokeSeat.readyAt, Is.EqualTo(b.activeAt + LabJigwiABTimeline.SmokeLeadSeconds).Within(.00001d));
             Assert.That(overlay.PersonalHeatVisible, Is.False);
             Assert.That(overlay.VisibleScreenFires, Is.Zero);
             Assert.That(overlay.GroupCurtainVisible, Is.False);
-            Assert.That(overlay.SyncPillar.DropsVisible, Is.False, "Bucket rounds hide the retired shared Water-drop display.");
-            Assert.That(overlay.SyncPillar.DropCount, Is.Zero);
-            Assert.That(overlay.SyncPillar.FilledDrops, Is.Zero);
-            Assert.That(overlay.BucketHandle, Is.Not.Null, "The saved overlay installs the current bucket presenter.");
-            Assert.That(overlay.BucketHandle.HandleVisible, Is.True, "The local bucket is visible during its actual arrival window.");
-            Assert.That(overlay.BucketHandle.Banner, Is.Empty, "Current bucket feedback uses its art rather than a text banner.");
+            Assert.That(overlay.SyncPillar.DropsVisible, Is.False, "Smoke rounds hide the retired shared Water-drop display.");
+            Assert.That(overlay.BucketHandle, Is.Not.Null, "The saved overlay installs the smoke presenter.");
+            Assert.That(overlay.BucketHandle.HandleVisible, Is.False, "#595: no bucket comes down; the smoke covers the screen instead.");
             Assert.That(overlay.Countdown, Is.Not.Null);
             Assert.That(overlay.Countdown.Shown, Is.Empty);
-            Assert.That(overlay.status.text, Is.Empty);
             Assert.That(current.orbs.Any(orb => orb.jigwiABSupplyEventId == b.id), Is.False,
-                "Bucket B must not also supply the old special Water orb.");
-            Assert.That(spendEvents, Is.EqualTo(1), "Bucket appearance and snapshots never flash as a paid generation.");
+                "Smoke B must not supply the old special Water orb.");
+            Assert.That(model.TryJigwiBPull(network.LocalPlayerId, b.id, clock.Now(Time.realtimeSinceStartupAsDouble)), Is.False,
+                "There is no bucket to pour.");
+            Assert.That(spendEvents, Is.EqualTo(1), "Smoke and snapshots never flash as a paid generation.");
             Assert.That(staminaFeedback.ConsumptionPulseCount, Is.Zero);
             Assert.That(network.GetComponentsInChildren<LabJigwiFireSurface>(true), Is.Empty);
             Assert.That(model.JigwiABBlocksBoss(network.LocalPlayerId, current.serverTime), Is.False);
@@ -189,28 +172,29 @@ namespace Hapio.Tests
             Assert.That(target.Hitbox.sharedMesh, Is.SameAs(shell), "Switching A/B cannot replace the bound Stage 3 hit shell.");
             Assert.That(target.GetComponentsInChildren<Collider>(true).Length, Is.EqualTo(originalColliderCount));
             Assert.That(clock.IsPaused, Is.True);
-            CaptureScreenEvidence("before-pour"); yield return null;
-            int paintedBefore = model.PaintSurface.CoveredCount;
-            // The held-clock fixture exercises the real Host pour rule, not phone sensors or keyboard sloshing.
-            PourLocalBucket(b.id);
-            PublishFireState(); yield return null;
-            HoldAt(bProbe + .2d); yield return null;
-            CaptureScreenEvidence("after-pour"); yield return null;
-            LabJigwiABRound poured = network.Snapshot.jigwiAB.rounds.Single(round => round.id == b.id);
-            Assert.That(poured.resolution, Is.EqualTo(LabJigwiABResolution.Completed), "The solo seat poured its only bucket.");
-            Assert.That(poured.players.Single().launchedAt, Is.EqualTo(startedAt + bProbe).Within(.00001d));
-            Assert.That(overlay.SyncPillar.DropsVisible, Is.False);
-            Assert.That(overlay.status.text, Is.Empty);
-            Assert.That(model.PaintSurface.CoveredCount, Is.GreaterThan(paintedBefore), "The bucket pour applies real Water paint to the boss.");
-            Assert.That(spendEvents, Is.EqualTo(1), "The bucket pour consumes no paid generation stamina.");
-            Assert.That(staminaFeedback.ConsumptionPulseCount, Is.Zero);
+            CaptureScreenEvidence("smoke"); yield return null;
+
+            HoldAt(aProbe);
+            yield return null;
+            Assert.That(network.Snapshot.paused, Is.True);
+            Assert.That(clock.Now(Time.realtimeSinceStartupAsDouble), Is.EqualTo(startedAt + aProbe).Within(.00001d));
+            LabJigwiABRound a = network.Snapshot.jigwiAB.Active(startedAt + aProbe);
+            Assert.That(a, Is.Not.Null); Assert.That(a.kind, Is.EqualTo(LabJigwiABKind.PersonalBurn));
+            Assert.That(a.common, Is.True, "#595: the talisman is shared by every seat.");
+            Assert.That(overlay.PersonalHeatVisible, Is.False, "#479: A has no screen heat or edge flames.");
+            Assert.That(overlay.VisibleScreenFires, Is.Zero);
+            Assert.That(overlay.status.text, Does.Not.Contain("과열"), "#479 removed A's hit-count text.");
+            Assert.That(hud.heat.gameObject.activeInHierarchy, Is.False);
+            Assert.That(hud.effectText.gameObject.activeInHierarchy, Is.False);
+            Assert.That(hud.stageNotice == null || !hud.stageNotice.gameObject.activeInHierarchy, Is.True);
+            Assert.That(hud.testToggle.gameObject.activeInHierarchy, Is.False);
+            AssertNoOldSurfacePresentation();
             Assert.That(target.Hitbox.sharedMesh, Is.SameAs(shell));
             Assert.That(target.GetComponentsInChildren<Collider>(true).Length, Is.EqualTo(originalColliderCount));
             network.LocalStaminaSpent -= onSpent;
-            HoldAt(bProbe + 3.8d); yield return null;
-            CaptureScreenEvidence("settled"); yield return null;
-            TestContext.WriteLine("JIGWI_AB_SAVED_STAGE3: Home/DEV skips/#540 A10/B45 probes/#551 saved bucket B/no special Water/no B colliders/local Host pour paints and completes solo B. "
-                + "Phone tilt/keyboard slosh input is not exercised by this held-clock fixture. Screen Space Overlay GPU pixels are not sampled by camera.Render; device/GPU visual review is separate.");
+            CaptureScreenEvidence("talisman"); yield return null;
+            TestContext.WriteLine("JIGWI_AB_SAVED_STAGE3: Home/DEV skips/#595 smoke 10 + shared talisman 45 probes/no bucket/no special Water/no B colliders. "
+                + "Rubbing the smoke and writing the talisman are not exercised by this held-clock fixture. Screen Space Overlay GPU pixels are not sampled by camera.Render; device/GPU visual review is separate.");
         }
 
         private static void CaptureScreenEvidence(string phase)
