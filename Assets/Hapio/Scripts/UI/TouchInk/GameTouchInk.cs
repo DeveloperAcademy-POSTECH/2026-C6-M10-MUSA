@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using C6Lab;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.Controls;
@@ -37,6 +38,8 @@ namespace Hapio
     /// - 전투 Scene(튜토리얼·일시정지 포함)에서는 새로 찍지 않는다.
     /// - 터치를 가로채지 않는다: 이 캔버스에는 GraphicRaycaster가 없고 그림은 터치를 받지 않는다. 입력은 장치에서 직접 읽는다.
     /// - 이 기기 화면에만 보이고 네트워크로 보내지 않는다.
+    /// - `Tap Sound`를 넣으면 터치할 때 소리가 한 번 난다(지금은 비어 있어 먹물만 나온다). Home 등에는 AudioListener가 일부러 없어서
+    ///   (TitleRevealSound와 같은 이유), 소리가 나는 동안만 잠깐 붙인다.
     /// - 메뉴·오프닝 위, 장면 전환 페이드와 로딩 화면 아래에 그린다.
     /// </summary>
     [DisallowMultipleComponent]
@@ -59,9 +62,14 @@ namespace Hapio
         private GameTouchInkArt art;
         private System.Random random;
         private RectTransform root;
+        private AudioSource source;
+        private AudioListener borrowed;
+        private float listenUntil = -1f;
 
         /// <summary>How many ink marks are on the screen.</summary>
         public int ActiveMarks => live.Count;
+        /// <summary>How many times the tap sound has played.</summary>
+        public int SoundsPlayed { get; private set; }
         /// <summary>How strong the newest mark is right now (0 when there is none).</summary>
         public float NewestMarkAlpha => live.Count > 0 ? live[live.Count - 1].Group.alpha : 0f;
 
@@ -94,9 +102,12 @@ namespace Hapio
             scaler.matchWidthOrHeight = .5f;
         }
 
+        private void OnDisable() => ReturnListener();
+
         private void Update()
         {
             float now = Time.unscaledTime;
+            if (borrowed != null && (now >= listenUntil || AnotherListener())) ReturnListener();
             for (int i = live.Count - 1; i >= 0; i--)
             {
                 float age = now - live[i].StartedAt;
@@ -106,7 +117,10 @@ namespace Hapio
             ReadTouches();
         }
 
-        /// <summary>Every finger that came down this frame leaves a mark; the mouse counts only when no finger did.</summary>
+        /// <summary>
+        /// Every finger that came down this frame leaves a mark, with one sound however many fingers it was;
+        /// the mouse counts only when no finger did.
+        /// </summary>
         public void ReadTouches()
         {
             if (!ShowsOn(SceneManager.GetActiveScene().path)) return;
@@ -120,7 +134,41 @@ namespace Hapio
                     Stamp(touch.position.ReadValue());
                 }
             Mouse mouse = Mouse.current;
-            if (!touched && mouse != null && mouse.leftButton.wasPressedThisFrame) Stamp(mouse.position.ReadValue());
+            if (!touched && mouse != null && mouse.leftButton.wasPressedThisFrame)
+            {
+                touched = true;
+                Stamp(mouse.position.ReadValue());
+            }
+            if (touched) PlayTapSound();
+        }
+
+        private void PlayTapSound()
+        {
+            if (art.tapSound == null || art.soundVolume <= 0f) return;
+            SoundsPlayed++;
+            if (source == null)
+            {
+                source = gameObject.AddComponent<AudioSource>();
+                source.playOnAwake = false;
+                source.spatialBlend = 0f;
+            }
+            if (borrowed == null && !AnotherListener()) borrowed = gameObject.AddComponent<AudioListener>();
+            if (borrowed != null) listenUntil = Time.unscaledTime + art.tapSound.length + .1f;
+            source.PlayOneShot(art.tapSound, art.soundVolume * LabAudioSettings.SfxVolume);
+        }
+
+        private bool AnotherListener()
+        {
+            foreach (AudioListener listener in FindObjectsByType<AudioListener>(FindObjectsSortMode.None))
+                if (listener != borrowed && listener.isActiveAndEnabled) return true;
+            return false;
+        }
+
+        private void ReturnListener()
+        {
+            if (borrowed != null) Destroy(borrowed);
+            borrowed = null;
+            listenUntil = -1f;
         }
 
         /// <summary>Puts a freshly rolled mark at this screen point, at its strongest.</summary>

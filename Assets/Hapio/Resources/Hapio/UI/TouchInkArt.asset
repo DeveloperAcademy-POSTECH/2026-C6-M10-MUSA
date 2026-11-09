@@ -39,4 +39,6 @@ MonoBehaviour:
   dropletSizeMax: 1
   dropletDistanceMin: 32
   dropletDistanceMax: 50
+  tapSound: {fileID: 0}
+  soundVolume: 0.8
   maxMarks: 10

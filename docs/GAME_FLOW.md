@@ -391,4 +391,5 @@ Host 로비는 안내문과 방 카드 사이에 `방장 IP 192.168.0.12, 172.20
 - **그리는 순서:** Sorting Order 30050. 메뉴·오프닝 위, 장면 전환 페이드(30100)·로딩 화면(30150) 아래다.
 - **모양:** 터치마다 가운데 얼룩의 종류·회전·크기와 주변 먹 방울의 개수·방향·거리·크기를 새로 정한다. 가운데 얼룩은 코드로 만든 둥근 먹 번짐 8종(`Art/UI/TouchInk/TouchInkBlob01~08`, [생성 기록](asset-generation/touch-ink-blobs.md))이고, 주변 방울은 `Resources/OrbBoard/Stains`의 튀김점 2종이다. 둘 다 먹색으로 칠해 쓴다.
 - **사라지는 방식:** 찍히는 순간이 가장 진하고, 머무는 시간 없이 바로 옅어지며 살짝 번져 커진다.
-- **조절:** `Assets/Hapio/Resources/Hapio/UI/TouchInkArt.asset`의 Inspector 값이다. 희미한 정도(`Ink Strength`), 가운데 얼룩 크기(`Stain Size`), 사라지는 시간(`Fade Seconds`), 먹 방울 수(`Droplets Min/Max`)와 크기(`Droplet Size Min/Max`), 동시 표시 수(`Max Marks`). Play 중에 바꾸면 희미한 정도와 시간은 바로, 모양은 다음 터치부터 반영된다.
+- **소리:** 지금은 넣지 않았다. `TouchInkArt`의 `Tap Sound`에 소리를 넣으면 코드 수정 없이 터치할 때 한 번 난다(여러 손가락이 동시에 닿아도 한 번). Home 등에는 AudioListener가 없어서 소리가 나는 동안만 잠깐 붙이고, 게임의 효과음 크기 설정을 함께 따른다. 소리를 넣을 때는 [오디오 출처](AUDIO_CREDITS.md)에도 기록한다.
+- **조절:** `Assets/Hapio/Resources/Hapio/UI/TouchInkArt.asset`의 Inspector 값이다. 터치 소리(`Tap Sound`)와 크기(`Sound Volume`), 희미한 정도(`Ink Strength`), 가운데 얼룩 크기(`Stain Size`), 사라지는 시간(`Fade Seconds`), 먹 방울 수(`Droplets Min/Max`)와 크기(`Droplet Size Min/Max`), 동시 표시 수(`Max Marks`). Play 중에 바꾸면 희미한 정도와 시간은 바로, 모양은 다음 터치부터 반영된다.

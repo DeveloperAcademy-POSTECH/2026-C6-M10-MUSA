@@ -7034,6 +7034,7 @@ Compared twelve seed masks and selected 572. Changed only seed defaults and the 
 | --- | --- |
 | Unity 컴파일 | PASS |
 | `TouchInkArt.asset` 생성·얼룩 8장·방울 2장 연결 (Editor) | PASS |
+| 터치 소리 틀 (`Tap Sound` 비어 있음, 소리 파일 미포함) | 코드·저장값 PASS — 소리 재생은 NOT_RUN |
 | 무작위 모양과 희미한 정도 시안 (실제 `RollMark` 값과 저장값으로 한지색 위 합성) | PASS — 화면 실행이 아닌 합성 이미지 |
 | EditMode·PlayMode Test Runner | NOT_RUN |
 | iPhone 실기기 (희미한 정도, 연타) | NOT_RUN |

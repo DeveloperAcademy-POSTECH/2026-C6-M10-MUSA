@@ -37,6 +37,10 @@ namespace Hapio
         [Tooltip("터치한 자리에서 먹 방울까지 거리 (pt, 최소)")] [Min(0f)] public float dropletDistanceMin = 32f;
         [Tooltip("터치한 자리에서 먹 방울까지 거리 (pt, 최대)")] [Min(0f)] public float dropletDistanceMax = 50f;
 
+        [Header("소리")]
+        [Tooltip("터치할 때 나는 소리. 비워 두면 소리 없이 먹물만 나온다.")] public AudioClip tapSound;
+        [Tooltip("터치 소리 크기 (0 = 안 남, 1 = 원본 크기). 게임의 효과음 크기 설정이 여기에 곱해진다.")] [Range(0f, 1f)] public float soundVolume = .5f;
+
         [Header("연타")]
         [Tooltip("동시에 보이는 번짐 수. 넘으면 가장 오래된 것부터 지우고 새로 찍는다.")] [Min(1)] public int maxMarks = 8;
 
