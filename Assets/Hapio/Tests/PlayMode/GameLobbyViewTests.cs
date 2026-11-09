@@ -95,6 +95,12 @@ namespace Hapio.Tests
             Assert.That(session.Network.TargetParticipantCount, Is.EqualTo(2));
             yield return Click(view.directConnectionButton);
             Assert.That(view.directConnectionPanel.activeInHierarchy, Is.True);
+            Assert.That(view.directPort.text, Is.Empty, "#557: a guest's own port is never the Host's.");
+            Assert.That(view.directFeedback.text, Does.Contain("방장 화면"));
+            view.directAddress.text = "127.0.0.1"; view.directPort.text = "";
+            yield return Click(view.directJoinButton);
+            Assert.That(session.Network.IsJoiningRoom || session.Network.IsConnected, Is.False, "An empty port is refused.");
+            Assert.That(view.directFeedback.text, Does.Contain("포트"));
             view.directAddress.text = ""; view.directPort.text = "0";
             yield return Click(view.directJoinButton);
             Assert.That(session.Network.IsJoiningRoom || session.Network.IsConnected, Is.False);
@@ -520,6 +526,7 @@ namespace Hapio.Tests
             Assert.That(VisibleSeats(view), Is.EqualTo(new[] { 1, 2, 3, 4, 5, 6 }));
             Assert.That(view.subheading.text, Is.EqualTo("3명씩 함께 앉아, 준비하시오."));
             Assert.That(view.joinedCount.text, Is.EqualTo("1 / 6명 입장"));
+            AssertAddressLineClear(view);
             // Actual raycasts must reach all six saved controls, including the bottom row in each team.
             for (int i = 0; i < 6; i++)
             {
@@ -670,6 +677,55 @@ namespace Hapio.Tests
                 .ToArray();
             Assert.That(rows.Length, Is.EqualTo(1), "The one listed room.");
             return rows[0].transform.Find("Action").GetComponent<UnityEngine.UI.Text>().text;
+        }
+
+        // #557: the tightest layouts are the plain room's hint and the 3:3 room's higher card.
+        private static void AssertAddressLineClear(GameLobbyView view)
+        {
+            Assert.That(view.HostAddressLine.gameObject.activeInHierarchy, Is.True);
+            Rect line = ScreenRect(view.HostAddressLine.rectTransform);
+            Assert.That(line.height, Is.GreaterThan(0f));
+            Assert.That(line.Overlaps(ScreenRect(view.subheading.rectTransform)), Is.False, "Clear of the hint.");
+            Assert.That(line.Overlaps(ScreenRect(view.roomName.rectTransform)), Is.False, "Clear of the room card.");
+        }
+
+        private static Rect ScreenRect(RectTransform target)
+        {
+            var corners = new Vector3[4];
+            target.GetWorldCorners(corners);
+            return Rect.MinMaxRect(corners[0].x, corners[0].y, corners[2].x, corners[2].y);
+        }
+
+        [Category("Bonjour")]
+        [UnityTest]
+        public IEnumerator AHostLobbyShowsItsPortAndThatPortOpensADirectJoin()
+        {
+            if (!LabBonjourDiscovery.IsSupported) Assert.Ignore("Native game-room advertisement requires macOS or iOS.");
+            session.Network.SetTargetParticipantCount(3);
+            session.Host();
+            yield return Until(() => session.State.phase == GameFlowPhase.Lobby && !session.IsLoadingScene
+                && SceneManager.GetActiveScene().path == GameScenePaths.Lobby && session.Network.IsHost, "Host lobby", 15f);
+            yield return null; yield return null;
+            GameLobbyView view = View();
+            Assert.That(view.HostAddressLine.gameObject.activeInHierarchy, Is.True);
+            // A test machine may have no usable network, so the address list is covered by LabLocalAddressesTests.
+            Assert.That(view.HostAddressLine.text, Does.EndWith("· 포트 " + session.Network.port));
+            AssertAddressLineClear(view);
+            string shownPort = view.HostAddressLine.text.Substring(view.HostAddressLine.text.LastIndexOf(' ') + 1);
+            session.GoHome();
+            yield return Until(() => session.State.phase == GameFlowPhase.Home && !session.IsLoadingScene
+                && session.Network.CanChooseConnection && SceneManager.GetActiveScene().path == GameScenePaths.Home, "Room list", 15f);
+            yield return null;
+            session.Network.port = 1;
+            view = View();
+            Assert.That(view.browserPage.activeInHierarchy, Is.True);
+            yield return Click(view.directConnectionButton);
+            view.directAddress.text = "127.0.0.1"; view.directPort.text = shownPort;
+            yield return Click(view.directJoinButton);
+            Assert.That(session.Network.port.ToString(), Is.EqualTo(shownPort), "The shown port is the one dialed.");
+            Assert.That(session.Network.IsJoiningRoom, Is.True);
+            session.Network.CancelJoin();
+            yield return Until(() => session.Network.CanChooseConnection, "Canceled join", 15f);
         }
 
         [Category("Bonjour")]

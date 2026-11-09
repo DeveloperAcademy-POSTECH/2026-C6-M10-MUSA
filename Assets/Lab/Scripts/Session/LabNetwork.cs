@@ -481,6 +481,8 @@ namespace C6Lab
             ? order.Count > 0 && order.All(id => configAcknowledgements.Contains(id))
             : clientConfigReady;
         public bool IsHost => manager != null && manager.IsHost;
+        /// <summary>#557: a Host may have no IPv4 socket; its IPv4 addresses are then not reachable.</summary>
+        public bool HostListensOnIpv4 => !(transport is LabDualStackTransport dual) || dual.HasIpv4Listener;
         public bool IsDeveloperSolo => developerSolo;
         /// <summary>Only a player with a drum on their board can generate orbs.</summary>
         public bool HasLocalDrum => LocalDrum() != null;

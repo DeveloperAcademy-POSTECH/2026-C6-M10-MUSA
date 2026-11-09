@@ -23,6 +23,8 @@ namespace Hapio
             Place(view.roomName.transform, 55, cardTop + 19, 280, 38);
             Place(view.joinedCount.transform, 55, cardTop + 58, 145, 27);
             Place(view.selectedCount.transform, 205, cardTop + 58, 143, 27);
+            // #557: the band between the hint and the card, which every layout keeps free.
+            Place(view.HostAddressLine.transform, 27, 244, 349, cardTop - 249);
             view.heading.fontSize = 36;
             view.heading.color = GameLobbySeatColors.Ink;
             view.heading.text = waiting ? view.heading.text : allChosen ? team ? "준비 완료!" : "요괴 봉인 준비 완료!" : "빈 자리를 고르시오.";
