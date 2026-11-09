@@ -426,6 +426,19 @@ namespace Hapio.Tests
             for (int line = 0; line < 4; line++) yield return TapThrough(director, tap, art);
             Assert.That(director.CurrentBeat.Action, Is.EqualTo(GameTutorialAction.PassDrumLeft));
             Assert.That(board.AllowedGestures, Is.EqualTo(LabBoardGestures.DrumMove), "Only the drum moves.");
+
+            // 기록 opens in the middle of an action: the board stops, and closing hands the same action back (the push below uses it).
+            var logOpener = director.GetComponentsInChildren<UnityEngine.UI.Button>(true).Single(button => button.name == "Log Button");
+            var logCloser = director.GetComponentsInChildren<UnityEngine.UI.Button>(true).Single(button => button.name == "Log Back");
+            logOpener.onClick.Invoke();
+            Assert.That(director.IsDialogueLogOpen, Is.True, "기록 opens during an action.");
+            Assert.That(board.AllowedGestures, Is.EqualTo(LabBoardGestures.None), "The board stops behind the log.");
+            yield return new WaitForSecondsRealtime(art.dimFadeSeconds + .1f);
+            Assert.That(director.IsWaitingForAction, Is.True, "The action is still to do.");
+            logCloser.onClick.Invoke();
+            yield return Until(() => !director.IsDialogueLogOpen, "뒤로 가기 during the action", 2f);
+            Assert.That(director.CurrentBeat.Action, Is.EqualTo(GameTutorialAction.PassDrumLeft), "The same action again.");
+            Assert.That(board.AllowedGestures, Is.EqualTo(LabBoardGestures.DrumMove), "The same gestures again.");
             int bounces = board.BlockBounces;
             yield return FlickDrum(board, 1f);
             yield return Until(() => board.BlockBounces > bounces, "Pushed right, the drum bounces off the red edge", 5f);
@@ -434,6 +447,14 @@ namespace Hapio.Tests
             yield return new WaitForSecondsRealtime(1.5f);
             if (director.IsWaitingForAction) yield return FlickDrum(board, -1f);
             yield return Until(() => !director.IsWaitingForAction, "The drum reaches 묵이", 10f);
+
+            // Behind the log the tutorial's clock stops: 성공! outlasts its own wait, and the next line comes after closing.
+            logOpener.onClick.Invoke();
+            Assert.That(director.IsDialogueLogOpen, Is.True, "기록 opens over 성공!.");
+            yield return new WaitForSecondsRealtime(art.afterActionSeconds + .3f);
+            Assert.That(director.CurrentBeat.Action, Is.EqualTo(GameTutorialAction.PassDrumLeft), "성공! waits behind the log.");
+            logCloser.onClick.Invoke();
+            yield return Until(() => !director.IsDialogueLogOpen, "뒤로 가기 over 성공!", 2f);
             Assert.That(network.Snapshot.drums[0].owner, Is.EqualTo(LabNetwork.TutorialLeftSeatId));
             yield return Until(() => board.BlockedSide == 0, "The block lifts once 묵이 has the drum", 2f);
             Assert.That(network.Snapshot.SwipeBlockOn(network.LocalPlayerId), Is.False);
@@ -441,6 +462,10 @@ namespace Hapio.Tests
             Assert.That(director.CurrentBeat.Speaker, Is.EqualTo(GameTutorialSpeaker.Muk));
             for (int line = 0; line < 5; line++) yield return TapThrough(director, tap, art);
             Assert.That(director.IsFinishing, Is.True, "\"가보자!\" ends the tutorial.");
+            // Every line said, in order, and only the script's lines: no remark, guide band or 성공!.
+            Assert.That(director.DialogueLog.Select(entry => (entry.Speaker, entry.Text)).ToArray(), Is.EqualTo(
+                GameTutorialScript.Steps.SelectMany(part => part.Beats).Where(said => said.IsLine)
+                    .Select(said => (said.Speaker, said.Text)).ToArray()), "The whole script, nothing else.");
             yield return Until(() => session.State.phase == GameFlowPhase.Home && !session.IsLoadingScene
                 && session.RoomBrowserVisible, "The tutorial leaves for the room list", 30f);
             Assert.That(session.IsTutorial, Is.False);
@@ -545,6 +570,17 @@ namespace Hapio.Tests
             Assert.That(hits[0].gameObject, Is.SameAs(dim.gameObject), "The log takes the touch.");
             int beat = director.BeatIndex;
 
+            // Nothing else starts under it, even from a finger already down when it opened.
+            int logged = director.DialogueLog.Count;
+            yield return new WaitForSecondsRealtime(art.tapCooldown + .05f);
+            tap.onClick.Invoke();
+            skip.onClick.Invoke();
+            buttons.Single(button => button.name == "Pause").onClick.Invoke();
+            yield return null;
+            Assert.That((director.BeatIndex, director.DialogueLog.Count), Is.EqualTo((beat, logged)), "The line stays.");
+            Assert.That(director.IsSkipDialogOpen, Is.False, "No skip dialog over the log.");
+            Assert.That(session.Network.IsBattlePaused, Is.False, "No pause menu over the log.");
+
             // 뒤로 가기: closes and carries on from the same line.
             back.onClick.Invoke();
             yield return Until(() => !director.IsDialogueLogOpen, "뒤로 가기 closes the log", 2f);
@@ -594,6 +630,8 @@ namespace Hapio.Tests
             yield return Until(() => director.SkipButtonAlpha >= .999f, "건너뛰기 has faded in", art.skipFadeSeconds + 1f);
             skip.onClick.Invoke();
             Assert.That(director.IsSkipDialogOpen, Is.True, "It asks first.");
+            buttons.Single(button => button.name == "Log Button").onClick.Invoke();
+            Assert.That(director.IsDialogueLogOpen, Is.False, "기록 waits behind the skip dialog.");
             Assert.That(session.IsTutorial, Is.True, "Nothing is left yet.");
             LogAssert.Expect(LogType.Log, new System.Text.RegularExpressions.Regex("^C6_LAB_TUTORIAL_SKIP step=0 beat=1$"));
             leave.onClick.Invoke();
@@ -626,6 +664,8 @@ namespace Hapio.Tests
             yield return null;
             buttons.Single(button => button.name == "Pause").onClick.Invoke();
             yield return Until(() => session.Network.IsBattlePaused && first.IsSteppedAsideForPause, "Paused", 5f);
+            buttons.Single(button => button.name == "Log Button").onClick.Invoke();
+            Assert.That(first.IsDialogueLogOpen, Is.False, "기록 waits behind the pause menu.");
 
             // RESTART sits where QUIT RUN was; QUIT RUN moves one row down into the hidden DEV row.
             LabHud hud = Object.FindFirstObjectByType<GameBattleBindings>().hud;
