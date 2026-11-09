@@ -18,6 +18,13 @@ namespace C6Lab.Tests
         public void ReasonCodesAreToldApartFromSentences(string reason, bool code) =>
             Assert.That(LabNetwork.IsInternalReasonCode(reason), Is.EqualTo(code));
 
+        [Test]
+        public void ASeatRefusalNamesNoCodeInTheGame()
+        {
+            Assert.That(LabNetwork.SlotRejectionText("SLOT_SELECTION_CLOSED", true), Does.Not.Contain("SLOT_"));
+            Assert.That(LabNetwork.SlotRejectionText("SLOT_SELECTION_CLOSED", false), Does.Contain("SLOT_SELECTION_CLOSED"));
+        }
+
         [TestCase(true, "INSUFFICIENT_STAMINA", "before")]
         [TestCase(false, "INSUFFICIENT_STAMINA", "INSUFFICIENT_STAMINA")]
         [TestCase(true, "Restoring board state. Try again in a moment.", "Restoring board state. Try again in a moment.")]

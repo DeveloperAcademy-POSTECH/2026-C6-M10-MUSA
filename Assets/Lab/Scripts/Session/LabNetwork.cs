@@ -2651,7 +2651,7 @@ namespace C6Lab
             {
                 ClearPendingSlotSelection();
                 SetNotice(packet.reason == "SLOT_TAKEN" ? "That P number is already selected."
-                    : "P number selection was rejected: " + packet.reason);
+                    : SlotRejectionText(packet.reason, gameFlowEnabled));
                 return;
             }
             if (packet.lobbyRevision <= 0) return;
@@ -3142,6 +3142,10 @@ namespace C6Lab
 
         private void SetStatus(string status) { Status = status; Changed?.Invoke(); }
         private void SetNotice(string notice) { Notice = notice; Changed?.Invoke(); }
+
+        /// <summary>The Lab shows the Host's reason; the game says it in words a player can act on.</summary>
+        public static string SlotRejectionText(string reason, bool game) => game
+            ? "자리를 고르지 못했소. 다시 골라주시오." : "P number selection was rejected: " + reason;
 
         /// <summary>A Host reason such as INSUFFICIENT_STAMINA names a log entry, not something to tell a player.</summary>
         public static bool IsInternalReasonCode(string reason)
