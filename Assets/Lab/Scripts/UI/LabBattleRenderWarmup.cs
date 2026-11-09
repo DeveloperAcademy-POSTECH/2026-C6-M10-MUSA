@@ -23,8 +23,8 @@ namespace C6Lab
         {
             LabOrbElement.Fire, LabOrbElement.Water, LabOrbElement.Wood, LabOrbElement.Metal, LabOrbElement.Earth, LabOrbElement.None
         };
-        /// <summary>Three steps must pass the widest trail's motif spacing (.48 m) or its particles never emit.</summary>
-        private const float StepMetres = .2f;
+        /// <summary>Two steps must pass the widest motif spacing (.48 m), so even the last trail has its particles on screen for a frame.</summary>
+        private const float StepMetres = .26f;
         private const string RootName = "Render warmup · private copies";
 
         private readonly List<LabProjectile> shots = new List<LabProjectile>();
