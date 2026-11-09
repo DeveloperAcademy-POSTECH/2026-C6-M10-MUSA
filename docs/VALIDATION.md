@@ -1,5 +1,105 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-09 — #501 로비에서 끊긴 게스트의 같은 방·같은 P번호 재입장, #502 전투 중 백그라운드 현재 동작 유지
+
+- **기준:** `feat/#501-background-reconnect`. main `e15f61f0` 위에서 만들고 검사했다. 커밋은 `27ccc99d`(기능)와 `be8f280e`·`d6111aa3`·`3f8c3846`·`3d27c6f1`·`f8e593b3`(독립 검토 1~5차 반영), 그 뒤의 기록 커밋이다. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal), `-buildTarget iOS`. Library는 다른 worktree에서 복제했다. 같은 Mac에서 다른 폴더의 Unity Editor가 열려 있었다.
+- **바꾼 것:** 동작은 `GAME_FLOW.md`의 "로비 재입장(#501)" 항목과 `AGENTS.md` #501 절에 적었다. 코드는 `LabNetwork.LobbyRejoin.cs`(새 파일)와 `LabNetwork.cs`·`LabNetwork.Recovery.cs`·`LabNetwork.GameFlow.cs`·`GameSession.cs`·`GameLobbyView.cs`·`GameLobbySeatDesign.cs`다. 게스트의 lobby 받기는 동작을 바꾸지 않고 `ReceiveLobby`로 옮겼다(검사에서 직접 부르기 위해). Game 토큰만 `C6HapioGame/45`로 올렸다.
+- **#502:** 코드를 바꾸지 않았다. 결정과 현재 동작을 `GAME_FLOW.md` "종료·정지·DEV"에 적었다.
+
+| 확인 | 결과 |
+| --- | --- |
+| 새 EditMode `LabLobbyRejoinTests`(21건)와 `LabGameFlowBridgeTests`·`LabJoinRejectionTests` | 50/50 PASS |
+| PlayMode `LabLobbyRejoinNetworkTests`(새 5건), `GameLobbyViewTests`(새 2건 포함 19건), `GameSceneFlowTests`(새 1건 포함 25건) | 49/49 PASS(138초, `3d27c6f1`) |
+| 대조 실험 17가지(아래) | 17가지 모두 해당 새 검사가 실패 |
+| `3d27c6f1` 전체 EditMode / 전체 PlayMode | 2109/2109 PASS(22.0초) / 714/714 PASS(585초) |
+| `f8e593b3`(최종 코드) 전체 EditMode / 전체 PlayMode | 2110/2110 PASS(21.2초) / 714/714 PASS(570초) |
+
+- `LabLobbyRejoinNetworkTests`는 한 Editor 프로세스 안에서 진짜 NGO·UTP 방장과 게스트를 loopback으로 연결한다. 전송 제한 시간은 2초로 줄였다. 끊김은 게스트의 NGO 갱신 단계를 멈춰(하트비트가 끊김) 만들었다. 다섯 경우를 본다.
+  - 시간 초과로 끊긴 게스트가 같은 방에 새 연결로 P2를 되찾는다. 그 사이 매 프레임 "연결됨" 또는 "들어가는 중"이었다.
+  - 제한 시간보다 긴 정지 뒤 복귀하면 바로 다시 들어간다.
+  - 나가기는 P를 바로 비우고 표를 버린다.
+  - 방장이 방을 닫으면 다시 들어가지 않는다.
+  - 응답 없는 방장에게는 30초 한도에서 진행 중인 시도까지 끝낸다(한도는 검사에서 2초로 줄임).
+- 대조 실험: 수정한 코드를 하나씩 예전처럼 되돌리고, 대응하는 새 검사가 실패하는지 확인했다. 매번 원래 코드로 되돌렸다.
+  - 자리 맡기 없음: EditMode 6건과 실제 연결 검사가 실패.
+  - 승인 대기 중인 재입장을 새 자리로 셈: "같은 프레임 두 명" 검사가 실패.
+  - P 기억을 예전 방식으로: "P를 취소한 채 끊김" 검사가 실패.
+  - 30초에 진행 중인 시도를 끊지 않음: 한도 검사가 실패.
+  - 나가기 뒤에도 표를 유지: 나가기 검사가 실패.
+  - "자리 비움" 표시를 지움: 로비 화면 검사가 실패.
+  - 받아 주지 않은 표로도 정원 찬 카드를 엶: EditMode·PlayMode 카드 검사가 실패.
+  - 정원 찬 카드를 늘 막음: EditMode 카드 검사가 실패.
+  - 카드 문구가 표를 무시: PlayMode 카드 검사가 실패.
+  - 소식 없는 게스트도 자리를 맡음: 해당 검사가 실패.
+  - 전투 중 나가기를 떠남으로 표시하지 않음: 해당 PlayMode 검사가 실패.
+  - Direct IP 표를 방 카드에 묶지 않음: 해당 검사가 실패.
+  - 같은 포트 Direct IP가 표를 새로 만듦: 카드 검사의 Direct IP 단언이 실패.
+  - 자리를 되찾은 새 연결을 확인된 것으로 치지 않음: "첫 패킷 전에 다시 끊김"·"확인된 연결을 바꾼 새 연결" 검사가 실패.
+  - 2:2 로비 복귀 때 확인 목록을 비우지 않음: "2:2 로비 복귀" 검사가 실패.
+  - 지금 판의 나가기 신호만 떠남으로 표시: 다른 판을 가리키는 나가기 단언이 실패.
+  - 기억해 둔 P로 돌아온 연결을 확인된 것으로 치지 않음: 해당 검사가 실패.
+- 앞선 커밋의 전체 실행:
+  - `27ccc99d`: EditMode 2096/2096, PlayMode 711건 중 710 PASS. 실패는 `LabPlayerPaintPatternRenderTests.PatternToggleChangesOnlyRenderedInkWithoutReuploadingOrRevisingMaps`(픽셀 하나 122 → 123)였다. 그 fixture만 두 번 다시 돌려 5/5, 5/5 PASS.
+  - `d6111aa3`: EditMode 2103/2103, PlayMode 713건 중 712 PASS. 실패는 `LabPlayerPaintPatternRenderTests.ActualSavedShaderDistinguishesAllSixPaintersWithoutChangingPaperAlphaOrCoverage`였다.
+  - `3f8c3846`: EditMode 2106/2106, PlayMode 714/714 PASS.
+  - 두 실패 모두 이 문서 앞쪽에 "실행마다 다르게 실패"로 기록된 GPU 화면 비교다.
+- 새 네트워크 검사가 그 GPU 검사에 영향을 주는지 따로 확인했다.
+  - 같은 순서(새 네트워크 검사 → GPU 두 fixture)로 두 번 돌렸다. 한 번은 기록된 간헐 실패 2건(`ActualSavedShader…`, `LabWatercolorSurfaceGrainTests.SurfaceGrainChanges…`)이 났고, 한 번은 모두 통과했다.
+  - 이어서 GPU fixture만 돌리기와 새 검사 뒤에 돌리기를 번갈아 네 번씩, 모두 8회 돌렸다. 8회 모두 PASS였다.
+  - 새 검사와 관계없는 기존 간헐 실패로 본다.
+- **독립 검토:** 읽기 전용 검토자와 반박 검증자를 네 차례 돌렸다.
+  - 1차: 검토자 4명. #501에서 6건이 확인됐고 1건은 반박됐다. #473에서는 흰 박 바닥 묻힘 1건이 확인됐다(그 PR의 확인 사항).
+  - 2차: 실제 문제 2건과 검사 빈틈 2건.
+  - 3차: 3건이 확인됐고(중간 1) 1건은 반박됐다.
+  - 4차: 3건이 확인됐다(중간 1: 2:2 로비 복귀 뒤 처리된 전투 중 끊김을 맡음).
+  - 5차: 처음부터 다시 훑은 검토자는 중간 이상을 찾지 못했다. 4차 수정의 작은 빈틈 1건이 확인됐다.
+  - 확인된 것은 모두 고쳤고, 고칠 때마다 검사를 더하고 대조 실험으로 그 검사가 문제를 잡는지 확인했다.
+- **main `1823993d`(#551·#552·#567·#571·#573 포함) 병합 뒤:** `44e799da`에서 EditMode 2123건 중 2121 PASS, PlayMode 715건 중 711 PASS. 실패 6건은 `LabJigwiABModelTests.BBucketArrivesSeatBySeatAndEachPourPaintsAtOnce`, `GameTutorialTests.GoalStepPlaysTheApprovedLinesWithGeumokAndBul`, `LabJigwiABNetworkTests` 3건, `GameJigwiStageIntegrationTests` 1건이다. 같은 6건을 #501 없는 main `1823993d`에서 돌려 같은 메시지로 모두 실패함을 확인했다. 이 PR이 만든 실패가 아니며 고치지 않았다. Game 토큰은 #551의 44 위인 45, 프로토콜 5697·`C6PhysicsLab/58`은 #551 값이다.
+- 각 실행의 skip·inconclusive는 0이다. batch 가져오기가 덧붙인 Lobby PNG `.meta` 20개의 WebGL 항목은 매번 되돌렸다.
+- **미실행:** iPhone의 실제 화면 잠금·백그라운드(멈춘 시간을 재는 벽시계와 복귀 처리는 Editor에서 그 함수를 직접 불러 확인했다), 실제 Wi-Fi 끊김, 두 대 이상의 실기기, Bonjour 방 카드로 정원 찬 방에 실제로 다시 들어가기(카드 문구는 꾸민 방 목록으로, 입장 가능 판단은 EditMode로만 확인했다), Mac·iOS 앱.
+
+## 2026-11-08 — #473 모든 박 1.1배 (Gourd Visual Size 1.4 → 1.54)
+
+- **기준:** `feat/#473-gourd-size`. main `e15f61f0`에서 고치고 검사했다. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal), `-buildTarget iOS`. Library는 다른 worktree에서 복제했다. 같은 Mac에서 다른 폴더의 Unity Editor가 열려 있었다.
+- **바꾼 것:**
+  - `LabConfig.asset`의 `gourdVisualSize`와 코드 기본값을 1.4에서 1.54로 올렸다. 코드 기본값은 `LabConfig.DefaultGourdVisualSize`이며, 실행 중 설정이 없을 때 `LabGourdPaint`도 이 값을 쓴다. 흰 박은 크기/1.8, 스테이지 박은 크기/1.4배로 그리므로 모든 박이 이전의 1.1배다. 판정 충돌체는 기존 동작대로 보이는 껍데기를 따라 커진다.
+  - 굽기 기준(`GameGourdRigBake.ReferenceVisualSize` 1.4, `TargetBodyHeight` 2.390325)은 그대로 두고 주석만 고쳤다. 박을 다시 굽지 않았다.
+  - `Hapio/Upgrade Menu DEV Rows`(batch `-executeMethod`)로 Home·Lobby의 저장 DEV 140행을 1.54로 저장했다. 장면마다 6줄이 바뀌었다.
+    - 입력의 `m_Text`, 슬라이더의 `m_Value`.
+    - 입력 자식의 표시 글자(`1.` → `1.5`).
+    - 슬라이더 Fill·Handle의 구동 앵커 3줄(0.36 → 0). 저장할 때 Unity가 구동 값을 비운다. 저장 257행 중 107행이 이미 이 상태였다.
+  - 흰 박 마운트 골든을 `GOURD_GOLDEN_RECORD=1`로 다시 기록했다. 바뀐 줄은 예상한 4줄이다.
+    - `visual.position` y: 0.186667 → 0.121333.
+    - `visual.scale`: 0.777778 → 0.855556.
+    - `shellInMount`·`hitboxInMount`: 대각 1.4 → 1.54, y −0.334444 → −0.451889.
+    - 요괴 골든(`WhiteGourdYokai.txt`)은 바이트 단위로 같다.
+  - `LabDeveloperConfigTests`의 기본값 단언을 1.54로 바꿨다.
+  - 문서: `AGENTS.md` #473 절, `DEVELOPER_MODE_PARAMETER_SPEC.md`, `GOURD_MODELS.md`.
+    - `DEVELOPER_MODE_PARAMETER_SPEC.md`에는 기본값과 충돌체가 따라 커지는 현재 동작을 적었다.
+- **접속 묶음:** Host가 보내는 공유값(인덱스 140)만 바뀐다. 그래서 설정 259개·5691·`C6PhysicsLab/52`·`C6HapioGame/39`를 그대로 둔다. #211·#225·#266의 기본값 변경과 같은 처리다.
+
+| 확인 | 결과 |
+| --- | --- |
+| 골든 기록 실행(마운트 검사만) | 1/1 PASS. `WhiteGourdMount.txt` 4줄 변경, `WhiteGourdYokai.txt`는 그대로 |
+| 기록 없이 `LabWhiteGourdGoldenTests` | 2/2 PASS |
+| EditMode 관련 5 fixture | 151/151 PASS |
+| PlayMode `LabGourdHitboxTests`·`LabGourdVisualRigTests`·`GameStageGourdIntegrationTests` | 12/12 PASS |
+| 전체 EditMode | 2089/2089 PASS(22.5초) |
+| 전체 PlayMode | 706건 중 705 PASS(575초). 실패 1건은 아래 |
+| 실패 1건만 다시: `LabWatercolorSurfaceGrainTests` fixture 두 번 | 2/2 PASS, 2/2 PASS |
+
+- EditMode 관련 5 fixture는 `LabDeveloperConfigTests`·`GameSceneAssetTests`·`GameGourdRigBakeTests`·`GameEditorMenuCleanupTests`·`LabPaintDryingConfigTests`다.
+- 전체 PlayMode의 실패 1건은 `LabWatercolorSurfaceGrainTests.PigmentTextureIsStaticAndFollowsTheObjectAcrossScreenTranslationAndRigRotation`이다.
+  - 0.12초 간격으로 찍은 두 화면의 RGB 차이가 최대 2였다(한도 1).
+  - 이 검사는 흰 박 프리팹을 크기 설정 없이 따로 그리므로 이번 변경과 무관한 일시적 실패로 본다.
+- 각 실행의 skip·inconclusive는 0이다. batch 가져오기가 덧붙인 Lobby PNG `.meta` 20개의 WebGL 항목은 매번 되돌렸다.
+- **계산만 했고 실행하지 않은 것:** 장면 값과 설정으로 계산했다.
+  - 흰 박(2:2·3:3·Lab 단판·튜토리얼)은 줄이 위아래로 출렁일 때(±0.45) 가장 낮은 지점에서 보이는 바닥 아래로 약 8cm 들어간다. 1.4에서는 16cm 위였다.
+  - 스테이지 박은 그 지점에서도 바닥 위에 남는다.
+  - 세게 맞아 박이 더 내려가면, 아래쪽을 노린 공이 바닥에 먼저 닿아 빗나감이 되는 경우가 드물게 생길 수 있다.
+  - 전투 카메라와 다시보기 카메라의 거리는 박 크기를 따라 바뀌지 않는다.
+- **미실행:** Editor·기기 화면 확인, 실기기의 판정과 프레임 비용, Mac·iOS 앱.
+
 ## 2026-11-08 — DEV 행 Editor 메뉴가 Home·Lobby의 저장 257행을 지키게 (PR #561 후속)
 
 - **기준:** `fix/menu-dev-row-240`, 바로 아래 절의 커밋 위(main `92d511ee`)에서 고치고 검사했다. 그 뒤 main `488104e7`(#562)을 rebase가 아니라 merge(`a434b800`)로 받아 다시 검사했다(표의 "병합 뒤"). Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal), `-buildTarget iOS`. 같은 Mac에서 다른 폴더의 Unity Editor가 열려 있었다.
@@ -6569,6 +6669,50 @@ PR-1(`feat/#507-gourd-rig-contract`) 위에서 Unity 6000.6.5f1 macOS batch Edit
 - `GameTutorialFlowTests`는 fixture 하나가 5초를 넘으므로(50.8초) 2026-11-05 기준대로 `[Category("Slow")]`를 붙였다. 동작은 바꾸지 않는다.
 - **미실행:** Play·iPhone에서 손가락으로 말풍선 가장자리를 눌러 보는 느낌, 8pt 여유가 충분한지.
 
+## #552 튜토리얼 대사 줄바꿈 정리 · 4단계 구슬 사라짐 안내 — 2026-11-08
+
+- **기준:** 최신 main → `feat/#552-tutorial-lines-orb-lifetime`. Play가 꺼진 것을 확인한 뒤 컴파일하고, Editor 안 계산만 했다. Test Runner·Play는 실행하지 않았다.
+
+### 1. 대사 줄바꿈
+- 말풍선 글자 칸은 236×150 그림에서 여백을 뺀 약 198×93pt다. 글꼴은 신라문화체 17pt, 자동 맞춤 최소 12pt다. 이 폭을 넘는 줄은 Unity가 저절로 줄을 넘겨 "아냐?"·"같아!"처럼 한 어절만 다음 줄로 떨어졌다.
+- 실제 Unity 글자 배치(TextGenerator)로 재서 저절로 넘어가던 14줄을 직접 줄바꿈으로 나눴다.
+  - 0단계 3개, 1단계 2개, 2단계 1개.
+  - 4단계 4개: 지도 대사 "오호! 누가 북을…"을 포함하고, "맞아! 너가 북을 줘야지…"의 끝 공백도 지웠다.
+  - 5단계 2개, 6단계 2개.
+- 한 말풍선은 **세 줄까지** 허용한다(사용자 결정). 대본 주석의 "두 줄 이내"를 고쳤다. 세 줄 대사는 5개이고 모두 17pt 그대로 들어간다.
+- 안내 띠 5개는 모두 20pt 한 줄로 들어가 바꾸지 않았다.
+
+### 2. 4단계 · 넘기기: 구슬 사라짐 안내
+- 지도 대사 "오호! 누가 북을 / 안 주고 있는지 실시간으로 / 확인할 수 있겠군!" 다음에 대사 4개를 넣고 5단계 · 폭탄으로 넘어간다.
+  - 불이 "어? 구슬이 빛나는데?"
+  - 금옥 "구슬은 오래 두면 사라져. / 빛이 나기 시작하면 곧 없어져!"
+  - 금옥 "못 쓰는 구슬은 쥐고 있지 말고 / 바로바로 넘겨 줘!"
+  - 불이 "오호! 알겠어"
+- **시연 (실제 게임과 같은 연출):** 튜토리얼은 구슬 수명을 하루로 꺼 두므로, 이 장면에서만 구슬 하나의 사라질 시각(`expiresAt`)을 당긴다. 수명 끝의 흰 반짝임(마지막 3초, #235), 연기(`LabOrbVanishSmoke`), 사라짐 알림은 실제 게임 코드가 그대로 낸다.
+  - "어? 구슬이 빛나는데?": 내 판의 음 → 양 → 오행 순으로 하나를 고른다(보통 2단계에서 남은 음). 없으면 음구슬을 하나 떨어뜨린다. 대사가 떠 있는 동안 0.2초마다 남은 시간을 3초로 되돌려, 처음 빠르기로 빛나기만 한다.
+  - "…곧 없어져!": 되돌리기를 멈춘다. 3초 동안 반짝임이 빨라지다 연기와 함께 사라진다. 사라지기 전에는 이 대사를 넘길 수 없고, ▽도 사라진 뒤에 뜬다. 6초가 지나도 안 사라지면 넘길 수 있게 풀린다.
+  - 두 대사 동안 그 구슬만 밝히고(`GameTutorialFocus.FadingOrb`), 사라진 뒤에도 같은 자리를 밝혀 둔다.
+  - 다른 구슬은 지금처럼 사라지지 않는다.
+- 새 코드
+  - `LabModel.TutorialSetOrbLife`, `LabNetwork.TutorialSetOrbLife`
+  - `GameTutorialDirector.Fade.cs`
+  - 대본의 `OrbGlow`·`OrbVanish` 연출, `FadingOrb` 밝히기, `FadeDemoLanding`
+
+| 실행한 확인 | 결과 |
+| --- | --- |
+| 컴파일 · Console 오류 | **PASS**: compilationFailed=false, 오류 0 |
+| 모든 대사·안내 띠 배치 (Editor 안, Unity TextGenerator) | **PASS**: 저절로 넘어가는 줄 0. 대사는 모두 17pt에 세 줄 이내, 안내 띠는 모두 20pt 한 줄 |
+| 시연 모델 동작 (Editor 안 계산) | **PASS**: 되돌리는 동안 남은 3.000초 유지, 놓으면 2.9초에 있고 3.1초에 사라짐, 사라짐 알림 1건, 다른 구슬은 그대로(남은 86393초). 없는 구슬·남의 구슬·음수·북은 거절 |
+
+- **수정·추가 검사 (NOT_RUN):**
+  - EditMode `GameTutorialTests`
+    - 0·1·2·5·6단계 대사 글자를 고쳤다.
+    - 4단계 장면 11개(대사·말하는 사람·지도/구슬 밝히기·연출)를 고쳤다.
+    - 추가: 시연 구슬 고르는 순서, 구슬 하나만 사라지게 하기(모델), 모든 대사가 쓴 곳에서만 줄이 바뀌고 제 크기로 들어가는지.
+  - PlayMode `GameTutorialFlowTests`: 4단계 끝에서 남은 음이 4초 동안 빛나기만 하는지, 사라지기 전 탭이 막히는지, 연기와 함께 사라진 뒤 양은 남는지, 대사 두 개 뒤 5단계로 가는지.
+- **미실행:**
+  - Play로 0~6단계 전체 확인. 특히 4단계 말풍선(불이 아래 가운데·금옥 오른쪽)이 빛나는 구슬을 가리지 않는지 본다.
+  - iPhone 실기기.
 
 ## 2026-11-08 — Hapio 타이틀 버튼·방 목록·모드 선택 Figma 적용
 
@@ -6636,6 +6780,24 @@ PR-1(`feat/#507-gourd-rig-contract`) 위에서 Unity 6000.6.5f1 macOS batch Edit
 - 원격 main `ae4aa87e`(#561)의 저장 DEV 257행·240번 기본값·Prefab 글꼴 보존 수정을 반영한 뒤 macOS 기본 batch 환경에서 재검사했다. **EditMode `GameEditorMenuCleanupTests` 4/4 PASS(0.60초), 관련 PlayMode 37/37 PASS(36.24초)**이며 실행 건수가 0이 아닌 NUnit 결과를 확인했다.
 - main 대비 PR 변경은 DEV 코드·해당 검사·사용법/검증 문서 13개 파일뿐이다. Scene·Prefab·머터리얼·패키지·ProjectSettings와 결과 화면 전환 코드는 변경하지 않았다. `git diff --check`와 검사 후 깨끗한 작업 트리를 확인했다. 추가 iOS·실네트워크·전체 검사 모음은 실행하지 않았다.
 
+### #552 튜토리얼 대사 넘기기를 화면 전체 터치로 되돌림 — 2026-11-08
+
+- **사용자 결정:** #536의 "말풍선과 둘레 8pt를 눌러야 대사가 넘어감"을 되돌려, 예전처럼 화면 어디를 눌러도 다음 대사로 넘어간다. 새 이슈를 파는 대신 #552 브랜치에서 함께 진행한다.
+- **되돌린 것 (#536이 넣은 부분만 직접 제거, `git revert` 아님):**
+  - 전체 화면 터치 층을 다시 `Tap To Continue`로 하고 `OnTap`에 연결했다.
+  - 말풍선 터치 영역, 말풍선 밖을 누르면 ▽가 커지는 동작(`OnScreenTap`, `TapHintNudge`)을 지웠다.
+  - `TutorialArt.asset` 값 3개(`lineTapPadding`, `tapHintNudgeScale`, `tapHintNudgeSeconds`)를 지웠다. Editor API로 다시 저장했고 이 3줄 외의 변경은 없다.
+- **그대로 둔 것:** ▽ 표시, 연타 방지 시간, 대사 중 판 잠금, #552의 "구슬이 사라지기 전에는 넘길 수 없음". 건너뛰기·일시정지 버튼을 누를 때는 대사가 넘어가지 않는다.
+
+| 실행한 확인 | 결과 |
+| --- | --- |
+| 컴파일 · Console 오류 | **PASS**: compilationFailed=false, 지운 멤버 참조 0 |
+| `TutorialArt.asset` 변경 범위 | **PASS**: 3줄 삭제만 |
+
+- **수정 검사 (NOT_RUN):**
+  - EditMode `GameTutorialTests`: ▽ 커짐 검사를 지웠다.
+  - PlayMode `GameTutorialFlowTests`: 말풍선 영역 검사를 지우고, 터치 영역이 화면 전체인지와 대사 중 판이 잠겨 있는지 확인하도록 바꿨다.
+- **미실행:** Play·iPhone에서 화면 아무 곳이나 눌러 대사가 넘어가는지, 건너뛰기·일시정지를 누를 때 대사가 넘어가지 않는지.
 
 ## 2026-11-08 — #566 결과 화면 중복·봉인 카드 재등장 정리
 
@@ -6685,3 +6847,60 @@ PR-1(`feat/#507-gourd-rig-contract`) 위에서 Unity 6000.6.5f1 macOS batch Edit
 ### 2026-11-09 - seed 572 fixed repetition
 
 Compared twelve seed masks and selected 572. Changed only seed defaults and the three-slot seed binding in the splash partial. All three generated brush slots compared pixel-identically (0 differences). Editor compile console had 0 errors; replay completed ready with no error. Restored previous shape sliders and appearance after compilation. Mac rebuild/full suites not run.
+## #567 튜토리얼 대화 기록 1단계: 기록 버튼과 기록 모으기 — 2026-11-08
+
+- **기준:** 최신 main `e15f61f0` → `feat/#567-tutorial-dialogue-log`. #552가 머지되기 전 main에서 시작했다. Play가 꺼진 것을 확인한 뒤 컴파일과 Editor API 에셋 작업만 했다.
+- **기록 모으기 (`GameTutorialDirector.Log.cs`):** 대본 대사를 넘긴 순간 말한 사람과 대사를 기록에 쌓는다. 동작 장면, 동작 중에 잠깐 뜨는 말("다시 해 봐!"), 안내 띠, "성공!"은 담지 않는다. RESTART는 Battle을 다시 불러 새 기록으로 시작한다.
+- **기록 버튼:** 기록이 하나라도 생기면 건너뛰기 바로 오른쪽(6pt 간격), 같은 높이에 건너뛰기와 같은 빠르기로 서서히 나타난다. 54×30pt, 높이는 건너뛰기와 같다. 아직 눌러도 열리는 화면은 없다(2단계).
+- **그림 (사용자 결정):** 건너뛰기 버튼과 같은 틀(`TutorialSkipButton`)에 같은 글꼴·크기로 "기록"을 쓴다. 처음 받은 검은 테두리 그림은 건너뛰기와 모양이 달라 쓰지 않았다.
+
+| 실행한 확인 | 결과 |
+| --- | --- |
+| 컴파일 · Console 컴파일 오류 | **PASS**: compilationFailed=false, error CS 0 |
+| 버튼 그려 보기 (Editor 안, 화면 밖) | **PASS**: 건너뛰기와 같은 틀·글꼴, 글자가 틀 안에 들어감 |
+| `TutorialArt.asset` 변경 범위 | **PASS**: 기록 버튼 값 2줄 추가만 |
+
+- **추가 검사 (NOT_RUN):**
+  - EditMode `GameTutorialLogTests`: 버튼 자리 계산, 글자, 건너뛰기와 같은 높이.
+  - PlayMode `GameTutorialFlowTests`: 첫 대사를 넘기기 전에는 기록·버튼이 없는지, 넘기면 그 대사가 기록되고 건너뛰기 옆 같은 높이에 같은 틀·글꼴로 뜨는지, 터치가 버튼에 닿는지, 오래된 대사가 먼저인지, RESTART 뒤 기록이 비는지.
+- **미실행:** Play·iPhone 화면 확인.
+
+## #567 튜토리얼 대화 기록 2단계: 기록 화면 — 2026-11-08
+
+- **기록 화면 (`GameTutorialDirector.Log.cs`):** 기록 버튼을 누르면 건너뛰기 창과 같은 어둠이 덮인다. 사용자가 준 막대 그림(`TutorialLogBar.png`, 투명 여백을 잘라 1015×175)에 대사를 하나씩 위에서 아래로 쌓는다.
+  - 막대 321×55pt, 간격 22pt, 한 번에 3개. 시안의 자리와 크기를 390×844 기준으로 옮겼다.
+  - 왼쪽에 얼굴과 이름(불이·금옥·묵이), 가운데에 대사. 글자는 시안처럼 굵은 신라문화체다.
+  - 한 줄로 들어가는 대사는 막대 가운데에, 긴 대사는 얼굴 옆 넓은 칸에 놓는다.
+  - 긴 대사는 대본 줄바꿈을 이어 한 문장으로 쓰고 최대 2줄이다. 글자 칸 높이를 2줄 분량으로 묶었고, 넘치면 11pt까지 줄어든다.
+  - 처음 열면 가장 최근 대사가 보이는 맨 아래다. 오른쪽 드래그 바(잡는 폭 24pt, 보이는 두께 6pt)로 움직이고, 목록을 끌어도 움직인다. 전부 들어가면 드래그 바는 숨는다.
+  - "뒤로 가기"는 건너뛰기 창의 버튼 틀을 쓴다.
+- **보는 동안:** 튜토리얼 시계와 판 조작이 멈추고, 화면 전체가 터치를 받아 뒤의 대사가 넘어가지 않는다. 닫으면 판 조작을 열기 전 상태로 돌리고 이어서 진행한다. 말풍선·손 안내는 어둠 아래에 멈춘 채로 남는다(시안과 같음).
+
+| 실행한 확인 | 결과 |
+| --- | --- |
+| 컴파일 · Console 컴파일 오류 | **PASS**: compilationFailed=false, error CS 0 |
+| 대본 전체 대사의 막대 배치 (Editor 안, Unity TextGenerator, 굵은 글꼴) | **PASS**: 모두 최대 2줄, 모두 15pt 유지 |
+| 실제 코드로 화면 그려 보기 (Editor 안, 화면 밖) | **PASS**: 시안과 막대·얼굴·이름·대사·드래그 바·뒤로 가기 자리와 크기가 맞음. 6개를 넣으면 맨 아래에서 열림 |
+| `TutorialArt.asset` 변경 범위 | **PASS**: 기록 화면 값 18줄 추가만 |
+
+- **추가 검사 (NOT_RUN):**
+  - EditMode `GameTutorialLogTests`: 한 문장 잇기, 막대 쌓기·맨 아래 위치 계산, 글자 칸 고르기, 대본 전체가 2줄 안에 들어가는지.
+  - PlayMode `GameTutorialFlowTests`: 열기·닫기, 쌓인 대사 표시, 터치가 뒤로 안 넘어감, 판 잠금, 같은 대사로 돌아옴, 3개가 넘으면 드래그 바가 뜨고 맨 아래에서 열림, 드래그 바로 맨 위까지 감.
+- **Editor 표시 참고:** 실행 중이 아닌 Editor 그림에서는 Unity `ScrollRect`가 드래그 바를 항상 켠다. 줄이 적을 때 숨는지는 PlayMode 검사로 본다.
+- **미실행:** Play·iPhone에서 손가락으로 드래그 바를 끌어 보는 느낌, 북 치기처럼 직접 조작하는 장면에서 열고 닫기. 이 브랜치에는 #552가 없어 4단계 구슬 시연 중 열기는 #552 머지 뒤에 확인한다.
+
+## #567 튜토리얼 대화 기록 3단계: 보는 동안의 규칙 — 2026-11-08
+
+- **겹침 막기:** 기록이 떠 있으면 대사 넘기기, 건너뛰기 창, 일시정지 메뉴가 시작되지 않는다. 터치는 어두운 화면이 받지만, 기록이 열릴 때 이미 다른 손가락이 눌려 있던 경우까지 코드에서 막았다. 건너뛰기 창이나 일시정지 메뉴가 떠 있으면 기록도 열리지 않는다.
+- **건너뛰기 경고 본문:** 이 브랜치의 대본에 #552의 두 줄 문구가 들어와 있어(`acc204f6`), EditMode 검사 `SkipDialogAsksInTheMockupsWordsOnTheGivenFrames`의 기대 문구를 같은 두 줄로 맞췄다. 글자 크기 16은 #552에 있다.
+- **#552와 합쳐 보기:** 작업 폴더를 건드리지 않는 시험 병합에서 충돌은 이 문서뿐이고 코드 충돌은 없다. #552의 구슬 시연 갱신(`UpdateFadeDemo`)은 기록을 멈추는 줄보다 앞에서 돌아, 코드상 기록 뒤에서도 빛나는 구슬은 사라지지 않는다. "곧 없어져!" 대사 중에 열면 구슬은 기록 뒤에서 사라지고, 닫으면 대사를 넘길 수 있다. 이 동작은 실행해 보지 않았다.
+
+| 실행한 확인 | 결과 |
+| --- | --- |
+| 컴파일 · Console 컴파일 오류 | **PASS**: compilationFailed=false, error CS 0 |
+| 건너뛰기 경고 검사 조건 (Editor 안에서 조건별 계산) | **PASS** |
+
+- **추가 검사 (NOT_RUN):** PlayMode `GameTutorialFlowTests`
+  - 전체 흐름: 직접 조작 장면에서 열고 닫으면 판 조작이 돌아오고 그 조작을 이어서 할 수 있음, "성공!" 대기가 기록 뒤에서 멈춤, 끝까지 간 기록이 대본 대사와 순서까지 같음.
+  - 기록 위에서 대사 넘기기·건너뛰기·일시정지가 시작되지 않음, 건너뛰기 창과 일시정지 메뉴 위에서 기록이 열리지 않음.
+- **미실행:** Test Runner 재실행, Play로 0~6단계 전체, iPhone 실기기, #552 머지 뒤 4단계 구슬 시연 중 기록 열기.

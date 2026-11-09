@@ -437,6 +437,7 @@ GameObject:
   - component: {fileID: 8121947810861207003}
   - component: {fileID: 4806445881070166951}
   - component: {fileID: 6854476936464384518}
+  - component: {fileID: 8805730192837465521}
   m_Layer: 0
   m_Name: AnimatedTitle
   m_TagString: Untagged
@@ -1284,3 +1285,19 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 5.4827585
+--- !u!114 &8805730192837465521
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3021991755688719118}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5e2a939a1bd3446c8e53470343e91509, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Hapio.Runtime::Hapio.TitleRevealSound
+  clip: {fileID: 8300000, guid: 9f6ba6ba6617494893fc2a4e0f7d3ad8, type: 3}
+  volume: 1
+  delaySeconds: 0.1
+  onlyFirstTime: 1

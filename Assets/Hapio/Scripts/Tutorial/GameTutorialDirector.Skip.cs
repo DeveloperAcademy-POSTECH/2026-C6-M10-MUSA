@@ -16,7 +16,7 @@ namespace Hapio
     public sealed partial class GameTutorialDirector
     {
         private float clock;
-        /// <summary>The tutorial's own clock: real time that stops while the skip dialog is open or the battle is paused.</summary>
+        /// <summary>The tutorial's own clock: real time that stops while the skip dialog or dialogue log is open or the battle is paused.</summary>
         private float Now => clock;
 
         private RectTransform skipButton;
@@ -47,7 +47,7 @@ namespace Hapio
 
         private void AdvanceClock()
         {
-            if (!skipOpen && !BattlePaused) clock += Time.unscaledDeltaTime;
+            if (!skipOpen && !logOpen && !BattlePaused) clock += Time.unscaledDeltaTime;
         }
 
         /// <summary>Any tap on the tutorial screen, taken or not, brings the skip button in.</summary>
@@ -139,7 +139,7 @@ namespace Hapio
 
         private void OpenSkipDialog()
         {
-            if (skipOpen || finishing || !HasTappedOnce || skipButton == null) return;
+            if (skipOpen || logOpen || finishing || !HasTappedOnce || skipButton == null) return;
             skipOpen = true;
             skipClosing = false;
             skipOpenedAt = Time.unscaledTime;

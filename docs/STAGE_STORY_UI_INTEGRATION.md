@@ -85,7 +85,7 @@ Host NEXT/재도전은 모두 다음 조건을 기다린다.
 
 ## 호환 범위와 확인할 검사
 
-현재 묶음은 **공유 설정259개 · 프로토콜5691 · `C6PhysicsLab/52` · `C6HapioGame/39`**다. 새 GameOver 재도전 flag와 이야기 확인 제어 때문에 Game 토큰을 올렸다. Lab 토큰·DEV 필드 수·지도 압축·Bulk 선택ACK 형식은 그대로다. Game38 이하 앱을 Game39 방과 혼용하지 않는다.
+#558 당시 묶음은 **공유 설정259개 · 프로토콜5691 · `C6PhysicsLab/52` · `C6HapioGame/39`**였다(현재 Game 기준은 `AGENTS.md`의 #501 절). 새 GameOver 재도전 flag와 이야기 확인 제어 때문에 Game 토큰을 올렸다. Lab 토큰·DEV 필드 수·지도 압축·Bulk 선택ACK 형식은 그대로다. Game38 이하 앱을 Game39 방과 혼용하지 않는다.
 
 관련 자동 검사:
 

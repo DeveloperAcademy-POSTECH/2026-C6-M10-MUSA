@@ -11,7 +11,9 @@ namespace C6Lab
     /// </summary>
     public sealed partial class LabNetwork
     {
-        private static readonly byte[] GameConnectionToken = Encoding.ASCII.GetBytes("C6HapioGame/39");
+        // 45: #501 lobby rejoin: a room ticket after the token, held lobby seats (lobby ids) and lobby_leave/lobby_closed.
+        //     (on top of #551's 44; protocol and Lab token unchanged by #501.)
+        private static readonly byte[] GameConnectionToken = Encoding.ASCII.GetBytes("C6HapioGame/45");
         private const int MaximumGameFlowBytes = 8192;
         private bool gameFlowEnabled;
         private bool gameBattleFrozen;
@@ -93,7 +95,11 @@ namespace C6Lab
             gameStageIndex = 0; gameStageId = null; gameStageYokai = LabStageYokai.None;
             EndBattleToLobby();
             UnlockGameRoster();
-            if (!developerSolo) BroadcastLobby();
+            if (!developerSolo)
+            {
+                BroadcastLobby();
+                ConfirmLobbyMembersAgain();
+            }
             return true;
         }
 
@@ -165,6 +171,7 @@ namespace C6Lab
             value.CombineRequested += OnCombineRequested;
             value.FoxFireTouched += OnFoxFireTouched;
             value.ThrowRequested += OnThrowRequested;
+            value.ThrowGate = JigwiBThrowAllowed; // #551 지귀 B: "지금!" 전에는 특수 물구슬을 못 던짐
             value.UseRequested += OnUseRequested;
             value.DrumTapped += Generate;
             value.JigwiBurnRequested += OnJigwiBurnRequested;
@@ -177,6 +184,7 @@ namespace C6Lab
             value.CombineRequested -= OnCombineRequested;
             value.FoxFireTouched -= OnFoxFireTouched;
             value.ThrowRequested -= OnThrowRequested;
+            if (value.ThrowGate == (System.Func<string, bool>)JigwiBThrowAllowed) value.ThrowGate = null;
             value.UseRequested -= OnUseRequested;
             value.DrumTapped -= Generate;
             value.JigwiBurnRequested -= OnJigwiBurnRequested;

@@ -309,7 +309,8 @@ namespace Hapio
             if (modePanel != null && modePanel.activeSelf && (!browser || !Network.CanChooseConnection || session.IsCreatingRoom)) SetModes(false);
             if (browser) RefreshBrowser();
             else if (lobby) RefreshPositions();
-            string notice = Network.IsJoiningRoom ? (Network.IsCancelingJoin ? "연결을 취소하고 있소..." : "방에 입장하고 있소...")
+            string notice = Network.IsJoiningRoom ? (Network.IsCancelingJoin ? "연결을 취소하고 있소..."
+                    : Network.IsRejoiningLobby ? "방에 다시 들어가고 있소..." : "방에 입장하고 있소...")
                 : !string.IsNullOrEmpty(localError) ? localError
                 : !string.IsNullOrEmpty(session.UiNotice) ? session.UiNotice
                 : browser && !string.IsNullOrEmpty(Network.RoomSearchMessage) ? Network.RoomSearchMessage : Network.Notice;
@@ -387,7 +388,8 @@ namespace Hapio
                     + (room.capacity >= 2 ? room.participants + " / " + room.capacity + "명 모였소" : "인원 확인 중");
                 bool connecting = Network.IsJoiningRoom && Network.JoiningRoomKey == room.key;
                 string action = room.pending && !room.ready ? "준비 중..." : connecting ? "입장 중..."
-                    : !room.pending && room.waiting ? "방장 대기" : room.playing ? "봉인 중" : room.full ? "정원 마감" : "입장 →";
+                    : !room.pending && room.waiting ? "방장 대기" : room.playing ? "봉인 중"
+                    : room.full && !Network.HoldsRoomTicket(room.key) ? "정원 마감" : "입장 →";
                 var label = rows[i].transform.Find("Action").GetComponent<UnityEngine.UI.Text>();
                 label.text = action; label.fontSize = action == "입장 →" ? 20 : 14;
                 Transform arrow = rows[i].transform.Find("Arrow");
@@ -455,6 +457,9 @@ namespace Hapio
         }
 
         private const float DisabledSeatAlpha = .45f;
+        /// <summary>#501: the seat label and hint while the Host keeps a dropped player's seat.</summary>
+        public const string HeldSeatLabel = "자리 비움";
+        public const string HeldSeatHint = "자리를 비운 이가 돌아오길 기다리고 있소.";
         private Color[] slotImageColors;
 
         private Color SlotImageColor(int index)
@@ -490,6 +495,7 @@ namespace Hapio
             heading.text = waiting ? "방 정보를 받고 있소..." : allChosen ? (team ? "준비 완료!" : "요괴 봉인 준비 완료!") : "빈 자리를 고르시오.";
             subheading.text = waiting ? "" : Network.SlotSelectionPending ? "자리 선택을 확인하고 있소..."
                 : allChosen ? (Network.SessionConfigReady ? "" : "방 설정을 확인하고 있소...")
+                : Network.HeldSeatCount > 0 ? HeldSeatHint
                 : team ? TeamSeatHint(count) : "실제로 앉은 위치의 빈 자리를 눌러주시오.";
             roomName.text = Network.HostRoomNamePending ? "방을 만들고 있소..." : LabRoomNames.Display(Network.ConnectedRoomName);
             joinedCount.text = waiting ? "인원 확인 중" : Network.ParticipantCount + " / " + count + "명 입장";
@@ -513,6 +519,8 @@ namespace Hapio
                 CopyRect(anchors[i], (RectTransform)slotButtons[i].transform);
                 ulong owner = Network.GetSlotOwner(i + 1);
                 bool occupied = owner != ulong.MaxValue, mine = occupied && owner == Network.LocalPlayerId;
+                // #501: the Host keeps a dropped player's seat for a while; it shows taken but faded.
+                bool held = occupied && Network.IsSlotHeld(i + 1);
                 slotImages[i].sprite = team ? TeamSlot(i, occupied) : occupied ? filledSlots[i] : emptySlots[i];
                 slotImages[i].rectTransform.localEulerAngles = new Vector3(0, 0, 180);
                 slotLabels[i].text = "P" + (i + 1);
@@ -521,13 +529,15 @@ namespace Hapio
                 // The Button tints only its transparent hit area, so dim an empty seat that cannot be chosen. A choice
                 // or developer restart awaiting the Host only pauses the seats; they are not refused.
                 Color seatColor = SlotImageColor(i);
-                if (!occupied && !slotButtons[i].interactable && !Network.SlotSelectionPending && !Network.IsDeveloperRestartPending)
+                if (held || !occupied && !slotButtons[i].interactable && !Network.SlotSelectionPending
+                    && !Network.IsDeveloperRestartPending)
                     seatColor.a *= DisabledSeatAlpha;
                 slotImages[i].color = seatColor;
                 bool host = occupied && owner == Unity.Netcode.NetworkManager.ServerClientId;
                 localLabels[i].fontSize = team ? teamLocalLabelFontSize
                     : storyLocalLabelFontSizes[Mathf.Min(i, storyLocalLabelFontSizes.Length - 1)];
-                localLabels[i].text = (host ? "방장" : string.Empty) + (mine ? (host ? " · 나 · 취소" : "나 · 취소") : string.Empty);
+                localLabels[i].text = held ? HeldSeatLabel
+                    : (host ? "방장" : string.Empty) + (mine ? (host ? " · 나 · 취소" : "나 · 취소") : string.Empty);
                 Vector2 center = anchors[i].anchoredPosition;
                 // Labels stay clear of the team lines: above the upper seats (2:2 P1·P3, 3:3 P2·P3·P5·P6) and both 1:1
                 // seats, below the lower ones (2:2 P2·P4, 3:3 P1·P4).
