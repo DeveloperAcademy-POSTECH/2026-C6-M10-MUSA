@@ -1,5 +1,23 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-09 — 결과·Home·Lobby의 시안에 없는 안내 줄 숨기기
+
+- **기준:** `fix/hide-result-status-line`, main `d1ea7b12` 위 `f37b4443`·`79bc2e15`. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 접속 묶음과 설정 수는 그대로다.
+- **바꾼 것:** StageResult 이야기 화면의 `Status` 줄과 Home·Lobby의 `ConnectionMessage` 줄을 실행 중 숨긴다. 프리팹은 바꾸지 않았다. Lobby 문구는 계속 계산하지만 화면에는 나오지 않는다. Direct IP 창의 안내 문구는 그대로다.
+
+| 확인 | 결과 |
+| --- | --- |
+| `GameFinishReplayTests`·`GameStageStoryPresentationTests`(결과 화면 30프레임 숨김 포함) | 9/9 PASS |
+| `GameStageStoryAssetTests` | 5/5 PASS |
+| `GameLobbyViewTests` | 19/19 PASS |
+| 대조 실험(결과 줄 표시, Lobby 줄 표시) | 해당 검사 실패 |
+| 전체 EditMode(`79bc2e15`) | 2150/2150 PASS |
+| 전체 PlayMode(`79bc2e15`) 1회차 | 692/731 PASS, 39건 실패 |
+| 전체 PlayMode(`79bc2e15`) 2회차 | 731/731 PASS |
+
+- 1회차는 코드 변경 없이 2회차에서 모두 통과했다. 1회차 실패의 대부분은 `GameSceneFlowTests.AGuestExitDuringTheRun…`이 전투 시작 대기에서 실패한 뒤 세션이 정리되지 않아 다음 검사의 SetUp이 실패한 연쇄다. 그 실행은 실제 약 51분, 검사 시간 약 8분이었다. 원인은 확인하지 못했다.
+- **미실행:** 실기기 화면 확인, 방 입장 실패·연결 끊김을 실제로 겪을 때의 사용감.
+
 ## 2026-11-09 — 전투 화면의 내부 거절 코드 숨기기
 
 - **기준:** `fix/hide-rejection-codes`, main `02a27205` 위 `a46fe72d`와 그 뒤 로비 자리 거절 문구 커밋. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal).
