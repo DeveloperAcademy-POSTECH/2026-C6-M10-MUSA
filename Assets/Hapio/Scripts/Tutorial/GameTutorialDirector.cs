@@ -389,6 +389,7 @@ namespace Hapio
             tapHint.gameObject.SetActive(false);
             bubbleRoot.gameObject.SetActive(false);
             BuildSkip();
+            BuildLogButton();
             BuildPause(root);
         }
 
@@ -512,6 +513,7 @@ namespace Hapio
             UpdateFadeDemo();
             // The skip dialog and the pause menu stop the tutorial where it is: nothing moves on behind them.
             if (skipOpen || BattlePaused) return;
+            if (logOpen) return;
             UpdateHandOvers();
             if (beatIndex < 0)
             {
@@ -542,6 +544,9 @@ namespace Hapio
 
         private void Advance()
         {
+            // A finger already down when the log opened can still let go on the line behind it.
+            if (logOpen) return;
+            NoteLinePassed();
             IReadOnlyList<GameTutorialStep> steps = GameTutorialScript.Steps;
             beatIndex++;
             while (stepIndex < steps.Count && beatIndex >= steps[stepIndex].Beats.Count)
@@ -1057,7 +1062,9 @@ namespace Hapio
             PlaceNames();
             UpdateKeepOut();
             if (UpdatePause()) return;
-            if (UpdateSkip()) return;
+            bool skipDialogUp = UpdateSkip();
+            UpdateLogButton();
+            if (skipDialogUp || UpdateLogScreen()) return;
             bool line = HasBeat && CurrentBeat.IsLine;
             if (remarkAt >= 0f && (Now - remarkAt > remarkSeconds || !remarkHolds && board.IsHolding))
             {

@@ -186,6 +186,14 @@ namespace Hapio
         /// "계속 배우기"는 하던 곳부터 잇고, "건너뛰기"는 마지막 장면 뒤와 같이 어두워지며 방 목록으로 간다.
         /// </summary>
         public const string SkipButtonLabel = "건너뛰기";
+        /// <summary>건너뛰기 옆 대화 기록 버튼의 글자 (#567).</summary>
+        public const string LogButtonLabel = "기록";
+        /// <summary>대화 기록을 닫는 버튼의 글자 (#567).</summary>
+        public const string LogBackLabel = "뒤로 가기";
+
+        /// <summary>대화 기록 막대에 쓰는 글: 대본의 줄바꿈과 겹친 공백을 한 칸으로 이어 한 문장으로 만든다 (#567).</summary>
+        public static string LogLine(string text) =>
+            string.Join(" ", (text ?? string.Empty).Split((char[])null, StringSplitOptions.RemoveEmptyEntries));
         public const string SkipTitle = "튜토리얼을 건너뛰겠소?";
         public const string SkipBody = "튜토리얼을 건너뛰면 기본 조작을 익히지 못해\n협동 플레이에 어려움이 있을 수 있소.";
         public const string SkipStay = "계속 배우기";
