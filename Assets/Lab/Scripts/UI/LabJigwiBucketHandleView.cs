@@ -171,12 +171,6 @@ namespace C6Lab
             steamObject.layer = gameObject.layer; steamObject.transform.SetParent(root, false);
             steam = steamObject.AddComponent<RawImage>(); steam.raycastTarget = false;
             steamHand = NewImage("Jigwi Bucket Steam Hand", Hand(), root);
-            // #595: a ring beside the rubbing finger fills as the smoke is wiped (full at the clear line).
-            ringBack = NewImage("Jigwi Smoke Wipe Gauge Back", Ring(), root);
-            ringFill = NewImage("Jigwi Smoke Wipe Gauge", Ring(), root);
-            ringFill.type = Image.Type.Filled; ringFill.fillMethod = Image.FillMethod.Radial360;
-            ringFill.fillOrigin = (int)Image.Origin360.Top; ringFill.fillClockwise = true;
-            ringBack.gameObject.SetActive(false); ringFill.gameObject.SetActive(false);
             // Both start hidden: they appear only when this seat's bucket ran out.
             steam.gameObject.SetActive(false); steamHand.gameObject.SetActive(false);
             flash = NewImage("Jigwi Bucket Flash", Vignette(), root);
@@ -679,6 +673,7 @@ namespace C6Lab
             if (steamRound == roundId) return;
             steamRound = roundId; steamOn = true; steamAt = Time.unscaledTime; steamClearedAt = -1f; rubbing = false;
             lastSqueakLeft = 1f; lastSqueakAt = -1f;
+            thickestSpot = handSpot = new Vector2(.5f, .66f); WipeGauge = 0f; // #595
             if (steamTexture == null)
             {
                 steamTexture = new Texture2D(SteamW, SteamH, TextureFormat.RGBA32, false)
@@ -702,7 +697,8 @@ namespace C6Lab
                 int x = i % SteamW, y = i / SteamW;
                 float warm = .5f + .5f * Mathf.Sin(x * .3f + y * .2f);
                 byte a = (byte)Mathf.RoundToInt(255f * Mathf.Clamp01(steamAlpha[i]));
-                steamPixels[i] = new Color32((byte)(128 + 14 * warm), (byte)(122 + 10 * warm), 118, a); // Jigwi's smoke grey
+                // #595: drawn light and tinted by how much is wiped (SmokeDark → SmokePale).
+                steamPixels[i] = new Color32((byte)(230 + 25 * warm), (byte)(219 + 18 * warm), 212, a);
             }
             steamTexture.SetPixels32(steamPixels); steamTexture.Apply(false, false);
         }
@@ -721,74 +717,76 @@ namespace C6Lab
             if (!steam.gameObject.activeSelf) steam.gameObject.SetActive(true);
             float fadeIn = Mathf.Clamp01((t - steamAt) / .5f);
             float fadeOut = steamClearedAt >= 0f ? 1f - Mathf.Clamp01((t - steamClearedAt) / .4f) : 1f;
-            steam.color = new Color(1f, 1f, 1f, fadeIn * fadeOut);
+            // #595: how much is left shows in the colour — thick dark soot at first, the smoke left turns paler as it is
+            // wiped (pale grey → white mist near the clear line). Still opaque; the clear moment flashes it white.
+            WipeGauge = Mathf.Clamp01((1f - steamLeft) / Mathf.Max(.01f, 1f - steamClearLeft));
+            float shade = Mathf.Lerp(SmokeDark, SmokePale, Mathf.SmoothStep(0f, 1f, WipeGauge));
+            if (steamClearedAt >= 0f) shade = 1f;
+            steam.color = new Color(shade, shade * .98f, shade * .96f, fadeIn * fadeOut);
             if (steamClearedAt >= 0f)
             {
                 if (fadeOut <= 0f) EndSteam();
                 Show(steamHand, false);
-                // Full ring flashes and swells away with the smoke.
-                float burst = Mathf.Clamp01((t - steamClearedAt) / .4f);
-                DrawWipeGauge(1f, 1f + .5f * burst, (1f - burst), board);
                 return;
             }
             // Rub: every finger (or mouse) drag over the board wipes a stroke out of the fog.
             if (TryPointer(out Vector2 screen) && board.Contains(screen))
             {
-                lastPointer = screen;
                 Vector2 uv = new Vector2((screen.x - board.xMin) / board.width, (screen.y - board.yMin) / board.height);
                 if (rubbing) Wipe(lastRub, uv, board); else Wipe(uv, uv, board);
                 lastRub = uv; rubbing = true;
             }
             else rubbing = false;
-            // A small hand rubs back and forth in the middle of the fog (hidden while a finger is already rubbing).
+            // A small hand rubs back and forth where the most smoke is left (hidden while a finger is already rubbing).
             bool hint = !rubbing;
             Show(steamHand, hint);
             if (hint)
             {
                 float hand = board.width * .16f;
                 float u = Mathf.Sin(t * 7f);
-                Vector2 centre = new Vector2(board.center.x + u * board.width * .12f, board.yMin + board.height * .66f + Mathf.Abs(u) * hand * .12f);
+                handSpot = Vector2.Lerp(handSpot, thickestSpot, Mathf.Clamp01(Time.unscaledDeltaTime * 3f)); // glides there
+                Vector2 centre = new Vector2(board.xMin + board.width * handSpot.x + u * board.width * .12f,
+                    board.yMin + board.height * handSpot.y + Mathf.Abs(u) * hand * .12f);
                 PlaceScreenRect(steamHand.rectTransform, new Rect(centre.x - hand * .33f, centre.y - hand * .5f, hand * .67f, hand));
                 steamHand.rectTransform.localEulerAngles = new Vector3(0f, 0f, -u * 12f);
                 steamHand.color = new Color(1f, 1f, 1f, Mathf.Clamp01(steamLeft * 1.6f) * fadeIn);
-                lastPointer = new Vector2(board.center.x + board.width * .12f, board.yMin + board.height * .66f); // steady beside the swaying hand
             }
-            float wiped = Mathf.Clamp01((1f - steamLeft) / Mathf.Max(.01f, 1f - steamClearLeft));
-            DrawWipeGauge(wiped, 1f, fadeIn, board);
         }
 
-        // ---------- #595 wipe gauge: a ring next to the finger (or the hint hand) ----------
-        private Image ringBack, ringFill;
-        private Vector2 lastPointer;
-        private static Sprite ringSprite;
-        /// <summary>테스트용: 연기 닦기 게이지(0~1, 1 = 다 닦음).</summary>
+        // ---------- #595 how much is left: throb, the hand goes to the thickest smoke, the rubbing sound rises ----------
+        /// <summary>#595: the smoke tint at the start (dark soot) and near the clear line (pale mist); the texture is drawn light.</summary>
+        private const float SmokeDark = .38f, SmokePale = .97f;
+        private Vector2 thickestSpot = new Vector2(.5f, .66f), handSpot = new Vector2(.5f, .66f);
+        private AudioSource rubSource;
+        /// <summary>테스트용: 연기를 얼마나 닦았는지(0~1, 1 = 다 닦음).</summary>
         public float WipeGauge { get; private set; }
 
-        private void DrawWipeGauge(float wiped, float scale, float alpha, Rect board)
+        /// <summary>Where the most smoke is left, on a coarse 4 × 8 grid of the screen (0~1).</summary>
+        private void FindThickest()
         {
-            WipeGauge = wiped;
-            Show(ringBack, alpha > .01f); Show(ringFill, alpha > .01f);
-            if (alpha <= .01f) return;
-            float size = board.width * .17f;
-            // Up and to the right of the finger, so the finger never covers it (kept on screen).
-            Vector2 at = lastPointer + new Vector2(size * .75f, size * .75f);
-            at.x = Mathf.Clamp(at.x, board.xMin + size * .6f, board.xMax - size * .6f);
-            at.y = Mathf.Clamp(at.y, board.yMin + size * .6f, board.yMax - size * .6f);
-            Rect rect = new Rect(at.x - size * .5f, at.y - size * .5f, size, size);
-            PlaceScreenRect(ringBack.rectTransform, rect); PlaceScreenRect(ringFill.rectTransform, rect);
-            ringBack.rectTransform.localScale = ringFill.rectTransform.localScale = Vector3.one * scale;
-            ringBack.color = new Color(.1f, .08f, .07f, .55f * alpha);
-            ringFill.fillAmount = wiped;
-            ringFill.color = Color.Lerp(new Color(1f, .93f, .7f, alpha), new Color(.55f, 1f, .7f, alpha), wiped >= 1f ? 1f : 0f);
+            const int cols = 4, rows = 8;
+            float best = -1f;
+            for (int cy = 0; cy < rows; cy++)
+                for (int cx = 0; cx < cols; cx++)
+                {
+                    float sum = 0f;
+                    int x0 = cx * SteamW / cols, x1 = (cx + 1) * SteamW / cols, y0 = cy * SteamH / rows, y1 = (cy + 1) * SteamH / rows;
+                    for (int y = y0; y < y1; y += 2)
+                        for (int x = x0; x < x1; x += 2) sum += steamAlpha[y * SteamW + x];
+                    if (sum > best) { best = sum; thickestSpot = new Vector2((cx + .5f) / cols, (cy + .5f) / rows); }
+                }
         }
 
-        /// <summary>A thick round ring (white, tinted by colour).</summary>
-        private static Sprite Ring() => ringSprite != null ? ringSprite : ringSprite = Build("Jigwi wipe ring", 96, 96, (u, v) =>
+        /// <summary>The rubbing whoosh, higher the more is wiped.</summary>
+        private void PlayRub(float progress)
         {
-            float d = Vector2.Distance(new Vector2(u, v), new Vector2(.5f, .5f)) * 2f;
-            float a = Mathf.Clamp01((1f - d) * 30f) * Mathf.Clamp01((d - .7f) * 30f);
-            return new Color(1f, 1f, 1f, a);
-        });
+            if (string.IsNullOrEmpty(rubSoundFolder) || rubVolume <= 0f) return;
+            AudioClip[] clips = Resources.LoadAll<AudioClip>("Audio/" + rubSoundFolder);
+            if (clips == null || clips.Length == 0) return;
+            if (rubSource == null) { rubSource = gameObject.AddComponent<AudioSource>(); rubSource.playOnAwake = false; rubSource.spatialBlend = 0f; }
+            rubSource.pitch = Mathf.Lerp(.9f, 1.5f, progress);
+            rubSource.PlayOneShot(clips[UnityEngine.Random.Range(0, clips.Length)], rubVolume * LabAudioSettings.SfxVolume);
+        }
 
         private void Wipe(Vector2 from, Vector2 to, Rect board)
         {
@@ -817,12 +815,14 @@ namespace C6Lab
             WriteSteam();
             float sum = 0f; foreach (float a in steamAlpha) sum += a;
             steamLeft = sum / steamAlpha.Length;
+            FindThickest();
+            float wiped = Mathf.Clamp01((1f - steamLeft) / Mathf.Max(.01f, 1f - steamClearLeft));
             // A light tick for every bit wiped away, a firm one when it is clear.
             if (lastTickLeft - steamLeft >= .06f && source != null)
-            { lastTickLeft = steamLeft; LabHaptics.PlayDirect(source.config, LabHapticStyle.Light, .35f); }
+            { lastTickLeft = steamLeft; LabHaptics.PlayDirect(source.config, LabHapticStyle.Light, Mathf.Lerp(.3f, .75f, wiped)); } // #595 firmer toward the end
             // 휘익: a fanning whoosh for every few percent rubbed away, at most every 0.25 s.
             if (lastSqueakLeft - steamLeft >= .04f && Time.unscaledTime - lastSqueakAt >= .25f)
-            { lastSqueakLeft = steamLeft; lastSqueakAt = Time.unscaledTime; Play(rubSoundFolder, rubVolume); }
+            { lastSqueakLeft = steamLeft; lastSqueakAt = Time.unscaledTime; PlayRub(wiped); }
             if (steamLeft <= steamClearLeft)
             {
                 steamClearedAt = Time.unscaledTime;
@@ -838,7 +838,7 @@ namespace C6Lab
             steamOn = false; rubbing = false;
             if (steam != null && steam.gameObject.activeSelf) steam.gameObject.SetActive(false);
             Show(steamHand, false);
-            Show(ringBack, false); Show(ringFill, false); WipeGauge = 0f;
+            WipeGauge = 0f;
             if (steamBlocking && source != null && source.board != null) source.board.SetUiInputBlocked(false);
             steamBlocking = false;
         }
