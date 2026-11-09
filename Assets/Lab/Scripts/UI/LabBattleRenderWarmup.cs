@@ -30,6 +30,10 @@ namespace C6Lab
         private readonly List<LabProjectile> shots = new List<LabProjectile>();
         private readonly List<Transform> bursts = new List<Transform>();
         private readonly List<Transform> boardCopies = new List<Transform>();
+        private readonly List<LabClayFlightSlot> clayShots = new List<LabClayFlightSlot>();
+        private readonly List<LabClayImpactSlot> clayContacts = new List<LabClayImpactSlot>();
+        private readonly List<Transform> claySurfaces = new List<Transform>();
+        private LabClayShapes clayShapes;
         private LabNetwork network;
         private Camera battleCamera, boardCamera;
         private LabHud hud;
@@ -103,9 +107,47 @@ namespace C6Lab
                     burst.Begin(LabOrbVisualFactory.TemporaryElementColor(element), battleCamera.transform.forward, battleCamera);
                     bursts.Add(burst.transform);
                 }
+            SpawnClayCopies(config);
             if (boardCamera != null) SpawnBoardCopies(config.OrbAppearance);
             MoveCopies();
         }
+
+        private void SpawnClayCopies(LabConfig config)
+        {
+            var profile = Resources.Load<LabFiveElementProfile>("FiveElements/Profile");
+            var shader = Resources.Load<Shader>("FiveElements/LabWetPigment");
+            if (profile == null || shader == null || !shader.isSupported) return;
+            // Use the real slot geometry without registering a Scene service or consuming a gameplay pool seed.
+            // PaperOrb's body and WetPigment's stretched trail/contact have distinct render pipelines.
+            var copies = new GameObject("Clay copies").transform;
+            copies.SetParent(root.transform, false);
+            clayShapes = new LabClayShapes(shader);
+            float diameter = Mathf.Clamp(config.ThrowRadius * 2f, .006f, 5f);
+            for (int i = 0; i < Elements.Length - 1; i++)
+            {
+                uint seed = 37219u + (uint)i;
+                Vector3 incoming = battleCamera.transform.forward;
+                var flight = new LabClayFlightSlot(copies, i, clayShapes, profile);
+                flight.Begin(Elements[i], ClayPoint(i, 0, false), incoming, diameter,
+                    profile.normalStrength, false, seed, false);
+                clayShots.Add(flight);
+                var surface = new GameObject("Private contact anchor " + i).transform;
+                surface.SetParent(copies, false);
+                surface.position = ClayPoint(i, 0, true);
+                claySurfaces.Add(surface);
+                var contact = new LabClayImpactSlot(copies, i, clayShapes, profile);
+                contact.Begin(Elements[i], surface.position, -incoming, incoming, diameter,
+                    profile.normalStrength, surface, false, 0f, seed, false);
+                // Already spread, with drops visible, even when the shared game clock is held during preparation.
+                // The squash uses the same PaperOrb mesh/material as the flight body above.
+                contact.Tick(.12f);
+                clayContacts.Add(contact);
+            }
+        }
+
+        private Vector3 ClayPoint(int index, int frame, bool contact) => battleCamera.ViewportToWorldPoint(new Vector3(
+            .12f + index * .17f, contact ? .67f : .31f, Mathf.Max(battleCamera.nearClipPlane + 2f, 3f)))
+            + battleCamera.transform.right * (frame * StepMetres * .35f);
 
         private void SpawnBoardCopies(LabOrbAppearance appearance)
         {
@@ -173,6 +215,13 @@ namespace C6Lab
         {
             for (int i = 0; i < shots.Count; i++) if (shots[i] != null) shots[i].transform.position = WorldPoint(i, drawnFrames);
             for (int i = 0; i < bursts.Count; i++) if (bursts[i] != null) bursts[i].position = WorldPoint(i, drawnFrames);
+            for (int i = 0; i < clayShots.Count; i++)
+            {
+                clayShots[i].Move(ClayPoint(i, drawnFrames, false), battleCamera.transform.right);
+                clayShots[i].Tick(1f / 60f);
+                claySurfaces[i].position = ClayPoint(i, drawnFrames, true);
+                clayContacts[i].Tick(0f);
+            }
             if (boardCamera == null) return;
             float depth = (boardCamera.nearClipPlane + boardCamera.farClipPlane) * .5f;
             for (int i = 0; i < boardCopies.Count; i++)
@@ -197,8 +246,12 @@ namespace C6Lab
         private void ReleaseCopies()
         {
             shots.Clear(); bursts.Clear(); boardCopies.Clear();
+            foreach (var flight in clayShots) flight.Return();
+            foreach (var contact in clayContacts) contact.Return();
+            clayShots.Clear(); clayContacts.Clear(); claySurfaces.Clear();
             if (root != null) { root.SetActive(false); Destroy(root); root = null; }
             if (dripMesh != null) { Destroy(dripMesh); dripMesh = null; }
+            clayShapes?.Dispose(); clayShapes = null;
         }
 
         private void OnDisable()

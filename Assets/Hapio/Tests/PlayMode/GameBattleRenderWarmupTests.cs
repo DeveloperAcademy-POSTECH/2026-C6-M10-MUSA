@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using C6Lab;
 using NUnit.Framework;
 using UnityEngine;
@@ -55,6 +56,13 @@ namespace Hapio.Tests
                 ? network.board.GetComponent<GameBattleBindings>().battleCamera : Object.FindAnyObjectByType<GameBattleBindings>().battleCamera;
             var batchTarget = new RenderTexture(390, 844, 24);
             if (Application.isBatchMode) battleCamera.targetTexture = batchTarget;
+            // Creating the real service is deliberate: the private warmup must neither replace it nor use its leases/seed.
+            var liveClay = LabFiveElementVfx.ForScene(warmup.gameObject.scene);
+            Assert.That(liveClay, Is.Not.Null);
+            var seedField = typeof(LabFiveElementVfx).GetField("nextSeed", BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(seedField, Is.Not.Null);
+            object liveSeed = seedField.GetValue(liveClay);
+            int liveFlights = liveClay.ActiveFlightCount, liveContacts = liveClay.ActiveImpactCount;
             yield return Until(() => warmup.Root != null, "The warmup starts");
             Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.SynchronizingBattle));
             int orbs = network.board.Count, boardLayer = LayerMask.NameToLayer("LabOrbBoard");
@@ -63,6 +71,14 @@ namespace Hapio.Tests
             int pooled = impacts.GetComponentsInChildren<LabImpactParticleBurst>(true).Length;
             var drawn = new HashSet<string>();
             var motifs = new HashSet<int>();
+            var clayDraws = new HashSet<string>();
+            var paperMaterials = new HashSet<Material>();
+            Transform clayCopies = warmup.Root.transform.Find("Clay copies");
+            Assert.That(clayCopies, Is.Not.Null);
+            Mesh[] privateClayMeshes = clayCopies.GetComponentsInChildren<MeshFilter>(true)
+                .Select(filter => filter.sharedMesh).Distinct().ToArray();
+            Material privateClayMaterial = clayCopies.GetComponentsInChildren<Renderer>(true)
+                .Select(renderer => renderer.sharedMaterial).First(material => material.name == "Wet pigment (shared)");
             while (warmup.Root != null)
             {
                 foreach (Renderer renderer in warmup.Root.GetComponentsInChildren<Renderer>())
@@ -70,10 +86,19 @@ namespace Hapio.Tests
                     {
                         drawn.Add((renderer.gameObject.layer == boardLayer ? "board " : "world ") + renderer.GetType().Name);
                         if (renderer.name == "Brush Motifs" && renderer.GetComponent<ParticleSystem>().particleCount > 0) motifs.Add(renderer.GetComponentInParent<LabProjectile>().transform.GetSiblingIndex());
+                        if (renderer.transform.IsChildOf(clayCopies))
+                        {
+                            clayDraws.Add(renderer.name);
+                            if (renderer.name == "Wet clay") paperMaterials.Add(renderer.sharedMaterial);
+                        }
                     }
                 Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.SynchronizingBattle), "Never into the countdown.");
                 Assert.That(warmup.Root.GetComponentsInChildren<Rigidbody>().All(body => !body.detectCollisions), Is.True);
                 Assert.That(warmup.Root.GetComponentsInChildren<Collider>().Any(collider => collider.enabled), Is.False);
+                Assert.That(LabFiveElementVfx.ForScene(warmup.gameObject.scene), Is.SameAs(liveClay));
+                Assert.That(liveClay.ActiveFlightCount, Is.EqualTo(liveFlights));
+                Assert.That(liveClay.ActiveImpactCount, Is.EqualTo(liveContacts));
+                Assert.That(seedField.GetValue(liveClay), Is.EqualTo(liveSeed));
                 yield return null;
             }
             battleCamera.targetTexture = null;
@@ -84,12 +109,23 @@ namespace Hapio.Tests
                 "board SpriteRenderer", "board MeshRenderer" }));
 
             Assert.That(motifs.Count, Is.EqualTo(5), "All five elements' trail particles really emitted.");
+            Assert.That(clayDraws, Is.SupersetOf(new[] { "Wet clay", "Pulling neck", "Wet surface mark", "Thrown clay 0" }),
+                "The new body, trail and contact must actually draw beneath the preparing cover.");
+            Assert.That(paperMaterials.Count, Is.EqualTo(5), "Every authored element body material is drawn.");
 
             yield return Until(() => session.State.phase != GameFlowPhase.SynchronizingBattle, "Countdown");
             yield return null;
             Assert.That(Object.FindObjectsByType<LabProjectile>(FindObjectsInactive.Include).Length, Is.Zero);
             Assert.That(Object.FindObjectsByType<LabElementFlightTrail>(FindObjectsInactive.Include).Length, Is.Zero);
             Assert.That(network.projectileRoot.childCount, Is.Zero);
+            Assert.That(clayCopies == null, Is.True);
+            Assert.That(privateClayMeshes.All(mesh => mesh == null), Is.True, "Private generated meshes are released.");
+            Assert.That(privateClayMaterial == null, Is.True, "The private generated material is released.");
+            Assert.That(paperMaterials.All(material => material != null), Is.True, "Authored shared materials remain intact.");
+            Assert.That(LabFiveElementVfx.ForScene(warmup.gameObject.scene), Is.SameAs(liveClay));
+            Assert.That(liveClay.ActiveFlightCount, Is.EqualTo(liveFlights));
+            Assert.That(liveClay.ActiveImpactCount, Is.EqualTo(liveContacts));
+            Assert.That(seedField.GetValue(liveClay), Is.EqualTo(liveSeed));
             Assert.That(impacts.ActiveBurstCount, Is.Zero);
             Assert.That(impacts.GetComponentsInChildren<LabImpactParticleBurst>(true).Length, Is.EqualTo(pooled));
             Assert.That(network.board.Count, Is.EqualTo(orbs));

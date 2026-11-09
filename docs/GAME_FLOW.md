@@ -81,7 +81,7 @@ Battle은 처음 만들 때만 저장된 Lab에서 복사했고(`CreateMissing`,
 
 GameOver에서 전투 발행을 동결해도, 마지막 결과 발행 당시 Bulk 백로그 때문에 건너뛴 참가자에게는 `LabNetwork.TerminalSnapshots`가 대기열이 줄어든 뒤 기존 paint+snapshot 트랜잭션을 한 번 큐에 넣는다. 실제 지도·Defeat 스냅샷을 헤더로 추정하지 않고, 게임 시뮬레이션을 다시 시작하지도 않는다. 새 라운드·전송 초기화·이탈에서는 남은 대상이 폐기된다.
 
-#558 당시 호환 묶음은 **공유 설정259개 · 프로토콜5691 · `C6PhysicsLab/52` · `C6HapioGame/39`**였다. Story 실패 재도전 상태와 결과 이야기 확인 메시지 때문에 Game 토큰만 올렸다. 현재 Game 토큰은 아래 로비 재입장(#501)의 `C6HapioGame/45`다. 아래의 Game23~38 기록은 도입 당시 이력이며 Game38 이하 게임 앱을 현재 방에 혼용하지 않는다. Lab 프로토콜·Bulk 압축/선택 ACK 형식은 변경하지 않는다.
+#558 당시 호환 묶음은 **공유 설정259개 · 프로토콜5691 · `C6PhysicsLab/52` · `C6HapioGame/39`**였다. Story 실패 재도전 상태와 결과 이야기 확인 메시지 때문에 Game 토큰만 올렸다. 현재 Game 토큰은 47이다. 현재 Game 토큰은 아래 로비 재입장(#501)의 `C6HapioGame/45`다. 아래의 Game23~38 기록은 도입 당시 이력이며 Game38 이하 게임 앱을 현재 방에 혼용하지 않는다. Lab 프로토콜·Bulk 압축/선택 ACK 형식은 변경하지 않는다.
 
 연결된 에셋·실행 순서·복구 분기·재도전 권한은 [스토리 결과 통합](STAGE_STORY_UI_INTEGRATION.md), 제작용 부품 편집은 [스토리 화면 제작](STAGE_STORY_PRESENTATION.md), 실제 수행 환경과 결과는 [VALIDATION](VALIDATION.md)을 따른다.
 

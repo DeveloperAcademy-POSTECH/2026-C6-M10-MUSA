@@ -31,6 +31,7 @@
 | 도색 건조·근처 재타격 | [페인트 건조](PAINT_DRYING.md) |
 | 실제 전투·완성 박의 고해상도 표현 | [런타임 고해상도 도색](RUNTIME_HIGH_RESOLUTION_PAINT.md) |
 | 승인된 채색 표현 기준과 후속 구현 목표 | [박 채색 표현 명세](PAINT_PRESENTATION_SPEC.md) |
+| 오색흙 투사체와 화·수·목·금·토 타격 비교 씬 | [오행 VFX 사용 안내](FIVE_ELEMENT_VFX.md) |
 | 일반 협동의 클레이·충돌 농도·DEV 두께/광택·Mac 실험 앱 사용법 | [박 클레이 스티커](CLAY_STICKER_PAINT.md) |
 | 누적 수채 브러시 구현·조절·비교 방법 | [수채 브러시 채색](WATERCOLOR_BRUSH_STAMPS.md) |
 | 투척 수치·물리 조정 | [투척 조정](THROW_TUNING_GUIDE.md) · [박 물리 조정](PINATA_TUNING_GUIDE.md) |

@@ -1,0 +1,69 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7cadac7c9f51b48c2bdca63c0b7b50ab, type: 3}
+  m_Name: Profile
+  m_EditorClassIdentifier: C6Lab.Runtime::C6Lab.LabFiveElementProfile
+  fireOrb: {fileID: 2100000, guid: 590a1cf82c7cf4f4e97306e8cb53b120, type: 2}
+  waterOrb: {fileID: 2100000, guid: dbe9ae50da93944f1bd7135b5303525b, type: 2}
+  woodOrb: {fileID: 2100000, guid: 883c49aed27a4446599ca529a5178b48, type: 2}
+  metalOrb: {fileID: 2100000, guid: 6db8ca9d9f11e4102a0b2330e41026a2, type: 2}
+  earthOrb: {fileID: 2100000, guid: 645d304e7349141adbe34e7271c2d0f4, type: 2}
+  monochromeOrb: {fileID: 2100000, guid: 8a3301892a46f483fb622c6a5d55da97, type: 2}
+  fire: {r: 0.87058824, g: 0.2901961, b: 0.12941177, a: 1}
+  water: {r: 0.078431375, g: 0.34509805, b: 0.5882353, a: 1}
+  wood: {r: 0.24705882, g: 0.4, b: 0.25882354, a: 1}
+  metal: {r: 0.9254902, g: 0.6666667, b: 0.18431373, a: 1}
+  earth: {r: 0.45490196, g: 0.3019608, b: 0.19607843, a: 1}
+  monochrome: {r: 0.66, g: 0.66, b: 0.66, a: 1}
+  wetGloss: 0.65
+  trailDiameters: 1.6
+  launchStretchSeconds: 0.14
+  pressSeconds: 0.052
+  spreadSeconds: 0.12
+  spread:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  normalSpread: 1.06
+  strongSpread: 1.51
+  normalStrength: 0.25
+  strongStrength: 1
+  clayDrops: 4
+  dropLifetime: 0.56
+  dropSpeed: 1
+  gravityDiameters: 13
+  tipSag: 0.115
+  contactSeconds: 0.86
+  markSeconds: 2
+  maxFlights: 16
+  maxImpacts: 24
+  lowDetailImpacts: 10

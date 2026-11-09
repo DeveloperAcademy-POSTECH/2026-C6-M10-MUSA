@@ -114,7 +114,7 @@ namespace C6Lab.Tests
             Assert.That(stage.Select(clip => clip.name), Is.EqualTo(new[] { "Gumiho_Stage" }));
             Assert.That(stage[0].loadType, Is.EqualTo(AudioClipLoadType.Streaming),
                 "The long stage song streams instead of sitting decompressed in memory.");
-            Assert.That(stage[0].length, Is.EqualTo(120f).Within(.1f), "Made for the 120 s battle (#409).");
+            Assert.That(stage[0].length, Is.GreaterThanOrEqualTo(120f), "Covers the whole 120 s battle without looping (#409, #577).");
             AudioClip[] territory = Resources.LoadAll<AudioClip>(LabBattleBgm.TerritoryClipFolder);
             Assert.That(territory.Select(clip => clip.name), Is.EqualTo(new[] { "Territory_Stage" }));
             Assert.That(territory[0].loadType, Is.EqualTo(AudioClipLoadType.Streaming));
