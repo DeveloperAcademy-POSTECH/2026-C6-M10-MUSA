@@ -103,6 +103,14 @@ namespace C6Lab
         }
     }
 
+    // Optional presentation data in targetImpact only. Older senders omit it.
+    [Serializable]
+    internal sealed class LabElementContactPose
+    {
+        public Vector3 localNormal;
+        public float diameter;
+    }
+
     /// <summary>
     /// Client-side gate for authoritative impact presentation. A shot can display once in the
     /// current Host round; stale, malformed, and repeated messages never replay the effect.
@@ -2109,7 +2117,7 @@ namespace C6Lab
             Vector3 velocity = LabThrowMath.LaunchVelocity(releaseVelocity, seatAnchor, targetCenter, config);
             // A blast-shrunk orb flies small and so has less reach on the gourd (#213).
             var projectile = LabProjectile.Create(launchPosition, config, projectileRoot, orb.element,
-                orb.small ? config.BlastShrinkScale : 1f);
+                orb.small ? config.BlastShrinkScale : 1f, useClayFlight: !orb.fiveColor && !orb.jigwiTalismanReward);
             if (orb.fiveColor) LabFiveColorSparkle.AttachArt(projectile.transform, config.OrbRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined), true);
             else if (orb.jigwiTalismanReward) LabFiveColorSparkle.AttachArt(projectile.transform,
                 config.OrbRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined) * LabJigwiWaterVolley.SizeScale, true,
@@ -2200,6 +2208,7 @@ namespace C6Lab
                         ?.ApplyHostImpact(result.HitPoint, result.ImpactVelocity) ?? 0f;
                     bool paintBlocked = element >= LabOrbElement.Fire && element <= LabOrbElement.Earth
                         && model.PaintSurface.WouldBlockHit(result.OwnerPlayerId, paintDirection);
+                    bool talismanHit = model.LastHitTalisman;
                     if (paintBlocked)
                     {
                         jigwiStagePresentation?.PlayBlocked(targetLocalPoint);
@@ -2208,14 +2217,16 @@ namespace C6Lab
                     else
                     {
                         target.NotifyApprovedHit(targetLocalPoint, element);
-                        impactFeedback?.PlayHit(target, targetLocalPoint, element, actualDamage,
-                            result.ImpactVelocity, false);
+                        if (talismanHit)
+                            impactFeedback?.PlayHit(target, targetLocalPoint, element, actualDamage, result.ImpactVelocity, false);
+                        else
+                            impactFeedback?.PlayContact(target, targetLocalPoint, element, actualDamage,
+                                result.ImpactVelocity, result.HitNormal, result.VisualDiameter);
                     }
                     bool fiveColor = model.LastHitFiveColor;
                     // The final-hit replay only shows a hit that painted (never a blocked or element-less one).
                     if (!paintBlocked && (element != LabOrbElement.None || fiveColor)) RememberReplayHit(result);
                     if (fiveColor && !paintBlocked) PresentFiveColorHit(targetLocalPoint, result.OwnerPlayerId);
-                    bool talismanHit = model.LastHitTalisman;
                     if (talismanHit && !paintBlocked) PresentTalismanHit(targetLocalPoint, result.OwnerPlayerId);
                     if (!paintBlocked && result.OwnerPlayerId == LocalPlayerId)
                     {
@@ -2236,6 +2247,11 @@ namespace C6Lab
                         x = targetLocalPoint.x, y = targetLocalPoint.y, z = targetLocalPoint.z,
                         wx = result.ImpactVelocity.x, wy = result.ImpactVelocity.y, wz = result.ImpactVelocity.z,
                         spinImpulse = signedYawImpulse, fiveColor = fiveColor, talisman = talismanHit, sizeScale = launchScale };
+                    if (!paintBlocked && !talismanHit && element != LabOrbElement.None && order.Count > 1)
+                        impact.payload = LabPacketPayload.Encode(new LabElementContactPose {
+                            localNormal = hitbox.InverseTransformDirection(result.HitNormal),
+                            diameter = result.VisualDiameter
+                        });
                     foreach (ulong id in order) if (id != LocalPlayerId) Send(id, impact);
                 }
             }
@@ -2580,9 +2596,22 @@ namespace C6Lab
                         {
                             target.NotifyApprovedHit(new Vector3(packet.x, packet.y, packet.z), (LabOrbElement)packet.element);
                             if (!presentedBefore)
-                                impactFeedback?.PlayHit(target, new Vector3(packet.x, packet.y, packet.z),
-                                    (LabOrbElement)packet.element, packet.damage,
-                                    new Vector3(packet.wx, packet.wy, packet.wz), false);
+                            {
+                                if (packet.talisman)
+                                    impactFeedback?.PlayHit(target, new Vector3(packet.x, packet.y, packet.z),
+                                        (LabOrbElement)packet.element, packet.damage, hostVelocity, false);
+                                else
+                                {
+                                    LabElementContactPose pose = LabPacketPayload.Decode<LabElementContactPose>(packet.payload);
+                                    Transform hitbox = target.Hitbox != null ? target.Hitbox.transform : target.transform;
+                                    float fallbackDiameter = 2f * (config != null ? config.ThrowRadius : .165f)
+                                        * (packet.sizeScale > 0f && Finite(packet.sizeScale) ? packet.sizeScale : 1f);
+                                    impactFeedback?.PlayContact(target, new Vector3(packet.x, packet.y, packet.z),
+                                        (LabOrbElement)packet.element, packet.damage, hostVelocity,
+                                        pose != null ? hitbox.TransformDirection(pose.localNormal) : Vector3.zero,
+                                        pose != null && float.IsFinite(pose.diameter) && pose.diameter > 0f ? pose.diameter : fallbackDiameter);
+                                }
+                            }
                             if (packet.fiveColor) PresentFiveColorHit(new Vector3(packet.x, packet.y, packet.z), packet.owner);
                             if (packet.talisman) PresentTalismanHit(new Vector3(packet.x, packet.y, packet.z), packet.owner);
                         }
@@ -2622,7 +2651,7 @@ namespace C6Lab
                         LabOrbElement element = packet.element >= (int)LabOrbElement.None && packet.element <= (int)LabOrbElement.Earth
                             ? (LabOrbElement)packet.element : LabOrbElement.None;
                         LabProjectile visual = LabProjectile.Create(position, config, projectileRoot, element,
-                            packet.small ? config.BlastShrinkScale : 1f);
+                            packet.small ? config.BlastShrinkScale : 1f, useClayFlight: !packet.fiveColor && !packet.talisman);
                         if (packet.fiveColor) LabFiveColorSparkle.AttachArt(visual.transform, config.OrbRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined), true);
                         else if (packet.talisman) LabFiveColorSparkle.AttachArt(visual.transform,
                             config.OrbRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined) * LabJigwiWaterVolley.SizeScale, true,
