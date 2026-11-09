@@ -813,17 +813,93 @@ namespace C6Lab
             // lines). The drops, the "now" vibration and the failure overlay carry the rest without text.
             // #540: the taunts are spoken by Jigwi's voice now (LabJigwiTalismanOverlay); no warning words on screen.
             string words = string.Empty;
-            // #595: a common talisman shows how many have written it (3/5) while it runs.
-            if (active != null && active.Active(now) && active.kind == LabJigwiABKind.PersonalBurn && active.common)
-            {
-                int done = 0, total = 0;
-                foreach (var seat in active.players ?? Array.Empty<LabJigwiABPlayerFire>())
-                    if (seat != null) { total++; if (seat.talismanAt >= 0d) done++; }
-                if (total > 0) words = "부적 " + done + "/" + total;
-            }
+            DrawTalismanProgress(active, now); // #595: icons, not words
             status.text = words; playerStatus.text = rows.ToString();
             statusPanel.gameObject.SetActive(words.Length > 0);
             playerStatus.gameObject.SetActive(rows.Length > 0);
+        }
+
+        // ---------- #595 공용 부적 진행: 사람 수만큼 부적 아이콘이 놓이고, 쓴 사람 수만큼 환하게 켜진다(켜질 때 톡 튐) ----------
+        private RectTransform talismanRow;
+        private readonly UnityEngine.UI.Image[] talismanIcons = new UnityEngine.UI.Image[LabJigwiABNetworkValidation.MaximumPlayers];
+        private readonly float[] talismanLitAt = { -1f, -1f, -1f, -1f, -1f };
+        private static Sprite talismanIconSprite;
+        /// <summary>테스트용: 지금 보이는 부적 아이콘 수 / 켜진 수.</summary>
+        public int TalismanIconsShown { get; private set; }
+        public int TalismanIconsLit { get; private set; }
+
+        private void DrawTalismanProgress(LabJigwiABRound active, double now)
+        {
+            int done = 0, total = 0;
+            bool show = active != null && active.Active(now) && active.kind == LabJigwiABKind.PersonalBurn && active.common;
+            if (show)
+                foreach (var seat in active.players ?? Array.Empty<LabJigwiABPlayerFire>())
+                    if (seat != null) { total++; if (seat.talismanAt >= 0d) done++; }
+            total = Mathf.Min(total, talismanIcons.Length);
+            TalismanIconsShown = total; TalismanIconsLit = Mathf.Min(done, total);
+            if (total == 0) { if (talismanRow != null && talismanRow.gameObject.activeSelf) talismanRow.gameObject.SetActive(false); return; }
+            if (talismanRow == null)
+            {
+                talismanRow = new GameObject("TalismanProgress", typeof(RectTransform)).GetComponent<RectTransform>();
+                talismanRow.gameObject.layer = gameObject.layer;
+                talismanRow.SetParent(transform, false);
+                // Just above the board, under the boss: where the red alarm flashes while writing.
+                talismanRow.anchorMin = new Vector2(.2f, .475f); talismanRow.anchorMax = new Vector2(.8f, .545f);
+                talismanRow.offsetMin = talismanRow.offsetMax = Vector2.zero;
+                for (int i = 0; i < talismanIcons.Length; i++)
+                {
+                    var icon = new GameObject("Talisman " + i, typeof(RectTransform)).AddComponent<UnityEngine.UI.Image>();
+                    icon.gameObject.layer = gameObject.layer;
+                    icon.transform.SetParent(talismanRow, false);
+                    icon.sprite = TalismanIcon(); icon.preserveAspect = true; icon.raycastTarget = false;
+                    talismanIcons[i] = icon;
+                }
+            }
+            if (!talismanRow.gameObject.activeSelf) talismanRow.gameObject.SetActive(true);
+            talismanRow.SetAsLastSibling();
+            float t = Time.unscaledTime;
+            for (int i = 0; i < talismanIcons.Length; i++)
+            {
+                var icon = talismanIcons[i];
+                bool on = i < total;
+                if (icon.gameObject.activeSelf != on) icon.gameObject.SetActive(on);
+                if (!on) { talismanLitAt[i] = -1f; continue; }
+                bool lit = i < done;
+                if (!lit) talismanLitAt[i] = -1f;
+                else if (talismanLitAt[i] < 0f) talismanLitAt[i] = t;
+                float x = .5f + (i - (total - 1) * .5f) * .17f;
+                var rect = icon.rectTransform;
+                rect.anchorMin = new Vector2(x - .075f, 0f); rect.anchorMax = new Vector2(x + .075f, 1f);
+                rect.offsetMin = rect.offsetMax = Vector2.zero;
+                float pop = lit ? 1f + .35f * Mathf.Clamp01(1f - (t - talismanLitAt[i]) / .35f) : 1f;
+                rect.localScale = Vector3.one * pop;
+                icon.color = lit ? Color.white : new Color(.38f, .34f, .32f, .55f);
+            }
+        }
+
+        /// <summary>작은 부적: 노란 종이, 붉은 테두리, 가운데 붉은 획, 아래 붉은 도장.</summary>
+        private static Sprite TalismanIcon()
+        {
+            if (talismanIconSprite != null) return talismanIconSprite;
+            const int w = 36, h = 64;
+            var texture = new Texture2D(w, h, TextureFormat.RGBA32, false)
+            { name = "Jigwi talisman icon (#595 runtime)", hideFlags = HideFlags.DontSave, wrapMode = TextureWrapMode.Clamp };
+            var pixels = new Color[w * h];
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                {
+                    bool inside = x >= 2 && x < w - 2 && y >= 2 && y < h - 2;
+                    bool edge = inside && (x < 5 || x >= w - 5 || y < 5 || y >= h - 5);
+                    bool stroke = inside && y > 20 && y < h - 10 && Mathf.Abs(x - (w * .5f + 5f * Mathf.Sin(y * .22f))) < 2.4f;
+                    bool bar = inside && Mathf.Abs(y - (h - 16)) < 2f && x > 9 && x < w - 9;
+                    bool seal = inside && new Vector2(x + .5f - w * .5f, y + .5f - 12f).magnitude < 5.5f;
+                    pixels[y * w + x] = !inside ? Color.clear : edge ? new Color(.55f, .1f, .06f, 1f)
+                        : stroke || bar || seal ? new Color(.82f, .13f, .08f, 1f) : new Color(1f, .9f, .55f, 1f);
+                }
+            texture.SetPixels(pixels); texture.Apply(false, true);
+            talismanIconSprite = Sprite.Create(texture, new Rect(0f, 0f, w, h), new Vector2(.5f, .5f), 64f);
+            talismanIconSprite.hideFlags = HideFlags.DontSave;
+            return talismanIconSprite;
         }
 
         private void PositionGroupStatus(LabJigwiABRound round, ulong owner, double now)
@@ -890,6 +966,8 @@ namespace C6Lab
             if (personalHeat != null) personalHeat.gameObject.SetActive(false);
             if (failureOverlay != null) failureOverlay.gameObject.SetActive(false);
             if (statusPanel != null) statusPanel.gameObject.SetActive(false);
+            if (talismanRow != null) talismanRow.gameObject.SetActive(false); // #595
+            TalismanIconsShown = TalismanIconsLit = 0;
             if (personalWaterDouse != null) personalWaterDouse.gameObject.SetActive(false);
             if (fireImages != null) foreach (var image in fireImages) if (image != null) image.gameObject.SetActive(false);
             if (fireWaterDouses != null) foreach (var image in fireWaterDouses) if (image != null) image.gameObject.SetActive(false);
