@@ -22,17 +22,26 @@ namespace Hapio.Experiments
         readonly LabWatercolorStampSettings settings;
         readonly LabPaintArtJournal journal;
         readonly string initializationError;
-        readonly ulong finalSequence;
+        LabPaintArtJournal firstHitJournal, repeatJournal, pendingJournal, publishedJournal;
+        Texture2D[] pendingBrushes;
+        ClayPreviewShapeDiagnostics diagnostics;
+        ClayPreviewShapeScenario pendingScenario, publishedScenario;
+        bool pendingOmitUndercoat, publishedOmitUndercoat;
         LabClayStickerRuntime pending, published;
         int pendingPreset = -1, publishedPreset = -1;
         ulong requestedGeneration, publishedGeneration;
         long ticks;
-        bool disposed;
+        bool disposed, acceptedPublishedFallback;
 
         /// <summary>Only true after the current request's sealed image reaches its GPU completion fence.</summary>
         public bool Ready => !disposed && Error == null && pending == null && published != null
-            && published.Ready && publishedGeneration == requestedGeneration;
+            && published.Ready && (publishedGeneration == requestedGeneration || acceptedPublishedFallback);
         public bool Busy => !disposed && Error == null && pending != null;
+        public bool HasPublished => !disposed && published != null && published.Ready;
+        public ulong PublishedGeneration => publishedGeneration;
+        public ClayPreviewShapeScenario CompletedScenario => publishedScenario;
+        public bool CompletedWithoutUndercoat => publishedOmitUndercoat;
+        public ClayPreviewShapeDiagnostics Diagnostics => diagnostics;
         public string Error { get; private set; }
         // While pending, retain the previous completed image instead of exposing a partial replay.
         public Texture PaintTexture => disposed ? null : published?.PaintTexture;
@@ -100,7 +109,7 @@ namespace Hapio.Experiments
                     && string.Equals(imported.PrefixHash, data.recordHash, StringComparison.OrdinalIgnoreCase),
                     "Frozen journal seal, sequence or record fingerprint differs.");
                 ValidateSourceColors(imported);
-                journal = imported; imported = null; finalSequence = data.lastSequence;
+                journal = imported; imported = null;
             }
             catch (Exception exception)
             {
@@ -117,11 +126,13 @@ namespace Hapio.Experiments
             { error = replay.Error; return error == null; }
         }
 
-        public void Request(int preset, Color32[] srgb)
+        public void Request(int preset, Color32[] srgb, Texture2D[] brushOverride = null,
+            ClayPreviewShapeScenario scenario = ClayPreviewShapeScenario.Full67, bool omitUndercoat = false,
+            Shader diagnosticCompositor = null)
         {
             if (disposed) { Error = "Palette replay has been disposed."; return; }
             DisposeRuntime(ref pending); pendingPreset = -1;
-            requestedGeneration++;
+            requestedGeneration++; acceptedPublishedFallback = false;
             Error = initializationError;
             if (Error != null) return;
             try
@@ -141,10 +152,18 @@ namespace Hapio.Experiments
                         throw new InvalidDataException("A frozen stroke has no exact source palette color.");
                     return replacement[index];
                 };
+                Require(Enum.IsDefined(typeof(ClayPreviewShapeScenario), scenario), "Unknown shape comparison scenario.");
+                Require(!omitUndercoat || preset == 3 && diagnosticCompositor != null && diagnosticCompositor.isSupported,
+                    "The comparison-only undercoat shader is not connected.");
                 ClayPreviewPalettePreset selected = presets[preset];
-                pending = new LabClayStickerRuntime(selected.brushes,
+                if (brushOverride != null)
+                    Require(preset == 3 && brushOverride.Length == 3 && Array.TrueForAll(brushOverride, b => b != null && b.width == 512 && b.height == 512), "Splash brushes require three 512px coating masks.");
+                pending = new LabClayStickerRuntime(brushOverride ?? selected.brushes,
                     new LabClayStickerSettings { minimumDensity = selected.minimumDensity, maximumDensity = selected.maximumDensity },
-                    selected.compositor, resolver);
+                    omitUndercoat ? diagnosticCompositor : selected.compositor, resolver);
+                pendingJournal = ScenarioJournal(scenario);
+                pendingScenario = scenario; pendingOmitUndercoat = omitUndercoat;
+                pendingBrushes = brushOverride;
                 pendingPreset = preset; ticks = 0;
             }
             catch (Exception exception) { Error = "Palette replay unavailable: " + exception.Message; DisposeRuntime(ref pending); }
@@ -159,16 +178,20 @@ namespace Hapio.Experiments
             RenderTexture previous = RenderTexture.active;
             try
             {
-                current.Update(journal, null, null, OutputColumns, settings, ticks++ * .016, false);
+                current.Update(pending != null ? pendingJournal : publishedJournal, null, null, OutputColumns, settings, ticks++ * .016, false);
                 Require(current.Error == null, current.Error ?? "The ordered compositor failed.");
                 if (pending != null && pending.Ready)
                 {
-                    Require(pending.AppliedThrough == finalSequence && pending.RenderedThrough == finalSequence,
+                    Require(pending.AppliedThrough == pendingJournal.LastSequence && pending.RenderedThrough == pendingJournal.LastSequence,
                         "A partial image reached publication before the frozen final sequence.");
+                    ClayPreviewShapeDiagnostics nextDiagnostics = ClayPreviewShapeDiagnostics.Create(pendingJournal,
+                        pendingBrushes != null ? pendingBrushes[0] : null);
                     LabClayStickerRuntime old = published;
-                    published = pending; pending = null;
+                    published = pending; publishedJournal = pendingJournal; pending = null;
                     publishedPreset = pendingPreset; pendingPreset = -1;
                     publishedGeneration = requestedGeneration;
+                    publishedScenario = pendingScenario; publishedOmitUndercoat = pendingOmitUndercoat;
+                    diagnostics?.Dispose(); diagnostics = nextDiagnostics;
                     if (old != null && (previous == old.PaintTexture || previous == old.HeightTexture)) previous = null;
                     DisposeRuntime(ref old);
                 }
@@ -181,19 +204,46 @@ namespace Hapio.Experiments
             finally { RenderTexture.active = previous; }
         }
 
+        /// <summary>Cancel only an unpublished replacement; a previously completed picture stays valid.</summary>
+        public void CancelPending()
+        {
+            if (disposed) return;
+            DisposeRuntime(ref pending); pendingPreset = -1; pendingJournal = null; pendingBrushes = null;
+            requestedGeneration++; acceptedPublishedFallback = false; Error = initializationError;
+        }
+
+        /// <summary>Explicitly accept the last completed picture after a replacement failed.</summary>
+        public bool RestorePublished()
+        {
+            CancelPending();
+            acceptedPublishedFallback = !disposed && Error == null && published != null;
+            return acceptedPublishedFallback;
+        }
+
         /// <summary>Drop experimental results when returning to the original frozen maps.</summary>
         public void Clear()
         {
             if (disposed) return;
             DisposeRuntime(ref pending); DisposeRuntime(ref published);
-            pendingPreset = publishedPreset = -1; requestedGeneration++; publishedGeneration = 0; ticks = 0;
+            diagnostics?.Dispose(); diagnostics = null; pendingJournal = publishedJournal = null; pendingBrushes = null;
+            pendingScenario = publishedScenario = ClayPreviewShapeScenario.Full67;
+            pendingOmitUndercoat = publishedOmitUndercoat = false;
+            pendingPreset = publishedPreset = -1; requestedGeneration++; publishedGeneration = 0; ticks = 0; acceptedPublishedFallback = false;
             Error = initializationError;
         }
 
         public void Dispose()
         {
             if (disposed) return;
-            Clear(); disposed = true; journal?.Dispose();
+            Clear(); disposed = true; journal?.Dispose(); firstHitJournal?.Dispose(); repeatJournal?.Dispose();
+        }
+
+        LabPaintArtJournal ScenarioJournal(ClayPreviewShapeScenario scenario)
+        {
+            if (scenario == ClayPreviewShapeScenario.Full67) return journal;
+            if (scenario == ClayPreviewShapeScenario.FirstHit)
+                return firstHitJournal ??= ClayPreviewShapeDiagnostics.CreateScenarioJournal(scenario, settings.Version, sourceLinear[0]);
+            return repeatJournal ??= ClayPreviewShapeDiagnostics.CreateScenarioJournal(scenario, settings.Version, sourceLinear[0]);
         }
 
         ClayPreviewPalettePreset CopyPreset(ClayPreviewPalettePreset source)

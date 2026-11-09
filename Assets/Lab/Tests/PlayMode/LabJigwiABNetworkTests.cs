@@ -68,8 +68,9 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
-        public IEnumerator APickedSeatsRealSpecialWaterShotOnTheBossCountsWithoutPaint()
+        public IEnumerator LegacySpecialWaterShotOnTheBossCountsWithoutPaintWhenExplicitlySelected()
         {
+            SelectLegacySpecialWaterRule();
             LabSnapshot snapshot = Install(31.1d);
             LabJigwiABRound round = snapshot.jigwiAB.Active(snapshot.serverTime);
             Assert.That(round.syncCount, Is.Zero);
@@ -111,9 +112,11 @@ namespace C6Lab.Tests
             var camera = cameraObject.AddComponent<Camera>(); camera.enabled = false;
             target.Hitbox.transform.localRotation = Quaternion.Euler(32f, 143f, 17f);
             Vector3[] meshVertices = target.Hitbox.sharedMesh.vertices;
-            // #509: only the picked seats (3 of 5) have a curtain.
-            Assert.That(active.players, Has.Length.EqualTo(3));
-            foreach (LabPlayerState player in snapshot.players.Where(p => active.players.Any(owner => owner.playerId == p.id)))
+            // The saved #551 bucket policy assigns all five seats. Keep the full envelope check at every seat.
+            Assert.That(active.bucket, Is.True, "Exercise the current saved bucket policy rather than the old three-seat pick.");
+            Assert.That(active.players.Select(owner => owner.playerId),
+                Is.EquivalentTo(snapshot.players.Select(player => player.id)), "Every participant owns its current B object.");
+            foreach (LabPlayerState player in snapshot.players)
             {
                 Assert.That(network.TryGetJigwiABCurtainFrame(active, player.id, snapshot.serverTime,
                     out Vector3 center, out Quaternion rotation, out Vector2 half), Is.True);
@@ -209,7 +212,7 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void BoardAndLaunchUseTheSmallerIndependentRadiusWhileKeepingGrabReachAndPaintBudget()
+        public void LegacyIndependentRadiusKeepsGrabReachAndPaintBudgetWhenSpecialWaterModeIsExplicitlySelected()
         {
             var cameraRoot = new GameObject("Board camera"); cameraRoot.transform.SetParent(root.transform, false);
             var camera = cameraRoot.AddComponent<Camera>(); camera.enabled = false;
@@ -237,18 +240,18 @@ namespace C6Lab.Tests
                 Assert.That(shot.RadiusScale, Is.EqualTo(combo), "B may not overwrite the combo/paint scale.");
                 Assert.That(shot.JigwiABRadiusScale, Is.EqualTo(.65f));
             }
-            // #509: switch the success splash off so it does not keep growing into the paint-budget comparison below.
+            // Isolate the retained special-Water compatibility mode; the saved default now uses individual buckets.
+            // Disable its success splash so it cannot add area to the independent-radius comparison.
             typeof(LabConfig).GetField("jigwiBSplashPaintShare", Private).SetValue(config, 0f);
-            model = Room(LabStageYokai.Jigwi);
+            SelectLegacySpecialWaterRule();
             LabModel control = Room(LabStageYokai.None);
             model.Tick(31d);
-            // Retain the generic independent-radius compatibility check with an explicit fixture,
-            // while the actual timed B curtain stays active only for the other player.
-            ExtinguishOwnPoints(0, 31d);
+            // Retain the generic independent-radius check after completing the explicitly selected old B rule.
+            CompleteLegacySpecialWaterRound(0, 31d);
             Assert.That(model.JigwiABBlocksBoss(0, 31d), Is.False);
             Assert.That(model.JigwiABBlocksBoss(20, 31d), Is.False, "#509: nobody is ever blocked.");
             int modelBefore = model.PaintSurface.CoveredCount; // no splash here, so nothing else is growing
-            // Hit after B's 5-second success reward [31, 36) so both rooms use the ordinary paint budget.
+            // Both rooms use the ordinary paint budget; the retained B rule has no timed radius or paint reward.
             LabOrbState reduced = Add(model, 0, 37d, LabOrbElement.Water);
             reduced.jigwiABRadiusScale = .65f; // Explicit old-field fixture, not a timed-mission penalty.
             LabOrbState normal = Add(control, 0, 37d, LabOrbElement.Water);
@@ -435,10 +438,11 @@ namespace C6Lab.Tests
             }
         }
 
-        /// <summary>#509: every picked seat throws its special Water at the boss together (B succeeds at once).</summary>
-        private void ExtinguishOwnPoints(ulong owner, double at)
+        /// <summary>Explicit #509 compatibility mode: picked seats throw special Water together.</summary>
+        private void CompleteLegacySpecialWaterRound(ulong owner, double at)
         {
             LabJigwiABRound round = model.Snapshot(at).jigwiAB.Active(at);
+            Assert.That(round.bucket, Is.False, "This helper only exercises the explicitly selected special-Water rule.");
             Assert.That(round.players.Any(player => player.playerId == owner), Is.True);
             foreach (var player in round.players)
             {
@@ -450,6 +454,16 @@ namespace C6Lab.Tests
             Assert.That(model.Snapshot(at).jigwiAB.rounds.Single(value => value.id == round.id).resolution,
                 Is.EqualTo(LabJigwiABResolution.Completed));
         }
+        private void SelectLegacySpecialWaterRule()
+        {
+            // Keep the unique special-Water collision and independent-radius compatibility checks explicit.
+            // Do not change the saved config or turn the current bucket policy off for the other fixtures.
+            JsonUtility.FromJsonOverwrite("{\"jigwiBBucket\":false,\"jigwiBCountdown\":false}", config);
+            Assert.That(config.JigwiBBucket, Is.False); Assert.That(config.JigwiBCountdown, Is.False);
+            model = Room(LabStageYokai.Jigwi);
+            Field("model").SetValue(network, model);
+        }
+
         private LabOrbState Special(string roundId, ulong seat) =>
             ((Dictionary<string, LabOrbState>)typeof(LabModel).GetField("orbs", Private).GetValue(model)).Values
                 .Single(orb => orb.jigwiABSupplyEventId == roundId && orb.originOwner == seat);
