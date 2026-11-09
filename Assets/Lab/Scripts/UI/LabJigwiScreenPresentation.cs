@@ -597,12 +597,8 @@ namespace C6Lab
             return false;
         }
 
-        private static bool SeatFailed(LabJigwiABRound round, ulong player)
-        {
-            foreach (var seat in round.players ?? Array.Empty<LabJigwiABPlayerFire>())
-                if (seat != null && seat.playerId == player) return seat.talismanAt < 0d;
-            return false;
-        }
+        // #595: a common talisman fails every seat when anyone did not finish it.
+        private static bool SeatFailed(LabJigwiABRound round, ulong player) => round != null && round.TalismanFailed(player);
 
         /// <summary>#509: true while a failed B keeps the boards on fire (drums blocked).</summary>
         public bool BoardFireVisible { get; private set; }
@@ -817,6 +813,14 @@ namespace C6Lab
             // lines). The drops, the "now" vibration and the failure overlay carry the rest without text.
             // #540: the taunts are spoken by Jigwi's voice now (LabJigwiTalismanOverlay); no warning words on screen.
             string words = string.Empty;
+            // #595: a common talisman shows how many have written it (3/5) while it runs.
+            if (active != null && active.Active(now) && active.kind == LabJigwiABKind.PersonalBurn && active.common)
+            {
+                int done = 0, total = 0;
+                foreach (var seat in active.players ?? Array.Empty<LabJigwiABPlayerFire>())
+                    if (seat != null) { total++; if (seat.talismanAt >= 0d) done++; }
+                if (total > 0) words = "부적 " + done + "/" + total;
+            }
             status.text = words; playerStatus.text = rows.ToString();
             statusPanel.gameObject.SetActive(words.Length > 0);
             playerStatus.gameObject.SetActive(rows.Length > 0);

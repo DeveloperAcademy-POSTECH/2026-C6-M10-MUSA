@@ -573,9 +573,7 @@ namespace C6Lab
             {
                 if (round == null || round.id != roundId) continue;
                 if (round.Active(now)) return false;
-                foreach (LabJigwiABPlayerFire seat in round.players ?? Array.Empty<LabJigwiABPlayerFire>())
-                    if (seat != null && seat.playerId == localPlayer) return seat.talismanAt < 0d;
-                return false;
+                return round.TalismanFailed(localPlayer); // #595: a common talisman fails when anyone did not finish
             }
             return false;
         }
@@ -714,7 +712,10 @@ namespace C6Lab
         /// </summary>
         private void UpdateFireLoop(bool running, float dt)
         {
-            FireLoopTarget = running ? FireballLoudness(fireballSeen, fireballProgress, fireLoopVolume, fireLoopWarnVolume) : 0f;
+            // #595: while the talisman is being written the timer tick carries the time; the fireball hum stays silent
+            // and only roars when the fireball falls.
+            bool writing = fireballSeen == LabJigwiFireball.Phase.Kindle || fireballSeen == LabJigwiFireball.Phase.Grow;
+            FireLoopTarget = running && !writing ? FireballLoudness(fireballSeen, fireballProgress, fireLoopVolume, fireLoopWarnVolume) : 0f;
             // #540: when the talisman is finished the hum dies away slowly (with the relief sound), not cut dead.
             float step = dt / Mathf.Max(.01f, Finishing ? finishFadeSeconds : fireLoopFadeSeconds);
             fireLoopLevel = Mathf.MoveTowards(fireLoopLevel, FireLoopTarget, step);
@@ -822,6 +823,8 @@ namespace C6Lab
 
         private float alarmPhase;
         private AudioSource tickSource;
+        /// <summary>#595 QA: 똑딱을 50% 크게.</summary>
+        private const float TickBoost = 1.5f;
         private bool tock;
         /// <summary>#595: 타이머처럼 똑-딱. 같은 소리를 번갈아 높게(똑)·낮게(딱) 낸다.</summary>
         private void Tick(float volume)
@@ -837,7 +840,7 @@ namespace C6Lab
             }
             tock = !tock;
             tickSource.pitch = tock ? .8f : 1f;
-            tickSource.PlayOneShot(clips[0], volume * LabAudioSettings.SfxVolume);
+            tickSource.PlayOneShot(clips[0], Mathf.Min(1f, volume * TickBoost) * LabAudioSettings.SfxVolume);
         }
         /// <summary>#540: 경보 진동을 낸 횟수 (테스트용, 설정에서 진동을 꺼도 센다).</summary>
         public int AlarmHapticCount { get; private set; }

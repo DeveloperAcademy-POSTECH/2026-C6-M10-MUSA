@@ -244,9 +244,10 @@ namespace C6Lab
             // #540: an A that runs out punishes every seat that did not finish its talisman (each seat for itself):
             // when Jigwi's line is over, every orb then on its board burns away at once. Drums keep working.
             var failed = new HashSet<ulong>();
+            // #595: a common talisman that someone did not finish burns every board, finished or not.
             if (item.kind == LabJigwiABKind.PersonalBurn && result == LabJigwiABResolution.Expired)
                 foreach (var seat in item.players ?? Array.Empty<LabJigwiABPlayerFire>())
-                    if (seat != null && seat.talismanAt < 0d) failed.Add(seat.playerId);
+                    if (seat != null && item.TalismanFailed(seat.playerId)) failed.Add(seat.playerId);
             // #540: which orbs burn is decided when Jigwi's line ends (see IgniteDueJigwiFailBurns), so orbs made meanwhile burn too.
             foreach (ulong owner in failed) jigwiFailBurns.Add((owner, item.id, item.resolvedAt + JigwiTalismanFailFirstBurnSeconds));
             foreach (var orb in orbs.Values)
@@ -535,6 +536,7 @@ namespace C6Lab
             var player = active.players.FirstOrDefault(value => value.playerId == sender);
             if (player == null || player.talismanAt >= 0d) return false;
             player.talismanAt = now;
+            if (active.common) return CompleteCommonJigwiTalisman(active, sender, now);
             ResumeJigwiAOrbLifetimes(sender, active.endsAt - now);
             foreach (var orb in orbs.Values)
                 if (orb.owner == sender && orb.jigwiABBurnEventId == active.id)
@@ -543,6 +545,26 @@ namespace C6Lab
             HoldJigwiOrbsForTalismanReward(sender, now);
             revision++;
             if (active.players.All(value => value.talismanAt >= 0d)) ResolveJigwiAB(active, LabJigwiABResolution.Completed, now);
+            return true;
+        }
+        /// <summary>
+        /// #595 공용 부적: 쓴 사람의 판은 아직 타지 않게만 하고 보상은 미룬다. 마지막 사람이 쓰는 순간 모두의 멈춘 구슬 수명이
+        /// 돌아가고, 모두에게 같은 때 부적 물구슬이 내려와 A가 끝난다. 한 명이라도 못 쓰면 끝날 때 모두의 판이 탄다(ResolveJigwiAB).
+        /// </summary>
+        private bool CompleteCommonJigwiTalisman(LabJigwiABRound active, ulong sender, double now)
+        {
+            foreach (var orb in orbs.Values)
+                if (orb.owner == sender && orb.jigwiABBurnEventId == active.id)
+                { orb.jigwiABBurnEventId = null; orb.jigwiABBurnAt = -1d; orb.revision = ++revision; }
+            revision++;
+            if (!active.players.All(value => value.talismanAt >= 0d)) return true;
+            foreach (var seat in active.players)
+            {
+                ResumeJigwiAOrbLifetimes(seat.playerId, active.endsAt - now);
+                GrantJigwiTalismanWater(seat.playerId, now);
+                HoldJigwiOrbsForTalismanReward(seat.playerId, now);
+            }
+            ResolveJigwiAB(active, LabJigwiABResolution.Completed, now);
             return true;
         }
         /// <summary>
