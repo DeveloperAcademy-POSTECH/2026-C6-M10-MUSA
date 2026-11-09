@@ -74,7 +74,7 @@ namespace C6Lab
         private void ResetJigwiAB(LabConfig config, double now)
         {
             jigwiABEnabled = !teamMode && StageYokai == LabStageYokai.Jigwi && config.JigwiStageTimelineEnabled;
-            jigwiSmokeFlow = config.JigwiSmokeFlow && !config.JigwiBTestOnly;
+            jigwiSmokeFlow = config.JigwiSmokeFlow; // #595: with B Test Only it tests the smoke B (every 17 s) instead of the old B
             jigwiSchedule = config.JigwiBTestOnly ? LabJigwiABTimeline.BTestSchedule // #551 시험용: B만
                 : config.JigwiATestOnly ? LabJigwiABTimeline.ATestSchedule // #595 시험용: 부적만
                 : jigwiSmokeFlow ? LabJigwiABTimeline.SmokeFlowSchedule // #595 연기 10 / 부적 45 / 연기 66 / 부적 83
