@@ -18,7 +18,7 @@ MonoBehaviour:
   - speaker: "\uBD88\uC774"
     dialogue: "\uC5B4\u2026 \uC5B4\uB77C?\n\uC65C \uBA48\uCD94\uC9C8 \uC54A\uB294 \uAC70\uC57C?!"
     autoReadSeconds: 3.55
-    voice: {fileID: 0}
+    voice: {fileID: 8300000, guid: 2d094334ae6c43ccbb5ff26682938929, type: 3}
   direction: 
   speaker: "\uBD88\uC774"
   dialogue: "\uC5B4\u2026 \uC5B4\uB77C?\n\uC65C \uBA48\uCD94\uC9C8 \uC54A\uB294 \uAC70\uC57C?!"

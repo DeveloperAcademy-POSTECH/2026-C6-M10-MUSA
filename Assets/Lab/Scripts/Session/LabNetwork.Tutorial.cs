@@ -138,6 +138,18 @@ namespace C6Lab
         }
 
         /// <summary>
+        /// 4단계 구슬 사라짐 시연 (#552): my orb <paramref name="orbId"/> runs out <paramref name="seconds"/> from now, and
+        /// every screen sees it at once. When the time comes it flashes and goes up in smoke as in a real round (#235).
+        /// </summary>
+        public bool TutorialSetOrbLife(string orbId, float seconds)
+        {
+            if (!TutorialHostReady || !model.TutorialSetOrbLife(LocalPlayerId, orbId, seconds,
+                battleClock.Now(Time.realtimeSinceStartupAsDouble))) return false;
+            PublishSnapshot(true);
+            return true;
+        }
+
+        /// <summary>
         /// A story neighbor passes <paramref name="orbId"/> back to me over our shared edge, entering at
         /// <paramref name="height"/> (0..1) and sliding in at <paramref name="speed"/> board widths per second.
         /// </summary>

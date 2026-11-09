@@ -159,7 +159,7 @@ Home/Lobby DEV의 `공통 / 구미호 / 야광귀 / 지귀`에서 해당 값만 
   - 방장과 다른 참가자 화면에서 맡아 둔 자리는 흐리게 "자리 비움"으로 보이고, 안내는 "자리를 비운 이가 돌아오길 기다리고 있소."다. 입장 인원에는 세지 않는다.
   - 하지 않는 것: 전투 중(#502), Lab 방, 방장 앱의 백그라운드 복귀.
   - 방장 기기의 주소가 바뀌면 저장한 주소로는 들어갈 수 없어 방 목록으로 돌아간다.
-  - 접속 묶음: Game 토큰만 `C6HapioGame/45`로 올렸다(40~44는 `feat/#551` 브랜치가 먼저 썼다). 설정 259개·프로토콜5691·`C6PhysicsLab/52`와 Lab 방의 패킷은 그대로다. Game39 이하 앱과 혼용하지 않는다.
+  - 접속 묶음: Game 토큰만 #551의 44에서 `C6HapioGame/45`로 올렸다. 설정 259개·프로토콜5697·`C6PhysicsLab/58`과 Lab 방의 패킷은 #501로 바뀌지 않았다. Game44 이하 앱과 혼용하지 않는다.
 - Home/Lobby의 `Hapio UI Background Camera`는 3D 오브젝트를 그리지 않고 검은 배경만 지운다. Canvas는 Screen Space Overlay를 유지하며 Editor의 카메라 없음 안내를 방지한다.
 - 위치 편집은 공통 Prefab에서 한다. `EditableSeatLayouts/Players2..5/P1..PN`이 각 인원의 저장된 자리 앵커이며 해당 앵커를 움직이면 자리 버튼 배치에 반영된다. 원본 Lab Scene의 UI 위치와는 독립적이다.
 - 명시적 UI 적용 메뉴는 `Hapio/Upgrade Figma Game Lobby`다. 기존 공통 Prefab이 있으면 원본 Lab에서 재생성하지 않고 수동 편집을 보존한다. 이 작업은 Home/Lobby만 갱신하며 Battle·StageResult·GameOver를 복사하거나 저장하지 않는다. 일반 Play/빌드에서는 자동 재생성하지 않는다.

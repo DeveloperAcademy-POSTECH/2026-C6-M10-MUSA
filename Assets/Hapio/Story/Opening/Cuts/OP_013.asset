@@ -18,7 +18,7 @@ MonoBehaviour:
   - speaker: 
     dialogue: 
     autoReadSeconds: 2.7
-    voice: {fileID: 0}
+    voice: {fileID: 8300000, guid: 38122bc82da64b9ebd800a34ddda6804, type: 3}
   direction: "\uD6A8\uACFC\uC74C: \uB35C\uCEF9\u2026 \uB35C\uCEF9\u2026 (\uC74C\uC6D0 \uBBF8\uC5F0\uACB0, \uB300\uC0AC\uCC3D \uC5C6\uC74C)"
   speaker: 
   dialogue: 

@@ -217,6 +217,11 @@
 
 - Hapio 전투는 `GameBattleBindings.Awake`가 모든 스테이지의 `LabHangingTarget`에 `LabRopeStyle.Curved`를 런타임으로 지정한다. 고정점에서 박 연결점까지 피벗을 제어점으로 둔 베지어 한 줄이며, 물리·피벗 높이·판정·접속 규약은 바꾸지 않는다. Lab Scene과 Battle.unity 저장값은 `Segmented`이며 YAML을 고치지 않는다. 기존 `Rope`·`Upper Rope`는 transform을 계속 계산하고 렌더러만 끈다. 상세는 `docs/PINATA_TUNING_GUIDE.md`.
 
+## #473 모든 박 1.1배
+
+- `Gourd Visual Size`(DEV 140) 기본값은 1.54(`LabConfig.DefaultGourdVisualSize`, 이전 1.4)다. 흰 박(크기/1.8)과 세 스테이지 박(크기/`referenceVisualSize` 1.4)이 모두 1.1배가 되고 판정 충돌체도 같은 배율로 따라간다. 굽기 기준 `GameGourdRigBake.ReferenceVisualSize`·`TargetBodyHeight`(크기 1.4 기준)는 바꾸지 않으며 박을 다시 굽지 않는다.
+- 흰 박 마운트 골든(`WhiteGourdMount.txt`)은 이 변경으로 다시 기록했다(요괴 골든은 그대로). Home·Lobby의 저장 DEV 140행은 `Hapio/Upgrade Menu DEV Rows`로 저장했다. Host가 보내는 공유값만 바뀌므로 설정 259개와 접속 묶음은 그대로다.
+
 ## #466 수채 브러시 누적 작품
 
 - 일반 협동은 `WatercolorStampProfile` V2 기본 ON·농도0.9, 기존 수채는 프로필 OFF의 비교 경로다. CPU 패턴·실제 셀/P지도·성장/건조·난수·면적·투척 규칙은 그대로이며 땅따먹기는 기존 청홍 표현이다. 원본은 Editor `BrushMasters`, 512² 표현 데이터는 `GourdPaint/WatercolorBrushes`다. 베이크 해시/설정을 라운드에 고정하고, 판정용 패턴 텍스처를 표현 목적으로 교체하지 않는다.
@@ -302,7 +307,21 @@
 - 부적 완성 연출 길이는 LabConfig `jigwiTalismanRewardDelaySeconds`(Host) 하나로 맞춘다. 부적 화면이 도장 뒤 머무는 시간을 그 값에 맞춰 늘이고 줄인다.
 - 부적 완성 흐름(약 2.9초, 에셋 `jigwiTalismanRewardDelaySeconds` 2.9): 숨 고르기 0.1초 → 금빛 훑기와 가락 "솔 도 시 라"(불은 그동안 그 자리에 멈춰 옅어짐) → "라!"에 도장 → 부적이 한 바퀴 빙글 말리며 구슬 크기로 오므라들고 가운데서 자라난 부적 구슬(물빛 + 금빛 "물")에 스며듦 → 구슬이 살짝 튀었다가 Host가 진짜 부적 구슬을 놓는 자리(`LabModel.JigwiTalismanWaterSpot`, 화면 위치는 `LabOrbBoard.TryGetScreenSpot`)로 톡 떨어짐. 진짜 부적 구슬은 위에서 떨어지지 않고 그 자리에 나타나며, 떨어진 구슬은 그것이 보이면(최대 0.6초) 사라진다. 부적을 다 쓰면 그 사람 판 구슬은 보상이 판에 닿고 1초(`LabModel.JigwiTalismanCalmSeconds`)까지는 수명이 다하지 않는다.
 - #540부터 지귀 불 연출(불덩이·부적 테두리 불·구슬이 타오르는 불, 북 불은 예외로 폭탄 불)은 그림 파일(Bomb/BlastFire 등)을 쓰지 않고 `LabProceduralFire`로 코드에서 그린다.
-- #540 당시 호환 묶음은 설정 259개·**5691**·`C6PhysicsLab/52`·**`C6HapioGame/38`**였다. main의 Bulk 선택 ACK(5690·Lab51·Game37)를 받은 위에 #540을 올렸다. 현재 Game 기준은 아래 #558 절이다. 5690·5689 이하 앱과 혼용하지 않는다.
+- #540 당시 호환 묶음은 설정 259개·**5691**·`C6PhysicsLab/52`·**`C6HapioGame/38`**였다. main의 Bulk 선택 ACK(5690·Lab51·Game37)를 받은 위에 #540을 올렸다. 현재 기준은 아래 #551 절이다.
+
+## #551 지귀 B 3-2-1 동시 던지기
+
+- LabConfig `jigwiBCountdown`(Host, 에셋에서 켬): 지목된 사람이 **모두** 자기 특수 물구슬을 손가락으로 잡고 있으면 Host가 3-2-1을 시작한다(`round.countdownAt`, 요청 `jigwiBReady`, `LabModel.TrySetJigwiBReady`). "던져!"는 `countdownAt + LabJigwiABTimeline.CountdownSeconds`(1.8초).
+- "던져!" 전에는 특수 물구슬이 던져지지 않는다(판 `LabOrbBoard.ThrowGate`가 미끄러지기만 하게, Host도 `JIGWI_B_WAIT`로 거절). 그 전에 누가 놓으면 3-2-1이 취소되고 다시 모두 잡으면 다시 시작한다.
+- "던져!" 뒤 `ReleaseSeconds`(1초) 안에 지목된 사람이 모두 위로 휙 던져야 한다(`seat.launchedAt`, 손만 떼면 던진 것이 아님). 늦으면 그 자리에서 실패(`FailLateJigwiBRelease`). 첫 명중부터 `round.syncWindowSeconds`(1.5초) 안에 모두 맞히면 성공. 빗나가면 실패(한 번의 기회).
+- 실패 벌(조합판 불바다)은 에셋 `jigwiBBoardFireSeconds` 0으로 껐다(코드 기본값 3초 그대로, 새 벌은 나중에 정함). 실패 순간의 화면 불꽃도 판 불바다가 켜졌을 때만 보이고, 지금은 짧은 붉은 기운만 남는다(`LabJigwiScreenPresentation.DrawFailure`).
+- 3-2-1 화면(`LabJigwiBCountdownView`, 모든 기기): 지목된 자리마다 P번호 동그라미(잡고 있으면 파랗게, 내 자리는 굵은 금색 테두리), 모두 잡으면 가운데 큰 "3·2·1"(박자마다 `JigwiBBeat` 북소리) → "던져!"(`JigwiBGo`, 내 구슬에서 위로 솟는 화살표 3개), 지목된 사람 폰은 박자마다 진동. "꾹 잡아" 안내: 아직 안 잡은 자리 동그라미는 고리가 두근거리고(모두가 봄), 내 판의 특수 물구슬 둘레에도 빈 고리가 두근거리며 "꾹!"이 뜬다. 잡으면 고리가 파랗게 한 바퀴 차오른다(게이지).
+- 끄면(코드 기본값) #509 규칙 그대로: 아무 때나 던지고 1초 안에 모두 맞히기.
+- B만 시험: LabConfig `jigwiBTestOnly`(Host, Inspector, 에셋 기본 끔)를 켜면 지귀 스테이지가 B만 4초부터 17초마다(4/21/38/55/72초, `LabJigwiABTimeline.BTestSchedule` = 스냅샷 `schedule` 2) 내고 A와 공통 기믹은 없다. 시험 뒤 끄고, 켠 에셋은 커밋하지 않는다.
+- 실패한 B의 `boardFireUntil`은 불바다가 꺼져 있으면 -1이어도 검증을 통과한다(전에는 Guest가 실패한 B 스냅샷을 거절할 수 있었음).
+- LabConfig `jigwiBBucket`(Host, 에셋에서 켬) — **개별 나무 물통**(11-08 오후 확정): B에 지목이 없고 **여우구슬처럼 따로따로**, B 시작 `BucketLeadSeconds`(3.5초) 뒤부터(2초 예고 때 나온 지귀 대사를 다 듣고, 박이 달아오른 다음) 한 사람씩 `BucketStaggerSeconds`(1초) 간격(무작위 순서)으로 자기 양동이가 온다(`seat.readyAt` = 도착, `round.bucket`, 특수 물구슬/3-2-1 없음, `countdownAt` -1). 도착부터 `BucketSeatSeconds`(7초) 안에(5명이어도 3.5 + 4 + 7 = 14.5초로 15초 B 안) 쏟아야 한다. 폰을 좌우로 기울여 `sloshDegrees`(20°)를 넘겨 꺾을 때마다(방향을 바꿔야 다음) 출렁, 3번(`sloshesToPour`)이면 마지막으로 꺾은 쪽으로 쏟고 `jigwiBPull`을 보낸다(`LabModel.TryJigwiBPull`, `seat.launchedAt`). Host는 받자마자 그 사람 쪽 박에 큰 물 칠(`jigwiBSplashPaintShare`). 모두 쏟으면 완료, 아니면 15초에 Expired. **못 쏟은 사람은 그 화면에서 지귀 연기가 화면 전체(박이 보이는 3D 영역과 조합판)를 회색으로 덮고(판 입력 막힘), 90% 문질러야(`steamClearLeft` 10% 아래) 걷힌다**(화면만, Host 상태 없음). 쏟는 방향은 그림만 다르다.
+- 물통 화면 `LabJigwiBucketHandleView`(2D, **글자 없음**): ① **위협** — 내 양동이가 오기 `threatLeadSeconds`(1.2초) 전부터 박이 내 쪽으로 시뻘겋게 달아오르고 연기가 모인다(처음부터 또렷하게 붉고, 남은 시간이 줄수록 커지고 빨리 뛰며 가운데가 하얗게 달아오름 = 시간 표시. 위치는 박 충돌체를 전투 카메라로 비춘 자리). ② 박 바로 위(`bucketHang` (.5, .93))에 🪣 양동이가 끈에 매달려 내려오고, 폰 기울기를 따라 같은 쪽으로 기운다(`bucketFollow`). 출렁마다 양동이가 흔들리며 물방울이 넘치고, **양동이 위 흔든 양 게이지**(출렁 수 + 다음 출렁까지 기운 정도, 칸 구분선)가 찬다(시간 게이지 없음). 판 가운데 📱 그림은 템플런처럼 폰 전체가 좌우로 기우는 모습(글자 없음). ③ **성공** — 뒤집혀 물줄기가 박으로, 불 꺼지는 소리(`JigwiFireDouse`), 박이 하얀 김을 뿜으며 식는다. ④ **실패** — 양동이가 떨어지고 지귀 대사(`failVoiceFolder`, 말풍선 없음) → 박이 숨을 들이켜듯 부풀었다가 뿜으면(화면 흔들림) → 달아오를 때 박 위에 피던 그 연기 덩어리 16개가 그대로 부풀며 화면 전체로 퍼져 회색으로 채우고 → 두꺼운 연기 막이 깔리며 쿵(`fogHitSoundFolder` = `JigwiBucketFogHit`, 강한 햅틱) → 작은 검지 손이 3D 영역에서 문지르는 시늉. 양동이는 박을 가리지 않게 `bucketHang` (.5, .93), 쏟을 때 3D 화면이 흔들린다(`pourShake`, `LabJigwiWaterFx.Shake`). 김 위 손은 검지만 펴고 나머지 손가락을 접은 앞모습 👆. 쏟은 물은 박 윗부분(`BucketPourPitch` 58°, 그 사람 쪽으로 기운 위)에 칠한다. 물통 회차에는 #509 물방울 칸(`LabJigwiSyncPillarView`)을 숨긴다. **소리**: 달아오르는 동안 지글지글 반복(`heatLoopFolder` = `JigwiBucketHeat`, 뜨거울수록 크고 높게, 식으면 멈춤), 쏟을 때 쏴아(`pourSoundFolder` = `JigwiBucketPour`), 연기가 뿜어질 때(`smokeSoundFolder` = `JigwiBucketSmoke`). 출렁마다 찰랑(`sloshSoundFolder` = `JigwiBucketSlosh`, 기운 쪽 스피커로 치우침). 대사: 쏟아 식을 때 지귀 비명 "앗 차가!!"(`pourVoiceFolder` = `JigwiVoiceBucketPour`, 강한 햅틱), 실패 말풍선 때 "연기로 뒤덮어주마!"(`failVoiceFolder` = `JigwiVoiceBucketFail`). 다 걷힌 순간(`clearSoundFolder` = `JigwiBucketClear`), 연기를 문지를 때 부채질 휘익(`rubSoundFolder` = `JigwiBucketFan`, 4%마다, 0.25초 간격). 폴더가 비어 있으면 조용히 넘어간다. **햅틱**: 10°마다 약한 톡, 출렁 1·2·3번 점점 세게, 쏟을 때 길고 세게, 말풍선 때 툭, 김 덮일 때 쿵. Editor/DEV 빌드는 **A/D 또는 ←/→**(`keyTiltDegrees` 35°). 지귀 부적(A)을 공용 기믹으로 바꾸는 일은 새 이슈로 따로 한다.
+- 현재 호환 묶음은 설정 259개·**5697**·`C6PhysicsLab/58`·**`C6HapioGame/44`**다(main #558의 5691·Lab52·Game39 위). 5696 이하 앱과 혼용하지 않는다.
 
 ## 검사 카테고리와 검사 전용 시작 단축 (2026-11-05)
 
@@ -354,11 +373,11 @@
 - 손실 판정: 모든 송신에 순번을 매기고, 확인된 조각의 첫 송신보다 앞서 마지막으로 나간 미확인 조각을 바로 다시 보낸다(공유 백오프 없음). 창 안의 모든 구멍에 적용하며, 다시 보낸 뒤에는 그보다 뒤에 보낸 조각이 도착해야 다시 손실로 본다. #437의 중복 ACK 3회 빠른 재전송과 에코 할인은 지웠다. 경로가 순서를 지킨다는 가정이며, 순서가 뒤바뀌면 조각 하나를 한 번 더 보낼 뿐이다.
 - RTT 표본은 이번 ACK가 새로 확인한 조각(선택 ACK 포함) 중 가장 최근에 보낸 조각이 한 번만 보낸 조각일 때 잰다(Karn). RTO 식·0.08~1초·시간 초과 공유 백오프는 #437 그대로다. 표본 전 RTO는 0.25초 기준에 같은 공유 백오프가 걸린다(위 #437 절, PR #545).
 - 창은 32→64조각(수신 버퍼 128), 공동 스냅샷 조각은 512→4000자다(`LabSessionSettings.SnapshotChunkCharacters`). 문자당 6바이트 escape에서도 한 조각이 Bulk 논리 본문 32,768자 안에 든다는 것을 검사로 고정했다. 선택 ACK 비트가 `AckThrough + 65`까지만 덮으므로 창을 65보다 키우려면 비트맵도 넓혀야 한다.
-- 이 절이 들어올 때 호환 묶음은 설정 259개·**5690**·`C6PhysicsLab/51`·**`C6HapioGame/37`**이었다(5689/Lab50/Game36은 `feat/#540` 브랜치가 먼저 썼다). #540이 이 위에 올라간 당시에는 **5691**·`C6PhysicsLab/52`·**`C6HapioGame/38`**이었다. 현재 Game 기준은 아래 #558 절이다. 5690 이하 앱과 혼용하지 않는다. 동작과 대안 비교는 `docs/LOCAL_BOARD_AUTHORITY.md`의 Bulk 절, 실행한 검사·측정은 `docs/VALIDATION.md`에만 기록한다.
+- 이 절이 들어올 때 호환 묶음은 설정 259개·**5690**·`C6PhysicsLab/51`·**`C6HapioGame/37`**이었다(5689/Lab50/Game36은 `feat/#540` 브랜치가 먼저 썼다). #540이 이 위에 올라간 당시에는 **5691**·`C6PhysicsLab/52`·**`C6HapioGame/38`**이었다. 현재 기준은 #551 절이다. 5690 이하 앱과 혼용하지 않는다. 동작과 대안 비교는 `docs/LOCAL_BOARD_AUTHORITY.md`의 Bulk 절, 실행한 검사·측정은 `docs/VALIDATION.md`에만 기록한다.
 
 ## #558 Story 결과 통합과 같은 방 재도전
 
-- #558 당시 호환 묶음은 설정259개·**5691**·`C6PhysicsLab/52`·**`C6HapioGame/39`**였다(현재 Game 기준은 아래 #501 절). Lab/Bulk 형식은 유지하고 Game38 이하와 혼용하지 않는다. `GameFlowState.retryableDefeat`와 결과 이야기 확인 제어가 추가됐다.
+- #558 머지 당시 호환 묶음은 설정259개·**5691**·`C6PhysicsLab/52`·**`C6HapioGame/39`**였다(현재 기준은 아래 #501 절). Lab/Bulk 형식은 유지하고 Game38 이하와 혼용하지 않는다. `GameFlowState.retryableDefeat`와 결과 이야기 확인 제어가 추가됐다.
 - 저장 StageResult/GameOver의 `GameStageStoryPresentation`은 실제 일치하는 Victory/Defeat 복사본만 카드·게이지에 연결한다. 제작용 예시값이나 앞선 성공 결과로 실패를 표시하지 않는다. 로컬 컷·카드 뒤집기는 공유하지 않고 결과/이야기 확인·관람 상태만 Host 진행 조건에 쓴다.
 - 정상 Story 패배만 Host가 같은 방·스테이지를 재시도한다. 원래 참가자·P·승인 설정·이전 성공 기록은 유지하고 기존 prepare/start 장벽으로 새 전투를 만든다. 이탈·연결 끊김·로드 실패는 Home만 남기며 오래된 ACK/중복/Guest 요청으로 재도전하지 않는다.
 - GameOver 동결 뒤에도 마지막 terminal 발행에서 Bulk 백로그로 빠진 피어에게는 대기열이 줄면 기존 paint+snapshot 트랜잭션을 한 번 큐에 넣는다. 실제 terminal 상태를 헤더에서 추정하거나 게임 시뮬레이션을 재개하지 않는다.
@@ -373,4 +392,4 @@
 - Hapio 로비 게스트가 끊기면 같은 방·같은 P번호로 다시 들어간다(`LabNetwork.LobbyRejoin.cs`). 게스트는 방마다 무작위 표(16진수 32자리, 저장 안 함)를 연결 토큰 뒤에 붙이고(`token|ticket`, 게임 방만), 방장은 나가기 신호(`lobby_leave`, 또는 전투 중 `exit` → `MarkLobbyLeaver`) 없이 끊긴 로비 게스트의 자리와 P를 90초(`LobbySeatHoldSeconds`) 맡아 같은 표에 돌려준다. 입장시킨 뒤 패킷을 한 번도 받지 못한 게스트(`heardLobbyMembers`)는 맡지 않는다. 맡아 둔 자리는 옛 연결 id로 `seats`에 남고 lobby 패킷의 `ids`가 맡아 둔 자리를 알린다(새 필드 없음). 정원·Bonjour 인원에는 세고 `ParticipantCount`·시작 조건에는 세지 않는다.
 - 게스트는 끊기거나, iPhone이 전송 제한 시간 이상 멈췄다 돌아오면(벽시계) `IsJoiningRoom`을 유지한 채 30초(`LobbyRejoinBudgetSeconds`, 진행 중인 시도도 끊음) 동안 다시 시도하고, 끝내 안 되면 #471 경로로 방 목록에 간다. 방장이 방을 닫으면(`lobby_closed`) 다시 들어가지 않는다. `GameSession`이 로비 단계에서만 `LobbyRejoinAllowed`를 켠다. 표를 가진 방은 정원이 차 보여도 방 목록에서 들어갈 수 있고(`HoldsRoomTicket`, 판단은 방장의 승인), 나가기 신호를 보낸 게스트는 표를 버린다. 승인 대기 중인 연결 중 자기 자리를 되찾는 것은 새 자리로 세지 않는다(`PendingNewPlaces`).
 - 전투 중 백그라운드(#502)는 현재 동작 유지로 정했다. 신호·일시정지 제안·표시는 없고, 30초 뒤 끊기면 기존 게임 오버·2:2 로비 복귀를 따른다. 전투 중에는 재입장을 하지 않으며 방장 앱의 백그라운드와 방장 소켓 재생성도 다루지 않는다.
-- 현재 호환 묶음은 설정259개·**5691**·`C6PhysicsLab/52`·**`C6HapioGame/45`**다(40~44는 `feat/#551` 브랜치가 먼저 썼다). Lab 방의 토큰·패킷은 그대로다. Game39 이하와 혼용하지 않는다. 동작은 `docs/GAME_FLOW.md`의 같은 항목, 실행한 검사는 `docs/VALIDATION.md`만 따른다.
+- 현재 호환 묶음은 설정259개·**5697**·`C6PhysicsLab/58`·**`C6HapioGame/45`**다(프로토콜·Lab 토큰은 #551 그대로, Game만 #501로 44에서 올림). Lab 방의 토큰·패킷은 #501로 바뀌지 않았다. Game44 이하와 혼용하지 않는다. 동작은 `docs/GAME_FLOW.md`의 같은 항목, 실행한 검사는 `docs/VALIDATION.md`만 따른다.

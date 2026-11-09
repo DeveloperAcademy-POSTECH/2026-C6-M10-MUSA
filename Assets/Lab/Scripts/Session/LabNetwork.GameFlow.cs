@@ -12,7 +12,7 @@ namespace C6Lab
     public sealed partial class LabNetwork
     {
         // 45: #501 lobby rejoin: a room ticket after the token, held lobby seats (lobby ids) and lobby_leave/lobby_closed.
-        //     40~44 were taken by the feat/#551 branch.
+        //     (on top of #551's 44; protocol and Lab token unchanged by #501.)
         private static readonly byte[] GameConnectionToken = Encoding.ASCII.GetBytes("C6HapioGame/45");
         private const int MaximumGameFlowBytes = 8192;
         private bool gameFlowEnabled;
@@ -171,6 +171,7 @@ namespace C6Lab
             value.CombineRequested += OnCombineRequested;
             value.FoxFireTouched += OnFoxFireTouched;
             value.ThrowRequested += OnThrowRequested;
+            value.ThrowGate = JigwiBThrowAllowed; // #551 지귀 B: "지금!" 전에는 특수 물구슬을 못 던짐
             value.UseRequested += OnUseRequested;
             value.DrumTapped += Generate;
             value.JigwiBurnRequested += OnJigwiBurnRequested;
@@ -183,6 +184,7 @@ namespace C6Lab
             value.CombineRequested -= OnCombineRequested;
             value.FoxFireTouched -= OnFoxFireTouched;
             value.ThrowRequested -= OnThrowRequested;
+            if (value.ThrowGate == (System.Func<string, bool>)JigwiBThrowAllowed) value.ThrowGate = null;
             value.UseRequested -= OnUseRequested;
             value.DrumTapped -= Generate;
             value.JigwiBurnRequested -= OnJigwiBurnRequested;

@@ -297,6 +297,103 @@ namespace C6Lab.Tests
             var water=m.Snapshot(6+config.JigwiTalismanRewardDelaySeconds).orbs.First(o=>o.jigwiTalismanReward);
             Assert.That(new Vector2(water.x,water.y),Is.EqualTo(LabModel.JigwiTalismanWaterSpot(0)),"It appears where the folded talisman drops.");
         }
+        [Test] public void BCountdownStartsOnlyWhileEveryPickedSeatHoldsItsSpecialWater()
+        {
+            // #551: both picked seats hold their special Water → 3-2-1; letting go before "지금!" stops it; no throw before.
+            JsonUtility.FromJsonOverwrite("{\"jigwiBCountdown\":true}",config);
+            var m=Room();var b=Current(m,31);
+            var specials=m.Snapshot(31).orbs.Where(o=>o.jigwiABSupplyEventId==b.id).ToArray();
+            Assert.That(specials,Has.Length.EqualTo(2));
+            Assert.That(m.TryLaunch(specials[0].owner,specials[0].id,Request(),31.2,out _,out var reason),Is.False);
+            Assert.That(reason,Is.EqualTo("JIGWI_B_WAIT"),"No throw before the countdown.");
+            Assert.That(m.TrySetJigwiBReady(Players[0],b.id,true,31.3),Is.True);
+            Assert.That(B(m,b.id,31.3).countdownAt,Is.EqualTo(-1d),"Not everyone holds yet.");
+            Assert.That(m.TrySetJigwiBReady(Players[1],b.id,true,31.4),Is.True);
+            Assert.That(B(m,b.id,31.4).countdownAt,Is.EqualTo(31.4).Within(1e-9));
+            Assert.That(m.TryLaunch(specials[0].owner,specials[0].id,Request(),31.5,out _,out reason),Is.False,"Still counting.");
+            Assert.That(m.TrySetJigwiBReady(Players[0],b.id,false,31.6),Is.True);
+            Assert.That(B(m,b.id,31.6).countdownAt,Is.EqualTo(-1d),"Letting go before 지금 stops the 3-2-1.");
+            Assert.That(m.TrySetJigwiBReady(Players[0],b.id,true,32),Is.True);
+            double go=32+LabJigwiABTimeline.CountdownSeconds;
+            foreach(var special in specials) Launch(m,Orbs(m)[special.id],go+.1);
+            Assert.That(B(m,b.id,go+.1).players.All(p=>p.launchedAt>=0d),Is.True);
+            Assert.That(LabJigwiABNetworkValidation.Valid(m.Snapshot(go+.1).jigwiAB,m.Snapshot(go+.1).players,m.Revision),Is.True);
+            // With the countdown the second hit may land up to 1.5 s after the first.
+            m.ConfirmHit(specials[0].id,go+.4,Vector3.back,out _,out _,out _);
+            m.ConfirmHit(specials[1].id,go+1.7,Vector3.back,out _,out _,out _);
+            Assert.That(B(m,b.id,go+1.7).resolution,Is.EqualTo(LabJigwiABResolution.Completed));
+        }
+        [Test] public void BFailsWhenAPickedSeatStillHoldsAfterTheReleaseMoment()
+        {
+            // #551: "지금!" then everyone must let go within 0.7 s; one late seat loses the single chance.
+            JsonUtility.FromJsonOverwrite("{\"jigwiBCountdown\":true}",config);
+            var m=Room();var b=Current(m,31);
+            var specials=m.Snapshot(31).orbs.Where(o=>o.jigwiABSupplyEventId==b.id).ToArray();
+            Assert.That(m.TrySetJigwiBReady(Players[0],b.id,true,32),Is.True);
+            Assert.That(m.TrySetJigwiBReady(Players[1],b.id,true,32),Is.True);
+            double go=32+LabJigwiABTimeline.CountdownSeconds;
+            Launch(m,Orbs(m)[specials[0].id],go+.1);
+            Assert.That(B(m,b.id,go+LabJigwiABTimeline.ReleaseSeconds-.01).resolution,Is.EqualTo(LabJigwiABResolution.None));
+            var late=B(m,b.id,go+LabJigwiABTimeline.ReleaseSeconds+.01);
+            Assert.That(late.resolution,Is.EqualTo(LabJigwiABResolution.Expired));
+        }
+        [Test] public void BTestOnlyRunsJustBFromFourSecondsAndStillValidates()
+        {
+            // #551 시험용: B만 4초부터 17초마다, A와 공통 기믹 없음.
+            JsonUtility.FromJsonOverwrite("{\"jigwiBTestOnly\":true}",config);
+            var m=Room();
+            Assert.That(Current(m,5).kind,Is.EqualTo(LabJigwiABKind.GroupFire));
+            var s=m.Snapshot(5);
+            Assert.That(s.jigwiAB.schedule,Is.EqualTo(LabJigwiABTimeline.BTestSchedule));
+            Assert.That(LabJigwiABNetworkValidation.Valid(s.jigwiAB,s.players,m.Revision),Is.True);
+            Assert.That(Current(m,22).kind,Is.EqualTo(LabJigwiABKind.GroupFire),"The next one is B again.");
+            var failed=m.Snapshot(22);
+            Assert.That(LabJigwiABNetworkValidation.Valid(failed.jigwiAB,failed.players,m.Revision),Is.True,"A failed B with no board fire still validates.");
+        }
+        LabJigwiABRound B(LabModel m,string id,double at)=>m.Snapshot(at).jigwiAB.rounds.Single(r=>r.id==id);
+        [Test] public void BBucketArrivesSeatBySeatAndEachPourPaintsAtOnce()
+        {
+            // #551 나무 물통 (개별, 여우구슬처럼): every seat gets its own bucket at its own time; no special Water, no 3-2-1.
+            JsonUtility.FromJsonOverwrite("{\"jigwiBBucket\":true}",config);
+            var m=Room3();var b=Current(m,25.1);
+            Assert.That(b.bucket,Is.True);
+            Assert.That(b.players.Select(p=>p.playerId),Is.EquivalentTo(Three),"Everyone has a bucket.");
+            Assert.That(b.countdownAt,Is.EqualTo(-1d),"No 3-2-1.");
+            Assert.That(b.players.Select(p=>p.readyAt).OrderBy(x=>x),
+                Is.EqualTo(new[]{0d,1d,2d}.Select(k=>b.activeAt+LabJigwiABTimeline.BucketLeadSeconds+k*LabJigwiABTimeline.BucketStaggerSeconds).ToArray()).Within(1e-9),
+                "One bucket after another.");
+            Assert.That(m.Snapshot(25.1).orbs.Any(o=>o.jigwiABSupplyEventId==b.id),Is.False,"No special Water orb.");
+            Assert.That(m.TrySetJigwiBReady(Three[0],b.id,true,25.2),Is.False,"Holding means nothing here.");
+            var last=b.players.OrderBy(p=>p.readyAt).Last();
+            Assert.That(m.TryJigwiBPull(last.playerId,b.id,last.readyAt-.1),Is.False,"Not before my bucket arrives.");
+            int painted=m.PaintSurface.PaintCount;
+            var first=b.players.OrderBy(p=>p.readyAt).First();
+            Assert.That(m.TryJigwiBPull(first.playerId,b.id,first.readyAt+1),Is.True);
+            Assert.That(m.PaintSurface.PaintCount,Is.GreaterThan(painted),"My pour paints at once.");
+            Assert.That(m.TryJigwiBPull(first.playerId,b.id,first.readyAt+1.5),Is.False,"One bucket each.");
+            var mid=m.Snapshot(first.readyAt+1.5);
+            Assert.That(mid.jigwiAB.rounds.Single(r=>r.id==b.id).resolution,Is.EqualTo(LabJigwiABResolution.None));
+            Assert.That(LabJigwiABNetworkValidation.Valid(mid.jigwiAB,mid.players,m.Revision),Is.True);
+            double end=0;
+            foreach(var seat in b.players.Where(p=>p.playerId!=first.playerId).OrderBy(p=>p.readyAt))
+            { end=seat.readyAt+2;Assert.That(m.TryJigwiBPull(seat.playerId,b.id,end),Is.True); }
+            var done=m.Snapshot(end);
+            Assert.That(done.jigwiAB.rounds.Single(r=>r.id==b.id).resolution,Is.EqualTo(LabJigwiABResolution.Completed),"Everyone poured.");
+            Assert.That(LabJigwiABNetworkValidation.Valid(done.jigwiAB,done.players,m.Revision),Is.True);
+        }
+        [Test] public void BBucketSeatThatRunsOutCannotPourAndBEndsUnfinished()
+        {
+            JsonUtility.FromJsonOverwrite("{\"jigwiBBucket\":true}",config);
+            var m=Room3();var b=Current(m,25.1);
+            var order=b.players.OrderBy(p=>p.readyAt).ToArray();
+            Assert.That(m.TryJigwiBPull(order[0].playerId,b.id,order[0].readyAt+1),Is.True);
+            Assert.That(m.TryJigwiBPull(order[1].playerId,b.id,order[1].readyAt+LabJigwiABTimeline.BucketSeatSeconds+.1),Is.False,"Its time ran out.");
+            Assert.That(B(m,b.id,b.endsAt-.01).resolution,Is.EqualTo(LabJigwiABResolution.None));
+            Assert.That(B(m,b.id,b.endsAt+.01).resolution,Is.EqualTo(LabJigwiABResolution.Expired),"Not everyone poured.");
+            Assert.That(m.JigwiBoardOnFire(b.endsAt+.5),Is.False,"Personal gimmick: a seat that did not pour never sets the others' boards on fire.");
+            var end=m.Snapshot(b.endsAt+.01);
+            Assert.That(LabJigwiABNetworkValidation.Valid(end.jigwiAB,end.players,m.Revision),Is.True);
+        }
         [Test] public void BGivesEachPickedSeatOneSpecialWaterWhileOrdinaryRawPairsKeepTheirNormalElement()
         {
             // #509: two players → both picked; each gets exactly one special Water on its own board.

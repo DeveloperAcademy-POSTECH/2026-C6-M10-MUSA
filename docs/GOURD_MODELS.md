@@ -41,7 +41,7 @@
 
 ## 현재 상태
 
-- 흰 박의 마운트·판정·칠 binding·요괴 자세는 main에서 기록한 골든(`Assets/Lab/Tests/PlayMode/Golden/`)과 같아야 한다.
+- 흰 박의 마운트·판정·칠 binding·요괴 자세는 main에서 기록한 골든(`Assets/Lab/Tests/PlayMode/Golden/`)과 같아야 한다. #473에서 기본 크기를 1.54로 올리며 마운트 골든만 다시 기록했다.
 - 1스테이지: `Hapio/Gourds/Stage01_Gumiho_Battle`, 2스테이지: `Stage02_Yagwanggwi_Battle`, 3스테이지: `Stage03_Jigwi_Battle`. 게임 토큰 `C6HapioGame/30`(도입 당시, 현재 기준은 `AGENTS.md`).
 - 2스테이지는 #526부터 경량 재출력 `Models/Yagwanggwi_Gourd_100K.fbx`(22렌더러·99,865삼각형, 원본 446,594)를 감싼 `Prefabs/Yagwanggwi_Gourd_100K_GameReady.prefab`에서 굽는다(`GameGourdRigBake.Spec.SourceVariant = "_100K"`). 원본 FBX·GameReady 프리팹은 그대로 보존한다. 새 GameReady는 원본과 같은 루트 배율·모델 위치·Animator 컨트롤러를 쓴다. 두 FBX의 노드 29개와 공연 클립 커브 280개가 같다(최대 차 1.5e-5).
 - 흰 박은 Lab 단판, 2:2 땅따먹기(스토리 스테이지 정의가 없음), 튜토리얼 연습 판에만 쓰인다.
@@ -64,7 +64,7 @@
 
 | 단계 | 내용 |
 | --- | --- |
-| 크기 | 몸통 높이를 흰 박 전투 높이 2.390325에 맞춘다. 현재 아트는 이미 맞아 배율 1.00000이다. `referenceVisualSize` 1.4(LabConfig 기본 Gourd Visual Size)에서 배율 1. 루트 배율 17.096은 자식 `Yagwanggwi_Gourd`로 옮기고 루트는 1이다. |
+| 크기 | 몸통 높이를 흰 박 전투 높이 2.390325에 맞춘다. 현재 아트는 이미 맞아 배율 1.00000이다. `referenceVisualSize` 1.4(굽기 기준 크기)에서 배율 1. #473부터 기본 Gourd Visual Size가 1.54라 전투에서는 흰 박과 같이 1.1배로 그린다. 기본 크기를 바꿀 때 박을 다시 굽지 않는다. 루트 배율 17.096은 자식 `Yagwanggwi_Gourd`로 옮기고 루트는 1이다. |
 | 칠 공간 | 원점=몸통 중심, +Y=몸통 축(Blender Z-up과 아트의 정적 30° 앞 기울기). `Paint Shell` transform이 그 기울기를 가지므로 화면 모습은 아트와 같다. |
 | 칠 껍데기 | `model_part0.001`(이중 벽 40,960삼각형)에서 원점 방향 광선의 가장 바깥 면만 남겨 20,608삼각형. 원점에서 본 바깥 면 비율(star-shaped) 100%. 몸통 바탕 그림(`model_part0_BaseColor`)은 `_UNDERPAINT_MAP` 재질로 칠 아래에 보인다. |
 | 뚜껑 | `model_part3.001`을 닫힌 자세의 같은 칠 공간으로 구워 `Lid_Hinge` 아래 `Lid Paint`로 둔다(뚜껑 바탕 `Image_0`). 열려도 칠이 뚜껑과 함께 움직인다. 칠 셰이더 재질을 가진 extra는 자기 재질을 유지한다. |

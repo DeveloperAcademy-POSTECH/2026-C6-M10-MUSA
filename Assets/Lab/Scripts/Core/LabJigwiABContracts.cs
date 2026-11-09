@@ -52,6 +52,24 @@ namespace C6Lab
         public double syncWindowAt = -1d, syncResetAt = -1d;
         /// <summary>#509 B failure: nobody can press a drum until this battle time (-1 = no board fire).</summary>
         public double boardFireUntil = -1d;
+        /// <summary>#551 B countdown: when every picked seat was holding its special Water (-1 = not all ready).</summary>
+        public double countdownAt = -1d;
+        /// <summary>#551: this B's sync window in seconds (0 = the #509 one second).</summary>
+        public float syncWindowSeconds;
+        /// <summary>
+        /// #551 나무 물통 (개별, 여우구슬처럼 따로따로): every seat gets its own bucket at its own time (seat.readyAt = arrival,
+        /// staggered in a random order) and has BucketSeatSeconds to pour it by rocking the phone (launchedAt = when it poured).
+        /// No special Water, no 3-2-1. Everyone poured = completed; a seat that runs out gets its board steamed over (client).
+        /// </summary>
+        public bool bucket;
+        /// <summary>#551: 3-2-1 length.</summary>
+        public double CountdownLength => LabJigwiABTimeline.CountdownSeconds;
+        /// <summary>#551: how long after "던져!" the throw may come.</summary>
+        public double PullSeconds => LabJigwiABTimeline.ReleaseSeconds;
+        /// <summary>#551: how long after the first picked hit the others may land.</summary>
+        public double SyncWindow => syncWindowSeconds > 0f ? syncWindowSeconds : LabJigwiABTimeline.GroupSyncWindowSeconds;
+        /// <summary>#551: the "지금!" moment (-1 while the 3-2-1 has not started).</summary>
+        public double GoAt => countdownAt < 0d ? -1d : countdownAt + CountdownLength;
         public bool Warning(double now) => resolution == LabJigwiABResolution.None && now >= warningAt && now < activeAt;
         public bool Active(double now) => resolution == LabJigwiABResolution.None && now >= activeAt && now < endsAt;
         public bool RewardActive(double now) => kind == LabJigwiABKind.GroupFire
@@ -72,10 +90,12 @@ namespace C6Lab
         public double lastWaterSplashAt = -1d;
         /// <summary>#479 A only: when this player finished writing the talisman; -1 while still burning.</summary>
         public double talismanAt = -1d;
+        /// <summary>#551 B only: since when this picked seat holds its special Water (-1 = not holding); when it threw it.</summary>
+        public double readyAt = -1d, launchedAt = -1d;
         public LabJigwiABFireTarget[] targets = Array.Empty<LabJigwiABFireTarget>();
         public LabJigwiABPlayerFire Copy() => new LabJigwiABPlayerFire
         {
-            playerId = playerId, lastWaterSplashAt = lastWaterSplashAt, talismanAt = talismanAt,
+            playerId = playerId, lastWaterSplashAt = lastWaterSplashAt, talismanAt = talismanAt, readyAt = readyAt, launchedAt = launchedAt,
             targets = (targets ?? Array.Empty<LabJigwiABFireTarget>()).Select(value => value?.Copy()).ToArray()
         };
     }
@@ -144,7 +164,7 @@ namespace C6Lab
                 double scheduled = state.startedAt + LabJigwiABTimeline.ActiveOffset(round.slot, state.schedule);
                 if (Math.Abs(round.activeAt - scheduled) > .00001d
                     || Math.Abs(round.warningAt - (scheduled - LabJigwiABTimeline.WarningSeconds)) > .00001d
-                    || round.kind != LabJigwiABTimeline.KindForSlot(round.slot)) return false;
+                    || round.kind != LabJigwiABTimeline.KindForSlot(round.slot, state.schedule)) return false;
                 if (round.resolution != LabJigwiABResolution.Skipped)
                 {
                     if (intervals.Any(other => round.activeAt < other.endsAt && other.activeAt < round.endsAt)) return false;
@@ -155,13 +175,16 @@ namespace C6Lab
                 if (round.clearedThroughRevision != 0
                     || modelRevision.HasValue && round.clearedThroughRevision > modelRevision.Value) return false;
                 if (round.rewardUntil != -1d) return false;
-                if (failed ? !Range(round.boardFireUntil, round.resolvedAt, round.resolvedAt + 10d) : round.boardFireUntil != -1d) return false;
+                // #551: a failed B may have no board fire at all (the punishment is off in the asset).
+                if (failed ? round.boardFireUntil != -1d && !Range(round.boardFireUntil, round.resolvedAt, round.resolvedAt + 10d)
+                    : round.boardFireUntil != -1d) return false;
                 if (round.resolution == LabJigwiABResolution.None)
                 {
                     // A may still be running during the next B's one-second warning.
                     if (round.resolvedAt != -1d || ++unresolved > 2) return false;
                 }
                 else if (round.resolvedAt < round.warningAt) return false;
+                if (round.kind == LabJigwiABKind.PersonalBurn && round.bucket) return false;
                 if (round.kind == LabJigwiABKind.PersonalBurn
                     && (round.syncCount != 0 || round.syncWindowAt != -1d || round.syncResetAt != -1d)) return false;
                 if (round.kind == LabJigwiABKind.PersonalBurn)
@@ -191,13 +214,18 @@ namespace C6Lab
                     || round.syncWindowAt != -1d && (round.resolution != LabJigwiABResolution.None
                         || !Range(round.syncWindowAt, round.activeAt, round.endsAt))
                     || round.syncResetAt != -1d && !Range(round.syncResetAt, round.activeAt,
-                        round.endsAt + LabJigwiABTimeline.GroupSyncWindowSeconds)) return false;
+                        round.endsAt + round.SyncWindow)) return false;
+                // #551 countdown: a start time only inside the B, a known window length.
+                if (round.countdownAt != -1d && !Range(round.countdownAt, round.activeAt, round.endsAt)
+                    || round.syncWindowSeconds != 0f && !Range(round.syncWindowSeconds, .5d, 3d)) return false;
                 var owners = new HashSet<ulong>();
                 var targets = new HashSet<string>(StringComparer.Ordinal);
                 foreach (var player in round.players)
                 {
                     if (player == null || !owners.Add(player.playerId) || memberIds != null && !memberIds.Contains(player.playerId)
                         || player.lastWaterSplashAt != -1d && !Range(player.lastWaterSplashAt, round.activeAt, round.endsAt)
+                        || player.readyAt != -1d && !Range(player.readyAt, round.activeAt, round.endsAt)
+                        || player.launchedAt != -1d && !Range(player.launchedAt, round.activeAt, round.endsAt)
                         || player.targets == null || player.targets.Length < 1 || player.targets.Length > MaximumFires) return false;
                     foreach (var target in player.targets)
                     {
@@ -207,12 +235,19 @@ namespace C6Lab
                         // A hit time exists only inside the open window.
                         if (target.extinguishedAt != -1d && (round.syncWindowAt < 0d
                             || target.extinguishedAt < round.syncWindowAt
-                            || target.extinguishedAt >= round.syncWindowAt + LabJigwiABTimeline.GroupSyncWindowSeconds)) return false;
+                            || target.extinguishedAt >= round.syncWindowAt + round.SyncWindow)) return false;
                     }
                 }
                 // #509: only the picked seats are listed (helpers are everyone else).
                 if (memberIds != null && round.resolution != LabJigwiABResolution.Skipped
-                    && owners.Count != LabJigwiABTimeline.GroupPickCount(memberIds.Count)) return false;
+                    && owners.Count != (round.bucket ? memberIds.Count : LabJigwiABTimeline.GroupPickCount(memberIds.Count))) return false;
+                // #551 나무 물통: no 3-2-1; each bucket arrives inside the stagger and is poured inside its own time.
+                if (round.bucket && (round.countdownAt != -1d
+                    || round.resolution == LabJigwiABResolution.Completed && round.players.Any(player => player.launchedAt < 0d)
+                    || round.players.Any(player => !Range(player.readyAt, round.activeAt + LabJigwiABTimeline.BucketLeadSeconds - .00001d,
+                        round.activeAt + LabJigwiABTimeline.BucketLeadSeconds + LabJigwiABTimeline.BucketStaggerSeconds * (MaximumPlayers - 1) + .00001d)
+                        || player.launchedAt != -1d && !Range(player.launchedAt, player.readyAt - .00001d,
+                            player.readyAt + LabJigwiABTimeline.BucketSeatSeconds + .00001d)))) return false;
                 bool allOff = round.players.Length > 0 && round.players.All(player => player.targets.All(target => !target.lit));
                 if (round.resolution == LabJigwiABResolution.Completed && !allOff
                     || (round.resolution == LabJigwiABResolution.None || failed) && allOff) return false;
