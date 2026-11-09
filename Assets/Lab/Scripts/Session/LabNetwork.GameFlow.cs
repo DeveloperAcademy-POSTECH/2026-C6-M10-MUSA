@@ -11,7 +11,7 @@ namespace C6Lab
     /// </summary>
     public sealed partial class LabNetwork
     {
-        private static readonly byte[] GameConnectionToken = Encoding.ASCII.GetBytes("C6HapioGame/39");
+        private static readonly byte[] GameConnectionToken = Encoding.ASCII.GetBytes("C6HapioGame/44");
         private const int MaximumGameFlowBytes = 8192;
         private bool gameFlowEnabled;
         private bool gameBattleFrozen;
@@ -165,6 +165,7 @@ namespace C6Lab
             value.CombineRequested += OnCombineRequested;
             value.FoxFireTouched += OnFoxFireTouched;
             value.ThrowRequested += OnThrowRequested;
+            value.ThrowGate = JigwiBThrowAllowed; // #551 지귀 B: "지금!" 전에는 특수 물구슬을 못 던짐
             value.UseRequested += OnUseRequested;
             value.DrumTapped += Generate;
             value.JigwiBurnRequested += OnJigwiBurnRequested;
@@ -177,6 +178,7 @@ namespace C6Lab
             value.CombineRequested -= OnCombineRequested;
             value.FoxFireTouched -= OnFoxFireTouched;
             value.ThrowRequested -= OnThrowRequested;
+            if (value.ThrowGate == (System.Func<string, bool>)JigwiBThrowAllowed) value.ThrowGate = null;
             value.UseRequested -= OnUseRequested;
             value.DrumTapped -= Generate;
             value.JigwiBurnRequested -= OnJigwiBurnRequested;

@@ -305,6 +305,10 @@ namespace C6Lab
         }
         /// <summary>The velocity is input displacement divided by board width and seconds.</summary>
         public event Action<LabOrbThrowGesture> ThrowRequested;
+        /// <summary>#551: when set and false for an orb, a throw swipe only slides it (e.g. Jigwi B before "지금!").</summary>
+        public Func<string, bool> ThrowGate;
+        /// <summary>#551: the orb under this player's finger right now (null when none).</summary>
+        public string HeldOrbId => heldId;
         /// <summary>내가 생성한 구슬이 북에서 튀어나오기 시작할 때 한 번 알린다. (구슬 ID)</summary>
         public event Action<string> SpawnStarted;
         /// <summary>A double tap on an unlocked usable item. The Host applies or rejects its effect.</summary>
@@ -1710,7 +1714,8 @@ namespace C6Lab
                 || (worldPoint.x >= bounds.xMax && inputVelocity.x > 0f);
             // Charmed (#251), an upward swipe is no throw: the orb slides up like any flick and bounces off the top.
             if (!charmed && entry.View.Kind.CanThrow(entry.View.LockSwipes) && !outwardSide
-                && Allows(LabBoardGestures.Throw) && LabThrowMath.IsThrowGesture(inputVelocity, swipeDistance, config))
+                && Allows(LabBoardGestures.Throw) && LabThrowMath.IsThrowGesture(inputVelocity, swipeDistance, config)
+                && (ThrowGate == null || ThrowGate(id)))
             {
                 entry.BeforeRequest = CaptureMotion(entry);
                 entry.Locked = true;
