@@ -7081,3 +7081,5 @@ Compared twelve seed masks and selected 572. Changed only seed defaults and the 
 - 검증용 임시 촬영 도구의 `GetInstanceID` 구형 API 때문에 한 차례 Safe Mode가 발생했다. 창 유형 재조회로 수정해 일반 Editor로 다시 열었으며 임시 도구는 커밋에서 제외한다. 이 도구를 추가하기 전에 위 전체 검사는 통과했다.
 - 비교 이미지는 `docs/images/five-elements/clay-only-spread.png`·`clay-only-settled.png`다. 과거 원소 해방 이미지는 새 외형 기준에서 제외했다. 원시 로그·빌드·기기 식별자는 저장소에 올리지 않는다.
 - 아직 수행하지 않은 항목: 사용자 최종 외형 승인, iOS 실기기 GPU 비용·가독성, 실제 여러 기기 LAN/핫스팟 확인. Editor의 프레임/GC 측정은 기기 성능 PASS 근거로 쓰지 않는다. **사용자 화면 승인 전 PR을 Draft로 유지하며 main은 병합하지 않는다.**
+
+**비교 창 재실행 보완:** 위 전체 검사 뒤 실제 GameView에서 UI Toolkit의 초기 NaN 좌표가 카메라와 lane padding에 전달되고 preview 높이가 0으로 접히는 문제를 발견했다. 비교용 UIDocument가 패널을 채우도록 하고 유효한 좌표일 때만 카메라를 갱신하며, 일시정지 중에도 레이아웃 복구를 재시도한다. 게임 Scene·VFX·물리·판정은 변경하지 않았다. 실제 비교 창에서 5종 진흙과 하단 조작을 확인했고, 새 실제 Scene 시작/일시정지 중 분리·재연결 검사를 포함한 접촉 PlayMode **5/5 통과**를 확인했다. 이 화면 보완 후 전체 검사를 다시 실행하지는 않았다.

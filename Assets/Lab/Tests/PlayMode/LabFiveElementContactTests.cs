@@ -1,13 +1,105 @@
 using System.Collections;
+using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
+using UnityEngine.UIElements;
 
 namespace C6Lab.Tests
 {
     [Category("GPU")]
     public sealed class LabFiveElementContactTests
     {
+#if UNITY_EDITOR
+        private const string ComparisonScenePath = "Assets/Experiments/FiveElements/Scenes/FiveElementsComparison.unity";
+        private bool comparisonSceneOwned;
+
+        [UnityTearDown]
+        public IEnumerator UnloadPreparedComparisonScene()
+        {
+            if (!comparisonSceneOwned) yield break;
+            comparisonSceneOwned = false;
+            Scene scene = SceneManager.GetSceneByPath(ComparisonScenePath);
+            if (scene.IsValid() && scene.isLoaded) yield return SceneManager.UnloadSceneAsync(scene);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PreparedComparisonFillsViewportAndRecoversDetachedLayoutWhilePaused()
+        {
+            Assert.IsNotNull(UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEditor.SceneAsset>(ComparisonScenePath),
+                "The checked-in prepared comparison Scene must be available without generating or saving it in this test.");
+            Assert.IsFalse(SceneManager.GetSceneByPath(ComparisonScenePath).isLoaded,
+                "The fixture must own its temporary additive Scene.");
+            comparisonSceneOwned = true;
+            yield return UnityEditor.SceneManagement.EditorSceneManager.LoadSceneAsyncInPlayMode(ComparisonScenePath,
+                new LoadSceneParameters(LoadSceneMode.Additive));
+            Scene scene = SceneManager.GetSceneByPath(ComparisonScenePath);
+            var demo = scene.GetRootGameObjects().SelectMany(root => root.GetComponentsInChildren<LabFiveElementsDemo>()).Single();
+            var document = demo.GetComponent<UIDocument>();
+            for (int frame = 0; frame < 60 && (demo.DemoCamera == null || document.rootVisualElement.panel == null ||
+                !(document.rootVisualElement.Q("view").worldBound.height > 1f)); frame++) yield return null;
+            yield return null;
+
+            VisualElement rootElement = document.rootVisualElement;
+            VisualElement shell = rootElement.Q("shell"), view = rootElement.Q("view");
+            Assert.IsNotNull(rootElement.panel, "The real comparison HUD must attach to its runtime panel.");
+            Assert.That(rootElement.worldBound.height,
+                Is.EqualTo(rootElement.panel.visualTree.worldBound.height).Within(1f),
+                "The UIDocument must fill the panel instead of collapsing its percentage-height shell.");
+            Assert.That(view.worldBound.height, Is.GreaterThan(shell.worldBound.height * .35f),
+                "The clay preview must consume the space between the top labels and transport controls.");
+            Assert.That(view.worldBound.yMax, Is.LessThanOrEqualTo(rootElement.Q(className: "transport").worldBound.yMin + 1f));
+            AssertComparisonViewport(demo, shell, view);
+
+            demo.SetPaused(true);
+            float pausedAt = demo.PlaybackTime;
+            float previousSize = demo.DemoCamera.orthographicSize;
+            demo.SetLens(float.NaN);
+            demo.SetLens(float.PositiveInfinity);
+            demo.SetLens(0f);
+            Assert.That(demo.DemoCamera.orthographicSize, Is.EqualTo(previousSize),
+                "Unresolved UI aspect values must never poison the lens or lane padding.");
+            AssertComparisonViewport(demo, shell, view);
+
+            // Detachment is a real UI Toolkit interval with no panel, as during document/layout rebuilds.
+            // Change the camera while detached so reattachment must actually frame it again while paused.
+            VisualElement parent = view.parent;
+            int index = parent.IndexOf(view);
+            view.RemoveFromHierarchy();
+            Rect detachedViewport = new Rect(0f, 0f, .25f, .25f);
+            demo.DemoCamera.rect = detachedViewport;
+            demo.SetComparison(false, false, false, false, false);
+            Assert.That(demo.DemoCamera.rect, Is.EqualTo(detachedViewport),
+                "A detached viewport must retain the last camera rectangle until layout is valid.");
+            parent.Insert(index, view);
+            for (int frame = 0; frame < 60 && (view.panel == null ||
+                Mathf.Abs(demo.DemoCamera.rect.width - 1f) > .001f); frame++) yield return null;
+            yield return null;
+            AssertComparisonViewport(demo, shell, view);
+            Assert.IsTrue(demo.Paused);
+            Assert.That(demo.PlaybackTime, Is.EqualTo(pausedAt).Within(.00001f),
+                "Recovering the comparison layout must not resume its paused animation.");
+        }
+
+        private static void AssertComparisonViewport(LabFiveElementsDemo demo, VisualElement shell, VisualElement view)
+        {
+            Assert.IsNotNull(demo.DemoCamera);
+            Rect rect = demo.DemoCamera.rect;
+            foreach (float component in new[] { rect.x, rect.y, rect.width, rect.height, demo.DemoCamera.orthographicSize,
+                shell.Q("lanes").resolvedStyle.paddingLeft, shell.Q("lanes").resolvedStyle.paddingRight })
+                Assert.IsFalse(float.IsNaN(component) || float.IsInfinity(component), "Layout must produce finite camera and lane values.");
+            Assert.That(rect.width, Is.EqualTo(1f).Within(.001f));
+            Assert.That(rect.height, Is.GreaterThan(0f).And.LessThanOrEqualTo(1.001f));
+            Assert.That(rect.yMin, Is.GreaterThanOrEqualTo(-.001f));
+            Assert.That(rect.yMax, Is.LessThanOrEqualTo(1.001f));
+            Assert.That(rect.height, Is.EqualTo(view.worldBound.height / shell.worldBound.height).Within(.002f));
+            Assert.That(rect.y, Is.EqualTo(1f - (view.worldBound.yMax - shell.worldBound.yMin) / shell.worldBound.height).Within(.002f));
+            Assert.That(demo.DemoCamera.orthographicSize, Is.GreaterThan(0f));
+        }
+#endif
+
         [UnityTest]
         public IEnumerator RealProjectileProducesOneIndependentEarthImpact()
         {

@@ -32,7 +32,7 @@ namespace C6Lab
         private LabDemoSurface surface;
         private int focus = -1, markSeconds = 2, frameRate = 60, lastHundredth = -1;
         private float speed = 1f;
-        private bool initialized, previousBackground;
+        private bool initialized, previousBackground, framingPending;
         private int previousFps, previousVSync;
         private float sampleRemainder;
 
@@ -120,6 +120,7 @@ namespace C6Lab
         private void CreateHud()
         {
             var root = GetComponent<UIDocument>().rootVisualElement;
+            root.style.flexGrow = 1;
             root.styleSheets.Add(hudStyle);
             shell = root.Q("shell");
             shell.style.unityFont = hudFont;
@@ -203,17 +204,26 @@ namespace C6Lab
 
         private void FrameCamera()
         {
-            if (view == null || view.panel == null || view.worldBound.height <= 1 || shell.worldBound.height <= 1) return;
+            framingPending = true;
+            if (view == null || view.panel == null || shell == null) return;
             var box = view.worldBound;
             var full = shell.worldBound;
+            // UI Toolkit geometry is initially NaN. Never feed it back into the camera or lane padding.
+            if (!Finite(box.yMin) || !Finite(box.yMax) || !Finite(full.yMin) ||
+                !Finite(box.height) || !Finite(full.height) || box.height <= 1f || full.height <= 1f) return;
             var rect = new Rect(0, 1f - (box.yMax - full.yMin) / full.height, 1, box.height / full.height);
-            DemoCamera.rect = rect;
             float aspect = (float)Screen.width / Mathf.Max(1f, Screen.height * rect.height);
+            if (!Finite(rect.y) || !Finite(rect.height) || !Finite(aspect) || aspect <= 0f) return;
+            DemoCamera.rect = rect;
             SetLens(aspect);
+            framingPending = false;
         }
+
+        private static bool Finite(float value) => !float.IsNaN(value) && !float.IsInfinity(value);
 
         public void SetLens(float aspect)
         {
+            if (!Finite(aspect) || aspect <= 0f) return;
             float mid = focus < 0 ? 0f : (focus - 2) * Spacing * diameter;
             var center = new Vector3(mid, .55f * diameter, 0);
             DemoCamera.orthographic = !distant;
@@ -287,6 +297,7 @@ namespace C6Lab
 
         private void Update()
         {
+            if (framingPending && DemoCamera != null) FrameCamera();
             if (pool == null || Paused) return;
             float step = 1f / frameRate;
             sampleRemainder += Mathf.Min(Time.unscaledDeltaTime, .2f);
