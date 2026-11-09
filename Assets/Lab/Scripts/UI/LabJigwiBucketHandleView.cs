@@ -171,6 +171,12 @@ namespace C6Lab
             steamObject.layer = gameObject.layer; steamObject.transform.SetParent(root, false);
             steam = steamObject.AddComponent<RawImage>(); steam.raycastTarget = false;
             steamHand = NewImage("Jigwi Bucket Steam Hand", Hand(), root);
+            // #595: a ring beside the rubbing finger fills as the smoke is wiped (full at the clear line).
+            ringBack = NewImage("Jigwi Smoke Wipe Gauge Back", Ring(), root);
+            ringFill = NewImage("Jigwi Smoke Wipe Gauge", Ring(), root);
+            ringFill.type = Image.Type.Filled; ringFill.fillMethod = Image.FillMethod.Radial360;
+            ringFill.fillOrigin = (int)Image.Origin360.Top; ringFill.fillClockwise = true;
+            ringBack.gameObject.SetActive(false); ringFill.gameObject.SetActive(false);
             // Both start hidden: they appear only when this seat's bucket ran out.
             steam.gameObject.SetActive(false); steamHand.gameObject.SetActive(false);
             flash = NewImage("Jigwi Bucket Flash", Vignette(), root);
@@ -720,11 +726,15 @@ namespace C6Lab
             {
                 if (fadeOut <= 0f) EndSteam();
                 Show(steamHand, false);
+                // Full ring flashes and swells away with the smoke.
+                float burst = Mathf.Clamp01((t - steamClearedAt) / .4f);
+                DrawWipeGauge(1f, 1f + .5f * burst, (1f - burst), board);
                 return;
             }
             // Rub: every finger (or mouse) drag over the board wipes a stroke out of the fog.
             if (TryPointer(out Vector2 screen) && board.Contains(screen))
             {
+                lastPointer = screen;
                 Vector2 uv = new Vector2((screen.x - board.xMin) / board.width, (screen.y - board.yMin) / board.height);
                 if (rubbing) Wipe(lastRub, uv, board); else Wipe(uv, uv, board);
                 lastRub = uv; rubbing = true;
@@ -741,8 +751,44 @@ namespace C6Lab
                 PlaceScreenRect(steamHand.rectTransform, new Rect(centre.x - hand * .33f, centre.y - hand * .5f, hand * .67f, hand));
                 steamHand.rectTransform.localEulerAngles = new Vector3(0f, 0f, -u * 12f);
                 steamHand.color = new Color(1f, 1f, 1f, Mathf.Clamp01(steamLeft * 1.6f) * fadeIn);
+                lastPointer = new Vector2(board.center.x + board.width * .12f, board.yMin + board.height * .66f); // steady beside the swaying hand
             }
+            float wiped = Mathf.Clamp01((1f - steamLeft) / Mathf.Max(.01f, 1f - steamClearLeft));
+            DrawWipeGauge(wiped, 1f, fadeIn, board);
         }
+
+        // ---------- #595 wipe gauge: a ring next to the finger (or the hint hand) ----------
+        private Image ringBack, ringFill;
+        private Vector2 lastPointer;
+        private static Sprite ringSprite;
+        /// <summary>테스트용: 연기 닦기 게이지(0~1, 1 = 다 닦음).</summary>
+        public float WipeGauge { get; private set; }
+
+        private void DrawWipeGauge(float wiped, float scale, float alpha, Rect board)
+        {
+            WipeGauge = wiped;
+            Show(ringBack, alpha > .01f); Show(ringFill, alpha > .01f);
+            if (alpha <= .01f) return;
+            float size = board.width * .17f;
+            // Up and to the right of the finger, so the finger never covers it (kept on screen).
+            Vector2 at = lastPointer + new Vector2(size * .75f, size * .75f);
+            at.x = Mathf.Clamp(at.x, board.xMin + size * .6f, board.xMax - size * .6f);
+            at.y = Mathf.Clamp(at.y, board.yMin + size * .6f, board.yMax - size * .6f);
+            Rect rect = new Rect(at.x - size * .5f, at.y - size * .5f, size, size);
+            PlaceScreenRect(ringBack.rectTransform, rect); PlaceScreenRect(ringFill.rectTransform, rect);
+            ringBack.rectTransform.localScale = ringFill.rectTransform.localScale = Vector3.one * scale;
+            ringBack.color = new Color(.1f, .08f, .07f, .55f * alpha);
+            ringFill.fillAmount = wiped;
+            ringFill.color = Color.Lerp(new Color(1f, .93f, .7f, alpha), new Color(.55f, 1f, .7f, alpha), wiped >= 1f ? 1f : 0f);
+        }
+
+        /// <summary>A thick round ring (white, tinted by colour).</summary>
+        private static Sprite Ring() => ringSprite != null ? ringSprite : ringSprite = Build("Jigwi wipe ring", 96, 96, (u, v) =>
+        {
+            float d = Vector2.Distance(new Vector2(u, v), new Vector2(.5f, .5f)) * 2f;
+            float a = Mathf.Clamp01((1f - d) * 30f) * Mathf.Clamp01((d - .7f) * 30f);
+            return new Color(1f, 1f, 1f, a);
+        });
 
         private void Wipe(Vector2 from, Vector2 to, Rect board)
         {
@@ -792,6 +838,7 @@ namespace C6Lab
             steamOn = false; rubbing = false;
             if (steam != null && steam.gameObject.activeSelf) steam.gameObject.SetActive(false);
             Show(steamHand, false);
+            Show(ringBack, false); Show(ringFill, false); WipeGauge = 0f;
             if (steamBlocking && source != null && source.board != null) source.board.SetUiInputBlocked(false);
             steamBlocking = false;
         }

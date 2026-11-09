@@ -813,7 +813,7 @@ namespace C6Lab
             // lines). The drops, the "now" vibration and the failure overlay carry the rest without text.
             // #540: the taunts are spoken by Jigwi's voice now (LabJigwiTalismanOverlay); no warning words on screen.
             string words = string.Empty;
-            DrawTalismanProgress(active, now); // #595: icons, not words
+            DrawTalismanProgress(LastCommonTalisman(stage, now) ?? active, now); // #595: icons, not words
             status.text = words; playerStatus.text = rows.ToString();
             statusPanel.gameObject.SetActive(words.Length > 0);
             playerStatus.gameObject.SetActive(rows.Length > 0);
@@ -828,10 +828,25 @@ namespace C6Lab
         public int TalismanIconsShown { get; private set; }
         public int TalismanIconsLit { get; private set; }
 
+        private const double TalismanLingerSeconds = 1.5d;
+        /// <summary>#595: the common talisman running now, or the one that just ended (still lingering).</summary>
+        private static LabJigwiABRound LastCommonTalisman(LabJigwiABSnapshot stage, double now)
+        {
+            LabJigwiABRound found = null;
+            foreach (var round in stage?.rounds ?? Array.Empty<LabJigwiABRound>())
+                if (round != null && round.kind == LabJigwiABKind.PersonalBurn && round.common && now >= round.activeAt
+                    && (round.Active(now) || round.resolvedAt >= 0d && now < round.resolvedAt + TalismanLingerSeconds)) found = round;
+            return found;
+        }
+
         private void DrawTalismanProgress(LabJigwiABRound active, double now)
         {
             int done = 0, total = 0;
-            bool show = active != null && active.Active(now) && active.kind == LabJigwiABKind.PersonalBurn && active.common;
+            // #595: also for a moment after it ends, so the last talisman written visibly lights its icon
+            // (alone, writing it finishes the round at once).
+            bool show = active != null && active.kind == LabJigwiABKind.PersonalBurn && active.common
+                && (active.Active(now) || active.resolvedAt >= 0d && now >= active.resolvedAt && now < active.resolvedAt + TalismanLingerSeconds
+                    && (active.resolution == LabJigwiABResolution.Completed || active.resolution == LabJigwiABResolution.Expired));
             if (show)
                 foreach (var seat in active.players ?? Array.Empty<LabJigwiABPlayerFire>())
                     if (seat != null) { total++; if (seat.talismanAt >= 0d) done++; }

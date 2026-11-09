@@ -24,6 +24,8 @@ namespace C6Lab
         /// </summary>
         public const int SmokeFlowSchedule = 3;
         private static readonly double[] SmokeFlowOffsets = { 10d, 45d, 66d, 83d };
+        /// <summary>#595 시험용: 부적(A)만 4초부터 17초마다 (4 / 21 / 38 / 55 / 72), 연기와 공통 기믹 없음.</summary>
+        public const int ATestSchedule = 4;
         /// <summary>#595: 연기 B가 시작되고(지귀 예고 2초 뒤) 박이 달아오르다 연기가 뿜어져 나오기까지(초). 모든 자리가 같다.</summary>
         public const double SmokeLeadSeconds = 1.5d;
         public const double WarningSeconds = 2d; // #509: 2초 예고(지귀 도발 문구를 읽을 시간)
@@ -31,13 +33,16 @@ namespace C6Lab
         private static readonly double[] ActivationOffsets = { 5d, 25d, 42d, 55d, 70d, 85d };
         private static readonly double[] FlowOffsets = { 10d, 45d, 66d, 83d };
         private static double[] Offsets(int schedule) => schedule == FlowSchedule ? FlowOffsets
-            : schedule == BTestSchedule ? BTestOffsets : schedule == SmokeFlowSchedule ? SmokeFlowOffsets : ActivationOffsets;
+            : schedule == BTestSchedule || schedule == ATestSchedule ? BTestOffsets
+            : schedule == SmokeFlowSchedule ? SmokeFlowOffsets : ActivationOffsets;
         public static bool ValidSchedule(int schedule) => schedule == LegacySchedule || schedule == FlowSchedule || schedule == BTestSchedule
-            || schedule == SmokeFlowSchedule;
+            || schedule == SmokeFlowSchedule || schedule == ATestSchedule;
         /// <summary>#551: the kind of a slot in this schedule (the B test schedule is all B).</summary>
         public static LabJigwiABKind KindForSlot(int slot, int schedule) => schedule == BTestSchedule
             ? (slot >= 0 && slot < SlotCount ? LabJigwiABKind.GroupFire : throw new ArgumentOutOfRangeException(nameof(slot)))
             // #595: 연기(B)가 먼저, 부적(A)이 다음.
+            : schedule == ATestSchedule
+                ? (slot >= 0 && slot < SlotCount ? LabJigwiABKind.PersonalBurn : throw new ArgumentOutOfRangeException(nameof(slot)))
             : schedule == SmokeFlowSchedule ? (KindForSlot(slot) == LabJigwiABKind.PersonalBurn ? LabJigwiABKind.GroupFire : LabJigwiABKind.PersonalBurn)
             : KindForSlot(slot);
         public static int SlotCountFor(int schedule) => Offsets(schedule).Length;

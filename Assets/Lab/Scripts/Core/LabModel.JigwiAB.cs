@@ -76,6 +76,7 @@ namespace C6Lab
             jigwiABEnabled = !teamMode && StageYokai == LabStageYokai.Jigwi && config.JigwiStageTimelineEnabled;
             jigwiSmokeFlow = config.JigwiSmokeFlow && !config.JigwiBTestOnly;
             jigwiSchedule = config.JigwiBTestOnly ? LabJigwiABTimeline.BTestSchedule // #551 시험용: B만
+                : config.JigwiATestOnly ? LabJigwiABTimeline.ATestSchedule // #595 시험용: 부적만
                 : jigwiSmokeFlow ? LabJigwiABTimeline.SmokeFlowSchedule // #595 연기 10 / 부적 45 / 연기 66 / 부적 83
                 : config.JigwiFlowSchedule ? LabJigwiABTimeline.FlowSchedule : LabJigwiABTimeline.LegacySchedule;
             jigwiAHoldBurn = config.JigwiAHoldBurnUntilEnd;
@@ -106,7 +107,8 @@ namespace C6Lab
         }
         private double NextJigwiABCommonAt(uint index)
         {
-            if (jigwiStageCutoffReached || jigwiSchedule == LabJigwiABTimeline.BTestSchedule) return double.PositiveInfinity; // #551 B만 시험
+            if (jigwiStageCutoffReached || jigwiSchedule == LabJigwiABTimeline.BTestSchedule
+                || jigwiSchedule == LabJigwiABTimeline.ATestSchedule) return double.PositiveInfinity; // #551 B만 / #595 부적만 시험
             if (jigwiSchedule != LabJigwiABTimeline.FlowSchedule && jigwiSchedule != LabJigwiABTimeline.SmokeFlowSchedule)
                 return index < JigwiStageCommonSlots.Length ? jigwiStageStartedAt + JigwiStageCommonSlots[index] : double.PositiveInfinity;
             // #540: from the start of the middle phase, every interval, until the fever.

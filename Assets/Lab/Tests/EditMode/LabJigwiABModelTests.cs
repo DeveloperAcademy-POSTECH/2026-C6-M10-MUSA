@@ -350,6 +350,21 @@ namespace C6Lab.Tests
             var failed=m.Snapshot(22);
             Assert.That(LabJigwiABNetworkValidation.Valid(failed.jigwiAB,failed.players,m.Revision),Is.True,"A failed B with no board fire still validates.");
         }
+        [Test] public void ATestOnlyRunsJustTheSharedTalismanFromFourSeconds()
+        {
+            // #595 시험용: 부적만 4초부터 17초마다, 연기와 공통 기믹 없음.
+            JsonUtility.FromJsonOverwrite("{\"jigwiATestOnly\":true,\"jigwiSmokeFlow\":true,\"jigwiABPersonalDurationSeconds\":10}",config);
+            var m=Room3();
+            var a=Current(m,4.1);
+            Assert.That(a.kind,Is.EqualTo(LabJigwiABKind.PersonalBurn));Assert.That(a.common,Is.True);
+            var next=typeof(LabModel).GetMethod("NextJigwiABCommonAt",BindingFlags.Instance|BindingFlags.NonPublic);
+            Assert.That((double)next.Invoke(m,new object[]{0u}),Is.EqualTo(double.PositiveInfinity),"No common gimmick.");
+            for(int t=5;t<=99;t++){m.Tick(t);var mid=m.Snapshot(t);
+                Assert.That(LabJigwiABNetworkValidation.Valid(mid.jigwiAB,mid.players,m.Revision),Is.True,"Valid at "+t+" s");}
+            var r=m.Snapshot(99).jigwiAB.rounds.OrderBy(x=>x.slot).ToArray();
+            Assert.That(r.Select(x=>x.activeAt),Is.EqualTo(new[]{4d,21d,38d,55d,72d}));
+            Assert.That(r.All(x=>x.kind==LabJigwiABKind.PersonalBurn&&x.common),Is.True,"Only the shared talisman.");
+        }
         [Test] public void SmokeFlowRunsSmokeThenSharedTalismanAndSmokesEveryScreenAtOnce()
         {
             // #595: 연기 10 / 부적 45 / 연기 66 / 부적 83, 공통 기믹은 25초부터 15초마다.
