@@ -11,7 +11,7 @@ namespace C6Lab.Tests
         public void EveryLongStageSongStreamsAndFeverSongsStayDecompressed()
         {
             foreach (string folder in new[] { LabBattleBgm.ClipFolder, LabBattleBgm.YaguangClipFolder,
-                LabBattleBgm.GumihoClipFolder, LabBattleBgm.TerritoryClipFolder })
+                LabBattleBgm.GumihoClipFolder, LabBattleBgm.TerritoryClipFolder, LabBattleBgm.JigwiClipFolder })
             {
                 AudioClip[] clips = Resources.LoadAll<AudioClip>(folder);
                 Assert.That(clips, Is.Not.Empty, folder);
@@ -23,7 +23,9 @@ namespace C6Lab.Tests
                 Is.EqualTo(new[] { "Yaguang_Stage" }));
             Assert.That(Resources.LoadAll<AudioClip>(LabBattleBgm.ClipFolder).Select(clip => clip.name),
                 Is.EqualTo(new[] { "Kkwaenggwari_13" }));
-            foreach (string folder in new[] { LabBattleBgm.FeverClipFolder, LabBattleBgm.GumihoFeverClipFolder })
+            Assert.That(Resources.LoadAll<AudioClip>(LabBattleBgm.JigwiClipFolder).Select(clip => clip.name),
+                Is.EqualTo(new[] { "Jigwi_Stage" }));
+            foreach (string folder in new[] { LabBattleBgm.FeverClipFolder, LabBattleBgm.GumihoFeverClipFolder, LabBattleBgm.JigwiFeverClipFolder })
                 foreach (AudioClip clip in Resources.LoadAll<AudioClip>(folder))
                     Assert.That(clip.loadType, Is.EqualTo(AudioClipLoadType.DecompressOnLoad),
                         folder + "/" + clip.name + " starts at an elapsed offset; it is preloaded instead of streamed.");

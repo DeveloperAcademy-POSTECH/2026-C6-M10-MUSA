@@ -9,6 +9,9 @@ namespace C6Lab
     /// - 일시정지: 멈춤 → 다시 시작하면 멈춘 지점부터 이어서
     /// - 승리/패배: 서서히 꺼짐
     /// 곡은 Resources/Audio/BGM 폴더의 첫 번째 소리 파일을 쓴다. 파일이 없으면 조용히 넘어간다.
+    /// - #577 라운드별 곡 (곡을 한 라운드씩 앞으로 당김): 1라운드 구미호 = 야광귀 곡(YaguangBGM, 크기 Yaguang Bgm Volume),
+    ///   2라운드 야광귀 = 기본 꽹과리 곡(BGM, 크기 BGM Volume), 3라운드 지귀 = 지귀 곡(JigwiBGM, 크기 Jigwi Bgm Volume).
+    ///   Yaguang Use New Bgm을 끄면 1라운드는 예전 구미호 곡(GumihoBGM, 크기 Gumiho Bgm Volume). 아래 #396/#351 설명은 그 전 기록이다.
     /// - 야광귀 스테이지 (#396): Resources/Audio/YaguangBGM의 곡을 튼다(크기는 Yaguang Bgm Volume). LabConfig Inspector의
     ///   Yaguang Use New Bgm(기본 켜짐)을 끄면 기존 꽹과리 BGM. 전투 중에 바꾸면 바로 처음부터 바꿔 튼다.
     /// - 구미호 스테이지 (#351): Resources/Audio/GumihoBGM 폴더에 곡이 있으면 그 곡을 대신 튼다 (크기는 LabConfig의
@@ -38,6 +41,10 @@ namespace C6Lab
         public const string YaguangClipFolder = "Audio/YaguangBGM";
         /// <summary>땅따먹기 전투 BGM (#409): 구미호 스테이지 곡이 바뀌기 전의 곡. 크기는 Gumiho Bgm Volume.</summary>
         public const string TerritoryClipFolder = "Audio/TerritoryBGM";
+        /// <summary>#577 지귀 스테이지 전투 BGM (진고 북이 중심인 무거운 곡). 크기는 LabConfig Jigwi Bgm Volume. 비어 있으면 기본 BGM.</summary>
+        public const string JigwiClipFolder = "Audio/JigwiBGM";
+        /// <summary>#577 지귀 피버(마지막 20초) 곡. 크기는 LabConfig Jigwi Fever Bgm Volume. 비어 있으면 지금처럼 구미호 피버 곡.</summary>
+        public const string JigwiFeverClipFolder = "Audio/JigwiFever";
 
         [Tooltip("LabConfig를 읽을 수 없을 때만 쓰는 기본 크기. 평소에는 LabConfig의 BGM Volume을 쓴다.")]
         [Range(0f, 1f)] public float volume = .2f;
@@ -52,7 +59,7 @@ namespace C6Lab
         private const double CueWindowSeconds = 1d;
 
         private AudioSource source, feverSource, cueSource;
-        private AudioClip battleClip, gumihoClip, feverClip, gumihoFeverClip, yaguangClip, territoryClip;
+        private AudioClip battleClip, gumihoClip, feverClip, gumihoFeverClip, yaguangClip, territoryClip, jigwiClip, jigwiFeverClip;
         private AudioClip[] cueClips;
         /// <summary>피버 시작 추임새를 낸 횟수 (테스트·확인용)</summary>
         public int FeverCueCount { get; private set; }
@@ -60,7 +67,7 @@ namespace C6Lab
         private string playingRound;
         private bool fading, feverOn;
         // 이번 라운드에 구미호 크기로 스테이지 곡(구미호 #351, 땅따먹기 #409)을 트는지, 지금 피버가 구미호 피버인지 (#351)
-        private bool gumihoBgm, gumihoFever, yaguangBgm;
+        private bool gumihoBgm, gumihoFever, yaguangBgm, jigwiBgm, jigwiFever;
         private float feverBlend; // 0 = 전투 BGM, 1 = 피버 곡
         private float toneSemitones; // 지금 전투 BGM 높이 (반음, 콤보 BIG/SMALL)
 
@@ -76,9 +83,11 @@ namespace C6Lab
 
         // 기본 크기(LabConfig: Inspector·DEV, 구미호 전투 BGM은 Inspector) × 이 기기의 BGM 설정(일시정지 메뉴)
         private float BaseVolume => network == null || network.config == null ? volume
+            : jigwiBgm ? network.config.JigwiBgmVolume
             : gumihoBgm ? network.config.GumihoBgmVolume : yaguangBgm ? network.config.YaguangBgmVolume : network.config.BgmVolume;
         private float TargetVolume => BaseVolume * LabAudioSettings.BgmVolume;
-        private float FeverTargetVolume => (gumihoFever && network != null && network.config != null
+        private float FeverTargetVolume => (jigwiFever && network != null && network.config != null ? network.config.JigwiFeverBgmVolume
+            : gumihoFever && network != null && network.config != null
             ? network.config.GumihoFeverBgmVolume : BaseVolume * feverVolume) * LabAudioSettings.BgmVolume;
 
         public void Bind(LabNetwork target) => network = target;
@@ -91,6 +100,8 @@ namespace C6Lab
             gumihoFeverClip = FirstClip(GumihoFeverClipFolder);
             yaguangClip = FirstClip(YaguangClipFolder);
             territoryClip = FirstClip(TerritoryClipFolder);
+            jigwiClip = FirstClip(JigwiClipFolder);
+            jigwiFeverClip = FirstClip(JigwiFeverClipFolder);
             source = gameObject.AddComponent<AudioSource>();
             source.playOnAwake = false;
             source.loop = true;
@@ -123,12 +134,14 @@ namespace C6Lab
         {
             bool gumiho = false;
             double elapsed = snapshot.paused ? -1d : FeverElapsed(snapshot, out gumiho);
-            AudioClip clip = gumiho && gumihoFeverClip != null ? gumihoFeverClip : feverClip;
+            bool jigwi = gumiho && jigwiFeverClip != null && network != null && network.GameStageYokai == LabStageYokai.Jigwi;
+            AudioClip clip = jigwi ? jigwiFeverClip : gumiho && gumihoFeverClip != null ? gumihoFeverClip : feverClip;
             bool fever = snapshot.paused ? feverOn : elapsed >= 0d && clip != null;
             if (fever && !feverOn)
             {
                 feverOn = true;
-                gumihoFever = gumiho;
+                gumihoFever = gumiho && !jigwi;
+                jigwiFever = jigwi;
                 feverSource.Stop();
                 feverSource.clip = clip;
                 feverSource.time = Mathf.Clamp((float)elapsed, 0f, Mathf.Max(0f, clip.length - .05f));
@@ -173,6 +186,7 @@ namespace C6Lab
         {
             feverOn = false;
             gumihoFever = false;
+            jigwiFever = false;
             feverBlend = 0f;
             if (feverSource != null)
             {
@@ -181,9 +195,9 @@ namespace C6Lab
             }
         }
 
-        /// <summary>야광귀 스테이지이고 Inspector에서 새 BGM을 켰고 곡 파일이 있으면 true (#396 테스트).</summary>
+        /// <summary>#577: 1라운드(구미호 스테이지)이고 Inspector에서 Yaguang Use New Bgm을 켰고 야광귀 곡 파일이 있으면 true.</summary>
         private bool WantsYaguangBgm() => yaguangClip != null && network != null && network.config != null
-            && network.config.YaguangUseNewBgm && network.GameStageYokai == LabStageYokai.Yaguang;
+            && network.config.YaguangUseNewBgm && network.GameStageYokai == LabStageYokai.Gumiho;
 
         private void Update()
         {
@@ -209,24 +223,27 @@ namespace C6Lab
                     fading = false;
                     StopFever();
                     SetTone(0f);
-                    AudioClip stageClip = snapshot.teamTerritory ? (territoryClip != null ? territoryClip : gumihoClip)
-                        : network.GameStageYokai == LabStageYokai.Gumiho ? gumihoClip : null;
+                    // #577: 1라운드 구미호 = 야광귀 곡, 2라운드 야광귀 = 기본 꽹과리 곡, 3라운드 지귀 = 지귀 곡. 땅따먹기는 그대로.
+                    AudioClip stageClip = snapshot.teamTerritory ? (territoryClip != null ? territoryClip : gumihoClip) : null;
+                    jigwiBgm = stageClip == null && jigwiClip != null && network.GameStageYokai == LabStageYokai.Jigwi;
+                    yaguangBgm = stageClip == null && !jigwiBgm && WantsYaguangBgm();
+                    if (stageClip == null && !jigwiBgm && !yaguangBgm && network.GameStageYokai == LabStageYokai.Gumiho) stageClip = gumihoClip;
                     gumihoBgm = stageClip != null;
-                    yaguangBgm = !gumihoBgm && WantsYaguangBgm();
                     source.Stop();
-                    source.clip = gumihoBgm ? stageClip : yaguangBgm ? yaguangClip : battleClip;
+                    source.clip = jigwiBgm ? jigwiClip : gumihoBgm ? stageClip : yaguangBgm ? yaguangClip : battleClip;
                     source.volume = TargetVolume;
                     source.time = 0f;
                     if (!snapshot.paused && source.clip != null)
                         using (LabFirstUse.Measure(LabFirstUseKind.BattleMusic)) source.Play();
                     return;
                 }
-                // 야광귀 새 BGM 후보 (#396): 전투 중에 Inspector 토글을 바꾸면 바로 다른 곡으로 처음부터 바꿔 들려준다.
-                if (!gumihoBgm && WantsYaguangBgm() != yaguangBgm && !FeverPlaying)
+                // 1라운드 곡 토글 (#396 → #577): 전투 중에 Inspector 토글을 바꾸면 바로 야광귀 곡 ↔ 예전 구미호 곡으로 처음부터 바꿔 튼다.
+                if (!snapshot.teamTerritory && network.GameStageYokai == LabStageYokai.Gumiho && WantsYaguangBgm() != yaguangBgm && !FeverPlaying)
                 {
                     yaguangBgm = !yaguangBgm;
+                    gumihoBgm = !yaguangBgm && gumihoClip != null;
                     source.Stop();
-                    source.clip = yaguangBgm ? yaguangClip : battleClip;
+                    source.clip = yaguangBgm ? yaguangClip : gumihoBgm ? gumihoClip : battleClip;
                     source.volume = TargetVolume;
                     source.time = 0f;
                     if (!snapshot.paused && source.clip != null) source.Play();
