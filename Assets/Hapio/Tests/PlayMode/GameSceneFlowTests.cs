@@ -1918,7 +1918,7 @@ namespace Hapio.Tests
             Assert.That(card, Is.Not.Null, "The current stage's actual seal card must be visible.");
             Assert.That(card.sealRate.text, Is.EqualTo(Mathf.RoundToInt(snapshot.paintCoverage * 100) + "%"));
             Assert.That(card.timeRemaining.text, Is.EqualTo(Mathf.CeilToInt((float)snapshot.remaining) + "초"));
-            StoryCardRecords.Record[] records = GameStageStoryPresentation.CardRecords(snapshot);
+            StoryCardRecords.Record[] records = GameStageStoryPresentation.CardRecords(snapshot, GameSession.Instance.Network.LocalPlayerId);
             Assert.That(card.players, Has.Length.EqualTo(5));
             for (int row = 0; row < 5; row++)
             {
