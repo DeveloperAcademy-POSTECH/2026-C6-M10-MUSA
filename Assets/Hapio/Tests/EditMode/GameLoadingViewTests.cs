@@ -19,6 +19,15 @@ namespace Hapio.Tests
         }
 
         [Test]
+        public void RunnerCaptionAndBarSitTogetherOnTheScreensMiddle()
+        {
+            const float runner = 182f, below = 81f;
+            float bottom = GameLoadingView.RunnerBottomForCenteredContent(10f, runner, below);
+            Assert.That((bottom + runner + bottom - below) * .5f, Is.EqualTo(10f).Within(1e-4f), "Half the block above the center, half below.");
+            Assert.That(GameLoadingArt.Load().contentCenterFromTop, Is.EqualTo(.5f), "The saved art centers the block on the screen (#586).");
+        }
+
+        [Test]
         public void FillIsARoundDotAtZeroAndTheWholeInsideAtFull()
         {
             const float inner = 257f, height = 11f;
