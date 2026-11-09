@@ -316,7 +316,8 @@ namespace Hapio
                 : !string.IsNullOrEmpty(session.UiNotice) ? session.UiNotice
                 : browser && !string.IsNullOrEmpty(Network.RoomSearchMessage) ? Network.RoomSearchMessage : Network.Notice;
             message.text = notice;
-            message.gameObject.SetActive((browser || lobby) && !string.IsNullOrEmpty(notice));
+            // The approved Home and Lobby designs have no status line; the text is kept for tests and logs only.
+            message.gameObject.SetActive(false);
         }
 
         private void FitScreen()

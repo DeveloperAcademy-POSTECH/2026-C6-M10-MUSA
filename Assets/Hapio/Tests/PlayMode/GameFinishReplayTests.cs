@@ -199,6 +199,13 @@ namespace Hapio.Tests
             Assert.That(parts.Any(n => n.StartsWith("Lid Paint")), Is.True);
             yield return Until(() => session.State.phase == GameFlowPhase.StageResult && !session.IsLoadingScene
                 && SceneManager.GetActiveScene().path == GameScenePaths.StageResult, "The stage result loads", 30d);
+            GameStageStoryPresentation story = null;
+            yield return Until(() => (story = Object.FindAnyObjectByType<GameStageStoryPresentation>()) != null, "The result story", 10d);
+            for (int frame = 0; frame < 30; frame++)
+            {
+                yield return null;
+                Assert.That(story.statusText.gameObject.activeInHierarchy, Is.False, "The approved result design has no status line.");
+            }
         }
 
         private IEnumerator ReachStage(int stage)
