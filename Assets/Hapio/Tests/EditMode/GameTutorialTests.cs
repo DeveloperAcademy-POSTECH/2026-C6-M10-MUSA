@@ -34,7 +34,7 @@ namespace Hapio.Tests
             Assert.That(goal.Beats.All(beat => beat.IsLine), Is.True, "The goal step only talks.");
             foreach (GameTutorialStep step in GameTutorialScript.Steps)
                 foreach (GameTutorialBeat line in step.Lines)
-                    Assert.That(line.Text.Split('\n').Length, Is.LessThanOrEqualTo(2), "One bubble holds two lines at most.");
+                    Assert.That(line.Text.Split('\n').Length, Is.LessThanOrEqualTo(3), "The approved #552 script allows up to three explicit lines per bubble.");
             Assert.That(GameTutorialScript.StageLabel, Is.EqualTo("튜토리얼"));
         }
 

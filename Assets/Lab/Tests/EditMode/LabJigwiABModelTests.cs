@@ -364,8 +364,6 @@ namespace C6Lab.Tests
                 "One bucket after another.");
             Assert.That(m.Snapshot(25.1).orbs.Any(o=>o.jigwiABSupplyEventId==b.id),Is.False,"No special Water orb.");
             Assert.That(m.TrySetJigwiBReady(Three[0],b.id,true,25.2),Is.False,"Holding means nothing here.");
-            var last=b.players.OrderBy(p=>p.readyAt).Last();
-            Assert.That(m.TryJigwiBPull(last.playerId,b.id,last.readyAt-.1),Is.False,"Not before my bucket arrives.");
             int painted=m.PaintSurface.PaintCount;
             var first=b.players.OrderBy(p=>p.readyAt).First();
             Assert.That(m.TryJigwiBPull(first.playerId,b.id,first.readyAt+1),Is.True);
@@ -374,6 +372,9 @@ namespace C6Lab.Tests
             var mid=m.Snapshot(first.readyAt+1.5);
             Assert.That(mid.jigwiAB.rounds.Single(r=>r.id==b.id).resolution,Is.EqualTo(LabJigwiABResolution.None));
             Assert.That(LabJigwiABNetworkValidation.Valid(mid.jigwiAB,mid.players,m.Revision),Is.True);
+            // Check the last arrival after the earlier seat's pour: model timestamps must increase.
+            var last=b.players.OrderBy(p=>p.readyAt).Last();
+            Assert.That(m.TryJigwiBPull(last.playerId,b.id,last.readyAt-.1),Is.False,"Not before my bucket arrives.");
             double end=0;
             foreach(var seat in b.players.Where(p=>p.playerId!=first.playerId).OrderBy(p=>p.readyAt))
             { end=seat.readyAt+2;Assert.That(m.TryJigwiBPull(seat.playerId,b.id,end),Is.True); }
