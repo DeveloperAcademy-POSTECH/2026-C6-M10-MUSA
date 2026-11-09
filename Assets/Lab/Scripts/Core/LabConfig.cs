@@ -739,8 +739,13 @@ namespace C6Lab
         [SerializeField, Range(0f, 1f)] private float paintClusterCompactness = .85f;
         [Tooltip("반복 명중 성장 덩어리 경계의 불규칙한 정도. 새 판에 적용한다.")]
         [SerializeField, Range(0f, 1f)] private float paintClusterIrregularity = .25f;
-        [SerializeField, Range(.5f, 3f)] private float gourdVisualSize = 1.4f;
-        public float GourdVisualSize => Mathf.Clamp(Finite(gourdVisualSize, 1.4f), .5f, 3f);
+        /// <summary>
+        /// #473: 1.1 times the earlier 1.4. The white gourd is drawn at size/1.8 and a baked stage gourd at
+        /// size/referenceVisualSize (1.4), so every gourd and its hitbox grow by the same 1.1.
+        /// </summary>
+        public const float DefaultGourdVisualSize = 1.54f;
+        [SerializeField, Range(.5f, 3f)] private float gourdVisualSize = DefaultGourdVisualSize;
+        public float GourdVisualSize => Mathf.Clamp(Finite(gourdVisualSize, DefaultGourdVisualSize), .5f, 3f);
         [SerializeField, Range(.1f, 100f)] private float paintGrowthPercentPerSecond = 6f;
         [SerializeField, Range(0f, 100f)] private float paintFillChancePercent = 60f;
         [SerializeField, Range(1f, 4f)] private float paintVerticalWeight = 1.35f;
