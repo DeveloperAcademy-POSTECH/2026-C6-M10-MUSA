@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -72,6 +73,19 @@ namespace Hapio.Tests
             var events=EventSystem.current;GameObject ownedEvents=null;if(events==null){ownedEvents=new GameObject("Events",typeof(EventSystem));events=ownedEvents.GetComponent<EventSystem>();}
             try
             {
+                var cut = view.GetComponent<StoryCutView>();
+                var drop = cut.beats.Single(beat => beat != null && beat.motion == StoryVisualBeat.Motion.PaperDrop);
+                Assert.That(drop.interactionDelay, Is.GreaterThan(drop.Duration),
+                    "Use the real card's delayed interaction, not a fixture where the entrance already unlocks clicks.");
+                cut.Sample(0);
+                Assert.That(drop.GetComponent<CanvasGroup>().blocksRaycasts, Is.False);
+                int sourcesBeforeSettle = view.GetComponentsInChildren<AudioSource>(true).Length;
+                cut.ShowCompletedPose();
+                Assert.That(drop.GetComponent<CanvasGroup>().alpha, Is.EqualTo(1));
+                Assert.That(drop.GetComponent<CanvasGroup>().blocksRaycasts, Is.True,
+                    "Settling an early-Skipped card must release its delayed interaction gate.");
+                Assert.That(view.GetComponentsInChildren<AudioSource>(true).Length, Is.EqualTo(sourcesBeforeSettle),
+                    "The quiet completed pose must not create the paper-drop or stamp sound sources.");
                 yield return null;Canvas.ForceUpdateCanvases();
                 var e=new PointerEventData(events){position=RectTransformUtility.WorldToScreenPoint(null,flip.card.TransformPoint(Vector2.zero))};
                 var hits=new System.Collections.Generic.List<RaycastResult>();events.RaycastAll(e,hits);

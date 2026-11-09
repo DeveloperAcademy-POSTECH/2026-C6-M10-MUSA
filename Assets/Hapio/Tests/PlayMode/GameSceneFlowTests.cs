@@ -788,8 +788,14 @@ namespace Hapio.Tests
                 Assert.That(session.IsAnyResultPresentationBusy, Is.True);
                 if (stage < 3) Assert.That(session.CanAdvanceStage, Is.False,
                     "Receiving the record cannot bypass the current story.");
+                StoryCutView resultViewBeforeSkip = story.player.CurrentView;
                 yield return FinishResultStory();
+                Assert.That(story.player.CurrentView, Is.SameAs(resultViewBeforeSkip),
+                    "SKIP keeps the current picture instead of instantiating the seal card again.");
                 AssertCurrentCard(story, session.ResultSnapshot);
+                AssertSkippedCardSettled(story);
+                Assert.That(story.player.nextButton.gameObject.activeInHierarchy, Is.False,
+                    "The authoring toolbar must not add a second progression button to the game.");
                 if (stage < 3)
                 {
                     yield return Until(() => story.advanceButton.interactable, "The Host starts the next stage only after story and result readiness.");
@@ -801,8 +807,10 @@ namespace Hapio.Tests
                         Assert.That(session.State.stageIndex, Is.EqualTo(1));
                         var cardActions = story.player.CurrentView.GetComponent<StoryResultActions>();
                         Assert.That(cardActions, Is.Not.Null);
+                        Assert.That(story.viewerButton.gameObject.activeInHierarchy, Is.False,
+                            "A retained seal card keeps its authored inspection action instead of adding a footer duplicate.");
                         cardActions.InspectGourd();
-                        yield return Until(() => session.IsViewerOpen, "The real card action opens the existing captured gourd.");
+                        yield return Until(() => session.IsViewerOpen, "The authored card action opens the existing captured gourd.");
                         yield return null;
                         Assert.That(story.presentationGroup.alpha, Is.Zero);
                         Assert.That(story.advanceButton.interactable, Is.False);
@@ -810,7 +818,8 @@ namespace Hapio.Tests
                         Assert.That(session.State.stageIndex, Is.EqualTo(1));
                         session.CloseGourdViewer();
                         yield return Until(() => story.advanceButton.interactable && story.presentationGroup.alpha == 1,
-                            "Closing inspection restores the same card and manual NEXT.");
+                            "Closing inspection restores the same result and manual NEXT.");
+                        Assert.That(story.player.CurrentView, Is.SameAs(resultViewBeforeSkip));
                         AssertCurrentCard(story, session.ResultSnapshot);
 
                         typeof(GameSession).GetMethod("SetResultViewer", BindingFlags.Instance | BindingFlags.NonPublic)
@@ -823,6 +832,15 @@ namespace Hapio.Tests
                         typeof(GameSession).GetMethod("SetResultViewer", BindingFlags.Instance | BindingFlags.NonPublic)
                             .Invoke(session, new object[] { 72UL, false });
                         yield return Until(() => story.advanceButton.interactable, "A closed peer viewer restores NEXT.");
+                        typeof(GameSession).GetMethod("SetResultPresentation", BindingFlags.Instance | BindingFlags.NonPublic)
+                            .Invoke(session, new object[] { 72UL, true });
+                        yield return null;
+                        Assert.That(story.advanceButton.interactable, Is.False, "A peer's unfinished story still blocks Host NEXT.");
+                        story.Advance();
+                        Assert.That(session.State.stageIndex, Is.EqualTo(1));
+                        typeof(GameSession).GetMethod("SetResultPresentation", BindingFlags.Instance | BindingFlags.NonPublic)
+                            .Invoke(session, new object[] { 72UL, false });
+                        yield return Until(() => story.advanceButton.interactable, "Finishing the peer story restores the one Host action.");
 
                         GameScreen screen = story.screen;
                         screen.gameObject.SetActive(false);
@@ -846,6 +864,12 @@ namespace Hapio.Tests
                 Assert.That(snapshot.sessionId, Is.EqualTo(session.State.battleSessionId));
                 Assert.That(snapshot.round, Is.EqualTo(session.State.battleRound));
                 Assert.That(snapshot.phase, Is.EqualTo(LabPhase.Victory));
+                StoryCutView finalResultView = story.player.CurrentView;
+                Assert.That(story.exitButton.gameObject.activeInHierarchy, Is.False,
+                    "The final result has one ending action, not an Exit button relabelled to the same action.");
+                Assert.That(story.presentationRoot.GetComponentsInChildren<UnityEngine.UI.Button>(true)
+                    .Count(button => button.gameObject.activeInHierarchy
+                        && button.GetComponentInChildren<UnityEngine.UI.Text>(true)?.text == "엔딩 보기"), Is.EqualTo(1));
                 story.overallButton.onClick.Invoke();
                 yield return null;
                 GameStageResultView view = story.screen.resultView;
@@ -856,8 +880,9 @@ namespace Hapio.Tests
                 view.nextButton.onClick.Invoke();
                 yield return null;
                 Assert.That(story.IsShowingOverall, Is.False);
+                Assert.That(story.player.CurrentView, Is.SameAs(finalResultView), "Overall returns to the retained result picture.");
                 AssertCurrentCard(story, snapshot);
-                yield return Until(() => story.advanceButton.interactable, "The final card waits for result readiness.");
+                yield return Until(() => story.advanceButton.interactable, "The final result waits for result readiness.");
                 story.advanceButton.onClick.Invoke();
                 Assert.That(story.player.sequence, Is.SameAs(story.ending));
                 Assert.That(story.player.sequence.cuts, Has.Count.EqualTo(6), "Do not show the authored fake Ending_07 title.");
@@ -868,6 +893,90 @@ namespace Hapio.Tests
                 Assert.That(Object.FindFirstObjectByType<GameLobbyView>(), Is.Not.Null,
                     "Ending returns to the actual saved Home, not a duplicate story title.");
             }
+        }
+
+        [UnityTest]
+        public IEnumerator NormalAfterStoryCompletionKeepsItsLastCutAndDoesNotReplayTheSealCard()
+        {
+            session.StartSolo();
+            yield return WaitPlaying(1);
+            CompleteMapInFixture(Model());
+            yield return WaitResultStory();
+            GameStageStoryPresentation story = ResultStory();
+            yield return Until(() => !story.player.UserInputBlocked, "The actual result entry shield releases.");
+            StoryCutView firstCard = story.player.CurrentView;
+            AssertCurrentCard(story, session.ResultSnapshot);
+            int viewChanges = 0;
+            story.player.ViewChanged += _ => viewChanges++;
+            int steps = 0;
+            while (story.player.IsPlaying && steps++ < 40)
+            {
+                // Direct cut sequencing is intentional here; genuine input is exercised by the neighbouring mouse test.
+                story.player.Next();
+                AssertNoInlineContinue(story.player.CurrentView);
+                if (!story.player.IsPlaying)
+                    Assert.That(story.advanceButton.interactable, Is.False, "The story-ending frame cannot also activate NEXT.");
+                yield return null;
+            }
+            Assert.That(story.player.IsPlaying, Is.False);
+            StoryCutView retained = story.player.CurrentView;
+            Assert.That(retained, Is.Not.Null);
+            Assert.That(story.player.CurrentCutIndex, Is.EqualTo(2));
+            Assert.That(retained.GetComponentInChildren<StoryCardRecords>(true), Is.Null,
+                "Normal completion stays on the last after-story picture, not a recreated first card.");
+            yield return Until(() => story.IsLocalStoryComplete && story.advanceButton.interactable,
+                "Released story completion enables the one Host stage action.");
+            Assert.That(story.player.CurrentView, Is.SameAs(retained));
+            Assert.That(viewChanges, Is.EqualTo(2), "Only the two remaining authored cuts may be instantiated.");
+            Assert.That(firstCard == null, Is.True);
+            Assert.That(story.player.sequence, Is.SameAs(story.afterStages[0]));
+            AssertNoInlineContinue(story.player.CurrentView);
+            Assert.That(story.player.nextButton.gameObject.activeInHierarchy, Is.False);
+            Assert.That(story.viewerButton.gameObject.activeInHierarchy && story.viewerButton.interactable, Is.True,
+                "The last after-story has no card actions, so the shared result group must retain inspection.");
+            story.viewerButton.onClick.Invoke();
+            yield return Until(() => session.IsViewerOpen, "The retained after-story still permits gourd inspection.");
+            session.CloseGourdViewer();
+            yield return Until(() => story.advanceButton.interactable, "Inspection restores the same manual stage action.");
+            Assert.That(story.player.CurrentView, Is.SameAs(retained));
+            Assert.That(viewChanges, Is.EqualTo(2), "Closing inspection does not replay any story cut.");
+            Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.StageResult));
+            Assert.That(session.State.stageIndex, Is.EqualTo(1));
+        }
+
+        [UnityTest]
+        public IEnumerator SkipDuringAfterStoryReadingKeepsThePictureWithoutAnInlineNextAction()
+        {
+            session.StartSolo();
+            yield return WaitPlaying(1);
+            CompleteMapInFixture(Model());
+            yield return WaitResultStory();
+            GameStageStoryPresentation story = ResultStory();
+            yield return Until(() => !story.player.UserInputBlocked, "The actual result entry shield releases.");
+            int steps = 0;
+            while ((story.player.CurrentCutIndex != 2 || !story.player.IsReading) && steps++ < 20)
+            {
+                story.player.Next();
+                AssertNoInlineContinue(story.player.CurrentView);
+                yield return null;
+            }
+            Assert.That(story.player.CurrentCutIndex, Is.EqualTo(2));
+            Assert.That(story.player.IsReading, Is.True, "Exercise an actual after-story dialogue, not only the initial card.");
+            StoryCutView retained = story.player.CurrentView;
+            Assert.That(retained.continueButton, Is.Not.Null,
+                "The final authored after-story supplies the inline next-yokai control being suppressed.");
+            AssertNoInlineContinue(retained);
+            story.Skip();
+            yield return Until(() => story.IsLocalStoryComplete && story.advanceButton.interactable,
+                "Skipping the reading cut releases the one explicit Host stage action.");
+            Assert.That(story.player.CurrentView, Is.SameAs(retained));
+            Assert.That(story.player.CurrentCutIndex, Is.EqualTo(2));
+            AssertNoInlineContinue(retained);
+            Assert.That(story.player.nextButton.gameObject.activeInHierarchy, Is.False);
+            Assert.That(story.presentationRoot.GetComponentsInChildren<UnityEngine.UI.Button>(true)
+                .Count(button => button.gameObject.activeInHierarchy
+                    && button.GetComponentInChildren<UnityEngine.UI.Text>(true)?.text == "다음 스테이지"), Is.EqualTo(1));
+            Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.StageResult));
         }
 
         [UnityTest]
@@ -907,12 +1016,16 @@ namespace Hapio.Tests
                     Is.InstanceOf<UnityEngine.InputSystem.UI.InputSystemUIInputModule>(),
                     "Exercise the saved Input System UI module, not direct UnityEvent callbacks.");
                 Assert.That(story.player.sequence, Is.SameAs(story.afterStages[2]));
+                StoryCutView skippedView = story.player.CurrentView;
                 yield return ClickVisibleButtonWithMouse(mouse, story.skipButton);
                 yield return Until(() => story.IsLocalStoryComplete,
                     "A real pointer click on the top SKIP must finish Jigwi's after-story.");
+                Assert.That(story.player.CurrentView, Is.SameAs(skippedView), "SKIP does not replay a card.");
+                AssertSkippedCardSettled(story);
+                Assert.That(story.player.nextButton.gameObject.activeInHierarchy, Is.False);
                 AssertCurrentCard(story, session.ResultSnapshot);
                 yield return Until(() => story.advanceButton.gameObject.activeInHierarchy && story.advanceButton.IsInteractable(),
-                    "The saved footer must expose the ending control after card review.");
+                    "The one result action group exposes ending after the story is released.");
                 yield return ClickVisibleButtonWithMouse(mouse, story.advanceButton);
                 yield return Until(() => story.player.sequence == story.ending && story.player.IsPlaying,
                     "A real footer click must begin the six-cut ending.");
@@ -1019,9 +1132,21 @@ namespace Hapio.Tests
                 InputSystem.QueueStateEvent(touchscreen, new TouchState
                     { touchId = 92, phase = UnityEngine.InputSystem.TouchPhase.Ended, position = Vector2.one * 40f });
                 InputSystem.Update();
-                yield return Until(() => !view.player.UserInputBlocked && view.exitButton.interactable,
+                yield return Until(() => !view.player.UserInputBlocked,
                     "All released pointers restore story input without a timed countdown.");
+                Assert.That(view.exitButton.gameObject.activeInHierarchy, Is.False,
+                    "Story reading does not add the finished-result action group early.");
                 Assert.That(session.CanAdvanceStage, Is.False, "Releasing input still requires story completion.");
+                InputSystem.QueueStateEvent(mouse, new MouseState().WithButton(MouseButton.Left));
+                InputSystem.Update();
+                view.player.Skip(); // Finish sequencing while another physical pointer remains held.
+                yield return null; yield return null;
+                Assert.That(view.IsLocalStoryComplete, Is.False, "Story completion waits for the final held gesture release.");
+                Assert.That(view.advanceButton.interactable, Is.False);
+                view.Advance();
+                Assert.That(session.State.stageIndex, Is.EqualTo(1), "The inherited release cannot become a stage action.");
+                InputSystem.QueueStateEvent(mouse, new MouseState());
+                InputSystem.Update();
                 yield return FinishResultStory();
                 yield return Until(() => view.advanceButton.interactable, "Only the completed story opens NEXT.");
                 Assert.That(session.State.stageIndex, Is.EqualTo(1), "Releasing inherited input cannot itself advance.");
@@ -1048,11 +1173,12 @@ namespace Hapio.Tests
                 Assert.That(session.CurrentStageDefinition.displayName, Is.EqualTo("야광귀"));
                 InputSystem.QueueStateEvent(mouse, new MouseState());
                 InputSystem.Update();
-                yield return Until(() => defeat.exitButton.interactable, "Released defeat input restores exit.");
+                yield return Until(() => !defeat.player.UserInputBlocked, "Released defeat input restores story input.");
                 yield return FinishResultStory();
                 var gauge = defeat.player.CurrentView.GetComponentInChildren<StorySealGauge>(true);
                 Assert.That(gauge.target, Is.EqualTo(defeat.BoundResult.paintCoverage));
-                CompleteButtonPointer(defeat.exitButton);
+                AssertFailureUsesOnlyAuthoredActions(defeat);
+                CompleteButtonPointer(FailureActionButton(defeat, "Exit"));
                 yield return WaitHome();
             }
             finally
@@ -1110,8 +1236,10 @@ namespace Hapio.Tests
             yield return FinishResultStory();
             var gauge = story.player.CurrentView.GetComponentInChildren<StorySealGauge>(true);
             Assert.That(gauge.target, Is.EqualTo(snapshot.paintCoverage), "Failure uses Jigwi's actual coverage, never authored 78%.");
-            yield return Until(() => story.exitButton.interactable, "The result permits explicit exit.");
-            story.exitButton.onClick.Invoke();
+            AssertFailureUsesOnlyAuthoredActions(story);
+            var exit = FailureActionButton(story, "Exit");
+            yield return Until(() => exit.interactable, "The authored result permits explicit exit.");
+            exit.onClick.Invoke();
             yield return WaitHome();
         }
 
@@ -1181,7 +1309,8 @@ namespace Hapio.Tests
             yield return FinishResultStory();
             var gauge = resultView.player.CurrentView.GetComponentInChildren<StorySealGauge>(true);
             Assert.That(gauge.target, Is.EqualTo(network.Snapshot.paintCoverage));
-            resultView.exitButton.onClick.Invoke();
+            AssertFailureUsesOnlyAuthoredActions(resultView);
+            FailureActionButton(resultView, "Exit").onClick.Invoke();
             yield return WaitHome();
         }
 
@@ -1694,10 +1823,58 @@ namespace Hapio.Tests
         {
             yield return WaitResultStory();
             GameStageStoryPresentation story = ResultStory();
-            yield return Until(() => !story.player.UserInputBlocked, "Inherited result inputs must release before story completion.");
+            yield return Until(() => story.IsLocalStoryComplete || !story.player.UserInputBlocked,
+                "Inherited result inputs must release before story completion.");
             if (!story.IsLocalStoryComplete) story.player.Skip();
             yield return Until(() => story.IsLocalStoryComplete, "Completing the local story opens only its result controls.");
             yield return null;
+        }
+
+        private static void AssertNoInlineContinue(StoryCutView view)
+        {
+            Assert.That(view, Is.Not.Null);
+            if (view.continueButton != null)
+                Assert.That(view.continueButton.gameObject.activeInHierarchy, Is.False,
+                    "An authored ‘next yokai’ picture action must not compete with the actual stage transition.");
+        }
+
+        private static void AssertSkippedCardSettled(GameStageStoryPresentation story)
+        {
+            StoryCutView actual = story.player.CurrentView;
+            StoryCutView authored = story.player.sequence.cuts[story.player.CurrentCutIndex].viewPrefab;
+            int checkedBeats = 0;
+            for (int index = 0; actual.beats != null && index < actual.beats.Length; index++)
+            {
+                StoryVisualBeat beat = actual.beats[index];
+                if (beat == null || beat.motion != StoryVisualBeat.Motion.PaperDrop) continue;
+                checkedBeats++;
+                Assert.That(beat.GetComponent<CanvasGroup>().alpha, Is.EqualTo(1), "Early Skip leaves a fully shown card.");
+                Assert.That(beat.GetComponent<CanvasGroup>().blocksRaycasts, Is.True,
+                    "The retained card must also be clickable when its interaction delay exceeds the entrance duration.");
+                Assert.That(Vector2.Distance(((RectTransform)beat.transform).anchoredPosition,
+                    ((RectTransform)authored.beats[index].transform).anchoredPosition), Is.LessThan(.001f));
+            }
+            Assert.That(checkedBeats, Is.GreaterThan(0), "The authored card fixture includes its paper-drop entrance.");
+        }
+
+        private static UnityEngine.UI.Button FailureActionButton(GameStageStoryPresentation story, string method)
+        {
+            var actions = story.player.CurrentView.GetComponent<StoryResultActions>();
+            Assert.That(actions, Is.Not.Null, "The authored failure dashboard owns its actions.");
+            return actions.GetComponentsInChildren<UnityEngine.UI.Button>(true).Single(button =>
+                Enumerable.Range(0, button.onClick.GetPersistentEventCount()).Any(i =>
+                    button.onClick.GetPersistentTarget(i) == actions && button.onClick.GetPersistentMethodName(i) == method));
+        }
+
+        private static void AssertFailureUsesOnlyAuthoredActions(GameStageStoryPresentation story)
+        {
+            Assert.That(story.advanceButton.gameObject.activeInHierarchy, Is.False, "No duplicate footer retry.");
+            Assert.That(story.exitButton.gameObject.activeInHierarchy, Is.False, "No duplicate footer exit.");
+            Assert.That(story.viewerButton.gameObject.activeInHierarchy, Is.False);
+            Assert.That(story.overallButton.gameObject.activeInHierarchy, Is.False);
+            Assert.That(story.player.nextButton.gameObject.activeInHierarchy, Is.False);
+            Assert.That(FailureActionButton(story, "Retry").gameObject.activeInHierarchy, Is.True);
+            Assert.That(FailureActionButton(story, "Exit").gameObject.activeInHierarchy, Is.True);
         }
 
         private static void AssertCurrentCard(GameStageStoryPresentation story, LabSnapshot snapshot)

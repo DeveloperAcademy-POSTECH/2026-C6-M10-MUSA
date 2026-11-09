@@ -27,6 +27,8 @@ namespace Hapio
         public bool playOnStart = true;
         [Tooltip("Game opening only: manual input; the authoring preview can still use AUTO.")]
         public bool touchOnly;
+        [Tooltip("Game results use their shared action group; the authoring preview keeps inline continue controls by default.")]
+        public bool hideInlineContinueButtons;
         public UnityEvent onCompleted = new UnityEvent();
         public UnityEvent onSkipped = new UnityEvent();
         public event Action<StoryExitReason> Finished;
@@ -253,7 +255,7 @@ namespace Hapio
         private void BeginReading()
         {
             IsReading = true;
-            if (currentView.continueButton != null) currentView.continueButton.gameObject.SetActive(true);
+            if (currentView.continueButton != null) currentView.continueButton.gameObject.SetActive(!hideInlineContinueButtons);
             readElapsed = 0f;
             SetDialogueVisible(!currentView.hideEmptyDialogue ||
                 !string.IsNullOrWhiteSpace(currentPage.dialogue) || !string.IsNullOrWhiteSpace(currentPage.speaker));

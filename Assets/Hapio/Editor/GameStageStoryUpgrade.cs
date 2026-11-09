@@ -25,15 +25,25 @@ namespace Hapio.Editor
                 if (SceneManager.GetSceneAt(i).isDirty)
                     throw new InvalidOperationException("Preserve unsaved Scene changes before connecting result stories.");
             SceneSetup[] setup = EditorSceneManager.GetSceneManagerSetup();
+            Scene originalActiveScene = SceneManager.GetActiveScene();
+            bool canRestoreSetup = setup.Length > 0 && setup.All(scene => !string.IsNullOrEmpty(scene.path));
             try
             {
                 PrepareEnding();
                 if (!File.Exists(CanvasPrefab)) PrepareCanvas();
+                UpgradeResultControls();
                 ConnectScene(GameScenePaths.StageResult);
                 ConnectScene(GameScenePaths.GameOver);
                 Debug.Log("HAPIO_STAGE_STORY_RESULTS_READY: saved result/failure views connected; normal game Scene list unchanged.");
             }
-            finally { EditorSceneManager.RestoreSceneManagerSetup(setup); }
+            finally
+            {
+                // A batch Editor may begin with an unsaved, empty-path Scene. RestoreSceneManagerSetup
+                // rejects that setup; our additive work closes only the Scenes it opened, so preserve it.
+                if (canRestoreSetup) EditorSceneManager.RestoreSceneManagerSetup(setup);
+                else if (originalActiveScene.IsValid() && originalActiveScene.isLoaded)
+                    SceneManager.SetActiveScene(originalActiveScene);
+            }
         }
 
         private static void PrepareEnding()
@@ -121,6 +131,42 @@ namespace Hapio.Editor
             }
         }
 
+        private static void UpgradeResultControls()
+        {
+            GameObject root = PrefabUtility.LoadPrefabContents(CanvasPrefab);
+            try
+            {
+                StoryPlayer player = root.GetComponent<StoryPlayer>();
+                Transform page = player != null && player.cutHost != null ? player.cutHost.parent : null;
+                if (page == null || page.GetComponent<StoryPageFit>() == null)
+                    throw new InvalidOperationException("The saved result Canvas needs its authored story page.");
+                Transform controls = page.Find("Result Controls") ?? root.transform.Find("Safe Controls/Result Controls");
+                if (controls == null) throw new InvalidOperationException("Preserve the saved result controls before upgrading them.");
+                controls.SetParent(page, false);
+                controls.SetAsLastSibling();
+                if (player.nextButton != null) player.nextButton.gameObject.SetActive(false);
+                player.hideInlineContinueButtons = true;
+                Font font = AssetDatabase.LoadAssetAtPath<Font>("Assets/Lab/Art/Fonts/Shilla_Culture(M).otf");
+                if (controls.Find("Viewer") == null)
+                    ButtonAt(controls, "Viewer", font, 0, 0, 1, 36, "완성 박 보기");
+                var layout = controls.GetComponent<GameResultActionLayout>() ?? controls.gameObject.AddComponent<GameResultActionLayout>();
+                layout.player = player;
+                layout.advanceButton = controls.Find("Advance").GetComponent<Button>();
+                layout.exitButton = controls.Find("Exit").GetComponent<Button>();
+                layout.overallButton = controls.Find("Overall").GetComponent<Button>();
+                layout.viewerButton = controls.Find("Viewer").GetComponent<Button>();
+                layout.statusText = controls.Find("Status").GetComponent<Text>();
+                layout.statusText.fontSize = 14;
+                layout.statusText.horizontalOverflow = HorizontalWrapMode.Wrap;
+                layout.statusText.verticalOverflow = VerticalWrapMode.Overflow;
+                layout.Apply();
+                root.SetActive(false);
+                if (PrefabUtility.SaveAsPrefabAsset(root, CanvasPrefab) == null)
+                    throw new InvalidOperationException("Could not save the result control upgrade.");
+            }
+            finally { PrefabUtility.UnloadPrefabContents(root); }
+        }
+
         private static void ConnectScene(string path)
         {
             Scene scene = SceneManager.GetSceneByPath(path);
@@ -144,10 +190,11 @@ namespace Hapio.Editor
                     .Select(x => AssetDatabase.LoadAssetAtPath<StorySequence>(StageStoryAssets.Root + "/" + x + ".asset")).ToArray();
                 adapter.ending = AssetDatabase.LoadAssetAtPath<StorySequence>(GameEnding);
                 adapter.failure = AssetDatabase.LoadAssetAtPath<StorySequence>(StageStoryAssets.Root + "/Failure.asset");
-                Transform controls = root.transform.Find("Safe Controls/Result Controls");
+                Transform controls = adapter.player.cutHost.parent.Find("Result Controls");
                 adapter.advanceButton = controls.Find("Advance").GetComponent<Button>();
                 adapter.exitButton = controls.Find("Exit").GetComponent<Button>();
                 adapter.overallButton = controls.Find("Overall").GetComponent<Button>();
+                adapter.viewerButton = controls.Find("Viewer").GetComponent<Button>();
                 adapter.statusText = controls.Find("Status").GetComponent<Text>();
                 adapter.skipButton = adapter.player.skipButton;
                 root.SetActive(false);

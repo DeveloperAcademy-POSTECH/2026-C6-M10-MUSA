@@ -1,4 +1,4 @@
-# 스테이지 스토리·전투 UI 통합 — #558
+# 스테이지 스토리·전투 UI 통합 — #558 / 결과 흐름 정리 #566
 
 이 문서는 #556의 저장 전투 UI와 #553의 스토리 부품을 일반 Hapio 게임 흐름에 연결한 범위와 변경 지점을 설명한다. 스토리 제작용 미리보기의 예시 데이터와 실제 경기 결과를 구분한다. 실행 결과·통과 건수는 이 문서에 기록하지 않으며 [VALIDATION](VALIDATION.md)을 따른다.
 
@@ -6,8 +6,8 @@
 
 Unity의 `Hapio > Open Home` → Play에서 기존 방 생성/입장·P번호 선택을 사용한다. 일반 Story는 같은 Battle Scene으로 1~3스테이지를 진행한다. 오프닝·Home/Lobby·튜토리얼·LAN/핫스팟 연결·구슬/도색 판정·DEV 규칙은 기존 경로를 유지한다. 실행/빌드는 [GAME_FLOW](GAME_FLOW.md)를 따른다.
 
-- **Story 승리:** 확정된 Victory와 해당 스테이지의 실제 기록 → 봉인 카드·후일담 → 카드 다시 보기/관람 → Host의 다음 스테이지.
-- **최종 Story 승리:** 지귀 카드·후일담 → 카드 다시 보기·전체 기록·완성 박 관람 → 각자 엔딩 → 각자 Home.
+- **Story 승리:** 확정된 Victory와 해당 스테이지의 실제 기록 → 봉인 카드 1회·후일담 → 마지막 컷을 유지한 결과 대기/관람 → Host의 다음 스테이지.
+- **최종 Story 승리:** 지귀 카드 1회·후일담 → 마지막 컷에서 전체 기록·완성 박 관람 또는 단일 엔딩 버튼 → 각자 엔딩 → 각자 Home.
 - **정상 Story 패배:** 확정된 Defeat → 실패 이야기 → 도달 봉인율 대시보드 → Host의 같은 스테이지 재도전 또는 나가기.
 - **나가기·연결 끊김·로드 실패:** 스토리 패배 재도전으로 해석하지 않는다. 종료 사유와 Home 경로를 유지한다.
 - **Territory/튜토리얼:** 이번 Story 어댑터를 사용하지 않는다. Territory의 기존 단판 결과·같은 방 복귀 API와 튜토리얼 종료 분기를 유지한다.
@@ -19,8 +19,9 @@ Unity의 `Hapio > Open Home` → Play에서 기존 방 생성/입장·P번호 �
 | 파일/구성 | 책임 |
 | --- | --- |
 | `Assets/Hapio/Scenes/StageResult.unity` / `GameOver.unity` | 기존 결과 UI를 보존하고 새 어댑터·스토리 Canvas 참조를 저장 |
-| `Assets/Hapio/Art/UI/GameStageStoryCanvas.prefab` | 게임 전용 StoryPlayer·터치 표면·안전 영역 안의 진행/나가기/전체 기록 버튼 |
+| `Assets/Hapio/Art/UI/GameStageStoryCanvas.prefab` | 게임 전용 StoryPlayer·터치 표면·402×874 그림과 같은 좌표계의 단일 진행/관람/나가기/전체 기록 버튼 |
 | `Assets/Hapio/Scripts/UI/GameStageStoryPresentation.cs` | 결과와 스토리 연결, 경기 기록 바인딩, 이야기 확인·관람·재도전/엔딩 UI 수명 |
+| `Assets/Hapio/Scripts/UI/GameResultActionLayout.cs` | 같은 PageFit 안에서 상태별 버튼 행·Safe Area 하단 여백·실패 안내 위치를 계산 |
 | `Assets/Hapio/Scripts/UI/GameScreen.cs` | 기존 결과 입력 보호와 버튼 권한 유지, 어댑터/관람/전체 기록으로 연결 |
 | `Assets/Hapio/Story/StageStories/AfterGumiho.asset`·`AfterYagwanggui.asset`·`AfterJigwi.asset` | 스테이지별 카드·후일담 목록 |
 | `Assets/Hapio/Story/StageStories/Failure.asset` | 첫 실패 장면·실패 대시보드 |
@@ -28,7 +29,7 @@ Unity의 `Hapio > Open Home` → Play에서 기존 방 생성/입장·P번호 �
 | `Assets/Hapio/Scripts/Story/StoryPlayer.cs` / `StoryCardRecords.cs` / `StorySealGauge.cs` | 기존 컷 재생·카드 기록·실패 게이지 부품 재사용 |
 | `Assets/Hapio/Editor/GameStageStoryUpgrade.cs` | 명시적 저장 에셋 연결 메뉴. Play/빌드에서 자동 재생성하지 않음 |
 
-저장 연결을 복구할 때는 Play를 멈추고 미저장 Scene을 먼저 보존한 뒤 `Hapio > Story > Connect Stage Stories To Game Results`를 실행한다. 기존 Canvas/게임용 엔딩이 있으면 다시 만들지 않고 참조를 연결한다. Battle Scene과 일반 빌드 Scene 목록을 교체하는 도구가 아니다. 제작용 미리보기의 편집 위치와 효과음은 [STAGE_STORY_PRESENTATION](STAGE_STORY_PRESENTATION.md)을 참고한다.
+저장 연결을 복구할 때는 Play를 멈추고 미저장 Scene을 먼저 보존한 뒤 `Hapio > Story > Connect Stage Stories To Game Results`를 실행한다. 기존 Canvas/게임용 엔딩은 재생성하지 않는다. 게임 Canvas의 기존 버튼을 재사용하고 필요한 관람 버튼·화면 맞춤 연결만 업그레이드한다. Battle Scene과 일반 빌드 Scene 목록을 교체하는 도구가 아니다. 제작용 미리보기의 편집 위치와 효과음은 [STAGE_STORY_PRESENTATION](STAGE_STORY_PRESENTATION.md)을 참고한다.
 
 ## 실제 경기 데이터와 표시 순서
 
@@ -39,9 +40,13 @@ Unity의 `Hapio > Open Home` → Play에서 기존 방 생성/입장·P번호 �
 - 실패 게이지는 해당 Defeat의 실제 `paintCoverage`를 `StorySealGauge.Show`에 전달한다. 표시 애니메이션이 실제 판정 지도를 변경하지 않는다.
 - StageResults에는 성공한 스테이지만 추가한다. 실패 시도는 전체 성공 기록을 덮어쓰지 않는다.
 - 완성 박은 기존 결과 관람 사본을 사용한다. 실패 결과에는 완성 박을 만들거나 이전 성공의 박을 재사용하지 않는다.
-- 최종 전체 기록은 기존 전체 결과 계산과 UI를 사용하고 봉인 카드로 돌아올 수 있다.
+- 최종 전체 기록은 기존 전체 결과 계산과 UI를 사용하고 떠났던 결과 화면으로 돌아올 수 있다.
 
-StoryPlayer는 스킵/완료 이벤트를 어댑터에 알린다. 성공 후일담을 마치면 카드 한 컷의 검토 목록을 로컬로 만들어 재표시한다. 실패 첫 장면을 스킵해도 대시보드 한 컷으로 이어진다. 실패 대시보드의 게이지가 차는 동안도 Host 재도전은 다른 조건이 충족되면 허용된다. 카드/대시보드는 게임 스테이지를 자동 진행시키지 않는다.
+StoryPlayer는 스킵/완료 이벤트를 어댑터에 알린다. #566에서는 정상 후일담 완료 시 마지막 `CurrentView`를 그대로 유지한다. 승리 카드·후일담을 SKIP하면 현재 컷의 같은 인스턴스를 완료 자세로 정지 표시하며, 카드·대사·등장 효과음을 다시 재생하지 않는다. 빠른 SKIP에서도 들어오는 중의 반투명/부분 자세에 멈추지 않도록 조용한 정지 샘플을 쓴다. 원본 제작용 미리보기의 재생·AUTO는 유지한다.
+
+실패 첫 대사를 SKIP할 때는 기존처럼 최종 봉인율 대시보드로 한 번 이동한다. 실패 결과의 원본 재도전·나가기 버튼을 쓰기 위한 경로이며, 승리 봉인 카드를 되돌리는 동작과 다르다. 실패 대시보드의 게이지가 차는 동안도 Host 재도전은 다른 조건이 충족되면 허용된다. 다음 스테이지 자동 진행과 새로운 고정 대기는 추가하지 않는다.
+
+게임용 미리보기 툴바의 `Next`와 후일담 그림의 별도 `continueButton`은 숨긴다. `StoryPlayer.hideInlineContinueButtons`는 게임 Canvas에서만 켜며 제작용 미리보기의 기본값은 OFF다. 이야기 중에는 화면 터치와 SKIP, 승리 이야기 종료 후에는 Host의 다음 스테이지와 별도 역할의 관람·나가기, 최종 결과에는 엔딩 1개와 관람·전체 기록을 표시한다. 현재 컷에 원본 관람 버튼이 있으면 같은 역할의 하단 버튼은 숨긴다. 실패 화면은 그림 안의 원본 재도전·나가기만 사용한다. Guest 재도전은 비활성 상태와 방장 대기 문구를 함께 표시한다.
 
 ## 결과 확인·관람·입력 보호
 
@@ -54,9 +59,9 @@ Host NEXT/재도전은 모두 다음 조건을 기다린다.
 3. 전원 로컬 이야기 확인 완료.
 4. 누구도 완성 박 관람 중이 아님.
 
-이야기 확인과 박 관람은 별도 상태다. 관람을 열면 스토리 Canvas만 숨기며 컷을 새로 시작하지 않는다. 닫으면 같은 카드 검토로 돌아온다. 어댑터를 종료할 때 이벤트 구독·임시 검토 목록·로컬 진행 상태를 해제한다. 오래된 세대의 종료 콜백으로 새 세대의 진행 상태를 변경하지 않는다.
+이야기 확인과 박 관람은 별도 상태다. 관람을 열면 스토리 Canvas만 숨기며 컷을 새로 시작하지 않는다. 닫으면 떠났던 같은 결과 컷으로 돌아온다. 어댑터를 종료할 때 이벤트 구독·실패 대시보드용 임시 목록·로컬 진행 상태를 해제한다. 오래된 세대의 종료 콜백으로 새 세대의 진행 상태를 변경하지 않는다.
 
-기존 결과 입력 보호를 공유한다. 결과 전환 직후 최소 다음 프레임을 기다리고 모든 눌린 터치/마우스가 해제돼야 버튼·터치 진행을 허용한다. 한 번 누른 입력으로 관람·재도전·다음 스테이지가 중복 실행되지 않도록 기존 pending 상태와 서버 조건을 함께 확인한다.
+기존 결과 입력 보호를 공유한다. 결과 전환 직후와 이야기 종료 직후에는 최소 다음 프레임 및 눌린 터치/마우스 해제를 기다린다. 이야기 종료 터치가 새 결과 버튼을 누르지 않도록 대기하며, 해제 확인 뒤 로컬 이야기 완료를 Host에 알린다. 한 번 누른 입력으로 관람·재도전·다음 스테이지가 중복 실행되지 않도록 기존 pending 상태와 서버 조건을 함께 확인한다.
 
 최종 엔딩은 각 기기에서 따로 시작한다. Host의 최종 Home은 기존 전원 결과 준비 조건을 유지하지만 다른 사람의 엔딩 종료를 기다리지 않는다. 최종 Completed 뒤 누군가 나가도 다른 기기의 확정 클리어와 로컬 엔딩을 GameOver로 바꾸지 않는다. 게임용 엔딩 끝에는 Figma 타이틀 컷을 한 번 더 보여주는 대신 입력 해제 뒤 실제 Home으로 돌아간다.
 

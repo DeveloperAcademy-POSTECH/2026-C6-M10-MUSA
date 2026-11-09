@@ -2321,6 +2321,17 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 467528435}
   m_CullTransparentMesh: 1
+--- !u!114 &509429749 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 7451435753484046876, guid: 1bbfe924e038f4058afb2382fd798ab4, type: 3}
+  m_PrefabInstance: {fileID: 1671291909}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4e29b1a8efbd4b44bb3f3716e73f07ff, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Button
 --- !u!1 &561407846
 GameObject:
   m_ObjectHideFlags: 0
@@ -2595,6 +2606,7 @@ MonoBehaviour:
   exitButton: {fileID: 1671291915}
   skipButton: {fileID: 1671291913}
   overallButton: {fileID: 1671291914}
+  viewerButton: {fileID: 509429749}
   statusText: {fileID: 1671291917}
 --- !u!1 &669576612
 GameObject:
