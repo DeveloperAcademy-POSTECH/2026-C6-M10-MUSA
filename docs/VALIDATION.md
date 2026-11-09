@@ -7014,6 +7014,8 @@ Compared twelve seed masks and selected 572. Changed only seed defaults and the 
 - 로딩 화면은 `runnerCenterFromTop`(캐릭터 가운데 비율)을 `contentCenterFromTop`(캐릭터 위 끝~막대 아래 끝 묶음의 가운데 비율, 0.5)으로 바꿨다. 묶음 높이로 계산하므로 화면 높이가 달라도 묶음 가운데가 정중앙이다. 캐릭터 5명의 그림 위아래 여백은 1.4~3.8pt다.
 - 땅따먹기 제한 시간은 `StageCatalog` 197번을 90초로, 피버 필요 명중 수는 `LabConfig` 값을 1:1 8번·2:2 10번·3:3 12번으로 바꿨다. Lab 단독 장면의 180초와 통신 규약 번호는 바꾸지 않았다.
 - `LabConfig.asset`을 Editor API로 저장하면서 코드에는 있었지만 파일에 없던 설정 18개가 코드 기본값 그대로 함께 기록됐다. 기존 값 변경은 피버 3개뿐이다.
+- 대화 기록 화면(추가 요청): 두루마리 제목 그림(`TutorialLogTitle.png`, 사용자 제공)을 목록 위에 넣고, 한 번에 보이는 막대를 3개에서 6개로, 목록과 뒤로 가기 사이를 45pt에서 8pt로 바꿨다. 대사는 얼굴 옆에서 왼쪽 정렬로 시작한다. 막대 폭·뒤로 가기 크기는 그대로다. 기록 버튼은 건너뛰기의 표시 여부와 투명도를 그대로 따라 같이 나타나며, 첫 터치가 대사를 넘기지 못한 때 눌러도 빈 기록 화면이 열린다.
+- 튜토리얼 PlayMode 검사의 탭 대기를 실제 시간 대신 튜토리얼 자체 시계(`TapCooldownOver`)로 바꿨다. `FinishedOpeningOpensThePracticeBoardOnceThenTheRoomList`가 6단계 대사에서 탭이 무시되어 1회 실패한 것에 대한 보정이며, 원인은 코드 기준 추정이다. 게임의 탭 판정 값은 그대로다.
 
 | 확인 | 결과 |
 | --- | --- |

@@ -512,7 +512,7 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
-        public IEnumerator LinesMovedOnFromGoIntoTheLogAndItsButtonComesBesideSkip()
+        public IEnumerator LinesMovedOnFromGoIntoTheLogAndItsButtonComesUnderSkip()
         {
             yield return SceneManager.LoadSceneAsync(GameScenePaths.Home, LoadSceneMode.Single);
             yield return Until(() => GameSession.Instance != null && !GameSession.Instance.IsLoadingScene, "Saved Home bootstrap");
@@ -532,14 +532,17 @@ namespace Hapio.Tests
             // The first line is only on the screen: nothing has been moved on from yet.
             yield return WaitForTapToCount(director, art);
             Assert.That(director.DialogueLog, Is.Empty);
-            Assert.That(log.gameObject.activeInHierarchy, Is.False, "No log, no button.");
+            Assert.That(log.gameObject.activeInHierarchy, Is.False, "No tap yet, no button.");
 
             tap.onClick.Invoke();
             GameTutorialBeat[] lines = GameTutorialScript.Goal.Lines.ToArray();
             Assert.That(director.DialogueLog.Select(entry => (entry.Speaker, entry.Text)).ToArray(),
                 Is.EqualTo(new[] { (lines[0].Speaker, lines[0].Text) }), "The line just moved on from.");
-            yield return Until(() => director.LogButtonAlpha >= .999f && director.SkipButtonAlpha >= .999f,
-                "기록 fades in with 건너뛰기", art.skipFadeSeconds + 1f);
+            yield return Until(() =>
+            {
+                Assert.That(director.LogButtonAlpha, Is.EqualTo(director.SkipButtonAlpha).Within(.001f), "기록 fades in together with 건너뛰기.");
+                return director.LogButtonAlpha >= .999f;
+            }, "기록 fades in with 건너뛰기", art.skipFadeSeconds + 1f);
             Rect skipRect = ScreenRect((RectTransform)skip.transform), logRect = ScreenRect((RectTransform)log.transform);
             float scale = skipRect.width / art.skipButtonSize.x;
             Assert.That(logRect.center.x, Is.EqualTo(skipRect.center.x).Within(1f), "On 건너뛰기's middle.");
@@ -576,6 +579,12 @@ namespace Hapio.Tests
             Assert.That(director.DialogueLogShownLines.ToArray(),
                 Is.EqualTo(new[] { GameTutorialScript.LogLine(lines[0].Text), GameTutorialScript.LogLine(lines[1].Text) }));
             Assert.That(bar.gameObject.activeSelf, Is.False, "Two lines fit: no drag bar.");
+            Assert.That(dim.GetComponentsInChildren<UnityEngine.UI.Text>(true).First(text => text.name == "Words").alignment,
+                Is.EqualTo(TextAnchor.MiddleLeft), "The words start right beside the face.");
+            var title = dim.GetComponentsInChildren<UnityEngine.UI.Image>(true).Single(image => image.name == "Log Title");
+            Assert.That(title.sprite, Is.SameAs(art.logTitle));
+            Rect listRect = ScreenRect(dim.GetComponentsInChildren<RectTransform>(true).Single(rect => rect.name == "Log List"));
+            Assert.That(ScreenRect(title.rectTransform).yMin, Is.GreaterThan(listRect.yMax), "The scroll sits above the list.");
             Assert.That(board.AllowedGestures, Is.EqualTo(LabBoardGestures.None));
 
             // A touch anywhere lands on the log, so the line behind stays where it was.
@@ -605,8 +614,8 @@ namespace Hapio.Tests
             Assert.That(director.BeatIndex, Is.EqualTo(beat), "The same line again.");
             Assert.That(director.IsShowingLine, Is.True);
 
-            // More lines than fit: it opens on the newest, and the drag bar shows.
-            for (int i = 2; i < lines.Length; i++)
+            // More lines than fit (all of 0단계 and the first of 1단계): it opens on the newest, and the drag bar shows.
+            for (int i = 2; i <= lines.Length; i++)
             {
                 yield return WaitForTapToCount(director, art);
                 tap.onClick.Invoke();

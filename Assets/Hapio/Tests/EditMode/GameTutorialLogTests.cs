@@ -44,11 +44,13 @@ namespace Hapio.Tests
         }
 
         [Test]
-        public void ShortWordsSitInTheMiddleOfTheBarAndLongOnesUseTheRoomBesideTheFace()
+        public void LogScreenShowsSixBarsUnderItsScrollTitle()
         {
-            Assert.That(GameTutorialDirector.LogWordsSpan(321f, 58f, 16f, 120f), Is.EqualTo(new Vector2(58f, 263f)), "Centered on the bar.");
-            Assert.That(GameTutorialDirector.LogWordsSpan(321f, 58f, 16f, 205f), Is.EqualTo(new Vector2(58f, 263f)), "Just fits.");
-            Assert.That(GameTutorialDirector.LogWordsSpan(321f, 58f, 16f, 400f), Is.EqualTo(new Vector2(58f, 305f)), "Up to the right side.");
+            GameTutorialArt art = GameTutorialArt.Load();
+            Assert.That(art.logTitle, Is.Not.Null, "The scroll picture.");
+            Assert.That(art.logVisibleBars, Is.EqualTo(6));
+            Assert.That(GameTutorialDirector.LogStackHeight(art.logVisibleBars, art.logBarSize.y, art.logBarGap), Is.EqualTo(440f),
+                "The mockup's first bar top to last bar bottom.");
         }
 
         /// <summary>Every scripted line fits its bar in at most two lines, whole, measured with the bar's own font and box.</summary>
@@ -64,23 +66,21 @@ namespace Hapio.Tests
                 var text = probe.AddComponent<UnityEngine.UI.Text>();
                 text.font = art.bannerFont;
                 text.fontSize = art.logTextFontSize;
-                text.alignment = TextAnchor.MiddleCenter;
+                text.alignment = TextAnchor.MiddleLeft;
                 text.horizontalOverflow = HorizontalWrapMode.Wrap;
                 text.verticalOverflow = VerticalWrapMode.Truncate;
                 text.supportRichText = false;
                 float height = art.logTextFontSize * GameTutorialDirector.LogWordsLineHeights;
+                float width = art.logBarSize.x - art.logTextLeft - art.logTextRight;
                 foreach (GameTutorialStep step in GameTutorialScript.Steps)
                     foreach (GameTutorialBeat line in step.Lines)
                     {
                         string words = GameTutorialScript.LogLine(line.Text);
-                        text.resizeTextForBestFit = false;
-                        float unwrapped = new TextGenerator().GetPreferredWidth(words, text.GetGenerationSettings(Vector2.zero));
-                        Vector2 span = GameTutorialDirector.LogWordsSpan(art.logBarSize.x, art.logTextLeft, art.logTextRight, unwrapped);
                         text.resizeTextForBestFit = true;
                         text.resizeTextMaxSize = art.logTextFontSize;
                         text.resizeTextMinSize = art.logMinTextFontSize;
                         var generator = new TextGenerator();
-                        generator.PopulateWithErrors(words, text.GetGenerationSettings(new Vector2(span.y - span.x, height)), probe);
+                        generator.PopulateWithErrors(words, text.GetGenerationSettings(new Vector2(width, height)), probe);
                         Assert.That(generator.lineCount, Is.LessThanOrEqualTo(2), step.Name + ": " + words);
                         Assert.That(generator.fontSizeUsedForBestFit, Is.GreaterThanOrEqualTo(art.logMinTextFontSize), step.Name + ": " + words);
                     }
