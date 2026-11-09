@@ -62,11 +62,15 @@ namespace Hapio.Tests
             var impacts = Object.FindAnyObjectByType<LabImpactParticleVfx>();
             int pooled = impacts.GetComponentsInChildren<LabImpactParticleBurst>(true).Length;
             var drawn = new HashSet<string>();
+            var motifs = new HashSet<int>();
             while (warmup.Root != null)
             {
                 foreach (Renderer renderer in warmup.Root.GetComponentsInChildren<Renderer>())
                     if (renderer.isVisible && renderer.enabled)
+                    {
                         drawn.Add((renderer.gameObject.layer == boardLayer ? "board " : "world ") + renderer.GetType().Name);
+                        if (renderer.name == "Brush Motifs" && renderer.GetComponent<ParticleSystem>().particleCount > 0) motifs.Add(renderer.GetComponentInParent<LabProjectile>().transform.GetSiblingIndex());
+                    }
                 Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.SynchronizingBattle), "Never into the countdown.");
                 Assert.That(warmup.Root.GetComponentsInChildren<Rigidbody>().All(body => !body.detectCollisions), Is.True);
                 Assert.That(warmup.Root.GetComponentsInChildren<Collider>().Any(collider => collider.enabled), Is.False);
@@ -78,6 +82,8 @@ namespace Hapio.Tests
             Assert.That(warmup.DrawnFrames, Is.GreaterThanOrEqualTo(LabBattleRenderWarmup.MinimumFrames));
             Assert.That(drawn, Is.SupersetOf(new[] { "world MeshRenderer", "world ParticleSystemRenderer", "world TrailRenderer",
                 "board SpriteRenderer", "board MeshRenderer" }));
+
+            Assert.That(motifs.Count, Is.EqualTo(5), "All five elements' trail particles really emitted.");
 
             yield return Until(() => session.State.phase != GameFlowPhase.SynchronizingBattle, "Countdown");
             yield return null;

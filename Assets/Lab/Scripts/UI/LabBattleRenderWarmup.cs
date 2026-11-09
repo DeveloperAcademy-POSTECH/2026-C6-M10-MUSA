@@ -23,6 +23,8 @@ namespace C6Lab
         {
             LabOrbElement.Fire, LabOrbElement.Water, LabOrbElement.Wood, LabOrbElement.Metal, LabOrbElement.Earth, LabOrbElement.None
         };
+        /// <summary>Three steps must pass the widest trail's motif spacing (.48 m) or its particles never emit.</summary>
+        private const float StepMetres = .2f;
         private const string RootName = "Render warmup · private copies";
 
         private readonly List<LabProjectile> shots = new List<LabProjectile>();
@@ -175,7 +177,8 @@ namespace C6Lab
 
         // Relative to the live camera each frame, because the seat camera can still settle; off-screen copies draw nothing.
         private Vector3 WorldPoint(int index, int frame) => battleCamera.ViewportToWorldPoint(new Vector3(
-            .15f + index * .13f + frame * .03f, .5f, Mathf.Max(battleCamera.nearClipPlane + 2f, 3f)));
+            .05f + index * .1f, .5f, Mathf.Max(battleCamera.nearClipPlane + 2f, 3f)))
+            + battleCamera.transform.right * (frame * StepMetres);
 
         private void Finish()
         {
