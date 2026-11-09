@@ -295,6 +295,9 @@ namespace Hapio
             if (!network.IsConnected || goingHome) return;
             if (network.IsHost)
             {
+                // #501: whatever run or stage it names, an "exit" means this guest is leaving the room. A 2:2 room may
+                // already be back in its lobby; a later drop of this guest is then not held.
+                if (control.kind == "exit") network.MarkLobbyLeaver(control.sender);
                 if (!MatchesControlIdentity(control, control.kind == "exit")) return;
                 if (control.kind == "loaded")
                     hostFlow.MarkBattleReady(control.sender, control.runId, control.stageIndex, control.revision);
@@ -373,6 +376,8 @@ namespace Hapio
         {
             GameFlowState previous = state;
             state = value.Copy();
+            // #501: only a lobby guest that loses its Host stays here and gets back into the same room.
+            network.LobbyRejoinAllowed = state.phase == GameFlowPhase.Lobby;
             // A Guest's network learns the stage's yokai here (#351); the Host's installed it when preparing the stage.
             Identity(state, out _, out LabStageYokai yokai);
             network.ObserveGameStage(yokai);

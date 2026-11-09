@@ -130,7 +130,8 @@ namespace C6Lab
             bool started;
             try
             {
-                started = active.StartAdvertise(hostAdvertiseName, port, ipv4, ipv6, Math.Max(1, order.Count),
+                started = active.StartAdvertise(hostAdvertiseName, port, ipv4, ipv6,
+                    Math.Max(1, Math.Min(targetParticipantCount, LobbyPlaceCount)),
                     targetParticipantCount, RoomPresenceBusy, false, hostAdvertiseAutoRename);
             }
             catch (ArgumentException) { started = false; }
@@ -151,7 +152,17 @@ namespace C6Lab
         private void OnApplicationPause(bool paused)
         {
             // The Editor sends pause on focus changes; only a suspended phone needs its discovery rebuilt.
-            if (!paused && Application.isMobilePlatform) ResumeDiscoveryAfterPause();
+            if (!Application.isMobilePlatform) return;
+            if (paused)
+            {
+                pausedAtWallClock = WallClockSeconds;
+                return;
+            }
+            ResumeDiscoveryAfterPause();
+            // The wall clock, not the transport's, measures a suspension (#501).
+            double pausedFor = double.IsNaN(pausedAtWallClock) ? 0d : WallClockSeconds - pausedAtWallClock;
+            pausedAtWallClock = double.NaN;
+            ResumeLobbyAfterPause(pausedFor);
         }
 
         /// <summary>
