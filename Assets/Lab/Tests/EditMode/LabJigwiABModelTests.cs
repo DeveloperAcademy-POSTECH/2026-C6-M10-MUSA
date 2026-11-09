@@ -350,6 +350,33 @@ namespace C6Lab.Tests
             var failed=m.Snapshot(22);
             Assert.That(LabJigwiABNetworkValidation.Valid(failed.jigwiAB,failed.players,m.Revision),Is.True,"A failed B with no board fire still validates.");
         }
+        [Test] public void SmokeFlowRunsSmokeThenSharedTalismanAndSmokesEveryScreenAtOnce()
+        {
+            // #595: 연기 10 / 부적 45 / 연기 66 / 부적 83, 공통 기믹은 25초부터 15초마다.
+            JsonUtility.FromJsonOverwrite("{\"jigwiSmokeFlow\":true,\"jigwiCommonStartSeconds\":25,\"jigwiABPersonalDurationSeconds\":10}",config);
+            var m=Room3();
+            var next=typeof(LabModel).GetMethod("NextJigwiABCommonAt",BindingFlags.Instance|BindingFlags.NonPublic);
+            Assert.That(Enumerable.Range(0,6).Select(i=>(double)next.Invoke(m,new object[]{(uint)i})),
+                Is.EqualTo(new[]{25d,40d,55d,70d,85d,double.PositiveInfinity}));
+            var smoke=Current(m,10.1);
+            Assert.That(smoke.kind,Is.EqualTo(LabJigwiABKind.GroupFire));
+            Assert.That(smoke.smoke&&smoke.bucket,Is.True);
+            Assert.That(smoke.players.Select(p=>p.playerId),Is.EquivalentTo(Three),"Everyone's screen smokes.");
+            Assert.That(smoke.players.Select(p=>p.readyAt).Distinct().Single(),
+                Is.EqualTo(10d+LabJigwiABTimeline.SmokeLeadSeconds).Within(1e-9),"All at the same moment.");
+            Assert.That(m.Snapshot(10.1).orbs.Any(o=>o.jigwiABSupplyEventId==smoke.id),Is.False,"No special Water.");
+            Assert.That(m.TryJigwiBPull(Three[0],smoke.id,12),Is.False,"No bucket to pour.");
+            for(int t=13;t<=99;t++){m.Tick(t);var mid=m.Snapshot(t);
+                Assert.That(LabJigwiABNetworkValidation.Valid(mid.jigwiAB,mid.players,m.Revision),Is.True,"Valid at "+t+" s");}
+            var r=m.Snapshot(99).jigwiAB.rounds.OrderBy(x=>x.slot).ToArray();
+            Assert.That(r.Select(x=>x.activeAt),Is.EqualTo(new[]{10d,45d,66d,83d}));
+            Assert.That(r.Select(x=>x.kind),Is.EqualTo(new[]{LabJigwiABKind.GroupFire,LabJigwiABKind.PersonalBurn,
+                LabJigwiABKind.GroupFire,LabJigwiABKind.PersonalBurn}));
+            Assert.That(r.Select(x=>x.smoke),Is.EqualTo(new[]{true,false,true,false}));
+            Assert.That(r.Select(x=>x.common),Is.EqualTo(new[]{false,true,false,true}));
+            Assert.That(r[0].resolution,Is.EqualTo(LabJigwiABResolution.Expired),"Smoke just ends; nobody pours.");
+            Assert.That(r[0].boardFireUntil,Is.EqualTo(-1d),"Smoke never sets the boards on fire.");
+        }
         LabJigwiABRound B(LabModel m,string id,double at)=>m.Snapshot(at).jigwiAB.rounds.Single(r=>r.id==id);
         [Test] public void BBucketArrivesSeatBySeatAndEachPourPaintsAtOnce()
         {

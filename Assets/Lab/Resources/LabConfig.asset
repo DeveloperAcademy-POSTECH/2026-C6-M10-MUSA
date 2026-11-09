@@ -42,7 +42,8 @@ MonoBehaviour:
   jigwiAHoldBurnUntilEnd: 1
   jigwiBCountdown: 1
   jigwiBBucket: 1
-  jigwiCommonStartSeconds: 40
+  jigwiSmokeFlow: 1
+  jigwiCommonStartSeconds: 25
   jigwiCommonIntervalSeconds: 15
   jigwiStageWarningSeconds: 1
   jigwiStageActiveSeconds: 7

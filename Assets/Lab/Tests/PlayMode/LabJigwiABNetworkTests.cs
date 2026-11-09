@@ -32,7 +32,7 @@ namespace C6Lab.Tests
             config = Object.Instantiate(source); // Keep the actual saved game throw profile (g30 / speed12.5), not code defaults.
             // These owner-header/projection fixtures retain the #509 A5/B25 policy and immediate A burn.
             // Pin only the cloned policy; #540's saved Flow schedule and held-burn gameplay stay unchanged.
-            JsonUtility.FromJsonOverwrite("{\"jigwiFlowSchedule\":false,\"jigwiAHoldBurnUntilEnd\":false}", config);
+            JsonUtility.FromJsonOverwrite("{\"jigwiFlowSchedule\":false,\"jigwiAHoldBurnUntilEnd\":false,\"jigwiSmokeFlow\":false}", config); // #595: these fixtures check the #509 timetable
             Assert.That(config.JigwiFlowSchedule, Is.False);
             Assert.That(config.JigwiAHoldBurnUntilEnd, Is.False);
             float[] values = config.CaptureDeveloperValues();

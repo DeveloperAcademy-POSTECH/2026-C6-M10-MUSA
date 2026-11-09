@@ -18,16 +18,27 @@ namespace C6Lab
         /// <summary>#551 시험용: 지귀 B만 4초부터 17초마다 (4 / 21 / 38 / 55 / 72), A와 공통 기믹 없음.</summary>
         public const int BTestSchedule = 2;
         private static readonly double[] BTestOffsets = { 4d, 21d, 38d, 55d, 72d };
+        /// <summary>
+        /// #595 연기 흐름: 연기(B) 10 / 부적(A, 공용) 45 / 연기 66 / 부적 83. 초반 40초는 연기 하나, 공통 기믹은 25초부터.
+        /// 연기는 양동이 없이 모두의 화면을 같은 때에 덮고, 부적은 모두가 써야 보상.
+        /// </summary>
+        public const int SmokeFlowSchedule = 3;
+        private static readonly double[] SmokeFlowOffsets = { 10d, 45d, 66d, 83d };
+        /// <summary>#595: 연기 B가 시작되고(지귀 예고 2초 뒤) 박이 달아오르다 연기가 뿜어져 나오기까지(초). 모든 자리가 같다.</summary>
+        public const double SmokeLeadSeconds = 1.5d;
         public const double WarningSeconds = 2d; // #509: 2초 예고(지귀 도발 문구를 읽을 시간)
         /// <summary>#509: A2 moved 40 → 42 so it never starts with the common bomb at 40.</summary>
         private static readonly double[] ActivationOffsets = { 5d, 25d, 42d, 55d, 70d, 85d };
         private static readonly double[] FlowOffsets = { 10d, 45d, 66d, 83d };
         private static double[] Offsets(int schedule) => schedule == FlowSchedule ? FlowOffsets
-            : schedule == BTestSchedule ? BTestOffsets : ActivationOffsets;
-        public static bool ValidSchedule(int schedule) => schedule == LegacySchedule || schedule == FlowSchedule || schedule == BTestSchedule;
+            : schedule == BTestSchedule ? BTestOffsets : schedule == SmokeFlowSchedule ? SmokeFlowOffsets : ActivationOffsets;
+        public static bool ValidSchedule(int schedule) => schedule == LegacySchedule || schedule == FlowSchedule || schedule == BTestSchedule
+            || schedule == SmokeFlowSchedule;
         /// <summary>#551: the kind of a slot in this schedule (the B test schedule is all B).</summary>
         public static LabJigwiABKind KindForSlot(int slot, int schedule) => schedule == BTestSchedule
             ? (slot >= 0 && slot < SlotCount ? LabJigwiABKind.GroupFire : throw new ArgumentOutOfRangeException(nameof(slot)))
+            // #595: 연기(B)가 먼저, 부적(A)이 다음.
+            : schedule == SmokeFlowSchedule ? (KindForSlot(slot) == LabJigwiABKind.PersonalBurn ? LabJigwiABKind.GroupFire : LabJigwiABKind.PersonalBurn)
             : KindForSlot(slot);
         public static int SlotCountFor(int schedule) => Offsets(schedule).Length;
         /// <summary>The next slot's activation, or +∞ after the last one (an A never runs into the next mission).</summary>

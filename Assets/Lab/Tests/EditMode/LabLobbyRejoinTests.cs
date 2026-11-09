@@ -21,16 +21,16 @@ namespace C6Lab.Tests
         [Test]
         public void AGameJoinMayAddARoomTicketAfterTheTokenButALabJoinMayNot()
         {
-            byte[] token = Encoding.ASCII.GetBytes("C6HapioGame/47");
+            byte[] token = Encoding.ASCII.GetBytes("C6HapioGame/48");
             Assert.That(Read(token, token, true, out string ticket), Is.True);
             Assert.That(ticket, Is.Null);
-            Assert.That(Read(Bytes("C6HapioGame/47|" + TicketA), token, true, out ticket), Is.True);
+            Assert.That(Read(Bytes("C6HapioGame/48|" + TicketA), token, true, out ticket), Is.True);
             Assert.That(ticket, Is.EqualTo(TicketA));
-            Assert.That(Read(Bytes("C6HapioGame/47|" + TicketA), token, false, out _), Is.False, "A Lab room accepts only its token.");
-            Assert.That(Read(Bytes("C6HapioGame/47|" + TicketA.ToUpperInvariant()), token, true, out _), Is.False);
-            Assert.That(Read(Bytes("C6HapioGame/47|" + TicketA.Substring(1)), token, true, out _), Is.False);
-            Assert.That(Read(Bytes("C6HapioGame/47:" + TicketA), token, true, out _), Is.False);
-            Assert.That(Read(Bytes("C6HapioGame/46|" + TicketA), token, true, out _), Is.False, "An older game token is still a mismatch.");
+            Assert.That(Read(Bytes("C6HapioGame/48|" + TicketA), token, false, out _), Is.False, "A Lab room accepts only its token.");
+            Assert.That(Read(Bytes("C6HapioGame/48|" + TicketA.ToUpperInvariant()), token, true, out _), Is.False);
+            Assert.That(Read(Bytes("C6HapioGame/48|" + TicketA.Substring(1)), token, true, out _), Is.False);
+            Assert.That(Read(Bytes("C6HapioGame/48:" + TicketA), token, true, out _), Is.False);
+            Assert.That(Read(Bytes("C6HapioGame/47|" + TicketA), token, true, out _), Is.False, "An older game token is still a mismatch.");
             Assert.That(Read(null, token, true, out _), Is.False);
         }
 

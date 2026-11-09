@@ -15,6 +15,8 @@ namespace C6Lab
     /// - 햅틱이 손맛: 기울일 때 각도마다 약한 톡, 출렁 1·2·3번 점점 세게, 쏟을 때 길고 세게.
     /// - Editor/DEV 빌드: A/D 또는 ←/→를 누르고 있으면 그쪽으로 기운다(섬광 흔들기의 K처럼 키보드 대체).
     /// - 판 가운데 📱 그림이 좌우로 기울며 할 일을 보여 주고, 박 아래 한 줄 안내.
+    /// - #595 연기(round.smoke): 양동이 없이 박이 달아오르다 seat.readyAt에 바로 실패 흐름(지귀 대사 → 연기가 화면을 덮음)으로 간다.
+    ///   모든 자리가 같은 때에 덮이고, 각자 90% 문질러 걷어 낸다.
     /// </summary>
     public sealed class LabJigwiBucketHandleView : MonoBehaviour
     {
@@ -189,7 +191,8 @@ namespace C6Lab
             LabJigwiABPlayerFire me = null;
             foreach (var seat in round.players ?? Array.Empty<LabJigwiABPlayerFire>()) if (seat != null && seat.playerId == source.LocalPlayerId) me = seat;
             if (me == null || me.readyAt < 0d) { Hide(); return; } // a bucket B I am not in (or not mine yet)
-            double arrive = me.readyAt, deadline = arrive + LabJigwiABTimeline.BucketSeatSeconds;
+            bool smokeOnly = round.smoke; // #595: no bucket — the smoke comes the moment the boss has heated up
+            double arrive = me.readyAt, deadline = smokeOnly ? arrive : arrive + LabJigwiABTimeline.BucketSeatSeconds;
             if (shownRound != round.id)
             {
                 shownRound = round.id; bucketAngle = 0f; dropIn = 1f; sloshes = 0; side = 0; poured = false; splashed = false;
@@ -197,7 +200,7 @@ namespace C6Lab
             }
             if (!poured && (me.launchedAt >= 0d || source.JigwiBucketPulledThisCount(round)))
             { poured = true; if (pourAt < 0f) { pourAt = t; pourSide = side != 0 ? side : 1; } }
-            bool failed = !poured && now > deadline;
+            bool failed = !poured && (smokeOnly ? now >= arrive : now > deadline);
             // My own bucket's time: from its arrival to its deadline (others' buckets come and go on their own screens).
             bool live = !poured && !failed && now >= arrive && round.resolution == LabJigwiABResolution.None;
             // Fail: Jigwi's bubble (and voice) first, then his smoke shoots down and fogs my board.
@@ -209,7 +212,7 @@ namespace C6Lab
             if (live) Slosh(t);
             Show(banner, false); // no words: the boss's glow, the bucket and the phone picture say it
             DrawThreat(now, arrive, deadline, t, dt);
-            if (now >= arrive - .7d) DrawBucket(now, arrive, deadline, failed, t, dt, live);
+            if (!smokeOnly && now >= arrive - .7d) DrawBucket(now, arrive, deadline, failed, t, dt, live);
             else { Show(pail, false); Show(hangRope, false); HideGauge(); }
             DrawCue(live, t);
             DrawWater(t, dt);

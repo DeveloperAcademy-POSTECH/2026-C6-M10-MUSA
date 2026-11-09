@@ -74,7 +74,9 @@ namespace C6Lab
         private void ResetJigwiAB(LabConfig config, double now)
         {
             jigwiABEnabled = !teamMode && StageYokai == LabStageYokai.Jigwi && config.JigwiStageTimelineEnabled;
+            jigwiSmokeFlow = config.JigwiSmokeFlow && !config.JigwiBTestOnly;
             jigwiSchedule = config.JigwiBTestOnly ? LabJigwiABTimeline.BTestSchedule // #551 시험용: B만
+                : jigwiSmokeFlow ? LabJigwiABTimeline.SmokeFlowSchedule // #595 연기 10 / 부적 45 / 연기 66 / 부적 83
                 : config.JigwiFlowSchedule ? LabJigwiABTimeline.FlowSchedule : LabJigwiABTimeline.LegacySchedule;
             jigwiAHoldBurn = config.JigwiAHoldBurnUntilEnd;
             jigwiBBucket = config.JigwiBBucket;
@@ -105,7 +107,7 @@ namespace C6Lab
         private double NextJigwiABCommonAt(uint index)
         {
             if (jigwiStageCutoffReached || jigwiSchedule == LabJigwiABTimeline.BTestSchedule) return double.PositiveInfinity; // #551 B만 시험
-            if (jigwiSchedule != LabJigwiABTimeline.FlowSchedule)
+            if (jigwiSchedule != LabJigwiABTimeline.FlowSchedule && jigwiSchedule != LabJigwiABTimeline.SmokeFlowSchedule)
                 return index < JigwiStageCommonSlots.Length ? jigwiStageStartedAt + JigwiStageCommonSlots[index] : double.PositiveInfinity;
             // #540: from the start of the middle phase, every interval, until the fever.
             double offset = jigwiCommonStart + index * Math.Max(3d, jigwiCommonInterval);
@@ -190,6 +192,7 @@ namespace C6Lab
         {
             LabJigwiABKind kind = LabJigwiABTimeline.KindForSlot(slot, jigwiSchedule);
             bool personal = kind == LabJigwiABKind.PersonalBurn;
+            bool smoke = !personal && jigwiSmokeFlow; // #595: B is smoke for everyone at once (no bucket to pour)
             var item = new LabJigwiABRound
             {
                 id = "jigwi-ab/" + sessionId + "/" + round + "/" + slot, slot = slot,
@@ -204,8 +207,9 @@ namespace C6Lab
                 // #509: B success no longer gives a timed launch reward.
                 rewardSizeScale = 1f, rewardPaintScale = 1f,
                 // #551: with the countdown the picked hits may land a little further apart.
-                syncWindowSeconds = !personal && jigwiBCountdown && !jigwiBBucket ? LabJigwiABTimeline.CountdownSyncWindowSeconds : 0f,
-                bucket = !personal && jigwiBBucket
+                syncWindowSeconds = !personal && jigwiBCountdown && !jigwiBBucket && !smoke ? LabJigwiABTimeline.CountdownSyncWindowSeconds : 0f,
+                bucket = !personal && (jigwiBBucket || smoke), smoke = smoke,
+                common = personal && jigwiSmokeFlow // #595: every talisman written = reward for all, one missing = all boards burn
             };
             // #479: A ignites every seat at once; each seat clears its own fire with a talisman.
             if (personal) item.players = seats.Take(activeSeatCount).Select(owner => new LabJigwiABPlayerFire
@@ -219,7 +223,9 @@ namespace C6Lab
             {
                 playerId = owner, targets = new[] { new LabJigwiABFireTarget { id = item.id + "/" + owner + "/0", x = .5f, y = .62f } },
                 // #551 나무 물통: buckets arrive one seat after another (the draw order), like fox fire.
-                readyAt = item.bucket ? activeAt + LabJigwiABTimeline.BucketLeadSeconds + order * LabJigwiABTimeline.BucketStaggerSeconds : -1d
+                // #595 연기: every screen smokes at the same moment.
+                readyAt = item.smoke ? activeAt + LabJigwiABTimeline.SmokeLeadSeconds
+                    : item.bucket ? activeAt + LabJigwiABTimeline.BucketLeadSeconds + order * LabJigwiABTimeline.BucketStaggerSeconds : -1d
             }).ToArray();
             jigwiABRounds.Add(item); revision++;
         }
@@ -420,7 +426,7 @@ namespace C6Lab
             if (active.syncWindowAt < 0d || now < active.syncWindowAt + active.SyncWindow) return;
             FailJigwiSync(active, active.syncWindowAt + active.SyncWindow);
         }
-        private bool jigwiBCountdown, jigwiBBucket;
+        private bool jigwiBCountdown, jigwiBBucket, jigwiSmokeFlow;
         /// <summary>
         /// #551 B countdown: a picked seat starts or stops holding its special Water. When every picked seat holds it
         /// the 3-2-1 starts (countdownAt); anyone letting go before "지금!" stops it. After "지금!" holding no longer
@@ -486,7 +492,7 @@ namespace C6Lab
             if (!jigwiABEnabled || !jigwiBBucket || string.IsNullOrEmpty(roundId) || !TryAdvance(now, out _)
                 || phase != LabPhase.Playing) return false;
             var active = ActiveJigwiABRound(now);
-            if (active == null || !active.bucket || !active.Active(now) || active.id != roundId) return false;
+            if (active == null || !active.bucket || active.smoke || !active.Active(now) || active.id != roundId) return false; // #595 연기엔 쏟을 양동이가 없다
             var seat = active.players.FirstOrDefault(value => value.playerId == sender);
             if (seat == null || seat.launchedAt >= 0d || now < seat.readyAt
                 || now > seat.readyAt + LabJigwiABTimeline.BucketSeatSeconds) return false;
