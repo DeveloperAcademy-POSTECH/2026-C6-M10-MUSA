@@ -4,6 +4,8 @@
 
 대상 Scene은 `Assets/Experiments/ClayPreview/ImageSamples/Scenes/ImageClayPreview.unity`다. 기존 세 프리셋 앱이나 파일 기능 없는 코팅 앱을 열면 이 문서의 `FILES / IMAGES`가 보이지 않을 수 있다. 구현 범위는 [둥근 클레이 실험 문서의 #543 절](ROUNDED_CLAY_STICKER_EXPERIMENT.md#543-스티커-질감배경-파일을-직접-불러오는-mac-실험), 실제 수행한 검사와 미실행 항목은 [검증 기록](VALIDATION.md)의 2026-11-07 · #543 절을 참고한다.
 
+윤곽 PNG를 바꿔보려면 **[17.3절의 샘플 3종 따라 하기](#173-제공된-png-세-개로-첫-비교하기)**부터 시작한다. 해당 절에서 최초 명중·재타격·완성 비교와 저장 방법으로 이어진다.
+
 ## 1. 이미 빌드된 앱으로 바로 보기
 
 1. Finder에서 프로젝트 폴더를 연다.
