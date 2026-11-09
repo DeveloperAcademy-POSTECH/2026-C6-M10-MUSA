@@ -274,29 +274,10 @@ namespace Hapio
             bool exit = review && !final || failed && !HasAction("Exit");
             Show(exitButton, exit); Set(exitButton, exit && !blocked);
             Label(exitButton, "나가기");
-            if (statusText != null) statusText.text = StatusMessage(review, failed, final);
+            // The approved result design has no status line, so the saved label stays hidden.
+            if (statusText != null && statusText.gameObject.activeSelf) statusText.gameObject.SetActive(false);
             RefreshActionButtons(blocked);
             ApplyVisibility();
-        }
-
-        private string StatusMessage(bool review, bool failed, bool final)
-        {
-            if (transitionPending || session.IsLoadingScene) return "다음 스테이지를 준비하고 있소…";
-            if (mode == Mode.Waiting) return "결과 기록을 받고 있소…";
-            if (mode == Mode.AfterStage)
-                return player.CurrentView != null && player.CurrentView.GetComponentInChildren<StoryCardFlip>(true) != null
-                    ? "카드 바깥을 터치해 이야기를 이어가시오" : "화면을 터치해 이야기를 이어가시오";
-            if ((review || failed) && !resultActionsReady) return "잠시 손을 떼고 결과를 확인하시오";
-            if (failed) return !session.Network.IsHost ? "방장이 재도전하기를 기다리고 있소"
-                : session.CanRetryStage ? "같은 방에서 이 스테이지를 다시 봉인할 수 있소"
-                : session.IsAnyResultPresentationBusy ? "모두가 이야기를 확인하기를 기다리고 있소"
-                : "모두가 결과를 받기를 기다리고 있소";
-            if (!review) return string.Empty;
-            if (final) return session.CanReturnHome ? "엔딩과 완성된 박을 확인할 수 있소" : "모두가 결과를 받기를 기다리고 있소";
-            if (!session.Network.IsHost) return "방장이 다음 스테이지를 시작하기를 기다리고 있소";
-            if (session.IsAnyResultViewerOpen) return "모두가 박 관람을 마치면 진행할 수 있소";
-            if (session.IsAnyResultPresentationBusy) return "모두가 이야기를 확인하기를 기다리고 있소";
-            return session.CanAdvanceStage ? "다음 스테이지로 진행할 수 있소" : "모두가 결과를 받기를 기다리고 있소";
         }
 
         private void BindActionButtons()
