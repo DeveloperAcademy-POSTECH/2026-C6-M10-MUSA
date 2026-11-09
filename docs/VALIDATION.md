@@ -54,6 +54,7 @@
   - 4차: 3건이 확인됐다(중간 1: 2:2 로비 복귀 뒤 처리된 전투 중 끊김을 맡음).
   - 5차: 처음부터 다시 훑은 검토자는 중간 이상을 찾지 못했다. 4차 수정의 작은 빈틈 1건이 확인됐다.
   - 확인된 것은 모두 고쳤고, 고칠 때마다 검사를 더하고 대조 실험으로 그 검사가 문제를 잡는지 확인했다.
+- **main `1823993d`(#551·#552·#567·#571·#573 포함) 병합 뒤:** `44e799da`에서 EditMode 2123건 중 2121 PASS, PlayMode 715건 중 711 PASS. 실패 6건은 `LabJigwiABModelTests.BBucketArrivesSeatBySeatAndEachPourPaintsAtOnce`, `GameTutorialTests.GoalStepPlaysTheApprovedLinesWithGeumokAndBul`, `LabJigwiABNetworkTests` 3건, `GameJigwiStageIntegrationTests` 1건이다. 같은 6건을 #501 없는 main `1823993d`에서 돌려 같은 메시지로 모두 실패함을 확인했다. 이 PR이 만든 실패가 아니며 고치지 않았다. Game 토큰은 #551의 44 위인 45, 프로토콜 5697·`C6PhysicsLab/58`은 #551 값이다.
 - 각 실행의 skip·inconclusive는 0이다. batch 가져오기가 덧붙인 Lobby PNG `.meta` 20개의 WebGL 항목은 매번 되돌렸다.
 - **미실행:** iPhone의 실제 화면 잠금·백그라운드(멈춘 시간을 재는 벽시계와 복귀 처리는 Editor에서 그 함수를 직접 불러 확인했다), 실제 Wi-Fi 끊김, 두 대 이상의 실기기, Bonjour 방 카드로 정원 찬 방에 실제로 다시 들어가기(카드 문구는 꾸민 방 목록으로, 입장 가능 판단은 EditMode로만 확인했다), Mac·iOS 앱.
 
