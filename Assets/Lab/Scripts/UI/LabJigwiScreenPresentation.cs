@@ -814,6 +814,8 @@ namespace C6Lab
             // #540: the taunts are spoken by Jigwi's voice now (LabJigwiTalismanOverlay); no warning words on screen.
             string words = string.Empty;
             DrawTalismanProgress(LastCommonTalisman(stage, now) ?? active, now); // #595: icons, not words
+            DrawTalismanStamps(LastCommonTalisman(stage, now), snapshot, local, now); // #595: who has written it
+            DrawTalismanSeal(stage, now); // #595: all written — the talismans fly to the boss and seal it
             status.text = words; playerStatus.text = rows.ToString();
             statusPanel.gameObject.SetActive(words.Length > 0);
             playerStatus.gameObject.SetActive(rows.Length > 0);
@@ -846,7 +848,8 @@ namespace C6Lab
             // (alone, writing it finishes the round at once).
             bool show = active != null && active.kind == LabJigwiABKind.PersonalBurn && active.common
                 && (active.Active(now) || active.resolvedAt >= 0d && now >= active.resolvedAt && now < active.resolvedAt + TalismanLingerSeconds
-                    && (active.resolution == LabJigwiABResolution.Completed || active.resolution == LabJigwiABResolution.Expired));
+                    && (active.resolution == LabJigwiABResolution.Completed && active.id != sealedRound // #595: they flew to the boss
+                        || active.resolution == LabJigwiABResolution.Expired));
             if (show)
                 foreach (var seat in active.players ?? Array.Empty<LabJigwiABPlayerFire>())
                     if (seat != null) { total++; if (seat.talismanAt >= 0d) done++; }
@@ -890,6 +893,235 @@ namespace C6Lab
                 rect.localScale = Vector3.one * pop;
                 icon.color = lit ? Color.white : new Color(.38f, .34f, .32f, .55f);
             }
+        }
+
+        // ---------- #595 누가 썼나: 사람 표시(양옆 P 동그라미, 작은 지도 자리)에 부적 도장이 쾅. 아직이면 그 표시가 깜빡 ----------
+        private readonly Dictionary<RectTransform, UnityEngine.UI.Image> stamps = new Dictionary<RectTransform, UnityEngine.UI.Image>();
+        private readonly Dictionary<RectTransform, float> stampedAt = new Dictionary<RectTransform, float>();
+        private readonly HashSet<RectTransform> stampsUsed = new HashSet<RectTransform>();
+        private LabDrumMinimap minimap;
+        private LabHud hud;
+        private static Sprite waitRingSprite;
+        /// <summary>테스트용: 도장이 찍힌 사람 표시 수 / 기다리는 표시 수.</summary>
+        public int StampsShown { get; private set; }
+        public int StampsWaiting { get; private set; }
+
+        private void DrawTalismanStamps(LabJigwiABRound round, LabSnapshot snapshot, ulong local, double now)
+        {
+            stampsUsed.Clear(); StampsShown = StampsWaiting = 0;
+            if (round != null && snapshot?.players != null)
+            {
+                if (minimap == null) minimap = FindFirstObjectByType<LabDrumMinimap>();
+                if (hud == null) hud = FindFirstObjectByType<LabHud>();
+                LabPlayerState[] seats = System.Linq.Enumerable.ToArray(System.Linq.Enumerable.OrderBy(
+                    System.Linq.Enumerable.Where(snapshot.players, p => p != null), p => p.seat));
+                int mine = Array.FindIndex(seats, p => p.id == local), n = seats.Length;
+                foreach (var seat in round.players ?? Array.Empty<LabJigwiABPlayerFire>())
+                {
+                    if (seat == null) continue;
+                    bool done = seat.talismanAt >= 0d;
+                    if (minimap != null) Stamp(minimap.SeatMarker(seat.playerId), done);
+                    // My left neighbour is the next seat, my right neighbour the one before (LabDrumMinimap.UnitPosition).
+                    if (hud != null && mine >= 0 && n > 1)
+                    {
+                        int at = Array.FindIndex(seats, p => p.id == seat.playerId);
+                        if (at == (mine + 1) % n && hud.leftNeighborBadge != null && hud.leftNeighborBadge.activeInHierarchy)
+                            Stamp(hud.leftNeighborBadge.transform as RectTransform, done);
+                        if (at == (mine + n - 1) % n && hud.rightNeighborBadge != null && hud.rightNeighborBadge.activeInHierarchy)
+                            Stamp(hud.rightNeighborBadge.transform as RectTransform, done);
+                    }
+                }
+            }
+            foreach (var pair in stamps)
+                if (!stampsUsed.Contains(pair.Key) && pair.Value != null && pair.Value.gameObject.activeSelf) pair.Value.gameObject.SetActive(false);
+        }
+
+        private void Stamp(RectTransform marker, bool done)
+        {
+            if (marker == null || !marker.gameObject.activeInHierarchy || stampsUsed.Contains(marker)) return;
+            stampsUsed.Add(marker);
+            if (!stamps.TryGetValue(marker, out var image) || image == null)
+            {
+                image = new GameObject("Talisman Stamp", typeof(RectTransform)).AddComponent<UnityEngine.UI.Image>();
+                image.gameObject.layer = gameObject.layer; image.raycastTarget = false; image.preserveAspect = true;
+                image.transform.SetParent(transform, false);
+                stamps[marker] = image;
+            }
+            if (!image.gameObject.activeSelf) image.gameObject.SetActive(true);
+            image.transform.SetAsLastSibling();
+            var rect = image.rectTransform;
+            rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(.5f, .5f);
+            rect.position = marker.TransformPoint(marker.rect.center);
+            float side = Mathf.Max(marker.rect.width * marker.lossyScale.x, marker.rect.height * marker.lossyScale.y)
+                / Mathf.Max(.0001f, rect.lossyScale.x);
+            float t = Time.unscaledTime;
+            if (done)
+            {
+                if (!stampedAt.TryGetValue(marker, out float when) || when < 0f) stampedAt[marker] = when = t;
+                StampsShown++;
+                image.sprite = TalismanIcon();
+                // Slams down big and settles over the marker's lower right, tilted like a stamped seal.
+                float slam = Mathf.Clamp01((t - when) / .18f);
+                rect.sizeDelta = new Vector2(side * .55f, side * .95f);
+                rect.localScale = Vector3.one * Mathf.Lerp(2.2f, 1f, slam * slam);
+                rect.position += (Vector3)(new Vector2(side * .32f, -side * .1f) * rect.lossyScale.x);
+                rect.localEulerAngles = new Vector3(0f, 0f, -12f);
+                image.color = new Color(1f, 1f, 1f, Mathf.Lerp(.3f, 1f, slam));
+            }
+            else
+            {
+                stampedAt[marker] = -1f;
+                StampsWaiting++;
+                // Still writing: an ember ring blinks around the marker.
+                image.sprite = WaitRing();
+                rect.sizeDelta = Vector2.one * side * 1.35f;
+                rect.localEulerAngles = Vector3.zero;
+                float blink = .5f + .5f * Mathf.Sin(t * 6f);
+                rect.localScale = Vector3.one * (1f + .08f * blink);
+                image.color = new Color(1f, .45f, .12f, .35f + .55f * blink);
+            }
+        }
+
+        private void HideStamps()
+        {
+            foreach (var pair in stamps) if (pair.Value != null) pair.Value.gameObject.SetActive(false);
+            StampsShown = StampsWaiting = 0;
+        }
+
+        private static Sprite WaitRing()
+        {
+            if (waitRingSprite != null) return waitRingSprite;
+            const int s = 64;
+            var texture = new Texture2D(s, s, TextureFormat.RGBA32, false)
+            { name = "Jigwi talisman wait ring (#595 runtime)", hideFlags = HideFlags.DontSave, wrapMode = TextureWrapMode.Clamp };
+            var pixels = new Color[s * s];
+            for (int y = 0; y < s; y++)
+                for (int x = 0; x < s; x++)
+                {
+                    float d = new Vector2(x + .5f - s * .5f, y + .5f - s * .5f).magnitude / (s * .5f);
+                    pixels[y * s + x] = new Color(1f, 1f, 1f, Mathf.Clamp01((1f - d) * 20f) * Mathf.Clamp01((d - .78f) * 20f));
+                }
+            texture.SetPixels(pixels); texture.Apply(false, true);
+            waitRingSprite = Sprite.Create(texture, new Rect(0f, 0f, s, s), new Vector2(.5f, .5f), s);
+            waitRingSprite.hideFlags = HideFlags.DontSave;
+            return waitRingSprite;
+        }
+
+        // ---------- #595 모두 썼다: 켜진 부적들이 박으로 휘릭 날아가 붙고, 큰 붉은 "봉" 도장이 쾅 (1초 남짓) ----------
+        private RectTransform sealRoot;
+        private UnityEngine.UI.Image sealStamp;
+        private UnityEngine.UI.Text sealGlyph;
+        private readonly UnityEngine.UI.Image[] flyers = new UnityEngine.UI.Image[LabJigwiABNetworkValidation.MaximumPlayers];
+        private readonly Vector3[] flyFrom = new Vector3[LabJigwiABNetworkValidation.MaximumPlayers];
+        private string sealedRound;
+        private float sealStartedAt = -1f;
+        private int flyCount;
+        private AudioSource sealAudio;
+        private const float FlySeconds = .45f, SealHoldSeconds = .6f, SealFadeSeconds = .35f;
+        /// <summary>테스트용: 봉인 연출이 도는 중인지.</summary>
+        public bool SealPlaying => sealStartedAt >= 0f;
+
+        private void DrawTalismanSeal(LabJigwiABSnapshot stage, double now)
+        {
+            foreach (var round in stage?.rounds ?? Array.Empty<LabJigwiABRound>())
+            {
+                if (round == null || !round.common || round.kind != LabJigwiABKind.PersonalBurn
+                    || round.resolution != LabJigwiABResolution.Completed || round.resolvedAt < 0d) continue;
+                if (round.id == sealedRound || now < round.resolvedAt || now - round.resolvedAt > 1d) continue;
+                BeginSeal(round);
+            }
+            if (sealStartedAt < 0f) return;
+            float age = Time.unscaledTime - sealStartedAt;
+            if (age >= FlySeconds + SealHoldSeconds + SealFadeSeconds) { sealStartedAt = -1f; sealRoot.gameObject.SetActive(false); return; }
+            Vector3 boss = BossPoint();
+            float fly = Mathf.Clamp01(age / FlySeconds);
+            for (int i = 0; i < flyers.Length; i++)
+            {
+                bool on = i < flyCount && fly < 1f;
+                if (flyers[i].gameObject.activeSelf != on) flyers[i].gameObject.SetActive(on);
+                if (!on) continue;
+                float k = Mathf.Clamp01((fly - i * .06f) / .8f);
+                float ease = k * k;
+                Vector3 arc = Vector3.up * Mathf.Sin(Mathf.PI * k) * 60f * transform.lossyScale.y;
+                flyers[i].rectTransform.position = Vector3.Lerp(flyFrom[i], boss, ease) + arc;
+                flyers[i].rectTransform.localEulerAngles = new Vector3(0f, 0f, 360f * ease * (i % 2 == 0 ? 1f : -1f));
+                flyers[i].rectTransform.localScale = Vector3.one * Mathf.Lerp(1f, .6f, ease);
+            }
+            float s = age - FlySeconds;
+            bool stamp = s >= 0f;
+            if (sealStamp.gameObject.activeSelf != stamp) sealStamp.gameObject.SetActive(stamp);
+            if (!stamp) return;
+            if (s - Time.unscaledDeltaTime < 0f) // the moment it lands
+            {
+                if (source != null) LabHaptics.PlayDirect(source.config, LabHapticStyle.Heavy, 1f, .3f, .9f, .5f);
+                PlaySeal();
+            }
+            float slam = Mathf.Clamp01(s / .16f);
+            float fade = 1f - Mathf.Clamp01((s - SealHoldSeconds) / SealFadeSeconds);
+            sealStamp.rectTransform.position = boss;
+            sealStamp.rectTransform.localScale = Vector3.one * Mathf.Lerp(2.6f, 1f, slam * slam);
+            sealStamp.color = new Color(.78f, .1f, .07f, .92f * fade * Mathf.Lerp(.4f, 1f, slam));
+            sealGlyph.color = new Color(1f, .96f, .88f, fade * slam);
+        }
+
+        private void BeginSeal(LabJigwiABRound round)
+        {
+            sealedRound = round.id; sealStartedAt = Time.unscaledTime;
+            if (sealRoot == null)
+            {
+                sealRoot = new GameObject("TalismanSeal", typeof(RectTransform)).GetComponent<RectTransform>();
+                sealRoot.gameObject.layer = gameObject.layer; sealRoot.SetParent(transform, false);
+                sealRoot.anchorMin = Vector2.zero; sealRoot.anchorMax = Vector2.one; sealRoot.offsetMin = sealRoot.offsetMax = Vector2.zero;
+                for (int i = 0; i < flyers.Length; i++)
+                {
+                    flyers[i] = new GameObject("Flying Talisman " + i, typeof(RectTransform)).AddComponent<UnityEngine.UI.Image>();
+                    flyers[i].gameObject.layer = gameObject.layer; flyers[i].raycastTarget = false; flyers[i].preserveAspect = true;
+                    flyers[i].sprite = TalismanIcon(); flyers[i].transform.SetParent(sealRoot, false);
+                }
+                sealStamp = new GameObject("Seal Stamp", typeof(RectTransform)).AddComponent<UnityEngine.UI.Image>();
+                sealStamp.gameObject.layer = gameObject.layer; sealStamp.raycastTarget = false;
+                sealStamp.transform.SetParent(sealRoot, false);
+                sealStamp.rectTransform.sizeDelta = Vector2.one * 220f;
+                sealGlyph = Label("SealGlyph", sealStamp.transform, 120);
+                sealGlyph.text = "봉"; sealGlyph.alignment = TextAnchor.MiddleCenter;
+                var glyph = sealGlyph.rectTransform;
+                glyph.anchorMin = Vector2.zero; glyph.anchorMax = Vector2.one; glyph.offsetMin = glyph.offsetMax = Vector2.zero;
+            }
+            sealRoot.gameObject.SetActive(true); sealRoot.SetAsLastSibling();
+            sealStamp.gameObject.SetActive(false);
+            sealStamp.rectTransform.localEulerAngles = new Vector3(0f, 0f, -8f);
+            // The lit icons in the row take off from where they are.
+            flyCount = 0;
+            for (int i = 0; i < talismanIcons.Length && flyCount < flyers.Length; i++)
+            {
+                var icon = talismanIcons[i];
+                if (icon == null || !icon.gameObject.activeInHierarchy) continue;
+                flyFrom[flyCount] = icon.rectTransform.position;
+                flyers[flyCount].rectTransform.sizeDelta = icon.rectTransform.rect.size;
+                flyCount++;
+            }
+            if (talismanRow != null) talismanRow.gameObject.SetActive(false);
+        }
+
+        /// <summary>The boss's centre on this canvas (the middle of the upper screen when it cannot be projected).</summary>
+        private Vector3 BossPoint()
+        {
+            var rect = transform as RectTransform;
+            Vector3 fallback = rect != null ? rect.TransformPoint(new Vector3(0f, rect.rect.height * .2f, 0f)) : transform.position;
+            if (source == null || source.target == null || battleCamera == null || rect == null) return fallback;
+            Vector3 screen = battleCamera.WorldToScreenPoint(source.target.transform.position);
+            if (screen.z <= 0f) return fallback;
+            Canvas root = canvas != null ? canvas.rootCanvas : GetComponentInParent<Canvas>();
+            Camera eye = root == null || root.renderMode == RenderMode.ScreenSpaceOverlay ? null : root.worldCamera;
+            return RectTransformUtility.ScreenPointToWorldPointInRectangle(rect, screen, eye, out Vector3 world) ? world : fallback;
+        }
+
+        private void PlaySeal()
+        {
+            AudioClip[] clips = Resources.LoadAll<AudioClip>("Audio/JigwiTalismanSplash");
+            if (clips == null || clips.Length == 0) return;
+            if (sealAudio == null) { sealAudio = gameObject.AddComponent<AudioSource>(); sealAudio.playOnAwake = false; sealAudio.spatialBlend = 0f; }
+            sealAudio.PlayOneShot(clips[0], LabAudioSettings.SfxVolume);
         }
 
         /// <summary>작은 부적: 노란 종이, 붉은 테두리, 가운데 붉은 획, 아래 붉은 도장.</summary>
@@ -982,6 +1214,8 @@ namespace C6Lab
             if (failureOverlay != null) failureOverlay.gameObject.SetActive(false);
             if (statusPanel != null) statusPanel.gameObject.SetActive(false);
             if (talismanRow != null) talismanRow.gameObject.SetActive(false); // #595
+            HideStamps();
+            if (sealRoot != null) sealRoot.gameObject.SetActive(false);
             TalismanIconsShown = TalismanIconsLit = 0;
             if (personalWaterDouse != null) personalWaterDouse.gameObject.SetActive(false);
             if (fireImages != null) foreach (var image in fireImages) if (image != null) image.gameObject.SetActive(false);
