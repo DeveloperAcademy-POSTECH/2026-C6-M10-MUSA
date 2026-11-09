@@ -210,7 +210,7 @@ namespace Hapio.Tests
             Assert.That(view.slotImages[0].sprite, Is.Not.SameAs(view.filledSlots[0]));
             Assert.That(session.Network.RequestPlayerSlot(4), Is.False, "P4 does not exist in this three-player room.");
             yield return null;
-            Assert.That(view.message.gameObject.activeInHierarchy, Is.True);
+            Assert.That(view.message.gameObject.activeInHierarchy, Is.False, "The approved lobby design has no status line.");
             Assert.That(view.message.text, Is.EqualTo(session.Network.Notice));
             Assert.That(view.message.text, Does.Contain("available P number"));
             Assert.That(view.message.text, Is.Not.EqualTo(session.Network.RoomSearchMessage),
