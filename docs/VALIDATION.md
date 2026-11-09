@@ -7161,3 +7161,9 @@ EditMode 모델 검사 4개:
 - EditMode GameBattleUiAssetTests: **2/2 PASS**, 실패·건너뜀 0. Lab/전투 외형이 별도 객체이고 두 곳 모두 같은 새 폭탄 프리팹을 참조함을 확인.
 - PlayMode GameBattleUiPresentationTests.SavedBattleThemeDrawsTheNewBombOnTheRealBoard: **1/1 PASS**, 실패·건너뜀 0. 실제 GameSession 시작 경로의 전투 외형과 로드된 Battle 구슬판에 표시 전용 폭탄 fixture를 넣어 새 컴포넌트·BombCount2 PNG·불꽃 표시를 확인. 모델의 자연 발생 폭탄이나 사용자의 수동 플레이 확인과 구분한다.
 - 스크립트 컴파일 오류 0, git diff --check 통과. 자연 발생 폭탄 수동 조작·다인 전달·실기기 검증은 여전히 미실행이다.
+
+### #584 main 병합·검증 기록 충돌 해결 — 2026-11-09
+
+main `33762faf`를 폭탄 브랜치에 병합했다. 같은 문서 끝에 추가된 main의 #581 기록과 #584 폭탄 기록이 충돌했으며 양쪽 내용을 모두 보존해 이어 붙였다. 코드·프리팹·에셋의 텍스트 충돌은 없었고, 자동 병합된 LabBattleRenderWarmup의 폭탄·클레이 복사본 준비를 함께 확인했다.
+
+Unity 6000.6.5f1 Editor 컴파일 오류 0. 병합 후 선택 PlayMode는 LabBombVisualTests 2개·GameBattleUiPresentationTests.SavedBattleThemeDrawsTheNewBombOnTheRealBoard 1개·GameBattleRenderWarmupTests 2개, **5/5 PASS**(실패·건너뜀 0, 7.61초). 전체 검사·실기기 검증은 추가 실행하지 않았다. 충돌 문서의 양쪽 원문 비어 있지 않은 모든 줄이 보존된 것을 대조했다. 문서 diff 검사는 통과했으며 main에서 가져온 Unity 오디오 meta의 기존 후행 공백은 변경하지 않았다.
