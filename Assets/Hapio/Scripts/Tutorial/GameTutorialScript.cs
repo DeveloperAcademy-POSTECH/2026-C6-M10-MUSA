@@ -24,7 +24,11 @@ namespace Hapio
         /// <summary>내 판의 폭탄 (자물쇠 숫자가 보이게).</summary>
         Bomb,
         /// <summary>오른쪽 위 북 위치 지도(미니맵). 둥근 네모로 밝히고, 말풍선이 지도를 가리면 얼굴 아래로 내려 단다.</summary>
-        Minimap
+        Minimap,
+        /// <summary>
+        /// 빛나다 사라지는 시연 구슬 하나 (4단계, #552). 사라진 뒤에도 그 자리를 그대로 밝혀 두어 빛이 다른 곳으로 튀지 않는다.
+        /// </summary>
+        FadingOrb
     }
 
     /// <summary>다음으로 넘어가기 전에 기다리는 일. None은 화면을 눌러 넘기는 대사다.</summary>
@@ -83,7 +87,17 @@ namespace Hapio
         /// </summary>
         ReturnBomb,
         /// <summary>"풀렸다!": 멈춰 기다리던 무지개 폭탄이 이 대사와 함께 공격 구슬 두 개로 열린다 (5단계).</summary>
-        OpenBomb
+        OpenBomb,
+        /// <summary>
+        /// "어? 구슬이 빛나는데?": 내 판에 남은 구슬 하나(음 → 양 → 오행 순, 없으면 하나 떨어뜨림)가 실제 게임의 수명 끝
+        /// 반짝임(#235)을 시작한다. 이 대사가 떠 있는 동안은 처음 빠르기로 계속 빛나고 사라지지 않는다 (4단계, #552).
+        /// </summary>
+        OrbGlow,
+        /// <summary>
+        /// "…빛이 나기 시작하면 곧 없어져!": 그 구슬의 남은 시간이 흘러 반짝임이 빨라지다 실제 게임처럼 연기와 함께 사라진다.
+        /// 구슬이 사라지기 전에는 이 대사를 넘길 수 없다 (4단계, #552).
+        /// </summary>
+        OrbVanish
     }
 
     /// <summary>
@@ -149,7 +163,7 @@ namespace Hapio
 
     /// <summary>
     /// 확정 대본 (#477, 2026-11-04). 오프닝 마지막 "얼른 요괴 잡으러 가자!" 바로 뒤에서 금옥이가 붙잡으며 시작한다.
-    /// 아이들끼리는 반말, 한 말풍선은 두 줄 이내. 안내 띠는 "~하시오"체.
+    /// 아이들끼리는 반말, 한 말풍선은 세 줄 이내(말풍선 글자 칸 폭을 넘는 줄은 직접 \n으로 나눈다, #552). 안내 띠는 "~하시오"체.
     /// </summary>
     public static class GameTutorialScript
     {
@@ -173,7 +187,7 @@ namespace Hapio
         /// </summary>
         public const string SkipButtonLabel = "건너뛰기";
         public const string SkipTitle = "튜토리얼을 건너뛰겠소?";
-        public const string SkipBody = "튜토리얼을 건너뛰면 구슬 전달과 조합 등\n기본 조작을 익히지 못해\n협동 플레이에 어려움이 있을 수 있소.";
+        public const string SkipBody = "튜토리얼을 건너뛰면 기본 조작을 익히지 못해\n협동 플레이에 어려움이 있을 수 있소.";
         public const string SkipStay = "계속 배우기";
         public const string SkipLeave = "건너뛰기";
         /// <summary>튜토리얼 일시정지 메뉴에 더하는 버튼: 연습 판을 처음부터 다시 연다. 메뉴의 다른 버튼(CONTINUE·QUIT RUN)과 같은 말투.</summary>
@@ -232,8 +246,8 @@ namespace Hapio
             return new UnityEngine.Vector2(UnityEngine.Mathf.Sin(radians), UnityEngine.Mathf.Cos(radians)) * speed;
         }
 
-        private static GameTutorialBeat Bul(string text, GameTutorialFocus focus = GameTutorialFocus.None) =>
-            GameTutorialBeat.Line(GameTutorialSpeaker.Bul, text, focus);
+        private static GameTutorialBeat Bul(string text, GameTutorialFocus focus = GameTutorialFocus.None,
+            GameTutorialCue cue = GameTutorialCue.None) => GameTutorialBeat.Line(GameTutorialSpeaker.Bul, text, focus, cue);
         private static GameTutorialBeat Geumok(string text, GameTutorialFocus focus = GameTutorialFocus.None,
             GameTutorialCue cue = GameTutorialCue.None) => GameTutorialBeat.Line(GameTutorialSpeaker.Geumok, text, focus, cue);
         private static GameTutorialBeat Muk(string text) => GameTutorialBeat.Line(GameTutorialSpeaker.Muk, text);
@@ -242,10 +256,10 @@ namespace Hapio
         public static readonly GameTutorialStep Goal = new GameTutorialStep("0단계 · 목표",
             Geumok("잠깐! 무작정 가면 안 돼."),
             Geumok("사용법부터 익히고 가자."),
-            Bul("에이~ 그냥 던지면 되는 거 아냐?"),
+            Bul("에이~\n그냥 던지면 되는 거 아냐?"),
             Geumok("그러다 또 사고 칠래?"),
-            Geumok("마침 박 속에 작은 요괴가 남아 있네.\n얘로 연습하자!"),
-            Geumok("봉인박을 오행의 기운으로\n빈틈없이 칠하면 요괴를 가둘 수 있어.", GameTutorialFocus.Gourd));
+            Geumok("마침 박 속에 작은 요괴가\n남아 있네. 얘로 연습하자!"),
+            Geumok("봉인박을 오행의 기운으로\n빈틈없이 칠하면\n요괴를 가둘 수 있어.", GameTutorialFocus.Gourd));
 
         /// <summary>
         /// 1단계 · 북 치기: 가운데 고정된 북을 세 번 눌러 음·양·음을 만든다. 기운은 딱 세 번 칠 만큼이라 바닥나고,
@@ -253,12 +267,12 @@ namespace Hapio
         /// </summary>
         public static readonly GameTutorialStep Drum = new GameTutorialStep("1단계 · 북 치기",
             Geumok("먼저 북을 쳐 봐.", GameTutorialFocus.Drum),
-            Geumok("음구슬이나 양구슬이 튀어나올 거야.", GameTutorialFocus.Drum),
+            Geumok("음구슬이나 양구슬이\n튀어나올 거야.", GameTutorialFocus.Drum),
             GameTutorialBeat.Do(GameTutorialAction.TapDrum, "북을 눌러 구슬을 만드시오", GameTutorialFocus.Drum,
                 GameStageSettings.TutorialDrumTaps),
             Bul("오, 나온다 나와!"),
             Geumok("북을 칠 때마다 기운이 줄어.", GameTutorialFocus.Stamina),
-            Geumok("바닥나면 잠깐 숨을 골라야 해.", GameTutorialFocus.Stamina, GameTutorialCue.StaminaShort),
+            Geumok("바닥나면 잠깐\n숨을 골라야 해.", GameTutorialFocus.Stamina, GameTutorialCue.StaminaShort),
             GameTutorialBeat.Do(GameTutorialAction.RefillStamina, string.Empty, GameTutorialFocus.Stamina));
 
         /// <summary>2단계에서 음·양을 합치면 나오는 오행: 화(빨강). 3단계에서 이 빨간 구슬을 던진다.</summary>
@@ -275,7 +289,7 @@ namespace Hapio
             GameTutorialBeat.Do(GameTutorialAction.CombineOrbs, "음구슬을 끌어 양구슬 위에 놓으시오", GameTutorialFocus.Pair),
             Bul("우와, 색이 변했어!"),
             Geumok("그게 오행구슬이야."),
-            Geumok("화·수·목·금·토 중 하나가 나와."));
+            Geumok("화·수·목·금·토 중\n하나가 나와."));
 
         /// <summary>3단계에서 빗나갔을 때 금옥이가 하는 말. 말풍선은 잠깐 뜨고, 화면을 막지 않아 바로 다시 던질 수 있다.</summary>
         public const string RetryLine = "다시 해 봐!";
@@ -313,15 +327,22 @@ namespace Hapio
         /// <summary>
         /// 4단계 · 넘기기: 북은 몇 개 없어 같이 쓴다. 북을 오른쪽 끝으로 밀어 금옥이에게 넘기면, 금옥이가 고맙다며 자기가 만든
         /// 양구슬과 북을 함께 돌려준다. 남은 음과 받은 양은 짝이 안 맞는 구슬을 친구에게 넘기는 이유가 된다.
+        /// 지도 대사 뒤에는 남은 구슬 하나가 빛나다 사라지는 모습을 보여 주며, 구슬은 오래 두면 사라지니 못 쓰는 구슬은
+        /// 바로 넘기라고 알려 준다 (#552). 튜토리얼의 다른 구슬은 여전히 사라지지 않는다.
         /// </summary>
         public static readonly GameTutorialStep Pass = new GameTutorialStep("4단계 · 넘기기",
-            Bul("나만 너무 열심히 하고 있는 거 아니야?"),
-            Geumok("맞아! 너가 북을 줘야지... \n북은 몇 개 없어서 같이 써야 해! 옆으로 밀면 넘어가. "),
+            Bul("나만 너무 열심히\n하고 있는 거 아니야?"),
+            Geumok("맞아! 너가 북을 줘야지...\n북은 몇 개 없어서 같이 써야 해!\n옆으로 밀면 넘어가."),
             GameTutorialBeat.Do(GameTutorialAction.PassDrum, "북을 오른쪽 끝으로 밀어 금옥이에게 넘기시오", GameTutorialFocus.None),
-            Geumok("고마워!\n대신 내가 만든 구슬과 북 줄게~", cue: GameTutorialCue.GiveBack),
+            Geumok("고마워! 대신 내가 만든\n구슬과 북 줄게~", cue: GameTutorialCue.GiveBack),
             Geumok("짝이 안 맞는 구슬은\n이렇게 친구한테 넘기면 돼."),
             Geumok("지금 북이 어디에 있는지는\n우측 지도에서 볼 수 있어!", GameTutorialFocus.Minimap),
-            Bul("오호! 누가 북을 안 주고 있는지\n실시간으로 확인할 수 있겠군!", GameTutorialFocus.Minimap));
+            Bul("오호! 누가 북을\n안 주고 있는지 실시간으로\n확인할 수 있겠군!", GameTutorialFocus.Minimap),
+            // #552: 구슬은 오래 두면 사라진다. 남은 구슬 하나가 실제 게임처럼 빛나다 연기와 함께 사라진다.
+            Bul("어? 구슬이 빛나는데?", GameTutorialFocus.FadingOrb, GameTutorialCue.OrbGlow),
+            Geumok("구슬은 오래 두면 사라져.\n빛이 나기 시작하면 곧 없어져!", GameTutorialFocus.FadingOrb, GameTutorialCue.OrbVanish),
+            Geumok("못 쓰는 구슬은 쥐고 있지 말고\n바로바로 넘겨 줘!"),
+            Bul("오호! 알겠어"));
 
         /// <summary>5단계 폭탄의 자물쇠 수: 내가 넘기면 1, 금옥이가 돌려주면 0이 되어 내 판에서 열린다.</summary>
         public const int BombLocks = 2;
@@ -331,18 +352,21 @@ namespace Hapio
         /// </summary>
         public static readonly UnityEngine.Vector2 BombLanding = new UnityEngine.Vector2(.42f, .72f);
 
+        /// <summary>4단계 구슬 사라짐 시연 (#552): 판에 남은 구슬이 없을 때 시연용 음구슬이 떨어지는 자리 (판 0..1).</summary>
+        public static readonly UnityEngine.Vector2 FadeDemoLanding = new UnityEngine.Vector2(.5f, .6f);
+
         /// <summary>
         /// 5단계 · 폭탄: 요괴가 박에서 자물쇠 2짜리 폭탄을 떨어뜨린다. 오른쪽 금옥이에게 넘기면(2→1) 금옥이가 "앗 뜨거!" 하며
         /// 도로 넘겨주고(1→0), 풀린 폭탄은 내 판에서 공격 구슬 두 개로 열린다.
         /// </summary>
         public static readonly GameTutorialStep Bomb = new GameTutorialStep("5단계 · 폭탄",
             GameTutorialBeat.Line(GameTutorialSpeaker.Bul, "으악! 박에서 뭐가 떨어졌어!", cue: GameTutorialCue.DropBomb),
-            Geumok("요괴가 던진 폭탄이야!\n적힌 숫자만큼 옆으로 넘기면 풀려.", GameTutorialFocus.Bomb),
+            Geumok("요괴가 던진 폭탄이야!\n적힌 숫자만큼 옆으로\n넘기면 풀려.", GameTutorialFocus.Bomb),
             GameTutorialBeat.Do(GameTutorialAction.PassBomb, "폭탄을 오른쪽 금옥이에게 넘기시오", GameTutorialFocus.None),
             Geumok("앗 뜨거! 도로 받아!", cue: GameTutorialCue.ReturnBomb),
             GameTutorialBeat.Do(GameTutorialAction.WaitBombBack, string.Empty, GameTutorialFocus.None),
             Geumok("풀렸다!", cue: GameTutorialCue.OpenBomb),
-            Geumok("풀린 폭탄은 오행 구슬 두 개가 돼."),
+            Geumok("풀린 폭탄은\n오행 구슬 두 개가 돼."),
             Bul("가만히 냅두면 터지니까\n얼른얼른 넘겨야겠네!"));
 
         /// <summary>6단계에서 요괴가 막는 쪽: 내 판 오른쪽(금옥이 쪽).</summary>
@@ -355,13 +379,13 @@ namespace Hapio
         public static readonly GameTutorialStep Block = new GameTutorialStep("6단계 · 막기",
             GameTutorialBeat.Do(GameTutorialAction.WatchBlock, string.Empty, GameTutorialFocus.None),
             Bul("어? 오른쪽이 빨개졌어!"),
-            Geumok("요괴가 오른쪽을 막은 것 같아!"),
+            Geumok("요괴가 오른쪽을\n막은 것 같아!"),
             Geumok("막힌 쪽은 튕겨 나와.\n반대쪽 묵이한테 북을 넘겨!"),
             Muk("드디어 내 차례가 왔네\n기다리느라 힘들었어..."),
             GameTutorialBeat.Do(GameTutorialAction.PassDrumLeft, "북을 왼쪽 끝으로 밀어 묵이에게 넘기시오", GameTutorialFocus.None),
             Muk("받았어. 고마워."),
             Geumok("좋아, 이 정도면\n잡을 수 있겠어!"),
-            Geumok("앞으로 나올 요괴들이 어떤 방해를 할지 모르니,\n조심하자!"),
+            Geumok("앞으로 나올 요괴들이\n어떤 방해를 할지 모르니,\n조심하자!"),
             Bul("이번엔 진짜다!\n다 같이 가자!"),
             Muk("가보자!"));
 

@@ -54,10 +54,6 @@ namespace Hapio
         public Vector2 tapHintOffset = Vector2.zero;
         [Tooltip("위에서 아래로 내려가는 깊이")] [Min(0f)] public float tapHintDepth = 4f;
         [Tooltip("한 번 내려갔다 다시 올라오는 시간")] [Min(.2f)] public float tapHintSeconds = .8f;
-        [Tooltip("대사를 넘기는 곳: 말풍선과 그 사방 이만큼 (pt). 그 밖을 누르면 넘어가지 않고 ▽가 한 번 커졌다 돌아온다. 판은 대사 동안 계속 막힌다.")]
-        [Min(0f)] public float lineTapPadding = 8f;
-        [Tooltip("말풍선 밖을 눌렀을 때 ▽가 커지는 크기 (제 크기 1)")] [Min(1f)] public float tapHintNudgeScale = 1.35f;
-        [Tooltip("말풍선 밖을 눌렀을 때 ▽가 커졌다 돌아오는 시간")] [Min(.05f)] public float tapHintNudgeSeconds = .3f;
 
         [Header("말풍선 등장 (살짝 커졌다가 제자리)")]
         [Min(.01f)] public float popSeconds = .28f;

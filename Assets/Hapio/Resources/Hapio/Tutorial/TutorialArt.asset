@@ -40,9 +40,6 @@ MonoBehaviour:
   tapHintOffset: {x: 0, y: 5}
   tapHintDepth: 4
   tapHintSeconds: 0.8
-  lineTapPadding: 8
-  tapHintNudgeScale: 1.35
-  tapHintNudgeSeconds: 0.3
   popSeconds: 0.28
   popOvershoot: 1.1
   dimColor: {r: 0, g: 0, b: 0, a: 0.62}
@@ -104,7 +101,7 @@ MonoBehaviour:
   skipPanelSize: {x: 336, y: 172}
   skipPanelTopFraction: 0.4
   skipTitleFontSize: 21
-  skipBodyFontSize: 14
+  skipBodyFontSize: 16
   skipChoiceSize: {x: 120, y: 48}
   skipChoiceGap: 12
   skipChoiceDrop: 10
