@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -7,87 +9,313 @@ namespace Hapio.Experiments
 {
     public sealed partial class ClayPreviewController
     {
-        public bool SplatterEnabled { get; private set; }
-        public float SplatterCore = .22f, SplatterLength = .24f, SplatterWidth = .043f;
-        public float SplatterRoundness = 1f, SplatterIrregularity = 1f;
-        public float SplatterAsymmetry = .75f;
-        public int SplatterSpikes = 14, SplatterSeed = 572, SplatterDroplets;
-        public float SplatterDropletSize = .018f, SplatterDropletDistance = .07f;
-        Texture2D[] splatterBrushes;
-        Texture2D splatterPreviewTexture;
-        Image splatterPreview;
-        Toggle splatterToggle;
-        Label splatterStatus;
+        public bool restoreSavedShapeOnStart = true;
+        public ClayPreviewShapeSource ShapeSource { get; private set; }
+        public bool SplatterEnabled => ShapeSource != ClayPreviewShapeSource.Original;
+        public bool ShapeAvailable => PaletteAvailable && PresetCount == 4;
+        public string ShapeError { get; private set; }
+        public int ShapeRevision { get; private set; }
+        public bool ShapeBusy => splatterDue >= 0 || PaletteBusy;
+        public bool ShapeReady => !ShapeBusy && string.IsNullOrEmpty(ShapeError);
+        public string ShapeImageFileName => imageShapeName;
+        public string ShapeProfilePath => ClayPreviewShapeProfile.DefaultPath;
+        public Texture2D ShapeMaskTexture => publishedShape?.brushes != null ? publishedShape.brushes[0] : null;
+        public Texture2D ShapePreviewTexture => publishedShape?.preview;
+        public float SplatterCore = .1625f, SplatterLength = .21f, SplatterWidth = .048f;
+        public float SplatterRoundness = .85f, SplatterIrregularity = 1f, SplatterAsymmetry = 1f;
+        public int SplatterSpikes = 9, SplatterSeed = 572, SplatterDroplets = 4;
+        public float SplatterDropletSize = .04f, SplatterDropletDistance = .1438f;
         readonly List<Action> syncSplatter = new List<Action>();
+        DropdownField shapeSourceField;
+        VisualElement proceduralControls, shapeModule;
+        Image splatterPreview;
+        Label splatterStatus, shapeFileLabel;
+        IntegerField shapeSeedField;
+        byte[] imageShapeBytes;
+        string imageShapeName;
+        Texture2D generatedPreviewTexture;
+        ShapeBundle requestedShape, publishedShape;
+        ClayPreviewShapeProfile committedShape;
         float splatterDue = -1;
-        bool UseSplatter => SplatterEnabled && ActivePreset == 3;
-        bool UseReplay => !IsDefaultPalette || UseSplatter;
+        bool UseSplatter => SplatterEnabled && ActivePreset == 3 && ShapeAvailable;
+        bool UseReplay => !IsDefaultPalette || UseSplatter || ComparisonNeedsReplay || OmitShapeUndercoat;
+        partial void BuildShapeDiagnosticsUi(VisualElement panel);
+        partial void TickShapeDiagnostics();
+        partial void ReleaseShapeDiagnostics();
+
+        sealed class ShapeBundle : IDisposable
+        {
+            public Texture2D[] brushes;
+            public Texture2D preview;
+            public ClayPreviewShapeMask.Result image;
+            public ClayPreviewShapeProfile profile;
+            public void Dispose()
+            {
+                if (image != null) { image.Dispose(); image = null; }
+                else
+                {
+                    if (brushes != null)
+                        foreach (Texture2D brush in brushes) if (brush != null) DestroyOwned(brush);
+                    if (preview != null) DestroyOwned(preview);
+                }
+                brushes = null; preview = null;
+            }
+        }
 
         void BuildSplatterUi(VisualElement panel)
         {
-            AddLabel(panel, "SPLASH SHAPE", "clay-section-label");
-            splatterToggle = new Toggle("Apply splash shape · coating preset") { value = SplatterEnabled };
-            panel.Add(splatterToggle);
-            splatterToggle.RegisterValueChangedCallback(e => { SplatterEnabled = e.newValue; ScheduleSplatter(); });
-            splatterPreview = new Image { name = "splatterPreview", scaleMode = ScaleMode.ScaleToFit };
-            splatterPreview.style.height = 220;
-            splatterPreview.style.backgroundColor = new Color(.92f,.91f,.89f); panel.Add(splatterPreview);
+            AddLabel(panel, "STICKER OUTLINE / 스티커 외곽", "clay-section-label");
+            shapeModule = new VisualElement { name = "shapeModule" }; panel.Add(shapeModule);
+            shapeSourceField = new DropdownField("OUTLINE SOURCE", new List<string> { "Original / 기존 윤곽", "Image alpha / 이미지 원형", "Procedural / 절차 생성" }, (int)ShapeSource) { name = "shapeSource" };
+            shapeModule.Add(shapeSourceField);
+            shapeSourceField.RegisterValueChangedCallback(e => SetShapeSource((ClayPreviewShapeSource)shapeSourceField.index));
+            AddButton(shapeModule, "Choose outline PNG…", "chooseShapeImage", PickShapeImage);
+            shapeFileLabel = AddLabel(shapeModule, "No outline PNG · texture files are a separate control", "clay-status");
+            splatterPreview = new Image { name = "splatterPreview", scaleMode = ScaleMode.ScaleToFit, pickingMode = PickingMode.Ignore };
+            splatterPreview.AddToClassList("clay-file-thumbnail"); splatterPreview.style.height = 220; shapeModule.Add(splatterPreview);
+            AddLabel(shapeModule, "MASK: 512 × 512 px · PNG alpha only · fixed 32 px padding · aspect ratio preserved.", "clay-status");
+            AddLabel(shapeModule, "표시 최대 범위 = 실제 도색 셀 + 상하·좌우·대각선 2셀의 합집합. 범위 안에서만 표시되며 밖은 잘립니다. 한 셀 기준 5×5는 예시이고 고정 사각 규격이 아닙니다.", "clay-status");
+            AddLabel(shapeModule, "현재 비교 지도: 256×128 = 32,768셀. 100% 완료에서는 표시 지원 제한을 우회하고 빈틈 바탕을 채웁니다. 표시 여유는 게임 도색 면적에 포함되지 않습니다.", "clay-status");
+            proceduralControls = new Foldout { text = "Procedural shape settings / 생성 모양", value = false, name = "proceduralShapeSettings" }; shapeModule.Add(proceduralControls);
             syncSplatter.Clear();
-            SplashSlider(panel,"BODY FULLNESS",.12f,.3f,()=>SplatterCore,v=>SplatterCore=v);
-            SplashSlider(panel,"LOBE COUNT",5,20,()=>SplatterSpikes,v=>SplatterSpikes=Mathf.RoundToInt(v));
-            SplashSlider(panel,"LOBE REACH",.05f,.3f,()=>SplatterLength,v=>SplatterLength=v);
-            SplashSlider(panel,"LOBE WIDTH",.015f,.08f,()=>SplatterWidth,v=>SplatterWidth=v);
-            SplashSlider(panel,"LOBE SOFTNESS",0,1,()=>SplatterRoundness,v=>SplatterRoundness=v);
-            SplashSlider(panel,"IRREGULARITY",0,1,()=>SplatterIrregularity,v=>SplatterIrregularity=v);
-            SplashSlider(panel,"BODY ASYMMETRY",0,1,()=>SplatterAsymmetry,v=>SplatterAsymmetry=v);
-            SplashSlider(panel,"DROPLET COUNT",0,12,()=>SplatterDroplets,v=>SplatterDroplets=Mathf.RoundToInt(v));
-            SplashSlider(panel,"DROPLET SIZE",.005f,.04f,()=>SplatterDropletSize,v=>SplatterDropletSize=v);
-            SplashSlider(panel,"DROPLET DISTANCE",0,.15f,()=>SplatterDropletDistance,v=>SplatterDropletDistance=v);
-            var seed = new IntegerField("SHAPE SEED") { value = SplatterSeed, isDelayed = true }; panel.Add(seed);
-            seed.RegisterValueChangedCallback(e=> { SplatterSeed=e.newValue; ScheduleSplatter(); });
-            AddButton(panel,"New shape","newSplatter",()=>{ SplatterSeed = unchecked(SplatterSeed+1); seed.SetValueWithoutNotify(SplatterSeed); ScheduleSplatter(); });
-            AddButton(panel,"Soft clay splash","referenceSplatter",()=>{ SetReferenceSplatter(); seed.SetValueWithoutNotify(SplatterSeed); });
-            AddButton(panel,"Flowing clay","flowingClay",()=> SetOrganicSplatter(1));
-            AddButton(panel,"Broad splash","broadClay",()=> SetOrganicSplatter(2));
-            splatterStatus=AddLabel(panel,"Original outline · enable to compare", "clay-status");
+            SplashSlider(proceduralControls,"BODY FULLNESS",.12f,.3f,()=>SplatterCore,v=>SplatterCore=v);
+            SplashSlider(proceduralControls,"LOBE COUNT",5,20,()=>SplatterSpikes,v=>SplatterSpikes=Mathf.RoundToInt(v));
+            SplashSlider(proceduralControls,"LOBE REACH",.05f,.3f,()=>SplatterLength,v=>SplatterLength=v);
+            SplashSlider(proceduralControls,"LOBE WIDTH",.015f,.08f,()=>SplatterWidth,v=>SplatterWidth=v);
+            SplashSlider(proceduralControls,"LOBE SOFTNESS",0,1,()=>SplatterRoundness,v=>SplatterRoundness=v);
+            SplashSlider(proceduralControls,"IRREGULARITY",0,1,()=>SplatterIrregularity,v=>SplatterIrregularity=v);
+            SplashSlider(proceduralControls,"BODY ASYMMETRY",0,1,()=>SplatterAsymmetry,v=>SplatterAsymmetry=v);
+            SplashSlider(proceduralControls,"DROPLET COUNT",0,12,()=>SplatterDroplets,v=>SplatterDroplets=Mathf.RoundToInt(v));
+            SplashSlider(proceduralControls,"DROPLET SIZE",.005f,.04f,()=>SplatterDropletSize,v=>SplatterDropletSize=v);
+            SplashSlider(proceduralControls,"DROPLET DISTANCE",0,.15f,()=>SplatterDropletDistance,v=>SplatterDropletDistance=v);
+            shapeSeedField = new IntegerField("SHAPE SEED") { name = "shapeSeed", value = SplatterSeed, isDelayed = true }; proceduralControls.Add(shapeSeedField);
+            shapeSeedField.RegisterValueChangedCallback(e => { SplatterSeed = e.newValue; ScheduleSplatter(); });
+            AddButton(proceduralControls,"New shape","newSplatter",()=> { SplatterSeed = unchecked(SplatterSeed+1); SyncShapeUi(); ScheduleSplatter(); });
+            AddButton(proceduralControls,"Saved reference settings","referenceSplatter",SetReferenceSplatter);
+            AddButton(proceduralControls,"Flowing clay","flowingClay",()=> SetOrganicSplatter(1));
+            AddButton(proceduralControls,"Broad splash","broadClay",()=> SetOrganicSplatter(2));
+            AddButton(shapeModule, "Save as startup shape", "saveShapeProfile", () => SaveShapeProfile());
+            AddButton(shapeModule, "Reload saved shape", "loadShapeProfile", () => LoadShapeProfile());
+            AddButton(shapeModule, "Reset shape defaults", "resetShapeProfile", ResetShapeProfile);
+            splatterStatus = AddLabel(panel, string.Empty, "clay-status"); splatterStatus.name = "shapeStatus";
+            BuildShapeDiagnosticsUi(panel);
+            SyncShapeUi();
         }
+
         void SplashSlider(VisualElement panel,string title,float low,float high,Func<float> get,Action<float> set)
         {
             Label label; var slider=AddSlider(panel,title,"splash"+title.Replace(" ",""),low,high,out label);
-            Action sync=()=>{ slider.SetValueWithoutNotify(get()); label.text=get().ToString("0.###",System.Globalization.CultureInfo.InvariantCulture); };
+            Action sync=()=> { slider.SetValueWithoutNotify(get()); label.text=get().ToString("0.###",CultureInfo.InvariantCulture); };
             syncSplatter.Add(sync); sync();
-            slider.RegisterValueChangedCallback(e=>{ set(e.newValue); sync(); ScheduleSplatter(); });
+            slider.RegisterValueChangedCallback(e=> { set(e.newValue); sync(); ScheduleSplatter(); });
+        }
+
+        public bool SetShapeSource(ClayPreviewShapeSource source)
+        {
+            if (!ShapeAvailable) return ShapeFailure("Open the four-preset coating or image comparison with its palette record.");
+            if (!Enum.IsDefined(typeof(ClayPreviewShapeSource), source)) return ShapeFailure("Unknown outline source.");
+            if (source == ClayPreviewShapeSource.Image && imageShapeBytes == null)
+                return ShapeFailure("Choose a transparent outline PNG first. Surface texture files do not define the outline.");
+            ShapeSource = source; ShapeError = null;
+            if (source != ClayPreviewShapeSource.Original) SelectCoatingWithoutAppearanceReset();
+            SyncShapeUi(); ScheduleSplatter(); return true;
+        }
+
+        void SelectCoatingWithoutAppearanceReset()
+        {
+            if (ActivePreset == 3) return;
+            float thickness = Thickness, gloss = Gloss, contact = ContactStrength, detail = DetailStrength;
+            float azimuth = LightAzimuth, elevation = LightElevation, intensity = LightIntensity;
+            SelectPreset(3);
+            SetAppearance(thickness, gloss); SetSurfaceDetails(contact, detail); SetLighting(azimuth, elevation, intensity);
+        }
+
+        public void PickShapeImage()
+        {
+            if (!ShapeAvailable) { ShapeFailure("Open the four-preset image comparison first."); return; }
+            manipulation?.Cancel(); AcceptShapeImage(ClayPreviewShapeMask.PickAndLoad());
+        }
+        public bool LoadShapeImageFile(string path) => AcceptShapeImage(ClayPreviewShapeMask.LoadFile(path));
+        public bool LoadShapeImageBytes(byte[] bytes, string name) => AcceptShapeImage(ClayPreviewShapeMask.LoadBytes(bytes, name));
+        bool AcceptShapeImage(ClayPreviewShapeMask.Result loaded)
+        {
+            using (loaded)
+            {
+                if (!ShapeAvailable) return ShapeFailure("Open the four-preset coating or image comparison first.");
+                if (loaded == null) return ShapeFailure("No outline image was supplied.");
+                if (loaded.Cancelled) return false;
+                if (!loaded.Succeeded) return ShapeFailure(loaded.Error);
+                imageShapeBytes = (byte[])loaded.SourceBytes.Clone(); imageShapeName = loaded.FileName;
+                return SetShapeSource(ClayPreviewShapeSource.Image);
+            }
+        }
+
+        public ClayPreviewShapeProfile CaptureShapeProfile()
+        {
+            var profile = new ClayPreviewShapeProfile { source = ShapeSource, core = SplatterCore, length = SplatterLength, width = SplatterWidth,
+                roundness = SplatterRoundness, irregularity = SplatterIrregularity, asymmetry = SplatterAsymmetry,
+                spikes = SplatterSpikes, seed = SplatterSeed, droplets = SplatterDroplets,
+                dropletSize = SplatterDropletSize, dropletDistance = SplatterDropletDistance };
+            if (imageShapeBytes != null)
+            {
+                profile.imagePngBase64 = Convert.ToBase64String(imageShapeBytes);
+                profile.imageSha256 = ClayPreviewShapeMask.Hash(imageShapeBytes); profile.imageFileName = imageShapeName;
+            }
+            return profile;
+        }
+
+        public bool SaveShapeProfile(string path = null)
+        {
+            if (ShapeBusy) return ShapeFailure("Wait until the current outline replay finishes before saving.");
+            if (!ClayPreviewShapeProfile.TrySave(path ?? ShapeProfilePath, CaptureShapeProfile(), out string error)) return ShapeFailure(error);
+            ShapeError = null; SyncShapeUi(); return true;
+        }
+        public bool LoadShapeProfile(string path = null)
+        {
+            if (!ShapeAvailable) return ShapeFailure("Open the four-preset comparison first.");
+            if (!ClayPreviewShapeProfile.TryLoad(path ?? ShapeProfilePath, out ClayPreviewShapeProfile profile, out string error)) return ShapeFailure(error);
+            return ApplyShapeProfile(profile);
+        }
+        public void ResetShapeProfile() => ApplyShapeProfile(new ClayPreviewShapeProfile());
+        bool ApplyShapeProfile(ClayPreviewShapeProfile profile)
+        {
+            if (!ShapeAvailable) return ShapeFailure("Open the four-preset coating or image comparison first.");
+            if (!profile.Validate(out string error)) return ShapeFailure(error);
+            byte[] bytes = null;
+            if (!string.IsNullOrEmpty(profile.imagePngBase64))
+            {
+                if (!profile.TryGetImageBytes(out bytes, out error)) return ShapeFailure(error);
+                using (var loaded = ClayPreviewShapeMask.LoadBytes(bytes, profile.imageFileName))
+                    if (!loaded.Succeeded) return ShapeFailure(loaded.Error);
+            }
+            ApplyShapeFields(profile, bytes);
+            if (ShapeSource != ClayPreviewShapeSource.Original) SelectCoatingWithoutAppearanceReset();
+            ShapeError = null; SyncShapeUi(); ScheduleSplatter(); return true;
+        }
+        void ApplyShapeFields(ClayPreviewShapeProfile profile, byte[] bytes)
+        {
+            ShapeSource = profile.source; SplatterCore = profile.core; SplatterLength = profile.length; SplatterWidth = profile.width;
+            SplatterRoundness = profile.roundness; SplatterIrregularity = profile.irregularity; SplatterAsymmetry = profile.asymmetry;
+            SplatterSpikes = profile.spikes; SplatterSeed = profile.seed; SplatterDroplets = profile.droplets;
+            SplatterDropletSize = profile.dropletSize; SplatterDropletDistance = profile.dropletDistance;
+            imageShapeBytes = bytes; imageShapeName = profile.imageFileName;
+        }
+        void RestoreStartupShape()
+        {
+            committedShape = CaptureShapeProfile();
+            if (restoreSavedShapeOnStart && ShapeAvailable && File.Exists(ShapeProfilePath)) LoadShapeProfile();
+        }
+        bool ShapeFailure(string error)
+        { ShapeError = error ?? "The outline could not be applied. Previous result kept."; SyncShapeUi(); return false; }
+        void SyncShapeUi()
+        {
+            shapeSourceField?.SetValueWithoutNotify(ShapeSource == ClayPreviewShapeSource.Original ? "Original / 기존 윤곽"
+                : ShapeSource == ClayPreviewShapeSource.Image ? "Image alpha / 이미지 원형" : "Procedural / 절차 생성");
+            shapeModule?.SetEnabled(ShapeAvailable);
+            proceduralControls?.SetEnabled(ShapeSource == ClayPreviewShapeSource.Procedural);
+            shapeSeedField?.SetValueWithoutNotify(SplatterSeed);
+            foreach (var sync in syncSplatter) sync();
+            if (splatterPreview != null) splatterPreview.image = ShapePreviewTexture;
+            if (shapeFileLabel != null) shapeFileLabel.text = imageShapeBytes == null ? "No outline PNG · texture files are a separate control" : imageShapeName + " · original alpha outline";
+            if (splatterStatus == null) return;
+            splatterStatus.EnableInClassList("clay-error", !string.IsNullOrEmpty(ShapeError));
+            splatterStatus.text = !ShapeAvailable ? "Shape controls need the four-preset coating/image comparison."
+                : !string.IsNullOrEmpty(ShapeError) ? ShapeError + " · previous valid picture is kept"
+                : ShapeBusy ? "Updating outline… previous completed picture is kept"
+                : ActivePreset != 3 && SplatterEnabled ? "Selected outline is used only by preset 4 · current preset keeps its original outline"
+                : ShapeSource == ClayPreviewShapeSource.Original ? "Original frozen outline · no imported reference is assumed"
+                : ShapeSource == ClayPreviewShapeSource.Image ? "Image alpha applied · inspect support/cut-off diagnostics below"
+                : "Procedural approximation · all settings and seed are saved together";
         }
         public void SetReferenceSplatter()
         {
-            SplatterCore=.17f; SplatterSpikes=8; SplatterLength=.21f; SplatterWidth=.048f;
-            SplatterRoundness=.85f; SplatterIrregularity=.85f; SplatterAsymmetry=.75f; SplatterSeed=572;
-            SplatterDroplets=4; SplatterDropletSize=.018f; SplatterDropletDistance=.07f;
-            SplatterEnabled=true; splatterToggle?.SetValueWithoutNotify(true);
-            foreach(var sync in syncSplatter) sync(); ScheduleSplatter();
+            var profile = new ClayPreviewShapeProfile { source = ClayPreviewShapeSource.Procedural };
+            if (imageShapeBytes != null)
+            { profile.imagePngBase64 = Convert.ToBase64String(imageShapeBytes); profile.imageFileName = imageShapeName; profile.imageSha256 = ClayPreviewShapeMask.Hash(imageShapeBytes); }
+            ApplyShapeProfile(profile);
         }
         public void SetOrganicSplatter(int style)
         {
+            if (!ShapeAvailable) { ShapeFailure("Open the four-preset comparison first."); return; }
             SetReferenceSplatter();
             if(style==1) { SplatterSpikes=6;SplatterLength=.22f;SplatterWidth=.075f;SplatterAsymmetry=1; }
             if(style==2) { SplatterSpikes=11;SplatterLength=.12f;SplatterWidth=.07f;SplatterAsymmetry=.55f; }
-            foreach(var sync in syncSplatter)sync(); ScheduleSplatter();
+            SyncShapeUi(); ScheduleSplatter();
         }
-        void ScheduleSplatter() { splatterDue=Time.realtimeSinceStartup+.25f; }
+        void ScheduleSplatter()
+        {
+            // A newer file/slider selection invalidates the old pending GPU request immediately.
+            paletteReplay?.CancelPending();
+            if (requestedShape != null && requestedShape != publishedShape) requestedShape.Dispose();
+            requestedShape = publishedShape;
+            splatterDue = Time.realtimeSinceStartup + .25f;
+        }
         void TickSplatter()
         {
-            if(splatterDue<0 || Time.realtimeSinceStartup<splatterDue) return;
-            splatterDue=-1;
-            // Release users of old brushes before releasing their owned textures.
-            paletteReplay?.Clear(); BindCurrentPreset(); ReleaseSplatterTextures();
-            if(UseSplatter)
+            if (splatterDue < 0 || Time.realtimeSinceStartup < splatterDue) return;
+            splatterDue = -1;
+            if (!ShapeAvailable) { ShapeFailure("The fixed palette record is not available."); return; }
+            ShapeBundle candidate = null;
+            try
             {
-                splatterBrushes=new Texture2D[3];
-                for(int i=0;i<3;i++) splatterBrushes[i]=GenerateSplatter(SplatterSeed,i==0);
+                var profile = CaptureShapeProfile();
+                if (!profile.Validate(out string error)) throw new InvalidOperationException(error);
+                candidate = new ShapeBundle { profile = profile };
+                if (UseSplatter && ShapeSource == ClayPreviewShapeSource.Image)
+                {
+                    candidate.image = ClayPreviewShapeMask.LoadBytes(imageShapeBytes, imageShapeName);
+                    if (!candidate.image.Succeeded) throw new InvalidOperationException(candidate.image.Error);
+                    candidate.brushes = new[] { candidate.image.Brush, candidate.image.Brush, candidate.image.Brush };
+                    candidate.preview = candidate.image.Preview;
+                }
+                else if (UseSplatter)
+                {
+                    candidate.brushes = new Texture2D[3];
+                    for (int i = 0; i < 3; i++) candidate.brushes[i] = GenerateSplatter(SplatterSeed, i == 0);
+                    candidate.preview = generatedPreviewTexture; generatedPreviewTexture = null;
+                }
+                ShapeBundle previousRequest = requestedShape;
+                requestedShape = candidate; candidate = null;
+                RefreshPalettePreview();
+                if (previousRequest != null && previousRequest != publishedShape) previousRequest.Dispose();
+                if (!string.IsNullOrEmpty(PaletteError)) RejectShapeCandidate(PaletteError);
+                else CommitShapeCandidate();
             }
-            if(splatterPreview!=null) splatterPreview.image=splatterPreviewTexture;
-            if(splatterStatus!=null) splatterStatus.text=UseSplatter?"Replaying fixed hits · preview only":"Original outline · select coating preset";
-            RefreshPalettePreview();
+            catch (Exception exception)
+            {
+                candidate?.Dispose();
+                if (generatedPreviewTexture != null) { DestroyOwned(generatedPreviewTexture); generatedPreviewTexture = null; }
+                RejectShapeCandidate(exception.Message);
+            }
+            SyncShapeUi();
+        }
+        void CommitShapeCandidate()
+        {
+            if (splatterDue >= 0 || requestedShape == null || requestedShape == publishedShape || UseReplay && !paletteReplay.Ready) return;
+            ShapeBundle old = publishedShape;
+            publishedShape = requestedShape; committedShape = publishedShape.profile; ShapeRevision++;
+            old?.Dispose(); SyncShapeUi();
+        }
+        void RejectShapeCandidate(string error)
+        {
+            paletteReplay?.RestorePublished();
+            RestoreShapeComparisonSelection();
+            if (requestedShape != null && requestedShape != publishedShape) requestedShape.Dispose();
+            requestedShape = publishedShape;
+            if (committedShape != null)
+            {
+                byte[] bytes = null;
+                if (!string.IsNullOrEmpty(committedShape.imagePngBase64)) committedShape.TryGetImageBytes(out bytes, out _);
+                ApplyShapeFields(committedShape, bytes);
+            }
+            ShapeFailure(error);
+        }
+        void ReleaseSplatterTextures()
+        {
+            if (requestedShape != null && requestedShape != publishedShape) requestedShape.Dispose();
+            publishedShape?.Dispose(); requestedShape = publishedShape = null;
+            if (generatedPreviewTexture != null) DestroyOwned(generatedPreviewTexture);
+            generatedPreviewTexture = null; imageShapeBytes = null;
         }
         Texture2D GenerateSplatter(int seed,bool preview)
         {
@@ -156,12 +384,8 @@ namespace Hapio.Experiments
             }
             var tex=new Texture2D(size,size,TextureFormat.RGBA32,false,true){name="Runtime organic clay brush",hideFlags=HideFlags.DontSave,wrapMode=TextureWrapMode.Clamp,filterMode=FilterMode.Bilinear};
             tex.SetPixels32(pixels);tex.Apply(false,false);
-            if(preview){splatterPreviewTexture=new Texture2D(size,size,TextureFormat.RGBA32,false){hideFlags=HideFlags.DontSave};splatterPreviewTexture.SetPixels32(display);splatterPreviewTexture.Apply();}
+            if(preview){generatedPreviewTexture=new Texture2D(size,size,TextureFormat.RGBA32,false){hideFlags=HideFlags.DontSave};generatedPreviewTexture.SetPixels32(display);generatedPreviewTexture.Apply();}
             return tex;
         }
-        static void Curve(List<Vector2> points,Vector2 a,Vector2 b,Vector2 c,Vector2 d)
-        {for(int i=0;i<12;i++){float t=i/12f,u=1-t;points.Add(u*u*u*a+3*u*u*t*b+3*u*t*t*c+t*t*t*d);}}
-        void ReleaseSplatterTextures()
-        { if(splatterBrushes!=null)foreach(var tex in splatterBrushes)if(tex!=null)DestroyOwned(tex);splatterBrushes=null;if(splatterPreviewTexture!=null)DestroyOwned(splatterPreviewTexture);splatterPreviewTexture=null; }
     }
 }

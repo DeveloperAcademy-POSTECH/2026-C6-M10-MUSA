@@ -12,7 +12,7 @@ namespace Hapio.Experiments
     {
         public const int MaximumDimension = 2048;
         public const int MaximumFileBytes = 16 * 1024 * 1024;
-        public enum Purpose { Background, SurfaceTexture }
+        public enum Purpose { Background, SurfaceTexture, ShapeMask }
 
         /// <summary>
         /// A successful result owns its texture. Keep it while displayed, then Dispose it after
@@ -28,10 +28,13 @@ namespace Hapio.Experiments
             public bool Succeeded => Texture != null && Error == null && !Cancelled;
             /// <summary>Original alpha-weighted linear luminance; diagnostic only, not a shader setting.</summary>
             public float MeanLuminance { get; private set; }
+            public byte[] SourceBytes { get; private set; }
             internal Result(Texture2D texture, string name, string error, bool cancelled, float mean = .5f)
-            { Texture = texture; FileName = name; Error = error; Cancelled = cancelled; MeanLuminance = mean; }
+                : this(texture, name, error, cancelled, mean, null) { }
+            internal Result(Texture2D texture, string name, string error, bool cancelled, float mean, byte[] sourceBytes)
+            { Texture = texture; FileName = name; Error = error; Cancelled = cancelled; MeanLuminance = mean; SourceBytes = sourceBytes; }
             public void Dispose()
-            { Texture2D owned = Texture; Texture = null; DestroyTexture(owned); }
+            { Texture2D owned = Texture; Texture = null; SourceBytes = null; DestroyTexture(owned); }
         }
 
         static readonly float[] LinearChannel = MakeLinearChannels();
@@ -43,8 +46,8 @@ namespace Hapio.Experiments
                 string path;
 #if UNITY_EDITOR
                 path = UnityEditor.EditorUtility.OpenFilePanelWithFilters(
-                    purpose == Purpose.Background ? "Choose preview background" : "Choose clay surface texture",
-                    string.Empty, new[] { "PNG or JPEG images", "png,jpg,jpeg" });
+                    purpose == Purpose.Background ? "Choose preview background" : purpose == Purpose.ShapeMask ? "Choose transparent PNG sticker outline" : "Choose clay surface texture",
+                    string.Empty, purpose == Purpose.ShapeMask ? new[] { "Transparent PNG", "png" } : new[] { "PNG or JPEG images", "png,jpg,jpeg" });
 #elif UNITY_STANDALONE_OSX
                 var selected = new byte[16384]; var nativeError = new byte[1024];
                 int status = HapioClayChooseImage(selected, selected.Length, nativeError, nativeError.Length);
@@ -91,19 +94,21 @@ namespace Hapio.Experiments
             Texture2D decoded = null, converted = null;
             try
             {
-                if (purpose != Purpose.Background && purpose != Purpose.SurfaceTexture) return Failed("Unknown image purpose.");
+                if (purpose != Purpose.Background && purpose != Purpose.SurfaceTexture && purpose != Purpose.ShapeMask) return Failed("Unknown image purpose.");
+                if (purpose == Purpose.ShapeMask && !PngSignature(bytes ?? Array.Empty<byte>()))
+                    return Failed("Sticker outlines require a PNG with transparent background.");
                 if (!TryGetDimensions(bytes, out int width, out int height, out string error)) return Failed(error);
                 string name = string.IsNullOrWhiteSpace(displayName) ? "Imported image" : Path.GetFileName(displayName);
                 decoded = new Texture2D(2, 2, TextureFormat.RGBA32, false, false)
                     { name = "Preview imported " + name, hideFlags = HideFlags.DontSave, filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
                 bool surface = purpose == Purpose.SurfaceTexture;
-                if (!ImageConversion.LoadImage(decoded, bytes, !surface)) return Failed("This PNG/JPEG could not be decoded.");
+                if (!ImageConversion.LoadImage(decoded, bytes, !surface && purpose != Purpose.ShapeMask)) return Failed("This PNG/JPEG could not be decoded.");
                 if (decoded.width != width || decoded.height != height)
                     return Failed("The decoded image dimensions differ from its header.");
                 if (!surface)
                 {
                     Texture2D result = decoded; decoded = null;
-                    return new Result(result, name, null, false);
+                    return new Result(result, name, null, false, .5f, sourceBytes: purpose == Purpose.ShapeMask ? (byte[])bytes.Clone() : null);
                 }
                 Color32[] pixels = decoded.GetPixels32(); double weighted = 0, alphaTotal = 0;
                 foreach (Color32 pixel in pixels)
