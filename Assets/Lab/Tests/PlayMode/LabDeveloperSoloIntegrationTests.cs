@@ -436,7 +436,7 @@ namespace C6Lab.Tests
             }
         }
 
-        [UnityTest]
+        [UnityTest, Category("GPU")]
         public IEnumerator SavedSceneSoloCanGenerateCombineAndPhysicallyPaintTheGourd()
         {
             yield return fixture.Load();
@@ -617,36 +617,28 @@ namespace C6Lab.Tests
                 Assert.That(projectile.GetComponentsInChildren<Collider>().Length, Is.EqualTo(1));
                 Assert.That(projectile.GetComponentsInChildren<Rigidbody>().Length, Is.EqualTo(1));
                 Assert.That(projectile.VisualMount.GetComponentsInChildren<LabOrbSpriteArt>(), Is.Empty);
-                Transform sphere = projectile.VisualMount.Find("Replacement Visual/Sphere");
-                Assert.That(sphere, Is.Not.Null, "The saved appearance supplies the flight sphere prefab.");
-                MeshRenderer sphereRenderer = sphere.GetComponent<MeshRenderer>();
-                Assert.That(sphereRenderer != null && sphereRenderer.gameObject.activeInHierarchy, Is.True);
-                MeshFilter sphereMesh = sphere.GetComponent<MeshFilter>();
+                Assert.That(projectile.VisualMount.gameObject.activeSelf, Is.False);
+                var elementVfx = LabFiveElementVfx.ForScene(projectile.gameObject.scene);
+                Assert.That(elementVfx.ActiveFlightCount, Is.EqualTo(1));
+                MeshRenderer sphereRenderer = elementVfx.GetComponentsInChildren<MeshRenderer>()
+                    .Single(renderer => renderer.name == "Wet clay");
+                MeshFilter sphereMesh = sphereRenderer.GetComponent<MeshFilter>();
                 Assert.That(sphereMesh != null && sphereMesh.sharedMesh != null, Is.True);
                 Assert.That(sphereMesh.sharedMesh.bounds.size.z, Is.GreaterThan(.1f));
-                foreach (float axis in new[] { sphereRenderer.bounds.size.x, sphereRenderer.bounds.size.y, sphereRenderer.bounds.size.z })
-                    Assert.That(axis, Is.EqualTo(2f * projectileRadius).Within(.001f),
-                        "The flight sphere keeps the gameplay scale, including blast and combo effects.");
+                Assert.That(Vector3.Distance(sphereRenderer.transform.position, projectile.transform.position), Is.LessThan(.001f));
+                float diameter = 2f * projectileRadius;
+                Vector3 scale = sphereRenderer.transform.lossyScale;
+                Assert.That(scale.x * scale.y * scale.z, Is.EqualTo(diameter * diameter * diameter).Within(.001f),
+                    "The launch stretch preserves volume at the actual blast/combo diameter.");
+                // Clay shape bounds include 0.4 units of culling padding for shader sag.
+                Vector3 meshSize = sphereMesh.sharedMesh.bounds.size - Vector3.one * .4f;
+                foreach (float axis in new[] { meshSize.x, meshSize.y, meshSize.z })
+                    Assert.That(axis, Is.InRange(.85f, 1.15f), "The kneaded mesh is authored at unit diameter.");
                 Assert.That(sphereRenderer.sharedMaterial,
-                    Is.SameAs(appearance.MaterialFor(LabOrbKind.Combined, combined.element)));
-                var sphereProperties = new MaterialPropertyBlock();
-                sphereRenderer.GetPropertyBlock(sphereProperties);
-                Color expectedElementColor = appearance.ElementColorFor(combined.element);
-                foreach (string colorProperty in new[] { "_BaseColor", "_Color" })
-                {
-                    Color actualElementColor = sphereProperties.GetColor(colorProperty);
-                    Assert.That(actualElementColor.r, Is.EqualTo(expectedElementColor.r).Within(.0001f));
-                    Assert.That(actualElementColor.g, Is.EqualTo(expectedElementColor.g).Within(.0001f));
-                    Assert.That(actualElementColor.b, Is.EqualTo(expectedElementColor.b).Within(.0001f));
-                }
-                Assert.That(projectile.ElementFlightTrail, Is.Not.Null);
-                Assert.That(projectile.ElementFlightTrail.IsEmitting, Is.True);
-                Assert.That(projectile.ElementFlightTrail.Element, Is.EqualTo(combined.element));
-                Assert.That(projectile.ElementFlightTrail.Profile,
-                    Is.SameAs(appearance.ElementTrailFor(combined.element)));
-                Assert.That(projectile.FlightTrail, Is.Null,
-                    "Configured elemental effects replace, rather than overlap, the legacy trail.");
-                Color expectedFeedbackColor = (Color32)LabOrbAppearance.DefaultElementColor(combined.element);
+                    Is.SameAs(elementVfx.Profile.OrbSurface(combined.element, false)));
+                Assert.That(sphereRenderer.HasPropertyBlock(), Is.False, "The authored paper ramp has no stale tint override.");
+                Assert.That(projectile.ElementFlightTrail, Is.Null);
+                Assert.That(projectile.FlightTrail, Is.Null);
 
                 for (int step = 0; step < 150 && network.Snapshot.hp == initialHp; step++)
                     yield return new WaitForFixedUpdate();
@@ -660,19 +652,14 @@ namespace C6Lab.Tests
                 Assert.That(network.Snapshot.players.Single().hitTotal, Is.EqualTo(1));
                 Assert.That(network.Snapshot.players.Single().damageTotal, Is.EqualTo(network.config.Damage));
                 var particles = UnityEngine.Object.FindFirstObjectByType<LabImpactParticleVfx>();
-                Assert.That(particles, Is.Not.Null, "The saved target must bind its approved world-space impact effect.");
-                Assert.That(particles.ActiveBurstCount, Is.EqualTo(1));
-                LabImpactParticleBurst activeBurst = particles.GetComponentsInChildren<LabImpactParticleBurst>()
-                    .Single(burst => burst.gameObject.activeInHierarchy);
-                ParticleSystem[] systems = activeBurst.GetComponentsInChildren<ParticleSystem>();
-                Assert.That(systems.Length, Is.GreaterThanOrEqualTo(3), "Core, sparks and ring must remain connected.");
-                foreach (ParticleSystem system in systems)
-                {
-                    Color actualColor = (Color32)system.main.startColor.color;
-                    Assert.That(actualColor.r, Is.EqualTo(expectedFeedbackColor.r).Within(.001f));
-                    Assert.That(actualColor.g, Is.EqualTo(expectedFeedbackColor.g).Within(.001f));
-                    Assert.That(actualColor.b, Is.EqualTo(expectedFeedbackColor.b).Within(.001f));
-                }
+                Assert.That(particles, Is.Not.Null);
+                Assert.That(particles.ActiveBurstCount, Is.Zero, "One approved hit must use one effect path.");
+                Assert.That(elementVfx.ActiveFlightCount, Is.Zero);
+                Assert.That(elementVfx.ActiveImpactCount, Is.EqualTo(1));
+                MeshRenderer pressed = elementVfx.GetComponentsInChildren<MeshRenderer>()
+                    .Single(renderer => renderer.name == "Contact squash");
+                Assert.That(pressed.sharedMaterial, Is.SameAs(elementVfx.Profile.OrbSurface(combined.element, false)));
+                Assert.That(elementVfx.GetComponentsInChildren<LabElementRelease>().Length, Is.EqualTo(1));
                 Transform impactLayer = network.impactFeedback.transform.Find("Impact Feedback");
                 Assert.That(impactLayer == null || impactLayer.GetComponentInChildren<UnityEngine.UI.Text>() == null, Is.True,
                     "Paint mode retains its approved hit effect without restoring the retired HP damage labels.");

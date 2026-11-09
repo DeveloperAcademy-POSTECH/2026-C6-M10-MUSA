@@ -6905,4 +6905,12 @@ PR-1(`feat/#507-gourd-rig-contract`) 위에서 Unity 6000.6.5f1 macOS batch Edit
 - **컴파일 및 비교 데모 통과.** Unity 6000.6.5f1, URP 17.6.0, iOS 타깃 설정, Mac Metal 편집기에서 프레임 1~88이 진행되었다. 30/60fps 설정의 실제 자동 발사와 다섯 충돌, UI 일시정지·단색 전환·재생, 중복 접촉·오래된 핸들·이동 표적·파괴 후 회수가 모두 통과했다. 일곱 렌더 캡처를 생성하고 원소별 방출 및 토의 변화도 확인했다.
 - **핵심 PlayMode 7/7 통과.** `LabFiveElementContactTests` 3건과 일반/부적 × 예측/수신 4건을 별도로 실행했다.
 - **전체 EditMode 2,123건 중 2,121 통과·2 실패.** 실패는 `LabJigwiABModelTests.BBucketArrivesSeatBySeatAndEachPourPaintsAtOnce`와 `GameTutorialTests.GoalStepPlaysTheApprovedLinesWithGeumokAndBul`이다. 수정 전 main `56e9c79f`의 두 검사만 다시 실행해 같은 실패를 확인했다.
-- **전체 PlayMode 실행 중.** 완료 결과를 이 항목에 추가할 예정이다. iPhone 실기기 GPU 비용과 새 main의 실제 전투 캡처는 후속 확인 항목이다.
+- **전체 PlayMode 최초 실행은 722건 중 715 통과·7 실패**(610.66초, 생략 0). 이후 제품 코드는 바꾸지 않고 새 비행·충돌 표현에 맞게 기존 검사 두 건을 갱신했다. `SavedSceneSoloCanGenerateCombineAndPhysicallyPaintTheGourd`는 실제 보드 조합→물리 투척→단일 타격·도색을 유지하면서 공의 부피·위치·종이 재질과 타격 효과를 검사하고, `HostProjectileCreationUsesTheCapturedRewardAndAcceptedRevision`는 캡처한 보상·리비전·지름·속도와 새 비행 핸들을 검사한다.
+- **최종 관련 PlayMode 11/11 통과**(3.69초, 실패·생략 0). 위 Solo 검사 1건, `LabJigwiMissionCancellationTests` 3건, 핵심 VFX 7건을 함께 실행했다. 전체 722건을 이 검사 수정 뒤 다시 실행하지 않았으므로 이 결과를 전체 통과로 합산하지 않는다.
+- 나머지 PlayMode 실패 중 다음 **4건은 수정 전 main `56e9c79f`에서도 재현**됐다.
+  - `LabJigwiABNetworkTests.APickedSeatsRealSpecialWaterShotOnTheBossCountsWithoutPaint`
+  - `LabJigwiABNetworkTests.BoardAndLaunchUseTheSmallerIndependentRadiusWhileKeepingGrabReachAndPaintBudget`
+  - `LabJigwiABNetworkTests.CurtainCornersCoverTheRotatedBossAtEverySeatAndBothPhoneAndTabletAspects`
+  - `GameJigwiStageIntegrationTests.SavedHomeReachesJigwiWithScreenAThenScreenBAndPreservesTheRealPaintShell`
+- `GameTutorialFlowTests.FinishedOpeningOpensThePracticeBoardOnceThenTheRoomList`는 전체 실행에서 실패했고, 원본 main과 이 브랜치의 선택 재실행에서는 각각 통과했다. 전체 실행 순서 또는 공유 상태의 영향은 아직 원인을 확정하지 못했다.
+- iPhone 실기기 GPU 비용, 실제 다중 기기 연결, 새 main의 실제 전투 화면 캡처, 전체 검사 잔여 실패 분석은 후속 확인 항목이다. 실행 가능한 소스와 에셋은 [Draft PR #581](https://github.com/DeveloperAcademy-POSTECH/2026-C6-M10-MUSA/pull/581)에 있다.
