@@ -1087,8 +1087,7 @@ namespace C6Lab
                 flyerGlows[i].color = new Color(1f, .85f, .35f, .85f * Mathf.Sin(Mathf.PI * Mathf.Min(1f, glow * 1.4f)) * (1f - ease * .6f) + .2f * glow);
             }
             float s = age - GlowSeconds - FlySeconds;
-            // ② "물" (the talisman's own Shilla Culture letter) bursts out of the boss, growing big as it fades.
-            bool letter = s >= 0f && s < GlyphSeconds;
+            bool letter = false; // #595 QA: no "물" letter with the waterfall (kept off; the waterfall alone)
             if (waterGlyph.gameObject.activeSelf != letter) waterGlyph.gameObject.SetActive(letter);
             if (letter)
             {
