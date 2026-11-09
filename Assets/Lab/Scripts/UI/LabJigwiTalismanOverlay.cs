@@ -804,14 +804,15 @@ namespace C6Lab
             Rect board = boardView != null ? boardView.pixelRect : new Rect(0f, 0f, Screen.width, Screen.height * .46f);
             PlaceScreenRect(alarm.rectTransform, new Rect(0f, board.yMax, Screen.width, Mathf.Max(1f, Screen.height - board.yMax)));
             float urgency = Mathf.Clamp01(WarnLevel);
-            float rate = Mathf.Lerp(1.1f, 2.6f, urgency);
+            // #595: a clock — one tick a second at first, faster (up to three a second) as the time runs out.
+            float rate = Mathf.Lerp(1f, 3f, urgency * urgency);
             bool running = Visible && source != null && source.Snapshot != null && !source.Snapshot.paused;
             float before = alarmPhase;
             if (running) alarmPhase += dt * rate;
             // The alarm sounds — and the phone knocks — at each flash's brightest moment, stronger as time runs out.
             if (running && Mathf.Floor(before + .5f) != Mathf.Floor(alarmPhase + .5f))
             {
-                Cue("Alarm", alarmSoundFolder, alarmSoundVolume * Mathf.Lerp(.55f, 1f, urgency));
+                Tick(alarmSoundVolume * Mathf.Lerp(.55f, 1f, urgency));
                 AlarmHapticCount++;
                 LabHaptics.PlayDirect(Config, LabHapticStyle.Rigid, alarmHapticIntensity * Mathf.Lerp(.5f, 1f, urgency));
             }
@@ -820,6 +821,24 @@ namespace C6Lab
         }
 
         private float alarmPhase;
+        private AudioSource tickSource;
+        private bool tock;
+        /// <summary>#595: 타이머처럼 똑-딱. 같은 소리를 번갈아 높게(똑)·낮게(딱) 낸다.</summary>
+        private void Tick(float volume)
+        {
+            LastCue = "Alarm"; CueCount++;
+            if (string.IsNullOrEmpty(alarmSoundFolder) || volume <= 0f) return;
+            AudioClip[] clips = Resources.LoadAll<AudioClip>("Audio/" + alarmSoundFolder);
+            if (clips == null || clips.Length == 0) return;
+            if (tickSource == null)
+            {
+                tickSource = gameObject.AddComponent<AudioSource>();
+                tickSource.playOnAwake = false; tickSource.spatialBlend = 0f;
+            }
+            tock = !tock;
+            tickSource.pitch = tock ? .8f : 1f;
+            tickSource.PlayOneShot(clips[0], volume * LabAudioSettings.SfxVolume);
+        }
         /// <summary>#540: 경보 진동을 낸 횟수 (테스트용, 설정에서 진동을 꺼도 센다).</summary>
         public int AlarmHapticCount { get; private set; }
         private readonly HashSet<string> orbBurnsCued = new HashSet<string>(StringComparer.Ordinal);

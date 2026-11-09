@@ -205,8 +205,9 @@ namespace C6Lab
             bool live = !poured && !failed && now >= arrive && round.resolution == LabJigwiABResolution.None;
             // Fail: Jigwi's bubble (and voice) first, then his smoke shoots down and fogs my board.
             if (failed && failAt < 0f) failAt = t;
-            if (failAt >= 0f && t - failAt >= 2f) StartSteam(round.id);
-            bool visible = now >= arrive - threatLeadSeconds - .1d && (poured ? t - pourAt < 1.9f : failAt < 0f || t - failAt < 3.4f);
+            // #595: the billows go out one after another (BillowStagger), then the screen is covered.
+            if (failAt >= 0f && t - failAt >= 2f + BillowSpread) StartSteam(round.id);
+            bool visible = now >= arrive - threatLeadSeconds - .1d && (poured ? t - pourAt < 1.9f : failAt < 0f || t - failAt < 3.4f + BillowSpread);
             if (!visible) { Hide(); return; }
             ReadRoll(dt);
             if (live) Slosh(t);
@@ -581,6 +582,9 @@ namespace C6Lab
         /// 실패: 지귀 목소리 → 1초 뒤 박이 부풀었다 뿜으면
         /// 달아오를 때 박 위에 피어오르던 그 연기가 그대로 부풀어 화면 전체(3D 영역과 판)로 퍼져 회색으로 채우고 → 그 위에 두꺼운 연기 막이 깔린다.
         /// </summary>
+        // #595: more time between the puffs Jigwi blows out (was .06 / .04 s), so the smoke clearly spreads out puff by puff.
+        private const float BillowColumnStagger = .2f, BillowRowStagger = .15f;
+        private static float BillowSpread => 3f * (BillowColumnStagger - .06f) + 3f * (BillowRowStagger - .04f);
         private void DrawFail(float t)
         {
             float since = failAt >= 0f ? t - failAt : -1f;
@@ -605,7 +609,7 @@ namespace C6Lab
             Vector2 boss = Boss;
             for (int i = 0; i < blow.Length; i++)
             {
-                float k = s - (i % 4) * .06f - (i / 4) * .04f;
+                float k = s - (i % 4) * BillowColumnStagger - (i / 4) * BillowRowStagger;
                 bool on = k >= 0f && k < 2.2f;
                 Show(blow[i], on);
                 if (!on) continue;
@@ -619,7 +623,7 @@ namespace C6Lab
                 blow[i].color = new Color(grey, grey * .97f, grey * .95f, alpha);
             }
             // The smoke closing over the screen: a thump.
-            if (s >= .5f && s - Time.unscaledDeltaTime < .5f && source != null)
+            if (s >= .5f + BillowSpread && s - Time.unscaledDeltaTime < .5f + BillowSpread && source != null)
                 LabHaptics.PlayDirect(source.config, LabHapticStyle.Heavy, .9f, .25f, .6f, .4f);
         }
 
