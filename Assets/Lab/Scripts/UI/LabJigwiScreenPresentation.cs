@@ -1037,9 +1037,10 @@ namespace C6Lab
         private float sealStartedAt = -1f;
         private int flyCount, nextDrop;
         private bool poured;
+        private float waterfallPulseAt = -1f;
         private float lastDropAt;
         private AudioSource sealAudio;
-        private const float GlowSeconds = .45f, FlySeconds = .4f, GlyphSeconds = .7f, PourSeconds = 1.5f;
+        private const float GlowSeconds = .45f, FlySeconds = .4f, GlyphSeconds = .7f, PourSeconds = 2.2f; // #595 QA: a longer, grander pour
         /// <summary>테스트용: 완성 연출이 도는 중인지 / 폭포가 보이는지.</summary>
         public bool SealPlaying => sealStartedAt >= 0f;
         public bool WaterfallVisible => waterfall != null && waterfall.gameObject.activeInHierarchy;
@@ -1107,7 +1108,9 @@ namespace C6Lab
             {
                 poured = true;
                 PlayPour();
-                if (source != null) LabHaptics.PlayDirect(source.config, LabHapticStyle.Heavy, 1f, .5f, .9f, .5f);
+                // A heavy hit as it lands, then a deep rumble for as long as it pours (low sharpness = heavy water).
+                if (source != null) LabHaptics.PlayDirect(source.config, LabHapticStyle.Heavy, 1f, PourSeconds - .4f, .85f, .15f);
+                waterfallPulseAt = Time.unscaledTime + .45f;
                 Collider hitbox = source != null && source.target != null ? source.target.Hitbox : null;
                 if (hitbox != null) { LabJigwiWaterFx.Get(hitbox.gameObject.layer); LabJigwiWaterFx.Shake(hitbox.bounds.extents.magnitude * .1f, 1f); }
             }
@@ -1121,6 +1124,9 @@ namespace C6Lab
             splash.rectTransform.position = boss;
             splash.rectTransform.sizeDelta = Vector2.one * width * 1.7f * (1f + .1f * Mathf.Sin(t * 30f));
             splash.color = new Color(.8f, .94f, 1f, .8f * fade * grow);
+            // Rolling surges on top of the rumble, every 0.45 s, fading with the pour.
+            if (source != null && waterfallPulseAt > 0f && t >= waterfallPulseAt && fade > .3f)
+            { waterfallPulseAt = t + .45f; LabHaptics.PlayDirect(source.config, LabHapticStyle.Medium, .55f * fade); }
             // Drops fly off the splash all the time it pours.
             if (fade > .2f && t - lastDropAt > .03f)
             {
@@ -1275,7 +1281,9 @@ namespace C6Lab
 
         private void PlayPour()
         {
-            AudioClip[] clips = Resources.LoadAll<AudioClip>("Audio/JigwiBucketPour");
+            // #595: its own long, grand waterfall (built from the bucket pour); the bucket pour if it is missing.
+            AudioClip[] clips = Resources.LoadAll<AudioClip>("Audio/JigwiTalismanWaterfall");
+            if (clips == null || clips.Length == 0) clips = Resources.LoadAll<AudioClip>("Audio/JigwiBucketPour");
             if (clips == null || clips.Length == 0) return;
             if (sealAudio == null) { sealAudio = gameObject.AddComponent<AudioSource>(); sealAudio.playOnAwake = false; sealAudio.spatialBlend = 0f; }
             sealAudio.PlayOneShot(clips[0], LabAudioSettings.SfxVolume);
