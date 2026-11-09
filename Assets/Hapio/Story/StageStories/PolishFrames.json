@@ -1,0 +1,321 @@
+{
+  "frames": [
+    {
+      "name": "Gumiho_SealCard",
+      "nodeId": "4210:3167",
+      "nodes": [
+        {
+          "nodeId": "4411:2220",
+          "name": "이야기 계속",
+          "kind": "text",
+          "x": 278,
+          "y": 778,
+          "width": 81,
+          "height": 22,
+          "rotation": 0,
+          "alpha": 1,
+          "text": "이야기 계속",
+          "size": 18.897674560546875,
+          "align": "LEFT",
+          "bold": false,
+          "lineHeight": 0,
+          "color": {
+            "r": 0.24705882370471954,
+            "g": 0.239215686917305,
+            "b": 0.21960784494876862
+          }
+        },
+        {
+          "nodeId": "4411:2221",
+          "name": "Polygon 1",
+          "kind": "image",
+          "x": 361.44635000000005,
+          "y": 783.8662,
+          "width": 12.1613,
+          "height": 10.2676,
+          "rotation": -90.54549621769885,
+          "alpha": 1,
+          "assetPath": "Assets/Hapio/Art/Story/StageStories/Polish/ContinueArrow.png"
+        }
+      ]
+    },
+    {
+      "name": "Yagwanggui_SealCard",
+      "nodeId": "4210:3213",
+      "nodes": [
+        {
+          "nodeId": "4411:2230",
+          "name": "이야기 계속",
+          "kind": "text",
+          "x": 278,
+          "y": 778,
+          "width": 81,
+          "height": 22,
+          "rotation": 0,
+          "alpha": 1,
+          "text": "이야기 계속",
+          "size": 18.897674560546875,
+          "align": "LEFT",
+          "bold": false,
+          "lineHeight": 0,
+          "color": {
+            "r": 0.24705882370471954,
+            "g": 0.239215686917305,
+            "b": 0.21960784494876862
+          }
+        },
+        {
+          "nodeId": "4411:2231",
+          "name": "Polygon 1",
+          "kind": "image",
+          "x": 361.44635000000005,
+          "y": 783.8662,
+          "width": 12.1613,
+          "height": 10.2676,
+          "rotation": -90.54549621769885,
+          "alpha": 1,
+          "assetPath": "Assets/Hapio/Art/Story/StageStories/Polish/ContinueArrow.png"
+        }
+      ]
+    },
+    {
+      "name": "Jigwi_SealCard",
+      "nodeId": "4210:3287",
+      "nodes": [
+        {
+          "nodeId": "4411:2240",
+          "name": "이야기 계속",
+          "kind": "text",
+          "x": 278,
+          "y": 778,
+          "width": 81,
+          "height": 22,
+          "rotation": 0,
+          "alpha": 1,
+          "text": "이야기 계속",
+          "size": 18.897674560546875,
+          "align": "LEFT",
+          "bold": false,
+          "lineHeight": 0,
+          "color": {
+            "r": 0.24705882370471954,
+            "g": 0.239215686917305,
+            "b": 0.21960784494876862
+          }
+        },
+        {
+          "nodeId": "4411:2241",
+          "name": "Polygon 1",
+          "kind": "image",
+          "x": 361.44635000000005,
+          "y": 783.8662,
+          "width": 12.1613,
+          "height": 10.2676,
+          "rotation": -90.54549621769885,
+          "alpha": 1,
+          "assetPath": "Assets/Hapio/Art/Story/StageStories/Polish/ContinueArrow.png"
+        }
+      ]
+    },
+    {
+      "name": "Gumiho_After_02",
+      "nodeId": "4210:2881",
+      "nodes": [
+        {
+          "nodeId": "4210:2895",
+          "name": "얘를 어쩌면 좋을까 ...",
+          "kind": "text",
+          "x": 93,
+          "y": 280,
+          "width": 122,
+          "height": 18,
+          "rotation": 0,
+          "alpha": 1,
+          "text": "얘를 어쩌면 좋을까 ...",
+          "size": 15,
+          "align": "LEFT",
+          "bold": true,
+          "lineHeight": 0,
+          "color": {
+            "r": 0.24705882370471954,
+            "g": 0.239215686917305,
+            "b": 0.21960784494876862
+          }
+        }
+      ]
+    },
+    {
+      "name": "Yagwanggui_After_01",
+      "nodeId": "4210:3248",
+      "nodes": [
+        {
+          "nodeId": "4407:2129",
+          "name": "으아앙 내 신발 어디갔어 ㅠㅠ",
+          "kind": "text",
+          "x": 249,
+          "y": 480,
+          "width": 126,
+          "height": 36,
+          "rotation": 0,
+          "alpha": 1,
+          "text": "으아앙 \n내 신발 어디갔어 ㅠㅠ",
+          "size": 15,
+          "align": "LEFT",
+          "bold": true,
+          "lineHeight": 0,
+          "color": {
+            "r": 0.24705882370471954,
+            "g": 0.239215686917305,
+            "b": 0.21960784494876862
+          }
+        },
+        {
+          "nodeId": "4210:3253",
+          "name": "image 1675",
+          "kind": "image",
+          "x": 201.285,
+          "y": 343.427,
+          "width": 187,
+          "height": 125,
+          "rotation": -0.2620278004062734,
+          "alpha": 1
+        },
+        {
+          "nodeId": "4210:3254",
+          "name": "image 1673",
+          "kind": "image",
+          "x": 239,
+          "y": 378,
+          "width": 104.288,
+          "height": 56.132,
+          "rotation": 0,
+          "alpha": 1
+        }
+      ]
+    },
+    {
+      "name": "Yagwanggui_After_02",
+      "nodeId": "4210:3264",
+      "nodes": [
+        {
+          "nodeId": "4387:2121",
+          "name": "이 참에 새로 사~",
+          "kind": "text",
+          "x": 72,
+          "y": 261,
+          "width": 95,
+          "height": 18,
+          "rotation": 0,
+          "alpha": 1,
+          "text": "이 참에 새로 사~",
+          "size": 15,
+          "align": "LEFT",
+          "bold": true,
+          "lineHeight": 0,
+          "color": {
+            "r": 0.24705882370471954,
+            "g": 0.239215686917305,
+            "b": 0.21960784494876862
+          }
+        }
+      ]
+    },
+    {
+      "name": "Jigwi_After_01",
+      "nodeId": "4210:3242",
+      "nodes": [
+        {
+          "nodeId": "4387:2123",
+          "name": "묵이 너 머리 어떡하냐 ㅋㅋ",
+          "kind": "text",
+          "x": 97,
+          "y": 307,
+          "width": 139,
+          "height": 18,
+          "rotation": 0,
+          "alpha": 1,
+          "text": "묵이 너 머리 어떡하냐 ㅋㅋ",
+          "size": 15,
+          "align": "LEFT",
+          "bold": true,
+          "lineHeight": 0,
+          "color": {
+            "r": 0.24705882370471954,
+            "g": 0.239215686917305,
+            "b": 0.21960784494876862
+          }
+        }
+      ]
+    },
+    {
+      "name": "Jigwi_After_02",
+      "nodeId": "4210:3257",
+      "nodes": [
+        {
+          "nodeId": "4387:2125",
+          "name": "너야말로 ..",
+          "kind": "text",
+          "x": 220,
+          "y": 320,
+          "width": 61,
+          "height": 18,
+          "rotation": 0,
+          "alpha": 1,
+          "text": "너야말로 ..",
+          "size": 15,
+          "align": "LEFT",
+          "bold": true,
+          "lineHeight": 0,
+          "color": {
+            "r": 0.24705882370471954,
+            "g": 0.239215686917305,
+            "b": 0.21960784494876862
+          }
+        }
+      ]
+    },
+    {
+      "name": "Ending_06",
+      "nodeId": "4210:3374",
+      "nodes": [
+        {
+          "nodeId": "4407:2127",
+          "name": "요괴 봉인은 계속된다. 투 비 컨티뉴드 -",
+          "kind": "text",
+          "x": 97,
+          "y": 402,
+          "width": 207,
+          "height": 70,
+          "rotation": 0,
+          "alpha": 1,
+          "text": "요괴 봉인은 계속된다.\n투 비 컨티뉴드 -",
+          "size": 25,
+          "align": "CENTER",
+          "bold": true,
+          "lineHeight": 35,
+          "color": {
+            "r": 0.9458823800086975,
+            "g": 0.8941176533699036,
+            "b": 0.8352941274642944
+          }
+        },
+        {
+          "nodeId": "4210:3382",
+          "name": "Rectangle 175",
+          "kind": "solid",
+          "x": 0,
+          "y": 0,
+          "width": 439,
+          "height": 874,
+          "rotation": 0,
+          "alpha": 0.8999999761581421,
+          "color": {
+            "r": 0.04976712912321091,
+            "g": 0.04740423336625099,
+            "b": 0.04571644589304924
+          }
+        }
+      ]
+    }
+  ]
+}

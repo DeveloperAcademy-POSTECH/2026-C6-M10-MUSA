@@ -75,6 +75,85 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
+--- !u!1 &733401915526003875
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 6692223709186537446}
+  - component: {fileID: 5278456188534000576}
+  - component: {fileID: 4613724817835723815}
+  m_Layer: 0
+  m_Name: Text
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &6692223709186537446
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 733401915526003875}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 0.46875, y: 0.46875, z: 0.46875}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 8830172333414564800}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 296.53333, y: 38.4}
+  m_Pivot: {x: 0, y: 1}
+--- !u!222 &5278456188534000576
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 733401915526003875}
+  m_CullTransparentMesh: 1
+--- !u!114 &4613724817835723815
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 733401915526003875}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5f7201a12d95ffc409449d95f23cf332, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Text
+  m_Material: {fileID: 0}
+  m_Color: {r: 0.24705882, g: 0.23921569, b: 0.21960784, a: 1}
+  m_RaycastTarget: 0
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_FontData:
+    m_Font: {fileID: 12800000, guid: 5f76b20538a6c4b1caa80654c9df48f1, type: 3}
+    m_FontSize: 32
+    m_FontStyle: 0
+    m_BestFit: 0
+    m_MinSize: 10
+    m_MaxSize: 40
+    m_Alignment: 0
+    m_AlignByGeometry: 0
+    m_RichText: 1
+    m_HorizontalOverflow: 1
+    m_VerticalOverflow: 1
+    m_LineSpacing: 1
+  m_Text: "\uBB35\uC774 \uB108 \uBA38\uB9AC \uC5B4\uB5A1\uD558\uB0D0 \u314B\u314B"
 --- !u!1 &808579615955853151
 GameObject:
   m_ObjectHideFlags: 0
@@ -154,9 +233,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 4289949469418742141}
   isBackground: 0
-  delay: 0.12
-  enterSeconds: 0.65
-  enterOffset: {x: 0, y: -12}
+  softFadeIn: 1
+  delay: 0.057000004
+  enterSeconds: 0.82
+  enterOffset: {x: 0, y: 0}
   startHeight: 1
   idleAmplitude: {x: 0, y: 0}
   idlePeriod: 6
@@ -239,6 +319,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 770978497482601300}
   isBackground: 1
+  softFadeIn: 0
   delay: 0
   enterSeconds: 0.65
   enterOffset: {x: 0, y: 0}
@@ -324,9 +405,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 8020909501031719116}
   isBackground: 0
-  delay: 0.06
-  enterSeconds: 0.65
-  enterOffset: {x: 0, y: -12}
+  softFadeIn: 1
+  delay: 0.045
+  enterSeconds: 0.82
+  enterOffset: {x: 0, y: 0}
   startHeight: 1
   idleAmplitude: {x: 0, y: 0}
   idlePeriod: 6
@@ -439,6 +521,7 @@ RectTransform:
   - {fileID: 101060766158830120}
   - {fileID: 1089951045906246288}
   - {fileID: 2506773184582703507}
+  - {fileID: 8830172333414564800}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
@@ -464,6 +547,14 @@ MonoBehaviour:
   - {fileID: 4502836166731622319}
   - {fileID: 850677716569326656}
   - {fileID: 2329251170537897011}
+  beats:
+  - {fileID: 813858553038740704}
+  continueButton: {fileID: 0}
+  requireContinueButton: 0
+  waitForEntrance: 1
+  exitCloudWipe: {fileID: 0}
+  music: {fileID: 0}
+  musicVolume: 0
   hideEmptyDialogue: 1
   sourceFigmaNumber: 0
   sourceFigmaNodeId: 4210:3242
@@ -490,6 +581,75 @@ MonoBehaviour:
     height: 33
   centerSpeakerName: 0
   speakerColor: {r: 1, g: 1, b: 1, a: 1}
+--- !u!1 &6281421591268561789
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 8830172333414564800}
+  - component: {fileID: 4687855694315383629}
+  - component: {fileID: 813858553038740704}
+  m_Layer: 0
+  m_Name: "\uBB35\uC774 \uB108 \uBA38\uB9AC \uC5B4\uB5A1\uD558\uB0D0 \u314B\u314B [4387:2123]"
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &8830172333414564800
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6281421591268561789}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 6692223709186537446}
+  m_Father: {fileID: 990141744270218988}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 166.5, y: -316}
+  m_SizeDelta: {x: 139, y: 18}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!225 &4687855694315383629
+CanvasGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6281421591268561789}
+  m_Enabled: 1
+  m_Alpha: 1
+  m_Interactable: 1
+  m_BlocksRaycasts: 1
+  m_IgnoreParentGroups: 0
+--- !u!114 &813858553038740704
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6281421591268561789}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 13d9f59d7ecd4402e82059cc33a56441, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryVisualBeat
+  motion: 5
+  delay: 1.021
+  duration: 0.58
+  offset: {x: 0, y: 0}
+  interactionDelay: 0
+  sound: {fileID: 0}
+  volume: 0.7
 --- !u!1 &6410773373153125383
 GameObject:
   m_ObjectHideFlags: 0
@@ -719,9 +879,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 6730235360294089437}
   isBackground: 0
-  delay: 0.17999999
-  enterSeconds: 0.65
-  enterOffset: {x: 0, y: -12}
+  softFadeIn: 1
+  delay: 0.069000006
+  enterSeconds: 0.82
+  enterOffset: {x: 0, y: 0}
   startHeight: 1
   idleAmplitude: {x: 0, y: 0}
   idlePeriod: 6
@@ -804,9 +965,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 5587742199868473703}
   isBackground: 0
-  delay: 0.24
-  enterSeconds: 0.65
-  enterOffset: {x: 0, y: -12}
+  softFadeIn: 1
+  delay: 0.081
+  enterSeconds: 0.82
+  enterOffset: {x: 0, y: 0}
   startHeight: 1
   idleAmplitude: {x: 0, y: 0}
   idlePeriod: 6

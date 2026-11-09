@@ -233,12 +233,82 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 9051502075234487714}
   isBackground: 0
-  delay: 0.12
-  enterSeconds: 0.65
-  enterOffset: {x: 0, y: -12}
+  softFadeIn: 1
+  delay: 0.057000004
+  enterSeconds: 0.82
+  enterOffset: {x: 0, y: 0}
   startHeight: 1
   idleAmplitude: {x: 0, y: 0}
   idlePeriod: 6
+--- !u!1 &2245947488072001675
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1385703540612551438}
+  - component: {fileID: 67931208267503031}
+  - component: {fileID: 4220605900006097099}
+  m_Layer: 0
+  m_Name: "\uB108\uC57C\uB9D0\uB85C .. [4387:2125]"
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &1385703540612551438
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2245947488072001675}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1105779344444752652}
+  m_Father: {fileID: 3131251785452365279}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 250.5, y: -329}
+  m_SizeDelta: {x: 61, y: 18}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!225 &67931208267503031
+CanvasGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2245947488072001675}
+  m_Enabled: 1
+  m_Alpha: 1
+  m_Interactable: 1
+  m_BlocksRaycasts: 1
+  m_IgnoreParentGroups: 0
+--- !u!114 &4220605900006097099
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2245947488072001675}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 13d9f59d7ecd4402e82059cc33a56441, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryVisualBeat
+  motion: 5
+  delay: 1.021
+  duration: 0.58
+  offset: {x: 0, y: 0}
+  interactionDelay: 0
+  sound: {fileID: 0}
+  volume: 0.7
 --- !u!1 &3469274807817527607
 GameObject:
   m_ObjectHideFlags: 0
@@ -324,6 +394,7 @@ GameObject:
   m_Component:
   - component: {fileID: 520383471064724091}
   - component: {fileID: 6029206713477730415}
+  - component: {fileID: 933927369210941080}
   m_Layer: 0
   m_Name: "\uB2E4\uC74C \uC694\uAD34 \uC7A1\uC73C\uB7EC ... [4210:3259]"
   m_TagString: Untagged
@@ -363,6 +434,25 @@ CanvasGroup:
   m_Interactable: 1
   m_BlocksRaycasts: 1
   m_IgnoreParentGroups: 0
+--- !u!114 &933927369210941080
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3890188227207508356}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 13d9f59d7ecd4402e82059cc33a56441, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryVisualBeat
+  motion: 5
+  delay: 1.521
+  duration: 0.28
+  offset: {x: 0, y: 0}
+  interactionDelay: 0
+  sound: {fileID: 0}
+  volume: 0.7
 --- !u!1 &4195656762226623207
 GameObject:
   m_ObjectHideFlags: 0
@@ -442,12 +532,92 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 3940917293571676768}
   isBackground: 0
-  delay: 0.17999999
-  enterSeconds: 0.65
-  enterOffset: {x: 0, y: -12}
+  softFadeIn: 1
+  delay: 0.069000006
+  enterSeconds: 0.82
+  enterOffset: {x: 0, y: 0}
   startHeight: 1
   idleAmplitude: {x: 0, y: 0}
   idlePeriod: 6
+--- !u!1 &4903161910795562460
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1105779344444752652}
+  - component: {fileID: 1816526555862845616}
+  - component: {fileID: 8967952222582570473}
+  m_Layer: 0
+  m_Name: Text
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &1105779344444752652
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4903161910795562460}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 0.46875, y: 0.46875, z: 0.46875}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1385703540612551438}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 130.13333, y: 38.4}
+  m_Pivot: {x: 0, y: 1}
+--- !u!222 &1816526555862845616
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4903161910795562460}
+  m_CullTransparentMesh: 1
+--- !u!114 &8967952222582570473
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4903161910795562460}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5f7201a12d95ffc409449d95f23cf332, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Text
+  m_Material: {fileID: 0}
+  m_Color: {r: 0.24705882, g: 0.23921569, b: 0.21960784, a: 1}
+  m_RaycastTarget: 0
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_FontData:
+    m_Font: {fileID: 12800000, guid: 5f76b20538a6c4b1caa80654c9df48f1, type: 3}
+    m_FontSize: 32
+    m_FontStyle: 0
+    m_BestFit: 0
+    m_MinSize: 10
+    m_MaxSize: 40
+    m_Alignment: 0
+    m_AlignByGeometry: 0
+    m_RichText: 1
+    m_HorizontalOverflow: 1
+    m_VerticalOverflow: 1
+    m_LineSpacing: 1
+  m_Text: "\uB108\uC57C\uB9D0\uB85C .."
 --- !u!1 &4929408223598582307
 GameObject:
   m_ObjectHideFlags: 0
@@ -527,9 +697,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 1048960731947774085}
   isBackground: 0
-  delay: 0.06
-  enterSeconds: 0.65
-  enterOffset: {x: 0, y: -12}
+  softFadeIn: 1
+  delay: 0.045
+  enterSeconds: 0.82
+  enterOffset: {x: 0, y: 0}
   startHeight: 1
   idleAmplitude: {x: 0, y: 0}
   idlePeriod: 6
@@ -568,6 +739,7 @@ RectTransform:
   - {fileID: 497275080274421023}
   - {fileID: 5317423670885386361}
   - {fileID: 3865354041231766808}
+  - {fileID: 1385703540612551438}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
@@ -593,6 +765,15 @@ MonoBehaviour:
   - {fileID: 5609198709638938559}
   - {fileID: 7533059089717691578}
   - {fileID: 2116112451468547936}
+  beats:
+  - {fileID: 933927369210941080}
+  - {fileID: 4220605900006097099}
+  continueButton: {fileID: 0}
+  requireContinueButton: 0
+  waitForEntrance: 1
+  exitCloudWipe: {fileID: 0}
+  music: {fileID: 0}
+  musicVolume: 0
   hideEmptyDialogue: 1
   sourceFigmaNumber: 0
   sourceFigmaNodeId: 4210:3257
@@ -923,6 +1104,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 7609926395679571075}
   isBackground: 1
+  softFadeIn: 0
   delay: 0
   enterSeconds: 0.65
   enterOffset: {x: 0, y: 0}
@@ -1008,9 +1190,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 6211658732463644815}
   isBackground: 0
-  delay: 0.24
-  enterSeconds: 0.65
-  enterOffset: {x: 0, y: -12}
+  softFadeIn: 1
+  delay: 0.081
+  enterSeconds: 0.82
+  enterOffset: {x: 0, y: 0}
   startHeight: 1
   idleAmplitude: {x: 0, y: 0}
   idlePeriod: 6

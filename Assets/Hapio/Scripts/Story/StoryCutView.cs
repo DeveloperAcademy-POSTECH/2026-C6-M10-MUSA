@@ -8,6 +8,11 @@ namespace Hapio
         public StoryLayer[] layers;
         public StoryVisualBeat[] beats;
         public UnityEngine.UI.Button continueButton;
+        [Tooltip("The card advances through its own continue button instead of a background tap.")]
+        public bool requireContinueButton;
+        [Tooltip("Do not jump past the timing of this cut when the player taps early.")]
+        public bool waitForEntrance;
+        public StoryCloudWipe exitCloudWipe;
         [Header("Optional music for this cut")]
         public AudioClip music;
         [Range(0, 1)] public float musicVolume;
@@ -52,11 +57,16 @@ namespace Hapio
                     if (beat != null) beat.SampleWithoutSound(Mathf.Max(beat.Duration, beat.interactionDelay));
         }
 
-        public void Sample(float elapsed)
+        internal void SampleArtwork(float elapsed)
         {
             if (layers != null)
                 foreach (var layer in layers)
                     if (layer != null) layer.Sample(elapsed);
+        }
+
+        public void Sample(float elapsed)
+        {
+            SampleArtwork(elapsed);
             if (beats != null)
                 foreach (var beat in beats)
                     if (beat != null) beat.Sample(elapsed);

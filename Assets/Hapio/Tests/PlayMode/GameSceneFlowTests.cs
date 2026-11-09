@@ -947,6 +947,11 @@ namespace Hapio.Tests
             {
                 // Direct cut sequencing is intentional here; genuine input is exercised by the neighbouring mouse test.
                 story.player.Next();
+                if (story.player.IsTransitioning)
+                {
+                    story.player.AdvanceTime(1f);
+                    story.player.AdvanceTime(1f);
+                }
                 AssertNoInlineContinue(story.player.CurrentView);
                 if (!story.player.IsPlaying)
                     Assert.That(story.advanceButton.interactable, Is.False, "The story-ending frame cannot also activate NEXT.");
@@ -991,6 +996,11 @@ namespace Hapio.Tests
             while ((story.player.CurrentCutIndex != 2 || !story.player.IsReading) && steps++ < 20)
             {
                 story.player.Next();
+                if (story.player.IsTransitioning)
+                {
+                    story.player.AdvanceTime(1f);
+                    story.player.AdvanceTime(1f);
+                }
                 AssertNoInlineContinue(story.player.CurrentView);
                 yield return null;
             }
@@ -1867,7 +1877,7 @@ namespace Hapio.Tests
         private static void AssertNoInlineContinue(StoryCutView view)
         {
             Assert.That(view, Is.Not.Null);
-            if (view.continueButton != null)
+            if (view.continueButton != null && !view.requireContinueButton)
                 Assert.That(view.continueButton.gameObject.activeInHierarchy, Is.False,
                     "An authored ‘next yokai’ picture action must not compete with the actual stage transition.");
         }
