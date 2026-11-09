@@ -13,7 +13,7 @@ namespace Hapio
         {
             public string kind, runId, sessionId;
             public int stageIndex, paintCount, columns, rows;
-            public uint revision, round, paintRevision, visualVersion, generation;
+            public uint revision, round, paintRevision, visualSequence, generation;
             public double startsAt, deadline;
             public bool skipped;
             /// <summary>The Host's final-hit replay record (prepare/commit only). Empty keeps the fixed 1.2 s finish.</summary>
@@ -83,7 +83,7 @@ namespace Hapio
             && value.runId == finishIdentity.runId && value.stageIndex == finishIdentity.stageIndex
             && value.revision == finishIdentity.revision && value.sessionId == finishIdentity.sessionId
             && value.round == finishIdentity.round && value.paintRevision == finishIdentity.paintRevision
-            && value.visualVersion == finishIdentity.visualVersion && value.paintCount == finishIdentity.paintCount
+            && value.visualSequence == finishIdentity.visualSequence && value.paintCount == finishIdentity.paintCount
             && value.columns == finishIdentity.columns && value.rows == finishIdentity.rows;
 
         void UpdatePaintFinish(double realNow)
@@ -217,17 +217,20 @@ namespace Hapio
         {
             runId = state.runId, revision = state.revision, stageIndex = state.stageIndex,
             sessionId = snapshot.sessionId, round = snapshot.round, paintRevision = snapshot.paintRevision,
-            visualVersion = network.PaintSurface.VisualVersion, paintCount = snapshot.paintCount,
+            visualSequence = network.PaintSurface.LastVisualSequence, paintCount = snapshot.paintCount,
             columns = snapshot.paintColumns, rows = snapshot.paintRows
         };
         bool PrepareFinalPaint()
         {
             if (finishIdentity == null || !LabPaintFinishPresentation.IsCompletedSurface(network)) return false;
+            return FinalPaintMatches() && finishPresentation != null && finishPresentation.Prepare();
+        }
+        bool FinalPaintMatches()
+        {
             LabSnapshot s = network.Snapshot;
-            if (s.paintRevision != finishIdentity.paintRevision || s.paintCount != finishIdentity.paintCount
-                || s.paintColumns != finishIdentity.columns || s.paintRows != finishIdentity.rows
-                || network.PaintSurface.VisualVersion != finishIdentity.visualVersion) return false;
-            return finishPresentation != null && finishPresentation.Prepare();
+            return s.paintRevision == finishIdentity.paintRevision && s.paintCount == finishIdentity.paintCount
+                && s.paintColumns == finishIdentity.columns && s.paintRows == finishIdentity.rows
+                && network.PaintSurface.LastVisualSequence == finishIdentity.visualSequence;
         }
         void ApplyPaintFinishControl(ulong sender, PaintFinishControl value, double realNow)
         {
@@ -281,7 +284,7 @@ namespace Hapio
             {
                 kind = "paint_finish_" + suffix, runId = finishIdentity.runId, stageIndex = finishIdentity.stageIndex,
                 revision = finishIdentity.revision, sessionId = finishIdentity.sessionId, round = finishIdentity.round,
-                paintRevision = finishIdentity.paintRevision, visualVersion = finishIdentity.visualVersion,
+                paintRevision = finishIdentity.paintRevision, visualSequence = finishIdentity.visualSequence,
                 paintCount = finishIdentity.paintCount, columns = finishIdentity.columns, rows = finishIdentity.rows,
                 generation = finishGeneration, startsAt = finishStartsAt,
                 deadline = finishServerDeadline, skipped = skipped,

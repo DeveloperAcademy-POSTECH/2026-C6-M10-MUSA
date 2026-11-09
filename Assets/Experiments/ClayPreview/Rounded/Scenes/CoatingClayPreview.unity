@@ -153,6 +153,19 @@ MonoBehaviour:
   imageBackgroundShader: {fileID: 0}
   surfaceTextureSamples: []
   surfaceTextureSampleNames: []
+  shapeNoUndercoatCompositor: {fileID: 4800000, guid: 417cd8d32d7fa49d9997ead1b2165381, type: 3}
+  restoreSavedShapeOnStart: 1
+  SplatterCore: 0.1625
+  SplatterLength: 0.21
+  SplatterWidth: 0.048
+  SplatterRoundness: 0.85
+  SplatterIrregularity: 1
+  SplatterAsymmetry: 1
+  SplatterSpikes: 9
+  SplatterSeed: 572
+  SplatterDroplets: 4
+  SplatterDropletSize: 0.04
+  SplatterDropletDistance: 0.1438
   sourcePrefab: {fileID: 6151071249947848590, guid: c7eb5fc42d3b947889d3a4430f8bf04b, type: 3}
   colorMap: {fileID: 2800000, guid: 4da8aa5d79b1b4463b32d1adf5e07601, type: 3}
   heightMap: {fileID: 2800000, guid: 8d0a71cb24fad43c2894bfb9f344ab14, type: 3}

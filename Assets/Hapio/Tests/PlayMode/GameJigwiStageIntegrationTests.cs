@@ -1,6 +1,5 @@
 using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -159,18 +158,29 @@ namespace Hapio.Tests
             LabSnapshot current = network.Snapshot;
             LabJigwiABRound b = current.jigwiAB.Active(startedAt + bProbe);
             Assert.That(b, Is.Not.Null); Assert.That(b.kind, Is.EqualTo(LabJigwiABKind.GroupFire));
-            // #509: a solo room picks its only seat; B is judged on the boss itself, with no fire art or colliders.
-            Assert.That(b.players.Single().playerId, Is.EqualTo(network.LocalPlayerId));
+            // #551: the saved profile gives each seat its own bucket. Solo has one seat and no special Water token.
+            Assert.That(network.config.JigwiBBucket, Is.True, "Keep the saved main rule; do not opt back into the old sync-orb mode.");
+            Assert.That(b.bucket, Is.True);
+            Assert.That(b.countdownAt, Is.LessThan(0d), "Bucket rounds do not run the shared 3-2-1.");
+            LabJigwiABPlayerFire bucketSeat = b.players.Single();
+            Assert.That(bucketSeat.playerId, Is.EqualTo(network.LocalPlayerId));
+            Assert.That(bucketSeat.readyAt, Is.EqualTo(b.activeAt + LabJigwiABTimeline.BucketLeadSeconds).Within(.00001d));
+            Assert.That(current.serverTime, Is.InRange(bucketSeat.readyAt, bucketSeat.readyAt + LabJigwiABTimeline.BucketSeatSeconds));
             Assert.That(overlay.PersonalHeatVisible, Is.False);
             Assert.That(overlay.VisibleScreenFires, Is.Zero);
             Assert.That(overlay.GroupCurtainVisible, Is.False);
-            Assert.That(overlay.SyncPillar.DropsVisible, Is.True);
-            // #509: past the two-second taunt B shows no words; the drops carry the progress.
-            Assert.That(overlay.status.text, Is.Empty);
+            Assert.That(overlay.SyncPillar.DropsVisible, Is.False, "Bucket rounds hide the retired shared Water-drop display.");
+            Assert.That(overlay.SyncPillar.DropCount, Is.Zero);
             Assert.That(overlay.SyncPillar.FilledDrops, Is.Zero);
-            Assert.That(current.orbs.Any(orb => orb.jigwiABSupplyEventId == b.id), Is.True,
-                "B supplies real owned Water, without a player generation request.");
-            Assert.That(spendEvents, Is.EqualTo(1), "Free supply and new snapshots never flash as a paid generation.");
+            Assert.That(overlay.BucketHandle, Is.Not.Null, "The saved overlay installs the current bucket presenter.");
+            Assert.That(overlay.BucketHandle.HandleVisible, Is.True, "The local bucket is visible during its actual arrival window.");
+            Assert.That(overlay.BucketHandle.Banner, Is.Empty, "Current bucket feedback uses its art rather than a text banner.");
+            Assert.That(overlay.Countdown, Is.Not.Null);
+            Assert.That(overlay.Countdown.Shown, Is.Empty);
+            Assert.That(overlay.status.text, Is.Empty);
+            Assert.That(current.orbs.Any(orb => orb.jigwiABSupplyEventId == b.id), Is.False,
+                "Bucket B must not also supply the old special Water orb.");
+            Assert.That(spendEvents, Is.EqualTo(1), "Bucket appearance and snapshots never flash as a paid generation.");
             Assert.That(staminaFeedback.ConsumptionPulseCount, Is.Zero);
             Assert.That(network.GetComponentsInChildren<LabJigwiFireSurface>(true), Is.Empty);
             Assert.That(model.JigwiABBlocksBoss(network.LocalPlayerId, current.serverTime), Is.False);
@@ -179,43 +189,47 @@ namespace Hapio.Tests
             Assert.That(target.Hitbox.sharedMesh, Is.SameAs(shell), "Switching A/B cannot replace the bound Stage 3 hit shell.");
             Assert.That(target.GetComponentsInChildren<Collider>(true).Length, Is.EqualTo(originalColliderCount));
             Assert.That(clock.IsPaused, Is.True);
-            CaptureScreenEvidence("3"); yield return null;
+            CaptureScreenEvidence("before-pour"); yield return null;
             int paintedBefore = model.PaintSurface.CoveredCount;
-            Assert.That(overlay.SyncPillar.DropCount, Is.EqualTo(1), "Solo: one picked seat, one drop.");
-            // #509: solo is the test room — its one special Water on the boss is the whole B.
-            ThrowSpecialWaterAtBoss(b.id);
+            // The held-clock fixture exercises the real Host pour rule, not phone sensors or keyboard sloshing.
+            PourLocalBucket(b.id);
             PublishFireState(); yield return null;
             HoldAt(bProbe + .2d); yield return null;
-            CaptureScreenEvidence("2"); yield return null;
-            Assert.That(network.Snapshot.jigwiAB.rounds.Single(round => round.id == b.id).resolution,
-                Is.EqualTo(LabJigwiABResolution.Completed));
+            CaptureScreenEvidence("after-pour"); yield return null;
+            LabJigwiABRound poured = network.Snapshot.jigwiAB.rounds.Single(round => round.id == b.id);
+            Assert.That(poured.resolution, Is.EqualTo(LabJigwiABResolution.Completed), "The solo seat poured its only bucket.");
+            Assert.That(poured.players.Single().launchedAt, Is.EqualTo(startedAt + bProbe).Within(.00001d));
             Assert.That(overlay.SyncPillar.DropsVisible, Is.False);
             Assert.That(overlay.status.text, Is.Empty);
-            Assert.That(model.PaintSurface.CoveredCount, Is.GreaterThan(paintedBefore), "The success splash paints the boss.");
+            Assert.That(model.PaintSurface.CoveredCount, Is.GreaterThan(paintedBefore), "The bucket pour applies real Water paint to the boss.");
+            Assert.That(spendEvents, Is.EqualTo(1), "The bucket pour consumes no paid generation stamina.");
+            Assert.That(staminaFeedback.ConsumptionPulseCount, Is.Zero);
             Assert.That(target.Hitbox.sharedMesh, Is.SameAs(shell));
+            Assert.That(target.GetComponentsInChildren<Collider>(true).Length, Is.EqualTo(originalColliderCount));
             network.LocalStaminaSpent -= onSpent;
             HoldAt(bProbe + 3.8d); yield return null;
-            CaptureScreenEvidence("0"); yield return null;
-            TestContext.WriteLine("JIGWI_AB_SAVED_STAGE3: Home/DEV skips/#540 A10/B45 probes/no B colliders/one special Water clears solo B. "
-                + "Screen Space Overlay GPU pixels are not sampled by camera.Render; device/GPU visual review is separate.");
+            CaptureScreenEvidence("settled"); yield return null;
+            TestContext.WriteLine("JIGWI_AB_SAVED_STAGE3: Home/DEV skips/#540 A10/B45 probes/#551 saved bucket B/no special Water/no B colliders/local Host pour paints and completes solo B. "
+                + "Phone tilt/keyboard slosh input is not exercised by this held-clock fixture. Screen Space Overlay GPU pixels are not sampled by camera.Render; device/GPU visual review is separate.");
         }
 
-        private static void CaptureScreenEvidence(string remaining)
+        private static void CaptureScreenEvidence(string phase)
         {
             if (Application.isBatchMode || SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Null) return;
             // Nonblocking GameView capture includes the real saved cameras and ScreenSpaceOverlay.
             // It is supporting visual evidence, not a mobile/device test or the GPU assertion fixture.
-            ScreenCapture.CaptureScreenshot(Path.Combine(Path.GetTempPath(), "jigwi341-curtain-" + remaining + ".png"));
+            ScreenCapture.CaptureScreenshot(Path.Combine(Path.GetTempPath(), "jigwi-saved-bucket-" + phase + ".png"));
         }
 
-        /// <summary>#509: the local seat throws the special Water B gave it; it hits the boss itself.</summary>
-        private void ThrowSpecialWaterAtBoss(string roundId)
+        private void PourLocalBucket(string roundId)
         {
             double now = clock.Now(Time.realtimeSinceStartupAsDouble);
-            var orb = ((Dictionary<string, LabOrbState>)typeof(LabModel).GetField("orbs", Private).GetValue(model)).Values
-                .Single(value => value.jigwiABSupplyEventId == roundId && value.originOwner == network.LocalPlayerId);
-            Assert.That(model.TryLaunch(orb.owner, orb.id, "launch/" + orb.id, now, out _, out string reason), Is.True, reason);
-            Assert.That(model.ConfirmHit(orb.id, now, Vector3.back, out _, out _, out _), Is.False, "Consumed as the sync token.");
+            Assert.That(model.TryJigwiBPull(network.LocalPlayerId, roundId, now), Is.True,
+                "The actual Host accepts one local pour inside the bucket's arrival window.");
+            int painted = model.PaintSurface.CoveredCount;
+            Assert.That(model.TryJigwiBPull(network.LocalPlayerId, roundId, now), Is.False,
+                "A bucket cannot be poured twice.");
+            Assert.That(model.PaintSurface.CoveredCount, Is.EqualTo(painted), "A duplicate pour adds no paint.");
         }
         private void PublishFireState()
         {

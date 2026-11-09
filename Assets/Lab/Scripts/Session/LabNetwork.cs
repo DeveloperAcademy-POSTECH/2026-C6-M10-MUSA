@@ -437,8 +437,11 @@ namespace C6Lab
         public int TargetParticipantCount => targetParticipantCount;
         public int LocalSlotNumber => IsConnected && playerSlots != null ? playerSlots.GetSlot(LocalPlayerId) : 0;
         public bool SlotSelectionPending => slotSelectionPending;
-        /// <summary>A Guest is connected but has not received the Host's lobby: the room size and seats it shows are stale.</summary>
-        public bool LobbyInfoPending => IsConnected && !IsHost && receivedLobbyRevision == 0;
+        /// <summary>
+        /// A Guest is connected but has not received the Host's lobby, or is getting back in (#501): the room size and seats
+        /// it would show are stale.
+        /// </summary>
+        public bool LobbyInfoPending => IsConnected && !IsHost && receivedLobbyRevision == 0 || lobbyRejoinActive;
         public bool IsDeveloperRestartPending => pendingDeveloperRestart;
         public bool CanSelectPlayerSlot => IsConnected && !developerSolo && model == null && latest == null
             && (!gameFlowEnabled || !gameRosterLocked)
@@ -446,14 +449,14 @@ namespace C6Lab
         public ulong GetSlotOwner(int slotNumber) => playerSlots?.GetOwner(slotNumber) ?? ulong.MaxValue;
         public bool IsSearchingRooms => roomSearchActive && discovery != null && discovery.IsBrowsing;
         public IReadOnlyList<LabDiscoveredRoom> DiscoveredRooms => discoveredRooms;
-        /// <summary>Includes the NGO shutdown wait after cancellation or a failed attempt.</summary>
-        public bool IsJoiningRoom => joinInProgress || joinRetryPending || joinFinishPending;
+        /// <summary>Includes the NGO shutdown wait after cancellation or a failed attempt, and a lobby rejoin (#501).</summary>
+        public bool IsJoiningRoom => joinInProgress || joinRetryPending || joinFinishPending || lobbyRejoinActive;
         public bool IsCancelingJoin => joinCanceling;
         public string JoiningRoomKey => IsJoiningRoom ? discoveryRoomKey ?? string.Empty : string.Empty;
         public float JoinElapsedSeconds => IsJoiningRoom
             ? (float)Math.Max(0d, Time.realtimeSinceStartupAsDouble - joinStartedAt) : 0f;
         public bool RoomSearchFailed => roomSearchFailed;
-        public string ConnectedRoomName => IsConnected ? connectedRoomName : string.Empty;
+        public string ConnectedRoomName => IsConnected ? connectedRoomName : lobbyRejoinActive ? lobbyRejoinRoomName : string.Empty;
         public string RoomSearchMessage
         {
             get
@@ -478,6 +481,8 @@ namespace C6Lab
             ? order.Count > 0 && order.All(id => configAcknowledgements.Contains(id))
             : clientConfigReady;
         public bool IsHost => manager != null && manager.IsHost;
+        /// <summary>#557: a Host may have no IPv4 socket; its IPv4 addresses are then not reachable.</summary>
+        public bool HostListensOnIpv4 => !(transport is LabDualStackTransport dual) || dual.HasIpv4Listener;
         public bool IsDeveloperSolo => developerSolo;
         /// <summary>Only a player with a drum on their board can generate orbs.</summary>
         public bool HasLocalDrum => LocalDrum() != null;
@@ -800,6 +805,7 @@ namespace C6Lab
                 StartRoomSearchInternal(true);
                 return;
             }
+            PrepareRejoinTicket(hostAddress + ":" + port.ToString(CultureInfo.InvariantCulture), port, true);
             BeginJoinCandidates(addresses);
         }
 
@@ -859,8 +865,10 @@ namespace C6Lab
 
         public bool CanJoinDiscoveredRoom(string roomKey)
         {
+            // A full room may still be holding this device's own place (#501): let the Host decide.
             return IsSearchingRooms && CanBeginConnection && !string.IsNullOrEmpty(roomKey)
-                && discoveredRooms.Any(item => string.Equals(item.Key, roomKey, StringComparison.OrdinalIgnoreCase) && !item.Playing && !item.IsFull && !item.WaitingForHost)
+                && discoveredRooms.Any(item => string.Equals(item.Key, roomKey, StringComparison.OrdinalIgnoreCase)
+                    && RoomOpenToThisDevice(item))
                 && LabRoomCatalog.RoutesForRoom(discovery.Targets, roomKey).Length > 0;
         }
 
@@ -871,7 +879,7 @@ namespace C6Lab
             LabDiscoveredRoom room = discoveredRooms.FirstOrDefault(item =>
                 string.Equals(item.Key, roomKey, StringComparison.OrdinalIgnoreCase));
             LabBonjourTarget[] targets = LabRoomCatalog.RoutesForRoom(discovery.Targets, roomKey);
-            if (room == null || room.Playing || room.IsFull || room.WaitingForHost || targets.Length == 0)
+            if (!RoomOpenToThisDevice(room) || targets.Length == 0)
             {
                 RefreshDiscoveredRooms();
                 SetRoomSearchMessage("That room is no longer available. Choose another room or refresh.", true);
@@ -882,6 +890,7 @@ namespace C6Lab
             // Keep browsing and showing the current list while one selected room connects.
             discoveryJoinActive = true;
             discoveryRoomKey = room.Key;
+            PrepareRejoinTicket(room.Key, room.Port, false);
             BeginJoinCandidates(targets.Select(item => item.Address));
             return IsJoiningRoom;
         }
@@ -890,6 +899,7 @@ namespace C6Lab
         public bool CancelJoin()
         {
             if (!IsJoiningRoom || joinFinishPending) return false;
+            EndLobbyRejoin("canceled");
             FinishJoin("Connection canceled. Choose a room to try again.", false, true);
             return true;
         }
@@ -917,7 +927,7 @@ namespace C6Lab
             if (!joinInProgress || joinFinishPending || joinCandidateIndex >= joinCandidates.Count
                 || manager == null || transport == null) return;
             string address = joinCandidates[joinCandidateIndex];
-            ConfigureManager();
+            ConfigureManager(true);
             try
             {
                 if (transport is LabDualStackTransport dual) dual.ConfigureClient(address, port);
@@ -945,12 +955,21 @@ namespace C6Lab
             string rejection = manager == null ? string.Empty : manager.DisconnectReason;
             if (IsTerminalJoinRejection(rejection))
             {
+                // The Host is not holding a place for this ticket now (#501).
+                rejoinTicketAdmitted = false;
+                EndLobbyRejoin("rejected");
                 FinishJoin("Join rejected: " + rejection, true);
                 return;
             }
             if (++joinCandidateIndex >= joinCandidates.Count
-                || Time.realtimeSinceStartupAsDouble - joinStartedAt > JoinBudgetSeconds)
+                || Time.realtimeSinceStartupAsDouble - joinStartedAt > JoinBudgetSeconds
+                || lobbyRejoinActive && Time.realtimeSinceStartupAsDouble >= lobbyRejoinUntil)
             {
+                if (lobbyRejoinActive)
+                {
+                    ScheduleLobbyRejoinRetry();
+                    return;
+                }
                 if (discoveryJoinActive && Time.realtimeSinceStartupAsDouble - joinStartedAt <= JoinBudgetSeconds)
                 {
                     joinRetryPending = true;
@@ -1014,6 +1033,8 @@ namespace C6Lab
         {
             if (stopping) return;
             stopping = true;
+            SayLobbyGoodbye();
+            EndLobbyRejoin("stopped");
             joinFinishPending = false;
             joinCanceling = false;
             joinInProgress = false;
@@ -1345,7 +1366,12 @@ namespace C6Lab
                 SetNotice("P number selection timed out. Try again.");
             }
             foreach (ulong stale in pendingApprovals.Where(item => now - item.Value > 15d)
-                         .Select(item => item.Key).ToArray()) pendingApprovals.Remove(stale);
+                         .Select(item => item.Key).ToArray())
+            {
+                pendingApprovals.Remove(stale);
+                approvedTickets.Remove(stale);
+            }
+            ExpireLobbySeatHolds(now);
             LabBonjourDiscovery activeDiscovery = discovery;
             if (activeDiscovery != null)
             {
@@ -1357,7 +1383,8 @@ namespace C6Lab
                     bool ipv4 = !(transport is LabDualStackTransport dual) || dual.HasIpv4Listener;
                     bool ipv6 = transport is LabDualStackTransport second && second.HasIpv6Listener;
                     if (ipv4 || ipv6)
-                        activeDiscovery.UpdatePresence(ipv4, ipv6, order.Count, targetParticipantCount, RoomPresenceBusy);
+                        activeDiscovery.UpdatePresence(ipv4, ipv6, Math.Min(targetParticipantCount, LobbyPlaceCount),
+                            targetParticipantCount, RoomPresenceBusy);
                 }
                 activeDiscovery.Tick();
                 if (discovery == activeDiscovery) RecoverHostAdvertisement(activeDiscovery, now);
@@ -1399,8 +1426,11 @@ namespace C6Lab
                     FinishJoin("No reachable route found. Use direct IP or check the Host network.", true);
                 }
             }
+            // A lobby rejoin also stops its attempt in flight when its budget ends (#501).
             if (joinInProgress && !joinRetryPending && !joinFinishPending && joinAttemptAt > 0
-                && now - joinAttemptAt >= JoinAttemptSeconds) AdvanceJoinCandidate();
+                && (now - joinAttemptAt >= JoinAttemptSeconds || lobbyRejoinActive && now >= lobbyRejoinUntil))
+                AdvanceJoinCandidate();
+            UpdateLobbyRejoin(now);
             ApplyGameStartSimulationHold();
             if (IsHost && model != null && !gameBattleFrozen)
             {
@@ -1449,13 +1479,13 @@ namespace C6Lab
             }
         }
 
-        private void ConfigureManager()
+        private void ConfigureManager(bool client = false)
         {
             manager.NetworkConfig = new NetworkConfig
             {
                 NetworkTransport = transport,
                 ProtocolVersion = LabProtocolVersion,
-                ConnectionData = (byte[])ActiveConnectionToken.Clone(),
+                ConnectionData = ConnectionPayload(client),
                 EnableSceneManagement = false,
                 ConnectionApproval = true,
                 PlayerPrefab = null,
@@ -1466,16 +1496,23 @@ namespace C6Lab
 
         private void Approve(NetworkManager.ConnectionApprovalRequest request, NetworkManager.ConnectionApprovalResponse response)
         {
-            bool alreadyPending = pendingApprovals.ContainsKey(request.ClientNetworkId);
+            bool validPayload = TryReadConnectionPayload(request.Payload, ActiveConnectionToken, gameFlowEnabled, out string ticket);
+            // Held places count toward the room size; a returning ticket takes its own back (#501).
             string rejection = !manager.IsHost ? "The room is no longer hosted."
-                : request.Payload == null || !request.Payload.SequenceEqual(ActiveConnectionToken)
+                : !validPayload
                     ? "Lab version mismatch. Use the same game version."
                     : model != null || (gameFlowEnabled && gameRosterLocked)
                         ? "Battle already started. Wait for the Host to return to the lobby."
-                        : order.Count + pendingApprovals.Count - (alreadyPending ? 1 : 0) >= targetParticipantCount
+                        : LobbyPlaceCount + PendingNewPlaces(request.ClientNetworkId) - ReclaimablePlaces(ticket)
+                          >= targetParticipantCount
                             ? "Room is full. Choose another room." : string.Empty;
             bool allowed = string.IsNullOrEmpty(rejection);
-            if (allowed) pendingApprovals[request.ClientNetworkId] = Time.realtimeSinceStartupAsDouble;
+            if (allowed)
+            {
+                pendingApprovals[request.ClientNetworkId] = Time.realtimeSinceStartupAsDouble;
+                if (ticket != null) approvedTickets[request.ClientNetworkId] = ticket;
+                else approvedTickets.Remove(request.ClientNetworkId);
+            }
             response.Approved = allowed;
             response.CreatePlayerObject = false;
             response.Pending = false;
@@ -1511,12 +1548,17 @@ namespace C6Lab
             if (manager.IsHost)
             {
                 pendingApprovals.Remove(id);
-                if (!order.Contains(id) && order.Count < targetParticipantCount) order.Add(id);
+                string ticket = TakeApprovedTicket(id);
+                int returningSlot = ReclaimLobbyPlace(id, ticket, out bool returningConfirmed);
+                if (!order.Contains(id) && LobbyPlaceCount < targetParticipantCount) order.Add(id);
                 else if (!order.Contains(id))
                 {
                     manager.DisconnectClient(id);
                     return;
                 }
+                if (ticket != null) memberTickets[id] = ticket;
+                if (returningConfirmed) heardLobbyMembers.Add(id);
+                RestoreLobbySlot(id, returningSlot);
                 AssignAutomaticTestSlot(id);
                 Debug.Log("C6_LAB_PEER_JOIN id=" + id + " participants=" + order.Count);
                 BroadcastLobby();
@@ -1527,6 +1569,8 @@ namespace C6Lab
             {
                 joinInProgress = false;
                 joinRetryPending = false;
+                EndLobbyRejoin("connected");
+                MarkRejoinTicketAdmitted();
                 clientSessionConnected = true;
                 discoveryJoinActive = false;
                 DisposeDiscovery();
@@ -1544,20 +1588,28 @@ namespace C6Lab
             {
                 if (gameFlowEnabled && order.Contains(id))
                 {
+                    // #501: decide before GameSession runs. A 2:2 abort inside it returns the room to its lobby first.
+                    bool lobbyDrop = LobbyRosterOpen;
                     GameFlowDisconnected?.Invoke(id, false);
                     // GameSession owns the GameOver transition; never clear the result or
                     // publish a legacy lobby that would erase it on the remaining peers.
                     if (stopping || manager == null || !manager.IsHost) return;
+                    bool held = HoldLobbyPlace(id, playerSlots?.GetSlot(id) ?? 0, lobbyDrop);
                     order.Remove(id);
                     bulkSenders.Remove(id); peerPaintPublishers.Remove(id); peerSharedRounds.Remove(id); paintCheckpointThrough.Remove(id);
                     boardSequences.Remove(id);
-                    playerSlots?.Release(id);
+                    if (!held) playerSlots?.Release(id);
                     slotRequestIds.Remove(id);
                     configAcknowledgements.Remove(id);
+                    memberTickets.Remove(id);
+                    lobbyLeavers.Remove(id);
+                    heardLobbyMembers.Remove(id);
                     pendingDeveloperRestart = false;
                     if (model == null && !gameBattleFrozen) BroadcastLobby();
                     return;
                 }
+                // A connection the Host replaced with the same ticket's new one (#501) was already cleaned up.
+                if (replacedMembers.Remove(id)) return;
                 if (!order.Remove(id))
                 {
                     Debug.Log("C6_LAB_JOIN_REJECTED id=" + id);
@@ -1580,6 +1632,10 @@ namespace C6Lab
                 if (!clientSessionConnected) return; // Ignore a retired attempt's late shutdown callback.
                 if (gameFlowEnabled)
                 {
+                    // #501: a lobby guest stays in the Lobby and gets back into the same room. Any other loss (a run, a
+                    // closed room) is not held by the Host, so the ticket no longer opens a full room card.
+                    if (TryBeginLobbyRejoin(false)) return;
+                    rejoinTicketAdmitted = false;
                     GameFlowDisconnected?.Invoke(id, true);
                     clientSessionConnected = false;
                     UnregisterHandler();
@@ -1610,7 +1666,8 @@ namespace C6Lab
         private void BroadcastLobby()
         {
             if (!IsHost) return;
-            var packet = new LabNetworkPacket { type = "lobby", seats = order.ToArray(),
+            // A held place stays seated with its P, and ids name the held seats (#501, game rooms only).
+            var packet = new LabNetworkPacket { type = "lobby", seats = LobbySeats(), ids = HeldLobbySeats(),
                 slotAssignments = playerSlots?.Snapshot() ?? Array.Empty<LabPlayerSlotAssignment>(),
                 targetParticipants = targetParticipantCount, configRevision = configRevision,
                 configFingerprint = configFingerprint, snapshotSequence = snapshotSequence,
@@ -1621,6 +1678,56 @@ namespace C6Lab
                 + " · P " + (playerSlots?.SelectedCount ?? 0) + "/" + targetParticipantCount
                 + " · settings " + configAcknowledgements.Count + "/" + order.Count);
             Changed?.Invoke();
+        }
+
+        /// <summary>A Guest's copy of the Host's lobby; a malformed or old one is dropped without changing the last.</summary>
+        private void ReceiveLobby(LabNetworkPacket packet)
+        {
+            // The Host decides the room size; a Guest only bounds it (6 is a 3:3 territory room, #394).
+            if (packet.targetParticipants < LabModel.MinimumParticipants
+                || packet.targetParticipants > LabModel.TerritoryMaximumParticipants
+                || packet.seats == null || packet.seats.Length > packet.targetParticipants
+                || packet.seats.Distinct().Count() != packet.seats.Length
+                || packet.slotAssignments == null || !ValidRoomName(packet.roomName)
+                || packet.lobbyRevision <= receivedLobbyRevision
+                || packet.snapshotSequence < incomingSequence
+                || packet.snapshotSequence < lobbySnapshotSequenceFloor) return;
+            var newSlots = new LabPlayerSlots(packet.targetParticipants);
+            if (!newSlots.TryReplace(packet.slotAssignments, packet.seats)) return;
+            receivedLobbyRevision = packet.lobbyRevision;
+            connectedRoomName = packet.roomName ?? string.Empty;
+            NameRejoinTicketRoom(connectedRoomName);
+            lobbySnapshotSequenceFloor = packet.snapshotSequence;
+            incomingSequence = Math.Max(incomingSequence, packet.snapshotSequence);
+            incomingChunks = null;
+            incomingChunkCount = 0;
+            incomingChunkReceived = 0;
+            order.Clear();
+            latest = null;
+            sessionId = null;
+            ResetPaintTransport();
+            ResetActionTransport();
+            pauseRequestPending = false;
+            impactReceipts.Reset();
+            impactFeedback?.Clear();
+            ClearProjectiles();
+            target?.GetComponent<LabHangingTarget>()?.ResetSwing();
+            visibleOrbIds.Clear();
+            if (board != null) board.Clear();
+            ApplyLocalPause(false);
+            ReadHeldLobbySeats(packet);
+            foreach (ulong seat in packet.seats) if (!heldSeatOwners.Contains(seat)) order.Add(seat);
+            playerSlots = newSlots;
+            targetParticipantCount = packet.targetParticipants;
+            pendingDeveloperRestart = packet.restarting;
+            TryCompleteSlotSelection();
+            if (packet.configRevision != configRevision || packet.configFingerprint != configFingerprint)
+                clientConfigReady = false;
+            SetStatus("LOBBY: " + order.Count + " / " + targetParticipantCount
+                + " · P " + playerSlots.SelectedCount + "/" + targetParticipantCount
+                + (clientConfigReady ? " · settings confirmed" : " · waiting for settings"));
+            Debug.Log("C6_LAB_LOBBY participants=" + order.Count + " slots="
+                + string.Join(",", playerSlots.Snapshot().Select(item => "P" + item.slotNumber + ":" + item.playerId)));
         }
 
         private void HandleSlotSelectionRequest(ulong sender, LabNetworkPacket packet)
@@ -2319,9 +2426,16 @@ namespace C6Lab
             if (IsHost)
             {
                 if (sender == LocalPlayerId || !order.Contains(sender)) return;
+                // #501: this member has seen its admission (its first packet is the automatic config_ack).
+                heardLobbyMembers.Add(sender);
                 if (packet.type == "slot_select")
                 {
                     HandleSlotSelectionRequest(sender, packet);
+                    return;
+                }
+                if (packet.type == "lobby_leave")
+                {
+                    if (gameFlowEnabled) lobbyLeavers.Add(sender);
                     return;
                 }
                 if (packet.type == "config_ack")
@@ -2362,6 +2476,10 @@ namespace C6Lab
                 case "clay_appearance":
                     ReceiveClayAppearance(packet);
                     break;
+                case "lobby_closed":
+                    // The Host left on purpose (#501): a disconnect after this does not rejoin.
+                    if (gameFlowEnabled) hostClosedLobby = true;
+                    break;
                 case "paint_art_error":
                     ReceivePaintArtError(packet);
                     break;
@@ -2375,52 +2493,8 @@ namespace C6Lab
                     ReceiveBoardChunk(packet);
                     break;
                 case "lobby":
-                {
-                    // The Host decides the room size; a Guest only bounds it (6 is a 3:3 territory room, #394).
-                    if (packet.targetParticipants < LabModel.MinimumParticipants
-                        || packet.targetParticipants > LabModel.TerritoryMaximumParticipants
-                        || packet.seats == null || packet.seats.Length > packet.targetParticipants
-                        || packet.seats.Distinct().Count() != packet.seats.Length
-                        || packet.slotAssignments == null || !ValidRoomName(packet.roomName)
-                        || packet.lobbyRevision <= receivedLobbyRevision
-                        || packet.snapshotSequence < incomingSequence
-                        || packet.snapshotSequence < lobbySnapshotSequenceFloor) return;
-                    var newSlots = new LabPlayerSlots(packet.targetParticipants);
-                    if (!newSlots.TryReplace(packet.slotAssignments, packet.seats)) return;
-                    receivedLobbyRevision = packet.lobbyRevision;
-                    connectedRoomName = packet.roomName ?? string.Empty;
-                    lobbySnapshotSequenceFloor = packet.snapshotSequence;
-                    incomingSequence = Math.Max(incomingSequence, packet.snapshotSequence);
-                    incomingChunks = null;
-                    incomingChunkCount = 0;
-                    incomingChunkReceived = 0;
-                    order.Clear();
-                    latest = null;
-                    sessionId = null;
-                    ResetPaintTransport();
-                    ResetActionTransport();
-                    pauseRequestPending = false;
-                    impactReceipts.Reset();
-                    impactFeedback?.Clear();
-                    ClearProjectiles();
-                    target?.GetComponent<LabHangingTarget>()?.ResetSwing();
-                    visibleOrbIds.Clear();
-                    if (board != null) board.Clear();
-                    ApplyLocalPause(false);
-                    order.AddRange(packet.seats);
-                    playerSlots = newSlots;
-                    targetParticipantCount = packet.targetParticipants;
-                    pendingDeveloperRestart = packet.restarting;
-                    TryCompleteSlotSelection();
-                    if (packet.configRevision != configRevision || packet.configFingerprint != configFingerprint)
-                        clientConfigReady = false;
-                    SetStatus("LOBBY: " + order.Count + " / " + targetParticipantCount
-                        + " · P " + playerSlots.SelectedCount + "/" + targetParticipantCount
-                        + (clientConfigReady ? " · settings confirmed" : " · waiting for settings"));
-                    Debug.Log("C6_LAB_LOBBY participants=" + order.Count + " slots="
-                        + string.Join(",", playerSlots.Snapshot().Select(item => "P" + item.slotNumber + ":" + item.playerId)));
+                    ReceiveLobby(packet);
                     break;
-                }
                 case "slot_result":
                     ReceiveSlotResult(packet);
                     break;
@@ -2577,7 +2651,7 @@ namespace C6Lab
             {
                 ClearPendingSlotSelection();
                 SetNotice(packet.reason == "SLOT_TAKEN" ? "That P number is already selected."
-                    : "P number selection was rejected: " + packet.reason);
+                    : SlotRejectionText(packet.reason, gameFlowEnabled));
                 return;
             }
             if (packet.lobbyRevision <= 0) return;
@@ -2814,7 +2888,7 @@ namespace C6Lab
         private void RejectLocally(string orbId, string reason)
         {
             if (!string.IsNullOrEmpty(orbId) && board != null) board.RejectEdge(orbId);
-            SetNotice(reason ?? "Request rejected.");
+            ShowRejection(reason);
             Debug.LogWarning("C6_LAB_REJECT orb=" + orbId + " reason=" + reason);
         }
 
@@ -2922,6 +2996,7 @@ namespace C6Lab
             lobbySnapshotSequenceFloor = 0;
             lobbyRevision = 0;
             receivedLobbyRevision = 0;
+            ResetLobbyRoom();
             LastShotReport = string.Empty;
             requestSequence = 0;
             if (board != null) board.Clear();
@@ -3067,6 +3142,31 @@ namespace C6Lab
 
         private void SetStatus(string status) { Status = status; Changed?.Invoke(); }
         private void SetNotice(string notice) { Notice = notice; Changed?.Invoke(); }
+
+        /// <summary>The Lab shows the Host's reason; the game says it in words a player can act on.</summary>
+        public static string SlotRejectionText(string reason, bool game) => game
+            ? "자리를 고르지 못했소. 다시 골라주시오." : "P number selection was rejected: " + reason;
+
+        /// <summary>A Host reason such as INSUFFICIENT_STAMINA names a log entry, not something to tell a player.</summary>
+        public static bool IsInternalReasonCode(string reason)
+        {
+            if (string.IsNullOrEmpty(reason)) return true;
+            foreach (char c in reason)
+                if (!(c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_')) return false;
+            return true;
+        }
+
+        // The game explains a refusal with its own feedback (stamina shake, blocked edge). The Lab keeps the raw reason
+        // on screen because that is what a physics test reads.
+        private void ShowRejection(string reason)
+        {
+            if (gameFlowEnabled && IsInternalReasonCode(reason))
+            {
+                if (Debug.isDebugBuild) Debug.Log("C6_LAB_REJECT_HIDDEN reason=" + reason);
+                return;
+            }
+            SetNotice(reason ?? "Request rejected.");
+        }
 
         private void OnDestroy()
         {

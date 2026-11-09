@@ -268,7 +268,7 @@ namespace C6Lab
                 foreach (Renderer extra in rig.paintExtras) if (extra != null) list.Add(extra);
             extras = list.ToArray();
             activeMaterial = prefabRig.paintMaterial;
-            rigReferenceSize = prefabRig.referenceVisualSize;
+            rigReferenceSize = prefabRig.referenceVisualSize / LabGourdVisualRig.StageSizeMultiplier;
             rigSizeAnchor = prefabRig.AnchorInRoot;
             foreach (var animator in VisualInstance.GetComponentsInChildren<Animator>(true))
                 animator.enabled = false;
@@ -320,7 +320,8 @@ namespace C6Lab
         private void ApplyVisualSize()
         {
             if (VisualInstance == null) return;
-            float size = network != null && network.config != null ? network.config.GourdVisualSize : 1.4f;
+            float size = network != null && network.config != null
+                ? network.config.GourdVisualSize : LabConfig.DefaultGourdVisualSize;
             Vector3 scale, position;
             if (rig == null)
             {

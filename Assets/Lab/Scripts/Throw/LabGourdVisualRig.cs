@@ -23,6 +23,11 @@ namespace C6Lab
         public Material paintMaterial;
         [Tooltip("줄 연결점. 없으면 판정 상단 중심.")]
         public Transform ropeSocket;
+        /// <summary>
+        /// Story-stage gourds are drawn this much larger than Gourd Visual Size alone would (approved from in-game
+        /// mockups). Only baked rigs use it, so the white gourd of the tutorial, 2:2 and Lab keeps its size.
+        /// </summary>
+        public const float StageSizeMultiplier = 1.4f;
         [Tooltip("이 프리팹이 배율 1로 맞는 Gourd Visual Size 값(LabConfig). 흰 박은 1.8에 해당한다.")]
         [Min(.01f)] public float referenceVisualSize = 1.8f;
         [Tooltip("크기를 바꿀 때 제자리에 두는 점(프리팹 루트 기준). 없으면 루트 원점.")]

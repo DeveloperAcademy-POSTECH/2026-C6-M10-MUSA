@@ -147,6 +147,23 @@ namespace C6Lab
         }
 
         /// <summary>
+        /// 4단계 구슬 사라짐 시연 (#552): <paramref name="owner"/>'s orb <paramref name="orbId"/> runs out
+        /// <paramref name="seconds"/> after <paramref name="now"/>, whatever the (tutorial-long) orb lifetime says. Called
+        /// again it moves that moment; when it comes the orb goes the ordinary way (#235): reported through the expiries,
+        /// so its screen flashes it and plays the smoke. Drums, locked bombs and orbs in the air are refused.
+        /// </summary>
+        public bool TutorialSetOrbLife(ulong owner, string orbId, float seconds, double now)
+        {
+            if (phase != LabPhase.Playing || !players.ContainsKey(owner) || !(seconds >= 0f) || float.IsInfinity(seconds)
+                || !orbs.TryGetValue(orbId ?? string.Empty, out LabOrbState orb) || orb.owner != owner || orb.inFlight
+                || orb.kind == LabOrbKind.Bomb && orb.lockSwipes > 0) return false;
+            if (!TryAdvance(now, out _) || !orbs.TryGetValue(orbId, out orb)) return false;
+            orb.expiresAt = now + seconds;
+            orb.revision = ++revision;
+            return true;
+        }
+
+        /// <summary>
         /// 5단계: the gourd drops a bomb with exactly <paramref name="lockSwipes"/> locks on <paramref name="target"/>'s
         /// board at <paramref name="landing"/> (0..1), the same way as its random bombs (#177): it is reported once
         /// through <see cref="DrainGourdBombs"/>, so the warning, the yokai's throw and the fall from above all play.

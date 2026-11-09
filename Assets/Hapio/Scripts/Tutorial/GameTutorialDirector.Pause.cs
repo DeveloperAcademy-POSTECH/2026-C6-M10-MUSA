@@ -36,7 +36,7 @@ namespace Hapio
         private void PressPause()
         {
             Button pause = hud != null ? hud.pauseButton : null;
-            if (pause == null || !pause.isActiveAndEnabled || !pause.interactable || finishing || skipOpen) return;
+            if (pause == null || !pause.isActiveAndEnabled || !pause.interactable || finishing || skipOpen || logOpen) return;
             pause.onClick.Invoke();
         }
 

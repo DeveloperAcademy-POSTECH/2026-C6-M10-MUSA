@@ -170,24 +170,11 @@ namespace Hapio.Tests
             yield return Until(() => !network.IsBattlePaused && !director.IsSteppedAsideForPause, "Back from the pause menu", 10f);
             Assert.That((overlayGroup.alpha, overlayGroup.blocksRaycasts), Is.EqualTo((1f, true)));
             Assert.That(director.IsShowingLine, Is.True, "The same line again.");
-            // #536: only the bubble moves a line on. A tap anywhere else keeps the board still, moves nothing on and makes
-            // the ▽ jump once to show where to tap.
-            var blocker = director.GetComponentsInChildren<UnityEngine.UI.Button>(true).Single(button => button.name == "Screen Blocker");
-            var bubbleRect = director.GetComponentsInChildren<RectTransform>(true).Single(rect => rect.name == "Bubble");
-            yield return Until(() => director.IsShowingTapHint, "The ▽ is up", 2f);
-            Rect area = ScreenRect(tap.GetComponent<RectTransform>()), drawn = ScreenRect(bubbleRect);
-            float pad = art.lineTapPadding * overlayGroup.GetComponent<Canvas>().scaleFactor;
-            Assert.That(area.xMin, Is.EqualTo(drawn.xMin - pad).Within(1f), "The bubble and a little around it, no more.");
-            Assert.That(area.yMax, Is.EqualTo(drawn.yMax + pad).Within(1f));
-            Assert.That(area.width, Is.LessThan(Screen.width * .9f), "Not the whole screen any more.");
-            int missed = director.ScreenTapsOffBubble;
-            blocker.onClick.Invoke();
-            Assert.That((director.StepIndex, director.BeatIndex), Is.EqualTo((0, 1)), "A tap off the bubble moves nothing on.");
-            Assert.That(director.ScreenTapsOffBubble, Is.EqualTo(missed + 1));
-            Assert.That(director.IsNudgingTapHint, Is.True, "The ▽ jumps to show where to tap.");
+            // #552 (undoing #536): a tap anywhere on the screen moves a line on, and the board stays still under it.
+            Rect tapArea = ScreenRect(tap.GetComponent<RectTransform>());
+            Assert.That(tapArea.width, Is.EqualTo(Screen.width).Within(1f), "The whole screen across.");
+            Assert.That(tapArea.height, Is.EqualTo(Screen.height).Within(1f), "And from top to bottom.");
             Assert.That(board.AllowedGestures, Is.EqualTo(LabBoardGestures.None), "The board stays still under the line.");
-            yield return new WaitForSecondsRealtime(art.tapHintNudgeSeconds + .05f);
-            Assert.That(director.IsNudgingTapHint, Is.False, "Once.");
             for (int line = 2; line < lines; line++)
             {
                 Assert.That(director.StepIndex, Is.EqualTo(0));
@@ -365,6 +352,36 @@ namespace Hapio.Tests
             Assert.That(director.CurrentBeat.Focus, Is.EqualTo(GameTutorialFocus.Minimap), "Still lit as 불이 answers.");
             yield return TapThrough(director, tap, art);
 
+            // #552: "어? 구슬이 빛나는데?" — the yin left from 2단계 starts its last flashes and keeps glowing while the line is up.
+            Assert.That(director.CurrentBeat.Cue, Is.EqualTo(GameTutorialCue.OrbGlow));
+            Assert.That(director.CurrentBeat.Focus, Is.EqualTo(GameTutorialFocus.FadingOrb), "Only that orb is lit.");
+            string fading = director.FadeDemoOrbId;
+            Assert.That(fading, Is.Not.Null, "An orb was picked for the demo.");
+            Assert.That(network.Snapshot.orbs.Single(orb => orb.id == fading).kind, Is.EqualTo(LabOrbKind.Yin), "The yin left from 2단계.");
+            string keptYang = network.Snapshot.orbs.Single(orb => orb.owner == network.LocalPlayerId && orb.kind == LabOrbKind.Yang).id;
+            LabOrbView fadingView = Object.FindObjectsByType<LabOrbView>(FindObjectsSortMode.None).Single(view => view.OrbId == fading);
+            yield return new WaitForSecondsRealtime(4f);
+            Assert.That(network.Snapshot.orbs.Any(orb => orb.id == fading), Is.True, "Read slowly, it is still there.");
+            Assert.That(fadingView.ExpiryWarning, Is.True, "Flashing white like an orb in its last seconds (#235).");
+            string vanished = null;
+            board.OrbVanished += id => vanished = id;
+            yield return TapThrough(director, tap, art);
+
+            // "…빛이 나기 시작하면 곧 없어져!" — it runs out in smoke; the line waits for that.
+            Assert.That(director.CurrentBeat.Cue, Is.EqualTo(GameTutorialCue.OrbVanish));
+            yield return new WaitForSecondsRealtime(art.tapCooldown + .05f);
+            tap.onClick.Invoke();
+            Assert.That(director.CurrentBeat.Cue, Is.EqualTo(GameTutorialCue.OrbVanish), "No moving on before it has gone.");
+            yield return Until(() => vanished == fading, "It goes up in smoke like a real run-out", 8f);
+            Assert.That(director.FadeDemoGone, Is.True);
+            Assert.That(network.Snapshot.orbs.Any(orb => orb.id == keptYang), Is.True, "The yang is untouched: nothing else runs out.");
+            yield return new WaitForSecondsRealtime(art.popSeconds);
+            yield return TapThrough(director, tap, art);
+            Assert.That(director.CurrentBeat.Focus, Is.EqualTo(GameTutorialFocus.None));
+            yield return TapThrough(director, tap, art);
+            Assert.That(director.CurrentBeat.Speaker, Is.EqualTo(GameTutorialSpeaker.Bul), "\"오호! 알겠어\"");
+            yield return TapThrough(director, tap, art);
+
             // 5단계: the gourd drops a two-lock bomb; I push it right to 금옥이, she sends it back unlocked and it opens
             // into two elemental orbs on my board.
             Assert.That(director.StepIndex, Is.EqualTo(5));
@@ -426,6 +443,19 @@ namespace Hapio.Tests
             for (int line = 0; line < 4; line++) yield return TapThrough(director, tap, art);
             Assert.That(director.CurrentBeat.Action, Is.EqualTo(GameTutorialAction.PassDrumLeft));
             Assert.That(board.AllowedGestures, Is.EqualTo(LabBoardGestures.DrumMove), "Only the drum moves.");
+
+            // 기록 opens in the middle of an action: the board stops, and closing hands the same action back (the push below uses it).
+            var logOpener = director.GetComponentsInChildren<UnityEngine.UI.Button>(true).Single(button => button.name == "Log Button");
+            var logCloser = director.GetComponentsInChildren<UnityEngine.UI.Button>(true).Single(button => button.name == "Log Back");
+            logOpener.onClick.Invoke();
+            Assert.That(director.IsDialogueLogOpen, Is.True, "기록 opens during an action.");
+            Assert.That(board.AllowedGestures, Is.EqualTo(LabBoardGestures.None), "The board stops behind the log.");
+            yield return new WaitForSecondsRealtime(art.dimFadeSeconds + .1f);
+            Assert.That(director.IsWaitingForAction, Is.True, "The action is still to do.");
+            logCloser.onClick.Invoke();
+            yield return Until(() => !director.IsDialogueLogOpen, "뒤로 가기 during the action", 2f);
+            Assert.That(director.CurrentBeat.Action, Is.EqualTo(GameTutorialAction.PassDrumLeft), "The same action again.");
+            Assert.That(board.AllowedGestures, Is.EqualTo(LabBoardGestures.DrumMove), "The same gestures again.");
             int bounces = board.BlockBounces;
             yield return FlickDrum(board, 1f);
             yield return Until(() => board.BlockBounces > bounces, "Pushed right, the drum bounces off the red edge", 5f);
@@ -434,6 +464,14 @@ namespace Hapio.Tests
             yield return new WaitForSecondsRealtime(1.5f);
             if (director.IsWaitingForAction) yield return FlickDrum(board, -1f);
             yield return Until(() => !director.IsWaitingForAction, "The drum reaches 묵이", 10f);
+
+            // Behind the log the tutorial's clock stops: 성공! outlasts its own wait, and the next line comes after closing.
+            logOpener.onClick.Invoke();
+            Assert.That(director.IsDialogueLogOpen, Is.True, "기록 opens over 성공!.");
+            yield return new WaitForSecondsRealtime(art.afterActionSeconds + .3f);
+            Assert.That(director.CurrentBeat.Action, Is.EqualTo(GameTutorialAction.PassDrumLeft), "성공! waits behind the log.");
+            logCloser.onClick.Invoke();
+            yield return Until(() => !director.IsDialogueLogOpen, "뒤로 가기 over 성공!", 2f);
             Assert.That(network.Snapshot.drums[0].owner, Is.EqualTo(LabNetwork.TutorialLeftSeatId));
             yield return Until(() => board.BlockedSide == 0, "The block lifts once 묵이 has the drum", 2f);
             Assert.That(network.Snapshot.SwipeBlockOn(network.LocalPlayerId), Is.False);
@@ -441,6 +479,10 @@ namespace Hapio.Tests
             Assert.That(director.CurrentBeat.Speaker, Is.EqualTo(GameTutorialSpeaker.Muk));
             for (int line = 0; line < 5; line++) yield return TapThrough(director, tap, art);
             Assert.That(director.IsFinishing, Is.True, "\"가보자!\" ends the tutorial.");
+            // Every line said, in order, and only the script's lines: no remark, guide band or 성공!.
+            Assert.That(director.DialogueLog.Select(entry => (entry.Speaker, entry.Text)).ToArray(), Is.EqualTo(
+                GameTutorialScript.Steps.SelectMany(part => part.Beats).Where(said => said.IsLine)
+                    .Select(said => (said.Speaker, said.Text)).ToArray()), "The whole script, nothing else.");
             yield return Until(() => session.State.phase == GameFlowPhase.Home && !session.IsLoadingScene
                 && session.RoomBrowserVisible, "The tutorial leaves for the room list", 30f);
             Assert.That(session.IsTutorial, Is.False);
@@ -470,6 +512,119 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
+        public IEnumerator LinesMovedOnFromGoIntoTheLogAndItsButtonComesBesideSkip()
+        {
+            yield return SceneManager.LoadSceneAsync(GameScenePaths.Home, LoadSceneMode.Single);
+            yield return Until(() => GameSession.Instance != null && !GameSession.Instance.IsLoadingScene, "Saved Home bootstrap");
+            session = GameSession.Instance;
+            session.Network.port = AvailablePort();
+            yield return null;
+            Assert.That(session.TryStartTutorial(), Is.True);
+            GameTutorialDirector director = null;
+            yield return Until(() => (director = Object.FindFirstObjectByType<GameTutorialDirector>()) != null
+                && director.IsShowingLine, "The practice board plays its first line", 30f);
+            GameTutorialArt art = GameTutorialArt.Load();
+            var buttons = director.GetComponentsInChildren<UnityEngine.UI.Button>(true);
+            var tap = buttons.Single(button => button.name == "Tap To Continue");
+            var skip = buttons.Single(button => button.name == "Skip Button");
+            var log = buttons.Single(button => button.name == "Log Button");
+
+            // The first line is only on the screen: nothing has been moved on from yet.
+            yield return new WaitForSecondsRealtime(art.tapCooldown + .05f);
+            Assert.That(director.DialogueLog, Is.Empty);
+            Assert.That(log.gameObject.activeInHierarchy, Is.False, "No log, no button.");
+
+            tap.onClick.Invoke();
+            GameTutorialBeat[] lines = GameTutorialScript.Goal.Lines.ToArray();
+            Assert.That(director.DialogueLog.Select(entry => (entry.Speaker, entry.Text)).ToArray(),
+                Is.EqualTo(new[] { (lines[0].Speaker, lines[0].Text) }), "The line just moved on from.");
+            yield return Until(() => director.LogButtonAlpha >= .999f && director.SkipButtonAlpha >= .999f,
+                "기록 fades in with 건너뛰기", art.skipFadeSeconds + 1f);
+            Rect skipRect = ScreenRect((RectTransform)skip.transform), logRect = ScreenRect((RectTransform)log.transform);
+            float scale = skipRect.width / art.skipButtonSize.x;
+            Assert.That(logRect.center.y, Is.EqualTo(skipRect.center.y).Within(1f), "Level with 건너뛰기.");
+            Assert.That(logRect.xMin - skipRect.xMax, Is.EqualTo(art.logButtonGap * scale).Within(1f), "Right beside it.");
+            Assert.That(logRect.height, Is.EqualTo(skipRect.height).Within(1f), "As tall as it.");
+            var logFrame = log.GetComponent<UnityEngine.UI.Image>();
+            var logLabel = log.GetComponentInChildren<UnityEngine.UI.Text>(true);
+            Assert.That(logFrame.sprite, Is.SameAs(skip.GetComponent<UnityEngine.UI.Image>().sprite), "The same frame as 건너뛰기.");
+            Assert.That(logFrame.type, Is.EqualTo(UnityEngine.UI.Image.Type.Sliced));
+            Assert.That(logLabel.text, Is.EqualTo("기록"));
+            Assert.That(logLabel.font, Is.SameAs(skip.GetComponentInChildren<UnityEngine.UI.Text>(true).font));
+
+            // A touch on it lands on the button, not on whatever moves the line on.
+            var hits = new System.Collections.Generic.List<UnityEngine.EventSystems.RaycastResult>();
+            log.GetComponentInParent<UnityEngine.UI.GraphicRaycaster>().Raycast(
+                new UnityEngine.EventSystems.PointerEventData(UnityEngine.EventSystems.EventSystem.current) { position = logRect.center }, hits);
+            Assert.That(hits.Count, Is.GreaterThan(0));
+            Assert.That(hits[0].gameObject, Is.SameAs(log.gameObject), "The button takes the touch.");
+
+            yield return new WaitForSecondsRealtime(art.tapCooldown + .05f);
+            tap.onClick.Invoke();
+            Assert.That(director.DialogueLog.Select(entry => entry.Text).ToArray(),
+                Is.EqualTo(new[] { lines[0].Text, lines[1].Text }), "Oldest first.");
+
+            // Pressing 기록: the screen darkens over everything and the tutorial waits, showing what has been said.
+            var dim = director.GetComponentsInChildren<RectTransform>(true).Single(rect => rect.name == "Log Screen");
+            var bar = dim.GetComponentInChildren<UnityEngine.UI.Scrollbar>(true);
+            var back = buttons.Single(button => button.name == "Log Back");
+            LabOrbBoard board = Object.FindFirstObjectByType<GameBattleBindings>().board;
+            log.onClick.Invoke();
+            Assert.That(director.IsDialogueLogOpen, Is.True);
+            yield return new WaitForSecondsRealtime(art.dimFadeSeconds + .1f);
+            Assert.That(dim.gameObject.activeInHierarchy, Is.True);
+            Assert.That(director.DialogueLogShownLines.ToArray(),
+                Is.EqualTo(new[] { GameTutorialScript.LogLine(lines[0].Text), GameTutorialScript.LogLine(lines[1].Text) }));
+            Assert.That(bar.gameObject.activeSelf, Is.False, "Two lines fit: no drag bar.");
+            Assert.That(board.AllowedGestures, Is.EqualTo(LabBoardGestures.None));
+
+            // A touch anywhere lands on the log, so the line behind stays where it was.
+            Rect screen = ScreenRect(dim);
+            hits.Clear();
+            dim.GetComponentInParent<UnityEngine.UI.GraphicRaycaster>().Raycast(
+                new UnityEngine.EventSystems.PointerEventData(UnityEngine.EventSystems.EventSystem.current) { position = new Vector2(screen.center.x, screen.height * .1f) }, hits);
+            Assert.That(hits.Count, Is.GreaterThan(0));
+            Assert.That(hits[0].gameObject, Is.SameAs(dim.gameObject), "The log takes the touch.");
+            int beat = director.BeatIndex;
+
+            // Nothing else starts under it, even from a finger already down when it opened.
+            int logged = director.DialogueLog.Count;
+            yield return new WaitForSecondsRealtime(art.tapCooldown + .05f);
+            tap.onClick.Invoke();
+            skip.onClick.Invoke();
+            buttons.Single(button => button.name == "Pause").onClick.Invoke();
+            yield return null;
+            Assert.That((director.BeatIndex, director.DialogueLog.Count), Is.EqualTo((beat, logged)), "The line stays.");
+            Assert.That(director.IsSkipDialogOpen, Is.False, "No skip dialog over the log.");
+            Assert.That(session.Network.IsBattlePaused, Is.False, "No pause menu over the log.");
+
+            // 뒤로 가기: closes and carries on from the same line.
+            back.onClick.Invoke();
+            yield return Until(() => !director.IsDialogueLogOpen, "뒤로 가기 closes the log", 2f);
+            Assert.That(dim.gameObject.activeInHierarchy, Is.False);
+            Assert.That(director.BeatIndex, Is.EqualTo(beat), "The same line again.");
+            Assert.That(director.IsShowingLine, Is.True);
+
+            // More lines than fit: it opens on the newest, and the drag bar shows.
+            for (int i = 2; i < lines.Length; i++)
+            {
+                yield return new WaitForSecondsRealtime(art.tapCooldown + .05f);
+                tap.onClick.Invoke();
+            }
+            Assert.That(director.DialogueLog.Count, Is.GreaterThan(art.logVisibleBars));
+            log.onClick.Invoke();
+            yield return new WaitForSecondsRealtime(art.dimFadeSeconds + .1f);
+            Assert.That(director.DialogueLogShownLines.Count(), Is.EqualTo(director.DialogueLog.Count));
+            Assert.That(bar.gameObject.activeSelf, Is.True, "Too many to fit: the drag bar shows.");
+            Assert.That(director.DialogueLogScroll, Is.EqualTo(0f).Within(.01f), "Opens at the newest line, at the bottom.");
+            bar.value = 1f;
+            yield return null;
+            Assert.That(director.DialogueLogScroll, Is.EqualTo(1f).Within(.01f), "The drag bar reaches the oldest line.");
+            back.onClick.Invoke();
+            yield return Until(() => !director.IsDialogueLogOpen, "Closed again", 2f);
+        }
+
+        [UnityTest]
         public IEnumerator SkippingAsksFirstThenLeavesForTheRoomList()
         {
             yield return SceneManager.LoadSceneAsync(GameScenePaths.Home, LoadSceneMode.Single);
@@ -492,6 +647,8 @@ namespace Hapio.Tests
             yield return Until(() => director.SkipButtonAlpha >= .999f, "건너뛰기 has faded in", art.skipFadeSeconds + 1f);
             skip.onClick.Invoke();
             Assert.That(director.IsSkipDialogOpen, Is.True, "It asks first.");
+            buttons.Single(button => button.name == "Log Button").onClick.Invoke();
+            Assert.That(director.IsDialogueLogOpen, Is.False, "기록 waits behind the skip dialog.");
             Assert.That(session.IsTutorial, Is.True, "Nothing is left yet.");
             LogAssert.Expect(LogType.Log, new System.Text.RegularExpressions.Regex("^C6_LAB_TUTORIAL_SKIP step=0 beat=1$"));
             leave.onClick.Invoke();
@@ -520,9 +677,12 @@ namespace Hapio.Tests
             yield return new WaitForSecondsRealtime(art.tapCooldown + .05f);
             buttons.Single(button => button.name == "Tap To Continue").onClick.Invoke();
             Assert.That(first.BeatIndex, Is.EqualTo(1));
+            Assert.That(first.DialogueLog.Count, Is.EqualTo(1));
             yield return null;
             buttons.Single(button => button.name == "Pause").onClick.Invoke();
             yield return Until(() => session.Network.IsBattlePaused && first.IsSteppedAsideForPause, "Paused", 5f);
+            buttons.Single(button => button.name == "Log Button").onClick.Invoke();
+            Assert.That(first.IsDialogueLogOpen, Is.False, "기록 waits behind the pause menu.");
 
             // RESTART sits where QUIT RUN was; QUIT RUN moves one row down into the hidden DEV row.
             LabHud hud = Object.FindFirstObjectByType<GameBattleBindings>().hud;
@@ -543,6 +703,7 @@ namespace Hapio.Tests
             yield return Until(() => (again = Object.FindFirstObjectByType<GameTutorialDirector>()) != null && again != first
                 && again.IsShowingLine, "The practice board opens again on its first line", 30f);
             Assert.That((again.StepIndex, again.BeatIndex), Is.EqualTo((0, 0)), "From the very start.");
+            Assert.That(again.DialogueLog, Is.Empty, "The log starts over too.");
             Assert.That(session.IsTutorial, Is.True);
             Assert.That(session.Network.IsBattlePaused, Is.False, "Not paused any more.");
             Assert.That(session.Network.Snapshot.drums[0].owner, Is.EqualTo(session.Network.LocalPlayerId), "A fresh board.");

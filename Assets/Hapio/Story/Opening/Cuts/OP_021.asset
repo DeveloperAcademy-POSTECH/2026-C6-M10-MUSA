@@ -18,7 +18,7 @@ MonoBehaviour:
   - speaker: "\uC194\uC774"
     dialogue: "\uC7A0\uAE50! \uC74C\uAD6C\uC2AC\uACFC \uC591\uAD6C\uC2AC\uC744 \uD569\uCE58\uBA74\u2026\n\uC624\uD589\uAD6C\uC2AC\uC744 \uB9CC\uB4E4 \uC218 \uC788\uACA0\uC5B4!"
     autoReadSeconds: 5.35
-    voice: {fileID: 0}
+    voice: {fileID: 8300000, guid: 1d15df4b000940ecb273307729e8e017, type: 3}
   direction: 
   speaker: "\uC194\uC774"
   dialogue: "\uC7A0\uAE50! \uC74C\uAD6C\uC2AC\uACFC \uC591\uAD6C\uC2AC\uC744 \uD569\uCE58\uBA74\u2026\n\uC624\uD589\uAD6C\uC2AC\uC744 \uB9CC\uB4E4 \uC218 \uC788\uACA0\uC5B4!"

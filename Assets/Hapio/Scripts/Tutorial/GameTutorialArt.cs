@@ -54,10 +54,6 @@ namespace Hapio
         public Vector2 tapHintOffset = Vector2.zero;
         [Tooltip("위에서 아래로 내려가는 깊이")] [Min(0f)] public float tapHintDepth = 4f;
         [Tooltip("한 번 내려갔다 다시 올라오는 시간")] [Min(.2f)] public float tapHintSeconds = .8f;
-        [Tooltip("대사를 넘기는 곳: 말풍선과 그 사방 이만큼 (pt). 그 밖을 누르면 넘어가지 않고 ▽가 한 번 커졌다 돌아온다. 판은 대사 동안 계속 막힌다.")]
-        [Min(0f)] public float lineTapPadding = 8f;
-        [Tooltip("말풍선 밖을 눌렀을 때 ▽가 커지는 크기 (제 크기 1)")] [Min(1f)] public float tapHintNudgeScale = 1.35f;
-        [Tooltip("말풍선 밖을 눌렀을 때 ▽가 커졌다 돌아오는 시간")] [Min(.05f)] public float tapHintNudgeSeconds = .3f;
 
         [Header("말풍선 등장 (살짝 커졌다가 제자리)")]
         [Min(.01f)] public float popSeconds = .28f;
@@ -161,6 +157,28 @@ namespace Hapio
         [Tooltip("\"계속 배우기\"·\"건너뛰기\"에 손가락을 대고 있는 동안의 크기 (제 크기 1)")] [Min(1f)] public float skipChoicePressScale = 1.08f;
         [Tooltip("커지거나 돌아오는 데 걸리는 시간")] [Min(.01f)] public float skipChoicePressSeconds = .08f;
         [Tooltip("\"계속 배우기\"를 누른 뒤 창이 사라지는 시간 (빠르게)")] [Min(.01f)] public float skipCloseSeconds = .12f;
+
+        [Header("대화 기록 (#567)")]
+        [Tooltip("건너뛰기 옆 \"기록\" 버튼 크기. 그림과 글자 크기는 건너뛰기 버튼과 같고, 높이도 같다.")] public Vector2 logButtonSize = new Vector2(54f, 30f);
+        [Tooltip("건너뛰기 버튼과 기록 버튼 사이")] [Min(0f)] public float logButtonGap = 6f;
+        [Tooltip("대화 기록 한 줄의 막대 그림")] public Sprite logBar;
+        [Tooltip("막대 하나의 크기")] public Vector2 logBarSize = new Vector2(321f, 55f);
+        [Tooltip("막대 사이")] [Min(0f)] public float logBarGap = 22f;
+        [Tooltip("한 번에 보이는 막대 수. 더 많으면 드래그 바로 움직인다.")] [Min(1)] public int logVisibleBars = 3;
+        [Tooltip("목록 위 끝이 화면 위에서 얼마나 내려와 있는지 (화면 높이 비율)")] [Range(0f, 1f)] public float logListTopFraction = .18f;
+        [Tooltip("막대 왼쪽 얼굴의 지름")] [Min(1f)] public float logFaceSize = 29f;
+        [Tooltip("막대 왼쪽 끝에서 얼굴 가운데까지")] public float logFaceCenterX = 33f;
+        [Tooltip("막대 위 끝에서 얼굴 위 끝까지")] public float logFaceTop = 7f;
+        [Min(6)] public int logNameFontSize = 11;
+        [Min(6)] public int logTextFontSize = 15;
+        [Tooltip("긴 대사가 2줄에 들어가도록 줄어드는 가장 작은 글자 크기")] [Min(6)] public int logMinTextFontSize = 11;
+        [Tooltip("대사 글자 칸이 막대 왼쪽 끝에서 떨어지는 거리 (얼굴을 비킨다)")] [Min(0f)] public float logTextLeft = 58f;
+        [Tooltip("긴 대사의 글자 칸이 막대 오른쪽 끝에서 떨어지는 거리")] [Min(0f)] public float logTextRight = 16f;
+        [Tooltip("막대 오른쪽 끝과 드래그 바 사이")] [Min(0f)] public float logHandleGap = 7f;
+        [Tooltip("드래그 바의 보이는 두께")] [Min(1f)] public float logHandleWidth = 6f;
+        [Tooltip("드래그 바를 잡을 수 있는 폭 (보이는 두께보다 넓게)")] [Min(1f)] public float logHandleTouchWidth = 24f;
+        public Color logHandleColor = new Color(.906f, .737f, .573f, 1f);
+        [Tooltip("목록 아래 끝과 \"뒤로 가기\" 버튼 위 끝 사이")] [Min(0f)] public float logBackGap = 45f;
 
         [Header("화살표 (끌어 놓을 방향)")]
         public Color arrowColor = new Color(.36f, .66f, .29f, 1f);

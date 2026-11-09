@@ -40,9 +40,6 @@ MonoBehaviour:
   tapHintOffset: {x: 0, y: 5}
   tapHintDepth: 4
   tapHintSeconds: 0.8
-  lineTapPadding: 8
-  tapHintNudgeScale: 1.35
-  tapHintNudgeSeconds: 0.3
   popSeconds: 0.28
   popOvershoot: 1.1
   dimColor: {r: 0, g: 0, b: 0, a: 0.62}
@@ -104,7 +101,7 @@ MonoBehaviour:
   skipPanelSize: {x: 336, y: 172}
   skipPanelTopFraction: 0.4
   skipTitleFontSize: 21
-  skipBodyFontSize: 14
+  skipBodyFontSize: 16
   skipChoiceSize: {x: 120, y: 48}
   skipChoiceGap: 12
   skipChoiceDrop: 10
@@ -112,6 +109,26 @@ MonoBehaviour:
   skipChoicePressScale: 1.08
   skipChoicePressSeconds: 0.08
   skipCloseSeconds: 0.12
+  logButtonSize: {x: 54, y: 30}
+  logButtonGap: 6
+  logBar: {fileID: 21300000, guid: 49b891b66fe7343c8bd85550200b5bd2, type: 3}
+  logBarSize: {x: 321, y: 55}
+  logBarGap: 22
+  logVisibleBars: 3
+  logListTopFraction: 0.18
+  logFaceSize: 29
+  logFaceCenterX: 33
+  logFaceTop: 7
+  logNameFontSize: 11
+  logTextFontSize: 15
+  logMinTextFontSize: 11
+  logTextLeft: 58
+  logTextRight: 16
+  logHandleGap: 7
+  logHandleWidth: 6
+  logHandleTouchWidth: 24
+  logHandleColor: {r: 0.906, g: 0.737, b: 0.573, a: 1}
+  logBackGap: 45
   arrowColor: {r: 0.36, g: 0.66, b: 0.29, a: 1}
   arrowWidth: 7
   arrowHeadLength: 18

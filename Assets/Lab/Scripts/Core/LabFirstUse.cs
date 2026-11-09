@@ -6,7 +6,7 @@ namespace C6Lab
     /// <summary>Work that can stall the frame it first runs in (#481). Numbers index arrays; append only.</summary>
     public enum LabFirstUseKind
     {
-        BrushDistance, PatternMask, BrushLoad, Projectile, BattleMusic, FeverMusic, RewardFire, Sound
+        BrushDistance, PatternMask, BrushLoad, Projectile, BattleMusic, FeverMusic, RewardFire, Sound, RenderWarmup
     }
 
     /// <summary>
@@ -15,13 +15,14 @@ namespace C6Lab
     /// </summary>
     public static class LabFirstUse
     {
-        public const int KindCount = 8;
+        public const int KindCount = 9;
         private static readonly ProfilerMarker[] Markers =
         {
             new ProfilerMarker("Hapio.FirstUse.BrushDistance"), new ProfilerMarker("Hapio.FirstUse.PatternMask"),
             new ProfilerMarker("Hapio.FirstUse.BrushLoad"), new ProfilerMarker("Hapio.FirstUse.Projectile"),
             new ProfilerMarker("Hapio.FirstUse.BattleMusic"), new ProfilerMarker("Hapio.FirstUse.FeverMusic"),
             new ProfilerMarker("Hapio.FirstUse.RewardFire"), new ProfilerMarker("Hapio.FirstUse.Sound"),
+            new ProfilerMarker("Hapio.FirstUse.RenderWarmup"),
         };
         private static readonly int[] Counts = new int[KindCount];
         private static int flags, flagsFrame = -1;
