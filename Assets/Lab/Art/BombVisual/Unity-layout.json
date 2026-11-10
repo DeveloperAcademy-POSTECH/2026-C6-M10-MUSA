@@ -1,0 +1,111 @@
+{
+  "canvas": {
+    "width": 130,
+    "height": 130
+  },
+  "coordinateSystem": "Figma: top-left origin, y down",
+  "parts": [
+    {
+      "file": "BombBody.png",
+      "x": 0,
+      "y": 26,
+      "width": 104,
+      "height": 104
+    },
+    {
+      "file": "BombFuse.svg",
+      "x": 73,
+      "y": 16,
+      "width": 48,
+      "height": 32
+    },
+    {
+      "file": "BombCap.png",
+      "x": 52,
+      "y": 16,
+      "width": 56,
+      "height": 56
+    },
+    {
+      "file": "BombFlame.png",
+      "x": 91,
+      "y": 7,
+      "width": 38,
+      "height": 38
+    },
+    {
+      "file": "BombCountN.png",
+      "x": 0,
+      "y": 26,
+      "width": 104,
+      "height": 104
+    }
+  ],
+  "files": [
+    {
+      "file": "Parts/BombBody.png",
+      "width": 1300,
+      "height": 1300
+    },
+    {
+      "file": "Parts/BombCap.png",
+      "width": 1300,
+      "height": 1300
+    },
+    {
+      "file": "Parts/BombCount1.png",
+      "width": 1300,
+      "height": 1300
+    },
+    {
+      "file": "Parts/BombCount2.png",
+      "width": 1300,
+      "height": 1300
+    },
+    {
+      "file": "Parts/BombCount3.png",
+      "width": 1300,
+      "height": 1300
+    },
+    {
+      "file": "Parts/BombCount4.png",
+      "width": 1300,
+      "height": 1300
+    },
+    {
+      "file": "Parts/BombFlame.png",
+      "width": 512,
+      "height": 512
+    },
+    {
+      "file": "Parts/BombFuse.png",
+      "width": 192,
+      "height": 128
+    },
+    {
+      "file": "Previews/BombVisual-1.png",
+      "width": 1300,
+      "height": 1300
+    },
+    {
+      "file": "Previews/BombVisual-2.png",
+      "width": 1300,
+      "height": 1300
+    },
+    {
+      "file": "Previews/BombVisual-3.png",
+      "width": 1300,
+      "height": 1300
+    },
+    {
+      "file": "Previews/BombVisual-4.png",
+      "width": 1300,
+      "height": 1300
+    },
+    {
+      "file": "Previews/BombVisual-Unlocked.png",
+      "width": 1300,
+      "height": 1300
+    }
+  ]
+}

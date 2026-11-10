@@ -33,6 +33,7 @@ MonoBehaviour:
   potionIcon: {fileID: 2800000, guid: d10f9e33aeb5d4549ac370bcca69ebb9, type: 3}
   bombIcon: {fileID: 2800000, guid: 12eb816e530194e729ba85ad40d0bae1, type: 3}
   bombArt: {fileID: 2800000, guid: 12eb816e530194e729ba85ad40d0bae1, type: 3}
+  bombVisualPrefab: {fileID: 5932086584214255254, guid: 03211d02bce804f05b1f11bdf93ecd78, type: 3}
   bombFuseArt: {fileID: 2800000, guid: 9f1c70eef1f064956be0a925a20d72fe, type: 3}
   bombBodySize: 1.2
   bombFuseCanvasSize: 2.044
@@ -57,7 +58,7 @@ MonoBehaviour:
   bombWarningSeconds: 3
   bombWarningSlowHz: 2
   bombWarningFastHz: 8
-  bombWarningColor: {r: 1, g: 0.12, b: 0.08, a: 1}
+  bombWarningColor: {r: 0.49803922, g: 0.10980392, b: 0.050980393, a: 1}
   expiryWarningSeconds: 3
   expiryFlashStartHz: 1.5
   expiryFlashFastHz: 7

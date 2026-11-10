@@ -152,6 +152,14 @@ namespace C6Lab
         private void SpawnBoardCopies(LabOrbAppearance appearance)
         {
             int layer = LayerMask.NameToLayer("LabOrbBoard");
+            if (appearance.BombVisualPrefab != null)
+            {
+                LabBombVisual bomb = Instantiate(appearance.BombVisualPrefab);
+                bomb.ShowCount("4");
+                bomb.SetLit(true);
+                bomb.Pose(appearance.BombCapAngle, 1f, appearance.BombCapAngle, 1f);
+                AddBoardCopy(bomb.gameObject, layer);
+            }
             Sprite sprite = appearance.SpriteFor(LabOrbKind.Yin);
             if (sprite != null)
             {

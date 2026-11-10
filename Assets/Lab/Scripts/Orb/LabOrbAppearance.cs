@@ -39,6 +39,8 @@ namespace C6Lab
         [Tooltip("The cartoon bomb's ball without its cap and fuse; its highlight stays put like a light. " +
             "Empty = the round item look with the bomb icon and padlock.")]
         [SerializeField] private Texture2D bombArt;
+        [Tooltip("Optional assembled art; receives existing marker state, with no gameplay logic.")]
+        [SerializeField] private LabBombVisual bombVisualPrefab;
         [Tooltip("The bomb's cap on a square canvas centred on the ball. It rolls around the ball in 3D as the bomb " +
             "moves; the rope and its burning spark are drawn in code on top of it (#212).")]
         [SerializeField] private Texture2D bombFuseArt;
@@ -209,6 +211,7 @@ namespace C6Lab
         public bool BlastFireHalo => blastFireHalo;
         public bool BlastFireEmbers => blastFireEmbers;
         public Texture2D BombArt => bombArt;
+        public LabBombVisual BombVisualPrefab => bombVisualPrefab;
         public Texture2D BombFuseArt => bombFuseArt;
         public float BombBodySize => bombBodySize > 0f ? bombBodySize : 1.2f;
         public float BombFuseCanvasSize => bombFuseCanvasSize > 0f ? bombFuseCanvasSize : 2.044f;
