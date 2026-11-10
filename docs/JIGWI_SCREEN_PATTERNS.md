@@ -172,7 +172,7 @@ Cue를 늘리면 전체 음성이 더 일찍 시작하며, 실제 A/B 발동 시
 |`Assets/Lab/Resources/Jigwi/ScreenFireCurtainStage2.png` / `ScreenFireCurtainStage1.png`|2026-10-28 built-in image_gen으로3단계 원본을 기준으로 추가 생성. 각1484×1060 RGBA·픽셀 수정 없이 복사. 프롬프트는12절|
 |`Assets/Lab/Resources/Jigwi/PatternAudio/JigwiA.wav` / `JigwiB.wav`|사용자 제공 A/B 원본 복사. 각각2.000초/3.760초·2ch·48000Hz. 음성 예고용이며 원본 hash 일치는 VALIDATION에 기록|
 |`Assets/Lab/Resources/Jigwi/PatternAudio/PatternAudioProfile.asset`|전용 클립·외침 후보 위치·개별 음량의 로컬 Inspector 자료|
-|`Assets/Lab/Resources/Jigwi/GroupFireLoop.wav`|사용자 제공 `612277__robinhood76__10835-big-fire-loop.wav` 원본 복사.13.5초·2ch·44100Hz. 외부 출처/라이선스 메타데이터는 추정하지 않음|
+|~~`Assets/Lab/Resources/Jigwi/GroupFireLoop.wav`~~|#602에서 삭제. 원본 `612277__robinhood76__10835-big-fire-loop.wav`의 라이선스를 확인하지 못했다. `LabJigwiGroupFireAudio`는 클립이 없으면 소리를 내지 않는다|
 |`Assets/Lab/Resources/Jigwi/ScreenFlame.shader`|Canvas용 alpha blend/clip/stencil/색상, Resources 포함. 전투 clock으로만 흔들리며 Pause 때 고정|
 
 물 생성 프롬프트(원문):

@@ -1,5 +1,36 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-10 — 플레이어별 칠 무늬 기본 OFF
+
+- **기준:** `feat/remove-player-paint-patterns`, 커밋 `a4ac0f04`(main `11cb2d6d` 위). Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 설정 259개·접속 묶음은 그대로다.
+- **바꾼 것:** `LabConfig.playerPaintPatternsEnabled` 코드 기본값과 `LabConfig.asset`을 끔으로, config가 없을 때도 끔으로 보게 했다(`LabHud`, `LabGourdPaint`). `Hapio/Upgrade Menu DEV Rows`로 Home·Lobby 저장 DEV 행을 다시 저장했다. 137행과 함께, 저장 행이 에셋과 달랐던 213행(야광귀 고유 첫 예고 15 → 에셋 10)도 맞춰졌다. 흰 박 마운트 골든은 `GOURD_GOLDEN_RECORD=1`로 다시 기록했고 `_PlayerPaintPatternsEnabled` 한 줄만 바뀌었다. 기본값을 전제로 하던 검사 13건은 기본값 검사를 끔으로 바꾸고, 무늬 기능 검사는 DEV로 켜고 돌리게 고쳤다.
+
+| 확인 | 결과 |
+| --- | --- |
+| 수정 전·후 Mac 개발 빌드, 같은 칠의 1스테이지 전투 화면 | 후: 플레이어 원 오른쪽 아래 무늬 표시 없음, 박 표면 P1 점무늬 없음 |
+| 관련 EditMode(무늬·클러스터·건조 설정) | 38/38 PASS |
+| 관련 PlayMode(무늬 UI·렌더, DEV 무늬, 완성 박 관람, 흰 박 골든, 스테이지 박) | 21/21 PASS |
+| 전체 EditMode / 전체 PlayMode(`a4ac0f04`) | 2168/2168, 741/754 |
+
+- PlayMode 실패 13건(지귀 A/B 8건, 터치 먹물 4건, 튜토리얼 기록 1건)은 이 변경 전 main `11cb2d6d`에서도 같게 실패했다(지귀는 `c68ca8c5`, 나머지 5건은 `11cb2d6d`에서 해당 fixture 실행). 이 변경은 고치지 않았다.
+- **미실행:** 실기기 화면, 멀티 게스트 화면, 2:2·3:3 방.
+
+## 2026-11-10 — 전투 상단 진행 막대가 100%에서 끝까지 차지 않던 문제
+
+- **기준:** `fix/battle-paint-bar-fill`, 커밋 `5e3b9982`. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 프리팹·Scene·접속 묶음·설정 수는 바꾸지 않았다.
+- **원인:** 채움 이미지 `DynamicFill`은 비율 유지(`m_PreserveAspect: 1`)로 저장돼 있다. 그림은 466×59(약 7.9:1)인데 새 전투 UI가 236×21(약 11.2:1) 틀에 넣어, 높이 21에 맞춘 약 166 폭만 왼쪽에 그려졌다. 100%가 틀의 약 70%까지만 찼고, 모든 값에서 막대가 숫자의 약 0.7배로 보였다. 숫자와 `fillAmount`는 같은 칠 칸 수에서 계산돼 맞았다.
+- **바꾼 것:** `GameBattleUiPresentation`이 채움을 새 틀에 넣을 때 비율 유지를 끈다. 튜토리얼과 독립 Lab은 이 경로를 타지 않는다.
+
+| 확인 | 결과 |
+| --- | --- |
+| 수정 전 Mac 개발 빌드 화면(채움 100%·50%) | 100%가 틀의 약 70%, 50%가 약 35%에서 멈춤. 비율 유지를 끄면 100%가 끝까지 참 |
+| 새 PlayMode `GameBattlePaintBarTests`(실제로 그려지는 폭) | PASS. 수정을 되돌리면 폭 165.9(틀 236)로 실패 |
+| 전체 EditMode / 전체 PlayMode(`5e3b9982`, main 병합 전) | 2160/2160, 734/742 |
+| main `a530f423` 병합 뒤 `GameBattlePaintBarTests`·`GameSceneFlowTests` | 30/30 PASS(`GameBattleUiPresentationTests` 포함) |
+
+- 전체 PlayMode 실패 8건(`LabJigwiABNetworkTests` 7건, `GameJigwiStageIntegrationTests` 1건)은 이 변경 전 main `c68ca8c5`에서도 같은 8건이 실패했다(같은 두 fixture를 그 커밋에서 실행, 2/10 PASS). 이 PR은 고치지 않았다.
+- **미실행:** 실기기 화면, 멀티 게스트 화면.
+
 ## 2026-11-10 — #603 튜토리얼·인게임 일시정지
 
 - Figma `wW7ny7lNQ4DXNJ4kD46AuR`의 `4367:1930`, `4405:2780`, `4418:1593`(기본 `4418:1653`, 누름 `4418:1699`)을 Battle의 공용 일시정지 화면에 적용했다. 원본 SVG와 PNG는 `Assets/Hapio/Art/UI/Pause`에 저장했다. ShillaCultureBold를 재사용하고 402×874 기준 안전 영역 등비 스케일을 적용했다.
@@ -23,7 +54,6 @@
 - 원본: Figma `wW7ny7lNQ4DXNJ4kD46AuR`, 기존 `4405:3339`, 불이 `4379:1991`, 금옥이 `4379:2004`. 이미지 5개는 `Assets/Hapio/Art/UI/GameOver`에 저장했다. 기존 ShillaCultureBold와 Capsule 에셋을 재사용한다. 버튼·대사·라벨 색은 시안의 DarkRed/500, PrimaryBrown/700, SecondaryLightIvory/100을 따른다.
 - Unity 6000.6.5f1에서 컴파일 및 장면 저장 성공. 저장 장면의 이미지 참조, 두 캐릭터의 배타적 표시, 100회 갱신 시 선택 고정, 홈 버튼 활성 조건, 기존 story/result 참조를 직접 검사해 통과했다.
 - 402×874 카메라 렌더에서 금옥이 화면을 확인했다. 안전 영역 기준 402×874 등비 축소를 적용했다. 전체 EditMode/PlayMode, 실제 네트워크 이탈·홈 클릭 및 모바일 실기기 검증은 아직 실행하지 않았다.
-
 
 ## 2026-11-09 — 결과 카드에서 내가 받은 칭호만 붉게 강조
 
@@ -7246,3 +7276,43 @@ EditMode 모델 검사 4개:
 main `33762faf`를 폭탄 브랜치에 병합했다. 같은 문서 끝에 추가된 main의 #581 기록과 #584 폭탄 기록이 충돌했으며 양쪽 내용을 모두 보존해 이어 붙였다. 코드·프리팹·에셋의 텍스트 충돌은 없었고, 자동 병합된 LabBattleRenderWarmup의 폭탄·클레이 복사본 준비를 함께 확인했다.
 
 Unity 6000.6.5f1 Editor 컴파일 오류 0. 병합 후 선택 PlayMode는 LabBombVisualTests 2개·GameBattleUiPresentationTests.SavedBattleThemeDrawsTheNewBombOnTheRealBoard 1개·GameBattleRenderWarmupTests 2개, **5/5 PASS**(실패·건너뜀 0, 7.61초). 전체 검사·실기기 검증은 추가 실행하지 않았다. 충돌 문서의 양쪽 원문 비어 있지 않은 모든 줄이 보존된 것을 대조했다. 문서 diff 검사는 통과했으며 main에서 가져온 Unity 오디오 meta의 기존 후행 공백은 변경하지 않았다.
+
+
+## 2026-11-10 — #605 방장 로비 Direct IP 주소·포트 표시 제거
+
+- 기준 main은 `11cb2d6d`다. #582가 추가한 런타임 주소 라벨·자리 배치 연결·1초 갱신과 전용 주소 수집/네이티브 선언을 제거했다. 주소 수집 전용 검사 14건도 해당 기능과 함께 제거했다. 기존 방 생성·Bonjour·LAN/핫스팟·Direct IP 접속과 접속 규약 5698/Lab59/Game48은 바꾸지 않았다.
+- Direct IP 창의 빈 포트 기본값과 범위 검증은 유지하고, 삭제된 방장 표시 줄을 가리키던 안내만 ‘방장의 IP 주소와 포트를 입력하시오’로 돌렸다. Scene·Prefab·원본 설정과 기존 자리 배치는 수정하지 않았다.
+- 실제 Unity Editor의 저장된 Home→방 목록→Host→Lobby를 실행했다. 390×844 GameView 화면 캡처에서 IP·포트 표시 줄 부재, 방 카드/P1~P3/시작 버튼의 기존 배치를 확인했다. 런타임 조회에서도 HostDirectAddress 객체 없음·입장 후 로비 Direct IP 버튼 비표시를 확인했다. 방 목록으로 돌아간 화면에는 기존 ‘직접 연결’ 버튼이 표시됨을 확인했다. 이는 #582 이전부터 있던 입장 전 기능이다. 캡처는 실제 화면이며 이미지 생성·후처리를 하지 않았다.
+
+![주소 줄을 제거한 실제 방장 로비](images/lobby/host-without-ip.png)
+
+| 검사 | 결과·근거 |
+| --- | --- |
+| 전체 EditMode | 2,152/2,154 통과, 실패2·skip0, 20.91초. 실패는 아래 기존 main 저장 DEV값 불일치다. |
+| 수정 없는 main EditMode 대조 | main `11cb2d6d`에서 MenuScreens 검사4건을 실행해 같은 Home·Lobby2건 실패 재현(2/4 통과). |
+| 전체 PlayMode | 741/754 통과, 실패13·skip0, 626.05초. 로비 동작 검사19/19 통과. |
+| 수정 없는 main PlayMode 대조 | 변경본에서 실패한 동일13건을 main `11cb2d6d`에서 실행해 13건 모두 실패 재현(0/13 통과, 8.28초). 실패 집합 동일. |
+| 로비 저장 자산 | 전체 EditMode 중 GameLobbyAssetTests 7/7 통과. |
+
+기존 main 실패2건: `GameSceneAssetTests.MenuScreens_HaveSavedEditableCanvasAndInput`의 Home·Lobby가 Setting198의 저장 입력값15와 `LabConfig.DeveloperSnapshot` 기대값10을 비교하다 실패한다. #586의 `ec5a353a`가 `teamFeverHits`를15→10으로 바꾸고 #591이 main에 반영했으나 저장 Scene의 입력값15가 남았다. 실제 DEV 진입은 세션 설정으로 입력/슬라이더를 갱신한다. 이번 변경에는 Scene·LabConfig·해당 검사 변경이 없고 실패를 삭제·skip·PASS 처리하지 않았다.
+
+미실행: iOS 실기기, 실제 여러 기기 Wi-Fi·핫스팟·수동 Direct IP 입장. 자동 입력 Join 요청 검사는 실제 원격 입장 성공과 구분한다.
+
+PlayMode의 기존 main 실패13건은 구형 지귀 A/B·특수 물구슬 검사7건, 현 지귀 스테이지 검사1건, 터치 먹물 검사4건, 튜토리얼 대화 기록 raycast 검사1건이다. 이번 변경에서 이 게임 코드·Scene·검사는 수정하지 않았다. 수정 없는 기준본에서도 동일한13개 테스트가 실패하는 것을 실행으로 확인했으며, 전체 검사 성공으로 기록하지 않는다. 이 범위 밖 실패를 이번 UI 제거에 섞어 고치지 않았다.
+
+### #607 2스테이지 작은 구슬 보이는 크기·스테이지 전환 로딩 화면 — 2026-11-10
+
+- 실제 게임의 원소 구슬은 기본 공을 숨기고 클레이 그림(`LabFiveElementVfx.BeginFlight`)으로 날아가며, 그 지름이 충돌 구체 크기를 따르고 있었다. 첫 수정은 기본 공만 키워 실제 게임에서는 여전히 안 보였고(사용자 확인), 클레이 지름도 보이는 크기(`FlightDiameter`)로 넘기게 고쳤다. 충돌·명중 자국 크기는 그대로다.
+- 콤보 실패(SMALL) 중 던진 구슬은 판정·칠 면적이 원래의 10%인 채로, 날아가는 동안 보이는 크기만 `LabConfig`의 Inspector 전용 `Thrown Orb Min Visible Scale`(기본 0.4)보다 작게 그리지 않는다. 0.4보다 큰 축소(폭발 0.5배·지귀 0.65배)는 이전과 같다. 공유 설정·통신 값은 바꾸지 않았다.
+- 전투로 들어가는 모든 전환(결과 → 다음 스테이지, 게임오버 → 같은 방 재도전, DEV 다음 스테이지)에 첫 전투와 같은 로딩 화면을 씌운다. "준비 n/m"을 띄우다 3·2·1 직전에 닫는다. 전투 → 결과·게임오버와 튜토리얼 시작은 그대로다.
+
+- #586 누락 보정: 2:2 피버 명중 수 저장값을 10으로 바꿀 때 Home·Lobby 장면의 DEV 198번 칸(입력·슬라이더)이 15로 남아 `GameSceneAssetTests.MenuScreens_HaveSavedEditableCanvasAndInput`(Home·Lobby)이 실패했다. 기존 메뉴 `Hapio/Upgrade Menu DEV Rows`로 두 장면을 맞췄고, 장면 변경은 그 칸의 15 → 10뿐이다.
+- 같은 EditMode 실행의 `LabOrbSpriteDesignTests`(5)·`GameBattleUiAssetTests`(2) 실패는 코드 문제가 아니었다. 이 프로젝트는 Play를 끌 때 도메인을 다시 불러오지 않아(Enter Play Mode Options), 전투 화면이 공용 `LabConfig`에 씌운 전투 구슬 테마(저장되지 않는 값)가 Play 뒤에도 메모리에 남았다. 스크립트를 다시 불러온 뒤 같은 조건을 Editor에서 다시 확인했을 때 모두 맞았다.
+| 확인 | 결과 |
+| --- | --- |
+| Unity 컴파일 | PASS |
+| 전환 규칙 (Editor eval: 결과 → 전투 표시, 전투 → 결과 미표시) | PASS |
+| 기본 공 보이는 크기 (Editor eval, 임시 장면) | PASS — SMALL 0.1배는 그림 0.40·판정 0.10, 폭발 0.5배·BIG 2.5배는 이전과 같음 |
+| 클레이 그림 지름 (`FlightDiameter`) | NOT_RUN — 코드만 고침. 편집 모드에서는 클레이 그림 풀이 만들어지지 않고, 측정하려던 때는 Editor가 Play 중이었음 |
+| EditMode·PlayMode Test Runner | NOT_RUN |
+| 3인 실행 (1→2→3스테이지, 재도전, SMALL 투척) | NOT_RUN |

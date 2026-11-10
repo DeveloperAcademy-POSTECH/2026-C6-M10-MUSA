@@ -52,7 +52,8 @@ namespace C6Lab.Tests
                 Assert.That(values.Skip(138).Take(2), Is.EqualTo(new[] { .85f, .25f }));
                 Assert.That(source.PaintRepeatPercent, Is.EqualTo(1.5f));
                 Assert.That(source.PaintGrowthPercentPerSecond, Is.EqualTo(6f));
-                Assert.That(source.CompletedGourdViewerEnabled && source.PlayerPaintPatternsEnabled, Is.True);
+                Assert.That(source.CompletedGourdViewerEnabled, Is.True);
+                Assert.That(source.PlayerPaintPatternsEnabled, Is.False);
                 Assert.That(source.PaintVictoryPercent, Is.EqualTo(100));
                 AssertSettingsMatch(source);
             }

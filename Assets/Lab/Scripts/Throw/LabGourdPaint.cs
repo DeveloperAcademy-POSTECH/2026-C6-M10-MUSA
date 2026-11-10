@@ -441,7 +441,7 @@ namespace C6Lab
                 || appliedWatercolorSettings != watercolorSettingsHash;
             bool pendingWatercolor = watercolor != null && watercolor.Error == null
                 && (watercolor.HasPendingWork || watercolor.IsAnimating || !watercolor.Ready);
-            bool playerPaintPatternsEnabled = config == null || config.PlayerPaintPatternsEnabled;
+            bool playerPaintPatternsEnabled = config != null && config.PlayerPaintPatternsEnabled;
             bool grainEnabled = config != null && config.PaintGrainEnabled;
             float grainSize = config != null ? config.PaintGrainSize : 1f;
             float grainStrength = config != null ? config.PaintGrainStrength : .3f;

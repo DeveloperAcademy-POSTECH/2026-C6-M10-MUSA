@@ -147,29 +147,29 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
-        public IEnumerator IndependentFeatureButtonsChangeOnlyTheDraftAndDefaultsRestoreBothOn()
+        public IEnumerator IndependentFeatureButtonsChangeOnlyTheDraftAndDefaultsRestoreAuthoredValues()
         {
             ui.Open();
             ui.panel.GetComponentsInChildren<Button>(true).Single(button => button.name == "Category Gourd")
                 .onClick.Invoke();
             Assert.That(LabConfig.DeveloperFields[ViewerField].Label, Is.EqualTo("Completed Gourd Viewer (0 off, 1 on)"));
             Assert.That(LabConfig.DeveloperFields[PlayerPatternsField].Label, Is.EqualTo("Player Paint Patterns (0 off, 1 on)"));
-            AssertFeatureConfig(ui.sourceConfig, true, true);
-            AssertFeatureDraft(true, true);
+            AssertFeatureConfig(ui.sourceConfig, true, false);
+            AssertFeatureDraft(true, false);
             Button viewerToggle = FeatureToggle(ViewerField), patternsToggle = FeatureToggle(PlayerPatternsField);
             Assert.That(viewerToggle.gameObject.activeInHierarchy, Is.True);
             Assert.That(patternsToggle.gameObject.activeInHierarchy, Is.True);
             viewerToggle.onClick.Invoke();
-            AssertFeatureDraft(false, true);
-            patternsToggle.onClick.Invoke();
             AssertFeatureDraft(false, false);
+            patternsToggle.onClick.Invoke();
+            AssertFeatureDraft(false, true);
             viewerToggle.onClick.Invoke();
-            AssertFeatureDraft(true, false);
-            AssertFeatureConfig(ui.network.config, true, true);
+            AssertFeatureDraft(true, true);
+            AssertFeatureConfig(ui.network.config, true, false);
             Assert.That(ui.network.Snapshot, Is.Null, "Changing feature buttons does not start a round.");
             ui.defaultsButton.onClick.Invoke();
-            AssertFeatureDraft(true, true);
-            AssertFeatureConfig(ui.network.config, true, true);
+            AssertFeatureDraft(true, false);
+            AssertFeatureConfig(ui.network.config, true, false);
             Assert.That(JsonUtility.ToJson(ui.sourceConfig), Is.EqualTo(sourceJson));
             yield return null;
         }
@@ -187,33 +187,33 @@ namespace C6Lab.Tests
 
             ui.Open();
             AssertFeatureDraft(false, true);
-            SetFeatureDraft(true, false);
+            SetFeatureDraft(true, true);
             AssertFeatureConfig(ui.network.config, false, true);
             ui.applyStartButton.onClick.Invoke();
             yield return null;
             Assert.That(ui.network.Snapshot.sessionId, Is.Not.EqualTo(firstSession));
             Assert.That(ui.network.Snapshot.phase, Is.EqualTo(LabPhase.Playing));
-            AssertFeatureConfig(ui.network.config, true, false);
+            AssertFeatureConfig(ui.network.config, true, true);
             string secondSession = ui.network.Snapshot.sessionId;
             Assert.That(ui.network.RestartDeveloperSolo(), Is.True, ui.network.Notice);
             yield return null;
             Assert.That(ui.network.Snapshot.sessionId, Is.Not.EqualTo(secondSession));
-            AssertFeatureConfig(ui.network.config, true, false);
+            AssertFeatureConfig(ui.network.config, true, true);
 
             ui.Open(); ui.defaultsButton.onClick.Invoke();
-            AssertFeatureDraft(true, true);
-            AssertFeatureConfig(ui.network.config, true, false);
+            AssertFeatureDraft(true, false);
+            AssertFeatureConfig(ui.network.config, true, true);
             string beforeDefaultsApply = ui.network.Snapshot.sessionId;
             ui.applyStartButton.onClick.Invoke();
             yield return null;
             Assert.That(ui.network.Snapshot.sessionId, Is.Not.EqualTo(beforeDefaultsApply));
-            AssertFeatureConfig(ui.network.config, true, true);
+            AssertFeatureConfig(ui.network.config, true, false);
             Assert.That(ui.network.PaintSurface.CoveredCount, Is.Zero);
             Assert.That(ui.network.PaintSurface.PaintCount, Is.Zero);
             ui.endSoloButton.onClick.Invoke();
             yield return null;
             Assert.That(ui.network.config, Is.SameAs(ui.sourceConfig));
-            AssertFeatureConfig(ui.network.config, true, true);
+            AssertFeatureConfig(ui.network.config, true, false);
             Assert.That(JsonUtility.ToJson(ui.sourceConfig), Is.EqualTo(sourceJson));
         }
 
@@ -255,7 +255,7 @@ namespace C6Lab.Tests
             ui.network.Stop();
             yield return null;
             Assert.That(ui.network.config, Is.SameAs(ui.sourceConfig));
-            AssertFeatureConfig(ui.network.config, true, true);
+            AssertFeatureConfig(ui.network.config, true, false);
         }
 
         private Button FeatureToggle(int field) => ui.valueInputs[field].transform.parent

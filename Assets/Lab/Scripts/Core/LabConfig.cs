@@ -683,6 +683,8 @@ namespace C6Lab
         [SerializeField, Range(0f, 30f)] private float comboPenaltyDurationSeconds = 15f;
         [Tooltip("페널티 중 던지는 공 반지름과 박에 칠해지는 면적에 곱하는 배율")]
         [SerializeField, Range(.01f, .19f)] private float comboPenaltySizeScale = .1f;
+        [Tooltip("던진 구슬이 날아갈 때 보이는 가장 작은 크기 (원래 크기 대비). 콤보 SMALL(0.1배)처럼 더 작아져도 이만큼은 보인다. 맞는 판정과 칠해지는 면적은 그대로다. Inspector 전용 (#607).")]
+        [SerializeField, Range(.05f, 1f)] private float thrownOrbMinVisibleScale = .4f;
         [Tooltip("페널티 대상. 팀 전체, 또는 틀린 색을 맞힌 사람만 (시간 초과는 언제나 팀 전체).")]
         [SerializeField] private bool comboPenaltyThrowerOnly;
         [Tooltip("콤보 성공 후 팀 전체의 공 크기/칠 면적이 커지는 시간 (초). 0이면 보상 없음.")]
@@ -769,8 +771,8 @@ namespace C6Lab
         [SerializeField, Range(1f, 90f)] private float paintNearbyHitRadiusDegrees = 20f;
         [Tooltip("Paint 100% 승리 뒤 모든 참가자에게 완성된 박의 로컬 관람을 허용한다. 새 판에 적용한다.")]
         [SerializeField] private bool completedGourdViewerEnabled = true;
-        [Tooltip("플레이어 P번호별 물감 무늬를 박과 HUD에 표시한다. 색칠·면적·승리 판정은 바꾸지 않으며 새 판에 적용한다.")]
-        [SerializeField] private bool playerPaintPatternsEnabled = true;
+        [Tooltip("플레이어 P번호별 물감 무늬를 박과 HUD에 표시한다. 기본은 끔이다. 색칠·면적·승리 판정은 바꾸지 않으며 새 판에 적용한다.")]
+        [SerializeField] private bool playerPaintPatternsEnabled = false;
         [Tooltip("줄이 스스로 늘고 줄어드는 폭(월드 단위). 0이면 주기 움직임을 끈다.")]
         [SerializeField, Range(0f, 1f)] private float gourdRopeCycleAmplitude = .45f;
         [Tooltip("줄이 한 번 늘었다 줄어드는 데 걸리는 시간(초).")]
@@ -1288,6 +1290,7 @@ namespace C6Lab
         public float ComboTimeLimitSeconds => Mathf.Clamp(Finite(comboTimeLimitSeconds, 15f), 1f, 600f);
         public float ComboPenaltyDurationSeconds => Mathf.Clamp(Finite(comboPenaltyDurationSeconds, 15f), 0f, 30f);
         public float ComboPenaltySizeScale => Mathf.Clamp(Finite(comboPenaltySizeScale, .1f), .01f, 1f);
+        public float ThrownOrbMinVisibleScale => Mathf.Clamp(Finite(thrownOrbMinVisibleScale, .4f), .05f, 1f);
         public bool ComboPenaltyThrowerOnly => comboPenaltyThrowerOnly;
         public float ComboRewardDurationSeconds => Mathf.Clamp(Finite(comboRewardDurationSeconds, 15f), 0f, 30f);
         public float ComboRewardSizeScale => Mathf.Clamp(Finite(comboRewardSizeScale, 2.5f), 1f, 4f);

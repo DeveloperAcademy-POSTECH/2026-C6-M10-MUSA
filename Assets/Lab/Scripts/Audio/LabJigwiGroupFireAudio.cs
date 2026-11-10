@@ -2,7 +2,11 @@ using UnityEngine;
 
 namespace C6Lab
 {
-    /// <summary>One local B-curtain loop. Presentation state never changes the battle or the shared clock.</summary>
+    /// <summary>
+    /// One local B-curtain loop. Presentation state never changes the battle or the shared clock.
+    /// #602: the GroupFireLoop clip was removed (licence unconfirmed), so with no clip assigned the old curtain B is silent.
+    /// Assign a cleared clip to <see cref="clip"/> (or put it back at <see cref="ClipResource"/>) to give it sound again.
+    /// </summary>
     [DisallowMultipleComponent]
     [RequireComponent(typeof(AudioSource))]
     public sealed class LabJigwiGroupFireAudio : MonoBehaviour
