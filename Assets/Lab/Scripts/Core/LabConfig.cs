@@ -683,6 +683,8 @@ namespace C6Lab
         [SerializeField, Range(0f, 30f)] private float comboPenaltyDurationSeconds = 15f;
         [Tooltip("페널티 중 던지는 공 반지름과 박에 칠해지는 면적에 곱하는 배율")]
         [SerializeField, Range(.01f, .19f)] private float comboPenaltySizeScale = .1f;
+        [Tooltip("던진 구슬이 날아갈 때 보이는 가장 작은 크기 (원래 크기 대비). 콤보 SMALL(0.1배)처럼 더 작아져도 이만큼은 보인다. 맞는 판정과 칠해지는 면적은 그대로다. Inspector 전용 (#607).")]
+        [SerializeField, Range(.05f, 1f)] private float thrownOrbMinVisibleScale = .4f;
         [Tooltip("페널티 대상. 팀 전체, 또는 틀린 색을 맞힌 사람만 (시간 초과는 언제나 팀 전체).")]
         [SerializeField] private bool comboPenaltyThrowerOnly;
         [Tooltip("콤보 성공 후 팀 전체의 공 크기/칠 면적이 커지는 시간 (초). 0이면 보상 없음.")]
@@ -1288,6 +1290,7 @@ namespace C6Lab
         public float ComboTimeLimitSeconds => Mathf.Clamp(Finite(comboTimeLimitSeconds, 15f), 1f, 600f);
         public float ComboPenaltyDurationSeconds => Mathf.Clamp(Finite(comboPenaltyDurationSeconds, 15f), 0f, 30f);
         public float ComboPenaltySizeScale => Mathf.Clamp(Finite(comboPenaltySizeScale, .1f), .01f, 1f);
+        public float ThrownOrbMinVisibleScale => Mathf.Clamp(Finite(thrownOrbMinVisibleScale, .4f), .05f, 1f);
         public bool ComboPenaltyThrowerOnly => comboPenaltyThrowerOnly;
         public float ComboRewardDurationSeconds => Mathf.Clamp(Finite(comboRewardDurationSeconds, 15f), 0f, 30f);
         public float ComboRewardSizeScale => Mathf.Clamp(Finite(comboRewardSizeScale, 2.5f), 1f, 4f);
