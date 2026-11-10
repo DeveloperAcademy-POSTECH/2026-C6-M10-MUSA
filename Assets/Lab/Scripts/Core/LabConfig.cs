@@ -769,8 +769,8 @@ namespace C6Lab
         [SerializeField, Range(1f, 90f)] private float paintNearbyHitRadiusDegrees = 20f;
         [Tooltip("Paint 100% 승리 뒤 모든 참가자에게 완성된 박의 로컬 관람을 허용한다. 새 판에 적용한다.")]
         [SerializeField] private bool completedGourdViewerEnabled = true;
-        [Tooltip("플레이어 P번호별 물감 무늬를 박과 HUD에 표시한다. 색칠·면적·승리 판정은 바꾸지 않으며 새 판에 적용한다.")]
-        [SerializeField] private bool playerPaintPatternsEnabled = true;
+        [Tooltip("플레이어 P번호별 물감 무늬를 박과 HUD에 표시한다. 기본은 끔이다. 색칠·면적·승리 판정은 바꾸지 않으며 새 판에 적용한다.")]
+        [SerializeField] private bool playerPaintPatternsEnabled = false;
         [Tooltip("줄이 스스로 늘고 줄어드는 폭(월드 단위). 0이면 주기 움직임을 끈다.")]
         [SerializeField, Range(0f, 1f)] private float gourdRopeCycleAmplitude = .45f;
         [Tooltip("줄이 한 번 늘었다 줄어드는 데 걸리는 시간(초).")]

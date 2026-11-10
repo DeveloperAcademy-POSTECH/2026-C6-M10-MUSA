@@ -462,7 +462,7 @@ namespace C6Lab
             Sprite art = LabPlayerPaintPatterns.SpriteFor(number);
             if (image.sprite != art) image.sprite = art;
             image.enabled = art != null;
-            bool patternsEnabled = network.config == null || network.config.PlayerPaintPatternsEnabled;
+            bool patternsEnabled = network.config != null && network.config.PlayerPaintPatternsEnabled;
             SetVisible(image.gameObject, visible && art != null && patternsEnabled);
         }
 

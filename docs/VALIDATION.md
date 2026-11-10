@@ -1,5 +1,20 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-10 — 플레이어별 칠 무늬 기본 OFF
+
+- **기준:** `feat/remove-player-paint-patterns`, 커밋 `a4ac0f04`(main `11cb2d6d` 위). Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 설정 259개·접속 묶음은 그대로다.
+- **바꾼 것:** `LabConfig.playerPaintPatternsEnabled` 코드 기본값과 `LabConfig.asset`을 끔으로, config가 없을 때도 끔으로 보게 했다(`LabHud`, `LabGourdPaint`). `Hapio/Upgrade Menu DEV Rows`로 Home·Lobby 저장 DEV 행을 다시 저장했다. 137행과 함께, 저장 행이 에셋과 달랐던 213행(야광귀 고유 첫 예고 15 → 에셋 10)도 맞춰졌다. 흰 박 마운트 골든은 `GOURD_GOLDEN_RECORD=1`로 다시 기록했고 `_PlayerPaintPatternsEnabled` 한 줄만 바뀌었다. 기본값을 전제로 하던 검사 13건은 기본값 검사를 끔으로 바꾸고, 무늬 기능 검사는 DEV로 켜고 돌리게 고쳤다.
+
+| 확인 | 결과 |
+| --- | --- |
+| 수정 전·후 Mac 개발 빌드, 같은 칠의 1스테이지 전투 화면 | 후: 플레이어 원 오른쪽 아래 무늬 표시 없음, 박 표면 P1 점무늬 없음 |
+| 관련 EditMode(무늬·클러스터·건조 설정) | 38/38 PASS |
+| 관련 PlayMode(무늬 UI·렌더, DEV 무늬, 완성 박 관람, 흰 박 골든, 스테이지 박) | 21/21 PASS |
+| 전체 EditMode / 전체 PlayMode(`a4ac0f04`) | 2168/2168, 741/754 |
+
+- PlayMode 실패 13건(지귀 A/B 8건, 터치 먹물 4건, 튜토리얼 기록 1건)은 이 변경 전 main `11cb2d6d`에서도 같게 실패했다(지귀는 `c68ca8c5`, 나머지 5건은 `11cb2d6d`에서 해당 fixture 실행). 이 변경은 고치지 않았다.
+- **미실행:** 실기기 화면, 멀티 게스트 화면, 2:2·3:3 방.
+
 ## 2026-11-10 — 전투 상단 진행 막대가 100%에서 끝까지 차지 않던 문제
 
 - **기준:** `fix/battle-paint-bar-fill`, 커밋 `5e3b9982`. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 프리팹·Scene·접속 묶음·설정 수는 바꾸지 않았다.

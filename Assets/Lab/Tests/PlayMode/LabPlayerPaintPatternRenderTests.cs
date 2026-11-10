@@ -64,6 +64,10 @@ namespace C6Lab.Tests
             LabPaintSurface surface = paint.Surface;
             var pixels = new Color32[surface.CellCount];
             var owners = new byte[surface.CellCount];
+            LabConfig saved = paint.network.config;
+            LabConfig enabled = EnablePlayerPaintPatterns(paint.network);
+            try
+            {
             using (var rig = new ShellRenderRig(paint))
             {
                 paint.ClearPaint();
@@ -132,6 +136,8 @@ namespace C6Lab.Tests
                 Assert.That(rig.Capture(paint, null), Is.EqualTo(neutral),
                     "Neutral owner 0 must remain exact after a frame without moving the shell or camera.");
             }
+            }
+            finally { RestoreConfig(paint, saved, enabled); }
         }
 
         [Category("GPU")]
@@ -148,6 +154,10 @@ namespace C6Lab.Tests
             LabPaintSurface surface = paint.Surface;
             var pixels = new Color32[surface.CellCount];
             var owners = new byte[surface.CellCount];
+            LabConfig saved = paint.network.config;
+            LabConfig enabled = EnablePlayerPaintPatterns(paint.network);
+            try
+            {
             using (var rig = new ShellRenderRig(paint))
             {
                 paint.ClearPaint();
@@ -186,6 +196,8 @@ namespace C6Lab.Tests
                     rig.SetOffset(Vector3.zero);
                 }
             }
+            }
+            finally { RestoreConfig(paint, saved, enabled); }
         }
 
         [Category("GPU")]
@@ -354,6 +366,27 @@ namespace C6Lab.Tests
                 network.config = saved;
                 Object.Destroy(config);
             }
+        }
+
+        /// <summary>
+        /// Player paint patterns default OFF (DEV 137). Feature render checks turn it ON on a
+        /// runtime copy so the Resources LabConfig asset is never mutated in Play Mode.
+        /// </summary>
+        private static LabConfig EnablePlayerPaintPatterns(LabNetwork network)
+        {
+            LabConfig copy = Object.Instantiate(network.config);
+            float[] values = copy.CaptureDeveloperValues();
+            values[137] = 1f;
+            Assert.That(copy.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            Assert.That(copy.PlayerPaintPatternsEnabled, Is.True);
+            network.config = copy;
+            return copy;
+        }
+
+        private static void RestoreConfig(LabGourdPaint paint, LabConfig saved, LabConfig copy)
+        {
+            paint.network.config = saved;
+            Object.Destroy(copy);
         }
 
         private static void Replace(LabPaintSurface surface, Color32[] pixels, byte[] owners) =>
