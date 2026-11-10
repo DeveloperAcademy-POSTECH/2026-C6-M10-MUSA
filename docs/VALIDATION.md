@@ -7353,3 +7353,12 @@ PlayMode의 기존 main 실패13건은 구형 지귀 A/B·특수 물구슬 검�
 | 클레이 그림 지름 (`FlightDiameter`) | NOT_RUN — 코드만 고침. 편집 모드에서는 클레이 그림 풀이 만들어지지 않고, 측정하려던 때는 Editor가 Play 중이었음 |
 | EditMode·PlayMode Test Runner | NOT_RUN |
 | 3인 실행 (1→2→3스테이지, 재도전, SMALL 투척) | NOT_RUN |
+
+### #621 튜토리얼 조합대 뒤 사각 배경 제거 — 2026-11-10
+
+- `fix/#621-tutorial-combination-board-box`에서 튜토리얼 진입 후 조합대 위쪽에 사각형 한지 경계가 나타나는 현상을 재현했다. 튜토리얼은 일반 전투의 투명 배경 합성 경로를 사용하지 않아, 하단 입력 카메라의 별도 한지 패스가 계속 화면에 그려지고 있었다.
+- 튜토리얼에만 `GameTutorialBoardPresentation`을 연결했다. 기존 `OrbBoardPlate`의 텍스처·색·UV를 사용하고 현재 입력 카메라로 투영한 보드 영역에 표시한다. 기존 `LabOrbHudComposition.presentationBackdrop`과 `GameBoardBackgroundContinuation`으로 원본 알파 밖에 같은 스테이지 배경이 이어지게 했다. 합성 중에는 기존 종이 패스/중복 plate 렌더링을 끄고, 합성 비활성 시에는 원래 plate 표시를 복원한다.
+- 원본 조합대 에셋·Scene·입력 카메라 투영·보드 판정·튜토리얼 진행 규칙·일반 전투 경로는 변경하지 않았다. 묵이/금옥이/불이와 북·구슬의 기존 표시 순서를 유지한다.
+- Unity 6000.6.5f1에서 수정 전후 실제 GameView(402×874)를 캡처하여 조합대 위쪽의 사각 경계가 사라졌음을 확인했다. 이미지 생성이나 후처리를 하지 않았다.
+- `GameTutorialFlowTests` PlayMode **5/5 PASS**, 실패·skip 0, 62.02초. 원본 그림 유지, 입력 보드와 화면 중심 일치, 한지 카메라 패스 비활성, 배경 연결부의 투영 광선 일치 검사를 추가했다. 전체 튜토리얼의 북 넘기기·구슬 조합·완료 복귀와 대사 기록·재시작·나가기·건너뛰기도 통과했다.
+- 컴파일과 `git diff --check` 통과. 전체 테스트와 iOS/Android 실기기 검증은 실행하지 않았다.

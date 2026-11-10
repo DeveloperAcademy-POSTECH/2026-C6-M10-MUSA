@@ -93,6 +93,28 @@ namespace Hapio.Tests
             GameTutorialArt art = GameTutorialArt.Load();
             var bindings = Object.FindFirstObjectByType<GameBattleBindings>();
             LabHud hud = bindings.hud;
+            // #621: the original tutorial board is alpha-composited over the continuous stage view.
+            yield return null;
+            var boardView = bindings.GetComponent<GameTutorialBoardPresentation>();
+            var composition = hud.GetComponent<LabOrbHudComposition>();
+            var plate = bindings.board.transform.Find("OrbBoardPlate").GetComponent<Renderer>();
+            Assert.That(boardView, Is.Not.Null);
+            Assert.That(composition.IsCompositing, Is.True, composition.InitializationError);
+            Assert.That(composition.presentationBackdrop, Is.SameAs(boardView.Artwork.rectTransform));
+            Assert.That(boardView.Artwork.texture, Is.SameAs(plate.sharedMaterial.mainTexture), "Keep the tutorial's original plate.");
+            Assert.That(boardView.Artwork.enabled, Is.True);
+            Assert.That(boardView.Artwork.raycastTarget, Is.False);
+            Assert.That(plate.enabled, Is.False, "No duplicate plate behind the composited artwork.");
+            Assert.That(bindings.sceneController.orbCamera.enabled, Is.False, "No rectangular lower-camera paper pass.");
+            Rect boardRect = ScreenRect(boardView.Artwork.rectTransform);
+            Vector3 projected = bindings.sceneController.orbCamera.WorldToScreenPoint(plate.bounds.center);
+            Assert.That(Vector2.Distance(boardRect.center, projected), Is.LessThan(1f), "Visual stays on the original input board.");
+            Assert.That(boardView.Artwork.transform.GetSiblingIndex(), Is.LessThan(hud.leftNeighborBadge.transform.GetSiblingIndex()));
+            var continuation = bindings.GetComponent<GameBoardBackgroundContinuation>().ContinuationCamera;
+            Assert.That(continuation != null && continuation.enabled, Is.True);
+            Ray upper = bindings.battleCamera.ViewportPointToRay(new Vector3(.37f,0,0));
+            Ray lower = continuation.ViewportPointToRay(new Vector3(.37f,1,0));
+            Assert.That(Vector3.Distance(upper.direction,lower.direction), Is.LessThan(.00001f), "Background joins without a viewport seam.");
             Assert.That(hud.localPlayerCircle.sprite, Is.SameAs(art.bul));
             Assert.That(hud.leftPlayerCircle.sprite, Is.SameAs(art.muk));
             Assert.That(hud.rightPlayerCircle.sprite, Is.SameAs(art.geumok));
