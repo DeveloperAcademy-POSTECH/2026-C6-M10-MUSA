@@ -77,6 +77,8 @@ namespace Hapio
             var rounded = mask.gameObject.AddComponent<LabRoundedGraphic>(); rounded.radius = 5;
             mask.gameObject.AddComponent<Mask>().showMaskGraphic = false;
             hud.yokaiHpFill.transform.SetParent(mask, false); Stretch(hud.yokaiHpFill.rectTransform);
+            // The fill sprite is about 7.9:1 and this track 11.2:1; keeping its aspect drew 100% at about 70% of the track.
+            hud.yokaiHpFill.preserveAspect = false;
             hud.yokaiHpFill.color = GameBattleUiColors.Red;
             if (hud.yokaiHpFill is LabShapeFillImage shaped)
             { shaped.filledColor = GameBattleUiColors.Red; shaped.emptyColor = Color.clear; hud.yokaiHpFill.color = Color.white; }
