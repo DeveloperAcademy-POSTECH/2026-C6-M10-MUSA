@@ -874,6 +874,47 @@ namespace Hapio.Tests
         private static int[] VisibleSeats(GameLobbyView view) => Enumerable.Range(0, view.slotButtons.Length)
             .Where(i => view.slotButtons[i].gameObject.activeSelf).Select(i => i + 1).ToArray();
 
+        /// <summary>
+        /// #631 (11/10 QA): the dims of the credits, the mode choice and the direct connection reach the screen's edges past the
+        /// fitted frame, "새 방 만들기 +" behind the mode card steps away while the card is up, and no ink lands over the credits.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator MenuDimsReachTheScreensEdgesAndNothingShowsBesideTheModeCard()
+        {
+            GameLobbyView view = View();
+            GameCreditsView credits = Object.FindFirstObjectByType<GameCreditsView>(FindObjectsInactive.Include);
+            Assert.That(credits, Is.Not.Null, "The saved credits window on Home.");
+            yield return Click(credits.openButton);
+            Assert.That((credits.IsOpen, GameCreditsView.AnyOpen), Is.EqualTo((true, true)));
+            Assert.That(GameTouchInk.ShowsOn(SceneManager.GetActiveScene().path, GameCreditsView.AnyOpen), Is.False,
+                "No touch ink anywhere while the credits are open.");
+            GameScreenEdgeCoverFlowTests.AssertDrawnToTheScreensEdges(credits.dismissButton.GetComponent<UnityEngine.UI.Graphic>());
+            yield return Click(credits.closeButton);
+            Assert.That(GameCreditsView.AnyOpen, Is.False);
+            Assert.That(GameTouchInk.ShowsOn(SceneManager.GetActiveScene().path, GameCreditsView.AnyOpen), Is.True);
+
+            yield return Click(view.enterButton);
+            yield return Click(view.countButtons[1]);
+            yield return Click(view.createButton);
+            Assert.That(view.modePanel.activeInHierarchy, Is.True);
+            Assert.That(view.createButton.gameObject.activeInHierarchy, Is.False,
+                "새 방 만들기 is a hair wider than the mode card and lay right behind it; its round ends showed at the sides.");
+            GameScreenEdgeCoverFlowTests.AssertDrawnToTheScreensEdges(view.modeDismissButton.GetComponent<UnityEngine.UI.Graphic>());
+            view.modeDismissButton.onClick.Invoke();
+            yield return null;
+            Assert.That(view.modePanel.activeSelf, Is.False);
+            Assert.That(view.createButton.gameObject.activeInHierarchy, Is.True, "It comes back when the card closes.");
+
+            RectTransform card = (RectTransform)view.directConnectionPanel.transform.GetChild(0);
+            Vector2 savedCard = card.anchoredPosition;
+            yield return Click(view.directConnectionButton);
+            Assert.That(view.directConnectionPanel.activeInHierarchy, Is.True);
+            GameScreenEdgeCoverFlowTests.AssertDrawnToTheScreensEdges(view.directConnectionPanel.GetComponent<UnityEngine.UI.Graphic>());
+            Assert.That(card.anchoredPosition, Is.EqualTo(savedCard), "The direct connection card stays where it was saved.");
+            yield return Click(view.closeDirectConnectionButton);
+            Assert.That(view.directConnectionPanel.activeSelf, Is.False);
+        }
+
         private static GameLobbyView View() => SceneManager.GetActiveScene().GetRootGameObjects()
             .SelectMany(root => root.GetComponentsInChildren<GameLobbyView>(true)).Single();
 
