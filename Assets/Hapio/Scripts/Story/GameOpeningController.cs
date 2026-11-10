@@ -20,6 +20,13 @@ namespace Hapio
         private Coroutine pendingStart;
         private Coroutine pendingReturn;
         private Action continuation;
+        // #635: the hand-over to the tutorial (or the room list) happens under the persistent clouds.
+        private bool clouds, cloudsClosing;
+        private Coroutine zooming;
+        private RectTransform zoomHost;
+        private Vector3 zoomHostPosition, zoomHostScale;
+        private GameObject hiddenToolbar;
+        private float hiddenDialogueAlpha = -1f;
 
         public bool IsPlaying => presenting && player != null && player.IsPlaying;
         public static bool HasPlayedThisRun => openingConsumed;
@@ -134,16 +141,101 @@ namespace Hapio
 
         private void OnFinished(StoryExitReason reason)
         {
-            if (pendingReturn == null) pendingReturn = StartCoroutine(ReturnAfterRelease());
+            if (pendingReturn != null) return;
+            CoverWithClouds(zoom: reason == StoryExitReason.Completed);
+            pendingReturn = StartCoroutine(ReturnAfterRelease());
         }
 
         private IEnumerator ReturnAfterRelease()
         {
-            // Keep the opening as an input shield through the release that finished/skipped it.
+            // Keep the opening as an input shield through the release that finished/skipped it, and (#635) until the
+            // clouds have wholly covered it: what comes next is only put behind them.
             yield return null;
-            while (StoryTapAdvance.HasHeldPointer) yield return null;
+            while (StoryTapAdvance.HasHeldPointer || cloudsClosing && CloudsUp) yield return null;
             pendingReturn = null;
             EndPresentation(continueToRooms: true);
+        }
+
+        private static bool CloudsUp => GameSession.Instance != null && GameSession.Instance.CloudsUp;
+
+        /// <summary>
+        /// #635: the clouds close over the opening. Seen to its end, the last picture first drops its words and buttons and
+        /// zooms toward the valley as they close; skipped, the clouds simply close over whatever is on the screen.
+        /// Without a session or its clouds the opening hands over as before.
+        /// </summary>
+        private void CoverWithClouds(bool zoom)
+        {
+            GameCloudCover cover = GameSession.Instance != null ? GameSession.Instance.CloudCover : null;
+            if (cover == null || continuation == null) return;
+            cloudsClosing = true;
+            if (!cover.Close(() => cloudsClosing = false))
+            {
+                cloudsClosing = false;
+                return;
+            }
+            clouds = true;
+            if (!zoom || player == null) return;
+            HideReadingControls();
+            GameOpeningTransitionArt art = GameOpeningTransitionArt.Load();
+            if (art != null && player.cutHost != null) zooming = StartCoroutine(ZoomTowardFocus(art, player.cutHost));
+        }
+
+        private void HideReadingControls()
+        {
+            if (player.dialogueGroup != null)
+            {
+                hiddenDialogueAlpha = player.dialogueGroup.alpha;
+                player.dialogueGroup.alpha = 0f;
+            }
+            Transform toolbar = player.skipButton != null ? player.skipButton.transform.parent : null;
+            if (toolbar != null && openingRoot != null && toolbar != openingRoot.transform && toolbar.IsChildOf(openingRoot.transform)
+                && toolbar.gameObject.activeSelf)
+            {
+                hiddenToolbar = toolbar.gameObject;
+                hiddenToolbar.SetActive(false);
+            }
+        }
+
+        private void RestoreReadingControls()
+        {
+            if (hiddenDialogueAlpha >= 0f && player != null && player.dialogueGroup != null) player.dialogueGroup.alpha = hiddenDialogueAlpha;
+            hiddenDialogueAlpha = -1f;
+            if (hiddenToolbar != null) hiddenToolbar.SetActive(true);
+            hiddenToolbar = null;
+        }
+
+        private IEnumerator ZoomTowardFocus(GameOpeningTransitionArt art, RectTransform host)
+        {
+            zoomHost = host;
+            zoomHostPosition = host.localPosition;
+            zoomHostScale = host.localScale;
+            Rect page = host.rect;
+            Vector2 focus = art.FocusFromMiddle(page.size);
+            float baseScale = zoomHostScale.x, seconds = 0f;
+            while (true)
+            {
+                float zoom = art.ZoomAt(seconds);
+                (float scale, Vector2 move) = GameOpeningTransitionArt.ZoomPose(zoom, focus, page.size, art.zoomScale, art.focusToCenter);
+                host.localScale = zoomHostScale * scale;
+                // Grow about the page's middle (the host's pivot is its top-left corner), then move toward the focus.
+                host.localPosition = zoomHostPosition + (Vector3)((page.center * (1f - scale) + move) * baseScale);
+                if (zoom >= 1f) break;
+                yield return null;
+                seconds += Time.unscaledDeltaTime;
+            }
+            zooming = null;
+        }
+
+        private void StopZoom()
+        {
+            if (zooming != null) StopCoroutine(zooming);
+            zooming = null;
+            if (zoomHost != null)
+            {
+                zoomHost.localScale = zoomHostScale;
+                zoomHost.localPosition = zoomHostPosition;
+            }
+            zoomHost = null;
         }
 
         private void EndPresentation(bool continueToRooms = false)
@@ -156,10 +248,25 @@ namespace Hapio
             continuation = null;
             presenting = false;
             if (current == this) current = null;
+            bool coveredByClouds = clouds;
+            clouds = cloudsClosing = false;
             Unsubscribe();
+            StopZoom();
+            RestoreReadingControls();
             if (player != null) player.Cancel();
             HideOpeningRoot();
-            next?.Invoke();
+            try { next?.Invoke(); }
+            finally
+            {
+                // #635: what came next lifts the clouds once it can be seen (the tutorial once playable, the room list at
+                // once). When nothing comes next (the opening was cut short) they go at once.
+                GameSession session = GameSession.Instance;
+                if (coveredByClouds && session != null)
+                {
+                    if (next != null) session.LiftCloudsOnceShown();
+                    else if (session.CloudCover != null) session.CloudCover.Cancel();
+                }
+            }
             if (lobbyView != null) lobbyView.SetOpeningBlocked(false);
         }
 

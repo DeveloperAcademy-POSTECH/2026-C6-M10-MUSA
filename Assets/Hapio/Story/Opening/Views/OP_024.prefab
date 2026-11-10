@@ -64,6 +64,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 4262554954609002825}
   isBackground: 0
+  softFadeIn: 0
   delay: 0.22
   enterSeconds: 0.5
   enterOffset: {x: 0, y: -8}
@@ -209,6 +210,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 3249664560928024073}
   isBackground: 0
+  softFadeIn: 0
   delay: 0.28
   enterSeconds: 0.5
   enterOffset: {x: 0, y: -8}
@@ -462,6 +464,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 2938803513265287007}
   isBackground: 0
+  softFadeIn: 0
   delay: 0.16
   enterSeconds: 0.5
   enterOffset: {x: 0, y: -8}
@@ -700,8 +703,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: -0.0029296875, y: -0}
-  m_SizeDelta: {x: 402.00586, y: 874}
+  m_AnchoredPosition: {x: -2.002945, y: 4.3482056}
+  m_SizeDelta: {x: 406.0059, y: 882.6964}
   m_Pivot: {x: 0, y: 1}
 --- !u!222 &3798324569637145114
 CanvasRenderer:
@@ -1093,6 +1096,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 8540397808272134765}
   isBackground: 1
+  softFadeIn: 0
   delay: 0
   enterSeconds: 0.25
   enterOffset: {x: 0, y: 0}
@@ -1236,6 +1240,13 @@ MonoBehaviour:
   - {fileID: 3839233748912091009}
   - {fileID: 3737816296847789670}
   - {fileID: 4558756474429409654}
+  beats: []
+  continueButton: {fileID: 0}
+  requireContinueButton: 0
+  waitForEntrance: 0
+  exitCloudWipe: {fileID: 0}
+  music: {fileID: 0}
+  musicVolume: 0
   hideEmptyDialogue: 1
   sourceFigmaNumber: 24
   sourceFigmaNodeId: 3182:12367
@@ -1413,6 +1424,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 1969187574744176033}
   isBackground: 0
+  softFadeIn: 0
   delay: 0.34
   enterSeconds: 0.5
   enterOffset: {x: 0, y: -8}
@@ -1534,6 +1546,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 8558106158219576699}
   isBackground: 0
+  softFadeIn: 0
   delay: 0.4
   enterSeconds: 0.5
   enterOffset: {x: 0, y: -8}

@@ -7543,3 +7543,23 @@ main `53b1f7a5`(#619 UI 스트로크·#622 튜토리얼 조합대·#628 지귀 Q
 문서 diff와 두 정책의 일치, 저장소 내부 Markdown 링크 대상, 충돌 마커 부재, `git diff --check`를 확인했다. 독립 읽기 검토에서도 필요한 관련 검사의 카테고리 제외 방지·전체 검사 조건·동일 조건 결과 재사용 규칙에 충돌이 없음을 확인했다.
 
 **Unity 컴파일·EditMode·PlayMode·빌드·실기기는 이번 작업에서 실행하지 않았다.** 문서만 바뀌어 새 정책의 문서 검사 범위를 적용했다. 보고서의 2,180/775건·35.62/743.08초는 #627 통합본 `dc602dea`의 기존 실제 실행 기록이며 #637의 새 검사 통과 건수가 아니다.
+
+
+## 2026-11-10 — #635 오프닝 → 튜토리얼 확대·한지 구름 전환, 마지막 장면 흰 선 제거
+
+기준은 main `53b1f7a5`(#632 공용 구름 병합 뒤), Unity 6000.6.5f1·macOS Editor다. 커밋은 단계별로 나눴다: 흰 선 → 구름 덮개 → 오프닝 끝 확대·덮기 → 튜토리얼 쪽 기다림 → 문서.
+
+- 흰 선 원인: OP_024 배경 `72eb0.png`(471×1024)의 맨 오른쪽 한 줄 알파가 50%(0x7F)였고, QA 화면에서 그림 왼쪽 1px·오른쪽 2px이 밝았다(스크린샷 픽셀 측정). 장면(`Page 402x874`)에는 RectMask2D가 있다. 배경 크기만 같은 비율·같은 가운데로 2pt씩 키워 x −2.003 ~ 404.003, 마지막 줄 시작 403.141(장면 402 밖)으로 보냈다. 프리팹은 Editor API로 저장했고, 저장 때 기존 기본값 항목(`softFadeIn: 0` 등)이 함께 기록됐다(동작 변화 없음).
+- 확대 지점: 사용자가 준 확대 영역 그림을 마지막 장면 스크린샷에서 찾아(배율 1.00, 평균 오차 0.005) 장면 가로 53.3%·세로 25.4%로 정했다.
+- 구름 덮개 `GameCloudCover`는 `GameSession` 아래에서 실행 중에 만든다(정렬 30120). Scene·Home·#630 공용 구름 코드는 바꾸지 않았고, 같은 어셈블리의 수동 진행(`BeginManual`·`Advance`)으로 "덮은 채 기다리기"를 구현했다. 새 설정 에셋 `CloudCoverArt.asset`·`OpeningTransitionArt.asset`은 Editor API로 만들었다.
+
+| 확인 | 결과 |
+| --- | --- |
+| Unity 컴파일 (단계 1~4 각각, 마지막은 4단계 커밋 뒤 Play 종료 후) | PASS |
+| Editor eval: OP_024 배경 범위·비율·마지막 줄 위치 | PASS — 위 수치, 비율 0.45996 유지 |
+| Editor eval: 구름 프리팹 연결·시간 | PASS — 덮기 0.62초, 전체 1.52초(0.62 + 0.10 + 0.80) |
+| Editor eval: 확대 곡선·끝 위치 | PASS — 30% 시간에 0.657, 90% 시간에 0.999, 끝에서 골짜기가 화면 가운데(0, 0) |
+| EditMode 새 검사: `StoryWorkspaceTests.LastCutBackgroundReachesPastThePageSoNoPaperLineShows`, `GameCloudCoverTests`(2), `GameOpeningTransitionTests`(3) | NOT_RUN (컴파일만 확인) |
+| PlayMode 새·수정 검사: `GameCloudCoverFlowTests`(3), `GameOpeningControllerTests`(끝까지 보기·건너뛰기·도중에 끄기 3개 추가), `GameTutorialFlowTests.FinishedOpeningOpensThePracticeBoardOnceThenTheRoomList`(구름 아래 기다림·첫 대사 시점 추가), `GameLobbyViewTests`(시작 때 구름이 걷힐 때까지 대기), `GameLoadingSessionTests`(주석만) | NOT_RUN (컴파일만 확인) |
+| 실제 화면 (Editor Play·iPhone): 확대 느낌, 구름 시간, 튜토리얼 첫 화면 | NOT_RUN |
+| 튜토리얼 준비 실패 → 방 목록에서 구름이 걷힘, 15초 제한 | NOT_RUN (검사로 재현하지 못함, 코드 경로만 확인) |
