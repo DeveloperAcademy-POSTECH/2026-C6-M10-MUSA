@@ -144,6 +144,39 @@
 - 전체 기록·2:2 결과 표의 갈색 강조는 바꾸지 않았다.
 - **미실행:** 실기기 화면, 멀티 게스트 화면, 긴 공동 수상 이름(`P1, P2(나)`)의 실제 표시.
 
+## 2026-11-10 — 한지 구름 전환 속도와 구름별 시차
+
+- **최종 전달 상태 (#630):** 사용자 시각 확인 완료. 큰 구름 6개 + 작은 구름 3개, 전체 1.52초. 관련 EditMode 32/32·PlayMode 18/18 통과. 전체 PlayMode는 사용자 요청으로 중단했으며 완료로 간주하지 않는다. 각 장면 삽입·연결은 다른 팀원이 담당한다. 아래 중간 단계의 시각 확인 대기 표기는 당시 기록이다.
+- 전체 EditMode는 2,156/2,156 통과했다. 전체 PlayMode 첫 시도는 로컬 iOS 프로필에 Lab 씬이 없어 실패했고, 공용 씬 목록으로 재시작했으나 사용자 요청으로 중단했다. 원래 iOS 프로필과 StageStoryPreview를 복원했다. 최신 main 통합·실기기 검증은 수행하지 않았다.
+
+- **작은 구름 감속:** 세 작은 구름의 걷힘 이동 시간을 각각 0.08초 연장(약 0.46~0.48초 → 0.54~0.56초). 공통 걷힘 구간을 0.80초로 늘리고 정규화된 시차·끝점을 다시 계산해 모든 출발 시점과 큰 구름의 이동 시간을 유지했다. 전체 전환 1.52초. 관련 PlayMode **18/18 PASS**, 사용자 시각 확인 대기.
+
+- **걷힘 방향 변경:** 작은 구름만 위·아래 왼쪽 / 가운데 오른쪽으로 변경. 진입 경로·시차·길이 유지. 연속 샘플에서 방향이 되돌아가지 않고 화면 밖까지 퇴장하는 PlayMode 검사를 추가했다. 첫 실행에서 큰 구름 하나까지 방향이 바뀐 설정 실수를 기존 검사가 잡아 수정했으며, 수정 후 PlayMode **18/18 PASS**. 관련 EditMode **32/32 PASS**. 사용자 시각 확인 대기.
+
+- **작은 구름 추가 후 최신 결과:** 사용자가 제공한 투명 PNG를 `CloudSmall.png`로 가져와 앞쪽 구름 3개(위·가운데·아래)를 추가, 공통 프리팹 총 9개. 가운데·아래 작은 구름은 큰 구름보다 늦게 걷히며 전체 1.44초 유지. Mac Unity 컴파일 완료, PlayMode **17/17 PASS**, 관련 EditMode **32/32 PASS**, Console 오류 0건, `git diff --check` 통과. 실제 Game 화면에서 완전 덮임과 1.02초 걷힘 중간 배치를 확인했다. 확인용 임시 오버레이는 제거했고 Scene은 저장하지 않았다. 최종 재생 감각은 사용자 확인 대기다.
+
+
+- **최신 재작업:** 기존 6개 구름의 3구간 직선 이동을 연속 3차 베지어 경로로 바꾸고, closeEnd/openEnd로 도착 시점도 분산했다. 걷힘은 위쪽 오른편에서 아래쪽 왼편으로 이어지며 약한 상하 곡률을 더한다. 전체 길이 1.44초 및 봉인 글씨 2px 보정은 유지한다.
+- **최신 검사:** Mac Unity 컴파일 완료, 관련 PlayMode **16/16 PASS**(출발·도착 분산 및 마지막 구름 퇴장 포함), EditMode **32/32 PASS**, Console 오류 0건. 미리보기 Play 상태로 열어 둠. 최종 움직임의 사용자 시각 확인 및 전체 검사는 아직 대기 중이다.
+
+- **기준:** `feat/stage-story-cloud-polish`의 기존 한지 구름 패치 미커밋 상태 위에서 수정. Mac Unity 6000.6.5f1 연결 Editor에서 실행했다.
+- 닫힘 0.62초·유지 0.10초·걷힘 0.72초, 6개 구름의 독립 closeDelay/openDelay. 공통 프리팹과 TryPlay 콜백 API를 유지한다.
+- 재조정: 같은 방향의 걷힘 지연을 0·0.19·0.38(약 0·0.14·0.27초)로 늘리고 세 카드의 봉인 글씨를 2px 아래로 옮겼다. 수정 후 위 관련 PlayMode 15개와 EditMode 32개를 재실행해 모두 통과했다. 구미호 카드의 수정된 글씨를 실제 Game 창에서 확인했으며 구름 동작의 최종 사용자 확인은 대기 중이다.
+- 컴파일 완료, 검사 및 미리보기 후 Console 오류 0건. 수정하지 않은 파일에서 obsolete API·DEVELOPMENT_BUILD 경고가 나왔다.
+- PlayMode `StoryResultPresentationTests`: **15/15 PASS**. 구름별 지연 시작, 완전 덮임 이후 1회 교체, 느린 프레임의 덮임 유지, 입력 차단, 취소·재사용과 후속 그림/대사 순서를 확인했다.
+- EditMode `GameStageStoryAssetTests`, `StageStoryAssetTests`, `StoryWorkspaceTests`, `StoryRecordHighlightTests`: **32/32 PASS**.
+- StageStoryPreview를 실제 Play하고 구미호 카드의 이야기 계속 버튼을 눌러 구름 완전 덮임 및 후일담 표시를 확인했다. 사용자 속도·엇갈림 시각 승인은 대기 중이다.
+- `git diff --check` 통과. 기존 미커밋 변경은 별도 보관하고 ProjectSettings·Build Profiles 변경은 수정하지 않았다.
+- **미실행:** 전체 EditMode/PlayMode(PR 전 실행 예정), 튜토리얼 실제 화면 연결, iOS/실기기, 멀티플레이. 튜토리얼 공통 API 재사용 검사는 위 PlayMode에 포함되며 실제 튜토리얼 화면 검증과 구분한다.
+
+## 2026-11-10 봉인 카드 위치·만복 이미지 갱신
+
+- Mac Unity 6000.6.5f1에서 에셋 재임포트·컴파일 후 Console 오류 0건.
+- 관련 EditMode 32/32 통과: GameStageStoryAssetTests, StageStoryAssetTests, StoryWorkspaceTests, StoryRecordHighlightTests.
+- StoryResultPresentationTests PlayMode 18/18 통과.
+- 세 카드 프리팹은 제목·카드 피벗·안내 글·손 아이콘의 y만 각각 -11 변경했다. 카드 앞뒷면 내부와 기존 참조는 보존했다.
+- StageStoryPreview 실제 Play 화면에서 구미호 카드 앞뒷면 배치 및 뒤집기, 야광귀 후일담의 새 만복 이미지를 확인했다. 사용자 시각 확인 완료. 전체 검사 중단 및 미실행 범위는 위 #630 최종 전달 기록을 따른다.
+
 ## 2026-11-09 — 결과·Home·Lobby의 시안에 없는 안내 줄 숨기기
 
 - **기준:** `fix/hide-result-status-line`, main `d1ea7b12` 위 `f37b4443`·`79bc2e15`. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 접속 묶음과 설정 수는 그대로다.
