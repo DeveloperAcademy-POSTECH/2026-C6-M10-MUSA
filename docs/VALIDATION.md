@@ -7237,3 +7237,26 @@ EditMode 모델 검사 4개:
 main `33762faf`를 폭탄 브랜치에 병합했다. 같은 문서 끝에 추가된 main의 #581 기록과 #584 폭탄 기록이 충돌했으며 양쪽 내용을 모두 보존해 이어 붙였다. 코드·프리팹·에셋의 텍스트 충돌은 없었고, 자동 병합된 LabBattleRenderWarmup의 폭탄·클레이 복사본 준비를 함께 확인했다.
 
 Unity 6000.6.5f1 Editor 컴파일 오류 0. 병합 후 선택 PlayMode는 LabBombVisualTests 2개·GameBattleUiPresentationTests.SavedBattleThemeDrawsTheNewBombOnTheRealBoard 1개·GameBattleRenderWarmupTests 2개, **5/5 PASS**(실패·건너뜀 0, 7.61초). 전체 검사·실기기 검증은 추가 실행하지 않았다. 충돌 문서의 양쪽 원문 비어 있지 않은 모든 줄이 보존된 것을 대조했다. 문서 diff 검사는 통과했으며 main에서 가져온 Unity 오디오 meta의 기존 후행 공백은 변경하지 않았다.
+
+
+## 2026-11-10 — #605 방장 로비 Direct IP 주소·포트 표시 제거
+
+- 기준 main은 `11cb2d6d`다. #582가 추가한 런타임 주소 라벨·자리 배치 연결·1초 갱신과 전용 주소 수집/네이티브 선언을 제거했다. 주소 수집 전용 검사 14건도 해당 기능과 함께 제거했다. 기존 방 생성·Bonjour·LAN/핫스팟·Direct IP 접속과 접속 규약 5698/Lab59/Game48은 바꾸지 않았다.
+- Direct IP 창의 빈 포트 기본값과 범위 검증은 유지하고, 삭제된 방장 표시 줄을 가리키던 안내만 ‘방장의 IP 주소와 포트를 입력하시오’로 돌렸다. Scene·Prefab·원본 설정과 기존 자리 배치는 수정하지 않았다.
+- 실제 Unity Editor의 저장된 Home→방 목록→Host→Lobby를 실행했다. 390×844 GameView 화면 캡처에서 IP·포트 표시 줄 부재, 방 카드/P1~P3/시작 버튼의 기존 배치를 확인했다. 런타임 조회에서도 HostDirectAddress 객체 없음·입장 후 로비 Direct IP 버튼 비표시를 확인했다. 방 목록으로 돌아간 화면에는 기존 ‘직접 연결’ 버튼이 표시됨을 확인했다. 이는 #582 이전부터 있던 입장 전 기능이다. 캡처는 실제 화면이며 이미지 생성·후처리를 하지 않았다.
+
+![주소 줄을 제거한 실제 방장 로비](images/lobby/host-without-ip.png)
+
+| 검사 | 결과·근거 |
+| --- | --- |
+| 전체 EditMode | 2,152/2,154 통과, 실패2·skip0, 20.91초. 실패는 아래 기존 main 저장 DEV값 불일치다. |
+| 수정 없는 main EditMode 대조 | main `11cb2d6d`에서 MenuScreens 검사4건을 실행해 같은 Home·Lobby2건 실패 재현(2/4 통과). |
+| 전체 PlayMode | 741/754 통과, 실패13·skip0, 626.05초. 로비 동작 검사19/19 통과. |
+| 수정 없는 main PlayMode 대조 | 변경본에서 실패한 동일13건을 main `11cb2d6d`에서 실행해 13건 모두 실패 재현(0/13 통과, 8.28초). 실패 집합 동일. |
+| 로비 저장 자산 | 전체 EditMode 중 GameLobbyAssetTests 7/7 통과. |
+
+기존 main 실패2건: `GameSceneAssetTests.MenuScreens_HaveSavedEditableCanvasAndInput`의 Home·Lobby가 Setting198의 저장 입력값15와 `LabConfig.DeveloperSnapshot` 기대값10을 비교하다 실패한다. #586의 `ec5a353a`가 `teamFeverHits`를15→10으로 바꾸고 #591이 main에 반영했으나 저장 Scene의 입력값15가 남았다. 실제 DEV 진입은 세션 설정으로 입력/슬라이더를 갱신한다. 이번 변경에는 Scene·LabConfig·해당 검사 변경이 없고 실패를 삭제·skip·PASS 처리하지 않았다.
+
+미실행: iOS 실기기, 실제 여러 기기 Wi-Fi·핫스팟·수동 Direct IP 입장. 자동 입력 Join 요청 검사는 실제 원격 입장 성공과 구분한다.
+
+PlayMode의 기존 main 실패13건은 구형 지귀 A/B·특수 물구슬 검사7건, 현 지귀 스테이지 검사1건, 터치 먹물 검사4건, 튜토리얼 대화 기록 raycast 검사1건이다. 이번 변경에서 이 게임 코드·Scene·검사는 수정하지 않았다. 수정 없는 기준본에서도 동일한13개 테스트가 실패하는 것을 실행으로 확인했으며, 전체 검사 성공으로 기록하지 않는다. 이 범위 밖 실패를 이번 UI 제거에 섞어 고치지 않았다.
