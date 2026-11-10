@@ -56,6 +56,7 @@ namespace Hapio
             {
                 player.playOnStart = false;
                 player.hideInlineContinueButtons = true;
+                player.hideProgress = true;
                 if (player.CurrentView != null) Show(player.CurrentView.continueButton, false);
                 Show(player.nextButton, false); Set(player.nextButton, false);
             }
@@ -252,6 +253,11 @@ namespace Hapio
             { SetBusy(false); screen.TryStoryHome(); }
         }
 
+        // The seal card and the first failure picture are read in full; skipping starts from the next picture.
+        private bool SkipHiddenOnThisCut => mode == Mode.AfterStage && player.CurrentView != null
+                && player.CurrentView.GetComponentInChildren<StoryCardFlip>(true) != null
+            || mode == Mode.Failure && player.CurrentCutIndex == 0;
+
         private bool ActionsBlocked => screen.StoryActionsBlocked || session.IsLoadingScene
             || session.IsViewerOpen || pendingFinish != null || transitionPending
             || ((mode == Mode.ReadyToAdvance || mode == Mode.FailureDashboard) && !resultActionsReady);
@@ -274,7 +280,8 @@ namespace Hapio
             Show(overallButton, overall); Set(overallButton, overall && !blocked);
             bool inspect = review && !HasAction("InspectGourd");
             Show(viewerButton, inspect); Set(viewerButton, inspect && !blocked && session.PreviewTexture != null);
-            bool skip = player.IsPlaying && (mode == Mode.AfterStage || mode == Mode.Failure || mode == Mode.Ending);
+            bool skip = player.IsPlaying && (mode == Mode.AfterStage || mode == Mode.Failure || mode == Mode.Ending)
+                && !SkipHiddenOnThisCut;
             Show(skipButton, skip); Set(skipButton, skip && !blocked);
             bool exit = review && !final || failed && !HasAction("Exit");
             Show(exitButton, exit); Set(exitButton, exit && !blocked);
