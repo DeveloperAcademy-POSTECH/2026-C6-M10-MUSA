@@ -11,6 +11,8 @@ namespace Hapio
         public Image artwork;
         [Tooltip("Keep the authored background fully visible throughout the cut; animate foreground layers separately.")]
         public bool isBackground;
+        [Tooltip("Fade gently from both ends of the entrance rather than revealing the image early.")]
+        public bool softFadeIn;
         [Min(0f)] public float delay;
         [Min(0.01f)] public float enterSeconds = .6f;
         public Vector2 enterOffset = new Vector2(0f, -35f);
@@ -52,7 +54,7 @@ namespace Hapio
                 Mathf.Sin((elapsed - EntranceDuration) * Mathf.PI * 2f / Mathf.Max(.1f, idlePeriod));
             rect.anchoredPosition = restPosition + enterOffset * (1f - eased) + drift;
             rect.localScale = new Vector3(restScale.x, restScale.y * Mathf.Lerp(startHeight, 1f, eased), restScale.z);
-            group.alpha = eased;
+            group.alpha = softFadeIn ? Mathf.SmoothStep(0f, 1f, progress) : eased;
         }
 
         public void Restore()

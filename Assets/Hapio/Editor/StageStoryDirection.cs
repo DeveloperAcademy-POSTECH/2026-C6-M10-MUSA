@@ -52,12 +52,6 @@ namespace Hapio.Editor
                     new Color(1f, .83f, .39f));
                 Beat(light, StoryVisualBeat.Motion.LightOut, .48f, .25f, "LightOut");
             }
-            else if (id == "Yagwanggui_After_02")
-            {
-                var ember = Glow(root, "Jigwi Ember", new Rect(16, 201, 26, 26),
-                    new Color(1f, .36f, .09f));
-                Beat(ember, StoryVisualBeat.Motion.Ember, .35f, .74f, "Ember").offset = new Vector2(360, 38);
-            }
 
             if (id == "Ending_01")
             {
@@ -100,7 +94,7 @@ namespace Hapio.Editor
                 return false;
             var caption = Node(view.transform, id == "Gumiho_After_02" ? "4210:2883" : "4210:3271");
             var label = caption.GetComponentInChildren<Text>();
-            label.text = "다음 요괴 잡으러  ›";
+            label.text = "다음 요괴 잡으러 ...";
             var hit = StoryWorkspaceBuilder.Rect("Continue Hit Area", caption,
                 new Rect(-8, -10, caption.sizeDelta.x + 16, Mathf.Max(44, caption.sizeDelta.y + 20)));
             var surface = hit.gameObject.AddComponent<Image>();

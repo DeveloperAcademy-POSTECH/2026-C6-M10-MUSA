@@ -35,6 +35,7 @@ namespace Hapio.Tests
                 "The first picture is up at once, no blank frame.");
             yield return null;
             AssertBubbleClearOfCaptionAndOnTheBar(view);
+            AssertRunnerToBarIsCenteredOnTheScreen(view, art);
 
             view.SetProgress(.5f);
             float leaned = 0f;
@@ -80,6 +81,14 @@ namespace Hapio.Tests
             while (view.Visible && Time.realtimeSinceStartup < until) yield return null;
             Assert.That(view.Visible, Is.False, "Closes after reaching 100% and a short hold.");
             Assert.That(view.DisplayedProgress, Is.EqualTo(1f));
+        }
+
+        private static void AssertRunnerToBarIsCenteredOnTheScreen(GameLoadingView view, GameLoadingArt art)
+        {
+            Rect runner = ScreenRect(view.RunnerBody), bar = ScreenRect(view.Bar);
+            // Landing squash only moves the runner's top, so the top comes from its feet and full height.
+            float runnerTop = runner.yMin + art.runnerHeight * (bar.height / art.barHeight);
+            Assert.That((runnerTop + bar.yMin) * .5f, Is.EqualTo(Screen.height * .5f).Within(1f), "Exactly halfway down the screen (#586).");
         }
 
         private static void AssertBubbleClearOfCaptionAndOnTheBar(GameLoadingView view)

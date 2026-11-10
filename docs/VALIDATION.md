@@ -4986,6 +4986,12 @@ Mac/iOS 빌드·설치·실기기 터치·실제 여러 기기의 LAN/핫스팟�
 - 코드 검토 워크플로(세 관점 검토 + 지적별 반박 검증)에서 제품 코드 결함은 확인되지 않았다. 검사 공백 3건(칠해진 셀 수 증분이 실제로 바뀌는 경우, 음수 칠 횟수 거절이 다른 실패에 가려짐, 복제본이 아닌 표면의 전체 검사)을 지적받아 검사를 추가했다.
 - **미실행:** 호출 경로 연결과 Guest GC 측정은 다음 이슈에서 한다. iPhone 실기기는 실행하지 않았다.
 
+## #589 스테이지 후일담 구름 전환과 엔딩 암전 — 2026-11-09
+
+- 최신 main `2d44363b`를 합친 Unity 6000.6.5f1 macOS Editor에서 관련 EditMode 26/26, 스토리 및 실제 결과 씬의 정상 진행·건너뛰기 PlayMode 45/45 통과.
+- 카드 바깥 터치와 중복 입력이 전환을 만들지 않는지, 구름 아래에서만 다음 컷으로 교체되는지, 구름 및 그림 등장 뒤 대사가 표시되는지, 엔딩에서 암전 뒤에만 글자가 표시되는지 확인했다.
+- 멀티플레이 실제 전체 흐름 및 iOS 실기기·빌드는 미실행.
+
 ## #549 엔딩 첫 컷 만복 대사 추가 — 2026-11-07
 
 - Unity 6000.6.5f1 macOS Editor: 스테이지 스토리 EditMode 5개, 결과 화면 PlayMode 9개 통과.
@@ -7136,3 +7142,82 @@ Compared twelve seed masks and selected 572. Changed only seed defaults and the 
 **비교 창 재실행 보완:** 위 전체 검사 뒤 실제 GameView에서 UI Toolkit의 초기 NaN 좌표가 카메라와 lane padding에 전달되고 preview 높이가 0으로 접히는 문제를 발견했다. 비교용 UIDocument가 패널을 채우도록 하고 유효한 좌표일 때만 카메라를 갱신하며, 일시정지 중에도 레이아웃 복구를 재시도한다. 게임 Scene·VFX·물리·판정은 변경하지 않았다. 실제 비교 창에서 5종 진흙과 하단 조작을 확인했고, 새 실제 Scene 시작/일시정지 중 분리·재연결 검사를 포함한 접촉 PlayMode **5/5 통과**를 확인했다. 이후 아래 최신 main 통합본의 전체 검사에서 이 화면 보완도 함께 확인했다.
 
 **화면 승인 후 최신 main 통합·병합 전 최종 검사:** `eb6c431a`에 main `2ee6c70f`(#592 내부 거절 코드 숨김·#596 시안에 없는 안내 줄 숨김)를 자동 병합했다. `LabNetwork`의 거절 안내와 클레이 비행/명중 처리가 함께 남는 것을 읽기로 확인했고 두 검토에서 병합 차단 결함을 찾지 못했다. Unity 6000.6.5f1 macOS/Metal의 독립 batch에서 전체 EditMode **2,150/2,150 통과**(17.28초), 전체 PlayMode **740/740 통과**(589.20초)했다. 필터·재시도·제외 없이 실행했으며 실패·skip 0건이다. 비교 창 시작/일시정지 중 레이아웃 복구와 최신 main의 검사도 포함한다. 사용자 외형 확인은 완료됐고 iOS 실기기·실제 다중 기기 네트워크 검증은 추가하지 않았다. #588 보존 대상 32개 파일의 SHA256과 데스크톱 작업 폴더의 변경 없음도 재확인했다.
+
+### #586 튜토리얼 기록 버튼·로딩 위치·땅따먹기 수치 — 2026-11-09
+
+- 기록 버튼을 건너뛰기 오른쪽에서 바로 아래로 옮겼다. 건너뛰기와 가로 가운데를 맞추고 간격은 기존 `logButtonGap` 6pt를 쓴다. 폭·테두리는 그대로다.
+- 로딩 화면은 `runnerCenterFromTop`(캐릭터 가운데 비율)을 `contentCenterFromTop`(캐릭터 위 끝~막대 아래 끝 묶음의 가운데 비율, 0.5)으로 바꿨다. 묶음 높이로 계산하므로 화면 높이가 달라도 묶음 가운데가 정중앙이다. 캐릭터 5명의 그림 위아래 여백은 1.4~3.8pt다.
+- 땅따먹기 제한 시간은 `StageCatalog` 197번을 90초로, 피버 필요 명중 수는 `LabConfig` 값을 1:1 8번·2:2 10번·3:3 12번으로 바꿨다. Lab 단독 장면의 180초와 통신 규약 번호는 바꾸지 않았다.
+- `LabConfig.asset`을 Editor API로 저장하면서 코드에는 있었지만 파일에 없던 설정 18개가 코드 기본값 그대로 함께 기록됐다. 기존 값 변경은 피버 3개뿐이다.
+- 대화 기록 화면(추가 요청): 두루마리 제목 그림(`TutorialLogTitle.png`, 사용자 제공)을 목록 위에 넣고, 한 번에 보이는 막대를 3개에서 6개로, 목록과 뒤로 가기 사이를 45pt에서 8pt로 바꿨다. 대사는 얼굴 옆에서 왼쪽 정렬로 시작한다. 막대 폭·뒤로 가기 크기는 그대로다. 기록 버튼은 건너뛰기의 표시 여부와 투명도를 그대로 따라 같이 나타나며, 첫 터치가 대사를 넘기지 못한 때 눌러도 빈 기록 화면이 열린다.
+- 튜토리얼 PlayMode 검사의 탭 대기를 실제 시간 대신 튜토리얼 자체 시계(`TapCooldownOver`)로 바꿨다. `FinishedOpeningOpensThePracticeBoardOnceThenTheRoomList`가 6단계 대사에서 탭이 무시되어 1회 실패한 것에 대한 보정이며, 원인은 코드 기준 추정이다. 게임의 탭 판정 값은 그대로다.
+
+| 확인 | 결과 |
+| --- | --- |
+| Unity 컴파일 | PASS |
+| 저장값·묶음 계산 (Editor eval, 화면 높이 844·874·932·1100) | PASS — 197번 90초, 피버 8/10/12, 묶음 가운데 0.5000 |
+| EditMode·PlayMode Test Runner | NOT_RUN |
+| 노치 iPhone 실기기, Mac 다중 앱 | NOT_RUN |
+
+### #587 전투 화면 밖 터치 먹물 번짐 — 2026-11-09
+
+- `GameTouchInk`와 `TouchInkArt.asset`을 추가하고 `GameSession`에 연결했다. 전투 Scene에서는 새로 찍지 않고, 캔버스에 `GraphicRaycaster`가 없어 터치를 막지 않는다.
+- 가운데 얼룩은 기존 수채 얼룩이 별 모양으로 보여, 코드로 만든 둥근 먹 번짐 8종으로 바꿨다. 참고 이미지는 분위기 확인에만 썼고 픽셀을 가져오지 않았다.
+- 일반 게임 규칙·통신 값·공유 설정은 바꾸지 않았다.
+
+| 확인 | 결과 |
+| --- | --- |
+| Unity 컴파일 | PASS |
+| `TouchInkArt.asset` 생성·얼룩 8장·방울 2장 연결 (Editor) | PASS |
+| 터치 소리 틀 (`Tap Sound` 비어 있음, 소리 파일 미포함) | 코드·저장값 PASS — 소리 재생은 NOT_RUN |
+| 무작위 모양과 희미한 정도 시안 (실제 `RollMark` 값과 저장값으로 한지색 위 합성) | PASS — 화면 실행이 아닌 합성 이미지 |
+| EditMode·PlayMode Test Runner | NOT_RUN |
+| iPhone 실기기 (희미한 정도, 연타) | NOT_RUN |
+
+## #584 폭탄 시각 부품 교체 — 2026-11-09
+
+브랜치 `fix/#584-bomb-visual`, Unity **6000.6.5f1 / macOS Editor**. `BombVisual-Latest.zip`의 Parts와 `Unity-layout.json`, Figma `4434:357`을 사용했다. Parts 9개(PNG 8개·SVG 1개)는 원본 SHA256과 일치한다. 프리팹은 공용 외형에 연결했으며, 모델·네트워크·설정 수치·전달/해금/만료 판정은 수정하지 않았다. 표시 연결은 [폭탄 시각 부품](BOMB_VISUALS.md)을 따른다.
+
+| 실제 수행 | 결과 | 범위 |
+| --- | --- | --- |
+| 스크립트 컴파일·심지 셰이더 컴파일 | PASS | Editor 컴파일 완료, 콘솔 오류 0, `ShaderHasError=false` |
+| EditMode 선택 실행 | **122/122 PASS**, 실패·건너뜀 0 | `LabDeveloperConfigTests`, `LabBattleAudioWarmupTests` 전체와 아래 모델 검사 4개. 약 1.68초. 전체 프로젝트 검사가 아니다. |
+| 최종 PlayMode 선택 실행 | **10/10 PASS**, 실패·건너뜀 0 | 새 `LabBombVisualTests` 2개, 아래 기존 폭탄 회귀 6개, `GameBattleRenderWarmupTests` 2개. 약 10.20초. |
+| Unity 카메라 렌더 | 확인 | 숫자 4/3/2/1/숨김, 넓은 꼭지·얇은 심지·불꽃 연결, 소진 비율 1/.75/.5/.25/0의 그림을 렌더해 시각 확인. |
+| Play 모드 실제 구슬판 표시 | **Fixture 확인** | 임시 `LabOrbBoard`·공용 저장 외형·실제 `UpsertOrb` 경로에 폭탄 9개 생성. 숫자·회전·심지·축소 불꽃·빨간 경고·무지개 링 캡처 확인. 정렬용 위치 고정은 Rigidbody constraints를 썼다. 일반 전투나 Host/Guest 전달 실행을 뜻하지 않는다. |
+| 최종 Fixture 콘솔 | 확인 | 오류·경고 0. 초기 캡처의 kinematic 위치 고정에서 난 속도 대입 경고는 Fixture를 constraints 고정으로 바꾼 뒤 발생하지 않았다. 게임 물리 코드는 수정하지 않았다. |
+| 저장 씬·Git 검사 | 확인 | Home 씬으로 복귀·Play 종료, 저장 씬 변경 없음, `git diff --check` 통과. |
+
+EditMode 모델 검사 4개:
+- `ALockedBombBlastsAtItsFuseButHandoffsDefuseItIntoAnAttackOrb`
+- `AnUnlockedBombOpensWhereItRestsIntoTwoAttackOrbsEvenOnAFullBoardAndIsNeverThrownOrPassed`
+- `ALockedBombCannotBeOpened`
+- `ExpiredItemsAndUnlockedBombsAreReportedButALockedBombBlastsInstead`
+
+기존 PlayMode 폭탄 회귀 6개(`LabOrbPhysicsTests`):
+- `ABombWithArtDrawsTheCartoonBombWithItsRedUnlockCountAndABurningFuse`
+- `TheFuseRopeBurnsDownTowardTheCapOverTheFuseLessItsWarningSeconds`
+- `AMovingBombRollsItsCapAndFuseAroundTheBallIn3D`
+- `ABombFlashesRedInItsLastSecondsFasterAsItRunsOut`
+- `ABombReceivedOnItsUnlockingHandoffSmokesOnceWithoutAPriorLocalFuse`
+- `ABombIsNeverThrownAndAnUnlockedOneGlidesInRestsThenAsksToOpenInSmoke`
+
+새 프리팹 검사는 저장 외형이 실제 프리팹을 생성하는지, 숫자 교체와 심지 값이 서로 독립적인지, 회전 중 숫자가 똑바른지, 기존 15초/3초 경고 계산·점멸·해금 연기·무지개가 유지되는지, 프리팹에 Collider/Rigidbody/게임 판정 스크립트가 없는지를 확인했다. 기존 테스트의 기대값은 변경하지 않았다.
+
+**미실행**: 전체 EditMode/PlayMode 모음, 일반 전투 한 판의 수동 조작, 실제 다인 Host/Guest 전달·해금·만료, Mac standalone 빌드, iOS·실기기, Metal 첫 사용 비용 측정. 공격 구슬 2개 전환·시간 초과 폭발은 위 자동 모델 검사 근거이며 다인 실행이나 시각 폭발 장면의 수동 확인으로 쓰지 않는다. 초기 심지 geometry 방식은 렌더 오류를 확인해 폐기하고 원본 PNG를 읽는 전용 머티리얼로 최종 검증했다.
+
+### #584 실제 Hapio 전투 연결 누락 수정 — 2026-11-09
+
+사용자 실제 플레이 캡처에서 이전 폭탄이 보이는 문제가 확인됐다. 앞선 122/10 검사와 임시 구슬판 캡처는 Lab 외형을 사용했으므로 Hapio 실제 적용을 증명하지 못했다. 실제 실행 중 GameSession.Network.config.OrbAppearance가 `Assets/Hapio/Resources/Hapio/UI/BattleOrbAppearance.asset`임을 조회했다. GameBattleUiPresentation.ApplyOrbAppearance()가 Lab 외형을 이 별도 에셋으로 덮어쓰며, 이 에셋에 새 프리팹 연결이 빠져 있었다.
+
+전투용 외형에 bombVisualPrefab 참조 1개만 추가했다. 모델·네트워크·게임 판정은 변경하지 않았다. 재발 방지를 위해 별도 테마 연결 검사와 저장 Home→솔로 시작→실제 Battle 씬의 구슬판 표시 검사를 추가했다.
+
+- EditMode GameBattleUiAssetTests: **2/2 PASS**, 실패·건너뜀 0. Lab/전투 외형이 별도 객체이고 두 곳 모두 같은 새 폭탄 프리팹을 참조함을 확인.
+- PlayMode GameBattleUiPresentationTests.SavedBattleThemeDrawsTheNewBombOnTheRealBoard: **1/1 PASS**, 실패·건너뜀 0. 실제 GameSession 시작 경로의 전투 외형과 로드된 Battle 구슬판에 표시 전용 폭탄 fixture를 넣어 새 컴포넌트·BombCount2 PNG·불꽃 표시를 확인. 모델의 자연 발생 폭탄이나 사용자의 수동 플레이 확인과 구분한다.
+- 스크립트 컴파일 오류 0, git diff --check 통과. 자연 발생 폭탄 수동 조작·다인 전달·실기기 검증은 여전히 미실행이다.
+
+### #584 main 병합·검증 기록 충돌 해결 — 2026-11-09
+
+main `33762faf`를 폭탄 브랜치에 병합했다. 같은 문서 끝에 추가된 main의 #581 기록과 #584 폭탄 기록이 충돌했으며 양쪽 내용을 모두 보존해 이어 붙였다. 코드·프리팹·에셋의 텍스트 충돌은 없었고, 자동 병합된 LabBattleRenderWarmup의 폭탄·클레이 복사본 준비를 함께 확인했다.
+
+Unity 6000.6.5f1 Editor 컴파일 오류 0. 병합 후 선택 PlayMode는 LabBombVisualTests 2개·GameBattleUiPresentationTests.SavedBattleThemeDrawsTheNewBombOnTheRealBoard 1개·GameBattleRenderWarmupTests 2개, **5/5 PASS**(실패·건너뜀 0, 7.61초). 전체 검사·실기기 검증은 추가 실행하지 않았다. 충돌 문서의 양쪽 원문 비어 있지 않은 모든 줄이 보존된 것을 대조했다. 문서 diff 검사는 통과했으며 main에서 가져온 Unity 오디오 meta의 기존 후행 공백은 변경하지 않았다.
