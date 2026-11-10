@@ -108,8 +108,9 @@ namespace C6Lab.Tests
             Assert.That(soundSources[0].gameObject, Is.SameAs(saved.audioView.gameObject));
             Assert.That(soundSources[0].playOnAwake, Is.False); Assert.That(soundSources[0].loop, Is.True);
             Assert.That(soundSources[0].spatialBlend, Is.Zero); Assert.That(soundSources[0].dopplerLevel, Is.Zero);
-            Assert.That(soundSources[0].clip, Is.SameAs(Resources.Load<AudioClip>("Jigwi/GroupFireLoop")));
-            Assert.That(saved.audioView.clip, Is.Not.Null);
+            // #602: GroupFireLoop (licence unconfirmed) was removed; the old curtain B keeps its source but is silent.
+            Assert.That(soundSources[0].clip, Is.Null);
+            Assert.That(saved.audioView.clip, Is.Null);
             Assert.That(saved.groupFireCurtain.gameObject.activeSelf, Is.False);
             Assert.That(saved.status, Is.Not.Null); Assert.That(saved.playerStatus, Is.Not.Null);
             Assert.That(saved.personalFlames, Has.Length.EqualTo(2));

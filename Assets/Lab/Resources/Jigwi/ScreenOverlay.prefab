@@ -261,7 +261,7 @@ AudioSource:
   serializedVersion: 4
   OutputAudioMixerGroup: {fileID: 0}
   m_audioClip: {fileID: 0}
-  m_Resource: {fileID: 8300000, guid: 22f510d9cdefe464eb9df28606de2444, type: 3}
+  m_Resource: {fileID: 0}
   m_PlayOnAwake: 0
   m_Volume: 0.6
   m_Pitch: 1
@@ -359,7 +359,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c70385d09f16d463fbc1bde303139374, type: 3}
   m_Name: 
   m_EditorClassIdentifier: C6Lab.Runtime::C6Lab.LabJigwiGroupFireAudio
-  clip: {fileID: 8300000, guid: 22f510d9cdefe464eb9df28606de2444, type: 3}
+  clip: {fileID: 0}
   volume: 0.6
   loopSource: {fileID: 5095446166344354642}
 --- !u!1 &698640622785641705

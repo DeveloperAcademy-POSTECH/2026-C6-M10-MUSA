@@ -23,8 +23,8 @@ namespace C6Lab
 
         private static readonly string[] JigwiClips =
         {
-            // #509: the 지귀 A/B shout clips were removed; only the B fire loop remains.
-            LabJigwiGroupFireAudio.ClipResource,
+            // #509: the 지귀 A/B shout clips were removed. #602: the old B fire loop (GroupFireLoop) was removed too,
+            // because its licence could not be confirmed; the old fire-curtain B is silent and the smoke B is unchanged.
         };
 
         private static Object retainedRewardFire;
