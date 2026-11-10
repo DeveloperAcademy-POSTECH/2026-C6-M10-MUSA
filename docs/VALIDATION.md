@@ -7388,3 +7388,13 @@ main `e1e8d3e2`의 #617 오프닝·#618 VFX 작업을 충돌 없이 합쳤고 �
 PlayMode의 기존 main 실패17건은 표시용 최소 구슬 크기와 구형 기대값 불일치2건(LabComboProjectileIntegrationTests), 저장된 지귀 A 전용 설정과 기대 시간표 불일치8건(LabJigwiABNetworkTests7·GameJigwiStageIntegrationTests1), GameSceneFlowTests2건, GameTouchInkFlowTests4건, GameTutorialFlowTests1건이다. 최소 표시 크기는 #607이 충돌 크기와 의도적으로 분리한 값이며 이번 변경에서 물리·트레일·해당 검사를 바꾸지 않았다. 테스트 실패를 삭제·skip·PASS 처리하지 않고 기준 main에서의 재현과 별도로 기록한다.
 
 독립 코드 검토에서 Notice 생성·로그·Host 권한·공유259개·접속 규약·Scene/Prefab 변경이 없고 Release 표시 차단이 유지되는 것을 확인했다. 기기별 설정·실제 Home→Lobby/Battle 연결은 위 실제 PlayMode 결과로 확인했으며, Release/Mac standalone/iOS 실행과 실제 다중 기기 네트워크 검증은 계속 미실행이다.
+
+
+### #616 최종 main #620 추가 반영 후 확인 — 2026-11-10
+
+검사 중 추가된 main `f9d13362`의 #620(지귀 시험 전용 스케줄 OFF·물바가지 B 복구)을 충돌 없이 보존해 합쳤다. #616 목적의 변경은 여전히 NoticeText 표시와 로컬 DEV 설정뿐이며, main이 복구한 LabConfig와 지귀 검사 준비값을 되돌리지 않았다.
+
+- 전체 EditMode 재확인: **2,166/2,174 통과·기존 결과 UI 실패8·skip0**, 20.68초. #620의 새 저장 설정 검사도 포함한다.
+- 영향 PlayMode: **14/23 통과·기존 실패9·skip0**, 32.65초. LabJigwiABNetwork9·GameJigwiStageIntegration1·NoticeText4건이 모두 통과해 이전 지귀 실패8건이 해소됐음을 확인했다.
+- 수정 없는 같은 main `f9d13362`에서 이전 실패17건을 재실행: **8/17 통과·9실패·skip0**, 29.98초. 남은 실패9건의 이름과 메시지가 변경본과 모두 동일하다. 구슬 표시 크기2·게임 흐름2·터치 먹물4·튜토리얼 로그1건이며 이번 변경에만 발생한 실패는 없다.
+- 전체 PlayMode 전수는 위 `e1e8d3e2` 통합 상태에서 수행했다. #620 추가 후에는 영향 묶음을 선별 재검사했으며 다시 전수 실행한 것으로 기록하지 않는다. Release·standalone·iOS·실제 다중 기기 네트워크 검증의 미실행 범위는 위와 같다.
