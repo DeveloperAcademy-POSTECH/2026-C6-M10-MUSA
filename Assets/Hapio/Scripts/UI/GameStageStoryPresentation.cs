@@ -103,7 +103,7 @@ namespace Hapio
             }
             if (mode == Mode.AfterStage && clearControls != null && player.IsReading && !player.IsTransitioning)
                 player.Next(); // The silent final picture itself is the ready/waiting screen.
-            if (mode == Mode.ReadyToAdvance && resultActionsReady && session.SummaryStarted)
+            if (mode == Mode.ReadyToAdvance && resultActionsReady && session.SummaryAllowed)
                 BeginEnding();
             screen.RefreshStoryViewer();
             if (showingOverall)
@@ -148,7 +148,9 @@ namespace Hapio
             clearControls = view.GetComponent<StoryStageClearControls>();
             if (clearControls != null) clearControls.nextSeal.onClick.AddListener(Advance);
             var summary = view.GetComponent<SealRunSummary>();
-            if (summary != null) summary.Bind(session.StageResults, session.Network.LocalPlayerId);
+            // Rows follow the stage number, so a missing stage leaves its own row empty instead of shifting the rest.
+            if (summary != null) summary.Bind(new[] { session.StageResultFor(1), session.StageResultFor(2), session.StageResultFor(3) },
+                session.Network.LocalPlayerId);
             StoryCardRecords.Record[] rows = CardRecords(boundResult, session.Network.LocalPlayerId);
             StoryCardRecords[] cards = view.GetComponentsInChildren<StoryCardRecords>(true);
             foreach (var records in cards)
@@ -301,12 +303,14 @@ namespace Hapio
             Label(advanceButton, failed ? "이 스테이지 재도전" : final ? "봉인 총평" : "다음 스테이지");
             bool overall = final && review && !authoredClear && session.StageResults.Count > 0;
             Show(overallButton, overall); Set(overallButton, overall && !blocked);
-            bool inspect = review && !authoredClear && !HasAction("InspectGourd");
+            // The clear picture keeps 완성 박 보기 (#649) and, before the last stage, 나가기 for everyone; only the
+            // shared advance moves to the picture's own 다음 봉인.
+            bool inspect = review && !HasAction("InspectGourd");
             Show(viewerButton, inspect); Set(viewerButton, inspect && !blocked && session.PreviewTexture != null);
             bool skip = player.IsPlaying && (mode == Mode.AfterStage || mode == Mode.Failure || mode == Mode.Ending)
                 && !SkipHiddenOnThisCut;
             Show(skipButton, skip); Set(skipButton, skip && !blocked);
-            bool exit = review && !final && !authoredClear || failed && !HasAction("Exit");
+            bool exit = review && !final || failed && !HasAction("Exit");
             Show(exitButton, exit); Set(exitButton, exit && !blocked);
             Label(exitButton, "나가기");
             // The approved result design has no status line, so the saved label stays hidden.
@@ -411,7 +415,7 @@ namespace Hapio
 
         private void BeginEnding()
         {
-            if (mode == Mode.Ending || !session.SummaryStarted || !session.CanReturnHome) return;
+            if (mode == Mode.Ending || !session.SummaryAllowed || !session.CanReturnHome) return;
             showingOverall = false; mode = Mode.Ending; SetBusy(true);
             player.Play(ending); RefreshControls();
         }

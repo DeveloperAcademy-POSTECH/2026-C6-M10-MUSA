@@ -105,6 +105,8 @@ namespace Hapio
         public LabSnapshot ResultSnapshot { get; private set; }
         /// <summary>이번 판에서 깬 스테이지들의 결과 (스테이지 순서). ALL STAGES CLEAR 화면의 전체 대시보드가 쓴다.</summary>
         public IReadOnlyList<LabResultStage> StageResults => new List<LabResultStage>(stageResults.Values);
+        /// <summary>The cleared result of one stage (1–3), or null when that stage has no successful record.</summary>
+        public LabResultStage StageResultFor(int stageIndex) => stageResults.TryGetValue(stageIndex, out var stage) ? stage : null;
         public Texture PreviewTexture => preview != null && !preview.IsDisposed ? preview.Texture : null;
         /// <summary>The open viewer's zoom (0 far … 1 near, .5 fitted); the floor shadow follows it.</summary>
         internal float PreviewZoom => preview != null && !preview.IsDisposed ? preview.ZoomNormalized : .5f;
@@ -954,9 +956,9 @@ namespace Hapio
             return true;
         }
 
-        private void OnPeerDisconnected(ulong _, bool lostHost)
+        private void OnPeerDisconnected(ulong peer, bool lostHost)
         {
-            if (state.phase == GameFlowPhase.Completed) { CacheResultSnapshot(); return; }
+            if (state.phase == GameFlowPhase.Completed) { CacheResultSnapshot(); ForgetResultPeer(peer, lostHost); return; }
             if (goingHome) return;
             if (state.phase == GameFlowPhase.GameOver && state.retryableDefeat)
             {

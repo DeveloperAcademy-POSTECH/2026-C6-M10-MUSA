@@ -9,6 +9,12 @@ namespace Hapio
         private readonly HashSet<ulong> resultPresentations = new HashSet<ulong>();
         private bool localResultPresentationBusy;
         public bool SummaryStarted { get; private set; }
+        /// <summary>
+        /// The Host left after the final clear, before starting the summary. Its start signal can no longer arrive,
+        /// so this member goes on to the summary and ending by itself instead of waiting on a silent picture.
+        /// </summary>
+        public bool HostLostAfterClear { get; private set; }
+        public bool SummaryAllowed => SummaryStarted || HostLostAfterClear;
         public bool CanStartSummary => network != null && network.IsConnected && !goingHome
             && !tutorialRun && !IsTerritory && state.phase == GameFlowPhase.Completed
             && state.stageIndex == state.totalStages && !SummaryStarted && CanAdvanceStage;
@@ -29,6 +35,20 @@ namespace Hapio
                 || !MatchesControlIdentity(control) || control.state.battleSessionId != state.battleSessionId
                 || control.state.battleRound != state.battleRound) return;
             SummaryStarted = true;
+            Changed?.Invoke();
+        }
+
+        /// <summary>
+        /// A member who leaves the final result no longer reads or views it; without this its last busy/viewer
+        /// report would keep the Host's 다음 봉인 disabled for good. The Host losing itself frees its members.
+        /// </summary>
+        private void ForgetResultPeer(ulong id, bool lostHost)
+        {
+            resultViewers.Remove(id);
+            resultPresentations.Remove(id);
+            resultReady.Remove(id);
+            if (lostHost && !network.IsHost && !tutorialRun && !IsTerritory && state.stageIndex == state.totalStages)
+                HostLostAfterClear = true;
             Changed?.Invoke();
         }
 
@@ -73,6 +93,7 @@ namespace Hapio
         private void ResetResultAdvance()
         {
             SummaryStarted = false;
+            HostLostAfterClear = false;
             resultViewers.Clear();
             resultPresentations.Clear();
             localResultPresentationBusy = false;

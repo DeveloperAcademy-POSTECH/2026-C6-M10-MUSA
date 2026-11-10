@@ -24,7 +24,7 @@ namespace Hapio.Tests
             {
                 Assert.That(cut.viewPrefab.sourceFigmaNodeId,Does.StartWith("4210:"));
                 foreach(var image in cut.viewPrefab.GetComponentsInChildren<Image>(true))
-                    if(image.GetComponent<Mask>()==null&&image.name!="Card Turn Pivot"&&!image.name.EndsWith(" Action")&&!image.name.StartsWith("Rectangle 175")&&image.name!="Continue Hit Area")Assert.That(image.sprite,Is.Not.Null,cut.cutId+" / "+image.name);
+                    if(image.GetComponent<Mask>()==null&&image.name!="Card Turn Pivot"&&!image.name.EndsWith(" Action")&&!image.name.StartsWith("Rectangle 175")&&image.name!="Continue Hit Area"&&image.name!="NextSeal")Assert.That(image.sprite,Is.Not.Null,cut.cutId+" / "+image.name);
             }
         }
         [Test] public void EachSealCardKeepsEditableFrontBackAndAnInspectionEvent()
