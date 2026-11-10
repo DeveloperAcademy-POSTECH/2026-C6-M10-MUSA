@@ -416,8 +416,13 @@ namespace Hapio.Tests
             Assert.That(camera.gameObject.scene, Is.EqualTo(session.gameObject.scene));
             Assert.That(Camera.allCameras.Count(candidate => candidate.name == camera.name), Is.EqualTo(1),
                 "An old preview camera must not share the current staging area.");
-            Assert.That(camera.transform.parent.GetComponentsInChildren<MeshRenderer>()
-                .Any(renderer => renderer.name == "Result Rope"), Is.False, "The viewer shows the gourd without its hanging rope.");
+            // The battle's hanging rope is drawn by LabHangingTarget's "Rope"/"Upper Rope" cylinders or the curved
+            // "Continuous Rope" line; the viewer copies only the gourd model, so none of them may reach the preview rig.
+            Transform rig = camera.transform.parent;
+            Assert.That(rig.GetComponentsInChildren<Renderer>(true).Select(renderer => renderer.name)
+                .Intersect(new[] { "Rope", "Upper Rope", "Continuous Rope" }), Is.Empty,
+                "The viewer shows the gourd without its hanging rope.");
+            Assert.That(rig.GetComponentsInChildren<LineRenderer>(true), Is.Empty, "No curved rope line in the viewer.");
 
             byte[] ReadAlpha()
             {
@@ -444,9 +449,20 @@ namespace Hapio.Tests
             Assert.That(shadow.texture, Is.SameAs(projection), "Turning the gourd reuses the projection texture.");
             Assert.That(ReadAlpha().Where((alpha, index) => Math.Abs(alpha - initial[index]) > 32).Count(),
                 Is.GreaterThan(100), "Turning the real result mesh changes its projected silhouette.");
+            // Zooming moves the preview camera; the floor shadow scales with the drawn gourd.
+            float fitted = shadow.rectTransform.localScale.x;
+            session.ZoomPreview(.4f);
+            yield return null;
+            Assert.That(shadow.rectTransform.localScale.x, Is.GreaterThan(fitted * 1.3f), "Zooming in grows the shadow with the gourd.");
             screen.resetViewerButton.onClick.Invoke();
             yield return null;
             Assert.That(ReadAlpha(), Is.EqualTo(initial), "Reset restores the original silhouette.");
+            Assert.That(shadow.rectTransform.localScale.x, Is.EqualTo(fitted).Within(.001f), "Reset restores the shadow size.");
+            // The stage art covers the screen without stretching: the visible part keeps the 402×874 proportions.
+            var backdrop = screen.viewerPanel.transform.Find("Stage Background").GetComponent<UnityEngine.UI.RawImage>();
+            Rect area = ((RectTransform)backdrop.transform).rect;
+            float shown = area.width / area.height * backdrop.uvRect.height / backdrop.uvRect.width;
+            Assert.That(shown, Is.EqualTo(402f / 874f).Within(.002f), "The stage background keeps its aspect.");
         }
 
         private static Vector2 PreviewScreenPoint(RectTransform rectangle, float x, float y)

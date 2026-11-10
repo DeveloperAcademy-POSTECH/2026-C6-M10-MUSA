@@ -67,15 +67,19 @@ namespace Hapio
         }
         public void Open()
         {
-            if(session==null||session.Network.IsBattlePaused||session.State.phase!=GameFlowPhase.Playing)return;
-            bindings.board.CancelDrag();modal.SetActive(true);GameViewerHelpUi.Fit(design);
+            if(!CanStayOpen)return;
+            bindings.board.CancelDrag();modal.SetActive(true);LabOrbBoard.ExternalModalOpen=true;GameViewerHelpUi.Fit(design);
         }
-        public void Close()=>modal.SetActive(false);
+        public void Close(){modal.SetActive(false);LabOrbBoard.ExternalModalOpen=false;}
+        // Closed for a shared pause and from the 100% finish on (the phase is still Playing while it plays).
+        private bool CanStayOpen=>session!=null&&!session.Network.IsBattlePaused&&session.State.phase==GameFlowPhase.Playing
+            &&!session.IsFinishingBattle;
+        private void OnDisable(){if(modal!=null&&modal.activeSelf)Close();}
         private void LateUpdate()
         {
             if(helpButton==null)return;
             helpButton.gameObject.SetActive(bindings.hud.pauseButton.gameObject.activeInHierarchy);
-            if(IsOpen){if(session.State.phase!=GameFlowPhase.Playing||session.Network.IsBattlePaused)Close();else GameViewerHelpUi.Fit(design);}
+            if(IsOpen){if(!CanStayOpen)Close();else GameViewerHelpUi.Fit(design);}
         }
     }
 }

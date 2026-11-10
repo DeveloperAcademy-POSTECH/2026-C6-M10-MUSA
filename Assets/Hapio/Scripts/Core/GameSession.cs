@@ -105,6 +105,8 @@ namespace Hapio
         /// <summary>이번 판에서 깬 스테이지들의 결과 (스테이지 순서). ALL STAGES CLEAR 화면의 전체 대시보드가 쓴다.</summary>
         public IReadOnlyList<LabResultStage> StageResults => new List<LabResultStage>(stageResults.Values);
         public Texture PreviewTexture => preview != null && !preview.IsDisposed ? preview.Texture : null;
+        /// <summary>The open viewer's zoom (0 far … 1 near, .5 fitted); the floor shadow follows it.</summary>
+        internal float PreviewZoom => preview != null && !preview.IsDisposed ? preview.ZoomNormalized : .5f;
         internal GameGourdFloorShadow PreviewShadow
         {
             get
