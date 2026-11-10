@@ -108,3 +108,10 @@ Host NEXT/재도전은 모두 다음 조건을 기다린다.
 - 새 미리보기: `Hapio > Story > Open Seal Run Summary Preview` → Play. 총평과 엔딩만 재생하며, `SealRunSummaryPreview.samplePlayer`를 1/2로 바꾸어 각자의 수치를 확인할 수 있다. 예시 데이터는 이 전용 미리보기 구성에만 있고 실제 결과 연결에는 쓰지 않는다. 게임 Scene·빌드 목록은 변경하지 않는다.
 - `Hapio > Story > Create Seal Run Summary`는 빠진 신규 에셋만 만들고 같은 컷을 중복 삽입하지 않는다. 이미 만든 프리팹의 수작업 편집은 덮어쓰지 않는다.
 - 색상은 Figma 명시값을 따르며 표 제목 `TextColor/DarkRed/900`, 헤더 `5OrbsColor/FireRed/900`, 행 `TextColor/SecondaryLightIvory/800`, 평가 `TextColor/PrimaryBrown/500***` 역할을 사용한다. 기존 한지 배경 재질과 신라문화체를 재사용한다.
+
+
+### #647 Host-controlled stage clear
+
+`StoryStageClearControls` owns role-specific UI on all three After_02 prefabs. Only the host sees Next Seal; existing readiness, viewer and touch-release gates control interaction. Background taps cannot advance. Gumiho/Yagwanggui guests see the host-wait message. Jigwi guests hide both the next-yokai heading and host-wait message, while host UI remains unchanged.
+
+Host advances everyone to the next game for stages 1/2. After Jigwi, StartSummary broadcasts a sticky summary-start flag for the matching completed run/stage/revision/settings/battle/round. Repeated state broadcasts recover missed messages. Summary/ending reading thereafter remains individual. Game connection token is C6HapioGame/49; older clients cannot mix. StageStoryShowcase.previewAsHost previews the role without network progression.

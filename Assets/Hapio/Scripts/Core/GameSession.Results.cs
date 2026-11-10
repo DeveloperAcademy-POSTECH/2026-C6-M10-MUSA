@@ -8,6 +8,30 @@ namespace Hapio
         private readonly HashSet<ulong> resultViewers = new HashSet<ulong>();
         private readonly HashSet<ulong> resultPresentations = new HashSet<ulong>();
         private bool localResultPresentationBusy;
+        public bool SummaryStarted { get; private set; }
+        public bool CanStartSummary => network != null && network.IsConnected && !goingHome
+            && !tutorialRun && !IsTerritory && state.phase == GameFlowPhase.Completed
+            && state.stageIndex == state.totalStages && !SummaryStarted && CanAdvanceStage;
+        public bool StartSummary()
+        {
+            if (!CanStartSummary) return false;
+            SummaryStarted = true;
+            BroadcastState();
+            Changed?.Invoke();
+            return true;
+        }
+        private void ReadSummaryStart(Control control)
+        {
+            // Sticky within this exact result generation; a delayed false heartbeat cannot undo it.
+            if (!control.summaryStarted || SummaryStarted || tutorialRun || IsTerritory
+                || state.phase != GameFlowPhase.Completed || state.stageIndex != state.totalStages
+                || control.state == null || control.state.phase != GameFlowPhase.Completed
+                || !MatchesControlIdentity(control) || control.state.battleSessionId != state.battleSessionId
+                || control.state.battleRound != state.battleRound) return;
+            SummaryStarted = true;
+            Changed?.Invoke();
+        }
+
         public bool IsAnyResultViewerOpen => IsViewerOpen || resultViewers.Count > 0;
         public bool IsAnyResultPresentationBusy => localResultPresentationBusy || resultPresentations.Count > 0;
 
@@ -48,6 +72,7 @@ namespace Hapio
 
         private void ResetResultAdvance()
         {
+            SummaryStarted = false;
             resultViewers.Clear();
             resultPresentations.Clear();
             localResultPresentationBusy = false;

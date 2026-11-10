@@ -7639,3 +7639,10 @@ The manual conflict resolution only combines documentation. Selected PlayMode ch
 ### #634 latest-main follow-up verification
 
 Main advanced to `6b2706aa` during PR verification (#633 and #639). Integrated it in `b49a35f9`; the only conflict was again this document, and both histories were retained. The 24 original #634 code/asset files remain unchanged. On this final integrated code, full EditMode **2199/2199 PASS** and the two result/game-over PlayMode checks named above **2/2 PASS**, no failures or skips. GitHub reported PR #640 mergeable. Only documentation was manually resolved; pre-existing generated asset whitespace was retained rather than modifying unrelated assets. Full PlayMode and physical-device tests were not rerun.
+
+
+### #647 Host-controlled stage clear - 2026-11-10
+
+Unity compilation: no errors. StageClearControlsTests: 4/4 pass after correcting a missing stageCatalog in the test fixture. Covers three prefab role states, Jigwi guest heading/wait suppression, and summary generation validation/sticky/reset behavior. Related LabGameFlowBridgeTests and LabLobbyRejoinTests: 43/43 pass with token 49. Full suite was not run.
+
+Unity Simulator: inspected only Jigwi final cut as guest; both requested messages and the advance button are absent. Stopped Play mode after inspection. Real multi-device synchronized progression and mobile builds remain unverified. Unity-generated blank m_Name YAML fields retain serializer whitespace.

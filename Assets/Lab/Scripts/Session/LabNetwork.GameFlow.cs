@@ -16,7 +16,7 @@ namespace C6Lab
         // 46: the paint-finish control compares the shared last stamp sequence, not each device's own change count.
         // 47: story-stage gourds and their hit shells are drawn 1.4 times larger.
         // 48: #595 Jigwi smoke flow (protocol 5698, Lab 59).
-        private static readonly byte[] GameConnectionToken = Encoding.ASCII.GetBytes("C6HapioGame/48");
+        private static readonly byte[] GameConnectionToken = Encoding.ASCII.GetBytes("C6HapioGame/49");
         private const int MaximumGameFlowBytes = 8192;
         private bool gameFlowEnabled;
         private bool gameBattleFrozen;

@@ -423,3 +423,6 @@
 ## 플레이어별 칠 무늬 기본 OFF
 
 - `Player Paint Patterns`(DEV 인덱스137, `LabConfig.playerPaintPatternsEnabled`)의 코드·저장 기본값은 꺼짐이다. 박 표면의 P번호별 무늬와 플레이어 원 오른쪽 아래·로비 P 자리의 무늬 표시가 함께 꺼진다. 색·면적·P지도·승리 판정은 그대로다. 기능 코드와 DEV 행·인덱스는 남겨 DEV로 다시 켤 수 있다. config가 없을 때도 꺼짐으로 본다. 설정 259개와 접속 묶음은 바꾸지 않았다.
+
+
+- #647 host-controlled stage clear adds the summary-start state flag. Current game token: **C6HapioGame/49**. Settings count 259, protocol 5698 and C6PhysicsLab/59 remain unchanged; do not mix Game/48 or older clients.
