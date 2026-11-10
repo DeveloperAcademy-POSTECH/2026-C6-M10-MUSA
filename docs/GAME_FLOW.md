@@ -382,3 +382,14 @@ B는 전원 동시에 자기 발화점을 소화하면 그 순간부터5초 보�
 ## Direct IP 주소 표시(#557)
 
 Host 로비는 안내문과 방 카드 사이에 `방장 IP 192.168.0.12, 172.20.10.1 · 포트 50123` 형식으로 이 기기의 IPv4와 실제 방 포트를 표시한다. Wi-Fi·유선을 앞에, 핫스팟을 그 뒤에 놓고, 루프백·링크 로컬·셀룰러·VPN은 뺀다. 주소는 1초마다 다시 읽는다. 읽을 수 없으면 `방장 IP 확인 불가`로 표시한다. 게스트·개발자 솔로에는 표시하지 않는다. Direct IP 입력창의 포트는 비어서 열린다. 방마다 포트가 다르므로 게스트의 포트를 미리 넣지 않으며, 비어 있으면 입장을 거절한다. 표시 줄은 Awake에서 기존 라벨을 복제해 만들고 공용 Prefab은 바꾸지 않는다.
+
+## 터치 먹물 번짐 (#587)
+
+전투 Scene을 제외한 모든 화면(Home·Lobby·StageResult·GameOver, 그 안의 오프닝·스토리)에서 손가락이 닿을 때마다 그 자리에 희미한 먹물이 번졌다 사라진다. 튜토리얼과 일시정지는 전투 Scene 안이라 나오지 않는다.
+
+- **구현:** `GameTouchInk`가 `GameSession` 아래에서 Scene을 넘어 유지된다. 입력은 장치(`Touchscreen`·`Mouse`)에서 직접 읽고, 캔버스에 `GraphicRaycaster`가 없어 버튼·스크롤 터치를 가로채지 않는다. 이 기기 화면에만 보이고 네트워크로 보내지 않는다.
+- **그리는 순서:** Sorting Order 30050. 메뉴·오프닝 위, 장면 전환 페이드(30100)·로딩 화면(30150) 아래다.
+- **모양:** 터치마다 가운데 얼룩의 종류·회전·크기와 주변 먹 방울의 개수·방향·거리·크기를 새로 정한다. 가운데 얼룩은 코드로 만든 둥근 먹 번짐 8종(`Art/UI/TouchInk/TouchInkBlob01~08`, [생성 기록](asset-generation/touch-ink-blobs.md))이고, 주변 방울은 `Resources/OrbBoard/Stains`의 튀김점 2종이다. 둘 다 먹색으로 칠해 쓴다.
+- **사라지는 방식:** 찍히는 순간이 가장 진하고, 머무는 시간 없이 바로 옅어지며 살짝 번져 커진다.
+- **소리:** 지금은 넣지 않았다. `TouchInkArt`의 `Tap Sound`에 소리를 넣으면 코드 수정 없이 터치할 때 한 번 난다(여러 손가락이 동시에 닿아도 한 번). Home 등에는 AudioListener가 없어서 소리가 나는 동안만 잠깐 붙이고, 게임의 효과음 크기 설정을 함께 따른다. 소리를 넣을 때는 [오디오 출처](AUDIO_CREDITS.md)에도 기록한다.
+- **조절:** `Assets/Hapio/Resources/Hapio/UI/TouchInkArt.asset`의 Inspector 값이다. 터치 소리(`Tap Sound`)와 크기(`Sound Volume`), 희미한 정도(`Ink Strength`), 가운데 얼룩 크기(`Stain Size`), 사라지는 시간(`Fade Seconds`), 먹 방울 수(`Droplets Min/Max`)와 크기(`Droplet Size Min/Max`), 동시 표시 수(`Max Marks`). Play 중에 바꾸면 희미한 정도와 시간은 바로, 모양은 다음 터치부터 반영된다.

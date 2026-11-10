@@ -7152,3 +7152,18 @@ Compared twelve seed masks and selected 572. Changed only seed defaults and the 
 | 저장값·묶음 계산 (Editor eval, 화면 높이 844·874·932·1100) | PASS — 197번 90초, 피버 8/10/12, 묶음 가운데 0.5000 |
 | EditMode·PlayMode Test Runner | NOT_RUN |
 | 노치 iPhone 실기기, Mac 다중 앱 | NOT_RUN |
+
+### #587 전투 화면 밖 터치 먹물 번짐 — 2026-11-09
+
+- `GameTouchInk`와 `TouchInkArt.asset`을 추가하고 `GameSession`에 연결했다. 전투 Scene에서는 새로 찍지 않고, 캔버스에 `GraphicRaycaster`가 없어 터치를 막지 않는다.
+- 가운데 얼룩은 기존 수채 얼룩이 별 모양으로 보여, 코드로 만든 둥근 먹 번짐 8종으로 바꿨다. 참고 이미지는 분위기 확인에만 썼고 픽셀을 가져오지 않았다.
+- 일반 게임 규칙·통신 값·공유 설정은 바꾸지 않았다.
+
+| 확인 | 결과 |
+| --- | --- |
+| Unity 컴파일 | PASS |
+| `TouchInkArt.asset` 생성·얼룩 8장·방울 2장 연결 (Editor) | PASS |
+| 터치 소리 틀 (`Tap Sound` 비어 있음, 소리 파일 미포함) | 코드·저장값 PASS — 소리 재생은 NOT_RUN |
+| 무작위 모양과 희미한 정도 시안 (실제 `RollMark` 값과 저장값으로 한지색 위 합성) | PASS — 화면 실행이 아닌 합성 이미지 |
+| EditMode·PlayMode Test Runner | NOT_RUN |
+| iPhone 실기기 (희미한 정도, 연타) | NOT_RUN |
