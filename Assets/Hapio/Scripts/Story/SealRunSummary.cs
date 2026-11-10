@@ -55,14 +55,16 @@ namespace Hapio
         public static string Contribution(LabResultStage stage, ulong localPlayerId)
         {
             if (stage == null || stage.Players == null) return "—";
-            long total = 0, mine = 0;
+            double total = 0, mine = 0;
             bool found = false;
             foreach (var player in stage.Players)
             {
                 if (player == null) continue;
-                int damage = Math.Max(0, player.damageTotal);
-                total += damage;
-                if (player.id == localPlayerId) { mine += damage; found = true; }
+                // Judgment cells are equal-area. Count newly painted cells, including funded growth,
+                // rather than hit score or the ownership still visible after drying/overpainting.
+                long painted = Math.Max(0L, player.paintedCellsTotal);
+                total += painted;
+                if (player.id == localPlayerId) { mine += painted; found = true; }
             }
             if (!found) return "—";
             return (total == 0 ? 0 : (int)Math.Round(100d * mine / total, MidpointRounding.AwayFromZero)).ToString() + "%";

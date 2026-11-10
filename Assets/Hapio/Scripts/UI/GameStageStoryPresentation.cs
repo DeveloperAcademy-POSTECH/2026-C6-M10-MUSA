@@ -141,8 +141,8 @@ namespace Hapio
             UnbindActions();
             if (view == null || boundResult == null) return;
             var summary = view.GetComponent<SealRunSummary>();
-            if (summary != null) summary.Bind(session.StageResults, session.Network.LocalPlayerId);
-            StoryCardRecords.Record[] rows = CardRecords(boundResult, session.Network.LocalPlayerId);
+            if (summary != null) summary.Bind(session.SealStageResults, session.ResultLocalPlayerId);
+            StoryCardRecords.Record[] rows = CardRecords(boundResult, session.ResultLocalPlayerId);
             StoryCardRecords[] cards = view.GetComponentsInChildren<StoryCardRecords>(true);
             foreach (var records in cards)
                 records.Bind(boundResult.paintCoverage, (float)boundResult.remaining, rows);

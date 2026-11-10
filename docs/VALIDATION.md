@@ -7639,3 +7639,31 @@ The manual conflict resolution only combines documentation. Selected PlayMode ch
 ### #634 latest-main follow-up verification
 
 Main advanced to `6b2706aa` during PR verification (#633 and #639). Integrated it in `b49a35f9`; the only conflict was again this document, and both histories were retained. The 24 original #634 code/asset files remain unchanged. On this final integrated code, full EditMode **2199/2199 PASS** and the two result/game-over PlayMode checks named above **2/2 PASS**, no failures or skips. GitHub reported PR #640 mergeable. Only documentation was manually resolved; pre-existing generated asset whitespace was retained rather than modifying unrelated assets. Full PlayMode and physical-device tests were not rerun.
+
+
+## 2026-11-10 — #642 봉인 총평의 실제 신규 도색 기여도·성공 시간 연결
+
+기준은 PR #646의 `feat/seal-run-summary`/`b0ae6bce`(main `64d556ae` 포함)다. Unity 6000.6.5f1·macOS/Metal의 기존 Editor 한 개에서 수행했다. 사용자 확정 기준은 **기여도=실제로 새로 칠한 면적의 비율**, **총 시간=성공한1~3스테이지 전투 시간의 합**이다. 예시 Preview의 공격 점수를 실제 기여도로 쓰지 않는다.
+
+Host의 `PaintFundedCell`에서 실제 빈 동일 면적 셀이 칠해질 때 최종 공급자에게만 `paintedCellsTotal`을 적립한다. 초기·성장·분수 공급·오색은 같은 경로를 사용하며 덮어쓰기·미사용 예산·시각 여백은 제외한다. 건조로 차감하지 않고 마른 셀 재도색은 다시 적립한다. 기존 공격 점수·땅따먹기 통계·색/P지도·면적 예산·난수·승패는 유지한다. 복사본의 새 통계는 기존 snapshot/보드/승인 경로로만 전달하며, 같은 세대·같은 플레이어의 확정 누적값만 최댓값으로 유지해 전송 순서 차이로 되감기지 않게 했다.
+
+총평은 성공 기록의 고정1/2/3슬롯과 결과용 로컬 ID를 읽는다. DEV Skip의 누락 기록은 앞당기지 않고 완료 후 연결 종료에도 본인 기여도를 유지한다. 실패/로딩/후일담 시간을 합산하지 않는다. 새 통계의 호환 묶음은 설정259개·5699/Lab60/Game50이다(Game49는 별도 #647이 사용). 원본 Scene·Prefab·Material·빌드/패키지 설정은 변경하지 않았다.
+
+| 실행 | 결과 |
+| --- | --- |
+| 최종 컴파일 확인 후 전체 EditMode | **2,225/2,225 통과**, 실패·skip·inconclusive0, 32.68초 |
+| 신규 집계·복제 집중 EditMode | **24/24 통과**, 실패·skip·inconclusive0, 6.25초 |
+| 전체 PlayMode 1회 | **784건 중781 통과·3실패**, skip·inconclusive0, 716.01초. 아래 검사 준비 문제를 구분해 보완했다. |
+| 실제3스테이지 결과→총평·연결 종료 후 본인 기록·엔딩/Home 재검증 | **1/1 통과**, 22.82초 |
+| 실제 마우스로 DEV Skip의 누락 행·Continue→구름→Ending_01→Home 재검증 | **1/1 통과**, 11.34초 |
+| 오프닝 완료 후 정리 재검증 | **1/1 통과**, 1.19초 |
+
+전체 PlayMode에서 발견한 실패3건은 새 총평 검사2건의 배열 `Has.Count` 반사 오류와 기존 오프닝 검사1건의 지연 파괴 프레임 경합이었다. 배열의 실제 `records.Count`를 직접 비교하고, 오프닝은 화면 숨김/CurrentView null/음성 정지 단언을 즉시 유지한 채 자식 객체 삭제 확인만 다음 프레임에 수행했다. 최초 총평 클릭 단독 재검사도 0/1(9.14초)이었는데, 새로 활성화된 Continue의 첫 렌더 전 레이캐스트에서 발생했다. 첫 렌더 한 프레임을 기다리도록 검사 준비만 추가했고, 화면내 좌표·첫 GraphicRaycaster 대상·실제 InputSystem 마우스 입력 단언은 모두 유지해 위11.34초 재검사로 확인했다. 게임의 입력·애니메이션 코드는 이 과정에서 바꾸지 않았다.
+
+초기 EditMode 요청의2,201/2,201(32.79초)은 컴파일 종료 전에 수집된 목록으로 신규 면적 검사가0개라 최종 구현의 통과 근거에서 제외한다. 신규 검사가 포함된 중간 전체 실행2,222/2,223(34.42초)은 새 모델 검사에서 진행 중인 판을 끝내지 않고 다시 Begin한 준비 오류1건을 발견했다. 실제 제한시간 종료→Defeat 확인→새 Begin 순서로 검사만 보완해 새 라운드0 초기화 단언을 유지했다. 그 뒤 최종 컴파일된 전체 목록의2,225/2,225 결과를 별도로 확정했다.
+
+실패한 PlayMode3건을 보완한 뒤 전체784건을 다시 실행한 것으로 표현하지 않는다. 변경 범위 기반 지침에 따라 영향 검사만 재실행했고, 전체 실행 뒤 바뀐 C#은 검사 준비뿐이며 게임 코드10파일의 내용은 보존한 해시와 동일했다. 현재 확인된 미해결 검사 실패는 없다. 신규24케이스에는 초기/반복/성장 공급자·분수 귀속·건조/재칠·Clear/Reset·지도/난수 비회귀·실제 Host ConfirmHit·복사 독립성, JSON/보드/receipt/스냅샷·큰 정수/음수·권한·동일시각/역순/중복·새 세대 초기화를 포함한다. Guest 수신은 로컬 메시지 fixture이며 실제 두 기기 통신 성공과 구분한다.
+
+실제 저장 게임 경로의 DEV Skip 결과를 원본 GameView로 촬영하고 세션 수치와 함께 저장소 밖 검증 자료로 보존했다. 누락1/2행은 —, 지귀 행만 실제 새셀2,048개 기준100%였다. 빠른 자동 완료의 전투시간0.000689초는 표시 규칙상00:00이며 임의 예시 시간이 아니다. 원본 Preview의 숫자를 실제 게임에 주입한 캡처가 아니다.
+
+미실행: iOS·실제 다인 일반Wi-Fi/핫스팟·standalone/Release 빌드 실행·성능 계측. 통신 통계가 추가됐으므로 실제 다인 확인 시 전 기기에 같은 새 버전을 사용해야 한다. PR 원격 갱신·main 병합은 이번 실행 단계에서 수행하지 않았다.

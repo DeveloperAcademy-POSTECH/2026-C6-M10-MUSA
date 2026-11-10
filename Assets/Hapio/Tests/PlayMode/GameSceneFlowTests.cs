@@ -903,29 +903,37 @@ namespace Hapio.Tests
                 Assert.That(snapshot.sessionId, Is.EqualTo(session.State.battleSessionId));
                 Assert.That(snapshot.round, Is.EqualTo(session.State.battleRound));
                 Assert.That(snapshot.phase, Is.EqualTo(LabPhase.Victory));
-                StoryCutView finalResultView = story.player.CurrentView;
                 Assert.That(story.exitButton.gameObject.activeInHierarchy, Is.False,
                     "The final result has one ending action, not an Exit button relabelled to the same action.");
                 Assert.That(story.presentationRoot.GetComponentsInChildren<UnityEngine.UI.Button>(true)
                     .Count(button => button.gameObject.activeInHierarchy
-                        && button.GetComponentInChildren<UnityEngine.UI.Text>(true)?.text == "엔딩 보기"), Is.EqualTo(1));
-                story.overallButton.onClick.Invoke();
-                yield return null;
-                GameStageResultView view = story.screen.resultView;
-                Assert.That(story.IsShowingOverall, Is.True);
-                Assert.That(view.gameObject.activeInHierarchy, Is.True);
-                Assert.That(view.paint.text, Is.EqualTo("전체 스테이지 기록"));
-                AssertVisibleRows(view, LabResultTable.OverallRowsFor(session.StageResults, network.LocalPlayerId));
-                view.nextButton.onClick.Invoke();
-                yield return null;
-                Assert.That(story.IsShowingOverall, Is.False);
-                Assert.That(story.player.CurrentView, Is.SameAs(finalResultView), "Overall returns to the retained result picture.");
-                AssertCurrentCard(story, snapshot);
+                        && button.GetComponentInChildren<UnityEngine.UI.Text>(true)?.text == "봉인 총평"), Is.EqualTo(1));
                 yield return Until(() => story.advanceButton.interactable, "The final result waits for result readiness.");
+                ulong completedPlayerId = network.LocalPlayerId;
+                Assert.That(session.ResultLocalPlayerId, Is.EqualTo(completedPlayerId));
+                network.Stop();
+                yield return null;
+                Assert.That(network.LocalPlayerId, Is.EqualTo(ulong.MaxValue), "The transport identity disappears after disconnect.");
+                Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.Completed), "A completed run retains its local result.");
+                Assert.That(session.ResultLocalPlayerId, Is.EqualTo(completedPlayerId),
+                    "Opening the summary after the connection ends still identifies the actual result owner.");
+                yield return Until(() => story.advanceButton.interactable, "Completed local results remain available after disconnect.");
                 story.advanceButton.onClick.Invoke();
                 Assert.That(story.player.sequence, Is.SameAs(story.ending));
-                Assert.That(story.player.sequence.cuts, Has.Count.EqualTo(6), "Do not show the authored fake Ending_07 title.");
+                Assert.That(story.player.sequence.cuts, Has.Count.EqualTo(7), "One actual summary precedes the existing six ending cuts.");
                 foreach (StoryCutDefinition cut in story.ending.cuts) Assert.That(cut.cutId, Is.Not.EqualTo("Ending_07"));
+                AssertSealSummaryFromActualStageRecords(story, true);
+                Assert.That(story.skipButton.gameObject.activeSelf, Is.False, "The summary must be read before its Continue action.");
+                Assert.That(story.screen.resultView.gameObject.activeInHierarchy, Is.False,
+                    "The authored summary replaces the retired overall dashboard rather than layering over it.");
+                yield return Until(() => story.player.CurrentView.continueButton.gameObject.activeInHierarchy
+                    && story.player.CurrentView.continueButton.IsInteractable() && story.player.IsReading,
+                    "The summary's own Continue becomes available after its entrance.");
+                story.player.CurrentView.continueButton.onClick.Invoke();
+                Assert.That(story.player.IsTransitioning, Is.True, "Continue starts the authored cloud wipe before replacing the summary.");
+                yield return Until(() => story.player.CurrentCutIndex == 1 && !story.player.IsTransitioning && story.player.IsReading,
+                    "The cloud wipe must finish on the actual first ending picture.");
+                Assert.That(story.player.sequence.cuts[story.player.CurrentCutIndex].cutId, Is.EqualTo("Ending_01"));
                 story.player.Skip();
                 yield return WaitHome();
                 Assert.That(network.IsConnected, Is.False);
@@ -1087,10 +1095,26 @@ namespace Hapio.Tests
                     "The one result action group exposes ending after the story is released.");
                 yield return ClickVisibleButtonWithMouse(mouse, story.advanceButton);
                 yield return Until(() => story.player.sequence == story.ending && story.player.IsPlaying,
-                    "A real footer click must begin the six-cut ending.");
-                Assert.That(story.ending.cuts, Has.Count.EqualTo(6));
+                    "A real footer click must open the summary before the six-cut ending.");
+                Assert.That(story.ending.cuts, Has.Count.EqualTo(7));
+                Assert.That(session.StageResults, Has.Count.EqualTo(1), "DEV skips are not successful-stage records.");
+                Assert.That(session.SealStageResults[0], Is.Null, "Skipping Gumiho leaves its own row empty.");
+                Assert.That(session.SealStageResults[1], Is.Null, "Skipping Yaguang leaves its own row empty.");
+                Assert.That(session.SealStageResults[2], Is.Not.Null, "The real Jigwi result stays in the Jigwi row.");
+                AssertSealSummaryFromActualStageRecords(story, false);
+                Assert.That(story.skipButton.gameObject.activeSelf, Is.False, "A summary is not skipped as if it were Ending_01.");
+                yield return Until(() => story.player.CurrentView.continueButton != null
+                    && story.player.CurrentView.continueButton.gameObject.activeInHierarchy
+                    && story.player.CurrentView.continueButton.IsInteractable() && story.player.IsReading,
+                    "Wait for the actual summary Continue, not a hidden authoring control.");
+                StoryCutView summaryView = story.player.CurrentView;
+                yield return ClickVisibleButtonWithMouse(mouse, summaryView.continueButton);
+                yield return Until(() => story.player.CurrentCutIndex == 1 && !story.player.IsTransitioning && story.player.IsReading,
+                    "A real Continue click crosses the cloud wipe and reveals Ending_01.");
+                Assert.That(story.player.sequence.cuts[1].cutId, Is.EqualTo("Ending_01"));
+                Assert.That(story.player.CurrentView, Is.Not.SameAs(summaryView));
                 yield return Until(() => story.skipButton.gameObject.activeInHierarchy && story.skipButton.IsInteractable(),
-                    "The ending reuses the reachable top SKIP control.");
+                    "The actual ending reuses the reachable top SKIP control.");
                 yield return ClickVisibleButtonWithMouse(mouse, story.skipButton);
                 yield return WaitHome();
                 Assert.That(network.IsConnected, Is.False);
@@ -1106,9 +1130,54 @@ namespace Hapio.Tests
             }
         }
 
+        private void AssertSealSummaryFromActualStageRecords(GameStageStoryPresentation story, bool allStagesCompleted)
+        {
+            var summary = story.player.CurrentView.GetComponent<SealRunSummary>();
+            Assert.That(summary, Is.Not.Null, "The actual saved StageResult binds the authored summary.");
+            Assert.That(Object.FindObjectsByType<SealRunSummaryPreview>(FindObjectsInactive.Include, FindObjectsSortMode.None),
+                Is.Empty, "The real result path must never get its numbers from the authoring preview fixture.");
+            Assert.That(story.player.CurrentCutIndex, Is.Zero);
+            Assert.That(story.player.sequence.cuts[0].cutId, Is.EqualTo("SealRunSummary"));
+            var records = session.SealStageResults;
+            Assert.That(records.Count, Is.EqualTo(3), "The summary retains stage-number slots even when some records are missing.");
+            Assert.That(summary.stageTimes, Has.Length.EqualTo(3));
+            Assert.That(summary.contributions, Has.Length.EqualTo(3));
+            double total = 0d;
+            for (int stage = 0; stage < records.Count; stage++)
+            {
+                LabResultStage record = records[stage];
+                if (record == null)
+                {
+                    Assert.That(summary.stageTimes[stage].text, Is.EqualTo("—"));
+                    Assert.That(summary.contributions[stage].text, Is.EqualTo("—"));
+                    continue;
+                }
+                Assert.That(record.PlayedSeconds, Is.GreaterThanOrEqualTo(0d));
+                total += record.PlayedSeconds;
+                Assert.That(summary.stageTimes[stage].text, Is.EqualTo(SummaryClock(record.PlayedSeconds)));
+                LabPlayerState actualPlayer = record.Players.Single(player => player.id == session.ResultLocalPlayerId);
+                Assert.That(actualPlayer.paintedCellsTotal, Is.GreaterThan(0L), "CPU fixture completion adds real authoritative surface cells.");
+                Assert.That(actualPlayer.damageTotal, Is.Zero, "No projectile hit was manufactured to give this fixture attack points.");
+                Assert.That(record.Players, Has.Length.EqualTo(1));
+                Assert.That(summary.contributions[stage].text, Is.EqualTo("100%"),
+                    "This solo painter owns all new cells even with zero attack score; contribution is painted area, not damage.");
+            }
+            Assert.That(records.All(record => record != null), Is.EqualTo(allStagesCompleted));
+            Assert.That(summary.totalTime.text, Is.EqualTo(allStagesCompleted ? SummaryClock(total) : "—"),
+                "Only all three actual successful battle times form a completed total.");
+        }
+
+        private static string SummaryClock(double seconds)
+        {
+            long whole = (long)Math.Floor(seconds);
+            return (whole / 60).ToString("00", System.Globalization.CultureInfo.InvariantCulture) + ":"
+                + (whole % 60).ToString("00", System.Globalization.CultureInfo.InvariantCulture);
+        }
+
         private static IEnumerator ClickVisibleButtonWithMouse(Mouse mouse, UnityEngine.UI.Button button)
         {
             Assert.That(button.gameObject.activeInHierarchy && button.IsInteractable(), Is.True);
+            yield return null;
             Canvas.ForceUpdateCanvases();
             Canvas canvas = button.GetComponentInParent<Canvas>();
             Camera eventCamera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;

@@ -35,15 +35,23 @@ namespace Hapio.Tests
             finally { Object.DestroyImmediate(root); }
         }
         private static LabResultStage Stage(double seconds, int mine) => new LabResultStage(new[]{
-            new LabPlayerState { id=10,damageTotal=mine }, new LabPlayerState { id=20,damageTotal=100-mine }}, seconds);
+            new LabPlayerState { id=10,paintedCellsTotal=mine,damageTotal=500 }, new LabPlayerState { id=20,paintedCellsTotal=100-mine,damageTotal=500 }}, seconds);
         [Test]
-        public void MissingAndZeroDamageAreDistinctAndTimeDoesNotWrapAtAnHour()
+        public void MissingAndZeroPaintAreDistinctAndTimeDoesNotWrapAtAnHour()
         {
             Assert.That(SealRunSummary.Contribution(null,10), Is.EqualTo("—"));
             Assert.That(SealRunSummary.Contribution(new LabResultStage(new[]{new LabPlayerState{id=10}}, 0),10), Is.EqualTo("0%"));
             Assert.That(SealRunSummary.FormatTime(3661), Is.EqualTo("61:01"));
             Assert.That(SealRunSummary.FormatTime(double.NaN), Is.EqualTo("00:00"));
             Assert.That(SealRunSummary.Appraisals.Distinct().Count(), Is.EqualTo(10));
+            var large = new LabResultStage(new[] {
+                new LabPlayerState { id=10, paintedCellsTotal=long.MaxValue },
+                new LabPlayerState { id=20, paintedCellsTotal=long.MaxValue },
+                new LabPlayerState { id=30, paintedCellsTotal=long.MaxValue },
+                new LabPlayerState { id=40, paintedCellsTotal=long.MaxValue }
+            }, 10);
+            Assert.That(SealRunSummary.Contribution(large, 10), Is.EqualTo("25%"),
+                "Summing valid long counters must not overflow.");
         }
         [Test]
         public void SummaryRequiresContinueAndExitsThroughSharedCloudBeforeEnding()
