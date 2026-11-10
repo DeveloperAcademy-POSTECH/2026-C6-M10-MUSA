@@ -446,6 +446,17 @@ namespace Hapio.Tests
         }
 
         [Test]
+        public void OnlyALeaveOrDisconnectCountsAsSomeoneLeaving()
+        {
+            Assert.That(GameRunFlow.IsLeaveReason(GameRunFlow.PlayerLeftReason), Is.True);
+            Assert.That(GameRunFlow.IsLeaveReason(GameRunFlow.PlayerDisconnectedReason), Is.True);
+            Assert.That(GameRunFlow.IsLeaveReason(GameRunFlow.HostDisconnectedReason), Is.True);
+            foreach (string other in new[] { "Time ran out.", "All players are down.", "A player could not finish preparing the stage.",
+                "The prepared battle could not be started.", "The stage result could not be synchronized.", "", null })
+                Assert.That(GameRunFlow.IsLeaveReason(other), Is.False, other ?? "null");
+        }
+
+        [Test]
         public void AbandonedAndTerritoryRunsCannotBecomeRetryableDefeats()
         {
             var flow = Run(0);

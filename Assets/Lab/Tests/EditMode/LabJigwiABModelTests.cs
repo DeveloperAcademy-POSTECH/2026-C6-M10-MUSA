@@ -67,6 +67,15 @@ namespace C6Lab.Tests
             Assert.That(m.JigwiABEnabled,Is.EqualTo(expected));Assert.That(s.jigwiStage.enabled,Is.False);
             Assert.That(m.JigwiStagePaintBlocked(Players[0],Vector3.forward),Is.False);
         }
+        [Test] public void SavedConfigKeepsTheTestOnlySchedulesOff()
+        {
+            // The A-only / B-only recording switches replace the whole Jigwi timetable. They are for local runs only;
+            // a saved ON value ships a stage with no smoke, bucket or common gimmicks.
+            var saved = Resources.Load<LabConfig>("LabConfig");
+            Assert.That(saved, Is.Not.Null);
+            Assert.That(saved.JigwiATestOnly, Is.False, "Turn jigwiATestOnly off before committing LabConfig.asset.");
+            Assert.That(saved.JigwiBTestOnly, Is.False, "Turn jigwiBTestOnly off before committing LabConfig.asset.");
+        }
         [Test] public void AWarningHasNoBurnUntilActiveAndThenBurnsEveryOwnersOrbs()
         {
             // #479: A ignites every seat at once; there is no target and no recovery boost.
@@ -410,11 +419,16 @@ namespace C6Lab.Tests
             Assert.That(LabJigwiABNetworkValidation.Valid(waiting.jigwiAB,waiting.players,m.Revision),Is.True);
             int painted=m.PaintSurface.PaintCount;
             Assert.That(m.TryCompleteJigwiTalisman(Three[2],a.id,52.5),Is.True);
-            Assert.That(m.PaintSurface.PaintCount,Is.GreaterThan(painted),"The waterfall paints the boss at once.");
             var done=m.Snapshot(52.5);
             Assert.That(done.jigwiAB.rounds.Single(r=>r.id==a.id).resolution,Is.EqualTo(LabJigwiABResolution.Completed));
             Assert.That(LabJigwiABNetworkValidation.Valid(done.jigwiAB,done.players,m.Revision),Is.True);
-            Assert.That(m.Snapshot(58).orbs.Any(o=>o.jigwiTalismanReward),Is.False,"#595: no talisman orbs, the waterfall is the reward.");
+            // #610: the waterfall paints when it lands — after the big talisman's melody and the small talismans' flight.
+            double lands=52.5+LabJigwiABTimeline.CommonTalismanRevealSeconds+LabJigwiABTimeline.CommonTalismanPourSeconds;
+            m.Tick(lands-.05);
+            Assert.That(m.PaintSurface.PaintCount,Is.EqualTo(painted),"Nothing is painted while the melody plays and the talismans fly.");
+            m.Tick(lands);
+            Assert.That(m.PaintSurface.PaintCount,Is.GreaterThan(painted),"The waterfall paints the boss when it lands.");
+            Assert.That(m.Snapshot(lands+.1).orbs.Any(o=>o.jigwiTalismanReward),Is.False,"#595: no talisman orbs, the waterfall is the reward.");
         }
         [Test] public void SharedTalismanBurnsEveryBoardWhenOneSeatMissesIt()
         {

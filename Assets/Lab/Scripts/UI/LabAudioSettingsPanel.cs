@@ -46,6 +46,12 @@ namespace C6Lab
         private void Start()
         {
             if (pauseMenu == null) return;
+            foreach (var slider in pauseMenu.GetComponentsInChildren<Slider>(true))
+            {
+                if (slider.name == "BGMVolume") bgmSlider = slider;
+                if (slider.name == "SFXVolume") sfxSlider = slider;
+            }
+            if (bgmSlider != null && sfxSlider != null) { BindControls(); return; }
             var card = pauseMenu.transform.Find("PausePanel") as RectTransform;
             if (card == null)
             {
@@ -64,6 +70,11 @@ namespace C6Lab
             bgmSlider = CreateRow(card, "BGM", firstRowTop, out bgmValue);
             sfxSlider = CreateRow(card, "SFX", firstRowTop + rowHeight + rowGap, out sfxValue);
 
+            BindControls();
+        }
+
+        private void BindControls()
+        {
             bgmSlider.SetValueWithoutNotify(LabAudioSettings.BgmVolume);
             sfxSlider.SetValueWithoutNotify(LabAudioSettings.SfxVolume);
             bgmSlider.onValueChanged.AddListener(value =>

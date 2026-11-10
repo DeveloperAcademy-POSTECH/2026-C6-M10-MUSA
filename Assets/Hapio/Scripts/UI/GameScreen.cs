@@ -18,6 +18,8 @@ namespace Hapio
     {
         public GameScreenKind kind;
         public GameStageResultView resultView;
+        public GameOverCharacterView gameOverView;
+        public GameTerritoryResultView territoryView;
         public GameStageStoryPresentation stageStory;
         public GameObject legacyResultContent;
         [Tooltip("The saved Figma view owns Home/Lobby navigation; this component keeps the scoped DEV panel.")]
@@ -47,6 +49,7 @@ namespace Hapio
         private Color? resultTitleColor;
         private string[] roomKeys = Array.Empty<string>();
         private bool syncingDeveloper;
+        private LabNoticeSettingsRow localNoticeSettings;
         private string localError;
         private RectTransform resultTable;
         private string resultTableKey;
@@ -68,6 +71,10 @@ namespace Hapio
             if (stageStory == null) stageStory = GetComponent<GameStageStoryPresentation>();
             if (stageStory != null) stageStory.Initialize(this, session);
             EnsureClayDeveloperRows();
+            if (kind == GameScreenKind.Home || kind == GameScreenKind.Lobby)
+                localNoticeSettings = LabNoticeSettingsRow.Attach(developerPanel,
+                    developerInputs != null && developerInputs.Length > 0 ? developerInputs[0] : null,
+                    applyDeveloperButton);
             if (!UsesExternalNavigation)
             {
                 Click(hostButton, () => { if (ApplyPort()) session.Host(); });
@@ -87,6 +94,13 @@ namespace Hapio
                 Click(resultView.homeButton, OnHomeButton);
             }
             Click(nextButton, OnNextButton);
+            if (gameOverView != null) Click(gameOverView.homeButton, OnHomeButton);
+            if (territoryView != null)
+            {
+                Click(territoryView.table.homeButton, OnHomeButton);
+                Click(territoryView.table.viewerButton, OnViewerButton);
+                Click(territoryView.table.nextButton, OnNextButton);
+            }
             Click(viewerButton, OnViewerButton);
             Click(closeViewerButton, () => session.CloseGourdViewer());
             Click(resetViewerButton, () => session.ResetPreview());
@@ -163,6 +177,12 @@ namespace Hapio
             Interactable(nextButton, false);
             Interactable(homeButton, false);
             Interactable(viewerButton, false);
+            if (territoryView != null)
+            {
+                Interactable(territoryView.table.nextButton, false);
+                Interactable(territoryView.table.homeButton, false);
+                Interactable(territoryView.table.viewerButton, false);
+            }
             if (resultView == null) return;
             Interactable(resultView.nextButton, false);
             Interactable(resultView.homeButton, false);
@@ -196,7 +216,16 @@ namespace Hapio
 
         private void RefreshGameOver(LabNetwork net)
         {
+            if (gameOverView != null) gameOverView.gameObject.SetActive(false);
             if (stageStory != null && stageStory.TryRefresh(false)) return;
+            if (gameOverView != null && GameRunFlow.IsLeaveReason(session.State.endReason))
+            {
+                SetStoryContentVisible(false);
+                session.SetResultPresentationBusy(false);
+                gameOverView.gameObject.SetActive(true);
+                gameOverView.Present(session.CanReturnHome && !ResultActionsBlocked);
+                return;
+            }
             SetStoryContentVisible(true);
             session.SetResultPresentationBusy(false);
             if (resultView != null) { RefreshDesignedResult(net, false); return; }
@@ -370,6 +399,19 @@ namespace Hapio
         /// </summary>
         private void RefreshDesignedTerritoryResult(LabNetwork net)
         {
+            if (territoryView != null)
+            {
+                resultView.gameObject.SetActive(false);
+                territoryView.gameObject.SetActive(true);
+                territoryView.Present(session.ResultSnapshot, net.LocalPlayerId);
+                Interactable(territoryView.table.homeButton, (!net.IsHost || session.CanReturnHome) && !ResultActionsBlocked);
+                // 2:2 is one round (#293): no 다시 도전, only 박 확인 and 나가기.
+                Show(territoryView.table.nextButton == null ? null : territoryView.table.nextButton.gameObject, false);
+                Interactable(territoryView.table.viewerButton, session.PreviewTexture != null && !ResultActionsBlocked);
+                Show(viewerPanel, session.IsViewerOpen && session.PreviewTexture != null);
+                if (viewerImage != null) viewerImage.texture = session.PreviewTexture;
+                return;
+            }
             LabSnapshot result = session.ResultSnapshot;
             LabTeam winner = result != null ? result.teamWinner : LabTeam.None;
             var rows = GameTerritoryResult.Rows(result, session.TerritoryFeverCount(LabTeam.Blue),
@@ -632,6 +674,7 @@ namespace Hapio
                 return;
             }
             DeveloperScope = scope;
+            if (localNoticeSettings != null) localNoticeSettings.gameObject.SetActive(scope == 0);
             syncingDeveloper = true;
             for (int i = 0; i < values.Length; i++)
             {

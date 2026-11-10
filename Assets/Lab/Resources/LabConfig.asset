@@ -41,9 +41,9 @@ MonoBehaviour:
   jigwiFlowSchedule: 1
   jigwiAHoldBurnUntilEnd: 1
   jigwiBCountdown: 1
-  jigwiBBucket: 0
+  jigwiBBucket: 1
   jigwiBTestOnly: 0
-  jigwiATestOnly: 1
+  jigwiATestOnly: 0
   jigwiSmokeFlow: 1
   jigwiCommonStartSeconds: 25
   jigwiCommonIntervalSeconds: 15
@@ -64,9 +64,9 @@ MonoBehaviour:
   jigwiTalismanWaterCount: 1
   jigwiTalismanWaterPaintScale: 3
   jigwiTalismanRewardDelaySeconds: 2.9
-  jigwiAFailDrumSlipSeconds: 15
+  jigwiAFailDrumSlipSeconds: 20
   jigwiAFailDrumSlipBoost: 2
-  jigwiTalismanCoverage: 0.9
+  jigwiTalismanCoverage: 0.85
   jigwiTalismanTolerance: 0.07
   jigwiBSplashPaintShare: 3
   jigwiBBoardFireSeconds: 0

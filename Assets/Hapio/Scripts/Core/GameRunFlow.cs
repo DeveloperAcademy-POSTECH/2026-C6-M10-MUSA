@@ -12,6 +12,13 @@ namespace Hapio
     {
         public const int StageCount = 3;
         public static int StagesFor(GameMode mode) => mode == GameMode.Territory ? 1 : StageCount;
+        // Game-over reasons for a player leaving the room. Only these show the 불이/금옥이 leave screen (#603);
+        // a load, preparation or sync failure is not someone leaving. The text travels in the flow state as before.
+        public const string PlayerLeftReason = "A player left the game.";
+        public const string PlayerDisconnectedReason = "A player disconnected.";
+        public const string HostDisconnectedReason = "The Host disconnected.";
+        public static bool IsLeaveReason(string reason) => reason == PlayerLeftReason
+            || reason == PlayerDisconnectedReason || reason == HostDisconnectedReason;
         private readonly HashSet<ulong> participants = new HashSet<ulong>();
         private readonly HashSet<ulong> ready = new HashSet<ulong>();
         private readonly HashSet<ulong> initialStateReady = new HashSet<ulong>();

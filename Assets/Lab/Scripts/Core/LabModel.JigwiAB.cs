@@ -84,7 +84,7 @@ namespace C6Lab
             jigwiBCountdown = config.JigwiBCountdown;
             jigwiCommonStart = config.JigwiCommonStartSeconds; jigwiCommonInterval = config.JigwiCommonIntervalSeconds;
             jigwiABRounds.Clear(); jigwiABActivated.Clear(); jigwiABFailureRevision = 0;
-            jigwiABLastBurnAt.Clear(); jigwiABBurnQueueId = null; jigwiTalismanDrops.Clear(); jigwiFailBurns.Clear(); jigwiAPausedOrbs.Clear(); jigwiTalismanShards.Clear();
+            jigwiABLastBurnAt.Clear(); jigwiABBurnQueueId = null; jigwiTalismanDrops.Clear(); jigwiFailBurns.Clear(); jigwiAPausedOrbs.Clear(); jigwiTalismanShards.Clear(); jigwiCommonPours.Clear();
             ResetJigwiABSupply(config);
             if (!jigwiABEnabled) return;
             // Preserve the old code as an inactive migration path, never run two policies together.
@@ -150,12 +150,13 @@ namespace C6Lab
         {
             if (phase != LabPhase.Playing)
             {
-                jigwiTalismanDrops.Clear(); jigwiFailBurns.Clear();
+                jigwiTalismanDrops.Clear(); jigwiFailBurns.Clear(); jigwiCommonPours.Clear();
                 CancelJigwiABForBattleEnd(now);
                 return;
             }
             GrantDueJigwiTalismanWater(now);
             IgniteDueJigwiFailBurns(now);
+            PourDueJigwiCommonTalismans(now);
             if (!jigwiStageCutoffReached && now >= jigwiStageCutoffAt)
             {
                 CancelJigwiABForBattleEnd(jigwiStageCutoffAt);
@@ -561,10 +562,13 @@ namespace C6Lab
             revision++;
             if (!active.players.All(value => value.talismanAt >= 0d)) return true;
             // #595: the reward is a waterfall on the boss (like each seat's poured bucket), not talisman orbs.
+            // #610: it paints when the waterfall actually lands — after the big talisman's melody ends (Reveal) and the
+            // small talismans glow and fly to the boss (Pour) — not the moment the last talisman is written.
+            double pourAt = now + LabJigwiABTimeline.CommonTalismanRevealSeconds + LabJigwiABTimeline.CommonTalismanPourSeconds;
             foreach (var seat in active.players)
             {
                 ResumeJigwiAOrbLifetimes(seat.playerId, active.endsAt - now);
-                PaintJigwiBucketPour(seat.playerId, now);
+                jigwiCommonPours.Add((seat.playerId, pourAt));
             }
             ResolveJigwiAB(active, LabJigwiABResolution.Completed, now);
             return true;
@@ -648,6 +652,18 @@ namespace C6Lab
         }
         /// <summary>#540: a talisman shard missed (floor, fire, gone). Forget it.</summary>
         public bool DropJigwiTalismanShard(string id) => id != null && jigwiTalismanShards.Remove(id);
+        // #610: the common talisman's waterfall paint, one per seat, due when the waterfall lands on the boss.
+        private readonly List<(ulong owner, double dueAt)> jigwiCommonPours = new List<(ulong owner, double dueAt)>();
+        private void PourDueJigwiCommonTalismans(double now)
+        {
+            for (int k = 0; k < jigwiCommonPours.Count; k++)
+            {
+                var (owner, dueAt) = jigwiCommonPours[k];
+                if (dueAt > now) continue;
+                jigwiCommonPours.RemoveAt(k--);
+                if (phase == LabPhase.Playing) PaintJigwiBucketPour(owner, dueAt);
+            }
+        }
         private void GrantJigwiTalismanWater(ulong owner, double now)
         {
             // #509: one at a time, every 0.3 s, so each drop falls in with its own moment.

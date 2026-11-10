@@ -49,7 +49,7 @@ namespace Hapio
 
         private void PrepareHome()
         {
-            if (player != null) player.playOnStart = false;
+            if (player != null) { player.playOnStart = false; player.hideProgress = true; }
             EndPresentation();
             if (lobbyView != null) lobbyView.RegisterOpening(this);
         }
@@ -77,6 +77,7 @@ namespace Hapio
             {
                 Unsubscribe();
                 player.playOnStart = false;
+                player.hideProgress = true;
                 // Re-enter the child lifecycle cleanly when Editor scene reload is disabled as well.
                 openingRoot.SetActive(false);
                 openingRoot.SetActive(true);

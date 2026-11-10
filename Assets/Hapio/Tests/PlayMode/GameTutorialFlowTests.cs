@@ -93,6 +93,28 @@ namespace Hapio.Tests
             GameTutorialArt art = GameTutorialArt.Load();
             var bindings = Object.FindFirstObjectByType<GameBattleBindings>();
             LabHud hud = bindings.hud;
+            // #621: the original tutorial board is alpha-composited over the continuous stage view.
+            yield return null;
+            var boardView = bindings.GetComponent<GameTutorialBoardPresentation>();
+            var composition = hud.GetComponent<LabOrbHudComposition>();
+            var plate = bindings.board.transform.Find("OrbBoardPlate").GetComponent<Renderer>();
+            Assert.That(boardView, Is.Not.Null);
+            Assert.That(composition.IsCompositing, Is.True, composition.InitializationError);
+            Assert.That(composition.presentationBackdrop, Is.SameAs(boardView.Artwork.rectTransform));
+            Assert.That(boardView.Artwork.texture, Is.SameAs(plate.sharedMaterial.mainTexture), "Keep the tutorial's original plate.");
+            Assert.That(boardView.Artwork.enabled, Is.True);
+            Assert.That(boardView.Artwork.raycastTarget, Is.False);
+            Assert.That(plate.enabled, Is.False, "No duplicate plate behind the composited artwork.");
+            Assert.That(bindings.sceneController.orbCamera.enabled, Is.False, "No rectangular lower-camera paper pass.");
+            Rect boardRect = ScreenRect(boardView.Artwork.rectTransform);
+            Vector3 projected = bindings.sceneController.orbCamera.WorldToScreenPoint(plate.bounds.center);
+            Assert.That(Vector2.Distance(boardRect.center, projected), Is.LessThan(1f), "Visual stays on the original input board.");
+            Assert.That(boardView.Artwork.transform.GetSiblingIndex(), Is.LessThan(hud.leftNeighborBadge.transform.GetSiblingIndex()));
+            var continuation = bindings.GetComponent<GameBoardBackgroundContinuation>().ContinuationCamera;
+            Assert.That(continuation != null && continuation.enabled, Is.True);
+            Ray upper = bindings.battleCamera.ViewportPointToRay(new Vector3(.37f,0,0));
+            Ray lower = continuation.ViewportPointToRay(new Vector3(.37f,1,0));
+            Assert.That(Vector3.Distance(upper.direction,lower.direction), Is.LessThan(.00001f), "Background joins without a viewport seam.");
             Assert.That(hud.localPlayerCircle.sprite, Is.SameAs(art.bul));
             Assert.That(hud.leftPlayerCircle.sprite, Is.SameAs(art.muk));
             Assert.That(hud.rightPlayerCircle.sprite, Is.SameAs(art.geumok));
@@ -593,7 +615,10 @@ namespace Hapio.Tests
             dim.GetComponentInParent<UnityEngine.UI.GraphicRaycaster>().Raycast(
                 new UnityEngine.EventSystems.PointerEventData(UnityEngine.EventSystems.EventSystem.current) { position = new Vector2(screen.center.x, screen.height * .1f) }, hits);
             Assert.That(hits.Count, Is.GreaterThan(0));
-            Assert.That(hits[0].gameObject, Is.SameAs(dim.gameObject), "The log takes the touch.");
+            // #586's six-line list can reach this point on a short screen (the batch Editor is landscape); then the list's
+            // drag area takes it instead of the backdrop. Either way the touch stays inside the log and misses 뒤로 가기.
+            Assert.That(hits[0].gameObject.transform.IsChildOf(dim), Is.True, "The log takes the touch: " + hits[0].gameObject.name);
+            Assert.That(hits[0].gameObject.transform.IsChildOf(back.transform), Is.False, "Not the back button.");
             int beat = director.BeatIndex;
 
             // Nothing else starts under it, even from a finger already down when it opened.
@@ -693,18 +718,17 @@ namespace Hapio.Tests
             buttons.Single(button => button.name == "Log Button").onClick.Invoke();
             Assert.That(first.IsDialogueLogOpen, Is.False, "기록 waits behind the pause menu.");
 
-            // RESTART sits where QUIT RUN was; QUIT RUN moves one row down into the hidden DEV row.
             LabHud hud = Object.FindFirstObjectByType<GameBattleBindings>().hud;
-            var restart = hud.pauseMenu.GetComponentsInChildren<UnityEngine.UI.Button>(true)
-                .Single(button => button.name == "Tutorial Restart Button");
+            var restart = hud.pauseMenu.GetComponent<GamePauseView>().restartButton;
             var resume = (RectTransform)hud.resumeButton.transform;
             var quit = (RectTransform)hud.returnLobbyButton.transform;
             var restartRect = (RectTransform)restart.transform;
             Assert.That(restart.gameObject.activeInHierarchy && restart.interactable, Is.True);
-            Assert.That(restart.GetComponentInChildren<UnityEngine.UI.Text>(true).text, Is.EqualTo(GameTutorialScript.RestartLabel));
+            Assert.That(restart.GetComponentInChildren<UnityEngine.UI.Text>(true).text, Is.EqualTo("재시작"));
             float row = restartRect.anchoredPosition.y - resume.anchoredPosition.y;
             Assert.That(row, Is.LessThan(0f), "Below CONTINUE.");
-            Assert.That(quit.anchoredPosition.y - restartRect.anchoredPosition.y, Is.EqualTo(row).Within(.01f), "QUIT RUN one row lower.");
+            Assert.That(quit.anchoredPosition.y, Is.EqualTo(restartRect.anchoredPosition.y).Within(.01f));
+            Assert.That(quit.anchoredPosition.x, Is.LessThan(restartRect.anchoredPosition.x));
             LogAssert.Expect(LogType.Log, new System.Text.RegularExpressions.Regex("^C6_LAB_TUTORIAL_RESTART step=0 beat=1$"));
             restart.onClick.Invoke();
             restart.onClick.Invoke();
