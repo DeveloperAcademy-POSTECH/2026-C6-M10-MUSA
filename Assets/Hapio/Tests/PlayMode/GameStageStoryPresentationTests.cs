@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Linq;
 using C6Lab;
 using NUnit.Framework;
 using UnityEngine;
@@ -40,6 +41,23 @@ namespace Hapio.Tests
             Assert.That(records[4].value, Does.Contain("88초"));
             Assert.That(p1.damageTotal, Is.EqualTo(80));
             Assert.That(snapshot.playedSeconds, Is.EqualTo(100));
+        }
+
+        [Test]
+        public void OnlyTheAwardsTheLocalPlayerEarnedAreMarkedIncludingTies()
+        {
+            var p1 = new LabPlayerState { id = 10, seat = 0, damageTotal = 80, hitTotal = 4, throwTotal = 4,
+                passedTotal = 5, drumPassedTotal = 2, drumSeconds = 12 };
+            var p2 = new LabPlayerState { id = 20, seat = 1, damageTotal = 20, hitTotal = 1, throwTotal = 4,
+                passedTotal = 5, drumPassedTotal = 9, drumSeconds = 88 };
+            var snapshot = new LabSnapshot { phase = LabPhase.Victory, players = new[] { p1, p2 }, playedSeconds = 100 };
+
+            var records = GameStageStoryPresentation.CardRecords(snapshot, 20);
+            Assert.That(records.Select(record => record.mine), Is.EqualTo(new[] { false, false, true, true, true }));
+            Assert.That(records[0].player, Is.EqualTo("P1"));
+            Assert.That(records[2].player, Is.EqualTo("P1, P2(나)"), "A tie marks the row and only the local name.");
+            Assert.That(records[3].player, Is.EqualTo("P2(나)"));
+            Assert.That(GameStageStoryPresentation.CardRecords(snapshot, 99).Any(record => record.mine), Is.False);
         }
 
         [Test]

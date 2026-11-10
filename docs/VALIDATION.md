@@ -1,5 +1,56 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-09 — 결과 카드에서 내가 받은 칭호만 붉게 강조
+
+- **기준:** `feat/result-my-title-highlight`, 커밋 `5f9fe518`. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 프리팹·Scene·접속 묶음·설정 수는 바꾸지 않았다. 최신 main `33762faf` 병합 뒤에는 아래 표의 관련 검사만 다시 돌렸다.
+- **바꾼 것:** 부적 카드 뒷면과 패배 대시보드에서 저장된 시안 띠(1·4행)를 끄고, 내가 받은 칭호 줄마다(동점 포함) 띠를 얹고 이름에 `(나)`를 붙인다. 패배 대시보드에 실제 기록을 넣는다. 동작은 `STAGE_STORY_PRESENTATION.md`의 "내 칭호 강조"를 따른다.
+
+| 확인 | 결과 |
+| --- | --- |
+| 새 EditMode `StoryRecordHighlightTests`(저장 프리팹 4종, 카드 앞면 제외, 패배 표 실제 기록) | 6/6 PASS |
+| PlayMode `GameStageStoryPresentationTests`(동점·`(나)`), `GameSceneFlowTests`(실제 결과 화면 경로) | 병합 뒤 32/32 PASS |
+| 대조 실험 5가지(시안 띠 유지, 패배 표 미기록, 내 칭호 판정 제거, 연결 제거, 카드 앞면 포함) | 모두 해당 검사 실패 |
+| 전체 EditMode / 전체 PlayMode(`5f9fe518`, 병합 전) | 2156/2156, 741/741 PASS |
+
+- 시안은 실제 프리팹을 Editor batch로 렌더링해 사용자가 `(나)` 포함 안을 골랐다.
+- 독립 검토에서 카드 앞면 도장 글자를 표로 잘못 잡는 문제와 문서 누락을 확인해 고쳤다.
+- 전체 기록·2:2 결과 표의 갈색 강조는 바꾸지 않았다.
+- **미실행:** 실기기 화면, 멀티 게스트 화면, 긴 공동 수상 이름(`P1, P2(나)`)의 실제 표시.
+
+## 2026-11-09 — 결과·Home·Lobby의 시안에 없는 안내 줄 숨기기
+
+- **기준:** `fix/hide-result-status-line`, main `d1ea7b12` 위 `f37b4443`·`79bc2e15`. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 접속 묶음과 설정 수는 그대로다.
+- **바꾼 것:** StageResult 이야기 화면의 `Status` 줄과 Home·Lobby의 `ConnectionMessage` 줄을 실행 중 숨긴다. 프리팹은 바꾸지 않았다. Lobby 문구는 계속 계산하지만 화면에는 나오지 않는다. Direct IP 창의 안내 문구는 그대로다.
+
+| 확인 | 결과 |
+| --- | --- |
+| `GameFinishReplayTests`·`GameStageStoryPresentationTests`(결과 화면 30프레임 숨김 포함) | 9/9 PASS |
+| `GameStageStoryAssetTests` | 5/5 PASS |
+| `GameLobbyViewTests` | 19/19 PASS |
+| 대조 실험(결과 줄 표시, Lobby 줄 표시) | 해당 검사 실패 |
+| 전체 EditMode(`79bc2e15`) | 2150/2150 PASS |
+| 전체 PlayMode(`79bc2e15`) 1회차 | 692/731 PASS, 39건 실패 |
+| 전체 PlayMode(`79bc2e15`) 2회차 | 731/731 PASS |
+
+- 1회차 실패 39건 중 38건은 실행 중 Mac 덮개가 닫혀 잠든 것이 원인이다(전원 로그 17:06:21 `Clamshell Sleep`, 이후 검사 지연과 시각이 일치). 멈춘 검사 2건이 세션을 정리하지 못해 뒤 검사 36건의 SetUp이 연쇄 실패했다. 나머지 1건은 잠들기 전의 `LabPaintSpreadFlowRenderTests` GPU 화면 비교(픽셀 차 3, 허용 1)이며 2회차에서 통과했고 원인은 조사하지 않았다.
+- **미실행:** 실기기 화면 확인, 방 입장 실패·연결 끊김을 실제로 겪을 때의 사용감.
+
+## 2026-11-09 — 전투 화면의 내부 거절 코드 숨기기
+
+- **기준:** `fix/hide-rejection-codes`, main `02a27205` 위 `a46fe72d`와 그 뒤 로비 자리 거절 문구 커밋. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal).
+- **바꾼 것:** Hapio 게임 흐름에서 거절 사유가 내부 코드(영문 대문자·숫자·밑줄 또는 빈 값)면 `Notice`를 바꾸지 않고 개발 빌드 로그에만 남긴다. 로비 자리 거절은 한국어 안내로 표시한다. 독립 Lab은 코드를 그대로 표시한다. 접속 묶음과 설정 수는 그대로다.
+
+| 확인 | 결과 |
+| --- | --- |
+| EditMode `LabRejectionNoticeTests`(11건)·`LabLobbyRejoinTests` | 32/32 PASS |
+| PlayMode 실제 솔로에서 스태미나를 다 쓰고 북 누르기, `GameLobbyViewTests`, `LabLobbyPositionSelectionTests` | 2/2, 24/24 PASS |
+| 대조 실험(코드 숨김 제거, 자리 안내 제거) | 해당 검사 실패 |
+| 전체 EditMode / 전체 PlayMode(`a46fe72d`) | 2149/2149, 731/731 PASS |
+
+- 자리 거절 문구는 전체 실행 뒤에 고쳤고, 위 표의 관련 검사만 다시 돌렸다.
+- 폭탄·여우불 등 영어 안내 문장과 DEV 솔로의 `SHOT HIT` 수치는 이번 범위가 아니어서 그대로 표시된다.
+- **미실행:** 실기기 화면 확인, 스테이지 결과 화면 하단 빨간 글씨의 원인 확인(코드 변경 없음).
+
 ## 2026-11-09 — 1~3스테이지 박 1.4배
 
 - **기준:** `feat/stage-gourd-size`, main `2427de5a` 위 `d3b4aaa9`. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 그 뒤 커밋은 코드 동작 없이 툴팁 위치·문서만 바꿨다.
@@ -6970,6 +7021,38 @@ Compared twelve seed masks and selected 572. Changed only seed defaults and the 
   - 기록 위에서 대사 넘기기·건너뛰기·일시정지가 시작되지 않음, 건너뛰기 창과 일시정지 메뉴 위에서 기록이 열리지 않음.
 - **미실행:** Test Runner 재실행, Play로 0~6단계 전체, iPhone 실기기, #552 머지 뒤 4단계 구슬 시연 중 기록 열기.
 
+## 오색흙 오행 VFX와 비교 씬 — 2026-11-06
+
+- Unity 6000.6.5f1, URP 17.6.0, iOS 타깃 설정을 유지한 MUSA 복사본에서 Play Mode를 실행했다. 렌더링 기기는 Apple M3 Pro, 그래픽 API는 Metal이었다. 실제 iPhone, 빌드 플레이어, 두 기기를 연결한 멀티플레이 세션은 이번 측정 범위 밖이다. [실행 및 조절 안내](FIVE_ELEMENT_VFX.md)
+- **재생 및 화면 확인 통과.** 편집기 프레임 1~89 사이에 60fps와 30fps 데모 설정에서 각각 발사한 다섯 공이 자동 충돌하고 기운 해방 시점을 지났다. 다섯 레인의 기운과 흔적이 회수된 장면을 픽셀로 비교했다. 화·수·목·금·토의 형태, 벽과 움직이는 벽, 밝은 단색 화면, 게임 거리의 작은 세로/가로 화면을 캡처했다. 토는 충돌 뒤 0.31초와 0.52초를 확대해 모래 뭉침과 가장자리 해체를 확인했다.
+- **조작 및 수명 확인 통과.** 실제 UI Toolkit 버튼에 제출 이벤트를 보내 일시정지, 같은 시점에서 단색/컬러 전환, 재생 재개를 확인했다. 중복 Hit를 무시하고, 재사용 이전의 핸들이 새 비행을 취소할 수 없으며, 이동 표적을 따라가다 표적이 없어지면 즉시 회수됐다. 데모 흔적 수명이 끝난 뒤 활성 타격은 0개였다.
+- **PlayMode 29/29, EditMode 27/27 통과.** 실제 물리 투척의 지름·단일 충돌·비행 핸들 반환·독립된 토 타격 수명, 기존 충돌 및 콤보 크기, 원소 꼬리, 피격 피드백, 손님 선반영의 승인/취소/중복 처리, 기존 네트워크 패킷·피격 강도·크기 보정 회귀 검사를 선택해 실행했다.
+- **따뜻해진 풀에서의 효과 갱신 비용.** 5속성 동시 타격, 품질별 24회 × 42프레임. 편집기 메인 스레드 갱신 시간은 기본 품질 중앙값 0.464ms·95백분위 0.556ms, 낮은 품질 중앙값 0.295ms·95백분위 0.374ms였다. 각 1,008회 갱신에서 해당 스레드의 관리 힙 할당은 0바이트였다. 이 수치는 첫 사용 시 리소스 생성, 렌더링과 HUD를 제외한다.
+- 충돌 약 0.35초에 효과 메시에 활성화된 렌더러 수와 삼각형 수를 집계했다. 기본은 30개·45,272개, 낮은 품질은 25개·37,136개였다. 효과 메시는 모두 불투명했다. 배치 편집기에서는 실제 GPU 드로 콜 카운터가 제공되지 않았고, GPU 시간·화면 중첩의 기기별 비용과 60fps 유지 여부는 실기기에서 측정해야 한다.
+
+## 오행 구슬의 3D 종이 재질과 색 매핑 — 2026-11-06
+
+- Unity 6000.6.5f1, URP 17.6, iOS 타깃 설정의 프로젝트 복사본에서 다섯 실제 프리팹을 Apple M3 Pro·Metal로 렌더링했다. 조명과 카메라를 고정하고 10도씩 한 바퀴 돌린 36프레임에서 모든 구슬 내부의 표면결 변화와 바닥 그림자를 확인했다. 재질 5종의 셰이더와 반복 텍스처 참조도 유효했다.
+- 참고 이미지에서 추출한 중간톤은 화/수/목/금/토 순서로 `#DE4A21`, `#145896`, `#3F6642`, `#ECAA2F`, `#744D32`였다. 같은 조명에서 렌더링한 구슬 내부의 중앙값은 `#DF4D25`, `#155B9B`, `#416944`, `#F0AD31`, `#774F34`였다. 밝기와 반사는 시점·조명에 따라 변한다.
+- 실제 비교 씬에서 30·60fps 설정의 자동 비행과 충돌, 단색 전환, 움직이는 표적의 흔적 회수를 재확인했다. 신규 재질의 비행·접촉 선택과 재사용을 포함한 관련 PlayMode 21개가 모두 통과했다. iPhone 실기기 GPU 시간은 이번 검증 범위 밖이다.
+
+## 오행 VFX 인수인계 브랜치와 최신 main 통합 — 2026-11-09
+
+- 이슈 #576. 최신 main `56e9c79f`를 기준으로 별도 브랜치 `codex/five-elements-vfx-handoff`에 소스·재질·텍스처·프리팹·비교 씬·문서를 모았다. 위 2026-11-06 결과는 이전 기준 `46ae9987`의 실행 이력이다.
+- 최신 main의 지귀 부적 구슬·특수 오색구슬은 전용 비행 표현을 쓰고, 부적의 Host/예측/수신 타격은 기존 피격 및 물파도 경로를 사용한다. 일반 원소 타격은 새 오행 VFX를 사용한다. 프로토콜 5697과 기존 게임 토큰을 유지했다.
+- **컴파일 및 비교 데모 통과.** Unity 6000.6.5f1, URP 17.6.0, iOS 타깃 설정, Mac Metal 편집기에서 프레임 1~88이 진행되었다. 30/60fps 설정의 실제 자동 발사와 다섯 충돌, UI 일시정지·단색 전환·재생, 중복 접촉·오래된 핸들·이동 표적·파괴 후 회수가 모두 통과했다. 일곱 렌더 캡처를 생성하고 원소별 방출 및 토의 변화도 확인했다.
+- **핵심 PlayMode 7/7 통과.** `LabFiveElementContactTests` 3건과 일반/부적 × 예측/수신 4건을 별도로 실행했다.
+- **전체 EditMode 2,123건 중 2,121 통과·2 실패.** 실패는 `LabJigwiABModelTests.BBucketArrivesSeatBySeatAndEachPourPaintsAtOnce`와 `GameTutorialTests.GoalStepPlaysTheApprovedLinesWithGeumokAndBul`이다. 수정 전 main `56e9c79f`의 두 검사만 다시 실행해 같은 실패를 확인했다.
+- **전체 PlayMode 최초 실행은 722건 중 715 통과·7 실패**(610.66초, 생략 0). 이후 제품 코드는 바꾸지 않고 새 비행·충돌 표현에 맞게 기존 검사 두 건을 갱신했다. `SavedSceneSoloCanGenerateCombineAndPhysicallyPaintTheGourd`는 실제 보드 조합→물리 투척→단일 타격·도색을 유지하면서 공의 부피·위치·종이 재질과 타격 효과를 검사하고, `HostProjectileCreationUsesTheCapturedRewardAndAcceptedRevision`는 캡처한 보상·리비전·지름·속도와 새 비행 핸들을 검사한다.
+- **최종 관련 PlayMode 11/11 통과**(3.69초, 실패·생략 0). 위 Solo 검사 1건, `LabJigwiMissionCancellationTests` 3건, 핵심 VFX 7건을 함께 실행했다. 전체 722건을 이 검사 수정 뒤 다시 실행하지 않았으므로 이 결과를 전체 통과로 합산하지 않는다.
+- 나머지 PlayMode 실패 중 다음 **4건은 수정 전 main `56e9c79f`에서도 재현**됐다.
+  - `LabJigwiABNetworkTests.APickedSeatsRealSpecialWaterShotOnTheBossCountsWithoutPaint`
+  - `LabJigwiABNetworkTests.BoardAndLaunchUseTheSmallerIndependentRadiusWhileKeepingGrabReachAndPaintBudget`
+  - `LabJigwiABNetworkTests.CurtainCornersCoverTheRotatedBossAtEverySeatAndBothPhoneAndTabletAspects`
+  - `GameJigwiStageIntegrationTests.SavedHomeReachesJigwiWithScreenAThenScreenBAndPreservesTheRealPaintShell`
+- `GameTutorialFlowTests.FinishedOpeningOpensThePracticeBoardOnceThenTheRoomList`는 전체 실행에서 실패했고, 원본 main과 이 브랜치의 선택 재실행에서는 각각 통과했다. 전체 실행 순서 또는 공유 상태의 영향은 아직 원인을 확정하지 못했다.
+- iPhone 실기기 GPU 비용, 실제 다중 기기 연결, 새 main의 실제 전투 화면 캡처, 전체 검사 잔여 실패 분석은 후속 확인 항목이다. 실행 가능한 소스와 에셋은 [Draft PR #581](https://github.com/DeveloperAcademy-POSTECH/2026-C6-M10-MUSA/pull/581)에 있다.
+
 
 ## 2026-11-09 — #569 이미지 윤곽 교체·최대 허용 범위 명시
 
@@ -7023,6 +7106,52 @@ Compared twelve seed masks and selected 572. Changed only seed defaults and the 
 **기존 main 검사의 보정 범위:** 지귀 양동이 모델 검사는 마지막 자리의 도착 전 거절 검사를 첫 자리 처리 뒤로 옮겨 단조 증가 시각을 지켰다. PlayMode의 구형 특수 물구슬 명중·독립 반경 검사는 복제 설정에서만 옛 모드를 명시해 실제 물리 접촉·무도색 처리·반경·잡기 범위·면적 검사를 유지했다. 기본 양동이 모드의 포괄 범위 검사는5명 모두를 검사한다. 저장된 Home→스테이지3 검사는 현재 기본 양동이 표시·도착 창·옛 물방울/특수 구슬 없음·Host 쏟기/중복 거절·실제 도색·스태미나 무소모·원래 HitShell/Collider 유지로 맞췄다. 튜토리얼은 이미 승인된#552 대본의 최대3줄 기준만 검사에 반영했다. 게임 규칙·대본·UI 배치·설정 원본을 고치거나 실패 검사를 삭제/skip하지 않았다.
 
 **최종 확인 범위:** 자동 GPU/Scene/네트워크 fixture와 Mac 앱 빌드다. 실제 앱의 버튼·선택창 관찰은 위#569 UI 기록의 버전을 따른다. 새 PNG 원본의 미관 승인, 최종 새 앱의 사용자 직접 파일 선택/조작, iOS·실기기·LAN/핫스팟 실환경은 이번 최종 검사에서 실행하지 않았다. 양동이 통합 fixture는 실제 Host 모델 판정을 확인하지만 폰 기울기·키보드 조작을 실행한 검사는 아니다. 원시 로그·검증 캡처·임시 빌드 도구·앱 산출물은 커밋하지 않는다.
+
+
+## 2026-11-09 — PR #581 원본 클레이 통합·원소 해방 제거 (사용자 화면 확인 완료)
+
+- 기준: PR #581 `0bab495f`에 main `02a27205`를 통합한 변경본. 별도 #588의 미커밋 32개 파일은 SHA256 대조로 그대로 보존했고 이 통합에 넣지 않았다. 데스크톱 작업 폴더도 변경하지 않았다.
+- 일반 오행의 3D 구슬·실제 경로를 따르는 클레이 꼬리·눌림·퍼짐·작은 진흙 방울을 유지하고 원소별 해방 클래스/형상/셰이더를 제거했다. 기존 `.86초 / Lerp(.95,1.13,strength)` 접촉 수명을 `contactSeconds`로 분리해 전투의 `leaveMark:false`에서도 짧은 진흙이 보이도록 유지했다. 실제 도색·투척·통신 규약·부적/특수 보상·마지막 일격 다시보기는 기존 경로를 유지한다.
+- 최신 main의 전투 사전 렌더 준비에 별도 클레이 비행/명중 복사본을 추가했다. 실제 Scene 풀/seed/leases를 사용하지 않으며 준비가 끝나면 전용 메시·재질을 해제한다.
+
+| 실행 | 환경·결과 | 확인 범위 |
+| --- | --- | --- |
+| 컴파일 | Unity 6000.6.5f1 / macOS / Metal | 게임 코드 컴파일 오류 없음 |
+| 접촉 선택 검사 | PlayMode 4/4 통과 | 5속성 × 장기 흔적 ON/OFF, 실제 물리 명중, 원소 해방 부재, 진흙 잔존·축소·회수, 이동 대상·제거·슬롯 재사용 |
+| 사전 렌더 선택 검사 | PlayMode 2/2 통과 | 5종 실제 재질 draw, 실제 풀/seed 불변, 임시 리소스 해제 |
+| 전체 EditMode | 독립 batch **2,139/2,139 통과**, 18.31초 | 필터·재시도·제외 없이 실행 |
+| 전체 PlayMode | 독립 batch **738/738 통과**, 632.54초 | 필터·재시도·제외 없이 실행, graphics 활성 |
+| 비교 씬 그래픽 검사 | Metal 자동 재생 통과 | 30/60fps 설정에서 자연 접촉 각5개, pause/단색/resume 이벤트, 진흙 렌더, 소멸·중복·재사용·대상 회수 |
+
+선행 PlayMode 뒤 같은 Editor에서 EditMode를 실행했을 때는 6건이 실패했다. `LabConfig`의 저장된 `orbAppearance`는 원본이지만 `OrbAppearance` getter가 Battle용 override를 반환하는 상태였다. 기존 main의 `Stop → RestoreSourceConfig → ConfigApplied → ApplyOrbAppearance`가 종료 중 source의 비직렬화 override를 다시 설정하는 경로를 읽기로 확인했다. 새 Editor의 독립 전체 검사에서는 위와 같이 통과했다. 이번 VFX 변경을 위해 원본 에셋·종료 정책을 바꾸지 않았다.
+
+실제 전투 촬영은 저장된 `Home → GameSession.StartSolo(Story) → Battle` 경로에서 수행했다. 촬영용 런타임 복사본만 HP 100000·600초·초기/반복 도색 1%·기믹 주기 0·색 조합 보너스 OFF로 조정했고, 정상 Combined를 fixture로 준비한 뒤 실제 보드 드래그/손떼기·기존 투척 물리·Host 승인·도색·VFX를 실행했다. 화/수/목/금/토 **5개 모두 실제 물리 명중·승인 이벤트 1회·도색 증가**를 확인했다. 780×1688 실제 GameView에서 0.08/0.25/0.60초 진흙 접촉이 남고 0.95초에는 회수된 것을 캡처했다. 자동 입력·촬영 검증이며 사용자의 직접 플레이 또는 iOS 검증으로 표시하지 않는다.
+
+![실제 Battle의 금 속성 명중 후 0.25초](images/five-elements/clay-only-battle.png)
+
+- 검증용 임시 촬영 도구의 `GetInstanceID` 구형 API 때문에 한 차례 Safe Mode가 발생했다. 창 유형 재조회로 수정해 일반 Editor로 다시 열었으며 임시 도구는 커밋에서 제외한다. 이 도구를 추가하기 전에 위 전체 검사는 통과했다.
+- 비교 이미지는 `docs/images/five-elements/clay-only-spread.png`·`clay-only-settled.png`다. 과거 원소 해방 이미지는 새 외형 기준에서 제외했다. 원시 로그·빌드·기기 식별자는 저장소에 올리지 않는다.
+- 2026-11-09 사용자가 수정된 비교 화면을 확인하고 이상 없으면 main 병합을 승인했다. iOS 실기기 GPU 비용·가독성과 실제 여러 기기 LAN/핫스팟 확인은 이번에 수행하지 않았다. Editor의 프레임/GC 측정은 기기 성능 PASS 근거로 쓰지 않는다.
+
+**비교 창 재실행 보완:** 위 전체 검사 뒤 실제 GameView에서 UI Toolkit의 초기 NaN 좌표가 카메라와 lane padding에 전달되고 preview 높이가 0으로 접히는 문제를 발견했다. 비교용 UIDocument가 패널을 채우도록 하고 유효한 좌표일 때만 카메라를 갱신하며, 일시정지 중에도 레이아웃 복구를 재시도한다. 게임 Scene·VFX·물리·판정은 변경하지 않았다. 실제 비교 창에서 5종 진흙과 하단 조작을 확인했고, 새 실제 Scene 시작/일시정지 중 분리·재연결 검사를 포함한 접촉 PlayMode **5/5 통과**를 확인했다. 이후 아래 최신 main 통합본의 전체 검사에서 이 화면 보완도 함께 확인했다.
+
+**화면 승인 후 최신 main 통합·병합 전 최종 검사:** `eb6c431a`에 main `2ee6c70f`(#592 내부 거절 코드 숨김·#596 시안에 없는 안내 줄 숨김)를 자동 병합했다. `LabNetwork`의 거절 안내와 클레이 비행/명중 처리가 함께 남는 것을 읽기로 확인했고 두 검토에서 병합 차단 결함을 찾지 못했다. Unity 6000.6.5f1 macOS/Metal의 독립 batch에서 전체 EditMode **2,150/2,150 통과**(17.28초), 전체 PlayMode **740/740 통과**(589.20초)했다. 필터·재시도·제외 없이 실행했으며 실패·skip 0건이다. 비교 창 시작/일시정지 중 레이아웃 복구와 최신 main의 검사도 포함한다. 사용자 외형 확인은 완료됐고 iOS 실기기·실제 다중 기기 네트워크 검증은 추가하지 않았다. #588 보존 대상 32개 파일의 SHA256과 데스크톱 작업 폴더의 변경 없음도 재확인했다.
+
+### #586 튜토리얼 기록 버튼·로딩 위치·땅따먹기 수치 — 2026-11-09
+
+- 기록 버튼을 건너뛰기 오른쪽에서 바로 아래로 옮겼다. 건너뛰기와 가로 가운데를 맞추고 간격은 기존 `logButtonGap` 6pt를 쓴다. 폭·테두리는 그대로다.
+- 로딩 화면은 `runnerCenterFromTop`(캐릭터 가운데 비율)을 `contentCenterFromTop`(캐릭터 위 끝~막대 아래 끝 묶음의 가운데 비율, 0.5)으로 바꿨다. 묶음 높이로 계산하므로 화면 높이가 달라도 묶음 가운데가 정중앙이다. 캐릭터 5명의 그림 위아래 여백은 1.4~3.8pt다.
+- 땅따먹기 제한 시간은 `StageCatalog` 197번을 90초로, 피버 필요 명중 수는 `LabConfig` 값을 1:1 8번·2:2 10번·3:3 12번으로 바꿨다. Lab 단독 장면의 180초와 통신 규약 번호는 바꾸지 않았다.
+- `LabConfig.asset`을 Editor API로 저장하면서 코드에는 있었지만 파일에 없던 설정 18개가 코드 기본값 그대로 함께 기록됐다. 기존 값 변경은 피버 3개뿐이다.
+- 대화 기록 화면(추가 요청): 두루마리 제목 그림(`TutorialLogTitle.png`, 사용자 제공)을 목록 위에 넣고, 한 번에 보이는 막대를 3개에서 6개로, 목록과 뒤로 가기 사이를 45pt에서 8pt로 바꿨다. 대사는 얼굴 옆에서 왼쪽 정렬로 시작한다. 막대 폭·뒤로 가기 크기는 그대로다. 기록 버튼은 건너뛰기의 표시 여부와 투명도를 그대로 따라 같이 나타나며, 첫 터치가 대사를 넘기지 못한 때 눌러도 빈 기록 화면이 열린다.
+- 튜토리얼 PlayMode 검사의 탭 대기를 실제 시간 대신 튜토리얼 자체 시계(`TapCooldownOver`)로 바꿨다. `FinishedOpeningOpensThePracticeBoardOnceThenTheRoomList`가 6단계 대사에서 탭이 무시되어 1회 실패한 것에 대한 보정이며, 원인은 코드 기준 추정이다. 게임의 탭 판정 값은 그대로다.
+
+| 확인 | 결과 |
+| --- | --- |
+| Unity 컴파일 | PASS |
+| 저장값·묶음 계산 (Editor eval, 화면 높이 844·874·932·1100) | PASS — 197번 90초, 피버 8/10/12, 묶음 가운데 0.5000 |
+| EditMode·PlayMode Test Runner | NOT_RUN |
+| 노치 iPhone 실기기, Mac 다중 앱 | NOT_RUN |
 
 ### #587 전투 화면 밖 터치 먹물 번짐 — 2026-11-09
 

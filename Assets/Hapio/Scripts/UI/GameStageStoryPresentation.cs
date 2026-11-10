@@ -139,8 +139,12 @@ namespace Hapio
         {
             UnbindActions();
             if (view == null || boundResult == null) return;
-            foreach (var records in view.GetComponentsInChildren<StoryCardRecords>(true))
-                records.Bind(boundResult.paintCoverage, (float)boundResult.remaining, CardRecords(boundResult));
+            StoryCardRecords.Record[] rows = CardRecords(boundResult, session.Network.LocalPlayerId);
+            StoryCardRecords[] cards = view.GetComponentsInChildren<StoryCardRecords>(true);
+            foreach (var records in cards)
+                records.Bind(boundResult.paintCoverage, (float)boundResult.remaining, rows);
+            // The failure dashboard has no record component, so its table is filled here from the same rows.
+            StoryRecordHighlight.Apply(view.transform, rows, cards.Length == 0);
             var gauge = view.GetComponentInChildren<StorySealGauge>(true);
             if (gauge != null)
             {
@@ -158,7 +162,7 @@ namespace Hapio
             RefreshControls();
         }
 
-        public static StoryCardRecords.Record[] CardRecords(LabSnapshot snapshot)
+        public static StoryCardRecords.Record[] CardRecords(LabSnapshot snapshot, ulong localPlayerId = ulong.MaxValue)
         {
             var order = new[] { LabResultTitle.MostDamage, LabResultTitle.MostAccurate,
                 LabResultTitle.MostPassed, LabResultTitle.MostDrumPassed, LabResultTitle.MostDrum };
@@ -170,8 +174,9 @@ namespace Hapio
                 foreach (var award in awards)
                     if (award.Title == order[i])
                     {
-                        result[i] = new StoryCardRecords.Record { player = LabResultStats.WinnerNames(award),
-                            value = LabResultStats.Record(award, snapshot.playedSeconds) };
+                        result[i] = new StoryCardRecords.Record { player = LabResultStats.WinnerNames(award, localPlayerId),
+                            value = LabResultStats.Record(award, snapshot.playedSeconds),
+                            mine = award.Winners != null && award.Winners.Any(winner => winner != null && winner.id == localPlayerId) };
                         break;
                     }
             }
@@ -274,29 +279,10 @@ namespace Hapio
             bool exit = review && !final || failed && !HasAction("Exit");
             Show(exitButton, exit); Set(exitButton, exit && !blocked);
             Label(exitButton, "나가기");
-            if (statusText != null) statusText.text = StatusMessage(review, failed, final);
+            // The approved result design has no status line, so the saved label stays hidden.
+            if (statusText != null && statusText.gameObject.activeSelf) statusText.gameObject.SetActive(false);
             RefreshActionButtons(blocked);
             ApplyVisibility();
-        }
-
-        private string StatusMessage(bool review, bool failed, bool final)
-        {
-            if (transitionPending || session.IsLoadingScene) return "다음 스테이지를 준비하고 있소…";
-            if (mode == Mode.Waiting) return "결과 기록을 받고 있소…";
-            if (mode == Mode.AfterStage)
-                return player.CurrentView != null && player.CurrentView.GetComponentInChildren<StoryCardFlip>(true) != null
-                    ? "카드 바깥을 터치해 이야기를 이어가시오" : "화면을 터치해 이야기를 이어가시오";
-            if ((review || failed) && !resultActionsReady) return "잠시 손을 떼고 결과를 확인하시오";
-            if (failed) return !session.Network.IsHost ? "방장이 재도전하기를 기다리고 있소"
-                : session.CanRetryStage ? "같은 방에서 이 스테이지를 다시 봉인할 수 있소"
-                : session.IsAnyResultPresentationBusy ? "모두가 이야기를 확인하기를 기다리고 있소"
-                : "모두가 결과를 받기를 기다리고 있소";
-            if (!review) return string.Empty;
-            if (final) return session.CanReturnHome ? "엔딩과 완성된 박을 확인할 수 있소" : "모두가 결과를 받기를 기다리고 있소";
-            if (!session.Network.IsHost) return "방장이 다음 스테이지를 시작하기를 기다리고 있소";
-            if (session.IsAnyResultViewerOpen) return "모두가 박 관람을 마치면 진행할 수 있소";
-            if (session.IsAnyResultPresentationBusy) return "모두가 이야기를 확인하기를 기다리고 있소";
-            return session.CanAdvanceStage ? "다음 스테이지로 진행할 수 있소" : "모두가 결과를 받기를 기다리고 있소";
         }
 
         private void BindActionButtons()

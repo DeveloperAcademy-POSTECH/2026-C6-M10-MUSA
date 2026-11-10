@@ -1,0 +1,35 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+  <ui:VisualElement name="shell" class="app" picking-mode="Ignore">
+    <ui:VisualElement class="header" picking-mode="Ignore">
+      <ui:Label text="오색흙  /  오행 비교" class="title" />
+      <ui:Label name="phase" class="phase" />
+    </ui:VisualElement>
+    <ui:VisualElement name="lanes" class="lanes" />
+    <ui:VisualElement name="view" class="view" picking-mode="Ignore"/>
+    <ui:VisualElement class="transport">
+      <ui:VisualElement class="row">
+        <ui:Button name="play" class="primary" />
+        <ui:Button name="restart" text="다시 재생" />
+        <ui:Button name="speed" />
+        <ui:Button name="fps" />
+        <ui:Label name="clock" class="clock" />
+      </ui:VisualElement>
+      <ui:VisualElement name="scrub" class="scrub">
+        <ui:VisualElement class="track" picking-mode="Ignore">
+          <ui:VisualElement name="progress" class="progress" picking-mode="Ignore" />
+          <ui:VisualElement name="impactTick" class="tick" picking-mode="Ignore" />
+        </ui:VisualElement>
+      </ui:VisualElement>
+      <ui:VisualElement class="row">
+        <ui:Button name="element" />
+        <ui:Button name="strength" />
+        <ui:Button name="surface" />
+        <ui:Button name="color" />
+        <ui:Button name="backdrop" />
+        <ui:Button name="camera" />
+        <ui:Button name="mark" />
+        <ui:Button name="detail" />
+      </ui:VisualElement>
+    </ui:VisualElement>
+  </ui:VisualElement>
+</ui:UXML>

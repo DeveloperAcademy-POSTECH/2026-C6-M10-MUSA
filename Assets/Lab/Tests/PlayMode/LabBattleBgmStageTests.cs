@@ -32,6 +32,8 @@ namespace C6Lab.Tests
             AudioClip gumiho = Resources.Load<AudioClip>("Audio/GumihoBGM/Gumiho_Stage");
             AudioClip yaguang = Resources.Load<AudioClip>("Audio/YaguangBGM/Yaguang_Stage");
             AudioClip territorySong = Resources.Load<AudioClip>("Audio/TerritoryBGM/Territory_Stage");
+            AudioClip jigwi = Resources.Load<AudioClip>("Audio/JigwiBGM/Jigwi_Stage");
+            Assert.That(jigwi, Is.Not.Null);
             Assert.That(normal, Is.Not.Null);
             Assert.That(gumiho, Is.Not.Null);
             Assert.That(yaguang, Is.Not.Null);
@@ -51,11 +53,12 @@ namespace C6Lab.Tests
                 fixture.SetSnapshot(snapshot);
                 yield return null;
                 yield return null;
-                // Territory keeps the Gumiho song from before #409; #396 Yaguang uses its own saved-default song.
-                // Jigwi, standalone Lab and an explicitly disabled Yaguang toggle keep the usual song.
+                // Territory keeps the Gumiho song from before #409; each stage plays its own folder (#577 adds Jigwi).
+                // Standalone Lab and an explicitly disabled Yaguang toggle keep the usual song.
                 AudioClip expected = territory ? territorySong
                     : gameFlow && stages[i] == LabStageYokai.Gumiho ? gumiho
-                    : gameFlow && stages[i] == LabStageYokai.Yaguang && !legacyYaguang ? yaguang : normal;
+                    : gameFlow && stages[i] == LabStageYokai.Yaguang && !legacyYaguang ? yaguang
+                    : gameFlow && stages[i] == LabStageYokai.Jigwi ? jigwi : normal;
                 Assert.That(fixture.Bgm.BattleClip, Is.SameAs(expected),
                     "Game=" + gameFlow + ", yokai=" + stages[i] + ", territory=" + territory);
                 Assert.That(fixture.Bgm.IsPlaying, Is.True, "The selected song must reach a running AudioSource.");

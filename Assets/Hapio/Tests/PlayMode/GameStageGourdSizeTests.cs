@@ -66,6 +66,30 @@ namespace Hapio.Tests
             }
         }
 
+        [UnityTest]
+        public IEnumerator TappingTheDrumWithoutStaminaLeavesNoCodeOnTheBattleScreen()
+        {
+            session.StartSolo();
+            yield return Until(() => session.State.phase == GameFlowPhase.Playing && !session.IsLoadingScene
+                && network.HasBattleReferences && !network.GameStartHeld, "Playing");
+            int shortTaps = 0;
+            Action onShort = () => shortTaps++;
+            network.LocalStaminaShort += onShort;
+            try
+            {
+                double deadline = Time.realtimeSinceStartupAsDouble + 30d;
+                while (shortTaps == 0)
+                {
+                    Assert.That(Time.realtimeSinceStartupAsDouble, Is.LessThan(deadline), "The gauge ran out.");
+                    network.Generate();
+                    yield return new WaitForSecondsRealtime(.05f);
+                }
+                yield return null;
+            }
+            finally { network.LocalStaminaShort -= onShort; }
+            Assert.That(network.Notice, Does.Not.Contain("INSUFFICIENT_STAMINA"));
+        }
+
         private static ushort AvailableDualFamilyPort()
         {
             for (int attempt = 0; attempt < 16; attempt++)

@@ -219,6 +219,11 @@ namespace C6Lab
                 + DrumSharePercent(player, playedSeconds) + "%";
 
         /// <summary>칭호를 받은 사람들 (예: "P1, P3"). 동점이면 좌석 순서로 모두 적는다. 내 줄은 화면에서 색으로 구분한다.</summary>
+        /// <summary>Names with the local player's marked "(나)", ties included.</summary>
+        public static string WinnerNames(LabResultAward award, ulong localPlayerId) =>
+            award.Winners == null ? "" : string.Join(", ", award.Winners.Select(winner =>
+                PlayerName(winner) + (winner != null && winner.id == localPlayerId ? "(나)" : "")));
+
         public static string WinnerNames(LabResultAward award) =>
             award.Winners == null ? "" : string.Join(", ", award.Winners.Select(PlayerName));
 

@@ -637,6 +637,63 @@ namespace C6Lab.Tests
             Assert.That(hits, Is.Zero, "The B warning starts within the margin; the Host may meet the shot behind the curtain.");
         }
 
+        [TestCase(false, false)]
+        [TestCase(false, true)]
+        [TestCase(true, false)]
+        [TestCase(true, true)]
+        [Category("GPU")]
+        public void OrdinaryContactUsesElementVfxWhileTalismanKeepsItsExistingPresentation(bool talisman, bool received)
+        {
+            AddHangingTarget();
+            network.impactFeedback = root.AddComponent<LabImpactFeedback>();
+            var rootsBefore = root.scene.GetRootGameObjects();
+            try
+            {
+                var pool = LabFiveElementVfx.ForScene(root.scene);
+                pool.ManualClock = true;
+                pool.ClearAll();
+                Vector3 point = network.target.Hitbox.transform.TransformPoint(Vector3.right * .6f);
+                Vector3 velocity = Vector3.left * 9f;
+                int talismanEvents = 0;
+                network.TalismanHit += _ => talismanEvents++;
+                if (received)
+                {
+                    object packet = NewPacket("targetImpact", 0, "element-contact");
+                    Type packetType = packet.GetType();
+                    Vector3 local = network.target.Hitbox.transform.InverseTransformPoint(point);
+                    packetType.GetField("owner").SetValue(packet, owner);
+                    packetType.GetField("element").SetValue(packet, (int)LabOrbElement.Water);
+                    packetType.GetField("impactValue").SetValue(packet, 20);
+                    packetType.GetField("paintX").SetValue(packet, 1f);
+                    packetType.GetField("x").SetValue(packet, local.x);
+                    packetType.GetField("y").SetValue(packet, local.y);
+                    packetType.GetField("z").SetValue(packet, local.z);
+                    packetType.GetField("wx").SetValue(packet, velocity.x);
+                    packetType.GetField("talisman").SetValue(packet, talisman);
+                    ReceivePacket(packet, Session, 1u);
+                    ReceivePacket(packet, Session, 1u);
+                    Assert.That(talismanEvents, Is.EqualTo(talisman ? 1 : 0),
+                        "The approved talisman splash stays on its existing once-only event path.");
+                }
+                else
+                {
+                    Get<LabLocalHitPresentation>("localHits").Register(60, "element-contact");
+                    Invoke("OnPredictedShotContact", 60L,
+                        new LabProjectileResult(null, 0ul, LabProjectileHitKind.Monster, point, .5f, 1f, 3f,
+                            velocity, hitNormal: Vector3.right, visualDiameter: .33f),
+                        LabOrbElement.Water, 20, 1f, false, false, talisman);
+                }
+                Assert.That(pool.ActiveImpactCount, Is.EqualTo(talisman ? 0 : 1),
+                    "Special talisman water effects must not also acquire an ordinary element impact.");
+            }
+            finally
+            {
+                // These synchronous handlers create detached burst roots and scene services.
+                foreach (GameObject created in root.scene.GetRootGameObjects())
+                    if (!rootsBefore.Contains(created)) UnityEngine.Object.DestroyImmediate(created);
+            }
+        }
+
         private LabHangingTarget AddHangingTarget()
         {
             LabTarget target = LabTarget.CreateCylinder(root.transform, new Vector3(0f, 500f, 0f), .6f, 2.7f);
@@ -651,7 +708,7 @@ namespace C6Lab.Tests
         {
             Get<LabLocalHitPresentation>("localHits").Register(requestId, projectileId);
             Invoke("OnPredictedShotContact", requestId,
-                new LabProjectileResult(null, 0ul, kind, point, .5f, 1f, 3f, velocity), LabOrbElement.None, 20, 1f, false, false);
+                new LabProjectileResult(null, 0ul, kind, point, .5f, 1f, 3f, velocity), LabOrbElement.None, 20, 1f, false, false, false);
         }
 
         private void ReceiveImpact(string projectileId, Vector3 worldPoint, Vector3 velocity, float spin)

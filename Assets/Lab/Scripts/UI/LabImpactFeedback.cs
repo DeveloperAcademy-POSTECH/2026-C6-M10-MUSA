@@ -21,6 +21,7 @@ namespace C6Lab
         private RectTransform effectLayer;
         private Canvas canvas;
         private Font font;
+        private LabFiveElementVfx elementVfx;
 
         private sealed class ActiveHit
         {
@@ -68,10 +69,30 @@ namespace C6Lab
             particleVfx?.Play(target, targetLocalPoint, element, impactVelocity);
         }
 
+        /// <summary>Called at the same single presentation point as the original target burst.</summary>
+        public void PlayContact(LabTarget target, Vector3 localPoint, LabOrbElement element, int damage,
+            Vector3 incoming, Vector3 worldNormal, float diameter)
+        {
+            if (!isActiveAndEnabled || target == null || target.Hitbox == null || Time.timeScale <= 0f
+                || !Finite(localPoint) || !Finite(incoming)) return;
+            if (element >= LabOrbElement.Fire && element <= LabOrbElement.Earth)
+            {
+                Transform anchor = target.Hitbox.transform;
+                if (!Finite(worldNormal) || worldNormal.sqrMagnitude < 1e-8f)
+                    worldNormal = anchor.TransformDirection(localPoint.normalized);
+                if (elementVfx == null) elementVfx = LabFiveElementVfx.ForScene(target.gameObject.scene);
+                if (elementVfx != null && elementVfx.PlayImpact(element, anchor.TransformPoint(localPoint), worldNormal, incoming,
+                    Mathf.Clamp(diameter, .006f, 5f), LabPaintImpact.Normalize(incoming, worldNormal), anchor, leaveMark: false))
+                    return;
+            }
+            PlayHit(target, localPoint, element, damage, incoming, false);
+        }
+
         /// <summary>Remove presentation immediately when a round or room ends.</summary>
         public void Clear()
         {
             particleVfx?.Clear();
+            elementVfx?.ClearAll();
             for (int i = 0; i < activeHits.Count; i++)
                 if (activeHits[i].Root != null) activeHits[i].Root.gameObject.SetActive(false);
             activeHits.Clear();
