@@ -1,5 +1,19 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-10 — 이탈 게임 오버만 캐릭터 화면, 2:2 결과의 다시 도전 숨기기
+
+- **기준:** `fix/gameover-leave-only-territory-no-retry`, main `45e1e60b` 위. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 프리팹·Scene·접속 묶음·설정 수는 바꾸지 않았다. 종료 사유 문자열도 그대로라 흐름 상태 형식이 같다.
+- **바꾼 것:** #603의 불이/금옥이 GameOver 화면은 종료 사유가 나가기·참가자 연결 끊김·Host 연결 끊김(`GameRunFlow.IsLeaveReason`)일 때만 보인다. 준비·로딩·동기화 실패는 기존 결과 카드("봉인 실패...")와 HOME으로 간다. 2:2 새 결과(`territoryView`)는 "다시 도전"(`NextStageOrOverall`)을 숨기고 박 확인·나가기만 둔다(#293).
+
+| 확인 | 결과 |
+| --- | --- |
+| `GameRunFlowTests`·`GameStageResultViewTests`·`GameTerritoryResultViewTests`(EditMode) | 57/57 PASS |
+| `GameSceneFlowTests`(PlayMode, 이탈 아닌 GameOver 검사 추가) | 27/27 PASS |
+| 대조 실험(이탈 조건 제거, 다시 도전 숨김 제거) | 해당 검사 2건 실패 |
+| 전체 EditMode / 전체 PlayMode | 2175/2175, 760/760 PASS |
+
+- **미실행:** 실기기·멀티에서 실제 이탈/연결 끊김 화면.
+
 ## 2026-11-10 — main에서 실패하던 화면·입력·구슬 크기 검사 17건 정리
 
 - **기준:** `fix/stale-ui-tests`, main `f9d13362` 위(검사 실행 기준). Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 게임 코드·프리팹·Scene·에셋·접속 묶음·설정 수는 바꾸지 않았고 검사 파일만 고쳤다.
