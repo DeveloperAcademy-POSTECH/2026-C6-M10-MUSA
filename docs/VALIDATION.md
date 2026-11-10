@@ -7583,3 +7583,34 @@ main `53b1f7a5`(#619 UI 스트로크·#622 튜토리얼 조합대·#628 지귀 Q
 | 새·수정 검사: EditMode `GameTutorialTests.SkipWindowAndItsTwoButtonsSitTogetherOnTheScreensMiddle`, `GameScreenEdgeCoverTests`(2), `GameTouchInkTests.NeverShowsWhileTheCreditsAreOpen` | NOT_RUN (컴파일만 확인) |
 | 새·수정 검사: PlayMode `GameScreenEdgeCoverFlowTests`, `GameTouchInkFlowTests.NoInkAnywhereWhileTheCreditsAreOpen`, `GameLobbyViewTests.MenuDimsReachTheScreensEdgesAndNothingShowsBesideTheModeCard`, `GameTutorialFlowTests`(건너뛰기 창 가운데 확인 추가) | NOT_RUN (컴파일만 확인) |
 | 실기기 화면 확인 (iPhone) | NOT_RUN |
+
+
+### #634 결과·게임 오버 스트로크 — 2026-11-10
+
+- `fix/#634-result-game-over-ui-stroke`에서 제공된 Figma 5개 노드를 확인했다. 게임 오버 복귀 버튼과 결과 버튼·점령 막대의 누락된 HEIST/GRINDHOUSE 원본 표면을 연결했다. 기존 브러시가 포함된 깃발·표 구분선·나가기 밑줄은 유지했다. 출처와 적용 범위는 `UI_STROKE_AUDIT_634.md` 참조.
+- GameOver/StageResult 씬과 관련 표시 코드, 원본 에셋/라이브러리, 범위 한정 업그레이드 메뉴를 변경했다. 승자 깃발 좌표, 캐릭터 무작위 선택, 점령률 계산, 복귀/박 보기 기능 및 다시 도전 버튼의 기존 숨김 규칙은 유지했다.
+- Unity 6000.6.5f1에서 저장된 씬을 사용해 불이·금옥이·홍팀 승리·청팀 승리를 각각 402×874로 렌더링하고 확인했다. 합성 결과 데이터를 넣은 UI 미리보기이며 실제 경기 캡처는 아니다. 점령 막대 채움과 외곽선 사이의 틈을 수정했고, 원본 버튼 영역 밖 브러시도 확인했다.
+- EditMode: `GameTerritoryResultViewTests` **7/7 PASS** (양 팀 승리/무승부/0%·100%, 마스크, 깃발 위치, 기록 표시), `GameResultStrokeTests` **3/3 PASS** (중복 적용 방지, 클릭 영역 유지, 실제 GraphicRaycaster 클릭 및 비활성 차단). 초기 마스크 검사는 비활성 씬 부모를 검색하지 못해 실패했으며 비활성 객체도 포함하도록 테스트를 수정한 후 통과했다.
+- PlayMode: `TerritoryDeveloperSoloUsesDesignedResultsAndReturnsHomeAfterViewingTheGourd` **1/1 PASS**, `MidStageExitLatchesGameOverAndWaitsForExplicitHome` **1/1 PASS**. 실제 결과 진입/박 보기/닫기/홈 복귀, 이탈 게임 오버의 상태 유지와 복귀를 확인했다.
+- 합계 **12/12 PASS**, 실패·skip 0. 씬 객체별 diff와 `git diff --check` 확인. 전체 테스트·모바일 실기기·다중 기기 네트워크 검증은 실행하지 않았다.
+
+
+### #634 봉인 실패 화면 바깥 배경 노출 수정 — 2026-11-10
+
+- 안전 영역에 맞춰 축소한 402×874 콘텐츠의 RectMask2D가 한지 배경까지 잘라 기존 화면 배경이 바깥에 노출되는 문제를 재현했다. `GameOverCharacterView`에서 한지는 Canvas 전체를 덮도록 원본 비율로 확대하고 기존 클리핑 등록을 해제한다. 구름 장식의 클립 경계도 실제 화면 끝으로 맞춘다. 캐릭터·버튼의 안전 영역 배치, 무작위 선택, 홈 복귀는 유지한다. Figma 4379:1991·4379:2004를 재확인했고 기존 로컬 원본 에셋을 재사용했다.
+- `GameResultStrokeTests` EditMode **7/7 PASS**: 402×874 기본/상하 안전 영역, 430×932, 768×1024에서 화면 네 모서리까지 배경 덮임과 기존 클립 해제, 버튼 클릭 및 비활성 차단 확인. `MidStageExitLatchesGameOverAndWaitsForExplicitHome` PlayMode **1/1 PASS**: 실제 이탈→게임 오버→홈 흐름 확인.
+- 안전 영역을 위 62·아래 34로 지정한 402×874 Unity 렌더링에서 불이·금옥이 모두 바깥의 기존 배경이 사라지고 구름이 화면 끝까지 이어지는 것을 확인했다. 이는 안전 영역을 모사한 저장 씬 UI 렌더링이며 iOS 실기기 재검증은 하지 않았다. 컴파일 및 `git diff --check` 통과.
+
+
+### #634 PR #640 merge verification — 2026-11-10
+
+Integrated main `99604e5b` into #634 `937e374b`. Only this document conflicted; both validation histories were preserved. All 24 #634 code/asset files remain identical to the pre-merge version, and incoming main changes were preserved.
+
+Unity 6000.6.5f1: compilation succeeded; full EditMode **2189/2189 PASS**; PlayMode `TerritoryDeveloperSoloUsesDesignedResultsAndReturnsHomeAfterViewingTheGourd` **1/1 PASS** and `MidStageExitLatchesGameOverAndWaitsForExplicitHome` **1/1 PASS**. No failures or skips. Conflict-marker and staged whitespace checks passed.
+
+The manual conflict resolution only combines documentation. Selected PlayMode checks cover the battle-to-result/game-over integration paths; unchanged UI assets reuse the preceding visual verification. Full PlayMode, builds and physical-device verification were not rerun for this merge.
+
+
+### #634 latest-main follow-up verification
+
+Main advanced to `6b2706aa` during PR verification (#633 and #639). Integrated it in `b49a35f9`; the only conflict was again this document, and both histories were retained. The 24 original #634 code/asset files remain unchanged. On this final integrated code, full EditMode **2199/2199 PASS** and the two result/game-over PlayMode checks named above **2/2 PASS**, no failures or skips. GitHub reported PR #640 mergeable. Only documentation was manually resolved; pre-existing generated asset whitespace was retained rather than modifying unrelated assets. Full PlayMode and physical-device tests were not rerun.

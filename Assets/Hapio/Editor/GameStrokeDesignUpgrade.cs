@@ -21,6 +21,12 @@ namespace Hapio.Editor
         public static void Upgrade()
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode) throw new InvalidOperationException("Exit Play Mode first.");
+            ImportLibrary();
+            UpgradeLobbyAndBattle();
+        }
+
+        public static void ImportLibrary()
+        {
             AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
             var manifest = JsonUtility.FromJson<Manifest>(File.ReadAllText(Art+"Source/manifest.json"));
             var library = AssetDatabase.LoadAssetAtPath<GameFigmaStrokeLibrary>(Library);
@@ -49,6 +55,10 @@ namespace Hapio.Editor
             });
             EditorUtility.SetDirty(library);
             AssetDatabase.SaveAssets();
+        }
+
+        private static void UpgradeLobbyAndBattle()
+        {
             var root = PrefabUtility.LoadPrefabContents(GameLobbySceneUpgrade.PrefabPath);
             try
             {
