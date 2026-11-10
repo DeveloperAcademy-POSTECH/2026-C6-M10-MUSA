@@ -581,6 +581,10 @@ namespace C6Lab
         [SerializeField] private bool jigwiBBucket = false;
         [Tooltip("#551 시험용 Inspector 전용(Host): 켜면 지귀 스테이지에서 B만 4초부터 17초마다(4/21/38/55/72초) 나오고 A와 공통 기믹(폭탄 등)은 나오지 않는다. 시험이 끝나면 끈다.")]
         [SerializeField] private bool jigwiBTestOnly = false;
+        [Tooltip("#595 시험용 Inspector 전용(Host): 켜면 지귀 스테이지에서 부적만 4초부터 17초마다(4/21/38/55/72초) 나오고 연기와 공통 기믹(폭탄 등)은 나오지 않는다. Jigwi Smoke Flow가 켜져 있으면 공용 부적(모두 써야 보상). 시험이 끝나면 끈다.")]
+        [SerializeField] private bool jigwiATestOnly = false;
+        [Tooltip("#595 Inspector 전용(Host): 켜면 지귀 시간표가 연기 10초 / 부적 45초 / 연기 66초 / 부적 83초(공통 기믹은 Jigwi Common Start Seconds부터)다. 연기는 양동이 없이 모두의 화면을 같은 때에 덮어 각자 90% 문질러 걷어 내고, 부적은 모두가 써야 모두 보상(한 명이라도 못 쓰면 모두의 판이 탄다). 켜면 Jigwi Flow Schedule과 Jigwi B Bucket보다 앞선다. B Test Only / A Test Only와 함께 켜면 연기만 / 공용 부적만 시험한다.")]
+        [SerializeField] private bool jigwiSmokeFlow = false;
         [Tooltip("#540 Inspector 전용(Host, 새 시간표만): 지귀 공통 기믹이 처음 나오는 때(초).")]
         [SerializeField, Range(0f, 99f)] private float jigwiCommonStartSeconds = 40f;
         [Tooltip("#540 Inspector 전용(Host, 새 시간표만): 지귀 공통 기믹 간격(초). 피버(100초) 전까지 되풀이.")]
@@ -874,13 +878,13 @@ namespace C6Lab
         [Tooltip("2:2 한 판의 제한 시간 (초)")]
         [SerializeField, Range(30f, 600f)] private float teamBattleSeconds = 180f;
         [Tooltip("팀이 이만큼 맞히면 피버가 시작된다. 0이면 피버 없음.")]
-        [SerializeField, Range(0, 50)] private int teamFeverHits = 15;
+        [SerializeField, Range(0, 50)] private int teamFeverHits = 10;
         [Tooltip("피버 시간 (초). 그동안 팀 판의 모든 구슬이 팀 색 결합 구슬이 되고, 생성해도 팀 색 결합 구슬이 나온다.")]
         [SerializeField, Range(1f, 30f)] private float teamFeverSeconds = 8f;
         [Tooltip("1:1 땅따먹기 (2명, #394): 이만큼 맞히면 피버. 0이면 피버 없음. 2:2는 위의 Team Fever Hits. Inspector 전용.")]
-        [SerializeField, Range(0, 50)] private int teamFeverHitsOneOnOne = 6;
+        [SerializeField, Range(0, 50)] private int teamFeverHitsOneOnOne = 8;
         [Tooltip("3:3 땅따먹기 (6명, #394): 이만큼 맞히면 피버. 0이면 피버 없음. Inspector 전용.")]
-        [SerializeField, Range(0, 50)] private int teamFeverHitsThreeOnThree = 18;
+        [SerializeField, Range(0, 50)] private int teamFeverHitsThreeOnThree = 12;
 
         [Header("2:2 땅따먹기 연출 (#293, Inspector 전용. 기본값이 지금 모습이다)")]
         [Tooltip("피버 구슬 둘레 무지개 고리 크기 (구슬 반지름의 배)")]
@@ -1195,6 +1199,8 @@ namespace C6Lab
         public bool JigwiBCountdown => jigwiBCountdown;
         public bool JigwiBBucket => jigwiBBucket;
         public bool JigwiBTestOnly => jigwiBTestOnly;
+        public bool JigwiATestOnly => jigwiATestOnly;
+        public bool JigwiSmokeFlow => jigwiSmokeFlow;
         public float JigwiCommonStartSeconds => Mathf.Clamp(Finite(jigwiCommonStartSeconds, 40f), 0f, 99f);
         public float JigwiCommonIntervalSeconds => Mathf.Clamp(Finite(jigwiCommonIntervalSeconds, 15f), 3f, 60f);
         public float JigwiStageWarningSeconds => Mathf.Clamp(Finite(jigwiStageWarningSeconds, 1f), 0f, 3f);

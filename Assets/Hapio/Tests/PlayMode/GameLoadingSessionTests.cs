@@ -56,6 +56,7 @@ namespace Hapio.Tests
             yield return Until(() => GameSession.Instance != null, "The session is made with Home");
             session = GameSession.Instance;
             Assert.That(session.LoadingView, Is.Not.Null, "The shared loading screen is ready for later.");
+            Assert.That(session.GetComponentsInChildren<GameTouchInk>(true).Length, Is.EqualTo(1), "The touch ink lives with the session, across every screen.");
             float until = Time.realtimeSinceStartup + 1.2f;
             bool shown = false;
             while (Time.realtimeSinceStartup < until)

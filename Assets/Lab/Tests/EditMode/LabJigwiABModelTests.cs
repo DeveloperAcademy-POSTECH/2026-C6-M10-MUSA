@@ -350,6 +350,89 @@ namespace C6Lab.Tests
             var failed=m.Snapshot(22);
             Assert.That(LabJigwiABNetworkValidation.Valid(failed.jigwiAB,failed.players,m.Revision),Is.True,"A failed B with no board fire still validates.");
         }
+        [Test] public void ATestOnlyRunsJustTheSharedTalismanFromFourSeconds()
+        {
+            // #595 시험용: 부적만 4초부터 17초마다, 연기와 공통 기믹 없음.
+            JsonUtility.FromJsonOverwrite("{\"jigwiATestOnly\":true,\"jigwiSmokeFlow\":true,\"jigwiABPersonalDurationSeconds\":10}",config);
+            var m=Room3();
+            var a=Current(m,4.1);
+            Assert.That(a.kind,Is.EqualTo(LabJigwiABKind.PersonalBurn));Assert.That(a.common,Is.True);
+            var next=typeof(LabModel).GetMethod("NextJigwiABCommonAt",BindingFlags.Instance|BindingFlags.NonPublic);
+            Assert.That((double)next.Invoke(m,new object[]{0u}),Is.EqualTo(double.PositiveInfinity),"No common gimmick.");
+            for(int t=5;t<=99;t++){m.Tick(t);var mid=m.Snapshot(t);
+                Assert.That(LabJigwiABNetworkValidation.Valid(mid.jigwiAB,mid.players,m.Revision),Is.True,"Valid at "+t+" s");}
+            var r=m.Snapshot(99).jigwiAB.rounds.OrderBy(x=>x.slot).ToArray();
+            Assert.That(r.Select(x=>x.activeAt),Is.EqualTo(new[]{4d,21d,38d,55d,72d}));
+            Assert.That(r.All(x=>x.kind==LabJigwiABKind.PersonalBurn&&x.common),Is.True,"Only the shared talisman.");
+        }
+        [Test] public void SmokeFlowRunsSmokeThenSharedTalismanAndSmokesEveryScreenAtOnce()
+        {
+            // #595: 연기 10 / 부적 45 / 연기 66 / 부적 83, 공통 기믹은 25초부터 15초마다.
+            JsonUtility.FromJsonOverwrite("{\"jigwiSmokeFlow\":true,\"jigwiCommonStartSeconds\":25,\"jigwiABPersonalDurationSeconds\":10}",config);
+            var m=Room3();
+            var next=typeof(LabModel).GetMethod("NextJigwiABCommonAt",BindingFlags.Instance|BindingFlags.NonPublic);
+            Assert.That(Enumerable.Range(0,6).Select(i=>(double)next.Invoke(m,new object[]{(uint)i})),
+                Is.EqualTo(new[]{25d,40d,55d,70d,85d,double.PositiveInfinity}));
+            var smoke=Current(m,10.1);
+            Assert.That(smoke.kind,Is.EqualTo(LabJigwiABKind.GroupFire));
+            Assert.That(smoke.smoke&&smoke.bucket,Is.True);
+            Assert.That(smoke.players.Select(p=>p.playerId),Is.EquivalentTo(Three),"Everyone's screen smokes.");
+            Assert.That(smoke.players.Select(p=>p.readyAt).Distinct().Single(),
+                Is.EqualTo(10d+LabJigwiABTimeline.SmokeLeadSeconds).Within(1e-9),"All at the same moment.");
+            Assert.That(m.Snapshot(10.1).orbs.Any(o=>o.jigwiABSupplyEventId==smoke.id),Is.False,"No special Water.");
+            Assert.That(m.TryJigwiBPull(Three[0],smoke.id,12),Is.False,"No bucket to pour.");
+            for(int t=13;t<=99;t++){m.Tick(t);var mid=m.Snapshot(t);
+                Assert.That(LabJigwiABNetworkValidation.Valid(mid.jigwiAB,mid.players,m.Revision),Is.True,"Valid at "+t+" s");}
+            var r=m.Snapshot(99).jigwiAB.rounds.OrderBy(x=>x.slot).ToArray();
+            Assert.That(r.Select(x=>x.activeAt),Is.EqualTo(new[]{10d,45d,66d,83d}));
+            Assert.That(r.Select(x=>x.kind),Is.EqualTo(new[]{LabJigwiABKind.GroupFire,LabJigwiABKind.PersonalBurn,
+                LabJigwiABKind.GroupFire,LabJigwiABKind.PersonalBurn}));
+            Assert.That(r.Select(x=>x.smoke),Is.EqualTo(new[]{true,false,true,false}));
+            Assert.That(r.Select(x=>x.common),Is.EqualTo(new[]{false,true,false,true}));
+            Assert.That(r[0].resolution,Is.EqualTo(LabJigwiABResolution.Expired),"Smoke just ends; nobody pours.");
+            Assert.That(r[0].boardFireUntil,Is.EqualTo(-1d),"Smoke never sets the boards on fire.");
+        }
+        LabModel SmokeFlowRoom3()
+        {
+            JsonUtility.FromJsonOverwrite("{\"jigwiSmokeFlow\":true,\"jigwiABPersonalDurationSeconds\":10,\"jigwiAHoldBurnUntilEnd\":true,\"jigwiTalismanWaterCount\":1}",config);
+            return Room3();
+        }
+        [Test] public void SharedTalismanPoursTheWaterfallOnlyWhenAllHaveWrittenIt()
+        {
+            // #595: 공용 부적 — 모두 써야 모두 보상.
+            var m=SmokeFlowRoom3();var a=Current(m,45.1);
+            Assert.That(a.kind,Is.EqualTo(LabJigwiABKind.PersonalBurn));Assert.That(a.common,Is.True);
+            Assert.That(m.TryCompleteJigwiTalisman(Three[0],a.id,46),Is.True);
+            Assert.That(m.TryCompleteJigwiTalisman(Three[1],a.id,47),Is.True);
+            var waiting=m.Snapshot(52);
+            Assert.That(waiting.orbs.Any(o=>o.jigwiTalismanReward),Is.False,"Nobody is rewarded until everyone has written it.");
+            Assert.That(waiting.jigwiAB.rounds.Single(r=>r.id==a.id).resolution,Is.EqualTo(LabJigwiABResolution.None));
+            Assert.That(LabJigwiABNetworkValidation.Valid(waiting.jigwiAB,waiting.players,m.Revision),Is.True);
+            int painted=m.PaintSurface.PaintCount;
+            Assert.That(m.TryCompleteJigwiTalisman(Three[2],a.id,52.5),Is.True);
+            Assert.That(m.PaintSurface.PaintCount,Is.GreaterThan(painted),"The waterfall paints the boss at once.");
+            var done=m.Snapshot(52.5);
+            Assert.That(done.jigwiAB.rounds.Single(r=>r.id==a.id).resolution,Is.EqualTo(LabJigwiABResolution.Completed));
+            Assert.That(LabJigwiABNetworkValidation.Valid(done.jigwiAB,done.players,m.Revision),Is.True);
+            Assert.That(m.Snapshot(58).orbs.Any(o=>o.jigwiTalismanReward),Is.False,"#595: no talisman orbs, the waterfall is the reward.");
+        }
+        [Test] public void SharedTalismanBurnsEveryBoardWhenOneSeatMissesIt()
+        {
+            // #595: 한 명이라도 못 쓰면 이미 쓴 사람의 판도 탄다.
+            var m=SmokeFlowRoom3();var a=Current(m,45.1);
+            Assert.That(m.TryCompleteJigwiTalisman(Three[0],a.id,46),Is.True);
+            Assert.That(m.TryCompleteJigwiTalisman(Three[1],a.id,47),Is.True);
+            var keep=Add(m,Three[0],54);
+            var end=m.Snapshot(55.01);var round=end.jigwiAB.rounds.Single(r=>r.id==a.id);
+            Assert.That(round.resolution,Is.EqualTo(LabJigwiABResolution.Expired));
+            Assert.That(Three.All(round.TalismanFailed),Is.True,"Every seat failed together.");
+            Assert.That(LabJigwiABNetworkValidation.Valid(end.jigwiAB,end.players,m.Revision),Is.True);
+            double lit=55+LabModel.JigwiTalismanFailFirstBurnSeconds+.01;
+            Assert.That(m.Snapshot(lit).orbs.Single(o=>o.id==keep.id).jigwiABBurnAt,
+                Is.EqualTo(55+LabModel.JigwiTalismanFailFirstBurnSeconds+LabModel.JigwiTalismanFailBlazeSeconds).Within(1e-6),
+                "A seat that wrote its talisman still burns.");
+            Assert.That(m.Snapshot(lit).orbs.Any(o=>o.jigwiTalismanReward),Is.False,"No reward.");
+        }
         LabJigwiABRound B(LabModel m,string id,double at)=>m.Snapshot(at).jigwiAB.rounds.Single(r=>r.id==id);
         [Test] public void BBucketArrivesSeatBySeatAndEachPourPaintsAtOnce()
         {

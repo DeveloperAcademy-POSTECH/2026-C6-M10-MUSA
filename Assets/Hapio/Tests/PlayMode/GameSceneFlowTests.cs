@@ -406,8 +406,8 @@ namespace Hapio.Tests
             Assert.That(session.IsTerritory, Is.True);
             Assert.That(session.State.totalStages, Is.EqualTo(1));
             Assert.That(network.Snapshot.teamTerritory, Is.True);
-            Assert.That(network.config.TeamBattleSeconds, Is.EqualTo(120f));
-            Assert.That(network.Snapshot.remaining, Is.InRange(110d, 120d));
+            Assert.That(network.config.TeamBattleSeconds, Is.EqualTo(90f));
+            Assert.That(network.Snapshot.remaining, Is.InRange(80d, 90d));
             var livePaint = Object.FindFirstObjectByType<LabGourdPaint>();
             Assert.That(livePaint.HighResolutionActive, Is.True);
             Assert.That(livePaint.WatercolorActive, Is.False, "Only the team battle uses the opaque high-resolution presentation.");
@@ -947,6 +947,11 @@ namespace Hapio.Tests
             {
                 // Direct cut sequencing is intentional here; genuine input is exercised by the neighbouring mouse test.
                 story.player.Next();
+                if (story.player.IsTransitioning)
+                {
+                    story.player.AdvanceTime(1f);
+                    story.player.AdvanceTime(1f);
+                }
                 AssertNoInlineContinue(story.player.CurrentView);
                 if (!story.player.IsPlaying)
                     Assert.That(story.advanceButton.interactable, Is.False, "The story-ending frame cannot also activate NEXT.");
@@ -991,6 +996,11 @@ namespace Hapio.Tests
             while ((story.player.CurrentCutIndex != 2 || !story.player.IsReading) && steps++ < 20)
             {
                 story.player.Next();
+                if (story.player.IsTransitioning)
+                {
+                    story.player.AdvanceTime(1f);
+                    story.player.AdvanceTime(1f);
+                }
                 AssertNoInlineContinue(story.player.CurrentView);
                 yield return null;
             }
@@ -1867,7 +1877,7 @@ namespace Hapio.Tests
         private static void AssertNoInlineContinue(StoryCutView view)
         {
             Assert.That(view, Is.Not.Null);
-            if (view.continueButton != null)
+            if (view.continueButton != null && !view.requireContinueButton)
                 Assert.That(view.continueButton.gameObject.activeInHierarchy, Is.False,
                     "An authored ‘next yokai’ picture action must not compete with the actual stage transition.");
         }
@@ -1918,7 +1928,12 @@ namespace Hapio.Tests
             Assert.That(card, Is.Not.Null, "The current stage's actual seal card must be visible.");
             Assert.That(card.sealRate.text, Is.EqualTo(Mathf.RoundToInt(snapshot.paintCoverage * 100) + "%"));
             Assert.That(card.timeRemaining.text, Is.EqualTo(Mathf.CeilToInt((float)snapshot.remaining) + "초"));
-            StoryCardRecords.Record[] records = GameStageStoryPresentation.CardRecords(snapshot);
+            StoryCardRecords.Record[] records = GameStageStoryPresentation.CardRecords(snapshot, GameSession.Instance.Network.LocalPlayerId);
+            var cardImages = story.player.CurrentView.GetComponentsInChildren<UnityEngine.UI.Image>(true);
+            Assert.That(cardImages.Count(image => image.name == StoryRecordHighlight.HighlightName && image.gameObject.activeSelf),
+                Is.EqualTo(records.Count(record => record.mine)), "Red marks exactly the awards this player earned.");
+            Assert.That(cardImages.Any(image => image.name.StartsWith("Rectangle 12") && image.gameObject.activeSelf), Is.False,
+                "The design's fixed sample strips are off on the real result path.");
             Assert.That(card.players, Has.Length.EqualTo(5));
             for (int row = 0; row < 5; row++)
             {

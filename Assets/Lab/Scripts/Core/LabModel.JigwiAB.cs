@@ -74,7 +74,10 @@ namespace C6Lab
         private void ResetJigwiAB(LabConfig config, double now)
         {
             jigwiABEnabled = !teamMode && StageYokai == LabStageYokai.Jigwi && config.JigwiStageTimelineEnabled;
+            jigwiSmokeFlow = config.JigwiSmokeFlow; // #595: with B Test Only it tests the smoke B (every 17 s) instead of the old B
             jigwiSchedule = config.JigwiBTestOnly ? LabJigwiABTimeline.BTestSchedule // #551 시험용: B만
+                : config.JigwiATestOnly ? LabJigwiABTimeline.ATestSchedule // #595 시험용: 부적만
+                : jigwiSmokeFlow ? LabJigwiABTimeline.SmokeFlowSchedule // #595 연기 10 / 부적 45 / 연기 66 / 부적 83
                 : config.JigwiFlowSchedule ? LabJigwiABTimeline.FlowSchedule : LabJigwiABTimeline.LegacySchedule;
             jigwiAHoldBurn = config.JigwiAHoldBurnUntilEnd;
             jigwiBBucket = config.JigwiBBucket;
@@ -104,8 +107,9 @@ namespace C6Lab
         }
         private double NextJigwiABCommonAt(uint index)
         {
-            if (jigwiStageCutoffReached || jigwiSchedule == LabJigwiABTimeline.BTestSchedule) return double.PositiveInfinity; // #551 B만 시험
-            if (jigwiSchedule != LabJigwiABTimeline.FlowSchedule)
+            if (jigwiStageCutoffReached || jigwiSchedule == LabJigwiABTimeline.BTestSchedule
+                || jigwiSchedule == LabJigwiABTimeline.ATestSchedule) return double.PositiveInfinity; // #551 B만 / #595 부적만 시험
+            if (jigwiSchedule != LabJigwiABTimeline.FlowSchedule && jigwiSchedule != LabJigwiABTimeline.SmokeFlowSchedule)
                 return index < JigwiStageCommonSlots.Length ? jigwiStageStartedAt + JigwiStageCommonSlots[index] : double.PositiveInfinity;
             // #540: from the start of the middle phase, every interval, until the fever.
             double offset = jigwiCommonStart + index * Math.Max(3d, jigwiCommonInterval);
@@ -190,6 +194,7 @@ namespace C6Lab
         {
             LabJigwiABKind kind = LabJigwiABTimeline.KindForSlot(slot, jigwiSchedule);
             bool personal = kind == LabJigwiABKind.PersonalBurn;
+            bool smoke = !personal && jigwiSmokeFlow; // #595: B is smoke for everyone at once (no bucket to pour)
             var item = new LabJigwiABRound
             {
                 id = "jigwi-ab/" + sessionId + "/" + round + "/" + slot, slot = slot,
@@ -204,8 +209,9 @@ namespace C6Lab
                 // #509: B success no longer gives a timed launch reward.
                 rewardSizeScale = 1f, rewardPaintScale = 1f,
                 // #551: with the countdown the picked hits may land a little further apart.
-                syncWindowSeconds = !personal && jigwiBCountdown && !jigwiBBucket ? LabJigwiABTimeline.CountdownSyncWindowSeconds : 0f,
-                bucket = !personal && jigwiBBucket
+                syncWindowSeconds = !personal && jigwiBCountdown && !jigwiBBucket && !smoke ? LabJigwiABTimeline.CountdownSyncWindowSeconds : 0f,
+                bucket = !personal && (jigwiBBucket || smoke), smoke = smoke,
+                common = personal && jigwiSmokeFlow // #595: every talisman written = reward for all, one missing = all boards burn
             };
             // #479: A ignites every seat at once; each seat clears its own fire with a talisman.
             if (personal) item.players = seats.Take(activeSeatCount).Select(owner => new LabJigwiABPlayerFire
@@ -219,7 +225,9 @@ namespace C6Lab
             {
                 playerId = owner, targets = new[] { new LabJigwiABFireTarget { id = item.id + "/" + owner + "/0", x = .5f, y = .62f } },
                 // #551 나무 물통: buckets arrive one seat after another (the draw order), like fox fire.
-                readyAt = item.bucket ? activeAt + LabJigwiABTimeline.BucketLeadSeconds + order * LabJigwiABTimeline.BucketStaggerSeconds : -1d
+                // #595 연기: every screen smokes at the same moment.
+                readyAt = item.smoke ? activeAt + LabJigwiABTimeline.SmokeLeadSeconds
+                    : item.bucket ? activeAt + LabJigwiABTimeline.BucketLeadSeconds + order * LabJigwiABTimeline.BucketStaggerSeconds : -1d
             }).ToArray();
             jigwiABRounds.Add(item); revision++;
         }
@@ -238,9 +246,10 @@ namespace C6Lab
             // #540: an A that runs out punishes every seat that did not finish its talisman (each seat for itself):
             // when Jigwi's line is over, every orb then on its board burns away at once. Drums keep working.
             var failed = new HashSet<ulong>();
+            // #595: a common talisman that someone did not finish burns every board, finished or not.
             if (item.kind == LabJigwiABKind.PersonalBurn && result == LabJigwiABResolution.Expired)
                 foreach (var seat in item.players ?? Array.Empty<LabJigwiABPlayerFire>())
-                    if (seat != null && seat.talismanAt < 0d) failed.Add(seat.playerId);
+                    if (seat != null && item.TalismanFailed(seat.playerId)) failed.Add(seat.playerId);
             // #540: which orbs burn is decided when Jigwi's line ends (see IgniteDueJigwiFailBurns), so orbs made meanwhile burn too.
             foreach (ulong owner in failed) jigwiFailBurns.Add((owner, item.id, item.resolvedAt + JigwiTalismanFailFirstBurnSeconds));
             foreach (var orb in orbs.Values)
@@ -420,7 +429,7 @@ namespace C6Lab
             if (active.syncWindowAt < 0d || now < active.syncWindowAt + active.SyncWindow) return;
             FailJigwiSync(active, active.syncWindowAt + active.SyncWindow);
         }
-        private bool jigwiBCountdown, jigwiBBucket;
+        private bool jigwiBCountdown, jigwiBBucket, jigwiSmokeFlow;
         /// <summary>
         /// #551 B countdown: a picked seat starts or stops holding its special Water. When every picked seat holds it
         /// the 3-2-1 starts (countdownAt); anyone letting go before "지금!" stops it. After "지금!" holding no longer
@@ -486,7 +495,7 @@ namespace C6Lab
             if (!jigwiABEnabled || !jigwiBBucket || string.IsNullOrEmpty(roundId) || !TryAdvance(now, out _)
                 || phase != LabPhase.Playing) return false;
             var active = ActiveJigwiABRound(now);
-            if (active == null || !active.bucket || !active.Active(now) || active.id != roundId) return false;
+            if (active == null || !active.bucket || active.smoke || !active.Active(now) || active.id != roundId) return false; // #595 연기엔 쏟을 양동이가 없다
             var seat = active.players.FirstOrDefault(value => value.playerId == sender);
             if (seat == null || seat.launchedAt >= 0d || now < seat.readyAt
                 || now > seat.readyAt + LabJigwiABTimeline.BucketSeatSeconds) return false;
@@ -529,6 +538,7 @@ namespace C6Lab
             var player = active.players.FirstOrDefault(value => value.playerId == sender);
             if (player == null || player.talismanAt >= 0d) return false;
             player.talismanAt = now;
+            if (active.common) return CompleteCommonJigwiTalisman(active, sender, now);
             ResumeJigwiAOrbLifetimes(sender, active.endsAt - now);
             foreach (var orb in orbs.Values)
                 if (orb.owner == sender && orb.jigwiABBurnEventId == active.id)
@@ -537,6 +547,26 @@ namespace C6Lab
             HoldJigwiOrbsForTalismanReward(sender, now);
             revision++;
             if (active.players.All(value => value.talismanAt >= 0d)) ResolveJigwiAB(active, LabJigwiABResolution.Completed, now);
+            return true;
+        }
+        /// <summary>
+        /// #595 공용 부적: 쓴 사람의 판은 아직 타지 않게만 하고 보상은 미룬다. 마지막 사람이 쓰는 순간 모두의 멈춘 구슬 수명이
+        /// 돌아가고, 박 위로 폭포가 쏟아져(자리마다 양동이 한 번만큼 물 칠) A가 끝난다. 한 명이라도 못 쓰면 끝날 때 모두의 판이 탄다(ResolveJigwiAB).
+        /// </summary>
+        private bool CompleteCommonJigwiTalisman(LabJigwiABRound active, ulong sender, double now)
+        {
+            foreach (var orb in orbs.Values)
+                if (orb.owner == sender && orb.jigwiABBurnEventId == active.id)
+                { orb.jigwiABBurnEventId = null; orb.jigwiABBurnAt = -1d; orb.revision = ++revision; }
+            revision++;
+            if (!active.players.All(value => value.talismanAt >= 0d)) return true;
+            // #595: the reward is a waterfall on the boss (like each seat's poured bucket), not talisman orbs.
+            foreach (var seat in active.players)
+            {
+                ResumeJigwiAOrbLifetimes(seat.playerId, active.endsAt - now);
+                PaintJigwiBucketPour(seat.playerId, now);
+            }
+            ResolveJigwiAB(active, LabJigwiABResolution.Completed, now);
             return true;
         }
         /// <summary>

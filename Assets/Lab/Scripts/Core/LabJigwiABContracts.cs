@@ -62,6 +62,26 @@ namespace C6Lab
         /// No special Water, no 3-2-1. Everyone poured = completed; a seat that runs out gets its board steamed over (client).
         /// </summary>
         public bool bucket;
+        /// <summary>
+        /// #595 연기: 양동이 없이 모든 자리의 화면이 같은 때(seat.readyAt = activeAt + SmokeLeadSeconds)에 지귀 연기로 덮인다.
+        /// bucket과 함께 켜진다(개별 B의 화면 길을 그대로 쓴다). 쏟기는 없고 시간이 다 되면 그냥 끝난다(벌 없음).
+        /// </summary>
+        public bool smoke;
+        /// <summary>#595 공용 부적(A): 모두가 써야 모두 보상, 한 명이라도 못 쓰면 모두의 판이 탄다.</summary>
+        public bool common;
+        /// <summary>#595: 이 A가 끝났을 때 이 자리 판이 타는지. 공용 부적이면 한 명이라도 못 썼을 때 모두.</summary>
+        public bool TalismanFailed(ulong player)
+        {
+            if (kind != LabJigwiABKind.PersonalBurn) return false;
+            bool member = false, anyOpen = false, mineOpen = false;
+            foreach (var seat in players ?? Array.Empty<LabJigwiABPlayerFire>())
+            {
+                if (seat == null) continue;
+                if (seat.talismanAt < 0d) anyOpen = true;
+                if (seat.playerId == player) { member = true; mineOpen = seat.talismanAt < 0d; }
+            }
+            return member && (common ? anyOpen : mineOpen);
+        }
         /// <summary>#551: 3-2-1 length.</summary>
         public double CountdownLength => LabJigwiABTimeline.CountdownSeconds;
         /// <summary>#551: how long after "던져!" the throw may come.</summary>
@@ -184,7 +204,9 @@ namespace C6Lab
                     if (round.resolvedAt != -1d || ++unresolved > 2) return false;
                 }
                 else if (round.resolvedAt < round.warningAt) return false;
-                if (round.kind == LabJigwiABKind.PersonalBurn && round.bucket) return false;
+                if (round.kind == LabJigwiABKind.PersonalBurn && (round.bucket || round.smoke)) return false;
+                // #595: smoke rides on the bucket B; only an A can be a common talisman.
+                if (round.smoke && !round.bucket || round.kind == LabJigwiABKind.GroupFire && round.common) return false;
                 if (round.kind == LabJigwiABKind.PersonalBurn
                     && (round.syncCount != 0 || round.syncWindowAt != -1d || round.syncResetAt != -1d)) return false;
                 if (round.kind == LabJigwiABKind.PersonalBurn)
@@ -242,10 +264,15 @@ namespace C6Lab
                 if (memberIds != null && round.resolution != LabJigwiABResolution.Skipped
                     && owners.Count != (round.bucket ? memberIds.Count : LabJigwiABTimeline.GroupPickCount(memberIds.Count))) return false;
                 // #551 나무 물통: no 3-2-1; each bucket arrives inside the stagger and is poured inside its own time.
+                // #595 연기: everyone's screen smokes at the same moment and nobody pours.
+                double lead = round.smoke ? LabJigwiABTimeline.SmokeLeadSeconds : LabJigwiABTimeline.BucketLeadSeconds;
+                double spread = round.smoke ? 0d : LabJigwiABTimeline.BucketStaggerSeconds * (MaximumPlayers - 1);
+                if (round.smoke && (round.resolution == LabJigwiABResolution.Completed || round.players.Any(player => player.launchedAt != -1d)))
+                    return false;
                 if (round.bucket && (round.countdownAt != -1d
                     || round.resolution == LabJigwiABResolution.Completed && round.players.Any(player => player.launchedAt < 0d)
-                    || round.players.Any(player => !Range(player.readyAt, round.activeAt + LabJigwiABTimeline.BucketLeadSeconds - .00001d,
-                        round.activeAt + LabJigwiABTimeline.BucketLeadSeconds + LabJigwiABTimeline.BucketStaggerSeconds * (MaximumPlayers - 1) + .00001d)
+                    || round.players.Any(player => !Range(player.readyAt, round.activeAt + lead - .00001d,
+                        round.activeAt + lead + spread + .00001d)
                         || player.launchedAt != -1d && !Range(player.launchedAt, player.readyAt - .00001d,
                             player.readyAt + LabJigwiABTimeline.BucketSeatSeconds + .00001d)))) return false;
                 bool allOff = round.players.Length > 0 && round.players.All(player => player.targets.All(target => !target.lit));

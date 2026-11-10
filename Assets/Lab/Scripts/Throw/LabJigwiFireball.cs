@@ -49,12 +49,15 @@ namespace C6Lab
                     if (item != null && item.playerId == localPlayer) seat = item;
                 if (seat == null) continue;
                 double span = Math.Max(.01d, round.endsAt - round.activeAt);
-                if (seat.talismanAt >= 0d)
+                // #595: a common talisman's fireball keeps growing until everyone has written it, then goes out for all.
+                double doneAt = !round.common ? seat.talismanAt
+                    : round.resolution == LabJigwiABResolution.Completed ? round.resolvedAt : -1d;
+                if (doneAt >= 0d)
                 {
-                    double age = now - seat.talismanAt;
+                    double age = now - doneAt;
                     if (age < 0d || age >= DouseSeconds) continue;
                     progress = (float)(age / DouseSeconds);
-                    size = Grown((float)((seat.talismanAt - round.activeAt) / span));
+                    size = Grown((float)((doneAt - round.activeAt) / span));
                     return Phase.Douse;
                 }
                 if (round.Warning(now))

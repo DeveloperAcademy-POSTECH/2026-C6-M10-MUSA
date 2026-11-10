@@ -42,8 +42,13 @@ namespace Hapio
         public bool AutoAdvance { get; private set; }
         public bool IsReading { get; private set; }
         public StoryCutView CurrentView => currentView;
+        public bool IsTransitioning => activeCloudWipe != null;
 
         private StoryCutView currentView;
+        private StoryCloudWipe activeCloudWipe;
+        private int coveredNextCut;
+        private float wipeElapsed;
+        private bool swappedUnderClouds;
         private bool shownCardHint;
         private AudioSource musicSource;
         private float musicTarget;
@@ -126,6 +131,11 @@ namespace Hapio
         internal void AdvanceTime(float seconds)
         {
             if (!IsPlaying || currentView == null) return;
+            if (IsTransitioning)
+            {
+                AdvanceCloudWipe(seconds);
+                return;
+            }
             elapsed += seconds;
             currentView.Sample(elapsed);
             if (!IsReading)
@@ -142,7 +152,14 @@ namespace Hapio
         /// <summary>UI input shares one frame gate. Direct sequencing and preview AUTO keep their existing API.</summary>
         public void RequestNext()
         {
-            if (AcceptUserInput()) Next();
+            if ((!IsReading && currentView != null && currentView.waitForEntrance) || !AcceptUserInput()) return;
+            Next();
+        }
+
+        public void RequestSurfaceAdvance()
+        {
+            if (currentView != null && currentView.requireContinueButton) return;
+            RequestNext();
         }
 
         public void RequestPrevious() { if (AcceptUserInput()) Previous(); }
@@ -150,7 +167,7 @@ namespace Hapio
 
         private bool AcceptUserInput()
         {
-            if (!IsPlaying || UserInputBlocked) return false;
+            if (!IsPlaying || UserInputBlocked || IsTransitioning) return false;
             if (touchOnly)
             {
                 if (StoryTapAdvance.PressedTouchCount > 0) suppressMultiTouch = true;
@@ -162,7 +179,7 @@ namespace Hapio
 
         public void Next()
         {
-            if (!IsPlaying) return;
+            if (!IsPlaying || IsTransitioning) return;
             if (!IsReading)
             {
                 elapsed = currentView.EntranceDuration;
@@ -178,13 +195,14 @@ namespace Hapio
             }
             int next = CurrentCutIndex + 1;
             if (next >= sequence.cuts.Count) Finish(StoryExitReason.Completed);
+            else if (currentView.exitCloudWipe != null) StartCloudWipe(next);
             else ShowCut(next);
         }
 
         /// <summary>Return to the previous picture's first page and pause automatic advance.</summary>
         public void Previous()
         {
-            if (!IsPlaying || CurrentCutIndex <= 0) return;
+            if (!IsPlaying || IsTransitioning || CurrentCutIndex <= 0) return;
             AutoAdvance = false;
             UpdateAutoLabel();
             ShowCut(CurrentCutIndex - 1);
@@ -217,6 +235,51 @@ namespace Hapio
         private void UpdateAutoLabel()
         {
             if (autoLabel != null) autoLabel.text = AutoAdvance ? "자동 켜짐" : "자동 꺼짐";
+        }
+
+        private void StartCloudWipe(int index)
+        {
+            activeCloudWipe = Instantiate(currentView.exitCloudWipe, cutHost, false);
+            activeCloudWipe.transform.SetAsLastSibling();
+            coveredNextCut = index;
+            wipeElapsed = 0f;
+            swappedUnderClouds = false;
+            activeCloudWipe.Sample(0);
+        }
+
+        private void AdvanceCloudWipe(float seconds)
+        {
+            var wipe = activeCloudWipe;
+            wipeElapsed += Mathf.Max(0, seconds);
+            if (!swappedUnderClouds && wipeElapsed >= wipe.SwapTime)
+            {
+                swappedUnderClouds = true;
+                wipe.Sample(wipe.SwapTime);
+                ShowCut(coveredNextCut);
+                if (activeCloudWipe != wipe) return;
+                wipe.transform.SetAsLastSibling();
+                // Keep a closed frame even when a slow frame crosses the entire wipe.
+                wipeElapsed = wipe.SwapTime;
+                return;
+            }
+            wipe.Sample(wipeElapsed);
+            if (swappedUnderClouds)
+            {
+                // Let the new picture unfold behind the receding paper clouds. Text and sounds
+                // remain on hold until the overlay is gone.
+                elapsed = Mathf.Clamp(wipeElapsed - wipe.SwapTime, 0, wipe.Duration - wipe.SwapTime);
+                currentView.SampleArtwork(elapsed);
+            }
+            if (wipeElapsed >= wipe.Duration) ClearCloudWipe();
+        }
+
+        private void ClearCloudWipe()
+        {
+            var wipe = activeCloudWipe;
+            activeCloudWipe = null;
+            if (wipe == null) return;
+            wipe.gameObject.SetActive(false);
+            Destroy(wipe.gameObject);
         }
 
         private void ShowCut(int index)
@@ -255,7 +318,8 @@ namespace Hapio
         private void BeginReading()
         {
             IsReading = true;
-            if (currentView.continueButton != null) currentView.continueButton.gameObject.SetActive(!hideInlineContinueButtons);
+            if (currentView.continueButton != null)
+                currentView.continueButton.gameObject.SetActive(currentView.requireContinueButton || !hideInlineContinueButtons);
             readElapsed = 0f;
             SetDialogueVisible(!currentView.hideEmptyDialogue ||
                 !string.IsNullOrWhiteSpace(currentPage.dialogue) || !string.IsNullOrWhiteSpace(currentPage.speaker));
@@ -435,6 +499,9 @@ namespace Hapio
         {
             // Clear state before invoking callbacks, so repeated clicks cannot finish twice.
             IsPlaying = false;
+            if (currentView != null && currentView.requireContinueButton && currentView.continueButton != null)
+                currentView.continueButton.gameObject.SetActive(false);
+            ClearCloudWipe();
             UpdatePreviousButton();
             if (voiceSource != null) voiceSource.Stop();
             musicTarget = 0;
@@ -446,6 +513,7 @@ namespace Hapio
         public void Cancel()
         {
             IsPlaying = IsReading = false;
+            ClearCloudWipe();
             musicTarget = 0;
             if (musicSource != null) musicSource.Stop();
             UpdatePreviousButton();

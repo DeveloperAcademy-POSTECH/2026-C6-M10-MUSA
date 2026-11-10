@@ -408,6 +408,7 @@
 - 1~3스테이지 박과 판정 껍데기는 Gourd Visual Size(DEV 140) 값에 더해 `LabGourdVisualRig.StageSizeMultiplier` 1.4배로 그린다(실제 화면 시안으로 승인). `LabGourdPaint`가 rig 기준 크기를 이 값으로 나눠 쓰므로 rig가 없는 흰 박(튜토리얼·2:2·Lab)과 그 골든은 바뀌지 않는다. 다시 굽지 않으며 프리팹의 `referenceVisualSize` 1.4도 그대로다.
 - 박은 줄 쪽 기준점을 유지한 채 아래로 커진다. 정지 자세의 실제 바닥은 땅 위지만 줄 흔들림의 아래쪽에서는 잠깐 땅과 겹칠 수 있다.
 - 현재 호환 묶음은 설정259개·5697·`C6PhysicsLab/58`·**`C6HapioGame/47`**다. 판정 모양이 달라져 Game46 이하 앱과 혼용하지 않는다.
+- #595 지귀 연기 흐름(round.smoke / round.common)으로 호환 묶음이 설정259개·**5698**·`C6PhysicsLab/59`·**`C6HapioGame/48`**이 됐다. 5697 이하 앱과 혼용하지 않는다.
 
 ## 시안에 없는 안내 줄
 

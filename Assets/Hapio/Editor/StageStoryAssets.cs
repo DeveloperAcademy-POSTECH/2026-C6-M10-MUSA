@@ -113,6 +113,7 @@ namespace Hapio.Editor
                     }
                     view.layers=layers.ToArray();
                     StageStoryDirection.Configure(id, view);
+                    StageStoryPolishAssets.Configure(id, view);
                     PrefabUtility.SaveAsPrefabAsset(root,viewPath);
                 } finally {Object.DestroyImmediate(root);}
             }
@@ -126,7 +127,7 @@ namespace Hapio.Editor
             StageStoryDirection.ConfigureCut(cut);
             AssetDatabase.CreateAsset(cut,cutPath);return cut;
         }
-        private static RectTransform Element(Transform parent, Node n, float offsetX=0, float offsetY=0)
+        internal static RectTransform Element(Transform parent, Node n, float offsetX=0, float offsetY=0)
         {
             var rect=Rect(n.name+" ["+n.nodeId+"]",parent,new Rect(n.x-offsetX,n.y-offsetY,n.width,n.height));
             rect.pivot=Vector2.one*.5f;rect.anchoredPosition+=new Vector2(n.width*.5f,-n.height*.5f);

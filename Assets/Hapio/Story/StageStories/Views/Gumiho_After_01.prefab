@@ -79,9 +79,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 317740586979195876}
   isBackground: 0
-  delay: 0.35
-  enterSeconds: 0.65
-  enterOffset: {x: 0, y: -12}
+  softFadeIn: 1
+  delay: 0.105000004
+  enterSeconds: 0.82
+  enterOffset: {x: 0, y: 0}
   startHeight: 1
   idleAmplitude: {x: 0, y: 0}
   idlePeriod: 6
@@ -428,9 +429,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 8149296898532550850}
   isBackground: 0
-  delay: 0.35
-  enterSeconds: 0.65
-  enterOffset: {x: 0, y: -12}
+  softFadeIn: 1
+  delay: 0.12900001
+  enterSeconds: 0.82
+  enterOffset: {x: 0, y: 0}
   startHeight: 1
   idleAmplitude: {x: 0, y: 0}
   idlePeriod: 6
@@ -588,9 +590,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 5370483236198928986}
   isBackground: 0
-  delay: 0.17999999
-  enterSeconds: 0.65
-  enterOffset: {x: 0, y: -12}
+  softFadeIn: 1
+  delay: 0.069000006
+  enterSeconds: 0.82
+  enterOffset: {x: 0, y: 0}
   startHeight: 1
   idleAmplitude: {x: 0, y: 0}
   idlePeriod: 6
@@ -823,9 +826,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 6958574536026148642}
   isBackground: 0
-  delay: 0.29999998
-  enterSeconds: 0.65
-  enterOffset: {x: 0, y: -12}
+  softFadeIn: 1
+  delay: 0.093
+  enterSeconds: 0.82
+  enterOffset: {x: 0, y: 0}
   startHeight: 1
   idleAmplitude: {x: 0, y: 0}
   idlePeriod: 6
@@ -908,9 +912,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 7216537819462355340}
   isBackground: 0
-  delay: 0.35
-  enterSeconds: 0.65
-  enterOffset: {x: 0, y: -12}
+  softFadeIn: 1
+  delay: 0.117
+  enterSeconds: 0.82
+  enterOffset: {x: 0, y: 0}
   startHeight: 1
   idleAmplitude: {x: 0, y: 0}
   idlePeriod: 6
@@ -1133,6 +1138,13 @@ MonoBehaviour:
   - {fileID: 7727512033713893570}
   - {fileID: 8131079464668886203}
   - {fileID: 907258936735213279}
+  beats: []
+  continueButton: {fileID: 0}
+  requireContinueButton: 0
+  waitForEntrance: 1
+  exitCloudWipe: {fileID: 0}
+  music: {fileID: 0}
+  musicVolume: 0
   hideEmptyDialogue: 1
   sourceFigmaNumber: 0
   sourceFigmaNodeId: 4210:2897
@@ -1238,9 +1250,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 335269699631579824}
   isBackground: 0
-  delay: 0.12
-  enterSeconds: 0.65
-  enterOffset: {x: 0, y: -12}
+  softFadeIn: 1
+  delay: 0.057000004
+  enterSeconds: 0.82
+  enterOffset: {x: 0, y: 0}
   startHeight: 1
   idleAmplitude: {x: 0, y: 0}
   idlePeriod: 6
@@ -1323,9 +1336,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 6769058745101724642}
   isBackground: 0
-  delay: 0.06
-  enterSeconds: 0.65
-  enterOffset: {x: 0, y: -12}
+  softFadeIn: 1
+  delay: 0.045
+  enterSeconds: 0.82
+  enterOffset: {x: 0, y: 0}
   startHeight: 1
   idleAmplitude: {x: 0, y: 0}
   idlePeriod: 6
@@ -1483,6 +1497,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 23588749537132158}
   isBackground: 1
+  softFadeIn: 0
   delay: 0
   enterSeconds: 0.65
   enterOffset: {x: 0, y: 0}
@@ -1682,9 +1697,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 8131168353475859741}
   isBackground: 0
-  delay: 0.35
-  enterSeconds: 0.65
-  enterOffset: {x: 0, y: -12}
+  softFadeIn: 1
+  delay: 0.12900001
+  enterSeconds: 0.82
+  enterOffset: {x: 0, y: 0}
   startHeight: 1
   idleAmplitude: {x: 0, y: 0}
   idlePeriod: 6
@@ -1767,9 +1783,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 7955211737395977579}
   isBackground: 0
-  delay: 0.24
-  enterSeconds: 0.65
-  enterOffset: {x: 0, y: -12}
+  softFadeIn: 1
+  delay: 0.081
+  enterSeconds: 0.82
+  enterOffset: {x: 0, y: 0}
   startHeight: 1
   idleAmplitude: {x: 0, y: 0}
   idlePeriod: 6

@@ -85,6 +85,7 @@ GameObject:
   m_Component:
   - component: {fileID: 3227873844106725568}
   - component: {fileID: 6197961816881837503}
+  - component: {fileID: 2808519139958507028}
   m_Layer: 0
   m_Name: "\uC598\uB97C \uC5B4\uCA4C\uBA74 \uC88B\uC744\uAE4C ... [4210:2895]"
   m_TagString: Untagged
@@ -124,6 +125,25 @@ CanvasGroup:
   m_Interactable: 1
   m_BlocksRaycasts: 1
   m_IgnoreParentGroups: 0
+--- !u!114 &2808519139958507028
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 870154361031964776}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 13d9f59d7ecd4402e82059cc33a56441, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryVisualBeat
+  motion: 5
+  delay: 1.069
+  duration: 0.58
+  offset: {x: 0, y: 0}
+  interactionDelay: 0
+  sound: {fileID: 0}
+  volume: 0.7
 --- !u!1 &1106273491114076494
 GameObject:
   m_ObjectHideFlags: 0
@@ -210,6 +230,7 @@ GameObject:
   - component: {fileID: 3646249241936519860}
   - component: {fileID: 373202841369194997}
   - component: {fileID: 4740253961009879230}
+  - component: {fileID: 5732983839164192081}
   m_Layer: 0
   m_Name: "\uB2E4\uC74C \uC694\uAD34 \uC7A1\uC73C\uB7EC ... [4210:2883]"
   m_TagString: Untagged
@@ -294,6 +315,25 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &5732983839164192081
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1364432635287205124}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 13d9f59d7ecd4402e82059cc33a56441, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryVisualBeat
+  motion: 5
+  delay: 1.569
+  duration: 0.28
+  offset: {x: 0, y: 0}
+  interactionDelay: 0
+  sound: {fileID: 0}
+  volume: 0.7
 --- !u!1 &1765106803443744655
 GameObject:
   m_ObjectHideFlags: 0
@@ -448,9 +488,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 816930901579480513}
   isBackground: 0
-  delay: 0.29999998
-  enterSeconds: 0.65
-  enterOffset: {x: 0, y: -12}
+  softFadeIn: 1
+  delay: 0.093
+  enterSeconds: 0.82
+  enterOffset: {x: 0, y: 0}
   startHeight: 1
   idleAmplitude: {x: 0, y: 0}
   idlePeriod: 6
@@ -533,9 +574,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 1025007128894677542}
   isBackground: 0
-  delay: 0.35
-  enterSeconds: 0.65
-  enterOffset: {x: 0, y: -12}
+  softFadeIn: 1
+  delay: 0.105000004
+  enterSeconds: 0.82
+  enterOffset: {x: 0, y: 0}
   startHeight: 1
   idleAmplitude: {x: 0, y: 0}
   idlePeriod: 6
@@ -693,9 +735,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 4355520358766999738}
   isBackground: 0
-  delay: 0.35
-  enterSeconds: 0.65
-  enterOffset: {x: 0, y: -12}
+  softFadeIn: 1
+  delay: 0.117
+  enterSeconds: 0.82
+  enterOffset: {x: 0, y: 0}
   startHeight: 1
   idleAmplitude: {x: 0, y: 0}
   idlePeriod: 6
@@ -932,9 +975,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 4112400796178516513}
   isBackground: 0
-  delay: 0.17999999
-  enterSeconds: 0.65
-  enterOffset: {x: 0, y: -12}
+  softFadeIn: 1
+  delay: 0.069000006
+  enterSeconds: 0.82
+  enterOffset: {x: 0, y: 0}
   startHeight: 1
   idleAmplitude: {x: 0, y: 0}
   idlePeriod: 6
@@ -1017,9 +1061,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 682619971779367302}
   isBackground: 0
-  delay: 0.35
-  enterSeconds: 0.65
-  enterOffset: {x: 0, y: -12}
+  softFadeIn: 1
+  delay: 0.12900001
+  enterSeconds: 0.82
+  enterOffset: {x: 0, y: 0}
   startHeight: 1
   idleAmplitude: {x: 0, y: 0}
   idlePeriod: 6
@@ -1102,9 +1147,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 1043067409777223885}
   isBackground: 0
-  delay: 0.35
-  enterSeconds: 0.65
-  enterOffset: {x: 0, y: -12}
+  softFadeIn: 1
+  delay: 0.12900001
+  enterSeconds: 0.82
+  enterOffset: {x: 0, y: 0}
   startHeight: 1
   idleAmplitude: {x: 0, y: 0}
   idlePeriod: 6
@@ -1301,9 +1347,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 2606490701895094997}
   isBackground: 0
-  delay: 0.12
-  enterSeconds: 0.65
-  enterOffset: {x: 0, y: -12}
+  softFadeIn: 1
+  delay: 0.057000004
+  enterSeconds: 0.82
+  enterOffset: {x: 0, y: 0}
   startHeight: 1
   idleAmplitude: {x: 0, y: 0}
   idlePeriod: 6
@@ -1668,6 +1715,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 49039590573654150}
   isBackground: 1
+  softFadeIn: 0
   delay: 0
   enterSeconds: 0.65
   enterOffset: {x: 0, y: 0}
@@ -1716,8 +1764,8 @@ RectTransform:
   - {fileID: 2323957217056596947}
   - {fileID: 4335829859044104123}
   - {fileID: 8173908584739430652}
-  - {fileID: 3227873844106725568}
   - {fileID: 936549349791572028}
+  - {fileID: 3227873844106725568}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
@@ -1751,8 +1799,13 @@ MonoBehaviour:
   - {fileID: 2524391579724130701}
   - {fileID: 3374681814857909426}
   beats:
+  - {fileID: 5732983839164192081}
   - {fileID: 388598599055029773}
+  - {fileID: 2808519139958507028}
   continueButton: {fileID: 4740253961009879230}
+  requireContinueButton: 0
+  waitForEntrance: 1
+  exitCloudWipe: {fileID: 0}
   music: {fileID: 0}
   musicVolume: 0
   hideEmptyDialogue: 1
@@ -1860,9 +1913,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 3730144957361312794}
   isBackground: 0
-  delay: 0.06
-  enterSeconds: 0.65
-  enterOffset: {x: 0, y: -12}
+  softFadeIn: 1
+  delay: 0.045
+  enterSeconds: 0.82
+  enterOffset: {x: 0, y: 0}
   startHeight: 1
   idleAmplitude: {x: 0, y: 0}
   idlePeriod: 6
@@ -2011,9 +2065,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 2747703907415021720}
   isBackground: 0
-  delay: 0.35
-  enterSeconds: 0.65
-  enterOffset: {x: 0, y: -12}
+  softFadeIn: 1
+  delay: 0.12900001
+  enterSeconds: 0.82
+  enterOffset: {x: 0, y: 0}
   startHeight: 1
   idleAmplitude: {x: 0, y: 0}
   idlePeriod: 6
@@ -2170,7 +2225,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 1
     m_VerticalOverflow: 1
     m_LineSpacing: 0.8084211
-  m_Text: "\uB2E4\uC74C \uC694\uAD34 \uC7A1\uC73C\uB7EC  \u203A"
+  m_Text: "\uB2E4\uC74C \uC694\uAD34 \uC7A1\uC73C\uB7EC ..."
 --- !u!1 &6814110909820540120
 GameObject:
   m_ObjectHideFlags: 0
@@ -2541,9 +2596,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 4084981376203190595}
   isBackground: 0
-  delay: 0.24
-  enterSeconds: 0.65
-  enterOffset: {x: 0, y: -12}
+  softFadeIn: 1
+  delay: 0.081
+  enterSeconds: 0.82
+  enterOffset: {x: 0, y: 0}
   startHeight: 1
   idleAmplitude: {x: 0, y: 0}
   idlePeriod: 6
@@ -2626,9 +2682,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 4807371789800667259}
   isBackground: 0
-  delay: 0.35
-  enterSeconds: 0.65
-  enterOffset: {x: 0, y: -12}
+  softFadeIn: 1
+  delay: 0.12900001
+  enterSeconds: 0.82
+  enterOffset: {x: 0, y: 0}
   startHeight: 1
   idleAmplitude: {x: 0, y: 0}
   idlePeriod: 6
