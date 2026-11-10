@@ -10,6 +10,8 @@ namespace Hapio
         public OpeningLayerMotion[] openingMotions;
         [Tooltip("Cut-authored Figma dialogue, including mixed font sizes. Null retains the shared dialogue UI.")]
         public CanvasGroup authoredDialogue;
+        [Tooltip("Matching non-empty keys retain the current artwork and its clock when only dialogue changes.")]
+        public string artworkContinuityKey;
         public UnityEngine.UI.Button continueButton;
         [Tooltip("The card advances through its own continue button instead of a background tap.")]
         public bool requireContinueButton;

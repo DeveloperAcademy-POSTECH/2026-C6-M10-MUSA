@@ -15,13 +15,16 @@ namespace Hapio.Editor
         const string Root = "Assets/Hapio/Story/Opening/";
         const string Art = "Assets/Hapio/Art/Story/Opening/Revision28/";
         [Serializable] public class Manifest { public Frame[] frames; }
-        [Serializable] public class Frame { public int number; public string id, speaker, dialogue; public Item[] items; public TextItem[] texts; }
+        [Serializable] public class Frame { public int number; public string id, speaker, dialogue, artworkContinuityKey; public Item[] items; public TextItem[] texts; }
         [Serializable] public class Item
         {
             public string id, name, key, path;
             public float x,y,width,height,boxWidth,boxHeight,rotation,alpha,wp=1,hp=1,lp,tp;
             public bool cover,bottom,crop,dialogue,shadow,inset;
             public float ix,iy,iw,ih;
+            public string backgroundSourcePath;
+            public float figmaOpacity;
+            public bool precompositedBackground, opacityInSource;
         }
         [Serializable] public class TextItem
         {
@@ -34,6 +37,7 @@ namespace Hapio.Editor
             if (EditorApplication.isPlaying) throw new InvalidOperationException("Stop Play before importing.");
             var manifest=JsonUtility.FromJson<Manifest>(File.ReadAllText(Root+"Revision28.json"));
             if (manifest.frames.Length!=28) throw new InvalidOperationException("Expected 28 approved frames.");
+            OpeningBackgroundBaker.Bake(manifest);
             foreach(var item in manifest.frames.SelectMany(f=>f.items))
                 if (!File.Exists(item.path)) throw new FileNotFoundException(item.path);
             foreach(var path in manifest.frames.SelectMany(f=>f.items).Select(i=>i.path).Distinct())
@@ -63,7 +67,7 @@ namespace Hapio.Editor
                 backing.color=Color.white;backing.raycastTarget=false;
                 root.AddComponent<RectMask2D>();
                 var view=root.GetComponent<StoryCutView>();
-                view.sourceFigmaNumber=f.number;view.sourceFigmaNodeId=f.id;
+                view.sourceFigmaNumber=f.number;view.sourceFigmaNodeId=f.id;view.artworkContinuityKey=f.artworkContinuityKey;
                 view.hideEmptyDialogue=true;view.layers=Array.Empty<StoryLayer>();view.beats=Array.Empty<StoryVisualBeat>();
                 // Every revised cut owns its dialogue. Empty groups intentionally suppress the old shared paper.
                 var words=Box("Authored Dialogue",root.transform,0,0,402,874);
@@ -78,7 +82,9 @@ namespace Hapio.Editor
                     {
                         var motion=motionRoot.gameObject.AddComponent<OpeningLayerMotion>();
                         motion.delay=.08f+Mathf.Min(ordinal*.055f,.25f);motion.seconds=.65f;
-                        Configure(motion,f.number,item.id,ordinal);motions.Add(motion);
+                        Configure(motion,f.number,item.id,ordinal);
+                        if(motion.kind==OpeningLayerMotion.Kind.Toss) ConfigureFlight(motion,item);
+                        motions.Add(motion);
                     }
                 }
                 foreach(var text in f.texts)
@@ -96,7 +102,7 @@ namespace Hapio.Editor
                     // Carry the intact gourd from frame 14 into the authored shattered pose of frame 15.
                     var gourd=JsonUtility.FromJson<Manifest>(File.ReadAllText(Root+"Revision28.json")).frames.Single(x=>x.number==14).items.Single(x=>x.id=="4553:2469");
                     AddImage(root.transform,gourd,out var falling);
-                    var drop=falling.gameObject.AddComponent<OpeningLayerMotion>();drop.kind=OpeningLayerMotion.Kind.Drop;drop.delay=.1f;drop.seconds=2.5f;drop.travel=new Vector2(-25,-365);drop.angle=28;motions.Add(drop);
+                    var drop=falling.gameObject.AddComponent<OpeningLayerMotion>();drop.kind=OpeningLayerMotion.Kind.Drop;drop.delay=.1f;drop.seconds=2.5f;drop.travel=new Vector2(-37,-379);drop.angle=28;motions.Add(drop);
                     drop.fadeAtEnd=true;view.waitForEntrance=true;
                 }
                 view.openingMotions=motions.ToArray();
@@ -153,6 +159,23 @@ namespace Hapio.Editor
             }
             return r;
         }
+        static void ConfigureFlight(OpeningLayerMotion motion, Item item)
+        {
+            // Page-space paths keep rotated brooms and boxes inside the action, above the dialogue.
+            Vector2 landing;
+            switch (item.id)
+            {
+                case "4553:2459": landing=new Vector2(145,520);motion.travel=new Vector2(55,290);motion.cycleSeconds=3.2f;motion.phase=.12f;break;
+                case "4553:2457": landing=new Vector2(260,460);motion.travel=new Vector2(65,240);motion.cycleSeconds=3.7f;motion.phase=.62f;break;
+                case "4553:2461": landing=new Vector2(110,570);motion.travel=new Vector2(65,260);motion.cycleSeconds=2.6f;motion.phase=.35f;break;
+                default: landing=new Vector2(285,510);motion.travel=new Vector2(50,290);motion.cycleSeconds=3f;motion.phase=.83f;break;
+            }
+            motion.pathOffset=new Vector2(landing.x-item.x-item.boxWidth/2, item.y+item.boxHeight/2-landing.y);
+            motion.angle=38;
+            var rect=(RectTransform)motion.transform;
+            rect.pivot=new Vector2(.5f,.5f);
+            rect.anchoredPosition+=new Vector2(0,item.height/2);
+        }
         static void Configure(OpeningLayerMotion m,int frame,string id,int order)
         {
             m.phase=order*.47f;
@@ -161,7 +184,8 @@ namespace Hapio.Editor
             if(frame==12&&(id=="4553:2454"||id=="4553:2455")){m.kind=OpeningLayerMotion.Kind.Sweep;m.travel=new Vector2(27,4);m.angle=12;}
             if(frame==13&&(id=="4553:2459"||id=="4553:2461"||id=="4553:2462"||id=="4553:2457")){m.kind=OpeningLayerMotion.Kind.Toss;m.travel=new Vector2(45,100);m.angle=30;}
             if(frame==14&&id=="4553:2469"){m.kind=OpeningLayerMotion.Kind.Teeter;m.travel=new Vector2(4,0);m.angle=10;m.seconds=1.5f;}
-            if(frame==15){m.delay=2.5f;m.seconds=.45f;if(id!="4553:2473"){m.kind=OpeningLayerMotion.Kind.Smoke;m.travel=new Vector2(4,35);m.delay=2.6f;}}
+            if(frame==15 && id!="4593:3393"){m.delay=2.5f;m.seconds=.45f;if(id!="4553:2473"){m.kind=OpeningLayerMotion.Kind.Smoke;m.travel=new Vector2(4,35);m.delay=2.6f;}}
+            if(frame==15&&id=="4593:3393"){m.kind=OpeningLayerMotion.Kind.GroundShadow;m.delay=.1f;m.seconds=2.5f;}
             if(frame==16&&(id=="4553:2488"||id=="4688:4901"||id=="4688:4903")){m.kind=OpeningLayerMotion.Kind.Smoke;m.travel=new Vector2(5,45);m.seconds=1.1f;m.fadeAtEnd=true;}
             if(frame==16&&(id=="4688:3476"||id=="4688:3477"||id=="4688:3478"))
             {m.kind=OpeningLayerMotion.Kind.Escape;m.delay=.35f+(order%3)*.18f;m.seconds=1.45f;m.travel=id=="4688:3476"?new Vector2(0,-600):new Vector2(id=="4688:3477"?150:-150,-300);m.angle=id=="4688:3477"?28:-28;}

@@ -25,7 +25,11 @@
           "tp": 0,
           "dialogue": false,
           "shadow": false,
-          "path": "Assets/Hapio/Art/Story/Opening/OP_001/Background.png"
+          "path": "Assets/Hapio/Art/Story/Opening/Revision28/Backgrounds/e1316-paper-100.png",
+          "backgroundSourcePath": "Assets/Hapio/Art/Story/Opening/OP_001/Background.png",
+          "figmaOpacity": 1,
+          "opacityInSource": true,
+          "precompositedBackground": true
         },
         {
           "id": "4553:2480",
@@ -91,7 +95,8 @@
         }
       ],
       "speaker": "",
-      "dialogue": "깊은 산중, 삼라만상 도술학교.\n백 년 만의 대제사가 머지 않았다."
+      "dialogue": "깊은 산중, 삼라만상 도술학교.\n백 년 만의 대제사가 머지 않았다.",
+      "artworkContinuityKey": ""
     },
     {
       "number": 2,
@@ -118,7 +123,11 @@
           "tp": 0,
           "dialogue": false,
           "shadow": false,
-          "path": "Assets/Hapio/Art/Story/Opening/OP_002/Background.png"
+          "path": "Assets/Hapio/Art/Story/Opening/Revision28/Backgrounds/946ed-paper-100.png",
+          "backgroundSourcePath": "Assets/Hapio/Art/Story/Opening/OP_002/Background.png",
+          "figmaOpacity": 1,
+          "opacityInSource": true,
+          "precompositedBackground": true
         },
         {
           "id": "4553:2408",
@@ -616,7 +625,8 @@
         }
       ],
       "speaker": "사부님",
-      "dialogue": "이레 뒤에 돌아올 테니,\n수장고를 깨끗이 청소해 놓거라!"
+      "dialogue": "이레 뒤에 돌아올 테니,\n수장고를 깨끗이 청소해 놓거라!",
+      "artworkContinuityKey": ""
     },
     {
       "number": 3,
@@ -633,7 +643,7 @@
           "boxWidth": 402,
           "boxHeight": 874,
           "rotation": -0.0,
-          "alpha": 0.8,
+          "alpha": 1,
           "cover": true,
           "bottom": false,
           "crop": false,
@@ -643,7 +653,11 @@
           "tp": 0,
           "dialogue": false,
           "shadow": false,
-          "path": "Assets/Hapio/Art/Story/Opening/Imported/37f73.png"
+          "path": "Assets/Hapio/Art/Story/Opening/Revision28/Backgrounds/37f73-paper-80.png",
+          "backgroundSourcePath": "Assets/Hapio/Art/Story/Opening/Imported/37f73.png",
+          "figmaOpacity": 0.8,
+          "opacityInSource": false,
+          "precompositedBackground": true
         },
         {
           "id": "4553:2627",
@@ -746,7 +760,8 @@
         }
       ],
       "speaker": "사부님",
-      "dialogue": "특히 안쪽 선반에 있는 물건은\n절대로 건드리지 말거라."
+      "dialogue": "특히 안쪽 선반에 있는 물건은\n절대로 건드리지 말거라.",
+      "artworkContinuityKey": ""
     },
     {
       "number": 4,
@@ -763,7 +778,7 @@
           "boxWidth": 778.2807006835938,
           "boxHeight": 1691.0001220703125,
           "rotation": -0.0,
-          "alpha": 0.9,
+          "alpha": 1,
           "cover": true,
           "bottom": false,
           "crop": false,
@@ -773,7 +788,11 @@
           "tp": 0,
           "dialogue": false,
           "shadow": false,
-          "path": "Assets/Hapio/Art/Story/Opening/Imported/37f73.png"
+          "path": "Assets/Hapio/Art/Story/Opening/Revision28/Backgrounds/37f73-paper-100.png",
+          "backgroundSourcePath": "Assets/Hapio/Art/Story/Opening/Imported/37f73.png",
+          "figmaOpacity": 1,
+          "opacityInSource": false,
+          "precompositedBackground": true
         },
         {
           "id": "4553:2713",
@@ -801,7 +820,8 @@
       ],
       "texts": [],
       "speaker": "",
-      "dialogue": ""
+      "dialogue": "",
+      "artworkContinuityKey": ""
     },
     {
       "number": 5,
@@ -818,7 +838,7 @@
           "boxWidth": 476,
           "boxHeight": 1034,
           "rotation": -0.0,
-          "alpha": 0.8,
+          "alpha": 1,
           "cover": true,
           "bottom": false,
           "crop": false,
@@ -828,7 +848,11 @@
           "tp": 0,
           "dialogue": false,
           "shadow": false,
-          "path": "Assets/Hapio/Art/Story/Opening/Imported/37f73.png"
+          "path": "Assets/Hapio/Art/Story/Opening/Revision28/Backgrounds/37f73-paper-80.png",
+          "backgroundSourcePath": "Assets/Hapio/Art/Story/Opening/Imported/37f73.png",
+          "figmaOpacity": 0.8,
+          "opacityInSource": false,
+          "precompositedBackground": true
         },
         {
           "id": "4553:2635",
@@ -954,7 +978,8 @@
         }
       ],
       "speaker": "불이",
-      "dialogue": "어휴 걱정마세요~\n깨~끗하게 청소해 놓겠습니다~"
+      "dialogue": "어휴 걱정마세요~\n깨~끗하게 청소해 놓겠습니다~",
+      "artworkContinuityKey": ""
     },
     {
       "number": 6,
@@ -971,7 +996,7 @@
           "boxWidth": 492,
           "boxHeight": 874,
           "rotation": -0.0,
-          "alpha": 0.9,
+          "alpha": 1,
           "cover": true,
           "bottom": false,
           "crop": false,
@@ -981,7 +1006,11 @@
           "tp": 0,
           "dialogue": false,
           "shadow": false,
-          "path": "Assets/Hapio/Art/Story/Opening/Imported/2af85.png"
+          "path": "Assets/Hapio/Art/Story/Opening/Revision28/Backgrounds/2af85-paper-90.png",
+          "backgroundSourcePath": "Assets/Hapio/Art/Story/Opening/Imported/2af85.png",
+          "figmaOpacity": 0.9,
+          "opacityInSource": false,
+          "precompositedBackground": true
         },
         {
           "id": "4553:2645",
@@ -1208,7 +1237,8 @@
         }
       ],
       "speaker": "",
-      "dialogue": "사부님들은 구름에 올랐고,\n견습 도사들은 빗자루를 들었다."
+      "dialogue": "사부님들은 구름에 올랐고,\n견습 도사들은 빗자루를 들었다.",
+      "artworkContinuityKey": ""
     },
     {
       "number": 7,
@@ -1225,7 +1255,7 @@
           "boxWidth": 402,
           "boxHeight": 874,
           "rotation": -0.0,
-          "alpha": 0.85,
+          "alpha": 1,
           "cover": false,
           "bottom": false,
           "crop": true,
@@ -1235,7 +1265,11 @@
           "tp": -0.17620000000000002,
           "dialogue": false,
           "shadow": false,
-          "path": "Assets/Hapio/Art/Story/Opening/Imported/d27a9.png"
+          "path": "Assets/Hapio/Art/Story/Opening/Revision28/Backgrounds/d27a9-paper-85.png",
+          "backgroundSourcePath": "Assets/Hapio/Art/Story/Opening/Imported/d27a9.png",
+          "figmaOpacity": 0.85,
+          "opacityInSource": false,
+          "precompositedBackground": true
         },
         {
           "id": "4553:2685",
@@ -1453,7 +1487,8 @@
         }
       ],
       "speaker": "불이",
-      "dialogue": "어후, 이 넓은 곳을 우리끼리 전부 다?!\n치워도 치워도 끝이 없잖아…"
+      "dialogue": "어후, 이 넓은 곳을 우리끼리 전부 다?!\n치워도 치워도 끝이 없잖아…",
+      "artworkContinuityKey": ""
     },
     {
       "number": 8,
@@ -1470,7 +1505,7 @@
           "boxWidth": 402,
           "boxHeight": 874,
           "rotation": -0.0,
-          "alpha": 0.85,
+          "alpha": 1,
           "cover": true,
           "bottom": false,
           "crop": false,
@@ -1480,7 +1515,11 @@
           "tp": 0,
           "dialogue": false,
           "shadow": false,
-          "path": "Assets/Hapio/Art/Story/Opening/Imported/d27a9.png"
+          "path": "Assets/Hapio/Art/Story/Opening/Revision28/Backgrounds/d27a9-paper-85.png",
+          "backgroundSourcePath": "Assets/Hapio/Art/Story/Opening/Imported/d27a9.png",
+          "figmaOpacity": 0.85,
+          "opacityInSource": false,
+          "precompositedBackground": true
         },
         {
           "id": "4553:2485",
@@ -1583,7 +1622,8 @@
         }
       ],
       "speaker": "불이",
-      "dialogue": "얘들아 우리 그냥\n도술로 한 번에 끝내버릴까~?"
+      "dialogue": "얘들아 우리 그냥\n도술로 한 번에 끝내버릴까~?",
+      "artworkContinuityKey": ""
     },
     {
       "number": 9,
@@ -1600,7 +1640,7 @@
           "boxWidth": 402,
           "boxHeight": 874,
           "rotation": -0.0,
-          "alpha": 0.85,
+          "alpha": 1,
           "cover": true,
           "bottom": false,
           "crop": false,
@@ -1610,7 +1650,11 @@
           "tp": 0,
           "dialogue": false,
           "shadow": false,
-          "path": "Assets/Hapio/Art/Story/Opening/Imported/d27a9.png"
+          "path": "Assets/Hapio/Art/Story/Opening/Revision28/Backgrounds/d27a9-paper-85.png",
+          "backgroundSourcePath": "Assets/Hapio/Art/Story/Opening/Imported/d27a9.png",
+          "figmaOpacity": 0.85,
+          "opacityInSource": false,
+          "precompositedBackground": true
         },
         {
           "id": "4553:2434",
@@ -1736,7 +1780,8 @@
         }
       ],
       "speaker": "금옥",
-      "dialogue": "뭐? 그런 주문 아직 안 배웠잖아!\n멋대로 쓰면 안 돼!"
+      "dialogue": "뭐? 그런 주문 아직 안 배웠잖아!\n멋대로 쓰면 안 돼!",
+      "artworkContinuityKey": "opening-9-10"
     },
     {
       "number": 10,
@@ -1753,7 +1798,7 @@
           "boxWidth": 402,
           "boxHeight": 874,
           "rotation": -0.0,
-          "alpha": 0.85,
+          "alpha": 1,
           "cover": true,
           "bottom": false,
           "crop": false,
@@ -1763,7 +1808,11 @@
           "tp": 0,
           "dialogue": false,
           "shadow": false,
-          "path": "Assets/Hapio/Art/Story/Opening/Imported/d27a9.png"
+          "path": "Assets/Hapio/Art/Story/Opening/Revision28/Backgrounds/d27a9-paper-85.png",
+          "backgroundSourcePath": "Assets/Hapio/Art/Story/Opening/Imported/d27a9.png",
+          "figmaOpacity": 0.85,
+          "opacityInSource": false,
+          "precompositedBackground": true
         },
         {
           "id": "4688:3416",
@@ -1889,7 +1938,8 @@
         }
       ],
       "speaker": "불이",
-      "dialogue": "에이~ 뭘 어렵다고. 괜찮아 괜찮아~"
+      "dialogue": "에이~ 뭘 어렵다고. 괜찮아 괜찮아~",
+      "artworkContinuityKey": "opening-9-10"
     },
     {
       "number": 11,
@@ -1906,7 +1956,7 @@
           "boxWidth": 402,
           "boxHeight": 874,
           "rotation": -0.0,
-          "alpha": 0.85,
+          "alpha": 1,
           "cover": true,
           "bottom": false,
           "crop": false,
@@ -1916,7 +1966,11 @@
           "tp": 0,
           "dialogue": false,
           "shadow": false,
-          "path": "Assets/Hapio/Art/Story/Opening/Imported/d27a9.png"
+          "path": "Assets/Hapio/Art/Story/Opening/Revision28/Backgrounds/d27a9-paper-85.png",
+          "backgroundSourcePath": "Assets/Hapio/Art/Story/Opening/Imported/d27a9.png",
+          "figmaOpacity": 0.85,
+          "opacityInSource": false,
+          "precompositedBackground": true
         },
         {
           "id": "4553:2437",
@@ -2065,7 +2119,8 @@
         }
       ],
       "speaker": "불이",
-      "dialogue": "자, 깨끗해져라!  청. 정. 무. 진."
+      "dialogue": "자, 깨끗해져라!  청. 정. 무. 진.",
+      "artworkContinuityKey": ""
     },
     {
       "number": 12,
@@ -2082,7 +2137,7 @@
           "boxWidth": 402,
           "boxHeight": 874,
           "rotation": -0.0,
-          "alpha": 0.85,
+          "alpha": 1,
           "cover": true,
           "bottom": false,
           "crop": false,
@@ -2092,7 +2147,11 @@
           "tp": 0,
           "dialogue": false,
           "shadow": false,
-          "path": "Assets/Hapio/Art/Story/Opening/Imported/d27a9.png"
+          "path": "Assets/Hapio/Art/Story/Opening/Revision28/Backgrounds/d27a9-paper-85.png",
+          "backgroundSourcePath": "Assets/Hapio/Art/Story/Opening/Imported/d27a9.png",
+          "figmaOpacity": 0.85,
+          "opacityInSource": false,
+          "precompositedBackground": true
         },
         {
           "id": "4553:2452",
@@ -2264,7 +2323,8 @@
         }
       ],
       "speaker": "불이",
-      "dialogue": "오오! 이것봐 어때?! 잘 되지?!\n역시 나만 믿으라니까!"
+      "dialogue": "오오! 이것봐 어때?! 잘 되지?!\n역시 나만 믿으라니까!",
+      "artworkContinuityKey": ""
     },
     {
       "number": 13,
@@ -2281,7 +2341,7 @@
           "boxWidth": 402,
           "boxHeight": 874,
           "rotation": -0.0,
-          "alpha": 0.85,
+          "alpha": 1,
           "cover": false,
           "bottom": false,
           "crop": true,
@@ -2291,7 +2351,11 @@
           "tp": -0.0197,
           "dialogue": false,
           "shadow": false,
-          "path": "Assets/Hapio/Art/Story/Opening/Imported/d27a9.png"
+          "path": "Assets/Hapio/Art/Story/Opening/Revision28/Backgrounds/d27a9-paper-85.png",
+          "backgroundSourcePath": "Assets/Hapio/Art/Story/Opening/Imported/d27a9.png",
+          "figmaOpacity": 0.85,
+          "opacityInSource": false,
+          "precompositedBackground": true
         },
         {
           "id": "4553:2457",
@@ -2578,7 +2642,8 @@
         }
       ],
       "speaker": "불이",
-      "dialogue": "엇... 어라..? 멈.. 멈춰라..! 멈춰!!!"
+      "dialogue": "엇... 어라..? 멈.. 멈춰라..! 멈춰!!!",
+      "artworkContinuityKey": ""
     },
     {
       "number": 14,
@@ -2595,7 +2660,7 @@
           "boxWidth": 491.8863525390625,
           "boxHeight": 874,
           "rotation": -0.0,
-          "alpha": 0.85,
+          "alpha": 1,
           "cover": false,
           "bottom": false,
           "crop": true,
@@ -2605,7 +2670,11 @@
           "tp": 0,
           "dialogue": false,
           "shadow": false,
-          "path": "Assets/Hapio/Art/Story/Opening/Imported/81152.png"
+          "path": "Assets/Hapio/Art/Story/Opening/Revision28/Backgrounds/81152-paper-85.png",
+          "backgroundSourcePath": "Assets/Hapio/Art/Story/Opening/Imported/81152.png",
+          "figmaOpacity": 0.85,
+          "opacityInSource": false,
+          "precompositedBackground": true
         },
         {
           "id": "4553:2469",
@@ -2656,7 +2725,8 @@
       ],
       "texts": [],
       "speaker": "",
-      "dialogue": ""
+      "dialogue": "",
+      "artworkContinuityKey": ""
     },
     {
       "number": 15,
@@ -2673,7 +2743,7 @@
           "boxWidth": 402,
           "boxHeight": 874,
           "rotation": -0.0,
-          "alpha": 0.85,
+          "alpha": 1,
           "cover": true,
           "bottom": false,
           "crop": false,
@@ -2683,7 +2753,34 @@
           "tp": 0,
           "dialogue": false,
           "shadow": false,
-          "path": "Assets/Hapio/Art/Story/Opening/Imported/68bab.png"
+          "path": "Assets/Hapio/Art/Story/Opening/Revision28/Backgrounds/68bab-paper-85.png",
+          "backgroundSourcePath": "Assets/Hapio/Art/Story/Opening/Imported/68bab.png",
+          "figmaOpacity": 0.85,
+          "opacityInSource": true,
+          "precompositedBackground": true
+        },
+        {
+          "id": "4593:3393",
+          "name": "Ground Shadow",
+          "key": "eecc0.png",
+          "path": "Assets/Hapio/Art/Story/Opening/Revision28/eecc0.png",
+          "x": 68,
+          "y": 732,
+          "width": 241,
+          "height": 25,
+          "boxWidth": 241,
+          "boxHeight": 25,
+          "rotation": 0,
+          "alpha": 1,
+          "wp": 1,
+          "hp": 1,
+          "lp": 0,
+          "tp": 0,
+          "cover": true,
+          "bottom": false,
+          "crop": false,
+          "dialogue": false,
+          "shadow": false
         },
         {
           "id": "4553:2473",
@@ -2780,7 +2877,8 @@
       ],
       "texts": [],
       "speaker": "",
-      "dialogue": ""
+      "dialogue": "",
+      "artworkContinuityKey": ""
     },
     {
       "number": 16,
@@ -2797,7 +2895,7 @@
           "boxWidth": 402,
           "boxHeight": 874,
           "rotation": -0.0,
-          "alpha": 0.85,
+          "alpha": 1,
           "cover": true,
           "bottom": false,
           "crop": false,
@@ -2807,7 +2905,11 @@
           "tp": 0,
           "dialogue": false,
           "shadow": false,
-          "path": "Assets/Hapio/Art/Story/Opening/Imported/80f07.png"
+          "path": "Assets/Hapio/Art/Story/Opening/Revision28/Backgrounds/80f07-paper-85.png",
+          "backgroundSourcePath": "Assets/Hapio/Art/Story/Opening/Imported/80f07.png",
+          "figmaOpacity": 0.85,
+          "opacityInSource": true,
+          "precompositedBackground": true
         },
         {
           "id": "4553:2488",
@@ -3019,7 +3121,8 @@
       ],
       "texts": [],
       "speaker": "",
-      "dialogue": ""
+      "dialogue": "",
+      "artworkContinuityKey": ""
     },
     {
       "number": 17,
@@ -3036,7 +3139,7 @@
           "boxWidth": 402,
           "boxHeight": 874,
           "rotation": -0.0,
-          "alpha": 0.8,
+          "alpha": 1,
           "cover": true,
           "bottom": false,
           "crop": false,
@@ -3046,7 +3149,11 @@
           "tp": 0,
           "dialogue": false,
           "shadow": false,
-          "path": "Assets/Hapio/Art/Story/Opening/Revision28/15795.png"
+          "path": "Assets/Hapio/Art/Story/Opening/Revision28/Backgrounds/15795-paper-80.png",
+          "backgroundSourcePath": "Assets/Hapio/Art/Story/Opening/Revision28/15795.png",
+          "figmaOpacity": 0.8,
+          "opacityInSource": true,
+          "precompositedBackground": true
         },
         {
           "id": "4553:2493",
@@ -3218,7 +3325,8 @@
         }
       ],
       "speaker": "만복",
-      "dialogue": "흐아아앙 ㅠㅠ\n우리 이제 어떡해애ㅠㅠㅠ"
+      "dialogue": "흐아아앙 ㅠㅠ\n우리 이제 어떡해애ㅠㅠㅠ",
+      "artworkContinuityKey": ""
     },
     {
       "number": 18,
@@ -3235,7 +3343,7 @@
           "boxWidth": 402,
           "boxHeight": 874,
           "rotation": -0.0,
-          "alpha": 0.9,
+          "alpha": 1,
           "cover": true,
           "bottom": false,
           "crop": false,
@@ -3245,7 +3353,11 @@
           "tp": 0,
           "dialogue": false,
           "shadow": false,
-          "path": "Assets/Hapio/Art/Story/Opening/Imported/4e6ab.png"
+          "path": "Assets/Hapio/Art/Story/Opening/Revision28/Backgrounds/4e6ab-paper-90.png",
+          "backgroundSourcePath": "Assets/Hapio/Art/Story/Opening/Imported/4e6ab.png",
+          "figmaOpacity": 0.9,
+          "opacityInSource": true,
+          "precompositedBackground": true
         },
         {
           "id": "4553:2506",
@@ -3486,7 +3598,8 @@
         }
       ],
       "speaker": "솔이",
-      "dialogue": "이거... 요괴들이 봉인 되어있던 \n호리병인가본데... 다 사라졌어..."
+      "dialogue": "이거... 요괴들이 봉인 되어있던 \n호리병인가본데... 다 사라졌어...",
+      "artworkContinuityKey": ""
     },
     {
       "number": 19,
@@ -3503,7 +3616,7 @@
           "boxWidth": 1311,
           "boxHeight": 874,
           "rotation": -0.0,
-          "alpha": 0.9,
+          "alpha": 1,
           "cover": true,
           "bottom": false,
           "crop": false,
@@ -3513,7 +3626,11 @@
           "tp": 0,
           "dialogue": false,
           "shadow": false,
-          "path": "Assets/Hapio/Art/Story/Opening/Imported/15140.png"
+          "path": "Assets/Hapio/Art/Story/Opening/Revision28/Backgrounds/15140-paper-90.png",
+          "backgroundSourcePath": "Assets/Hapio/Art/Story/Opening/Imported/15140.png",
+          "figmaOpacity": 0.9,
+          "opacityInSource": true,
+          "precompositedBackground": true
         },
         {
           "id": "4553:2515",
@@ -3616,7 +3733,8 @@
         }
       ],
       "speaker": "불이",
-      "dialogue": "그냥.. 풀로 붙이면 안될까..?"
+      "dialogue": "그냥.. 풀로 붙이면 안될까..?",
+      "artworkContinuityKey": "opening-19-20"
     },
     {
       "number": 20,
@@ -3633,7 +3751,7 @@
           "boxWidth": 1311,
           "boxHeight": 874,
           "rotation": -0.0,
-          "alpha": 0.9,
+          "alpha": 1,
           "cover": true,
           "bottom": false,
           "crop": false,
@@ -3643,7 +3761,11 @@
           "tp": 0,
           "dialogue": false,
           "shadow": false,
-          "path": "Assets/Hapio/Art/Story/Opening/Imported/15140.png"
+          "path": "Assets/Hapio/Art/Story/Opening/Revision28/Backgrounds/15140-paper-90.png",
+          "backgroundSourcePath": "Assets/Hapio/Art/Story/Opening/Imported/15140.png",
+          "figmaOpacity": 0.9,
+          "opacityInSource": true,
+          "precompositedBackground": true
         },
         {
           "id": "4553:2768",
@@ -3746,7 +3868,8 @@
         }
       ],
       "speaker": "금옥",
-      "dialogue": "되겠냐."
+      "dialogue": "되겠냐.",
+      "artworkContinuityKey": "opening-19-20"
     },
     {
       "number": 21,
@@ -3763,7 +3886,7 @@
           "boxWidth": 1317,
           "boxHeight": 878,
           "rotation": -0.0,
-          "alpha": 0.9,
+          "alpha": 1,
           "cover": true,
           "bottom": false,
           "crop": false,
@@ -3773,7 +3896,11 @@
           "tp": 0,
           "dialogue": false,
           "shadow": false,
-          "path": "Assets/Hapio/Art/Story/Opening/Imported/b520c.png"
+          "path": "Assets/Hapio/Art/Story/Opening/Revision28/Backgrounds/b520c-paper-90.png",
+          "backgroundSourcePath": "Assets/Hapio/Art/Story/Opening/Imported/b520c.png",
+          "figmaOpacity": 0.9,
+          "opacityInSource": true,
+          "precompositedBackground": true
         },
         {
           "id": "4553:2529",
@@ -3876,7 +4003,8 @@
         }
       ],
       "speaker": "묵이",
-      "dialogue": "얘들아 잠깐! 여기 좀 봐!"
+      "dialogue": "얘들아 잠깐! 여기 좀 봐!",
+      "artworkContinuityKey": ""
     },
     {
       "number": 22,
@@ -3893,7 +4021,7 @@
           "boxWidth": 1312,
           "boxHeight": 875,
           "rotation": -0.0,
-          "alpha": 0.9,
+          "alpha": 1,
           "cover": true,
           "bottom": false,
           "crop": false,
@@ -3903,7 +4031,11 @@
           "tp": 0,
           "dialogue": false,
           "shadow": false,
-          "path": "Assets/Hapio/Art/Story/Opening/Imported/cbc06.png"
+          "path": "Assets/Hapio/Art/Story/Opening/Revision28/Backgrounds/cbc06-paper-90.png",
+          "backgroundSourcePath": "Assets/Hapio/Art/Story/Opening/Imported/cbc06.png",
+          "figmaOpacity": 0.9,
+          "opacityInSource": true,
+          "precompositedBackground": true
         },
         {
           "id": "4553:2656",
@@ -4057,7 +4189,8 @@
         }
       ],
       "speaker": "묵이",
-      "dialogue": "임시 봉인박?!\n이 사태를 해결할 방법이 있겠어!"
+      "dialogue": "임시 봉인박?!\n이 사태를 해결할 방법이 있겠어!",
+      "artworkContinuityKey": ""
     },
     {
       "number": 23,
@@ -4074,7 +4207,7 @@
           "boxWidth": 1386.971435546875,
           "boxHeight": 924.6476440429688,
           "rotation": -0.0,
-          "alpha": 0.9,
+          "alpha": 1,
           "cover": true,
           "bottom": false,
           "crop": false,
@@ -4084,7 +4217,11 @@
           "tp": 0,
           "dialogue": false,
           "shadow": false,
-          "path": "Assets/Hapio/Art/Story/Opening/Imported/cbc06.png"
+          "path": "Assets/Hapio/Art/Story/Opening/Revision28/Backgrounds/cbc06-paper-90.png",
+          "backgroundSourcePath": "Assets/Hapio/Art/Story/Opening/Imported/cbc06.png",
+          "figmaOpacity": 0.9,
+          "opacityInSource": true,
+          "precompositedBackground": true
         },
         {
           "id": "4553:2672",
@@ -4183,7 +4320,8 @@
         }
       ],
       "speaker": "",
-      "dialogue": ""
+      "dialogue": "",
+      "artworkContinuityKey": ""
     },
     {
       "number": 24,
@@ -4200,7 +4338,7 @@
           "boxWidth": 1311,
           "boxHeight": 874,
           "rotation": -0.0,
-          "alpha": 0.9,
+          "alpha": 1,
           "cover": false,
           "bottom": true,
           "crop": false,
@@ -4210,7 +4348,11 @@
           "tp": 0,
           "dialogue": false,
           "shadow": false,
-          "path": "Assets/Hapio/Art/Story/Opening/Imported/15e68.png"
+          "path": "Assets/Hapio/Art/Story/Opening/Revision28/Backgrounds/15e68-paper-90.png",
+          "backgroundSourcePath": "Assets/Hapio/Art/Story/Opening/Imported/15e68.png",
+          "figmaOpacity": 0.9,
+          "opacityInSource": true,
+          "precompositedBackground": true
         },
         {
           "id": "4553:2548",
@@ -4359,7 +4501,8 @@
         }
       ],
       "speaker": "만복",
-      "dialogue": "이 구슬들은 뭘까?\n검은 것도 있고, 하얀 것도 있네?"
+      "dialogue": "이 구슬들은 뭘까?\n검은 것도 있고, 하얀 것도 있네?",
+      "artworkContinuityKey": ""
     },
     {
       "number": 25,
@@ -4376,7 +4519,7 @@
           "boxWidth": 1311,
           "boxHeight": 874,
           "rotation": -0.0,
-          "alpha": 0.9,
+          "alpha": 1,
           "cover": false,
           "bottom": true,
           "crop": false,
@@ -4386,7 +4529,11 @@
           "tp": 0,
           "dialogue": false,
           "shadow": false,
-          "path": "Assets/Hapio/Art/Story/Opening/Imported/32e7e.png"
+          "path": "Assets/Hapio/Art/Story/Opening/Revision28/Backgrounds/32e7e-paper-90.png",
+          "backgroundSourcePath": "Assets/Hapio/Art/Story/Opening/Imported/32e7e.png",
+          "figmaOpacity": 0.9,
+          "opacityInSource": true,
+          "precompositedBackground": true
         },
         {
           "id": "4553:2554",
@@ -6029,7 +6176,8 @@
         }
       ],
       "speaker": "솔이",
-      "dialogue": "그래! 음 양 구슬 두개를 합치면 ..."
+      "dialogue": "그래! 음 양 구슬 두개를 합치면 ...",
+      "artworkContinuityKey": ""
     },
     {
       "number": 26,
@@ -6046,7 +6194,7 @@
           "boxWidth": 1311,
           "boxHeight": 874,
           "rotation": -0.0,
-          "alpha": 0.9,
+          "alpha": 1,
           "cover": false,
           "bottom": true,
           "crop": false,
@@ -6056,7 +6204,11 @@
           "tp": 0,
           "dialogue": false,
           "shadow": false,
-          "path": "Assets/Hapio/Art/Story/Opening/Imported/462b7.png"
+          "path": "Assets/Hapio/Art/Story/Opening/Revision28/Backgrounds/462b7-paper-90.png",
+          "backgroundSourcePath": "Assets/Hapio/Art/Story/Opening/Imported/462b7.png",
+          "figmaOpacity": 0.9,
+          "opacityInSource": true,
+          "precompositedBackground": true
         },
         {
           "id": "4688:3608",
@@ -6274,7 +6426,8 @@
         }
       ],
       "speaker": "솔이",
-      "dialogue": "오색의 오행 구슬이 되는거야!"
+      "dialogue": "오색의 오행 구슬이 되는거야!",
+      "artworkContinuityKey": ""
     },
     {
       "number": 27,
@@ -6291,7 +6444,7 @@
           "boxWidth": 1311,
           "boxHeight": 874,
           "rotation": -0.0,
-          "alpha": 0.9,
+          "alpha": 1,
           "cover": false,
           "bottom": true,
           "crop": false,
@@ -6301,7 +6454,11 @@
           "tp": 0,
           "dialogue": false,
           "shadow": false,
-          "path": "Assets/Hapio/Art/Story/Opening/Imported/da8af.png"
+          "path": "Assets/Hapio/Art/Story/Opening/Revision28/Backgrounds/da8af-paper-90.png",
+          "backgroundSourcePath": "Assets/Hapio/Art/Story/Opening/Imported/da8af.png",
+          "figmaOpacity": 0.9,
+          "opacityInSource": true,
+          "precompositedBackground": true
         },
         {
           "id": "4553:2619",
@@ -6496,7 +6653,8 @@
         }
       ],
       "speaker": "솔이",
-      "dialogue": "이 구슬들로 봉인박 전체에\n오행의 기운을 고르게 입히면 돼!"
+      "dialogue": "이 구슬들로 봉인박 전체에\n오행의 기운을 고르게 입히면 돼!",
+      "artworkContinuityKey": ""
     },
     {
       "number": 28,
@@ -6523,7 +6681,11 @@
           "tp": 0,
           "dialogue": false,
           "shadow": false,
-          "path": "Assets/Hapio/Art/Story/Opening/Imported/72eb0.png"
+          "path": "Assets/Hapio/Art/Story/Opening/Revision28/Backgrounds/72eb0-paper-100.png",
+          "backgroundSourcePath": "Assets/Hapio/Art/Story/Opening/Imported/72eb0.png",
+          "figmaOpacity": 1,
+          "opacityInSource": true,
+          "precompositedBackground": true
         },
         {
           "id": "4553:2444",
@@ -6774,7 +6936,8 @@
         }
       ],
       "speaker": "불이",
-      "dialogue": "좋아! 어서 요괴 잡으러가자!\n사부님 돌아오시기 전에..."
+      "dialogue": "좋아! 어서 요괴 잡으러가자!\n사부님 돌아오시기 전에...",
+      "artworkContinuityKey": ""
     }
   ]
 }

@@ -51,14 +51,55 @@ namespace Hapio.Tests
   }
   [Test] public void LastBackgroundBleedsPastBothEdgesWithoutChangingAspect(){
    var view=AssetDatabase.LoadAssetAtPath<StoryCutView>(Root+"Views/OP_028.prefab");
-   var image=view.GetComponentsInChildren<Image>(true).Single(x=>x.sprite!=null&&x.sprite.name=="72eb0");
+   var image=view.GetComponentsInChildren<Image>(true).Single(x=>x.sprite!=null&&x.sprite.name.StartsWith("72eb0-paper-"));
    Assert.That(image.rectTransform.anchoredPosition.x,Is.EqualTo(-2).Within(.01));
    Assert.That(image.rectTransform.rect.width,Is.EqualTo(406).Within(.01));
    Assert.That(image.rectTransform.rect.width/image.rectTransform.rect.height,Is.EqualTo(402f/874).Within(.001));
   }
+  [Test] public void SighSettlesAndRemainsVisibleWhileThePlayerReads(){
+   var view=Object.Instantiate(AssetDatabase.LoadAssetAtPath<StoryCutView>(Root+"Views/OP_007.prefab"));
+   try{
+    var motion=view.openingMotions.Single(x=>x.kind==OpeningLayerMotion.Kind.Sigh);
+    motion.Sample(.55f);Assert.That(motion.GetComponentInChildren<Image>().fillAmount,Is.Zero);
+    motion.Sample(3);var position=((RectTransform)motion.transform).anchoredPosition;
+    motion.Sample(30);Assert.That(motion.GetComponent<CanvasGroup>().alpha,Is.EqualTo(1));
+    Assert.That(motion.GetComponentInChildren<Image>().fillAmount,Is.EqualTo(1));
+    Assert.That(((RectTransform)motion.transform).anchoredPosition,Is.EqualTo(position));
+   }finally{Object.DestroyImmediate(view.gameObject);}
+  }
+  [Test] public void GroundShadowStaysOnTheFloorAndGrowsAsTheGourdApproaches(){
+   var view=Object.Instantiate(AssetDatabase.LoadAssetAtPath<StoryCutView>(Root+"Views/OP_015.prefab"));
+   try{
+    var shadow=view.openingMotions.Single(x=>x.kind==OpeningLayerMotion.Kind.GroundShadow);
+    var drop=view.openingMotions.Single(x=>x.kind==OpeningLayerMotion.Kind.Drop);
+    Assert.That(shadow.delay,Is.EqualTo(drop.delay));Assert.That(shadow.seconds,Is.EqualTo(drop.seconds));
+    shadow.Sample(0);var position=shadow.transform.position;float width=shadow.transform.localScale.x;
+    float alpha=shadow.GetComponent<CanvasGroup>().alpha;
+    shadow.Sample(2.6f);Assert.That(shadow.transform.position,Is.EqualTo(position));
+    Assert.That(shadow.transform.localScale.x,Is.GreaterThan(width));Assert.That(shadow.GetComponent<CanvasGroup>().alpha,Is.GreaterThan(alpha));
+   }finally{Object.DestroyImmediate(view.gameObject);}
+  }
+  [Test] public void FlyingPropsCrossTheMiddleOfTheSceneInsteadOfStayingAtTheCeiling(){
+   var view=Object.Instantiate(AssetDatabase.LoadAssetAtPath<StoryCutView>(Root+"Views/OP_013.prefab"));
+   try{foreach(var motion in view.openingMotions.Where(x=>x.kind==OpeningLayerMotion.Kind.Toss)){
+    float low=float.MaxValue,high=float.MinValue;
+    for(float time=1;time<9;time+=.1f){motion.Sample(time);float y=-view.transform.InverseTransformPoint(motion.transform.position).y;low=Mathf.Min(low,y);high=Mathf.Max(high,y);}
+    Assert.That(low,Is.GreaterThan(100));Assert.That(high,Is.LessThan(640));
+    Assert.That(high-low,Is.GreaterThan(200));
+   }}finally{Object.DestroyImmediate(view.gameObject);}
+  }
+  [Test] public void AllBackgroundsUseOpaqueSrgbCompositesAndFrameFourUsesFullOpacity(){
+   var json=File.ReadAllText(Root+"Revision28.json");
+   Assert.That(json,Does.Contain("backgroundSourcePath"));
+   var sequence=AssetDatabase.LoadAssetAtPath<StorySequence>(Root+"Opening.asset");
+   foreach(var cut in sequence.cuts){var background=cut.viewPrefab.transform.GetChild(1).GetComponentInChildren<Image>();
+    Assert.That(background.sprite.name,Does.Contain("-paper-"));Assert.That(background.color.a,Is.EqualTo(1));
+   }
+   Assert.That(sequence.cuts[3].viewPrefab.transform.GetChild(1).GetComponentInChildren<Image>().sprite.name,Does.EndWith("-paper-100"));
+  }
   [Test] public void InstructionScrollUsesNativeTextAndLastCutKeepsCloudTransitionLandscape(){
    var scroll=AssetDatabase.LoadAssetAtPath<StoryCutView>(Root+"Views/OP_023.prefab");Assert.That(scroll.GetComponentsInChildren<Text>(true),Has.Length.EqualTo(5));
-   var last=AssetDatabase.LoadAssetAtPath<StoryCutView>(Root+"Views/OP_028.prefab");Assert.That(last.GetComponentsInChildren<Image>(true).Any(x=>x.sprite!=null&&x.sprite.name=="72eb0"),Is.True);
+   var last=AssetDatabase.LoadAssetAtPath<StoryCutView>(Root+"Views/OP_028.prefab");Assert.That(last.GetComponentsInChildren<Image>(true).Any(x=>x.sprite!=null&&x.sprite.name.StartsWith("72eb0-paper-")),Is.True);
   }
  }
 }

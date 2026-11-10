@@ -7,12 +7,14 @@ namespace Hapio
     [RequireComponent(typeof(RectTransform), typeof(CanvasGroup))]
     public sealed class OpeningLayerMotion : MonoBehaviour
     {
-        public enum Kind { Reveal, Sigh, Sweep, Toss, Teeter, Drop, Escape, Smoke, Cloud }
+        public enum Kind { Reveal, Sigh, Sweep, Toss, Teeter, Drop, Escape, Smoke, Cloud, GroundShadow }
         public Kind kind;
         public float delay, seconds = .65f, phase;
         public Vector2 travel = new Vector2(0, 8);
         public float angle = 8;
         public bool fadeAtEnd;
+        public Vector2 pathOffset;
+        public float cycleSeconds = 2.6f;
         public float Duration => delay + (kind == Kind.Sigh ? .45f : seconds);
         RectTransform rect;
         CanvasGroup group;
@@ -43,7 +45,6 @@ namespace Hapio
                     if(sigh!=null)sigh.fillAmount=Mathf.SmoothStep(0,1,Mathf.Clamp01(t/.5f));
                     rect.anchoredPosition = rest + new Vector2(-18 + 40 * ease, -5 * ease);
                     rect.localScale = Vector3.Scale(scale, new Vector3(Mathf.Lerp(.6f, 1.08f, ease), Mathf.Lerp(.8f, 1, ease), 1));
-                    group.alpha *= 1 - Mathf.SmoothStep(0, 1, Mathf.InverseLerp(.65f, 1, t));
                     break;
                 case Kind.Sweep:
                     float sweep = Mathf.Sin(age * Mathf.PI * 2 / .85f + phase) * Mathf.SmoothStep(0, 1, t);
@@ -51,9 +52,10 @@ namespace Hapio
                     rect.localRotation = rotation * Quaternion.Euler(0, 0, angle * sweep);
                     break;
                 case Kind.Toss:
-                    float flight = Mathf.Repeat(age / 2.6f + phase, 1);
+                    float flight = Mathf.Repeat(age / Mathf.Max(.1f,cycleSeconds) + phase, 1);
                     float envelope = Mathf.SmoothStep(0, 1, t);
-                    rect.anchoredPosition = rest + envelope * new Vector2(travel.x * Mathf.Sin(flight * Mathf.PI * 2), travel.y * 4 * flight * (1 - flight));
+                    Vector2 pageOffset = pathOffset + new Vector2(travel.x * Mathf.Sin(flight * Mathf.PI * 2), travel.y * 4 * flight * (1 - flight));
+                    rect.anchoredPosition = rest + (Vector2)(Quaternion.Inverse(rect.parent.localRotation) * (Vector3)(pageOffset * envelope));
                     rect.localRotation = rotation * Quaternion.Euler(0, 0, angle * Mathf.Sin(flight * Mathf.PI * 2) * envelope);
                     break;
                 case Kind.Teeter:
@@ -78,6 +80,11 @@ namespace Hapio
                     rect.anchoredPosition = rest + new Vector2(Mathf.Sin(age * 1.7f + phase) * travel.x, -travel.y * (1 - ease));
                     rect.localScale = Vector3.Scale(scale, new Vector3(1 + .025f * Mathf.Sin(age * 2 + phase), Mathf.Lerp(.92f, 1, ease), 1));
                     group.alpha = ease * (fadeAtEnd ? 1 - .45f * Mathf.SmoothStep(0, 1, Mathf.InverseLerp(1.2f, 2.5f, age)) : 1);
+                    break;
+                case Kind.GroundShadow:
+                    float approach = t * t;
+                    rect.localScale = Vector3.Scale(scale, new Vector3(Mathf.Lerp(.55f,1,approach),Mathf.Lerp(.7f,1,approach),1));
+                    group.alpha = Mathf.Lerp(.5f,1,approach);
                     break;
                 case Kind.Cloud:
                     rect.anchoredPosition = rest + travel * Mathf.Sin(age * .35f);
