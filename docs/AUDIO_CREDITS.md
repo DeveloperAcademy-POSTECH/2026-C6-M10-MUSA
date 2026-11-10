@@ -2,6 +2,8 @@
 
 게임에 들어간 소리 파일의 출처와 이용 조건을 기록한다. 새 소리를 추가할 때는 이 표에 함께 적는다.
 
+게임 안 크레딧(Home 타이틀 오른쪽 위의 "크레딧" 버튼, #602)의 글은 `Assets/Hapio/Art/UI/Credits/Credits.txt`다. 출처 표시 의무가 있는 소리(공공누리, CC BY)를 추가하면 그 파일에도 문구를 넣는다. 전체 파일과 출처 묶음은 `docs/AUDIO_INVENTORY.md`.
+
 ## 배경음악
 
 | 파일 | 용도 | 출처 | 이용 조건 | 가공 |
@@ -32,11 +34,8 @@
 | `Assets/Lab/Resources/Audio/Bomb/Ppeong/Ppeong.wav` | 내 판에서 폭탄이 터질 때 (Bomb Sound = PPEONG, 그 판 주인 기기만) | "뻥튀기 뻥2" by 김용배, [공유마당 (한국저작권위원회)](https://gongu.copyright.or.kr/gongu/wrt/wrt/view.do?wrtSn=13253710&menuNo=200020) | **CC BY (저작자 표시)** – 출처 표시 의무 있음 | 끝 0.06초 페이드아웃, 스테레오를 모노로 합치고 가장 큰 순간이 -1dB가 되도록 맞춤. 44.1kHz 16bit로 저장. 음색 변경 없음 |
 | `Assets/Lab/Resources/Audio/Miss/Miss.wav` | 내가 던진 구슬이 요괴를 빗나갔을 때 (던진 사람 기기만) | "Woosh_Whip 3" by CAT-FOX_ALEX, [freesound.org](https://freesound.org/people/CAT-FOX_ALEX/sounds/870096/) | CC0 (출처 표시 의무 없음) | 이름만 변경. 소리 자체는 변경 없음 |
 | `Assets/Lab/Resources/Audio/FiveColorHit/FiveColorHit_1.wav`, `FiveColorHit_2.wav` (2개) | 내가 던진 오색구슬(#329)이 박에 맞았을 때와 콤보 BIG 중 던진 큰 공이 맞았을 때 (#338, #395 징, #398 BIG, #464에서 25현 가야금 가락으로 교체, 던진 사람 기기만, 맞을 때마다 1 → 2 → 1 번갈아) | 국립국악원, [국악 디지털 음원 – 단음 다운로드](https://www.gugak.go.kr/digitaleum/front/monotone/list.do) – 25현 가야금 - 기본음계 - 강 | 출처 표시 조건으로 누구나 이용 가능 (공공누리 제1유형, 상업적 이용·변경 가능) | 원본 wav(약 237초, 스테레오 48kHz, 25줄을 한 줄씩 친 기본음계)에서 음을 골라 빠르게 이어 붙인 짧은 가락 두 개(각 약 2초). 앞 소리가 울리는 중에 또 맞으면 코드가 끊고 새로 친다. 모노로 합치고 가장 큰 순간이 -1dB가 되도록 음량만 맞춤. 44.1kHz 모노 16bit wav |
-| `Assets/Lab/Resources/Audio/JigwiTalismanSweep/JigwiTalismanSweep.wav` | 지귀 부적(#533)을 다 써서 금빛이 획을 훑기 시작할 때 (쓴 사람 기기만) | 국립국악원, [국악 디지털 음원 – 단음 다운로드](https://www.gugak.go.kr/digitaleum/front/monotone/list.do) – 25현 가야금 - 기본음계 - 강 | 출처 표시 조건으로 누구나 이용 가능 (공공누리 제1유형, 상업적 이용·변경 가능) | `FiveColorHit_1.wav`(25현 가야금 가락)를 음높이는 그대로 두고 0.85배 속도로 늘림(2.36초). 가장 큰 순간이 -1dB가 되도록 음량만 맞춤. 44.1kHz 모노 16bit wav |
-| `Assets/Lab/Resources/Audio/JigwiTalismanChime/JigwiTalismanChime.wav` | 지귀 부적(#533) 금빛 훑기가 끝나고 "쾅" 하는 순간, 여운 뒤 보상 (쓴 사람 기기만) | 국립국악원, [국악 디지털 음원 – 단음 다운로드](https://www.gugak.go.kr/digitaleum/front/monotone/list.do) – 25현 가야금 - 기본음계 - 강 | 출처 표시 조건으로 누구나 이용 가능 (공공누리 제1유형, 상업적 이용·변경 가능) | `FiveColorHit_1.wav`를 길이는 그대로 두고 2반음(한 음) 높인 뒤, 메아리 8겹(0.18~2.9초)으로 긴 여운을 붙이고 3.2초부터 1.6초 동안 페이드아웃, 끝 무음을 잘라 3.7초. 가장 큰 순간이 -1dB가 되도록 음량만 맞춤. 44.1kHz 모노 16bit wav |
 | `Assets/Lab/Resources/Audio/JigwiTalismanNote/JigwiTalismanNote.wav` | 지귀 부적(#533/#540)을 다 썼을 때 완성 가락 "둥 둥 둥 .. 둥!" 네 음 (쓴 사람 기기만). 코드가 음마다 -2/3/2/0반음으로 높낮이를 바꿔 솔 (쉼) 도 (쉼) 시 (쉼 쉼) 라로 낸다(양금 `ComboHit`로 내던 가락보다 두 옥타브 아래) | 국립국악원, [국악 디지털 음원 – 단음 다운로드](https://www.gugak.go.kr/digitaleum/front/monotone/list.do) – 25현 가야금 - 시김새 - 추성 - 강 | 출처 표시 조건으로 누구나 이용 가능 (공공누리 제1유형, 상업적 이용·변경 가능) | 원본 wav(275.7초, 25현을 낮은 줄부터 차례로 추성으로 뜯은 모음, 스테레오 48kHz 32bit float)에서 25.1초의 한 음(라(A2, 110Hz) 줄, 양금보다 두 옥타브 아래)을 잘라 모노로 합침. 이 음은 라보다 1반음쯤 낮게 울려, 가락의 음(솔 도 시 라)이 그대로 들리도록 음높이를 시간에 따라 바로잡아 처음 0.08초만 살짝 아래에서 올라오고(추성 느낌) 그 뒤로는 110Hz(±0.05반음)에 머물게 함. 2.3초로 자르고 끝 0.5초 페이드아웃, 가장 큰 순간이 -1dB가 되도록 음량만 맞춤(평균 -19dB). 44.1kHz 모노 16bit wav #577 QA(11-09): 부적 완성 소리를 키우려고 +5dB 뒤 리미터로 최대 -1dB를 지키며 평균 크기를 약 1.5배(+3.5dB)로 올림. |
 | `Assets/Lab/Resources/Audio/JigwiTalismanWrite/JigwiTalismanWrite_1.wav`, `_2.wav`, `_3.wav` (3개) | 지귀 부적(#533)을 칠하는 동안 이어지는 연필 사각 소리 (쓴 사람 기기만, 무작위·높낮이 ±8%·크기 ±20%) | 팀 제공 CC0 소리 (원본 이름 `연필 사각 1~3`) | CC0 (출처 표시 의무 없음) | 원본 wav(0.32~0.46초, 모노 48kHz 32bit)의 앞뒤 무음을 자르고, 평균 크기가 셋 다 -22dB가 되도록 음량만 키움(+12.5~15.3dB, 최대 -4.7~-7.7dB). 끝 0.03초 페이드아웃. 44.1kHz 모노 16bit wav |
-| `Assets/Lab/Resources/Audio/JigwiTalismanFireLoop/JigwiTalismanFireLoop.wav` | 지귀 부적(#540)을 쓰는 동안 깔리는 구슬 타는 소리(반복, A가 끝나 갈수록 커짐, 쓴 사람 기기만) | "Fire Crackling Cozy Campfire Fireplace SFX" by lilmati, [freesound.org](https://freesound.org/s/714566/) | CC0 (출처 표시 의무 없음) | 원본 wav(5초, 스테레오 48kHz)를 모노로 합치고 압축(-30dB 이상 6:1)과 +18dB 뒤 리미터로 탁탁 튀는 소리를 고르게 함. 0.5~4.5초를 잘라 끝 0.5초를 처음 0.5초와 겹쳐 이음매 없이 반복되게 만듦(4.0초). 최대 -1dB. 44.1kHz 모노 16bit wav |
 | `Assets/Lab/Resources/Audio/JigwiTalismanSplash/JigwiTalismanSplash.wav` | 지귀 부적(#540) 완성 도장 "쾅" 순간의 시원한 물벼락 (쓴 사람 기기만) | "vang nuoc lon tieng on kenh" by sieuamthanh, [freesound.org](https://freesound.org/s/676380/) | CC0 (출처 표시 의무 없음) | 원본 wav(2초, 모노 48kHz 32bit)의 앞뒤 무음을 자르고(1.69초) 끝 0.08초 페이드아웃, 가장 큰 순간이 -1dB가 되도록 음량만 맞춤. 44.1kHz 모노 16bit wav #577 QA(11-09): 부적 완성 소리를 키우려고 +5dB 뒤 리미터로 최대 -1dB를 지키며 평균 크기를 약 1.5배(+3.5dB)로 올림. |
 | `Assets/Lab/Resources/Audio/JigwiFireDouse/JigwiFireDouse.wav` | 지귀 부적 구슬(#540, 3갈래 중 어느 것이든)이 박에 맞는 순간 불귀신의 불이 물에 꺼지는 "치이익" (모든 기기, 한 번 던진 것은 한 번만) | 팀이 코드로 합성(Python numpy/scipy, 2026-11-08): 아래로 훑어 내려가는 대역 잡음(지글거림) + 타닥 튀는 소리 + 낮은 물 "퉁" | 팀 제작, 외부 소스 없음 | 1.3초, 끝 0.15초 페이드아웃, 가장 큰 순간 -1dB. 44.1kHz 모노 16bit wav |
 | `Assets/Lab/Resources/Audio/JigwiBucketHeat/JigwiBucketHeat.wav` | 지귀 B 나무 물통(#551): 내 양동이가 오기 직전부터 박이 내 쪽으로 달아오르는 동안 깔리는 다리미 "치이익" (반복, 뜨거울수록 크고 높게, 내 기기만) | AI 생성: [ElevenLabs](https://elevenlabs.io) Sound Effects (2026-11-08, Creator 유료 플랜) | ElevenLabs 이용약관: 유료 플랜으로 만든 소리는 상업적 이용 가능 (무료 플랜은 출처 표시·비상업만) | 원본 wav(3.88초, 스테레오 48kHz)를 모노로 합치고, 앞 0.4초를 끝 0.4초와 겹쳐 이음매 없이 반복되게 만듦(3.48초). 최대 -1dB. 44.1kHz 모노 16bit wav |
@@ -103,7 +102,6 @@
 | `ComboClear/Jota.wav` | 추임새 – 좋타 (염경애) |
 | `ComboHit/ComboHit.wav` | 양금 기본음 강 |
 | `FiveColorHit/FiveColorHit_1.wav`, `FiveColorHit_2.wav` | 25현 가야금 - 기본음계 - 강 |
-| `JigwiTalismanSweep/JigwiTalismanSweep.wav`, `JigwiTalismanChime/JigwiTalismanChime.wav` | 25현 가야금 - 기본음계 - 강 (가공) |
 
 **CC BY 소리 (출처 표시 의무 있음)**
 
@@ -113,7 +111,7 @@ CC0 소리(Punch, Splat, Squelch, Combine, Miss, Boom, ComboFail)는 표시 의�
 
 > 타격음 "Cartoon Punch Cassette E" by modusmogulus, 페인트 타격음 "Squishes and Splats" by mrickey13, 스친 타격음 "SFX_SQUELCH_slayer_215" by MrFossy, 결합 소리 "chimes" by _bliind, 빗나감 소리 "Woosh_Whip 3" by CAT-FOX_ALEX, 폭발음 "rubble_explode" by canberries4 (freesound.org, CC0)
 
-게임 안에 크레딧 화면이 생기면 위 문구를 함께 넣는다.
+위 문구는 게임 안 크레딧(`Credits.txt`)에 들어 있다.
 
 **AI로 만든 소리 (#351)**
 

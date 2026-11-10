@@ -124,10 +124,10 @@ namespace C6Lab
         [SerializeField, Range(0f, 1f)] private float noteSoundVolume = .7f;
         [Tooltip("마지막 강세 음(\"둥!\") 크기.")]
         [SerializeField, Range(0f, 1f)] private float accentSoundVolume = 1f;
-        [Tooltip("(가락과 따로) 금빛이 획을 훑기 시작할 때 덧낼 소리. 비우면 없음. 예: JigwiTalismanSweep(가야금 띠리링을 조금 느리게). 예: FiveColorHit, CharmRelease")]
+        [Tooltip("(가락과 따로) 금빛이 획을 훑기 시작할 때 덧낼 소리. 비우면 없음. 예: FiveColorHit, CharmRelease")]
         [SerializeField] private string sweepSoundFolder = "";
         [SerializeField, Range(0f, 1f)] private float sweepSoundVolume = .7f;
-        [Tooltip("(가락과 따로) \"쾅\" 순간 덧낼 소리. 기본 JigwiTalismanSplash(시원한 물벼락). 비우면 없음. 예: JigwiTalismanChime(긴 여운), YaguangShakeBellFinal")]
+        [Tooltip("(가락과 따로) \"쾅\" 순간 덧낼 소리. 기본 JigwiTalismanSplash(시원한 물벼락). 비우면 없음. 예: YaguangShakeBellFinal")]
         [SerializeField] private string burstSoundFolder = "JigwiTalismanSplash";
         [Header("#540 지귀 목소리 (A/B 예고가 뜨는 순간, 각 기기에서)")]
         [Tooltip("A(부적) 예고 때 지귀 대사 폴더. 예: \"다 태워버리겠어!\". 비우면 없음.")]
