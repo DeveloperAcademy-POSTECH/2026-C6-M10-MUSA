@@ -7267,6 +7267,8 @@ PlayMode의 기존 main 실패13건은 구형 지귀 A/B·특수 물구슬 검�
 - 콤보 실패(SMALL) 중 던진 구슬은 판정·칠 면적이 원래의 10%인 채로, 날아가는 동안 보이는 크기만 `LabConfig`의 Inspector 전용 `Thrown Orb Min Visible Scale`(기본 0.4)보다 작게 그리지 않는다. 0.4보다 큰 축소(폭발 0.5배·지귀 0.65배)는 이전과 같다. 공유 설정·통신 값은 바꾸지 않았다.
 - 전투로 들어가는 모든 전환(결과 → 다음 스테이지, 게임오버 → 같은 방 재도전, DEV 다음 스테이지)에 첫 전투와 같은 로딩 화면을 씌운다. "준비 n/m"을 띄우다 3·2·1 직전에 닫는다. 전투 → 결과·게임오버와 튜토리얼 시작은 그대로다.
 
+- #586 누락 보정: 2:2 피버 명중 수 저장값을 10으로 바꿀 때 Home·Lobby 장면의 DEV 198번 칸(입력·슬라이더)이 15로 남아 `GameSceneAssetTests.MenuScreens_HaveSavedEditableCanvasAndInput`(Home·Lobby)이 실패했다. 기존 메뉴 `Hapio/Upgrade Menu DEV Rows`로 두 장면을 맞췄고, 장면 변경은 그 칸의 15 → 10뿐이다.
+- 같은 EditMode 실행의 `LabOrbSpriteDesignTests`(5)·`GameBattleUiAssetTests`(2) 실패는 코드 문제가 아니었다. 이 프로젝트는 Play를 끌 때 도메인을 다시 불러오지 않아(Enter Play Mode Options), 전투 화면이 공용 `LabConfig`에 씌운 전투 구슬 테마(저장되지 않는 값)가 Play 뒤에도 메모리에 남았다. 스크립트를 다시 불러온 뒤 같은 조건을 Editor에서 다시 확인했을 때 모두 맞았다.
 | 확인 | 결과 |
 | --- | --- |
 | Unity 컴파일 | PASS |
