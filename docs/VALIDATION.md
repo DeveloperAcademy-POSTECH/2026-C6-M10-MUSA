@@ -1,5 +1,24 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-10 — #645 병합 검토 반영
+
+- **기준:** `feat/#645-sealed-gourd-help-button-ui` `4019f782`(PR 원본 `8e72dc7e` + 검토 반영), main `64d556ae` 위. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 저장 Scene·Prefab·접속 규약은 바꾸지 않았다.
+- **고친 것:** 확대·축소 때 바닥 그림자 크기(관람 카메라 거리 2^(2·zoom−1)), 배경 402×874 비율 유지(`uvRect` 덮기)와 그 바닥선에 그림자 위치, 100% 완료 연출(`IsFinishingBattle`) 시작 시 도움말 닫기·다시 열기 막기, 도움말이 열린 동안 지귀 부적 쓰기·연기 문지르기 직접 입력 무시(`LabOrbBoard.ExternalModalOpen`), 튜토리얼 도움말 프록시는 위치를 잡은 뒤에만 표시·`GameHelpView` 한 번만 찾기, 관람 글자·그림자 색을 토큰(PrimaryBrown/400·SecondaryLightIvory/200·PrimaryBrown/700)으로. 항상 통과하던 줄 검사를 실제 줄 이름(`Rope`·`Upper Rope`·`Continuous Rope`)·LineRenderer 확인으로 바꾸고, 위 "줄 복사 코드 제거" 문장을 정정했다.
+- **고치지 않은 것:** 관람 배경 3장의 무압축(약 24 MiB). 텍스처 압축은 #499처럼 아트 승인 대상이다.
+- **검사 범위 이유:** 관람 복사본 수명(`GameSession`)과 공통 입력 차단을 바꾸므로 전체 EditMode·PlayMode를 실행했다.
+
+| 확인 | 결과 |
+| --- | --- |
+| 관련 PlayMode(그림자·도움말·튜토리얼) | 7/7 PASS |
+| 대조 실험(그림자 확대, 완료 중 도움말 닫기 각각 되돌림) | 새 단언 2건 실패 |
+| 전체 EditMode | 2198/2198 PASS |
+| 전체 PlayMode | 783/786 |
+| 실패 중 GPU 2건(`LabPaintSpreadFlowRenderTests`, `LabWatercolorSurfaceGrainTests`)만 따로 | 수정본 4/4, PR 원본 4/4 PASS. 픽셀 오차 3·2(허용 1)로 전체 실행 중에만 실패 |
+| 실패 중 `GameOpeningControllerTests.CompletingAllTwentyFourCuts…` | main `64d556ae`에서도 단독 실행 같은 실패. 이 PR과 무관 |
+| Mac 개발 빌드 화면 | 적용 전·PR 원본·수정본 각각 캡처(관람 확대·축소 포함) |
+
+- **미실행:** 실기기, 16:9·iPad 실제 화면, 멀티, 지귀 부적·연기 중 도움말을 실제로 연 플레이.
+
 ## 2026-11-10 — #645 관람 박 겹침과 매달림 줄
 
 - `feat/#645-sealed-gourd-help-button-ui`의 `64d556ae` 위 작업 변경을 Unity 6000.6.5f1 macOS Editor/Metal에서 확인했다.
