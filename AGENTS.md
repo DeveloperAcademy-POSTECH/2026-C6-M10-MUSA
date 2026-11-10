@@ -413,3 +413,7 @@
 ## 시안에 없는 안내 줄
 
 - StageResult 이야기 화면의 `Status`와 Home·Lobby의 `ConnectionMessage`는 승인된 시안에 없어 실행 중 숨긴다. 프리팹을 지우지 않는다. 위 #471 등의 "안내 표시" 문장은 이 줄에 쓰던 당시 동작이며 지금은 화면에 나오지 않는다. `GameLobbyView.message.text`는 계속 계산한다. Direct IP 창의 안내 문구는 유지한다.
+
+## 플레이어별 칠 무늬 기본 OFF
+
+- `Player Paint Patterns`(DEV 인덱스137, `LabConfig.playerPaintPatternsEnabled`)의 코드·저장 기본값은 꺼짐이다. 박 표면의 P번호별 무늬와 플레이어 원 오른쪽 아래·로비 P 자리의 무늬 표시가 함께 꺼진다. 색·면적·P지도·승리 판정은 그대로다. 기능 코드와 DEV 행·인덱스는 남겨 DEV로 다시 켤 수 있다. config가 없을 때도 꺼짐으로 본다. 설정 259개와 접속 묶음은 바꾸지 않았다.
