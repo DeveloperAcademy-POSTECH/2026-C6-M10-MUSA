@@ -15,6 +15,8 @@ namespace C6Lab
             if (snapshot == null || snapshot.phase != LabPhase.Playing || !gameFlowEnabled
                 || gameStageYokai != LabStageYokai.Yaguang || snapshot.teamTerritory || config == null) return -1d;
             double end = config.YaguangTimelineSabotageEndSeconds;
+            double pulled = VfxLabYaguangFeverPlayedFor(snapshot); // #610 VFX 실험실이 피버를 당긴 판만
+            if (pulled >= 0d && pulled < end) end = pulled;
             if (end <= 0d || snapshot.playedSeconds < end) return -1d;
             return snapshot.playedSeconds - end;
         }

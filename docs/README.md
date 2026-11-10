@@ -49,6 +49,7 @@
 
 ## 실험·과거 구현 자료
 
+- [VFX 녹화용 실험실](VFX_LAB.md): 혼자 녹화하기 어려운 야광귀/지귀 장면(콤보 성공/BIG/오색구슬/피버/공용 부적 완성)을 Editor 창에서 바로 띄우는 법과 장면 번호(#610).
 - [Mac 스티커 질감·배경 비교 앱 상세 사용법](CLAY_PREVIEW_IMAGE_USER_GUIDE.md): 샘플3종·외부 PNG/JPG·질감/배경·4프리셋·광원·RGB/HEX·초기화·빌드·문제 해결.
 - [곡면 스티커 에셋 시제품](SURFACE_STICKER_PROTOTYPE.md): 클레이 도입 전 원형 부착과 영역 제한형을 비교한 Editor 시제품 이력.
 - [이전 한지 얼룩 스티커](PAPER_STICKER_PAINT.md): 클레이 전환 전 표현의 구현·검증 이력.
