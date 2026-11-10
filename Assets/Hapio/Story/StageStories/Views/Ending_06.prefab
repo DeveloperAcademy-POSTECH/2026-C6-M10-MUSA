@@ -37,6 +37,7 @@ RectTransform:
   - {fileID: 732073302973100452}
   - {fileID: 5420925601713327457}
   - {fileID: 4087043661563466873}
+  - {fileID: 5047709077654879101}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
@@ -65,8 +66,12 @@ MonoBehaviour:
   - {fileID: 5519214268492916021}
   - {fileID: 4265742553332823679}
   - {fileID: 7292357979723366121}
-  beats: []
+  beats:
+  - {fileID: 2082235911617822645}
   continueButton: {fileID: 0}
+  requireContinueButton: 0
+  waitForEntrance: 1
+  exitCloudWipe: {fileID: 0}
   music: {fileID: 8300000, guid: 7fbd5585167f44b0db25f415f8309a4a, type: 3}
   musicVolume: 0.075
   hideEmptyDialogue: 1
@@ -173,7 +178,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 3210445300426330484}
-  isBackground: 0
+  isBackground: 1
   delay: 0.29999998
   enterSeconds: 0.65
   enterOffset: {x: 0, y: -12}
@@ -258,7 +263,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 3270153137231233130}
-  isBackground: 0
+  isBackground: 1
   delay: 0.06
   enterSeconds: 0.65
   enterOffset: {x: 0, y: -12}
@@ -343,13 +348,161 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 7945379225618778656}
-  isBackground: 0
+  isBackground: 1
   delay: 0.12
   enterSeconds: 0.65
   enterOffset: {x: 0, y: -12}
   startHeight: 1
   idleAmplitude: {x: 0, y: 0}
   idlePeriod: 6
+--- !u!1 &1138267376420154816
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 5047709077654879101}
+  - component: {fileID: 6321005917005627454}
+  - component: {fileID: 2082235911617822645}
+  m_Layer: 0
+  m_Name: "\uC694\uAD34 \uBD09\uC778\uC740 \uACC4\uC18D\uB41C\uB2E4. \uD22C \uBE44 \uCEE8\uD2F0\uB274\uB4DC - [4407:2127]"
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &5047709077654879101
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1138267376420154816}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 27105933201517597}
+  m_Father: {fileID: 7182007385453269172}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 200.5, y: -437}
+  m_SizeDelta: {x: 207, y: 70}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!225 &6321005917005627454
+CanvasGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1138267376420154816}
+  m_Enabled: 1
+  m_Alpha: 1
+  m_Interactable: 1
+  m_BlocksRaycasts: 1
+  m_IgnoreParentGroups: 0
+--- !u!114 &2082235911617822645
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1138267376420154816}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 13d9f59d7ecd4402e82059cc33a56441, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryVisualBeat
+  motion: 5
+  delay: 1.3499999
+  duration: 0.38
+  offset: {x: 0, y: 0}
+  interactionDelay: 0
+  sound: {fileID: 0}
+  volume: 0.7
+--- !u!1 &1759574954388600218
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 27105933201517597}
+  - component: {fileID: 2144259268416711478}
+  - component: {fileID: 2474427120909063880}
+  m_Layer: 0
+  m_Name: Text
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &27105933201517597
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1759574954388600218}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 0.78125, y: 0.78125, z: 0.78125}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 5047709077654879101}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 264.96, y: 89.6}
+  m_Pivot: {x: 0, y: 1}
+--- !u!222 &2144259268416711478
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1759574954388600218}
+  m_CullTransparentMesh: 1
+--- !u!114 &2474427120909063880
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1759574954388600218}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5f7201a12d95ffc409449d95f23cf332, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Text
+  m_Material: {fileID: 0}
+  m_Color: {r: 0.9458824, g: 0.89411765, b: 0.8352941, a: 1}
+  m_RaycastTarget: 0
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_FontData:
+    m_Font: {fileID: 12800000, guid: 5f76b20538a6c4b1caa80654c9df48f1, type: 3}
+    m_FontSize: 32
+    m_FontStyle: 0
+    m_BestFit: 0
+    m_MinSize: 10
+    m_MaxSize: 40
+    m_Alignment: 1
+    m_AlignByGeometry: 0
+    m_RichText: 1
+    m_HorizontalOverflow: 1
+    m_VerticalOverflow: 1
+    m_LineSpacing: 1.1789473
+  m_Text: "\uC694\uAD34 \uBD09\uC778\uC740 \uACC4\uC18D\uB41C\uB2E4.\n\uD22C \uBE44 \uCEE8\uD2F0\uB274\uB4DC -"
 --- !u!1 &1919822620172509230
 GameObject:
   m_ObjectHideFlags: 0
@@ -467,7 +620,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 4652544298794361904}
-  isBackground: 0
+  isBackground: 1
   delay: 0.17999999
   enterSeconds: 0.65
   enterOffset: {x: 0, y: -12}
@@ -552,7 +705,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 7220315512111218028}
-  isBackground: 0
+  isBackground: 1
   delay: 0.35
   enterSeconds: 0.65
   enterOffset: {x: 0, y: -12}
@@ -1047,8 +1200,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 0}
   isBackground: 0
-  delay: 0.35
-  enterSeconds: 1.2
+  delay: 0
+  enterSeconds: 1.05
   enterOffset: {x: 0, y: 0}
   startHeight: 1
   idleAmplitude: {x: 0, y: 0}
@@ -1281,7 +1434,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 1377493804205417986}
-  isBackground: 0
+  isBackground: 1
   delay: 0.24
   enterSeconds: 0.65
   enterOffset: {x: 0, y: -12}

@@ -100,6 +100,64 @@ namespace Hapio.Tests
             }
             finally{if(ownedEvents!=null)Object.DestroyImmediate(ownedEvents);}
         }
+        [UnityTest] public IEnumerator ContinueKeepsTheCardUntilCoveredAndRevealsNewArtBeforeItsLine()
+        {
+            root = new GameObject("Story", typeof(RectTransform));
+            root.SetActive(false);
+            var player = root.AddComponent<StoryPlayer>();
+            player.playOnStart = false;
+            player.cutHost = (RectTransform)root.transform;
+            player.hideInlineContinueButtons = true;
+            root.SetActive(true);
+            var sequence = UnityEditor.AssetDatabase.LoadAssetAtPath<StorySequence>(
+                "Assets/Hapio/Story/StageStories/AfterYagwanggui.asset");
+            Assert.That(player.Play(sequence), Is.True);
+            var card = player.CurrentView;
+            player.AdvanceTime(card.EntranceDuration + .01f);
+            Assert.That(card.continueButton.gameObject.activeInHierarchy, Is.True);
+            player.RequestSurfaceAdvance();
+            Assert.That(player.IsTransitioning, Is.False, "Tapping outside the card must not leave it.");
+            card.continueButton.onClick.Invoke();
+            Assert.That(player.IsTransitioning, Is.True);
+            player.AdvanceTime(.2f);
+            player.Next();
+            Assert.That(player.CurrentView, Is.SameAs(card));
+            player.AdvanceTime(.2f);
+            Assert.That(player.CurrentCutIndex, Is.EqualTo(1));
+            Assert.That(player.IsTransitioning, Is.True);
+            Assert.That(player.cutHost.GetChild(player.cutHost.childCount - 1).GetComponent<StoryCloudWipe>(), Is.Not.Null);
+            var line = System.Array.Find(player.CurrentView.beats, b => b.name.Contains("4407:2129"));
+            var manbok = System.Array.Find(player.CurrentView.layers, l => l.name.Contains("4210:3252"));
+            player.AdvanceTime(.3f);
+            Assert.That(player.IsTransitioning, Is.True);
+            Assert.That(manbok.GetComponent<CanvasGroup>().alpha, Is.GreaterThan(0));
+            Assert.That(line.GetComponent<CanvasGroup>().alpha, Is.Zero);
+            player.AdvanceTime(1f);
+            Assert.That(player.IsTransitioning, Is.False);
+            Assert.That(line.GetComponent<CanvasGroup>().alpha, Is.Zero);
+            player.RequestNext();
+            Assert.That(player.IsReading, Is.False);
+            player.AdvanceTime(line.delay + line.duration);
+            Assert.That(line.GetComponent<CanvasGroup>().alpha, Is.EqualTo(1f));
+            Assert.That(player.IsReading, Is.True);
+            yield return null;
+        }
+
+        [Test] public void EndingNoticeWaitsForDarkenedPicture()
+        {
+            var sequence = UnityEditor.AssetDatabase.LoadAssetAtPath<StorySequence>(
+                "Assets/Hapio/Story/StageStories/Ending.asset");
+            root = Object.Instantiate(sequence.cuts[5].viewPrefab.gameObject);
+            var cut = root.GetComponent<StoryCutView>();
+            var shade = System.Array.Find(cut.layers, l => l.name.Contains("4210:3382"));
+            var notice = System.Array.Find(cut.beats, b => b.name.Contains("4407:2127"));
+            cut.Sample(shade.EntranceDuration);
+            Assert.That(shade.GetComponent<CanvasGroup>().alpha, Is.EqualTo(1f));
+            Assert.That(notice.GetComponent<CanvasGroup>().alpha, Is.Zero);
+            cut.Sample(cut.EntranceDuration + .01f);
+            Assert.That(notice.GetComponent<CanvasGroup>().alpha, Is.EqualTo(1f));
+        }
+
         [UnityTest] public IEnumerator ActualSuccessAndFailureGroupsPlayWithoutRetainingPreviousPictures()
         {
             foreach(string name in new[]{"AllStageStories","Failure"})
@@ -123,6 +181,11 @@ namespace Hapio.Tests
                         Assert.That(player.CurrentView, Is.SameAs(view));
                     }
                     player.Next();
+                    if (player.IsTransitioning)
+                    {
+                        player.AdvanceTime(1f);
+                        player.AdvanceTime(1f);
+                    }
                 }
                 Assert.That(player.IsPlaying,Is.False);Assert.That(ended,Is.EqualTo(1));Object.DestroyImmediate(root);root=null;
             }

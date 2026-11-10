@@ -61,7 +61,7 @@ namespace Hapio
             bool advance = releasedTap && releasedPointer == data.pointerId &&
                 pointers.Count == 0 && PressedTouchCount == 0;
             releasedTap = false;
-            if (advance && player != null && player.isActiveAndEnabled) player.RequestNext();
+            if (advance && player != null && player.isActiveAndEnabled) player.RequestSurfaceAdvance();
         }
 
         // IDragHandler is required for EventSystem to acquire a drag target and send BeginDrag.
