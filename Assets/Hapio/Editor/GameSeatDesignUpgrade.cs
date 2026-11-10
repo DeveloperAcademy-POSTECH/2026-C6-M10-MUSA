@@ -93,6 +93,7 @@ namespace Hapio.Editor
                     Place(view.slotImages[i].transform, (63 - bounds.x) / 2, (63 - bounds.y) / 2, bounds.x, bounds.y);
                 }
                 EditorUtility.SetDirty(view); EditorUtility.SetDirty(design);
+                GameFigmaButton.Apply(root.GetComponent<GameLobbyView>());
                 PrefabUtility.SaveAsPrefabAsset(root, GameLobbySceneUpgrade.PrefabPath);
             }
             finally { PrefabUtility.UnloadPrefabContents(root); }
