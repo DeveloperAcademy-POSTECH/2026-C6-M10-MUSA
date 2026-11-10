@@ -1,5 +1,26 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-10 — main에서 실패하던 화면·입력·구슬 크기 검사 17건 정리
+
+- **기준:** `fix/stale-ui-tests`, main `f9d13362` 위(검사 실행 기준). Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 게임 코드·프리팹·Scene·에셋·접속 묶음·설정 수는 바꾸지 않았고 검사 파일만 고쳤다.
+- **결과 화면(#611/#603):** 저장된 GameOver·StageResult Scene이 새 이탈 화면(`gameOverView`)과 2:2 결과(`territoryView`)를 쓰면서 예전 결과 카드는 꺼진다. `GameSceneFlowTests` 2건은 새 화면을 보도록 바꿨다. `GameStageResultViewTests` 8건은 두 번째 결과표 때문에 `Single()`이 실패했으므로 2:2 결과표를 빼고 찾는다. 팀 결과 카드 검사 2건은 `territoryView`를 비운 상태에서 기존 대체 경로를 확인한다(Scene은 저장하지 않음).
+- **터치 먹물(#594):** 배치 모드 에디터에는 포커스를 가진 Game 창이 없다. 기본 입력 설정에서는 검사용 마우스·터치가 추가되자마자 꺼지거나 이벤트가 미뤄진다. 그래서 장치를 추가하기 전에 `IgnoreFocus`·`AllDeviceInputAlwaysGoesToGameView`로 바꾸고 끝나면 되돌린다. `GameFinishReplayTests`와 같은 방식이다.
+- **튜토리얼 기록(#591/#586):** 6줄 목록이 가로 화면에서 확인 지점을 덮는다. 그래서 맨 위에 맞은 것이 Log Screen 자체인지가 아니라 기록 화면 안의 요소인지, 그리고 뒤로 가기 버튼이 아닌지를 확인한다.
+- **콤보 구슬 크기(#613/#607):** 날아가는 구슬을 최소 크기 아래로 그리지 않게 바뀌었다. 판정 반경과 그림 크기가 같은지 보는 2건은 복사본에서 최소 크기를 하한 .05로 낮춘다. 최소 크기 자체는 `LabThrowTests`가 확인한다.
+
+| 확인 | 결과 |
+| --- | --- |
+| 고친 PlayMode 검사(터치 먹물·튜토리얼·결과 화면 2건) | 14/14 PASS (main에서 7건 실패) |
+| `GameStageResultViewTests`·`GameTerritoryResultViewTests`(EditMode) | 21/21 PASS (main에서 8건 실패) |
+| `LabComboProjectileIntegrationTests`·`LabThrowTests`(PlayMode) | 21/21 PASS (main에서 2건 실패) |
+| 전체 EditMode | 2174/2174 PASS |
+| 전체 PlayMode | 753/755 |
+
+- 전체 PlayMode의 실패 2건(`LabOrbBoardTrailTests.PendingLaunchStaysClear…`, `LabPlayerPaintPatternRenderTests.ActualSavedShaderDistinguishes…`)은 이번에 고치지 않은 파일이다. 같은 브랜치의 앞선 전체 실행에서는 통과했고, 따로 돌리면 15/15 PASS라 간헐 실패로 남긴다.
+- 검사를 돌린 뒤 main `34cabe25`(#616 NoticeText)를 병합했다. 병합 뒤에는 다시 돌리지 않았다.
+- **미실행:** 실기기·멀티 화면.
+- **남은 사양 질문:** 2:2 새 결과의 "다시 도전" 버튼과 #293 정책(박 확인·나가기만) 사이의 차이, 이탈이 아닌 게임 오버(로드 시간 초과)도 같은 이탈 화면으로 가는 것.
+
 ## 2026-11-10 — 지귀 시험용 스케줄 스위치가 켜진 채 저장된 문제
 
 - **기준:** `fix/jigwi-test-switch-off`, main `e1e8d3e2` 위. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 코드·프리팹·Scene·접속 묶음·설정 수는 바꾸지 않았다.
