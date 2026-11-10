@@ -56,6 +56,8 @@ namespace Hapio.Editor
             result.name = "GameEnding";
             result.storyId = "game-ending";
             result.cuts = source.cuts.Take(6).ToList();
+            var summary = AssetDatabase.LoadAssetAtPath<StoryCutDefinition>(SealRunSummaryAssets.CutPath);
+            if (summary != null) result.cuts.Insert(0, summary);
             AssetDatabase.CreateAsset(result, GameEnding);
             AssetDatabase.SaveAssetIfDirty(result);
         }

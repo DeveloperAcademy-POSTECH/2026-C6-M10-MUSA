@@ -46,7 +46,7 @@ namespace Hapio.Tests
                 Assert.That(adapter.failure.Validate(out string failureError), Is.True, failureError);
                 Assert.That(adapter.failure.cuts, Has.Count.EqualTo(2));
                 Assert.That(adapter.ending.Validate(out string endingError), Is.True, endingError);
-                Assert.That(adapter.ending.cuts, Has.Count.EqualTo(6), "The actual Home owns the title, not Ending_07's picture.");
+                Assert.That(adapter.ending.cuts, Has.Count.EqualTo(7), "Summary followed by six ending cuts; Home owns the title.");
                 Assert.That(adapter.ending.cuts.Select(x => x.name), Does.Not.Contain("Ending_07"));
                 Assert.That(new[] { adapter.advanceButton, adapter.exitButton, adapter.viewerButton, adapter.overallButton, adapter.skipButton }, Is.All.Not.Null);
                 Assert.That(adapter.statusText, Is.Not.Null);
