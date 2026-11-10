@@ -218,7 +218,7 @@ namespace Hapio
         {
             if (gameOverView != null) gameOverView.gameObject.SetActive(false);
             if (stageStory != null && stageStory.TryRefresh(false)) return;
-            if (gameOverView != null)
+            if (gameOverView != null && GameRunFlow.IsLeaveReason(session.State.endReason))
             {
                 SetStoryContentVisible(false);
                 session.SetResultPresentationBusy(false);
@@ -405,7 +405,8 @@ namespace Hapio
                 territoryView.gameObject.SetActive(true);
                 territoryView.Present(session.ResultSnapshot, net.LocalPlayerId);
                 Interactable(territoryView.table.homeButton, (!net.IsHost || session.CanReturnHome) && !ResultActionsBlocked);
-                Interactable(territoryView.table.nextButton, session.CanAdvanceStage && !ResultActionsBlocked);
+                // 2:2 is one round (#293): no 다시 도전, only 박 확인 and 나가기.
+                Show(territoryView.table.nextButton == null ? null : territoryView.table.nextButton.gameObject, false);
                 Interactable(territoryView.table.viewerButton, session.PreviewTexture != null && !ResultActionsBlocked);
                 Show(viewerPanel, session.IsViewerOpen && session.PreviewTexture != null);
                 if (viewerImage != null) viewerImage.texture = session.PreviewTexture;

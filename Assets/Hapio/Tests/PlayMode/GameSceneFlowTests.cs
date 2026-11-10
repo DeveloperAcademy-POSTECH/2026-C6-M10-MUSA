@@ -437,7 +437,8 @@ namespace Hapio.Tests
             Assert.That(territory.bluePercent.text, Is.EqualTo("100%"));
             Assert.That(territory.redPercent.text, Is.EqualTo("0%"));
             Assert.That(territory.blueWinnerFlag.activeSelf && !territory.redWinnerFlag.activeSelf, Is.True);
-            Assert.That(view.nextButton.interactable, Is.False, "A one-round DEV solo has no next round.");
+            Assert.That(view.nextButton.gameObject.activeSelf, Is.False, "2:2 is one round: no 다시 도전 (#293).");
+            Assert.That(view.viewerButton.gameObject.activeSelf && view.homeButton.gameObject.activeSelf, Is.True, "박 확인 and 나가기 stay.");
             yield return Until(() => view.viewerButton.interactable && view.homeButton.interactable,
                 "Local result readiness and the pointer-release shield must open the two actions.");
             Texture preview = session.PreviewTexture;
@@ -1329,6 +1330,28 @@ namespace Hapio.Tests
             Assert.That(leave.dialogue.text, Is.EqualTo(leave.geumok.activeSelf ? "지금, 누가 나갔지?" : "얼른 다시 돌아와!"));
             yield return Until(() => leave.homeButton.interactable, "The terminal screen must retain a visible exit.");
             leave.homeButton.onClick.Invoke();
+            yield return WaitHome();
+        }
+
+        [UnityTest]
+        public IEnumerator AGameOverThatIsNotALeaveKeepsTheResultCardInsteadOfTheLeaveScreen()
+        {
+            session.StartSolo();
+            yield return WaitPlaying(1);
+            // A real non-leave abort path (the same one a failed settings hand-off takes); nobody left the room.
+            typeof(GameSession).GetMethod("AbortHost", BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(session, new object[] { "The prepared battle could not be started.", "판을 멈추고 로비로 돌아왔소." });
+            yield return WaitGameOver();
+            GameScreen screen = null;
+            yield return Until(() => (screen = Object.FindFirstObjectByType<GameScreen>()) != null
+                && screen.resultView != null && screen.resultView.gameObject.activeInHierarchy, "The result card shows.");
+            Assert.That(session.State.retryableDefeat, Is.False);
+            Assert.That(GameRunFlow.IsLeaveReason(session.State.endReason), Is.False);
+            Assert.That(screen.gameOverView, Is.Not.Null, "The saved GameOver Scene still has the leave screen.");
+            Assert.That(screen.gameOverView.gameObject.activeSelf, Is.False, "Nobody left: no 불이/금옥이 leave screen.");
+            GameStageResultView card = screen.resultView;
+            yield return Until(() => card.homeButton.interactable, "The result card keeps an exit.");
+            card.homeButton.onClick.Invoke();
             yield return WaitHome();
         }
 
