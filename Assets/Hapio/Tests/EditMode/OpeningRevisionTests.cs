@@ -56,6 +56,31 @@ namespace Hapio.Tests
    Assert.That(image.rectTransform.rect.width,Is.EqualTo(406).Within(.01));
    Assert.That(image.rectTransform.rect.width/image.rectTransform.rect.height,Is.EqualTo(402f/874).Within(.001));
   }
+  [Test] public void GourdReachesTheFloorBeforeItsShatteredArtworkAppears(){
+   var view=Object.Instantiate(AssetDatabase.LoadAssetAtPath<StoryCutView>(Root+"Views/OP_015.prefab"));
+   try{
+    var drop=view.openingMotions.Single(x=>x.kind==OpeningLayerMotion.Kind.Drop);
+    var shadow=view.openingMotions.Single(x=>x.kind==OpeningLayerMotion.Kind.GroundShadow);
+    var shards=view.openingMotions.Single(x=>x.transform.parent.name.Contains("4553:2473"));
+    float impact=drop.delay+drop.seconds;
+    view.Sample(impact-.01f);
+    Assert.That(drop.GetComponent<CanvasGroup>().alpha,Is.EqualTo(1));
+    Assert.That(shards.GetComponent<CanvasGroup>().alpha,Is.Zero);
+    view.Sample(impact);
+    // Contact measured on the opaque silhouette after rotation; independent of the image's transparent padding.
+    var contact=drop.transform.position+new Vector3(-59.78f,-14.84f,0);
+    var shadowRect=(RectTransform)shadow.transform;
+    Assert.That(Vector3.Distance(contact,shadowRect.TransformPoint(shadowRect.rect.center)),Is.LessThan(.02f));
+    var landed=drop.transform.position;
+    view.Sample(impact+OpeningLayerMotion.ImpactFadeSeconds+.01f);
+    Assert.That(drop.transform.position,Is.EqualTo(landed));
+    Assert.That(drop.GetComponent<CanvasGroup>().alpha,Is.Zero);
+    Assert.That(shards.GetComponent<CanvasGroup>().alpha,Is.EqualTo(1));
+    var authored=(RectTransform)shards.transform.parent;
+    Assert.That(authored.anchoredPosition,Is.EqualTo(new Vector2(206.5f,-626.5f)));
+    Assert.That(((RectTransform)shards.transform).anchoredPosition,Is.EqualTo(new Vector2(138.5f,-395)));
+   }finally{Object.DestroyImmediate(view.gameObject);}
+  }
   [Test] public void SighSettlesAndRemainsVisibleWhileThePlayerReads(){
    var view=Object.Instantiate(AssetDatabase.LoadAssetAtPath<StoryCutView>(Root+"Views/OP_007.prefab"));
    try{

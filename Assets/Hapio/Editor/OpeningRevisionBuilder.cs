@@ -102,7 +102,13 @@ namespace Hapio.Editor
                     // Carry the intact gourd from frame 14 into the authored shattered pose of frame 15.
                     var gourd=JsonUtility.FromJson<Manifest>(File.ReadAllText(Root+"Revision28.json")).frames.Single(x=>x.number==14).items.Single(x=>x.id=="4553:2469");
                     AddImage(root.transform,gourd,out var falling);
-                    var drop=falling.gameObject.AddComponent<OpeningLayerMotion>();drop.kind=OpeningLayerMotion.Kind.Drop;drop.delay=.1f;drop.seconds=2.5f;drop.travel=new Vector2(-37,-379);drop.angle=28;motions.Add(drop);
+                    var floor=f.items.Single(x=>x.id=="4593:3393");
+                    // The opaque silhouette's lowest point at 28 degrees, relative to its bottom pivot.
+                    // Align that contact point (not the transparent image rectangle) with the floor shadow.
+                    var contact=new Vector2(-59.78f,-14.84f);
+                    var startPivot=new Vector2(gourd.x+gourd.width/2,-gourd.y-gourd.height);
+                    var landing=new Vector2(floor.x+floor.width/2,-floor.y-floor.height/2);
+                    var drop=falling.gameObject.AddComponent<OpeningLayerMotion>();drop.kind=OpeningLayerMotion.Kind.Drop;drop.delay=.1f;drop.seconds=2.5f;drop.travel=landing-startPivot-contact;drop.angle=28;motions.Add(drop);
                     drop.fadeAtEnd=true;view.waitForEntrance=true;
                 }
                 view.openingMotions=motions.ToArray();
@@ -184,7 +190,12 @@ namespace Hapio.Editor
             if(frame==12&&(id=="4553:2454"||id=="4553:2455")){m.kind=OpeningLayerMotion.Kind.Sweep;m.travel=new Vector2(27,4);m.angle=12;}
             if(frame==13&&(id=="4553:2459"||id=="4553:2461"||id=="4553:2462"||id=="4553:2457")){m.kind=OpeningLayerMotion.Kind.Toss;m.travel=new Vector2(45,100);m.angle=30;}
             if(frame==14&&id=="4553:2469"){m.kind=OpeningLayerMotion.Kind.Teeter;m.travel=new Vector2(4,0);m.angle=10;m.seconds=1.5f;}
-            if(frame==15 && id!="4593:3393"){m.delay=2.5f;m.seconds=.45f;if(id!="4553:2473"){m.kind=OpeningLayerMotion.Kind.Smoke;m.travel=new Vector2(4,35);m.delay=2.6f;}}
+            if(frame==15 && id!="4593:3393")
+            {
+                m.delay=2.6f;
+                if(id=="4553:2473"){m.seconds=OpeningLayerMotion.ImpactFadeSeconds;m.travel=Vector2.zero;}
+                else {m.kind=OpeningLayerMotion.Kind.Smoke;m.seconds=.45f;m.travel=new Vector2(4,35);}
+            }
             if(frame==15&&id=="4593:3393"){m.kind=OpeningLayerMotion.Kind.GroundShadow;m.delay=.1f;m.seconds=2.5f;}
             if(frame==16&&(id=="4553:2488"||id=="4688:4901"||id=="4688:4903")){m.kind=OpeningLayerMotion.Kind.Smoke;m.travel=new Vector2(5,45);m.seconds=1.1f;m.fadeAtEnd=true;}
             if(frame==16&&(id=="4688:3476"||id=="4688:3477"||id=="4688:3478"))

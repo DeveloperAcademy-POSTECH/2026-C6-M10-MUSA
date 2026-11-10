@@ -15,7 +15,8 @@ namespace Hapio
         public bool fadeAtEnd;
         public Vector2 pathOffset;
         public float cycleSeconds = 2.6f;
-        public float Duration => delay + (kind == Kind.Sigh ? .45f : seconds);
+        public const float ImpactFadeSeconds = .12f;
+        public float Duration => delay + (kind == Kind.Sigh ? .45f : seconds) + (kind == Kind.Drop && fadeAtEnd ? ImpactFadeSeconds : 0);
         RectTransform rect;
         CanvasGroup group;
         Vector2 rest;
@@ -68,7 +69,8 @@ namespace Hapio
                     float fall = t * t;
                     rect.anchoredPosition = rest + travel * fall;
                     rect.localRotation = rotation * Quaternion.Euler(0, 0, angle * fall);
-                    if(fadeAtEnd) group.alpha *= 1 - Mathf.SmoothStep(0,1,Mathf.InverseLerp(.94f,1,t));
+                    // Stay fully visible until contact; exchange intact/shattered artwork on the ground.
+                    if(fadeAtEnd) group.alpha *= 1 - Mathf.SmoothStep(0,1,Mathf.Clamp01((age-seconds)/ImpactFadeSeconds));
                     break;
                 case Kind.Escape:
                     rect.anchoredPosition = rest + travel * (1 - ease) + new Vector2(-travel.x * .35f, 45) * Mathf.SmoothStep(0, 1, Mathf.Clamp01((age - seconds) / 1.5f));
