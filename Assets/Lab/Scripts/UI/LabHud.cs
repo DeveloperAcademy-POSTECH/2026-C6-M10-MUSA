@@ -109,6 +109,7 @@ namespace C6Lab
 
         private void Awake()
         {
+            UpdateNoticeVisibility();
             CacheGoalTitle();
             if (directConnectionButton != null)
                 directConnectionButtonLabel = directConnectionButton.GetComponentInChildren<Text>(true);
@@ -163,6 +164,7 @@ namespace C6Lab
 
         private void Update()
         {
+            UpdateNoticeVisibility();
             if (network == null) return;
             var snapshot = network.Snapshot;
             bool paintGoal = network.config == null || network.config.GourdMode == LabGourdMode.Paint;
@@ -768,6 +770,11 @@ namespace C6Lab
             }
             network.port = parsed;
             return true;
+        }
+
+        private void UpdateNoticeVisibility()
+        {
+            SetVisible(noticeText == null ? null : noticeText.gameObject, LabNoticeSettings.Enabled);
         }
 
         private static void SetVisible(GameObject target, bool visible)

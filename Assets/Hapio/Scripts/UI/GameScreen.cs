@@ -49,6 +49,7 @@ namespace Hapio
         private Color? resultTitleColor;
         private string[] roomKeys = Array.Empty<string>();
         private bool syncingDeveloper;
+        private LabNoticeSettingsRow localNoticeSettings;
         private string localError;
         private RectTransform resultTable;
         private string resultTableKey;
@@ -70,6 +71,10 @@ namespace Hapio
             if (stageStory == null) stageStory = GetComponent<GameStageStoryPresentation>();
             if (stageStory != null) stageStory.Initialize(this, session);
             EnsureClayDeveloperRows();
+            if (kind == GameScreenKind.Home || kind == GameScreenKind.Lobby)
+                localNoticeSettings = LabNoticeSettingsRow.Attach(developerPanel,
+                    developerInputs != null && developerInputs.Length > 0 ? developerInputs[0] : null,
+                    applyDeveloperButton);
             if (!UsesExternalNavigation)
             {
                 Click(hostButton, () => { if (ApplyPort()) session.Host(); });
@@ -668,6 +673,7 @@ namespace Hapio
                 return;
             }
             DeveloperScope = scope;
+            if (localNoticeSettings != null) localNoticeSettings.gameObject.SetActive(scope == 0);
             syncingDeveloper = true;
             for (int i = 0; i < values.Length; i++)
             {

@@ -83,6 +83,7 @@ namespace C6Lab
             BuildCategoryLayout();
             BuildToggles();
             BuildChoices();
+            LabNoticeSettingsRow.Attach(panel, valueInputs.Length > 0 ? valueInputs[0] : null, applyHostButton);
 
             if (toggleButton != null) toggleButton.onClick.AddListener(Open);
             if (closeButton != null) closeButton.onClick.AddListener(Close);

@@ -7322,3 +7322,22 @@ PlayMode의 기존 main 실패13건은 구형 지귀 A/B·특수 물구슬 검�
 | 클레이 그림 지름 (`FlightDiameter`) | NOT_RUN — 코드만 고침. 편집 모드에서는 클레이 그림 풀이 만들어지지 않고, 측정하려던 때는 Editor가 Play 중이었음 |
 | EditMode·PlayMode Test Runner | NOT_RUN |
 | 3인 실행 (1→2→3스테이지, 재도전, SMALL 투척) | NOT_RUN |
+
+
+## 2026-11-10 — #616 NoticeText 기본 숨김·로컬 DEV 표시 설정
+
+기준은 main `e0a32da5`, Unity 6000.6.5f1·macOS Editor다. Scene·Prefab 배치와 Network.Notice 생성·로그를 유지하고, LabHud의 NoticeText만 기본 숨김으로 바꿨다. Home/Lobby 공통 DEV 및 Lab/Battle DEV의 독립 표시 행이 PlayerPrefs의 기기별 값을 즉시 바꾼다. 공유 설정 259개·설정 인덱스·접속 규약에는 항목을 추가하지 않았다. Release의 표시/저장 경로는 컴파일 조건으로 차단한다.
+
+| 수행 검사 | 결과·범위 |
+| --- | --- |
+| 전체 EditMode | **2,161/2,169 통과**, 실패8·skip0, 21.03초. Notice/거절 메시지 기존 검사 포함. 아래 결과 UI의 기존 main 실패와 동일하다. |
+| 수정 없는 기준 main 대조 | `GameStageResultViewTests` 16건 중 8통과·8실패, 0.46초. 전체 변경본의 실패 이름 8개와 일치한다. |
+| DEV·로비 집중 PlayMode | **45/45 통과**, 실패·skip0, 56.59초. LabNoticeSettings 2, GameNoticeSettings 1, GameDeveloperTapTarget 7, LabDeveloperSoloIntegration 14, LabClayDeveloperControls 2, GameLobbyView 19건. |
+| 실제 게임 연결 추가 PlayMode | GameNoticeSettings **2/2 통과**, 실패·skip0, 3.52초. 앞의 Home→Lobby 1건 재확인과 새 Home→Solo Battle→숨김 DEV 3회 입력→OFF 1건. 전체 실행을 중복 제외하면 PlayMode 46건이다. |
+| 변경 형식 | 스크립트 컴파일 오류 없음, `git diff --check` 통과. |
+
+새 검사 4건은 저장된 Lab/Home/Lobby/Battle을 사용한다. 기본값을 읽어도 저장 키가 생기지 않는지, 비어 있지 않은 Notice를 숨겨도 텍스트 데이터는 갱신되는지, 실제 버튼 리스너가 즉시 ON/OFF를 바꾸는지, 패널 재진입·Scene 이동 후 값이 유지되는지 확인했다. 실제 Battle은 public Solo 시작·준비/카운트다운을 거쳐 동일한 영속 Network와 LabHud에 연결됐으며, 설치된 숨김 DEV 입력 대상에서 전투 일시정지·패널 열기 후 OFF를 확인했다. 검사는 기기별 표시값과 솔로 시작 스테이지 선호값을 종료 시 원래대로 복원한다. 수치 원본·실행 중 공용 설정·259개 입력과 슬라이더 배열은 바뀌지 않았다.
+
+기존 main 실패8건은 StageResult에 일반 결과와 땅따먹기 결과의 GameStageResultView가 각각 존재하는데, `GameStageResultViewTests.WithView`가 비활성 객체까지 포함한 검색 결과를 `.Single()`로 선택하기 때문이다. 실제 검사 본문 전에 예외가 발생한다. 같은 기준 main에서 동일 실패를 재현했으며 이번 UI 표시 변경으로 고치거나 skip하지 않았다.
+
+미실행: 전체 PlayMode, Mac standalone/Release 빌드 실행, iOS 실기기, 여러 기기의 LAN·핫스팟 동시 플레이. Editor 검사의 통과를 Release 실행 검증으로 기록하지 않는다. 사용법은 GAME_FLOW의 ‘중앙 안내 문구 표시’ 항목을 따른다.
