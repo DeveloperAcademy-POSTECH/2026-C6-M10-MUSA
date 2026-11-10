@@ -107,9 +107,29 @@ namespace C6Lab
                     burst.Begin(LabOrbVisualFactory.TemporaryElementColor(element), battleCamera.transform.forward, battleCamera);
                     bursts.Add(burst.transform);
                 }
+            SpawnReleaseBubbleCopy();
             SpawnClayCopies(config);
             if (boardCamera != null) SpawnBoardCopies(config.OrbAppearance);
             MoveCopies();
+        }
+
+        private void SpawnReleaseBubbleCopy()
+        {
+            Sprite artwork = Resources.Load<Sprite>(LabGourdAlert.YaguangReleasePath);
+            if (artwork == null) return;
+            var copy = new GameObject("Release bubble warmup", typeof(RectTransform), typeof(Canvas));
+            copy.transform.SetParent(root.transform, false);
+            var canvas = copy.GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceCamera;
+            canvas.worldCamera = battleCamera;
+            canvas.planeDistance = battleCamera.nearClipPlane + .1f;
+            var picture = new GameObject("Artwork", typeof(RectTransform), typeof(UnityEngine.UI.Image));
+            picture.transform.SetParent(copy.transform, false);
+            var image = picture.GetComponent<UnityEngine.UI.Image>();
+            image.sprite = artwork;
+            image.preserveAspect = true;
+            image.raycastTarget = false;
+            image.rectTransform.sizeDelta = new Vector2(110f, 110f);
         }
 
         private void SpawnClayCopies(LabConfig config)
