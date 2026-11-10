@@ -19,17 +19,3 @@
 
 <b>공유마당 (CC BY)</b>
 김용배의 "뻥튀기 뻥2"(공유마당, https://gongu.copyright.or.kr/gongu/wrt/wrt/view.do?wrtSn=13253710&menuNo=200020)은 CC BY 라이선스로 제공됩니다.
-
-<b>Freesound (CC0)</b>
-"Cartoon Punch Cassette E" by modusmogulus
-"Squishes and Splats" by mrickey13
-"SFX_SQUELCH_slayer_215" by MrFossy
-"chimes" by _bliind
-"Woosh_Whip 3" by CAT-FOX_ALEX
-"rubble_explode" by canberries4
-"vang nuoc lon tieng on kenh" by sieuamthanh
-freesound.org
-
-<b>AI로 만든 소리</b>
-효과음/음악/목소리 일부: ElevenLabs로 제작
-구미호 스테이지 음악/매혹 풀림/여우 구슬 소리: Suno로 제작

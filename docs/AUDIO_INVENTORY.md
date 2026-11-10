@@ -1,23 +1,24 @@
 # 소리 파일 전수 조사 (#602, 2026-11-10)
 
-`Assets` 안의 소리 파일 119개를 출처별로 묶었다. 기준은 가장 엄격한 국립국악원 공공누리 제1유형이다. 자세한 출처/가공은 `docs/AUDIO_CREDITS.md`.
+`Assets` 안의 소리 파일 118개를 출처별로 묶었다. 기준은 가장 엄격한 국립국악원 공공누리 제1유형이다. 자세한 출처/가공은 `docs/AUDIO_CREDITS.md`, 게임 안 크레딧 글은 `Assets/Hapio/Art/UI/Credits/Credits.txt`이며, 표시 의무가 있는 것(공공누리, CC BY)만 넣는다.
 
-| 출처 | 파일 수 | 더 필요한 것 |
+#602에서 지운 파일: JigwiTalismanChime / JigwiTalismanSweep / JigwiTalismanFireLoop(안 씀), `Jigwi/GroupFireLoop.wav`(Freesound #612277, 라이선스 확인 못 함).
+
+| 출처 | 파일 수 | 남은 확인 |
 | --- | --- | --- |
-| ElevenLabs (Creator 유료) | 65 | 만든 날짜에 Creator 유료 플랜이었다는 근거(결제 내역). 표시 의무 없음 |
-| 출처 모름 | 10 | 출처 확인 또는 교체 필요 (출시 차단) |
-| 국립국악원 (공공누리 제1유형) | 15 | 각 저작물의 작성 연도, 원본 페이지 URL. 크레딧 화면에 공공누리 문구 필수 |
-| Freesound CC0 | 13 | 원본 URL(Boom은 소리 페이지 URL 필요). 표시 의무 없음 |
-| 공유마당 CC BY | 1 | 크레딧 화면에 저작자 표시 필수 |
-| Suno | 4 | 만든 계정이 그때 유료 플랜(Pro/Premier)이었는지 확인. 무료였다면 교체 |
-| 팀 제공 CC0 (원본 출처 미기록) | 6 | 원본 사이트/URL/라이선스 근거 필요 |
+| ElevenLabs (팀 공용 계정) | 65 | 표시 의무 없음. 공용 계정 결제 내역으로 만든 날짜에 유료 플랜이었는지 확인 |
+| OpenAI ChatGPT (Yetii Cho, 유료 플랜) | 9 | 표시 의무 없음 |
+| 국립국악원 (공공누리 제1유형) | 15 | 크레딧에 공공누리 문구 있음. 저작물 작성 연도는 다운로드 페이지에 없음 |
+| Freesound CC0 | 13 | 표시 의무 없음 |
+| 공유마당 CC BY | 1 | 크레딧에 저작자 표시 있음 |
+| Suno (팀 공용 계정) | 4 | 표시 의무 없음. 공용 계정 결제 내역으로 만든 날짜에 유료 플랜이었는지 확인 |
+| CC0 (Jess가 직접 찾음, 원본 URL 미기록) | 6 | 표시 의무 없음 |
 | 팀 합성 (외부 소스 없음) | 4 | 추가 필요 없음 |
-| Freesound #612277 Robinhood76 (라이선스 미확인) | 1 | 라이선스 확인(CC BY-NC면 상업 이용 불가 → 교체) |
-
+| 출처 모름 | 1 | 출처 확인 또는 교체 필요 (출시 차단) |
 
 ## 파일별 목록
 
-### ElevenLabs (Creator 유료) (65개)
+### ElevenLabs (팀 공용 계정) (65개)
 
 - `Assets/Hapio/Art/Story/Opening/Audio/OP_001_Mountain.wav`
 - `Assets/Hapio/Art/Story/Opening/Audio/OP_002_Staff.wav`
@@ -85,7 +86,7 @@
 - `Assets/Lab/Resources/Audio/YaguangShakeBell/YaguangShakeBell.wav`
 - `Assets/Lab/Resources/Audio/YaguangShakeBellFinal/YaguangShakeBellFinal.wav`
 
-### 출처 모름 (10개)
+### OpenAI ChatGPT (Yetii Cho, 유료 플랜) (9개)
 
 - `Assets/Hapio/Art/Story/StageStories/Audio/BrokenGourd.wav`
 - `Assets/Hapio/Art/Story/StageStories/Audio/Ember.wav`
@@ -96,7 +97,6 @@
 - `Assets/Hapio/Art/Story/StageStories/Audio/PaperFlip.wav`
 - `Assets/Hapio/Art/Story/StageStories/Audio/PaperLand.wav`
 - `Assets/Hapio/Art/Story/StageStories/Audio/RedSeal.wav`
-- `Assets/Lab/Resources/Audio/JigwiTalismanCrackle/JigwiTalismanCrackle.wav`
 
 ### 국립국악원 (공공누리 제1유형) (15개)
 
@@ -136,14 +136,14 @@
 
 - `Assets/Lab/Resources/Audio/Bomb/Ppeong/Ppeong.wav`
 
-### Suno (4개)
+### Suno (팀 공용 계정) (4개)
 
 - `Assets/Lab/Resources/Audio/CharmRelease/CharmRelease.wav`
 - `Assets/Lab/Resources/Audio/FoxClear/FoxClear.wav`
 - `Assets/Lab/Resources/Audio/FoxFall/FoxFall.wav`
 - `Assets/Lab/Resources/Audio/TerritoryBGM/Territory_Stage.wav`
 
-### 팀 제공 CC0 (원본 출처 미기록) (6개)
+### CC0 (Jess가 직접 찾음, 원본 URL 미기록) (6개)
 
 - `Assets/Lab/Resources/Audio/ComboFail/ComboFail.wav`
 - `Assets/Lab/Resources/Audio/JigwiFireballLoop/JigwiFireballLoop.wav`
@@ -159,6 +159,6 @@
 - `Assets/Lab/Resources/Audio/JigwiFireDouse/JigwiFireDouse.wav`
 - `Assets/Lab/Resources/Audio/JigwiTalismanRelief/JigwiTalismanRelief.wav`
 
-### Freesound #612277 Robinhood76 (라이선스 미확인) (1개)
+### 출처 모름 (1개)
 
-- `Assets/Lab/Resources/Jigwi/GroupFireLoop.wav`
+- `Assets/Lab/Resources/Audio/JigwiTalismanCrackle/JigwiTalismanCrackle.wav`

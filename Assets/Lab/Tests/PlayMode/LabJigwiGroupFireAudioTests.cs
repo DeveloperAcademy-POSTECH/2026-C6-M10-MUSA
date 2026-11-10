@@ -19,12 +19,15 @@ namespace C6Lab.Tests
         {
             root = new GameObject("Muted B fire audio fixture");
             audio = root.AddComponent<LabJigwiGroupFireAudio>();
+            // #602: the shipped loop was removed, so the lifecycle checks use a silent stand-in clip.
+            audio.clip = AudioClip.Create("Test B fire loop", 44100 * 2, 2, 44100, false);
             audio.EnsureSource(); audio.Source.mute = true;
             Focus(audio, true);
         }
         [UnityTearDown]
         public IEnumerator Cleanup()
         {
+            if (audio != null && audio.clip != null) Object.Destroy(audio.clip);
             if (root != null) Object.Destroy(root);
             if (config != null) Object.Destroy(config);
             yield return null;
@@ -34,7 +37,8 @@ namespace C6Lab.Tests
         [Test]
         public void ImportedUserLoopIsOneLocalSourceWithTheExistingSfxVolumePath()
         {
-            Assert.That(audio.clip, Is.SameAs(Resources.Load<AudioClip>(LabJigwiGroupFireAudio.ClipResource)));
+            Assert.That(Resources.Load<AudioClip>(LabJigwiGroupFireAudio.ClipResource), Is.Null,
+                "#602: GroupFireLoop (licence unconfirmed) is not shipped.");
             Assert.That(audio.clip, Is.Not.Null);
             Assert.That(audio.clip.length, Is.GreaterThan(1f)); Assert.That(audio.clip.channels, Is.EqualTo(2));
             Assert.That(root.GetComponents<AudioSource>(), Has.Length.EqualTo(1));
