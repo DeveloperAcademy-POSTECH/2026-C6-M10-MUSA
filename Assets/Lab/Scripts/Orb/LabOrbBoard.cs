@@ -259,6 +259,11 @@ namespace C6Lab
         public LabOrbAreaShape AreaShape => areaShape;
         public bool InteractionEnabled => interactionEnabled;
         public bool UiInputBlocked => uiInputBlocked;
+        /// <summary>
+        /// A full-screen local popup (Hapio help) is open. Overlays that read the pointer directly instead of
+        /// through uGUI (지귀 talisman writing, smoke rubbing) ignore touches while it is set.
+        /// </summary>
+        public static bool ExternalModalOpen { get; set; }
         public event Action<LabOrbEdgeCrossing> EdgeCrossed;
         /// <summary>
         /// 결합 요청. (첫 구슬, 두 번째 구슬, 결합 위치 0..1, 결합 구슬이 이어받을 속도 보드 폭/초)

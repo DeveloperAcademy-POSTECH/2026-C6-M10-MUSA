@@ -1800,6 +1800,7 @@ namespace C6Lab
         private void ReadPointer()
         {
             Vector2 screen = default; bool pressed = false, began = false;
+            if (LabOrbBoard.ExternalModalOpen) { hasLast = false; return; }
             var touch = Touchscreen.current?.primaryTouch;
             if (touch != null && touch.press.isPressed)
             { screen = touch.position.ReadValue(); pressed = true; began = touch.press.wasPressedThisFrame; }

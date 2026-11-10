@@ -202,6 +202,13 @@ namespace Hapio.Tests
             var pause = buttons.Single(button => button.name == "Pause");
             yield return null;
             Assert.That(pause.gameObject.activeInHierarchy, Is.True, "An invisible press lies over the HUD pause button.");
+            var help = buttons.Single(button => button.name == "Help");
+            Assert.That(help.gameObject.activeInHierarchy, Is.True);
+            Rect pauseIcon = ScreenRect(pause.GetComponent<GameHudButtonArtwork>().artwork.rectTransform);
+            Rect helpIcon = ScreenRect(help.GetComponent<GameHudButtonArtwork>().artwork.rectTransform);
+            Assert.That(helpIcon.center.y, Is.EqualTo(pauseIcon.center.y).Within(.5f),
+                "The help and pause artwork must align even though their hit areas differ in the tutorial.");
+            Assert.That(helpIcon.xMax, Is.LessThan(pauseIcon.xMin));
             pause.onClick.Invoke();
             yield return Until(() => network.IsBattlePaused && director.IsSteppedAsideForPause, "Paused from a line", 5f);
             var overlayGroup = director.GetComponentsInChildren<CanvasGroup>(true).Single(group => group.name == "Tutorial Overlay");

@@ -133,3 +133,69 @@ MonoBehaviour:
     size: {x: 127, y: 29}
     offset: {x: -3.0806348, y: -3.6761656}
     exportSize: {x: 134, y: 37}
+  - name: HelpNormal
+    source: 4405:3875
+    sprite: {fileID: 21300000, guid: b70ccb6248f914e6b84eb9dac11f41f2, type: 3}
+    size: {x: 33, y: 34}
+    offset: {x: 0, y: 0}
+    exportSize: {x: 33.333332, y: 34}
+  - name: HelpPressed
+    source: 4405:4528
+    sprite: {fileID: 21300000, guid: 2d7d0bcc47e2d4349856396ba59a6c63, type: 3}
+    size: {x: 33, y: 34}
+    offset: {x: 0, y: 0}
+    exportSize: {x: 33, y: 34}
+  - name: PauseNormal
+    source: 4212:2151
+    sprite: {fileID: 21300000, guid: fc3f7c2cafe6e4fc59b7ecb5e88e9ab3, type: 3}
+    size: {x: 33, y: 34}
+    offset: {x: 0, y: 0}
+    exportSize: {x: 33.333332, y: 34}
+  - name: PausePressed
+    source: 4405:4529
+    sprite: {fileID: 21300000, guid: 62518083b55834767bbb82426d1bee7a, type: 3}
+    size: {x: 33, y: 34}
+    offset: {x: 0, y: 0}
+    exportSize: {x: 33, y: 34}
+  - name: HelpPanel
+    source: 4624:1857
+    sprite: {fileID: 21300000, guid: 1a7b600837cda47f98d496fdd637df17, type: 3}
+    size: {x: 348, y: 490}
+    offset: {x: 0, y: 0}
+    exportSize: {x: 348, y: 490}
+  - name: HelpTitle
+    source: 4624:1892
+    sprite: {fileID: 21300000, guid: 9206a4550d0314dffbf65841b93d926d, type: 3}
+    size: {x: 194, y: 59}
+    offset: {x: -2.9604187, y: -4.4362803}
+    exportSize: {x: 201, y: 68}
+  - name: HelpStep1
+    source: 4624:1867
+    sprite: {fileID: 21300000, guid: 3cb74d5cb630e4aba9dda1ef7dc7afcb, type: 3}
+    size: {x: 120.97947, y: 85.05224}
+    offset: {x: 0, y: 0}
+    exportSize: {x: 121, y: 85.333336}
+  - name: HelpStep2
+    source: 4624:1875
+    sprite: {fileID: 21300000, guid: 5d053ed50feb74b4fb7f16d53f2463bb, type: 3}
+    size: {x: 121.712685, y: 85.05224}
+    offset: {x: 0, y: 0}
+    exportSize: {x: 122, y: 85.333336}
+  - name: HelpStep3
+    source: 4624:1883
+    sprite: {fileID: 21300000, guid: 728b52a291d5d4f1f8e91b40d77f5276, type: 3}
+    size: {x: 120.97947, y: 85.05224}
+    offset: {x: 0, y: 0}
+    exportSize: {x: 121, y: 85.333336}
+  - name: HelpStep4
+    source: 4624:1891
+    sprite: {fileID: 21300000, guid: c62ccba51966d41678d24ea5fd3ddab0, type: 3}
+    size: {x: 120.97947, y: 85.05224}
+    offset: {x: 0, y: 0}
+    exportSize: {x: 121, y: 85.333336}
+  - name: ViewerReset
+    source: 4606:4620
+    sprite: {fileID: 21300000, guid: b0b20ac3c1a5a4489bb2abd5a49ee364, type: 3}
+    size: {x: 234, y: 45}
+    offset: {x: -0.045173645, y: -2.1259155}
+    exportSize: {x: 235, y: 48}
