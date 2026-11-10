@@ -1,5 +1,40 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-10 — 이탈 게임 오버만 캐릭터 화면, 2:2 결과의 다시 도전 숨기기
+
+- **기준:** `fix/gameover-leave-only-territory-no-retry`, main `45e1e60b` 위. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 프리팹·Scene·접속 묶음·설정 수는 바꾸지 않았다. 종료 사유 문자열도 그대로라 흐름 상태 형식이 같다.
+- **바꾼 것:** #603의 불이/금옥이 GameOver 화면은 종료 사유가 나가기·참가자 연결 끊김·Host 연결 끊김(`GameRunFlow.IsLeaveReason`)일 때만 보인다. 준비·로딩·동기화 실패는 기존 결과 카드("봉인 실패...")와 HOME으로 간다. 2:2 새 결과(`territoryView`)는 "다시 도전"(`NextStageOrOverall`)을 숨기고 박 확인·나가기만 둔다(#293).
+
+| 확인 | 결과 |
+| --- | --- |
+| `GameRunFlowTests`·`GameStageResultViewTests`·`GameTerritoryResultViewTests`(EditMode) | 57/57 PASS |
+| `GameSceneFlowTests`(PlayMode, 이탈 아닌 GameOver 검사 추가) | 27/27 PASS |
+| 대조 실험(이탈 조건 제거, 다시 도전 숨김 제거) | 해당 검사 2건 실패 |
+| 전체 EditMode / 전체 PlayMode | 2175/2175, 760/760 PASS |
+
+- **미실행:** 실기기·멀티에서 실제 이탈/연결 끊김 화면.
+
+## 2026-11-10 — main에서 실패하던 화면·입력·구슬 크기 검사 17건 정리
+
+- **기준:** `fix/stale-ui-tests`, main `f9d13362` 위(검사 실행 기준). Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 게임 코드·프리팹·Scene·에셋·접속 묶음·설정 수는 바꾸지 않았고 검사 파일만 고쳤다.
+- **결과 화면(#611/#603):** 저장된 GameOver·StageResult Scene이 새 이탈 화면(`gameOverView`)과 2:2 결과(`territoryView`)를 쓰면서 예전 결과 카드는 꺼진다. `GameSceneFlowTests` 2건은 새 화면을 보도록 바꿨다. `GameStageResultViewTests` 8건은 두 번째 결과표 때문에 `Single()`이 실패했으므로 2:2 결과표를 빼고 찾는다. 팀 결과 카드 검사 2건은 `territoryView`를 비운 상태에서 기존 대체 경로를 확인한다(Scene은 저장하지 않음).
+- **터치 먹물(#594):** 배치 모드 에디터에는 포커스를 가진 Game 창이 없다. 기본 입력 설정에서는 검사용 마우스·터치가 추가되자마자 꺼지거나 이벤트가 미뤄진다. 그래서 장치를 추가하기 전에 `IgnoreFocus`·`AllDeviceInputAlwaysGoesToGameView`로 바꾸고 끝나면 되돌린다. `GameFinishReplayTests`와 같은 방식이다.
+- **튜토리얼 기록(#591/#586):** 6줄 목록이 가로 화면에서 확인 지점을 덮는다. 그래서 맨 위에 맞은 것이 Log Screen 자체인지가 아니라 기록 화면 안의 요소인지, 그리고 뒤로 가기 버튼이 아닌지를 확인한다.
+- **콤보 구슬 크기(#613/#607):** 날아가는 구슬을 최소 크기 아래로 그리지 않게 바뀌었다. 판정 반경과 그림 크기가 같은지 보는 2건은 복사본에서 최소 크기를 하한 .05로 낮춘다. 최소 크기 자체는 `LabThrowTests`가 확인한다.
+
+| 확인 | 결과 |
+| --- | --- |
+| 고친 PlayMode 검사(터치 먹물·튜토리얼·결과 화면 2건) | 14/14 PASS (main에서 7건 실패) |
+| `GameStageResultViewTests`·`GameTerritoryResultViewTests`(EditMode) | 21/21 PASS (main에서 8건 실패) |
+| `LabComboProjectileIntegrationTests`·`LabThrowTests`(PlayMode) | 21/21 PASS (main에서 2건 실패) |
+| 전체 EditMode | 2174/2174 PASS |
+| 전체 PlayMode | 753/755 |
+
+- 전체 PlayMode의 실패 2건(`LabOrbBoardTrailTests.PendingLaunchStaysClear…`, `LabPlayerPaintPatternRenderTests.ActualSavedShaderDistinguishes…`)은 이번에 고치지 않은 파일이다. 같은 브랜치의 앞선 전체 실행에서는 통과했고, 따로 돌리면 15/15 PASS라 간헐 실패로 남긴다.
+- 그 뒤 main `34cabe25`(#616 NoticeText, `GameScreen.cs` 변경)를 병합하고 관련 묶음을 다시 돌렸다: 결과 EditMode 21/21, `GameSceneFlowTests`·터치 먹물·튜토리얼·콤보 구슬·`GameNoticeSettingsTests` PlayMode 44/44 PASS. 병합 뒤 전체 묶음은 다시 돌리지 않았다.
+- **미실행:** 실기기·멀티 화면.
+- **남은 사양 질문:** 2:2 새 결과의 "다시 도전" 버튼과 #293 정책(박 확인·나가기만) 사이의 차이, 이탈이 아닌 게임 오버(로드 시간 초과)도 같은 이탈 화면으로 가는 것.
+
 ## 2026-11-10 — 지귀 시험용 스케줄 스위치가 켜진 채 저장된 문제
 
 - **기준:** `fix/jigwi-test-switch-off`, main `e1e8d3e2` 위. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 코드·프리팹·Scene·접속 묶음·설정 수는 바꾸지 않았다.
@@ -7353,6 +7388,52 @@ PlayMode의 기존 main 실패13건은 구형 지귀 A/B·특수 물구슬 검�
 | 클레이 그림 지름 (`FlightDiameter`) | NOT_RUN — 코드만 고침. 편집 모드에서는 클레이 그림 풀이 만들어지지 않고, 측정하려던 때는 Editor가 Play 중이었음 |
 | EditMode·PlayMode Test Runner | NOT_RUN |
 | 3인 실행 (1→2→3스테이지, 재도전, SMALL 투척) | NOT_RUN |
+
+
+## 2026-11-10 — #616 NoticeText 기본 숨김·로컬 DEV 표시 설정
+
+기준은 main `e0a32da5`, Unity 6000.6.5f1·macOS Editor다. Scene·Prefab 배치와 Network.Notice 생성·로그를 유지하고, LabHud의 NoticeText만 기본 숨김으로 바꿨다. Home/Lobby 공통 DEV 및 Lab/Battle DEV의 독립 표시 행이 PlayerPrefs의 기기별 값을 즉시 바꾼다. 공유 설정 259개·설정 인덱스·접속 규약에는 항목을 추가하지 않았다. Release의 표시/저장 경로는 컴파일 조건으로 차단한다.
+
+| 수행 검사 | 결과·범위 |
+| --- | --- |
+| 전체 EditMode | **2,161/2,169 통과**, 실패8·skip0, 21.03초. Notice/거절 메시지 기존 검사 포함. 아래 결과 UI의 기존 main 실패와 동일하다. |
+| 수정 없는 기준 main 대조 | `GameStageResultViewTests` 16건 중 8통과·8실패, 0.46초. 전체 변경본의 실패 이름 8개와 일치한다. |
+| DEV·로비 집중 PlayMode | **45/45 통과**, 실패·skip0, 56.59초. LabNoticeSettings 2, GameNoticeSettings 1, GameDeveloperTapTarget 7, LabDeveloperSoloIntegration 14, LabClayDeveloperControls 2, GameLobbyView 19건. |
+| 실제 게임 연결 추가 PlayMode | GameNoticeSettings **2/2 통과**, 실패·skip0, 3.52초. 앞의 Home→Lobby 1건 재확인과 새 Home→Solo Battle→숨김 DEV 3회 입력→OFF 1건. 전체 실행을 중복 제외하면 PlayMode 46건이다. |
+| 변경 형식 | 스크립트 컴파일 오류 없음, `git diff --check` 통과. |
+
+새 검사 4건은 저장된 Lab/Home/Lobby/Battle을 사용한다. 기본값을 읽어도 저장 키가 생기지 않는지, 비어 있지 않은 Notice를 숨겨도 텍스트 데이터는 갱신되는지, 실제 버튼 리스너가 즉시 ON/OFF를 바꾸는지, 패널 재진입·Scene 이동 후 값이 유지되는지 확인했다. 실제 Battle은 public Solo 시작·준비/카운트다운을 거쳐 동일한 영속 Network와 LabHud에 연결됐으며, 설치된 숨김 DEV 입력 대상에서 전투 일시정지·패널 열기 후 OFF를 확인했다. 검사는 기기별 표시값과 솔로 시작 스테이지 선호값을 종료 시 원래대로 복원한다. 수치 원본·실행 중 공용 설정·259개 입력과 슬라이더 배열은 바뀌지 않았다.
+
+기존 main 실패8건은 StageResult에 일반 결과와 땅따먹기 결과의 GameStageResultView가 각각 존재하는데, `GameStageResultViewTests.WithView`가 비활성 객체까지 포함한 검색 결과를 `.Single()`로 선택하기 때문이다. 실제 검사 본문 전에 예외가 발생한다. 같은 기준 main에서 동일 실패를 재현했으며 이번 UI 표시 변경으로 고치거나 skip하지 않았다.
+
+미실행: 전체 PlayMode, Mac standalone/Release 빌드 실행, iOS 실기기, 여러 기기의 LAN·핫스팟 동시 플레이. Editor 검사의 통과를 Release 실행 검증으로 기록하지 않는다. 사용법은 GAME_FLOW의 ‘중앙 안내 문구 표시’ 항목을 따른다.
+
+
+### #616 최신 main 통합·PR 전 전체 검사 — 2026-11-10
+
+main `e1e8d3e2`의 #617 오프닝·#618 VFX 작업을 충돌 없이 합쳤고 양쪽 검증 기록을 보존했다. 새 검사에서 Home 초기화 대기가 실패해도 이미 생성된 영속 GameSession을 정리하도록 소유 참조를 대기 조건 안에서 먼저 잡았다. 실제 게임 코드와 저장된 Scene·Prefab·공유 수치는 추가 변경하지 않았다.
+
+| 검사 | 결과 |
+| --- | --- |
+| 최신 main 통합 후 전체 EditMode | **2,165/2,173 통과**, 실패8·skip0, 21.47초. 이전 #616 실행과 같은 결과 UI 8건이며 관련 검사·Scene·결과 구현은 대조 기준 `e0a32da5`에서 변경되지 않았다. |
+| 최신 main 통합 후 전체 PlayMode | **742/759 통과**, 실패17·skip0, 638.52초. 새 NoticeText 검사4건은 모두 통과했다. |
+| 수정 없는 최신 main PlayMode 대조 | 기준 `e1e8d3e2`에서 변경본의 실패17건을 정확한 이름으로 실행해 **0/17 통과·17실패**, skip0, 32.83초. 실패 이름 집합이 전부 일치하며 변경본에만 발생한 실패는 없다. 전체 main PlayMode를 다시 실행한 결과는 아니다. |
+| 변경 검사 | 스크립트 컴파일 오류0, `git diff --check` 통과. |
+
+PlayMode의 기존 main 실패17건은 표시용 최소 구슬 크기와 구형 기대값 불일치2건(LabComboProjectileIntegrationTests), 저장된 지귀 A 전용 설정과 기대 시간표 불일치8건(LabJigwiABNetworkTests7·GameJigwiStageIntegrationTests1), GameSceneFlowTests2건, GameTouchInkFlowTests4건, GameTutorialFlowTests1건이다. 최소 표시 크기는 #607이 충돌 크기와 의도적으로 분리한 값이며 이번 변경에서 물리·트레일·해당 검사를 바꾸지 않았다. 테스트 실패를 삭제·skip·PASS 처리하지 않고 기준 main에서의 재현과 별도로 기록한다.
+
+독립 코드 검토에서 Notice 생성·로그·Host 권한·공유259개·접속 규약·Scene/Prefab 변경이 없고 Release 표시 차단이 유지되는 것을 확인했다. 기기별 설정·실제 Home→Lobby/Battle 연결은 위 실제 PlayMode 결과로 확인했으며, Release/Mac standalone/iOS 실행과 실제 다중 기기 네트워크 검증은 계속 미실행이다.
+
+
+### #616 최종 main #620 추가 반영 후 확인 — 2026-11-10
+
+검사 중 추가된 main `f9d13362`의 #620(지귀 시험 전용 스케줄 OFF·물바가지 B 복구)을 충돌 없이 보존해 합쳤다. #616 목적의 변경은 여전히 NoticeText 표시와 로컬 DEV 설정뿐이며, main이 복구한 LabConfig와 지귀 검사 준비값을 되돌리지 않았다.
+
+- 전체 EditMode 재확인: **2,166/2,174 통과·기존 결과 UI 실패8·skip0**, 20.68초. #620의 새 저장 설정 검사도 포함한다.
+- 영향 PlayMode: **14/23 통과·기존 실패9·skip0**, 32.65초. LabJigwiABNetwork9·GameJigwiStageIntegration1·NoticeText4건이 모두 통과해 이전 지귀 실패8건이 해소됐음을 확인했다.
+- 수정 없는 같은 main `f9d13362`에서 이전 실패17건을 재실행: **8/17 통과·9실패·skip0**, 29.98초. 남은 실패9건의 이름과 메시지가 변경본과 모두 동일하다. 구슬 표시 크기2·게임 흐름2·터치 먹물4·튜토리얼 로그1건이며 이번 변경에만 발생한 실패는 없다.
+- 전체 PlayMode 전수는 위 `e1e8d3e2` 통합 상태에서 수행했다. #620 추가 후에는 영향 묶음을 선별 재검사했으며 다시 전수 실행한 것으로 기록하지 않는다. Release·standalone·iOS·실제 다중 기기 네트워크 검증의 미실행 범위는 위와 같다.
+
 
 ### #621 튜토리얼 조합대 뒤 사각 배경 제거 — 2026-11-10
 

@@ -615,7 +615,10 @@ namespace Hapio.Tests
             dim.GetComponentInParent<UnityEngine.UI.GraphicRaycaster>().Raycast(
                 new UnityEngine.EventSystems.PointerEventData(UnityEngine.EventSystems.EventSystem.current) { position = new Vector2(screen.center.x, screen.height * .1f) }, hits);
             Assert.That(hits.Count, Is.GreaterThan(0));
-            Assert.That(hits[0].gameObject, Is.SameAs(dim.gameObject), "The log takes the touch.");
+            // #586's six-line list can reach this point on a short screen (the batch Editor is landscape); then the list's
+            // drag area takes it instead of the backdrop. Either way the touch stays inside the log and misses 뒤로 가기.
+            Assert.That(hits[0].gameObject.transform.IsChildOf(dim), Is.True, "The log takes the touch: " + hits[0].gameObject.name);
+            Assert.That(hits[0].gameObject.transform.IsChildOf(back.transform), Is.False, "Not the back button.");
             int beat = director.BeatIndex;
 
             // Nothing else starts under it, even from a finger already down when it opened.

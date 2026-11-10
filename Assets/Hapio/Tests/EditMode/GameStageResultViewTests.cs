@@ -101,6 +101,9 @@ namespace Hapio.Tests
                     session.State.runId = "territory-result-fixture";
                     GameScreen screen = view.GetComponentInParent<GameScreen>();
                     typeof(GameScreen).GetField("session", flags).SetValue(screen, session);
+                    // #603's saved Scene shows its own team result (GameTerritoryResultViewTests). This checks the
+                    // retained result-card fallback, used when no team result view is wired; the Scene is not saved.
+                    screen.territoryView = null;
                     screen.legacyResultContent.SetActive(true);
                     bool blue = winner == LabTeam.Blue;
                     // P1·P2 청, P3·P4 홍: throws 10..13, hits 5..8, stolen 0/100/200/300 cells.
@@ -326,7 +329,9 @@ namespace Hapio.Tests
             var scene = EditorSceneManager.OpenScene(path, OpenSceneMode.Additive);
             try
             {
-                var view = scene.GetRootGameObjects().SelectMany(root => root.GetComponentsInChildren<GameStageResultView>(true)).Single();
+                // #603 added the 2:2 result's own table (GameTerritoryResultView.table); these checks are for the main result card.
+                var view = scene.GetRootGameObjects().SelectMany(root => root.GetComponentsInChildren<GameStageResultView>(true))
+                    .Single(candidate => candidate.GetComponentInParent<GameTerritoryResultView>(true) == null);
                 action(view);
             }
             finally { EditorSceneManager.CloseScene(scene, true); }

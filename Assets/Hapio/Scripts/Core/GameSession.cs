@@ -318,7 +318,7 @@ namespace Hapio
                     SetResultPresentation(control.sender, control.resultPresentationBusy);
                 else if (control.kind == "exit" && state.IsRunActive && control.runId == state.runId
                     && control.stageIndex == state.stageIndex)
-                    AbortHost("A player left the game.", "한 명이 나가 판을 멈추고 로비로 돌아왔소.");
+                    AbortHost(GameRunFlow.PlayerLeftReason, "한 명이 나가 판을 멈추고 로비로 돌아왔소.");
                 return;
             }
             if (control.kind == "countdown_commit")
@@ -908,7 +908,7 @@ namespace Hapio
             if (state.phase == GameFlowPhase.Home || state.phase == GameFlowPhase.Lobby
                 || state.phase == GameFlowPhase.Completed || state.phase == GameFlowPhase.GameOver)
             { GoHome(); return; }
-            ExitWithLocalReason("A player left the game.");
+            ExitWithLocalReason(GameRunFlow.PlayerLeftReason);
         }
 
         private void ExitWithLocalReason(string reason)
@@ -944,7 +944,7 @@ namespace Hapio
             if (goingHome) return;
             if (state.phase == GameFlowPhase.GameOver && state.retryableDefeat)
             {
-                string reason = lostHost ? "The Host disconnected." : "A player disconnected.";
+                string reason = lostHost ? GameRunFlow.HostDisconnectedReason : GameRunFlow.PlayerDisconnectedReason;
                 if (network.IsHost)
                 {
                     if (hostFlow.EndDefeatRetry(reason)) SetHostState();
@@ -960,12 +960,12 @@ namespace Hapio
                 return;
             }
             if (!state.IsRunActive) return;
-            if (network.IsHost) AbortHost("A player disconnected.", "한 명이 나가 판을 멈추고 로비로 돌아왔소.");
+            if (network.IsHost) AbortHost(GameRunFlow.PlayerDisconnectedReason, "한 명이 나가 판을 멈추고 로비로 돌아왔소.");
             else
             {
                 GameFlowState failed = state.Copy();
                 failed.phase = GameFlowPhase.GameOver;
-                failed.endReason = lostHost ? "The Host disconnected." : "A player disconnected.";
+                failed.endReason = lostHost ? GameRunFlow.HostDisconnectedReason : GameRunFlow.PlayerDisconnectedReason;
                 failed.revision++;
                 SetLocalState(failed);
             }
