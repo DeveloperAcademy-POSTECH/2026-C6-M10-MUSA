@@ -1334,24 +1334,24 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
-        public IEnumerator AGameOverThatIsNotALeaveKeepsTheResultCardInsteadOfTheLeaveScreen()
+        public IEnumerator APreparationFailureGameOverAlsoUsesTheCharacterScreen()
         {
             session.StartSolo();
             yield return WaitPlaying(1);
-            // A real non-leave abort path (the same one a failed settings hand-off takes); nobody left the room.
+            // A real non-leave abort path (the same one a failed battle start takes); nobody left the room.
             typeof(GameSession).GetMethod("AbortHost", BindingFlags.Instance | BindingFlags.NonPublic)
                 .Invoke(session, new object[] { "The prepared battle could not be started.", "판을 멈추고 로비로 돌아왔소." });
             yield return WaitGameOver();
             GameScreen screen = null;
             yield return Until(() => (screen = Object.FindFirstObjectByType<GameScreen>()) != null
-                && screen.resultView != null && screen.resultView.gameObject.activeInHierarchy, "The result card shows.");
+                && screen.gameOverView != null && screen.gameOverView.gameObject.activeInHierarchy,
+                "Preparation, loading and sync failures show the 불이/금옥이 screen like a leave.");
             Assert.That(session.State.retryableDefeat, Is.False);
-            Assert.That(GameRunFlow.IsLeaveReason(session.State.endReason), Is.False);
-            Assert.That(screen.gameOverView, Is.Not.Null, "The saved GameOver Scene still has the leave screen.");
-            Assert.That(screen.gameOverView.gameObject.activeSelf, Is.False, "Nobody left: no 불이/금옥이 leave screen.");
-            GameStageResultView card = screen.resultView;
-            yield return Until(() => card.homeButton.interactable, "The result card keeps an exit.");
-            card.homeButton.onClick.Invoke();
+            Assert.That(screen.resultView.gameObject.activeSelf, Is.False, "No result card under it.");
+            GameOverCharacterView character = screen.gameOverView;
+            Assert.That(character.bul.activeSelf != character.geumok.activeSelf, Is.True, "Exactly one character.");
+            yield return Until(() => character.homeButton.interactable, "The character screen keeps an exit.");
+            character.homeButton.onClick.Invoke();
             yield return WaitHome();
         }
 

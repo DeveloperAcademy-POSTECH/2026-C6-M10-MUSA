@@ -28,7 +28,7 @@
 - 요괴별 기본값·규칙은 `Resources/Hapio/StageCatalog`와 StageDefinition, 실행 중 조정은 GameStageSettings 복사본으로 관리한다. #297 당시 모든 스테이지의 표시 모델은 WhiteGourd 내부의 공통 검은 요괴였고, 현재는 아래 #507처럼 세 스테이지가 각자 구운 박(구미호·야광귀·지귀)을 쓴다. StageDefinition의 `yokaiVisual` override를 비워 두고 갱신 도구에서 구미호를 다시 연결하지 않는다. 원본 LabConfig를 자동 저장하지 않는다.
 
 - #281 2:2 청홍 땅따먹기는 Hapio의 독자 모드(4명, 한 판)다. 규칙은 `LabTeams`·`LabModel.Team`과 공유 설정196~199에 있고 Lab DEV에서도 4명·솔로로 켤 수 있다. Hapio에서 196 켜기는 방 모드가 정하며 DEV 탭에서 바꾸지 않는다. 전투 화면 요소(점유율 막대·피버·벽·무지개)는 실행 중에 만들고, 로비 팝업·팀 자리 화면은 `Hapio > Upgrade 2v2 Lobby UI`로만 저장한다.
-- #293/PR #382의 현재 2:2 디자인 결과는 `박 확인`·`나가기`만 표시하고 NEXT를 숨긴다(#603의 새 2:2 결과도 "다시 도전" 버튼을 숨긴다). #603의 불이/금옥이 GameOver 화면은 이탈·연결 끊김(`GameRunFlow.IsLeaveReason`)에서만 쓰고, 준비·로딩·동기화 실패는 기존 결과 카드다. `나가기`는 `GameSession.GoHome`으로 연결을 종료하고 타이틀로 돌아간다. #281의 같은 방 로비 복귀는 `NextStage`·`ReturnTerritoryToLobby`와 구형 결과 fallback에 남아 있다. 전투 중 참가자 이탈·로딩 실패의 기존 로비 복귀 및 방장 이탈 정책은 유지한다.
+- #293/PR #382의 현재 2:2 디자인 결과는 `박 확인`·`나가기`만 표시하고 NEXT를 숨긴다(#603의 새 2:2 결과도 "다시 도전" 버튼을 숨긴다). #603의 불이/금옥이 GameOver 화면은 정상 Story 패배(실패 이야기·재도전)가 아닌 모든 GameOver에 쓴다(이탈·연결 끊김·준비·로딩·동기화 실패). `나가기`는 `GameSession.GoHome`으로 연결을 종료하고 타이틀로 돌아간다. #281의 같은 방 로비 복귀는 `NextStage`·`ReturnTerritoryToLobby`와 구형 결과 fallback에 남아 있다. 전투 중 참가자 이탈·로딩 실패의 기존 로비 복귀 및 방장 이탈 정책은 유지한다.
 - #278 Home/Lobby는 `Assets/Hapio/Art/UI/GameLobby.prefab`의 한지 로비를 공유한다. GameLobbyView는 UI만 관리하고 GameSession/GamePendingRoomRegistry가 연결·대기 광고를 소유한다. 기존 Lab Scene과 전투/결과 Scene을 로비 적용 목적으로 다시 복사하지 않는다.
 - 게임 방은 Game-family TXT/연결 토큰을 사용한다. Lab과 같은 Bonjour 서비스 종류라도 검색 결과를 섞지 않는다. 로비 나가기는 방 목록, 최종 결과·게임 오버 HOME은 타이틀 복귀다.
 

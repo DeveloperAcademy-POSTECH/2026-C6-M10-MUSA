@@ -218,7 +218,9 @@ namespace Hapio
         {
             if (gameOverView != null) gameOverView.gameObject.SetActive(false);
             if (stageStory != null && stageStory.TryRefresh(false)) return;
-            if (gameOverView != null && GameRunFlow.IsLeaveReason(session.State.endReason))
+            // Every GameOver that is not the Story defeat story above uses the 불이/금옥이 screen: a leave, a
+            // disconnect, and a preparation, loading or sync failure alike.
+            if (gameOverView != null)
             {
                 SetStoryContentVisible(false);
                 session.SetResultPresentationBusy(false);
