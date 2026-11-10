@@ -103,6 +103,14 @@ namespace C6Lab
         }
     }
 
+    // Optional presentation data in targetImpact only. Older senders omit it.
+    [Serializable]
+    internal sealed class LabElementContactPose
+    {
+        public Vector3 localNormal;
+        public float diameter;
+    }
+
     /// <summary>
     /// Client-side gate for authoritative impact presentation. A shot can display once in the
     /// current Host round; stale, malformed, and repeated messages never replay the effect.
@@ -269,13 +277,14 @@ namespace C6Lab
         // 5695: #551 Jigwi B bucket: two picked seats, 2.5 s to pull, slower 3-2-1.
         // 5696: #551 Jigwi B bucket is personal: every seat pours its own bucket by rocking the phone (no 3-2-1, no attempts).
         // 5697: #551 Jigwi B bucket: the first bucket comes 3.5 s after B starts, 1 s apart, 7 s each.
-        internal const ushort LabProtocolVersion = 5697;
+        // 5698: #595 Jigwi smoke flow: round.smoke (B smokes every screen at once, no bucket) and round.common (shared talisman A).
+        internal const ushort LabProtocolVersion = 5698;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Double-tap a blue fox orb to clear it, and keep your Yin and Yang away.";
         /// <summary>More fox orbs than one fox fire ever drops; a longer list is ignored (#251).</summary>
         private const int MaximumFoxFireOrbs = 10;
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/58");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/59");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;
@@ -2109,7 +2118,7 @@ namespace C6Lab
             Vector3 velocity = LabThrowMath.LaunchVelocity(releaseVelocity, seatAnchor, targetCenter, config);
             // A blast-shrunk orb flies small and so has less reach on the gourd (#213).
             var projectile = LabProjectile.Create(launchPosition, config, projectileRoot, orb.element,
-                orb.small ? config.BlastShrinkScale : 1f);
+                orb.small ? config.BlastShrinkScale : 1f, useClayFlight: !orb.fiveColor && !orb.jigwiTalismanReward);
             if (orb.fiveColor) LabFiveColorSparkle.AttachArt(projectile.transform, config.OrbRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined), true);
             else if (orb.jigwiTalismanReward) LabFiveColorSparkle.AttachArt(projectile.transform,
                 config.OrbRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined) * LabJigwiWaterVolley.SizeScale, true,
@@ -2200,6 +2209,7 @@ namespace C6Lab
                         ?.ApplyHostImpact(result.HitPoint, result.ImpactVelocity) ?? 0f;
                     bool paintBlocked = element >= LabOrbElement.Fire && element <= LabOrbElement.Earth
                         && model.PaintSurface.WouldBlockHit(result.OwnerPlayerId, paintDirection);
+                    bool talismanHit = model.LastHitTalisman;
                     if (paintBlocked)
                     {
                         jigwiStagePresentation?.PlayBlocked(targetLocalPoint);
@@ -2208,14 +2218,16 @@ namespace C6Lab
                     else
                     {
                         target.NotifyApprovedHit(targetLocalPoint, element);
-                        impactFeedback?.PlayHit(target, targetLocalPoint, element, actualDamage,
-                            result.ImpactVelocity, false);
+                        if (talismanHit)
+                            impactFeedback?.PlayHit(target, targetLocalPoint, element, actualDamage, result.ImpactVelocity, false);
+                        else
+                            impactFeedback?.PlayContact(target, targetLocalPoint, element, actualDamage,
+                                result.ImpactVelocity, result.HitNormal, result.VisualDiameter);
                     }
                     bool fiveColor = model.LastHitFiveColor;
                     // The final-hit replay only shows a hit that painted (never a blocked or element-less one).
                     if (!paintBlocked && (element != LabOrbElement.None || fiveColor)) RememberReplayHit(result);
                     if (fiveColor && !paintBlocked) PresentFiveColorHit(targetLocalPoint, result.OwnerPlayerId);
-                    bool talismanHit = model.LastHitTalisman;
                     if (talismanHit && !paintBlocked) PresentTalismanHit(targetLocalPoint, result.OwnerPlayerId);
                     if (!paintBlocked && result.OwnerPlayerId == LocalPlayerId)
                     {
@@ -2236,6 +2248,11 @@ namespace C6Lab
                         x = targetLocalPoint.x, y = targetLocalPoint.y, z = targetLocalPoint.z,
                         wx = result.ImpactVelocity.x, wy = result.ImpactVelocity.y, wz = result.ImpactVelocity.z,
                         spinImpulse = signedYawImpulse, fiveColor = fiveColor, talisman = talismanHit, sizeScale = launchScale };
+                    if (!paintBlocked && !talismanHit && element != LabOrbElement.None && order.Count > 1)
+                        impact.payload = LabPacketPayload.Encode(new LabElementContactPose {
+                            localNormal = hitbox.InverseTransformDirection(result.HitNormal),
+                            diameter = result.VisualDiameter
+                        });
                     foreach (ulong id in order) if (id != LocalPlayerId) Send(id, impact);
                 }
             }
@@ -2580,9 +2597,22 @@ namespace C6Lab
                         {
                             target.NotifyApprovedHit(new Vector3(packet.x, packet.y, packet.z), (LabOrbElement)packet.element);
                             if (!presentedBefore)
-                                impactFeedback?.PlayHit(target, new Vector3(packet.x, packet.y, packet.z),
-                                    (LabOrbElement)packet.element, packet.damage,
-                                    new Vector3(packet.wx, packet.wy, packet.wz), false);
+                            {
+                                if (packet.talisman)
+                                    impactFeedback?.PlayHit(target, new Vector3(packet.x, packet.y, packet.z),
+                                        (LabOrbElement)packet.element, packet.damage, hostVelocity, false);
+                                else
+                                {
+                                    LabElementContactPose pose = LabPacketPayload.Decode<LabElementContactPose>(packet.payload);
+                                    Transform hitbox = target.Hitbox != null ? target.Hitbox.transform : target.transform;
+                                    float fallbackDiameter = 2f * (config != null ? config.ThrowRadius : .165f)
+                                        * (packet.sizeScale > 0f && Finite(packet.sizeScale) ? packet.sizeScale : 1f);
+                                    impactFeedback?.PlayContact(target, new Vector3(packet.x, packet.y, packet.z),
+                                        (LabOrbElement)packet.element, packet.damage, hostVelocity,
+                                        pose != null ? hitbox.TransformDirection(pose.localNormal) : Vector3.zero,
+                                        pose != null && float.IsFinite(pose.diameter) && pose.diameter > 0f ? pose.diameter : fallbackDiameter);
+                                }
+                            }
                             if (packet.fiveColor) PresentFiveColorHit(new Vector3(packet.x, packet.y, packet.z), packet.owner);
                             if (packet.talisman) PresentTalismanHit(new Vector3(packet.x, packet.y, packet.z), packet.owner);
                         }
@@ -2622,7 +2652,7 @@ namespace C6Lab
                         LabOrbElement element = packet.element >= (int)LabOrbElement.None && packet.element <= (int)LabOrbElement.Earth
                             ? (LabOrbElement)packet.element : LabOrbElement.None;
                         LabProjectile visual = LabProjectile.Create(position, config, projectileRoot, element,
-                            packet.small ? config.BlastShrinkScale : 1f);
+                            packet.small ? config.BlastShrinkScale : 1f, useClayFlight: !packet.fiveColor && !packet.talisman);
                         if (packet.fiveColor) LabFiveColorSparkle.AttachArt(visual.transform, config.OrbRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined), true);
                         else if (packet.talisman) LabFiveColorSparkle.AttachArt(visual.transform,
                             config.OrbRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined) * LabJigwiWaterVolley.SizeScale, true,
@@ -2651,7 +2681,7 @@ namespace C6Lab
             {
                 ClearPendingSlotSelection();
                 SetNotice(packet.reason == "SLOT_TAKEN" ? "That P number is already selected."
-                    : "P number selection was rejected: " + packet.reason);
+                    : SlotRejectionText(packet.reason, gameFlowEnabled));
                 return;
             }
             if (packet.lobbyRevision <= 0) return;
@@ -2888,7 +2918,7 @@ namespace C6Lab
         private void RejectLocally(string orbId, string reason)
         {
             if (!string.IsNullOrEmpty(orbId) && board != null) board.RejectEdge(orbId);
-            SetNotice(reason ?? "Request rejected.");
+            ShowRejection(reason);
             Debug.LogWarning("C6_LAB_REJECT orb=" + orbId + " reason=" + reason);
         }
 
@@ -3142,6 +3172,31 @@ namespace C6Lab
 
         private void SetStatus(string status) { Status = status; Changed?.Invoke(); }
         private void SetNotice(string notice) { Notice = notice; Changed?.Invoke(); }
+
+        /// <summary>The Lab shows the Host's reason; the game says it in words a player can act on.</summary>
+        public static string SlotRejectionText(string reason, bool game) => game
+            ? "자리를 고르지 못했소. 다시 골라주시오." : "P number selection was rejected: " + reason;
+
+        /// <summary>A Host reason such as INSUFFICIENT_STAMINA names a log entry, not something to tell a player.</summary>
+        public static bool IsInternalReasonCode(string reason)
+        {
+            if (string.IsNullOrEmpty(reason)) return true;
+            foreach (char c in reason)
+                if (!(c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_')) return false;
+            return true;
+        }
+
+        // The game explains a refusal with its own feedback (stamina shake, blocked edge). The Lab keeps the raw reason
+        // on screen because that is what a physics test reads.
+        private void ShowRejection(string reason)
+        {
+            if (gameFlowEnabled && IsInternalReasonCode(reason))
+            {
+                if (Debug.isDebugBuild) Debug.Log("C6_LAB_REJECT_HIDDEN reason=" + reason);
+                return;
+            }
+            SetNotice(reason ?? "Request rejected.");
+        }
 
         private void OnDestroy()
         {

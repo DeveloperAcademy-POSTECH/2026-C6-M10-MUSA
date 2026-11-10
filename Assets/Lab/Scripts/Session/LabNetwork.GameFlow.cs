@@ -14,7 +14,9 @@ namespace C6Lab
         // 45: #501 lobby rejoin: a room ticket after the token, held lobby seats (lobby ids) and lobby_leave/lobby_closed.
         //     (on top of #551's 44; protocol and Lab token unchanged by #501.)
         // 46: the paint-finish control compares the shared last stamp sequence, not each device's own change count.
-        private static readonly byte[] GameConnectionToken = Encoding.ASCII.GetBytes("C6HapioGame/46");
+        // 47: story-stage gourds and their hit shells are drawn 1.4 times larger.
+        // 48: #595 Jigwi smoke flow (protocol 5698, Lab 59).
+        private static readonly byte[] GameConnectionToken = Encoding.ASCII.GetBytes("C6HapioGame/48");
         private const int MaximumGameFlowBytes = 8192;
         private bool gameFlowEnabled;
         private bool gameBattleFrozen;

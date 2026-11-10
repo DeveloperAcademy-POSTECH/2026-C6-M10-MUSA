@@ -18,6 +18,7 @@ namespace C6Lab
         /// <summary>Physics surface normal captured with the chosen contact, for appearance only.</summary>
         public readonly Vector3 HitNormal;
         public readonly Vector3 HitPoint;
+        public readonly float VisualDiameter;
         public readonly float FlightSeconds;
         public readonly float PeakRise;
         public readonly float HorizontalDistance;
@@ -30,7 +31,8 @@ namespace C6Lab
 
         public LabProjectileResult(string projectileId, ulong ownerPlayerId, LabProjectileHitKind kind,
             Vector3 hitPoint, float flightSeconds, float peakRise, float horizontalDistance,
-            Vector3 impactVelocity = default, string fireId = null, string fireTargetId = null, Vector3 hitNormal = default)
+            Vector3 impactVelocity = default, string fireId = null, string fireTargetId = null,
+            Vector3 hitNormal = default, float visualDiameter = 0f)
         {
             ProjectileId = projectileId;
             OwnerPlayerId = ownerPlayerId;
@@ -41,6 +43,7 @@ namespace C6Lab
             ImpactVelocity = impactVelocity;
             HitNormal = hitNormal;
             HitPoint = hitPoint;
+            VisualDiameter = visualDiameter;
             FlightSeconds = flightSeconds;
             PeakRise = peakRise;
             HorizontalDistance = horizontalDistance;
@@ -68,6 +71,8 @@ namespace C6Lab
 
         [SerializeField] private Transform visualMount;
         [SerializeField] private TrailRenderer flightTrail;
+        private bool useClayFlight;
+        private LabFiveElementVfx.Flight clayFlight;
         private LabElementFlightTrail elementFlightTrail;
         private LabJigwiWaterFlightPath jigwiWaterFlightPath;
         private LabJigwiRewardFireTrail jigwiRewardFireTrail;
@@ -253,7 +258,7 @@ namespace C6Lab
         /// bomb blast made small (#213), so it also has less reach on the gourd.
         /// </summary>
         public static LabProjectile Create(Vector3 position, LabConfig config, Transform parent = null,
-            LabOrbElement element = LabOrbElement.None, float sizeScale = 1f)
+            LabOrbElement element = LabOrbElement.None, float sizeScale = 1f, bool useClayFlight = false)
         {
             if (config == null) throw new ArgumentNullException(nameof(config));
             LabFirstUse.Note(LabFirstUseKind.Projectile);
@@ -265,10 +270,11 @@ namespace C6Lab
             LabProjectile projectile = root.AddComponent<LabProjectile>();
             projectile.config = config;
             projectile.element = element;
+            projectile.useClayFlight = useClayFlight;
             projectile.sizeScale = sizeScale > 0f && sizeScale <= 1f ? sizeScale : 1f;
             projectile.ConfigureAppearance(config.OrbAppearance);
             projectile.EnsureDefaultVisual(projectile.ScaledRadius);
-            projectile.EnsureFlightTrail(projectile.ScaledRadius);
+            if (!projectile.WantsClayFlight) projectile.EnsureFlightTrail(projectile.ScaledRadius);
             return projectile;
         }
 
@@ -314,6 +320,7 @@ namespace C6Lab
         {
             if (authoritative || resolved || approvedElement < LabOrbElement.None || approvedElement > LabOrbElement.Earth) return;
             bool changed = element != approvedElement;
+            float previousRadius = ScaledRadius;
             element = approvedElement;
             sizeScale = approvedSize > 0f && approvedSize <= 1f ? approvedSize : 1f;
             SetRadiusScale(approvedRadius > 0f ? approvedRadius : 1f);
@@ -322,11 +329,15 @@ namespace C6Lab
             // keeps the approved Host body's trajectory/radius frozen; never rewind position or velocity.
             if (sphere != null) sphere.radius = ScaledRadius;
             EnsureDefaultVisual(ScaledRadius);
-            EnsureFlightTrail(ScaledRadius);
-            // 예측한 크기와 Host가 정한 크기(콤보 SMALL/BIG)가 다르면 꼬리도 새 크기로 다시 그린다.
-            LabElementTrailProfile trailProfile = ScaledTrailProfile();
-            if (elementFlightTrail != null && appearance != null && (changed || elementFlightTrail.Profile != trailProfile))
-                elementFlightTrail.Begin(transform, trailProfile);
+            if (useClayFlight && launched && (changed || !Mathf.Approximately(previousRadius, ScaledRadius)))
+                StartFlightPresentation(body.linearVelocity);
+            else if (!clayFlight.IsActive)
+            {
+                EnsureFlightTrail(ScaledRadius);
+                LabElementTrailProfile trailProfile = ScaledTrailProfile();
+                if (elementFlightTrail != null && appearance != null && (changed || elementFlightTrail.Profile != trailProfile))
+                    elementFlightTrail.Begin(transform, trailProfile);
+            }
             ConfigureJigwiWaterFlightPath();
             ConfigureJigwiRewardFireTrail();
         }
@@ -407,6 +418,28 @@ namespace C6Lab
             launchedAt = Time.time;
             launched = true;
             EnsureDefaultVisual(ScaledRadius);
+            StartFlightPresentation(initialVelocity);
+            ConfigureJigwiWaterFlightPath();
+            ConfigureJigwiRewardFireTrail();
+        }
+
+        private bool WantsClayFlight => useClayFlight && element >= LabOrbElement.Fire && element <= LabOrbElement.Earth;
+
+        private void StartFlightPresentation(Vector3 velocity)
+        {
+            clayFlight.Cancel();
+            if (WantsClayFlight)
+            {
+                var pool = LabFiveElementVfx.ForScene(gameObject.scene);
+                if (pool != null) clayFlight = pool.BeginFlight(element, transform.position, velocity, WorldRadius * 2f);
+            }
+            visualMount.gameObject.SetActive(!clayFlight.IsActive);
+            if (clayFlight.IsActive)
+            {
+                elementFlightTrail?.Clear();
+                if (flightTrail != null) { flightTrail.emitting = false; flightTrail.Clear(); }
+                return;
+            }
             EnsureFlightTrail(ScaledRadius);
             if (elementFlightTrail != null)
                 elementFlightTrail.Begin(transform, ScaledTrailProfile());
@@ -415,8 +448,12 @@ namespace C6Lab
                 flightTrail.Clear();
                 flightTrail.emitting = true;
             }
-            ConfigureJigwiWaterFlightPath();
-            ConfigureJigwiRewardFireTrail();
+        }
+
+        private void LateUpdate()
+        {
+            if (clayFlight.IsActive)
+                clayFlight.Move(transform.position, body.linearVelocity);
         }
 
         private void FixedUpdate()
@@ -634,7 +671,7 @@ namespace C6Lab
             Vector2 startXZ = new Vector2(launchPosition.x, launchPosition.z);
             report(new LabProjectileResult(null, 0ul, kind, point, Mathf.Max(0f, Time.time - launchedAt),
                 Mathf.Max(0f, peakHeight - launchPosition.y), Vector2.Distance(startXZ, new Vector2(point.x, point.z)),
-                incomingVelocity, fire != null ? fire.FireId : null, fire != null ? fire.FireTargetId : null, normal));
+                incomingVelocity, fire != null ? fire.FireId : null, fire != null ? fire.FireTargetId : null, normal, WorldRadius * 2f));
         }
 
         private void FinishVisual()
@@ -664,7 +701,7 @@ namespace C6Lab
             LabProjectileResult result = new LabProjectileResult(projectileId, ownerPlayerId,
                 kind, point, Mathf.Max(0f, Time.time - launchedAt),
                 Mathf.Max(0f, peakHeight - launchPosition.y), Vector2.Distance(startXZ, endXZ), impactVelocity,
-                fire != null ? fire.FireId : null, fire != null ? fire.FireTargetId : null, normal);
+                fire != null ? fire.FireId : null, fire != null ? fire.FireTargetId : null, normal, WorldRadius * 2f);
             // Keep the last visible part of the flight briefly. If the callback ends the
             // round, ClearProjectiles also destroys this detached child of projectileRoot.
             LeaveFadingTrail();
@@ -815,6 +852,7 @@ namespace C6Lab
 
         private void LeaveFadingTrail()
         {
+            clayFlight.Cancel();
             if (jigwiRewardFireTrail != null)
             {
                 var fadingFire = jigwiRewardFireTrail; jigwiRewardFireTrail = null;
@@ -851,6 +889,7 @@ namespace C6Lab
 
         private void OnDisable()
         {
+            clayFlight.Cancel();
             // A restart/room exit cancels an attached effect immediately. A resolved shot's
             // detached fading effect is no longer owned here and keeps its natural lifetime.
             if (elementFlightTrail != null) elementFlightTrail.Clear();

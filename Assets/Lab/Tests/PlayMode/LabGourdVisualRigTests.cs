@@ -87,7 +87,7 @@ namespace C6Lab.Tests
                 {
                     size.SetValue(paint.network.config, value);
                     paint.RefreshCommittedMap();
-                    float ratio = value / paint.Rig.referenceVisualSize;
+                    float ratio = value / paint.Rig.referenceVisualSize * LabGourdVisualRig.StageSizeMultiplier;
                     Assert.That(paint.VisualInstance.transform.localScale.x, Is.EqualTo(ratio).Within(1e-5f));
                     Vector3 drawn = target.VisualMount.InverseTransformPoint(paint.Rig.sizeAnchor.position);
                     Assert.That(Vector3.Distance(drawn, anchor), Is.LessThan(1e-4f), "The anchor stays put at size " + value);

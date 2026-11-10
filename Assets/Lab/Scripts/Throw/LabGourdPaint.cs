@@ -268,7 +268,7 @@ namespace C6Lab
                 foreach (Renderer extra in rig.paintExtras) if (extra != null) list.Add(extra);
             extras = list.ToArray();
             activeMaterial = prefabRig.paintMaterial;
-            rigReferenceSize = prefabRig.referenceVisualSize;
+            rigReferenceSize = prefabRig.referenceVisualSize / LabGourdVisualRig.StageSizeMultiplier;
             rigSizeAnchor = prefabRig.AnchorInRoot;
             foreach (var animator in VisualInstance.GetComponentsInChildren<Animator>(true))
                 animator.enabled = false;

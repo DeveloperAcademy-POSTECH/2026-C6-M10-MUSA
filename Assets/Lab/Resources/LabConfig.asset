@@ -41,9 +41,11 @@ MonoBehaviour:
   jigwiFlowSchedule: 1
   jigwiAHoldBurnUntilEnd: 1
   jigwiBCountdown: 1
-  jigwiBBucket: 1
+  jigwiBBucket: 0
   jigwiBTestOnly: 0
-  jigwiCommonStartSeconds: 40
+  jigwiATestOnly: 1
+  jigwiSmokeFlow: 1
+  jigwiCommonStartSeconds: 25
   jigwiCommonIntervalSeconds: 15
   jigwiStageWarningSeconds: 1
   jigwiStageActiveSeconds: 7
@@ -263,6 +265,8 @@ MonoBehaviour:
   yaguangUseNewBgm: 1
   yaguangBgmVolume: 0.35
   gumihoFeverBgmVolume: 0.4
+  jigwiBgmVolume: 0.35
+  jigwiFeverBgmVolume: 0.35
   charmCastSoundVolume: 0.4
   charmCheckSoundVolume: 0.8
   charmReleaseSoundVolume: 0.4

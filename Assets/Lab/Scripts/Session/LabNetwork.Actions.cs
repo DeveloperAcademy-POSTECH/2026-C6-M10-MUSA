@@ -438,7 +438,7 @@ namespace C6Lab
             NotifyLocalStaminaSpent(request, receipt, purged);
             if (!purged && receipt.accepted && !receipt.consumedWithoutOutput && request.type == "combine") LocalCombined?.Invoke();
             predictedJigwiBurns.Remove(receipt.requestId);
-            if (!receipt.accepted) SetNotice(receipt.reason ?? "Request rejected.");
+            if (!receipt.accepted) ShowRejection(receipt.reason);
             if (!IsHost)
             {
                 boardReplica.ApplyReceipt(receipt);
@@ -562,9 +562,10 @@ namespace C6Lab
             bool small = orb != null && orb.small;
             LabOrbElement element = orb?.element ?? LabOrbElement.None;
             if (orb == null && board != null) board.TryGetLocalAppearance(request.firstId, out element, out small);
-            LabProjectile visual = LabProjectile.Create(position, config, projectileRoot,
-                element, small ? config.BlastShrinkScale : 1f);
             bool fiveColor = orb != null ? orb.fiveColor : board != null && board.IsFiveColor(request.firstId);
+            bool talisman = orb != null && orb.jigwiTalismanReward;
+            LabProjectile visual = LabProjectile.Create(position, config, projectileRoot,
+                element, small ? config.BlastShrinkScale : 1f, useClayFlight: !fiveColor && !talisman);
             if (fiveColor) LabFiveColorSparkle.AttachArt(visual.transform, config.OrbRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined), true);
             else if (orb != null && orb.jigwiTalismanReward) LabFiveColorSparkle.AttachArt(visual.transform,
                 config.OrbRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined) * LabJigwiWaterVolley.SizeScale, true,
@@ -575,7 +576,6 @@ namespace C6Lab
             float comboScale = scale;
             bool rewarded = JigwiRewardAt(latest.serverTime);
             if (rewarded) scale *= config.JigwiABRewardSizeScale;
-            bool talisman = orb != null && orb.jigwiTalismanReward;
             if (talisman) scale *= LabJigwiWaterVolley.SizeScale; // #540 부적 구슬 1.5배
             visual.SetRadiusScale(scale);
             visual.SetJigwiABReward(rewarded);
@@ -590,7 +590,7 @@ namespace C6Lab
                 config.RelayDoubleMultiplier, config.RelayMaxMultiplier);
             localHits.Register(requestId, id);
             visual.LaunchVisual(velocity, config, target,
-                contact => OnPredictedShotContact(requestId, contact, element, attack, comboScale, fiveColor, supply));
+                contact => OnPredictedShotContact(requestId, contact, element, attack, comboScale, fiveColor, supply, talisman));
             if (talisman) LaunchTalismanVolley(visual, id, LocalPlayerId, position, velocity, scale, element, false); // #540
             predictedShots[request.requestId] = visual;
             presentedShots.Add(request.requestId);
@@ -603,7 +603,7 @@ namespace C6Lab
         /// may block or burn the shot (B curtain, stage fire, legacy fire) wait for the Host as before.
         /// </summary>
         private void OnPredictedShotContact(long requestId, LabProjectileResult contact, LabOrbElement element,
-            int attackValue, float comboScale, bool fiveColor, bool supply)
+            int attackValue, float comboScale, bool fiveColor, bool supply, bool talisman)
         {
             if (IsHost || target == null || supply || !PredictedContactAllowed()) return;
             if (contact.Kind == LabProjectileHitKind.Monster)
@@ -619,7 +619,11 @@ namespace C6Lab
                     + Math.Max(.3d, 2d * LastActionRoundTripMilliseconds / 1000d));
                 Transform hitbox = target.Hitbox != null ? target.Hitbox.transform : target.transform;
                 Vector3 local = hitbox.InverseTransformPoint(contact.HitPoint);
-                impactFeedback?.PlayHit(target, local, element, attackValue, contact.ImpactVelocity, false);
+                if (talisman)
+                    impactFeedback?.PlayHit(target, local, element, attackValue, contact.ImpactVelocity, false);
+                else
+                    impactFeedback?.PlayContact(target, local, element, attackValue, contact.ImpactVelocity,
+                        contact.HitNormal, contact.VisualDiameter);
                 LastLocalHitOffset = LabThrowSound.HitOffset(local, hitbox.InverseTransformDirection(contact.ImpactVelocity));
                 LastLocalHitSmall = LabThrowSound.IsSmallThrow(comboScale);
                 LastLocalHitBig = LabThrowSound.IsBigThrow(comboScale);

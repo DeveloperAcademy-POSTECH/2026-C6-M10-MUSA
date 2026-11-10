@@ -581,6 +581,10 @@ namespace C6Lab
         [SerializeField] private bool jigwiBBucket = false;
         [Tooltip("#551 시험용 Inspector 전용(Host): 켜면 지귀 스테이지에서 B만 4초부터 17초마다(4/21/38/55/72초) 나오고 A와 공통 기믹(폭탄 등)은 나오지 않는다. 시험이 끝나면 끈다.")]
         [SerializeField] private bool jigwiBTestOnly = false;
+        [Tooltip("#595 시험용 Inspector 전용(Host): 켜면 지귀 스테이지에서 부적만 4초부터 17초마다(4/21/38/55/72초) 나오고 연기와 공통 기믹(폭탄 등)은 나오지 않는다. Jigwi Smoke Flow가 켜져 있으면 공용 부적(모두 써야 보상). 시험이 끝나면 끈다.")]
+        [SerializeField] private bool jigwiATestOnly = false;
+        [Tooltip("#595 Inspector 전용(Host): 켜면 지귀 시간표가 연기 10초 / 부적 45초 / 연기 66초 / 부적 83초(공통 기믹은 Jigwi Common Start Seconds부터)다. 연기는 양동이 없이 모두의 화면을 같은 때에 덮어 각자 90% 문질러 걷어 내고, 부적은 모두가 써야 모두 보상(한 명이라도 못 쓰면 모두의 판이 탄다). 켜면 Jigwi Flow Schedule과 Jigwi B Bucket보다 앞선다. B Test Only / A Test Only와 함께 켜면 연기만 / 공용 부적만 시험한다.")]
+        [SerializeField] private bool jigwiSmokeFlow = false;
         [Tooltip("#540 Inspector 전용(Host, 새 시간표만): 지귀 공통 기믹이 처음 나오는 때(초).")]
         [SerializeField, Range(0f, 99f)] private float jigwiCommonStartSeconds = 40f;
         [Tooltip("#540 Inspector 전용(Host, 새 시간표만): 지귀 공통 기믹 간격(초). 피버(100초) 전까지 되풀이.")]
@@ -985,6 +989,10 @@ namespace C6Lab
         [SerializeField, Range(0f, 1f)] private float yaguangBgmVolume = .35f;
         [Tooltip("구미호 피버타임(마지막 20초) 곡 크기 (Resources/Audio/GumihoFever, 모든 기기). 파일이 없으면 야광귀 피버 곡을 이 크기로 튼다.")]
         [SerializeField, Range(0f, 1f)] private float gumihoFeverBgmVolume = .3f;
+        [Tooltip("#577 지귀 스테이지 전투 BGM 크기 (Resources/Audio/JigwiBGM, 진고 북 중심 곡, 모든 기기). 파일이 없으면 기본 BGM.")]
+        [SerializeField, Range(0f, 1f)] private float jigwiBgmVolume = .35f; // #577: 세 라운드 곡을 같은 크기로 맞춰서 야광귀와 같은 값
+        [Tooltip("#577 지귀 피버(마지막 20초) 곡 크기 (Resources/Audio/JigwiFever, 모든 기기). 지귀 곡을 높이고 빠르게 한 곡. 파일이 없으면 구미호 피버 곡을 Gumiho Fever Bgm Volume으로 튼다.")]
+        [SerializeField, Range(0f, 1f)] private float jigwiFeverBgmVolume = .35f;
         [Tooltip("매혹이 걸릴 때 소리 크기 (Resources/Audio/CharmCast, 모든 기기)")]
         [SerializeField, Range(0f, 1f)] private float charmCastSoundVolume = .7f;
         [Tooltip("양옆 사람이 내 몫을 다 눌러 체크가 뜰 때 소리 크기 (Resources/Audio/CharmCheck, 누른 사람 기기만)")]
@@ -1191,6 +1199,8 @@ namespace C6Lab
         public bool JigwiBCountdown => jigwiBCountdown;
         public bool JigwiBBucket => jigwiBBucket;
         public bool JigwiBTestOnly => jigwiBTestOnly;
+        public bool JigwiATestOnly => jigwiATestOnly;
+        public bool JigwiSmokeFlow => jigwiSmokeFlow;
         public float JigwiCommonStartSeconds => Mathf.Clamp(Finite(jigwiCommonStartSeconds, 40f), 0f, 99f);
         public float JigwiCommonIntervalSeconds => Mathf.Clamp(Finite(jigwiCommonIntervalSeconds, 15f), 3f, 60f);
         public float JigwiStageWarningSeconds => Mathf.Clamp(Finite(jigwiStageWarningSeconds, 1f), 0f, 3f);
@@ -1518,6 +1528,8 @@ namespace C6Lab
         public float GumihoBgmVolume => Mathf.Clamp01(Finite(gumihoBgmVolume, .2f));
         public bool YaguangUseNewBgm => yaguangUseNewBgm;
         public float YaguangBgmVolume => Mathf.Clamp01(Finite(yaguangBgmVolume, .35f));
+        public float JigwiBgmVolume => Mathf.Clamp01(Finite(jigwiBgmVolume, .35f));
+        public float JigwiFeverBgmVolume => Mathf.Clamp01(Finite(jigwiFeverBgmVolume, .35f));
         public float GumihoFeverBgmVolume => Mathf.Clamp01(Finite(gumihoFeverBgmVolume, .3f));
         public float CharmCastSoundVolume => Mathf.Clamp01(Finite(charmCastSoundVolume, .7f));
         public float CharmCheckSoundVolume => Mathf.Clamp01(Finite(charmCheckSoundVolume, .8f));

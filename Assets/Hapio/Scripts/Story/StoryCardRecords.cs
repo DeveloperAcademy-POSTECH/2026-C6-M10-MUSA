@@ -12,6 +12,7 @@ namespace Hapio
         {
             public string player;
             public string value;
+            public bool mine;
         }
 
         public Text sealRate;
