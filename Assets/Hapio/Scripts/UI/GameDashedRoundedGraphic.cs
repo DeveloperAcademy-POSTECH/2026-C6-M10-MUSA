@@ -15,7 +15,8 @@ namespace Hapio
             Rect rect = rectTransform.rect;
             float half = strokeWidth * .5f;
             rect = Rect.MinMaxRect(rect.xMin + half, rect.yMin + half, rect.xMax - half, rect.yMax - half);
-            float corner = Mathf.Min(radius, Mathf.Min(rect.width, rect.height) * .5f);
+            // Figma radius describes the outside boundary; this path is the centre of an INSIDE stroke.
+            float corner = Mathf.Min(Mathf.Max(0, radius - half), Mathf.Min(rect.width, rect.height) * .5f);
             var points = new List<Vector2>(52);
             for (int c = 0; c < 4; c++)
             {

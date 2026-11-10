@@ -7292,3 +7292,20 @@ PlayMode의 기존 main 실패13건은 구형 지귀 A/B·특수 물구슬 검�
 | 클레이 그림 지름 (`FlightDiameter`) | NOT_RUN — 코드만 고침. 편집 모드에서는 클레이 그림 풀이 만들어지지 않고, 측정하려던 때는 Editor가 Play 중이었음 |
 | EditMode·PlayMode Test Runner | NOT_RUN |
 | 3인 실행 (1→2→3스테이지, 재도전, SMALL 투척) | NOT_RUN |
+
+### #615 Figma UI 스트로크 복원 — 2026-11-10
+
+- `fix/#615-ui-stroke`에서 작업. 사용자 최종 요청에 따라 게임 오버·땅따먹기 결과 4개 화면과 #603 변경은 제외했다. 54개 제공 노드의 속성을 확인하고, 나머지 화면의 공통 버튼·HUD 컴포넌트에서 누락된 HEIST/SLASHER/GRINDHOUSE 브러시 윤곽을 원본 에셋으로 연결했다. 세부 범위·출처·재생성 방법은 `UI_STROKE_AUDIT_615.md`와 `Assets/Hapio/Art/UI/Strokes/Source/manifest.json`에 기록했다.
+- 18개 원본 표면/윤곽 에셋, 반투명 채움·스트로크의 개별 불투명도, 선택/눌림/비활성 상태, 컴포넌트 밖으로 나오는 CENTER 스트로크를 보존했다. 스태미나 여섯 칸은 기존 합성 둥근 사각형 대신 실제 Figma 브러시 마스크를 사용한다. 종이 채움은 논리 영역에 그리고 테두리를 그 위에 겹친다. 팀 자리 점선은 INSIDE 2pt의 중심선 반지름을 보정했다.
+- 공유 `GameLobby.prefab`과 `BattleUiTheme.asset`만 저장 자산을 갱신했다. 씬·통신·게임 판정·자리 좌표·버튼 네비게이션은 변경하지 않았다. 기존 `Assets/Gumiho_V1` 미추적 파일은 이번 작업과 무관해 수정하지 않았다.
+
+| 검사 | 결과 |
+| --- | --- |
+| GameFigmaStrokeTests (EditMode) | 3/3 PASS: 배율별 바깥 윤곽, 중복 배경 방지·상태 전환, 실제 GraphicRaycaster 클릭과 비활성 차단 |
+| GameLobbyAssetTests (EditMode) | 7/7 PASS |
+| GameBattleUiAssetTests (EditMode) | 2/2 PASS |
+| GameBattleUiPresentationTests (PlayMode) | 3/3 PASS: 1~3스테이지, 팀 HUD, 기존 일시정지 동작 |
+| GameLobbyViewTests (PlayMode) | 19/19 PASS: 실제 메뉴/방/자리 선택/복귀 흐름 |
+| Unity 렌더링 | 버튼 상태별 402×920 비교판 및 HUD 외곽선/스태미나 비교판 확인. 완성 게임 화면 캡처가 아닌 실제 UI 컴포넌트 렌더링이다. |
+
+선택 검사 합계 **34/34 PASS**, 실패·skip 0. 초기 EditMode 클릭 검사는 렌더 전 canvas depth가 없어 실패했으며, 카메라로 그린 뒤 실제 raycast를 검증하도록 수정해 통과했다. 전체 테스트·iOS/Android 실기기·여러 기기 네트워크 테스트는 실행하지 않았다. 원본 좌표와 버튼 클릭 사각형이 유지되는지 prefab 객체별 diff를 확인했다.
