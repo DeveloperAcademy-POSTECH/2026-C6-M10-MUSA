@@ -13,6 +13,7 @@
 | 전체 EditMode / 전체 PlayMode(`dd3c4488`) | 2161/2161, 741/754 |
 
 - PlayMode 실패 13건(지귀 A/B 8건, 터치 먹물 4건, 튜토리얼 기록 1건)은 이 변경 전 main에서도 같게 실패한다.
+- 최신 main `e0a32da5` 병합 뒤 `GameSceneFlowTests`·`GameOpeningControllerTests` 34/36. 실패 2건(`DefeatDisconnectRestoresTerminalGameOver…`, `TerritoryDeveloperSoloUsesDesignedResults…`)은 병합 전 main `e0a32da5`에서도 같게 실패한다.
 - **미실행:** 실기기 화면, 멀티 게스트 화면.
 
 ## 2026-11-10 — #612 5인 자리 선택 P4·P5 위치
