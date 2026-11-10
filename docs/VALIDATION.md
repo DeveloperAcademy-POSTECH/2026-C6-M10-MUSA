@@ -144,6 +144,39 @@
 - 전체 기록·2:2 결과 표의 갈색 강조는 바꾸지 않았다.
 - **미실행:** 실기기 화면, 멀티 게스트 화면, 긴 공동 수상 이름(`P1, P2(나)`)의 실제 표시.
 
+## 2026-11-10 — 한지 구름 전환 속도와 구름별 시차
+
+- **최종 전달 상태 (#630):** 사용자 시각 확인 완료. 큰 구름 6개 + 작은 구름 3개, 전체 1.52초. 관련 EditMode 32/32·PlayMode 18/18 통과. 전체 PlayMode는 사용자 요청으로 중단했으며 완료로 간주하지 않는다. 각 장면 삽입·연결은 다른 팀원이 담당한다. 아래 중간 단계의 시각 확인 대기 표기는 당시 기록이다.
+- 전체 EditMode는 2,156/2,156 통과했다. 전체 PlayMode 첫 시도는 로컬 iOS 프로필에 Lab 씬이 없어 실패했고, 공용 씬 목록으로 재시작했으나 사용자 요청으로 중단했다. 원래 iOS 프로필과 StageStoryPreview를 복원했다. 최신 main 통합·실기기 검증은 수행하지 않았다.
+
+- **작은 구름 감속:** 세 작은 구름의 걷힘 이동 시간을 각각 0.08초 연장(약 0.46~0.48초 → 0.54~0.56초). 공통 걷힘 구간을 0.80초로 늘리고 정규화된 시차·끝점을 다시 계산해 모든 출발 시점과 큰 구름의 이동 시간을 유지했다. 전체 전환 1.52초. 관련 PlayMode **18/18 PASS**, 사용자 시각 확인 대기.
+
+- **걷힘 방향 변경:** 작은 구름만 위·아래 왼쪽 / 가운데 오른쪽으로 변경. 진입 경로·시차·길이 유지. 연속 샘플에서 방향이 되돌아가지 않고 화면 밖까지 퇴장하는 PlayMode 검사를 추가했다. 첫 실행에서 큰 구름 하나까지 방향이 바뀐 설정 실수를 기존 검사가 잡아 수정했으며, 수정 후 PlayMode **18/18 PASS**. 관련 EditMode **32/32 PASS**. 사용자 시각 확인 대기.
+
+- **작은 구름 추가 후 최신 결과:** 사용자가 제공한 투명 PNG를 `CloudSmall.png`로 가져와 앞쪽 구름 3개(위·가운데·아래)를 추가, 공통 프리팹 총 9개. 가운데·아래 작은 구름은 큰 구름보다 늦게 걷히며 전체 1.44초 유지. Mac Unity 컴파일 완료, PlayMode **17/17 PASS**, 관련 EditMode **32/32 PASS**, Console 오류 0건, `git diff --check` 통과. 실제 Game 화면에서 완전 덮임과 1.02초 걷힘 중간 배치를 확인했다. 확인용 임시 오버레이는 제거했고 Scene은 저장하지 않았다. 최종 재생 감각은 사용자 확인 대기다.
+
+
+- **최신 재작업:** 기존 6개 구름의 3구간 직선 이동을 연속 3차 베지어 경로로 바꾸고, closeEnd/openEnd로 도착 시점도 분산했다. 걷힘은 위쪽 오른편에서 아래쪽 왼편으로 이어지며 약한 상하 곡률을 더한다. 전체 길이 1.44초 및 봉인 글씨 2px 보정은 유지한다.
+- **최신 검사:** Mac Unity 컴파일 완료, 관련 PlayMode **16/16 PASS**(출발·도착 분산 및 마지막 구름 퇴장 포함), EditMode **32/32 PASS**, Console 오류 0건. 미리보기 Play 상태로 열어 둠. 최종 움직임의 사용자 시각 확인 및 전체 검사는 아직 대기 중이다.
+
+- **기준:** `feat/stage-story-cloud-polish`의 기존 한지 구름 패치 미커밋 상태 위에서 수정. Mac Unity 6000.6.5f1 연결 Editor에서 실행했다.
+- 닫힘 0.62초·유지 0.10초·걷힘 0.72초, 6개 구름의 독립 closeDelay/openDelay. 공통 프리팹과 TryPlay 콜백 API를 유지한다.
+- 재조정: 같은 방향의 걷힘 지연을 0·0.19·0.38(약 0·0.14·0.27초)로 늘리고 세 카드의 봉인 글씨를 2px 아래로 옮겼다. 수정 후 위 관련 PlayMode 15개와 EditMode 32개를 재실행해 모두 통과했다. 구미호 카드의 수정된 글씨를 실제 Game 창에서 확인했으며 구름 동작의 최종 사용자 확인은 대기 중이다.
+- 컴파일 완료, 검사 및 미리보기 후 Console 오류 0건. 수정하지 않은 파일에서 obsolete API·DEVELOPMENT_BUILD 경고가 나왔다.
+- PlayMode `StoryResultPresentationTests`: **15/15 PASS**. 구름별 지연 시작, 완전 덮임 이후 1회 교체, 느린 프레임의 덮임 유지, 입력 차단, 취소·재사용과 후속 그림/대사 순서를 확인했다.
+- EditMode `GameStageStoryAssetTests`, `StageStoryAssetTests`, `StoryWorkspaceTests`, `StoryRecordHighlightTests`: **32/32 PASS**.
+- StageStoryPreview를 실제 Play하고 구미호 카드의 이야기 계속 버튼을 눌러 구름 완전 덮임 및 후일담 표시를 확인했다. 사용자 속도·엇갈림 시각 승인은 대기 중이다.
+- `git diff --check` 통과. 기존 미커밋 변경은 별도 보관하고 ProjectSettings·Build Profiles 변경은 수정하지 않았다.
+- **미실행:** 전체 EditMode/PlayMode(PR 전 실행 예정), 튜토리얼 실제 화면 연결, iOS/실기기, 멀티플레이. 튜토리얼 공통 API 재사용 검사는 위 PlayMode에 포함되며 실제 튜토리얼 화면 검증과 구분한다.
+
+## 2026-11-10 봉인 카드 위치·만복 이미지 갱신
+
+- Mac Unity 6000.6.5f1에서 에셋 재임포트·컴파일 후 Console 오류 0건.
+- 관련 EditMode 32/32 통과: GameStageStoryAssetTests, StageStoryAssetTests, StoryWorkspaceTests, StoryRecordHighlightTests.
+- StoryResultPresentationTests PlayMode 18/18 통과.
+- 세 카드 프리팹은 제목·카드 피벗·안내 글·손 아이콘의 y만 각각 -11 변경했다. 카드 앞뒷면 내부와 기존 참조는 보존했다.
+- StageStoryPreview 실제 Play 화면에서 구미호 카드 앞뒷면 배치 및 뒤집기, 야광귀 후일담의 새 만복 이미지를 확인했다. 사용자 시각 확인 완료. 전체 검사 중단 및 미실행 범위는 위 #630 최종 전달 기록을 따른다.
+
 ## 2026-11-09 — 결과·Home·Lobby의 시안에 없는 안내 줄 숨기기
 
 - **기준:** `fix/hide-result-status-line`, main `d1ea7b12` 위 `f37b4443`·`79bc2e15`. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 접속 묶음과 설정 수는 그대로다.
@@ -7433,6 +7466,34 @@ PlayMode의 기존 main 실패17건은 표시용 최소 구슬 크기와 구형 
 - 영향 PlayMode: **14/23 통과·기존 실패9·skip0**, 32.65초. LabJigwiABNetwork9·GameJigwiStageIntegration1·NoticeText4건이 모두 통과해 이전 지귀 실패8건이 해소됐음을 확인했다.
 - 수정 없는 같은 main `f9d13362`에서 이전 실패17건을 재실행: **8/17 통과·9실패·skip0**, 29.98초. 남은 실패9건의 이름과 메시지가 변경본과 모두 동일하다. 구슬 표시 크기2·게임 흐름2·터치 먹물4·튜토리얼 로그1건이며 이번 변경에만 발생한 실패는 없다.
 - 전체 PlayMode 전수는 위 `e1e8d3e2` 통합 상태에서 수행했다. #620 추가 후에는 영향 묶음을 선별 재검사했으며 다시 전수 실행한 것으로 기록하지 않는다. Release·standalone·iOS·실제 다중 기기 네트워크 검증의 미실행 범위는 위와 같다.
+
+
+### #621 튜토리얼 조합대 뒤 사각 배경 제거 — 2026-11-10
+
+- `fix/#621-tutorial-combination-board-box`에서 튜토리얼 진입 후 조합대 위쪽에 사각형 한지 경계가 나타나는 현상을 재현했다. 튜토리얼은 일반 전투의 투명 배경 합성 경로를 사용하지 않아, 하단 입력 카메라의 별도 한지 패스가 계속 화면에 그려지고 있었다.
+- 튜토리얼에만 `GameTutorialBoardPresentation`을 연결했다. 기존 `OrbBoardPlate`의 텍스처·색·UV를 사용하고 현재 입력 카메라로 투영한 보드 영역에 표시한다. 기존 `LabOrbHudComposition.presentationBackdrop`과 `GameBoardBackgroundContinuation`으로 원본 알파 밖에 같은 스테이지 배경이 이어지게 했다. 합성 중에는 기존 종이 패스/중복 plate 렌더링을 끄고, 합성 비활성 시에는 원래 plate 표시를 복원한다.
+- 원본 조합대 에셋·Scene·입력 카메라 투영·보드 판정·튜토리얼 진행 규칙·일반 전투 경로는 변경하지 않았다. 묵이/금옥이/불이와 북·구슬의 기존 표시 순서를 유지한다.
+- Unity 6000.6.5f1에서 수정 전후 실제 GameView(402×874)를 캡처하여 조합대 위쪽의 사각 경계가 사라졌음을 확인했다. 이미지 생성이나 후처리를 하지 않았다.
+- `GameTutorialFlowTests` PlayMode **5/5 PASS**, 실패·skip 0, 62.02초. 원본 그림 유지, 입력 보드와 화면 중심 일치, 한지 카메라 패스 비활성, 배경 연결부의 투영 광선 일치 검사를 추가했다. 전체 튜토리얼의 북 넘기기·구슬 조합·완료 복귀와 대사 기록·재시작·나가기·건너뛰기도 통과했다.
+- 컴파일과 `git diff --check` 통과. 전체 테스트와 iOS/Android 실기기 검증은 실행하지 않았다.
+
+
+### #615 Figma UI 스트로크 복원 — 2026-11-10
+
+- `fix/#615-ui-stroke`에서 작업. 사용자 최종 요청에 따라 게임 오버·땅따먹기 결과 4개 화면과 #603 변경은 제외했다. 54개 제공 노드의 속성을 확인하고, 나머지 화면의 공통 버튼·HUD 컴포넌트에서 누락된 HEIST/SLASHER/GRINDHOUSE 브러시 윤곽을 원본 에셋으로 연결했다. 세부 범위·출처·재생성 방법은 `UI_STROKE_AUDIT_615.md`와 `Assets/Hapio/Art/UI/Strokes/Source/manifest.json`에 기록했다.
+- 18개 원본 표면/윤곽 에셋, 반투명 채움·스트로크의 개별 불투명도, 선택/눌림/비활성 상태, 컴포넌트 밖으로 나오는 CENTER 스트로크를 보존했다. 스태미나 여섯 칸은 기존 합성 둥근 사각형 대신 실제 Figma 브러시 마스크를 사용한다. 종이 채움은 논리 영역에 그리고 테두리를 그 위에 겹친다. 팀 자리 점선은 INSIDE 2pt의 중심선 반지름을 보정했다.
+- 공유 `GameLobby.prefab`과 `BattleUiTheme.asset`만 저장 자산을 갱신했다. 씬·통신·게임 판정·자리 좌표·버튼 네비게이션은 변경하지 않았다. 기존 `Assets/Gumiho_V1` 미추적 파일은 이번 작업과 무관해 수정하지 않았다.
+
+| 검사 | 결과 |
+| --- | --- |
+| GameFigmaStrokeTests (EditMode) | 3/3 PASS: 배율별 바깥 윤곽, 중복 배경 방지·상태 전환, 실제 GraphicRaycaster 클릭과 비활성 차단 |
+| GameLobbyAssetTests (EditMode) | 7/7 PASS |
+| GameBattleUiAssetTests (EditMode) | 2/2 PASS |
+| GameBattleUiPresentationTests (PlayMode) | 3/3 PASS: 1~3스테이지, 팀 HUD, 기존 일시정지 동작 |
+| GameLobbyViewTests (PlayMode) | 19/19 PASS: 실제 메뉴/방/자리 선택/복귀 흐름 |
+| Unity 렌더링 | 버튼 상태별 402×920 비교판 및 HUD 외곽선/스태미나 비교판 확인. 완성 게임 화면 캡처가 아닌 실제 UI 컴포넌트 렌더링이다. |
+
+선택 검사 합계 **34/34 PASS**, 실패·skip 0. 초기 EditMode 클릭 검사는 렌더 전 canvas depth가 없어 실패했으며, 카메라로 그린 뒤 실제 raycast를 검증하도록 수정해 통과했다. 전체 테스트·iOS/Android 실기기·여러 기기 네트워크 테스트는 실행하지 않았다. 원본 좌표와 버튼 클릭 사각형이 유지되는지 prefab 객체별 diff를 확인했다.
 
 
 ## 2026-11-10 — #627 피버 오색 구슬의 공통 클레이 VFX 연결

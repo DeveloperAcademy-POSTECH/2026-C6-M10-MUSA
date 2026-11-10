@@ -122,7 +122,7 @@ namespace Hapio.Tests
             player.AdvanceTime(.2f);
             player.Next();
             Assert.That(player.CurrentView, Is.SameAs(card));
-            player.AdvanceTime(.2f);
+            player.AdvanceTime(card.exitCloudWipe.SwapTime - .2f);
             Assert.That(player.CurrentCutIndex, Is.EqualTo(1));
             Assert.That(player.IsTransitioning, Is.True);
             Assert.That(player.cutHost.GetChild(player.cutHost.childCount - 1).GetComponent<StoryCloudWipe>(), Is.Not.Null);
@@ -141,6 +141,188 @@ namespace Hapio.Tests
             Assert.That(line.GetComponent<CanvasGroup>().alpha, Is.EqualTo(1f));
             Assert.That(player.IsReading, Is.True);
             yield return null;
+        }
+
+        StoryCloudWipe SharedWipe()
+        {
+            var prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<StoryCloudWipe>(
+                "Assets/Hapio/Story/StageStories/Views/StoryCloudWipe.prefab");
+            Assert.That(prefab, Is.Not.Null);
+            root = Object.Instantiate(prefab.gameObject);
+            ((RectTransform)root.transform).sizeDelta = new Vector2(402, 874);
+            return root.GetComponent<StoryCloudWipe>();
+        }
+
+        [Test] public void SharedWipeKeepsCoveredFrameAndCallsEachCallbackOnce()
+        {
+            var wipe = SharedWipe();
+            int swaps = 0, completed = 0;
+            Assert.That(wipe.TryPlay(() =>
+            {
+                swaps++;
+                Assert.That(root.GetComponentInChildren<CanvasGroup>().alpha, Is.EqualTo(1));
+            }, () => completed++), Is.True);
+            Assert.That(wipe.TryPlay(() => Assert.Fail("Duplicate request")), Is.False);
+            Assert.That(root.GetComponent<Image>().raycastTarget, Is.True);
+            wipe.Advance(10);
+            Assert.That(swaps, Is.EqualTo(1));
+            Assert.That(completed, Is.Zero);
+            Assert.That(wipe.IsPlaying, Is.True, "Slow frames must not skip full cover.");
+            wipe.Advance(10);
+            wipe.Advance(10);
+            Assert.That(completed, Is.EqualTo(1));
+            Assert.That(root.GetComponentInChildren<CanvasGroup>().alpha, Is.Zero);
+            Assert.That(root.GetComponent<Image>().raycastTarget, Is.False);
+        }
+
+        [Test] public void SharedWipeStaggersCloudsAndSwapsOnlyAfterFullCover()
+        {
+            var wipe = SharedWipe();
+            var serialized = new UnityEditor.SerializedObject(wipe);
+            var clouds = serialized.FindProperty("clouds");
+            var positions = new Vector2[clouds.arraySize];
+            wipe.Sample(0);
+            for (int i = 0; i < clouds.arraySize; i++)
+                positions[i] = ((RectTransform)clouds.GetArrayElementAtIndex(i)
+                    .FindPropertyRelative("rect").objectReferenceValue).anchoredPosition;
+            wipe.Sample(wipe.SwapTime * .05f);
+            int moved = 0;
+            for (int i = 0; i < clouds.arraySize; i++)
+                if (((RectTransform)clouds.GetArrayElementAtIndex(i)
+                    .FindPropertyRelative("rect").objectReferenceValue).anchoredPosition != positions[i]) moved++;
+            Assert.That(moved, Is.InRange(1, clouds.arraySize - 1), "Clouds must not start together.");
+            int swaps = 0;
+            wipe.TryPlay(() =>
+            {
+                swaps++;
+                Assert.That(root.GetComponentInChildren<CanvasGroup>().alpha, Is.EqualTo(1));
+                for (int i = 0; i < clouds.arraySize; i++)
+                {
+                    var cloud = clouds.GetArrayElementAtIndex(i);
+                    Assert.That(((RectTransform)cloud.FindPropertyRelative("rect").objectReferenceValue).anchoredPosition,
+                        Is.EqualTo(cloud.FindPropertyRelative("covered").vector2Value));
+                }
+            });
+            wipe.Advance(wipe.SwapTime - .01f);
+            Assert.That(swaps, Is.Zero);
+            wipe.Advance(.02f);
+            Assert.That(swaps, Is.EqualTo(1));
+            wipe.Advance(.05f);
+            Assert.That(root.GetComponentInChildren<CanvasGroup>().alpha, Is.EqualTo(1));
+            wipe.Advance(wipe.Duration);
+            for (int i = 0; i < clouds.arraySize; i++)
+            {
+                var rect = (RectTransform)clouds.GetArrayElementAtIndex(i)
+                    .FindPropertyRelative("rect").objectReferenceValue;
+                Assert.That(rect.anchoredPosition.x <= -rect.rect.width || rect.anchoredPosition.x >= 402f, Is.True);
+            }
+        }
+
+        [Test] public void SharedWipeDepartureFinishesInWavesInsteadOfCatchingUpAtOneDeadline()
+        {
+            var wipe = SharedWipe();
+            var serialized = new UnityEditor.SerializedObject(wipe);
+            var clouds = serialized.FindProperty("clouds");
+            var outside = new Vector2[clouds.arraySize];
+            wipe.Sample(wipe.Duration);
+            for (int i = 0; i < clouds.arraySize; i++)
+                outside[i] = ((RectTransform)clouds.GetArrayElementAtIndex(i)
+                    .FindPropertyRelative("rect").objectReferenceValue).anchoredPosition;
+            float openSeconds = serialized.FindProperty("openSeconds").floatValue;
+            float openStart = wipe.Duration - openSeconds;
+            wipe.Sample(openStart + openSeconds * .85f);
+            int finished = 0;
+            for (int i = 0; i < clouds.arraySize; i++)
+                if (((RectTransform)clouds.GetArrayElementAtIndex(i)
+                    .FindPropertyRelative("rect").objectReferenceValue).anchoredPosition == outside[i]) finished++;
+            Assert.That(finished, Is.InRange(1, clouds.arraySize - 1),
+                "Some clouds must have departed while the trailing clouds are still moving.");
+            wipe.Sample(wipe.Duration);
+            for (int i = 0; i < clouds.arraySize; i++)
+                Assert.That(((RectTransform)clouds.GetArrayElementAtIndex(i)
+                    .FindPropertyRelative("rect").objectReferenceValue).anchoredPosition, Is.EqualTo(outside[i]));
+        }
+
+        [Test] public void SmallCloudsTrailTheLargeCloudsAndLeaveNoStaticOverlay()
+        {
+            var wipe = SharedWipe();
+            var serialized = new UnityEditor.SerializedObject(wipe);
+            var clouds = serialized.FindProperty("clouds");
+            Assert.That(clouds.arraySize, Is.EqualTo(9));
+            var outside = new Vector2[clouds.arraySize];
+            wipe.Sample(0f);
+            for (int i = 0; i < clouds.arraySize; i++)
+                outside[i] = ((RectTransform)clouds.GetArrayElementAtIndex(i)
+                    .FindPropertyRelative("rect").objectReferenceValue).anchoredPosition;
+            float opening = serialized.FindProperty("openSeconds").floatValue;
+            wipe.Sample(wipe.Duration - opening * .08f);
+            for (int i = 0; i < 6; i++)
+                Assert.That(((RectTransform)clouds.GetArrayElementAtIndex(i)
+                    .FindPropertyRelative("rect").objectReferenceValue).anchoredPosition, Is.EqualTo(outside[i]));
+            var last = (RectTransform)clouds.GetArrayElementAtIndex(8)
+                .FindPropertyRelative("rect").objectReferenceValue;
+            Assert.That(last.anchoredPosition, Is.Not.EqualTo(outside[8]));
+            wipe.Cancel();
+            for (int i = 0; i < clouds.arraySize; i++)
+                Assert.That(((RectTransform)clouds.GetArrayElementAtIndex(i)
+                    .FindPropertyRelative("rect").objectReferenceValue).anchoredPosition, Is.EqualTo(outside[i]));
+        }
+
+        [Test] public void SmallCloudsExitLeftRightLeftWithoutReversingDuringDeparture()
+        {
+            var wipe = SharedWipe();
+            var serialized = new UnityEditor.SerializedObject(wipe);
+            var clouds = serialized.FindProperty("clouds");
+            float opening = serialized.FindProperty("openSeconds").floatValue;
+            float start = wipe.Duration - opening;
+            var previous = new float[3];
+            for (int i = 0; i < 3; i++)
+                previous[i] = clouds.GetArrayElementAtIndex(6 + i).FindPropertyRelative("covered").vector2Value.x;
+            for (int frame = 0; frame <= 60; frame++)
+            {
+                wipe.Sample(start + opening * frame / 60f);
+                for (int i = 0; i < 3; i++)
+                {
+                    var rect = (RectTransform)clouds.GetArrayElementAtIndex(6 + i).FindPropertyRelative("rect").objectReferenceValue;
+                    float x = rect.anchoredPosition.x;
+                    Assert.That(i == 1 ? x >= previous[i] - .001f : x <= previous[i] + .001f, Is.True);
+                    previous[i] = x;
+                    if (frame == 60) Assert.That(i == 1 ? x >= 402f : x <= -rect.rect.width, Is.True);
+                }
+            }
+        }
+
+        [Test] public void SharedWipeDisableDropsCallbacksAndCanReplay()
+        {
+            var wipe = SharedWipe();
+            int swaps = 0, completed = 0;
+            wipe.TryPlay(() => swaps++, () => completed++);
+            wipe.Advance(.1f);
+            root.SetActive(false);
+            root.SetActive(true);
+            wipe.Advance(10);
+            Assert.That(swaps + completed, Is.Zero);
+            Assert.That(root.GetComponent<Image>().raycastTarget, Is.False);
+            Assert.That(wipe.TryPlay(() => swaps++, () => completed++), Is.True);
+            wipe.Advance(10);
+            wipe.Cancel();
+            wipe.Advance(10);
+            Assert.That(swaps, Is.EqualTo(1));
+            Assert.That(completed, Is.Zero);
+            Assert.That(root.GetComponentInChildren<CanvasGroup>().alpha, Is.Zero);
+        }
+
+        [UnityTest] public IEnumerator SharedWipeRunsWhileGameTimeIsPaused()
+        {
+            var wipe = SharedWipe();
+            int swaps = 0, completed = 0;
+            Time.timeScale = 0;
+            Assert.That(wipe.TryPlay(() => swaps++, () => completed++), Is.True);
+            float deadline = Time.realtimeSinceStartup + 5;
+            while (wipe.IsPlaying && Time.realtimeSinceStartup < deadline) yield return null;
+            Assert.That(swaps, Is.EqualTo(1));
+            Assert.That(completed, Is.EqualTo(1));
+            Assert.That(wipe.IsPlaying, Is.False);
         }
 
         [Test] public void EndingNoticeWaitsForDarkenedPicture()

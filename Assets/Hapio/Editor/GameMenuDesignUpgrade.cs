@@ -113,6 +113,7 @@ namespace Hapio.Editor
                 Place(view.teamSoloButton.transform, 111, 600, 180, 34);
                 view.modePanel.SetActive(false);
                 EditorUtility.SetDirty(view);
+                GameFigmaButton.Apply(view);
                 PrefabUtility.SaveAsPrefabAsset(root, GameLobbySceneUpgrade.PrefabPath);
             }
             finally { PrefabUtility.UnloadPrefabContents(root); }

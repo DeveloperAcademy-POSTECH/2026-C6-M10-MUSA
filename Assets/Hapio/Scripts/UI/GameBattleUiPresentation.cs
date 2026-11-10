@@ -90,10 +90,15 @@ namespace Hapio
             Guide(stamina, 111, 804, 241, 39);
             foreach (Transform child in stamina) if (child != hud.staminaFill.transform) child.gameObject.SetActive(false);
             Place(hud.staminaFill.rectTransform, 9, 8, 223, 23);
+            var cellSurface = GameFigmaStrokeLibrary.Find("StaminaCells");
+            if (cellSurface != null)
+                Place(hud.staminaFill.rectTransform, 9 + cellSurface.offset.x, 8 + cellSurface.offset.y,
+                    cellSurface.exportSize.x, cellSurface.exportSize.y);
             hud.staminaFill.sprite = theme.staminaCells; hud.staminaFill.color = Color.white;
             if (hud.staminaFill is LabShapeFillImage cells)
             { cells.filledColor = GameBattleUiColors.Blue; cells.emptyColor = GameBattleUiColors.BlueEmpty; }
             staminaFrame = Frame(stamina, "Stage Stamina Outline", new Rect(0,0,241,39), GameBattleUiColors.Brown, 6, 11);
+            staminaFrame.UseBrush("Stamina");
             hud.playerCircleSprites = theme.playerBadges;
             Guide(hud.localPlayerCircle.rectTransform, territory ? 57 : 58, 800, 45, 47);
             if (hud.leftPlayerCircle != null) hud.leftPlayerCircle.rectTransform.sizeDelta = new Vector2(45,47);
@@ -169,6 +174,7 @@ namespace Hapio
             var outline = root.Find("Figma Team Outline");
             if (outline == null) outline = PaperFrame(root,"Figma Team Outline",new Rect(0,0,342,27),ink,3,8,false);
             outline.GetComponent<GameUiFrame>().color = ink; outline.SetAsFirstSibling();
+            root.Find("Figma Team Outline Paper Mask")?.SetAsFirstSibling();
             var blue = root.Find("Fill Mask/Blue Fill").GetComponent<Image>(); blue.color = GameBattleUiColors.Blue;
             var red = root.Find("Fill Mask/Red Fill").GetComponent<Image>(); red.color = GameBattleUiColors.Fire;
             foreach (Transform child in root) if (child.name.StartsWith("Tick ")) child.gameObject.SetActive(false);
@@ -202,12 +208,17 @@ namespace Hapio
         {
             var root = Rect(parent, name);
             if (guide) Guide(root,area.x,area.y,area.width,area.height); else Place(root,area.x,area.y,area.width,area.height);
-            var mask = Rect(root, "Paper Mask"); Place(mask, stroke,stroke,area.width-2*stroke,area.height-2*stroke);
-            var shape = mask.gameObject.AddComponent<LabRoundedGraphic>(); shape.radius = radius-stroke; shape.raycastTarget = false;
+            // Figma fills the logical shape underneath a centred stroke. Draw paper first, then the brush,
+            // instead of leaving the old inside-stroke inset as a transparent gap around the paper.
+            var mask = Rect(parent, name + " Paper Mask");
+            if (guide) Guide(mask,area.x,area.y,area.width,area.height); else Place(mask,area.x,area.y,area.width,area.height);
+            mask.SetSiblingIndex(root.GetSiblingIndex());
+            var shape = mask.gameObject.AddComponent<LabRoundedGraphic>(); shape.radius = radius; shape.raycastTarget = false;
             mask.gameObject.AddComponent<Mask>().showMaskGraphic = false;
-            var paper = Picture(mask, "Paper", theme.paper, new Rect(0,0,area.width-2*stroke,area.height-2*stroke));
+            var paper = Picture(mask, "Paper", theme.paper, new Rect(0,0,area.width,area.height));
             paper.color = new Color(1,1,1,name == "Frame" || name == "Figma Team Outline" ? .6f : 1);
             var frame = root.gameObject.AddComponent<GameUiFrame>(); frame.color = border; frame.stroke = stroke; frame.radius = radius; frame.raycastTarget = false;
+            frame.UseBrush(name == "Time" ? "Time" : name == "Paper" ? "Pause" : name == "Figma Team Outline" ? "TeamPaint" : "Paint");
             return root;
         }
         private static GameUiFrame Frame(Transform parent, string name, Rect box, Color color, float stroke, float radius)

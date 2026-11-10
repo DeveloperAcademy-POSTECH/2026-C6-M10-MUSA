@@ -612,12 +612,12 @@ namespace C6Lab
         [SerializeField, Range(1f, 3f)] private float jigwiTalismanWaterPaintScale = 1.5f;
         [Tooltip("#540 Inspector 전용(Host): 부적을 다 쓴 뒤 보상 구슬이 판에 생기기까지 (초). 부적 완성 연출(불 꺼짐 → 가락 → 도장 → 접혀 떨어짐)이 판에 닿는 때와 맞춘다. 0이면 바로.")]
         [SerializeField, Range(0f, 8f)] private float jigwiTalismanRewardDelaySeconds = 0f;
-        [Tooltip("#540 Inspector 전용(각 기기): 부적을 못 써 판이 탄 뒤, 그 사람 북에 불이 붙어 가벼워지는 가장 긴 시간(초). 다른 기믹 예고나 피버가 오면 그 전에 꺼진다. 0이면 끔.")]
-        [SerializeField, Range(0f, 15f)] private float jigwiAFailDrumSlipSeconds = 0f;
+        [Tooltip("#540 Inspector 전용(각 기기): 부적을 못 써 판이 탄 뒤, 그 사람 북에 불이 붙어 가벼워지는 가장 긴 시간(초). 다음 부적 예고나 피버가 오면 그 전에 꺼진다(#626부터 연기 예고에는 꺼지지 않음). 0이면 끔.")]
+        [SerializeField, Range(0f, 30f)] private float jigwiAFailDrumSlipSeconds = 0f;
         [Tooltip("#540 Inspector 전용(각 기기): 불붙은 북이 얼마나 가벼운지. 옆으로 밀 때 빠르기는 이 배, 미끄러지며 느려지는 정도는 1/이 배 (2면 같은 스와이프로 약 8배 멀리).")]
         [SerializeField, Range(1f, 4f)] private float jigwiAFailDrumSlipBoost = 2f;
         [Tooltip("#479 Inspector 전용(각 기기): 부적 점선 \"물\" 중 이만큼 칠하면 다 쓴 것으로 본다 (0~1).")]
-        [SerializeField, Range(.3f, 1f)] private float jigwiTalismanCoverage = .9f;
+        [SerializeField, Range(.3f, 1f)] private float jigwiTalismanCoverage = .85f;
         [Tooltip("#479 Inspector 전용(각 기기): 손가락이 점선에서 이만큼(글자 칸 크기 대비) 떨어져도 칠한다. 클수록 쉽다.")]
         [SerializeField, Range(.02f, .2f)] private float jigwiTalismanTolerance = .07f;
         [Tooltip("#509 Inspector 전용(Host): B 성공 때 지목된 사람마다 박에 떨어지는 물벼락의 칠 크기(한 번 맞힘 대비, 최대 3).")]
@@ -1220,9 +1220,9 @@ namespace C6Lab
         public int JigwiTalismanWaterCount => Mathf.Clamp(jigwiTalismanWaterCount, 0, 6);
         public float JigwiTalismanWaterPaintScale => Mathf.Clamp(Finite(jigwiTalismanWaterPaintScale, 1.5f), 1f, 3f);
         public float JigwiTalismanRewardDelaySeconds => Mathf.Clamp(Finite(jigwiTalismanRewardDelaySeconds, 0f), 0f, 8f);
-        public float JigwiAFailDrumSlipSeconds => Mathf.Clamp(Finite(jigwiAFailDrumSlipSeconds, 0f), 0f, 15f);
+        public float JigwiAFailDrumSlipSeconds => Mathf.Clamp(Finite(jigwiAFailDrumSlipSeconds, 0f), 0f, 30f);
         public float JigwiAFailDrumSlipBoost => Mathf.Clamp(Finite(jigwiAFailDrumSlipBoost, 2f), 1f, 4f);
-        public float JigwiTalismanCoverage => Mathf.Clamp(Finite(jigwiTalismanCoverage, .9f), .3f, 1f);
+        public float JigwiTalismanCoverage => Mathf.Clamp(Finite(jigwiTalismanCoverage, .85f), .3f, 1f);
         public float JigwiTalismanTolerance => Mathf.Clamp(Finite(jigwiTalismanTolerance, .07f), .02f, .2f);
         public float JigwiBSplashPaintShare => Mathf.Clamp(Finite(jigwiBSplashPaintShare, 3f), 0f, 3f);
         public float JigwiBBoardFireSeconds => Mathf.Clamp(Finite(jigwiBBoardFireSeconds, 3f), 0f, 10f);

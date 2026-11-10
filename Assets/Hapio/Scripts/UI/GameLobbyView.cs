@@ -131,6 +131,7 @@ namespace Hapio
 
         private void Awake()
         {
+            GameFigmaButton.Apply(this);
             originalBackground = background.texture;
             session = GameSession.EnsureExists();
             if (screen == null) screen = GetComponentInParent<GameScreen>();

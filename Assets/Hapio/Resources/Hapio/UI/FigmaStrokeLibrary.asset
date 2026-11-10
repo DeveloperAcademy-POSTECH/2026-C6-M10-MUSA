@@ -1,0 +1,123 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 42c014ba6e1e84fd884deb0d080b6dfc, type: 3}
+  m_Name: FigmaStrokeLibrary
+  m_EditorClassIdentifier: Hapio.Runtime::Hapio.GameFigmaStrokeLibrary
+  surfaces:
+  - name: Start
+    source: 3905:104
+    sprite: {fileID: 21300000, guid: c2fbaf3c81ac74485ad9bc6bc4eab159, type: 3}
+    size: {x: 293, y: 56}
+    offset: {x: -0.09474373, y: -4}
+    exportSize: {x: 295, y: 62}
+  - name: Create
+    source: 3905:107
+    sprite: {fileID: 21300000, guid: 13b6a13369d1746128c779b08d69ee82, type: 3}
+    size: {x: 348, y: 45}
+    offset: {x: -0.45913696, y: -2.5}
+    exportSize: {x: 350, y: 49}
+  - name: Chip
+    source: 3905:111
+    sprite: {fileID: 21300000, guid: 59d8637a455b44284b385d670341a7a4, type: 3}
+    size: {x: 48, y: 38}
+    offset: {x: -1.0793457, y: -1.835619}
+    exportSize: {x: 52, y: 42}
+  - name: ChipSelected
+    source: 4405:2966
+    sprite: {fileID: 21300000, guid: 699387fd7d22746f9a4c84ccc8886a83, type: 3}
+    size: {x: 48, y: 38}
+    offset: {x: -1.0793457, y: -1.8356171}
+    exportSize: {x: 52, y: 42}
+  - name: RoomDark
+    source: 3905:170
+    sprite: {fileID: 21300000, guid: 76580b5d1439c45139dbd8ee16d7b3a3, type: 3}
+    size: {x: 348, y: 84}
+    offset: {x: -0.49858665, y: -2.3051796}
+    exportSize: {x: 351, y: 88}
+  - name: RoomDarkPressed
+    source: 4448:1652
+    sprite: {fileID: 21300000, guid: 27fa9a51ea0ad4e76880ffa4bca88561, type: 3}
+    size: {x: 348, y: 84}
+    offset: {x: -0.49858737, y: -2.3051789}
+    exportSize: {x: 351, y: 88}
+  - name: RoomLight
+    source: 4448:1660
+    sprite: {fileID: 21300000, guid: 85e8bd3adc3a04502b2fd2e14234889b, type: 3}
+    size: {x: 348, y: 84}
+    offset: {x: -0.49858737, y: -2.3051789}
+    exportSize: {x: 351, y: 88}
+  - name: RoomLightPressed
+    source: 4448:1668
+    sprite: {fileID: 21300000, guid: c7c18a46cf9ef4042abe4ac9244a205e, type: 3}
+    size: {x: 348, y: 84}
+    offset: {x: -0.49858737, y: -2.3051789}
+    exportSize: {x: 351, y: 88}
+  - name: Mode
+    source: 4263:1425
+    sprite: {fileID: 21300000, guid: faa2dc186fa54447983d7c9fbb49dcc0, type: 3}
+    size: {x: 303, y: 48}
+    offset: {x: -0.17369556, y: -2.5}
+    exportSize: {x: 304, y: 52}
+  - name: ModeDisabled
+    source: 4263:1512
+    sprite: {fileID: 21300000, guid: b3ed00f7f0334491ea1f1076b880fe24, type: 3}
+    size: {x: 303, y: 48}
+    offset: {x: -0.17369542, y: -2.5}
+    exportSize: {x: 304, y: 52}
+  - name: SealWait
+    source: 3897:74
+    sprite: {fileID: 21300000, guid: dcfac7044097e4fcab1b20ace62aa30a, type: 3}
+    size: {x: 349, y: 56}
+    offset: {x: -0.5794678, y: -4}
+    exportSize: {x: 351, y: 62}
+  - name: SealReady
+    source: 3912:519
+    sprite: {fileID: 21300000, guid: cc6691795e7d1489ba10c986b02c5a2d, type: 3}
+    size: {x: 349, y: 58}
+    offset: {x: -0.6057739, y: -4}
+    exportSize: {x: 351, y: 64}
+  - name: Time
+    source: 4212:2150
+    sprite: {fileID: 21300000, guid: 012156133afe249bb99cc479d00eaf31, type: 3}
+    size: {x: 77, y: 30}
+    offset: {x: -1.2828674, y: -1.5236435}
+    exportSize: {x: 80, y: 34}
+  - name: Pause
+    source: 4405:3872
+    sprite: {fileID: 21300000, guid: d6dbc76110b484f56820c956b165d5d9, type: 3}
+    size: {x: 30, y: 30}
+    offset: {x: -1.3746731, y: -1.5573609}
+    exportSize: {x: 33, y: 33}
+  - name: Paint
+    source: 4185:2764
+    sprite: {fileID: 21300000, guid: 75544544edf854ee186c61ffd87b3f1e, type: 3}
+    size: {x: 242, y: 27}
+    offset: {x: -1.4182515, y: -1.1427314}
+    exportSize: {x: 245, y: 30}
+  - name: TeamPaint
+    source: 4185:2886
+    sprite: {fileID: 21300000, guid: fe1c31c70892f46beb7d7e399aa2f9b6, type: 3}
+    size: {x: 342, y: 27}
+    offset: {x: -1.2945919, y: -1.1427307}
+    exportSize: {x: 345, y: 30}
+  - name: Stamina
+    source: 4212:3071
+    sprite: {fileID: 21300000, guid: 3b03c9f01ce284cea8c68a48f1a4ff83, type: 3}
+    size: {x: 241, y: 39}
+    offset: {x: -3, y: -2.2854633}
+    exportSize: {x: 247, y: 44}
+  - name: StaminaCells
+    source: 4212:2943
+    sprite: {fileID: 21300000, guid: 7f815ba48110646dcb40cb5c21a23832, type: 3}
+    size: {x: 223, y: 23}
+    offset: {x: -0.75, y: -0.76171875}
+    exportSize: {x: 224.66667, y: 24.666666}
