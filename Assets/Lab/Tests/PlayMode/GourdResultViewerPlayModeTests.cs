@@ -32,14 +32,14 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
-        public IEnumerator DefaultsEnableBothFeaturesButCreateOnlyTheLightweightObserverBeforeAResult()
+        public IEnumerator DefaultsEnableTheViewerWithPatternsOffButCreateOnlyTheLightweightObserverBeforeAResult()
         {
             yield return SceneManager.LoadSceneAsync("Lab", LoadSceneMode.Single);
             yield return null;
             LabNetwork network = Object.FindFirstObjectByType<LabNetwork>();
             Assert.That(network, Is.Not.Null);
             Assert.That(network.config.CompletedGourdViewerEnabled, Is.True);
-            Assert.That(network.config.PlayerPaintPatternsEnabled, Is.True);
+            Assert.That(network.config.PlayerPaintPatternsEnabled, Is.False);
             LabGourdResultViewer viewer = Object.FindObjectsByType<LabGourdResultViewer>(FindObjectsSortMode.None)
                 .Single(item => item.Network == network);
             Assert.That(LabGourdResultViewer.Attach(network), Is.SameAs(viewer),
@@ -234,7 +234,7 @@ namespace C6Lab.Tests
                 yield return null;
                 Assert.That(network.config, Is.SameAs(savedNetwork));
                 Assert.That(network.config.CompletedGourdViewerEnabled, Is.True);
-                Assert.That(network.config.PlayerPaintPatternsEnabled, Is.True);
+                Assert.That(network.config.PlayerPaintPatternsEnabled, Is.False);
                 Assert.That(savedNetwork.CaptureDeveloperValues(), Is.EqualTo(savedTuning));
             }
             finally

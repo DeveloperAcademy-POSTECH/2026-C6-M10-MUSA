@@ -61,8 +61,7 @@ namespace C6Lab.Tests
 
             RectTransform[] parents = images.Select(image => (RectTransform)image.transform.parent).ToArray();
             Assert.That(network.SetTargetParticipantCount(5), Is.True);
-            network.Host();
-            Assert.That(network.IsHost, Is.True, network.Notice);
+            HostWithPlayerPaintPatterns();
             yield return null;
             Assert.That(network.LocalSlotNumber, Is.Zero);
             // The existing HorizontalLayoutGroup runs when the formerly hidden lobby opens.
@@ -105,8 +104,8 @@ namespace C6Lab.Tests
         [UnityTest]
         public IEnumerator DeveloperRoomApplyHidesAndRestoresAllSamplesWithoutChangingPlayerIdentity()
         {
-            Assert.That(network.config.PlayerPaintPatternsEnabled, Is.True,
-                "The saved room configuration enables player patterns by default.");
+            Assert.That(network.config.PlayerPaintPatternsEnabled, Is.False,
+                "The saved room configuration disables player patterns by default; the DEV room apply below turns them on.");
             Assert.That(network.SetTargetParticipantCount(5), Is.True);
             network.Host();
             Assert.That(network.IsHost, Is.True, network.Notice);
@@ -204,8 +203,7 @@ namespace C6Lab.Tests
         [UnityTest]
         public IEnumerator BattleSamplesUseActualPSeatsRatherThanHostConnectionOrSnapshotArrayOrder()
         {
-            network.Host();
-            Assert.That(network.IsHost, Is.True, network.Notice);
+            HostWithPlayerPaintPatterns();
             network.enabled = false;
             hud.enabled = false;
             ulong local = network.LocalPlayerId;
@@ -257,6 +255,23 @@ namespace C6Lab.Tests
                 Assert.That(sample.sprite, Is.Null, "Returning to lobby must not leave a stale battle ownership sample.");
             }
             yield break;
+        }
+
+        /// <summary>
+        /// Player paint patterns default OFF (DEV 137). Open the room through the ordinary
+        /// DEV Host form with 137 ON so the source LabConfig asset stays unchanged.
+        /// </summary>
+        private void HostWithPlayerPaintPatterns()
+        {
+            LabDeveloperMode developer = hud.GetComponent<LabDeveloperMode>();
+            float[] sourceValues = developer.sourceConfig.CaptureDeveloperValues();
+            developer.Open();
+            developer.valueInputs[137].text = "1";
+            developer.ApplyAndHost();
+            Assert.That(network.IsHost, Is.True, developer.feedbackText.text + " " + network.Notice);
+            Assert.That(network.config, Is.Not.SameAs(developer.sourceConfig));
+            Assert.That(network.config.PlayerPaintPatternsEnabled, Is.True, developer.feedbackText.text);
+            Assert.That(developer.sourceConfig.CaptureDeveloperValues(), Is.EqualTo(sourceValues));
         }
 
         private static void AssertSample(Image sample, int number)

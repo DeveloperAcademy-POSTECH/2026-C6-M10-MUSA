@@ -145,7 +145,7 @@ MonoBehaviour:
   paintDryingPercentPerSecond: 0.2
   paintNearbyHitRadiusDegrees: 20
   completedGourdViewerEnabled: 1
-  playerPaintPatternsEnabled: 1
+  playerPaintPatternsEnabled: 0
   gourdRopeCycleAmplitude: 0.45
   gourdRopeCyclePeriod: 3
   gourdRopeHitBounce: 0.32

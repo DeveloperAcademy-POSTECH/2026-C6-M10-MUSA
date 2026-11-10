@@ -18,18 +18,18 @@ namespace C6Lab.Tests
         [TearDown] public void Dispose() => Object.DestroyImmediate(config);
 
         [Test]
-        public void FreshAndAuthoredDefaultsEnableBothIndependentGourdPresentationSwitches()
+        public void FreshAndAuthoredDefaultsEnableTheViewerAndDisablePlayerPaintPatterns()
         {
             LabConfig authored = Resources.Load<LabConfig>("LabConfig");
             Assert.That(authored, Is.Not.Null);
             foreach (LabConfig source in new[] { config, authored })
             {
-                Assert.That(source.PlayerPaintPatternsEnabled, Is.True);
+                Assert.That(source.PlayerPaintPatternsEnabled, Is.False);
                 Assert.That(source.CompletedGourdViewerEnabled, Is.True);
                 float[] values = source.CaptureDeveloperValues();
                 Assert.That(values.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
                 Assert.That(values[110], Is.EqualTo(1f));
-                Assert.That(values[137], Is.EqualTo(1f));
+                Assert.That(values[137], Is.EqualTo(0f));
             }
             Assert.That(LabConfig.DeveloperFields[110].DisplayLabel, Is.EqualTo("Completed Gourd Viewer"));
             Assert.That(LabConfig.DeveloperFields[134].Label, Is.EqualTo("Paint Pattern"));
