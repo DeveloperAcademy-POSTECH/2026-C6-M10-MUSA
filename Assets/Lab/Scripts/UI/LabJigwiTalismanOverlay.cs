@@ -1394,11 +1394,14 @@ namespace C6Lab
         private bool OthersStillWriting()
         {
             LabSnapshot snapshot = source != null ? source.Snapshot : null;
-            if (snapshot?.jigwiAB?.rounds == null || RoundId == null) return false;
+            // #610: BeginFinish runs right after RoundId is cleared, so look the finished round up by writtenRound too.
+            // (It used to miss it, and the common talisman folded into a gold talisman orb that the Host never gives.)
+            string id = RoundId ?? writtenRound;
+            if (snapshot?.jigwiAB?.rounds == null || id == null) return false;
             foreach (LabJigwiABRound round in snapshot.jigwiAB.rounds)
             {
                 // #595: a common talisman gives no orbs at all (the reward is the waterfall), so it never folds into one.
-                if (round != null && round.id == RoundId && round.common) return true;
+                if (round != null && round.id == id && round.common) return true;
             }
             return false;
         }

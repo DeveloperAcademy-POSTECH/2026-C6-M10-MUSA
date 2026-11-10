@@ -1,5 +1,21 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-10 — 오프닝 쪽수 숨기기, 봉인 카드·실패 첫 컷 건너뛰기 없애기
+
+- **기준:** `fix/story-skip-and-page-number`, 커밋 `dd3c4488`(main `39e549e7` 위). Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 프리팹·Scene·접속 묶음·설정 수는 바꾸지 않았다.
+- **바꾼 것:** `StoryPlayer.hideProgress`를 추가해 게임의 오프닝(`GameOpeningController`)과 결과 이야기(`GameStageStoryPresentation`)에서 왼쪽 위 쪽수를 숨긴다. 제작용 미리보기 씬은 그대로 보인다. 결과 이야기의 건너뛰기는 봉인 카드 그림과 실패 첫 그림에서 숨긴다. 실패 이야기는 그림 한 장 뒤 대시보드라 실패 쪽에는 건너뛰기가 나오지 않는다. 엔딩이 끝나면 타이틀로 돌아가는 동작은 이미 있었고 검사를 더했다.
+
+| 확인 | 결과 |
+| --- | --- |
+| Mac 개발 빌드 화면(오프닝 첫 컷, 봉인 카드, 실패 컷, 후일담) | 쪽수 없음, 카드·실패 컷에 건너뛰기 없음, 후일담에 건너뛰기 있음 |
+| `GameSceneFlowTests`·`GameOpeningControllerTests`·`GameStageStoryPresentationTests` | 42/42 PASS |
+| 대조 실험(건너뛰기 조건 제거, 쪽수 숨김 제거) | 해당 검사 실패 |
+| 전체 EditMode / 전체 PlayMode(`dd3c4488`) | 2161/2161, 741/754 |
+
+- PlayMode 실패 13건(지귀 A/B 8건, 터치 먹물 4건, 튜토리얼 기록 1건)은 이 변경 전 main에서도 같게 실패한다.
+- 최신 main `e0a32da5` 병합 뒤 `GameSceneFlowTests`·`GameOpeningControllerTests` 34/36. 실패 2건(`DefeatDisconnectRestoresTerminalGameOver…`, `TerritoryDeveloperSoloUsesDesignedResults…`)은 병합 전 main `e0a32da5`에서도 같게 실패한다.
+- **미실행:** 실기기 화면, 멀티 게스트 화면.
+
 ## 2026-11-10 — #612 5인 자리 선택 P4·P5 위치
 
 - Figma `wW7ny7lNQ4DXNJ4kD46AuR`, `3908:252` 기준으로 공용 GameLobby 프리팹의 5인 배치만 수정했다. P4는 오른쪽 위, P5는 오른쪽 아래이며 생성 코드 GameSeatDesignUpgrade에도 반영했다. 번호별 에셋·버튼 배열·SelectSlot 연결·다른 인원 배치는 유지한다.

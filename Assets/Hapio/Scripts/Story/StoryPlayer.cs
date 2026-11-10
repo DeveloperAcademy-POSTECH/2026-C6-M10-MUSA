@@ -16,6 +16,8 @@ namespace Hapio
         public Text speakerText;
         public Text dialogueText;
         public Text progressText;
+        /// <summary>The game hides the authoring page counter; previews keep it.</summary>
+        public bool hideProgress;
         public Button nextButton;
         public Button previousButton;
         public Button skipButton;
@@ -351,7 +353,9 @@ namespace Hapio
                     currentView.speakerBadge != null && !string.IsNullOrWhiteSpace(currentPage.speaker);
             if (dialogueText != null) dialogueText.text = currentPage.dialogue;
             ApplySpeakerStyle();
-            if (progressText != null)
+            if (progressText != null && progressText.gameObject.activeSelf == hideProgress)
+                progressText.gameObject.SetActive(!hideProgress);
+            if (progressText != null && !hideProgress)
             {
                 int pages = sequence.cuts[CurrentCutIndex].PageCount;
                 progressText.text = pages > 1

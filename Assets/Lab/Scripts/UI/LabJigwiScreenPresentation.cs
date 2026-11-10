@@ -833,6 +833,8 @@ namespace C6Lab
         // ---------- #595 공용 부적 진행: 사람 수만큼 부적 아이콘이 놓이고, 쓴 사람 수만큼 환하게 켜진다(켜질 때 톡 튐) ----------
         private RectTransform talismanRow;
         private readonly UnityEngine.UI.Image[] talismanIcons = new UnityEngine.UI.Image[LabJigwiABNetworkValidation.MaximumPlayers];
+        /// <summary>#610 VFX 실험실(에디터 창)이 정하는 가짜 자리 수(0~4). 진짜 공용 부적의 자리 아이콘에만 더해진다.</summary>
+        public static int VfxLabFakeSeats;
         private readonly float[] talismanLitAt = { -1f, -1f, -1f, -1f, -1f };
         private static Sprite talismanIconSprite;
         /// <summary>테스트용: 지금 보이는 부적 아이콘 수 / 켜진 수.</summary>
@@ -840,13 +842,19 @@ namespace C6Lab
         public int TalismanIconsLit { get; private set; }
 
         private const double TalismanLingerSeconds = 1.5d;
+        /// <summary>
+        /// #610: an ended common talisman's icons stay until the small talismans take off. A completed one waits for the big
+        /// talisman's melody to end (CommonTalismanRevealSeconds) before they glow; a missed one just lingers a moment.
+        /// </summary>
+        private static double LingerUntil(LabJigwiABRound round) => round.resolvedAt + TalismanLingerSeconds
+            + (round.resolution == LabJigwiABResolution.Completed ? LabJigwiABTimeline.CommonTalismanRevealSeconds : 0d);
         /// <summary>#595: the common talisman running now, or the one that just ended (still lingering).</summary>
         private static LabJigwiABRound LastCommonTalisman(LabJigwiABSnapshot stage, double now)
         {
             LabJigwiABRound found = null;
             foreach (var round in stage?.rounds ?? Array.Empty<LabJigwiABRound>())
                 if (round != null && round.kind == LabJigwiABKind.PersonalBurn && round.common && now >= round.activeAt
-                    && (round.Active(now) || round.resolvedAt >= 0d && now < round.resolvedAt + TalismanLingerSeconds)) found = round;
+                    && (round.Active(now) || round.resolvedAt >= 0d && now < LingerUntil(round))) found = round;
             return found;
         }
 
@@ -861,13 +869,22 @@ namespace C6Lab
             // #595: also for a moment after it ends, so the last talisman written visibly lights its icon
             // (alone, writing it finishes the round at once).
             bool show = active != null && active.kind == LabJigwiABKind.PersonalBurn && active.common
-                && (active.Active(now) || active.resolvedAt >= 0d && now >= active.resolvedAt && now < active.resolvedAt + TalismanLingerSeconds
+                && (active.Active(now) || active.resolvedAt >= 0d && now >= active.resolvedAt && now < LingerUntil(active)
                     && (active.resolution == LabJigwiABResolution.Completed && active.id != sealedRound // #595: they flew to the boss
                         || active.resolution == LabJigwiABResolution.Expired));
             var seats = new List<LabJigwiABPlayerFire>();
             if (show)
                 foreach (var seat in active.players ?? Array.Empty<LabJigwiABPlayerFire>())
                     if (seat != null && seats.Count < talismanIcons.Length) { seats.Add(seat); if (seat.talismanAt >= 0d) done++; }
+            // #610 VFX 실험실: 혼자서도 여러 명이 쓰는 모습을 녹화하게, 진짜 공용 부적에 가짜 자리를 더한다(화면만, Host 판정 그대로).
+            // 가짜 자리는 부적이 시작되고 0.6초 간격으로 차례로 다 쓴 것처럼 켜진다. 실험실이 0이면 아무것도 더하지 않는다.
+            if (show && snapshot != null && VfxLabFakeSeats > 0)
+                for (int i = 0; i < VfxLabFakeSeats && seats.Count < talismanIcons.Length; i++)
+                {
+                    double litAt = active.activeAt + .6d * (i + 1);
+                    seats.Add(new LabJigwiABPlayerFire { playerId = 901ul + (ulong)i, talismanAt = now >= litAt ? litAt : -1d });
+                    if (now >= litAt) done++;
+                }
             total = seats.Count;
             TalismanIconsShown = total; TalismanIconsLit = Mathf.Min(done, total);
             if (total == 0) { if (talismanRow != null && talismanRow.gameObject.activeSelf) talismanRow.gameObject.SetActive(false); return; }
@@ -1066,7 +1083,8 @@ namespace C6Lab
         private float waterfallPulseAt = -1f;
         private float lastDropAt;
         private AudioSource sealAudio;
-        private const float GlowSeconds = 1f, FlySeconds = .4f, GlyphSeconds = .7f, PourSeconds = 2.2f; // #595 QA: a longer, grander pour
+        // #595 QA: a longer, grander pour. #610: GlowSeconds + FlySeconds = LabJigwiABTimeline.CommonTalismanPourSeconds (Host paints then).
+        private const float GlowSeconds = 1f, FlySeconds = .4f, GlyphSeconds = .7f, PourSeconds = 2.2f;
         /// <summary>테스트용: 완성 연출이 도는 중인지 / 폭포가 보이는지.</summary>
         public bool SealPlaying => sealStartedAt >= 0f;
         public bool WaterfallVisible => waterfall != null && waterfall.gameObject.activeInHierarchy;
@@ -1081,7 +1099,9 @@ namespace C6Lab
         {
             if (round == null || !round.common || round.kind != LabJigwiABKind.PersonalBurn
                 || round.resolution != LabJigwiABResolution.Completed || round.resolvedAt < 0d) return;
-            if (round.id == sealedRound || now < round.resolvedAt || now - round.resolvedAt > 1d) return;
+            // #610: the small talismans glow only after the big talisman's completion melody has ended.
+            double glowAt = round.resolvedAt + LabJigwiABTimeline.CommonTalismanRevealSeconds;
+            if (round.id == sealedRound || now < glowAt || now - glowAt > 1d) return;
             BeginSeal(round);
         }
 

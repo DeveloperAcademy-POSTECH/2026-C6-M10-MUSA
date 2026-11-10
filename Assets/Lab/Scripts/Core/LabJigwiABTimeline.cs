@@ -28,6 +28,13 @@ namespace C6Lab
         public const int ATestSchedule = 4;
         /// <summary>#595: 연기 B가 시작되고(지귀 예고 2초 뒤) 박이 달아오르다 연기가 뿜어져 나오기까지(초). 모든 자리가 같다.</summary>
         public const double SmokeLeadSeconds = 1.5d;
+        /// <summary>
+        /// #610 공용 부적: 마지막 사람이 다 쓴 뒤, 큰 부적의 완성 가락("둥 둥 둥 .. 둥!", 마지막 음 2.3초 포함)이 끝나고 나서
+        /// 위의 작은 부적들이 빛나기 시작하기까지(초). 모든 기기의 화면과 Host의 폭포 칠이 이 시각을 함께 본다.
+        /// </summary>
+        public const double CommonTalismanRevealSeconds = 4.5d;
+        /// <summary>#610 공용 부적: 작은 부적이 빛나고(1초) 박으로 날아가(0.4초) 폭포가 박에 닿기까지(초).</summary>
+        public const double CommonTalismanPourSeconds = 1.4d;
         public const double WarningSeconds = 2d; // #509: 2초 예고(지귀 도발 문구를 읽을 시간)
         /// <summary>#509: A2 moved 40 → 42 so it never starts with the common bomb at 40.</summary>
         private static readonly double[] ActivationOffsets = { 5d, 25d, 42d, 55d, 70d, 85d };
