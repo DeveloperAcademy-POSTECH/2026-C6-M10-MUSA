@@ -17,7 +17,7 @@
 | 전체 PlayMode | 753/755 |
 
 - 전체 PlayMode의 실패 2건(`LabOrbBoardTrailTests.PendingLaunchStaysClear…`, `LabPlayerPaintPatternRenderTests.ActualSavedShaderDistinguishes…`)은 이번에 고치지 않은 파일이다. 같은 브랜치의 앞선 전체 실행에서는 통과했고, 따로 돌리면 15/15 PASS라 간헐 실패로 남긴다.
-- 검사를 돌린 뒤 main `34cabe25`(#616 NoticeText)를 병합했다. 병합 뒤에는 다시 돌리지 않았다.
+- 그 뒤 main `34cabe25`(#616 NoticeText, `GameScreen.cs` 변경)를 병합하고 관련 묶음을 다시 돌렸다: 결과 EditMode 21/21, `GameSceneFlowTests`·터치 먹물·튜토리얼·콤보 구슬·`GameNoticeSettingsTests` PlayMode 44/44 PASS. 병합 뒤 전체 묶음은 다시 돌리지 않았다.
 - **미실행:** 실기기·멀티 화면.
 - **남은 사양 질문:** 2:2 새 결과의 "다시 도전" 버튼과 #293 정책(박 확인·나가기만) 사이의 차이, 이탈이 아닌 게임 오버(로드 시간 초과)도 같은 이탈 화면으로 가는 것.
 
