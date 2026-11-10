@@ -426,14 +426,18 @@ namespace Hapio.Tests
             Assert.That(session.ResultSnapshot.blueCells, Is.EqualTo(surface.CellCount));
             Assert.That(session.ResultSnapshot.redCells, Is.Zero);
             GameScreen screen = Object.FindFirstObjectByType<GameScreen>();
-            GameStageResultView view = screen.resultView;
-            Assert.That(view.gameObject.activeInHierarchy, Is.True);
+            // #603: the saved StageResult Scene shows the designed team result; the old result card stays off.
+            GameTerritoryResultView territory = screen.territoryView;
+            Assert.That(territory, Is.Not.Null, "The saved StageResult Scene wires the #603 team result.");
+            yield return Until(() => territory.gameObject.activeInHierarchy, "The team result shows.");
+            Assert.That(screen.resultView.gameObject.activeSelf, Is.False);
             Assert.That(screen.legacyResultContent.activeSelf, Is.False);
-            Assert.That(view.stage.text, Is.EqualTo("땅따먹기"), "A DEV solo check is not a 1:1, 2:2 or 3:3 match (#394).");
+            GameStageResultView view = territory.table;
             Assert.That(view.judgment.text, Does.Contain("청팀"));
-            Assert.That(view.nextButton.gameObject.activeSelf, Is.False);
-            Assert.That(view.homeButton.GetComponentInChildren<UnityEngine.UI.Text>().text, Is.EqualTo("나가기"));
-            Assert.That(view.rows.Find("Award_0/Player").GetComponent<UnityEngine.UI.Text>().text, Is.EqualTo("100.0%"));
+            Assert.That(territory.bluePercent.text, Is.EqualTo("100%"));
+            Assert.That(territory.redPercent.text, Is.EqualTo("0%"));
+            Assert.That(territory.blueWinnerFlag.activeSelf && !territory.redWinnerFlag.activeSelf, Is.True);
+            Assert.That(view.nextButton.interactable, Is.False, "A one-round DEV solo has no next round.");
             yield return Until(() => view.viewerButton.interactable && view.homeButton.interactable,
                 "Local result readiness and the pointer-release shield must open the two actions.");
             Texture preview = session.PreviewTexture;
@@ -1312,15 +1316,19 @@ namespace Hapio.Tests
             // Invoke the actual game-flow disconnect callback: this fixture has only one transport peer.
             typeof(GameSession).GetMethod("OnPeerDisconnected", BindingFlags.Instance | BindingFlags.NonPublic)
                 .Invoke(session, new object[] { 72UL, false });
-            yield return Until(() => !story.IsPresenting && story.screen.resultView.gameObject.activeInHierarchy,
-                "A disconnect during the failure story must restore the terminal fallback immediately.");
+            // #603: the saved GameOver Scene's terminal screen is the 불이/금옥이 leave screen, not the old result card.
+            GameOverCharacterView leave = story.screen.gameOverView;
+            Assert.That(leave, Is.Not.Null, "The saved GameOver Scene wires the #603 leave screen.");
+            yield return Until(() => !story.IsPresenting && leave.gameObject.activeInHierarchy,
+                "A disconnect during the failure story must restore the terminal screen immediately.");
             Assert.That(session.State.retryableDefeat, Is.False);
             Assert.That(session.CanRetryStage, Is.False);
             Assert.That(story.presentationRoot.activeSelf, Is.False);
-            GameStageResultView fallback = story.screen.resultView;
-            Assert.That(fallback.judgment.text, Is.EqualTo("봉인 실패..."));
-            yield return Until(() => fallback.homeButton.interactable, "The terminal fallback must retain a visible exit.");
-            fallback.homeButton.onClick.Invoke();
+            Assert.That(story.screen.resultView.gameObject.activeSelf, Is.False, "No hidden result card under it.");
+            Assert.That(leave.bul.activeSelf != leave.geumok.activeSelf, Is.True, "Exactly one character.");
+            Assert.That(leave.dialogue.text, Is.EqualTo(leave.geumok.activeSelf ? "지금, 누가 나갔지?" : "얼른 다시 돌아와!"));
+            yield return Until(() => leave.homeButton.interactable, "The terminal screen must retain a visible exit.");
+            leave.homeButton.onClick.Invoke();
             yield return WaitHome();
         }
 

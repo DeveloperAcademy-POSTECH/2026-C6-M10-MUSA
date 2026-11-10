@@ -14,10 +14,28 @@ namespace Hapio.Tests
     {
         private GameObject holder;
         private GameTouchInkArt soundArt;
+        private InputSettings.BackgroundBehavior savedBackground;
+        private InputSettings.EditorInputBehaviorInPlayMode savedEditorInput;
+
+        /// <summary>
+        /// A batch-mode Editor has no focused Game view. With the default settings a test mouse/touchscreen is disabled
+        /// as soon as it is added and its pointer events wait for the Editor update, so the ink never sees the press.
+        /// Let the test devices through like a real phone, before any AddDevice, and put the settings back afterwards.
+        /// </summary>
+        [SetUp]
+        public void LetTestPointersThrough()
+        {
+            savedBackground = InputSystem.settings.backgroundBehavior;
+            savedEditorInput = InputSystem.settings.editorInputBehaviorInPlayMode;
+            InputSystem.settings.backgroundBehavior = InputSettings.BackgroundBehavior.IgnoreFocus;
+            InputSystem.settings.editorInputBehaviorInPlayMode = InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
+        }
 
         [TearDown]
         public void Cleanup()
         {
+            InputSystem.settings.backgroundBehavior = savedBackground;
+            InputSystem.settings.editorInputBehaviorInPlayMode = savedEditorInput;
             if (holder != null) Object.Destroy(holder);
             if (soundArt != null)
             {

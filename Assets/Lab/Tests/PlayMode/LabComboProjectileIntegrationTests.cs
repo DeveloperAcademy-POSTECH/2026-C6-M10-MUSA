@@ -10,6 +10,16 @@ namespace C6Lab.Tests
     /// <summary>Cross-feature presentation/physics checks, not a remote transport or hit-accuracy test.</summary>
     public sealed class LabComboProjectileIntegrationTests
     {
+        /// <summary>
+        /// #607 draws a thrown orb no smaller than ThrownOrbMinVisibleScale (LabThrowTests covers that floor). These checks
+        /// are about the drawn size following the hit radius, so lower the floor to its minimum on the copy.
+        /// </summary>
+        private static void PinTrueSize(LabConfig config)
+        {
+            JsonUtility.FromJsonOverwrite("{\"thrownOrbMinVisibleScale\":0.05}", config);
+            Assert.That(config.ThrownOrbMinVisibleScale, Is.EqualTo(.05f).Within(.0001f));
+        }
+
         [UnityTest]
         public IEnumerator ComboAndBlastScalesMatchOnHostAndReplicaWithTheAuthoredSphereArt()
         {
@@ -17,6 +27,7 @@ namespace C6Lab.Tests
             Assert.That(source, Is.Not.Null);
             string sourceBefore = JsonUtility.ToJson(source);
             var config = Object.Instantiate(source);
+            PinTrueSize(config);
             var target = LabTarget.CreateCylinder(null, new Vector3(500f, 1000f, 500f), .8f, 2f);
             try
             {
@@ -80,6 +91,7 @@ namespace C6Lab.Tests
         public void TheFallbackTrailUsesTheCombinedBlastAndComboRadius()
         {
             var config = ScriptableObject.CreateInstance<LabConfig>();
+            PinTrueSize(config);
             var target = LabTarget.CreateCylinder(null, new Vector3(500f, 1000f, 500f), .8f, 2f);
             try
             {
