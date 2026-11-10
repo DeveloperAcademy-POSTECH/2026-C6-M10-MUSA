@@ -73,9 +73,28 @@ namespace Hapio.Tests
             Assert.That(session.RoomBrowserVisible, Is.False);
             Assert.That(GameSession.TutorialPending, Is.False, "Once per app run.");
 
+            // #635: the clouds that closed over the opening stay, wordless, while the board is prepared, lift once it can be
+            // played, and only then does its first line come.
+            Assert.That(session.CloudsUp, Is.True, "The clouds cover the hand-over.");
             GameTutorialDirector director = null;
-            yield return Until(() => (director = Object.FindFirstObjectByType<GameTutorialDirector>()) != null
-                && director.IsShowingLine, "The practice board plays its first line", 30f);
+            bool heldWhilePreparing = false, coverUnderClouds = false, lineUnderClouds = false, loadingScreen = false;
+            float deadline = Time.realtimeSinceStartup + 30f;
+            while (Time.realtimeSinceStartup < deadline)
+            {
+                heldWhilePreparing |= session.CloudCover.IsHolding && session.IsLoadingScene;
+                coverUnderClouds |= session.CloudsUp && session.StartOverlay != null && session.StartOverlay.Visible;
+                loadingScreen |= session.IsLoadingScreenUp;
+                director = Object.FindFirstObjectByType<GameTutorialDirector>();
+                lineUnderClouds |= session.CloudsUp && director != null && director.IsShowingLine;
+                if (director != null && director.IsShowingLine) break;
+                yield return null;
+            }
+            Assert.That(director != null && director.IsShowingLine, Is.True, "The practice board plays its first line");
+            Assert.That(heldWhilePreparing, Is.True, "The clouds wait, covering, while the board is prepared.");
+            Assert.That(coverUnderClouds, Is.False, "No \"튜토리얼 준비 중\" words under the clouds.");
+            Assert.That(loadingScreen, Is.False, "Nor the loading screen.");
+            Assert.That(lineUnderClouds, Is.False, "The first line waits until the clouds have lifted.");
+            Assert.That(session.CloudsUp, Is.False);
             Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.Playing));
             Assert.That(session.StartOverlay == null || !session.StartOverlay.Visible, Is.True, "No countdown cover is left.");
 

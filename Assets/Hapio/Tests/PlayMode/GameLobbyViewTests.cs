@@ -40,6 +40,8 @@ namespace Hapio.Tests
                 opening.player.Skip();
                 yield return Until(() => !GameOpeningController.IsPresenting, "Skip finishes behind the release shield");
                 Assert.That(session.RoomBrowserVisible, Is.True);
+                // #635: the skip closes the clouds over the opening; they lift over the room list before anything is tapped.
+                yield return Until(() => !session.CloudsUp, "The clouds lift from the room list");
                 session.GoHome();
                 yield return Until(() => !session.IsLoadingScene, "Return to title for menu raycasts");
             }

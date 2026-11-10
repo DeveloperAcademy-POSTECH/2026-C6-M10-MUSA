@@ -111,7 +111,7 @@ namespace Hapio.Tests
             Assert.That(motifs.Count, Is.EqualTo(5), "All five elements' trail particles really emitted.");
             Assert.That(clayDraws, Is.SupersetOf(new[] { "Wet clay", "Pulling neck", "Wet surface mark", "Thrown clay 0" }),
                 "The new body, trail and contact must actually draw beneath the preparing cover.");
-            Assert.That(paperMaterials.Count, Is.EqualTo(5), "Every authored element body material is drawn.");
+            Assert.That(paperMaterials.Count, Is.EqualTo(6), "All five authored element bodies and the five-color paper body are drawn.");
 
             yield return Until(() => session.State.phase != GameFlowPhase.SynchronizingBattle, "Countdown");
             yield return null;

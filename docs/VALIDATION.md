@@ -144,6 +144,39 @@
 - 전체 기록·2:2 결과 표의 갈색 강조는 바꾸지 않았다.
 - **미실행:** 실기기 화면, 멀티 게스트 화면, 긴 공동 수상 이름(`P1, P2(나)`)의 실제 표시.
 
+## 2026-11-10 — 한지 구름 전환 속도와 구름별 시차
+
+- **최종 전달 상태 (#630):** 사용자 시각 확인 완료. 큰 구름 6개 + 작은 구름 3개, 전체 1.52초. 관련 EditMode 32/32·PlayMode 18/18 통과. 전체 PlayMode는 사용자 요청으로 중단했으며 완료로 간주하지 않는다. 각 장면 삽입·연결은 다른 팀원이 담당한다. 아래 중간 단계의 시각 확인 대기 표기는 당시 기록이다.
+- 전체 EditMode는 2,156/2,156 통과했다. 전체 PlayMode 첫 시도는 로컬 iOS 프로필에 Lab 씬이 없어 실패했고, 공용 씬 목록으로 재시작했으나 사용자 요청으로 중단했다. 원래 iOS 프로필과 StageStoryPreview를 복원했다. 최신 main 통합·실기기 검증은 수행하지 않았다.
+
+- **작은 구름 감속:** 세 작은 구름의 걷힘 이동 시간을 각각 0.08초 연장(약 0.46~0.48초 → 0.54~0.56초). 공통 걷힘 구간을 0.80초로 늘리고 정규화된 시차·끝점을 다시 계산해 모든 출발 시점과 큰 구름의 이동 시간을 유지했다. 전체 전환 1.52초. 관련 PlayMode **18/18 PASS**, 사용자 시각 확인 대기.
+
+- **걷힘 방향 변경:** 작은 구름만 위·아래 왼쪽 / 가운데 오른쪽으로 변경. 진입 경로·시차·길이 유지. 연속 샘플에서 방향이 되돌아가지 않고 화면 밖까지 퇴장하는 PlayMode 검사를 추가했다. 첫 실행에서 큰 구름 하나까지 방향이 바뀐 설정 실수를 기존 검사가 잡아 수정했으며, 수정 후 PlayMode **18/18 PASS**. 관련 EditMode **32/32 PASS**. 사용자 시각 확인 대기.
+
+- **작은 구름 추가 후 최신 결과:** 사용자가 제공한 투명 PNG를 `CloudSmall.png`로 가져와 앞쪽 구름 3개(위·가운데·아래)를 추가, 공통 프리팹 총 9개. 가운데·아래 작은 구름은 큰 구름보다 늦게 걷히며 전체 1.44초 유지. Mac Unity 컴파일 완료, PlayMode **17/17 PASS**, 관련 EditMode **32/32 PASS**, Console 오류 0건, `git diff --check` 통과. 실제 Game 화면에서 완전 덮임과 1.02초 걷힘 중간 배치를 확인했다. 확인용 임시 오버레이는 제거했고 Scene은 저장하지 않았다. 최종 재생 감각은 사용자 확인 대기다.
+
+
+- **최신 재작업:** 기존 6개 구름의 3구간 직선 이동을 연속 3차 베지어 경로로 바꾸고, closeEnd/openEnd로 도착 시점도 분산했다. 걷힘은 위쪽 오른편에서 아래쪽 왼편으로 이어지며 약한 상하 곡률을 더한다. 전체 길이 1.44초 및 봉인 글씨 2px 보정은 유지한다.
+- **최신 검사:** Mac Unity 컴파일 완료, 관련 PlayMode **16/16 PASS**(출발·도착 분산 및 마지막 구름 퇴장 포함), EditMode **32/32 PASS**, Console 오류 0건. 미리보기 Play 상태로 열어 둠. 최종 움직임의 사용자 시각 확인 및 전체 검사는 아직 대기 중이다.
+
+- **기준:** `feat/stage-story-cloud-polish`의 기존 한지 구름 패치 미커밋 상태 위에서 수정. Mac Unity 6000.6.5f1 연결 Editor에서 실행했다.
+- 닫힘 0.62초·유지 0.10초·걷힘 0.72초, 6개 구름의 독립 closeDelay/openDelay. 공통 프리팹과 TryPlay 콜백 API를 유지한다.
+- 재조정: 같은 방향의 걷힘 지연을 0·0.19·0.38(약 0·0.14·0.27초)로 늘리고 세 카드의 봉인 글씨를 2px 아래로 옮겼다. 수정 후 위 관련 PlayMode 15개와 EditMode 32개를 재실행해 모두 통과했다. 구미호 카드의 수정된 글씨를 실제 Game 창에서 확인했으며 구름 동작의 최종 사용자 확인은 대기 중이다.
+- 컴파일 완료, 검사 및 미리보기 후 Console 오류 0건. 수정하지 않은 파일에서 obsolete API·DEVELOPMENT_BUILD 경고가 나왔다.
+- PlayMode `StoryResultPresentationTests`: **15/15 PASS**. 구름별 지연 시작, 완전 덮임 이후 1회 교체, 느린 프레임의 덮임 유지, 입력 차단, 취소·재사용과 후속 그림/대사 순서를 확인했다.
+- EditMode `GameStageStoryAssetTests`, `StageStoryAssetTests`, `StoryWorkspaceTests`, `StoryRecordHighlightTests`: **32/32 PASS**.
+- StageStoryPreview를 실제 Play하고 구미호 카드의 이야기 계속 버튼을 눌러 구름 완전 덮임 및 후일담 표시를 확인했다. 사용자 속도·엇갈림 시각 승인은 대기 중이다.
+- `git diff --check` 통과. 기존 미커밋 변경은 별도 보관하고 ProjectSettings·Build Profiles 변경은 수정하지 않았다.
+- **미실행:** 전체 EditMode/PlayMode(PR 전 실행 예정), 튜토리얼 실제 화면 연결, iOS/실기기, 멀티플레이. 튜토리얼 공통 API 재사용 검사는 위 PlayMode에 포함되며 실제 튜토리얼 화면 검증과 구분한다.
+
+## 2026-11-10 봉인 카드 위치·만복 이미지 갱신
+
+- Mac Unity 6000.6.5f1에서 에셋 재임포트·컴파일 후 Console 오류 0건.
+- 관련 EditMode 32/32 통과: GameStageStoryAssetTests, StageStoryAssetTests, StoryWorkspaceTests, StoryRecordHighlightTests.
+- StoryResultPresentationTests PlayMode 18/18 통과.
+- 세 카드 프리팹은 제목·카드 피벗·안내 글·손 아이콘의 y만 각각 -11 변경했다. 카드 앞뒷면 내부와 기존 참조는 보존했다.
+- StageStoryPreview 실제 Play 화면에서 구미호 카드 앞뒷면 배치 및 뒤집기, 야광귀 후일담의 새 만복 이미지를 확인했다. 사용자 시각 확인 완료. 전체 검사 중단 및 미실행 범위는 위 #630 최종 전달 기록을 따른다.
+
 ## 2026-11-09 — 결과·Home·Lobby의 시안에 없는 안내 줄 숨기기
 
 - **기준:** `fix/hide-result-status-line`, main `d1ea7b12` 위 `f37b4443`·`79bc2e15`. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 접속 묶음과 설정 수는 그대로다.
@@ -7461,6 +7494,75 @@ PlayMode의 기존 main 실패17건은 표시용 최소 구슬 크기와 구형 
 | Unity 렌더링 | 버튼 상태별 402×920 비교판 및 HUD 외곽선/스태미나 비교판 확인. 완성 게임 화면 캡처가 아닌 실제 UI 컴포넌트 렌더링이다. |
 
 선택 검사 합계 **34/34 PASS**, 실패·skip 0. 초기 EditMode 클릭 검사는 렌더 전 canvas depth가 없어 실패했으며, 카메라로 그린 뒤 실제 raycast를 검증하도록 수정해 통과했다. 전체 테스트·iOS/Android 실기기·여러 기기 네트워크 테스트는 실행하지 않았다. 원본 좌표와 버튼 클릭 사각형이 유지되는지 prefab 객체별 diff를 확인했다.
+
+
+## 2026-11-10 — #627 피버 오색 구슬의 공통 클레이 VFX 연결
+
+기준 main `1a2a695e`, Unity 6000.6.5f1·macOS/Metal이다. Host 실제 투척·Guest 선반영·원격 복제에 표시 전용 fiveColor 인자를 연결했다. 실제 원소 None/fiveColor와 도색·피해·물리·공유259개·접속 버전·Scene/Prefab은 변경하지 않았다. 일반 클레이 메시/경로/눌림/퍼짐/수명을 재사용하고 기존 오색 색상 주기를 PaperOrb 농담과 진흙 꼬리·방울에 적용했다. 명중 직전 위상을 기존 선택적 접촉 payload에 보존한다. 보드·피버 HUD/음악·지귀 부적/보상 불꽃·마지막 일격의 전용 경로는 유지한다.
+
+- 전체 EditMode: **2,175/2,175 통과**, 실패·skip0, 19.86초. 기존 피버 생성·시간표·오색·보드/전용 HUD 검사 포함.
+- 최초 집중 PlayMode: **21/22 통과·1실패**, skip0, 9.65초. 새 이동 검사가 세 렌더 프레임만 기다려 빠른 batch에서 물리 갱신 전에 거리0을 읽었다. 물리 갱신 세 번과 후속 프레임을 기다리도록 검사 준비만 보완했으며 게임 이동 코드는 수정하지 않았다.
+- 보완 후 집중/회귀 PlayMode: **34/34 통과**, 실패·skip0, 42.25초. 새 FiveColorClayFlight6·FiveColorClayNetwork2, 기존 FiveElementContact5·ComboProjectileIntegration4·JigwiRewardBoardFire4·JigwiRewardFireTrail4·GameBattleRenderWarmup2·GameBattleUiPresentation3·GameFinishReplay4건.
+- 새 검사에서 실제 PaperOrb/fiber 재질·색면 변화·충돌 반지름과 보이는 크기 분리·실제 경로·None 명시적 허용·일반/오색 접촉의 geometry/시간 일치·lease 재사용/오래된 핸들/상한/취소/정리를 확인했다.
+- 네트워크 검사는 저장된 Lab에서 실제 Solo Host의 오색 보상→투척→물리 명중 콜백·도색·오색 전용 별가루 경로를 확인한다. Guest 선반영/원격 복제는 승인된 수신 메시지를 로컬 fixture로 주입해 기본 접촉·전용 별가루 중복 방지와 법선/크기/위상 전달을 검사했다. 실제 두 기기 통신 성공으로 표현하지 않는다. Host 송신 optional payload 조건은 소스 검토와 별개로 구분한다.
+- 준비 화면의 여섯 번째 오색 복사본도 실제로 그려지고, 게임의 풀·seed·도색 상태를 소비하지 않으며 준비 종료 시 정리되는 기존 검사 통과.
+- 독립 코드 검토 및 `git diff --check` 통과. 원본 Material/Shader/Scene/Prefab·패키지 설정은 수정하지 않았다.
+
+이 시점 미실행: 실제 Editor 전투 화면의 수동 외형 비교, 전체 PlayMode, Mac standalone/Release/iOS 빌드·실기기, 실제 다중 기기의 LAN·핫스팟 검증, GPU/CPU 성능 계측. 사용법과 호환되는 optional payload는 `FIVE_ELEMENT_VFX.md`의 #627 항목을 따른다.
+
+
+### #627 실제 Editor Battle 외형 확인 추가 — 2026-11-10
+
+데스크탑 프로젝트를 #627 브랜치로 연결해 기존 Unity 창에서 Home→2스테이지 Story 솔로를 실행했다. 처음의 시작 스테이지 선호값3을 보존했고, 확인용 시작 호출 때만2를 사용한 뒤 즉시 원래 값으로 복원했다. 프레임과 Snapshot 시각이 실제로 진행되는 것을 확인했다.
+
+기존 VFX 실험실 API로 콤보 대응용 일반 Fire Combined를 준비하고 실제 투척 요청 경로로 발사했다. 이어 Y5로 피버를 시작하고 북의 Generate로 실제 `None/fiveColor=true` 구슬을 생성해 같은 입력으로 던졌다. 일반·피버 모두 `ClayFlightActive=true`, 실제 명중 시 공통 접촉1개가 관측됐다. 실제 GameView에서 일반 비행/명중, 피버 시작, 피버 비행/명중의 원본 캡처5장을 작업의 로컬 검증 산출물로 보존했다. 생성 이미지나 합성 그림은 사용하지 않았다.
+
+화면에서 같은 3D 구슬 계열과 진흙 접촉을 확인했고, 피버 문구·흐르는 부적·스태미나 색 파동·보드 오색 그림이 유지됨을 확인했다. 기존 전용 효과 코드는 바꾸지 않았다. 확인 종료 시 Console 오류0·Scene dirty=false·작업 폴더 변경 없음·시작 스테이지 선호값3 복원을 확인하고 Play를 종료했다. 실제 물리 입력은 Editor API로 자동 수행했으며 사람의 터치나 실제 두 기기 연결 검증은 아니다.
+
+실제 화면 확인은2스테이지다. 세 스테이지의 공통 피버 생성 규칙은 위 EditMode 검사로 확인했으며1·3스테이지를 별도 수동 플레이한 것으로 기록하지 않는다. 전체 PlayMode·standalone/Release/iOS·실제 다인 네트워크·성능 계측은 계속 미실행이다.
+
+
+### #627 PR 전 최신 main 통합·전체 검사 — 2026-11-10
+
+main `53b1f7a5`(#619 UI 스트로크·#622 튜토리얼 조합대·#628 지귀 QA·#632 결과 구름 연출 포함)를 병합한 `dc602dea`에서 Unity 6000.6.5f1 macOS/Metal의 기존 Editor로 전체 검사를 실행했다. 문서 충돌 한 곳은 양쪽 검증 기록을 보존해 해결했고, 피버 런타임·새 검사 코드는 기존 구현 커밋과 동일하다. 준비 화면 설명의 경로 수를 일반 오행5종+오색1종으로 맞췄다.
+
+| 확인 | 결과 |
+| --- | --- |
+| 전체 EditMode | **2,180/2,180 통과**, 실패·skip·inconclusive0, 35.62초 |
+| 전체 PlayMode | **775/775 통과**, 실패·skip·inconclusive0, 743.08초 |
+| 코드·범위 검토 | 독립 재검토에서 병합 차단 결함 없음. 물리·도색·피버 판정과 기존 전용 효과 보존 확인 |
+| 변경 검사 | `git diff --check` 통과. Scene/Prefab/원본 Material/Shader/패키지에 이번 작업의 변경 없음 |
+
+검사 중 생성된 InitTestScene은 자동 검사 임시 파일로 커밋에 포함하지 않는다. 실제 외형 확인은 위2스테이지 Editor 캡처이며, 이번 전체 자동 검사로 iOS·standalone/Release·실제 다인 LAN/핫스팟·성능 계측을 수행한 것으로 표현하지 않는다.
+
+
+### #637 변경 범위 기반 검사 지침 — 2026-11-10
+
+기준 main `a0d9aeef`, 브랜치 `chore/#637-change-based-test-policy`. 변경은 AGENTS.md의 검사 정책, TEST_SUITE_REPORT.md의 선택 기준/과거 집계 구분, 이 기록뿐이다. 실제 게임 코드·Scene·Prefab·Material·패키지·테스트와 기존 지침은 보존했다.
+
+문서 diff와 두 정책의 일치, 저장소 내부 Markdown 링크 대상, 충돌 마커 부재, `git diff --check`를 확인했다. 독립 읽기 검토에서도 필요한 관련 검사의 카테고리 제외 방지·전체 검사 조건·동일 조건 결과 재사용 규칙에 충돌이 없음을 확인했다.
+
+**Unity 컴파일·EditMode·PlayMode·빌드·실기기는 이번 작업에서 실행하지 않았다.** 문서만 바뀌어 새 정책의 문서 검사 범위를 적용했다. 보고서의 2,180/775건·35.62/743.08초는 #627 통합본 `dc602dea`의 기존 실제 실행 기록이며 #637의 새 검사 통과 건수가 아니다.
+
+
+## 2026-11-10 — #635 오프닝 → 튜토리얼 확대·한지 구름 전환, 마지막 장면 흰 선 제거
+
+기준은 main `53b1f7a5`(#632 공용 구름 병합 뒤), Unity 6000.6.5f1·macOS Editor다. 커밋은 단계별로 나눴다: 흰 선 → 구름 덮개 → 오프닝 끝 확대·덮기 → 튜토리얼 쪽 기다림 → 문서.
+
+- 흰 선 원인: OP_024 배경 `72eb0.png`(471×1024)의 맨 오른쪽 한 줄 알파가 50%(0x7F)였고, QA 화면에서 그림 왼쪽 1px·오른쪽 2px이 밝았다(스크린샷 픽셀 측정). 장면(`Page 402x874`)에는 RectMask2D가 있다. 배경 크기만 같은 비율·같은 가운데로 2pt씩 키워 x −2.003 ~ 404.003, 마지막 줄 시작 403.141(장면 402 밖)으로 보냈다. 프리팹은 Editor API로 저장했고, 저장 때 기존 기본값 항목(`softFadeIn: 0` 등)이 함께 기록됐다(동작 변화 없음).
+- 확대 지점: 사용자가 준 확대 영역 그림을 마지막 장면 스크린샷에서 찾아(배율 1.00, 평균 오차 0.005) 장면 가로 53.3%·세로 25.4%로 정했다.
+- 구름 덮개 `GameCloudCover`는 `GameSession` 아래에서 실행 중에 만든다(정렬 30120). Scene·Home·#630 공용 구름 코드는 바꾸지 않았고, 같은 어셈블리의 수동 진행(`BeginManual`·`Advance`)으로 "덮은 채 기다리기"를 구현했다. 새 설정 에셋 `CloudCoverArt.asset`·`OpeningTransitionArt.asset`은 Editor API로 만들었다.
+
+| 확인 | 결과 |
+| --- | --- |
+| Unity 컴파일 (단계 1~4 각각, 마지막은 4단계 커밋 뒤 Play 종료 후) | PASS |
+| Editor eval: OP_024 배경 범위·비율·마지막 줄 위치 | PASS — 위 수치, 비율 0.45996 유지 |
+| Editor eval: 구름 프리팹 연결·시간 | PASS — 덮기 0.62초, 전체 1.52초(0.62 + 0.10 + 0.80) |
+| Editor eval: 확대 곡선·끝 위치 | PASS — 30% 시간에 0.657, 90% 시간에 0.999, 끝에서 골짜기가 화면 가운데(0, 0) |
+| EditMode 새 검사: `StoryWorkspaceTests.LastCutBackgroundReachesPastThePageSoNoPaperLineShows`, `GameCloudCoverTests`(2), `GameOpeningTransitionTests`(3) | NOT_RUN (컴파일만 확인) |
+| PlayMode 새·수정 검사: `GameCloudCoverFlowTests`(3), `GameOpeningControllerTests`(끝까지 보기·건너뛰기·도중에 끄기 3개 추가), `GameTutorialFlowTests.FinishedOpeningOpensThePracticeBoardOnceThenTheRoomList`(구름 아래 기다림·첫 대사 시점 추가), `GameLobbyViewTests`(시작 때 구름이 걷힐 때까지 대기), `GameLoadingSessionTests`(주석만) | NOT_RUN (컴파일만 확인) |
+| 실제 화면 (Editor Play·iPhone): 확대 느낌, 구름 시간, 튜토리얼 첫 화면 | NOT_RUN |
+| 튜토리얼 준비 실패 → 방 목록에서 구름이 걷힘, 15초 제한 | NOT_RUN (검사로 재현하지 못함, 코드 경로만 확인) |
 
 
 ## 2026-11-10 — #631 11/10 QA: 건너뛰기 창 가운데 정렬·메뉴 어두운 막 좌우 틈·크레딧 먹물 끄기

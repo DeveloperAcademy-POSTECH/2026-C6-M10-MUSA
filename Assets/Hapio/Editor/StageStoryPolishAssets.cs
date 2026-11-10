@@ -11,7 +11,6 @@ namespace Hapio.Editor
     /// <summary>Applies the Figma dialogue, continue cue, and shared wipe without replacing authored prefabs.</summary>
     internal static class StageStoryPolishAssets
     {
-        private const string Art = StageStoryAssets.Art + "Polish/";
         private const string WipePath = StageStoryAssets.Root + "/Views/StoryCloudWipe.prefab";
         private const string ManifestPath = StageStoryAssets.Root + "/PolishFrames.json";
         private static readonly string[] Cards = {"Gumiho_SealCard", "Yagwanggui_SealCard", "Jigwi_SealCard"};
@@ -195,34 +194,10 @@ namespace Hapio.Editor
 
         private static StoryCloudWipe EnsureWipe()
         {
-            var existing = AssetDatabase.LoadAssetAtPath<GameObject>(WipePath);
-            if (existing != null) return existing.GetComponent<StoryCloudWipe>();
-            StoryWorkspaceBuilder.ImportSprite(Art + "CloudWipe.png");
-            StoryWorkspaceBuilder.ImportSprite(Art + "ContinueArrow.png");
-            var sprite = AssetDatabase.LoadAssetAtPath<Sprite>(Art + "CloudWipe.png");
-            if (sprite == null) throw new InvalidOperationException("Missing Figma cloud image");
-            var root = new GameObject("Story Cloud Wipe", typeof(RectTransform), typeof(RectMask2D), typeof(StoryCloudWipe));
-            try
-            {
-                var rect = (RectTransform)root.transform;
-                rect.anchorMin = Vector2.zero;
-                rect.anchorMax = Vector2.one;
-                rect.offsetMin = rect.offsetMax = Vector2.zero;
-                var wipe = root.GetComponent<StoryCloudWipe>();
-                wipe.upper = Cloud(root.transform, "Upper cloud [4411:2391]", new Rect(-278, -74, 908, 605), sprite);
-                wipe.lower = Cloud(root.transform, "Lower cloud [4411:2411]", new Rect(-230, 412, 811, 540), sprite);
-                return PrefabUtility.SaveAsPrefabAsset(root, WipePath).GetComponent<StoryCloudWipe>();
-            }
-            finally { UnityEngine.Object.DestroyImmediate(root); }
-        }
-
-        private static RectTransform Cloud(Transform parent, string name, Rect bounds, Sprite sprite)
-        {
-            var rect = StoryWorkspaceBuilder.Rect(name, parent, bounds);
-            var image = rect.gameObject.AddComponent<Image>();
-            image.sprite = sprite;
-            image.raycastTarget = false;
-            return rect;
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(WipePath);
+            var wipe = prefab != null ? prefab.GetComponent<StoryCloudWipe>() : null;
+            if (wipe == null) throw new InvalidOperationException("Missing shared cloud wipe prefab: " + WipePath);
+            return wipe;
         }
 
         private static void SetBounds(RectTransform rect, Rect bounds)

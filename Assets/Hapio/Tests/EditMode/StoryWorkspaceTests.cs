@@ -234,6 +234,32 @@ namespace Hapio.Tests
             Assert.That(spriteWindows, Is.EqualTo(4));
         }
 
+        /// <summary>
+        /// #635: the last cut's background ends in a half see-through column of pixels, and the page edge can fall inside a
+        /// screen pixel, so the light paper base showed as thin lines at both sides. The picture now reaches 2pt past the page
+        /// on every side (same shape, same centre); the page's mask trims what lies outside.
+        /// </summary>
+        [Test]
+        public void LastCutBackgroundReachesPastThePageSoNoPaperLineShows()
+        {
+            var view = AssetDatabase.LoadAssetAtPath<StoryCutView>("Assets/Hapio/Story/Opening/Views/OP_024.prefab");
+            var background = view.layers.Single(layer => layer.isBackground).artwork;
+            Assert.That(background.sprite.name, Is.EqualTo("72eb0"));
+            var corners = new Vector3[4];
+            background.rectTransform.GetWorldCorners(corners);
+            Vector3 min = view.transform.InverseTransformPoint(corners[0]), max = view.transform.InverseTransformPoint(corners[2]);
+            // The page is x 0..402, y -874..0 in the cut's own units.
+            Assert.That(min.x, Is.EqualTo(-2f).Within(.01f), "Left, 2pt past the page.");
+            Assert.That(max.x, Is.EqualTo(404f).Within(.01f), "Right, 2pt past the page.");
+            Assert.That(max.y, Is.GreaterThan(0f), "Top past the page.");
+            Assert.That(min.y, Is.LessThan(-874f), "Bottom past the page.");
+            float width = max.x - min.x, height = max.y - min.y;
+            Assert.That(width / height, Is.EqualTo(402.00586f / 874f).Within(1e-4f), "Grown evenly, not stretched.");
+            Assert.That((min.x + max.x) * .5f, Is.EqualTo(201f).Within(.01f), "Same centre.");
+            float lastColumn = max.x - width / background.sprite.texture.width;
+            Assert.That(lastColumn, Is.GreaterThan(402f), "The half see-through last column lies outside the page.");
+        }
+
         [Test]
         public void AddedCutsKeepOriginalDialogueAndUpdatedTwentyTwoUsesNewFigmaGeometry()
         {
