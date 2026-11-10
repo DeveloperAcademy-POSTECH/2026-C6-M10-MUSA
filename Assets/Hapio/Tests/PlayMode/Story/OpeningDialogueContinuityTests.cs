@@ -50,6 +50,10 @@ namespace Hapio.Tests
                     foreach (string line in expected.Split('\n'))
                         Assert.That(rich, Does.Contain(line));
                     Assert.That(view.authoredDialogue.alpha, Is.EqualTo(1));
+                    var palette=AssetDatabase.LoadAssetAtPath<StorySpeakerPalette>("Assets/Hapio/Story/Opening/SpeakerPalette.asset");
+                    Assert.That(palette.TryGet(sequence.cuts[first+1].GetPage(0).speaker,out var style),Is.True);
+                    var badge=view.authoredDialogue.GetComponentsInChildren<Image>().Single(x=>x.sprite!=null&&x.sprite.name=="9769e");
+                    Assert.That(badge.color,Is.EqualTo(style.badgeColor),"Dialogue-only changes must also replace the speaker color.");
                     player.AdvanceTime(.01f);
                     Assert.That(artwork.GetComponent<CanvasGroup>().alpha, Is.EqualTo(1), "The retained clock must not restart the entrance on the next tick.");
                     player.Previous();

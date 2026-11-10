@@ -68,17 +68,27 @@ namespace Hapio.Editor
                 root.AddComponent<RectMask2D>();
                 var view=root.GetComponent<StoryCutView>();
                 view.sourceFigmaNumber=f.number;view.sourceFigmaNodeId=f.id;view.artworkContinuityKey=f.artworkContinuityKey;
+                view.autoContinueAfterSeconds=f.number==14?2.3f:f.number==15?3.35f:f.number==16?3.2f:0f;
                 view.hideEmptyDialogue=true;view.layers=Array.Empty<StoryLayer>();view.beats=Array.Empty<StoryVisualBeat>();
                 // Every revised cut owns its dialogue. Empty groups intentionally suppress the old shared paper.
                 var words=Box("Authored Dialogue",root.transform,0,0,402,874);
                 view.authoredDialogue=words.gameObject.AddComponent<CanvasGroup>();view.authoredDialogue.blocksRaycasts=false;
+                var palette=AssetDatabase.LoadAssetAtPath<StorySpeakerPalette>(Root+"SpeakerPalette.asset");
+                StorySpeakerPalette.Style speakerStyle=null;
+                if(palette!=null) palette.TryGet(f.speaker,out speakerStyle);
                 var motions=new List<OpeningLayerMotion>();
                 int ordinal=0;
                 foreach(var item in f.items)
                 {
                     var parent=item.dialogue?words:root.transform;
                     var image=AddImage(parent,item,out var motionRoot);
-                    if(!item.dialogue && ordinal++>0 && item.width>15 && item.height>15)
+                    if(item.dialogue && item.key=="9769e.png" && speakerStyle!=null)
+                    {
+                        image.material=palette.badgeMaterial;
+                        image.color=speakerStyle.badgeColor;
+                    }
+                    // Frame 4 is the same pointing pose in a close-up; the hand must not re-enter.
+                    if(!item.dialogue && ordinal++>0 && item.width>15 && item.height>15 && f.number!=4)
                     {
                         var motion=motionRoot.gameObject.AddComponent<OpeningLayerMotion>();
                         motion.delay=.08f+Mathf.Min(ordinal*.055f,.25f);motion.seconds=.65f;
@@ -90,6 +100,8 @@ namespace Hapio.Editor
                 foreach(var text in f.texts)
                 {
                     var textRect=AddText(text.dialogue?words:root.transform,text);
+                    if(text.dialogue && text.text==f.speaker && speakerStyle!=null)
+                        textRect.GetComponent<Text>().color=speakerStyle.textColor;
                     if(!text.dialogue)
                     {
                         var reveal=textRect.gameObject.AddComponent<OpeningLayerMotion>();

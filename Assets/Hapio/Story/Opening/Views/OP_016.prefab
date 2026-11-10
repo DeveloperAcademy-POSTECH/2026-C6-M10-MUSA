@@ -956,6 +956,7 @@ MonoBehaviour:
   continueButton: {fileID: 0}
   requireContinueButton: 0
   waitForEntrance: 0
+  autoContinueAfterSeconds: 3.2
   exitCloudWipe: {fileID: 0}
   music: {fileID: 0}
   musicVolume: 0

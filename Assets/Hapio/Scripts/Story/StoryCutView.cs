@@ -17,6 +17,8 @@ namespace Hapio
         public bool requireContinueButton;
         [Tooltip("Do not jump past the timing of this cut when the player taps early.")]
         public bool waitForEntrance;
+        [Min(0), Tooltip("Silent cinematic cut: automatically continue after this many seconds from entry; zero waits for input.")]
+        public float autoContinueAfterSeconds;
         public StoryCloudWipe exitCloudWipe;
         [Header("Optional music for this cut")]
         public AudioClip music;

@@ -45,6 +45,7 @@ namespace Hapio
         public bool IsReading { get; private set; }
         public StoryCutView CurrentView => currentView;
         public bool IsTransitioning => activeCloudWipe != null;
+        private bool IsCinematicCut => currentView != null && currentView.autoContinueAfterSeconds > 0;
 
         private StoryCutView currentView;
         private StoryCloudWipe activeCloudWipe;
@@ -137,6 +138,18 @@ namespace Hapio
             }
             elapsed += seconds;
             currentView.Sample(elapsed);
+            if (IsCinematicCut)
+            {
+                float end = Mathf.Max(currentView.EntranceDuration, currentView.autoContinueAfterSeconds);
+                if (elapsed >= end)
+                {
+                    float remainder = elapsed - end;
+                    AdvanceToNextCut();
+                    if (IsPlaying && remainder > 0) AdvanceTime(remainder);
+                }
+                else if (!IsReading && elapsed >= currentView.EntranceDuration) BeginReading();
+                return;
+            }
             if (!IsReading)
             {
                 if (elapsed >= currentView.EntranceDuration) BeginReading();
@@ -151,7 +164,7 @@ namespace Hapio
         /// <summary>UI input shares one frame gate. Direct sequencing and preview AUTO keep their existing API.</summary>
         public void RequestNext()
         {
-            if ((!IsReading && currentView != null && currentView.waitForEntrance) || !AcceptUserInput()) return;
+            if (IsCinematicCut || (!IsReading && currentView != null && currentView.waitForEntrance) || !AcceptUserInput()) return;
             Next();
         }
 
@@ -192,6 +205,11 @@ namespace Hapio
                 ShowPage(CurrentPageIndex + 1);
                 return;
             }
+            AdvanceToNextCut();
+        }
+
+        private void AdvanceToNextCut()
+        {
             int next = CurrentCutIndex + 1;
             if (next >= sequence.cuts.Count) Finish(StoryExitReason.Completed);
             else if (currentView.exitCloudWipe != null) StartCloudWipe(next);
@@ -206,7 +224,7 @@ namespace Hapio
             UpdateAutoLabel();
             var previousPicture = currentView;
             ShowCut(CurrentCutIndex - 1);
-            if (currentView == previousPicture) return;
+            if (currentView == previousPicture || IsCinematicCut) return;
             // Reviewing a previous picture should not require waiting for its entrance again.
             elapsed = currentView.EntranceDuration;
             currentView.Sample(elapsed);
@@ -216,6 +234,7 @@ namespace Hapio
         private void UpdatePreviousButton()
         {
             if (previousButton != null) previousButton.interactable = IsPlaying && CurrentCutIndex > 0;
+            if (nextButton != null) nextButton.interactable = IsPlaying && !IsCinematicCut;
         }
 
         public void Skip()

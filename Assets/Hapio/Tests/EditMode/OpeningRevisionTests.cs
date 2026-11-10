@@ -30,6 +30,28 @@ namespace Hapio.Tests
     }
    }
   }
+  [Test] public void EveryAuthoredSpeakerUsesTheCharacterPalette(){
+   var palette=AssetDatabase.LoadAssetAtPath<StorySpeakerPalette>(Root+"SpeakerPalette.asset");
+   var sequence=AssetDatabase.LoadAssetAtPath<StorySequence>(Root+"Opening.asset");
+   foreach(var cut in sequence.cuts){
+    string speaker=cut.GetPage(0).speaker;if(string.IsNullOrEmpty(speaker))continue;
+    Assert.That(palette.TryGet(speaker,out var style),Is.True,speaker);
+    var badge=cut.viewPrefab.authoredDialogue.GetComponentsInChildren<Image>(true).Single(x=>x.sprite!=null&&x.sprite.name=="9769e");
+    Assert.That(badge.color,Is.EqualTo(style.badgeColor),cut.cutId);
+    Assert.That(badge.material,Is.SameAs(palette.badgeMaterial),cut.cutId);
+    var name=cut.viewPrefab.authoredDialogue.GetComponentsInChildren<Text>(true).Single(x=>x.text=="<size=53>"+speaker+"</size>");
+    Assert.That(name.color,Is.EqualTo(style.textColor),cut.cutId);
+   }
+  }
+  [Test] public void CloseUpKeepsThePointingHandStillAndCinematicTimingIsOptIn(){
+   var sequence=AssetDatabase.LoadAssetAtPath<StorySequence>(Root+"Opening.asset");
+   Assert.That(sequence.cuts[3].viewPrefab.openingMotions,Is.Empty);
+   foreach(var cut in sequence.cuts){
+    int n=cut.viewPrefab.sourceFigmaNumber;
+    if(n>=14&&n<=16){Assert.That(cut.viewPrefab.autoContinueAfterSeconds,Is.GreaterThan(cut.viewPrefab.EntranceDuration));Assert.That(cut.GetPage(0).dialogue,Is.Empty);}
+    else Assert.That(cut.viewPrefab.autoContinueAfterSeconds,Is.Zero);
+   }
+  }
   [TestCase(7,OpeningLayerMotion.Kind.Sigh,1)]
   [TestCase(12,OpeningLayerMotion.Kind.Sweep,2)]
   [TestCase(13,OpeningLayerMotion.Kind.Toss,4)]

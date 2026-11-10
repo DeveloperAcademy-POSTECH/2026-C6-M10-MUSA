@@ -85,7 +85,6 @@ GameObject:
   m_Component:
   - component: {fileID: 6205436266833323857}
   - component: {fileID: 6986770966197336862}
-  - component: {fileID: 4077480545834004767}
   m_Layer: 0
   m_Name: Motion
   m_TagString: Untagged
@@ -125,27 +124,6 @@ CanvasGroup:
   m_Interactable: 1
   m_BlocksRaycasts: 1
   m_IgnoreParentGroups: 0
---- !u!114 &4077480545834004767
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1421850420821294731}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 0ef39d6d9cfef4d929dd78ed341d217c, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Hapio.Runtime::Hapio.OpeningLayerMotion
-  kind: 0
-  delay: 0.19
-  seconds: 0.65
-  phase: 0.94
-  travel: {x: 0, y: 8}
-  angle: 8
-  fadeAtEnd: 0
-  pathOffset: {x: 0, y: 0}
-  cycleSeconds: 2.6
 --- !u!1 &3910238853236229336
 GameObject:
   m_ObjectHideFlags: 0
@@ -471,13 +449,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryCutView
   layers: []
   beats: []
-  openingMotions:
-  - {fileID: 4077480545834004767}
+  openingMotions: []
   authoredDialogue: {fileID: 1609604401601950018}
   artworkContinuityKey: 
   continueButton: {fileID: 0}
   requireContinueButton: 0
   waitForEntrance: 0
+  autoContinueAfterSeconds: 0
   exitCloudWipe: {fileID: 0}
   music: {fileID: 0}
   musicVolume: 0

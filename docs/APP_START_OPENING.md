@@ -102,3 +102,9 @@ OP_024 배경 그림(`72eb0.png`)의 맨 오른쪽 한 줄이 반투명(50%)이�
 `GameOpeningAssetTests`는 저장 연결·초기 숨김·원본 미리보기·Canvas/안전 영역을, `GameOpeningControllerTests`는 최초 타이틀 대기·게임 시작·전체 페이지·메뉴 차단·스킵/방 목록·실패·잘못된 연결 복구를 확인한다. 메뉴 전용 검사는 첫 게임 시작의 오프닝을 실제로 건너뛴 뒤 같은 실행에서 타이틀로 돌아와 기존 메뉴를 검사한다. DEV·SOLO 전용 검사는 초기 타이틀에서 진행한다.
 
 각 변경의 실행 건수·환경·성공/실패와 빌드 여부는 [검증 기록](VALIDATION.md)의 #354·#356·#359/#360 절을 구분해 따른다. #356의 `StoryBackgroundTests`는 배경 고정·다음 배경 준비 순서, `StoryTapAdvanceTests`는 실제 raycast와 터치 이벤트의 한 단계 진행·버튼 우선·취소 경계를 검사한다. 이 검사를 실제 iOS 손가락 조작으로 해석하지 않는다. 오디오 미할당 소스의 정리 검사를 실제 음성 청취로 해석하지 않는다. 13번 컷 효과음 미할당과 iOS 안전 영역·모바일 메모리/성능은 실제 추가 확인이 필요한 범위다.
+
+### Continuous cinematic and authored speaker colors
+
+Frames 14 (2.3 seconds), 15 (3.35 seconds) and 16 (3.2 seconds) opt into `StoryCutView.autoContinueAfterSeconds`. They advance without AUTO or taps, carry excess frame time into the next cut, and ignore surface/Next input during the sequence. Frame 17 returns to manual dialogue progression. Previous replays a cinematic cut from its start; Skip remains available. This is the exception to the default tap-to-continue rule for silent cuts. Frame 4 keeps the pointing-hand artwork stationary from entry so its gourd close-up is not interrupted by a separate hand entrance.
+
+Each authored dialogue badge now uses the existing `Opening/SpeakerPalette.asset` and `SpeakerBadgeColor` material, preserving the brush silhouette and text layout. All six speaker colors and the dark lettering for the yellow badge are applied to the saved prefabs and retained by the revision builder. Dialogue-only swaps (9/10 and 19/20) also replace the speaker colors.
