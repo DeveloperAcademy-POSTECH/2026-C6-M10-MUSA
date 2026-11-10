@@ -7448,3 +7448,14 @@ PlayMode의 기존 main 실패17건은 표시용 최소 구슬 크기와 구형 
 - 독립 코드 검토 및 `git diff --check` 통과. 원본 Material/Shader/Scene/Prefab·패키지 설정은 수정하지 않았다.
 
 이 시점 미실행: 실제 Editor 전투 화면의 수동 외형 비교, 전체 PlayMode, Mac standalone/Release/iOS 빌드·실기기, 실제 다중 기기의 LAN·핫스팟 검증, GPU/CPU 성능 계측. 사용법과 호환되는 optional payload는 `FIVE_ELEMENT_VFX.md`의 #627 항목을 따른다.
+
+
+### #627 실제 Editor Battle 외형 확인 추가 — 2026-11-10
+
+데스크탑 프로젝트를 #627 브랜치로 연결해 기존 Unity 창에서 Home→2스테이지 Story 솔로를 실행했다. 처음의 시작 스테이지 선호값3을 보존했고, 확인용 시작 호출 때만2를 사용한 뒤 즉시 원래 값으로 복원했다. 프레임과 Snapshot 시각이 실제로 진행되는 것을 확인했다.
+
+기존 VFX 실험실 API로 콤보 대응용 일반 Fire Combined를 준비하고 실제 투척 요청 경로로 발사했다. 이어 Y5로 피버를 시작하고 북의 Generate로 실제 `None/fiveColor=true` 구슬을 생성해 같은 입력으로 던졌다. 일반·피버 모두 `ClayFlightActive=true`, 실제 명중 시 공통 접촉1개가 관측됐다. 실제 GameView에서 일반 비행/명중, 피버 시작, 피버 비행/명중의 원본 캡처5장을 작업의 로컬 검증 산출물로 보존했다. 생성 이미지나 합성 그림은 사용하지 않았다.
+
+화면에서 같은 3D 구슬 계열과 진흙 접촉을 확인했고, 피버 문구·흐르는 부적·스태미나 색 파동·보드 오색 그림이 유지됨을 확인했다. 기존 전용 효과 코드는 바꾸지 않았다. 확인 종료 시 Console 오류0·Scene dirty=false·작업 폴더 변경 없음·시작 스테이지 선호값3 복원을 확인하고 Play를 종료했다. 실제 물리 입력은 Editor API로 자동 수행했으며 사람의 터치나 실제 두 기기 연결 검증은 아니다.
+
+실제 화면 확인은2스테이지다. 세 스테이지의 공통 피버 생성 규칙은 위 EditMode 검사로 확인했으며1·3스테이지를 별도 수동 플레이한 것으로 기록하지 않는다. 전체 PlayMode·standalone/Release/iOS·실제 다인 네트워크·성능 계측은 계속 미실행이다.
