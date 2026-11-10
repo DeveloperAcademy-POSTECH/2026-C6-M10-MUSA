@@ -112,20 +112,20 @@ namespace Hapio.Tests
         }
 
         [Test]
-        public void LoadingScreenComesEverywhereButBetweenTheScreensOfOneRun()
+        public void LoadingScreenComesEverywhereButWhenABattleGoesToItsResult()
         {
             string home = GameScenePaths.Home, lobby = GameScenePaths.Lobby, battle = GameScenePaths.Battle,
                 result = GameScenePaths.StageResult, over = GameScenePaths.GameOver;
             foreach ((string from, string to) in new[]
                 { (home, lobby), (lobby, home), (lobby, battle), (home, battle), (battle, home), (result, home), (over, home),
-                  (over, lobby), (result, lobby), (battle, battle) })
+                  (over, lobby), (result, lobby), (battle, battle), (result, battle), (over, battle) })
                 Assert.That(GameSession.ShowsLoading(from, to), Is.True, from + " → " + to);
-            foreach ((string from, string to) in new[] { (battle, result), (result, battle), (battle, over), (result, over) })
-                Assert.That(GameSession.ShowsLoading(from, to), Is.False, from + " → " + to + " stays inside the run");
+            foreach ((string from, string to) in new[] { (battle, result), (battle, over), (result, over) })
+                Assert.That(GameSession.ShowsLoading(from, to), Is.False, from + " → " + to + " keeps its own presentation");
             Assert.That(GameSession.ShowsLoading(home, battle, tutorialStarting: true), Is.False,
                 "The opening → tutorial gets its own transition later.");
-            Assert.That(GameSession.ShowsLoading(battle, battle, stageChanges: true), Is.False,
-                "The DEV panel's next stage reloads Battle into another stage, which stays inside the run like NEXT.");
+            // #607: the next stage, a retry from game over and the DEV panel's next stage (Battle → Battle) all count players in
+            // on the loading screen instead of the black "전투 준비 중" cover.
         }
 
         private static void ResetRunState(Type owner, string method)

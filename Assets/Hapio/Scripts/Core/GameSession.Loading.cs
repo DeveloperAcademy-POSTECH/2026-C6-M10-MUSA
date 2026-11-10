@@ -8,7 +8,7 @@ namespace Hapio
     /// 타이틀·방 목록 ↔ 자리 고르기, 자리 고르기 → 첫 전투, 튜토리얼 → 방 목록·타이틀, 결과·게임오버 → 타이틀·방,
     /// 튜토리얼 RESTART.
     /// 씌우지 않는 곳(사용자 결정): 앱을 켜서 첫 화면이 뜰 때(바로 메인 화면), 오프닝 → 튜토리얼(나중에 따로 만든다),
-    /// 판 안의 전환(전투 → 스테이지 결과 → 다음 전투, 전투 → 게임오버, 스테이지 사이는 따로 만든다).
+    /// 판 안에서 전투를 떠나는 전환(전투 → 스테이지 결과·게임오버). 전투로 들어가는 길은 모두 씌운다(#607: 다음 스테이지·재도전·DEV 다음 스테이지).
     /// 막대는 씬 불러오기로 60%까지 차고, 그다음 준비로 나머지가 찬다:
     /// Home·자리 고르기는 화면이 다 그려지면, 첫 전투는 3·2·1이 시작되면(그동안 "준비 n/m"), 튜토리얼은 첫 대사를 띄울 수 있게
     /// 되면 100%다. 아무리 짧아도 1초는 보이고(0→100%가 한 번 차 보임), 100%를 잠깐 보여 준 뒤 살짝 사라진다.
@@ -49,14 +49,15 @@ namespace Hapio
 
         /// <summary>
         /// Whether moving from scene <paramref name="from"/> to <paramref name="to"/> shows the loading screen: always,
-        /// except between the screens of one run (battle, stage result, game over), which keep their own presentation.
-        /// Reloading the same battle (a restart) shows it; reloading it into another stage (the DEV panel's next stage,
-        /// <paramref name="stageChanges"/>) is a change between stages and does not.
+        /// except leaving a battle for its own result or game over, which keep their own presentation. Every way into a
+        /// battle shows it (#607): the first one, the next stage, a retry from game over and any reload of Battle.
         /// </summary>
-        public static bool ShowsLoading(string from, string to, bool tutorialStarting = false, bool stageChanges = false)
+        public static bool ShowsLoading(string from, string to, bool tutorialStarting = false)
         {
             // The opening's hand-over to the practice board gets its own transition later (user decision).
-            if (tutorialStarting || stageChanges) return false;
+            if (tutorialStarting) return false;
+            // #607: the black "전투 준비 중" cover is no longer seen between stages; the loading screen counts players in.
+            if (to == GameScenePaths.Battle) return true;
             bool fromRun = InRun(from), toRun = InRun(to);
             return !(fromRun && toRun && from != to);
         }
