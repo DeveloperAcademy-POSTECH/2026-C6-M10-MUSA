@@ -131,6 +131,7 @@ namespace Hapio
 
         private void Awake()
         {
+            GameFigmaButton.Apply(this);
             originalBackground = background.texture;
             session = GameSession.EnsureExists();
             if (screen == null) screen = GetComponentInParent<GameScreen>();
@@ -153,7 +154,10 @@ namespace Hapio
                 BindNavigation(teamModeButton, () => CreateRoom(GameMode.Territory));
                 BindNavigation(teamSoloButton, () => { SetModes(false); session.StartSolo(GameMode.Territory); });
                 modePanel.SetActive(false);
+                // #631: the dim behind the mode card reaches the screen's edges, past the fitted 402×874 frame.
+                if (modeDismissButton != null) GameScreenEdgeCover.Ensure(modeDismissButton.GetComponent<UnityEngine.UI.Graphic>());
             }
+            if (directConnectionPanel != null) GameScreenEdgeCover.Ensure(directConnectionPanel.GetComponent<UnityEngine.UI.Graphic>());
             if (teamShifted != null && teamShiftAnchors != null && teamShifted.Length == teamShiftAnchors.Length)
             {
                 // Keep each story position in a hidden copy, so leaving a 2:2 room restores the authored layout.
@@ -256,10 +260,22 @@ namespace Hapio
             if (modePanel == null) return;
             if (visible && (session.IsCreatingRoom || session.State.phase != GameFlowPhase.Home || !Network.CanChooseConnection)) return;
             modePanel.SetActive(visible);
+            ShowCreateButtonUnlessChoosingMode();
             if (!visible) return;
             modePanel.transform.SetAsLastSibling();
             RefreshModes();
             teamSoloButton.gameObject.SetActive(false);
+        }
+
+        /// <summary>
+        /// #631: "새 방 만들기 +" lies right behind the mode card and is a hair wider than it, so its round ends showed past the
+        /// card's sides. It steps away while the card is up and comes back when the card closes.
+        /// </summary>
+        private void ShowCreateButtonUnlessChoosingMode()
+        {
+            if (createButton == null) return;
+            bool show = modePanel == null || !modePanel.activeSelf;
+            if (createButton.gameObject.activeSelf != show) createButton.gameObject.SetActive(show);
         }
 
         private void EnterRoom(int index)
@@ -345,6 +361,8 @@ namespace Hapio
         {
             bool canChoose = Network.CanChooseConnection && !session.IsCreatingRoom;
             createButton.interactable = canChoose && (modePanel != null || creationCapacity >= 2);
+            // The mode card can also be closed without SetModes (Home hidden for the opening); the button comes back then too.
+            ShowCreateButtonUnlessChoosingMode();
             directConnectionButton.interactable = canChoose;
             refreshButton.interactable = canChoose;
             refreshButton.gameObject.SetActive(!Network.IsJoiningRoom && !session.IsCreatingRoom);

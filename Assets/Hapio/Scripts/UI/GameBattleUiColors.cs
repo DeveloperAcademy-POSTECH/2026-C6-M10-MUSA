@@ -9,6 +9,8 @@ namespace Hapio
         public static readonly Color Ink = new Color(0.1905882359f, 0.1670588255f, 0.1388235241f, 1f);
         // TextColor/PrimaryBrown/500***
         public static readonly Color Brown = new Color(0.3176470697f, 0.2784313858f, 0.2313725501f, 1f);
+        // TextColor/PrimaryBrown/400
+        public static readonly Color Muted = new Color(0.4541176558f, 0.4227451086f, 0.3850980401f, 1f);
         // TextColor/SecondaryLightIvory/200
         public static readonly Color Light = new Color(0.9639215469f, 0.9294117689f, 0.890196085f, 1f);
         // TextColor/DarkRed/500***

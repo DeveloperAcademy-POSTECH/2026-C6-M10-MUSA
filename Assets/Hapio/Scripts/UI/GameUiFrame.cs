@@ -8,8 +8,13 @@ namespace Hapio
     public sealed class GameUiFrame : MaskableGraphic
     {
         public float radius = 8, stroke = 3;
+        private GameFigmaStrokeLibrary.Surface brush;
+        public override Texture mainTexture => brush?.sprite != null ? brush.sprite.texture : base.mainTexture;
+        public void UseBrush(string name)
+        { brush = GameFigmaStrokeLibrary.Find(name); SetAllDirty(); }
         protected override void OnPopulateMesh(VertexHelper mesh)
         {
+            if (brush != null) { brush.Draw(mesh, rectTransform.rect, color); return; }
             mesh.Clear(); Rect r = rectTransform.rect;
             float outer = Mathf.Min(radius, Mathf.Min(r.width, r.height) * .5f);
             float width = Mathf.Clamp(stroke, 0, outer), inner = outer - width;

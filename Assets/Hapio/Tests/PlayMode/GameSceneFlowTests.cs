@@ -391,6 +391,80 @@ namespace Hapio.Tests
                 "Local gesture input must not alter the committed gameplay result.");
         }
 
+        [Category("GPU")]
+        [UnityTest]
+        public IEnumerator SealedGourdShadowFollowsPreviewRotationAndReset()
+        {
+            if (SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Null)
+                Assert.Ignore("Reading the projected shadow requires a graphics device.");
+
+            session.StartSolo();
+            yield return WaitPlaying(1);
+            CompleteMapInFixture(Model());
+            yield return Until(() => session.State.phase == GameFlowPhase.StageResult && !session.IsLoadingScene
+                && SceneManager.GetActiveScene().path == GameScenePaths.StageResult && session.PreviewTexture != null,
+                "Load the saved result screen with its completed preview.");
+            GameScreen screen = Object.FindFirstObjectByType<GameScreen>();
+            session.OpenGourdViewer();
+            var shadow = screen.viewerPanel.transform.Find("Gourd Shadow").GetComponent<UnityEngine.UI.RawImage>();
+            yield return Until(() => shadow.isActiveAndEnabled && shadow.texture is RenderTexture target && target.IsCreated(),
+                "The visible viewer renders a shadow mask.");
+            var projection = (RenderTexture)shadow.texture;
+            var camera = Camera.allCameras.Single(candidate => candidate.targetTexture == session.PreviewTexture);
+            Assert.That(camera.transform.IsChildOf(session.transform), Is.True,
+                "The completed preview must live and tear down with its session.");
+            Assert.That(camera.gameObject.scene, Is.EqualTo(session.gameObject.scene));
+            Assert.That(Camera.allCameras.Count(candidate => candidate.name == camera.name), Is.EqualTo(1),
+                "An old preview camera must not share the current staging area.");
+            // The battle's hanging rope is drawn by LabHangingTarget's "Rope"/"Upper Rope" cylinders or the curved
+            // "Continuous Rope" line; the viewer copies only the gourd model, so none of them may reach the preview rig.
+            Transform rig = camera.transform.parent;
+            Assert.That(rig.GetComponentsInChildren<Renderer>(true).Select(renderer => renderer.name)
+                .Intersect(new[] { "Rope", "Upper Rope", "Continuous Rope" }), Is.Empty,
+                "The viewer shows the gourd without its hanging rope.");
+            Assert.That(rig.GetComponentsInChildren<LineRenderer>(true), Is.Empty, "No curved rope line in the viewer.");
+
+            byte[] ReadAlpha()
+            {
+                var pixels = new Texture2D(projection.width, projection.height, TextureFormat.RGBA32, false, true);
+                RenderTexture previous = RenderTexture.active;
+                try
+                {
+                    RenderTexture.active = projection;
+                    pixels.ReadPixels(new Rect(0, 0, projection.width, projection.height), 0, 0, false);
+                    return pixels.GetPixels32().Select(pixel => pixel.a).ToArray();
+                }
+                finally
+                {
+                    RenderTexture.active = previous;
+                    Object.Destroy(pixels);
+                }
+            }
+
+            byte[] initial = ReadAlpha();
+            int covered = initial.Count(alpha => alpha > 127);
+            Assert.That(covered, Is.InRange(500, initial.Length / 2), "The floor texture contains a visible, bounded silhouette.");
+            session.RotatePreview(new Vector2(.18f, .40f));
+            yield return null;
+            Assert.That(shadow.texture, Is.SameAs(projection), "Turning the gourd reuses the projection texture.");
+            Assert.That(ReadAlpha().Where((alpha, index) => Math.Abs(alpha - initial[index]) > 32).Count(),
+                Is.GreaterThan(100), "Turning the real result mesh changes its projected silhouette.");
+            // Zooming moves the preview camera; the floor shadow scales with the drawn gourd.
+            float fitted = shadow.rectTransform.localScale.x;
+            session.ZoomPreview(.4f);
+            yield return null;
+            Assert.That(shadow.rectTransform.localScale.x, Is.GreaterThan(fitted * 1.3f), "Zooming in grows the shadow with the gourd.");
+            screen.resetViewerButton.onClick.Invoke();
+            yield return null;
+            Assert.That(ReadAlpha(), Is.EqualTo(initial), "Reset restores the original silhouette.");
+            Assert.That(shadow.rectTransform.localScale.x, Is.EqualTo(fitted).Within(.001f), "Reset restores the shadow size.");
+            // The stage art covers the screen without stretching: the visible part keeps the 402×874 proportions.
+            var backdrop = screen.viewerPanel.transform.Find("Stage Background").GetComponent<UnityEngine.UI.RawImage>();
+            Rect area = ((RectTransform)backdrop.transform).rect;
+            float shown = area.width / area.height * backdrop.uvRect.height / backdrop.uvRect.width;
+            Assert.That(shown, Is.EqualTo(402f / 874f).Within(.002f), "The stage background keeps its aspect.");
+        }
+
         private static Vector2 PreviewScreenPoint(RectTransform rectangle, float x, float y)
         {
             Rect local = rectangle.rect;
@@ -437,7 +511,8 @@ namespace Hapio.Tests
             Assert.That(territory.bluePercent.text, Is.EqualTo("100%"));
             Assert.That(territory.redPercent.text, Is.EqualTo("0%"));
             Assert.That(territory.blueWinnerFlag.activeSelf && !territory.redWinnerFlag.activeSelf, Is.True);
-            Assert.That(view.nextButton.interactable, Is.False, "A one-round DEV solo has no next round.");
+            Assert.That(view.nextButton.gameObject.activeSelf, Is.False, "2:2 is one round: no 다시 도전 (#293).");
+            Assert.That(view.viewerButton.gameObject.activeSelf && view.homeButton.gameObject.activeSelf, Is.True, "박 확인 and 나가기 stay.");
             yield return Until(() => view.viewerButton.interactable && view.homeButton.interactable,
                 "Local result readiness and the pointer-release shield must open the two actions.");
             Texture preview = session.PreviewTexture;
@@ -1329,6 +1404,28 @@ namespace Hapio.Tests
             Assert.That(leave.dialogue.text, Is.EqualTo(leave.geumok.activeSelf ? "지금, 누가 나갔지?" : "얼른 다시 돌아와!"));
             yield return Until(() => leave.homeButton.interactable, "The terminal screen must retain a visible exit.");
             leave.homeButton.onClick.Invoke();
+            yield return WaitHome();
+        }
+
+        [UnityTest]
+        public IEnumerator APreparationFailureGameOverAlsoUsesTheCharacterScreen()
+        {
+            session.StartSolo();
+            yield return WaitPlaying(1);
+            // A real non-leave abort path (the same one a failed battle start takes); nobody left the room.
+            typeof(GameSession).GetMethod("AbortHost", BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(session, new object[] { "The prepared battle could not be started.", "판을 멈추고 로비로 돌아왔소." });
+            yield return WaitGameOver();
+            GameScreen screen = null;
+            yield return Until(() => (screen = Object.FindFirstObjectByType<GameScreen>()) != null
+                && screen.gameOverView != null && screen.gameOverView.gameObject.activeInHierarchy,
+                "Preparation, loading and sync failures show the 불이/금옥이 screen like a leave.");
+            Assert.That(session.State.retryableDefeat, Is.False);
+            Assert.That(screen.resultView.gameObject.activeSelf, Is.False, "No result card under it.");
+            GameOverCharacterView character = screen.gameOverView;
+            Assert.That(character.bul.activeSelf != character.geumok.activeSelf, Is.True, "Exactly one character.");
+            yield return Until(() => character.homeButton.interactable, "The character screen keeps an exit.");
+            character.homeButton.onClick.Invoke();
             yield return WaitHome();
         }
 

@@ -105,6 +105,7 @@ namespace Hapio
             Click(closeViewerButton, () => session.CloseGourdViewer());
             Click(resetViewerButton, () => session.ResetPreview());
             GamePreviewAspect.Attach(viewerImage);
+            GameSealedGourdView.Attach(this);
             Click(developerButton, OpenDeveloper);
             if (kind == GameScreenKind.Home || kind == GameScreenKind.Lobby) GameDeveloperAccess.BindMenu(this);
             for (int i = 0; developerScopeButtons != null && i < developerScopeButtons.Length; i++)
@@ -218,6 +219,8 @@ namespace Hapio
         {
             if (gameOverView != null) gameOverView.gameObject.SetActive(false);
             if (stageStory != null && stageStory.TryRefresh(false)) return;
+            // Every GameOver that is not the Story defeat story above uses the 불이/금옥이 screen: a leave, a
+            // disconnect, and a preparation, loading or sync failure alike.
             if (gameOverView != null)
             {
                 SetStoryContentVisible(false);
@@ -405,7 +408,8 @@ namespace Hapio
                 territoryView.gameObject.SetActive(true);
                 territoryView.Present(session.ResultSnapshot, net.LocalPlayerId);
                 Interactable(territoryView.table.homeButton, (!net.IsHost || session.CanReturnHome) && !ResultActionsBlocked);
-                Interactable(territoryView.table.nextButton, session.CanAdvanceStage && !ResultActionsBlocked);
+                // 2:2 is one round (#293): no 다시 도전, only 박 확인 and 나가기.
+                Show(territoryView.table.nextButton == null ? null : territoryView.table.nextButton.gameObject, false);
                 Interactable(territoryView.table.viewerButton, session.PreviewTexture != null && !ResultActionsBlocked);
                 Show(viewerPanel, session.IsViewerOpen && session.PreviewTexture != null);
                 if (viewerImage != null) viewerImage.texture = session.PreviewTexture;

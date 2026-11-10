@@ -145,13 +145,14 @@ namespace C6Lab
             copies.SetParent(root.transform, false);
             clayShapes = new LabClayShapes(shader);
             float diameter = Mathf.Clamp(config.ThrowRadius * 2f, .006f, 5f);
-            for (int i = 0; i < Elements.Length - 1; i++)
+            for (int i = 0; i < Elements.Length; i++)
             {
+                bool fiveColor = Elements[i] == LabOrbElement.None;
                 uint seed = 37219u + (uint)i;
                 Vector3 incoming = battleCamera.transform.forward;
                 var flight = new LabClayFlightSlot(copies, i, clayShapes, profile);
                 flight.Begin(Elements[i], ClayPoint(i, 0, false), incoming, diameter,
-                    profile.normalStrength, false, seed, false);
+                    profile.normalStrength, false, seed, false, fiveColor: fiveColor);
                 clayShots.Add(flight);
                 var surface = new GameObject("Private contact anchor " + i).transform;
                 surface.SetParent(copies, false);
@@ -159,7 +160,7 @@ namespace C6Lab
                 claySurfaces.Add(surface);
                 var contact = new LabClayImpactSlot(copies, i, clayShapes, profile);
                 contact.Begin(Elements[i], surface.position, -incoming, incoming, diameter,
-                    profile.normalStrength, surface, false, 0f, seed, false);
+                    profile.normalStrength, surface, false, 0f, seed, false, fiveColor: fiveColor);
                 // Already spread, with drops visible, even when the shared game clock is held during preparation.
                 // The squash uses the same PaperOrb mesh/material as the flight body above.
                 contact.Tick(.12f);
@@ -168,7 +169,9 @@ namespace C6Lab
         }
 
         private Vector3 ClayPoint(int index, int frame, bool contact) => battleCamera.ViewportToWorldPoint(new Vector3(
-            .12f + index * .17f, contact ? .67f : .31f, Mathf.Max(battleCamera.nearClipPlane + 2f, 3f)))
+            index == Elements.Length - 1 ? .5f : .12f + index * .17f,
+            index == Elements.Length - 1 ? (contact ? .84f : .48f) : (contact ? .67f : .31f),
+            Mathf.Max(battleCamera.nearClipPlane + 2f, 3f)))
             + battleCamera.transform.right * (frame * StepMetres * .35f);
 
         private void SpawnBoardCopies(LabOrbAppearance appearance)

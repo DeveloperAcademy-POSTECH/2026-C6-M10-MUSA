@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -26,14 +27,38 @@ namespace Hapio
 
         public bool IsOpen => panel != null && panel.activeSelf;
 
+        private static readonly List<GameCreditsView> Views = new List<GameCreditsView>();
+
+        /// <summary>
+        /// A credits window is on screen. The touch ink (#587) stays off everywhere while one is (#631), so ink never lies over
+        /// the words being read. A window whose screen is hidden (Home hidden for the opening or DEV) does not count.
+        /// </summary>
+        public static bool AnyOpen
+        {
+            get
+            {
+                foreach (GameCreditsView view in Views)
+                    if (view != null && view.panel != null && view.panel.activeInHierarchy) return true;
+                return false;
+            }
+        }
+
         private void Awake()
         {
+            Views.Add(this);
             if (openButton != null) openButton.onClick.AddListener(Open);
             if (closeButton != null) closeButton.onClick.AddListener(Close);
-            if (dismissButton != null) dismissButton.onClick.AddListener(Close);
+            if (dismissButton != null)
+            {
+                dismissButton.onClick.AddListener(Close);
+                // #631: the dark backdrop reaches the screen's edges, past the fitted 402×874 frame.
+                GameScreenEdgeCover.Ensure(dismissButton.GetComponent<Graphic>());
+            }
             Fill();
             if (panel != null) panel.SetActive(false);
         }
+
+        private void OnDestroy() => Views.Remove(this);
 
         public void Fill()
         {

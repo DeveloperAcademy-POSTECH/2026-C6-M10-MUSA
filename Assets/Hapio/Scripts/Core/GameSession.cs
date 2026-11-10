@@ -105,6 +105,16 @@ namespace Hapio
         /// <summary>이번 판에서 깬 스테이지들의 결과 (스테이지 순서). ALL STAGES CLEAR 화면의 전체 대시보드가 쓴다.</summary>
         public IReadOnlyList<LabResultStage> StageResults => new List<LabResultStage>(stageResults.Values);
         public Texture PreviewTexture => preview != null && !preview.IsDisposed ? preview.Texture : null;
+        /// <summary>The open viewer's zoom (0 far … 1 near, .5 fitted); the floor shadow follows it.</summary>
+        internal float PreviewZoom => preview != null && !preview.IsDisposed ? preview.ZoomNormalized : .5f;
+        internal GameGourdFloorShadow PreviewShadow
+        {
+            get
+            {
+                Transform model = preview?.ModelRoot;
+                return model != null ? model.GetComponent<GameGourdFloorShadow>() : null;
+            }
+        }
         public bool IsViewerOpen { get; private set; }
         public string UiNotice { get; private set; } = string.Empty;
         public bool RoomBrowserVisible => roomBrowserVisible;
@@ -175,6 +185,7 @@ namespace Hapio
             sceneFade = GameSceneFade.Create(transform, lobbyFadeColor);
             CreateLoadingView();
             GameTouchInk.Create(transform);
+            cloudCover = GameCloudCover.Create(transform);
             network.GameFlowMessage += ReceiveControl;
             network.GameFlowDisconnected += OnPeerDisconnected;
             network.GameFlowDeveloperRestartRequested += OnDeveloperRestart;
@@ -194,6 +205,7 @@ namespace Hapio
         {
             if (Instance != this || network == null) return;
             UpdateLoading();
+            UpdateCloudCover();
             // The browse that resumes behind the title after a game must not keep the phone awake there (#476).
             network.RoomSearchKeepsAwake = roomBrowserVisible;
             pendingRooms.Tick(out string pendingError);
@@ -318,7 +330,7 @@ namespace Hapio
                     SetResultPresentation(control.sender, control.resultPresentationBusy);
                 else if (control.kind == "exit" && state.IsRunActive && control.runId == state.runId
                     && control.stageIndex == state.stageIndex)
-                    AbortHost("A player left the game.", "한 명이 나가 판을 멈추고 로비로 돌아왔소.");
+                    AbortHost(GameRunFlow.PlayerLeftReason, "한 명이 나가 판을 멈추고 로비로 돌아왔소.");
                 return;
             }
             if (control.kind == "countdown_commit")
@@ -523,7 +535,7 @@ namespace Hapio
             {
                 preview?.Dispose();
                 preview = copy;
-                DontDestroyOnLoad(preview.PreviewCamera.transform.root.gameObject);
+                GameGourdPreviewPresentation.Apply(preview, transform);
                 RememberCapturedResult();
             }
             else if (network.RequiresPaintArt)
@@ -908,7 +920,7 @@ namespace Hapio
             if (state.phase == GameFlowPhase.Home || state.phase == GameFlowPhase.Lobby
                 || state.phase == GameFlowPhase.Completed || state.phase == GameFlowPhase.GameOver)
             { GoHome(); return; }
-            ExitWithLocalReason("A player left the game.");
+            ExitWithLocalReason(GameRunFlow.PlayerLeftReason);
         }
 
         private void ExitWithLocalReason(string reason)
@@ -944,7 +956,7 @@ namespace Hapio
             if (goingHome) return;
             if (state.phase == GameFlowPhase.GameOver && state.retryableDefeat)
             {
-                string reason = lostHost ? "The Host disconnected." : "A player disconnected.";
+                string reason = lostHost ? GameRunFlow.HostDisconnectedReason : GameRunFlow.PlayerDisconnectedReason;
                 if (network.IsHost)
                 {
                     if (hostFlow.EndDefeatRetry(reason)) SetHostState();
@@ -960,12 +972,12 @@ namespace Hapio
                 return;
             }
             if (!state.IsRunActive) return;
-            if (network.IsHost) AbortHost("A player disconnected.", "한 명이 나가 판을 멈추고 로비로 돌아왔소.");
+            if (network.IsHost) AbortHost(GameRunFlow.PlayerDisconnectedReason, "한 명이 나가 판을 멈추고 로비로 돌아왔소.");
             else
             {
                 GameFlowState failed = state.Copy();
                 failed.phase = GameFlowPhase.GameOver;
-                failed.endReason = lostHost ? "The Host disconnected." : "A player disconnected.";
+                failed.endReason = lostHost ? GameRunFlow.HostDisconnectedReason : GameRunFlow.PlayerDisconnectedReason;
                 failed.revision++;
                 SetLocalState(failed);
             }

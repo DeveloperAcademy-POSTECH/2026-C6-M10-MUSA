@@ -54,7 +54,7 @@ namespace Hapio
         /// </summary>
         public static bool ShowsLoading(string from, string to, bool tutorialStarting = false)
         {
-            // The opening's hand-over to the practice board gets its own transition later (user decision).
+            // The opening's hand-over to the practice board has its own transition: the clouds (#635), not the loading screen.
             if (tutorialStarting) return false;
             // #607: the black "전투 준비 중" cover is no longer seen between stages; the loading screen counts players in.
             if (to == GameScenePaths.Battle) return true;

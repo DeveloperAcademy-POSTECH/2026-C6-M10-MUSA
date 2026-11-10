@@ -21,7 +21,7 @@ MonoBehaviour:
   underlineDark: {fileID: 21300000, guid: 34af188e497f143ac9a0ea62f5f40f05, type: 3}
   underlineLight: {fileID: 21300000, guid: dd0cc8a7c420243b9a2739c4cad2378a, type: 3}
   pauseStroke: {fileID: 21300000, guid: d6ed6ce54158942bb8d02b013d9b91aa, type: 3}
-  staminaCells: {fileID: 21300000, guid: 0d413890aa9ef44a4afbd21d4f5f005d, type: 3}
+  staminaCells: {fileID: 21300000, guid: 7f815ba48110646dcb40cb5c21a23832, type: 3}
   playerBadges:
   - {fileID: 21300000, guid: 72751bbc8aed0455cacd57f704f41a74, type: 3}
   - {fileID: 21300000, guid: c427c41dab7a7455d95136793e8d7e3f, type: 3}

@@ -73,9 +73,28 @@ namespace Hapio.Tests
             Assert.That(session.RoomBrowserVisible, Is.False);
             Assert.That(GameSession.TutorialPending, Is.False, "Once per app run.");
 
+            // #635: the clouds that closed over the opening stay, wordless, while the board is prepared, lift once it can be
+            // played, and only then does its first line come.
+            Assert.That(session.CloudsUp, Is.True, "The clouds cover the hand-over.");
             GameTutorialDirector director = null;
-            yield return Until(() => (director = Object.FindFirstObjectByType<GameTutorialDirector>()) != null
-                && director.IsShowingLine, "The practice board plays its first line", 30f);
+            bool heldWhilePreparing = false, coverUnderClouds = false, lineUnderClouds = false, loadingScreen = false;
+            float deadline = Time.realtimeSinceStartup + 30f;
+            while (Time.realtimeSinceStartup < deadline)
+            {
+                heldWhilePreparing |= session.CloudCover.IsHolding && session.IsLoadingScene;
+                coverUnderClouds |= session.CloudsUp && session.StartOverlay != null && session.StartOverlay.Visible;
+                loadingScreen |= session.IsLoadingScreenUp;
+                director = Object.FindFirstObjectByType<GameTutorialDirector>();
+                lineUnderClouds |= session.CloudsUp && director != null && director.IsShowingLine;
+                if (director != null && director.IsShowingLine) break;
+                yield return null;
+            }
+            Assert.That(director != null && director.IsShowingLine, Is.True, "The practice board plays its first line");
+            Assert.That(heldWhilePreparing, Is.True, "The clouds wait, covering, while the board is prepared.");
+            Assert.That(coverUnderClouds, Is.False, "No \"튜토리얼 준비 중\" words under the clouds.");
+            Assert.That(loadingScreen, Is.False, "Nor the loading screen.");
+            Assert.That(lineUnderClouds, Is.False, "The first line waits until the clouds have lifted.");
+            Assert.That(session.CloudsUp, Is.False);
             Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.Playing));
             Assert.That(session.StartOverlay == null || !session.StartOverlay.Visible, Is.True, "No countdown cover is left.");
 
@@ -93,6 +112,28 @@ namespace Hapio.Tests
             GameTutorialArt art = GameTutorialArt.Load();
             var bindings = Object.FindFirstObjectByType<GameBattleBindings>();
             LabHud hud = bindings.hud;
+            // #621: the original tutorial board is alpha-composited over the continuous stage view.
+            yield return null;
+            var boardView = bindings.GetComponent<GameTutorialBoardPresentation>();
+            var composition = hud.GetComponent<LabOrbHudComposition>();
+            var plate = bindings.board.transform.Find("OrbBoardPlate").GetComponent<Renderer>();
+            Assert.That(boardView, Is.Not.Null);
+            Assert.That(composition.IsCompositing, Is.True, composition.InitializationError);
+            Assert.That(composition.presentationBackdrop, Is.SameAs(boardView.Artwork.rectTransform));
+            Assert.That(boardView.Artwork.texture, Is.SameAs(plate.sharedMaterial.mainTexture), "Keep the tutorial's original plate.");
+            Assert.That(boardView.Artwork.enabled, Is.True);
+            Assert.That(boardView.Artwork.raycastTarget, Is.False);
+            Assert.That(plate.enabled, Is.False, "No duplicate plate behind the composited artwork.");
+            Assert.That(bindings.sceneController.orbCamera.enabled, Is.False, "No rectangular lower-camera paper pass.");
+            Rect boardRect = ScreenRect(boardView.Artwork.rectTransform);
+            Vector3 projected = bindings.sceneController.orbCamera.WorldToScreenPoint(plate.bounds.center);
+            Assert.That(Vector2.Distance(boardRect.center, projected), Is.LessThan(1f), "Visual stays on the original input board.");
+            Assert.That(boardView.Artwork.transform.GetSiblingIndex(), Is.LessThan(hud.leftNeighborBadge.transform.GetSiblingIndex()));
+            var continuation = bindings.GetComponent<GameBoardBackgroundContinuation>().ContinuationCamera;
+            Assert.That(continuation != null && continuation.enabled, Is.True);
+            Ray upper = bindings.battleCamera.ViewportPointToRay(new Vector3(.37f,0,0));
+            Ray lower = continuation.ViewportPointToRay(new Vector3(.37f,1,0));
+            Assert.That(Vector3.Distance(upper.direction,lower.direction), Is.LessThan(.00001f), "Background joins without a viewport seam.");
             Assert.That(hud.localPlayerCircle.sprite, Is.SameAs(art.bul));
             Assert.That(hud.leftPlayerCircle.sprite, Is.SameAs(art.muk));
             Assert.That(hud.rightPlayerCircle.sprite, Is.SameAs(art.geumok));
@@ -144,6 +185,11 @@ namespace Hapio.Tests
             skip.onClick.Invoke();
             Assert.That(director.IsSkipDialogOpen, Is.True);
             yield return new WaitForSecondsRealtime(art.popSeconds + .1f);
+            // #631: the window and the two buttons under it sit, as one block, on the screen's middle.
+            var skipDialog = director.GetComponentsInChildren<RectTransform>(true).Single(rect => rect.name == "Skip Dialog");
+            Rect skipWindow = ScreenRect((RectTransform)skipDialog.Find("Window")), stayRect = ScreenRect((RectTransform)stay.transform);
+            Assert.That((skipWindow.yMax + stayRect.yMin) * .5f, Is.EqualTo(ScreenRect(skipDialog).center.y).Within(1f),
+                "The skip window and its buttons are centred top to bottom.");
             Assert.That(director.IsShowingLine, Is.False, "The bubble waits behind the dialog.");
             tap.onClick.Invoke();
             Assert.That(director.BeatIndex, Is.EqualTo(1), "No tap gets past the dialog.");
@@ -156,6 +202,13 @@ namespace Hapio.Tests
             var pause = buttons.Single(button => button.name == "Pause");
             yield return null;
             Assert.That(pause.gameObject.activeInHierarchy, Is.True, "An invisible press lies over the HUD pause button.");
+            var help = buttons.Single(button => button.name == "Help");
+            Assert.That(help.gameObject.activeInHierarchy, Is.True);
+            Rect pauseIcon = ScreenRect(pause.GetComponent<GameHudButtonArtwork>().artwork.rectTransform);
+            Rect helpIcon = ScreenRect(help.GetComponent<GameHudButtonArtwork>().artwork.rectTransform);
+            Assert.That(helpIcon.center.y, Is.EqualTo(pauseIcon.center.y).Within(.5f),
+                "The help and pause artwork must align even though their hit areas differ in the tutorial.");
+            Assert.That(helpIcon.xMax, Is.LessThan(pauseIcon.xMin));
             pause.onClick.Invoke();
             yield return Until(() => network.IsBattlePaused && director.IsSteppedAsideForPause, "Paused from a line", 5f);
             var overlayGroup = director.GetComponentsInChildren<CanvasGroup>(true).Single(group => group.name == "Tutorial Overlay");
