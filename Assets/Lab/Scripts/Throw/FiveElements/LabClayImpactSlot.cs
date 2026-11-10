@@ -21,6 +21,10 @@ namespace C6Lab
         private int dropCount;
         private float strength, diameter, markLife, contactLife, totalLife, oblique, spin;
         private float pressEnd, spreadDuration;
+        private bool fiveColor;
+        private Color32[] fiveColorPalette;
+        private float fiveColorStartAge;
+        private Material fiveColorSurface;
         public float Age { get; private set; }
         public bool Active { get; private set; }
 
@@ -47,17 +51,21 @@ namespace C6Lab
         }
 
         public void Begin(LabOrbElement element, Vector3 point, Vector3 surfaceNormal, Vector3 direction, float diameter,
-            float strength, Transform follow, bool monochrome, float markSeconds, uint seed, bool reduced)
+            float strength, Transform follow, bool monochrome, float markSeconds, uint seed, bool reduced, bool fiveColor = false)
         {
             this.diameter=diameter;
             this.strength=strength;
+            this.fiveColor=fiveColor;
+            fiveColorPalette=fiveColor ? LabFiveColorSparkle.FiveColors : null;
+            fiveColorStartAge=0f;
+            fiveColorSurface=fiveColor ? art.OrbSurface(element,true) : null;
             markLife=markSeconds;
             contactLife=Mathf.Max(.25f,art.contactSeconds)/Mathf.Lerp(.95f,1.13f,strength);
             pressEnd=Mathf.Max(.012f,art.pressSeconds)*Mathf.Lerp(1.12f,.80f,strength);
             spreadDuration=Mathf.Max(.025f,art.spreadSeconds)*Mathf.Lerp(1.16f,.67f,strength);
             totalLife=Mathf.Max(contactLife,markLife,art.dropLifetime+.035f);
             Age=0f;
-            color=art.Pigment(element,monochrome);
+            color=fiveColor ? LabFiveColorSparkle.ColorAt(0f,fiveColorPalette) : art.Pigment(element,monochrome);
             direction=LabFiveElementVfx.Direction(direction,Vector3.down);
             Vector3 n=LabFiveElementVfx.Direction(surfaceNormal,-direction);
             Vector3 right=Vector3.ProjectOnPlane(Camera.main != null ? Camera.main.transform.right : Vector3.right,n);
@@ -84,16 +92,27 @@ namespace C6Lab
             for (int i=0; i<drops.Length; ++i)
             {
                 dropRenderers[i].enabled=false;
+                shapes.ResetPaint(dropRenderers[i]);
                 if (i>=dropCount) continue;
                 float a=spin+6.283185f*(i+.15f*Mathf.Sin(spin+i*3.4f))/dropCount;
                 float radial=(2.68f+.71f*Mathf.Sin(spin*3+i*2.3f))*Mathf.Lerp(.9f,1.8f,strength);
                 float lift=(2.25f+.57f*Mathf.Cos(spin+i*2.1f))*Mathf.Lerp(1f,1.28f,strength);
                 velocities[i]=new Vector3(radial*Mathf.Cos(a),lift,radial*Mathf.Sin(a))*art.dropSpeed;
                 sizes[i]=.22f+.08f*Mathf.Sin(spin+2.8f*i);
-                shapes.Paint(dropRenderers[i],color,art.wetGloss,Vector3.zero);
+                Color dropColor=fiveColor ? LabFiveColorSparkle.ColorAt(
+                    (i+1)*LabClayShapes.FiveColorStepSeconds,fiveColorPalette) : color;
+                shapes.Paint(dropRenderers[i],dropColor,art.wetGloss,Vector3.zero);
             }
             root.gameObject.SetActive(true);
             Active=true;
+            Tick(0f);
+        }
+
+        public void TintFiveColor(float visualAge, Color32[] palette)
+        {
+            if (!Active || !fiveColor || float.IsNaN(visualAge) || float.IsInfinity(visualAge)) return;
+            fiveColorStartAge=Mathf.Max(0f,visualAge)-Age;
+            fiveColorPalette=palette != null && palette.Length>0 ? palette : LabFiveColorSparkle.FiveColors;
             Tick(0f);
         }
 
@@ -120,6 +139,12 @@ namespace C6Lab
                 return;
             }
             if (followsTarget) SyncSurface();
+            float paletteAge=fiveColorStartAge+Age;
+            if (fiveColor)
+            {
+                color=LabFiveColorSparkle.ColorAt(paletteAge,fiveColorPalette);
+                shapes.PaintFiveColorOrb(pressRenderer,fiveColorSurface,color,art.wetGloss);
+            }
 
             float compression=Mathf.SmoothStep(0f,1f,Age/pressEnd);
             float releaseBall=1f-Mathf.SmoothStep(0f,1f,(Age-pressEnd*.83f)/(spreadDuration*.85f));
@@ -146,7 +171,7 @@ namespace C6Lab
                 spread.localRotation=contactRotation;
                 spread.localPosition=contactRotation*new Vector3(0,.006f,.16f*curve*oblique);
                 spread.localScale=new Vector3(radius,h,radius*(1+.26f*oblique));
-                if (Age <= .7f || dt==0f)
+                if (Age <= .7f || dt==0f || fiveColor)
                 {
                     Vector3 down=spread.InverseTransformDirection(Vector3.down);
                     down.y=0f;
@@ -162,6 +187,10 @@ namespace C6Lab
             {
                 dropRenderers[i].enabled=showDrops;
                 if (!showDrops) continue;
+                if (fiveColor)
+                    shapes.Paint(dropRenderers[i],LabFiveColorSparkle.ColorAt(
+                        paletteAge*LabClayShapes.FiveColorFlowSpeed+(i+1)*LabClayShapes.FiveColorStepSeconds,
+                        fiveColorPalette),art.wetGloss,Vector3.zero);
                 float size=sizes[i]*(1f-Mathf.SmoothStep(0f,1f,Mathf.InverseLerp(life*.57f,life,elapsed)));
                 Vector3 p=velocities[i]*elapsed + gravity*(.5f*elapsed*elapsed);
                 bool resting=p.y < size*.39f;
@@ -178,6 +207,13 @@ namespace C6Lab
             Active=false;
             target=null;
             followsTarget=false;
+            fiveColor=false;
+            fiveColorStartAge=0f;
+            fiveColorPalette=null;
+            fiveColorSurface=null;
+            shapes.ResetPaint(pressRenderer);
+            shapes.ResetPaint(spreadRenderer);
+            foreach (var renderer in dropRenderers) shapes.ResetPaint(renderer);
             root.gameObject.SetActive(false);
         }
     }

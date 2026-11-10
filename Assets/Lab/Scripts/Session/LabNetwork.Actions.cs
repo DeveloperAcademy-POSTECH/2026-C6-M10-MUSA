@@ -565,7 +565,7 @@ namespace C6Lab
             bool fiveColor = orb != null ? orb.fiveColor : board != null && board.IsFiveColor(request.firstId);
             bool talisman = orb != null && orb.jigwiTalismanReward;
             LabProjectile visual = LabProjectile.Create(position, config, projectileRoot,
-                element, small ? config.BlastShrinkScale : 1f, useClayFlight: !fiveColor && !talisman);
+                element, small ? config.BlastShrinkScale : 1f, useClayFlight: !talisman, fiveColor: fiveColor);
             if (fiveColor) LabFiveColorSparkle.AttachArt(visual.transform, config.OrbRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined), true);
             else if (orb != null && orb.jigwiTalismanReward) LabFiveColorSparkle.AttachArt(visual.transform,
                 config.OrbRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined) * LabJigwiWaterVolley.SizeScale, true,
@@ -623,7 +623,7 @@ namespace C6Lab
                     impactFeedback?.PlayHit(target, local, element, attackValue, contact.ImpactVelocity, false);
                 else
                     impactFeedback?.PlayContact(target, local, element, attackValue, contact.ImpactVelocity,
-                        contact.HitNormal, contact.VisualDiameter);
+                        contact.HitNormal, contact.VisualDiameter, fiveColor: fiveColor, fiveColorAge: contact.FiveColorAge);
                 LastLocalHitOffset = LabThrowSound.HitOffset(local, hitbox.InverseTransformDirection(contact.ImpactVelocity));
                 LastLocalHitSmall = LabThrowSound.IsSmallThrow(comboScale);
                 LastLocalHitBig = LabThrowSound.IsBigThrow(comboScale);
@@ -699,7 +699,8 @@ namespace C6Lab
                 if (predictedShots.TryGetValue(packet.requestId, out var visual) && visual != null)
                 {
                     visual.ReconcileVisual((LabOrbElement)packet.element,
-                        packet.small ? config.BlastShrinkScale : 1f, packet.sizeScale, packet.jigwiABRadiusScale);
+                        packet.small ? config.BlastShrinkScale : 1f, packet.sizeScale, packet.jigwiABRadiusScale,
+                        fiveColor: packet.fiveColor);
                     visual.SetJigwiABReward(packet.jigwiABReward);
                     TagJigwiSupplyProjectile(visual, packet.firstId, packet.jigwiABSupplyEventId);
                     visual.AuthorityRevision = packet.modelRevision;

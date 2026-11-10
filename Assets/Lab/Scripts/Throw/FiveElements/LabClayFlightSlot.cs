@@ -15,12 +15,17 @@ namespace C6Lab
         private Vector3 position, forward;
         private float age, phase;
         private bool lowDetail;
+        private Color32[] fiveColorPalette;
+        private float fiveColorAge;
         public int Version { get; private set; }
         public bool Active { get; private set; }
         public float Diameter { get; private set; }
         public float Strength { get; private set; }
         public LabOrbElement Element { get; private set; }
         public bool Monochrome { get; private set; }
+        public bool FiveColor { get; private set; }
+        public float FiveColorAge => fiveColorAge;
+        public Color32[] FiveColorPalette => fiveColorPalette;
 
         public LabClayFlightSlot(Transform parent, int index, LabClayShapes shapes, LabFiveElementProfile art)
         {
@@ -45,7 +50,7 @@ namespace C6Lab
         }
 
         public void Begin(LabOrbElement element, Vector3 start, Vector3 direction, float diameter,
-            float strength, bool mono, uint seed, bool reduced)
+            float strength, bool mono, uint seed, bool reduced, bool fiveColor = false)
         {
             Version = unchecked(Version+1);
             Active = true;
@@ -53,6 +58,9 @@ namespace C6Lab
             Diameter = diameter;
             Strength = strength;
             Monochrome = mono;
+            FiveColor = fiveColor;
+            fiveColorAge = 0f;
+            fiveColorPalette = fiveColor ? LabFiveColorSparkle.FiveColors : null;
             lowDetail = reduced;
             position = start;
             forward = LabFiveElementVfx.Direction(direction, Vector3.forward);
@@ -70,6 +78,37 @@ namespace C6Lab
             for (int i=0; i<drops.Length; ++i) drops[i].gameObject.SetActive(!lowDetail || i==0);
             root.gameObject.SetActive(true);
             Tick(0);
+        }
+
+        public bool TintFiveColor(float visualAge, Color32[] palette)
+        {
+            if (!Active || !FiveColor || float.IsNaN(visualAge) || float.IsInfinity(visualAge)) return false;
+            fiveColorAge = Mathf.Max(0f, visualAge);
+            fiveColorPalette = palette != null && palette.Length > 0 ? palette : LabFiveColorSparkle.FiveColors;
+            PaintFiveColor();
+            return true;
+        }
+
+        private void PaintFiveColor()
+        {
+            shapes.PaintFiveColorOrb(renderers[0], art.OrbSurface(Element, true),
+                LabFiveColorSparkle.ColorAt(fiveColorAge, fiveColorPalette), art.wetGloss);
+            shapes.Paint(renderers[1], TailColor(.25f), art.wetGloss, Vector3.zero);
+            for (int i=0; i<drops.Length; ++i)
+            {
+                float p=Mathf.Repeat(age*3.7f+phase+i*.338f,1f);
+                shapes.Paint(renderers[i+2], TailColor(p), art.wetGloss, Vector3.zero);
+            }
+            for (int i=0; i<wisps.Length; ++i)
+                shapes.Paint(renderers[i+5], TailColor(.4f+.3f*i), art.wetGloss, Vector3.zero);
+        }
+
+        private Color TailColor(float distance)
+        {
+            // Match the old five-key palette flow, sampled on the existing clay tail pieces.
+            float seconds=fiveColorAge*LabClayShapes.FiveColorFlowSpeed +
+                (1f-Mathf.Clamp01(distance))*4f*LabClayShapes.FiveColorStepSeconds;
+            return LabFiveColorSparkle.ColorAt(seconds, fiveColorPalette);
         }
 
         private static Color ElementAccent(LabOrbElement element)
@@ -119,6 +158,7 @@ namespace C6Lab
         public void Tick(float dt)
         {
             age+=dt;
+            if (FiveColor) fiveColorAge+=dt;
             Vector3 right = Vector3.Cross(Vector3.up, forward);
             right = LabFiveElementVfx.Direction(right, Vector3.right);
             Vector3 up = Vector3.Cross(forward,right).normalized;
@@ -153,6 +193,7 @@ namespace C6Lab
                 Vector3 end=Back(tail*(.8f+.12f*side)+wave*.1f) + offset*.7f + up*(.05f*Diameter);
                 Stretch(wisps[i],front,end,Diameter*(.114f-.022f*i),forward);
             }
+            if (FiveColor) PaintFiveColor();
         }
 
         private static void Stretch(Transform t, Vector3 front, Vector3 back, float width, Vector3 forward)
@@ -167,6 +208,8 @@ namespace C6Lab
         {
             if (!Active) return;
             Active=false; count=0; head=0; age=0f;
+            FiveColor=false; fiveColorAge=0f; fiveColorPalette=null;
+            foreach (var renderer in renderers) shapes.ResetPaint(renderer);
             root.gameObject.SetActive(false);
         }
     }
