@@ -7357,3 +7357,19 @@ PlayMode의 기존 main 실패13건은 구형 지귀 A/B·특수 물구슬 검�
 기존 main 실패8건은 StageResult에 일반 결과와 땅따먹기 결과의 GameStageResultView가 각각 존재하는데, `GameStageResultViewTests.WithView`가 비활성 객체까지 포함한 검색 결과를 `.Single()`로 선택하기 때문이다. 실제 검사 본문 전에 예외가 발생한다. 같은 기준 main에서 동일 실패를 재현했으며 이번 UI 표시 변경으로 고치거나 skip하지 않았다.
 
 미실행: 전체 PlayMode, Mac standalone/Release 빌드 실행, iOS 실기기, 여러 기기의 LAN·핫스팟 동시 플레이. Editor 검사의 통과를 Release 실행 검증으로 기록하지 않는다. 사용법은 GAME_FLOW의 ‘중앙 안내 문구 표시’ 항목을 따른다.
+
+
+### #616 최신 main 통합·PR 전 전체 검사 — 2026-11-10
+
+main `e1e8d3e2`의 #617 오프닝·#618 VFX 작업을 충돌 없이 합쳤고 양쪽 검증 기록을 보존했다. 새 검사에서 Home 초기화 대기가 실패해도 이미 생성된 영속 GameSession을 정리하도록 소유 참조를 대기 조건 안에서 먼저 잡았다. 실제 게임 코드와 저장된 Scene·Prefab·공유 수치는 추가 변경하지 않았다.
+
+| 검사 | 결과 |
+| --- | --- |
+| 최신 main 통합 후 전체 EditMode | **2,165/2,173 통과**, 실패8·skip0, 21.47초. 이전 #616 실행과 같은 결과 UI 8건이며 관련 검사·Scene·결과 구현은 대조 기준 `e0a32da5`에서 변경되지 않았다. |
+| 최신 main 통합 후 전체 PlayMode | **742/759 통과**, 실패17·skip0, 638.52초. 새 NoticeText 검사4건은 모두 통과했다. |
+| 수정 없는 최신 main PlayMode 대조 | 기준 `e1e8d3e2`에서 변경본의 실패17건을 정확한 이름으로 실행해 **0/17 통과·17실패**, skip0, 32.83초. 실패 이름 집합이 전부 일치하며 변경본에만 발생한 실패는 없다. 전체 main PlayMode를 다시 실행한 결과는 아니다. |
+| 변경 검사 | 스크립트 컴파일 오류0, `git diff --check` 통과. |
+
+PlayMode의 기존 main 실패17건은 표시용 최소 구슬 크기와 구형 기대값 불일치2건(LabComboProjectileIntegrationTests), 저장된 지귀 A 전용 설정과 기대 시간표 불일치8건(LabJigwiABNetworkTests7·GameJigwiStageIntegrationTests1), GameSceneFlowTests2건, GameTouchInkFlowTests4건, GameTutorialFlowTests1건이다. 최소 표시 크기는 #607이 충돌 크기와 의도적으로 분리한 값이며 이번 변경에서 물리·트레일·해당 검사를 바꾸지 않았다. 테스트 실패를 삭제·skip·PASS 처리하지 않고 기준 main에서의 재현과 별도로 기록한다.
+
+독립 코드 검토에서 Notice 생성·로그·Host 권한·공유259개·접속 규약·Scene/Prefab 변경이 없고 Release 표시 차단이 유지되는 것을 확인했다. 기기별 설정·실제 Home→Lobby/Battle 연결은 위 실제 PlayMode 결과로 확인했으며, Release/Mac standalone/iOS 실행과 실제 다중 기기 네트워크 검증은 계속 미실행이다.

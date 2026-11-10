@@ -36,9 +36,12 @@ namespace Hapio.Tests
             PlayerPrefs.Save();
             Assert.That(GameSession.Instance, Is.Null, "Release the previous persistent session first.");
             yield return SceneManager.LoadSceneAsync(GameScenePaths.Home, LoadSceneMode.Single);
-            yield return Until(() => GameSession.Instance != null && !GameSession.Instance.IsLoadingScene,
-                "Saved Home must finish its session bootstrap.");
-            session = GameSession.Instance;
+            yield return Until(() =>
+            {
+                // Own the persistent object before the wait can fail, so teardown can release it.
+                if (session == null) session = GameSession.Instance;
+                return session != null && !session.IsLoadingScene;
+            }, "Saved Home must finish its session bootstrap.");
             session.Network.port = AvailablePort();
             yield return null;
         }
