@@ -917,8 +917,8 @@ namespace Hapio.Tests
                 {
                     yield return Until(() => clear.nextSeal.gameObject.activeInHierarchy && clear.nextSeal.interactable,
                         "The Host starts the next stage only after story and result readiness.");
-                    Assert.That(story.exitButton.gameObject.activeInHierarchy, Is.True,
-                        "Before the last stage the clear picture keeps 나가기.");
+                    Assert.That(story.exitButton.gameObject.activeInHierarchy, Is.False,
+                        "The approved clear picture has no footer 나가기.");
                     if (stage == 1)
                     {
                         // Keep the retired automatic-advance regression independent of viewer activity.
@@ -926,10 +926,11 @@ namespace Hapio.Tests
                         Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.StageResult));
                         Assert.That(session.State.stageIndex, Is.EqualTo(1));
                         Assert.That(story.player.CurrentView.GetComponent<StoryResultActions>(), Is.Null);
-                        Assert.That(story.viewerButton.gameObject.activeInHierarchy && story.viewerButton.interactable, Is.True,
-                            "The clear picture has no card actions, so the shared footer keeps inspection.");
-                        story.viewerButton.onClick.Invoke();
-                        yield return Until(() => session.IsViewerOpen, "The footer action opens the existing captured gourd.");
+                        Assert.That(story.viewerButton.gameObject.activeInHierarchy, Is.False,
+                            "The approved clear picture has no footer 완성 박 보기.");
+                        // Inspection itself (opened earlier from the seal card) still holds the Host's 다음 봉인.
+                        session.OpenGourdViewer();
+                        yield return Until(() => session.IsViewerOpen, "The captured gourd can still be inspected.");
                         yield return null;
                         Assert.That(story.presentationGroup.alpha, Is.Zero);
                         Assert.That(clear.nextSeal.interactable, Is.False);
@@ -1104,10 +1105,11 @@ namespace Hapio.Tests
             Assert.That(story.player.sequence, Is.SameAs(story.afterStages[0]));
             AssertNoInlineContinue(story.player.CurrentView);
             Assert.That(story.player.nextButton.gameObject.activeInHierarchy, Is.False);
-            Assert.That(story.viewerButton.gameObject.activeInHierarchy && story.viewerButton.interactable, Is.True,
-                "The clear picture has no card actions, so the shared result group must retain inspection.");
-            story.viewerButton.onClick.Invoke();
-            yield return Until(() => session.IsViewerOpen, "The retained after-story still permits gourd inspection.");
+            Assert.That(story.viewerButton.gameObject.activeInHierarchy, Is.False,
+                "The approved clear picture has no footer 완성 박 보기 or 나가기.");
+            Assert.That(story.exitButton.gameObject.activeInHierarchy, Is.False);
+            session.OpenGourdViewer();
+            yield return Until(() => session.IsViewerOpen, "The captured gourd can still be inspected while the picture waits.");
             session.CloseGourdViewer();
             yield return Until(() => clear.nextSeal.interactable, "Inspection restores the same manual stage action.");
             Assert.That(story.player.CurrentView, Is.SameAs(retained));
