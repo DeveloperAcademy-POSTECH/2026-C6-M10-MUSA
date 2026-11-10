@@ -24,7 +24,7 @@ namespace C6Lab.Tests
             values[5] = 1f;                       // 생성 비용을 낮춰 한 사람이 여러 번 만든다
             values[104] = 0f; values[105] = 5f;   // 작은 박, 한 번에 5%
             values[134] = (float)LabPaintPattern.Splatter;
-            values[196] = 1f; values[197] = 30f; values[198] = 15f; values[199] = 8f;
+            values[196] = 1f; values[197] = 30f; values[198] = 10f; values[199] = 8f;
             Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
         }
 
@@ -199,15 +199,15 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void FeverNeedsSixHitsInOneOnOneAndEighteenInThreeOnThree()
+        public void FeverNeedsEightHitsInOneOnOneTenInTwoOnTwoAndTwelveInThreeOnThree()
         {
-            Assert.That(new[] { 2, 4, 6, 1 }.Select(config.TeamFeverHitsFor), Is.EqualTo(new[] { 6, 15, 18, 15 }));
+            Assert.That(new[] { 2, 4, 6, 1 }.Select(config.TeamFeverHitsFor), Is.EqualTo(new[] { 8, 10, 12, 10 }));
             LabModel model = Begin("one-on-one-fever", Two);
-            for (int hit = 0; hit < 5; hit++) Hit(model, 10, 1d, Vector3.forward);
-            Assert.That(model.Snapshot(1d).blueFeverHits, Is.EqualTo(5));
+            for (int hit = 0; hit < 7; hit++) Hit(model, 10, 1d, Vector3.forward);
+            Assert.That(model.Snapshot(1d).blueFeverHits, Is.EqualTo(7));
             Assert.That(model.Snapshot(1d).FeverOn(LabTeam.Blue), Is.False);
             Hit(model, 10, 1d, Vector3.forward);
-            Assert.That(model.Snapshot(1d).FeverOn(LabTeam.Blue), Is.True, "The sixth hit starts the 1:1 fever.");
+            Assert.That(model.Snapshot(1d).FeverOn(LabTeam.Blue), Is.True, "The eighth hit starts the 1:1 fever.");
 
             JsonUtility.FromJsonOverwrite("{\"teamFeverHitsThreeOnThree\":2}", config);
             Assert.That(config.TeamFeverHitsFor(6), Is.EqualTo(2), "Each size has its own Inspector value.");

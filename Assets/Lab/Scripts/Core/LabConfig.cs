@@ -878,13 +878,13 @@ namespace C6Lab
         [Tooltip("2:2 한 판의 제한 시간 (초)")]
         [SerializeField, Range(30f, 600f)] private float teamBattleSeconds = 180f;
         [Tooltip("팀이 이만큼 맞히면 피버가 시작된다. 0이면 피버 없음.")]
-        [SerializeField, Range(0, 50)] private int teamFeverHits = 15;
+        [SerializeField, Range(0, 50)] private int teamFeverHits = 10;
         [Tooltip("피버 시간 (초). 그동안 팀 판의 모든 구슬이 팀 색 결합 구슬이 되고, 생성해도 팀 색 결합 구슬이 나온다.")]
         [SerializeField, Range(1f, 30f)] private float teamFeverSeconds = 8f;
         [Tooltip("1:1 땅따먹기 (2명, #394): 이만큼 맞히면 피버. 0이면 피버 없음. 2:2는 위의 Team Fever Hits. Inspector 전용.")]
-        [SerializeField, Range(0, 50)] private int teamFeverHitsOneOnOne = 6;
+        [SerializeField, Range(0, 50)] private int teamFeverHitsOneOnOne = 8;
         [Tooltip("3:3 땅따먹기 (6명, #394): 이만큼 맞히면 피버. 0이면 피버 없음. Inspector 전용.")]
-        [SerializeField, Range(0, 50)] private int teamFeverHitsThreeOnThree = 18;
+        [SerializeField, Range(0, 50)] private int teamFeverHitsThreeOnThree = 12;
 
         [Header("2:2 땅따먹기 연출 (#293, Inspector 전용. 기본값이 지금 모습이다)")]
         [Tooltip("피버 구슬 둘레 무지개 고리 크기 (구슬 반지름의 배)")]

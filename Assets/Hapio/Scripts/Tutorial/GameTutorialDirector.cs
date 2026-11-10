@@ -102,6 +102,8 @@ namespace Hapio
         public bool IsShowingLine => HasBeat && CurrentBeat.IsLine && bubbleRoot != null && bubbleRoot.gameObject.activeSelf;
         /// <summary>The ▽ on the bubble: up only on a line that a tap moves on from, once it can.</summary>
         public bool IsShowingTapHint => tapHint != null && tapHint.gameObject.activeInHierarchy;
+        /// <summary>The beat on screen has been up long enough, on the tutorial's own clock, for a tap to count.</summary>
+        public bool TapCooldownOver => HasBeat && Now - shownAt >= art.tapCooldown;
         /// <summary>Waiting for the player (or the gauge) to finish the current action.</summary>
         public bool IsWaitingForAction => HasBeat && !CurrentBeat.IsLine && actionDoneAt < 0f;
         /// <summary>How many times the current action has been done.</summary>
@@ -536,7 +538,7 @@ namespace Hapio
         {
             NoteTap();
             if (skipOpen) return;
-            if (!HasBeat || !CurrentBeat.IsLine || Now - shownAt < art.tapCooldown) return;
+            if (!HasBeat || !CurrentBeat.IsLine || !TapCooldownOver) return;
             // "…곧 없어져!" moves on only once the orb has gone (#552).
             if (FadeDemoHoldsTap) return;
             Advance();

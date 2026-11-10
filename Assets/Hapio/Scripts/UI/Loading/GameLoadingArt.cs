@@ -37,7 +37,7 @@ namespace Hapio
         [Header("달리는 캐릭터 (로딩 화면이 뜰 때마다 무작위로 한 명)")]
         public Runner[] runners = Array.Empty<Runner>();
         [Tooltip("캐릭터 그림 높이")] [Min(10f)] public float runnerHeight = 182f;
-        [Tooltip("캐릭터 가운데가 화면 위에서 얼마나 내려와 있는지 (화면 높이 비율)")] [Range(0f, 1f)] public float runnerCenterFromTop = .356f;
+        [Tooltip("캐릭터 위 끝부터 막대 아래 끝까지 묶음의 가운데가 화면 위에서 얼마나 내려와 있는지 (화면 높이 비율, 0.5 = 정중앙)")] [Range(0f, 1f)] public float contentCenterFromTop = .5f;
         [Tooltip("발이 닿을 때 몸이 납작해지는 정도 (0 = 없음)")] [Range(0f, .2f)] public float landingSquash = .04f;
         [Tooltip("납작해졌다 돌아오는 시간")] [Min(.01f)] public float landingSquashSeconds = .08f;
 

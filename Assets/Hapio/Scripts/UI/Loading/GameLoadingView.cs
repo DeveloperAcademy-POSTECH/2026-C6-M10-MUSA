@@ -54,6 +54,7 @@ namespace Hapio
         public RectTransform Bar => trackEdge != null ? trackEdge.rectTransform : null;
         public RectTransform Bubble => bubbleRoot;
         public RectTransform Caption => caption != null ? caption.rectTransform : null;
+        public RectTransform RunnerBody => runner != null ? runner.rectTransform : null;
         /// <summary>The line under the bar (the ready count while a battle is prepared), empty when none.</summary>
         public string DetailText => detail != null && detail.gameObject.activeSelf ? detail.text : string.Empty;
         public bool FadingOut => fading != null;
@@ -295,13 +296,14 @@ namespace Hapio
             float height = art.runnerHeight * (current != null ? current.scale : 1f);
             Sprite sprite = runner.sprite != null ? runner.sprite : current != null && current.Usable ? current.frames[0] : null;
             float aspect = sprite != null ? sprite.rect.width / Mathf.Max(1f, sprite.rect.height) : 1f;
-            float runnerCenter = top - area.height * art.runnerCenterFromTop;
-            float runnerBottom = runnerCenter - art.runnerHeight * .5f;
+            float captionHeight = art.captionFontSize * 1.3f;
+            float belowRunner = art.captionGapBelowRunner + captionHeight + art.bubbleGapBelowCaption + art.bubbleSize.y
+                + art.bubbleTail + art.bubbleGapAboveBar + art.barHeight;
+            float runnerBottom = RunnerBottomForCenteredContent(top - area.height * art.contentCenterFromTop, art.runnerHeight, belowRunner);
             RectTransform body = runner.rectTransform;
             body.anchoredPosition = new Vector2(offset.x, runnerBottom + offset.y);
             body.sizeDelta = new Vector2(height * aspect, height);
 
-            float captionHeight = art.captionFontSize * 1.3f;
             float captionTop = runnerBottom - art.captionGapBelowRunner;
             caption.rectTransform.sizeDelta = new Vector2(area.width, captionHeight);
             caption.rectTransform.anchoredPosition = new Vector2(0f, captionTop - captionHeight * .5f);
@@ -336,6 +338,10 @@ namespace Hapio
         }
 
         // ---------- Pure rules (tested) ----------
+
+        /// <summary>The runner's bottom so the whole block, runner's top to bar's bottom, is centered on <paramref name="center"/> (#586).</summary>
+        public static float RunnerBottomForCenteredContent(float center, float runnerHeight, float belowRunner) =>
+            center + (runnerHeight + belowRunner) * .5f - runnerHeight;
 
         /// <summary>The bar's middle so the % bubble on it ends <paramref name="gap"/> below the caption's bottom.</summary>
         public static float BarCenterBelow(float captionBottom, float gap, float bubbleHeight, float tail, float bubbleGap,

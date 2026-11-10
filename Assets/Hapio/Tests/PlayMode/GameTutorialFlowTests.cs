@@ -180,7 +180,7 @@ namespace Hapio.Tests
                 Assert.That(director.StepIndex, Is.EqualTo(0));
                 Assert.That(director.BeatIndex, Is.EqualTo(line - 1));
                 Assert.That(board.AllowedGestures, Is.EqualTo(LabBoardGestures.None), "Lines keep the board still.");
-                yield return new WaitForSecondsRealtime(art.tapCooldown + .05f);
+                yield return WaitForTapToCount(director, art);
                 tap.onClick.Invoke();
                 Assert.That(director.BeatIndex, Is.EqualTo(line), "Tap " + line);
             }
@@ -512,7 +512,7 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
-        public IEnumerator LinesMovedOnFromGoIntoTheLogAndItsButtonComesBesideSkip()
+        public IEnumerator LinesMovedOnFromGoIntoTheLogAndItsButtonComesUnderSkip()
         {
             yield return SceneManager.LoadSceneAsync(GameScenePaths.Home, LoadSceneMode.Single);
             yield return Until(() => GameSession.Instance != null && !GameSession.Instance.IsLoadingScene, "Saved Home bootstrap");
@@ -530,20 +530,23 @@ namespace Hapio.Tests
             var log = buttons.Single(button => button.name == "Log Button");
 
             // The first line is only on the screen: nothing has been moved on from yet.
-            yield return new WaitForSecondsRealtime(art.tapCooldown + .05f);
+            yield return WaitForTapToCount(director, art);
             Assert.That(director.DialogueLog, Is.Empty);
-            Assert.That(log.gameObject.activeInHierarchy, Is.False, "No log, no button.");
+            Assert.That(log.gameObject.activeInHierarchy, Is.False, "No tap yet, no button.");
 
             tap.onClick.Invoke();
             GameTutorialBeat[] lines = GameTutorialScript.Goal.Lines.ToArray();
             Assert.That(director.DialogueLog.Select(entry => (entry.Speaker, entry.Text)).ToArray(),
                 Is.EqualTo(new[] { (lines[0].Speaker, lines[0].Text) }), "The line just moved on from.");
-            yield return Until(() => director.LogButtonAlpha >= .999f && director.SkipButtonAlpha >= .999f,
-                "기록 fades in with 건너뛰기", art.skipFadeSeconds + 1f);
+            yield return Until(() =>
+            {
+                Assert.That(director.LogButtonAlpha, Is.EqualTo(director.SkipButtonAlpha).Within(.001f), "기록 fades in together with 건너뛰기.");
+                return director.LogButtonAlpha >= .999f;
+            }, "기록 fades in with 건너뛰기", art.skipFadeSeconds + 1f);
             Rect skipRect = ScreenRect((RectTransform)skip.transform), logRect = ScreenRect((RectTransform)log.transform);
             float scale = skipRect.width / art.skipButtonSize.x;
-            Assert.That(logRect.center.y, Is.EqualTo(skipRect.center.y).Within(1f), "Level with 건너뛰기.");
-            Assert.That(logRect.xMin - skipRect.xMax, Is.EqualTo(art.logButtonGap * scale).Within(1f), "Right beside it.");
+            Assert.That(logRect.center.x, Is.EqualTo(skipRect.center.x).Within(1f), "On 건너뛰기's middle.");
+            Assert.That(skipRect.yMin - logRect.yMax, Is.EqualTo(art.logButtonGap * scale).Within(1f), "Right under it.");
             Assert.That(logRect.height, Is.EqualTo(skipRect.height).Within(1f), "As tall as it.");
             var logFrame = log.GetComponent<UnityEngine.UI.Image>();
             var logLabel = log.GetComponentInChildren<UnityEngine.UI.Text>(true);
@@ -559,7 +562,7 @@ namespace Hapio.Tests
             Assert.That(hits.Count, Is.GreaterThan(0));
             Assert.That(hits[0].gameObject, Is.SameAs(log.gameObject), "The button takes the touch.");
 
-            yield return new WaitForSecondsRealtime(art.tapCooldown + .05f);
+            yield return WaitForTapToCount(director, art);
             tap.onClick.Invoke();
             Assert.That(director.DialogueLog.Select(entry => entry.Text).ToArray(),
                 Is.EqualTo(new[] { lines[0].Text, lines[1].Text }), "Oldest first.");
@@ -576,6 +579,12 @@ namespace Hapio.Tests
             Assert.That(director.DialogueLogShownLines.ToArray(),
                 Is.EqualTo(new[] { GameTutorialScript.LogLine(lines[0].Text), GameTutorialScript.LogLine(lines[1].Text) }));
             Assert.That(bar.gameObject.activeSelf, Is.False, "Two lines fit: no drag bar.");
+            Assert.That(dim.GetComponentsInChildren<UnityEngine.UI.Text>(true).First(text => text.name == "Words").alignment,
+                Is.EqualTo(TextAnchor.MiddleLeft), "The words start right beside the face.");
+            var title = dim.GetComponentsInChildren<UnityEngine.UI.Image>(true).Single(image => image.name == "Log Title");
+            Assert.That(title.sprite, Is.SameAs(art.logTitle));
+            Rect listRect = ScreenRect(dim.GetComponentsInChildren<RectTransform>(true).Single(rect => rect.name == "Log List"));
+            Assert.That(ScreenRect(title.rectTransform).yMin, Is.GreaterThan(listRect.yMax), "The scroll sits above the list.");
             Assert.That(board.AllowedGestures, Is.EqualTo(LabBoardGestures.None));
 
             // A touch anywhere lands on the log, so the line behind stays where it was.
@@ -605,10 +614,10 @@ namespace Hapio.Tests
             Assert.That(director.BeatIndex, Is.EqualTo(beat), "The same line again.");
             Assert.That(director.IsShowingLine, Is.True);
 
-            // More lines than fit: it opens on the newest, and the drag bar shows.
-            for (int i = 2; i < lines.Length; i++)
+            // More lines than fit (all of 0단계 and the first of 1단계): it opens on the newest, and the drag bar shows.
+            for (int i = 2; i <= lines.Length; i++)
             {
-                yield return new WaitForSecondsRealtime(art.tapCooldown + .05f);
+                yield return WaitForTapToCount(director, art);
                 tap.onClick.Invoke();
             }
             Assert.That(director.DialogueLog.Count, Is.GreaterThan(art.logVisibleBars));
@@ -674,7 +683,7 @@ namespace Hapio.Tests
                 "The practice board plays its first line", 30f);
             GameTutorialArt art = GameTutorialArt.Load();
             var buttons = first.GetComponentsInChildren<UnityEngine.UI.Button>(true);
-            yield return new WaitForSecondsRealtime(art.tapCooldown + .05f);
+            yield return WaitForTapToCount(first, art);
             buttons.Single(button => button.name == "Tap To Continue").onClick.Invoke();
             Assert.That(first.BeatIndex, Is.EqualTo(1));
             Assert.That(first.DialogueLog.Count, Is.EqualTo(1));
@@ -719,12 +728,19 @@ namespace Hapio.Tests
             Assert.That(session.IsTutorial, Is.False);
         }
 
+        /// <summary>
+        /// Waits on the tutorial's own clock, which is what decides whether a tap counts. That clock only moves at the
+        /// start of a frame, so after a slow frame a fixed wall-clock wait can end with the cooldown not over yet.
+        /// </summary>
+        private static IEnumerator WaitForTapToCount(GameTutorialDirector director, GameTutorialArt art) =>
+            Until(() => director.TapCooldownOver, "The tap cooldown passes", art.tapCooldown + 5f);
+
         /// <summary>Wait out the tap cooldown, tap once, and check the next beat came.</summary>
         private static IEnumerator TapThrough(GameTutorialDirector director, UnityEngine.UI.Button tap, GameTutorialArt art)
         {
             Assert.That(director.IsShowingLine, Is.True, "A line is waiting for a tap.");
             int step = director.StepIndex, beat = director.BeatIndex;
-            yield return new WaitForSecondsRealtime(art.tapCooldown + .05f);
+            yield return WaitForTapToCount(director, art);
             tap.onClick.Invoke();
             Assert.That(director.IsFinishing || director.StepIndex != step || director.BeatIndex == beat + 1, Is.True,
                 "Tap moved on from step " + step + " beat " + beat);

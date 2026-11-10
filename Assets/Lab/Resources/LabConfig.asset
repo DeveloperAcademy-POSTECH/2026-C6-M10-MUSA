@@ -213,10 +213,10 @@ MonoBehaviour:
   jigwiAutoGenerationBurnWeight: 1
   teamTerritoryEnabled: 0
   teamBattleSeconds: 180
-  teamFeverHits: 15
+  teamFeverHits: 10
   teamFeverSeconds: 8
-  teamFeverHitsOneOnOne: 6
-  teamFeverHitsThreeOnThree: 18
+  teamFeverHitsOneOnOne: 8
+  teamFeverHitsThreeOnThree: 12
   teamFeverRingScale: 2.9
   teamFeverRingAlpha: 1
   teamFeverGlowMin: 0.45

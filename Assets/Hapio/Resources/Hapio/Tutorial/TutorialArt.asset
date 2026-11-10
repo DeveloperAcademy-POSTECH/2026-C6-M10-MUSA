@@ -97,7 +97,7 @@ MonoBehaviour:
   skipButtonMargin: 16
   skipButtonFontSize: 14
   skipFadeSeconds: 0.5
-  skipDimColor: {r: 0, g: 0, b: 0, a: 0.55}
+  skipDimColor: {r: 0, g: 0, b: 0, a: 0.9607843}
   skipPanelSize: {x: 336, y: 172}
   skipPanelTopFraction: 0.4
   skipTitleFontSize: 21
@@ -112,9 +112,12 @@ MonoBehaviour:
   logButtonSize: {x: 54, y: 30}
   logButtonGap: 6
   logBar: {fileID: 21300000, guid: 49b891b66fe7343c8bd85550200b5bd2, type: 3}
+  logTitle: {fileID: 21300000, guid: b1fdcd3e3caae4bd6a8612f10c338b8b, type: 3}
+  logTitleSize: {x: 155, y: 65}
+  logTitleGap: 8
   logBarSize: {x: 321, y: 55}
   logBarGap: 22
-  logVisibleBars: 3
+  logVisibleBars: 6
   logListTopFraction: 0.18
   logFaceSize: 29
   logFaceCenterX: 33
@@ -128,7 +131,7 @@ MonoBehaviour:
   logHandleWidth: 6
   logHandleTouchWidth: 24
   logHandleColor: {r: 0.906, g: 0.737, b: 0.573, a: 1}
-  logBackGap: 45
+  logBackGap: 8
   arrowColor: {r: 0.36, g: 0.66, b: 0.29, a: 1}
   arrowWidth: 7
   arrowHeadLength: 18
