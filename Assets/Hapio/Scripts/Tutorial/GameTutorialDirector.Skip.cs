@@ -47,7 +47,8 @@ namespace Hapio
 
         private void AdvanceClock()
         {
-            if (!skipOpen && !logOpen && !BattlePaused) clock += Time.unscaledDeltaTime;
+            // #635: also still while the opening's clouds are over the board, so nothing starts under them.
+            if (!skipOpen && !logOpen && !BattlePaused && !CloudsUp) clock += Time.unscaledDeltaTime;
         }
 
         /// <summary>Any tap on the tutorial screen, taken or not, brings the skip button in.</summary>
