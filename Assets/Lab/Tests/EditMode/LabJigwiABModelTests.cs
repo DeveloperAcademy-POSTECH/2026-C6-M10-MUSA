@@ -67,6 +67,15 @@ namespace C6Lab.Tests
             Assert.That(m.JigwiABEnabled,Is.EqualTo(expected));Assert.That(s.jigwiStage.enabled,Is.False);
             Assert.That(m.JigwiStagePaintBlocked(Players[0],Vector3.forward),Is.False);
         }
+        [Test] public void SavedConfigKeepsTheTestOnlySchedulesOff()
+        {
+            // The A-only / B-only recording switches replace the whole Jigwi timetable. They are for local runs only;
+            // a saved ON value ships a stage with no smoke, bucket or common gimmicks.
+            var saved = Resources.Load<LabConfig>("LabConfig");
+            Assert.That(saved, Is.Not.Null);
+            Assert.That(saved.JigwiATestOnly, Is.False, "Turn jigwiATestOnly off before committing LabConfig.asset.");
+            Assert.That(saved.JigwiBTestOnly, Is.False, "Turn jigwiBTestOnly off before committing LabConfig.asset.");
+        }
         [Test] public void AWarningHasNoBurnUntilActiveAndThenBurnsEveryOwnersOrbs()
         {
             // #479: A ignites every seat at once; there is no target and no recovery boost.
