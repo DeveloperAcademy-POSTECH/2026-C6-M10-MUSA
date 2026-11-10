@@ -160,6 +160,8 @@ namespace Hapio.Editor
                 layer.SetParent(stamp, false);
                 layer.anchoredPosition = position;
             }
+            // Optical centering of the original vertical lettering inside the red stamp.
+            lettering.anchoredPosition += new Vector2(0, -2f);
             var beat = Beat(stamp, StoryVisualBeat.Motion.SealStamp, .61f, .23f, "RedSeal");
             beat.offset = new Vector2(0, 20);
             beat.volume = .92f;

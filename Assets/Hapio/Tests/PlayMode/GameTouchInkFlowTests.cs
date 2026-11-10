@@ -152,6 +152,51 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
+        public IEnumerator NoInkAnywhereWhileTheCreditsAreOpen()
+        {
+            GameTouchInk ink = CreateInk();
+            // A bare credits window, wired before its Awake as Home saves it: it starts closed.
+            var creditsRoot = new GameObject("Credits test", typeof(RectTransform));
+            creditsRoot.transform.SetParent(holder.transform, false);
+            creditsRoot.SetActive(false);
+            var panel = new GameObject("Credits Panel", typeof(RectTransform));
+            panel.transform.SetParent(creditsRoot.transform, false);
+            var credits = creditsRoot.AddComponent<GameCreditsView>();
+            credits.panel = panel;
+            creditsRoot.SetActive(true);
+            Mouse mouse = InputSystem.AddDevice<Mouse>();
+            try
+            {
+                yield return null;
+                Assert.That(GameCreditsView.AnyOpen, Is.False);
+                // The tap on "크레딧" lands before the window opens and leaves its mark.
+                ink.Stamp(ScreenMiddle);
+                credits.Open();
+                Assert.That(GameCreditsView.AnyOpen, Is.True);
+                yield return null;
+                Assert.That(ink.ActiveMarks, Is.Zero, "That mark goes as the credits open (#631).");
+                yield return Press(mouse, ink);
+                Assert.That(ink.ActiveMarks, Is.Zero, "No new ink while the credits are open.");
+                credits.Close();
+                Assert.That(GameCreditsView.AnyOpen, Is.False);
+                yield return Press(mouse, ink);
+                Assert.That(ink.ActiveMarks, Is.EqualTo(1), "Closed again, a touch leaves ink as before.");
+            }
+            finally { InputSystem.RemoveDevice(mouse); }
+        }
+
+        /// <summary>Lets go of the mouse, then presses it again in the middle and lets the ink read that press.</summary>
+        private static IEnumerator Press(Mouse mouse, GameTouchInk ink)
+        {
+            InputSystem.QueueStateEvent(mouse, new MouseState { position = ScreenMiddle });
+            InputSystem.Update();
+            yield return null;
+            InputSystem.QueueStateEvent(mouse, new MouseState { position = ScreenMiddle }.WithButton(MouseButton.Left));
+            InputSystem.Update();
+            ink.ReadTouches();
+        }
+
+        [UnityTest]
         public IEnumerator EachFingerAndTheMouseLeaveAMarkWithoutDoubling()
         {
             GameTouchInk ink = CreateInkWithSound(true);

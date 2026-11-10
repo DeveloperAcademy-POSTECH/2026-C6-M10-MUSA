@@ -101,6 +101,8 @@ namespace C6Lab
 
         /// <summary>지금 몸통 색 (다섯 색 사이를 건너가는 중의 색)</summary>
         public Color BodyColor => Col(age);
+        /// <summary>Bounded presentation phase, retained when this orb turns into a contact squash.</summary>
+        public float ColorPhase => Mathf.Repeat(age, ColorSeconds * colors.Length);
 
         /// <summary>
         /// 이 구슬에 오색구슬 그림을 얹는다(이미 있으면 그것을 쓴다). faceCamera는 투사체처럼 3D로 날아가는 구슬용으로,
@@ -283,6 +285,8 @@ namespace C6Lab
         public void Tint()
         {
             if (flightRoot == null) return;
+            var projectile = flightRoot.GetComponentInParent<LabProjectile>();
+            if (projectile != null && projectile.TryTintClayFlight(age, colors)) return;
             if (tintBlock == null) tintBlock = new MaterialPropertyBlock();
             Color color = Col(age);
             flightRoot.GetComponentsInChildren(false, tinted);
@@ -304,6 +308,8 @@ namespace C6Lab
         public void TintTrail()
         {
             if (flightRoot == null) return;
+            var clayProjectile = flightRoot.GetComponentInParent<LabProjectile>();
+            if (clayProjectile != null && clayProjectile.ClayFlightActive) return;
             if (flightTrail == null)
             {
                 // 공의 기본 꼬리를 쓴다 (지귀 보상 불꽃 꼬리 같은 다른 꼬리는 건드리지 않는다).

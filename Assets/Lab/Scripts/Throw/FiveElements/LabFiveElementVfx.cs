@@ -25,13 +25,21 @@ namespace C6Lab
                 if (IsActive && Finite(position) && Finite(direction)) owner.flights[index].Move(position, direction);
             }
 
+            public bool TintFiveColor(float age, Color32[] palette)
+            {
+                return IsActive && Finite(age) && owner.flights[index].TintFiveColor(age,palette);
+            }
+
             public bool Hit(Vector3 point, Vector3 normal, Vector3 incoming, Transform target = null, bool leaveMark = true)
             {
                 if (!IsActive || !Finite(point) || !Finite(normal) || !Finite(incoming)) return false;
                 var flight = owner.flights[index];
+                bool fiveColor=flight.FiveColor;
+                float paletteAge=flight.FiveColorAge;
+                Color32[] palette=flight.FiveColorPalette;
                 flight.Return();
-                return owner.PlayImpact(flight.Element, point, normal, incoming, flight.Diameter, flight.Strength,
-                    target, leaveMark, flight.Monochrome);
+                return owner.PlayImpactCore(flight.Element, point, normal, incoming, flight.Diameter, flight.Strength,
+                    target, leaveMark, flight.Monochrome, fiveColor, paletteAge, palette);
             }
 
             public void Cancel()
@@ -87,9 +95,9 @@ namespace C6Lab
         }
 
         public Flight BeginFlight(LabOrbElement element, Vector3 position, Vector3 direction,
-            float diameter, float strength = .3f, bool monochrome = false)
+            float diameter, float strength = .3f, bool monochrome = false, bool fiveColor = false)
         {
-            if (!Available(element, diameter) || !Finite(position) || !Finite(direction) || !Finite(strength)) return default;
+            if (!Available(element, diameter, fiveColor) || !Finite(position) || !Finite(direction) || !Finite(strength)) return default;
             int i = 0;
             while (i < flights.Count && flights[i].Active) ++i;
             if (i == flights.Count)
@@ -97,14 +105,23 @@ namespace C6Lab
                 if (i >= Profile.maxFlights) return default;
                 flights.Add(new LabClayFlightSlot(transform, i, shapes, Profile));
             }
-            flights[i].Begin(element, position, direction, diameter, Mathf.Clamp01(strength), monochrome, Seed(), LowDetail);
+            flights[i].Begin(element, position, direction, diameter, Mathf.Clamp01(strength), monochrome, Seed(), LowDetail, fiveColor);
             return new Flight(this, i, flights[i].Version);
         }
 
         public bool PlayImpact(LabOrbElement element, Vector3 point, Vector3 normal, Vector3 incoming,
-            float diameter, float strength, Transform target = null, bool leaveMark = true, bool monochrome = false)
+            float diameter, float strength, Transform target = null, bool leaveMark = true, bool monochrome = false,
+            bool fiveColor = false, float fiveColorAge = 0f)
         {
-            if (!Available(element, diameter) || !Finite(point) || !Finite(normal) || !Finite(incoming) || !Finite(strength)) return false;
+            float paletteAge=Finite(fiveColorAge) ? Mathf.Max(0f,fiveColorAge) : 0f;
+            return PlayImpactCore(element,point,normal,incoming,diameter,strength,target,leaveMark,monochrome,fiveColor,paletteAge,null);
+        }
+
+        private bool PlayImpactCore(LabOrbElement element, Vector3 point, Vector3 normal, Vector3 incoming,
+            float diameter, float strength, Transform target, bool leaveMark, bool monochrome,
+            bool fiveColor, float paletteAge, Color32[] palette)
+        {
+            if (!Available(element, diameter, fiveColor) || !Finite(point) || !Finite(normal) || !Finite(incoming) || !Finite(strength)) return false;
             int limit = LowDetail ? Mathf.Min(Profile.lowDetailImpacts, Profile.maxImpacts) : Profile.maxImpacts;
             limit = Mathf.Max(1, limit);
             // Prefer a returned slot, then replace the oldest visible stain at the cap.
@@ -115,7 +132,8 @@ namespace C6Lab
             else if (use == hits.Count) hits.Add(new LabClayImpactSlot(transform, use, shapes, Profile));
             float life = MarkLifetimeOverride >= 0 ? MarkLifetimeOverride : Profile.markSeconds;
             hits[use].Begin(element, point, normal, incoming, diameter, Mathf.Clamp01(strength),
-                target, monochrome, leaveMark ? Mathf.Max(0f, life) : 0f, Seed(), LowDetail);
+                target, monochrome, leaveMark ? Mathf.Max(0f, life) : 0f, Seed(), LowDetail, fiveColor);
+            if (fiveColor) hits[use].TintFiveColor(paletteAge,palette);
             return true;
         }
 
@@ -127,8 +145,9 @@ namespace C6Lab
             return index;
         }
 
-        private bool Available(LabOrbElement element, float diameter) => shapes != null && isActiveAndEnabled &&
-            element >= LabOrbElement.Fire && element <= LabOrbElement.Earth && diameter > 0 && !float.IsInfinity(diameter);
+        private bool Available(LabOrbElement element, float diameter, bool fiveColor) => shapes != null && isActiveAndEnabled &&
+            ((element >= LabOrbElement.Fire && element <= LabOrbElement.Earth) ||
+                (fiveColor && element == LabOrbElement.None)) && diameter > 0 && !float.IsInfinity(diameter);
 
         private bool IsCurrent(int index, int generation)
             => index >= 0 && index < flights.Count && flights[index].Active && flights[index].Version == generation;
