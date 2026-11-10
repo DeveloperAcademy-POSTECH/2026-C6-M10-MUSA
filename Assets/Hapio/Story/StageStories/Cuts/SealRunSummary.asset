@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4485ab5ed52da49dd8b525f3743f1721, type: 3}
+  m_Name: SealRunSummary
+  m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryCutDefinition
+  cutId: SealRunSummary
+  viewPrefab: {fileID: 3424838002118216047, guid: f038c97e7c5fe45b6b82543dc9257c6d, type: 3}
+  pages:
+  - speaker: 
+    dialogue: 
+    autoReadSeconds: 30
+    voice: {fileID: 0}
+  direction: "\uC138 \uD310\uC758 \uC131\uACF5 \uAE30\uB85D\uACFC \uB85C\uCEEC \uD50C\uB808\uC774\uC5B4 \uAE30\uC5EC\uB3C4. \uC774\uC57C\uAE30 \uACC4\uC18D \u2192 \uAD6C\uB984 \u2192 \uC5D4\uB529."
+  speaker: 
+  dialogue: 
+  autoReadSeconds: 4
+  voice: {fileID: 0}

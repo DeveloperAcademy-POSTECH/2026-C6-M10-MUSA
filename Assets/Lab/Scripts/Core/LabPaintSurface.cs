@@ -41,6 +41,7 @@ namespace C6Lab
         private int[] cellRegions;
         private readonly List<Region> regions = new List<Region>();
         private readonly SortedSet<int> activeRegions = new SortedSet<int>();
+        private readonly Dictionary<ulong, long> newlyPaintedCells = new Dictionary<ulong, long>();
         private decimal initialCells, repeatCells, cellsPerSecond, speedCredit, totalBudget;
         private float fillChance, verticalWeight;
         private uint initialSeed, randomState;
@@ -57,6 +58,13 @@ namespace C6Lab
         public float Coverage => CoveredCount / (float)CellCount;
         public bool IsComplete => CoveredCount == CellCount;
         public ulong LastPainter { get; private set; }
+        /// <summary>
+        /// Authoritative empty-to-painted cell events supplied by this owner in this round.
+        /// Drying retains earned credit; a later repaint of a dried cell earns new credit.
+        /// Replica and offline preview maps cannot reconstruct this cumulative statistic.
+        /// </summary>
+        public long NewlyPaintedCellsBy(ulong owner) => !preview && !replica
+            && newlyPaintedCells.TryGetValue(owner, out long count) ? count : 0L;
         public double PendingCoverage => (double)Math.Min(totalBudget / CellCount,
             (CellCount - CoveredCount) / (decimal)CellCount);
         public int RegionCount
@@ -303,6 +311,10 @@ namespace C6Lab
             RecordNewPaint(cell);
             region.Remove(cell);
             CoveredCount++;
+            // Consume has already selected the final funding supply, including a cell
+            // assembled from fractional supplies belonging to different players.
+            newlyPaintedCells.TryGetValue(ink.Owner, out long earned);
+            if (earned < long.MaxValue) newlyPaintedCells[ink.Owner] = earned + 1L;
             LastPainter = ink.Owner;
             unchecked { Revision++; }
             RecordArtPaint(ink, cell);
@@ -456,6 +468,7 @@ namespace C6Lab
             if (points == null || points.Length != pixels.Length) points = MakePoints(Columns, Rows);
             for (int i = 0; i < cellRegions.Length; i++) cellRegions[i] = -1;
             regions.Clear(); activeRegions.Clear();
+            newlyPaintedCells.Clear();
             CoveredCount = PaintCount = 0;
             LastPainter = 0;
             speedCredit = totalBudget = 0m;

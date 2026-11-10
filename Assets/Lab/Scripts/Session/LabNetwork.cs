@@ -280,13 +280,14 @@ namespace C6Lab
         // 5696: #551 Jigwi B bucket is personal: every seat pours its own bucket by rocking the phone (no 3-2-1, no attempts).
         // 5697: #551 Jigwi B bucket: the first bucket comes 3.5 s after B starts, 1 s apart, 7 s each.
         // 5698: #595 Jigwi smoke flow: round.smoke (B smokes every screen at once, no bucket) and round.common (shared talisman A).
-        internal const ushort LabProtocolVersion = 5698;
+        // 5699: actual newly painted-cell contribution is a Host-owned Int64 player statistic.
+        internal const ushort LabProtocolVersion = 5699;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Double-tap a blue fox orb to clear it, and keep your Yin and Yang away.";
         /// <summary>More fox orbs than one fox fire ever drops; a longer list is ignored (#251).</summary>
         private const int MaximumFoxFireOrbs = 10;
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/59");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/60");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;
@@ -2788,6 +2789,7 @@ namespace C6Lab
             catch (Exception) { return; }
             if (snapshot == null || snapshot.sessionId != packet.sessionId
                 || snapshot.players == null || snapshot.players.Length != targetParticipantCount
+                || !LabPaintContributionNetworkValidation.Valid(snapshot.players)
                 || !LabJigwiNetworkValidation.Valid(snapshot.jigwi)
                 || !LabJigwiStageNetworkValidation.Valid(snapshot.jigwiStage, snapshot.players)
                 || !LabJigwiABNetworkValidation.Valid(snapshot.jigwiAB, snapshot.players)

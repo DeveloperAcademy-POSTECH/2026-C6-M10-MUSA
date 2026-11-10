@@ -242,7 +242,14 @@ namespace C6Lab
 
         /// <summary>Independent player resource/statistic records in the established P/seat order.</summary>
         public LabPlayerState[] CopyPlayers() => players.Values.OrderBy(player => player.seat)
-            .Select(player => player.Copy()).ToArray();
+            .Select(CopyPlayerWithPaintStats).ToArray();
+
+        private LabPlayerState CopyPlayerWithPaintStats(LabPlayerState player)
+        {
+            LabPlayerState copy = player.Copy();
+            copy.paintedCellsTotal = paintSurface.NewlyPaintedCellsBy(player.id);
+            return copy;
+        }
 
         /// <summary>
         /// Independent ledger entries for one owner, including drums and in-flight orbs. Callers
@@ -1350,7 +1357,7 @@ namespace C6Lab
                 paintCoveredCount = paintSurface.CoveredCount,
                 paintCellCount = paintSurface.CellCount,
                 paintCount = paintSurface.PaintCount,
-                players = players.Values.OrderBy(player => player.seat).Select(player => player.Copy()).ToArray(),
+                players = CopyPlayers(),
                 orbs = orbs.Values.OrderBy(orb => orb.id, StringComparer.Ordinal).Select(orb => orb.Copy()).ToArray(),
                 drums = drums.Values.OrderBy(drum => drum.id, StringComparer.Ordinal).Select(drum => drum.Copy()).ToArray(),
                 jigwi = CopyJigwiStates(),

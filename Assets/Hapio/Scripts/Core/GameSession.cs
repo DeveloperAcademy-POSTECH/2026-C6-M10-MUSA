@@ -70,6 +70,7 @@ namespace Hapio
         // 전체 게임 대시보드용: 이번 판의 스테이지별 결과. 같은 스테이지를 다시 하면 마지막 기록으로 덮어쓴다.
         private readonly SortedDictionary<int, LabResultStage> stageResults = new SortedDictionary<int, LabResultStage>();
         private string stageResultsRunId;
+        private ulong resultLocalPlayerId = ulong.MaxValue;
 
         [Serializable]
         private sealed class Control
@@ -104,6 +105,25 @@ namespace Hapio
         public LabSnapshot ResultSnapshot { get; private set; }
         /// <summary>이번 판에서 깬 스테이지들의 결과 (스테이지 순서). ALL STAGES CLEAR 화면의 전체 대시보드가 쓴다.</summary>
         public IReadOnlyList<LabResultStage> StageResults => new List<LabResultStage>(stageResults.Values);
+        /// <summary>Summary rows keep their stage number even when DEV skipped an earlier stage.</summary>
+        public IReadOnlyList<LabResultStage> SealStageResults
+        {
+            get
+            {
+                var rows = new LabResultStage[GameRunFlow.StageCount];
+                if (stageResultsRunId == state.runId)
+                    for (int i = 0; i < rows.Length; i++) stageResults.TryGetValue(i + 1, out rows[i]);
+                return rows;
+            }
+        }
+        /// <summary>The local result identity survives the Host closing a completed room.</summary>
+        public ulong ResultLocalPlayerId => network != null && network.IsConnected
+            ? network.LocalPlayerId : resultLocalPlayerId;
+
+        private void RememberResultIdentity()
+        {
+            if (network != null && network.IsConnected) resultLocalPlayerId = network.LocalPlayerId;
+        }
         public Texture PreviewTexture => preview != null && !preview.IsDisposed ? preview.Texture : null;
         /// <summary>The open viewer's zoom (0 far … 1 near, .5 fitted); the floor shadow follows it.</summary>
         internal float PreviewZoom => preview != null && !preview.IsDisposed ? preview.ZoomNormalized : .5f;
@@ -204,6 +224,7 @@ namespace Hapio
         private void Update()
         {
             if (Instance != this || network == null) return;
+            RememberResultIdentity();
             UpdateLoading();
             UpdateCloudCover();
             // The browse that resumes behind the title after a game must not keep the phone awake there (#476).
@@ -385,6 +406,7 @@ namespace Hapio
 
         private void SetLocalState(GameFlowState value)
         {
+            RememberResultIdentity();
             GameFlowState previous = state;
             state = value.Copy();
             // #501: only a lobby guest that loses its Host stays here and gets back into the same room.
@@ -552,6 +574,7 @@ namespace Hapio
 
         private void CacheResultSnapshot()
         {
+            RememberResultIdentity();
             if (ResultSnapshot != null && ResultSnapshot.sessionId == state.battleSessionId
                 && ResultSnapshot.round == state.battleRound) return;
             if (MatchesBattle(network.Snapshot) && (network.Snapshot.phase == LabPhase.Victory
@@ -1013,6 +1036,7 @@ namespace Hapio
             tutorialRun = false;
             ReleaseResult(); UiNotice = string.Empty;
             stageResults.Clear(); stageResultsRunId = null;
+            resultLocalPlayerId = ulong.MaxValue;
         }
 
         private void ReleaseResult()

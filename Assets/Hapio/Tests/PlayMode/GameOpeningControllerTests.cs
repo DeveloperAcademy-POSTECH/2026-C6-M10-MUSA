@@ -138,8 +138,10 @@ namespace Hapio.Tests
             Assert.That(skipped, Is.Zero);
             AssertAtBrowserWithNoOpening();
             Assert.That(player.CurrentView, Is.Null);
-            Assert.That(player.cutHost.GetComponentsInChildren<StoryCutView>(true), Is.Empty);
             Assert.That(player.voiceSource == null || !player.voiceSource.isPlaying && player.voiceSource.clip == null, Is.True);
+            // Cancel hides the picture immediately; Destroy retires its GameObject at the frame boundary.
+            yield return null;
+            Assert.That(player.cutHost.GetComponentsInChildren<StoryCutView>(true), Is.Empty);
         }
 
         [UnityTest]
