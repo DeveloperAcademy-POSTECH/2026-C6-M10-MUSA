@@ -19,6 +19,7 @@ namespace C6Lab
         public readonly Vector3 HitNormal;
         public readonly Vector3 HitPoint;
         public readonly float VisualDiameter;
+        public readonly float FiveColorAge;
         public readonly float FlightSeconds;
         public readonly float PeakRise;
         public readonly float HorizontalDistance;
@@ -32,7 +33,7 @@ namespace C6Lab
         public LabProjectileResult(string projectileId, ulong ownerPlayerId, LabProjectileHitKind kind,
             Vector3 hitPoint, float flightSeconds, float peakRise, float horizontalDistance,
             Vector3 impactVelocity = default, string fireId = null, string fireTargetId = null,
-            Vector3 hitNormal = default, float visualDiameter = 0f)
+            Vector3 hitNormal = default, float visualDiameter = 0f, float fiveColorAge = 0f)
         {
             ProjectileId = projectileId;
             OwnerPlayerId = ownerPlayerId;
@@ -44,6 +45,7 @@ namespace C6Lab
             HitNormal = hitNormal;
             HitPoint = hitPoint;
             VisualDiameter = visualDiameter;
+            FiveColorAge = fiveColorAge;
             FlightSeconds = flightSeconds;
             PeakRise = peakRise;
             HorizontalDistance = horizontalDistance;
@@ -72,6 +74,7 @@ namespace C6Lab
         [SerializeField] private Transform visualMount;
         [SerializeField] private TrailRenderer flightTrail;
         private bool useClayFlight;
+        private bool fiveColorPresentation;
         private LabFiveElementVfx.Flight clayFlight;
         private LabElementFlightTrail elementFlightTrail;
         private LabJigwiWaterFlightPath jigwiWaterFlightPath;
@@ -153,6 +156,12 @@ namespace C6Lab
         public Vector3 InitialVelocity => initialVelocity;
         public Transform VisualMount => visualMount;
         public TrailRenderer FlightTrail => flightTrail;
+        public bool ClayFlightActive => clayFlight.IsActive;
+        /// <summary>Recolour only this projectile's current clay lease; a returned lease never tints a reused slot.</summary>
+        public bool TryTintClayFlight(float age, Color32[] palette) =>
+            fiveColorPresentation && clayFlight.TintFiveColor(age, palette);
+        private float FiveColorPhase => fiveColorPresentation
+            ? GetComponentInChildren<LabFiveColorSparkle>()?.ColorPhase ?? 0f : 0f;
         public LabElementFlightTrail ElementFlightTrail => elementFlightTrail;
         public LabJigwiWaterFlightPath JigwiWaterFlightPath => jigwiWaterFlightPath;
         public LabJigwiRewardFireTrail JigwiRewardFireTrail => jigwiRewardFireTrail;
@@ -261,7 +270,8 @@ namespace C6Lab
         /// bomb blast made small (#213), so it also has less reach on the gourd.
         /// </summary>
         public static LabProjectile Create(Vector3 position, LabConfig config, Transform parent = null,
-            LabOrbElement element = LabOrbElement.None, float sizeScale = 1f, bool useClayFlight = false)
+            LabOrbElement element = LabOrbElement.None, float sizeScale = 1f, bool useClayFlight = false,
+            bool fiveColor = false)
         {
             if (config == null) throw new ArgumentNullException(nameof(config));
             LabFirstUse.Note(LabFirstUseKind.Projectile);
@@ -274,6 +284,7 @@ namespace C6Lab
             projectile.config = config;
             projectile.element = element;
             projectile.useClayFlight = useClayFlight;
+            projectile.fiveColorPresentation = fiveColor;
             projectile.sizeScale = sizeScale > 0f && sizeScale <= 1f ? sizeScale : 1f;
             projectile.ConfigureAppearance(config.OrbAppearance);
             projectile.EnsureDefaultVisual(projectile.DrawnRadius);
@@ -319,12 +330,29 @@ namespace C6Lab
         }
 
         /// <summary>Correct only a predicted shot's appearance; never rewind its local flight or award a hit.</summary>
-        public void ReconcileVisual(LabOrbElement approvedElement, float approvedSize, float approvedRadius, float approvedJigwiABRadius = 1f)
+        public void ReconcileVisual(LabOrbElement approvedElement, float approvedSize, float approvedRadius,
+            float approvedJigwiABRadius = 1f, bool? fiveColor = null)
         {
             if (authoritative || resolved || approvedElement < LabOrbElement.None || approvedElement > LabOrbElement.Earth) return;
             bool changed = element != approvedElement;
+            bool appearanceChanged = fiveColor.HasValue && fiveColorPresentation != fiveColor.Value;
             float previousRadius = DrawnRadius;
             element = approvedElement;
+            if (appearanceChanged)
+            {
+                fiveColorPresentation = fiveColor.Value;
+                if (fiveColorPresentation)
+                {
+                    var look = LabFiveColorSparkle.AttachArt(transform,
+                        (config != null ? config.OrbRadius : .3f) * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined), true);
+                    if (look != null) look.gameObject.SetActive(true);
+                }
+                else
+                {
+                    var look = GetComponentInChildren<LabFiveColorSparkle>(true);
+                    if (look != null) look.gameObject.SetActive(false);
+                }
+            }
             sizeScale = approvedSize > 0f && approvedSize <= 1f ? approvedSize : 1f;
             SetRadiusScale(approvedRadius > 0f ? approvedRadius : 1f);
             SetJigwiABRadiusScale(approvedJigwiABRadius);
@@ -332,7 +360,7 @@ namespace C6Lab
             // keeps the approved Host body's trajectory/radius frozen; never rewind position or velocity.
             if (sphere != null) sphere.radius = ScaledRadius;
             EnsureDefaultVisual(DrawnRadius);
-            if (useClayFlight && launched && (changed || !Mathf.Approximately(previousRadius, DrawnRadius)))
+            if (useClayFlight && launched && (changed || appearanceChanged || !Mathf.Approximately(previousRadius, DrawnRadius)))
                 StartFlightPresentation(body.linearVelocity);
             else if (!clayFlight.IsActive)
             {
@@ -426,7 +454,8 @@ namespace C6Lab
             ConfigureJigwiRewardFireTrail();
         }
 
-        private bool WantsClayFlight => useClayFlight && element >= LabOrbElement.Fire && element <= LabOrbElement.Earth;
+        private bool WantsClayFlight => useClayFlight && (fiveColorPresentation
+            || element >= LabOrbElement.Fire && element <= LabOrbElement.Earth);
 
         private void StartFlightPresentation(Vector3 velocity)
         {
@@ -434,13 +463,15 @@ namespace C6Lab
             if (WantsClayFlight)
             {
                 var pool = LabFiveElementVfx.ForScene(gameObject.scene);
-                if (pool != null) clayFlight = pool.BeginFlight(element, transform.position, velocity, FlightDiameter);
+                if (pool != null) clayFlight = pool.BeginFlight(element, transform.position, velocity, FlightDiameter,
+                    fiveColor: fiveColorPresentation);
             }
             visualMount.gameObject.SetActive(!clayFlight.IsActive);
             if (clayFlight.IsActive)
             {
                 elementFlightTrail?.Clear();
                 if (flightTrail != null) { flightTrail.emitting = false; flightTrail.Clear(); }
+                if (fiveColorPresentation) GetComponentInChildren<LabFiveColorSparkle>()?.Tint();
                 return;
             }
             EnsureFlightTrail(DrawnRadius);
@@ -687,7 +718,8 @@ namespace C6Lab
             Vector2 startXZ = new Vector2(launchPosition.x, launchPosition.z);
             report(new LabProjectileResult(null, 0ul, kind, point, Mathf.Max(0f, Time.time - launchedAt),
                 Mathf.Max(0f, peakHeight - launchPosition.y), Vector2.Distance(startXZ, new Vector2(point.x, point.z)),
-                incomingVelocity, fire != null ? fire.FireId : null, fire != null ? fire.FireTargetId : null, normal, WorldRadius * 2f));
+                incomingVelocity, fire != null ? fire.FireId : null, fire != null ? fire.FireTargetId : null,
+                normal, WorldRadius * 2f, FiveColorPhase));
         }
 
         private void FinishVisual()
@@ -717,7 +749,8 @@ namespace C6Lab
             LabProjectileResult result = new LabProjectileResult(projectileId, ownerPlayerId,
                 kind, point, Mathf.Max(0f, Time.time - launchedAt),
                 Mathf.Max(0f, peakHeight - launchPosition.y), Vector2.Distance(startXZ, endXZ), impactVelocity,
-                fire != null ? fire.FireId : null, fire != null ? fire.FireTargetId : null, normal, WorldRadius * 2f);
+                fire != null ? fire.FireId : null, fire != null ? fire.FireTargetId : null,
+                normal, WorldRadius * 2f, FiveColorPhase);
             // Keep the last visible part of the flight briefly. If the callback ends the
             // round, ClearProjectiles also destroys this detached child of projectileRoot.
             LeaveFadingTrail();

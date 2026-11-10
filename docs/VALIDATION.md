@@ -7433,3 +7433,18 @@ PlayMode의 기존 main 실패17건은 표시용 최소 구슬 크기와 구형 
 - 영향 PlayMode: **14/23 통과·기존 실패9·skip0**, 32.65초. LabJigwiABNetwork9·GameJigwiStageIntegration1·NoticeText4건이 모두 통과해 이전 지귀 실패8건이 해소됐음을 확인했다.
 - 수정 없는 같은 main `f9d13362`에서 이전 실패17건을 재실행: **8/17 통과·9실패·skip0**, 29.98초. 남은 실패9건의 이름과 메시지가 변경본과 모두 동일하다. 구슬 표시 크기2·게임 흐름2·터치 먹물4·튜토리얼 로그1건이며 이번 변경에만 발생한 실패는 없다.
 - 전체 PlayMode 전수는 위 `e1e8d3e2` 통합 상태에서 수행했다. #620 추가 후에는 영향 묶음을 선별 재검사했으며 다시 전수 실행한 것으로 기록하지 않는다. Release·standalone·iOS·실제 다중 기기 네트워크 검증의 미실행 범위는 위와 같다.
+
+
+## 2026-11-10 — #627 피버 오색 구슬의 공통 클레이 VFX 연결
+
+기준 main `1a2a695e`, Unity 6000.6.5f1·macOS/Metal이다. Host 실제 투척·Guest 선반영·원격 복제에 표시 전용 fiveColor 인자를 연결했다. 실제 원소 None/fiveColor와 도색·피해·물리·공유259개·접속 버전·Scene/Prefab은 변경하지 않았다. 일반 클레이 메시/경로/눌림/퍼짐/수명을 재사용하고 기존 오색 색상 주기를 PaperOrb 농담과 진흙 꼬리·방울에 적용했다. 명중 직전 위상을 기존 선택적 접촉 payload에 보존한다. 보드·피버 HUD/음악·지귀 부적/보상 불꽃·마지막 일격의 전용 경로는 유지한다.
+
+- 전체 EditMode: **2,175/2,175 통과**, 실패·skip0, 19.86초. 기존 피버 생성·시간표·오색·보드/전용 HUD 검사 포함.
+- 최초 집중 PlayMode: **21/22 통과·1실패**, skip0, 9.65초. 새 이동 검사가 세 렌더 프레임만 기다려 빠른 batch에서 물리 갱신 전에 거리0을 읽었다. 물리 갱신 세 번과 후속 프레임을 기다리도록 검사 준비만 보완했으며 게임 이동 코드는 수정하지 않았다.
+- 보완 후 집중/회귀 PlayMode: **34/34 통과**, 실패·skip0, 42.25초. 새 FiveColorClayFlight6·FiveColorClayNetwork2, 기존 FiveElementContact5·ComboProjectileIntegration4·JigwiRewardBoardFire4·JigwiRewardFireTrail4·GameBattleRenderWarmup2·GameBattleUiPresentation3·GameFinishReplay4건.
+- 새 검사에서 실제 PaperOrb/fiber 재질·색면 변화·충돌 반지름과 보이는 크기 분리·실제 경로·None 명시적 허용·일반/오색 접촉의 geometry/시간 일치·lease 재사용/오래된 핸들/상한/취소/정리를 확인했다.
+- 네트워크 검사는 저장된 Lab에서 실제 Solo Host의 오색 보상→투척→물리 명중 콜백·도색·오색 전용 별가루 경로를 확인한다. Guest 선반영/원격 복제는 승인된 수신 메시지를 로컬 fixture로 주입해 기본 접촉·전용 별가루 중복 방지와 법선/크기/위상 전달을 검사했다. 실제 두 기기 통신 성공으로 표현하지 않는다. Host 송신 optional payload 조건은 소스 검토와 별개로 구분한다.
+- 준비 화면의 여섯 번째 오색 복사본도 실제로 그려지고, 게임의 풀·seed·도색 상태를 소비하지 않으며 준비 종료 시 정리되는 기존 검사 통과.
+- 독립 코드 검토 및 `git diff --check` 통과. 원본 Material/Shader/Scene/Prefab·패키지 설정은 수정하지 않았다.
+
+이 시점 미실행: 실제 Editor 전투 화면의 수동 외형 비교, 전체 PlayMode, Mac standalone/Release/iOS 빌드·실기기, 실제 다중 기기의 LAN·핫스팟 검증, GPU/CPU 성능 계측. 사용법과 호환되는 optional payload는 `FIVE_ELEMENT_VFX.md`의 #627 항목을 따른다.
