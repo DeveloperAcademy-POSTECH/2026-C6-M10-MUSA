@@ -31,6 +31,30 @@
 - 전체 PlayMode 실패 8건(`LabJigwiABNetworkTests` 7건, `GameJigwiStageIntegrationTests` 1건)은 이 변경 전 main `c68ca8c5`에서도 같은 8건이 실패했다(같은 두 fixture를 그 커밋에서 실행, 2/10 PASS). 이 PR은 고치지 않았다.
 - **미실행:** 실기기 화면, 멀티 게스트 화면.
 
+## 2026-11-10 — #603 튜토리얼·인게임 일시정지
+
+- Figma `wW7ny7lNQ4DXNJ4kD46AuR`의 `4367:1930`, `4405:2780`, `4418:1593`(기본 `4418:1653`, 누름 `4418:1699`)을 Battle의 공용 일시정지 화면에 적용했다. 원본 SVG와 PNG는 `Assets/Hapio/Art/UI/Pause`에 저장했다. ShillaCultureBold를 재사용하고 402×874 기준 안전 영역 등비 스케일을 적용했다.
+- 기존 일시정지·재개·나가기 버튼 연결을 보존하고, 재시작은 Host의 기존 현재 스테이지 재시작 흐름으로 연결했다. 튜토리얼은 기존 RestartTutorial·로그·중복 입력 방지를 유지한다. 음량은 기존 LabAudioSettings 저장 경로에 연결하며 Lab 기본 화면 생성은 유지한다.
+- Unity 6000.6.5f1: EditMode `GamePauseViewTests` **3/3 PASS**(슬라이더 끝점·36×36 손잡이·15px 트랙·누름 이미지·음량 연결), `GameRunFlowTests` **35/35 PASS**. PlayMode `PauseMenuRestartStartsThePracticeBoardOverAndQuitGoesToTheTitle` **1/1 PASS**(실제 튜토리얼 정지→재시작→Title).
+- 저장 UI를 Unity 카메라로 기본·누름 상태 렌더해 확인했다. 캡처는 팝업만 흰 배경에 표시한 검증용 렌더이며 실제 게임 배경 캡처는 아니다. Battle 기존 객체 삭제 0, 기존 객체 변경 16개. 코드·문서 diff 공백 검사는 통과했고 Unity 직렬화 Scene의 빈 필드 후행 공백은 남아 있다.
+- 전체 테스트, 일반 전투의 실제 버튼 조작, 다인 Host/Guest 실행, 모바일 실기기는 미실행이다.
+
+## 2026-11-10 — #603 땅따먹기 결과 시안
+
+- Figma `wW7ny7lNQ4DXNJ4kD46AuR`의 홍팀 `4379:1822`, 청팀 `4405:3467`을 기준으로 StageResult에 전용 결과 뷰를 저장했다. 기존 스토리 결과 뷰·배경과 게임 오버 변경은 보존한다.
+- 실제 최종 snapshot의 승리팀·전체 칸 대비 점유율·개인 칭호를 표시한다. 동점 수상자도 내 이름에만 `(나)`를 붙이고 내 칭호 행을 강조한다. 시안의 샘플 수치·P번호를 게임 데이터로 저장하지 않는다. 무승부·미칠 영역·결과 수신 대기도 처리한다.
+- 봉인 박 둘러보기는 기존 관람, 나가기는 기존 Home, 다시 도전은 Host의 기존 `CanAdvanceStage` 및 `NextStage`를 통한 같은 방 로비 복귀에 연결한다. Guest·DEV 솔로·결과 미수신 상태는 재도전 버튼을 비활성화한다. 입력 해제 대기도 유지한다.
+- Unity 6000.6.5f1 컴파일·저장 성공. `GameTerritoryResultViewTests` 5/5, 기존 `GameTerritoryFlowTests` 11/11 PASS. 청·홍 402×874 카메라 렌더를 검증용 기록으로 확인했다. 기존 Scene 객체 삭제 없음. 기존 표의 기본 행 높이 40은 유지하고 새 뷰만 46으로 설정했다.
+- 안전 영역에 402×874를 등비 맞춤하는 기존 결과 뷰의 스케일링을 재사용한다. 모바일 실기기·네트워크 PlayMode 및 전체 회귀 검사는 미실행이다.
+
+
+## 2026-11-10 — #603 이탈 게임 오버
+
+- 기존 `feat/#603-game-over-pause-territory-result-ui`에서 GameOver 장면에 불이·금옥이 화면을 저장했다. 진입마다 무작위로 한 번 선택하고 갱신 중에는 고정한다. 정상 패배의 이야기·재도전 경로와 기존 OnHomeButton 입력 해제 대기는 유지한다.
+- 원본: Figma `wW7ny7lNQ4DXNJ4kD46AuR`, 기존 `4405:3339`, 불이 `4379:1991`, 금옥이 `4379:2004`. 이미지 5개는 `Assets/Hapio/Art/UI/GameOver`에 저장했다. 기존 ShillaCultureBold와 Capsule 에셋을 재사용한다. 버튼·대사·라벨 색은 시안의 DarkRed/500, PrimaryBrown/700, SecondaryLightIvory/100을 따른다.
+- Unity 6000.6.5f1에서 컴파일 및 장면 저장 성공. 저장 장면의 이미지 참조, 두 캐릭터의 배타적 표시, 100회 갱신 시 선택 고정, 홈 버튼 활성 조건, 기존 story/result 참조를 직접 검사해 통과했다.
+- 402×874 카메라 렌더에서 금옥이 화면을 확인했다. 안전 영역 기준 402×874 등비 축소를 적용했다. 전체 EditMode/PlayMode, 실제 네트워크 이탈·홈 클릭 및 모바일 실기기 검증은 아직 실행하지 않았다.
+
 ## 2026-11-09 — 결과 카드에서 내가 받은 칭호만 붉게 강조
 
 - **기준:** `feat/result-my-title-highlight`, 커밋 `5f9fe518`. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 프리팹·Scene·접속 묶음·설정 수는 바꾸지 않았다. 최신 main `33762faf` 병합 뒤에는 아래 표의 관련 검사만 다시 돌렸다.

@@ -809,6 +809,16 @@ namespace Hapio
 
         public void Pause() => network.PauseBattle();
         public void Resume() => network.ResumeBattle();
+        public bool CanRestartPausedBattle => network != null && network.IsHost && network.IsBattlePaused
+            && state.phase == GameFlowPhase.Playing && !IsLoadingScene && !goingHome && !restartPending;
+
+        public bool RestartPausedBattle()
+        {
+            if (!CanRestartPausedBattle) return false;
+            if (tutorialRun) return RestartTutorial();
+            restartPending = true;
+            return true;
+        }
         public void OpenGourdViewer() { IsViewerOpen = PreviewTexture != null; NotifyResultViewer(); Changed?.Invoke(); }
         public void CloseGourdViewer() { IsViewerOpen = false; NotifyResultViewer(); Changed?.Invoke(); }
         public void RotatePreview(Vector2 delta) { preview?.Rotate(delta); }
