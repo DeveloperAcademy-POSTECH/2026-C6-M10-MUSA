@@ -72,11 +72,6 @@ namespace C6Lab
         [DllImport(SystemLibrary, CallingConvention = CallingConvention.Cdecl, SetLastError = true)]
         internal static extern int poll(ref PollDescriptor descriptor, uint count, int milliseconds);
 
-        [DllImport(SystemLibrary, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern int getifaddrs(out IntPtr head);
-        [DllImport(SystemLibrary, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern void freeifaddrs(IntPtr head);
-
         internal static ushort NetworkPort(ushort port) => BitConverter.IsLittleEndian ? (ushort)((port << 8) | (port >> 8)) : port;
     }
 }
