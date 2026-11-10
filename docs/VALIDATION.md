@@ -1,5 +1,20 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-10 — 지귀 시험용 스케줄 스위치가 켜진 채 저장된 문제
+
+- **기준:** `fix/jigwi-test-switch-off`, main `e1e8d3e2` 위. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 코드·프리팹·Scene·접속 묶음·설정 수는 바꾸지 않았다.
+- **원인:** `ff7d52e1`(#595)이 `LabConfig.asset`에 `jigwiATestOnly: 1`을 저장하고 `jigwiBBucket`을 1→0으로 바꿨다. 스케줄 선택은 이 시험 스위치를 스모크 흐름보다 먼저 보므로, 저장된 지귀 스테이지가 부적(A)만 4/21/38/55/72초에 내는 시험 스케줄(4)로 돌았다(스모크·물통 B·공통 기믹 없음).
+- **바꾼 것:** 에셋을 `jigwiATestOnly: 0`, `jigwiBBucket: 1`(ff7d52e1 이전 값)로 되돌렸다. 스모크 흐름이 켜진 저장 프로필에서는 `jigwiBBucket` 값이 진행에 영향을 주지 않는다. `LabJigwiABNetworkTests`는 복사본에서 시험 스위치 둘을 끄고 물통 B를 켜 #509 시간표 검사를 저장값과 분리했다. 저장된 설정에 시험 스위치가 켜져 있으면 실패하는 `LabJigwiABModelTests.SavedConfigKeepsTheTestOnlySchedulesOff`를 더했다.
+
+| 확인 | 결과 |
+| --- | --- |
+| `LabJigwiABNetworkTests`·`GameJigwiStageIntegrationTests`(PlayMode) | 10/10 PASS (수정 전 main 8건 실패) |
+| `LabJigwiABModelTests`(EditMode) | 68/68 PASS |
+| 대조 실험(에셋 `jigwiATestOnly: 1`) | 새 저장값 검사 실패 |
+| 이름에 Jigwi가 들어간 EditMode / PlayMode 전체 | 344/344, 85/85 PASS |
+
+- **미실행:** 전체 EditMode·PlayMode, 실기기·멀티 지귀 플레이.
+
 ## 2026-11-10 — 오프닝 쪽수 숨기기, 봉인 카드·실패 첫 컷 건너뛰기 없애기
 
 - **기준:** `fix/story-skip-and-page-number`, 커밋 `dd3c4488`(main `39e549e7` 위). Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 프리팹·Scene·접속 묶음·설정 수는 바꾸지 않았다.
