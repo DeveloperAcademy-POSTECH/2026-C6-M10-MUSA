@@ -195,6 +195,7 @@ namespace Hapio
         {
             if (Instance != this || network == null) return;
             UpdateLoading();
+            UpdateCloudCover();
             // The browse that resumes behind the title after a game must not keep the phone awake there (#476).
             network.RoomSearchKeepsAwake = roomBrowserVisible;
             pendingRooms.Tick(out string pendingError);
