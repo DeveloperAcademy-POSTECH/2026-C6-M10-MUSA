@@ -391,6 +391,64 @@ namespace Hapio.Tests
                 "Local gesture input must not alter the committed gameplay result.");
         }
 
+        [Category("GPU")]
+        [UnityTest]
+        public IEnumerator SealedGourdShadowFollowsPreviewRotationAndReset()
+        {
+            if (SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Null)
+                Assert.Ignore("Reading the projected shadow requires a graphics device.");
+
+            session.StartSolo();
+            yield return WaitPlaying(1);
+            CompleteMapInFixture(Model());
+            yield return Until(() => session.State.phase == GameFlowPhase.StageResult && !session.IsLoadingScene
+                && SceneManager.GetActiveScene().path == GameScenePaths.StageResult && session.PreviewTexture != null,
+                "Load the saved result screen with its completed preview.");
+            GameScreen screen = Object.FindFirstObjectByType<GameScreen>();
+            session.OpenGourdViewer();
+            var shadow = screen.viewerPanel.transform.Find("Gourd Shadow").GetComponent<UnityEngine.UI.RawImage>();
+            yield return Until(() => shadow.isActiveAndEnabled && shadow.texture is RenderTexture target && target.IsCreated(),
+                "The visible viewer renders a shadow mask.");
+            var projection = (RenderTexture)shadow.texture;
+            var camera = Camera.allCameras.Single(candidate => candidate.targetTexture == session.PreviewTexture);
+            Assert.That(camera.transform.IsChildOf(session.transform), Is.True,
+                "The completed preview must live and tear down with its session.");
+            Assert.That(camera.gameObject.scene, Is.EqualTo(session.gameObject.scene));
+            Assert.That(Camera.allCameras.Count(candidate => candidate.name == camera.name), Is.EqualTo(1),
+                "An old preview camera must not share the current staging area.");
+            Assert.That(camera.transform.parent.GetComponentsInChildren<MeshRenderer>()
+                .Any(renderer => renderer.name == "Result Rope"), Is.False, "The viewer shows the gourd without its hanging rope.");
+
+            byte[] ReadAlpha()
+            {
+                var pixels = new Texture2D(projection.width, projection.height, TextureFormat.RGBA32, false, true);
+                RenderTexture previous = RenderTexture.active;
+                try
+                {
+                    RenderTexture.active = projection;
+                    pixels.ReadPixels(new Rect(0, 0, projection.width, projection.height), 0, 0, false);
+                    return pixels.GetPixels32().Select(pixel => pixel.a).ToArray();
+                }
+                finally
+                {
+                    RenderTexture.active = previous;
+                    Object.Destroy(pixels);
+                }
+            }
+
+            byte[] initial = ReadAlpha();
+            int covered = initial.Count(alpha => alpha > 127);
+            Assert.That(covered, Is.InRange(500, initial.Length / 2), "The floor texture contains a visible, bounded silhouette.");
+            session.RotatePreview(new Vector2(.18f, .40f));
+            yield return null;
+            Assert.That(shadow.texture, Is.SameAs(projection), "Turning the gourd reuses the projection texture.");
+            Assert.That(ReadAlpha().Where((alpha, index) => Math.Abs(alpha - initial[index]) > 32).Count(),
+                Is.GreaterThan(100), "Turning the real result mesh changes its projected silhouette.");
+            screen.resetViewerButton.onClick.Invoke();
+            yield return null;
+            Assert.That(ReadAlpha(), Is.EqualTo(initial), "Reset restores the original silhouette.");
+        }
+
         private static Vector2 PreviewScreenPoint(RectTransform rectangle, float x, float y)
         {
             Rect local = rectangle.rect;

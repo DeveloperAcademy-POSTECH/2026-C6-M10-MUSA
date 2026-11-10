@@ -105,6 +105,14 @@ namespace Hapio
         /// <summary>이번 판에서 깬 스테이지들의 결과 (스테이지 순서). ALL STAGES CLEAR 화면의 전체 대시보드가 쓴다.</summary>
         public IReadOnlyList<LabResultStage> StageResults => new List<LabResultStage>(stageResults.Values);
         public Texture PreviewTexture => preview != null && !preview.IsDisposed ? preview.Texture : null;
+        internal GameGourdFloorShadow PreviewShadow
+        {
+            get
+            {
+                Transform model = preview?.ModelRoot;
+                return model != null ? model.GetComponent<GameGourdFloorShadow>() : null;
+            }
+        }
         public bool IsViewerOpen { get; private set; }
         public string UiNotice { get; private set; } = string.Empty;
         public bool RoomBrowserVisible => roomBrowserVisible;
@@ -525,7 +533,7 @@ namespace Hapio
             {
                 preview?.Dispose();
                 preview = copy;
-                DontDestroyOnLoad(preview.PreviewCamera.transform.root.gameObject);
+                GameGourdPreviewPresentation.Apply(preview, transform);
                 RememberCapturedResult();
             }
             else if (network.RequiresPaintArt)

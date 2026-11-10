@@ -407,6 +407,138 @@
       },
       "exportWidth": 134.0,
       "exportHeight": 37.0
+    },
+    {
+      "name": "HelpNormal",
+      "source": "4405:3875",
+      "width": 33,
+      "height": 34,
+      "offset": {
+        "x": 0,
+        "y": 0
+      },
+      "exportWidth": 33.333333333333336,
+      "exportHeight": 34.0
+    },
+    {
+      "name": "HelpPressed",
+      "source": "4405:4528",
+      "width": 33,
+      "height": 34,
+      "offset": {
+        "x": 0,
+        "y": 0
+      },
+      "exportWidth": 33.0,
+      "exportHeight": 34.0
+    },
+    {
+      "name": "PauseNormal",
+      "source": "4212:2151",
+      "width": 33,
+      "height": 34,
+      "offset": {
+        "x": 0,
+        "y": 0
+      },
+      "exportWidth": 33.333333333333336,
+      "exportHeight": 34.0
+    },
+    {
+      "name": "PausePressed",
+      "source": "4405:4529",
+      "width": 33,
+      "height": 34,
+      "offset": {
+        "x": 0,
+        "y": 0
+      },
+      "exportWidth": 33.0,
+      "exportHeight": 34.0
+    },
+    {
+      "name": "HelpPanel",
+      "source": "4624:1857",
+      "width": 348,
+      "height": 490,
+      "offset": {
+        "x": 0,
+        "y": 0
+      },
+      "exportWidth": 348.0,
+      "exportHeight": 490.0
+    },
+    {
+      "name": "HelpTitle",
+      "source": "4624:1892",
+      "width": 194,
+      "height": 59,
+      "offset": {
+        "x": -2.960418701171875,
+        "y": -4.436280250549316
+      },
+      "exportWidth": 201.0,
+      "exportHeight": 68.0
+    },
+    {
+      "name": "HelpStep1",
+      "source": "4624:1867",
+      "width": 120.9794692993164,
+      "height": 85.05223846435547,
+      "offset": {
+        "x": 0,
+        "y": 0
+      },
+      "exportWidth": 121.0,
+      "exportHeight": 85.33333333333333
+    },
+    {
+      "name": "HelpStep2",
+      "source": "4624:1875",
+      "width": 121.71268463134766,
+      "height": 85.05223846435547,
+      "offset": {
+        "x": 0,
+        "y": 0
+      },
+      "exportWidth": 122.0,
+      "exportHeight": 85.33333333333333
+    },
+    {
+      "name": "HelpStep3",
+      "source": "4624:1883",
+      "width": 120.9794692993164,
+      "height": 85.05223846435547,
+      "offset": {
+        "x": 0,
+        "y": 0
+      },
+      "exportWidth": 121.0,
+      "exportHeight": 85.33333333333333
+    },
+    {
+      "name": "HelpStep4",
+      "source": "4624:1891",
+      "width": 120.9794692993164,
+      "height": 85.05223846435547,
+      "offset": {
+        "x": 0,
+        "y": 0
+      },
+      "exportWidth": 121.0,
+      "exportHeight": 85.33333333333333
+    },
+    {
+      "name": "ViewerReset",
+      "source": "4606:4620",
+      "width": 234,
+      "height": 45,
+      "offset": {
+        "x": -0.04517364501953125,
+        "y": -2.12591552734375
+      },
+      "exportWidth": 235.0,
+      "exportHeight": 48.0
     }
   ]
 }

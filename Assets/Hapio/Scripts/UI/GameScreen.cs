@@ -105,6 +105,7 @@ namespace Hapio
             Click(closeViewerButton, () => session.CloseGourdViewer());
             Click(resetViewerButton, () => session.ResetPreview());
             GamePreviewAspect.Attach(viewerImage);
+            GameSealedGourdView.Attach(this);
             Click(developerButton, OpenDeveloper);
             if (kind == GameScreenKind.Home || kind == GameScreenKind.Lobby) GameDeveloperAccess.BindMenu(this);
             for (int i = 0; developerScopeButtons != null && i < developerScopeButtons.Length; i++)

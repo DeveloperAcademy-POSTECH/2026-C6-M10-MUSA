@@ -16,6 +16,7 @@ namespace Hapio
     {
         private CanvasGroup overlayGroup;
         private Image pauseProxy;
+        private Image helpProxy;
         private Button restartButton;
 
         /// <summary>The battle is paused: the tutorial screen has stepped aside for the pause menu.</summary>
@@ -30,7 +31,13 @@ namespace Hapio
             Button press = pauseProxy.gameObject.AddComponent<Button>();
             press.transition = Selectable.Transition.None;
             press.onClick.AddListener(PressPause);
+            GameHudButtonArtwork.Attach(press,"Pause");
             pauseProxy.gameObject.SetActive(false);
+            helpProxy=AddImage("Help",overlay,Color.clear,null,true);
+            var help=helpProxy.gameObject.AddComponent<Button>();help.transition=Selectable.Transition.None;
+            GameHudButtonArtwork.Attach(help,"Help");
+            help.onClick.AddListener(()=>Object.FindFirstObjectByType<GameHelpView>()?.Open());
+            helpProxy.gameObject.SetActive(false);
         }
 
         private void PressPause()
@@ -110,11 +117,15 @@ namespace Hapio
             bool shown = pause != null && !finishing && !skipOpen
                 && TryOverlayRect(pause.transform as RectTransform, out Rect area);
             if (pauseProxy.gameObject.activeSelf != shown) pauseProxy.gameObject.SetActive(shown);
+            helpProxy.gameObject.SetActive(shown&&!logOpen);
             if (!shown) return;
             TryOverlayRect(pause.transform as RectTransform, out area);
             RectTransform rect = pauseProxy.rectTransform;
             rect.anchoredPosition = area.center;
             rect.sizeDelta = area.size;
+            var view=Object.FindFirstObjectByType<GameHelpView>();
+            if(view!=null&&TryOverlayRect(view.helpButton.transform as RectTransform,out Rect helpArea))
+            {helpProxy.rectTransform.anchoredPosition=helpArea.center;helpProxy.rectTransform.sizeDelta=helpArea.size;}
         }
     }
 }

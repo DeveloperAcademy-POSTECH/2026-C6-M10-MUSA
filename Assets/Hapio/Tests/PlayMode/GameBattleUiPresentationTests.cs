@@ -16,6 +16,40 @@ namespace Hapio.Tests
 {
     public sealed class GameBattleUiPresentationTests
     {
+        [UnityTest]
+        public IEnumerator HelpBlocksTouchesAndUsesOriginalPressedArtworkWithoutPausingPeers()
+        {
+            yield return SceneManager.LoadSceneAsync(GameScenePaths.Home);
+            yield return Until(()=>GameSession.Instance!=null&&!GameSession.Instance.IsLoadingScene);
+            session=GameSession.Instance;
+            var port=new TcpListener(IPAddress.Loopback,0);port.Start();
+            session.Network.port=(ushort)((IPEndPoint)port.LocalEndpoint).Port;port.Stop();
+            session.StartSolo();
+            yield return Until(()=>session.State.phase==GameFlowPhase.Playing&&!session.IsLoadingScene&&!session.SceneFade.BlocksInput&&!session.IsLoadingScreenUp&&!session.IsPreparingBattle);
+            var view=Object.FindFirstObjectByType<GameHelpView>();
+            Assert.That(view,Is.Not.Null);
+            var pointer=new PointerEventData(EventSystem.current){button=PointerEventData.InputButton.Left};
+            ExecuteEvents.Execute(view.helpButton.gameObject,pointer,ExecuteEvents.pointerDownHandler);
+            Assert.That(view.helpButton.GetComponent<GameHudButtonArtwork>().artwork.SurfaceName,Is.EqualTo("HelpPressed"));
+            ExecuteEvents.Execute(view.helpButton.gameObject,pointer,ExecuteEvents.pointerUpHandler);
+            ExecuteEvents.Execute(view.helpButton.gameObject,pointer,ExecuteEvents.pointerClickHandler);
+            yield return null;
+            Assert.That(view.IsOpen,Is.True);
+            Assert.That(session.Network.IsBattlePaused,Is.False);
+            Canvas.ForceUpdateCanvases();
+            var dim=(RectTransform)view.modal.transform.Find("Dim");
+            pointer.position=RectTransformUtility.WorldToScreenPoint(null,dim.TransformPoint(new Vector3(dim.rect.center.x,dim.rect.yMin+20,0)));
+            var hits=new List<RaycastResult>();EventSystem.current.RaycastAll(pointer,hits);
+            Assert.That(hits.Count,Is.GreaterThan(0));
+            Assert.That(hits[0].gameObject.transform.IsChildOf(view.modal.transform),Is.True,"The modal must intercept board touches: "+string.Join(",",hits.Select(hit=>hit.gameObject.name+":"+hit.sortingOrder)));
+            view.closeButton.onClick.Invoke();yield return null;
+            Assert.That(view.IsOpen,Is.False);
+            view.helpButton.onClick.Invoke();yield return null;
+            Object.FindFirstObjectByType<GameBattleBindings>().hud.pauseButton.onClick.Invoke();yield return null;
+            Assert.That(session.Network.IsBattlePaused,Is.True);
+            Assert.That(view.IsOpen,Is.False,"Shared pause takes precedence over local help.");
+        }
+
         private GameSession session;
 #if UNITY_EDITOR
         private bool soloStagePreferenceOverridden, hadSoloStagePreference;
