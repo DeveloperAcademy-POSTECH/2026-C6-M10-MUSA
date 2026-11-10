@@ -11,7 +11,7 @@ namespace Hapio
     {
         public const string ResourcePath = "Hapio/UI/CloudCoverArt";
 
-        [Tooltip("화면을 덮었다 걷히는 한지 구름 (#630 StoryCloudWipe 프리팹). 덮는 데 0.62초, 걷히는 데 0.72초.")]
+        [Tooltip("화면을 덮었다 걷히는 한지 구름 (#630 StoryCloudWipe 프리팹). 저장값은 덮는 데 0.62초, 덮인 채 0.10초, 걷히는 데 0.80초.")]
         public StoryCloudWipe cloudWipe;
 
         public static GameCloudCoverArt Load() => Resources.Load<GameCloudCoverArt>(ResourcePath);
