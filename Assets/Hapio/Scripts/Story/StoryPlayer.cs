@@ -457,6 +457,12 @@ namespace Hapio
 
         private void SetDialogueVisible(bool visible)
         {
+            if (currentView != null && currentView.authoredDialogue != null)
+            {
+                currentView.authoredDialogue.alpha = visible ? 1f : 0f;
+                currentView.authoredDialogue.blocksRaycasts = false;
+                visible = false;
+            }
             if (dialogueGroup == null) return;
             dialogueGroup.alpha = visible ? 1f : 0f;
             dialogueGroup.interactable = visible;

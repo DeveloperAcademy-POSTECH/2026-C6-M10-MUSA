@@ -182,6 +182,8 @@ namespace Hapio
 
         private void HideReadingControls()
         {
+            if (player.CurrentView != null && player.CurrentView.authoredDialogue != null)
+                player.CurrentView.authoredDialogue.alpha = 0;
             if (player.dialogueGroup != null)
             {
                 hiddenDialogueAlpha = player.dialogueGroup.alpha;

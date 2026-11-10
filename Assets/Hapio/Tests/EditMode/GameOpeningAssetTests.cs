@@ -32,8 +32,8 @@ namespace Hapio.Tests
                 Assert.That(PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(controller.openingRoot), Is.EqualTo(OpeningPrefab));
                 Assert.That(AssetDatabase.GetAssetPath(controller.player.sequence), Is.EqualTo(OpeningSequence));
                 Assert.That(controller.player.playOnStart, Is.False, "The app-opening controller owns the single start.");
-                Assert.That(controller.player.sequence.cuts.Count, Is.EqualTo(25));
-                Assert.That(controller.player.sequence.cuts.Sum(cut => cut.PageCount), Is.EqualTo(27));
+                Assert.That(controller.player.sequence.cuts.Count, Is.EqualTo(28));
+                Assert.That(controller.player.sequence.cuts.Sum(cut => cut.PageCount), Is.EqualTo(28));
                 Assert.That(All<EventSystem>(scene), Has.Length.EqualTo(1));
                 Assert.That(All<LabNetwork>(scene), Is.Empty, "The opening must reuse the persistent session bootstrap.");
                 Assert.That(All<Camera>(scene), Has.Length.EqualTo(1), "An overlay opening does not need another camera.");
@@ -83,11 +83,12 @@ namespace Hapio.Tests
         public void EverySavedOpeningCutHasOneStableBackgroundWithoutChangingForegroundRoles()
         {
             var sequence = AssetDatabase.LoadAssetAtPath<StorySequence>(OpeningSequence);
-            Assert.That(sequence.cuts, Has.Count.EqualTo(25));
+            Assert.That(sequence.cuts, Has.Count.EqualTo(28));
             foreach (var cut in sequence.cuts)
             {
-                Assert.That(cut.viewPrefab.layers[0].isBackground, Is.True, cut.cutId);
-                Assert.That(cut.viewPrefab.layers.Count(layer => layer.isBackground), Is.EqualTo(1), cut.cutId);
+                Assert.That(cut.viewPrefab.transform.Find("Paper backing"), Is.Not.Null, cut.cutId);
+                Assert.That(cut.viewPrefab.transform.GetChild(1).GetComponentInChildren<OpeningLayerMotion>(), Is.Null, "Background stays still");
+                Assert.That(cut.viewPrefab.authoredDialogue, Is.Not.Null, cut.cutId);
             }
         }
 

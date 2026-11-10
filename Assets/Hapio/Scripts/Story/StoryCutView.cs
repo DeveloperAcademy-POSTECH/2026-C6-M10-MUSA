@@ -7,6 +7,9 @@ namespace Hapio
     {
         public StoryLayer[] layers;
         public StoryVisualBeat[] beats;
+        public OpeningLayerMotion[] openingMotions;
+        [Tooltip("Cut-authored Figma dialogue, including mixed font sizes. Null retains the shared dialogue UI.")]
+        public CanvasGroup authoredDialogue;
         public UnityEngine.UI.Button continueButton;
         [Tooltip("The card advances through its own continue button instead of a background tap.")]
         public bool requireContinueButton;
@@ -36,6 +39,9 @@ namespace Hapio
             get
             {
                 float duration = 0f;
+                if (openingMotions != null)
+                    foreach (var motion in openingMotions)
+                        if (motion != null) duration = Mathf.Max(duration, motion.Duration);
                 if (layers != null)
                     foreach (var layer in layers)
                         if (layer != null) duration = Mathf.Max(duration, layer.EntranceDuration);
@@ -49,6 +55,9 @@ namespace Hapio
         /// <summary>Keep this picture instance at rest when its remaining story is skipped.</summary>
         public void ShowCompletedPose()
         {
+            if (openingMotions != null)
+                foreach (var motion in openingMotions)
+                    if (motion != null) motion.Sample(EntranceDuration);
             if (layers != null)
                 foreach (var layer in layers)
                     if (layer != null) layer.Sample(layer.EntranceDuration);
@@ -59,6 +68,9 @@ namespace Hapio
 
         internal void SampleArtwork(float elapsed)
         {
+            if (openingMotions != null)
+                foreach (var motion in openingMotions)
+                    if (motion != null) motion.Sample(elapsed);
             if (layers != null)
                 foreach (var layer in layers)
                     if (layer != null) layer.Sample(elapsed);

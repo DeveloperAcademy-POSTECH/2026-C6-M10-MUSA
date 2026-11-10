@@ -7766,3 +7766,14 @@ Host의 `PaintFundedCell`에서 실제 빈 동일 면적 셀이 칠해질 때 �
 구현 `86269500`의 실제 저장 Home→공통 Battle 3판→실제 총평 경로를 별도로 촬영했다. CPU 도색 지도 완료를 자동 실행했고, 실제 세션 시간 5.002463/7.001923/9.002901초가 00:05/00:07/00:09와 합계00:21로 표시됐다. 각 판 Host 신규 셀2,048개로 솔로 기여도100%다. 예시 Preview 데이터나 직접 투척한 수동 플레이가 아니며, 이 촬영을 최신 main 통합 후 재촬영으로 기록하지 않는다.
 
 검증·PR에는 실제 면적 기준과 건조 뒤 재도색의 누적 의미, 기존 공격 점수/땅따먹기 통계/난수/지도/승패/물리 유지, 설정259개·5699/Lab60/Game50 및 전 기기 같은 새 버전 필요를 명시했다. iOS·실제 다인 LAN/핫스팟·standalone/Release 실행·성능 계측은 이번에도 미실행이다. 독립 코드/PR 설명 검토에서 병합 차단 결함은 발견되지 않았다. C#·문서 충돌 마커/공백 검사는 통과했고, 기존 Unity 직렬화 에셋의 생성 공백은 임의로 고치지 않았다.
+## 2026-11-11 — #654 Opening revision: 28 frames
+
+Validated in Unity 6000.6.5f1 on macOS, on the isolated branch based on origin/main `7b3025ee`. Existing product-name, splash and iOS Build Profile changes in the original checkout were preserved there.
+
+All 28 frames from Figma section `4553:2390` retain the approved dialogue, speaker, image placement, rotation, cropping and mixed text sizes. Frame 7 includes the sigh placed outside its frame in the source. All 28 prefabs were rendered at 804×1748. Frames 7/12/13/14/15/16 were also sampled at 0/0.7/1.4/2.1/2.8/4 seconds. Visual review corrected wrapping, rotating masks, the final background's 2pt bleed, smoke obscuring demons and the initially invisible falling gourd. These captures are Editor renders, not device performance measurements.
+
+Affected EditMode checks: OpeningRevisionTests 10/10, GameOpeningAssetTests and GameOpeningTransitionTests 7/7, retained StoryWorkspaceTests 8/8 passed. Obsolete 25-cut/27-page layout assertions were replaced with checks for the new approved text, typography, coordinates, independent motion, deterministic replay and final background bleed. Title and page-fit tests remain.
+
+Affected PlayMode checks: GameOpeningControllerTests 13/13 passed (9.33 seconds), including all 28 cuts, authored dialogue visibility, hiding the shared dialogue, completion/skip, pointer release, cloud zoom and cancellation/fallback. GameTutorialFlowTests.FinishedOpeningOpensThePracticeBoardOnceThenTheRoomList passed 1/1 (54.27 seconds): completing frame 28 hides its dialogue, closes the clouds, holds them during preparation, reveals the tutorial and eventually opens the room list. Subsequent changes only refine prop selection, rotating masks and scroll entrance; transition code is unchanged.
+
+Live2D title, Home bindings, gameplay/network settings and protocol tokens are unchanged. Full test suites, standalone/iOS builds, real iPhones, multiplayer and performance profiling were not run. Raw logs and visual captures stay outside the repository.
