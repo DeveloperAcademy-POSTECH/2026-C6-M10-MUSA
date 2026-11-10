@@ -166,6 +166,11 @@ namespace Hapio.Tests
             skip.onClick.Invoke();
             Assert.That(director.IsSkipDialogOpen, Is.True);
             yield return new WaitForSecondsRealtime(art.popSeconds + .1f);
+            // #631: the window and the two buttons under it sit, as one block, on the screen's middle.
+            var skipDialog = director.GetComponentsInChildren<RectTransform>(true).Single(rect => rect.name == "Skip Dialog");
+            Rect skipWindow = ScreenRect((RectTransform)skipDialog.Find("Window")), stayRect = ScreenRect((RectTransform)stay.transform);
+            Assert.That((skipWindow.yMax + stayRect.yMin) * .5f, Is.EqualTo(ScreenRect(skipDialog).center.y).Within(1f),
+                "The skip window and its buttons are centred top to bottom.");
             Assert.That(director.IsShowingLine, Is.False, "The bubble waits behind the dialog.");
             tap.onClick.Invoke();
             Assert.That(director.BeatIndex, Is.EqualTo(1), "No tap gets past the dialog.");

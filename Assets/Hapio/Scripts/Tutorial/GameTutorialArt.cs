@@ -147,7 +147,8 @@ namespace Hapio
         [Tooltip("처음 누른 뒤 건너뛰기 버튼이 서서히 나타나는 시간")] [Min(.01f)] public float skipFadeSeconds = .5f;
         [Tooltip("경고 창 뒤를 덮는 어둠")] public Color skipDimColor = new Color(0f, 0f, 0f, .55f);
         public Vector2 skipPanelSize = new Vector2(336f, 172f);
-        [Tooltip("경고 창 가운데가 화면 위에서 얼마나 내려와 있는지 (화면 높이 비율)")] [Range(0f, 1f)] public float skipPanelTopFraction = .4f;
+        [Tooltip("경고 창과 그 아래 두 버튼을 한 묶음으로 본 가운데가 화면 위에서 얼마나 내려와 있는지 (화면 높이 비율, 0.5 = 정중앙)")]
+        [Range(0f, 1f)] public float skipBlockCenterFromTop = .5f;
         [Min(8)] public int skipTitleFontSize = 21;
         [Min(8)] public int skipBodyFontSize = 14;
         [Tooltip("\"계속 배우기\"·\"건너뛰기\" 버튼 하나의 크기")] public Vector2 skipChoiceSize = new Vector2(120f, 48f);

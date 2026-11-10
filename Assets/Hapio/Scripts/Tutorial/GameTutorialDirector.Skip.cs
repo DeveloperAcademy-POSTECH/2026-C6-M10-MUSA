@@ -45,6 +45,13 @@ namespace Hapio
         public static float SkipFade(float sinceTap, float seconds) =>
             sinceTap < 0f ? 0f : seconds <= 0f ? 1f : Mathf.Clamp01(sinceTap / seconds);
 
+        /// <summary>
+        /// How far above the screen's middle the window's middle goes so that the window and the two buttons hanging under it
+        /// sit, as one block, <paramref name="blockCenterFromTop"/> of the way down the screen (#631: 0.5, the middle).
+        /// </summary>
+        public static float SkipWindowY(float screenHeight, float blockCenterFromTop, float choiceDrop, float choiceHeight) =>
+            screenHeight * (.5f - blockCenterFromTop) + (choiceDrop + choiceHeight) * .5f;
+
         private void AdvanceClock()
         {
             if (!skipOpen && !logOpen && !BattlePaused) clock += Time.unscaledDeltaTime;
@@ -225,8 +232,8 @@ namespace Hapio
             float age = Time.unscaledTime - skipOpenedAt;
             skipDialogGroup.alpha = Mathf.Clamp01(age / art.dimFadeSeconds);
             skipWindow.localScale = Vector3.one * PopScale(age / art.popSeconds, art.popOvershoot);
-            Rect bounds = overlay.rect;
-            skipWindow.anchoredPosition = new Vector2(0f, bounds.height * (.5f - art.skipPanelTopFraction));
+            skipWindow.anchoredPosition = new Vector2(0f,
+                SkipWindowY(overlay.rect.height, art.skipBlockCenterFromTop, art.skipChoiceDrop, art.skipChoiceSize.y));
             // Something that came up behind the dialog (a remark for a throw that was already flying) stays hidden.
             foreach (KeyValuePair<GameObject, bool> part in hiddenBySkip)
                 if (part.Key != null && part.Key.activeSelf) part.Key.SetActive(false);

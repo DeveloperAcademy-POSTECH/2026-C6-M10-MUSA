@@ -1135,6 +1135,19 @@ namespace Hapio.Tests
         }
 
         [Test]
+        public void SkipWindowAndItsTwoButtonsSitTogetherOnTheScreensMiddle()
+        {
+            const float screen = 844f, window = 172f, drop = 10f, button = 48f;
+            float y = GameTutorialDirector.SkipWindowY(screen, .5f, drop, button);
+            float top = y + window * .5f, bottom = y - window * .5f - drop - button;
+            Assert.That((top + bottom) * .5f, Is.EqualTo(0f).Within(1e-4f), "Window and buttons, as one block, on the middle (#631).");
+            Assert.That(GameTutorialDirector.SkipWindowY(screen, .4f, drop, button), Is.GreaterThan(y), "A smaller fraction lifts it.");
+            GameTutorialArt art = GameTutorialArt.Load();
+            Assert.That(art.skipBlockCenterFromTop, Is.EqualTo(.5f), "The saved art centers the block.");
+            Assert.That(typeof(GameTutorialArt).GetField("skipPanelTopFraction"), Is.Null, "Only the block is placed, not the window alone.");
+        }
+
+        [Test]
         public void SkipButtonFadesInOverHalfASecondAfterTheFirstTap()
         {
             Assert.That(GameTutorialDirector.SkipFade(-1f, .5f), Is.EqualTo(0f), "Not before a tap.");
