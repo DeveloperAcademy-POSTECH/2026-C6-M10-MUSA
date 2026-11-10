@@ -15,6 +15,12 @@ namespace C6Lab
         private static readonly int Tint = Shader.PropertyToID("_BaseColor");
         private static readonly int Gloss = Shader.PropertyToID("_Gloss");
         private static readonly int Sag = Shader.PropertyToID("_Sag");
+        private static readonly int Ink = Shader.PropertyToID("_InkColor");
+        private static readonly int Shadow = Shader.PropertyToID("_ShadowColor");
+        private static readonly int Lit = Shader.PropertyToID("_LitColor");
+        private static readonly int Light = Shader.PropertyToID("_LightColor");
+        private static readonly int Glint = Shader.PropertyToID("_GlintColor");
+        internal const float FiveColorStepSeconds = .9f, FiveColorFlowSpeed = 2f;
 
         public LabClayShapes(Shader shader)
         {
@@ -41,9 +47,11 @@ namespace C6Lab
 
         public void Paint(MeshRenderer renderer, Color color, float gloss, Vector3 sag)
         {
+            properties.Clear();
             properties.SetColor(Tint, color);
             properties.SetFloat(Gloss, gloss);
             properties.SetVector(Sag, sag);
+            if (renderer.sharedMaterial != material) renderer.sharedMaterial = material;
             renderer.SetPropertyBlock(properties);
         }
 
@@ -57,6 +65,43 @@ namespace C6Lab
             }
             renderer.sharedMaterial = material;
             Paint(renderer, fallback, gloss, Vector3.zero);
+        }
+
+        public void PaintFiveColorOrb(MeshRenderer renderer, Material surface, Color color, float gloss)
+        {
+            if (surface == null || !surface.shader.isSupported || !surface.HasProperty(Ink))
+            {
+                renderer.sharedMaterial = material;
+                Paint(renderer, color, gloss, Vector3.zero);
+                return;
+            }
+            // Recolor the authored value ramp, retaining the paper texture, bands and dry brush.
+            // Overriding only _BaseColor would leave the shadow and highlight bands gray.
+            float middle = surface.GetColor(Tint).grayscale;
+            properties.Clear();
+            properties.SetColor(Ink, RampColor(color, surface.GetColor(Ink), middle));
+            properties.SetColor(Shadow, RampColor(color, surface.GetColor(Shadow), middle));
+            properties.SetColor(Tint, color);
+            properties.SetColor(Lit, RampColor(color, surface.GetColor(Lit), middle));
+            properties.SetColor(Light, RampColor(color, surface.GetColor(Light), middle));
+            properties.SetColor(Glint, RampColor(color, surface.GetColor(Glint), middle));
+            if (renderer.sharedMaterial != surface) renderer.sharedMaterial = surface;
+            renderer.SetPropertyBlock(properties);
+        }
+
+        private static Color RampColor(Color pigment, Color authored, float middle)
+        {
+            float value = authored.grayscale;
+            Color result = value <= middle ? pigment * (value / Mathf.Max(.001f, middle)) :
+                Color.Lerp(pigment, Color.white, (value - middle) / Mathf.Max(.001f, 1f - middle));
+            result.a = authored.a;
+            return result;
+        }
+
+        public void ResetPaint(MeshRenderer renderer)
+        {
+            renderer.SetPropertyBlock(null);
+            renderer.sharedMaterial = material;
         }
 
         public void Dispose()
