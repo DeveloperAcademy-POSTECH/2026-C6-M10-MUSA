@@ -7534,3 +7534,12 @@ main `53b1f7a5`(#619 UI 스트로크·#622 튜토리얼 조합대·#628 지귀 Q
 | 변경 검사 | `git diff --check` 통과. Scene/Prefab/원본 Material/Shader/패키지에 이번 작업의 변경 없음 |
 
 검사 중 생성된 InitTestScene은 자동 검사 임시 파일로 커밋에 포함하지 않는다. 실제 외형 확인은 위2스테이지 Editor 캡처이며, 이번 전체 자동 검사로 iOS·standalone/Release·실제 다인 LAN/핫스팟·성능 계측을 수행한 것으로 표현하지 않는다.
+
+
+### #637 변경 범위 기반 검사 지침 — 2026-11-10
+
+기준 main `a0d9aeef`, 브랜치 `chore/#637-change-based-test-policy`. 변경은 AGENTS.md의 검사 정책, TEST_SUITE_REPORT.md의 선택 기준/과거 집계 구분, 이 기록뿐이다. 실제 게임 코드·Scene·Prefab·Material·패키지·테스트와 기존 지침은 보존했다.
+
+문서 diff와 두 정책의 일치, 저장소 내부 Markdown 링크 대상, 충돌 마커 부재, `git diff --check`를 확인했다. 독립 읽기 검토에서도 필요한 관련 검사의 카테고리 제외 방지·전체 검사 조건·동일 조건 결과 재사용 규칙에 충돌이 없음을 확인했다.
+
+**Unity 컴파일·EditMode·PlayMode·빌드·실기기는 이번 작업에서 실행하지 않았다.** 문서만 바뀌어 새 정책의 문서 검사 범위를 적용했다. 보고서의 2,180/775건·35.62/743.08초는 #627 통합본 `dc602dea`의 기존 실제 실행 기록이며 #637의 새 검사 통과 건수가 아니다.
