@@ -10,6 +10,7 @@ namespace Hapio
         public UnityEngine.UI.Text bluePercent, redPercent;
         public GameObject blueDecoration, redDecoration;
         public GameObject blueWinnerFlag, redWinnerFlag, blueSmallFlag, redSmallFlag;
+        private void Awake() => GameResultStrokes.Apply(this);
 
         public void Present(LabSnapshot result, ulong localPlayerId)
         {

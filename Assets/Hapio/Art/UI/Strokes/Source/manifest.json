@@ -369,6 +369,44 @@
       "exportWidth": 224.66666666666666,
       "exportHeight": 24.666666666666668,
       "strokeOnly": true
+    },
+    {
+      "name": "ResultAction",
+      "source": "4379:1869",
+      "width": 234,
+      "height": 45,
+      "offset": {
+        "x": -0.04517364501953125,
+        "y": -2.12591552734375
+      },
+      "strokeOnly": false,
+      "brush": {
+        "type": "BRUSH",
+        "brushType": "STRETCH",
+        "brushName": "HEIST",
+        "direction": "FORWARD"
+      },
+      "exportWidth": 235.0,
+      "exportHeight": 48.0
+    },
+    {
+      "name": "ResultFill",
+      "source": "4405:3443",
+      "width": 127,
+      "height": 29,
+      "offset": {
+        "x": -3.080634832382202,
+        "y": -3.6761655807495117
+      },
+      "strokeOnly": true,
+      "brush": {
+        "type": "BRUSH",
+        "brushType": "STRETCH",
+        "brushName": "GRINDHOUSE",
+        "direction": "BACKWARD"
+      },
+      "exportWidth": 134.0,
+      "exportHeight": 37.0
     }
   ]
 }

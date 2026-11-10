@@ -109,6 +109,7 @@ namespace Hapio.Editor
                 view.redSmallFlag = Flag(design, "RedSmall", "Assets/Hapio/Art/UI/Battle/3aff5.png", 334, 228, 44, 45, "홍팀", 18, new Color32(211, 46, 21, 255));
                 table.gameObject.SetActive(false);
                 screen.territoryView = view;
+                GameResultStrokes.Apply(view);
                 if (screen.viewerPanel != null) screen.viewerPanel.transform.SetAsLastSibling();
                 EditorUtility.SetDirty(screen);
                 EditorSceneManager.MarkSceneDirty(scene);
