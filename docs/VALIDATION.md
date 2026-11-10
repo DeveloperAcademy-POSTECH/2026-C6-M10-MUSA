@@ -1,5 +1,21 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-10 — 전투 상단 진행 막대가 100%에서 끝까지 차지 않던 문제
+
+- **기준:** `fix/battle-paint-bar-fill`, 커밋 `5e3b9982`. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 프리팹·Scene·접속 묶음·설정 수는 바꾸지 않았다.
+- **원인:** 채움 이미지 `DynamicFill`은 비율 유지(`m_PreserveAspect: 1`)로 저장돼 있다. 그림은 466×59(약 7.9:1)인데 새 전투 UI가 236×21(약 11.2:1) 틀에 넣어, 높이 21에 맞춘 약 166 폭만 왼쪽에 그려졌다. 100%가 틀의 약 70%까지만 찼고, 모든 값에서 막대가 숫자의 약 0.7배로 보였다. 숫자와 `fillAmount`는 같은 칠 칸 수에서 계산돼 맞았다.
+- **바꾼 것:** `GameBattleUiPresentation`이 채움을 새 틀에 넣을 때 비율 유지를 끈다. 튜토리얼과 독립 Lab은 이 경로를 타지 않는다.
+
+| 확인 | 결과 |
+| --- | --- |
+| 수정 전 Mac 개발 빌드 화면(채움 100%·50%) | 100%가 틀의 약 70%, 50%가 약 35%에서 멈춤. 비율 유지를 끄면 100%가 끝까지 참 |
+| 새 PlayMode `GameBattlePaintBarTests`(실제로 그려지는 폭) | PASS. 수정을 되돌리면 폭 165.9(틀 236)로 실패 |
+| 전체 EditMode / 전체 PlayMode(`5e3b9982`, main 병합 전) | 2160/2160, 734/742 |
+| main `a530f423` 병합 뒤 `GameBattlePaintBarTests`·`GameSceneFlowTests` | 30/30 PASS(`GameBattleUiPresentationTests` 포함) |
+
+- 전체 PlayMode 실패 8건(`LabJigwiABNetworkTests` 7건, `GameJigwiStageIntegrationTests` 1건)은 이 변경 전 main `c68ca8c5`에서도 같은 8건이 실패했다(같은 두 fixture를 그 커밋에서 실행, 2/10 PASS). 이 PR은 고치지 않았다.
+- **미실행:** 실기기 화면, 멀티 게스트 화면.
+
 ## 2026-11-09 — 결과 카드에서 내가 받은 칭호만 붉게 강조
 
 - **기준:** `feat/result-my-title-highlight`, 커밋 `5f9fe518`. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 프리팹·Scene·접속 묶음·설정 수는 바꾸지 않았다. 최신 main `33762faf` 병합 뒤에는 아래 표의 관련 검사만 다시 돌렸다.
