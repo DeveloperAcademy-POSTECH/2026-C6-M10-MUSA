@@ -7426,3 +7426,10 @@ PlayMode의 기존 main 실패17건은 표시용 최소 구슬 크기와 구형 
 - 첨부 312×312 RGBA PNG를 무압축 Single Sprite로 가져오고, 해제 시 기존 배경·문구 대신 전체 이미지를 표시한다. 표시 시간·해제 판정·본인 화면 조건은 유지한다.
 - Unity 컴파일 후 Console error 0. `LabYaguangFlashLookTests` PlayMode 5/5 통과(기존 섬광 표현 회귀 검사).
 - PNG 전용 표시 뒤 공용 텍스트/눈 말풍선 복원은 Editor 객체 검사로 별도 확인한다. 실기기 표시 크기·시각 검수는 미실행.
+
+
+### #650 피격 말풍선 PNG 추가
+
+- 첨부 312×312 RGBA 이미지를 `Sabotage/YaguangTauntBubble` Single Sprite(무압축)로 추가했다. 섬광 피격 시 텍스트 대신 PNG만 2초 표시하며 기존 해제 PNG와 공용 알림을 구분한다. 두 PNG 모두 렌더 준비에 포함한다.
+- Editor 객체 검사: 피격 PNG 선택·Text 숨김·해제 PNG 전환·기존 텍스트 말풍선 복원 통과. 변경 스크립트 컴파일 및 `git diff --check` 통과.
+- 이번 PlayMode 검사 시도는 Editor가 재생 중이어서 시작되지 않았다(0개 실행). Console에 Unity Transport `ResetStatics` 컬렉션 변경 예외 1건이 있어 오류 0건으로 기록하지 않는다. 실기기 시각 검수 미실행.

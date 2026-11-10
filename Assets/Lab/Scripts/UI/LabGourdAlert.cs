@@ -18,6 +18,7 @@ namespace C6Lab
     public sealed class LabGourdAlert : MonoBehaviour
     {
         public const string Text = "!";
+        public const string YaguangTauntPath = "Sabotage/YaguangTauntBubble";
         public const string YaguangReleasePath = "Sabotage/YaguangReleaseBubble";
         private const int TextureSize = 150;
         // 말풍선 그림 안의 위치 (픽셀, 아래가 0): 몸통 타원과 박을 가리키는 꼬리 끝.
@@ -200,8 +201,14 @@ namespace C6Lab
 
         /// <summary>#650: complete artwork, with no generated bubble or text over it.</summary>
         public bool ShowYaguangRelease(LabTarget gourd, float seconds)
+            => ShowArtwork(gourd, YaguangReleasePath, seconds);
+
+        public bool ShowYaguangTaunt(LabTarget gourd, float seconds)
+            => ShowArtwork(gourd, YaguangTauntPath, seconds);
+
+        private bool ShowArtwork(LabTarget gourd, string resourcePath, float seconds)
         {
-            Sprite artwork = Resources.Load<Sprite>(YaguangReleasePath);
+            Sprite artwork = Resources.Load<Sprite>(resourcePath);
             if (gourd == null || artwork == null || !EnsureBubble()) return false;
             showingBlock = showingHeart = false;
             ShowOnly(null);
