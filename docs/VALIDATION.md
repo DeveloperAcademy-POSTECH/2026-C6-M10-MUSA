@@ -1,5 +1,22 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-10 — 준비·로딩·동기화 실패도 이탈 화면
+
+- **기준:** `fix/gameover-character-for-all-failures`, main `0d51e188` 위(검사 실행 기준). 이후 main `99604e5b`를 병합했다. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 프리팹·Scene·접속 묶음·설정 수는 바꾸지 않았다.
+- **바꾼 것:** #625에서 나누었던 GameOver 화면을 다시 하나로 했다. 정상 Story 패배(실패 이야기·봉인율·재도전)가 아닌 모든 GameOver, 즉 나가기·연결 끊김·준비·로딩·동기화 실패가 불이/금옥이 이탈 화면을 쓴다. `GameRunFlow.IsLeaveReason`과 그 EditMode 검사는 지웠다. 종료 사유 상수는 남겼다.
+
+| 확인 | 결과 |
+| --- | --- |
+| `GameRunFlowTests`·`GameStageResultViewTests`(EditMode) | 51/51 PASS |
+| `GameStageStoryAssetTests`(EditMode) | 5/5 PASS |
+| `GameSceneFlowTests`(PlayMode, 준비 실패 GameOver가 이탈 화면인지 확인) | 27/27 PASS |
+| `GameStageStoryPresentationTests`(PlayMode) | 6/6 PASS |
+| 대조 실험(준비 실패만 결과 카드로 되돌림) | 새 검사 실패 |
+| 전체 PlayMode | 760/760 PASS |
+
+- `GameLoadingSessionTests`만 따로 batch로 돌리면 Play 모드 진입 직후 아무 출력 없이 멈춘다. 이 변경이 없는 main `99604e5b`에서도 같았고, 전체 PlayMode 안에서는 통과한다. 이번에 원인은 고치지 않았다.
+- **미실행:** 전체 EditMode(관련 묶음만 실행), main 병합 뒤 재실행, 실기기·멀티에서 실제 실패 화면.
+
 ## 2026-11-10 — 이탈 게임 오버만 캐릭터 화면, 2:2 결과의 다시 도전 숨기기
 
 - **기준:** `fix/gameover-leave-only-territory-no-retry`, main `45e1e60b` 위. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 프리팹·Scene·접속 묶음·설정 수는 바꾸지 않았다. 종료 사유 문자열도 그대로라 흐름 상태 형식이 같다.
