@@ -34,6 +34,10 @@ namespace Hapio.Editor
                         heading.alignment=TextAnchor.UpperCenter;
                     }
                     controls.heading=heading;
+                    // The imported Figma layer that holds the heading was saved hidden on 구미호/야광귀; the heading
+                    // must show there (both roles) and never on the final 지귀 picture.
+                    for (Transform layer=heading.transform.parent; layer!=null && layer!=root.transform; layer=layer.parent)
+                        layer.gameObject.SetActive(!controls.finalStage);
                     if(controls.waiting==null) controls.waiting=Label(root.transform,"HostWaiting", "방장의 시작을 기다리시오.",new Rect(129,i==0?670:172,143,24),15,"68645c",true);
                     if(controls.nextSeal==null)
                     {
@@ -43,6 +47,9 @@ namespace Hapio.Editor
                         Label(hit,"Caption","다음 봉인",new Rect(16,14,71,22),18.898f,"3f3d38",false);
                         StageStoryAssets.Element(hit,new StageStoryAssets.Node {name="Arrow",nodeId="4593:3048",kind="image",assetPath=StageStoryAssets.Art+"Polish/ContinueArrow.png",x=91.446f,y=19.866f,width=12.1613f,height=10.2676f,rotation=-90.5455f});
                     }
+                    var caption=controls.nextSeal.GetComponentsInChildren<UnityEngine.UI.Text>(true).FirstOrDefault(t=>t.name=="Caption")
+                        ?? controls.nextSeal.GetComponentInChildren<UnityEngine.UI.Text>(true);
+                    if(caption!=null) caption.text=controls.finalStage ? StoryStageClearControls.FinishLabel : StoryStageClearControls.NextSealLabel;
                     controls.Present(false,false,false);
                     PrefabUtility.SaveAsPrefabAsset(root,path);
                 }

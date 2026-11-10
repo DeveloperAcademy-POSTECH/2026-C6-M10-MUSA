@@ -988,6 +988,8 @@ namespace Hapio.Tests
                 Assert.That(story.exitButton.gameObject.activeInHierarchy, Is.False,
                     "The final result has one ending action, not an Exit button relabelled to the same action.");
                 string sealCaption = clear.nextSeal.GetComponentInChildren<UnityEngine.UI.Text>(true)?.text;
+                Assert.That(sealCaption, Is.EqualTo(StoryStageClearControls.FinishLabel), "The last yokai's button reads 마치기.");
+                Assert.That(clear.heading.gameObject.activeInHierarchy, Is.False, "No 다음 요괴 잡으러 ... after the last yokai.");
                 Assert.That(story.presentationRoot.GetComponentsInChildren<UnityEngine.UI.Button>(true)
                     .Concat(story.player.CurrentView.GetComponentsInChildren<UnityEngine.UI.Button>(true)).Distinct()
                     .Count(button => button.gameObject.activeInHierarchy
