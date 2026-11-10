@@ -7609,3 +7609,8 @@ Integrated main `99604e5b` into #634 `937e374b`. Only this document conflicted; 
 Unity 6000.6.5f1: compilation succeeded; full EditMode **2189/2189 PASS**; PlayMode `TerritoryDeveloperSoloUsesDesignedResultsAndReturnsHomeAfterViewingTheGourd` **1/1 PASS** and `MidStageExitLatchesGameOverAndWaitsForExplicitHome` **1/1 PASS**. No failures or skips. Conflict-marker and staged whitespace checks passed.
 
 The manual conflict resolution only combines documentation. Selected PlayMode checks cover the battle-to-result/game-over integration paths; unchanged UI assets reuse the preceding visual verification. Full PlayMode, builds and physical-device verification were not rerun for this merge.
+
+
+### #634 latest-main follow-up verification
+
+Main advanced to `6b2706aa` during PR verification (#633 and #639). Integrated it in `b49a35f9`; the only conflict was again this document, and both histories were retained. The 24 original #634 code/asset files remain unchanged. On this final integrated code, full EditMode **2199/2199 PASS** and the two result/game-over PlayMode checks named above **2/2 PASS**, no failures or skips. GitHub reported PR #640 mergeable. Only documentation was manually resolved; pre-existing generated asset whitespace was retained rather than modifying unrelated assets. Full PlayMode and physical-device tests were not rerun.
