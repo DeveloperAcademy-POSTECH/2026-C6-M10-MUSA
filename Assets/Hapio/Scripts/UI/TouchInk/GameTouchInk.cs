@@ -36,6 +36,7 @@ namespace Hapio
     /// <summary>
     /// 전투 화면 밖에서 터치할 때마다 그 자리에 희미한 먹물이 번졌다 사라진다 (#587).
     /// - 전투 Scene(튜토리얼·일시정지 포함)에서는 새로 찍지 않는다.
+    /// - 크레딧 창이 열려 있는 동안에도 화면 어디에도 찍지 않고, 열 때 남아 있던 먹물도 지운다 (#631).
     /// - 터치를 가로채지 않는다: 이 캔버스에는 GraphicRaycaster가 없고 그림은 터치를 받지 않는다. 입력은 장치에서 직접 읽는다.
     /// - 이 기기 화면에만 보이고 네트워크로 보내지 않는다.
     /// - `Tap Sound`를 넣으면 터치할 때 소리가 한 번 난다(지금은 비어 있어 먹물만 나온다). Home 등에는 AudioListener가 일부러 없어서
@@ -108,6 +109,8 @@ namespace Hapio
         {
             float now = Time.unscaledTime;
             if (borrowed != null && (now >= listenUntil || AnotherListener())) ReturnListener();
+            // #631: the mark left by the tap that opened the credits does not linger over the words either.
+            if (GameCreditsView.AnyOpen) while (live.Count > 0) Retire(live.Count - 1);
             for (int i = live.Count - 1; i >= 0; i--)
             {
                 float age = now - live[i].StartedAt;
@@ -123,7 +126,7 @@ namespace Hapio
         /// </summary>
         public void ReadTouches()
         {
-            if (!ShowsOn(SceneManager.GetActiveScene().path)) return;
+            if (!ShowsOn(SceneManager.GetActiveScene().path, GameCreditsView.AnyOpen)) return;
             bool touched = false;
             Touchscreen screen = Touchscreen.current;
             if (screen != null)
@@ -263,6 +266,9 @@ namespace Hapio
 
         /// <summary>Everywhere but the battle screen, which also holds the tutorial and the pause menu.</summary>
         public static bool ShowsOn(string activeScenePath) => activeScenePath != GameScenePaths.Battle;
+
+        /// <summary>#631: and never while a credits window is open, anywhere on the screen (on the card or the dark around it).</summary>
+        public static bool ShowsOn(string activeScenePath, bool creditsOpen) => ShowsOn(activeScenePath) && !creditsOpen;
 
         /// <summary>At its strongest the moment it lands, then fading at once, with no time held.</summary>
         public static float MarkAlpha(float age, float seconds, float strength) =>

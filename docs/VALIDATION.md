@@ -7563,3 +7563,23 @@ main `53b1f7a5`(#619 UI 스트로크·#622 튜토리얼 조합대·#628 지귀 Q
 | PlayMode 새·수정 검사: `GameCloudCoverFlowTests`(3), `GameOpeningControllerTests`(끝까지 보기·건너뛰기·도중에 끄기 3개 추가), `GameTutorialFlowTests.FinishedOpeningOpensThePracticeBoardOnceThenTheRoomList`(구름 아래 기다림·첫 대사 시점 추가), `GameLobbyViewTests`(시작 때 구름이 걷힐 때까지 대기), `GameLoadingSessionTests`(주석만) | NOT_RUN (컴파일만 확인) |
 | 실제 화면 (Editor Play·iPhone): 확대 느낌, 구름 시간, 튜토리얼 첫 화면 | NOT_RUN |
 | 튜토리얼 준비 실패 → 방 목록에서 구름이 걷힘, 15초 제한 | NOT_RUN (검사로 재현하지 못함, 코드 경로만 확인) |
+
+
+## 2026-11-10 — #631 11/10 QA: 건너뛰기 창 가운데 정렬·메뉴 어두운 막 좌우 틈·크레딧 먹물 끄기
+
+기준은 main `0d51e188`(#619 병합 뒤), Unity 6000.6.5f1·macOS Editor다.
+
+- 튜토리얼 건너뛰기 창: 창 가운데를 화면 위 40%에 두던 값(`skipPanelTopFraction` 0.4)을 없애고, 창과 아래 두 버튼을 한 묶음으로 본 가운데를 화면 높이 50%에 둔다(`skipBlockCenterFromTop` 0.5, `GameTutorialDirector.SkipWindowY`). 이전에는 묶음 가운데가 화면 위에서 약 43.4%였다. `TutorialArt.asset`은 Editor API로 저장했고 바뀐 줄은 그 값 하나다.
+- 메뉴 어두운 막: 원인은 402×874 기준 틀을 화면 안에 맞춰 키울 때(`GameLobbyView.FitScreen`) 남는 좌우 띠였다. QA 화면(923×2000)에서는 x=0~1·921~922, Editor의 1284×2778 화면에서는 좌우 약 3px이 덮이지 않았다. 해당 막은 모드 선택 `Dim`, 크레딧 `Dismiss`, `DirectConnectionPanel` 셋이었고 전투 화면에는 이 띠가 없었다. 새 `GameScreenEdgeCover`를 실행 중에 붙여 막이 그리는 모양만 화면 끝까지 늘렸다. 저장 크기·창 자리·누를 수 있는 영역과 Scene·Prefab은 바꾸지 않았다.
+- 모드 선택 창 옆 검은 조각: 바로 뒤의 `CreateRoom`(새 방 만들기 +)이 카드보다 좌우로 조금 넓어(Editor 측정 89..1195 대 카드 92..1189) 둥근 끝이 비쳤다. 카드가 떠 있는 동안 버튼을 숨기고 닫히면 다시 보인다.
+- 크레딧 터치 먹물: 크레딧 창이 열려 있는 동안(`GameCreditsView.AnyOpen`) 화면 어디서도 먹물을 찍지 않고, 창을 열 때 남은 먹물은 지운다. 닫으면 이전처럼 나온다.
+
+| 확인 | 결과 |
+| --- | --- |
+| Unity 컴파일 (본 코드·새 검사 포함) | PASS |
+| Editor eval: 건너뛰기 묶음 가운데 (844pt 화면) | PASS — 창 y=+29, 묶음 가운데 0 |
+| Editor eval: 막 범위 계산·먹물 규칙 | PASS — 좌우 1.5pt 띠까지 넓힘, Home+크레딧 열림=먹물 없음 |
+| 원인 측정 (QA 스크린샷 픽셀·Play 중 실제 화면 크기) | PASS — 위 수치 |
+| 새·수정 검사: EditMode `GameTutorialTests.SkipWindowAndItsTwoButtonsSitTogetherOnTheScreensMiddle`, `GameScreenEdgeCoverTests`(2), `GameTouchInkTests.NeverShowsWhileTheCreditsAreOpen` | NOT_RUN (컴파일만 확인) |
+| 새·수정 검사: PlayMode `GameScreenEdgeCoverFlowTests`, `GameTouchInkFlowTests.NoInkAnywhereWhileTheCreditsAreOpen`, `GameLobbyViewTests.MenuDimsReachTheScreensEdgesAndNothingShowsBesideTheModeCard`, `GameTutorialFlowTests`(건너뛰기 창 가운데 확인 추가) | NOT_RUN (컴파일만 확인) |
+| 실기기 화면 확인 (iPhone) | NOT_RUN |

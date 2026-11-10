@@ -16,6 +16,14 @@ namespace Hapio.Tests
         }
 
         [Test]
+        public void NeverShowsWhileTheCreditsAreOpen()
+        {
+            Assert.That(GameTouchInk.ShowsOn(GameScenePaths.Home, false), Is.True);
+            Assert.That(GameTouchInk.ShowsOn(GameScenePaths.Home, true), Is.False, "Credits open: nowhere on the screen (#631).");
+            Assert.That(GameTouchInk.ShowsOn(GameScenePaths.Battle, false), Is.False, "The battle stays without ink.");
+        }
+
+        [Test]
         public void DrawsOverTheMenusAndUnderTheFadeAndLoadingScreen()
         {
             Assert.That(GameTouchInk.SortingOrder, Is.GreaterThan(5000), "Over the DEV button and the opening.");
