@@ -175,6 +175,7 @@ namespace Hapio
             sceneFade = GameSceneFade.Create(transform, lobbyFadeColor);
             CreateLoadingView();
             GameTouchInk.Create(transform);
+            cloudCover = GameCloudCover.Create(transform);
             network.GameFlowMessage += ReceiveControl;
             network.GameFlowDisconnected += OnPeerDisconnected;
             network.GameFlowDeveloperRestartRequested += OnDeveloperRestart;
