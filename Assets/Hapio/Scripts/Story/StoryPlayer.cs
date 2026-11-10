@@ -46,9 +46,6 @@ namespace Hapio
 
         private StoryCutView currentView;
         private StoryCloudWipe activeCloudWipe;
-        private int coveredNextCut;
-        private float wipeElapsed;
-        private bool swappedUnderClouds;
         private bool shownCardHint;
         private AudioSource musicSource;
         private float musicTarget;
@@ -239,38 +236,31 @@ namespace Hapio
 
         private void StartCloudWipe(int index)
         {
-            activeCloudWipe = Instantiate(currentView.exitCloudWipe, cutHost, false);
-            activeCloudWipe.transform.SetAsLastSibling();
-            coveredNextCut = index;
-            wipeElapsed = 0f;
-            swappedUnderClouds = false;
-            activeCloudWipe.Sample(0);
+            var wipe = Instantiate(currentView.exitCloudWipe, cutHost, false);
+            activeCloudWipe = wipe;
+            if (wipe.BeginManual(() =>
+            {
+                ShowCut(index);
+                if (activeCloudWipe == wipe) wipe.transform.SetAsLastSibling();
+            })) return;
+
+            ClearCloudWipe();
+            ShowCut(index);
         }
 
         private void AdvanceCloudWipe(float seconds)
         {
             var wipe = activeCloudWipe;
-            wipeElapsed += Mathf.Max(0, seconds);
-            if (!swappedUnderClouds && wipeElapsed >= wipe.SwapTime)
+            wipe.Advance(seconds);
+            if (activeCloudWipe != wipe) return;
+
+            // Let the new picture unfold behind the clouds. Text and sounds wait for the overlay.
+            if (wipe.HasCovered)
             {
-                swappedUnderClouds = true;
-                wipe.Sample(wipe.SwapTime);
-                ShowCut(coveredNextCut);
-                if (activeCloudWipe != wipe) return;
-                wipe.transform.SetAsLastSibling();
-                // Keep a closed frame even when a slow frame crosses the entire wipe.
-                wipeElapsed = wipe.SwapTime;
-                return;
-            }
-            wipe.Sample(wipeElapsed);
-            if (swappedUnderClouds)
-            {
-                // Let the new picture unfold behind the receding paper clouds. Text and sounds
-                // remain on hold until the overlay is gone.
-                elapsed = Mathf.Clamp(wipeElapsed - wipe.SwapTime, 0, wipe.Duration - wipe.SwapTime);
+                elapsed = wipe.RevealElapsed;
                 currentView.SampleArtwork(elapsed);
             }
-            if (wipeElapsed >= wipe.Duration) ClearCloudWipe();
+            if (!wipe.IsPlaying) ClearCloudWipe();
         }
 
         private void ClearCloudWipe()
