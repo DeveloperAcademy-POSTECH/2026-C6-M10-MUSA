@@ -425,8 +425,14 @@
 - `Player Paint Patterns`(DEV 인덱스137, `LabConfig.playerPaintPatternsEnabled`)의 코드·저장 기본값은 꺼짐이다. 박 표면의 P번호별 무늬와 플레이어 원 오른쪽 아래·로비 P 자리의 무늬 표시가 함께 꺼진다. 색·면적·P지도·승리 판정은 그대로다. 기능 코드와 DEV 행·인덱스는 남겨 DEV로 다시 켤 수 있다. config가 없을 때도 꺼짐으로 본다. 설정 259개와 접속 묶음은 바꾸지 않았다.
 
 
+## #642 봉인 총평의 실제 도색 기여도
+
+- 스테이지별 봉인 시간은 Host 최종 성공 snapshot의 `playedSeconds`, 총 소요 시간은 성공한1~3판의 원본 전투 시간 합이다. 실패 시도·로딩·후일담은 합산하지 않고 누락 판은 `—`로 표시한다. 총평 전용 `GameSession.SealStageResults`가 스테이지별 누락 자리를 유지하고, `ResultLocalPlayerId`는 완료 후 연결이 끝나도 개인 식별을 보존한다.
+- 내 기여도는 Host의 `LabPlayerState.paintedCellsTotal`(이번 라운드 누적 신규 동일 면적 셀 수) 중 내 비율이다. `LabPaintSurface.PaintFundedCell`의 실제 빈 칸→칠한 칸 변경에서 최종 공급 `Ink.Owner`에게만 한 번 적립한다. 초기·성장·분수 예산을 포함하며 덮어쓰기·미사용 예산·시각 여백은 제외한다. 건조로 차감하지 않고 마른 칸 재칠은 다시 더한다. 기존 공격 점수·땅따먹기 소유 면적·난수/예산/색/P지도·승패는 변경하지 않는다.
+- 통계는 기존 플레이어 snapshot/헤더/승인 경로로 Host가 보내고 Guest는 임의로 집계하지 않는다. 호환 묶음은 **설정259개·5699·`C6PhysicsLab/60`·`C6HapioGame/50`**이며 Game49는 별도 #647이 사용해 건너뛴 값이다. 구현과 검증 범위는 `docs/STAGE_STORY_UI_INTEGRATION.md`·`docs/VALIDATION.md`를 따른다.
+
 ## #647 스테이지 클리어 방장 진행
 
 - 각 스테이지 마지막 컷(`*_After_02`)의 `StoryStageClearControls`에서 방장만 진행 버튼을 누른다. 구미호·야광귀는 방장·구성원 모두 "다음 요괴 잡으러 ..."를 보고, 방장은 "다음 봉인", 구성원은 "방장의 시작을 기다리시오."를 본다. 지귀는 "다음 요괴 잡으러 ..."를 아무에게도 보이지 않고 방장 버튼은 "마치기"다. 프리팹은 `Hapio/Story/Update Stage Clear Host Controls` 도구로만 다시 저장한다. 마지막 컷에서도 완성 박 보기와(마지막 스테이지가 아니면) 나가기는 모두에게 남긴다.
 - 지귀의 "다음 봉인"은 `GameSession.StartSummary`로 결과 제어 패킷의 `summaryStarted`를 켜고, 모든 기기가 봉인 총평(#646)과 엔딩으로 간다. 최종 결과에서 끊긴 구성원의 읽는 중·관람 중 표시는 지운다. 방장이 총평 전에 끊기면 구성원은 `HostLostAfterClear`로 스스로 총평·엔딩으로 넘어간다.
-- 현재 호환 묶음은 설정259개·**5698**·`C6PhysicsLab/59`·**`C6HapioGame/49`**다. Game48 이하 앱과 혼용하지 않는다.
+- 현재 호환 묶음은 설정259개·**5699**·`C6PhysicsLab/60`·**`C6HapioGame/51`**다(#642의 Game50 위). Game50 이하 앱과 혼용하지 않는다.

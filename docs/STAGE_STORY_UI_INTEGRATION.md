@@ -100,18 +100,23 @@ Host NEXT/재도전은 모두 다음 조건을 기다린다.
 ## #642 봉인 총평
 
 - Figma `wW7ny7lNQ4DXNJ4kD46AuR`, 프레임 `4593:1603`의 402×874 배치와 원본 요괴·도장 이미지를 사용한다. `SealRunSummary.prefab`은 `GameEnding.asset`의 첫 컷이며 그 뒤의 6개 엔딩 컷은 유지한다.
-- `GameStageStoryPresentation.BindView`가 현재 실행의 `GameSession.StageResults`와 `Network.LocalPlayerId`를 `SealRunSummary.Bind`에 넘긴다. 기존 `RecordStageResult`가 보관하는 성공 결과만 사용하므로 실패·재도전 대기·후일담 시간은 더하지 않는다.
+- `GameStageStoryPresentation.BindView`가 현재 실행의 `GameSession.SealStageResults`와 `ResultLocalPlayerId`를 `SealRunSummary.Bind`에 넘긴다. 전자는 1·2·3스테이지 자리를 고정하고 누락된 판은 null로 남긴다. DEV 중간 시작/Skip으로 지귀 기록을 구미호 행에 표시하지 않는다. 결과용 로컬 ID는 연결 중 기억하므로 완료 뒤 Host가 먼저 방을 닫아도 같은 사람의 기록을 표시한다. 기존 `StageResults` API와 `RecordStageResult`의 성공 판 보관은 유지한다. 실패·재도전 대기·후일담 시간은 더하지 않는다.
 - 각 행은 성공한 한 판의 `PlayedSeconds`, 총 도장은 세 판 원본 시간을 합산한 뒤 초 미만을 버린 `분:초`다. 60분 이상도 분을 누적 표시한다. 세 성공 기록이 모두 없으면 총합은 `—`이며 이전 경기나 디자인 예시로 채우지 않는다.
-- 내 기여도는 해당 판의 `damageTotal`(Host가 확정한 타격의 누적 공격 점수) 중 로컬 플레이어 몫을 정수 퍼센트로 반올림한 값이다. 최종 칠 소유 면적·명중률과는 별도다. 기록에 없는 플레이어는 `—`, 공격 점수 합계가 0인 참가자는 `0%`다. 반올림 때문에 참가자별 정수 합은 100과 조금 다를 수 있다.
+- 내 기여도는 **Host가 확정한 내 `paintedCellsTotal` ÷ 그 판 모든 참가자의 `paintedCellsTotal` 합 × 100**을 정수로 반올림(정확한 절반은 올림)한 값이다. 판정 표면은 동일 면적 셀이므로 이는 실제 새 도색 면적의 비율이다. 최초 명중과 타격에서 이어진 성장에서 빈 칸이 새로 칠해질 때만, 실제 마지막 성장 공급자(`Ink.Owner`)에게 1셀을 누적한다. 이미 칠한 칸의 덮어쓰기는 추가하지 않고, 아직 쓰이지 않은 성장 예산/시각 여백/렌더 픽셀은 세지 않는다. 건조로 기존 누적값을 빼지 않으며 말라 비워진 칸을 다시 칠하면 새 작업량으로 더한다. 분수 성장량이 모여 한 셀이 될 때도 기존 판정이 선택한 최종 공급자에게만 한 번 귀속한다.
+- `paintedCellsTotal`은 라운드마다 초기화하는 누적 통계다. 최종 잔존 소유 면적, `damageTotal` 공격 점수, 땅따먹기의 `paintedCells`·`stolenCells`와 구분하고 기존 점수/판정은 바꾸지 않는다. 기록에 없는 플레이어는 `—`, 기록은 있으나 전체 새 도색량이 0이면 `0%`다. 반올림 때문에 각 참가자의 정수 합은 100과 조금 다를 수 있다. 모든 기기는 기존 플레이어 snapshot/조합판 헤더·승인 경로로 받은 Host 통계를 사용하고 화면에서 칠을 추측하지 않는다. 같은 세션·라운드의 동일 플레이어에 대해서는 이 누적값만 최대치를 보존해, 같은 시각의 헤더·스냅샷·승인이 다른 순서로 도착해도 기여도가 줄어들지 않게 한다. 새 세션/라운드에서는 초기화하고 다른 HP·스태미나·상태의 기존 병합 규칙은 유지한다.
 - 요청한 평가 문장 10개 중 인스턴스 첫 바인딩 때 하나만 선택하며, 같은 화면의 데이터 갱신으로 바뀌지 않는다. 최신 Figma에 따라 “수고했소.”는 표시하지 않고, 22px/35px 행간의 평가 두 줄을 표시한다. 10개 문장은 사용자가 지정한 위치에 명시적 개행을 넣으며 자동 줄바꿈을 하지 않는다. 도장은 최신 원본(불투명도 100%)과 170.511×156 크기, 시간 숫자 32.911px 및 수정 위치를 따른다.
 - 세 봉인 완료 그림은 0.12/0.50/0.88초에 회전을 시작해 각각 0.68초 동안 감속·정지한다. 총 시간 도장은 1.7초에 착지해 0.3초 동안 눌림을 풀고, 2초 이후 계속 버튼을 표시한다. 총평에서는 배경 탭과 건너뛰기를 숨긴다. 버튼은 `StoryPlayer`의 기존 `StoryCloudWipe` 경로로 다음 엔딩 컷을 완전히 가려진 순간 교체한다.
 - 새 미리보기: `Hapio > Story > Open Seal Run Summary Preview` → Play. 총평과 엔딩만 재생하며, `SealRunSummaryPreview.samplePlayer`를 1/2로 바꾸어 각자의 수치를 확인할 수 있다. 예시 데이터는 이 전용 미리보기 구성에만 있고 실제 결과 연결에는 쓰지 않는다. 게임 Scene·빌드 목록은 변경하지 않는다.
 - `Hapio > Story > Create Seal Run Summary`는 빠진 신규 에셋만 만들고 같은 컷을 중복 삽입하지 않는다. 이미 만든 프리팹의 수작업 편집은 덮어쓰지 않는다.
 - 색상은 Figma 명시값을 따르며 표 제목 `TextColor/DarkRed/900`, 헤더 `5OrbsColor/FireRed/900`, 행 `TextColor/SecondaryLightIvory/800`, 평가 `TextColor/PrimaryBrown/500***` 역할을 사용한다. 기존 한지 배경 재질과 신라문화체를 재사용한다.
 
+### 실제 면적 통계의 통신 호환
+
+누적 면적 통계 필드가 추가돼 접속 묶음은 **설정259개·프로토콜5699·`C6PhysicsLab/60`·`C6HapioGame/50`**이다. Game49는 별도 #647 브랜치가 먼저 사용해 건너뛰었다. 공유 설정 수/인덱스·지도/저널/압축/Bulk 형식·게임 판정은 유지한다. 새 통계가 없는 구형 앱과 섞어 정확한 총평을 표시하지 않도록 기존 접속 버전 검사로 구분한다. 실제 검사·기기 실행 여부는 `VALIDATION.md`에 별도로 기록한다.
+
 
 ### #647 Host-controlled stage clear
 
 `StoryStageClearControls` owns role-specific UI on all three After_02 prefabs. Only the host sees Next Seal; existing readiness, viewer and touch-release gates control interaction. Background taps cannot advance. Gumiho/Yagwanggui guests see the host-wait message. Jigwi guests hide both the next-yokai heading and host-wait message, while host UI remains unchanged.
 
-Host advances everyone to the next game for stages 1/2. After Jigwi, StartSummary broadcasts a sticky summary-start flag for the matching completed run/stage/revision/settings/battle/round. Repeated state broadcasts recover missed messages. Summary/ending reading thereafter remains individual. Game connection token is C6HapioGame/49; older clients cannot mix. StageStoryShowcase.previewAsHost previews the role without network progression.
+Host advances everyone to the next game for stages 1/2. After Jigwi, StartSummary broadcasts a sticky summary-start flag for the matching completed run/stage/revision/settings/battle/round. Repeated state broadcasts recover missed messages. Summary/ending reading thereafter remains individual. Game connection token is C6HapioGame/51 (on top of #642's 50); older clients cannot mix. StageStoryShowcase.previewAsHost previews the role without network progression.

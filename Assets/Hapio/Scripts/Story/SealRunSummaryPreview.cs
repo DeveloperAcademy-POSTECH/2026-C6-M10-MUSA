@@ -18,7 +18,7 @@ namespace Hapio
             summary.Bind(stages, (ulong)samplePlayer);
         }
         private static LabResultStage Stage(double seconds, int mine) => new LabResultStage(new[] {
-            new LabPlayerState {id=1, damageTotal=mine}, new LabPlayerState {id=2, damageTotal=100-mine}
+            new LabPlayerState {id=1, paintedCellsTotal=mine}, new LabPlayerState {id=2, paintedCellsTotal=100-mine}
         }, seconds);
     }
 }

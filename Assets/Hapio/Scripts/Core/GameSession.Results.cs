@@ -14,7 +14,13 @@ namespace Hapio
         /// so this member goes on to the summary and ending by itself instead of waiting on a silent picture.
         /// </summary>
         public bool HostLostAfterClear { get; private set; }
-        public bool SummaryAllowed => SummaryStarted || HostLostAfterClear;
+        /// <summary>
+        /// The summary may open: the Host started it, the Host was lost after the clear, or this device's connection
+        /// ended on the completed result (#642 keeps the local result identity), so nobody is left to press 마치기.
+        /// </summary>
+        public bool SummaryAllowed => SummaryStarted || HostLostAfterClear
+            || state.phase == GameFlowPhase.Completed && !tutorialRun && !IsTerritory && state.stageIndex == state.totalStages
+                && network != null && !network.IsConnected && !goingHome;
         public bool CanStartSummary => network != null && network.IsConnected && !goingHome
             && !tutorialRun && !IsTerritory && state.phase == GameFlowPhase.Completed
             && state.stageIndex == state.totalStages && !SummaryStarted && CanAdvanceStage;

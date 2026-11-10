@@ -148,10 +148,8 @@ namespace Hapio
             clearControls = view.GetComponent<StoryStageClearControls>();
             if (clearControls != null) clearControls.nextSeal.onClick.AddListener(Advance);
             var summary = view.GetComponent<SealRunSummary>();
-            // Rows follow the stage number, so a missing stage leaves its own row empty instead of shifting the rest.
-            if (summary != null) summary.Bind(new[] { session.StageResultFor(1), session.StageResultFor(2), session.StageResultFor(3) },
-                session.Network.LocalPlayerId);
-            StoryCardRecords.Record[] rows = CardRecords(boundResult, session.Network.LocalPlayerId);
+            if (summary != null) summary.Bind(session.SealStageResults, session.ResultLocalPlayerId);
+            StoryCardRecords.Record[] rows = CardRecords(boundResult, session.ResultLocalPlayerId);
             StoryCardRecords[] cards = view.GetComponentsInChildren<StoryCardRecords>(true);
             foreach (var records in cards)
                 records.Bind(boundResult.paintCoverage, (float)boundResult.remaining, rows);
