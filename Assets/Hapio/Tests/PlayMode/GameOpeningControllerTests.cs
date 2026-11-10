@@ -74,6 +74,8 @@ namespace Hapio.Tests
             Assert.That(opening.IsPlaying, Is.True);
             Assert.That(GameOpeningController.HasPlayedThisRun && GameOpeningController.IsPresenting, Is.True);
             Assert.That(opening.player.CurrentCutIndex, Is.Zero);
+            Assert.That(opening.player.progressText == null || !opening.player.progressText.gameObject.activeInHierarchy, Is.True,
+                "The game hides the authoring page counter.");
             Assert.That(opening.player.AutoAdvance, Is.False, "Button entry keeps screen-tap dialogue advance.");
             Assert.That(opening.player.sequence.cuts.Count, Is.EqualTo(25));
             Assert.That(opening.player.sequence.cuts.Sum(cut => cut.PageCount), Is.EqualTo(27));

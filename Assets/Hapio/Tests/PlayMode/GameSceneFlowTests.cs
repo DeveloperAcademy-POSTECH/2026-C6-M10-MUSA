@@ -926,6 +926,9 @@ namespace Hapio.Tests
                 Assert.That(network.IsConnected, Is.False);
                 Assert.That(Object.FindFirstObjectByType<GameLobbyView>(), Is.Not.Null,
                     "Ending returns to the actual saved Home, not a duplicate story title.");
+                yield return null;
+                Assert.That(Object.FindFirstObjectByType<GameLobbyView>().titlePage.activeInHierarchy, Is.True,
+                    "The ending returns to the title screen, not the room list.");
             }
         }
 
@@ -942,6 +945,9 @@ namespace Hapio.Tests
             AssertCurrentCard(story, session.ResultSnapshot);
             int viewChanges = 0;
             story.player.ViewChanged += _ => viewChanges++;
+            Assert.That(story.skipButton.gameObject.activeSelf, Is.False, "The seal card has no SKIP.");
+            yield return AdvancePast(story.player, () => story.player.CurrentView == firstCard);
+            Assert.That(story.skipButton.gameObject.activeSelf, Is.True, "SKIP appears on the after-story pictures.");
             int steps = 0;
             while (story.player.IsPlaying && steps++ < 40)
             {
@@ -1053,21 +1059,25 @@ namespace Hapio.Tests
                 CompleteMapInFixture(Model());
                 yield return WaitResultStory();
                 GameStageStoryPresentation story = ResultStory();
-                yield return Until(() => !story.player.UserInputBlocked && story.skipButton.IsInteractable()
+                yield return Until(() => !story.player.UserInputBlocked
                     && !session.LoadingView.Visible && !session.SceneFade.BlocksInput,
                     "The saved final result must finish its entry shield before genuine UI input.");
                 Assert.That(EventSystem.current.currentInputModule,
                     Is.InstanceOf<UnityEngine.InputSystem.UI.InputSystemUIInputModule>(),
                     "Exercise the saved Input System UI module, not direct UnityEvent callbacks.");
                 Assert.That(story.player.sequence, Is.SameAs(story.afterStages[2]));
+                Assert.That(story.skipButton.gameObject.activeSelf, Is.False, "The seal card has no SKIP.");
+                StoryCutView card = story.player.CurrentView;
+                yield return AdvancePast(story.player, () => story.player.CurrentView == card);
+                yield return Until(() => story.skipButton.gameObject.activeInHierarchy && story.skipButton.IsInteractable()
+                    && story.player.IsReading && !story.player.IsTransitioning && !story.player.UserInputBlocked,
+                    "SKIP appears on the first after-story picture.");
                 StoryCutView skippedView = story.player.CurrentView;
                 yield return ClickVisibleButtonWithMouse(mouse, story.skipButton);
                 yield return Until(() => story.IsLocalStoryComplete,
                     "A real pointer click on the top SKIP must finish Jigwi's after-story.");
-                Assert.That(story.player.CurrentView, Is.SameAs(skippedView), "SKIP does not replay a card.");
-                AssertSkippedCardSettled(story);
+                Assert.That(story.player.CurrentView, Is.SameAs(skippedView), "SKIP keeps the current picture and does not replay a card.");
                 Assert.That(story.player.nextButton.gameObject.activeInHierarchy, Is.False);
-                AssertCurrentCard(story, session.ResultSnapshot);
                 yield return Until(() => story.advanceButton.gameObject.activeInHierarchy && story.advanceButton.IsInteractable(),
                     "The one result action group exposes ending after the story is released.");
                 yield return ClickVisibleButtonWithMouse(mouse, story.advanceButton);
@@ -1347,6 +1357,11 @@ namespace Hapio.Tests
             Assert.That(resultView.BoundResult, Is.SameAs(session.ResultSnapshot));
             Assert.That(resultView.BoundResult.phase, Is.EqualTo(LabPhase.Defeat));
             Assert.That(resultView.player.sequence, Is.SameAs(resultView.failure));
+            Assert.That(resultView.player.CurrentCutIndex, Is.Zero);
+            Assert.That(resultView.skipButton.gameObject.activeSelf, Is.False, "The first failure picture has no SKIP.");
+            // The failure story is one picture and then the dashboard, whose own buttons replace SKIP.
+            yield return AdvancePast(resultView.player, () => resultView.player.CurrentCutIndex == 0);
+            Assert.That(resultView.skipButton.gameObject.activeSelf, Is.False);
             session.NextStage();
             yield return null;
             Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.GameOver));
@@ -1862,6 +1877,16 @@ namespace Hapio.Tests
         private IEnumerator WaitResultStory() => Until(() => !session.IsLoadingScene && ResultStory() != null
             && ResultStory().IsPresenting && ResultStory().BoundResult != null && ResultStory().player.CurrentView != null,
             "The saved result story must bind the matching actual record before interaction.");
+
+        // Picture changes wait for their cloud wipe, so keep asking for the next page until the picture really changes.
+        private static IEnumerator AdvancePast(StoryPlayer player, Func<bool> stillOn)
+        {
+            double deadline = Time.realtimeSinceStartupAsDouble + 15d;
+            while (player.IsPlaying && stillOn() && Time.realtimeSinceStartupAsDouble < deadline)
+            { player.Next(); yield return null; }
+            Assert.That(stillOn() && player.IsPlaying, Is.False, "The story moved on to the next picture.");
+            yield return null;
+        }
 
         private IEnumerator FinishResultStory()
         {
