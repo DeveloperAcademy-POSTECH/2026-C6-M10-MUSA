@@ -61,9 +61,20 @@ namespace Hapio
             return false;
         }
 
-        /// <summary>The pause menu's RESTART, made once from its QUIT RUN button: in QUIT RUN's place, which moves one row down.</summary>
+        /// <summary>Bind the designed restart control, or create the legacy fallback once.</summary>
         private void EnsureRestartButton()
         {
+            var designed = hud.pauseMenu != null ? hud.pauseMenu.GetComponent<GamePauseView>() : null;
+            if (designed != null)
+            {
+                if (restartButton == null)
+                {
+                    restartButton = designed.restartButton;
+                    restartButton.onClick = new Button.ButtonClickedEvent();
+                    restartButton.onClick.AddListener(PressRestart);
+                }
+                return;
+            }
             if (restartButton != null || hud.returnLobbyButton == null || hud.resumeButton == null) return;
             var quit = (RectTransform)hud.returnLobbyButton.transform;
             var resume = (RectTransform)hud.resumeButton.transform;

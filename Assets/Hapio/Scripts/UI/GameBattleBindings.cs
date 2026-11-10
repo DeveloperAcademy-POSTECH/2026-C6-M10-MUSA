@@ -133,7 +133,8 @@ namespace Hapio
             // These original controls belong to Lab's single-scene flow; the new run owns navigation.
             if (hud != null)
             {
-                Route(hud.returnLobbyButton, () => session.ExitRun(), "QUIT RUN");
+                Route(hud.returnLobbyButton, () => session.ExitRun(), hud.pauseMenu != null
+                    && hud.pauseMenu.GetComponent<GamePauseView>() != null ? "나가기" : "QUIT RUN");
                 Route(hud.leaveButton, () => session.ExitRun(), "QUIT RUN");
                 Route(hud.pauseButton, () => session.Pause(), null);
                 Route(hud.resumeButton, () => session.Resume(), null);

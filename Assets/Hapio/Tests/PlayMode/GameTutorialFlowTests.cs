@@ -693,18 +693,17 @@ namespace Hapio.Tests
             buttons.Single(button => button.name == "Log Button").onClick.Invoke();
             Assert.That(first.IsDialogueLogOpen, Is.False, "기록 waits behind the pause menu.");
 
-            // RESTART sits where QUIT RUN was; QUIT RUN moves one row down into the hidden DEV row.
             LabHud hud = Object.FindFirstObjectByType<GameBattleBindings>().hud;
-            var restart = hud.pauseMenu.GetComponentsInChildren<UnityEngine.UI.Button>(true)
-                .Single(button => button.name == "Tutorial Restart Button");
+            var restart = hud.pauseMenu.GetComponent<GamePauseView>().restartButton;
             var resume = (RectTransform)hud.resumeButton.transform;
             var quit = (RectTransform)hud.returnLobbyButton.transform;
             var restartRect = (RectTransform)restart.transform;
             Assert.That(restart.gameObject.activeInHierarchy && restart.interactable, Is.True);
-            Assert.That(restart.GetComponentInChildren<UnityEngine.UI.Text>(true).text, Is.EqualTo(GameTutorialScript.RestartLabel));
+            Assert.That(restart.GetComponentInChildren<UnityEngine.UI.Text>(true).text, Is.EqualTo("재시작"));
             float row = restartRect.anchoredPosition.y - resume.anchoredPosition.y;
             Assert.That(row, Is.LessThan(0f), "Below CONTINUE.");
-            Assert.That(quit.anchoredPosition.y - restartRect.anchoredPosition.y, Is.EqualTo(row).Within(.01f), "QUIT RUN one row lower.");
+            Assert.That(quit.anchoredPosition.y, Is.EqualTo(restartRect.anchoredPosition.y).Within(.01f));
+            Assert.That(quit.anchoredPosition.x, Is.LessThan(restartRect.anchoredPosition.x));
             LogAssert.Expect(LogType.Log, new System.Text.RegularExpressions.Regex("^C6_LAB_TUTORIAL_RESTART step=0 beat=1$"));
             restart.onClick.Invoke();
             restart.onClick.Invoke();

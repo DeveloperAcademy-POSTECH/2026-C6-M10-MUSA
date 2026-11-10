@@ -16,6 +16,7 @@ namespace Hapio
         public RectTransform rows;
         public ScrollRect scroll;
         public GameObject rowTemplate;
+        public float rowHeight = 40f;
         public Color ink = new Color32(63, 61, 56, 255);
         public Color secondaryInk = new Color32(104, 100, 92, 255);
         [Header("2:2 땅따먹기 결과 (#293)")]
@@ -157,7 +158,7 @@ namespace Hapio
                 item.name = "Award_" + i;
                 item.SetActive(true);
                 RectTransform rect = (RectTransform)item.transform;
-                rect.anchoredPosition = new Vector2(0f, -40f * i);
+                rect.anchoredPosition = new Vector2(0f, -rowHeight * i);
                 item.transform.Find("Highlight").gameObject.SetActive(row.Mine);
                 string who = row.Who;
                 SetCell(item, "Title", row.Title, row.Mine);
@@ -166,7 +167,7 @@ namespace Hapio
             }
             for (int i = count; i < instances.Count; i++) instances[i].SetActive(false);
             emptyLabel.gameObject.SetActive(count == 0);
-            rows.sizeDelta = new Vector2(rows.sizeDelta.x, Mathf.Max(200f, count * 40f));
+            rows.sizeDelta = new Vector2(rows.sizeDelta.x, Mathf.Max(rowHeight * 5f, count * rowHeight));
             scroll.vertical = count > 5;
             scroll.verticalNormalizedPosition = 1f;
         }
