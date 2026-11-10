@@ -125,6 +125,16 @@ namespace Hapio
             if (network != null && network.IsConnected) resultLocalPlayerId = network.LocalPlayerId;
         }
         public Texture PreviewTexture => preview != null && !preview.IsDisposed ? preview.Texture : null;
+        /// <summary>The open viewer's zoom (0 far … 1 near, .5 fitted); the floor shadow follows it.</summary>
+        internal float PreviewZoom => preview != null && !preview.IsDisposed ? preview.ZoomNormalized : .5f;
+        internal GameGourdFloorShadow PreviewShadow
+        {
+            get
+            {
+                Transform model = preview?.ModelRoot;
+                return model != null ? model.GetComponent<GameGourdFloorShadow>() : null;
+            }
+        }
         public bool IsViewerOpen { get; private set; }
         public string UiNotice { get; private set; } = string.Empty;
         public bool RoomBrowserVisible => roomBrowserVisible;
@@ -547,7 +557,7 @@ namespace Hapio
             {
                 preview?.Dispose();
                 preview = copy;
-                DontDestroyOnLoad(preview.PreviewCamera.transform.root.gameObject);
+                GameGourdPreviewPresentation.Apply(preview, transform);
                 RememberCapturedResult();
             }
             else if (network.RequiresPaintArt)

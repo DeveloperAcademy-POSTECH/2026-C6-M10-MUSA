@@ -884,6 +884,7 @@ namespace C6Lab
         private static bool TryPointer(out Vector2 screen)
         {
             screen = default;
+            if (LabOrbBoard.ExternalModalOpen) return false;
             var touch = Touchscreen.current?.primaryTouch;
             if (touch != null && touch.press.isPressed) { screen = touch.position.ReadValue(); return true; }
             if (Mouse.current != null && Mouse.current.leftButton.isPressed) { screen = Mouse.current.position.ReadValue(); return true; }
