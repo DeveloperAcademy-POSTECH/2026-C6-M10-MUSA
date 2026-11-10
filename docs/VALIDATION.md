@@ -7554,6 +7554,18 @@ PlayMode의 기존 main 실패17건은 표시용 최소 구슬 크기와 구형 
 - 전체 PlayMode 전수는 위 `e1e8d3e2` 통합 상태에서 수행했다. #620 추가 후에는 영향 묶음을 선별 재검사했으며 다시 전수 실행한 것으로 기록하지 않는다. Release·standalone·iOS·실제 다중 기기 네트워크 검증의 미실행 범위는 위와 같다.
 
 
+## 2026-11-10 #650 야광귀 방해 해제 PNG
+
+- 첨부 312×312 RGBA PNG를 무압축 Single Sprite로 가져오고, 해제 시 기존 배경·문구 대신 전체 이미지를 표시한다. 표시 시간·해제 판정·본인 화면 조건은 유지한다.
+- Unity 컴파일 후 Console error 0. `LabYaguangFlashLookTests` PlayMode 5/5 통과(기존 섬광 표현 회귀 검사).
+- PNG 전용 표시 뒤 공용 텍스트/눈 말풍선 복원은 Editor 객체 검사로 별도 확인한다. 실기기 표시 크기·시각 검수는 미실행.
+
+
+### #650 피격 말풍선 PNG 추가
+
+- 첨부 312×312 RGBA 이미지를 `Sabotage/YaguangTauntBubble` Single Sprite(무압축)로 추가했다. 섬광 피격 시 텍스트 대신 PNG만 2초 표시하며 기존 해제 PNG와 공용 알림을 구분한다. 두 PNG 모두 렌더 준비에 포함한다.
+- Editor 객체 검사: 피격 PNG 선택·Text 숨김·해제 PNG 전환·기존 텍스트 말풍선 복원 통과. 변경 스크립트 컴파일 및 `git diff --check` 통과.
+- 이번 PlayMode 검사 시도는 Editor가 재생 중이어서 시작되지 않았다(0개 실행). Console에 Unity Transport `ResetStatics` 컬렉션 변경 예외 1건이 있어 오류 0건으로 기록하지 않는다. 실기기 시각 검수 미실행.
 ### #621 튜토리얼 조합대 뒤 사각 배경 제거 — 2026-11-10
 
 - `fix/#621-tutorial-combination-board-box`에서 튜토리얼 진입 후 조합대 위쪽에 사각형 한지 경계가 나타나는 현상을 재현했다. 튜토리얼은 일반 전투의 투명 배경 합성 경로를 사용하지 않아, 하단 입력 카메라의 별도 한지 패스가 계속 화면에 그려지고 있었다.
@@ -7700,3 +7712,9 @@ The manual conflict resolution only combines documentation. Selected PlayMode ch
 ### #634 latest-main follow-up verification
 
 Main advanced to `6b2706aa` during PR verification (#633 and #639). Integrated it in `b49a35f9`; the only conflict was again this document, and both histories were retained. The 24 original #634 code/asset files remain unchanged. On this final integrated code, full EditMode **2199/2199 PASS** and the two result/game-over PlayMode checks named above **2/2 PASS**, no failures or skips. GitHub reported PR #640 mergeable. Only documentation was manually resolved; pre-existing generated asset whitespace was retained rather than modifying unrelated assets. Full PlayMode and physical-device tests were not rerun.
+
+
+### #650 최신 main 충돌 해결 — 2026-11-10
+
+- origin/main 병합 중 이 문서의 추가 기록 충돌 한 곳을 양쪽 내용 보존으로 해결했다. LabBattleRenderWarmup은 main의 오색 준비와 #650 두 PNG 준비가 모두 유지되는 것을 확인했다. 충돌 마커·미해결 인덱스 없음, 해결한 문서와 병합된 준비 코드의 diff 공백 검사 통과. main에서 가져온 다른 Unity meta의 기존 공백은 변경하지 않았다.
+- 영향 경로인 LabYaguangFlashLookTests·GameBattleRenderWarmupTests PlayMode 실행을 시도했다. 첫 시도는 Editor 재생 중이라 시작 불가, 재생 종료 후 재시도는 초기화 시간 초과로 0개 실행됐다. 전체 EditMode·실기기·화면 확인은 이번 병합에서 미실행이며 과거 검사 결과를 병합본 통과로 재사용하지 않는다.
