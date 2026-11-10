@@ -55,7 +55,7 @@ namespace Hapio.Editor
                 view.connectionLines.color = Color.white;
                 SetSeats(view.seats3, 27, 385, new Vector2(144, 198.5f), new Vector2(54, 49), new Vector2(232, 49));
                 SetSeats(view.seats4, 27, 385, new Vector2(143, 196), new Vector2(49, 110), new Vector2(143, 24), new Vector2(235, 110));
-                SetSeats(view.seats5, 27, 385, new Vector2(144, 196), new Vector2(58, 130), new Vector2(83, 30), new Vector2(227, 130), new Vector2(207, 30));
+                SetSeats(view.seats5, 27, 385, new Vector2(144, 192), new Vector2(58, 125), new Vector2(83, 30), new Vector2(207, 30), new Vector2(229, 125));
                 LineAnchor(view.lineLayouts[0], 90.108f, 455.856f, "5089e", 180);
                 LineAnchor(view.lineLayouts[1], 87.88f, 428.071f, "3c326", 0);
                 LineAnchor(view.lineLayouts[2], 108.266f, 438.187f, "79dac", 180);

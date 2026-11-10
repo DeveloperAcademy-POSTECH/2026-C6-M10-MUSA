@@ -313,6 +313,37 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
+        public IEnumerator ASmallComboThrowIsDrawnAtTheMinimumButStillHitsAtItsOwnSize()
+        {
+            LabConfig config = ScriptableObject.CreateInstance<LabConfig>();
+            LabTarget target = LabTarget.CreateCylinder(null, new Vector3(0f, 1f, 0f), .8f, 2f);
+            LabProjectile tiny = LabProjectile.Create(new Vector3(0f, 1f, 3f), config);
+            LabProjectile half = LabProjectile.Create(new Vector3(3f, 1f, 3f), config, null, LabOrbElement.Fire, .5f);
+            try
+            {
+                Assert.That(config.ThrownOrbMinVisibleScale, Is.EqualTo(.4f));
+                tiny.SetRadiusScale(.1f); // the combo SMALL penalty (#222)
+                Assert.That(tiny.Launch("tiny", 1UL, new Vector3(0f, 0f, -12f), config, target, _ => { }), Is.True);
+                Assert.That(tiny.GetComponent<SphereCollider>().radius, Is.EqualTo(.1f * config.ThrowRadius).Within(1e-5f),
+                    "It still hits and paints at a tenth.");
+                Assert.That(tiny.VisualMount.Find("Default Sphere").localScale.x,
+                    Is.EqualTo(2f * .4f * config.ThrowRadius).Within(1e-4f), "Drawn at the minimum so the thrower sees it (#607).");
+                Assert.That(tiny.FlightDiameter, Is.EqualTo(2f * .4f * config.ThrowRadius).Within(1e-4f),
+                    "The clay orb the real game flies is drawn at the minimum too.");
+                Assert.That(half.VisualMount.Find("Default Sphere").localScale.x,
+                    Is.EqualTo(config.ThrowRadius).Within(1e-4f), "Above the minimum it is drawn exactly as before.");
+                yield return null;
+            }
+            finally
+            {
+                if (tiny != null) Object.Destroy(tiny.gameObject);
+                if (half != null) Object.Destroy(half.gameObject);
+                Object.Destroy(target.gameObject);
+                Object.Destroy(config);
+            }
+        }
+
+        [UnityTest]
         public IEnumerator HostProjectileReportsOnePhysicalHit()
         {
             LabConfig config = ScriptableObject.CreateInstance<LabConfig>();

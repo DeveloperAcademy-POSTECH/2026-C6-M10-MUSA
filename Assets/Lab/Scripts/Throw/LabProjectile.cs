@@ -147,6 +147,9 @@ namespace C6Lab
         // 폭발로 작아진 구슬(#213)의 sizeScale과 콤보 페널티/보상(#222)의 radiusScale을 함께 곱한다.
         private float ScaledRadius => (config != null ? config.ThrowRadius : .165f)
             * (jigwiABRadiusScale < 1f ? Mathf.Min(sizeScale * radiusScale, jigwiABRadiusScale) : sizeScale * radiusScale);
+        // #607: 보이는 크기는 맞는 크기(ScaledRadius)와 같지만 설정한 최소 크기보다 작게 그리지 않는다. 판정·칠 면적은 그대로다.
+        private float DrawnRadius => Mathf.Max(ScaledRadius,
+            (config != null ? config.ThrowRadius : .165f) * (config != null ? config.ThrownOrbMinVisibleScale : 0f));
         public Vector3 InitialVelocity => initialVelocity;
         public Transform VisualMount => visualMount;
         public TrailRenderer FlightTrail => flightTrail;
@@ -174,14 +177,14 @@ namespace C6Lab
         public void SetRadiusScale(float scale)
         {
             radiusScale = float.IsNaN(scale) || float.IsInfinity(scale) ? 1f : Mathf.Clamp(scale, .01f, 3f);
-            EnsureDefaultVisual(ScaledRadius);
+            EnsureDefaultVisual(DrawnRadius);
         }
 
         /// <summary>Independent B shrink, captured before launch; never changes paint share or launch velocity.</summary>
         public void SetJigwiABRadiusScale(float scale)
         {
             jigwiABRadiusScale = float.IsNaN(scale) || float.IsInfinity(scale) || scale <= 0f ? 1f : Mathf.Clamp(scale, .2f, 1f);
-            EnsureDefaultVisual(ScaledRadius);
+            EnsureDefaultVisual(DrawnRadius);
         }
 
         /// <summary>Sets shared presentation; this projectile's root collider is unchanged.</summary>
@@ -189,7 +192,7 @@ namespace C6Lab
         {
             if (appearance == value)
             {
-                EnsureDefaultVisual(ScaledRadius);
+                EnsureDefaultVisual(DrawnRadius);
                 return;
             }
             appearance = value;
@@ -221,7 +224,7 @@ namespace C6Lab
 
         private void SetVisualPrefabInternal(GameObject prefab)
         {
-            float radius = ScaledRadius;
+            float radius = DrawnRadius;
             EnsureDefaultVisual(radius);
             // A destroyed source prefab compares equal to null in Unity. Do not skip
             // removing an instantiated visual when callers clear that source.
@@ -273,8 +276,8 @@ namespace C6Lab
             projectile.useClayFlight = useClayFlight;
             projectile.sizeScale = sizeScale > 0f && sizeScale <= 1f ? sizeScale : 1f;
             projectile.ConfigureAppearance(config.OrbAppearance);
-            projectile.EnsureDefaultVisual(projectile.ScaledRadius);
-            if (!projectile.WantsClayFlight) projectile.EnsureFlightTrail(projectile.ScaledRadius);
+            projectile.EnsureDefaultVisual(projectile.DrawnRadius);
+            if (!projectile.WantsClayFlight) projectile.EnsureFlightTrail(projectile.DrawnRadius);
             return projectile;
         }
 
@@ -320,7 +323,7 @@ namespace C6Lab
         {
             if (authoritative || resolved || approvedElement < LabOrbElement.None || approvedElement > LabOrbElement.Earth) return;
             bool changed = element != approvedElement;
-            float previousRadius = ScaledRadius;
+            float previousRadius = DrawnRadius;
             element = approvedElement;
             sizeScale = approvedSize > 0f && approvedSize <= 1f ? approvedSize : 1f;
             SetRadiusScale(approvedRadius > 0f ? approvedRadius : 1f);
@@ -328,12 +331,12 @@ namespace C6Lab
             // Only this cosmetic prediction is reconciled. The authoritative launch guard above
             // keeps the approved Host body's trajectory/radius frozen; never rewind position or velocity.
             if (sphere != null) sphere.radius = ScaledRadius;
-            EnsureDefaultVisual(ScaledRadius);
-            if (useClayFlight && launched && (changed || !Mathf.Approximately(previousRadius, ScaledRadius)))
+            EnsureDefaultVisual(DrawnRadius);
+            if (useClayFlight && launched && (changed || !Mathf.Approximately(previousRadius, DrawnRadius)))
                 StartFlightPresentation(body.linearVelocity);
             else if (!clayFlight.IsActive)
             {
-                EnsureFlightTrail(ScaledRadius);
+                EnsureFlightTrail(DrawnRadius);
                 LabElementTrailProfile trailProfile = ScaledTrailProfile();
                 if (elementFlightTrail != null && appearance != null && (changed || elementFlightTrail.Profile != trailProfile))
                     elementFlightTrail.Begin(transform, trailProfile);
@@ -366,8 +369,8 @@ namespace C6Lab
             sphere.enabled = false;
             puppet = true;
             ConfigureAppearance(tuning.OrbAppearance);
-            EnsureDefaultVisual(ScaledRadius);
-            EnsureFlightTrail(ScaledRadius);
+            EnsureDefaultVisual(DrawnRadius);
+            EnsureFlightTrail(DrawnRadius);
             if (elementFlightTrail != null) elementFlightTrail.Begin(transform, ScaledTrailProfile());
             if (flightTrail != null) { flightTrail.Clear(); flightTrail.emitting = true; }
             jigwiABReward = jigwiReward;
@@ -417,7 +420,7 @@ namespace C6Lab
             peakHeight = body.position.y;
             launchedAt = Time.time;
             launched = true;
-            EnsureDefaultVisual(ScaledRadius);
+            EnsureDefaultVisual(DrawnRadius);
             StartFlightPresentation(initialVelocity);
             ConfigureJigwiWaterFlightPath();
             ConfigureJigwiRewardFireTrail();
@@ -431,7 +434,7 @@ namespace C6Lab
             if (WantsClayFlight)
             {
                 var pool = LabFiveElementVfx.ForScene(gameObject.scene);
-                if (pool != null) clayFlight = pool.BeginFlight(element, transform.position, velocity, WorldRadius * 2f);
+                if (pool != null) clayFlight = pool.BeginFlight(element, transform.position, velocity, FlightDiameter);
             }
             visualMount.gameObject.SetActive(!clayFlight.IsActive);
             if (clayFlight.IsActive)
@@ -440,7 +443,7 @@ namespace C6Lab
                 if (flightTrail != null) { flightTrail.emitting = false; flightTrail.Clear(); }
                 return;
             }
-            EnsureFlightTrail(ScaledRadius);
+            EnsureFlightTrail(DrawnRadius);
             if (elementFlightTrail != null)
                 elementFlightTrail.Begin(transform, ScaledTrailProfile());
             if (flightTrail != null)
@@ -654,6 +657,19 @@ namespace C6Lab
             }
         }
 
+        /// <summary>
+        /// How big the clay orb is drawn in flight (#607): the drawn radius in world size, so a SMALL throw (0.1) still shows
+        /// at the minimum. Contact and the impact mark keep <see cref="WorldRadius"/>, the hit sphere's size.
+        /// </summary>
+        public float FlightDiameter
+        {
+            get
+            {
+                Vector3 scale = transform.lossyScale;
+                return 2f * DrawnRadius * Mathf.Max(Mathf.Abs(scale.x), Mathf.Abs(scale.y), Mathf.Abs(scale.z));
+            }
+        }
+
         private void RememberSurfacePoses()
         {
             previousTargetPose = new SurfacePose(target != null ? target.Hitbox : null);
@@ -789,15 +805,15 @@ namespace C6Lab
             if ((!launched && !puppet) || resolved) return;
             if (jigwiRewardFireTrail != null)
             {
-                if (jigwiRewardFireTrail.IsEmitting) jigwiRewardFireTrail.Reconfigure(ScaledRadius);
-                else jigwiRewardFireTrail.Begin(transform, ScaledRadius, jigwiRewardFireTrail.Profile);
+                if (jigwiRewardFireTrail.IsEmitting) jigwiRewardFireTrail.Reconfigure(DrawnRadius);
+                else jigwiRewardFireTrail.Begin(transform, DrawnRadius, jigwiRewardFireTrail.Profile);
                 return;
             }
             var child = new GameObject("Jigwi B Reward Fire");
             child.transform.SetParent(transform, false);
             child.layer = gameObject.layer;
             jigwiRewardFireTrail = child.AddComponent<LabJigwiRewardFireTrail>();
-            jigwiRewardFireTrail.Begin(transform, ScaledRadius);
+            jigwiRewardFireTrail.Begin(transform, DrawnRadius);
         }
 
         private void ConfigureJigwiWaterFlightPath()
@@ -824,7 +840,7 @@ namespace C6Lab
                 appearance != null ? appearance.ElementTrailFor(LabOrbElement.Water) : null);
         }
 
-        // 콤보 SMALL/BIG(#222)·폭발 축소(#213)로 공이 작아지거나 커지면 3D 꼬리도 같은 배율로 줄이고 늘린다.
+        // 콤보 SMALL/BIG(#222)·폭발 축소(#213)로 공이 작아지거나 커지면 3D 꼬리도 보이는 공 크기(#607)에 맞춰 줄이고 늘린다.
         // 줄인 꼬리 설정은 배율(0.05 단위)마다 한 번만 만들어 함께 쓴다. 공이 사라진 뒤 남아 흐려지는 꼬리도 이 설정을 쓰므로 지우지 않는다.
         private static readonly System.Collections.Generic.Dictionary<(LabElementTrailProfile, int), LabElementTrailProfile>
             scaledTrailProfiles = new System.Collections.Generic.Dictionary<(LabElementTrailProfile, int), LabElementTrailProfile>();
@@ -833,7 +849,7 @@ namespace C6Lab
         private LabElementTrailProfile ScaledTrailProfile()
         {
             LabElementTrailProfile profile = appearance != null ? appearance.ElementTrailFor(element) : null;
-            float scale = jigwiABRadiusScale < 1f ? Mathf.Min(sizeScale * radiusScale, jigwiABRadiusScale) : sizeScale * radiusScale;
+            float scale = DrawnRadius / (config != null ? config.ThrowRadius : .165f);
             return ScaledTrailProfile(profile, scale);
         }
 

@@ -62,8 +62,6 @@ namespace Hapio
 #endif
         private string wantedScene;
         private bool forceBattleReload, goingHome, battleReadyPending, localBattleReady;
-        // #478: a forced Battle reload that keeps the stage is a restart (loading screen); one into the next stage is not.
-        private bool reloadKeepsStage;
         private bool restartPending;
         private double loadStartedAt, nextStateAt, nextReadyAt, nextResultReadyAt;
         private LabGourdResultPreview preview;
@@ -408,7 +406,6 @@ namespace Hapio
                 loadStartedAt = Time.realtimeSinceStartupAsDouble;
                 localBattleReady = battleReadyPending = false;
                 forceBattleReload = SceneManager.GetActiveScene().path == GameScenePaths.Battle;
-                reloadKeepsStage = previous.stageIndex == state.stageIndex;
             }
             if (IsResultPresentationPhase) CacheResultSnapshot();
             if (state.phase == GameFlowPhase.GameOver) network.FreezeGameBattle();
@@ -451,8 +448,7 @@ namespace Hapio
             if (quitting) { sceneRoutine = null; yield break; }
             // #478: outside a run every scene change is covered by the loading screen (drawn above the fade below),
             // except the opening's hand-over to the tutorial, which gets its own transition later.
-            if (ShowsLoading(SceneManager.GetActiveScene().path, wantedScene, TutorialStarting(wantedScene),
-                forceBattleReload && !reloadKeepsStage))
+            if (ShowsLoading(SceneManager.GetActiveScene().path, wantedScene, TutorialStarting(wantedScene)))
                 BeginLoading(wantedScene);
             if (holdForFade) yield return FadeOutOfScene();
             while (SceneManager.GetActiveScene().path != wantedScene || forceBattleReload)
@@ -813,6 +809,16 @@ namespace Hapio
 
         public void Pause() => network.PauseBattle();
         public void Resume() => network.ResumeBattle();
+        public bool CanRestartPausedBattle => network != null && network.IsHost && network.IsBattlePaused
+            && state.phase == GameFlowPhase.Playing && !IsLoadingScene && !goingHome && !restartPending;
+
+        public bool RestartPausedBattle()
+        {
+            if (!CanRestartPausedBattle) return false;
+            if (tutorialRun) return RestartTutorial();
+            restartPending = true;
+            return true;
+        }
         public void OpenGourdViewer() { IsViewerOpen = PreviewTexture != null; NotifyResultViewer(); Changed?.Invoke(); }
         public void CloseGourdViewer() { IsViewerOpen = false; NotifyResultViewer(); Changed?.Invoke(); }
         public void RotatePreview(Vector2 delta) { preview?.Rotate(delta); }
