@@ -19,6 +19,7 @@
 | 합이오 컬러 토큰·전체 팔레트·불투명도 | [컬러 시스템](COLOR_SYSTEM.md) |
 | 스테이지별 배경·PNG 교체·미리보기 | [스테이지 배경 편집](STAGE_BACKGROUNDS.md) |
 | 오프닝 순서·진입 정책·터치 진행 | [앱 시작 오프닝](APP_START_OPENING.md) |
+| 오프닝 → 튜토리얼 확대·한지 구름 전환 | [앱 시작 오프닝](APP_START_OPENING.md#오프닝--튜토리얼-구름-전환-635) |
 | 오프닝 그림·대사·제작용 미리보기 편집 | [팝업북 스토리 제작](POPUP_STORY_WORKFLOW.md) |
 | 스테이지 사이·뒤집는 봉인 카드·실패 게이지·엔딩 제작 | [스토리 화면 제작](STAGE_STORY_PRESENTATION.md) |
 | 실제 경기 스토리·같은 방 실패 재도전·결과 준비/전송 복구 | [스토리 결과 통합](STAGE_STORY_UI_INTEGRATION.md) |

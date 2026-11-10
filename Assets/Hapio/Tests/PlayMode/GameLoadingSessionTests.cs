@@ -14,7 +14,7 @@ namespace Hapio.Tests
     /// <summary>
     /// 로딩 화면 (#478) 2단계: GameSession이 공용 로딩 화면을 띄우는 순간. 튜토리얼 → 방 목록 같은 화면 전환에는 뜨고(아무리 짧아도
     /// 1초, 100%까지 찬 뒤 닫힘), 앱을 켜서 첫 화면이 뜰 때와 오프닝 → 튜토리얼에는 뜨지 않는다(사용자 결정). 오프닝 → 튜토리얼은
-    /// 따로 만들 때까지 예전 "튜토리얼 준비 중" 가림막이 덮는다.
+    /// 한지 구름(#635, GameTutorialFlowTests)이 덮고, 오프닝 없이 바로 연 튜토리얼만 예전 "튜토리얼 준비 중" 가림막이 덮는다.
     /// </summary>
     public sealed class GameLoadingSessionTests
     {
@@ -77,8 +77,8 @@ namespace Hapio.Tests
             session.Network.port = AvailablePort();
             yield return null;
 
-            // The opening's hand-over to the practice board gets its own transition later: no loading screen, only the old
-            // "튜토리얼 준비 중" cover for now.
+            // Opened straight away, with no opening and so no clouds (#635): no loading screen, only the old
+            // "튜토리얼 준비 중" cover.
             Assert.That(session.TryStartTutorial(), Is.True);
             bool shown = false, oldCover = false, coverText = false;
             GameTutorialDirector director = null;
@@ -95,7 +95,7 @@ namespace Hapio.Tests
             }
             Assert.That(director != null && director.IsShowingLine, Is.True, "The first line comes");
             Assert.That(shown, Is.False, "No loading screen between the opening and the tutorial.");
-            Assert.That(oldCover && coverText, Is.True, "The old \"튜토리얼 준비 중\" cover covers it for now.");
+            Assert.That(oldCover && coverText, Is.True, "The old \"튜토리얼 준비 중\" cover covers it.");
             Assert.That(session.StartOverlay.Visible, Is.False, "And it is gone once the first line is up.");
 
             // Leaving for the room list goes behind it, for at least a second, filled to 100%.

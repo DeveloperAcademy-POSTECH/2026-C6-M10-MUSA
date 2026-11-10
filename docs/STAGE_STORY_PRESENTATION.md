@@ -86,6 +86,8 @@ private void OnDisable()
 
 재생 중 GraphicRaycaster 입력은 오버레이가 차단한다. 키보드·직접 호출 등 별도 입력 경로는 `IsPlaying`으로 막는다. 이 컴포넌트는 로컬 화면 교체용이며, 비동기 Scene 로드 완료 대기나 네트워크 동기화는 호출 측에서 처리해야 한다. Inspector의 Close Seconds / Covered Seconds / Open Seconds로 시간을 조절할 수 있고, 공통 프리팹 저장값은 0.62 / 0.10 / 0.80초다.
 
+오프닝 → 튜토리얼(#635)은 이 공용 프리팹을 `GameCloudCover`로 감싸 장면 전환을 넘어 쓴다. 다 덮인 뒤 튜토리얼 전투 장면이 준비될 때까지 덮인 채 기다렸다가 걷히므로, 이 프리팹의 시간 값을 바꾸면 그 전환도 함께 바뀐다([앱 시작 오프닝](APP_START_OPENING.md#오프닝--튜토리얼-구름-전환-635)).
+
 기존 StoryCutView에는 `Exit Cloud Wipe`만 연결하면 된다. StoryPlayer가 수동 시간 진행을 담당하므로 별도로 TryPlay를 중복 호출하지 않는다. 엔딩 마지막 암전·문구·타이틀 페이드는 기존 전용 레이어 타이밍을 유지한다.
 
 ## 봉인 실패와 도달 봉인율

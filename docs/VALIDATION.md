@@ -7545,6 +7545,46 @@ main `53b1f7a5`(#619 UI 스트로크·#622 튜토리얼 조합대·#628 지귀 Q
 **Unity 컴파일·EditMode·PlayMode·빌드·실기기는 이번 작업에서 실행하지 않았다.** 문서만 바뀌어 새 정책의 문서 검사 범위를 적용했다. 보고서의 2,180/775건·35.62/743.08초는 #627 통합본 `dc602dea`의 기존 실제 실행 기록이며 #637의 새 검사 통과 건수가 아니다.
 
 
+## 2026-11-10 — #635 오프닝 → 튜토리얼 확대·한지 구름 전환, 마지막 장면 흰 선 제거
+
+기준은 main `53b1f7a5`(#632 공용 구름 병합 뒤), Unity 6000.6.5f1·macOS Editor다. 커밋은 단계별로 나눴다: 흰 선 → 구름 덮개 → 오프닝 끝 확대·덮기 → 튜토리얼 쪽 기다림 → 문서.
+
+- 흰 선 원인: OP_024 배경 `72eb0.png`(471×1024)의 맨 오른쪽 한 줄 알파가 50%(0x7F)였고, QA 화면에서 그림 왼쪽 1px·오른쪽 2px이 밝았다(스크린샷 픽셀 측정). 장면(`Page 402x874`)에는 RectMask2D가 있다. 배경 크기만 같은 비율·같은 가운데로 2pt씩 키워 x −2.003 ~ 404.003, 마지막 줄 시작 403.141(장면 402 밖)으로 보냈다. 프리팹은 Editor API로 저장했고, 저장 때 기존 기본값 항목(`softFadeIn: 0` 등)이 함께 기록됐다(동작 변화 없음).
+- 확대 지점: 사용자가 준 확대 영역 그림을 마지막 장면 스크린샷에서 찾아(배율 1.00, 평균 오차 0.005) 장면 가로 53.3%·세로 25.4%로 정했다.
+- 구름 덮개 `GameCloudCover`는 `GameSession` 아래에서 실행 중에 만든다(정렬 30120). Scene·Home·#630 공용 구름 코드는 바꾸지 않았고, 같은 어셈블리의 수동 진행(`BeginManual`·`Advance`)으로 "덮은 채 기다리기"를 구현했다. 새 설정 에셋 `CloudCoverArt.asset`·`OpeningTransitionArt.asset`은 Editor API로 만들었다.
+
+| 확인 | 결과 |
+| --- | --- |
+| Unity 컴파일 (단계 1~4 각각, 마지막은 4단계 커밋 뒤 Play 종료 후) | PASS |
+| Editor eval: OP_024 배경 범위·비율·마지막 줄 위치 | PASS — 위 수치, 비율 0.45996 유지 |
+| Editor eval: 구름 프리팹 연결·시간 | PASS — 덮기 0.62초, 전체 1.52초(0.62 + 0.10 + 0.80) |
+| Editor eval: 확대 곡선·끝 위치 | PASS — 30% 시간에 0.657, 90% 시간에 0.999, 끝에서 골짜기가 화면 가운데(0, 0) |
+| EditMode 새 검사: `StoryWorkspaceTests.LastCutBackgroundReachesPastThePageSoNoPaperLineShows`, `GameCloudCoverTests`(2), `GameOpeningTransitionTests`(3) | NOT_RUN (컴파일만 확인) |
+| PlayMode 새·수정 검사: `GameCloudCoverFlowTests`(3), `GameOpeningControllerTests`(끝까지 보기·건너뛰기·도중에 끄기 3개 추가), `GameTutorialFlowTests.FinishedOpeningOpensThePracticeBoardOnceThenTheRoomList`(구름 아래 기다림·첫 대사 시점 추가), `GameLobbyViewTests`(시작 때 구름이 걷힐 때까지 대기), `GameLoadingSessionTests`(주석만) | NOT_RUN (컴파일만 확인) |
+| 실제 화면 (Editor Play·iPhone): 확대 느낌, 구름 시간, 튜토리얼 첫 화면 | NOT_RUN |
+| 튜토리얼 준비 실패 → 방 목록에서 구름이 걷힘, 15초 제한 | NOT_RUN (검사로 재현하지 못함, 코드 경로만 확인) |
+
+
+## 2026-11-10 — #631 11/10 QA: 건너뛰기 창 가운데 정렬·메뉴 어두운 막 좌우 틈·크레딧 먹물 끄기
+
+기준은 main `0d51e188`(#619 병합 뒤), Unity 6000.6.5f1·macOS Editor다.
+
+- 튜토리얼 건너뛰기 창: 창 가운데를 화면 위 40%에 두던 값(`skipPanelTopFraction` 0.4)을 없애고, 창과 아래 두 버튼을 한 묶음으로 본 가운데를 화면 높이 50%에 둔다(`skipBlockCenterFromTop` 0.5, `GameTutorialDirector.SkipWindowY`). 이전에는 묶음 가운데가 화면 위에서 약 43.4%였다. `TutorialArt.asset`은 Editor API로 저장했고 바뀐 줄은 그 값 하나다.
+- 메뉴 어두운 막: 원인은 402×874 기준 틀을 화면 안에 맞춰 키울 때(`GameLobbyView.FitScreen`) 남는 좌우 띠였다. QA 화면(923×2000)에서는 x=0~1·921~922, Editor의 1284×2778 화면에서는 좌우 약 3px이 덮이지 않았다. 해당 막은 모드 선택 `Dim`, 크레딧 `Dismiss`, `DirectConnectionPanel` 셋이었고 전투 화면에는 이 띠가 없었다. 새 `GameScreenEdgeCover`를 실행 중에 붙여 막이 그리는 모양만 화면 끝까지 늘렸다. 저장 크기·창 자리·누를 수 있는 영역과 Scene·Prefab은 바꾸지 않았다.
+- 모드 선택 창 옆 검은 조각: 바로 뒤의 `CreateRoom`(새 방 만들기 +)이 카드보다 좌우로 조금 넓어(Editor 측정 89..1195 대 카드 92..1189) 둥근 끝이 비쳤다. 카드가 떠 있는 동안 버튼을 숨기고 닫히면 다시 보인다.
+- 크레딧 터치 먹물: 크레딧 창이 열려 있는 동안(`GameCreditsView.AnyOpen`) 화면 어디서도 먹물을 찍지 않고, 창을 열 때 남은 먹물은 지운다. 닫으면 이전처럼 나온다.
+
+| 확인 | 결과 |
+| --- | --- |
+| Unity 컴파일 (본 코드·새 검사 포함) | PASS |
+| Editor eval: 건너뛰기 묶음 가운데 (844pt 화면) | PASS — 창 y=+29, 묶음 가운데 0 |
+| Editor eval: 막 범위 계산·먹물 규칙 | PASS — 좌우 1.5pt 띠까지 넓힘, Home+크레딧 열림=먹물 없음 |
+| 원인 측정 (QA 스크린샷 픽셀·Play 중 실제 화면 크기) | PASS — 위 수치 |
+| 새·수정 검사: EditMode `GameTutorialTests.SkipWindowAndItsTwoButtonsSitTogetherOnTheScreensMiddle`, `GameScreenEdgeCoverTests`(2), `GameTouchInkTests.NeverShowsWhileTheCreditsAreOpen` | NOT_RUN (컴파일만 확인) |
+| 새·수정 검사: PlayMode `GameScreenEdgeCoverFlowTests`, `GameTouchInkFlowTests.NoInkAnywhereWhileTheCreditsAreOpen`, `GameLobbyViewTests.MenuDimsReachTheScreensEdgesAndNothingShowsBesideTheModeCard`, `GameTutorialFlowTests`(건너뛰기 창 가운데 확인 추가) | NOT_RUN (컴파일만 확인) |
+| 실기기 화면 확인 (iPhone) | NOT_RUN |
+
+
 ### #634 결과·게임 오버 스트로크 — 2026-11-10
 
 - `fix/#634-result-game-over-ui-stroke`에서 제공된 Figma 5개 노드를 확인했다. 게임 오버 복귀 버튼과 결과 버튼·점령 막대의 누락된 HEIST/GRINDHOUSE 원본 표면을 연결했다. 기존 브러시가 포함된 깃발·표 구분선·나가기 밑줄은 유지했다. 출처와 적용 범위는 `UI_STROKE_AUDIT_634.md` 참조.
