@@ -154,6 +154,7 @@ namespace Hapio.Tests
                 }
                 Assert.That(bindings.hud.staminaFill.sprite,Is.SameAs(ui.Theme.staminaCells));
                 Assert.That(bindings.hud.staminaFill.transform.parent.parent,Is.SameAs(bindings.hud.battleUi.transform),"Orb composition keeps the stamina root directly under Battle UI.");
+                AssertPlayerBadgeLayout(bindings.hud);
                 Assert.That(bindings.sceneController.GetComponent<LabDrumMinimap>().compactGamePresentation,Is.True);
                 yield return Until(() => !session.IsLoadingScreenUp && !session.IsPreparingBattle);
                 yield return null; // The invisible hit target refreshes availability after the start cover closes.
@@ -210,6 +211,7 @@ namespace Hapio.Tests
             Assert.That(moon.group.gameObject.activeInHierarchy, Is.False, "The moon must not sit behind the territory team flag.");
             Assert.That(backgrounds.Resolve(1).studio.gameObject.activeSelf, Is.False);
             Assert.That(ui.AppliedStage, Is.EqualTo(2));
+            AssertPlayerBadgeLayout(bindings.hud);
             Assert.That(ui.BoardArtwork.texture, Is.SameAs(ui.Theme.BoardFor(2)));
             Assert.That(bindings.stageLabel.color, Is.EqualTo(GameBattleUiColors.Light));
             var composition = bindings.hud.GetComponent<LabOrbHudComposition>();
@@ -270,6 +272,25 @@ namespace Hapio.Tests
             }
             finally { snapshot.players=original; }
         }
+        private static void AssertPlayerBadgeLayout(LabHud hud)
+        {
+            var stamina = (RectTransform)hud.staminaFill.transform.parent;
+            var badge = hud.localPlayerCircle.rectTransform;
+            Assert.That(badge.anchorMin, Is.EqualTo(stamina.anchorMin));
+            Assert.That(badge.anchorMin.x, Is.EqualTo(.5f));
+            float badgeLeft = badge.anchoredPosition.x - badge.rect.width * .5f;
+            float staminaRight = stamina.anchoredPosition.x + stamina.rect.width * .5f;
+            float gap = staminaRight - stamina.rect.width - (badgeLeft + badge.rect.width);
+            Assert.That(badgeLeft + staminaRight, Is.EqualTo(0f).Within(.01f));
+            Assert.That(gap, Is.EqualTo(9f).Within(.01f));
+            var left = hud.leftPlayerCircle.rectTransform;
+            var right = hud.rightPlayerCircle.rectTransform;
+            Assert.That(left.anchorMin.x, Is.EqualTo(14.5f / 402f).Within(.0001f));
+            Assert.That(right.anchorMin.x, Is.EqualTo(387.5f / 402f).Within(.0001f));
+            Assert.That(left.anchorMin.y, Is.EqualTo(1f - 495.5f / 874f).Within(.0001f));
+            Assert.That(right.anchorMin.y, Is.EqualTo(left.anchorMin.y));
+        }
+
         [UnityTearDown]
         public IEnumerator Cleanup()
         {

@@ -67,6 +67,7 @@ namespace C6Lab
         public Image leftPlayerCircle;
         public Image rightPlayerCircle;
         public Sprite[] playerCircleSprites;
+        [System.NonSerialized] public Sprite[] territoryBlueBadges, territoryRedBadges;
         [Header("Saved player paint-pattern samples")]
         public Image[] playerSlotPatternSamples;
         public Image localPlayerPatternSample;
@@ -333,13 +334,17 @@ namespace C6Lab
             GetNeighborLabels(snapshot, network.LocalPlayerId, out string left, out string right);
             Set(leftNeighborText, left);
             Set(rightNeighborText, right);
-            SetPlayerCircle(localPlayerCircle, local == null ? 0 : local.seat + 1);
-            SetPlayerCircle(leftPlayerCircle, ParsePlayerNumber(left));
-            SetPlayerCircle(rightPlayerCircle, ParsePlayerNumber(right));
+            int localNumber = local == null ? 0 : local.seat + 1;
+            int leftNumber = ParsePlayerNumber(left);
+            int rightNumber = ParsePlayerNumber(right);
+            Sprite localTerritoryBadge = TerritoryBadge(snapshot, localNumber);
+            SetPlayerCircle(localPlayerCircle, localNumber, localTerritoryBadge);
+            SetPlayerCircle(leftPlayerCircle, leftNumber, TerritoryBadge(snapshot, leftNumber));
+            SetPlayerCircle(rightPlayerCircle, rightNumber, TerritoryBadge(snapshot, rightNumber));
             SetPaintPatternSample(localPlayerPatternSample, local == null ? 0 : local.seat + 1, battleVisible);
             SetPaintPatternSample(leftPlayerPatternSample, ParsePlayerNumber(left), hasNeighbors);
             SetPaintPatternSample(rightPlayerPatternSample, ParsePlayerNumber(right), hasNeighbors);
-            RefreshTeamHud(snapshot, battleVisible);
+            RefreshTeamHud(snapshot, battleVisible, localTerritoryBadge != null ? null : localPlayerCircle);
         }
 
         /// <summary>A 2:2 battle (#281) ends with the winning team or a draw; every other battle keeps its words.</summary>
@@ -350,7 +355,7 @@ namespace C6Lab
         /// 2:2 (#281): the Blue/Red share bar takes the paint bar's place, this player's badge wears the team ring,
         /// the fever gauges sit under the bar, and a fever is announced with a banner and my team's edge glow.
         /// </summary>
-        private void RefreshTeamHud(LabSnapshot snapshot, bool battleVisible)
+        private void RefreshTeamHud(LabSnapshot snapshot, bool battleVisible, Image ringBadge = null)
         {
             bool territory = battleVisible && snapshot != null && snapshot.teamTerritory;
             Transform paintBar = hpText != null ? hpText.transform.parent : null;
@@ -367,7 +372,7 @@ namespace C6Lab
             if (teamBar == null) teamBar = LabTeamBar.Create((RectTransform)battleUi.transform, font);
             if (teamFever == null) teamFever = LabTeamFever.Create((RectTransform)battleUi.transform, font);
             LabTeam team = LabTeams.TeamOf(snapshot, network.LocalPlayerId);
-            teamBar.Present(snapshot, team, localPlayerCircle,
+            teamBar.Present(snapshot, team, ringBadge,
                 network.config != null ? network.config.TeamFeverHitsFor(snapshot.players?.Length ?? 0) : 0);
             teamFever.Present(snapshot, team, network.config);
         }
@@ -449,11 +454,29 @@ namespace C6Lab
                 ? number : 0;
         }
 
-        private void SetPlayerCircle(Image image, int number)
+        private Sprite TerritoryBadge(LabSnapshot snapshot, int number)
+        {
+            if (!snapshot.teamTerritory || number <= 0) return null;
+            int count = snapshot.players?.Length ?? 0;
+            int teamSize = LabTeams.TeamSize(count);
+            if (count == 1 && number == 1)
+                return BadgeAt(territoryBlueBadges, 0);
+            int seat = number - 1;
+            switch (LabTeams.SeatTeam(seat, count))
+            {
+                case LabTeam.Blue: return BadgeAt(territoryBlueBadges, seat);
+                case LabTeam.Red: return BadgeAt(territoryRedBadges, seat - teamSize);
+                default: return null;
+            }
+        }
+
+        private static Sprite BadgeAt(Sprite[] badges, int index) =>
+            badges != null && index >= 0 && index < badges.Length ? badges[index] : null;
+
+        private void SetPlayerCircle(Image image, int number, Sprite territoryBadge)
         {
             if (image == null) return;
-            Sprite art = playerCircleSprites != null && number > 0 && number <= playerCircleSprites.Length
-                ? playerCircleSprites[number - 1] : null;
+            Sprite art = territoryBadge != null ? territoryBadge : BadgeAt(playerCircleSprites, number - 1);
             image.enabled = art != null;
             if (image.sprite != art) image.sprite = art;
         }
