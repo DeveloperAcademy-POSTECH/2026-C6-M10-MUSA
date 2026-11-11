@@ -13,6 +13,7 @@ namespace Hapio
         public static readonly Color Muted = new Color(0.4541176558f, 0.4227451086f, 0.3850980401f, 1f);
         // TextColor/SecondaryLightIvory/200
         public static readonly Color Light = new Color(0.9639215469f, 0.9294117689f, 0.890196085f, 1f);
+        public static readonly Color SecondaryLightIvory800 = new Color(0.363921582698822f, 0.3294117748737335f, 0.29019609093666077f, 1f);
         // TextColor/DarkRed/500***
         public static readonly Color Red = new Color(0.6881760955f, 0.2785799503f, 0.2187512815f, 1f);
         // 5OrbsColor/WaterBlue/500***
