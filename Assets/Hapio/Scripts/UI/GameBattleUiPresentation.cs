@@ -87,7 +87,11 @@ namespace Hapio
             if (oldPaint != parent && oldPaint != parts) oldPaint.gameObject.SetActive(false);
 
             RectTransform stamina = (RectTransform)hud.staminaFill.transform.parent;
-            Guide(stamina, 111, 804, 241, 39);
+            const float badgeWidth = 45, badgeHeight = 47, staminaWidth = 241, staminaGap = 9;
+            const float designCenterX = 201, bottomRowTop = 800;
+            // Use the same center anchor and fixed offsets so the row stays centered as the canvas resizes.
+            Guide(stamina, designCenterX - staminaWidth * .5f, bottomRowTop + 4, staminaWidth, 39);
+            stamina.anchoredPosition = new Vector2((badgeWidth + staminaGap) * .5f, 0);
             foreach (Transform child in stamina) if (child != hud.staminaFill.transform) child.gameObject.SetActive(false);
             Place(hud.staminaFill.rectTransform, 9, 8, 223, 23);
             var cellSurface = GameFigmaStrokeLibrary.Find("StaminaCells");
@@ -100,9 +104,16 @@ namespace Hapio
             staminaFrame = Frame(stamina, "Stage Stamina Outline", new Rect(0,0,241,39), GameBattleUiColors.Brown, 6, 11);
             staminaFrame.UseBrush("Stamina");
             hud.playerCircleSprites = theme.playerBadges;
-            Guide(hud.localPlayerCircle.rectTransform, territory ? 57 : 58, 800, 45, 47);
-            if (hud.leftPlayerCircle != null) hud.leftPlayerCircle.rectTransform.sizeDelta = new Vector2(45,47);
-            if (hud.rightPlayerCircle != null) hud.rightPlayerCircle.rectTransform.sizeDelta = new Vector2(45,47);
+            hud.territoryBlueBadges = theme.territoryBlueBadges;
+            hud.territoryRedBadges = theme.territoryRedBadges;
+            RectTransform localBadge = hud.localPlayerCircle.rectTransform;
+            Guide(localBadge, designCenterX - badgeWidth * .5f, bottomRowTop, badgeWidth, badgeHeight);
+            localBadge.anchoredPosition = new Vector2(-(staminaWidth + staminaGap) * .5f, 0);
+            const float neighborTop = 472f;
+            if (hud.leftPlayerCircle != null)
+                Guide(hud.leftPlayerCircle.rectTransform, -8, neighborTop, badgeWidth, badgeHeight);
+            if (hud.rightPlayerCircle != null)
+                Guide(hud.rightPlayerCircle.rectTransform, 365, neighborTop, badgeWidth, badgeHeight);
             var minimap = bindings.sceneController.GetComponent<LabDrumMinimap>() ?? bindings.sceneController.gameObject.AddComponent<LabDrumMinimap>();
             minimap.compactGamePresentation = true; minimap.size = new Vector2(100,72); minimap.lineWidth = 2;
             minimap.labelSize = 10; minimap.lineColor = GameBattleUiColors.Brown; minimap.otherTextColor = GameBattleUiColors.Ink;

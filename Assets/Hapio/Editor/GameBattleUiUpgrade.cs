@@ -47,6 +47,8 @@ namespace Hapio.Editor
             theme.underlineDark=Sprite("21af4"); theme.underlineLight=Sprite("34af9"); theme.pauseStroke=Sprite("4cf20");
             theme.staminaCells=AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Hapio/Art/UI/Strokes/StaminaCells.png") ?? Sprite("StaminaCells");
             theme.playerBadges = new[] { Sprite("Player1"),Sprite("Player2"),Sprite("Player3"),Sprite("Player4"),Sprite("Player5"),Sprite("Mini6") };
+            theme.territoryBlueBadges = new[] { Sprite("TerritoryBlueP1"), Sprite("TerritoryBlueP2"), Sprite("TerritoryBlueP3") };
+            theme.territoryRedBadges = new[] { Sprite("TerritoryRedP1"), Sprite("TerritoryRedP2"), Sprite("TerritoryRedP3") };
             theme.minimapBadges = new[] { Sprite("Mini1"),Sprite("Mini2"),Sprite("Mini3"),Sprite("Mini4"),Sprite("Mini5"),Sprite("Mini6") };
             theme.teamPositionArtwork = new[] { Sprite("Position2v2Red"),Sprite("Position2v2Blue"),Sprite("Position3v3Red"),Sprite("Position3v3Blue") };
             theme.teamBlueMarker=Sprite("TeamBlue"); theme.teamRedMarker=Sprite("TeamRed"); theme.drumIcon=Sprite("DrumIcon");

@@ -29,6 +29,14 @@ MonoBehaviour:
   - {fileID: 21300000, guid: 7f9a0ef641ed6415880da5c2eb737b0a, type: 3}
   - {fileID: 21300000, guid: 6bc1fb254db7d425ab600e10e2983240, type: 3}
   - {fileID: 21300000, guid: fb3ef5f81cfdb4299850e1c9ceb241a4, type: 3}
+  territoryBlueBadges:
+  - {fileID: 21300000, guid: 679c35fd346444d6aa947dfc57f77a9b, type: 3}
+  - {fileID: 21300000, guid: 42114ac3be48446e9b715f5bd82d4f48, type: 3}
+  - {fileID: 21300000, guid: fae1355d64584252ab9df8377a57280b, type: 3}
+  territoryRedBadges:
+  - {fileID: 21300000, guid: bb6a669c9428493bb4f1efaa485aa40a, type: 3}
+  - {fileID: 21300000, guid: 0ce612bbd7f44d11ba7bef7f5a0f675c, type: 3}
+  - {fileID: 21300000, guid: 6a189e4ab1004bb2be86fc6e0880a032, type: 3}
   minimapBadges:
   - {fileID: 21300000, guid: d3cc39afb92bd49c2bc036ef029e6037, type: 3}
   - {fileID: 21300000, guid: d797dea265d6c448bb2c0a97c23db97b, type: 3}
