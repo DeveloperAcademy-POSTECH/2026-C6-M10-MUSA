@@ -8452,4 +8452,5 @@ Unity 6000.6.5f1 macOS Editor에서 새로고침 후 컴파일 오류0. 전체 E
 - 컴파일 오류0. 모델/굽기 EditMode **14/14 PASS**(1.62초): GameGourdRigBakeTests·GameStageGourdVisualTests. 기존 계약 검사에 스테이지별 키링 그룹1개·비활성·원본 장식 보존 확인을 추가했다.
 - 영향 PlayMode **11/11 PASS**(119.77초): GameStageGourdIntegrationTests·GameStage2GourdHitFinishTests·GameFinishReplayTests·GourdResultViewerPlayModeTests. 저장 Home→3개 스테이지 마운트·칠/판정·매달기 줄·요괴 반응·완료 복사, 실제 투사체 명중, 다시보기와 결과 관람 관련 검사가 통과했다. 실패/skip0.
 - 임시 인스턴스에서 세 박의 닫힘/요괴 올라옴/닫힘 자세를 샘플링해 키링 그룹 비활성 유지 및 rig Validate 성공을 확인하고 임시 객체를 정리했다. 완료 복사는 비활성 자식 순회를 건너뛰며, 관람 복사는 계층 active 상태를 보존하는 경로를 확인했다.
-- diff 공백 검사 통과. 전체 EditMode/PlayMode·새 빌드·iOS 실기기·실제 다중 기기 화면 확인은 이번 작업에서 실행하지 않았다.
+- 전체 EditMode 최종 **2340/2340 PASS**(52.26초), 실패/skip0. 앞선 두 실행은2333/2340(52.85초·52.35초)으로 구슬 원본 참조5건·Lab/전투 외형 분리2건이 실패했다. PlayMode 뒤 Resources의 LabConfig 메모리 참조가 BattleOrbAppearance로 남아 있었으며 저장 파일에는 원래 LabOrbAppearance GUID가 유지됐다. ForceUpdate 재임포트로는 바뀌지 않았고 Resources.UnloadAsset 후 재로드하자 원래 LabOrbAppearance로 복구됐다. 코드·저장 설정·단언 변경 없이 전체 재실행에서 통과했다.
+- diff 공백 검사 통과. 전체 PlayMode·새 빌드·iOS 실기기·실제 전투 전체 화면/다중 기기 화면 확인은 이번 작업에서 실행하지 않았다.
