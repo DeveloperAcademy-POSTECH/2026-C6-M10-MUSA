@@ -21,6 +21,8 @@ namespace Hapio
         public Button nextButton;
         public Button previousButton;
         public Button skipButton;
+        [Tooltip("Opening only: hide skip outside playback and during uninterrupted cinematic cuts.")]
+        public bool hideSkipDuringCinematics;
         public Button autoButton;
         public Text autoLabel;
         public Image speakerBadge;
@@ -181,7 +183,7 @@ namespace Hapio
         }
 
         public void RequestPrevious() { if (AcceptUserInput()) Previous(); }
-        public void RequestSkip() { if (AcceptUserInput()) Skip(); }
+        public void RequestSkip() { if (!(hideSkipDuringCinematics && IsCinematicCut) && AcceptUserInput()) Skip(); }
 
         private bool AcceptUserInput()
         {
@@ -241,6 +243,8 @@ namespace Hapio
         {
             if (previousButton != null) previousButton.interactable = IsPlaying && CurrentCutIndex > 0;
             if (nextButton != null) nextButton.interactable = IsPlaying && !IsCinematicCut;
+            if (hideSkipDuringCinematics && skipButton != null)
+                skipButton.gameObject.SetActive(IsPlaying && !IsCinematicCut);
         }
 
         public void Skip()
