@@ -8402,3 +8402,23 @@ Unity 6000.6.5f1 / macOS Metal Editor에서 컴파일·전체 EditMode와 UI 영
 화면 검증: 실제 Unity UI를804×1748 RenderTexture에 렌더해 구성원·방장 대기·전원 준비·확인 팝업4개를 확인했다. Figma의 gamma 합성용 기존 재질을 dim과 그림자에 재사용해 밝기 차이를 보정했고, 구성원383.57 기준 폭과402 화면 폭 차이의 흰 띠는 종이 배경을 바깥으로 이어서 제거했다. 캐릭터 중복 없는5자리 배정, 기존 프레임 애니메이션, timeScale=0에서 문구 교대, popup 중 시작 차단/취소 준비 유지/확인 후 방 목록 복귀를 검사했다. 마지막 종이 maskable 수정은 UI 렌더와 위 영향 PlayMode에 포함됐으며 게임 규칙은 바꾸지 않았다.
 
 원시 JSON과 화면 PNG는 로컬 Codex 작업공간 `artifacts/issue687/`에 보관한다. 이번 작업은 새 iOS/Mac 빌드나 실기기3~5대 동시 접속 검증을 수행하지 않았다. 참가 기기는 Game54가 포함된 같은 빌드를 사용해야 한다.
+
+
+## 2026-11-11 — #697 미사용 지귀 검사 정리와 NUnit 발견 복구
+
+기준 main `e97a4a25`, 브랜치 `chore/#697-retire-unused-jigwi-tests`, Unity6000.6.5f1 / macOS Metal Editor다. 로컬 지침 변경은 별도 로컬 보존 커밋 `0bc0541c`와 사본으로 보존한 뒤 최신 main에 적용했다. 미사용 검사 정리 절·보고서 안내와 최신 main의 #687 지침이 함께 유지되는지 비교했다. 게임 runtime/editor 코드·Scene·Prefab·Shader·Material·게임 에셋·asmdef·패키지·설정·통신 규약은 변경하지 않았다.
+
+삭제 대상/근거/대체 검사의13개 대응표는 `TEST_SUITE_REPORT.md`의 #697 절에 기록했다. 두 구형 fixture와 meta는 Unity AssetDatabase로 함께 제거했다. 해당 GUID는 다른 Scene·Prefab·설정에 참조되지 않았고, 남은 합성 fixture의 공용 준비·정리와 meta를 유지했다. 과거 VALIDATION 기록은 변경하지 않았다.
+
+| 단계 | 실제 결과 |
+| --- | --- |
+| 삭제 전 현행 공용 에셋 이관 검사 | `LabJigwiABPresentationTests.AOrbFlameUsesTheDedicatedInkMaterialAndItsRealTransparentTexture` **1/1**,0.23초. 실제 Metal GPU로 wash alpha를 읽고 현행 A 구슬 renderer를 확인한 뒤 구형 검사를 삭제했다. |
+| `[Test]` 복구 직후 단독 검사 | **0/1**,0.30초. 처음 Launch에서 ORB_NOT_FOUND: 시각0에서39.9까지 지난 A가 새로 주입한 fixture 구슬을 소급 소각했다. |
+| 누락 검사 fixture 수정 후 | **1/1**,0.29초.39.9초까지 먼저 진행한 뒤 일반 구슬/비행 구슬을 주입한다. 이 인위적 fixture에서만 B 공급 탄환을 빼 만료 단언을 일반 구슬 보존에 한정했다. 실제 공급 탄환 제거는 기존 `LabJigwiABSupplyModelTests.DeadlineFailureRemovesOnlyThisMissionsSupplyAndKeepsBoardsAndStamina`가 확인하며 해당 검사는 바꾸지 않았다. 기존16개 단언·3초 경계·HP/스태미나/명중 통계·상태 유효성 확인은 유지했다. |
+| 최종 전체 EditMode | **2340/2340**,34.44초. 복구한 메서드와 기존 공급 탄환·호환성 검사 포함, 실패/skip/inconclusive0. |
+| 현행 지귀 표현 PlayMode | `LabJigwiABPresentationTests` **21/21**,1.71초. 이전한 공용 에셋 검사와 현재 A/B,정지/재개,구형 표면 제거 포함. |
+| 합성 PlayMode | `LabOrbHudCompositionTests` **7/7**,0.12초. 기존 rear-art/alpha/공용 준비 유지. |
+| 저장 Home→지귀 PlayMode | `GameJigwiStageIntegrationTests` **1/1**,3.80초. |
+| 최종 NUnit 발견 목록 | 이관/복구 후 삭제 직전 Edit2340/Play843 → 삭제 후 Edit2340/Play830. 차이는 지정한13개와 정확히 일치하고 예상 밖 누락/추가0. 이관한 에셋 검사와 복구한 B 실패 검사는 둘 다 남아 있다. 이 수치는 발견 목록이며 Play830개 전체 통과를 뜻하지 않는다. |
+
+이번 실행은 전체 EditMode와 영향 PlayMode29개다. 실제 게임 코드·공유 fixture·asmdef·에셋이 바뀌지 않아 전체 PlayMode는 재실행하지 않았다. iOS/실기기/독립 앱/일반 Wi-Fi·핫스팟 확인과 새 빌드는 수행하지 않았다. 새 검사와 최종 실행의 skip/inconclusive는0이며 최초 실패도 위에 보존했다. 원시 결과·발견 목록은 커밋하지 않은 로컬 `artifacts/jigwi-test-retirement`에 있다. 기존 Scene을 복원했고 Editor 재생OFF/컴파일OFF/미저장변경없음을 확인했다.

@@ -2,7 +2,7 @@
 
 ## 현재 검사 선택 기준 — 2026-11-10
 
-[저장소 지침](../AGENTS.md)의 변경 범위 기반 정책을 따른다. **PR을 만든다는 이유만으로 전체 검사를 의무 실행하지 않는다.** 실제 diff와 진입점·호출 경로·공유 데이터를 확인해 아래 범위를 선택한다. 기존 검사와 핵심 단언은 유지한다.
+[저장소 지침](../AGENTS.md)의 변경 범위 기반 정책을 따른다. **PR을 만든다는 이유만으로 전체 검사를 의무 실행하지 않는다.** 실제 diff와 진입점·호출 경로·공유 데이터를 확인해 아래 범위를 선택한다. 현행 동작·계약을 지키는 핵심 검사와 단언은 유지한다. 미사용·퇴역 기능 전용 검사의 제거는 [저장소 지침의 정리 기준](../AGENTS.md#미사용퇴역-기능의-검사-정리-2026-11-11)을 따른다. 지원 중인 DEV·Lab·비교/실험 경로와 남은 호환성 계약은 단순 미사용으로 분류하지 않는다.
 
 | 변경 범위 | 기본 확인 |
 | --- | --- |
@@ -27,6 +27,34 @@
 5. 새 실패는 최초 결과를 남기고 원인을 확인한다. 재실행 통과만으로 최초 실패를 지우거나 임의로 기존 실패라 판단하지 않는다.
 
 PR과 `docs/VALIDATION.md`에는 **변경·영향 범위와 검사 선택 이유 / 기준 버전·환경 / 실제 수행 범위·건수·결과 / 전체 검사 생략 이유·남은 확인 사항**을 기록한다. 선택 검사의 통과를 전체 검사 통과로 표현하지 않는다.
+
+### #697 미사용 지귀 검사 정리 — 2026-11-11
+
+기준은 main `e97a4a25`다. 현재 게임 코드·Scene·Prefab·에셋·패키지·통신 계약을 바꾸지 않고 아래 기존 PlayMode 메서드13개를 정리한다. `Legacy` 이름만으로 삭제하지 않았다. `LabModel.JigwiStage.ResetJigwiStage`는 같은 활성 조건의 `ResetJigwiAB`를 먼저 호출해 구형 표면 정책을 활성화할 수 없고, `LabNetwork.JigwiStage`도 표면을 그리지 않고 지우기만 한다. B 성공 보상의 `rewardUntil`은 모델이 생성하지 않으며 `LabJigwiABNetworkValidation`은 `-1` 외 값을 거절한다.
+
+| 삭제한 fixture | 삭제한 메서드 |
+| --- | --- |
+| `LabJigwiRewardBoardFireTests` | `BoardRingFollowsVisualHoverAndUsesOneHollowMeshWithHeldAnimation` |
+| `LabJigwiRewardBoardFireTests` | `PhaseExitMissingSnapshotAndBoardResetNeverCarryRewardToTheNextBoard` |
+| `LabJigwiRewardBoardFireTests` | `PredictionApprovalAndRejectionKeepFireOnTheVisibleIdentityOnly` |
+| `LabJigwiRewardBoardFireTests` | `SharedRewardLightsExistingAndArrivingOrbsButNotItemsWithoutChangingAOrPhysics` |
+| `LabJigwiStagePresentationTests` | `CutoffAndResultGuidanceNeverPretendThatNaturalExpiryWasTeammateSuccess` |
+| `LabJigwiStagePresentationTests` | `FlameShaderUsesTheHeldBattleClockAndAdvancesOnlyAfterResume` |
+| `LabJigwiStagePresentationTests` | `HelperSeesOnlyTheirRootAndRecipientSeesOnlyTheirOwnFiniteFirePatches` |
+| `LabJigwiStagePresentationTests` | `MutualCurtainsResolveIndependentlyAndCutoffLeavesNoSourceOrFire` |
+| `LabJigwiStagePresentationTests` | `RuntimeGuidanceUsesTheExistingCanvasAndDoesNotBlockAnyTouch` |
+| `LabJigwiStagePresentationTests` | `SurfaceFlamesUseTheDedicatedInkMaterialAndItsRealTransparentTexture` |
+| `LabJigwiStagePresentationTests` | `TheActualPaintFrameIsUsedEvenWithRotatedNonUniformColliderScale` |
+| `LabJigwiStagePresentationTests` | `TheHudUsesPSeatsRatherThanConnectionIdsAndShowsBothIndependentHelpDirections` |
+| `LabOrbHudCompositionTests` | `ActualForegroundCameraAddsAndRemovesTheRewardRingWithoutCoveringTheElementArtwork` |
+
+- `LabJigwiStagePresentationTests.cs`와 `LabJigwiRewardBoardFireTests.cs`는 전용 private 준비·정리 코드만 포함하며 외부 참조가 없다. 두 테스트 파일과 `.meta`를 함께 제거한다. `LabOrbHudCompositionTests`는 해당 메서드 하나만 제거하고 나머지 fixture·meta·공용 준비 함수를 유지한다.
+- `SurfaceFlamesUseTheDedicatedInkMaterialAndItsRealTransparentTexture`의 공용 단언은 삭제 전에 `LabJigwiABPresentationTests.AOrbFlameUsesTheDedicatedInkMaterialAndItsRealTransparentTexture`로 옮겼다. 실제 현행 A 구슬의 소각/불꽃 renderer에서 셰이더·투명 render queue·원본 wash 연결·UV·GPU alpha를 확인한다. 이전 검사 단독1/1(0.23초) 통과를 확인한 뒤 구형 파일을 삭제했다. 더 이상 생성되지 않는 구형 표면 Mesh의 단언은 현행 에셋 검사의 근거로 사용하지 않는다.
+- 일반 합성의 rear-art 분리·sprite alpha·이중 alpha 곱 방지는 `LabOrbHudCompositionTests.ActualForegroundCameraKeepsTheRearArtworkOutAndPreservesSpriteAlpha`와 `ForegroundCompositePreservesHalfTransparentColourWithoutMultiplyingAlphaTwice`에 유지한다. 현행 A의 정지/재개와 구형 표면 제거는 `LabJigwiABPresentationTests`에, 저장 Home→지귀 연결은 `GameJigwiStageIntegrationTests`에 유지한다.
+- `LabJigwiABModelTests.BFailureSetsEveryBoardOnFireForThreeSecondsAndKeepsOrbsStaminaAndStatistics`는 `[Test]`가 없어 NUnit 목록에 없었고 다른 호출자도 없었다. `[Test]`를 복구하고 지원되는 특수 물/3초 판 화재 대안 모드를 fixture에 명시했다. 과거 A 시간이 소급 실행되지 않게39.9초까지 먼저 진행하고, 일반 구슬 보존만 보는 인위적 fixture에서는 B 지급 탄환만 제외했다. 실제 B 탄환의 실패 시 제거는 `LabJigwiABSupplyModelTests.DeadlineFailureRemovesOnlyThisMissionsSupplyAndKeepsBoardsAndStamina`에 그대로 남는다. 기존16개 단언을 완화하지 않았고 게임의 기본 모드를 바꾸지 않았다. 복구 직후의 준비 실패와 수정 후 결과는 VALIDATION에 별도로 기록한다.
+- 수동 Lab 화재·기존 물 모드·Editor 투사체 보상 궤적 비교·이전 DTO의 유효 복사/잘못된 헤더 거절·예약 DEV 인덱스·도색/Clay 비교 검사는 유지한다. 폐기된 표현의 긍정 검사와 현재도 필요한 호환성/퇴역 경계 검사를 구분한다.
+
+검증은 컴파일·전체 EditMode·위 현행 에셋/합성/저장 지귀 흐름의 PlayMode로 선정한다. runtime·공유 fixture·asmdef·게임 에셋이 바뀌지 않아 전체 PlayMode를 의무 재실행하지 않는다. 수행 결과와 발견 목록의 전후 차이는 `VALIDATION.md`의 #697 기록을 따른다. 이번 정리에서는 과거 PASS 기록을 소급 삭제하지 않는다.
 
 ### 최근 전체 실행 참고값
 
