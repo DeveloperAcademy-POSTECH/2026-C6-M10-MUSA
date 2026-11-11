@@ -1004,6 +1004,9 @@ namespace C6Lab
         [Tooltip("2라운드 야광귀 피버 곡 빠르기")] [SerializeField, Range(.5f, 1.5f)] private float yaguangFeverBgmSpeed = 1f;
         [Tooltip("3라운드 지귀 전투 BGM 빠르기")] [SerializeField, Range(.5f, 1.5f)] private float jigwiBgmSpeed = 1f;
         [Tooltip("3라운드 지귀 피버 곡 빠르기")] [SerializeField, Range(.5f, 1.5f)] private float jigwiFeverBgmSpeed = 1f;
+        [Tooltip("#629 튜토리얼(연습판) BGM 크기 (Resources/Audio/TutorialBGM, 이 기기). 파일이 없으면 기본 BGM.")]
+        [SerializeField, Range(0f, 1f)] private float tutorialBgmVolume = .5f;
+        [Tooltip("#629 튜토리얼 BGM 빠르기")] [SerializeField, Range(.5f, 1.5f)] private float tutorialBgmSpeed = 1f;
         [Tooltip("매혹이 걸릴 때 소리 크기 (Resources/Audio/CharmCast, 모든 기기)")]
         [SerializeField, Range(0f, 1f)] private float charmCastSoundVolume = .7f;
         [Tooltip("양옆 사람이 내 몫을 다 눌러 체크가 뜰 때 소리 크기 (Resources/Audio/CharmCheck, 누른 사람 기기만)")]
@@ -1551,6 +1554,8 @@ namespace C6Lab
         public float YaguangFeverBgmSpeed => BgmSpeed(yaguangFeverBgmSpeed);
         public float JigwiBgmSpeed => BgmSpeed(jigwiBgmSpeed);
         public float JigwiFeverBgmSpeed => BgmSpeed(jigwiFeverBgmSpeed);
+        public float TutorialBgmVolume => Mathf.Clamp01(Finite(tutorialBgmVolume, .5f));
+        public float TutorialBgmSpeed => BgmSpeed(tutorialBgmSpeed);
         private static float BgmSpeed(float speed) => speed <= 0f ? 1f : Mathf.Clamp(Finite(speed, 1f), .5f, 1.5f);
         public float CharmCastSoundVolume => Mathf.Clamp01(Finite(charmCastSoundVolume, .7f));
         public float CharmCheckSoundVolume => Mathf.Clamp01(Finite(charmCheckSoundVolume, .8f));

@@ -274,6 +274,8 @@ MonoBehaviour:
   yaguangFeverBgmSpeed: 1
   jigwiBgmSpeed: 1
   jigwiFeverBgmSpeed: 1
+  tutorialBgmVolume: 0.5
+  tutorialBgmSpeed: 1
   charmCastSoundVolume: 0.4
   charmCheckSoundVolume: 0.8
   charmReleaseSoundVolume: 0.4

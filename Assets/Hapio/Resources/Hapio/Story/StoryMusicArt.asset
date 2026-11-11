@@ -15,7 +15,7 @@ MonoBehaviour:
   calmMusic: {fileID: 8300000, guid: d2d4aeb161564b34bcb172021a43bbae, type: 3}
   calmVolume: 1
   calmSpeed: 1
-  titleVolume: 0.45
+  titleVolume: 0.32
   titleToOpeningSeconds: 1.5
   brokenMusic: {fileID: 8300000, guid: ddca4d3616b44dbe87b38d02e229eb8d, type: 3}
   brokenVolume: 0.6

@@ -39,7 +39,7 @@ namespace Hapio
         [Tooltip("평화 곡 크기 (게임 설정의 BGM 볼륨에 곱한다)")] [Range(0f, 1f)] public float calmVolume = 1f;
         [Tooltip("평화 곡 빠르기 (1 = 원래. 낮추면 느리고 낮게, 높이면 빠르고 높게)")] [Range(.3f, 2f)] public float calmSpeed = 1f;
         [Tooltip("타이틀·방 목록에서는 평화 곡을 이만큼만 틀어 터치 먹물 소리가 잘 들리게 한다 (Calm Volume에 곱한다)")]
-        [Range(0f, 1f)] public float titleVolume = .45f;
+        [Range(0f, 1f)] public float titleVolume = .32f;
         [Tooltip("시작을 눌러 오프닝이 열리면 작던 타이틀 곡이 원래 크기까지 커지는 시간 (초, 0~1 전체 기준)")]
         [Min(0f)] public float titleToOpeningSeconds = 1.5f;
         [Tooltip("박이 깨진 뒤 오프닝 끝까지 나오는 곡 (반복)")] public AudioClip brokenMusic;
