@@ -18,6 +18,7 @@ namespace C6Lab
         private double foxRoundStartedAt = -1d, foxRoundEndsAt = -1d;
         private int foxRoundTotal, foxRoundResult, foxRoundCount;
         private double foxRoundResultAt = -1d;
+        private bool foxRoundRunning;
 
         /// <summary>The fox round rules are on: a fox orb drop starts a timed team round.</summary>
         private bool FoxRoundRules => rules != null && rules.FoxRoundSeconds > 0f
@@ -25,7 +26,14 @@ namespace C6Lab
 
         /// <summary>A fox round is running at this Host time: dropped, not yet cleared, timed out or cancelled.</summary>
         public bool FoxRoundOn(double now) => phase == LabPhase.Playing && foxRoundEndsAt >= 0d && now >= foxRoundStartedAt
-            && now < foxRoundEndsAt && foxRoundResult == 0;
+            && now < foxRoundEndsAt && !FoxRoundSettled;
+
+        /// <summary>
+        /// The latest round is over (or there is none). The last result stays as it was until the next one is settled, so the
+        /// last BIG/SMALL keeps its badge while a new round runs (only with a short DEV interval). A drop at the very moment
+        /// the last round is settled starts a new one.
+        /// </summary>
+        private bool FoxRoundSettled => !foxRoundRunning || foxRoundEndsAt < 0d;
 
         /// <summary>Fox orbs on every board now (the team's count).</summary>
         public int FoxOrbsLeft() => orbs.Values.Count(orb => orb.kind == LabOrbKind.FoxFire);
@@ -34,6 +42,7 @@ namespace C6Lab
         {
             foxRoundStartedAt = foxRoundEndsAt = foxRoundResultAt = -1d;
             foxRoundTotal = foxRoundResult = foxRoundCount = 0;
+            foxRoundRunning = false;
         }
 
         /// <summary>The fox orbs just dropped start a round, or join the one already running (only with a short DEV interval).</summary>
@@ -44,8 +53,7 @@ namespace C6Lab
             {
                 foxRoundStartedAt = at;
                 foxRoundEndsAt = at + rules.FoxRoundSeconds;
-                foxRoundResult = 0;
-                foxRoundResultAt = -1d;
+                foxRoundRunning = true;
             }
             // Every fox orb stays until the round ends; the team has to clear them, nothing fades by itself.
             foreach (LabOrbState fox in orbs.Values.Where(orb => orb.kind == LabOrbKind.FoxFire))
@@ -66,7 +74,7 @@ namespace C6Lab
         /// <summary>At the round's end, whatever is left goes in smoke and the round is lost.</summary>
         private void AdvanceFoxRound(double now)
         {
-            if (foxRoundEndsAt < 0d || foxRoundResult != 0 || phase != LabPhase.Playing) return;
+            if (FoxRoundSettled || phase != LabPhase.Playing) return;
             if (FoxOrbsLeft() == 0) { SettleFoxRound(Math.Min(now, foxRoundEndsAt), true); return; }
             if (now < foxRoundEndsAt) return;
             foreach (LabOrbState fox in orbs.Values.Where(orb => orb.kind == LabOrbKind.FoxFire).ToArray())
@@ -84,6 +92,7 @@ namespace C6Lab
         /// </summary>
         private void SettleFoxRound(double at, bool cleared)
         {
+            foxRoundRunning = false;
             foxRoundResult = cleared ? 1 : -1;
             foxRoundResultAt = at;
             foxRoundCount++;
@@ -110,7 +119,8 @@ namespace C6Lab
         /// <summary>The fever start (or anything else that clears the fox orbs) ends a running round with no result.</summary>
         private void CancelFoxRound()
         {
-            if (foxRoundResult != 0 || foxRoundEndsAt < 0d) return;
+            if (FoxRoundSettled) return;
+            foxRoundRunning = false;
             foxRoundEndsAt = -1d;
             foxRoundStartedAt = -1d;
             foxRoundTotal = 0;

@@ -426,14 +426,39 @@ namespace C6Lab
         public double foxRoundStartedAt = -1d, foxRoundEndsAt = -1d;
         /// <summary>Fox orbs the round began with, and still on the boards while it runs (0 once it is over).</summary>
         public int foxRoundTotal, foxRoundRemaining;
-        /// <summary>The latest finished round: 1 cleared (BIG), -1 timed out (SMALL), 0 none or still running; when, and how many have finished.</summary>
+        /// <summary>
+        /// The latest finished round: 1 cleared (BIG), -1 timed out (SMALL), 0 none yet; when, and how many have finished. It stays
+        /// while the next round runs, so the last BIG/SMALL still shows its badge and its time.
+        /// </summary>
         public int foxRoundResult;
         public double foxRoundResultAt = -1d;
         public int foxRoundCount;
+        /// <summary>The latest round has started and is neither settled nor cancelled yet.</summary>
+        public bool foxRoundRunning;
 
         /// <summary>A fox round is running at this time: the team is clearing fox orbs against the clock (#664).</summary>
-        public bool FoxRoundOn(double now) => foxRoundEndsAt >= 0d && now >= foxRoundStartedAt && now < foxRoundEndsAt
-            && foxRoundResult == 0;
+        public bool FoxRoundOn(double now) => foxRoundRunning && foxRoundEndsAt >= 0d && now >= foxRoundStartedAt
+            && now < foxRoundEndsAt;
+
+        /// <summary>
+        /// The team's latest BIG/SMALL result (#664): the 야광귀 colour combo's or the fox round's, whichever came last. -1 SMALL,
+        /// 1 BIG, 0 none yet; at is its Host time (-1 with none). Its badge, sounds and BGM tone run from at.
+        /// </summary>
+        public int LastEffectResult(out double at)
+        {
+            int combo = 0;
+            if (comboResultCount > 0 && comboResultAt >= 0d)
+                combo = comboResult == LabComboResult.Success ? 1
+                    : comboResult == LabComboResult.WrongColor || comboResult == LabComboResult.Timeout ? -1 : 0;
+            int fox = foxRoundCount > 0 && foxRoundResultAt >= 0d ? Math.Sign(foxRoundResult) : 0;
+            if (fox != 0 && (combo == 0 || foxRoundResultAt >= comboResultAt))
+            {
+                at = foxRoundResultAt;
+                return fox;
+            }
+            at = combo != 0 ? comboResultAt : -1d;
+            return combo;
+        }
 
         // 박 색상 콤보 실험 (#222). DEV에서 끄면 모두 기본값(콤보 없음)이다.
         // 시각은 serverTime과 같은 전투 시계 기준이다.

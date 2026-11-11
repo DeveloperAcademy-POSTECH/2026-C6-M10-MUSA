@@ -1370,6 +1370,7 @@ namespace C6Lab
                 foxRoundResult = foxRoundResult,
                 foxRoundResultAt = foxRoundResultAt,
                 foxRoundCount = foxRoundCount,
+                foxRoundRunning = foxRoundRunning,
                 comboActive = combo.Active,
                 comboColors = combo.Count == 0 ? Array.Empty<LabOrbElement>() : combo.Colors,
                 comboProgress = combo.Progress,

@@ -135,6 +135,9 @@ namespace C6Lab
             // 박 색상 콤보 실험 (#222): 4칸 색/남은 시간/결과/페널티 표시. 실험이 꺼져 있으면 아무것도 안 그린다.
             if (hud != null && boardNetwork != null && GetComponent<LabGourdComboHud>() == null)
                 gameObject.AddComponent<LabGourdComboHud>().Bind(boardNetwork, hud.GetComponentInParent<Canvas>());
+            // 여우구슬 팀 판정 (#664): 판정 중 화면 위에 팀 전체 남은 여우구슬 수와 남은 시간 막대 (결과·BIG/SMALL은 위 콤보 표시가 그린다)
+            if (hud != null && boardNetwork != null && GetComponent<LabFoxRoundHud>() == null)
+                gameObject.AddComponent<LabFoxRoundHud>().Bind(boardNetwork, hud.GetComponentInParent<Canvas>());
             // 야광귀 섬광 (#268): 맞을 사람 화면의 예고 빛·번쩍임·진동, 판 구슬 하얗게. 꺼져 있으면 아무것도 안 그린다.
             if (hud != null && boardNetwork != null && GetComponent<LabYaguangFlashHud>() == null)
                 gameObject.AddComponent<LabYaguangFlashHud>().Bind(boardNetwork, hud.GetComponentInParent<Canvas>());

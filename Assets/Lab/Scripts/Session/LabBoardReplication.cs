@@ -49,6 +49,7 @@ namespace C6Lab
         /// <summary>#664: the team's fox round (drop, time-up, count, result) travels with every header.</summary>
         public double foxRoundStartedAt = -1d, foxRoundEndsAt = -1d, foxRoundResultAt = -1d;
         public int foxRoundTotal, foxRoundRemaining, foxRoundResult, foxRoundCount;
+        public bool foxRoundRunning;
         /// <summary>Explicit presence keeps an omitted header from clearing a matched shared snapshot.</summary>
         public bool hasComboState;
         public bool comboActive;
@@ -175,7 +176,7 @@ namespace C6Lab
                 foxRoundStartedAt = snapshot.foxRoundStartedAt, foxRoundEndsAt = snapshot.foxRoundEndsAt,
                 foxRoundResultAt = snapshot.foxRoundResultAt, foxRoundTotal = snapshot.foxRoundTotal,
                 foxRoundRemaining = snapshot.foxRoundRemaining, foxRoundResult = snapshot.foxRoundResult,
-                foxRoundCount = snapshot.foxRoundCount,
+                foxRoundCount = snapshot.foxRoundCount, foxRoundRunning = snapshot.foxRoundRunning,
                 hasComboState = true, comboActive = snapshot.comboActive,
                 comboColors = snapshot.comboColors == null ? Array.Empty<LabOrbElement>() : (LabOrbElement[])snapshot.comboColors.Clone(),
                 comboProgress = snapshot.comboProgress, comboStartedAt = snapshot.comboStartedAt,
@@ -452,7 +453,7 @@ namespace C6Lab
                 copy.foxRoundStartedAt = header.foxRoundStartedAt; copy.foxRoundEndsAt = header.foxRoundEndsAt;
                 copy.foxRoundResultAt = header.foxRoundResultAt; copy.foxRoundTotal = header.foxRoundTotal;
                 copy.foxRoundRemaining = header.foxRoundRemaining; copy.foxRoundResult = header.foxRoundResult;
-                copy.foxRoundCount = header.foxRoundCount;
+                copy.foxRoundCount = header.foxRoundCount; copy.foxRoundRunning = header.foxRoundRunning;
                 if (header.hasComboState)
                 {
                     // Copy Host control state, never infer progress from a locally presented hit.
@@ -686,7 +687,7 @@ namespace C6Lab
             foxRoundStartedAt = source.foxRoundStartedAt, foxRoundEndsAt = source.foxRoundEndsAt,
             foxRoundResultAt = source.foxRoundResultAt, foxRoundTotal = source.foxRoundTotal,
             foxRoundRemaining = source.foxRoundRemaining, foxRoundResult = source.foxRoundResult,
-            foxRoundCount = source.foxRoundCount,
+            foxRoundCount = source.foxRoundCount, foxRoundRunning = source.foxRoundRunning,
             comboActive = source.comboActive,
             comboColors = source.comboColors == null ? Array.Empty<LabOrbElement>() : (LabOrbElement[])source.comboColors.Clone(),
             comboProgress = source.comboProgress, comboStartedAt = source.comboStartedAt, comboEndsAt = source.comboEndsAt,
