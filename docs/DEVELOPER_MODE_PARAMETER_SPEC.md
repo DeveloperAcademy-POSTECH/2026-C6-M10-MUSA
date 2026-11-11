@@ -937,9 +937,9 @@ DEV 행이 없는 고정 규칙(`LabJigwiABTimeline`): 예고 2초(`WarningSecon
 근거: `LabConfig.InactiveDeveloperFields`·`IsInactiveDeveloperField`·`IsDeveloperFieldHidden`·`DeveloperCategories`, `LabDeveloperMode.BuildCategoryLayout`, `LabConfig.IsReplacedByJigwiTimeline`·`HiddenByJigwiTimelineInGame`, `LabDeveloperMode.RefreshJigwiTimelineRows`·`ShowCategory`, `GameStageSettings.IsFieldShown`·`IsFieldVisible`, `GameScreen.SelectDeveloperScope`·`RefreshJigwiTimelineRows`. 이 문서 갱신은 실행 검증을 뜻하지 않는다. 실행 결과는 `VALIDATION.md`의 2026-11-05 DEV 표시 정리 절을 따른다.
 
 
-### #676 도색량 시험 기본값
+### #676 1차 공통 기본값 변경 기록
 
-5인 영상의 딜 중지 전 첫80% 도달 구간을 바탕으로 `Paint Initial Coverage`(105)를1.3%, `Paint Repeat Growth`(106)를1.0%로 조정했다. 코드·비정상값 fallback·저장 LabConfig의 기본값을 맞춘다. 인원별 자동 배율이나 명중 계측 기능을 추가하지 않는다. 기존 DEV 공통 값이므로 새로 초기화한 모든 인원·세 스테이지에 적용되고, 사용자가 따로 설정한 값과 이미 진행 중인 판은 덮어쓰지 않는다. 성장 속도6%p/초·건조·보상 개수·설정259개·통신 형식은 그대로다. 위 #211의2%/1.5%와4% 비교는 당시 기록이다. 실제 새5인 플레이의100~110초 완료는 별도 확인 대상이다.
+5인 영상의 딜 중지 전 첫80% 도달 구간을 바탕으로 `Paint Initial Coverage`(105)를1.3%, `Paint Repeat Growth`(106)를1.0%로 조정했다. 코드·비정상값 fallback·저장 LabConfig의 기본값을 맞춘다. 이 1차 변경에는 인원 보정이 없었으며, 현행 인원 보정은 다음 절을 따른다. 명중 계측 기능은 추가하지 않는다. 기존 DEV 공통 값이므로 새로 초기화한 모든 인원·세 스테이지에 적용되고, 사용자가 따로 설정한 값과 이미 진행 중인 판은 덮어쓰지 않는다. 성장 속도6%p/초·건조·보상 개수·설정259개·통신 형식은 그대로다. 위 #211의2%/1.5%와4% 비교는 당시 기록이다. 실제 새5인 플레이의100~110초 완료는 별도 확인 대상이다.
 
 
 ### #676 후속 — 실제 인원에 따른 스토리 도색량
