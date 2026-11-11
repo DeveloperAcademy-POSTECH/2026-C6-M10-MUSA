@@ -281,9 +281,10 @@ namespace C6Lab
         // 5697: #551 Jigwi B bucket: the first bucket comes 3.5 s after B starts, 1 s apart, 7 s each.
         // 5698: #595 Jigwi smoke flow: round.smoke (B smokes every screen at once, no bucket) and round.common (shared talisman A).
         // 5699: actual newly painted-cell contribution is a Host-owned Int64 player statistic.
+        // 5700: #663 Jigwi smoke flow: a talisman may start right after the smoke before it (earlier than its slot time).
         // 5701: #664 구미호 co-op gimmicks: several charmed players (charmedPlayers/charmEnds/charmHelperTargets), the fox
         //       round (foxRound*, foxRoundRunning, its goal and cleared count, up to 100 fox orbs a board) and six more DEV
-        //       values (265). 5700 is #663's on main.
+        //       values (265), on top of #663's 5700.
         internal const ushort LabProtocolVersion = 5701;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
@@ -1362,6 +1363,7 @@ namespace C6Lab
                 SetRoomSearchMessage(explanation, true);
                 return;
             }
+            KeepReplayHitPoses();
             double now = Time.realtimeSinceStartupAsDouble;
             if (resumeRoomSearchAfterStop && CanBeginConnection)
             {

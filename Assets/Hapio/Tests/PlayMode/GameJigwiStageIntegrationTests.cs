@@ -135,7 +135,13 @@ namespace Hapio.Tests
             Assert.That(network.config.JigwiAHoldBurnUntilEnd, Is.True,
                 "The saved main profile preserves the board while the talisman is being written.");
             double smokeProbe = LabJigwiABTimeline.ActiveOffset(0, before.jigwiAB.schedule) + LabJigwiABTimeline.SmokeLeadSeconds + .5d;
-            double aProbe = LabJigwiABTimeline.ActiveOffset(1, before.jigwiAB.schedule) + 1.2d;
+            // #663: with the saved profile the talisman follows the smoke (which times out here, nobody rubs it) a few seconds later.
+            double talismanAt = LabJigwiABTimeline.ActiveOffset(1, before.jigwiAB.schedule);
+            double pull = network.config.JigwiSmokeToTalismanSeconds;
+            if (pull > 0d)
+                talismanAt = Math.Min(talismanAt,
+                    LabJigwiABTimeline.ActiveOffset(0, before.jigwiAB.schedule) + LabJigwiABTimeline.GroupMissionSeconds + pull);
+            double aProbe = talismanAt + 1.2d;
             HoldAt(smokeProbe);
             // The same clock stays held across the forward seek; no real-time Update can roll it back.
             Method("SyncJigwiFireSurfaces").Invoke(network, null);

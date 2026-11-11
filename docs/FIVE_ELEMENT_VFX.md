@@ -4,11 +4,11 @@ Lab과 Hapio 전투에서 일반 원소 구슬과 오색 구슬을 던지면 종
 
 ## 다른 환경에서 이어서 작업
 
-이슈 #576과 PR 브랜치 `codex/five-elements-vfx-handoff`에서 소스와 Unity 에셋을 함께 받는다.
+이슈 #576의 소스와 Unity 에셋은 현재 `main`에 통합되어 있다. 최신 `main`을 기준으로 이어서 작업한다.
 
 ```sh
-git fetch origin codex/five-elements-vfx-handoff
-git switch --track origin/codex/five-elements-vfx-handoff
+git fetch origin main
+git switch main
 ```
 
 Unity 6000.6.5f1로 프로젝트를 열어 패키지 복원을 마친다. 비교 씬은 아래 메뉴로 실행하고, 실제 전투는 `Assets/Hapio/Scenes/Home.unity` → Play → 기존 개발자 솔로 진입을 사용한다. 하단 보드에는 기존 2D 스프라이트가 표시된다. 새 구슬 재질은 일반 오행·오색 투사체의 비행과 충돌 직후 눌림에 적용된다. 지귀 부적 보상·숨은 파편은 각자의 전용 표현 경로를 사용한다.

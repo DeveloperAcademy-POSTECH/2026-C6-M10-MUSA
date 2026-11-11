@@ -45,6 +45,7 @@ MonoBehaviour:
   jigwiBTestOnly: 0
   jigwiATestOnly: 0
   jigwiSmokeFlow: 1
+  jigwiSmokeToTalismanSeconds: 4
   jigwiCommonStartSeconds: 25
   jigwiCommonIntervalSeconds: 15
   jigwiStageWarningSeconds: 1
@@ -66,6 +67,7 @@ MonoBehaviour:
   jigwiTalismanRewardDelaySeconds: 2.9
   jigwiAFailDrumSlipSeconds: 20
   jigwiAFailDrumSlipBoost: 2
+  jigwiAFailBurnStartSeconds: 0.6
   jigwiTalismanCoverage: 0.85
   jigwiTalismanTolerance: 0.07
   jigwiBSplashPaintShare: 3

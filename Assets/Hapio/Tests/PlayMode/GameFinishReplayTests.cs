@@ -143,6 +143,33 @@ namespace Hapio.Tests
             Assert.That(session.ResultSnapshot.paintRevision, Is.EqualTo(paintRevision));
         }
 
+        /// <summary>
+        /// Stage 3's common-talisman waterfall (and the growth it funds) can finish the gourd with no orb, seconds after
+        /// the last throw — past the 4 s window and past the gourd's live pose history. The round's newest hit still
+        /// replays from the poses kept when it landed.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator PaintWithoutAnOrbFinishingLaterStillReplaysTheRoundsLastHit()
+        {
+            yield return ReachStage(3);
+            yield return DeterministicOrbs(3);
+            yield return ThrowUntilHit();
+            var hanging = network.target.GetComponent<LabHangingTarget>();
+            double hitBy = Time.fixedTimeAsDouble;
+            yield return Until(() => hanging.OldestPoseTime > hitBy, "The hit leaves the live pose history", 15d);
+            Assert.That(Time.fixedTimeAsDouble - hitBy, Is.GreaterThan(4d), "Older than the recent-hit window.");
+            CompletePaint(Model());
+
+            LabFinishReplay replay = null;
+            yield return Until(() => (replay = session.FinishReplay) != null && replay.Running
+                || session.State.phase != GameFlowPhase.Playing, "The final-hit replay starts", 60d);
+            Assert.That(session.FinishUsesReplay && replay.Running, Is.True, "The round's last real hit is replayed.");
+            Assert.That(hanging.PresentationPoseActive, Is.True, "The kept poses are drawn.");
+            yield return Until(() => (session.State.phase == GameFlowPhase.StageResult || session.State.phase == GameFlowPhase.Completed)
+                && !session.IsLoadingScene && SceneManager.GetActiveScene().path == GameScenePaths.StageResult,
+                "The result loads after the replay", 30d);
+        }
+
         [UnityTest]
         public IEnumerator ANewTapSkipsTheReplayOnThisDeviceAndTheSoloResultFollows()
         {

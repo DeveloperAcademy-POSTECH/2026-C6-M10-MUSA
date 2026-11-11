@@ -603,6 +603,8 @@ namespace C6Lab
         [SerializeField] private bool jigwiATestOnly = false;
         [Tooltip("#595 Inspector 전용(Host): 켜면 지귀 시간표가 연기 10초 / 부적 45초 / 연기 66초 / 부적 83초(공통 기믹은 Jigwi Common Start Seconds부터)다. 연기는 양동이 없이 모두의 화면을 같은 때에 덮어 각자 90% 문질러 걷어 내고, 부적은 모두가 써야 모두 보상(한 명이라도 못 쓰면 모두의 판이 탄다). 켜면 Jigwi Flow Schedule과 Jigwi B Bucket보다 앞선다. B Test Only / A Test Only와 함께 켜면 연기만 / 공용 부적만 시험한다.")]
         [SerializeField] private bool jigwiSmokeFlow = false;
+        [Tooltip("#663 Inspector 전용(Host, 연기 흐름만): 연기가 끝나면(다 걷어 내거나 시간이 다 되면) 이만큼 뒤에 다음 부적이 시작된다(초, 지귀 예고 2초 포함). 원래 시각(45초/83초)보다 늦어지지는 않는다. 그 사이에 올 공통 기믹은 부적이 끝난 뒤로 미룬다. 0이면 예전처럼 정해진 시각.")]
+        [SerializeField, Range(0f, 20f)] private float jigwiSmokeToTalismanSeconds = 4f;
         [Tooltip("#540 Inspector 전용(Host, 새 시간표만): 지귀 공통 기믹이 처음 나오는 때(초).")]
         [SerializeField, Range(0f, 99f)] private float jigwiCommonStartSeconds = 40f;
         [Tooltip("#540 Inspector 전용(Host, 새 시간표만): 지귀 공통 기믹 간격(초). 피버(100초) 전까지 되풀이.")]
@@ -634,6 +636,8 @@ namespace C6Lab
         [SerializeField, Range(0f, 30f)] private float jigwiAFailDrumSlipSeconds = 0f;
         [Tooltip("#540 Inspector 전용(각 기기): 불붙은 북이 얼마나 가벼운지. 옆으로 밀 때 빠르기는 이 배, 미끄러지며 느려지는 정도는 1/이 배 (2면 같은 스와이프로 약 8배 멀리).")]
         [SerializeField, Range(1f, 4f)] private float jigwiAFailDrumSlipBoost = 2f;
+        [Tooltip("#663 Inspector 전용(Host): 부적을 다 못 써 실패한 뒤 판의 구슬에 불이 붙기까지(초, 부적이 끝난 때부터). 불덩이가 판에 닿는 때가 0.45초. 붙은 뒤 1초 동안 재가 된다. 예전에는 지귀 대사 '모두 재가 되어라!'(지금은 파일이 없어 나지 않음)를 기다려 3.7초였다.")]
+        [SerializeField, Range(.45f, 5f)] private float jigwiAFailBurnStartSeconds = (float)LabModel.JigwiTalismanFailFirstBurnSeconds;
         [Tooltip("#479 Inspector 전용(각 기기): 부적 점선 \"물\" 중 이만큼 칠하면 다 쓴 것으로 본다 (0~1).")]
         [SerializeField, Range(.3f, 1f)] private float jigwiTalismanCoverage = .85f;
         [Tooltip("#479 Inspector 전용(각 기기): 손가락이 점선에서 이만큼(글자 칸 크기 대비) 떨어져도 칠한다. 클수록 쉽다.")]
@@ -1246,6 +1250,15 @@ namespace C6Lab
         public bool JigwiBTestOnly => jigwiBTestOnly;
         public bool JigwiATestOnly => jigwiATestOnly;
         public bool JigwiSmokeFlow => jigwiSmokeFlow;
+        /// <summary>#663: 0 = off; otherwise at least the 2 s warning.</summary>
+        public float JigwiSmokeToTalismanSeconds
+        {
+            get
+            {
+                float seconds = Mathf.Clamp(Finite(jigwiSmokeToTalismanSeconds, 4f), 0f, 20f);
+                return seconds <= 0f ? 0f : Mathf.Max((float)LabJigwiABTimeline.WarningSeconds, seconds);
+            }
+        }
         public float JigwiCommonStartSeconds => Mathf.Clamp(Finite(jigwiCommonStartSeconds, 40f), 0f, 99f);
         public float JigwiCommonIntervalSeconds => Mathf.Clamp(Finite(jigwiCommonIntervalSeconds, 15f), 3f, 60f);
         public float JigwiStageWarningSeconds => Mathf.Clamp(Finite(jigwiStageWarningSeconds, 1f), 0f, 3f);
@@ -1264,6 +1277,8 @@ namespace C6Lab
         public float JigwiTalismanWaterPaintScale => Mathf.Clamp(Finite(jigwiTalismanWaterPaintScale, 1.5f), 1f, 3f);
         public float JigwiTalismanRewardDelaySeconds => Mathf.Clamp(Finite(jigwiTalismanRewardDelaySeconds, 0f), 0f, 8f);
         public float JigwiAFailDrumSlipSeconds => Mathf.Clamp(Finite(jigwiAFailDrumSlipSeconds, 0f), 0f, 30f);
+        public float JigwiAFailBurnStartSeconds =>
+            Mathf.Clamp(Finite(jigwiAFailBurnStartSeconds, (float)LabModel.JigwiTalismanFailFirstBurnSeconds), .45f, 5f);
         public float JigwiAFailDrumSlipBoost => Mathf.Clamp(Finite(jigwiAFailDrumSlipBoost, 2f), 1f, 4f);
         public float JigwiTalismanCoverage => Mathf.Clamp(Finite(jigwiTalismanCoverage, .85f), .3f, 1f);
         public float JigwiTalismanTolerance => Mathf.Clamp(Finite(jigwiTalismanTolerance, .07f), .02f, .2f);
