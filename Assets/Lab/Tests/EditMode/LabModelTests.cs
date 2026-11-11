@@ -3093,10 +3093,17 @@ namespace C6Lab.Tests
             var mix = MixConfig(5f, bomb: 0, block: 0, fox: 1, charm: 0);
             try
             {
+                // Test both polarities without ending the team round after the first collision.
+                // The default spare allowance may otherwise make its goal one and smoke the second fox.
+                var values = mix.CaptureDeveloperValues();
+                values[LabConfig.FoxRoundSpareMinField] = values[LabConfig.FoxRoundSpareMaxField] = 0f;
+                Assert.That(mix.TryApplyDeveloperValues(values, out string configError), Is.True, configError);
                 var solo = new LabModel();
                 solo.BeginSolo("fox-touch", 42ul, 0d, mix);
                 solo.Tick(5d);
                 string[] foxes = solo.DrainFoxFires().Single().OrbIds;
+                Assert.That(foxes.Length, Is.GreaterThanOrEqualTo(2));
+                Assert.That(solo.Snapshot(5d).foxRoundGoal, Is.EqualTo(foxes.Length));
                 LabOrbState yin = null, yang = null;
                 for (int i = 0; i < 10 && (yin == null || yang == null); i++)
                 {
@@ -3120,6 +3127,7 @@ namespace C6Lab.Tests
                 LabOrbState[] left = solo.Snapshot(6.1d).orbs;
                 Assert.That(left.Any(orb => orb.id == foxes[0] || orb.id == yin.id), Is.False, "Both go.");
                 Assert.That(left.Any(orb => orb.kind == LabOrbKind.Combined), Is.False, "Nothing comes of it.");
+                Assert.That(left.Any(orb => orb.id == foxes[1]), Is.True, "The second fox remains until its own collision.");
                 Assert.That(solo.TryFoxFireAt(42ul, foxes[1], yang.id, "fox-takes-yang", 6.2d, out reason), Is.True, reason);
             }
             finally { UnityEngine.Object.DestroyImmediate(mix); }

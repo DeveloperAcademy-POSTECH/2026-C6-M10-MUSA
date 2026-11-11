@@ -229,6 +229,7 @@ namespace Hapio.Tests
                 Is.EqualTo(GameBattleUiColors.Light));
             Assert.That(teamBar.BlueFlagAt, Is.Zero);
             Assert.That(teamBar.RedFlagAt, Is.EqualTo(1));
+            AssertTerritoryPlayerBadgeSprites(bindings.hud, ui.Theme, session.Network);
             var snapshot=session.Network.Snapshot;
             var original=snapshot.players;
             try
@@ -272,6 +273,86 @@ namespace Hapio.Tests
             }
             finally { snapshot.players=original; }
         }
+        private static void AssertTerritoryPlayerBadgeSprites(LabHud hud, GameBattleUiTheme theme, LabNetwork network)
+        {
+            Assert.That(theme.territoryBlueBadges, Has.Length.EqualTo(3));
+            Assert.That(theme.territoryRedBadges, Has.Length.EqualTo(3));
+            for (int i = 0; i < 3; i++)
+            {
+                Assert.That(theme.territoryBlueBadges[i], Is.Not.Null);
+                Assert.That(theme.territoryRedBadges[i], Is.Not.Null);
+                Assert.That(theme.territoryBlueBadges[i].name, Is.EqualTo("TerritoryBlueP" + (i + 1)));
+                Assert.That(theme.territoryRedBadges[i].name, Is.EqualTo("TerritoryRedP" + (i + 1)));
+            }
+            var snapshot = network.Snapshot;
+            var originalPlayers = snapshot.players;
+            var originalBlue = hud.territoryBlueBadges;
+            var originalRed = hud.territoryRedBadges;
+            var update = typeof(LabHud).GetMethod("Update", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            Action refresh = () => update.Invoke(hud, null);
+            Func<int, int, LabPlayerState[]> roster = (total, mine) => Enumerable.Range(0, total)
+                .Select(seat => new LabPlayerState { seat = seat, id = seat == mine ? network.LocalPlayerId : network.LocalPlayerId + (ulong)seat + 1 })
+                .ToArray();
+            try
+            {
+                // Refresh in the same frame: the live solo Host must not replace these display-only rosters.
+                foreach (int total in new[] { 4, 6 })
+                {
+                    int size = total / 2;
+                    // Authored 2:2 end walls and 3:3 P2-P1-P3 seating, independently of the runtime neighbor lookup.
+                    int[] left = total == 4 ? new[] { -1, 0 } : new[] { 1, 2, 0 };
+                    int[] right = total == 4 ? new[] { 1, -1 } : new[] { 2, 0, 1 };
+                    for (int mine = 0; mine < total; mine++)
+                    {
+                        snapshot.players = roster(total, mine);
+                        refresh();
+                        var badges = mine < size ? theme.territoryBlueBadges : theme.territoryRedBadges;
+                        int number = mine % size;
+                        string context = total + " players, global P" + (mine + 1);
+                        AssertPlayerBadgeSprite(hud.localPlayerCircle, badges[number], context + " local");
+                        AssertPlayerBadgeSprite(hud.leftPlayerCircle, left[number] < 0 ? null : badges[left[number]], context + " left");
+                        AssertPlayerBadgeSprite(hud.rightPlayerCircle, right[number] < 0 ? null : badges[right[number]], context + " right");
+                        Assert.That(hud.TeamBar.LocalRing == null || !hud.TeamBar.LocalRing.gameObject.activeSelf, Is.True,
+                            context + ": team artwork already carries its own colour rim.");
+                    }
+                }
+                snapshot.players = roster(1, 0);
+                refresh();
+                AssertPlayerBadgeSprite(hud.localPlayerCircle, theme.territoryBlueBadges[0], "Solo blue P1");
+                AssertPlayerBadgeSprite(hud.leftPlayerCircle, null, "Solo left");
+                AssertPlayerBadgeSprite(hud.rightPlayerCircle, null, "Solo right");
+
+                // Without the optional theme art, global P numbers and the legacy team ring still work.
+                snapshot.players = roster(6, 4);
+                hud.territoryBlueBadges = hud.territoryRedBadges = null;
+                refresh();
+                AssertPlayerBadgeSprite(hud.localPlayerCircle, hud.playerCircleSprites[4], "Fallback global P5");
+                AssertPlayerBadgeSprite(hud.leftPlayerCircle, hud.playerCircleSprites[5], "Fallback global P6 left");
+                AssertPlayerBadgeSprite(hud.rightPlayerCircle, hud.playerCircleSprites[3], "Fallback global P4 right");
+                Assert.That(hud.TeamBar.LocalRing, Is.Not.Null);
+                Assert.That(hud.TeamBar.LocalRing.gameObject.activeSelf, Is.True);
+                hud.territoryBlueBadges = originalBlue;
+                hud.territoryRedBadges = originalRed;
+                refresh();
+                AssertPlayerBadgeSprite(hud.localPlayerCircle, theme.territoryRedBadges[1], "Restored red P2");
+                Assert.That(hud.TeamBar.LocalRing.gameObject.activeSelf, Is.False, "Restored team art hides the fallback ring.");
+            }
+            finally
+            {
+                snapshot.players = originalPlayers;
+                hud.territoryBlueBadges = originalBlue;
+                hud.territoryRedBadges = originalRed;
+                refresh();
+            }
+        }
+
+        private static void AssertPlayerBadgeSprite(UnityEngine.UI.Image badge, Sprite expected, string context)
+        {
+            Assert.That(badge.sprite, Is.SameAs(expected), context);
+            Assert.That(badge.enabled, Is.EqualTo(expected != null), context + " image visibility");
+            Assert.That(badge.gameObject.activeInHierarchy, Is.EqualTo(expected != null), context + " edge visibility");
+        }
+
         private static void AssertPlayerBadgeLayout(LabHud hud)
         {
             var stamina = (RectTransform)hud.staminaFill.transform.parent;

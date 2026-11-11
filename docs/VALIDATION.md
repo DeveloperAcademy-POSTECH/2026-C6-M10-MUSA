@@ -8344,3 +8344,16 @@ Home/Lobby의 저장 DEV 105/106 입력·슬라이더도 같은 값으로 맞췄
 인원2/3/4/5에서 적용되는 최초/재타격을 Editor에서도 각각3.25/2.5, 2.16666651/1.66666663, 1.625/1.25, 1.3/1.0으로 확인했다. 내부 반올림은 하지 않는다. 원래 가로 Game view 선택3 복원과 설정259개·5701/Lab61/Game52를 확인했다. main의 VFX·박 잘림·봉인 기록·새 콤보/오프닝/음향 수정은 되돌리지 않았다. 해당 Source 파일과 main diff를 검토했다.
 
 원시 결과는 로컬 `artifacts/issue676-participants/final-summary.json` 및 단계별 결과에 보관한다. 실기기3/4/5인 실제 플레이·iOS·Wi-Fi/핫스팟·클리어 시간은 이번 자동 검사와 구분해 미검증이다.
+
+
+## 2026-11-11 — #686 전투 번호·스태미나 UI 최신 main 통합
+
+PR #686 `e1ecc1a9`에 main `f8998ff0`(#680 구미호 협동 기믹 포함)을 통합했다(`cf4e5cce`). 충돌은 이 문서 한 곳으로 양쪽 기록을 모두 보존했다. Scene·Prefab·판정·입력·물리·도색량·VFX·통신 코드는 이번 PR에서 변경하지 않는다. 설정265개·5702/Lab62/Game53을 유지한다.
+
+Unity 6000.6.5f1 / macOS Metal Editor에서 컴파일·전체 EditMode와 UI 영향 PlayMode를 실행했다. 처음에는 브랜치 전환 뒤 Editor에 이전 어셈블리가 남아 EditMode2320개와 PlayMode의 StageCatalog 오류4건이 기록됐다. AssetDatabase 동기 새로고침 뒤 새 구미호 타입·팀 배지3개·프로토콜5702 로드를 확인하고 다시 실행했다. 이 초기 결과는 최신 통합 검증으로 사용하지 않는다.
+
+새로고침 후 전체 EditMode 첫 실행은2336/2337(35.10초)이었다. 기존 `LabModelTests.AFoxOrbTakesAYinOrYangAwayWithItButNotInItsSafeSecond`는 기본 spare 추첨으로 목표가1이 되면 첫 음 구슬 충돌 때 팀 성공으로 남은 여우구슬까지 사라져 두 번째 양 구슬 충돌이 ORB_NOT_FOUND가 됐다. 이 충돌 전용 fixture에서만 spare를0으로 고정하고 목표=실제 낙하 수·최소2·첫 충돌 뒤 두 번째 여우구슬 존재를 확인하도록 보완했다. 음/양 소모·보호1초·조합 거부 단언과 실제 게임 기본값은 유지했다. 최종 전체 EditMode는 **2337/2337,35.19초**이며 실패·skip·inconclusive0이다.
+
+영향 PlayMode는 **44/44**다: `GameBattleUiPresentationTests`4(9.47초), `LabOrbHudCompositionTests`8(0.11초), `LabTeamBattleScreenTests`5(8.15초), `LabStaminaBarHudTests`1(0.32초), `LabStaminaFeedbackTests`7(0.02초), `LabStaminaShortFeedbackTests`5(0.02초), `LabCharmBubblesTests`10(4.12초), `LabCharmHeartRainTests`2(0.03초), `LabFoxRoundHudTests`2(1.74초). 기존 territory fixture에4/6인의 전 자리·양 팀·좌우 끝·솔로·이미지 누락 fallback·기존 고리 복구를 실제 HUD.Update 경로로 검사했다. 이후 수정은 EditMode fixture뿐이어서 이 PlayMode 결과는 같은 게임 코드·에셋·PlayMode 어셈블리에 대한 결과를 재사용한다.
+
+실제402×874 Game View에서 구미호3인 표시와3:3 청/홍팀 표시를 촬영해 좌우 번호·하단 정렬·팀 이미지 색/번호를 확인했다. 화면용 참가자 배열을 사용했으며 실제 다중 기기 연결 성공을 뜻하지 않는다. 원래 Scene·Game View·솔로 시작 스테이지 설정은 복원하고 재생을 종료했다. UI만 변경하므로 전체 PlayMode는 재실행하지 않았다. iOS·실제 멀티 Wi-Fi/핫스팟·기기별 inset은 미검증이고 이번 새 Mac 빌드도 수행하지 않았다. 원시 결과와 PNG는 커밋하지 않은 로컬 artifacts/pr686-ui에 보관한다.
