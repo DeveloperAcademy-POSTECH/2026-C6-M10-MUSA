@@ -27,6 +27,26 @@ namespace Hapio.Tests
                     if(image.GetComponent<Mask>()==null&&image.name!="Card Turn Pivot"&&!image.name.EndsWith(" Action")&&!image.name.StartsWith("Rectangle 175")&&image.name!="Continue Hit Area"&&image.name!="NextSeal")Assert.That(image.sprite,Is.Not.Null,cut.cutId+" / "+image.name);
             }
         }
+        [Test] public void SealCardSwipeHintUsesTheApprovedLineAndStaysAfterFlipping()
+        {
+            foreach(var name in new[]{"AfterGumiho","AfterYagwanggui","AfterJigwi"})
+            {
+                var root=Object.Instantiate(Sequence(name).cuts[0].viewPrefab.gameObject);
+                try
+                {
+                    var flip=root.GetComponentInChildren<StoryCardFlip>(true);
+                    Assert.That(flip.swipeHint,Is.Not.Null,name);
+                    Assert.That(flip.swipeHint.GetComponentInChildren<Text>(true).text,Is.EqualTo("좌우로 밀어 부적 뒤집기"),name);
+                    flip.SetHintVisible(true);
+                    flip.Flip();
+                    typeof(StoryCardFlip).GetMethod("Advance",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic|System.Reflection.BindingFlags.Public)
+                        .Invoke(flip,new object[]{flip.flipSeconds+.1f});
+                    Assert.That(flip.IsBack,Is.True);
+                    Assert.That(flip.swipeHint.activeSelf,Is.True,"The back face keeps the swipe hint: "+name);
+                }
+                finally{Object.DestroyImmediate(root);}
+            }
+        }
         [Test] public void EachSealCardKeepsEditableFrontBackAndAnInspectionEvent()
         {
             foreach(var name in new[]{"AfterGumiho","AfterYagwanggui","AfterJigwi"})
