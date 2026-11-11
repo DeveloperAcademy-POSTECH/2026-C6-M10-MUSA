@@ -196,8 +196,9 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void FiveColorContactHasTheSameClayGeometryAndTimingAsANormalContactAndOnlyHitsOnce()
+        public void CurrentFiveColorComparisonRetainsNormalGeometryAndTimingAndOnlyHitsOnce()
         {
+            pool.FiveColorBoostEnabled = false; // The retained comparison is the pre-enhancement clay look.
             Vector3 point = new Vector3(.2f, 81f, .3f), normal = new Vector3(.1f, 1f, .2f).normalized;
             Vector3 incoming = new Vector3(2f, -9f, 1f);
             var normalLease = pool.BeginFlight(LabOrbElement.Wood, point, incoming, .37f, .6f);
@@ -221,6 +222,131 @@ namespace C6Lab.Tests
             pool.Advance(2f);
             Assert.That(pool.ActiveImpactCount, Is.Zero);
         }
+
+        [Test]
+        public void FiveColorBoostDoesNotChangeNormalFlightOrContactGeometry()
+        {
+            const float diameter = .4f;
+            pool.FiveColorBoostEnabled = false;
+            var baseline = pool.BeginFlight(LabOrbElement.Water, Vector3.zero, Vector3.right, diameter, .6f);
+            FollowDenseStraightPath(baseline, diameter);
+            var flightGeometry = Geometry(pool.transform.Find("Flight 0"));
+            Assert.That(baseline.Hit(Vector3.right * 3f, Vector3.up, Vector3.down,
+                leaveMark: false), Is.True);
+            pool.Advance(.25f);
+            var contactGeometry = Geometry(pool.transform.Find("Impact 0"));
+
+            pool.ClearAll();
+            pool.FiveColorBoostEnabled = true;
+            var unchanged = pool.BeginFlight(LabOrbElement.Water, Vector3.zero, Vector3.right, diameter, .6f);
+            FollowDenseStraightPath(unchanged, diameter);
+            AssertGeometry(flightGeometry, pool.transform.Find("Flight 0"));
+            Assert.That(unchanged.Hit(Vector3.right * 3f, Vector3.up, Vector3.down,
+                leaveMark: false), Is.True);
+            pool.Advance(.25f);
+            AssertGeometry(contactGeometry, pool.transform.Find("Impact 0"));
+        }
+
+        [Test]
+        public void EnhancedFiveColorKeepsTheSameBodyButHasAThickerLongerTravelledTail()
+        {
+            const float diameter = .4f;
+            pool.FiveColorBoostEnabled = false;
+            var current = pool.BeginFlight(LabOrbElement.None, Vector3.zero, Vector3.right,
+                diameter, fiveColor: true);
+            FollowDenseStraightPath(current, diameter);
+            Transform slot = pool.transform.Find("Flight 0");
+            Vector3 oldBody = slot.Find("Wet clay").localScale;
+            float oldWidth = slot.Find("Pulling neck").localScale.x;
+            float oldReach = slot.position.x - TailEnd(slot.Find("Pigment streak 1")).x;
+
+            pool.ClearAll();
+            pool.FiveColorBoostEnabled = true;
+            var enhanced = pool.BeginFlight(LabOrbElement.None, Vector3.zero, Vector3.right,
+                diameter, fiveColor: true);
+            FollowDenseStraightPath(enhanced, diameter);
+            Assert.That(Vector3.Distance(slot.Find("Wet clay").localScale, oldBody), Is.LessThan(.00001f),
+                "The boosted trail does not increase the orb body or imply a larger collision sphere.");
+            Assert.That(slot.Find("Pulling neck").localScale.x / oldWidth, Is.InRange(1.3f, 1.5f));
+            float newReach = slot.position.x - TailEnd(slot.Find("Pigment streak 1")).x;
+            Assert.That(newReach, Is.GreaterThan(oldReach * 1.3f));
+            Assert.That(newReach / diameter, Is.InRange(2.1f, 2.6f),
+                "Dense travel samples must retain the real extended trail, rather than truncating it to the old 32-sample path.");
+            Assert.That(TailEnd(slot.Find("Pigment streak 1")).x, Is.GreaterThanOrEqualTo(0f),
+                "Even the boosted tail only uses positions reached since launch.");
+            Assert.That(slot.GetComponentsInChildren<Collider>(true), Is.Empty);
+            Assert.That(slot.GetComponentsInChildren<Rigidbody>(true), Is.Empty);
+        }
+
+        [TestCase(false, 5)]
+        [TestCase(true, 3)]
+        public void EnhancedImpactUsesBoundedDistinctClayDropsAndRetiresWithoutASecondHit(bool lowDetail, int expectedDrops)
+        {
+            pool.FiveColorBoostEnabled = false;
+            var original = pool.BeginFlight(LabOrbElement.None, Vector3.zero, Vector3.down,
+                .4f, .6f, fiveColor: true);
+            Assert.That(original.Hit(Vector3.zero, Vector3.up, Vector3.down, leaveMark: false), Is.True);
+            pool.Advance(.25f);
+            Transform impact = pool.transform.Find("Impact 0");
+            float previousWidth = impact.Find("Wet surface mark").localScale.x;
+            Assert.That(VisibleDrops(impact).Length, Is.EqualTo(4));
+
+            pool.ClearAll();
+            pool.LowDetail = lowDetail;
+            pool.FiveColorBoostEnabled = true;
+            var enhanced = pool.BeginFlight(LabOrbElement.None, Vector3.zero, Vector3.down,
+                .4f, .6f, fiveColor: true);
+            Assert.That(enhanced.Hit(Vector3.zero, Vector3.up, Vector3.down, leaveMark: false), Is.True);
+            Assert.That(enhanced.Hit(Vector3.zero, Vector3.up, Vector3.down, leaveMark: false), Is.False);
+            pool.Advance(.25f);
+            MeshRenderer[] drops = VisibleDrops(impact);
+            Assert.That(drops.Length, Is.EqualTo(expectedDrops));
+            Assert.That(drops.Select(BaseColor).Distinct().Count(), Is.EqualTo(expectedDrops),
+                "The larger drops must simultaneously show separate palette colors, not one uniform burst.");
+            Assert.That(impact.Find("Wet surface mark").localScale.x / previousWidth, Is.InRange(1.25f, 1.45f),
+                "Five-color enlargement is a bounded linear visual scale, not extra gameplay paint.");
+            Assert.That(impact.localScale, Is.EqualTo(Vector3.one * .4f),
+                "The actual supplied projectile diameter remains the root scale.");
+            Assert.That(impact.GetComponentsInChildren<Collider>(true), Is.Empty);
+            Assert.That(impact.GetComponentsInChildren<Rigidbody>(true), Is.Empty);
+            Assert.That(impact.Find("Element release"), Is.Null);
+            Assert.That(pool.ActiveImpactCount, Is.EqualTo(1));
+            pool.Advance(.35f);
+            Assert.That(VisibleDrops(impact).Length, Is.EqualTo(expectedDrops),
+                "Large clay drops are still visible at 0.6 seconds before fading out.");
+            pool.Advance(1f);
+            Assert.That(pool.ActiveImpactCount, Is.Zero);
+            Assert.That(pool.ActiveFlightCount, Is.Zero);
+        }
+
+        [TestCase(false, true, 4)]
+        [TestCase(true, false, 5)]
+        public void AFlightKeepsItsChosenComparisonWhenThePoolToggleChangesBeforeContact(
+            bool chosenBoost, bool laterBoost, int expectedDrops)
+        {
+            pool.FiveColorBoostEnabled = chosenBoost;
+            var lease = pool.BeginFlight(LabOrbElement.None, Vector3.zero, Vector3.down,
+                .4f, .6f, fiveColor: true);
+            pool.FiveColorBoostEnabled = laterBoost;
+            Assert.That(lease.Hit(Vector3.zero, Vector3.up, Vector3.down, leaveMark: false), Is.True);
+            pool.Advance(.2f);
+            Assert.That(VisibleDrops(pool.transform.Find("Impact 0")).Length, Is.EqualTo(expectedDrops),
+                "Changing the comparison only affects the next throw; a live lease cannot change its impact style mid-flight.");
+        }
+
+        private void FollowDenseStraightPath(LabFiveElementVfx.Flight lease, float diameter)
+        {
+            // Just above the distance threshold: the original 32-slot buffer retained less than 2.1D.
+            for (int step = 1; step <= 96; step++)
+            {
+                lease.Move(Vector3.right * (diameter * .065f * step), Vector3.right);
+                pool.Advance(.002f);
+            }
+        }
+
+        private static Vector3 TailEnd(Transform piece) => piece.position - piece.forward * (piece.localScale.z * .5f);
+        private static MeshRenderer[] VisibleDrops(Transform impact) => impact.GetComponentsInChildren<MeshRenderer>(true)
+            .Where(part => part.name.StartsWith("Thrown clay ") && part.enabled && part.gameObject.activeInHierarchy).ToArray();
 
         [Test]
         public void ReusedNormalSlotRejectsStaleTintAndClearsTheFiveColorPaperRamp()

@@ -277,15 +277,11 @@ namespace C6Lab
             bool clay = replayVfx != null && replayVfx.PlayImpact(Shot.Element, point, posedNormal, incoming,
                 2f * Shot.Radius, LabPaintImpact.Normalize(Shot.ImpactVelocity, normal), impactAnchor,
                 leaveMark: false, fiveColor: Shot.FiveColor, fiveColorAge: Shot.FlightSeconds);
-            if (!clay)
+            // Five-color uses the pool's plain-pigment clay fallback if wet shading is unavailable.
+            // If neither shader can render, keep sound/transition without resurrecting the legacy dust and stars.
+            if (!clay && !Shot.FiveColor)
             {
                 if (!PlayAuthoredBurst(point, speed)) Burst(point, speed);
-                if (Shot.FiveColor)
-                {
-                    float radius = Network.config.OrbRadius;
-                    LabFiveColorSparkle.DustBurst(point, radius).transform.SetParent(effectRoot, true);
-                    LabFiveColorSparkle.Burst(point, radius).transform.SetParent(effectRoot, true);
-                }
             }
             throwSound?.PlayHit(0f, LabThrowSound.IsSmallThrow(Shot.LaunchScale),
                 LabThrowSound.IsBigThrow(Shot.LaunchScale) && !Shot.FiveColor);

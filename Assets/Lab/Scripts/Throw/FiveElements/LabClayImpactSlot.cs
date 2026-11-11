@@ -20,8 +20,8 @@ namespace C6Lab
         private Color color;
         private int dropCount;
         private float strength, diameter, markLife, contactLife, totalLife, oblique, spin;
-        private float pressEnd, spreadDuration;
-        private bool fiveColor;
+        private float pressEnd, spreadDuration, dropLife, spreadScale, pressWidthScale;
+        private bool fiveColor, enhancedFiveColor, singleTone;
         private Color32[] fiveColorPalette;
         private float fiveColorStartAge;
         private Material fiveColorSurface;
@@ -51,19 +51,28 @@ namespace C6Lab
         }
 
         public void Begin(LabOrbElement element, Vector3 point, Vector3 surfaceNormal, Vector3 direction, float diameter,
-            float strength, Transform follow, bool monochrome, float markSeconds, uint seed, bool reduced, bool fiveColor = false)
+            float strength, Transform follow, bool monochrome, float markSeconds, uint seed, bool reduced,
+            bool fiveColor = false, bool enhanceFiveColor = true)
         {
             this.diameter=diameter;
             this.strength=strength;
             this.fiveColor=fiveColor;
+            enhancedFiveColor=fiveColor && enhanceFiveColor && art.fiveColorBoostEnabled;
+            singleTone=monochrome;
+            spreadScale=enhancedFiveColor ? Mathf.Clamp(art.fiveColorSpreadScale,1f,1.8f) : 1f;
+            pressWidthScale=enhancedFiveColor ? Mathf.Clamp(art.fiveColorPressWidthScale,1f,1.5f) : 1f;
+            dropLife=enhancedFiveColor ? Mathf.Clamp(art.fiveColorDropLifetime,.2f,1.3f) : art.dropLifetime;
             fiveColorPalette=fiveColor ? LabFiveColorSparkle.FiveColors : null;
             fiveColorStartAge=0f;
             fiveColorSurface=fiveColor ? art.OrbSurface(element,true) : null;
             markLife=markSeconds;
-            contactLife=Mathf.Max(.25f,art.contactSeconds)/Mathf.Lerp(.95f,1.13f,strength);
-            pressEnd=Mathf.Max(.012f,art.pressSeconds)*Mathf.Lerp(1.12f,.80f,strength);
-            spreadDuration=Mathf.Max(.025f,art.spreadSeconds)*Mathf.Lerp(1.16f,.67f,strength);
-            totalLife=Mathf.Max(contactLife,markLife,art.dropLifetime+.035f);
+            float contact=enhancedFiveColor ? Mathf.Clamp(art.fiveColorContactSeconds,.25f,1.5f) : art.contactSeconds;
+            float press=enhancedFiveColor ? Mathf.Clamp(art.fiveColorPressSeconds,.025f,.15f) : art.pressSeconds;
+            float spreadTime=enhancedFiveColor ? Mathf.Clamp(art.fiveColorSpreadSeconds,.04f,.25f) : art.spreadSeconds;
+            contactLife=Mathf.Max(.25f,contact)/Mathf.Lerp(.95f,1.13f,strength);
+            pressEnd=Mathf.Max(.012f,press)*Mathf.Lerp(1.12f,.80f,strength);
+            spreadDuration=Mathf.Max(.025f,spreadTime)*Mathf.Lerp(1.16f,.67f,strength);
+            totalLife=Mathf.Max(contactLife,markLife,dropLife+.035f);
             Age=0f;
             color=fiveColor ? LabFiveColorSparkle.ColorAt(0f,fiveColorPalette) : art.Pigment(element,monochrome);
             direction=LabFiveElementVfx.Direction(direction,Vector3.down);
@@ -87,7 +96,7 @@ namespace C6Lab
             shapes.PaintOrb(pressRenderer, art.OrbSurface(element, monochrome), color, art.wetGloss);
             shapes.Paint(spreadRenderer,color,art.wetGloss,Vector3.zero);
             spreadRenderer.enabled=false;
-            dropCount=Mathf.Clamp(art.clayDrops,3,5);
+            dropCount=Mathf.Clamp(enhancedFiveColor ? art.fiveColorClayDrops : art.clayDrops,3,5);
             if (reduced) dropCount=Mathf.Min(3,dropCount);
             for (int i=0; i<drops.Length; ++i)
             {
@@ -98,7 +107,8 @@ namespace C6Lab
                 float radial=(2.68f+.71f*Mathf.Sin(spin*3+i*2.3f))*Mathf.Lerp(.9f,1.8f,strength);
                 float lift=(2.25f+.57f*Mathf.Cos(spin+i*2.1f))*Mathf.Lerp(1f,1.28f,strength);
                 velocities[i]=new Vector3(radial*Mathf.Cos(a),lift,radial*Mathf.Sin(a))*art.dropSpeed;
-                sizes[i]=.22f+.08f*Mathf.Sin(spin+2.8f*i);
+                sizes[i]=(.22f+.08f*Mathf.Sin(spin+2.8f*i)) *
+                    (enhancedFiveColor ? Mathf.Clamp(art.fiveColorDropSizeScale,1f,2f) : 1f);
                 Color dropColor=fiveColor ? LabFiveColorSparkle.ColorAt(
                     (i+1)*LabClayShapes.FiveColorStepSeconds,fiveColorPalette) : color;
                 shapes.Paint(dropRenderers[i],dropColor,art.wetGloss,Vector3.zero);
@@ -142,7 +152,7 @@ namespace C6Lab
             float paletteAge=fiveColorStartAge+Age;
             if (fiveColor)
             {
-                color=LabFiveColorSparkle.ColorAt(paletteAge,fiveColorPalette);
+                color=enhancedFiveColor && singleTone ? art.monochrome : LabFiveColorSparkle.ColorAt(paletteAge,fiveColorPalette);
                 shapes.PaintFiveColorOrb(pressRenderer,fiveColorSurface,color,art.wetGloss);
             }
 
@@ -152,7 +162,7 @@ namespace C6Lab
             if (pressRenderer.enabled)
             {
                 float height=Mathf.Lerp(1f,.31f,compression)*releaseBall;
-                float width=Mathf.Lerp(1f,1.42f,compression)*releaseBall;
+                float width=Mathf.Lerp(1f,1.42f*pressWidthScale,compression)*releaseBall;
                 pressed.localScale=new Vector3(width,height,width*(1+.12f*oblique*compression));
                 pressed.localPosition=new Vector3(0f,height*.49f,.06f*oblique*compression);
                 pressed.localRotation=contactRotation;
@@ -164,8 +174,10 @@ namespace C6Lab
             spreadRenderer.enabled=growth>0f && fade>.005f;
             if (spreadRenderer.enabled)
             {
-                float curve=art.spread != null ? Mathf.Clamp01(art.spread.Evaluate(growth)) : growth;
-                float radius=Mathf.Lerp(.28f,Mathf.Lerp(art.normalSpread,art.strongSpread,strength),curve)*fade;
+                // A fast initial push followed by deceleration, without an extra ring or another hit event.
+                float curve=enhancedFiveColor ? 1f-(1f-growth)*(1f-growth)*(1f-growth) :
+                    art.spread != null ? Mathf.Clamp01(art.spread.Evaluate(growth)) : growth;
+                float radius=Mathf.Lerp(.28f,Mathf.Lerp(art.normalSpread,art.strongSpread,strength)*spreadScale,curve)*fade;
                 float settle=Mathf.SmoothStep(0,1,Mathf.InverseLerp(.24f,.69f,Age));
                 float h=Mathf.Lerp(1.14f,.79f,settle)*Mathf.Lerp(1f,.72f,strength)*Mathf.Sqrt(fade);
                 spread.localRotation=contactRotation;
@@ -180,7 +192,7 @@ namespace C6Lab
             }
 
             float elapsed=Age-pressEnd*.69f;
-            float life=Mathf.Max(.01f,art.dropLifetime);
+            float life=Mathf.Max(.01f,dropLife);
             bool showDrops=elapsed>=0f && elapsed<life;
             Vector3 gravity=root.InverseTransformDirection(Vector3.down)*art.gravityDiameters;
             for (int i=0; i<dropCount; ++i)
@@ -188,7 +200,7 @@ namespace C6Lab
                 dropRenderers[i].enabled=showDrops;
                 if (!showDrops) continue;
                 if (fiveColor)
-                    shapes.Paint(dropRenderers[i],LabFiveColorSparkle.ColorAt(
+                    shapes.Paint(dropRenderers[i],enhancedFiveColor ? RewardDropColor(i) : LabFiveColorSparkle.ColorAt(
                         paletteAge*LabClayShapes.FiveColorFlowSpeed+(i+1)*LabClayShapes.FiveColorStepSeconds,
                         fiveColorPalette),art.wetGloss,Vector3.zero);
                 float size=sizes[i]*(1f-Mathf.SmoothStep(0f,1f,Mathf.InverseLerp(life*.57f,life,elapsed)));
@@ -201,13 +213,21 @@ namespace C6Lab
             }
         }
 
+        private Color RewardDropColor(int index)
+        {
+            if (singleTone) return art.monochrome;
+            // Hold the five distinct pigments for this short splash; don't change all drops into blended colors.
+            int first=Mathf.FloorToInt(Mathf.Repeat(fiveColorStartAge/LabClayShapes.FiveColorStepSeconds,fiveColorPalette.Length));
+            return fiveColorPalette[(first+index)%fiveColorPalette.Length];
+        }
+
         public void Return()
         {
             if (!Active) return;
             Active=false;
             target=null;
             followsTarget=false;
-            fiveColor=false;
+            fiveColor=false; enhancedFiveColor=false; singleTone=false;
             fiveColorStartAge=0f;
             fiveColorPalette=null;
             fiveColorSurface=null;

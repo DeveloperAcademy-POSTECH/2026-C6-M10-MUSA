@@ -83,6 +83,87 @@ namespace C6Lab.Tests
                 "Recovering the comparison layout must not resume its paused animation.");
         }
 
+        [UnityTest]
+        public IEnumerator PreparedComparisonButtonsRetainTimeFramingAndProfileAcrossFiveAndSingleThrows()
+        {
+            Assert.IsFalse(SceneManager.GetSceneByPath(ComparisonScenePath).isLoaded);
+            comparisonSceneOwned = true;
+            yield return UnityEditor.SceneManagement.EditorSceneManager.LoadSceneAsyncInPlayMode(ComparisonScenePath,
+                new LoadSceneParameters(LoadSceneMode.Additive));
+            Scene scene = SceneManager.GetSceneByPath(ComparisonScenePath);
+            var demo = scene.GetRootGameObjects().SelectMany(root => root.GetComponentsInChildren<LabFiveElementsDemo>()).Single();
+            var document = demo.GetComponent<UIDocument>();
+            for (int frame = 0; frame < 60 && (demo.DemoCamera == null || document.rootVisualElement.panel == null ||
+                !(document.rootVisualElement.Q("view").worldBound.height > 1f)); frame++) yield return null;
+            yield return null;
+            demo.SetPaused(true);
+            var pool = LabFiveElementVfx.ForScene(scene);
+            string originalProfile = JsonUtility.ToJson(pool.Profile);
+            VisualElement hud = document.rootVisualElement;
+
+            ClickComparison(hud, "currentFiveColor");
+            demo.Seek(.4f);
+            Assert.That(demo.SelectedComparison, Is.EqualTo(LabFiveElementsComparison.CurrentFiveColor));
+            Assert.That(demo.ActiveFlights, Is.EqualTo(5));
+            Assert.That(demo.ActiveImpacts, Is.Zero);
+            float oldWidth = pool.transform.Find("Flight 0/Pulling neck").localScale.x;
+            Matrix4x4 cameraPose = demo.DemoCamera.transform.localToWorldMatrix;
+            float oldLens = demo.DemoCamera.orthographicSize;
+            Rect oldViewport = demo.DemoCamera.rect;
+            ClickComparison(hud, "enhancedFiveColor");
+            Assert.That(demo.SelectedComparison, Is.EqualTo(LabFiveElementsComparison.EnhancedFiveColor));
+            Assert.That(demo.ActiveFlights, Is.EqualTo(5));
+            Assert.That(pool.transform.Find("Flight 0/Pulling neck").localScale.x, Is.GreaterThan(oldWidth * 1.2f),
+                "The real HUD button must switch the actual pooled five-color appearance.");
+            Assert.That(demo.PlaybackTime, Is.EqualTo(.4f).Within(.00001f));
+            Assert.That(demo.Paused, Is.True);
+            Assert.That(demo.DemoCamera.transform.localToWorldMatrix, Is.EqualTo(cameraPose));
+            Assert.That(demo.DemoCamera.orthographicSize, Is.EqualTo(oldLens));
+            Assert.That(demo.DemoCamera.rect, Is.EqualTo(oldViewport));
+            Assert.That(hud.Q<Button>("enhancedFiveColor").ClassListContains("primary"), Is.True);
+            Assert.That(hud.Q<Button>("currentFiveColor").ClassListContains("primary"), Is.False);
+
+            demo.Seek(.9f);
+            Assert.That(demo.ActiveFlights, Is.Zero);
+            Assert.That(demo.ActiveImpacts, Is.EqualTo(5));
+            ClickComparison(hud, "currentFiveColor");
+            Assert.That(demo.ActiveImpacts, Is.EqualTo(5));
+            Assert.That(demo.VolleyHits, Is.EqualTo(5), "Comparison switching replaces the volley rather than layering a duplicate.");
+            demo.SelectLane(2);
+            Assert.That(demo.ActiveImpacts, Is.EqualTo(1));
+            cameraPose = demo.DemoCamera.transform.localToWorldMatrix;
+            oldLens = demo.DemoCamera.orthographicSize;
+            ClickComparison(hud, "enhancedFiveColor");
+            Assert.That(demo.SelectedLane, Is.EqualTo(2));
+            Assert.That(demo.ActiveImpacts, Is.EqualTo(1));
+            Assert.That(demo.VolleyHits, Is.EqualTo(1));
+            Assert.That(demo.PlaybackTime, Is.EqualTo(.9f).Within(.00001f));
+            Assert.That(demo.DemoCamera.transform.localToWorldMatrix, Is.EqualTo(cameraPose));
+            Assert.That(demo.DemoCamera.orthographicSize, Is.EqualTo(oldLens));
+            ClickComparison(hud, "ordinaryElements");
+            Assert.That(demo.SelectedComparison, Is.EqualTo(LabFiveElementsComparison.OrdinaryElements));
+            Assert.That(demo.SelectedLane, Is.EqualTo(2));
+            Assert.That(demo.ActiveImpacts, Is.EqualTo(1));
+            Assert.That(demo.Paused, Is.True);
+            Assert.That(demo.PlaybackTime, Is.EqualTo(.9f).Within(.00001f));
+            Assert.That(JsonUtility.ToJson(pool.Profile), Is.EqualTo(originalProfile),
+                "Comparison controls must not write the shared Resources art profile or game defaults.");
+        }
+
+        private static void ClickComparison(VisualElement hud, string name)
+        {
+            Button button = hud.Q<Button>(name);
+            Assert.That(button, Is.Not.Null, name + " must be present in the checked-in comparison HUD.");
+            Assert.That(button.enabledInHierarchy, Is.True);
+            // SendEvent dispatches through the panel; it does not assign this element as the target.
+            // Explicitly address the real Button so its Clickable invokes the registered HUD callback.
+            using (var submit = NavigationSubmitEvent.GetPooled())
+            {
+                submit.target = button;
+                button.SendEvent(submit);
+            }
+        }
+
         private static void AssertComparisonViewport(LabFiveElementsDemo demo, VisualElement shell, VisualElement view)
         {
             Assert.IsNotNull(demo.DemoCamera);

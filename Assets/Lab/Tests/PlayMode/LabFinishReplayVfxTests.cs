@@ -123,6 +123,39 @@ namespace C6Lab.Tests
             AssertIndependentAndUnchanged();
         }
 
+        [Test]
+        public void MissingWetShaderKeepsFiveColorClayOnTheSampledClockWithoutLegacyBursts()
+        {
+            LabFinishReplayShot shot = Shot(LabOrbElement.None, true);
+            Assert.That(replay.Begin(shot), Is.True);
+            var pool = replay.ClayVfx;
+            // Model a device where the specialized shader cannot render. The real pipeline Unlit
+            // material must keep the same meshes and clock rather than creating the old sprite cloud.
+            var field = typeof(LabFiveElementVfx).GetField("shapes", Private);
+            object shapes = field.GetValue(pool);
+            shapes.GetType().GetMethod("Dispose").Invoke(shapes, null);
+            field.SetValue(pool, null);
+            replay.Sample(Elapsed(shot, 0, -.2f));
+            Assert.That(pool.UsesSimpleMaterial, Is.True);
+            Assert.That(pool.BeginFlight(LabOrbElement.Water, Vector3.zero, Vector3.forward, .3f).IsActive, Is.False,
+                "Creating a simple five-color effect must not change an ordinary orb's existing fallback.");
+            Assert.That(pool.PlayImpact(LabOrbElement.Fire, Vector3.zero, Vector3.up, Vector3.down, .3f, .5f), Is.False);
+            Assert.That(replay.Ghost.ClayFlightActive, Is.True);
+            replay.Sample(Elapsed(shot, 0, .2f));
+            Assert.That(pool.ActiveImpactCount, Is.EqualTo(1));
+            Transform impact = pool.transform.Find("Impact 0");
+            Assert.That(impact.GetComponentsInChildren<MeshRenderer>().Count(r => r.enabled && r.name.StartsWith("Thrown clay")),
+                Is.EqualTo(5));
+            Assert.That(pool.GetComponentsInChildren<ParticleSystem>(true), Is.Empty);
+            Assert.That(pool.GetComponentsInChildren<SpriteRenderer>(true), Is.Empty);
+            Assert.That(Object.FindObjectsByType<LabFiveColorSparkle>(FindObjectsSortMode.None)
+                .Any(v => v.name.Contains("Burst")), Is.False);
+            Matrix4x4[] sample = Geometry(impact);
+            replay.Sample(Elapsed(shot, 0, .2f));
+            Assert.That(Geometry(impact), Is.EqualTo(sample));
+            AssertIndependentAndUnchanged();
+        }
+
         [UnityTest]
         public IEnumerator ThreeCutsClearPreviousClayAndResetRestoresTheBattle()
         {
