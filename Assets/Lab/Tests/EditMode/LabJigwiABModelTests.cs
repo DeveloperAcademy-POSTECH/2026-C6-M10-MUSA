@@ -228,13 +228,27 @@ namespace C6Lab.Tests
             var done=m.Snapshot(20);var round=done.jigwiAB.rounds.Single(r=>r.id==a.id);
             Assert.That(round.resolution,Is.EqualTo(LabJigwiABResolution.Expired));
             Assert.That(LabJigwiABNetworkValidation.Valid(done.jigwiAB,done.players,m.Revision),Is.True);
-            Assert.That(m.Snapshot(22).orbs.Single(o=>o.id==theirs.id).jigwiABBurnAt,Is.EqualTo(-1),"The finished board keeps its orbs.");
+            // #663: the burn now starts 0.6 s after the end, so this is read just before it (time only moves forward).
+            Assert.That(m.Snapshot(20.5).orbs.Single(o=>o.id==theirs.id).jigwiABBurnAt,Is.EqualTo(-1),"The finished board keeps its orbs.");
             // #540: when Jigwi's line is over, every orb on the board burns away together in 1 s.
             double gone=20+LabModel.JigwiTalismanFailFirstBurnSeconds+LabModel.JigwiTalismanFailBlazeSeconds+.01;
             var later=m.Snapshot(gone);
             Assert.That(later.orbs.Any(o=>o.id==mine.id||o.id==mine2.id),Is.False,"The unfinished board's orbs burned.");
+            Assert.That(later.orbs.Any(o=>o.id==theirs.id),Is.True,"…while the finished board still keeps its own.");
             // The clock has moved on to the end of the burn, so the drum is tried after that (an earlier time is rejected as INVALID_TIME).
             Assert.That(m.TryGenerate(Players[0],Request(),gone+.1,out _,out e),Is.True,"#540: a failed talisman never blocks the drums. "+e);
+        }
+        [Test] public void AFailedTalismanBurnsTheBoardSoonAfterTheFireballLands()
+        {
+            // #663: no more waiting 3.7 s for a voice line that no longer exists; the Host setting moves the moment.
+            Assert.That(LabModel.JigwiTalismanFailFirstBurnSeconds,Is.LessThan(1d),"Just after the fireball lands (0.45 s).");
+            Assert.That(config.JigwiAFailBurnStartSeconds,Is.EqualTo((float)LabModel.JigwiTalismanFailFirstBurnSeconds).Within(1e-6f));
+            JsonUtility.FromJsonOverwrite("{\"jigwiAHoldBurnUntilEnd\":true,\"jigwiAFailBurnStartSeconds\":2}",config);
+            var m=Room();var a=Current(m,5);var mine=Add(m,Players[0],4);
+            Assert.That(m.Snapshot(20).jigwiAB.rounds.Single(r=>r.id==a.id).resolution,Is.EqualTo(LabJigwiABResolution.Expired));
+            Assert.That(m.Snapshot(21.99).orbs.Single(o=>o.id==mine.id).jigwiABBurnAt,Is.EqualTo(-1),"Not before the set moment.");
+            Assert.That(m.Snapshot(22.01).orbs.Single(o=>o.id==mine.id).jigwiABBurnAt,
+                Is.EqualTo(22+LabModel.JigwiTalismanFailBlazeSeconds).Within(1e-6),"Lit 2 s after the end, as set.");
         }
         [Test] public void HoldingTheBurnKeepsEveryOrbUntilTheARunsOut()
         {
@@ -249,7 +263,8 @@ namespace C6Lab.Tests
             // #540: once Jigwi's "모두 재가 되어라!" is over, every orb then on the board — even one made while Jigwi spoke —
             // catches fire at once and is gone 1 s later. An orb made after that moment is safe.
             double landed=20+LabModel.JigwiTalismanFailFirstBurnSeconds, blaze=LabModel.JigwiTalismanFailBlazeSeconds;
-            Assert.That(m.TryGenerate(Players[0],Request(),21,out var during,out e),Is.True,e);
+            // #663: the board now catches fire just after the fireball lands, so "during" is made in that short gap.
+            Assert.That(m.TryGenerate(Players[0],Request(),20+LabModel.JigwiTalismanFailFirstBurnSeconds*.5,out var during,out e),Is.True,e);
             var speaking=m.Snapshot(landed-.01).orbs.Where(o=>o.id==mine.id||o.id==fresh.id||o.id==during.id).ToArray();
             Assert.That(speaking,Has.Length.EqualTo(3),"Nothing burns while Jigwi speaks.");
             Assert.That(speaking.All(o=>o.jigwiABBurnAt==-1),Is.True,"Not even marked yet.");
@@ -377,7 +392,8 @@ namespace C6Lab.Tests
         [Test] public void SmokeFlowRunsSmokeThenSharedTalismanAndSmokesEveryScreenAtOnce()
         {
             // #595: 연기 10 / 부적 45 / 연기 66 / 부적 83, 공통 기믹은 25초부터 15초마다.
-            JsonUtility.FromJsonOverwrite("{\"jigwiSmokeFlow\":true,\"jigwiCommonStartSeconds\":25,\"jigwiABPersonalDurationSeconds\":10}",config);
+            // #663: this checks the fixed timetable, so the talisman is not pulled forward after the smoke.
+            JsonUtility.FromJsonOverwrite("{\"jigwiSmokeFlow\":true,\"jigwiCommonStartSeconds\":25,\"jigwiABPersonalDurationSeconds\":10,\"jigwiSmokeToTalismanSeconds\":0}",config);
             var m=Room3();
             var next=typeof(LabModel).GetMethod("NextJigwiABCommonAt",BindingFlags.Instance|BindingFlags.NonPublic);
             Assert.That(Enumerable.Range(0,6).Select(i=>(double)next.Invoke(m,new object[]{(uint)i})),
@@ -401,9 +417,33 @@ namespace C6Lab.Tests
             Assert.That(r[0].resolution,Is.EqualTo(LabJigwiABResolution.Expired),"Smoke just ends; nobody pours.");
             Assert.That(r[0].boardFireUntil,Is.EqualTo(-1d),"Smoke never sets the boards on fire.");
         }
+        [Test] public void AFinishedSmokeBringsTheTalismanSoonAndPushesTheCommonGimmickPastIt()
+        {
+            // #663: no empty stretch between the smoke and the talisman. The smoke (10 s) times out at 25 s, so the talisman
+            // starts 4 s later (warning at 27 s) instead of at 45 s; the common gimmick due meanwhile waits until it is over.
+            JsonUtility.FromJsonOverwrite("{\"jigwiSmokeFlow\":true,\"jigwiCommonStartSeconds\":30,\"jigwiABPersonalDurationSeconds\":10,\"jigwiSmokeToTalismanSeconds\":4}",config);
+            var m=Room3();
+            Assert.That(Current(m,10.1).smoke,Is.True);
+            m.Tick(26.9);
+            Assert.That(m.Snapshot(26.9).jigwiAB.rounds.Count(x=>x.kind==LabJigwiABKind.PersonalBurn),Is.Zero,"Not before its warning.");
+            var early=m.Snapshot(27.1);
+            var talisman=early.jigwiAB.rounds.Single(x=>x.kind==LabJigwiABKind.PersonalBurn);
+            Assert.That(talisman.activeAt,Is.EqualTo(29d).Within(1e-9),"Smoke ended at 25 s + 4 s.");
+            Assert.That(talisman.warningAt,Is.EqualTo(27d).Within(1e-9));
+            Assert.That(talisman.endsAt,Is.EqualTo(39d).Within(1e-9),"Still the usual 10 s.");
+            Assert.That(LabJigwiABNetworkValidation.Valid(early.jigwiAB,early.players,m.Revision),Is.True,"Other screens accept the earlier talisman.");
+            var nextCommon=(double)typeof(LabModel).GetField("nextCommonGimmickAt",BindingFlags.Instance|BindingFlags.NonPublic).GetValue(m);
+            Assert.That(nextCommon,Is.EqualTo(40d).Within(1e-9),"The common gimmick due at 30 s waits until 1 s after the talisman.");
+            for(int t=28;t<=99;t++){m.Tick(t);var mid=m.Snapshot(t);
+                Assert.That(LabJigwiABNetworkValidation.Valid(mid.jigwiAB,mid.players,m.Revision),Is.True,"Valid at "+t+" s");}
+            var r=m.Snapshot(99).jigwiAB.rounds.OrderBy(x=>x.slot).ToArray();
+            Assert.That(r.Select(x=>x.activeAt).Take(3),Is.EqualTo(new[]{10d,29d,66d}),"The next smoke keeps its own time.");
+            Assert.That(r[3].activeAt,Is.EqualTo(83d).Within(1e-9),"The second smoke times out at 81 s; 85 s would be later than 83 s.");
+        }
         LabModel SmokeFlowRoom3()
         {
-            JsonUtility.FromJsonOverwrite("{\"jigwiSmokeFlow\":true,\"jigwiABPersonalDurationSeconds\":10,\"jigwiAHoldBurnUntilEnd\":true,\"jigwiTalismanWaterCount\":1}",config);
+            // #663: these talisman fixtures read the talisman at its fixed 45 s.
+            JsonUtility.FromJsonOverwrite("{\"jigwiSmokeFlow\":true,\"jigwiABPersonalDurationSeconds\":10,\"jigwiAHoldBurnUntilEnd\":true,\"jigwiTalismanWaterCount\":1,\"jigwiSmokeToTalismanSeconds\":0}",config);
             return Room3();
         }
         [Test] public void SharedTalismanPoursTheWaterfallOnlyWhenAllHaveWrittenIt()

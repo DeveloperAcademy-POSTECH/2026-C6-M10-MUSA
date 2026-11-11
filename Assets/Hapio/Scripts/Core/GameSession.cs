@@ -127,6 +127,7 @@ namespace Hapio
         }
         public Texture PreviewTexture => preview != null && !preview.IsDisposed ? preview.Texture : null;
         /// <summary>The open viewer's zoom (0 far … 1 near, .5 fitted); the floor shadow follows it.</summary>
+        internal Vector2 PreviewFrameScale => preview != null && !preview.IsDisposed ? preview.FrameScale : Vector2.one;
         internal float PreviewZoom => preview != null && !preview.IsDisposed ? preview.ZoomNormalized : .5f;
         internal GameGourdFloorShadow PreviewShadow
         {
@@ -206,6 +207,7 @@ namespace Hapio
             sceneFade = GameSceneFade.Create(transform, lobbyFadeColor);
             CreateLoadingView();
             GameTouchInk.Create(transform);
+            GameStoryMusic.Create(transform); // #629 title / opening / room list music
             cloudCover = GameCloudCover.Create(transform);
             network.GameFlowMessage += ReceiveControl;
             network.GameFlowDisconnected += OnPeerDisconnected;

@@ -31,6 +31,8 @@ namespace Hapio
         public bool IsPlaying => presenting && player != null && player.IsPlaying;
         public static bool HasPlayedThisRun => openingConsumed;
         public static bool IsPresenting => current != null && current.presenting;
+        /// <summary>#629: the player of the opening on screen now, for its music; null when none is shown.</summary>
+        public static StoryPlayer PresentingPlayer => IsPresenting ? current.player : null;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetRunState()

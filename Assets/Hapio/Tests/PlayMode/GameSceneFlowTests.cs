@@ -350,8 +350,11 @@ namespace Hapio.Tests
             RectTransform viewport = rectangle.parent as RectTransform;
             Assert.That(viewport, Is.Not.Null);
             Assert.That(viewport.name, Is.EqualTo("Gourd preview aspect viewport"));
+            // The texture shows a larger frame around the authored square (ExtendFrame); the gesture square keeps that
+            // centre part's aspect, and the frame image around it shows the rest at the same scale.
+            Vector2 frame = session.PreviewFrameScale;
             Assert.That(rectangle.rect.width / rectangle.rect.height,
-                Is.EqualTo(screen.viewerImage.texture.width / (float)screen.viewerImage.texture.height).Within(.001f),
+                Is.EqualTo(screen.viewerImage.texture.width / frame.x / (screen.viewerImage.texture.height / frame.y)).Within(.001f),
                 "The real captured gourd must keep its aspect on the actual portrait result Scene.");
             var imageCorners = new Vector3[4];
             rectangle.GetWorldCorners(imageCorners);

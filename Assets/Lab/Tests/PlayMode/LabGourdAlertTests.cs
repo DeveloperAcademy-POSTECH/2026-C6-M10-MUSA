@@ -157,6 +157,10 @@ namespace C6Lab.Tests
             Assert.That(eyes.gameObject.activeSelf, Is.True);
             Assert.That(alert.Bubble.Find("Gourd Alert Mark").gameObject.activeSelf, Is.False);
             Assert.That(lit.color.a, Is.Zero, "Plain eyes first.");
+            Assert.That(lit.sprite, Is.EqualTo(Resources.Load<Sprite>(LabYaguangShakeCue.ArtPath + "EyesYellow")));
+            Assert.That(eyes.Find("Gourd Alert Eyes Plain").GetComponent<Image>().sprite,
+                Is.EqualTo(Resources.Load<Sprite>(LabYaguangShakeCue.ArtPath + "EyesNormal")));
+            Assert.That(alert.Bubble.GetComponent<Image>().enabled, Is.False, "Complete PNG replaces the generated bubble.");
             Assert.That(eyes.GetComponentsInChildren<Image>().All(image => !image.raycastTarget), Is.True);
 
             alert.SetEyeGlow(1f);
@@ -168,16 +172,34 @@ namespace C6Lab.Tests
             Assert.That(alert.Active, Is.False, "Gone by the flash.");
             Assert.That(alert.ShowingEyes, Is.False);
 
+            alert.ShowEyes(gourd, 1f);
+            Assert.That(alert.ShowYaguangRelease(gourd, 1f), Is.True);
+            Image bubbleImage = alert.Bubble.GetComponent<Image>();
+            Assert.That(bubbleImage.enabled, Is.True, "Release artwork re-enables the background hidden by eye PNGs.");
+            Assert.That(bubbleImage.sprite, Is.EqualTo(Resources.Load<Sprite>(LabGourdAlert.YaguangReleasePath)));
+            Assert.That(bubbleImage.preserveAspect, Is.True);
+            alert.ShowEyes(gourd, 1f);
+            Assert.That(alert.ShowYaguangTaunt(gourd, 1f), Is.True);
+            Assert.That(bubbleImage.enabled, Is.True);
+            Assert.That(bubbleImage.sprite, Is.EqualTo(Resources.Load<Sprite>(LabGourdAlert.YaguangTauntPath)));
+
             alert.ShowWord(gourd, "셋!", 1f);
             Text word = alert.Bubble.Find("Gourd Alert Mark").GetComponent<Text>();
             Assert.That(alert.ShowingWord, Is.True);
             Assert.That(word.text, Is.EqualTo("셋!"));
+            Assert.That(alert.Bubble.GetComponent<Image>().enabled, Is.True, "The PNG background remains visible.");
+            Assert.That(bubbleImage.preserveAspect, Is.True, "The provided countdown artwork keeps its aspect ratio.");
+            Assert.That(alert.Bubble.sizeDelta.x, Is.EqualTo(alert.Bubble.sizeDelta.y).Within(.001f));
+            Assert.That(word.gameObject.activeSelf, Is.False, "The supplied PNG already contains the word.");
+            Assert.That(alert.Bubble.GetComponent<Image>().sprite, Is.EqualTo(LabYaguangComboArt.Load("CountThree")));
             Assert.That(word.GetComponent<Outline>().enabled, Is.False, "No offset outline doubling the ink strokes (#271).");
             alert.ShowWord(gourd, "넷!", 1f);
             Assert.That(word.text, Is.EqualTo("넷!"), "The same bubble just changes its word.");
+            Assert.That(alert.Bubble.GetComponent<Image>().sprite, Is.EqualTo(LabYaguangComboArt.Load("CountFour")));
             Assert.That(word.resizeTextForBestFit, Is.False, "Short words keep their big size.");
             alert.ShowWord(gourd, "안보이지롱~", 1f);
             RectTransform bubbleRect = alert.Bubble;
+            Assert.That(bubbleImage.preserveAspect, Is.False, "Ordinary words restore the common text background geometry.");
             Assert.That(word.resizeTextForBestFit, Is.True, "A long word (#301) shrinks to fit...");
             Assert.That(word.horizontalOverflow, Is.EqualTo(HorizontalWrapMode.Wrap));
             Assert.That(word.rectTransform.sizeDelta.x, Is.LessThan(bubbleRect.sizeDelta.x), "...inside the bubble.");
