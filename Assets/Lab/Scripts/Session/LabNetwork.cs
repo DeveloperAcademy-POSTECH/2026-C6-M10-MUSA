@@ -281,7 +281,8 @@ namespace C6Lab
         // 5697: #551 Jigwi B bucket: the first bucket comes 3.5 s after B starts, 1 s apart, 7 s each.
         // 5698: #595 Jigwi smoke flow: round.smoke (B smokes every screen at once, no bucket) and round.common (shared talisman A).
         // 5699: actual newly painted-cell contribution is a Host-owned Int64 player statistic.
-        internal const ushort LabProtocolVersion = 5699;
+        // 5700: #663 Jigwi smoke flow: a talisman may start right after the smoke before it (earlier than its slot time).
+        internal const ushort LabProtocolVersion = 5700;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Double-tap a blue fox orb to clear it, and keep your Yin and Yang away.";
