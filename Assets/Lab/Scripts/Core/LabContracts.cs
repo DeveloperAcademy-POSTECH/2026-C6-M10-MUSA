@@ -427,6 +427,13 @@ namespace C6Lab
         /// <summary>Fox orbs the round began with, and still on the boards while it runs (0 once it is over).</summary>
         public int foxRoundTotal, foxRoundRemaining;
         /// <summary>
+        /// How many the team must clear (what fell less a few, at least 1) and how many it has cleared by double taps and
+        /// yin/yang touches. Reaching the goal wins the round; the rest go in smoke.
+        /// </summary>
+        public int foxRoundGoal, foxRoundCleared;
+        /// <summary>Fox orbs still to clear for the goal (the number at the top of the screen).</summary>
+        public int FoxRoundToGo => Math.Max(0, foxRoundGoal - foxRoundCleared);
+        /// <summary>
         /// The latest finished round: 1 cleared (BIG), -1 timed out (SMALL), 0 none yet; when, and how many have finished. It stays
         /// while the next round runs, so the last BIG/SMALL still shows its badge and its time.
         /// </summary>

@@ -74,7 +74,7 @@ namespace C6Lab.Tests
             string savedConfig = JsonUtility.ToJson(developer.sourceConfig);
             string sessionConfig = JsonUtility.ToJson(hud.network.config);
             float[] sharedValues = developer.sourceConfig.CaptureDeveloperValues();
-            Assert.That(sharedValues.Length, Is.EqualTo(261));
+            Assert.That(sharedValues.Length, Is.EqualTo(265));
             developer.Open();
             var row = developer.panel.GetComponentsInChildren<LabNoticeSettingsRow>(true).Single();
             Assert.That(row.name, Is.EqualTo(LabNoticeSettingsRow.RowName));
@@ -105,8 +105,8 @@ namespace C6Lab.Tests
             developer.Open();
             Assert.That(row.ToggleButton.GetComponentInChildren<Text>(true).text, Is.EqualTo("OFF"));
 
-            Assert.That(developer.valueInputs.Length, Is.EqualTo(261));
-            Assert.That(developer.valueSliders.Length, Is.EqualTo(261));
+            Assert.That(developer.valueInputs.Length, Is.EqualTo(265));
+            Assert.That(developer.valueSliders.Length, Is.EqualTo(265));
             Assert.That(developer.sourceConfig.CaptureDeveloperValues(), Is.EqualTo(sharedValues));
             Assert.That(JsonUtility.ToJson(developer.sourceConfig), Is.EqualTo(savedConfig));
             Assert.That(JsonUtility.ToJson(hud.network.config), Is.EqualTo(sessionConfig),

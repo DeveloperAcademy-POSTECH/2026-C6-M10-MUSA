@@ -17,7 +17,7 @@ namespace C6Lab.Tests
         [Test]
         public void RetainedSurfaceFieldsKeepValuesWhileTheActiveCategoryUsesScreenFields()
         {
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(261));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(265));
             Assert.That(LabConfig.JigwiStageFirstField, Is.EqualTo(228));
             Assert.That(LabConfig.JigwiStageLastField, Is.EqualTo(235));
             Assert.That(config.CaptureDeveloperValues().Skip(228).Take(8), Is.EqualTo(new[] { 1f, 1f, 7f, 18f, 30f, 1f, 3f, 2f }));

@@ -5,7 +5,8 @@ namespace C6Lab
 {
     /// <summary>
     /// 여우구슬 팀 판정 (#664)의 화면 위 표시. 여우불이 떨어진 순간부터 판정이 끝날 때까지, 야광귀 콤보 패널과 같은 자리·모양의
-    /// 패널에 여우구슬 그림과 팀 전체 남은 여우구슬 수, 그 아래 줄어드는 남은 시간 막대를 보여 준다. 남은 시간은 콤보처럼
+    /// 패널에 여우구슬 그림과 팀이 더 지워야 하는 수(목표치 − 지운 수), 그 아래 줄어드는 남은 시간 막대를 보여 준다. 목표치는
+    /// 떨어진 수보다 조금 적을 수 있어서 판에 보이는 여우구슬 수보다 작을 수 있다. 남은 시간은 콤보처럼
     /// 숫자 없이 막대로만 보이고, 째깍 소리(LabYaguangSound)가 함께 난다.
     /// - 수가 줄 때마다 숫자가 톡 튄다. 남은 시간이 3초 이하면 막대가 빨개지고 패널이 두근거린다.
     /// - 다 지우거나 시간이 다 되면 바로 사라지고, 같은 자리에 LabGourdComboHud가 성공!/시간 끝!과 BIG/SMALL 표시를 띄운다.
@@ -34,7 +35,7 @@ namespace C6Lab
 
         /// <summary>판정 패널이 보이는지</summary>
         public bool Visible => panel != null && panel.gameObject.activeInHierarchy;
-        /// <summary>보이는 남은 여우구슬 수 (안 보이면 빈 문자열)</summary>
+        /// <summary>보이는 더 지울 수 (안 보이면 빈 문자열)</summary>
         public string CountText => Visible ? number.text : string.Empty;
         /// <summary>남은 시간 막대 비율 (1 → 0)</summary>
         public float TimeFill => timeBar != null ? timeBar.anchorMax.x : 0f;
@@ -84,7 +85,7 @@ namespace C6Lab
             layer.SetAsLastSibling();
 
             // 수: 새 판정이면 처음 수 그대로, 같은 판정에서 줄면 톡 튄다.
-            int count = Mathf.Max(0, snapshot.foxRoundRemaining);
+            int count = snapshot.FoxRoundToGo;
             if (shownRound != snapshot.foxRoundStartedAt) shownCount = -1;
             shownRound = snapshot.foxRoundStartedAt;
             if (count != shownCount)

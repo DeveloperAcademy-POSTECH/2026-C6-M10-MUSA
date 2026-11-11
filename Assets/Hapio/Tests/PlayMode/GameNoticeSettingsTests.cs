@@ -93,7 +93,7 @@ namespace Hapio.Tests
             Assert.That(homeRow.gameObject.activeInHierarchy, Is.True);
             Assert.That(homeRow.transform.GetSiblingIndex(), Is.Zero);
             Assert.That(homeRow.ToggleButton.GetComponentInChildren<Text>(true).text, Is.EqualTo("OFF"));
-            Assert.That(home.developerInputs.Length, Is.EqualTo(261));
+            Assert.That(home.developerInputs.Length, Is.EqualTo(265));
             float[][] sharedBefore = CaptureSharedSettings();
 
             homeRow.ToggleButton.onClick.Invoke();
@@ -122,8 +122,8 @@ namespace Hapio.Tests
             Assert.That(lobbyRow.gameObject.activeInHierarchy, Is.True);
             Assert.That(lobbyRow.ToggleButton.GetComponentInChildren<Text>(true).text, Is.EqualTo("ON"),
                 "A new Scene's DEV row reads the saved local preference.");
-            Assert.That(lobby.developerInputs.Length, Is.EqualTo(261));
-            Assert.That(lobby.developerSliders.Length, Is.EqualTo(261));
+            Assert.That(lobby.developerInputs.Length, Is.EqualTo(265));
+            Assert.That(lobby.developerSliders.Length, Is.EqualTo(265));
             float[][] lobbySharedBefore = CaptureSharedSettings();
             lobbyRow.ToggleButton.onClick.Invoke();
             Assert.That(LabNoticeSettings.Enabled, Is.False);

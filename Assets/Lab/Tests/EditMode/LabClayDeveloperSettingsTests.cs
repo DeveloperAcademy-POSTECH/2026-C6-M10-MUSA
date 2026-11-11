@@ -14,7 +14,7 @@ namespace C6Lab.Tests
             try
             {
                 float[] before = config.CaptureDeveloperValues();
-                Assert.That(before.Length, Is.EqualTo(261));
+                Assert.That(before.Length, Is.EqualTo(265));
                 Assert.That(LabConfig.ClayThicknessField, Is.EqualTo(257));
                 Assert.That(LabConfig.ClayGlossField, Is.EqualTo(258));
                 Assert.That(config.ClayThickness, Is.EqualTo(.006f));

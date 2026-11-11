@@ -531,7 +531,7 @@ namespace C6Lab
             orbs.Remove(foxId);
             orbs.Remove(orbId);
             reason = "FOX_FIRE";
-            SettleFoxRoundIfCleared(now); // #664
+            CountFoxCleared(now); // #664: one more toward the team's goal
             return true;
         }
 
@@ -1115,7 +1115,7 @@ namespace C6Lab
                 orbs.Remove(current.id);
                 reason = "FOX_FIRE_CLEARED";
                 orb = current.Copy();
-                SettleFoxRoundIfCleared(now); // #664: the last fox orb gone wins the team's BIG
+                CountFoxCleared(now); // #664: one more toward the team's goal
                 return true;
             }
             if (current.kind == LabOrbKind.Bomb)
@@ -1367,6 +1367,8 @@ namespace C6Lab
                 foxRoundEndsAt = foxRoundEndsAt,
                 foxRoundTotal = foxRoundTotal,
                 foxRoundRemaining = FoxRoundOn(now) ? FoxOrbsLeft() : 0,
+                foxRoundGoal = foxRoundGoal,
+                foxRoundCleared = foxRoundCleared,
                 foxRoundResult = foxRoundResult,
                 foxRoundResultAt = foxRoundResultAt,
                 foxRoundCount = foxRoundCount,
@@ -1605,26 +1607,28 @@ namespace C6Lab
         /// <summary>
         /// 여우불 (#251, #418): 받을 수 있는 모든 사람의 판에 한꺼번에 떨어뜨린다. 개수는 모두 같고, 떨어질 자리는 판마다 따로
         /// 뽑는다. 기믹 기록·"!" 알림은 한 번이고(대상은 자리 순서로 첫 사람), 각 판 주인에게는 떨어진 여우 구슬로 따로 알린다.
+        /// #664: 개수 범위는 이번 판의 몇 번째 여우불인지에 따라 커진다(FoxFireCountRange).
         /// </summary>
         private void DropFoxFireOnAll(List<ulong> targets, double at, uint index)
         {
-            for (int lane = 0; lane < targets.Count; lane++) DropFoxFire(targets[lane], at, index, (uint)lane);
-            StartFoxRound(at); // #664: the team clears them all within the time, or they all go and everyone's orbs shrink
+            (int min, int max) = FoxFireCountRange(foxFireDrops++);
+            int count = min + (int)(DrawFor(seed ^ FoxCountSalt, SabotageDrawKey, index) % (ulong)(max - min + 1));
+            int dropped = 0;
+            for (int lane = 0; lane < targets.Count; lane++) dropped += DropFoxFire(targets[lane], at, index, (uint)lane, count);
+            StartFoxRound(at, dropped, index); // #664: the team clears its goal within the time, or they all go and everyone's orbs shrink
             sabotages.Add(new LabSabotage(LabSabotageKind.FoxFire, targets[0], at));
             gimmickStats.Add(LabSabotageKind.FoxFire);
         }
 
         /// <summary>
-        /// 여우불 (#251): 이 사람의 판에 푸른 여우구슬을 정해 둔 개수만큼 떨어뜨린다. 판이 거의 차 있으면 빈 칸 수만큼만
+        /// 여우불 (#251): 이 사람의 판에 푸른 여우구슬을 정해 둔 개수(wanted)만큼 떨어뜨린다. 판이 거의 차 있으면 빈 칸 수만큼만
         /// 떨어진다. 떨어질 자리는 판 안쪽에서 seed로 하나씩 뽑는다. lane(0부터)은 같은 여우불을 받는 몇 번째 판인지로,
-        /// 판마다 자리가 달라진다 (첫 판은 예전과 같은 자리).
+        /// 판마다 자리가 달라진다 (첫 판은 예전과 같은 자리). 실제로 떨어진 수를 돌려준다.
         /// </summary>
-        private void DropFoxFire(ulong target, double at, uint index, uint lane)
+        private int DropFoxFire(ulong target, double at, uint index, uint lane, int wanted)
         {
             uint landing = unchecked(lane * FoxLaneSalt);
-            int span = rules.FoxFireCountMax - rules.FoxFireCountMin + 1;
-            int count = Math.Min(rules.OrbStorageLimit - CountStored(target, at),
-                rules.FoxFireCountMin + (int)(DrawFor(seed ^ FoxCountSalt, SabotageDrawKey, index) % (ulong)span));
+            int count = Math.Max(0, Math.Min(rules.OrbStorageLimit - CountStored(target, at), wanted));
             var ids = new string[count];
             for (int i = 0; i < count; i++)
             {
@@ -1641,6 +1645,7 @@ namespace C6Lab
                 ids[i] = fox.id;
             }
             foxFires.Add(new LabFoxFireDrop(target, ids));
+            return count;
         }
 
         /// <summary>
@@ -1735,7 +1740,8 @@ namespace C6Lab
         {
             if (kind == LabSabotageKind.GourdBomb) DropGourdBomb(target, at);
             else if (kind == LabSabotageKind.SwipeBlock) StartSwipeBlock(target, at);
-            else if (kind == LabSabotageKind.FoxFire) DropFoxFire(target, at, index, 0u);
+            // #664: the same rising count and team round as DropFoxFireOnAll, which also records the cast.
+            else if (kind == LabSabotageKind.FoxFire) { DropFoxFireOnAll(new List<ulong> { target }, at, index); return; }
             else if (kind == LabSabotageKind.Charm) StartCharm(new[] { target }, at);
             sabotages.Add(new LabSabotage(kind, target, at));
             gimmickStats.Add(kind);
@@ -2018,8 +2024,12 @@ namespace C6Lab
             /// <summary>Fox fire (#251): how many fox orbs fall, and how long after they fall they cannot be touched off.</summary>
             public readonly int FoxFireCountMin, FoxFireCountMax;
             public readonly float FoxFireSafeSeconds;
-            /// <summary>#664: how long the team has to clear every fox orb of one drop (0 = the old way: each fades by itself).</summary>
+            /// <summary>#664: how long the team has to clear its goal of one drop (0 = the old way: each fades by itself).</summary>
             public readonly float FoxRoundSeconds;
+            /// <summary>#664: how much the fox orb count's minimum and maximum grow with each fox fire of a round.</summary>
+            public readonly int FoxFireCountStepMin, FoxFireCountStepMax;
+            /// <summary>#664: the range of x, the fox orbs the team may leave: the goal is what fell less x (at least 1).</summary>
+            public readonly int FoxRoundSpareMin, FoxRoundSpareMax;
             /// <summary>
             /// Charm (#251): how long it lasts, and how many taps each player beside must give to wake the charmed one
             /// (#305); the warning before it starts.
@@ -2075,6 +2085,10 @@ namespace C6Lab
                 FoxFireCountMax = config.FoxFireCountMax;
                 FoxFireSafeSeconds = config.FoxFireSafeSeconds;
                 FoxRoundSeconds = config.FoxRoundSeconds;
+                FoxFireCountStepMin = config.FoxFireCountStepMin;
+                FoxFireCountStepMax = config.FoxFireCountStepMax;
+                FoxRoundSpareMin = config.FoxRoundSpareMin;
+                FoxRoundSpareMax = config.FoxRoundSpareMax;
                 CharmSeconds = config.CharmSeconds;
                 CharmWarningSeconds = config.CharmWarningSeconds;
                 CharmRescueTaps = config.CharmRescueTaps;

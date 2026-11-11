@@ -23,7 +23,7 @@ namespace C6Lab.Tests
                 Assert.That(Token(network), Is.EqualTo("C6PhysicsLab/61"));
                 Assert.That(typeof(LabNetwork).GetField("LabProtocolVersion",
                     BindingFlags.Static | BindingFlags.NonPublic).GetRawConstantValue(), Is.EqualTo((ushort)5701));
-                Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(261));
+                Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(265));
                 Assert.That(network.SetGameFlowEnabled(true), Is.True);
                 Assert.That(Token(network), Is.EqualTo("C6HapioGame/52"));
                 Assert.That(network.SetGameFlowEnabled(false), Is.True);

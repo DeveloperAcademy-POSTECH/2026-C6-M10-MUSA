@@ -27,23 +27,24 @@ namespace C6Lab.Tests
                 var snapshot = new LabSnapshot
                 {
                     sessionId = "fox-hud", round = 1, phase = LabPhase.Playing,
-                    foxRoundStartedAt = 5d, foxRoundEndsAt = 20d, foxRoundRunning = true, foxRoundTotal = 6, foxRoundRemaining = 6
+                    foxRoundStartedAt = 5d, foxRoundEndsAt = 20d, foxRoundRunning = true, foxRoundTotal = 6, foxRoundRemaining = 6,
+                    foxRoundGoal = 4
                 };
                 hud.Present(snapshot, 4.9d, true, .1f);
                 Assert.That(hud.Visible, Is.False, "Nothing before the drop.");
 
                 hud.Present(snapshot, 5d, true, .1f);
                 Assert.That(hud.Visible, Is.True);
-                Assert.That(hud.CountText, Is.EqualTo("6"), "The whole team's fox orbs.");
+                Assert.That(hud.CountText, Is.EqualTo("4"), "The team's goal (six fell, two may stay), not the orbs on the boards.");
                 Assert.That(hud.TimeFill, Is.EqualTo(1f).Within(.01f));
                 Assert.That(hud.Urgent, Is.False);
                 Assert.That(hud.IconSprite, Is.SameAs(Resources.Load<Sprite>(LabOrbAppearance.FoxFireSpritePath)),
                     "The same fox orb art as on the boards.");
                 Assert.That(hud.AnyImageTakesTouches, Is.False, "It never takes a touch.");
 
-                snapshot.foxRoundRemaining = 4;
+                snapshot.foxRoundRemaining = 4; snapshot.foxRoundCleared = 2;
                 hud.Present(snapshot, 12.5d, true, .1f);
-                Assert.That(hud.CountText, Is.EqualTo("4"), "The count follows the boards.");
+                Assert.That(hud.CountText, Is.EqualTo("2"), "It counts down as the team clears them.");
                 Assert.That(hud.TimeFill, Is.EqualTo(.5f).Within(.01f), "Half the time left, as a bar with no seconds.");
 
                 hud.Present(snapshot, 17.5d, true, .1f);

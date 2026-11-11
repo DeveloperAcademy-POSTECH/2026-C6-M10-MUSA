@@ -282,13 +282,17 @@ namespace C6Lab
         // 5698: #595 Jigwi smoke flow: round.smoke (B smokes every screen at once, no bucket) and round.common (shared talisman A).
         // 5699: actual newly painted-cell contribution is a Host-owned Int64 player statistic.
         // 5701: #664 구미호 co-op gimmicks: several charmed players (charmedPlayers/charmEnds/charmHelperTargets), the fox
-        //       round (foxRound* and foxRoundRunning) and two more DEV values (261). 5700 is #663's on main.
+        //       round (foxRound*, foxRoundRunning, its goal and cleared count, up to 100 fox orbs a board) and six more DEV
+        //       values (265). 5700 is #663's on main.
         internal const ushort LabProtocolVersion = 5701;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Double-tap a blue fox orb to clear it, and keep your Yin and Yang away.";
-        /// <summary>More fox orbs than one fox fire ever drops; a longer list is ignored (#251).</summary>
-        private const int MaximumFoxFireOrbs = 10;
+        /// <summary>
+        /// More fox orbs than one fox fire ever drops on a board; a longer list is ignored (#251). Since #664 the count grows
+        /// with each fox fire, so this is the most a board can hold (the stored orb limit's DEV maximum).
+        /// </summary>
+        private const int MaximumFoxFireOrbs = 100;
         private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/61");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
