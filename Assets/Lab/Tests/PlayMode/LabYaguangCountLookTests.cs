@@ -13,7 +13,7 @@ namespace C6Lab.Tests
             { LabOrbElement.Fire, LabOrbElement.Water, LabOrbElement.Wood, LabOrbElement.Earth };
 
         [UnityTest]
-        public IEnumerator TheYaguangCountsTheSlotsAndAClearStaysPlain()
+        public IEnumerator TheYaguangCountsTheSlotsAndStampsAClear()
         {
             var root = new GameObject("Yaguang count fixture");
             var network = root.AddComponent<LabNetwork>();
@@ -63,8 +63,21 @@ namespace C6Lab.Tests
                 latest.SetValue(network, cleared);
                 yield return null;
                 Assert.That(hud.ResultLabel, Is.EqualTo(LabGourdComboHud.ClearText), "No counting riddle on a clear.");
+                var result = canvasRoot.transform.Find("Gourd Combo/Combo Result");
+                var stamp = result.Find("Success Stamp").GetComponent<UnityEngine.UI.Image>();
+                Assert.That(hud.ResultVisible, Is.True, "Success stamp starts immediately.");
+                Assert.That(stamp.gameObject.activeInHierarchy, Is.True);
+                Assert.That(result.GetComponent<UnityEngine.UI.Text>().enabled, Is.False);
+                Assert.That(stamp.sprite, Is.EqualTo(LabYaguangComboArt.Load("SuccessStamp")));
+                Assert.That(stamp.raycastTarget, Is.False);
+                yield return new WaitForSecondsRealtime(.4f);
+                Assert.That(stamp.rectTransform.localScale.x, Is.EqualTo(1f).Within(.01f));
                 yield return new WaitForSecondsRealtime(.9f);
                 Assert.That(hud.ResultLabel, Is.EqualTo(LabGourdComboHud.ClearText));
+
+                Assert.That(stamp.gameObject.activeInHierarchy, Is.True, "Stamp holds before fading.");
+                yield return new WaitForSecondsRealtime(.4f);
+                Assert.That(stamp.gameObject.activeInHierarchy, Is.False, "Stamp ends after ResultSeconds.");
 
                 // Off: the old look.
                 float[] values = config.CaptureDeveloperValues();
