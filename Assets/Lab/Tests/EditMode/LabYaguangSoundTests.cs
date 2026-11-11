@@ -228,24 +228,37 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void GeumokSaysTheRuleOnlyBeforeTheRoundsFirstCombo()
+        public void GeumokSaysTheRuleAfterTheGoblinsFourOnlyBeforeTheRoundsFirstCombo()
         {
-            // #695: 30초 예고 (아직 나온 콤보 0개) → 금옥 규칙 한 번. 야광귀 넷도 알아챈다.
+            // #695: 30초 예고 (아직 나온 콤보 0개): 야광귀 "넷" → 0.9초 뒤 금옥 규칙. 넷/셋/둘/하나는 모두 센다.
             LabYaguangSound sound = Sound();
             LabSnapshot snapshot = ComboWarning();
             sound.ObserveFlash(snapshot, 29.5d, Me);
-            Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideRule), Is.Zero);
-            foreach (double now in new[] { 30d, 30.5d, 31d, 32d, 33d })
+            sound.ObserveFlash(snapshot, 30d, Me);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboCountFour), Is.EqualTo(1), "넷 first.");
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideRule), Is.Zero, "Geumok waits for the four.");
+            foreach (double now in new[] { 30.5d, 30.95d, 31d, 32d, 33d })
                 sound.ObserveFlash(snapshot, now, Me);
-            Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideRule), Is.EqualTo(1), "Once, as the warning starts.");
-            Assert.That(sound.PlayCount(LabYaguangSfx.ComboCountFour), Is.EqualTo(1), "The goblin's count is still noticed.");
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideRule), Is.EqualTo(1));
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboCountThree), Is.EqualTo(1), "The count goes on under her.");
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboCountOne), Is.EqualTo(1));
 
             // 두 번째 콤보 예고 (이미 1개가 나옴): 규칙은 다시 말하지 않는다 (기본 1 = 첫 콤보만).
             snapshot.comboCount = 1;
             snapshot.comboWarningAt = 60d; snapshot.comboNextAt = 64d;
-            foreach (double now in new[] { 60d, 61d, 62d })
+            foreach (double now in new[] { 60d, 61d, 62d, 63d })
                 sound.ObserveFlash(snapshot, now, Me);
             Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideRule), Is.EqualTo(1));
+        }
+
+        [Test]
+        public void TheCountFadesFourThreeTwoOneUnderTheRule()
+        {
+            Assert.That(LabYaguangSound.GuideCountGain(4, .6f), Is.EqualTo(1f).Within(1e-5f), "넷 at full size");
+            Assert.That(LabYaguangSound.GuideCountGain(3, .6f), Is.EqualTo(.6f).Within(1e-5f));
+            Assert.That(LabYaguangSound.GuideCountGain(2, .6f), Is.EqualTo(.36f).Within(1e-5f));
+            Assert.That(LabYaguangSound.GuideCountGain(1, .6f), Is.EqualTo(.216f).Within(1e-5f), "하나 the quietest");
+            Assert.That(LabYaguangSound.GuideCountGain(2, 1f), Is.EqualTo(1f), "1 keeps them all the same.");
         }
 
         [Test]

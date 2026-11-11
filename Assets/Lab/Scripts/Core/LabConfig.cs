@@ -1131,8 +1131,10 @@ namespace C6Lab
         [SerializeField, Range(0, 20)] private int yaguangComboGuideRuleCombos = 1;
         [Tooltip("칸을 맞힌 뒤 금옥 칭찬(좋아! / 잘했어! / 하나만 더..! / 그렇지!!)까지 지연 (초). 맞힌 소리 뒤에 들리게")]
         [SerializeField, Range(0f, 2f)] private float yaguangComboGuideFeedbackDelaySeconds = .3f;
-        [Tooltip("금옥 규칙 안내가 나오는 동안 야광귀의 넷/셋/둘/하나 목소리를 내지 않는다 (두 목소리가 겹치지 않게)")]
-        [SerializeField] private bool yaguangComboGuideQuietsCount = true;
+        [Tooltip("규칙 안내가 있는 예고에서 야광귀가 \"넷\"을 센 뒤 금옥 규칙 안내가 나오기까지 (예고 시작부터 초)")]
+        [SerializeField, Range(0f, 3f)] private float yaguangComboGuideRuleDelaySeconds = .9f;
+        [Tooltip("규칙 안내가 있는 예고에서 넷→셋→둘→하나로 갈 때마다 야광귀 목소리 크기에 곱하는 값 (1이면 그대로, 작을수록 빨리 작아짐)")]
+        [SerializeField, Range(.1f, 1f)] private float yaguangComboGuideCountFade = .6f;
         [Tooltip("금옥 안내 목소리 크기 (규칙 + 칭찬, 모든 기기)")]
         [SerializeField, Range(0f, 1f)] private float yaguangComboGuideSoundVolume = 1f;
         [Header("야광귀 콤보 예고와 피버 신호 (#414, Inspector 전용)")]
@@ -1685,7 +1687,8 @@ namespace C6Lab
         public bool YaguangFirstComboForgive => yaguangFirstComboForgive;
         public int YaguangComboGuideRuleCombos => Mathf.Clamp(yaguangComboGuideRuleCombos, 0, 20);
         public float YaguangComboGuideFeedbackDelaySeconds => Mathf.Clamp(Finite(yaguangComboGuideFeedbackDelaySeconds, .3f), 0f, 2f);
-        public bool YaguangComboGuideQuietsCount => yaguangComboGuideQuietsCount;
+        public float YaguangComboGuideRuleDelaySeconds => Mathf.Clamp(Finite(yaguangComboGuideRuleDelaySeconds, .9f), 0f, 3f);
+        public float YaguangComboGuideCountFade => Mathf.Clamp(Finite(yaguangComboGuideCountFade, .6f), .1f, 1f);
         public float YaguangComboGuideSoundVolume => Mathf.Clamp01(Finite(yaguangComboGuideSoundVolume, 1f));
         public float YaguangComboWarningShade => Mathf.Clamp01(Finite(yaguangComboWarningShade, .5f));
         public float BigHitSoundVolume => Mathf.Clamp01(Finite(bigHitSoundVolume, .8f));

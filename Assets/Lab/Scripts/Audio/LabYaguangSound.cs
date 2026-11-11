@@ -35,8 +35,8 @@ namespace C6Lab
     ///   "이럴 수가!" 폴더가 비어 있으면 "이런!" 파일을 쓴다.
     ///   다음 콤보 결과가 먼저 나오면 앞 결과의 남은 소리는 내지 않는다.
     /// #695 금옥 콤보 안내 (모든 기기, 금옥 목소리, 야광귀 목소리와 따로):
-    /// - 규칙 (Audio/YaguangComboGuideRule): 콤보 예고가 시작될 때, 라운드의 처음 Inspector 번(기본 1 = 첫 콤보만).
-    ///   이 안내가 나오는 동안은 야광귀의 넷/셋/둘/하나 목소리를 내지 않는다(Inspector로 끌 수 있음, 알아챈 횟수는 센다).
+    /// - 규칙 (Audio/YaguangComboGuideRule): 라운드의 처음 Inspector 번(기본 1 = 첫 콤보만) 예고에서, 야광귀가 "넷"을 센 뒤
+    ///   Inspector 지연(기본 0.9초)에. 그 예고의 넷/셋/둘/하나는 점점 작아진다(넷 원래 크기, 한 칸마다 Inspector 배율, 기본 0.6).
     /// - 칭찬 (Audio/YaguangComboGuideHit1 "좋아!" / Hit2 "잘했어!" / Hit3 "하나만 더..!" / Clear "그렇지!!"):
     ///   칸을 맞힐 때마다 Inspector 지연(기본 0.3초) 뒤에. 새로 말하면 앞의 안내는 끊는다. 실패하면 말하지 않고 야광귀가 "메롱~"을 한다.
     /// #664 구미호 여우구슬 판정 (모든 기기, 야광귀 콤보와 같은 소리):
@@ -127,12 +127,13 @@ namespace C6Lab
         private LabYaguangFlashHud flashHud;
         // #695 금옥 안내: 규칙을 낸 예고(4칸이 나올 시각), 색을 부를 콤보와 맞힌 칸 수, 부를 칸과 그 시각, 안내가 끝나는 시각
         private double guideRuleFor = double.NaN;
+        // 이번 예고에 규칙 안내가 있는지(있으면 넷→하나가 점점 작아짐), 아직 낼 규칙 안내와 그 시각
+        private bool guideRuleWarning, guideRuleDue;
+        private double guideRuleAt;
         private uint guideComboFor;
         private int guideProgress;
         private int guideSlot = -1;
         private double guideSlotAt;
-        private double guideBusyUntil = double.NegativeInfinity;
-        private double observedAt;
 
         public static string Folder(LabYaguangSfx sfx) => Folders[(int)sfx];
         public int ClipCount(LabYaguangSfx sfx) => clips == null ? 0 : clips[(int)sfx].Length;
@@ -233,12 +234,11 @@ namespace C6Lab
                 seenFoxRoundCount = snapshot.foxRoundCount;
                 foxStartDue = foxEndDue = false;
                 guideRuleFor = double.NaN;
+                guideRuleWarning = guideRuleDue = false;
                 guideComboFor = snapshot.comboCount;
                 guideProgress = snapshot.comboProgress;
                 guideSlot = -1;
-                guideBusyUntil = double.NegativeInfinity;
             }
-            observedAt = now;
             ObserveCombo(snapshot, now);
             ObserveComboResult(snapshot, now);
             ObserveFoxRound(snapshot, now);
@@ -326,12 +326,18 @@ namespace C6Lab
             // 예고: 남은 초(올림)가 바뀔 때마다 그 수를 야광귀가 센다. 4초보다 길면 넷부터 다시 (말풍선과 같음).
             if (snapshot.ComboWarningOn(now))
             {
-                // #695: 예고가 시작되면 금옥이 규칙을 먼저 말한다 (라운드의 처음 몇 번 콤보만). 이번 예고 = (지금까지 나온 콤보 수 + 1)번째.
+                // #695: 라운드의 처음 몇 번 콤보(이번 예고 = 지금까지 나온 콤보 수 + 1번째)는 야광귀가 "넷"을 센 뒤
+                // Inspector 지연만큼 지나 금옥이 규칙을 말한다. 그 예고의 넷/셋/둘/하나는 점점 작아져 금옥 목소리가 잘 들린다.
                 if (guideRuleFor != snapshot.comboNextAt)
                 {
                     guideRuleFor = snapshot.comboNextAt;
-                    if (snapshot.comboCount < GuideRuleCombos && now - snapshot.comboWarningAt <= LateSeconds)
-                        PlayGuide(LabYaguangSfx.ComboGuideRule);
+                    guideRuleWarning = guideRuleDue = snapshot.comboCount < GuideRuleCombos;
+                    guideRuleAt = snapshot.comboWarningAt + GuideRuleDelay;
+                }
+                if (guideRuleDue && now >= guideRuleAt)
+                {
+                    guideRuleDue = false;
+                    if (now - guideRuleAt <= LateSeconds) PlayGuide(LabYaguangSfx.ComboGuideRule);
                 }
                 if (comboCountFor != snapshot.comboNextAt)
                 {
@@ -342,7 +348,8 @@ namespace C6Lab
                 if (count != lastComboCount)
                 {
                     lastComboCount = count;
-                    if (now - (snapshot.comboNextAt - count) <= LateSeconds) Play(CountSfx(count));
+                    if (now - (snapshot.comboNextAt - count) <= LateSeconds)
+                        Play(CountSfx(count), source, 1f, guideRuleWarning ? GuideCountGain(count, GuideCountFade) : 1f);
                 }
             }
 
@@ -402,7 +409,6 @@ namespace C6Lab
             guideSource.Stop();
             guideSource.pitch = 1f;
             guideSource.PlayOneShot(clip, Volume(sfx) * LabAudioSettings.SfxVolume);
-            guideBusyUntil = observedAt + clip.length;
         }
 
         /// <summary>
@@ -572,7 +578,15 @@ namespace C6Lab
         private double ClearedDelay => network != null && network.config != null ? network.config.YaguangComboClearedDelaySeconds : .8d;
         private int GuideRuleCombos => network != null && network.config != null ? network.config.YaguangComboGuideRuleCombos : 1;
         private double GuideFeedbackDelay => network != null && network.config != null ? network.config.YaguangComboGuideFeedbackDelaySeconds : .3d;
-        private bool GuideQuietsCount => network == null || network.config == null || network.config.YaguangComboGuideQuietsCount;
+        private double GuideRuleDelay => network != null && network.config != null ? network.config.YaguangComboGuideRuleDelaySeconds : .9d;
+        private float GuideCountFade => network != null && network.config != null ? network.config.YaguangComboGuideCountFade : .6f;
+
+        /// <summary>
+        /// #695 규칙 안내가 있는 예고에서 야광귀 숫자 count의 크기 배율. 넷이 원래 크기이고 셋, 둘, 하나로 갈 때마다 fade를 곱한다
+        /// (넷 1 / 셋 fade / 둘 fade² / 하나 fade³).
+        /// </summary>
+        public static float GuideCountGain(int count, float fade) =>
+            Mathf.Pow(Mathf.Clamp01(fade), Mathf.Clamp(4 - count, 0, 3));
         private double CaughtDelay => network != null && network.config != null ? network.config.YaguangFlashCaughtDelaySeconds : .2d;
 
         /// <summary>이 소리를 한 번 낸다. 소리를 냈으면 true (파일이 없으면 세기만 하고 false).</summary>
@@ -596,16 +610,13 @@ namespace C6Lab
             return Mathf.Pow(2f, up * Mathf.Clamp(step, 0f, 12f) / 12f);
         }
 
-        private bool Play(LabYaguangSfx sfx, AudioSource player, float pitch)
+        private bool Play(LabYaguangSfx sfx, AudioSource player, float pitch, float gain = 1f)
         {
             counts[(int)sfx]++;
-            // #695: 금옥이 규칙을 말하는 동안 야광귀의 넷/셋/둘/하나는 내지 않는다 (알아챈 횟수는 센다).
-            if (sfx >= LabYaguangSfx.ComboCountOne && sfx <= LabYaguangSfx.ComboCountFour
-                && GuideQuietsCount && observedAt < guideBusyUntil) return false;
             AudioClip[] set = clips != null ? clips[(int)sfx] : null;
             if (set == null || set.Length == 0 || player == null) return false;
             player.pitch = pitch;
-            player.PlayOneShot(set[Random.Range(0, set.Length)], Volume(sfx) * LabAudioSettings.SfxVolume);
+            player.PlayOneShot(set[Random.Range(0, set.Length)], Volume(sfx) * gain * LabAudioSettings.SfxVolume);
             return true;
         }
 
