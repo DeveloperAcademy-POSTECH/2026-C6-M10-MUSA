@@ -62,7 +62,7 @@ namespace Hapio
         public static bool IsStageCommonGimmick(int index) => index == 169 || index == 170 || index == 205 || index == 207 || index == 208;
         /// <summary>
         /// BIG/SMALL's time and size (#664): the 야광귀 colour combo's reward and penalty, which the 구미호 fox round gives too.
-        /// Stages 1 and 2 each keep their own (both 8 s, 2.5x and 0.1x by default), so either tab tunes its own stage.
+        /// Stages 1 and 2 each keep their own (by default SMALL 0.1x for 13 s, BIG 2.5x for 8 s), so either tab tunes its own stage.
         /// </summary>
         public static bool IsComboEffectField(int index) => index == 159 || index == 160 || index == 162 || index == 163;
         /// <summary>Jigwi's 120-second timeline switch (#332): on by default, it schedules A/B and the common gimmicks itself.</summary>

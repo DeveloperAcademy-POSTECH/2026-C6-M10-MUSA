@@ -60,8 +60,8 @@ namespace Hapio.Editor
             AssetDatabase.SaveAssetIfDirty(catalog);
             // Existing session assets retain GUIDs and all transport fields; catalog is loaded by its explicit resource path.
         }
-        /// <summary>#664: the fox round's BIG/SMALL last as long as the 야광귀 combo's (8 s each, see YaguangDefaults).</summary>
-        private static GameStageValue[] GumihoDefaults() => new[] { new GameStageValue(159, 8f), new GameStageValue(162, 8f) };
+        /// <summary>#664: the fox round's BIG/SMALL last as long as the 야광귀 combo's (SMALL 13 s, BIG 8 s, see YaguangDefaults).</summary>
+        private static GameStageValue[] GumihoDefaults() => new[] { new GameStageValue(159, 13f), new GameStageValue(162, 8f) };
         private static GameStageValue[] YaguangDefaults() => new[]
         {
             new GameStageValue(155, 1f), new GameStageValue(184, 1f), new GameStageValue(191, 1f),

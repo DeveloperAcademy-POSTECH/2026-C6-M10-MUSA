@@ -20,6 +20,6 @@ MonoBehaviour:
   gourdVisualResource: Hapio/Gourds/Stage01_Gumiho_Battle
   defaultValues:
   - index: 159
-    value: 8
+    value: 13
   - index: 162
     value: 8

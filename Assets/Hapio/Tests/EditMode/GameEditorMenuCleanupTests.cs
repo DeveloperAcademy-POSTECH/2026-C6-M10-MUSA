@@ -96,12 +96,12 @@ namespace Hapio.Tests
                 saved.Get(2).defaultValues.Select(value => value.index + "=" + value.value),
                 defaults.Select(value => value.index + "=" + value.value),
                 "Recreating Stage02 gives the same defaults as the saved asset.");
-            // #664: Stage01 keeps the fox round's 8-second BIG/SMALL when it is recreated too.
+            // #664: Stage01 keeps the fox round's BIG/SMALL times (SMALL 13 s, BIG 8 s) when it is recreated too.
             var gumiho = (GameStageValue[])assets.GetMethod("GumihoDefaults", BindingFlags.NonPublic | BindingFlags.Static)
                 .Invoke(null, null);
             CollectionAssert.AreEquivalent(saved.Get(1).defaultValues.Select(value => value.index + "=" + value.value),
                 gumiho.Select(value => value.index + "=" + value.value), "Recreating Stage01 gives the same defaults as the saved asset.");
-            CollectionAssert.AreEquivalent(gumiho.Select(value => value.index + "=" + value.value), new[] { "159=8", "162=8" });
+            CollectionAssert.AreEquivalent(gumiho.Select(value => value.index + "=" + value.value), new[] { "159=13", "162=8" });
 
             var stage = ScriptableObject.CreateInstance<GameStageDefinition>();
             var catalog = ScriptableObject.CreateInstance<GameStageCatalog>();

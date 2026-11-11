@@ -198,7 +198,7 @@ namespace Hapio.Tests
             }
         }
         /// <summary>
-        /// #664: the 구미호 fox round gives the same BIG/SMALL as the 야광귀 colour combo: 8 s each, 2.5x and 0.1x. Both stage
+        /// #664: the 구미호 fox round gives the same BIG/SMALL as the 야광귀 colour combo: SMALL 0.1x for 13 s, BIG 2.5x for 8 s. Both stage
         /// tabs show the four rows and each keeps its own values.
         /// </summary>
         [Test]
@@ -218,7 +218,7 @@ namespace Hapio.Tests
                 float[] fox = settings.Capture(1), yaguang = settings.Capture(2);
                 foreach (int index in new[] { 159, 160, 162, 163 })
                     Assert.That(fox[index], Is.EqualTo(yaguang[index]), LabConfig.DeveloperFields[index].Label);
-                Assert.That((fox[159], fox[162], fox[160], fox[163]), Is.EqualTo((8f, 8f, .1f, 2.5f)));
+                Assert.That((fox[159], fox[162], fox[160], fox[163]), Is.EqualTo((13f, 8f, .1f, 2.5f)));
 
                 fox[162] = 5f;
                 Assert.That(settings.TryApply(1, fox, out string error), Is.True, error);
