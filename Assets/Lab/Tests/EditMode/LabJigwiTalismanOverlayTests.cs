@@ -176,7 +176,7 @@ namespace C6Lab.Tests
             Assert.That(overlay.RemainingHintOn, Is.False, "Nothing written yet: just the stroke guide.");
             int firstStroke = overlay.GuideDotsShown;
             Assert.That(firstStroke, Is.GreaterThan(0));
-            JsonUtility.FromJsonOverwrite("{\"remainingHintFrom\":0.01}", overlay);
+            JsonUtility.FromJsonOverwrite("{\"remainingHintFrom\":0.01,\"remainingHintFadeSeconds\":0}", overlay);
             Vector2 point = LabJigwiTalismanStroke.Water[0];
             overlay.PaintNormalized(point, point);
             Assert.That(overlay.Coverage, Is.GreaterThan(.01f).And.LessThan(1f));

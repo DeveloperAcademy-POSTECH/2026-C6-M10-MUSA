@@ -254,13 +254,16 @@ namespace C6Lab
         [Tooltip("#540 획 안내: 지금 써야 할 획이 글자 안에서 빛나는 색.")]
         [SerializeField] private Color strokeGuideColor = new Color(1f, .93f, .6f, .75f);
         [Tooltip("#663: 부적을 이만큼(0~1, 글자 전체 대비) 넘게 썼는데 아직 완성이 안 됐으면, 지금 획만이 아니라 남은 곳을 모두 빨갛게 강하게 보여 준다. 0이면 끔. 완성 기준(LabConfig Jigwi Talisman Coverage)보다 작게.")]
-        [SerializeField, Range(0f, 1f)] private float remainingHintFrom = .6f;
-        [Tooltip("#663: 남은 곳을 보여 줄 때 색 (빨강).")]
-        [SerializeField] private Color remainingHintColor = new Color(.95f, .12f, .08f, .95f);
+        [SerializeField, Range(0f, 1f)] private float remainingHintFrom = .8f;
+        [Tooltip("#663: 남은 곳을 보여 줄 때 색 (연붉은 색, 획 안내 흰빛과 비슷한 세기).")]
+        [SerializeField] private Color remainingHintColor = new Color(1f, .6f, .55f, .75f);
         [Tooltip("#663: 남은 곳 점 크기 배율 (1 = 획 안내와 같음).")]
-        [SerializeField, Range(1f, 2f)] private float remainingHintScale = 1.35f;
-        [Tooltip("#663: 남은 곳이 반짝이는 빠르기 (1초에 몇 번).")]
+        [SerializeField, Range(1f, 2f)] private float remainingHintScale = 1f;
+        [Tooltip("#663: 남은 곳이 깜빡이는 빠르기 (1초에 몇 번).")]
         [SerializeField, Range(0f, 4f)] private float remainingHintBlinksPerSecond = 1.5f;
+        [Tooltip("#663: 획 안내에서 남은 곳 안내로 서서히 바뀌는 시간 (초). 갑자기 바뀌지 않게.")]
+        [SerializeField, Range(0f, 2f)] private float remainingHintFadeSeconds = .6f;
+        private float remainingBlend, remainingBlendAt = -1f;
         /// <summary>#663: 남은 곳을 모두 빨갛게 보여 주는 중인지 (테스트·확인용).</summary>
         public bool RemainingHintOn { get; private set; }
         [Tooltip("#540 획 안내: 지금 획을 따라 움직이는 화살표 색.")]
@@ -1148,22 +1151,29 @@ namespace C6Lab
             if (!Visible || next < 0) { HideStrokeGuide(); return; }
             int current = stroke.StrokeOf(next);
             GuidedStroke = current;
-            // #663: nearly written but not finished: every place still left shows, brighter and larger, so the last bits are easy to find.
+            // #663: nearly written but not finished: every place still left blinks a soft red (about as strong as the white
+            // stroke guide), easing in rather than switching at once, so the last bits are easy to find.
             bool remaining = remainingHintFrom > 0f && stroke.Coverage >= remainingHintFrom;
             RemainingHintOn = remaining;
-            float glow = remaining
-                ? .75f + .25f * Mathf.Cos(time * Mathf.Max(0f, remainingHintBlinksPerSecond) * Mathf.PI * 2f)
-                : .6f + .4f * Mathf.Sin(time * 4f);
+            float step = remainingBlendAt < 0f ? 0f : Mathf.Max(0f, time - remainingBlendAt);
+            remainingBlendAt = time;
+            remainingBlend = remainingHintFadeSeconds <= 0f ? (remaining ? 1f : 0f)
+                : Mathf.MoveTowards(remainingBlend, remaining ? 1f : 0f, step / remainingHintFadeSeconds);
+            float guideGlow = .6f + .4f * Mathf.Sin(time * 4f);
+            float blink = .5f + .5f * Mathf.Cos(time * Mathf.Max(0f, remainingHintBlinksPerSecond) * Mathf.PI * 2f);
             int shown = 0;
             for (int i = 0; i < guideDots.Length; i++)
             {
                 if (guideDots[i] == null) continue;
-                bool on = !stroke.IsCovered(i) && (remaining || stroke.StrokeOf(i) == current);
+                bool guided = stroke.StrokeOf(i) == current;
+                bool on = !stroke.IsCovered(i) && (guided || remainingBlend > 0f);
                 if (guideDots[i].gameObject.activeSelf != on) guideDots[i].gameObject.SetActive(on);
                 if (!on) continue;
                 shown++;
-                Color c = remaining ? remainingHintColor : strokeGuideColor; c.a *= glow; guideDots[i].color = c;
-                guideDots[i].rectTransform.localScale = Vector3.one * (remaining ? remainingHintScale : 1f);
+                Color guide = strokeGuideColor; guide.a *= guided ? guideGlow : 0f;
+                Color red = remainingHintColor; red.a *= blink;
+                guideDots[i].color = Color.Lerp(guide, red, remainingBlend);
+                guideDots[i].rectTransform.localScale = Vector3.one * Mathf.Lerp(1f, remainingHintScale, remainingBlend);
             }
             GuideDotsShown = shown;
             if (strokeArrow == null) return;
@@ -1865,6 +1875,7 @@ namespace C6Lab
         private void ResetWriting()
         {
             stroke.Clear(); hasLast = false; writtenRound = null;
+            remainingBlend = 0f; // #663: a new talisman starts with the plain stroke guide
             RestoreHint();
             for (int i = 0; i < dots.Length; i++)
             {
