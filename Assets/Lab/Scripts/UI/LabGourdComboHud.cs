@@ -49,6 +49,8 @@ namespace C6Lab
         private const int TextureSize = 96;
         /// <summary>콤보 결과 문구가 떠 있는 초. 이 뒤에 SMALL/BIG 배지가 나온다 (#398 효과음도 이 시각에 맞춘다).</summary>
         public const float ResultSeconds = 1.6f;
+        /// <summary>#695: 콤보 성공 도장(#668)이 크게 내려와 박에 닿는 때 (결과부터 초). 도장 그리는 코드의 .16f와 같다. 이때 징이 울린다.</summary>
+        public const float StampLandSeconds = .16f;
         // #664 LabFoxRoundHud도 같은 먹색·패널색·빨강·둥근 패널을 쓴다.
         internal static readonly Color32 InkColor = new Color32(43, 36, 32, 255);
         internal static readonly Color PanelColor = new Color(1f, .98f, .93f, .92f);

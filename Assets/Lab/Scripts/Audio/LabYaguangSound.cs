@@ -6,7 +6,7 @@ namespace C6Lab
     public enum LabYaguangSfx { FlashWarn, FlashGlow, FlashCount, FlashBurst, FlashTaunt, ShakeBell, ShakeBellFinal, FlashCaught,
         ComboCountOne, ComboCountTwo, ComboCountThree, ComboCountFour, ComboStart, ComboTick, ComboTickFast,
         ComboTaunt, ComboSmallStart, ComboSmallEnd, ComboBigStart, ComboBigEnd, ComboClearedFirst, ComboClearedSecond,
-        ComboGuideRule, ComboGuideHit1, ComboGuideHit2, ComboGuideHit3, ComboGuideClear, ComboGuideFail }
+        ComboGuideRule, ComboGuideHit1, ComboGuideHit2, ComboGuideHit3, ComboGuideClear, ComboGuideFail, ComboStamp }
 
     /// <summary>
     /// 야광귀 섬광 예고와 번쩍 효과음 (#395). Host 스냅샷의 섬광 시각만 보고 소리를 낸다(화면 코드와 따로 돈다).
@@ -41,6 +41,8 @@ namespace C6Lab
     ///   칸을 맞힐 때마다 Inspector 지연(기본 0.3초) 뒤에. 새로 말하면 앞의 안내는 끊는다.
     /// - 실패 (Audio/YaguangComboGuideFail "아이고"): 콤보 실패 뒤 Inspector 지연(기본 0.1초). 야광귀 "메롱~"은 이 말이 끝나고
     ///   Inspector 간격(기본 0.1초) 뒤에 나온다 (원래 메롱 지연보다 이르지는 않다).
+    /// #695 콤보 성공 도장 징 (Audio/YaguangComboStamp, 국립국악원 징): 성공 도장(#668)이 박에 닿는 때(결과 + 0.16초), 모든 기기.
+    ///   야광귀 셈법이 꺼져 도장이 안 나오면 내지 않는다.
     /// #664 구미호 여우구슬 판정 (모든 기기, 야광귀 콤보와 같은 소리):
     /// - 제한 시간 째깍: 여우구슬이 떨어진 순간부터 콤보와 같은 간격으로 째깍, 남은 시간이 짧으면 빠른 째깍. 다 지우면 바로 멈춘다.
     /// - BIG/SMALL 시작·끝: 콤보 결과와 같은 때 (결과 + LabGourdComboHud.ResultSeconds, 가장 늦게 끝나는 사람 기준).
@@ -72,6 +74,7 @@ namespace C6Lab
         public const string ComboClearedFirstFolder = "Audio/YaguangComboClearedFirst";
         public const string ComboClearedSecondFolder = "Audio/YaguangComboClearedSecond";
         public const string ComboGuideFolder = "Audio/YaguangComboGuide";
+        public const string ComboStampFolder = "Audio/YaguangComboStamp";
         private static readonly string[] Folders = { FlashWarnFolder, FlashGlowFolder, FlashCountFolder, FlashBurstFolder,
             FlashTauntFolder, ShakeBellFolder, ShakeBellFinalFolder, FlashCaughtFolder,
             ComboCountFolder + "1", ComboCountFolder + "2", ComboCountFolder + "3", ComboCountFolder + "4",
@@ -79,7 +82,7 @@ namespace C6Lab
             ComboTauntFolder, ComboSmallStartFolder, ComboSmallEndFolder, ComboBigStartFolder, ComboBigEndFolder,
             ComboClearedFirstFolder, ComboClearedSecondFolder,
             ComboGuideFolder + "Rule", ComboGuideFolder + "Hit1", ComboGuideFolder + "Hit2", ComboGuideFolder + "Hit3",
-            ComboGuideFolder + "Clear", ComboGuideFolder + "Fail" };
+            ComboGuideFolder + "Clear", ComboGuideFolder + "Fail", ComboStampFolder };
         /// <summary>The folders this component loads, for the battle audio preload (#492).</summary>
         public static System.Collections.Generic.IReadOnlyList<string> ClipFolders => Folders;
         /// <summary>The ones the 구미호 fox round plays too (#664): its clock and the BIG/SMALL start and end.</summary>
@@ -117,7 +120,7 @@ namespace C6Lab
         private uint seenResultCount;
         private double resultAt;
         private int resultEffect;
-        private bool tauntDue, effectStartDue, effectEndDue, clearedDue;
+        private bool tauntDue, effectStartDue, effectEndDue, clearedDue, stampDue;
         // 이번 라운드에 본 콤보 성공 수 (첫 성공 "이런!", 그 뒤 "이럴 수가!")
         private int clearedCount;
         // #664 여우구슬 판정: 째깍을 센 판정(떨어진 시각)과 마지막 째깍, 본 판정 결과 수, 그 결과 시각과 효과, 아직 낼 소리
@@ -232,7 +235,7 @@ namespace C6Lab
                 lastTickAt = double.NegativeInfinity;
                 // 접속 직후 이미 지난 콤보 결과의 소리는 내지 않는다.
                 seenResultCount = snapshot.comboResultCount;
-                tauntDue = effectStartDue = effectEndDue = clearedDue = false;
+                tauntDue = effectStartDue = effectEndDue = clearedDue = stampDue = false;
                 clearedCount = 0;
                 foxTickFor = double.NaN;
                 lastFoxTickAt = double.NegativeInfinity;
@@ -436,12 +439,19 @@ namespace C6Lab
                 guideFailEndsAt = double.NegativeInfinity;
                 foxStartDue = foxEndDue = false; // 새 결과가 앞 결과의 남은 소리를 대신한다.
                 clearedDue = resultEffect > 0 && resultAt >= 0d;
+                stampDue = clearedDue && StampShown; // #695 성공 도장이 박에 닿을 때 징
                 if (clearedDue) clearedCount++;
                 effectStartDue = effectEndDue = resultEffect != 0 && resultAt >= 0d
                     && EffectUntil(snapshot, resultEffect, resultAt) > resultAt + LabGourdComboHud.ResultSeconds;
             }
             if (snapshot.paused) return;
 
+            double stampAt = resultAt + LabGourdComboHud.StampLandSeconds;
+            if (stampDue && now >= stampAt)
+            {
+                stampDue = false;
+                if (now - stampAt <= LateSeconds) Play(LabYaguangSfx.ComboStamp);
+            }
             double failAt = resultAt + GuideFailDelay;
             if (guideFailDue && now >= failAt)
             {
@@ -595,6 +605,8 @@ namespace C6Lab
         private int GuideRuleCombos => network != null && network.config != null ? network.config.YaguangComboGuideRuleCombos : 1;
         private double GuideFeedbackDelay => network != null && network.config != null ? network.config.YaguangComboGuideFeedbackDelaySeconds : .3d;
         private double GuideRuleDelay => network != null && network.config != null ? network.config.YaguangComboGuideRuleDelaySeconds : .9d;
+        /// <summary>콤보 성공 도장(#668)은 야광귀 셈법일 때만 나온다 (LabGourdComboHud.YaguangCount와 같은 기준).</summary>
+        private bool StampShown => network == null || network.config == null || network.config.ComboYaguangCountEnabled;
         private double GuideFailDelay => network != null && network.config != null ? network.config.YaguangComboGuideFailDelaySeconds : .1d;
         private double GuideFailToTaunt => network != null && network.config != null ? network.config.YaguangComboGuideFailToTauntSeconds : .1d;
         private float GuideCountFade => network != null && network.config != null ? network.config.YaguangComboGuideCountFade : .6f;
@@ -671,6 +683,7 @@ namespace C6Lab
                 case LabYaguangSfx.ComboGuideHit3:
                 case LabYaguangSfx.ComboGuideClear:
                 case LabYaguangSfx.ComboGuideFail: return config.YaguangComboGuideSoundVolume;
+                case LabYaguangSfx.ComboStamp: return config.YaguangComboStampSoundVolume;
                 default: return config.YaguangFlashBurstSoundVolume;
             }
         }

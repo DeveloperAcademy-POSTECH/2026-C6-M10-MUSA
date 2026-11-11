@@ -290,6 +290,7 @@ namespace C6Lab.Tests
             snapshot.comboResultCount = 1; snapshot.comboResult = LabComboResult.Success; snapshot.comboResultAt = 39d;
             Watch(sound, snapshot, 39d, 40d);
             Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideClear), Is.EqualTo(1), "그렇지!!");
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboStamp), Is.EqualTo(1), "The gong as the stamp lands.");
             Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideHit1), Is.EqualTo(1), "Each line once.");
         }
 
@@ -309,6 +310,7 @@ namespace C6Lab.Tests
             Watch(sound, snapshot, 36.1d, 38d);
             Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideHit2), Is.Zero);
             Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideClear), Is.Zero);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboStamp), Is.Zero, "No stamp, no gong.");
             Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideFail), Is.EqualTo(1), "아이고 first");
             Assert.That(sound.PlayCount(LabYaguangSfx.ComboTaunt), Is.EqualTo(1), "then 메롱~");
         }
@@ -321,6 +323,7 @@ namespace C6Lab.Tests
             Assert.That(LabYaguangSound.Folder(LabYaguangSfx.ComboGuideHit3), Is.EqualTo("Audio/YaguangComboGuideHit3"));
             Assert.That(LabYaguangSound.Folder(LabYaguangSfx.ComboGuideClear), Is.EqualTo("Audio/YaguangComboGuideClear"));
             Assert.That(LabYaguangSound.Folder(LabYaguangSfx.ComboGuideFail), Is.EqualTo("Audio/YaguangComboGuideFail"));
+            Assert.That(LabYaguangSound.Folder(LabYaguangSfx.ComboStamp), Is.EqualTo("Audio/YaguangComboStamp"));
             Assert.That(LabYaguangSound.GuideFeedbackSfx(1), Is.EqualTo(LabYaguangSfx.ComboGuideHit1));
             Assert.That(LabYaguangSound.GuideFeedbackSfx(2), Is.EqualTo(LabYaguangSfx.ComboGuideHit2));
             Assert.That(LabYaguangSound.GuideFeedbackSfx(3), Is.EqualTo(LabYaguangSfx.ComboGuideHit3));
