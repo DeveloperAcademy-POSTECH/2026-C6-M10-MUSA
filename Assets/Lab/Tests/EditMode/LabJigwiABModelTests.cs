@@ -636,7 +636,8 @@ namespace C6Lab.Tests
             var reference=Room(LabStageYokai.None);
             foreach(var seat in m.Snapshot(31).players.Where(p=>b.players.Any(x=>x.playerId==p.id)))
                 Assert.That(reference.PaintSurface.RegisterHit(Vector3.forward,reference.PaintColorFor(LabOrbElement.Water),seat.id,seat.seat+1,3f),Is.True);
-            double expected=reference.PaintSurface.Coverage+reference.PaintSurface.PendingCoverage;
+            // The reference is unscaled Lab paint; this Story room has two actual participants.
+            double expected=(reference.PaintSurface.Coverage+reference.PaintSurface.PendingCoverage)*(5d/2d);
             Assert.That(budget,Is.EqualTo(expected).Within(2d/m.PaintSurface.CellCount),
                 "One splash (3 shares) per picked seat where its special Water hit; the special Water itself never paints.");
         }

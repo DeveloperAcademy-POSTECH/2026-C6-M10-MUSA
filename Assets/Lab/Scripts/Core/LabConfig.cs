@@ -1426,6 +1426,23 @@ namespace C6Lab
             DryingPercentPerSecond = PaintDryingPercentPerSecond,
             NearbyHitRadiusDegrees = PaintNearbyHitRadiusDegrees
         };
+        /// <summary>
+        /// Captures round-owned paint settings. Story co-op uses the configured five-player hit budget
+        /// scaled by the actual participant count; solo, tutorial/Lab and territory keep the configured values.
+        /// </summary>
+        public LabPaintGrowthSettings CapturePaintGrowthSettings(int participants, LabStageYokai stageYokai,
+            bool teamMode = false)
+        {
+            LabPaintGrowthSettings settings = PaintGrowthSettings;
+            bool storyStage = stageYokai == LabStageYokai.Gumiho
+                || stageYokai == LabStageYokai.Yaguang || stageYokai == LabStageYokai.Jigwi;
+            if (teamMode || !storyStage || participants < 2 || participants > 5) return settings;
+            float factor = 5f / participants;
+            settings.InitialPercent = Mathf.Min(100f, settings.InitialPercent * factor);
+            settings.RepeatPercent = Mathf.Min(100f, settings.RepeatPercent * factor);
+            return settings;
+        }
+
         public bool CompletedGourdViewerEnabled => completedGourdViewerEnabled;
         public bool PlayerPaintPatternsEnabled => playerPaintPatternsEnabled;
         public float GourdRopeCycleAmplitude => Mathf.Clamp(Finite(gourdRopeCycleAmplitude, .45f), 0f, 1f);
