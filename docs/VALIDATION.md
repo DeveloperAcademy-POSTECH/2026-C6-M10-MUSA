@@ -1,5 +1,29 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-11 — 박 잘림 (전투 땅 아래·봉인 박 관람 확대)
+
+- **기준:** `fix/gourd-clipping` (main `81e64ca0`에서 작업, `47d33dd3` 병합). Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 접속 묶음·설정·박 높이·움직임·크기는 그대로다.
+- **원인:**
+  - **전투:** 박이 가장 낮을 때(줄 최저 + 반동 최대) 스테이지 박 맨 아래가 땅(y −0.8)보다 약 0.9 아래로 내려간다. 불투명한 땅이 그 부분을 가려 일자로 잘려 보였다. 카메라·화면 경계 때문은 아니다.
+  - **관람:** 박을 402×402 사각형 텍스처에 그려서, 확대하면 사각형 경계에서 잘렸다.
+- **고친 것:**
+  - **전투:** `GameGourdOverGround`가 땅이 보이는 픽셀(스텐실)에서 땅 뒤에 있는 박만 다시 그린다.
+  - **관람:** `ExtendFrame(1.7, 2.8)`으로 같은 크기·중심에서 사각형 밖까지 그린다.
+
+| 확인 | 결과 |
+| --- | --- |
+| Mac 개발 빌드(DEV 솔로), main: 1~3스테이지 박 최저 자세 / 관람 최대 확대 | 박 아래가 땅선에서 일자로 잘림 / 사각형 아래 경계에서 잘림 |
+| 같은 빌드, 수정본 | 1~3스테이지 박 전체가 보임, 배경(2스테이지 파란 땅·기와집·소나무) 그대로 / 최대 확대에서 화면 끝까지 그려짐, 기본 확대의 크기·위치 동일 |
+| 시험안: 땅의 깊이 쓰기를 끄는 방식(채택 안 함) | 박은 보이지만 하늘 배경이 땅을 덮어 2스테이지 땅이 사라짐 |
+| 새 PlayMode `GameGourdClippingTests` (1·3스테이지: 정지 자세는 화면 변화 0, 최저 자세는 박 화면 범위 안에서만 변함 / 관람 텍스처·시야각·이미지 크기) | 3/3, 연속 2회 PASS |
+| `GamePreviewAspectTests`·`GourdResultViewerPlayModeTests`·`GameFinishReplayTests`·`GameStage2GourdHitFinishTests` | 함께 13건 중 새 검사 외 PASS |
+| `GameSceneFlowTests` (관람 비율 단언을 사각형 기준으로 갱신) | 28/28 PASS |
+| 전체 EditMode | 2242/2243. 실패 1건 `RecreatedYaguangDefaults…`는 main에서도 같은 실패 |
+| 전체 PlayMode | 792/793. 실패 1건은 위 관람 비율 단언(갱신 후 PASS) |
+| main `47d33dd3` 병합 후: 전체 EditMode / 관련 PlayMode(위 검사 + `GameBattleRenderWarmupTests`) | 2248/2248, 42/42 PASS |
+
+- **미실행:** 실기기·iOS 화면과 프레임 비용 측정, 2:2·튜토리얼 화면 확인.
+
 ## 2026-11-11 — 3스테이지 마지막 일격 다시보기 (구슬 없는 칠 완료)
 
 - **기준:** `fix/stage3-final-hit-replay` (main `ee9319a4` 기준). Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 기록 형식과 패킷은 바꾸지 않아 접속 묶음은 그대로다.

@@ -395,6 +395,39 @@ namespace C6Lab
             ApplyCameraPose();
         }
 
+        /// <summary>How much larger than the requested frame the texture now shows (1,1 until <see cref="ExtendFrame"/>).</summary>
+        public Vector2 FrameScale { get; private set; } = Vector2.one;
+
+        /// <summary>
+        /// Render a larger texture around the same view: the camera keeps its distance and zoom, and its field of view
+        /// widens by the same factor, so the original frame is unchanged at its centre and a zoomed gourd is cut only
+        /// at the edge of the larger image. Opt-in; the default preview is unchanged.
+        /// </summary>
+        public bool ExtendFrame(float horizontal, float vertical)
+        {
+            if (disposed || previewCamera == null || texture == null || FrameScale != Vector2.one
+                || !(horizontal >= 1f) || !(vertical >= 1f)) return false;
+            int width = Mathf.RoundToInt(texture.width * horizontal), height = Mathf.RoundToInt(texture.height * vertical);
+            if (width > SystemInfo.maxTextureSize || height > SystemInfo.maxTextureSize) return false;
+            var wider = new RenderTexture(width, height, 24, RenderTextureFormat.ARGB32)
+            {
+                name = texture.name, hideFlags = HideFlags.HideAndDontSave,
+                antiAliasing = 1, useMipMap = false, autoGenerateMips = false,
+                filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp
+            };
+            if (!wider.Create()) { DestroyOwned(wider); return false; }
+            var scale = new Vector2(width / (float)texture.width, height / (float)texture.height);
+            float halfTangent = Mathf.Tan(previewCamera.fieldOfView * .5f * Mathf.Deg2Rad) * scale.y;
+            previewCamera.targetTexture = wider;
+            previewCamera.fieldOfView = 2f * Mathf.Atan(halfTangent) * Mathf.Rad2Deg;
+            previewCamera.aspect = width / (float)height;
+            texture.Release();
+            DestroyOwned(texture);
+            texture = wider;
+            FrameScale = scale;
+            return true;
+        }
+
         private void ApplyCameraPose()
         {
             if (previewCamera == null) return;
