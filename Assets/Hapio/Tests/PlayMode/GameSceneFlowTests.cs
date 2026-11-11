@@ -2004,6 +2004,10 @@ namespace Hapio.Tests
             Set(foxSettings, "Gimmick Chance Charm (%)", 0f);
             Set(foxSettings, "Fox Fire Count Min", 2f);
             Set(foxSettings, "Fox Fire Count Max", 2f);
+            // #664: the fox round's goal is what fell less x; with x = 0 the goal is both foxes, so clearing one keeps
+            // the round running and leaves the other fox for the reload cleanup (reaching the goal smokes the rest).
+            Set(foxSettings, "여우구슬 목표에서 빼는 수: 최소", 0f);
+            Set(foxSettings, "여우구슬 목표에서 빼는 수: 최대", 0f);
             Set(foxSettings, "Fox Fire Safe Seconds", .25f);
             Set(foxSettings, "Charm Seconds", 9f);
             Set(foxSettings, "Charm Rescue Taps per Neighbor (0 = none)", 5f);

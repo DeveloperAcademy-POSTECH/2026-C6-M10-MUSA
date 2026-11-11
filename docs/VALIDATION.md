@@ -1,5 +1,26 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-11 — #664 병합 뒤 실패 검사 정리
+
+- **기준:** `fix/664-test-failures` (main `8b8aeb59`). Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal).
+- **원인:** #680(#664) 병합 뒤 전체 검사에서 실패 6건이 나왔다. 6건 모두 PR 브랜치(`13bea1d8`)에서도 같이 실패했고 병합 전 main(`f80506bc`)에서는 통과했다. 모두 #664가 의도해서 바꾼 동작을 예전 기준으로 검사하던 것이다. 실행 코드는 바꾸지 않았다.
+  - `LabCharmHostIdentityPlayTests`: `StartCharm`이 대상 목록(`IReadOnlyList<ulong>`)을 받게 바뀌었다. 검사는 한 명짜리 목록으로 부른다.
+  - `LabComboEffectLookTests` 2건: BIG/SMALL은 이제 팀의 마지막 결과(`LastEffectResult`)부터 센다. 그래서 검사용 스냅샷에 결과 횟수·종류를 넣고, 결과 문구는 이미 보인 것으로 둔다.
+  - `LabOrbPhysicsTests`: 매혹된 판은 이제 멈추고 터치를 받지 않는다. 그래서 위로 밀기 튕김 대신 터치 거절을 검사하고, 검사 이름도 바꿨다.
+  - `GameSceneFlowTests` 여우·매혹 초기화: 여우구슬 목표에서 빼는 수(0~3)에 따라 하나만 지워도 라운드가 끝나 남은 여우가 사라졌다. 그래서 빼는 수를 0으로 고정한다.
+  - `LabModelTests` 여우·음양: 이미 main `b0764a72`에서 고쳐져 있다.
+
+| 확인 | 결과 |
+| --- | --- |
+| 실패 4종 PlayMode(`LabCharmHostIdentityPlayTests`·`LabComboEffectLookTests`·`LabOrbPhysicsTests`·해당 `GameSceneFlowTests`) / EditMode `LabModelTests` | 73/73, 126/126 PASS |
+| 전체 EditMode / PlayMode | 2337/2337, 839/840. 남은 1건 `GameTutorialFlowTests.FinishedOpening…`(`Invalid index 0 36 1` 로그)는 #680 병합 전 main에서도 같은 실패 |
+
+- **튜토리얼 검사(같은 PR에서 추가):** `GameTutorialFlowTests`의 세로 Game view 크기 정리는 #671에서 들어왔다. `GameViewSizeGroup.RemoveCustomSize`에 전체 목록 번호(기본 크기 다음)를 넘겨야 하는데 사용자 크기 안의 번호(0)를 넘겼다. 그래서 지우기가 거절되며 `Invalid index 0 36 1`이 남았고, 더한 390×844 크기도 지워지지 않았다. 더할 때의 전체 번호로 지우게 고쳤다.
+
+| 확인 | 결과 |
+| --- | --- |
+| `GameTutorialFlowTests` | 5/5 PASS, 로그에 `Invalid index` 없음 |
+
 ## 2026-11-11 — 박 칠 색을 오행 팔레트 그대로 (클레이 농도 1)
 
 - **기준:** `feat/clay-full-palette-color` (main `51a24721`). Unity 6000.6.5f1 batch(macOS, Metal). 박 칠 색은 표현만 바꿨고, 판정·P 지도·도색 해시·접속 규약·공유 설정은 그대로다.
