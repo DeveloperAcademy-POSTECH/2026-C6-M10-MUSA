@@ -1,0 +1,49 @@
+using UnityEngine;
+
+namespace Hapio
+{
+    /// <summary>
+    /// #629 타이틀·오프닝 음악 곡과 값. Resources/Hapio/Story/StoryMusicArt 하나를 읽는다. Play 중에 바꿔도 바로 들린다.
+    /// - 평화 곡: 타이틀 화면부터 오프닝 앞부분까지 끊기지 않고 이어지고, 방 목록에서도 나온다.
+    /// - 박이 떨어지는 컷(Break Cut Id)이 시작되면 평화 곡이 테이프가 멈추듯 느려지며 메아리만 남고,
+    ///   조금 뒤 깨진 이후 곡이 들어온다.
+    /// </summary>
+    [CreateAssetMenu(fileName = "StoryMusicArt", menuName = "Hapio/Story Music Art")]
+    public sealed class GameStoryMusicArt : ScriptableObject
+    {
+        public const string ResourcePath = "Hapio/Story/StoryMusicArt";
+
+        [Header("곡")]
+        [Tooltip("타이틀 ~ 박이 떨어지기 전, 그리고 방 목록 곡 (반복)")] public AudioClip calmMusic;
+        [Tooltip("평화 곡 크기 (게임 설정의 BGM 볼륨에 곱한다)")] [Range(0f, 1f)] public float calmVolume = 1f;
+        [Tooltip("박이 깨진 뒤 오프닝 끝까지 나오는 곡 (반복)")] public AudioClip brokenMusic;
+        [Tooltip("깨진 이후 곡 크기 (게임 설정의 BGM 볼륨에 곱한다)")] [Range(0f, 1f)] public float brokenVolume = 1f;
+        [Tooltip("대기실(자리 고르기)에서도 평화 곡을 계속 틀지")] public bool playInLobby = true;
+
+        [Header("전환")]
+        [Tooltip("이 컷이 시작되는 순간 평화 곡이 멈추기 시작한다 (새 28컷에서 박이 떨어지기 시작하는 컷)")] public string breakCutId = "OP_014";
+        [Tooltip("평화 곡이 테이프처럼 느려져 완전히 멈출 때까지 (초). 기본은 컷 14(2.3초) + 컷 15에서 박이 바닥에 닿는 2.6초")]
+        [Min(.1f)] public float tapeStopSeconds = 4.9f;
+        [Tooltip("느려지는 모양. 클수록 처음엔 천천히, 끝으로 갈수록 급하게 멈춘다")] [Range(.5f, 4f)] public float tapeStopCurve = 1.6f;
+        [Tooltip("멈추기 시작한 뒤 깨진 이후 곡이 들어올 때까지 (초)")] [Min(0f)] public float brokenDelaySeconds = 7.4f;
+        [Tooltip("깨진 이후 곡이 스며들 듯 커지는 시간 (초)")] [Min(0f)] public float brokenFadeInSeconds = 1.2f;
+
+        [Header("메아리 (멈추는 동안)")]
+        [Tooltip("메아리 간격 (밀리초)")] [Range(10f, 2000f)] public float echoDelayMs = 330f;
+        [Tooltip("메아리가 한 번 돌아올 때마다 남는 크기 (클수록 길게 남는다)")] [Range(0f, 1f)] public float echoDecay = .6f;
+        [Tooltip("메아리 소리 크기")] [Range(0f, 1f)] public float echoWet = .7f;
+        [Tooltip("평화 곡이 멈춘 뒤에도 메아리가 울리도록 기다리는 시간 (초)")] [Min(0f)] public float echoTailSeconds = 6f;
+
+        [Header("켜고 끄기")]
+        [Tooltip("타이틀·방 목록에서 곡이 들어오는 시간 (초)")] [Min(0f)] public float fadeInSeconds = .5f;
+        [Tooltip("튜토리얼·전투로 넘어가거나 스토리를 건너뛸 때 곡이 사라지는 시간 (초)")] [Min(0f)] public float fadeOutSeconds = 1f;
+
+        public static GameStoryMusicArt Load() => Resources.Load<GameStoryMusicArt>(ResourcePath);
+
+        /// <summary>테이프 멈춤 진행(0~1)에서의 재생 속도. 1에서 시작해 0에서 멈춘다.</summary>
+        public float TapeSpeedAt(float progress) => Mathf.Pow(1f - Mathf.Clamp01(progress), tapeStopCurve);
+
+        /// <summary>테이프 멈춤 진행(0~1)에서의 크기. 느려지는 동안 함께 작아져 멈출 때 0이 된다.</summary>
+        public static float TapeLoudnessAt(float progress) => 1f - Mathf.Pow(Mathf.Clamp01(progress), .9f);
+    }
+}
