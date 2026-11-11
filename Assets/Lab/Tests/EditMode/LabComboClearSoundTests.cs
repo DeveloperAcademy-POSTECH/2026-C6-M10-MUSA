@@ -51,6 +51,21 @@ namespace C6Lab.Tests
                 "Resources/Audio/ComboFail/ComboFail.wav (#338)");
         }
 
+        /// <summary>#664: the 구미호 fox round is judged like the combo: cleared in time says 좋다, a time-up plays the fail sound.</summary>
+        [Test]
+        public void TheFoxRoundSaysJotaWhenClearedAndFailsAtTheTimeUp()
+        {
+            LabComboClearSound sound = Create();
+            var snapshot = new LabSnapshot { phase = LabPhase.Playing, sessionId = "s", round = 1, foxRoundCount = 1, foxRoundResult = 1 };
+            Assert.That(sound.Observe(snapshot), Is.False, "A result from before joining stays quiet.");
+            snapshot.foxRoundCount = 2; snapshot.foxRoundResult = 1;
+            Assert.That(sound.Observe(snapshot), Is.True, "All cleared: 좋다.");
+            Assert.That(sound.Observe(snapshot), Is.False, "Only once per round.");
+            snapshot.foxRoundCount = 3; snapshot.foxRoundResult = -1;
+            Assert.That(sound.Observe(snapshot), Is.False);
+            Assert.That((sound.PlayCount, sound.FailPlayCount), Is.EqualTo((1, 1)), "Time up: the fail sound.");
+        }
+
         [Test]
         public void ANewRoundStartsCountingAgain()
         {

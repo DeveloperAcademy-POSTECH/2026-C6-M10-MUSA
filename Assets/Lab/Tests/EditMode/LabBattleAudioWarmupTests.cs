@@ -41,7 +41,9 @@ namespace C6Lab.Tests
 
             LabBattleAudioWarmup.Preload(LabStageYokai.Gumiho);
             AssertLoaded(LabStageYokai.Gumiho, true);
-            Assert.That(LabYaguangSound.ClipFolders.SelectMany(Resources.LoadAll<AudioClip>)
+            Assert.That(LabBattleAudioWarmup.StageFolders(LabStageYokai.Gumiho), Is.SupersetOf(LabYaguangSound.FoxRoundClipFolders),
+                "#664: the fox round ticks and goes BIG/SMALL with the 야광귀 combo's sounds.");
+            Assert.That(LabYaguangSound.ClipFolders.Except(LabYaguangSound.FoxRoundClipFolders).SelectMany(Resources.LoadAll<AudioClip>)
                 .All(clip => clip.loadState != AudioDataLoadState.Loaded), Is.True, "Another stage's effects are released.");
 
             LabBattleAudioWarmup.Preload(LabStageYokai.Jigwi);
