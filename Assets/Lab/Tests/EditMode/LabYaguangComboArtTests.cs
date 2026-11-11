@@ -28,8 +28,8 @@ namespace C6Lab.Tests
             Assert.That(sprite, Is.EqualTo(LabYaguangComboArt.Load(name)));
             Assert.That(sprite.rect.size, Is.EqualTo(new Vector2(96, 98)));
         }
-        [TestCase(349f, 765f, 71f, 107f)]
-        [TestCase(698f, 1530f, 142f, 214f)]
+        [TestCase(358f, 765f, 64f, 69f)]
+        [TestCase(716f, 1530f, 128f, 138f)]
         public void PanelMatchesTheFigmaPositionAndUniformSize(float width, float height, float left, float top)
         {
             var viewport = new Vector2(width, height);
@@ -37,7 +37,7 @@ namespace C6Lab.Tests
             Vector2 size = LabYaguangComboArt.PanelReference.size * LabYaguangComboArt.Fit(viewport);
             Assert.That(anchor.x * width - size.x * .5f, Is.EqualTo(left).Within(.01f));
             Assert.That((1f - anchor.y) * height - size.y * .5f, Is.EqualTo(top).Within(.01f));
-            Assert.That(size.x / size.y, Is.EqualTo(207f / 51f).Within(.001f));
+            Assert.That(size.x / size.y, Is.EqualTo(229f / 87f).Within(.001f));
         }
         [TestCase(844f, 390f)]
         [TestCase(1080f, 2400f)]

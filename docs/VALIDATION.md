@@ -8422,3 +8422,24 @@ Unity 6000.6.5f1 / macOS Metal Editor에서 컴파일·전체 EditMode와 UI 영
 | 최종 NUnit 발견 목록 | 이관/복구 후 삭제 직전 Edit2340/Play843 → 삭제 후 Edit2340/Play830. 차이는 지정한13개와 정확히 일치하고 예상 밖 누락/추가0. 이관한 에셋 검사와 복구한 B 실패 검사는 둘 다 남아 있다. 이 수치는 발견 목록이며 Play830개 전체 통과를 뜻하지 않는다. |
 
 이번 실행은 전체 EditMode와 영향 PlayMode29개다. 실제 게임 코드·공유 fixture·asmdef·에셋이 바뀌지 않아 전체 PlayMode는 재실행하지 않았다. iOS/실기기/독립 앱/일반 Wi-Fi·핫스팟 확인과 새 빌드는 수행하지 않았다. 새 검사와 최종 실행의 skip/inconclusive는0이며 최초 실패도 위에 보존했다. 원시 결과·발견 목록은 커밋하지 않은 로컬 `artifacts/jigwi-test-retirement`에 있다. 기존 Scene을 복원했고 Editor 재생OFF/컴파일OFF/미저장변경없음을 확인했다.
+
+## 2026-11-11 #692 야광귀 콤보 보드 사이즈
+
+- 기준 `3719fb99` 위 `fix/#692-yagwanggwi-combo-board-size` 작업 사본, Unity 6000.6.5f1 macOS Editor. 보드 배치·구슬 크기·상단 제목/밑줄 숨김 및 복원만 변경했다. UI 변경 범위에 따라 전체 EditMode 및 관련 PlayMode를 선택했고 전체 PlayMode·빌드는 실행하지 않았다.
+- 전체 EditMode **2,337/2,337 PASS**(55.51초). 첫 실행은 Editor Play Mode 때문에 시작되지 않아 정지 후 재실행했다.
+- 관련 PlayMode **15/15 PASS**(8.12초): LabYaguangCountLookTests, LabComboEffectLookTests, LabComboProjectileIntegrationTests, GameBattleRenderWarmupTests. 보드 크기/위치·제목/밑줄 alpha0·Pause/Disable 복원, 기존 성공/실패 및 첫 렌더 준비를 확인했다.
+- 최초 관련 실행 13/15, 효과 표시 fixture 2개 실패(부적 비 감소·페널티 잔량). 재실행에도 동일했다. 기존 #664 LastEffectResult는 결과 종류와 count를 필요로 하나 fixture는 시각만 채웠다. fixture에 실제 결과 종류/count와 이미 표시된 결과 상태를 넣어 단언/게임 동작 변경 없이 보완한 뒤 15/15 통과했다. PlayMode fixture만 후속 변경되어 앞선 EditMode 검사 대상은 동일하다.
+- 임시 Unity Canvas/카메라로 358×765에서 보드 실제 렌더 확인: 229×87 패널·네 구슬·진행 바 배치 및 페이드 완료 상태. 임시 객체와 RT는 정리했다. 컴파일 오류 0, diff 공백 검사 통과. 실제 전투 전체 화면·iOS 실기기 해상도 확인은 미실행이다.
+
+### #692 후속 — 순서 번호와 적중 체크
+
+- 전체 EditMode **2,337/2,337 PASS**(52.95초), 관련 PlayMode **15/15 PASS**(8.52초). 범위는 직전 #692와 동일하며 전체 PlayMode·실기기·빌드는 미실행이다.
+- 1~4 텍스트/미적중 표시·적중 시 구슬 및 번호 숨김·체크 최초 등장 반동·정착·최종 칸 체크 후 성공 도장 전환을 검사했다. 전투 신라문화체를 연결한 임시 Unity Canvas 렌더에서 기본 상태와 1번 적중 상태를 확인하고 임시 객체/RT를 해제했다.
+- 최초 컴파일에서 기존 지역 변수명과 충돌(CS0136)한 것을 전용 orderOutline 이름으로 수정했다. 최초 EditMode 시도는 Editor Play Mode 상태로 시작되지 않아 정지 후 재실행했다. 최종 컴파일 오류 0, diff 공백 검사 통과.
+
+
+## 2026-11-11 — #692 main 병합 충돌 해결
+
+기준 #692 `4b99504e`에 main `45a55a34`를 병합했다. 충돌은 `LabComboEffectLookTests.cs`의 중복 fixture 보완과 이 문서 끝의 병렬 기록 추가였다. 테스트는 main의 `MarkResultShown` helper와 조건부 결과 count/종류를 그대로 유지하고, #692·#687·#697 검증 기록은 모두 보존했다. #692의 보드 크기·번호·체크 애니메이션 runtime 코드는 변경하지 않았다. main의 설정265개·5702/Lab62/Game54를 유지한다.
+
+Unity 6000.6.5f1 macOS Editor에서 새로고침 후 컴파일 오류0. 전체 EditMode **2340/2340 PASS**(47.70초), 관련 PlayMode **15/15 PASS**(7.69초), 실패/skip0. PlayMode 범위는 LabYaguangCountLookTests·LabComboEffectLookTests·LabComboProjectileIntegrationTests·GameBattleRenderWarmupTests다. 전체 PlayMode·빌드·실기기는 이번 병합에서 실행하지 않았다. diff 공백 및 충돌 표식 검사를 수행했다.

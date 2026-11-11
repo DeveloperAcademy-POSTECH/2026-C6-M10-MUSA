@@ -43,8 +43,8 @@ namespace C6Lab.Tests
                 var panel = canvasRoot.transform.Find("Gourd Combo/Gourd Combo Panel").GetComponent<RectTransform>();
                 Assert.That(panel.GetComponent<UnityEngine.UI.Image>().sprite, Is.EqualTo(LabYaguangComboArt.Load("Panel")));
                 float fit = LabYaguangComboArt.Fit(canvasRoot.GetComponent<RectTransform>().rect.size);
-                Assert.That(panel.sizeDelta.x, Is.EqualTo(207f * fit).Within(.01f));
-                Assert.That(panel.sizeDelta.y, Is.EqualTo(51f * fit).Within(.01f));
+                Assert.That(panel.sizeDelta.x, Is.EqualTo(229f * fit).Within(.01f));
+                Assert.That(panel.sizeDelta.y, Is.EqualTo(87f * fit).Within(.01f));
                 var layer = panel.parent;
                 Assert.That(layer.Find("Combo Count Pop").GetComponent<RectTransform>().anchorMin, Is.EqualTo(panel.anchorMin));
                 Assert.That(layer.Find("Combo Result").GetComponent<RectTransform>().anchorMin, Is.EqualTo(panel.anchorMin));
@@ -53,9 +53,18 @@ namespace C6Lab.Tests
                     var slot = panel.Find("Combo Slot " + (i + 1));
                     Assert.That(slot.GetComponent<UnityEngine.UI.Image>().sprite, Is.EqualTo(LabYaguangComboArt.Orb(Colors[i])));
                     Assert.That(hud.SlotChecked(i), Is.EqualTo(i < 2));
+                    var number = slot.Find("Order Number").GetComponent<UnityEngine.UI.Text>();
+                    Assert.That(number.text, Is.EqualTo((i + 1).ToString()));
+                    Assert.That(number.gameObject.activeSelf, Is.EqualTo(i >= 2));
+                    Assert.That(slot.GetComponent<UnityEngine.UI.Image>().enabled, Is.EqualTo(i >= 2));
                     Assert.That(slot.Find("Check").GetComponent<UnityEngine.UI.Image>().sprite, Is.EqualTo(LabYaguangComboArt.Load("Check")));
                 }
 
+                var firstCheck = panel.Find("Combo Slot 1/Check").GetComponent<RectTransform>();
+                Assert.That(firstCheck.localScale.x, Is.Not.EqualTo(1f), "New checks animate.");
+                yield return new WaitForSecondsRealtime(.32f);
+                Assert.That(firstCheck.localScale.x, Is.EqualTo(1f).Within(.001f));
+                Assert.That(firstCheck.localEulerAngles.z, Is.EqualTo(0f).Within(.001f));
                 var cleared = Snapshot(40d, progress: 4, active: false);
                 cleared.comboResult = LabComboResult.Success;
                 cleared.comboResultCount = 1;
@@ -65,7 +74,11 @@ namespace C6Lab.Tests
                 Assert.That(hud.ResultLabel, Is.EqualTo(LabGourdComboHud.ClearText), "No counting riddle on a clear.");
                 var result = canvasRoot.transform.Find("Gourd Combo/Combo Result");
                 var stamp = result.Find("Success Stamp").GetComponent<UnityEngine.UI.Image>();
-                Assert.That(hud.ResultVisible, Is.True, "Success stamp starts immediately.");
+                Assert.That(hud.ResultVisible, Is.False, "The final check lands first.");
+                Assert.That(hud.PanelVisible, Is.True);
+                Assert.That(hud.SlotChecked(3), Is.True);
+                yield return new WaitForSecondsRealtime(.32f);
+                Assert.That(hud.ResultVisible, Is.True, "Success stamp follows the final check.");
                 Assert.That(stamp.gameObject.activeInHierarchy, Is.True);
                 Assert.That(result.GetComponent<UnityEngine.UI.Text>().enabled, Is.False);
                 Assert.That(stamp.sprite, Is.EqualTo(LabYaguangComboArt.Load("SuccessStamp")));
@@ -113,6 +126,11 @@ namespace C6Lab.Tests
             var frame = new GameObject("Frame", typeof(RectTransform)).GetComponent<RectTransform>();
             frame.SetParent(progress.transform, false); frame.sizeDelta = new Vector2(242, 27);
             frame.anchoredPosition = new Vector2(-33, 200);
+            var title = new GameObject("StageLabel", typeof(RectTransform), typeof(CanvasGroup));
+            title.transform.SetParent(canvasRoot.transform, false);
+            var titleGroup = title.GetComponent<CanvasGroup>(); titleGroup.alpha = .7f;
+            var underline = new GameObject("Stage Underline", typeof(RectTransform));
+            underline.transform.SetParent(canvasRoot.transform, false);
             var hud = root.AddComponent<LabGourdComboHud>(); hud.Bind(network, canvasRoot.GetComponent<Canvas>());
             var latest = typeof(LabNetwork).GetField("latest", BindingFlags.Instance | BindingFlags.NonPublic);
             var snapshot = Snapshot(35, 1, true); latest.SetValue(network, snapshot);
@@ -123,17 +141,22 @@ namespace C6Lab.Tests
                 var fade = panel.GetComponent<CanvasGroup>();
                 Assert.That(group.alpha, Is.Zero, "Gauge and percentage are hidden before the panel becomes opaque.");
                 Assert.That(fade.alpha, Is.LessThan(1f), "The panel fades in rather than appearing instantly.");
-                Assert.That(panel.position.x, Is.EqualTo(frame.position.x).Within(.01f));
-                Assert.That(panel.position.y, Is.EqualTo(frame.position.y).Within(.01f));
-                Assert.That(panel.sizeDelta.x, Is.EqualTo(242f * .98f).Within(.01f));
+                var viewport = canvasRoot.GetComponent<RectTransform>().rect.size;
+                Assert.That(panel.anchorMin, Is.EqualTo(LabYaguangComboArt.PanelAnchor(viewport)));
+                Assert.That(panel.sizeDelta, Is.EqualTo(new Vector2(229, 87) * LabYaguangComboArt.Fit(viewport)));
+                Assert.That(titleGroup.alpha, Is.Zero);
+                Assert.That(underline.GetComponent<CanvasGroup>().alpha, Is.Zero);
                 yield return new WaitForSecondsRealtime(.26f);
                 Assert.That(fade.alpha, Is.EqualTo(1f).Within(.001f));
                 snapshot.paused = true; latest.SetValue(network, snapshot); yield return null;
                 Assert.That(group.alpha, Is.EqualTo(.65f), "Pause restores the gauge's previous alpha.");
+                Assert.That(titleGroup.alpha, Is.EqualTo(.7f));
+                Assert.That(underline.GetComponent<CanvasGroup>().alpha, Is.EqualTo(1f));
                 snapshot.paused = false; latest.SetValue(network, snapshot); yield return null;
                 Assert.That(group.alpha, Is.Zero);
                 hud.enabled = false;
                 Assert.That(group.alpha, Is.EqualTo(.65f), "Disabling the HUD never leaves the gauge hidden.");
+                Assert.That(titleGroup.alpha, Is.EqualTo(.7f));
                 snapshot.comboActive = false; hud.enabled = true; latest.SetValue(network, snapshot); yield return null;
                 Assert.That(group.alpha, Is.EqualTo(.65f), "The gauge returns when the combo overlay ends.");
             }
