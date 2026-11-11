@@ -46,9 +46,12 @@ namespace C6Lab.Editor
                 EditorGUILayout.HelpBox("전투가 시작되면 버튼이 켜진다 (혼자 Host일 때만).", MessageType.Info);
             LabStageYokai stage = ready ? network.VfxLabStage : LabStageYokai.None;
             DrawCommon(network, ready);
-            if (!EditorApplication.isPlaying || stage == LabStageYokai.Gumiho) DrawGumiho(network, ready && stage == LabStageYokai.Gumiho);
-            if (!EditorApplication.isPlaying || stage == LabStageYokai.Yaguang) DrawYaguang(network, ready && stage == LabStageYokai.Yaguang);
-            if (!EditorApplication.isPlaying || stage == LabStageYokai.Jigwi) DrawJigwi(network, ready && stage == LabStageYokai.Jigwi);
+            // #673: only the chosen round's gimmicks show (in a battle, the round actually being played).
+            LabStageYokai shown = stage != LabStageYokai.None ? stage
+                : round == 0 ? LabStageYokai.Gumiho : round == 1 ? LabStageYokai.Yaguang : LabStageYokai.Jigwi;
+            if (shown == LabStageYokai.Gumiho) DrawGumiho(network, ready && stage == LabStageYokai.Gumiho);
+            if (shown == LabStageYokai.Yaguang) DrawYaguang(network, ready && stage == LabStageYokai.Yaguang);
+            if (shown == LabStageYokai.Jigwi) DrawJigwi(network, ready && stage == LabStageYokai.Jigwi);
             if (!string.IsNullOrEmpty(last))
             {
                 EditorGUILayout.Space();
