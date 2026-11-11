@@ -1479,13 +1479,15 @@ namespace C6Lab
                 else AdvanceJigwiStage(effectiveNow);
                 // Fever time (#334) stops the yokai before any gimmick due at the same moment is cast.
                 StartFeverTime(effectiveNow);
-                AdvanceFoxRound(effectiveNow); // #664: before expiry, so time-up judges the orbs still there
                 if (StageYokai != LabStageYokai.None)
                 {
                     ExpireOrbs(effectiveNow);
                     AdvanceJigwi(effectiveNow);
                 }
                 CastGimmicks(effectiveNow);
+                // #664: after the gimmicks due in this slice, each of which first settled any round already over at its
+                // own time, so a late tick settles and starts rounds in the same order as small steps.
+                AdvanceFoxRound(effectiveNow);
                 AdvanceJigwi(effectiveNow);
                 AdvanceStageJigwi(effectiveNow);
                 AdvanceCombo(effectiveNow);
@@ -1611,6 +1613,8 @@ namespace C6Lab
         /// </summary>
         private void DropFoxFireOnAll(List<ulong> targets, double at, uint index)
         {
+            // #664: a round whose time was up by now is settled first (its fox orbs go), even within one late tick.
+            AdvanceFoxRound(at);
             (int min, int max) = FoxFireCountRange(foxFireDrops++);
             int count = min + (int)(DrawFor(seed ^ FoxCountSalt, SabotageDrawKey, index) % (ulong)(max - min + 1));
             int dropped = 0;

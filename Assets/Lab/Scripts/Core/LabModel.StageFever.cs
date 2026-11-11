@@ -61,7 +61,8 @@ namespace C6Lab
                 charmStartedAt = System.Math.Min(charmStartedAt, at);
                 EndAllCharms(at);
             }
-            // #664: a fox round on now ends with no reward or penalty.
+            // #664: a fox round on now ends with no reward or penalty (one already over before the fever is settled first).
+            AdvanceFoxRound(at);
             CancelFoxRound();
             foreach (LabOrbState orb in orbs.Values.Where(orb => !orb.inFlight && orb.kind == LabOrbKind.FoxFire).ToArray())
             {
