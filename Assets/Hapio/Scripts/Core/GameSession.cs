@@ -206,6 +206,7 @@ namespace Hapio
             sceneFade = GameSceneFade.Create(transform, lobbyFadeColor);
             CreateLoadingView();
             GameTouchInk.Create(transform);
+            GameStoryMusic.Create(transform); // #629 title / opening / room list music
             cloudCover = GameCloudCover.Create(transform);
             network.GameFlowMessage += ReceiveControl;
             network.GameFlowDisconnected += OnPeerDisconnected;

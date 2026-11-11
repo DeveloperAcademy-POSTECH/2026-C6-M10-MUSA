@@ -39,6 +39,13 @@ namespace C6Lab
             if (gourdNetwork != null) gourdNetwork.ConfigApplied -= OnGourdConfigApplied;
         }
 
+        private bool HasOwnListener()
+        {
+            foreach (AudioListener listener in FindObjectsByType<AudioListener>(FindObjectsSortMode.None))
+                if (listener.gameObject.scene == gameObject.scene) return true;
+            return false;
+        }
+
         private void Awake()
         {
             LabNetwork boardNetwork = null;
@@ -53,8 +60,9 @@ namespace C6Lab
             }
             // 장면에 소리를 듣는 귀(AudioListener)가 없으면 어떤 소리도 들리지 않는다.
             // 게임 소리는 모두 화면 기준(2D)이라 위치와 상관없이 하나만 있으면 된다.
-            if (FindFirstObjectByType<AudioListener>() == null)
-                gameObject.AddComponent<AudioListener>();
+            // #629: 이 장면의 귀만 센다. 다른 장면에서 넘어온 오브젝트(타이틀 음악·터치 먹물)가 잠깐 빌린 귀는 곧 돌려주므로,
+            // 그것을 이 장면의 귀로 치면 돌려준 뒤 전투에서 아무 소리도 들리지 않는다.
+            if (!HasOwnListener()) gameObject.AddComponent<AudioListener>();
             // 소리·햅틱은 장면 수정 없이 여기에 붙인다. 크기·햅틱 설정은 모두 boardNetwork.config(LabConfig)에서 읽는다.
             // 구슬 생성 효과음 (내 구슬이 떠오를 때)
             LabGenerateSound generateSound = GetComponent<LabGenerateSound>();
