@@ -1,3 +1,4 @@
+using System.Linq;
 using UnityEngine;
 
 namespace C6Lab
@@ -80,6 +81,120 @@ namespace C6Lab
             EndYaguangTimeline(now);
             revision++;
             return yaguangTimelineEnded;
+        }
+
+        // ───────── #673: 1~3라운드 모든 기믹 ─────────
+
+        /// <summary>
+        /// #673 공통/구미호 기믹을 지금 바로 건다 (주기·확률·스테이지 켜기와 상관없이). 박 폭탄·넘기기 막기·매혹은 이 사람에게,
+        /// 여우불은 모두의 판에 떨어진다. 같은 것이 이미 걸려 있으면(넘기기 막기, 매혹) false.
+        /// </summary>
+        public bool VfxLabCastGimmick(LabSabotageKind kind, ulong target, double now)
+        {
+            if (!TryAdvance(now, out _) || phase != LabPhase.Playing || !players.ContainsKey(target)) return false;
+            if (kind == LabSabotageKind.SwipeBlock && BlockOn(now)) return false;
+            if (kind == LabSabotageKind.Charm && CharmComingOrOn(now)) return false;
+            uint index = commonGimmickCount + uniqueGimmickCount + 1000u + (uint)sabotages.Count;
+            if (kind == LabSabotageKind.FoxFire)
+                DropFoxFireOnAll(seats.Take(activeSeatCount).ToList(), now, index);
+            else DispatchGimmick(kind, target, now, index);
+            revision++;
+            return true;
+        }
+
+        /// <summary>#673 Y1(섬광): 지금 바로 섬광 예고를 시작한다. 시간표가 섬광 차례를 꺼낼 때와 같은 길이다.</summary>
+        public bool VfxLabStartFlash(double now)
+        {
+            if (!TryAdvance(now, out _) || phase != LabPhase.Playing || !VfxLabYaguangTimelineOn || !rules.FlashEnabled
+                || YaguangUniqueBusy(now)) return false;
+            nextFlashAt = now + rules.FlashWarningSeconds;
+            SettleFlashTarget(now);
+            flashWarned = true;
+            flashHeld = flashWasHeld = false;
+            flashQueuedAt = -1d;
+            AdvanceFlash(now);
+            revision++;
+            return true;
+        }
+
+        /// <summary>#673 Y2(콤보 실패): 지금 칸에 틀린 색을 맞힌 것으로 처리해 콤보를 실패시킨다. SMALL 벌칙이 실제 게임처럼 걸린다.</summary>
+        public bool VfxLabFailCombo(ulong thrower, double now)
+        {
+            if (!TryAdvance(now, out _) || phase != LabPhase.Playing || !combo.Active) return false;
+            LabOrbElement wanted = combo.ColorAt(combo.Progress);
+            LabOrbElement wrong = new[] { LabOrbElement.Fire, LabOrbElement.Water, LabOrbElement.Wood, LabOrbElement.Metal, LabOrbElement.Earth }
+                .First(element => element != wanted);
+            LabComboResult result = combo.Judge(wrong, thrower, now);
+            if (result != LabComboResult.None) OnComboFinished(result);
+            revision++;
+            return result == LabComboResult.WrongColor;
+        }
+
+        /// <summary>#673 G(구미호 피버): 남은 시간이 피버 시간이 된 때를 지금으로 당겨 피버를 바로 시작한다.</summary>
+        public bool VfxLabStartGumihoFever(double now)
+        {
+            if (!TryAdvance(now, out _) || phase != LabPhase.Playing || rules.FeverTimeSeconds <= 0d || feverTimeStarted) return false;
+            feverTimeAt = now;
+            StartFeverTime(now);
+            revision++;
+            return feverTimeStarted;
+        }
+
+        /// <summary>#673 지귀 시간표가 돌고 있어(피버 전) 미션을 부를 수 있는지</summary>
+        public bool VfxLabJigwiOn => jigwiABEnabled && !jigwiStageCutoffReached;
+        /// <summary>#673 지금 진행 중인(예고 포함) 지귀 미션 종류. 없으면 null.</summary>
+        public LabJigwiABKind? VfxLabJigwiMission(double now)
+        {
+            var item = jigwiABRounds.LastOrDefault(value => value.resolution == LabJigwiABResolution.None && now >= value.warningAt);
+            return item?.kind;
+        }
+
+        /// <summary>
+        /// #673 J(지귀): 시간표의 다음 미션(연기 또는 부적)을 지금 예고부터 시작한다. 진행 중인 미션이 있거나 남은 미션이 없으면 false.
+        /// </summary>
+        public bool VfxLabStartNextJigwiMission(double now)
+        {
+            if (!TryAdvance(now, out _) || phase != LabPhase.Playing || !VfxLabJigwiOn
+                || jigwiStageNextSlot >= LabJigwiABTimeline.SlotCountFor(jigwiSchedule)
+                || jigwiABRounds.Any(value => value.resolution == LabJigwiABResolution.None)) return false;
+            jigwiNextSlotPulledAt = now + LabJigwiABTimeline.WarningSeconds;
+            AdvanceJigwiAB(now);
+            revision++;
+            return true;
+        }
+
+        /// <summary>
+        /// #673 J(지귀): 진행 중인 미션을 지금 끝낸다. complete면 성공(부적은 모든 자리가 다 쓴 것으로 → 완성 연출/보상),
+        /// 아니면 시간이 다 된 것으로(부적은 실패 → 불덩이와 판 타기, 연기는 그냥 끝남).
+        /// </summary>
+        public bool VfxLabFinishJigwiMission(bool complete, double now)
+        {
+            if (!TryAdvance(now, out _) || phase != LabPhase.Playing) return false;
+            var active = ActiveJigwiABRound(now);
+            if (active == null) return false;
+            if (complete && active.kind == LabJigwiABKind.PersonalBurn)
+            {
+                foreach (var seat in active.players.Where(value => value.talismanAt < 0d).ToArray())
+                    TryCompleteJigwiTalisman(seat.playerId, active.id, now);
+            }
+            else ResolveJigwiAB(active, complete ? LabJigwiABResolution.Completed : LabJigwiABResolution.Expired, now);
+            revision++;
+            return active.resolution != LabJigwiABResolution.None;
+        }
+
+        /// <summary>
+        /// #673 J(지귀 피버): 방해가 끝나는 때(100초)를 지금으로 당겨 피버를 바로 시작한다. 진행 중이던 미션은 지금 끝난 것으로 잘린다.
+        /// </summary>
+        public bool VfxLabStartJigwiFever(double now)
+        {
+            if (!TryAdvance(now, out _) || phase != LabPhase.Playing || !VfxLabJigwiOn) return false;
+            jigwiStageCutoffAt = now;
+            // A mission still in its warning would start after the new cutoff: drop it (the timetable is over anyway).
+            jigwiABRounds.RemoveAll(value => value.activeAt > now);
+            foreach (var item in jigwiABRounds) if (item.endsAt > now) item.endsAt = now;
+            AdvanceJigwiAB(now);
+            revision++;
+            return jigwiStageCutoffReached;
         }
 
         private void AddVfxLabOrb(ulong owner, LabOrbElement element, bool fiveColor, double now)

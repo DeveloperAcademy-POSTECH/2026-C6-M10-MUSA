@@ -7369,7 +7369,7 @@ Compared twelve seed masks and selected 572. Changed only seed defaults and the 
 
 ## 오행 VFX 인수인계 브랜치와 최신 main 통합 — 2026-11-09
 
-- 이슈 #576. 최신 main `56e9c79f`를 기준으로 별도 브랜치 `codex/five-elements-vfx-handoff`에 소스·재질·텍스처·프리팹·비교 씬·문서를 모았다. 위 2026-11-06 결과는 이전 기준 `46ae9987`의 실행 이력이다.
+- 이슈 #576. 최신 main `56e9c79f`를 기준으로 당시 전달용 브랜치에 소스·재질·텍스처·프리팹·비교 씬·문서를 모았다. 위 2026-11-06 결과는 이전 기준 `46ae9987`의 실행 이력이다.
 - 최신 main의 지귀 부적 구슬·특수 오색구슬은 전용 비행 표현을 쓰고, 부적의 Host/예측/수신 타격은 기존 피격 및 물파도 경로를 사용한다. 일반 원소 타격은 새 오행 VFX를 사용한다. 프로토콜 5697과 기존 게임 토큰을 유지했다.
 - **컴파일 및 비교 데모 통과.** Unity 6000.6.5f1, URP 17.6.0, iOS 타깃 설정, Mac Metal 편집기에서 프레임 1~88이 진행되었다. 30/60fps 설정의 실제 자동 발사와 다섯 충돌, UI 일시정지·단색 전환·재생, 중복 접촉·오래된 핸들·이동 표적·파괴 후 회수가 모두 통과했다. 일곱 렌더 캡처를 생성하고 원소별 방출 및 토의 변화도 확인했다.
 - **핵심 PlayMode 7/7 통과.** `LabFiveElementContactTests` 3건과 일반/부적 × 예측/수신 4건을 별도로 실행했다.
@@ -7792,6 +7792,141 @@ The manual conflict resolution only combines documentation. Selected PlayMode ch
 
 Main advanced to `6b2706aa` during PR verification (#633 and #639). Integrated it in `b49a35f9`; the only conflict was again this document, and both histories were retained. The 24 original #634 code/asset files remain unchanged. On this final integrated code, full EditMode **2199/2199 PASS** and the two result/game-over PlayMode checks named above **2/2 PASS**, no failures or skips. GitHub reported PR #640 mergeable. Only documentation was manually resolved; pre-existing generated asset whitespace was retained rather than modifying unrelated assets. Full PlayMode and physical-device tests were not rerun.
 
+## 2026-11-11 - #652 Yaguang shake-release UI
+
+- Branch: fix/#652-yagwanggwi-shake-ui; based on main. Figma 4607:4749/4773, reference 349x765. Six transparent 2x PNGs and Nanum Brush Script Regular/OFL are connected through LabYaguangShakeCue. Input, threshold, Host release/retry, bonus and protocol remain unchanged. See YAGUANG_SHAKE_UI.md and asset Source.json.
+- Scope: presentation and private render warmup. Selected full EditMode plus affected cue/flash/request/warmup PlayMode; full PlayMode omitted because network, physics, paint and win/loss behavior did not change.
+- Unity 6000.6.5f1 macOS Editor: full EditMode 2198/2198 PASS, failed/skipped 0, 61.45s. Final related PlayMode 14/14 PASS, failed/skipped 0, 4.61s: LabYaguangShakeCueTests, LabYaguangFlashLookTests, LabFlashShakeRequestTests, GameBattleRenderWarmupTests. Console errors 0; git diff --check passed.
+- Initial PlayMode: 13/14, old veil-alpha expectation .12 failed against intentional Figma .9. Updated that expectation to the new design, then passed.
+- Initial Canvas render exposed page-background contamination in download_assets exports and stretched text glyphs. Direct node exportAsync produced transparent assets; tight text bounds now display at half their 2x pixel size, centered within the source slots. Final 0/10 and 6/10 standalone Canvas renders at 698x1530 were inspected for artwork, transparency, typography, guide visibility, rotation and gauge. These use a plain background, not an actual full battle capture. Temporary Figma clones were removed.
+- NOT RUN: device sensors/safe area, iOS/standalone builds, real multiplayer and full-battle manual visual verification. No commit or push performed.
+
+### #652 warning countdown and authored eye bubbles - 2026-11-11
+
+- Added five transparent 2x PNGs from Figma: 3/2/1 (4570:11822/11823/11821) and complete plain/yellow eye bubbles (4590:3369/3370). Digits preserve authored Shilla Culture Bold 110, strokes and per-step colors. Source.json records provenance. Custom countdowns above three retain dynamic text.
+- Existing countdown/eye glow timing and target visibility stay unchanged. Complete bubble PNGs replace generated bubble/eyes/halo only during eye warnings; the next shared alert restores its generated background and pivot. All five assets join private render warmup.
+- Unity macOS Editor: full EditMode 2198/2198 PASS (44.50s), relevant PlayMode 18/18 PASS (7.92s): cue/countdown, flash look, release requests, shared alerts and render warmup. Initial PlayMode 17/18: new test used GetComponentInParent on an inactive countdown object and received null. Changed the test to read the known immediate parent; rerun passed. Runtime code was unchanged by this test correction.
+- Actual Canvas renders of 3/2/1 with plain/yellow bubbles were visually inspected on a plain background. No page-color contamination or duplicate generated bubble/text. These are isolated UI renders, not full battle captures. Device/video playback, builds and real multiplayer not verified. Full PlayMode omitted for this presentation-only change; no input, network, physics or paint logic changes.
+
+### #652 responsive frames, accelerating yellow flash and immediate fast phone cue - 2026-11-11
+
+- Reviewed the user's 17.225s recording. Changed the release veil to the existing warning-edge yellow, added a center-out radial front lasting .6s with t^2.8 acceleration and final diameter 1.1x viewport diagonal. The stable veil then fades with recognized progress. Phone movement starts at zero recognized shakes, 5Hz/+/-12 degrees. UI/countdown/eyes share the 349x765 uniform fit; eye bubble uses 104x104 source dimensions and updates with viewport size. Input and Host release logic remain unchanged.
+- New coverage checks accelerating radius, opaque coverage of portrait/landscape corners and fitted content bounds. Updated zero-count cue assertion for immediate motion. Existing shared-alert, warning lifecycle, release-request and warmup assertions remain intact.
+- Final full EditMode 2198/2198 PASS, failed/skipped0, 45.37s. Relevant PlayMode 19/19 PASS, failed/skipped0, 8.52s. git diff --check passed. Full PlayMode omitted for this presentation-only scope. Device sensors/safe area, builds, real multiplayer and full battle manual playback remain unverified.
+- Initial related run16/19: BurstAlpha observed only the old flat veil and returned0 during the new radial front. Updated the runtime state getter to include the visible radial effect; no test assertions relaxed. One subsequent run aborted in the Unity runner after18/19 without assertion failures, alongside Transport ResetStatics/GC-handle/null-reference console errors; retry passed19/19.
+- A later full EditMode run2191/2198 exposed seven unrelated orb-appearance expectations: saved LabConfig carried a nonserialized Hapio appearance override in memory after Play. Confirmed the saved config/theme assets were unchanged, cleared only that nonserialized override through SetOrbPresentationOverride(null), and reran2198/2198. No orb asset or test changed.
+- Rendered72 frames of the actual cue and radial renderer at349x765/60fps with a plain fixture backdrop; inspected early/mid/complete expansion and opposite phone poses. Encoded an MP4 preview locally. This is an isolated UI animation preview, not a gameplay recording. No commit or push.
+
+### #652 native HDR white flash and Bloom - 2026-11-11
+
+- Replaced colored UI sheets with LabYaguangFlashLight: a private HDR emitter, real URP Bloom and additive RawImage composition below the cue/countdown. White core with a warm gold fringe; warning, expanding front and residual glare all use this renderer. Existing UI Images become white fallback only. No global camera, lighting, volume, pipeline asset or package-version changes. Runtime asmdef references the existing Core/Universal assemblies.
+- Private ARGBHalf texture with24-bit depth, output long edge capped960px. Bloom scatter .9, up to5 iterations, front intensity3. Native rig is owned in the UI hierarchy, neutralizes Canvas scale and sits outside gameplay visibility on unused layer31. Disabling stops its camera/volume; destruction frees the rig, profile, materials and texture. Loading warmup exercises the actual pipeline.
+- Final full EditMode2198/2198 PASS, failed/skipped0, 46.13s. Relevant PlayMode20/20 PASS, failed/skipped0, 8.51s, including GPU source-radiance/Bloom/lifecycle checks. Console errors0 and diff whitespace check passed. The GPU test verifies HDR radiance above1 before grading, bright white output, added light outside the emitter with native post-processing, disabled camera and rig destruction.
+- Initial GPU run19/20: RenderGraph warned about a missing depth buffer and the post-processed center did not exceed1. Added24-bit depth. Investigation confirmed existing LDR grading caps final output even in ARGBHalf; separated the HDR-source and actual outside-emitter Bloom checks. A later19/20 run exposed a GameView-dependent sampling threshold; fixed the test viewport to349x765 and increased visual Bloom spread to match the request, without reducing the light-spread assertion. Final run20/20 passed.
+- Preview cleanup exposed three orphan rigs from earlier inactive/editor previews. Cleaned only those transient rigs, then parented each rig under its owning UI to cover inactive destruction/domain reload cases. Repeated the preview with the final hierarchy; remaining private HDR cameras0. The active scene stayed Home.
+- Visually inspected the real HDR/Bloom renders: small white hot spot, broad soft halo, full-screen peak and residual white glare. Encoded72 rendered frames at60fps as a standalone UI preview on a plain background. For same-frame editor capture only, cloned the emitter material per capture to avoid SRP constant-buffer reuse; runtime uses one material updated per frame.
+- Full PlayMode omitted for the isolated presentation/assembly-reference scope. Existing packages and pipeline behavior are unchanged. iOS/standalone builds, physical-device brightness/performance/thermal behavior, real multiplayer and full-battle manual validation remain NOT RUN. No commit or push.
+
+### #652 readable countdown, brief pulse, mild afterglow and round frame - 2026-11-11
+
+- Latest request supersedes radial expansion. Countdown PNGs are fully opaque from their first frame; warning strength is .12. After3/2/1, one whole-screen HDR pulse lasts .16s and falls with (1-t)^3; removed the old traveling-circle fallback/generator. Residual strength is .20. Bloom intensity is1.1 for the pulse/.35 otherwise, scatter .75.
+- Warning falloff is elliptical so its inner boundary no longer resembles a beveled square. Composite uses an antialiased rounded-rectangle mask with radius9% of the short side. Countdown/cue remain above the light. Fast phone motion and all input/Host logic are unchanged.
+- Final full EditMode2198/2198 PASS (45.61s); affected PlayMode20/20 PASS (8.31s), failures/skips0. Pulse-decay/short-duration, initial countdown opacity and mild-warning/afterglow expectations updated to the intended behavior. Native Bloom test samples the new elliptical emitter's lit edge and unlit interior; existing spread assertion retained. Console errors0 and git diff --check passed.
+- Inspected a126-frame/30fps actual UI render covering3/2/1, the instantaneous flash and the mild residual glow, including rounded corners. Exported a4.2s standalone preview with a plain backdrop; not a full gameplay capture. Current implementation/provenance docs rewritten around final behavior. Earlier validation entries remain as history.
+- Full PlayMode not repeated for this visual-only adjustment; device brightness/performance, builds and real multiplayer remain unverified. No commit or push.
+
+### #652 stronger pulse and distinct3/2 warning stages - 2026-11-11
+
+- Selected scope: strengthen only the flash moment. Raised HDR pulse white radiance5->10 and pulse Bloom1.1->2.2; kept .16s duration, countdown artwork/opacity and .20 afterglow. Verified a same-time render is brighter while residual parameters are unchanged.
+- Follow-up: distinguish countdown3 from2. Warning is now tied to remaining whole seconds rather than sharing the eye-glow plateau:3=.18x maximum/.0216 actual strength,2=.55x/.066,1=1x/.12. Three uses a narrow warmer fringe; two a wider/brighter fringe; one retains the widest12% warning. Existing eye PNG glow timing remains unchanged. Pause/target gates retained.
+- Final full EditMode2198/2198 PASS (46.08s); related PlayMode21/21 PASS (8.03s), failures/skips0. New relational stage test plus snapshot sequence confirms3->2 grows by more than2x. Initial20/21 failed because the prior1.5s fixture was already showing2 while the new assertion expected3; changed the fixture to an actual3s warning and explicitly checked all three stages. No assertion relaxed.
+- First pulse-only PlayMode attempt could not start while Editor was playing; stopped Play and reran20/20 before the follow-up. Final staged run21/21 and full asset run passed. Visually inspected3/2/1 renders and refreshed the4.2s standalone preview with stronger flash. Existing rounded mask, phone motion and input/Host logic unchanged.
+- Full PlayMode, physical-device brightness/performance, builds and real multiplayer not run for this visual-only update. No commit or push.
+
+
+### #652 발광 실험실 (2026-11-11)
+
+- `C6 Lab/Experiments/Yagwanggwi Glow Lab` 추가. Unity 6000.6.5f1 / macOS Metal에서 창과 실제 HDR/Bloom 발광 미리보기를 확인했다.
+- 전체 EditMode 2,198개 통과. 영향 PlayMode 22/22 통과(8.58초): FlashLight, ShakeCue, FlashLook, FlashShakeRequest, GourdAlert, GameBattleRenderWarmup.
+- 새 GPU 검사는 설정 복사 격리, HDR 강도·색상 변경, 작은 면적 밖 무발광 및 전체 면적 전환을 검증한다. 기존 native Bloom·수명 정리 검사도 통과했다.
+- 테스트 추가 중 URP 타입 직접 참조의 테스트 어셈블리 컴파일 오류를 발견해 기존 검사와 같은 reflection 경로로 수정했다. 최종 컴파일 오류 없음.
+- 실험실 열기/미리보기만으로 게임 설정 에셋이 생성되지 않는 것을 확인했다. 게임 기본값 저장 버튼은 실행하지 않았다. iOS 실기기 밝기·성능은 미검증이다.
+
+
+### #652 발광 면적 자동 확장 (2026-11-11)
+
+- 3/2/1 이후 면적0.02→1을0.28초 동안 세제곱 가속으로 확장하고,0.16초 동안 감쇠한다. 저장된 밝기·색상·Bloom·예고·잔광 설정을 보존한다. 실험실의 번쩍임/전체 흐름도 동일 경로다.
+- UI/VFX 변경 범위에 따라 전체 EditMode 2,198개 통과, 관련 PlayMode 23/23 통과(8.26초). 네트워크·판정·입력 규칙은 변경하지 않아 전체 PlayMode는 생략했다. Unity6000.6.5f1/macOS Metal 기준이다.
+- GPU 검사에서 확장 시작 시 외곽 무발광, 확장 완료 시 모서리 HDR 피크 유지, 이후 감쇠를 확인했다. 실험실 캡처에서도 작은 광원·중간 확장·전체 화면을 확인했다. iOS 실기기 밝기·성능은 미검증이다.
+- 첫 EditMode 시도는 Editor Play 상태로 시작되지 않아 Stop 후 재실행했다. 첫 PlayMode는 이전0.2초 이하 단발 섬광 기대값1개가 실패했다. 새 요청의0.28초 확장+0.16초 감쇠 계약으로 검사를 갱신한 뒤23/23 통과했다.
+
+
+### #652 확장 빛/안내 잔광 투명도 연결 (2026-11-11)
+
+- 잔광 입력에0.85배를 적용하고, 확장 중에도 같은 잔광을 유지한다. 감쇠 시 Bloom 강도를 잔광 값으로 보간한다. Screen 합성으로 배경을 보존하며 게임 확장/잔광의 빛 기여를최대22%로 제한한다. 면적/속도/저장된 HDR 색상 설정은 유지한다.
+- UI/VFX 범위: 전체 EditMode 2,198/2,198(43.60초), 관련 PlayMode 24/24(8.16초) 통과. 새 GPU 합성 검사는 회색 배경 위 최대 발광이 배경을 지우지 않고 예상 Screen 합성값을 만드는지 확인했다. 실험실 전체 흐름의 최대 확장 프레임도 실제 캡처로 확인했다.
+- Unity6000.6.5f1/macOS Metal 기준. 공통 입력·네트워크·판정 변경이 없어 전체 PlayMode는 생략했다. 실제 게임/iOS 실기기 화면 확인은 미실행이다.
+
+
+### #652 확장 시작 순간 빛 강조 (2026-11-11)
+
+- 시작0.035초 동안 HDR2배·합성 최대70%·짧은 잔광 추가.0.14초까지 제거해 이전 원 확장과22% 후반 합성으로 복귀한다.
+- UI/VFX 범위로 전체 EditMode2,198/2,198(46.89초), 관련 PlayMode25/25(8.46초) 통과. GPU 검사에서 시작 잔광을 확인하고, 추가 시간 검사에서 확장 연결 전 강조가0이 되는 것을 확인했다. 실험실 시작 프레임도 캡처해 확인했다.
+- 첫 EditMode 시도는 Play 상태로 시작되지 않아 Stop 후 재실행했다. Unity6000.6.5f1/macOS Metal 기준. 입력/네트워크/판정 변경이 없어 전체 PlayMode는 생략했고 실제 게임/iOS 실기기 밝기는 미검증이다.
+
+
+### #652 숫자 교차 페이드·1 머무름·Gaussian 확산 (2026-11-11)
+
+- 숫자를0.25초 교차 페이드하고 팝을1.06배로 줄였다. 마지막1은 로컬 표현에서0.25초 추가 유지 후 빛과 함께 사라진다. 확장은0.55초, 발광은 Gaussian 및 부드러운 합성 제한으로 원 테두리를 없앤다. 서버 섬광 판정·입력·회차는 유지한다.
+- 최종 전체 EditMode2,198/2,198(46.48초), 관련 PlayMode25/25(8.42초) 통과. 기존 숫자 검사에 이전 숫자와의 전환,1의 페이드 종료를 추가했다. native HDR/Bloom·배경 보존·기기 수명·라운드/보드 연결 검사를 포함했다.
+- 첫 PlayMode는 즉시 섬광을 기대한 기존 연결 검사3개가 새1 머무름 때문에 실패했다. 머무름 중1표시/섬광0을 검증하고 이후 시간에서 기존 섬광/라운드/보드 수명 단언을 유지해 재실행했다.
+- 실험실 전체 흐름도 동일 숫자 전환/머무름/번짐으로 연결하고 중간 발광 프레임을 캡처해 확인했다. Unity6000.6.5f1/macOS Metal 기준. UI/VFX 범위여서 전체 PlayMode는 생략했다. 실제 게임/iOS 실기기 연출은 미검증이다.
+
+
+### #652 선택한 투명도 버전으로 복원 (2026-11-11)
+
+- 사용자가 인용한 잔광15% 완화 상태로 복원했다. 후속 시작 피크·숫자 교차 페이드·1 추가 머무름·Gaussian 확장·지수 합성을 제거하고0.28초 확장+0.16초 감쇠, 최대22% Screen 합성으로 되돌렸다.
+- 첨부 시안의 중앙#FFDA3D→외곽#FFFFFF 방사형 잔광을 셰이더로 반영하고 선택 시점의 저장 강도/Bloom 설정을 복원했다. 실험실 잔광 화면을 캡처해 확인했다.
+- 전체 EditMode2,198/2,198(48.53초), 관련 PlayMode24/24(8.48초) 통과. Unity6000.6.5f1/macOS Metal 기준. UI/VFX 복원 범위여서 전체 PlayMode는 생략했다. 실제 게임/iOS 실기기 밝기는 미검증이다.
+
+
+### #652 원 확대 제거·전체 화면 두 펄스 (2026-11-11)
+
+- 중앙 원 확대를 제거하고 첫 프레임부터 면적1로 전체 화면이 동시에 번쩍이도록 변경했다. 전체0.4초 안에서 첫0~0.16초, 두 번째0.20~0.36초(75%) 펄스를 표시한다. 첫 피크는 흰색 쪽으로 보정하고 Screen 기여 최대42%, 잔광22%로 배경을 보존한다. 별도 뒤쪽 원 에셋/동작은 변경하지 않았다.
+- 전체 EditMode2,198/2,198(48.73초), 관련 PlayMode23/23(8.36초) 통과. 삭제한 확장 전용 단언은 첫 프레임 화면 모서리 HDR·약한 두 번째 전체 화면 펄스·두 펄스 사이 간격 검사로 대체했다. UI/VFX 변경 범위여서 전체 PlayMode는 생략했다.
+- Unity6000.6.5f1/macOS Metal. 실험실 전체 흐름의 첫 펄스 프레임을 캡처해 확인했다. 실제 게임/iOS 실기기에서 뒤쪽 원과의 가독성은 미검증이다.
+- 문서 갱신은 사용량 한도로 자동 승인 검토가 완료되지 않아 한 번 실행되지 않았다. 사용자의 다시 시도 지시 후 같은 승인 경로로 재실행해 완료했다.
+
+
+### #652 해제 전 배경 반복·흰빛/연노랑 (2026-11-11)
+
+- 잔광이 남고 Pause가 아니면1.2초마다 전체 화면 두 펄스가 반복된다. 초기 섬광 판정/Host 요청/회차/햅틱을 다시 실행하지 않는다. 해제 후 잔광0이면 반복도 중단된다. 최대42% 기여와 잔광0.85배는 유지한다.
+- 저장 프로필 및 코드의 진한 노랑을 흰빛(1,.985,.94)과 연노랑(1,.96,.8)으로 바꿨다. 실험실 잔광에서도 배경이 반복되고 전체 흐름의 반복 프레임을 캡처해 확인했다.
+- 전체 EditMode2,198/2,198(49.31초), 관련 PlayMode24/24(8.37초) 통과. 반복과 휴지기 시간 검사 및 실제 HUD에서 반복 중에도 햅틱1회 유지 검사를 포함한다. 첫 반복 시간 검사는 감쇠 중 샘플을 피크 값으로 기대해1개 실패했다. 정확한 샘플 시점의 감쇠 기댓값으로 수정 후 통과했다.
+- Unity6000.6.5f1/macOS Metal 기준. UI/VFX 변경 범위여서 전체 PlayMode는 생략했다. 실제 게임/iOS 실기기 밝기와 뒤쪽 원의 가독성은 미검증이다.
+
+
+### #652 참고 영상의 배경 섬광 박자 (2026-11-11)
+
+- 첨부 영상의 배경 밝기를30fps로 읽어 약0.6초 간격의 피크를 확인했다. 기존 두 펄스/1.2초 주기를 단일 펄스/0.6초로 변경했다.0.5초 제곱 감쇠+0.1초 휴지기로 여운을 유지한다. 흰빛/연노랑·최대42%·해제 시 종료·추가 햅틱 없음은 유지한다.
+- 전체 EditMode2,198/2,198(48.84초), 관련 PlayMode24/24(8.44초) 통과. native HDR 화면 전체 균일 감쇠·반복 주기와 쉬는 구간·HUD 반복 햅틱1회·수명 검사를 포함했다. 컴파일/콘솔 오류 없음.
+- Unity6000.6.5f1/macOS Metal 기준. UI/VFX 변경 범위여서 전체 PlayMode는 생략했다. 실험실 잔광 모드를 새 박자로 열어두었다. 실제 게임/iOS 실기기에서 원과의 가독성은 미검증이다.
+
+
+### #652 흔든 횟수에 따른 반복 섬광 투명도 (2026-11-11)
+
+- 잔광에만 적용되던 진행률을 최종 Screen 합성의 `_Visibility`로 연결했다. 반복 섬광의 포화 밝기/최대 덮임도 함께 감소한다.0/10=원래 밝기,5/10=절반,9/10=10%,10/10=빛 없음. 기존 부드러운 횟수 추종과 목표 도달 즉시 제거를 유지한다. 잔광 입력은 진행률을 중복 곱하지 않도록 원본을 전달한다. fallback 섬광도 같은 비율을 적용했다.
+- 실험실 잔광/전체 흐름에 인식 횟수0~10 슬라이더를 추가했다. 게임 판정/입력/Host 요청/보상은 변경하지 않았다.
+- 전체 EditMode2,198/2,198(51.20초), 관련 PlayMode27/27(8.91초) 통과. GPU 합성의0/5/9/10회 정량 검사와 실제 HUD 인식 횟수→최종 재질 비율 및 목표 완료 시 섬광0 검사를 포함한다. 컴파일 오류 없음.
+- Unity6000.6.5f1/macOS Metal 기준. UI/VFX 변경 범위여서 전체 PlayMode는 생략했다. 실험실은5/10 상태로 열어두었다. iOS 실기기 흔들기/밝기는 미검증이다.
+
+
+### #652 K키/인식한 흔들기마다 단발 섬광 (2026-11-11)
+
+- 사용자 확인에 따라 누르는 대상은 디버그 K키다. 자동0.6초 반복을 제거했다. 최초 섬광 또는 인식한 흔들기의 기존 `lastShakeAt` 시각마다0.5초 단발 섬광을 시작한다. 실제 기기 흔들기도 같은 인식 경로를 쓴다. 진한 노랑 제거·횟수별 투명도·목표 도달 시 제거는 유지한다.
+- 실험실 잔광에 K키/`K · 흔들기 1회` 버튼을 연결했다. 미리보기 동작 호출 시0→1회와 렌더 텍스처 생성을 확인했다. 실제 게임에서 OS K키 이벤트를 직접 누르는 검증은 미실행이다.
+- 전체 EditMode2,198/2,198(48.77초), 관련 PlayMode27/27(9.17초) 통과. HUD 검사는 입력 없이 자동 재발광 없음→입력 시각에서 단발→0.6초 뒤 잔광만 유지→추가 입력·횟수에 따른 감쇠→목표 도달 시0을 확인한다. 추가 서버 섬광/중복 햅틱은 없다.
+- Unity6000.6.5f1/macOS Metal 기준. 입력 판정/통신 코드는 유지하고 표시만 변경했으므로 전체 PlayMode는 생략했다. iOS 실기기 흔들기/밝기는 미검증이다.
 
 ### #647 Host-controlled stage clear - 2026-11-10
 
@@ -7883,3 +8018,12 @@ The initial cinematic fixture passed 1/2 because it incorrectly expected Skip al
 Prepared `feat/opening-28-frame-direction` with only the opening commits and merged origin/main `45001d21` (battle BGM updates). The original checkout remains on its existing local review branch with its preview and personal settings preserved; host-control work from #647 is not part of this PR. The sole cherry-pick conflict was this validation document; existing history and the new opening record were retained.
 
 All 279 changed opening code/asset/test files (excluding the tutorial test file, which retains main's independent Help-button assertions) have identical Git blob hashes to the tested local revision `fb021e31`. The main merge adds only six audio-file changes relative to the prepared opening branch. Accordingly, the preceding 17 EditMode and 27 PlayMode results are reused for unchanged opening behavior; they are not reported as a new run after this audio-only integration. The initial full tutorial handoff check remains separately dated above. Source/document whitespace checks and PR scope review passed; no scene, title, project setting, build profile or network-protocol changes are included.
+
+
+### #652 main 충돌 통합 (2026-11-11)
+
+- 작업8a72d85f에 main81e64ca0를 통합했다. 충돌은 LabBattleRenderWarmup/LabGourdAlert/이 문서3곳이었다. 흔들기·숫자·눈 PNG/HDR 준비와 main의 해제·놀림 PNG 준비를 함께 유지하고, 눈 이미지가 숨긴 배경을 다음 PNG/일반 말풍선에서 다시 켠다. 양쪽 검증 기록은 모두 보존했다. 병합 커밋a6c4293a는 검증 중 원격에 반영됐다.
+- 첫 전체 EditMode는2,242통과/1실패였다. main의 저장 Stage02 설정159=13과 에셋 재생성 코드159=8 불일치를 확인했다. 재생성 코드만13으로 맞춰 기존 저장 게임 동작은 유지했다. 검사를 완화하지 않았다.
+- 최종 전체 EditMode2,243/2,243(49.05초), 관련 PlayMode27/27(8.97초) 통과. 눈→해제/놀림 PNG→일반 텍스트 복원, 흔들기 PNG와 해제/놀림 PNG의 warmup 동시 존재를 추가 단언했다. 기존 K키 단발·횟수별 투명도·초기 준비·보드 수명도 통과했다.
+- Unity6000.6.5f1/macOS Metal 기준. main 대비 실행 변경은 UI/VFX와 에셋 재생성 기본값 정합성이라 전체 PlayMode는 생략했다. main의 통신/게임 흐름 변경은 그대로 통합하고 이 브랜치에서 다시 수정하지 않았다. 실제 게임/iOS 실기기 화면은 미검증이다.
+- 충돌 표식/미해결 index0개. 수동 변경 소스·검증 문서 whitespace 검사 통과. main에서 넘어온 기존 생성 에셋의 공백은 일괄 수정하지 않았다.

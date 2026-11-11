@@ -13,7 +13,9 @@ namespace C6Lab
         private string vfxLabYaguangFeverSession;
         private uint vfxLabYaguangFeverRound;
 
-        public bool VfxLabReady => IsHost && model != null && latest != null && latest.phase == LabPhase.Playing;
+        // #673: 혼자 Host일 때만. 다른 기기가 접속해 있으면 실험실은 아무것도 하지 않는다(실제 판에 끼어들지 않게).
+        public bool VfxLabReady => IsHost && model != null && latest != null && latest.phase == LabPhase.Playing
+            && order.Count <= 1;
         /// <summary>지금 게임 스테이지(구미호/야광귀/지귀). Lab 단판이면 None.</summary>
         public LabStageYokai VfxLabStage => gameFlowEnabled ? gameStageYokai : LabStageYokai.None;
         public bool VfxLabComboRunning => VfxLabReady && model.VfxLabComboRunning;
@@ -55,6 +57,22 @@ namespace C6Lab
             PublishSnapshot(true);
             return true;
         }
+
+        // ───────── #673: 1~3라운드 모든 기믹 ─────────
+        public bool VfxLabJigwiOn => VfxLabReady && model.VfxLabJigwiOn;
+        public LabJigwiABKind? VfxLabJigwiMission => VfxLabReady ? model.VfxLabJigwiMission(VfxLabNow) : null;
+
+        /// <summary>공통/구미호 기믹(박 폭탄, 넘기기 막기, 여우불, 매혹)을 지금 나에게 건다.</summary>
+        public bool VfxLabCastGimmick(LabSabotageKind kind) =>
+            VfxLabReady && VfxLabPublish(model.VfxLabCastGimmick(kind, LocalPlayerId, VfxLabNow));
+        public bool VfxLabStartFlash() => VfxLabReady && VfxLabPublish(model.VfxLabStartFlash(VfxLabNow));
+        public bool VfxLabFailCombo() => VfxLabReady && VfxLabPublish(model.VfxLabFailCombo(LocalPlayerId, VfxLabNow));
+        public bool VfxLabStartGumihoFever() => VfxLabReady && VfxLabStage == LabStageYokai.Gumiho
+            && VfxLabPublish(model.VfxLabStartGumihoFever(VfxLabNow));
+        public bool VfxLabStartNextJigwiMission() => VfxLabReady && VfxLabPublish(model.VfxLabStartNextJigwiMission(VfxLabNow));
+        public bool VfxLabFinishJigwiMission(bool complete) => VfxLabReady && VfxLabPublish(model.VfxLabFinishJigwiMission(complete, VfxLabNow));
+        public bool VfxLabStartJigwiFever() => VfxLabReady && VfxLabStage == LabStageYokai.Jigwi
+            && VfxLabPublish(model.VfxLabStartJigwiFever(VfxLabNow));
 
         /// <summary>실험실이 이 판의 야광귀 피버를 당겼으면 그 전투 경과 초, 아니면 -1 (YaguangFeverElapsed가 본다).</summary>
         private double VfxLabYaguangFeverPlayedFor(LabSnapshot snapshot) =>
