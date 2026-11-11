@@ -17,9 +17,9 @@ MonoBehaviour:
   pages:
   - speaker: 
     dialogue: 
-    autoReadSeconds: 2.7
-    voice: {fileID: 8300000, guid: c1396d6fd28b441b89f90b0f5d063fc5, type: 3}
-  direction: "\uD654\uBA74 \uD6A8\uACFC\uC74C: \uC640\uC7A5\uCC3D!! (\uB300\uC0AC\uCC3D \uC5C6\uC74C)"
+    autoReadSeconds: 4
+    voice: {fileID: 0}
+  direction: Approved Figma frame 14 (4553:2467); native text and independent artwork motion.
   speaker: 
   dialogue: 
   autoReadSeconds: 4

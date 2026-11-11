@@ -67,7 +67,14 @@ namespace Hapio.Tests
 
             opening.lobbyView.enterButton.onClick.Invoke();
             yield return Until(() => opening.IsPlaying, "First Start opens the story");
-            opening.player.Skip();
+            Assert.That(opening.player.sequence.cuts.Count, Is.EqualTo(28));
+            for (int cut = 0; cut < 28; cut++)
+            {
+                Assert.That(opening.player.CurrentCutIndex, Is.EqualTo(cut));
+                opening.player.AdvanceTime(opening.player.CurrentView.EntranceDuration + .1f);
+                opening.player.Next();
+            }
+            Assert.That(opening.player.CurrentView.authoredDialogue.alpha, Is.Zero, "The authored words hide under the closing clouds.");
             yield return Until(() => !GameOpeningController.IsPresenting, "The opening hands over");
             Assert.That(session.IsTutorial, Is.True, "The opening hands over to the tutorial, not the room list.");
             Assert.That(session.RoomBrowserVisible, Is.False);
