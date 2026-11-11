@@ -8443,3 +8443,13 @@ Unity 6000.6.5f1 / macOS Metal Editor에서 컴파일·전체 EditMode와 UI 영
 기준 #692 `4b99504e`에 main `45a55a34`를 병합했다. 충돌은 `LabComboEffectLookTests.cs`의 중복 fixture 보완과 이 문서 끝의 병렬 기록 추가였다. 테스트는 main의 `MarkResultShown` helper와 조건부 결과 count/종류를 그대로 유지하고, #692·#687·#697 검증 기록은 모두 보존했다. #692의 보드 크기·번호·체크 애니메이션 runtime 코드는 변경하지 않았다. main의 설정265개·5702/Lab62/Game54를 유지한다.
 
 Unity 6000.6.5f1 macOS Editor에서 새로고침 후 컴파일 오류0. 전체 EditMode **2340/2340 PASS**(47.70초), 관련 PlayMode **15/15 PASS**(7.69초), 실패/skip0. PlayMode 범위는 LabYaguangCountLookTests·LabComboEffectLookTests·LabComboProjectileIntegrationTests·GameBattleRenderWarmupTests다. 전체 PlayMode·빌드·실기기는 이번 병합에서 실행하지 않았다. diff 공백 및 충돌 표식 검사를 수행했다.
+
+
+## 2026-11-12 — #701 스토리 박 키링 숨김
+
+기준 `d6f96d16`, `fix/#701-gourd-keyring`. Unity6000.6.5f1 macOS Editor. 세 전투 프리팹의 `Sandal_Dangling_Pivot`(복제 접미사 포함)을 비활성화해 한복/짚신/불꽃 장식과 연결 고리·연결 끈을 함께 숨겼다. 프리팹 차이는 각각 m_IsActive 한 곳뿐이다. 원본 FBX·아트 프리팹·메시·재질·생성 판정/칠 메시·요괴 클립·Scene·통신/설정은 변경하지 않았다. 굽기 도구 Assemble에도 같은 정책을 적용해 재생성 때 복구되지 않게 했다.
+
+- 컴파일 오류0. 모델/굽기 EditMode **14/14 PASS**(1.62초): GameGourdRigBakeTests·GameStageGourdVisualTests. 기존 계약 검사에 스테이지별 키링 그룹1개·비활성·원본 장식 보존 확인을 추가했다.
+- 영향 PlayMode **11/11 PASS**(119.77초): GameStageGourdIntegrationTests·GameStage2GourdHitFinishTests·GameFinishReplayTests·GourdResultViewerPlayModeTests. 저장 Home→3개 스테이지 마운트·칠/판정·매달기 줄·요괴 반응·완료 복사, 실제 투사체 명중, 다시보기와 결과 관람 관련 검사가 통과했다. 실패/skip0.
+- 임시 인스턴스에서 세 박의 닫힘/요괴 올라옴/닫힘 자세를 샘플링해 키링 그룹 비활성 유지 및 rig Validate 성공을 확인하고 임시 객체를 정리했다. 완료 복사는 비활성 자식 순회를 건너뛰며, 관람 복사는 계층 active 상태를 보존하는 경로를 확인했다.
+- diff 공백 검사 통과. 전체 EditMode/PlayMode·새 빌드·iOS 실기기·실제 다중 기기 화면 확인은 이번 작업에서 실행하지 않았다.

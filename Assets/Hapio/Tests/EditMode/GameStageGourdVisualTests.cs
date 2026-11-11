@@ -43,6 +43,15 @@ namespace Hapio.Tests
             Assert.That(prefab.GetComponentsInChildren<Animator>(true), Is.Empty, "The looping art Animator is removed.");
             foreach (Transform part in prefab.GetComponentsInChildren<Transform>(true))
                 Assert.That(part.name, Does.Not.StartWith("Rear_Rope"), "The model's own hanging rope is removed.");
+            int keyringRoots = 0;
+            foreach (Transform part in prefab.GetComponentsInChildren<Transform>(true))
+                if (part.name == "Sandal_Dangling_Pivot" || part.name.StartsWith("Sandal_Dangling_Pivot."))
+                {
+                    keyringRoots++;
+                    Assert.That(part.gameObject.activeSelf, Is.False, "The keyring and its attachment ropes stay hidden.");
+                    Assert.That(part.GetComponentsInChildren<Renderer>(true), Is.Not.Empty, "The original charm remains recoverable.");
+                }
+            Assert.That(keyringRoots, Is.EqualTo(1), "Each stage has one complete keyring group.");
             Assert.That(prefab.transform.localScale, Is.EqualTo(Vector3.one));
         }
 
