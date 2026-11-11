@@ -1129,6 +1129,8 @@ namespace C6Lab
         [SerializeField] private bool yaguangFirstComboForgive = true;
         [Tooltip("콤보 예고 때 금옥 규칙 안내(Audio/YaguangComboGuideRule)를 라운드의 처음 몇 번 콤보까지 낼지 (0이면 끔, 1이면 첫 콤보만)")]
         [SerializeField, Range(0, 20)] private int yaguangComboGuideRuleCombos = 1;
+        [Tooltip("규칙 안내 다음 콤보(기본 두 번째 콤보) 예고에서 금옥이 \"자.. 다들 준비 됐지?\"(Audio/YaguangComboGuideReady)를 말할지")]
+        [SerializeField] private bool yaguangComboGuideReadyOn = true;
         [Tooltip("칸을 맞힌 뒤 금옥 칭찬(좋아! / 잘했어! / 하나만 더..! / 그렇지!!)까지 지연 (초). 맞힌 소리 뒤에 들리게")]
         [SerializeField, Range(0f, 2f)] private float yaguangComboGuideFeedbackDelaySeconds = .3f;
         [Tooltip("규칙 안내가 있는 예고에서 야광귀가 \"넷\"을 센 뒤 금옥 규칙 안내가 나오기까지 (예고 시작부터 초)")]
@@ -1696,6 +1698,7 @@ namespace C6Lab
         public float YaguangComboGuideRuleDelaySeconds => Mathf.Clamp(Finite(yaguangComboGuideRuleDelaySeconds, .9f), 0f, 3f);
         public float YaguangComboGuideFailDelaySeconds => Mathf.Clamp(Finite(yaguangComboGuideFailDelaySeconds, .1f), 0f, 2f);
         public float YaguangComboGuideFailToTauntSeconds => Mathf.Clamp(Finite(yaguangComboGuideFailToTauntSeconds, .1f), 0f, 2f);
+        public bool YaguangComboGuideReadyOn => yaguangComboGuideReadyOn;
         public float YaguangComboStampSoundVolume => Mathf.Clamp01(Finite(yaguangComboStampSoundVolume, .8f));
         public float YaguangComboGuideCountFade => Mathf.Clamp(Finite(yaguangComboGuideCountFade, .6f), .1f, 1f);
         public float YaguangComboGuideSoundVolume => Mathf.Clamp01(Finite(yaguangComboGuideSoundVolume, 1f));

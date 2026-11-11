@@ -243,12 +243,22 @@ namespace C6Lab.Tests
             Assert.That(sound.PlayCount(LabYaguangSfx.ComboCountThree), Is.EqualTo(1), "The count goes on under her.");
             Assert.That(sound.PlayCount(LabYaguangSfx.ComboCountOne), Is.EqualTo(1));
 
-            // 두 번째 콤보 예고 (이미 1개가 나옴): 규칙은 다시 말하지 않는다 (기본 1 = 첫 콤보만).
+            // 두 번째 콤보 예고 (이미 1개가 나옴): 규칙 대신 "자.. 다들 준비 됐지?"
             snapshot.comboCount = 1;
             snapshot.comboWarningAt = 60d; snapshot.comboNextAt = 64d;
             foreach (double now in new[] { 60d, 61d, 62d, 63d })
                 sound.ObserveFlash(snapshot, now, Me);
             Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideRule), Is.EqualTo(1));
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideReady), Is.EqualTo(1));
+
+            // 세 번째부터는 금옥 말 없이 야광귀만 센다.
+            snapshot.comboCount = 2;
+            snapshot.comboWarningAt = 90d; snapshot.comboNextAt = 94d;
+            foreach (double now in new[] { 90d, 91d, 92d, 93d })
+                sound.ObserveFlash(snapshot, now, Me);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideRule) + sound.PlayCount(LabYaguangSfx.ComboGuideReady), Is.EqualTo(2));
+            Assert.That(LabYaguangSound.WarningLine(1, 1, false), Is.Null, "The ready line can be turned off.");
+            Assert.That(LabYaguangSound.WarningLine(2, 2, true), Is.EqualTo(LabYaguangSfx.ComboGuideReady), "It follows the rule combos.");
         }
 
         [Test]
@@ -336,6 +346,7 @@ namespace C6Lab.Tests
             Assert.That(LabYaguangSound.Folder(LabYaguangSfx.ComboGuideClear), Is.EqualTo("Audio/YaguangComboGuideClear"));
             Assert.That(LabYaguangSound.Folder(LabYaguangSfx.ComboGuideFail), Is.EqualTo("Audio/YaguangComboGuideFail"));
             Assert.That(LabYaguangSound.Folder(LabYaguangSfx.ComboStamp), Is.EqualTo("Audio/YaguangComboStamp"));
+            Assert.That(LabYaguangSound.Folder(LabYaguangSfx.ComboGuideReady), Is.EqualTo("Audio/YaguangComboGuideReady"));
             Assert.That(LabYaguangSound.GuideFeedbackSfx(1), Is.EqualTo(LabYaguangSfx.ComboGuideHit1));
             Assert.That(LabYaguangSound.GuideFeedbackSfx(2), Is.EqualTo(LabYaguangSfx.ComboGuideHit2));
             Assert.That(LabYaguangSound.GuideFeedbackSfx(3), Is.EqualTo(LabYaguangSfx.ComboGuideHit3));
