@@ -24,8 +24,9 @@ namespace Hapio.Tests
                 Assert.That(c.heading.gameObject.activeInHierarchy,Is.EqualTo(!final),"Host: 다음 요괴 잡으러 ... shows before the last yokai only.");
                 Assert.That(c.nextSeal.GetComponentInChildren<UnityEngine.UI.Text>(true).text,
                     Is.EqualTo(final ? StoryStageClearControls.FinishLabel : StoryStageClearControls.NextSealLabel));
-                c.Present(true,false,true); Assert.That(c.nextSeal.gameObject.activeSelf,Is.False);
-                Assert.That(c.waiting.gameObject.activeSelf,Is.EqualTo(!final));
+                c.Present(true,false,true); Assert.That(c.nextSeal.gameObject.activeSelf,Is.True);
+                Assert.That(c.nextSeal.interactable,Is.True);
+                Assert.That(c.waiting.gameObject.activeSelf,Is.False);
                 Assert.That(c.heading.gameObject.activeInHierarchy,Is.EqualTo(!final),"Member: same heading rule, visible in the real hierarchy.");
                 Assert.That(c.waiting.text,Is.EqualTo("방장의 시작을 기다리시오."));
                 Assert.That(root.GetComponent<StoryCutView>().requireContinueButton,Is.True);

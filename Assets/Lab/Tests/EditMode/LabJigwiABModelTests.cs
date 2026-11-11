@@ -772,11 +772,19 @@ namespace C6Lab.Tests
             Assert.That(LabJigwiABNetworkValidation.Valid(snapshot.jigwiAB, snapshot.players), Is.True);
         }
 
+        [Test]
         public void BFailureSetsEveryBoardOnFireForThreeSecondsAndKeepsOrbsStaminaAndStatistics()
         {
+            // The saved smoke flow has no board fire; explicitly select the supported special-Water alternative.
+            JsonUtility.FromJsonOverwrite("{\"jigwiFlowSchedule\":false,\"jigwiSmokeFlow\":false,\"jigwiBBucket\":false,\"jigwiBCountdown\":false,\"jigwiBBoardFireSeconds\":3}",config);
             // #509: B1 fails at 40, the same second as the common gimmick; keep this fixture to B's own result.
             var quiet=config.CaptureDeveloperValues();NoCommonGimmick(quiet);Apply(quiet);
-            var m=Room();
+            var m=Room();m.Tick(39.9d); // Finish A before injecting the ordinary board/flight fixtures.
+            // DeadlineFailureRemovesOnlyThisMissionsSupplyAndKeepsBoardsAndStamina covers real B-token cleanup.
+            // Omit only that ammunition here so the expiry assertion isolates ordinary orbs.
+            var states=Orbs(m);
+            foreach(var id in states.Values.Where(o=>!string.IsNullOrEmpty(o.jigwiABSupplyEventId)).Select(o=>o.id).ToArray())
+                states.Remove(id);
             var fixture=new List<LabOrbState>();
             foreach(ulong owner in Players)
             {

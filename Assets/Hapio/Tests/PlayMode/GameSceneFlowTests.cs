@@ -86,6 +86,39 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
+        public IEnumerator SealReadinessAndQuitPopupKeepTheStageUntilConfirmedThenOpenRooms()
+        {
+            session.StartSolo();
+            yield return WaitPlaying(1);
+            CompleteMapInFixture(Model());
+            yield return FinishResultStory();
+            var story = ResultStory();
+            Assert.That(session.CanAdvanceStage, Is.False, "Reading the story is not explicit readiness.");
+            story.Advance();
+            yield return Until(() => story.ReadyView.start.IsInteractable(), "Solo host is ready after tapping next seal.");
+            Assert.That(story.ReadyView.IsWaiting, Is.True);
+            Assert.That(session.State.stageIndex, Is.EqualTo(1));
+            Assert.That(session.SealReadyCount, Is.EqualTo(1));
+            story.ReadyView.quit.onClick.Invoke();
+            Assert.That(story.ReadyView.IsConfirmingQuit, Is.True);
+            Assert.That(session.CanAdvanceStage, Is.False, "A quit confirmation holds the shared start barrier.");
+            story.StartPreparedStage();
+            Assert.That(session.State.stageIndex, Is.EqualTo(1));
+            story.ReadyView.cancelQuit.onClick.Invoke();
+            Assert.That(story.ReadyView.IsConfirmingQuit, Is.False);
+            Assert.That(story.ReadyView.IsWaiting && session.LocalSealReady, Is.True);
+            yield return Until(() => story.ReadyView.start.IsInteractable(), "Cancel restores the prepared host.");
+            story.ReadyView.quit.onClick.Invoke();
+            story.ReadyView.confirmQuit.onClick.Invoke();
+            yield return Until(() => !session.IsLoadingScene && session.State.phase == GameFlowPhase.Home,
+                "Quit loads the room browser directly.");
+            Assert.That(SceneManager.GetActiveScene().path, Is.EqualTo(GameScenePaths.Home));
+            Assert.That(session.RoomBrowserVisible, Is.True);
+            Assert.That(network.IsConnected, Is.False);
+            Assert.That(session.LocalSealReady, Is.False);
+        }
+
+        [UnityTest]
         public IEnumerator SharedCountdownWaitsForInitialPresentationAndOnlyThenStartsGameplay()
         {
             // This test owns the visible 3/2/1 and "시작!": it runs the production start durations, not the
@@ -842,6 +875,7 @@ namespace Hapio.Tests
                 previousPreviewMaps = preparedMaps;
                 if (stage < 3)
                 {
+                    Assert.That(session.ConfirmSealReady(), Is.True, "The local participant explicitly confirms the next seal.");
                     yield return Until(() => session.CanAdvanceStage,
                         "Host must wait for every copied result and loaded result Scene before NEXT.");
                     yield return null;
@@ -949,8 +983,8 @@ namespace Hapio.Tests
                             .Invoke(session, new object[] { 72UL, true });
                         yield return null;
                         Assert.That(session.IsAnyResultViewerOpen, Is.True);
-                        Assert.That(clear.nextSeal.interactable, Is.False, "A peer's inspection blocks Host NEXT.");
-                        story.Advance();
+                        Assert.That(session.CanAdvanceStage, Is.False, "A peer inspection blocks shared start, not local readiness.");
+                        story.StartPreparedStage();
                         Assert.That(session.State.stageIndex, Is.EqualTo(1));
                         typeof(GameSession).GetMethod("SetResultViewer", BindingFlags.Instance | BindingFlags.NonPublic)
                             .Invoke(session, new object[] { 72UL, false });
@@ -958,8 +992,8 @@ namespace Hapio.Tests
                         typeof(GameSession).GetMethod("SetResultPresentation", BindingFlags.Instance | BindingFlags.NonPublic)
                             .Invoke(session, new object[] { 72UL, true });
                         yield return null;
-                        Assert.That(clear.nextSeal.interactable, Is.False, "A peer's unfinished story still blocks Host NEXT.");
-                        story.Advance();
+                        Assert.That(session.CanAdvanceStage, Is.False, "A peer story still blocks shared start.");
+                        story.StartPreparedStage();
                         Assert.That(session.State.stageIndex, Is.EqualTo(1));
                         typeof(GameSession).GetMethod("SetResultPresentation", BindingFlags.Instance | BindingFlags.NonPublic)
                             .Invoke(session, new object[] { 72UL, false });
@@ -982,6 +1016,10 @@ namespace Hapio.Tests
                     clear.nextSeal.onClick.Invoke();
                     Assert.That(clear.nextSeal.interactable, Is.False, "Accepted NEXT disables the old button immediately.");
                     clear.nextSeal.onClick.Invoke();
+                    Assert.That(session.State.stageIndex, Is.EqualTo(stage), "Next seal only opens the waiting page.");
+                    yield return Until(() => story.ReadyView.start.IsInteractable(), "All participants enable the Host start.");
+                    story.ReadyView.start.onClick.Invoke();
+                    story.ReadyView.start.onClick.Invoke();
                     Assert.That(session.State.stageIndex, Is.EqualTo(stage + 1), "Repeated input cannot skip a loading generation.");
                     continue;
                 }
@@ -1008,7 +1046,7 @@ namespace Hapio.Tests
                 typeof(GameSession).GetMethod("SetResultPresentation", BindingFlags.Instance | BindingFlags.NonPublic)
                     .Invoke(session, new object[] { 72UL, true });
                 yield return null;
-                Assert.That(clear.nextSeal.interactable, Is.False, "A reading peer holds the summary start.");
+                Assert.That(session.CanStartSummary, Is.False, "A reading peer holds the summary start.");
                 typeof(GameSession).GetMethod("OnPeerDisconnected", BindingFlags.Instance | BindingFlags.NonPublic)
                     .Invoke(session, new object[] { 72UL, false });
                 yield return Until(() => clear.nextSeal.interactable, "A peer that left no longer holds the summary start.");
@@ -1266,6 +1304,8 @@ namespace Hapio.Tests
                         yield return Until(() => next.gameObject.activeInHierarchy && next.IsInteractable(),
                             "Closing inspection allows the Host to start the next stage.");
                         yield return ClickVisibleButtonWithMouse(mouse, next);
+                        yield return Until(() => story.ReadyView.start.IsInteractable(), "The prepared host gets its separate start action.");
+                        yield return ClickVisibleButtonWithMouse(mouse, story.ReadyView.start);
                     }
                 }
                 Assert.That(EventSystem.current.currentInputModule,
@@ -1292,6 +1332,9 @@ namespace Hapio.Tests
                 yield return Until(() => clear.nextSeal.gameObject.activeInHierarchy && clear.nextSeal.IsInteractable(),
                     "The clear picture exposes 다음 봉인 after the story is released.");
                 yield return ClickVisibleButtonWithMouse(mouse, clear.nextSeal);
+                Assert.That(story.ReadyView.IsWaiting, Is.True);
+                yield return Until(() => story.ReadyView.start.IsInteractable(), "The host confirms readiness before starting the ending.");
+                yield return ClickVisibleButtonWithMouse(mouse, story.ReadyView.start);
                 yield return Until(() => story.player.sequence == story.ending && story.player.IsPlaying,
                     "A real click on 다음 봉인 must begin the summary and ending.");
                 Assert.That(story.ending.cuts, Has.Count.EqualTo(7));
@@ -1479,6 +1522,9 @@ namespace Hapio.Tests
                     "Only the completed story opens NEXT.");
                 Assert.That(session.State.stageIndex, Is.EqualTo(1), "Releasing inherited input cannot itself advance.");
                 CompleteButtonPointer(clear.nextSeal);
+                Assert.That(session.State.stageIndex, Is.EqualTo(1), "Readiness does not start gameplay.");
+                yield return Until(() => view.ReadyView.start.IsInteractable(), "Wait for the separate Host start gesture.");
+                CompleteButtonPointer(view.ReadyView.start);
                 Assert.That(session.State.stageIndex, Is.EqualTo(2), "A fresh completed pointer gesture starts the next stage.");
                 yield return WaitPlaying(2);
 
@@ -1543,6 +1589,7 @@ namespace Hapio.Tests
                 CompleteMapInFixture(Model());
                 yield return WaitResultStory();
                 yield return FinishResultStory();
+                Assert.That(session.ConfirmSealReady(), Is.True, "The local participant explicitly confirms the next seal.");
                 yield return Until(() => session.CanAdvanceStage, "The preceding story and result must finish.");
                 session.NextStage();
             }
@@ -2004,6 +2051,8 @@ namespace Hapio.Tests
             Set(foxSettings, "Gimmick Chance Charm (%)", 0f);
             Set(foxSettings, "Fox Fire Count Min", 2f);
             Set(foxSettings, "Fox Fire Count Max", 2f);
+            // Preserve a second fox for restart cleanup after the first contact (#664 team round).
+            foxSettings[LabConfig.FoxRoundSpareMinField] = foxSettings[LabConfig.FoxRoundSpareMaxField] = 0f;
             Set(foxSettings, "Fox Fire Safe Seconds", .25f);
             Set(foxSettings, "Charm Seconds", 9f);
             Set(foxSettings, "Charm Rescue Taps per Neighbor (0 = none)", 5f);
@@ -2095,7 +2144,8 @@ namespace Hapio.Tests
             CompleteMapInFixture(Model());
             yield return WaitResultStory();
             yield return FinishResultStory();
-            yield return Until(() => session.CanAdvanceStage,
+            Assert.That(session.ConfirmSealReady(), Is.True, "The local participant explicitly confirms the next seal.");
+                yield return Until(() => session.CanAdvanceStage,
                 "A real committed victory must reach the next-stage barrier while Charm is active.");
             Assert.That(charmBoard == null && charmHud == null && charmAlert == null, Is.True);
             session.NextStage();

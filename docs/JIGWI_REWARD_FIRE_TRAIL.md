@@ -132,7 +132,9 @@ All space outside the paint and all four central holes must have actual alpha-ze
 ```
 
 
-## 8. 조합판의 보상 화염
+## 8. 보존된 구형 조합판 보상 화염
+
+이 절은 당시 비교 구현과 캡처 기록이다. 현재 모델은 B 성공의 `rewardUntil`을 만들지 않으며 수신 검증도 `-1` 이외 값을 거절하므로, 일반 게임에서 아래 보상 고리가 켜지지 않는다. #697에서는 이 미사용 표현의 전용 검사만 정리한다. A의 소각 불꽃, 현재 투사체 VFX와 Editor 보상 궤적 비교, 공용 에셋은 유지한다.
 
 `LabNetwork.SyncJigwiRewardBoardPresentation`은 Playing/활성 정책에서 `latest.jigwiAB.Reward(JigwiABPresentationTime)`을 읽는다. Host의 전투 clock·Client의 수신 후 보간 clock을 그대로 쓰므로 snapshot 사이에도 보상 만료를 표시하며 Pause/시작 대기에는 시간을 멈춘다. 기존 발사 캡처 `jigwiABReward`를 판 구슬에 저장하지 않는다.
 
@@ -142,4 +144,4 @@ All space outside the paint and all four central holes must have actual alpha-ze
 
 ![실제 Lab 조합판의 음·양과 5속성 보상 화염](images/jigwi-reward-fire-board.png)
 
-위 이미지는 실제 Lab Scene의390×844 Game 화면이다. 표시 비교를 위해 런타임 솔로 판에 음·양2개와 화/수/목/금/토 Combined5개를 배치하고 물리를 멈춰 보상 표시만 켰다. Scene/원본 설정은 저장하지 않았다. 실제 B 소화·다기기 성공 검증을 뜻하지 않는다. 자동 검사는 `LabJigwiRewardBoardFireTests`와 `LabOrbHudCompositionTests.ActualForegroundCameraAddsAndRemovesTheRewardRingWithoutCoveringTheElementArtwork`에 있다.
+위 이미지는 실제 Lab Scene의390×844 Game 화면이다. 표시 비교를 위해 런타임 솔로 판에 음·양2개와 화/수/목/금/토 Combined5개를 배치하고 물리를 멈춰 보상 표시만 켰다. Scene/원본 설정은 저장하지 않았다. 실제 B 소화·다기기 성공 검증을 뜻하지 않는다. 당시 이 그림의 전용 검사는 #697에서 제거했다. 현행 공용 불꽃 에셋은 `LabJigwiABPresentationTests.AOrbFlameUsesTheDedicatedInkMaterialAndItsRealTransparentTexture`, 일반 합성·alpha는 `LabOrbHudCompositionTests`의 나머지 검사로 확인한다. 투사체 보상 비교 검사는 `LabJigwiRewardFireTrailTests`에 유지한다.
