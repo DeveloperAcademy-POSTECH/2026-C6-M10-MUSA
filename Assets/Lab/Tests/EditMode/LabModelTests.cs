@@ -3173,8 +3173,12 @@ namespace C6Lab.Tests
             finally { UnityEngine.Object.DestroyImmediate(mix); }
         }
 
+        /// <summary>
+        /// #664: fox orbs no longer fade on their own after the orb lifetime; they stay until the team's 15-second round
+        /// ends, and then whatever is left goes in smoke on its holder's screen and the round is lost.
+        /// </summary>
         [Test]
-        public void FoxOrbsRunOutAfterTheOrbLifetime()
+        public void FoxOrbsStayUntilTheRoundEndsThenGoInSmoke()
         {
             var mix = MixConfig(5f, bomb: 0, block: 0, fox: 1, charm: 0);
             try
@@ -3183,11 +3187,91 @@ namespace C6Lab.Tests
                 solo.BeginSolo("fox-life", 42ul, 0d, mix);
                 solo.Tick(5d);
                 string[] foxes = solo.DrainFoxFires().Single().OrbIds;
-                solo.Tick(12.9d);
-                Assert.That(solo.DrainOrbExpiries().Select(item => item.OrbId).Intersect(foxes), Is.Empty);
+                Assert.That(solo.Snapshot(5d).orbs.Where(orb => foxes.Contains(orb.id)).Select(orb => orb.expiresAt).Distinct(),
+                    Is.EqualTo(new[] { 20d }), "They last as long as the round (15 s), not the orb lifetime.");
                 solo.Tick(13.1d);
+                Assert.That(solo.DrainOrbExpiries().Select(item => item.OrbId).Intersect(foxes), Is.Empty,
+                    "Past the orb lifetime they are still there.");
+                solo.Tick(19.9d);
+                Assert.That(solo.DrainOrbExpiries().Select(item => item.OrbId).Intersect(foxes), Is.Empty);
+                solo.Tick(20.1d);
                 Assert.That(solo.DrainOrbExpiries().Select(item => item.OrbId), Is.SupersetOf(foxes),
-                    "They last as long as any orb, then go in smoke on their holder's screen.");
+                    "At the round's end they go in smoke on their holder's screen.");
+                Assert.That(solo.Snapshot(20.1d).foxRoundResult, Is.EqualTo(-1), "And the round is lost.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(mix); }
+        }
+
+        /// <summary>
+        /// #664: the team clears every fox orb of a drop within the round, by double taps or by yin/yang touching them, and
+        /// everyone's throws go BIG for the colour combo's reward time; the round's count follows the boards.
+        /// </summary>
+        [Test]
+        public void ClearingEveryFoxOrbInTimeMakesEveryonesThrowsBig()
+        {
+            var mix = MixConfig(20f, bomb: 0, block: 0, fox: 1, charm: 0);
+            try
+            {
+                var ids = new ulong[] { 10, 20, 30 };
+                var room = new LabModel();
+                room.Begin("fox-round-big", ids, 0d, mix);
+                room.Tick(20d);
+                LabSnapshot dropped = room.Snapshot(20d);
+                LabOrbState[] foxes = dropped.orbs.Where(orb => orb.kind == LabOrbKind.FoxFire).ToArray();
+                Assert.That(dropped.FoxRoundOn(20d), Is.True);
+                Assert.That((dropped.foxRoundTotal, dropped.foxRoundRemaining), Is.EqualTo((foxes.Length, foxes.Length)));
+                Assert.That(dropped.foxRoundEndsAt, Is.EqualTo(35d), "Fifteen seconds to clear them all.");
+                foreach (ulong id in ids) Assert.That(foxes.Any(fox => fox.owner == id), Is.True, "Every board gets some.");
+
+                for (int i = 0; i < foxes.Length - 1; i++)
+                    Assert.That(room.TryUseItemAt(foxes[i].owner, foxes[i].id, "fox-tap-" + i, 22d, new Vector2(.5f, .5f),
+                        out _, out string tapped), Is.True, tapped);
+                LabSnapshot oneLeft = room.Snapshot(22d);
+                Assert.That(oneLeft.foxRoundRemaining, Is.EqualTo(1), "The count follows the boards.");
+                Assert.That(oneLeft.FoxRoundOn(22d), Is.True, "Not won while one is left.");
+                Assert.That(room.ThrowScaleFor(10, 22d), Is.EqualTo(1f));
+
+                LabOrbState last = foxes[foxes.Length - 1];
+                Assert.That(room.TryUseItemAt(last.owner, last.id, "fox-tap-last", 23d, new Vector2(.5f, .5f), out _, out string reason),
+                    Is.True, reason);
+                LabSnapshot won = room.Snapshot(23d);
+                Assert.That((won.foxRoundResult, won.foxRoundResultAt, won.foxRoundCount), Is.EqualTo((1, 23d, 1)), "Cleared at once.");
+                Assert.That(won.FoxRoundOn(23d), Is.False);
+                Assert.That(won.foxRoundRemaining, Is.Zero);
+                foreach (LabPlayerState player in won.players)
+                    Assert.That(player.comboRewardUntil, Is.EqualTo(23d + mix.ComboRewardDurationSeconds).Within(1e-6),
+                        "Everyone BIG for the combo's reward time.");
+                Assert.That(room.ThrowScaleFor(20, 23.1d), Is.EqualTo(mix.ComboRewardSizeScale), "Their throws grow.");
+                Assert.That(room.ThrowScaleFor(20, 23d + mix.ComboRewardDurationSeconds + .1d), Is.EqualTo(1f), "Then back.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(mix); }
+        }
+
+        /// <summary>#664: when the time is up with fox orbs left, they all go and everyone's throws go SMALL.</summary>
+        [Test]
+        public void FoxOrbsLeftAtTheTimeUpMakeEveryonesThrowsSmall()
+        {
+            var mix = MixConfig(20f, bomb: 0, block: 0, fox: 1, charm: 0);
+            try
+            {
+                var ids = new ulong[] { 10, 20, 30 };
+                var room = new LabModel();
+                room.Begin("fox-round-small", ids, 0d, mix);
+                room.Tick(20d);
+                LabOrbState[] foxes = room.Snapshot(20d).orbs.Where(orb => orb.kind == LabOrbKind.FoxFire).ToArray();
+                Assert.That(room.TryUseItemAt(foxes[0].owner, foxes[0].id, "fox-tap-one", 21d, new Vector2(.5f, .5f), out _, out _), Is.True);
+                room.Tick(34.9d);
+                Assert.That(room.Snapshot(34.9d).FoxRoundOn(34.9d), Is.True);
+                room.DrainOrbExpiries();
+                room.Tick(35.1d);
+                LabSnapshot lost = room.Snapshot(35.1d);
+                Assert.That((lost.foxRoundResult, lost.foxRoundResultAt), Is.EqualTo((-1, 35d)), "Lost at the time-up.");
+                Assert.That(lost.orbs.Any(orb => orb.kind == LabOrbKind.FoxFire), Is.False, "The rest are gone...");
+                Assert.That(room.DrainOrbExpiries().Select(item => item.OrbId), Is.SupersetOf(foxes.Skip(1).Select(fox => fox.id)),
+                    "...in smoke on each holder's screen.");
+                foreach (LabPlayerState player in lost.players)
+                    Assert.That(player.comboPenaltyUntil, Is.EqualTo(35d + mix.ComboPenaltyDurationSeconds).Within(1e-6));
+                Assert.That(room.ThrowScaleFor(30, 35.2d), Is.EqualTo(mix.ComboPenaltySizeScale), "Everyone's throws shrink.");
             }
             finally { UnityEngine.Object.DestroyImmediate(mix); }
         }

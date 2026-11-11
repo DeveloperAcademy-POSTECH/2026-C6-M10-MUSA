@@ -421,6 +421,20 @@ namespace C6Lab
         public int FeverHits(LabTeam team) => team == LabTeam.Blue ? blueFeverHits : team == LabTeam.Red ? redFeverHits : 0;
         public int TeamCells(LabTeam team) => team == LabTeam.Blue ? blueCells : team == LabTeam.Red ? redCells : 0;
 
+        // 여우구슬 팀 판정 (#664). 시각은 serverTime과 같은 전투 시계다.
+        /// <summary>The latest fox round's drop and time-up (-1 before the first, or after one cancelled by the fever).</summary>
+        public double foxRoundStartedAt = -1d, foxRoundEndsAt = -1d;
+        /// <summary>Fox orbs the round began with, and still on the boards while it runs (0 once it is over).</summary>
+        public int foxRoundTotal, foxRoundRemaining;
+        /// <summary>The latest finished round: 1 cleared (BIG), -1 timed out (SMALL), 0 none or still running; when, and how many have finished.</summary>
+        public int foxRoundResult;
+        public double foxRoundResultAt = -1d;
+        public int foxRoundCount;
+
+        /// <summary>A fox round is running at this time: the team is clearing fox orbs against the clock (#664).</summary>
+        public bool FoxRoundOn(double now) => foxRoundEndsAt >= 0d && now >= foxRoundStartedAt && now < foxRoundEndsAt
+            && foxRoundResult == 0;
+
         // 박 색상 콤보 실험 (#222). DEV에서 끄면 모두 기본값(콤보 없음)이다.
         // 시각은 serverTime과 같은 전투 시계 기준이다.
         /// <summary>지금 진행 중인 콤보가 있는지</summary>

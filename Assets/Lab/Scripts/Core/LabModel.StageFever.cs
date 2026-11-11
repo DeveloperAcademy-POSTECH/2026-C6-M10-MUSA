@@ -61,6 +61,8 @@ namespace C6Lab
                 charmStartedAt = System.Math.Min(charmStartedAt, at);
                 EndAllCharms(at);
             }
+            // #664: a fox round on now ends with no reward or penalty.
+            CancelFoxRound();
             foreach (LabOrbState orb in orbs.Values.Where(orb => !orb.inFlight && orb.kind == LabOrbKind.FoxFire).ToArray())
             {
                 // 수명이 다한 구슬처럼 가진 사람 화면에서 연기로 사라진다 (#235).

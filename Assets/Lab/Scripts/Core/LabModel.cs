@@ -346,6 +346,7 @@ namespace C6Lab
             charmTaps = 0;
             charmHelperTaps.Clear();
             // 기믹 묶음 (#311): 각 묶음은 전투 시작 뒤 자기 간격만큼 지나 처음 발동한다.
+            ResetFoxRound(); // #664
             commonGimmickCount = uniqueGimmickCount = 0;
             lastCommonTarget = lastUniqueTarget = null;
             gimmickStats = new LabGimmickStats();
@@ -530,6 +531,7 @@ namespace C6Lab
             orbs.Remove(foxId);
             orbs.Remove(orbId);
             reason = "FOX_FIRE";
+            SettleFoxRoundIfCleared(now); // #664
             return true;
         }
 
@@ -723,7 +725,7 @@ namespace C6Lab
         /// <summary>박 색상 콤보 페널티/보상(#222) 배율. 던지는 공 반지름과 칠 면적에 곱한다.</summary>
         public float ThrowScaleFor(ulong playerId, double now)
         {
-            if (rules == null || !rules.ComboEnabled || !players.TryGetValue(playerId, out var player)) return 1f;
+            if (rules == null || !rules.ComboEnabled && !FoxRoundRules || !players.TryGetValue(playerId, out var player)) return 1f;
             if (player.comboPenaltyUntil > now) return rules.ComboPenaltySizeScale;
             return player.comboRewardUntil > now ? rules.ComboRewardSizeScale : 1f;
         }
@@ -1113,6 +1115,7 @@ namespace C6Lab
                 orbs.Remove(current.id);
                 reason = "FOX_FIRE_CLEARED";
                 orb = current.Copy();
+                SettleFoxRoundIfCleared(now); // #664: the last fox orb gone wins the team's BIG
                 return true;
             }
             if (current.kind == LabOrbKind.Bomb)
@@ -1360,6 +1363,13 @@ namespace C6Lab
                 charmHelpers = CharmHelperRows(now, row => row.helper),
                 charmHelperTargets = CharmHelperRows(now, row => row.target),
                 charmHelperTaps = CharmHelperRows(now, row => charmHelperTaps.TryGetValue(row, out int taps) ? taps : 0),
+                foxRoundStartedAt = foxRoundStartedAt,
+                foxRoundEndsAt = foxRoundEndsAt,
+                foxRoundTotal = foxRoundTotal,
+                foxRoundRemaining = FoxRoundOn(now) ? FoxOrbsLeft() : 0,
+                foxRoundResult = foxRoundResult,
+                foxRoundResultAt = foxRoundResultAt,
+                foxRoundCount = foxRoundCount,
                 comboActive = combo.Active,
                 comboColors = combo.Count == 0 ? Array.Empty<LabOrbElement>() : combo.Colors,
                 comboProgress = combo.Progress,
@@ -1466,6 +1476,7 @@ namespace C6Lab
                 else AdvanceJigwiStage(effectiveNow);
                 // Fever time (#334) stops the yokai before any gimmick due at the same moment is cast.
                 StartFeverTime(effectiveNow);
+                AdvanceFoxRound(effectiveNow); // #664: before expiry, so time-up judges the orbs still there
                 if (StageYokai != LabStageYokai.None)
                 {
                     ExpireOrbs(effectiveNow);
@@ -1597,6 +1608,7 @@ namespace C6Lab
         private void DropFoxFireOnAll(List<ulong> targets, double at, uint index)
         {
             for (int lane = 0; lane < targets.Count; lane++) DropFoxFire(targets[lane], at, index, (uint)lane);
+            StartFoxRound(at); // #664: the team clears them all within the time, or they all go and everyone's orbs shrink
             sabotages.Add(new LabSabotage(LabSabotageKind.FoxFire, targets[0], at));
             gimmickStats.Add(LabSabotageKind.FoxFire);
         }
@@ -1760,6 +1772,8 @@ namespace C6Lab
             bool charming = CharmComingOrOn(at);
             if (kind == LabSabotageKind.SwipeBlock && blocking) return targets;
             if (kind == LabSabotageKind.Charm && charming) return targets;
+            // #664: nor while the team is clearing fox orbs (only when the DEV interval is shorter than the round).
+            if (kind == LabSabotageKind.Charm && FoxRoundOn(at)) return targets;
             // 야광귀 모드 (#271): 폭탄·넘기기 막기는 자기 종류도 보고(한 화면에 폭탄 하나), 여우불·매혹은 방해공작으로 본다.
             LabYaguangEvent self = kind == LabSabotageKind.GourdBomb ? LabYaguangEvent.GourdBomb
                 : kind == LabSabotageKind.SwipeBlock ? LabYaguangEvent.SwipeBlock : LabYaguangEvent.Sabotage;
@@ -2000,6 +2014,8 @@ namespace C6Lab
             /// <summary>Fox fire (#251): how many fox orbs fall, and how long after they fall they cannot be touched off.</summary>
             public readonly int FoxFireCountMin, FoxFireCountMax;
             public readonly float FoxFireSafeSeconds;
+            /// <summary>#664: how long the team has to clear every fox orb of one drop (0 = the old way: each fades by itself).</summary>
+            public readonly float FoxRoundSeconds;
             /// <summary>
             /// Charm (#251): how long it lasts, and how many taps each player beside must give to wake the charmed one
             /// (#305); the warning before it starts.
@@ -2054,6 +2070,7 @@ namespace C6Lab
                 FoxFireCountMin = config.FoxFireCountMin;
                 FoxFireCountMax = config.FoxFireCountMax;
                 FoxFireSafeSeconds = config.FoxFireSafeSeconds;
+                FoxRoundSeconds = 15f;
                 CharmSeconds = config.CharmSeconds;
                 CharmWarningSeconds = config.CharmWarningSeconds;
                 CharmRescueTaps = config.CharmRescueTaps;
