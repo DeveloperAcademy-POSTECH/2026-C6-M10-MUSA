@@ -38,8 +38,23 @@ namespace C6Lab.Tests
 
                 latest.SetValue(network, Snapshot(35d, progress: 2, active: true));
                 yield return null;
-                Assert.That(new[] { hud.SlotWord(0), hud.SlotWord(1), hud.SlotWord(2) }, Is.EqualTo(new[] { "하나", "둘", "" }));
-                Assert.That(hud.QuestionSlotVisible, Is.True, "The fifth slot it cannot count.");
+                Assert.That(new[] { hud.SlotWord(0), hud.SlotWord(1), hud.SlotWord(2) }, Is.EqualTo(new[] { "", "", "" }));
+                Assert.That(hud.QuestionSlotVisible, Is.False, "The authored four-slot panel has no extra question orb.");
+                var panel = canvasRoot.transform.Find("Gourd Combo/Gourd Combo Panel").GetComponent<RectTransform>();
+                Assert.That(panel.GetComponent<UnityEngine.UI.Image>().sprite, Is.EqualTo(LabYaguangComboArt.Load("Panel")));
+                float fit = LabYaguangComboArt.Fit(canvasRoot.GetComponent<RectTransform>().rect.size);
+                Assert.That(panel.sizeDelta.x, Is.EqualTo(207f * fit).Within(.01f));
+                Assert.That(panel.sizeDelta.y, Is.EqualTo(51f * fit).Within(.01f));
+                var layer = panel.parent;
+                Assert.That(layer.Find("Combo Count Pop").GetComponent<RectTransform>().anchorMin, Is.EqualTo(panel.anchorMin));
+                Assert.That(layer.Find("Combo Result").GetComponent<RectTransform>().anchorMin, Is.EqualTo(panel.anchorMin));
+                for (int i = 0; i < Colors.Length; i++)
+                {
+                    var slot = panel.Find("Combo Slot " + (i + 1));
+                    Assert.That(slot.GetComponent<UnityEngine.UI.Image>().sprite, Is.EqualTo(LabYaguangComboArt.Orb(Colors[i])));
+                    Assert.That(hud.SlotChecked(i), Is.EqualTo(i < 2));
+                    Assert.That(slot.Find("Check").GetComponent<UnityEngine.UI.Image>().sprite, Is.EqualTo(LabYaguangComboArt.Load("Check")));
+                }
 
                 var cleared = Snapshot(40d, progress: 4, active: false);
                 cleared.comboResult = LabComboResult.Success;
@@ -70,6 +85,46 @@ namespace C6Lab.Tests
                 Object.Destroy(canvasRoot);
                 Object.Destroy(config);
             }
+        }
+
+        [UnityTest]
+        public IEnumerator ComboReplacesTheGaugeFadesInAndRestoresItOnPauseAndDisable()
+        {
+            var root = new GameObject("Combo gauge replacement");
+            var network = root.AddComponent<LabNetwork>(); network.enabled = false;
+            var config = ScriptableObject.CreateInstance<LabConfig>(); network.config = config;
+            var canvasRoot = new GameObject("Canvas", typeof(RectTransform), typeof(Canvas));
+            var progress = new GameObject("Paint Progress", typeof(RectTransform), typeof(CanvasGroup));
+            progress.transform.SetParent(canvasRoot.transform, false);
+            var group = progress.GetComponent<CanvasGroup>(); group.alpha = .65f;
+            var frame = new GameObject("Frame", typeof(RectTransform)).GetComponent<RectTransform>();
+            frame.SetParent(progress.transform, false); frame.sizeDelta = new Vector2(242, 27);
+            frame.anchoredPosition = new Vector2(-33, 200);
+            var hud = root.AddComponent<LabGourdComboHud>(); hud.Bind(network, canvasRoot.GetComponent<Canvas>());
+            var latest = typeof(LabNetwork).GetField("latest", BindingFlags.Instance | BindingFlags.NonPublic);
+            var snapshot = Snapshot(35, 1, true); latest.SetValue(network, snapshot);
+            try
+            {
+                Canvas.ForceUpdateCanvases(); yield return null;
+                var panel = canvasRoot.transform.Find("Gourd Combo/Gourd Combo Panel").GetComponent<RectTransform>();
+                var fade = panel.GetComponent<CanvasGroup>();
+                Assert.That(group.alpha, Is.Zero, "Gauge and percentage are hidden before the panel becomes opaque.");
+                Assert.That(fade.alpha, Is.LessThan(1f), "The panel fades in rather than appearing instantly.");
+                Assert.That(panel.position.x, Is.EqualTo(frame.position.x).Within(.01f));
+                Assert.That(panel.position.y, Is.EqualTo(frame.position.y).Within(.01f));
+                Assert.That(panel.sizeDelta.x, Is.EqualTo(242f * .98f).Within(.01f));
+                yield return new WaitForSecondsRealtime(.26f);
+                Assert.That(fade.alpha, Is.EqualTo(1f).Within(.001f));
+                snapshot.paused = true; latest.SetValue(network, snapshot); yield return null;
+                Assert.That(group.alpha, Is.EqualTo(.65f), "Pause restores the gauge's previous alpha.");
+                snapshot.paused = false; latest.SetValue(network, snapshot); yield return null;
+                Assert.That(group.alpha, Is.Zero);
+                hud.enabled = false;
+                Assert.That(group.alpha, Is.EqualTo(.65f), "Disabling the HUD never leaves the gauge hidden.");
+                snapshot.comboActive = false; hud.enabled = true; latest.SetValue(network, snapshot); yield return null;
+                Assert.That(group.alpha, Is.EqualTo(.65f), "The gauge returns when the combo overlay ends.");
+            }
+            finally { Object.Destroy(root); Object.Destroy(canvasRoot); Object.Destroy(config); }
         }
 
         private static LabSnapshot Snapshot(double now, int progress, bool active) => new LabSnapshot
