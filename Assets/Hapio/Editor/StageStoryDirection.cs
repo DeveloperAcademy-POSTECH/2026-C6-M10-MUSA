@@ -40,8 +40,10 @@ namespace Hapio.Editor
                 drop.offset = new Vector2(-35, 58);
                 drop.interactionDelay = .63f;
                 flip.flipSound = Sound("PaperFlip");
-                var hint = root.GetComponentsInChildren<Text>(true).Single(t => t.text == "좌우로 밀어 부적 뒤집기");
-                hint.text = "밀어서 뒤집기";
+                // Keep the approved Figma wording; a shorter line sits left inside the authored left-aligned box.
+                var hint = root.GetComponentsInChildren<Text>(true)
+                    .Single(t => t.text == SealCardSwipeHint.Text || t.text == SealCardSwipeHint.RetiredText);
+                hint.text = SealCardSwipeHint.Text;
                 flip.swipeHint = hint.transform.parent.gameObject;
                 Stamp(flip.front.transform);
                 WireRecords(flip);
