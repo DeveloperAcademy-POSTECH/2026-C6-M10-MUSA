@@ -17,9 +17,9 @@ MonoBehaviour:
   pages:
   - speaker: "\uC0AC\uBD80\uB2D8"
     dialogue: "\uD2B9\uD788 \uC548\uCABD \uC120\uBC18\uC5D0 \uC788\uB294 \uBB3C\uAC74\uC740\n\uC808\uB300\uB85C \uAC74\uB4DC\uB9AC\uC9C0 \uB9D0\uAC70\uB77C."
-    autoReadSeconds: 4.75
-    voice: {fileID: 8300000, guid: d044aea2931a43c694e2d94d98baf430, type: 3}
-  direction: 
+    autoReadSeconds: 4
+    voice: {fileID: 0}
+  direction: Approved Figma frame 3 (4553:2625); native text and independent artwork motion.
   speaker: "\uC0AC\uBD80\uB2D8"
   dialogue: "\uD2B9\uD788 \uC548\uCABD \uC120\uBC18\uC5D0 \uC788\uB294 \uBB3C\uAC74\uC740\n\uC808\uB300\uB85C \uAC74\uB4DC\uB9AC\uC9C0 \uB9D0\uAC70\uB77C."
   autoReadSeconds: 4

@@ -1,0 +1,152 @@
+using System;
+using System.IO;
+using System.Linq;
+using NUnit.Framework;
+using UnityEditor;
+using UnityEngine;
+using UnityEngine.UI;
+using Object=UnityEngine.Object;
+namespace Hapio.Tests
+{
+ public sealed class OpeningRevisionTests
+ {
+  [Serializable] class Manifest { public Frame[] frames; }
+  [Serializable] class Frame { public int number;public string id,speaker,dialogue;public TextItem[] texts; }
+  [Serializable] class TextItem { public string id,richText;public float x,y,width,height; }
+  const string Root="Assets/Hapio/Story/Opening/";
+  [Test] public void All28CutsUseApprovedDialogueTypographyAndUniqueSourceFrames(){
+   var expected=JsonUtility.FromJson<Manifest>(File.ReadAllText(Root+"Revision28.json"));
+   var sequence=AssetDatabase.LoadAssetAtPath<StorySequence>(Root+"Opening.asset");
+   Assert.That(sequence.Validate(out var error),Is.True,error);Assert.That(sequence.cuts.Count,Is.EqualTo(28));
+   foreach(var frame in expected.frames){
+    var cut=sequence.cuts[frame.number-1];Assert.That(cut.cutId,Is.EqualTo($"OP_{frame.number:000}"));
+    Assert.That(cut.viewPrefab.sourceFigmaNodeId,Is.EqualTo(frame.id));Assert.That(cut.PageCount,Is.EqualTo(1));
+    Assert.That(cut.GetPage(0).speaker,Is.EqualTo(frame.speaker));Assert.That(cut.GetPage(0).dialogue,Is.EqualTo(frame.dialogue));
+    var texts=cut.viewPrefab.GetComponentsInChildren<Text>(true);Assert.That(texts.Length,Is.EqualTo(frame.texts.Length));
+    foreach(var t in frame.texts){var actual=texts.Single(x=>x.name=="Text ["+t.id+"]");Assert.That(actual.text,Is.EqualTo(t.richText));
+     Assert.That(actual.rectTransform.sizeDelta.x*actual.rectTransform.localScale.x,Is.EqualTo(t.width).Within(.01));
+     Assert.That(actual.rectTransform.anchoredPosition.x,Is.EqualTo(t.x+t.width/2).Within(.01));
+     Assert.That(actual.rectTransform.anchoredPosition.y,Is.EqualTo(-t.y-t.height/2).Within(.01));
+    }
+   }
+  }
+  [Test] public void EveryAuthoredSpeakerUsesTheCharacterPalette(){
+   var palette=AssetDatabase.LoadAssetAtPath<StorySpeakerPalette>(Root+"SpeakerPalette.asset");
+   var sequence=AssetDatabase.LoadAssetAtPath<StorySequence>(Root+"Opening.asset");
+   foreach(var cut in sequence.cuts){
+    string speaker=cut.GetPage(0).speaker;if(string.IsNullOrEmpty(speaker))continue;
+    Assert.That(palette.TryGet(speaker,out var style),Is.True,speaker);
+    var badge=cut.viewPrefab.authoredDialogue.GetComponentsInChildren<Image>(true).Single(x=>x.sprite!=null&&x.sprite.name=="9769e");
+    Assert.That(badge.color,Is.EqualTo(style.badgeColor),cut.cutId);
+    Assert.That(badge.material,Is.SameAs(palette.badgeMaterial),cut.cutId);
+    var name=cut.viewPrefab.authoredDialogue.GetComponentsInChildren<Text>(true).Single(x=>x.text=="<size=53>"+speaker+"</size>");
+    Assert.That(name.color,Is.EqualTo(style.textColor),cut.cutId);
+   }
+  }
+  [Test] public void CloseUpKeepsThePointingHandStillAndCinematicTimingIsOptIn(){
+   var sequence=AssetDatabase.LoadAssetAtPath<StorySequence>(Root+"Opening.asset");
+   Assert.That(sequence.cuts[3].viewPrefab.openingMotions,Is.Empty);
+   foreach(var cut in sequence.cuts){
+    int n=cut.viewPrefab.sourceFigmaNumber;
+    if(n>=14&&n<=16){Assert.That(cut.viewPrefab.autoContinueAfterSeconds,Is.GreaterThan(cut.viewPrefab.EntranceDuration));Assert.That(cut.GetPage(0).dialogue,Is.Empty);}
+    else Assert.That(cut.viewPrefab.autoContinueAfterSeconds,Is.Zero);
+   }
+  }
+  [TestCase(7,OpeningLayerMotion.Kind.Sigh,1)]
+  [TestCase(12,OpeningLayerMotion.Kind.Sweep,2)]
+  [TestCase(13,OpeningLayerMotion.Kind.Toss,4)]
+  [TestCase(14,OpeningLayerMotion.Kind.Teeter,1)]
+  [TestCase(15,OpeningLayerMotion.Kind.Drop,1)]
+  [TestCase(16,OpeningLayerMotion.Kind.Escape,3)]
+  public void RequestedMotionIsBoundToIndependentArtwork(int number,OpeningLayerMotion.Kind kind,int count){
+   var view=AssetDatabase.LoadAssetAtPath<StoryCutView>(Root+$"Views/OP_{number:000}.prefab");
+   Assert.That(view.openingMotions.Count(x=>x.kind==kind),Is.EqualTo(count));
+  }
+  [Test] public void DropCannotSkipItsFallAndRestoresDeterministicallyWhenReplayed(){
+   var prefab=AssetDatabase.LoadAssetAtPath<StoryCutView>(Root+"Views/OP_015.prefab");var view=Object.Instantiate(prefab);
+   try{Assert.That(view.waitForEntrance,Is.True);Assert.That(view.EntranceDuration,Is.GreaterThan(2.5));
+    var drop=view.openingMotions.Single(x=>x.kind==OpeningLayerMotion.Kind.Drop);var rect=(RectTransform)drop.transform;
+    drop.Sample(.1f);var start=rect.anchoredPosition;drop.Sample(1.35f);var middle=rect.anchoredPosition;
+    drop.Sample(2.6f);Assert.That(rect.anchoredPosition.y,Is.LessThan(middle.y));Assert.That(middle.y,Is.LessThan(start.y));
+    drop.Sample(.1f);drop.Sample(1.35f);Assert.That(rect.anchoredPosition,Is.EqualTo(middle));
+   }finally{Object.DestroyImmediate(view.gameObject);}
+  }
+  [Test] public void LastBackgroundBleedsPastBothEdgesWithoutChangingAspect(){
+   var view=AssetDatabase.LoadAssetAtPath<StoryCutView>(Root+"Views/OP_028.prefab");
+   var image=view.GetComponentsInChildren<Image>(true).Single(x=>x.sprite!=null&&x.sprite.name.StartsWith("72eb0-paper-"));
+   Assert.That(image.rectTransform.anchoredPosition.x,Is.EqualTo(-2).Within(.01));
+   Assert.That(image.rectTransform.rect.width,Is.EqualTo(406).Within(.01));
+   Assert.That(image.rectTransform.rect.width/image.rectTransform.rect.height,Is.EqualTo(402f/874).Within(.001));
+  }
+  [Test] public void GourdReachesTheFloorBeforeItsShatteredArtworkAppears(){
+   var view=Object.Instantiate(AssetDatabase.LoadAssetAtPath<StoryCutView>(Root+"Views/OP_015.prefab"));
+   try{
+    var drop=view.openingMotions.Single(x=>x.kind==OpeningLayerMotion.Kind.Drop);
+    var shadow=view.openingMotions.Single(x=>x.kind==OpeningLayerMotion.Kind.GroundShadow);
+    var shards=view.openingMotions.Single(x=>x.transform.parent.name.Contains("4553:2473"));
+    float impact=drop.delay+drop.seconds;
+    view.Sample(impact-.01f);
+    Assert.That(drop.GetComponent<CanvasGroup>().alpha,Is.EqualTo(1));
+    Assert.That(shards.GetComponent<CanvasGroup>().alpha,Is.Zero);
+    view.Sample(impact);
+    // Contact measured on the opaque silhouette after rotation; independent of the image's transparent padding.
+    var contact=drop.transform.position+new Vector3(-59.78f,-14.84f,0);
+    var shadowRect=(RectTransform)shadow.transform;
+    Assert.That(Vector3.Distance(contact,shadowRect.TransformPoint(shadowRect.rect.center)),Is.LessThan(.02f));
+    var landed=drop.transform.position;
+    view.Sample(impact+OpeningLayerMotion.ImpactFadeSeconds+.01f);
+    Assert.That(drop.transform.position,Is.EqualTo(landed));
+    Assert.That(drop.GetComponent<CanvasGroup>().alpha,Is.Zero);
+    Assert.That(shards.GetComponent<CanvasGroup>().alpha,Is.EqualTo(1));
+    var authored=(RectTransform)shards.transform.parent;
+    Assert.That(authored.anchoredPosition,Is.EqualTo(new Vector2(206.5f,-626.5f)));
+    Assert.That(((RectTransform)shards.transform).anchoredPosition,Is.EqualTo(new Vector2(138.5f,-395)));
+   }finally{Object.DestroyImmediate(view.gameObject);}
+  }
+  [Test] public void SighSettlesAndRemainsVisibleWhileThePlayerReads(){
+   var view=Object.Instantiate(AssetDatabase.LoadAssetAtPath<StoryCutView>(Root+"Views/OP_007.prefab"));
+   try{
+    var motion=view.openingMotions.Single(x=>x.kind==OpeningLayerMotion.Kind.Sigh);
+    motion.Sample(.55f);Assert.That(motion.GetComponentInChildren<Image>().fillAmount,Is.Zero);
+    motion.Sample(3);var position=((RectTransform)motion.transform).anchoredPosition;
+    motion.Sample(30);Assert.That(motion.GetComponent<CanvasGroup>().alpha,Is.EqualTo(1));
+    Assert.That(motion.GetComponentInChildren<Image>().fillAmount,Is.EqualTo(1));
+    Assert.That(((RectTransform)motion.transform).anchoredPosition,Is.EqualTo(position));
+   }finally{Object.DestroyImmediate(view.gameObject);}
+  }
+  [Test] public void GroundShadowStaysOnTheFloorAndGrowsAsTheGourdApproaches(){
+   var view=Object.Instantiate(AssetDatabase.LoadAssetAtPath<StoryCutView>(Root+"Views/OP_015.prefab"));
+   try{
+    var shadow=view.openingMotions.Single(x=>x.kind==OpeningLayerMotion.Kind.GroundShadow);
+    var drop=view.openingMotions.Single(x=>x.kind==OpeningLayerMotion.Kind.Drop);
+    Assert.That(shadow.delay,Is.EqualTo(drop.delay));Assert.That(shadow.seconds,Is.EqualTo(drop.seconds));
+    shadow.Sample(0);var position=shadow.transform.position;float width=shadow.transform.localScale.x;
+    float alpha=shadow.GetComponent<CanvasGroup>().alpha;
+    shadow.Sample(2.6f);Assert.That(shadow.transform.position,Is.EqualTo(position));
+    Assert.That(shadow.transform.localScale.x,Is.GreaterThan(width));Assert.That(shadow.GetComponent<CanvasGroup>().alpha,Is.GreaterThan(alpha));
+   }finally{Object.DestroyImmediate(view.gameObject);}
+  }
+  [Test] public void FlyingPropsCrossTheMiddleOfTheSceneInsteadOfStayingAtTheCeiling(){
+   var view=Object.Instantiate(AssetDatabase.LoadAssetAtPath<StoryCutView>(Root+"Views/OP_013.prefab"));
+   try{foreach(var motion in view.openingMotions.Where(x=>x.kind==OpeningLayerMotion.Kind.Toss)){
+    float low=float.MaxValue,high=float.MinValue;
+    for(float time=1;time<9;time+=.1f){motion.Sample(time);float y=-view.transform.InverseTransformPoint(motion.transform.position).y;low=Mathf.Min(low,y);high=Mathf.Max(high,y);}
+    Assert.That(low,Is.GreaterThan(100));Assert.That(high,Is.LessThan(640));
+    Assert.That(high-low,Is.GreaterThan(200));
+   }}finally{Object.DestroyImmediate(view.gameObject);}
+  }
+  [Test] public void AllBackgroundsUseOpaqueSrgbCompositesAndFrameFourUsesFullOpacity(){
+   var json=File.ReadAllText(Root+"Revision28.json");
+   Assert.That(json,Does.Contain("backgroundSourcePath"));
+   var sequence=AssetDatabase.LoadAssetAtPath<StorySequence>(Root+"Opening.asset");
+   foreach(var cut in sequence.cuts){var background=cut.viewPrefab.transform.GetChild(1).GetComponentInChildren<Image>();
+    Assert.That(background.sprite.name,Does.Contain("-paper-"));Assert.That(background.color.a,Is.EqualTo(1));
+   }
+   Assert.That(sequence.cuts[3].viewPrefab.transform.GetChild(1).GetComponentInChildren<Image>().sprite.name,Does.EndWith("-paper-100"));
+  }
+  [Test] public void InstructionScrollUsesNativeTextAndLastCutKeepsCloudTransitionLandscape(){
+   var scroll=AssetDatabase.LoadAssetAtPath<StoryCutView>(Root+"Views/OP_023.prefab");Assert.That(scroll.GetComponentsInChildren<Text>(true),Has.Length.EqualTo(5));
+   var last=AssetDatabase.LoadAssetAtPath<StoryCutView>(Root+"Views/OP_028.prefab");Assert.That(last.GetComponentsInChildren<Image>(true).Any(x=>x.sprite!=null&&x.sprite.name.StartsWith("72eb0-paper-")),Is.True);
+  }
+ }
+}

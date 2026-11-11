@@ -11,72 +11,11 @@ namespace Hapio.Tests
         [System.Serializable] private class Frame { public int number; public string cutId; public Page[] pages; }
         [System.Serializable] private class Page { public string speaker, dialogue; }
 
-        [Test]
-        public void EveryPageMatchesTheApprovedScriptIncludingTheTwoSpeakersInCutSeventeen()
-        {
-            var approved = JsonUtility.FromJson<Approved>(System.IO.File.ReadAllText("Assets/Hapio/Story/Opening/ApprovedScript.json"));
-            Assert.That(approved.frames.Length, Is.EqualTo(25));
-            int pages = 0;
-            foreach (var frame in approved.frames)
-            {
-                string id = string.IsNullOrEmpty(frame.cutId) ? $"OP_{frame.number:000}" : frame.cutId;
-                var cut = AssetDatabase.LoadAssetAtPath<StoryCutDefinition>($"Assets/Hapio/Story/Opening/Cuts/{id}.asset");
-                Assert.That(cut.PageCount, Is.EqualTo(frame.pages.Length));
-                Assert.That(cut.viewPrefab.centerSpeakerName, Is.True);
-                Assert.That(cut.viewPrefab.dialogueRect, Is.EqualTo(new Rect(84, 720, 270, 100)), $"Cut {frame.number} body alignment");
-                for (int i = 0; i < frame.pages.Length; i++)
-                {
-                    Assert.That(cut.GetPage(i).speaker, Is.EqualTo(frame.pages[i].speaker));
-                    Assert.That(cut.GetPage(i).dialogue, Is.EqualTo(frame.pages[i].dialogue));
-                    Assert.That(cut.GetPage(i).speaker, Does.Not.Contain("스승님"));
-                    pages++;
-                }
-                if (frame.number == 13 || frame.number == 14)
-                {
-                    Assert.That(cut.GetPage(0).dialogue, Is.Empty);
-                    Assert.That(cut.viewPrefab.hideEmptyDialogue, Is.True);
-                    Assert.That(cut.direction, Is.Not.Empty);
-                }
-            }
-            Assert.That(pages, Is.EqualTo(27));
-            var seventeen = AssetDatabase.LoadAssetAtPath<StoryCutDefinition>("Assets/Hapio/Story/Opening/Cuts/OP_017.asset");
-            Assert.That(seventeen.GetPage(0).speaker, Is.EqualTo("불이"));
-            Assert.That(seventeen.GetPage(1).speaker, Is.EqualTo("금옥이"));
-            Assert.That(seventeen.GetPage(1).dialogue, Is.EqualTo("되겠냐."));
-            Assert.That(seventeen.GetPage(1).autoReadSeconds, Is.LessThan(2));
-        }
 
-        [Test]
-        public void EnlargedInstructionsFollowCutNineteenAndUseNativeTextWithoutADialoguePanel()
-        {
-            var story = AssetDatabase.LoadAssetAtPath<StorySequence>("Assets/Hapio/Story/Opening/Opening.asset");
-            var cut = story.cuts[19];
-            Assert.That(story.cuts[18].cutId, Is.EqualTo("OP_019"));
-            Assert.That(cut.cutId, Is.EqualTo("OP_019_1"));
-            Assert.That(story.cuts[20].cutId, Is.EqualTo("OP_020"));
-            Assert.That(cut.GetPage(0).dialogue, Is.Empty);
-            Assert.That(cut.viewPrefab.hideEmptyDialogue, Is.True);
-            Assert.That(cut.viewPrefab.sourceFigmaNodeId, Is.EqualTo("3331:479"));
-            Assert.That(cut.viewPrefab.GetComponentsInChildren<UnityEngine.UI.Text>(true).Length, Is.EqualTo(2));
-            Assert.That(cut.GetPage(0).autoReadSeconds, Is.GreaterThan(10));
-        }
 
-        [Test]
-        public void BrokenGourdUsesTheLatestSourcePlacementInCutsFifteenAndSixteen()
-        {
-            foreach (int number in new[] {15, 16})
-            {
-                var view = AssetDatabase.LoadAssetAtPath<StoryCutView>($"Assets/Hapio/Story/Opening/Views/OP_{number:000}.prefab");
-                string id = number == 15 ? "3273:13" : "3273:18";
-                var placement = view.transform.Find($"image 1308 [{id}] Placement") as RectTransform;
-                Assert.That(placement, Is.Not.Null);
-                Assert.That(placement.anchoredPosition, Is.EqualTo(new Vector2(53, -580)));
-                Assert.That(placement.sizeDelta, Is.EqualTo(new Vector2(323, 147)));
-                var image = placement.GetComponentInChildren<UnityEngine.UI.Image>(true);
-                Assert.That(AssetDatabase.GetAssetPath(image.sprite), Does.EndWith("/4a78f.png"));
-                Assert.That(placement.GetSiblingIndex(), Is.GreaterThan(1));
-            }
-        }
+
+
+
 
         [Test]
         public void AnimatedTitleSharesFourCloudsWithTheHomeStartPage()
@@ -169,123 +108,15 @@ namespace Hapio.Tests
                 "The flag and the leaves are hit by the same gust.");
         }
 
-        [Test]
-        public void SecondCutHasOriginalCharacterLayersSpeakerBadgeAndTwoCutPreview()
-        {
-            var cut = AssetDatabase.LoadAssetAtPath<StoryCutDefinition>("Assets/Hapio/Story/Opening/Cuts/OP_002.asset");
-            var view = cut.viewPrefab;
-            Assert.That(view.layers.Length, Is.EqualTo(7));
-            foreach (var layer in view.layers) Assert.That(layer.artwork.sprite, Is.Not.Null, layer.name);
-            Assert.That(view.overrideDialogueLayout, Is.True);
-            Assert.That(view.speakerBadge, Is.Not.Null);
-            Assert.That(view.dialogueRect, Is.EqualTo(new Rect(84, 720, 270, 100)));
-            Assert.That(view.GetComponentsInChildren<UnityEngine.UI.Image>(true).Length, Is.EqualTo(17));
-            Assert.That(view.transform.Find("Building Placement/Motion/Artwork").GetComponent<UnityEngine.UI.Image>().color.a,
-                Is.EqualTo(.9f).Within(.001f));
-            Assert.That(cut.GetPage(0).speaker, Is.EqualTo("사부님"));
-            var preview = AssetDatabase.LoadAssetAtPath<StorySequence>("Assets/Hapio/Story/Opening/OpeningPreview.asset");
-            Assert.That(preview.Validate(out string error), Is.True, error);
-            Assert.That(preview.cuts.Count, Is.EqualTo(2));
-            Assert.That(preview.cuts[1], Is.SameAs(cut));
-        }
 
-        [Test]
-        public void PreparedPreviewIncludesTheEnlargedInstructionsWithoutRenumberingExistingCuts()
-        {
-            const string root = "Assets/Hapio/Story/Opening/";
-            var preview = AssetDatabase.LoadAssetAtPath<StorySequence>(root + "BatchPreview.asset");
-            Assert.That(preview.Validate(out string error), Is.True, error);
-            Assert.That(preview.cuts.Count, Is.EqualTo(25));
-            Assert.That(preview.cuts[0].cutId, Is.EqualTo("OP_001"));
-            Assert.That(preview.cuts[1].cutId, Is.EqualTo("OP_002"));
-            for (int number = 3; number <= 24; number++)
-            {
-                var cut = preview.cuts[number <= 19 ? number - 1 : number];
-                Assert.That(cut.cutId, Is.EqualTo($"OP_{number:000}"));
-                var view = cut.viewPrefab;
-                Assert.That(view.sourceFigmaNumber, Is.EqualTo(number));
-                Assert.That(view.sourceFigmaNodeId, Does.StartWith("3182:"));
-                Assert.That(view.hideEmptyDialogue, Is.True);
-                Assert.That(view.layers.Length, Is.GreaterThanOrEqualTo(2));
-                var images = view.GetComponentsInChildren<UnityEngine.UI.Image>(true);
-                foreach (var image in images)
-                    if (image.name != "Paper Base") Assert.That(image.sprite, Is.Not.Null, cut.cutId + " / " + image.name);
-            }
 
-        }
 
-        [Test]
-        public void CroppedBackgroundAndBeadSpritesRetainTheirSourceWindows()
-        {
-            var six = AssetDatabase.LoadAssetAtPath<StoryCutView>("Assets/Hapio/Story/Opening/Views/OP_006.prefab");
-            var background = six.layers[0].artwork;
-            Assert.That(background.color.a, Is.EqualTo(.85f).Within(.0001f));
-            Assert.That(background.GetComponentInParent<UnityEngine.UI.RectMask2D>(true), Is.Not.Null);
-            Assert.That(background.rectTransform.anchoredPosition.x, Is.EqualTo(402 * -.2051f).Within(.01f));
-            Assert.That(background.rectTransform.sizeDelta.x, Is.EqualTo(402 * 1.2927f).Within(.01f));
-            var twentyTwo = AssetDatabase.LoadAssetAtPath<StoryCutView>("Assets/Hapio/Story/Opening/Views/OP_022.prefab");
-            int spriteWindows = 0;
-            foreach (var image in twentyTwo.GetComponentsInChildren<UnityEngine.UI.Image>(true))
-                if (image.name == "Artwork" && image.rectTransform.sizeDelta.x > 4.9f * image.rectTransform.parent.GetComponent<RectTransform>().sizeDelta.x)
-                {
-                    spriteWindows++;
-                    Assert.That(image.GetComponentInParent<UnityEngine.UI.RectMask2D>(true), Is.Not.Null);
-                }
-            Assert.That(spriteWindows, Is.EqualTo(4));
-        }
 
-        /// <summary>
-        /// #635: the last cut's background ends in a half see-through column of pixels, and the page edge can fall inside a
-        /// screen pixel, so the light paper base showed as thin lines at both sides. The picture now reaches 2pt past the page
-        /// on every side (same shape, same centre); the page's mask trims what lies outside.
-        /// </summary>
-        [Test]
-        public void LastCutBackgroundReachesPastThePageSoNoPaperLineShows()
-        {
-            var view = AssetDatabase.LoadAssetAtPath<StoryCutView>("Assets/Hapio/Story/Opening/Views/OP_024.prefab");
-            var background = view.layers.Single(layer => layer.isBackground).artwork;
-            Assert.That(background.sprite.name, Is.EqualTo("72eb0"));
-            var corners = new Vector3[4];
-            background.rectTransform.GetWorldCorners(corners);
-            Vector3 min = view.transform.InverseTransformPoint(corners[0]), max = view.transform.InverseTransformPoint(corners[2]);
-            // The page is x 0..402, y -874..0 in the cut's own units.
-            Assert.That(min.x, Is.EqualTo(-2f).Within(.01f), "Left, 2pt past the page.");
-            Assert.That(max.x, Is.EqualTo(404f).Within(.01f), "Right, 2pt past the page.");
-            Assert.That(max.y, Is.GreaterThan(0f), "Top past the page.");
-            Assert.That(min.y, Is.LessThan(-874f), "Bottom past the page.");
-            float width = max.x - min.x, height = max.y - min.y;
-            Assert.That(width / height, Is.EqualTo(402.00586f / 874f).Within(1e-4f), "Grown evenly, not stretched.");
-            Assert.That((min.x + max.x) * .5f, Is.EqualTo(201f).Within(.01f), "Same centre.");
-            float lastColumn = max.x - width / background.sprite.texture.width;
-            Assert.That(lastColumn, Is.GreaterThan(402f), "The half see-through last column lies outside the page.");
-        }
 
-        [Test]
-        public void AddedCutsKeepOriginalDialogueAndUpdatedTwentyTwoUsesNewFigmaGeometry()
-        {
-            const string root = "Assets/Hapio/Story/Opening/";
-            var three = AssetDatabase.LoadAssetAtPath<StoryCutDefinition>(root + "Cuts/OP_003.asset");
-            Assert.That(three.GetPage(0).speaker, Is.EqualTo("사부님"));
-            Assert.That(three.GetPage(0).dialogue, Is.EqualTo("특히 안쪽 선반에 있는 물건은\n절대로 건드리지 말거라."));
-            Assert.That(three.viewPrefab.dialogueFontSize, Is.InRange(18f, 20.7f));
-            Assert.That(three.viewPrefab.dialogueRect, Is.EqualTo(new Rect(84, 720, 270, 100)));
-            var four = AssetDatabase.LoadAssetAtPath<StoryCutDefinition>(root + "Cuts/OP_004.asset");
-            Assert.That(four.GetPage(0).speaker, Is.EqualTo("불이"));
-            Assert.That(four.GetPage(0).dialogue, Is.EqualTo("어휴~ 걱정 마세요!"));
-            var five = AssetDatabase.LoadAssetAtPath<StoryCutDefinition>(root + "Cuts/OP_005.asset");
-            Assert.That(five.GetPage(0).dialogue, Is.EqualTo("그렇게 사부님들은\n구름을 타고 떠나셨다."));
-            Assert.That(five.viewPrefab.layers.Length, Is.EqualTo(9));
-            var view = AssetDatabase.LoadAssetAtPath<StoryCutView>(root + "Views/OP_022.prefab");
-            var figure = view.transform.Find("image 1248 [3182:11930] Placement").GetComponent<RectTransform>();
-            Assert.That(figure.anchoredPosition, Is.EqualTo(new Vector2(-16, -218)));
-            var gourd = view.transform.Find("image 1212 [3182:11931] Placement").GetComponent<RectTransform>();
-            Assert.That(gourd.anchoredPosition, Is.EqualTo(new Vector2(143, -549)));
-            Assert.That(gourd.sizeDelta, Is.EqualTo(new Vector2(123, 129)));
-            Assert.That(gourd.GetSiblingIndex(), Is.GreaterThan(figure.GetSiblingIndex()), "The gourd must render in front of the figure.");
-            var red = view.transform.Find("image 1217 [3182:11933] Placement").GetComponent<RectTransform>();
-            Assert.That(red.anchoredPosition.x, Is.EqualTo(324.9333f).Within(.001f));
-            Assert.That(red.anchoredPosition.y, Is.EqualTo(-595f).Within(.001f));
-        }
+
+
+
+
 
         [TestCase(900, 400)]
         [TestCase(402, 874)]
@@ -309,28 +140,7 @@ namespace Hapio.Tests
             finally { Object.DestroyImmediate(parent); }
         }
 
-        [Test]
-        public void OpeningHas25UniqueEditableCutsAndFirstCutUsesSeparateOriginalSprites()
-        {
-            var story = AssetDatabase.LoadAssetAtPath<StorySequence>("Assets/Hapio/Story/Opening/Opening.asset");
-            Assert.That(story, Is.Not.Null);
-            Assert.That(story.Validate(out string error), Is.True, error);
-            Assert.That(story.cuts.Count, Is.EqualTo(25));
-            for (int i = 0; i < 24; i++)
-            {
-                var cut = story.cuts[i < 19 ? i : i + 1];
-                Assert.That(cut.cutId, Is.EqualTo($"OP_{i + 1:000}"));
-                Assert.That(AssetDatabase.GetAssetPath(cut.viewPrefab),
-                    Is.EqualTo($"Assets/Hapio/Story/Opening/Views/OP_{i + 1:000}.prefab"));
-            }
-            var layers = story.cuts[0].viewPrefab.layers;
-            Assert.That(layers.Length, Is.EqualTo(2));
-            Assert.That(AssetDatabase.GetAssetPath(layers[0].artwork.sprite), Does.EndWith("/Background.png"));
-            Assert.That(AssetDatabase.GetAssetPath(layers[1].artwork.sprite), Does.EndWith("/Temple.png"));
-            Assert.That(layers[1].artwork.rectTransform.sizeDelta, Is.EqualTo(new Vector2(281, 500)));
-            Assert.That(layers[1].transform.parent.GetComponent<RectTransform>().anchoredPosition,
-                Is.EqualTo(new Vector2(60, -259)));
-        }
+
 
         [Test]
         public void DuplicateCutIdsAreRejectedBeforePlayback()

@@ -113,3 +113,10 @@ Host NEXT/재도전은 모두 다음 조건을 기다린다.
 ### 실제 면적 통계의 통신 호환
 
 누적 면적 통계 필드가 추가돼 접속 묶음은 **설정259개·프로토콜5699·`C6PhysicsLab/60`·`C6HapioGame/50`**이다. Game49는 별도 #647 브랜치가 먼저 사용해 건너뛰었다. 공유 설정 수/인덱스·지도/저널/압축/Bulk 형식·게임 판정은 유지한다. 새 통계가 없는 구형 앱과 섞어 정확한 총평을 표시하지 않도록 기존 접속 버전 검사로 구분한다. 실제 검사·기기 실행 여부는 `VALIDATION.md`에 별도로 기록한다.
+
+
+### #647 Host-controlled stage clear
+
+`StoryStageClearControls` owns role-specific UI on all three After_02 prefabs. Only the host sees Next Seal; existing readiness, viewer and touch-release gates control interaction. Background taps cannot advance. Gumiho/Yagwanggui guests see the host-wait message. Jigwi guests hide both the next-yokai heading and host-wait message, while host UI remains unchanged.
+
+Host advances everyone to the next game for stages 1/2. After Jigwi, StartSummary broadcasts a sticky summary-start flag for the matching completed run/stage/revision/settings/battle/round. Repeated state broadcasts recover missed messages. Summary/ending reading thereafter remains individual. Game connection token is C6HapioGame/51 (on top of #642's 50); older clients cannot mix. StageStoryShowcase.previewAsHost previews the role without network progression.

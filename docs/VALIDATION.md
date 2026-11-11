@@ -1,5 +1,28 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-10 — #647 병합 검토 반영 (스테이지 클리어 방장 진행)
+
+- **기준:** `feat/stage-clear-host-controls` `34c5a609`(PR 원본 `72daba95` + #646 + main `868c885f` 병합 + 검토 반영). Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 접속 묶음은 PR대로 `C6HapioGame/49`.
+- **고친 것:**
+  - 최종 결과에서 끊긴 구성원의 읽는 중·관람 중 표시를 지워 방장 진행이 막히지 않게 했다. 방장이 총평 전에 끊기면 구성원이 `HostLostAfterClear`로 스스로 총평·엔딩으로 간다.
+  - 마지막 컷 하단 완성 박 보기·나가기는 검토 중 한때 되살렸으나, 승인된 시안대로 다시 뺐다(완성 박은 봉인 카드의 "봉인 박 둘러보기"로 연다).
+  - 총평 표를 스테이지 번호로 맞췄다.
+  - 구미호·야광귀 마지막 컷의 "다음 요괴 잡으러 ..." 레이어가 꺼진 채 저장돼 방장·구성원 모두 보이지 않던 것을 켰다. 지귀는 문구를 숨기고 방장 버튼을 "마치기"로 했다(편집기 도구로 프리팹 3개 재저장, 레이어 켬/끔과 글자 한 줄만 변경).
+  - 기존 PlayMode 5건·EditMode 1건을 새 흐름에 맞췄다(실물 마우스 검사는 구름 전환이 끝난 뒤 SKIP을 누르게 함).
+  - AGENTS.md 접속 기록과 Game 49 이력 주석을 맞췄다.
+- **그대로 둔 것:** 새 글자색 `3f3d38`·`68645c`는 기존 결과 화면 도구와 같은 Figma 값이라 토큰으로 바꾸지 않았다(바꾸면 프리팹 재생성이 필요).
+
+| 확인 | 결과 |
+| --- | --- |
+| 원본 PR(main 병합본) 전체 EditMode / PlayMode | 2204/2205, 780/786 (새 실패 6건) |
+| 관련 EditMode(StageClearControls·StageStoryAsset·SealRunSummary·GameStageStoryAsset) | 17/17 PASS |
+| `GameSceneFlowTests` | 28/28 PASS (끊긴 구성원이 총평 시작을 막지 않는 단언 추가) |
+| 전체 EditMode | 2205/2205 PASS |
+| 전체 PlayMode | 785/786. 실패 1건 `GameOpeningControllerTests.CompletingAllTwentyFourCuts…`는 main에서도 같은 실패 |
+| Mac 개발 빌드 두 앱(방장 P1 + 구성원 P2, 직접 IP) | 1~3스테이지 마지막 컷, 지귀 "마치기", 총평 동시 이동 화면 확인 |
+
+- **미실행:** 실제로 방장 앱을 종료하거나 구성원 연결을 끊는 재현(단언과 코드 경로로만 확인), 실기기·iOS, 3인 이상.
+
 ## 2026-11-10 — 봉인 총평 (#642)
 
 - 기준: `feat/seal-run-summary`, 최신 main `c930f120`에서 시작. Unity 6000.6.5f1 로컬 Editor.
@@ -7722,6 +7745,12 @@ The manual conflict resolution only combines documentation. Selected PlayMode ch
 Main advanced to `6b2706aa` during PR verification (#633 and #639). Integrated it in `b49a35f9`; the only conflict was again this document, and both histories were retained. The 24 original #634 code/asset files remain unchanged. On this final integrated code, full EditMode **2199/2199 PASS** and the two result/game-over PlayMode checks named above **2/2 PASS**, no failures or skips. GitHub reported PR #640 mergeable. Only documentation was manually resolved; pre-existing generated asset whitespace was retained rather than modifying unrelated assets. Full PlayMode and physical-device tests were not rerun.
 
 
+### #647 Host-controlled stage clear - 2026-11-10
+
+Unity compilation: no errors. StageClearControlsTests: 4/4 pass after correcting a missing stageCatalog in the test fixture. Covers three prefab role states, Jigwi guest heading/wait suppression, and summary generation validation/sticky/reset behavior. Related LabGameFlowBridgeTests and LabLobbyRejoinTests: 43/43 pass with token 49. Full suite was not run.
+
+Unity Simulator: inspected only Jigwi final cut as guest; both requested messages and the advance button are absent. Stopped Play mode after inspection. Real multi-device synchronized progression and mobile builds remain unverified. Unity-generated blank m_Name YAML fields retain serializer whitespace.
+
 ## 2026-11-10 — #642 봉인 총평의 실제 신규 도색 기여도·성공 시간 연결
 
 기준은 PR #646의 `feat/seal-run-summary`/`b0ae6bce`(main `64d556ae` 포함)다. Unity 6000.6.5f1·macOS/Metal의 기존 Editor 한 개에서 수행했다. 사용자 확정 기준은 **기여도=실제로 새로 칠한 면적의 비율**, **총 시간=성공한1~3스테이지 전투 시간의 합**이다. 예시 Preview의 공격 점수를 실제 기여도로 쓰지 않는다.
@@ -7766,3 +7795,43 @@ Host의 `PaintFundedCell`에서 실제 빈 동일 면적 셀이 칠해질 때 �
 구현 `86269500`의 실제 저장 Home→공통 Battle 3판→실제 총평 경로를 별도로 촬영했다. CPU 도색 지도 완료를 자동 실행했고, 실제 세션 시간 5.002463/7.001923/9.002901초가 00:05/00:07/00:09와 합계00:21로 표시됐다. 각 판 Host 신규 셀2,048개로 솔로 기여도100%다. 예시 Preview 데이터나 직접 투척한 수동 플레이가 아니며, 이 촬영을 최신 main 통합 후 재촬영으로 기록하지 않는다.
 
 검증·PR에는 실제 면적 기준과 건조 뒤 재도색의 누적 의미, 기존 공격 점수/땅따먹기 통계/난수/지도/승패/물리 유지, 설정259개·5699/Lab60/Game50 및 전 기기 같은 새 버전 필요를 명시했다. iOS·실제 다인 LAN/핫스팟·standalone/Release 실행·성능 계측은 이번에도 미실행이다. 독립 코드/PR 설명 검토에서 병합 차단 결함은 발견되지 않았다. C#·문서 충돌 마커/공백 검사는 통과했고, 기존 Unity 직렬화 에셋의 생성 공백은 임의로 고치지 않았다.
+## 2026-11-11 — #654 Opening revision: 28 frames
+
+Validated in Unity 6000.6.5f1 on macOS, on the isolated branch based on origin/main `7b3025ee`. Existing product-name, splash and iOS Build Profile changes in the original checkout were preserved there.
+
+All 28 frames from Figma section `4553:2390` retain the approved dialogue, speaker, image placement, rotation, cropping and mixed text sizes. Frame 7 includes the sigh placed outside its frame in the source. All 28 prefabs were rendered at 804×1748. Frames 7/12/13/14/15/16 were also sampled at 0/0.7/1.4/2.1/2.8/4 seconds. Visual review corrected wrapping, rotating masks, the final background's 2pt bleed, smoke obscuring demons and the initially invisible falling gourd. These captures are Editor renders, not device performance measurements.
+
+Affected EditMode checks: OpeningRevisionTests 10/10, GameOpeningAssetTests and GameOpeningTransitionTests 7/7, retained StoryWorkspaceTests 8/8 passed. Obsolete 25-cut/27-page layout assertions were replaced with checks for the new approved text, typography, coordinates, independent motion, deterministic replay and final background bleed. Title and page-fit tests remain.
+
+Affected PlayMode checks: GameOpeningControllerTests 13/13 passed (9.33 seconds), including all 28 cuts, authored dialogue visibility, hiding the shared dialogue, completion/skip, pointer release, cloud zoom and cancellation/fallback. GameTutorialFlowTests.FinishedOpeningOpensThePracticeBoardOnceThenTheRoomList passed 1/1 (54.27 seconds): completing frame 28 hides its dialogue, closes the clouds, holds them during preparation, reveals the tutorial and eventually opens the room list. Subsequent changes only refine prop selection, rotating masks and scroll entrance; transition code is unchanged.
+
+Live2D title, Home bindings, gameplay/network settings and protocol tokens are unchanged. Full test suites, standalone/iOS builds, real iPhones, multiplayer and performance profiling were not run. Raw logs and visual captures stay outside the repository.
+
+### #654 background and motion follow-up — 2026-11-11
+
+Re-read all 28 background paints in Figma, including frame 4's updated full opacity. Backgrounds are now composited over white in sRGB before import: raw fills apply the authored opacity once, while filtered exports retain the opacity already present in their pixels. This fixes both double opacity and the washed-out result of linear-space UI blending. Captured all 28 saved prefabs and compared representative frames against Figma; sampled background colors agree within rounding. Frame 15's original shadow image is retained on the floor and grows/darkens with the fall. Frames 7/12/13/14/15/16 were sampled over time; the sigh remains visible, and the flying props cross the middle of frame 13. These are Editor renders, not device captures.
+
+Unity 6000.6.5f1 affected checks passed: OpeningRevisionTests **14/14**, OpeningDialogueContinuityTests **1/1**, GameOpeningControllerTests **13/13**, StoryPlayerTests **11/11**; no failures or skips in the final runs. Continuity verifies both forward and backward changes for 9/10 and 19/20, retaining actual artwork instances, positions and elapsed animation while replacing only dialogue. The final shadow intensity and strengthened continuity assertions were rechecked in the 14- and 1-test runs. Controller checks cover all 28 cuts and the final cloud transition; the full tutorial-to-room-list flow above was not rerun for this follow-up.
+
+The first StoryPlayerTests run passed 10/11: the legacy prepared-opening test assumed every Image had a sprite and every cut replayed its entrance. Its assertions now distinguish the deliberate white backing and hidden masks, and respect dialogue-only cuts; the rerun passed 11/11. An earlier Editor audio update hang occurred before PlayMode tests executed; reopening the worktree Editor resolved it. C#/JSON/document whitespace checks passed. Unity-generated prefab whitespace was retained. Full suites, builds, physical iPhones and performance profiling were not run. Captures and raw test output remain outside the repository.
+
+### #654 frame 15 landing alignment — 2026-11-11
+
+Applied the updated Figma frame 15 positions and layer order: shattered gourd at (68,429), revised smoke positions, and the 308pt-wide floor shadow at (37,732). Rebuilt only OP_015, retaining its GUID. The intact gourd's rotated opaque contact point now lands at the shadow center; it stays fully visible through the descent, then exchanges with the stationary shards over 0.12 seconds after contact. The shards no longer move up from below their authored position.
+
+Unity 6000.6.5f1: OpeningRevisionTests **15/15 PASS**, including floor contact, no premature fade/shards, stationary contact during the exchange and the revised shard coordinates; GameOpeningControllerTests **13/13 PASS** (9.39 seconds), including 28-cut completion and the existing final cloud transition. No failures or skips. Rendered the saved frame at 2.30/2.50/2.60/2.66/2.73/3.10 seconds and compared the landing and settled composition to Figma. C#/JSON/document whitespace checks passed. No full suites, builds or device testing were performed; captures and raw results remain outside the repository.
+
+### #654 continuous accident sequence and speaker colors - 2026-11-11
+
+In the original checkout, frames 14/15/16 now continue on their cut clocks (2.3/3.35/3.2 seconds) without AUTO or touch input, returning to manual dialogue at frame 17. Surplus elapsed time carries across boundaries; tapping Next cannot interrupt these cuts, Previous replays them, and Skip remains available. Frame 4 retains its authored close-up and stationary hand. The 21 speaking cuts now use the six existing SpeakerPalette styles and the brush-alpha material, including dark text on the yellow badge. Prefabs were updated in place with GUIDs and layout preserved; the revision builder reproduces these settings.
+
+Unity 6000.6.5f1: OpeningRevisionTests **17/17 PASS**; affected PlayMode OpeningCinematicTests **2/2**, OpeningDialogueContinuityTests **1/1**, StoryPlayerTests **11/11**, GameOpeningControllerTests **13/13 PASS**. Tests cover automatic boundaries, ignored taps, long-frame time carry, manual dialogue resumption, Previous/Replay/Skip, all authored speaker badges and dialogue-only color swaps, plus existing 28-cut completion/cloud exit. Rendered frame 4 and all six speaker colors from saved prefabs, checking the yellow badge's dark lettering and unchanged typography.
+
+The initial cinematic fixture passed 1/2 because it incorrectly expected Skip alone to destroy the retained final picture. A first timing-only adjustment also failed; the fixture now calls Cancel as the owning screen does and asserts both immediate hiding and subsequent cleanup. Runtime cleanup was unchanged. One further attempt was aborted when Play stopped before results; the completed rerun above is the evidence used. A combined filter that selected zero tests was excluded; the four groups were then run separately. C#/document whitespace checks passed. Existing five local settings/build-profile files retained their original hashes. No full suites, builds, physical devices or performance measurements were run; raw logs/captures remain outside the repository.
+
+
+### #654 PR preparation on latest main - 2026-11-11
+
+Prepared `feat/opening-28-frame-direction` with only the opening commits and merged origin/main `45001d21` (battle BGM updates). The original checkout remains on its existing local review branch with its preview and personal settings preserved; host-control work from #647 is not part of this PR. The sole cherry-pick conflict was this validation document; existing history and the new opening record were retained.
+
+All 279 changed opening code/asset/test files (excluding the tutorial test file, which retains main's independent Help-button assertions) have identical Git blob hashes to the tested local revision `fb021e31`. The main merge adds only six audio-file changes relative to the prepared opening branch. Accordingly, the preceding 17 EditMode and 27 PlayMode results are reused for unchanged opening behavior; they are not reported as a new run after this audio-only integration. The initial full tutorial handoff check remains separately dated above. Source/document whitespace checks and PR scope review passed; no scene, title, project setting, build profile or network-protocol changes are included.

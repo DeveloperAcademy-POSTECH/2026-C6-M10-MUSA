@@ -88,6 +88,7 @@ namespace Hapio
             public int participantCount;
             public bool resultViewerOpen;
             public bool resultPresentationBusy;
+            public bool summaryStarted;
             public double finishDeadline;
             [NonSerialized] public ulong sender;
         }
@@ -365,6 +366,7 @@ namespace Hapio
             {
                 ReadStartProgress(control);
                 ReadFinishDeadline(control);
+                ReadSummaryStart(control);
             }
             if (state.phase == GameFlowPhase.GameOver)
             {
@@ -381,6 +383,7 @@ namespace Hapio
                 SetLocalState(replica.State);
                 ReadStartProgress(control);
                 ReadFinishDeadline(control);
+                ReadSummaryStart(control);
             }
         }
 
@@ -615,6 +618,7 @@ namespace Hapio
                 readyCount = StartReadyCount, participantCount = StartParticipantCount,
                 resultViewerOpen = IsViewerOpen,
                 resultPresentationBusy = localResultPresentationBusy,
+                summaryStarted = SummaryStarted && current.phase == GameFlowPhase.Completed,
                 finishDeadline = finishServerDeadline
             };
         }
@@ -973,9 +977,9 @@ namespace Hapio
             return true;
         }
 
-        private void OnPeerDisconnected(ulong _, bool lostHost)
+        private void OnPeerDisconnected(ulong peer, bool lostHost)
         {
-            if (state.phase == GameFlowPhase.Completed) { CacheResultSnapshot(); return; }
+            if (state.phase == GameFlowPhase.Completed) { CacheResultSnapshot(); ForgetResultPeer(peer, lostHost); return; }
             if (goingHome) return;
             if (state.phase == GameFlowPhase.GameOver && state.retryableDefeat)
             {
