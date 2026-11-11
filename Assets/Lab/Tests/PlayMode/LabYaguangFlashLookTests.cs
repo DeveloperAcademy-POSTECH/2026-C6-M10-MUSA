@@ -90,12 +90,16 @@ namespace C6Lab.Tests
             Assert.That(latest, Is.Not.Null);
             try
             {
-                latest.SetValue(network, Snapshot(19.7d, warningAt: 19.5d, flashAt: 21d));
+                latest.SetValue(network, Snapshot(18.2d, warningAt: 18d, flashAt: 21d));
                 yield return null;
-                Assert.That(hud.EdgeAlpha, Is.Zero, "Early in the warning the eyes are still plain.");
-                latest.SetValue(network, Snapshot(20.8d, warningAt: 19.5d, flashAt: 21d));
+                Assert.That(hud.EdgeAlpha, Is.InRange(.01f, .04f), "Three starts with a faint warning while the eyes remain plain.");
+                float three = hud.EdgeAlpha;
+                latest.SetValue(network, Snapshot(19.2d, warningAt: 18d, flashAt: 21d));
                 yield return null;
-                Assert.That(hud.EdgeAlpha, Is.GreaterThan(.5f), "Once the eyes light up, the edge glows.");
+                Assert.That(hud.EdgeAlpha, Is.GreaterThan(three * 2f), "Two must be visibly stronger than three.");
+                latest.SetValue(network, Snapshot(20.8d, warningAt: 18d, flashAt: 21d));
+                yield return null;
+                Assert.That(hud.EdgeAlpha, Is.InRange(.08f, .15f), "The warning remains gentle so the countdown is readable.");
                 Assert.That(hud.BurstAlpha, Is.Zero);
 
                 LabSnapshot flashed = Snapshot(21.05d, warningAt: -1d, flashAt: -1d);
@@ -107,13 +111,43 @@ namespace C6Lab.Tests
                 Assert.That(hud.EdgeAlpha, Is.Zero);
                 Assert.That(hud.HapticCount, Is.EqualTo(1), "One haptic for the new flash.");
 
-                LabSnapshot dazzled = Snapshot(23d, warningAt: -1d, flashAt: -1d);
+                LabSnapshot dazzled = Snapshot(23.35d, warningAt: -1d, flashAt: -1d);
                 dazzled.flashCount = 1;
                 dazzled.flashLastAt = 21d;
                 latest.SetValue(network, dazzled);
                 yield return null;
-                Assert.That(hud.BurstAlpha, Is.EqualTo(.12f).Within(.01f), "Only a faint veil stays while dazzled (7 s).");
+                Assert.That(hud.BurstAlpha, Is.EqualTo(.2f).Within(.01f), "Only a mild 20% afterglow remains after the short flash.");
                 Assert.That(hud.HapticCount, Is.EqualTo(1), "The same flash does not buzz again.");
+
+                LabSnapshot repeating = Snapshot(23.42d, warningAt: -1d, flashAt: -1d);
+                repeating.flashCount = 1; repeating.flashLastAt = 21d;
+                latest.SetValue(network, repeating);
+                yield return null;
+                Assert.That(hud.BurstAlpha, Is.EqualTo(.2f).Within(.01f), "Without a new shake, no automatic flash repeats.");
+                Assert.That(hud.HapticCount, Is.EqualTo(1), "Waiting never replays the flash haptic.");
+
+                var flags = BindingFlags.Instance | BindingFlags.NonPublic;
+                typeof(LabYaguangFlashHud).GetField("lastShakeAt", flags).SetValue(hud, Time.unscaledTime);
+                yield return null;
+                Assert.That(hud.BurstAlpha, Is.GreaterThan(.9f), "A recognized K/shake input starts a new pulse.");
+                yield return new WaitForSeconds(.6f);
+                Assert.That(hud.BurstAlpha, Is.EqualTo(.2f).Within(.01f), "The pulse ends and remains off until another input.");
+                var counter = (LabShakeCounter)typeof(LabYaguangFlashHud).GetField("shakeCounter", flags).GetValue(hud);
+                int target = config.YaguangFlashShakeCount;
+                int half = target / 2;
+                for (int i = 0; i < half; i++) counter.AddOne();
+                float progress = half / (float)target;
+                typeof(LabYaguangFlashHud).GetField("shownShake", flags).SetValue(hud, progress);
+                typeof(LabYaguangFlashHud).GetField("lastShakeAt", flags).SetValue(hud, Time.unscaledTime);
+                yield return null;
+                var light = (LabYaguangFlashLight)typeof(LabYaguangFlashHud).GetField("flashLight", flags).GetValue(hud);
+                var material = (Material)typeof(LabYaguangFlashLight).GetField("composite", flags).GetValue(light);
+                Assert.That(material.GetFloat("_Visibility"), Is.EqualTo(1f - progress).Within(.001f),
+                    "Recognized shakes fade the repeated flash itself, not only the residual veil.");
+                for (int i = half; i < target; i++) counter.AddOne();
+                typeof(LabYaguangFlashHud).GetField("shownShake", flags).SetValue(hud, 1f);
+                yield return null;
+                Assert.That(hud.BurstAlpha, Is.Zero, "The completed shake target leaves no repeating flash.");
 
                 foreach (Graphic graphic in canvasRoot.GetComponentsInChildren<Graphic>(true))
                     Assert.That(graphic.raycastTarget, Is.False, "The flash never blocks the board or throws.");

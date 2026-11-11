@@ -585,6 +585,8 @@ namespace C6Lab
         [SerializeField] private bool jigwiATestOnly = false;
         [Tooltip("#595 Inspector 전용(Host): 켜면 지귀 시간표가 연기 10초 / 부적 45초 / 연기 66초 / 부적 83초(공통 기믹은 Jigwi Common Start Seconds부터)다. 연기는 양동이 없이 모두의 화면을 같은 때에 덮어 각자 90% 문질러 걷어 내고, 부적은 모두가 써야 모두 보상(한 명이라도 못 쓰면 모두의 판이 탄다). 켜면 Jigwi Flow Schedule과 Jigwi B Bucket보다 앞선다. B Test Only / A Test Only와 함께 켜면 연기만 / 공용 부적만 시험한다.")]
         [SerializeField] private bool jigwiSmokeFlow = false;
+        [Tooltip("#663 Inspector 전용(Host, 연기 흐름만): 연기가 끝나면(다 걷어 내거나 시간이 다 되면) 이만큼 뒤에 다음 부적이 시작된다(초, 지귀 예고 2초 포함). 원래 시각(45초/83초)보다 늦어지지는 않는다. 그 사이에 올 공통 기믹은 부적이 끝난 뒤로 미룬다. 0이면 예전처럼 정해진 시각.")]
+        [SerializeField, Range(0f, 20f)] private float jigwiSmokeToTalismanSeconds = 4f;
         [Tooltip("#540 Inspector 전용(Host, 새 시간표만): 지귀 공통 기믹이 처음 나오는 때(초).")]
         [SerializeField, Range(0f, 99f)] private float jigwiCommonStartSeconds = 40f;
         [Tooltip("#540 Inspector 전용(Host, 새 시간표만): 지귀 공통 기믹 간격(초). 피버(100초) 전까지 되풀이.")]
@@ -616,6 +618,8 @@ namespace C6Lab
         [SerializeField, Range(0f, 30f)] private float jigwiAFailDrumSlipSeconds = 0f;
         [Tooltip("#540 Inspector 전용(각 기기): 불붙은 북이 얼마나 가벼운지. 옆으로 밀 때 빠르기는 이 배, 미끄러지며 느려지는 정도는 1/이 배 (2면 같은 스와이프로 약 8배 멀리).")]
         [SerializeField, Range(1f, 4f)] private float jigwiAFailDrumSlipBoost = 2f;
+        [Tooltip("#663 Inspector 전용(Host): 부적을 다 못 써 실패한 뒤 판의 구슬에 불이 붙기까지(초, 부적이 끝난 때부터). 불덩이가 판에 닿는 때가 0.45초. 붙은 뒤 1초 동안 재가 된다. 예전에는 지귀 대사 '모두 재가 되어라!'(지금은 파일이 없어 나지 않음)를 기다려 3.7초였다.")]
+        [SerializeField, Range(.45f, 5f)] private float jigwiAFailBurnStartSeconds = (float)LabModel.JigwiTalismanFailFirstBurnSeconds;
         [Tooltip("#479 Inspector 전용(각 기기): 부적 점선 \"물\" 중 이만큼 칠하면 다 쓴 것으로 본다 (0~1).")]
         [SerializeField, Range(.3f, 1f)] private float jigwiTalismanCoverage = .85f;
         [Tooltip("#479 Inspector 전용(각 기기): 손가락이 점선에서 이만큼(글자 칸 크기 대비) 떨어져도 칠한다. 클수록 쉽다.")]
@@ -995,6 +999,18 @@ namespace C6Lab
         [SerializeField, Range(0f, 1f)] private float jigwiBgmVolume = .35f; // #577: 세 라운드 곡을 같은 크기로 맞춰서 야광귀와 같은 값
         [Tooltip("#577 지귀 피버(마지막 20초) 곡 크기 (Resources/Audio/JigwiFever, 모든 기기). 지귀 곡을 높이고 빠르게 한 곡. 파일이 없으면 구미호 피버 곡을 Gumiho Fever Bgm Volume으로 튼다.")]
         [SerializeField, Range(0f, 1f)] private float jigwiFeverBgmVolume = .35f;
+        [Tooltip("#629 야광귀 피버(마지막 20초) 곡 크기 (Resources/Audio/Fever, 모든 기기). LabBattleBgm의 Fever Volume을 한 번 더 곱한다. 야광귀 새 BGM을 끄면 예전처럼 BGM Volume 기준.")]
+        [SerializeField, Range(0f, 1f)] private float yaguangFeverBgmVolume = .35f;
+        [Header("Sound · 라운드별 BGM 빠르기 (#629, Inspector 전용. 1 = 원래, 낮추면 느리고 낮게, 높이면 빠르고 높게)")]
+        [Tooltip("1라운드 구미호 전투 BGM 빠르기")] [SerializeField, Range(.5f, 1.5f)] private float gumihoBgmSpeed = 1f;
+        [Tooltip("1라운드 구미호 피버 곡 빠르기")] [SerializeField, Range(.5f, 1.5f)] private float gumihoFeverBgmSpeed = 1f;
+        [Tooltip("2라운드 야광귀 전투 BGM 빠르기 (콤보 BIG/SMALL 높이 변화는 이 위에 곱해진다)")] [SerializeField, Range(.5f, 1.5f)] private float yaguangBgmSpeed = 1f;
+        [Tooltip("2라운드 야광귀 피버 곡 빠르기")] [SerializeField, Range(.5f, 1.5f)] private float yaguangFeverBgmSpeed = 1f;
+        [Tooltip("3라운드 지귀 전투 BGM 빠르기")] [SerializeField, Range(.5f, 1.5f)] private float jigwiBgmSpeed = 1f;
+        [Tooltip("3라운드 지귀 피버 곡 빠르기")] [SerializeField, Range(.5f, 1.5f)] private float jigwiFeverBgmSpeed = 1f;
+        [Tooltip("#629 튜토리얼(연습판) BGM 크기 (Resources/Audio/TutorialBGM, 이 기기). 파일이 없으면 기본 BGM.")]
+        [SerializeField, Range(0f, 1f)] private float tutorialBgmVolume = .5f;
+        [Tooltip("#629 튜토리얼 BGM 빠르기")] [SerializeField, Range(.5f, 1.5f)] private float tutorialBgmSpeed = 1f;
         [Tooltip("매혹이 걸릴 때 소리 크기 (Resources/Audio/CharmCast, 모든 기기)")]
         [SerializeField, Range(0f, 1f)] private float charmCastSoundVolume = .7f;
         [Tooltip("양옆 사람이 내 몫을 다 눌러 체크가 뜰 때 소리 크기 (Resources/Audio/CharmCheck, 누른 사람 기기만)")]
@@ -1203,6 +1219,15 @@ namespace C6Lab
         public bool JigwiBTestOnly => jigwiBTestOnly;
         public bool JigwiATestOnly => jigwiATestOnly;
         public bool JigwiSmokeFlow => jigwiSmokeFlow;
+        /// <summary>#663: 0 = off; otherwise at least the 2 s warning.</summary>
+        public float JigwiSmokeToTalismanSeconds
+        {
+            get
+            {
+                float seconds = Mathf.Clamp(Finite(jigwiSmokeToTalismanSeconds, 4f), 0f, 20f);
+                return seconds <= 0f ? 0f : Mathf.Max((float)LabJigwiABTimeline.WarningSeconds, seconds);
+            }
+        }
         public float JigwiCommonStartSeconds => Mathf.Clamp(Finite(jigwiCommonStartSeconds, 40f), 0f, 99f);
         public float JigwiCommonIntervalSeconds => Mathf.Clamp(Finite(jigwiCommonIntervalSeconds, 15f), 3f, 60f);
         public float JigwiStageWarningSeconds => Mathf.Clamp(Finite(jigwiStageWarningSeconds, 1f), 0f, 3f);
@@ -1221,6 +1246,8 @@ namespace C6Lab
         public float JigwiTalismanWaterPaintScale => Mathf.Clamp(Finite(jigwiTalismanWaterPaintScale, 1.5f), 1f, 3f);
         public float JigwiTalismanRewardDelaySeconds => Mathf.Clamp(Finite(jigwiTalismanRewardDelaySeconds, 0f), 0f, 8f);
         public float JigwiAFailDrumSlipSeconds => Mathf.Clamp(Finite(jigwiAFailDrumSlipSeconds, 0f), 0f, 30f);
+        public float JigwiAFailBurnStartSeconds =>
+            Mathf.Clamp(Finite(jigwiAFailBurnStartSeconds, (float)LabModel.JigwiTalismanFailFirstBurnSeconds), .45f, 5f);
         public float JigwiAFailDrumSlipBoost => Mathf.Clamp(Finite(jigwiAFailDrumSlipBoost, 2f), 1f, 4f);
         public float JigwiTalismanCoverage => Mathf.Clamp(Finite(jigwiTalismanCoverage, .85f), .3f, 1f);
         public float JigwiTalismanTolerance => Mathf.Clamp(Finite(jigwiTalismanTolerance, .07f), .02f, .2f);
@@ -1534,6 +1561,17 @@ namespace C6Lab
         public float JigwiBgmVolume => Mathf.Clamp01(Finite(jigwiBgmVolume, .35f));
         public float JigwiFeverBgmVolume => Mathf.Clamp01(Finite(jigwiFeverBgmVolume, .35f));
         public float GumihoFeverBgmVolume => Mathf.Clamp01(Finite(gumihoFeverBgmVolume, .3f));
+        public float YaguangFeverBgmVolume => Mathf.Clamp01(Finite(yaguangFeverBgmVolume, .35f));
+        // #629 라운드별 BGM 빠르기 (Inspector 값 그대로)
+        public float GumihoBgmSpeed => BgmSpeed(gumihoBgmSpeed);
+        public float GumihoFeverBgmSpeed => BgmSpeed(gumihoFeverBgmSpeed);
+        public float YaguangBgmSpeed => BgmSpeed(yaguangBgmSpeed);
+        public float YaguangFeverBgmSpeed => BgmSpeed(yaguangFeverBgmSpeed);
+        public float JigwiBgmSpeed => BgmSpeed(jigwiBgmSpeed);
+        public float JigwiFeverBgmSpeed => BgmSpeed(jigwiFeverBgmSpeed);
+        public float TutorialBgmVolume => Mathf.Clamp01(Finite(tutorialBgmVolume, .5f));
+        public float TutorialBgmSpeed => BgmSpeed(tutorialBgmSpeed);
+        private static float BgmSpeed(float speed) => speed <= 0f ? 1f : Mathf.Clamp(Finite(speed, 1f), .5f, 1.5f);
         public float CharmCastSoundVolume => Mathf.Clamp01(Finite(charmCastSoundVolume, .7f));
         public float CharmCheckSoundVolume => Mathf.Clamp01(Finite(charmCheckSoundVolume, .8f));
         public float CharmReleaseSoundVolume => Mathf.Clamp01(Finite(charmReleaseSoundVolume, .8f));

@@ -45,6 +45,7 @@ MonoBehaviour:
   jigwiBTestOnly: 0
   jigwiATestOnly: 0
   jigwiSmokeFlow: 1
+  jigwiSmokeToTalismanSeconds: 4
   jigwiCommonStartSeconds: 25
   jigwiCommonIntervalSeconds: 15
   jigwiStageWarningSeconds: 1
@@ -66,6 +67,7 @@ MonoBehaviour:
   jigwiTalismanRewardDelaySeconds: 2.9
   jigwiAFailDrumSlipSeconds: 20
   jigwiAFailDrumSlipBoost: 2
+  jigwiAFailBurnStartSeconds: 0.6
   jigwiTalismanCoverage: 0.85
   jigwiTalismanTolerance: 0.07
   jigwiBSplashPaintShare: 3
@@ -261,12 +263,21 @@ MonoBehaviour:
   chuimsaeChancePercent: 15
   chuimsaeMinGap: 5
   staminaShortSoundVolume: 1
-  gumihoBgmVolume: 0.4
+  gumihoBgmVolume: 0.55
   yaguangUseNewBgm: 1
-  yaguangBgmVolume: 0.35
-  gumihoFeverBgmVolume: 0.4
-  jigwiBgmVolume: 0.35
-  jigwiFeverBgmVolume: 0.35
+  yaguangBgmVolume: 0.5
+  gumihoFeverBgmVolume: 0.55
+  jigwiBgmVolume: 0.5
+  jigwiFeverBgmVolume: 0.5
+  yaguangFeverBgmVolume: 0.5
+  gumihoBgmSpeed: 1
+  gumihoFeverBgmSpeed: 1
+  yaguangBgmSpeed: 1
+  yaguangFeverBgmSpeed: 1
+  jigwiBgmSpeed: 1
+  jigwiFeverBgmSpeed: 1
+  tutorialBgmVolume: 0.5
+  tutorialBgmSpeed: 1
   charmCastSoundVolume: 0.4
   charmCheckSoundVolume: 0.8
   charmReleaseSoundVolume: 0.4

@@ -35,6 +35,12 @@ namespace Hapio
         public UnityEvent onSkipped = new UnityEvent();
         public event Action<StoryExitReason> Finished;
         public event Action<StoryCutView> ViewChanged;
+        /// <summary>
+        /// #629: optional (volume multiplier, playback speed) for the sound of a cut, by its cutId. The game sets it from
+        /// StoryMusicArt's Cut Sounds table; previews leave it null and play every sound as authored.
+        /// </summary>
+        public static Func<string, Vector2> VoiceTuning;
+        private float voiceBaseVolume = -1f;
         public bool UserInputBlocked { get; private set; }
         public void SetInputBlocked(bool value) => UserInputBlocked = value;
 
@@ -367,6 +373,12 @@ namespace Hapio
                 !string.IsNullOrWhiteSpace(currentPage.dialogue) || !string.IsNullOrWhiteSpace(currentPage.speaker));
             if (voiceSource != null && currentPage.voice != null)
             {
+                if (voiceBaseVolume < 0f) voiceBaseVolume = voiceSource.volume;
+                StoryCutDefinition cut = sequence != null && CurrentCutIndex >= 0 && CurrentCutIndex < sequence.cuts.Count
+                    ? sequence.cuts[CurrentCutIndex] : null;
+                Vector2 tuning = VoiceTuning != null && cut != null ? VoiceTuning(cut.cutId) : Vector2.one;
+                voiceSource.volume = voiceBaseVolume * Mathf.Clamp01(tuning.x);
+                voiceSource.pitch = tuning.y > 0f ? tuning.y : 1f;
                 voiceSource.clip = currentPage.voice;
                 voiceSource.Play();
             }
