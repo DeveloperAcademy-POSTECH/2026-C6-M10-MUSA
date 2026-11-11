@@ -66,6 +66,7 @@ namespace Hapio
             broken = NewSource("Broken");
             sfx = NewSource("Break Sounds");
             sfx.loop = false;
+            sfx.volume = 1f; // PlayOneShot scales by the source volume: the music sources start at 0, this one must not.
         }
 
         private AudioSource NewSource(string name)
@@ -160,6 +161,7 @@ namespace Hapio
             float brokenSeconds = brokenWanted ? art.brokenFadeInSeconds : art.fadeOutSeconds;
             brokenFade = Mathf.MoveTowards(brokenFade, brokenWanted ? 1f : 0f, brokenSeconds <= 0f ? 1f : seconds / brokenSeconds);
             broken.volume = brokenFade * art.brokenVolume * bgm;
+            broken.pitch = art.brokenPitch;
             SetPlaying(broken, art.brokenMusic, brokenFade > 0f);
 
             // The opening is over (or the screen went silent): the next calm music starts again from the top.

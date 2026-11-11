@@ -3,12 +3,6 @@ using UnityEngine;
 
 namespace Hapio
 {
-    /// <summary>
-    /// #629 타이틀·오프닝 음악 곡과 값. Resources/Hapio/Story/StoryMusicArt 하나를 읽는다. Play 중에 바꿔도 바로 들린다.
-    /// - 평화 곡: 타이틀 화면부터 오프닝 앞부분까지 끊기지 않고 이어지고, 방 목록에서도 나온다.
-    /// - 박이 떨어지는 컷(Break Cut Id)이 시작되면 평화 곡이 테이프가 멈추듯 느려지며 메아리만 남고,
-    ///   조금 뒤 깨진 이후 곡이 들어온다.
-    /// </summary>
     /// <summary>#629 박 사고 컷(14~16)에서 정해진 순간에 나는 효과음 하나.</summary>
     [Serializable]
     public struct GameStoryTimedSound
@@ -18,6 +12,12 @@ namespace Hapio
         [Tooltip("크기 (게임 설정의 효과음 볼륨에 곱한다)")] [Range(0f, 1f)] public float volume;
     }
 
+    /// <summary>
+    /// #629 타이틀·오프닝 음악 곡과 값. Resources/Hapio/Story/StoryMusicArt 하나를 읽는다. Play 중에 바꿔도 바로 들린다.
+    /// - 평화 곡: 타이틀 화면부터 오프닝 앞부분까지 끊기지 않고 이어지고, 방 목록에서도 나온다.
+    /// - 박이 떨어지는 컷(Break Cut Id)이 시작되면 평화 곡이 테이프가 멈추듯 느려지며 메아리만 남고,
+    ///   조금 뒤 깨진 이후 곡이 들어온다.
+    /// </summary>
     [CreateAssetMenu(fileName = "StoryMusicArt", menuName = "Hapio/Story Music Art")]
     public sealed class GameStoryMusicArt : ScriptableObject
     {
@@ -27,7 +27,9 @@ namespace Hapio
         [Tooltip("타이틀 ~ 박이 떨어지기 전, 그리고 방 목록 곡 (반복)")] public AudioClip calmMusic;
         [Tooltip("평화 곡 크기 (게임 설정의 BGM 볼륨에 곱한다)")] [Range(0f, 1f)] public float calmVolume = 1f;
         [Tooltip("박이 깨진 뒤 오프닝 끝까지 나오는 곡 (반복)")] public AudioClip brokenMusic;
-        [Tooltip("깨진 이후 곡 크기 (게임 설정의 BGM 볼륨에 곱한다)")] [Range(0f, 1f)] public float brokenVolume = 1f;
+        [Tooltip("깨진 이후 곡 크기 (게임 설정의 BGM 볼륨에 곱한다)")] [Range(0f, 1f)] public float brokenVolume = .6f;
+        [Tooltip("깨진 이후 곡 재생 속도. 1보다 작으면 테이프를 늦추듯 더 느리고 더 낮아진다 (0.85 ≈ 15% 느리고 반음 약 3개 낮게)")]
+        [Range(.3f, 1.5f)] public float brokenPitch = .85f;
         [Tooltip("대기실(자리 고르기)에서도 평화 곡을 계속 틀지")] public bool playInLobby = true;
 
         [Header("전환")]
