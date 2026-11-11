@@ -350,8 +350,11 @@ namespace Hapio.Tests
             RectTransform viewport = rectangle.parent as RectTransform;
             Assert.That(viewport, Is.Not.Null);
             Assert.That(viewport.name, Is.EqualTo("Gourd preview aspect viewport"));
+            // The texture shows a larger frame around the authored square (ExtendFrame); the gesture square keeps that
+            // centre part's aspect, and the frame image around it shows the rest at the same scale.
+            Vector2 frame = session.PreviewFrameScale;
             Assert.That(rectangle.rect.width / rectangle.rect.height,
-                Is.EqualTo(screen.viewerImage.texture.width / (float)screen.viewerImage.texture.height).Within(.001f),
+                Is.EqualTo(screen.viewerImage.texture.width / frame.x / (screen.viewerImage.texture.height / frame.y)).Within(.001f),
                 "The real captured gourd must keep its aspect on the actual portrait result Scene.");
             var imageCorners = new Vector3[4];
             rectangle.GetWorldCorners(imageCorners);
@@ -1170,7 +1173,7 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
-        public IEnumerator SavedStorySkipAndEndingButtonsReceiveRealMouseClicksAtTheirVisibleScreenPositions()
+        public IEnumerator SavedStoryViewerSkipAndEndingButtonsReceiveRealMouseClicks()
         {
             InputSettings original = InputSystem.settings;
             HideFlags originalFlags = original.hideFlags;
@@ -1188,20 +1191,83 @@ namespace Hapio.Tests
             try
             {
                 session.StartSolo();
-                // The existing DEV transition prepares the real third Battle without manufacturing result state.
-                for (int stage = 1; stage < 3; stage++)
+                GameStageStoryPresentation story = null;
+                for (int stage = 1; stage <= 3; stage++)
                 {
                     yield return WaitPlaying(stage);
-                    session.Pause();
-                    Assert.That(session.DeveloperNextStage(), Is.True);
+                    CompleteMapInFixture(Model());
+                    yield return WaitResultStory();
+                    story = ResultStory();
+                    yield return Until(() => !story.player.UserInputBlocked && story.player.IsReading
+                        && !session.LoadingView.Visible && !session.SceneFade.BlocksInput,
+                        "The saved result must finish its entry shield before genuine UI input.");
+                    StoryCutView sealCard = story.player.CurrentView;
+                    var flip = sealCard.GetComponentInChildren<StoryCardFlip>(true);
+                    flip.Flip();
+                    var inspect = sealCard.GetComponentsInChildren<UnityEngine.UI.Button>(true)
+                        .Single(button => button.name == "Inspect Gourd Action");
+                    yield return Until(() => flip.IsBack && !flip.IsFlipping && inspect.IsInteractable(),
+                        "The back of the seal card exposes its inspect button.");
+                    Assert.That(session.IsViewerOpen, Is.False, "Inspection starts from the result card.");
+                    Assert.That(story.screen.viewerPanel.activeInHierarchy, Is.False);
+                    yield return ClickVisibleButtonWithMouse(mouse, inspect);
+                    GameScreen screen = story.screen;
+                    Assert.That(session.IsViewerOpen && screen.viewerPanel.activeInHierarchy, Is.True, "Stage " + stage);
+                    Assert.That(session.State.stageIndex, Is.EqualTo(stage));
+                    Assert.That(screen.viewerImage.isActiveAndEnabled, Is.True);
+                    Assert.That(screen.viewerImage.texture, Is.SameAs(session.PreviewTexture).And.Not.Null);
+                    var viewer = screen.viewerPanel.GetComponent<GameSealedGourdView>();
+                    var art = Resources.Load<GameSealedGourdArt>("Hapio/UI/SealedGourdArt");
+                    Assert.That(viewer.background.isActiveAndEnabled, Is.True);
+                    Assert.That(viewer.background.texture, Is.SameAs(art.stageBackgrounds[stage - 1]),
+                        "The card must open its own stage's viewer background.");
+                    Assert.That(screen.resetViewerButton.gameObject.activeInHierarchy, Is.True);
+                    Assert.That(screen.closeViewerButton.gameObject.activeInHierarchy, Is.True);
+                    var close = screen.closeViewerButton;
+                    var surface = close.GetComponentInChildren<GameFigmaSurface>();
+                    Assert.That(surface, Is.Not.Null, "The return button shows the Figma brush surface.");
+                    Assert.That(surface.SurfaceName, Is.EqualTo("ResultAction"));
+                    Assert.That(surface.raycastTarget, Is.False);
+                    Assert.That(close.targetGraphic.isActiveAndEnabled && close.targetGraphic.raycastTarget, Is.True);
+                    var caption = close.GetComponentInChildren<UnityEngine.UI.Text>();
+                    Assert.That(caption.text, Is.EqualTo("결과로 돌아가기"));
+                    Assert.That((Color32)caption.color, Is.EqualTo(new Color32(245, 238, 225, 255)));
+                    var hint = screen.viewerPanel.GetComponentsInChildren<UnityEngine.UI.Text>()
+                        .Single(text => text.name == "Rotate Hint");
+                    Assert.That(hint.color, Is.EqualTo(GameBattleUiColors.SecondaryLightIvory800));
+                    var preview = (LabGourdResultPreview)typeof(GameSession).GetField("preview",
+                        BindingFlags.Instance | BindingFlags.NonPublic).GetValue(session);
+                    Quaternion initialRotation = preview.ModelRotation;
+                    float initialZoom = preview.ZoomNormalized;
+                    string initialPaint = preview.PaintPixelHash;
+                    string initialResult = JsonUtility.ToJson(session.ResultSnapshot);
+                    session.RotatePreview(new Vector2(.2f, .15f));
+                    session.ZoomPreview(.3f);
+                    yield return null;
+                    Assert.That(Quaternion.Angle(initialRotation, preview.ModelRotation), Is.GreaterThan(1f));
+                    Assert.That(preview.ZoomNormalized, Is.GreaterThan(initialZoom));
+                    yield return ClickVisibleButtonWithMouse(mouse, screen.resetViewerButton);
+                    Assert.That(session.IsViewerOpen && screen.viewerPanel.activeInHierarchy, Is.True,
+                        "Reset keeps the current stage's gourd viewer open.");
+                    Assert.That(Quaternion.Angle(initialRotation, preview.ModelRotation), Is.LessThan(.001f));
+                    Assert.That(preview.ZoomNormalized, Is.EqualTo(initialZoom).Within(.001f));
+                    Assert.That(preview.PaintPixelHash, Is.EqualTo(initialPaint));
+                    Assert.That(JsonUtility.ToJson(session.ResultSnapshot), Is.EqualTo(initialResult));
+                    yield return ClickVisibleButtonWithMouse(mouse, close);
+                    Assert.That(session.IsViewerOpen || screen.viewerPanel.activeInHierarchy, Is.False, "Stage " + stage);
+                    Assert.That(story.presentationGroup.alpha, Is.EqualTo(1f));
+                    Assert.That(story.player.CurrentView, Is.SameAs(sealCard));
+                    Assert.That(flip.IsBack, Is.True, "Returning retains the seal card's record face.");
+                    Assert.That(story.BoundResult, Is.SameAs(session.ResultSnapshot));
+                    if (stage < 3)
+                    {
+                        yield return FinishResultStory();
+                        var next = story.player.CurrentView.GetComponent<StoryStageClearControls>().nextSeal;
+                        yield return Until(() => next.gameObject.activeInHierarchy && next.IsInteractable(),
+                            "Closing inspection allows the Host to start the next stage.");
+                        yield return ClickVisibleButtonWithMouse(mouse, next);
+                    }
                 }
-                yield return WaitPlaying(3);
-                CompleteMapInFixture(Model());
-                yield return WaitResultStory();
-                GameStageStoryPresentation story = ResultStory();
-                yield return Until(() => !story.player.UserInputBlocked
-                    && !session.LoadingView.Visible && !session.SceneFade.BlocksInput,
-                    "The saved final result must finish its entry shield before genuine UI input.");
                 Assert.That(EventSystem.current.currentInputModule,
                     Is.InstanceOf<UnityEngine.InputSystem.UI.InputSystemUIInputModule>(),
                     "Exercise the saved Input System UI module, not direct UnityEvent callbacks.");
@@ -1229,11 +1295,8 @@ namespace Hapio.Tests
                 yield return Until(() => story.player.sequence == story.ending && story.player.IsPlaying,
                     "A real click on 다음 봉인 must begin the summary and ending.");
                 Assert.That(story.ending.cuts, Has.Count.EqualTo(7));
-                Assert.That(session.StageResults, Has.Count.EqualTo(1), "DEV skips are not successful-stage records.");
-                Assert.That(session.SealStageResults[0], Is.Null, "Skipping Gumiho leaves its own row empty.");
-                Assert.That(session.SealStageResults[1], Is.Null, "Skipping Yaguang leaves its own row empty.");
-                Assert.That(session.SealStageResults[2], Is.Not.Null, "The real Jigwi result stays in the Jigwi row.");
-                AssertSealSummaryFromActualStageRecords(story, false);
+                Assert.That(session.StageResults, Has.Count.EqualTo(3));
+                AssertSealSummaryFromActualStageRecords(story, true);
                 Assert.That(story.skipButton.gameObject.activeSelf, Is.False, "A summary is not skipped as if it were Ending_01.");
                 yield return Until(() => story.player.CurrentView.continueButton != null
                     && story.player.CurrentView.continueButton.gameObject.activeInHierarchy

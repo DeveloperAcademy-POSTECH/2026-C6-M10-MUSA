@@ -1,0 +1,32 @@
+{
+  "fileKey": "wW7ny7lNQ4DXNJ4kD46AuR",
+  "panel": "4841:11338",
+  "orbNodes": {
+    "Earth": "4607:3482",
+    "Wood": "4607:3491",
+    "Fire": "4607:3500",
+    "Water": "4607:3509",
+    "Metal": "4607:3518"
+  },
+  "check": "4607:3540",
+  "bar": "4607:3528",
+  "reference": [
+    349,
+    765
+  ],
+  "panelRect": [
+    71,
+    107,
+    207,
+    51
+  ],
+  "providedCounts": {
+    "CountThree": "Group 675.png",
+    "CountTwo": "Group 676.png",
+    "CountOne": "Group 677.png",
+    "CountFour": "Group 678.png"
+  },
+  "exportScale": 2,
+  "note": "Panel exports the original frame fill/stroke without its children; temporary clone removed.",
+  "runtimePlacement": "Centered over the actual Paint Progress/Frame; width=98% of gauge frame; gauge/percentage hidden while combo is visible."
+}

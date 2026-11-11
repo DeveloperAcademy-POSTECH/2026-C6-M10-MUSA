@@ -59,6 +59,59 @@ namespace Hapio.Tests
             finally { Object.DestroyImmediate(view); }
         }
 
+        /// <summary>The drawn text's horizontal centre in world space, laid out by the text generator itself.</summary>
+        private static float GlyphCenterX(Text text)
+        {
+            var generator = new TextGenerator();
+            generator.Populate(text.text, text.GetGenerationSettings(text.rectTransform.rect.size));
+            float min = float.MaxValue, max = float.MinValue;
+            foreach (UIVertex vertex in generator.verts)
+            {
+                float x = text.transform.TransformPoint(vertex.position / text.pixelsPerUnit).x;
+                min = Mathf.Min(min, x); max = Mathf.Max(max, x);
+            }
+            Assert.That(max, Is.GreaterThan(min), text.text + " draws");
+            return (min + max) * .5f;
+        }
+
+        [TestCase("Gumiho_SealCard"), TestCase("Yagwanggui_SealCard"), TestCase("Jigwi_SealCard"), TestCase("Failure_Dashboard")]
+        public void PlayerAndRecordValuesAreCentredUnderTheirHeadersWhateverTheirLength(string prefab)
+        {
+            GameObject view = Object.Instantiate(AssetDatabase.LoadAssetAtPath<GameObject>(Views + prefab + ".prefab"));
+            try
+            {
+                var rows = new[]
+                {
+                    new StoryCardRecords.Record { player = "P1", value = "420 (21회 타격)" },
+                    new StoryCardRecords.Record { player = "P3", value = "100%" },
+                    new StoryCardRecords.Record { player = "P2(나)", value = "32회", mine = true },
+                    new StoryCardRecords.Record { player = "P1, P5", value = "8회" },
+                    new StoryCardRecords.Record { player = "P2(나)", value = "93초 · 86%", mine = true },
+                };
+                foreach (StoryCardRecords records in view.GetComponentsInChildren<StoryCardRecords>(true)) records.Bind(1f, 12f, rows);
+                bool dashboard = view.GetComponentsInChildren<StoryCardRecords>(true).Length == 0;
+                // Applying twice keeps the same place (the presentation binds again on every view change).
+                StoryRecordHighlight.Apply(view.transform, rows, dashboard);
+                StoryRecordHighlight.Apply(view.transform, rows, dashboard);
+                Text[] texts = view.GetComponentsInChildren<Text>(true);
+                Text playerHeader = texts.First(text => text.text == StoryRecordHighlight.PlayerHeader);
+                Text recordHeader = texts.First(text => text.text == StoryRecordHighlight.RecordHeader);
+                float players = GlyphCenterX(playerHeader), records0 = GlyphCenterX(recordHeader);
+                // Centring follows the font's advance width; glyph outlines differ by their side bearings (well under a
+                // pixel). Before centring the cells were up to 14.5 units off.
+                float tolerance = playerHeader.rectTransform.lossyScale.x * 1.5f;
+                for (int row = 0; row < rows.Length; row++)
+                {
+                    Text player = texts.First(text => text.text == rows[row].player
+                        && Mathf.Abs(CenterY(text.rectTransform) - CenterY(Title(view, row).rectTransform)) < .5f * Mathf.Abs(CenterY(Title(view, 1).rectTransform) - CenterY(Title(view, 0).rectTransform)));
+                    Text value = texts.First(text => text.text == rows[row].value);
+                    Assert.That(GlyphCenterX(player), Is.EqualTo(players).Within(tolerance), prefab + " row " + row + " " + rows[row].player);
+                    Assert.That(GlyphCenterX(value), Is.EqualTo(records0).Within(tolerance), prefab + " row " + row + " " + rows[row].value);
+                }
+            }
+            finally { Object.DestroyImmediate(view); }
+        }
+
         [Test]
         public void TheCardFrontIsNotTreatedAsPartOfTheTable()
         {

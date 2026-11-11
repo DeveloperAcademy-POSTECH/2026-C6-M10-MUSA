@@ -1,12 +1,18 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements">
   <ui:VisualElement name="shell" class="app" picking-mode="Ignore">
     <ui:VisualElement class="header" picking-mode="Ignore">
-      <ui:Label text="오색흙  /  오행 비교" class="title" />
+      <ui:Label name="comparisonTitle" text="오색흙  /  일반 오행 비교" class="title" />
       <ui:Label name="phase" class="phase" />
     </ui:VisualElement>
     <ui:VisualElement name="lanes" class="lanes" />
     <ui:VisualElement name="view" class="view" picking-mode="Ignore"/>
     <ui:VisualElement class="transport">
+      <ui:VisualElement class="row">
+        <ui:Button name="ordinaryElements" text="일반 오행" />
+        <ui:Button name="currentFiveColor" text="현재 오색" />
+        <ui:Button name="enhancedFiveColor" text="강화 오색" />
+        <ui:Label text="같은 경로 · 같은 시점" class="comparison-note" />
+      </ui:VisualElement>
       <ui:VisualElement class="row">
         <ui:Button name="play" class="primary" />
         <ui:Button name="restart" text="다시 재생" />

@@ -178,6 +178,19 @@ namespace C6Lab
         public void ShowWord(LabTarget gourd, string word, float seconds)
         {
             if (gourd == null || string.IsNullOrEmpty(word) || !EnsureBubble()) return;
+            string countPath = LabYaguangComboArt.CountPath(word);
+            if (countPath != null && Resources.Load<Sprite>(countPath) != null)
+            {
+                if (ShowArtwork(gourd, countPath, seconds))
+                {
+                    showingWord = true;
+                    wordPopElapsed = 0f;
+                    mark.text = word; // Logical label; the PNG supplies the visible lettering.
+                    markOutline.enabled = false;
+                    bubble.pivot = new Vector2(30f / 114f, 7f / 114f);
+                }
+                return;
+            }
             bool continuing = Active && showingWord && target == gourd;
             showingBlock = showingHeart = false;
             ShowOnly(mark.gameObject);
