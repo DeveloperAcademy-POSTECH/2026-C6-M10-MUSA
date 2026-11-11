@@ -1297,7 +1297,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5e2a939a1bd3446c8e53470343e91509, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.TitleRevealSound
-  clip: {fileID: 8300000, guid: 9f6ba6ba6617494893fc2a4e0f7d3ad8, type: 3}
+  clip: {fileID: 0}
   volume: 1
   delaySeconds: 0.1
   onlyFirstTime: 1

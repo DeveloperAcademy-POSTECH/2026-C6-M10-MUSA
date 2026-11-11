@@ -18,7 +18,7 @@ MonoBehaviour:
   - speaker: "\uBD88\uC774"
     dialogue: "\uC5C7... \uC5B4\uB77C..? \uBA48.. \uBA48\uCDB0\uB77C..! \uBA48\uCDB0!!!"
     autoReadSeconds: 4
-    voice: {fileID: 0}
+    voice: {fileID: 8300000, guid: 76f31b0c3b4e4420bb65c080c21f031c, type: 3}
   direction: Approved Figma frame 13 (4553:2456); native text and independent artwork motion.
   speaker: 
   dialogue: 

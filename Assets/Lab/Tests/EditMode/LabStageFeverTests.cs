@@ -68,6 +68,30 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void TheJigwiFeverMusicStartsWithTheJigwiFever()
+        {
+            // #629: the jigwi has no feverTimeAt, so its fever song (JigwiFever) never played before.
+            LabModel room = Room(LabStageYokai.Jigwi);
+            room.Tick(99.9d);
+            Assert.That(LabBattleBgm.FeverElapsedFor(room.Snapshot(99.9d), LabStageYokai.Jigwi, -1d, 99.9d, out bool early),
+                Is.EqualTo(-1d));
+            Assert.That(early, Is.False);
+            room.Tick(103d);
+            Assert.That(LabBattleBgm.FeverElapsedFor(room.Snapshot(103d), LabStageYokai.Jigwi, -1d, 103d, out bool fever),
+                Is.EqualTo(3d).Within(1e-6), "Three seconds into the jigwi fever, its song is three seconds in.");
+            Assert.That(fever, Is.True, "Not the yaguang's fever: the stage's own song (JigwiFever) is chosen.");
+
+            LabModel fox = Room(LabStageYokai.Gumiho);
+            fox.Tick(103d);
+            Assert.That(LabBattleBgm.FeverElapsedFor(fox.Snapshot(103d), LabStageYokai.Gumiho, -1d, 103d, out bool foxFever),
+                Is.EqualTo(3d).Within(1e-6), "The fox's fever is unchanged.");
+            Assert.That(foxFever, Is.True);
+            Assert.That(LabBattleBgm.FeverElapsedFor(new LabSnapshot { phase = LabPhase.Playing, serverTime = 50d },
+                LabStageYokai.Yaguang, 4d, 50d, out bool yaguangStage), Is.EqualTo(4d), "The yaguang keeps its own count.");
+            Assert.That(yaguangStage, Is.False);
+        }
+
+        [Test]
         public void EveryScreenReadsTheSameStartFromTheSnapshot()
         {
             foreach (LabStageYokai stage in new[] { LabStageYokai.Gumiho, LabStageYokai.Jigwi })

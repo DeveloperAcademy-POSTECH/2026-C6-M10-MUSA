@@ -40,5 +40,11 @@ MonoBehaviour:
   dropletDistanceMin: 32
   dropletDistanceMax: 50
   tapSound: {fileID: 0}
-  soundVolume: 0.8
+  tapSounds:
+  - {fileID: 8300000, guid: 38c43784ad0d479c95d1086629addc2a, type: 3}
+  - {fileID: 8300000, guid: 620fada890f246828577553d5dbd7ed7, type: 3}
+  - {fileID: 8300000, guid: 5fe6ded8170444b9bca67f82067e35ac, type: 3}
+  tapLoudness: 1
+  tapSpeed: 1
+  soundVolume: 1
   maxMarks: 10
