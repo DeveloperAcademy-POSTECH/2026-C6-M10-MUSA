@@ -251,7 +251,7 @@
 ## #506 현재 기본 표현 — 곡면 클레이 스티커
 
 - 사용자 원형 부착 승인과 #506에 따라 저장 프로필은 `ClaySticker`·`clay-stickers-v1`이다. 이전 Paper/Watercolor와 Editor 비교 자료를 보존하며 현재 연결·범위는 `docs/CLAY_STICKER_PAINT.md`가 우선한다. 원본 박 재질은 색 지도 Ready0, 별도 `Clay Sticker Overlay`가 원본 메시를 공유해 누적 색/높이를 표시한다. 도장마다 메시·GameObject를 생성하지 않는다. 한지 내부결 대신 둥근 클레이 표면/겹침 음영을 쓴다.
-- 실제 Host 접촉 법선/속도의 정면 속도를 초기0~20m/s 기준으로 정규화해 `LabPaintVisualStamp.impact01` 예약 바이트에 보존한다. 0은legacy0.5, 44바이트 크기는 유지한다. 농도는흰클레이→같은오행색 .65~1, Alpha/면적/성장/물리/스태미나/P판정을바꾸지않는다.
+- 실제 Host 접촉 법선/속도의 정면 속도를 초기0~20m/s 기준으로 정규화해 `LabPaintVisualStamp.impact01` 예약 바이트에 보존한다. 0은legacy0.5, 44바이트 크기는 유지한다. 농도 기본값은 min=max=1(칠 팔레트 그대로, 2026-11-11 변경, 이전 .65~1은 흰클레이와 섞여 흐렸다)이며 Alpha/면적/성장/물리/스태미나/P판정을바꾸지않는다. 농도 범위는 표현 버전 fingerprint에 포함된다.
 - 원형 표현은 고정2셀 시각여유를 허용하며 면적에는포함하지않는다. 100%는 실제셀판정이고마지막표시빈틈은별도클레이바탕으로채운다. 건조는모든누적색/높이를제거하며0셀에서시각여유까지비운다. 저널/페이지/캐시/과거자국보존정책은유지한다.
 - DEV257(두께0~.02, 기본.006)·258(광택0~1, 기본.25)을뒤에붙여259개다. Host Pause중즉시미리보기는 `clay_appearance`의session/round/config/sequence를검사한다. 실제렌더는 `network.ClayThickness/ClayGloss`, sourceConfig를재저장하지않는다. HapioCommon프로필은두값을다음stage에도기억한다. 새접속묶음5686/Lab47/Game31, 원격main5683과혼용금지.
 - 최초준비는라운드생성성공→Synchronizing→기존ready/Countdown gate순서다. 첫프레임표시미준비를라운드생성실패로간주해Loading에갇히게하지않는다. 기존입력차단/전원시작확인은우회하지않는다.

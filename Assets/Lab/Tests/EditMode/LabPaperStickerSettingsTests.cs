@@ -55,5 +55,24 @@ namespace C6Lab.Tests
             }
             Assert.That(captured.Fingerprint, Is.EqualTo(fingerprint));
         }
+
+        [Test]
+        public void SavedClayPigmentKeepsTheFullPaletteColorAtEveryImpact()
+        {
+            // The painted clay shows the element palette at full strength, like the orb art it was taken
+            // from; impact no longer mixes it toward white clay. Relief and gloss are unaffected.
+            LabWatercolorStampSettings current = LabWatercolorStampSettings.CaptureDefault();
+            foreach (float impact in new[] { 0f, .25f, .5f, .62f, 1f, float.NaN })
+                Assert.That(current.claySticker.Density(impact), Is.EqualTo(1f), "impact " + impact);
+            Assert.That(new LabClayStickerSettings().Density(0f), Is.EqualTo(1f), "Code default matches the saved profile.");
+            Assert.That(new LabClayStickerSettings { minimumDensity = float.NaN }.SanitizedCopy().minimumDensity, Is.EqualTo(1f));
+
+            // The Host compares the full presentation version, which carries the pigment fingerprint, so a
+            // build with the previous .65 white-clay mix cannot join a round and draw different colors.
+            LabWatercolorStampSettings previous = current.SanitizedCopy();
+            previous.claySticker.minimumDensity = .65f;
+            Assert.That(current.Version, Does.StartWith(LabClayStickerSettings.StyleVersion + "/"));
+            Assert.That(previous.Version, Is.Not.EqualTo(current.Version));
+        }
     }
 }

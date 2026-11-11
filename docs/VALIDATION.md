@@ -1,5 +1,21 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-11 — 박 칠 색을 오행 팔레트 그대로 (클레이 농도 1)
+
+- **기준:** `feat/clay-full-palette-color` (main `51a24721`). Unity 6000.6.5f1 batch(macOS, Metal). 박 칠 색은 표현만 바꿨고, 판정·P 지도·도색 해시·접속 규약·공유 설정은 그대로다.
+- **원인:** `LabClayStickerRuntime.Pigment`는 오행색을 선형 공간에서 흰 클레이(0.82)와 섞는다. 섞는 비율(농도)은 `Lerp(0.65, 1, 충돌 강도)`이고, 충돌 강도는 정면 속도를 20 m/s로 나눈 값이다. 실제 투척은 최대 12.5 m/s라 강도가 약 0.62를 넘지 않으므로, 실제 농도는 0.65~0.87이었다. 톤매핑은 None이었고, 클레이 조명은 색을 0.78~1.04배로만 바꿨다.
+- **고친 것:** `LabClayStickerSettings.minimumDensity` 기본값과 `WatercolorStampProfile`의 저장값을 0.65에서 1로 바꿨다. 이제 모든 명중이 `LabPaintPalette` 색 그대로 칠해진다. 표현 버전 이름은 `clay-stickers-v2` 그대로다. 버전 문자열의 fingerprint가 바뀌므로 이전 빌드와는 도색 기록 버전이 맞지 않는다(`paintArtVersionMismatch`).
+
+| 확인 | 결과 |
+| --- | --- |
+| 화면 측정: DEV 솔로 1스테이지 박, 같은 칠, BattleCamera 복사 카메라로 1080×1424 렌더, 원소별 중앙값(임시 PlayMode 하네스, 커밋 안 함) | 변경 전(main `cfbf65b2` 작업 트리), 강도 0.4: 화 #D4857A · 수 #6D8CAC · 목 #74937F · 금 #DFB16E · 토 #715E4D |
+| 같은 측정, 변경 후 기본값, 가장 약한 명중(강도 0.1) | 화 #CF5537 · 수 #14699C · 목 #387851 · 금 #E1A626 · 토 #62402B (팔레트 #D85736 · #1471A7 · #3D8258 · #F8B72A · #6F4A32) |
+| 새 EditMode `SavedClayPigmentKeepsTheFullPaletteColorAtEveryImpact`(저장 기본값의 농도는 모든 강도에서 1, 0.65 프로필과 버전 문자열이 다름) | PASS |
+| EditMode 빠른 묶음(`!Slow;!Legacy;!LabOnly`) | 2120/2120 PASS |
+| PlayMode `LabGourdPaintTests` 9 · `LabClayDeveloperControlsTests` 2 · `GameStageGourdIntegrationTests` 1 · `ClayPreviewPlayModeTests` 17 | 29/29 PASS |
+
+- **미실행:** 전체 PlayMode, Mac/iOS 빌드, 실기기, 멀티플레이 화면.
+
 ## 2026-11-11 — #660 박 둘러보기 결과 복귀
 
 - 기준은 `fix/#660-gourd-view-back-button`의 `9b66da6e` 위 작업 변경이다. Unity 6000.6.5f1 macOS Editor에서 검증했다.
@@ -8049,6 +8065,13 @@ Prepared `feat/opening-28-frame-direction` with only the opening commits and mer
 All 279 changed opening code/asset/test files (excluding the tutorial test file, which retains main's independent Help-button assertions) have identical Git blob hashes to the tested local revision `fb021e31`. The main merge adds only six audio-file changes relative to the prepared opening branch. Accordingly, the preceding 17 EditMode and 27 PlayMode results are reused for unchanged opening behavior; they are not reported as a new run after this audio-only integration. The initial full tutorial handoff check remains separately dated above. Source/document whitespace checks and PR scope review passed; no scene, title, project setting, build profile or network-protocol changes are included.
 
 
+## 2026-11-11 — #671 오프닝 건너뛰기 버튼
+
+- 기준: main `81e64ca0`, Unity 6000.6.5f1, 기존 프로젝트의 `feat/671-opening-skip-button`. 개인 ProjectSettings·iOS Build Profile은 수정 범위에 포함하지 않음.
+- 최종 PlayMode 17/17 통과: OpeningSkipButtonTests 2, OpeningCinematicTests 2, GameOpeningControllerTests 13. 28개 화면의 표시/숨김, 숨겨진 버튼 요청 차단, 클릭 종료 1회·다시보기·취소, 3가지 화면 비율의 그림/버튼 배치 일치, 기존 타이틀·구름 전환 검증.
+- Home 실제 재생에서 타이틀 버튼 비표시, 1번 새 버튼 표시, 버튼 중심 EventSystem raycast 첫 대상 `Skip` 확인. Game View 캡처로 원본 모양·위치·색상·투명도 확인. 마지막 콘솔 오류 0건.
+- 전체 테스트 모음과 iOS 빌드·실기기 검증은 수행하지 않음.
+
 ### #652 main 충돌 통합 (2026-11-11)
 
 - 작업8a72d85f에 main81e64ca0를 통합했다. 충돌은 LabBattleRenderWarmup/LabGourdAlert/이 문서3곳이었다. 흔들기·숫자·눈 PNG/HDR 준비와 main의 해제·놀림 PNG 준비를 함께 유지하고, 눈 이미지가 숨긴 배경을 다음 PNG/일반 말풍선에서 다시 켠다. 양쪽 검증 기록은 모두 보존했다. 병합 커밋a6c4293a는 검증 중 원격에 반영됐다.
@@ -8056,6 +8079,13 @@ All 279 changed opening code/asset/test files (excluding the tutorial test file,
 - 최종 전체 EditMode2,243/2,243(49.05초), 관련 PlayMode27/27(8.97초) 통과. 눈→해제/놀림 PNG→일반 텍스트 복원, 흔들기 PNG와 해제/놀림 PNG의 warmup 동시 존재를 추가 단언했다. 기존 K키 단발·횟수별 투명도·초기 준비·보드 수명도 통과했다.
 - Unity6000.6.5f1/macOS Metal 기준. main 대비 실행 변경은 UI/VFX와 에셋 재생성 기본값 정합성이라 전체 PlayMode는 생략했다. main의 통신/게임 흐름 변경은 그대로 통합하고 이 브랜치에서 다시 수정하지 않았다. 실제 게임/iOS 실기기 화면은 미검증이다.
 - 충돌 표식/미해결 index0개. 수동 변경 소스·검증 문서 whitespace 검사 통과. main에서 넘어온 기존 생성 에셋의 공백은 일괄 수정하지 않았다.
+
+### #671 최신 main 통합 확인 (2026-11-11)
+
+- main `9e12a7ce`를 통합하고 이 문서의 양쪽 검증 기록을 모두 보존했다. 코드 충돌은 없었다.
+- 통합 후 Unity 6000.6.5f1에서 관련 PlayMode 17/17 재통과(9.91초): OpeningSkipButtonTests 2, OpeningCinematicTests 2, GameOpeningControllerTests 13. 컴파일 오류 0건.
+
+
 ### #668 콤보 카운트 PNG·Figma 조합 패널 (2026-11-11)
 
 - 현재 브랜치fix/#668-yagwanggwi-combo-asset(기준81e64ca0)에서 첨부 카운트4개와 Figma 패널/구슬5종/체크/시간 바 PNG를 연결했다. Figma 세션c79d30e0-2476-4dea-ada9-a599a61b82f9, 원본4607:3800·3480·3529. 자세한 슬롯·리소스 대응은 YAGUANG_COMBO_UI.md와 Source.json을 따른다.

@@ -108,3 +108,12 @@ OP_024 배경 그림(`72eb0.png`)의 맨 오른쪽 한 줄이 반투명(50%)이�
 Frames 14 (2.3 seconds), 15 (3.35 seconds) and 16 (3.2 seconds) opt into `StoryCutView.autoContinueAfterSeconds`. They advance without AUTO or taps, carry excess frame time into the next cut, and ignore surface/Next input during the sequence. Frame 17 returns to manual dialogue progression. Previous replays a cinematic cut from its start; Skip remains available. This is the exception to the default tap-to-continue rule for silent cuts. Frame 4 keeps the pointing-hand artwork stationary from entry so its gourd close-up is not interrupted by a separate hand entrance.
 
 Each authored dialogue badge now uses the existing `Opening/SpeakerPalette.asset` and `SpeakerBadgeColor` material, preserving the brush silhouette and text layout. All six speaker colors and the dark lettering for the yellow badge are applied to the saved prefabs and retained by the revision builder. Dialogue-only swaps (9/10 and 19/20) also replace the speaker colors.
+
+
+## #671 오프닝 건너뛰기 버튼
+
+- Figma 스토리 페이지의 `4765:4160`(26번 화면에 놓인 동일 버튼)을 원본으로 사용한다. 요청 링크의 `4765:3814`는 조회되지 않아, 실제 각 화면에 배치된 `Group 676`을 확인했다. 402×874 기준 위치 `(7, 53)`, 크기 `115×38`이다.
+- `OpeningSkip.png`는 해당 그룹의 4배 PNG 내보내기(460×152)이며, 구름 이미지의 80% 불투명도와 글자·화살표의 100% 불투명도를 함께 보존한다. Unity Image는 흰색·alpha 1로 표시해 투명도를 다시 곱하지 않는다. 글자와 화살표 색상은 Figma `TextColor/PrimaryBrown/600` 원본을 보존한다.
+- 기존 Button과 클릭 연결을 재사용하며, 그림과 동일한 `StoryPageFit`이 적용되는 `Opening Skip Overlay`에 배치한다. 전체 화면 탭 영역보다 위에서 입력을 받는다. `Hapio/Story/Upgrade Opening Skip Button`으로 프리팹을 갱신할 수 있고, 기존 오프닝 생성·갱신 도구에서도 설정을 재사용한다.
+- 게임 오프닝만 `hideSkipDuringCinematics`를 켠다. 재생 전·종료 후와 14~16번 자동 연출에서는 숨기며, 17번부터 다시 표시한다. 숨겨진 연출 구간의 `RequestSkip`도 차단한다. 직접 제어용 `Skip()`과 다른 스토리 플레이어의 기본 동작은 유지한다.
+- 마지막 구름 전환에서는 새 버튼과 기존 이전·다음 툴바를 모두 숨긴다. 타이틀 Live2D·Home Scene 연결은 바꾸지 않는다.

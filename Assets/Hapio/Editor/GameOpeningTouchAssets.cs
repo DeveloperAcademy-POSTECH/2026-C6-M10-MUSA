@@ -61,6 +61,7 @@ namespace Hapio.Editor
             if (player == null || controls == null)
                 throw new InvalidOperationException("Repair the existing opening controls; do not replace the layout.");
             player.touchOnly = true;
+            OpeningSkipButtonAssets.Configure(root);
             if (player.autoButton != null) player.autoButton.gameObject.SetActive(false);
             Transform surface = root.transform.Find("Tap To Continue");
             if (surface == null)

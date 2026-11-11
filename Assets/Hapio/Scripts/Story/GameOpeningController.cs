@@ -26,6 +26,7 @@ namespace Hapio
         private RectTransform zoomHost;
         private Vector3 zoomHostPosition, zoomHostScale;
         private GameObject hiddenToolbar;
+        private GameObject hiddenNavigationToolbar;
         private float hiddenDialogueAlpha = -1f;
 
         public bool IsPlaying => presenting && player != null && player.IsPlaying;
@@ -198,6 +199,13 @@ namespace Hapio
                 hiddenToolbar = toolbar.gameObject;
                 hiddenToolbar.SetActive(false);
             }
+            // The redesigned skip lives on a fitted overlay; also hide the original navigation during the final zoom.
+            var navigation = openingRoot != null ? openingRoot.transform.Find("Safe Controls/Toolbar") : null;
+            if (navigation != null && navigation != toolbar && navigation.gameObject.activeSelf)
+            {
+                hiddenNavigationToolbar = navigation.gameObject;
+                hiddenNavigationToolbar.SetActive(false);
+            }
         }
 
         private void RestoreReadingControls()
@@ -206,6 +214,8 @@ namespace Hapio
             hiddenDialogueAlpha = -1f;
             if (hiddenToolbar != null) hiddenToolbar.SetActive(true);
             hiddenToolbar = null;
+            if (hiddenNavigationToolbar != null) hiddenNavigationToolbar.SetActive(true);
+            hiddenNavigationToolbar = null;
         }
 
         private IEnumerator ZoomTowardFocus(GameOpeningTransitionArt art, RectTransform host)
