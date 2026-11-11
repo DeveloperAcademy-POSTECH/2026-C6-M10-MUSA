@@ -8364,3 +8364,17 @@ Unity 6000.6.5f1 / macOS Metal Editor에서 컴파일·전체 EditMode와 UI 영
 - 최종 코드 컴파일 오류 0. 전체 EditMode **2,263/2,263 PASS**(48.98초). 관련 PlayMode **15/15 PASS**: `LabYaguangCountLookTests`, `LabComboEffectLookTests`, `LabComboProjectileIntegrationTests` 13개 및 `GameBattleRenderWarmupTests` 2개. 일반 UI 변경 범위에 따라 전체 PlayMode는 생략했다.
 - 도장 즉시 표시·PNG 참조·텍스트 중복 없음·터치 통과·반동 후 1배 정착·유지 후 종료, 기존 비야광귀 콤보 표시 및 렌더 준비 수명 검사를 통과했다.
 - 임시 Canvas/카메라의 실제 Unity UI 렌더를 0.06/0.16/0.5/1.5초에서 확인했다. 배경 투명 부분과 도장 크기·기울기를 확인하고 임시 객체·RenderTexture를 해제했다. 실제 전투 전체 화면과 iOS 실기기의 타격감·음성 타이밍은 미검증이다.
+
+## 2026-11-11 #692 야광귀 콤보 보드 사이즈
+
+- 기준 `3719fb99` 위 `fix/#692-yagwanggwi-combo-board-size` 작업 사본, Unity 6000.6.5f1 macOS Editor. 보드 배치·구슬 크기·상단 제목/밑줄 숨김 및 복원만 변경했다. UI 변경 범위에 따라 전체 EditMode 및 관련 PlayMode를 선택했고 전체 PlayMode·빌드는 실행하지 않았다.
+- 전체 EditMode **2,337/2,337 PASS**(55.51초). 첫 실행은 Editor Play Mode 때문에 시작되지 않아 정지 후 재실행했다.
+- 관련 PlayMode **15/15 PASS**(8.12초): LabYaguangCountLookTests, LabComboEffectLookTests, LabComboProjectileIntegrationTests, GameBattleRenderWarmupTests. 보드 크기/위치·제목/밑줄 alpha0·Pause/Disable 복원, 기존 성공/실패 및 첫 렌더 준비를 확인했다.
+- 최초 관련 실행 13/15, 효과 표시 fixture 2개 실패(부적 비 감소·페널티 잔량). 재실행에도 동일했다. 기존 #664 LastEffectResult는 결과 종류와 count를 필요로 하나 fixture는 시각만 채웠다. fixture에 실제 결과 종류/count와 이미 표시된 결과 상태를 넣어 단언/게임 동작 변경 없이 보완한 뒤 15/15 통과했다. PlayMode fixture만 후속 변경되어 앞선 EditMode 검사 대상은 동일하다.
+- 임시 Unity Canvas/카메라로 358×765에서 보드 실제 렌더 확인: 229×87 패널·네 구슬·진행 바 배치 및 페이드 완료 상태. 임시 객체와 RT는 정리했다. 컴파일 오류 0, diff 공백 검사 통과. 실제 전투 전체 화면·iOS 실기기 해상도 확인은 미실행이다.
+
+### #692 후속 — 순서 번호와 적중 체크
+
+- 전체 EditMode **2,337/2,337 PASS**(52.95초), 관련 PlayMode **15/15 PASS**(8.52초). 범위는 직전 #692와 동일하며 전체 PlayMode·실기기·빌드는 미실행이다.
+- 1~4 텍스트/미적중 표시·적중 시 구슬 및 번호 숨김·체크 최초 등장 반동·정착·최종 칸 체크 후 성공 도장 전환을 검사했다. 전투 신라문화체를 연결한 임시 Unity Canvas 렌더에서 기본 상태와 1번 적중 상태를 확인하고 임시 객체/RT를 해제했다.
+- 최초 컴파일에서 기존 지역 변수명과 충돌(CS0136)한 것을 전용 orderOutline 이름으로 수정했다. 최초 EditMode 시도는 Editor Play Mode 상태로 시작되지 않아 정지 후 재실행했다. 최종 컴파일 오류 0, diff 공백 검사 통과.

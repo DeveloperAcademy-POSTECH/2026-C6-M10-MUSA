@@ -106,6 +106,8 @@ namespace C6Lab.Tests
             Assert.That(latest, Is.Not.Null);
             try
             {
+                // The result has already been presented; test the continuing effect only.
+                typeof(LabGourdComboHud).GetField("shownResultCount", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(hud, 1u);
                 latest.SetValue(network, Snapshot(network, 50d, penaltyUntil: 55d));
                 yield return null;
                 yield return null;
@@ -212,6 +214,8 @@ namespace C6Lab.Tests
             FieldInfo latest = typeof(LabNetwork).GetField("latest", BindingFlags.Instance | BindingFlags.NonPublic);
             try
             {
+                // The result has already been presented; test the continuing effect only.
+                typeof(LabGourdComboHud).GetField("shownResultCount", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(hud, 1u);
                 latest.SetValue(network, Snapshot(network, 50d, penaltyUntil: 59d));
                 yield return null;
                 yield return null;
@@ -242,6 +246,10 @@ namespace C6Lab.Tests
                 comboCount = 1, comboActive = false,
                 comboColors = new[] { LabOrbElement.Fire, LabOrbElement.Water, LabOrbElement.Wood, LabOrbElement.Earth },
                 comboResultAt = 49d,
+                // #664 resolves effect age from the latest explicit result, not its timestamp alone.
+                comboResultCount = 1,
+                comboResult = penaltyUntil > 0d ? LabComboResult.WrongColor
+                    : rewardUntil > 0d ? LabComboResult.Success : LabComboResult.None,
                 players = new[]
                 {
                     new LabPlayerState { id = network.LocalPlayerId, comboPenaltyUntil = penaltyUntil, comboRewardUntil = rewardUntil }
