@@ -234,6 +234,8 @@ namespace C6Lab
             showingBlock = showingHeart = false;
             showingEyes = true;
             ShowOnly(eyesRect.gameObject);
+            bubble.GetComponent<Image>().enabled = false;
+            bubble.pivot = new Vector2(65f / 312f, 23f / 312f);
             SetEyeGlow(0f);
             Begin(gourd, Mathf.Max(.2f, seconds));
         }
@@ -244,10 +246,7 @@ namespace C6Lab
             eyeGlow = float.IsNaN(glow) ? 0f : Mathf.Clamp01(glow);
             if (eyesLit == null) return;
             eyesLit.color = new Color(1f, 1f, 1f, eyeGlow);
-            eyesHalo.color = new Color(1f, 1f, 1f, .85f * eyeGlow);
-            // 다 빛난 뒤에는 둘레 빛이 두근거린다.
-            float beat = eyeGlow >= 1f ? .08f * Mathf.Sin(Time.unscaledTime * 9f) : 0f;
-            eyesHalo.rectTransform.localScale = Vector3.one * (1f + .3f * eyeGlow + beat);
+
         }
 
         /// <summary>
@@ -270,6 +269,8 @@ namespace C6Lab
         // 말풍선 안 표시는 한 번에 하나만 보인다.
         private void ShowOnly(GameObject shown)
         {
+            bubble.GetComponent<Image>().enabled = true;
+            bubble.pivot = TailTip / TextureSize;
             if (shown != eyesRect.gameObject) showingEyes = false;
             showingWord = false;
             if (mark != null)
@@ -321,6 +322,12 @@ namespace C6Lab
         /// <summary>꼬리 끝을 화면에서 박의 오른쪽 위 어깨에 맞춘다.</summary>
         private void Place()
         {
+            if (showingEyes)
+            {
+                float size = 104f * LabYaguangShakeCue.FitScale(canvasRect.rect.size);
+                bubble.sizeDelta = eyesRect.sizeDelta = new Vector2(size, size);
+            }
+            else bubble.sizeDelta = new Vector2(bubbleSize, bubbleSize);
             Collider hitbox = target != null ? target.Hitbox : null;
             if (battleCamera == null) battleCamera = Camera.main;
             if (hitbox == null || battleCamera == null)
@@ -429,11 +436,10 @@ namespace C6Lab
 
             // 야광귀 눈 (#268): 둘레 빛 → 보통 눈 → 빛나는 눈 순서로 겹친다.
             eyesRect = NewRect("Gourd Alert Eyes", bubble);
-            eyesRect.anchorMin = eyesRect.anchorMax = center;
-            eyesRect.sizeDelta = new Vector2(bubbleSize * .74f, bubbleSize * .37f);
-            eyesHalo = EyesLayer("Gourd Alert Eyes Halo", EyesHaloSprite());
-            EyesLayer("Gourd Alert Eyes Plain", EyesSprite(false));
-            eyesLit = EyesLayer("Gourd Alert Eyes Lit", EyesSprite(true));
+            eyesRect.anchorMin = eyesRect.anchorMax = new Vector2(.5f, .5f);
+            eyesRect.sizeDelta = new Vector2(bubbleSize, bubbleSize);
+            EyesLayer("Gourd Alert Eyes Plain", Resources.Load<Sprite>(LabYaguangShakeCue.ArtPath + "EyesNormal"));
+            eyesLit = EyesLayer("Gourd Alert Eyes Lit", Resources.Load<Sprite>(LabYaguangShakeCue.ArtPath + "EyesYellow"));
             eyesRect.gameObject.SetActive(false);
             bubble.gameObject.SetActive(false);
             return true;

@@ -157,6 +157,10 @@ namespace C6Lab.Tests
             Assert.That(eyes.gameObject.activeSelf, Is.True);
             Assert.That(alert.Bubble.Find("Gourd Alert Mark").gameObject.activeSelf, Is.False);
             Assert.That(lit.color.a, Is.Zero, "Plain eyes first.");
+            Assert.That(lit.sprite, Is.EqualTo(Resources.Load<Sprite>(LabYaguangShakeCue.ArtPath + "EyesYellow")));
+            Assert.That(eyes.Find("Gourd Alert Eyes Plain").GetComponent<Image>().sprite,
+                Is.EqualTo(Resources.Load<Sprite>(LabYaguangShakeCue.ArtPath + "EyesNormal")));
+            Assert.That(alert.Bubble.GetComponent<Image>().enabled, Is.False, "Complete PNG replaces the generated bubble.");
             Assert.That(eyes.GetComponentsInChildren<Image>().All(image => !image.raycastTarget), Is.True);
 
             alert.SetEyeGlow(1f);
@@ -172,6 +176,7 @@ namespace C6Lab.Tests
             Text word = alert.Bubble.Find("Gourd Alert Mark").GetComponent<Text>();
             Assert.That(alert.ShowingWord, Is.True);
             Assert.That(word.text, Is.EqualTo("셋!"));
+            Assert.That(alert.Bubble.GetComponent<Image>().enabled, Is.True, "Shared text restores its background.");
             Assert.That(word.GetComponent<Outline>().enabled, Is.False, "No offset outline doubling the ink strokes (#271).");
             alert.ShowWord(gourd, "넷!", 1f);
             Assert.That(word.text, Is.EqualTo("넷!"), "The same bubble just changes its word.");

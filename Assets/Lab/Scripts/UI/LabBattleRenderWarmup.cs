@@ -107,9 +107,38 @@ namespace C6Lab
                     burst.Begin(LabOrbVisualFactory.TemporaryElementColor(element), battleCamera.transform.forward, battleCamera);
                     bursts.Add(burst.transform);
                 }
+            SpawnShakeArtCopies();
             SpawnClayCopies(config);
             if (boardCamera != null) SpawnBoardCopies(config.OrbAppearance);
             MoveCopies();
+        }
+
+        private void SpawnShakeArtCopies()
+        {
+            var copy = new GameObject("Shake UI warmup", typeof(RectTransform), typeof(Canvas));
+            copy.transform.SetParent(root.transform, false);
+            var canvas = copy.GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceCamera;
+            canvas.worldCamera = battleCamera;
+            canvas.planeDistance = battleCamera.nearClipPlane + .1f;
+            var lightObject = new GameObject("HDR Flash warmup", typeof(RectTransform));
+            lightObject.transform.SetParent(copy.transform, false);
+            var lightRect = (RectTransform)lightObject.transform;
+            lightRect.anchorMin = Vector2.zero;
+            lightRect.anchorMax = Vector2.one;
+            lightRect.offsetMin = lightRect.offsetMax = Vector2.zero;
+            lightObject.AddComponent<LabYaguangFlashLight>().Present(.22f, 0f, 0f);
+            int index = 0;
+            foreach (string name in new[] { "Phone", "Title", "Guide", "GaugeTrack", "CellFull", "CellEmpty", "Countdown1", "Countdown2", "Countdown3", "EyesNormal", "EyesYellow" })
+            {
+                var image = new GameObject(name, typeof(RectTransform), typeof(UnityEngine.UI.Image)).GetComponent<UnityEngine.UI.Image>();
+                image.transform.SetParent(copy.transform, false);
+                image.sprite = Resources.Load<Sprite>(LabYaguangShakeCue.ArtPath + name);
+                image.preserveAspect = true;
+                image.raycastTarget = false;
+                image.rectTransform.sizeDelta = new Vector2(100f, 100f);
+                image.rectTransform.anchoredPosition = new Vector2((index % 6 - 3) * 70f, (index++ / 6) * 110f);
+            }
         }
 
         private void SpawnClayCopies(LabConfig config)
