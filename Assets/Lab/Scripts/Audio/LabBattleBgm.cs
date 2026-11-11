@@ -18,7 +18,7 @@ namespace C6Lab
     ///   같은 크기로 틀고, 폴더가 비어 있으면 구미호 곡을 쓴다. 어느 곡을 틀지는 라운드가 시작될 때 정한다.
     ///   야광귀·지귀·Lab 단판은 기본 전투 BGM. 땅따먹기에는 피버타임 곡이 없다(팀 피버에도 곡을 바꾸지 않는다).
     /// - #577 피버 곡: 세 라운드 모두 그 라운드 곡을 반음 2개 높이고 점점 빠르게 한 20초 곡. 구미호 = GumihoFever, 야광귀 = Fever,
-    ///   지귀 = JigwiFever.
+    ///   지귀 = JigwiFever. 지귀 피버는 방해가 끝나는 100초(#332, 스테이지 피버 #441과 같은 시각)부터다 (#629에서 연결).
     /// - 야광귀 피버타임 (#343): 피버가 시작되면 Resources/Audio/Fever 폴더의 첫 파일(피버 20초에 맞춘 곡)로 바꿔 처음부터 튼다. 늦게 들어온 기기는 피버가 흐른 만큼 건너뛰어 맞춘다.
     ///   전투 BGM은 그동안 줄여 둔다. 일시정지·승리/패배·새 라운드는 전투 BGM과 똑같이 다룬다.
     ///   피버가 시작되는 순간에는 콤보 성공 추임새 "좋다"(Resources/Audio/ComboClear)를 한 번 낸다. 늦게 들어와 이미 한참 지난
@@ -166,12 +166,31 @@ namespace C6Lab
         {
             gumiho = false;
             if (network == null) return -1d;
-            double yaguang = network.YaguangFeverElapsed(snapshot);
-            if (yaguang >= 0d) return yaguang;
-            double now = network.BattlePresentationTime;
-            if (!snapshot.FeverTimeOn(now)) return -1d;
-            gumiho = true;
-            return now - snapshot.feverTimeAt;
+            return FeverElapsedFor(snapshot, network.GameStageYokai, network.YaguangFeverElapsed(snapshot),
+                network.BattlePresentationTime, out gumiho);
+        }
+
+        /// <summary>
+        /// 피버 곡을 틀 시각 계산 (검사에서 스테이지를 정해 부를 수 있게 공개). stageFever는 야광귀가 아닌 피버(구미호·지귀)이면 true이고,
+        /// 그 곡은 DriveFever가 스테이지를 보고 고른다.
+        /// #629: 지귀 피버(#332, 방해가 끝나는 100초)는 feverTimeAt이 없어서 지귀 피버 곡(JigwiFever)이 한 번도 나오지 않았다.
+        /// 이제 스테이지 피버(#441, LabNetwork.StageFeverElapsed)와 같은 시각에 튼다.
+        /// </summary>
+        public static double FeverElapsedFor(LabSnapshot snapshot, LabStageYokai stage, double yaguangElapsed, double now,
+            out bool stageFever)
+        {
+            stageFever = false;
+            if (snapshot == null) return -1d;
+            if (yaguangElapsed >= 0d) return yaguangElapsed;
+            if (snapshot.FeverTimeOn(now))
+            {
+                stageFever = true;
+                return now - snapshot.feverTimeAt;
+            }
+            if (stage != LabStageYokai.Jigwi) return -1d;
+            double jigwi = LabNetwork.StageFeverElapsed(snapshot, LabStageYokai.Jigwi, -1d);
+            stageFever = jigwi >= 0d;
+            return jigwi;
         }
 
         /// <summary>피버 시작 추임새 "좋다"를 한 번 낸다 (콤보 성공과 같은 파일).</summary>
