@@ -290,7 +290,6 @@ namespace C6Lab.Tests
             snapshot.comboResultCount = 1; snapshot.comboResult = LabComboResult.Success; snapshot.comboResultAt = 39d;
             Watch(sound, snapshot, 39d, 40d);
             Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideClear), Is.EqualTo(1), "그렇지!!");
-            Assert.That(sound.PlayCount(LabYaguangSfx.ComboStamp), Is.EqualTo(1), "The gong as the stamp lands.");
             Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideHit1), Is.EqualTo(1), "Each line once.");
         }
 
@@ -310,9 +309,22 @@ namespace C6Lab.Tests
             Watch(sound, snapshot, 36.1d, 38d);
             Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideHit2), Is.Zero);
             Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideClear), Is.Zero);
-            Assert.That(sound.PlayCount(LabYaguangSfx.ComboStamp), Is.Zero, "No stamp, no gong.");
             Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideFail), Is.EqualTo(1), "아이고 first");
             Assert.That(sound.PlayCount(LabYaguangSfx.ComboTaunt), Is.EqualTo(1), "then 메롱~");
+        }
+
+        [Test]
+        public void TheStampThudsExactlyWhenTheScreenPressesItIn()
+        {
+            // #695: 쾅은 시각 계산이 아니라 화면의 도장이 찍힌 수를 따른다.
+            LabYaguangSound sound = Sound();
+            Assert.That(sound.ObserveStamp(0), Is.False);
+            Assert.That(sound.ObserveStamp(1), Is.True, "쾅");
+            Assert.That(sound.ObserveStamp(1), Is.False, "Once per stamp.");
+            Assert.That(sound.ObserveStamp(2), Is.True);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboStamp), Is.EqualTo(2));
+            Assert.That(sound.ObserveStamp(0), Is.False, "A new screen counts from zero again.");
+            Assert.That(sound.ObserveStamp(1), Is.True);
         }
 
         [Test]

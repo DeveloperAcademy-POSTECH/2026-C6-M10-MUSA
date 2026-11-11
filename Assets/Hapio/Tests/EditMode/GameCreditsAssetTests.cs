@@ -15,7 +15,6 @@ namespace Hapio.Tests
         [TestCase("양금 기본음 강")]
         [TestCase("25현 가야금 - 기본음계 - 강")]
         [TestCase("25현 가야금 - 시김새 - 추성 - 강")]
-        [TestCase("징 - 타격음 - 강")]
         public void CreditsCarryTheKoglType1Attribution(string work)
         {
             string text = Load();

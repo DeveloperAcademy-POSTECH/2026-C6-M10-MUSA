@@ -41,8 +41,8 @@ namespace C6Lab
     ///   칸을 맞힐 때마다 Inspector 지연(기본 0.3초) 뒤에. 새로 말하면 앞의 안내는 끊는다.
     /// - 실패 (Audio/YaguangComboGuideFail "아이고"): 콤보 실패 뒤 Inspector 지연(기본 0.1초). 야광귀 "메롱~"은 이 말이 끝나고
     ///   Inspector 간격(기본 0.1초) 뒤에 나온다 (원래 메롱 지연보다 이르지는 않다).
-    /// #695 콤보 성공 도장 징 (Audio/YaguangComboStamp, 국립국악원 징): 성공 도장(#668)이 박에 닿는 때(결과 + 0.16초), 모든 기기.
-    ///   야광귀 셈법이 꺼져 도장이 안 나오면 내지 않는다.
+    /// #695 콤보 성공 도장 쾅 (Audio/YaguangComboStamp): 이 기기 화면에서 성공 도장(#668)이 박에 찍히는 순간
+    ///   (LabGourdComboHud.StampsLanded가 늘 때). 도장이 안 나오면(야광귀 셈법이 꺼짐) 소리도 없다.
     /// #664 구미호 여우구슬 판정 (모든 기기, 야광귀 콤보와 같은 소리):
     /// - 제한 시간 째깍: 여우구슬이 떨어진 순간부터 콤보와 같은 간격으로 째깍, 남은 시간이 짧으면 빠른 째깍. 다 지우면 바로 멈춘다.
     /// - BIG/SMALL 시작·끝: 콤보 결과와 같은 때 (결과 + LabGourdComboHud.ResultSeconds, 가장 늦게 끝나는 사람 기준).
@@ -120,7 +120,7 @@ namespace C6Lab
         private uint seenResultCount;
         private double resultAt;
         private int resultEffect;
-        private bool tauntDue, effectStartDue, effectEndDue, clearedDue, stampDue;
+        private bool tauntDue, effectStartDue, effectEndDue, clearedDue;
         // 이번 라운드에 본 콤보 성공 수 (첫 성공 "이런!", 그 뒤 "이럴 수가!")
         private int clearedCount;
         // #664 여우구슬 판정: 째깍을 센 판정(떨어진 시각)과 마지막 째깍, 본 판정 결과 수, 그 결과 시각과 효과, 아직 낼 소리
@@ -130,6 +130,8 @@ namespace C6Lab
         private int foxEffect;
         private bool foxStartDue, foxEndDue;
         private LabYaguangFlashHud flashHud;
+        private LabGourdComboHud comboHud;
+        private int seenStamps;
         // #695 금옥 안내: 규칙을 낸 예고(4칸이 나올 시각), 색을 부를 콤보와 맞힌 칸 수, 부를 칸과 그 시각, 안내가 끝나는 시각
         private double guideRuleFor = double.NaN;
         // 이번 예고에 규칙 안내가 있는지(있으면 넷→하나가 점점 작아짐), 아직 낼 규칙 안내와 그 시각
@@ -179,6 +181,8 @@ namespace C6Lab
             LabSnapshot snapshot = network.Snapshot;
             if (snapshot == null) return;
             ObserveFlash(snapshot, network.BattlePresentationTime, network.LocalPlayerId);
+            if (comboHud == null) comboHud = GetComponent<LabGourdComboHud>();
+            if (comboHud != null) ObserveStamp(comboHud.StampsLanded);
             if (flashHud == null) flashHud = GetComponent<LabYaguangFlashHud>();
             if (flashHud != null && network.config != null && snapshot.phase == LabPhase.Playing)
                 ObserveShakes(flashHud.ShakeCount, network.config.YaguangFlashShakeCount);
@@ -203,6 +207,19 @@ namespace C6Lab
             float step = config != null ? config.YaguangShakeBellStepSemitones : 0f;
             Play(LabYaguangSfx.ShakeBell, bellSource, BellPitch(count, step));
             return LabYaguangSfx.ShakeBell;
+        }
+
+        /// <summary>
+        /// #695: 화면의 성공 도장이 찍힌 수(landed)가 늘었으면 쾅 한 번. 화면이 도장을 그리는 바로 그 프레임에 맞춘다.
+        /// 낸 소리가 있으면 true.
+        /// </summary>
+        public bool ObserveStamp(int landed)
+        {
+            if (landed < seenStamps) seenStamps = landed;
+            if (landed <= seenStamps) return false;
+            seenStamps = landed;
+            Play(LabYaguangSfx.ComboStamp);
+            return true;
         }
 
         /// <summary>count번째 흔들기 방울의 재생 속도. 1번이 원래 높이이고 한 번 늘 때마다 step 반음씩 높다 (최대 +12반음).</summary>
@@ -235,7 +252,7 @@ namespace C6Lab
                 lastTickAt = double.NegativeInfinity;
                 // 접속 직후 이미 지난 콤보 결과의 소리는 내지 않는다.
                 seenResultCount = snapshot.comboResultCount;
-                tauntDue = effectStartDue = effectEndDue = clearedDue = stampDue = false;
+                tauntDue = effectStartDue = effectEndDue = clearedDue = false;
                 clearedCount = 0;
                 foxTickFor = double.NaN;
                 lastFoxTickAt = double.NegativeInfinity;
@@ -439,19 +456,12 @@ namespace C6Lab
                 guideFailEndsAt = double.NegativeInfinity;
                 foxStartDue = foxEndDue = false; // 새 결과가 앞 결과의 남은 소리를 대신한다.
                 clearedDue = resultEffect > 0 && resultAt >= 0d;
-                stampDue = clearedDue && StampShown; // #695 성공 도장이 박에 닿을 때 징
                 if (clearedDue) clearedCount++;
                 effectStartDue = effectEndDue = resultEffect != 0 && resultAt >= 0d
                     && EffectUntil(snapshot, resultEffect, resultAt) > resultAt + LabGourdComboHud.ResultSeconds;
             }
             if (snapshot.paused) return;
 
-            double stampAt = resultAt + LabGourdComboHud.StampLandSeconds;
-            if (stampDue && now >= stampAt)
-            {
-                stampDue = false;
-                if (now - stampAt <= LateSeconds) Play(LabYaguangSfx.ComboStamp);
-            }
             double failAt = resultAt + GuideFailDelay;
             if (guideFailDue && now >= failAt)
             {
@@ -605,8 +615,6 @@ namespace C6Lab
         private int GuideRuleCombos => network != null && network.config != null ? network.config.YaguangComboGuideRuleCombos : 1;
         private double GuideFeedbackDelay => network != null && network.config != null ? network.config.YaguangComboGuideFeedbackDelaySeconds : .3d;
         private double GuideRuleDelay => network != null && network.config != null ? network.config.YaguangComboGuideRuleDelaySeconds : .9d;
-        /// <summary>콤보 성공 도장(#668)은 야광귀 셈법일 때만 나온다 (LabGourdComboHud.YaguangCount와 같은 기준).</summary>
-        private bool StampShown => network == null || network.config == null || network.config.ComboYaguangCountEnabled;
         private double GuideFailDelay => network != null && network.config != null ? network.config.YaguangComboGuideFailDelaySeconds : .1d;
         private double GuideFailToTaunt => network != null && network.config != null ? network.config.YaguangComboGuideFailToTauntSeconds : .1d;
         private float GuideCountFade => network != null && network.config != null ? network.config.YaguangComboGuideCountFade : .6f;

@@ -1141,7 +1141,7 @@ namespace C6Lab
         [SerializeField, Range(0f, 2f)] private float yaguangComboGuideFailToTauntSeconds = .1f;
         [Tooltip("금옥 안내 목소리 크기 (규칙 + 칭찬 + 아이고, 모든 기기)")]
         [SerializeField, Range(0f, 1f)] private float yaguangComboGuideSoundVolume = 1f;
-        [Tooltip("콤보 성공 도장이 박에 닿을 때 징 크기 (Audio/YaguangComboStamp, 국립국악원 징, 모든 기기)")]
+        [Tooltip("콤보 성공 도장이 박에 찍힐 때 쾅 크기 (Audio/YaguangComboStamp, 모든 기기)")]
         [SerializeField, Range(0f, 1f)] private float yaguangComboStampSoundVolume = .8f;
         [Header("야광귀 콤보 예고와 피버 신호 (#414, Inspector 전용)")]
         [Tooltip("콤보 예고(넷/셋/둘/하나) 동안 화면 가장자리가 어두워지는 최대 진하기 (0이면 끔, 모든 기기)")]

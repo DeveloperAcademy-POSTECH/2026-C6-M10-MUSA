@@ -49,7 +49,7 @@ namespace C6Lab
         private const int TextureSize = 96;
         /// <summary>콤보 결과 문구가 떠 있는 초. 이 뒤에 SMALL/BIG 배지가 나온다 (#398 효과음도 이 시각에 맞춘다).</summary>
         public const float ResultSeconds = 1.6f;
-        /// <summary>#695: 콤보 성공 도장(#668)이 크게 내려와 박에 닿는 때 (결과부터 초). 도장 그리는 코드의 .16f와 같다. 이때 징이 울린다.</summary>
+        /// <summary>#668/#695: 콤보 성공 도장이 크게 내려와 박에 찍히는 때 (결과 문구가 시작된 때부터 초). 이때 쾅 소리가 난다.</summary>
         public const float StampLandSeconds = .16f;
         // #664 LabFoxRoundHud도 같은 먹색·패널색·빨강·둥근 패널을 쓴다.
         internal static readonly Color32 InkColor = new Color32(43, 36, 32, 255);
@@ -191,6 +191,9 @@ namespace C6Lab
         /// <summary>조합판에 알린 이 기기 플레이어의 콤보 효과: -1 SMALL, 1 BIG, 0 없음 (#257)</summary>
         public int BoardLook => boardLook;
         public bool ResultVisible => resultText != null && resultText.gameObject.activeSelf;
+        /// <summary>#695: 이 화면에서 성공 도장이 박에 찍힌 횟수. 도장 쾅 소리(LabYaguangSound)가 이 수가 늘 때 난다.</summary>
+        public int StampsLanded { get; private set; }
+        private uint stampLandedFor;
         /// <summary>COMBO! 카운트다운 예고가 보이는지 (#241)</summary>
         public bool WarningVisible => warningPanel != null && warningPanel.gameObject.activeSelf;
         /// <summary>예고에 보이는 남은 초 (3, 2, 1). 예고가 없으면 빈 문자열.</summary>
@@ -693,12 +696,12 @@ namespace C6Lab
                 var rect = successStamp.rectTransform;
                 float diameter = Mathf.Min(layer.rect.width * .54f, layer.rect.height * .28f);
                 rect.sizeDelta = Vector2.one * diameter;
-                float approach = Mathf.Clamp01(t / .16f);
-                float rebound = Mathf.Clamp01((t - .16f) / .22f);
-                float scale = t < .16f ? Mathf.Lerp(2.4f, .92f, approach * approach)
+                float approach = Mathf.Clamp01(t / StampLandSeconds);
+                float rebound = Mathf.Clamp01((t - StampLandSeconds) / .22f);
+                float scale = t < StampLandSeconds ? Mathf.Lerp(2.4f, .92f, approach * approach)
                     : 1f - .08f * Mathf.Cos(rebound * Mathf.PI * 3f) * (1f - rebound);
                 rect.localScale = Vector3.one * scale;
-                float kick = t >= .16f ? Mathf.Exp(-(t - .16f) * 22f) : 0f;
+                float kick = t >= StampLandSeconds ? Mathf.Exp(-(t - StampLandSeconds) * 22f) : 0f;
                 // Position relative to the full canvas, below the order panel and over the gourd.
                 rect.anchoredPosition = new Vector2(Mathf.Sin(t * 95f) * diameter * .018f * kick,
                     layer.rect.height * (.65f - resultText.rectTransform.anchorMin.y)
@@ -706,6 +709,12 @@ namespace C6Lab
                 rect.localRotation = Quaternion.Euler(0, 0, Mathf.Lerp(-14f, -7f, approach));
                 successStamp.color = new Color(1, 1, 1, Mathf.Clamp01(t / .045f) * (1f - leave));
                 flash.gameObject.SetActive(false);
+                // #695: the moment it is pressed into the gourd (smallest, before the rebound), once per result. The sound follows this.
+                if (t >= StampLandSeconds && stampLandedFor != shownResultCount)
+                {
+                    stampLandedFor = shownResultCount;
+                    StampsLanded++;
+                }
                 return;
             }
             if (clear)
