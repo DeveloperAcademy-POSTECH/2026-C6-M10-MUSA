@@ -129,6 +129,8 @@ namespace C6Lab
 
         private uint shownResultCount;
         private int shownFoxRoundCount;
+        // #664: the result words on screen are the fox round's (they sit at panelAnchor, not over the paint gauge).
+        private bool resultIsFoxRound;
         private float resultElapsed = -1f;
         private LabComboResult shownResult;
         private int lastProgress;
@@ -261,7 +263,9 @@ namespace C6Lab
             DrawWarning(snapshot, serverNow, warning);
             DrawShade(warning);
             DrawEffect(snapshot, serverNow);
-            CoverGauge(figmaPanel && (panel.gameObject.activeSelf || resultText.gameObject.activeSelf || comboPopFinal && comboPop.gameObject.activeSelf));
+            // #664: the fox round's result words never sit over the gauge, so they leave it showing.
+            CoverGauge(figmaPanel && (panel.gameObject.activeSelf || resultText.gameObject.activeSelf && !resultIsFoxRound
+                || comboPopFinal && comboPop.gameObject.activeSelf));
         }
 
         /// <summary>#414 예고 그늘: 예고 동안 천천히 진해지고, 4칸이 나오면 빨리 걷힌다.</summary>
@@ -458,6 +462,7 @@ namespace C6Lab
             shownResult = snapshot.foxRoundResult > 0 ? LabComboResult.Success : LabComboResult.Timeout;
             resultElapsed = Mathf.Max(0f, (float)(serverNow - snapshot.foxRoundResultAt));
             resultDelay = 0f;
+            resultIsFoxRound = true;
             resultText.text = ResultTextFor(shownResult, false, false, -1);
         }
 
@@ -467,6 +472,7 @@ namespace C6Lab
             {
                 shownResultCount = snapshot.comboResultCount;
                 shownResult = snapshot.comboResult;
+                resultIsFoxRound = false;
                 resultElapsed = 0f;
                 RememberFailer(snapshot);
                 resultText.text = ResultTextFor(shownResult, shownFailedKnown,
