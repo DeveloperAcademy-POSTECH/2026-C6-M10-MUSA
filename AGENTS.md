@@ -445,3 +445,5 @@
 - 상세 동작과 한계는 `docs/FINAL_HIT_REPLAY.md`·`docs/FIVE_ELEMENT_VFX.md`, 실제 검사는 `docs/VALIDATION.md`를 따른다. #659는 표현만 바꾸며 #647의 설정259개·5699/Lab60/Game51을 유지한다.
 
 - #659 후속 오색 강화: 승인된 오색 전용 아트값을 `FiveElements/Profile`에 둔다(기본ON, 꼬리2.4D/폭1.4, 퍼짐 선형1.35, 큰5색 방울5개·저품질3). 일반 구슬·실제 반경·물리·도색·기여도·통신은 유지한다. 비교 Scene의 현재/강화 오색 버튼은 풀의 임시 override만 바꾸고 Resources를 저장하지 않는다. 오색 Wet shader 실패는 같은 메시의 Unlit 간소 표현을 사용하며 다시보기에서 구형 먼지·별을 되살리지 않는다. 실제 실행 결과는 VALIDATION의 후속 절을 따른다.
+
+- #659 별 파열 후속: 강화 오색 명중에만 기존 `FiveColorSparkle.png`를 쓰는10개/0.45초 별을 더한다(저품질5개, Inspector ON/OFF·개수·크기·거리·시간). `LabClayImpactSlot`의 Age·seed와 공유 메시/재질로 재생하며 구형 독립 `Burst`·Dust는 복구하지 않는다. 일반/현재 비교는 별 없이 유지하고 준비 화면·마지막 일격도 같은 시계를 사용한다. 판정·통신은 유지한다.

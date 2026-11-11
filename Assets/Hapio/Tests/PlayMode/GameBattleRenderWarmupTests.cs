@@ -79,6 +79,9 @@ namespace Hapio.Tests
                 .Select(filter => filter.sharedMesh).Distinct().ToArray();
             Material privateClayMaterial = clayCopies.GetComponentsInChildren<Renderer>(true)
                 .Select(renderer => renderer.sharedMaterial).First(material => material.name == "Wet pigment (shared)");
+            Material privateStarMaterial = clayCopies.GetComponentsInChildren<MeshRenderer>(true)
+                .First(renderer => renderer.name.StartsWith("Reward star ")).sharedMaterial;
+            Assert.That(privateStarMaterial.shader.isSupported, Is.True);
             while (warmup.Root != null)
             {
                 foreach (Renderer renderer in warmup.Root.GetComponentsInChildren<Renderer>())
@@ -111,6 +114,8 @@ namespace Hapio.Tests
             Assert.That(motifs.Count, Is.EqualTo(5), "All five elements' trail particles really emitted.");
             Assert.That(clayDraws, Is.SupersetOf(new[] { "Wet clay", "Pulling neck", "Wet surface mark", "Thrown clay 0" }),
                 "The new body, trail and contact must actually draw beneath the preparing cover.");
+            Assert.That(clayDraws.Any(name => name.StartsWith("Reward star ")), Is.True,
+                "The short reward-star shader must draw under the preparation cover too.");
             Assert.That(paperMaterials.Count, Is.EqualTo(6), "All five authored element bodies and the five-color paper body are drawn.");
 
             yield return Until(() => session.State.phase != GameFlowPhase.SynchronizingBattle, "Countdown");
@@ -121,6 +126,7 @@ namespace Hapio.Tests
             Assert.That(clayCopies == null, Is.True);
             Assert.That(privateClayMeshes.All(mesh => mesh == null), Is.True, "Private generated meshes are released.");
             Assert.That(privateClayMaterial == null, Is.True, "The private generated material is released.");
+            Assert.That(privateStarMaterial == null, Is.True, "The private star material is released with its warmup pool.");
             Assert.That(paperMaterials.All(material => material != null), Is.True, "Authored shared materials remain intact.");
             Assert.That(LabFiveElementVfx.ForScene(warmup.gameObject.scene), Is.SameAs(liveClay));
             Assert.That(liveClay.ActiveFlightCount, Is.EqualTo(liveFlights));

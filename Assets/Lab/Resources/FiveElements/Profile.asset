@@ -75,6 +75,11 @@ MonoBehaviour:
   fiveColorClayDrops: 5
   fiveColorDropLifetime: 0.65
   fiveColorContactSeconds: 0.95
+  fiveColorStarsEnabled: 1
+  fiveColorStarCount: 10
+  fiveColorStarLifetime: 0.45
+  fiveColorStarSize: 0.42
+  fiveColorStarReach: 2.6
   maxFlights: 16
   maxImpacts: 24
   lowDetailImpacts: 10

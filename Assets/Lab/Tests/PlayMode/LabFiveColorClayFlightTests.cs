@@ -17,6 +17,7 @@ namespace C6Lab.Tests
         private GameObject root;
         private LabConfig config;
         private LabFiveElementVfx pool;
+        private LabFiveElementProfile privateProfile;
 
         [UnitySetUp]
         public IEnumerator Prepare()
@@ -43,6 +44,8 @@ namespace C6Lab.Tests
             if (root != null) Object.Destroy(root);
             if (config != null) Object.Destroy(config);
             if (pool != null) Object.Destroy(pool.gameObject);
+            if (privateProfile != null) Object.Destroy(privateProfile);
+            privateProfile = null;
             yield return null;
             if (scene.IsValid() && scene.isLoaded) yield return SceneManager.UnloadSceneAsync(scene);
         }
@@ -334,6 +337,165 @@ namespace C6Lab.Tests
                 "Changing the comparison only affects the next throw; a live lease cannot change its impact style mid-flight.");
         }
 
+        [Test]
+        public void OrdinaryCurrentAndDisabledStarOptionsNeverShowRewardStars()
+        {
+            var art = UsePrivateProfile();
+            for (int mode = 0; mode < 3; mode++)
+            {
+                pool.ClearAll();
+                bool fiveColor = mode != 0;
+                pool.FiveColorBoostEnabled = mode != 1;
+                art.fiveColorStarsEnabled = mode != 2;
+                Assert.That(pool.PlayImpact(fiveColor ? LabOrbElement.None : LabOrbElement.Fire,
+                    Vector3.zero, Vector3.up, Vector3.down, .4f, .6f, leaveMark: false, fiveColor: fiveColor), Is.True);
+                pool.Advance(.12f);
+                Assert.That(pool.ActiveImpactCount, Is.EqualTo(1), "Each option must still show its clay contact.");
+                Assert.That(VisibleStars(pool.transform.Find("Impact 0")), Is.Empty,
+                    mode == 0 ? "Ordinary element contacts must not gain reward stars." :
+                    mode == 1 ? "The retained current-five-color option has no new burst." :
+                    "The art-profile OFF option must suppress stars without removing the clay.");
+            }
+        }
+
+        [TestCase(false, 10)]
+        [TestCase(true, 5)]
+        public void EnhancedContactShowsOneBoundedFiveColorStarBurstFromTheAuthoredTexture(bool lowDetail, int count)
+        {
+            pool.LowDetail = lowDetail;
+            var lease = pool.BeginFlight(LabOrbElement.None, Vector3.zero, Vector3.down,
+                .4f, .6f, fiveColor: true);
+            Assert.That(lease.Hit(Vector3.zero, Vector3.up, Vector3.down, leaveMark: false), Is.True);
+            Assert.That(lease.Hit(Vector3.zero, Vector3.up, Vector3.down, leaveMark: false), Is.False,
+                "Stars must not create a second contact or consume the flight twice.");
+            pool.Advance(.12f);
+            Transform impact = pool.transform.Find("Impact 0");
+            MeshRenderer[] stars = VisibleStars(impact);
+            Assert.That(stars.Length, Is.EqualTo(count));
+            Assert.That(pool.ActiveImpactCount, Is.EqualTo(1));
+            Assert.That(stars.Select(BaseColor).Select(color => new Vector3(color.r, color.g, color.b)).Distinct().Count(),
+                Is.GreaterThanOrEqualTo(5), "One burst must read as five separate reward colors.");
+            Texture2D source = Resources.Load<Texture2D>("Yaguang/FiveColorSparkle");
+            Assert.That(source, Is.Not.Null, "Use the existing pointed-star art, not a generic mesh dot.");
+            foreach (MeshRenderer star in stars)
+            {
+                Assert.That(star.sharedMaterial.shader.name, Is.EqualTo("C6Lab/Five Elements/Reward Star"));
+                Assert.That(star.sharedMaterial.GetTexture("_MainTex"), Is.SameAs(source));
+                Assert.That(BaseColor(star).a, Is.GreaterThan(0f).And.LessThanOrEqualTo(1f));
+                Assert.That(star.transform.localScale.x, Is.GreaterThan(0f));
+            }
+            Assert.That(impact.GetComponentsInChildren<ParticleSystem>(true), Is.Empty);
+            Assert.That(impact.GetComponentsInChildren<SpriteRenderer>(true), Is.Empty);
+            Assert.That(impact.GetComponentsInChildren<Collider>(true), Is.Empty);
+            Assert.That(impact.GetComponentsInChildren<Rigidbody>(true), Is.Empty);
+            float initialAlpha = BaseColor(stars[0]).a;
+            pool.Advance(.12f);
+            Assert.That(VisibleStars(impact).Length, Is.EqualTo(count));
+            Assert.That(BaseColor(stars[0]).a, Is.GreaterThan(0f).And.LessThan(initialAlpha),
+                "The burst fades continuously on the shared contact clock instead of popping off at its lifetime.");
+            pool.Advance(.24f);
+            Assert.That(VisibleStars(impact), Is.Empty, "The short burst must end while the wet clay is still visible.");
+            Assert.That(Part(impact, "Wet surface mark").enabled, Is.True);
+        }
+
+        [UnityTest]
+        public IEnumerator RewardStarsPauseAndRebuildAtTheSameTimeWithoutAccumulatingMotion()
+        {
+            Assert.That(pool.PlayImpact(LabOrbElement.None, Vector3.zero, Vector3.up, Vector3.down,
+                .4f, .6f, leaveMark: false, fiveColor: true), Is.True);
+            pool.Advance(.2f);
+            Transform impact = pool.transform.Find("Impact 0");
+            PartGeometry[] atTime = Geometry(impact);
+            PartGeometry[] starGeometry = atTime.Where(part => part.Name.StartsWith("Reward star ")).ToArray();
+            MeshRenderer[] stars = VisibleStars(impact);
+            Assert.That(stars.Length, Is.EqualTo(10));
+            Color[] colors = stars.Select(BaseColor).ToArray();
+            float[] spin = stars.Select(part => PropertyFloat(part, "_Spin")).ToArray();
+            yield return null;
+            yield return null;
+            AssertGeometry(atTime, impact);
+            for (int i = 0; i < stars.Length; i++)
+            {
+                AssertColor(BaseColor(stars[i]), colors[i]);
+                Assert.That(PropertyFloat(stars[i], "_Spin"), Is.EqualTo(spin[i]).Within(.00001f));
+            }
+            pool.Advance(0f);
+            pool.Advance(0f);
+            AssertGeometry(atTime, impact);
+
+            pool.ClearAll();
+            Assert.That(pool.PlayImpact(LabOrbElement.None, Vector3.zero, Vector3.up, Vector3.down,
+                .4f, .6f, leaveMark: false, fiveColor: true), Is.True);
+            for (int step = 0; step < 4; step++) pool.Advance(.05f);
+            AssertGeometry(starGeometry, impact, "Reward star ");
+            MeshRenderer[] rebuilt = VisibleStars(impact);
+            Assert.That(rebuilt.Length, Is.EqualTo(stars.Length));
+            for (int i = 0; i < rebuilt.Length; i++)
+            {
+                AssertColor(BaseColor(rebuilt[i]), colors[i]);
+                Assert.That(PropertyFloat(rebuilt[i], "_Spin"), Is.EqualTo(spin[i]).Within(.00001f),
+                    "Analytic star spin must not depend on the number of simulation steps.");
+            }
+        }
+
+        [Test]
+        public void LongerStarsFinishBeforeSlotReuseAndDoNotConsumeTheGameplayRandomStream()
+        {
+            var art = UsePrivateProfile();
+            art.fiveColorStarLifetime = 1f;
+            art.fiveColorContactSeconds = .25f;
+            art.fiveColorDropLifetime = .2f;
+            Random.State previousRandom = Random.state;
+            try
+            {
+                Random.InitState(659);
+                Random.State beforeEffect = Random.state;
+                Assert.That(pool.PlayImpact(LabOrbElement.None, Vector3.zero, Vector3.up, Vector3.down,
+                    .4f, .6f, leaveMark: false, fiveColor: true), Is.True);
+                pool.Advance(.7f);
+                Transform impact = pool.transform.Find("Impact 0");
+                Assert.That(pool.ActiveImpactCount, Is.EqualTo(1), "The slot must survive until its last visual component ends.");
+                Assert.That(VisibleStars(impact).Length, Is.GreaterThan(0));
+                Assert.That(VisibleDrops(impact), Is.Empty);
+                Assert.That(Part(impact, "Wet surface mark").enabled, Is.False);
+                pool.Advance(.31f);
+                Assert.That(pool.ActiveImpactCount, Is.Zero);
+                Assert.That(VisibleStars(impact), Is.Empty);
+
+                Assert.That(pool.PlayImpact(LabOrbElement.Water, Vector3.right, Vector3.up, Vector3.down,
+                    .4f, .6f, leaveMark: false), Is.True);
+                pool.Advance(.12f);
+                Assert.That(pool.transform.Find("Impact 0"), Is.SameAs(impact));
+                Assert.That(VisibleStars(impact), Is.Empty, "Reusing the reward slot for an ordinary contact must not reveal old stars.");
+                pool.ClearAll();
+                Assert.That(pool.ActiveImpactCount, Is.Zero);
+                Assert.That(VisibleStars(impact), Is.Empty);
+                float afterEffect = Random.value;
+                Random.state = beforeEffect;
+                Assert.That(afterEffect, Is.EqualTo(Random.value),
+                    "Presentation seeds and star motion must not consume the gameplay Unity Random stream.");
+            }
+            finally { Random.state = previousRandom; }
+        }
+
+        private LabFiveElementProfile UsePrivateProfile()
+        {
+            Assert.That(privateProfile, Is.Null);
+            privateProfile = Object.Instantiate(pool.Profile);
+            typeof(LabFiveElementVfx).GetProperty(nameof(LabFiveElementVfx.Profile)).SetValue(pool, privateProfile);
+            return privateProfile;
+        }
+
+        private static MeshRenderer[] VisibleStars(Transform impact) => impact.GetComponentsInChildren<MeshRenderer>(true)
+            .Where(part => part.name.StartsWith("Reward star ") && part.enabled && part.gameObject.activeInHierarchy).ToArray();
+
+        private static float PropertyFloat(Renderer renderer, string property)
+        {
+            var block = new MaterialPropertyBlock();
+            renderer.GetPropertyBlock(block);
+            return block.GetFloat(property);
+        }
+
         private void FollowDenseStraightPath(LabFiveElementVfx.Flight lease, float diameter)
         {
             // Just above the distance threshold: the original 32-slot buffer retained less than 2.1D.
@@ -437,9 +599,10 @@ namespace C6Lab.Tests
             .Select(part => new PartGeometry { Name = part.name, Position = part.transform.localPosition,
                 Rotation = part.transform.localRotation, Scale = part.transform.localScale,
                 Mesh = part.GetComponent<MeshFilter>().sharedMesh, Enabled = part.enabled }).ToArray();
-        private static void AssertGeometry(PartGeometry[] expected, Transform slot)
+        private static void AssertGeometry(PartGeometry[] expected, Transform slot, string prefix = null)
         {
             var actual = Geometry(slot);
+            if (prefix != null) actual = actual.Where(part => part.Name.StartsWith(prefix)).ToArray();
             Assert.That(actual.Select(part => part.Name), Is.EqualTo(expected.Select(part => part.Name)));
             for (int i = 0; i < expected.Length; i++)
             {

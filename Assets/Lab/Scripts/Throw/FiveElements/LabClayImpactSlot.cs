@@ -11,6 +11,10 @@ namespace C6Lab
         private readonly MeshRenderer[] dropRenderers = new MeshRenderer[5];
         private readonly Vector3[] velocities = new Vector3[5];
         private readonly float[] sizes = new float[5];
+        // Allocate renderers only when a pooled slot first presents an enhanced reward. Never allocate per frame.
+        private readonly MeshRenderer[] stars = new MeshRenderer[12];
+        private int starCount;
+        private float starLife, starSize, starReach;
         private readonly LabClayShapes shapes;
         private readonly LabFiveElementProfile art;
         private Transform target;
@@ -57,6 +61,7 @@ namespace C6Lab
             this.diameter=diameter;
             this.strength=strength;
             this.fiveColor=fiveColor;
+            ClearStars();
             enhancedFiveColor=fiveColor && enhanceFiveColor && art.fiveColorBoostEnabled;
             singleTone=monochrome;
             spreadScale=enhancedFiveColor ? Mathf.Clamp(art.fiveColorSpreadScale,1f,1.8f) : 1f;
@@ -113,9 +118,39 @@ namespace C6Lab
                     (i+1)*LabClayShapes.FiveColorStepSeconds,fiveColorPalette) : color;
                 shapes.Paint(dropRenderers[i],dropColor,art.wetGloss,Vector3.zero);
             }
+            PrepareStars(reduced);
             root.gameObject.SetActive(true);
             Active=true;
             Tick(0f);
+        }
+
+        private void PrepareStars(bool reduced)
+        {
+            if (!enhancedFiveColor || !art.fiveColorStarsEnabled) return;
+            int requested = Mathf.Clamp(art.fiveColorStarCount, 5, stars.Length);
+            if (reduced) requested = Mathf.Min(5, requested);
+            starLife = Mathf.Clamp(art.fiveColorStarLifetime, .15f, 1f);
+            starSize = Mathf.Clamp(art.fiveColorStarSize, .1f, 1f);
+            starReach = Mathf.Clamp(art.fiveColorStarReach, 1f, 4f);
+            for (int i=0; i<requested; ++i)
+            {
+                if (stars[i] == null) stars[i] = shapes.CreateStar(root, "Reward star " + i);
+                if (stars[i] == null) break;
+                ++starCount;
+            }
+            if (starCount > 0) totalLife = Mathf.Max(totalLife, starLife);
+        }
+
+        private void ClearStars()
+        {
+            foreach (var star in stars)
+            {
+                if (star == null) continue;
+                star.enabled = false;
+                star.SetPropertyBlock(null);
+            }
+            starCount = 0;
+            starLife = 0f;
         }
 
         public void TintFiveColor(float visualAge, Color32[] palette)
@@ -149,6 +184,7 @@ namespace C6Lab
                 return;
             }
             if (followsTarget) SyncSurface();
+            TickStars();
             float paletteAge=fiveColorStartAge+Age;
             if (fiveColor)
             {
@@ -213,6 +249,35 @@ namespace C6Lab
             }
         }
 
+        private void TickStars()
+        {
+            if (starCount == 0) return;
+            bool shown = Age < starLife;
+            float u = Mathf.Clamp01(Age / starLife);
+            float expansion = 1f-(1f-u)*(1f-u)*(1f-u);
+            float sizeEnvelope = Mathf.Lerp(.6f,1f,Mathf.Clamp01(u/.12f)) *
+                (1f-Mathf.SmoothStep(0f,1f,Mathf.InverseLerp(.25f,1f,u)));
+            float alpha = 1f-Mathf.SmoothStep(0f,1f,Mathf.InverseLerp(.22f,1f,u));
+            for (int i=0; i<starCount; ++i)
+            {
+                var renderer = stars[i];
+                renderer.enabled = shown;
+                if (!shown) continue;
+                float angle = spin + 6.283185f*(i+.12f*Mathf.Sin(spin+i*2.7f))/starCount;
+                float reach = starReach*(.91f+.09f*Mathf.Sin(spin+i*1.8f));
+                float distance = Mathf.Lerp(.55f,reach,expansion);
+                var t = renderer.transform;
+                t.localPosition = new Vector3(Mathf.Cos(angle)*distance,
+                    .12f+.48f*expansion-.12f*u*u, Mathf.Sin(angle)*distance);
+                t.localRotation = Quaternion.identity;
+                t.localScale = Vector3.one*(starSize*(.9f+.1f*Mathf.Sin(spin+i*3.1f))*sizeEnvelope);
+                Color pigment = RewardDropColor(i);
+                Color tint = singleTone ? pigment : Color.Lerp(pigment, Color.white, .22f);
+                tint.a = alpha;
+                shapes.PaintStar(renderer,tint,spin+i*.71f+(i%2==0 ? 1f : -1f)*u*.9f);
+            }
+        }
+
         private Color RewardDropColor(int index)
         {
             if (singleTone) return art.monochrome;
@@ -225,6 +290,7 @@ namespace C6Lab
         {
             if (!Active) return;
             Active=false;
+            ClearStars();
             target=null;
             followsTarget=false;
             fiveColor=false; enhancedFiveColor=false; singleTone=false;

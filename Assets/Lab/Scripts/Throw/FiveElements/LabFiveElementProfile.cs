@@ -53,6 +53,15 @@ namespace C6Lab
         [Range(.2f, 1.3f)] public float fiveColorDropLifetime = .65f;
         [Range(.25f, 1.5f)] public float fiveColorContactSeconds = .95f;
 
+        [Header("Five-color reward stars • enhanced contact only")]
+        public bool fiveColorStarsEnabled = true;
+        [Range(5, 12)] public int fiveColorStarCount = 10;
+        [Range(.15f, 1f)] public float fiveColorStarLifetime = .45f;
+        [Tooltip("Peak star width in actual ball diameters.")]
+        [Range(.1f, 1f)] public float fiveColorStarSize = .42f;
+        [Tooltip("Maximum radial reach from the contact point, in actual ball diameters.")]
+        [Range(1f, 4f)] public float fiveColorStarReach = 2.6f;
+
         [Header("Maximum visible slots per scene")]
         [Range(5, 48)] public int maxFlights = 16;
         [Range(5, 64)] public int maxImpacts = 24;

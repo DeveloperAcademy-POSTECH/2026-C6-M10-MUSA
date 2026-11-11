@@ -118,6 +118,8 @@ namespace C6Lab.Tests
             Assert.That(impact.Find("Wet surface mark").GetComponent<MeshRenderer>().enabled, Is.True);
             Assert.That(impact.GetComponentsInChildren<ParticleSystem>(true), Is.Empty);
             Assert.That(impact.Find("Element release"), Is.Null);
+            Assert.That(VisibleStars(impact).Length, Is.EqualTo(fiveColor ? 10 : 0),
+                "Only enhanced five-color contact adds the short sampled reward stars.");
             Assert.That(pool.GetComponentsInChildren<Collider>(true), Is.Empty);
             Assert.That(pool.GetComponentsInChildren<Rigidbody>(true), Is.Empty);
             AssertIndependentAndUnchanged();
@@ -150,6 +152,7 @@ namespace C6Lab.Tests
             Assert.That(pool.GetComponentsInChildren<SpriteRenderer>(true), Is.Empty);
             Assert.That(Object.FindObjectsByType<LabFiveColorSparkle>(FindObjectsSortMode.None)
                 .Any(v => v.name.Contains("Burst")), Is.False);
+            Assert.That(VisibleStars(impact).Length, Is.EqualTo(10), "The independent star shader survives wet-clay fallback.");
             Matrix4x4[] sample = Geometry(impact);
             replay.Sample(Elapsed(shot, 0, .2f));
             Assert.That(Geometry(impact), Is.EqualTo(sample));
@@ -168,10 +171,12 @@ namespace C6Lab.Tests
                 Assert.That(replay.CurrentPass, Is.EqualTo(pass));
                 Assert.That(pool.ActiveFlightCount, Is.EqualTo(1));
                 Assert.That(pool.ActiveImpactCount, Is.Zero, "A camera cut retires the old contact immediately.");
+                Assert.That(VisibleStars(pool.transform).Length, Is.Zero, "Camera cuts do not leak the last burst.");
                 replay.Sample(Elapsed(shot, pass, .2f));
                 Assert.That(replay.ImpactsPresented, Is.EqualTo(pass + 1));
                 Assert.That(pool.ActiveFlightCount, Is.Zero);
                 Assert.That(pool.ActiveImpactCount, Is.EqualTo(1));
+                Assert.That(VisibleStars(pool.transform).Length, Is.EqualTo(10));
                 AssertIndependentAndUnchanged();
             }
             replay.ResetPresentation();
@@ -185,9 +190,9 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
-        public IEnumerator SampledClayFollowsTheDrawnPoseAndFreezesOnRepeatedSamplesAndSkip()
+        public IEnumerator SampledClayFollowsTheDrawnPoseAndFreezesOnRepeatedSamplesAndSkip([Values(false, true)] bool fiveColor)
         {
-            LabFinishReplayShot shot = Shot(LabOrbElement.Earth, false);
+            LabFinishReplayShot shot = Shot(fiveColor ? LabOrbElement.None : LabOrbElement.Earth, fiveColor);
             Matrix4x4 fixedHitbox = target.Hitbox.transform.localToWorldMatrix;
             Assert.That(replay.Begin(shot), Is.True);
             replay.Sample(Elapsed(shot, 0, .05f));
@@ -214,7 +219,7 @@ namespace C6Lab.Tests
         public void LateContactSampleMatchesIncrementalReplayTime()
         {
             // Cover the visible squash as well as the later spread and thrown drops.
-            foreach (float time in new[] { .05f, .2f }) AssertLateContactSample(time);
+            foreach (float time in new[] { .05f, .2f, .28f }) AssertLateContactSample(time);
         }
 
         private void AssertLateContactSample(float sampleTime)
@@ -227,6 +232,8 @@ namespace C6Lab.Tests
             Transform impact = replay.ClayVfx.transform.Find("Impact 0");
             MeshRenderer[] incrementalParts = impact.GetComponentsInChildren<MeshRenderer>(true);
             bool[] incrementalEnabled = incrementalParts.Select(r => r.enabled).ToArray();
+            Assert.That(VisibleStars(impact).Length, Is.EqualTo(sampleTime < .45f ? 10 : 0),
+                "Reward stars use the same sampled contact clock as the visible clay.");
             string[] visibleParts = VisibleParts(impact).Select(r => r.name).ToArray();
             Matrix4x4[] incremental = VisibleParts(impact).Select(r => r.transform.localToWorldMatrix).ToArray();
             Color[] incrementalColors = VisibleParts(impact).Select(BaseColor).ToArray();
@@ -252,6 +259,9 @@ namespace C6Lab.Tests
             Assert.That(replay.ImpactsPresented, Is.EqualTo(1), "Late sampling does not replay an authority contact.");
             AssertIndependentAndUnchanged();
         }
+
+        private static MeshRenderer[] VisibleStars(Transform impact) => VisibleParts(impact)
+            .Where(renderer => renderer.name.StartsWith("Reward star ")).ToArray();
 
         private static MeshRenderer[] VisibleParts(Transform impact) => impact.GetComponentsInChildren<MeshRenderer>(true)
             .Where(renderer => renderer.enabled && renderer.gameObject.activeInHierarchy).ToArray();
