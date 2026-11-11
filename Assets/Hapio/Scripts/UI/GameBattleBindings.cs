@@ -64,6 +64,8 @@ namespace Hapio
             if (!session.IsTutorial) gameObject.AddComponent<GameBattleUiPresentation>().Bind(this, session);
             else gameObject.AddComponent<GameTutorialBoardPresentation>().Bind(this);
             gameObject.AddComponent<GameHelpView>().Bind(this, session);
+            // The gourd's sunk part stays visible over the ground (presentation only; no height, motion or size change).
+            gameObject.AddComponent<GameGourdOverGround>().Bind(target, battleFloor);
             // #492: the stage's sound data and 지귀 art load here, behind the opaque preparing overlay, not on first use.
             float warmupStarted = Time.realtimeSinceStartup;
             int warmed = LabBattleAudioWarmup.Preload(network.GameStageYokai, this);
