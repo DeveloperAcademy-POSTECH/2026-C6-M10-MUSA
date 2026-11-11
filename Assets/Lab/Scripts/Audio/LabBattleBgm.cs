@@ -88,7 +88,18 @@ namespace C6Lab
         private float TargetVolume => BaseVolume * LabAudioSettings.BgmVolume;
         private float FeverTargetVolume => (jigwiFever && network != null && network.config != null ? network.config.JigwiFeverBgmVolume
             : gumihoFever && network != null && network.config != null
-            ? network.config.GumihoFeverBgmVolume : BaseVolume * feverVolume) * LabAudioSettings.BgmVolume;
+            ? network.config.GumihoFeverBgmVolume
+            : yaguangBgm && network != null && network.config != null ? network.config.YaguangFeverBgmVolume * feverVolume
+            : BaseVolume * feverVolume) * LabAudioSettings.BgmVolume;
+
+        // #629 라운드별 빠르기 (LabConfig Inspector). 땅따먹기·Lab 단판·예전 꽹과리 BGM은 원래 빠르기.
+        private float BattleSpeed => network == null || network.config == null || territoryRound ? 1f
+            : jigwiBgm ? network.config.JigwiBgmSpeed : gumihoBgm ? network.config.GumihoBgmSpeed
+            : yaguangBgm ? network.config.YaguangBgmSpeed : 1f;
+        private float FeverSpeed => network == null || network.config == null ? 1f
+            : jigwiFever ? network.config.JigwiFeverBgmSpeed : gumihoFever ? network.config.GumihoFeverBgmSpeed
+            : yaguangBgm ? network.config.YaguangFeverBgmSpeed : 1f;
+        private bool territoryRound;
 
         public void Bind(LabNetwork target) => network = target;
 
@@ -144,7 +155,9 @@ namespace C6Lab
                 jigwiFever = jigwi;
                 feverSource.Stop();
                 feverSource.clip = clip;
-                feverSource.time = Mathf.Clamp((float)elapsed, 0f, Mathf.Max(0f, clip.length - .05f));
+                feverSource.pitch = FeverSpeed;
+                // At another speed the song has moved on that many times as far since the fever began.
+                feverSource.time = Mathf.Clamp((float)elapsed * FeverSpeed, 0f, Mathf.Max(0f, clip.length - .05f));
                 using (LabFirstUse.Measure(LabFirstUseKind.FeverMusic)) feverSource.Play();
                 if (elapsed < CueWindowSeconds) PlayFeverCue();
             }
@@ -154,6 +167,7 @@ namespace C6Lab
             source.volume = TargetVolume * (1f - feverBlend);
             feverSource.volume = FeverTargetVolume * feverBlend;
             if (!feverOn) return;
+            feverSource.pitch = FeverSpeed;
             if (snapshot.paused) { if (feverSource.isPlaying) feverSource.Pause(); }
             else if (!feverSource.isPlaying) { feverSource.UnPause(); if (!feverSource.isPlaying) feverSource.Play(); }
         }
@@ -246,6 +260,7 @@ namespace C6Lab
                     AudioClip stageClip = snapshot.teamTerritory ? (territoryClip != null ? territoryClip : gumihoClip)
                         : network.GameStageYokai == LabStageYokai.Gumiho ? gumihoClip : null;
                     gumihoBgm = stageClip != null;
+                    territoryRound = snapshot.teamTerritory;
                     jigwiBgm = !gumihoBgm && jigwiClip != null && network.GameStageYokai == LabStageYokai.Jigwi;
                     yaguangBgm = !gumihoBgm && !jigwiBgm && WantsYaguangBgm();
                     source.Stop();
@@ -330,7 +345,7 @@ namespace C6Lab
         private void SetTone(float semitones)
         {
             toneSemitones = semitones;
-            if (source != null) source.pitch = Mathf.Pow(2f, semitones / 12f);
+            if (source != null) source.pitch = BattleSpeed * Mathf.Pow(2f, semitones / 12f);
         }
 
         private void StopNow()
