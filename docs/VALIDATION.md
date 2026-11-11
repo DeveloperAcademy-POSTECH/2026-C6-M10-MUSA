@@ -7860,3 +7860,11 @@ The initial cinematic fixture passed 1/2 because it incorrectly expected Skip al
 Prepared `feat/opening-28-frame-direction` with only the opening commits and merged origin/main `45001d21` (battle BGM updates). The original checkout remains on its existing local review branch with its preview and personal settings preserved; host-control work from #647 is not part of this PR. The sole cherry-pick conflict was this validation document; existing history and the new opening record were retained.
 
 All 279 changed opening code/asset/test files (excluding the tutorial test file, which retains main's independent Help-button assertions) have identical Git blob hashes to the tested local revision `fb021e31`. The main merge adds only six audio-file changes relative to the prepared opening branch. Accordingly, the preceding 17 EditMode and 27 PlayMode results are reused for unchanged opening behavior; they are not reported as a new run after this audio-only integration. The initial full tutorial handoff check remains separately dated above. Source/document whitespace checks and PR scope review passed; no scene, title, project setting, build profile or network-protocol changes are included.
+
+
+## 2026-11-11 — #671 오프닝 건너뛰기 버튼
+
+- 기준: main `81e64ca0`, Unity 6000.6.5f1, 기존 프로젝트의 `feat/671-opening-skip-button`. 개인 ProjectSettings·iOS Build Profile은 수정 범위에 포함하지 않음.
+- 최종 PlayMode 17/17 통과: OpeningSkipButtonTests 2, OpeningCinematicTests 2, GameOpeningControllerTests 13. 28개 화면의 표시/숨김, 숨겨진 버튼 요청 차단, 클릭 종료 1회·다시보기·취소, 3가지 화면 비율의 그림/버튼 배치 일치, 기존 타이틀·구름 전환 검증.
+- Home 실제 재생에서 타이틀 버튼 비표시, 1번 새 버튼 표시, 버튼 중심 EventSystem raycast 첫 대상 `Skip` 확인. Game View 캡처로 원본 모양·위치·색상·투명도 확인. 마지막 콘솔 오류 0건.
+- 전체 테스트 모음과 iOS 빌드·실기기 검증은 수행하지 않음.

@@ -241,7 +241,6 @@ RectTransform:
   - {fileID: 3780492962297962317}
   - {fileID: 6509153004746603963}
   - {fileID: 4631790954849023250}
-  - {fileID: 3228234865652354153}
   - {fileID: 6400267387618275332}
   - {fileID: 6969811112803051911}
   m_Father: {fileID: 7865618372343885330}
@@ -422,6 +421,7 @@ RectTransform:
   - {fileID: 637737036929475395}
   - {fileID: 1911838615929269167}
   - {fileID: 7865618372343885330}
+  - {fileID: 4233223366012408619}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -511,9 +511,11 @@ MonoBehaviour:
   speakerText: {fileID: 6198283357082384012}
   dialogueText: {fileID: 4711450960543843838}
   progressText: {fileID: 3047539479284572977}
+  hideProgress: 0
   nextButton: {fileID: 6739533530228933966}
   previousButton: {fileID: 4718937416080140941}
   skipButton: {fileID: 4450910861899289541}
+  hideSkipDuringCinematics: 1
   autoButton: {fileID: 8489945982841522918}
   autoLabel: {fileID: 7529809870635766389}
   speakerBadge: {fileID: 5908507122690048356}
@@ -521,6 +523,7 @@ MonoBehaviour:
   voiceSource: {fileID: 257042265640424925}
   playOnStart: 0
   touchOnly: 1
+  hideInlineContinueButtons: 0
   onCompleted:
     m_PersistentCalls:
       m_Calls: []
@@ -981,12 +984,12 @@ RectTransform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 3974722283543494784}
-  m_Father: {fileID: 2029695472022896389}
+  m_Father: {fileID: 4233223366012408619}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 230, y: -2}
-  m_SizeDelta: {x: 64, y: 30}
+  m_AnchoredPosition: {x: 7, y: -53}
+  m_SizeDelta: {x: 115, y: 38}
   m_Pivot: {x: 0, y: 1}
 --- !u!222 &4553913988517138298
 CanvasRenderer:
@@ -1009,16 +1012,16 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 0.96, g: 0.91, b: 0.81, a: 0.92}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 0}
+  m_Sprite: {fileID: 21300000, guid: 05af6dc4189514036b6256c5b81bf8be, type: 3}
   m_Type: 0
-  m_PreserveAspect: 0
+  m_PreserveAspect: 1
   m_FillCenter: 1
   m_FillMethod: 4
   m_FillAmount: 1
@@ -1048,9 +1051,9 @@ MonoBehaviour:
   m_Transition: 1
   m_Colors:
     m_NormalColor: {r: 1, g: 1, b: 1, a: 1}
-    m_HighlightedColor: {r: 0.9607843, g: 0.9607843, b: 0.9607843, a: 1}
+    m_HighlightedColor: {r: 1, g: 1, b: 1, a: 1}
     m_PressedColor: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 1}
-    m_SelectedColor: {r: 0.9607843, g: 0.9607843, b: 0.9607843, a: 1}
+    m_SelectedColor: {r: 1, g: 1, b: 1, a: 1}
     m_DisabledColor: {r: 0.78431374, g: 0.78431374, b: 0.78431374, a: 0.5019608}
     m_ColorMultiplier: 1
     m_FadeDuration: 0.1
@@ -1070,6 +1073,56 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls: []
+--- !u!1 &3260858441452892184
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 4233223366012408619}
+  - component: {fileID: 2327468474369442527}
+  m_Layer: 0
+  m_Name: Opening Skip Overlay
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &4233223366012408619
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3260858441452892184}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 0, y: 0, z: 0}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 3228234865652354153}
+  m_Father: {fileID: 8786650136082993880}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 402, y: 874}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &2327468474369442527
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3260858441452892184}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1d50f936c05504e0fb090eba6882b026, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryPageFit
+  referenceSize: {x: 402, y: 874}
 --- !u!1 &3516074946326799807
 GameObject:
   m_ObjectHideFlags: 0
@@ -1872,7 +1925,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &3974722283543494784
 RectTransform:
   m_ObjectHideFlags: 0
