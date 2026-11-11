@@ -3277,6 +3277,45 @@ namespace C6Lab.Tests
         }
 
         /// <summary>
+        /// #664, only with a short DEV interval: the last BIG/SMALL stays in the snapshot while the next round runs, so its
+        /// badge, sounds and BGM tone run on; a drop at the very moment a round is lost starts the next round at once.
+        /// </summary>
+        [Test]
+        public void TheLastFoxRoundResultStaysWhileTheNextRoundRuns()
+        {
+            var mix = MixConfig(5f, bomb: 0, block: 0, fox: 1, charm: 0);
+            try
+            {
+                var solo = new LabModel();
+                solo.BeginSolo("fox-next", 42ul, 0d, mix);
+                solo.Tick(5d);
+                string[] first = solo.DrainFoxFires().Single().OrbIds;
+                for (int i = 0; i < first.Length; i++)
+                    Assert.That(solo.TryUseItemAt(42ul, first[i], "fox-next-" + i, 6d, new Vector2(.5f, .5f), out _, out string reason),
+                        Is.True, reason);
+                Assert.That(solo.Snapshot(6d).LastEffectResult(out double at), Is.EqualTo(1), "Cleared: BIG.");
+                Assert.That(at, Is.EqualTo(6d));
+
+                solo.Tick(10d);
+                LabSnapshot next = solo.Snapshot(10d);
+                Assert.That(next.FoxRoundOn(10d), Is.True, "The next drop starts a new round...");
+                Assert.That((next.foxRoundStartedAt, next.foxRoundEndsAt), Is.EqualTo((10d, 25d)));
+                Assert.That(next.LastEffectResult(out at), Is.EqualTo(1), "...and the last BIG still shows.");
+                Assert.That((at, next.foxRoundResult, next.foxRoundCount), Is.EqualTo((6d, 1, 1)));
+
+                // Drops at 15 s and 20 s join the round; at 25 s it is lost and the drop due at the same moment starts the next.
+                solo.Tick(25d);
+                LabSnapshot lost = solo.Snapshot(25d);
+                Assert.That(lost.LastEffectResult(out at), Is.EqualTo(-1), "Its own result replaces the last one.");
+                Assert.That((at, lost.foxRoundCount), Is.EqualTo((25d, 2)));
+                Assert.That(lost.FoxRoundOn(25d), Is.True, "The drop at the same moment is a new round, not a settled one.");
+                Assert.That((lost.foxRoundStartedAt, lost.foxRoundEndsAt), Is.EqualTo((25d, 40d)));
+                Assert.That(lost.foxRoundRemaining, Is.GreaterThan(0));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(mix); }
+        }
+
+        /// <summary>
         /// #664: a charmed player does nothing at all until the charm ends: no throw (#251), no pass, no drum, no combine;
         /// and nothing can be passed to them. Everyone else plays on.
         /// </summary>
@@ -3480,6 +3519,123 @@ namespace C6Lab.Tests
                 }
             }
             finally { UnityEngine.Object.DestroyImmediate(mix); }
+        }
+
+        /// <summary>
+        /// #664: a swipe block cast at the same moment no longer swallows the unique gimmick. Fox fire still falls on the
+        /// blocked board, so a lone player always gets one; the charm keeps passing over the blocked player.
+        /// </summary>
+        [Test]
+        public void ASwipeBlockAtTheSameMomentLeavesTheFoxFireButNotTheCharm()
+        {
+            var mix = MixConfig(5f, bomb: 0, block: 1, fox: 1, charm: 1);
+            var foxOnly = MixConfig(5f, bomb: 0, block: 1, fox: 1, charm: 0);
+            var charmOnly = MixConfig(5f, bomb: 0, block: 1, fox: 0, charm: 1);
+            try
+            {
+                for (int run = 0; run < 12; run++)
+                {
+                    var solo = new LabModel();
+                    solo.BeginSolo("block-fox-solo-" + run, 42ul, 0d, mix);
+                    solo.Tick(5d);
+                    LabSabotage[] cast = solo.DrainSabotages();
+                    Assert.That(cast.Select(item => item.Kind), Is.EqualTo(new[] { LabSabotageKind.SwipeBlock, LabSabotageKind.FoxFire }),
+                        "Alone: the block first, then fox fire every time (the charm cannot go to a blocked player).");
+                    Assert.That(solo.DrainFoxFires().Single().Target, Is.EqualTo(42ul), "On the blocked board itself.");
+                    Assert.That(solo.Snapshot(5d).FoxRoundOn(5d), Is.True);
+                }
+
+                var room = new LabModel();
+                room.Begin("block-fox-room", new ulong[] { 10, 20, 30 }, 0d, foxOnly);
+                room.Tick(5d);
+                ulong blocked = room.Snapshot(5d).swipeBlockedPlayer;
+                Assert.That(room.Snapshot(5d).SwipeBlockOn(blocked), Is.True);
+                Assert.That(room.DrainFoxFires().Select(drop => drop.Target), Is.EqualTo(new ulong[] { 10, 20, 30 }),
+                    "Every board, the blocked one included.");
+
+                var alone = new LabModel();
+                alone.BeginSolo("block-charm-solo", 42ul, 0d, charmOnly);
+                alone.Tick(5d);
+                Assert.That(alone.DrainSabotages().Select(item => item.Kind), Is.EqualTo(new[] { LabSabotageKind.SwipeBlock }),
+                    "The charm still never lands on a blocked player.");
+                Assert.That(alone.Snapshot(5d).CharmTargets(), Is.Empty);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(mix);
+                UnityEngine.Object.DestroyImmediate(foxOnly);
+                UnityEngine.Object.DestroyImmediate(charmOnly);
+            }
+        }
+
+        /// <summary>
+        /// #664 DEV: the five-player charm count (259, default 2) and the fox round's time (260, default 15 s, 0 = off) append
+        /// to the shared form, round-trip, reject what they cannot be, and the Host follows them.
+        /// </summary>
+        [Test]
+        public void TheDevCharmCountAndFoxRoundTimeDriveTheHost()
+        {
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(261));
+            Assert.That((LabConfig.CharmTargetsAtFiveField, LabConfig.FoxRoundSecondsField), Is.EqualTo((259, 260)),
+                "Appended after the clay rows; every older index stays put.");
+            Assert.That(LabConfig.DeveloperFields[259].WholeNumber, Is.True);
+            foreach (LabConfig source in new[] { ScriptableObject.CreateInstance<LabConfig>(), Resources.Load<LabConfig>("LabConfig") })
+            {
+                float[] defaults = source.CaptureDeveloperValues();
+                Assert.That((defaults[259], defaults[260]), Is.EqualTo((2f, 15f)), source.name + ": two charmed, fifteen seconds.");
+                if (string.IsNullOrEmpty(source.name)) UnityEngine.Object.DestroyImmediate(source);
+            }
+
+            var charm = MixConfig(5f, bomb: 0, block: 0, fox: 0, charm: 1);
+            var fox = MixConfig(5f, bomb: 0, block: 0, fox: 1, charm: 0);
+            try
+            {
+                float[] values = charm.CaptureDeveloperValues();
+                foreach (float invalid in new[] { 0f, 3f, 1.5f })
+                {
+                    float[] wrong = (float[])values.Clone();
+                    wrong[259] = invalid;
+                    Assert.That(charm.TryApplyDeveloperValues(wrong, out _), Is.False, "Charm count " + invalid);
+                }
+                values[259] = 1f;
+                Assert.That(charm.TryApplyDeveloperValues(values, out string error), Is.True, error);
+                Assert.That(charm.CaptureDeveloperValues()[259], Is.EqualTo(1f));
+                var room = new LabModel();
+                room.Begin("charm-dev-one", new ulong[] { 10, 20, 30, 40, 50 }, 0d, charm);
+                room.Tick(5d);
+                Assert.That(room.Snapshot(5d).charmedPlayers.Length, Is.EqualTo(1), "Set to one, a room of five charms one.");
+
+                values = fox.CaptureDeveloperValues();
+                foreach (float invalid in new[] { -1f, 61f, float.NaN })
+                {
+                    float[] wrong = (float[])values.Clone();
+                    wrong[260] = invalid;
+                    Assert.That(fox.TryApplyDeveloperValues(wrong, out _), Is.False, "Fox round " + invalid);
+                }
+                values[260] = 8f;
+                Assert.That(fox.TryApplyDeveloperValues(values, out error), Is.True, error);
+                var timed = new LabModel();
+                timed.BeginSolo("fox-dev-8", 42ul, 0d, fox);
+                timed.Tick(5d);
+                Assert.That(timed.Snapshot(5d).foxRoundEndsAt, Is.EqualTo(13d), "Eight seconds to clear them.");
+
+                values[260] = 0f;
+                Assert.That(fox.TryApplyDeveloperValues(values, out error), Is.True, error);
+                var plain = new LabModel();
+                plain.BeginSolo("fox-dev-off", 42ul, 0d, fox);
+                plain.Tick(5d);
+                string[] foxes = plain.DrainFoxFires().Single().OrbIds;
+                Assert.That(plain.Snapshot(5d).FoxRoundOn(5d), Is.False, "0 turns the round off...");
+                plain.Tick(5d + fox.OrbLifetimeSeconds + .1d);
+                Assert.That(plain.DrainOrbExpiries().Select(item => item.OrbId), Is.SupersetOf(foxes),
+                    "...and each fox orb fades after the orb lifetime, as before.");
+                Assert.That(plain.Snapshot(5d + fox.OrbLifetimeSeconds + .1d).foxRoundCount, Is.Zero, "No BIG or SMALL.");
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(charm);
+                UnityEngine.Object.DestroyImmediate(fox);
+            }
         }
 
         /// <summary>

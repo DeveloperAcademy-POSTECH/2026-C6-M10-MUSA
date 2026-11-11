@@ -1782,7 +1782,10 @@ namespace C6Lab
             {
                 ulong player = seats[i];
                 if (last.HasValue && player == last.Value && activeSeatCount > 1) continue;
-                if (blocking && player == swipeBlockedPlayer) continue;
+                // #664: fox fire falls on a swipe-blocked board too (the team clears every board's fox orbs, and a lone
+                // player is no longer left with nothing when a block lands at the same moment). Other gimmicks, the charm
+                // above all, still pass over the blocked player so two of them never stack on one person.
+                if (blocking && player == swipeBlockedPlayer && kind != LabSabotageKind.FoxFire) continue;
                 if (charming && charmTargets.Contains(player)) continue;
                 if (JigwiBlocksSabotage(player, at)) continue;
                 if (kind == LabSabotageKind.FoxFire && CountStored(player, at) >= rules.OrbStorageLimit) continue;
@@ -2071,11 +2074,11 @@ namespace C6Lab
                 FoxFireCountMin = config.FoxFireCountMin;
                 FoxFireCountMax = config.FoxFireCountMax;
                 FoxFireSafeSeconds = config.FoxFireSafeSeconds;
-                FoxRoundSeconds = 15f;
+                FoxRoundSeconds = config.FoxRoundSeconds;
                 CharmSeconds = config.CharmSeconds;
                 CharmWarningSeconds = config.CharmWarningSeconds;
                 CharmRescueTaps = config.CharmRescueTaps;
-                CharmTargetsAtFive = 2;
+                CharmTargetsAtFive = config.CharmTargetsAtFive;
                 DrumStopBounds = config.DrumStopBounds();
                 DrumStopChances = config.DrumStopChances();
                 PaintColors = new Color[(int)LabOrbElement.Earth + 1];
