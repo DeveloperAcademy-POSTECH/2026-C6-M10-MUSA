@@ -9,11 +9,11 @@ namespace C6Lab
     {
         public const string ResourceFolder = "GourdPaint/ClaySticker/";
         public const string StyleVersion = "clay-stickers-v2";
-        [Range(.1f,1f)] public float minimumDensity = .65f;
+        [Range(.1f,1f)] public float minimumDensity = 1f;
         [Range(.1f,1f)] public float maximumDensity = 1f;
         public LabClayStickerSettings SanitizedCopy()
         {
-            float min = Mathf.Clamp(float.IsFinite(minimumDensity) ? minimumDensity : .65f,.1f,1f);
+            float min = Mathf.Clamp(float.IsFinite(minimumDensity) ? minimumDensity : 1f,.1f,1f);
             float max = Mathf.Clamp(float.IsFinite(maximumDensity) ? maximumDensity : 1f,min,1f);
             return new LabClayStickerSettings { minimumDensity=min, maximumDensity=max };
         }

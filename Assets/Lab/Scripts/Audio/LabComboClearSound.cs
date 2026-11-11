@@ -8,6 +8,7 @@ namespace C6Lab
     /// Host 스냅샷의 콤보 결과 순번이 새로 늘었고 결과가 성공일 때 한 번만 낸다. 새 라운드·세션이면 처음부터 다시 세고,
     /// 접속 직후 이미 끝난 결과는 내지 않는다(LabHaptics와 같은 방식). 소리 파일은 Resources/Audio/ComboClear 폴더의
     /// 파일을 쓰고(여러 개면 무작위), 없으면 조용히 넘어간다. 크기는 volume × 일시정지 메뉴 효과음 설정.
+    /// #664: 구미호 여우구슬 판정도 같다. 제한 시간 안에 다 지우면 "좋다", 시간이 다 되면 실패 소리 (판정 순번이 새로 늘 때 한 번).
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class LabComboClearSound : MonoBehaviour
@@ -25,6 +26,7 @@ namespace C6Lab
         private string session;
         private uint round;
         private uint resultCount;
+        private int foxRoundCount;
 
         public int ClipCount => clips == null ? 0 : clips.Length;
         public int FailClipCount => failClips == null ? 0 : failClips.Length;
@@ -53,23 +55,39 @@ namespace C6Lab
         public bool Observe(LabSnapshot snapshot)
         {
             if (snapshot == null || snapshot.phase != LabPhase.Playing) return false;
-            if (snapshot.sessionId != session || snapshot.round != round || snapshot.comboResultCount < resultCount)
+            if (snapshot.sessionId != session || snapshot.round != round || snapshot.comboResultCount < resultCount
+                || snapshot.foxRoundCount < foxRoundCount)
             {
                 session = snapshot.sessionId;
                 round = snapshot.round;
                 resultCount = snapshot.comboResultCount;
+                foxRoundCount = snapshot.foxRoundCount;
                 return false;
             }
-            if (snapshot.comboResultCount == resultCount) return false;
+            bool cleared = false;
+            // #664 여우구슬 판정: 다 지우면 성공(1), 시간이 다 되면 실패(-1)
+            if (snapshot.foxRoundCount != foxRoundCount)
+            {
+                foxRoundCount = snapshot.foxRoundCount;
+                cleared = PlayResult(System.Math.Sign(snapshot.foxRoundResult));
+            }
+            if (snapshot.comboResultCount == resultCount) return cleared;
             resultCount = snapshot.comboResultCount;
-            if (snapshot.comboResult == LabComboResult.WrongColor || snapshot.comboResult == LabComboResult.Timeout)
+            bool failed = snapshot.comboResult == LabComboResult.WrongColor || snapshot.comboResult == LabComboResult.Timeout;
+            return PlayResult(failed ? -1 : snapshot.comboResult == LabComboResult.Success ? 1 : 0) || cleared;
+        }
+
+        /// <summary>성공(1)이면 "좋다", 실패(-1)면 실패 소리를 낸다. 성공이면 true.</summary>
+        private bool PlayResult(int result)
+        {
+            if (result < 0)
             {
                 FailPlayCount++;
                 if (failClips != null && failClips.Length > 0 && source != null)
                     source.PlayOneShot(failClips[Random.Range(0, failClips.Length)], failVolume * LabAudioSettings.SfxVolume);
                 return false;
             }
-            if (snapshot.comboResult != LabComboResult.Success) return false;
+            if (result == 0) return false;
             PlayCount++;
             if (clips != null && clips.Length > 0 && source != null)
                 source.PlayOneShot(clips[Random.Range(0, clips.Length)], volume * LabAudioSettings.SfxVolume);

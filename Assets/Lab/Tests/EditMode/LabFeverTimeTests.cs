@@ -45,7 +45,7 @@ namespace C6Lab.Tests
         [Test]
         public void FeverTimeAppendsTwoDevRowsInItsOwnGroup()
         {
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(259));
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(265));
             Assert.That(LabConfig.DeveloperFields.Skip(238).Take(2).Select(field => field.Label), Is.EqualTo(new[]
             {
                 "피버 타임 시작 (남은 초, 0 = 끔)", "피버 타임 충전 배율"
@@ -203,6 +203,12 @@ namespace C6Lab.Tests
                     Assert.That(foxes, Is.Not.Empty);
                     Assert.That(after.orbs.Any(orb => orb.kind == LabOrbKind.FoxFire), Is.False);
                     Assert.That(model.DrainOrbExpiries().Select(item => item.OrbId), Is.SupersetOf(foxes), "In their blue smoke.");
+                    // #664: the team's fox round is called off with no reward or penalty.
+                    Assert.That(before.FoxRoundOn(99.9d), Is.True);
+                    Assert.That(after.FoxRoundOn(100.2d), Is.False);
+                    Assert.That(after.foxRoundResult, Is.Zero, "Neither cleared nor lost.");
+                    Assert.That(after.players.All(player => player.comboRewardUntil < 100.2d && player.comboPenaltyUntil < 100.2d),
+                        Is.True, "No BIG, no SMALL.");
                     break;
                 case LabSabotageKind.Charm:
                     Assert.That(before.CharmWarningAt(99.9d), Is.True, "Warned at 98 s, due to start at 101 s.");

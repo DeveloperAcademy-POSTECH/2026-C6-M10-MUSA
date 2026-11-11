@@ -60,8 +60,8 @@ Paint의 HP와 결과 대시보드는 구분한다. Paint의 `damageTotal`은 �
 | DEV 입력 이름 | 위치 | 기본값 | 입력 범위 | 효과 |
 | --- | --- | ---: | --- | --- |
 | Paint Surface Resolution (0 low 1 medium 2 high) | 105번째 · 인덱스 104 | 2 | 정수 0–2 | 0: 64×32, 1: 128×64, 2: 256×128 동일 면적 구면 셀. 새 판에서 적용한다. |
-| Paint Initial Coverage (%) | 106번째 · 인덱스 105 | 2 | 0.1–100% | 미도색 명중의 전체 초기 면적 예산. 고정 크기 마스크의 빈 셀만 즉시 칠하고 겹침 잔량은 명중점 주변 시간 성장으로 넘긴다. 전체 셀 수 기준으로 양자화한다. |
-| Paint Repeat Growth (%) | 107번째 · 인덱스 106 | 1.5 | 0.1–100% | 이미 칠한 지점에 맞히면 연결된 영역에 추가하는 성장 면적 예산. 기존 셀 색은 바꾸지 않는다. |
+| Paint Initial Coverage (%) | 106번째 · 인덱스 105 | 1.3 | 0.1–100% | 미도색 명중의 전체 초기 면적 예산. 고정 크기 마스크의 빈 셀만 즉시 칠하고 겹침 잔량은 명중점 주변 시간 성장으로 넘긴다. 전체 셀 수 기준으로 양자화한다. |
+| Paint Repeat Growth (%) | 107번째 · 인덱스 106 | 1 | 0.1–100% | 이미 칠한 지점에 맞히면 연결된 영역에 추가하는 성장 면적 예산. 기존 셀 색은 바꾸지 않는다. |
 | Paint Growth Speed (%/s) | 108번째 · 인덱스 107 | 6 | 0.1–100%/초 | 모든 영역이 함께 나눠 쓰는 전체 표면 기준 성장 속도. 영역 수만큼 속도가 늘지 않는다. |
 | Paint Fill Chance (%) | 109번째 · 인덱스 108 | 60 | 0–100% | 이웃이 둘 이상 칠해진 빈 셀을 우선 채울 확률. 해당 후보가 없으면 다른 인접 후보로 진행한다. |
 | Paint Vertical Weight | 110번째 · 인덱스 109 | 1.35 | 1–4 | 세로 방향 인접 후보의 선택 가중치. 1은 가로와 같은 가중치다. |
@@ -568,7 +568,7 @@ DEV → Gourd의 `Player Paint Patterns`(138번째, 인덱스137)와 `Completed 
 
 | 설정 | 인덱스 | 저장 기본값 | 범위 | 적용 |
 | --- | --- | --- | --- | --- |
-| Paint Repeat Growth (%) |106|1.5|기존 범위 유지|타격 한 번의 면적 공급. 해상도와 독립적인 전체 표면 비율|
+| Paint Repeat Growth (%) |106|1|기존 범위 유지|타격 한 번의 면적 공급. 해상도와 독립적인 전체 표면 비율|
 | Paint Growth Speed (%/s) |107|6|기존 범위 유지|모든 연결 영역이 나누는 전역 성장 속도|
 | Paint Cluster Compactness |138|0.85|0~1|군집의 넓은 접촉·빈틈 메우기 선호도.0이어도 지역 군집 탐색은 유지|
 | Paint Cluster Irregularity |139|0.25|0~1|군집별 고정된 완만한 구면 굴곡. 셀별 백색 잡음은 추가하지 않음|
@@ -935,3 +935,24 @@ DEV 행이 없는 고정 규칙(`LabJigwiABTimeline`): 예고 2초(`WarningSecon
 55·87·88·152·154·167·168·211·230~234 13개와, #509가 은퇴시켰지만 Inspector에 남아 있던 251~255 5개에 `HideInInspector`를 붙였다(229·241·242·244·245·246·247은 이미 숨김). `SerializeField`는 그대로라 `LabConfig.asset`의 저장값과 DEV 배열 값은 바뀌지 않는다. 211에 붙어 있던 `Yaguang stage schedule` 머리글은 다음 칸(212)으로 옮겨 Inspector에 남긴다. 253에 붙어 있던 `Jigwi B free extinguishing supplies` 머리글은 아직 쓰는 256(발화점 거리) 위로 옮기고 `Jigwi B fire target depth`로 이름을 바꿨다.
 
 근거: `LabConfig.InactiveDeveloperFields`·`IsInactiveDeveloperField`·`IsDeveloperFieldHidden`·`DeveloperCategories`, `LabDeveloperMode.BuildCategoryLayout`, `LabConfig.IsReplacedByJigwiTimeline`·`HiddenByJigwiTimelineInGame`, `LabDeveloperMode.RefreshJigwiTimelineRows`·`ShowCategory`, `GameStageSettings.IsFieldShown`·`IsFieldVisible`, `GameScreen.SelectDeveloperScope`·`RefreshJigwiTimelineRows`. 이 문서 갱신은 실행 검증을 뜻하지 않는다. 실행 결과는 `VALIDATION.md`의 2026-11-05 DEV 표시 정리 절을 따른다.
+
+
+### #676 1차 공통 기본값 변경 기록
+
+5인 영상의 딜 중지 전 첫80% 도달 구간을 바탕으로 `Paint Initial Coverage`(105)를1.3%, `Paint Repeat Growth`(106)를1.0%로 조정했다. 코드·비정상값 fallback·저장 LabConfig의 기본값을 맞춘다. 이 1차 변경에는 인원 보정이 없었으며, 현행 인원 보정은 다음 절을 따른다. 명중 계측 기능은 추가하지 않는다. 기존 DEV 공통 값이므로 새로 초기화한 모든 인원·세 스테이지에 적용되고, 사용자가 따로 설정한 값과 이미 진행 중인 판은 덮어쓰지 않는다. 성장 속도6%p/초·건조·보상 개수·설정259개·통신 형식은 그대로다. 위 #211의2%/1.5%와4% 비교는 당시 기록이다. 실제 새5인 플레이의100~110초 완료는 별도 확인 대상이다.
+
+
+### #676 후속 — 실제 인원에 따른 스토리 도색량
+
+DEV의 최초1.3%·재타격1.0%는 **5인 기준값**이다. 일반 스토리 협동은 Host가 라운드 시작 시 실제 참가자 수로 `5 / 인원`을 한 번 곱한다. 소수는 내부에서 반올림하지 않으며 표는 표시용 반올림이다.
+
+| 인원 | 최초 명중 | 재타격 성장 |
+| --- | ---: | ---: |
+| 2 | 3.25% | 2.50% |
+| 3 | 약2.17% | 약1.67% |
+| 4 | 약1.63% | 1.25% |
+| 5 | 1.30% | 1.00% |
+
+DEV 입력값을 바꾸면 그것을5인 기준으로 같은 보정을 적용한다. DEV 안내에는 현재 방 인원에 적용되는 두 값을 함께 표시한다. 원본 설정과 공유 배열은 기준값을 보존하고, `LabConfig.CapturePaintGrowthSettings`가 새 사본을 만들어 `LabModel.Rules`에 라운드별로 고정한다. Retry에서는 새로 계산하고 진행 중 도중 인원 변화로 다시 곱하지 않는다. 최종 최초/재타격은100%를 넘지 않는다.
+
+구미호·야광귀·지귀의 실제2~5인 협동에만 적용한다. 솔로·튜토리얼·Lab단판·2:2/3:3땅따먹기는 입력값을 그대로 쓴다. 성장 속도·건조·보상 개수·물리·색칠 판정은 그대로이며, 오색/물붓기 등의 기존 배율은 보정한 면적 예산 위에 기존대로 적용된다. 첫 공통기본값 변경만 했을 때와 달리 인원별 해석이 추가되어 접속 묶음은 **설정259개·5701/Lab61/Game52**로 갱신한다. 이전 앱과 혼용하지 않는다. 실기기에서 인원별 클리어 시간이 같다는 검증은 아직 수행하지 않았다.

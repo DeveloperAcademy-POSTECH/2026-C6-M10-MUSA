@@ -29,7 +29,7 @@ namespace C6Lab.Tests
                 var actual = fixture.Stages[stage];
                 Assert.That(LabHighResolutionPaintFixture.Pixels(actual), Is.EqualTo(LabHighResolutionPaintFixture.Pixels(control)));
                 Assert.That(actual.Revision, Is.EqualTo(control.Revision));
-                Assert.That(actual.CoveredCount, Is.EqualTo((int)decimal.Floor((2m + stage * 1.5m) * control.CellCount / 100m)));
+                Assert.That(actual.CoveredCount, Is.EqualTo((int)decimal.Floor(((decimal)1.3f + stage * (decimal)1f) * control.CellCount / 100m)));
                 for (int cell = 0; cell < control.CellCount; cell++)
                     Assert.That(actual.GetPainterSlot(cell), Is.EqualTo(control.GetPainterSlot(cell)));
             }

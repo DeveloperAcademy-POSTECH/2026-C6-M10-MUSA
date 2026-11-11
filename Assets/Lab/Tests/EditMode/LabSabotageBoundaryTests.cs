@@ -24,7 +24,9 @@ namespace C6Lab.Tests
             finally { Object.DestroyImmediate(config); }
         }
 
-        [TestCase(5f, 15d)]
+        // #664: fox orbs now stay until their 15-second round ends (not the orb lifetime), so a board full of them is
+        // freed at the round's end: every 5 s, the next drop after 5 s that finds room is at 20 s.
+        [TestCase(5f, 20d)]
         [TestCase(20f, 40d)]
         public void LateTickFreesExpiredStorageBeforeDrawingTheNextFoxFire(float interval, double until)
         {

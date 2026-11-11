@@ -56,7 +56,9 @@ namespace C6Lab
         {
             switch (yokai)
             {
-                case LabStageYokai.Gumiho: return LabGumihoSound.ClipFolders.Append(LabBattleBgm.GumihoFeverClipFolder).ToArray();
+                // #664: the fox round ticks and goes BIG/SMALL with the 야광귀 combo's sounds.
+                case LabStageYokai.Gumiho: return LabGumihoSound.ClipFolders.Concat(LabYaguangSound.FoxRoundClipFolders)
+                    .Append(LabBattleBgm.GumihoFeverClipFolder).ToArray();
                 case LabStageYokai.Yaguang: return LabYaguangSound.ClipFolders.Append(LabBattleBgm.FeverClipFolder).ToArray();
                 case LabStageYokai.Jigwi: return System.Array.Empty<string>(); // 지귀 has no fever song.
                 default: return System.Array.Empty<string>();

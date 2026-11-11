@@ -40,7 +40,7 @@ Editor의 `LabClayVisualStudy.ExportLocalGlossComparison(절대 출력 폴더)`�
 
 강도는 `LabPaintVisualStamp.impact01`에 보관한다. 0은 이전 기록의 기본 강도 0.5, 1~255는 새 정규화 강도 0~1이다. 기존 44바이트 레이아웃의 예약 바이트를 사용하고 나머지 예약 바이트는 0을 요구한다. 기본 기록의 기존 바이트는 유지되지만 구형 앱과의 연결은 새 프로토콜로 거절한다.
 
-농도는 `minimumDensity=0.65`부터 `maximumDensity=1`까지 보간한다. 약한 명중은 같은 오행색을 흰 클레이와 섞은 밝은 색, 강한 명중은 진한 원래 안료색이다. Raw·타격 횟수·투사체 크기·스태미나·실제 도색 예산과 관계없는 표현값이다. 농도 범위는 `WatercolorStampProfile.settings.claySticker` Inspector에서 조정한다.
+농도는 `minimumDensity`부터 `maximumDensity`까지 보간하며, 기본값은 둘 다 1이다. 그래서 기본 게임은 충돌 강도와 관계없이 오행 칠 팔레트(`LabPaintPalette`, 구슬 그림에서 뽑은 색)를 그대로 칠한다. 이전 기본값 0.65는 같은 오행색을 선형 공간에서 흰 클레이(0.82)와 섞었는데, 실제 투척은 최대 12.5 m/s라 정규화 강도가 약 0.62를 넘지 않아 농도가 0.65~0.87에 머물렀다. 그 결과 화는 분홍, 토는 회색, 수는 흐린 하늘색으로 보였다(측정은 `docs/VALIDATION.md`). Raw·타격 횟수·투사체 크기·스태미나·실제 도색 예산과 관계없는 표현값이다. 농도 범위는 `WatercolorStampProfile.settings.claySticker` Inspector에서 조정한다. 충돌 강도는 계속 `impact01`에 기록되며, 범위를 1 아래로 내리면 이전처럼 약한 명중이 밝아진다. 농도 범위는 표현 버전 문자열(`LabWatercolorStampSettings.Version`)의 fingerprint에 들어간다. 그래서 값이 다른 빌드의 Guest는 Host의 도색 기록을 적용하지 않고 버전 불일치(`paintArtVersionMismatch`)로 처리한다.
 
 ## DEV 조절
 
@@ -77,7 +77,7 @@ Hapio에서는 `GameSession`이 전투 DEV의 `ClayAppearanceChanged`를 구독�
 
 ## 직접 확인
 
-1. 일반 협동 또는 DEV Solo로 시작한다. 실제 Combined를 박에 약하게·강하게 맞혀 같은 색 계열의 농도 차이를 본다.
+1. 일반 협동 또는 DEV Solo로 시작한다. 실제 Combined를 박에 맞혀 칠이 구슬 그림과 같은 진한 오행색인지 본다(기본 농도 1에서는 세기에 따른 색 차이가 없다).
 2. Pause → DEV → Gourd에서 두께·광택을 각각 끝값으로 바꿔 다른 값이 유지되는지 확인한다.
 3. 재타격 성장과 건조·재도색을 확인하고 100% 완성한 뒤 관람을 연다. 전투 종료 후 결과 관람에서는 완성된 색·높이가 유지돼야 한다. 다음 스테이지에는 새 박의 도색이 비어 있어야 하며, DEV 두께·광택 값만 이어받는다.
 4. 정지 상태 Editor의 `LabClayVisualStudy.Export(절대 출력 폴더)`로 최초/재타격3회/두색, 강도0·1, 두께·광택 끝값, 완성6방향·PNG 비교를 생성한다. Preview Scene만 사용한다.

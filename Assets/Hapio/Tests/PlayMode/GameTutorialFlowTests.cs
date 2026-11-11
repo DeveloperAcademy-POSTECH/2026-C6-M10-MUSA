@@ -21,11 +21,27 @@ namespace Hapio.Tests
     public sealed class GameTutorialFlowTests
     {
         private GameSession session;
+#if UNITY_EDITOR
+        private PortraitGameView portraitGameView;
+#endif
 
         [UnitySetUp]
         public IEnumerator StartANewAppRun()
         {
             Assert.That(GameSession.Instance, Is.Null, "The preceding fixture must release its persistent session.");
+#if UNITY_EDITOR
+            // The authored tutorial is portrait. A landscape VFX comparison left open in the Editor changes the
+            // board's physical aspect and HUD keep-out walls, so the scripted launches hit different walls.
+            portraitGameView = new PortraitGameView();
+            float displayDeadline = Time.realtimeSinceStartup + 5f;
+            while ((Screen.width != 390 || Screen.height != 844) && Time.realtimeSinceStartup < displayDeadline)
+            {
+                portraitGameView.Repaint();
+                yield return null;
+            }
+            Assert.That(new Vector2Int(Screen.width, Screen.height), Is.EqualTo(new Vector2Int(390, 844)),
+                "The tutorial fixture must render at its portrait size before loading Home.");
+#endif
             ResetRunState(typeof(GameOpeningController), "ResetRunState");
             ResetRunState(typeof(GameSession), "ResetTutorialRun");
             Assert.That(GameSession.TutorialPending, Is.True);
@@ -51,8 +67,87 @@ namespace Hapio.Tests
             // Later fixtures start from a fresh opening that leads straight to the room list.
             ResetRunState(typeof(GameOpeningController), "ResetRunState");
             GameSession.SkipTutorialThisRun();
+#if UNITY_EDITOR
+            portraitGameView?.Dispose();
+            portraitGameView = null;
+#endif
             yield return null;
         }
+
+#if UNITY_EDITOR
+        /// <summary>Own only this fixture's display choice; restore the user's selection after the Scenes are gone.</summary>
+        private sealed class PortraitGameView : IDisposable
+        {
+            private const BindingFlags Members = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
+            private readonly UnityEditor.EditorWindow view;
+            private readonly PropertyInfo selection;
+            private readonly int previousSelection;
+            private readonly bool createdView;
+            private readonly object group;
+            private int addedCustomIndex = -1;
+
+            public PortraitGameView()
+            {
+                Assembly editor = typeof(UnityEditor.Editor).Assembly;
+                Type viewType = editor.GetType("UnityEditor.GameView", true);
+                createdView = !Resources.FindObjectsOfTypeAll<UnityEditor.EditorWindow>().Any(window => window.GetType() == viewType);
+                view = UnityEditor.EditorWindow.GetWindow(viewType, false, null, false);
+                selection = viewType.GetProperty("selectedSizeIndex", Members);
+                Assert.That(selection, Is.Not.Null, "The Editor exposes its Game view size selection.");
+                previousSelection = (int)selection.GetValue(view);
+                try
+                {
+                    Type sizesType = editor.GetType("UnityEditor.GameViewSizes", true);
+                    Type singleton = typeof(UnityEditor.ScriptableSingleton<>).MakeGenericType(sizesType);
+                    object sizes = singleton.GetProperty("instance", BindingFlags.Public | BindingFlags.Static).GetValue(null);
+                    object groupType = sizesType.GetProperty("currentGroupType", Members).GetValue(sizes);
+                    group = sizesType.GetMethod("GetGroup", Members).Invoke(sizes, new[] { groupType });
+                    Type groupClass = group.GetType();
+                    int count = (int)groupClass.GetMethod("GetTotalCount", Members).Invoke(group, null);
+                    MethodInfo getSize = groupClass.GetMethod("GetGameViewSize", Members);
+                    int portraitIndex = -1;
+                    for (int index = 0; index < count; index++)
+                    {
+                        object size = getSize.Invoke(group, new object[] { index });
+                        Type sizeClass = size.GetType();
+                        if (sizeClass.GetProperty("sizeType", Members).GetValue(size).ToString() == "FixedResolution"
+                            && (int)sizeClass.GetProperty("width", Members).GetValue(size) == 390
+                            && (int)sizeClass.GetProperty("height", Members).GetValue(size) == 844)
+                        { portraitIndex = index; break; }
+                    }
+                    if (portraitIndex < 0)
+                    {
+                        Type sizeType = editor.GetType("UnityEditor.GameViewSizeType", true);
+                        Type sizeClass = editor.GetType("UnityEditor.GameViewSize", true);
+                        object fixedSize = Activator.CreateInstance(sizeClass, Members, null,
+                            new object[] { Enum.Parse(sizeType, "FixedResolution"), 390, 844, "C6 Portrait (tutorial test)" }, null);
+                        int customIndex = count - (int)groupClass.GetMethod("GetBuiltinCount", Members).Invoke(group, null);
+                        groupClass.GetMethod("AddCustomSize", Members).Invoke(group, new[] { fixedSize });
+                        portraitIndex = count;
+                        addedCustomIndex = customIndex;
+                    }
+                    selection.SetValue(view, portraitIndex);
+                    Repaint();
+                }
+                catch { Dispose(); throw; }
+            }
+
+            public void Repaint() => view.Repaint();
+
+            public void Dispose()
+            {
+                if (view != null) selection.SetValue(view, previousSelection);
+                if (addedCustomIndex >= 0)
+                {
+                    group.GetType().GetMethod("RemoveCustomSize", Members).Invoke(group, new object[] { addedCustomIndex });
+                    addedCustomIndex = -1;
+                }
+                if (view == null) return;
+                if (createdView) view.Close();
+                else view.Repaint();
+            }
+        }
+#endif
 
         [UnityTest]
         public IEnumerator FinishedOpeningOpensThePracticeBoardOnceThenTheRoomList()

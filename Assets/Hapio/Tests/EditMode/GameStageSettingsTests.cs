@@ -89,7 +89,7 @@ namespace Hapio.Tests
                 foreach (int stage in new[] { 1, 2, 3 })
                 {
                     float[] values = settings.Capture(stage);
-                    Assert.That(values.Length, Is.EqualTo(259));
+                    Assert.That(values.Length, Is.EqualTo(265));
                     Assert.That(values[205], Is.EqualTo(before[205]), "Common gimmick interval preserved (#311)");
                     Assert.That(values[206], Is.EqualTo(before[206]), "Unique gimmick interval preserved (#311)");
                 }
@@ -172,7 +172,9 @@ namespace Hapio.Tests
                     Assert.That(GameStageSettings.IsFieldVisible(stage, index), Is.EqualTo(stage != 2 || index == 207 || index == 208), "Stage " + stage + ": " + index);
                 Assert.That(GameStageSettings.IsFieldVisible(GameStageSettings.TerritoryScope, index), Is.False);
             }
-            foreach (int index in new[] { 171, 172, 206, 209, 210 })
+            foreach (int index in new[] { 171, 172, 206, 209, 210, LabConfig.CharmTargetsAtFiveField, LabConfig.FoxRoundSecondsField,
+                LabConfig.FoxFireCountStepMinField, LabConfig.FoxFireCountStepMaxField, LabConfig.FoxRoundSpareMinField,
+                LabConfig.FoxRoundSpareMaxField })
             {
                 Assert.That(GameStageSettings.IsFieldVisible(1, index), Is.True, "The fox's own gimmick field: " + index);
                 Assert.That(GameStageSettings.IsFieldVisible(2, index) || GameStageSettings.IsFieldVisible(3, index), Is.False);
@@ -195,6 +197,38 @@ namespace Hapio.Tests
                 finally { UnityEngine.Object.DestroyImmediate(config); }
             }
         }
+        /// <summary>
+        /// #664: the 구미호 fox round gives the same BIG/SMALL as the 야광귀 colour combo: SMALL 0.1x for 13 s, BIG 2.5x for 8 s. Both stage
+        /// tabs show the four rows and each keeps its own values.
+        /// </summary>
+        [Test]
+        public void TheFoxRoundsBigAndSmallMatchTheYaguangCombosAndEachStageKeepsItsOwn()
+        {
+            foreach (int index in new[] { 159, 160, 162, 163 })
+            {
+                Assert.That(GameStageSettings.IsComboEffectField(index), Is.True);
+                for (int scope = 0; scope <= GameStageSettings.TerritoryScope; scope++)
+                    Assert.That(GameStageSettings.IsFieldVisible(scope, index), Is.EqualTo(scope == 1 || scope == 2),
+                        LabConfig.DeveloperFields[index].Label + " in scope " + scope);
+            }
+            foreach (int index in new[] { 155, 158, 164 })
+                Assert.That(GameStageSettings.IsFieldVisible(1, index), Is.False, "The combo itself stays the 야광귀's: " + index);
+            using (var settings = new GameStageSettings(Resources.Load<LabConfig>("LabConfig"), GameStageCatalog.RequireDefault()))
+            {
+                float[] fox = settings.Capture(1), yaguang = settings.Capture(2);
+                foreach (int index in new[] { 159, 160, 162, 163 })
+                    Assert.That(fox[index], Is.EqualTo(yaguang[index]), LabConfig.DeveloperFields[index].Label);
+                Assert.That((fox[159], fox[162], fox[160], fox[163]), Is.EqualTo((13f, 8f, .1f, 2.5f)));
+
+                fox[162] = 5f;
+                Assert.That(settings.TryApply(1, fox, out string error), Is.True, error);
+                Assert.That(settings.Capture(2)[162], Is.EqualTo(8f), "The fox tab leaves the 야광귀's alone.");
+                var config = settings.CreateStageConfig(1);
+                try { Assert.That(config.ComboRewardDurationSeconds, Is.EqualTo(5f)); }
+                finally { UnityEngine.Object.DestroyImmediate(config); }
+            }
+        }
+
         [Test]
         public void YaguangScheduleIsIsolatedAndCannotEditUnusedPeriodicControls()
         {

@@ -282,13 +282,20 @@ namespace C6Lab
         // 5698: #595 Jigwi smoke flow: round.smoke (B smokes every screen at once, no bucket) and round.common (shared talisman A).
         // 5699: actual newly painted-cell contribution is a Host-owned Int64 player statistic.
         // 5700: #663 Jigwi smoke flow: a talisman may start right after the smoke before it (earlier than its slot time).
-        internal const ushort LabProtocolVersion = 5700;
+        // 5701: Story paint budgets are five-player bases scaled once by the actual round roster (#676).
+        // 5702: #664 구미호 co-op gimmicks: several charmed players (charmedPlayers/charmEnds/charmHelperTargets), the fox
+        //       round (foxRound*, foxRoundRunning, its goal and cleared count, up to 100 fox orbs a board) and six more DEV
+        //       values (265), on top of #676's 5701 (#664 had also used 5701 on its own branch).
+        internal const ushort LabProtocolVersion = 5702;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Double-tap a blue fox orb to clear it, and keep your Yin and Yang away.";
-        /// <summary>More fox orbs than one fox fire ever drops; a longer list is ignored (#251).</summary>
-        private const int MaximumFoxFireOrbs = 10;
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/60");
+        /// <summary>
+        /// More fox orbs than one fox fire ever drops on a board; a longer list is ignored (#251). Since #664 the count grows
+        /// with each fox fire, so this is the most a board can hold (the stored orb limit's DEV maximum).
+        /// </summary>
+        private const int MaximumFoxFireOrbs = 100;
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/62");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;
@@ -2088,8 +2095,9 @@ namespace C6Lab
             }
             if (packet.type == "charmTap")
             {
-                // Only a player beside the charmed one counts; enough taps wake them at once (#251).
-                if (!model.TryCharmTap(sender, now, out var woken)) return;
+                // Only a player beside the charmed one counts; enough taps wake them at once (#251). The tap names whom it
+                // wakes (#664): the player between two charmed ones taps each one's bubble.
+                if (!model.TryCharmTap(sender, packet.owner, now, out var woken)) return;
                 // Sent before the snapshot that no longer holds the charm, so every screen knows it was woken.
                 if (woken.HasValue) AnnounceCharmWoken(woken.Value);
                 PublishSnapshot(true);
@@ -2364,9 +2372,11 @@ namespace C6Lab
                 blockedHere ? (float)(latest.swipeBlockedUntil - latest.serverTime) : 0f);
             // 2:2 (#281): the outer edge of this player's board is closed; only the teammate's side passes.
             board.SetTeamWall(LabTeams.ClosedSide(latest, LocalPlayerId));
-            // The fox's charm (#251) stops throws and shows its haze only on the charmed player's own board.
+            // The fox's charm (#251) shows its haze only on the charmed player's own board, which stands still (#664);
+            // the boards beside it shut their edge toward it.
             bool charmedHere = latest.CharmOn(LocalPlayerId);
-            board.SetCharm(charmedHere ? (float)(latest.charmUntil - latest.serverTime) : 0f);
+            board.SetCharm(charmedHere ? (float)(latest.CharmEndOf(LocalPlayerId) - latest.serverTime) : 0f);
+            board.SetCharmWalls(latest.CharmWallSide(LocalPlayerId));
             board.SetJigwiOverheat(latest.phase == LabPhase.Playing
                 && latest.JigwiFor(LocalPlayerId)?.Overheated(latest.serverTime) == true);
             // #540: my unfinished talisman set my drums alight — light and slippery for a while.
@@ -2402,11 +2412,14 @@ namespace C6Lab
                 passiveCombine = board != null && board.IsContactCombineRequest });
         }
 
-        /// <summary>매혹 (#251): 하트 말풍선을 눌러 옆 사람을 깨우는 한 번을 Host에 보낸다. 셈은 Host가 한다.</summary>
-        public void TapCharm()
+        /// <summary>
+        /// 매혹 (#251): 하트 말풍선을 눌러 옆 사람(charmed)을 깨우는 한 번을 Host에 보낸다. 셈은 Host가 한다. #664: 두 사람 사이에
+        /// 낀 사람은 누구의 말풍선을 눌렀는지 함께 보낸다.
+        /// </summary>
+        public void TapCharm(ulong charmed)
         {
             if (latest == null || latest.phase != LabPhase.Playing || latest.paused) return;
-            Request(new LabNetworkPacket { type = "charmTap", requestId = ++requestSequence });
+            Request(new LabNetworkPacket { type = "charmTap", requestId = ++requestSequence, owner = charmed });
         }
 
         private void OnFoxFireTouched(string foxId, string orbId)
