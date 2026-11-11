@@ -86,7 +86,8 @@ namespace C6Lab
             jigwiSmokeFlow = config.JigwiSmokeFlow; // #595: with B Test Only it tests the smoke B (every 17 s) instead of the old B
             jigwiSchedule = config.JigwiBTestOnly ? LabJigwiABTimeline.BTestSchedule // #551 시험용: B만
                 : config.JigwiATestOnly ? LabJigwiABTimeline.ATestSchedule // #595 시험용: 부적만
-                : jigwiSmokeFlow ? LabJigwiABTimeline.SmokeFlowSchedule // #595 연기 10 / 부적 45 / 연기 66 / 부적 83
+                // #696 연기 8 / 부적 24 / 연기 40 / 부적 55 / 연기 70 / 부적 85, 끄면 #595 연기 10 / 부적 45 / 연기 66 / 부적 83
+                : jigwiSmokeFlow ? (config.JigwiDenseTimeline ? LabJigwiABTimeline.DenseSmokeFlowSchedule : LabJigwiABTimeline.SmokeFlowSchedule)
                 : config.JigwiFlowSchedule ? LabJigwiABTimeline.FlowSchedule : LabJigwiABTimeline.LegacySchedule;
             jigwiAHoldBurn = config.JigwiAHoldBurnUntilEnd;
             jigwiAFailBurnStart = config.JigwiAFailBurnStartSeconds; // #663
@@ -120,7 +121,7 @@ namespace C6Lab
         {
             if (jigwiStageCutoffReached || jigwiSchedule == LabJigwiABTimeline.BTestSchedule
                 || jigwiSchedule == LabJigwiABTimeline.ATestSchedule) return double.PositiveInfinity; // #551 B만 / #595 부적만 시험
-            if (jigwiSchedule != LabJigwiABTimeline.FlowSchedule && jigwiSchedule != LabJigwiABTimeline.SmokeFlowSchedule)
+            if (jigwiSchedule != LabJigwiABTimeline.FlowSchedule && !LabJigwiABTimeline.IsSmokeFlow(jigwiSchedule))
                 return index < JigwiStageCommonSlots.Length ? jigwiStageStartedAt + JigwiStageCommonSlots[index] : double.PositiveInfinity;
             // #540: from the start of the middle phase, every interval, until the fever.
             double offset = jigwiCommonStart + index * Math.Max(3d, jigwiCommonInterval);
@@ -196,7 +197,7 @@ namespace C6Lab
         private void PullTalismanAfterSmoke(LabJigwiABRound item, LabJigwiABResolution result)
         {
             if (!item.smoke || jigwiSmokeToTalisman <= 0d || result == LabJigwiABResolution.Cancelled
-                || result == LabJigwiABResolution.Skipped || jigwiSchedule != LabJigwiABTimeline.SmokeFlowSchedule
+                || result == LabJigwiABResolution.Skipped || !LabJigwiABTimeline.IsSmokeFlow(jigwiSchedule)
                 || jigwiStageNextSlot >= LabJigwiABTimeline.SlotCountFor(jigwiSchedule)
                 || LabJigwiABTimeline.KindForSlot(jigwiStageNextSlot, jigwiSchedule) != LabJigwiABKind.PersonalBurn) return;
             double fixedAt = jigwiStageStartedAt + LabJigwiABTimeline.ActiveOffset(jigwiStageNextSlot, jigwiSchedule);

@@ -389,6 +389,23 @@ namespace C6Lab.Tests
             Assert.That(r.Select(x=>x.activeAt),Is.EqualTo(new[]{4d,21d,38d,55d,72d}));
             Assert.That(r.All(x=>x.kind==LabJigwiABKind.PersonalBurn&&x.common),Is.True,"Only the shared talisman.");
         }
+        [Test] public void DenseSmokeFlowRunsSixMissionsWithShortGaps()
+        {
+            // #696: 연기 8 / 부적 24 / 연기 40 / 부적 55 / 연기 70 / 부적 85 (부적 10초, 연기 15초), 정해진 시각 그대로 확인.
+            JsonUtility.FromJsonOverwrite("{\"jigwiSmokeFlow\":true,\"jigwiDenseTimeline\":true,\"jigwiCommonStartSeconds\":25,\"jigwiABPersonalDurationSeconds\":10,\"jigwiSmokeToTalismanSeconds\":0}",config);
+            var m=Room3();
+            Assert.That(m.Snapshot(0).jigwiAB.schedule,Is.EqualTo(LabJigwiABTimeline.DenseSmokeFlowSchedule));
+            for(int t=1;t<=99;t++){m.Tick(t);var mid=m.Snapshot(t);
+                Assert.That(LabJigwiABNetworkValidation.Valid(mid.jigwiAB,mid.players,m.Revision),Is.True,"Valid at "+t+" s");}
+            var r=m.Snapshot(99).jigwiAB.rounds.OrderBy(x=>x.slot).ToArray();
+            Assert.That(r.Select(x=>x.activeAt),Is.EqualTo(new[]{8d,24d,40d,55d,70d,85d}));
+            Assert.That(r.Select(x=>x.smoke),Is.EqualTo(new[]{true,false,true,false,true,false}),"Smoke first, then the talisman, three times.");
+            Assert.That(r.Select(x=>x.common),Is.EqualTo(new[]{false,true,false,true,false,true}));
+            for(int i=1;i<r.Length;i++)
+                Assert.That(r[i].activeAt-r[i-1].endsAt,Is.InRange(0d,6d),"No gap longer than 6 s between missions ("+i+").");
+            Assert.That(r.Last().endsAt,Is.LessThanOrEqualTo(r.Last().activeAt+10d+1e-9));
+        }
+
         [Test] public void SmokeFlowRunsSmokeThenSharedTalismanAndSmokesEveryScreenAtOnce()
         {
             // #595: 연기 10 / 부적 45 / 연기 66 / 부적 83, 공통 기믹은 25초부터 15초마다.

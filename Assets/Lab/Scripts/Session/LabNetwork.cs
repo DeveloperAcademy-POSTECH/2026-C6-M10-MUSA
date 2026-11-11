@@ -286,7 +286,8 @@ namespace C6Lab
         // 5702: #664 구미호 co-op gimmicks: several charmed players (charmedPlayers/charmEnds/charmHelperTargets), the fox
         //       round (foxRound*, foxRoundRunning, its goal and cleared count, up to 100 fox orbs a board) and six more DEV
         //       values (265), on top of #676's 5701 (#664 had also used 5701 on its own branch).
-        internal const ushort LabProtocolVersion = 5702;
+        // 5703: #696 Jigwi dense smoke flow schedule (jigwiAB.schedule 5: six missions); older builds reject the new schedule.
+        internal const ushort LabProtocolVersion = 5703;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Double-tap a blue fox orb to clear it, and keep your Yin and Yang away.";
