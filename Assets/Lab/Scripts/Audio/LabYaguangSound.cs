@@ -6,7 +6,7 @@ namespace C6Lab
     public enum LabYaguangSfx { FlashWarn, FlashGlow, FlashCount, FlashBurst, FlashTaunt, ShakeBell, ShakeBellFinal, FlashCaught,
         ComboCountOne, ComboCountTwo, ComboCountThree, ComboCountFour, ComboStart, ComboTick, ComboTickFast,
         ComboTaunt, ComboSmallStart, ComboSmallEnd, ComboBigStart, ComboBigEnd, ComboClearedFirst, ComboClearedSecond,
-        ComboGuideRule, ComboGuideHit1, ComboGuideHit2, ComboGuideHit3, ComboGuideClear }
+        ComboGuideRule, ComboGuideHit1, ComboGuideHit2, ComboGuideHit3, ComboGuideClear, ComboGuideFail }
 
     /// <summary>
     /// 야광귀 섬광 예고와 번쩍 효과음 (#395). Host 스냅샷의 섬광 시각만 보고 소리를 낸다(화면 코드와 따로 돈다).
@@ -38,7 +38,9 @@ namespace C6Lab
     /// - 규칙 (Audio/YaguangComboGuideRule): 라운드의 처음 Inspector 번(기본 1 = 첫 콤보만) 예고에서, 야광귀가 "넷"을 센 뒤
     ///   Inspector 지연(기본 0.9초)에. 그 예고의 넷/셋/둘/하나는 점점 작아진다(넷 원래 크기, 한 칸마다 Inspector 배율, 기본 0.6).
     /// - 칭찬 (Audio/YaguangComboGuideHit1 "좋아!" / Hit2 "잘했어!" / Hit3 "하나만 더..!" / Clear "그렇지!!"):
-    ///   칸을 맞힐 때마다 Inspector 지연(기본 0.3초) 뒤에. 새로 말하면 앞의 안내는 끊는다. 실패하면 말하지 않고 야광귀가 "메롱~"을 한다.
+    ///   칸을 맞힐 때마다 Inspector 지연(기본 0.3초) 뒤에. 새로 말하면 앞의 안내는 끊는다.
+    /// - 실패 (Audio/YaguangComboGuideFail "아이고"): 콤보 실패 뒤 Inspector 지연(기본 0.1초). 야광귀 "메롱~"은 이 말이 끝나고
+    ///   Inspector 간격(기본 0.1초) 뒤에 나온다 (원래 메롱 지연보다 이르지는 않다).
     /// #664 구미호 여우구슬 판정 (모든 기기, 야광귀 콤보와 같은 소리):
     /// - 제한 시간 째깍: 여우구슬이 떨어진 순간부터 콤보와 같은 간격으로 째깍, 남은 시간이 짧으면 빠른 째깍. 다 지우면 바로 멈춘다.
     /// - BIG/SMALL 시작·끝: 콤보 결과와 같은 때 (결과 + LabGourdComboHud.ResultSeconds, 가장 늦게 끝나는 사람 기준).
@@ -77,7 +79,7 @@ namespace C6Lab
             ComboTauntFolder, ComboSmallStartFolder, ComboSmallEndFolder, ComboBigStartFolder, ComboBigEndFolder,
             ComboClearedFirstFolder, ComboClearedSecondFolder,
             ComboGuideFolder + "Rule", ComboGuideFolder + "Hit1", ComboGuideFolder + "Hit2", ComboGuideFolder + "Hit3",
-            ComboGuideFolder + "Clear" };
+            ComboGuideFolder + "Clear", ComboGuideFolder + "Fail" };
         /// <summary>The folders this component loads, for the battle audio preload (#492).</summary>
         public static System.Collections.Generic.IReadOnlyList<string> ClipFolders => Folders;
         /// <summary>The ones the 구미호 fox round plays too (#664): its clock and the BIG/SMALL start and end.</summary>
@@ -134,6 +136,9 @@ namespace C6Lab
         private int guideProgress;
         private int guideSlot = -1;
         private double guideSlotAt;
+        // 콤보 실패 "아이고"를 아직 낼지, 그 말이 끝나는 시각 (메롱은 그 뒤에)
+        private bool guideFailDue;
+        private double guideFailEndsAt = double.NegativeInfinity;
 
         public static string Folder(LabYaguangSfx sfx) => Folders[(int)sfx];
         public int ClipCount(LabYaguangSfx sfx) => clips == null ? 0 : clips[(int)sfx].Length;
@@ -238,6 +243,8 @@ namespace C6Lab
                 guideComboFor = snapshot.comboCount;
                 guideProgress = snapshot.comboProgress;
                 guideSlot = -1;
+                guideFailDue = false;
+                guideFailEndsAt = double.NegativeInfinity;
             }
             ObserveCombo(snapshot, now);
             ObserveComboResult(snapshot, now);
@@ -399,16 +406,17 @@ namespace C6Lab
             hits >= LabGourdCombo.Length ? LabYaguangSfx.ComboGuideClear
             : hits <= 1 ? LabYaguangSfx.ComboGuideHit1 : hits == 2 ? LabYaguangSfx.ComboGuideHit2 : LabYaguangSfx.ComboGuideHit3;
 
-        /// <summary>금옥 안내 하나를 낸다. 앞 안내가 아직 나오고 있으면 끊고 새로 낸다. 안내가 끝나는 시각을 기억한다.</summary>
-        private void PlayGuide(LabYaguangSfx sfx)
+        /// <summary>금옥 안내 하나를 낸다. 앞 안내가 아직 나오고 있으면 끊고 새로 낸다. 낸 소리의 길이(초)를 돌려준다 (파일이 없으면 0).</summary>
+        private float PlayGuide(LabYaguangSfx sfx)
         {
             counts[(int)sfx]++;
             AudioClip[] set = clips != null ? clips[(int)sfx] : null;
-            if (set == null || set.Length == 0 || guideSource == null) return;
+            if (set == null || set.Length == 0 || guideSource == null) return 0f;
             AudioClip clip = set[Random.Range(0, set.Length)];
             guideSource.Stop();
             guideSource.pitch = 1f;
             guideSource.PlayOneShot(clip, Volume(sfx) * LabAudioSettings.SfxVolume);
+            return clip.length;
         }
 
         /// <summary>
@@ -424,6 +432,8 @@ namespace C6Lab
                 bool failed = snapshot.comboResult == LabComboResult.WrongColor || snapshot.comboResult == LabComboResult.Timeout;
                 resultEffect = failed ? -1 : snapshot.comboResult == LabComboResult.Success ? 1 : 0;
                 tauntDue = failed && resultAt >= 0d;
+                guideFailDue = tauntDue; // #695 금옥 "아이고" 다음에 야광귀 "메롱~"
+                guideFailEndsAt = double.NegativeInfinity;
                 foxStartDue = foxEndDue = false; // 새 결과가 앞 결과의 남은 소리를 대신한다.
                 clearedDue = resultEffect > 0 && resultAt >= 0d;
                 if (clearedDue) clearedCount++;
@@ -432,8 +442,14 @@ namespace C6Lab
             }
             if (snapshot.paused) return;
 
-            double tauntAt = resultAt + ComboTauntDelay;
-            if (tauntDue && now >= tauntAt)
+            double failAt = resultAt + GuideFailDelay;
+            if (guideFailDue && now >= failAt)
+            {
+                guideFailDue = false;
+                if (now - failAt <= LateSeconds) guideFailEndsAt = now + PlayGuide(LabYaguangSfx.ComboGuideFail);
+            }
+            double tauntAt = System.Math.Max(resultAt + ComboTauntDelay, guideFailEndsAt + GuideFailToTaunt);
+            if (tauntDue && !guideFailDue && now >= tauntAt)
             {
                 tauntDue = false;
                 if (now - tauntAt <= LateSeconds) Play(LabYaguangSfx.ComboTaunt);
@@ -579,6 +595,8 @@ namespace C6Lab
         private int GuideRuleCombos => network != null && network.config != null ? network.config.YaguangComboGuideRuleCombos : 1;
         private double GuideFeedbackDelay => network != null && network.config != null ? network.config.YaguangComboGuideFeedbackDelaySeconds : .3d;
         private double GuideRuleDelay => network != null && network.config != null ? network.config.YaguangComboGuideRuleDelaySeconds : .9d;
+        private double GuideFailDelay => network != null && network.config != null ? network.config.YaguangComboGuideFailDelaySeconds : .1d;
+        private double GuideFailToTaunt => network != null && network.config != null ? network.config.YaguangComboGuideFailToTauntSeconds : .1d;
         private float GuideCountFade => network != null && network.config != null ? network.config.YaguangComboGuideCountFade : .6f;
 
         /// <summary>
@@ -651,7 +669,8 @@ namespace C6Lab
                 case LabYaguangSfx.ComboGuideHit1:
                 case LabYaguangSfx.ComboGuideHit2:
                 case LabYaguangSfx.ComboGuideHit3:
-                case LabYaguangSfx.ComboGuideClear: return config.YaguangComboGuideSoundVolume;
+                case LabYaguangSfx.ComboGuideClear:
+                case LabYaguangSfx.ComboGuideFail: return config.YaguangComboGuideSoundVolume;
                 default: return config.YaguangFlashBurstSoundVolume;
             }
         }
