@@ -5,6 +5,7 @@ namespace Hapio
     public sealed class StageStoryShowcase : MonoBehaviour
     {
         public StoryPlayer player;
+        public bool previewAsHost = true;
         public StorySequence[] groups;
         public UnityEngine.UI.Text selectionLabel;
         private StoryCutView previous;
@@ -16,9 +17,13 @@ namespace Hapio
         }
         private void Update()
         {
-            if (player == null || player.CurrentView == previous) return;
+            if (player == null) return;
+            var clear = player.CurrentView != null ? player.CurrentView.GetComponent<StoryStageClearControls>() : null;
+            if (clear != null) clear.Present(player.IsReading, previewAsHost, true);
+            if (player.CurrentView == previous) return;
             previous = player.CurrentView;
             if (previous == null) return;
+            if (clear != null) clear.nextSeal.onClick.AddListener(player.RequestNext);
             var actions = previous.GetComponent<StoryResultActions>();
             if (actions == null) return;
             actions.onRetry.AddListener(RetryFailure);

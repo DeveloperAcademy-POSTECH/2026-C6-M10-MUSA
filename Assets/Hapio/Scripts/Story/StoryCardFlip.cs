@@ -40,8 +40,8 @@ namespace Hapio
         public void Flip()
         {
             if (IsFlipping || card == null || front == null || back == null) return;
+            // The approved card shows "좌우로 밀어 부적 뒤집기" under both faces, so flipping keeps the hint.
             Capture(); targetBack = !IsBack; elapsed = 0; IsFlipping = true;
-            SetHintVisible(false);
             StoryVisualBeat.PlaySound(gameObject, flipSound, .65f);
         }
         private void Update() => Advance(Time.unscaledDeltaTime);

@@ -413,8 +413,8 @@
 
 - 1~3스테이지 박과 판정 껍데기는 Gourd Visual Size(DEV 140) 값에 더해 `LabGourdVisualRig.StageSizeMultiplier` 1.4배로 그린다(실제 화면 시안으로 승인). `LabGourdPaint`가 rig 기준 크기를 이 값으로 나눠 쓰므로 rig가 없는 흰 박(튜토리얼·2:2·Lab)과 그 골든은 바뀌지 않는다. 다시 굽지 않으며 프리팹의 `referenceVisualSize` 1.4도 그대로다.
 - 박은 줄 쪽 기준점을 유지한 채 아래로 커진다. 정지 자세의 실제 바닥은 땅 위지만 줄 흔들림의 아래쪽에서는 잠깐 땅과 겹칠 수 있다.
-- 현재 호환 묶음은 설정259개·5697·`C6PhysicsLab/58`·**`C6HapioGame/47`**다. 판정 모양이 달라져 Game46 이하 앱과 혼용하지 않는다.
-- #595 지귀 연기 흐름(round.smoke / round.common)으로 호환 묶음이 설정259개·**5698**·`C6PhysicsLab/59`·**`C6HapioGame/48`**이 됐다. 5697 이하 앱과 혼용하지 않는다.
+- 당시 호환 묶음은 설정259개·5697·`C6PhysicsLab/58`·**`C6HapioGame/47`**였다(현재 기준은 아래 #647 절). 판정 모양이 달라져 Game46 이하 앱과 혼용하지 않는다.
+- #595 지귀 연기 흐름(round.smoke / round.common)으로 호환 묶음이 설정259개·**5698**·`C6PhysicsLab/59`·**`C6HapioGame/48`**이 됐다(현재 기준은 아래 #647 절). 5697 이하 앱과 혼용하지 않는다.
 
 ## 시안에 없는 안내 줄
 
@@ -430,3 +430,9 @@
 - 스테이지별 봉인 시간은 Host 최종 성공 snapshot의 `playedSeconds`, 총 소요 시간은 성공한1~3판의 원본 전투 시간 합이다. 실패 시도·로딩·후일담은 합산하지 않고 누락 판은 `—`로 표시한다. 총평 전용 `GameSession.SealStageResults`가 스테이지별 누락 자리를 유지하고, `ResultLocalPlayerId`는 완료 후 연결이 끝나도 개인 식별을 보존한다.
 - 내 기여도는 Host의 `LabPlayerState.paintedCellsTotal`(이번 라운드 누적 신규 동일 면적 셀 수) 중 내 비율이다. `LabPaintSurface.PaintFundedCell`의 실제 빈 칸→칠한 칸 변경에서 최종 공급 `Ink.Owner`에게만 한 번 적립한다. 초기·성장·분수 예산을 포함하며 덮어쓰기·미사용 예산·시각 여백은 제외한다. 건조로 차감하지 않고 마른 칸 재칠은 다시 더한다. 기존 공격 점수·땅따먹기 소유 면적·난수/예산/색/P지도·승패는 변경하지 않는다.
 - 통계는 기존 플레이어 snapshot/헤더/승인 경로로 Host가 보내고 Guest는 임의로 집계하지 않는다. 호환 묶음은 **설정259개·5699·`C6PhysicsLab/60`·`C6HapioGame/50`**이며 Game49는 별도 #647이 사용해 건너뛴 값이다. 구현과 검증 범위는 `docs/STAGE_STORY_UI_INTEGRATION.md`·`docs/VALIDATION.md`를 따른다.
+
+## #647 스테이지 클리어 방장 진행
+
+- 각 스테이지 마지막 컷(`*_After_02`)의 `StoryStageClearControls`에서 방장만 진행 버튼을 누른다. 구미호·야광귀는 방장·구성원 모두 "다음 요괴 잡으러 ..."를 보고, 방장은 "다음 봉인", 구성원은 "방장의 시작을 기다리시오."를 본다. 지귀는 "다음 요괴 잡으러 ..."를 아무에게도 보이지 않고 방장 버튼은 "마치기"다. 프리팹은 `Hapio/Story/Update Stage Clear Host Controls` 도구로만 다시 저장한다. 마지막 컷에는 하단 완성 박 보기·나가기 버튼을 두지 않는다(승인된 시안). 완성 박은 봉인 카드의 "봉인 박 둘러보기"로 연다.
+- 지귀의 "다음 봉인"은 `GameSession.StartSummary`로 결과 제어 패킷의 `summaryStarted`를 켜고, 모든 기기가 봉인 총평(#646)과 엔딩으로 간다. 최종 결과에서 끊긴 구성원의 읽는 중·관람 중 표시는 지운다. 방장이 총평 전에 끊기면 구성원은 `HostLostAfterClear`로 스스로 총평·엔딩으로 넘어간다.
+- 현재 호환 묶음은 설정259개·**5699**·`C6PhysicsLab/60`·**`C6HapioGame/51`**다(#642의 Game50 위). Game50 이하 앱과 혼용하지 않는다.

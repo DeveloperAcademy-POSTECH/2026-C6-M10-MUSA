@@ -26,7 +26,8 @@ namespace Hapio
         private LabSnapshot boundResult;
         private string generation;
         private bool victory, initialized, showingOverall, subscribed, busy;
-        private StorySequence failureDashboard;
+        private StorySequence failureDashboard, clearDashboard;
+        private StoryStageClearControls clearControls;
         private Coroutine pendingReady;
         private bool resultActionsReady, transitionPending;
         private readonly List<BoundAction> boundActions = new List<BoundAction>();
@@ -100,6 +101,10 @@ namespace Hapio
                     { StopPresentation(); return false; }
                 }
             }
+            if (mode == Mode.AfterStage && clearControls != null && player.IsReading && !player.IsTransitioning)
+                player.Next(); // The silent final picture itself is the ready/waiting screen.
+            if (mode == Mode.ReadyToAdvance && resultActionsReady && session.SummaryAllowed)
+                BeginEnding();
             screen.RefreshStoryViewer();
             if (showingOverall)
             {
@@ -140,6 +145,8 @@ namespace Hapio
         {
             UnbindActions();
             if (view == null || boundResult == null) return;
+            clearControls = view.GetComponent<StoryStageClearControls>();
+            if (clearControls != null) clearControls.nextSeal.onClick.AddListener(Advance);
             var summary = view.GetComponent<SealRunSummary>();
             if (summary != null) summary.Bind(session.SealStageResults, session.ResultLocalPlayerId);
             StoryCardRecords.Record[] rows = CardRecords(boundResult, session.ResultLocalPlayerId);
@@ -197,6 +204,16 @@ namespace Hapio
             if (mode == Mode.ReadyToAdvance || mode == Mode.FailureDashboard) { RefreshControls(); return; }
             if (victory)
             {
+                if (reason == StoryExitReason.Skipped && player.CurrentView != null
+                    && player.CurrentView.GetComponent<StoryStageClearControls>() == null)
+                {
+                    var source = afterStages[session.State.stageIndex - 1];
+                    if (clearDashboard != null) Destroy(clearDashboard);
+                    clearDashboard = SingleCut(source, source.cuts.Count - 1, "stage-clear-waiting");
+                    mode = Mode.AfterStage;
+                    player.Play(clearDashboard);
+                    return;
+                }
                 // Finish/Skip already retain CurrentView. Never replay the first card or its audio/entrance.
                 if (reason == StoryExitReason.Skipped && player.CurrentView != null)
                     player.CurrentView.ShowCompletedPose();
@@ -276,17 +293,22 @@ namespace Hapio
             // The game uses tap-to-read; the authoring preview keeps its own toolbar unchanged.
             Show(player.nextButton, false); Set(player.nextButton, false);
             bool primary = review && (final || session.Network.IsHost) || failed && session.Network.IsHost && !HasAction("Retry");
-            Show(advanceButton, primary);
+            bool authoredClear = clearControls != null;
+            if (authoredClear) clearControls.Present(review, session.Network.IsHost,
+                !blocked && (final ? session.CanStartSummary : session.CanAdvanceStage));
+            Show(advanceButton, primary && !authoredClear);
             Set(advanceButton, primary && !blocked && (failed ? session.CanRetryStage : final ? session.CanReturnHome : session.CanAdvanceStage));
             Label(advanceButton, failed ? "이 스테이지 재도전" : final ? "봉인 총평" : "다음 스테이지");
-            bool overall = final && review && session.StageResults.Count > 0;
+            bool overall = final && review && !authoredClear && session.StageResults.Count > 0;
             Show(overallButton, overall); Set(overallButton, overall && !blocked);
-            bool inspect = review && !HasAction("InspectGourd");
+            // The approved clear picture has only its own 다음 봉인/마치기: no footer 완성 박 보기 or 나가기 (#647).
+            // The sealed gourd stays reachable from the seal card's 봉인 박 둘러보기.
+            bool inspect = review && !authoredClear && !HasAction("InspectGourd");
             Show(viewerButton, inspect); Set(viewerButton, inspect && !blocked && session.PreviewTexture != null);
             bool skip = player.IsPlaying && (mode == Mode.AfterStage || mode == Mode.Failure || mode == Mode.Ending)
                 && !SkipHiddenOnThisCut;
             Show(skipButton, skip); Set(skipButton, skip && !blocked);
-            bool exit = review && !final || failed && !HasAction("Exit");
+            bool exit = review && !final && !authoredClear || failed && !HasAction("Exit");
             Show(exitButton, exit); Set(exitButton, exit && !blocked);
             Label(exitButton, "나가기");
             // The approved result design has no status line, so the saved label stays hidden.
@@ -349,7 +371,11 @@ namespace Hapio
             if (!IsPresenting || ActionsBlocked) return;
             if (mode == Mode.FailureDashboard) { Retry(); return; }
             if (mode != Mode.ReadyToAdvance) return;
-            if (session.State.phase == GameFlowPhase.Completed) BeginEnding();
+            if (!session.Network.IsHost) return;
+            if (session.State.phase == GameFlowPhase.Completed)
+            {
+                if (session.StartSummary()) BeginEnding();
+            }
             else
             {
                 transitionPending = true;
@@ -381,13 +407,13 @@ namespace Hapio
         {
             if (!IsPresenting || ActionsBlocked) return;
             if (victory && session.State.phase == GameFlowPhase.Completed)
-            { if (mode == Mode.ReadyToAdvance) BeginEnding(); }
+            { if (mode == Mode.ReadyToAdvance) Advance(); }
             else screen.TryStoryHome();
         }
 
         private void BeginEnding()
         {
-            if (mode == Mode.Ending || !session.CanReturnHome) return;
+            if (mode == Mode.Ending || !session.SummaryAllowed || !session.CanReturnHome) return;
             showingOverall = false; mode = Mode.Ending; SetBusy(true);
             player.Play(ending); RefreshControls();
         }
@@ -395,7 +421,7 @@ namespace Hapio
         public void OpenOverall()
         {
             if (mode != Mode.ReadyToAdvance || session.State.phase != GameFlowPhase.Completed || ActionsBlocked) return;
-            BeginEnding();
+            Advance();
         }
 
         public void CloseOverall()
@@ -412,6 +438,8 @@ namespace Hapio
 
         private void UnbindActions()
         {
+            if (clearControls != null) clearControls.nextSeal.onClick.RemoveListener(Advance);
+            clearControls = null;
             boundActions.Clear();
             if (actions == null) return;
             actions.onInspectGourd.RemoveListener(InspectGourd);
@@ -435,6 +463,8 @@ namespace Hapio
             if (presentationRoot != null) presentationRoot.SetActive(false);
             if (failureDashboard != null) Destroy(failureDashboard);
             failureDashboard = null;
+            if (clearDashboard != null) Destroy(clearDashboard);
+            clearDashboard = null;
             boundResult = null; generation = null; showingOverall = false; mode = Mode.None;
         }
 

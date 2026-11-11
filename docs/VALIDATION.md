@@ -1,5 +1,28 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-10 — #647 병합 검토 반영 (스테이지 클리어 방장 진행)
+
+- **기준:** `feat/stage-clear-host-controls` `34c5a609`(PR 원본 `72daba95` + #646 + main `868c885f` 병합 + 검토 반영). Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 접속 묶음은 PR대로 `C6HapioGame/49`.
+- **고친 것:**
+  - 최종 결과에서 끊긴 구성원의 읽는 중·관람 중 표시를 지워 방장 진행이 막히지 않게 했다. 방장이 총평 전에 끊기면 구성원이 `HostLostAfterClear`로 스스로 총평·엔딩으로 간다.
+  - 마지막 컷 하단 완성 박 보기·나가기는 검토 중 한때 되살렸으나, 승인된 시안대로 다시 뺐다(완성 박은 봉인 카드의 "봉인 박 둘러보기"로 연다).
+  - 총평 표를 스테이지 번호로 맞췄다.
+  - 구미호·야광귀 마지막 컷의 "다음 요괴 잡으러 ..." 레이어가 꺼진 채 저장돼 방장·구성원 모두 보이지 않던 것을 켰다. 지귀는 문구를 숨기고 방장 버튼을 "마치기"로 했다(편집기 도구로 프리팹 3개 재저장, 레이어 켬/끔과 글자 한 줄만 변경).
+  - 기존 PlayMode 5건·EditMode 1건을 새 흐름에 맞췄다(실물 마우스 검사는 구름 전환이 끝난 뒤 SKIP을 누르게 함).
+  - AGENTS.md 접속 기록과 Game 49 이력 주석을 맞췄다.
+- **그대로 둔 것:** 새 글자색 `3f3d38`·`68645c`는 기존 결과 화면 도구와 같은 Figma 값이라 토큰으로 바꾸지 않았다(바꾸면 프리팹 재생성이 필요).
+
+| 확인 | 결과 |
+| --- | --- |
+| 원본 PR(main 병합본) 전체 EditMode / PlayMode | 2204/2205, 780/786 (새 실패 6건) |
+| 관련 EditMode(StageClearControls·StageStoryAsset·SealRunSummary·GameStageStoryAsset) | 17/17 PASS |
+| `GameSceneFlowTests` | 28/28 PASS (끊긴 구성원이 총평 시작을 막지 않는 단언 추가) |
+| 전체 EditMode | 2205/2205 PASS |
+| 전체 PlayMode | 785/786. 실패 1건 `GameOpeningControllerTests.CompletingAllTwentyFourCuts…`는 main에서도 같은 실패 |
+| Mac 개발 빌드 두 앱(방장 P1 + 구성원 P2, 직접 IP) | 1~3스테이지 마지막 컷, 지귀 "마치기", 총평 동시 이동 화면 확인 |
+
+- **미실행:** 실제로 방장 앱을 종료하거나 구성원 연결을 끊는 재현(단언과 코드 경로로만 확인), 실기기·iOS, 3인 이상.
+
 ## 2026-11-10 — 봉인 총평 (#642)
 
 - 기준: `feat/seal-run-summary`, 최신 main `c930f120`에서 시작. Unity 6000.6.5f1 로컬 Editor.
@@ -7721,6 +7744,12 @@ The manual conflict resolution only combines documentation. Selected PlayMode ch
 
 Main advanced to `6b2706aa` during PR verification (#633 and #639). Integrated it in `b49a35f9`; the only conflict was again this document, and both histories were retained. The 24 original #634 code/asset files remain unchanged. On this final integrated code, full EditMode **2199/2199 PASS** and the two result/game-over PlayMode checks named above **2/2 PASS**, no failures or skips. GitHub reported PR #640 mergeable. Only documentation was manually resolved; pre-existing generated asset whitespace was retained rather than modifying unrelated assets. Full PlayMode and physical-device tests were not rerun.
 
+
+### #647 Host-controlled stage clear - 2026-11-10
+
+Unity compilation: no errors. StageClearControlsTests: 4/4 pass after correcting a missing stageCatalog in the test fixture. Covers three prefab role states, Jigwi guest heading/wait suppression, and summary generation validation/sticky/reset behavior. Related LabGameFlowBridgeTests and LabLobbyRejoinTests: 43/43 pass with token 49. Full suite was not run.
+
+Unity Simulator: inspected only Jigwi final cut as guest; both requested messages and the advance button are absent. Stopped Play mode after inspection. Real multi-device synchronized progression and mobile builds remain unverified. Unity-generated blank m_Name YAML fields retain serializer whitespace.
 
 ## 2026-11-10 — #642 봉인 총평의 실제 신규 도색 기여도·성공 시간 연결
 
