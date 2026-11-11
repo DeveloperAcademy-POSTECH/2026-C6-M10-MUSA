@@ -263,6 +263,12 @@ namespace C6Lab
         [SerializeField, Range(0f, 4f)] private float remainingHintBlinksPerSecond = 1.5f;
         [Tooltip("#663: 획 안내에서 남은 곳 안내로 서서히 바뀌는 시간 (초). 갑자기 바뀌지 않게.")]
         [SerializeField, Range(0f, 2f)] private float remainingHintFadeSeconds = .6f;
+        [Tooltip("#663: 완성에 거의 다 왔을 때(완성 기준 바로 앞) 남은 곳 색. Remaining Hint From에서 완성 기준까지 칠할수록 이 색 쪽으로 진해진다.")]
+        [SerializeField] private Color remainingHintNearColor = new Color(1f, .3f, .25f, 1f);
+        [Tooltip("#663: 완성에 거의 다 왔을 때 남은 곳 점 크기 배율. 칠할수록 이 크기 쪽으로 커진다.")]
+        [SerializeField, Range(1f, 2f)] private float remainingHintNearScale = 1.3f;
+        /// <summary>#663: 남은 곳 안내가 완성에 얼마나 가까운지 (0 = 막 켜짐, 1 = 완성 기준 바로 앞).</summary>
+        public float RemainingHintNearness { get; private set; }
         private float remainingBlend, remainingBlendAt = -1f;
         /// <summary>#663: 남은 곳을 모두 빨갛게 보여 주는 중인지 (테스트·확인용).</summary>
         public bool RemainingHintOn { get; private set; }
@@ -1161,6 +1167,11 @@ namespace C6Lab
                 : Mathf.MoveTowards(remainingBlend, remaining ? 1f : 0f, step / remainingHintFadeSeconds);
             float guideGlow = .6f + .4f * Mathf.Sin(time * 4f);
             float blink = .5f + .5f * Mathf.Cos(time * Mathf.Max(0f, remainingHintBlinksPerSecond) * Mathf.PI * 2f);
+            // #663: the closer to finishing, the stronger and larger the soft red, so the very last bits stand out most.
+            float near = remaining ? Mathf.InverseLerp(remainingHintFrom, Mathf.Max(remainingHintFrom + .001f, Required), stroke.Coverage) : 0f;
+            RemainingHintNearness = near;
+            Color hint = Color.Lerp(remainingHintColor, remainingHintNearColor, near);
+            float hintScale = Mathf.Lerp(remainingHintScale, remainingHintNearScale, near);
             int shown = 0;
             for (int i = 0; i < guideDots.Length; i++)
             {
@@ -1171,9 +1182,9 @@ namespace C6Lab
                 if (!on) continue;
                 shown++;
                 Color guide = strokeGuideColor; guide.a *= guided ? guideGlow : 0f;
-                Color red = remainingHintColor; red.a *= blink;
+                Color red = hint; red.a *= Mathf.Lerp(blink, .35f + .65f * blink, near); // late on, it never fully disappears
                 guideDots[i].color = Color.Lerp(guide, red, remainingBlend);
-                guideDots[i].rectTransform.localScale = Vector3.one * Mathf.Lerp(1f, remainingHintScale, remainingBlend);
+                guideDots[i].rectTransform.localScale = Vector3.one * Mathf.Lerp(1f, hintScale, remainingBlend);
             }
             GuideDotsShown = shown;
             if (strokeArrow == null) return;
