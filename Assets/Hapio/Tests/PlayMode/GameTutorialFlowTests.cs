@@ -84,7 +84,7 @@ namespace Hapio.Tests
             private readonly int previousSelection;
             private readonly bool createdView;
             private readonly object group;
-            private int addedCustomIndex = -1;
+            private int addedCustomIndex = -1; // Total index (built-in + custom) of the size this fixture added.
 
             public PortraitGameView()
             {
@@ -121,10 +121,10 @@ namespace Hapio.Tests
                         Type sizeClass = editor.GetType("UnityEditor.GameViewSize", true);
                         object fixedSize = Activator.CreateInstance(sizeClass, Members, null,
                             new object[] { Enum.Parse(sizeType, "FixedResolution"), 390, 844, "C6 Portrait (tutorial test)" }, null);
-                        int customIndex = count - (int)groupClass.GetMethod("GetBuiltinCount", Members).Invoke(group, null);
                         groupClass.GetMethod("AddCustomSize", Members).Invoke(group, new[] { fixedSize });
                         portraitIndex = count;
-                        addedCustomIndex = customIndex;
+                        // RemoveCustomSize takes the index in the whole list (built-in sizes first), like the selection.
+                        addedCustomIndex = portraitIndex;
                     }
                     selection.SetValue(view, portraitIndex);
                     Repaint();
