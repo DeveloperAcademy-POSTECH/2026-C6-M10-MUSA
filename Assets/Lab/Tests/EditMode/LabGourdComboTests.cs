@@ -80,6 +80,49 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void TheFirstComboIgnoresWrongColorsUntilItsFirstSlotIsHit()
+        {
+            // #695: Sample is Fire, Water, Water, Earth.
+            var combo = new LabGourdCombo();
+            combo.Start(Sample, 0d, 10d, forgiveUntilFirstHit: true);
+            Assert.That(combo.Forgiving, Is.True);
+            Assert.That(combo.Judge(LabOrbElement.Earth, 7, 1d), Is.EqualTo(LabComboResult.None), "A wrong color is ignored.");
+            Assert.That(combo.Judge(LabOrbElement.Water, 8, 2d), Is.EqualTo(LabComboResult.None), "Again and again.");
+            Assert.That(combo.Active, Is.True);
+            Assert.That(combo.Progress, Is.Zero);
+            Assert.That(combo.LastResult, Is.EqualTo(LabComboResult.None));
+            Assert.That(combo.ForgivenCount, Is.EqualTo(2u), "Each forgiven miss is counted (Geumok answers each).");
+
+            Assert.That(combo.Judge(LabOrbElement.Fire, 7, 3d), Is.EqualTo(LabComboResult.None));
+            Assert.That(combo.Progress, Is.EqualTo(1));
+            Assert.That(combo.Forgiving, Is.False, "From the first hit on, it is the usual combo.");
+            Assert.That(combo.Judge(LabOrbElement.Fire, 9, 4d), Is.EqualTo(LabComboResult.WrongColor));
+            Assert.That(combo.LastFailedBy, Is.EqualTo(9ul));
+            Assert.That(combo.ForgivenCount, Is.EqualTo(2u), "A real wrong color is not forgiven.");
+            combo.Reset();
+            Assert.That(combo.ForgivenCount, Is.Zero, "A new round counts from zero.");
+        }
+
+        [Test]
+        public void TheForgivingComboStillEndsAtItsTimeLimitAndTheNextOneDoesNotForgive()
+        {
+            var combo = new LabGourdCombo();
+            combo.Start(Sample, 0d, 10d, forgiveUntilFirstHit: true);
+            Assert.That(combo.Judge(LabOrbElement.Earth, 7, 10.5d), Is.EqualTo(LabComboResult.Timeout),
+                "The time limit stays: a hit after it is a timeout, wrong color or not.");
+            Assert.That(combo.Forgiving, Is.False);
+
+            combo.Start(Sample, 20d, 10d);
+            Assert.That(combo.Forgiving, Is.False);
+            Assert.That(combo.Judge(LabOrbElement.Earth, 7, 21d), Is.EqualTo(LabComboResult.WrongColor));
+
+            combo.Start(Sample, 40d, 10d, forgiveUntilFirstHit: true);
+            combo.EndForgiving();
+            Assert.That(combo.Judge(LabOrbElement.Earth, 7, 41d), Is.EqualTo(LabComboResult.WrongColor),
+                "The VFX lab's fail button ends the forgiving first.");
+        }
+
+        [Test]
         public void StartRejectsNonElementColors()
         {
             var combo = new LabGourdCombo();
@@ -433,7 +476,7 @@ namespace C6Lab.Tests
         }
 
         private LabConfig Config(bool enabled, float firstStart = 20f, float timeLimit = 10f, bool throwerOnly = false,
-            float warning = 3f)
+            float warning = 3f, bool forgiveFirst = false)
         {
             var config = ScriptableObject.CreateInstance<LabConfig>();
             created.Add(config);
@@ -457,6 +500,8 @@ namespace C6Lab.Tests
             // The rules are checked with times outside the DEV sliders (#271 centred them on the defaults),
             // so these go straight onto the asset fields; the model accepts them as before.
             Times(config, firstStart: firstStart, timeLimit: timeLimit);
+            // #695: these rule tests fail the round's first combo on a wrong color, so its forgiving is off unless asked for.
+            JsonUtility.FromJsonOverwrite("{\"yaguangFirstComboForgive\":" + (forgiveFirst ? "true" : "false") + "}", config);
             return config;
         }
 

@@ -57,7 +57,7 @@ namespace C6Lab
         public int comboProgress;
         public double comboStartedAt = -1d, comboEndsAt = -1d, comboResultAt = -1d;
         public double comboNextAt = -1d, comboWarningAt = -1d;
-        public uint comboCount, comboResultCount;
+        public uint comboCount, comboResultCount, comboForgivenCount;
         public LabComboResult comboResult;
         public ulong comboFailedBy;
         public float targetYawDegrees, targetYawSpeedDegreesPerSecond;
@@ -182,6 +182,7 @@ namespace C6Lab
                 comboColors = snapshot.comboColors == null ? Array.Empty<LabOrbElement>() : (LabOrbElement[])snapshot.comboColors.Clone(),
                 comboProgress = snapshot.comboProgress, comboStartedAt = snapshot.comboStartedAt,
                 comboEndsAt = snapshot.comboEndsAt, comboCount = snapshot.comboCount,
+                comboForgivenCount = snapshot.comboForgivenCount,
                 comboResult = snapshot.comboResult, comboResultCount = snapshot.comboResultCount,
                 comboResultAt = snapshot.comboResultAt, comboFailedBy = snapshot.comboFailedBy,
                 comboNextAt = snapshot.comboNextAt, comboWarningAt = snapshot.comboWarningAt,
@@ -462,6 +463,7 @@ namespace C6Lab
                     copy.comboActive = header.comboActive;
                     copy.comboColors = (LabOrbElement[])header.comboColors.Clone();
                     copy.comboProgress = header.comboProgress; copy.comboCount = header.comboCount;
+                    copy.comboForgivenCount = header.comboForgivenCount;
                     copy.comboStartedAt = header.comboStartedAt; copy.comboEndsAt = header.comboEndsAt;
                     copy.comboResult = header.comboResult; copy.comboResultCount = header.comboResultCount;
                     copy.comboResultAt = header.comboResultAt; copy.comboFailedBy = header.comboFailedBy;
@@ -695,6 +697,7 @@ namespace C6Lab
             comboColors = source.comboColors == null ? Array.Empty<LabOrbElement>() : (LabOrbElement[])source.comboColors.Clone(),
             comboProgress = source.comboProgress, comboStartedAt = source.comboStartedAt, comboEndsAt = source.comboEndsAt,
             comboCount = source.comboCount, comboResult = source.comboResult, comboResultCount = source.comboResultCount,
+            comboForgivenCount = source.comboForgivenCount,
             comboResultAt = source.comboResultAt, comboFailedBy = source.comboFailedBy,
             comboNextAt = source.comboNextAt, comboWarningAt = source.comboWarningAt,
             flashWarningAt = source.flashWarningAt, flashAt = source.flashAt, flashTarget = source.flashTarget,

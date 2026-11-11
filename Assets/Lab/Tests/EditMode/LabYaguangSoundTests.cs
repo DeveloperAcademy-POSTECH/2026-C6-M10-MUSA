@@ -228,6 +228,165 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void GeumokSaysTheRuleAfterTheGoblinsFourOnlyBeforeTheRoundsFirstCombo()
+        {
+            // #695: 30초 예고 (아직 나온 콤보 0개): 야광귀 "넷" → 0.9초 뒤 금옥 규칙. 넷/셋/둘/하나는 모두 센다.
+            LabYaguangSound sound = Sound();
+            LabSnapshot snapshot = ComboWarning();
+            sound.ObserveFlash(snapshot, 29.5d, Me);
+            sound.ObserveFlash(snapshot, 30d, Me);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboCountFour), Is.EqualTo(1), "넷 first.");
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideRule), Is.Zero, "Geumok waits for the four.");
+            foreach (double now in new[] { 30.5d, 30.95d, 31d, 32d, 33d })
+                sound.ObserveFlash(snapshot, now, Me);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideRule), Is.EqualTo(1));
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboCountThree), Is.EqualTo(1), "The count goes on under her.");
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboCountOne), Is.EqualTo(1));
+
+            // 두 번째 콤보 예고 (이미 1개가 나옴): 규칙 대신 "자.. 다들 준비 됐지?"
+            snapshot.comboCount = 1;
+            snapshot.comboWarningAt = 60d; snapshot.comboNextAt = 64d;
+            foreach (double now in new[] { 60d, 61d, 62d, 63d })
+                sound.ObserveFlash(snapshot, now, Me);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideRule), Is.EqualTo(1));
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideReady), Is.EqualTo(1));
+
+            // 세 번째부터는 금옥 말 없이 야광귀만 센다.
+            snapshot.comboCount = 2;
+            snapshot.comboWarningAt = 90d; snapshot.comboNextAt = 94d;
+            foreach (double now in new[] { 90d, 91d, 92d, 93d })
+                sound.ObserveFlash(snapshot, now, Me);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideRule) + sound.PlayCount(LabYaguangSfx.ComboGuideReady), Is.EqualTo(2));
+            Assert.That(LabYaguangSound.WarningLine(1, 1, false), Is.Null, "The ready line can be turned off.");
+            Assert.That(LabYaguangSound.WarningLine(2, 2, true), Is.EqualTo(LabYaguangSfx.ComboGuideReady), "It follows the rule combos.");
+        }
+
+        [Test]
+        public void TheCountFadesFourThreeTwoOneUnderTheRule()
+        {
+            Assert.That(LabYaguangSound.GuideCountGain(4, .6f), Is.EqualTo(1f).Within(1e-5f), "넷 at full size");
+            Assert.That(LabYaguangSound.GuideCountGain(3, .6f), Is.EqualTo(.6f).Within(1e-5f));
+            Assert.That(LabYaguangSound.GuideCountGain(2, .6f), Is.EqualTo(.36f).Within(1e-5f));
+            Assert.That(LabYaguangSound.GuideCountGain(1, .6f), Is.EqualTo(.216f).Within(1e-5f), "하나 the quietest");
+            Assert.That(LabYaguangSound.GuideCountGain(2, 1f), Is.EqualTo(1f), "1 keeps them all the same.");
+        }
+
+        [Test]
+        public void GeumokPraisesEachHitAndCheersTheClear()
+        {
+            LabYaguangSound sound = Sound();
+            var snapshot = new LabSnapshot { sessionId = "yaguang", round = 1, phase = LabPhase.Playing };
+            sound.ObserveFlash(snapshot, 33.9d, Me);
+            snapshot.comboCount = 1; snapshot.comboActive = true;
+            snapshot.comboStartedAt = 34d; snapshot.comboEndsAt = 44d;
+            Watch(sound, snapshot, 34d, 35.9d);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideHit1), Is.Zero, "Nothing until a slot is hit.");
+
+            // #695: 칸을 맞힐 때마다 0.3초 뒤에 좋아! / 잘했어! / 하나만 더..!
+            snapshot.comboProgress = 1;
+            sound.ObserveFlash(snapshot, 36d, Me);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideHit1), Is.Zero, "It waits for the hit sound.");
+            Watch(sound, snapshot, 36.05d, 36.9d);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideHit1), Is.EqualTo(1), "좋아!");
+            snapshot.comboProgress = 2;
+            Watch(sound, snapshot, 37d, 37.9d);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideHit2), Is.EqualTo(1), "잘했어!");
+            snapshot.comboProgress = 3;
+            Watch(sound, snapshot, 38d, 38.9d);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideHit3), Is.EqualTo(1), "하나만 더..!");
+
+            // 넷째 칸 = 성공: 콤보는 끝났지만 그렇지!!
+            snapshot.comboProgress = 4; snapshot.comboActive = false;
+            snapshot.comboResultCount = 1; snapshot.comboResult = LabComboResult.Success; snapshot.comboResultAt = 39d;
+            Watch(sound, snapshot, 39d, 40d);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideClear), Is.EqualTo(1), "그렇지!!");
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideHit1), Is.EqualTo(1), "Each line once.");
+        }
+
+        [Test]
+        public void AFailedComboGetsNoPraiseOnlyTheGoblinsMelong()
+        {
+            LabYaguangSound sound = Sound();
+            var snapshot = new LabSnapshot { sessionId = "yaguang", round = 1, phase = LabPhase.Playing };
+            sound.ObserveFlash(snapshot, 33.9d, Me);
+            snapshot.comboCount = 1; snapshot.comboActive = true;
+            snapshot.comboStartedAt = 34d; snapshot.comboEndsAt = 44d;
+            snapshot.comboProgress = 2;
+            sound.ObserveFlash(snapshot, 36d, Me);
+            // 0.3초 안에 틀린 색으로 끝남: 잘했어!는 내지 않는다.
+            snapshot.comboActive = false;
+            snapshot.comboResultCount = 1; snapshot.comboResult = LabComboResult.WrongColor; snapshot.comboResultAt = 36.1d;
+            Watch(sound, snapshot, 36.1d, 38d);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideHit2), Is.Zero);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideClear), Is.Zero);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideFail), Is.EqualTo(1), "아이고 first");
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboTaunt), Is.EqualTo(1), "then 메롱~");
+        }
+
+        [Test]
+        public void GeumokAsksToTryAgainForEachForgivenMissInTurn()
+        {
+            LabYaguangSound sound = Sound();
+            var snapshot = new LabSnapshot { sessionId = "yaguang", round = 1, phase = LabPhase.Playing };
+            sound.ObserveFlash(snapshot, 33.9d, Me);
+            snapshot.comboCount = 1; snapshot.comboActive = true;
+            snapshot.comboStartedAt = 34d; snapshot.comboEndsAt = 44d;
+
+            // #695: Host가 틀린 색을 봐줌 → 0.3초 뒤 "한 번만 다시 해보자".
+            snapshot.comboForgivenCount = 1;
+            sound.ObserveFlash(snapshot, 35d, Me);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideRetry), Is.Zero, "It waits like the praise.");
+            Watch(sound, snapshot, 35.05d, 36d);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideRetry), Is.EqualTo(1));
+            snapshot.comboForgivenCount = 2;
+            Watch(sound, snapshot, 36.05d, 37d);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideRetry), Is.EqualTo(2), "Once per forgiven miss.");
+
+            // 봐준 직후 콤보가 끝나면(시간 초과) 말하지 않는다.
+            snapshot.comboForgivenCount = 3;
+            sound.ObserveFlash(snapshot, 38d, Me);
+            snapshot.comboActive = false;
+            Watch(sound, snapshot, 38.05d, 39d);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideRetry), Is.EqualTo(2));
+
+            Assert.That(LabYaguangSound.RetryClip(0, 3), Is.EqualTo(0));
+            Assert.That(LabYaguangSound.RetryClip(1, 3), Is.EqualTo(1));
+            Assert.That(LabYaguangSound.RetryClip(3, 3), Is.EqualTo(0), "Three lines take turns.");
+            Assert.That(LabYaguangSound.RetryClip(0, 0), Is.EqualTo(-1));
+        }
+
+        [Test]
+        public void TheStampThudsExactlyWhenTheScreenPressesItIn()
+        {
+            // #695: 쾅은 시각 계산이 아니라 화면의 도장이 찍힌 수를 따른다.
+            LabYaguangSound sound = Sound();
+            Assert.That(sound.ObserveStamp(0), Is.False);
+            Assert.That(sound.ObserveStamp(1), Is.True, "쾅");
+            Assert.That(sound.ObserveStamp(1), Is.False, "Once per stamp.");
+            Assert.That(sound.ObserveStamp(2), Is.True);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboStamp), Is.EqualTo(2));
+            Assert.That(sound.ObserveStamp(0), Is.False, "A new screen counts from zero again.");
+            Assert.That(sound.ObserveStamp(1), Is.True);
+        }
+
+        [Test]
+        public void TheGuideFoldersFollowTheHitCount()
+        {
+            Assert.That(LabYaguangSound.Folder(LabYaguangSfx.ComboGuideRule), Is.EqualTo("Audio/YaguangComboGuideRule"));
+            Assert.That(LabYaguangSound.Folder(LabYaguangSfx.ComboGuideHit1), Is.EqualTo("Audio/YaguangComboGuideHit1"));
+            Assert.That(LabYaguangSound.Folder(LabYaguangSfx.ComboGuideHit3), Is.EqualTo("Audio/YaguangComboGuideHit3"));
+            Assert.That(LabYaguangSound.Folder(LabYaguangSfx.ComboGuideClear), Is.EqualTo("Audio/YaguangComboGuideClear"));
+            Assert.That(LabYaguangSound.Folder(LabYaguangSfx.ComboGuideFail), Is.EqualTo("Audio/YaguangComboGuideFail"));
+            Assert.That(LabYaguangSound.Folder(LabYaguangSfx.ComboStamp), Is.EqualTo("Audio/YaguangComboStamp"));
+            Assert.That(LabYaguangSound.Folder(LabYaguangSfx.ComboGuideReady), Is.EqualTo("Audio/YaguangComboGuideReady"));
+            Assert.That(LabYaguangSound.Folder(LabYaguangSfx.ComboGuideRetry), Is.EqualTo("Audio/YaguangComboGuideRetry"));
+            Assert.That(LabYaguangSound.GuideFeedbackSfx(1), Is.EqualTo(LabYaguangSfx.ComboGuideHit1));
+            Assert.That(LabYaguangSound.GuideFeedbackSfx(2), Is.EqualTo(LabYaguangSfx.ComboGuideHit2));
+            Assert.That(LabYaguangSound.GuideFeedbackSfx(3), Is.EqualTo(LabYaguangSfx.ComboGuideHit3));
+            Assert.That(LabYaguangSound.GuideFeedbackSfx(4), Is.EqualTo(LabYaguangSfx.ComboGuideClear));
+        }
+
+        [Test]
         public void TheClockTicksEveryHalfSecondThenFasterAndStopsWithTheCombo()
         {
             LabYaguangSound sound = Sound();

@@ -1124,6 +1124,27 @@ namespace C6Lab
         [SerializeField, Range(0f, 3f)] private float yaguangComboClearedDelaySeconds = .8f;
         [Tooltip("콤보 성공 야광귀 대사 크기 (Audio/YaguangComboClearedFirst, YaguangComboClearedSecond)")]
         [SerializeField, Range(0f, 1f)] private float yaguangComboClearedSoundVolume = .9f;
+        [Header("야광귀 콤보 금옥 안내와 첫 콤보 봐주기 (#695, Inspector 전용)")]
+        [Tooltip("라운드 첫 콤보는 첫 칸을 맞힐 때까지 틀린 색을 실패 없이 무시한다 (첫 칸을 맞힌 뒤 틀린 색은 실패, 제한 시간은 그대로). Host 기준")]
+        [SerializeField] private bool yaguangFirstComboForgive = true;
+        [Tooltip("콤보 예고 때 금옥 규칙 안내(Audio/YaguangComboGuideRule)를 라운드의 처음 몇 번 콤보까지 낼지 (0이면 끔, 1이면 첫 콤보만)")]
+        [SerializeField, Range(0, 20)] private int yaguangComboGuideRuleCombos = 1;
+        [Tooltip("규칙 안내 다음 콤보(기본 두 번째 콤보) 예고에서 금옥이 \"자.. 다들 준비 됐지?\"(Audio/YaguangComboGuideReady)를 말할지")]
+        [SerializeField] private bool yaguangComboGuideReadyOn = true;
+        [Tooltip("칸을 맞힌 뒤 금옥 칭찬(좋아! / 잘했어! / 하나만 더..! / 그렇지!!)까지 지연 (초). 맞힌 소리 뒤에 들리게")]
+        [SerializeField, Range(0f, 2f)] private float yaguangComboGuideFeedbackDelaySeconds = .3f;
+        [Tooltip("규칙 안내가 있는 예고에서 야광귀가 \"넷\"을 센 뒤 금옥 규칙 안내가 나오기까지 (예고 시작부터 초)")]
+        [SerializeField, Range(0f, 3f)] private float yaguangComboGuideRuleDelaySeconds = .9f;
+        [Tooltip("규칙 안내가 있는 예고에서 넷→셋→둘→하나로 갈 때마다 야광귀 목소리 크기에 곱하는 값 (1이면 그대로, 작을수록 빨리 작아짐)")]
+        [SerializeField, Range(.1f, 1f)] private float yaguangComboGuideCountFade = .6f;
+        [Tooltip("콤보 실패 뒤 금옥 \"아이고\"(Audio/YaguangComboGuideFail)까지 지연 (초)")]
+        [SerializeField, Range(0f, 2f)] private float yaguangComboGuideFailDelaySeconds = .1f;
+        [Tooltip("금옥 \"아이고\"가 끝나고 야광귀 \"메롱~\"까지 간격 (초)")]
+        [SerializeField, Range(0f, 2f)] private float yaguangComboGuideFailToTauntSeconds = .1f;
+        [Tooltip("금옥 안내 목소리 크기 (규칙 + 칭찬 + 아이고, 모든 기기)")]
+        [SerializeField, Range(0f, 1f)] private float yaguangComboGuideSoundVolume = 1f;
+        [Tooltip("콤보 성공 도장이 박에 찍힐 때 쾅 크기 (Audio/YaguangComboStamp, 모든 기기)")]
+        [SerializeField, Range(0f, 1f)] private float yaguangComboStampSoundVolume = .8f;
         [Header("야광귀 콤보 예고와 피버 신호 (#414, Inspector 전용)")]
         [Tooltip("콤보 예고(넷/셋/둘/하나) 동안 화면 가장자리가 어두워지는 최대 진하기 (0이면 끔, 모든 기기)")]
         [SerializeField, Range(0f, 1f)] private float yaguangComboWarningShade = .5f;
@@ -1671,6 +1692,16 @@ namespace C6Lab
         public float YaguangComboBgmToneSeconds => Mathf.Clamp(Finite(yaguangComboBgmToneSeconds, .3f), 0f, 2f);
         public float YaguangComboClearedDelaySeconds => Mathf.Clamp(Finite(yaguangComboClearedDelaySeconds, .8f), 0f, 3f);
         public float YaguangComboClearedSoundVolume => Mathf.Clamp01(Finite(yaguangComboClearedSoundVolume, .9f));
+        public bool YaguangFirstComboForgive => yaguangFirstComboForgive;
+        public int YaguangComboGuideRuleCombos => Mathf.Clamp(yaguangComboGuideRuleCombos, 0, 20);
+        public float YaguangComboGuideFeedbackDelaySeconds => Mathf.Clamp(Finite(yaguangComboGuideFeedbackDelaySeconds, .3f), 0f, 2f);
+        public float YaguangComboGuideRuleDelaySeconds => Mathf.Clamp(Finite(yaguangComboGuideRuleDelaySeconds, .9f), 0f, 3f);
+        public float YaguangComboGuideFailDelaySeconds => Mathf.Clamp(Finite(yaguangComboGuideFailDelaySeconds, .1f), 0f, 2f);
+        public float YaguangComboGuideFailToTauntSeconds => Mathf.Clamp(Finite(yaguangComboGuideFailToTauntSeconds, .1f), 0f, 2f);
+        public bool YaguangComboGuideReadyOn => yaguangComboGuideReadyOn;
+        public float YaguangComboStampSoundVolume => Mathf.Clamp01(Finite(yaguangComboStampSoundVolume, .8f));
+        public float YaguangComboGuideCountFade => Mathf.Clamp(Finite(yaguangComboGuideCountFade, .6f), .1f, 1f);
+        public float YaguangComboGuideSoundVolume => Mathf.Clamp01(Finite(yaguangComboGuideSoundVolume, 1f));
         public float YaguangComboWarningShade => Mathf.Clamp01(Finite(yaguangComboWarningShade, .5f));
         public float BigHitSoundVolume => Mathf.Clamp01(Finite(bigHitSoundVolume, .8f));
         public float YaguangComboTickFastSeconds => Mathf.Clamp(Finite(yaguangComboTickFastSeconds, 4f), 0f, 10f);

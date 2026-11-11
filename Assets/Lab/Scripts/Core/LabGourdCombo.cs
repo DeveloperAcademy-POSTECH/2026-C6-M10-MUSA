@@ -16,6 +16,8 @@ namespace C6Lab
         public const int Length = 4;
 
         private readonly LabOrbElement[] colors = new LabOrbElement[Length];
+        // #695: the round's first combo forgives wrong colors until its first slot is hit.
+        private bool forgiving;
 
         /// <summary>지금 진행 중인 콤보가 있는지</summary>
         public bool Active { get; private set; }
@@ -33,6 +35,11 @@ namespace C6Lab
         /// <summary>틀린 색으로 끝났을 때 그 구슬을 던진 사람. 그 밖에는 0.</summary>
         public ulong LastFailedBy { get; private set; }
 
+        /// <summary>#695: 지금 틀린 색을 봐주는 중인지 (라운드 첫 콤보이고 아직 첫 칸을 못 맞힘). 이때 틀린 색은 실패가 아니다.</summary>
+        public bool Forgiving => Active && forgiving && Progress == 0;
+        /// <summary>#695: 이번 라운드에 봐준 틀린 색 수. 늘 때마다 금옥이 "한 번만 다시 해보자" 같은 말을 한다.</summary>
+        public uint ForgivenCount { get; private set; }
+
         public LabOrbElement ColorAt(int index) => colors[index];
         public LabOrbElement[] Colors => (LabOrbElement[])colors.Clone();
 
@@ -40,17 +47,23 @@ namespace C6Lab
         {
             Array.Clear(colors, 0, colors.Length);
             Active = false;
+            forgiving = false;
             Progress = 0;
             StartedAt = EndsAt = -1d;
             Count = 0;
+            ForgivenCount = 0;
             LastResult = LabComboResult.None;
             LastResultCount = 0;
             LastResultAt = -1d;
             LastFailedBy = 0;
         }
 
-        /// <summary>새 콤보를 낸다. 색은 화·수·목·금·토(Fire~Earth)만 쓸 수 있다.</summary>
-        public void Start(LabOrbElement[] nextColors, double at, double timeLimit)
+        /// <summary>
+        /// 새 콤보를 낸다. 색은 화·수·목·금·토(Fire~Earth)만 쓸 수 있다.
+        /// forgiveUntilFirstHit(#695)이면 첫 칸을 맞힐 때까지 틀린 색은 무시하고(실패 아님), 첫 칸을 맞힌 뒤부터는 평소처럼 바로 실패.
+        /// 제한 시간은 그대로다.
+        /// </summary>
+        public void Start(LabOrbElement[] nextColors, double at, double timeLimit, bool forgiveUntilFirstHit = false)
         {
             if (nextColors == null || nextColors.Length != Length)
                 throw new ArgumentException("A combo needs exactly four colors.", nameof(nextColors));
@@ -61,6 +74,7 @@ namespace C6Lab
                 throw new ArgumentOutOfRangeException(nameof(timeLimit));
             Array.Copy(nextColors, colors, Length);
             Active = true;
+            forgiving = forgiveUntilFirstHit;
             Progress = 0;
             StartedAt = at;
             EndsAt = at + timeLimit;
@@ -76,10 +90,18 @@ namespace C6Lab
             if (!Active || element < LabOrbElement.Fire || element > LabOrbElement.Earth)
                 return LabComboResult.None;
             if (at >= EndsAt) return Finish(LabComboResult.Timeout, EndsAt, 0);
-            if (element != colors[Progress]) return Finish(LabComboResult.WrongColor, at, thrower);
+            if (element != colors[Progress])
+            {
+                if (!Forgiving) return Finish(LabComboResult.WrongColor, at, thrower);
+                ForgivenCount++;
+                return LabComboResult.None;
+            }
             Progress++;
             return Progress >= Length ? Finish(LabComboResult.Success, at, 0) : LabComboResult.None;
         }
+
+        /// <summary>#695: 봐주기를 끝낸다 (VFX 실험실의 콤보 실패 버튼이 첫 콤보에서도 바로 실패시키도록).</summary>
+        public void EndForgiving() => forgiving = false;
 
         /// <summary>Cancel a scheduled pattern without a success/failure result or a new reward/penalty.</summary>
         public void Stop(double at)
