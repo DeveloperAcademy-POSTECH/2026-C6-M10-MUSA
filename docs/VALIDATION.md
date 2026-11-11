@@ -15,6 +15,12 @@
 | 실패 4종 PlayMode(`LabCharmHostIdentityPlayTests`·`LabComboEffectLookTests`·`LabOrbPhysicsTests`·해당 `GameSceneFlowTests`) / EditMode `LabModelTests` | 73/73, 126/126 PASS |
 | 전체 EditMode / PlayMode | 2337/2337, 839/840. 남은 1건 `GameTutorialFlowTests.FinishedOpening…`(`Invalid index 0 36 1` 로그)는 #680 병합 전 main에서도 같은 실패 |
 
+- **튜토리얼 검사(같은 PR에서 추가):** `GameTutorialFlowTests`의 세로 Game view 크기 정리는 #671에서 들어왔다. `GameViewSizeGroup.RemoveCustomSize`에 전체 목록 번호(기본 크기 다음)를 넘겨야 하는데 사용자 크기 안의 번호(0)를 넘겼다. 그래서 지우기가 거절되며 `Invalid index 0 36 1`이 남았고, 더한 390×844 크기도 지워지지 않았다. 더할 때의 전체 번호로 지우게 고쳤다.
+
+| 확인 | 결과 |
+| --- | --- |
+| `GameTutorialFlowTests` | 5/5 PASS, 로그에 `Invalid index` 없음 |
+
 ## 2026-11-11 — 박 칠 색을 오행 팔레트 그대로 (클레이 농도 1)
 
 - **기준:** `feat/clay-full-palette-color` (main `51a24721`). Unity 6000.6.5f1 batch(macOS, Metal). 박 칠 색은 표현만 바꿨고, 판정·P 지도·도색 해시·접속 규약·공유 설정은 그대로다.
