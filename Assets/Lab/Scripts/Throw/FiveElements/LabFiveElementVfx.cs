@@ -53,6 +53,7 @@ namespace C6Lab
         private readonly List<LabClayImpactSlot> hits = new List<LabClayImpactSlot>();
         private LabClayShapes shapes;
         private bool ownsProfile;
+        private bool registerSceneService = true;
         private Scene sceneKey;
         private uint nextSeed = 37219u;
         public LabFiveElementProfile Profile { get; private set; }
@@ -80,10 +81,24 @@ namespace C6Lab
             return root.AddComponent<LabFiveElementVfx>();
         }
 
+        /// <summary>A presentation-owned pool with its own clock; never replaces or clears the battle's scene service.</summary>
+        public static LabFiveElementVfx CreateManual(Transform parent)
+        {
+            if (parent == null) return null;
+            var root = new GameObject("Final hit replay · clay VFX");
+            root.SetActive(false);
+            root.transform.SetParent(parent, false);
+            var service = root.AddComponent<LabFiveElementVfx>();
+            service.registerSceneService = false;
+            service.ManualClock = true;
+            root.SetActive(true);
+            return service;
+        }
+
         private void Awake()
         {
             sceneKey = gameObject.scene;
-            Services[sceneKey] = this;
+            if (registerSceneService) Services[sceneKey] = this;
             Profile = Resources.Load<LabFiveElementProfile>("FiveElements/Profile");
             if (Profile == null)
             {

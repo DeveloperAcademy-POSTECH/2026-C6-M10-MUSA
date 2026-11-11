@@ -89,6 +89,55 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void FullClayPoolKeepsFiveColorFallbackTrailAtTheCommonShapeThroughReconciliation()
+        {
+            for (int i = 0; i < pool.Profile.maxFlights; i++)
+                Assert.That(pool.BeginFlight(LabOrbElement.Wood, Vector3.up * (81f + i), Vector3.forward,
+                    .33f).IsActive, Is.True);
+            var normal = LabProjectile.Create(new Vector3(-2f, 81f, 0f), config, root.transform,
+                LabOrbElement.None, useClayFlight: true);
+            var fiveColor = LabProjectile.Create(new Vector3(2f, 81f, 0f), config, root.transform,
+                LabOrbElement.None, useClayFlight: true, fiveColor: true);
+            var sparkle = LabFiveColorSparkle.AttachArt(fiveColor.transform, config.OrbRadius, true);
+            Assert.That(normal.LaunchVisual(Vector3.forward, config), Is.True);
+            Assert.That(fiveColor.LaunchVisual(Vector3.forward, config), Is.True);
+            Assert.That(fiveColor.ClayFlightActive, Is.False, "A full clay pool exercises the actual fallback path.");
+            Assert.That(pool.ActiveFlightCount, Is.EqualTo(pool.Profile.maxFlights));
+            Assert.That(normal.FlightTrail, Is.Not.Null);
+            Assert.That(fiveColor.FlightTrail, Is.Not.Null);
+            float originalWidth = normal.FlightTrail.widthMultiplier;
+            for (int pass = 0; pass < 3; pass++)
+            {
+                sparkle.TintTrail();
+                AssertSameTrailShape(normal.FlightTrail, fiveColor.FlightTrail);
+            }
+            Assert.That(fiveColor.FlightTrail.colorGradient.colorKeys.Length, Is.EqualTo(5));
+            Assert.That(fiveColor.FlightTrail.colorGradient.colorKeys.Select(key => key.color).Distinct().Count(),
+                Is.EqualTo(5), "The common fallback still carries the five-color reward gradient.");
+
+            normal.ReconcileVisual(LabOrbElement.None, .5f, .65f, fiveColor: false);
+            fiveColor.ReconcileVisual(LabOrbElement.None, .5f, .65f, fiveColor: true);
+            Assert.That(normal.FlightTrail.widthMultiplier, Is.LessThan(originalWidth),
+                "Exercise the normal size adjustment before repeated palette writes.");
+            for (int pass = 0; pass < 3; pass++)
+            {
+                sparkle.TintTrail();
+                AssertSameTrailShape(normal.FlightTrail, fiveColor.FlightTrail);
+            }
+            Assert.That(fiveColor.FlightTrail.colorGradient.colorKeys.Length, Is.EqualTo(5));
+            Assert.That(pool.ActiveImpactCount, Is.Zero);
+        }
+
+        private static void AssertSameTrailShape(TrailRenderer normal, TrailRenderer fiveColor)
+        {
+            Assert.That(fiveColor.widthMultiplier, Is.EqualTo(normal.widthMultiplier).Within(.00001f));
+            Assert.That(fiveColor.time, Is.EqualTo(normal.time).Within(.00001f));
+            for (int sample = 0; sample <= 4; sample++)
+                Assert.That(fiveColor.widthCurve.Evaluate(sample * .25f),
+                    Is.EqualTo(normal.widthCurve.Evaluate(sample * .25f)).Within(.00001f));
+        }
+
+        [Test]
         public void CurvedFiveColorLeaseKeepsTheTravelledCornerAndFlowsThroughTheClayTail()
         {
             const float diameter = .4f;

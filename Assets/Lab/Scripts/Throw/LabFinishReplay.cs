@@ -36,6 +36,7 @@ namespace C6Lab
         public Camera ReplayCamera => replayCamera;
         public LabProjectile Ghost => ghost;
         public Canvas Overlay => overlay;
+        public LabFiveElementVfx ClayVfx => replayVfx;
 
         private readonly List<Canvas> hiddenCanvases = new List<Canvas>();
         private readonly List<Camera> disabledCameras = new List<Camera>();
@@ -48,6 +49,8 @@ namespace C6Lab
         private Image flash;
         private CanvasGroup captionGroup;
         private Transform effectRoot;
+        private LabFiveElementVfx replayVfx;
+        private Transform impactAnchor;
         private LabProjectile ghost;
         private bool ghostDone;
         private LabThrowSound throwSound;
@@ -55,6 +58,7 @@ namespace C6Lab
         private Vector3 gourdAtImpact, viewer, travel, side, normal;
         private float bodyRadius;
         private float previousReplayTime = float.NegativeInfinity;
+        private float sampledFlightTime;
         private float impactElapsed = -1f;
         private string roundKey;
 
@@ -96,6 +100,8 @@ namespace C6Lab
             HideBattleView(battle);
             BuildOverlay();
             effectRoot = new GameObject("Final hit replay · effects").transform;
+            UnityEngine.SceneManagement.SceneManager.MoveGameObjectToScene(effectRoot.gameObject, gameObject.scene);
+            replayVfx = LabFiveElementVfx.CreateManual(effectRoot);
             Running = true;
             Complete = Skipped = false;
             Elapsed = 0f;
@@ -112,7 +118,7 @@ namespace C6Lab
             if (!Running || Shot == null) return;
             Elapsed = Mathf.Clamp((float)sharedElapsed, 0f, Duration);
             int pass = LabFinishReplayTimeline.Evaluate(Elapsed, Shot.FlightSeconds, out float time, out float passElapsed);
-            if (pass != CurrentPass)
+            if (pass != CurrentPass || time < previousReplayTime)
             {
                 StartPass(pass);
                 previousReplayTime = float.NegativeInfinity;
@@ -120,8 +126,20 @@ namespace C6Lab
             ReplayTime = time;
             LabHangingTarget.RigState pose = Shot.PoseAt(time);
             hanging.SetPresentationPose(pose);
+            UpdateImpactAnchor(pose);
             UpdateGhost(time);
-            if (previousReplayTime < 0f && time >= 0f) PresentImpact(pass, pose);
+            if (previousReplayTime < 0f && time >= 0f)
+            {
+                // Seed contact orientation at the exact impact, even when this device samples after it.
+                LabFinishReplayTimeline.Pass timing = LabFinishReplayTimeline.Passes[pass].Fitted(Shot.FlightSeconds);
+                UpdateImpactAnchor(impactPose);
+                PlaceCamera(pass, 0f, -timing.From / timing.Speed, impactPose);
+                PresentImpact(pass, impactPose);
+                UpdateImpactAnchor(pose);
+            }
+            // Clay follows the shared replay clock, including a late first sample after the contact.
+            if (time >= 0f && replayVfx != null)
+                replayVfx.Advance(Mathf.Max(0f, time - Mathf.Max(0f, previousReplayTime)));
             previousReplayTime = time;
             PlaceCamera(pass, time, passElapsed, pose);
             UpdateOverlay(pass, passElapsed);
@@ -147,11 +165,12 @@ namespace C6Lab
             disabledCameras.Clear();
             hiddenCanvases.Clear();
             if (ghost != null) Destroy(ghost.gameObject);
-            if (effectRoot != null) Destroy(effectRoot.gameObject);
+            if (effectRoot != null) { effectRoot.gameObject.SetActive(false); Destroy(effectRoot.gameObject); }
             bursts.Clear();
             if (replayCamera != null) { replayCamera.enabled = false; Destroy(replayCamera.gameObject); }
             if (overlay != null) { overlay.gameObject.SetActive(false); Destroy(overlay.gameObject); }
             ghost = null; effectRoot = null; replayCamera = null; overlay = null;
+            replayVfx = null; impactAnchor = null;
             topBar = bottomBar = null; flash = null; captionGroup = null;
             Shot = null; Running = Complete = Skipped = false; Elapsed = 0f; CurrentPass = -1; ImpactsPresented = 0;
             impactElapsed = -1f; ghostDone = false; roundKey = null;
@@ -187,27 +206,49 @@ namespace C6Lab
             ghost = null;
             ghostDone = false;
             impactElapsed = -1f;
+            sampledFlightTime = -Shot.FlightSeconds;
+            replayVfx?.ClearAll();
             // A cut never carries the last pass's fading trails or bursts into the new angle.
             if (effectRoot != null)
-                for (int i = effectRoot.childCount - 1; i >= 0; i--) Destroy(effectRoot.GetChild(i).gameObject);
+                for (int i = effectRoot.childCount - 1; i >= 0; i--)
+                {
+                    GameObject child = effectRoot.GetChild(i).gameObject;
+                    if (replayVfx != null && child == replayVfx.gameObject) continue;
+                    child.SetActive(false);
+                    Destroy(child);
+                }
+            bursts.Clear();
+            impactAnchor = new GameObject("Final hit replay · contact pose").transform;
+            impactAnchor.SetParent(effectRoot, false);
         }
 
         private void UpdateGhost(float time)
         {
             if (ghostDone || !Shot.Launched(time)) return;
-            Vector3 position = Shot.BallAt(Mathf.Min(time, 0f));
             if (ghost == null)
             {
-                ghost = LabProjectile.Create(position, Network.config, effectRoot, Shot.Element, Shot.BlastScale);
+                // Rebuild the short travelled tail from the recorded launch even when a cut opens halfway through a flight.
+                ghost = LabProjectile.Create(Shot.LaunchPosition, Network.config, effectRoot, Shot.Element, Shot.BlastScale,
+                    useClayFlight: true, fiveColor: Shot.FiveColor);
                 ghost.name = "Final hit replay · ghost orb";
                 ghost.SetRadiusScale(Shot.RadiusScale);
                 ghost.SetJigwiABRadiusScale(Shot.JigwiRadiusScale);
-                if (Shot.FiveColor)
+                ghost.BeginPuppet(Network.config, Shot.JigwiReward, replayVfx, Shot.LaunchVelocity);
+                // Realtime sprite tinting would overwrite the clay pool's sampled palette clock.
+                if (Shot.FiveColor && !ghost.ClayFlightActive)
                     LabFiveColorSparkle.AttachArt(ghost.transform,
                         Network.config.OrbRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined), true);
-                ghost.BeginPuppet(Network.config, Shot.JigwiReward);
             }
-            ghost.transform.position = position;
+            float until = Mathf.Min(time, 0f);
+            while (sampledFlightTime < until)
+            {
+                float next = Mathf.Min(until, sampledFlightTime + LabFinishReplayShot.StepSeconds);
+                Vector3 from = Shot.BallAt(sampledFlightTime), to = Shot.BallAt(next);
+                ghost.SamplePuppet(to, to - from);
+                replayVfx?.Advance(next - sampledFlightTime);
+                sampledFlightTime = next;
+            }
+            ghost.TryTintClayFlight(Mathf.Max(0f, until + Shot.FlightSeconds), LabFiveColorSparkle.FiveColors);
             if (time >= 0f)
             {
                 ghost.EndPuppet();
@@ -216,18 +257,35 @@ namespace C6Lab
             }
         }
 
+        private void UpdateImpactAnchor(LabHangingTarget.RigState pose)
+        {
+            if (impactAnchor == null) return;
+            Matrix4x4 frame = hanging.PoseMatrix(pose);
+            impactAnchor.SetPositionAndRotation(frame.MultiplyPoint3x4(Vector3.zero), frame.rotation);
+            impactAnchor.localScale = frame.lossyScale;
+        }
+
         private void PresentImpact(int pass, LabHangingTarget.RigState pose)
         {
             ImpactsPresented++;
             impactElapsed = Elapsed;
             Vector3 point = hanging.MovePosedPoint(Shot.HitPoint, impactPose, pose);
             float speed = LabFinishReplayTimeline.Passes[pass].Fitted(Shot.FlightSeconds).Speed;
-            if (!PlayAuthoredBurst(point, speed)) Burst(point, speed);
-            if (Shot.FiveColor)
+            Matrix4x4 moved = hanging.PoseMatrix(pose) * hanging.PoseMatrix(impactPose).inverse;
+            Vector3 posedNormal = moved.inverse.transpose.MultiplyVector(normal).normalized;
+            Vector3 incoming = moved.MultiplyVector(Shot.ImpactVelocity);
+            bool clay = replayVfx != null && replayVfx.PlayImpact(Shot.Element, point, posedNormal, incoming,
+                2f * Shot.Radius, LabPaintImpact.Normalize(Shot.ImpactVelocity, normal), impactAnchor,
+                leaveMark: false, fiveColor: Shot.FiveColor, fiveColorAge: Shot.FlightSeconds);
+            if (!clay)
             {
-                float radius = Network.config.OrbRadius;
-                LabFiveColorSparkle.DustBurst(point, radius).transform.SetParent(effectRoot, true);
-                LabFiveColorSparkle.Burst(point, radius).transform.SetParent(effectRoot, true);
+                if (!PlayAuthoredBurst(point, speed)) Burst(point, speed);
+                if (Shot.FiveColor)
+                {
+                    float radius = Network.config.OrbRadius;
+                    LabFiveColorSparkle.DustBurst(point, radius).transform.SetParent(effectRoot, true);
+                    LabFiveColorSparkle.Burst(point, radius).transform.SetParent(effectRoot, true);
+                }
             }
             throwSound?.PlayHit(0f, LabThrowSound.IsSmallThrow(Shot.LaunchScale),
                 LabThrowSound.IsBigThrow(Shot.LaunchScale) && !Shot.FiveColor);

@@ -108,6 +108,8 @@ namespace Hapio.Tests
                         Assert.That(body.isKinematic && !body.detectCollisions, Is.True, "The ghost orb has no physics.");
                         Assert.That(ghost.GetComponent<SphereCollider>().enabled, Is.False);
                         Assert.That(ghost.IsResolved, Is.False);
+                        Assert.That(ghost.ClayFlightActive, Is.True, "The real story replay uses the battle's current clay flight look.");
+                        Assert.That(replay.ClayVfx.ManualClock, Is.True, "Replay clay follows the shared presentation clock.");
                         ghostChecked = true;
                     }
                     if (replay.Running)

@@ -7835,3 +7835,33 @@ The initial cinematic fixture passed 1/2 because it incorrectly expected Skip al
 Prepared `feat/opening-28-frame-direction` with only the opening commits and merged origin/main `45001d21` (battle BGM updates). The original checkout remains on its existing local review branch with its preview and personal settings preserved; host-control work from #647 is not part of this PR. The sole cherry-pick conflict was this validation document; existing history and the new opening record were retained.
 
 All 279 changed opening code/asset/test files (excluding the tutorial test file, which retains main's independent Help-button assertions) have identical Git blob hashes to the tested local revision `fb021e31`. The main merge adds only six audio-file changes relative to the prepared opening branch. Accordingly, the preceding 17 EditMode and 27 PlayMode results are reused for unchanged opening behavior; they are not reported as a new run after this audio-only integration. The initial full tutorial handoff check remains separately dated above. Source/document whitespace checks and PR scope review passed; no scene, title, project setting, build profile or network-protocol changes are included.
+
+
+## 2026-11-11 — #659 마지막 일격·오색 구슬의 클레이 VFX 통일
+
+기준은 최신 main `9b66da6e`(#646 실제 면적 총평·#647 방장 진행·28컷 오프닝을 보존), 브랜치는 `fix/#659-finish-five-color-clay-vfx`다. Unity 6000.6.5f1·macOS/Metal의 기존 데스크탑 프로젝트 Editor 한 개에서 검증했다. Scene·Prefab·Material·Shader·Resources 원본·프로필·LabConfig·패키지·프로젝트 설정은 변경하지 않았다. 접속 묶음259개·5699/Lab60/Game51도 그대로다.
+
+원인은 마지막 일격의 `Create`/`BeginPuppet`이 일반 클레이를 거치지 않고 예전 TrailRenderer/원소 꼬리를 만들고, 명중도 예전 파편 프리팹을 재생한 데 있다. 오색은 #627부터 이미 공통 클레이였으나 실제 명중에 구형 먼지·별가루가 중첩됐으며, 풀 소진 시 기본 꼬리를5배/0.45초로 키우는 대체 코드가 남아 있었다.
+
+다시보기 전용 수동 시계 풀을 만들고 공통 클레이 형상/재질/프로필을 사용했다. Scene 서비스 등록을 바꾸거나 실전 풀을 비우지 않으며, 기록된 비행/접촉 시간으로만 효과를 진행한다. 접촉은 실제 물리 Hitbox 대신 기록 자세를 따르는 전용 기준점에 부착하고, 명중 진흙은 기록된 실제 반경을 사용한다. 각도 전환·Reset의 정리와 Skip의 마지막 프레임 유지, 세 각도5.1125초·공유 장벽·kinematic/충돌 없음·판정/기여도/지도 불변을 보존했다. 클레이 준비 실패 때만 기존 대체 명중을 쓴다. 실전 오색의 구형 먼지/별가루 중첩은 제거하고, 기본 꼬리 대체도 일반 폭·시간·곡선을 쓴다. 오색 색 흐름·명중 보상 이벤트·피버 HUD/음악·지귀 부적/물/보상 불꽃은 보존했다.
+
+| 검사 | 실제 결과 |
+| --- | --- |
+| 컴파일 완료·새 VFX 검사 어셈블리 포함 | 확인 |
+| 전체 EditMode | **2,238/2,238 통과**, 실패·skip·inconclusive0, 37.90초 |
+| `LabFinishReplayVfxTests` | **9/9 통과**, 0.32초. 오행5종/오색·전용 풀 분리·실제 반경·3각도·Reset·동일 시각/기록 자세·Skip 동결·초기 눌림/늦은 샘플의 보이는 형상/색 일치 |
+| `LabFiveColorClayFlightTests` | **7/7 통과**, 0.14초. 실물 재질·색 흐름·재사용·풀 소진 대체 꼬리/보정/반복 Tint |
+| `LabFiveColorClayNetworkTests` | **2/2 통과**, 1.11초. 실제 Host 명중·예측/확인·Guest 로컬 메시지 fixture·중복 방지·클레이1회/구형 별·먼지0/본인 피드백1회 |
+| `GameFinishReplayTests` | **4/4 통과**, 33.56초. 실제 저장 Home/Battle의 투척·두 스테이지3각도·탭 Skip·기록 없을 때 기존 대체·결과 이동과 판정 불변 |
+| `GameStage2GourdHitFinishTests` | **1/1 통과**, 11.28초 |
+| `LabFiveElementContactTests` | **5/5 통과**, 0.26초 |
+| `LabProjectileContactTests` | **8/8 통과**, 4.40초. 스침/반지름·고속·움직이는 실제 박·시각 복제의 권한 분리 |
+| `LabJigwiRewardFireTrailTests` | **4/4 통과**, 1.18초. 독립 불꽃·승인 변경/재사용·과거 실제 경로·잔상 수명 |
+
+관련 PlayMode는 합계 **40/40 통과**, 실패·skip·inconclusive0이다. 최초 새 재생 검사는8/9(0.32초)였으며, 늦은 명중 검사에서 이미 숨겨진 Contact squash의 오래된 Transform까지 비교했다. 증분 재생은 마지막으로 보였던 작은 크기를, 바로 늦은 시각으로 간 재생은 초기 숨긴 크기를 보관해 보이지 않는 행렬만 달랐다. 표시 레이어 집합·모든 보이는 형상/색·정확한 오색 위상·명중1회 단언을 유지하고,0.05초의 보이는 눌림과0.2초의 퍼짐/방울을 각각 비교하도록 검사만 보완했다. 게임 코드는 이 보완으로 변경하지 않았고, 전체 EditMode 뒤 변경된 것은 이 PlayMode 검사뿐이라 EditMode 결과는 재사용했다. 최초 실패 결과도 저장소 밖 증거로 남겼다.
+
+검사 범위는 표현·전용 puppet 렌더/수동 시계·명중 피드백에 한정되어 컴파일/전체 EditMode/영향 PlayMode를 선택했다. 정상 투사체 물리·판정·공통 수명·권한/통신 형식·게임 진행/공유 시작 시각은 변경하지 않아 전체 PlayMode는 실행하지 않았다. 네트워크 fixture는 실제 다인 LAN/핫스팟 검증이 아니다.
+
+실제 Home/Battle 통합 검사에서 기록된 Wood 투척의 마지막 일격을 GameView로 촬영했다. 최근 실제 명중 뒤 테스트가 CPU 도색 지도를100%로 완료해 재생을 유발한 것이며 수동 플레이나 오색 실기기 촬영으로 표현하지 않는다. 명중 확대에서 공통 녹색 진흙 눌림/퍼짐을 확인했고, 비행 첫 캡처는 각도 전환의 흰 플래시와 겹쳐 정상 비행 외형의 근거에서 제외했다. 전환 후 구간을 다시 촬영해 일반 전투와 같은 종이결 3D 몸통·늘어나는 진흙 목·분리 방울을 확인했다. 촬영용으로 같은 실제 투척 재생 2케이스를 추가 실행해2/2 통과(22.48초)했고, 이를 앞의40개와 별개 신규 검사로 중복 집계하지 않는다. 도색 바탕의 외형·색·스티커 표현은 이번 범위에서 바꾸지 않았다.
+
+한계: 기존 기록은 최초 오색의 무작위 색상 위상을 보관하지 않아 다시보기 색 흐름은 비행 경과 기준으로 재구성한다. 지귀 부적 여부도 이번에 기록 필드로 추가하지 않았다. iOS·실제 다인 Wi-Fi/핫스팟·standalone/Release·모바일 성능 검증은 미실행이다. PR/원격 코드 업로드·main 병합은 이번 구현 단계에서 수행하지 않았다.
