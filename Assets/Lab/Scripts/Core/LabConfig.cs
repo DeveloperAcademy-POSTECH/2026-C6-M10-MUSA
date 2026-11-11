@@ -749,8 +749,8 @@ namespace C6Lab
         [Header("Gourd (요괴 박)")]
         // DEMO_TUNING_VALUE: growth settings are captured when a round starts and may be tuned in DEV.
         [SerializeField, Range(0, 2)] private int paintSurfaceResolution = 2;
-        [SerializeField, Range(.1f, 100f)] private float paintInitialPercent = 2f;
-        [SerializeField, Range(.1f, 100f)] private float paintRepeatPercent = 1.5f;
+        [SerializeField, Range(.1f, 100f)] private float paintInitialPercent = 1.3f;
+        [SerializeField, Range(.1f, 100f)] private float paintRepeatPercent = 1f;
         [Tooltip("반복 명중 성장을 맞은 영역 가까이에 모으는 정도. 새 판에 적용한다.")]
         [SerializeField, Range(0f, 1f)] private float paintClusterCompactness = .85f;
         [Tooltip("반복 명중 성장 덩어리 경계의 불규칙한 정도. 새 판에 적용한다.")]
@@ -1397,8 +1397,8 @@ namespace C6Lab
         // Paint victory requires the entire target surface; it is not a DEV tuning value.
         public int PaintVictoryPercent => DefaultPaintVictoryPercent;
         public int PaintSurfaceResolution => Mathf.Clamp(paintSurfaceResolution, 0, 2);
-        public float PaintInitialPercent => Mathf.Clamp(Finite(paintInitialPercent, 2f), .1f, 100f);
-        public float PaintRepeatPercent => Mathf.Clamp(Finite(paintRepeatPercent, 1.5f), .1f, 100f);
+        public float PaintInitialPercent => Mathf.Clamp(Finite(paintInitialPercent, 1.3f), .1f, 100f);
+        public float PaintRepeatPercent => Mathf.Clamp(Finite(paintRepeatPercent, 1f), .1f, 100f);
         public float PaintClusterCompactness => Mathf.Clamp01(Finite(paintClusterCompactness, .85f));
         public float PaintClusterIrregularity => Mathf.Clamp01(Finite(paintClusterIrregularity, .25f));
         public float PaintGrowthPercentPerSecond => Mathf.Clamp(Finite(paintGrowthPercentPerSecond, 6f), .1f, 100f);
@@ -1426,6 +1426,23 @@ namespace C6Lab
             DryingPercentPerSecond = PaintDryingPercentPerSecond,
             NearbyHitRadiusDegrees = PaintNearbyHitRadiusDegrees
         };
+        /// <summary>
+        /// Captures round-owned paint settings. Story co-op uses the configured five-player hit budget
+        /// scaled by the actual participant count; solo, tutorial/Lab and territory keep the configured values.
+        /// </summary>
+        public LabPaintGrowthSettings CapturePaintGrowthSettings(int participants, LabStageYokai stageYokai,
+            bool teamMode = false)
+        {
+            LabPaintGrowthSettings settings = PaintGrowthSettings;
+            bool storyStage = stageYokai == LabStageYokai.Gumiho
+                || stageYokai == LabStageYokai.Yaguang || stageYokai == LabStageYokai.Jigwi;
+            if (teamMode || !storyStage || participants < 2 || participants > 5) return settings;
+            float factor = 5f / participants;
+            settings.InitialPercent = Mathf.Min(100f, settings.InitialPercent * factor);
+            settings.RepeatPercent = Mathf.Min(100f, settings.RepeatPercent * factor);
+            return settings;
+        }
+
         public bool CompletedGourdViewerEnabled => completedGourdViewerEnabled;
         public bool PlayerPaintPatternsEnabled => playerPaintPatternsEnabled;
         public float GourdRopeCycleAmplitude => Mathf.Clamp(Finite(gourdRopeCycleAmplitude, .45f), 0f, 1f);
