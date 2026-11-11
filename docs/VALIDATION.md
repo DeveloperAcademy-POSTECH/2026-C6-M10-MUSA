@@ -2,7 +2,7 @@
 
 ## 2026-11-11 — 박 잘림 (전투 땅 아래·봉인 박 관람 확대)
 
-- **기준:** `fix/gourd-clipping` (main `81e64ca0` 기준). Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 접속 묶음·설정·박 높이·움직임·크기는 그대로다.
+- **기준:** `fix/gourd-clipping` (main `81e64ca0`에서 작업, `47d33dd3` 병합). Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 접속 묶음·설정·박 높이·움직임·크기는 그대로다.
 - **원인:**
   - **전투:** 박이 가장 낮을 때(줄 최저 + 반동 최대) 스테이지 박 맨 아래가 땅(y −0.8)보다 약 0.9 아래로 내려간다. 불투명한 땅이 그 부분을 가려 일자로 잘려 보였다. 카메라·화면 경계 때문은 아니다.
   - **관람:** 박을 402×402 사각형 텍스처에 그려서, 확대하면 사각형 경계에서 잘렸다.
@@ -20,6 +20,7 @@
 | `GameSceneFlowTests` (관람 비율 단언을 사각형 기준으로 갱신) | 28/28 PASS |
 | 전체 EditMode | 2242/2243. 실패 1건 `RecreatedYaguangDefaults…`는 main에서도 같은 실패 |
 | 전체 PlayMode | 792/793. 실패 1건은 위 관람 비율 단언(갱신 후 PASS) |
+| main `47d33dd3` 병합 후: 전체 EditMode / 관련 PlayMode(위 검사 + `GameBattleRenderWarmupTests`) | 2248/2248, 42/42 PASS |
 
 - **미실행:** 실기기·iOS 화면과 프레임 비용 측정, 2:2·튜토리얼 화면 확인.
 
