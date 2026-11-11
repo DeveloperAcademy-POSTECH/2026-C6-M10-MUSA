@@ -407,6 +407,8 @@ namespace C6Lab
         {
             orb = null;
             if (!BeginRequest(sender, requestId, now, out reason)) return false;
+            // #664: a charmed player's board stands still; not even the drum answers.
+            if (Charmed(sender, now)) return Reject("CHARMED", out reason);
             if (JigwiBoardOnFire(now)) return Reject("JIGWI_BOARD_FIRE", out reason); // #509 지귀 B 실패: 잠깐 북을 못 누름
             // Without a tapped drum, use the sender's earliest placed one (drums are never removed).
             LabOrbState drum = drumId == null
@@ -465,6 +467,7 @@ namespace C6Lab
         {
             orb = null;
             if (!BeginRequest(sender, requestId, now, out reason)) return false;
+            if (Charmed(sender, now)) return Reject("CHARMED", out reason); // #664
             if (!Unit(normalizedCenter.x) || !Unit(normalizedCenter.y) || !Finite(normalizedVelocity))
                 return Reject("INVALID_MOTION", out reason);
             if (string.IsNullOrEmpty(firstId) || string.IsNullOrEmpty(secondId) || firstId == secondId ||
@@ -514,6 +517,7 @@ namespace C6Lab
         public bool TryFoxFireAt(ulong sender, string foxId, string orbId, string requestId, double now, out string reason)
         {
             if (!BeginRequest(sender, requestId, now, out reason)) return false;
+            if (Charmed(sender, now)) return Reject("CHARMED", out reason); // #664
             if (string.IsNullOrEmpty(foxId) || string.IsNullOrEmpty(orbId) || foxId == orbId
                 || !orbs.TryGetValue(foxId, out var fox) || !orbs.TryGetValue(orbId, out var orb))
                 return Reject("ORB_NOT_FOUND", out reason);
@@ -538,6 +542,8 @@ namespace C6Lab
             if (!BeginRequest(sender, requestId, now, out reason)) return false;
             if (!TryFindMovable(id, out var current)) return Reject("ORB_NOT_FOUND", out reason);
             if (!UsableBy(current, sender)) return Reject("NOT_OWNED_IDLE", out reason);
+            // #664: nothing leaves a charmed player's board, not even what a blast pushes.
+            if (Charmed(sender, now)) return Reject("CHARMED", out reason);
             // A fox orb never reaches a neighbour (#251); since #328 the side edges stop it and a double tap clears it.
             if (current.kind == LabOrbKind.FoxFire) return Reject("FOX_FIRE_BLOCKED", out reason);
             // An unlocked bomb opens where it lands (#328); it is not passed on again.
@@ -562,6 +568,8 @@ namespace C6Lab
                 : LabPlayerSlots.NeighborSeat(players[sender].seat, activeSeatCount, right);
             if (receiverSeat < 0) return Reject("TEAM_EDGE", out reason);
             ulong receiver = seats[receiverSeat];
+            // #664: and nothing reaches one; it bounces back off that edge of the sender's board.
+            if (Charmed(receiver, now)) return Reject("RECEIVER_CHARMED", out reason);
             // A drum is not a stored orb, so a full board still receives it.
             if (!current.kind.IsDrum() && CountStored(receiver) >= rules.OrbStorageLimit)
                 return Reject("RECEIVER_FULL", out reason);
@@ -1094,6 +1102,8 @@ namespace C6Lab
             if (!Unit(normalizedPosition.x) || !Unit(normalizedPosition.y)) return Reject("INVALID_MOTION", out reason);
             if (!orbs.TryGetValue(id ?? string.Empty, out var current)) return Reject("ORB_NOT_FOUND", out reason);
             if (!UsableBy(current, sender)) return Reject("NOT_OWNED_IDLE", out reason);
+            // #664: a charmed player taps nothing (a fox orb, an item); only a bomb opens by itself.
+            if (current.kind != LabOrbKind.Bomb && Charmed(sender, now)) return Reject("CHARMED", out reason);
             // Neither is a choice to punish while overheated: the bomb opens by itself, the fox orb is the yokai's.
             if (current.kind == LabOrbKind.FoxFire)
             {
@@ -1296,7 +1306,10 @@ namespace C6Lab
             && now < charmStartedAt;
         private bool CharmComingOrOn(double now) => CharmWarning(now) || CharmOn(now);
 
-        /// <summary>Whether the fox's charm (#251) keeps this player from attacking at this Host time.</summary>
+        /// <summary>
+        /// Whether the fox's charm (#251) holds this player at this Host time. Since #664 it stops everything they do:
+        /// throwing, passing, drumming, combining, tapping fox orbs and items; and nothing can be passed to them.
+        /// </summary>
         public bool Charmed(ulong player, double now) => CharmOn(now) && player == charmedPlayer;
 
         /// <summary>

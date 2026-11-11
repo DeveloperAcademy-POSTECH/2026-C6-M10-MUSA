@@ -26,10 +26,12 @@ namespace C6Lab
         /// <summary>The glow's opacity now: the calm wall, or brighter just after a bounce.</summary>
         public float Brightness => glow != null ? glow.color.a : 0f;
         public int GlowSortingOrder => GlowOrder;
+        /// <summary>The wall's colour: ink for the team wall, pink for a charmed neighbour's edge (#664).</summary>
+        public Color Tint { get; set; } = Ink;
 
-        public static LabOrbTeamWall Create(Transform board)
+        public static LabOrbTeamWall Create(Transform board, string name = "Team Wall Edge")
         {
-            var wall = new GameObject("Team Wall Edge");
+            var wall = new GameObject(name);
             wall.layer = board.gameObject.layer;
             wall.transform.SetParent(board, false);
             return wall.AddComponent<LabOrbTeamWall>();
@@ -75,8 +77,8 @@ namespace C6Lab
         {
             float lift = flashSeconds > 0f ? flash / flashSeconds : 0f;
             // The line brightens with the glow, at the same 0.25 : 0.4 share as before.
-            glow.color = new Color(Ink.r, Ink.g, Ink.b, Mathf.Min(1f, GlowAlpha + flashBoost * lift));
-            line.color = new Color(Ink.r, Ink.g, Ink.b, Mathf.Min(1f, LineAlpha + flashBoost * .625f * lift));
+            glow.color = new Color(Tint.r, Tint.g, Tint.b, Mathf.Min(1f, GlowAlpha + flashBoost * lift));
+            line.color = new Color(Tint.r, Tint.g, Tint.b, Mathf.Min(1f, LineAlpha + flashBoost * .625f * lift));
         }
 
         private void EnsureParts()

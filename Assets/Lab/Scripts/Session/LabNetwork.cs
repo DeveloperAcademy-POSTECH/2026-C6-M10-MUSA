@@ -2362,9 +2362,11 @@ namespace C6Lab
                 blockedHere ? (float)(latest.swipeBlockedUntil - latest.serverTime) : 0f);
             // 2:2 (#281): the outer edge of this player's board is closed; only the teammate's side passes.
             board.SetTeamWall(LabTeams.ClosedSide(latest, LocalPlayerId));
-            // The fox's charm (#251) stops throws and shows its haze only on the charmed player's own board.
+            // The fox's charm (#251) shows its haze only on the charmed player's own board, which stands still (#664);
+            // the boards beside it shut their edge toward it.
             bool charmedHere = latest.CharmOn(LocalPlayerId);
             board.SetCharm(charmedHere ? (float)(latest.charmUntil - latest.serverTime) : 0f);
+            board.SetCharmWalls(latest.CharmWallSide(LocalPlayerId));
             board.SetJigwiOverheat(latest.phase == LabPhase.Playing
                 && latest.JigwiFor(LocalPlayerId)?.Overheated(latest.serverTime) == true);
             // #540: my unfinished talisman set my drums alight — light and slippery for a while.

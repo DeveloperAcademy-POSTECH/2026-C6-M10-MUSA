@@ -3192,8 +3192,12 @@ namespace C6Lab.Tests
             finally { UnityEngine.Object.DestroyImmediate(mix); }
         }
 
+        /// <summary>
+        /// #664: a charmed player does nothing at all until the charm ends: no throw (#251), no pass, no drum, no combine;
+        /// and nothing can be passed to them. Everyone else plays on.
+        /// </summary>
         [Test]
-        public void ACharmStopsOnlyTheCharmedPlayersThrowsUntilItEnds()
+        public void ACharmStopsEverythingTheCharmedPlayerDoesUntilItEnds()
         {
             var mix = MixConfig(5f, bomb: 0, block: 0, fox: 0, charm: 1);
             try
@@ -3201,6 +3205,9 @@ namespace C6Lab.Tests
                 var ids = new ulong[] { 10, 20, 30 };
                 var room = new LabModel();
                 room.Begin("charm-throw", ids, 0d, mix);
+                // Everyone readies an attack and a raw pair before the charm falls.
+                Dictionary<ulong, string> attack = ids.ToDictionary(id => id, id => CombinedFor(room, id, 4.5d));
+                Dictionary<ulong, (LabOrbState yin, LabOrbState yang)> pair = ids.ToDictionary(id => id, id => RawPairFor(room, id, 4.6d));
                 room.Tick(5d);
                 ulong charmed = room.DrainSabotages().Single().Target;
                 LabSnapshot on = room.Snapshot(5d);
@@ -3208,17 +3215,97 @@ namespace C6Lab.Tests
                 Assert.That(on.CharmOn(charmed), Is.True);
                 Assert.That(on.charmUntil, Is.EqualTo(15d), "Ten seconds by default.");
                 Assert.That(on.charmTaps, Is.Zero);
-                ulong other = ids.First(id => id != charmed);
+                int Seat(ulong id) => on.players.Single(player => player.id == id).seat;
+                // The player whose right-hand pass would reach the charmed one, and the third who is beside neither way.
+                ulong toward = ids.First(id => id != charmed
+                    && LabPlayerSlots.NeighborSeat(Seat(id), ids.Length, true) == Seat(charmed));
+                ulong other = ids.First(id => id != charmed && id != toward);
 
-                string charmedOrb = CombinedFor(room, charmed, 7.5d);
-                string otherOrb = CombinedFor(room, other, 7.5d);
-                Assert.That(room.TryLaunch(charmed, charmedOrb, "charm-throw-1", 7.6d, out _, out string reason), Is.False);
+                Assert.That(room.TryLaunch(charmed, attack[charmed], "charm-throw-1", 7.6d, out _, out string reason), Is.False);
                 Assert.That(reason, Is.EqualTo("CHARMED"), "Too dazed to attack.");
-                Assert.That(room.TryLaunch(other, otherOrb, "charm-throw-2", 7.6d, out _, out reason), Is.True,
+                Assert.That(room.TryGenerate(charmed, "charm-drum", 7.6d, out _, out reason), Is.False);
+                Assert.That(reason, Is.EqualTo("CHARMED"), "The drum does not answer either.");
+                Assert.That(room.TryCombineAt(charmed, pair[charmed].yin.id, pair[charmed].yang.id, "charm-combine", 7.6d,
+                    new Vector2(.5f, .5f), Vector2.zero, out _, out reason), Is.False);
+                Assert.That(reason, Is.EqualTo("CHARMED"), "Nor can they combine.");
+                Assert.That(room.TryTransferAt(charmed, pair[charmed].yin.id, true, new Vector2(.99f, .5f), Vector2.right,
+                    "charm-pass-out", 7.6d, LabEdgeCrossingKind.Swipe, out _, out reason), Is.False);
+                Assert.That(reason, Is.EqualTo("CHARMED"), "Nor pass.");
+                Assert.That(room.TryTransferAt(charmed, pair[charmed].yang.id, false, new Vector2(.01f, .5f), Vector2.left,
+                    "charm-push-out", 7.6d, LabEdgeCrossingKind.Pushed, out _, out reason), Is.False);
+                Assert.That(reason, Is.EqualTo("CHARMED"), "Not even a blast pushes anything off the board.");
+                Assert.That(room.TryTransferAt(toward, pair[toward].yin.id, true, new Vector2(.99f, .5f), Vector2.right,
+                    "charm-pass-in", 7.6d, LabEdgeCrossingKind.Swipe, out _, out reason), Is.False);
+                Assert.That(reason, Is.EqualTo("RECEIVER_CHARMED"), "Nothing is passed to them; it bounces back.");
+                Assert.That(room.TryTransferAt(toward, pair[toward].yang.id, false, new Vector2(.01f, .5f), Vector2.left,
+                    "charm-pass-away", 7.6d, LabEdgeCrossingKind.Swipe, out _, out reason), Is.True,
+                    "The other way still passes. " + reason);
+
+                Assert.That(room.TryLaunch(other, attack[other], "charm-throw-2", 7.6d, out _, out reason), Is.True,
                     "Only the charmed player is stopped. " + reason);
+                Assert.That(room.TryGenerate(other, "other-drum", 7.6d, out _, out reason), Is.True, reason);
                 Assert.That(room.Snapshot(14.9d).CharmOn(charmed), Is.True);
                 Assert.That(room.Snapshot(15.1d).CharmOn(charmed), Is.False, "It wears off after its seconds.");
-                Assert.That(room.TryLaunch(charmed, charmedOrb, "charm-throw-3", 15.1d, out _, out reason), Is.True, reason);
+                Assert.That(room.TryLaunch(charmed, attack[charmed], "charm-throw-3", 15.1d, out _, out reason), Is.True, reason);
+                Assert.That(room.TryGenerate(charmed, "charm-drum-2", 15.1d, out _, out reason), Is.True, reason);
+                Assert.That(room.TryTransferAt(toward, pair[toward].yin.id, true, new Vector2(.99f, .5f), Vector2.right,
+                    "charm-pass-in-2", 15.1d, LabEdgeCrossingKind.Swipe, out _, out reason), Is.True,
+                    "Passes reach them again once awake. " + reason);
+            }
+            finally { UnityEngine.Object.DestroyImmediate(mix); }
+        }
+
+        /// <summary>#664: the warning (#305) still lets the chosen player act; only the charm itself stops them.</summary>
+        [Test]
+        public void TheCharmWarningAloneStopsNothing()
+        {
+            var mix = MixConfig(5f, bomb: 0, block: 0, fox: 0, charm: 1, charmWarning: 3f);
+            try
+            {
+                var ids = new ulong[] { 10, 20, 30 };
+                var room = new LabModel();
+                room.Begin("charm-warned", ids, 0d, mix);
+                room.Tick(5d);
+                ulong charmed = room.DrainSabotages().Single().Target;
+                Assert.That(room.Snapshot(6d).CharmWarningAt(6d), Is.True);
+                Assert.That(room.TryGenerate(charmed, "warned-drum", 6d, out _, out string reason), Is.True, reason);
+                Assert.That(room.TryGenerate(charmed, "charmed-drum", 8.1d, out _, out reason), Is.False);
+                Assert.That(reason, Is.EqualTo("CHARMED"));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(mix); }
+        }
+
+        /// <summary>#664: the boards beside a charmed player shut their edge toward it; both edges when both neighbours are.</summary>
+        [Test]
+        public void TheBoardsBesideACharmedPlayerShutTheirEdgeTowardIt()
+        {
+            var mix = MixConfig(5f, bomb: 0, block: 0, fox: 0, charm: 1);
+            try
+            {
+                var room = new LabModel();
+                room.Begin("charm-walls", new ulong[] { 10, 20, 30, 40, 50 }, 0d, mix);
+                room.Tick(5d);
+                LabSnapshot on = room.Snapshot(5d);
+                LabPlayerState charmed = on.players.Single(player => player.id == on.charmedPlayer);
+                ulong AtSeat(int seat) => on.players.Single(player => player.seat == seat).id;
+                ulong rightPasser = AtSeat(on.players.Single(player =>
+                    LabPlayerSlots.NeighborSeat(player.seat, 5, true) == charmed.seat).seat);
+                ulong leftPasser = AtSeat(on.players.Single(player =>
+                    LabPlayerSlots.NeighborSeat(player.seat, 5, false) == charmed.seat).seat);
+                Assert.That(on.CharmWallSide(rightPasser), Is.EqualTo(1), "Its right edge leads to the charmed one.");
+                Assert.That(on.CharmWallSide(leftPasser), Is.EqualTo(-1), "Its left edge leads to the charmed one.");
+                Assert.That(on.CharmWallSide(charmed.id), Is.Zero, "The charmed board itself stands still instead.");
+                foreach (LabPlayerState player in on.players)
+                    if (player.id != rightPasser && player.id != leftPasser && player.id != charmed.id)
+                        Assert.That(on.CharmWallSide(player.id), Is.Zero, "Not beside it: nothing shut.");
+                Assert.That(room.Snapshot(15.1d).CharmWallSide(rightPasser), Is.Zero, "Open again once the charm ends.");
+
+                var pairRoom = new LabModel();
+                pairRoom.Begin("charm-walls-pair", new ulong[] { 10, 20 }, 0d, mix);
+                pairRoom.Tick(5d);
+                LabSnapshot pairOn = pairRoom.Snapshot(5d);
+                ulong awake = pairOn.players.Single(player => player.id != pairOn.charmedPlayer).id;
+                Assert.That(pairOn.CharmWallSide(awake), Is.EqualTo(LabTeams.BothSides), "With two, both edges lead to the charmed one.");
             }
             finally { UnityEngine.Object.DestroyImmediate(mix); }
         }
@@ -3485,6 +3572,20 @@ namespace C6Lab.Tests
         }
 
         /// <summary>A Combined orb made on this player's board at this Host time.</summary>
+        private static (LabOrbState yin, LabOrbState yang) RawPairFor(LabModel room, ulong owner, double at)
+        {
+            LabOrbState yin = null, yang = null;
+            for (int i = 0; i < 12 && (yin == null || yang == null); i++)
+            {
+                Assert.That(room.TryGenerate(owner, "raw-pair-" + owner + "-" + i, at, out var orb, out string reason),
+                    Is.True, reason);
+                if (orb.kind == LabOrbKind.Yin && yin == null) yin = orb;
+                else if (orb.kind == LabOrbKind.Yang && yang == null) yang = orb;
+            }
+            Assert.That(yin != null && yang != null, Is.True);
+            return (yin, yang);
+        }
+
         private static string CombinedFor(LabModel room, ulong owner, double at)
         {
             LabOrbState yin = null, yang = null;

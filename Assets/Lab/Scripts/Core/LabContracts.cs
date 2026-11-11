@@ -334,6 +334,27 @@ namespace C6Lab
 
         /// <summary>Whether this player is charmed at this snapshot.</summary>
         public bool CharmOn(ulong player) => charmUntil > serverTime && serverTime >= charmStartedAt && charmedPlayer == player;
+        /// <summary>
+        /// 매혹 (#664): the edges of this player's board shut because the neighbour that way is charmed: right 1, left -1,
+        /// both LabTeams.BothSides, none 0. A charmed player's own board is not walled; it stands still instead.
+        /// </summary>
+        public int CharmWallSide(ulong player)
+        {
+            if (players == null || players.Length < 2 || teamTerritory || CharmOn(player)) return 0;
+            int count = players.Length;
+            LabPlayerState me = Array.Find(players, item => item != null && item.id == player);
+            if (me == null || me.seat < 0 || me.seat >= count) return 0;
+            bool right = CharmedAtSeat(LabPlayerSlots.NeighborSeat(me.seat, count, true));
+            bool left = CharmedAtSeat(LabPlayerSlots.NeighborSeat(me.seat, count, false));
+            return right && left ? LabTeams.BothSides : right ? 1 : left ? -1 : 0;
+        }
+
+        private bool CharmedAtSeat(int seat)
+        {
+            LabPlayerState at = Array.Find(players, item => item != null && item.seat == seat);
+            return at != null && CharmOn(at.id);
+        }
+
         /// <summary>Whether the charm on charmedPlayer is being warned of at this time (#305).</summary>
         public bool CharmWarningAt(double now) => charmWarnedAt >= 0d && now >= charmWarnedAt && now < charmStartedAt;
         /// <summary>How many times this player beside the charmed one has tapped (#305); 0 for anyone else.</summary>
