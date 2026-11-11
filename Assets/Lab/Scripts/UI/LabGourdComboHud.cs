@@ -102,7 +102,8 @@ namespace C6Lab
         private readonly LabOrbElement[] slotElements = new LabOrbElement[LabGourdCombo.Length];
         private Text resultText;
         private Image successStamp;
-        private bool StampSuccess => YaguangCount && successStamp != null && successStamp.sprite != null;
+        // #668 도장은 야광귀 콤보 성공에만 찍는다. #664 구미호 여우구슬 성공도 같은 결과 문구를 쓰지만 도장 없이 성공!을 띄운다.
+        private bool StampSuccess => YaguangCount && !resultIsFoxRound && successStamp != null && successStamp.sprite != null;
         private Image flash;
         private float unit = 1f;
         private RectTransform effectBadge, effectGauge, effectIcon;
