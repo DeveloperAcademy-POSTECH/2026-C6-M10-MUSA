@@ -81,7 +81,7 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
-        public IEnumerator ACharmedBoardsThrowingEdgeGlowsRedAndAnUpwardSwipeOnlyFlicksTheOrb()
+        public IEnumerator ACharmedBoardsThrowingEdgeGlowsRedAndTakesNoTouch()
         {
             var combined = board.UpsertOrb("charmed-throw", LabOrbKind.Combined, new Vector2(.5f, .3f),
                 element: LabOrbElement.Fire);
@@ -108,14 +108,10 @@ namespace C6Lab.Tests
             Assert.That(brightest - dimmest, Is.GreaterThan(.05f), "It slowly brightens and dims.");
 
             Vector2 from = BoardPoint(combined);
-            Assert.That(board.TryBeginDragAtWorld(from, 1d), Is.True);
-            Assert.That(board.EndDragAtWorld(from + new Vector2(0f, 1.7f), 1.1d), Is.True);
-            Assert.That(throws, Is.Zero, "A charmed player cannot attack.");
-            Assert.That(board.IsSnapshotSuppressed("charmed-throw"), Is.False, "The orb stays on the board...");
-            Assert.That(combined.Body.linearVelocity.y, Is.GreaterThan(0f), "...sliding up like a flick, to bounce off the top.");
-            until = Time.time + 1.5f;
-            while (combined.Body.linearVelocity.y >= 0f && Time.time < until) yield return new WaitForFixedUpdate();
-            Assert.That(combined.Body.linearVelocity.y, Is.LessThan(0f), "It bounced back off the top wall.");
+            Assert.That(board.TryBeginDragAtWorld(from, 1d), Is.False, "Since #664 a charmed board takes no touch at all...");
+            Assert.That(board.EndDragAtWorld(from + new Vector2(0f, 1.7f), 1.1d), Is.False);
+            Assert.That(throws, Is.Zero, "...so a charmed player cannot attack.");
+            Assert.That(board.IsSnapshotSuppressed("charmed-throw"), Is.False, "The orb stays on the board.");
 
             board.SetCharm(0f);
             Assert.That(board.Charmed, Is.False);
