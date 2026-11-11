@@ -99,7 +99,7 @@ MonoBehaviour:
   skipFadeSeconds: 0.5
   skipDimColor: {r: 0, g: 0, b: 0, a: 0.9607843}
   skipPanelSize: {x: 336, y: 172}
-  skipPanelTopFraction: 0.4
+  skipBlockCenterFromTop: 0.5
   skipTitleFontSize: 21
   skipBodyFontSize: 16
   skipChoiceSize: {x: 120, y: 48}

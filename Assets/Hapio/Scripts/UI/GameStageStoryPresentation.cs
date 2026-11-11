@@ -140,7 +140,9 @@ namespace Hapio
         {
             UnbindActions();
             if (view == null || boundResult == null) return;
-            StoryCardRecords.Record[] rows = CardRecords(boundResult, session.Network.LocalPlayerId);
+            var summary = view.GetComponent<SealRunSummary>();
+            if (summary != null) summary.Bind(session.SealStageResults, session.ResultLocalPlayerId);
+            StoryCardRecords.Record[] rows = CardRecords(boundResult, session.ResultLocalPlayerId);
             StoryCardRecords[] cards = view.GetComponentsInChildren<StoryCardRecords>(true);
             foreach (var records in cards)
                 records.Bind(boundResult.paintCoverage, (float)boundResult.remaining, rows);
@@ -256,7 +258,8 @@ namespace Hapio
         // The seal card and the first failure picture are read in full; skipping starts from the next picture.
         private bool SkipHiddenOnThisCut => mode == Mode.AfterStage && player.CurrentView != null
                 && player.CurrentView.GetComponentInChildren<StoryCardFlip>(true) != null
-            || mode == Mode.Failure && player.CurrentCutIndex == 0;
+            || mode == Mode.Failure && player.CurrentCutIndex == 0
+            || player.CurrentView != null && player.CurrentView.GetComponent<SealRunSummary>() != null;
 
         private bool ActionsBlocked => screen.StoryActionsBlocked || session.IsLoadingScene
             || session.IsViewerOpen || pendingFinish != null || transitionPending
@@ -275,7 +278,7 @@ namespace Hapio
             bool primary = review && (final || session.Network.IsHost) || failed && session.Network.IsHost && !HasAction("Retry");
             Show(advanceButton, primary);
             Set(advanceButton, primary && !blocked && (failed ? session.CanRetryStage : final ? session.CanReturnHome : session.CanAdvanceStage));
-            Label(advanceButton, failed ? "이 스테이지 재도전" : final ? "엔딩 보기" : "다음 스테이지");
+            Label(advanceButton, failed ? "이 스테이지 재도전" : final ? "봉인 총평" : "다음 스테이지");
             bool overall = final && review && session.StageResults.Count > 0;
             Show(overallButton, overall); Set(overallButton, overall && !blocked);
             bool inspect = review && !HasAction("InspectGourd");
@@ -392,7 +395,7 @@ namespace Hapio
         public void OpenOverall()
         {
             if (mode != Mode.ReadyToAdvance || session.State.phase != GameFlowPhase.Completed || ActionsBlocked) return;
-            showingOverall = true; screen.ShowStoryOverall(); RefreshControls();
+            BeginEnding();
         }
 
         public void CloseOverall()

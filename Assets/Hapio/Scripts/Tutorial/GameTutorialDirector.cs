@@ -530,8 +530,12 @@ namespace Hapio
         private bool BattlePlayable() => session.IsTutorial && session.State.phase == GameFlowPhase.Playing
             && session.Network != null && !session.Network.GameStartHeld
             && (session.StartOverlay == null || !session.StartOverlay.Visible)
-            // The first line waits until the loading screen (#478) has gone.
-            && !session.IsLoadingScreenUp;
+            // The first line waits until the loading screen (#478) has gone, and the opening's clouds (#635) have lifted.
+            && !session.IsLoadingScreenUp
+            && !session.CloudsUp;
+
+        /// <summary>The opening's clouds (#635) are over the board: the tutorial's clock stands still and its first line waits.</summary>
+        private bool CloudsUp => session != null && session.CloudsUp;
 
         /// <summary>A tap anywhere on the screen: the line moves on.</summary>
         private void OnTap()

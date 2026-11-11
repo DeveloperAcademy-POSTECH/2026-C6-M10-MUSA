@@ -105,6 +105,7 @@ namespace Hapio
             Click(closeViewerButton, () => session.CloseGourdViewer());
             Click(resetViewerButton, () => session.ResetPreview());
             GamePreviewAspect.Attach(viewerImage);
+            GameSealedGourdView.Attach(this);
             Click(developerButton, OpenDeveloper);
             if (kind == GameScreenKind.Home || kind == GameScreenKind.Lobby) GameDeveloperAccess.BindMenu(this);
             for (int i = 0; developerScopeButtons != null && i < developerScopeButtons.Length; i++)
@@ -218,7 +219,9 @@ namespace Hapio
         {
             if (gameOverView != null) gameOverView.gameObject.SetActive(false);
             if (stageStory != null && stageStory.TryRefresh(false)) return;
-            if (gameOverView != null && GameRunFlow.IsLeaveReason(session.State.endReason))
+            // Every GameOver that is not the Story defeat story above uses the 불이/금옥이 screen: a leave, a
+            // disconnect, and a preparation, loading or sync failure alike.
+            if (gameOverView != null)
             {
                 SetStoryContentVisible(false);
                 session.SetResultPresentationBusy(false);

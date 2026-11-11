@@ -62,6 +62,7 @@ namespace Hapio.Editor
                 view.homeButton.interactable = false;
                 Label("Label", buttonRect, "수장고로 돌아가기", 24, 0, 0, 349, 58, new Color32(250, 246, 241, 255));
                 screen.gameOverView = view;
+                GameResultStrokes.Apply(view);
                 design.gameObject.SetActive(false);
                 EditorUtility.SetDirty(screen);
                 EditorSceneManager.MarkSceneDirty(scene);

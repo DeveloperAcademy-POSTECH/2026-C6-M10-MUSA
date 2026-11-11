@@ -16,6 +16,60 @@ namespace Hapio.Tests
 {
     public sealed class GameBattleUiPresentationTests
     {
+        [UnityTest]
+        public IEnumerator HelpBlocksTouchesAndUsesOriginalPressedArtworkWithoutPausingPeers()
+        {
+            yield return SceneManager.LoadSceneAsync(GameScenePaths.Home);
+            yield return Until(()=>GameSession.Instance!=null&&!GameSession.Instance.IsLoadingScene);
+            session=GameSession.Instance;
+            var port=new TcpListener(IPAddress.Loopback,0);port.Start();
+            session.Network.port=(ushort)((IPEndPoint)port.LocalEndpoint).Port;port.Stop();
+            session.StartSolo();
+            yield return Until(()=>session.State.phase==GameFlowPhase.Playing&&!session.IsLoadingScene&&!session.SceneFade.BlocksInput&&!session.IsLoadingScreenUp&&!session.IsPreparingBattle);
+            var view=Object.FindFirstObjectByType<GameHelpView>();
+            Assert.That(view,Is.Not.Null);
+            var pointer=new PointerEventData(EventSystem.current){button=PointerEventData.InputButton.Left};
+            ExecuteEvents.Execute(view.helpButton.gameObject,pointer,ExecuteEvents.pointerDownHandler);
+            Assert.That(view.helpButton.GetComponent<GameHudButtonArtwork>().artwork.SurfaceName,Is.EqualTo("HelpPressed"));
+            ExecuteEvents.Execute(view.helpButton.gameObject,pointer,ExecuteEvents.pointerUpHandler);
+            ExecuteEvents.Execute(view.helpButton.gameObject,pointer,ExecuteEvents.pointerClickHandler);
+            yield return null;
+            Assert.That(view.IsOpen,Is.True);
+            Assert.That(session.Network.IsBattlePaused,Is.False);
+            Canvas.ForceUpdateCanvases();
+            var dim=(RectTransform)view.modal.transform.Find("Dim");
+            pointer.position=RectTransformUtility.WorldToScreenPoint(null,dim.TransformPoint(new Vector3(dim.rect.center.x,dim.rect.yMin+20,0)));
+            var hits=new List<RaycastResult>();EventSystem.current.RaycastAll(pointer,hits);
+            Assert.That(hits.Count,Is.GreaterThan(0));
+            Assert.That(hits[0].gameObject.transform.IsChildOf(view.modal.transform),Is.True,"The modal must intercept board touches: "+string.Join(",",hits.Select(hit=>hit.gameObject.name+":"+hit.sortingOrder)));
+            Assert.That(C6Lab.LabOrbBoard.ExternalModalOpen,Is.True,"Direct-touch overlays (talisman, smoke) must ignore touches under help.");
+            view.closeButton.onClick.Invoke();yield return null;
+            Assert.That(view.IsOpen,Is.False);
+            Assert.That(C6Lab.LabOrbBoard.ExternalModalOpen,Is.False);
+            view.helpButton.onClick.Invoke();yield return null;
+            Object.FindFirstObjectByType<GameBattleBindings>().hud.pauseButton.onClick.Invoke();yield return null;
+            Assert.That(session.Network.IsBattlePaused,Is.True);
+            Assert.That(view.IsOpen,Is.False,"Shared pause takes precedence over local help.");
+            Assert.That(C6Lab.LabOrbBoard.ExternalModalOpen,Is.False);
+
+            // The 100% finish keeps the phase at Playing; help must not cover it.
+            session.Network.ResumeBattle();
+            yield return Until(()=>!session.Network.IsBattlePaused);
+            view.helpButton.onClick.Invoke();yield return null;
+            Assert.That(view.IsOpen,Is.True);
+            var model=(C6Lab.LabModel)typeof(C6Lab.LabNetwork).GetField("model",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic).GetValue(session.Network);
+            var surface=model.PaintSurface;
+            var pixels=Enumerable.Repeat(C6Lab.LabPaintSurface.Opaque(model.PaintColorFor(C6Lab.LabOrbElement.Water)),surface.CellCount).ToArray();
+            var owners=Enumerable.Repeat((byte)session.Network.LocalSlotNumber,surface.CellCount).ToArray();
+            Assert.That(surface.TryReplacePixels(surface.Columns,surface.Rows,surface.Revision+1,pixels,owners,1),Is.True);
+            yield return Until(()=>session.IsFinishingBattle||session.State.phase!=GameFlowPhase.Playing);
+            yield return null;
+            Assert.That(view.IsOpen,Is.False,"Help closes once the 100% finish starts.");
+            Assert.That(C6Lab.LabOrbBoard.ExternalModalOpen,Is.False);
+            view.Open();
+            Assert.That(view.IsOpen,Is.False,"Help cannot be opened during the finish.");
+        }
+
         private GameSession session;
 #if UNITY_EDITOR
         private bool soloStagePreferenceOverridden, hadSoloStagePreference;

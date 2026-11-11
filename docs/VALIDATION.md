@@ -1,5 +1,99 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-10 — 봉인 총평 (#642)
+
+- 기준: `feat/seal-run-summary`, 최신 main `c930f120`에서 시작. Unity 6000.6.5f1 로컬 Editor.
+- `SealRunSummaryTests` 3개 + `GameStageStoryAssetTests` 5개: **8/8 PASS**. 세 판 원본 시간 합산, 로컬 플레이어 변경 시 기여도 변경, 누락/0점 구분, 문구 갱신 유지, 총평→엔딩 에셋 순서 및 공통 구름 연결을 검사했다.
+- 신규 스크립트 컴파일 오류 0개. 새 `SealRunSummaryPreview`만 재생해 총평 배치·긴 평가 줄바꿈·샘플 합산 `05:31`을 육안 확인했다. 실제 Continue 이벤트 직후 컷0 유지/구름 전환 활성, 전환 후 `Ending_01`/컷1 도달을 확인했다. Play는 종료했다.
+- 후속 시안 수정: 도장 원본 교체·100% 불투명도·170.511×156 크기·시간 위치와 글자 크기·평가 수동 개행을 반영. 전용 총평 미리보기에서 확인했고, 10개 문구 모두 2줄이며 표시 영역 안에 들어감을 런타임 TextGenerator로 확인했다. 컴파일 오류 0개. 이 배치 수정으로 전체 테스트를 다시 실행하지 않았다.
+- 전체 게임/전체 테스트는 사용자 요청에 따라 실행하지 않았다. 실제 3판 멀티플레이·다른 기기 동시 표시·iOS 실기기는 미검증. 사용자 시각 확인 후 시간 숫자를 왼쪽 5px 보정했고 커밋·PR 진행 승인을 받았다.
+
+## 2026-11-10 — #645 병합 검토 반영
+
+- **기준:** `feat/#645-sealed-gourd-help-button-ui` `4019f782`(PR 원본 `8e72dc7e` + 검토 반영), main `64d556ae` 위. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 저장 Scene·Prefab·접속 규약은 바꾸지 않았다.
+- **고친 것:** 확대·축소 때 바닥 그림자 크기(관람 카메라 거리 2^(2·zoom−1)), 배경 402×874 비율 유지(`uvRect` 덮기)와 그 바닥선에 그림자 위치, 100% 완료 연출(`IsFinishingBattle`) 시작 시 도움말 닫기·다시 열기 막기, 도움말이 열린 동안 지귀 부적 쓰기·연기 문지르기 직접 입력 무시(`LabOrbBoard.ExternalModalOpen`), 튜토리얼 도움말 프록시는 위치를 잡은 뒤에만 표시·`GameHelpView` 한 번만 찾기, 관람 글자·그림자 색을 토큰(PrimaryBrown/400·SecondaryLightIvory/200·PrimaryBrown/700)으로. 항상 통과하던 줄 검사를 실제 줄 이름(`Rope`·`Upper Rope`·`Continuous Rope`)·LineRenderer 확인으로 바꾸고, 위 "줄 복사 코드 제거" 문장을 정정했다.
+- **고치지 않은 것:** 관람 배경 3장의 무압축(약 24 MiB). 텍스처 압축은 #499처럼 아트 승인 대상이다.
+- **검사 범위 이유:** 관람 복사본 수명(`GameSession`)과 공통 입력 차단을 바꾸므로 전체 EditMode·PlayMode를 실행했다.
+
+| 확인 | 결과 |
+| --- | --- |
+| 관련 PlayMode(그림자·도움말·튜토리얼) | 7/7 PASS |
+| 대조 실험(그림자 확대, 완료 중 도움말 닫기 각각 되돌림) | 새 단언 2건 실패 |
+| 전체 EditMode | 2198/2198 PASS |
+| 전체 PlayMode | 783/786 |
+| 실패 중 GPU 2건(`LabPaintSpreadFlowRenderTests`, `LabWatercolorSurfaceGrainTests`)만 따로 | 수정본 4/4, PR 원본 4/4 PASS. 픽셀 오차 3·2(허용 1)로 전체 실행 중에만 실패 |
+| 실패 중 `GameOpeningControllerTests.CompletingAllTwentyFourCuts…` | main `64d556ae`에서도 단독 실행 같은 실패. 이 PR과 무관 |
+| Mac 개발 빌드 화면 | 적용 전·PR 원본·수정본 각각 캡처(관람 확대·축소 포함) |
+
+- **미실행:** 실기기, 16:9·iPad 실제 화면, 멀티, 지귀 부적·연기 중 도움말을 실제로 연 플레이.
+
+## 2026-11-10 — #645 관람 박 겹침과 매달림 줄
+
+- `feat/#645-sealed-gourd-help-button-ui`의 `64d556ae` 위 작업 변경을 Unity 6000.6.5f1 macOS Editor/Metal에서 확인했다.
+- 겹친 화면에서 현재 카메라와 씬을 잃은 이전 관람 카메라가 같은 위치에 있었다. 이전 실행의 고립된 오브젝트를 정리했고, 새 관람 복사본의 카메라와 메시를 현재 세션에 귀속했다. 관람 복사 대상은 박 모델 아래뿐이라 매달림 줄은 원래 들어가지 않는다(병합 검토 때 정정: 이 PR에 줄 복사 코드 제거 변경은 없다).
+- 실제 3스테이지 관람에서 카메라 한 대와 매달림 줄 메시 0개를 확인했다. 문제 각도에서 회전한 미리보기의 분홍색 오류 픽셀은 0개였다. Play 종료 후 관람 카메라 0개, 재진입 후 한 대를 확인했다. 로컬 검증용 솔로 전투에서 다섯 색으로 실제 도색을 기록한 박을 Game 탭에 열었다.
+- 전체 EditMode **2,198/2,198** 통과. 관련 PlayMode **4/4** 통과. 관람 카메라 소유와 GPU 그림자, 회전·리셋·재열기, 땅따먹기 결과·복귀, 스토리 세 스테이지의 관람 복사본 수명을 확인했다. 관람 복사본 경로를 중심으로 검사했으며 모바일 빌드와 실기기는 미검증이다.
+
+## 2026-11-10 — #645 회전에 따라 바뀌는 봉인 박 그림자
+
+- `feat/#645-sealed-gourd-help-button-ui`의 `64d556ae` 위 작업 변경을 Unity 6000.6.5f1 macOS Editor/Metal에서 확인했다.
+- Hapio 관람 복사본의 박 본체와 윗장식을 스테이지별 바닥 위치에 투영하고, 회전한 프레임에서 그림자 윤곽을 갱신한다. 1·2·3스테이지의 실제 관람 화면에서 GPU 알파 마스크가 회전 후 달라지고 리셋 후 원래와 일치하는 것을 확인했다.
+- 컴파일과 전체 EditMode **2,198/2,198** 통과. 관련 PlayMode **4/4** 통과. 그림자 GPU 픽셀, 관람 제스처·리셋·재열기, 땅따먹기 결과 관람·복귀, 스토리 세 스테이지의 관람 복사본 수명을 검사했다.
+- 새 GPU 검사의 첫 실행에서는 관람 그림자 텍스처가 준비되기 전에 참조를 확인해 실패했다. 완료 미리보기와 첫 그림자 렌더링을 기다리도록 테스트를 수정한 뒤 통과했다.
+- 3스테이지의 특정 회전에서 줄 끝 분홍색이 보인다. 관람용 원본 텍스처를 비교했을 때 그림자 렌더링을 켜거나 꺼도 같은 각도에서 동일한 현상이 재현됐다. 검증은 Hapio 관람에 집중했으며 모바일 빌드와 실기기는 미검증이다.
+
+## 2026-11-10 — #645 봉인 박 바닥 그림자
+
+- `feat/#645-sealed-gourd-help-button-ui`의 `64d556ae` 위 작업 변경을 Unity 6000.6.5f1 macOS Editor에서 검증했다.
+- 402×874 배경에서 스테이지 1·2·3 그림자 중심의 상단 기준 Y를 각각 590·598·586으로 배치했다. 박 아래 빈 바닥에 중심을 고정하고, 관람 박과 같은 비율로 크기를 조절한다. 검증용 도색으로 세 스테이지 관람 화면을 실제 재생하고 캡처했다.
+- 컴파일과 전체 EditMode **2,198/2,198** 통과. 관련 PlayMode **3/3** 통과. 스토리의 관람 열기·회전·리셋·재열기, 땅따먹기의 결과 관람·복귀, 관람 이미지 종횡비를 확인했다.
+- 화면 배치 변경이므로 관람 경로를 중심으로 PlayMode 검사 범위를 선정했다. 모바일 빌드와 실기기는 미검증이다.
+
+## 2026-11-10 — #645 도움말·일시정지 아이콘 정렬
+
+- 기준은 `feat/#645-sealed-gourd-help-button-ui`의 `64d556ae` 위 작업 변경이며 Unity 6000.6.5f1 macOS Editor에서 검사했다.
+- 튜토리얼의 두 버튼은 터치 영역 높이가 달라 동일한 상단 여백을 적용했을 때 아이콘 중심이 5 디자인 픽셀 어긋났다. 도움말을 일시정지 아이콘과 같은 높이에 두고 402×874 기준 중심 간격 47픽셀과 도움말 44×44 터치 영역을 적용했다.
+- 컴파일과 전체 EditMode **2,198/2,198**, 전투 UI PlayMode **4/4**, 튜토리얼 PlayMode **5/5** 통과. 튜토리얼 재생 화면을 402×874로 캡처해 정렬을 확인했다.
+- 버튼 배치 변경이므로 전체 PlayMode 대신 두 진입 경로를 검사했다. 모바일 실기기와 빌드는 미검증이다.
+
+## 2026-11-10 — #645 봉인 박 관람·도움말 UI
+
+- **기준:** `feat/#645-sealed-gourd-help-button-ui`, `64d556ae` 위 작업 변경. Unity 6000.6.5f1, macOS Editor/Metal, 로컬 Pipeline Test Runner. 네트워크 규약·판정·설정 계약·저장 Scene은 변경하지 않았다.
+- **범위:** 세 스테이지 배경만 캡처한 관람 배경, 원래 결과 모델의 줄/투명 배경/표시 크기, 기존 회전·줌·리셋·복귀 연결, 도움말 로컬 모달과 기본/눌림 버튼, 튜토리얼 버튼 프록시. 원본 노드와 재생성 방법은 `SEALED_GOURD_HELP_UI.md`.
+
+| 확인 | 결과 |
+| --- | --- |
+| 최종 컴파일·전체 EditMode | **2,198/2,198 PASS**, 최종 크기 변경 후 재실행 48.64초 |
+| `GameBattleUiPresentationTests` | **4/4 PASS**. 실제 포인터 기본/눌림, 도움말 열기/닫기, 뒤쪽 터치 차단, 공유 일시정지 우선, 기존 HUD |
+| `GameSceneFlowTests` | **27/27 PASS**, 113.12초. 결과·홈·다음 스테이지·땅따먹기·관람 연결 |
+| `GameTutorialFlowTests` | **5/5 PASS**, 68.96초. 튜토리얼 일시정지·재시작·나가기 경로 |
+| `GamePreviewAspectTests` | **1/1 PASS**. 관람 이미지 종횡비와 viewport 크기 변경 |
+| 최종 관람 크기 변경 후 관련 검사 재실행 | `SavedResultPreviewUsesOneNormalizedGestureHandlerAndClearsHeldDragsOnResetAndReopen` **1/1 PASS**, 5.51초 |
+| 실제 화면 | 1·2·3스테이지 결과에서 관람을 열어 배경/줄/버튼 확인. 402×874 및 390×844 Game View 캡처. 도움말 팝업 캡처 |
+| 실제 리셋·복귀 | 회전/확대 후 기존 리셋 버튼으로 rotation=identity, zoom=.5, 관람 크기=1.55 유지. 닫기 버튼으로 IsViewerOpen=false |
+| 변경 파일 점검 | `git diff --check` 통과, 새 Unity 에셋의 `.meta` 누락 없음, 촬영용 임시 에셋 제거, DEV 시작 스테이지 설정 복구 |
+
+- **실패/복구 이력:** 도움말 차단 검사는 최초에 준비 오버레이가 남은 시점에서 실행되어 실패했다. 전투 준비/로딩 종료 대기를 추가하고 실제 Dim 화면 좌표로 검사하여 통과했다. 별도 SceneFlow 실행은 앞선 Test Runner의 재생 종료와 겹쳐 시작 단계에서 중단됐다(`SaveModifiedSceneTask`). 해당 실행을 취소하고 Edit 모드 복귀를 확인한 뒤 재실행하여 27/27 통과했다.
+- **사진 데이터:** 빠른 종료 확인을 위해 기존 검사와 같은 100% coverage 단색 도색 fixture를 사용했다. 실제 캡처된 결과 모델과 실제 UI이며, 일반 플레이의 무늬를 새 이미지로 대체하지 않는다. 시각 검토에서 박이 원본보다 작아 관람 복사본만 1.55배로 조정했다. 화면 표현만 변경되므로 이전 HUD·튜토리얼 결과는 재사용하고, 최종 전체 EditMode 및 직접 영향받는 관람 PlayMode를 재실행했다.
+- **선정 이유/미검증:** UI 표현과 로컬 모달의 변경으로 전체 PlayMode는 실행하지 않았다. 관련 호출 경로를 위 묶음으로 검증했다. iOS/Android 빌드·실기기 노치/터치·실제 다중 기기 멀티플레이는 미검증이다.
+
+## 2026-11-10 — 준비·로딩·동기화 실패도 이탈 화면
+
+- **기준:** `fix/gameover-character-for-all-failures`, main `0d51e188` 위(검사 실행 기준). 이후 main `99604e5b`를 병합했다. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 프리팹·Scene·접속 묶음·설정 수는 바꾸지 않았다.
+- **바꾼 것:** #625에서 나누었던 GameOver 화면을 다시 하나로 했다. 정상 Story 패배(실패 이야기·봉인율·재도전)가 아닌 모든 GameOver, 즉 나가기·연결 끊김·준비·로딩·동기화 실패가 불이/금옥이 이탈 화면을 쓴다. `GameRunFlow.IsLeaveReason`과 그 EditMode 검사는 지웠다. 종료 사유 상수는 남겼다.
+
+| 확인 | 결과 |
+| --- | --- |
+| `GameRunFlowTests`·`GameStageResultViewTests`(EditMode) | 51/51 PASS |
+| `GameStageStoryAssetTests`(EditMode) | 5/5 PASS |
+| `GameSceneFlowTests`(PlayMode, 준비 실패 GameOver가 이탈 화면인지 확인) | 27/27 PASS |
+| `GameStageStoryPresentationTests`(PlayMode) | 6/6 PASS |
+| 대조 실험(준비 실패만 결과 카드로 되돌림) | 새 검사 실패 |
+| 전체 PlayMode | 760/760 PASS |
+
+- `GameLoadingSessionTests`만 따로 batch로 돌리면 Play 모드 진입 직후 아무 출력 없이 멈춘다. 이 변경이 없는 main `99604e5b`에서도 같았고, 전체 PlayMode 안에서는 통과한다. 이번에 원인은 고치지 않았다.
+- **미실행:** 전체 EditMode(관련 묶음만 실행), main 병합 뒤 재실행, 실기기·멀티에서 실제 실패 화면.
+
 ## 2026-11-10 — 이탈 게임 오버만 캐릭터 화면, 2:2 결과의 다시 도전 숨기기
 
 - **기준:** `fix/gameover-leave-only-territory-no-retry`, main `45e1e60b` 위. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 프리팹·Scene·접속 묶음·설정 수는 바꾸지 않았다. 종료 사유 문자열도 그대로라 흐름 상태 형식이 같다.
@@ -143,6 +237,39 @@
 - 독립 검토에서 카드 앞면 도장 글자를 표로 잘못 잡는 문제와 문서 누락을 확인해 고쳤다.
 - 전체 기록·2:2 결과 표의 갈색 강조는 바꾸지 않았다.
 - **미실행:** 실기기 화면, 멀티 게스트 화면, 긴 공동 수상 이름(`P1, P2(나)`)의 실제 표시.
+
+## 2026-11-10 — 한지 구름 전환 속도와 구름별 시차
+
+- **최종 전달 상태 (#630):** 사용자 시각 확인 완료. 큰 구름 6개 + 작은 구름 3개, 전체 1.52초. 관련 EditMode 32/32·PlayMode 18/18 통과. 전체 PlayMode는 사용자 요청으로 중단했으며 완료로 간주하지 않는다. 각 장면 삽입·연결은 다른 팀원이 담당한다. 아래 중간 단계의 시각 확인 대기 표기는 당시 기록이다.
+- 전체 EditMode는 2,156/2,156 통과했다. 전체 PlayMode 첫 시도는 로컬 iOS 프로필에 Lab 씬이 없어 실패했고, 공용 씬 목록으로 재시작했으나 사용자 요청으로 중단했다. 원래 iOS 프로필과 StageStoryPreview를 복원했다. 최신 main 통합·실기기 검증은 수행하지 않았다.
+
+- **작은 구름 감속:** 세 작은 구름의 걷힘 이동 시간을 각각 0.08초 연장(약 0.46~0.48초 → 0.54~0.56초). 공통 걷힘 구간을 0.80초로 늘리고 정규화된 시차·끝점을 다시 계산해 모든 출발 시점과 큰 구름의 이동 시간을 유지했다. 전체 전환 1.52초. 관련 PlayMode **18/18 PASS**, 사용자 시각 확인 대기.
+
+- **걷힘 방향 변경:** 작은 구름만 위·아래 왼쪽 / 가운데 오른쪽으로 변경. 진입 경로·시차·길이 유지. 연속 샘플에서 방향이 되돌아가지 않고 화면 밖까지 퇴장하는 PlayMode 검사를 추가했다. 첫 실행에서 큰 구름 하나까지 방향이 바뀐 설정 실수를 기존 검사가 잡아 수정했으며, 수정 후 PlayMode **18/18 PASS**. 관련 EditMode **32/32 PASS**. 사용자 시각 확인 대기.
+
+- **작은 구름 추가 후 최신 결과:** 사용자가 제공한 투명 PNG를 `CloudSmall.png`로 가져와 앞쪽 구름 3개(위·가운데·아래)를 추가, 공통 프리팹 총 9개. 가운데·아래 작은 구름은 큰 구름보다 늦게 걷히며 전체 1.44초 유지. Mac Unity 컴파일 완료, PlayMode **17/17 PASS**, 관련 EditMode **32/32 PASS**, Console 오류 0건, `git diff --check` 통과. 실제 Game 화면에서 완전 덮임과 1.02초 걷힘 중간 배치를 확인했다. 확인용 임시 오버레이는 제거했고 Scene은 저장하지 않았다. 최종 재생 감각은 사용자 확인 대기다.
+
+
+- **최신 재작업:** 기존 6개 구름의 3구간 직선 이동을 연속 3차 베지어 경로로 바꾸고, closeEnd/openEnd로 도착 시점도 분산했다. 걷힘은 위쪽 오른편에서 아래쪽 왼편으로 이어지며 약한 상하 곡률을 더한다. 전체 길이 1.44초 및 봉인 글씨 2px 보정은 유지한다.
+- **최신 검사:** Mac Unity 컴파일 완료, 관련 PlayMode **16/16 PASS**(출발·도착 분산 및 마지막 구름 퇴장 포함), EditMode **32/32 PASS**, Console 오류 0건. 미리보기 Play 상태로 열어 둠. 최종 움직임의 사용자 시각 확인 및 전체 검사는 아직 대기 중이다.
+
+- **기준:** `feat/stage-story-cloud-polish`의 기존 한지 구름 패치 미커밋 상태 위에서 수정. Mac Unity 6000.6.5f1 연결 Editor에서 실행했다.
+- 닫힘 0.62초·유지 0.10초·걷힘 0.72초, 6개 구름의 독립 closeDelay/openDelay. 공통 프리팹과 TryPlay 콜백 API를 유지한다.
+- 재조정: 같은 방향의 걷힘 지연을 0·0.19·0.38(약 0·0.14·0.27초)로 늘리고 세 카드의 봉인 글씨를 2px 아래로 옮겼다. 수정 후 위 관련 PlayMode 15개와 EditMode 32개를 재실행해 모두 통과했다. 구미호 카드의 수정된 글씨를 실제 Game 창에서 확인했으며 구름 동작의 최종 사용자 확인은 대기 중이다.
+- 컴파일 완료, 검사 및 미리보기 후 Console 오류 0건. 수정하지 않은 파일에서 obsolete API·DEVELOPMENT_BUILD 경고가 나왔다.
+- PlayMode `StoryResultPresentationTests`: **15/15 PASS**. 구름별 지연 시작, 완전 덮임 이후 1회 교체, 느린 프레임의 덮임 유지, 입력 차단, 취소·재사용과 후속 그림/대사 순서를 확인했다.
+- EditMode `GameStageStoryAssetTests`, `StageStoryAssetTests`, `StoryWorkspaceTests`, `StoryRecordHighlightTests`: **32/32 PASS**.
+- StageStoryPreview를 실제 Play하고 구미호 카드의 이야기 계속 버튼을 눌러 구름 완전 덮임 및 후일담 표시를 확인했다. 사용자 속도·엇갈림 시각 승인은 대기 중이다.
+- `git diff --check` 통과. 기존 미커밋 변경은 별도 보관하고 ProjectSettings·Build Profiles 변경은 수정하지 않았다.
+- **미실행:** 전체 EditMode/PlayMode(PR 전 실행 예정), 튜토리얼 실제 화면 연결, iOS/실기기, 멀티플레이. 튜토리얼 공통 API 재사용 검사는 위 PlayMode에 포함되며 실제 튜토리얼 화면 검증과 구분한다.
+
+## 2026-11-10 봉인 카드 위치·만복 이미지 갱신
+
+- Mac Unity 6000.6.5f1에서 에셋 재임포트·컴파일 후 Console 오류 0건.
+- 관련 EditMode 32/32 통과: GameStageStoryAssetTests, StageStoryAssetTests, StoryWorkspaceTests, StoryRecordHighlightTests.
+- StoryResultPresentationTests PlayMode 18/18 통과.
+- 세 카드 프리팹은 제목·카드 피벗·안내 글·손 아이콘의 y만 각각 -11 변경했다. 카드 앞뒷면 내부와 기존 참조는 보존했다.
+- StageStoryPreview 실제 Play 화면에서 구미호 카드 앞뒷면 배치 및 뒤집기, 야광귀 후일담의 새 만복 이미지를 확인했다. 사용자 시각 확인 완료. 전체 검사 중단 및 미실행 범위는 위 #630 최종 전달 기록을 따른다.
 
 ## 2026-11-09 — 결과·Home·Lobby의 시안에 없는 안내 줄 숨기기
 
@@ -7433,3 +7560,209 @@ PlayMode의 기존 main 실패17건은 표시용 최소 구슬 크기와 구형 
 - 영향 PlayMode: **14/23 통과·기존 실패9·skip0**, 32.65초. LabJigwiABNetwork9·GameJigwiStageIntegration1·NoticeText4건이 모두 통과해 이전 지귀 실패8건이 해소됐음을 확인했다.
 - 수정 없는 같은 main `f9d13362`에서 이전 실패17건을 재실행: **8/17 통과·9실패·skip0**, 29.98초. 남은 실패9건의 이름과 메시지가 변경본과 모두 동일하다. 구슬 표시 크기2·게임 흐름2·터치 먹물4·튜토리얼 로그1건이며 이번 변경에만 발생한 실패는 없다.
 - 전체 PlayMode 전수는 위 `e1e8d3e2` 통합 상태에서 수행했다. #620 추가 후에는 영향 묶음을 선별 재검사했으며 다시 전수 실행한 것으로 기록하지 않는다. Release·standalone·iOS·실제 다중 기기 네트워크 검증의 미실행 범위는 위와 같다.
+
+
+## 2026-11-10 #650 야광귀 방해 해제 PNG
+
+- 첨부 312×312 RGBA PNG를 무압축 Single Sprite로 가져오고, 해제 시 기존 배경·문구 대신 전체 이미지를 표시한다. 표시 시간·해제 판정·본인 화면 조건은 유지한다.
+- Unity 컴파일 후 Console error 0. `LabYaguangFlashLookTests` PlayMode 5/5 통과(기존 섬광 표현 회귀 검사).
+- PNG 전용 표시 뒤 공용 텍스트/눈 말풍선 복원은 Editor 객체 검사로 별도 확인한다. 실기기 표시 크기·시각 검수는 미실행.
+
+
+### #650 피격 말풍선 PNG 추가
+
+- 첨부 312×312 RGBA 이미지를 `Sabotage/YaguangTauntBubble` Single Sprite(무압축)로 추가했다. 섬광 피격 시 텍스트 대신 PNG만 2초 표시하며 기존 해제 PNG와 공용 알림을 구분한다. 두 PNG 모두 렌더 준비에 포함한다.
+- Editor 객체 검사: 피격 PNG 선택·Text 숨김·해제 PNG 전환·기존 텍스트 말풍선 복원 통과. 변경 스크립트 컴파일 및 `git diff --check` 통과.
+- 이번 PlayMode 검사 시도는 Editor가 재생 중이어서 시작되지 않았다(0개 실행). Console에 Unity Transport `ResetStatics` 컬렉션 변경 예외 1건이 있어 오류 0건으로 기록하지 않는다. 실기기 시각 검수 미실행.
+### #621 튜토리얼 조합대 뒤 사각 배경 제거 — 2026-11-10
+
+- `fix/#621-tutorial-combination-board-box`에서 튜토리얼 진입 후 조합대 위쪽에 사각형 한지 경계가 나타나는 현상을 재현했다. 튜토리얼은 일반 전투의 투명 배경 합성 경로를 사용하지 않아, 하단 입력 카메라의 별도 한지 패스가 계속 화면에 그려지고 있었다.
+- 튜토리얼에만 `GameTutorialBoardPresentation`을 연결했다. 기존 `OrbBoardPlate`의 텍스처·색·UV를 사용하고 현재 입력 카메라로 투영한 보드 영역에 표시한다. 기존 `LabOrbHudComposition.presentationBackdrop`과 `GameBoardBackgroundContinuation`으로 원본 알파 밖에 같은 스테이지 배경이 이어지게 했다. 합성 중에는 기존 종이 패스/중복 plate 렌더링을 끄고, 합성 비활성 시에는 원래 plate 표시를 복원한다.
+- 원본 조합대 에셋·Scene·입력 카메라 투영·보드 판정·튜토리얼 진행 규칙·일반 전투 경로는 변경하지 않았다. 묵이/금옥이/불이와 북·구슬의 기존 표시 순서를 유지한다.
+- Unity 6000.6.5f1에서 수정 전후 실제 GameView(402×874)를 캡처하여 조합대 위쪽의 사각 경계가 사라졌음을 확인했다. 이미지 생성이나 후처리를 하지 않았다.
+- `GameTutorialFlowTests` PlayMode **5/5 PASS**, 실패·skip 0, 62.02초. 원본 그림 유지, 입력 보드와 화면 중심 일치, 한지 카메라 패스 비활성, 배경 연결부의 투영 광선 일치 검사를 추가했다. 전체 튜토리얼의 북 넘기기·구슬 조합·완료 복귀와 대사 기록·재시작·나가기·건너뛰기도 통과했다.
+- 컴파일과 `git diff --check` 통과. 전체 테스트와 iOS/Android 실기기 검증은 실행하지 않았다.
+
+
+### #615 Figma UI 스트로크 복원 — 2026-11-10
+
+- `fix/#615-ui-stroke`에서 작업. 사용자 최종 요청에 따라 게임 오버·땅따먹기 결과 4개 화면과 #603 변경은 제외했다. 54개 제공 노드의 속성을 확인하고, 나머지 화면의 공통 버튼·HUD 컴포넌트에서 누락된 HEIST/SLASHER/GRINDHOUSE 브러시 윤곽을 원본 에셋으로 연결했다. 세부 범위·출처·재생성 방법은 `UI_STROKE_AUDIT_615.md`와 `Assets/Hapio/Art/UI/Strokes/Source/manifest.json`에 기록했다.
+- 18개 원본 표면/윤곽 에셋, 반투명 채움·스트로크의 개별 불투명도, 선택/눌림/비활성 상태, 컴포넌트 밖으로 나오는 CENTER 스트로크를 보존했다. 스태미나 여섯 칸은 기존 합성 둥근 사각형 대신 실제 Figma 브러시 마스크를 사용한다. 종이 채움은 논리 영역에 그리고 테두리를 그 위에 겹친다. 팀 자리 점선은 INSIDE 2pt의 중심선 반지름을 보정했다.
+- 공유 `GameLobby.prefab`과 `BattleUiTheme.asset`만 저장 자산을 갱신했다. 씬·통신·게임 판정·자리 좌표·버튼 네비게이션은 변경하지 않았다. 기존 `Assets/Gumiho_V1` 미추적 파일은 이번 작업과 무관해 수정하지 않았다.
+
+| 검사 | 결과 |
+| --- | --- |
+| GameFigmaStrokeTests (EditMode) | 3/3 PASS: 배율별 바깥 윤곽, 중복 배경 방지·상태 전환, 실제 GraphicRaycaster 클릭과 비활성 차단 |
+| GameLobbyAssetTests (EditMode) | 7/7 PASS |
+| GameBattleUiAssetTests (EditMode) | 2/2 PASS |
+| GameBattleUiPresentationTests (PlayMode) | 3/3 PASS: 1~3스테이지, 팀 HUD, 기존 일시정지 동작 |
+| GameLobbyViewTests (PlayMode) | 19/19 PASS: 실제 메뉴/방/자리 선택/복귀 흐름 |
+| Unity 렌더링 | 버튼 상태별 402×920 비교판 및 HUD 외곽선/스태미나 비교판 확인. 완성 게임 화면 캡처가 아닌 실제 UI 컴포넌트 렌더링이다. |
+
+선택 검사 합계 **34/34 PASS**, 실패·skip 0. 초기 EditMode 클릭 검사는 렌더 전 canvas depth가 없어 실패했으며, 카메라로 그린 뒤 실제 raycast를 검증하도록 수정해 통과했다. 전체 테스트·iOS/Android 실기기·여러 기기 네트워크 테스트는 실행하지 않았다. 원본 좌표와 버튼 클릭 사각형이 유지되는지 prefab 객체별 diff를 확인했다.
+
+
+## 2026-11-10 — #627 피버 오색 구슬의 공통 클레이 VFX 연결
+
+기준 main `1a2a695e`, Unity 6000.6.5f1·macOS/Metal이다. Host 실제 투척·Guest 선반영·원격 복제에 표시 전용 fiveColor 인자를 연결했다. 실제 원소 None/fiveColor와 도색·피해·물리·공유259개·접속 버전·Scene/Prefab은 변경하지 않았다. 일반 클레이 메시/경로/눌림/퍼짐/수명을 재사용하고 기존 오색 색상 주기를 PaperOrb 농담과 진흙 꼬리·방울에 적용했다. 명중 직전 위상을 기존 선택적 접촉 payload에 보존한다. 보드·피버 HUD/음악·지귀 부적/보상 불꽃·마지막 일격의 전용 경로는 유지한다.
+
+- 전체 EditMode: **2,175/2,175 통과**, 실패·skip0, 19.86초. 기존 피버 생성·시간표·오색·보드/전용 HUD 검사 포함.
+- 최초 집중 PlayMode: **21/22 통과·1실패**, skip0, 9.65초. 새 이동 검사가 세 렌더 프레임만 기다려 빠른 batch에서 물리 갱신 전에 거리0을 읽었다. 물리 갱신 세 번과 후속 프레임을 기다리도록 검사 준비만 보완했으며 게임 이동 코드는 수정하지 않았다.
+- 보완 후 집중/회귀 PlayMode: **34/34 통과**, 실패·skip0, 42.25초. 새 FiveColorClayFlight6·FiveColorClayNetwork2, 기존 FiveElementContact5·ComboProjectileIntegration4·JigwiRewardBoardFire4·JigwiRewardFireTrail4·GameBattleRenderWarmup2·GameBattleUiPresentation3·GameFinishReplay4건.
+- 새 검사에서 실제 PaperOrb/fiber 재질·색면 변화·충돌 반지름과 보이는 크기 분리·실제 경로·None 명시적 허용·일반/오색 접촉의 geometry/시간 일치·lease 재사용/오래된 핸들/상한/취소/정리를 확인했다.
+- 네트워크 검사는 저장된 Lab에서 실제 Solo Host의 오색 보상→투척→물리 명중 콜백·도색·오색 전용 별가루 경로를 확인한다. Guest 선반영/원격 복제는 승인된 수신 메시지를 로컬 fixture로 주입해 기본 접촉·전용 별가루 중복 방지와 법선/크기/위상 전달을 검사했다. 실제 두 기기 통신 성공으로 표현하지 않는다. Host 송신 optional payload 조건은 소스 검토와 별개로 구분한다.
+- 준비 화면의 여섯 번째 오색 복사본도 실제로 그려지고, 게임의 풀·seed·도색 상태를 소비하지 않으며 준비 종료 시 정리되는 기존 검사 통과.
+- 독립 코드 검토 및 `git diff --check` 통과. 원본 Material/Shader/Scene/Prefab·패키지 설정은 수정하지 않았다.
+
+이 시점 미실행: 실제 Editor 전투 화면의 수동 외형 비교, 전체 PlayMode, Mac standalone/Release/iOS 빌드·실기기, 실제 다중 기기의 LAN·핫스팟 검증, GPU/CPU 성능 계측. 사용법과 호환되는 optional payload는 `FIVE_ELEMENT_VFX.md`의 #627 항목을 따른다.
+
+
+### #627 실제 Editor Battle 외형 확인 추가 — 2026-11-10
+
+데스크탑 프로젝트를 #627 브랜치로 연결해 기존 Unity 창에서 Home→2스테이지 Story 솔로를 실행했다. 처음의 시작 스테이지 선호값3을 보존했고, 확인용 시작 호출 때만2를 사용한 뒤 즉시 원래 값으로 복원했다. 프레임과 Snapshot 시각이 실제로 진행되는 것을 확인했다.
+
+기존 VFX 실험실 API로 콤보 대응용 일반 Fire Combined를 준비하고 실제 투척 요청 경로로 발사했다. 이어 Y5로 피버를 시작하고 북의 Generate로 실제 `None/fiveColor=true` 구슬을 생성해 같은 입력으로 던졌다. 일반·피버 모두 `ClayFlightActive=true`, 실제 명중 시 공통 접촉1개가 관측됐다. 실제 GameView에서 일반 비행/명중, 피버 시작, 피버 비행/명중의 원본 캡처5장을 작업의 로컬 검증 산출물로 보존했다. 생성 이미지나 합성 그림은 사용하지 않았다.
+
+화면에서 같은 3D 구슬 계열과 진흙 접촉을 확인했고, 피버 문구·흐르는 부적·스태미나 색 파동·보드 오색 그림이 유지됨을 확인했다. 기존 전용 효과 코드는 바꾸지 않았다. 확인 종료 시 Console 오류0·Scene dirty=false·작업 폴더 변경 없음·시작 스테이지 선호값3 복원을 확인하고 Play를 종료했다. 실제 물리 입력은 Editor API로 자동 수행했으며 사람의 터치나 실제 두 기기 연결 검증은 아니다.
+
+실제 화면 확인은2스테이지다. 세 스테이지의 공통 피버 생성 규칙은 위 EditMode 검사로 확인했으며1·3스테이지를 별도 수동 플레이한 것으로 기록하지 않는다. 전체 PlayMode·standalone/Release/iOS·실제 다인 네트워크·성능 계측은 계속 미실행이다.
+
+
+### #627 PR 전 최신 main 통합·전체 검사 — 2026-11-10
+
+main `53b1f7a5`(#619 UI 스트로크·#622 튜토리얼 조합대·#628 지귀 QA·#632 결과 구름 연출 포함)를 병합한 `dc602dea`에서 Unity 6000.6.5f1 macOS/Metal의 기존 Editor로 전체 검사를 실행했다. 문서 충돌 한 곳은 양쪽 검증 기록을 보존해 해결했고, 피버 런타임·새 검사 코드는 기존 구현 커밋과 동일하다. 준비 화면 설명의 경로 수를 일반 오행5종+오색1종으로 맞췄다.
+
+| 확인 | 결과 |
+| --- | --- |
+| 전체 EditMode | **2,180/2,180 통과**, 실패·skip·inconclusive0, 35.62초 |
+| 전체 PlayMode | **775/775 통과**, 실패·skip·inconclusive0, 743.08초 |
+| 코드·범위 검토 | 독립 재검토에서 병합 차단 결함 없음. 물리·도색·피버 판정과 기존 전용 효과 보존 확인 |
+| 변경 검사 | `git diff --check` 통과. Scene/Prefab/원본 Material/Shader/패키지에 이번 작업의 변경 없음 |
+
+검사 중 생성된 InitTestScene은 자동 검사 임시 파일로 커밋에 포함하지 않는다. 실제 외형 확인은 위2스테이지 Editor 캡처이며, 이번 전체 자동 검사로 iOS·standalone/Release·실제 다인 LAN/핫스팟·성능 계측을 수행한 것으로 표현하지 않는다.
+
+
+### #637 변경 범위 기반 검사 지침 — 2026-11-10
+
+기준 main `a0d9aeef`, 브랜치 `chore/#637-change-based-test-policy`. 변경은 AGENTS.md의 검사 정책, TEST_SUITE_REPORT.md의 선택 기준/과거 집계 구분, 이 기록뿐이다. 실제 게임 코드·Scene·Prefab·Material·패키지·테스트와 기존 지침은 보존했다.
+
+문서 diff와 두 정책의 일치, 저장소 내부 Markdown 링크 대상, 충돌 마커 부재, `git diff --check`를 확인했다. 독립 읽기 검토에서도 필요한 관련 검사의 카테고리 제외 방지·전체 검사 조건·동일 조건 결과 재사용 규칙에 충돌이 없음을 확인했다.
+
+**Unity 컴파일·EditMode·PlayMode·빌드·실기기는 이번 작업에서 실행하지 않았다.** 문서만 바뀌어 새 정책의 문서 검사 범위를 적용했다. 보고서의 2,180/775건·35.62/743.08초는 #627 통합본 `dc602dea`의 기존 실제 실행 기록이며 #637의 새 검사 통과 건수가 아니다.
+
+
+## 2026-11-10 — #635 오프닝 → 튜토리얼 확대·한지 구름 전환, 마지막 장면 흰 선 제거
+
+기준은 main `53b1f7a5`(#632 공용 구름 병합 뒤), Unity 6000.6.5f1·macOS Editor다. 커밋은 단계별로 나눴다: 흰 선 → 구름 덮개 → 오프닝 끝 확대·덮기 → 튜토리얼 쪽 기다림 → 문서.
+
+- 흰 선 원인: OP_024 배경 `72eb0.png`(471×1024)의 맨 오른쪽 한 줄 알파가 50%(0x7F)였고, QA 화면에서 그림 왼쪽 1px·오른쪽 2px이 밝았다(스크린샷 픽셀 측정). 장면(`Page 402x874`)에는 RectMask2D가 있다. 배경 크기만 같은 비율·같은 가운데로 2pt씩 키워 x −2.003 ~ 404.003, 마지막 줄 시작 403.141(장면 402 밖)으로 보냈다. 프리팹은 Editor API로 저장했고, 저장 때 기존 기본값 항목(`softFadeIn: 0` 등)이 함께 기록됐다(동작 변화 없음).
+- 확대 지점: 사용자가 준 확대 영역 그림을 마지막 장면 스크린샷에서 찾아(배율 1.00, 평균 오차 0.005) 장면 가로 53.3%·세로 25.4%로 정했다.
+- 구름 덮개 `GameCloudCover`는 `GameSession` 아래에서 실행 중에 만든다(정렬 30120). Scene·Home·#630 공용 구름 코드는 바꾸지 않았고, 같은 어셈블리의 수동 진행(`BeginManual`·`Advance`)으로 "덮은 채 기다리기"를 구현했다. 새 설정 에셋 `CloudCoverArt.asset`·`OpeningTransitionArt.asset`은 Editor API로 만들었다.
+
+| 확인 | 결과 |
+| --- | --- |
+| Unity 컴파일 (단계 1~4 각각, 마지막은 4단계 커밋 뒤 Play 종료 후) | PASS |
+| Editor eval: OP_024 배경 범위·비율·마지막 줄 위치 | PASS — 위 수치, 비율 0.45996 유지 |
+| Editor eval: 구름 프리팹 연결·시간 | PASS — 덮기 0.62초, 전체 1.52초(0.62 + 0.10 + 0.80) |
+| Editor eval: 확대 곡선·끝 위치 | PASS — 30% 시간에 0.657, 90% 시간에 0.999, 끝에서 골짜기가 화면 가운데(0, 0) |
+| EditMode 새 검사: `StoryWorkspaceTests.LastCutBackgroundReachesPastThePageSoNoPaperLineShows`, `GameCloudCoverTests`(2), `GameOpeningTransitionTests`(3) | NOT_RUN (컴파일만 확인) |
+| PlayMode 새·수정 검사: `GameCloudCoverFlowTests`(3), `GameOpeningControllerTests`(끝까지 보기·건너뛰기·도중에 끄기 3개 추가), `GameTutorialFlowTests.FinishedOpeningOpensThePracticeBoardOnceThenTheRoomList`(구름 아래 기다림·첫 대사 시점 추가), `GameLobbyViewTests`(시작 때 구름이 걷힐 때까지 대기), `GameLoadingSessionTests`(주석만) | NOT_RUN (컴파일만 확인) |
+| 실제 화면 (Editor Play·iPhone): 확대 느낌, 구름 시간, 튜토리얼 첫 화면 | NOT_RUN |
+| 튜토리얼 준비 실패 → 방 목록에서 구름이 걷힘, 15초 제한 | NOT_RUN (검사로 재현하지 못함, 코드 경로만 확인) |
+
+
+## 2026-11-10 — #631 11/10 QA: 건너뛰기 창 가운데 정렬·메뉴 어두운 막 좌우 틈·크레딧 먹물 끄기
+
+기준은 main `0d51e188`(#619 병합 뒤), Unity 6000.6.5f1·macOS Editor다.
+
+- 튜토리얼 건너뛰기 창: 창 가운데를 화면 위 40%에 두던 값(`skipPanelTopFraction` 0.4)을 없애고, 창과 아래 두 버튼을 한 묶음으로 본 가운데를 화면 높이 50%에 둔다(`skipBlockCenterFromTop` 0.5, `GameTutorialDirector.SkipWindowY`). 이전에는 묶음 가운데가 화면 위에서 약 43.4%였다. `TutorialArt.asset`은 Editor API로 저장했고 바뀐 줄은 그 값 하나다.
+- 메뉴 어두운 막: 원인은 402×874 기준 틀을 화면 안에 맞춰 키울 때(`GameLobbyView.FitScreen`) 남는 좌우 띠였다. QA 화면(923×2000)에서는 x=0~1·921~922, Editor의 1284×2778 화면에서는 좌우 약 3px이 덮이지 않았다. 해당 막은 모드 선택 `Dim`, 크레딧 `Dismiss`, `DirectConnectionPanel` 셋이었고 전투 화면에는 이 띠가 없었다. 새 `GameScreenEdgeCover`를 실행 중에 붙여 막이 그리는 모양만 화면 끝까지 늘렸다. 저장 크기·창 자리·누를 수 있는 영역과 Scene·Prefab은 바꾸지 않았다.
+- 모드 선택 창 옆 검은 조각: 바로 뒤의 `CreateRoom`(새 방 만들기 +)이 카드보다 좌우로 조금 넓어(Editor 측정 89..1195 대 카드 92..1189) 둥근 끝이 비쳤다. 카드가 떠 있는 동안 버튼을 숨기고 닫히면 다시 보인다.
+- 크레딧 터치 먹물: 크레딧 창이 열려 있는 동안(`GameCreditsView.AnyOpen`) 화면 어디서도 먹물을 찍지 않고, 창을 열 때 남은 먹물은 지운다. 닫으면 이전처럼 나온다.
+
+| 확인 | 결과 |
+| --- | --- |
+| Unity 컴파일 (본 코드·새 검사 포함) | PASS |
+| Editor eval: 건너뛰기 묶음 가운데 (844pt 화면) | PASS — 창 y=+29, 묶음 가운데 0 |
+| Editor eval: 막 범위 계산·먹물 규칙 | PASS — 좌우 1.5pt 띠까지 넓힘, Home+크레딧 열림=먹물 없음 |
+| 원인 측정 (QA 스크린샷 픽셀·Play 중 실제 화면 크기) | PASS — 위 수치 |
+| 새·수정 검사: EditMode `GameTutorialTests.SkipWindowAndItsTwoButtonsSitTogetherOnTheScreensMiddle`, `GameScreenEdgeCoverTests`(2), `GameTouchInkTests.NeverShowsWhileTheCreditsAreOpen` | NOT_RUN (컴파일만 확인) |
+| 새·수정 검사: PlayMode `GameScreenEdgeCoverFlowTests`, `GameTouchInkFlowTests.NoInkAnywhereWhileTheCreditsAreOpen`, `GameLobbyViewTests.MenuDimsReachTheScreensEdgesAndNothingShowsBesideTheModeCard`, `GameTutorialFlowTests`(건너뛰기 창 가운데 확인 추가) | NOT_RUN (컴파일만 확인) |
+| 실기기 화면 확인 (iPhone) | NOT_RUN |
+
+
+### #634 결과·게임 오버 스트로크 — 2026-11-10
+
+- `fix/#634-result-game-over-ui-stroke`에서 제공된 Figma 5개 노드를 확인했다. 게임 오버 복귀 버튼과 결과 버튼·점령 막대의 누락된 HEIST/GRINDHOUSE 원본 표면을 연결했다. 기존 브러시가 포함된 깃발·표 구분선·나가기 밑줄은 유지했다. 출처와 적용 범위는 `UI_STROKE_AUDIT_634.md` 참조.
+- GameOver/StageResult 씬과 관련 표시 코드, 원본 에셋/라이브러리, 범위 한정 업그레이드 메뉴를 변경했다. 승자 깃발 좌표, 캐릭터 무작위 선택, 점령률 계산, 복귀/박 보기 기능 및 다시 도전 버튼의 기존 숨김 규칙은 유지했다.
+- Unity 6000.6.5f1에서 저장된 씬을 사용해 불이·금옥이·홍팀 승리·청팀 승리를 각각 402×874로 렌더링하고 확인했다. 합성 결과 데이터를 넣은 UI 미리보기이며 실제 경기 캡처는 아니다. 점령 막대 채움과 외곽선 사이의 틈을 수정했고, 원본 버튼 영역 밖 브러시도 확인했다.
+- EditMode: `GameTerritoryResultViewTests` **7/7 PASS** (양 팀 승리/무승부/0%·100%, 마스크, 깃발 위치, 기록 표시), `GameResultStrokeTests` **3/3 PASS** (중복 적용 방지, 클릭 영역 유지, 실제 GraphicRaycaster 클릭 및 비활성 차단). 초기 마스크 검사는 비활성 씬 부모를 검색하지 못해 실패했으며 비활성 객체도 포함하도록 테스트를 수정한 후 통과했다.
+- PlayMode: `TerritoryDeveloperSoloUsesDesignedResultsAndReturnsHomeAfterViewingTheGourd` **1/1 PASS**, `MidStageExitLatchesGameOverAndWaitsForExplicitHome` **1/1 PASS**. 실제 결과 진입/박 보기/닫기/홈 복귀, 이탈 게임 오버의 상태 유지와 복귀를 확인했다.
+- 합계 **12/12 PASS**, 실패·skip 0. 씬 객체별 diff와 `git diff --check` 확인. 전체 테스트·모바일 실기기·다중 기기 네트워크 검증은 실행하지 않았다.
+
+
+### #634 봉인 실패 화면 바깥 배경 노출 수정 — 2026-11-10
+
+- 안전 영역에 맞춰 축소한 402×874 콘텐츠의 RectMask2D가 한지 배경까지 잘라 기존 화면 배경이 바깥에 노출되는 문제를 재현했다. `GameOverCharacterView`에서 한지는 Canvas 전체를 덮도록 원본 비율로 확대하고 기존 클리핑 등록을 해제한다. 구름 장식의 클립 경계도 실제 화면 끝으로 맞춘다. 캐릭터·버튼의 안전 영역 배치, 무작위 선택, 홈 복귀는 유지한다. Figma 4379:1991·4379:2004를 재확인했고 기존 로컬 원본 에셋을 재사용했다.
+- `GameResultStrokeTests` EditMode **7/7 PASS**: 402×874 기본/상하 안전 영역, 430×932, 768×1024에서 화면 네 모서리까지 배경 덮임과 기존 클립 해제, 버튼 클릭 및 비활성 차단 확인. `MidStageExitLatchesGameOverAndWaitsForExplicitHome` PlayMode **1/1 PASS**: 실제 이탈→게임 오버→홈 흐름 확인.
+- 안전 영역을 위 62·아래 34로 지정한 402×874 Unity 렌더링에서 불이·금옥이 모두 바깥의 기존 배경이 사라지고 구름이 화면 끝까지 이어지는 것을 확인했다. 이는 안전 영역을 모사한 저장 씬 UI 렌더링이며 iOS 실기기 재검증은 하지 않았다. 컴파일 및 `git diff --check` 통과.
+
+
+### #634 PR #640 merge verification — 2026-11-10
+
+Integrated main `99604e5b` into #634 `937e374b`. Only this document conflicted; both validation histories were preserved. All 24 #634 code/asset files remain identical to the pre-merge version, and incoming main changes were preserved.
+
+Unity 6000.6.5f1: compilation succeeded; full EditMode **2189/2189 PASS**; PlayMode `TerritoryDeveloperSoloUsesDesignedResultsAndReturnsHomeAfterViewingTheGourd` **1/1 PASS** and `MidStageExitLatchesGameOverAndWaitsForExplicitHome` **1/1 PASS**. No failures or skips. Conflict-marker and staged whitespace checks passed.
+
+The manual conflict resolution only combines documentation. Selected PlayMode checks cover the battle-to-result/game-over integration paths; unchanged UI assets reuse the preceding visual verification. Full PlayMode, builds and physical-device verification were not rerun for this merge.
+
+
+### #634 latest-main follow-up verification
+
+Main advanced to `6b2706aa` during PR verification (#633 and #639). Integrated it in `b49a35f9`; the only conflict was again this document, and both histories were retained. The 24 original #634 code/asset files remain unchanged. On this final integrated code, full EditMode **2199/2199 PASS** and the two result/game-over PlayMode checks named above **2/2 PASS**, no failures or skips. GitHub reported PR #640 mergeable. Only documentation was manually resolved; pre-existing generated asset whitespace was retained rather than modifying unrelated assets. Full PlayMode and physical-device tests were not rerun.
+
+
+## 2026-11-10 — #642 봉인 총평의 실제 신규 도색 기여도·성공 시간 연결
+
+기준은 PR #646의 `feat/seal-run-summary`/`b0ae6bce`(main `64d556ae` 포함)다. Unity 6000.6.5f1·macOS/Metal의 기존 Editor 한 개에서 수행했다. 사용자 확정 기준은 **기여도=실제로 새로 칠한 면적의 비율**, **총 시간=성공한1~3스테이지 전투 시간의 합**이다. 예시 Preview의 공격 점수를 실제 기여도로 쓰지 않는다.
+
+Host의 `PaintFundedCell`에서 실제 빈 동일 면적 셀이 칠해질 때 최종 공급자에게만 `paintedCellsTotal`을 적립한다. 초기·성장·분수 공급·오색은 같은 경로를 사용하며 덮어쓰기·미사용 예산·시각 여백은 제외한다. 건조로 차감하지 않고 마른 셀 재도색은 다시 적립한다. 기존 공격 점수·땅따먹기 통계·색/P지도·면적 예산·난수·승패는 유지한다. 복사본의 새 통계는 기존 snapshot/보드/승인 경로로만 전달하며, 같은 세대·같은 플레이어의 확정 누적값만 최댓값으로 유지해 전송 순서 차이로 되감기지 않게 했다.
+
+총평은 성공 기록의 고정1/2/3슬롯과 결과용 로컬 ID를 읽는다. DEV Skip의 누락 기록은 앞당기지 않고 완료 후 연결 종료에도 본인 기여도를 유지한다. 실패/로딩/후일담 시간을 합산하지 않는다. 새 통계의 호환 묶음은 설정259개·5699/Lab60/Game50이다(Game49는 별도 #647이 사용). 원본 Scene·Prefab·Material·빌드/패키지 설정은 변경하지 않았다.
+
+| 실행 | 결과 |
+| --- | --- |
+| 최종 컴파일 확인 후 전체 EditMode | **2,225/2,225 통과**, 실패·skip·inconclusive0, 32.68초 |
+| 신규 집계·복제 집중 EditMode | **24/24 통과**, 실패·skip·inconclusive0, 6.25초 |
+| 전체 PlayMode 1회 | **784건 중781 통과·3실패**, skip·inconclusive0, 716.01초. 아래 검사 준비 문제를 구분해 보완했다. |
+| 실제3스테이지 결과→총평·연결 종료 후 본인 기록·엔딩/Home 재검증 | **1/1 통과**, 22.82초 |
+| 실제 마우스로 DEV Skip의 누락 행·Continue→구름→Ending_01→Home 재검증 | **1/1 통과**, 11.34초 |
+| 오프닝 완료 후 정리 재검증 | **1/1 통과**, 1.19초 |
+
+전체 PlayMode에서 발견한 실패3건은 새 총평 검사2건의 배열 `Has.Count` 반사 오류와 기존 오프닝 검사1건의 지연 파괴 프레임 경합이었다. 배열의 실제 `records.Count`를 직접 비교하고, 오프닝은 화면 숨김/CurrentView null/음성 정지 단언을 즉시 유지한 채 자식 객체 삭제 확인만 다음 프레임에 수행했다. 최초 총평 클릭 단독 재검사도 0/1(9.14초)이었는데, 새로 활성화된 Continue의 첫 렌더 전 레이캐스트에서 발생했다. 첫 렌더 한 프레임을 기다리도록 검사 준비만 추가했고, 화면내 좌표·첫 GraphicRaycaster 대상·실제 InputSystem 마우스 입력 단언은 모두 유지해 위11.34초 재검사로 확인했다. 게임의 입력·애니메이션 코드는 이 과정에서 바꾸지 않았다.
+
+초기 EditMode 요청의2,201/2,201(32.79초)은 컴파일 종료 전에 수집된 목록으로 신규 면적 검사가0개라 최종 구현의 통과 근거에서 제외한다. 신규 검사가 포함된 중간 전체 실행2,222/2,223(34.42초)은 새 모델 검사에서 진행 중인 판을 끝내지 않고 다시 Begin한 준비 오류1건을 발견했다. 실제 제한시간 종료→Defeat 확인→새 Begin 순서로 검사만 보완해 새 라운드0 초기화 단언을 유지했다. 그 뒤 최종 컴파일된 전체 목록의2,225/2,225 결과를 별도로 확정했다.
+
+실패한 PlayMode3건을 보완한 뒤 전체784건을 다시 실행한 것으로 표현하지 않는다. 변경 범위 기반 지침에 따라 영향 검사만 재실행했고, 전체 실행 뒤 바뀐 C#은 검사 준비뿐이며 게임 코드10파일의 내용은 보존한 해시와 동일했다. 현재 확인된 미해결 검사 실패는 없다. 신규24케이스에는 초기/반복/성장 공급자·분수 귀속·건조/재칠·Clear/Reset·지도/난수 비회귀·실제 Host ConfirmHit·복사 독립성, JSON/보드/receipt/스냅샷·큰 정수/음수·권한·동일시각/역순/중복·새 세대 초기화를 포함한다. Guest 수신은 로컬 메시지 fixture이며 실제 두 기기 통신 성공과 구분한다.
+
+실제 저장 게임 경로의 DEV Skip 결과를 원본 GameView로 촬영하고 세션 수치와 함께 저장소 밖 검증 자료로 보존했다. 누락1/2행은 —, 지귀 행만 실제 새셀2,048개 기준100%였다. 빠른 자동 완료의 전투시간0.000689초는 표시 규칙상00:00이며 임의 예시 시간이 아니다. 원본 Preview의 숫자를 실제 게임에 주입한 캡처가 아니다.
+
+미실행: iOS·실제 다인 일반Wi-Fi/핫스팟·standalone/Release 빌드 실행·성능 계측. 통신 통계가 추가됐으므로 실제 다인 확인 시 전 기기에 같은 새 버전을 사용해야 한다. PR 원격 갱신·main 병합은 이번 실행 단계에서 수행하지 않았다.
+
+### #650 최신 main 충돌 해결 — 2026-11-10
+
+- origin/main 병합 중 이 문서의 추가 기록 충돌 한 곳을 양쪽 내용 보존으로 해결했다. LabBattleRenderWarmup은 main의 오색 준비와 #650 두 PNG 준비가 모두 유지되는 것을 확인했다. 충돌 마커·미해결 인덱스 없음, 해결한 문서와 병합된 준비 코드의 diff 공백 검사 통과. main에서 가져온 다른 Unity meta의 기존 공백은 변경하지 않았다.
+- 영향 경로인 LabYaguangFlashLookTests·GameBattleRenderWarmupTests PlayMode 실행을 시도했다. 첫 시도는 Editor 재생 중이라 시작 불가, 재생 종료 후 재시도는 초기화 시간 초과로 0개 실행됐다. 전체 EditMode·실기기·화면 확인은 이번 병합에서 미실행이며 과거 검사 결과를 병합본 통과로 재사용하지 않는다.
+
+
+## 2026-11-10 — #642 / PR #646 실제 기록 연결·최신 main 병합 검증
+
+구현 `86269500`에 main `5201dac4`(#649 박 관람·도움말)을 합친 `b1e28898`에서 Unity 6000.6.5f1·macOS/Metal의 기존 Editor로 전체 EditMode **2,225/2,225 통과(33.27초)**, 전체 PlayMode **786/786 통과(738.70초)**를 확인했다. 실패·skip·inconclusive는 모두 0이다. 통계 직렬화·세션 결과 수명·화면 전환이 함께 바뀌어 전체 범위를 선택했으며, 앞서 실패했던 총평 2건과 오프닝 1건도 이 전체 실행에 포함되어 통과했다. 이전 실패 이력은 위 항목에 보존한다.
+
+검사 중 main이 `868c885f`(#651 야광귀 해제/도발 말풍선)로 갱신되어 `1c43b8ac`에 추가 통합했다. 두 번의 충돌 모두 `docs/VALIDATION.md`뿐이며 양쪽 기록을 그대로 보존했다. #649의 62개 게임/에셋 파일 중 세션·연결 검사 2개만 총평 변경과 자동 결합됐고 나머지는 main 원본과 동일하다. #651은 UI C# 3개·PNG/메타 4개·검증 기록뿐이다. 도색 집계/통신/게임 판정/설정/Scene 파일에는 두 번째 통합의 변경이 없으며, 전체 실행 때와 비교한 소스 해시도 이 UI 3개 외에는 동일하다.
+
+최종 `1c43b8ac`에서는 컴파일 확인 뒤 전체 EditMode **2,225/2,225 통과(34.42초)**와 영향 PlayMode **12/12 통과**를 확인했다. 세부 결과는 `LabGourdAlertTests` 3/3(4.03초), `LabYaguangFlashLookTests` 5/5(0.76초), `GameBattleRenderWarmupTests` 2/2(2.02초), 실제 3판 결과→총평→엔딩/Home 1/1(22.32초), 실제 마우스 DEV Skip 누락 행→총평→엔딩/Home 1/1(10.60초)다. 모두 실패·skip·inconclusive 0이다. 두 번째 통합은 UI 표현과 비공개 렌더 준비 복사본만 변경하여 범위 기반 지침에 따라 미영향 전체 PlayMode 결과를 재사용했다. 최종 main 통합 뒤 전체 786건을 다시 실행한 것으로 표현하지 않는다. 기존 검사는 새 말풍선 PNG의 미적 일치까지 증명하지 않는다.
+
+구현 `86269500`의 실제 저장 Home→공통 Battle 3판→실제 총평 경로를 별도로 촬영했다. CPU 도색 지도 완료를 자동 실행했고, 실제 세션 시간 5.002463/7.001923/9.002901초가 00:05/00:07/00:09와 합계00:21로 표시됐다. 각 판 Host 신규 셀2,048개로 솔로 기여도100%다. 예시 Preview 데이터나 직접 투척한 수동 플레이가 아니며, 이 촬영을 최신 main 통합 후 재촬영으로 기록하지 않는다.
+
+검증·PR에는 실제 면적 기준과 건조 뒤 재도색의 누적 의미, 기존 공격 점수/땅따먹기 통계/난수/지도/승패/물리 유지, 설정259개·5699/Lab60/Game50 및 전 기기 같은 새 버전 필요를 명시했다. iOS·실제 다인 LAN/핫스팟·standalone/Release 실행·성능 계측은 이번에도 미실행이다. 독립 코드/PR 설명 검토에서 병합 차단 결함은 발견되지 않았다. C#·문서 충돌 마커/공백 검사는 통과했고, 기존 Unity 직렬화 에셋의 생성 공백은 임의로 고치지 않았다.

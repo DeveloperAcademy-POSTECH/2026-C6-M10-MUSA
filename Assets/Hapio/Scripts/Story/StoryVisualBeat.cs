@@ -7,7 +7,7 @@ namespace Hapio
     [RequireComponent(typeof(RectTransform), typeof(CanvasGroup))]
     public sealed class StoryVisualBeat : MonoBehaviour
     {
-        public enum Motion { PaperDrop, Impact, LightOut, Ember, SealStamp, Reveal, FadeOut }
+        public enum Motion { PaperDrop, Impact, LightOut, Ember, SealStamp, Reveal, FadeOut, SpinSeal }
         public Motion motion;
         [Min(0)] public float delay;
         [Min(.01f)] public float duration = .35f;
@@ -55,6 +55,12 @@ namespace Hapio
                 rect.localRotation = rotation * Quaternion.Euler(0, 0, -9 * (1 - settle));
                 group.alpha = Mathf.Clamp01(t * 4);
                 group.blocksRaycasts = elapsed >= interactionDelay;
+            }
+            else if (motion == Motion.SpinSeal)
+            {
+                group.alpha = Mathf.Clamp01(t * 5);
+                rect.localRotation = rotation * Quaternion.Euler(0, 0, -360 * (1 - settle));
+                rect.localScale = scale * Mathf.Lerp(.72f, 1, settle);
             }
             else if (motion == Motion.Impact)
             {

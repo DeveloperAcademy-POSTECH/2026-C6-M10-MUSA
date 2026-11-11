@@ -1782,7 +1782,7 @@ namespace C6Lab
         }
 
         private float Tolerance => source != null && source.config != null ? source.config.JigwiTalismanTolerance : .07f;
-        private float Required => source != null && source.config != null ? source.config.JigwiTalismanCoverage : .9f;
+        private float Required => source != null && source.config != null ? source.config.JigwiTalismanCoverage : .85f;
 
         private void Send()
         {
@@ -1800,6 +1800,7 @@ namespace C6Lab
         private void ReadPointer()
         {
             Vector2 screen = default; bool pressed = false, began = false;
+            if (LabOrbBoard.ExternalModalOpen) { hasLast = false; return; }
             var touch = Touchscreen.current?.primaryTouch;
             if (touch != null && touch.press.isPressed)
             { screen = touch.position.ReadValue(); pressed = true; began = touch.press.wasPressedThisFrame; }

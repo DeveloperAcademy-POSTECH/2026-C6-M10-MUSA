@@ -511,6 +511,81 @@ namespace C6Lab
             DrawWater(now, held);
             DrawStatus(stage, active, snapshot, localPlayer, now, held);
             DrawFailure(stage, localPlayer, now);
+            DrawTalismanFailRed(snapshot, localPlayer, now);
+        }
+
+        // ---------- #626 부적 실패 패널티: 화면 전체가 빨갛게 ----------
+        [Header("#626 부적 실패 패널티 (화면 전체 빨강, 각 기기)")]
+        [Tooltip("불덩이가 떨어져 북에 불이 붙는 순간 화면 전체가 번쩍이는 빨강의 진하기 (0이면 끔).")]
+        [SerializeField, Range(0f, 1f)] private float failRedFlash = .55f;
+        [Tooltip("번쩍임이 사라지는 시간(초).")]
+        [SerializeField, Range(.1f, 2f)] private float failRedFlashSeconds = .8f;
+        [Tooltip("북이 타는 동안 화면 가장자리에 남는 붉은 기운의 진하기 (가운데는 이것의 1/4).")]
+        [SerializeField, Range(0f, 1f)] private float failRedEdge = .5f;
+        private UnityEngine.UI.Image failRed;
+        private static Sprite failRedSprite;
+        /// <summary>테스트용: 부적 실패의 붉은 화면이 보이는지.</summary>
+        public bool TalismanFailRedVisible => failRed != null && failRed.gameObject.activeSelf;
+
+        private void DrawTalismanFailRed(LabSnapshot snapshot, ulong localPlayer, double now)
+        {
+            float burnSeconds = source != null && source.config != null ? source.config.JigwiAFailDrumSlipSeconds : 0f;
+            float left = DrumFireSecondsLeft(snapshot, localPlayer, now, Mathf.Max(burnSeconds, failRedFlashSeconds));
+            double since = TalismanFailBurnSince(snapshot, localPlayer, now);
+            bool on = left > 0f && since >= 0d;
+            if (!on) { if (failRed != null && failRed.gameObject.activeSelf) failRed.gameObject.SetActive(false); return; }
+            if (failRed == null)
+            {
+                failRed = Image("TalismanFailRed", transform, Color.clear);
+                failRed.sprite = FailRedSprite();
+                Stretch(failRed.rectTransform, Vector2.zero, Vector2.one);
+            }
+            if (!failRed.gameObject.activeSelf) failRed.gameObject.SetActive(true);
+            failRed.transform.SetAsLastSibling();
+            float flash = failRedFlash * Mathf.Clamp01(1f - (float)since / Mathf.Max(.01f, failRedFlashSeconds));
+            float pulse = .8f + .2f * Mathf.Sin(Time.unscaledTime * 5f);
+            float fadeOut = Mathf.Clamp01(left / .6f); // eases away as the drum goes out
+            float edge = failRedEdge * pulse * fadeOut * Mathf.Clamp01((float)since / .3f);
+            // The sprite is red at the edges and a quarter as strong in the middle; the flash fills it all.
+            failRed.color = new Color(1f, .08f, .02f, Mathf.Clamp01(Mathf.Max(edge, flash)));
+            if (flash > .01f) failRed.color = new Color(1f, .08f, .02f, Mathf.Clamp01(flash + edge * .5f));
+        }
+
+        /// <summary>#626: how long ago this seat's drum caught fire for a failed talisman (-1 when it is not burning).</summary>
+        private static double TalismanFailBurnSince(LabSnapshot snapshot, ulong player, double now)
+        {
+            if (snapshot?.jigwiAB?.rounds == null) return -1d;
+            double since = -1d;
+            foreach (var round in snapshot.jigwiAB.rounds)
+            {
+                if (round == null || round.kind != LabJigwiABKind.PersonalBurn || round.resolution != LabJigwiABResolution.Expired
+                    || round.resolvedAt < 0d || !SeatFailed(round, player)) continue;
+                double from = round.resolvedAt + LabModel.JigwiTalismanFailBurnDelaySeconds;
+                if (now >= from) since = since < 0d ? now - from : Math.Min(since, now - from);
+            }
+            return since;
+        }
+
+        /// <summary>#626: a full-screen vignette, deep red at the edges and a quarter as strong in the middle.</summary>
+        private static Sprite FailRedSprite()
+        {
+            if (failRedSprite != null) return failRedSprite;
+            const int w = 64, h = 128;
+            var texture = new Texture2D(w, h, TextureFormat.RGBA32, false)
+            { name = "Jigwi talisman fail red (#626 runtime)", hideFlags = HideFlags.DontSave, wrapMode = TextureWrapMode.Clamp };
+            var pixels = new Color32[w * h];
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                {
+                    float u = Mathf.Abs((x + .5f) / w * 2f - 1f), v = Mathf.Abs((y + .5f) / h * 2f - 1f);
+                    float d = Mathf.Clamp01(Mathf.Max(u, v) * .6f + Mathf.Sqrt(u * u + v * v) * .4f);
+                    float a = Mathf.Lerp(.25f, 1f, Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.35f, 1f, d)));
+                    pixels[y * w + x] = new Color32(255, 255, 255, (byte)Mathf.RoundToInt(255f * a));
+                }
+            texture.SetPixels32(pixels); texture.Apply(false, true);
+            failRedSprite = Sprite.Create(texture, new Rect(0, 0, w, h), new Vector2(.5f, .5f), 100f);
+            failRedSprite.hideFlags = HideFlags.DontSave;
+            return failRedSprite;
         }
 
         /// <summary>#479: true once this seat finished writing its talisman in this A.</summary>
@@ -551,8 +626,10 @@ namespace C6Lab
                 double from = round.resolvedAt + LabModel.JigwiTalismanFailBurnDelaySeconds;
                 double until = from + seconds;
                 if (snapshot.jigwiAB.cutoffAt > from) until = Math.Min(until, snapshot.jigwiAB.cutoffAt);
+                // #626 QA: the drum keeps burning through the next smoke; only the next talisman (or the fever) puts it out.
                 foreach (var other in snapshot.jigwiAB.rounds)
-                    if (other != null && other.warningAt > from) until = Math.Min(until, other.warningAt);
+                    if (other != null && other.kind == LabJigwiABKind.PersonalBurn && other.warningAt > from)
+                        until = Math.Min(until, other.warningAt);
                 foreach (var group in snapshot.jigwiStage?.groups ?? Array.Empty<LabJigwiStageGroup>())
                     if (group != null && group.warningAt > from) until = Math.Min(until, group.warningAt);
                 if (now >= from && now < until) return (float)(until - now);
@@ -1210,6 +1287,11 @@ namespace C6Lab
                 dropAt[i2] = boss + new Vector3(UnityEngine.Random.Range(-.4f, .4f) * width * unit, 0f, 0f);
                 dropVelocity[i2] = new Vector2(UnityEngine.Random.Range(-1f, 1f) * 520f, UnityEngine.Random.Range(380f, 720f));
                 dropBorn[i2] = t;
+                // #626: place and size it before it shows, or for one frame it appeared at its default spot and size
+                // (a big blue circle below the boss as the waterfall started).
+                d.rectTransform.position = dropAt[i2];
+                d.rectTransform.sizeDelta = new Vector2(26f, 26f * 1.25f);
+                d.color = new Color(.75f, .92f, 1f, 1f);
                 d.gameObject.SetActive(true);
             }
         }

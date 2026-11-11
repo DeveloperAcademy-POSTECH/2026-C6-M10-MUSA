@@ -169,7 +169,7 @@ namespace Hapio.Editor
         }
         private static void BuildCard(GameObject root, Frame frontFrame, Frame backFrame)
         {
-            const float x=44,y=152,w=313.7531f,h=570.4908f;
+            const float x=44,y=163,w=313.7531f,h=570.4908f;
             var body=Rect("Card Turn Pivot",root.transform,new Rect(x,y,w,h));body.pivot=Vector2.one*.5f;body.anchoredPosition+=new Vector2(w/2,-h/2);
             var front=Rect("Front",body,new Rect(0,0,w,h));var back=Rect("Back",body,new Rect(0,0,w,h));
             // Card body bounds separate the flipping paper from the fixed header/clouds/instructions.

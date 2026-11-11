@@ -109,6 +109,8 @@ namespace C6Lab
     {
         public Vector3 localNormal;
         public float diameter;
+        // Optional cosmetic phase. Old payloads read as zero; gameplay state/packet types are unchanged.
+        public float fiveColorAge;
     }
 
     /// <summary>
@@ -278,13 +280,14 @@ namespace C6Lab
         // 5696: #551 Jigwi B bucket is personal: every seat pours its own bucket by rocking the phone (no 3-2-1, no attempts).
         // 5697: #551 Jigwi B bucket: the first bucket comes 3.5 s after B starts, 1 s apart, 7 s each.
         // 5698: #595 Jigwi smoke flow: round.smoke (B smokes every screen at once, no bucket) and round.common (shared talisman A).
-        internal const ushort LabProtocolVersion = 5698;
+        // 5699: actual newly painted-cell contribution is a Host-owned Int64 player statistic.
+        internal const ushort LabProtocolVersion = 5699;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Double-tap a blue fox orb to clear it, and keep your Yin and Yang away.";
         /// <summary>More fox orbs than one fox fire ever drops; a longer list is ignored (#251).</summary>
         private const int MaximumFoxFireOrbs = 10;
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/59");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/60");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;
@@ -2116,7 +2119,8 @@ namespace C6Lab
             Vector3 velocity = LabThrowMath.LaunchVelocity(releaseVelocity, seatAnchor, targetCenter, config);
             // A blast-shrunk orb flies small and so has less reach on the gourd (#213).
             var projectile = LabProjectile.Create(launchPosition, config, projectileRoot, orb.element,
-                orb.small ? config.BlastShrinkScale : 1f, useClayFlight: !orb.fiveColor && !orb.jigwiTalismanReward);
+                orb.small ? config.BlastShrinkScale : 1f, useClayFlight: !orb.jigwiTalismanReward,
+                fiveColor: orb.fiveColor);
             if (orb.fiveColor) LabFiveColorSparkle.AttachArt(projectile.transform, config.OrbRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined), true);
             else if (orb.jigwiTalismanReward) LabFiveColorSparkle.AttachArt(projectile.transform,
                 config.OrbRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined) * LabJigwiWaterVolley.SizeScale, true,
@@ -2208,6 +2212,7 @@ namespace C6Lab
                     bool paintBlocked = element >= LabOrbElement.Fire && element <= LabOrbElement.Earth
                         && model.PaintSurface.WouldBlockHit(result.OwnerPlayerId, paintDirection);
                     bool talismanHit = model.LastHitTalisman;
+                    bool fiveColor = model.LastHitFiveColor;
                     if (paintBlocked)
                     {
                         jigwiStagePresentation?.PlayBlocked(targetLocalPoint);
@@ -2220,9 +2225,9 @@ namespace C6Lab
                             impactFeedback?.PlayHit(target, targetLocalPoint, element, actualDamage, result.ImpactVelocity, false);
                         else
                             impactFeedback?.PlayContact(target, targetLocalPoint, element, actualDamage,
-                                result.ImpactVelocity, result.HitNormal, result.VisualDiameter);
+                                result.ImpactVelocity, result.HitNormal, result.VisualDiameter,
+                                fiveColor: fiveColor, fiveColorAge: result.FiveColorAge);
                     }
-                    bool fiveColor = model.LastHitFiveColor;
                     // The final-hit replay only shows a hit that painted (never a blocked or element-less one).
                     if (!paintBlocked && (element != LabOrbElement.None || fiveColor)) RememberReplayHit(result);
                     if (fiveColor && !paintBlocked) PresentFiveColorHit(targetLocalPoint, result.OwnerPlayerId);
@@ -2246,10 +2251,10 @@ namespace C6Lab
                         x = targetLocalPoint.x, y = targetLocalPoint.y, z = targetLocalPoint.z,
                         wx = result.ImpactVelocity.x, wy = result.ImpactVelocity.y, wz = result.ImpactVelocity.z,
                         spinImpulse = signedYawImpulse, fiveColor = fiveColor, talisman = talismanHit, sizeScale = launchScale };
-                    if (!paintBlocked && !talismanHit && element != LabOrbElement.None && order.Count > 1)
+                    if (!paintBlocked && !talismanHit && (element != LabOrbElement.None || fiveColor) && order.Count > 1)
                         impact.payload = LabPacketPayload.Encode(new LabElementContactPose {
                             localNormal = hitbox.InverseTransformDirection(result.HitNormal),
-                            diameter = result.VisualDiameter
+                            diameter = result.VisualDiameter, fiveColorAge = fiveColor ? result.FiveColorAge : 0f
                         });
                     foreach (ulong id in order) if (id != LocalPlayerId) Send(id, impact);
                 }
@@ -2608,7 +2613,8 @@ namespace C6Lab
                                     impactFeedback?.PlayContact(target, new Vector3(packet.x, packet.y, packet.z),
                                         (LabOrbElement)packet.element, packet.damage, hostVelocity,
                                         pose != null ? hitbox.TransformDirection(pose.localNormal) : Vector3.zero,
-                                        pose != null && float.IsFinite(pose.diameter) && pose.diameter > 0f ? pose.diameter : fallbackDiameter);
+                                        pose != null && float.IsFinite(pose.diameter) && pose.diameter > 0f ? pose.diameter : fallbackDiameter,
+                                        fiveColor: packet.fiveColor, fiveColorAge: pose != null ? pose.fiveColorAge : 0f);
                                 }
                             }
                             if (packet.fiveColor) PresentFiveColorHit(new Vector3(packet.x, packet.y, packet.z), packet.owner);
@@ -2650,7 +2656,8 @@ namespace C6Lab
                         LabOrbElement element = packet.element >= (int)LabOrbElement.None && packet.element <= (int)LabOrbElement.Earth
                             ? (LabOrbElement)packet.element : LabOrbElement.None;
                         LabProjectile visual = LabProjectile.Create(position, config, projectileRoot, element,
-                            packet.small ? config.BlastShrinkScale : 1f, useClayFlight: !packet.fiveColor && !packet.talisman);
+                            packet.small ? config.BlastShrinkScale : 1f, useClayFlight: !packet.talisman,
+                            fiveColor: packet.fiveColor);
                         if (packet.fiveColor) LabFiveColorSparkle.AttachArt(visual.transform, config.OrbRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined), true);
                         else if (packet.talisman) LabFiveColorSparkle.AttachArt(visual.transform,
                             config.OrbRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined) * LabJigwiWaterVolley.SizeScale, true,
@@ -2782,6 +2789,7 @@ namespace C6Lab
             catch (Exception) { return; }
             if (snapshot == null || snapshot.sessionId != packet.sessionId
                 || snapshot.players == null || snapshot.players.Length != targetParticipantCount
+                || !LabPaintContributionNetworkValidation.Valid(snapshot.players)
                 || !LabJigwiNetworkValidation.Valid(snapshot.jigwi)
                 || !LabJigwiStageNetworkValidation.Valid(snapshot.jigwiStage, snapshot.players)
                 || !LabJigwiABNetworkValidation.Valid(snapshot.jigwiAB, snapshot.players)

@@ -25,6 +25,8 @@ namespace Hapio.Tests
         [TestCase(LabTeam.Blue, 76, 24)]
         [TestCase(LabTeam.Red, 37, 63)]
         [TestCase(LabTeam.None, 40, 40)]
+        [TestCase(LabTeam.Blue, 100, 0)]
+        [TestCase(LabTeam.Red, 0, 100)]
         public void FinalSharesAndWinnerFollowSnapshot(LabTeam winner, int blue, int red)
         {
             view.Present(new LabSnapshot { teamWinner = winner, paintCellCount = 100, blueCells = blue, redCells = red }, 7);
@@ -36,6 +38,18 @@ namespace Hapio.Tests
             Assert.That(view.redDecoration.activeSelf, Is.EqualTo(winner == LabTeam.Red));
             Assert.That(view.bluePercent.text, Is.EqualTo(blue + "%"));
             Assert.That(view.redPercent.text, Is.EqualTo(red + "%"));
+            Assert.That(view.blueFill.GetComponentInChildren<GameFigmaSurface>(true).SurfaceName, Is.EqualTo("ResultFill"));
+            Assert.That(view.redFill.GetComponentInChildren<GameFigmaSurface>(true).SurfaceName, Is.EqualTo("ResultFill"));
+            Assert.That(view.table.design.Find("TerritoryBarFrame/Brush Outline").GetComponent<GameFigmaSurface>().SurfaceName,
+                Is.EqualTo("TeamPaint"));
+            Assert.That(view.blueFill.GetComponent<UnityEngine.UI.Image>().enabled, Is.False);
+            var clip=view.blueFill.GetComponentInParent<UnityEngine.UI.Mask>(true);
+            Assert.That(clip, Is.Not.Null, "Centred fill strokes must stay inside the rounded track.");
+            Assert.That(clip.GetComponent<LabRoundedGraphic>().radius, Is.EqualTo(8));
+            var blueFlag=(RectTransform)view.blueWinnerFlag.transform;
+            var redFlag=(RectTransform)view.redWinnerFlag.transform;
+            Assert.That(Vector2.Distance(blueFlag.anchoredPosition,new Vector2(52.60f,-240.87f)),Is.LessThan(.01f));
+            Assert.That(Vector2.Distance(redFlag.anchoredPosition,new Vector2(348.56f,-238.59f)),Is.LessThan(.01f));
         }
 
         [Test]

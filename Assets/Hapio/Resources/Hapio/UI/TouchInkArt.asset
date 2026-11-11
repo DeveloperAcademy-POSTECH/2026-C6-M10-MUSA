@@ -27,11 +27,11 @@ MonoBehaviour:
   inkColor: {r: 0.19058824, g: 0.16705883, b: 0.13882352, a: 1}
   stainFill: 0.66
   dropletFill: 0.24
-  inkStrength: 0.8
+  inkStrength: 1
   fadeSeconds: 0.6
-  startScale: 0.85
-  endScale: 1.1
-  stainSize: 30
+  startScale: 0.8
+  endScale: 1.3
+  stainSize: 50
   stainSizeVariation: 0.2
   dropletsMin: 1
   dropletsMax: 2

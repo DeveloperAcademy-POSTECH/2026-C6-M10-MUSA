@@ -28,7 +28,7 @@
 - 요괴별 기본값·규칙은 `Resources/Hapio/StageCatalog`와 StageDefinition, 실행 중 조정은 GameStageSettings 복사본으로 관리한다. #297 당시 모든 스테이지의 표시 모델은 WhiteGourd 내부의 공통 검은 요괴였고, 현재는 아래 #507처럼 세 스테이지가 각자 구운 박(구미호·야광귀·지귀)을 쓴다. StageDefinition의 `yokaiVisual` override를 비워 두고 갱신 도구에서 구미호를 다시 연결하지 않는다. 원본 LabConfig를 자동 저장하지 않는다.
 
 - #281 2:2 청홍 땅따먹기는 Hapio의 독자 모드(4명, 한 판)다. 규칙은 `LabTeams`·`LabModel.Team`과 공유 설정196~199에 있고 Lab DEV에서도 4명·솔로로 켤 수 있다. Hapio에서 196 켜기는 방 모드가 정하며 DEV 탭에서 바꾸지 않는다. 전투 화면 요소(점유율 막대·피버·벽·무지개)는 실행 중에 만들고, 로비 팝업·팀 자리 화면은 `Hapio > Upgrade 2v2 Lobby UI`로만 저장한다.
-- #293/PR #382의 현재 2:2 디자인 결과는 `박 확인`·`나가기`만 표시하고 NEXT를 숨긴다(#603의 새 2:2 결과도 "다시 도전" 버튼을 숨긴다). #603의 불이/금옥이 GameOver 화면은 이탈·연결 끊김(`GameRunFlow.IsLeaveReason`)에서만 쓰고, 준비·로딩·동기화 실패는 기존 결과 카드다. `나가기`는 `GameSession.GoHome`으로 연결을 종료하고 타이틀로 돌아간다. #281의 같은 방 로비 복귀는 `NextStage`·`ReturnTerritoryToLobby`와 구형 결과 fallback에 남아 있다. 전투 중 참가자 이탈·로딩 실패의 기존 로비 복귀 및 방장 이탈 정책은 유지한다.
+- #293/PR #382의 현재 2:2 디자인 결과는 `박 확인`·`나가기`만 표시하고 NEXT를 숨긴다(#603의 새 2:2 결과도 "다시 도전" 버튼을 숨긴다). #603의 불이/금옥이 GameOver 화면은 정상 Story 패배(실패 이야기·재도전)가 아닌 모든 GameOver에 쓴다(이탈·연결 끊김·준비·로딩·동기화 실패). `나가기`는 `GameSession.GoHome`으로 연결을 종료하고 타이틀로 돌아간다. #281의 같은 방 로비 복귀는 `NextStage`·`ReturnTerritoryToLobby`와 구형 결과 fallback에 남아 있다. 전투 중 참가자 이탈·로딩 실패의 기존 로비 복귀 및 방장 이탈 정책은 유지한다.
 - #278 Home/Lobby는 `Assets/Hapio/Art/UI/GameLobby.prefab`의 한지 로비를 공유한다. GameLobbyView는 UI만 관리하고 GameSession/GamePendingRoomRegistry가 연결·대기 광고를 소유한다. 기존 Lab Scene과 전투/결과 Scene을 로비 적용 목적으로 다시 복사하지 않는다.
 - 게임 방은 Game-family TXT/연결 토큰을 사용한다. Lab과 같은 Bonjour 서비스 종류라도 검색 결과를 섞지 않는다. 로비 나가기는 방 목록, 최종 결과·게임 오버 HOME은 타이틀 복귀다.
 
@@ -323,9 +323,15 @@
 - 물통 화면 `LabJigwiBucketHandleView`(2D, **글자 없음**): ① **위협** — 내 양동이가 오기 `threatLeadSeconds`(1.2초) 전부터 박이 내 쪽으로 시뻘겋게 달아오르고 연기가 모인다(처음부터 또렷하게 붉고, 남은 시간이 줄수록 커지고 빨리 뛰며 가운데가 하얗게 달아오름 = 시간 표시. 위치는 박 충돌체를 전투 카메라로 비춘 자리). ② 박 바로 위(`bucketHang` (.5, .93))에 🪣 양동이가 끈에 매달려 내려오고, 폰 기울기를 따라 같은 쪽으로 기운다(`bucketFollow`). 출렁마다 양동이가 흔들리며 물방울이 넘치고, **양동이 위 흔든 양 게이지**(출렁 수 + 다음 출렁까지 기운 정도, 칸 구분선)가 찬다(시간 게이지 없음). 판 가운데 📱 그림은 템플런처럼 폰 전체가 좌우로 기우는 모습(글자 없음). ③ **성공** — 뒤집혀 물줄기가 박으로, 불 꺼지는 소리(`JigwiFireDouse`), 박이 하얀 김을 뿜으며 식는다. ④ **실패** — 양동이가 떨어지고 지귀 대사(`failVoiceFolder`, 말풍선 없음) → 박이 숨을 들이켜듯 부풀었다가 뿜으면(화면 흔들림) → 달아오를 때 박 위에 피던 그 연기 덩어리 16개가 그대로 부풀며 화면 전체로 퍼져 회색으로 채우고 → 두꺼운 연기 막이 깔리며 쿵(`fogHitSoundFolder` = `JigwiBucketFogHit`, 강한 햅틱) → 작은 검지 손이 3D 영역에서 문지르는 시늉. 양동이는 박을 가리지 않게 `bucketHang` (.5, .93), 쏟을 때 3D 화면이 흔들린다(`pourShake`, `LabJigwiWaterFx.Shake`). 김 위 손은 검지만 펴고 나머지 손가락을 접은 앞모습 👆. 쏟은 물은 박 윗부분(`BucketPourPitch` 58°, 그 사람 쪽으로 기운 위)에 칠한다. 물통 회차에는 #509 물방울 칸(`LabJigwiSyncPillarView`)을 숨긴다. **소리**: 달아오르는 동안 지글지글 반복(`heatLoopFolder` = `JigwiBucketHeat`, 뜨거울수록 크고 높게, 식으면 멈춤), 쏟을 때 쏴아(`pourSoundFolder` = `JigwiBucketPour`), 연기가 뿜어질 때(`smokeSoundFolder` = `JigwiBucketSmoke`). 출렁마다 찰랑(`sloshSoundFolder` = `JigwiBucketSlosh`, 기운 쪽 스피커로 치우침). 대사: 쏟아 식을 때 지귀 비명 "앗 차가!!"(`pourVoiceFolder` = `JigwiVoiceBucketPour`, 강한 햅틱), 실패 말풍선 때 "연기로 뒤덮어주마!"(`failVoiceFolder` = `JigwiVoiceBucketFail`). 다 걷힌 순간(`clearSoundFolder` = `JigwiBucketClear`), 연기를 문지를 때 부채질 휘익(`rubSoundFolder` = `JigwiBucketFan`, 4%마다, 0.25초 간격). 폴더가 비어 있으면 조용히 넘어간다. **햅틱**: 10°마다 약한 톡, 출렁 1·2·3번 점점 세게, 쏟을 때 길고 세게, 말풍선 때 툭, 김 덮일 때 쿵. Editor/DEV 빌드는 **A/D 또는 ←/→**(`keyTiltDegrees` 35°). 지귀 부적(A)을 공용 기믹으로 바꾸는 일은 새 이슈로 따로 한다.
 - #551 당시 호환 묶음은 설정 259개·**5697**·`C6PhysicsLab/58`·**`C6HapioGame/44`**였다(현재 Game 기준은 아래 #501 절, main #558의 5691·Lab52·Game39 위). 5696 이하 앱과 혼용하지 않는다.
 
-## 검사 카테고리와 검사 전용 시작 단축 (2026-11-05)
+## 변경 범위 기반 검사와 검사 전용 시작 단축 (2026-11-10)
 
-- 검사에는 NUnit `[Category]` `Slow`(fixture 5초 이상)·`GPU`·`Bonjour`·`LabOnly`·`Legacy`를 붙인다. 정의와 실행 묶음(빠른 묶음 `-testCategory "!Slow;!Legacy;!LabOnly"`)은 `docs/TEST_SUITE_REPORT.md`의 현재 구성 절을 따른다. 새 검사도 같은 기준으로 붙이며, 현재 경로를 지키는 유일한 검사에는 `Legacy`를 붙이지 않는다. 카테고리는 실행 범위 표시이고 검사 삭제가 아니다. PR 전에는 전체를 돌린다.
+- PR마다 전체 검사를 의무 실행하지 않는다. 검사 전에 실제 diff와 실행·호출 경로를 확인해 아래 기준으로 범위를 선택한다. 상세 기준·실행 예시는 `docs/TEST_SUITE_REPORT.md`의 현재 검사 선택 기준을 따른다. 기존 검사를 삭제하거나 단언을 완화해 시간을 줄이지 않는다.
+- 문서·동작 변경 없는 주석만 바뀌면 내용·링크·diff 정합성을 확인하고 Unity 검사·빌드는 생략한다. Scene·Prefab·Material·Shader·Importer·설정·테스트 코드 변경은 문서 변경으로 분류하지 않는다.
+- 일반 UI·VFX·개별 기능 변경은 컴파일, 전체 EditMode, 변경 기능과 영향받는 호출·연결 경로의 PlayMode를 실행한다. 화면 표현 변경은 관련 렌더링·참조 검사와 가능한 환경의 실제 화면 확인을 포함하고, 실행하지 못한 화면·실기기 확인은 미검증으로 남긴다.
+- 세션·동기화·통신 규약/직렬화·공유 설정 계약, 공통 입력/물리/투사체 수명, 도색 면적·성장·건조·소유권·승패 판정, Scene 전환/공유 수명, Unity·패키지·플랫폼/빌드 설정의 동작을 바꾸거나 영향 범위를 판단하기 어려우면 전체 EditMode·PlayMode를 실행한다. 파일명이 아니라 실제 동작과 의존 관계로 판단한다.
+- 검사에는 NUnit `[Category]` `Slow`(fixture 5초 이상)·`GPU`·`Bonjour`·`LabOnly`·`Legacy`를 붙인다. 새 검사도 같은 기준으로 붙이며 현재 경로를 지키는 유일한 검사에는 `Legacy`를 붙이지 않는다. 빠른 묶음 `-testCategory "!Slow;!Legacy;!LabOnly"`은 개발 중 선택 가능한 보조 묶음이다. 변경 경로의 관련 검사는 카테고리와 관계없이 직접 포함한다. 카테고리는 검사 삭제나 필요한 검사 생략의 근거가 아니다.
+- 통과 결과는 관련 코드·에셋·검사·패키지·설정과 실행 환경이 같은 경우 재사용한다. 검증 기록·PR 설명 등 동작에 영향 없는 문서만 바뀌면 재실행하지 않는다. 수정이나 main 통합 후에는 기존 검증 버전과의 diff·연결 경로를 비교해 영향 검사부터 재실행하고, 위 전체 검사 조건에 해당하면 전체를 실행한다. 실행 환경·플랫폼 차이를 같은 검증으로 취급하지 않는다.
+- PR과 `docs/VALIDATION.md`에는 검사 범위 선정 이유, 기준 버전·환경·수행 결과, 전체 검사 생략 이유와 미검증 항목을 구분해 기록한다. 실패 후 통과해도 최초 실패와 원인·수정/재실행 결과를 보존하며, 실행하지 않은 검사는 PASS로 쓰지 않는다.
 - `GameSession.Start.cs`의 `GameStartTiming` 기본값(3초·1초·5초·0.5초)은 게임 코드에서 바꾸지 않는다. `Hapio.PlayModeTests`의 `GameTestStartTiming`(SetUpFixture)만 길이를 줄이며 #306의 순서·ACK·재예약·로드 한도는 같다. 카운트다운 길이에 기대는 검사는 기본값으로 되돌려 실행하고, 시작 직후 던지는 다시보기 검사는 `WaitReplayPoseWindow`로 자세 기록 창을 기다린다.
 - 실제 Host를 여는 PlayMode 검사는 고정 UDP 포트 대신 `LabSavedSceneNetworkFixture.UseAvailablePort`·`AvailableDualFamilyPort()`를 쓴다.
 
@@ -417,3 +423,10 @@
 ## 플레이어별 칠 무늬 기본 OFF
 
 - `Player Paint Patterns`(DEV 인덱스137, `LabConfig.playerPaintPatternsEnabled`)의 코드·저장 기본값은 꺼짐이다. 박 표면의 P번호별 무늬와 플레이어 원 오른쪽 아래·로비 P 자리의 무늬 표시가 함께 꺼진다. 색·면적·P지도·승리 판정은 그대로다. 기능 코드와 DEV 행·인덱스는 남겨 DEV로 다시 켤 수 있다. config가 없을 때도 꺼짐으로 본다. 설정 259개와 접속 묶음은 바꾸지 않았다.
+
+
+## #642 봉인 총평의 실제 도색 기여도
+
+- 스테이지별 봉인 시간은 Host 최종 성공 snapshot의 `playedSeconds`, 총 소요 시간은 성공한1~3판의 원본 전투 시간 합이다. 실패 시도·로딩·후일담은 합산하지 않고 누락 판은 `—`로 표시한다. 총평 전용 `GameSession.SealStageResults`가 스테이지별 누락 자리를 유지하고, `ResultLocalPlayerId`는 완료 후 연결이 끝나도 개인 식별을 보존한다.
+- 내 기여도는 Host의 `LabPlayerState.paintedCellsTotal`(이번 라운드 누적 신규 동일 면적 셀 수) 중 내 비율이다. `LabPaintSurface.PaintFundedCell`의 실제 빈 칸→칠한 칸 변경에서 최종 공급 `Ink.Owner`에게만 한 번 적립한다. 초기·성장·분수 예산을 포함하며 덮어쓰기·미사용 예산·시각 여백은 제외한다. 건조로 차감하지 않고 마른 칸 재칠은 다시 더한다. 기존 공격 점수·땅따먹기 소유 면적·난수/예산/색/P지도·승패는 변경하지 않는다.
+- 통계는 기존 플레이어 snapshot/헤더/승인 경로로 Host가 보내고 Guest는 임의로 집계하지 않는다. 호환 묶음은 **설정259개·5699·`C6PhysicsLab/60`·`C6HapioGame/50`**이며 Game49는 별도 #647이 사용해 건너뛴 값이다. 구현과 검증 범위는 `docs/STAGE_STORY_UI_INTEGRATION.md`·`docs/VALIDATION.md`를 따른다.

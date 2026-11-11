@@ -138,8 +138,10 @@ namespace Hapio.Tests
             Assert.That(skipped, Is.Zero);
             AssertAtBrowserWithNoOpening();
             Assert.That(player.CurrentView, Is.Null);
-            Assert.That(player.cutHost.GetComponentsInChildren<StoryCutView>(true), Is.Empty);
             Assert.That(player.voiceSource == null || !player.voiceSource.isPlaying && player.voiceSource.clip == null, Is.True);
+            // Cancel hides the picture immediately; Destroy retires its GameObject at the frame boundary.
+            yield return null;
+            Assert.That(player.cutHost.GetComponentsInChildren<StoryCutView>(true), Is.Empty);
         }
 
         [UnityTest]
@@ -214,6 +216,85 @@ namespace Hapio.Tests
             Assert.That(opening.lobbyView.OpeningBlocked, Is.False);
             Assert.That(session.RoomBrowserVisible, Is.True, "Reload keeps the existing room-browser destination.");
             Assert.That(opening.lobbyView.browserPage.activeInHierarchy, Is.True);
+        }
+
+        /// <summary>
+        /// #635: the last page seen to its end drops its words and buttons at once and zooms toward the valley as the clouds
+        /// close; only once covered does the next screen (here the room list) come, and the clouds then lift over it.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator FinishingTheLastPageZoomsTowardTheValleyUnderTheCloudsThenTheyLift()
+        {
+            yield return LoadHome();
+            yield return PressStart();
+            StoryPlayer player = opening.player;
+            while (player.CurrentCutIndex < player.sequence.cuts.Count - 1 ||
+                player.CurrentPageIndex < player.sequence.cuts[player.CurrentCutIndex].PageCount - 1 || !player.IsReading)
+                player.Next();
+            GameObject toolbar = player.skipButton.transform.parent.gameObject;
+            Assert.That(toolbar.activeSelf, Is.True);
+            Vector3 hostScale = player.cutHost.localScale, hostPosition = player.cutHost.localPosition;
+            player.Next();
+            Assert.That(player.IsPlaying, Is.False, "The last page is done.");
+            Assert.That(session.CloudsUp, Is.True, "The clouds start at once.");
+            Assert.That(player.dialogueGroup.alpha, Is.Zero, "The words go at once.");
+            Assert.That(toolbar.activeSelf, Is.False, "And the buttons on top.");
+            float largest = 1f;
+            bool browserBeforeCovered = false;
+            double deadline = Time.realtimeSinceStartupAsDouble + 15d;
+            while (GameOpeningController.IsPresenting && Time.realtimeSinceStartupAsDouble < deadline)
+            {
+                largest = Mathf.Max(largest, player.cutHost.localScale.x / hostScale.x);
+                browserBeforeCovered |= session.RoomBrowserVisible && !session.CloudCover.IsCovered;
+                yield return null;
+            }
+            GameOpeningTransitionArt art = GameOpeningTransitionArt.Load();
+            Assert.That(largest, Is.EqualTo(art.zoomScale).Within(.05f), "Zoomed all the way in before the clouds covered it.");
+            Assert.That(browserBeforeCovered, Is.False, "Nothing comes next until the screen is covered.");
+            AssertAtBrowserWithNoOpening();
+            Assert.That((player.cutHost.localScale, player.cutHost.localPosition), Is.EqualTo((hostScale, hostPosition)),
+                "The picture's frame is put back for any later play.");
+            Assert.That(toolbar.activeSelf, Is.True, "The buttons are put back too.");
+            Assert.That(session.CloudsUp, Is.True, "The clouds are still over the room list...");
+            yield return Until(() => !session.CloudsUp, "...and lift from it");
+        }
+
+        /// <summary>#635: skipping covers what is on the screen with the clouds only, with no zoom, then the room list.</summary>
+        [UnityTest]
+        public IEnumerator SkippingCoversTheScreenWithCloudsOnlyThenTheyLift()
+        {
+            yield return LoadHome();
+            yield return PressStart();
+            StoryPlayer player = opening.player;
+            GameObject toolbar = player.skipButton.transform.parent.gameObject;
+            Vector3 hostScale = player.cutHost.localScale;
+            player.skipButton.onClick.Invoke();
+            Assert.That(session.CloudsUp, Is.True, "The clouds start at once.");
+            Assert.That(toolbar.activeSelf, Is.True, "The screen is left as it was under them.");
+            bool zoomed = false;
+            double deadline = Time.realtimeSinceStartupAsDouble + 15d;
+            while (GameOpeningController.IsPresenting && Time.realtimeSinceStartupAsDouble < deadline)
+            {
+                zoomed |= player.cutHost.localScale != hostScale;
+                yield return null;
+            }
+            Assert.That(zoomed, Is.False, "No zoom when skipped.");
+            AssertAtBrowserWithNoOpening();
+            yield return Until(() => !session.CloudsUp, "The clouds lift from the room list");
+        }
+
+        /// <summary>#635: an opening cut short while its clouds close takes them away at once; nothing is left covered.</summary>
+        [UnityTest]
+        public IEnumerator DisablingWhileTheCloudsCloseTakesThemAwayAtOnce()
+        {
+            yield return LoadHome();
+            yield return PressStart();
+            opening.player.Skip();
+            Assert.That(session.CloudsUp, Is.True);
+            opening.enabled = false;
+            Assert.That(session.CloudsUp, Is.False, "No clouds left over a screen nobody will lift them from.");
+            yield return null;
+            Assert.That(session.CloudsUp, Is.False);
         }
 
         [UnityTest]

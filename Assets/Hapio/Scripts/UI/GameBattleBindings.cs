@@ -62,6 +62,8 @@ namespace Hapio
             network.BindBattleReferences(board, target, battleCamera, battleFloor, impactFeedback, projectileRoot);
             RebindScene(network);
             if (!session.IsTutorial) gameObject.AddComponent<GameBattleUiPresentation>().Bind(this, session);
+            else gameObject.AddComponent<GameTutorialBoardPresentation>().Bind(this);
+            gameObject.AddComponent<GameHelpView>().Bind(this, session);
             // #492: the stage's sound data and 지귀 art load here, behind the opaque preparing overlay, not on first use.
             float warmupStarted = Time.realtimeSinceStartup;
             int warmed = LabBattleAudioWarmup.Preload(network.GameStageYokai, this);
