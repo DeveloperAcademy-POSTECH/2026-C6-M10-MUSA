@@ -19,7 +19,7 @@ MonoBehaviour:
       edgeStrength: 0.08
       grainScale: 2
     claySticker:
-      minimumDensity: 0.65
+      minimumDensity: 1
       maximumDensity: 1
     enabled: 1
     density: 0.9

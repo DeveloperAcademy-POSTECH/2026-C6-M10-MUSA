@@ -1,5 +1,21 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-11 — 박 칠 색을 오행 팔레트 그대로 (클레이 농도 1)
+
+- **기준:** `feat/clay-full-palette-color` (main `51a24721`). Unity 6000.6.5f1 batch(macOS, Metal). 박 칠 색은 표현만 바꿨고, 판정·P 지도·도색 해시·접속 규약·공유 설정은 그대로다.
+- **원인:** `LabClayStickerRuntime.Pigment`는 오행색을 선형 공간에서 흰 클레이(0.82)와 섞는다. 섞는 비율(농도)은 `Lerp(0.65, 1, 충돌 강도)`이고, 충돌 강도는 정면 속도를 20 m/s로 나눈 값이다. 실제 투척은 최대 12.5 m/s라 강도가 약 0.62를 넘지 않으므로, 실제 농도는 0.65~0.87이었다. 톤매핑은 None이었고, 클레이 조명은 색을 0.78~1.04배로만 바꿨다.
+- **고친 것:** `LabClayStickerSettings.minimumDensity` 기본값과 `WatercolorStampProfile`의 저장값을 0.65에서 1로 바꿨다. 이제 모든 명중이 `LabPaintPalette` 색 그대로 칠해진다. 표현 버전 이름은 `clay-stickers-v2` 그대로다. 버전 문자열의 fingerprint가 바뀌므로 이전 빌드와는 도색 기록 버전이 맞지 않는다(`paintArtVersionMismatch`).
+
+| 확인 | 결과 |
+| --- | --- |
+| 화면 측정: DEV 솔로 1스테이지 박, 같은 칠, BattleCamera 복사 카메라로 1080×1424 렌더, 원소별 중앙값(임시 PlayMode 하네스, 커밋 안 함) | 변경 전(main `cfbf65b2` 작업 트리), 강도 0.4: 화 #D4857A · 수 #6D8CAC · 목 #74937F · 금 #DFB16E · 토 #715E4D |
+| 같은 측정, 변경 후 기본값, 가장 약한 명중(강도 0.1) | 화 #CF5537 · 수 #14699C · 목 #387851 · 금 #E1A626 · 토 #62402B (팔레트 #D85736 · #1471A7 · #3D8258 · #F8B72A · #6F4A32) |
+| 새 EditMode `SavedClayPigmentKeepsTheFullPaletteColorAtEveryImpact`(저장 기본값의 농도는 모든 강도에서 1, 0.65 프로필과 버전 문자열이 다름) | PASS |
+| EditMode 빠른 묶음(`!Slow;!Legacy;!LabOnly`) | 2120/2120 PASS |
+| PlayMode `LabGourdPaintTests` 9 · `LabClayDeveloperControlsTests` 2 · `GameStageGourdIntegrationTests` 1 · `ClayPreviewPlayModeTests` 17 | 29/29 PASS |
+
+- **미실행:** 전체 PlayMode, Mac/iOS 빌드, 실기기, 멀티플레이 화면.
+
 ## 2026-11-11 — #660 박 둘러보기 결과 복귀
 
 - 기준은 `fix/#660-gourd-view-back-button`의 `9b66da6e` 위 작업 변경이다. Unity 6000.6.5f1 macOS Editor에서 검증했다.
