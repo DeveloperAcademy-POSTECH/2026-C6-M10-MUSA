@@ -10,7 +10,9 @@ namespace C6Lab
         private readonly LabClayShapes shapes;
         private readonly LabFiveElementProfile art;
         // The short tail samples distance along the actual game path (including a curved throw).
-        private readonly Vector3[] history = new Vector3[32];
+        private readonly Vector3[] history = new Vector3[64];
+        // Preserve the original path window for ordinary / baseline shots. Enhanced tails need more distance.
+        private int historyCapacity = 32;
         private int head, count;
         private Vector3 position, forward;
         private float age, phase;
@@ -24,6 +26,7 @@ namespace C6Lab
         public LabOrbElement Element { get; private set; }
         public bool Monochrome { get; private set; }
         public bool FiveColor { get; private set; }
+        public bool EnhancedFiveColor { get; private set; }
         public float FiveColorAge => fiveColorAge;
         public Color32[] FiveColorPalette => fiveColorPalette;
 
@@ -50,7 +53,7 @@ namespace C6Lab
         }
 
         public void Begin(LabOrbElement element, Vector3 start, Vector3 direction, float diameter,
-            float strength, bool mono, uint seed, bool reduced, bool fiveColor = false)
+            float strength, bool mono, uint seed, bool reduced, bool fiveColor = false, bool enhanceFiveColor = true)
         {
             Version = unchecked(Version+1);
             Active = true;
@@ -59,6 +62,8 @@ namespace C6Lab
             Strength = strength;
             Monochrome = mono;
             FiveColor = fiveColor;
+            EnhancedFiveColor = fiveColor && enhanceFiveColor && art.fiveColorBoostEnabled;
+            historyCapacity = EnhancedFiveColor ? history.Length : 32;
             fiveColorAge = 0f;
             fiveColorPalette = fiveColor ? LabFiveColorSparkle.FiveColors : null;
             lowDetail = reduced;
@@ -92,15 +97,23 @@ namespace C6Lab
         private void PaintFiveColor()
         {
             shapes.PaintFiveColorOrb(renderers[0], art.OrbSurface(Element, true),
-                LabFiveColorSparkle.ColorAt(fiveColorAge, fiveColorPalette), art.wetGloss);
-            shapes.Paint(renderers[1], TailColor(.25f), art.wetGloss, Vector3.zero);
+                EnhancedFiveColor && Monochrome ? art.monochrome : LabFiveColorSparkle.ColorAt(fiveColorAge, fiveColorPalette), art.wetGloss);
+            shapes.Paint(renderers[1], EnhancedFiveColor ? FlowBandColor(1) : TailColor(.25f), art.wetGloss, Vector3.zero);
             for (int i=0; i<drops.Length; ++i)
             {
                 float p=Mathf.Repeat(age*3.7f+phase+i*.338f,1f);
-                shapes.Paint(renderers[i+2], TailColor(p), art.wetGloss, Vector3.zero);
+                shapes.Paint(renderers[i+2], EnhancedFiveColor ? FlowBandColor(i+2) : TailColor(p), art.wetGloss, Vector3.zero);
             }
             for (int i=0; i<wisps.Length; ++i)
-                shapes.Paint(renderers[i+5], TailColor(.4f+.3f*i), art.wetGloss, Vector3.zero);
+                shapes.Paint(renderers[i+5], EnhancedFiveColor ? FlowBandColor(i) : TailColor(.4f+.3f*i), art.wetGloss, Vector3.zero);
+        }
+
+        private Color FlowBandColor(int band)
+        {
+            // Separate the five pigment bands even when the actual throw is shorter than one color cycle.
+            return Monochrome ? art.monochrome : LabFiveColorSparkle.ColorAt(
+                fiveColorAge*LabClayShapes.FiveColorFlowSpeed + band*LabClayShapes.FiveColorStepSeconds,
+                fiveColorPalette);
         }
 
         private Color TailColor(float distance)
@@ -130,9 +143,9 @@ namespace C6Lab
             // Keep a minimum distance between samples so 120 Hz and low-speed shots still retain the tail.
             if ((next-history[head]).sqrMagnitude > Diameter*Diameter*.004f)
             {
-                head=(head+1)%history.Length;
+                head=(head+1)%historyCapacity;
                 history[head]=next;
-                count=Mathf.Min(count+1,history.Length);
+                count=Mathf.Min(count+1,historyCapacity);
             }
             position=next;
             root.position=next;
@@ -144,7 +157,7 @@ namespace C6Lab
             Vector3 p = position;
             for (int i=0; i<count; ++i)
             {
-                int previous=(head-i+history.Length)%history.Length;
+                int previous=(head-i+historyCapacity)%historyCapacity;
                 Vector3 q=history[previous];
                 float length=Vector3.Distance(p,q);
                 if (length>.00001f && length>=remaining) return Vector3.Lerp(p,q,remaining/length);
@@ -170,10 +183,12 @@ namespace C6Lab
             ball.rotation=flight*Quaternion.AngleAxis(360f*phase+age*210f,Vector3.forward);
             ball.localScale=Diameter*new Vector3(squeeze,squeeze,1+stretch);
             float wave=.5f+.5f*Mathf.Sin((age*6.5f+phase)*Mathf.PI*2);
-            float tail=art.trailDiameters;
+            float tail=EnhancedFiveColor ? Mathf.Clamp(art.fiveColorTrailDiameters,.5f,3.5f) : art.trailDiameters;
+            float widthScale=EnhancedFiveColor ? Mathf.Clamp(art.fiveColorTrailWidthScale,1f,2.5f) : 1f;
+            float dropScale=EnhancedFiveColor ? Mathf.Clamp(art.fiveColorDropSizeScale,1f,2f) : 1f;
             Vector3 neckHead=Back(.24f);
-            Vector3 neckEnd=Back(Mathf.Min(tail,.6f+.26f*wave));
-            Stretch(neck,neckHead,neckEnd,Diameter*(.26f-.075f*wave),forward);
+            Vector3 neckEnd=Back(Mathf.Min(tail,EnhancedFiveColor ? .9f+.35f*wave : .6f+.26f*wave));
+            Stretch(neck,neckHead,neckEnd,Diameter*(.26f-.075f*wave)*widthScale,forward);
             for (int i=0; i<drops.Length; ++i)
             {
                 if (lowDetail && i>0) continue;
@@ -181,7 +196,7 @@ namespace C6Lab
                 Vector3 track=Back(Mathf.Lerp(.57f,tail+.24f,p));
                 drops[i].position=track + Vector3.down*(Diameter*.23f*p*p)
                     + right*(Diameter*.055f*Mathf.Sin(phase*5+i*2));
-                float size=Diameter*Mathf.Lerp(.23f,.042f,p);
+                float size=Diameter*Mathf.Lerp(.23f,.042f,p)*dropScale;
                 drops[i].localScale=new Vector3(size,size,size*(1.5f-.4f*p));
                 drops[i].rotation=flight;
             }
@@ -191,7 +206,7 @@ namespace C6Lab
                 Vector3 offset=(right*side + up*.42f)*Diameter*.22f;
                 Vector3 front=Back(.38f+.14f*i) + offset;
                 Vector3 end=Back(tail*(.8f+.12f*side)+wave*.1f) + offset*.7f + up*(.05f*Diameter);
-                Stretch(wisps[i],front,end,Diameter*(.114f-.022f*i),forward);
+                Stretch(wisps[i],front,end,Diameter*(.114f-.022f*i)*widthScale,forward);
             }
             if (FiveColor) PaintFiveColor();
         }
@@ -208,7 +223,7 @@ namespace C6Lab
         {
             if (!Active) return;
             Active=false; count=0; head=0; age=0f;
-            FiveColor=false; fiveColorAge=0f; fiveColorPalette=null;
+            FiveColor=false; EnhancedFiveColor=false; fiveColorAge=0f; fiveColorPalette=null;
             foreach (var renderer in renderers) shapes.ResetPaint(renderer);
             root.gameObject.SetActive(false);
         }

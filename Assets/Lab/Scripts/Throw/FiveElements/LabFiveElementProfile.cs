@@ -38,6 +38,30 @@ namespace C6Lab
         [Min(.25f)] public float contactSeconds = .86f;
         [Min(0f)] public float markSeconds = 2f;
 
+        [Header("Five-color reward • presentation only")]
+        [Tooltip("Adds a heavier clay tail and five-color splash. Does not change ball size, force or paint area.")]
+        public bool fiveColorBoostEnabled = true;
+        [Range(.5f, 3.5f)] public float fiveColorTrailDiameters = 2.4f;
+        [Range(1f, 2.5f)] public float fiveColorTrailWidthScale = 1.4f;
+        [Range(1f, 2f)] public float fiveColorDropSizeScale = 1.3f;
+        [Tooltip("Linear width/depth multiplier of the temporary clay splash, not painted surface area.")]
+        [Range(1f, 1.8f)] public float fiveColorSpreadScale = 1.35f;
+        [Range(1f, 1.5f)] public float fiveColorPressWidthScale = 1.2f;
+        [Range(.025f, .15f)] public float fiveColorPressSeconds = .06f;
+        [Range(.04f, .25f)] public float fiveColorSpreadSeconds = .10f;
+        [Range(3, 5)] public int fiveColorClayDrops = 5;
+        [Range(.2f, 1.3f)] public float fiveColorDropLifetime = .65f;
+        [Range(.25f, 1.5f)] public float fiveColorContactSeconds = .95f;
+
+        [Header("Five-color reward stars • enhanced contact only")]
+        public bool fiveColorStarsEnabled = true;
+        [Range(5, 12)] public int fiveColorStarCount = 10;
+        [Range(.15f, 1f)] public float fiveColorStarLifetime = .45f;
+        [Tooltip("Peak star width in actual ball diameters.")]
+        [Range(.1f, 1f)] public float fiveColorStarSize = .42f;
+        [Tooltip("Maximum radial reach from the contact point, in actual ball diameters.")]
+        [Range(1f, 4f)] public float fiveColorStarReach = 2.6f;
+
         [Header("Maximum visible slots per scene")]
         [Range(5, 48)] public int maxFlights = 16;
         [Range(5, 64)] public int maxImpacts = 24;

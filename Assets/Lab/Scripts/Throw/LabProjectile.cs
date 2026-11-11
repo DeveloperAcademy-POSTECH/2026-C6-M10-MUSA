@@ -137,6 +137,7 @@ namespace C6Lab
         private bool resolved;
         // The final-hit replay's ghost: same look, no physics, moved by its presenter. It never launches or resolves.
         private bool puppet;
+        private LabFiveElementVfx puppetVfx;
 
         public string ProjectileId => projectileId;
         public ulong OwnerPlayerId => ownerPlayerId;
@@ -157,6 +158,7 @@ namespace C6Lab
         public Transform VisualMount => visualMount;
         public TrailRenderer FlightTrail => flightTrail;
         public bool ClayFlightActive => clayFlight.IsActive;
+        public bool FiveColorPresentation => fiveColorPresentation;
         /// <summary>Recolour only this projectile's current clay lease; a returned lease never tints a reused slot.</summary>
         public bool TryTintClayFlight(float age, Color32[] palette) =>
             fiveColorPresentation && clayFlight.TintFiveColor(age, palette);
@@ -384,7 +386,8 @@ namespace C6Lab
         /// shot, with a kinematic body that detects nothing. The caller moves the transform and ends it with
         /// <see cref="EndPuppet"/>. It never launches, never reports contact and never resolves.
         /// </summary>
-        internal void BeginPuppet(LabConfig tuning, bool jigwiReward)
+        internal void BeginPuppet(LabConfig tuning, bool jigwiReward, LabFiveElementVfx presentationPool = null,
+            Vector3 direction = default)
         {
             if (launched || puppet || resolved || tuning == null) return;
             config = tuning;
@@ -396,11 +399,16 @@ namespace C6Lab
             body.interpolation = RigidbodyInterpolation.None;
             sphere.enabled = false;
             puppet = true;
+            puppetVfx = presentationPool;
             ConfigureAppearance(tuning.OrbAppearance);
             EnsureDefaultVisual(DrawnRadius);
-            EnsureFlightTrail(DrawnRadius);
-            if (elementFlightTrail != null) elementFlightTrail.Begin(transform, ScaledTrailProfile());
-            if (flightTrail != null) { flightTrail.Clear(); flightTrail.emitting = true; }
+            if (presentationPool != null) StartFlightPresentation(direction, presentationPool);
+            else
+            {
+                EnsureFlightTrail(DrawnRadius);
+                if (elementFlightTrail != null) elementFlightTrail.Begin(transform, ScaledTrailProfile());
+                if (flightTrail != null) { flightTrail.Clear(); flightTrail.emitting = true; }
+            }
             jigwiABReward = jigwiReward;
             ConfigureJigwiRewardFireTrail();
         }
@@ -415,6 +423,14 @@ namespace C6Lab
         }
 
         internal bool IsPuppet => puppet;
+
+        /// <summary>The replay moves its look explicitly; the kinematic body never supplies a simulated velocity.</summary>
+        internal void SamplePuppet(Vector3 position, Vector3 direction)
+        {
+            if (!puppet || resolved) return;
+            transform.position = position;
+            clayFlight.Move(position, direction);
+        }
 
         private void Prepare(Vector3 velocity, LabConfig tuning, bool visualOnly)
         {
@@ -457,12 +473,12 @@ namespace C6Lab
         private bool WantsClayFlight => useClayFlight && (fiveColorPresentation
             || element >= LabOrbElement.Fire && element <= LabOrbElement.Earth);
 
-        private void StartFlightPresentation(Vector3 velocity)
+        private void StartFlightPresentation(Vector3 velocity, LabFiveElementVfx presentationPool = null)
         {
             clayFlight.Cancel();
             if (WantsClayFlight)
             {
-                var pool = LabFiveElementVfx.ForScene(gameObject.scene);
+                var pool = presentationPool != null ? presentationPool : LabFiveElementVfx.ForScene(gameObject.scene);
                 if (pool != null) clayFlight = pool.BeginFlight(element, transform.position, velocity, FlightDiameter,
                     fiveColor: fiveColorPresentation);
             }
@@ -486,7 +502,7 @@ namespace C6Lab
 
         private void LateUpdate()
         {
-            if (clayFlight.IsActive)
+            if (clayFlight.IsActive && !(puppet && puppetVfx != null))
                 clayFlight.Move(transform.position, body.linearVelocity);
         }
 

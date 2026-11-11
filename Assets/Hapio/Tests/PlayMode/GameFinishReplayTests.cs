@@ -57,11 +57,11 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
-        public IEnumerator TheFinalThrowIsReplayedThreeTimesThenTheResultOpensUnderTheCover([Values(1, 3)] int stage)
+        public IEnumerator TheFinalThrowIsReplayedThreeTimesThenTheResultOpensUnderTheCover([Values(1, 2, 3)] int stage)
         {
             yield return ReachStage(stage);
             yield return DeterministicOrbs(stage);
-            yield return ThrowUntilHit();
+            yield return ThrowUntilHit(fiveColor: stage == 2);
             LabModel model = Model();
             LabGourdPaint paint = network.target.GetComponent<LabGourdPaint>();
             var hanging = network.target.GetComponent<LabHangingTarget>();
@@ -71,6 +71,7 @@ namespace Hapio.Tests
             yield return Until(() => (replay = session.FinishReplay) != null && replay.Running
                 || session.State.phase != GameFlowPhase.Playing, "The final-hit replay starts", 60d);
             Assert.That(session.FinishUsesReplay && replay.Running, Is.True, "A recent real hit is replayed.");
+            Assert.That(replay.Shot.FiveColor, Is.EqualTo(stage == 2), "Stage 2 replays an actual five-color reward throw.");
             LabPlayerState before = Copy(model.CopyPlayers().Single());
             uint paintRevision = network.Snapshot.paintRevision;
             int paintCount = network.PaintSurface.PaintCount;
@@ -108,6 +109,8 @@ namespace Hapio.Tests
                         Assert.That(body.isKinematic && !body.detectCollisions, Is.True, "The ghost orb has no physics.");
                         Assert.That(ghost.GetComponent<SphereCollider>().enabled, Is.False);
                         Assert.That(ghost.IsResolved, Is.False);
+                        Assert.That(ghost.ClayFlightActive, Is.True, "The real story replay uses the battle's current clay flight look.");
+                        Assert.That(replay.ClayVfx.ManualClock, Is.True, "Replay clay follows the shared presentation clock.");
                         ghostChecked = true;
                     }
                     if (replay.Running)
@@ -275,7 +278,7 @@ namespace Hapio.Tests
             Assert.That(network.target.GetComponent<LabGourdPaint>().Rig, Is.Not.Null, "The stage's baked gourd.");
         }
 
-        private IEnumerator ThrowUntilHit()
+        private IEnumerator ThrowUntilHit(bool fiveColor = false)
         {
             LabTarget target = network.target;
             int approved = 0;
@@ -287,15 +290,23 @@ namespace Hapio.Tests
                 float[] flicks = { .6f, .5f, .7f, .55f, .65f, .45f };
                 for (int attempt = 0; attempt < 4 && approved == 0; attempt++)
                 {
-                    int generated = network.Snapshot.players.Single().generatedTotal;
-                    network.Generate();
-                    yield return Until(() => network.Snapshot.players.Single().generatedTotal > generated, "Generate");
-                    LabOrbState box = network.Snapshot.orbs.First(orb => orb.kind == LabOrbKind.SecretBox);
-                    yield return Until(() => network.board.GetComponentsInChildren<LabOrbView>().Any(v => v.OrbId == box.id), "Box on board");
-                    double now = Time.timeAsDouble;
-                    TapOrb(network.board, box.id, now);
-                    TapOrb(network.board, box.id, now + .2d);
-                    yield return Until(() => network.Snapshot.orbs.Count(orb => orb.kind == LabOrbKind.Combined) >= 2, "Box opens");
+                    if (fiveColor)
+                    {
+                        Assert.That(network.VfxLabGiveFiveColorOrbs(2), Is.EqualTo(2));
+                        yield return Until(() => network.Snapshot.orbs.Count(orb => orb.fiveColor) >= 2, "Five-color rewards on board");
+                    }
+                    else
+                    {
+                        int generated = network.Snapshot.players.Single().generatedTotal;
+                        network.Generate();
+                        yield return Until(() => network.Snapshot.players.Single().generatedTotal > generated, "Generate");
+                        LabOrbState box = network.Snapshot.orbs.First(orb => orb.kind == LabOrbKind.SecretBox);
+                        yield return Until(() => network.board.GetComponentsInChildren<LabOrbView>().Any(v => v.OrbId == box.id), "Box on board");
+                        double now = Time.timeAsDouble;
+                        TapOrb(network.board, box.id, now);
+                        TapOrb(network.board, box.id, now + .2d);
+                        yield return Until(() => network.Snapshot.orbs.Count(orb => orb.kind == LabOrbKind.Combined) >= 2, "Box opens");
+                    }
                     foreach (string shot in network.Snapshot.orbs.Where(orb => orb.kind == LabOrbKind.Combined).Select(orb => orb.id).ToArray())
                     {
                         yield return WaitReplayPoseWindow(target.GetComponent<LabHangingTarget>());
