@@ -100,6 +100,8 @@ namespace Hapio
             if (IsStageCommonGimmick(index)) return scope >= 1 && scope <= 3;
             // The fox's own gimmicks (#311): interval, switches and chances, with fox fire and charm details (#251, #305).
             bool gumiho = index >= 171 && index <= 177 || index == 204 || index == 206 || index == 209 || index == 210
+                // #664: the five-player charm count and the fox round's time.
+                || index == LabConfig.CharmTargetsAtFiveField || index == LabConfig.FoxRoundSecondsField
                 // Fever time (#334) is the fox's alone for now; the other yokai keep their own endings.
                 || index == LabConfig.FeverTimeSecondsField || index == LabConfig.FeverTimeRecoveryField;
             bool jigwi = index >= 178 && index <= 183 || index >= 192 && index <= 195;

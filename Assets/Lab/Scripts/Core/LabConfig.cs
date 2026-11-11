@@ -393,8 +393,16 @@ namespace C6Lab
             new LabDeveloperField("Reserved Jigwi B Supply Limit (unused)", 1f, 12f, true),
             new LabDeveloperField("지귀 B 발화점 거리 (박까지 비율)", .4f, .9f),
             new LabDeveloperField("Clay Thickness (body units)", 0f, .02f),
-            new LabDeveloperField("Clay Gloss", 0f, 1f)
+            new LabDeveloperField("Clay Gloss", 0f, 1f),
+            // 구미호 협동 기믹 (#664): 다섯 명 방의 매혹 인원(서로 옆자리 아님), 여우구슬 팀 판정 시간.
+            new LabDeveloperField("매혹 인원 (5명일 때)", 1f, 2f, true),
+            new LabDeveloperField("여우구슬 제한 시간 (초, 0 = 끔)", 0f, 60f)
         });
+
+        /// <summary>#664: how many are charmed at once in a room of five (1 or 2, never side by side).</summary>
+        public const int CharmTargetsAtFiveField = 259;
+        /// <summary>#664: the fox round's time to clear every fox orb (0 = off: each fox orb fades by itself).</summary>
+        public const int FoxRoundSecondsField = 260;
 
         public const int ClayThicknessField = 257;
         public const int ClayGlossField = 258;
@@ -515,7 +523,7 @@ namespace C6Lab
             new LabDeveloperCategory("지귀 120초 (Hapio 전용)", 228, 235, 240, 243, 248, 249, 250, 256),
             // 기믹 묶음 (#311): 공용(폭탄·넘기기 막기)과 고유(구미호: 여우불·매혹)를 나눠 간격·켜기·비율·세부값을 모은다.
             new LabDeveloperCategory("Gimmicks", 205, 207, 169, 208, 170, 153,
-                166, 206, 209, 171, 210, 172, 173, 174, 175, 176, 204, 177)
+                166, 206, 209, 171, 210, 172, 173, 174, 175, FoxRoundSecondsField, 176, 204, 177, CharmTargetsAtFiveField)
                 .WithDividers((0, "── 공용 기믹 ──"), (6, "── 고유 기믹 (구미호) ──")),
             // 야광귀 묶음 (#268): 야광귀 스테이지에 쓰는 박 색상 콤보와 섬광. 제목 오른쪽 버튼 하나로 둘을 함께 켜고 끈다.
             // 섬광 7칸은 지귀(#272) 6칸 뒤 184~190번, 야광귀 셈법(#271)은 그 뒤 191번이다.
@@ -851,6 +859,11 @@ namespace C6Lab
         [SerializeField, Range(0, 10)] private int charmRescueTaps = 10;
         [Tooltip("매혹 예고 (#305): 매혹이 걸리기 이 시간 (초) 전부터 모두에게 \"구미호가 P2에게 매혹을 걸려고 한다!\"를 보여 준다. 0이면 예고 없이 바로 걸린다.")]
         [SerializeField, Range(0f, 10f)] private float charmWarningSeconds = 3f;
+        [Tooltip("매혹 인원 (#664): 다섯 명 방에서 한 번에 매혹에 걸리는 사람 수. 2면 서로 옆자리가 아닌 두 명. 네 명 이하 방은 늘 한 명.")]
+        [SerializeField, Range(1, 2)] private int charmTargetsAtFive = 2;
+        [Tooltip("여우구슬 제한 시간 (#664): 여우불이 떨어지면 이 시간 (초) 안에 팀이 모든 판의 여우구슬을 지워야 한다. 다 지우면 모두 BIG, "
+            + "못 지우면 남은 여우구슬이 사라지고 모두 SMALL (야광귀 콤보 보상·벌칙 값). 0이면 판정 없이 여우구슬이 구슬 수명만큼 있다가 사라진다.")]
+        [SerializeField, Range(0f, 60f)] private float foxRoundSeconds = 15f;
 
         // 은퇴 (#328): 야광귀도 공용 전투 시간을 쓴다. 공유 설정의 자리만 지키고 Inspector에는 보이지 않는다.
         [HideInInspector, SerializeField, Range(60f, 180f)] private float yaguangTimelineBattleSeconds = 120f;
@@ -1461,6 +1474,8 @@ namespace C6Lab
         public float CharmSeconds => Mathf.Clamp(Finite(charmSeconds, 10f), 1f, 30f);
         public int CharmRescueTaps => Mathf.Clamp(charmRescueTaps, 0, 10);
         public float CharmWarningSeconds => Mathf.Clamp(Finite(charmWarningSeconds, 3f), 0f, 10f);
+        public int CharmTargetsAtFive => Mathf.Clamp(charmTargetsAtFive, 1, 2);
+        public float FoxRoundSeconds => Mathf.Clamp(Finite(foxRoundSeconds, 15f), 0f, 60f);
         public int JigwiFireTargetCount => Mathf.Clamp(jigwiFireTargetCount, 1, 5);
         public float JigwiFireSeconds => Mathf.Clamp(Finite(jigwiFireSeconds, 15f), 1f, 120f);
         public float JigwiOverheatSeconds => Mathf.Clamp(Finite(jigwiOverheatSeconds, 4f), .1f, 60f);
@@ -1747,7 +1762,8 @@ namespace C6Lab
                 JigwiABShrinkScale, JigwiABFireMoveAmount, JigwiABFireMovePeriodSeconds, JigwiABFireTargetRadius,
                 JigwiABRewardSizeScale, JigwiABRewardPaintScale,
                 JigwiABSupplyIntervalSeconds, JigwiABSupplyInitialCount, JigwiABSupplyLimit, JigwiABFireDepth,
-                ClayThickness, ClayGloss
+                ClayThickness, ClayGloss,
+                CharmTargetsAtFive, FoxRoundSeconds
             };
         }
 
@@ -2046,6 +2062,8 @@ namespace C6Lab
             jigwiABFireDepth = values[256];
             clayThickness = values[ClayThicknessField];
             clayGloss = values[ClayGlossField];
+            charmTargetsAtFive = (int)values[CharmTargetsAtFiveField];
+            foxRoundSeconds = values[FoxRoundSecondsField];
             error = string.Empty;
             return true;
         }

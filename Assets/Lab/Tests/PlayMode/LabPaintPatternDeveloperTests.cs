@@ -26,8 +26,8 @@ namespace C6Lab.Tests
             ui = SceneManager.GetActiveScene().GetRootGameObjects()
                 .SelectMany(root => root.GetComponentsInChildren<LabDeveloperMode>(true)).Single();
             sourceJson = JsonUtility.ToJson(ui.sourceConfig);
-            Assert.That(ui.valueInputs.Length, Is.EqualTo(259), "The live DEV panel includes all appended settings, including nearby-hit drying.");
-            Assert.That(ui.valueSliders.Length, Is.EqualTo(259), "Every DEV field keeps its corresponding control slot.");
+            Assert.That(ui.valueInputs.Length, Is.EqualTo(261), "The live DEV panel includes all appended settings, including nearby-hit drying.");
+            Assert.That(ui.valueSliders.Length, Is.EqualTo(261), "Every DEV field keeps its corresponding control slot.");
         }
 
         [UnityTearDown]

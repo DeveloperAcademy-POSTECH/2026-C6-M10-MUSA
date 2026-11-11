@@ -281,13 +281,15 @@ namespace C6Lab
         // 5697: #551 Jigwi B bucket: the first bucket comes 3.5 s after B starts, 1 s apart, 7 s each.
         // 5698: #595 Jigwi smoke flow: round.smoke (B smokes every screen at once, no bucket) and round.common (shared talisman A).
         // 5699: actual newly painted-cell contribution is a Host-owned Int64 player statistic.
-        internal const ushort LabProtocolVersion = 5699;
+        // 5701: #664 구미호 co-op gimmicks: several charmed players (charmedPlayers/charmEnds/charmHelperTargets), the fox
+        //       round (foxRound* and foxRoundRunning) and two more DEV values (261). 5700 is #663's on main.
+        internal const ushort LabProtocolVersion = 5701;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Double-tap a blue fox orb to clear it, and keep your Yin and Yang away.";
         /// <summary>More fox orbs than one fox fire ever drops; a longer list is ignored (#251).</summary>
         private const int MaximumFoxFireOrbs = 10;
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/60");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/61");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;

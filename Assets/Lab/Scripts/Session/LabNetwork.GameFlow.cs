@@ -18,7 +18,8 @@ namespace C6Lab
         // 48: #595 Jigwi smoke flow (protocol 5698, Lab 59).
         // 50: newly painted-cell contribution (protocol 5699, Lab 60); 49 was reserved by #647's summary-start flow.
         // 51: #647 the Host's 봉인 총평 start rides on the result control (summaryStarted), on top of 50.
-        private static readonly byte[] GameConnectionToken = Encoding.ASCII.GetBytes("C6HapioGame/51");
+        // 52: #664 구미호 co-op gimmicks (protocol 5701, Lab 61, 261 DEV values).
+        private static readonly byte[] GameConnectionToken = Encoding.ASCII.GetBytes("C6HapioGame/52");
         private const int MaximumGameFlowBytes = 8192;
         private bool gameFlowEnabled;
         private bool gameBattleFrozen;

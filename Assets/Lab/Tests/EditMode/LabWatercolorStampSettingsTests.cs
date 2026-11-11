@@ -34,7 +34,7 @@ namespace C6Lab.Tests
             Assert.That(value.rimBreakup, Is.EqualTo(.45f));
             Assert.That(value.revealSeconds, Is.EqualTo(.35f));
             Assert.DoesNotThrow(value.Validate);
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(259), "V2 settings remain in their presentation profile; only the new clay controls append to the current shared schema.");
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(261), "V2 settings remain in their presentation profile; only the new clay controls append to the current shared schema.");
         }
 
         [Test]

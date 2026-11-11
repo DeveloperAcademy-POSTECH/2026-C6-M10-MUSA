@@ -297,8 +297,8 @@ namespace C6Lab.Tests
             fixture.UseAvailablePort(ui.network);
             string sourceJson = JsonUtility.ToJson(ui.sourceConfig);
             ui.Open();
-            Assert.That(ui.valueInputs, Has.Length.EqualTo(259));
-            Assert.That(ui.valueSliders, Has.Length.EqualTo(259));
+            Assert.That(ui.valueInputs, Has.Length.EqualTo(261));
+            Assert.That(ui.valueSliders, Has.Length.EqualTo(261));
             ui.panel.GetComponentsInChildren<UnityEngine.UI.Button>(true)
                 .Single(button => button.name == "Category Generation chances").onClick.Invoke();
             Transform row = ui.valueInputs[225].transform.parent;

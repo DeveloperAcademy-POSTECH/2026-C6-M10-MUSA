@@ -89,7 +89,7 @@ namespace Hapio.Tests
                 .Select(session.CaptureDeveloperSettings).ToArray();
             screen.developerScopeButtons[2].onClick.Invoke();
             AssertScope(screen, 2);
-            Assert.That(screen.developerSliders, Has.Length.EqualTo(259));
+            Assert.That(screen.developerSliders, Has.Length.EqualTo(261));
             Assert.That(Row(screen, 236).activeSelf, Is.True, "The flash reward count stays the Yaguang's.");
             Assert.That(Row(screen, 237).activeSelf, Is.False, "The paint scale moved to Common.");
             // Its own battle time (211) is retired (#328); the schedule's end (212) is the first timetable value.
@@ -210,7 +210,7 @@ namespace Hapio.Tests
         private void AssertScope(GameScreen screen, int scope)
         {
             Assert.That(screen.DeveloperScope, Is.EqualTo(scope));
-            Assert.That(screen.developerInputs, Has.Length.EqualTo(259));
+            Assert.That(screen.developerInputs, Has.Length.EqualTo(261));
             float[] values = session.CaptureDeveloperSettings(scope);
             for (int i = 0; i < screen.developerInputs.Length; i++)
                 Assert.That(Row(screen, i).activeSelf,

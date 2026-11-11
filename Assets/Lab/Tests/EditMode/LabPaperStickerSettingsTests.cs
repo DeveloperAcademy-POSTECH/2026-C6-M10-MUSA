@@ -26,7 +26,7 @@ namespace C6Lab.Tests
             Assert.That(current.revealSeconds, Is.Zero, "The opaque sticker default must not cross-fade lower paint through a new sticker.");
             Assert.That(current.Version, Is.Not.EqualTo(legacy.Version));
             Assert.DoesNotThrow(current.Validate);
-            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(259), "The two clay controls append after the existing 257 slots; retained paper parameters stay in their profile.");
+            Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(261), "The two clay controls append after the existing 257 slots; retained paper parameters stay in their profile.");
         }
 
         [Test]

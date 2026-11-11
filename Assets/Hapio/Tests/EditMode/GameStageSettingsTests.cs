@@ -89,7 +89,7 @@ namespace Hapio.Tests
                 foreach (int stage in new[] { 1, 2, 3 })
                 {
                     float[] values = settings.Capture(stage);
-                    Assert.That(values.Length, Is.EqualTo(259));
+                    Assert.That(values.Length, Is.EqualTo(261));
                     Assert.That(values[205], Is.EqualTo(before[205]), "Common gimmick interval preserved (#311)");
                     Assert.That(values[206], Is.EqualTo(before[206]), "Unique gimmick interval preserved (#311)");
                 }
@@ -172,7 +172,7 @@ namespace Hapio.Tests
                     Assert.That(GameStageSettings.IsFieldVisible(stage, index), Is.EqualTo(stage != 2 || index == 207 || index == 208), "Stage " + stage + ": " + index);
                 Assert.That(GameStageSettings.IsFieldVisible(GameStageSettings.TerritoryScope, index), Is.False);
             }
-            foreach (int index in new[] { 171, 172, 206, 209, 210 })
+            foreach (int index in new[] { 171, 172, 206, 209, 210, LabConfig.CharmTargetsAtFiveField, LabConfig.FoxRoundSecondsField })
             {
                 Assert.That(GameStageSettings.IsFieldVisible(1, index), Is.True, "The fox's own gimmick field: " + index);
                 Assert.That(GameStageSettings.IsFieldVisible(2, index) || GameStageSettings.IsFieldVisible(3, index), Is.False);

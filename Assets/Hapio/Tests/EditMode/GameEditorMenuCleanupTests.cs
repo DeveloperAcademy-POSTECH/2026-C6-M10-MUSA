@@ -122,7 +122,7 @@ namespace Hapio.Tests
             {
                 // Saved the Lab Scene over Battle and erased Battle-only backgrounds, floors and lighting.
                 "Hapio/Upgrade Existing Game Scenes From Current Lab",
-                // Threw against the current project (existing Lab Scene, retuned throw gains, 259 DEV rows).
+                // Threw against the current project (existing Lab Scene, retuned throw gains, 261 DEV rows).
                 "C6 Lab/Build Editable Lab Scene",
                 "C6 Lab/Migrate Legacy Throw Tuning",
                 "C6 Lab/Upgrade Developer Controls",

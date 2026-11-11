@@ -104,6 +104,7 @@ MonoBehaviour:
   comboTimeLimitSeconds: 15
   comboPenaltyDurationSeconds: 15
   comboPenaltySizeScale: 0.1
+  thrownOrbMinVisibleScale: 0.4
   comboPenaltyThrowerOnly: 0
   comboRewardDurationSeconds: 15
   comboRewardSizeScale: 2.5
@@ -188,6 +189,8 @@ MonoBehaviour:
   charmSeconds: 10
   charmRescueTaps: 10
   charmWarningSeconds: 3
+  charmTargetsAtFive: 2
+  foxRoundSeconds: 15
   yaguangTimelineBattleSeconds: 120
   yaguangTimelineSabotageEndSeconds: 100
   yaguangTimelineUniqueSeconds:

@@ -2052,7 +2052,7 @@ namespace Hapio.Tests
         private void AssertDeveloperSettings(float[] expected)
         {
             float[] actual = network.config.CaptureDeveloperValues();
-            Assert.That(actual.Length, Is.EqualTo(259), "The persistent game session must use the current shared schema.");
+            Assert.That(actual.Length, Is.EqualTo(261), "The persistent game session must use the current shared schema.");
             Assert.That(actual, Is.EqualTo(expected),
                 "All approved values, including the gimmick group fields (#311), must survive Scene-owned DEV cleanup.");
         }
