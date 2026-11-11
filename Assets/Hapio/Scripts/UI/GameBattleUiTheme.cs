@@ -11,6 +11,7 @@ namespace Hapio
         public Texture2D[] boardTextures;
         public Sprite paper, underlineDark, underlineLight, pauseStroke, staminaCells;
         public Sprite[] playerBadges, minimapBadges;
+        public Sprite[] territoryBlueBadges, territoryRedBadges;
         public Sprite[] teamPositionArtwork; // Figma 2:2 red/blue, 3:3 red/blue component assets.
         public Sprite teamBlueMarker, teamRedMarker, drumIcon;
         public Sprite teamPairConnector, teamTrioConnector;
