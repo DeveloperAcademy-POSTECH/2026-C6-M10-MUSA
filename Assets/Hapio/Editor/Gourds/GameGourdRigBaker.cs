@@ -95,9 +95,9 @@ namespace Hapio.Editor
             Object.DestroyImmediate(model.Find(result.BodyPath).gameObject);
             Object.DestroyImmediate(model.Find(result.LidPath).gameObject);
             foreach (Transform rope in RopeParts(model)) Object.DestroyImmediate(rope.gameObject);
-            // #701: keep source art and animation paths, hide the charm and all three attachment ropes.
+            // #701: keep source art and animation paths, hide the charm, cloth ribbons and their ties.
             foreach (Transform part in model.GetComponentsInChildren<Transform>(true))
-                if (GameGourdRigBake.BaseName(part.name) == "Sandal_Dangling_Pivot")
+                if (Array.IndexOf(GameGourdRigBake.HiddenDecorationParts, GameGourdRigBake.BaseName(part.name)) >= 0)
                     part.gameObject.SetActive(false);
             Object.DestroyImmediate(model.GetComponent<Animator>());
             var animation = model.gameObject.AddComponent<Animation>();

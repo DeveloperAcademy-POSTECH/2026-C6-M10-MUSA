@@ -8454,3 +8454,12 @@ Unity 6000.6.5f1 macOS Editor에서 새로고침 후 컴파일 오류0. 전체 E
 - 임시 인스턴스에서 세 박의 닫힘/요괴 올라옴/닫힘 자세를 샘플링해 키링 그룹 비활성 유지 및 rig Validate 성공을 확인하고 임시 객체를 정리했다. 완료 복사는 비활성 자식 순회를 건너뛰며, 관람 복사는 계층 active 상태를 보존하는 경로를 확인했다.
 - 전체 EditMode 최종 **2340/2340 PASS**(52.26초), 실패/skip0. 앞선 두 실행은2333/2340(52.85초·52.35초)으로 구슬 원본 참조5건·Lab/전투 외형 분리2건이 실패했다. PlayMode 뒤 Resources의 LabConfig 메모리 참조가 BattleOrbAppearance로 남아 있었으며 저장 파일에는 원래 LabOrbAppearance GUID가 유지됐다. ForceUpdate 재임포트로는 바뀌지 않았고 Resources.UnloadAsset 후 재로드하자 원래 LabOrbAppearance로 복구됐다. 코드·저장 설정·단언 변경 없이 전체 재실행에서 통과했다.
 - diff 공백 검사 통과. 전체 PlayMode·새 빌드·iOS 실기기·실제 전투 전체 화면/다중 기기 화면 확인은 이번 작업에서 실행하지 않았다.
+
+
+### 2026-11-12 #701 후속 — 저고리·색동 리본 숨김
+
+사용자 후속 요청으로 키링과 별도인 청록 저고리 리본(구미호·지귀), 색동 리본과 묶음 끈(세 스테이지)8개를 비활성화했다. 프리팹 변경은 각 장식의 m_IsActive뿐이며 원본 아트·메시·클립·판정·칠·접속 설정은 유지한다. HiddenDecorationParts 목록을 생성 도구와 연결해 재굽기에도 보존한다.
+
+- 전체 EditMode **2340/2340 PASS**(49.17초), 영향 PlayMode **5/5 PASS**(35.43초), 실패/skip0. PlayMode는 GameStageGourdIntegrationTests·GameStage2GourdHitFinishTests·GourdResultViewerPlayModeTests다. 다시보기 runtime 경로는 직전 #701 검증과 같으며 이번에는 다시 실행하지 않았다.
+- 최초 EditMode 요청은 Editor PlayMode 진입 상태여서 실행0건으로 거절됐다. 재생을 종료한 뒤 위 전체 검사를 실행했다. 도메인 전환 중 Transport ResetStatics/이전 GC handle 로그2건이 있었으며 컴파일 오류는 없었다.
+- Unity PreviewRenderUtility로 세 저장 프리팹의 닫힌 자세를 임시 렌더해 천 장식 숨김을 확인했다. 임시 객체/RT는 해제했다. 실제 전투 전체 화면·실기기·빌드·전체 PlayMode는 이번에 실행하지 않았다.
