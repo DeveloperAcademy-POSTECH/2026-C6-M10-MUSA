@@ -253,15 +253,15 @@ namespace C6Lab
         private static Sprite arrowSprite;
         [Tooltip("#540 획 안내: 지금 써야 할 획이 글자 안에서 빛나는 색.")]
         [SerializeField] private Color strokeGuideColor = new Color(1f, .93f, .6f, .75f);
-        [Tooltip("#663: 부적을 이만큼(0~1, 글자 전체 대비) 넘게 썼는데 아직 완성이 안 됐으면, 지금 획만이 아니라 남은 곳을 모두 하얗게 강하게 보여 준다. 0이면 끔. 완성 기준(LabConfig Jigwi Talisman Coverage)보다 작게.")]
+        [Tooltip("#663: 부적을 이만큼(0~1, 글자 전체 대비) 넘게 썼는데 아직 완성이 안 됐으면, 지금 획만이 아니라 남은 곳을 모두 빨갛게 강하게 보여 준다. 0이면 끔. 완성 기준(LabConfig Jigwi Talisman Coverage)보다 작게.")]
         [SerializeField, Range(0f, 1f)] private float remainingHintFrom = .6f;
-        [Tooltip("#663: 남은 곳을 보여 줄 때 색 (진한 흰빛).")]
-        [SerializeField] private Color remainingHintColor = new Color(1f, 1f, 1f, .95f);
+        [Tooltip("#663: 남은 곳을 보여 줄 때 색 (빨강).")]
+        [SerializeField] private Color remainingHintColor = new Color(.95f, .12f, .08f, .95f);
         [Tooltip("#663: 남은 곳 점 크기 배율 (1 = 획 안내와 같음).")]
         [SerializeField, Range(1f, 2f)] private float remainingHintScale = 1.35f;
         [Tooltip("#663: 남은 곳이 반짝이는 빠르기 (1초에 몇 번).")]
         [SerializeField, Range(0f, 4f)] private float remainingHintBlinksPerSecond = 1.5f;
-        /// <summary>#663: 남은 곳을 모두 하얗게 보여 주는 중인지 (테스트·확인용).</summary>
+        /// <summary>#663: 남은 곳을 모두 빨갛게 보여 주는 중인지 (테스트·확인용).</summary>
         public bool RemainingHintOn { get; private set; }
         [Tooltip("#540 획 안내: 지금 획을 따라 움직이는 화살표 색.")]
         [SerializeField] private Color strokeArrowColor = new Color(.16f, .47f, .93f, 1f);

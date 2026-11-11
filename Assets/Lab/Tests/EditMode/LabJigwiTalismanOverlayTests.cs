@@ -166,10 +166,10 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void NearlyWrittenShowsEveryPlaceStillLeftInStrongWhite()
+        public void NearlyWrittenShowsEveryPlaceStillLeftInRed()
         {
             // #663: while little is written only the stroke to write now glows; once most of it is written, every unwritten
-            // place glows in strong white so the last bits are easy to find.
+            // place glows in red so the last bits are easy to find.
             LabSnapshot snapshot = Snapshot(-1d);
             overlay.Present(snapshot, Local, 11d);
             overlay.DrawGuide(0f);
