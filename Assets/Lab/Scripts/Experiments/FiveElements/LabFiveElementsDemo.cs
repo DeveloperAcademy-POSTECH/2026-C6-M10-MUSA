@@ -4,6 +4,7 @@ using UnityEngine.UIElements;
 namespace C6Lab
 {
     public enum LabDemoSurface { Floor, Wall, MovingWall }
+    public enum LabFiveElementsComparison { OrdinaryElements, CurrentFiveColor, EnhancedFiveColor }
 
     /// <summary>Isolated presentation clock. The sample path feeds the same VFX pool as a game throw.</summary>
     [RequireComponent(typeof(UIDocument))]
@@ -27,12 +28,13 @@ namespace C6Lab
         private LabFiveElementVfx pool;
         private Material platformMaterial;
         private VisualElement shell, view, progress, scrub;
-        private Label clockLabel, phaseLabel;
+        private Label clockLabel, phaseLabel, comparisonTitle;
         private bool strong, mono, bright, distant, lowDetail;
         private LabDemoSurface surface;
+        private LabFiveElementsComparison comparison;
         private int focus = -1, markSeconds = 2, frameRate = 60, lastHundredth = -1;
         private float speed = 1f;
-        private bool initialized, previousBackground, framingPending;
+        private bool initialized, previousBackground, framingPending, previousFiveColorBoost;
         private int previousFps, previousVSync;
         private float sampleRemainder;
 
@@ -43,6 +45,9 @@ namespace C6Lab
         public int ActiveFlights => pool.ActiveFlightCount;
         public int ActiveImpacts => pool.ActiveImpactCount;
         public int SelectedLane => focus;
+        public LabFiveElementsComparison SelectedComparison => comparison;
+        public string ComparisonCaption => comparison == LabFiveElementsComparison.OrdinaryElements ? "일반 오행" :
+            comparison == LabFiveElementsComparison.CurrentFiveColor ? "현재 오색" : "강화 오색";
 
         private void Start()
         {
@@ -56,6 +61,7 @@ namespace C6Lab
             Application.targetFrameRate = frameRate;
             initialized = true;
             pool = LabFiveElementVfx.ForScene(gameObject.scene);
+            previousFiveColorBoost = pool.FiveColorBoostEnabled;
             pool.ManualClock = true;
             platformMaterial = new Material(stageMaterial) { name = "Comparison surface", hideFlags = HideFlags.DontSave };
             CreateStudio();
@@ -77,6 +83,7 @@ namespace C6Lab
                 pool.ManualClock = false;
                 pool.MarkLifetimeOverride = -1;
                 pool.LowDetail = false;
+                pool.FiveColorBoostEnabled = previousFiveColorBoost;
             }
         }
 
@@ -139,6 +146,10 @@ namespace C6Lab
             }
             clockLabel = root.Q<Label>("clock");
             phaseLabel = root.Q<Label>("phase");
+            comparisonTitle = root.Q<Label>("comparisonTitle");
+            Bind("ordinaryElements", () => SelectComparison(LabFiveElementsComparison.OrdinaryElements));
+            Bind("currentFiveColor", () => SelectComparison(LabFiveElementsComparison.CurrentFiveColor));
+            Bind("enhancedFiveColor", () => SelectComparison(LabFiveElementsComparison.EnhancedFiveColor));
             Bind("play", () => SetPaused(!Paused));
             Bind("restart", () => { Replay(); SetPaused(false); });
             Bind("speed", () => { speed = speed == 1f ? .25f : speed == .25f ? .5f : 1f; UpdateLabels(); });
@@ -174,6 +185,14 @@ namespace C6Lab
             focus = Mathf.Clamp(lane, -1, 4);
             FrameCamera();
             Seek(PlaybackTime);
+        }
+
+        public void SelectComparison(LabFiveElementsComparison value)
+        {
+            if ((uint)value > (uint)LabFiveElementsComparison.EnhancedFiveColor)
+                throw new System.ArgumentOutOfRangeException(nameof(value));
+            comparison = value;
+            if (pool != null) Seek(PlaybackTime);
         }
 
         public void SetSurface(LabDemoSurface value) { surface = value; Seek(PlaybackTime); }
@@ -232,7 +251,8 @@ namespace C6Lab
             DemoCamera.transform.LookAt(center);
             DemoCamera.fieldOfView = 52f;
             float width = (focus < 0 ? GalleryWidth : 5.90f) * diameter;
-            DemoCamera.orthographicSize = Mathf.Max(1.65f * diameter, width / (2f * Mathf.Max(.1f, aspect)));
+            // Reserve the same vertical margin for every style, including the larger reward splash on walls.
+            DemoCamera.orthographicSize = Mathf.Max(3.6f * diameter, width / (2f * Mathf.Max(.1f, aspect)));
             if (shell != null)
             {
                 var lanes = shell.Q("lanes");
@@ -279,6 +299,8 @@ namespace C6Lab
             pool.ClearAll();
             pool.MarkLifetimeOverride = markSeconds;
             pool.LowDetail = lowDetail;
+            pool.FiveColorBoostEnabled = comparison == LabFiveElementsComparison.EnhancedFiveColor;
+            bool fiveColor = comparison != LabFiveElementsComparison.OrdinaryElements;
             PlaybackTime = 0;
             VolleyHits = 0;
             sampleRemainder = 0;
@@ -289,8 +311,9 @@ namespace C6Lab
                 targets[i].gameObject.SetActive(visible);
                 laneButtons[i].style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
                 if (visible)
-                    flights[i] = pool.BeginFlight((LabOrbElement)(i + 1), FlightPosition(i, 0), FlightDirection(0),
-                        diameter, strong ? pool.Profile.strongStrength : pool.Profile.normalStrength, mono);
+                    flights[i] = pool.BeginFlight(fiveColor ? LabOrbElement.None : (LabOrbElement)(i + 1),
+                        FlightPosition(i, 0), FlightDirection(0), diameter,
+                        strong ? pool.Profile.strongStrength : pool.Profile.normalStrength, mono, fiveColor);
             }
             UpdateLabels();
         }
@@ -347,6 +370,15 @@ namespace C6Lab
         private void UpdateLabels()
         {
             if (shell == null) return;
+            bool fiveColor = comparison != LabFiveElementsComparison.OrdinaryElements;
+            comparisonTitle.text = "오색흙  /  " + ComparisonCaption + " 비교";
+            shell.Q<Button>("ordinaryElements").EnableInClassList("primary", !fiveColor);
+            shell.Q<Button>("currentFiveColor").EnableInClassList("primary", comparison == LabFiveElementsComparison.CurrentFiveColor);
+            shell.Q<Button>("enhancedFiveColor").EnableInClassList("primary", comparison == LabFiveElementsComparison.EnhancedFiveColor);
+            for (int i = 0; i < laneButtons.Length; i++)
+            {
+                laneButtons[i].text = fiveColor ? "오색 " + (i + 1) : Names[i];
+            }
             Caption("play", Paused ? "재생" : "일시정지");
             Caption("speed", speed == 1f ? "속도 1×" : speed == .5f ? "속도 0.5×" : "속도 0.25×");
             Caption("fps", frameRate + " fps");
@@ -355,7 +387,7 @@ namespace C6Lab
             Caption("backdrop", bright ? "밝은 배경" : "어두운 배경");
             Caption("surface", surface == LabDemoSurface.Floor ? "바닥" : surface == LabDemoSurface.Wall ? "벽" : "움직이는 벽");
             Caption("camera", distant ? "게임 거리" : "확대 비교");
-            Caption("element", focus < 0 ? "다섯 동시" : "단일 · " + Names[focus]);
+            Caption("element", focus < 0 ? "다섯 동시" : "단일 · " + (fiveColor ? "오색 " + (focus + 1) : Names[focus]));
             Caption("mark", "흔적 " + markSeconds + "초");
             Caption("detail", lowDetail ? "낮은 품질" : "기본 품질");
             lastHundredth = -1;

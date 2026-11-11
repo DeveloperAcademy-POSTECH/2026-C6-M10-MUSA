@@ -6,8 +6,8 @@ namespace C6Lab
     /// <summary>
     /// 섬광 파훼 보상 오색구슬 (#329)의 모습. 판·투사체 구슬 위에 다섯 색(노랑·초록·파랑·빨강·갈색) 사이를 쉬지 않고
     /// 부드럽게 건너가는 구슬을 얹는다. 몸통 색이 바뀌는 동안 안쪽에서 다음 색 빛이 천천히 돌아 물들고, 둘레에는 같은 색
-    /// 빛무리, 가장자리를 따라 도는 윤광, 둘레에서 피었다 지는 별빛이 있어 영롱하게 보인다. 박에 맞은 자리에서는
-    /// 다섯 색 가루 먼지가 털리고 그 위로 별가루가 함께 터진다 (#464). 화면 표시만 하며 규칙·물리에는 쓰지 않는다.
+    /// 빛무리, 가장자리를 따라 도는 윤광, 둘레에서 피었다 지는 별빛이 있어 영롱하게 보인다. 오색 명중은 공통 클레이가 그리며,
+    /// 가루·별가루 생성 함수는 지귀 부적 등 전용 표현이 사용한다. 화면 표시만 하며 규칙·물리에는 쓰지 않는다.
     /// 3D로 날아가는 오색구슬(투사체)은 납작한 그림을 얹지 않고, 구슬(3D 공) 자체의 색이 다섯 색 사이를 건너간다 (#426).
     /// 그림은 카메라 쪽으로 돌려 세워야 하는데, 자리마다 전투 카메라 방향이 달라 옆자리에서는 그림이 납작하게 공 옆으로 비켜 보였다.
     /// 먹선·그늘·하이라이트 그림은 Resources/Yaguang/FiveColorOrb, 별은 FiveColorSparkle에 있고, 없으면 코드로 그린 것을 쓴다.
@@ -303,7 +303,7 @@ namespace C6Lab
         /// <summary>
         /// 날아가는 구슬의 꼬리(TrailRenderer)를 다섯 색 그라데이션으로 칠한다. 머리부터 꼬리 끝까지 다섯 색이 한 번씩 놓이고,
         /// 시간이 지나면 색이 꼬리를 타고 뒤로 흘러간다. 투명도는 머리 쪽이 진하고 끝으로 갈수록 사라진다. 꼬리가 없으면 넘어간다.
-        /// 기본 꼬리는 너무 얇고 짧아 원소 꼬리만큼 보이도록 폭과 길이도 키운다.
+        /// 실제 오색 투사체의 fallback은 공통 꼬리 크기와 수명을 유지한다. 부적 등 기존 전용 표현은 그대로 쓴다.
         /// </summary>
         public void TintTrail()
         {
@@ -322,8 +322,9 @@ namespace C6Lab
                 }
             }
             if (flightTrail == null) return;
-            // 공이 크기/꼬리를 다시 정하면(던질 때, 예측 보정 때) 그 폭을 기준으로 다시 키운다.
-            if (!Mathf.Approximately(flightTrail.widthMultiplier, trailWrittenWidth))
+            // 실제 오색구슬은 fallback에서도 일반 투사체와 같은 꼬리를 쓴다. 부적 등 전용 표현만 기존 확장을 유지한다.
+            if ((clayProjectile == null || !clayProjectile.FiveColorPresentation)
+                && !Mathf.Approximately(flightTrail.widthMultiplier, trailWrittenWidth))
             {
                 trailWrittenWidth = flightTrail.widthMultiplier * TrailWidthScale;
                 flightTrail.widthMultiplier = trailWrittenWidth;

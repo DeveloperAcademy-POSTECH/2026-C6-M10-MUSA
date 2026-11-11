@@ -11,6 +11,9 @@ namespace C6Lab
         public readonly Mesh streak;
         public readonly Mesh[] splats = new Mesh[4];
         public readonly Material material;
+        private Material starMaterial;
+        private Mesh starQuad;
+        private bool starResourcesAttempted;
         private readonly MaterialPropertyBlock properties = new MaterialPropertyBlock();
         private static readonly int Tint = Shader.PropertyToID("_BaseColor");
         private static readonly int Gloss = Shader.PropertyToID("_Gloss");
@@ -20,6 +23,7 @@ namespace C6Lab
         private static readonly int Lit = Shader.PropertyToID("_LitColor");
         private static readonly int Light = Shader.PropertyToID("_LightColor");
         private static readonly int Glint = Shader.PropertyToID("_GlintColor");
+        private static readonly int Spin = Shader.PropertyToID("_Spin");
         internal const float FiveColorStepSeconds = .9f, FiveColorFlowSpeed = 2f;
 
         public LabClayShapes(Shader shader)
@@ -43,6 +47,41 @@ namespace C6Lab
             renderer.reflectionProbeUsage = ReflectionProbeUsage.Off;
             renderer.motionVectorGenerationMode = MotionVectorGenerationMode.ForceNoMotion;
             return renderer;
+        }
+
+        public MeshRenderer CreateStar(Transform parent, string name)
+        {
+            if (!starResourcesAttempted)
+            {
+                starResourcesAttempted = true;
+                var shader = Resources.Load<Shader>("FiveElements/LabFiveColorStar");
+                var texture = Resources.Load<Texture2D>(LabFiveColorSparkle.SparkleSpritePath);
+                if (shader != null && shader.isSupported && texture != null)
+                {
+                    starMaterial = new Material(shader) { name = "Five-color reward stars (shared)", hideFlags = HideFlags.DontSave };
+                    starMaterial.SetTexture("_MainTex", texture);
+                    starQuad = new Mesh { name = "Reward star billboard", hideFlags = HideFlags.DontSave };
+                    starQuad.vertices = new[] { new Vector3(-.5f,-.5f,0), new Vector3(-.5f,.5f,0),
+                        new Vector3(.5f,.5f,0), new Vector3(.5f,-.5f,0) };
+                    starQuad.uv = new[] { Vector2.zero, Vector2.up, Vector2.one, Vector2.right };
+                    starQuad.triangles = new[] { 0,1,2,0,2,3 };
+                    // The shader turns the quad toward whichever camera is rendering (including replay cameras).
+                    starQuad.bounds = new Bounds(Vector3.zero, Vector3.one*1.5f);
+                }
+            }
+            if (starMaterial == null || starQuad == null) return null;
+            var renderer = Create(parent, name, starQuad);
+            renderer.sharedMaterial = starMaterial;
+            renderer.enabled = false;
+            return renderer;
+        }
+
+        public void PaintStar(MeshRenderer renderer, Color color, float spin)
+        {
+            properties.Clear();
+            properties.SetColor(Tint, color);
+            properties.SetFloat(Spin, spin);
+            renderer.SetPropertyBlock(properties);
         }
 
         public void Paint(MeshRenderer renderer, Color color, float gloss, Vector3 sag)
@@ -109,6 +148,8 @@ namespace C6Lab
             Object.Destroy(material);
             Object.Destroy(ball);
             Object.Destroy(streak);
+            if (starMaterial != null) Object.Destroy(starMaterial);
+            if (starQuad != null) Object.Destroy(starQuad);
             foreach (Mesh splat in splats) Object.Destroy(splat);
         }
 

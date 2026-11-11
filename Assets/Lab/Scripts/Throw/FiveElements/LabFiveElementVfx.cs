@@ -37,9 +37,10 @@ namespace C6Lab
                 bool fiveColor=flight.FiveColor;
                 float paletteAge=flight.FiveColorAge;
                 Color32[] palette=flight.FiveColorPalette;
+                bool enhance=flight.EnhancedFiveColor;
                 flight.Return();
                 return owner.PlayImpactCore(flight.Element, point, normal, incoming, flight.Diameter, flight.Strength,
-                    target, leaveMark, flight.Monochrome, fiveColor, paletteAge, palette);
+                    target, leaveMark, flight.Monochrome, fiveColor, paletteAge, palette, enhance);
             }
 
             public void Cancel()
@@ -53,11 +54,15 @@ namespace C6Lab
         private readonly List<LabClayImpactSlot> hits = new List<LabClayImpactSlot>();
         private LabClayShapes shapes;
         private bool ownsProfile;
+        private bool registerSceneService = true;
         private Scene sceneKey;
         private uint nextSeed = 37219u;
         public LabFiveElementProfile Profile { get; private set; }
         public bool ManualClock { get; set; }
         public bool LowDetail { get; set; }
+        /// <summary>Local comparison override. Each lease captures this; no game configuration or network state changes.</summary>
+        public bool FiveColorBoostEnabled { get; set; } = true;
+        public bool UsesSimpleMaterial { get; private set; }
         public float MarkLifetimeOverride { get; set; } = -1f;
         public int ActiveFlightCount
         {
@@ -80,10 +85,24 @@ namespace C6Lab
             return root.AddComponent<LabFiveElementVfx>();
         }
 
+        /// <summary>A presentation-owned pool with its own clock; never replaces or clears the battle's scene service.</summary>
+        public static LabFiveElementVfx CreateManual(Transform parent)
+        {
+            if (parent == null) return null;
+            var root = new GameObject("Final hit replay · clay VFX");
+            root.SetActive(false);
+            root.transform.SetParent(parent, false);
+            var service = root.AddComponent<LabFiveElementVfx>();
+            service.registerSceneService = false;
+            service.ManualClock = true;
+            root.SetActive(true);
+            return service;
+        }
+
         private void Awake()
         {
             sceneKey = gameObject.scene;
-            Services[sceneKey] = this;
+            if (registerSceneService) Services[sceneKey] = this;
             Profile = Resources.Load<LabFiveElementProfile>("FiveElements/Profile");
             if (Profile == null)
             {
@@ -105,7 +124,7 @@ namespace C6Lab
                 if (i >= Profile.maxFlights) return default;
                 flights.Add(new LabClayFlightSlot(transform, i, shapes, Profile));
             }
-            flights[i].Begin(element, position, direction, diameter, Mathf.Clamp01(strength), monochrome, Seed(), LowDetail, fiveColor);
+            flights[i].Begin(element, position, direction, diameter, Mathf.Clamp01(strength), monochrome, Seed(), LowDetail, fiveColor, FiveColorBoostEnabled);
             return new Flight(this, i, flights[i].Version);
         }
 
@@ -114,12 +133,12 @@ namespace C6Lab
             bool fiveColor = false, float fiveColorAge = 0f)
         {
             float paletteAge=Finite(fiveColorAge) ? Mathf.Max(0f,fiveColorAge) : 0f;
-            return PlayImpactCore(element,point,normal,incoming,diameter,strength,target,leaveMark,monochrome,fiveColor,paletteAge,null);
+            return PlayImpactCore(element,point,normal,incoming,diameter,strength,target,leaveMark,monochrome,fiveColor,paletteAge,null,FiveColorBoostEnabled);
         }
 
         private bool PlayImpactCore(LabOrbElement element, Vector3 point, Vector3 normal, Vector3 incoming,
             float diameter, float strength, Transform target, bool leaveMark, bool monochrome,
-            bool fiveColor, float paletteAge, Color32[] palette)
+            bool fiveColor, float paletteAge, Color32[] palette, bool enhanceFiveColor)
         {
             if (!Available(element, diameter, fiveColor) || !Finite(point) || !Finite(normal) || !Finite(incoming) || !Finite(strength)) return false;
             int limit = LowDetail ? Mathf.Min(Profile.lowDetailImpacts, Profile.maxImpacts) : Profile.maxImpacts;
@@ -132,7 +151,7 @@ namespace C6Lab
             else if (use == hits.Count) hits.Add(new LabClayImpactSlot(transform, use, shapes, Profile));
             float life = MarkLifetimeOverride >= 0 ? MarkLifetimeOverride : Profile.markSeconds;
             hits[use].Begin(element, point, normal, incoming, diameter, Mathf.Clamp01(strength),
-                target, monochrome, leaveMark ? Mathf.Max(0f, life) : 0f, Seed(), LowDetail, fiveColor);
+                target, monochrome, leaveMark ? Mathf.Max(0f, life) : 0f, Seed(), LowDetail, fiveColor, enhanceFiveColor);
             if (fiveColor) hits[use].TintFiveColor(paletteAge,palette);
             return true;
         }
@@ -145,9 +164,24 @@ namespace C6Lab
             return index;
         }
 
-        private bool Available(LabOrbElement element, float diameter, bool fiveColor) => shapes != null && isActiveAndEnabled &&
-            ((element >= LabOrbElement.Fire && element <= LabOrbElement.Earth) ||
-                (fiveColor && element == LabOrbElement.None)) && diameter > 0 && !float.IsInfinity(diameter);
+        private bool Available(LabOrbElement element, float diameter, bool fiveColor)
+        {
+            if (!isActiveAndEnabled || !Finite(diameter) || diameter <= 0f ||
+                !((element >= LabOrbElement.Fire && element <= LabOrbElement.Earth) ||
+                    (fiveColor && element == LabOrbElement.None))) return false;
+            // A missing wet shader must not revive the old five-color dust/stars. Keep the same pooled
+            // clay geometry and sampled clock with plain pigment if the pipeline's unlit shader is available.
+            if (shapes == null && fiveColor)
+            {
+                var simple = Shader.Find("Universal Render Pipeline/Unlit");
+                if (simple != null && simple.isSupported)
+                {
+                    shapes = new LabClayShapes(simple);
+                    UsesSimpleMaterial = true;
+                }
+            }
+            return shapes != null && (!UsesSimpleMaterial || fiveColor);
+        }
 
         private bool IsCurrent(int index, int generation)
             => index >= 0 && index < flights.Count && flights[index].Active && flights[index].Version == generation;
