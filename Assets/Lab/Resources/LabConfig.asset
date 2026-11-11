@@ -194,7 +194,7 @@ MonoBehaviour:
   foxFireCountStepMin: 1
   foxFireCountStepMax: 2
   foxRoundSpareMin: 0
-  foxRoundSpareMax: 5
+  foxRoundSpareMax: 3
   yaguangTimelineBattleSeconds: 120
   yaguangTimelineSabotageEndSeconds: 100
   yaguangTimelineUniqueSeconds:

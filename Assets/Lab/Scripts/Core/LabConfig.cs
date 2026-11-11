@@ -397,7 +397,7 @@ namespace C6Lab
             // 구미호 협동 기믹 (#664): 다섯 명 방의 매혹 인원(서로 옆자리 아님), 여우구슬 팀 판정 시간.
             new LabDeveloperField("매혹 인원 (5명일 때)", 1f, 2f, true),
             new LabDeveloperField("여우구슬 제한 시간 (초, 0 = 끔)", 0f, 60f),
-            // 여우구슬 개수는 여우불마다 늘고 (2~5 → 3~7 → 4~9 …), 목표치는 떨어진 수에서 x(0~5)를 뺀다 (#664).
+            // 여우구슬 개수는 여우불마다 늘고 (2~5 → 3~7 → 4~9 …), 목표치는 떨어진 수에서 x(0~3)를 뺀다 (#664).
             new LabDeveloperField("여우구슬 증가: 최소 (여우불마다)", 0f, 5f, true),
             new LabDeveloperField("여우구슬 증가: 최대 (여우불마다)", 0f, 5f, true),
             new LabDeveloperField("여우구슬 목표에서 빼는 수: 최소", 0f, 10f, true),
@@ -410,7 +410,7 @@ namespace C6Lab
         public const int FoxRoundSecondsField = 260;
         /// <summary>#664: how much the fox orb count's minimum and maximum grow with each fox fire of a round (1 and 2).</summary>
         public const int FoxFireCountStepMinField = 261, FoxFireCountStepMaxField = 262;
-        /// <summary>#664: the range of x, the fox orbs the team may leave (goal = what fell less x, 0 to 5).</summary>
+        /// <summary>#664: the range of x, the fox orbs the team may leave (goal = what fell less x, 0 to 3).</summary>
         public const int FoxRoundSpareMinField = 263, FoxRoundSpareMaxField = 264;
 
         public const int ClayThicknessField = 257;
@@ -881,7 +881,7 @@ namespace C6Lab
         [Tooltip("여우구슬 목표치 (#664): 떨어진 팀 전체 수에서 이 범위의 수(x)를 무작위로 빼서 목표치로 삼는다 (최소 1). 목표치만큼 "
             + "지우면 BIG이고 남은 여우구슬은 연기로 사라진다.")]
         [SerializeField, Range(0, 10)] private int foxRoundSpareMin = 0;
-        [SerializeField, Range(0, 10)] private int foxRoundSpareMax = 5;
+        [SerializeField, Range(0, 10)] private int foxRoundSpareMax = 3;
 
         // 은퇴 (#328): 야광귀도 공용 전투 시간을 쓴다. 공유 설정의 자리만 지키고 Inspector에는 보이지 않는다.
         [HideInInspector, SerializeField, Range(60f, 180f)] private float yaguangTimelineBattleSeconds = 120f;

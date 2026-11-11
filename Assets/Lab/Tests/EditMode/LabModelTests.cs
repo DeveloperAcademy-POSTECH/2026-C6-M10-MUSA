@@ -3203,7 +3203,7 @@ namespace C6Lab.Tests
         }
 
         /// <summary>
-        /// #664: the team need not clear every fox orb: the goal is what fell less x (0 to 5, at least 1). Reaching it within
+        /// #664: the team need not clear every fox orb: the goal is what fell less x (0 to 3, at least 1). Reaching it within
         /// the round, by double taps or by yin/yang touching them, makes everyone's throws BIG for the colour combo's reward
         /// time, and the fox orbs left go in smoke at once.
         /// </summary>
@@ -3224,7 +3224,7 @@ namespace C6Lab.Tests
                     LabOrbState[] foxes = dropped.orbs.Where(orb => orb.kind == LabOrbKind.FoxFire).ToArray();
                     Assert.That(dropped.FoxRoundOn(20d), Is.True);
                     Assert.That((dropped.foxRoundTotal, dropped.foxRoundRemaining), Is.EqualTo((foxes.Length, foxes.Length)));
-                    Assert.That(dropped.foxRoundGoal, Is.InRange(Math.Max(1, foxes.Length - 5), foxes.Length), "What fell less 0 to 5.");
+                    Assert.That(dropped.foxRoundGoal, Is.InRange(Math.Max(1, foxes.Length - 3), foxes.Length), "What fell less 0 to 3.");
                     Assert.That((dropped.foxRoundCleared, dropped.FoxRoundToGo), Is.EqualTo((0, dropped.foxRoundGoal)));
                     Assert.That(dropped.foxRoundEndsAt, Is.EqualTo(35d), "Fifteen seconds to reach it.");
                     foreach (ulong id in ids) Assert.That(foxes.Any(fox => fox.owner == id), Is.True, "Every board gets some.");
@@ -3319,7 +3319,7 @@ namespace C6Lab.Tests
                         Assert.That(count, Is.InRange(expected[k].Item1, expected[k].Item2), "Fox fire " + (k + 1));
                         LabSnapshot round = solo.Snapshot(20d * (k + 1));
                         Assert.That(round.foxRoundTotal, Is.EqualTo(count));
-                        Assert.That(round.foxRoundGoal, Is.InRange(Math.Max(1, count - 5), count));
+                        Assert.That(round.foxRoundGoal, Is.InRange(Math.Max(1, count - 3), count));
                     }
                 }
 
@@ -3657,8 +3657,8 @@ namespace C6Lab.Tests
             {
                 float[] defaults = source.CaptureDeveloperValues();
                 Assert.That((defaults[259], defaults[260]), Is.EqualTo((2f, 15f)), source.name + ": two charmed, fifteen seconds.");
-                Assert.That(defaults.Skip(261).Take(4), Is.EqualTo(new[] { 1f, 2f, 0f, 5f }),
-                    source.name + ": fox orbs rise by 1 and 2 a fox fire, and the goal leaves 0 to 5.");
+                Assert.That(defaults.Skip(261).Take(4), Is.EqualTo(new[] { 1f, 2f, 0f, 3f }),
+                    source.name + ": fox orbs rise by 1 and 2 a fox fire, and the goal leaves 0 to 3.");
                 if (string.IsNullOrEmpty(source.name)) UnityEngine.Object.DestroyImmediate(source);
             }
 
