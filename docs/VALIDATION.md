@@ -8028,3 +8028,10 @@ All 279 changed opening code/asset/test files (excluding the tutorial test file,
 - 첫 PlayMode39/40 통과. 판 아래의 비최종 숫자 피드백까지 게이지 숨김 조건에 넣어 복원이 지연된1건을 수정했다. 실제 게이지 위치를 덮는 판/결과/최종 피드백만 숨김 조건으로 유지했다.
 - 최종 전체 EditMode2,263/2,263(50.66초), 관련 PlayMode40/40(13.82초) 통과. 신규 검사는 게이지 중앙/폭·페이드 진행·이전 alpha0.65 보존·Pause/Disable/종료 복원을 검증한다. 기존 콤보/말풍선/섬광/준비 경로도 포함한다.
 - Unity 실제 UI 렌더에서 완전 표시와50% 페이드 프레임을 확인했다.50% 페이드 중에도 gauge alpha0을 확인했다. 복원은 위 PlayMode 수명 검사에서 확인했다. Editor 수동 프리뷰의 enabled 변경은 PlayMode 콜백 검증에 사용하지 않았다. preview root/config/camera/RT는 정리했다. Unity6000.6.5f1/macOS Metal 기준. UI 표시/수명 범위라 전체 PlayMode는 생략했다. 전체 게임 화면/iOS 실기기 전환은 미검증이다.
+
+## 2026-11-11 #668 콤보 성공 도장
+
+- 기준: `fix/#668-yagwanggwi-combo-asset`, `ea71546c` 위 작업 사본. Unity 6000.6.5f1 macOS Editor. 생성한 투명 PNG를 성공 시 즉시 찍는 화면 표현과 첫 사용 렌더 준비만 변경했다. Host 콤보 판정·공유 설정·통신 형식은 변경하지 않았다.
+- 최종 코드 컴파일 오류 0. 전체 EditMode **2,263/2,263 PASS**(48.98초). 관련 PlayMode **15/15 PASS**: `LabYaguangCountLookTests`, `LabComboEffectLookTests`, `LabComboProjectileIntegrationTests` 13개 및 `GameBattleRenderWarmupTests` 2개. 일반 UI 변경 범위에 따라 전체 PlayMode는 생략했다.
+- 도장 즉시 표시·PNG 참조·텍스트 중복 없음·터치 통과·반동 후 1배 정착·유지 후 종료, 기존 비야광귀 콤보 표시 및 렌더 준비 수명 검사를 통과했다.
+- 임시 Canvas/카메라의 실제 Unity UI 렌더를 0.06/0.16/0.5/1.5초에서 확인했다. 배경 투명 부분과 도장 크기·기울기를 확인하고 임시 객체·RenderTexture를 해제했다. 실제 전투 전체 화면과 iOS 실기기의 타격감·음성 타이밍은 미검증이다.

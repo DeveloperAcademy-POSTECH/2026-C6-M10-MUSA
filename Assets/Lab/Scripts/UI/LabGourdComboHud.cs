@@ -98,6 +98,8 @@ namespace C6Lab
         private bool figmaPanel;
         private readonly LabOrbElement[] slotElements = new LabOrbElement[LabGourdCombo.Length];
         private Text resultText;
+        private Image successStamp;
+        private bool StampSuccess => YaguangCount && successStamp != null && successStamp.sprite != null;
         private Image flash;
         private float unit = 1f;
         private RectTransform effectBadge, effectGauge, effectIcon;
@@ -449,7 +451,12 @@ namespace C6Lab
                     network != null && shownFailedBy == network.LocalPlayerId, shownFailedSeat);
                 // 다 맞혔으면(#301) 4 COMBO!!를 먼저 크게 보여준 다음 CLEAR!.
                 resultDelay = 0f;
-                if (shownResult == LabComboResult.Success)
+                if (shownResult == LabComboResult.Success && StampSuccess)
+                {
+                    comboPopElapsed = -1f;
+                    comboPop.gameObject.SetActive(false);
+                }
+                if (shownResult == LabComboResult.Success && !StampSuccess)
                 {
                     ShowComboPop(LabGourdCombo.Length, true, snapshot.comboCount);
                     resultDelay = comboClearSeconds;
@@ -592,6 +599,8 @@ namespace C6Lab
         private void DrawResult()
         {
             DrawComboPop();
+            if (successStamp != null) successStamp.gameObject.SetActive(false);
+            resultText.enabled = true;
             if (resultElapsed < 0f)
             {
                 resultText.gameObject.SetActive(false);
@@ -619,6 +628,32 @@ namespace C6Lab
             resultText.color = clear ? ClearColor : FailColor;
             float t = resultElapsed;
             float leave = Mathf.Clamp01((t - (ResultSeconds - .2f)) / .2f);
+            if (clear && StampSuccess)
+            {
+                // PNG lands once, rebounds briefly, holds, then dissolves; no duplicate success text.
+                resultText.enabled = false;
+                resultText.rectTransform.localScale = Vector3.one;
+                resultText.rectTransform.localRotation = Quaternion.identity;
+                resultText.rectTransform.anchoredPosition = Vector2.zero;
+                successStamp.gameObject.SetActive(true);
+                var rect = successStamp.rectTransform;
+                float diameter = Mathf.Min(layer.rect.width * .54f, layer.rect.height * .28f);
+                rect.sizeDelta = Vector2.one * diameter;
+                float approach = Mathf.Clamp01(t / .16f);
+                float rebound = Mathf.Clamp01((t - .16f) / .22f);
+                float scale = t < .16f ? Mathf.Lerp(2.4f, .92f, approach * approach)
+                    : 1f - .08f * Mathf.Cos(rebound * Mathf.PI * 3f) * (1f - rebound);
+                rect.localScale = Vector3.one * scale;
+                float kick = t >= .16f ? Mathf.Exp(-(t - .16f) * 22f) : 0f;
+                // Position relative to the full canvas, below the order panel and over the gourd.
+                rect.anchoredPosition = new Vector2(Mathf.Sin(t * 95f) * diameter * .018f * kick,
+                    layer.rect.height * (.65f - resultText.rectTransform.anchorMin.y)
+                    + diameter * .3f * (1f - approach));
+                rect.localRotation = Quaternion.Euler(0, 0, Mathf.Lerp(-14f, -7f, approach));
+                successStamp.color = new Color(1, 1, 1, Mathf.Clamp01(t / .045f) * (1f - leave));
+                flash.gameObject.SetActive(false);
+                return;
+            }
             if (clear)
             {
                 float pop = t < .18f ? 1.3f * (1f - Mathf.Pow(1f - t / .18f, 3f)) : Mathf.Lerp(1.3f, 1f, Mathf.Clamp01((t - .18f) / .15f));
@@ -853,6 +888,13 @@ namespace C6Lab
             resultOutline.effectColor = InkColor;
             resultOutline.effectDistance = new Vector2(3f, -3f) * Mathf.Max(.5f, u);
             resultText.gameObject.SetActive(false);
+            var stampRect = NewRect("Success Stamp", resultText.rectTransform);
+            stampRect.anchorMin = stampRect.anchorMax = new Vector2(.5f, .5f);
+            successStamp = stampRect.gameObject.AddComponent<Image>();
+            successStamp.sprite = LabYaguangComboArt.Load("SuccessStamp");
+            successStamp.preserveAspect = true;
+            successStamp.raycastTarget = false;
+            stampRect.gameObject.SetActive(false);
 
             // 콤보 예고 (#241): 패널과 같은 자리·크기에 COMBO! (왼쪽)와 남은 초 (오른쪽).
             warningPanel = NewRect("Combo Warning", layer);
