@@ -25,11 +25,85 @@ namespace C6Lab.Tests
         }
         [TearDown] public void Dispose() => Object.DestroyImmediate(config);
 
-        private LabModel Room()
+        private LabModel Room(LabStageYokai stage = LabStageYokai.Yaguang)
         {
             var room = new LabModel();
-            room.Begin("vfx-lab", Players, 0d, config, LabStageYokai.Yaguang);
+            room.Begin("vfx-lab", Players, 0d, config, stage);
             return room;
+        }
+
+        // ───────── #673: 1~3라운드 모든 기믹 ─────────
+
+        [Test]
+        public void TheLabCastsEveryCommonAndFoxGimmickAtOnce()
+        {
+            LabModel room = Room(LabStageYokai.Gumiho);
+            Assert.That(room.VfxLabCastGimmick(LabSabotageKind.GourdBomb, 0ul, 1d), Is.True, "Gourd bomb.");
+            Assert.That(room.VfxLabCastGimmick(LabSabotageKind.SwipeBlock, 0ul, 1.1d), Is.True, "Swipe block.");
+            Assert.That(room.VfxLabCastGimmick(LabSabotageKind.SwipeBlock, 0ul, 1.2d), Is.False, "Only one swipe block at a time.");
+            Assert.That(room.VfxLabCastGimmick(LabSabotageKind.FoxFire, 0ul, 1.3d), Is.True, "Fox fire on every board.");
+            Assert.That(room.VfxLabCastGimmick(LabSabotageKind.Charm, 0ul, 1.4d), Is.True, "Charm.");
+            Assert.That(room.VfxLabCastGimmick(LabSabotageKind.Charm, 0ul, 1.5d), Is.False, "Only one charm at a time.");
+            Assert.That(room.Snapshot(1.6d).orbs.Any(orb => orb.kind == LabOrbKind.Bomb), Is.True, "The gourd bomb is on a board.");
+        }
+
+        [Test]
+        public void TheLabStartsTheFoxFeverNow()
+        {
+            LabModel room = Room(LabStageYokai.Gumiho);
+            Assert.That(room.StageFeverOn(5d), Is.False);
+            Assert.That(room.VfxLabStartGumihoFever(5d), Is.True);
+            Assert.That(room.StageFeverOn(5d), Is.True, "The fever starts at once (100 s moved to now).");
+            Assert.That(room.VfxLabStartGumihoFever(6d), Is.False, "Once per battle.");
+            Assert.That(Room(LabStageYokai.Yaguang).VfxLabStartGumihoFever(5d), Is.False, "Only the fox has this fever.");
+        }
+
+        [Test]
+        public void TheLabFailsTheComboIntoTheSmallPenalty()
+        {
+            LabModel room = Room();
+            Assert.That(room.VfxLabStartCombo(1d), Is.True);
+            double active = 1d + config.ComboWarningSeconds + .1d;
+            Assert.That(room.Snapshot(active).comboActive, Is.True);
+            Assert.That(room.VfxLabFailCombo(0ul, active), Is.True);
+            LabSnapshot snapshot = room.Snapshot(active + .1d);
+            Assert.That(snapshot.comboResult, Is.EqualTo(LabComboResult.WrongColor));
+            Assert.That(snapshot.players.Any(player => player.comboPenaltyUntil > active), Is.True, "The SMALL penalty is on.");
+        }
+
+        [Test]
+        public void TheLabStartsAFlashWhenTheYaguangFlashIsOn()
+        {
+            float[] values = config.CaptureDeveloperValues();
+            values[184] = 1f; // 섬광 켜기
+            Assert.That(config.TryApplyDeveloperValues(values, out string error), Is.True, error);
+            LabModel room = Room();
+            Assert.That(room.VfxLabStartFlash(1d), Is.True);
+            Assert.That(room.VfxLabStartFlash(1.1d), Is.False, "One flash at a time.");
+        }
+
+        [Test]
+        public void TheLabRunsJigwiMissionsNowAndItsFever()
+        {
+            LabModel room = Room(LabStageYokai.Jigwi);
+            Assert.That(room.VfxLabJigwiOn, Is.True);
+            Assert.That(room.VfxLabStartNextJigwiMission(1d), Is.True, "The next mission starts with its warning now.");
+            Assert.That(room.VfxLabStartNextJigwiMission(1.5d), Is.False, "One mission at a time.");
+            LabSnapshot snapshot = room.Snapshot(3.1d);
+            LabJigwiABRound round = snapshot.jigwiAB.Active(3.1d);
+            Assert.That(round, Is.Not.Null);
+            Assert.That(round.activeAt, Is.EqualTo(1d + LabJigwiABTimeline.WarningSeconds).Within(1e-9));
+            Assert.That(LabJigwiABNetworkValidation.Valid(snapshot.jigwiAB, snapshot.players, room.Revision), Is.True,
+                "Other screens accept the early mission.");
+            Assert.That(room.VfxLabFinishJigwiMission(false, 4d), Is.True, "Ended as if time ran out.");
+            Assert.That(room.Snapshot(4.1d).jigwiAB.Active(4.1d), Is.Null);
+            Assert.That(room.VfxLabStartNextJigwiMission(5d), Is.True, "And the one after it.");
+            Assert.That(room.VfxLabStartJigwiFever(6d), Is.True);
+            snapshot = room.Snapshot(6.1d);
+            Assert.That(room.StageFeverOn(6.1d), Is.True, "The fever starts now (100 s moved to now).");
+            Assert.That(room.VfxLabJigwiOn, Is.False);
+            Assert.That(LabJigwiABNetworkValidation.Valid(snapshot.jigwiAB, snapshot.players, room.Revision), Is.True,
+                "The mission cut short by the fever still validates.");
         }
 
         [Test]

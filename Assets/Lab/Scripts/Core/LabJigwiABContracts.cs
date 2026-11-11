@@ -186,8 +186,8 @@ namespace C6Lab
                     || round.players == null || round.players.Length > MaximumPlayers) return false;
                 double scheduled = state.startedAt + LabJigwiABTimeline.ActiveOffset(round.slot, state.schedule);
                 // #663: in the smoke flow a talisman may start earlier than its slot (right after the smoke before it).
-                bool pulled = state.schedule == LabJigwiABTimeline.SmokeFlowSchedule && round.kind == LabJigwiABKind.PersonalBurn
-                    && round.activeAt < scheduled - .00001d;
+                // #673: the VFX lab may also start any mission early. Never later than its slot.
+                bool pulled = round.activeAt < scheduled - .00001d;
                 if (!pulled && Math.Abs(round.activeAt - scheduled) > .00001d
                     || Math.Abs(round.warningAt - (round.activeAt - LabJigwiABTimeline.WarningSeconds)) > .00001d
                     || round.kind != LabJigwiABTimeline.KindForSlot(round.slot, state.schedule)) return false;
