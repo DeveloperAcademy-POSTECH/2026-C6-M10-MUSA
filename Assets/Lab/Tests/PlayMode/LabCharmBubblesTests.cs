@@ -113,6 +113,49 @@ namespace C6Lab.Tests
             Assert.That(bubbles.LeftWokenShowing, Is.False, "It is gone in a moment.");
         }
 
+        /// <summary>
+        /// #664: in a room of five the player between two charmed ones sees both bubbles, one for each, filling on their own;
+        /// when one of them wakes only that bubble goes.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator ThePlayerBetweenTwoCharmedOnesTapsEachBubbleOnItsOwn()
+        {
+            // Player 10 in seat 0 of five: seat 1 (20) on the left, seat 4 (50) on the right; both charmed.
+            LabSnapshot Two(int leftTaps, int rightTaps, double rightEnd = 10d)
+            {
+                LabSnapshot snapshot = Charm(20, 10d, 5);
+                snapshot.charmedPlayers = new ulong[] { 20, 50 };
+                snapshot.charmEnds = new[] { 10d, rightEnd };
+                snapshot.charmUntil = System.Math.Max(10d, rightEnd);
+                // Rows for 20 (beside it: 30 and 10) and for 50 (beside it: 10 and 40), only while each is charmed.
+                bool rightOn = rightEnd > 1d;
+                snapshot.charmHelpers = rightOn ? new ulong[] { 10, 30, 40, 10 } : new ulong[] { 10, 30 };
+                snapshot.charmHelperTargets = rightOn ? new ulong[] { 20, 20, 50, 50 } : new ulong[] { 20, 20 };
+                snapshot.charmHelperTaps = rightOn ? new[] { leftTaps, 0, 0, rightTaps } : new[] { leftTaps, 0 };
+                return snapshot;
+            }
+            bubbles.Present(Two(0, 0), 10, 1d, 3);
+            Assert.That((bubbles.LeftShowing, bubbles.RightShowing), Is.EqualTo((true, true)), "A bubble for each charmed one.");
+            Assert.That((bubbles.SidePlayer(false), bubbles.SidePlayer(true)), Is.EqualTo((20ul, 50ul)));
+            yield return null;
+            bubbles.Present(Two(2, 0), 10, 1.01d, 3);
+            Assert.That(bubbles.LeftWakeFill, Is.EqualTo(2f / 3f).Within(1e-4f), "The left one fills with its own taps...");
+            Assert.That(bubbles.RightWakeFill, Is.Zero, "...the right one does not.");
+            bubbles.RightBubble.GetComponent<Button>().onClick.Invoke();
+            Assert.That(bubbles.TapsSent, Is.EqualTo(1));
+            bubbles.Present(Two(2, 0), 10, 1.02d, 3);
+            Assert.That(bubbles.RightWakeFill, Is.EqualTo(1f / 3f).Within(1e-4f), "This screen's own tap shows on the right at once.");
+            Assert.That(bubbles.LeftWakeFill, Is.EqualTo(2f / 3f).Within(1e-4f));
+
+            // The right one is woken: only its bubble goes; the left one stays as it was.
+            bubbles.ShowWoken(50);
+            bubbles.Present(Two(2, 0, rightEnd: 1.03d), 10, 1.05d, 3);
+            Assert.That(bubbles.RightShowing, Is.False);
+            Assert.That(bubbles.RightWokenShowing, Is.True);
+            Assert.That(bubbles.LeftShowing, Is.True, "The other one is still charmed.");
+            Assert.That(bubbles.SidePlayer(false), Is.EqualTo(20ul));
+        }
+
         [UnityTest]
         public IEnumerator ACharmThatRunsOutOnlyFadesItsBubbleAway()
         {

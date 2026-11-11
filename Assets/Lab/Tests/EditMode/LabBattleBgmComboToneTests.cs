@@ -40,6 +40,28 @@ namespace C6Lab.Tests
             Assert.AreEqual(0f, LabBattleBgm.ComboToneSemitones(big, 52d, 2f, 2f), "Only during the battle.");
         }
 
+        /// <summary>#664: the 구미호 fox round's BIG/SMALL moves the BGM the same way, from its own result.</summary>
+        [Test]
+        public void TheFoxRoundsBigAndSmallMoveTheBgmToo()
+        {
+            var fox = new LabSnapshot
+            {
+                sessionId = "gumiho", round = 1, phase = LabPhase.Playing,
+                foxRoundCount = 1, foxRoundResult = 1, foxRoundResultAt = 10d,
+                players = new[] { new LabPlayerState { id = 1ul, comboRewardUntil = 25d } }
+            };
+            Assert.AreEqual(0f, LabBattleBgm.ComboToneSemitones(fox, 11d, 2f, 2f), "Not before its mark.");
+            Assert.AreEqual(2f, LabBattleBgm.ComboToneSemitones(fox, 12d, 2f, 2f));
+            Assert.AreEqual(0f, LabBattleBgm.ComboToneSemitones(fox, 25d, 2f, 2f));
+            fox.foxRoundResult = -1;
+            fox.players[0].comboRewardUntil = 0d;
+            fox.players[0].comboPenaltyUntil = 25d;
+            Assert.AreEqual(-2f, LabBattleBgm.ComboToneSemitones(fox, 12d, 2f, 2f));
+            // The next round running keeps the last result's tone.
+            fox.foxRoundRunning = true; fox.foxRoundStartedAt = 14d; fox.foxRoundEndsAt = 29d;
+            Assert.AreEqual(-2f, LabBattleBgm.ComboToneSemitones(fox, 15d, 2f, 2f));
+        }
+
         [Test]
         public void TheToneGlidesOverAThirdOfASecond()
         {

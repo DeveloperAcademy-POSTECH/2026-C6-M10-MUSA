@@ -393,8 +393,25 @@ namespace C6Lab
             new LabDeveloperField("Reserved Jigwi B Supply Limit (unused)", 1f, 12f, true),
             new LabDeveloperField("지귀 B 발화점 거리 (박까지 비율)", .4f, .9f),
             new LabDeveloperField("Clay Thickness (body units)", 0f, .02f),
-            new LabDeveloperField("Clay Gloss", 0f, 1f)
+            new LabDeveloperField("Clay Gloss", 0f, 1f),
+            // 구미호 협동 기믹 (#664): 다섯 명 방의 매혹 인원(서로 옆자리 아님), 여우구슬 팀 판정 시간.
+            new LabDeveloperField("매혹 인원 (5명일 때)", 1f, 2f, true),
+            new LabDeveloperField("여우구슬 제한 시간 (초, 0 = 끔)", 0f, 60f),
+            // 여우구슬 개수는 여우불마다 늘고 (2~5 → 3~7 → 4~9 …), 목표치는 떨어진 수에서 x(0~3)를 뺀다 (#664).
+            new LabDeveloperField("여우구슬 증가: 최소 (여우불마다)", 0f, 5f, true),
+            new LabDeveloperField("여우구슬 증가: 최대 (여우불마다)", 0f, 5f, true),
+            new LabDeveloperField("여우구슬 목표에서 빼는 수: 최소", 0f, 10f, true),
+            new LabDeveloperField("여우구슬 목표에서 빼는 수: 최대", 0f, 10f, true)
         });
+
+        /// <summary>#664: how many are charmed at once in a room of five (1 or 2, never side by side).</summary>
+        public const int CharmTargetsAtFiveField = 259;
+        /// <summary>#664: the fox round's time to clear its goal (0 = off: each fox orb fades by itself).</summary>
+        public const int FoxRoundSecondsField = 260;
+        /// <summary>#664: how much the fox orb count's minimum and maximum grow with each fox fire of a round (1 and 2).</summary>
+        public const int FoxFireCountStepMinField = 261, FoxFireCountStepMaxField = 262;
+        /// <summary>#664: the range of x, the fox orbs the team may leave (goal = what fell less x, 0 to 3).</summary>
+        public const int FoxRoundSpareMinField = 263, FoxRoundSpareMaxField = 264;
 
         public const int ClayThicknessField = 257;
         public const int ClayGlossField = 258;
@@ -515,7 +532,8 @@ namespace C6Lab
             new LabDeveloperCategory("지귀 120초 (Hapio 전용)", 228, 235, 240, 243, 248, 249, 250, 256),
             // 기믹 묶음 (#311): 공용(폭탄·넘기기 막기)과 고유(구미호: 여우불·매혹)를 나눠 간격·켜기·비율·세부값을 모은다.
             new LabDeveloperCategory("Gimmicks", 205, 207, 169, 208, 170, 153,
-                166, 206, 209, 171, 210, 172, 173, 174, 175, 176, 204, 177)
+                166, 206, 209, 171, 210, 172, 173, 174, FoxFireCountStepMinField, FoxFireCountStepMaxField, 175,
+                FoxRoundSecondsField, FoxRoundSpareMinField, FoxRoundSpareMaxField, 176, 204, 177, CharmTargetsAtFiveField)
                 .WithDividers((0, "── 공용 기믹 ──"), (6, "── 고유 기믹 (구미호) ──")),
             // 야광귀 묶음 (#268): 야광귀 스테이지에 쓰는 박 색상 콤보와 섬광. 제목 오른쪽 버튼 하나로 둘을 함께 켜고 끈다.
             // 섬광 7칸은 지귀(#272) 6칸 뒤 184~190번, 야광귀 셈법(#271)은 그 뒤 191번이다.
@@ -855,6 +873,19 @@ namespace C6Lab
         [SerializeField, Range(0, 10)] private int charmRescueTaps = 10;
         [Tooltip("매혹 예고 (#305): 매혹이 걸리기 이 시간 (초) 전부터 모두에게 \"구미호가 P2에게 매혹을 걸려고 한다!\"를 보여 준다. 0이면 예고 없이 바로 걸린다.")]
         [SerializeField, Range(0f, 10f)] private float charmWarningSeconds = 3f;
+        [Tooltip("매혹 인원 (#664): 다섯 명 방에서 한 번에 매혹에 걸리는 사람 수. 2면 서로 옆자리가 아닌 두 명. 네 명 이하 방은 늘 한 명.")]
+        [SerializeField, Range(1, 2)] private int charmTargetsAtFive = 2;
+        [Tooltip("여우구슬 제한 시간 (#664): 여우불이 떨어지면 이 시간 (초) 안에 팀이 모든 판의 여우구슬을 지워야 한다. 다 지우면 모두 BIG, "
+            + "못 지우면 남은 여우구슬이 사라지고 모두 SMALL (야광귀 콤보 보상·벌칙 값). 0이면 판정 없이 여우구슬이 구슬 수명만큼 있다가 사라진다.")]
+        [SerializeField, Range(0f, 60f)] private float foxRoundSeconds = 15f;
+        [Tooltip("여우구슬 개수 증가 (#664): 한 판에서 여우불이 한 번 떨어질 때마다 판 하나에 떨어지는 수의 최소·최대가 이만큼 는다. "
+            + "기본 1과 2: 2~5 → 3~7 → 4~9 → 5~11. 판 빈자리보다 많이 떨어지지는 않는다.")]
+        [SerializeField, Range(0, 5)] private int foxFireCountStepMin = 1;
+        [SerializeField, Range(0, 5)] private int foxFireCountStepMax = 2;
+        [Tooltip("여우구슬 목표치 (#664): 떨어진 팀 전체 수에서 이 범위의 수(x)를 무작위로 빼서 목표치로 삼는다 (최소 1). 목표치만큼 "
+            + "지우면 BIG이고 남은 여우구슬은 연기로 사라진다.")]
+        [SerializeField, Range(0, 10)] private int foxRoundSpareMin = 0;
+        [SerializeField, Range(0, 10)] private int foxRoundSpareMax = 3;
 
         // 은퇴 (#328): 야광귀도 공용 전투 시간을 쓴다. 공유 설정의 자리만 지키고 Inspector에는 보이지 않는다.
         [HideInInspector, SerializeField, Range(60f, 180f)] private float yaguangTimelineBattleSeconds = 120f;
@@ -1493,6 +1524,12 @@ namespace C6Lab
         public float CharmSeconds => Mathf.Clamp(Finite(charmSeconds, 10f), 1f, 30f);
         public int CharmRescueTaps => Mathf.Clamp(charmRescueTaps, 0, 10);
         public float CharmWarningSeconds => Mathf.Clamp(Finite(charmWarningSeconds, 3f), 0f, 10f);
+        public int CharmTargetsAtFive => Mathf.Clamp(charmTargetsAtFive, 1, 2);
+        public float FoxRoundSeconds => Mathf.Clamp(Finite(foxRoundSeconds, 15f), 0f, 60f);
+        public int FoxFireCountStepMin => Mathf.Clamp(foxFireCountStepMin, 0, 5);
+        public int FoxFireCountStepMax => Mathf.Clamp(foxFireCountStepMax, FoxFireCountStepMin, 5);
+        public int FoxRoundSpareMin => Mathf.Clamp(foxRoundSpareMin, 0, 10);
+        public int FoxRoundSpareMax => Mathf.Clamp(foxRoundSpareMax, FoxRoundSpareMin, 10);
         public int JigwiFireTargetCount => Mathf.Clamp(jigwiFireTargetCount, 1, 5);
         public float JigwiFireSeconds => Mathf.Clamp(Finite(jigwiFireSeconds, 15f), 1f, 120f);
         public float JigwiOverheatSeconds => Mathf.Clamp(Finite(jigwiOverheatSeconds, 4f), .1f, 60f);
@@ -1779,7 +1816,9 @@ namespace C6Lab
                 JigwiABShrinkScale, JigwiABFireMoveAmount, JigwiABFireMovePeriodSeconds, JigwiABFireTargetRadius,
                 JigwiABRewardSizeScale, JigwiABRewardPaintScale,
                 JigwiABSupplyIntervalSeconds, JigwiABSupplyInitialCount, JigwiABSupplyLimit, JigwiABFireDepth,
-                ClayThickness, ClayGloss
+                ClayThickness, ClayGloss,
+                CharmTargetsAtFive, FoxRoundSeconds,
+                FoxFireCountStepMin, FoxFireCountStepMax, FoxRoundSpareMin, FoxRoundSpareMax
             };
         }
 
@@ -1832,6 +1871,10 @@ namespace C6Lab
             if (uniqueChances != 100f)
             { error = "Unique gimmick chances (Fox Fire + Charm) must add up to 100 (now " + uniqueChances + ")."; return false; }
             if (values[173] > values[174]) { error = "Fox Fire Count Min cannot exceed Fox Fire Count Max."; return false; }
+            if (values[FoxFireCountStepMinField] > values[FoxFireCountStepMaxField])
+            { error = "여우구슬 증가: 최소가 최대보다 클 수 없습니다."; return false; }
+            if (values[FoxRoundSpareMinField] > values[FoxRoundSpareMaxField])
+            { error = "여우구슬 목표에서 빼는 수: 최소가 최대보다 클 수 없습니다."; return false; }
             if (values[192] > values[193]) { error = "Jigwi Auto Interval Min cannot exceed Jigwi Auto Interval Max."; return false; }
 
             // The Yaguang's timetable runs inside the common battle time (#328); a slot past the battle's end never comes.
@@ -2078,6 +2121,12 @@ namespace C6Lab
             jigwiABFireDepth = values[256];
             clayThickness = values[ClayThicknessField];
             clayGloss = values[ClayGlossField];
+            charmTargetsAtFive = (int)values[CharmTargetsAtFiveField];
+            foxRoundSeconds = values[FoxRoundSecondsField];
+            foxFireCountStepMin = (int)values[FoxFireCountStepMinField];
+            foxFireCountStepMax = (int)values[FoxFireCountStepMaxField];
+            foxRoundSpareMin = (int)values[FoxRoundSpareMinField];
+            foxRoundSpareMax = (int)values[FoxRoundSpareMaxField];
             error = string.Empty;
             return true;
         }

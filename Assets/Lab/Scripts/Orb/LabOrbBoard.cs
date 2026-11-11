@@ -212,7 +212,9 @@ namespace C6Lab
         private double lastTapTime;
         private bool heldByTouch;
         private bool interactionEnabled = true;
-        private bool simulationHeld;
+        // Held still at the game start (startHeld) or while this board's player is charmed (#664, charmHeld).
+        private bool startHeld, charmHeld;
+        private bool simulationHeld => startHeld || charmHeld;
         public bool SimulationHeld => simulationHeld;
         private bool uiInputBlocked;
         private bool configured;
@@ -670,25 +672,28 @@ namespace C6Lab
         private LabCharmEdgeFlash charmEdge;
         private bool charmed;
 
-        /// <summary>This board's player is charmed (#251): an upward swipe is only a flick that bounces off the top.</summary>
+        /// <summary>This board's player is charmed (#251). Since #664 the whole board stands still and takes no touch.</summary>
         public bool Charmed => charmed;
         public LabCharmEdgeFlash CharmEdge => charmEdge;
 
         /// <summary>
-        /// 매혹 (#251): 이 판의 주인이 헤롱헤롱해 공격(위로 던지기)을 못 한다. secondsLeft가 0보다 크면 걸린 것이고, 던지는 쪽
-        /// 가장자리(판 위쪽 곡선)가 빨갛게 은은히 빛난다. 풀리면 부드럽게 사라진다.
+        /// 매혹 (#251): 이 판의 주인이 헤롱헤롱한다. secondsLeft가 0보다 크면 걸린 것이고, 던지는 쪽 가장자리(판 위쪽 곡선)가
+        /// 빨갛게 은은히 빛난다. #664부터는 판 전체가 멈춘다: 구슬이 그 자리에 서고(풀리면 하던 대로 이어 감) 어떤 손동작도
+        /// 받지 않는다(던지기·넘기기·북·끌기·합치기·두 번 누르기). 풀리면 부드럽게 사라진다.
         /// </summary>
         public void SetCharm(float secondsLeft)
         {
             if (configured && secondsLeft > 0f && !float.IsInfinity(secondsLeft))
             {
                 charmed = true;
+                SetCharmHeld(true);
                 if (charmEdge == null) charmEdge = LabCharmEdgeFlash.Create(transform);
                 charmEdge.Show(areaShape.UpperBoundary, bounds.width);
                 return;
             }
             if (!charmed) return;
             charmed = false;
+            SetCharmHeld(false);
             if (charmEdge != null) charmEdge.Release();
         }
 
@@ -786,6 +791,7 @@ namespace C6Lab
             SyncBoardTrails();
             // Follows the board if its area was resized.
             if (teamWallSide != 0) ShowTeamWall();
+            if (charmWallSide != 0) LayCharmWalls();
             if (blockedSide == 0) return;
             blockSecondsLeft -= Time.deltaTime;
             if (blockSecondsLeft <= 0f) LiftSwipeBlock();
@@ -1437,7 +1443,9 @@ namespace C6Lab
             LiftSwipeBlock();
             bombOpeningHeld = false;
             SetTeamWall(0);
+            SetCharmWalls(0);
             charmed = false;
+            charmHeld = false;
             jigwiOverheat = false;
             jigwiDrumSlip = 1f;
             jigwiRewardFire = jigwiRewardHeld = false;
@@ -1472,9 +1480,25 @@ namespace C6Lab
         /// <summary>Opt-in start barrier: pin only this board's physics while the loading Canvas keeps updating.</summary>
         public void SetSimulationHeld(bool held)
         {
-            if (simulationHeld == held) return;
-            if (held) { CancelDrag(); ResetRestingRecovery(); }
-            simulationHeld = held;
+            if (startHeld == held) return;
+            bool was = simulationHeld;
+            startHeld = held;
+            ApplyHold(was);
+        }
+
+        private void SetCharmHeld(bool held)
+        {
+            if (charmHeld == held) return;
+            bool was = simulationHeld;
+            charmHeld = held;
+            ApplyHold(was);
+        }
+
+        /// <summary>Every orb stops where it is (and goes on as it was) when the board as a whole is held or let go.</summary>
+        private void ApplyHold(bool was)
+        {
+            if (simulationHeld == was) return;
+            if (simulationHeld) { CancelDrag(); ResetRestingRecovery(); }
             foreach (var entry in entries.Values)
                 if (entry.View != null) SetBodyMode(entry);
         }

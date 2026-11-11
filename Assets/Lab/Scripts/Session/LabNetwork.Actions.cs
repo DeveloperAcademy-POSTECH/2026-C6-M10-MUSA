@@ -572,7 +572,7 @@ namespace C6Lab
                 LabFiveColorSparkle.BlueTones); // #540 부적 구슬
             float scale = player.comboPenaltyUntil > latest.serverTime ? config.ComboPenaltySizeScale
                 : player.comboRewardUntil > latest.serverTime ? config.ComboRewardSizeScale : 1f;
-            if (!config.GourdColorComboEnabled) scale = 1f;
+            // BIG/SMALL come from the colour combo (야광귀) or, since #664, from the fox round (구미호): the Host's times say which.
             float comboScale = scale;
             bool rewarded = JigwiRewardAt(latest.serverTime);
             if (rewarded) scale *= config.JigwiABRewardSizeScale;

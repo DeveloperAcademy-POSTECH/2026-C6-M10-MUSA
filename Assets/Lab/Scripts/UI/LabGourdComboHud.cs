@@ -21,6 +21,8 @@ namespace C6Lab
     /// - #414: 예고 동안 화면 가장자리가 천천히 어두워지고(박 쪽은 밝게) 4칸이 나오면 걷힌다. N 콤보!는 내 판 북 크기에 맞춰
     ///   작게 보인다(ComboPopFit).
     /// - #411: 화면 문구는 모두 한글이고, 글꼴은 피버타임 배너와 같은 신라문화체 굵은 글씨(LabYaguangFeverHud.ShillaFont)다.
+    /// - #664: 구미호 여우구슬 판정도 같은 결과 문구(다 지우면 성공!, 시간이 다 되면 시간 끝!)·실패 번쩍임·BIG/SMALL 표시·부적 비를
+    ///   쓴다. 판정 중 화면 위 남은 여우구슬 수와 시간 막대는 LabFoxRoundHud가 같은 자리에 그린다.
     /// 콤보 패널 → 결과 문구 → 배지가 한 번에 하나씩만 보인다 (겹치지 않음). 예고 중에는 배지도 잠시 숨는다.
     /// 앞 콤보의 결과 문구가 떠 있는 동안 예고가 시작되면 결과 문구가 끝난 뒤 남은 카운트다운을 보여준다.
     /// 실험이 꺼져 있으면 스냅샷에 콤보가 없으므로 아무것도 그리지 않는다. 화면 표시만 하며 터치를 막지 않는다.
@@ -47,10 +49,11 @@ namespace C6Lab
         private const int TextureSize = 96;
         /// <summary>콤보 결과 문구가 떠 있는 초. 이 뒤에 SMALL/BIG 배지가 나온다 (#398 효과음도 이 시각에 맞춘다).</summary>
         public const float ResultSeconds = 1.6f;
-        private static readonly Color32 InkColor = new Color32(43, 36, 32, 255);
-        private static readonly Color PanelColor = new Color(1f, .98f, .93f, .92f);
+        // #664 LabFoxRoundHud도 같은 먹색·패널색·빨강·둥근 패널을 쓴다.
+        internal static readonly Color32 InkColor = new Color32(43, 36, 32, 255);
+        internal static readonly Color PanelColor = new Color(1f, .98f, .93f, .92f);
         private static readonly Color ClearColor = new Color(.98f, .78f, .16f);
-        private static readonly Color FailColor = new Color(.91f, .16f, .1f);
+        internal static readonly Color FailColor = new Color(.91f, .16f, .1f);
         // 배지 배경: 결과 문구보다 살짝 차분한 빨강/노랑 (흰 글자가 잘 읽히도록)
         private static readonly Color PenaltyBadgeColor = new Color(.84f, .25f, .2f, 1f);
         private static readonly Color RewardBadgeColor = new Color(.95f, .69f, .13f, 1f);
@@ -125,6 +128,9 @@ namespace C6Lab
         private bool starsWereOn;
 
         private uint shownResultCount;
+        private int shownFoxRoundCount;
+        // #664: the result words on screen are the fox round's (they sit at panelAnchor, not over the paint gauge).
+        private bool resultIsFoxRound;
         private float resultElapsed = -1f;
         private LabComboResult shownResult;
         private int lastProgress;
@@ -234,7 +240,8 @@ namespace C6Lab
             else if (!snapshot.paused) SetBoardLook(LocalEffect(snapshot, serverNow, out _));
             // 첫 콤보 예고 (#241)는 아직 콤보가 한 번도 안 나왔을 때 시작하므로 따로 본다.
             bool warning = battle && snapshot.ComboWarningOn(serverNow);
-            bool anyCombo = snapshot != null && (snapshot.comboCount > 0 || warning);
+            // #664: 여우구슬 판정 결과가 하나라도 나왔으면 결과 문구와 BIG/SMALL 표시를 그린다.
+            bool anyCombo = snapshot != null && (snapshot.comboCount > 0 || warning || snapshot.foxRoundCount > 0);
             if (!battle || !anyCombo)
             {
                 CoverGauge(false);
@@ -248,14 +255,17 @@ namespace C6Lab
             layer.gameObject.SetActive(true);
             layer.SetAsLastSibling();
 
-            if (snapshot.comboCount < lastComboCount) ResetRound();
+            if (snapshot.comboCount < lastComboCount || snapshot.foxRoundCount < shownFoxRoundCount) ResetRound();
             DetectChanges(snapshot);
+            DetectFoxRound(snapshot, serverNow);
             DrawCombo(snapshot, serverNow);
             DrawResult();
             DrawWarning(snapshot, serverNow, warning);
             DrawShade(warning);
             DrawEffect(snapshot, serverNow);
-            CoverGauge(figmaPanel && (panel.gameObject.activeSelf || resultText.gameObject.activeSelf || comboPopFinal && comboPop.gameObject.activeSelf));
+            // #664: the fox round's result words never sit over the gauge, so they leave it showing.
+            CoverGauge(figmaPanel && (panel.gameObject.activeSelf || resultText.gameObject.activeSelf && !resultIsFoxRound
+                || comboPopFinal && comboPop.gameObject.activeSelf));
         }
 
         /// <summary>#414 예고 그늘: 예고 동안 천천히 진해지고, 4칸이 나오면 빨리 걷힌다.</summary>
@@ -394,7 +404,9 @@ namespace C6Lab
         private void DrawEffect(LabSnapshot snapshot, double serverNow)
         {
             int kind = LocalEffect(snapshot, serverNow, out double until);
-            double totalTime = until - snapshot.comboResultAt;
+            // 효과는 마지막 결과(콤보 또는 #664 여우구슬 판정) 시각부터 끝 시각까지 줄어든다.
+            snapshot.LastEffectResult(out double effectFrom);
+            double totalTime = until - effectFrom;
             float remaining = kind != 0 && totalTime > 0d ? Mathf.Clamp01((float)((until - serverNow) / totalTime)) : 0f;
             // 보상은 부적 비로도 보여준다. CLEAR!가 뜨는 순간부터 바로 쏟아진다 (#271).
             DrawStars(kind > 0, remaining);
@@ -413,7 +425,7 @@ namespace C6Lab
             effectBadge.gameObject.SetActive(true);
 
             double left = until - serverNow;
-            double total = until - snapshot.comboResultAt;
+            double total = totalTime;
             float fraction = total > 0d ? Mathf.Clamp01((float)(left / total)) : 1f;
             effectGauge.anchorMax = new Vector2(1f, fraction); // 세로 사각형: 위에서 아래로 줄어든다 (#301)
             bool reward = kind > 0;
@@ -437,12 +449,30 @@ namespace C6Lab
             effectBadge.localScale = Vector3.one * scale;
         }
 
+        /// <summary>
+        /// #664 여우구슬 판정 결과: 판정 순번이 늘면 콤보 결과와 같은 자리에 성공!(다 지움) 또는 시간 끝!(못 지움)을 띄운다.
+        /// 결과 문구가 다 사라질 만큼 지난 결과(늦게 들어옴)는 띄우지 않는다.
+        /// </summary>
+        private void DetectFoxRound(LabSnapshot snapshot, double serverNow)
+        {
+            if (snapshot.foxRoundCount == shownFoxRoundCount) return;
+            shownFoxRoundCount = snapshot.foxRoundCount;
+            if (snapshot.foxRoundResult == 0 || snapshot.foxRoundResultAt < 0d
+                || serverNow - snapshot.foxRoundResultAt > ResultSeconds) return;
+            shownResult = snapshot.foxRoundResult > 0 ? LabComboResult.Success : LabComboResult.Timeout;
+            resultElapsed = Mathf.Max(0f, (float)(serverNow - snapshot.foxRoundResultAt));
+            resultDelay = 0f;
+            resultIsFoxRound = true;
+            resultText.text = ResultTextFor(shownResult, false, false, -1);
+        }
+
         private void DetectChanges(LabSnapshot snapshot)
         {
             if (snapshot.comboResultCount != shownResultCount && snapshot.comboResult != LabComboResult.None)
             {
                 shownResultCount = snapshot.comboResultCount;
                 shownResult = snapshot.comboResult;
+                resultIsFoxRound = false;
                 resultElapsed = 0f;
                 RememberFailer(snapshot);
                 resultText.text = ResultTextFor(shownResult, shownFailedKnown,
@@ -649,6 +679,7 @@ namespace C6Lab
         private void ResetRound()
         {
             shownResultCount = 0;
+            shownFoxRoundCount = 0;
             resultElapsed = -1f;
             lastProgress = 0;
             lastComboCount = 0;
@@ -1063,7 +1094,7 @@ namespace C6Lab
             return pillSprite;
         }
 
-        private static Sprite RoundedSprite()
+        internal static Sprite RoundedSprite()
         {
             if (roundedSprite != null) return roundedSprite;
             float radius = TextureSize * .3f;

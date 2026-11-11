@@ -191,6 +191,12 @@ MonoBehaviour:
   charmSeconds: 10
   charmRescueTaps: 10
   charmWarningSeconds: 3
+  charmTargetsAtFive: 2
+  foxRoundSeconds: 15
+  foxFireCountStepMin: 1
+  foxFireCountStepMax: 2
+  foxRoundSpareMin: 0
+  foxRoundSpareMax: 3
   yaguangTimelineBattleSeconds: 120
   yaguangTimelineSabotageEndSeconds: 100
   yaguangTimelineUniqueSeconds:

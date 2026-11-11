@@ -60,6 +60,11 @@ namespace Hapio
         private static readonly int[] RetiredFields = System.Linq.Enumerable.ToArray(LabConfig.RetiredDeveloperFields);
         /// <summary>The common gimmick group's settings (#311), which each of the three stages keeps for itself.</summary>
         public static bool IsStageCommonGimmick(int index) => index == 169 || index == 170 || index == 205 || index == 207 || index == 208;
+        /// <summary>
+        /// BIG/SMALL's time and size (#664): the 야광귀 colour combo's reward and penalty, which the 구미호 fox round gives too.
+        /// Stages 1 and 2 each keep their own (by default SMALL 0.1x for 13 s, BIG 2.5x for 8 s), so either tab tunes its own stage.
+        /// </summary>
+        public static bool IsComboEffectField(int index) => index == 159 || index == 160 || index == 162 || index == 163;
         /// <summary>Jigwi's 120-second timeline switch (#332): on by default, it schedules A/B and the common gimmicks itself.</summary>
         public const int JigwiTimelineField = LabConfig.JigwiStageFirstField;
         /// <summary>
@@ -100,6 +105,11 @@ namespace Hapio
             if (IsStageCommonGimmick(index)) return scope >= 1 && scope <= 3;
             // The fox's own gimmicks (#311): interval, switches and chances, with fox fire and charm details (#251, #305).
             bool gumiho = index >= 171 && index <= 177 || index == 204 || index == 206 || index == 209 || index == 210
+                // #664: the five-player charm count and the fox round's time.
+                || index == LabConfig.CharmTargetsAtFiveField || index == LabConfig.FoxRoundSecondsField
+                || index >= LabConfig.FoxFireCountStepMinField && index <= LabConfig.FoxRoundSpareMaxField
+                // ...and the BIG/SMALL its fox round gives, which the 야광귀 tab keeps for its combo too.
+                || IsComboEffectField(index)
                 // Fever time (#334) is the fox's alone for now; the other yokai keep their own endings.
                 || index == LabConfig.FeverTimeSecondsField || index == LabConfig.FeverTimeRecoveryField;
             bool jigwi = index >= 178 && index <= 183 || index >= 192 && index <= 195;

@@ -321,6 +321,13 @@ namespace C6Lab
         public double charmStartedAt = -1d, charmUntil = -1d;
         public int charmTaps;
         /// <summary>
+        /// #664: everyone charmed this time (one, or two never side by side in a room of five) and when each one's charm
+        /// ends, in the same order: a woken player's ends early. charmedPlayer is the first of them, charmUntil the last end.
+        /// Empty in an older single-charm snapshot, which only has charmedPlayer and charmUntil.
+        /// </summary>
+        public ulong[] charmedPlayers = Array.Empty<ulong>();
+        public double[] charmEnds = Array.Empty<double>();
+        /// <summary>
         /// 매혹 예고 (#305): the Host chose charmedPlayer at charmWarnedAt and the charm itself starts at charmStartedAt;
         /// in between every screen shows the warning. -1 while no charm is coming or on.
         /// </summary>
@@ -331,9 +338,64 @@ namespace C6Lab
         /// </summary>
         public ulong[] charmHelpers = Array.Empty<ulong>();
         public int[] charmHelperTaps = Array.Empty<int>();
+        /// <summary>
+        /// #664: which charmed player each charmHelpers row wakes (the same order). The player between two charmed ones
+        /// has a row for each. Empty in an older snapshot, where every row is for charmedPlayer.
+        /// </summary>
+        public ulong[] charmHelperTargets = Array.Empty<ulong>();
 
         /// <summary>Whether this player is charmed at this snapshot.</summary>
-        public bool CharmOn(ulong player) => charmUntil > serverTime && serverTime >= charmStartedAt && charmedPlayer == player;
+        public bool CharmOn(ulong player) => CharmOn(player, serverTime);
+
+        /// <summary>Whether this player is charmed at this time (#664: each charmed player's charm may end on its own).</summary>
+        public bool CharmOn(ulong player, double now) => now >= charmStartedAt && CharmEndOf(player) > now;
+
+        /// <summary>When this player's charm ends (or is coming to end), or -1 when they are not charmed this time.</summary>
+        public double CharmEndOf(ulong player)
+        {
+            if (charmedPlayers != null && charmedPlayers.Length > 0)
+            {
+                int index = Array.IndexOf(charmedPlayers, player);
+                return index >= 0 && charmEnds != null && index < charmEnds.Length ? charmEnds[index] : -1d;
+            }
+            return charmedPlayer == player && charmUntil >= 0d ? charmUntil : -1d;
+        }
+
+        /// <summary>Everyone charmed or warned of a charm this time, in the Host's order (one in an older snapshot).</summary>
+        public ulong[] CharmTargets() => charmedPlayers != null && charmedPlayers.Length > 0 ? charmedPlayers
+            : charmUntil >= 0d ? new[] { charmedPlayer } : Array.Empty<ulong>();
+
+        /// <summary>How many times this helper has tapped to wake this charmed player (#664); 0 for anyone else.</summary>
+        public int CharmTapsBy(ulong helper, ulong target)
+        {
+            if (charmHelpers == null || charmHelperTaps == null) return 0;
+            bool rowsNamed = charmHelperTargets != null && charmHelperTargets.Length == charmHelpers.Length;
+            for (int i = 0; i < charmHelpers.Length && i < charmHelperTaps.Length; i++)
+                if (charmHelpers[i] == helper && (rowsNamed ? charmHelperTargets[i] == target : target == charmedPlayer))
+                    return charmHelperTaps[i];
+            return 0;
+        }
+        /// <summary>
+        /// 매혹 (#664): the edges of this player's board shut because the neighbour that way is charmed: right 1, left -1,
+        /// both LabTeams.BothSides, none 0. A charmed player's own board is not walled; it stands still instead.
+        /// </summary>
+        public int CharmWallSide(ulong player)
+        {
+            if (players == null || players.Length < 2 || teamTerritory || CharmOn(player)) return 0;
+            int count = players.Length;
+            LabPlayerState me = Array.Find(players, item => item != null && item.id == player);
+            if (me == null || me.seat < 0 || me.seat >= count) return 0;
+            bool right = CharmedAtSeat(LabPlayerSlots.NeighborSeat(me.seat, count, true));
+            bool left = CharmedAtSeat(LabPlayerSlots.NeighborSeat(me.seat, count, false));
+            return right && left ? LabTeams.BothSides : right ? 1 : left ? -1 : 0;
+        }
+
+        private bool CharmedAtSeat(int seat)
+        {
+            LabPlayerState at = Array.Find(players, item => item != null && item.seat == seat);
+            return at != null && CharmOn(at.id);
+        }
+
         /// <summary>Whether the charm on charmedPlayer is being warned of at this time (#305).</summary>
         public bool CharmWarningAt(double now) => charmWarnedAt >= 0d && now >= charmWarnedAt && now < charmStartedAt;
         /// <summary>How many times this player beside the charmed one has tapped (#305); 0 for anyone else.</summary>
@@ -358,6 +420,52 @@ namespace C6Lab
             : team == LabTeam.Red && redFeverUntil > serverTime;
         public int FeverHits(LabTeam team) => team == LabTeam.Blue ? blueFeverHits : team == LabTeam.Red ? redFeverHits : 0;
         public int TeamCells(LabTeam team) => team == LabTeam.Blue ? blueCells : team == LabTeam.Red ? redCells : 0;
+
+        // 여우구슬 팀 판정 (#664). 시각은 serverTime과 같은 전투 시계다.
+        /// <summary>The latest fox round's drop and time-up (-1 before the first, or after one cancelled by the fever).</summary>
+        public double foxRoundStartedAt = -1d, foxRoundEndsAt = -1d;
+        /// <summary>Fox orbs the round began with, and still on the boards while it runs (0 once it is over).</summary>
+        public int foxRoundTotal, foxRoundRemaining;
+        /// <summary>
+        /// How many the team must clear (what fell less a few, at least 1) and how many it has cleared by double taps and
+        /// yin/yang touches. Reaching the goal wins the round; the rest go in smoke.
+        /// </summary>
+        public int foxRoundGoal, foxRoundCleared;
+        /// <summary>Fox orbs still to clear for the goal (the number at the top of the screen).</summary>
+        public int FoxRoundToGo => Math.Max(0, foxRoundGoal - foxRoundCleared);
+        /// <summary>
+        /// The latest finished round: 1 cleared (BIG), -1 timed out (SMALL), 0 none yet; when, and how many have finished. It stays
+        /// while the next round runs, so the last BIG/SMALL still shows its badge and its time.
+        /// </summary>
+        public int foxRoundResult;
+        public double foxRoundResultAt = -1d;
+        public int foxRoundCount;
+        /// <summary>The latest round has started and is neither settled nor cancelled yet.</summary>
+        public bool foxRoundRunning;
+
+        /// <summary>A fox round is running at this time: the team is clearing fox orbs against the clock (#664).</summary>
+        public bool FoxRoundOn(double now) => foxRoundRunning && foxRoundEndsAt >= 0d && now >= foxRoundStartedAt
+            && now < foxRoundEndsAt;
+
+        /// <summary>
+        /// The team's latest BIG/SMALL result (#664): the 야광귀 colour combo's or the fox round's, whichever came last. -1 SMALL,
+        /// 1 BIG, 0 none yet; at is its Host time (-1 with none). Its badge, sounds and BGM tone run from at.
+        /// </summary>
+        public int LastEffectResult(out double at)
+        {
+            int combo = 0;
+            if (comboResultCount > 0 && comboResultAt >= 0d)
+                combo = comboResult == LabComboResult.Success ? 1
+                    : comboResult == LabComboResult.WrongColor || comboResult == LabComboResult.Timeout ? -1 : 0;
+            int fox = foxRoundCount > 0 && foxRoundResultAt >= 0d ? Math.Sign(foxRoundResult) : 0;
+            if (fox != 0 && (combo == 0 || foxRoundResultAt >= comboResultAt))
+            {
+                at = foxRoundResultAt;
+                return fox;
+            }
+            at = combo != 0 ? comboResultAt : -1d;
+            return combo;
+        }
 
         // 박 색상 콤보 실험 (#222). DEV에서 끄면 모두 기본값(콤보 없음)이다.
         // 시각은 serverTime과 같은 전투 시계 기준이다.

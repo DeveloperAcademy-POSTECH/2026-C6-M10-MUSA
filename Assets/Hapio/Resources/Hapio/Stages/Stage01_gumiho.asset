@@ -18,4 +18,8 @@ MonoBehaviour:
   yokai: 1
   yokaiVisual: {fileID: 0}
   gourdVisualResource: Hapio/Gourds/Stage01_Gumiho_Battle
-  defaultValues: []
+  defaultValues:
+  - index: 159
+    value: 13
+  - index: 162
+    value: 8

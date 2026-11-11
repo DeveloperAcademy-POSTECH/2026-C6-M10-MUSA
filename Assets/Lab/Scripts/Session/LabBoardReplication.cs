@@ -32,6 +32,10 @@ namespace C6Lab
         public double charmWarnedAt = -1d;
         public ulong[] charmHelpers = Array.Empty<ulong>();
         public int[] charmHelperTaps = Array.Empty<int>();
+        /// <summary>#664: everyone charmed (two in a room of five) with each one's end, and whom each helper row wakes.</summary>
+        public ulong[] charmedPlayers = Array.Empty<ulong>();
+        public double[] charmEnds = Array.Empty<double>();
+        public ulong[] charmHelperTargets = Array.Empty<ulong>();
         /// <summary>2:2 땅따먹기 (#281)의 팀 피버도 헤더로 보내 피버가 모든 화면에서 바로 시작되게 한다.</summary>
         public int blueFeverHits, redFeverHits;
         public double blueFeverStartedAt = -1d, blueFeverUntil = -1d, redFeverStartedAt = -1d, redFeverUntil = -1d;
@@ -42,6 +46,10 @@ namespace C6Lab
         public ulong flashTarget, flashLastTarget;
         public bool flashTargetAll, flashLastTargetAll;
         public uint flashCount;
+        /// <summary>#664: the team's fox round (drop, time-up, count, result) travels with every header.</summary>
+        public double foxRoundStartedAt = -1d, foxRoundEndsAt = -1d, foxRoundResultAt = -1d;
+        public int foxRoundTotal, foxRoundRemaining, foxRoundResult, foxRoundCount, foxRoundGoal, foxRoundCleared;
+        public bool foxRoundRunning;
         /// <summary>Explicit presence keeps an omitted header from clearing a matched shared snapshot.</summary>
         public bool hasComboState;
         public bool comboActive;
@@ -153,6 +161,8 @@ namespace C6Lab
                 charmedPlayer = snapshot.charmedPlayer, charmStartedAt = snapshot.charmStartedAt,
                 charmUntil = snapshot.charmUntil, charmTaps = snapshot.charmTaps, charmWarnedAt = snapshot.charmWarnedAt,
                 charmHelpers = CopyArray(snapshot.charmHelpers), charmHelperTaps = CopyArray(snapshot.charmHelperTaps),
+                charmedPlayers = CopyArray(snapshot.charmedPlayers), charmEnds = CopyArray(snapshot.charmEnds),
+                charmHelperTargets = CopyArray(snapshot.charmHelperTargets),
                 blueFeverHits = snapshot.blueFeverHits, redFeverHits = snapshot.redFeverHits,
                 blueFeverStartedAt = snapshot.blueFeverStartedAt, blueFeverUntil = snapshot.blueFeverUntil,
                 redFeverStartedAt = snapshot.redFeverStartedAt, redFeverUntil = snapshot.redFeverUntil,
@@ -163,6 +173,11 @@ namespace C6Lab
                 flashTarget = snapshot.flashTarget, flashTargetAll = snapshot.flashTargetAll,
                 flashCount = snapshot.flashCount, flashLastAt = snapshot.flashLastAt,
                 flashLastTarget = snapshot.flashLastTarget, flashLastTargetAll = snapshot.flashLastTargetAll,
+                foxRoundStartedAt = snapshot.foxRoundStartedAt, foxRoundEndsAt = snapshot.foxRoundEndsAt,
+                foxRoundResultAt = snapshot.foxRoundResultAt, foxRoundTotal = snapshot.foxRoundTotal,
+                foxRoundRemaining = snapshot.foxRoundRemaining, foxRoundResult = snapshot.foxRoundResult,
+                foxRoundCount = snapshot.foxRoundCount, foxRoundRunning = snapshot.foxRoundRunning,
+                foxRoundGoal = snapshot.foxRoundGoal, foxRoundCleared = snapshot.foxRoundCleared,
                 hasComboState = true, comboActive = snapshot.comboActive,
                 comboColors = snapshot.comboColors == null ? Array.Empty<LabOrbElement>() : (LabOrbElement[])snapshot.comboColors.Clone(),
                 comboProgress = snapshot.comboProgress, comboStartedAt = snapshot.comboStartedAt,
@@ -423,6 +438,9 @@ namespace C6Lab
                 copy.charmWarnedAt = header.charmWarnedAt;
                 copy.charmHelpers = LabBoardPublisher.CopyArray(header.charmHelpers);
                 copy.charmHelperTaps = LabBoardPublisher.CopyArray(header.charmHelperTaps);
+                copy.charmedPlayers = LabBoardPublisher.CopyArray(header.charmedPlayers);
+                copy.charmEnds = LabBoardPublisher.CopyArray(header.charmEnds);
+                copy.charmHelperTargets = LabBoardPublisher.CopyArray(header.charmHelperTargets);
                 copy.blueFeverHits = header.blueFeverHits; copy.redFeverHits = header.redFeverHits;
                 copy.blueFeverStartedAt = header.blueFeverStartedAt; copy.blueFeverUntil = header.blueFeverUntil;
                 copy.redFeverStartedAt = header.redFeverStartedAt; copy.redFeverUntil = header.redFeverUntil;
@@ -433,6 +451,11 @@ namespace C6Lab
                 copy.flashTarget = header.flashTarget; copy.flashTargetAll = header.flashTargetAll;
                 copy.flashCount = header.flashCount; copy.flashLastAt = header.flashLastAt;
                 copy.flashLastTarget = header.flashLastTarget; copy.flashLastTargetAll = header.flashLastTargetAll;
+                copy.foxRoundStartedAt = header.foxRoundStartedAt; copy.foxRoundEndsAt = header.foxRoundEndsAt;
+                copy.foxRoundResultAt = header.foxRoundResultAt; copy.foxRoundTotal = header.foxRoundTotal;
+                copy.foxRoundRemaining = header.foxRoundRemaining; copy.foxRoundResult = header.foxRoundResult;
+                copy.foxRoundCount = header.foxRoundCount; copy.foxRoundRunning = header.foxRoundRunning;
+                copy.foxRoundGoal = header.foxRoundGoal; copy.foxRoundCleared = header.foxRoundCleared;
                 if (header.hasComboState)
                 {
                     // Copy Host control state, never infer progress from a locally presented hit.
@@ -542,6 +565,10 @@ namespace C6Lab
             && Finite(frame.swipeBlockStartedAt) && Finite(frame.swipeBlockedUntil)
             && Finite(frame.charmStartedAt) && Finite(frame.charmUntil) && frame.charmTaps >= 0
             && Finite(frame.charmWarnedAt) && ValidCharmHelpers(frame.charmHelpers, frame.charmHelperTaps)
+            && ValidCharmTargets(frame.charmedPlayers, frame.charmEnds, frame.charmHelpers, frame.charmHelperTargets)
+            && Finite(frame.foxRoundStartedAt) && Finite(frame.foxRoundEndsAt) && Finite(frame.foxRoundResultAt)
+            && frame.foxRoundTotal >= 0 && frame.foxRoundRemaining >= 0 && frame.foxRoundResult >= -1 && frame.foxRoundResult <= 1
+            && frame.foxRoundCount >= 0 && frame.foxRoundGoal >= 0 && frame.foxRoundCleared >= 0
             && frame.blueFeverHits >= 0 && frame.redFeverHits >= 0
             && Finite(frame.blueFeverStartedAt) && Finite(frame.blueFeverUntil)
             && Finite(frame.redFeverStartedAt) && Finite(frame.redFeverUntil)
@@ -614,8 +641,22 @@ namespace C6Lab
         private static bool Finite(double value) => !double.IsNaN(value) && !double.IsInfinity(value);
         private static bool Reject(string value, out string reason) { reason = value; return false; }
         // At most the two players beside the charmed one, each with a tap count of its own (#305).
+        /// <summary>Two rows for each charmed player (#664: up to two charmed, so up to four rows).</summary>
         private static bool ValidCharmHelpers(ulong[] helpers, int[] taps) => (helpers?.Length ?? 0) == (taps?.Length ?? 0)
-            && (helpers?.Length ?? 0) <= 2 && (taps ?? Array.Empty<int>()).All(count => count >= 0);
+            && (helpers?.Length ?? 0) <= 2 * MaximumCharmed && (taps ?? Array.Empty<int>()).All(count => count >= 0);
+
+        private const int MaximumCharmed = 2;
+
+        /// <summary>#664: up to two charmed players, each with a finite end, and a target for every helper row (or none, older).</summary>
+        private static bool ValidCharmTargets(ulong[] charmed, double[] ends, ulong[] helpers, ulong[] targets)
+        {
+            int count = charmed?.Length ?? 0;
+            if (count > MaximumCharmed || (ends?.Length ?? 0) != count) return false;
+            if (ends != null && !ends.All(Finite)) return false;
+            int rows = targets?.Length ?? 0;
+            if (rows != 0 && rows != (helpers?.Length ?? 0)) return false;
+            return targets == null || targets.All(target => charmed != null && Array.IndexOf(charmed, target) >= 0);
+        }
 
         public static LabSnapshot CopySnapshot(LabSnapshot source) => new LabSnapshot
         {
@@ -635,6 +676,9 @@ namespace C6Lab
             charmStartedAt = source.charmStartedAt, charmUntil = source.charmUntil, charmTaps = source.charmTaps,
             charmWarnedAt = source.charmWarnedAt, charmHelpers = LabBoardPublisher.CopyArray(source.charmHelpers),
             charmHelperTaps = LabBoardPublisher.CopyArray(source.charmHelperTaps),
+            charmedPlayers = LabBoardPublisher.CopyArray(source.charmedPlayers),
+            charmEnds = LabBoardPublisher.CopyArray(source.charmEnds),
+            charmHelperTargets = LabBoardPublisher.CopyArray(source.charmHelperTargets),
             teamTerritory = source.teamTerritory, blueCells = source.blueCells, redCells = source.redCells,
             teamWinner = source.teamWinner, blueFeverHits = source.blueFeverHits, redFeverHits = source.redFeverHits,
             blueFeverStartedAt = source.blueFeverStartedAt, blueFeverUntil = source.blueFeverUntil,
@@ -642,6 +686,11 @@ namespace C6Lab
             jigwi = LabJigwiNetworkValidation.Copy(source.jigwi),
             jigwiStage = LabJigwiStageNetworkValidation.Copy(source.jigwiStage),
             jigwiAB = LabJigwiABNetworkValidation.Copy(source.jigwiAB),
+            foxRoundStartedAt = source.foxRoundStartedAt, foxRoundEndsAt = source.foxRoundEndsAt,
+            foxRoundResultAt = source.foxRoundResultAt, foxRoundTotal = source.foxRoundTotal,
+            foxRoundRemaining = source.foxRoundRemaining, foxRoundResult = source.foxRoundResult,
+            foxRoundCount = source.foxRoundCount, foxRoundRunning = source.foxRoundRunning,
+            foxRoundGoal = source.foxRoundGoal, foxRoundCleared = source.foxRoundCleared,
             comboActive = source.comboActive,
             comboColors = source.comboColors == null ? Array.Empty<LabOrbElement>() : (LabOrbElement[])source.comboColors.Clone(),
             comboProgress = source.comboProgress, comboStartedAt = source.comboStartedAt, comboEndsAt = source.comboEndsAt,

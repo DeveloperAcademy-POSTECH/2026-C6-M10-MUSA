@@ -101,6 +101,7 @@ namespace C6Lab
                 Include(player.comboPenaltyUntil);
                 Include(player.comboRewardUntil);
             }
+            if (FoxRoundOn(lastTime)) Include(foxRoundEndsAt); // #664: the time-up
             foreach (var state in jigwiStates.Values)
             {
                 Include(state.fireEndsAt);

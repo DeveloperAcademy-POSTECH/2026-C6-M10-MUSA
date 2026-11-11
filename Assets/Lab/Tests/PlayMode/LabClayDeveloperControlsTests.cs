@@ -26,7 +26,7 @@ namespace C6Lab.Tests
         public IEnumerator PausedHostSlidersPreviewImmediatelyAndExplicitRestartKeepsBothValues()
         {
             string saved = JsonUtility.ToJson(ui.sourceConfig);
-            Assert.That(ui.valueInputs.Length, Is.EqualTo(259));
+            Assert.That(ui.valueInputs.Length, Is.EqualTo(265));
             fixture.UseAvailablePort(ui.network);
             ui.Open(); ui.applyStartButton.onClick.Invoke();
             for (int i = 0; i < 120 && !ui.network.CanPauseBattle; i++) yield return null;

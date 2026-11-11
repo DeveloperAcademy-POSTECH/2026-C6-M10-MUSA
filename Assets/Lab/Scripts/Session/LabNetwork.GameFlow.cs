@@ -19,7 +19,9 @@ namespace C6Lab
         // 50: newly painted-cell contribution (protocol 5699, Lab 60); 49 was reserved by #647's summary-start flow.
         // 51: #647 the Host's 봉인 총평 start rides on the result control (summaryStarted), on top of 50.
         // 52: #676 Story paint budgets use the actual cooperative participant count (protocol5701/Lab61).
-        private static readonly byte[] GameConnectionToken = Encoding.ASCII.GetBytes("C6HapioGame/52");
+        // 52 was also taken by #664 구미호 co-op gimmicks on its own branch; merged together they are 53.
+        // 53: #664 구미호 co-op gimmicks (265 DEV values) on top of #676 (protocol 5702, Lab 62).
+        private static readonly byte[] GameConnectionToken = Encoding.ASCII.GetBytes("C6HapioGame/53");
         private const int MaximumGameFlowBytes = 8192;
         private bool gameFlowEnabled;
         private bool gameBattleFrozen;

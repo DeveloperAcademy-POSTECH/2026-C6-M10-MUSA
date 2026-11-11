@@ -135,12 +135,18 @@ namespace C6Lab
             // 박 색상 콤보 실험 (#222): 4칸 색/남은 시간/결과/페널티 표시. 실험이 꺼져 있으면 아무것도 안 그린다.
             if (hud != null && boardNetwork != null && GetComponent<LabGourdComboHud>() == null)
                 gameObject.AddComponent<LabGourdComboHud>().Bind(boardNetwork, hud.GetComponentInParent<Canvas>());
+            // 여우구슬 팀 판정 (#664): 판정 중 화면 위에 팀 전체 남은 여우구슬 수와 남은 시간 막대 (결과·BIG/SMALL은 위 콤보 표시가 그린다)
+            if (hud != null && boardNetwork != null && GetComponent<LabFoxRoundHud>() == null)
+                gameObject.AddComponent<LabFoxRoundHud>().Bind(boardNetwork, hud.GetComponentInParent<Canvas>());
             // 야광귀 섬광 (#268): 맞을 사람 화면의 예고 빛·번쩍임·진동, 판 구슬 하얗게. 꺼져 있으면 아무것도 안 그린다.
             if (hud != null && boardNetwork != null && GetComponent<LabYaguangFlashHud>() == null)
                 gameObject.AddComponent<LabYaguangFlashHud>().Bind(boardNetwork, hud.GetComponentInParent<Canvas>());
             // 매혹 (#251): 홀린 사람 자신의 화면에 "매혹 N초"·하트·헤롱~·정신 차림!
             if (hud != null && boardNetwork != null && GetComponent<LabCharmHud>() == null)
                 gameObject.AddComponent<LabCharmHud>().Bind(boardNetwork, hud.GetComponentInParent<Canvas>());
+            // 매혹 화면 효과 (#664): 홀린 사람 자신의 화면에 분홍빛과 아래에서 올라오는 하트 말풍선
+            if (hud != null && boardNetwork != null && GetComponent<LabCharmHeartRain>() == null)
+                gameObject.AddComponent<LabCharmHeartRain>().Bind(boardNetwork, hud.GetComponentInParent<Canvas>());
             // 여우 구슬 안내 (#328): 판마다 내 판에 처음 떨어지면 "빠르게 두 번 눌러서…"
             if (hud != null && boardNetwork != null && GetComponent<LabFoxFireGuide>() == null)
                 gameObject.AddComponent<LabFoxFireGuide>().Bind(boardNetwork, hud.GetComponentInParent<Canvas>());
