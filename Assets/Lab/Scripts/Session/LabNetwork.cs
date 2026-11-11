@@ -1357,6 +1357,7 @@ namespace C6Lab
                 SetRoomSearchMessage(explanation, true);
                 return;
             }
+            KeepReplayHitPoses();
             double now = Time.realtimeSinceStartupAsDouble;
             if (resumeRoomSearchAfterStop && CanBeginConnection)
             {

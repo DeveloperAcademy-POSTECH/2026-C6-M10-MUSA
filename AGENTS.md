@@ -272,7 +272,7 @@
 
 ## 마지막 일격 다시보기 (스토리 1·2·3)
 
-- 100% 뒤 Host가 마지막 일격(결과의 `LastPainter`가 최근 4초 안에 던진 칠 명중, 없으면 최근 명중) 기록 `LabFinishReplayShot`을 finish prepare/commit의 `replay` 문자열에 싣는다. 모든 기기가 공통 `StartsAt`부터 세 각도(던진 사람·옆면·확대, 1.31/1.5/1.8초, 점점 느리게)와 전환 0.5초, 총 5.11초를 재생한 뒤 한지색 `GameSceneFade` 아래에서 결과로 간다. 후보가 없거나 12초 한도에 들어가지 않으면 기존 1.2초 연출이다. 2:2·Lab은 바꾸지 않는다.
+- 100% 뒤 Host가 마지막 일격(결과의 `LastPainter`가 최근 4초 안에 던진 칠 명중, 없으면 최근 명중. 구슬이 아닌 칠(지귀 공통 부적 폭포 등)로 끝나 4초 안 명중이 없으면 명중 때 저장해 둔 자세로 이번 라운드의 가장 최근 명중) 기록 `LabFinishReplayShot`을 finish prepare/commit의 `replay` 문자열에 싣는다. 모든 기기가 공통 `StartsAt`부터 세 각도(던진 사람·옆면·확대, 1.31/1.5/1.8초, 점점 느리게)와 전환 0.5초, 총 5.11초를 재생한 뒤 한지색 `GameSceneFade` 아래에서 결과로 간다. 후보가 없거나 12초 한도에 들어가지 않으면 기존 1.2초 연출이다. 2:2·Lab은 바꾸지 않는다.
 - 표현 전용이다. 실제 박은 숨기지 않고 렌더 콜백 사이에서만 기록 자세로 그린다(`LabHangingTarget.SetPresentationPose`). 구슬은 물리 없는 ghost, 카메라는 전용 연출 카메라다. 판정·통계·네트워크 상태·BattleCamera 자세·전역 `Time.timeScale`을 바꾸지 않는다.
 - 새 탭은 그 기기만 건너뛴다. release는 모든 참가자의 done(끝남·건너뜀)을 기다린다(`TryRelease` 최소 0, 기존 연출은 1.2초 유지). 솔로는 건너뛰면 바로 결과로 간다.
 - #525 당시 호환 묶음은 설정 259개·**5687**·`C6PhysicsLab/48`·**`C6HapioGame/33`**이며 Game32 앱과 혼용하지 않는다. 상세는 `docs/FINAL_HIT_REPLAY.md`, 실행한 검사는 `docs/VALIDATION.md`를 따른다.

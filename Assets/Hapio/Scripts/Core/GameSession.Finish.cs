@@ -162,6 +162,7 @@ namespace Hapio
                         finishIdentity.replay = string.Empty;
                         AdoptFinishReplay(string.Empty);
                         nextFinishSendAt = 0d;
+                        Debug.Log("C6_FINISH_REPLAY fallback reason=late_schedule generation=" + finishGeneration);
                     }
                     if (ready) finishBarrier.ReadyForSchedule(network.LocalPlayerId, finishGeneration);
                     if (!singleLocal) finishBarrier.Commit(scheduleNow);
@@ -367,6 +368,9 @@ namespace Hapio
                     + ReplayBudgetMargin <= finishServerDeadline;
             finishIdentity.replay = fits ? encoded : string.Empty;
             replayDecided = true;
+            // Whether the replay plays, and why not, so a playtest log tells the cause. A later late_schedule line replaces it.
+            Debug.Log(fits ? "C6_FINISH_REPLAY replay"
+                : "C6_FINISH_REPLAY fallback reason=" + (string.IsNullOrEmpty(encoded) ? network.FinishReplayMissReason ?? "no_record" : "budget"));
             AdoptFinishReplay(finishIdentity.replay);
             nextFinishSendAt = 0d;
         }

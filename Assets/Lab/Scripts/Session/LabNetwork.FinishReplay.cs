@@ -31,6 +31,8 @@ namespace C6Lab
             public double At;
             public float FlightSeconds;
             public Vector3 Point, Normal, Velocity;
+            /// <summary>The gourd's poses around this impact, kept once they are recorded so an older hit stays replayable.</summary>
+            public LabHangingTarget.RigState[] Poses;
         }
 
         private readonly Dictionary<string, ReplayLaunch> replayLaunches = new Dictionary<string, ReplayLaunch>();
@@ -75,45 +77,84 @@ namespace C6Lab
         }
 
         /// <summary>
-        /// Host only, after Victory: the replay record of the final hit — the newest recent hit by the player credited with
-        /// the last paint (the result's "last hit"), else the newest recent hit. <paramref name="waiting"/> is true while the
-        /// gourd's poses after that impact are still being recorded; pass <paramref name="force"/> to take what exists.
-        /// False with a null record when there is no hit to replay.
+        /// Keep each recent hit's poses once the gourd has recorded them. The live history holds about five seconds, so a
+        /// gourd finished later by paint without an orb (the Jigwi common-talisman waterfall and its growth) would
+        /// otherwise have no hit left to replay.
+        /// </summary>
+        private void KeepReplayHitPoses()
+        {
+            if (!IsHost || target == null || replayHits.TrueForAll(hit => hit.Poses != null)) return;
+            var hanging = target.GetComponent<LabHangingTarget>();
+            if (hanging == null || hanging.PoseHistoryCount < 2) return;
+            for (int i = replayHits.Count - 1; i >= 0; i--)
+            {
+                ReplayHit hit = replayHits[i];
+                if (hit.Poses != null) continue;
+                // Its window already left the kept history (an earlier round, or poses never caught up): never replayable.
+                if (hit.At - LabFinishReplayShot.PoseBefore < hanging.OldestPoseTime) { replayHits.RemoveAt(i); continue; }
+                // Every sample must be recorded first, the last one too (it sits one step past +PoseAfter).
+                if (hanging.LatestPoseTime < hit.At - LabFinishReplayShot.PoseBefore + (ReplayPoseCount - 1) / LabFinishReplayShot.PoseRate)
+                    continue;
+                hit.Poses = SampleReplayPoses(hanging, hit.At);
+                replayHits[i] = hit;
+            }
+        }
+
+        private static readonly int ReplayPoseCount = Mathf.Min(LabFinishReplayShot.MaximumPoses,
+            Mathf.CeilToInt((LabFinishReplayShot.PoseBefore + LabFinishReplayShot.PoseAfter) * LabFinishReplayShot.PoseRate) + 1);
+
+        private static LabHangingTarget.RigState[] SampleReplayPoses(LabHangingTarget hanging, double at)
+        {
+            var poses = new LabHangingTarget.RigState[ReplayPoseCount];
+            for (int i = 0; i < poses.Length; i++)
+                hanging.TrySamplePose(at - LabFinishReplayShot.PoseBefore + i / LabFinishReplayShot.PoseRate, out poses[i]);
+            return poses;
+        }
+
+        /// <summary>Why the last <see cref="TryCaptureFinishReplay"/> had no record (for the fallback log), or null.</summary>
+        public string FinishReplayMissReason { get; private set; }
+
+        /// <summary>
+        /// Host only, after Victory: the replay record of the final hit — the newest recent hit (last
+        /// <see cref="ReplayHitSeconds"/>) by the player credited with the last paint (the result's "last hit"), else the newest
+        /// recent hit. When the gourd was finished by paint that is not an orb, so no hit is recent, the round's newest kept
+        /// hit stands in (the last painter's first). <paramref name="waiting"/> is true while the gourd's poses after that
+        /// impact are still being recorded; pass <paramref name="force"/> to take what exists. False with a null record when
+        /// there is no hit to replay.
         /// </summary>
         public bool TryCaptureFinishReplay(bool force, out string encoded, out bool waiting)
         {
             encoded = null;
             waiting = false;
-            if (!IsHost || model == null || target == null) return false;
+            FinishReplayMissReason = null;
+            if (!IsHost || model == null || target == null) { FinishReplayMissReason = "no_host_battle"; return false; }
             var hanging = target.GetComponent<LabHangingTarget>();
-            if (hanging == null || hanging.PoseHistoryCount < 2) return false;
+            if (hanging == null || hanging.PoseHistoryCount < 2) { FinishReplayMissReason = "no_pose_history"; return false; }
+            KeepReplayHitPoses();
             double now = Time.fixedTimeAsDouble;
             ulong lastPainter = model.PaintSurface != null ? model.PaintSurface.LastPainter : 0ul;
             int chosen = -1;
-            for (int pass = 0; pass < 2 && chosen < 0; pass++)
+            // Passes: recent by the last painter, recent by anyone, then (no recent hit) older kept hits the same way.
+            for (int pass = 0; pass < 4 && chosen < 0; pass++)
                 for (int i = replayHits.Count - 1; i >= 0; i--)
                 {
                     ReplayHit hit = replayHits[i];
-                    if (hit.Launch.SessionId != sessionId || hit.Launch.Round != model.Round
-                        || now - hit.At > ReplayHitSeconds) continue;
-                    if (pass == 0 && hit.Launch.Owner != lastPainter) continue;
+                    if (hit.Launch.SessionId != sessionId || hit.Launch.Round != model.Round) continue;
+                    if (pass < 2 && now - hit.At > ReplayHitSeconds) continue;
+                    if (pass % 2 == 0 && hit.Launch.Owner != lastPainter) continue;
                     // Its whole replay window must still be in the gourd's kept poses, or the swing would freeze.
-                    if (hit.At - LabFinishReplayShot.PoseBefore < hanging.OldestPoseTime) continue;
+                    if (hit.Poses == null && hit.At - LabFinishReplayShot.PoseBefore < hanging.OldestPoseTime) continue;
                     chosen = i;
                     break;
                 }
-            if (chosen < 0) return false;
+            if (chosen < 0) { FinishReplayMissReason = "no_hit"; return false; }
             ReplayHit final = replayHits[chosen];
-            if (!force && hanging.LatestPoseTime < final.At + LabFinishReplayShot.PoseAfter)
+            if (final.Poses == null && !force && hanging.LatestPoseTime < final.At + LabFinishReplayShot.PoseAfter)
             {
                 waiting = true;
                 return false;
             }
-            int count = Mathf.Min(LabFinishReplayShot.MaximumPoses,
-                Mathf.CeilToInt((LabFinishReplayShot.PoseBefore + LabFinishReplayShot.PoseAfter) * LabFinishReplayShot.PoseRate) + 1);
-            var poses = new LabHangingTarget.RigState[count];
-            for (int i = 0; i < count; i++)
-                hanging.TrySamplePose(final.At - LabFinishReplayShot.PoseBefore + i / LabFinishReplayShot.PoseRate, out poses[i]);
+            var poses = final.Poses ?? SampleReplayPoses(hanging, final.At);
             ReplayLaunch launch = final.Launch;
             var shot = new LabFinishReplayShot
             {
@@ -126,9 +167,9 @@ namespace C6Lab
                 HitPoint = final.Point, HitNormal = final.Normal, ImpactVelocity = final.Velocity,
                 PoseStart = -LabFinishReplayShot.PoseBefore, Poses = poses
             };
-            if (!shot.IsValid()) return false;
+            if (!shot.IsValid()) { FinishReplayMissReason = "invalid_shot"; return false; }
             string record = shot.Encode();
-            if (record.Length > LabFinishReplayShot.MaximumEncodedLength) return false;
+            if (record.Length > LabFinishReplayShot.MaximumEncodedLength) { FinishReplayMissReason = "record_too_long"; return false; }
             encoded = record;
             return true;
         }
