@@ -30,6 +30,8 @@ namespace Hapio
         private StoryStageClearControls clearControls;
         private Coroutine pendingReady;
         private bool resultActionsReady, transitionPending;
+        private StoryStageReadyView readyView;
+        public StoryStageReadyView ReadyView => readyView;
         private readonly List<BoundAction> boundActions = new List<BoundAction>();
         private sealed class BoundAction
         {
@@ -62,6 +64,15 @@ namespace Hapio
                 Show(player.nextButton, false); Set(player.nextButton, false);
             }
             if (presentationRoot != null) presentationRoot.SetActive(false);
+            if (readyView == null && presentationRoot != null)
+            {
+                readyView = StoryStageReadyView.Create(presentationRoot.transform);
+                readyView.start.onClick.AddListener(StartPreparedStage);
+                readyView.quit.onClick.AddListener(RequestExit);
+                readyView.cancelQuit.onClick.AddListener(CancelQuit);
+                readyView.confirmQuit.onClick.AddListener(ConfirmQuit);
+                readyView.ResetView();
+            }
             if (advanceButton != null) advanceButton.onClick.AddListener(Advance);
             if (exitButton != null) exitButton.onClick.AddListener(RequestExit);
             if (skipButton != null && (player == null || skipButton != player.skipButton)) skipButton.onClick.AddListener(Skip);
@@ -250,6 +261,8 @@ namespace Hapio
                 || GenerationKey(session) != expectedGeneration) yield break;
             resultActionsReady = true;
             SetBusy(false);
+            if (session.LocalSealReady && readyView != null && mode == Mode.ReadyToAdvance)
+                readyView.BeginWaiting(session.Network.IsHost, session.State.runId, session.State.stageIndex, boundResult.players, session.ResultLocalPlayerId);
             RefreshControls();
         }
 
@@ -280,6 +293,7 @@ namespace Hapio
 
         private bool ActionsBlocked => screen.StoryActionsBlocked || session.IsLoadingScene
             || session.IsViewerOpen || pendingFinish != null || transitionPending
+            || readyView != null && readyView.IsConfirmingQuit
             || ((mode == Mode.ReadyToAdvance || mode == Mode.FailureDashboard) && !resultActionsReady);
 
         private void RefreshControls()
@@ -294,8 +308,14 @@ namespace Hapio
             Show(player.nextButton, false); Set(player.nextButton, false);
             bool primary = review && (final || session.Network.IsHost) || failed && session.Network.IsHost && !HasAction("Retry");
             bool authoredClear = clearControls != null;
-            if (authoredClear) clearControls.Present(review, session.Network.IsHost,
-                !blocked && (final ? session.CanStartSummary : session.CanAdvanceStage));
+            if (authoredClear) clearControls.Present(review && !session.LocalSealReady, session.Network.IsHost, !blocked);
+            if (readyView != null)
+            {
+                readyView.transform.SetAsLastSibling();
+                readyView.Present(victory && (mode == Mode.AfterStage || review || mode == Mode.Ending),
+                    final ? session.CanStartSummary : session.CanAdvanceStage,
+                    session.SealReadyCount, session.SealParticipantCount, blocked, final);
+            }
             Show(advanceButton, primary && !authoredClear);
             Set(advanceButton, primary && !blocked && (failed ? session.CanRetryStage : final ? session.CanReturnHome : session.CanAdvanceStage));
             Label(advanceButton, failed ? "이 스테이지 재도전" : final ? "봉인 총평" : "다음 스테이지");
@@ -371,7 +391,15 @@ namespace Hapio
             if (!IsPresenting || ActionsBlocked) return;
             if (mode == Mode.FailureDashboard) { Retry(); return; }
             if (mode != Mode.ReadyToAdvance) return;
-            if (!session.Network.IsHost) return;
+            if (session.LocalSealReady || !session.ConfirmSealReady()) return;
+            readyView.BeginWaiting(session.Network.IsHost, session.State.runId, session.State.stageIndex,
+                boundResult.players, session.ResultLocalPlayerId);
+            RefreshControls();
+        }
+
+        public void StartPreparedStage()
+        {
+            if (mode != Mode.ReadyToAdvance || ActionsBlocked || !session.LocalSealReady || !session.Network.IsHost) return;
             if (session.State.phase == GameFlowPhase.Completed)
             {
                 if (session.StartSummary()) BeginEnding();
@@ -406,15 +434,30 @@ namespace Hapio
         public void RequestExit()
         {
             if (!IsPresenting || ActionsBlocked) return;
-            if (victory && session.State.phase == GameFlowPhase.Completed)
-            { if (mode == Mode.ReadyToAdvance) Advance(); }
-            else screen.TryStoryHome();
+            if (!victory) { screen.TryStoryHome(); return; }
+            readyView.ShowQuit(true);
+            SetBusy(true);
+            RefreshControls();
+        }
+
+        public void CancelQuit()
+        {
+            if (readyView == null) return;
+            readyView.ShowQuit(false);
+            SetBusy(mode != Mode.ReadyToAdvance && mode != Mode.FailureDashboard); RefreshControls();
+        }
+        public void ConfirmQuit()
+        {
+            if (readyView == null || !readyView.IsConfirmingQuit || session == null) return;
+            readyView.ShowQuit(false);
+            session.QuitStoryToRooms();
         }
 
         private void BeginEnding()
         {
             if (mode == Mode.Ending || !session.SummaryAllowed || !session.CanReturnHome) return;
             showingOverall = false; mode = Mode.Ending; SetBusy(true);
+            if (readyView != null) readyView.ResetView();
             player.Play(ending); RefreshControls();
         }
 
@@ -454,6 +497,7 @@ namespace Hapio
             pendingFinish = null;
             if (pendingReady != null) StopCoroutine(pendingReady);
             pendingReady = null; resultActionsReady = false; transitionPending = false;
+            if (readyView != null) readyView.ResetView();
             if (busy && session != null && GenerationKey(session) == generation) SetBusy(false);
             busy = false;
             UnbindActions();

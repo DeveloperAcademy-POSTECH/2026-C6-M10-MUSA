@@ -1,5 +1,26 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-11 — #664 병합 뒤 실패 검사 정리
+
+- **기준:** `fix/664-test-failures` (main `8b8aeb59`). Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal).
+- **원인:** #680(#664) 병합 뒤 전체 검사에서 실패 6건이 나왔다. 6건 모두 PR 브랜치(`13bea1d8`)에서도 같이 실패했고 병합 전 main(`f80506bc`)에서는 통과했다. 모두 #664가 의도해서 바꾼 동작을 예전 기준으로 검사하던 것이다. 실행 코드는 바꾸지 않았다.
+  - `LabCharmHostIdentityPlayTests`: `StartCharm`이 대상 목록(`IReadOnlyList<ulong>`)을 받게 바뀌었다. 검사는 한 명짜리 목록으로 부른다.
+  - `LabComboEffectLookTests` 2건: BIG/SMALL은 이제 팀의 마지막 결과(`LastEffectResult`)부터 센다. 그래서 검사용 스냅샷에 결과 횟수·종류를 넣고, 결과 문구는 이미 보인 것으로 둔다.
+  - `LabOrbPhysicsTests`: 매혹된 판은 이제 멈추고 터치를 받지 않는다. 그래서 위로 밀기 튕김 대신 터치 거절을 검사하고, 검사 이름도 바꿨다.
+  - `GameSceneFlowTests` 여우·매혹 초기화: 여우구슬 목표에서 빼는 수(0~3)에 따라 하나만 지워도 라운드가 끝나 남은 여우가 사라졌다. 그래서 빼는 수를 0으로 고정한다.
+  - `LabModelTests` 여우·음양: 이미 main `b0764a72`에서 고쳐져 있다.
+
+| 확인 | 결과 |
+| --- | --- |
+| 실패 4종 PlayMode(`LabCharmHostIdentityPlayTests`·`LabComboEffectLookTests`·`LabOrbPhysicsTests`·해당 `GameSceneFlowTests`) / EditMode `LabModelTests` | 73/73, 126/126 PASS |
+| 전체 EditMode / PlayMode | 2337/2337, 839/840. 남은 1건 `GameTutorialFlowTests.FinishedOpening…`(`Invalid index 0 36 1` 로그)는 #680 병합 전 main에서도 같은 실패 |
+
+- **튜토리얼 검사(같은 PR에서 추가):** `GameTutorialFlowTests`의 세로 Game view 크기 정리는 #671에서 들어왔다. `GameViewSizeGroup.RemoveCustomSize`에 전체 목록 번호(기본 크기 다음)를 넘겨야 하는데 사용자 크기 안의 번호(0)를 넘겼다. 그래서 지우기가 거절되며 `Invalid index 0 36 1`이 남았고, 더한 390×844 크기도 지워지지 않았다. 더할 때의 전체 번호로 지우게 고쳤다.
+
+| 확인 | 결과 |
+| --- | --- |
+| `GameTutorialFlowTests` | 5/5 PASS, 로그에 `Invalid index` 없음 |
+
 ## 2026-11-11 — 박 칠 색을 오행 팔레트 그대로 (클레이 농도 1)
 
 - **기준:** `feat/clay-full-palette-color` (main `51a24721`). Unity 6000.6.5f1 batch(macOS, Metal). 박 칠 색은 표현만 바꿨고, 판정·P 지도·도색 해시·접속 규약·공유 설정은 그대로다.
@@ -8365,6 +8386,43 @@ Unity 6000.6.5f1 / macOS Metal Editor에서 컴파일·전체 EditMode와 UI 영
 - 도장 즉시 표시·PNG 참조·텍스트 중복 없음·터치 통과·반동 후 1배 정착·유지 후 종료, 기존 비야광귀 콤보 표시 및 렌더 준비 수명 검사를 통과했다.
 - 임시 Canvas/카메라의 실제 Unity UI 렌더를 0.06/0.16/0.5/1.5초에서 확인했다. 배경 투명 부분과 도장 크기·기울기를 확인하고 임시 객체·RenderTexture를 해제했다. 실제 전투 전체 화면과 iOS 실기기의 타격감·음성 타이밍은 미검증이다.
 
+## 2026-11-11 — #687 스토리 준비 대기·그만두기
+
+원래 Unity 프로젝트, `feat/687-stage-ready-quit`. 시작 기준 main `f8998ff0`에서 구현하고 작업 중 들어온 팀원 PR #686·#690의 `3719fb99`를 fast-forward로 반영했다. 개인 productName/스플래시 설정과 iOS 빌드 프로필은 보존했다. Unity 6000.6.5f1 macOS Metal Editor/iOS 타깃이다. 명시적 참여자 준비와 Game54 제어 필드가 추가되어 전체 EditMode·PlayMode를 선택했다.
+
+- 초기 EditMode: 2336/2337, 이어 새 검사 포함 2338/2339(59.56초). 기존 여우구슬 충돌 fixture가 첫 충돌 후 팀 성공으로 남은 구슬까지 지워져 ORB_NOT_FOUND로 실패했다. 이 EditMode 보완은 최신 main의 팀원 #686 변경으로 들어왔다. 최종 전체 EditMode **2339/2339, 56.51초**, 실패·skip 0.
+- 최초 PlayMode 시도는 개인 iOS 프로필이 Lab 장면을 제외해 26/840 진행 중 중단했다. 테스트 때만 프로필의 공용 장면 목록을 사용했다. 종료 후 원래 overrideGlobalScenes=true와 개인 프로필을 복원했다.
+- 전체 PlayMode **832/841, 1144.56초**, 실패9·skip0. 새 그만두기→Home 방 목록 복귀 검사는 통과했다. 실패 내역과 로그는 원시 결과에 보존했다.
+- 수정/통합 뒤 영향 PlayMode **47/49, 224.91초**, 실패2·skip0. GameSceneFlow29, GameStageRetry2, StoryStageReady1, StoryTapAdvance4는 모두 통과(**스토리 관련36/36**). 함께 들어온 GameBattleUiPresentation4·LabYaguangCountLook2도 통과. LabComboEffectLook는5/7이다.
+
+전체 검사 중 실제 클릭 fixture 한 곳이 예전 한 번의 다음 봉인 클릭만 보내고 있었으므로 준비→별도 시작 두 입력으로 바꿨다. 여우구슬→매혹→재시작→다음 스테이지 검사도 #664 기본 spare로 두 번째 구슬이 먼저 사라지지 않도록 해당 fixture에서만 spare=0을 지정했다. 기존 접촉·재시작·설정 유지 단언을 완화하지 않았으며 재검사에서 모두 통과했다. 전체 검사에서 실패했던 StoryTapAdvance2건도 영향 묶음에서는 통과했다. 최종 UI 정리와 main의 표시 변경에는 영향 묶음을 재실행하고 실행 코드가 그대로인 다른 전체 검사 결과를 재사용했으므로, 최신 버전 전체 PlayMode가 한 번에 모두 통과했다고 기록하지 않는다.
+
+미해결/미확인: `LabCharmHostIdentityPlayTests.RescuingTheHostRaisesTheLocalWakeEventExactlyOnceWithPlayerZero`는 기존 private StartCharm의 배열 인자와 fixture의 ulong 인자 불일치, `LabOrbPhysicsTests.ACharmedBoardsThrowingEdgeGlowsRedAndAnUpwardSwipeOnlyFlicksTheOrb`는 기존 매혹 동작 단언 실패다. 콤보의 `SmallShowsABarWithoutSecondsAndBigRainsStarsInstead`·`TheSmallBarStandsUpAndShrinksDownward`는 재검사에서도 각각1.25, 약0.15로 실패했다. 이 경로는 이번 준비 UI 구현에서 수정하지 않았다. 튜토리얼의 `FinishedOpeningOpensThePracticeBoardOnceThenTheRoomList`는 본문 동작 뒤 Game View 선택 복원 과정에서 Invalid index로 실패했으며 재검사하지 않았다. 해당 검사의 성공으로 간주하지 않는다.
+
+화면 검증: 실제 Unity UI를804×1748 RenderTexture에 렌더해 구성원·방장 대기·전원 준비·확인 팝업4개를 확인했다. Figma의 gamma 합성용 기존 재질을 dim과 그림자에 재사용해 밝기 차이를 보정했고, 구성원383.57 기준 폭과402 화면 폭 차이의 흰 띠는 종이 배경을 바깥으로 이어서 제거했다. 캐릭터 중복 없는5자리 배정, 기존 프레임 애니메이션, timeScale=0에서 문구 교대, popup 중 시작 차단/취소 준비 유지/확인 후 방 목록 복귀를 검사했다. 마지막 종이 maskable 수정은 UI 렌더와 위 영향 PlayMode에 포함됐으며 게임 규칙은 바꾸지 않았다.
+
+원시 JSON과 화면 PNG는 로컬 Codex 작업공간 `artifacts/issue687/`에 보관한다. 이번 작업은 새 iOS/Mac 빌드나 실기기3~5대 동시 접속 검증을 수행하지 않았다. 참가 기기는 Game54가 포함된 같은 빌드를 사용해야 한다.
+
+
+## 2026-11-11 — #697 미사용 지귀 검사 정리와 NUnit 발견 복구
+
+기준 main `e97a4a25`, 브랜치 `chore/#697-retire-unused-jigwi-tests`, Unity6000.6.5f1 / macOS Metal Editor다. 로컬 지침 변경은 별도 로컬 보존 커밋 `0bc0541c`와 사본으로 보존한 뒤 최신 main에 적용했다. 미사용 검사 정리 절·보고서 안내와 최신 main의 #687 지침이 함께 유지되는지 비교했다. 게임 runtime/editor 코드·Scene·Prefab·Shader·Material·게임 에셋·asmdef·패키지·설정·통신 규약은 변경하지 않았다.
+
+삭제 대상/근거/대체 검사의13개 대응표는 `TEST_SUITE_REPORT.md`의 #697 절에 기록했다. 두 구형 fixture와 meta는 Unity AssetDatabase로 함께 제거했다. 해당 GUID는 다른 Scene·Prefab·설정에 참조되지 않았고, 남은 합성 fixture의 공용 준비·정리와 meta를 유지했다. 과거 VALIDATION 기록은 변경하지 않았다.
+
+| 단계 | 실제 결과 |
+| --- | --- |
+| 삭제 전 현행 공용 에셋 이관 검사 | `LabJigwiABPresentationTests.AOrbFlameUsesTheDedicatedInkMaterialAndItsRealTransparentTexture` **1/1**,0.23초. 실제 Metal GPU로 wash alpha를 읽고 현행 A 구슬 renderer를 확인한 뒤 구형 검사를 삭제했다. |
+| `[Test]` 복구 직후 단독 검사 | **0/1**,0.30초. 처음 Launch에서 ORB_NOT_FOUND: 시각0에서39.9까지 지난 A가 새로 주입한 fixture 구슬을 소급 소각했다. |
+| 누락 검사 fixture 수정 후 | **1/1**,0.29초.39.9초까지 먼저 진행한 뒤 일반 구슬/비행 구슬을 주입한다. 이 인위적 fixture에서만 B 공급 탄환을 빼 만료 단언을 일반 구슬 보존에 한정했다. 실제 공급 탄환 제거는 기존 `LabJigwiABSupplyModelTests.DeadlineFailureRemovesOnlyThisMissionsSupplyAndKeepsBoardsAndStamina`가 확인하며 해당 검사는 바꾸지 않았다. 기존16개 단언·3초 경계·HP/스태미나/명중 통계·상태 유효성 확인은 유지했다. |
+| 최종 전체 EditMode | **2340/2340**,34.44초. 복구한 메서드와 기존 공급 탄환·호환성 검사 포함, 실패/skip/inconclusive0. |
+| 현행 지귀 표현 PlayMode | `LabJigwiABPresentationTests` **21/21**,1.71초. 이전한 공용 에셋 검사와 현재 A/B,정지/재개,구형 표면 제거 포함. |
+| 합성 PlayMode | `LabOrbHudCompositionTests` **7/7**,0.12초. 기존 rear-art/alpha/공용 준비 유지. |
+| 저장 Home→지귀 PlayMode | `GameJigwiStageIntegrationTests` **1/1**,3.80초. |
+| 최종 NUnit 발견 목록 | 이관/복구 후 삭제 직전 Edit2340/Play843 → 삭제 후 Edit2340/Play830. 차이는 지정한13개와 정확히 일치하고 예상 밖 누락/추가0. 이관한 에셋 검사와 복구한 B 실패 검사는 둘 다 남아 있다. 이 수치는 발견 목록이며 Play830개 전체 통과를 뜻하지 않는다. |
+
+이번 실행은 전체 EditMode와 영향 PlayMode29개다. 실제 게임 코드·공유 fixture·asmdef·에셋이 바뀌지 않아 전체 PlayMode는 재실행하지 않았다. iOS/실기기/독립 앱/일반 Wi-Fi·핫스팟 확인과 새 빌드는 수행하지 않았다. 새 검사와 최종 실행의 skip/inconclusive는0이며 최초 실패도 위에 보존했다. 원시 결과·발견 목록은 커밋하지 않은 로컬 `artifacts/jigwi-test-retirement`에 있다. 기존 Scene을 복원했고 Editor 재생OFF/컴파일OFF/미저장변경없음을 확인했다.
+
 ## 2026-11-11 #692 야광귀 콤보 보드 사이즈
 
 - 기준 `3719fb99` 위 `fix/#692-yagwanggwi-combo-board-size` 작업 사본, Unity 6000.6.5f1 macOS Editor. 보드 배치·구슬 크기·상단 제목/밑줄 숨김 및 복원만 변경했다. UI 변경 범위에 따라 전체 EditMode 및 관련 PlayMode를 선택했고 전체 PlayMode·빌드는 실행하지 않았다.
@@ -8378,3 +8436,10 @@ Unity 6000.6.5f1 / macOS Metal Editor에서 컴파일·전체 EditMode와 UI 영
 - 전체 EditMode **2,337/2,337 PASS**(52.95초), 관련 PlayMode **15/15 PASS**(8.52초). 범위는 직전 #692와 동일하며 전체 PlayMode·실기기·빌드는 미실행이다.
 - 1~4 텍스트/미적중 표시·적중 시 구슬 및 번호 숨김·체크 최초 등장 반동·정착·최종 칸 체크 후 성공 도장 전환을 검사했다. 전투 신라문화체를 연결한 임시 Unity Canvas 렌더에서 기본 상태와 1번 적중 상태를 확인하고 임시 객체/RT를 해제했다.
 - 최초 컴파일에서 기존 지역 변수명과 충돌(CS0136)한 것을 전용 orderOutline 이름으로 수정했다. 최초 EditMode 시도는 Editor Play Mode 상태로 시작되지 않아 정지 후 재실행했다. 최종 컴파일 오류 0, diff 공백 검사 통과.
+
+
+## 2026-11-11 — #692 main 병합 충돌 해결
+
+기준 #692 `4b99504e`에 main `45a55a34`를 병합했다. 충돌은 `LabComboEffectLookTests.cs`의 중복 fixture 보완과 이 문서 끝의 병렬 기록 추가였다. 테스트는 main의 `MarkResultShown` helper와 조건부 결과 count/종류를 그대로 유지하고, #692·#687·#697 검증 기록은 모두 보존했다. #692의 보드 크기·번호·체크 애니메이션 runtime 코드는 변경하지 않았다. main의 설정265개·5702/Lab62/Game54를 유지한다.
+
+Unity 6000.6.5f1 macOS Editor에서 새로고침 후 컴파일 오류0. 전체 EditMode **2340/2340 PASS**(47.70초), 관련 PlayMode **15/15 PASS**(7.69초), 실패/skip0. PlayMode 범위는 LabYaguangCountLookTests·LabComboEffectLookTests·LabComboProjectileIntegrationTests·GameBattleRenderWarmupTests다. 전체 PlayMode·빌드·실기기는 이번 병합에서 실행하지 않았다. diff 공백 및 충돌 표식 검사를 수행했다.

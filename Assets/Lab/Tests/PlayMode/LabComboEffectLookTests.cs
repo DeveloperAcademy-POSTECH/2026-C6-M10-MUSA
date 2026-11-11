@@ -104,10 +104,9 @@ namespace C6Lab.Tests
             hud.Bind(network, canvasRoot.GetComponent<Canvas>());
             FieldInfo latest = typeof(LabNetwork).GetField("latest", BindingFlags.Instance | BindingFlags.NonPublic);
             Assert.That(latest, Is.Not.Null);
+            MarkResultShown(hud);
             try
             {
-                // The result has already been presented; test the continuing effect only.
-                typeof(LabGourdComboHud).GetField("shownResultCount", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(hud, 1u);
                 latest.SetValue(network, Snapshot(network, 50d, penaltyUntil: 55d));
                 yield return null;
                 yield return null;
@@ -214,8 +213,7 @@ namespace C6Lab.Tests
             FieldInfo latest = typeof(LabNetwork).GetField("latest", BindingFlags.Instance | BindingFlags.NonPublic);
             try
             {
-                // The result has already been presented; test the continuing effect only.
-                typeof(LabGourdComboHud).GetField("shownResultCount", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(hud, 1u);
+                MarkResultShown(hud);
                 latest.SetValue(network, Snapshot(network, 50d, penaltyUntil: 59d));
                 yield return null;
                 yield return null;
@@ -238,6 +236,14 @@ namespace C6Lab.Tests
             }
         }
 
+        /// <summary>The fixture's combo result (count 1) has already shown its words; only its BIG/SMALL effect is left.</summary>
+        private static void MarkResultShown(LabGourdComboHud hud)
+        {
+            FieldInfo shown = typeof(LabGourdComboHud).GetField("shownResultCount", BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(shown, Is.Not.Null);
+            shown.SetValue(hud, 1u);
+        }
+
         private static LabSnapshot Snapshot(LabNetwork network, double now, double penaltyUntil = 0d, double rewardUntil = 0d)
         {
             return new LabSnapshot
@@ -246,10 +252,11 @@ namespace C6Lab.Tests
                 comboCount = 1, comboActive = false,
                 comboColors = new[] { LabOrbElement.Fire, LabOrbElement.Water, LabOrbElement.Wood, LabOrbElement.Earth },
                 comboResultAt = 49d,
-                // #664 resolves effect age from the latest explicit result, not its timestamp alone.
-                comboResultCount = 1,
-                comboResult = penaltyUntil > 0d ? LabComboResult.WrongColor
-                    : rewardUntil > 0d ? LabComboResult.Success : LabComboResult.None,
+                // #664: BIG/SMALL runs from the team's last counted result (LabSnapshot.LastEffectResult), so an effect
+                // comes with the result that gave it, as the Host sends it.
+                comboResultCount = penaltyUntil > 0d || rewardUntil > 0d ? 1u : 0u,
+                comboResult = rewardUntil > 0d ? LabComboResult.Success
+                    : penaltyUntil > 0d ? LabComboResult.Timeout : LabComboResult.None,
                 players = new[]
                 {
                     new LabPlayerState { id = network.LocalPlayerId, comboPenaltyUntil = penaltyUntil, comboRewardUntil = rewardUntil }

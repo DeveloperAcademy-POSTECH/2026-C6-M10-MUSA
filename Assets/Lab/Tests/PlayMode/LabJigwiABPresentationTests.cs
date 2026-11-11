@@ -393,6 +393,51 @@ namespace C6Lab.Tests
             Assert.That(view.statusPanel.gameObject.activeSelf, Is.False);
         }
 
+        [Category("GPU")]
+        [Test]
+        public void AOrbFlameUsesTheDedicatedInkMaterialAndItsRealTransparentTexture()
+        {
+            if (SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Null)
+                Assert.Ignore("GPU unavailable: the actual imported flame texture alpha was not read back.");
+            Material source = Resources.Load<Material>("Jigwi/SurfaceFlame");
+            Texture2D wash = Resources.Load<Texture2D>("Jigwi/SurfaceFlameWash");
+            Assert.That(source, Is.Not.Null, "The current A orb flame needs its Player-loadable ink material.");
+            Assert.That(wash, Is.Not.Null);
+            Assert.That(source.shader, Is.Not.Null);
+            Assert.That(source.shader.name, Is.EqualTo("C6Lab/Jigwi Ink Flame"));
+            Assert.That(source.shader.isSupported, Is.True, "The actual render pipeline must support the flame shader.");
+            Assert.That(source.GetTexture("_BaseMap"), Is.SameAs(wash));
+            Assert.That(source.renderQueue, Is.GreaterThanOrEqualTo(3000));
+
+            var orb = new GameObject("Current A orb ink flame asset fixture");
+            orb.transform.SetParent(root.transform, false);
+            var body = orb.AddComponent<LabOrbView>();
+            body.Configure("a-ink-flame", LabOrbKind.Combined, .32f, LabOrbElement.Wood);
+            body.Body.useGravity = false;
+            body.SetJigwiABBurn(.5f, true);
+            Assert.That(body.JigwiABFlame.Charring, Is.True, "Exercise the current A orb's last-second flame.");
+            MeshRenderer charRenderer = body.JigwiABFlame.FlameRenderer;
+            MeshRenderer tongue = body.JigwiABFlame.TongueRenderer;
+            Assert.That(charRenderer.enabled, Is.True);
+            Assert.That(tongue.enabled && tongue.gameObject.activeInHierarchy, Is.True,
+                "The real A orb tongue must use the shared art, rather than leaving it as an unused Resource.");
+            Assert.That(charRenderer.sharedMaterial.shader, Is.SameAs(source.shader));
+            Assert.That(charRenderer.sharedMaterial.GetTexture("_BaseMap"), Is.SameAs(body.JigwiABFlame.CharTexture));
+            Assert.That(tongue.sharedMaterial.shader, Is.SameAs(source.shader));
+            Assert.That(tongue.sharedMaterial.GetTexture("_BaseMap"), Is.SameAs(wash));
+            Assert.That(tongue.sharedMaterial.renderQueue, Is.GreaterThanOrEqualTo(3000));
+            Mesh mesh = tongue.GetComponent<MeshFilter>().sharedMesh;
+            Assert.That(mesh.uv.Length, Is.EqualTo(mesh.vertexCount));
+            Assert.That(mesh.uv.Any(uv => uv.x < .1f), Is.True);
+            Assert.That(mesh.uv.Any(uv => uv.x > .9f), Is.True);
+
+            Color32[] pixels = ReadFlameTexture(wash);
+            Assert.That(pixels.Count(pixel => pixel.a < 10), Is.GreaterThan(4),
+                "The flame art must have real transparent space without a rectangular background.");
+            Assert.That(pixels.Count(pixel => pixel.a > 180), Is.GreaterThan(4),
+                "The ink/flame strokes must remain visible through their alpha channel.");
+        }
+
         [UnityTest]
         public IEnumerator AOrbFireHasItsOwnHeldCountdownAndClearsWithoutChangingBombFireOrTheBody()
         {
@@ -502,6 +547,28 @@ namespace C6Lab.Tests
             Assert.That(view.personalHeat.rectTransform.sizeDelta, Is.EqualTo(originalA));
             Assert.That(view.personalHeat.GetComponentsInParent<UnityEngine.UI.RectMask2D>(true), Is.Empty);
             Assert.That(view.personalWaterDouse.GetComponentsInParent<UnityEngine.UI.RectMask2D>(true), Is.Empty);
+        }
+
+        private static Color32[] ReadFlameTexture(Texture source)
+        {
+            var capture = new RenderTexture(128, 128, 0, RenderTextureFormat.ARGB32);
+            var readback = new Texture2D(128, 128, TextureFormat.RGBA32, false, true);
+            RenderTexture previous = RenderTexture.active;
+            try
+            {
+                Graphics.Blit(source, capture);
+                RenderTexture.active = capture;
+                readback.ReadPixels(new Rect(0, 0, capture.width, capture.height), 0, 0);
+                readback.Apply(false, false);
+                return readback.GetPixels32();
+            }
+            finally
+            {
+                RenderTexture.active = previous;
+                capture.Release();
+                Object.DestroyImmediate(capture);
+                Object.DestroyImmediate(readback);
+            }
         }
 
         private void SetSnapshot(LabSnapshot value) => typeof(LabNetwork).GetField("latest", Private).SetValue(network, value);

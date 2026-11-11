@@ -50,7 +50,7 @@ namespace C6Lab.Tests
             double now = Time.realtimeSinceStartupAsDouble;
             var model = new LabModel();
             model.Begin(session, new ulong[] { 0, neighbor }, now, controlledConfig);
-            typeof(LabModel).GetMethod("StartCharm", Private).Invoke(model, new object[] { 0ul, now });
+            typeof(LabModel).GetMethod("StartCharm", Private).Invoke(model, new object[] { new ulong[] { 0ul }, now });
             typeof(LabNetwork).GetField("model", Private).SetValue(network, model);
             typeof(LabNetwork).GetField("sessionId", Private).SetValue(network, session);
             typeof(LabNetwork).GetField("latest", Private).SetValue(network, model.Snapshot(now));
