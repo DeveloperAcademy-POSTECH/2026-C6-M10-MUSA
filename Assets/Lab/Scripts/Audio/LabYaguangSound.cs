@@ -6,7 +6,7 @@ namespace C6Lab
     public enum LabYaguangSfx { FlashWarn, FlashGlow, FlashCount, FlashBurst, FlashTaunt, ShakeBell, ShakeBellFinal, FlashCaught,
         ComboCountOne, ComboCountTwo, ComboCountThree, ComboCountFour, ComboStart, ComboTick, ComboTickFast,
         ComboTaunt, ComboSmallStart, ComboSmallEnd, ComboBigStart, ComboBigEnd, ComboClearedFirst, ComboClearedSecond,
-        ComboGuideRule, ComboGuideFire, ComboGuideWater, ComboGuideWood, ComboGuideMetal, ComboGuideEarth }
+        ComboGuideRule, ComboGuideHit1, ComboGuideHit2, ComboGuideHit3, ComboGuideClear }
 
     /// <summary>
     /// 야광귀 섬광 예고와 번쩍 효과음 (#395). Host 스냅샷의 섬광 시각만 보고 소리를 낸다(화면 코드와 따로 돈다).
@@ -37,9 +37,8 @@ namespace C6Lab
     /// #695 금옥 콤보 안내 (모든 기기, 금옥 목소리, 야광귀 목소리와 따로):
     /// - 규칙 (Audio/YaguangComboGuideRule): 콤보 예고가 시작될 때, 라운드의 처음 Inspector 번(기본 1 = 첫 콤보만).
     ///   이 안내가 나오는 동안은 야광귀의 넷/셋/둘/하나 목소리를 내지 않는다(Inspector로 끌 수 있음, 알아챈 횟수는 센다).
-    /// - 색 부르기 (Audio/YaguangComboGuideFire 빨강 / Water 파랑 / Wood 초록 / Metal 노랑 / Earth 갈색):
-    ///   4칸이 나오면 첫 칸 색을, 칸을 맞힐 때마다 다음 칸 색을 Inspector 지연(기본 0.3초) 뒤에 부른다. 새로 부르면 앞의 안내는 끊는다.
-    ///   콤보가 끝나면(성공/실패) 부르지 않는다.
+    /// - 칭찬 (Audio/YaguangComboGuideHit1 "좋아!" / Hit2 "잘했어!" / Hit3 "하나만 더..!" / Clear "그렇지!!"):
+    ///   칸을 맞힐 때마다 Inspector 지연(기본 0.3초) 뒤에. 새로 말하면 앞의 안내는 끊는다. 실패하면 말하지 않고 야광귀가 "메롱~"을 한다.
     /// #664 구미호 여우구슬 판정 (모든 기기, 야광귀 콤보와 같은 소리):
     /// - 제한 시간 째깍: 여우구슬이 떨어진 순간부터 콤보와 같은 간격으로 째깍, 남은 시간이 짧으면 빠른 째깍. 다 지우면 바로 멈춘다.
     /// - BIG/SMALL 시작·끝: 콤보 결과와 같은 때 (결과 + LabGourdComboHud.ResultSeconds, 가장 늦게 끝나는 사람 기준).
@@ -77,8 +76,8 @@ namespace C6Lab
             ComboStartFolder, ComboTickFolder, ComboTickFastFolder,
             ComboTauntFolder, ComboSmallStartFolder, ComboSmallEndFolder, ComboBigStartFolder, ComboBigEndFolder,
             ComboClearedFirstFolder, ComboClearedSecondFolder,
-            ComboGuideFolder + "Rule", ComboGuideFolder + "Fire", ComboGuideFolder + "Water", ComboGuideFolder + "Wood",
-            ComboGuideFolder + "Metal", ComboGuideFolder + "Earth" };
+            ComboGuideFolder + "Rule", ComboGuideFolder + "Hit1", ComboGuideFolder + "Hit2", ComboGuideFolder + "Hit3",
+            ComboGuideFolder + "Clear" };
         /// <summary>The folders this component loads, for the battle audio preload (#492).</summary>
         public static System.Collections.Generic.IReadOnlyList<string> ClipFolders => Folders;
         /// <summary>The ones the 구미호 fox round plays too (#664): its clock and the BIG/SMALL start and end.</summary>
@@ -322,7 +321,7 @@ namespace C6Lab
             }
             if (snapshot.paused) return;
 
-            ObserveGuideColor(snapshot, now);
+            ObserveGuideFeedback(snapshot, now);
 
             // 예고: 남은 초(올림)가 바뀔 때마다 그 수를 야광귀가 센다. 4초보다 길면 넷부터 다시 (말풍선과 같음).
             if (snapshot.ComboWarningOn(now))
@@ -360,56 +359,38 @@ namespace C6Lab
         }
 
         /// <summary>
-        /// #695 금옥 색 부르기: 4칸이 나오면 첫 칸, 칸을 맞힐 때마다 다음 칸 색을 Inspector 지연 뒤에 부른다.
-        /// 같은 콤보 안에서만 부르고, 콤보가 끝났거나 너무 늦게 알아챘으면 부르지 않는다.
+        /// #695 금옥 칭찬: 같은 콤보 안에서 칸을 맞힐 때마다 Inspector 지연 뒤에 1칸 "좋아!", 2칸 "잘했어!", 3칸 "하나만 더..!",
+        /// 4칸(성공) "그렇지!!". 1~3칸은 그 사이 콤보가 끝났으면(실패) 내지 않는다. 실패는 야광귀 "메롱~"이 맡는다.
+        /// 너무 늦게 알아챘으면 내지 않는다.
         /// </summary>
-        private void ObserveGuideColor(LabSnapshot snapshot, double now)
+        private void ObserveGuideFeedback(LabSnapshot snapshot, double now)
         {
             if (snapshot.comboCount != guideComboFor)
             {
-                bool newer = snapshot.comboCount > guideComboFor;
                 guideComboFor = snapshot.comboCount;
                 guideProgress = snapshot.comboProgress;
                 guideSlot = -1;
-                // 4칸이 나온 순간: 첫 칸 색 (깽! 뒤에).
-                if (newer && snapshot.comboActive && snapshot.comboStartedAt >= 0d)
-                    Due(snapshot.comboProgress, snapshot.comboStartedAt + GuideColorDelay);
             }
-            else if (snapshot.comboActive && snapshot.comboProgress > guideProgress)
+            else if (snapshot.comboProgress > guideProgress)
             {
-                // 칸을 맞혔다: 다음 칸 색 (맞힌 소리 뒤에).
+                // 칸을 맞혔다 (맞힌 소리 뒤에). 한 번에 여러 칸이 늘었으면 마지막 칸의 말만.
                 guideProgress = snapshot.comboProgress;
-                Due(snapshot.comboProgress, now + GuideColorDelay);
+                guideSlot = Mathf.Min(snapshot.comboProgress, LabGourdCombo.Length);
+                guideSlotAt = now + GuideFeedbackDelay;
             }
-            if (guideSlot < 0 || now < guideSlotAt) return;
-            int slot = guideSlot;
+            if (guideSlot < 1 || now < guideSlotAt) return;
+            int hits = guideSlot;
             guideSlot = -1;
-            if (!snapshot.comboActive || snapshot.comboColors == null || slot >= snapshot.comboColors.Length
-                || now - guideSlotAt > LateSeconds) return;
-            LabYaguangSfx? color = GuideColorSfx(snapshot.comboColors[slot]);
-            if (color.HasValue) PlayGuide(color.Value);
+            if (now - guideSlotAt > LateSeconds) return;
+            bool cleared = hits >= LabGourdCombo.Length;
+            if (!cleared && !snapshot.comboActive) return;
+            PlayGuide(GuideFeedbackSfx(hits));
         }
 
-        private void Due(int slot, double at)
-        {
-            if (slot >= LabGourdCombo.Length) { guideSlot = -1; return; }
-            guideSlot = slot;
-            guideSlotAt = at;
-        }
-
-        /// <summary>#695 칠할 색의 금옥 목소리 (화 빨강 / 수 파랑 / 목 초록 / 금 노랑 / 토 갈색). 속성이 아니면 null.</summary>
-        public static LabYaguangSfx? GuideColorSfx(LabOrbElement element)
-        {
-            switch (element)
-            {
-                case LabOrbElement.Fire: return LabYaguangSfx.ComboGuideFire;
-                case LabOrbElement.Water: return LabYaguangSfx.ComboGuideWater;
-                case LabOrbElement.Wood: return LabYaguangSfx.ComboGuideWood;
-                case LabOrbElement.Metal: return LabYaguangSfx.ComboGuideMetal;
-                case LabOrbElement.Earth: return LabYaguangSfx.ComboGuideEarth;
-                default: return null;
-            }
-        }
+        /// <summary>#695 맞힌 칸 수에 따른 금옥 칭찬 (1 좋아! / 2 잘했어! / 3 하나만 더..! / 4 그렇지!!).</summary>
+        public static LabYaguangSfx GuideFeedbackSfx(int hits) =>
+            hits >= LabGourdCombo.Length ? LabYaguangSfx.ComboGuideClear
+            : hits <= 1 ? LabYaguangSfx.ComboGuideHit1 : hits == 2 ? LabYaguangSfx.ComboGuideHit2 : LabYaguangSfx.ComboGuideHit3;
 
         /// <summary>금옥 안내 하나를 낸다. 앞 안내가 아직 나오고 있으면 끊고 새로 낸다. 안내가 끝나는 시각을 기억한다.</summary>
         private void PlayGuide(LabYaguangSfx sfx)
@@ -590,7 +571,7 @@ namespace C6Lab
         private double ComboTauntDelay => network != null && network.config != null ? network.config.YaguangComboTauntDelaySeconds : .3d;
         private double ClearedDelay => network != null && network.config != null ? network.config.YaguangComboClearedDelaySeconds : .8d;
         private int GuideRuleCombos => network != null && network.config != null ? network.config.YaguangComboGuideRuleCombos : 1;
-        private double GuideColorDelay => network != null && network.config != null ? network.config.YaguangComboGuideColorDelaySeconds : .3d;
+        private double GuideFeedbackDelay => network != null && network.config != null ? network.config.YaguangComboGuideFeedbackDelaySeconds : .3d;
         private bool GuideQuietsCount => network == null || network.config == null || network.config.YaguangComboGuideQuietsCount;
         private double CaughtDelay => network != null && network.config != null ? network.config.YaguangFlashCaughtDelaySeconds : .2d;
 
@@ -656,11 +637,10 @@ namespace C6Lab
                 case LabYaguangSfx.ComboClearedFirst:
                 case LabYaguangSfx.ComboClearedSecond: return config.YaguangComboClearedSoundVolume;
                 case LabYaguangSfx.ComboGuideRule:
-                case LabYaguangSfx.ComboGuideFire:
-                case LabYaguangSfx.ComboGuideWater:
-                case LabYaguangSfx.ComboGuideWood:
-                case LabYaguangSfx.ComboGuideMetal:
-                case LabYaguangSfx.ComboGuideEarth: return config.YaguangComboGuideSoundVolume;
+                case LabYaguangSfx.ComboGuideHit1:
+                case LabYaguangSfx.ComboGuideHit2:
+                case LabYaguangSfx.ComboGuideHit3:
+                case LabYaguangSfx.ComboGuideClear: return config.YaguangComboGuideSoundVolume;
                 default: return config.YaguangFlashBurstSoundVolume;
             }
         }
