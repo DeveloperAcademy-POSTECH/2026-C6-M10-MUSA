@@ -7995,3 +7995,12 @@ The initial cinematic fixture passed 1/2 because it incorrectly expected Skip al
 Prepared `feat/opening-28-frame-direction` with only the opening commits and merged origin/main `45001d21` (battle BGM updates). The original checkout remains on its existing local review branch with its preview and personal settings preserved; host-control work from #647 is not part of this PR. The sole cherry-pick conflict was this validation document; existing history and the new opening record were retained.
 
 All 279 changed opening code/asset/test files (excluding the tutorial test file, which retains main's independent Help-button assertions) have identical Git blob hashes to the tested local revision `fb021e31`. The main merge adds only six audio-file changes relative to the prepared opening branch. Accordingly, the preceding 17 EditMode and 27 PlayMode results are reused for unchanged opening behavior; they are not reported as a new run after this audio-only integration. The initial full tutorial handoff check remains separately dated above. Source/document whitespace checks and PR scope review passed; no scene, title, project setting, build profile or network-protocol changes are included.
+
+
+### #652 main 충돌 통합 (2026-11-11)
+
+- 작업8a72d85f에 main81e64ca0를 통합했다. 충돌은 LabBattleRenderWarmup/LabGourdAlert/이 문서3곳이었다. 흔들기·숫자·눈 PNG/HDR 준비와 main의 해제·놀림 PNG 준비를 함께 유지하고, 눈 이미지가 숨긴 배경을 다음 PNG/일반 말풍선에서 다시 켠다. 양쪽 검증 기록은 모두 보존했다. 병합 커밋a6c4293a는 검증 중 원격에 반영됐다.
+- 첫 전체 EditMode는2,242통과/1실패였다. main의 저장 Stage02 설정159=13과 에셋 재생성 코드159=8 불일치를 확인했다. 재생성 코드만13으로 맞춰 기존 저장 게임 동작은 유지했다. 검사를 완화하지 않았다.
+- 최종 전체 EditMode2,243/2,243(49.05초), 관련 PlayMode27/27(8.97초) 통과. 눈→해제/놀림 PNG→일반 텍스트 복원, 흔들기 PNG와 해제/놀림 PNG의 warmup 동시 존재를 추가 단언했다. 기존 K키 단발·횟수별 투명도·초기 준비·보드 수명도 통과했다.
+- Unity6000.6.5f1/macOS Metal 기준. main 대비 실행 변경은 UI/VFX와 에셋 재생성 기본값 정합성이라 전체 PlayMode는 생략했다. main의 통신/게임 흐름 변경은 그대로 통합하고 이 브랜치에서 다시 수정하지 않았다. 실제 게임/iOS 실기기 화면은 미검증이다.
+- 충돌 표식/미해결 index0개. 수동 변경 소스·검증 문서 whitespace 검사 통과. main에서 넘어온 기존 생성 에셋의 공백은 일괄 수정하지 않았다.

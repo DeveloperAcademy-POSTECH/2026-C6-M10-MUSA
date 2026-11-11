@@ -172,11 +172,24 @@ namespace C6Lab.Tests
             Assert.That(alert.Active, Is.False, "Gone by the flash.");
             Assert.That(alert.ShowingEyes, Is.False);
 
+            alert.ShowEyes(gourd, 1f);
+            Assert.That(alert.ShowYaguangRelease(gourd, 1f), Is.True);
+            Image bubbleImage = alert.Bubble.GetComponent<Image>();
+            Assert.That(bubbleImage.enabled, Is.True, "Release artwork re-enables the background hidden by eye PNGs.");
+            Assert.That(bubbleImage.sprite, Is.EqualTo(Resources.Load<Sprite>(LabGourdAlert.YaguangReleasePath)));
+            Assert.That(bubbleImage.preserveAspect, Is.True);
+            alert.ShowEyes(gourd, 1f);
+            Assert.That(alert.ShowYaguangTaunt(gourd, 1f), Is.True);
+            Assert.That(bubbleImage.enabled, Is.True);
+            Assert.That(bubbleImage.sprite, Is.EqualTo(Resources.Load<Sprite>(LabGourdAlert.YaguangTauntPath)));
+
             alert.ShowWord(gourd, "셋!", 1f);
             Text word = alert.Bubble.Find("Gourd Alert Mark").GetComponent<Text>();
             Assert.That(alert.ShowingWord, Is.True);
             Assert.That(word.text, Is.EqualTo("셋!"));
             Assert.That(alert.Bubble.GetComponent<Image>().enabled, Is.True, "Shared text restores its background.");
+            Assert.That(bubbleImage.preserveAspect, Is.False, "Shared text resets artwork-specific geometry.");
+            Assert.That(alert.Bubble.sizeDelta.x, Is.EqualTo(alert.Bubble.sizeDelta.y).Within(.001f));
             Assert.That(word.GetComponent<Outline>().enabled, Is.False, "No offset outline doubling the ink strokes (#271).");
             alert.ShowWord(gourd, "넷!", 1f);
             Assert.That(word.text, Is.EqualTo("넷!"), "The same bubble just changes its word.");
