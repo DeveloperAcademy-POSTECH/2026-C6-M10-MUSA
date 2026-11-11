@@ -185,6 +185,7 @@ namespace Hapio.Tests
                 if (presentation != null && presentation.IsPresenting && !presentation.IsLocalStoryComplete
                     && presentation.player != null && presentation.player.IsPlaying)
                     presentation.player.Skip();
+                if (presentation != null && presentation.IsLocalStoryComplete && session.State.phase == GameFlowPhase.StageResult) session.ConfirmSealReady();
                 yield return null;
             }
             Assert.That(ready(), Is.True, "Local story completion and committed result readiness must release the Host action.");
