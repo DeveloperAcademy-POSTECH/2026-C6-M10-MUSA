@@ -16,10 +16,10 @@ MonoBehaviour:
   viewPrefab: {fileID: 4442446553377550696, guid: 4a8a888fdefc942588592e721009002f, type: 3}
   pages:
   - speaker: 
-    dialogue: "\uBC31 \uB144\uC5D0 \uD55C \uBC88 \uC5F4\uB9AC\uB294 \uB300\uC81C\uC0AC.\n\uC774\uC81C \uC77C\uC8FC\uC77C\uBC16\uC5D0 \uB0A8\uC9C0 \uC54A\uC558\uB2E4."
-    autoReadSeconds: 5.05
+    dialogue: "\uAE4A\uC740 \uC0B0\uC911, \uC0BC\uB77C\uB9CC\uC0C1 \uB3C4\uC220\uD559\uAD50.\n\uBC31 \uB144 \uB9CC\uC758 \uB300\uC81C\uC0AC\uAC00 \uBA38\uC9C0 \uC54A\uC558\uB2E4."
+    autoReadSeconds: 4
     voice: {fileID: 8300000, guid: ed3ee7d6f5264c02b9691bd73cf0232f, type: 3}
-  direction: 
+  direction: Approved Figma frame 1 (4553:2477); native text and independent artwork motion.
   speaker: 
   dialogue: "\uBC31 \uB144\uC5D0 \uD55C \uBC88 \uC5F4\uB9AC\uB294 \uB300\uC81C\uC0AC.\n\uC774\uC81C \uC77C\uC8FC\uC77C\uBC16\uC5D0 \uB0A8\uC9C0 \uC54A\uC558\uB2E4."
   autoReadSeconds: 4

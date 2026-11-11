@@ -2,289 +2,283 @@
   "frames": [
     {
       "number": 1,
+      "cutId": "OP_001",
       "pages": [
         {
           "speaker": "",
-          "dialogue": "백 년에 한 번 열리는 대제사.\n이제 일주일밖에 남지 않았다.",
-          "seconds": 5.05
+          "dialogue": "깊은 산중, 삼라만상 도술학교.\n백 년 만의 대제사가 머지 않았다."
         }
-      ],
-      "direction": ""
+      ]
     },
     {
       "number": 2,
+      "cutId": "OP_002",
       "pages": [
         {
           "speaker": "사부님",
-          "dialogue": "이레 뒤에 돌아올 테니,\n수장고를 깨끗이 청소해 놓거라!",
-          "seconds": 4.8999999999999995
+          "dialogue": "이레 뒤에 돌아올 테니,\n수장고를 깨끗이 청소해 놓거라!"
         }
-      ],
-      "direction": ""
+      ]
     },
     {
       "number": 3,
+      "cutId": "OP_003",
       "pages": [
         {
           "speaker": "사부님",
-          "dialogue": "특히 안쪽 선반에 있는 물건은\n절대로 건드리지 말거라.",
-          "seconds": 4.75
+          "dialogue": "특히 안쪽 선반에 있는 물건은\n절대로 건드리지 말거라."
         }
-      ],
-      "direction": ""
+      ]
     },
     {
       "number": 4,
+      "cutId": "OP_004",
       "pages": [
         {
-          "speaker": "불이",
-          "dialogue": "어휴~ 걱정 마세요!",
-          "seconds": 3
+          "speaker": "",
+          "dialogue": ""
         }
-      ],
-      "direction": ""
+      ]
     },
     {
       "number": 5,
+      "cutId": "OP_005",
       "pages": [
         {
-          "speaker": "",
-          "dialogue": "그렇게 사부님들은\n구름을 타고 떠나셨다.",
-          "seconds": 4.0
+          "speaker": "불이",
+          "dialogue": "어휴 걱정마세요~\n깨~끗하게 청소해 놓겠습니다~"
         }
-      ],
-      "direction": ""
+      ]
     },
     {
       "number": 6,
+      "cutId": "OP_006",
       "pages": [
         {
-          "speaker": "불이",
-          "dialogue": "휴우… 이제 이 많은 걸\n우리끼리 다 치워야 하는 거야?\n치워도 치워도 끝이 없잖아…",
-          "seconds": 5.12
+          "speaker": "",
+          "dialogue": "사부님들은 구름에 올랐고,\n견습 도사들은 빗자루를 들었다."
         }
-      ],
-      "direction": ""
+      ]
     },
     {
       "number": 7,
+      "cutId": "OP_007",
       "pages": [
         {
           "speaker": "불이",
-          "dialogue": "으으 귀찮아... 얘들아 그냥\n도술로 한 번에 치워버릴까?",
-          "seconds": 4.0
+          "dialogue": "어후, 이 넓은 곳을 우리끼리 전부 다?!\n치워도 치워도 끝이 없잖아…"
         }
-      ],
-      "direction": ""
+      ]
     },
     {
       "number": 8,
+      "cutId": "OP_008",
       "pages": [
         {
-          "speaker": "금옥이",
-          "dialogue": "그 주문 아직 안 배웠잖아!\n멋대로 쓰면 안 돼!",
-          "seconds": 3.62
-        },
-        {
           "speaker": "불이",
-          "dialogue": "에이, 괜찮아 괜찮아~",
-          "seconds": 3
+          "dialogue": "얘들아 우리 그냥\n도술로 한 번에 끝내버릴까~?"
         }
-      ],
-      "direction": ""
+      ]
     },
     {
       "number": 9,
+      "cutId": "OP_009",
       "pages": [
         {
-          "speaker": "불이",
-          "dialogue": "자, 깨끗해져라~! 청! 정! 무! 진!",
-          "seconds": 3.25
+          "speaker": "금옥",
+          "dialogue": "뭐? 그런 주문 아직 안 배웠잖아!\n멋대로 쓰면 안 돼!"
         }
-      ],
-      "direction": ""
+      ]
     },
     {
       "number": 10,
+      "cutId": "OP_010",
       "pages": [
         {
           "speaker": "불이",
-          "dialogue": "오오! 이것봐 어때?! 잘 되지?!\n역시 나만 믿으라니까!",
-          "seconds": 4.0
+          "dialogue": "에이~ 뭘 어렵다고. 괜찮아 괜찮아~"
         }
-      ],
-      "direction": ""
+      ]
     },
     {
       "number": 11,
+      "cutId": "OP_011",
       "pages": [
         {
           "speaker": "불이",
-          "dialogue": "어… 어라?\n왜 멈추질 않는 거야?!",
-          "seconds": 3.1
+          "dialogue": "자, 깨끗해져라!  청. 정. 무. 진."
         }
-      ],
-      "direction": ""
+      ]
     },
     {
       "number": 12,
+      "cutId": "OP_012",
       "pages": [
         {
           "speaker": "불이",
-          "dialogue": "어… 어라?\n왜 멈추질 않는 거야?!",
-          "seconds": 3.55
+          "dialogue": "오오! 이것봐 어때?! 잘 되지?!\n역시 나만 믿으라니까!"
         }
-      ],
-      "direction": ""
+      ]
     },
     {
       "number": 13,
-      "pages": [
-        {
-          "speaker": "",
-          "dialogue": "",
-          "seconds": 2.7
-        }
-      ],
-      "direction": "효과음: 덜컹… 덜컹… (음원 미연결, 대사창 없음)"
-    },
-    {
-      "number": 14,
-      "pages": [
-        {
-          "speaker": "",
-          "dialogue": "",
-          "seconds": 2.7
-        }
-      ],
-      "direction": "화면 효과음: 와장창!! (대사창 없음)"
-    },
-    {
-      "number": 15,
-      "pages": [
-        {
-          "speaker": "만복이",
-          "dialogue": "으아아아!!\n우리 이제 어떡해?!",
-          "seconds": 3.55
-        }
-      ],
-      "direction": ""
-    },
-    {
-      "number": 16,
-      "pages": [
-        {
-          "speaker": "금옥이",
-          "dialogue": "설마… 저게 요괴를 봉인해 둔 박이야?\n그럼 요괴들이 풀려난 거잖아!",
-          "seconds": 5.6499999999999995
-        }
-      ],
-      "direction": ""
-    },
-    {
-      "number": 17,
+      "cutId": "OP_013",
       "pages": [
         {
           "speaker": "불이",
-          "dialogue": "그냥… 다시 붙이면 안 될까…?",
-          "seconds": 3.25
-        },
-        {
-          "speaker": "금옥이",
-          "dialogue": "되겠냐.",
-          "seconds": 1.3
+          "dialogue": "엇... 어라..? 멈.. 멈춰라..! 멈춰!!!"
         }
-      ],
-      "direction": ""
+      ]
     },
     {
-      "number": 18,
-      "pages": [
-        {
-          "speaker": "묵이",
-          "dialogue": "얘들아.\n잠깐, 여기 좀 봐.",
-          "seconds": 3.0999999999999996
-        }
-      ],
-      "direction": ""
-    },
-    {
-      "number": 19,
-      "pages": [
-        {
-          "speaker": "금옥이",
-          "dialogue": "여기 임시 봉인박 사용법이 적혀 있어!\n이 사태를 해결할 방법이 있을지도 몰라!",
-          "seconds": 6.25
-        }
-      ],
-      "direction": ""
-    },
-    {
-      "number": 19,
-      "cutId": "OP_019_1",
+      "number": 14,
+      "cutId": "OP_014",
       "pages": [
         {
           "speaker": "",
-          "dialogue": "",
-          "seconds": 14
+          "dialogue": ""
         }
-      ],
-      "direction": "봉인박 사용법 확대. 하단 대사창 없이 종이에 적힌 사용법을 읽는 컷."
+      ]
+    },
+    {
+      "number": 15,
+      "cutId": "OP_015",
+      "pages": [
+        {
+          "speaker": "",
+          "dialogue": ""
+        }
+      ]
+    },
+    {
+      "number": 16,
+      "cutId": "OP_016",
+      "pages": [
+        {
+          "speaker": "",
+          "dialogue": ""
+        }
+      ]
+    },
+    {
+      "number": 17,
+      "cutId": "OP_017",
+      "pages": [
+        {
+          "speaker": "만복",
+          "dialogue": "흐아아앙 ㅠㅠ\n우리 이제 어떡해애ㅠㅠㅠ"
+        }
+      ]
+    },
+    {
+      "number": 18,
+      "cutId": "OP_018",
+      "pages": [
+        {
+          "speaker": "솔이",
+          "dialogue": "이거... 요괴들이 봉인 되어있던 \n호리병인가본데... 다 사라졌어..."
+        }
+      ]
+    },
+    {
+      "number": 19,
+      "cutId": "OP_019",
+      "pages": [
+        {
+          "speaker": "불이",
+          "dialogue": "그냥.. 풀로 붙이면 안될까..?"
+        }
+      ]
     },
     {
       "number": 20,
+      "cutId": "OP_020",
       "pages": [
         {
-          "speaker": "만복이",
-          "dialogue": "어? 이 구슬들은 뭐지?\n검은 것도 있고, 하얀 것도 있네?",
-          "seconds": 4.8999999999999995
+          "speaker": "금옥",
+          "dialogue": "되겠냐."
         }
-      ],
-      "direction": ""
+      ]
     },
     {
       "number": 21,
+      "cutId": "OP_021",
       "pages": [
         {
-          "speaker": "솔이",
-          "dialogue": "잠깐! 음구슬과 양구슬을 합치면…\n오행구슬을 만들 수 있겠어!",
-          "seconds": 5.35
+          "speaker": "묵이",
+          "dialogue": "얘들아 잠깐! 여기 좀 봐!"
         }
-      ],
-      "direction": ""
+      ]
     },
     {
       "number": 22,
+      "cutId": "OP_022",
       "pages": [
         {
-          "speaker": "솔이",
-          "dialogue": "됐다!\n이게 바로 오행구슬이구나!",
-          "seconds": 3.55
+          "speaker": "묵이",
+          "dialogue": "임시 봉인박?!\n이 사태를 해결할 방법이 있겠어!"
         }
-      ],
-      "direction": ""
+      ]
     },
     {
       "number": 23,
+      "cutId": "OP_023",
       "pages": [
         {
-          "speaker": "금옥이",
-          "dialogue": "이 구슬로 봉인박 전체에\n오행의 기운을 고르게 입히면 돼!",
-          "seconds": 4.8999999999999995
+          "speaker": "",
+          "dialogue": ""
         }
-      ],
-      "direction": ""
+      ]
     },
     {
       "number": 24,
+      "cutId": "OP_024",
+      "pages": [
+        {
+          "speaker": "만복",
+          "dialogue": "이 구슬들은 뭘까?\n검은 것도 있고, 하얀 것도 있네?"
+        }
+      ]
+    },
+    {
+      "number": 25,
+      "cutId": "OP_025",
       "pages": [
         {
           "speaker": "솔이",
-          "dialogue": "얼른 요괴 잡으러 가자! 사부님들이 돌아오기 전에...",
-          "seconds": 4.8999999999999995
+          "dialogue": "그래! 음 양 구슬 두개를 합치면 ..."
         }
-      ],
-      "direction": ""
+      ]
+    },
+    {
+      "number": 26,
+      "cutId": "OP_026",
+      "pages": [
+        {
+          "speaker": "솔이",
+          "dialogue": "오색의 오행 구슬이 되는거야!"
+        }
+      ]
+    },
+    {
+      "number": 27,
+      "cutId": "OP_027",
+      "pages": [
+        {
+          "speaker": "솔이",
+          "dialogue": "이 구슬들로 봉인박 전체에\n오행의 기운을 고르게 입히면 돼!"
+        }
+      ]
+    },
+    {
+      "number": 28,
+      "cutId": "OP_028",
+      "pages": [
+        {
+          "speaker": "불이",
+          "dialogue": "좋아! 어서 요괴 잡으러가자!\n사부님 돌아오시기 전에..."
+        }
+      ]
     }
   ]
 }

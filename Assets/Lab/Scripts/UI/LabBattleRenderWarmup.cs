@@ -108,6 +108,8 @@ namespace C6Lab
                     bursts.Add(burst.transform);
                 }
             SpawnShakeArtCopies();
+            SpawnReleaseBubbleCopy(LabGourdAlert.YaguangReleasePath, -60f);
+            SpawnReleaseBubbleCopy(LabGourdAlert.YaguangTauntPath, 60f);
             SpawnClayCopies(config);
             if (boardCamera != null) SpawnBoardCopies(config.OrbAppearance);
             MoveCopies();
@@ -139,6 +141,26 @@ namespace C6Lab
                 image.rectTransform.sizeDelta = new Vector2(100f, 100f);
                 image.rectTransform.anchoredPosition = new Vector2((index % 6 - 3) * 70f, (index++ / 6) * 110f);
             }
+        }
+
+        private void SpawnReleaseBubbleCopy(string resourcePath, float x)
+        {
+            Sprite artwork = Resources.Load<Sprite>(resourcePath);
+            if (artwork == null) return;
+            var copy = new GameObject("Release bubble warmup", typeof(RectTransform), typeof(Canvas));
+            copy.transform.SetParent(root.transform, false);
+            var canvas = copy.GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceCamera;
+            canvas.worldCamera = battleCamera;
+            canvas.planeDistance = battleCamera.nearClipPlane + .1f;
+            var picture = new GameObject("Artwork", typeof(RectTransform), typeof(UnityEngine.UI.Image));
+            picture.transform.SetParent(copy.transform, false);
+            var image = picture.GetComponent<UnityEngine.UI.Image>();
+            image.sprite = artwork;
+            image.preserveAspect = true;
+            image.raycastTarget = false;
+            image.rectTransform.sizeDelta = new Vector2(110f, 110f);
+            image.rectTransform.anchoredPosition = new Vector2(x, 0f);
         }
 
         private void SpawnClayCopies(LabConfig config)

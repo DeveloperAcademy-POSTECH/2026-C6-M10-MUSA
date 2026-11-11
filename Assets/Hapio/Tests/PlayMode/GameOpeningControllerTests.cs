@@ -77,8 +77,8 @@ namespace Hapio.Tests
             Assert.That(opening.player.progressText == null || !opening.player.progressText.gameObject.activeInHierarchy, Is.True,
                 "The game hides the authoring page counter.");
             Assert.That(opening.player.AutoAdvance, Is.False, "Button entry keeps screen-tap dialogue advance.");
-            Assert.That(opening.player.sequence.cuts.Count, Is.EqualTo(25));
-            Assert.That(opening.player.sequence.cuts.Sum(cut => cut.PageCount), Is.EqualTo(27));
+            Assert.That(opening.player.sequence.cuts.Count, Is.EqualTo(28));
+            Assert.That(opening.player.sequence.cuts.Sum(cut => cut.PageCount), Is.EqualTo(28));
             Assert.That(opening.openingRoot.activeInHierarchy, Is.True);
             Assert.That(opening.openingRoot.GetComponentsInChildren<GameSafeArea>(true), Has.Length.EqualTo(1));
             Canvas canvas = opening.openingRoot.GetComponentInChildren<Canvas>(true);
@@ -107,7 +107,7 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
-        public IEnumerator CompletingAllTwentyFourCutsAndTwentySixPagesOpensTheBrowserOnce()
+        public IEnumerator CompletingAllTwentyEightCutsOpensTheBrowserOnce()
         {
             yield return LoadHome();
             yield return PressStart();
@@ -117,7 +117,7 @@ namespace Hapio.Tests
             for (int cutIndex = 0; cutIndex < player.sequence.cuts.Count; cutIndex++)
             {
                 Assert.That(player.CurrentCutIndex, Is.EqualTo(cutIndex));
-                if (!player.IsReading) player.Next();
+                if (!player.IsReading) player.AdvanceTime(player.CurrentView.EntranceDuration + .1f);
                 StoryCutView picture = player.CurrentView;
                 int pageCount = player.sequence.cuts[cutIndex].PageCount;
                 for (int pageIndex = 0; pageIndex < pageCount; pageIndex++)
@@ -126,20 +126,25 @@ namespace Hapio.Tests
                     Assert.That(player.CurrentCutIndex, Is.EqualTo(cutIndex));
                     Assert.That(player.CurrentPageIndex, Is.EqualTo(pageIndex));
                     Assert.That(player.CurrentView, Is.SameAs(picture), "Another page on the same cut reuses the picture.");
+                    Assert.That(player.dialogueGroup.alpha, Is.Zero, "Shared paper stays hidden for authored cuts.");
+                    bool hasWords = !string.IsNullOrEmpty(player.sequence.cuts[cutIndex].GetPage(pageIndex).dialogue);
+                    Assert.That(picture.authoredDialogue.alpha, Is.EqualTo(hasWords ? 1f : 0f));
                     pages++;
                     player.Next();
                 }
                 yield return null;
             }
-            Assert.That(pages, Is.EqualTo(27));
+            Assert.That(pages, Is.EqualTo(28));
             player.Next(); player.Skip(); player.Next();
             yield return Until(() => !GameOpeningController.IsPresenting, "Completed story opens the room browser");
             Assert.That(completed, Is.EqualTo(1));
             Assert.That(skipped, Is.Zero);
             AssertAtBrowserWithNoOpening();
             Assert.That(player.CurrentView, Is.Null);
-            Assert.That(player.cutHost.GetComponentsInChildren<StoryCutView>(true), Is.Empty);
             Assert.That(player.voiceSource == null || !player.voiceSource.isPlaying && player.voiceSource.clip == null, Is.True);
+            // Cancel hides the picture immediately; Destroy retires its GameObject at the frame boundary.
+            yield return null;
+            Assert.That(player.cutHost.GetComponentsInChildren<StoryCutView>(true), Is.Empty);
         }
 
         [UnityTest]

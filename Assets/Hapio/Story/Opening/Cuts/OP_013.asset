@@ -15,11 +15,11 @@ MonoBehaviour:
   cutId: OP_013
   viewPrefab: {fileID: 1826327572372485036, guid: 4524e9b1b190544178d68d50ad42670e, type: 3}
   pages:
-  - speaker: 
-    dialogue: 
-    autoReadSeconds: 2.7
-    voice: {fileID: 8300000, guid: 38122bc82da64b9ebd800a34ddda6804, type: 3}
-  direction: "\uD6A8\uACFC\uC74C: \uB35C\uCEF9\u2026 \uB35C\uCEF9\u2026 (\uC74C\uC6D0 \uBBF8\uC5F0\uACB0, \uB300\uC0AC\uCC3D \uC5C6\uC74C)"
+  - speaker: "\uBD88\uC774"
+    dialogue: "\uC5C7... \uC5B4\uB77C..? \uBA48.. \uBA48\uCDB0\uB77C..! \uBA48\uCDB0!!!"
+    autoReadSeconds: 4
+    voice: {fileID: 8300000, guid: 76f31b0c3b4e4420bb65c080c21f031c, type: 3}
+  direction: Approved Figma frame 13 (4553:2456); native text and independent artwork motion.
   speaker: 
   dialogue: 
   autoReadSeconds: 4

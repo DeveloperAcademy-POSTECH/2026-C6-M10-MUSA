@@ -125,10 +125,16 @@ namespace C6Lab.Editor
                 if (bOnly != null && aOnly != null)
                 {
                     int mode = bOnly.boolValue ? 1 : aOnly.boolValue ? 2 : 0;
+                    // #663: write only when the toolbar is clicked. Writing every repaint put A Test Only back on whenever
+                    // it was turned off in the Inspector (and saved it into LabConfig.asset while this window was open).
+                    EditorGUI.BeginChangeCheck();
                     using (new EditorGUI.DisabledScope(EditorApplication.isPlayingOrWillChangePlaymode))
                         mode = GUILayout.Toolbar(mode, JigwiModes);
-                    bOnly.boolValue = mode == 1; aOnly.boolValue = mode == 2;
-                    serialized.ApplyModifiedProperties();
+                    if (EditorGUI.EndChangeCheck())
+                    {
+                        bOnly.boolValue = mode == 1; aOnly.boolValue = mode == 2;
+                        serialized.ApplyModifiedProperties();
+                    }
                     EditorGUILayout.LabelField(JigwiModeHelp[mode], EditorStyles.wordWrappedMiniLabel);
                     if (mode != 0)
                         EditorGUILayout.HelpBox("LabConfig 값(B/A Test Only)을 켰다. 녹화가 끝나면 \"기본 시간표\"로 돌리고, 이 값은 커밋하지 않는다.", MessageType.Warning);

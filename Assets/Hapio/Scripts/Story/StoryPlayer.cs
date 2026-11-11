@@ -35,6 +35,12 @@ namespace Hapio
         public UnityEvent onSkipped = new UnityEvent();
         public event Action<StoryExitReason> Finished;
         public event Action<StoryCutView> ViewChanged;
+        /// <summary>
+        /// #629: optional (volume multiplier, playback speed) for the sound of a cut, by its cutId. The game sets it from
+        /// StoryMusicArt's Cut Sounds table; previews leave it null and play every sound as authored.
+        /// </summary>
+        public static Func<string, Vector2> VoiceTuning;
+        private float voiceBaseVolume = -1f;
         public bool UserInputBlocked { get; private set; }
         public void SetInputBlocked(bool value) => UserInputBlocked = value;
 
@@ -45,6 +51,7 @@ namespace Hapio
         public bool IsReading { get; private set; }
         public StoryCutView CurrentView => currentView;
         public bool IsTransitioning => activeCloudWipe != null;
+        private bool IsCinematicCut => currentView != null && currentView.autoContinueAfterSeconds > 0;
 
         private StoryCutView currentView;
         private StoryCloudWipe activeCloudWipe;
@@ -137,6 +144,18 @@ namespace Hapio
             }
             elapsed += seconds;
             currentView.Sample(elapsed);
+            if (IsCinematicCut)
+            {
+                float end = Mathf.Max(currentView.EntranceDuration, currentView.autoContinueAfterSeconds);
+                if (elapsed >= end)
+                {
+                    float remainder = elapsed - end;
+                    AdvanceToNextCut();
+                    if (IsPlaying && remainder > 0) AdvanceTime(remainder);
+                }
+                else if (!IsReading && elapsed >= currentView.EntranceDuration) BeginReading();
+                return;
+            }
             if (!IsReading)
             {
                 if (elapsed >= currentView.EntranceDuration) BeginReading();
@@ -151,7 +170,7 @@ namespace Hapio
         /// <summary>UI input shares one frame gate. Direct sequencing and preview AUTO keep their existing API.</summary>
         public void RequestNext()
         {
-            if ((!IsReading && currentView != null && currentView.waitForEntrance) || !AcceptUserInput()) return;
+            if (IsCinematicCut || (!IsReading && currentView != null && currentView.waitForEntrance) || !AcceptUserInput()) return;
             Next();
         }
 
@@ -192,6 +211,11 @@ namespace Hapio
                 ShowPage(CurrentPageIndex + 1);
                 return;
             }
+            AdvanceToNextCut();
+        }
+
+        private void AdvanceToNextCut()
+        {
             int next = CurrentCutIndex + 1;
             if (next >= sequence.cuts.Count) Finish(StoryExitReason.Completed);
             else if (currentView.exitCloudWipe != null) StartCloudWipe(next);
@@ -204,7 +228,9 @@ namespace Hapio
             if (!IsPlaying || IsTransitioning || CurrentCutIndex <= 0) return;
             AutoAdvance = false;
             UpdateAutoLabel();
+            var previousPicture = currentView;
             ShowCut(CurrentCutIndex - 1);
+            if (currentView == previousPicture || IsCinematicCut) return;
             // Reviewing a previous picture should not require waiting for its entrance again.
             elapsed = currentView.EntranceDuration;
             currentView.Sample(elapsed);
@@ -214,6 +240,7 @@ namespace Hapio
         private void UpdatePreviousButton()
         {
             if (previousButton != null) previousButton.interactable = IsPlaying && CurrentCutIndex > 0;
+            if (nextButton != null) nextButton.interactable = IsPlaying && !IsCinematicCut;
         }
 
         public void Skip()
@@ -278,6 +305,7 @@ namespace Hapio
         {
             var previousView = currentView;
             var cut = sequence.cuts[index];
+            if (TryChangeAuthoredDialogue(index, cut)) return;
             var nextView = Instantiate(cut.viewPrefab, cutHost, false);
             // Prepare the next background before removing the picture covering the paper base.
             nextView.Sample(0f);
@@ -307,6 +335,34 @@ namespace Hapio
             ViewChanged?.Invoke(currentView);
         }
 
+        private bool TryChangeAuthoredDialogue(int index, StoryCutDefinition cut)
+        {
+            var source = cut.viewPrefab;
+            if (currentView == null || source == null || currentView.authoredDialogue == null ||
+                source.authoredDialogue == null || string.IsNullOrEmpty(source.artworkContinuityKey) ||
+                currentView.artworkContinuityKey != source.artworkContinuityKey) return false;
+
+            // Keep the actual background/character instances and elapsed animation time, in both directions.
+            var previousDialogue = currentView.authoredDialogue;
+            var nextDialogue = Instantiate(source.authoredDialogue, currentView.transform, false);
+            nextDialogue.transform.SetAsLastSibling();
+            previousDialogue.gameObject.SetActive(false);
+            Destroy(previousDialogue.gameObject);
+            currentView.authoredDialogue = nextDialogue;
+            currentView.sourceFigmaNumber = source.sourceFigmaNumber;
+            currentView.sourceFigmaNodeId = source.sourceFigmaNodeId;
+            CurrentCutIndex = index;
+            CurrentPageIndex = 0;
+            currentPage = cut.GetPage(0);
+            if (voiceSource != null) { voiceSource.Stop(); voiceSource.clip = null; }
+            ApplyDialogueLayout();
+            UpdatePageText();
+            UpdatePreviousButton();
+            BeginReading();
+            ViewChanged?.Invoke(currentView);
+            return true;
+        }
+
         private void BeginReading()
         {
             IsReading = true;
@@ -317,6 +373,12 @@ namespace Hapio
                 !string.IsNullOrWhiteSpace(currentPage.dialogue) || !string.IsNullOrWhiteSpace(currentPage.speaker));
             if (voiceSource != null && currentPage.voice != null)
             {
+                if (voiceBaseVolume < 0f) voiceBaseVolume = voiceSource.volume;
+                StoryCutDefinition cut = sequence != null && CurrentCutIndex >= 0 && CurrentCutIndex < sequence.cuts.Count
+                    ? sequence.cuts[CurrentCutIndex] : null;
+                Vector2 tuning = VoiceTuning != null && cut != null ? VoiceTuning(cut.cutId) : Vector2.one;
+                voiceSource.volume = voiceBaseVolume * Mathf.Clamp01(tuning.x);
+                voiceSource.pitch = tuning.y > 0f ? tuning.y : 1f;
                 voiceSource.clip = currentPage.voice;
                 voiceSource.Play();
             }
@@ -457,6 +519,12 @@ namespace Hapio
 
         private void SetDialogueVisible(bool visible)
         {
+            if (currentView != null && currentView.authoredDialogue != null)
+            {
+                currentView.authoredDialogue.alpha = visible ? 1f : 0f;
+                currentView.authoredDialogue.blocksRaycasts = false;
+                visible = false;
+            }
             if (dialogueGroup == null) return;
             dialogueGroup.alpha = visible ? 1f : 0f;
             dialogueGroup.interactable = visible;

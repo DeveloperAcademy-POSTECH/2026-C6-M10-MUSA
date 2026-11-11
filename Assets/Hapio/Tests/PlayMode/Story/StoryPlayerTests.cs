@@ -154,7 +154,7 @@ namespace Hapio.Tests
             for (int i = 0; i < sequence.cuts.Count; i++)
             {
                 Assert.That(player.CurrentCutIndex, Is.EqualTo(i));
-                player.Next();
+                if (!player.IsReading) player.AdvanceTime(player.CurrentView.EntranceDuration + .1f);
                 Assert.That(player.IsReading, Is.True);
                 var picture = player.CurrentView;
                 for (int page = 0; page < sequence.cuts[i].PageCount; page++)
@@ -165,7 +165,11 @@ namespace Hapio.Tests
                     yield return null;
                     Assert.That(player.cutHost.GetComponentsInChildren<StoryCutView>().Length, Is.EqualTo(1));
                     foreach (var image in player.CurrentView.GetComponentsInChildren<UnityEngine.UI.Image>())
-                        if (image.name != "Paper Base") Assert.That(image.sprite, Is.Not.Null, sequence.cuts[i].cutId + " / " + image.name);
+                    {
+                        if (image.name == "Paper backing") Assert.That(image.color, Is.EqualTo(Color.white));
+                        else if (image.TryGetComponent<UnityEngine.UI.Mask>(out var mask)) Assert.That(mask.showMaskGraphic, Is.False);
+                        else Assert.That(image.sprite, Is.Not.Null, sequence.cuts[i].cutId + " / " + image.name);
+                    }
                     player.Next();
                 }
             }

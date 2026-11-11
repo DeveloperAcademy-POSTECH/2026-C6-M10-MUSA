@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4485ab5ed52da49dd8b525f3743f1721, type: 3}
+  m_Name: OP_026
+  m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryCutDefinition
+  cutId: OP_026
+  viewPrefab: {fileID: 2592411832867476399, guid: 3f36a95e4e0ad485e9c6ad55bda85e7d, type: 3}
+  pages:
+  - speaker: "\uC194\uC774"
+    dialogue: "\uC624\uC0C9\uC758 \uC624\uD589 \uAD6C\uC2AC\uC774 \uB418\uB294\uAC70\uC57C!"
+    autoReadSeconds: 4
+    voice: {fileID: 8300000, guid: dd2d7aa03bdc4473a80ce44f02cbde69, type: 3}
+  direction: Approved Figma frame 26 (4553:2391); native text and independent artwork motion.
+  speaker: 
+  dialogue: 
+  autoReadSeconds: 4
+  voice: {fileID: 0}

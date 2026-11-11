@@ -1,5 +1,61 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-11 — 3스테이지 마지막 일격 다시보기 (구슬 없는 칠 완료)
+
+- **기준:** `fix/stage3-final-hit-replay` (main `ee9319a4` 기준). Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 기록 형식과 패킷은 바꾸지 않아 접속 묶음은 그대로다.
+- **원인:**
+  - 지귀 공통 부적 폭포(`PaintJigwiBucketPour`)와 그 칠이 번지는 성장은 구슬 없이 박을 칠한다.
+  - 이것으로 100%가 되면 최근 4초 안의 명중이 없다. 박 자세 기록(256 고정 스텝, 약 5.1초)에서도 그 명중이 밀려나, 다시보기 대신 1.2초 연출이 나왔다.
+  - 1·2스테이지에는 구슬 없이 칠하는 경로가 없다.
+- **고친 것:**
+  - Host가 명중마다 전후 자세를 저장한다(`KeepReplayHitPoses`).
+  - 최근 명중이 없으면 이번 라운드의 가장 최근 명중을 재생한다.
+  - `C6_FINISH_REPLAY` 로그로 재생 여부와 대체 이유를 남긴다.
+
+| 확인 | 결과 |
+| --- | --- |
+| Mac 개발 빌드 3앱(방장 + 구성원 2, 직접 IP), main, 3스테이지 구슬 완료 시작 직후·102초 | 3대 모두 재생 |
+| 같은 3앱, Victory부터 재생 시작까지(1·2·3스테이지) | 2.5 / 3.0 / 2.5초 (한도 약 5.4초) |
+| 같은 3앱, 폭포로 마지막 칠 재현 시도 2회 | 폭포가 99.8~99.9%까지 올렸으나 건조로 100%에 못 미쳐 재현 못 함 |
+| 새 PlayMode `PaintWithoutAnOrbFinishingLaterStillReplaysTheRoundsLastHit`(명중 뒤 자세 기록을 벗어난 뒤 구슬 없는 칠로 완료) | 수정 전 FAIL, 수정 후 PASS |
+| `GameFinishReplayTests` / EditMode `FinishReplay` | 5/5, 8/8 PASS |
+| Mac 3앱, 수정본, 명중 7초 뒤 구슬 없는 칠로 완료 | 3대 모두 재생, 방장 로그 `C6_FINISH_REPLAY replay` |
+| 전체 EditMode | 2242/2243. 실패 1건 `GameEditorMenuCleanupTests.RecreatedYaguangDefaults…`는 main `ee9319a4`에서도 같은 실패 |
+| 전체 PlayMode | 778/790. 실패 12건 중 9건은 앞 검사가 남긴 세션 때문에 SetUp이 실패한 연쇄다. 실패한 7개 묶음(50건)을 다시 돌리면 이 브랜치와 main 모두 50/50 PASS |
+
+- **미실행:** 실기기·iOS, 실제 폭포가 마지막 칠을 하는 실플레이(재현 실패), 5인.
+
+## 2026-11-10 — #647 병합 검토 반영 (스테이지 클리어 방장 진행)
+
+- **기준:** `feat/stage-clear-host-controls` `34c5a609`(PR 원본 `72daba95` + #646 + main `868c885f` 병합 + 검토 반영). Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 접속 묶음은 PR대로 `C6HapioGame/49`.
+- **고친 것:**
+  - 최종 결과에서 끊긴 구성원의 읽는 중·관람 중 표시를 지워 방장 진행이 막히지 않게 했다. 방장이 총평 전에 끊기면 구성원이 `HostLostAfterClear`로 스스로 총평·엔딩으로 간다.
+  - 마지막 컷 하단 완성 박 보기·나가기는 검토 중 한때 되살렸으나, 승인된 시안대로 다시 뺐다(완성 박은 봉인 카드의 "봉인 박 둘러보기"로 연다).
+  - 총평 표를 스테이지 번호로 맞췄다.
+  - 구미호·야광귀 마지막 컷의 "다음 요괴 잡으러 ..." 레이어가 꺼진 채 저장돼 방장·구성원 모두 보이지 않던 것을 켰다. 지귀는 문구를 숨기고 방장 버튼을 "마치기"로 했다(편집기 도구로 프리팹 3개 재저장, 레이어 켬/끔과 글자 한 줄만 변경).
+  - 기존 PlayMode 5건·EditMode 1건을 새 흐름에 맞췄다(실물 마우스 검사는 구름 전환이 끝난 뒤 SKIP을 누르게 함).
+  - AGENTS.md 접속 기록과 Game 49 이력 주석을 맞췄다.
+- **그대로 둔 것:** 새 글자색 `3f3d38`·`68645c`는 기존 결과 화면 도구와 같은 Figma 값이라 토큰으로 바꾸지 않았다(바꾸면 프리팹 재생성이 필요).
+
+| 확인 | 결과 |
+| --- | --- |
+| 원본 PR(main 병합본) 전체 EditMode / PlayMode | 2204/2205, 780/786 (새 실패 6건) |
+| 관련 EditMode(StageClearControls·StageStoryAsset·SealRunSummary·GameStageStoryAsset) | 17/17 PASS |
+| `GameSceneFlowTests` | 28/28 PASS (끊긴 구성원이 총평 시작을 막지 않는 단언 추가) |
+| 전체 EditMode | 2205/2205 PASS |
+| 전체 PlayMode | 785/786. 실패 1건 `GameOpeningControllerTests.CompletingAllTwentyFourCuts…`는 main에서도 같은 실패 |
+| Mac 개발 빌드 두 앱(방장 P1 + 구성원 P2, 직접 IP) | 1~3스테이지 마지막 컷, 지귀 "마치기", 총평 동시 이동 화면 확인 |
+
+- **미실행:** 실제로 방장 앱을 종료하거나 구성원 연결을 끊는 재현(단언과 코드 경로로만 확인), 실기기·iOS, 3인 이상.
+
+## 2026-11-10 — 봉인 총평 (#642)
+
+- 기준: `feat/seal-run-summary`, 최신 main `c930f120`에서 시작. Unity 6000.6.5f1 로컬 Editor.
+- `SealRunSummaryTests` 3개 + `GameStageStoryAssetTests` 5개: **8/8 PASS**. 세 판 원본 시간 합산, 로컬 플레이어 변경 시 기여도 변경, 누락/0점 구분, 문구 갱신 유지, 총평→엔딩 에셋 순서 및 공통 구름 연결을 검사했다.
+- 신규 스크립트 컴파일 오류 0개. 새 `SealRunSummaryPreview`만 재생해 총평 배치·긴 평가 줄바꿈·샘플 합산 `05:31`을 육안 확인했다. 실제 Continue 이벤트 직후 컷0 유지/구름 전환 활성, 전환 후 `Ending_01`/컷1 도달을 확인했다. Play는 종료했다.
+- 후속 시안 수정: 도장 원본 교체·100% 불투명도·170.511×156 크기·시간 위치와 글자 크기·평가 수동 개행을 반영. 전용 총평 미리보기에서 확인했고, 10개 문구 모두 2줄이며 표시 영역 안에 들어감을 런타임 TextGenerator로 확인했다. 컴파일 오류 0개. 이 배치 수정으로 전체 테스트를 다시 실행하지 않았다.
+- 전체 게임/전체 테스트는 사용자 요청에 따라 실행하지 않았다. 실제 3판 멀티플레이·다른 기기 동시 표시·iOS 실기기는 미검증. 사용자 시각 확인 후 시간 숫자를 왼쪽 5px 보정했고 커밋·PR 진행 승인을 받았다.
+
 ## 2026-11-10 — #645 병합 검토 반영
 
 - **기준:** `feat/#645-sealed-gourd-help-button-ui` `4019f782`(PR 원본 `8e72dc7e` + 검토 반영), main `64d556ae` 위. Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 저장 Scene·Prefab·접속 규약은 바꾸지 않았다.
@@ -7554,6 +7610,18 @@ PlayMode의 기존 main 실패17건은 표시용 최소 구슬 크기와 구형 
 - 전체 PlayMode 전수는 위 `e1e8d3e2` 통합 상태에서 수행했다. #620 추가 후에는 영향 묶음을 선별 재검사했으며 다시 전수 실행한 것으로 기록하지 않는다. Release·standalone·iOS·실제 다중 기기 네트워크 검증의 미실행 범위는 위와 같다.
 
 
+## 2026-11-10 #650 야광귀 방해 해제 PNG
+
+- 첨부 312×312 RGBA PNG를 무압축 Single Sprite로 가져오고, 해제 시 기존 배경·문구 대신 전체 이미지를 표시한다. 표시 시간·해제 판정·본인 화면 조건은 유지한다.
+- Unity 컴파일 후 Console error 0. `LabYaguangFlashLookTests` PlayMode 5/5 통과(기존 섬광 표현 회귀 검사).
+- PNG 전용 표시 뒤 공용 텍스트/눈 말풍선 복원은 Editor 객체 검사로 별도 확인한다. 실기기 표시 크기·시각 검수는 미실행.
+
+
+### #650 피격 말풍선 PNG 추가
+
+- 첨부 312×312 RGBA 이미지를 `Sabotage/YaguangTauntBubble` Single Sprite(무압축)로 추가했다. 섬광 피격 시 텍스트 대신 PNG만 2초 표시하며 기존 해제 PNG와 공용 알림을 구분한다. 두 PNG 모두 렌더 준비에 포함한다.
+- Editor 객체 검사: 피격 PNG 선택·Text 숨김·해제 PNG 전환·기존 텍스트 말풍선 복원 통과. 변경 스크립트 컴파일 및 `git diff --check` 통과.
+- 이번 PlayMode 검사 시도는 Editor가 재생 중이어서 시작되지 않았다(0개 실행). Console에 Unity Transport `ResetStatics` 컬렉션 변경 예외 1건이 있어 오류 0건으로 기록하지 않는다. 실기기 시각 검수 미실행.
 ### #621 튜토리얼 조합대 뒤 사각 배경 제거 — 2026-11-10
 
 - `fix/#621-tutorial-combination-board-box`에서 튜토리얼 진입 후 조합대 위쪽에 사각형 한지 경계가 나타나는 현상을 재현했다. 튜토리얼은 일반 전투의 투명 배경 합성 경로를 사용하지 않아, 하단 입력 카메라의 별도 한지 패스가 계속 화면에 그려지고 있었다.
@@ -7836,3 +7904,94 @@ Main advanced to `6b2706aa` during PR verification (#633 and #639). Integrated i
 - 실험실 잔광에 K키/`K · 흔들기 1회` 버튼을 연결했다. 미리보기 동작 호출 시0→1회와 렌더 텍스처 생성을 확인했다. 실제 게임에서 OS K키 이벤트를 직접 누르는 검증은 미실행이다.
 - 전체 EditMode2,198/2,198(48.77초), 관련 PlayMode27/27(9.17초) 통과. HUD 검사는 입력 없이 자동 재발광 없음→입력 시각에서 단발→0.6초 뒤 잔광만 유지→추가 입력·횟수에 따른 감쇠→목표 도달 시0을 확인한다. 추가 서버 섬광/중복 햅틱은 없다.
 - Unity6000.6.5f1/macOS Metal 기준. 입력 판정/통신 코드는 유지하고 표시만 변경했으므로 전체 PlayMode는 생략했다. iOS 실기기 흔들기/밝기는 미검증이다.
+
+### #647 Host-controlled stage clear - 2026-11-10
+
+Unity compilation: no errors. StageClearControlsTests: 4/4 pass after correcting a missing stageCatalog in the test fixture. Covers three prefab role states, Jigwi guest heading/wait suppression, and summary generation validation/sticky/reset behavior. Related LabGameFlowBridgeTests and LabLobbyRejoinTests: 43/43 pass with token 49. Full suite was not run.
+
+Unity Simulator: inspected only Jigwi final cut as guest; both requested messages and the advance button are absent. Stopped Play mode after inspection. Real multi-device synchronized progression and mobile builds remain unverified. Unity-generated blank m_Name YAML fields retain serializer whitespace.
+
+## 2026-11-10 — #642 봉인 총평의 실제 신규 도색 기여도·성공 시간 연결
+
+기준은 PR #646의 `feat/seal-run-summary`/`b0ae6bce`(main `64d556ae` 포함)다. Unity 6000.6.5f1·macOS/Metal의 기존 Editor 한 개에서 수행했다. 사용자 확정 기준은 **기여도=실제로 새로 칠한 면적의 비율**, **총 시간=성공한1~3스테이지 전투 시간의 합**이다. 예시 Preview의 공격 점수를 실제 기여도로 쓰지 않는다.
+
+Host의 `PaintFundedCell`에서 실제 빈 동일 면적 셀이 칠해질 때 최종 공급자에게만 `paintedCellsTotal`을 적립한다. 초기·성장·분수 공급·오색은 같은 경로를 사용하며 덮어쓰기·미사용 예산·시각 여백은 제외한다. 건조로 차감하지 않고 마른 셀 재도색은 다시 적립한다. 기존 공격 점수·땅따먹기 통계·색/P지도·면적 예산·난수·승패는 유지한다. 복사본의 새 통계는 기존 snapshot/보드/승인 경로로만 전달하며, 같은 세대·같은 플레이어의 확정 누적값만 최댓값으로 유지해 전송 순서 차이로 되감기지 않게 했다.
+
+총평은 성공 기록의 고정1/2/3슬롯과 결과용 로컬 ID를 읽는다. DEV Skip의 누락 기록은 앞당기지 않고 완료 후 연결 종료에도 본인 기여도를 유지한다. 실패/로딩/후일담 시간을 합산하지 않는다. 새 통계의 호환 묶음은 설정259개·5699/Lab60/Game50이다(Game49는 별도 #647이 사용). 원본 Scene·Prefab·Material·빌드/패키지 설정은 변경하지 않았다.
+
+| 실행 | 결과 |
+| --- | --- |
+| 최종 컴파일 확인 후 전체 EditMode | **2,225/2,225 통과**, 실패·skip·inconclusive0, 32.68초 |
+| 신규 집계·복제 집중 EditMode | **24/24 통과**, 실패·skip·inconclusive0, 6.25초 |
+| 전체 PlayMode 1회 | **784건 중781 통과·3실패**, skip·inconclusive0, 716.01초. 아래 검사 준비 문제를 구분해 보완했다. |
+| 실제3스테이지 결과→총평·연결 종료 후 본인 기록·엔딩/Home 재검증 | **1/1 통과**, 22.82초 |
+| 실제 마우스로 DEV Skip의 누락 행·Continue→구름→Ending_01→Home 재검증 | **1/1 통과**, 11.34초 |
+| 오프닝 완료 후 정리 재검증 | **1/1 통과**, 1.19초 |
+
+전체 PlayMode에서 발견한 실패3건은 새 총평 검사2건의 배열 `Has.Count` 반사 오류와 기존 오프닝 검사1건의 지연 파괴 프레임 경합이었다. 배열의 실제 `records.Count`를 직접 비교하고, 오프닝은 화면 숨김/CurrentView null/음성 정지 단언을 즉시 유지한 채 자식 객체 삭제 확인만 다음 프레임에 수행했다. 최초 총평 클릭 단독 재검사도 0/1(9.14초)이었는데, 새로 활성화된 Continue의 첫 렌더 전 레이캐스트에서 발생했다. 첫 렌더 한 프레임을 기다리도록 검사 준비만 추가했고, 화면내 좌표·첫 GraphicRaycaster 대상·실제 InputSystem 마우스 입력 단언은 모두 유지해 위11.34초 재검사로 확인했다. 게임의 입력·애니메이션 코드는 이 과정에서 바꾸지 않았다.
+
+초기 EditMode 요청의2,201/2,201(32.79초)은 컴파일 종료 전에 수집된 목록으로 신규 면적 검사가0개라 최종 구현의 통과 근거에서 제외한다. 신규 검사가 포함된 중간 전체 실행2,222/2,223(34.42초)은 새 모델 검사에서 진행 중인 판을 끝내지 않고 다시 Begin한 준비 오류1건을 발견했다. 실제 제한시간 종료→Defeat 확인→새 Begin 순서로 검사만 보완해 새 라운드0 초기화 단언을 유지했다. 그 뒤 최종 컴파일된 전체 목록의2,225/2,225 결과를 별도로 확정했다.
+
+실패한 PlayMode3건을 보완한 뒤 전체784건을 다시 실행한 것으로 표현하지 않는다. 변경 범위 기반 지침에 따라 영향 검사만 재실행했고, 전체 실행 뒤 바뀐 C#은 검사 준비뿐이며 게임 코드10파일의 내용은 보존한 해시와 동일했다. 현재 확인된 미해결 검사 실패는 없다. 신규24케이스에는 초기/반복/성장 공급자·분수 귀속·건조/재칠·Clear/Reset·지도/난수 비회귀·실제 Host ConfirmHit·복사 독립성, JSON/보드/receipt/스냅샷·큰 정수/음수·권한·동일시각/역순/중복·새 세대 초기화를 포함한다. Guest 수신은 로컬 메시지 fixture이며 실제 두 기기 통신 성공과 구분한다.
+
+실제 저장 게임 경로의 DEV Skip 결과를 원본 GameView로 촬영하고 세션 수치와 함께 저장소 밖 검증 자료로 보존했다. 누락1/2행은 —, 지귀 행만 실제 새셀2,048개 기준100%였다. 빠른 자동 완료의 전투시간0.000689초는 표시 규칙상00:00이며 임의 예시 시간이 아니다. 원본 Preview의 숫자를 실제 게임에 주입한 캡처가 아니다.
+
+미실행: iOS·실제 다인 일반Wi-Fi/핫스팟·standalone/Release 빌드 실행·성능 계측. 통신 통계가 추가됐으므로 실제 다인 확인 시 전 기기에 같은 새 버전을 사용해야 한다. PR 원격 갱신·main 병합은 이번 실행 단계에서 수행하지 않았다.
+
+### #650 최신 main 충돌 해결 — 2026-11-10
+
+- origin/main 병합 중 이 문서의 추가 기록 충돌 한 곳을 양쪽 내용 보존으로 해결했다. LabBattleRenderWarmup은 main의 오색 준비와 #650 두 PNG 준비가 모두 유지되는 것을 확인했다. 충돌 마커·미해결 인덱스 없음, 해결한 문서와 병합된 준비 코드의 diff 공백 검사 통과. main에서 가져온 다른 Unity meta의 기존 공백은 변경하지 않았다.
+- 영향 경로인 LabYaguangFlashLookTests·GameBattleRenderWarmupTests PlayMode 실행을 시도했다. 첫 시도는 Editor 재생 중이라 시작 불가, 재생 종료 후 재시도는 초기화 시간 초과로 0개 실행됐다. 전체 EditMode·실기기·화면 확인은 이번 병합에서 미실행이며 과거 검사 결과를 병합본 통과로 재사용하지 않는다.
+
+
+## 2026-11-10 — #642 / PR #646 실제 기록 연결·최신 main 병합 검증
+
+구현 `86269500`에 main `5201dac4`(#649 박 관람·도움말)을 합친 `b1e28898`에서 Unity 6000.6.5f1·macOS/Metal의 기존 Editor로 전체 EditMode **2,225/2,225 통과(33.27초)**, 전체 PlayMode **786/786 통과(738.70초)**를 확인했다. 실패·skip·inconclusive는 모두 0이다. 통계 직렬화·세션 결과 수명·화면 전환이 함께 바뀌어 전체 범위를 선택했으며, 앞서 실패했던 총평 2건과 오프닝 1건도 이 전체 실행에 포함되어 통과했다. 이전 실패 이력은 위 항목에 보존한다.
+
+검사 중 main이 `868c885f`(#651 야광귀 해제/도발 말풍선)로 갱신되어 `1c43b8ac`에 추가 통합했다. 두 번의 충돌 모두 `docs/VALIDATION.md`뿐이며 양쪽 기록을 그대로 보존했다. #649의 62개 게임/에셋 파일 중 세션·연결 검사 2개만 총평 변경과 자동 결합됐고 나머지는 main 원본과 동일하다. #651은 UI C# 3개·PNG/메타 4개·검증 기록뿐이다. 도색 집계/통신/게임 판정/설정/Scene 파일에는 두 번째 통합의 변경이 없으며, 전체 실행 때와 비교한 소스 해시도 이 UI 3개 외에는 동일하다.
+
+최종 `1c43b8ac`에서는 컴파일 확인 뒤 전체 EditMode **2,225/2,225 통과(34.42초)**와 영향 PlayMode **12/12 통과**를 확인했다. 세부 결과는 `LabGourdAlertTests` 3/3(4.03초), `LabYaguangFlashLookTests` 5/5(0.76초), `GameBattleRenderWarmupTests` 2/2(2.02초), 실제 3판 결과→총평→엔딩/Home 1/1(22.32초), 실제 마우스 DEV Skip 누락 행→총평→엔딩/Home 1/1(10.60초)다. 모두 실패·skip·inconclusive 0이다. 두 번째 통합은 UI 표현과 비공개 렌더 준비 복사본만 변경하여 범위 기반 지침에 따라 미영향 전체 PlayMode 결과를 재사용했다. 최종 main 통합 뒤 전체 786건을 다시 실행한 것으로 표현하지 않는다. 기존 검사는 새 말풍선 PNG의 미적 일치까지 증명하지 않는다.
+
+구현 `86269500`의 실제 저장 Home→공통 Battle 3판→실제 총평 경로를 별도로 촬영했다. CPU 도색 지도 완료를 자동 실행했고, 실제 세션 시간 5.002463/7.001923/9.002901초가 00:05/00:07/00:09와 합계00:21로 표시됐다. 각 판 Host 신규 셀2,048개로 솔로 기여도100%다. 예시 Preview 데이터나 직접 투척한 수동 플레이가 아니며, 이 촬영을 최신 main 통합 후 재촬영으로 기록하지 않는다.
+
+검증·PR에는 실제 면적 기준과 건조 뒤 재도색의 누적 의미, 기존 공격 점수/땅따먹기 통계/난수/지도/승패/물리 유지, 설정259개·5699/Lab60/Game50 및 전 기기 같은 새 버전 필요를 명시했다. iOS·실제 다인 LAN/핫스팟·standalone/Release 실행·성능 계측은 이번에도 미실행이다. 독립 코드/PR 설명 검토에서 병합 차단 결함은 발견되지 않았다. C#·문서 충돌 마커/공백 검사는 통과했고, 기존 Unity 직렬화 에셋의 생성 공백은 임의로 고치지 않았다.
+## 2026-11-11 — #654 Opening revision: 28 frames
+
+Validated in Unity 6000.6.5f1 on macOS, on the isolated branch based on origin/main `7b3025ee`. Existing product-name, splash and iOS Build Profile changes in the original checkout were preserved there.
+
+All 28 frames from Figma section `4553:2390` retain the approved dialogue, speaker, image placement, rotation, cropping and mixed text sizes. Frame 7 includes the sigh placed outside its frame in the source. All 28 prefabs were rendered at 804×1748. Frames 7/12/13/14/15/16 were also sampled at 0/0.7/1.4/2.1/2.8/4 seconds. Visual review corrected wrapping, rotating masks, the final background's 2pt bleed, smoke obscuring demons and the initially invisible falling gourd. These captures are Editor renders, not device performance measurements.
+
+Affected EditMode checks: OpeningRevisionTests 10/10, GameOpeningAssetTests and GameOpeningTransitionTests 7/7, retained StoryWorkspaceTests 8/8 passed. Obsolete 25-cut/27-page layout assertions were replaced with checks for the new approved text, typography, coordinates, independent motion, deterministic replay and final background bleed. Title and page-fit tests remain.
+
+Affected PlayMode checks: GameOpeningControllerTests 13/13 passed (9.33 seconds), including all 28 cuts, authored dialogue visibility, hiding the shared dialogue, completion/skip, pointer release, cloud zoom and cancellation/fallback. GameTutorialFlowTests.FinishedOpeningOpensThePracticeBoardOnceThenTheRoomList passed 1/1 (54.27 seconds): completing frame 28 hides its dialogue, closes the clouds, holds them during preparation, reveals the tutorial and eventually opens the room list. Subsequent changes only refine prop selection, rotating masks and scroll entrance; transition code is unchanged.
+
+Live2D title, Home bindings, gameplay/network settings and protocol tokens are unchanged. Full test suites, standalone/iOS builds, real iPhones, multiplayer and performance profiling were not run. Raw logs and visual captures stay outside the repository.
+
+### #654 background and motion follow-up — 2026-11-11
+
+Re-read all 28 background paints in Figma, including frame 4's updated full opacity. Backgrounds are now composited over white in sRGB before import: raw fills apply the authored opacity once, while filtered exports retain the opacity already present in their pixels. This fixes both double opacity and the washed-out result of linear-space UI blending. Captured all 28 saved prefabs and compared representative frames against Figma; sampled background colors agree within rounding. Frame 15's original shadow image is retained on the floor and grows/darkens with the fall. Frames 7/12/13/14/15/16 were sampled over time; the sigh remains visible, and the flying props cross the middle of frame 13. These are Editor renders, not device captures.
+
+Unity 6000.6.5f1 affected checks passed: OpeningRevisionTests **14/14**, OpeningDialogueContinuityTests **1/1**, GameOpeningControllerTests **13/13**, StoryPlayerTests **11/11**; no failures or skips in the final runs. Continuity verifies both forward and backward changes for 9/10 and 19/20, retaining actual artwork instances, positions and elapsed animation while replacing only dialogue. The final shadow intensity and strengthened continuity assertions were rechecked in the 14- and 1-test runs. Controller checks cover all 28 cuts and the final cloud transition; the full tutorial-to-room-list flow above was not rerun for this follow-up.
+
+The first StoryPlayerTests run passed 10/11: the legacy prepared-opening test assumed every Image had a sprite and every cut replayed its entrance. Its assertions now distinguish the deliberate white backing and hidden masks, and respect dialogue-only cuts; the rerun passed 11/11. An earlier Editor audio update hang occurred before PlayMode tests executed; reopening the worktree Editor resolved it. C#/JSON/document whitespace checks passed. Unity-generated prefab whitespace was retained. Full suites, builds, physical iPhones and performance profiling were not run. Captures and raw test output remain outside the repository.
+
+### #654 frame 15 landing alignment — 2026-11-11
+
+Applied the updated Figma frame 15 positions and layer order: shattered gourd at (68,429), revised smoke positions, and the 308pt-wide floor shadow at (37,732). Rebuilt only OP_015, retaining its GUID. The intact gourd's rotated opaque contact point now lands at the shadow center; it stays fully visible through the descent, then exchanges with the stationary shards over 0.12 seconds after contact. The shards no longer move up from below their authored position.
+
+Unity 6000.6.5f1: OpeningRevisionTests **15/15 PASS**, including floor contact, no premature fade/shards, stationary contact during the exchange and the revised shard coordinates; GameOpeningControllerTests **13/13 PASS** (9.39 seconds), including 28-cut completion and the existing final cloud transition. No failures or skips. Rendered the saved frame at 2.30/2.50/2.60/2.66/2.73/3.10 seconds and compared the landing and settled composition to Figma. C#/JSON/document whitespace checks passed. No full suites, builds or device testing were performed; captures and raw results remain outside the repository.
+
+### #654 continuous accident sequence and speaker colors - 2026-11-11
+
+In the original checkout, frames 14/15/16 now continue on their cut clocks (2.3/3.35/3.2 seconds) without AUTO or touch input, returning to manual dialogue at frame 17. Surplus elapsed time carries across boundaries; tapping Next cannot interrupt these cuts, Previous replays them, and Skip remains available. Frame 4 retains its authored close-up and stationary hand. The 21 speaking cuts now use the six existing SpeakerPalette styles and the brush-alpha material, including dark text on the yellow badge. Prefabs were updated in place with GUIDs and layout preserved; the revision builder reproduces these settings.
+
+Unity 6000.6.5f1: OpeningRevisionTests **17/17 PASS**; affected PlayMode OpeningCinematicTests **2/2**, OpeningDialogueContinuityTests **1/1**, StoryPlayerTests **11/11**, GameOpeningControllerTests **13/13 PASS**. Tests cover automatic boundaries, ignored taps, long-frame time carry, manual dialogue resumption, Previous/Replay/Skip, all authored speaker badges and dialogue-only color swaps, plus existing 28-cut completion/cloud exit. Rendered frame 4 and all six speaker colors from saved prefabs, checking the yellow badge's dark lettering and unchanged typography.
+
+The initial cinematic fixture passed 1/2 because it incorrectly expected Skip alone to destroy the retained final picture. A first timing-only adjustment also failed; the fixture now calls Cancel as the owning screen does and asserts both immediate hiding and subsequent cleanup. Runtime cleanup was unchanged. One further attempt was aborted when Play stopped before results; the completed rerun above is the evidence used. A combined filter that selected zero tests was excluded; the four groups were then run separately. C#/document whitespace checks passed. Existing five local settings/build-profile files retained their original hashes. No full suites, builds, physical devices or performance measurements were run; raw logs/captures remain outside the repository.
+
+
+### #654 PR preparation on latest main - 2026-11-11
+
+Prepared `feat/opening-28-frame-direction` with only the opening commits and merged origin/main `45001d21` (battle BGM updates). The original checkout remains on its existing local review branch with its preview and personal settings preserved; host-control work from #647 is not part of this PR. The sole cherry-pick conflict was this validation document; existing history and the new opening record were retained.
+
+All 279 changed opening code/asset/test files (excluding the tutorial test file, which retains main's independent Help-button assertions) have identical Git blob hashes to the tested local revision `fb021e31`. The main merge adds only six audio-file changes relative to the prepared opening branch. Accordingly, the preceding 17 EditMode and 27 PlayMode results are reused for unchanged opening behavior; they are not reported as a new run after this audio-only integration. The initial full tutorial handoff check remains separately dated above. Source/document whitespace checks and PR scope review passed; no scene, title, project setting, build profile or network-protocol changes are included.

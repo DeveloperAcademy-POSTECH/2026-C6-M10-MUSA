@@ -229,6 +229,9 @@ namespace C6Lab
         private bool baseline;
         private LabBoardFrame header;
         private LabPlayerState[] players = Array.Empty<LabPlayerState>();
+        // Cumulative Host totals can share a clock tick across the board and full-snapshot streams.
+        // Keep only this statistic monotonic; all other player fields retain their existing timestamp rules.
+        private readonly Dictionary<ulong, long> paintedCellsTotals = new Dictionary<ulong, long>();
         private double playersAt = -1d;
         private ulong latestModelRevision, purgedThroughRevision;
         private double purgedAt = -1d;
@@ -256,6 +259,7 @@ namespace C6Lab
             owner = localOwner;
             states.Clear(); tombstones.Clear();
             players = Array.Empty<LabPlayerState>(); playersAt = -1d;
+            paintedCellsTotals.Clear();
             header = null; baseline = false; LatestSequence = 0; NeedsCheckpoint = false;
             latestModelRevision = purgedThroughRevision = 0;
             purgedAt = -1d; hasPurge = false;
@@ -378,6 +382,7 @@ namespace C6Lab
         public LabSnapshot Overlay(LabSnapshot snapshot)
         {
             if (snapshot == null || !Matches(snapshot.sessionId, snapshot.round)) return snapshot;
+            RememberPaintContributions(snapshot.players);
             ObserveJigwiSupplySnapshot(snapshot);
             if (!baseline)
             {
@@ -402,6 +407,7 @@ namespace C6Lab
                 .Select(orb => orb.Copy()).ToArray();
             bool useCachedPlayers = playersAt >= snapshot.serverTime && players.Length > 0;
             if (useCachedPlayers) copy.players = LabBoardPublisher.CopyPlayers(players);
+            ApplyPaintContributions(copy.players);
             if (hasPurge && (useCachedPlayers ? playersAt : snapshot.serverTime) <= purgedAt)
                 foreach (LabPlayerState player in copy.players) if (player != null) player.stamina = 0f;
             if (header != null && (!hasPurge || header.modelRevision >= purgedThroughRevision)
@@ -448,11 +454,31 @@ namespace C6Lab
 
         private void ApplyPlayers(LabPlayerState[] incoming, double serverTime)
         {
+            RememberPaintContributions(incoming);
+            ApplyPaintContributions(players);
             if (serverTime < playersAt || (incoming?.Length ?? 0) == 0) return;
             players = LabBoardPublisher.CopyPlayers(incoming);
+            ApplyPaintContributions(players);
             if (hasPurge && serverTime <= purgedAt)
                 foreach (LabPlayerState player in players) player.stamina = 0f;
             playersAt = serverTime;
+        }
+
+        private void RememberPaintContributions(LabPlayerState[] observed)
+        {
+            foreach (LabPlayerState player in observed ?? Array.Empty<LabPlayerState>())
+            {
+                if (player == null || player.paintedCellsTotal < 0L) continue;
+                if (!paintedCellsTotals.TryGetValue(player.id, out long previous) || player.paintedCellsTotal > previous)
+                    paintedCellsTotals[player.id] = player.paintedCellsTotal;
+            }
+        }
+
+        private void ApplyPaintContributions(LabPlayerState[] values)
+        {
+            foreach (LabPlayerState player in values ?? Array.Empty<LabPlayerState>())
+                if (player != null && paintedCellsTotals.TryGetValue(player.id, out long confirmed))
+                    player.paintedCellsTotal = confirmed;
         }
 
         private void SeedMissingDrums(LabOrbState[] incoming)
@@ -573,7 +599,8 @@ namespace C6Lab
 
         private static bool ValidPlayers(LabPlayerState[] values)
         {
-            if (values == null || values.Length > MaximumPlayers) return false;
+            if (values == null || values.Length > MaximumPlayers
+                || !LabPaintContributionNetworkValidation.Valid(values)) return false;
             var ids = new HashSet<ulong>();
             var seats = new HashSet<int>();
             return values.All(player => player != null && ids.Add(player.id) && player.seat >= 0
@@ -625,6 +652,13 @@ namespace C6Lab
             flashTargetAll = source.flashTargetAll, flashCount = source.flashCount, flashLastAt = source.flashLastAt,
             flashLastTarget = source.flashLastTarget, flashLastTargetAll = source.flashLastTargetAll
         };
+    }
+
+    /// <summary>The Host's cumulative newly painted-cell count travels in every player-state route.</summary>
+    public static class LabPaintContributionNetworkValidation
+    {
+        public static bool Valid(LabPlayerState[] players) => players != null
+            && Array.TrueForAll(players, player => player != null && player.paintedCellsTotal >= 0L);
     }
 
     public static class LabFlashNetworkValidation

@@ -42,12 +42,8 @@ namespace C6Lab
         [SerializeField, Range(.05f, .8f)] private float countdownPopSeconds = .25f;
         private static readonly Color CountdownInk = new Color32(43, 36, 32, 255);
         [Header("섬광 말풍선 (#301)")]
-        [Tooltip("섬광을 맞은 직후 박 옆 말풍선에 야광귀가 하는 말 (맞은 사람 화면만). 비우면 안 띄운다.")]
-        [SerializeField] private string tauntText = "안보이지롱~";
         [Tooltip("놀리는 말풍선이 떠 있는 시간 (초)")]
         [SerializeField, Range(.3f, 6f)] private float tauntSeconds = 2f;
-        [Tooltip("폰을 흔들어 눈부심을 풀었을 때 말풍선 (푼 사람 화면만). 비우면 안 띄운다.")]
-        [SerializeField] private string caughtText = "으악 어지러워~";
         [Tooltip("풀린 말풍선이 떠 있는 시간 (초)")]
         [SerializeField, Range(.3f, 6f)] private float caughtSeconds = 3f;
         [Header("흔들어 풀기 (#301)")]
@@ -459,10 +455,12 @@ namespace C6Lab
             HapticCount++;
             LabHaptics haptics = GetComponent<LabHaptics>();
             if (haptics != null) haptics.PlayForFlash(config);
-            if (Say(tauntText, tauntSeconds)) TauntCount++;
+            LabGourdAlert alert = GetComponent<LabGourdAlert>();
+            if (alert != null && network != null && alert.ShowYaguangTaunt(network.target, tauntSeconds))
+                TauntCount++;
         }
 
-        /// <summary>내가 요괴 얼굴을 맞혀 이번 섬광의 눈부심을 풀었으면(#301) "앗 들켰다!"를 한 번 띄운다.</summary>
+        /// <summary>내가 요괴 얼굴을 맞혀 이번 섬광의 눈부심을 풀었으면(#650) 텍스트 없는 PNG를 한 번 띄운다.</summary>
         private void CheckCaught(LabSnapshot snapshot, double now, ulong me)
         {
             double released = snapshot.FlashReleasedAt(me);
@@ -470,17 +468,9 @@ namespace C6Lab
             caughtShownFor = snapshot.flashCount;
             // 접속 직후 이미 오래전에 푼 기록에는 띄우지 않는다.
             if (now - released > 1d) return;
-            if (Say(caughtText, caughtSeconds)) CaughtCount++;
-        }
-
-        /// <summary>박 옆 말풍선에 짧은 말을 띄운다. 말풍선이나 박이 없으면 false.</summary>
-        private bool Say(string text, float seconds)
-        {
-            if (string.IsNullOrEmpty(text)) return false;
             LabGourdAlert alert = GetComponent<LabGourdAlert>();
-            if (alert == null || network == null || network.target == null) return false;
-            alert.ShowWord(network.target, text, seconds);
-            return true;
+            if (alert != null && network != null && alert.ShowYaguangRelease(network.target, caughtSeconds))
+                CaughtCount++;
         }
 
         private void Hide()

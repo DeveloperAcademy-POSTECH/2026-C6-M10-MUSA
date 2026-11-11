@@ -15,11 +15,11 @@ MonoBehaviour:
   cutId: OP_021
   viewPrefab: {fileID: 1220480265513094391, guid: 5e3c1a751ac954625b642132cbc3c0ea, type: 3}
   pages:
-  - speaker: "\uC194\uC774"
-    dialogue: "\uC7A0\uAE50! \uC74C\uAD6C\uC2AC\uACFC \uC591\uAD6C\uC2AC\uC744 \uD569\uCE58\uBA74\u2026\n\uC624\uD589\uAD6C\uC2AC\uC744 \uB9CC\uB4E4 \uC218 \uC788\uACA0\uC5B4!"
-    autoReadSeconds: 5.35
-    voice: {fileID: 8300000, guid: 1d15df4b000940ecb273307729e8e017, type: 3}
-  direction: 
+  - speaker: "\uBB35\uC774"
+    dialogue: "\uC598\uB4E4\uC544 \uC7A0\uAE50! \uC5EC\uAE30 \uC880 \uBD10!"
+    autoReadSeconds: 4
+    voice: {fileID: 8300000, guid: 90cb7193c2034fcca6b782256bacb012, type: 3}
+  direction: Approved Figma frame 21 (4553:2526); native text and independent artwork motion.
   speaker: "\uC194\uC774"
   dialogue: "\uC7A0\uAE50! \uC74C\uAD6C\uC2AC\uACFC \uC591\uAD6C\uC2AC\uC744 \uD569\uCE58\uBA74\u2026\n\uC624\uD589\uAD6C\uC2AC\uC744 \uB9CC\uB4E4 \uC218 \uC788\uACA0\uC5B4!"
   autoReadSeconds: 4

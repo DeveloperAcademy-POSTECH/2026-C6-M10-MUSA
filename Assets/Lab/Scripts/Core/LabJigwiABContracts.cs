@@ -151,6 +151,9 @@ namespace C6Lab
         public const int MaximumRounds = LabJigwiABTimeline.SlotCount, MaximumPlayers = 5, MaximumFires = 6;
         public static LabJigwiABSnapshot Copy(LabJigwiABSnapshot state) => state?.Copy() ?? new LabJigwiABSnapshot();
         private static bool Finite(double value) => !double.IsNaN(value) && !double.IsInfinity(value);
+        /// <summary>#663: when a mission's time is really over — its end, or earlier if it was resolved before that.</summary>
+        private static double MissionUntil(LabJigwiABRound round) => round.resolution != LabJigwiABResolution.None
+            && round.resolvedAt >= 0d ? Math.Min(round.endsAt, round.resolvedAt) : round.endsAt;
         private static bool Range(double value, double min, double max) => Finite(value) && value >= min && value <= max;
         public static bool Valid(LabJigwiABSnapshot state, LabPlayerState[] members = null, ulong? modelRevision = null)
         {
@@ -182,12 +185,16 @@ namespace C6Lab
                     || !Range(round.rewardUntil, -1d, state.cutoffAt)
                     || round.players == null || round.players.Length > MaximumPlayers) return false;
                 double scheduled = state.startedAt + LabJigwiABTimeline.ActiveOffset(round.slot, state.schedule);
-                if (Math.Abs(round.activeAt - scheduled) > .00001d
-                    || Math.Abs(round.warningAt - (scheduled - LabJigwiABTimeline.WarningSeconds)) > .00001d
+                // #663: in the smoke flow a talisman may start earlier than its slot (right after the smoke before it).
+                bool pulled = state.schedule == LabJigwiABTimeline.SmokeFlowSchedule && round.kind == LabJigwiABKind.PersonalBurn
+                    && round.activeAt < scheduled - .00001d;
+                if (!pulled && Math.Abs(round.activeAt - scheduled) > .00001d
+                    || Math.Abs(round.warningAt - (round.activeAt - LabJigwiABTimeline.WarningSeconds)) > .00001d
                     || round.kind != LabJigwiABTimeline.KindForSlot(round.slot, state.schedule)) return false;
                 if (round.resolution != LabJigwiABResolution.Skipped)
                 {
-                    if (intervals.Any(other => round.activeAt < other.endsAt && other.activeAt < round.endsAt)) return false;
+                    // #663: a mission that ended early (smoke wiped away) frees its time from that moment, so the pulled talisman fits.
+                    if (intervals.Any(other => round.activeAt < MissionUntil(other) && other.activeAt < MissionUntil(round))) return false;
                     intervals.Add(round);
                 }
                 bool failed = round.kind == LabJigwiABKind.GroupFire && round.resolution == LabJigwiABResolution.Expired;

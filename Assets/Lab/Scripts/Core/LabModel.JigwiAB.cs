@@ -19,15 +19,24 @@ namespace C6Lab
         /// <summary>#540: the timetable this battle runs and, for the flow timetable, the common gimmick rhythm.</summary>
         private int jigwiSchedule;
         private double jigwiCommonStart = 40d, jigwiCommonInterval = 15d;
+        /// <summary>#663: seconds after a smoke ends that the next talisman starts (0 = the fixed timetable).</summary>
+        private double jigwiSmokeToTalisman;
+        /// <summary>#663: the next slot's activation when a smoke ended early pulled it forward (+∞ = its fixed time).</summary>
+        private double jigwiNextSlotPulledAt = double.PositiveInfinity;
+        /// <summary>The next slot's activation: its fixed time, or earlier when a finished smoke pulled the talisman forward.</summary>
+        private double JigwiNextSlotActiveAt => Math.Min(jigwiNextSlotPulledAt,
+            jigwiStageStartedAt + LabJigwiABTimeline.ActiveOffset(jigwiStageNextSlot, jigwiSchedule));
         /// <summary>#540: once Jigwi's line is over, every orb on an unfinished talisman's board burns away together in this long.</summary>
         public const double JigwiTalismanFailBlazeSeconds = 1d;
         /// <summary>#540: the fireball falls onto a failed seat's board this long after the A ends.</summary>
         public const double JigwiTalismanFailBurnDelaySeconds = .45d;
         /// <summary>
-        /// #540: the first orb catches fire this long after the A ends — once Jigwi's "모두 재가 되어라!" (`JigwiVoiceAFail`, 3.64 s,
-        /// played as the fireball falls) has finished.
+        /// #540: the first orb catches fire this long after the A ends. #663: it waited 3.7 s for Jigwi's "모두 재가 되어라!"
+        /// (`JigwiVoiceAFail`), which no longer exists, so the board sat still; now it catches fire just after the fireball lands
+        /// (0.45 s). The default of LabConfig Jigwi A Fail Burn Start Seconds (Host, Inspector).
         /// </summary>
-        public const double JigwiTalismanFailFirstBurnSeconds = 3.7d;
+        public const double JigwiTalismanFailFirstBurnSeconds = .6d;
+        private double jigwiAFailBurnStart = JigwiTalismanFailFirstBurnSeconds;
         // #479: A burns each owner's orbs one at a time. The last queued deadline per owner for the running A.
         private readonly Dictionary<ulong, double> jigwiABLastBurnAt = new Dictionary<ulong, double>();
         private string jigwiABBurnQueueId;
@@ -80,9 +89,11 @@ namespace C6Lab
                 : jigwiSmokeFlow ? LabJigwiABTimeline.SmokeFlowSchedule // #595 연기 10 / 부적 45 / 연기 66 / 부적 83
                 : config.JigwiFlowSchedule ? LabJigwiABTimeline.FlowSchedule : LabJigwiABTimeline.LegacySchedule;
             jigwiAHoldBurn = config.JigwiAHoldBurnUntilEnd;
+            jigwiAFailBurnStart = config.JigwiAFailBurnStartSeconds; // #663
             jigwiBBucket = config.JigwiBBucket;
             jigwiBCountdown = config.JigwiBCountdown;
             jigwiCommonStart = config.JigwiCommonStartSeconds; jigwiCommonInterval = config.JigwiCommonIntervalSeconds;
+            jigwiSmokeToTalisman = config.JigwiSmokeToTalismanSeconds; jigwiNextSlotPulledAt = double.PositiveInfinity;
             jigwiABRounds.Clear(); jigwiABActivated.Clear(); jigwiABFailureRevision = 0;
             jigwiABLastBurnAt.Clear(); jigwiABBurnQueueId = null; jigwiTalismanDrops.Clear(); jigwiFailBurns.Clear(); jigwiAPausedOrbs.Clear(); jigwiTalismanShards.Clear(); jigwiCommonPours.Clear();
             ResetJigwiABSupply(config);
@@ -124,7 +135,7 @@ namespace C6Lab
             foreach (var drop in jigwiTalismanDrops) Include(drop.dueAt); // #509 talisman Water, one at a time
             foreach (var burn in jigwiFailBurns) Include(burn.dueAt); // #540 the failed boards catch fire right on time
             if (jigwiStageNextSlot < LabJigwiABTimeline.SlotCountFor(jigwiSchedule))
-                Include(jigwiStageStartedAt + LabJigwiABTimeline.ActiveOffset(jigwiStageNextSlot, jigwiSchedule) - LabJigwiABTimeline.WarningSeconds);
+                Include(JigwiNextSlotActiveAt - LabJigwiABTimeline.WarningSeconds);
             foreach (var item in jigwiABRounds)
             {
                 if (item.resolution == LabJigwiABResolution.None)
@@ -167,13 +178,33 @@ namespace C6Lab
             foreach (var item in jigwiABRounds.Where(value => value.resolution == LabJigwiABResolution.None).ToArray())
                 if (now >= item.endsAt) ResolveJigwiAB(item, LabJigwiABResolution.Expired, item.endsAt);
             while (jigwiStageNextSlot < LabJigwiABTimeline.SlotCountFor(jigwiSchedule)
-                && jigwiStageStartedAt + LabJigwiABTimeline.ActiveOffset(jigwiStageNextSlot, jigwiSchedule) - LabJigwiABTimeline.WarningSeconds <= now)
+                && JigwiNextSlotActiveAt - LabJigwiABTimeline.WarningSeconds <= now)
             {
+                double activeAt = JigwiNextSlotActiveAt;
                 int slot = jigwiStageNextSlot++;
-                BeginJigwiABSlot(slot, jigwiStageStartedAt + LabJigwiABTimeline.ActiveOffset(slot, jigwiSchedule));
+                jigwiNextSlotPulledAt = double.PositiveInfinity;
+                BeginJigwiABSlot(slot, activeAt);
             }
             var active = ActiveJigwiABRound(now);
             if (active != null) AdvanceJigwiABActive(active, now);
+        }
+        /// <summary>
+        /// #663: in the smoke flow, once a smoke is over (wiped away or timed out) the next talisman follows Jigwi Smoke To Talisman
+        /// Seconds later instead of waiting for its fixed time (45 s / 83 s), never later than that. A common gimmick that would
+        /// fall from the talisman's warning to its end waits until 1 s after it, so the two never overlap.
+        /// </summary>
+        private void PullTalismanAfterSmoke(LabJigwiABRound item, LabJigwiABResolution result)
+        {
+            if (!item.smoke || jigwiSmokeToTalisman <= 0d || result == LabJigwiABResolution.Cancelled
+                || result == LabJigwiABResolution.Skipped || jigwiSchedule != LabJigwiABTimeline.SmokeFlowSchedule
+                || jigwiStageNextSlot >= LabJigwiABTimeline.SlotCountFor(jigwiSchedule)
+                || LabJigwiABTimeline.KindForSlot(jigwiStageNextSlot, jigwiSchedule) != LabJigwiABKind.PersonalBurn) return;
+            double fixedAt = jigwiStageStartedAt + LabJigwiABTimeline.ActiveOffset(jigwiStageNextSlot, jigwiSchedule);
+            double pulled = item.resolvedAt + Math.Max(LabJigwiABTimeline.WarningSeconds, jigwiSmokeToTalisman);
+            if (pulled >= fixedAt || pulled >= jigwiStageCutoffAt) return;
+            jigwiNextSlotPulledAt = pulled;
+            double from = pulled - LabJigwiABTimeline.WarningSeconds, until = pulled + jigwiABDuration + 1d;
+            if (nextCommonGimmickAt >= from && nextCommonGimmickAt < until) nextCommonGimmickAt = until;
         }
         private void AdvanceJigwiABActive(LabJigwiABRound active, double now)
         {
@@ -244,6 +275,7 @@ namespace C6Lab
         {
             if (item == null || item.resolution != LabJigwiABResolution.None) return;
             item.resolution = result; item.resolvedAt = Math.Max(item.warningAt, at);
+            PullTalismanAfterSmoke(item, result);
             // #540: an A that runs out punishes every seat that did not finish its talisman (each seat for itself):
             // when Jigwi's line is over, every orb then on its board burns away at once. Drums keep working.
             var failed = new HashSet<ulong>();
@@ -252,7 +284,7 @@ namespace C6Lab
                 foreach (var seat in item.players ?? Array.Empty<LabJigwiABPlayerFire>())
                     if (seat != null && item.TalismanFailed(seat.playerId)) failed.Add(seat.playerId);
             // #540: which orbs burn is decided when Jigwi's line ends (see IgniteDueJigwiFailBurns), so orbs made meanwhile burn too.
-            foreach (ulong owner in failed) jigwiFailBurns.Add((owner, item.id, item.resolvedAt + JigwiTalismanFailFirstBurnSeconds));
+            foreach (ulong owner in failed) jigwiFailBurns.Add((owner, item.id, item.resolvedAt + jigwiAFailBurnStart));
             foreach (var orb in orbs.Values)
             {
                 if (failed.Contains(orb.owner)) continue;

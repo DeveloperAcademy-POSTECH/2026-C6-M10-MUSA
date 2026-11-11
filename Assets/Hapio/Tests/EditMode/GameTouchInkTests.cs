@@ -89,5 +89,24 @@ namespace Hapio.Tests
             Assert.That(art.dropletsMax, Is.GreaterThanOrEqualTo(art.dropletsMin));
             Assert.That(art.maxMarks, Is.GreaterThanOrEqualTo(1));
         }
+
+        [Test]
+        public void EachTapPicksOneOfTheThreeInkSoundsNeverTheSameTwiceInARow()
+        {
+            // #629: three recorded ink drops at full volume; consecutive taps never repeat the same one.
+            GameTouchInkArt art = GameTouchInkArt.Load();
+            Assert.That(art.tapSounds, Has.Length.EqualTo(3));
+            Assert.That(art.tapSounds, Has.None.Null);
+            Assert.That(art.soundVolume, Is.EqualTo(1f));
+            int previous = -1;
+            for (int i = 0; i < 60; i++)
+            {
+                AudioClip clip = art.PickTapSound(previous, out int picked);
+                Assert.That(clip, Is.Not.Null);
+                Assert.That(picked, Is.InRange(0, 2));
+                Assert.That(picked, Is.Not.EqualTo(previous), "Not the same sound twice in a row.");
+                previous = picked;
+            }
+        }
     }
 }

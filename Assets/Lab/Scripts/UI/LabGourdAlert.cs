@@ -18,6 +18,8 @@ namespace C6Lab
     public sealed class LabGourdAlert : MonoBehaviour
     {
         public const string Text = "!";
+        public const string YaguangTauntPath = "Sabotage/YaguangTauntBubble";
+        public const string YaguangReleasePath = "Sabotage/YaguangReleaseBubble";
         private const int TextureSize = 150;
         // 말풍선 그림 안의 위치 (픽셀, 아래가 0): 몸통 타원과 박을 가리키는 꼬리 끝.
         private static readonly Vector2 BodyCenter = new Vector2(88f, 94f);
@@ -197,6 +199,30 @@ namespace C6Lab
             Begin(gourd, Mathf.Max(.3f, seconds));
         }
 
+        /// <summary>#650: complete artwork, with no generated bubble or text over it.</summary>
+        public bool ShowYaguangRelease(LabTarget gourd, float seconds)
+            => ShowArtwork(gourd, YaguangReleasePath, seconds);
+
+        public bool ShowYaguangTaunt(LabTarget gourd, float seconds)
+            => ShowArtwork(gourd, YaguangTauntPath, seconds);
+
+        private bool ShowArtwork(LabTarget gourd, string resourcePath, float seconds)
+        {
+            Sprite artwork = Resources.Load<Sprite>(resourcePath);
+            if (gourd == null || artwork == null || !EnsureBubble()) return false;
+            showingBlock = showingHeart = false;
+            ShowOnly(null);
+            mark.text = string.Empty;
+            var image = bubble.GetComponent<Image>();
+            image.sprite = artwork;
+            image.preserveAspect = true;
+            bubble.sizeDelta = new Vector2(bubbleSize * artwork.rect.width / artwork.rect.height, bubbleSize);
+            // Tail tip in the supplied 312px artwork (bottom-left origin).
+            bubble.pivot = new Vector2(65f / 312f, 23f / 312f);
+            Begin(gourd, Mathf.Max(.3f, seconds));
+            return true;
+        }
+
         /// <summary>지금 짧은 말(야광귀 셈법)을 보여 주는 중인지 (#271).</summary>
         public bool ShowingWord => Active && showingWord;
 
@@ -269,7 +295,11 @@ namespace C6Lab
         // 말풍선 안 표시는 한 번에 하나만 보인다.
         private void ShowOnly(GameObject shown)
         {
-            bubble.GetComponent<Image>().enabled = true;
+            var background = bubble.GetComponent<Image>();
+            background.enabled = true;
+            background.sprite = BubbleSprite();
+            background.preserveAspect = false;
+            bubble.sizeDelta = new Vector2(bubbleSize, bubbleSize);
             bubble.pivot = TailTip / TextureSize;
             if (shown != eyesRect.gameObject) showingEyes = false;
             showingWord = false;

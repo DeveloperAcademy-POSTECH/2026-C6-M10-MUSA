@@ -247,6 +247,12 @@ namespace C6Lab
         /// <summary>오색구슬을 받은 섬광 번호 (#329). 한 섬광에 한 번만 받는다. 0이면 아직 없음.</summary>
         public uint flashBonusFlash;
 
+        /// <summary>
+        /// 이번 라운드에 내 공급으로 실제 빈 표면을 새로 칠한 동일 면적 셀 수(누적).
+        /// 건조로 차감하지 않으며 마른 뒤 다시 칠하면 추가한다. 현재 점유 면적·공격 점수와 별도다.
+        /// </summary>
+        public long paintedCellsTotal;
+
         // 2:2 청홍 땅따먹기 (#281) 결과 기록. 팀전이 아니면 0이다.
         /// <summary>지금 박에 남아 있는 이 사람이 칠한 칸 수 (빼앗긴 칸은 빠진다)</summary>
         public int paintedCells;

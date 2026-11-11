@@ -272,7 +272,7 @@
 
 ## 마지막 일격 다시보기 (스토리 1·2·3)
 
-- 100% 뒤 Host가 마지막 일격(결과의 `LastPainter`가 최근 4초 안에 던진 칠 명중, 없으면 최근 명중) 기록 `LabFinishReplayShot`을 finish prepare/commit의 `replay` 문자열에 싣는다. 모든 기기가 공통 `StartsAt`부터 세 각도(던진 사람·옆면·확대, 1.31/1.5/1.8초, 점점 느리게)와 전환 0.5초, 총 5.11초를 재생한 뒤 한지색 `GameSceneFade` 아래에서 결과로 간다. 후보가 없거나 12초 한도에 들어가지 않으면 기존 1.2초 연출이다. 2:2·Lab은 바꾸지 않는다.
+- 100% 뒤 Host가 마지막 일격(결과의 `LastPainter`가 최근 4초 안에 던진 칠 명중, 없으면 최근 명중. 구슬이 아닌 칠(지귀 공통 부적 폭포 등)로 끝나 4초 안 명중이 없으면 명중 때 저장해 둔 자세로 이번 라운드의 가장 최근 명중) 기록 `LabFinishReplayShot`을 finish prepare/commit의 `replay` 문자열에 싣는다. 모든 기기가 공통 `StartsAt`부터 세 각도(던진 사람·옆면·확대, 1.31/1.5/1.8초, 점점 느리게)와 전환 0.5초, 총 5.11초를 재생한 뒤 한지색 `GameSceneFade` 아래에서 결과로 간다. 후보가 없거나 12초 한도에 들어가지 않으면 기존 1.2초 연출이다. 2:2·Lab은 바꾸지 않는다.
 - 표현 전용이다. 실제 박은 숨기지 않고 렌더 콜백 사이에서만 기록 자세로 그린다(`LabHangingTarget.SetPresentationPose`). 구슬은 물리 없는 ghost, 카메라는 전용 연출 카메라다. 판정·통계·네트워크 상태·BattleCamera 자세·전역 `Time.timeScale`을 바꾸지 않는다.
 - 새 탭은 그 기기만 건너뛴다. release는 모든 참가자의 done(끝남·건너뜀)을 기다린다(`TryRelease` 최소 0, 기존 연출은 1.2초 유지). 솔로는 건너뛰면 바로 결과로 간다.
 - #525 당시 호환 묶음은 설정 259개·**5687**·`C6PhysicsLab/48`·**`C6HapioGame/33`**이며 Game32 앱과 혼용하지 않는다. 상세는 `docs/FINAL_HIT_REPLAY.md`, 실행한 검사는 `docs/VALIDATION.md`를 따른다.
@@ -413,8 +413,8 @@
 
 - 1~3스테이지 박과 판정 껍데기는 Gourd Visual Size(DEV 140) 값에 더해 `LabGourdVisualRig.StageSizeMultiplier` 1.4배로 그린다(실제 화면 시안으로 승인). `LabGourdPaint`가 rig 기준 크기를 이 값으로 나눠 쓰므로 rig가 없는 흰 박(튜토리얼·2:2·Lab)과 그 골든은 바뀌지 않는다. 다시 굽지 않으며 프리팹의 `referenceVisualSize` 1.4도 그대로다.
 - 박은 줄 쪽 기준점을 유지한 채 아래로 커진다. 정지 자세의 실제 바닥은 땅 위지만 줄 흔들림의 아래쪽에서는 잠깐 땅과 겹칠 수 있다.
-- 현재 호환 묶음은 설정259개·5697·`C6PhysicsLab/58`·**`C6HapioGame/47`**다. 판정 모양이 달라져 Game46 이하 앱과 혼용하지 않는다.
-- #595 지귀 연기 흐름(round.smoke / round.common)으로 호환 묶음이 설정259개·**5698**·`C6PhysicsLab/59`·**`C6HapioGame/48`**이 됐다. 5697 이하 앱과 혼용하지 않는다.
+- 당시 호환 묶음은 설정259개·5697·`C6PhysicsLab/58`·**`C6HapioGame/47`**였다(현재 기준은 아래 #647 절). 판정 모양이 달라져 Game46 이하 앱과 혼용하지 않는다.
+- #595 지귀 연기 흐름(round.smoke / round.common)으로 호환 묶음이 설정259개·**5698**·`C6PhysicsLab/59`·**`C6HapioGame/48`**이 됐다(현재 기준은 아래 #647 절). 5697 이하 앱과 혼용하지 않는다.
 
 ## 시안에 없는 안내 줄
 
@@ -423,3 +423,16 @@
 ## 플레이어별 칠 무늬 기본 OFF
 
 - `Player Paint Patterns`(DEV 인덱스137, `LabConfig.playerPaintPatternsEnabled`)의 코드·저장 기본값은 꺼짐이다. 박 표면의 P번호별 무늬와 플레이어 원 오른쪽 아래·로비 P 자리의 무늬 표시가 함께 꺼진다. 색·면적·P지도·승리 판정은 그대로다. 기능 코드와 DEV 행·인덱스는 남겨 DEV로 다시 켤 수 있다. config가 없을 때도 꺼짐으로 본다. 설정 259개와 접속 묶음은 바꾸지 않았다.
+
+
+## #642 봉인 총평의 실제 도색 기여도
+
+- 스테이지별 봉인 시간은 Host 최종 성공 snapshot의 `playedSeconds`, 총 소요 시간은 성공한1~3판의 원본 전투 시간 합이다. 실패 시도·로딩·후일담은 합산하지 않고 누락 판은 `—`로 표시한다. 총평 전용 `GameSession.SealStageResults`가 스테이지별 누락 자리를 유지하고, `ResultLocalPlayerId`는 완료 후 연결이 끝나도 개인 식별을 보존한다.
+- 내 기여도는 Host의 `LabPlayerState.paintedCellsTotal`(이번 라운드 누적 신규 동일 면적 셀 수) 중 내 비율이다. `LabPaintSurface.PaintFundedCell`의 실제 빈 칸→칠한 칸 변경에서 최종 공급 `Ink.Owner`에게만 한 번 적립한다. 초기·성장·분수 예산을 포함하며 덮어쓰기·미사용 예산·시각 여백은 제외한다. 건조로 차감하지 않고 마른 칸 재칠은 다시 더한다. 기존 공격 점수·땅따먹기 소유 면적·난수/예산/색/P지도·승패는 변경하지 않는다.
+- 통계는 기존 플레이어 snapshot/헤더/승인 경로로 Host가 보내고 Guest는 임의로 집계하지 않는다. 호환 묶음은 **설정259개·5699·`C6PhysicsLab/60`·`C6HapioGame/50`**이며 Game49는 별도 #647이 사용해 건너뛴 값이다. 구현과 검증 범위는 `docs/STAGE_STORY_UI_INTEGRATION.md`·`docs/VALIDATION.md`를 따른다.
+
+## #647 스테이지 클리어 방장 진행
+
+- 각 스테이지 마지막 컷(`*_After_02`)의 `StoryStageClearControls`에서 방장만 진행 버튼을 누른다. 구미호·야광귀는 방장·구성원 모두 "다음 요괴 잡으러 ..."를 보고, 방장은 "다음 봉인", 구성원은 "방장의 시작을 기다리시오."를 본다. 지귀는 "다음 요괴 잡으러 ..."를 아무에게도 보이지 않고 방장 버튼은 "마치기"다. 프리팹은 `Hapio/Story/Update Stage Clear Host Controls` 도구로만 다시 저장한다. 마지막 컷에는 하단 완성 박 보기·나가기 버튼을 두지 않는다(승인된 시안). 완성 박은 봉인 카드의 "봉인 박 둘러보기"로 연다.
+- 지귀의 "다음 봉인"은 `GameSession.StartSummary`로 결과 제어 패킷의 `summaryStarted`를 켜고, 모든 기기가 봉인 총평(#646)과 엔딩으로 간다. 최종 결과에서 끊긴 구성원의 읽는 중·관람 중 표시는 지운다. 방장이 총평 전에 끊기면 구성원은 `HostLostAfterClear`로 스스로 총평·엔딩으로 넘어간다.
+- 현재 호환 묶음은 설정259개·**5699**·`C6PhysicsLab/60`·**`C6HapioGame/51`**다(#642의 Game50 위). Game50 이하 앱과 혼용하지 않는다.
