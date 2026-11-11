@@ -616,6 +616,8 @@ namespace C6Lab
         [SerializeField, Range(0f, 30f)] private float jigwiAFailDrumSlipSeconds = 0f;
         [Tooltip("#540 Inspector 전용(각 기기): 불붙은 북이 얼마나 가벼운지. 옆으로 밀 때 빠르기는 이 배, 미끄러지며 느려지는 정도는 1/이 배 (2면 같은 스와이프로 약 8배 멀리).")]
         [SerializeField, Range(1f, 4f)] private float jigwiAFailDrumSlipBoost = 2f;
+        [Tooltip("#663 Inspector 전용(Host): 부적을 다 못 써 실패한 뒤 판의 구슬에 불이 붙기까지(초, 부적이 끝난 때부터). 불덩이가 판에 닿는 때가 0.45초. 붙은 뒤 1초 동안 재가 된다. 예전에는 지귀 대사 '모두 재가 되어라!'(지금은 파일이 없어 나지 않음)를 기다려 3.7초였다.")]
+        [SerializeField, Range(.45f, 5f)] private float jigwiAFailBurnStartSeconds = (float)LabModel.JigwiTalismanFailFirstBurnSeconds;
         [Tooltip("#479 Inspector 전용(각 기기): 부적 점선 \"물\" 중 이만큼 칠하면 다 쓴 것으로 본다 (0~1).")]
         [SerializeField, Range(.3f, 1f)] private float jigwiTalismanCoverage = .85f;
         [Tooltip("#479 Inspector 전용(각 기기): 손가락이 점선에서 이만큼(글자 칸 크기 대비) 떨어져도 칠한다. 클수록 쉽다.")]
@@ -1221,6 +1223,8 @@ namespace C6Lab
         public float JigwiTalismanWaterPaintScale => Mathf.Clamp(Finite(jigwiTalismanWaterPaintScale, 1.5f), 1f, 3f);
         public float JigwiTalismanRewardDelaySeconds => Mathf.Clamp(Finite(jigwiTalismanRewardDelaySeconds, 0f), 0f, 8f);
         public float JigwiAFailDrumSlipSeconds => Mathf.Clamp(Finite(jigwiAFailDrumSlipSeconds, 0f), 0f, 30f);
+        public float JigwiAFailBurnStartSeconds =>
+            Mathf.Clamp(Finite(jigwiAFailBurnStartSeconds, (float)LabModel.JigwiTalismanFailFirstBurnSeconds), .45f, 5f);
         public float JigwiAFailDrumSlipBoost => Mathf.Clamp(Finite(jigwiAFailDrumSlipBoost, 2f), 1f, 4f);
         public float JigwiTalismanCoverage => Mathf.Clamp(Finite(jigwiTalismanCoverage, .85f), .3f, 1f);
         public float JigwiTalismanTolerance => Mathf.Clamp(Finite(jigwiTalismanTolerance, .07f), .02f, .2f);

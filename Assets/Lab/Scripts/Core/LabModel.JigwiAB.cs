@@ -24,10 +24,12 @@ namespace C6Lab
         /// <summary>#540: the fireball falls onto a failed seat's board this long after the A ends.</summary>
         public const double JigwiTalismanFailBurnDelaySeconds = .45d;
         /// <summary>
-        /// #540: the first orb catches fire this long after the A ends — once Jigwi's "모두 재가 되어라!" (`JigwiVoiceAFail`, 3.64 s,
-        /// played as the fireball falls) has finished.
+        /// #540: the first orb catches fire this long after the A ends. #663: it waited 3.7 s for Jigwi's "모두 재가 되어라!"
+        /// (`JigwiVoiceAFail`), which no longer exists, so the board sat still; now it catches fire just after the fireball lands
+        /// (0.45 s). The default of LabConfig Jigwi A Fail Burn Start Seconds (Host, Inspector).
         /// </summary>
-        public const double JigwiTalismanFailFirstBurnSeconds = 3.7d;
+        public const double JigwiTalismanFailFirstBurnSeconds = .6d;
+        private double jigwiAFailBurnStart = JigwiTalismanFailFirstBurnSeconds;
         // #479: A burns each owner's orbs one at a time. The last queued deadline per owner for the running A.
         private readonly Dictionary<ulong, double> jigwiABLastBurnAt = new Dictionary<ulong, double>();
         private string jigwiABBurnQueueId;
@@ -80,6 +82,7 @@ namespace C6Lab
                 : jigwiSmokeFlow ? LabJigwiABTimeline.SmokeFlowSchedule // #595 연기 10 / 부적 45 / 연기 66 / 부적 83
                 : config.JigwiFlowSchedule ? LabJigwiABTimeline.FlowSchedule : LabJigwiABTimeline.LegacySchedule;
             jigwiAHoldBurn = config.JigwiAHoldBurnUntilEnd;
+            jigwiAFailBurnStart = config.JigwiAFailBurnStartSeconds; // #663
             jigwiBBucket = config.JigwiBBucket;
             jigwiBCountdown = config.JigwiBCountdown;
             jigwiCommonStart = config.JigwiCommonStartSeconds; jigwiCommonInterval = config.JigwiCommonIntervalSeconds;
@@ -252,7 +255,7 @@ namespace C6Lab
                 foreach (var seat in item.players ?? Array.Empty<LabJigwiABPlayerFire>())
                     if (seat != null && item.TalismanFailed(seat.playerId)) failed.Add(seat.playerId);
             // #540: which orbs burn is decided when Jigwi's line ends (see IgniteDueJigwiFailBurns), so orbs made meanwhile burn too.
-            foreach (ulong owner in failed) jigwiFailBurns.Add((owner, item.id, item.resolvedAt + JigwiTalismanFailFirstBurnSeconds));
+            foreach (ulong owner in failed) jigwiFailBurns.Add((owner, item.id, item.resolvedAt + jigwiAFailBurnStart));
             foreach (var orb in orbs.Values)
             {
                 if (failed.Contains(orb.owner)) continue;

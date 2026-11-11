@@ -236,6 +236,18 @@ namespace C6Lab.Tests
             // The clock has moved on to the end of the burn, so the drum is tried after that (an earlier time is rejected as INVALID_TIME).
             Assert.That(m.TryGenerate(Players[0],Request(),gone+.1,out _,out e),Is.True,"#540: a failed talisman never blocks the drums. "+e);
         }
+        [Test] public void AFailedTalismanBurnsTheBoardSoonAfterTheFireballLands()
+        {
+            // #663: no more waiting 3.7 s for a voice line that no longer exists; the Host setting moves the moment.
+            Assert.That(LabModel.JigwiTalismanFailFirstBurnSeconds,Is.LessThan(1d),"Just after the fireball lands (0.45 s).");
+            Assert.That(config.JigwiAFailBurnStartSeconds,Is.EqualTo((float)LabModel.JigwiTalismanFailFirstBurnSeconds).Within(1e-6f));
+            JsonUtility.FromJsonOverwrite("{\"jigwiAHoldBurnUntilEnd\":true,\"jigwiAFailBurnStartSeconds\":2}",config);
+            var m=Room();var a=Current(m,5);var mine=Add(m,Players[0],4);
+            Assert.That(m.Snapshot(20).jigwiAB.rounds.Single(r=>r.id==a.id).resolution,Is.EqualTo(LabJigwiABResolution.Expired));
+            Assert.That(m.Snapshot(21.99).orbs.Single(o=>o.id==mine.id).jigwiABBurnAt,Is.EqualTo(-1),"Not before the set moment.");
+            Assert.That(m.Snapshot(22.01).orbs.Single(o=>o.id==mine.id).jigwiABBurnAt,
+                Is.EqualTo(22+LabModel.JigwiTalismanFailBlazeSeconds).Within(1e-6),"Lit 2 s after the end, as set.");
+        }
         [Test] public void HoldingTheBurnKeepsEveryOrbUntilTheARunsOut()
         {
             // #540: while the talisman is being written the orbs are untouched (only the fireball grows);
@@ -249,7 +261,8 @@ namespace C6Lab.Tests
             // #540: once Jigwi's "모두 재가 되어라!" is over, every orb then on the board — even one made while Jigwi spoke —
             // catches fire at once and is gone 1 s later. An orb made after that moment is safe.
             double landed=20+LabModel.JigwiTalismanFailFirstBurnSeconds, blaze=LabModel.JigwiTalismanFailBlazeSeconds;
-            Assert.That(m.TryGenerate(Players[0],Request(),21,out var during,out e),Is.True,e);
+            // #663: the board now catches fire just after the fireball lands, so "during" is made in that short gap.
+            Assert.That(m.TryGenerate(Players[0],Request(),20+LabModel.JigwiTalismanFailFirstBurnSeconds*.5,out var during,out e),Is.True,e);
             var speaking=m.Snapshot(landed-.01).orbs.Where(o=>o.id==mine.id||o.id==fresh.id||o.id==during.id).ToArray();
             Assert.That(speaking,Has.Length.EqualTo(3),"Nothing burns while Jigwi speaks.");
             Assert.That(speaking.All(o=>o.jigwiABBurnAt==-1),Is.True,"Not even marked yet.");
