@@ -1,5 +1,57 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-11 — #660 박 둘러보기 결과 복귀
+
+- 기준은 `fix/#660-gourd-view-back-button`의 `9b66da6e` 위 작업 변경이다. Unity 6000.6.5f1 macOS Editor에서 검증했다.
+- [Figma 봉인 박 확인 화면](https://www.figma.com/design/wW7ny7lNQ4DXNJ4kD46AuR/-C6--%EC%9D%BC%EB%8B%A8%EB%AC%B4%EC%82%AC?node-id=4752-17898&m=dev)의 붉은 붓터치 버튼과 아이보리 문구를 적용했다. 관람 화면이 열리면 결과 Canvas의 최상단에 배치하고, 버튼의 입력 영역은 배경과 문구의 그래픽에서 분리했다.
+- PlayMode `GameSceneFlowTests` **28/28 통과**. 구미호·야광귀·지귀에서 봉인 카드 뒷면의 관람 진입과 복귀 버튼을 Input System 마우스 이벤트로 눌렀다. 같은 카드 뒷면과 결과 기록으로 돌아오고, 이후 스테이지 진행과 총평·엔딩이 동작하는지 확인했다.
+- 결과 화면의 붓터치, 스토리 에셋, 봉인 총평, 스테이지 및 땅따먹기 결과 UI의 관련 EditMode **38/38 통과**.
+- 후속 색상 변경은 `TextColor/SecondaryLightIvory/800`의 sRGB 원본 값(표시 HEX `#5D544A`, alpha 1)을 회전 안내 문구에 적용했다. 변경 후 세 스테이지를 실제 Editor Game 화면으로 PNG 캡처했다.
+- 후속 PlayMode 실물 마우스 검사 **1/1 통과**(세 스테이지 순회). 박을 회전·확대한 뒤 각 리셋 버튼을 눌러 기본 회전·확대 복원을 확인했다. 리셋 후 관람 화면·도색·결과 기록이 유지됐으며, 각 결과 복귀 버튼은 같은 봉인 카드 뒷면으로 돌아왔다. 이후 다음 스테이지·총평·엔딩 진입도 통과했다. 캡처의 박은 테스트용 단색 100% 도색 상태다.
+- 수정 전 같은 Editor 경로에서 지귀의 클릭 불가 증상은 재현되지 않았다. 모바일 실기기와 멀티플레이는 미검증이다.
+- 관람 진입 경로 재점검도 PlayMode **1/1 통과**(구미호·야광귀·지귀 순회). 결과 카드 뒷면에서 관람이 닫혀 있는 상태를 확인한 뒤 실제 `봉인 박 둘러보기` 버튼을 마우스로 눌렀다. 각 스테이지의 배경 에셋, 완료 박 RenderTexture, 리셋·복귀 버튼의 활성 표시를 확인하고 클릭 전후 화면을 캡처했다. 이어 리셋·결과 카드 복귀·다음 스테이지 진행·총평·엔딩도 통과했다.
+
+## 2026-11-11 — 봉인 기록 표 견습생·기록 열 정렬
+
+- **기준:** `fix/seal-card-columns` (main `5bdbab91`). Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal).
+- **원인:** 표 칸은 Figma에서 가져온 왼쪽 정렬 글자 상자이고, 너비가 예시 값("P5(나)", "P2" 등)에 맞춰져 있다. 실제 값의 길이가 다르면 열에서 벗어났다.
+  - 실제 렌더 측정(구미호 카드 단위, 헤더 가운데 −1.4): P1 −15.9, P2(나) +5.7·+6.8.
+  - 기록 열은 헤더 +70.8에 대해 값이 +74.6~+77.6이었다.
+  - 카드 3종이 같고, 실패 대시보드도 같은 구조다.
+- **고친 것:** `StoryRecordHighlight.Apply`가 두 칸을 가운데 정렬로 바꾸고, 각 열 헤더의 실제 글자 가운데에 맞춘다. 프리팹은 그대로다.
+
+| 확인 | 결과 |
+| --- | --- |
+| 저장 프리팹 4종을 스크린샷과 같은 기록으로 렌더(EditMode, 전/후) | 전: 스크린샷과 같은 어긋남 / 후: 두 열 모두 헤더 아래 가운데 |
+| `StoryRecordHighlightTests`(새 검사: 프리팹 4종에서 값 길이와 상관없이 글자 가운데 = 헤더 가운데, 두 번 적용해도 같음) | 10/10 PASS |
+| PlayMode `Hapio.Tests.Story*`·`GameSceneFlowTests` / 전체 EditMode | 74/74, 2252/2252 PASS |
+
+- **미실행:** 실기기 화면.
+
+## 2026-11-11 — 박 잘림 (전투 땅 아래·봉인 박 관람 확대)
+
+- **기준:** `fix/gourd-clipping` (main `81e64ca0`에서 작업, `47d33dd3` 병합). Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 접속 묶음·설정·박 높이·움직임·크기는 그대로다.
+- **원인:**
+  - **전투:** 박이 가장 낮을 때(줄 최저 + 반동 최대) 스테이지 박 맨 아래가 땅(y −0.8)보다 약 0.9 아래로 내려간다. 불투명한 땅이 그 부분을 가려 일자로 잘려 보였다. 카메라·화면 경계 때문은 아니다.
+  - **관람:** 박을 402×402 사각형 텍스처에 그려서, 확대하면 사각형 경계에서 잘렸다.
+- **고친 것:**
+  - **전투:** `GameGourdOverGround`가 땅이 보이는 픽셀(스텐실)에서 땅 뒤에 있는 박만 다시 그린다.
+  - **관람:** `ExtendFrame(1.7, 2.8)`으로 같은 크기·중심에서 사각형 밖까지 그린다.
+
+| 확인 | 결과 |
+| --- | --- |
+| Mac 개발 빌드(DEV 솔로), main: 1~3스테이지 박 최저 자세 / 관람 최대 확대 | 박 아래가 땅선에서 일자로 잘림 / 사각형 아래 경계에서 잘림 |
+| 같은 빌드, 수정본 | 1~3스테이지 박 전체가 보임, 배경(2스테이지 파란 땅·기와집·소나무) 그대로 / 최대 확대에서 화면 끝까지 그려짐, 기본 확대의 크기·위치 동일 |
+| 시험안: 땅의 깊이 쓰기를 끄는 방식(채택 안 함) | 박은 보이지만 하늘 배경이 땅을 덮어 2스테이지 땅이 사라짐 |
+| 새 PlayMode `GameGourdClippingTests` (1·3스테이지: 정지 자세는 화면 변화 0, 최저 자세는 박 화면 범위 안에서만 변함 / 관람 텍스처·시야각·이미지 크기) | 3/3, 연속 2회 PASS |
+| `GamePreviewAspectTests`·`GourdResultViewerPlayModeTests`·`GameFinishReplayTests`·`GameStage2GourdHitFinishTests` | 함께 13건 중 새 검사 외 PASS |
+| `GameSceneFlowTests` (관람 비율 단언을 사각형 기준으로 갱신) | 28/28 PASS |
+| 전체 EditMode | 2242/2243. 실패 1건 `RecreatedYaguangDefaults…`는 main에서도 같은 실패 |
+| 전체 PlayMode | 792/793. 실패 1건은 위 관람 비율 단언(갱신 후 PASS) |
+| main `47d33dd3` 병합 후: 전체 EditMode / 관련 PlayMode(위 검사 + `GameBattleRenderWarmupTests`) | 2248/2248, 42/42 PASS |
+
+- **미실행:** 실기기·iOS 화면과 프레임 비용 측정, 2:2·튜토리얼 화면 확인.
+
 ## 2026-11-11 — 3스테이지 마지막 일격 다시보기 (구슬 없는 칠 완료)
 
 - **기준:** `fix/stage3-final-hit-replay` (main `ee9319a4` 기준). Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 기록 형식과 패킷은 바꾸지 않아 접속 묶음은 그대로다.
@@ -8016,3 +8068,29 @@ All 279 changed opening code/asset/test files (excluding the tutorial test file,
 
 - main `9e12a7ce`를 통합하고 이 문서의 양쪽 검증 기록을 모두 보존했다. 코드 충돌은 없었다.
 - 통합 후 Unity 6000.6.5f1에서 관련 PlayMode 17/17 재통과(9.91초): OpeningSkipButtonTests 2, OpeningCinematicTests 2, GameOpeningControllerTests 13. 컴파일 오류 0건.
+
+
+### #668 콤보 카운트 PNG·Figma 조합 패널 (2026-11-11)
+
+- 현재 브랜치fix/#668-yagwanggwi-combo-asset(기준81e64ca0)에서 첨부 카운트4개와 Figma 패널/구슬5종/체크/시간 바 PNG를 연결했다. Figma 세션c79d30e0-2476-4dea-ada9-a599a61b82f9, 원본4607:3800·3480·3529. 자세한 슬롯·리소스 대응은 YAGUANG_COMBO_UI.md와 Source.json을 따른다.
+- 판정/입력/공유 설정 계약은 유지하고 화면과 에셋 warmup만 변경했다. 따라서 전체 EditMode와 관련 콤보/말풍선/사전 준비 PlayMode를 선택하고 전체 PlayMode는 생략했다. Unity6000.6.5f1/macOS Metal 기준이다.
+- 최초 EditMode2,251통과/2실패. 패널 소수점 export의 실제 크기는517×192인데 최초 기대값은516×192였고, 복사한 importer의 기본 platform 최대512 설정으로512×190으로 축소됐다. 원본 크기517와2048/무압축 importer로 고쳤다. 별도로 기존 Stage02 저장 설정159=13과 재생성 코드159=8을 발견해 재생성만13으로 맞췄다(저장 게임 설정 변경 없음).
+- 최종 전체 EditMode2,253/2,253(54.22초), 관련 PlayMode17/17(10.58초) 통과: LabYaguangCountLookTests/LabGourdAlertTests/LabComboProjectileIntegrationTests/LabComboEffectLookTests/GameBattleRenderWarmupTests. 5색 Sprite 매핑·카운트 완성 PNG·기준 패널 크기·체크 상태·일반 UI 복귀 및 기존 콤보 연결을 검증했다.
+- 실제 Unity UI 렌더에서 빈4칸/2칸 완료/카운트4종을 캡처해 Figma 시안과 비교했다. 원본과 첨부 복사본4개는 SHA256 일치. 컴파일 오류 없음. 임시 미리보기 카메라/RT/config는 정리했다. 실제 게임 전체 화면/iOS 실기기/다인 연결은 미검증이다.
+
+
+### #668 Figma 기준 위치·크기 정렬 및 최신 main 반영 (2026-11-11)
+
+- 사용자 확인으로 이전 Figma 배치를 선택했다. 패널 reference45/201/258.02887×95.96863(349×765)을 단일 원본으로 두고 화면 비율에 맞는 균일 배율과 anchor를 계산한다. 콤보 숫자/성공·실패 결과/일반 예고도 패널 anchor에 정렬했다. 패널이 숨겨진 결과 상태에서도 배치를 갱신한다.
+- 작업 중 main9e12a7ce와 기존 작업의 stash 적용으로 LabGourdAlertTests/이 문서에 충돌 표식이 생겼다. 기존 눈→해제·놀림 전환, 새 카운트 PNG, 일반 문장 복원 검사를 함께 유지해 해결했다. 충돌 표식 제거 후 컴파일 오류 없음.
+- 최종 전체 EditMode2,257/2,257(48.50초), 관련 PlayMode39/39(13.01초) 통과.349×765/698×1530의 기준 좌표와 크기, 가로·긴 화면의 경계/비율, 관련 표시의 anchor 일치를 추가 검사했다. 콤보/말풍선/섬광/사전 준비/횟수별 투명도 경로도 포함했다.
+- 실제 Unity 컴포넌트를349×765로 렌더해 패널 위치를 확인했다. 미리보기 root/config/camera/RT는 정리했다. 첨부 mov는 임시 경로에서 찾을 수 없어 스크린샷과 Figma 좌표를 사용했다. 실기기/전체 게임 화면의 수동 배치는 미검증이다. UI 배치 변경 범위여서 전체 PlayMode는 생략했다.
+
+
+### #668 게이지 교체형 콤보 판·페이드 인 (2026-11-11)
+
+- 최신 Figma4841:11338(207×51) 배경을414×102 PNG로 다시 추출했다. 구슬/체크/바 배치를 새 프레임 비율에 맞췄다. 실제 Paint Progress/Frame의 world corners를 레이어 좌표로 변환해 중앙에 겹치고 폭은 프레임98%, 높이는51/207 비율로 표시한다. 게이지 없는 미리보기는349×765의71/107/207×51 기준이다.
+- 앞 레이어의 판은0.22초 SmoothStep으로 페이드 인한다. 뒤 게이지 전체(프레임/채움/퍼센트)는 첫 프레임부터 alpha0이다. 콤보 판/같은 자리의 결과가 끝나거나 Pause/Disable/Destroy 때 원래 alpha로 복원하며, 소유한 임시 CanvasGroup도 정리한다. 게이지 계산·입력·판정은 바꾸지 않았다.
+- 첫 PlayMode39/40 통과. 판 아래의 비최종 숫자 피드백까지 게이지 숨김 조건에 넣어 복원이 지연된1건을 수정했다. 실제 게이지 위치를 덮는 판/결과/최종 피드백만 숨김 조건으로 유지했다.
+- 최종 전체 EditMode2,263/2,263(50.66초), 관련 PlayMode40/40(13.82초) 통과. 신규 검사는 게이지 중앙/폭·페이드 진행·이전 alpha0.65 보존·Pause/Disable/종료 복원을 검증한다. 기존 콤보/말풍선/섬광/준비 경로도 포함한다.
+- Unity 실제 UI 렌더에서 완전 표시와50% 페이드 프레임을 확인했다.50% 페이드 중에도 gauge alpha0을 확인했다. 복원은 위 PlayMode 수명 검사에서 확인했다. Editor 수동 프리뷰의 enabled 변경은 PlayMode 콜백 검증에 사용하지 않았다. preview root/config/camera/RT는 정리했다. Unity6000.6.5f1/macOS Metal 기준. UI 표시/수명 범위라 전체 PlayMode는 생략했다. 전체 게임 화면/iOS 실기기 전환은 미검증이다.
