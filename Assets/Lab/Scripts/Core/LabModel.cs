@@ -185,13 +185,15 @@ namespace C6Lab
         private LabGimmickStats gimmickStats = new LabGimmickStats();
         private double lastCommonCastAt = double.NegativeInfinity;
         private readonly List<LabFoxFireDrop> foxFires = new List<LabFoxFireDrop>();
-        private ulong charmedPlayer;
+        // 매혹 (#251, #305, #664): who is charmed (one, or two never side by side in a room of five), when each one's charm
+        // ends (a woken player's ends early), the shared warning and start, the end of the last one (charmUntil), and
+        // each helper's taps for each charmed player beside them. See LabModel.Charm.cs.
+        private readonly List<ulong> charmTargets = new List<ulong>();
+        private readonly Dictionary<ulong, double> charmEnds = new Dictionary<ulong, double>();
         private double charmStartedAt = -1d, charmUntil = -1d;
         private int charmTaps;
-        // 매혹 예고와 양옆 풀기 (#305): the Host picks the charmed player charmWarnedAt, the charm starts after the
-        // warning, and each player beside keeps their own tap count.
         private double charmWarnedAt = -1d;
-        private readonly Dictionary<ulong, int> charmHelperTaps = new Dictionary<ulong, int>();
+        private readonly Dictionary<(ulong target, ulong helper), int> charmHelperTaps = new Dictionary<(ulong target, ulong helper), int>();
         private uint drumHandoffCount;
         private uint bombOpenCount;
         private readonly LabGourdCombo combo = new LabGourdCombo();
@@ -338,7 +340,8 @@ namespace C6Lab
             swipeBlockedPlayer = 0;
             swipeBlockedRight = false;
             swipeBlockStartedAt = swipeBlockedUntil = -1d;
-            charmedPlayer = 0;
+            charmTargets.Clear();
+            charmEnds.Clear();
             charmStartedAt = charmUntil = charmWarnedAt = -1d;
             charmTaps = 0;
             charmHelperTaps.Clear();
@@ -920,7 +923,7 @@ namespace C6Lab
         private bool OtherOpenOn(ulong player, double at, LabYaguangEvent self)
         {
             if (BlockOn(at) && swipeBlockedPlayer == player) return true;
-            if (self != LabYaguangEvent.Sabotage && CharmComingOrOn(at) && charmedPlayer == player) return true;
+            if (self != LabYaguangEvent.Sabotage && CharmComingOrOn(at) && charmTargets.Contains(player)) return true;
             foreach (LabOrbState orb in orbs.Values)
             {
                 if (orb.owner != player) continue;
@@ -978,7 +981,7 @@ namespace C6Lab
                     return double.PositiveInfinity;
             double end = before;
             if (BlockOn(before) && swipeBlockedPlayer == player) end = Math.Max(end, swipeBlockedUntil);
-            if (CharmComingOrOn(before) && charmedPlayer == player) end = Math.Max(end, charmUntil);
+            if (CharmComingOrOn(before) && charmEnds.TryGetValue(player, out double charmEnd)) end = Math.Max(end, charmEnd);
             return end;
         }
 
@@ -1310,40 +1313,7 @@ namespace C6Lab
         /// Whether the fox's charm (#251) holds this player at this Host time. Since #664 it stops everything they do:
         /// throwing, passing, drumming, combining, tapping fox orbs and items; and nothing can be passed to them.
         /// </summary>
-        public bool Charmed(ulong player, double now) => CharmOn(now) && player == charmedPlayer;
-
-        /// <summary>
-        /// 매혹 (#251, #305): 홀린 사람의 양옆 사람이 하트 말풍선을 누른 한 번. 양옆 사람이 각자 정해 둔 횟수를 채워야
-        /// 매혹이 풀린다 (둘이 하는 판은 상대 한 사람). 먼저 다 채운 사람의 더 누르기는 세지 않는다. 양옆이 아닌 사람,
-        /// 홀린 사람 자신, 예고 중이거나 매혹이 없을 때, 깨우기가 꺼져 있을 때는 받지 않는다. 이 탭으로 깨어났으면
-        /// woken에 그 사람을, 아니면 null을 돌려준다 (Host의 플레이어 ID도 0이므로 구분한다).
-        /// </summary>
-        public bool TryCharmTap(ulong sender, double now, out ulong? woken)
-        {
-            woken = null;
-            if (!TryAdvance(now, out _) || !CharmOn(now) || rules.CharmRescueTaps <= 0 || sender == charmedPlayer
-                || Array.IndexOf(CharmHelpers(), sender) < 0)
-                return false;
-            charmHelperTaps.TryGetValue(sender, out int taps);
-            if (taps >= rules.CharmRescueTaps) return true;
-            charmHelperTaps[sender] = taps + 1;
-            charmTaps++;
-            foreach (ulong helper in CharmHelpers())
-                if (!charmHelperTaps.TryGetValue(helper, out int done) || done < rules.CharmRescueTaps) return true;
-            charmUntil = now;
-            woken = charmedPlayer;
-            return true;
-        }
-
-        /// <summary>The players beside the charmed one, in seat order: two, or one in a two-player room, or none solo (#305).</summary>
-        private ulong[] CharmHelpers()
-        {
-            if (!players.TryGetValue(charmedPlayer, out var charmed) || activeSeatCount < 2) return Array.Empty<ulong>();
-            int seat = charmed.seat;
-            ulong before = seats[(seat + activeSeatCount - 1) % activeSeatCount];
-            ulong after = seats[(seat + 1) % activeSeatCount];
-            return before == after ? new[] { before } : new[] { before, after };
-        }
+        public bool Charmed(ulong player, double now) => CharmOn(now) && charmEnds.TryGetValue(player, out double end) && end > now;
 
         public LabSnapshot Snapshot(double now)
         {
@@ -1380,14 +1350,16 @@ namespace C6Lab
                 swipeBlockedRight = BlockOn(now) && swipeBlockedRight,
                 swipeBlockStartedAt = BlockOn(now) ? swipeBlockStartedAt : -1d,
                 swipeBlockedUntil = BlockOn(now) ? swipeBlockedUntil : -1d,
-                charmedPlayer = CharmComingOrOn(now) ? charmedPlayer : 0,
+                charmedPlayer = CharmComingOrOn(now) && charmTargets.Count > 0 ? charmTargets[0] : 0,
+                charmedPlayers = CharmComingOrOn(now) ? charmTargets.ToArray() : Array.Empty<ulong>(),
+                charmEnds = CharmComingOrOn(now) ? charmTargets.Select(target => charmEnds[target]).ToArray() : Array.Empty<double>(),
                 charmStartedAt = CharmComingOrOn(now) ? charmStartedAt : -1d,
                 charmUntil = CharmComingOrOn(now) ? charmUntil : -1d,
                 charmTaps = CharmOn(now) ? charmTaps : 0,
                 charmWarnedAt = CharmComingOrOn(now) ? charmWarnedAt : -1d,
-                charmHelpers = CharmOn(now) ? CharmHelpers() : Array.Empty<ulong>(),
-                charmHelperTaps = CharmOn(now) ? CharmHelpers().Select(helper =>
-                    charmHelperTaps.TryGetValue(helper, out int taps) ? taps : 0).ToArray() : Array.Empty<int>(),
+                charmHelpers = CharmHelperRows(now, row => row.helper),
+                charmHelperTargets = CharmHelperRows(now, row => row.target),
+                charmHelperTaps = CharmHelperRows(now, row => charmHelperTaps.TryGetValue(row, out int taps) ? taps : 0),
                 comboActive = combo.Active,
                 comboColors = combo.Count == 0 ? Array.Empty<LabOrbElement>() : combo.Colors,
                 comboProgress = combo.Progress,
@@ -1619,20 +1591,6 @@ namespace C6Lab
         }
 
         /// <summary>
-        /// 매혹 (#251): 이 사람은 정해 둔 시간 동안 헤롱헤롱해 공격(위로 던지기)을 못 한다. #305: 예고 시간만큼 먼저 모두에게
-        /// 알리고 그 뒤에 걸린다 (예고 0이면 바로).
-        /// </summary>
-        private void StartCharm(ulong target, double at)
-        {
-            charmedPlayer = target;
-            charmWarnedAt = at;
-            charmStartedAt = at + rules.CharmWarningSeconds;
-            charmUntil = charmStartedAt + rules.CharmSeconds;
-            charmTaps = 0;
-            charmHelperTaps.Clear();
-        }
-
-        /// <summary>
         /// 여우불 (#251, #418): 받을 수 있는 모든 사람의 판에 한꺼번에 떨어뜨린다. 개수는 모두 같고, 떨어질 자리는 판마다 따로
         /// 뽑는다. 기믹 기록·"!" 알림은 한 번이고(대상은 자리 순서로 첫 사람), 각 판 주인에게는 떨어진 여우 구슬로 따로 알린다.
         /// </summary>
@@ -1748,7 +1706,9 @@ namespace C6Lab
                 if (kinds[i] == LabSabotageKind.FoxFire) { DropFoxFireOnAll(targets[i], at, index); return true; }
                 ulong target = targets[i][(int)(DrawFor(seed ^ targetSalt, SabotageDrawKey, index) % (ulong)targets[i].Count)];
                 last = target;
-                DispatchGimmick(kinds[i], target, at, index);
+                // #664: a room of five charms two at once, never side by side.
+                if (kinds[i] == LabSabotageKind.Charm) DispatchCharm(CharmTargetsFrom(targets[i], target, index, targetSalt), at);
+                else DispatchGimmick(kinds[i], target, at, index);
                 return true;
             }
             return false;
@@ -1763,7 +1723,7 @@ namespace C6Lab
             if (kind == LabSabotageKind.GourdBomb) DropGourdBomb(target, at);
             else if (kind == LabSabotageKind.SwipeBlock) StartSwipeBlock(target, at);
             else if (kind == LabSabotageKind.FoxFire) DropFoxFire(target, at, index, 0u);
-            else if (kind == LabSabotageKind.Charm) StartCharm(target, at);
+            else if (kind == LabSabotageKind.Charm) StartCharm(new[] { target }, at);
             sabotages.Add(new LabSabotage(kind, target, at));
             gimmickStats.Add(kind);
         }
@@ -1808,7 +1768,7 @@ namespace C6Lab
                 ulong player = seats[i];
                 if (last.HasValue && player == last.Value && activeSeatCount > 1) continue;
                 if (blocking && player == swipeBlockedPlayer) continue;
-                if (charming && player == charmedPlayer) continue;
+                if (charming && charmTargets.Contains(player)) continue;
                 if (JigwiBlocksSabotage(player, at)) continue;
                 if (kind == LabSabotageKind.FoxFire && CountStored(player, at) >= rules.OrbStorageLimit) continue;
                 // 야광귀 모드 (#271): 다른 이벤트가 열려 있는 화면에는 걸지 않는다.
@@ -2046,6 +2006,8 @@ namespace C6Lab
             /// </summary>
             public readonly float CharmSeconds, CharmWarningSeconds;
             public readonly int CharmRescueTaps;
+            /// <summary>#664: how many are charmed at once in a room of five or more (one in smaller rooms).</summary>
+            public readonly int CharmTargetsAtFive;
             public readonly float[] DrumStopBounds;
             public readonly int[] DrumStopChances;
             public readonly Color[] PaintColors;
@@ -2095,6 +2057,7 @@ namespace C6Lab
                 CharmSeconds = config.CharmSeconds;
                 CharmWarningSeconds = config.CharmWarningSeconds;
                 CharmRescueTaps = config.CharmRescueTaps;
+                CharmTargetsAtFive = 2;
                 DrumStopBounds = config.DrumStopBounds();
                 DrumStopChances = config.DrumStopChances();
                 PaintColors = new Color[(int)LabOrbElement.Earth + 1];

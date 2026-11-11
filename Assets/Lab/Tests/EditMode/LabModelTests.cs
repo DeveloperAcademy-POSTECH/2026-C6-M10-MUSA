@@ -3246,9 +3246,12 @@ namespace C6Lab.Tests
                 Assert.That(room.TryGenerate(other, "other-drum", 7.6d, out _, out reason), Is.True, reason);
                 Assert.That(room.Snapshot(14.9d).CharmOn(charmed), Is.True);
                 Assert.That(room.Snapshot(15.1d).CharmOn(charmed), Is.False, "It wears off after its seconds.");
-                Assert.That(room.TryLaunch(charmed, attack[charmed], "charm-throw-3", 15.1d, out _, out reason), Is.True, reason);
+                // The orbs made before the charm have run out of their eight seconds by now; awake, they make new ones.
                 Assert.That(room.TryGenerate(charmed, "charm-drum-2", 15.1d, out _, out reason), Is.True, reason);
-                Assert.That(room.TryTransferAt(toward, pair[toward].yin.id, true, new Vector2(.99f, .5f), Vector2.right,
+                string awakeAttack = CombinedFor(room, charmed, 15.1d);
+                Assert.That(room.TryLaunch(charmed, awakeAttack, "charm-throw-3", 15.1d, out _, out reason), Is.True, reason);
+                LabOrbState passIn = RawPairFor(room, toward, 15.1d).yin;
+                Assert.That(room.TryTransferAt(toward, passIn.id, true, new Vector2(.99f, .5f), Vector2.right,
                     "charm-pass-in-2", 15.1d, LabEdgeCrossingKind.Swipe, out _, out reason), Is.True,
                     "Passes reach them again once awake. " + reason);
             }
@@ -3283,15 +3286,15 @@ namespace C6Lab.Tests
             try
             {
                 var room = new LabModel();
-                room.Begin("charm-walls", new ulong[] { 10, 20, 30, 40, 50 }, 0d, mix);
+                room.Begin("charm-walls", new ulong[] { 10, 20, 30, 40 }, 0d, mix);
                 room.Tick(5d);
                 LabSnapshot on = room.Snapshot(5d);
                 LabPlayerState charmed = on.players.Single(player => player.id == on.charmedPlayer);
                 ulong AtSeat(int seat) => on.players.Single(player => player.seat == seat).id;
                 ulong rightPasser = AtSeat(on.players.Single(player =>
-                    LabPlayerSlots.NeighborSeat(player.seat, 5, true) == charmed.seat).seat);
+                    LabPlayerSlots.NeighborSeat(player.seat, 4, true) == charmed.seat).seat);
                 ulong leftPasser = AtSeat(on.players.Single(player =>
-                    LabPlayerSlots.NeighborSeat(player.seat, 5, false) == charmed.seat).seat);
+                    LabPlayerSlots.NeighborSeat(player.seat, 4, false) == charmed.seat).seat);
                 Assert.That(on.CharmWallSide(rightPasser), Is.EqualTo(1), "Its right edge leads to the charmed one.");
                 Assert.That(on.CharmWallSide(leftPasser), Is.EqualTo(-1), "Its left edge leads to the charmed one.");
                 Assert.That(on.CharmWallSide(charmed.id), Is.Zero, "The charmed board itself stands still instead.");
@@ -3317,11 +3320,13 @@ namespace C6Lab.Tests
             try
             {
                 var room = new LabModel();
-                room.Begin("charm-wake", new ulong[] { 10, 20, 30, 40, 50 }, 0d, mix);
+                // Four players: one charmed (a room of five charms two, #664, tested below).
+                room.Begin("charm-wake", new ulong[] { 10, 20, 30, 40 }, 0d, mix);
                 room.Tick(5d);
                 LabSnapshot on = room.Snapshot(5d);
+                Assert.That(on.charmedPlayers.Length, Is.EqualTo(1));
                 LabPlayerState charmed = on.players.Single(player => player.id == on.charmedPlayer);
-                ulong BySeat(int offset) => on.players.Single(player => player.seat == (charmed.seat + offset + 5) % 5).id;
+                ulong BySeat(int offset) => on.players.Single(player => player.seat == (charmed.seat + offset + 4) % 4).id;
                 ulong leftOf = BySeat(-1), rightOf = BySeat(1), far = BySeat(2);
                 Assert.That(on.charmHelpers, Is.EquivalentTo(new[] { leftOf, rightOf }), "The two beside, each with a gauge (#305).");
                 Assert.That(on.charmHelperTaps, Is.EqualTo(new[] { 0, 0 }));
@@ -3348,6 +3353,114 @@ namespace C6Lab.Tests
                 Assert.That(room.Snapshot(5.4d).CharmOn(charmed.id), Is.False, "Both sides done: awake at once.");
                 Assert.That(room.Charmed(charmed.id, 5.4d), Is.False);
                 Assert.That(room.TryCharmTap(rightOf, 5.5d, out _), Is.False, "Nothing left to wake.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(mix); }
+        }
+
+        /// <summary>
+        /// #664: in a room of five two are charmed at once, never side by side, so no one who must wake a charmed player is
+        /// charmed. Every draw over many rounds keeps that; three and four players still charm one.
+        /// </summary>
+        [Test]
+        public void ARoomOfFiveCharmsTwoNeverSideBySide()
+        {
+            var mix = MixConfig(5f, bomb: 0, block: 0, fox: 0, charm: 1);
+            try
+            {
+                for (int round = 0; round < 40; round++)
+                {
+                    var room = new LabModel();
+                    room.Begin("charm-two-" + round, new ulong[] { 10, 20, 30, 40, 50 }, 0d, mix);
+                    room.Tick(5d);
+                    LabSabotage[] casts = room.DrainSabotages();
+                    LabSnapshot on = room.Snapshot(5d);
+                    Assert.That(on.charmedPlayers.Length, Is.EqualTo(2), "Two charmed in a room of five.");
+                    Assert.That(casts.Select(cast => cast.Target), Is.EquivalentTo(on.charmedPlayers), "One notice for each.");
+                    Assert.That(on.charmedPlayer, Is.EqualTo(on.charmedPlayers[0]));
+                    int a = on.players.Single(player => player.id == on.charmedPlayers[0]).seat;
+                    int b = on.players.Single(player => player.id == on.charmedPlayers[1]).seat;
+                    int gap = (a - b + 5) % 5;
+                    Assert.That(gap, Is.Not.EqualTo(1).And.Not.EqualTo(4), "Never side by side (seats " + a + ", " + b + ").");
+                    foreach (ulong charmed in on.charmedPlayers) Assert.That(on.CharmOn(charmed), Is.True);
+                    Assert.That(on.charmHelpers.Length, Is.EqualTo(4), "Two players beside each.");
+                    Assert.That(on.charmHelpers.Intersect(on.charmedPlayers), Is.Empty, "No helper is charmed.");
+                    Assert.That(on.charmHelpers.Distinct().Count(), Is.EqualTo(3), "The one between them helps both.");
+                }
+                foreach (int count in new[] { 3, 4 })
+                {
+                    var room = new LabModel();
+                    room.Begin("charm-one-" + count, Enumerable.Range(1, count).Select(id => (ulong)id * 10).ToArray(), 0d, mix);
+                    room.Tick(5d);
+                    Assert.That(room.Snapshot(5d).charmedPlayers.Length, Is.EqualTo(1), count + " players: one charmed.");
+                    Assert.That(room.CharmTargetCount(count), Is.EqualTo(1));
+                }
+            }
+            finally { UnityEngine.Object.DestroyImmediate(mix); }
+        }
+
+        /// <summary>
+        /// #664: the player between two charmed ones taps each one's bubble its own count; each charmed player wakes on their
+        /// own once both beside them are done, while the other stays charmed.
+        /// </summary>
+        [Test]
+        public void TheOneBetweenTwoCharmedTapsEachAndEachWakesOnTheirOwn()
+        {
+            var mix = MixConfig(5f, bomb: 0, block: 0, fox: 0, charm: 1, rescueTaps: 2);
+            try
+            {
+                var room = new LabModel();
+                room.Begin("charm-between", new ulong[] { 10, 20, 30, 40, 50 }, 0d, mix);
+                room.Tick(5d);
+                LabSnapshot on = room.Snapshot(5d);
+                ulong first = on.charmedPlayers[0], second = on.charmedPlayers[1];
+                ulong[] HelpersOf(ulong target) => on.charmHelpers.Where((helper, i) => on.charmHelperTargets[i] == target).ToArray();
+                ulong between = HelpersOf(first).Intersect(HelpersOf(second)).Single();
+                ulong firstOuter = HelpersOf(first).Single(helper => helper != between);
+                ulong secondOuter = HelpersOf(second).Single(helper => helper != between);
+
+                Assert.That(room.TryCharmTap(between, first, 5.1d, out var woken), Is.True);
+                Assert.That(room.TryCharmTap(between, first, 5.2d, out woken), Is.True);
+                Assert.That(woken, Is.Null, "One side alone never wakes them.");
+                LabSnapshot half = room.Snapshot(5.2d);
+                Assert.That(half.CharmTapsBy(between, first), Is.EqualTo(2));
+                Assert.That(half.CharmTapsBy(between, second), Is.Zero, "Each one's bubble counts on its own.");
+                Assert.That(room.TryCharmTap(firstOuter, second, 5.3d, out _), Is.False, "Only those beside that one count.");
+
+                Assert.That(room.TryCharmTap(firstOuter, first, 5.4d, out woken), Is.True);
+                Assert.That(room.TryCharmTap(firstOuter, first, 5.5d, out woken), Is.True);
+                Assert.That(woken, Is.EqualTo(first), "Both beside them done: the first wakes.");
+                LabSnapshot one = room.Snapshot(5.5d);
+                Assert.That(one.CharmOn(first), Is.False);
+                Assert.That(one.CharmOn(second), Is.True, "The other stays charmed.");
+                Assert.That(room.Charmed(first, 5.5d), Is.False);
+                Assert.That(room.Charmed(second, 5.5d), Is.True);
+                Assert.That(one.charmHelpers.Length, Is.EqualTo(2), "Only the bubbles of the one still charmed remain.");
+                Assert.That(room.TryGenerate(first, "woken-drum", 5.6d, out _, out string reason), Is.True, "Awake, they play again. " + reason);
+
+                Assert.That(room.TryCharmTap(between, 5.7d, out woken), Is.True, "A tap naming nobody goes to the one still waiting.");
+                Assert.That(room.Snapshot(5.7d).CharmTapsBy(between, second), Is.EqualTo(1));
+                Assert.That(room.TryCharmTap(between, second, 5.8d, out _), Is.True);
+                Assert.That(room.TryCharmTap(secondOuter, second, 5.9d, out _), Is.True);
+                Assert.That(room.TryCharmTap(secondOuter, second, 6d, out woken), Is.True);
+                Assert.That(woken, Is.EqualTo(second));
+                Assert.That(room.Snapshot(6d).CharmTargets().Any(id => room.Snapshot(6d).CharmOn(id)), Is.False, "Both awake.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(mix); }
+        }
+
+        /// <summary>#664: a board between two charmed players shuts both its edges.</summary>
+        [Test]
+        public void TheBoardBetweenTwoCharmedPlayersShutsBothEdges()
+        {
+            var mix = MixConfig(5f, bomb: 0, block: 0, fox: 0, charm: 1);
+            try
+            {
+                var room = new LabModel();
+                room.Begin("charm-walls-five", new ulong[] { 10, 20, 30, 40, 50 }, 0d, mix);
+                room.Tick(5d);
+                LabSnapshot on = room.Snapshot(5d);
+                ulong between = on.charmHelpers.GroupBy(helper => helper).Single(group => group.Count() == 2).Key;
+                Assert.That(on.CharmWallSide(between), Is.EqualTo(LabTeams.BothSides));
             }
             finally { UnityEngine.Object.DestroyImmediate(mix); }
         }
@@ -3577,7 +3690,7 @@ namespace C6Lab.Tests
             LabOrbState yin = null, yang = null;
             for (int i = 0; i < 12 && (yin == null || yang == null); i++)
             {
-                Assert.That(room.TryGenerate(owner, "raw-pair-" + owner + "-" + i, at, out var orb, out string reason),
+                Assert.That(room.TryGenerate(owner, "raw-pair-" + owner + "-" + at.ToString("R") + "-" + i, at, out var orb, out string reason),
                     Is.True, reason);
                 if (orb.kind == LabOrbKind.Yin && yin == null) yin = orb;
                 else if (orb.kind == LabOrbKind.Yang && yang == null) yang = orb;
@@ -3591,13 +3704,13 @@ namespace C6Lab.Tests
             LabOrbState yin = null, yang = null;
             for (int i = 0; i < 12 && (yin == null || yang == null); i++)
             {
-                Assert.That(room.TryGenerate(owner, "combined-for-" + owner + "-" + i, at, out var orb, out string reason),
+                Assert.That(room.TryGenerate(owner, "combined-for-" + owner + "-" + at.ToString("R") + "-" + i, at, out var orb, out string reason),
                     Is.True, reason);
                 if (orb.kind == LabOrbKind.Yin) yin = orb;
                 else if (orb.kind == LabOrbKind.Yang) yang = orb;
             }
             Assert.That(yin != null && yang != null, Is.True);
-            Assert.That(room.TryCombineAt(owner, yin.id, yang.id, "combined-for-" + owner, at, new Vector2(.5f, .5f),
+            Assert.That(room.TryCombineAt(owner, yin.id, yang.id, "combined-for-" + owner + "-" + at.ToString("R"), at, new Vector2(.5f, .5f),
                 Vector2.zero, out var combined, out string why), Is.True, why);
             return combined.id;
         }

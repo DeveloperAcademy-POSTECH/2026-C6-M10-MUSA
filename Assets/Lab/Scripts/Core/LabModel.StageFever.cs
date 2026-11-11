@@ -59,7 +59,7 @@ namespace C6Lab
             {
                 charmWarnedAt = -1d;
                 charmStartedAt = System.Math.Min(charmStartedAt, at);
-                charmUntil = at;
+                EndAllCharms(at);
             }
             foreach (LabOrbState orb in orbs.Values.Where(orb => !orb.inFlight && orb.kind == LabOrbKind.FoxFire).ToArray())
             {

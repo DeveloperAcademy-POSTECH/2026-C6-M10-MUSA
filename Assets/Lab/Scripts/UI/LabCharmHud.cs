@@ -16,6 +16,18 @@ namespace C6Lab
         public const string AwakeText = "정신 차림!";
         public const string WaitText = "옆 사람이 풀어 줄 때까지\n기다려야 한다...";
         public static string WarningText(string who) => "요괴가 " + who + "에게\n매혹을 걸려고 한다!";
+
+        /// <summary>
+        /// #664: the warning for everyone about to be charmed, in the Host's order. This screen's own player reads "나" and comes
+        /// first ("나와 P3"); two others read "P1, P3".
+        /// </summary>
+        public static string WarningText(System.Collections.Generic.IReadOnlyList<string> names, bool includesMe)
+        {
+            if (names == null || names.Count == 0) return WarningText(string.Empty);
+            if (names.Count == 1) return WarningText(names[0]);
+            return WarningText(includesMe ? names[0] + "와 " + string.Join(", ", System.Linq.Enumerable.Skip(names, 1))
+                : string.Join(", ", names));
+        }
         private const float WarningPopSeconds = .2f, WarningPulseHz = 2f;
         private const float AwakeSeconds = 1.2f;
         private static readonly Color GaugeBackColor = new Color(.17f, .14f, .12f, .55f);
@@ -92,8 +104,7 @@ namespace C6Lab
                 return;
             }
             double now = network.BattlePresentationTime;
-            bool charmed = snapshot.charmedPlayer == network.LocalPlayerId
-                && snapshot.charmUntil > now && now >= snapshot.charmStartedAt;
+            bool charmed = snapshot.CharmOn(network.LocalPlayerId, now);
             bool warned = snapshot.CharmWarningAt(now);
             if (wasCharmed && !charmed)
             {
@@ -116,8 +127,9 @@ namespace C6Lab
             if (charmed)
             {
                 PlaceGauge();
-                double total = snapshot.charmUntil - snapshot.charmStartedAt;
-                float left = total > 0d ? Mathf.Clamp01((float)((snapshot.charmUntil - now) / total)) : 0f;
+                double end = snapshot.CharmEndOf(network.LocalPlayerId);
+                double total = end - snapshot.charmStartedAt;
+                float left = total > 0d ? Mathf.Clamp01((float)((end - now) / total)) : 0f;
                 gaugeFill.anchorMax = new Vector2(1f, left);
             }
             DrawAwake();
@@ -138,9 +150,18 @@ namespace C6Lab
                 return;
             }
             warningAge = warningAge < 0f ? 0f : warningAge + Time.deltaTime;
-            LabPlayerState target = System.Array.Find(snapshot.players ?? new LabPlayerState[0],
-                player => player != null && player.id == snapshot.charmedPlayer);
-            warning.text = WarningText(snapshot.charmedPlayer == network.LocalPlayerId ? "나" : LabResultStats.PlayerName(target));
+            ulong local = network.LocalPlayerId;
+            var names = new System.Collections.Generic.List<string>();
+            bool includesMe = false;
+            foreach (ulong charmed in snapshot.CharmTargets())
+            {
+                if (charmed == local) { includesMe = true; continue; }
+                LabPlayerState target = System.Array.Find(snapshot.players ?? new LabPlayerState[0],
+                    player => player != null && player.id == charmed);
+                names.Add(LabResultStats.PlayerName(target));
+            }
+            if (includesMe) names.Insert(0, "나");
+            warning.text = WarningText(names, includesMe);
             PlaceWarning();
             float pop = warningAge < WarningPopSeconds ? Mathf.Lerp(.5f, 1f, warningAge / WarningPopSeconds)
                 : 1f + .04f * Mathf.Sin((warningAge - WarningPopSeconds) * WarningPulseHz * 2f * Mathf.PI);

@@ -2086,8 +2086,9 @@ namespace C6Lab
             }
             if (packet.type == "charmTap")
             {
-                // Only a player beside the charmed one counts; enough taps wake them at once (#251).
-                if (!model.TryCharmTap(sender, now, out var woken)) return;
+                // Only a player beside the charmed one counts; enough taps wake them at once (#251). The tap names whom it
+                // wakes (#664): the player between two charmed ones taps each one's bubble.
+                if (!model.TryCharmTap(sender, packet.owner, now, out var woken)) return;
                 // Sent before the snapshot that no longer holds the charm, so every screen knows it was woken.
                 if (woken.HasValue) AnnounceCharmWoken(woken.Value);
                 PublishSnapshot(true);
@@ -2365,7 +2366,7 @@ namespace C6Lab
             // The fox's charm (#251) shows its haze only on the charmed player's own board, which stands still (#664);
             // the boards beside it shut their edge toward it.
             bool charmedHere = latest.CharmOn(LocalPlayerId);
-            board.SetCharm(charmedHere ? (float)(latest.charmUntil - latest.serverTime) : 0f);
+            board.SetCharm(charmedHere ? (float)(latest.CharmEndOf(LocalPlayerId) - latest.serverTime) : 0f);
             board.SetCharmWalls(latest.CharmWallSide(LocalPlayerId));
             board.SetJigwiOverheat(latest.phase == LabPhase.Playing
                 && latest.JigwiFor(LocalPlayerId)?.Overheated(latest.serverTime) == true);
@@ -2402,11 +2403,14 @@ namespace C6Lab
                 passiveCombine = board != null && board.IsContactCombineRequest });
         }
 
-        /// <summary>매혹 (#251): 하트 말풍선을 눌러 옆 사람을 깨우는 한 번을 Host에 보낸다. 셈은 Host가 한다.</summary>
-        public void TapCharm()
+        /// <summary>
+        /// 매혹 (#251): 하트 말풍선을 눌러 옆 사람(charmed)을 깨우는 한 번을 Host에 보낸다. 셈은 Host가 한다. #664: 두 사람 사이에
+        /// 낀 사람은 누구의 말풍선을 눌렀는지 함께 보낸다.
+        /// </summary>
+        public void TapCharm(ulong charmed)
         {
             if (latest == null || latest.phase != LabPhase.Playing || latest.paused) return;
-            Request(new LabNetworkPacket { type = "charmTap", requestId = ++requestSequence });
+            Request(new LabNetworkPacket { type = "charmTap", requestId = ++requestSequence, owner = charmed });
         }
 
         private void OnFoxFireTouched(string foxId, string orbId)

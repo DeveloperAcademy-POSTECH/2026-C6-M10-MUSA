@@ -321,6 +321,13 @@ namespace C6Lab
         public double charmStartedAt = -1d, charmUntil = -1d;
         public int charmTaps;
         /// <summary>
+        /// #664: everyone charmed this time (one, or two never side by side in a room of five) and when each one's charm
+        /// ends, in the same order: a woken player's ends early. charmedPlayer is the first of them, charmUntil the last end.
+        /// Empty in an older single-charm snapshot, which only has charmedPlayer and charmUntil.
+        /// </summary>
+        public ulong[] charmedPlayers = Array.Empty<ulong>();
+        public double[] charmEnds = Array.Empty<double>();
+        /// <summary>
         /// 매혹 예고 (#305): the Host chose charmedPlayer at charmWarnedAt and the charm itself starts at charmStartedAt;
         /// in between every screen shows the warning. -1 while no charm is coming or on.
         /// </summary>
@@ -331,9 +338,43 @@ namespace C6Lab
         /// </summary>
         public ulong[] charmHelpers = Array.Empty<ulong>();
         public int[] charmHelperTaps = Array.Empty<int>();
+        /// <summary>
+        /// #664: which charmed player each charmHelpers row wakes (the same order). The player between two charmed ones
+        /// has a row for each. Empty in an older snapshot, where every row is for charmedPlayer.
+        /// </summary>
+        public ulong[] charmHelperTargets = Array.Empty<ulong>();
 
         /// <summary>Whether this player is charmed at this snapshot.</summary>
-        public bool CharmOn(ulong player) => charmUntil > serverTime && serverTime >= charmStartedAt && charmedPlayer == player;
+        public bool CharmOn(ulong player) => CharmOn(player, serverTime);
+
+        /// <summary>Whether this player is charmed at this time (#664: each charmed player's charm may end on its own).</summary>
+        public bool CharmOn(ulong player, double now) => now >= charmStartedAt && CharmEndOf(player) > now;
+
+        /// <summary>When this player's charm ends (or is coming to end), or -1 when they are not charmed this time.</summary>
+        public double CharmEndOf(ulong player)
+        {
+            if (charmedPlayers != null && charmedPlayers.Length > 0)
+            {
+                int index = Array.IndexOf(charmedPlayers, player);
+                return index >= 0 && charmEnds != null && index < charmEnds.Length ? charmEnds[index] : -1d;
+            }
+            return charmedPlayer == player && charmUntil >= 0d ? charmUntil : -1d;
+        }
+
+        /// <summary>Everyone charmed or warned of a charm this time, in the Host's order (one in an older snapshot).</summary>
+        public ulong[] CharmTargets() => charmedPlayers != null && charmedPlayers.Length > 0 ? charmedPlayers
+            : charmUntil >= 0d ? new[] { charmedPlayer } : Array.Empty<ulong>();
+
+        /// <summary>How many times this helper has tapped to wake this charmed player (#664); 0 for anyone else.</summary>
+        public int CharmTapsBy(ulong helper, ulong target)
+        {
+            if (charmHelpers == null || charmHelperTaps == null) return 0;
+            bool rowsNamed = charmHelperTargets != null && charmHelperTargets.Length == charmHelpers.Length;
+            for (int i = 0; i < charmHelpers.Length && i < charmHelperTaps.Length; i++)
+                if (charmHelpers[i] == helper && (rowsNamed ? charmHelperTargets[i] == target : target == charmedPlayer))
+                    return charmHelperTaps[i];
+            return 0;
+        }
         /// <summary>
         /// 매혹 (#664): the edges of this player's board shut because the neighbour that way is charmed: right 1, left -1,
         /// both LabTeams.BothSides, none 0. A charmed player's own board is not walled; it stands still instead.
