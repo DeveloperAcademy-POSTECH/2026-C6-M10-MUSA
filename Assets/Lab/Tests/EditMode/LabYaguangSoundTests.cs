@@ -228,6 +228,73 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void GeumokSaysTheRuleOnlyBeforeTheRoundsFirstCombo()
+        {
+            // #695: 30초 예고 (아직 나온 콤보 0개) → 금옥 규칙 한 번. 야광귀 넷도 알아챈다.
+            LabYaguangSound sound = Sound();
+            LabSnapshot snapshot = ComboWarning();
+            sound.ObserveFlash(snapshot, 29.5d, Me);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideRule), Is.Zero);
+            foreach (double now in new[] { 30d, 30.5d, 31d, 32d, 33d })
+                sound.ObserveFlash(snapshot, now, Me);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideRule), Is.EqualTo(1), "Once, as the warning starts.");
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboCountFour), Is.EqualTo(1), "The goblin's count is still noticed.");
+
+            // 두 번째 콤보 예고 (이미 1개가 나옴): 규칙은 다시 말하지 않는다 (기본 1 = 첫 콤보만).
+            snapshot.comboCount = 1;
+            snapshot.comboWarningAt = 60d; snapshot.comboNextAt = 64d;
+            foreach (double now in new[] { 60d, 61d, 62d })
+                sound.ObserveFlash(snapshot, now, Me);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideRule), Is.EqualTo(1));
+        }
+
+        [Test]
+        public void GeumokCallsTheColorToPaintAfterTheGongAndAfterEachHit()
+        {
+            LabYaguangSound sound = Sound();
+            var snapshot = new LabSnapshot { sessionId = "yaguang", round = 1, phase = LabPhase.Playing };
+            sound.ObserveFlash(snapshot, 33.9d, Me);
+
+            // 34초에 4칸: 빨강(화) 파랑(수) 초록(목) 갈색(토). 0.3초 뒤에 첫 칸 색.
+            snapshot.comboCount = 1; snapshot.comboActive = true;
+            snapshot.comboStartedAt = 34d; snapshot.comboEndsAt = 44d;
+            snapshot.comboColors = new[] { LabOrbElement.Fire, LabOrbElement.Water, LabOrbElement.Wood, LabOrbElement.Earth };
+            sound.ObserveFlash(snapshot, 34.05d, Me);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideFire), Is.Zero, "It waits for the gong.");
+            Watch(sound, snapshot, 34.1d, 35.9d);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideFire), Is.EqualTo(1), "빨강!");
+
+            snapshot.comboProgress = 1;
+            Watch(sound, snapshot, 36d, 36.9d);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideWater), Is.EqualTo(1), "파랑! after the first hit");
+            snapshot.comboProgress = 2;
+            Watch(sound, snapshot, 37d, 37.9d);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideWood), Is.EqualTo(1), "초록!");
+
+            // 셋째 칸을 맞히자마자 콤보가 끝나면(여기서는 시간 초과) 넷째 색은 부르지 않는다.
+            snapshot.comboProgress = 3;
+            sound.ObserveFlash(snapshot, 38d, Me);
+            snapshot.comboActive = false;
+            Watch(sound, snapshot, 38.05d, 39d);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideEarth), Is.Zero);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideFire), Is.EqualTo(1), "Each color once.");
+        }
+
+        [Test]
+        public void TheGuideFoldersAndColorsMatchTheFiveElements()
+        {
+            Assert.That(LabYaguangSound.Folder(LabYaguangSfx.ComboGuideRule), Is.EqualTo("Audio/YaguangComboGuideRule"));
+            Assert.That(LabYaguangSound.Folder(LabYaguangSfx.ComboGuideFire), Is.EqualTo("Audio/YaguangComboGuideFire"));
+            Assert.That(LabYaguangSound.Folder(LabYaguangSfx.ComboGuideEarth), Is.EqualTo("Audio/YaguangComboGuideEarth"));
+            Assert.That(LabYaguangSound.GuideColorSfx(LabOrbElement.Fire), Is.EqualTo(LabYaguangSfx.ComboGuideFire));
+            Assert.That(LabYaguangSound.GuideColorSfx(LabOrbElement.Water), Is.EqualTo(LabYaguangSfx.ComboGuideWater));
+            Assert.That(LabYaguangSound.GuideColorSfx(LabOrbElement.Wood), Is.EqualTo(LabYaguangSfx.ComboGuideWood));
+            Assert.That(LabYaguangSound.GuideColorSfx(LabOrbElement.Metal), Is.EqualTo(LabYaguangSfx.ComboGuideMetal));
+            Assert.That(LabYaguangSound.GuideColorSfx(LabOrbElement.Earth), Is.EqualTo(LabYaguangSfx.ComboGuideEarth));
+            Assert.That(LabYaguangSound.GuideColorSfx(LabOrbElement.None), Is.Null);
+        }
+
+        [Test]
         public void TheClockTicksEveryHalfSecondThenFasterAndStopsWithTheCombo()
         {
             LabYaguangSound sound = Sound();

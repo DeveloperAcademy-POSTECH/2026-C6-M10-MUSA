@@ -776,7 +776,8 @@ namespace C6Lab
                     uint index = combo.Count * (uint)LabGourdCombo.Length + (uint)i;
                     colors[i] = (LabOrbElement)(1 + (int)(DrawFor(seed ^ ComboColorSalt, ComboDrawKey, index) % 5UL));
                 }
-                combo.Start(colors, at, rules.ComboTimeLimitSeconds);
+                // #695: the round's first combo forgives wrong colors until its first slot is hit.
+                combo.Start(colors, at, rules.ComboTimeLimitSeconds, rules.ComboFirstForgive && combo.Count == 0);
                 // Scheduled stages receive the next occurrence from CastGimmicks, never from this effect.
                 nextComboAt = rules.YaguangTimeline ? double.PositiveInfinity : at + rules.ComboRepeatIntervalSeconds;
             }
@@ -2046,6 +2047,8 @@ namespace C6Lab
             public readonly int[] DrumStopChances;
             public readonly Color[] PaintColors;
             public readonly bool ComboEnabled, ComboPenaltyThrowerOnly;
+            /// <summary>#695: the round's first combo ignores wrong colors until its first slot is hit (Host only).</summary>
+            public readonly bool ComboFirstForgive;
             public readonly float ComboFirstStartSeconds, ComboRepeatIntervalSeconds, ComboTimeLimitSeconds,
                 ComboPenaltyDurationSeconds, ComboPenaltySizeScale, ComboRewardDurationSeconds, ComboRewardSizeScale,
                 ComboWarningSeconds;
@@ -2134,6 +2137,7 @@ namespace C6Lab
                 ComboRewardDurationSeconds = config.ComboRewardDurationSeconds;
                 ComboRewardSizeScale = config.ComboRewardSizeScale;
                 ComboWarningSeconds = config.ComboWarningSeconds;
+                ComboFirstForgive = config.YaguangFirstComboForgive;
                 FlashEnabled = config.YaguangFlashEnabled
                     && (stageYokai == LabStageYokai.None || stageYokai == LabStageYokai.Yaguang);
                 FlashTargetOne = config.YaguangFlashTargetOne;

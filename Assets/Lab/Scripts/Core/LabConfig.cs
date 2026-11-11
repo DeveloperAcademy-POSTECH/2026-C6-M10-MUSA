@@ -1124,6 +1124,17 @@ namespace C6Lab
         [SerializeField, Range(0f, 3f)] private float yaguangComboClearedDelaySeconds = .8f;
         [Tooltip("콤보 성공 야광귀 대사 크기 (Audio/YaguangComboClearedFirst, YaguangComboClearedSecond)")]
         [SerializeField, Range(0f, 1f)] private float yaguangComboClearedSoundVolume = .9f;
+        [Header("야광귀 콤보 금옥 안내와 첫 콤보 봐주기 (#695, Inspector 전용)")]
+        [Tooltip("라운드 첫 콤보는 첫 칸을 맞힐 때까지 틀린 색을 실패 없이 무시한다 (첫 칸을 맞힌 뒤 틀린 색은 실패, 제한 시간은 그대로). Host 기준")]
+        [SerializeField] private bool yaguangFirstComboForgive = true;
+        [Tooltip("콤보 예고 때 금옥 규칙 안내(Audio/YaguangComboGuideRule)를 라운드의 처음 몇 번 콤보까지 낼지 (0이면 끔, 1이면 첫 콤보만)")]
+        [SerializeField, Range(0, 20)] private int yaguangComboGuideRuleCombos = 1;
+        [Tooltip("금옥이 칠할 색(빨강/파랑/초록/노랑/갈색)을 부르기까지 지연 (초). 4칸이 나올 때는 깽! 뒤에, 칸을 맞혔을 때는 맞힌 소리 뒤에 들리게")]
+        [SerializeField, Range(0f, 2f)] private float yaguangComboGuideColorDelaySeconds = .3f;
+        [Tooltip("금옥 규칙 안내가 나오는 동안 야광귀의 넷/셋/둘/하나 목소리를 내지 않는다 (두 목소리가 겹치지 않게)")]
+        [SerializeField] private bool yaguangComboGuideQuietsCount = true;
+        [Tooltip("금옥 안내 목소리 크기 (규칙 + 색 부르기, 모든 기기)")]
+        [SerializeField, Range(0f, 1f)] private float yaguangComboGuideSoundVolume = 1f;
         [Header("야광귀 콤보 예고와 피버 신호 (#414, Inspector 전용)")]
         [Tooltip("콤보 예고(넷/셋/둘/하나) 동안 화면 가장자리가 어두워지는 최대 진하기 (0이면 끔, 모든 기기)")]
         [SerializeField, Range(0f, 1f)] private float yaguangComboWarningShade = .5f;
@@ -1671,6 +1682,11 @@ namespace C6Lab
         public float YaguangComboBgmToneSeconds => Mathf.Clamp(Finite(yaguangComboBgmToneSeconds, .3f), 0f, 2f);
         public float YaguangComboClearedDelaySeconds => Mathf.Clamp(Finite(yaguangComboClearedDelaySeconds, .8f), 0f, 3f);
         public float YaguangComboClearedSoundVolume => Mathf.Clamp01(Finite(yaguangComboClearedSoundVolume, .9f));
+        public bool YaguangFirstComboForgive => yaguangFirstComboForgive;
+        public int YaguangComboGuideRuleCombos => Mathf.Clamp(yaguangComboGuideRuleCombos, 0, 20);
+        public float YaguangComboGuideColorDelaySeconds => Mathf.Clamp(Finite(yaguangComboGuideColorDelaySeconds, .3f), 0f, 2f);
+        public bool YaguangComboGuideQuietsCount => yaguangComboGuideQuietsCount;
+        public float YaguangComboGuideSoundVolume => Mathf.Clamp01(Finite(yaguangComboGuideSoundVolume, 1f));
         public float YaguangComboWarningShade => Mathf.Clamp01(Finite(yaguangComboWarningShade, .5f));
         public float BigHitSoundVolume => Mathf.Clamp01(Finite(bigHitSoundVolume, .8f));
         public float YaguangComboTickFastSeconds => Mathf.Clamp(Finite(yaguangComboTickFastSeconds, 4f), 0f, 10f);
