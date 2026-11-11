@@ -8004,3 +8004,26 @@ All 279 changed opening code/asset/test files (excluding the tutorial test file,
 - 최종 전체 EditMode2,243/2,243(49.05초), 관련 PlayMode27/27(8.97초) 통과. 눈→해제/놀림 PNG→일반 텍스트 복원, 흔들기 PNG와 해제/놀림 PNG의 warmup 동시 존재를 추가 단언했다. 기존 K키 단발·횟수별 투명도·초기 준비·보드 수명도 통과했다.
 - Unity6000.6.5f1/macOS Metal 기준. main 대비 실행 변경은 UI/VFX와 에셋 재생성 기본값 정합성이라 전체 PlayMode는 생략했다. main의 통신/게임 흐름 변경은 그대로 통합하고 이 브랜치에서 다시 수정하지 않았다. 실제 게임/iOS 실기기 화면은 미검증이다.
 - 충돌 표식/미해결 index0개. 수동 변경 소스·검증 문서 whitespace 검사 통과. main에서 넘어온 기존 생성 에셋의 공백은 일괄 수정하지 않았다.
+
+
+## 2026-11-11 — #676 도색 기본값 1.3% / 1.0% 시험
+
+기준 main `47d33dd3`, 브랜치 `feat/#676-five-player-paint-balance`, Unity 6000.6.5f1 / macOS Metal이다. 사용자 정정에 따라 계측·CSV·타수 로그 구현은 취소했다. `LabConfig` 코드 기본값·비정상값 fallback·저장 에셋을 최초 2→1.3%, 재타격 1.5→1.0%로 맞췄다. Editor에서 Host 공유 배열의 105/106이 1.3/1이고 총 259개인 것을 확인했다. 성장 6%p/초·건조·보상 개수·승리·통신 형식은 바꾸지 않았다. 기존 공통값을 읽는 모든 인원·스테이지에 적용되며 5인 전용 자동 분기는 없다.
+
+Home/Lobby의 저장 DEV 105/106 입력·슬라이더도 같은 값으로 맞췄다. 각 Scene의 변경 객체는 11개이며 두 행의 입력·문구·슬라이더·내부 fill/handle, GameScreen의 기존 null 필드 명시뿐이다. GameObject/fileID와 부모 행 배치는 같다. 비활성 슬라이더의 Unity 직렬화 anchor 0은 활성화 때 uGUI `Slider.OnEnable/UpdateVisuals`가 현재 값으로 다시 그린다. 에셋 저장 때 기존 암묵 기본값 `thrownOrbMinVisibleScale: 0.4`도 명시됐으나 기존 코드 기본값·fallback과 같아 동작 변화가 없다.
+
+| 검사 | 결과 |
+| --- | --- |
+| 최초 전체 EditMode | 2,246/2,248, 31.42초. Home/Lobby의 저장 DEV에 예전 2/1.5가 남아 있는 두 건을 발견했다. 실제 표시값을 고쳤으며 단언을 완화하지 않았다. |
+| 최종 전체 EditMode | **2,248/2,248**, 32.23초, 실패·skip·inconclusive 0 |
+| 전체 PlayMode | **800/801 통과**, 740.38초. skip·inconclusive 0. 아래 튜토리얼 초기 배치 실패 1건은 미해결로 구분 |
+| Mac Development 빌드 | **Succeeded**, 오류 0·경고 60, 21.96초, 2,038,889,119 bytes. 최초1.3%·재타격1.0%, StandaloneOSX 유지 |
+
+도색 면적 기본값과 저장 설정의 실행 결과가 바뀌어 전체 EditMode/PlayMode를 선택했다. 명시적인 2%/4% 과거 비교 fixture·골든은 재생성하지 않았다. 현재 저장 기본값을 검사하는 단언만 새 정확 면적 예산에 맞췄다. 원시 결과는 로컬 `artifacts/issue676-balance`에 보관한다. 이전 #659 VFX 작업은 원래 브랜치/PR에 보존했고, 이번 최신 main 기준 빌드에 그 미병합 VFX가 포함됐다고 표현하지 않는다.
+
+새 기본값은 앱을 완전히 종료하고 새 빌드를 실행한 Host에서 새 방을 만들어 확인한다. 기존 GameSession의 DEV 수정값은 Home/새 방에도 남을 수 있다. Guest는 Host의 공유값을 받으므로 예전 Host에 입장하면 그 Host의 수치를 쓴다. 별도 설정 파일이나 PlayerPrefs 삭제는 필요 없다. 새 수치의 실제 5인 클리어 시간·iOS·핫스팟 실기기는 미검증이다.
+
+
+남은 실패는 `GameTutorialFlowTests.FinishedOpeningOpensThePracticeBoardOnceThenTheRoomList`의 두 번째 음 구슬이 양 구슬 위에 있는지 확인하는 초기 배치 단언이다. 첫 조합·명중·도색을 수행하기 전 단계에서 `(3.50, 0.66, 0.00)` 위치로 실패했다. 단독 fixture도4/5(27.12초)였고, 실제 저장 도색량을 이전2%/1.5%로 잠시 되돌려 해당1건만 비교해도 같은 위치·단언으로0/1(14.59초) 실패했다. 비교 후 `finally`에서 승인된1.3%/1.0% 복구를 확인한 뒤 빌드했다. 이 비교는 전체main원본 재검사가 아니라 두 도색량의 A/B 확인이다. 튜토리얼 동작이나 검사 단언은 이번 범위에서 바꾸지 않았다. 전체 PlayMode가 모두 통과했다고 기록하지 않는다.
+
+확인용 앱은 `Builds/Hapio/20261111-161941-bb0209a2/macOS/Hapio-Development.app`다. 기존 `Hapio/Development Build/Build Mac App` 경로로 Home부터 시작하는 게임 Scene 목록을 사용했다. 새 앱은 자동으로 실행하지 않았으며 실제 5인 플레이 결과·iOS 빌드 성공을 뜻하지 않는다.
