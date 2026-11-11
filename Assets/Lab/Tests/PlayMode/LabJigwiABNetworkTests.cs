@@ -246,13 +246,18 @@ namespace C6Lab.Tests
             typeof(LabConfig).GetField("jigwiBSplashPaintShare", Private).SetValue(config, 0f);
             SelectLegacySpecialWaterRule();
             LabModel control = Room(LabStageYokai.None);
+            // Match the two-player Story hit budget independently of the runtime participant-scaling helper.
+            LabPaintGrowthSettings normalPaint = config.PaintGrowthSettings;
+            normalPaint.InitialPercent *= 5f / 2f;
+            normalPaint.RepeatPercent *= 5f / 2f;
+            control.PaintSurface.Reset(normalPaint, 1u);
             model.Tick(31d);
             // Retain the generic independent-radius check after completing the explicitly selected old B rule.
             CompleteLegacySpecialWaterRound(0, 31d);
             Assert.That(model.JigwiABBlocksBoss(0, 31d), Is.False);
             Assert.That(model.JigwiABBlocksBoss(20, 31d), Is.False, "#509: nobody is ever blocked.");
             int modelBefore = model.PaintSurface.CoveredCount; // no splash here, so nothing else is growing
-            // Both rooms use the ordinary paint budget; the retained B rule has no timed radius or paint reward.
+            // Both rooms use the same two-player budget; the retained B rule has no timed radius or paint reward.
             LabOrbState reduced = Add(model, 0, 37d, LabOrbElement.Water);
             reduced.jigwiABRadiusScale = .65f; // Explicit old-field fixture, not a timed-mission penalty.
             LabOrbState normal = Add(control, 0, 37d, LabOrbElement.Water);

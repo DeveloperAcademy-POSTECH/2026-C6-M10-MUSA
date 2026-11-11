@@ -33,6 +33,10 @@ namespace C6Lab
     ///   Inspector 지연(기본 0.8초). 이번 라운드 첫 성공은 "이런!", 그 뒤 성공은 "이럴 수가!" (이 기기에서 본 성공 수 기준).
     ///   "이럴 수가!" 폴더가 비어 있으면 "이런!" 파일을 쓴다.
     ///   다음 콤보 결과가 먼저 나오면 앞 결과의 남은 소리는 내지 않는다.
+    /// #664 구미호 여우구슬 판정 (모든 기기, 야광귀 콤보와 같은 소리):
+    /// - 제한 시간 째깍: 여우구슬이 떨어진 순간부터 콤보와 같은 간격으로 째깍, 남은 시간이 짧으면 빠른 째깍. 다 지우면 바로 멈춘다.
+    /// - BIG/SMALL 시작·끝: 콤보 결과와 같은 때 (결과 + LabGourdComboHud.ResultSeconds, 가장 늦게 끝나는 사람 기준).
+    ///   야광귀 목소리(메롱~, 이런!)는 내지 않는다.
     /// 그 순간보다 LateSeconds 넘게 늦게 알아챈 기기(늦게 들어옴, 일시정지 뒤)는 내지 않는다. 일시정지 중·시작 대기 중에는
     /// 새로 내지 않는다. 폴더가 비어 있으면 그 소리만 조용히 넘어간다(여러 개면 무작위).
     /// 크기는 LabConfig Inspector의 소리별 크기 × 일시정지 메뉴 효과음 설정.
@@ -67,6 +71,9 @@ namespace C6Lab
             ComboClearedFirstFolder, ComboClearedSecondFolder };
         /// <summary>The folders this component loads, for the battle audio preload (#492).</summary>
         public static System.Collections.Generic.IReadOnlyList<string> ClipFolders => Folders;
+        /// <summary>The ones the 구미호 fox round plays too (#664): its clock and the BIG/SMALL start and end.</summary>
+        public static readonly string[] FoxRoundClipFolders = { ComboTickFolder, ComboTickFastFolder,
+            ComboSmallStartFolder, ComboSmallEndFolder, ComboBigStartFolder, ComboBigEndFolder };
         /// <summary>째깍은 그 박자보다 이 초 넘게 늦게 알아채면 건너뛴다 (스냅샷이 늦게 와도 몰아서 울리지 않게).</summary>
         public const double TickLateSeconds = .3d;
         public const double DefaultTickInterval = .5d;
@@ -102,6 +109,12 @@ namespace C6Lab
         private bool tauntDue, effectStartDue, effectEndDue, clearedDue;
         // 이번 라운드에 본 콤보 성공 수 (첫 성공 "이런!", 그 뒤 "이럴 수가!")
         private int clearedCount;
+        // #664 여우구슬 판정: 째깍을 센 판정(떨어진 시각)과 마지막 째깍, 본 판정 결과 수, 그 결과 시각과 효과, 아직 낼 소리
+        private double foxTickFor = double.NaN, lastFoxTickAt = double.NegativeInfinity;
+        private int seenFoxRoundCount;
+        private double foxResultAt;
+        private int foxEffect;
+        private bool foxStartDue, foxEndDue;
         private LabYaguangFlashHud flashHud;
 
         public static string Folder(LabYaguangSfx sfx) => Folders[(int)sfx];
@@ -196,9 +209,14 @@ namespace C6Lab
                 seenResultCount = snapshot.comboResultCount;
                 tauntDue = effectStartDue = effectEndDue = clearedDue = false;
                 clearedCount = 0;
+                foxTickFor = double.NaN;
+                lastFoxTickAt = double.NegativeInfinity;
+                seenFoxRoundCount = snapshot.foxRoundCount;
+                foxStartDue = foxEndDue = false;
             }
             ObserveCombo(snapshot, now);
             ObserveComboResult(snapshot, now);
+            ObserveFoxRound(snapshot, now);
 
             // 번쩍: 섬광 수가 늘었고 이번에 내가 맞았으면 (진동과 같은 기준, 1초 넘게 지난 섬광은 내지 않음).
             if (snapshot.flashCount < seenFlashCount) seenFlashCount = snapshot.flashCount;
@@ -319,6 +337,7 @@ namespace C6Lab
                 bool failed = snapshot.comboResult == LabComboResult.WrongColor || snapshot.comboResult == LabComboResult.Timeout;
                 resultEffect = failed ? -1 : snapshot.comboResult == LabComboResult.Success ? 1 : 0;
                 tauntDue = failed && resultAt >= 0d;
+                foxStartDue = foxEndDue = false; // 새 결과가 앞 결과의 남은 소리를 대신한다.
                 clearedDue = resultEffect > 0 && resultAt >= 0d;
                 if (clearedDue) clearedCount++;
                 effectStartDue = effectEndDue = resultEffect != 0 && resultAt >= 0d
@@ -356,6 +375,57 @@ namespace C6Lab
             effectEndDue = false;
             if (now - endAt <= LateSeconds && endAt > startAt)
                 Play(resultEffect < 0 ? LabYaguangSfx.ComboSmallEnd : LabYaguangSfx.ComboBigEnd);
+        }
+
+        /// <summary>
+        /// 구미호 여우구슬 판정 소리 (#664): 판정 중 째깍(콤보와 같은 간격·소리), 결과 뒤 BIG/SMALL 시작·끝(콤보 결과와 같은 때).
+        /// </summary>
+        private void ObserveFoxRound(LabSnapshot snapshot, double now)
+        {
+            if (snapshot.foxRoundCount < seenFoxRoundCount) seenFoxRoundCount = snapshot.foxRoundCount;
+            if (snapshot.foxRoundCount > seenFoxRoundCount)
+            {
+                seenFoxRoundCount = snapshot.foxRoundCount;
+                foxResultAt = snapshot.foxRoundResultAt;
+                foxEffect = System.Math.Sign(snapshot.foxRoundResult);
+                foxStartDue = foxEndDue = foxEffect != 0 && foxResultAt >= 0d
+                    && EffectUntil(snapshot, foxEffect, foxResultAt) > foxResultAt + LabGourdComboHud.ResultSeconds;
+                if (foxStartDue) effectStartDue = effectEndDue = false; // 콤보 결과의 남은 소리는 이 결과가 대신한다.
+            }
+            if (snapshot.paused) return;
+
+            double startAt = foxResultAt + LabGourdComboHud.ResultSeconds;
+            if (foxStartDue && now >= startAt)
+            {
+                foxStartDue = false;
+                if (now - startAt <= LateSeconds) Play(foxEffect < 0 ? LabYaguangSfx.ComboSmallStart : LabYaguangSfx.ComboBigStart);
+            }
+            if (foxEndDue)
+            {
+                double endAt = EffectUntil(snapshot, foxEffect, foxResultAt);
+                if (now >= endAt)
+                {
+                    foxEndDue = false;
+                    if (now - endAt <= LateSeconds && endAt > startAt)
+                        Play(foxEffect < 0 ? LabYaguangSfx.ComboSmallEnd : LabYaguangSfx.ComboBigEnd);
+                }
+            }
+
+            // 제한 시간 째깍: 판정이 진행 중일 때만. 떨어진 순간부터 센다.
+            if (!snapshot.FoxRoundOn(now)) return;
+            if (foxTickFor != snapshot.foxRoundStartedAt)
+            {
+                foxTickFor = snapshot.foxRoundStartedAt;
+                lastFoxTickAt = snapshot.foxRoundStartedAt;
+            }
+            LabConfig config = network != null ? network.config : null;
+            double fastFor = config != null ? config.YaguangComboTickFastSeconds : DefaultTickFastSeconds;
+            double every = config != null ? config.YaguangComboTickIntervalSeconds : DefaultTickInterval;
+            double fastEvery = config != null ? config.YaguangComboTickFastIntervalSeconds : DefaultTickFastInterval;
+            double tick = LatestTickAt(snapshot.foxRoundStartedAt, snapshot.foxRoundEndsAt, now, fastFor, every, fastEvery, out bool fast);
+            if (tick <= lastFoxTickAt) return;
+            lastFoxTickAt = tick;
+            if (now - tick <= TickLateSeconds) Play(fast ? LabYaguangSfx.ComboTickFast : LabYaguangSfx.ComboTick);
         }
 
         /// <summary>

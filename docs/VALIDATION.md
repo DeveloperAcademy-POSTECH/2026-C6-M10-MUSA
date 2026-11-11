@@ -8233,3 +8233,114 @@ VFX자체는main의설정259개·5700/Lab60/Game51을유지한다. 인원보정#
 - 최종 상단 좌표 472에서 402×874 스토리 3인 3종과 땅따먹기 3:3 청팀·홍팀 Game View PNG를 다시 캡처하고 양옆 번호와 하단 HUD를 확인했다. 캡처에는 표시용 참가자 데이터를 사용했다.
 - 좌우 번호를 화면 중앙 쪽으로 각각 4 디자인 단위 옮긴 뒤 402×874 Game View에서 스토리 3인 3종과 땅따먹기 3:3 양 팀 PNG를 다시 캡처해 확인했다. 표시용 참가자 데이터를 사용했다.
 - 좌우 번호를 각각 바깥쪽으로 2 디자인 단위 옮긴 뒤 구미호 3인 표시용 402×874 Game View 캡처에서 확인했다.
+
+
+## 2026-11-11 — #664 구미호 고유 기믹 협동 강화 (매혹 판 멈춤·5명 2인 매혹, 여우구슬 팀 판정)
+
+기준은 main `8e9d03d4`(#661 병합 뒤), 브랜치 `feat/#664-gumiho-coop-gimmicks`, Unity 6000.6.5f1·macOS Editor다. 커밋은 단계별로 나눴다: 매혹 판 멈춤·분홍 벽 → 5명 2인 매혹 → 분홍빛·하트 → 여우구슬 팀 판정(방장) → 판정 화면·소리 → DEV 값·접속 버전 → 넘기기 막기 판에도 여우불 → 개수 증가·목표치·보상·벌칙 시간 → 늦은 프레임 판정 순서 → 목표에서 빼는 수 최대 3 → main 병합 → 1스테이지 벌칙 13초.
+
+- **매혹:** 걸린 사람은 던지기·좌우 넘기기·구슬 만들기·판 위 끌기/합치기·여우구슬 누르기가 모두 방장에서 거절된다(`CHARMED`, 폭탄 열림만 예외). 그 사람에게 넘긴 구슬은 거절(`RECEIVER_CHARMED`)되고 화면에서는 분홍 벽에 튕긴다. 판 물리는 멈춘 채 속도를 보관했다가 풀리면 이어 간다.
+- **5명 2인 매혹:** 3~4명은 1명, 5명은 서로 옆자리가 아닌 2명(DEV 259, 기본 2). 두 사람 사이에 낀 사람은 말풍선 둘을 각각 10번씩 누른다. 걸린 사람 화면에는 분홍빛과 하트 그림(`Resources/Sabotage/CharmHeart.png`, 생성 이미지)이 아래에서 올라온다.
+- **여우구슬 팀 판정:** 여우불이 떨어진 순간부터 DEV 260(기본 15초, 0 = 판정 끔) 안에 목표치만큼 지우면 모두 BIG, 못 지우면 남은 여우구슬이 연기로 사라지고 모두 SMALL. 목표치 = 실제로 떨어진 팀 전체 수 − x(DEV 263~264, 기본 0~3), 최소 1. 목표에 닿으면 남은 여우구슬도 바로 연기로 사라진다. 지운 수는 두 번 누르기와 음·양 닿기만 센다.
+- **개수 증가:** 판 하나에 떨어지는 수 N은 한 판에서 여우불마다 최소 +1·최대 +2(DEV 261~262): 2~5 → 3~7 → 4~9 → 5~11. 모든 판이 같은 N을 받고 판 빈자리만큼만 떨어진다. 휴대폰이 한 번에 받는 여우구슬 상한을 10 → 100(판 보유 한도의 DEV 최댓값)으로 올렸다.
+- **BIG/SMALL:** 야광귀 콤보와 같은 값·연출·소리(성공!/시간 끝!, 크게/작게 표시, 부적 비, 판 구슬 1.4/0.6배, 던지는 공 2.5/0.1배, 째깍·BIG/SMALL 시작·끝 소리, "좋다"/실패 소리, BGM ±2반음). 야광귀 목소리(메롱~, 이런!)는 내지 않는다. 1스테이지도 2스테이지와 같게 `Stage01_gumiho.asset` 기본값을 벌칙(159) 13초·보상(162) 8초로 맞췄고(main 병합 때 #663/#652가 2스테이지 벌칙을 8 → 13초로 바꿔 함께 맞춤), 보상·벌칙 시간·크기 4칸(159·160·162·163)을 Hapio 1스테이지 DEV 탭에도 보이게 했다(스테이지별 값).
+- **기믹 추첨:** 같은 초에 공용 기믹(넘기기 막기)이 먼저 걸리면 그 사람이 고유 기믹 대상에서 빠져 1명 판에서 고유 기믹이 약 절반 사라지던 문제(#251부터의 규칙)를 고쳤다. 여우불은 넘기기 막기에 걸린 판에도 떨어지고, 매혹만 그 사람을 피한다. 여우구슬 판정 중에는 매혹을 걸지 않는다(DEV 간격을 판정보다 짧게 했을 때의 안전장치). 피버가 시작되면 진행 중 판정은 보상·벌칙 없이 취소된다.
+- **늦은 프레임:** 한 번에 긴 시간을 처리할 때(StageYokai None 경로) 판정 마무리가 그 구간의 기믹보다 먼저 일어나, 끝난 판정에 새 여우불이 붙거나 끝난 판정의 여우구슬이 되살아났다. 여우불을 떨어뜨리기 전에 그 시각까지 끝난 판정을 먼저 마무리하고, 구간 끝 마무리는 기믹을 다 건 뒤로 옮겼다. 피버 시작 때도 이미 끝난 판정은 먼저 마무리한다.
+- **호환 묶음:** 설정 **265개**·프로토콜 **5701**·`C6PhysicsLab/61`·`C6HapioGame/52`. 5700은 main의 #663이 사용해 건너뛰었다. 동기화에 여러 명 매혹(`charmedPlayers`·`charmEnds`·`charmHelperTargets`)과 여우구슬 판정(시각·떨어진 수·남은 수·목표·지운 수·진행 중·결과·결과 시각·횟수)이 추가돼 이전 앱과 섞어 쓰지 않는다. main 병합 때 `LabNetwork.cs` 버전 줄 충돌이 예상된다(5701 유지, 5700·5701 주석 모두 유지).
+- 에셋은 Editor API로 저장했다: `LabConfig.asset`(새 DEV 값 6개, 저장 때 코드 기본값과 같은 `thrownOrbMinVisibleScale: 0.4` 한 줄이 함께 기록됨), `Stage01_gumiho.asset`, 새 `CharmHeart.png`. Scene·Prefab·패키지·빌드 설정은 바꾸지 않았다.
+
+| 확인 | 결과 |
+| --- | --- |
+| Unity 컴파일 (단계마다, 마지막은 `b7a322b6` 내용) | PASS |
+| Editor eval: 매혹 거절 (던지기·넘기기·만들기·합치기·여우구슬·받는 쪽) | PASS |
+| Editor eval: 5명 2인 매혹 | PASS — 60/60판 2명, 옆자리 0 |
+| Editor eval: 1스테이지 설정 120초 시뮬레이션 (1명·3명 각 20판) | PASS — 고유 기믹 차례(20·40·60·80초) 160번 중 빠짐 0, 여우불이 일부 판에만 떨어진 경우 0 (수정 전 1명 판은 4번 중 2~3번) |
+| Editor eval: 여우불 개수 증가 (3명 30판, 여우불만) | PASS — 1~4번째 N이 각각 2~5·3~7·4~9·5~11 안 |
+| Editor eval: 목표 도달·시간 끝 | PASS — 목표 13 방: 12개째 남은 목표 1·진행 중, 13개째 BIG 2.5배·남은 2개 연기 / 시간 끝 SMALL 0.1배 |
+| Editor eval: 판정 화면·소리 | PASS — 패널 수·막대·3초 빨강·터치 안 막음, 15초 째깍 0.5초×21 + 0.25초×16, 시간 끝 뒤 SMALL 시작·끝 1번씩·메롱 0, BIG 배지 동안 BGM +2반음 (BIG 소리·BGM −2는 새 검사로만, NOT_RUN) |
+| Editor eval: 스테이지별 BIG/SMALL 값 (main 병합 뒤) | PASS — 1·2스테이지 모두 BIG 2.5배·8초 / SMALL 0.1배·13초 |
+| Editor eval: DEV 값·탭·접속 버전 | PASS — 259~264 = 2·15·1·2·0·3, 1스테이지 탭에만 보임, 5701/61/52 |
+| Editor eval: 판 헤더 복제 (목표·지운 수) | PASS |
+| Test Runner 1차 전체 EditMode·PlayMode (사용자 실행, `b4d826a1`) | 실패 EditMode 5·PlayMode 3. 통과 건수는 받지 못함 |
+| ㄴ #664 원인: `LabModelTests.AFarJumpCastsTheSameGimmicksAsSmallSteps`, `TheLastFoxRoundResultStaysWhileTheNextRoundRuns`, `LabSabotageBoundaryTests.LateTickFreesExpiredStorageBeforeDrawingTheNextFoxFire`(2) | `a63c7de5`에서 수정. 같은 내용을 Editor eval로 따라 해 일치 확인(기믹 48/48 동일, 6·10·25초 결과, 판 한도 3개). Test Runner 재실행 NOT_RUN |
+| ㄴ 환경 원인: `GourdResultViewerPlayModeTests`(3) | 로컬 `EditorBuildSettings.asset`에서 Lab 씬이 꺼져(`enabled: 0`, 커밋 안 함) `LoadSceneAsync("Lab")` 실패. #664 변경 없음 |
+| ㄴ 환경 원인: `GameResultStrokeTests.SavedResultBrushKeepsOriginalButtonTapAndDisabledGate("Viewer","ResultAction")` | `ResultAction.png`의 로컬 Library 캐시 손상("Unknown error occurred while loading 'VirtualArtifacts/Primary/e3472224…'"). 강제 Reimport로도 안 풀림. 원본 PNG·.meta 변경 없음 |
+| Test Runner 재실행 (수정·목표 최대 3 반영, Lab 씬 켜고 캐시 복구 뒤) | NOT_RUN |
+| Mac 3인 실행·5인 실행·iOS 실기기 | NOT_RUN |
+
+새·수정 검사:
+- EditMode `LabModelTests`: 매혹 판 멈춤·옆 판·예고, 5명 2인·가운데 사람, 여우구슬 판정(목표 도달 BIG·시간 끝 SMALL·지난 결과 유지·개수 증가·목표 최소 1), 넘기기 막기와 같은 시각, DEV 값 6개
+- EditMode: `LabYaguangSoundTests`(2), `LabComboClearSoundTests`, `LabBattleBgmComboToneTests`, `LabBattleAudioWarmupTests`, `LabFeverTimeTests`, `LabSabotageBoundaryTests`, `LabFoxRoundReplicationTests`(새 파일), `LabLobbyRejoinTests`·`LabGameFlowBridgeTests`·`LabSharedSettingsSchemaTests`(접속 버전), `LabDeveloperConfigTests`(Gimmicks 칸 순서), `GameStageSettingsTests`(1스테이지 탭·8초), `GameEditorMenuCleanupTests`(1스테이지 파일 재생성)
+- PlayMode: `LabCharmBoardTests`(새 파일), `LabCharmHeartRainTests`(새 파일), `LabFoxRoundHudTests`(새 파일), 말풍선 두 개 검사
+- DEV 개수 259 → 265 반영 33개 파일
+
+#637 기준: 방장 규칙·동기화·DEV 값 개수가 바뀌어 전체 EditMode·PlayMode가 필요하다. 1차 전체 실행 뒤 바뀐 게임 코드는 `LabModel.cs`·`LabModel.StageFever.cs`(판정 순서)와 `LabConfig.cs`·`LabModel.FoxRound.cs`(목표에서 빼는 수 기본 3)이므로 전체 재실행이 남아 있다.
+
+### #664 main 병합 — 2026-11-11
+
+origin/main `3764518d`(#663·#665·#667·#669·#673·#675·#678·#679)를 병합했다(`4f7566ee`). 충돌은 `LabNetwork.cs`·`LabGameFlowBridgeTests.cs`·`LabSharedSettingsSchemaTests.cs`의 접속 버전과 이 문서였다. 프로토콜은 5701을 남기고 5700(#663)·5701(#664) 주석을 모두 남겼으며, 검사는 5701·설정 265를 유지했다. 이 문서는 main의 #652 병합 기록 다음에 #664 기록을 두었다. main은 DEV 값을 추가하지 않았고(Inspector 전용 `jigwiSmokeToTalismanSeconds`·`jigwiAFailBurnStartSeconds`만 추가) 259~264번과 겹치지 않는다. main이 2스테이지 콤보 벌칙(159)을 8 → 13초로 바꿔, 1스테이지 `Stage01_gumiho.asset`과 재생성 기본값(`GameStageAssets.GumihoDefaults`)도 159 = 13초로 맞추고 검사를 고쳤다(Editor API로 저장).
+
+| 확인 | 결과 |
+| --- | --- |
+| 충돌 표식·남은 설정 259 단언 | 0 |
+| Unity 컴파일 (병합 뒤) | PASS — 설정 265개 |
+| Editor eval: 스테이지별 BIG/SMALL 시간 | PASS — 1·2스테이지 BIG 8초·SMALL 13초 |
+| 병합 뒤 Test Runner 전체 EditMode·PlayMode | NOT_RUN |
+
+### #664 main 2차 병합 — 2026-11-11
+
+origin/main `d2405f93`(#666·#668·#674·#681·#662 포함)를 다시 병합했다. 충돌은 이 문서뿐이었고 main 기록(#668·#659·#662) 다음에 #664 기록을 두었다. main의 접속 버전은 아직 5700/60/51이라 5701/61/52를 그대로 유지했다. 열린 #682도 5701/61/52를 쓰므로 둘 중 나중에 머지하는 쪽이 5702/62/53으로 올려야 한다.
+
+#668이 야광귀 콤보 판·결과 문구가 떠 있는 동안 도색 게이지를 가리도록 바꿨는데, 1스테이지도 야광귀 셈법(191)이 켜져 있어 여우구슬 결과 문구 1.6초 동안 게이지가 사라졌다. 여우구슬 결과 문구는 게이지 위가 아니라 `panelAnchor`(화면 위 80%)에 뜨므로, 콤보 결과일 때만 게이지를 가리도록 `LabGourdComboHud`를 고쳤다.
+
+| 확인 | 결과 |
+| --- | --- |
+| 충돌 표식 | 0 |
+| Unity 컴파일 (병합 + 게이지 수정 뒤) | PASS — 설정 265개 |
+| 자동 병합된 `LabGourdComboHud`의 여우구슬 경로 (결과 문구·BIG/SMALL 시간·공유 색/패널) | 코드 확인 — 그대로 남음 |
+| 여우구슬 결과 때 게이지가 보이는지 실제 화면 | NOT_RUN |
+| 병합 뒤 Test Runner 전체 EditMode·PlayMode | NOT_RUN |
+
+## 2026-11-11 — #676 도색 기본값 1.3% / 1.0% 시험
+
+기준 main `47d33dd3`, 브랜치 `feat/#676-five-player-paint-balance`, Unity 6000.6.5f1 / macOS Metal이다. 사용자 정정에 따라 계측·CSV·타수 로그 구현은 취소했다. `LabConfig` 코드 기본값·비정상값 fallback·저장 에셋을 최초 2→1.3%, 재타격 1.5→1.0%로 맞췄다. Editor에서 Host 공유 배열의 105/106이 1.3/1이고 총 259개인 것을 확인했다. 성장 6%p/초·건조·보상 개수·승리·통신 형식은 바꾸지 않았다. 기존 공통값을 읽는 모든 인원·스테이지에 적용되며 5인 전용 자동 분기는 없다.
+
+Home/Lobby의 저장 DEV 105/106 입력·슬라이더도 같은 값으로 맞췄다. 각 Scene의 변경 객체는 11개이며 두 행의 입력·문구·슬라이더·내부 fill/handle, GameScreen의 기존 null 필드 명시뿐이다. GameObject/fileID와 부모 행 배치는 같다. 비활성 슬라이더의 Unity 직렬화 anchor 0은 활성화 때 uGUI `Slider.OnEnable/UpdateVisuals`가 현재 값으로 다시 그린다. 에셋 저장 때 기존 암묵 기본값 `thrownOrbMinVisibleScale: 0.4`도 명시됐으나 기존 코드 기본값·fallback과 같아 동작 변화가 없다.
+
+| 검사 | 결과 |
+| --- | --- |
+| 최초 전체 EditMode | 2,246/2,248, 31.42초. Home/Lobby의 저장 DEV에 예전 2/1.5가 남아 있는 두 건을 발견했다. 실제 표시값을 고쳤으며 단언을 완화하지 않았다. |
+| 최종 전체 EditMode | **2,248/2,248**, 32.23초, 실패·skip·inconclusive 0 |
+| 전체 PlayMode | **800/801 통과**, 740.38초. skip·inconclusive 0. 아래 튜토리얼 초기 배치 실패 1건은 미해결로 구분 |
+| Mac Development 빌드 | **Succeeded**, 오류 0·경고 60, 21.96초, 2,038,889,119 bytes. 최초1.3%·재타격1.0%, StandaloneOSX 유지 |
+
+도색 면적 기본값과 저장 설정의 실행 결과가 바뀌어 전체 EditMode/PlayMode를 선택했다. 명시적인 2%/4% 과거 비교 fixture·골든은 재생성하지 않았다. 현재 저장 기본값을 검사하는 단언만 새 정확 면적 예산에 맞췄다. 원시 결과는 로컬 `artifacts/issue676-balance`에 보관한다. 이전 #659 VFX 작업은 원래 브랜치/PR에 보존했고, 이번 최신 main 기준 빌드에 그 미병합 VFX가 포함됐다고 표현하지 않는다.
+
+새 기본값은 앱을 완전히 종료하고 새 빌드를 실행한 Host에서 새 방을 만들어 확인한다. 기존 GameSession의 DEV 수정값은 Home/새 방에도 남을 수 있다. Guest는 Host의 공유값을 받으므로 예전 Host에 입장하면 그 Host의 수치를 쓴다. 별도 설정 파일이나 PlayerPrefs 삭제는 필요 없다. 새 수치의 실제 5인 클리어 시간·iOS·핫스팟 실기기는 미검증이다.
+
+
+남은 실패는 `GameTutorialFlowTests.FinishedOpeningOpensThePracticeBoardOnceThenTheRoomList`의 두 번째 음 구슬이 양 구슬 위에 있는지 확인하는 초기 배치 단언이다. 첫 조합·명중·도색을 수행하기 전 단계에서 `(3.50, 0.66, 0.00)` 위치로 실패했다. 단독 fixture도4/5(27.12초)였고, 실제 저장 도색량을 이전2%/1.5%로 잠시 되돌려 해당1건만 비교해도 같은 위치·단언으로0/1(14.59초) 실패했다. 비교 후 `finally`에서 승인된1.3%/1.0% 복구를 확인한 뒤 빌드했다. 이 비교는 전체main원본 재검사가 아니라 두 도색량의 A/B 확인이다. 튜토리얼 동작이나 검사 단언은 이번 범위에서 바꾸지 않았다. 전체 PlayMode가 모두 통과했다고 기록하지 않는다.
+
+확인용 앱은 `Builds/Hapio/20261111-161941-bb0209a2/macOS/Hapio-Development.app`다. 기존 `Hapio/Development Build/Build Mac App` 경로로 Home부터 시작하는 게임 Scene 목록을 사용했다. 새 앱은 자동으로 실행하지 않았으며 실제 5인 플레이 결과·iOS 빌드 성공을 뜻하지 않는다.
+
+
+## 2026-11-11 — #676 인원별 스토리 도색량 후속
+
+초기1.3%/1.0%만적용한6cc2df42에는인원보정이없었다. 사용자확인후같은값을5인기준으로정의하고일반스토리협동2~5인의실제라운드명단에5/N을한번적용했다. 최초/재타격만보정하고나머지성장·건조·보상·물리규칙은그대로다. 설정259개·5701/Lab61/Game52로분리한다. 실제다인클리어시간검증과코드산술검사는구분한다.
+
+사전전체EditMode첫실행은2,299/2,300(34.72초)이었다. 기존지귀물붓기검사의2인기댓값이종전공통예산이라실제새규칙의2.5배결과와달랐다. 동일단언/허용오차를유지하고독립적인5/2기댓값으로맞춘뒤**2,300/2,300**(34.38초)통과했다. 새인원보정52건도포함한다.
+
+이전튜토리얼실패는VFX비교뒤남은1920×1080GameView에서세로튜토리얼의물리keep-out영역이달라져생겼다. 검사fixture만390×844로고정후사용자선택을복원하도록보완했다. 기존초기구슬위치·실제드래그단언을그대로둔`GameTutorialFlowTests`가가로설정에서**5/5**(62.33초)통과했고,종료후선택3(FullHD)복원을확인했다. 런타임튜토리얼은수정하지않았다.
+
+위는최신main/VFX통합전사전결과이며최종통합검사는완료후별도로기록한다. 원시결과는로컬`artifacts/issue676-participants`에보관한다.
+
+
+## 2026-11-11 — #682 인원별 보정·VFX 최종 통합
+
+#662를 병합한 main d2405f93와 인원 보정을 합친 bc7b8de3에서 전체 EditMode **2,319/2,319**(33.46초), 전체 PlayMode **829/830**(829.55초)을 실행했다. 남은 것은 `LabJigwiABNetworkTests.LegacyIndependentRadiusKeepsGrabReachAndPaintBudgetWhenSpecialWaterModeIsExplicitlySelected`의 비교 기준이었다. 이 검사는 인원 보정 대상인 지귀2인 모델과 대상이 아닌 Lab 모델을 비교하므로, 기준 모델의 면적도 독립적인5/2 배율을 셀 반올림 전에 적용해야 했다. 구형 반경 필드·잡기·물리·정확 면적 단언은 그대로 유지했고 게임 코드는 바꾸지 않았다.
+
+검증 중 추가된 main18aad551의 오프닝 건너뛰기·BGM/터치음·클레이 농도 기본값도 보존했다. 최신 통합에서 전체 EditMode **2,320/2,320**(35.71초), 영향 PlayMode **42/42**를 재실행했다: 지귀 네트워크9(0.52초), 튜토리얼5(62.09초), 건너뛰기2(0.10초), 터치 먹8(1.10초), 오프닝13(9.50초), 스티커GPU5(4.68초). 앞선 미영향 결과는 코드·데이터 실행 연결이 같은 것을 확인해 재사용했다. 최종 고유 PlayMode는 **832/832**로 모든 실패가 해소됐고 skip·inconclusive0이다. 최신832개를 한 번에 전체 재실행했다고 표현하지 않는다.
+
+인원2/3/4/5에서 적용되는 최초/재타격을 Editor에서도 각각3.25/2.5, 2.16666651/1.66666663, 1.625/1.25, 1.3/1.0으로 확인했다. 내부 반올림은 하지 않는다. 원래 가로 Game view 선택3 복원과 설정259개·5701/Lab61/Game52를 확인했다. main의 VFX·박 잘림·봉인 기록·새 콤보/오프닝/음향 수정은 되돌리지 않았다. 해당 Source 파일과 main diff를 검토했다.
+
+원시 결과는 로컬 `artifacts/issue676-participants/final-summary.json` 및 단계별 결과에 보관한다. 실기기3/4/5인 실제 플레이·iOS·Wi-Fi/핫스팟·클리어 시간은 이번 자동 검사와 구분해 미검증이다.

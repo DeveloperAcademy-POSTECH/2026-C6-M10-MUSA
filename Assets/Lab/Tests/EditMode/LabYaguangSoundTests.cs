@@ -397,5 +397,80 @@ namespace C6Lab.Tests
             Assert.That(LabYaguangSound.Folder(LabYaguangSfx.ComboClearedFirst), Is.EqualTo("Audio/YaguangComboClearedFirst"));
             Assert.That(LabYaguangSound.Folder(LabYaguangSfx.ComboClearedSecond), Is.EqualTo("Audio/YaguangComboClearedSecond"));
         }
+
+        // #664 구미호 여우구슬 판정: 5초에 떨어져 20초에 끝난다.
+        private static LabSnapshot FoxRound()
+        {
+            return new LabSnapshot
+            {
+                sessionId = "gumiho", round = 1, phase = LabPhase.Playing,
+                foxRoundStartedAt = 5d, foxRoundEndsAt = 20d, foxRoundRunning = true, foxRoundTotal = 6, foxRoundRemaining = 6,
+                players = new[] { new LabPlayerState { id = Me }, new LabPlayerState { id = Other } }
+            };
+        }
+
+        private static void Settle(LabSnapshot snapshot, int result, double at, double until)
+        {
+            snapshot.foxRoundRunning = false;
+            snapshot.foxRoundRemaining = 0;
+            snapshot.foxRoundResult = result;
+            snapshot.foxRoundResultAt = at;
+            snapshot.foxRoundCount++;
+            foreach (LabPlayerState player in snapshot.players)
+                if (result < 0) player.comboPenaltyUntil = until;
+                else player.comboRewardUntil = until;
+        }
+
+        [Test]
+        public void TheFoxRoundTicksLikeTheComboThenTimesUpIntoSmallWithoutTheGoblinsVoice()
+        {
+            LabYaguangSound sound = Sound();
+            sound.ObserveFlash(new LabSnapshot { sessionId = "gumiho", round = 1, phase = LabPhase.Playing }, 4.9d, Me);
+            LabSnapshot snapshot = FoxRound();
+            // 5~20초: 5.5~15.5초 0.5초마다 21번, 남은 4초(16~19.75초)는 0.25초마다 16번. 끝나는 순간에는 울리지 않는다.
+            Watch(sound, snapshot, 5d, 19.99d);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboTick), Is.EqualTo(21));
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboTickFast), Is.EqualTo(16));
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboStart), Is.Zero, "No gong: the fox orbs falling have their own sound.");
+
+            Settle(snapshot, -1, 20d, 35d);
+            Watch(sound, snapshot, 20d, 21.5d);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboTick) + sound.PlayCount(LabYaguangSfx.ComboTickFast), Is.EqualTo(37),
+                "The clock stops with the round.");
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboSmallStart), Is.Zero, "SMALL waits for its mark, like the combo's.");
+            Watch(sound, snapshot, 21.6d, 34.9d);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboSmallStart), Is.EqualTo(1));
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboSmallEnd), Is.Zero);
+            Watch(sound, snapshot, 35d, 37d);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboSmallEnd), Is.EqualTo(1));
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboTaunt), Is.Zero, "No 메롱~: that is the 야광귀's voice.");
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboBigStart) + sound.PlayCount(LabYaguangSfx.ComboBigEnd), Is.Zero);
+        }
+
+        [Test]
+        public void ClearingTheFoxOrbsStopsTheClockAndGoesBigWithoutTheGoblinsVoice()
+        {
+            LabYaguangSound sound = Sound();
+            sound.ObserveFlash(new LabSnapshot { sessionId = "gumiho", round = 1, phase = LabPhase.Playing }, 4.9d, Me);
+            LabSnapshot snapshot = FoxRound();
+            Watch(sound, snapshot, 5d, 9.2d);
+            int ticks = sound.PlayCount(LabYaguangSfx.ComboTick);
+            Assert.That(ticks, Is.EqualTo(8), "5.5 s to 9 s.");
+            Settle(snapshot, 1, 9.2d, 24.2d);
+            Watch(sound, snapshot, 9.25d, 30d);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboTick) + sound.PlayCount(LabYaguangSfx.ComboTickFast), Is.EqualTo(ticks));
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboBigStart), Is.EqualTo(1));
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboBigEnd), Is.EqualTo(1));
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboClearedFirst) + sound.PlayCount(LabYaguangSfx.ComboClearedSecond),
+                Is.Zero, "No 이런!: that is the 야광귀's voice.");
+
+            LabYaguangSound late = Sound();
+            for (double t = 12d; t <= 30d; t += .05d) late.ObserveFlash(snapshot, t, Me);
+            Assert.That(late.PlayCount(LabYaguangSfx.ComboBigStart) + late.PlayCount(LabYaguangSfx.ComboBigEnd), Is.Zero,
+                "Someone joining after the result hears nothing old.");
+            Assert.That(LabYaguangSound.FoxRoundClipFolders, Is.EquivalentTo(new[] { "Audio/YaguangComboTick",
+                "Audio/YaguangComboTickFast", "Audio/YaguangComboSmallStart", "Audio/YaguangComboSmallEnd",
+                "Audio/YaguangComboBigStart", "Audio/YaguangComboBigEnd" }));
+        }
     }
 }

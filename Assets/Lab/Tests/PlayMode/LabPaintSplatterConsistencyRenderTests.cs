@@ -42,7 +42,7 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
-        public IEnumerator SavedDefaultOneAndHalfPercentAddsSmallerBurstsWithoutChangingTheFirstSplatter()
+        public IEnumerator SavedDefaultOnePointThreePercentInitialAndOnePercentRepeatsUseTheirExactBudgets()
         {
             if (SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null)
                 Assert.Ignore("No graphics device: no saved-shell verification was performed.");
@@ -53,15 +53,17 @@ namespace C6Lab.Tests
             var source = Resources.Load<LabConfig>("LabConfig");
             var settings = source.PaintGrowthSettings;
             Assert.That(settings.Resolution, Is.EqualTo(2));
-            Assert.That(settings.InitialPercent, Is.EqualTo(2f));
-            Assert.That(settings.RepeatPercent, Is.EqualTo(1.5f));
+            Assert.That(settings.InitialPercent, Is.EqualTo(1.3f));
+            Assert.That(settings.RepeatPercent, Is.EqualTo(1f));
             var surface = new LabPaintSurface(settings, 123);
-            var evidence = new Evidence { fixture = "saved-default-first-2-repeat-1_5-percent", baseline = false };
+            decimal initialCells = (decimal)1.3f * surface.CellCount / 100m;
+            decimal repeatCells = (decimal)1f * surface.CellCount / 100m;
+            var evidence = new Evidence { fixture = "saved-default-first-1_3-repeat-1-percent", baseline = false };
             surface.RegisterHit(Vector3.forward, ColorFor(1), 1, 1);
-            Assert.That(surface.CoveredCount, Is.EqualTo(655));
+            Assert.That(surface.CoveredCount, Is.EqualTo((int)decimal.Floor(initialCells)));
             using (var rig = new ShellRig(paint))
             {
-                rig.Capture(surface, "default1_5-first", false, true);
+                rig.Capture(surface, "default1_3-1-first", false, true);
                 for (int hit = 1; hit <= 3; hit++)
                 {
                     Color32[] before = Pixels(surface);
@@ -71,17 +73,19 @@ namespace C6Lab.Tests
                     surface.Advance(1d);
                     Color32[] after = Pixels(surface);
                     int[] added = Added(before, after);
-                    Assert.That(added.Length, Is.InRange(491, 492));
-                    Assert.That(surface.CoveredCount, Is.EqualTo((int)decimal.Floor((2m + hit * 1.5m) * surface.CellCount / 100m)));
+                    int expectedTotal = (int)decimal.Floor(initialCells + hit * repeatCells);
+                    int expectedBefore = (int)decimal.Floor(initialCells + (hit - 1) * repeatCells);
+                    Assert.That(added.Length, Is.EqualTo(expectedTotal - expectedBefore));
+                    Assert.That(surface.CoveredCount, Is.EqualTo(expectedTotal));
                     Assert.That(added.All(i => after[i].Equals((Color32)ColorFor(painter))
                         && surface.GetPainterSlot(i) == painter), Is.True);
                     AssertOldPaintUnchanged(surface, before, owners);
                     Assert.That(surface.PendingCoverage, Is.LessThan(1d / surface.CellCount));
-                    evidence.shapes.Add(Measure(surface, added, 123, hit, "repeat-default1_5"));
-                    rig.Capture(surface, $"default1_5-repeat{hit}", false, true);
+                    evidence.shapes.Add(Measure(surface, added, 123, hit, "repeat-default1_3-1"));
+                    rig.Capture(surface, $"default1_3-1-repeat{hit}", false, true);
                 }
             }
-            WriteEvidence("default1_5-evidence.json", evidence);
+            WriteEvidence("default1_3-1-evidence.json", evidence);
         }
 
         [UnityTest]

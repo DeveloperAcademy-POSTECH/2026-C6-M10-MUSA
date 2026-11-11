@@ -83,6 +83,9 @@ namespace C6Lab
             public bool OwnView;
             /// <summary>The charmed player this side shows, while showing or ending.</summary>
             public ulong Player;
+            /// <summary>This screen's own taps on this side's charm (#305), shown at once before the Host's count catches up.
+            /// Kept per side since #664: the player between two charmed ones taps each one's bubble.</summary>
+            public int LocalTaps;
             public bool Showing;
             public bool WokenEnd;
             public float PulseAge = -1f;
@@ -98,8 +101,7 @@ namespace C6Lab
         private float bobPhase;
         private ulong wokenPlayer;
         private float wokenAt = float.NegativeInfinity;
-        // This screen's own taps on the current charm (#305): shown at once, before the Host's count catches up.
-        private int localTaps;
+        // The charm (its start) this screen's own taps belong to (#305); a new one starts every side's count again.
         private double localTapsCharmAt = double.NaN;
         private LabGuideText guide;
         // This screen still has to tap a bubble beside it (#328): the hand shows, and the guide on its one charm.
@@ -120,6 +122,8 @@ namespace C6Lab
         public RectTransform RightBubble => right.Bubble;
         public bool Pulsing(bool rightSide) => (rightSide ? right : left).PulseAge >= 0f;
         /// <summary>How full the wake-up fill is heading on that side, 0 to 1.</summary>
+        /// <summary>The charmed player each side's bubble is for (#664: two different ones for the player between them).</summary>
+        public ulong SidePlayer(bool rightSide) => (rightSide ? right : left).Player;
         public float LeftWakeFill => left.FillTarget;
         public float RightWakeFill => right.FillTarget;
         /// <summary>The check above that side's bubble: that player beside has tapped enough and waits for the other (#305).</summary>
@@ -184,15 +188,15 @@ namespace C6Lab
             if (!snapshot.charmStartedAt.Equals(localTapsCharmAt))
             {
                 localTapsCharmAt = snapshot.charmStartedAt;
-                localTaps = 0;
+                left.LocalTaps = right.LocalTaps = 0;
             }
             if (snapshot.charmStartedAt >= 0d) lastCharm = snapshot.charmStartedAt;
             CharmedSides(snapshot, localId, now, out bool onLeft, out bool onRight, out bool ownView,
-                out ulong leftHelper, out ulong rightHelper);
+                out ulong leftCharmed, out ulong rightCharmed, out ulong leftHelper, out ulong rightHelper);
             bobPhase = Mathf.Repeat(bobPhase + Time.deltaTime * BobHz, 1f);
             helperWaiting = false;
-            Step(left, onLeft, snapshot.charmedPlayer, ownView, snapshot.CharmTapsBy(leftHelper), rescueTaps);
-            Step(right, onRight, snapshot.charmedPlayer, ownView, snapshot.CharmTapsBy(rightHelper), rescueTaps);
+            Step(left, onLeft, leftCharmed, ownView, snapshot.CharmTapsBy(leftHelper, leftCharmed), rescueTaps);
+            Step(right, onRight, rightCharmed, ownView, snapshot.CharmTapsBy(rightHelper, rightCharmed), rescueTaps);
             // The guide is for a first time (#328): this player's first charm beside someone, until they finish tapping.
             string charm = snapshot.sessionId + "/" + snapshot.round + "/" + snapshot.charmStartedAt.ToString("R");
             if (helperWaiting && guideCharm == null && LabGuideText.TryShowOnce(HelperGuideOnceKey)) guideCharm = charm;
@@ -217,39 +221,43 @@ namespace C6Lab
         }
 
         /// <summary>
-        /// Which badges show a bubble, and whose taps each one shows: this screen's own beside the charmed player, or,
-        /// on the charmed player's own screen, each player beside them (#305).
+        /// Which badges show a bubble, for which charmed player, and whose taps each one shows: on a screen beside a charmed
+        /// player that side's bubble (both, for the player between two charmed ones, #664), or, on the charmed player's own
+        /// screen, each player beside them (#305).
         /// </summary>
         private static void CharmedSides(LabSnapshot snapshot, ulong localId, double now, out bool onLeft, out bool onRight,
-            out bool ownView, out ulong leftHelper, out ulong rightHelper)
+            out bool ownView, out ulong leftCharmed, out ulong rightCharmed, out ulong leftHelper, out ulong rightHelper)
         {
             onLeft = onRight = ownView = false;
+            leftCharmed = rightCharmed = 0;
             leftHelper = rightHelper = localId;
             LabPlayerState[] players = snapshot.players;
-            if (players == null || players.Length < 2 || !(snapshot.charmUntil > now && now >= snapshot.charmStartedAt)) return;
+            if (players == null || players.Length < 2) return;
             LabPlayerState me = Array.Find(players, player => player != null && player.id == localId);
-            LabPlayerState charmed = Array.Find(players, player => player != null && player.id == snapshot.charmedPlayer);
-            if (me == null || charmed == null) return;
+            if (me == null) return;
             int count = players.Length;
-            if (me.seat < 0 || me.seat >= count || charmed.seat < 0 || charmed.seat >= count) return;
+            if (me.seat < 0 || me.seat >= count) return;
             // Preserve the separate team-seat presentation; story rooms use the same
             // clockwise neighbours as the lobby, HUD and actual Host handoff.
             bool team = LabTeams.TeamSeats(snapshot);
             int leftSeat = team ? (me.seat + count - 1) % count : LabPlayerSlots.NeighborSeat(me.seat, count, false);
             int rightSeat = team ? (me.seat + 1) % count : LabPlayerSlots.NeighborSeat(me.seat, count, true);
-            if (charmed == me)
+            LabPlayerState before = Array.Find(players, player => player != null && player.seat == leftSeat);
+            LabPlayerState after = Array.Find(players, player => player != null && player.seat == rightSeat);
+            if (snapshot.CharmOn(localId, now))
             {
-                LabPlayerState before = Array.Find(players, player => player != null && player.seat == leftSeat);
-                LabPlayerState after = Array.Find(players, player => player != null && player.seat == rightSeat);
                 ownView = true;
                 onLeft = before != null;
                 onRight = after != null;
+                leftCharmed = rightCharmed = localId;
                 if (before != null) leftHelper = before.id;
                 if (after != null) rightHelper = after.id;
                 return;
             }
-            onLeft = charmed.seat == leftSeat;
-            onRight = charmed.seat == rightSeat;
+            onLeft = before != null && snapshot.CharmOn(before.id, now);
+            onRight = after != null && snapshot.CharmOn(after.id, now);
+            if (onLeft) leftCharmed = before.id;
+            if (onRight) rightCharmed = after.id;
         }
 
         private void Step(Side side, bool charmedHere, ulong charmed, bool ownView, int hostTaps, int rescueTaps)
@@ -262,6 +270,7 @@ namespace C6Lab
                 side.WokenEnd = false;
                 side.PulseAge = side.ReleaseAge = side.CheckAge = -1f;
                 side.Taps = 0;
+                side.LocalTaps = 0;
                 side.FillShown = 0f;
             }
             else if (!charmedHere && side.Showing)
@@ -288,7 +297,7 @@ namespace C6Lab
                 side.Woken.gameObject.SetActive(false);
                 side.BubbleImage.color = side.FaceImage.color = Color.white;
                 // Each player beside fills their own gauge (#305): the Host's count, and this screen's own taps at once.
-                side.Taps = side.OwnView ? hostTaps : Mathf.Max(localTaps, hostTaps);
+                side.Taps = side.OwnView ? hostTaps : Mathf.Max(side.LocalTaps, hostTaps);
                 bool done = rescueTaps > 0 && side.Taps >= rescueTaps;
                 side.BubbleImage.raycastTarget = tappable && !done;
                 side.FillTarget = rescueTaps > 0 ? Mathf.Clamp01(side.Taps / (float)rescueTaps) : 0f;
@@ -379,9 +388,9 @@ namespace C6Lab
         {
             if (!side.Showing || side.OwnView) return;
             side.PulseAge = 0f;
-            localTaps++;
+            side.LocalTaps++;
             TapsSent++;
-            if (network != null) network.TapCharm();
+            if (network != null) network.TapCharm(side.Player);
         }
 
         // 내가 다 채웠다 (#305): 말풍선 위에 체크가 톡 튀어나와 다른 한 사람을 기다린다.

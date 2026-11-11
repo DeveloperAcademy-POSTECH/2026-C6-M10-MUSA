@@ -337,17 +337,15 @@ namespace C6Lab
         /// <summary>
         /// 콤보 결과에 맞는 전투 BGM 높이 (반음). 성공이면 BIG 배지가 떠 있는 동안 +big, 실패(틀린 색/시간 초과)면 SMALL 배지가
         /// 떠 있는 동안 -small, 그 밖에는 0. 배지는 결과 문구가 사라진 때(결과 + LabGourdComboHud.ResultSeconds)부터 효과가 가장 늦게
-        /// 끝나는 때(LabYaguangSound.EffectUntil)까지 떠 있다.
+        /// 끝나는 때(LabYaguangSound.EffectUntil)까지 떠 있다. #664: 구미호 여우구슬 판정의 BIG/SMALL도 같다(둘 중 마지막 결과 기준).
         /// </summary>
         public static float ComboToneSemitones(LabSnapshot snapshot, double now, float big, float small)
         {
-            if (snapshot == null || snapshot.phase != LabPhase.Playing || snapshot.comboResultCount == 0
-                || snapshot.comboResultAt < 0d) return 0f;
-            bool failed = snapshot.comboResult == LabComboResult.WrongColor || snapshot.comboResult == LabComboResult.Timeout;
-            int effect = failed ? -1 : snapshot.comboResult == LabComboResult.Success ? 1 : 0;
+            if (snapshot == null || snapshot.phase != LabPhase.Playing) return 0f;
+            int effect = snapshot.LastEffectResult(out double at);
             if (effect == 0) return 0f;
-            double start = snapshot.comboResultAt + LabGourdComboHud.ResultSeconds;
-            double end = LabYaguangSound.EffectUntil(snapshot, effect, snapshot.comboResultAt);
+            double start = at + LabGourdComboHud.ResultSeconds;
+            double end = LabYaguangSound.EffectUntil(snapshot, effect, at);
             if (now < start || now >= end) return 0f;
             return effect > 0 ? Mathf.Clamp(big, 0f, 12f) : -Mathf.Clamp(small, 0f, 12f);
         }
