@@ -56,6 +56,7 @@ namespace Hapio.Tests
             holder = new GameObject("Touch ink test");
             soundArt = Object.Instantiate(GameTouchInkArt.Load());
             soundArt.tapSound = hasSound ? AudioClip.Create("Test tap", 4800, 1, 48000, false) : null;
+            soundArt.tapSounds = new AudioClip[0]; // #629: the saved art's three tap sounds are not part of these checks
             soundArt.soundVolume = volume;
             return GameTouchInk.Create(holder.transform, soundArt, new System.Random(3));
         }

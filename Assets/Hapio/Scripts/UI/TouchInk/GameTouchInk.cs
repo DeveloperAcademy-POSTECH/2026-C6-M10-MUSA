@@ -142,9 +142,29 @@ namespace Hapio
             if (touched) PlayTapSound();
         }
 
+        private int lastTapSound = -1; // #629: index of the tap sound played last, so the next one differs
+
+        // #629: Unity cannot play a clip louder than its file, so a louder copy is made once per clip and loudness.
+        private static readonly Dictionary<(AudioClip, float), AudioClip> louder = new Dictionary<(AudioClip, float), AudioClip>();
+        private static AudioClip Louder(AudioClip clip, float gain)
+        {
+            if (clip == null || gain <= 1.001f) return clip;
+            gain = Mathf.Round(gain * 100f) / 100f;
+            if (louder.TryGetValue((clip, gain), out AudioClip made) && made != null) return made;
+            if (clip.loadType != AudioClipLoadType.DecompressOnLoad || clip.samples <= 0) return clip;
+            var data = new float[clip.samples * clip.channels];
+            if (!clip.GetData(data, 0)) return clip;
+            for (int i = 0; i < data.Length; i++) data[i] = Mathf.Clamp(data[i] * gain, -1f, 1f);
+            made = AudioClip.Create(clip.name + " x" + gain, clip.samples, clip.channels, clip.frequency, false);
+            made.SetData(data, 0);
+            louder[(clip, gain)] = made;
+            return made;
+        }
         private void PlayTapSound()
         {
-            if (art.tapSound == null || art.soundVolume <= 0f) return;
+            AudioClip clip = art.PickTapSound(lastTapSound, out int picked);
+            if (clip == null || art.soundVolume <= 0f) return;
+            lastTapSound = picked;
             SoundsPlayed++;
             if (source == null)
             {
@@ -153,8 +173,10 @@ namespace Hapio
                 source.spatialBlend = 0f;
             }
             if (borrowed == null && !AnotherListener()) borrowed = gameObject.AddComponent<AudioListener>();
-            if (borrowed != null) listenUntil = Time.unscaledTime + art.tapSound.length + .1f;
-            source.PlayOneShot(art.tapSound, art.soundVolume * LabAudioSettings.SfxVolume);
+            float speed = Mathf.Clamp(art.tapSpeed, .1f, 2f);
+            if (borrowed != null) listenUntil = Mathf.Max(listenUntil, Time.unscaledTime + clip.length / speed + .1f);
+            source.pitch = speed; // #629: slow motion like a slowed tape (longer and lower)
+            source.PlayOneShot(Louder(clip, art.tapLoudness), art.soundVolume * LabAudioSettings.SfxVolume);
         }
 
         private bool AnotherListener()
