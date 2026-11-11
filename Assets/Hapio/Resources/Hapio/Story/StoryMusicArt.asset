@@ -18,8 +18,8 @@ MonoBehaviour:
   titleVolume: 0.32
   titleToOpeningSeconds: 1.5
   brokenMusic: {fileID: 8300000, guid: ddca4d3616b44dbe87b38d02e229eb8d, type: 3}
-  brokenVolume: 0.6
-  brokenPitch: 0.85
+  brokenVolume: 1
+  brokenPitch: 1.5
   playInLobby: 1
   breakCutId: OP_014
   tapeStopSeconds: 4.9
@@ -36,7 +36,7 @@ MonoBehaviour:
     volume: 1
     speed: 1
   - clip: {fileID: 8300000, guid: 38122bc82da64b9ebd800a34ddda6804, type: 3}
-    seconds: 4.4
+    seconds: 4
     volume: 1
     speed: 1
   - clip: {fileID: 8300000, guid: c1396d6fd28b441b89f90b0f5d063fc5, type: 3}
