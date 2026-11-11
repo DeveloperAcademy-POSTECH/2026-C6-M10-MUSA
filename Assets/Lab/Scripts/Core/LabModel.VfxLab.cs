@@ -121,6 +121,7 @@ namespace C6Lab
         public bool VfxLabFailCombo(ulong thrower, double now)
         {
             if (!TryAdvance(now, out _) || phase != LabPhase.Playing || !combo.Active) return false;
+            combo.EndForgiving(); // #695: the lab's fail button fails even the round's first combo
             LabOrbElement wanted = combo.ColorAt(combo.Progress);
             LabOrbElement wrong = new[] { LabOrbElement.Fire, LabOrbElement.Water, LabOrbElement.Wood, LabOrbElement.Metal, LabOrbElement.Earth }
                 .First(element => element != wanted);

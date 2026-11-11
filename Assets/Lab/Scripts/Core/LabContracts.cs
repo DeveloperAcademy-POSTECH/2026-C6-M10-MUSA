@@ -475,6 +475,8 @@ namespace C6Lab
         public LabOrbElement[] comboColors = Array.Empty<LabOrbElement>();
         /// <summary>맞힌 칸 수 (0~4)</summary>
         public int comboProgress;
+        /// <summary>#695: 이번 라운드에 봐준 틀린 색 수 (라운드 첫 콤보의 첫 칸 전). 늘면 금옥이 다시 해보자고 한다.</summary>
+        public uint comboForgivenCount;
         /// <summary>진행 중인 콤보가 나온 시각과 제한 시간이 끝나는 시각</summary>
         public double comboStartedAt = -1d;
         public double comboEndsAt = -1d;
