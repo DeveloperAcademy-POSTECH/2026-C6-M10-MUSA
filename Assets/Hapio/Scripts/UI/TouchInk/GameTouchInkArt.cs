@@ -41,8 +41,8 @@ namespace Hapio
         [Tooltip("터치할 때 나는 소리. 비워 두면 소리 없이 먹물만 나온다. 아래 Tap Sounds가 있으면 그쪽을 쓴다.")] public AudioClip tapSound;
         [Tooltip("#629 터치할 때마다 번갈아 나는 소리들 (먹이 종이에 툭 떨어지는 소리 3개). 바로 앞과 같은 소리는 연달아 나지 않는다. 비우면 Tap Sound 하나를 쓴다.")]
         public AudioClip[] tapSounds = new AudioClip[0];
-        [Tooltip("#629 터치 소리를 원본보다 몇 배 크게 낼지 (1 = 원본 그대로). Sound Volume(최대 1)으로 부족할 때 올린다. 너무 올리면 소리가 찢어진다.")]
-        [Range(1f, 8f)] public float tapLoudness = 1f;
+        [Tooltip("#629 터치 소리를 원본보다 몇 배 크게 낼지 (1 = 원본 그대로). Sound Volume(최대 1)으로 부족할 때 올린다. #672 최대 100배. 파일 끝까지 차면 부드럽게 눌러 담아 찢어지는 소리를 줄이지만, 많이 올릴수록 소리가 납작해진다.")]
+        [Range(1f, 100f)] public float tapLoudness = 1f;
         [Tooltip("#629 터치 소리의 빠르기 (1 = 원본, 0.5 = 절반 속도). 테이프를 천천히 돌리듯 느려질수록 길어지고 낮아진다.")]
         [Range(.1f, 2f)] public float tapSpeed = 1f;
 

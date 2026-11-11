@@ -135,8 +135,8 @@ MonoBehaviour:
   drumStopBounds: 14000000280000003c00000050000000i
   drumStopChances: 28000000230000000f0000000a000000i
   paintSurfaceResolution: 2
-  paintInitialPercent: 2
-  paintRepeatPercent: 1.5
+  paintInitialPercent: 1.3
+  paintRepeatPercent: 1
   paintClusterCompactness: 0.85
   paintClusterIrregularity: 0.25
   gourdVisualSize: 1.54

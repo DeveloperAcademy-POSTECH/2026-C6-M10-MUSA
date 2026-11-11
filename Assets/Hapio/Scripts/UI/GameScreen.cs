@@ -661,7 +661,7 @@ namespace Hapio
             if (session == null || session.IsCreatingRoom) return;
             // A 2:2 room (#281) opens on its own tab; story rooms keep Common first.
             SelectDeveloperScope(session.IsTerritory ? GameStageSettings.TerritoryScope : 0);
-            Text(developerFeedback, "공통 설정과 요괴별 설정은 각각 APPLY로 적용합니다. 저장된 LabConfig는 유지됩니다.");
+            Text(developerFeedback, "공통 설정과 요괴별 설정은 각각 APPLY로 적용합니다. 저장된 LabConfig는 유지됩니다." + PaintParticipantNote());
             Show(developerPanel, true);
         }
 
@@ -695,7 +695,7 @@ namespace Hapio
                         ? new Color(.18f, .43f, .47f, 1f) : new Color(.12f, .18f, .21f, 1f);
             Text(developerFeedback, name + " 설정 · 탭을 바꾸기 전에 APPLY로 적용해주세요."
                 + (scope == 2 ? "\n야광귀는 시간표로 발동하며 일반 기믹 간격·확률은 사용하지 않습니다."
-                    : scope == 3 ? JigwiTimelineNote : string.Empty));
+                    : scope == 3 ? JigwiTimelineNote : string.Empty) + PaintParticipantNote());
             var scroll = developerPanel != null ? developerPanel.GetComponentInChildren<UnityEngine.UI.ScrollRect>(true) : null;
             if (scroll != null) scroll.verticalNormalizedPosition = 1f;
         }
@@ -712,7 +712,18 @@ namespace Hapio
             }
             bool applied = session.ApplyDeveloperSettings(DeveloperScope, values, out string error);
             if (applied) SelectDeveloperScope(DeveloperScope);
-            Text(developerFeedback, applied ? "선택한 범위의 설정을 적용했습니다. 스테이지 전환과 새 판에도 유지됩니다." : error);
+            Text(developerFeedback, applied ? "선택한 범위의 설정을 적용했습니다. 스테이지 전환과 새 판에도 유지됩니다." + PaintParticipantNote() : error);
+        }
+
+        private string PaintParticipantNote()
+        {
+            var net = session?.Network;
+            if (net?.config == null || net.IsTutorial || session.IsTerritory || DeveloperScope == GameStageSettings.TerritoryScope) return string.Empty;
+            int count = net.IsDeveloperSolo ? 1 : net.TargetParticipantCount;
+            var paint = net.config.CapturePaintGrowthSettings(count, LabStageYokai.Gumiho);
+            return "\n도색 입력은 5인 기준 · " + count + "인 적용 "
+                + paint.InitialPercent.ToString("0.##", CultureInfo.InvariantCulture) + "% / "
+                + paint.RepeatPercent.ToString("0.##", CultureInfo.InvariantCulture) + "%";
         }
 
         private void SyncSlider(int index, string raw)

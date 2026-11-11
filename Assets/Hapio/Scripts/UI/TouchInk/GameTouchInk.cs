@@ -154,14 +154,32 @@ namespace Hapio
             if (clip == null || gain <= 1.001f) return clip;
             gain = Mathf.Round(gain * 100f) / 100f;
             if (louder.TryGetValue((clip, gain), out AudioClip made) && made != null) return made;
-            if (clip.loadType != AudioClipLoadType.DecompressOnLoad || clip.samples <= 0) return clip;
+            if (clip.loadType != AudioClipLoadType.DecompressOnLoad || clip.samples <= 0) return LoudnessSkipped(clip, "Load Type is " + clip.loadType + " (needs Decompress On Load)");
             var data = new float[clip.samples * clip.channels];
-            if (!clip.GetData(data, 0)) return clip;
-            for (int i = 0; i < data.Length; i++) data[i] = Mathf.Clamp(data[i] * gain, -1f, 1f);
+            if (!clip.GetData(data, 0)) return LoudnessSkipped(clip, "audio data is not loaded (turn on Preload Audio Data)");
+            for (int i = 0; i < data.Length; i++) data[i] = SoftLimit(data[i] * gain);
             made = AudioClip.Create(clip.name + " x" + gain, clip.samples, clip.channels, clip.frequency, false);
             made.SetData(data, 0);
             louder[(clip, gain)] = made;
             return made;
+        }
+        // #672: Tap Loudness silently did nothing when a clip could not be read; say so once per clip so it is not mistaken for "not loud enough".
+        private static readonly HashSet<AudioClip> loudnessWarned = new HashSet<AudioClip>();
+        private static AudioClip LoudnessSkipped(AudioClip clip, string why)
+        {
+            if (loudnessWarned.Add(clip)) Debug.LogWarning("HAPIO_TOUCH_INK_LOUDNESS_SKIPPED: " + clip.name + " plays at its file loudness because " + why + ".");
+            return clip;
+        }
+
+        // #672: past the knee, peaks are squeezed smoothly toward full scale instead of being cut flat (less harsh at high loudness).
+        private const float SoftKnee = .8f;
+        internal static float SoftLimit(float x)
+        {
+            float a = Mathf.Abs(x);
+            if (a <= SoftKnee) return x;
+            float room = 1f - SoftKnee;
+            float y = SoftKnee + room * (float)System.Math.Tanh((a - SoftKnee) / room);
+            return x < 0f ? -y : y;
         }
         private void PlayTapSound()
         {

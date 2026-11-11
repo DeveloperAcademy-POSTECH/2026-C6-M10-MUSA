@@ -1,5 +1,21 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-11 — 박 칠 색을 오행 팔레트 그대로 (클레이 농도 1)
+
+- **기준:** `feat/clay-full-palette-color` (main `51a24721`). Unity 6000.6.5f1 batch(macOS, Metal). 박 칠 색은 표현만 바꿨고, 판정·P 지도·도색 해시·접속 규약·공유 설정은 그대로다.
+- **원인:** `LabClayStickerRuntime.Pigment`는 오행색을 선형 공간에서 흰 클레이(0.82)와 섞는다. 섞는 비율(농도)은 `Lerp(0.65, 1, 충돌 강도)`이고, 충돌 강도는 정면 속도를 20 m/s로 나눈 값이다. 실제 투척은 최대 12.5 m/s라 강도가 약 0.62를 넘지 않으므로, 실제 농도는 0.65~0.87이었다. 톤매핑은 None이었고, 클레이 조명은 색을 0.78~1.04배로만 바꿨다.
+- **고친 것:** `LabClayStickerSettings.minimumDensity` 기본값과 `WatercolorStampProfile`의 저장값을 0.65에서 1로 바꿨다. 이제 모든 명중이 `LabPaintPalette` 색 그대로 칠해진다. 표현 버전 이름은 `clay-stickers-v2` 그대로다. 버전 문자열의 fingerprint가 바뀌므로 이전 빌드와는 도색 기록 버전이 맞지 않는다(`paintArtVersionMismatch`).
+
+| 확인 | 결과 |
+| --- | --- |
+| 화면 측정: DEV 솔로 1스테이지 박, 같은 칠, BattleCamera 복사 카메라로 1080×1424 렌더, 원소별 중앙값(임시 PlayMode 하네스, 커밋 안 함) | 변경 전(main `cfbf65b2` 작업 트리), 강도 0.4: 화 #D4857A · 수 #6D8CAC · 목 #74937F · 금 #DFB16E · 토 #715E4D |
+| 같은 측정, 변경 후 기본값, 가장 약한 명중(강도 0.1) | 화 #CF5537 · 수 #14699C · 목 #387851 · 금 #E1A626 · 토 #62402B (팔레트 #D85736 · #1471A7 · #3D8258 · #F8B72A · #6F4A32) |
+| 새 EditMode `SavedClayPigmentKeepsTheFullPaletteColorAtEveryImpact`(저장 기본값의 농도는 모든 강도에서 1, 0.65 프로필과 버전 문자열이 다름) | PASS |
+| EditMode 빠른 묶음(`!Slow;!Legacy;!LabOnly`) | 2120/2120 PASS |
+| PlayMode `LabGourdPaintTests` 9 · `LabClayDeveloperControlsTests` 2 · `GameStageGourdIntegrationTests` 1 · `ClayPreviewPlayModeTests` 17 | 29/29 PASS |
+
+- **미실행:** 전체 PlayMode, Mac/iOS 빌드, 실기기, 멀티플레이 화면.
+
 ## 2026-11-11 — #660 박 둘러보기 결과 복귀
 
 - 기준은 `fix/#660-gourd-view-back-button`의 `9b66da6e` 위 작업 변경이다. Unity 6000.6.5f1 macOS Editor에서 검증했다.
@@ -8049,6 +8065,13 @@ Prepared `feat/opening-28-frame-direction` with only the opening commits and mer
 All 279 changed opening code/asset/test files (excluding the tutorial test file, which retains main's independent Help-button assertions) have identical Git blob hashes to the tested local revision `fb021e31`. The main merge adds only six audio-file changes relative to the prepared opening branch. Accordingly, the preceding 17 EditMode and 27 PlayMode results are reused for unchanged opening behavior; they are not reported as a new run after this audio-only integration. The initial full tutorial handoff check remains separately dated above. Source/document whitespace checks and PR scope review passed; no scene, title, project setting, build profile or network-protocol changes are included.
 
 
+## 2026-11-11 — #671 오프닝 건너뛰기 버튼
+
+- 기준: main `81e64ca0`, Unity 6000.6.5f1, 기존 프로젝트의 `feat/671-opening-skip-button`. 개인 ProjectSettings·iOS Build Profile은 수정 범위에 포함하지 않음.
+- 최종 PlayMode 17/17 통과: OpeningSkipButtonTests 2, OpeningCinematicTests 2, GameOpeningControllerTests 13. 28개 화면의 표시/숨김, 숨겨진 버튼 요청 차단, 클릭 종료 1회·다시보기·취소, 3가지 화면 비율의 그림/버튼 배치 일치, 기존 타이틀·구름 전환 검증.
+- Home 실제 재생에서 타이틀 버튼 비표시, 1번 새 버튼 표시, 버튼 중심 EventSystem raycast 첫 대상 `Skip` 확인. Game View 캡처로 원본 모양·위치·색상·투명도 확인. 마지막 콘솔 오류 0건.
+- 전체 테스트 모음과 iOS 빌드·실기기 검증은 수행하지 않음.
+
 ### #652 main 충돌 통합 (2026-11-11)
 
 - 작업8a72d85f에 main81e64ca0를 통합했다. 충돌은 LabBattleRenderWarmup/LabGourdAlert/이 문서3곳이었다. 흔들기·숫자·눈 PNG/HDR 준비와 main의 해제·놀림 PNG 준비를 함께 유지하고, 눈 이미지가 숨긴 배경을 다음 PNG/일반 말풍선에서 다시 켠다. 양쪽 검증 기록은 모두 보존했다. 병합 커밋a6c4293a는 검증 중 원격에 반영됐다.
@@ -8056,6 +8079,12 @@ All 279 changed opening code/asset/test files (excluding the tutorial test file,
 - 최종 전체 EditMode2,243/2,243(49.05초), 관련 PlayMode27/27(8.97초) 통과. 눈→해제/놀림 PNG→일반 텍스트 복원, 흔들기 PNG와 해제/놀림 PNG의 warmup 동시 존재를 추가 단언했다. 기존 K키 단발·횟수별 투명도·초기 준비·보드 수명도 통과했다.
 - Unity6000.6.5f1/macOS Metal 기준. main 대비 실행 변경은 UI/VFX와 에셋 재생성 기본값 정합성이라 전체 PlayMode는 생략했다. main의 통신/게임 흐름 변경은 그대로 통합하고 이 브랜치에서 다시 수정하지 않았다. 실제 게임/iOS 실기기 화면은 미검증이다.
 - 충돌 표식/미해결 index0개. 수동 변경 소스·검증 문서 whitespace 검사 통과. main에서 넘어온 기존 생성 에셋의 공백은 일괄 수정하지 않았다.
+
+### #671 최신 main 통합 확인 (2026-11-11)
+
+- main `9e12a7ce`를 통합하고 이 문서의 양쪽 검증 기록을 모두 보존했다. 코드 충돌은 없었다.
+- 통합 후 Unity 6000.6.5f1에서 관련 PlayMode 17/17 재통과(9.91초): OpeningSkipButtonTests 2, OpeningCinematicTests 2, GameOpeningControllerTests 13. 컴파일 오류 0건.
+
 
 ### #668 콤보 카운트 PNG·Figma 조합 패널 (2026-11-11)
 
@@ -8258,3 +8287,47 @@ origin/main `d2405f93`(#666·#668·#674·#681·#662 포함)를 다시 병합했�
 | 자동 병합된 `LabGourdComboHud`의 여우구슬 경로 (결과 문구·BIG/SMALL 시간·공유 색/패널) | 코드 확인 — 그대로 남음 |
 | 여우구슬 결과 때 게이지가 보이는지 실제 화면 | NOT_RUN |
 | 병합 뒤 Test Runner 전체 EditMode·PlayMode | NOT_RUN |
+
+## 2026-11-11 — #676 도색 기본값 1.3% / 1.0% 시험
+
+기준 main `47d33dd3`, 브랜치 `feat/#676-five-player-paint-balance`, Unity 6000.6.5f1 / macOS Metal이다. 사용자 정정에 따라 계측·CSV·타수 로그 구현은 취소했다. `LabConfig` 코드 기본값·비정상값 fallback·저장 에셋을 최초 2→1.3%, 재타격 1.5→1.0%로 맞췄다. Editor에서 Host 공유 배열의 105/106이 1.3/1이고 총 259개인 것을 확인했다. 성장 6%p/초·건조·보상 개수·승리·통신 형식은 바꾸지 않았다. 기존 공통값을 읽는 모든 인원·스테이지에 적용되며 5인 전용 자동 분기는 없다.
+
+Home/Lobby의 저장 DEV 105/106 입력·슬라이더도 같은 값으로 맞췄다. 각 Scene의 변경 객체는 11개이며 두 행의 입력·문구·슬라이더·내부 fill/handle, GameScreen의 기존 null 필드 명시뿐이다. GameObject/fileID와 부모 행 배치는 같다. 비활성 슬라이더의 Unity 직렬화 anchor 0은 활성화 때 uGUI `Slider.OnEnable/UpdateVisuals`가 현재 값으로 다시 그린다. 에셋 저장 때 기존 암묵 기본값 `thrownOrbMinVisibleScale: 0.4`도 명시됐으나 기존 코드 기본값·fallback과 같아 동작 변화가 없다.
+
+| 검사 | 결과 |
+| --- | --- |
+| 최초 전체 EditMode | 2,246/2,248, 31.42초. Home/Lobby의 저장 DEV에 예전 2/1.5가 남아 있는 두 건을 발견했다. 실제 표시값을 고쳤으며 단언을 완화하지 않았다. |
+| 최종 전체 EditMode | **2,248/2,248**, 32.23초, 실패·skip·inconclusive 0 |
+| 전체 PlayMode | **800/801 통과**, 740.38초. skip·inconclusive 0. 아래 튜토리얼 초기 배치 실패 1건은 미해결로 구분 |
+| Mac Development 빌드 | **Succeeded**, 오류 0·경고 60, 21.96초, 2,038,889,119 bytes. 최초1.3%·재타격1.0%, StandaloneOSX 유지 |
+
+도색 면적 기본값과 저장 설정의 실행 결과가 바뀌어 전체 EditMode/PlayMode를 선택했다. 명시적인 2%/4% 과거 비교 fixture·골든은 재생성하지 않았다. 현재 저장 기본값을 검사하는 단언만 새 정확 면적 예산에 맞췄다. 원시 결과는 로컬 `artifacts/issue676-balance`에 보관한다. 이전 #659 VFX 작업은 원래 브랜치/PR에 보존했고, 이번 최신 main 기준 빌드에 그 미병합 VFX가 포함됐다고 표현하지 않는다.
+
+새 기본값은 앱을 완전히 종료하고 새 빌드를 실행한 Host에서 새 방을 만들어 확인한다. 기존 GameSession의 DEV 수정값은 Home/새 방에도 남을 수 있다. Guest는 Host의 공유값을 받으므로 예전 Host에 입장하면 그 Host의 수치를 쓴다. 별도 설정 파일이나 PlayerPrefs 삭제는 필요 없다. 새 수치의 실제 5인 클리어 시간·iOS·핫스팟 실기기는 미검증이다.
+
+
+남은 실패는 `GameTutorialFlowTests.FinishedOpeningOpensThePracticeBoardOnceThenTheRoomList`의 두 번째 음 구슬이 양 구슬 위에 있는지 확인하는 초기 배치 단언이다. 첫 조합·명중·도색을 수행하기 전 단계에서 `(3.50, 0.66, 0.00)` 위치로 실패했다. 단독 fixture도4/5(27.12초)였고, 실제 저장 도색량을 이전2%/1.5%로 잠시 되돌려 해당1건만 비교해도 같은 위치·단언으로0/1(14.59초) 실패했다. 비교 후 `finally`에서 승인된1.3%/1.0% 복구를 확인한 뒤 빌드했다. 이 비교는 전체main원본 재검사가 아니라 두 도색량의 A/B 확인이다. 튜토리얼 동작이나 검사 단언은 이번 범위에서 바꾸지 않았다. 전체 PlayMode가 모두 통과했다고 기록하지 않는다.
+
+확인용 앱은 `Builds/Hapio/20261111-161941-bb0209a2/macOS/Hapio-Development.app`다. 기존 `Hapio/Development Build/Build Mac App` 경로로 Home부터 시작하는 게임 Scene 목록을 사용했다. 새 앱은 자동으로 실행하지 않았으며 실제 5인 플레이 결과·iOS 빌드 성공을 뜻하지 않는다.
+
+
+## 2026-11-11 — #676 인원별 스토리 도색량 후속
+
+초기1.3%/1.0%만적용한6cc2df42에는인원보정이없었다. 사용자확인후같은값을5인기준으로정의하고일반스토리협동2~5인의실제라운드명단에5/N을한번적용했다. 최초/재타격만보정하고나머지성장·건조·보상·물리규칙은그대로다. 설정259개·5701/Lab61/Game52로분리한다. 실제다인클리어시간검증과코드산술검사는구분한다.
+
+사전전체EditMode첫실행은2,299/2,300(34.72초)이었다. 기존지귀물붓기검사의2인기댓값이종전공통예산이라실제새규칙의2.5배결과와달랐다. 동일단언/허용오차를유지하고독립적인5/2기댓값으로맞춘뒤**2,300/2,300**(34.38초)통과했다. 새인원보정52건도포함한다.
+
+이전튜토리얼실패는VFX비교뒤남은1920×1080GameView에서세로튜토리얼의물리keep-out영역이달라져생겼다. 검사fixture만390×844로고정후사용자선택을복원하도록보완했다. 기존초기구슬위치·실제드래그단언을그대로둔`GameTutorialFlowTests`가가로설정에서**5/5**(62.33초)통과했고,종료후선택3(FullHD)복원을확인했다. 런타임튜토리얼은수정하지않았다.
+
+위는최신main/VFX통합전사전결과이며최종통합검사는완료후별도로기록한다. 원시결과는로컬`artifacts/issue676-participants`에보관한다.
+
+
+## 2026-11-11 — #682 인원별 보정·VFX 최종 통합
+
+#662를 병합한 main d2405f93와 인원 보정을 합친 bc7b8de3에서 전체 EditMode **2,319/2,319**(33.46초), 전체 PlayMode **829/830**(829.55초)을 실행했다. 남은 것은 `LabJigwiABNetworkTests.LegacyIndependentRadiusKeepsGrabReachAndPaintBudgetWhenSpecialWaterModeIsExplicitlySelected`의 비교 기준이었다. 이 검사는 인원 보정 대상인 지귀2인 모델과 대상이 아닌 Lab 모델을 비교하므로, 기준 모델의 면적도 독립적인5/2 배율을 셀 반올림 전에 적용해야 했다. 구형 반경 필드·잡기·물리·정확 면적 단언은 그대로 유지했고 게임 코드는 바꾸지 않았다.
+
+검증 중 추가된 main18aad551의 오프닝 건너뛰기·BGM/터치음·클레이 농도 기본값도 보존했다. 최신 통합에서 전체 EditMode **2,320/2,320**(35.71초), 영향 PlayMode **42/42**를 재실행했다: 지귀 네트워크9(0.52초), 튜토리얼5(62.09초), 건너뛰기2(0.10초), 터치 먹8(1.10초), 오프닝13(9.50초), 스티커GPU5(4.68초). 앞선 미영향 결과는 코드·데이터 실행 연결이 같은 것을 확인해 재사용했다. 최종 고유 PlayMode는 **832/832**로 모든 실패가 해소됐고 skip·inconclusive0이다. 최신832개를 한 번에 전체 재실행했다고 표현하지 않는다.
+
+인원2/3/4/5에서 적용되는 최초/재타격을 Editor에서도 각각3.25/2.5, 2.16666651/1.66666663, 1.625/1.25, 1.3/1.0으로 확인했다. 내부 반올림은 하지 않는다. 원래 가로 Game view 선택3 복원과 설정259개·5701/Lab61/Game52를 확인했다. main의 VFX·박 잘림·봉인 기록·새 콤보/오프닝/음향 수정은 되돌리지 않았다. 해당 Source 파일과 main diff를 검토했다.
+
+원시 결과는 로컬 `artifacts/issue676-participants/final-summary.json` 및 단계별 결과에 보관한다. 실기기3/4/5인 실제 플레이·iOS·Wi-Fi/핫스팟·클리어 시간은 이번 자동 검사와 구분해 미검증이다.

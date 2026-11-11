@@ -282,10 +282,11 @@ namespace C6Lab
         // 5698: #595 Jigwi smoke flow: round.smoke (B smokes every screen at once, no bucket) and round.common (shared talisman A).
         // 5699: actual newly painted-cell contribution is a Host-owned Int64 player statistic.
         // 5700: #663 Jigwi smoke flow: a talisman may start right after the smoke before it (earlier than its slot time).
-        // 5701: #664 구미호 co-op gimmicks: several charmed players (charmedPlayers/charmEnds/charmHelperTargets), the fox
+        // 5701: Story paint budgets are five-player bases scaled once by the actual round roster (#676).
+        // 5702: #664 구미호 co-op gimmicks: several charmed players (charmedPlayers/charmEnds/charmHelperTargets), the fox
         //       round (foxRound*, foxRoundRunning, its goal and cleared count, up to 100 fox orbs a board) and six more DEV
-        //       values (265), on top of #663's 5700.
-        internal const ushort LabProtocolVersion = 5701;
+        //       values (265), on top of #676's 5701 (#664 had also used 5701 on its own branch).
+        internal const ushort LabProtocolVersion = 5702;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Double-tap a blue fox orb to clear it, and keep your Yin and Yang away.";
@@ -294,7 +295,7 @@ namespace C6Lab
         /// with each fox fire, so this is the most a board can hold (the stored orb limit's DEV maximum).
         /// </summary>
         private const int MaximumFoxFireOrbs = 100;
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/61");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/62");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;

@@ -2074,7 +2074,7 @@ namespace C6Lab
                 MonsterMaxHp = config.MonsterMaxHp;
                 GourdMode = config.GourdMode;
                 PaintVictoryPercent = config.PaintVictoryPercent;
-                PaintGrowthSettings = config.PaintGrowthSettings;
+                PaintGrowthSettings = config.CapturePaintGrowthSettings(seats, stageYokai, teamMode);
                 SwipeBlockSeconds = config.SwipeBlockSeconds;
                 CommonGimmickInterval = config.CommonGimmickInterval;
                 UniqueGimmickInterval = config.UniqueGimmickInterval;
