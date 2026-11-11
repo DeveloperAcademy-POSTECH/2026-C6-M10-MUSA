@@ -37,6 +37,8 @@ namespace C6Lab
 
         /// <summary>#695: 지금 틀린 색을 봐주는 중인지 (라운드 첫 콤보이고 아직 첫 칸을 못 맞힘). 이때 틀린 색은 실패가 아니다.</summary>
         public bool Forgiving => Active && forgiving && Progress == 0;
+        /// <summary>#695: 이번 라운드에 봐준 틀린 색 수. 늘 때마다 금옥이 "한 번만 다시 해보자" 같은 말을 한다.</summary>
+        public uint ForgivenCount { get; private set; }
 
         public LabOrbElement ColorAt(int index) => colors[index];
         public LabOrbElement[] Colors => (LabOrbElement[])colors.Clone();
@@ -49,6 +51,7 @@ namespace C6Lab
             Progress = 0;
             StartedAt = EndsAt = -1d;
             Count = 0;
+            ForgivenCount = 0;
             LastResult = LabComboResult.None;
             LastResultCount = 0;
             LastResultAt = -1d;
@@ -88,7 +91,11 @@ namespace C6Lab
                 return LabComboResult.None;
             if (at >= EndsAt) return Finish(LabComboResult.Timeout, EndsAt, 0);
             if (element != colors[Progress])
-                return Forgiving ? LabComboResult.None : Finish(LabComboResult.WrongColor, at, thrower);
+            {
+                if (!Forgiving) return Finish(LabComboResult.WrongColor, at, thrower);
+                ForgivenCount++;
+                return LabComboResult.None;
+            }
             Progress++;
             return Progress >= Length ? Finish(LabComboResult.Success, at, 0) : LabComboResult.None;
         }

@@ -91,12 +91,16 @@ namespace C6Lab.Tests
             Assert.That(combo.Active, Is.True);
             Assert.That(combo.Progress, Is.Zero);
             Assert.That(combo.LastResult, Is.EqualTo(LabComboResult.None));
+            Assert.That(combo.ForgivenCount, Is.EqualTo(2u), "Each forgiven miss is counted (Geumok answers each).");
 
             Assert.That(combo.Judge(LabOrbElement.Fire, 7, 3d), Is.EqualTo(LabComboResult.None));
             Assert.That(combo.Progress, Is.EqualTo(1));
             Assert.That(combo.Forgiving, Is.False, "From the first hit on, it is the usual combo.");
             Assert.That(combo.Judge(LabOrbElement.Fire, 9, 4d), Is.EqualTo(LabComboResult.WrongColor));
             Assert.That(combo.LastFailedBy, Is.EqualTo(9ul));
+            Assert.That(combo.ForgivenCount, Is.EqualTo(2u), "A real wrong color is not forgiven.");
+            combo.Reset();
+            Assert.That(combo.ForgivenCount, Is.Zero, "A new round counts from zero.");
         }
 
         [Test]

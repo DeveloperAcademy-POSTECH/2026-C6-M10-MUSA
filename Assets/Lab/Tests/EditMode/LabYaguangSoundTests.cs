@@ -324,6 +324,38 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void GeumokAsksToTryAgainForEachForgivenMissInTurn()
+        {
+            LabYaguangSound sound = Sound();
+            var snapshot = new LabSnapshot { sessionId = "yaguang", round = 1, phase = LabPhase.Playing };
+            sound.ObserveFlash(snapshot, 33.9d, Me);
+            snapshot.comboCount = 1; snapshot.comboActive = true;
+            snapshot.comboStartedAt = 34d; snapshot.comboEndsAt = 44d;
+
+            // #695: Host가 틀린 색을 봐줌 → 0.3초 뒤 "한 번만 다시 해보자".
+            snapshot.comboForgivenCount = 1;
+            sound.ObserveFlash(snapshot, 35d, Me);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideRetry), Is.Zero, "It waits like the praise.");
+            Watch(sound, snapshot, 35.05d, 36d);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideRetry), Is.EqualTo(1));
+            snapshot.comboForgivenCount = 2;
+            Watch(sound, snapshot, 36.05d, 37d);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideRetry), Is.EqualTo(2), "Once per forgiven miss.");
+
+            // 봐준 직후 콤보가 끝나면(시간 초과) 말하지 않는다.
+            snapshot.comboForgivenCount = 3;
+            sound.ObserveFlash(snapshot, 38d, Me);
+            snapshot.comboActive = false;
+            Watch(sound, snapshot, 38.05d, 39d);
+            Assert.That(sound.PlayCount(LabYaguangSfx.ComboGuideRetry), Is.EqualTo(2));
+
+            Assert.That(LabYaguangSound.RetryClip(0, 3), Is.EqualTo(0));
+            Assert.That(LabYaguangSound.RetryClip(1, 3), Is.EqualTo(1));
+            Assert.That(LabYaguangSound.RetryClip(3, 3), Is.EqualTo(0), "Three lines take turns.");
+            Assert.That(LabYaguangSound.RetryClip(0, 0), Is.EqualTo(-1));
+        }
+
+        [Test]
         public void TheStampThudsExactlyWhenTheScreenPressesItIn()
         {
             // #695: 쾅은 시각 계산이 아니라 화면의 도장이 찍힌 수를 따른다.
@@ -347,6 +379,7 @@ namespace C6Lab.Tests
             Assert.That(LabYaguangSound.Folder(LabYaguangSfx.ComboGuideFail), Is.EqualTo("Audio/YaguangComboGuideFail"));
             Assert.That(LabYaguangSound.Folder(LabYaguangSfx.ComboStamp), Is.EqualTo("Audio/YaguangComboStamp"));
             Assert.That(LabYaguangSound.Folder(LabYaguangSfx.ComboGuideReady), Is.EqualTo("Audio/YaguangComboGuideReady"));
+            Assert.That(LabYaguangSound.Folder(LabYaguangSfx.ComboGuideRetry), Is.EqualTo("Audio/YaguangComboGuideRetry"));
             Assert.That(LabYaguangSound.GuideFeedbackSfx(1), Is.EqualTo(LabYaguangSfx.ComboGuideHit1));
             Assert.That(LabYaguangSound.GuideFeedbackSfx(2), Is.EqualTo(LabYaguangSfx.ComboGuideHit2));
             Assert.That(LabYaguangSound.GuideFeedbackSfx(3), Is.EqualTo(LabYaguangSfx.ComboGuideHit3));
