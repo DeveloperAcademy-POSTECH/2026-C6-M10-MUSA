@@ -251,7 +251,8 @@ namespace C6Lab
             DemoCamera.transform.LookAt(center);
             DemoCamera.fieldOfView = 52f;
             float width = (focus < 0 ? GalleryWidth : 5.90f) * diameter;
-            DemoCamera.orthographicSize = Mathf.Max(1.65f * diameter, width / (2f * Mathf.Max(.1f, aspect)));
+            // Reserve the same vertical margin for every style, including the larger reward splash on walls.
+            DemoCamera.orthographicSize = Mathf.Max(3.6f * diameter, width / (2f * Mathf.Max(.1f, aspect)));
             if (shell != null)
             {
                 var lanes = shell.Q("lanes");

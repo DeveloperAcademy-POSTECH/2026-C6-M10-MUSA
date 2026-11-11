@@ -146,8 +146,46 @@ namespace C6Lab.Tests
             Assert.That(demo.ActiveImpacts, Is.EqualTo(1));
             Assert.That(demo.Paused, Is.True);
             Assert.That(demo.PlaybackTime, Is.EqualTo(.9f).Within(.00001f));
+            // A wide single-lane wall close-up used to clip the enlarged reward splash at the bottom.
+            // Use an explicit viewport aspect so a portrait batch GameView cannot mask that regression.
+            demo.SetSurface(LabDemoSurface.Wall);
+            ClickComparison(hud, "enhancedFiveColor");
+            demo.Seek(1.08f);
+            Camera camera = demo.DemoCamera;
+            float previousAspect = camera.aspect;
+            try
+            {
+                camera.aspect = 2f;
+                demo.SetLens(camera.aspect);
+                Assert.That(demo.ActiveImpacts, Is.EqualTo(1));
+                var visibleClay = pool.GetComponentsInChildren<MeshRenderer>().Where(renderer => renderer.enabled &&
+                    (renderer.name == "Wet surface mark" || renderer.name.StartsWith("Thrown clay "))).ToArray();
+                Assert.That(visibleClay.Count(renderer => renderer.name.StartsWith("Thrown clay ")), Is.EqualTo(5));
+                Assert.That(visibleClay.Count(renderer => renderer.name == "Wet surface mark"), Is.EqualTo(1));
+                foreach (MeshRenderer renderer in visibleClay) AssertBoundsInsideViewport(camera, renderer);
+            }
+            finally
+            {
+                camera.aspect = previousAspect;
+                demo.SetLens(previousAspect);
+            }
             Assert.That(JsonUtility.ToJson(pool.Profile), Is.EqualTo(originalProfile),
                 "Comparison controls must not write the shared Resources art profile or game defaults.");
+        }
+
+        private static void AssertBoundsInsideViewport(Camera camera, Renderer renderer)
+        {
+            Bounds bounds = renderer.bounds;
+            for (int x = -1; x <= 1; x += 2)
+            for (int y = -1; y <= 1; y += 2)
+            for (int z = -1; z <= 1; z += 2)
+            {
+                Vector3 corner = bounds.center + Vector3.Scale(bounds.extents, new Vector3(x, y, z));
+                Vector3 viewport = camera.WorldToViewportPoint(corner);
+                Assert.That(viewport.z, Is.GreaterThan(0f), renderer.name + " must remain in front of the preview camera.");
+                Assert.That(viewport.x, Is.InRange(-.001f, 1.001f), renderer.name + " must not clip horizontally.");
+                Assert.That(viewport.y, Is.InRange(-.001f, 1.001f), renderer.name + " must not clip vertically.");
+            }
         }
 
         private static void ClickComparison(VisualElement hud, string name)

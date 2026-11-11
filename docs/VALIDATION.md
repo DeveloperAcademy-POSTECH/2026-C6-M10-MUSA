@@ -7873,13 +7873,13 @@ All 279 changed opening code/asset/test files (excluding the tutorial test file,
 
 | 실행 범위 | 결과 |
 | --- | --- |
-| 컴파일 및 전체 EditMode | **2,238/2,238 통과**, 31.76초 |
+| 컴파일 및 전체 EditMode | **2,238/2,238 통과**, 32.24초 (마지막 비교 카메라 보완 후 재실행) |
 | LabFinishReplayVfxTests | **10/10 통과**, 0.31초 |
 | LabFiveColorClayFlightTests | **13/13 통과**, 0.19초 |
 | LabFiveColorClayNetworkTests | **2/2 통과**, 0.93초 |
 | GameFinishReplayTests | **5/5 통과**, 43.10초 |
 | GameStage2GourdHitFinishTests | **1/1 통과**, 10.43초 |
-| LabFiveElementContactTests | **6/6 통과**, 0.32초 |
+| LabFiveElementContactTests | **6/6 통과**, 0.31초 (마지막 가시성 단언 추가 후 재실행) |
 | LabProjectileContactTests | **8/8 통과**, 4.42초 |
 | LabJigwiRewardFireTrailTests | **4/4 통과**, 1.20초 |
 
@@ -7897,3 +7897,5 @@ All 279 changed opening code/asset/test files (excluding the tutorial test file,
 - 확대 접촉은 기존 접평면 진흙 메시이며 굽은 박 전체에 투영된 실제 도색 영역을 뜻하지 않는다. 순간적으로 구슬/퍼짐이 일부 방울을 가릴 수 있고, 실제 모바일 화면에서의 가독성·성능은 별도 확인 대상이다.
 
 선택 이유: VFX 프로필/전용 슬롯/비교 UI 변경이며 공통 물리·판정·게임 상태 수명·접속 규약은 수정하지 않아 전체 EditMode+영향 PlayMode를 실행했고 전체 PlayMode는 생략했다. 실제 다인 LAN/핫스팟, iOS, standalone/Release, GPU 성능 측정은 미실행이다. 독립 앱을 새로 만들거나 실행하지 않았다. 기존 기록에 원 투척의 무작위 오색 위상이 없어 다시보기는 비행 경과 기준 색 흐름을 쓰는 한계도 유지한다.
+
+후속 확대 비교에서 벽에 붙은 강화 효과의 하단이 잘려 비교 전용 카메라의 공통 최소 여백을3.6D로 조정했다. 처음2.6D 보완은 표시 중 메시의 회전된 전체 경계 검사에서5/6으로 실패해, 단언을 유지한 채 여백을 충분히 확보한 뒤6/6 통과했다. 전체 EditMode도2,238/2,238 재실행했다. 일반/현재/강화의 카메라는 동일하고 실제 게임 카메라·VFX는 바뀌지 않아 나머지43개 PlayMode 결과는 재사용한다. Full HD 동일 조건 비교 이미지는 최종 카메라로 다시 촬영했다.
