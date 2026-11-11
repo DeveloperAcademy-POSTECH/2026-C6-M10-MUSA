@@ -8111,7 +8111,6 @@ All 279 changed opening code/asset/test files (excluding the tutorial test file,
 - 최종 전체 EditMode2,263/2,263(50.66초), 관련 PlayMode40/40(13.82초) 통과. 신규 검사는 게이지 중앙/폭·페이드 진행·이전 alpha0.65 보존·Pause/Disable/종료 복원을 검증한다. 기존 콤보/말풍선/섬광/준비 경로도 포함한다.
 - Unity 실제 UI 렌더에서 완전 표시와50% 페이드 프레임을 확인했다.50% 페이드 중에도 gauge alpha0을 확인했다. 복원은 위 PlayMode 수명 검사에서 확인했다. Editor 수동 프리뷰의 enabled 변경은 PlayMode 콜백 검증에 사용하지 않았다. preview root/config/camera/RT는 정리했다. Unity6000.6.5f1/macOS Metal 기준. UI 표시/수명 범위라 전체 PlayMode는 생략했다. 전체 게임 화면/iOS 실기기 전환은 미검증이다.
 
-
 ## 2026-11-11 — #659 마지막 일격·오색 구슬의 클레이 VFX 통일
 
 기준은 최신 main `9b66da6e`(#646 실제 면적 총평·#647 방장 진행·28컷 오프닝을 보존), 브랜치는 `fix/#659-finish-five-color-clay-vfx`다. Unity 6000.6.5f1·macOS/Metal의 기존 데스크탑 프로젝트 Editor 한 개에서 검증했다. Scene·Prefab·Material·Shader·Resources 원본·프로필·LabConfig·패키지·프로젝트 설정은 변경하지 않았다. 접속 묶음259개·5699/Lab60/Game51도 그대로다.
@@ -8357,3 +8356,11 @@ Unity 6000.6.5f1 / macOS Metal Editor에서 컴파일·전체 EditMode와 UI 영
 영향 PlayMode는 **44/44**다: `GameBattleUiPresentationTests`4(9.47초), `LabOrbHudCompositionTests`8(0.11초), `LabTeamBattleScreenTests`5(8.15초), `LabStaminaBarHudTests`1(0.32초), `LabStaminaFeedbackTests`7(0.02초), `LabStaminaShortFeedbackTests`5(0.02초), `LabCharmBubblesTests`10(4.12초), `LabCharmHeartRainTests`2(0.03초), `LabFoxRoundHudTests`2(1.74초). 기존 territory fixture에4/6인의 전 자리·양 팀·좌우 끝·솔로·이미지 누락 fallback·기존 고리 복구를 실제 HUD.Update 경로로 검사했다. 이후 수정은 EditMode fixture뿐이어서 이 PlayMode 결과는 같은 게임 코드·에셋·PlayMode 어셈블리에 대한 결과를 재사용한다.
 
 실제402×874 Game View에서 구미호3인 표시와3:3 청/홍팀 표시를 촬영해 좌우 번호·하단 정렬·팀 이미지 색/번호를 확인했다. 화면용 참가자 배열을 사용했으며 실제 다중 기기 연결 성공을 뜻하지 않는다. 원래 Scene·Game View·솔로 시작 스테이지 설정은 복원하고 재생을 종료했다. UI만 변경하므로 전체 PlayMode는 재실행하지 않았다. iOS·실제 멀티 Wi-Fi/핫스팟·기기별 inset은 미검증이고 이번 새 Mac 빌드도 수행하지 않았다. 원시 결과와 PNG는 커밋하지 않은 로컬 artifacts/pr686-ui에 보관한다.
+
+
+## 2026-11-11 #668 콤보 성공 도장
+
+- 기준: `fix/#668-yagwanggwi-combo-asset`, `ea71546c` 위 작업 사본. Unity 6000.6.5f1 macOS Editor. 생성한 투명 PNG를 성공 시 즉시 찍는 화면 표현과 첫 사용 렌더 준비만 변경했다. Host 콤보 판정·공유 설정·통신 형식은 변경하지 않았다.
+- 최종 코드 컴파일 오류 0. 전체 EditMode **2,263/2,263 PASS**(48.98초). 관련 PlayMode **15/15 PASS**: `LabYaguangCountLookTests`, `LabComboEffectLookTests`, `LabComboProjectileIntegrationTests` 13개 및 `GameBattleRenderWarmupTests` 2개. 일반 UI 변경 범위에 따라 전체 PlayMode는 생략했다.
+- 도장 즉시 표시·PNG 참조·텍스트 중복 없음·터치 통과·반동 후 1배 정착·유지 후 종료, 기존 비야광귀 콤보 표시 및 렌더 준비 수명 검사를 통과했다.
+- 임시 Canvas/카메라의 실제 Unity UI 렌더를 0.06/0.16/0.5/1.5초에서 확인했다. 배경 투명 부분과 도장 크기·기울기를 확인하고 임시 객체·RenderTexture를 해제했다. 실제 전투 전체 화면과 iOS 실기기의 타격감·음성 타이밍은 미검증이다.
