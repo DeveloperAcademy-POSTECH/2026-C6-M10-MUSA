@@ -26,5 +26,15 @@ MonoBehaviour:
   echoDecay: 0.6
   echoWet: 0.7
   echoTailSeconds: 6
+  breakSounds:
+  - clip: {fileID: 8300000, guid: 2d094334ae6c43ccbb5ff26682938929, type: 3}
+    seconds: 0
+    volume: 1
+  - clip: {fileID: 8300000, guid: 38122bc82da64b9ebd800a34ddda6804, type: 3}
+    seconds: 4.4
+    volume: 1
+  - clip: {fileID: 8300000, guid: c1396d6fd28b441b89f90b0f5d063fc5, type: 3}
+    seconds: 5.95
+    volume: 1
   fadeInSeconds: 0.5
   fadeOutSeconds: 1

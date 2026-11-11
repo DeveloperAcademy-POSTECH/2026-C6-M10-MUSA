@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 namespace Hapio
@@ -8,6 +9,15 @@ namespace Hapio
     /// - 박이 떨어지는 컷(Break Cut Id)이 시작되면 평화 곡이 테이프가 멈추듯 느려지며 메아리만 남고,
     ///   조금 뒤 깨진 이후 곡이 들어온다.
     /// </summary>
+    /// <summary>#629 박 사고 컷(14~16)에서 정해진 순간에 나는 효과음 하나.</summary>
+    [Serializable]
+    public struct GameStoryTimedSound
+    {
+        [Tooltip("효과음")] public AudioClip clip;
+        [Tooltip("박이 떨어지기 시작한 순간(Break Cut 시작)부터 몇 초 뒤에 낼지")] [Min(0f)] public float seconds;
+        [Tooltip("크기 (게임 설정의 효과음 볼륨에 곱한다)")] [Range(0f, 1f)] public float volume;
+    }
+
     [CreateAssetMenu(fileName = "StoryMusicArt", menuName = "Hapio/Story Music Art")]
     public sealed class GameStoryMusicArt : ScriptableObject
     {
@@ -33,6 +43,10 @@ namespace Hapio
         [Tooltip("메아리가 한 번 돌아올 때마다 남는 크기 (클수록 길게 남는다)")] [Range(0f, 1f)] public float echoDecay = .6f;
         [Tooltip("메아리 소리 크기")] [Range(0f, 1f)] public float echoWet = .7f;
         [Tooltip("평화 곡이 멈춘 뒤에도 메아리가 울리도록 기다리는 시간 (초)")] [Min(0f)] public float echoTailSeconds = 6f;
+
+        [Header("박 사고 효과음 (컷 14~16은 자동으로 흘러가서 컷 효과음 칸 대신 여기서 정확한 순간에 낸다)")]
+        [Tooltip("기본: 0초 덜컹 / 4.4초 떨어져 와장창(와장창이 파일 0.5초 지점이라 박이 바닥에 닿는 4.9초에 맞음) / 5.95초 요괴 탈출")]
+        public GameStoryTimedSound[] breakSounds = new GameStoryTimedSound[0];
 
         [Header("켜고 끄기")]
         [Tooltip("타이틀·방 목록에서 곡이 들어오는 시간 (초)")] [Min(0f)] public float fadeInSeconds = .5f;

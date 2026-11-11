@@ -12,6 +12,7 @@ namespace Hapio
     /// - 타이틀 화면: 평화 곡이 들어와 반복된다. 시작을 눌러 오프닝이 열려도 같은 곡이 끊기지 않고 이어진다.
     /// - 오프닝에서 박이 떨어지기 시작하는 컷(<see cref="GameStoryMusicArt.breakCutId"/>)이 시작되면, 평화 곡이 테이프가 멈추듯
     ///   빠르기와 음높이가 함께 떨어지며 사라지고 메아리만 남는다. 잠시 뒤 깨진 이후 곡이 스며들 듯 들어온다.
+    ///   박 사고 컷(14~16)은 손대지 않아도 흘러가므로, 덜컹/와장창/탈출 효과음도 여기서 정해진 순간(<see cref="GameStoryMusicArt.breakSounds"/>)에 낸다.
     ///   한 번 깨지면 앞 컷으로 돌아가도 오프닝이 끝날 때까지 깨진 이후 곡이 이어진다.
     /// - 오프닝이 끝나거나 건너뛰면 곡이 사라진다. 그 뒤 튜토리얼·전투에서는 나오지 않고, 방 목록(Home)과 대기실에서는 평화 곡이 다시 나온다.
     /// - 크기는 게임 설정의 BGM 볼륨을 따른다. Home에는 일부러 AudioListener가 없어서, 곡이 나오는 동안만 잠깐 붙인다(터치 먹물과 같은 방식).
@@ -21,7 +22,8 @@ namespace Hapio
     public sealed class GameStoryMusic : MonoBehaviour
     {
         private GameStoryMusicArt art;
-        private AudioSource calm, broken;
+        private AudioSource calm, broken, sfx;
+        private bool[] breakSoundPlayed = new bool[0];
         private AudioEchoFilter echo;
         private AudioListener borrowed;
         private float calmFade, brokenFade;
@@ -37,6 +39,8 @@ namespace Hapio
         public AudioSource BrokenSource => broken;
         public bool Breaking => breaking;
         public bool EchoOn => echo != null && echo.enabled;
+        /// <summary>박 사고 효과음이 지금까지 몇 번 났는지.</summary>
+        public int BreakSoundsPlayed { get; private set; }
 
         public static GameStoryMusic Create(Transform parent, GameStoryMusicArt art = null)
         {
@@ -60,6 +64,8 @@ namespace Hapio
             echo = calm.gameObject.AddComponent<AudioEchoFilter>();
             echo.enabled = false;
             broken = NewSource("Broken");
+            sfx = NewSource("Break Sounds");
+            sfx.loop = false;
         }
 
         private AudioSource NewSource(string name)
@@ -132,8 +138,13 @@ namespace Hapio
                 float progress = breakElapsed / Mathf.Max(.1f, art.tapeStopSeconds);
                 calm.pitch = Mathf.Max(0f, art.TapeSpeedAt(progress));
                 // Silence (the opening was skipped mid-fall) also takes the dying tape down with everything else.
-                if (wanted == GameStoryMusicMode.Silent) calmFade = Toward(calmFade, 0f, seconds);
+                if (wanted == GameStoryMusicMode.Silent)
+                {
+                    calmFade = Toward(calmFade, 0f, seconds);
+                    if (sfx.isPlaying) sfx.Stop();
+                }
                 calm.volume = calmFade * GameStoryMusicArt.TapeLoudnessAt(progress) * art.calmVolume * bgm;
+                PlayDueBreakSounds(wanted);
                 // Keep the source running at a standstill so the echo can ring out; then let it go.
                 if (calm.isPlaying && breakElapsed >= art.tapeStopSeconds + art.echoTailSeconds) calm.Stop();
             }
@@ -153,7 +164,7 @@ namespace Hapio
 
             // The opening is over (or the screen went silent): the next calm music starts again from the top.
             if (breaking && wanted == GameStoryMusicMode.Silent && brokenFade <= 0f && (!calm.isPlaying || calmFade <= 0f)) EndBreak();
-            KeepListener(calm.isPlaying || broken.isPlaying);
+            KeepListener(calm.isPlaying || broken.isPlaying || sfx.isPlaying);
         }
 
         private float Toward(float level, float goal, float seconds)
@@ -166,6 +177,7 @@ namespace Hapio
         {
             breaking = true;
             breakElapsed = 0f;
+            breakSoundPlayed = new bool[art.breakSounds != null ? art.breakSounds.Length : 0];
             echo.delay = art.echoDelayMs;
             echo.decayRatio = art.echoDecay;
             echo.wetMix = art.echoWet;
@@ -175,11 +187,27 @@ namespace Hapio
             if (!calm.isPlaying) calmFade = 0f;
         }
 
+        private void PlayDueBreakSounds(GameStoryMusicMode wanted)
+        {
+            GameStoryTimedSound[] sounds = art.breakSounds ?? new GameStoryTimedSound[0];
+            if (breakSoundPlayed.Length != sounds.Length) breakSoundPlayed = new bool[sounds.Length];
+            for (int i = 0; i < sounds.Length; i++)
+            {
+                if (breakSoundPlayed[i] || breakElapsed < sounds[i].seconds) continue;
+                breakSoundPlayed[i] = true;
+                // A skipped opening does not still crash a moment later.
+                if (wanted != GameStoryMusicMode.Broken || sounds[i].clip == null || sounds[i].volume <= 0f) continue;
+                sfx.PlayOneShot(sounds[i].clip, sounds[i].volume * LabAudioSettings.SfxVolume);
+                BreakSoundsPlayed++;
+            }
+        }
+
         private void EndBreak()
         {
             breaking = false;
             breakElapsed = 0f;
             echo.enabled = false;
+            sfx.Stop();
             calm.Stop();
             calm.pitch = 1f;
             calmFade = 0f;
@@ -219,6 +247,7 @@ namespace Hapio
             ReturnListener();
             if (calm != null) calm.Stop();
             if (broken != null) broken.Stop();
+            if (sfx != null) sfx.Stop();
         }
     }
 }
