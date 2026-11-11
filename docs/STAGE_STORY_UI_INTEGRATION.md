@@ -120,3 +120,16 @@ Host NEXT/재도전은 모두 다음 조건을 기다린다.
 `StoryStageClearControls` owns role-specific UI on all three After_02 prefabs. Only the host sees Next Seal; existing readiness, viewer and touch-release gates control interaction. Background taps cannot advance. Gumiho/Yagwanggui guests see the host-wait message. Jigwi guests hide both the next-yokai heading and host-wait message, while host UI remains unchanged.
 
 Host advances everyone to the next game for stages 1/2. After Jigwi, StartSummary broadcasts a sticky summary-start flag for the matching completed run/stage/revision/settings/battle/round. Repeated state broadcasts recover missed messages. Summary/ending reading thereafter remains individual. Game connection token is C6HapioGame/51 (on top of #642's 50); older clients cannot mix. StageStoryShowcase.previewAsHost previews the role without network progression.
+
+
+## #687 — 다음 봉인 준비와 그만두기
+
+구미호·야광귀의 마지막 그림에서 방장과 구성원 모두 `다음 봉인`을 누른다. 읽기를 끝낸 것만으로 준비 처리하지 않는다. 각 기기의 버튼은 로컬 준비를 알리고 대기 화면을 연다. 전원의 명시적 준비, 기록 동기화, 이야기·관람 종료를 모두 확인한 뒤 방장이 `요괴 봉인 시작`으로 다음 스테이지를 연다. 지귀의 기존 `마치기` 진입과 전체 기록·엔딩 순서는 유지한다.
+
+구성원 대기 문구는 3초마다 `방장이 다음 봉인을 준비하고 있소.` / `모두가 준비되면 함께 이동하오.`로 교대한다. `GameLoadingArt`의 기존 5종 달리기 프레임·속도·착지 squash를 재사용한다. 동일한 결과 명단을 ID순으로 정렬하고 run/stage별 공통 순열을 적용하므로 각 기기는 서로 다른 캐릭터를 받으며, 같은 스테이지 화면을 다시 열어도 배정이 바뀌지 않는다. 3~5명 스토리 기준이다.
+
+방장은 준비 인원과 비활성 시작 버튼을 보고, 전원이 준비되면 5인 단체 그림과 활성 시작 버튼을 본다. 준비 패킷 `seal_ready`는 기존 run/stage/revision/settings 검증을 통과해야 하며, 주기적 `result_ready`에도 `sealReady`를 포함해 유실을 복구한다. 같은 결과 내 준비 true는 유지하고 다음 결과·방 초기화 시 지운다. 이전 기기가 명시적 준비를 보내지 않아 영구 대기하는 것을 막기 위해 Game 접속 토큰만 **C6HapioGame/54**로 올린다. 설정265개·프로토콜5702·Lab62는 유지한다.
+
+후일담·대기·엔딩의 왼쪽 위 `그만두기`는 확인 팝업을 연다. 확인 중에는 이야기·다음 스테이지 시작을 막는다. `계속하겠소.`는 원래 화면과 준비를 보존하고, `그만두겠소.`는 기존 퇴장 통지를 거쳐 연결을 종료한 뒤 Home의 방 목록/방 만들기 화면으로 돌아간다. 진행 중 퇴장으로 다른 기기가 종료되는 정책과 최종 클리어 뒤 방장 연결 종료 처리 정책은 기존 그대로다. 패배 재도전·땅따먹기·튜토리얼 UI에는 이 팝업을 적용하지 않는다.
+
+화면은 `Assets/Hapio/Resources/Hapio/Story/StageReadyView.prefab`, 생성기는 `Assets/Hapio/Editor/StageReadyAssets.cs`다. Figma `4814:7810`(방장 대기), `4814:8090`(전원 준비), `4814:7976`(구성원), `4814:8646`(확인)을 기준으로 좌표·폰트·색·배경·딤을 구성했다. `Hapio > Story > Update Stage Ready and Quit UI`는 이 프리팹만 명시적으로 다시 만들며 일반 실행/빌드에서 자동 재생성하지 않는다. 원본 PNG와 meta는 `Art/Story/StageReady`에 보관한다.

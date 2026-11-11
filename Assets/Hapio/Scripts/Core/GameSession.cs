@@ -88,6 +88,7 @@ namespace Hapio
             public int participantCount;
             public bool resultViewerOpen;
             public bool resultPresentationBusy;
+            public bool sealReady;
             public bool summaryStarted;
             public double finishDeadline;
             [NonSerialized] public ulong sender;
@@ -146,7 +147,7 @@ namespace Hapio
         public bool CanAdvanceStage => network != null && network.IsHost && !IsLoadingScene && AllResultsReady
             && (state.phase == GameFlowPhase.StageResult || state.phase == GameFlowPhase.Completed)
             && (!IsTerritory || !network.IsDeveloperSolo)
-            && (IsTerritory || !IsAnyResultViewerOpen && !IsAnyResultPresentationBusy);
+            && (IsTerritory || !IsAnyResultViewerOpen && !IsAnyResultPresentationBusy && AllSealParticipantsReady);
         // The run's own stage count: 2:2 (#281) plays one battle, so it has no next stage to skip to.
         public bool CanDeveloperAdvanceStage => network != null && network.DeveloperBuildAvailable
             && network.IsConnected && network.IsHost && !goingHome && !IsLoadingScene && !restartPending
@@ -347,7 +348,10 @@ namespace Hapio
                     resultReady.Add(control.sender);
                     SetResultViewer(control.sender, control.resultViewerOpen);
                     SetResultPresentation(control.sender, control.resultPresentationBusy);
+                    SetSealParticipantReady(control.sender, control.sealReady);
                 }
+                else if (control.kind == "seal_ready" && IsResultPresentationPhase)
+                    SetSealParticipantReady(control.sender, control.sealReady);
                 else if (control.kind == "result_viewer" && IsResultPresentationPhase)
                     SetResultViewer(control.sender, control.resultViewerOpen);
                 else if (control.kind == "result_presentation" && IsResultPresentationPhase)
@@ -620,6 +624,7 @@ namespace Hapio
                 readyCount = StartReadyCount, participantCount = StartParticipantCount,
                 resultViewerOpen = IsViewerOpen,
                 resultPresentationBusy = localResultPresentationBusy,
+                sealReady = LocalSealReady,
                 summaryStarted = SummaryStarted && current.phase == GameFlowPhase.Completed,
                 finishDeadline = finishServerDeadline
             };

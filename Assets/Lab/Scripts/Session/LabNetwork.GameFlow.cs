@@ -21,7 +21,7 @@ namespace C6Lab
         // 52: #676 Story paint budgets use the actual cooperative participant count (protocol5701/Lab61).
         // 52 was also taken by #664 구미호 co-op gimmicks on its own branch; merged together they are 53.
         // 53: #664 구미호 co-op gimmicks (265 DEV values) on top of #676 (protocol 5702, Lab 62).
-        private static readonly byte[] GameConnectionToken = Encoding.ASCII.GetBytes("C6HapioGame/53");
+        private static readonly byte[] GameConnectionToken = Encoding.ASCII.GetBytes("C6HapioGame/54");
         private const int MaximumGameFlowBytes = 8192;
         private bool gameFlowEnabled;
         private bool gameBattleFrozen;

@@ -8364,3 +8364,20 @@ Unity 6000.6.5f1 / macOS Metal Editor에서 컴파일·전체 EditMode와 UI 영
 - 최종 코드 컴파일 오류 0. 전체 EditMode **2,263/2,263 PASS**(48.98초). 관련 PlayMode **15/15 PASS**: `LabYaguangCountLookTests`, `LabComboEffectLookTests`, `LabComboProjectileIntegrationTests` 13개 및 `GameBattleRenderWarmupTests` 2개. 일반 UI 변경 범위에 따라 전체 PlayMode는 생략했다.
 - 도장 즉시 표시·PNG 참조·텍스트 중복 없음·터치 통과·반동 후 1배 정착·유지 후 종료, 기존 비야광귀 콤보 표시 및 렌더 준비 수명 검사를 통과했다.
 - 임시 Canvas/카메라의 실제 Unity UI 렌더를 0.06/0.16/0.5/1.5초에서 확인했다. 배경 투명 부분과 도장 크기·기울기를 확인하고 임시 객체·RenderTexture를 해제했다. 실제 전투 전체 화면과 iOS 실기기의 타격감·음성 타이밍은 미검증이다.
+
+## 2026-11-11 — #687 스토리 준비 대기·그만두기
+
+원래 Unity 프로젝트, `feat/687-stage-ready-quit`. 시작 기준 main `f8998ff0`에서 구현하고 작업 중 들어온 팀원 PR #686·#690의 `3719fb99`를 fast-forward로 반영했다. 개인 productName/스플래시 설정과 iOS 빌드 프로필은 보존했다. Unity 6000.6.5f1 macOS Metal Editor/iOS 타깃이다. 명시적 참여자 준비와 Game54 제어 필드가 추가되어 전체 EditMode·PlayMode를 선택했다.
+
+- 초기 EditMode: 2336/2337, 이어 새 검사 포함 2338/2339(59.56초). 기존 여우구슬 충돌 fixture가 첫 충돌 후 팀 성공으로 남은 구슬까지 지워져 ORB_NOT_FOUND로 실패했다. 이 EditMode 보완은 최신 main의 팀원 #686 변경으로 들어왔다. 최종 전체 EditMode **2339/2339, 56.51초**, 실패·skip 0.
+- 최초 PlayMode 시도는 개인 iOS 프로필이 Lab 장면을 제외해 26/840 진행 중 중단했다. 테스트 때만 프로필의 공용 장면 목록을 사용했다. 종료 후 원래 overrideGlobalScenes=true와 개인 프로필을 복원했다.
+- 전체 PlayMode **832/841, 1144.56초**, 실패9·skip0. 새 그만두기→Home 방 목록 복귀 검사는 통과했다. 실패 내역과 로그는 원시 결과에 보존했다.
+- 수정/통합 뒤 영향 PlayMode **47/49, 224.91초**, 실패2·skip0. GameSceneFlow29, GameStageRetry2, StoryStageReady1, StoryTapAdvance4는 모두 통과(**스토리 관련36/36**). 함께 들어온 GameBattleUiPresentation4·LabYaguangCountLook2도 통과. LabComboEffectLook는5/7이다.
+
+전체 검사 중 실제 클릭 fixture 한 곳이 예전 한 번의 다음 봉인 클릭만 보내고 있었으므로 준비→별도 시작 두 입력으로 바꿨다. 여우구슬→매혹→재시작→다음 스테이지 검사도 #664 기본 spare로 두 번째 구슬이 먼저 사라지지 않도록 해당 fixture에서만 spare=0을 지정했다. 기존 접촉·재시작·설정 유지 단언을 완화하지 않았으며 재검사에서 모두 통과했다. 전체 검사에서 실패했던 StoryTapAdvance2건도 영향 묶음에서는 통과했다. 최종 UI 정리와 main의 표시 변경에는 영향 묶음을 재실행하고 실행 코드가 그대로인 다른 전체 검사 결과를 재사용했으므로, 최신 버전 전체 PlayMode가 한 번에 모두 통과했다고 기록하지 않는다.
+
+미해결/미확인: `LabCharmHostIdentityPlayTests.RescuingTheHostRaisesTheLocalWakeEventExactlyOnceWithPlayerZero`는 기존 private StartCharm의 배열 인자와 fixture의 ulong 인자 불일치, `LabOrbPhysicsTests.ACharmedBoardsThrowingEdgeGlowsRedAndAnUpwardSwipeOnlyFlicksTheOrb`는 기존 매혹 동작 단언 실패다. 콤보의 `SmallShowsABarWithoutSecondsAndBigRainsStarsInstead`·`TheSmallBarStandsUpAndShrinksDownward`는 재검사에서도 각각1.25, 약0.15로 실패했다. 이 경로는 이번 준비 UI 구현에서 수정하지 않았다. 튜토리얼의 `FinishedOpeningOpensThePracticeBoardOnceThenTheRoomList`는 본문 동작 뒤 Game View 선택 복원 과정에서 Invalid index로 실패했으며 재검사하지 않았다. 해당 검사의 성공으로 간주하지 않는다.
+
+화면 검증: 실제 Unity UI를804×1748 RenderTexture에 렌더해 구성원·방장 대기·전원 준비·확인 팝업4개를 확인했다. Figma의 gamma 합성용 기존 재질을 dim과 그림자에 재사용해 밝기 차이를 보정했고, 구성원383.57 기준 폭과402 화면 폭 차이의 흰 띠는 종이 배경을 바깥으로 이어서 제거했다. 캐릭터 중복 없는5자리 배정, 기존 프레임 애니메이션, timeScale=0에서 문구 교대, popup 중 시작 차단/취소 준비 유지/확인 후 방 목록 복귀를 검사했다. 마지막 종이 maskable 수정은 UI 렌더와 위 영향 PlayMode에 포함됐으며 게임 규칙은 바꾸지 않았다.
+
+원시 JSON과 화면 PNG는 로컬 Codex 작업공간 `artifacts/issue687/`에 보관한다. 이번 작업은 새 iOS/Mac 빌드나 실기기3~5대 동시 접속 검증을 수행하지 않았다. 참가 기기는 Game54가 포함된 같은 빌드를 사용해야 한다.

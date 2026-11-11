@@ -8,6 +8,51 @@ namespace Hapio
         private readonly HashSet<ulong> resultViewers = new HashSet<ulong>();
         private readonly HashSet<ulong> resultPresentations = new HashSet<ulong>();
         private bool localResultPresentationBusy;
+        private readonly HashSet<ulong> sealParticipantsReady = new HashSet<ulong>();
+        public bool LocalSealReady { get; private set; }
+        private bool RequiresSealReady => !IsTerritory && !tutorialRun
+            && (state.phase == GameFlowPhase.StageResult || state.phase == GameFlowPhase.Completed);
+        public int SealParticipantCount => network == null ? 0 : network.ConnectedPlayerIds.Length;
+        public int SealReadyCount
+        {
+            get
+            {
+                int count = 0;
+                if (network != null) foreach (ulong id in network.ConnectedPlayerIds)
+                    if (sealParticipantsReady.Contains(id) && resultReady.Contains(id)
+                        && !resultPresentations.Contains(id) && !resultViewers.Contains(id)) count++;
+                return count;
+            }
+        }
+        private bool AllSealParticipantsReady => !RequiresSealReady
+            || SealParticipantCount > 0 && SealReadyCount == SealParticipantCount;
+        public bool ConfirmSealReady()
+        {
+            if (!RequiresSealReady || network == null || !network.IsConnected || goingHome
+                || IsLoadingScene || localResultPresentationBusy || IsViewerOpen || ResultSnapshot == null) return false;
+            LocalSealReady = true;
+            if (network.IsHost) SetSealParticipantReady(network.LocalPlayerId, true);
+            else network.SendGameFlowToHost(JsonUtility.ToJson(MakeControl("seal_ready")));
+            Changed?.Invoke();
+            return true;
+        }
+        private void SetSealParticipantReady(ulong id, bool ready)
+        {
+            // True is sticky within one result generation; reordered old heartbeats cannot undo a tap.
+            if (ready && RequiresSealReady) sealParticipantsReady.Add(id);
+        }
+        public void QuitStoryToRooms()
+        {
+            if (goingHome || tutorialRun || IsTerritory || !IsResultPresentationPhase) return;
+            if (state.IsRunActive) ExitRun(); // Notify the other devices using the existing departure policy.
+            goingHome = true;
+            network.Stop(); network.UnbindBattleReferences();
+            ResetRoomFlow();
+            roomBrowserVisible = true;
+            SetLocalState(new GameFlowState());
+            goingHome = false;
+            EnterRoomBrowser();
+        }
         public bool SummaryStarted { get; private set; }
         /// <summary>
         /// The Host left after the final clear, before starting the summary. Its start signal can no longer arrive,
@@ -53,6 +98,7 @@ namespace Hapio
             resultViewers.Remove(id);
             resultPresentations.Remove(id);
             resultReady.Remove(id);
+            sealParticipantsReady.Remove(id);
             if (lostHost && !network.IsHost && !tutorialRun && !IsTerritory && state.stageIndex == state.totalStages)
                 HostLostAfterClear = true;
             Changed?.Invoke();
@@ -98,6 +144,8 @@ namespace Hapio
 
         private void ResetResultAdvance()
         {
+            LocalSealReady = false;
+            sealParticipantsReady.Clear();
             SummaryStarted = false;
             HostLostAfterClear = false;
             resultViewers.Clear();
