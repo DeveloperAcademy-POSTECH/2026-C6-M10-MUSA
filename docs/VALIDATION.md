@@ -7835,3 +7835,45 @@ The initial cinematic fixture passed 1/2 because it incorrectly expected Skip al
 Prepared `feat/opening-28-frame-direction` with only the opening commits and merged origin/main `45001d21` (battle BGM updates). The original checkout remains on its existing local review branch with its preview and personal settings preserved; host-control work from #647 is not part of this PR. The sole cherry-pick conflict was this validation document; existing history and the new opening record were retained.
 
 All 279 changed opening code/asset/test files (excluding the tutorial test file, which retains main's independent Help-button assertions) have identical Git blob hashes to the tested local revision `fb021e31`. The main merge adds only six audio-file changes relative to the prepared opening branch. Accordingly, the preceding 17 EditMode and 27 PlayMode results are reused for unchanged opening behavior; they are not reported as a new run after this audio-only integration. The initial full tutorial handoff check remains separately dated above. Source/document whitespace checks and PR scope review passed; no scene, title, project setting, build profile or network-protocol changes are included.
+
+
+## 2026-11-11 — #664 구미호 고유 기믹 협동 강화 (매혹 판 멈춤·5명 2인 매혹, 여우구슬 팀 판정)
+
+기준은 main `8e9d03d4`(#661 병합 뒤), 브랜치 `feat/#664-gumiho-coop-gimmicks`, Unity 6000.6.5f1·macOS Editor다. 커밋은 단계별로 나눴다: 매혹 판 멈춤·분홍 벽 → 5명 2인 매혹 → 분홍빛·하트 → 여우구슬 팀 판정(방장) → 판정 화면·소리 → DEV 값·접속 버전 → 넘기기 막기 판에도 여우불 → 개수 증가·목표치·보상 8초 → 늦은 프레임 판정 순서 → 목표에서 빼는 수 최대 3.
+
+- **매혹:** 걸린 사람은 던지기·좌우 넘기기·구슬 만들기·판 위 끌기/합치기·여우구슬 누르기가 모두 방장에서 거절된다(`CHARMED`, 폭탄 열림만 예외). 그 사람에게 넘긴 구슬은 거절(`RECEIVER_CHARMED`)되고 화면에서는 분홍 벽에 튕긴다. 판 물리는 멈춘 채 속도를 보관했다가 풀리면 이어 간다.
+- **5명 2인 매혹:** 3~4명은 1명, 5명은 서로 옆자리가 아닌 2명(DEV 259, 기본 2). 두 사람 사이에 낀 사람은 말풍선 둘을 각각 10번씩 누른다. 걸린 사람 화면에는 분홍빛과 하트 그림(`Resources/Sabotage/CharmHeart.png`, 생성 이미지)이 아래에서 올라온다.
+- **여우구슬 팀 판정:** 여우불이 떨어진 순간부터 DEV 260(기본 15초, 0 = 판정 끔) 안에 목표치만큼 지우면 모두 BIG, 못 지우면 남은 여우구슬이 연기로 사라지고 모두 SMALL. 목표치 = 실제로 떨어진 팀 전체 수 − x(DEV 263~264, 기본 0~3), 최소 1. 목표에 닿으면 남은 여우구슬도 바로 연기로 사라진다. 지운 수는 두 번 누르기와 음·양 닿기만 센다.
+- **개수 증가:** 판 하나에 떨어지는 수 N은 한 판에서 여우불마다 최소 +1·최대 +2(DEV 261~262): 2~5 → 3~7 → 4~9 → 5~11. 모든 판이 같은 N을 받고 판 빈자리만큼만 떨어진다. 휴대폰이 한 번에 받는 여우구슬 상한을 10 → 100(판 보유 한도의 DEV 최댓값)으로 올렸다.
+- **BIG/SMALL:** 야광귀 콤보와 같은 값·연출·소리(성공!/시간 끝!, 크게/작게 표시, 부적 비, 판 구슬 1.4/0.6배, 던지는 공 2.5/0.1배, 째깍·BIG/SMALL 시작·끝 소리, "좋다"/실패 소리, BGM ±2반음). 야광귀 목소리(메롱~, 이런!)는 내지 않는다. 실제 2스테이지가 보상·벌칙을 8초로 쓰므로 1스테이지도 `Stage01_gumiho.asset` 기본값 159·162 = 8초로 맞췄고, 보상·벌칙 시간·크기 4칸(159·160·162·163)을 Hapio 1스테이지 DEV 탭에도 보이게 했다(스테이지별 값).
+- **기믹 추첨:** 같은 초에 공용 기믹(넘기기 막기)이 먼저 걸리면 그 사람이 고유 기믹 대상에서 빠져 1명 판에서 고유 기믹이 약 절반 사라지던 문제(#251부터의 규칙)를 고쳤다. 여우불은 넘기기 막기에 걸린 판에도 떨어지고, 매혹만 그 사람을 피한다. 여우구슬 판정 중에는 매혹을 걸지 않는다(DEV 간격을 판정보다 짧게 했을 때의 안전장치). 피버가 시작되면 진행 중 판정은 보상·벌칙 없이 취소된다.
+- **늦은 프레임:** 한 번에 긴 시간을 처리할 때(StageYokai None 경로) 판정 마무리가 그 구간의 기믹보다 먼저 일어나, 끝난 판정에 새 여우불이 붙거나 끝난 판정의 여우구슬이 되살아났다. 여우불을 떨어뜨리기 전에 그 시각까지 끝난 판정을 먼저 마무리하고, 구간 끝 마무리는 기믹을 다 건 뒤로 옮겼다. 피버 시작 때도 이미 끝난 판정은 먼저 마무리한다.
+- **호환 묶음:** 설정 **265개**·프로토콜 **5701**·`C6PhysicsLab/61`·`C6HapioGame/52`. 5700은 main의 #663이 사용해 건너뛰었다. 동기화에 여러 명 매혹(`charmedPlayers`·`charmEnds`·`charmHelperTargets`)과 여우구슬 판정(시각·떨어진 수·남은 수·목표·지운 수·진행 중·결과·결과 시각·횟수)이 추가돼 이전 앱과 섞어 쓰지 않는다. main 병합 때 `LabNetwork.cs` 버전 줄 충돌이 예상된다(5701 유지, 5700·5701 주석 모두 유지).
+- 에셋은 Editor API로 저장했다: `LabConfig.asset`(새 DEV 값 6개, 저장 때 코드 기본값과 같은 `thrownOrbMinVisibleScale: 0.4` 한 줄이 함께 기록됨), `Stage01_gumiho.asset`, 새 `CharmHeart.png`. Scene·Prefab·패키지·빌드 설정은 바꾸지 않았다.
+
+| 확인 | 결과 |
+| --- | --- |
+| Unity 컴파일 (단계마다, 마지막은 `b7a322b6` 내용) | PASS |
+| Editor eval: 매혹 거절 (던지기·넘기기·만들기·합치기·여우구슬·받는 쪽) | PASS |
+| Editor eval: 5명 2인 매혹 | PASS — 60/60판 2명, 옆자리 0 |
+| Editor eval: 1스테이지 설정 120초 시뮬레이션 (1명·3명 각 20판) | PASS — 고유 기믹 차례(20·40·60·80초) 160번 중 빠짐 0, 여우불이 일부 판에만 떨어진 경우 0 (수정 전 1명 판은 4번 중 2~3번) |
+| Editor eval: 여우불 개수 증가 (3명 30판, 여우불만) | PASS — 1~4번째 N이 각각 2~5·3~7·4~9·5~11 안 |
+| Editor eval: 목표 도달·시간 끝 | PASS — 목표 13 방: 12개째 남은 목표 1·진행 중, 13개째 BIG 2.5배·남은 2개 연기 / 시간 끝 SMALL 0.1배 |
+| Editor eval: 판정 화면·소리 | PASS — 패널 수·막대·3초 빨강·터치 안 막음, 15초 째깍 0.5초×21 + 0.25초×16, 시간 끝 뒤 SMALL 시작·끝 1번씩·메롱 0, BIG 배지 동안 BGM +2반음 (BIG 소리·BGM −2는 새 검사로만, NOT_RUN) |
+| Editor eval: 스테이지별 BIG/SMALL 값 | PASS — 1·2스테이지 모두 2.5배·8초 / 0.1배·8초 |
+| Editor eval: DEV 값·탭·접속 버전 | PASS — 259~264 = 2·15·1·2·0·3, 1스테이지 탭에만 보임, 5701/61/52 |
+| Editor eval: 판 헤더 복제 (목표·지운 수) | PASS |
+| Test Runner 1차 전체 EditMode·PlayMode (사용자 실행, `b4d826a1`) | 실패 EditMode 5·PlayMode 3. 통과 건수는 받지 못함 |
+| ㄴ #664 원인: `LabModelTests.AFarJumpCastsTheSameGimmicksAsSmallSteps`, `TheLastFoxRoundResultStaysWhileTheNextRoundRuns`, `LabSabotageBoundaryTests.LateTickFreesExpiredStorageBeforeDrawingTheNextFoxFire`(2) | `a63c7de5`에서 수정. 같은 내용을 Editor eval로 따라 해 일치 확인(기믹 48/48 동일, 6·10·25초 결과, 판 한도 3개). Test Runner 재실행 NOT_RUN |
+| ㄴ 환경 원인: `GourdResultViewerPlayModeTests`(3) | 로컬 `EditorBuildSettings.asset`에서 Lab 씬이 꺼져(`enabled: 0`, 커밋 안 함) `LoadSceneAsync("Lab")` 실패. #664 변경 없음 |
+| ㄴ 환경 원인: `GameResultStrokeTests.SavedResultBrushKeepsOriginalButtonTapAndDisabledGate("Viewer","ResultAction")` | `ResultAction.png`의 로컬 Library 캐시 손상("Unknown error occurred while loading 'VirtualArtifacts/Primary/e3472224…'"). 강제 Reimport로도 안 풀림. 원본 PNG·.meta 변경 없음 |
+| Test Runner 재실행 (수정·목표 최대 3 반영, Lab 씬 켜고 캐시 복구 뒤) | NOT_RUN |
+| Mac 3인 실행·5인 실행·iOS 실기기 | NOT_RUN |
+
+새·수정 검사:
+- EditMode `LabModelTests`: 매혹 판 멈춤·옆 판·예고, 5명 2인·가운데 사람, 여우구슬 판정(목표 도달 BIG·시간 끝 SMALL·지난 결과 유지·개수 증가·목표 최소 1), 넘기기 막기와 같은 시각, DEV 값 6개
+- EditMode: `LabYaguangSoundTests`(2), `LabComboClearSoundTests`, `LabBattleBgmComboToneTests`, `LabBattleAudioWarmupTests`, `LabFeverTimeTests`, `LabSabotageBoundaryTests`, `LabFoxRoundReplicationTests`(새 파일), `LabLobbyRejoinTests`·`LabGameFlowBridgeTests`·`LabSharedSettingsSchemaTests`(접속 버전), `LabDeveloperConfigTests`(Gimmicks 칸 순서), `GameStageSettingsTests`(1스테이지 탭·8초), `GameEditorMenuCleanupTests`(1스테이지 파일 재생성)
+- PlayMode: `LabCharmBoardTests`(새 파일), `LabCharmHeartRainTests`(새 파일), `LabFoxRoundHudTests`(새 파일), 말풍선 두 개 검사
+- DEV 개수 259 → 265 반영 33개 파일
+
+#637 기준: 방장 규칙·동기화·DEV 값 개수가 바뀌어 전체 EditMode·PlayMode가 필요하다. 1차 전체 실행 뒤 바뀐 게임 코드는 `LabModel.cs`·`LabModel.StageFever.cs`(판정 순서)와 `LabConfig.cs`·`LabModel.FoxRound.cs`(목표에서 빼는 수 기본 3)이므로 전체 재실행이 남아 있다.
