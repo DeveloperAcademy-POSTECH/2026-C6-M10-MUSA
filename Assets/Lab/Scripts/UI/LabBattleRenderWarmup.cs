@@ -110,6 +110,9 @@ namespace C6Lab
             SpawnShakeArtCopies();
             SpawnReleaseBubbleCopy(LabGourdAlert.YaguangReleasePath, -60f);
             SpawnReleaseBubbleCopy(LabGourdAlert.YaguangTauntPath, 60f);
+            int artIndex = 0;
+            foreach (string name in new[] { "CountOne", "CountTwo", "CountThree", "CountFour", "Panel", "Earth", "Wood", "Fire", "Water", "Metal", "Check", "BarFill" })
+                SpawnReleaseBubbleCopy(LabYaguangComboArt.Path + name, (artIndex++ % 5 - 2) * 45f);
             SpawnClayCopies(config);
             if (boardCamera != null) SpawnBoardCopies(config.OrbAppearance);
             MoveCopies();
