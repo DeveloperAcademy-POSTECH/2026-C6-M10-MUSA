@@ -253,6 +253,16 @@ namespace C6Lab
         private static Sprite arrowSprite;
         [Tooltip("#540 획 안내: 지금 써야 할 획이 글자 안에서 빛나는 색.")]
         [SerializeField] private Color strokeGuideColor = new Color(1f, .93f, .6f, .75f);
+        [Tooltip("#663: 부적을 이만큼(0~1, 글자 전체 대비) 넘게 썼는데 아직 완성이 안 됐으면, 지금 획만이 아니라 남은 곳을 모두 하얗게 강하게 보여 준다. 0이면 끔. 완성 기준(LabConfig Jigwi Talisman Coverage)보다 작게.")]
+        [SerializeField, Range(0f, 1f)] private float remainingHintFrom = .6f;
+        [Tooltip("#663: 남은 곳을 보여 줄 때 색 (진한 흰빛).")]
+        [SerializeField] private Color remainingHintColor = new Color(1f, 1f, 1f, .95f);
+        [Tooltip("#663: 남은 곳 점 크기 배율 (1 = 획 안내와 같음).")]
+        [SerializeField, Range(1f, 2f)] private float remainingHintScale = 1.35f;
+        [Tooltip("#663: 남은 곳이 반짝이는 빠르기 (1초에 몇 번).")]
+        [SerializeField, Range(0f, 4f)] private float remainingHintBlinksPerSecond = 1.5f;
+        /// <summary>#663: 남은 곳을 모두 하얗게 보여 주는 중인지 (테스트·확인용).</summary>
+        public bool RemainingHintOn { get; private set; }
         [Tooltip("#540 획 안내: 지금 획을 따라 움직이는 화살표 색.")]
         [SerializeField] private Color strokeArrowColor = new Color(.16f, .47f, .93f, 1f);
         /// <summary>#540 테스트용: 지금 안내 중인 획 번호 (안내가 없으면 -1).</summary>
@@ -1109,6 +1119,9 @@ namespace C6Lab
         }
 
         /// <summary>#533: 지금 써야 할 획의 다음 빈 점에서 깜빡이는 표시. 획 순서를 알려 줄 뿐, 다른 곳을 칠해도 된다.</summary>
+        /// <summary>#663: 다음 점 표시와 획 안내를 그린다. LateUpdate와 테스트가 같이 쓴다.</summary>
+        public void DrawGuide(float time) => UpdateNextMarker(time);
+
         private void UpdateNextMarker(float time)
         {
             if (nextMarker == null) return;
@@ -1135,16 +1148,22 @@ namespace C6Lab
             if (!Visible || next < 0) { HideStrokeGuide(); return; }
             int current = stroke.StrokeOf(next);
             GuidedStroke = current;
-            float glow = .6f + .4f * Mathf.Sin(time * 4f);
+            // #663: nearly written but not finished: every place still left shows, brighter and larger, so the last bits are easy to find.
+            bool remaining = remainingHintFrom > 0f && stroke.Coverage >= remainingHintFrom;
+            RemainingHintOn = remaining;
+            float glow = remaining
+                ? .75f + .25f * Mathf.Cos(time * Mathf.Max(0f, remainingHintBlinksPerSecond) * Mathf.PI * 2f)
+                : .6f + .4f * Mathf.Sin(time * 4f);
             int shown = 0;
             for (int i = 0; i < guideDots.Length; i++)
             {
                 if (guideDots[i] == null) continue;
-                bool on = stroke.StrokeOf(i) == current && !stroke.IsCovered(i);
+                bool on = !stroke.IsCovered(i) && (remaining || stroke.StrokeOf(i) == current);
                 if (guideDots[i].gameObject.activeSelf != on) guideDots[i].gameObject.SetActive(on);
                 if (!on) continue;
                 shown++;
-                Color c = strokeGuideColor; c.a *= glow; guideDots[i].color = c;
+                Color c = remaining ? remainingHintColor : strokeGuideColor; c.a *= glow; guideDots[i].color = c;
+                guideDots[i].rectTransform.localScale = Vector3.one * (remaining ? remainingHintScale : 1f);
             }
             GuideDotsShown = shown;
             if (strokeArrow == null) return;

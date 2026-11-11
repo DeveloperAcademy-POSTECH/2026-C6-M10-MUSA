@@ -166,6 +166,26 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void NearlyWrittenShowsEveryPlaceStillLeftInStrongWhite()
+        {
+            // #663: while little is written only the stroke to write now glows; once most of it is written, every unwritten
+            // place glows in strong white so the last bits are easy to find.
+            LabSnapshot snapshot = Snapshot(-1d);
+            overlay.Present(snapshot, Local, 11d);
+            overlay.DrawGuide(0f);
+            Assert.That(overlay.RemainingHintOn, Is.False, "Nothing written yet: just the stroke guide.");
+            int firstStroke = overlay.GuideDotsShown;
+            Assert.That(firstStroke, Is.GreaterThan(0));
+            JsonUtility.FromJsonOverwrite("{\"remainingHintFrom\":0.01}", overlay);
+            Vector2 point = LabJigwiTalismanStroke.Water[0];
+            overlay.PaintNormalized(point, point);
+            Assert.That(overlay.Coverage, Is.GreaterThan(.01f).And.LessThan(1f));
+            overlay.DrawGuide(0f);
+            Assert.That(overlay.RemainingHintOn, Is.True);
+            Assert.That(overlay.GuideDotsShown, Is.GreaterThan(firstStroke), "Every unwritten place, not just the first stroke.");
+        }
+
+        [Test]
         public void AnUnfinishedTalismanBurnsAwayWhenTheARunsOut()
         {
             LabSnapshot snapshot = Snapshot(-1d);
