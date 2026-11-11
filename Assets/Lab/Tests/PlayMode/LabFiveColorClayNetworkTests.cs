@@ -63,8 +63,9 @@ namespace C6Lab.Tests
             Assert.That(orb.kind, Is.EqualTo(LabOrbKind.Combined));
             pool = LabFiveElementVfx.ForScene(network.projectileRoot.gameObject.scene);
             pool.ManualClock = true;
-            int hits = 0, receipts = 0;
+            int hits = 0, receipts = 0, rewardHits = 0;
             network.LocalThrowHit += _ => hits++;
+            network.LocalFiveColorHit += () => rewardHits++;
             Invoke("OnThrowRequested", new LabOrbThrowGesture(orb.id, new Vector2(0f, 2.8f), .5f, .5f));
             LabProjectile shot = network.projectileRoot.GetComponentsInChildren<LabProjectile>()
                 .Single(item => item.ProjectileId == orb.id);
@@ -94,15 +95,15 @@ namespace C6Lab.Tests
             Assert.That(pool.ActiveFlightCount, Is.Zero);
             Assert.That(pool.ActiveImpactCount, Is.EqualTo(1));
             AssertTint(pool.transform.Find("Impact 0/Contact squash").GetComponent<MeshRenderer>(), contact.FiveColorAge);
-            Assert.That(Object.FindObjectsByType<LabFiveColorSparkle>(FindObjectsSortMode.None)
-                .Count(item => item.name == "Five Color Sparkle Burst"), Is.EqualTo(1));
-            Assert.That(Object.FindObjectsByType<LabFiveColorSparkle>(FindObjectsSortMode.None)
-                .Count(item => item.name == "Five Color Dust Burst"), Is.EqualTo(1));
+            Assert.That(rewardHits, Is.EqualTo(1), "The thrower's dedicated sound and haptic event still fires.");
+            AssertNoLegacyFiveColorBursts();
             Invoke("OnProjectileResolved", contact);
             for (int step = 0; step < 3; step++) yield return new WaitForFixedUpdate();
             Assert.That(receipts, Is.EqualTo(1));
             Assert.That(hits, Is.EqualTo(1), "A repeated Host callback cannot confirm the consumed reward twice.");
+            Assert.That(rewardHits, Is.EqualTo(1));
             Assert.That(pool.ActiveImpactCount, Is.EqualTo(1));
+            AssertNoLegacyFiveColorBursts();
         }
 
         [UnityTest]
@@ -127,8 +128,9 @@ namespace C6Lab.Tests
             Assert.That(predicted.ClayFlightActive, Is.True, "The same body can reconcile back to approved five-color clay.");
             Assert.That(predicted.transform.position, Is.EqualTo(before), "Appearance reconciliation cannot rewind flight.");
             Assert.That(network.projectileRoot.GetComponentsInChildren<LabProjectile>().Length, Is.EqualTo(1));
-            int hits = 0;
+            int hits = 0, rewardHits = 0;
             network.LocalThrowHit += _ => hits++;
+            network.LocalFiveColorHit += () => rewardHits++;
             Transform hitbox = network.target.Hitbox.transform;
             Vector3 point = hitbox.TransformPoint(new Vector3(0f, 0f, .8f));
             Vector3 normal = hitbox.forward, incoming = -normal * 10f;
@@ -137,11 +139,15 @@ namespace C6Lab.Tests
             Invoke("OnPredictedShotContact", 19L, contact, LabOrbElement.None, 20, 1f, true, false, false);
             Assert.That(hits, Is.EqualTo(1));
             Assert.That(pool.ActiveImpactCount, Is.EqualTo(1));
+            Assert.That(rewardHits, Is.Zero, "Dedicated reward feedback waits for Host confirmation.");
+            AssertNoLegacyFiveColorBursts();
             object confirmation = ImpactPacket("predicted-five", network.LocalPlayerId, point, normal, .27f);
             Receive(confirmation);
             Receive(confirmation);
             Assert.That(hits, Is.EqualTo(1), "The Host verdict corrects a presented hit without replaying it.");
+            Assert.That(rewardHits, Is.EqualTo(1), "Repeated confirmation keeps reward sound and haptics single-shot.");
             Assert.That(pool.ActiveImpactCount, Is.EqualTo(1));
+            AssertNoLegacyFiveColorBursts();
             predicted.gameObject.SetActive(false);
 
             object replicaPacket = ProjectilePacket("remote-five", 2UL, 20, new Vector3(0f, 81f, 3f));
@@ -169,15 +175,24 @@ namespace C6Lab.Tests
             Receive(impact);
             Assert.That(pool.ActiveImpactCount, Is.EqualTo(2));
             Assert.That(hits, Is.EqualTo(1), "Remote visual contact never awards a local gameplay hit.");
+            Assert.That(rewardHits, Is.EqualTo(1), "A remote throw must not trigger my reward sound or haptics.");
+            AssertNoLegacyFiveColorBursts();
             Assert.That(network.Snapshot.hp, Is.EqualTo(800));
             Assert.That(network.Snapshot.paintCoveredCount, Is.Zero, "Client feedback never performs Host paint adjudication.");
+        }
+
+        private static void AssertNoLegacyFiveColorBursts()
+        {
+            Assert.That(Object.FindObjectsByType<LabFiveColorSparkle>(FindObjectsSortMode.None)
+                .Where(item => item.name == "Five Color Sparkle Burst" || item.name == "Five Color Dust Burst"),
+                Is.Empty, "Five-color hits use the common clay contact without legacy billboard overlays.");
         }
 
         private void PrepareClient()
         {
             previousScene = SceneManager.GetActiveScene();
             clientScene = SceneManager.CreateScene("Five color clay client fixture");
-            SceneManager.SetActiveScene(clientScene); // Own the standalone hit stars/dust as well as the fixture root.
+            SceneManager.SetActiveScene(clientScene); // Own any unexpected standalone effects as well as the fixture root.
             root = new GameObject("Five color clay client fixture");
             SceneManager.MoveGameObjectToScene(root, clientScene);
             tuning = Object.Instantiate(Resources.Load<LabConfig>("LabConfig"));

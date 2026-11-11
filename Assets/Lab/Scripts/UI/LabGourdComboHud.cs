@@ -93,6 +93,13 @@ namespace C6Lab
         private readonly Image[] slotFills = new Image[LabGourdCombo.Length];
         private readonly Image[] slotChecks = new Image[LabGourdCombo.Length];
         private Image timeBarFill;
+        private RectTransform gaugeFrame, gaugeContainer;
+        private CanvasGroup gaugeGroup, ownedGaugeGroup, panelGroup;
+        private readonly Vector3[] gaugeCorners = new Vector3[4];
+        private float gaugeAlphaBeforeCover, panelShownAt;
+        private bool gaugeCovered, panelWasShown;
+        private bool figmaPanel;
+        private readonly LabOrbElement[] slotElements = new LabOrbElement[LabGourdCombo.Length];
         private Text resultText;
         private Image flash;
         private float unit = 1f;
@@ -210,11 +217,13 @@ namespace C6Lab
             return failedSeat >= 0 ? "P" + (failedSeat + 1) + " " + WrongColorText : WrongColorText;
         }
         public bool SlotChecked(int index) => slotChecks[index] != null && slotChecks[index].gameObject.activeSelf;
-        public Color SlotColor(int index) => slotFills[index] != null ? slotFills[index].color : Color.clear;
+        public Color SlotColor(int index) => figmaPanel ? (Color)LabPaintPalette.SrgbColorFor(slotElements[index])
+            : slotFills[index] != null ? slotFills[index].color : Color.clear;
 
         /// <summary>스냅샷을 읽을 네트워크와, 패널을 그릴 Canvas를 연결한다.</summary>
         public void Bind(LabNetwork target, Canvas uiCanvas)
         {
+            ReleaseGauge();
             network = target;
             canvas = uiCanvas != null ? uiCanvas.rootCanvas : null;
         }
@@ -233,6 +242,9 @@ namespace C6Lab
             bool anyCombo = snapshot != null && (snapshot.comboCount > 0 || warning || snapshot.foxRoundCount > 0);
             if (!battle || !anyCombo)
             {
+                CoverGauge(false);
+                panelWasShown = false;
+                if (panelGroup != null) panelGroup.alpha = 0f;
                 if (layer != null) layer.gameObject.SetActive(false);
                 if (snapshot == null || snapshot.phase != LabPhase.Playing) ResetRound();
                 return;
@@ -249,6 +261,7 @@ namespace C6Lab
             DrawWarning(snapshot, serverNow, warning);
             DrawShade(warning);
             DrawEffect(snapshot, serverNow);
+            CoverGauge(figmaPanel && (panel.gameObject.activeSelf || resultText.gameObject.activeSelf || comboPopFinal && comboPop.gameObject.activeSelf));
         }
 
         /// <summary>#414 예고 그늘: 예고 동안 천천히 진해지고, 4칸이 나오면 빨리 걷힌다.</summary>
@@ -487,10 +500,15 @@ namespace C6Lab
             // 결과 문구가 떠 있는 동안에는 패널을 숨긴다 (콤보 → 결과 → 배지가 겹치지 않게).
             bool showPanel = snapshot.comboActive && resultElapsed < 0f && snapshot.comboColors != null
                 && snapshot.comboColors.Length == LabGourdCombo.Length;
-            panel.gameObject.SetActive(showPanel);
-            if (!showPanel) return;
             bool yaguang = YaguangCount;
-            questionSlot.gameObject.SetActive(yaguang);
+            figmaPanel = yaguang && LabYaguangComboArt.Load("Panel") != null;
+            ApplyPanelArtwork(figmaPanel);
+            panel.gameObject.SetActive(showPanel);
+            if (showPanel && !panelWasShown) panelShownAt = Time.unscaledTime;
+            panelWasShown = showPanel;
+            panelGroup.alpha = showPanel ? Mathf.SmoothStep(0f, 1f, (Time.unscaledTime - panelShownAt) / .22f) : 0f;
+            if (!showPanel) return;
+            questionSlot.gameObject.SetActive(yaguang && !figmaPanel);
             if (yaguang)
                 questionSlot.localRotation = Quaternion.Euler(0f, 0f, 8f * Mathf.Sin(Time.unscaledTime * 2.3f));
 
@@ -498,7 +516,10 @@ namespace C6Lab
             if (popElapsed >= 0f) popElapsed += Time.unscaledDeltaTime;
             for (int i = 0; i < LabGourdCombo.Length; i++)
             {
-                slotFills[i].color = LabPaintPalette.SrgbColorFor(snapshot.comboColors[i]);
+                slotElements[i] = snapshot.comboColors[i];
+                Sprite art = figmaPanel ? LabYaguangComboArt.Orb(slotElements[i]) : null;
+                slotFills[i].sprite = art != null ? art : DiscSprite();
+                slotFills[i].color = art != null ? Color.white : (Color)LabPaintPalette.SrgbColorFor(slotElements[i]);
                 bool hit = i < snapshot.comboProgress;
                 slotChecks[i].gameObject.SetActive(hit);
                 float scale = 1f;
@@ -508,8 +529,8 @@ namespace C6Lab
                 slots[i].localScale = Vector3.one * scale;
                 // 야광귀 셈법 (#271): 맞힌 칸 위에 그 칸의 수가 톡 튀어나와 남는다.
                 Text word = slotWords[i];
-                word.gameObject.SetActive(yaguang && hit);
-                if (!(yaguang && hit)) continue;
+                word.gameObject.SetActive(yaguang && hit && !figmaPanel);
+                if (!(yaguang && hit) || figmaPanel) continue;
                 word.text = CountWord(i + 1);
                 float rise = 0f, wordScale = 1f;
                 if (i == popSlot && popElapsed >= 0f && popElapsed < .35f)
@@ -528,10 +549,68 @@ namespace C6Lab
                 double left = System.Math.Max(0d, snapshot.comboEndsAt - serverNow);
                 double limit = snapshot.comboEndsAt - snapshot.comboStartedAt;
                 timeBar.anchorMax = new Vector2(limit > 0d ? Mathf.Clamp01((float)(left / limit)) : 0f, 1f);
-                timeBarFill.color = left <= 3d ? FailColor : (Color)InkColor;
+                timeBarFill.color = figmaPanel ? Color.white : left <= 3d ? FailColor : (Color)InkColor;
                 timeBar.parent.gameObject.SetActive(true);
             }
             else timeBar.parent.gameObject.SetActive(false);
+        }
+
+        private void ApplyPanelArtwork(bool authored)
+        {
+            Vector2 viewport = ((RectTransform)canvas.transform).rect.size;
+            float fit = LabYaguangComboArt.Fit(viewport);
+            Vector2 authoredSize = LabYaguangComboArt.PanelReference.size * fit;
+            Vector2 authoredAnchor = LabYaguangComboArt.PanelAnchor(viewport);
+            if (authored && FindGauge())
+            {
+                gaugeFrame.GetWorldCorners(gaugeCorners);
+                Vector2 lo = layer.InverseTransformPoint(gaugeCorners[0]);
+                Vector2 hi = layer.InverseTransformPoint(gaugeCorners[2]);
+                Rect placement = LabYaguangComboArt.OverGauge(Rect.MinMaxRect(lo.x, lo.y, hi.x, hi.y));
+                authoredSize = placement.size;
+                fit = authoredSize.x / 207f;
+                authoredAnchor = new Vector2((placement.center.x - layer.rect.xMin) / layer.rect.width,
+                    (placement.center.y - layer.rect.yMin) / layer.rect.height);
+            }
+            float gap = slotSize * .22f;
+            Vector2 anchor = authored ? authoredAnchor : panelAnchor;
+            panel.anchorMin = panel.anchorMax = anchor;
+            resultText.rectTransform.anchorMin = resultText.rectTransform.anchorMax = anchor;
+            comboPop.anchorMin = comboPop.anchorMax = anchor;
+            warningPanel.anchorMin = warningPanel.anchorMax = anchor;
+            Image back = panel.GetComponent<Image>();
+            back.sprite = authored ? LabYaguangComboArt.Load("Panel") : RoundedSprite();
+            back.type = authored ? Image.Type.Simple : Image.Type.Sliced;
+            back.color = authored ? Color.white : PanelColor;
+            panel.sizeDelta = authored ? authoredSize
+                : new Vector2(slotSize * LabGourdCombo.Length + gap * (LabGourdCombo.Length + 1), slotSize + gap * 3f + 10f * unit);
+            for (int i = 0; i < slots.Length; i++)
+            {
+                slots[i].sizeDelta = authored ? new Vector2(26.27368f, 26.82105f) * fit : Vector2.one * slotSize;
+                slots[i].anchoredPosition = authored
+                    ? new Vector2(38.63685f + 13.13684f + i * 34.48421f, -7.43684f - 13.41053f) * fit
+                    : new Vector2(gap + slotSize * .5f + i * (slotSize + gap), -gap - slotSize * .5f);
+                var check = slotChecks[i].rectTransform;
+                slotChecks[i].sprite = authored ? LabYaguangComboArt.Load("Check") : CheckSprite();
+                if (authored)
+                {
+                    check.anchorMin = check.anchorMax = new Vector2(.5f, .5f);
+                    check.sizeDelta = Vector2.one * (18.61052f * fit);
+                    check.anchoredPosition = new Vector2(0f, -.27368f * fit);
+                }
+                else
+                {
+                    check.anchorMin = Vector2.zero; check.anchorMax = Vector2.one;
+                    check.offsetMin = check.offsetMax = Vector2.zero;
+                }
+            }
+            var track = (RectTransform)timeBar.parent;
+            track.offsetMin = authored ? new Vector2(13.13684f, 6.34210f) * fit : new Vector2(gap, gap);
+            track.offsetMax = authored ? new Vector2(-13.13684f, 10.17368f) * fit : new Vector2(-gap, gap + 10f * unit);
+            var trackImage = track.GetComponent<Image>();
+            trackImage.sprite = authored ? LabYaguangComboArt.Load("BarFill") : null;
+            trackImage.color = authored ? new Color(1, 1, 1, .15f) : new Color(0, 0, 0, .15f);
+            timeBarFill.sprite = authored ? LabYaguangComboArt.Load("BarFill") : null;
         }
 
         private void DrawResult()
@@ -716,6 +795,8 @@ namespace C6Lab
             back.type = Image.Type.Sliced;
             back.color = PanelColor;
             back.raycastTarget = false;
+            panelGroup = panel.gameObject.AddComponent<CanvasGroup>();
+            panelGroup.alpha = 0f; panelGroup.blocksRaycasts = false; panelGroup.interactable = false;
 
             for (int i = 0; i < LabGourdCombo.Length; i++)
             {
@@ -1055,8 +1136,56 @@ namespace C6Lab
             return Vector2.Distance(p, a + ab * t);
         }
 
+        private bool FindGauge()
+        {
+            if (gaugeFrame != null && gaugeContainer != null) return true;
+            if (canvas == null) return false;
+            foreach (var rect in canvas.GetComponentsInChildren<RectTransform>(true))
+                if (rect.name == "Paint Progress" && rect.Find("Frame") is RectTransform frame)
+                { gaugeContainer = rect; gaugeFrame = frame; return true; }
+            return false;
+        }
+        private void CoverGauge(bool cover)
+        {
+            if (cover)
+            {
+                if (!FindGauge()) return;
+                if (gaugeGroup == null)
+                {
+                    gaugeGroup = gaugeContainer.GetComponent<CanvasGroup>();
+                    if (gaugeGroup == null)
+                    {
+                        gaugeGroup = ownedGaugeGroup = gaugeContainer.gameObject.AddComponent<CanvasGroup>();
+                        gaugeGroup.blocksRaycasts = false; gaugeGroup.interactable = false;
+                    }
+                }
+                if (!gaugeCovered) gaugeAlphaBeforeCover = gaugeGroup.alpha;
+                gaugeCovered = true; gaugeGroup.alpha = 0f;
+            }
+            else
+            {
+                if (gaugeCovered && gaugeGroup != null) gaugeGroup.alpha = gaugeAlphaBeforeCover;
+                gaugeCovered = false;
+            }
+        }
+        private void ReleaseGauge()
+        {
+            CoverGauge(false);
+            if (ownedGaugeGroup != null)
+            {
+                if (Application.isPlaying) Destroy(ownedGaugeGroup); else DestroyImmediate(ownedGaugeGroup);
+            }
+            gaugeGroup = ownedGaugeGroup = null; gaugeFrame = gaugeContainer = null;
+        }
+        private void OnDisable()
+        {
+            CoverGauge(false); panelWasShown = false;
+            if (panelGroup != null) panelGroup.alpha = 0f;
+            if (layer != null) layer.gameObject.SetActive(false);
+        }
         private void OnDestroy()
         {
+            ReleaseGauge();
             if (layer != null) Destroy(layer.gameObject);
         }
     }

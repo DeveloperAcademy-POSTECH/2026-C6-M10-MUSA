@@ -43,11 +43,28 @@ namespace Hapio
             shadow.enabled = false;
             design=GameViewerHelpUi.Design(transform,"Sealed Gourd Design");
             viewport.SetParent(design,false);GameViewerHelpUi.Place(viewport,0,128,402,414);
-            GameViewerHelpUi.Label(design,"Rotate Hint","회전해서 박을 확인하시오,",theme.bold,20,GameBattleUiColors.Muted,63,664,276,30);
+            GameViewerHelpUi.Label(design,"Rotate Hint","회전해서 박을 확인하시오,",theme.bold,20,GameBattleUiColors.SecondaryLightIvory800,63,664,276,30);
             Dress(screen.resetViewerButton,"박 리셋","ViewerReset",711,theme.medium);
-            Dress(screen.closeViewerButton,"결과로 돌아가기","ResultAction",768,theme.medium);
+            BuildReturnButton(theme.medium);
             ApplyStage(1);
         }
+        private void OnEnable() => transform.SetAsLastSibling();
+
+        private void BuildReturnButton(Font font)
+        {
+            Button button = screen.closeViewerButton;
+            button.transform.SetParent(design, false);
+            GameViewerHelpUi.Place((RectTransform)button.transform, 84, 768, 234, 45);
+            foreach (Transform child in button.transform) child.gameObject.SetActive(false);
+
+            button.transition = Selectable.Transition.None;
+            button.targetGraphic.color = Color.clear;
+            button.targetGraphic.raycastTarget = true;
+            GameViewerHelpUi.Surface(button.transform, "ResultAction", 0, 0, 234, 45);
+            GameViewerHelpUi.Label(button.transform, "Label", "결과로 돌아가기", font, 21,
+                new Color32(245, 238, 225, 255), 0, 0, 234, 45);
+        }
+
         private void Dress(Button button,string label,string key,float y,Font font)
         {
             button.transform.SetParent(design,false);GameViewerHelpUi.Place((RectTransform)button.transform,84,y,234,45);

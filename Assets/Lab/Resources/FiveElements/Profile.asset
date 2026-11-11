@@ -64,6 +64,22 @@ MonoBehaviour:
   tipSag: 0.115
   contactSeconds: 0.86
   markSeconds: 2
+  fiveColorBoostEnabled: 1
+  fiveColorTrailDiameters: 2.4
+  fiveColorTrailWidthScale: 1.4
+  fiveColorDropSizeScale: 1.3
+  fiveColorSpreadScale: 1.35
+  fiveColorPressWidthScale: 1.2
+  fiveColorPressSeconds: 0.06
+  fiveColorSpreadSeconds: 0.1
+  fiveColorClayDrops: 5
+  fiveColorDropLifetime: 0.65
+  fiveColorContactSeconds: 0.95
+  fiveColorStarsEnabled: 1
+  fiveColorStarCount: 10
+  fiveColorStarLifetime: 0.45
+  fiveColorStarSize: 0.42
+  fiveColorStarReach: 2.6
   maxFlights: 16
   maxImpacts: 24
   lowDetailImpacts: 10
