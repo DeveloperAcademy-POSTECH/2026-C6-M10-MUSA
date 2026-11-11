@@ -1,5 +1,30 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-11 — 3스테이지 마지막 일격 다시보기 (구슬 없는 칠 완료)
+
+- **기준:** `fix/stage3-final-hit-replay` (main `ee9319a4` 기준). Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 기록 형식과 패킷은 바꾸지 않아 접속 묶음은 그대로다.
+- **원인:**
+  - 지귀 공통 부적 폭포(`PaintJigwiBucketPour`)와 그 칠이 번지는 성장은 구슬 없이 박을 칠한다.
+  - 이것으로 100%가 되면 최근 4초 안의 명중이 없다. 박 자세 기록(256 고정 스텝, 약 5.1초)에서도 그 명중이 밀려나, 다시보기 대신 1.2초 연출이 나왔다.
+  - 1·2스테이지에는 구슬 없이 칠하는 경로가 없다.
+- **고친 것:**
+  - Host가 명중마다 전후 자세를 저장한다(`KeepReplayHitPoses`).
+  - 최근 명중이 없으면 이번 라운드의 가장 최근 명중을 재생한다.
+  - `C6_FINISH_REPLAY` 로그로 재생 여부와 대체 이유를 남긴다.
+
+| 확인 | 결과 |
+| --- | --- |
+| Mac 개발 빌드 3앱(방장 + 구성원 2, 직접 IP), main, 3스테이지 구슬 완료 시작 직후·102초 | 3대 모두 재생 |
+| 같은 3앱, Victory부터 재생 시작까지(1·2·3스테이지) | 2.5 / 3.0 / 2.5초 (한도 약 5.4초) |
+| 같은 3앱, 폭포로 마지막 칠 재현 시도 2회 | 폭포가 99.8~99.9%까지 올렸으나 건조로 100%에 못 미쳐 재현 못 함 |
+| 새 PlayMode `PaintWithoutAnOrbFinishingLaterStillReplaysTheRoundsLastHit`(명중 뒤 자세 기록을 벗어난 뒤 구슬 없는 칠로 완료) | 수정 전 FAIL, 수정 후 PASS |
+| `GameFinishReplayTests` / EditMode `FinishReplay` | 5/5, 8/8 PASS |
+| Mac 3앱, 수정본, 명중 7초 뒤 구슬 없는 칠로 완료 | 3대 모두 재생, 방장 로그 `C6_FINISH_REPLAY replay` |
+| 전체 EditMode | 2242/2243. 실패 1건 `GameEditorMenuCleanupTests.RecreatedYaguangDefaults…`는 main `ee9319a4`에서도 같은 실패 |
+| 전체 PlayMode | 778/790. 실패 12건 중 9건은 앞 검사가 남긴 세션 때문에 SetUp이 실패한 연쇄다. 실패한 7개 묶음(50건)을 다시 돌리면 이 브랜치와 main 모두 50/50 PASS |
+
+- **미실행:** 실기기·iOS, 실제 폭포가 마지막 칠을 하는 실플레이(재현 실패), 5인.
+
 ## 2026-11-10 — #647 병합 검토 반영 (스테이지 클리어 방장 진행)
 
 - **기준:** `feat/stage-clear-host-controls` `34c5a609`(PR 원본 `72daba95` + #646 + main `868c885f` 병합 + 검토 반영). Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 접속 묶음은 PR대로 `C6HapioGame/49`.
