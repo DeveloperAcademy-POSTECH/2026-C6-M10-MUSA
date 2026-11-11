@@ -45,6 +45,6 @@ MonoBehaviour:
   - {fileID: 8300000, guid: 620fada890f246828577553d5dbd7ed7, type: 3}
   - {fileID: 8300000, guid: 5fe6ded8170444b9bca67f82067e35ac, type: 3}
   tapLoudness: 8
-  tapSpeed: 1
+  tapSpeed: 0.3
   soundVolume: 1
   maxMarks: 10
