@@ -64,7 +64,7 @@ namespace Hapio.Editor
         {
             new GameStageValue(155, 1f), new GameStageValue(184, 1f), new GameStageValue(191, 1f),
             new GameStageValue(164, 4f), new GameStageValue(158, 13f),
-            new GameStageValue(159, 8f), new GameStageValue(162, 8f),
+            new GameStageValue(159, 13f), new GameStageValue(162, 8f),
             new GameStageValue(188, 3f), new GameStageValue(189, 11f), new GameStageValue(190, 1f),
             // 211 (yaguang battle seconds) is retired (#328); every stage shares the common 120 s battle.
             new GameStageValue(212, 100f),

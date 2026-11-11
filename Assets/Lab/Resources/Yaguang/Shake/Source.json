@@ -1,0 +1,31 @@
+{
+  "fileKey": "wW7ny7lNQ4DXNJ4kD46AuR",
+  "referenceFrame": "4607:4749",
+  "scale": 2,
+  "assets": {
+    "Phone.png": "4607:4932",
+    "Title.png": "4607:4756",
+    "Guide.png": "4607:4757",
+    "GaugeTrack.png": "4607:4910 (background only; temporary clone removed)",
+    "CellFull.png": "4607:4782",
+    "CellEmpty.png": "4607:4911",
+    "Countdown3.png": "4570:11822",
+    "Countdown2.png": "4570:11823",
+    "Countdown1.png": "4570:11821",
+    "EyesNormal.png": "4590:3369",
+    "EyesYellow.png": "4590:3370"
+  },
+  "font": "Nanum Brush Script Regular; google/fonts/ofl/nanumbrushscript; OFL.txt",
+  "colors": {
+    "count": "5orbscolor/MetalYellow/700 (#956D14)",
+    "veil": "Native HDR white light; warning .12, afterglow .20, whole-screen pulse .16 seconds; round-corner additive composite."
+  },
+  "notes": [
+    "Transparent direct node exports; text PNGs use tight glyph bounds centered in original text slots.",
+    "Target-dependent 2..18 cells; fixed 218x22 gauge.",
+    "Screen fits centered 349x765 reference with uniform scaling.",
+    "Countdown PNGs remain opaque from their first frame; source Shilla Culture Bold 110 with authored stroke/fills.",
+    "Phone moves at 5Hz from count zero. No radial expansion: one .16s flash, then mild .20 afterglow.",
+    "Native URP Bloom on a private ARGBHalf camera; global pipeline/lighting assets remain unchanged. Elliptical warning falloff and rounded frame corners."
+  ]
+}

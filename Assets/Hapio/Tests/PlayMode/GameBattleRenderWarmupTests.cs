@@ -64,6 +64,10 @@ namespace Hapio.Tests
             object liveSeed = seedField.GetValue(liveClay);
             int liveFlights = liveClay.ActiveFlightCount, liveContacts = liveClay.ActiveImpactCount;
             yield return Until(() => warmup.Root != null, "The warmup starts");
+            var warmupImages = warmup.Root.GetComponentsInChildren<UnityEngine.UI.Image>(true);
+            foreach (string path in new[] { LabYaguangShakeCue.ArtPath + "Phone", LabGourdAlert.YaguangReleasePath, LabGourdAlert.YaguangTauntPath })
+                Assert.That(warmupImages.Any(image => image.sprite == Resources.Load<Sprite>(path)), Is.True,
+                    "Both shake UI and release/taunt artwork must be warmed: " + path);
             Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.SynchronizingBattle));
             int orbs = network.board.Count, boardLayer = LayerMask.NameToLayer("LabOrbBoard");
             var revision = network.PaintSurface.Revision; var paintCount = network.PaintSurface.PaintCount;
