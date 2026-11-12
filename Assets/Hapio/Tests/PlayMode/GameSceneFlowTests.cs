@@ -541,13 +541,18 @@ namespace Hapio.Tests
             Assert.That(territory, Is.Not.Null, "The saved StageResult Scene wires the #603 team result.");
             yield return Until(() => territory.gameObject.activeInHierarchy, "The team result shows.");
             Assert.That(screen.resultView.gameObject.activeSelf, Is.False);
+            Assert.That(screen.resultView.background.gameObject.activeSelf, Is.False);
             Assert.That(screen.legacyResultContent.activeSelf, Is.False);
             GameStageResultView view = territory.table;
+            Assert.That(view.background.transform.parent, Is.SameAs(territory.transform));
+            Assert.That(territory.transform.parent, Is.SameAs(screen.transform));
+            Assert.That(view.background.rectTransform.anchorMin, Is.EqualTo(Vector2.zero));
+            Assert.That(view.background.rectTransform.anchorMax, Is.EqualTo(Vector2.one));
             Assert.That(view.judgment.text, Does.Contain("청팀"));
             Assert.That(territory.bluePercent.text, Is.EqualTo("100%"));
             Assert.That(territory.redPercent.text, Is.EqualTo("0%"));
             Assert.That(territory.blueWinnerFlag.activeSelf && !territory.redWinnerFlag.activeSelf, Is.True);
-            Assert.That(view.nextButton.gameObject.activeSelf, Is.False, "2:2 is one round: no 다시 도전 (#293).");
+            Assert.That(view.nextButton.gameObject.activeInHierarchy, Is.True);
             Assert.That(view.viewerButton.gameObject.activeSelf && view.homeButton.gameObject.activeSelf, Is.True, "박 확인 and 나가기 stay.");
             yield return Until(() => view.viewerButton.interactable && view.homeButton.interactable,
                 "Local result readiness and the pointer-release shield must open the two actions.");
@@ -561,6 +566,21 @@ namespace Hapio.Tests
             Assert.That(JsonUtility.ToJson(session.ResultSnapshot), Is.EqualTo(result));
             screen.closeViewerButton.onClick.Invoke();
             yield return Until(() => !session.IsViewerOpen && !screen.viewerPanel.activeSelf, "Closing the preview restores the team result.");
+            yield return Until(() => view.nextButton.interactable, "Retry unlocks when the gourd viewer closes.");
+            string finishedBattle = session.State.battleSessionId;
+            uint finishedRound = session.State.battleRound;
+            view.nextButton.onClick.Invoke();
+            yield return WaitPlaying(1);
+            Assert.That(session.State.battleSessionId != finishedBattle || session.State.battleRound != finishedRound, Is.True);
+            Assert.That(session.PreviewTexture, Is.Null);
+
+            surface = Model().PaintSurface;
+            Assert.That(surface.TryReplacePixels(surface.Columns, surface.Rows, surface.Revision + 1,
+                pixels, owners, 1), Is.True);
+            yield return Until(() => session.State.phase == GameFlowPhase.Completed && !session.IsLoadingScene,
+                "The rematch has its own result.");
+            view = Object.FindFirstObjectByType<GameScreen>().territoryView.table;
+            yield return Until(() => view.homeButton.IsInteractable(), "Exit is available after the rematch.");
             view.homeButton.onClick.Invoke();
             yield return WaitHome();
             Assert.That(network.IsConnected, Is.False);
@@ -1262,6 +1282,8 @@ namespace Hapio.Tests
                     Assert.That(screen.resetViewerButton.gameObject.activeInHierarchy, Is.True);
                     Assert.That(screen.closeViewerButton.gameObject.activeInHierarchy, Is.True);
                     var close = screen.closeViewerButton;
+                    Assert.That(((RectTransform)screen.resetViewerButton.transform).anchoredPosition.y, Is.EqualTo(-698f));
+                    Assert.That(((RectTransform)close.transform).anchoredPosition.y, Is.EqualTo(-755f));
                     var surface = close.GetComponentInChildren<GameFigmaSurface>();
                     Assert.That(surface, Is.Not.Null, "The return button shows the Figma brush surface.");
                     Assert.That(surface.SurfaceName, Is.EqualTo("ResultAction"));
@@ -1269,7 +1291,7 @@ namespace Hapio.Tests
                     Assert.That(close.targetGraphic.isActiveAndEnabled && close.targetGraphic.raycastTarget, Is.True);
                     var caption = close.GetComponentInChildren<UnityEngine.UI.Text>();
                     Assert.That(caption.text, Is.EqualTo("결과로 돌아가기"));
-                    Assert.That((Color32)caption.color, Is.EqualTo(new Color32(245, 238, 225, 255)));
+                    Assert.That(caption.color, Is.EqualTo(GameLobbySeatColors.LightText));
                     var hint = screen.viewerPanel.GetComponentsInChildren<UnityEngine.UI.Text>()
                         .Single(text => text.name == "Rotate Hint");
                     Assert.That(hint.color, Is.EqualTo(GameBattleUiColors.SecondaryLightIvory800));

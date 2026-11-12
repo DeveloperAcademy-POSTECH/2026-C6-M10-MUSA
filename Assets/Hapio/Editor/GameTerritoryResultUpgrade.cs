@@ -40,16 +40,19 @@ namespace Hapio.Editor
             {
                 var screen = scene.GetRootGameObjects().SelectMany(root => root.GetComponentsInChildren<GameScreen>(true)).Single();
                 if (screen.territoryView != null) return;
-                var table = UnityEngine.Object.Instantiate(screen.resultView, screen.resultView.transform.parent, false);
+                var table = UnityEngine.Object.Instantiate(screen.resultView, screen.transform, false);
                 table.name = "TerritoryResult";
                 var view = table.gameObject.AddComponent<GameTerritoryResultView>();
                 view.table = table;
                 var design = table.design;
-                design.gameObject.AddComponent<UnityEngine.UI.RectMask2D>();
-                table.background = null;
+                if (table.background != null && table.background.transform.IsChildOf(table.transform))
+                    UnityEngine.Object.DestroyImmediate(table.background.gameObject);
                 foreach (string name in new[] { "Stage", "RecordPanel", "Paint", "TimeLeft", "Guidance" })
                     design.Find(name)?.gameObject.SetActive(false);
-                var paper = Picture("Parchment", design, "Assets/Hapio/Art/UI/GameOver/Parchment.png", -74, -167, 704, 1041);
+                var paper = Picture("Parchment", table.transform, "Assets/Hapio/Art/UI/GameOver/Parchment.png", 0, 0, 402, 874);
+                GameViewerHelpUi.Stretch(paper.rectTransform);
+                paper.uvRect = new Rect(74f / 704f, 0f, 402f / 704f, 874f / 1041f);
+                table.background = paper;
                 paper.transform.SetAsFirstSibling();
                 Picture("CloudLeft", design, "Assets/Hapio/Art/UI/GameOver/Cloud.png", -250, 167, 337, 112).transform.SetSiblingIndex(1);
                 Picture("CloudBottom", design, "Assets/Hapio/Art/UI/GameOver/Cloud.png", -175, 744, 337, 112).transform.SetSiblingIndex(2);
