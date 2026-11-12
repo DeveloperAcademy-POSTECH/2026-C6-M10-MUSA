@@ -18,6 +18,8 @@ namespace C6Lab
         public bool LastHitFiveColor { get; private set; }
         /// <summary>#540: the last confirmed hit was a Jigwi talisman orb.</summary>
         public bool LastHitTalisman { get; private set; }
+        /// <summary>#696: the last confirmed hit was the Jigwi black orb (a five-colour orb that paints black ink).</summary>
+        public bool LastHitSoot { get; private set; }
 
         /// <summary>
         /// 이번 섬광(generation)에서 끝까지 흔든 사람에게 오색구슬을 준다. 이미 받았거나, 이번 섬광을 맞지 않았거나,
@@ -67,7 +69,7 @@ namespace C6Lab
         /// 오색구슬 명중 (#329): 맞은 자리 둘레에 다섯 원소 색 얼룩을 하나씩 칠한다. 다섯 얼룩의 칠 면적을 합치면 share다.
         /// 원소 색 그대로지만 맞힌 구슬의 원소가 없어 콤보에는 세지 않는다. 하나라도 칠했으면 true.
         /// </summary>
-        private bool PaintFiveColors(Vector3 direction, LabPlayerState attacker, float share, float impactStrength = .5f)
+        private bool PaintFiveColors(Vector3 direction, LabPlayerState attacker, float share, float impactStrength = .5f, Color? only = null)
         {
             if (direction.sqrMagnitude < 1e-6f) return false;
             Vector3 normal = direction.normalized;
@@ -82,7 +84,7 @@ namespace C6Lab
             {
                 float angle = (start - 72f * i) * Mathf.Deg2Rad;
                 Vector3 spot = (normal + (side * Mathf.Cos(angle) + up * Mathf.Sin(angle)) * reach).normalized;
-                painted |= paintSurface.RegisterHit(spot, PaintColorFor(FiveColorPaintOrder[i]),
+                painted |= paintSurface.RegisterHit(spot, only ?? PaintColorFor(FiveColorPaintOrder[i]),
                     attacker.id, attacker.seat + 1, each, impactStrength);
             }
             return painted;
