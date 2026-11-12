@@ -1149,7 +1149,7 @@ namespace C6Lab
         [SerializeField, Range(0f, 1f)] private float yaguangComboStampSoundVolume = .8f;
         [Header("지귀 검정 구슬 / 연기 파편 소리 (#713, Inspector 전용)")]
         [Tooltip("내 판에 검정 구슬이 있는 동안 웅웅 기운 크기 (Audio/JigwiSootAura, 반복, 가진 사람 기기만)")]
-        [SerializeField, Range(0f, 1f)] private float jigwiSootAuraVolume = .35f;
+        [SerializeField, Range(0f, 1f)] private float jigwiSootAuraVolume = .6f;
         [Tooltip("검정 구슬이 박에 맞을 때 소리 크기 (Audio/JigwiSootHit, 모든 기기)")]
         [SerializeField, Range(0f, 1f)] private float jigwiSootHitVolume = 1f;
         [Tooltip("연기를 닦다가 밑에 깔린 파편이 드러날 때 소리 크기 (Audio/JigwiSootReveal, 내 기기만)")]
@@ -1714,7 +1714,7 @@ namespace C6Lab
         public float YaguangComboGuideFailToTauntSeconds => Mathf.Clamp(Finite(yaguangComboGuideFailToTauntSeconds, .1f), 0f, 2f);
         public bool YaguangComboGuideReadyOn => yaguangComboGuideReadyOn;
         public float YaguangComboStampSoundVolume => Mathf.Clamp01(Finite(yaguangComboStampSoundVolume, .8f));
-        public float JigwiSootAuraVolume => Mathf.Clamp01(Finite(jigwiSootAuraVolume, .35f));
+        public float JigwiSootAuraVolume => Mathf.Clamp01(Finite(jigwiSootAuraVolume, .6f));
         public float JigwiSootHitVolume => Mathf.Clamp01(Finite(jigwiSootHitVolume, 1f));
         public float JigwiSootRevealVolume => Mathf.Clamp01(Finite(jigwiSootRevealVolume, .8f));
         public float JigwiSootJoinVolume => Mathf.Clamp01(Finite(jigwiSootJoinVolume, .8f));

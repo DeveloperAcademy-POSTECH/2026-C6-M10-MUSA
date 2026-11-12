@@ -101,7 +101,7 @@ namespace C6Lab
                 aura.time = 0f;
                 aura.Play();
             }
-            float volume = Config != null ? Config.JigwiSootAuraVolume : .35f;
+            float volume = Config != null ? Config.JigwiSootAuraVolume : .6f;
             aura.volume = volume * auraLevel * LabAudioSettings.SfxVolume;
         }
 
