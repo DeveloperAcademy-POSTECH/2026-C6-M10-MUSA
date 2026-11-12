@@ -450,8 +450,8 @@ namespace C6Lab.Tests
 
             // 다른 사람 연기도 따로, 음/양과는 합쳐지지 않는다.
             Assert.That(m.TryClearJigwiSmoke(Three[1],smoke.id,ready+4),Is.True);
-            Launch(m,black,t+.5);
-            Assert.That(m.ConfirmHit(black.id,t+.6),Is.True);
+            Launch(m,black,t+1.1);
+            Assert.That(m.ConfirmHit(black.id,t+1.2),Is.True);
             Assert.That(m.LastHitFiveColor,Is.True,"Hits as wide as a five-color orb (in ink).");
         }
 
