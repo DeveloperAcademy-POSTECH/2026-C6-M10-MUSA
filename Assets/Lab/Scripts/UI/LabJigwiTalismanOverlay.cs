@@ -135,6 +135,8 @@ namespace C6Lab
         [Tooltip("B(물구슬 동시 명중) 예고 때 지귀 대사 폴더. 예: \"물방울로는 어림도 없다!\". 비우면 없음.")]
         [SerializeField] private string voiceBFolder = "JigwiVoiceB";
         [SerializeField, Range(0f, 1f)] private float voiceVolume = 1f;
+        [Tooltip("#713 공용 부적을 모두 써서 물폭포가 박에 쏟아지는 순간 지귀 비명 폴더 (모든 기기). 예: \"으아악, 차가워!\". 비우면 없음.")]
+        [SerializeField] private string winVoiceFolder = "JigwiVoiceAWin";
         [Tooltip("#540 부적을 쓰는 동안 깔리는 소리(반복). 불씨가 붙을 때부터 불덩이가 커질수록 점점 커진다. 비우면 없음.")]
         [SerializeField] private string fireLoopFolder = "JigwiFireballLoop";
         [Tooltip("불씨가 막 붙었을 때 타는 소리 크기.")]
@@ -284,6 +286,7 @@ namespace C6Lab
         private float[] strokeRank = Array.Empty<float>();
         private AudioSource sfx, scratch, fireLoop, voice;
         private readonly HashSet<string> voicedRounds = new HashSet<string>();
+        private readonly HashSet<string> voicedWins = new HashSet<string>();
         /// <summary>#540: 지귀 예고 대사를 낸 횟수와 마지막 대사 종류(A/B). 테스트용.</summary>
         public int VoiceCount { get; private set; }
         public string LastVoice { get; private set; }
@@ -531,6 +534,16 @@ namespace C6Lab
                 if (!voicedRounds.Add(item.id)) continue;
                 bool a = item.kind == LabJigwiABKind.PersonalBurn;
                 PlayVoice(a ? "A" : "B", a ? voiceAFolder : voiceBFolder);
+            }
+            // #713: when everyone wrote the common talisman, Jigwi yelps as the waterfall pours onto him
+            // (the same shared moment the Host paints it: resolved + reveal + pour).
+            foreach (LabJigwiABRound item in snapshot.jigwiAB.rounds)
+            {
+                if (item == null || item.id == null || item.kind != LabJigwiABKind.PersonalBurn || !item.common
+                    || item.resolution != LabJigwiABResolution.Completed) continue;
+                double pourAt = item.resolvedAt + LabJigwiABTimeline.CommonTalismanRevealSeconds + LabJigwiABTimeline.CommonTalismanPourSeconds;
+                if (now < pourAt || now - pourAt > .6d || !voicedWins.Add(item.id)) continue;
+                PlayVoice("AWin", winVoiceFolder);
             }
         }
 

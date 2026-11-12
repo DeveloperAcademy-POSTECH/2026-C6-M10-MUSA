@@ -21,14 +21,19 @@ namespace C6Lab
         public const string RevealFolder = "Audio/JigwiSootReveal";
         public const string JoinFolder = "Audio/JigwiSootJoin";
         public const string WholeFolder = "Audio/JigwiSootWhole";
-        public static readonly string[] ClipFolders = { AuraFolder, HitFolder, RevealFolder, JoinFolder, WholeFolder };
+        /// <summary>검정 구슬이 맞은 뒤 지귀 반응 대사 (모든 기기, 명중음 조금 뒤).</summary>
+        public const string HitVoiceFolder = "Audio/JigwiVoiceSootHit";
+        public static readonly string[] ClipFolders = { AuraFolder, HitFolder, RevealFolder, JoinFolder, WholeFolder, HitVoiceFolder };
 
         /// <summary>기운이 차오르고 / 사라지는 데 걸리는 초.</summary>
         private const float AuraFadeSeconds = .5f;
         /// <summary>한 연기에서 드러날 때마다 높아지는 음 (반음 비율), 최대 네 번째까지.</summary>
         private static readonly float[] RevealPitches = { 1f, 1.12f, 1.26f, 1.34f };
 
-        private AudioClip[] auraClips, hitClips, revealClips, joinClips, wholeClips;
+        private AudioClip[] auraClips, hitClips, revealClips, joinClips, wholeClips, hitVoiceClips;
+        private AudioSource voice;
+        private float hitVoiceAt = -1f;
+        private int lastHitVoice = -1;
         private AudioSource oneShots, revealSource, aura;
         private LabNetwork network;
         private LabOrbBoard board;
@@ -63,6 +68,7 @@ namespace C6Lab
             joinClips = Resources.LoadAll<AudioClip>(JoinFolder);
             System.Array.Sort(joinClips, (a, b) => string.CompareOrdinal(a.name, b.name));
             wholeClips = Resources.LoadAll<AudioClip>(WholeFolder);
+            hitVoiceClips = Resources.LoadAll<AudioClip>(HitVoiceFolder);
             oneShots = gameObject.AddComponent<AudioSource>();
             oneShots.playOnAwake = false;
             oneShots.spatialBlend = 0f;
@@ -70,6 +76,9 @@ namespace C6Lab
             revealSource = gameObject.AddComponent<AudioSource>();
             revealSource.playOnAwake = false;
             revealSource.spatialBlend = 0f;
+            voice = gameObject.AddComponent<AudioSource>();
+            voice.playOnAwake = false;
+            voice.spatialBlend = 0f;
             aura = gameObject.AddComponent<AudioSource>();
             aura.playOnAwake = false;
             aura.loop = true;
@@ -96,6 +105,7 @@ namespace C6Lab
 
         private void Update()
         {
+            if (hitVoiceAt >= 0f && Time.unscaledTime >= hitVoiceAt) { hitVoiceAt = -1f; PlayHitVoice(); }
             bool want = HoldsBlackOrb(network);
             auraLevel = Mathf.MoveTowards(auraLevel, want ? 1f : 0f, Time.unscaledDeltaTime / AuraFadeSeconds);
             if (aura == null) return;
@@ -125,6 +135,25 @@ namespace C6Lab
         {
             HitCount++;
             Play(oneShots, hitClips, Config != null ? Config.JigwiSootHitVolume : 1f, 1f);
+            // Jigwi reacts a moment after the boom (one line even if two black orbs land together).
+            if (hitVoiceAt < 0f) hitVoiceAt = Time.unscaledTime + (Config != null ? Config.JigwiSootHitVoiceDelaySeconds : .35f);
+        }
+
+        /// <summary>확인용: 지귀 반응 대사를 낸 횟수 (파일이 없어도 센다).</summary>
+        public int HitVoiceCount { get; private set; }
+
+        private void PlayHitVoice()
+        {
+            HitVoiceCount++;
+            if (hitVoiceClips == null || hitVoiceClips.Length == 0 || voice == null) return;
+            // A different line from the last one when there are several.
+            int index = Random.Range(0, hitVoiceClips.Length);
+            if (hitVoiceClips.Length > 1 && index == lastHitVoice) index = (index + 1) % hitVoiceClips.Length;
+            lastHitVoice = index;
+            voice.Stop();
+            voice.clip = hitVoiceClips[index];
+            voice.volume = (Config != null ? Config.JigwiSootHitVoiceVolume : 1f) * LabAudioSettings.SfxVolume;
+            voice.Play();
         }
 
         private void OnSootRevealed(int count)

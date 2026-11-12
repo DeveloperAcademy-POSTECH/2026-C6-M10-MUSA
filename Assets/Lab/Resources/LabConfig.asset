@@ -68,7 +68,7 @@ MonoBehaviour:
   jigwiTalismanRewardDelaySeconds: 2.9
   jigwiAFailDrumSlipSeconds: 20
   jigwiAFailDrumSlipBoost: 2
-  jigwiAFailBurnStartSeconds: 0.6
+  jigwiAFailBurnStartSeconds: 2.9
   jigwiTalismanCoverage: 0.85
   jigwiTalismanTolerance: 0.07
   jigwiBSplashPaintShare: 3

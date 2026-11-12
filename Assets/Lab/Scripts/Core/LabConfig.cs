@@ -638,7 +638,7 @@ namespace C6Lab
         [SerializeField, Range(0f, 30f)] private float jigwiAFailDrumSlipSeconds = 0f;
         [Tooltip("#540 Inspector 전용(각 기기): 불붙은 북이 얼마나 가벼운지. 옆으로 밀 때 빠르기는 이 배, 미끄러지며 느려지는 정도는 1/이 배 (2면 같은 스와이프로 약 8배 멀리).")]
         [SerializeField, Range(1f, 4f)] private float jigwiAFailDrumSlipBoost = 2f;
-        [Tooltip("#663 Inspector 전용(Host): 부적을 다 못 써 실패한 뒤 판의 구슬에 불이 붙기까지(초, 부적이 끝난 때부터). 불덩이가 판에 닿는 때가 0.45초. 붙은 뒤 1초 동안 재가 된다. 예전에는 지귀 대사 '모두 재가 되어라!'(지금은 파일이 없어 나지 않음)를 기다려 3.7초였다.")]
+        [Tooltip("#663 Inspector 전용(Host): 부적을 다 못 써 실패한 뒤 판의 구슬에 불이 붙기까지(초, 부적이 끝난 때부터). 불덩이가 판에 닿는 때가 0.45초. 붙은 뒤 1초 동안 재가 된다. 예전에는 지귀 대사를 기다려 3.7초였다. #713부터 실패 대사(Audio/JigwiVoiceAFail, 약 2.6초)가 끝난 뒤 타도록 asset에서 2.9초.")]
         [SerializeField, Range(.45f, 5f)] private float jigwiAFailBurnStartSeconds = (float)LabModel.JigwiTalismanFailFirstBurnSeconds;
         [Tooltip("#479 Inspector 전용(각 기기): 부적 점선 \"물\" 중 이만큼 칠하면 다 쓴 것으로 본다 (0~1).")]
         [SerializeField, Range(.3f, 1f)] private float jigwiTalismanCoverage = .85f;
@@ -1158,6 +1158,10 @@ namespace C6Lab
         [SerializeField, Range(0f, 1f)] private float jigwiSootJoinVolume = .8f;
         [Tooltip("네 조각이 모여 검정 구슬이 될 때 소리 크기 (Audio/JigwiSootWhole, 내 기기만)")]
         [SerializeField, Range(0f, 1f)] private float jigwiSootWholeVolume = 1f;
+        [Tooltip("검정 구슬이 박에 맞은 뒤 지귀 반응 대사 크기 (Audio/JigwiVoiceSootHit, 모든 기기)")]
+        [SerializeField, Range(0f, 1f)] private float jigwiSootHitVoiceVolume = 1f;
+        [Tooltip("검정 구슬 명중음 뒤 지귀 반응 대사까지 (초)")]
+        [SerializeField, Range(0f, 1.5f)] private float jigwiSootHitVoiceDelaySeconds = .35f;
         [Header("야광귀 콤보 예고와 피버 신호 (#414, Inspector 전용)")]
         [Tooltip("콤보 예고(넷/셋/둘/하나) 동안 화면 가장자리가 어두워지는 최대 진하기 (0이면 끔, 모든 기기)")]
         [SerializeField, Range(0f, 1f)] private float yaguangComboWarningShade = .5f;
@@ -1719,6 +1723,8 @@ namespace C6Lab
         public float JigwiSootRevealVolume => Mathf.Clamp01(Finite(jigwiSootRevealVolume, .8f));
         public float JigwiSootJoinVolume => Mathf.Clamp01(Finite(jigwiSootJoinVolume, .8f));
         public float JigwiSootWholeVolume => Mathf.Clamp01(Finite(jigwiSootWholeVolume, 1f));
+        public float JigwiSootHitVoiceVolume => Mathf.Clamp01(Finite(jigwiSootHitVoiceVolume, 1f));
+        public float JigwiSootHitVoiceDelaySeconds => Mathf.Clamp(Finite(jigwiSootHitVoiceDelaySeconds, .35f), 0f, 1.5f);
         public float YaguangComboGuideCountFade => Mathf.Clamp(Finite(yaguangComboGuideCountFade, .6f), .1f, 1f);
         public float YaguangComboGuideSoundVolume => Mathf.Clamp01(Finite(yaguangComboGuideSoundVolume, 1f));
         public float YaguangComboWarningShade => Mathf.Clamp01(Finite(yaguangComboWarningShade, .5f));
