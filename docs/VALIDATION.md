@@ -8496,6 +8496,18 @@ Unity 6000.6.5f1 macOS Editor에서 새로고침 후 컴파일 오류0. 전체 E
 - Unity PreviewRenderUtility로 세 저장 프리팹의 닫힌 자세를 임시 렌더해 천 장식 숨김을 확인했다. 임시 객체/RT는 해제했다. 실제 전투 전체 화면·실기기·빌드·전체 PlayMode는 이번에 실행하지 않았다.
 
 
+## 2026-11-12 — #711 Stage2 배경 폴리싱
+- fix/#711-stage2-background-polish: Stage2 장식 대비0.8/회갈색 중간톤, 바닥과 backing 색 배율1.30/1.09/1.04. 원본 PNG/배치/바람/눈/반딧불/발자국/조합대 UI 보존. 공용 InkCard에 중간톤 대비 제어 추가(기본1=기존 표현). 달/날씨 재질은 대비1을 유지했다.
+- 동일한 SOLO 카메라 위치·각도·비율의 배경 전용 전후 렌더를 비교했다(UI/스테이지 박 제외). 기본 셰이더 대비1 확인, 셰이더 컴파일 오류 없음, Studio 미적용 항목0. EditMode 배경 에셋/애니메이션7/7 PASS. PlayMode GameBattleUiPresentationTests4/4 PASS(1~3 스토리/땅따먹기 UI와 배경 연결 포함).
+- 미실행: iPhone·Mac/iOS 빌드·실제 다기기. Stage2 공유 땅따먹기에도 새 배경 색이 적용된다.
+
+- #711 화풍 통일 후속: Stage3 먹선 원화를 참조해6종 PNG를 생성·분리하고 Stage2 전용 슬롯에 연결. 새로운 종횡비의 과확대와 뜬 바닥을 배경 렌더로 발견해 높이/너비/접지 수정. 더 깊은 남청색 하늘paperColor0.78/0.83/0.93 적용. 같은 플레이어 카메라 자세의 배경 렌더에서 최종 확인(UI/스테이지 박 제외). 첫 EditMode의 경로 검사1건 실패는 새 PNG를 기존 Textures 하위로 이동해 해결(GUID유지); 재실행7/7 PASS. PlayMode GameBattleUiPresentationTests4/4 PASS. 새 PNG는 약251~583px 폭의1차 아트. 실기기/빌드/다기기 미실행.
+
+- 후속 검사에서 비활성 여분 카드의 이전 산 PNG 참조가 남은 것을 발견해 그룹 PNG와 동기화했다. 최종 EditMode 배경/애니메이션7/7 PASS. 비활성 카드는 그대로 비활성 상태를 유지한다.
+
+- #711 사용자 피드백 후속: 한옥 폭약6.86→14.5, 높이5→6.5로 확대. 먼산 높이0.8→0.11, Stage2 바닥40→72로 확장. 같은 플레이어 카메라 자세의 배경 전용 렌더에서 집 가로 확대와 산 아래 틈 제거 확인(UI/스테이지 박 제외). EditMode 배경/애니메이션7건 재실행. 실기기는 미실행.
+
+
 ## 2026-11-12 — #706 야광귀 3인 시연
 
 기준 main `59ad1803`, 브랜치 `feat/#706-yaguang-demo-build`, Unity6000.6.5f1/macOS Metal이다. 일반 카탈로그3개와 원본5개 Game Scene·Lab·설정·공통 Prefab을 보존하며 시연용 빌드 정의/경로 `[2]`를 선택한다. 야광귀는 원래 Stage2 정체성과 수치/그림/물리/규칙을 사용한다. 사용법과 메뉴는 `YAGUANG_DEMO.md`에 기록했다.
@@ -8587,3 +8599,8 @@ main `e3108459`의 #712(칠용 뚜껑 법선 공유와3개 LidPaint 메시)을 �
 
 
 - 법선 보완 후 최종 배포용 시연 빌드(기준 `10fd8908`, 미커밋 소스 없음): Mac `Builds/HapioDemo/20261112-073926-f36af0f8-release/macOS/Hapio-Yaguang-Demo.app` Succeeded·오류0, iOS `Builds/HapioDemo/20261112-074031-0114fa00-release/iOS/Unity-iPhone.xcodeproj` Succeeded·기존 Pipeline subtarget 예외1. 두 manifest가 Demo/1·5703·Stage2 설정 해시·버전/앱ID에 일치하며 보호12개 파일은 최신 main과 같다. 법선 보완이 없는 앞선 빌드 경로와 구분한다. Xcode 서명/설치·실제3기기·최종 화면 육안은 여전히 미검증이다.
+
+
+## 2026-11-12 — #711 main 병합 충돌 해결
+
+main fbc943e8을 통합하며 VALIDATION 문서 끝의 독립 기록 추가 충돌을 양쪽 보존으로 해결했다. 자동 병합된 Battle 씬은 Stage2 하위591개 블록이 작업 브랜치와 같고 Stage3 하위710개 블록이 main과 같은 것을 정적 비교했다. 씬 object ID 중복0, 새 미해결 GUID0, 충돌 표식0을 확인했다. 기존 패키지 GUID는 프로젝트 에셋 GUID 검사에서 제외했다. main의 시연/법선 수정과 기존 Stage2 폴리싱을 함께 보존했다. 이 병합본에서 Unity 컴파일/실행 검사는 재실행하지 않았으며 앞선 PASS 기록과 구분한다.
