@@ -8569,3 +8569,8 @@ Unity 6000.6.5f1 macOS Editor에서 새로고침 후 컴파일 오류0. 전체 E
 - iOS Release 내보내기: `Builds/HapioDemo/20261112-072435-d74af28d-release/iOS/Unity-iPhone.xcodeproj`, Succeeded·오류1. 앞서 기록한 Pipeline의 iOS subtarget 예외와 동일함을 BuildReport에서 확인했다. Xcode 컴파일/서명/설치/실기기는 미실행이다.
 - 두 manifest의5703 시연 TXT·Demo/1·실제Stage2 설정 해시가 같고 출력 앱 이름/ID를 검증했다. 두 Player의 실제 컴파일 응답에서 Demo define 포함·Development/Editor define 제외를 확인했다. 이전5702 산출물과 혼용하지 않는다. 새 Mac 앱의 수동 화면/3기기 검증은 하지 않았다.
 - 빌드 후 보호12개 파일은 최신 main과 동일하다. 일반 StandaloneOSX·Development false·variant false·기존 product/ID·빈 저장 defines로 복원됐으며 ProjectSettings/Packages/원본 Scene/LabConfig의 PR diff는 없다. 새로 만든 시연 사본만 PR에 추가했다. 컴파일·검사·빌드 원시 로그/산출물·복구 Scene은 커밋하지 않았다.
+
+
+### #706 병합 직전 #712 뚜껑 법선 보존
+
+main `e3108459`의 #712(칠용 뚜껑 법선 공유와3개 LidPaint 메시)을 추가 통합한다. 삼각형·위치·UV·판정 껍데기·면적·게임 규칙/규약은 그대로이며 칠 두께에 따른 시각 틈을 수정한 표현/굽기 변경이다. #706과 같은 파일을 수정하지 않아 수동 충돌은 없다. 전체 EditMode와 시연·세 스테이지 rig·실제Stage2명중·관람 PlayMode를 추가 확인하고, 실행 경로가 같은 직전 전체835건 및 배경 영향 검사는 재사용한다. 새 시연 빌드에도 이 법선을 포함한다.
