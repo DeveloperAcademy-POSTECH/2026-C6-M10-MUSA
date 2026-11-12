@@ -324,6 +324,21 @@ MonoBehaviour:
   yaguangComboBgmToneSeconds: 0.3
   yaguangComboClearedDelaySeconds: 0.8
   yaguangComboClearedSoundVolume: 0.9
+  yaguangFirstComboForgive: 1
+  yaguangComboGuideRuleCombos: 1
+  yaguangComboGuideReadyOn: 1
+  yaguangComboGuideFeedbackDelaySeconds: 0.3
+  yaguangComboGuideRuleDelaySeconds: 0.9
+  yaguangComboGuideCountFade: 0.6
+  yaguangComboGuideFailDelaySeconds: 0.1
+  yaguangComboGuideFailToTauntSeconds: 0.1
+  yaguangComboGuideSoundVolume: 1
+  yaguangComboStampSoundVolume: 0.8
+  jigwiSootAuraVolume: 1
+  jigwiSootHitVolume: 1
+  jigwiSootRevealVolume: 0.8
+  jigwiSootJoinVolume: 0.8
+  jigwiSootWholeVolume: 1
   yaguangComboWarningShade: 0.5
   comboPopDrumRatio: 0.35
   yaguangFeverDrumPulseScale: 0.12

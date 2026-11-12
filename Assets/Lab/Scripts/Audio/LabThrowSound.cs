@@ -10,6 +10,7 @@ namespace C6Lab
     ///   콤보 실패 페널티(SMALL, #222) 중에 던진 내 공이 맞으면, 같은 타격음을 Inspector 반음(기본 +6)만큼 높여 작은 공처럼 낸다 (#398).
     ///   콤보 성공 보상(BIG) 중에 던진 큰 공이 맞으면 물감 소리 대신 징(Resources/Audio/FiveColorHit)을 낸다 (#398). 징은 길어서
     ///   새로 맞으면 앞 징을 끊고 다시 친다. 오색구슬이면 오색구슬 징(LabFlashRewardSound)이 따로 나므로 겹쳐 내지 않는다.
+    ///   지귀 검정 구슬(#713)이면 물감 소리를 내지 않는다 (전용 명중음 LabJigwiSootSound만).
     ///   작은 공/큰 공인지는 맞은 때가 아니라 던질 때 정해진 공 크기로 본다 (LabNetwork.LastLocalHitSmall/Big).
     /// - 빗나가면: Resources/Audio/Miss 폴더의 소리 중 하나 (같은 방식)
     /// 소리 파일이 없으면 조용히 넘어간다. 크기는 기본 크기 × 일시정지 메뉴 SFX 설정.
@@ -100,7 +101,14 @@ namespace C6Lab
             bigSource.spatialBlend = 0f;
         }
 
-        private void OnLocalThrowHit(int damage) => PlayHit(network != null ? network.LastLocalHitOffset : 0f,
+        private void OnLocalThrowHit(int damage)
+        {
+            // #713: the Jigwi black orb rings only its own hit sound (LabJigwiSootSound, every device), no paint splash.
+            if (network != null && network.LastLocalHitSoot) return;
+            PlayLocalHit();
+        }
+
+        private void PlayLocalHit() => PlayHit(network != null ? network.LastLocalHitOffset : 0f,
             network != null && network.LastLocalHitSmall,
             network != null && network.LastLocalHitBig && !network.LastLocalHitFiveColor);
 

@@ -420,6 +420,8 @@ namespace C6Lab
         public bool LastLocalHitBig { get; private set; }
         /// <summary>마지막으로 맞은 내 공이 오색구슬이었는지 (#398, 큰 공 징과 오색구슬 징이 겹치지 않게).</summary>
         public bool LastLocalHitFiveColor { get; private set; }
+        /// <summary>#713 마지막으로 맞은 내 공이 지귀 검정 구슬이었는지 (전용 명중음만 내고 물감 소리는 내지 않는다).</summary>
+        public bool LastLocalHitSoot { get; private set; }
         /// <summary>내 판에서 잠긴 폭탄이 터졌을 때 한 번 알린다. (폭탄 ID, 터진 위치 0..1)</summary>
         public event Action<string, Vector2> BombBlasted;
         /// <summary>An orb on this player's board reached the end of its lifetime and went (#235).</summary>
@@ -2267,6 +2269,7 @@ namespace C6Lab
                         LastLocalHitSmall = LabThrowSound.IsSmallThrow(launchScale);
                         LastLocalHitBig = LabThrowSound.IsBigThrow(launchScale);
                         LastLocalHitFiveColor = fiveColor;
+                        LastLocalHitSoot = soot;
                         LocalThrowHit?.Invoke(impactValue);
                     }
                     Color paintColor = fiveColor ? model.PaintColorFor(LabOrbElement.Wood) : model.PaintColorFor(element); // 표시용, 오색구슬은 다섯 색을 칠한다
@@ -2667,6 +2670,7 @@ namespace C6Lab
                             LastLocalHitSmall = LabThrowSound.IsSmallThrow(packet.sizeScale);
                             LastLocalHitBig = LabThrowSound.IsBigThrow(packet.sizeScale);
                             LastLocalHitFiveColor = packet.fiveColor;
+                            LastLocalHitSoot = packet.soot;
                             LocalThrowHit?.Invoke(packet.impactValue);
                         }
                     }
