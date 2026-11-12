@@ -915,7 +915,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 2ba14621714c943d2aa40a66d258990e, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.GameFigmaSurface
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -1592,6 +1592,7 @@ MonoBehaviour:
   rows: {fileID: 999693580}
   scroll: {fileID: 1907967530}
   rowTemplate: {fileID: 791386153}
+  rowHeight: 40
   ink: {r: 0.24705882, g: 0.23921569, b: 0.21960784, a: 1}
   secondaryInk: {r: 0.40784314, g: 0.39215687, b: 0.36078432, a: 1}
   blueTeamBackground: {fileID: 0}
@@ -2352,6 +2353,7 @@ MonoBehaviour:
   kind: 3
   resultView: {fileID: 264505554}
   gameOverView: {fileID: 1106101891}
+  territoryView: {fileID: 0}
   stageStory: {fileID: 615858794}
   legacyResultContent: {fileID: 186631405}
   externalNavigation: 0
@@ -4535,7 +4537,7 @@ MonoBehaviour:
     m_FontStyle: 0
     m_BestFit: 0
     m_MinSize: 10
-    m_MaxSize: 40
+    m_MaxSize: 50
     m_Alignment: 0
     m_AlignByGeometry: 0
     m_RichText: 1
@@ -5334,7 +5336,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 1c1941b0ee4b44ebba69cc8699d1e9a4, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.GameFigmaButton
   kind: SealReady
   button: {fileID: 2003264753}

@@ -1,6 +1,6 @@
 Shader "C6Lab/Environment/InkCard"
 {
- Properties { _BaseMap("PNG",2D)="white"{} _BaseColor("Color",Color)=(1,1,1,1) _Cutoff("Alpha Cutoff",Range(0,1))=.005 _WindAmount("Wind",Float)=0 _WindSpeed("Wind Speed",Float)=1 _Billboard("Billboard",Float)=0 }
+ Properties { _BaseMap("PNG",2D)="white"{} _BaseColor("Color",Color)=(1,1,1,1) _Cutoff("Alpha Cutoff",Range(0,1))=.005 _WindAmount("Wind",Float)=0 _WindSpeed("Wind Speed",Float)=1 _Billboard("Billboard",Float)=0 _Contrast("Ink Contrast",Range(0,1))=1 _ContrastPivot("Ink Midtone",Color)=(.5,.5,.5,1) }
  SubShader
  {
   Tags { "RenderPipeline"="UniversalPipeline" "RenderType"="Transparent" "Queue"="Transparent" }
@@ -16,7 +16,7 @@ Shader "C6Lab/Environment/InkCard"
    #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
    TEXTURE2D(_BaseMap); SAMPLER(sampler_BaseMap);
    CBUFFER_START(UnityPerMaterial)
-    float4 _BaseMap_ST; half4 _BaseColor; float _Cutoff; float _WindAmount; float _WindSpeed; float _Billboard;
+    float4 _BaseMap_ST; half4 _BaseColor; float _Cutoff; float _WindAmount; float _WindSpeed; float _Billboard; half _Contrast; half4 _ContrastPivot;
    CBUFFER_END
    struct Attributes { float4 positionOS:POSITION; float2 uv:TEXCOORD0; half4 color:COLOR; };
    struct Varyings { float4 positionCS:SV_POSITION; float2 uv:TEXCOORD0; half alpha:TEXCOORD1; };
@@ -34,7 +34,7 @@ Shader "C6Lab/Environment/InkCard"
     }
     o.positionCS=TransformWorldToHClip(world);o.uv=TRANSFORM_TEX(v.uv,_BaseMap);o.alpha=v.color.a;return o;
    }
-   half4 frag(Varyings i):SV_Target { half4 c=SAMPLE_TEXTURE2D(_BaseMap,sampler_BaseMap,i.uv)*_BaseColor;c.a*=i.alpha;clip(c.a-_Cutoff);return c; }
+   half4 frag(Varyings i):SV_Target { half4 c=SAMPLE_TEXTURE2D(_BaseMap,sampler_BaseMap,i.uv)*_BaseColor;c.rgb=lerp(_ContrastPivot.rgb,c.rgb,_Contrast);c.a*=i.alpha;clip(c.a-_Cutoff);return c; }
    ENDHLSL
   }
  }
