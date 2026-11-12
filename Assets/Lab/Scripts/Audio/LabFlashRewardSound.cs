@@ -118,7 +118,8 @@ namespace C6Lab
             return true;
         }
 
-        private void HandleFiveColorHit() => OnFiveColorHit();
+        // #713: the Jigwi black orb rings its own hit sound on every device instead (LabJigwiSootSound).
+        private void HandleFiveColorHit() { if (network == null || !network.LastFiveColorHitSoot) OnFiveColorHit(); }
 
         private bool Play(AudioClip[] clips, float volume)
         {

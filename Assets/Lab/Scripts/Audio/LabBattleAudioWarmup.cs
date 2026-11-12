@@ -60,7 +60,7 @@ namespace C6Lab
                 case LabStageYokai.Gumiho: return LabGumihoSound.ClipFolders.Concat(LabYaguangSound.FoxRoundClipFolders)
                     .Append(LabBattleBgm.GumihoFeverClipFolder).ToArray();
                 case LabStageYokai.Yaguang: return LabYaguangSound.ClipFolders.Append(LabBattleBgm.FeverClipFolder).ToArray();
-                case LabStageYokai.Jigwi: return System.Array.Empty<string>(); // 지귀 has no fever song.
+                case LabStageYokai.Jigwi: return LabJigwiSootSound.ClipFolders; // 지귀 has no fever song; #713 soot sounds.
                 default: return System.Array.Empty<string>();
             }
         }

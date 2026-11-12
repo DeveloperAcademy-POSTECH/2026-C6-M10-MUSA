@@ -1147,6 +1147,17 @@ namespace C6Lab
         [SerializeField, Range(0f, 1f)] private float yaguangComboGuideSoundVolume = 1f;
         [Tooltip("콤보 성공 도장이 박에 찍힐 때 쾅 크기 (Audio/YaguangComboStamp, 모든 기기)")]
         [SerializeField, Range(0f, 1f)] private float yaguangComboStampSoundVolume = .8f;
+        [Header("지귀 검정 구슬 / 연기 파편 소리 (#713, Inspector 전용)")]
+        [Tooltip("내 판에 검정 구슬이 있는 동안 웅웅 기운 크기 (Audio/JigwiSootAura, 반복, 가진 사람 기기만)")]
+        [SerializeField, Range(0f, 1f)] private float jigwiSootAuraVolume = .35f;
+        [Tooltip("검정 구슬이 박에 맞을 때 소리 크기 (Audio/JigwiSootHit, 모든 기기)")]
+        [SerializeField, Range(0f, 1f)] private float jigwiSootHitVolume = 1f;
+        [Tooltip("연기를 닦다가 밑에 깔린 파편이 드러날 때 소리 크기 (Audio/JigwiSootReveal, 내 기기만)")]
+        [SerializeField, Range(0f, 1f)] private float jigwiSootRevealVolume = .8f;
+        [Tooltip("파편 두 조각이 붙을 때 소리 크기 (Audio/JigwiSootJoin, 내 기기만)")]
+        [SerializeField, Range(0f, 1f)] private float jigwiSootJoinVolume = .8f;
+        [Tooltip("네 조각이 모여 검정 구슬이 될 때 소리 크기 (Audio/JigwiSootWhole, 내 기기만)")]
+        [SerializeField, Range(0f, 1f)] private float jigwiSootWholeVolume = 1f;
         [Header("야광귀 콤보 예고와 피버 신호 (#414, Inspector 전용)")]
         [Tooltip("콤보 예고(넷/셋/둘/하나) 동안 화면 가장자리가 어두워지는 최대 진하기 (0이면 끔, 모든 기기)")]
         [SerializeField, Range(0f, 1f)] private float yaguangComboWarningShade = .5f;
@@ -1703,6 +1714,11 @@ namespace C6Lab
         public float YaguangComboGuideFailToTauntSeconds => Mathf.Clamp(Finite(yaguangComboGuideFailToTauntSeconds, .1f), 0f, 2f);
         public bool YaguangComboGuideReadyOn => yaguangComboGuideReadyOn;
         public float YaguangComboStampSoundVolume => Mathf.Clamp01(Finite(yaguangComboStampSoundVolume, .8f));
+        public float JigwiSootAuraVolume => Mathf.Clamp01(Finite(jigwiSootAuraVolume, .35f));
+        public float JigwiSootHitVolume => Mathf.Clamp01(Finite(jigwiSootHitVolume, 1f));
+        public float JigwiSootRevealVolume => Mathf.Clamp01(Finite(jigwiSootRevealVolume, .8f));
+        public float JigwiSootJoinVolume => Mathf.Clamp01(Finite(jigwiSootJoinVolume, .8f));
+        public float JigwiSootWholeVolume => Mathf.Clamp01(Finite(jigwiSootWholeVolume, 1f));
         public float YaguangComboGuideCountFade => Mathf.Clamp(Finite(yaguangComboGuideCountFade, .6f), .1f, 1f);
         public float YaguangComboGuideSoundVolume => Mathf.Clamp01(Finite(yaguangComboGuideSoundVolume, 1f));
         public float YaguangComboWarningShade => Mathf.Clamp01(Finite(yaguangComboWarningShade, .5f));

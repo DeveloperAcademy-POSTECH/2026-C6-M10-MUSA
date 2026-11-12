@@ -63,6 +63,48 @@ namespace C6Lab
 
         private SpriteRenderer[] joinPuffs;
 
+        // #713 박 명중 기운 (PlayHit): 3D 세상에 떠서 카메라를 보고, 연기 기운이 잠시 감돌다 사라진다.
+        private const float HitSeconds = 1.9f;
+        private bool hitHolder;
+        private LabSootAura hitAura;
+        /// <summary>기운 전체 진하기 (명중 기운이 사라질 때 줄인다).</summary>
+        private float alphaScale = 1f;
+
+        /// <summary>
+        /// #713 검정 구슬 명중: 맞은 자리에서 판 위 기운과 같은 검정 기운이 터진다.
+        /// 보랏빛이 번쩍이며 먹빛 연기가 사방으로 확 퍼지고(완성 터짐과 같은 모양, 더 크게), 그 자리에 연기 기운이 잠시 감돌다 사라진다.
+        /// 카메라를 보며 스스로 사라진다.
+        /// </summary>
+        public static void PlayHit(Vector3 worldPoint, float orbRadius, int layer)
+        {
+            if (!(orbRadius > 0f) || !float.IsFinite(worldPoint.x) || !float.IsFinite(worldPoint.y) || !float.IsFinite(worldPoint.z)) return;
+            var root = new GameObject("Soot Hit Aura");
+            root.layer = layer;
+            root.transform.position = worldPoint;
+            var holder = root.AddComponent<LabSootAura>();
+            holder.hitHolder = true;
+            holder.FaceCamera();
+            PlayJoin(root.transform, orbRadius * 1.6f, true);
+            holder.hitAura = Attach(root.transform, orbRadius * 1.3f);
+            holder.hitAura.alphaScale = 0f;
+        }
+
+        private void FaceCamera()
+        {
+            Camera view = Camera.main;
+            if (view != null) transform.rotation = view.transform.rotation;
+        }
+
+        private void UpdateHit()
+        {
+            age += Time.deltaTime;
+            FaceCamera();
+            float u = Mathf.Clamp01(age / HitSeconds);
+            // 터짐 뒤에 연기 기운이 차오르고(0.25초), 끝으로 갈수록 옅어진다.
+            if (hitAura != null) hitAura.alphaScale = Mathf.Clamp01((age - .15f) / .25f) * (1f - u * u);
+            if (u >= 1f) Destroy(gameObject);
+        }
+
         private void PoseJoin()
         {
             float u = Mathf.Clamp01(age / joinSeconds);
@@ -141,6 +183,7 @@ namespace C6Lab
 
         private void Update()
         {
+            if (hitHolder) { UpdateHit(); return; }
             if (join) { age += Time.deltaTime; PoseJoin(); return; }
             if (!shown) return;
             age += Time.deltaTime;
@@ -154,7 +197,7 @@ namespace C6Lab
             float breath = .5f + .5f * Mathf.Sin(age * GlowHz * 2f * Mathf.PI);
             glow.transform.localPosition = new Vector3(0f, 0f, .05f * radius);
             glow.transform.localScale = Vector3.one * (radius * Mathf.Lerp(2.9f, 3.5f, breath));
-            glow.color = new Color(Violet.r, Violet.g, Violet.b, Mathf.Lerp(.22f, .42f, breath));
+            glow.color = new Color(Violet.r, Violet.g, Violet.b, Mathf.Lerp(.22f, .42f, breath) * alphaScale);
 
             // 먹빛 연기 가닥: 구슬 가장자리에서 생겨 돌면서 바깥/위로 번지고, 커지며 옅어진다.
             float spin = age * SpinDegreesPerSecond;
@@ -169,7 +212,7 @@ namespace C6Lab
                 wisp.transform.localScale = Vector3.one * (radius * Mathf.Lerp(.7f, 1.5f, u));
                 float fade = Mathf.Clamp01(u * 5f) * (1f - u);
                 Color tint = Color.Lerp(Ink, Violet, .18f + .12f * Mathf.Sin(i * 1.7f + age));
-                wisp.color = new Color(tint.r, tint.g, tint.b, .75f * fade);
+                wisp.color = new Color(tint.r, tint.g, tint.b, .75f * fade * alphaScale);
             }
         }
     }

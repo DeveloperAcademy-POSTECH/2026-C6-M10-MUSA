@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
@@ -84,6 +85,11 @@ namespace C6Lab
         private float steamAt, steamClearedAt = -1f, steamLeft, lastTickLeft;
         /// <summary>#696: how much smoke there was at the start (the thin edges make it a little under 1).</summary>
         private float steamStartLeft = 1f;
+        // #713: soot shards already uncovered under this smoke (each rings the reveal sound once).
+        private readonly HashSet<string> sootRevealed = new HashSet<string>(StringComparer.Ordinal);
+        private readonly List<string> sootShards = new List<string>();
+        /// <summary>#713: smoke this thin (0~1) over a shard's centre counts as uncovered.</summary>
+        private const float SootRevealAlpha = .4f;
         private Vector2 lastRub;
         private Image waterBack, waterFill;
         // #551 threat: the boss glows red-hot toward me while my bucket waits; failing = Jigwi's bubble, then his smoke on my board.
@@ -686,6 +692,7 @@ namespace C6Lab
         {
             if (steamRound == roundId) return;
             steamRound = roundId; steamOn = true; steamAt = Time.unscaledTime; steamClearedAt = -1f; rubbing = false;
+            sootRevealed.Clear();
             lastSqueakLeft = 1f; lastSqueakAt = -1f;
             thickestSpot = handSpot = new Vector2(.5f, .66f); WipeGauge = 0f; touched = false; // #595
             if (steamTexture == null)
@@ -746,6 +753,7 @@ namespace C6Lab
             steam.color = new Color(SmokeGrey, SmokeGrey * .98f, SmokeGrey * .96f, fadeIn * fadeOut);
             if (steamClearedAt >= 0f)
             {
+                RevealSootShards(true); // #713: whatever was still hidden shows as the smoke lifts
                 if (fadeOut <= 0f) EndSteam();
                 Show(steamHand, false);
                 // The full ring flashes and swells away with the smoke.
@@ -762,6 +770,7 @@ namespace C6Lab
                 lastRub = uv; rubbing = true;
             }
             else rubbing = false;
+            RevealSootShards(false);
             // A small hand rubs back and forth where the most smoke is left (hidden while a finger is already rubbing).
             bool hint = !rubbing;
             Show(steamHand, hint);
@@ -892,6 +901,37 @@ namespace C6Lab
 
         /// <summary>#696: 0 at the start of the smoke, 1 when it counts as wiped (the thin edges are already counted as thin).</summary>
         private float WipedShare => Mathf.Clamp01((steamStartLeft - steamLeft) / Mathf.Max(.01f, steamStartLeft - steamClearLeft));
+
+        /// <summary>
+        /// #713: a soot shard lying under the smoke is "found" once the smoke over its centre is rubbed thin
+        /// (or all at once when the smoke lifts); each one rings the reveal sound once (this device only).
+        /// </summary>
+        private void RevealSootShards(bool all)
+        {
+            if (source == null || source.board == null) return;
+            source.board.CollectSootShards(sootShards);
+            int found = 0;
+            foreach (string id in sootShards)
+            {
+                if (sootRevealed.Contains(id)) continue;
+                bool open = all;
+                if (!open && source.board.TryGetScreenPoint(id, out Vector2 screen) && Screen.width > 0 && Screen.height > 0)
+                    open = SmokeAt(screen.x / Screen.width, screen.y / Screen.height) <= SootRevealAlpha;
+                if (open && sootRevealed.Add(id)) found++;
+            }
+            source.NotifySootShardRevealed(found);
+        }
+
+        /// <summary>#713: the smoke left around a screen point (0~1 each way), averaged over a few texels.</summary>
+        private float SmokeAt(float u, float v)
+        {
+            if (!(u >= 0f && u <= 1f && v >= 0f && v <= 1f)) return 1f;
+            int cx = Mathf.Clamp(Mathf.FloorToInt(u * SteamW), 0, SteamW - 1), cy = Mathf.Clamp(Mathf.FloorToInt(v * SteamH), 0, SteamH - 1);
+            float sum = 0f; int n = 0;
+            for (int y = Mathf.Max(0, cy - 2); y <= Mathf.Min(SteamH - 1, cy + 2); y++)
+                for (int x = Mathf.Max(0, cx - 2); x <= Mathf.Min(SteamW - 1, cx + 2); x++) { sum += steamAlpha[y * SteamW + x]; n++; }
+            return n > 0 ? sum / n : 1f;
+        }
 
         private void EndSteam()
         {

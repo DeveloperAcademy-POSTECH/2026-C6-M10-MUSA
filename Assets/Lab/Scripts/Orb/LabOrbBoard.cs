@@ -535,7 +535,7 @@ namespace C6Lab
             view.SetFever(fever, config.TeamFeverRingScale, config.TeamFeverRingAlpha);
             view.SetFiveColor(fiveColor, soot);
             view.SetSootShard(sootPieces);
-            if (sootJoined) view.PlaySootJoin(soot); // #696 파편이 붙는 순간
+            if (sootJoined) { view.PlaySootJoin(soot); SootJoined?.Invoke(soot); } // #696 파편이 붙는 순간, #713 소리
             view.SetJigwiRewardFire(jigwiRewardFire, jigwiRewardHeld || simulationHeld);
             if (fiveColor) fiveColorIds.Add(id);
             if (soot) sootIds.Add(id);
@@ -1358,6 +1358,18 @@ namespace C6Lab
         public bool IsFiveColor(string id) => id != null && fiveColorIds.Contains(id);
 
         private readonly HashSet<string> sootIds = new HashSet<string>(StringComparer.Ordinal);
+        /// <summary>#713 이 판에서 파편이 붙었다 (true면 네 조각이 모여 검정 구슬이 됨). 판 주인 기기에서만.</summary>
+        public event Action<bool> SootJoined;
+
+        /// <summary>#713 이 판에 보이는 연기 파편 id들을 into에 담는다.</summary>
+        public void CollectSootShards(List<string> into)
+        {
+            if (into == null) return;
+            into.Clear();
+            foreach (var pair in entries)
+                if (pair.Value.View != null && pair.Value.View.Kind.IsSootShard()) into.Add(pair.Key);
+        }
+
         /// <summary>#696 이 판 구슬이 지귀 검정 구슬인지. 던질 때 투사체도 검정 톤이 된다.</summary>
         public bool IsSoot(string id) => id != null && sootIds.Contains(id);
 
