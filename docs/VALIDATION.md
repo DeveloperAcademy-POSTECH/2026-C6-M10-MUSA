@@ -8504,4 +8504,11 @@ Unity 6000.6.5f1 macOS Editor에서 새로고침 후 컴파일 오류0. 전체 E
 - iOS Release 내보내기: `Builds/HapioDemo/20261112-062237-daa06e6c-release/iOS/Unity-iPhone.xcodeproj`. Unity BuildReport Succeeded·오류1·경고57. Info.plist의 표시명/버전0.1.0/빌드1과 앱 타깃의 Demo ID를 확인했다. 오류를0으로 기록하지 않는다: `com.unity.pipeline@f311b58065e4`의 `PipelineRuntimeBuildProcessor.OnPreprocessBuild`64행이 iOS에서 `BuildSummary.GetSubtarget<StandaloneBuildSubtarget>()`를 호출해 ArgumentException을 남겼다. 본 게임/시연 코드가 아닌 연결 도구의 사전 빌드 처리에서 발생하며 Xcode 생성은 완료됐다. 패키지를 변경하거나 예외를 숨기지 않았다. 실제 Xcode 컴파일·서명·설치·iOS 실행은 하지 않았다.
 - 두 manifest의 원래 Stage2 설정 SHA256은 동일하다. 두 Player의 실제 C6Lab.Runtime 컴파일 응답 파일에서 `HAPIO_YAGUANG_DEMO` 포함, `DEVELOPMENT_BUILD`·`UNITY_EDITOR` 미포함을 확인했다. manifest는 기준 HEAD와 미커밋 작업 포함 여부를 기록한다. QA 빌드는 이번에 실행하지 않았다.
 - Mac Release 앱을 창390×844로15초 실행했다. 초기 실행 중 예외/크래시는 기록되지 않았고 직접 시작한 프로세스는 종료했다. URP Gaussian/Bokeh DOF·Panini shader 미지원/stripped 경고4건은 로그에 남았다. 이 확인은 초기 프로세스/렌더러 가동만 뜻하며 실제3개 Guest 화면이나 시연 플레이 전체에 대한 육안 통과로 사용하지 않는다.
-- 빌드 후 Editor는 StandaloneOSX·Development false·일반 variant false·기존 product/ID/version으로 복원됐으며 두 플랫폼 저장 defines는 비어 있다. 시작 때 열려 있던 FiveElementsComparison Scene도 dirty 없이 돌아왔다. 보호12개 파일의 해시가 모두 같고 공백 검사도 통과했다. 일반 Wi-Fi/핫스팟·iOS 실기기 확인은 사용자 결정에 따라 이번 범위에서 제외했다.
+- 빌드 후 Editor는 StandaloneOSX·Development false·일반 variant false·기존 product/ID/version으로 복원됐으며 두 플랫폼 저장 defines는 비어 있다. 시작 때 열려 있던 FiveElementsComparison Scene도 dirty 없이 돌아왔다. 보호12개 파일의 해시가 모두 같고 코드·문서의 공백 검사도 통과했다. Unity가 직렬화한 신규 에셋/메타의 빈 필드 뒤 공백은 자동 저장 형식 그대로 보존했다. 일반 Wi-Fi/핫스팟·iOS 실기기 확인은 사용자 결정에 따라 이번 범위에서 제외했다.
+
+
+### #706 PR 준비 — 최신 main #705 통합
+
+시연 구현을 `f014784f`로 커밋한 뒤 main `c2829b46`(#705 봉인 박 관람 버튼·땅따먹기 결과)을 `b3d37cfd`에 통합했다. 수동 충돌은 없었으며 `GameRunFlow`의 Territory 재시작과 `GameSession.Results`의 같은 방 재도전을 시연 경로와 함께 보존했다. #705의 StageResult Scene을 옛59ad 버전으로 복원하지 않았다. 보호12개 파일은 최신 main과 일치한다.
+
+이번 main 통합은 공통 결과/재도전/Scene 흐름을 변경하므로 이전835건 PlayMode 결과만으로 통합본 통과를 판단하지 않는다. Unity6000.6.5f1/macOS Metal의 전체 EditMode·PlayMode를 다시 실행하고 아래에 실제 결과를 기록한다. 앞선 빌드의 manifest/시각/예외는 해당 빌드 당시 기록으로 보존한다. 실기기는 계속 이번 범위에서 제외한다.
