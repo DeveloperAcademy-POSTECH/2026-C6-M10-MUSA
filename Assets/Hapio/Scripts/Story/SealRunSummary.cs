@@ -13,6 +13,8 @@ namespace Hapio
         public Text[] contributions;
         public Text totalTime;
         public Text appraisal;
+        [Tooltip("Canonical stage identities shown by this view. The demo shows only the original stage 2.")]
+        public int[] stageIndices = { 1, 2, 3 };
         public static readonly string[] Appraisals = {
             "흔들림 없는 솜씨가\n참으로 훌륭했소.",
             "요괴를 다루는 손길이\n예사롭지 않았소.",
@@ -30,10 +32,12 @@ namespace Hapio
         public void Bind(IReadOnlyList<LabResultStage> stages, ulong localPlayerId)
         {
             double total = 0;
-            bool complete = stages != null && stages.Count == 3;
-            for (int i = 0; i < 3; i++)
+            int[] identities = stageIndices ?? Array.Empty<int>();
+            bool complete = stages != null && identities.Length > 0;
+            for (int i = 0; i < identities.Length; i++)
             {
-                LabResultStage stage = stages != null && i < stages.Count ? stages[i] : null;
+                int index = identities[i] - 1;
+                LabResultStage stage = stages != null && index >= 0 && index < stages.Count ? stages[index] : null;
                 if (stageTimes != null && i < stageTimes.Length && stageTimes[i] != null)
                     stageTimes[i].text = stage == null ? "—" : FormatTime(stage.PlayedSeconds);
                 if (contributions != null && i < contributions.Length && contributions[i] != null)

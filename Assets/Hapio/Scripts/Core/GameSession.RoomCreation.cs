@@ -17,7 +17,8 @@ namespace Hapio
         /// <summary>Keep the confirmed discovery identity, then enter without another card click.</summary>
         public bool CreateAndEnterRoom(int capacity, GameMode mode = GameMode.Story)
         {
-            if (IsCreatingRoom || goingHome || state.phase != GameFlowPhase.Home || !network.CanChooseConnection)
+            if (!AllowsRoom(mode, capacity) || IsCreatingRoom || goingHome
+                || state.phase != GameFlowPhase.Home || !network.CanChooseConnection)
                 return false;
             roomBrowserVisible = true;
             if (!pendingRooms.TryCreate(capacity, mode, out GamePendingRoomHandle handle, out string error))

@@ -50,7 +50,7 @@ namespace Hapio
             ResetRoomFlow();
             roomBrowserVisible = true;
             SetLocalState(new GameFlowState());
-            goingHome = false;
+            goingHome = !network.CanChooseConnection;
             EnterRoomBrowser();
         }
         public bool SummaryStarted { get; private set; }
@@ -64,11 +64,11 @@ namespace Hapio
         /// ended on the completed result (#642 keeps the local result identity), so nobody is left to press 마치기.
         /// </summary>
         public bool SummaryAllowed => SummaryStarted || HostLostAfterClear
-            || state.phase == GameFlowPhase.Completed && !tutorialRun && !IsTerritory && state.stageIndex == state.totalStages
+            || state.phase == GameFlowPhase.Completed && !tutorialRun && !IsTerritory && state.stageIndex == RunProfile.FinalStage
                 && network != null && !network.IsConnected && !goingHome;
         public bool CanStartSummary => network != null && network.IsConnected && !goingHome
             && !tutorialRun && !IsTerritory && state.phase == GameFlowPhase.Completed
-            && state.stageIndex == state.totalStages && !SummaryStarted && CanAdvanceStage;
+            && state.stageIndex == RunProfile.FinalStage && !SummaryStarted && CanAdvanceStage;
         public bool StartSummary()
         {
             if (!CanStartSummary) return false;
@@ -81,7 +81,7 @@ namespace Hapio
         {
             // Sticky within this exact result generation; a delayed false heartbeat cannot undo it.
             if (!control.summaryStarted || SummaryStarted || tutorialRun || IsTerritory
-                || state.phase != GameFlowPhase.Completed || state.stageIndex != state.totalStages
+                || state.phase != GameFlowPhase.Completed || state.stageIndex != RunProfile.FinalStage
                 || control.state == null || control.state.phase != GameFlowPhase.Completed
                 || !MatchesControlIdentity(control) || control.state.battleSessionId != state.battleSessionId
                 || control.state.battleRound != state.battleRound) return;
@@ -99,7 +99,7 @@ namespace Hapio
             resultPresentations.Remove(id);
             resultReady.Remove(id);
             sealParticipantsReady.Remove(id);
-            if (lostHost && !network.IsHost && !tutorialRun && !IsTerritory && state.stageIndex == state.totalStages)
+            if (lostHost && !network.IsHost && !tutorialRun && !IsTerritory && state.stageIndex == RunProfile.FinalStage)
                 HostLostAfterClear = true;
             Changed?.Invoke();
         }

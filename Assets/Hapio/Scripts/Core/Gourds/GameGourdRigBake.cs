@@ -555,7 +555,9 @@ namespace Hapio
                     Vector3 own = Normals.Count > v ? Normals[v] : Vector3.zero, sum = Vector3.zero;
                     if (own.sqrMagnitude > 1e-12f && faces.TryGetValue(Key(Positions[v]), out var list))
                         foreach (Vector3 face in list) if (Vector3.Dot(face, own) > 0f) sum += face;
-                    normals.Add(sum.sqrMagnitude > 1e-20f ? sum.normalized : own);
+                    // Vector3.normalized cuts small, valid area-weighted sums to zero. Preserve their direction.
+                    float squaredLength = sum.sqrMagnitude;
+                    normals.Add(squaredLength > 1e-20f ? sum / Mathf.Sqrt(squaredLength) : own);
                 }
                 return new Triangles(Positions, normals, Uv, Indices);
             }

@@ -69,7 +69,9 @@ namespace Hapio
         {
             if (!isActiveAndEnabled) return false;
             if (presenting) return true;
-            if (openingConsumed) return false;
+            // The exhibition build gives every new party the opening when they press Start again.
+            // The normal game's once-per-app rule remains independent of that build choice.
+            if (openingConsumed && !C6Lab.LabGameBuildVariant.IsYaguangDemo) return false;
 
             // An interrupted or invalid attempt is still consumed, so Home cannot get stuck in a retry loop.
             openingConsumed = true;
@@ -77,6 +79,10 @@ namespace Hapio
             current = this;
             presenting = true;
             if (lobbyView != null) lobbyView.SetOpeningBlocked(true);
+            // A completed party may leave the title's background browser running (#476). The demo
+            // replays its opening for the next party; room discovery starts again at its hand-over.
+            if (C6Lab.LabGameBuildVariant.IsYaguangDemo && GameSession.Instance != null)
+                GameSession.Instance.Network.CancelRoomSearch();
             if (!ValidateBindings(out string error))
             {
                 Unavailable(error);

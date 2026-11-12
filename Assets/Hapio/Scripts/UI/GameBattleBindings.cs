@@ -167,7 +167,7 @@ namespace Hapio
             if (stageLabel != null && session.IsTutorial) stageLabel.text = GameTutorialScript.StageLabel;
             else if (stageLabel != null)
                 stageLabel.text = (session.IsTerritory ? (session.TerritoryMatchLabel + " 땅따먹기").TrimStart()
-                        : "STAGE " + session.State.stageIndex + " / " + session.State.totalStages
+                        : "STAGE " + session.RunProfile.Position(session.State.stageIndex) + " / " + session.RunProfile.Count
                             + (stage != null ? " · " + stage.displayName : string.Empty))
                     + (session.IsPreparingBattle ? " · WAITING" : string.Empty);
             RefreshDeveloperNextStage();
@@ -188,9 +188,9 @@ namespace Hapio
             developerNextStageButton.interactable = visible && session.CanDeveloperAdvanceStage;
             var label = developerNextStageButton.GetComponentInChildren<UnityEngine.UI.Text>(true);
             if (label == null || session == null) return;
-            bool last = session.State.stageIndex >= session.State.totalStages;
-            string value = last ? "LAST STAGE · " + session.State.totalStages + " / " + session.State.totalStages
-                : "NEXT STAGE · " + (session.State.stageIndex + 1) + " / " + session.State.totalStages
+            bool last = session.State.stageIndex == session.RunProfile.FinalStage;
+            string value = last ? "LAST STAGE · " + session.RunProfile.Count + " / " + session.RunProfile.Count
+                : "NEXT STAGE · " + (session.RunProfile.Position(session.State.stageIndex) + 1) + " / " + session.RunProfile.Count
                     + "\nAPPLIED SETTINGS ONLY";
             if (label.text != value) label.text = value;
         }

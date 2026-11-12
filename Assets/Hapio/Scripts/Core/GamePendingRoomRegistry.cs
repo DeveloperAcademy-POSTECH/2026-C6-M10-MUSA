@@ -54,6 +54,8 @@ namespace Hapio
             handle = null;
             error = string.Empty;
             if (disposed) { error = "방 목록이 닫혔소."; return false; }
+            if (LabGameBuildVariant.IsYaguangDemo && (mode != GameMode.Story || capacity != 3))
+            { error = "야광귀 시연은 3인 기본 모드만 사용할 수 있소."; return false; }
             if (rooms.Count >= LabBonjourDiscovery.MaximumServices)
             { error = "열린 방이 너무 많소. 만든 방에 먼저 입장해주시오."; return false; }
             if (!LabPendingRoom.TryCreate(capacity, LabRoomFamily.Game, mode == GameMode.Territory,
