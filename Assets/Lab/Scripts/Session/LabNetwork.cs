@@ -566,7 +566,7 @@ namespace C6Lab
         /// <summary>The Host chooses 2–5 network participants before creating the room.</summary>
         public bool SetTargetParticipantCount(int count)
         {
-            if (!CanChooseConnection || count < 2 || count > 5) return false;
+            if (!CanChooseConnection || count < 2 || count > 5 || !AllowsDemoRoom(count, false)) return false;
             targetParticipantCount = count;
             Changed?.Invoke();
             return true;
@@ -576,7 +576,8 @@ namespace C6Lab
         public bool ConfigureHostSession(LabConfig candidate, int targetParticipants)
         {
             // 땅따먹기 방은 2·4·6명, 그 밖의 방은 2~5명이다 (#394).
-            if (!CanChooseConnection || !LabModel.ValidRoomSize(targetParticipants, candidate != null && candidate.TeamTerritoryEnabled))
+            if (!CanChooseConnection || !AllowsDemoRoom(targetParticipants, candidate != null && candidate.TeamTerritoryEnabled)
+                || !LabModel.ValidRoomSize(targetParticipants, candidate != null && candidate.TeamTerritoryEnabled))
             {
                 SetNotice("Choose 2–5 players (2, 4 or 6 for territory) before creating a room.");
                 return false;
@@ -747,7 +748,8 @@ namespace C6Lab
         {
             if (!CanChooseConnection || registeredRoom == null || registeredRoom.Family != RoomFamily || !registeredRoom.IsAdvertising
                 || !registeredRoom.AdvertisingConfirmed || !ValidRoomName(registeredRoom.RegisteredServiceName)
-                || roomPort == 0 || !LabModel.ValidRoomSize(capacity, registeredRoom.Team)) return false;
+                || roomPort == 0 || !AllowsDemoRoom(capacity, registeredRoom.Team)
+                || !LabModel.ValidRoomSize(capacity, registeredRoom.Team)) return false;
             port = roomPort;
             targetParticipantCount = capacity;
             return HostInternal(registeredRoom);
@@ -755,7 +757,8 @@ namespace C6Lab
 
         private bool HostInternal(LabBonjourDiscovery registeredRoom)
         {
-            if (!CanChooseConnection || manager == null || transport == null || config == null) return false;
+            if (!CanChooseConnection || manager == null || transport == null || config == null
+                || !AllowsDemoRoom(targetParticipantCount, config.TeamTerritoryEnabled)) return false;
             // A room without a registered card is advertised as a plain room, so it holds 2 to 5 players. Check before the
             // Host starts: a six-player size left from a 3:3 room must not open a half-advertised room (#405).
             if (registeredRoom == null && !LabModel.ValidRoomSize(targetParticipantCount, false))
@@ -874,6 +877,8 @@ namespace C6Lab
         public void CancelRoomSearch()
         {
             if (IsJoiningRoom) return;
+            // An explicit cancel also retires a browse queued by asynchronous Stop (#706).
+            resumeRoomSearchAfterStop = false;
             if (!roomSearchActive)
             {
                 // A canceled search must not come back by itself between two retries (#476).
@@ -1706,7 +1711,7 @@ namespace C6Lab
         private void ReceiveLobby(LabNetworkPacket packet)
         {
             // The Host decides the room size; a Guest only bounds it (6 is a 3:3 territory room, #394).
-            if (packet.targetParticipants < LabModel.MinimumParticipants
+            if (!AllowsDemoRoom(packet.targetParticipants, false) || packet.targetParticipants < LabModel.MinimumParticipants
                 || packet.targetParticipants > LabModel.TerritoryMaximumParticipants
                 || packet.seats == null || packet.seats.Length > packet.targetParticipants
                 || packet.seats.Distinct().Count() != packet.seats.Length
@@ -2754,7 +2759,9 @@ namespace C6Lab
         {
             if (packet.configRevision < 1 || packet.targetParticipants < LabModel.MinimumParticipants
                 || packet.targetParticipants > LabModel.TerritoryMaximumParticipants
-                || packet.tuning == null || packet.tuning.Length != LabConfig.DeveloperFields.Count) return;
+                || packet.tuning == null || packet.tuning.Length != LabConfig.DeveloperFields.Count
+                // Shared field196 is the established territory toggle; reject before installing any value.
+                || !AllowsDemoRoom(packet.targetParticipants, packet.tuning[196] != 0f)) return;
             string expected;
             try { expected = LabSessionSettings.Fingerprint(packet.tuning, packet.targetParticipants, LabProtocolVersion); }
             catch (ArgumentException) { return; }

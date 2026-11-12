@@ -16,6 +16,7 @@ namespace Hapio
                 return Reject("invalid text fields", out reason);
             if (!Enum.IsDefined(typeof(GameMode), value.mode) || value.totalStages != GameRunFlow.StagesFor(value.mode))
                 return Reject("unsupported stage count", out reason);
+            GameRunProfile profile = GameRunProfile.ForMode(value.mode);
             if (value.notice == null || value.notice.Length > 128
                 || value.phase != GameFlowPhase.Lobby && value.notice.Length != 0)
                 return Reject("invalid notice", out reason);
@@ -39,11 +40,11 @@ namespace Hapio
                 return true;
             }
             if (string.IsNullOrEmpty(value.runId) || value.revision == 0
-                || value.stageIndex < 1 || value.stageIndex > value.totalStages)
+                || !profile.Contains(value.stageIndex))
                 return Reject("invalid run generation", out reason);
-            if (value.phase == GameFlowPhase.Completed && value.stageIndex != value.totalStages)
+            if (value.phase == GameFlowPhase.Completed && value.stageIndex != profile.FinalStage)
                 return Reject("completed before final stage", out reason);
-            if (value.phase == GameFlowPhase.StageResult && value.stageIndex >= value.totalStages)
+            if (value.phase == GameFlowPhase.StageResult && value.stageIndex == profile.FinalStage)
                 return Reject("final stage is not an intermediate result", out reason);
             if (value.phase == GameFlowPhase.LoadingBattle
                 && (!string.IsNullOrEmpty(value.battleSessionId) || value.battleRound != 0))
@@ -66,6 +67,7 @@ namespace Hapio
             bool allowNewRun, out string reason)
         {
             if (!IsValid(incoming, out reason)) return false;
+            GameRunProfile profile = GameRunProfile.ForMode(incoming.mode);
             if (current == null) return true;
             if (incoming.runId != current.runId)
             {
@@ -73,7 +75,7 @@ namespace Hapio
                 if (incoming.phase == GameFlowPhase.Home || incoming.phase == GameFlowPhase.Lobby)
                     return true;
                 if ((current.phase != GameFlowPhase.Home && current.phase != GameFlowPhase.Lobby)
-                    || incoming.phase != GameFlowPhase.LoadingBattle || incoming.stageIndex != 1)
+                    || incoming.phase != GameFlowPhase.LoadingBattle || incoming.stageIndex != profile.FirstStage)
                     return Reject("new run requires lobby", out reason);
                 return true;
             }
@@ -83,7 +85,7 @@ namespace Hapio
                 && incoming.phase != current.phase) return true;
             if (incoming.revision <= current.revision)
                 return Reject("duplicate or stale revision", out reason);
-            if (incoming.stageIndex < current.stageIndex)
+            if (profile.Position(incoming.stageIndex) < profile.Position(current.stageIndex))
                 return Reject("previous stage", out reason);
             if (current.phase == GameFlowPhase.GameOver)
             {
@@ -97,7 +99,7 @@ namespace Hapio
             }
             if (current.phase == GameFlowPhase.Completed)
                 return Reject("terminal run", out reason);
-            if (incoming.stageIndex > current.stageIndex + 1)
+            if (profile.Position(incoming.stageIndex) > profile.Position(current.stageIndex) + 1)
                 return Reject("skipped stage", out reason);
             if (current.stageIndex == incoming.stageIndex)
             {
@@ -135,6 +137,8 @@ namespace Hapio
             current != null && incoming != null && current.phase == GameFlowPhase.GameOver
             && current.retryableDefeat && current.mode == GameMode.Story && incoming.mode == GameMode.Story
             && current.runId == incoming.runId && !string.IsNullOrEmpty(current.runId)
+            && current.totalStages == incoming.totalStages && incoming.totalStages == GameRunFlow.StagesFor(incoming.mode)
+            && GameRunProfile.ForMode(current.mode).Contains(current.stageIndex)
             && incoming.stageIndex == current.stageIndex && incoming.revision > current.revision
             && incoming.phase == GameFlowPhase.LoadingBattle && !incoming.retryableDefeat
             && string.IsNullOrEmpty(incoming.battleSessionId) && incoming.battleRound == 0

@@ -18,6 +18,7 @@ namespace Hapio.Tests
     {
         private GameSession session;
         private GameOpeningController opening;
+        private IDisposable demoVariant;
 
         [UnitySetUp]
         public IEnumerator StartANewAppRun()
@@ -35,6 +36,10 @@ namespace Hapio.Tests
         [UnityTearDown]
         public IEnumerator Cleanup()
         {
+            // NUnit can stop a parent iterator when a nested yielded assertion fails; its using/finally
+            // need not run. The fixture owns this global override and releases it even on that path.
+            demoVariant?.Dispose();
+            demoVariant = null;
             Time.timeScale = 1f;
             if (opening != null) opening.enabled = false;
             GameSession ownedSession = session != null ? session : GameSession.Instance;
@@ -45,7 +50,7 @@ namespace Hapio.Tests
                 yield return null;
             }
             Scene previous = SceneManager.GetActiveScene();
-            Scene cleanup = SceneManager.CreateScene("Opening flow fixture cleanup");
+            Scene cleanup = SceneManager.CreateScene("Opening flow fixture cleanup " + Guid.NewGuid().ToString("N"));
             SceneManager.SetActiveScene(cleanup);
             if (previous.IsValid() && previous.isLoaded) yield return SceneManager.UnloadSceneAsync(previous);
             opening = null;
@@ -64,6 +69,36 @@ namespace Hapio.Tests
             Assert.That(opening.player.CurrentView, Is.Null);
             Assert.That(session.Network.IsSearchingRooms, Is.False);
             Assert.That(GameOpeningController.HasPlayedThisRun, Is.False);
+        }
+
+        [UnityTest]
+        public IEnumerator DemoStartReplaysTheOpeningForTheNextPartyAndAlwaysHandsOverToRooms()
+        {
+            demoVariant = C6Lab.LabGameBuildVariant.OverrideForTests(true);
+            typeof(GameSession).GetMethod("ResetTutorialRun", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, null);
+            Assert.That(typeof(GameSession).GetField("tutorialConsumed", BindingFlags.Static | BindingFlags.NonPublic)
+                .GetValue(null), Is.False, "The tutorial is unseen in this app run.");
+            Assert.That(GameSession.TutorialPending, Is.False, "The demo never schedules even an unseen tutorial.");
+            yield return LoadHome();
+            yield return PressStart();
+            opening.player.Skip();
+            yield return Until(() => !GameOpeningController.IsPresenting && !session.CloudsUp, "First party reaches the rooms");
+            AssertAtBrowserWithNoOpening();
+            Assert.That(session.IsTutorial, Is.False);
+            Assert.That(session.Network.IsTutorial, Is.False);
+            Assert.That(session.Network.IsConnected, Is.False);
+
+            session.GoHome();
+            yield return Until(() => !session.RoomBrowserVisible && !session.IsLoadingScene, "Return to the real title");
+            yield return null;
+            Assert.That(GameOpeningController.HasPlayedThisRun, Is.True);
+            yield return PressStart();
+            Assert.That(opening.player.CurrentCutIndex, Is.Zero, "A fresh Start replays the first opening picture.");
+            opening.player.Skip();
+            yield return Until(() => !GameOpeningController.IsPresenting && !session.CloudsUp, "Second party reaches the rooms");
+            AssertAtBrowserWithNoOpening();
+            Assert.That(session.IsTutorial, Is.False);
         }
 
         [UnityTest]

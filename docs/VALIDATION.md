@@ -1,5 +1,21 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-12 — 스테이지 박 뚜껑 칠의 흰 노이즈
+
+- **기준:** `fix/lid-paint-smooth-normals` (main `c2829b46`). Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 판정·접속 묶음·설정은 그대로다.
+- **원인:** 원본 FBX 뚜껑(`model_part3`)이 각진 모서리로 내보내져, 한 위치에 법선이 다른 점이 여러 개 있다. 굽기 도구는 뚜껑을 그대로 복사했다. 클레이 층(`ClayStickerSurface`)은 점을 법선 방향으로 밀어 내므로 삼각형 사이가 벌어져 흰 뚜껑이 비쳤다.
+- **고친 것:** 칠용 뚜껑(`Lid Paint`)을 구울 때 같은 위치·같은 쪽 면의 법선을 공유하게 했다. 세 스테이지 박을 다시 구웠고, 바뀐 것은 `Stage0N_LidPaint.asset` 3개다.
+
+| 확인 | 결과 |
+| --- | --- |
+| 구운 뚜껑 메시: 같은 위치·같은 쪽인데 법선이 갈린 위치 | 1·3스테이지 2,576 → 50, 2스테이지 2,324 → 32 |
+| 관람 복사본에서 층 끄고 켜기(수정 전) | 클레이만 켜면 삼각형 모서리를 따라 구멍. 클레이를 끄면 노이즈 없음 |
+| 전투 박 뚜껑 렌더(위에서 본 카메라, 1~3스테이지, 전/후) | 전: 흰 선·점 / 후: 없음 |
+| 전체 EditMode / PlayMode | 2349/2349, 829/830. 실패 1건 `LabPlayerPaintPatternRenderTests.PatternToggle…`는 흰 박만 쓰는 검사이고, 단독으로 다시 돌리면 이 브랜치 2회·main 1회 모두 5/5 PASS |
+
+- **그대로 둔 것:** 뚜껑 꼭대기의 부채꼴 칠 무늬는 칠 방향 매핑의 극 때문이다. 수정 전에도 있었고 이번 범위가 아니다.
+- **미실행:** 실기기 화면.
+
 ## 2026-11-12 — #700 봉인 박 둘러보기·땅따먹기 결과
 
 - 기준은 `fix/#700-seal-box-browse-buttons-and-territory-results`의 `d6f96d16` 위 변경과 macOS Unity 6000.6.5f1(Metal)이다.
@@ -8480,6 +8496,43 @@ Unity 6000.6.5f1 macOS Editor에서 새로고침 후 컴파일 오류0. 전체 E
 - Unity PreviewRenderUtility로 세 저장 프리팹의 닫힌 자세를 임시 렌더해 천 장식 숨김을 확인했다. 임시 객체/RT는 해제했다. 실제 전투 전체 화면·실기기·빌드·전체 PlayMode는 이번에 실행하지 않았다.
 
 
+## 2026-11-12 — #706 야광귀 3인 시연
+
+기준 main `59ad1803`, 브랜치 `feat/#706-yaguang-demo-build`, Unity6000.6.5f1/macOS Metal이다. 일반 카탈로그3개와 원본5개 Game Scene·Lab·설정·공통 Prefab을 보존하며 시연용 빌드 정의/경로 `[2]`를 선택한다. 야광귀는 원래 Stage2 정체성과 수치/그림/물리/규칙을 사용한다. 사용법과 메뉴는 `YAGUANG_DEMO.md`에 기록했다.
+
+명시적인 Unity Editor API 생성으로 `Resources/Hapio/Demo/Yaguang` 아래에 한 스테이지 총평과 엔딩 사본을 만들었다. 일반 엔딩/카탈로그를 저장하지 않았다. CLI 연결이 없는 초기 컴파일에서 발견한 Capacity/TargetParticipants 차이·지원되지 않는 NonParallelizable 검사 속성·IReadOnlyList에 대한 Array.FindIndex 사용을 수정한 뒤 정상 컴파일/에셋 생성과 Pipeline 연결을 확인했다. 해당 초기 컴파일은 검사 통과로 사용하지 않는다.
+
+| 단계 | 실제 결과와 보완 |
+| --- | --- |
+| 최초 사전 검사 | 전체 EditMode2387/2387(36.38초), 시연 Home3/3(1.01초). 시연 Host+두 로컬 프로토콜 참가자 흐름0/1(11초): 엔딩 뒤 방 목록이 열렸다. 비동기 NGO 종료 중 Home이 잔여 연결을 새 Lobby로 인식하는 경합을 수정했다. 기존 타이틀 복귀 단언은 유지했다. |
+| 종료 대기 수정 후 | 전체 EditMode2387/2387(34.96초), 시연 Home3/3(0.88초), 3인 흐름1/1(10.50초). 오프닝13/14(9.46초): 새 fixture가 Demo의 TutorialPending을 true로 가정한 준비 조건 오류와 실패 시 중복 cleanup Scene을 발견했다. 원시 미소비 상태를 확인하고 Demo의 실제 false 계약을 검사하며 cleanup 이름을 고유화했다. |
+| 반복 오프닝 경계 확인 | 오프닝11/14(11.14초): 두 번째 시연의 오프닝 중 이전 방 검색이 남고, 새 coroutine의 테스트 override가 실패 시 다음 일반판 검사로 새는 문제를 발견했다. 시연 오프닝의 검색 취소·지연 재검색 예약 취소를 연결하고 override를 UnityTearDown에서 소유/복원했다. 기존 일반판의 단언은 유지했다. |
+| 최종 사전 검사 | 전체 EditMode **2388/2388**(35.40초), 시연 Home **3/3**(0.95초), 실제 Host+두 loopback 프로토콜 참가자 시연 흐름 **1/1**(10.81초), 오프닝 **14/14**(12.65초). 실패·skip·inconclusive0. |
+| 최종 전체 PlayMode | **835/835**(858.36초). 실패·skip·inconclusive0. 일반 Story·Lab·투척·페인트·결과/관람·재도전·오프닝을 포함한 전체 PlayMode를 실행했다. |
+
+시연 흐름 검사는 저장 Home/Lobby/Battle/결과와 실제 Host를 열고 두 로컬 프로토콜 참가자가 ACK/Ready를 교환한다. 원래 Stage2와 실제 CPU 도색 승리, 야광귀 후일담, 전원 준비/방장 진행, 한 스테이지 실제 총평, 엔딩6컷, 타이틀까지 확인한다. Guest UI 자체나 세 물리 기기의 무선 연결 성공을 뜻하지 않는다. 실기기·서명 설치·일반 Wi-Fi/핫스팟은 미검증이다.
+
+원본12개 파일(ProjectSettings·EditorBuildSettings·LabConfig·Lab Scene·StageCatalog·GameSession/GameLobby Prefab·Game Scene5개)이 기준 main과 동일한 것을 빌드 전·후 SHA256으로 확인했다. `git diff -- ProjectSettings Packages`도 비어 있다. 원시 실행 결과/초기 실패/빌드 기록은 커밋하지 않는 로컬 `artifacts/yaguang-demo`에 보관한다.
+
+### 실제 빌드와 복원
+
+- Mac Release: `Builds/HapioDemo/20261112-062102-298e6a4b-release/macOS/Hapio-Yaguang-Demo.app`. Unity BuildReport Succeeded·오류0, 출력 Info.plist의 Demo 이름/ID·버전0.1.0을 확인했다.
+- iOS Release 내보내기: `Builds/HapioDemo/20261112-062237-daa06e6c-release/iOS/Unity-iPhone.xcodeproj`. Unity BuildReport Succeeded·오류1·경고57. Info.plist의 표시명/버전0.1.0/빌드1과 앱 타깃의 Demo ID를 확인했다. 오류를0으로 기록하지 않는다: `com.unity.pipeline@f311b58065e4`의 `PipelineRuntimeBuildProcessor.OnPreprocessBuild`64행이 iOS에서 `BuildSummary.GetSubtarget<StandaloneBuildSubtarget>()`를 호출해 ArgumentException을 남겼다. 본 게임/시연 코드가 아닌 연결 도구의 사전 빌드 처리에서 발생하며 Xcode 생성은 완료됐다. 패키지를 변경하거나 예외를 숨기지 않았다. 실제 Xcode 컴파일·서명·설치·iOS 실행은 하지 않았다.
+- 두 manifest의 원래 Stage2 설정 SHA256은 동일하다. 두 Player의 실제 C6Lab.Runtime 컴파일 응답 파일에서 `HAPIO_YAGUANG_DEMO` 포함, `DEVELOPMENT_BUILD`·`UNITY_EDITOR` 미포함을 확인했다. manifest는 기준 HEAD와 미커밋 작업 포함 여부를 기록한다. QA 빌드는 이번에 실행하지 않았다.
+- Mac Release 앱을 창390×844로15초 실행했다. 초기 실행 중 예외/크래시는 기록되지 않았고 직접 시작한 프로세스는 종료했다. URP Gaussian/Bokeh DOF·Panini shader 미지원/stripped 경고4건은 로그에 남았다. 이 확인은 초기 프로세스/렌더러 가동만 뜻하며 실제3개 Guest 화면이나 시연 플레이 전체에 대한 육안 통과로 사용하지 않는다.
+- 빌드 후 Editor는 StandaloneOSX·Development false·일반 variant false·기존 product/ID/version으로 복원됐으며 두 플랫폼 저장 defines는 비어 있다. 시작 때 열려 있던 FiveElementsComparison Scene도 dirty 없이 돌아왔다. 보호12개 파일의 해시가 모두 같고 코드·문서의 공백 검사도 통과했다. Unity가 직렬화한 신규 에셋/메타의 빈 필드 뒤 공백은 자동 저장 형식 그대로 보존했다. 일반 Wi-Fi/핫스팟·iOS 실기기 확인은 사용자 결정에 따라 이번 범위에서 제외했다.
+
+
+### #706 PR 준비 — 최신 main #705 통합
+
+시연 구현을 `f014784f`로 커밋한 뒤 main `c2829b46`(#705 봉인 박 관람 버튼·땅따먹기 결과)을 `b3d37cfd`에 통합했다. 수동 충돌은 없었으며 `GameRunFlow`의 Territory 재시작과 `GameSession.Results`의 같은 방 재도전을 시연 경로와 함께 보존했다. #705의 StageResult Scene을 옛59ad 버전으로 복원하지 않았다. 보호12개 파일은 최신 main과 일치한다.
+
+이번 main 통합은 공통 결과/재도전/Scene 흐름을 변경하므로 이전835건 PlayMode 결과만으로 통합본 통과를 판단하지 않는다. Unity6000.6.5f1/macOS Metal의 전체 EditMode·PlayMode를 다시 실행하고 아래에 실제 결과를 기록한다. 앞선 빌드의 manifest/시각/예외는 해당 빌드 당시 기록으로 보존한다. 실기기는 계속 이번 범위에서 제외한다.
+
+
+- #705 통합본 `0d7a6d53`: 전체 EditMode **2388/2388**(36.44초), 시연 Home **3/3**(0.86초), 시연 전체 흐름 **1/1**(10.37초), 오프닝 **14/14**(12.58초), 전체 PlayMode **835/835**(869.76초). 실패·skip·inconclusive0.
+- 이 검사 도중 main에 #709(`90974c90`, 지귀 연기/검정 구슬, 프로토콜5703)가 병합돼 해당 변경도 통합했다. `LabNetwork`의 새 soot 처리와 시연 제한을 함께 보존했고 현재 규약 안내만5703으로 갱신했다. 과거5702 manifest/검증 기록은 당시 결과로 유지한다. 지귀는 StageYokai gate 안에 있어 야광귀 시연에서는 활성화되지 않는다. 공통 보드·투사체·통신이 바뀌므로 최신 통합본의 전체 검사를 별도로 실행하며 Mac/iOS 시연 산출물도 재생성한다.
+
 ## 2026-11-12 — #707 Stage3 먹선 배경 1차 교체
 
 - Stage3 전용 Polish707 PNG 8종(목탑·사찰·지귀 집·첨성대·대문/담장·주변 초가집·하늘·바닥)을 추가하고 Battle의 Stage03 Studio에 연결했다. 기존 공유 PNG와 Stage1/2 자료는 보존했다. 목탑85도·사찰115도·초가집335도·첨성대230도 중심으로 배치했다. 한지 살구색에 맞춰 채도를 낮췄으며 기존 산/바위/풀과 효과는 재사용했다.
@@ -8497,3 +8550,40 @@ Unity 6000.6.5f1 macOS Editor에서 새로고침 후 컴파일 오류0. 전체 E
 - 미실행: iPhone·플레이어 빌드·다기기/실기기 성능. 실제 Pause 버튼을 통한 효과 정지 시각 검토는 미실행; 기존 정지 공유 시계를 사용하는 연결과 동일 시각 재샘플을 확인했다.
 
 - #707 붉은 먹선 구름: 6장으로 늘리고 전투 연출시계 기반 수평 원주 이동을 추가했다. 1회전35~46초(약7.8~10.3도/초), 구름별 속도 차이·수직0.12m 흔들림. 배경 원주를 연속 이동하므로 화면 끝에서 순간이동하지 않는다. 컴파일 오류0. 수동6장 모두2초 후 위치 이동, 같은 시각 위치 고정, 각 주기 후 XZ 원위치 확인. Stage1 전환 시 원위치 복원.
+
+
+### #706 최종 통합 — #709 전체 검사와 #710 배경 보존
+
+- #709 통합본 `7ad1c219`: 전체 EditMode **2392/2392**(38.38초), 시연 Home **3/3**(1.02초), 실제 Host+두 loopback 참가자의 시연 흐름 **1/1**(10.89초), 오프닝 **14/14**(13.10초), 전체 PlayMode **835/835**(887.83초). 실패·skip·inconclusive0.
+- 이어 추가된 main `78644632`(#710 Stage3 배경)을 통합했다. 충돌은 이 문서 끝의 독립 기록 추가 한 곳이며 #706/#707 양쪽 실행 이력을 모두 보존했다. 원본 Battle Scene과 Stage3 아트/배경 움직임을 그대로 채택했다. Scene/에셋을 다시 저장하거나 옛 버전으로 복원하지 않았다.
+- #710은 Stage03 카드의 Transform/MaterialPropertyBlock을 기존 전투 연출시계로 갱신하는 배경 표현이다. 세션/Scene 전환/공유 수명/판정/프로토콜 변경은 없다. 일반 UI/VFX 검사 정책에 따라 전체 EditMode와 영향 PlayMode(배경/HUD·야광귀 실제 시연·세 스테이지 rig·실제 Stage2 명중·렌더 준비·관람)를 추가 실행한다. 방금 통과한835건 중 실행 경로가 같은 공통 통신/물리 검사는 재사용하며 또 전체835건을 반복하지 않는다. 실제 배경 화면/Pause 육안·실기기 확인은 미검증으로 구분한다.
+
+- #710 최종 통합본 `c7369052`: 전체 EditMode **2392/2392**(38.63초), 영향 PlayMode **12/12**(49.26초). GameBattleUiPresentationTests4건(배경/HUD/모드 연결), GameYaguangDemoFlowTests1건(실제3인 시연), GameStageGourdIntegrationTests1건, GameStage2GourdHitFinishTests1건, GameBattleRenderWarmupTests2건, GourdResultViewerPlayModeTests3건이다. 실패·skip·inconclusive0. #709 통합본의 전체835건 통과와 함께 최종 영향 범위를 확인했다. 실제 화면 육안·다기기 무선·iOS 서명 설치는 실행하지 않았다.
+
+
+### #706 최종5703 시연 산출물
+
+기준 `c3515d47`(소스 미커밋 변경 없음), main `78644632`의 #705/#709/#710을 모두 포함한다.
+
+- Mac Release: `Builds/HapioDemo/20261112-072337-0302b87b-release/macOS/Hapio-Yaguang-Demo.app`, Succeeded·오류0.
+- iOS Release 내보내기: `Builds/HapioDemo/20261112-072435-d74af28d-release/iOS/Unity-iPhone.xcodeproj`, Succeeded·오류1. 앞서 기록한 Pipeline의 iOS subtarget 예외와 동일함을 BuildReport에서 확인했다. Xcode 컴파일/서명/설치/실기기는 미실행이다.
+- 두 manifest의5703 시연 TXT·Demo/1·실제Stage2 설정 해시가 같고 출력 앱 이름/ID를 검증했다. 두 Player의 실제 컴파일 응답에서 Demo define 포함·Development/Editor define 제외를 확인했다. 이전5702 산출물과 혼용하지 않는다. 새 Mac 앱의 수동 화면/3기기 검증은 하지 않았다.
+- 빌드 후 보호12개 파일은 최신 main과 동일하다. 일반 StandaloneOSX·Development false·variant false·기존 product/ID·빈 저장 defines로 복원됐으며 ProjectSettings/Packages/원본 Scene/LabConfig의 PR diff는 없다. 새로 만든 시연 사본만 PR에 추가했다. 컴파일·검사·빌드 원시 로그/산출물·복구 Scene은 커밋하지 않았다.
+
+
+### #706 병합 직전 #712 뚜껑 법선 보존
+
+main `e3108459`의 #712(칠용 뚜껑 법선 공유와3개 LidPaint 메시)을 추가 통합한다. 삼각형·위치·UV·판정 껍데기·면적·게임 규칙/규약은 그대로이며 칠 두께에 따른 시각 틈을 수정한 표현/굽기 변경이다. #706과 같은 파일을 수정하지 않아 수동 충돌은 없다. 전체 EditMode와 시연·세 스테이지 rig·실제Stage2명중·관람 PlayMode를 추가 확인하고, 실행 경로가 같은 직전 전체835건 및 배경 영향 검사는 재사용한다. 새 시연 빌드에도 이 법선을 포함한다.
+
+
+### #706 통합 보완 — #712의 작은 면 법선이0이 되는 경계
+
+- 기존 #712 영향 검사(전체 Edit2392/2392·Play6/6)는 통과했지만 추가 메시 리뷰와 Unity API 확인에서1/3스테이지 각93개,2스테이지69개의0법선을 확인했다. 기존 메시 freshness 검사는 위치/삼각형만 비교하고 법선의 유효성을 검사하지 않았다.
+- 먼저 computed/saved LidPaint의 finite·nonzero·unit·상호 일치 검사를 세 스테이지 fixture에 추가했다. 보완 전 `probe` 실행은 **12건 중9통과/3실패**(1.16초)로 같은93/69/93개 결함을 실제 재현했다. 단언은 완화하지 않았다.
+- 원인은 작은 면의 면적 가중 합이 기존1e-20 제곱길이 조건은 통과하지만 `Vector3.normalized`의 작은 벡터 절삭에서0이 되는 것이다. 면 선택/가중/fallback 조건을 유지하고 합을 실제 길이로 나누는 정규화만 바꿨다. 게임 판정·위치·UV·인덱스·면적은 변경하지 않았다.
+- Unity Editor API로 기존3개 LidPaint의 normals만 갱신했다.0법선은 모두0개가 됐고 vertices/UV/triangles/bounds/GUID가 갱신 전과 같은 것을 확인했다. Prefab·Scene·원본 모델·HitShell은 다시 굽거나 저장하지 않았다. 최종 검사 결과는 아래에 기록한다.
+
+- 법선 보완 최종: 전체 EditMode **2395/2395**(37.23초), 영향 PlayMode **6/6**(38.17초: 실제3인 시연1·세 스테이지 rig1·실제Stage2명중1·관람3), 실패·skip·inconclusive0. 새3개 법선 단언은 최초 실패 때와 같다. 기존 전체835건은 공통 게임 코드가 같은 범위에서 재사용했다. 실제 기기·최종 화면 육안은 미검증이다.
+
+
+- 법선 보완 후 최종 배포용 시연 빌드(기준 `10fd8908`, 미커밋 소스 없음): Mac `Builds/HapioDemo/20261112-073926-f36af0f8-release/macOS/Hapio-Yaguang-Demo.app` Succeeded·오류0, iOS `Builds/HapioDemo/20261112-074031-0114fa00-release/iOS/Unity-iPhone.xcodeproj` Succeeded·기존 Pipeline subtarget 예외1. 두 manifest가 Demo/1·5703·Stage2 설정 해시·버전/앱ID에 일치하며 보호12개 파일은 최신 main과 같다. 법선 보완이 없는 앞선 빌드 경로와 구분한다. Xcode 서명/설치·실제3기기·최종 화면 육안은 여전히 미검증이다.

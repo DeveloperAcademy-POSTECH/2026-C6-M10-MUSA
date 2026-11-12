@@ -130,7 +130,9 @@ namespace C6Lab
         }
 
         public static string ProtocolFor(LabRoomFamily family) => family == LabRoomFamily.Lab ? Protocol
-            : family == LabRoomFamily.Game ? "C6-HAPIO-" + LabNetwork.LabProtocolVersion.ToString(CultureInfo.InvariantCulture)
+             : family == LabRoomFamily.Game ? (LabGameBuildVariant.IsYaguangDemo
+                ? "C6-HAPIO-DEMO-" + LabGameBuildVariant.YaguangDemoRevision + "-" : "C6-HAPIO-")
+                + LabNetwork.LabProtocolVersion.ToString(CultureInfo.InvariantCulture)
             : throw new ArgumentOutOfRangeException(nameof(family));
 
         public event Action Changed;

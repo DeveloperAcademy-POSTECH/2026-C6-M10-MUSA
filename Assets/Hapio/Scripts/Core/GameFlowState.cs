@@ -26,7 +26,7 @@ namespace Hapio
         public string runId = string.Empty;
         public uint revision;
         public int stageIndex;
-        public int totalStages = GameRunFlow.StageCount;
+        public int totalStages = GameRunFlow.StagesFor(GameMode.Story);
         public GameMode mode;
         public GameFlowPhase phase = GameFlowPhase.Home;
         public string endReason = string.Empty;

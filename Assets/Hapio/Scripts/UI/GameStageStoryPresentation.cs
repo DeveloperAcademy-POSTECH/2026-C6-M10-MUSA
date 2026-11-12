@@ -17,6 +17,7 @@ namespace Hapio
         public CanvasGroup presentationGroup;
         public StorySequence[] afterStages;
         public StorySequence ending, failure;
+        public const string YaguangDemoEndingResource = "Hapio/Demo/Yaguang/GameEnding";
         public Button advanceButton, exitButton, skipButton, overallButton, viewerButton;
         public Text statusText;
 
@@ -48,6 +49,8 @@ namespace Hapio
         public bool IsLocalStoryComplete => resultActionsReady && (mode == Mode.ReadyToAdvance || mode == Mode.FailureDashboard);
         public bool IsResultActionReady => IsLocalStoryComplete;
         public LabSnapshot BoundResult => boundResult;
+        private StorySequence EndingSequence => C6Lab.LabGameBuildVariant.IsYaguangDemo
+            ? Resources.Load<StorySequence>(YaguangDemoEndingResource) : ending;
 
         public void Initialize(GameScreen owner, GameSession game)
         {
@@ -134,8 +137,9 @@ namespace Hapio
                 || presentationRoot == gameObject || transform.IsChildOf(presentationRoot.transform)) return false;
             StorySequence sequence = successful && session.State.stageIndex >= 1 && afterStages != null
                 && session.State.stageIndex <= afterStages.Length ? afterStages[session.State.stageIndex - 1] : failure;
+            StorySequence finalStory = EndingSequence;
             return sequence != null && sequence.Validate(out _)
-                && (!successful || session.State.phase != GameFlowPhase.Completed || ending != null && ending.Validate(out _));
+                && (!successful || session.State.phase != GameFlowPhase.Completed || finalStory != null && finalStory.Validate(out _));
         }
 
         private bool MatchesResult(LabSnapshot result, bool successful) => result != null
@@ -308,7 +312,7 @@ namespace Hapio
             Show(player.nextButton, false); Set(player.nextButton, false);
             bool primary = review && (final || session.Network.IsHost) || failed && session.Network.IsHost && !HasAction("Retry");
             bool authoredClear = clearControls != null;
-            if (authoredClear) clearControls.Present(review && !session.LocalSealReady, session.Network.IsHost, !blocked);
+            if (authoredClear) clearControls.Present(review && !session.LocalSealReady, session.Network.IsHost, !blocked, final);
             if (readyView != null)
             {
                 readyView.transform.SetAsLastSibling();
@@ -458,7 +462,7 @@ namespace Hapio
             if (mode == Mode.Ending || !session.SummaryAllowed || !session.CanReturnHome) return;
             showingOverall = false; mode = Mode.Ending; SetBusy(true);
             if (readyView != null) readyView.ResetView();
-            player.Play(ending); RefreshControls();
+            player.Play(EndingSequence); RefreshControls();
         }
 
         public void OpenOverall()
