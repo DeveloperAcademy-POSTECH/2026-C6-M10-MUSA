@@ -31,7 +31,7 @@ Unity6000.6.5f1에서 프로젝트를 연다.
 - `LabGameBuildVariant`: `HAPIO_YAGUANG_DEMO`를 전용 빌드에만 전달한다. Development 여부로 콘텐츠를 선택하지 않으며 Editor 테스트 override는 메모리 범위에서만 복원한다.
 - `GameRunProfile`: 실제 스테이지 정체성과 진행 위치/완료 여부를 구분한다. `GameRunFlow`, `GameFlowSnapshot`, `GameSession`이 동일한 경로로 시작·수신·재도전·총평을 판단한다.
 - `GameLobbyView`/`GamePendingRoomRegistry`/`LabNetwork`: UI뿐 아니라 방 생성·설정 수신·준비에서도3인 Story를 확인한다.
-- 일반판 접속 토큰 `C6HapioGame/54`, Lab 토큰/공유 프로토콜5702/설정265개는 유지한다. 시연 토큰은 `C6HapioDemo/1`, Game-family Bonjour TXT는 `C6-HAPIO-DEMO-1-5702`다. 검색과 실제 접속을 모두 분리한다.
+- 일반판 접속 토큰 `C6HapioGame/54`, Lab 토큰62/공유 프로토콜5703/설정265개는 유지한다. 시연 토큰은 `C6HapioDemo/1`, Game-family Bonjour TXT는 `C6-HAPIO-DEMO-1-5703`다. 검색과 실제 접속을 모두 분리한다.
 - `GameStageStoryPresentation`: 원래 야광귀 후일담을 사용하고 마지막 봉인으로 표시한다. 시연용 `GameEnding` 사본은 단일 야광귀 총평과 기존 엔딩 그림/음향을 사용하며 첫 대사의 세 마리 표현만 야광귀 봉인으로 바꾼다. 제작용 가짜 타이틀 컷 대신 실제 Home 타이틀로 돌아간다.
 - `GameDemoBuild`: 명시적인 기존 다섯 Game Scene으로 빌드하고, 임시 이름/ID/버전/빌드번호/플랫폼/Scene 목록·설정 파일을 복원한다. 저장된 전체 스테이지 카탈로그·Scene 배치·일반 빌드 기본값을 자동 변경하지 않는다.
 
