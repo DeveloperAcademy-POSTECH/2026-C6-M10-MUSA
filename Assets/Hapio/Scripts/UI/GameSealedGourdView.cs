@@ -1,3 +1,4 @@
+using C6Lab;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -11,6 +12,8 @@ namespace Hapio
 
         public RectTransform design;
         public RawImage background;
+        // TextColor/DarkRed/400
+        private static readonly Color ResetFill = new Color(.75054085f, .42286396f, .37500101f);
         private GameSealedGourdArt art;
         private GameScreen screen;
         private RawImage shadow;
@@ -43,34 +46,38 @@ namespace Hapio
             shadow.enabled = false;
             design=GameViewerHelpUi.Design(transform,"Sealed Gourd Design");
             viewport.SetParent(design,false);GameViewerHelpUi.Place(viewport,0,128,402,414);
-            GameViewerHelpUi.Label(design,"Rotate Hint","회전해서 박을 확인하시오,",theme.bold,20,GameBattleUiColors.SecondaryLightIvory800,63,664,276,30);
-            Dress(screen.resetViewerButton,"박 리셋","ViewerReset",711,theme.medium);
-            BuildReturnButton(theme.medium);
+            GameViewerHelpUi.Label(design, "Rotate Hint", "회전해서 박을 확인하시오,", theme.bold,
+                20, GameBattleUiColors.SecondaryLightIvory800, 63, 647, 276, 30);
+            BuildButton(screen.resetViewerButton, "박 리셋", theme.medium, 698f, false);
+            BuildButton(screen.closeViewerButton, "결과로 돌아가기", theme.medium, 755f, true);
             ApplyStage(1);
         }
         private void OnEnable() => transform.SetAsLastSibling();
 
-        private void BuildReturnButton(Font font)
+        private void BuildButton(Button button, string caption, Font font, float y, bool primary)
         {
-            Button button = screen.closeViewerButton;
             button.transform.SetParent(design, false);
-            GameViewerHelpUi.Place((RectTransform)button.transform, 84, 768, 234, 45);
+            GameViewerHelpUi.Place((RectTransform)button.transform, 84, y, 234, 45);
             foreach (Transform child in button.transform) child.gameObject.SetActive(false);
 
             button.transition = Selectable.Transition.None;
+            button.targetGraphic.enabled = true;
             button.targetGraphic.color = Color.clear;
             button.targetGraphic.raycastTarget = true;
-            GameViewerHelpUi.Surface(button.transform, "ResultAction", 0, 0, 234, 45);
-            GameViewerHelpUi.Label(button.transform, "Label", "결과로 돌아가기", font, 21,
-                new Color32(245, 238, 225, 255), 0, 0, 234, 45);
-        }
+            if (primary && GameFigmaStrokeLibrary.Find("ResultAction") != null)
+            {
+                GameViewerHelpUi.Surface(button.transform, "ResultAction", 0, 0, 234, 45);
+            }
+            else
+            {
+                var fill = GameViewerHelpUi.Rect(button.transform, "Button Fill", 0, 0, 234, 45)
+                    .gameObject.AddComponent<LabRoundedGraphic>();
+                fill.color = primary ? GameLobbySeatColors.Versus : ResetFill;
+                fill.raycastTarget = false;
+            }
 
-        private void Dress(Button button,string label,string key,float y,Font font)
-        {
-            button.transform.SetParent(design,false);GameViewerHelpUi.Place((RectTransform)button.transform,84,y,234,45);
-            foreach(Transform child in button.transform)child.gameObject.SetActive(false);
-            GameFigmaButton.Attach(button,key);
-            GameViewerHelpUi.Label(button.transform,"Label",label,font,21,GameBattleUiColors.Light,0,0,234,45);
+            GameViewerHelpUi.Label(button.transform, "Label", caption, font, 20,
+                GameLobbySeatColors.LightText, 0, 0, 234, 45);
         }
         public void ApplyStage(int value)
         {
