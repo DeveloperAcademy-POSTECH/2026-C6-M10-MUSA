@@ -20,7 +20,7 @@ namespace C6Lab
             public ulong Owner;
             public int Slot;
             public LabOrbElement Element;
-            public bool FiveColor, JigwiReward;
+            public bool FiveColor, JigwiReward, Soot;
             public float BlastScale, RadiusScale, JigwiRadiusScale, Radius, LaunchScale, Gravity, Damping;
             public Vector3 Position, Velocity;
         }
@@ -54,7 +54,7 @@ namespace C6Lab
             {
                 SessionId = sessionId, Round = model != null ? model.Round : 0u, At = now,
                 Owner = orb.owner, Slot = playerSlots != null ? playerSlots.GetSlot(orb.owner) : 0,
-                Element = orb.element, FiveColor = orb.fiveColor, JigwiReward = projectile.JigwiABRewardActive,
+                Element = orb.element, FiveColor = orb.fiveColor, Soot = orb.soot, JigwiReward = projectile.JigwiABRewardActive,
                 BlastScale = blast, RadiusScale = radius, JigwiRadiusScale = jigwi,
                 Radius = config.ThrowRadius * (jigwi < 1f ? Mathf.Min(blast * radius, jigwi) : blast * radius),
                 LaunchScale = launchScale, Gravity = projectile.GravityAcceleration, Damping = config.ThrowAirDamping,
@@ -158,7 +158,7 @@ namespace C6Lab
             ReplayLaunch launch = final.Launch;
             var shot = new LabFinishReplayShot
             {
-                Owner = launch.Owner, Slot = launch.Slot, Element = launch.Element, FiveColor = launch.FiveColor,
+                Owner = launch.Owner, Slot = launch.Slot, Element = launch.Element, FiveColor = launch.FiveColor, Soot = launch.Soot,
                 JigwiReward = launch.JigwiReward, BlastScale = launch.BlastScale, RadiusScale = launch.RadiusScale,
                 JigwiRadiusScale = launch.JigwiRadiusScale, Radius = launch.Radius, LaunchScale = launch.LaunchScale,
                 FlightSeconds = Mathf.Max(LabFinishReplayShot.StepSeconds, final.FlightSeconds),

@@ -75,7 +75,7 @@ namespace C6Lab
         /// 보랏빛이 번쩍이며 먹빛 연기가 사방으로 확 퍼지고(완성 터짐과 같은 모양, 더 크게), 그 자리에 연기 기운이 잠시 감돌다 사라진다.
         /// 카메라를 보며 스스로 사라진다.
         /// </summary>
-        public static void PlayHit(Vector3 worldPoint, float orbRadius, int layer)
+        public static void PlayHit(Vector3 worldPoint, float orbRadius, int layer, Camera facing = null)
         {
             if (!(orbRadius > 0f) || !float.IsFinite(worldPoint.x) || !float.IsFinite(worldPoint.y) || !float.IsFinite(worldPoint.z)) return;
             var root = new GameObject("Soot Hit Aura");
@@ -83,15 +83,18 @@ namespace C6Lab
             root.transform.position = worldPoint;
             var holder = root.AddComponent<LabSootAura>();
             holder.hitHolder = true;
+            holder.facing = facing;
             holder.FaceCamera();
             PlayJoin(root.transform, orbRadius * 1.6f, true);
             holder.hitAura = Attach(root.transform, orbRadius * 1.3f);
             holder.hitAura.alphaScale = 0f;
         }
 
+        private Camera facing;
+
         private void FaceCamera()
         {
-            Camera view = Camera.main;
+            Camera view = facing != null ? facing : Camera.main;
             if (view != null) transform.rotation = view.transform.rotation;
         }
 

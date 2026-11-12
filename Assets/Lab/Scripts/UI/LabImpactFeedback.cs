@@ -71,7 +71,8 @@ namespace C6Lab
 
         /// <summary>Called at the same single presentation point as the original target burst.</summary>
         public void PlayContact(LabTarget target, Vector3 localPoint, LabOrbElement element, int damage,
-            Vector3 incoming, Vector3 worldNormal, float diameter, bool fiveColor = false, float fiveColorAge = 0f)
+            Vector3 incoming, Vector3 worldNormal, float diameter, bool fiveColor = false, float fiveColorAge = 0f,
+            Color32[] fiveColorPalette = null)
         {
             if (!isActiveAndEnabled || target == null || target.Hitbox == null || Time.timeScale <= 0f
                 || !Finite(localPoint) || !Finite(incoming)) return;
@@ -83,7 +84,7 @@ namespace C6Lab
                 if (elementVfx == null) elementVfx = LabFiveElementVfx.ForScene(target.gameObject.scene);
                 if (elementVfx != null && elementVfx.PlayImpact(element, anchor.TransformPoint(localPoint), worldNormal, incoming,
                     Mathf.Clamp(diameter, .006f, 5f), LabPaintImpact.Normalize(incoming, worldNormal), anchor,
-                    leaveMark: false, fiveColor: fiveColor, fiveColorAge: fiveColorAge))
+                    leaveMark: false, fiveColor: fiveColor, fiveColorAge: fiveColorAge, fiveColorPalette: fiveColorPalette))
                     return;
             }
             PlayHit(target, localPoint, element, damage, incoming, false);

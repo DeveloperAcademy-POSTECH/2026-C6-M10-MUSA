@@ -2256,7 +2256,8 @@ namespace C6Lab
                         else
                             impactFeedback?.PlayContact(target, targetLocalPoint, element, actualDamage,
                                 result.ImpactVelocity, result.HitNormal, result.VisualDiameter,
-                                fiveColor: fiveColor, fiveColorAge: result.FiveColorAge);
+                                fiveColor: fiveColor, fiveColorAge: result.FiveColorAge,
+                                fiveColorPalette: soot ? LabFiveColorSparkle.SootTones : null); // #713
                     }
                     // The final-hit replay only shows a hit that painted (never a blocked or element-less one).
                     if (!paintBlocked && (element != LabOrbElement.None || fiveColor)) RememberReplayHit(result);
@@ -2655,7 +2656,8 @@ namespace C6Lab
                                         (LabOrbElement)packet.element, packet.damage, hostVelocity,
                                         pose != null ? hitbox.TransformDirection(pose.localNormal) : Vector3.zero,
                                         pose != null && float.IsFinite(pose.diameter) && pose.diameter > 0f ? pose.diameter : fallbackDiameter,
-                                        fiveColor: packet.fiveColor, fiveColorAge: pose != null ? pose.fiveColorAge : 0f);
+                                        fiveColor: packet.fiveColor, fiveColorAge: pose != null ? pose.fiveColorAge : 0f,
+                                        fiveColorPalette: packet.soot ? LabFiveColorSparkle.SootTones : null); // #713
                                 }
                             }
                             if (packet.fiveColor) PresentFiveColorHit(new Vector3(packet.x, packet.y, packet.z), packet.owner, packet.soot);

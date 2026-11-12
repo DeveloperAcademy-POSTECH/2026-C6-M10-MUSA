@@ -139,6 +139,9 @@ namespace C6Lab
             if (hitVoiceAt < 0f) hitVoiceAt = Time.unscaledTime + (Config != null ? Config.JigwiSootHitVoiceDelaySeconds : .35f);
         }
 
+        /// <summary>#713 다시보기용: 검정 구슬 명중음만 한 번 낸다 (지귀 반응 대사와 횟수는 그대로).</summary>
+        public void PlayHitSound() => Play(oneShots, hitClips, Config != null ? Config.JigwiSootHitVolume : 1f, 1f);
+
         /// <summary>확인용: 지귀 반응 대사를 낸 횟수 (파일이 없어도 센다).</summary>
         public int HitVoiceCount { get; private set; }
 

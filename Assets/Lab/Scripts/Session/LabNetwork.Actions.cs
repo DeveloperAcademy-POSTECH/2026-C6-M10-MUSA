@@ -626,7 +626,8 @@ namespace C6Lab
                     impactFeedback?.PlayHit(target, local, element, attackValue, contact.ImpactVelocity, false);
                 else
                     impactFeedback?.PlayContact(target, local, element, attackValue, contact.ImpactVelocity,
-                        contact.HitNormal, contact.VisualDiameter, fiveColor: fiveColor, fiveColorAge: contact.FiveColorAge);
+                        contact.HitNormal, contact.VisualDiameter, fiveColor: fiveColor, fiveColorAge: contact.FiveColorAge,
+                        fiveColorPalette: soot ? LabFiveColorSparkle.SootTones : null); // #713
                 LastLocalHitOffset = LabThrowSound.HitOffset(local, hitbox.InverseTransformDirection(contact.ImpactVelocity));
                 LastLocalHitSmall = LabThrowSound.IsSmallThrow(comboScale);
                 LastLocalHitBig = LabThrowSound.IsBigThrow(comboScale);
