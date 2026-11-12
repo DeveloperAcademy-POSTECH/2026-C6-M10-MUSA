@@ -583,14 +583,17 @@ namespace C6Lab
             return true;
         }
         /// <summary>
-        /// #696: 깨진 검정 구슬처럼, 북 조각은 위 / 서 조각은 왼쪽 / 남 조각은 아래 / 동 조각은 오른쪽에 조금씩 떨어져 놓인다.
+        /// #696: 깨진 검정 구슬이 사방으로 튄 것처럼, 북 조각은 위 / 서 조각은 왼쪽 / 남 조각은 아래 / 동 조각은 오른쪽 끝 가까이 멀리 떨어져 놓인다.
         /// i는 조각 쪽 번호 (0 북, 1 서, 2 남, 3 동).
         /// </summary>
         public static Vector2 JigwiSootShardSpot(int i)
         {
             float angle = (90f + 90f * (i & 3)) * Mathf.Deg2Rad;
-            return new Vector2(.5f + .12f * Mathf.Cos(angle), .52f + .10f * Mathf.Sin(angle));
+            return new Vector2(.5f + JigwiSootShardSpreadX * Mathf.Cos(angle), .52f + JigwiSootShardSpreadY * Mathf.Sin(angle));
         }
+
+        /// <summary>#696: 파편이 판 가운데에서 얼마나 멀리 흩어지는지 (판 너비/높이 비율). 서로 끌어다 붙여야 할 만큼 멀리.</summary>
+        public const float JigwiSootShardSpreadX = .32f, JigwiSootShardSpreadY = .27f;
 
         /// <summary>#696: 네 쪽이 다 모인 검정 구슬.</summary>
         public const int SootWholePieces = 15;
