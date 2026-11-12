@@ -144,6 +144,7 @@ namespace Hapio
             // 2:2 (#281): "새 방 만들기 +" first asks which mode. A prefab without the mode panel keeps the old story flow.
             BindNavigation(createButton, () =>
             {
+                if (LabGameBuildVariant.IsYaguangDemo) { creationCapacity = 3; CreateRoom(GameMode.Story); return; }
                 if (creationCapacity < 2) { localError = "먼저 함께할 인원을 고르시오."; return; }
                 if (modePanel != null) SetModes(true); else CreateRoom(GameMode.Story);
             });
@@ -185,6 +186,12 @@ namespace Hapio
             BindNavigation(directJoinButton, JoinDirect);
             BindNavigation(soloButton, () => session.StartSolo());
             GameDeveloperAccess.MoveSoloIntoSettings(screen, soloButton, teamSoloButton);
+            if (LabGameBuildVariant.IsYaguangDemo)
+            {
+                // QA may open DEV settings, but the demo still requires three real participants.
+                if (soloButton != null) soloButton.gameObject.SetActive(false);
+                if (teamSoloButton != null) teamSoloButton.gameObject.SetActive(false);
+            }
             // GameScreen owns the existing scoped DEV panel and wires developerButton once.
             for (int i = 0; i < countButtons.Length; i++)
             {
@@ -192,6 +199,7 @@ namespace Hapio
                 BindNavigation(countButtons[i], () =>
                 {
                     if (session.IsCreatingRoom || !Network.CanChooseConnection || session.State.phase != GameFlowPhase.Home) return;
+                    if (LabGameBuildVariant.IsYaguangDemo && count != 3) return;
                     creationCapacity = count; localError = string.Empty;
                     Network.SetTargetParticipantCount(count);
                 });
@@ -209,13 +217,15 @@ namespace Hapio
         }
 
         /// <summary>고른 인원으로 이 모드를 열 수 있는지 (#394): 기본 모드는 3~5명, 땅따먹기는 2·4·6명.</summary>
-        public static bool ModeAllowed(GameMode mode, int players) => mode == GameMode.Territory
+        public static bool ModeAllowed(GameMode mode, int players) => LabGameBuildVariant.IsYaguangDemo
+            ? mode == GameMode.Story && players == 3 : mode == GameMode.Territory
             ? LabTeams.IsTeamCount(players) : players >= StoryMinimumPlayers && players <= LabModel.MaximumParticipants;
 
         /// <summary>막힌 모드 버튼 아래에 보이는 이유 한 줄. 열 수 있으면 빈 문자열이다.</summary>
         public static string ModeBlockedReason(GameMode mode, int players)
         {
             if (ModeAllowed(mode, players)) return string.Empty;
+            if (LabGameBuildVariant.IsYaguangDemo) return "야광귀 시연은 3인 기본 모드만 사용할 수 있소.";
             if (mode == GameMode.Territory) return "땅따먹기는 2·4·6명만 할 수 있소.";
             return LabTeams.IsTeamCount(players)
                 ? players + "명은 땅따먹기 " + LabTeams.MatchLabel(players) + "만 할 수 있소." : "기본 모드는 3~5명만 할 수 있소.";
@@ -359,6 +369,7 @@ namespace Hapio
 
         private void RefreshBrowser()
         {
+            if (LabGameBuildVariant.IsYaguangDemo) creationCapacity = 3;
             bool canChoose = Network.CanChooseConnection && !session.IsCreatingRoom;
             createButton.interactable = canChoose && (modePanel != null || creationCapacity >= 2);
             // The mode card can also be closed without SetModes (Home hidden for the opening); the button comes back then too.
@@ -371,7 +382,8 @@ namespace Hapio
             for (int i = 0; i < countButtons.Length; i++)
             {
                 bool selected = creationCapacity == i + 2;
-                countButtons[i].interactable = canChoose;
+                countButtons[i].gameObject.SetActive(!LabGameBuildVariant.IsYaguangDemo || i + 2 == 3);
+                countButtons[i].interactable = canChoose && (!LabGameBuildVariant.IsYaguangDemo || i + 2 == 3);
                 countButtons[i].targetGraphic.color = selected ? ColorOf("D5BEA5") : new Color(232f/255f, 210f/255f, 185f/255f, .7f);
                 countButtons[i].GetComponentInChildren<UnityEngine.UI.Text>().color = ColorOf("312B23");
             }
@@ -382,6 +394,7 @@ namespace Hapio
                 { key = room.Key, name = room.Name, port = room.Port, participants = room.Participants,
                     capacity = room.TargetParticipants, waiting = room.WaitingForHost, playing = room.Playing, full = room.IsFull,
                     team = room.Team }))
+                .Where(room => !LabGameBuildVariant.IsYaguangDemo || !room.team && room.capacity == 3)
                 .GroupBy(room => room.key, StringComparer.OrdinalIgnoreCase).Select(group => group.First())
                 .OrderBy(room => LabRoomNames.SortNumber(room.name)).ThenBy(room => room.name, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(room => room.port).ToArray();

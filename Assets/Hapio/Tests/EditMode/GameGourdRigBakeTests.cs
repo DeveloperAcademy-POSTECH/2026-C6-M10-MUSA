@@ -41,6 +41,36 @@ namespace Hapio.Tests
         }
 
         [Test]
+        public void TheComputedAndSavedLidNormalsAreFiniteUnitAndIdentical()
+        {
+            string path = spec.Generated("LidPaint.asset");
+            var saved = AssetDatabase.LoadAssetAtPath<Mesh>(path);
+            Assert.That(saved, Is.Not.Null, path);
+            Vector3[] bakedNormals = result.LidPaint.normals, savedNormals = saved.normals;
+            Assert.That(bakedNormals.Length, Is.EqualTo(result.LidPaint.vertexCount), "Every computed lid vertex needs a normal.");
+            Assert.That(savedNormals.Length, Is.EqualTo(saved.vertexCount), "Every saved lid vertex needs a normal.");
+            Assert.That(savedNormals.Length, Is.EqualTo(bakedNormals.Length), path + " normal count");
+            int invalidBaked = InvalidNormalCount(bakedNormals), invalidSaved = InvalidNormalCount(savedNormals);
+            Assert.That(invalidBaked + invalidSaved, Is.Zero,
+                path + " requires finite, nonzero unit normals: computed invalid=" + invalidBaked + ", saved invalid=" + invalidSaved);
+            float worst = 0f;
+            for (int i = 0; i < bakedNormals.Length; i++)
+                worst = Mathf.Max(worst, Vector3.Distance(bakedNormals[i], savedNormals[i]));
+            Assert.That(worst, Is.LessThan(1e-5f), path + " normals must match the current bake.");
+        }
+
+        private static int InvalidNormalCount(Vector3[] normals)
+        {
+            int invalid = 0;
+            foreach (Vector3 normal in normals)
+                if (float.IsNaN(normal.x) || float.IsInfinity(normal.x)
+                    || float.IsNaN(normal.y) || float.IsInfinity(normal.y)
+                    || float.IsNaN(normal.z) || float.IsInfinity(normal.z)
+                    || Mathf.Abs(normal.sqrMagnitude - 1f) > 1e-4f) invalid++;
+            return invalid;
+        }
+
+        [Test]
         public void TheSavedTimelineIsTheCurrentBakeInOrderWithExistingPaths()
         {
             var profile = AssetDatabase.LoadAssetAtPath<LabGourdYokaiProfile>(spec.Generated("YokaiProfile.asset"));

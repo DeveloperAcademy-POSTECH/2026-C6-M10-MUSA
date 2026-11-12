@@ -15,12 +15,15 @@ namespace Hapio
         /// 구미호·야광귀: everyone sees "다음 요괴 잡으러 ..."; every participant gets 다음 봉인.
         /// 지귀 (final): no next-yokai heading for anyone, and everyone’s button reads 마치기.
         /// </summary>
-        public void Present(bool ready, bool isHost, bool canAdvance)
+        public void Present(bool ready, bool isHost, bool canAdvance, bool? isFinalStage = null)
         {
+            bool final = isFinalStage ?? finalStage;
             nextSeal.gameObject.SetActive(ready);
             nextSeal.interactable = ready && canAdvance;
             waiting.gameObject.SetActive(false);
-            if (heading != null) heading.gameObject.SetActive(!finalStage);
+            if (heading != null) heading.gameObject.SetActive(!final);
+            var caption = nextSeal.GetComponentInChildren<UnityEngine.UI.Text>(true);
+            if (caption != null) caption.text = final ? FinishLabel : NextSealLabel;
         }
     }
 }

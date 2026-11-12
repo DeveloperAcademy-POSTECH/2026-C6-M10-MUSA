@@ -475,3 +475,11 @@
 - 마지막 스테이지 그림의 다음 봉인/마치기는 모든 참여자의 명시적 준비다. 읽기 종료만으로 준비시키거나 방장 클릭 한 번으로 다음 스테이지를 자동 시작하지 않는다. 전원 준비·결과 동기화·관람/연출 종료 뒤 별도 방장 시작 버튼으로 진행한다.
 - 대기는 기존 GameLoadingArt 5종을 사용하며 같은 결과 명단/공통 순열로 기기마다 다른 캐릭터를 배정한다. 그만두기 확인은 Home 방 목록/방 만들기로 복귀하고 취소는 준비 상태를 보존한다.
 - 현재 이 변경의 접속 묶음은 설정265개·5702/Lab62/**Game54**다. 실행 검사는 docs/VALIDATION.md, 상세는 docs/STAGE_STORY_UI_INTEGRATION.md를 따른다.
+
+
+## #706 야광귀 3인 시연 빌드
+
+- 일반 Story `[1,2,3]`와 시연 `[2]`는 `GameRunProfile`로 선택한다. 시연도 실제 Stage2/yaguang/Yaguang 설정·리소스·결과 키를 유지하며 진행 위치1/1과 구분한다. `stageIndex <= totalStages`나 마지막 번호=스테이지 수로 판단하는 분기를 다시 만들지 않는다. 원본3개 StageCatalog와 일반 Scene을 보존한다.
+- 시연 여부는 전용 빌드의 `HAPIO_YAGUANG_DEMO`이며 Development 여부/EditorPrefs로 콘텐츠를 고르지 않는다.3인 Story만 생성/입장/시작하고 튜토리얼·솔로·팀전을 열지 않는다. 일반 Game54/Lab62·5703·265개 설정은 유지하고 시연의 토큰 `C6HapioDemo/1`과 Game Bonjour `C6-HAPIO-DEMO-1-5703`를 함께 구분한다.
+- 시연은 메인 스토리→방 목록→3인 야광귀→해당 후일담→전원 준비·방장 총평→실제Stage2만의 총평→엔딩6컷→타이틀이다. 일반 엔딩/총평을 덮어쓰지 않고 `Resources/Hapio/Demo/Yaguang`의 사본을 사용한다. 준비는 `Hapio/Demo/Update Yaguang Demo Stories`의 명시적 동작이고 빌드는 이를 자동 재생성하지 않는다.
+- 전용 Release/Development QA 메뉴와 출력·앱ID를 구분하고 빌드 임시 설정/플랫폼/Scene 목록을 복원한다. 홈 복귀는 연결 종료가 끝날 때까지 재입장 전이를 막아 타이틀/방목록 목적지를 유지한다. 사용법은 `docs/YAGUANG_DEMO.md`, 실제 검증은 `docs/VALIDATION.md`를 따른다.

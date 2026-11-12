@@ -11,7 +11,7 @@ namespace Hapio
     public sealed class GameRunFlow
     {
         public const int StageCount = 3;
-        public static int StagesFor(GameMode mode) => mode == GameMode.Territory ? 1 : StageCount;
+        public static int StagesFor(GameMode mode) => GameRunProfile.ForMode(mode).Count;
         // Game-over reasons for a player leaving the room. The text travels in the flow state as before.
         public const string PlayerLeftReason = "A player left the game.";
         public const string PlayerDisconnectedReason = "A player disconnected.";
@@ -59,7 +59,7 @@ namespace Hapio
             {
                 runId = Guid.NewGuid().ToString("N"),
                 revision = 1,
-                stageIndex = 1,
+                stageIndex = GameRunProfile.ForMode(mode).FirstStage,
                 mode = mode,
                 totalStages = StagesFor(mode),
                 phase = GameFlowPhase.LoadingBattle
@@ -138,7 +138,7 @@ namespace Hapio
             if (state.phase != GameFlowPhase.Playing
                 || state.battleSessionId != battleSessionId || state.battleRound != battleRound)
                 return false;
-            state.phase = state.stageIndex == state.totalStages
+            state.phase = state.stageIndex == GameRunProfile.ForMode(state.mode).FinalStage
                 ? GameFlowPhase.Completed : GameFlowPhase.StageResult;
             state.revision++;
             return true;
@@ -146,9 +146,10 @@ namespace Hapio
 
         public bool NextStage(string runId, int stageIndex, uint revision)
         {
+            int next = GameRunProfile.ForMode(state.mode).Next(state.stageIndex);
             if (!Matches(runId, stageIndex, revision) || state.phase != GameFlowPhase.StageResult
-                || state.stageIndex >= state.totalStages) return false;
-            state.stageIndex++;
+                || next == 0) return false;
+            state.stageIndex = next;
             BeginLoad();
             return true;
         }
@@ -156,9 +157,10 @@ namespace Hapio
         /// <summary>DEV-only caller authorization belongs to GameSession; this transition never records victory.</summary>
         public bool DeveloperNextStage(string runId, int stageIndex, uint revision)
         {
+            int next = GameRunProfile.ForMode(state.mode).Next(state.stageIndex);
             if (!Matches(runId, stageIndex, revision) || state.phase != GameFlowPhase.Playing
-                || state.stageIndex >= state.totalStages) return false;
-            state.stageIndex++;
+                || next == 0) return false;
+            state.stageIndex = next;
             BeginLoad();
             return true;
         }
@@ -169,8 +171,9 @@ namespace Hapio
         /// </summary>
         public bool DeveloperStartAt(int stageIndex)
         {
-            if (state.phase != GameFlowPhase.LoadingBattle || state.stageIndex != 1
-                || stageIndex <= 1 || stageIndex > state.totalStages) return false;
+            GameRunProfile profile = GameRunProfile.ForMode(state.mode);
+            if (state.phase != GameFlowPhase.LoadingBattle || state.stageIndex != profile.FirstStage
+                || profile.Position(stageIndex) <= 1) return false;
             state.stageIndex = stageIndex;
             return true;
         }
