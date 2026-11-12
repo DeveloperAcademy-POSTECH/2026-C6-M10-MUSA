@@ -8463,3 +8463,30 @@ Unity 6000.6.5f1 macOS Editor에서 새로고침 후 컴파일 오류0. 전체 E
 - 전체 EditMode **2340/2340 PASS**(49.17초), 영향 PlayMode **5/5 PASS**(35.43초), 실패/skip0. PlayMode는 GameStageGourdIntegrationTests·GameStage2GourdHitFinishTests·GourdResultViewerPlayModeTests다. 다시보기 runtime 경로는 직전 #701 검증과 같으며 이번에는 다시 실행하지 않았다.
 - 최초 EditMode 요청은 Editor PlayMode 진입 상태여서 실행0건으로 거절됐다. 재생을 종료한 뒤 위 전체 검사를 실행했다. 도메인 전환 중 Transport ResetStatics/이전 GC handle 로그2건이 있었으며 컴파일 오류는 없었다.
 - Unity PreviewRenderUtility로 세 저장 프리팹의 닫힌 자세를 임시 렌더해 천 장식 숨김을 확인했다. 임시 객체/RT는 해제했다. 실제 전투 전체 화면·실기기·빌드·전체 PlayMode는 이번에 실행하지 않았다.
+
+
+## 2026-11-12 — #706 야광귀 3인 시연
+
+기준 main `59ad1803`, 브랜치 `feat/#706-yaguang-demo-build`, Unity6000.6.5f1/macOS Metal이다. 일반 카탈로그3개와 원본5개 Game Scene·Lab·설정·공통 Prefab을 보존하며 시연용 빌드 정의/경로 `[2]`를 선택한다. 야광귀는 원래 Stage2 정체성과 수치/그림/물리/규칙을 사용한다. 사용법과 메뉴는 `YAGUANG_DEMO.md`에 기록했다.
+
+명시적인 Unity Editor API 생성으로 `Resources/Hapio/Demo/Yaguang` 아래에 한 스테이지 총평과 엔딩 사본을 만들었다. 일반 엔딩/카탈로그를 저장하지 않았다. CLI 연결이 없는 초기 컴파일에서 발견한 Capacity/TargetParticipants 차이·지원되지 않는 NonParallelizable 검사 속성·IReadOnlyList에 대한 Array.FindIndex 사용을 수정한 뒤 정상 컴파일/에셋 생성과 Pipeline 연결을 확인했다. 해당 초기 컴파일은 검사 통과로 사용하지 않는다.
+
+| 단계 | 실제 결과와 보완 |
+| --- | --- |
+| 최초 사전 검사 | 전체 EditMode2387/2387(36.38초), 시연 Home3/3(1.01초). 시연 Host+두 로컬 프로토콜 참가자 흐름0/1(11초): 엔딩 뒤 방 목록이 열렸다. 비동기 NGO 종료 중 Home이 잔여 연결을 새 Lobby로 인식하는 경합을 수정했다. 기존 타이틀 복귀 단언은 유지했다. |
+| 종료 대기 수정 후 | 전체 EditMode2387/2387(34.96초), 시연 Home3/3(0.88초), 3인 흐름1/1(10.50초). 오프닝13/14(9.46초): 새 fixture가 Demo의 TutorialPending을 true로 가정한 준비 조건 오류와 실패 시 중복 cleanup Scene을 발견했다. 원시 미소비 상태를 확인하고 Demo의 실제 false 계약을 검사하며 cleanup 이름을 고유화했다. |
+| 반복 오프닝 경계 확인 | 오프닝11/14(11.14초): 두 번째 시연의 오프닝 중 이전 방 검색이 남고, 새 coroutine의 테스트 override가 실패 시 다음 일반판 검사로 새는 문제를 발견했다. 시연 오프닝의 검색 취소·지연 재검색 예약 취소를 연결하고 override를 UnityTearDown에서 소유/복원했다. 기존 일반판의 단언은 유지했다. |
+| 최종 사전 검사 | 전체 EditMode **2388/2388**(35.40초), 시연 Home **3/3**(0.95초), 실제 Host+두 loopback 프로토콜 참가자 시연 흐름 **1/1**(10.81초), 오프닝 **14/14**(12.65초). 실패·skip·inconclusive0. |
+| 최종 전체 PlayMode | **835/835**(858.36초). 실패·skip·inconclusive0. 일반 Story·Lab·투척·페인트·결과/관람·재도전·오프닝을 포함한 전체 PlayMode를 실행했다. |
+
+시연 흐름 검사는 저장 Home/Lobby/Battle/결과와 실제 Host를 열고 두 로컬 프로토콜 참가자가 ACK/Ready를 교환한다. 원래 Stage2와 실제 CPU 도색 승리, 야광귀 후일담, 전원 준비/방장 진행, 한 스테이지 실제 총평, 엔딩6컷, 타이틀까지 확인한다. Guest UI 자체나 세 물리 기기의 무선 연결 성공을 뜻하지 않는다. 실기기·서명 설치·일반 Wi-Fi/핫스팟은 미검증이다.
+
+원본12개 파일(ProjectSettings·EditorBuildSettings·LabConfig·Lab Scene·StageCatalog·GameSession/GameLobby Prefab·Game Scene5개)이 기준 main과 동일한 것을 빌드 전·후 SHA256으로 확인했다. `git diff -- ProjectSettings Packages`도 비어 있다. 원시 실행 결과/초기 실패/빌드 기록은 커밋하지 않는 로컬 `artifacts/yaguang-demo`에 보관한다.
+
+### 실제 빌드와 복원
+
+- Mac Release: `Builds/HapioDemo/20261112-062102-298e6a4b-release/macOS/Hapio-Yaguang-Demo.app`. Unity BuildReport Succeeded·오류0, 출력 Info.plist의 Demo 이름/ID·버전0.1.0을 확인했다.
+- iOS Release 내보내기: `Builds/HapioDemo/20261112-062237-daa06e6c-release/iOS/Unity-iPhone.xcodeproj`. Unity BuildReport Succeeded·오류1·경고57. Info.plist의 표시명/버전0.1.0/빌드1과 앱 타깃의 Demo ID를 확인했다. 오류를0으로 기록하지 않는다: `com.unity.pipeline@f311b58065e4`의 `PipelineRuntimeBuildProcessor.OnPreprocessBuild`64행이 iOS에서 `BuildSummary.GetSubtarget<StandaloneBuildSubtarget>()`를 호출해 ArgumentException을 남겼다. 본 게임/시연 코드가 아닌 연결 도구의 사전 빌드 처리에서 발생하며 Xcode 생성은 완료됐다. 패키지를 변경하거나 예외를 숨기지 않았다. 실제 Xcode 컴파일·서명·설치·iOS 실행은 하지 않았다.
+- 두 manifest의 원래 Stage2 설정 SHA256은 동일하다. 두 Player의 실제 C6Lab.Runtime 컴파일 응답 파일에서 `HAPIO_YAGUANG_DEMO` 포함, `DEVELOPMENT_BUILD`·`UNITY_EDITOR` 미포함을 확인했다. manifest는 기준 HEAD와 미커밋 작업 포함 여부를 기록한다. QA 빌드는 이번에 실행하지 않았다.
+- Mac Release 앱을 창390×844로15초 실행했다. 초기 실행 중 예외/크래시는 기록되지 않았고 직접 시작한 프로세스는 종료했다. URP Gaussian/Bokeh DOF·Panini shader 미지원/stripped 경고4건은 로그에 남았다. 이 확인은 초기 프로세스/렌더러 가동만 뜻하며 실제3개 Guest 화면이나 시연 플레이 전체에 대한 육안 통과로 사용하지 않는다.
+- 빌드 후 Editor는 StandaloneOSX·Development false·일반 variant false·기존 product/ID/version으로 복원됐으며 두 플랫폼 저장 defines는 비어 있다. 시작 때 열려 있던 FiveElementsComparison Scene도 dirty 없이 돌아왔다. 보호12개 파일의 해시가 모두 같고 공백 검사도 통과했다. 일반 Wi-Fi/핫스팟·iOS 실기기 확인은 사용자 결정에 따라 이번 범위에서 제외했다.
