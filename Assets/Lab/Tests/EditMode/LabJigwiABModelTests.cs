@@ -429,12 +429,12 @@ namespace C6Lab.Tests
             Assert.That(m.TryClearJigwiSmoke(Three[0],"other",ready+2),Is.False);
             Assert.That(m.TryClearJigwiSmoke(Three[0],smoke.id,ready+2),Is.True);
             Assert.That(m.TryClearJigwiSmoke(Three[0],smoke.id,ready+2.5),Is.False,"Once per smoke.");
-            var shards=m.Snapshot(ready+2).orbs.Where(o=>o.kind==LabOrbKind.SootShard).ToArray();
+            var shards=m.Snapshot(ready+2.5).orbs.Where(o=>o.kind==LabOrbKind.SootShard).ToArray();
             Assert.That(shards.Length,Is.EqualTo(LabModel.JigwiSootShardCount));
             Assert.That(shards.All(o=>o.owner==Three[0]&&o.element==LabOrbElement.None),Is.True);
             Assert.That(shards.Select(o=>o.sootPieces).OrderBy(v=>v),Is.EqualTo(new[]{1,2,4,8}),"North, west, south, east.");
             shards=shards.OrderBy(o=>o.sootPieces).ToArray(); // 0 북, 1 서, 2 남, 3 동
-            Assert.That(m.TryLaunch(Three[0],shards[0].id,Request(),ready+2.1,out _,out var why),Is.False,"A shard cannot be thrown.");
+            Assert.That(m.TryLaunch(Three[0],shards[0].id,Request(),ready+2.6,out _,out var why),Is.False,"A shard cannot be thrown.");
 
             double t=ready+3;
             Assert.That(m.TryCombineAt(Three[0],shards[0].id,shards[2].id,Request(),t,new Vector2(.5f,.5f),Vector2.zero,out _,out var e0),Is.False);
