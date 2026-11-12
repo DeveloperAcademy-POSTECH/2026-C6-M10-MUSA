@@ -8478,3 +8478,22 @@ Unity 6000.6.5f1 macOS Editor에서 새로고침 후 컴파일 오류0. 전체 E
 - 전체 EditMode **2340/2340 PASS**(49.17초), 영향 PlayMode **5/5 PASS**(35.43초), 실패/skip0. PlayMode는 GameStageGourdIntegrationTests·GameStage2GourdHitFinishTests·GourdResultViewerPlayModeTests다. 다시보기 runtime 경로는 직전 #701 검증과 같으며 이번에는 다시 실행하지 않았다.
 - 최초 EditMode 요청은 Editor PlayMode 진입 상태여서 실행0건으로 거절됐다. 재생을 종료한 뒤 위 전체 검사를 실행했다. 도메인 전환 중 Transport ResetStatics/이전 GC handle 로그2건이 있었으며 컴파일 오류는 없었다.
 - Unity PreviewRenderUtility로 세 저장 프리팹의 닫힌 자세를 임시 렌더해 천 장식 숨김을 확인했다. 임시 객체/RT는 해제했다. 실제 전투 전체 화면·실기기·빌드·전체 PlayMode는 이번에 실행하지 않았다.
+
+
+## 2026-11-12 — #707 Stage3 먹선 배경 1차 교체
+
+- Stage3 전용 Polish707 PNG 8종(목탑·사찰·지귀 집·첨성대·대문/담장·주변 초가집·하늘·바닥)을 추가하고 Battle의 Stage03 Studio에 연결했다. 기존 공유 PNG와 Stage1/2 자료는 보존했다. 목탑85도·사찰115도·초가집335도·첨성대230도 중심으로 배치했다. 한지 살구색에 맞춰 채도를 낮췄으며 기존 산/바위/풀과 효과는 재사용했다.
+- Unity 6000.6.5f1 Editor: GameStageBackgroundAssetTests EditMode 5/5 PASS. StoryThemesPreserveStageSceneryAndBindExistingHudAndBoard PlayMode 1/1 PASS(1→2→3 배경/HUD/조합대 연결). 콘솔 오류 0건. Stage3 SOLO Playing 진입과 배경 로드 확인.
+- 배경 전용 임시 카메라로 사찰/초가집/첨성대 세 방향을 캡처하여 확인했다. 이는 실제 플레이어 카메라/완성 박 캡처가 아니다. 실제 게임 캡처에는 지귀 부적/증기와 일시정지가 겹쳐 전체 조합대 조화의 최종 시각 검토는 제한됐다.
+- 미실행: iPhone·Mac/iOS 빌드·다기기 성능. 새 건물은 생성 시트에서 분리한 약375~587px 폭의 1차 아트이며 2048px 최종 원화가 아니다. 사찰의 추가 측면/부속건물·별도 그을음 오버레이는 미제작.
+
+- #707 배치 후속: 실제 SOLO BattleCamera(0,2,18 / yaw180 / FOV52) 기준으로 사찰162도·목탑198도에 재배치하고 건물 크기를 키웠다. 나머지는 초가335·첨성대35·문95·주변집275도. 산 높이3.3→0.6, 반경26, 폭29; 바닥40→72로 넓혀 산 아래 지면 틈을 제거했다. 실제 카메라 자세·viewport 비율을 복제한 배경 전용 렌더에서 사찰/목탑과 접지 확인(UI/스테이지 박은 포함하지 않음).
+
+
+## 2026-11-12 — #707 연기·불꽃·재 움직임
+- Stage03 Studio에 GameStageAtmosphere를 저장했다. 기존 연무/불티/불꽃 7장과 건물 주변16장, 총23개 카드가 전투 연출 시계 BattlePresentationTime으로 움직인다. 지귀 집·주변집·사찰·대문에 각각 연기2장/불꽃1장/재1장을 배치했다. 그을음 원화는 유지하며 먹선 PNG/공용 셰이더를 재사용한다.
+- Smoke는 상승/옆흐름/확대/등장·소멸, Ember는 상승/축소/등장·소멸, Flame은 밑면을 고정한 크기/기울기/불투명도 변화를 사용한다. 입자·충돌·실제 화재 판정·네트워크 메시지는 추가하지 않았다. 비활성 시 원본 위치/크기/색을 복원한다. Inspector Layer에서 opacity/duration/rise/drift를 조정할 수 있다.
+- Editor 수동: 동일 연출시각1초 재샘플의23개 위치 동일, 2초 샘플의23개 위치 변화, Stage1 전환 시 컴포넌트 비활성 확인. 1/4초 배경 렌더에서 변화 확인(실제 UI/스테이지 박 제외). 컴파일/콘솔 오류0. EditMode GameStageBackgroundAssetTests+GameBackgroundAnimationAssetTests 7/7 PASS. PlayMode StoryThemesPreserveStageSceneryAndBindExistingHudAndBoard 1/1 PASS.
+- 미실행: iPhone·플레이어 빌드·다기기/실기기 성능. 실제 Pause 버튼을 통한 효과 정지 시각 검토는 미실행; 기존 정지 공유 시계를 사용하는 연결과 동일 시각 재샘플을 확인했다.
+
+- #707 붉은 먹선 구름: 6장으로 늘리고 전투 연출시계 기반 수평 원주 이동을 추가했다. 1회전35~46초(약7.8~10.3도/초), 구름별 속도 차이·수직0.12m 흔들림. 배경 원주를 연속 이동하므로 화면 끝에서 순간이동하지 않는다. 컴파일 오류0. 수동6장 모두2초 후 위치 이동, 같은 시각 위치 고정, 각 주기 후 XZ 원위치 확인. Stage1 전환 시 원위치 복원.
