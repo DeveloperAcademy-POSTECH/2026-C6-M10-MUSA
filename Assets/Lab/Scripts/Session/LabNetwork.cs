@@ -2149,7 +2149,8 @@ namespace C6Lab
             projectile.name = "Projectile " + orb.id;
             float sizeScale = (model != null ? model.LaunchScaleOf(orb.id) : 1f)
                 * (orb.jigwiABReward ? orb.jigwiABRewardSizeScale : 1f)
-                * (orb.jigwiTalismanReward ? LabJigwiWaterVolley.SizeScale : 1f); // #540 부적 구슬은 1.5배
+                * (orb.jigwiTalismanReward ? LabJigwiWaterVolley.SizeScale : 1f) // #540 부적 구슬은 1.5배
+                * (orb.soot ? LabModel.SootOrbSizeScale : 1f); // #696 검정 구슬은 1.3배
             projectile.SetRadiusScale(sizeScale);
             projectile.SetJigwiABRadiusScale(orb.jigwiABRadiusScale);
             projectile.SetJigwiABReward(orb.jigwiABReward);
@@ -2346,7 +2347,11 @@ namespace C6Lab
                         : orb.LifeSecondsLeft(latest.serverTime, config.OrbLifetimeSeconds, config.ItemLifetimeSeconds),
                     jigwiScale: orb.jigwiRadiusScale, fever: orb.fever, fiveColor: orb.fiveColor,
                     soot: orb.soot, sootPieces: orb.sootPieces, // #696 검정 구슬 / 연기 파편
-                    jigwiABScale: orb.jigwiABRadiusScale * (orb.jigwiTalismanReward ? LabJigwiWaterVolley.SizeScale : 1f), // #540 부적 구슬 1.5배
+                    // #696: shards just joined (or became the black orb) burst on the board where they met.
+                    sootJoined: (orb.soot || LabModel.SootPieceCount(orb.sootPieces) >= 2)
+                        && latest.serverTime - orb.createdAt < LabOrbState.UnlockEffectWindowSeconds,
+                    jigwiABScale: orb.jigwiABRadiusScale * (orb.jigwiTalismanReward ? LabJigwiWaterVolley.SizeScale : 1f) // #540 부적 구슬 1.5배
+                        * (orb.soot ? LabModel.SootOrbSizeScale : 1f), // #696 검정 구슬 1.3배
                     // #540: an unfinished talisman's orbs show no A fire at all (they burn to ash in turn instead).
                     jigwiABBurnSeconds: orb.jigwiABBurnAt >= 0d && !LabJigwiScreenPresentation.FailBurnPending(latest, orb)
                         ? Mathf.Max(0f, (float)(orb.jigwiABBurnAt - latest.serverTime)) : 0f,

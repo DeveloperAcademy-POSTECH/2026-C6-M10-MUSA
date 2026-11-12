@@ -425,7 +425,7 @@ namespace C6Lab.Tests
             var smoke=Current(m,8.1);
             Assert.That(smoke.smoke,Is.True);
             double ready=smoke.players.First().readyAt;
-            Assert.That(m.TryClearJigwiSmoke(Three[0],smoke.id,ready+.5),Is.False,"Nobody rubs a whole screen that fast.");
+            Assert.That(m.TryClearJigwiSmoke(Three[0],smoke.id,ready-.5),Is.False,"Nobody rubs before the smoke covers the screen.");
             Assert.That(m.TryClearJigwiSmoke(Three[0],"other",ready+2),Is.False);
             Assert.That(m.TryClearJigwiSmoke(Three[0],smoke.id,ready+2),Is.True);
             Assert.That(m.TryClearJigwiSmoke(Three[0],smoke.id,ready+2.5),Is.False,"Once per smoke.");

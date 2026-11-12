@@ -14,8 +14,8 @@ namespace C6Lab
         private readonly HashSet<string> jigwiSmokeCleared = new HashSet<string>(StringComparer.Ordinal);
         /// <summary>#696: soot shards one cleared smoke gives; merged two by two they make one black orb.</summary>
         public const int JigwiSootShardCount = 4;
-        /// <summary>#696: the earliest a smoke can be cleared after it covers the screen (rubbing takes at least this long).</summary>
-        public const double JigwiSmokeClearMinimumSeconds = 1d;
+        /// <summary>#696: how soon after the smoke covers the screen its shards can be asked for (rubbing starts right away).</summary>
+        public const double JigwiSmokeClearMinimumSeconds = 0d;
         /// <summary>#696 검정 구슬이 칠하는 먹색.</summary>
         public static readonly Color SootInk = new Color(.13f, .12f, .14f, 1f);
         private bool jigwiABEnabled;
@@ -594,6 +594,9 @@ namespace C6Lab
 
         /// <summary>#696: 파편이 판 가운데에서 얼마나 멀리 흩어지는지 (판 너비/높이 비율). 서로 끌어다 붙여야 할 만큼 멀리.</summary>
         public const float JigwiSootShardSpreadX = .32f, JigwiSootShardSpreadY = .27f;
+
+        /// <summary>#696: 검정 구슬은 보통 결합 구슬보다 이만큼 크다 (판 위 / 날아갈 때).</summary>
+        public const float SootOrbSizeScale = 1.3f;
 
         /// <summary>#696: 네 쪽이 다 모인 검정 구슬.</summary>
         public const int SootWholePieces = 15;

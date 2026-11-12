@@ -64,6 +64,8 @@ namespace C6Lab
         // #551 failure: Jigwi's steam fogs my board until I rub it clear.
         [Tooltip("김이 이만큼(0~1) 남을 때까지 문지르면 닦인 것.")]
         [SerializeField, Range(.05f, .8f)] private float steamClearLeft = .1f;
+        [Tooltip("#696 연기를 이만큼(0~1) 걷어 내기 시작하면 Host에 검은 파편을 달라고 한다. 파편은 아직 연기 밑 판 구석구석에 깔려 있어, 닦는 동안 하나씩 드러난다.")]
+        [SerializeField, Range(0f, .5f)] private float sootRevealWiped = .03f;
         [Tooltip("문지르는 손가락 굵기(판 폭 비율).")]
         [SerializeField, Range(.03f, .3f)] private float steamBrush = .14f;
         private const int SteamW = 144, SteamH = 312; // the whole screen, fine enough that wiped edges stay smooth
@@ -858,10 +860,11 @@ namespace C6Lab
             // 휘익: a fanning whoosh for every few percent rubbed away, at most every 0.25 s.
             if (lastSqueakLeft - steamLeft >= .04f && Time.unscaledTime - lastSqueakAt >= .25f)
             { lastSqueakLeft = steamLeft; lastSqueakAt = Time.unscaledTime; PlayRub(wiped); }
+            // #696: once rubbing starts the Host lays the soot shards under the smoke, so wiping uncovers them one by one.
+            if (1f - steamLeft >= sootRevealWiped && source != null) source.RequestJigwiSmokeClear(steamRound);
             if (steamLeft <= steamClearLeft)
             {
                 steamClearedAt = Time.unscaledTime;
-                if (source != null) source.RequestJigwiSmokeClear(steamRound); // #696: the Host gives the soot shards
                 if (source != null) LabHaptics.PlayDirect(source.config, LabHapticStyle.Medium, .7f);
                 Play(clearSoundFolder, clearVolume);
                 if (steamBlocking && source != null && source.board != null) source.board.SetUiInputBlocked(false);

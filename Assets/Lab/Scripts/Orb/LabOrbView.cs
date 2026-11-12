@@ -442,6 +442,15 @@ namespace C6Lab
         }
 
         private LabSootAura sootAura;
+        /// <summary>
+        /// #696 파편끼리 붙는 순간: 붙은 자리에서 먹빛 연기가 확 퍼지고 보랏빛 빛이 번쩍인다.
+        /// 네 쪽이 다 모여 검정 구슬이 될 때(whole)는 더 크고 길게.
+        /// </summary>
+        public void PlaySootJoin(bool whole)
+        {
+            float art = visualRadius * (orbSpriteArt != null && orbSpriteArt.gameObject.activeSelf ? LabOrbSpriteArt.SizeScaleFor(kind) : 1.2f);
+            LabSootAura.PlayJoin(transform, art, whole);
+        }
         /// <summary>#696 검정 구슬의 연기 기운이 보이는지.</summary>
         public bool SootAuraShown => sootAura != null && sootAura.Shown;
 

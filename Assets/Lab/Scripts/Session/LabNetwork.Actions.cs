@@ -579,6 +579,7 @@ namespace C6Lab
             bool rewarded = JigwiRewardAt(latest.serverTime);
             if (rewarded) scale *= config.JigwiABRewardSizeScale;
             if (talisman) scale *= LabJigwiWaterVolley.SizeScale; // #540 부적 구슬 1.5배
+            if (soot) scale *= LabModel.SootOrbSizeScale; // #696 검정 구슬 1.3배
             visual.SetRadiusScale(scale);
             visual.SetJigwiABReward(rewarded);
             visual.SetJigwiABRadiusScale(orb != null ? orb.jigwiABRadiusScale : board != null ? board.JigwiABRadiusScaleFor(request.firstId) : 1f);

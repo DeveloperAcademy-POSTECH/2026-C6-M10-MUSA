@@ -6,6 +6,7 @@ namespace C6Lab
     /// #696 지귀 검정 구슬의 기운: 판 위에 놓여만 있어도 구슬 둘레에서 먹빛 연기가 천천히 피어올라 감돌고,
     /// 뒤에서 보랏빛 빛무리가 숨 쉬듯 커졌다 작아진다. "연기를 모아 만든 구슬"로 보이게 한다. 표시만 한다.
     /// 오색구슬 그림(LabFiveColorSparkle) 밑에 붙어 같이 카메라를 보고, 그 그림보다 뒤(sortingOrder가 낮게)에 그린다.
+    /// 같은 컴포넌트가 파편이 붙는 순간의 터짐(PlayJoin)도 그린다 (그때는 그림 앞에, 한 번만).
     /// </summary>
     public sealed class LabSootAura : MonoBehaviour
     {
@@ -26,6 +27,63 @@ namespace C6Lab
         private float radius = .3f;
         private float age;
         private bool shown = true;
+
+        // #696 붙는 순간 터짐 (PlayJoin): 한 번 퍼지고 스스로 사라진다.
+        private const int JoinPuffCount = 10;
+        private bool join, joinWhole;
+        private float joinSeconds;
+        private readonly Vector3[] joinDirections = new Vector3[JoinPuffCount];
+
+        /// <summary>
+        /// #696 파편이 붙는 순간의 터짐: 가운데 보랏빛이 번쩍이고, 먹빛 연기 덩이가 사방으로 확 퍼졌다 옅어진다.
+        /// whole(검정 구슬 완성)이면 더 크고 길게, 빛도 한 번 더 크게 번진다. parent(구슬)를 따라다니다 스스로 사라진다.
+        /// </summary>
+        public static void PlayJoin(Transform parent, float orbRadius, bool whole)
+        {
+            if (parent == null || !(orbRadius > 0f)) return;
+            var root = new GameObject(whole ? "Soot Join Burst (Whole)" : "Soot Join Burst");
+            root.layer = parent.gameObject.layer;
+            root.transform.SetParent(parent, false);
+            var burst = root.AddComponent<LabSootAura>();
+            burst.join = true;
+            burst.joinWhole = whole;
+            burst.joinSeconds = whole ? 1.1f : .6f;
+            burst.radius = orbRadius;
+            Sprite puff = LabOrbVanishSmoke.PuffSprite();
+            burst.glow = burst.Part("Soot Join Flash", puff, 20);
+            for (int i = 0; i < JoinPuffCount; i++)
+            {
+                float angle = (i + Random.Range(-.3f, .3f)) * (360f / JoinPuffCount) * Mathf.Deg2Rad;
+                burst.joinDirections[i] = new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), 0f) * Random.Range(.8f, 1.15f);
+            }
+            burst.joinPuffs = new SpriteRenderer[JoinPuffCount];
+            for (int i = 0; i < JoinPuffCount; i++) burst.joinPuffs[i] = burst.Part("Soot Join Puff " + i, puff, 21);
+            burst.PoseJoin();
+        }
+
+        private SpriteRenderer[] joinPuffs;
+
+        private void PoseJoin()
+        {
+            float u = Mathf.Clamp01(age / joinSeconds);
+            float ease = 1f - (1f - u) * (1f - u) * (1f - u);
+            float size = joinWhole ? 1.5f : 1f;
+            // 가운데 번쩍임: 아주 빨리 커지고 천천히 사라진다. 검정 구슬이면 끝무렵 한 번 더 크게 번진다.
+            float flash = Mathf.Clamp01(1f - u * (joinWhole ? 1.2f : 1.8f));
+            float second = joinWhole ? Mathf.Clamp01(1f - Mathf.Abs(u - .55f) / .25f) : 0f;
+            glow.transform.localPosition = new Vector3(0f, 0f, -.02f * radius);
+            glow.transform.localScale = Vector3.one * (radius * size * (1.2f + 2.6f * ease + 1.5f * second));
+            glow.color = new Color(Violet.r * 1.3f, Violet.g * 1.2f, Violet.b, Mathf.Max(.85f * flash * flash, .6f * second));
+            for (int i = 0; i < JoinPuffCount; i++)
+            {
+                SpriteRenderer puff = joinPuffs[i];
+                puff.transform.localPosition = joinDirections[i] * (radius * size * (.3f + 1.9f * ease)) + new Vector3(0f, 0f, -.03f * radius);
+                puff.transform.localScale = Vector3.one * (radius * size * (.55f + .9f * ease));
+                Color tint = Color.Lerp(Ink, Violet, .25f * (1f - u));
+                puff.color = new Color(tint.r, tint.g, tint.b, .85f * Mathf.Pow(1f - u, 1.4f) * Mathf.Clamp01(u * 10f + .3f));
+            }
+            if (u >= 1f) Destroy(gameObject);
+        }
 
         /// <summary>parent(보통 검정 구슬의 오색구슬 그림) 밑에 기운을 붙인다. 이미 있으면 그것을 쓴다.</summary>
         public static LabSootAura Attach(Transform parent, float orbRadius)
@@ -83,6 +141,7 @@ namespace C6Lab
 
         private void Update()
         {
+            if (join) { age += Time.deltaTime; PoseJoin(); return; }
             if (!shown) return;
             age += Time.deltaTime;
             Pose();
@@ -90,7 +149,7 @@ namespace C6Lab
 
         private void Pose()
         {
-            if (glow == null) return;
+            if (glow == null || join) return;
             // 뒤의 보랏빛 빛무리: 천천히 숨 쉰다.
             float breath = .5f + .5f * Mathf.Sin(age * GlowHz * 2f * Mathf.PI);
             glow.transform.localPosition = new Vector3(0f, 0f, .05f * radius);

@@ -462,7 +462,7 @@ namespace C6Lab
             LabDrumArrival arrival = LabDrumArrival.None, float stopAt = -1f, bool small = false,
             float burnSeconds = 0f, float lifeSeconds = -1f, float jigwiScale = 1f, bool fever = false, bool fiveColor = false,
             float jigwiABScale = 1f, float jigwiABBurnSeconds = 0f, bool jigwiABHeld = false,
-            bool soot = false, int sootPieces = 0)
+            bool soot = false, int sootPieces = 0, bool sootJoined = false)
         {
             RequireConfigured();
             small &= !kind.IsDrum();
@@ -535,6 +535,7 @@ namespace C6Lab
             view.SetFever(fever, config.TeamFeverRingScale, config.TeamFeverRingAlpha);
             view.SetFiveColor(fiveColor, soot);
             view.SetSootShard(sootPieces);
+            if (sootJoined) view.PlaySootJoin(soot); // #696 파편이 붙는 순간
             view.SetJigwiRewardFire(jigwiRewardFire, jigwiRewardHeld || simulationHeld);
             if (fiveColor) fiveColorIds.Add(id);
             if (soot) sootIds.Add(id);

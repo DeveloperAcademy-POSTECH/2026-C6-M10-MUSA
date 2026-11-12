@@ -50,7 +50,8 @@ namespace C6Lab
         private string jigwiSmokeClearSentRound;
 
         /// <summary>
-        /// #696: 이 기기 화면에서 지귀 연기를 다 걷어 냈다. 연기 회차마다 한 번 Host에 보낸다(파편 판정은 Host). 보냈으면 true.
+        /// #696: 이 기기 화면에서 지귀 연기를 닦기 시작했다(파편이 연기 밑에 깔려 닦는 동안 드러난다).
+        /// 연기 회차마다 한 번 Host에 보낸다(파편 판정은 Host). 보냈으면 true.
         /// </summary>
         public bool RequestJigwiSmokeClear(string roundId)
         {
