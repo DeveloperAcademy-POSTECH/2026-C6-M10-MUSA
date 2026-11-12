@@ -46,9 +46,11 @@ MonoBehaviour:
   jigwiATestOnly: 0
   jigwiSmokeFlow: 1
   jigwiDenseTimeline: 1
+  jigwiRelayTimeline: 1
+  jigwiRelayGapSeconds: 10
   jigwiSmokeToTalismanSeconds: 12
   jigwiCommonStartSeconds: 25
-  jigwiCommonIntervalSeconds: 15
+  jigwiCommonIntervalSeconds: 20
   jigwiStageWarningSeconds: 1
   jigwiStageActiveSeconds: 7
   jigwiStageRootAngleDegrees: 18

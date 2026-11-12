@@ -891,6 +891,7 @@ namespace C6Lab
             if (steamLeft <= steamClearLeft)
             {
                 steamClearedAt = Time.unscaledTime;
+                if (source != null) source.RequestJigwiSmokeWiped(steamRound); // #713: everyone wiped = the smoke is over
                 if (source != null) LabHaptics.PlayDirect(source.config, LabHapticStyle.Medium, .7f);
                 Play(clearSoundFolder, clearVolume);
                 if (steamBlocking && source != null && source.board != null) source.board.SetUiInputBlocked(false);

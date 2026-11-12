@@ -605,6 +605,10 @@ namespace C6Lab
         [SerializeField] private bool jigwiSmokeFlow = false;
         [Tooltip("#696 연기 흐름을 미션 5개로: 연기 6 / 부적 30 / 연기 44 / 부적 68 / 연기 82, 연기마다 검정 구슬을 던질 틈이 있게 (끄면 #595 연기 10 / 부적 45 / 연기 66 / 부적 83). Host 기준")]
         [SerializeField] private bool jigwiDenseTimeline = false;
+        [Tooltip("#713 연기 흐름 이어달리기: 첫 연기만 6초에 오고, 그 뒤로는 앞 미션이 끝나고(연기는 모두 닦거나 15초, 부적은 물폭포나 구슬이 다 탄 뒤) Jigwi Relay Gap Seconds 뒤에 다음 미션. 피버 전에 끝낼 수 있는 만큼. 켜면 Jigwi Dense Timeline보다 앞선다. Host 기준")]
+        [SerializeField] private bool jigwiRelayTimeline = false;
+        [Tooltip("#713 이어달리기: 앞 미션이 끝나고 다음 미션이 시작하기까지(초, 지귀 예고 2초 포함)")]
+        [SerializeField, Range(2f, 30f)] private float jigwiRelayGapSeconds = 10f;
         [Tooltip("#663 Inspector 전용(Host, 연기 흐름만): 연기가 끝나면(다 걷어 내거나 시간이 다 되면) 이만큼 뒤에 다음 부적이 시작된다(초, 지귀 예고 2초 포함). 원래 시각(45초/83초)보다 늦어지지는 않는다. 그 사이에 올 공통 기믹은 부적이 끝난 뒤로 미룬다. 0이면 예전처럼 정해진 시각.")]
         [SerializeField, Range(0f, 20f)] private float jigwiSmokeToTalismanSeconds = 4f;
         [Tooltip("#540 Inspector 전용(Host, 새 시간표만): 지귀 공통 기믹이 처음 나오는 때(초).")]
@@ -1289,6 +1293,8 @@ namespace C6Lab
         public bool JigwiATestOnly => jigwiATestOnly;
         public bool JigwiSmokeFlow => jigwiSmokeFlow;
         public bool JigwiDenseTimeline => jigwiDenseTimeline;
+        public bool JigwiRelayTimeline => jigwiRelayTimeline;
+        public float JigwiRelayGapSeconds => Mathf.Clamp(Finite(jigwiRelayGapSeconds, 10f), (float)LabJigwiABTimeline.WarningSeconds, 30f);
         /// <summary>#663: 0 = off; otherwise at least the 2 s warning.</summary>
         public float JigwiSmokeToTalismanSeconds
         {

@@ -289,7 +289,8 @@ namespace C6Lab
         //       round (foxRound*, foxRoundRunning, its goal and cleared count, up to 100 fox orbs a board) and six more DEV
         //       values (265), on top of #676's 5701 (#664 had also used 5701 on its own branch).
         // 5703: #696 Jigwi dense smoke flow schedule (jigwiAB.schedule 5: six missions); older builds reject the new schedule.
-        internal const ushort LabProtocolVersion = 5703;
+        // 5704: #713 Jigwi relay smoke flow (jigwiAB.schedule 6: each mission follows the last) and the "jigwiSmokeWiped" request.
+        internal const ushort LabProtocolVersion = 5704;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Double-tap a blue fox orb to clear it, and keep your Yin and Yang away.";
@@ -2094,6 +2095,13 @@ namespace C6Lab
                 // #696 지귀 연기를 다 걷어 냄: Host가 확인하고 그 사람 조합판에 검은 파편을 준다. 연기마다 한 사람 한 번.
                 if (battleClock.IsPaused || packet.requestId < 1) return;
                 if (model.TryClearJigwiSmoke(sender, packet.firstId, now)) PublishSnapshot(true);
+                return;
+            }
+            if (packet.type == JigwiSmokeWipedPacket)
+            {
+                // #713 이 사람이 연기를 다 닦음: 모두 닦으면 그 연기가 끝나고 다음 미션이 그 뒤로 잡힌다.
+                if (battleClock.IsPaused || packet.requestId < 1) return;
+                if (model.TryWipeJigwiSmoke(sender, packet.firstId, now)) PublishSnapshot(true);
                 return;
             }
             if (packet.type == JigwiTalismanPacket)

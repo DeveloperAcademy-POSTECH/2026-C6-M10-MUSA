@@ -187,7 +187,9 @@ namespace C6Lab
                 double scheduled = state.startedAt + LabJigwiABTimeline.ActiveOffset(round.slot, state.schedule);
                 // #663: in the smoke flow a talisman may start earlier than its slot (right after the smoke before it).
                 bool pulled = LabJigwiABTimeline.IsSmokeFlow(state.schedule) && round.kind == LabJigwiABKind.PersonalBurn
-                    && round.activeAt < scheduled - .00001d;
+                    && round.activeAt < scheduled - .00001d
+                    // #713 이어달리기: only the first smoke has a fixed time (or earlier from the VFX lab); the rest follow the one before.
+                    || LabJigwiABTimeline.IsRelay(state.schedule) && (round.slot > 0 || round.activeAt < scheduled - .00001d);
                 if (!pulled && Math.Abs(round.activeAt - scheduled) > .00001d
                     || Math.Abs(round.warningAt - (round.activeAt - LabJigwiABTimeline.WarningSeconds)) > .00001d
                     || round.kind != LabJigwiABTimeline.KindForSlot(round.slot, state.schedule)) return false;
