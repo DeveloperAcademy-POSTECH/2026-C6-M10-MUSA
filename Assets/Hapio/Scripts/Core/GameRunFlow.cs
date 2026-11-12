@@ -213,8 +213,9 @@ namespace Hapio
 
         public bool RestartCurrentStage(string runId, int stageIndex, uint revision)
         {
+            bool completedTerritory = state.mode == GameMode.Territory && state.phase == GameFlowPhase.Completed;
             if (!Matches(runId, stageIndex, revision)
-                || (state.phase != GameFlowPhase.Playing && state.phase != GameFlowPhase.StageResult))
+                || (state.phase != GameFlowPhase.Playing && state.phase != GameFlowPhase.StageResult && !completedTerritory))
                 return false;
             BeginLoad();
             return true;
