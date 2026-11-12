@@ -43,6 +43,25 @@ namespace Hapio.Tests
             Assert.That(prefab.GetComponentsInChildren<Animator>(true), Is.Empty, "The looping art Animator is removed.");
             foreach (Transform part in prefab.GetComponentsInChildren<Transform>(true))
                 Assert.That(part.name, Does.Not.StartWith("Rear_Rope"), "The model's own hanging rope is removed.");
+            int keyringRoots = 0;
+            foreach (Transform part in prefab.GetComponentsInChildren<Transform>(true))
+                if (part.name == "Sandal_Dangling_Pivot" || part.name.StartsWith("Sandal_Dangling_Pivot."))
+                {
+                    keyringRoots++;
+                    Assert.That(part.gameObject.activeSelf, Is.False, "The keyring and its attachment ropes stay hidden.");
+                    Assert.That(part.GetComponentsInChildren<Renderer>(true), Is.Not.Empty, "The original charm remains recoverable.");
+                }
+            Assert.That(keyringRoots, Is.EqualTo(1), "Each stage has one complete keyring group.");
+            int clothParts = 0;
+            foreach (Transform part in prefab.GetComponentsInChildren<Transform>(true))
+            {
+                string name = GameGourdRigBake.BaseName(part.name);
+                if (name != "Gumiho_Teal_Jeogori_Ribbon" && name != "Saekdong_Ribbon_1"
+                    && name != "Saekdong_Ribbon_1_Separate_Rope_Tie") continue;
+                clothParts++;
+                Assert.That(part.gameObject.activeSelf, Is.False, "Cloth ribbons and their tie stay hidden: " + part.name);
+            }
+            Assert.That(clothParts, Is.EqualTo(stage == 2 ? 2 : 3));
             Assert.That(prefab.transform.localScale, Is.EqualTo(Vector3.one));
         }
 

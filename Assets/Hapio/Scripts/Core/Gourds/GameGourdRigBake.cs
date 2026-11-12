@@ -34,6 +34,10 @@ namespace Hapio
         public static readonly string[] ModelRopeParts =
             { "Rear_Rope_Strand_1", "Rear_Rope_Strand_2", "Rear_Rope_Strand_3", "Rear_Rope_Binding", "Rear_Rope_Eye_Tie" };
 
+        /// <summary>#701: preserve these source nodes but hide dangling charms, cloth ribbons and their ties in battle.</summary>
+        public static readonly string[] HiddenDecorationParts =
+            { "Sandal_Dangling_Pivot", "Gumiho_Teal_Jeogori_Ribbon", "Saekdong_Ribbon_1", "Saekdong_Ribbon_1_Separate_Rope_Tie" };
+
         /// <summary>Where one stage's art comes from and where its battle gourd goes.</summary>
         public sealed class Spec
         {
