@@ -94,7 +94,7 @@ namespace C6Lab
             jigwiSmokeFlow = config.JigwiSmokeFlow; // #595: with B Test Only it tests the smoke B (every 17 s) instead of the old B
             jigwiSchedule = config.JigwiBTestOnly ? LabJigwiABTimeline.BTestSchedule // #551 시험용: B만
                 : config.JigwiATestOnly ? LabJigwiABTimeline.ATestSchedule // #595 시험용: 부적만
-                // #696 연기 8 / 부적 24 / 연기 40 / 부적 55 / 연기 70 / 부적 85, 끄면 #595 연기 10 / 부적 45 / 연기 66 / 부적 83
+                // #696 연기 6 / 부적 30 / 연기 44 / 부적 68 / 연기 82, 끄면 #595 연기 10 / 부적 45 / 연기 66 / 부적 83
                 : jigwiSmokeFlow ? (config.JigwiDenseTimeline ? LabJigwiABTimeline.DenseSmokeFlowSchedule : LabJigwiABTimeline.SmokeFlowSchedule)
                 : config.JigwiFlowSchedule ? LabJigwiABTimeline.FlowSchedule : LabJigwiABTimeline.LegacySchedule;
             jigwiAHoldBurn = config.JigwiAHoldBurnUntilEnd;

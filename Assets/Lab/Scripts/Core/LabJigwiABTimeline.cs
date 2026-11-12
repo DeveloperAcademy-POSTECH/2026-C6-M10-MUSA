@@ -27,11 +27,12 @@ namespace C6Lab
         /// <summary>#595 시험용: 부적(A)만 4초부터 17초마다 (4 / 21 / 38 / 55 / 72), 연기와 공통 기믹 없음.</summary>
         public const int ATestSchedule = 4;
         /// <summary>
-        /// #696 촘촘한 연기 흐름: 연기 8 / 부적 24 / 연기 40 / 부적 55 / 연기 70 / 부적 85. #595 연기 흐름과 같은 규칙에 미션만 6개로,
-        /// 미션 사이 빈 구간이 6초를 넘지 않게 (연기 15초, 부적 10초 기준).
+        /// #696 촘촘한 연기 흐름: 연기 6 / 부적 30 / 연기 44 / 부적 68 / 연기 82. #595 연기 흐름과 같은 규칙에 미션 5개.
+        /// 연기마다 다음 부적까지 24초라, 닦는 동안 드러난 검은 파편을 모아 검정 구슬로 던질 틈이 있다
+        /// (부적이 끝나면 4초 안에 다음 연기, 마지막 검정 구슬은 피버 직전에 던진다).
         /// </summary>
         public const int DenseSmokeFlowSchedule = 5;
-        private static readonly double[] DenseSmokeFlowOffsets = { 8d, 24d, 40d, 55d, 70d, 85d };
+        private static readonly double[] DenseSmokeFlowOffsets = { 6d, 30d, 44d, 68d, 82d };
         /// <summary>#595/#696: 연기가 먼저 오고 부적이 뒤따르는 연기 흐름인지 (4개 또는 촘촘한 6개).</summary>
         public static bool IsSmokeFlow(int schedule) => schedule == SmokeFlowSchedule || schedule == DenseSmokeFlowSchedule;
         /// <summary>#595: 연기 B가 시작되고(지귀 예고 2초 뒤) 박이 달아오르다 연기가 뿜어져 나오기까지(초). 모든 자리가 같다.</summary>
