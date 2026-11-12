@@ -8543,3 +8543,13 @@ Unity 6000.6.5f1 macOS Editor에서 새로고침 후 컴파일 오류0. 전체 E
 - #710은 Stage03 카드의 Transform/MaterialPropertyBlock을 기존 전투 연출시계로 갱신하는 배경 표현이다. 세션/Scene 전환/공유 수명/판정/프로토콜 변경은 없다. 일반 UI/VFX 검사 정책에 따라 전체 EditMode와 영향 PlayMode(배경/HUD·야광귀 실제 시연·세 스테이지 rig·실제 Stage2 명중·렌더 준비·관람)를 추가 실행한다. 방금 통과한835건 중 실행 경로가 같은 공통 통신/물리 검사는 재사용하며 또 전체835건을 반복하지 않는다. 실제 배경 화면/Pause 육안·실기기 확인은 미검증으로 구분한다.
 
 - #710 최종 통합본 `c7369052`: 전체 EditMode **2392/2392**(38.63초), 영향 PlayMode **12/12**(49.26초). GameBattleUiPresentationTests4건(배경/HUD/모드 연결), GameYaguangDemoFlowTests1건(실제3인 시연), GameStageGourdIntegrationTests1건, GameStage2GourdHitFinishTests1건, GameBattleRenderWarmupTests2건, GourdResultViewerPlayModeTests3건이다. 실패·skip·inconclusive0. #709 통합본의 전체835건 통과와 함께 최종 영향 범위를 확인했다. 실제 화면 육안·다기기 무선·iOS 서명 설치는 실행하지 않았다.
+
+
+### #706 최종5703 시연 산출물
+
+기준 `c3515d47`(소스 미커밋 변경 없음), main `78644632`의 #705/#709/#710을 모두 포함한다.
+
+- Mac Release: `Builds/HapioDemo/20261112-072337-0302b87b-release/macOS/Hapio-Yaguang-Demo.app`, Succeeded·오류0.
+- iOS Release 내보내기: `Builds/HapioDemo/20261112-072435-d74af28d-release/iOS/Unity-iPhone.xcodeproj`, Succeeded·오류1. 앞서 기록한 Pipeline의 iOS subtarget 예외와 동일함을 BuildReport에서 확인했다. Xcode 컴파일/서명/설치/실기기는 미실행이다.
+- 두 manifest의5703 시연 TXT·Demo/1·실제Stage2 설정 해시가 같고 출력 앱 이름/ID를 검증했다. 두 Player의 실제 컴파일 응답에서 Demo define 포함·Development/Editor define 제외를 확인했다. 이전5702 산출물과 혼용하지 않는다. 새 Mac 앱의 수동 화면/3기기 검증은 하지 않았다.
+- 빌드 후 보호12개 파일은 최신 main과 동일하다. 일반 StandaloneOSX·Development false·variant false·기존 product/ID·빈 저장 defines로 복원됐으며 ProjectSettings/Packages/원본 Scene/LabConfig의 PR diff는 없다. 새로 만든 시연 사본만 PR에 추가했다. 컴파일·검사·빌드 원시 로그/산출물·복구 Scene은 커밋하지 않았다.
