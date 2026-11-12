@@ -186,7 +186,10 @@ namespace Hapio
             Triangles lidTris = Transform(Read(lidRenderer.GetComponent<MeshFilter>().sharedMesh),
                 worldToPaint * lidRenderer.transform.localToWorldMatrix);
             result.LidTriangles = lidTris.Count;
-            result.LidPaint = lidTris.Build(null, spec.Label + " lid paint");
+            // The art lid is exported with hard edges: one position carries several vertices with different normals. The
+            // clay coat is pushed out along the normal, so those vertices parted and the white lid showed through the gaps.
+            // Share one normal per position and side; triangles, positions and UVs stay as the art has them.
+            result.LidPaint = lidTris.WithSharedNormals().Build(null, spec.Label + " lid paint");
 
             // Hit shell: the outermost radius of the outer wall and the closed lid along 48 x 24 directions.
             Triangles outerTris = bodyTris.Subset(outer);
@@ -521,6 +524,40 @@ namespace Hapio
                 for (int i = 0; i < triangles.Count; i++)
                     for (int k = 0; k < 3; k++) indices[i * 3 + k] = Indices[triangles[i] * 3 + k];
                 return new Triangles(Positions, Normals, Uv, indices);
+            }
+
+            /// <summary>
+            /// The same triangles with one normal per position and side: each vertex takes the area-weighted normal of the
+            /// faces at its position that face its own way (within 90 degrees of its own normal), so an inner face never
+            /// averages with the outer one at a shared rim.
+            /// </summary>
+            public Triangles WithSharedNormals()
+            {
+                float size = 0f;
+                foreach (Vector3 p in Positions) size = Mathf.Max(size, Mathf.Abs(p.x), Mathf.Abs(p.y), Mathf.Abs(p.z));
+                float cell = Mathf.Max(1e-6f, size * 1e-5f);
+                Vector3Int Key(Vector3 p) => new Vector3Int(Mathf.RoundToInt(p.x / cell), Mathf.RoundToInt(p.y / cell), Mathf.RoundToInt(p.z / cell));
+                var faces = new Dictionary<Vector3Int, List<Vector3>>();
+                for (int t = 0; t < Count; t++)
+                {
+                    Vector3 face = FaceNormal(t);
+                    if (face.sqrMagnitude < 1e-20f) continue;
+                    for (int k = 0; k < 3; k++)
+                    {
+                        Vector3Int key = Key(Positions[Indices[t * 3 + k]]);
+                        if (!faces.TryGetValue(key, out var list)) faces[key] = list = new List<Vector3>();
+                        list.Add(face);
+                    }
+                }
+                var normals = new List<Vector3>(Positions.Count);
+                for (int v = 0; v < Positions.Count; v++)
+                {
+                    Vector3 own = Normals.Count > v ? Normals[v] : Vector3.zero, sum = Vector3.zero;
+                    if (own.sqrMagnitude > 1e-12f && faces.TryGetValue(Key(Positions[v]), out var list))
+                        foreach (Vector3 face in list) if (Vector3.Dot(face, own) > 0f) sum += face;
+                    normals.Add(sum.sqrMagnitude > 1e-20f ? sum.normalized : own);
+                }
+                return new Triangles(Positions, normals, Uv, Indices);
             }
 
             /// <summary>A compact mesh of the chosen triangles (all when null), keeping normals and UV0.</summary>
