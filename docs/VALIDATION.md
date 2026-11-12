@@ -8478,3 +8478,15 @@ Unity 6000.6.5f1 macOS Editor에서 새로고침 후 컴파일 오류0. 전체 E
 - 전체 EditMode **2340/2340 PASS**(49.17초), 영향 PlayMode **5/5 PASS**(35.43초), 실패/skip0. PlayMode는 GameStageGourdIntegrationTests·GameStage2GourdHitFinishTests·GourdResultViewerPlayModeTests다. 다시보기 runtime 경로는 직전 #701 검증과 같으며 이번에는 다시 실행하지 않았다.
 - 최초 EditMode 요청은 Editor PlayMode 진입 상태여서 실행0건으로 거절됐다. 재생을 종료한 뒤 위 전체 검사를 실행했다. 도메인 전환 중 Transport ResetStatics/이전 GC handle 로그2건이 있었으며 컴파일 오류는 없었다.
 - Unity PreviewRenderUtility로 세 저장 프리팹의 닫힌 자세를 임시 렌더해 천 장식 숨김을 확인했다. 임시 객체/RT는 해제했다. 실제 전투 전체 화면·실기기·빌드·전체 PlayMode는 이번에 실행하지 않았다.
+
+
+## 2026-11-12 — #711 Stage2 배경 폴리싱
+- fix/#711-stage2-background-polish: Stage2 장식 대비0.8/회갈색 중간톤, 바닥과 backing 색 배율1.30/1.09/1.04. 원본 PNG/배치/바람/눈/반딧불/발자국/조합대 UI 보존. 공용 InkCard에 중간톤 대비 제어 추가(기본1=기존 표현). 달/날씨 재질은 대비1을 유지했다.
+- 동일한 SOLO 카메라 위치·각도·비율의 배경 전용 전후 렌더를 비교했다(UI/스테이지 박 제외). 기본 셰이더 대비1 확인, 셰이더 컴파일 오류 없음, Studio 미적용 항목0. EditMode 배경 에셋/애니메이션7/7 PASS. PlayMode GameBattleUiPresentationTests4/4 PASS(1~3 스토리/땅따먹기 UI와 배경 연결 포함).
+- 미실행: iPhone·Mac/iOS 빌드·실제 다기기. Stage2 공유 땅따먹기에도 새 배경 색이 적용된다.
+
+- #711 화풍 통일 후속: Stage3 먹선 원화를 참조해6종 PNG를 생성·분리하고 Stage2 전용 슬롯에 연결. 새로운 종횡비의 과확대와 뜬 바닥을 배경 렌더로 발견해 높이/너비/접지 수정. 더 깊은 남청색 하늘paperColor0.78/0.83/0.93 적용. 같은 플레이어 카메라 자세의 배경 렌더에서 최종 확인(UI/스테이지 박 제외). 첫 EditMode의 경로 검사1건 실패는 새 PNG를 기존 Textures 하위로 이동해 해결(GUID유지); 재실행7/7 PASS. PlayMode GameBattleUiPresentationTests4/4 PASS. 새 PNG는 약251~583px 폭의1차 아트. 실기기/빌드/다기기 미실행.
+
+- 후속 검사에서 비활성 여분 카드의 이전 산 PNG 참조가 남은 것을 발견해 그룹 PNG와 동기화했다. 최종 EditMode 배경/애니메이션7/7 PASS. 비활성 카드는 그대로 비활성 상태를 유지한다.
+
+- #711 사용자 피드백 후속: 한옥 폭약6.86→14.5, 높이5→6.5로 확대. 먼산 높이0.8→0.11, Stage2 바닥40→72로 확장. 같은 플레이어 카메라 자세의 배경 전용 렌더에서 집 가로 확대와 산 아래 틈 제거 확인(UI/스테이지 박 제외). EditMode 배경/애니메이션7건 재실행. 실기기는 미실행.
