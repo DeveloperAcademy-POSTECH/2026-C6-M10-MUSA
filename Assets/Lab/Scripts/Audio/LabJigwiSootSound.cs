@@ -8,6 +8,8 @@ namespace C6Lab
     /// - 명중: 검정 구슬이 박에 맞을 때 (모든 기기, LabNetwork.SootHit). 이때 오색구슬 가야금은 나지 않는다.
     /// - 드러남: 연기를 닦다가 밑에 깔린 파편이 드러날 때 (내 기기, LabNetwork.SootShardRevealed). 드러날수록 조금씩 높게.
     /// - 붙음 / 완성: 조각 둘이 붙을 때, 네 조각이 모여 검정 구슬이 될 때 (판 주인 기기, LabOrbBoard.SootJoined).
+    ///   한 번 연기에 붙음은 두 번(세 번째로 붙으면 완성)이라, 붙음 소리는 이름 순서대로 두 개씩 짝지어
+    ///   첫 붙음은 가볍게(JigwiSootJoin_1 / _3), 두 번째 붙음은 더 꽉 차게(_2 / _4) 내고, 연기마다 짝을 번갈아 쓴다.
     /// 소리 파일은 Resources/Audio/JigwiSoot* 폴더의 파일을 쓰고(여러 개면 무작위), 없으면 조용히 넘어간다.
     /// 크기는 LabConfig(Inspector) × 일시정지 메뉴 효과음 설정.
     /// </summary>
@@ -33,6 +35,9 @@ namespace C6Lab
         private float auraLevel;
         private int revealsThisSmoke;
         private float lastRevealAt = -10f;
+        private int joinsThisSmoke, smokeChains;
+        private bool chainFinished = true;
+        private float lastJoinAt = -100f;
 
         /// <summary>확인용: 알아챈 횟수 (소리 파일이 없어도 센다).</summary>
         public int HitCount { get; private set; }
@@ -56,6 +61,7 @@ namespace C6Lab
             hitClips = Resources.LoadAll<AudioClip>(HitFolder);
             revealClips = Resources.LoadAll<AudioClip>(RevealFolder);
             joinClips = Resources.LoadAll<AudioClip>(JoinFolder);
+            System.Array.Sort(joinClips, (a, b) => string.CompareOrdinal(a.name, b.name));
             wholeClips = Resources.LoadAll<AudioClip>(WholeFolder);
             oneShots = gameObject.AddComponent<AudioSource>();
             oneShots.playOnAwake = false;
@@ -134,8 +140,39 @@ namespace C6Lab
 
         private void OnSootJoined(bool whole)
         {
-            if (whole) { WholeCount++; Play(oneShots, wholeClips, Config != null ? Config.JigwiSootWholeVolume : 1f, 1f); }
-            else { JoinCount++; Play(oneShots, joinClips, Config != null ? Config.JigwiSootJoinVolume : .8f, 1f); }
+            if (whole)
+            {
+                WholeCount++;
+                chainFinished = true;
+                Play(oneShots, wholeClips, Config != null ? Config.JigwiSootWholeVolume : 1f, 1f);
+                return;
+            }
+            JoinCount++;
+            int index = NextJoinIndex(Time.unscaledTime);
+            if (joinClips == null || joinClips.Length == 0) return;
+            float volume = (Config != null ? Config.JigwiSootJoinVolume : .8f) * LabAudioSettings.SfxVolume;
+            if (oneShots == null || volume <= 0f) return;
+            oneShots.pitch = 1f;
+            oneShots.PlayOneShot(joinClips[index % joinClips.Length], volume);
+        }
+
+        /// <summary>
+        /// #713: which join sound (by name order) this join plays. A new smoke's shards start a new chain (after the black orb
+        /// was made, or 10 s without a join); its first join is the lighter one, its second the fuller one, and each chain uses
+        /// the next pair (_1/_2, then _3/_4, then _1/_2 again).
+        /// </summary>
+        public int NextJoinIndex(float now)
+        {
+            if (chainFinished || now - lastJoinAt > 10f)
+            {
+                smokeChains++;
+                chainFinished = false;
+                joinsThisSmoke = 0;
+            }
+            lastJoinAt = now;
+            int index = (smokeChains - 1) % 2 * 2 + Mathf.Min(joinsThisSmoke, 1);
+            joinsThisSmoke++;
+            return index;
         }
 
         private static void Play(AudioSource source, AudioClip[] clips, float volume, float pitch)
