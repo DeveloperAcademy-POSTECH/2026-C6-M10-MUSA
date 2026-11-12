@@ -8584,3 +8584,6 @@ main `e3108459`의 #712(칠용 뚜껑 법선 공유와3개 LidPaint 메시)을 �
 - Unity Editor API로 기존3개 LidPaint의 normals만 갱신했다.0법선은 모두0개가 됐고 vertices/UV/triangles/bounds/GUID가 갱신 전과 같은 것을 확인했다. Prefab·Scene·원본 모델·HitShell은 다시 굽거나 저장하지 않았다. 최종 검사 결과는 아래에 기록한다.
 
 - 법선 보완 최종: 전체 EditMode **2395/2395**(37.23초), 영향 PlayMode **6/6**(38.17초: 실제3인 시연1·세 스테이지 rig1·실제Stage2명중1·관람3), 실패·skip·inconclusive0. 새3개 법선 단언은 최초 실패 때와 같다. 기존 전체835건은 공통 게임 코드가 같은 범위에서 재사용했다. 실제 기기·최종 화면 육안은 미검증이다.
+
+
+- 법선 보완 후 최종 배포용 시연 빌드(기준 `10fd8908`, 미커밋 소스 없음): Mac `Builds/HapioDemo/20261112-073926-f36af0f8-release/macOS/Hapio-Yaguang-Demo.app` Succeeded·오류0, iOS `Builds/HapioDemo/20261112-074031-0114fa00-release/iOS/Unity-iPhone.xcodeproj` Succeeded·기존 Pipeline subtarget 예외1. 두 manifest가 Demo/1·5703·Stage2 설정 해시·버전/앱ID에 일치하며 보호12개 파일은 최신 main과 같다. 법선 보완이 없는 앞선 빌드 경로와 구분한다. Xcode 서명/설치·실제3기기·최종 화면 육안은 여전히 미검증이다.
