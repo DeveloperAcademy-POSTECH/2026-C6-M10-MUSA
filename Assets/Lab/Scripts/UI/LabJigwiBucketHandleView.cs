@@ -861,6 +861,7 @@ namespace C6Lab
             if (steamLeft <= steamClearLeft)
             {
                 steamClearedAt = Time.unscaledTime;
+                if (source != null) source.RequestJigwiSmokeClear(steamRound); // #696: the Host gives the soot shards
                 if (source != null) LabHaptics.PlayDirect(source.config, LabHapticStyle.Medium, .7f);
                 Play(clearSoundFolder, clearVolume);
                 if (steamBlocking && source != null && source.board != null) source.board.SetUiInputBlocked(false);

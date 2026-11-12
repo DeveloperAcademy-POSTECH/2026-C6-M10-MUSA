@@ -389,6 +389,72 @@ namespace C6Lab.Tests
             Assert.That(r.Select(x=>x.activeAt),Is.EqualTo(new[]{4d,21d,38d,55d,72d}));
             Assert.That(r.All(x=>x.kind==LabJigwiABKind.PersonalBurn&&x.common),Is.True,"Only the shared talisman.");
         }
+        [Test] public void SootShardsAreNorthWestSouthEastPiecesThatOnlyJoinTheirNeighbours()
+        {
+            // 1 북 / 2 서 / 4 남 / 8 동: 이웃끼리만 붙는다.
+            Assert.That(LabModel.SootPiecesFit(1, 2), Is.True, "north + west");
+            Assert.That(LabModel.SootPiecesFit(8, 1), Is.True, "east + north");
+            Assert.That(LabModel.SootPiecesFit(1, 4), Is.False, "north + south leave a bow tie");
+            Assert.That(LabModel.SootPiecesFit(2, 8), Is.False, "west + east");
+            Assert.That(LabModel.SootPiecesFit(1 | 2, 4), Is.True);
+            Assert.That(LabModel.SootPiecesFit(1 | 2, 4 | 8), Is.True, "two halves make the whole orb");
+            Assert.That(LabModel.SootPiecesFit(1 | 2, 2 | 4), Is.False, "the same piece twice");
+            Assert.That(LabModel.SootArcStart(8 | 1), Is.EqualTo(3));
+            Assert.That(LabModel.SootArcStart(1 | 4), Is.EqualTo(-1));
+            // 북 조각은 위쪽, 동 조각은 오른쪽에 놓인다.
+            Assert.That(LabModel.JigwiSootShardSpot(0).y, Is.GreaterThan(LabModel.JigwiSootShardSpot(2).y));
+            Assert.That(LabModel.JigwiSootShardSpot(3).x, Is.GreaterThan(LabModel.JigwiSootShardSpot(1).x));
+
+            Texture2D Art(int pieces) => LabSootShardArt.SpriteFor(pieces).texture;
+            float Opaque(int pieces) => Art(pieces).GetPixels().Count(c => c.a > .5f) / (float)(Art(pieces).width * Art(pieces).height);
+            float quarter = Opaque(1), half = Opaque(1 | 2), threeQuarters = Opaque(1 | 2 | 4);
+            Assert.That(half, Is.EqualTo(quarter * 2f).Within(quarter * .35f));
+            Assert.That(threeQuarters, Is.EqualTo(quarter * 3f).Within(quarter * .5f));
+            // 북 조각은 그림 위쪽 가운데가 칠해지고 아래쪽 가운데는 비어 있다.
+            Texture2D north = Art(1);
+            Assert.That(north.GetPixel(north.width / 2, north.height * 7 / 8).a, Is.GreaterThan(.5f));
+            Assert.That(north.GetPixel(north.width / 2, north.height / 8).a, Is.LessThan(.5f));
+            Assert.That(LabFiveColorSparkle.SootTones.All(c => c.r < 100 && c.g < 100 && c.b < 140), "the black orb stays black");
+        }
+
+        [Test] public void ClearingTheSmokeGivesFourSootShardsThatMergeIntoTheBlackOrb()
+        {
+            // #696: 연기를 다 걷어 낸 사람 판에 검은 파편 4개 → 둘씩 합쳐 2, 2 → 검정 구슬(오색구슬처럼 넓게, 먹색).
+            JsonUtility.FromJsonOverwrite("{\"jigwiSmokeFlow\":true,\"jigwiDenseTimeline\":true,\"jigwiABPersonalDurationSeconds\":10,\"jigwiSmokeToTalismanSeconds\":0}",config);
+            var m=Room3();
+            var smoke=Current(m,8.1);
+            Assert.That(smoke.smoke,Is.True);
+            double ready=smoke.players.First().readyAt;
+            Assert.That(m.TryClearJigwiSmoke(Three[0],smoke.id,ready+.5),Is.False,"Nobody rubs a whole screen that fast.");
+            Assert.That(m.TryClearJigwiSmoke(Three[0],"other",ready+2),Is.False);
+            Assert.That(m.TryClearJigwiSmoke(Three[0],smoke.id,ready+2),Is.True);
+            Assert.That(m.TryClearJigwiSmoke(Three[0],smoke.id,ready+2.5),Is.False,"Once per smoke.");
+            var shards=m.Snapshot(ready+2).orbs.Where(o=>o.kind==LabOrbKind.SootShard).ToArray();
+            Assert.That(shards.Length,Is.EqualTo(LabModel.JigwiSootShardCount));
+            Assert.That(shards.All(o=>o.owner==Three[0]&&o.element==LabOrbElement.None),Is.True);
+            Assert.That(shards.Select(o=>o.sootPieces).OrderBy(v=>v),Is.EqualTo(new[]{1,2,4,8}),"North, west, south, east.");
+            shards=shards.OrderBy(o=>o.sootPieces).ToArray(); // 0 북, 1 서, 2 남, 3 동
+            Assert.That(m.TryLaunch(Three[0],shards[0].id,Request(),ready+2.1,out _,out var why),Is.False,"A shard cannot be thrown.");
+
+            double t=ready+3;
+            Assert.That(m.TryCombineAt(Three[0],shards[0].id,shards[2].id,Request(),t,new Vector2(.5f,.5f),Vector2.zero,out _,out var e0),Is.False);
+            Assert.That(e0,Is.EqualTo("SOOT_MISFIT"),"North and south do not touch.");
+            Assert.That(m.TryCombineAt(Three[0],shards[0].id,shards[1].id,Request(),t,new Vector2(.5f,.5f),Vector2.zero,out var a,out var e),Is.True,e);
+            Assert.That(e,Is.EqualTo("SOOT_MERGED")); Assert.That(a.kind,Is.EqualTo(LabOrbKind.SootShard)); Assert.That(a.sootPieces,Is.EqualTo(1|2));
+            Assert.That(m.TryCombineAt(Three[0],shards[2].id,shards[3].id,Request(),t,new Vector2(.4f,.5f),Vector2.zero,out var b,out e),Is.True,e);
+            Assert.That(m.TryCombineAt(Three[0],a.id,b.id,Request(),t+.1,new Vector2(.45f,.5f),Vector2.zero,out var black,out e),Is.True,e);
+            Assert.That(e,Is.EqualTo("SOOT_ORB"));
+            Assert.That(black.kind,Is.EqualTo(LabOrbKind.Combined)); Assert.That(black.soot&&black.fiveColor,Is.True);
+            Assert.That(black.sootPieces,Is.Zero); Assert.That(black.element,Is.EqualTo(LabOrbElement.None),"No element: combos ignore it.");
+            Assert.That(m.Snapshot(t+.2).orbs.Count(o=>o.kind==LabOrbKind.SootShard),Is.Zero);
+
+            // 다른 사람 연기도 따로, 음/양과는 합쳐지지 않는다.
+            Assert.That(m.TryClearJigwiSmoke(Three[1],smoke.id,ready+4),Is.True);
+            Launch(m,black,t+.5);
+            Assert.That(m.ConfirmHit(black.id,t+.6),Is.True);
+            Assert.That(m.LastHitFiveColor,Is.True,"Hits as wide as a five-color orb (in ink).");
+        }
+
         [Test] public void DenseSmokeFlowRunsSixMissionsWithShortGaps()
         {
             // #696: 연기 8 / 부적 24 / 연기 40 / 부적 55 / 연기 70 / 부적 85 (부적 10초, 연기 15초), 정해진 시각 그대로 확인.

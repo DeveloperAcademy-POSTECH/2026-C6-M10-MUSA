@@ -10,6 +10,14 @@ namespace C6Lab
     {
         private readonly List<LabJigwiABRound> jigwiABRounds = new List<LabJigwiABRound>();
         private readonly HashSet<string> jigwiABActivated = new HashSet<string>(StringComparer.Ordinal);
+        /// <summary>#696: smoke round id + seat that already cleared its smoke (one handful of shards each).</summary>
+        private readonly HashSet<string> jigwiSmokeCleared = new HashSet<string>(StringComparer.Ordinal);
+        /// <summary>#696: soot shards one cleared smoke gives; merged two by two they make one black orb.</summary>
+        public const int JigwiSootShardCount = 4;
+        /// <summary>#696: the earliest a smoke can be cleared after it covers the screen (rubbing takes at least this long).</summary>
+        public const double JigwiSmokeClearMinimumSeconds = 1d;
+        /// <summary>#696 검정 구슬이 칠하는 먹색.</summary>
+        public static readonly Color SootInk = new Color(.13f, .12f, .14f, 1f);
         private bool jigwiABEnabled;
         private const double JigwiABMissionSeconds = LabJigwiABTimeline.GroupMissionSeconds;
         private const uint JigwiGroupPickSalt = 0x509B1C4Bu;
@@ -95,7 +103,7 @@ namespace C6Lab
             jigwiBCountdown = config.JigwiBCountdown;
             jigwiCommonStart = config.JigwiCommonStartSeconds; jigwiCommonInterval = config.JigwiCommonIntervalSeconds;
             jigwiSmokeToTalisman = config.JigwiSmokeToTalismanSeconds; jigwiNextSlotPulledAt = double.PositiveInfinity;
-            jigwiABRounds.Clear(); jigwiABActivated.Clear(); jigwiABFailureRevision = 0;
+            jigwiABRounds.Clear(); jigwiABActivated.Clear(); jigwiSmokeCleared.Clear(); jigwiABFailureRevision = 0;
             jigwiABLastBurnAt.Clear(); jigwiABBurnQueueId = null; jigwiTalismanDrops.Clear(); jigwiFailBurns.Clear(); jigwiAPausedOrbs.Clear(); jigwiTalismanShards.Clear(); jigwiCommonPours.Clear();
             ResetJigwiABSupply(config);
             if (!jigwiABEnabled) return;
@@ -307,7 +315,7 @@ namespace C6Lab
         }
         private void ApplyJigwiABOrb(LabOrbState orb, double now)
         {
-            if (!jigwiABEnabled || orb.inFlight || orb.jigwiTalismanReward || (!orb.kind.IsRaw() && orb.kind != LabOrbKind.Combined)) return;
+            if (!jigwiABEnabled || orb.inFlight || orb.jigwiTalismanReward || orb.soot || (!orb.kind.IsRaw() && orb.kind != LabOrbKind.Combined)) return;
             var active = ActiveJigwiABRound(now);
             if (active == null || !active.Active(now)) return;
             if (active.kind == LabJigwiABKind.PersonalBurn && !jigwiAHoldBurn)
@@ -546,6 +554,101 @@ namespace C6Lab
             }
             return true;
         }
+        /// <summary>
+        /// #696 연기 보상: 이 자리가 연기를 다 걷어 냈다(문지르기는 화면 LabJigwiBucketHandleView가 센다). 연기마다 한 번,
+        /// 연기가 덮이고 JigwiSmokeClearMinimumSeconds가 지난 뒤부터 그 연기가 끝난 1초 뒤까지 받는다.
+        /// 그 사람 조합판에 검은 파편 JigwiSootShardCount개를 준다(판이 가득해도 준다).
+        /// </summary>
+        public bool TryClearJigwiSmoke(ulong sender, string roundId, double now)
+        {
+            if (!jigwiABEnabled || string.IsNullOrEmpty(roundId) || !TryAdvance(now, out _) || phase != LabPhase.Playing
+                || !players.ContainsKey(sender)) return false;
+            var round = jigwiABRounds.FirstOrDefault(value => value.id == roundId);
+            if (round == null || !round.smoke || now > round.endsAt + 1d) return false;
+            var seat = round.players?.FirstOrDefault(value => value.playerId == sender);
+            if (seat == null || now < seat.readyAt + JigwiSmokeClearMinimumSeconds) return false;
+            if (!jigwiSmokeCleared.Add(roundId + "/" + sender)) return false;
+            for (int i = 0; i < JigwiSootShardCount; i++)
+            {
+                Vector2 spot = JigwiSootShardSpot(i);
+                var shard = new LabOrbState
+                {
+                    id = NewOrbId(), owner = sender, kind = LabOrbKind.SootShard, element = LabOrbElement.None, sootPieces = 1 << i,
+                    origin = LabOrbOrigin.Gourd, originOwner = sender, x = spot.x, y = spot.y,
+                    createdAt = now, expiresAt = now + FiveColorOrbLifetimeSeconds, revision = ++revision
+                };
+                orbs.Add(shard.id, shard);
+            }
+            revision++;
+            return true;
+        }
+        /// <summary>
+        /// #696: 깨진 검정 구슬처럼, 북 조각은 위 / 서 조각은 왼쪽 / 남 조각은 아래 / 동 조각은 오른쪽에 조금씩 떨어져 놓인다.
+        /// i는 조각 쪽 번호 (0 북, 1 서, 2 남, 3 동).
+        /// </summary>
+        public static Vector2 JigwiSootShardSpot(int i)
+        {
+            float angle = (90f + 90f * (i & 3)) * Mathf.Deg2Rad;
+            return new Vector2(.5f + .12f * Mathf.Cos(angle), .52f + .10f * Mathf.Sin(angle));
+        }
+
+        /// <summary>#696: 네 쪽이 다 모인 검정 구슬.</summary>
+        public const int SootWholePieces = 15;
+
+        public static int SootPieceCount(int pieces)
+        {
+            int count = 0;
+            for (int bit = 0; bit < 4; bit++) if ((pieces & (1 << bit)) != 0) count++;
+            return count;
+        }
+
+        /// <summary>
+        /// #696: 조각들이 이어진 한 덩어리(북→서→남→동 차례로 이웃)면 그 덩어리가 시작하는 쪽 번호, 아니면 -1.
+        /// 예: 북+서 = 0, 동+북 = 3, 북+남(마주 보는 쪽) = -1.
+        /// </summary>
+        public static int SootArcStart(int pieces)
+        {
+            if (pieces <= 0 || pieces > SootWholePieces) return -1;
+            if (pieces == SootWholePieces) return 0;
+            int count = SootPieceCount(pieces);
+            for (int start = 0; start < 4; start++)
+            {
+                int arc = 0;
+                for (int k = 0; k < count; k++) arc |= 1 << ((start + k) & 3);
+                if (arc == pieces) return start;
+            }
+            return -1;
+        }
+
+        /// <summary>#696: 두 조각이 겹치지 않고, 붙이면 이어진 한 덩어리가 될 때만 붙는다 (북+남처럼 마주 보는 쪽은 안 붙는다).</summary>
+        public static bool SootPiecesFit(int first, int second) =>
+            first > 0 && second > 0 && first < SootWholePieces && second < SootWholePieces
+            && (first & second) == 0 && SootArcStart(first | second) >= 0;
+
+        /// <summary>
+        /// #696: 이웃한 연기 파편 둘을 합친다. 쪽(sootPieces)을 모으고, 네 쪽이 다 모이면 검정 구슬(soot, 오색구슬처럼 넓게 먹색으로 칠함)이 된다.
+        /// </summary>
+        private bool MergeSootShards(ulong sender, LabOrbState first, LabOrbState second, Vector2 center, Vector2 velocity,
+            double now, out LabOrbState orb, out string reason)
+        {
+            orbs.Remove(first.id); orbs.Remove(second.id);
+            int pieces = first.sootPieces | second.sootPieces;
+            bool whole = pieces == SootWholePieces;
+            Vector2 motion = Vector2.ClampMagnitude(velocity, rules.MaximumMotionSpeed);
+            orb = new LabOrbState
+            {
+                id = NewOrbId(), owner = sender, element = LabOrbElement.None,
+                kind = whole ? LabOrbKind.Combined : LabOrbKind.SootShard, sootPieces = whole ? 0 : pieces,
+                soot = whole, fiveColor = whole,
+                origin = LabOrbOrigin.Combined, originOwner = sender, x = center.x, y = center.y, vx = motion.x, vy = motion.y,
+                createdAt = now, expiresAt = now + FiveColorOrbLifetimeSeconds, revision = ++revision
+            };
+            orbs.Add(orb.id, orb);
+            reason = whole ? "SOOT_ORB" : "SOOT_MERGED";
+            orb = orb.Copy();
+            return true;
+        }
+
         /// <summary>#551: one poured bucket = one big Water splash on the top of the boss, leaning to that seat's side (can win the battle).</summary>
         private void PaintJigwiBucketPour(ulong owner, double now)
         {
@@ -671,7 +774,7 @@ namespace C6Lab
             if (!TryAdvance(now, out _) || phase != LabPhase.Playing || !players.TryGetValue(shard.owner, out var attacker)) return false;
             if (JigwiABBlocksBoss(shard.owner, now)) return false;
             TryExtinguishJigwiStageRoot(shard.owner, paintDirection, now, out _);
-            LastHitFiveColor = false; LastHitTalisman = true;
+            LastHitFiveColor = false; LastHitTalisman = true; LastHitSoot = false;
             bool painted = paintSurface.RegisterHit(paintDirection, PaintColorFor(LabOrbElement.Water), attacker.id, attacker.seat + 1,
                 Mathf.Min(3f, shard.paint), paintImpactStrength);
             if (painted && paintSurface.IsComplete && phase == LabPhase.Playing)
@@ -718,7 +821,7 @@ namespace C6Lab
                 double burnAt = dueAt + JigwiTalismanFailBlazeSeconds;
                 foreach (var orb in orbs.Values)
                 {
-                    if (orb.owner != owner || orb.inFlight || orb.jigwiTalismanReward || (!orb.kind.IsRaw() && orb.kind != LabOrbKind.Combined)) continue;
+                    if (orb.owner != owner || orb.inFlight || orb.jigwiTalismanReward || orb.soot || (!orb.kind.IsRaw() && orb.kind != LabOrbKind.Combined)) continue;
                     // B's special Water is the next mission's ammunition (it can arrive while Jigwi is still speaking): never burn it.
                     if (!string.IsNullOrEmpty(orb.jigwiABSupplyEventId) || orb.jigwiSupply) continue;
                     if (orb.jigwiABBurnAt < 0d || burnAt < orb.jigwiABBurnAt)

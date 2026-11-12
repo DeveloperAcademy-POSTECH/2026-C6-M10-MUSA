@@ -424,17 +424,41 @@ namespace C6Lab
         /// 섬광 파훼 보상 오색구슬 (#329): 다섯 색 조각 그림을 얹는다. 표시만 바뀐다.
         /// 크기는 결합 구슬 그림과 같고 콤보 배율(#257)도 따라간다(판이 매 프레임 부르는 SetGlare에서 맞춘다).
         /// </summary>
-        public void SetFiveColor(bool shown)
+        public void SetFiveColor(bool shown, bool soot = false)
         {
-            if (fiveColor == null)
+            if (fiveColor == null && !shown) return;
+            if (shown)
             {
-                if (!shown) return;
-                fiveColor = LabFiveColorSparkle.AttachArt(transform, FiveColorArtRadius, false);
+                // #696 검정 구슬은 같은 그림을 검정 톤(SootTones)으로 쓰고, 던지기 전에도 먹빛 연기 기운이 감돈다.
+                fiveColor = LabFiveColorSparkle.AttachArt(transform, FiveColorArtRadius, false,
+                    soot ? LabFiveColorSparkle.SootTones : null);
+                if (soot && fiveColor != null) sootAura = LabSootAura.Attach(fiveColor.transform, FiveColorArtRadius);
+                else if (sootAura != null) sootAura.Show(false);
                 return;
             }
             fiveColor.SetRadius(FiveColorArtRadius);
-            fiveColor.Show(shown);
+            fiveColor.Show(false);
+            if (sootAura != null) sootAura.Show(false);
         }
+
+        private LabSootAura sootAura;
+        /// <summary>#696 검정 구슬의 연기 기운이 보이는지.</summary>
+        public bool SootAuraShown => sootAura != null && sootAura.Shown;
+
+        private int sootPieces;
+        /// <summary>
+        /// #696 연기 파편이 검정 구슬의 어느 쪽인지 (비트: 1 북 / 2 서 / 4 남 / 8 동). 파편 그림(LabSootShardArt)이
+        /// 그 쪽 조각만 그리므로, 이웃 조각끼리 붙으면 제자리에 맞물린 반달 → 4분의 3이 된다.
+        /// </summary>
+        public void SetSootShard(int pieces)
+        {
+            pieces = kind == LabOrbKind.SootShard ? pieces & LabModel.SootWholePieces : 0;
+            if (pieces == LabModel.SootWholePieces) pieces = 0;
+            if (pieces == sootPieces) return;
+            sootPieces = pieces;
+            UpdateVisual();
+        }
+        public int SootPieces => sootPieces;
 
         private float FiveColorArtRadius => visualRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined) * comboScale;
 
@@ -839,6 +863,8 @@ namespace C6Lab
             }
             Sprite drumSprite = kind.IsDrum() && appearance != null ? appearance.DrumSprite : null;
             Sprite orbSprite = appearance != null ? appearance.SpriteFor(kind, element) : null;
+            // #696: a soot shard is drawn as a broken piece of the black orb.
+            if (kind == LabOrbKind.SootShard) orbSprite = LabSootShardArt.SpriteFor(sootPieces > 0 ? sootPieces : 1);
             // Flat art (the drum's, or the cartoon bomb's on the item marker) replaces the ball.
             bool flatArt = drumSprite != null || HasBombArt || orbSprite != null;
             Transform defaultSphere = visual.Find("Default Sphere");
@@ -1141,6 +1167,7 @@ namespace C6Lab
                 LabOrbKind.Yin => new Color(.08f, .08f, .09f),  // 음 · 검정
                 LabOrbKind.Yang => new Color(.95f, .95f, .93f), // 양 · 흰색
                 LabOrbKind.Combined => TemporaryElementColor(LabOrbElement.None),
+                LabOrbKind.SootShard => new Color(.16f, .15f, .17f), // #696 검은 파편 (그을음)
                 _ => new Color(.53f, .34f, .84f)
             };
             var properties = new MaterialPropertyBlock();

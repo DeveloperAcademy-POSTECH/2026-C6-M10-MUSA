@@ -563,10 +563,12 @@ namespace C6Lab
             LabOrbElement element = orb?.element ?? LabOrbElement.None;
             if (orb == null && board != null) board.TryGetLocalAppearance(request.firstId, out element, out small);
             bool fiveColor = orb != null ? orb.fiveColor : board != null && board.IsFiveColor(request.firstId);
+            bool soot = orb != null ? orb.soot : board != null && board.IsSoot(request.firstId);
             bool talisman = orb != null && orb.jigwiTalismanReward;
             LabProjectile visual = LabProjectile.Create(position, config, projectileRoot,
                 element, small ? config.BlastShrinkScale : 1f, useClayFlight: !talisman, fiveColor: fiveColor);
-            if (fiveColor) LabFiveColorSparkle.AttachArt(visual.transform, config.OrbRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined), true);
+            if (fiveColor) LabFiveColorSparkle.AttachArt(visual.transform, config.OrbRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined), true,
+                soot ? LabFiveColorSparkle.SootTones : null); // #696 검정 구슬
             else if (orb != null && orb.jigwiTalismanReward) LabFiveColorSparkle.AttachArt(visual.transform,
                 config.OrbRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined) * LabJigwiWaterVolley.SizeScale, true,
                 LabFiveColorSparkle.BlueTones); // #540 부적 구슬
@@ -700,7 +702,7 @@ namespace C6Lab
                 {
                     visual.ReconcileVisual((LabOrbElement)packet.element,
                         packet.small ? config.BlastShrinkScale : 1f, packet.sizeScale, packet.jigwiABRadiusScale,
-                        fiveColor: packet.fiveColor);
+                        fiveColor: packet.fiveColor, soot: packet.soot);
                     visual.SetJigwiABReward(packet.jigwiABReward);
                     TagJigwiSupplyProjectile(visual, packet.firstId, packet.jigwiABSupplyEventId);
                     visual.AuthorityRevision = packet.modelRevision;

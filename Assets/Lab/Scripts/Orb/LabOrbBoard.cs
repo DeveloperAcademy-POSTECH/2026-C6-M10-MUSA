@@ -461,7 +461,8 @@ namespace C6Lab
             int relayStage = 0, float fuseSeconds = -1f, bool justUnlocked = false,
             LabDrumArrival arrival = LabDrumArrival.None, float stopAt = -1f, bool small = false,
             float burnSeconds = 0f, float lifeSeconds = -1f, float jigwiScale = 1f, bool fever = false, bool fiveColor = false,
-            float jigwiABScale = 1f, float jigwiABBurnSeconds = 0f, bool jigwiABHeld = false)
+            float jigwiABScale = 1f, float jigwiABBurnSeconds = 0f, bool jigwiABHeld = false,
+            bool soot = false, int sootPieces = 0)
         {
             RequireConfigured();
             small &= !kind.IsDrum();
@@ -505,9 +506,11 @@ namespace C6Lab
                 existing.View.SetJigwiABBurn(jigwiABBurnSeconds, jigwiABHeld);
                 existing.View.SetLife(lifeSeconds);
                 existing.View.SetFever(fever, config.TeamFeverRingScale, config.TeamFeverRingAlpha);
-                existing.View.SetFiveColor(fiveColor);
+                existing.View.SetFiveColor(fiveColor, soot);
+                existing.View.SetSootShard(sootPieces);
                 existing.View.SetJigwiRewardFire(jigwiRewardFire, jigwiRewardHeld || simulationHeld);
                 if (fiveColor) fiveColorIds.Add(id); else fiveColorIds.Remove(id);
+                if (soot) sootIds.Add(id); else sootIds.Remove(id);
                 SetBodyMode(existing);
                 return existing.View;
             }
@@ -530,9 +533,11 @@ namespace C6Lab
             view.SetJigwiABBurn(jigwiABBurnSeconds, jigwiABHeld);
             view.SetLife(lifeSeconds);
             view.SetFever(fever, config.TeamFeverRingScale, config.TeamFeverRingAlpha);
-            view.SetFiveColor(fiveColor);
+            view.SetFiveColor(fiveColor, soot);
+            view.SetSootShard(sootPieces);
             view.SetJigwiRewardFire(jigwiRewardFire, jigwiRewardHeld || simulationHeld);
             if (fiveColor) fiveColorIds.Add(id);
+            if (soot) sootIds.Add(id);
             SetLayerRecursively(gameObject.transform, gameObject.layer);
             view.HitSphere.sharedMaterial = contactMaterial;
             view.HitOrb += (other, speed) => OnOrbHit(view, other, speed);
@@ -1351,6 +1356,10 @@ namespace C6Lab
         /// <summary>이 판 구슬이 섬광 파훼 보상 오색구슬인지 (#329). 던질 때 투사체도 오색구슬 모습이 된다.</summary>
         public bool IsFiveColor(string id) => id != null && fiveColorIds.Contains(id);
 
+        private readonly HashSet<string> sootIds = new HashSet<string>(StringComparer.Ordinal);
+        /// <summary>#696 이 판 구슬이 지귀 검정 구슬인지. 던질 때 투사체도 검정 톤이 된다.</summary>
+        public bool IsSoot(string id) => id != null && sootIds.Contains(id);
+
         public bool TryGetLocalAppearance(string id, out LabOrbElement element, out bool small)
         {
             element = LabOrbElement.None;
@@ -1712,7 +1721,7 @@ namespace C6Lab
             else lastTapId = null;
 
             // An intentional raw overlap keeps its existing manual combine before assisted passing.
-            if (config.DropCombineEnabled && (entry.View.Kind.IsRaw() || FoxReady(entry)))
+            if (config.DropCombineEnabled && (entry.View.Kind.IsRaw() || FoxReady(entry) || entry.View.Kind.IsSootShard()))
             {
                 Entry target = FindOppositeOverlap(entry);
                 if (target != null)
@@ -2087,7 +2096,11 @@ namespace C6Lab
             if (!entries.TryGetValue(self.OrbId, out var first)
                 || !entries.TryGetValue(other.OrbId, out var second)) return;
             if (!CanContactCombine(first) || !CanContactCombine(second)) return;
-            if (first.View.Kind == second.View.Kind) return;
+            // #696: soot shards join each other; otherwise only opposite kinds combine.
+            if (first.View.Kind == second.View.Kind && !first.View.Kind.IsSootShard()) return;
+            if (first.View.Kind.IsSootShard() != second.View.Kind.IsSootShard()) return;
+            // #696: only neighbouring pieces join (north+west, not north+south), like the Host.
+            if (first.View.Kind.IsSootShard() && !LabModel.SootPiecesFit(first.View.SootPieces, second.View.SootPieces)) return;
 
             // 물리 속도는 월드 단위라, 다른 튜닝 값처럼 보드 너비 단위로 바꿔서 비교한다.
             float speed = worldSpeed / bounds.width;
@@ -2135,7 +2148,7 @@ namespace C6Lab
         /// <summary>닿으면 결합에 쓸 수 있는 구슬인지 확인한다. 여우구슬은 보호 시간이 지난 뒤부터 (#251).</summary>
         private static bool CanContactCombine(Entry entry)
         {
-            return (entry.View.Kind.IsRaw() || FoxReady(entry))
+            return (entry.View.Kind.IsRaw() || FoxReady(entry) || entry.View.Kind.IsSootShard())
                 && entry.LocalOwner
                 && !entry.Held
                 && !entry.Locked
@@ -2152,7 +2165,11 @@ namespace C6Lab
             foreach (var candidate in entries.Values)
             {
                 // Yin meets Yang; a fox orb meets either, and either meets a fox orb past its safe moment (#251).
-                bool partner = dragged.View.Kind == LabOrbKind.FoxFire ? candidate.View.Kind.IsRaw()
+                // #696: a soot shard meets only another soot shard.
+                bool partner = dragged.View.Kind.IsSootShard() ? candidate.View.Kind.IsSootShard()
+                        && LabModel.SootPiecesFit(dragged.View.SootPieces, candidate.View.SootPieces)
+                    : candidate.View.Kind.IsSootShard() ? false
+                    : dragged.View.Kind == LabOrbKind.FoxFire ? candidate.View.Kind.IsRaw()
                     : candidate.View.Kind.IsRaw() ? candidate.View.Kind != dragged.View.Kind : FoxReady(candidate);
                 if (candidate == dragged || !partner || !candidate.LocalOwner
                     || candidate.Locked || candidate.EdgePending || candidate.Held || candidate.HiddenForPending) continue;

@@ -45,6 +45,22 @@ namespace C6Lab
             Request(new LabNetworkPacket { type = JigwiBPullPacket, requestId = ++requestSequence, firstId = roundId });
         }
 
+        /// <summary>#696 연기 보상: 연기를 다 걷어 냈다고 Host에 알리는 패킷 종류. firstId에 연기 회차 id.</summary>
+        public const string JigwiSmokeClearPacket = "jigwiSmokeClear";
+        private string jigwiSmokeClearSentRound;
+
+        /// <summary>
+        /// #696: 이 기기 화면에서 지귀 연기를 다 걷어 냈다. 연기 회차마다 한 번 Host에 보낸다(파편 판정은 Host). 보냈으면 true.
+        /// </summary>
+        public bool RequestJigwiSmokeClear(string roundId)
+        {
+            if (!IsConnected || !CanProcessBattleActions || latest == null || latest.paused || string.IsNullOrEmpty(roundId)
+                || jigwiSmokeClearSentRound == roundId) return false;
+            jigwiSmokeClearSentRound = roundId;
+            Request(new LabNetworkPacket { type = JigwiSmokeClearPacket, requestId = ++requestSequence, firstId = roundId });
+            return true;
+        }
+
         /// <summary>#551: 이 기기 사람이 지목된, 지금 진행 중인 B (아니면 null).</summary>
         private LabJigwiABRound MyJigwiB(double now)
         {
