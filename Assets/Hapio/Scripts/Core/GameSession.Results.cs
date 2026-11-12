@@ -130,6 +130,20 @@ namespace Hapio
             return true;
         }
 
+        public bool CanRetryTerritory => IsTerritory && state.phase == GameFlowPhase.Completed
+            && network != null && network.IsConnected && network.IsHost && !goingHome && !IsLoadingScene
+            && AllResultsReady && !IsAnyResultViewerOpen;
+
+        public bool RetryTerritory()
+        {
+            if (!CanRetryTerritory) return false;
+            if (!network.IsDeveloperSolo) return ReturnTerritoryToLobby("한 판이 끝났소. 다시 자리를 고르시오.");
+            if (!hostFlow.RestartCurrentStage(state.runId, state.stageIndex, state.revision)) return false;
+            stageResults.Remove(state.stageIndex);
+            PrepareStage();
+            return true;
+        }
+
         public void SetResultPresentationBusy(bool busy)
         {
             if (!IsResultPresentationPhase || localResultPresentationBusy == busy) return;

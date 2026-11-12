@@ -99,7 +99,7 @@ namespace Hapio
             {
                 Click(territoryView.table.homeButton, OnHomeButton);
                 Click(territoryView.table.viewerButton, OnViewerButton);
-                Click(territoryView.table.nextButton, OnNextButton);
+                Click(territoryView.table.nextButton, OnTerritoryRetryButton);
             }
             Click(viewerButton, OnViewerButton);
             Click(closeViewerButton, () => session.CloseGourdViewer());
@@ -291,13 +291,12 @@ namespace Hapio
             // Keep this result intact until the accepted next-stage Scene replaces it.
             if (resultAdvancePending) return;
             if (stageStory != null && stageStory.TryRefresh(true)) return;
-            SetStoryContentVisible(true);
+            bool showTerritory = session.IsTerritory && territoryView != null;
+            SetStoryContentVisible(!showTerritory);
             session.SetResultPresentationBusy(false);
             if (resultView != null)
             {
-                // 2:2 (#293) uses the same designed result page, with team records instead of awards.
-                Show(resultView.gameObject, true);
-                Show(resultView.background.gameObject, true);
+                if (resultView.background != null) Show(resultView.background.gameObject, !showTerritory);
                 Show(legacyResultContent, false);
                 if (session.IsTerritory) RefreshDesignedTerritoryResult(net);
                 else RefreshDesignedResult(net, true);
@@ -398,18 +397,17 @@ namespace Hapio
 
         /// <summary>
         /// 2:2 땅따먹기 결과 (#293): 디자인된 결과 화면에 이긴 팀(청 파란 배경, 홍 빨간 배경)과 팀별 기록을 보인다.
-        /// 한 판으로 끝나므로 다음 버튼은 없고, 박 확인과 나가기만 둔다.
+        /// 다시 도전은 방장이 시작하며, 참가자는 같은 방으로 함께 돌아간다.
         /// </summary>
         private void RefreshDesignedTerritoryResult(LabNetwork net)
         {
             if (territoryView != null)
             {
-                resultView.gameObject.SetActive(false);
                 territoryView.gameObject.SetActive(true);
                 territoryView.Present(session.ResultSnapshot, net.LocalPlayerId);
                 Interactable(territoryView.table.homeButton, (!net.IsHost || session.CanReturnHome) && !ResultActionsBlocked);
-                // 2:2 is one round (#293): no 다시 도전, only 박 확인 and 나가기.
-                Show(territoryView.table.nextButton == null ? null : territoryView.table.nextButton.gameObject, false);
+                Show(territoryView.table.nextButton.gameObject, true);
+                Interactable(territoryView.table.nextButton, session.CanRetryTerritory && !ResultActionsBlocked);
                 Interactable(territoryView.table.viewerButton, session.PreviewTexture != null && !ResultActionsBlocked);
                 Show(viewerPanel, session.IsViewerOpen && session.PreviewTexture != null);
                 if (viewerImage != null) viewerImage.texture = session.PreviewTexture;
@@ -558,6 +556,14 @@ namespace Hapio
             ApplyResultInputGate();
             session.NextStage();
             if (session.State.revision == revision) resultAdvancePending = false;
+        }
+
+        private void OnTerritoryRetryButton()
+        {
+            if (ResultActionsBlocked || !session.CanRetryTerritory) return;
+            resultAdvancePending = true;
+            ApplyResultInputGate();
+            if (!session.RetryTerritory()) resultAdvancePending = false;
         }
 
         private void OnHomeButton()
