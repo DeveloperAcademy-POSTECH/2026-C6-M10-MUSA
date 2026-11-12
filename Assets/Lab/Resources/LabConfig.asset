@@ -47,7 +47,8 @@ MonoBehaviour:
   jigwiSmokeFlow: 1
   jigwiDenseTimeline: 1
   jigwiRelayTimeline: 1
-  jigwiRelayGapSeconds: 10
+  jigwiRelayGapSeconds: 14
+  jigwiRelayGapAfterTalismanSeconds: 12
   jigwiSmokeToTalismanSeconds: 12
   jigwiCommonStartSeconds: 25
   jigwiCommonIntervalSeconds: 20

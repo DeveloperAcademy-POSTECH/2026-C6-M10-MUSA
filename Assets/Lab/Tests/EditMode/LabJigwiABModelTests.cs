@@ -458,7 +458,7 @@ namespace C6Lab.Tests
         [Test] public void RelaySmokeFlowStartsEachMissionAGapAfterTheLastOneEnded()
         {
             // #713: 연기 6초 → 모두 닦으면 연기 끝 → 10초 뒤 부적 → 못 써서 실패 → 구슬이 다 탄 뒤 10초 뒤 다음 연기.
-            JsonUtility.FromJsonOverwrite("{\"jigwiSmokeFlow\":true,\"jigwiRelayTimeline\":true,\"jigwiRelayGapSeconds\":10,\"jigwiABPersonalDurationSeconds\":10,\"jigwiAFailBurnStartSeconds\":2.9}",config);
+            JsonUtility.FromJsonOverwrite("{\"jigwiSmokeFlow\":true,\"jigwiRelayTimeline\":true,\"jigwiRelayGapSeconds\":10,\"jigwiRelayGapAfterTalismanSeconds\":10,\"jigwiABPersonalDurationSeconds\":10,\"jigwiAFailBurnStartSeconds\":2.9}",config);
             var m=Room3();
             Assert.That(m.Snapshot(0).jigwiAB.schedule,Is.EqualTo(LabJigwiABTimeline.RelaySmokeFlowSchedule));
             var smoke=Current(m,6.1);

@@ -35,8 +35,8 @@ namespace C6Lab
         private double JigwiNextSlotActiveAt => LabJigwiABTimeline.IsRelay(jigwiSchedule) && jigwiStageNextSlot > 0
             ? jigwiNextSlotPulledAt // #713: after the first smoke every mission waits for the one before it
             : Math.Min(jigwiNextSlotPulledAt, jigwiStageStartedAt + LabJigwiABTimeline.ActiveOffset(jigwiStageNextSlot, jigwiSchedule));
-        /// <summary>#713 이어달리기: 앞 미션이 끝나고 다음 미션이 시작하기까지(초, 예고 포함).</summary>
-        private double jigwiRelayGap = 10d;
+        /// <summary>#713 이어달리기: 연기가 끝나고 / 부적이 끝나고 다음 미션이 시작하기까지(초, 예고 포함).</summary>
+        private double jigwiRelayGap = 14d, jigwiRelayGapAfterTalisman = 12d;
         /// <summary>#713: smoke round id → seats that rubbed their smoke all away (all of them = the smoke is over).</summary>
         private readonly Dictionary<string, HashSet<ulong>> jigwiSmokeWiped = new Dictionary<string, HashSet<ulong>>(StringComparer.Ordinal);
         /// <summary>#540: once Jigwi's line is over, every orb on an unfinished talisman's board burns away together in this long.</summary>
@@ -109,7 +109,8 @@ namespace C6Lab
             jigwiBCountdown = config.JigwiBCountdown;
             jigwiCommonStart = config.JigwiCommonStartSeconds; jigwiCommonInterval = config.JigwiCommonIntervalSeconds;
             jigwiSmokeToTalisman = config.JigwiSmokeToTalismanSeconds; jigwiNextSlotPulledAt = double.PositiveInfinity;
-            jigwiRelayGap = config.JigwiRelayGapSeconds; jigwiSmokeWiped.Clear();
+            jigwiRelayGap = config.JigwiRelayGapSeconds; jigwiRelayGapAfterTalisman = config.JigwiRelayGapAfterTalismanSeconds;
+            jigwiSmokeWiped.Clear();
             jigwiABRounds.Clear(); jigwiABActivated.Clear(); jigwiSmokeCleared.Clear(); jigwiABFailureRevision = 0;
             jigwiABLastBurnAt.Clear(); jigwiABBurnQueueId = null; jigwiTalismanDrops.Clear(); jigwiFailBurns.Clear(); jigwiAPausedOrbs.Clear(); jigwiTalismanShards.Clear(); jigwiCommonPours.Clear();
             ResetJigwiABSupply(config);
@@ -246,7 +247,8 @@ namespace C6Lab
         {
             if (!LabJigwiABTimeline.IsRelay(jigwiSchedule) || result == LabJigwiABResolution.Cancelled
                 || jigwiStageNextSlot >= LabJigwiABTimeline.SlotCountFor(jigwiSchedule)) return;
-            double activeAt = JigwiMissionDoneAt(item) + Math.Max(LabJigwiABTimeline.WarningSeconds, jigwiRelayGap);
+            double gap = item.kind == LabJigwiABKind.PersonalBurn ? jigwiRelayGapAfterTalisman : jigwiRelayGap;
+            double activeAt = JigwiMissionDoneAt(item) + Math.Max(LabJigwiABTimeline.WarningSeconds, gap);
             bool personal = LabJigwiABTimeline.KindForSlot(jigwiStageNextSlot, jigwiSchedule) == LabJigwiABKind.PersonalBurn;
             double length = personal ? jigwiABDuration + jigwiAFailBurnStart + JigwiTalismanFailBlazeSeconds : JigwiABMissionSeconds;
             if (!(activeAt + length <= jigwiStageCutoffAt)) { jigwiStageNextSlot = LabJigwiABTimeline.SlotCountFor(jigwiSchedule); return; }
