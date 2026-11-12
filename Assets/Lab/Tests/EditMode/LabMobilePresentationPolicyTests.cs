@@ -63,6 +63,20 @@ namespace C6Lab.Tests
             Assert.That(mode & SystemGestureDeferMode.TopEdge, Is.EqualTo(SystemGestureDeferMode.None));
         }
 
+        [Test]
+        public void JigwiSmokeWipingDefersEveryEdgeEvenWithTheBoardBlocked()
+        {
+            // #696: the board is blocked under the smoke, but the player rubs edge to edge (top included).
+            var mode = LabMobilePresentationPolicy.SelectGestureMode(LabPhase.Playing,
+                false, false, false, true, true, smokeWiping: true);
+            Assert.That(mode, Is.EqualTo(SystemGestureDeferMode.LeftEdge | SystemGestureDeferMode.RightEdge
+                | SystemGestureDeferMode.BottomEdge | SystemGestureDeferMode.TopEdge));
+            Assert.That(LabMobilePresentationPolicy.SelectGestureMode(LabPhase.Playing,
+                false, true, false, true, true, smokeWiping: true), Is.EqualTo(SystemGestureDeferMode.None), "Paused still frees the edges.");
+            Assert.That(LabMobilePresentationPolicy.SelectGestureMode(LabPhase.Playing,
+                false, false, false, false, true, smokeWiping: true), Is.EqualTo(SystemGestureDeferMode.None), "So does going to the background.");
+        }
+
         [TestCase(LabPhase.Idle, true, false, false, true, true)]
         [TestCase(LabPhase.Victory, true, false, false, true, true)]
         [TestCase(LabPhase.Defeat, true, false, false, true, true)]

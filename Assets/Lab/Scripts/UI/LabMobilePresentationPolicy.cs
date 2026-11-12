@@ -124,18 +124,24 @@ namespace C6Lab
             SetGestureMode(SelectGestureMode(snapshot != null ? snapshot.phase : LabPhase.Idle,
                 boardInteractive, snapshot != null && snapshot.paused,
                 network != null && network.GameStartHeld, focused && !backgrounded,
-                network != null && network.IsConnected));
+                network != null && network.IsConnected,
+                network != null && network.isActiveAndEnabled && network.JigwiSmokeWiping)); // #696
             bool awake = isActiveAndEnabled && network != null && NetworkKeepsAwake(network.IsConnected, network.IsJoiningRoom,
                 network.RoomSearchKeepsAwake && network.IsSearchingRooms, network.RoomSearchKeepsAwake && network.RoomSearchRetryPending);
             SetSleepTimeout(SleepTimeoutFor(Application.platform, awake));
         }
 
-        /// <summary>Preparing/countdown has a Playing snapshot but cannot defer gestures before input opens.</summary>
+        /// <summary>
+        /// Preparing/countdown has a Playing snapshot but cannot defer gestures before input opens.
+        /// #696: while Jigwi's smoke covers the screen the board is blocked, yet the player rubs edge to edge,
+        /// so every edge (the top too) waits for a second swipe.
+        /// </summary>
         public static LabSystemGestureEdges SelectGestureMode(LabPhase phase, bool boardInteractive,
-            bool paused, bool startHeld, bool foreground, bool connected)
+            bool paused, bool startHeld, bool foreground, bool connected, bool smokeWiping = false)
         {
-            return connected && foreground && boardInteractive && !paused && !startHeld
-                && phase == LabPhase.Playing ? BattleGestureEdges : LabSystemGestureEdges.None;
+            if (!connected || !foreground || paused || startHeld || phase != LabPhase.Playing) return LabSystemGestureEdges.None;
+            if (smokeWiping) return BattleGestureEdges | LabSystemGestureEdges.TopEdge;
+            return boardInteractive ? BattleGestureEdges : LabSystemGestureEdges.None;
         }
 
         private void SetGestureMode(LabSystemGestureEdges mode)

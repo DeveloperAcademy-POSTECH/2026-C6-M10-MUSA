@@ -7,7 +7,7 @@ namespace C6Lab
     public enum LabPhase { Idle, Playing, Victory, Defeat }
     // Items and the drum are appended so the serialized numbers of existing kinds stay unchanged.
     // FoxFire is the nine-tailed fox's fake orb (#251).
-    public enum LabOrbKind { Yin, Yang, Combined, Relay, SecretBox, Potion, Bomb, Drum, FoxFire }
+    public enum LabOrbKind { Yin, Yang, Combined, Relay, SecretBox, Potion, Bomb, Drum, FoxFire, SootShard }
     // Gourd is appended for bombs the gourd drops as sabotage (#177).
     public enum LabOrbOrigin { Unknown, Generated, Combined, Gourd }
     // The yokai's sabotages the sabotage mix draws from (#251), in the order of their DEV weights. Numbers are serialized.
@@ -34,6 +34,8 @@ namespace C6Lab
     public static class LabOrbKindRules
     {
         public static bool IsRaw(this LabOrbKind kind) => kind == LabOrbKind.Yin || kind == LabOrbKind.Yang;
+        /// <summary>#696 지귀 연기를 다 걷어 낸 사람이 받는 검은 파편. 던질 수 없고, 파편끼리 합쳐 검정 구슬이 된다.</summary>
+        public static bool IsSootShard(this LabOrbKind kind) => kind == LabOrbKind.SootShard;
         public static bool IsItem(this LabOrbKind kind) => kind >= LabOrbKind.Relay && kind <= LabOrbKind.Bomb;
         /// <summary>
         /// The generate drum moves and passes between screens like an orb, but it is kept in its
@@ -138,6 +140,16 @@ namespace C6Lab
         /// 수명이 없어 던질 때까지 남는다(만들 때 expiresAt을 아주 멀리 둔다). 옆 사람에게 넘길 수 있다.
         /// </summary>
         public bool fiveColor;
+        /// <summary>
+        /// #696 지귀 연기 파편: 이 조각이 검정 구슬의 어느 쪽인지 (비트: 1 북 / 2 서 / 4 남 / 8 동).
+        /// 이웃한 쪽끼리만 붙어 반달 → 4분의 3이 되고, 15(네 쪽)가 되면 검정 구슬(soot)이 된다. 다른 구슬은 0.
+        /// </summary>
+        public int sootPieces;
+        /// <summary>
+        /// #696 검정 구슬: 연기 파편 4개를 합친 구슬. 오색구슬(fiveColor)처럼 넓게, 먹색으로 칠한다. 원소가 없어 콤보에는 세지 않고,
+        /// 지귀 불에 타지 않으며 던질 때까지 남는다.
+        /// </summary>
+        public bool soot;
 
         /// <summary>An unlock older than this, for example seen after a reconnect, shows the item already open.</summary>
         public const double UnlockEffectWindowSeconds = 1d;

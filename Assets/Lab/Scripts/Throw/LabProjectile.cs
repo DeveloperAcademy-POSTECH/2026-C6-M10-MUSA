@@ -333,7 +333,7 @@ namespace C6Lab
 
         /// <summary>Correct only a predicted shot's appearance; never rewind its local flight or award a hit.</summary>
         public void ReconcileVisual(LabOrbElement approvedElement, float approvedSize, float approvedRadius,
-            float approvedJigwiABRadius = 1f, bool? fiveColor = null)
+            float approvedJigwiABRadius = 1f, bool? fiveColor = null, bool soot = false)
         {
             if (authoritative || resolved || approvedElement < LabOrbElement.None || approvedElement > LabOrbElement.Earth) return;
             bool changed = element != approvedElement;
@@ -346,7 +346,8 @@ namespace C6Lab
                 if (fiveColorPresentation)
                 {
                     var look = LabFiveColorSparkle.AttachArt(transform,
-                        (config != null ? config.OrbRadius : .3f) * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined), true);
+                        (config != null ? config.OrbRadius : .3f) * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined), true,
+                        soot ? LabFiveColorSparkle.SootTones : null); // #696
                     if (look != null) look.gameObject.SetActive(true);
                 }
                 else

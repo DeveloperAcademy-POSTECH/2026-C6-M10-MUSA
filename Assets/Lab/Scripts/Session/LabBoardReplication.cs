@@ -217,7 +217,7 @@ namespace C6Lab
             && a.jigwiABRewardPaintScale == b.jigwiABRewardPaintScale && a.jigwiTalismanReward == b.jigwiTalismanReward
             && a.jigwiABSupplyEventId == b.jigwiABSupplyEventId
             && a.jigwiSupply == b.jigwiSupply && a.jigwiGenerationBurn == b.jigwiGenerationBurn && a.fever == b.fever
-            && a.fiveColor == b.fiveColor;
+            && a.fiveColor == b.fiveColor && a.soot == b.soot && a.sootPieces == b.sootPieces;
 
         internal static LabPlayerState[] CopyPlayers(LabPlayerState[] players) =>
             (players ?? Array.Empty<LabPlayerState>()).Select(player => player?.Copy()).ToArray();
@@ -592,7 +592,10 @@ namespace C6Lab
             {
                 if (state == null || !ValidId(state.id) || !ids.Add(state.id) || state.ownershipVersion == 0
                     || !LabJigwiSupplyIdentity.Valid(state, session, round, members)
-                    || state.kind < LabOrbKind.Yin || state.kind > LabOrbKind.FoxFire
+                    || state.kind < LabOrbKind.Yin || state.kind > LabOrbKind.SootShard
+                    || state.sootPieces < 0 || state.sootPieces >= LabModel.SootWholePieces
+                    || state.kind.IsSootShard() != (state.sootPieces > 0)
+                    || state.sootPieces > 0 && LabModel.SootArcStart(state.sootPieces) < 0 || state.soot && !state.fiveColor
                     || state.element < LabOrbElement.None || state.element > LabOrbElement.Earth
                     || state.lockSwipes < 0 || state.relayStage < 0 || state.relayStage > 3
                     || !Unit(state.x) || !Unit(state.y) || !Finite(state.vx) || !Finite(state.vy)
