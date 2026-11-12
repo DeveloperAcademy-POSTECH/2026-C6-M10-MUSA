@@ -299,6 +299,7 @@ namespace C6Lab
             {
                 LabOrbKind.Yin => yinMaterial,
                 LabOrbKind.Yang => yangMaterial,
+                LabOrbKind.SootShard => yinMaterial, // #696 검은 파편: 음 구슬의 먹색 재질 (그림 없이 공으로)
                 _ => combinedMaterial
             };
         }

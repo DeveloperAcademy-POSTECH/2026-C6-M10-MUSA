@@ -57,10 +57,24 @@ namespace C6Lab
         }
 
         /// <summary>오색구슬 명중: 공통 클레이 접촉은 기존 피격 경로가 그리고, 던진 사람에게 소리·진동을 알린다.</summary>
-        private void PresentFiveColorHit(Vector3 targetLocalPoint, ulong owner)
+        private void PresentFiveColorHit(Vector3 targetLocalPoint, ulong owner, bool soot = false)
         {
             if (target == null) return;
+            if (soot) PresentSootHit(targetLocalPoint);
             if (owner == LocalPlayerId) LocalFiveColorHit?.Invoke();
+        }
+
+        /// <summary>
+        /// #696 검정 구슬 명중: 박에는 오색구슬만큼 넓게 먹색이 칠해지고(모델), 맞은 자리에서 검은 먹구름과
+        /// 보랏빛 반짝이 별가루가 크게 터진다. 모든 기기에서 보인다.
+        /// </summary>
+        private void PresentSootHit(Vector3 targetLocalPoint)
+        {
+            Transform hitbox = target.Hitbox != null ? target.Hitbox.transform : target.transform;
+            Vector3 point = hitbox.TransformPoint(targetLocalPoint);
+            float radius = config != null ? config.OrbRadius : .3f;
+            LabFiveColorSparkle.DustBurst(point, radius, LabFiveColorSparkle.DefaultDustPuffScale * 1.5f, LabFiveColorSparkle.SootTones);
+            LabFiveColorSparkle.Burst(point, radius * 1.2f, LabFiveColorSparkle.SootTones);
         }
 
         /// <summary>#540 지귀 부적 구슬 명중 이벤트 (맞은 자리 박 기준 좌표, 던진 사람). 소리·진동이 듣는다.</summary>

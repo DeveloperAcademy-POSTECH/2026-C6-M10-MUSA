@@ -64,6 +64,12 @@ namespace C6Lab
         // #551 failure: Jigwi's steam fogs my board until I rub it clear.
         [Tooltip("김이 이만큼(0~1) 남을 때까지 문지르면 닦인 것.")]
         [SerializeField, Range(.05f, .8f)] private float steamClearLeft = .1f;
+        [Tooltip("#696 연기를 이만큼(0~1) 걷어 내기 시작하면 Host에 검은 파편을 달라고 한다. 파편은 아직 연기 밑 판 구석구석에 깔려 있어, 닦는 동안 하나씩 드러난다.")]
+        [SerializeField, Range(0f, .5f)] private float sootRevealWiped = .03f;
+        [Tooltip("#696 화면 위/아래 가장자리에서 연기가 옅어지는 띠의 폭(화면 높이 비율). 손가락이 닿기 어려운 끝자락은 덜 닦아도 걷힌다.")]
+        [SerializeField, Range(0f, .25f)] private float steamEdgeBand = .08f;
+        [Tooltip("#696 가장자리 끝(맨 위/맨 아래)의 연기 진하기(0~1). 띠 안쪽으로 갈수록 1까지 진해진다.")]
+        [SerializeField, Range(0f, 1f)] private float steamEdgeAlpha = .3f;
         [Tooltip("문지르는 손가락 굵기(판 폭 비율).")]
         [SerializeField, Range(.03f, .3f)] private float steamBrush = .14f;
         private const int SteamW = 144, SteamH = 312; // the whole screen, fine enough that wiped edges stay smooth
@@ -76,6 +82,8 @@ namespace C6Lab
         private string steamRound;
         private bool steamOn, steamBlocking, rubbing;
         private float steamAt, steamClearedAt = -1f, steamLeft, lastTickLeft;
+        /// <summary>#696: how much smoke there was at the start (the thin edges make it a little under 1).</summary>
+        private float steamStartLeft = 1f;
         private Vector2 lastRub;
         private Image waterBack, waterFill;
         // #551 threat: the boss glows red-hot toward me while my bucket waits; failing = Jigwi's bubble, then his smoke on my board.
@@ -688,10 +696,21 @@ namespace C6Lab
                 steam.texture = steamTexture;
             }
             // Fully opaque until rubbed away: nothing of the boss or the board shows through.
-            for (int i = 0; i < steamAlpha.Length; i++) steamAlpha[i] = 1f;
+            // #696: except a thinner band at the very top and bottom (hard to reach past the notch/home bar),
+            // which therefore weighs less in what is left to wipe.
+            for (int y = 0; y < SteamH; y++)
+            {
+                float v = (y + .5f) / SteamH;
+                float edge = steamEdgeBand > 0f ? Mathf.Clamp01(Mathf.Min(v, 1f - v) / steamEdgeBand) : 1f;
+                float alpha = Mathf.Lerp(steamEdgeAlpha, 1f, edge * edge * (3f - 2f * edge));
+                for (int x = 0; x < SteamW; x++) steamAlpha[y * SteamW + x] = alpha;
+            }
             WriteSteam();
-            steamLeft = lastTickLeft = 1f;
+            float startSum = 0f; foreach (float a in steamAlpha) startSum += a;
+            steamStartLeft = steamLeft = lastTickLeft = startSum / steamAlpha.Length;
+            lastSqueakLeft = steamLeft;
             if (source != null && source.board != null) { source.board.SetUiInputBlocked(true); steamBlocking = true; }
+            if (source != null) source.JigwiSmokeWiping = true; // #696 iOS edge gestures wait while rubbing
             if (source != null) LabHaptics.PlayDirect(source.config, LabHapticStyle.Heavy, 1f, .45f, .8f, .3f);
             Play(fogHitSoundFolder, fogHitVolume);
         }
@@ -723,7 +742,7 @@ namespace C6Lab
             if (!steam.gameObject.activeSelf) steam.gameObject.SetActive(true);
             float fadeIn = Mathf.Clamp01((t - steamAt) / .5f);
             float fadeOut = steamClearedAt >= 0f ? 1f - Mathf.Clamp01((t - steamClearedAt) / .4f) : 1f;
-            WipeGauge = Mathf.Clamp01((1f - steamLeft) / Mathf.Max(.01f, 1f - steamClearLeft));
+            WipeGauge = WipedShare;
             steam.color = new Color(SmokeGrey, SmokeGrey * .98f, SmokeGrey * .96f, fadeIn * fadeOut);
             if (steamClearedAt >= 0f)
             {
@@ -851,13 +870,15 @@ namespace C6Lab
             float sum = 0f; foreach (float a in steamAlpha) sum += a;
             steamLeft = sum / steamAlpha.Length;
             FindThickest();
-            float wiped = Mathf.Clamp01((1f - steamLeft) / Mathf.Max(.01f, 1f - steamClearLeft));
+            float wiped = WipedShare;
             // A light tick for every bit wiped away, a firm one when it is clear.
             if (lastTickLeft - steamLeft >= .06f && source != null)
             { lastTickLeft = steamLeft; LabHaptics.PlayDirect(source.config, LabHapticStyle.Light, Mathf.Lerp(.3f, .75f, wiped)); } // #595 firmer toward the end
             // 휘익: a fanning whoosh for every few percent rubbed away, at most every 0.25 s.
             if (lastSqueakLeft - steamLeft >= .04f && Time.unscaledTime - lastSqueakAt >= .25f)
             { lastSqueakLeft = steamLeft; lastSqueakAt = Time.unscaledTime; PlayRub(wiped); }
+            // #696: once rubbing starts the Host lays the soot shards under the smoke, so wiping uncovers them one by one.
+            if (steamStartLeft - steamLeft >= sootRevealWiped && source != null) source.RequestJigwiSmokeClear(steamRound);
             if (steamLeft <= steamClearLeft)
             {
                 steamClearedAt = Time.unscaledTime;
@@ -865,8 +886,12 @@ namespace C6Lab
                 Play(clearSoundFolder, clearVolume);
                 if (steamBlocking && source != null && source.board != null) source.board.SetUiInputBlocked(false);
                 steamBlocking = false;
+                if (source != null) source.JigwiSmokeWiping = false;
             }
         }
+
+        /// <summary>#696: 0 at the start of the smoke, 1 when it counts as wiped (the thin edges are already counted as thin).</summary>
+        private float WipedShare => Mathf.Clamp01((steamStartLeft - steamLeft) / Mathf.Max(.01f, steamStartLeft - steamClearLeft));
 
         private void EndSteam()
         {
@@ -877,6 +902,7 @@ namespace C6Lab
             Show(ringBack, false); Show(ringFill, false);
             if (steamBlocking && source != null && source.board != null) source.board.SetUiInputBlocked(false);
             steamBlocking = false;
+            if (source != null) source.JigwiSmokeWiping = false;
         }
 
         private void OnDisable() { EndSteam(); StopHeatSound(); }

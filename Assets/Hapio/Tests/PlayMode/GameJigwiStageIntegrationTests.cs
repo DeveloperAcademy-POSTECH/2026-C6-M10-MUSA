@@ -130,8 +130,8 @@ namespace Hapio.Tests
             clock = (LabBattleClock)Field("battleClock").GetValue(network);
             model = (LabModel)Field("model").GetValue(network);
             startedAt = before.jigwiAB.startedAt;
-            Assert.That(before.jigwiAB.schedule, Is.EqualTo(LabJigwiABTimeline.SmokeFlowSchedule),
-                "The saved main profile runs #595's smoke 10 / talisman 45 / smoke 66 / talisman 83 schedule.");
+            Assert.That(before.jigwiAB.schedule, Is.EqualTo(LabJigwiABTimeline.DenseSmokeFlowSchedule),
+                "The saved main profile runs #696's smoke 8 / talisman 24 / smoke 40 / talisman 55 / smoke 70 / talisman 85 schedule.");
             Assert.That(network.config.JigwiAHoldBurnUntilEnd, Is.True,
                 "The saved main profile preserves the board while the talisman is being written.");
             double smokeProbe = LabJigwiABTimeline.ActiveOffset(0, before.jigwiAB.schedule) + LabJigwiABTimeline.SmokeLeadSeconds + .5d;

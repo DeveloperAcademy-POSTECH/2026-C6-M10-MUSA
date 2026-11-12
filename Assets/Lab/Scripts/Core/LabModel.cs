@@ -478,6 +478,12 @@ namespace C6Lab
                 !orbs.TryGetValue(firstId, out var first) || !orbs.TryGetValue(secondId, out var second))
                 return Reject("ORB_NOT_FOUND", out reason);
             if (!UsableBy(first, sender) || !UsableBy(second, sender)) return Reject("NOT_OWNED_IDLE", out reason);
+            // #696: two soot shards merge into a bigger one, and four make the black orb.
+            if (first.kind.IsSootShard() && second.kind.IsSootShard())
+            {
+                if (!SootPiecesFit(first.sootPieces, second.sootPieces)) return Reject("SOOT_MISFIT", out reason);
+                return MergeSootShards(sender, first, second, normalizedCenter, normalizedVelocity, now, out orb, out reason);
+            }
             if (!first.kind.IsRaw() || !second.kind.IsRaw() || first.kind == second.kind)
                 return Reject("POLARITY_MISMATCH", out reason);
 
@@ -688,6 +694,7 @@ namespace C6Lab
 
             LastHitFiveColor = orb.fiveColor;
             LastHitTalisman = orb.jigwiTalismanReward;
+            LastHitSoot = orb.soot;
             if (teamMode)
                 ConfirmTeamHit(attacker, element, paintDirection, (orb.small ? rules.SmallOrbPaintShare : 1f) * areaScale, now);
             else
@@ -695,10 +702,11 @@ namespace C6Lab
                 float share = Mathf.Min(3f, (orb.small ? rules.SmallOrbPaintShare : 1f) * areaScale
                     * (orb.jigwiABReward || orb.jigwiTalismanReward ? orb.jigwiABRewardPaintScale : 1f));
                 // 오색구슬 (#329): 다섯 원소 색 얼룩으로, 정해 둔 배율만큼 넓게 칠한다. 도색 한 번은 최대 3배다.
+                // #696 검정 구슬(soot)도 같은 넓이로, 다섯 얼룩 모두 먹색이다.
                 if (orb.fiveColor) share = Mathf.Min(3f, share * rules.FiveColorOrbPaintScale);
                 bool paints = orb.fiveColor || element >= LabOrbElement.Fire && element <= LabOrbElement.Earth;
                 bool painted = paints && (orb.fiveColor
-                    ? PaintFiveColors(paintDirection, attacker, share, paintImpactStrength)
+                    ? PaintFiveColors(paintDirection, attacker, share, paintImpactStrength, orb.soot ? SootInk : (Color?)null)
                     : paintSurface.RegisterHit(paintDirection, PaintColorFor(element), attacker.id, attacker.seat + 1, share, paintImpactStrength));
                 if (painted && paintSurface.IsComplete && phase == LabPhase.Playing) // #509: B 물벼락이 먼저 이겼으면 한 번만
                 {

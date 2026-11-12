@@ -51,6 +51,15 @@ namespace C6Lab
             new Color32(24, 52, 168, 255), new Color32(38, 132, 240, 255), new Color32(46, 200, 232, 255),
             new Color32(70, 64, 210, 255), new Color32(36, 170, 190, 255)
         };
+        /// <summary>
+        /// #696 지귀 검정 구슬 (연기 파편 4개를 합친 것): 오색구슬과 같은 영롱한 모습을 쓰되, 먹색에 가까운 검정이
+        /// 남빛·보랏빛·청흑빛으로 은은하게 일렁인다. 반짝이 별은 흰빛 쪽으로 밝혀 그리므로 검정이어도 반짝인다.
+        /// </summary>
+        public static readonly Color32[] SootTones =
+        {
+            new Color32(14, 12, 20, 255), new Color32(44, 30, 104, 255), new Color32(20, 20, 28, 255),
+            new Color32(84, 38, 128, 255), new Color32(18, 50, 84, 255)
+        };
         /// <summary>이 구슬·가루가 건너가는 색들 (기본 다섯 색).</summary>
         private Color32[] colors = FiveColors;
         private Color Col(float seconds) => ColorAt(seconds, colors);

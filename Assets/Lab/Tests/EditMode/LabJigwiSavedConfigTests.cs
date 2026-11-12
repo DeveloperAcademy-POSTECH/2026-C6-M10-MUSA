@@ -18,7 +18,9 @@ namespace C6Lab.Tests
             Assert.That(config, Is.Not.Null, ConfigPath);
             Assert.That(config.JigwiATestOnly, Is.False, "A Test Only (talisman only) is for testing; turn it off before committing.");
             Assert.That(config.JigwiBTestOnly, Is.False, "B Test Only (smoke only) is for testing; turn it off before committing.");
-            Assert.That(config.JigwiSmokeFlow, Is.True, "The game runs smoke 10 / talisman 45 / smoke 66 / talisman 83 (#595).");
+            Assert.That(config.JigwiSmokeFlow, Is.True, "The game runs the smoke flow (#595).");
+            Assert.That(config.JigwiDenseTimeline, Is.True,
+                "#696: six missions, smoke 8 / talisman 24 / smoke 40 / talisman 55 / smoke 70 / talisman 85.");
         }
 
         [Test]
