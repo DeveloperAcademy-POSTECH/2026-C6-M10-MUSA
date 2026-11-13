@@ -8604,3 +8604,12 @@ main `e3108459`의 #712(칠용 뚜껑 법선 공유와3개 LidPaint 메시)을 �
 ## 2026-11-12 — #711 main 병합 충돌 해결
 
 main fbc943e8을 통합하며 VALIDATION 문서 끝의 독립 기록 추가 충돌을 양쪽 보존으로 해결했다. 자동 병합된 Battle 씬은 Stage2 하위591개 블록이 작업 브랜치와 같고 Stage3 하위710개 블록이 main과 같은 것을 정적 비교했다. 씬 object ID 중복0, 새 미해결 GUID0, 충돌 표식0을 확인했다. 기존 패키지 GUID는 프로젝트 에셋 GUID 검사에서 제외했다. main의 시연/법선 수정과 기존 Stage2 폴리싱을 함께 보존했다. 이 병합본에서 Unity 컴파일/실행 검사는 재실행하지 않았으며 앞선 PASS 기록과 구분한다.
+
+
+## 2026-11-13 — #719 야광귀 콤보 가이딩 (소리 없이 화면만 보고)
+
+기준 main `9be6d1f1` 위 `feat/#719-yaguang-combo-guide`, Unity Editor(macOS)에서 팀원이 실행했다. 비교 시점에 main에 새 커밋이 없어 병합 충돌은 없다. 공유 설정 개수·인덱스와 프로토콜 5704는 그대로다(새 스냅샷 필드 comboNextColors·comboWrong*은 옛 빌드가 무시하는 추가 필드).
+
+- 전체 EditMode 첫 실행 **2,394 PASS / 4 FAIL**(총 2,398, skip 0). 실패 4개는 모두 #719에서 의도한 변경을 옛 기대값이 따르지 못한 것이다: LabDeveloperConfigTests.GourdColorComboFieldsFormTheComboGroupAndStartOff(저장 에셋 예고 6초), LabGourdComboTests.TheWarningCountsDownBeforeTheFourSlotsAppearOnTime(예고 중 던지기 COMBO_HOLD 거절), GameSceneAssetTests.MenuScreens_HaveSavedEditableCanvasAndInput Home·Lobby(장면 DEV 패널 Setting164 값 4). 테스트 기대값과 두 메뉴 장면의 Setting164 값(6)을 고친 뒤 **Rerun Failed 4개 PASS**.
+- 새 테스트 LabGourdComboTests.EveryWrongColorIsRememberedForTheXMark는 첫 실행에서 통과했다.
+- 수정 뒤 전체 EditMode 재실행, PlayMode, 빌드, iOS 실기기·다중 기기 화면 확인은 이번 기록에서 실행하지 않았다. 화면 동작(다음 콤보 색 미리보기, 지금 칸 강조·똑딱 박자, 필요한 색 테두리, 틀린 색 X, 예고 중 던지기 막기, 섬광 보상 오색구슬 등장)은 팀원이 Editor 플레이로 보며 조정했다.
