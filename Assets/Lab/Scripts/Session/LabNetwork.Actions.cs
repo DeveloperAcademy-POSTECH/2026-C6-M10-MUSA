@@ -27,6 +27,9 @@ namespace C6Lab
         private uint actionRound;
         private double nextActionRecoveryAt, nextBoardCheckpointAt;
         private bool flushingActions;
+        // A given-up recovery needs the Host's board; sent once the .5 s checkpoint spacing allows.
+        private bool boardCheckpointWanted;
+        public long AbandonedActions { get; private set; }
 
         /// <summary>Last local request/receipt round trip, not a cross-device one-way estimate.</summary>
         public double LastActionRoundTripMilliseconds { get; private set; }
@@ -71,6 +74,7 @@ namespace C6Lab
             actionSession = null; actionRound = 0;
             deferredBoardFrame = null;
             nextActionRecoveryAt = nextBoardCheckpointAt = 0d;
+            boardCheckpointWanted = false;
             ResetTargetPoseReconcile();
             guestBattleClock.Reset();
         }
@@ -230,6 +234,7 @@ namespace C6Lab
                 }
             }
             finally { flushingActions = false; }
+            ExpireActionRecovery(now);
             if (now >= nextActionRecoveryAt)
             {
                 nextActionRecoveryAt = now + 2d;
@@ -237,6 +242,67 @@ namespace C6Lab
                     Send(NetworkManager.ServerClientId, new LabNetworkPacket { type = "action_query",
                         sessionId = actionSession, round = actionRound, requestId = id });
             }
+            if (boardCheckpointWanted) RequestBoardCheckpoint(now);
+        }
+
+        /// <summary>
+        /// A recovery query that has had no answer for <see cref="LabLocalActionCoordinator.RecoveryAbandonSeconds"/>
+        /// is given up: its local views (and those of actions built on it) roll back as for a rejection, and the
+        /// Host's board checkpoint then shows whatever the Host really did with it.
+        /// </summary>
+        private void ExpireActionRecovery(double now)
+        {
+            LabLocalActionResolution[] expired = localActions.ExpireRecovery(now);
+            if (expired.Length == 0) return;
+            foreach (LabLocalActionResolution resolution in expired)
+            {
+                // Restore dependent pending views before removing their provisional parent.
+                foreach (long child in resolution.rejectedDependents) RollBackAbandonedAction(child);
+                RollBackAbandonedAction(resolution.requestId);
+                AbandonedActions++;
+                Debug.LogWarning("C6_LAB_ACTION_ABANDONED request=" + resolution.requestId
+                    + " dependents=" + resolution.rejectedDependents.Length);
+            }
+            if (!IsHost) boardCheckpointWanted = true;
+            SyncBoard();
+            Changed?.Invoke();
+        }
+
+        private void RollBackAbandonedAction(long requestId)
+        {
+            RollBackAction(requestId);
+            predictedJigwiBurns.Remove(requestId);
+        }
+
+        private void RequestBoardCheckpoint(double now)
+        {
+            if (IsHost || now < nextBoardCheckpointAt) return;
+            nextBoardCheckpointAt = now + .5d;
+            boardCheckpointWanted = false;
+            Send(NetworkManager.ServerClientId, new LabNetworkPacket { type = "board_checkpoint",
+                sessionId = actionSession, round = actionRound });
+        }
+
+        /// <summary>
+        /// The Host's answer arrived after this device gave the action up. Its board part is still the
+        /// Host's ordered stream: apply it only when it is the next sequence, otherwise the checkpoint wins.
+        /// </summary>
+        private void ReceiveAbandonedReceipt(LabActionReceipt receipt)
+        {
+            if (IsHost) return;
+            bool applied = boardReplica.ApplyReceipt(receipt);
+            Debug.Log("C6_LAB_ACTION_LATE_RECEIPT request=" + receipt.requestId + " accepted=" + receipt.accepted
+                + " applied=" + applied);
+            if (!applied)
+            {
+                // A gap left the replica waiting for a checkpoint; gate input on the board as a gap frame does.
+                boardCheckpointWanted = true;
+                SyncBoard();
+                return;
+            }
+            latest = boardReplica.Overlay(latest);
+            SyncBoard();
+            Changed?.Invoke();
         }
 
         private bool ReceiveActionRetry(LabNetworkPacket packet)
@@ -389,8 +455,9 @@ namespace C6Lab
 
         private void ReceiveActionReceipt(LabActionReceipt receipt)
         {
-            if (!CanProcessBattleActions || receipt == null || !ValidJigwiSupplyReceipt(receipt)
-                || !localActions.ApplyReceipt(receipt, out var resolution)
+            if (!CanProcessBattleActions || receipt == null || !ValidJigwiSupplyReceipt(receipt)) return;
+            if (localActions.WasAbandoned(receipt)) { ReceiveAbandonedReceipt(receipt); return; }
+            if (!localActions.ApplyReceipt(receipt, out var resolution)
                 || !actionRequests.TryGetValue(receipt.requestId, out var request)) return;
             if (actionStartedAt.TryGetValue(receipt.requestId, out double at))
                 LastActionRoundTripMilliseconds = (Time.realtimeSinceStartupAsDouble - at) * 1000d;
@@ -538,10 +605,8 @@ namespace C6Lab
             }
             else if (boardReplica.NeedsCheckpoint && Time.realtimeSinceStartupAsDouble >= nextBoardCheckpointAt)
             {
-                nextBoardCheckpointAt = Time.realtimeSinceStartupAsDouble + .5d;
                 SyncBoard();
-                Send(NetworkManager.ServerClientId, new LabNetworkPacket { type = "board_checkpoint",
-                    sessionId = actionSession, round = actionRound });
+                RequestBoardCheckpoint(Time.realtimeSinceStartupAsDouble);
             }
         }
 

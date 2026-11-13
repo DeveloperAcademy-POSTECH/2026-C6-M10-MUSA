@@ -1,5 +1,23 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-14 — 설정 거절·행동 복구의 무기한 대기 (PR-A)
+
+- **기준:** `fix/lab-config-action-waits` (main `53118b72` 위). Unity 6000.6.5f1 batch(macOS, Metal). 접속 묶음 5704·`C6PhysicsLab/62`·`C6HapioGame/54`와 설정 수는 그대로다.
+- **원인:** ① 로비에서 구성원이 방장 설정을 지문 불일치나 설치 실패로 거절하면 상태 글자만 바꾸고 config_ack를 보내지 않았다. 방장은 모든 ACK를 기다리므로 방이 시작되지 못한 채 머물렀다. ② 행동 영수증이 끝내 오지 않아 RecoveryRequired가 된 행동은 2초마다 `action_query`만 보내고 끝나지 않았다. 숨긴 구슬·미리보기가 그대로 남았다.
+- **고친 것:** ① 이런 거절에서는 `AbandonRoomForSettings`가 `C6_LAB_CONFIG_REJECTED`를 남기고 다음 프레임에 `Stop`을 부른다. `Stop`이 `lobby_leave`를 보내므로 방장은 P를 바로 푼다. 조건은 `!gameFlowEnabled || LobbyRejoinAllowed`다. 게임 진행 중의 거절은 예전처럼 방장의 설정 확인 예산이 처리한다. 앞선 revision, 깨진 패킷, 같은 revision 재수신은 떠나지 않으며, 같은 revision을 다시 받으면 ACK를 다시 보낸다. `lobby`/`config` 전송 실패는 `C6_LAB_SEND_FAILED type=…`로 남긴다. ② RecoveryRequired가 된 시각부터 30초(`RecoveryAbandonSeconds`, 전송 끊김 시간과 같음)가 지나면 그 행동과 딸린 행동을 거절과 같은 경로로 되돌린다. 이때 `C6_LAB_ACTION_ABANDONED`를 남기고 `board_checkpoint`를 요청한다(0.5초 간격 유지). 그 뒤 늦게 온 영수증은 판 순번이 이어질 때만 판에 반영하고, 아니면 체크포인트를 기다린다.
+
+| 확인 | 결과 |
+| --- | --- |
+| 전체 EditMode | 2415/2415 PASS |
+| 전체 PlayMode | 851/851 PASS |
+| 새 EditMode: 설정 거절(지문 불일치·설치 실패의 로비/Lab 퇴장, 진행 중 유지, 이전·깨진 패킷 무시, 같은 revision 재ACK) | 4/4 PASS |
+| 새 EditMode: 가장 큰 lobby/config 패킷 크기(6자리, 63자 방 이름, 모든 값이 가장 긴 float) | lobby 1,768 B, config 2,893 B(가장 긴 float일 때 7,405 B). 상한 32,768 B |
+| 새 EditMode: `ExpireRecovery` 29.999초/30초 경계, 딸린 행동, 만료 뒤 늦은 영수증, 라운드 초기화 | 3/3 PASS |
+| 새 PlayMode: 복구 포기 뒤 구슬·스프라이트 복원, 이어지는 늦은 영수증 반영, 순번이 빈 늦은 영수증은 체크포인트로 처리 | 2/2 PASS |
+
+- **최초 실패와 재실행:** 첫 EditMode에서는 새 검사 2건이 실패했다. 하나는 설정 준비 로그를 기대하지 않았고, 다른 하나는 예약된 `ulong.MaxValue` id로 자리를 골랐다. 검사를 고쳐 재실행했다. main `a7208003` 위의 첫 전체 PlayMode는 834/845였다. 그중 10건(`LabComboProjectileIntegrationTests` 2, `LabFiveColorClayNetworkTests` 1, `LabLocalBoardNetworkIntegrationTests`의 기존 `PresentContact` 리플렉션 7)은 변경 없는 `a7208003`에서도 같게 실패했다. 나머지 1건은 새 검사로, 순번이 빈 늦은 영수증 뒤에 판 입력을 다시 막지 않았다(`SyncBoard` 누락). 이를 고친 뒤 main `53118b72`로 다시 올려 위 전체 결과를 얻었다.
+- **미실행:** 여러 기기 실제 네트워크, iPhone 실기기.
+
 ## 2026-11-12 — 스테이지 박 뚜껑 칠의 흰 노이즈
 
 - **기준:** `fix/lid-paint-smooth-normals` (main `c2829b46`). Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 판정·접속 묶음·설정은 그대로다.

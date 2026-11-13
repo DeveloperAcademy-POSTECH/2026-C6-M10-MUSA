@@ -2,8 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Text;
+using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.TestTools;
 
 namespace C6Lab.Tests
 {
@@ -453,6 +455,165 @@ namespace C6Lab.Tests
             }
         }
 
+        [Test]
+        public void AGuestLeavesALobbyWhoseSettingsFailTheirIntegrityCheck()
+        {
+            using (var room = new HostRoom(3, host: false))
+            {
+                room.Network.LobbyRejoinAllowed = true;
+                LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("C6_LAB_CONFIG_REJECTED .*leave=True"));
+                room.ReceiveConfig(Config(room, 2, fingerprint: "corrupt"));
+                Assert.That(room.Get("stopAfterDisconnect"), Is.True, "The next Update stops and says lobby_leave.");
+                Assert.That(room.Network.Status, Does.Contain("integrity"));
+                Assert.That(room.Get("clientConfigReady"), Is.False);
+            }
+        }
+
+        [Test]
+        public void AGuestLeavesALobbyOrLabRoomWhoseSettingsCannotInstall()
+        {
+            using (var room = new HostRoom(3, host: false))
+            {
+                // No source config: TryInstallValues refuses, as it would for any setting this build cannot hold.
+                room.Network.LobbyRejoinAllowed = true;
+                LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("C6_LAB_CONFIG_REJECTED .*leave=True"));
+                room.ReceiveConfig(Config(room, 2));
+                Assert.That(room.Get("stopAfterDisconnect"), Is.True);
+                Assert.That(room.Network.Status, Does.StartWith("Host settings rejected"));
+            }
+            using (var room = new HostRoom(3, host: false))
+            {
+                room.Set("gameFlowEnabled", false);
+                LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("C6_LAB_CONFIG_REJECTED .*leave=True"));
+                room.ReceiveConfig(Config(room, 2));
+                Assert.That(room.Get("stopAfterDisconnect"), Is.True, "A Lab room has no run; it leaves too.");
+            }
+        }
+
+        [Test]
+        public void DuringAGameRunARejectedSettingKeepsTheConnectionForTheHostsBudget()
+        {
+            using (var room = new HostRoom(3, host: false))
+            {
+                Assert.That(room.Network.LobbyRejoinAllowed, Is.False, "GameSession turns it on only in the lobby.");
+                LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("C6_LAB_CONFIG_REJECTED .*leave=False"));
+                room.ReceiveConfig(Config(room, 2, fingerprint: "corrupt"));
+                LogAssert.Expect(LogType.Warning, new System.Text.RegularExpressions.Regex("C6_LAB_CONFIG_REJECTED .*leave=False"));
+                room.ReceiveConfig(Config(room, 3));
+                Assert.That(room.Get("stopAfterDisconnect"), Is.False);
+                Assert.That(room.Network.Status, Does.StartWith("Host settings rejected"));
+            }
+        }
+
+        [Test]
+        public void StaleOrMalformedSettingsNeverMakeAGuestLeaveAndARepeatIsAcknowledgedAgain()
+        {
+            using (var room = new HostRoom(3, host: false))
+            {
+                var source = ScriptableObject.CreateInstance<LabConfig>();
+                try
+                {
+                    room.Network.config = source;
+                    room.Network.LobbyRejoinAllowed = true;
+                    object current = Config(room, 4);
+                    LogAssert.Expect(LogType.Log, new System.Text.RegularExpressions.Regex("C6_LAB_CONFIG_READY revision=4"));
+                    room.ReceiveConfig(current);
+                    Assert.That(room.Get("clientConfigReady"), Is.True);
+                    Assert.That(room.Get("configRevision"), Is.EqualTo(4));
+                    int acks = room.Acks;
+                    room.ReceiveConfig(Config(room, 4));
+                    Assert.That(room.Acks, Is.EqualTo(acks + 1), "A duplicate of the installed revision is acknowledged again.");
+                    // Reordered: an older generation, even one that would fail its own check, changes nothing.
+                    room.ReceiveConfig(Config(room, 3));
+                    room.ReceiveConfig(Config(room, 3, fingerprint: "corrupt"));
+                    // Malformed: dropped before any check.
+                    object shortTuning = Config(room, 5);
+                    Type type = shortTuning.GetType();
+                    type.GetField("tuning").SetValue(shortTuning, new float[3]);
+                    room.ReceiveConfig(shortTuning);
+                    object noRevision = Config(room, 0, fingerprint: "corrupt");
+                    room.ReceiveConfig(noRevision);
+                    object oversize = Config(room, 6, fingerprint: "corrupt");
+                    type.GetField("targetParticipants").SetValue(oversize, LabModel.TerritoryMaximumParticipants + 1);
+                    room.ReceiveConfig(oversize);
+                    Assert.That(room.Get("stopAfterDisconnect"), Is.False);
+                    Assert.That(room.Get("configRevision"), Is.EqualTo(4));
+                    Assert.That(room.Get("clientConfigReady"), Is.True);
+                    LogAssert.NoUnexpectedReceived();
+                }
+                finally
+                {
+                    var installed = (UnityEngine.Object)room.Get("sessionConfig");
+                    if (installed != null) UnityEngine.Object.DestroyImmediate(installed);
+                    UnityEngine.Object.DestroyImmediate(source);
+                }
+            }
+        }
+
+        [Test]
+        public void TheLargestLobbyAndConfigPacketsFitInOneControlMessage()
+        {
+            using (var room = new HostRoom(LabModel.TerritoryMaximumParticipants))
+            {
+                var source = ScriptableObject.CreateInstance<LabConfig>();
+                try
+                {
+                    room.Network.config = source;
+                    for (ulong id = ulong.MaxValue - 5; id != ulong.MaxValue; id++)
+                    {
+                        room.Order.Add(id);
+                        Assert.That(room.Slots.TrySelect(id, room.Order.Count, out string reason), Is.True, reason);
+                    }
+                    Assert.That(room.Order.Count, Is.EqualTo(LabModel.TerritoryMaximumParticipants));
+                    room.Set("connectedRoomName", new string('방', 63));
+                    room.Set("configRevision", int.MaxValue);
+                    room.Set("configFingerprint", new string('f', 64));
+                    room.Set("snapshotSequence", long.MaxValue);
+                    room.Set("lobbyRevision", long.MaxValue - 1);
+                    int limit = (int)typeof(LabNetwork).GetField("MaximumPacketBytes", BindingFlags.NonPublic | BindingFlags.Static)
+                        .GetRawConstantValue();
+                    object lobby = room.Call("LobbyPacket");
+                    // Every seat is held: the ids list is as long as it can be.
+                    lobby.GetType().GetField("ids").SetValue(lobby, room.Order.Select(id => id.ToString()).ToArray());
+                    object settings = room.Call("SessionConfigPacket");
+                    float[] tuning = (float[])settings.GetType().GetField("tuning").GetValue(settings);
+                    Assert.That(tuning.Length, Is.EqualTo(LabConfig.DeveloperFields.Count));
+                    int lobbyBytes = Encoded(lobby), configBytes = Encoded(settings);
+                    // The widest float text JsonUtility writes, in every field.
+                    for (int i = 0; i < tuning.Length; i++) tuning[i] = -1.17549435E-38f;
+                    int worstConfigBytes = Encoded(settings);
+                    TestContext.WriteLine("lobby=" + lobbyBytes + " config=" + configBytes + " worstConfig=" + worstConfigBytes
+                        + " limit=" + limit);
+                    Assert.That(lobbyBytes, Is.LessThanOrEqualTo(limit));
+                    Assert.That(configBytes, Is.LessThanOrEqualTo(limit));
+                    Assert.That(worstConfigBytes, Is.LessThanOrEqualTo(limit));
+                }
+                finally { UnityEngine.Object.DestroyImmediate(source); }
+            }
+        }
+
+        private static int Encoded(object packet) => (int)typeof(LabNetwork)
+            .GetMethod("EncodedPacketBytes", BindingFlags.NonPublic | BindingFlags.Static).Invoke(null, new[] { packet });
+
+        /// <summary>A Host config packet for this room, with a correct fingerprint unless one is given.</summary>
+        private static object Config(HostRoom room, int revision, string fingerprint = null)
+        {
+            Type type = typeof(LabNetwork).Assembly.GetType("C6Lab.LabNetworkPacket", true);
+            object packet = Activator.CreateInstance(type);
+            var defaults = ScriptableObject.CreateInstance<LabConfig>();
+            float[] tuning;
+            try { tuning = defaults.CaptureDeveloperValues(); }
+            finally { UnityEngine.Object.DestroyImmediate(defaults); }
+            ushort protocol = (ushort)typeof(LabNetwork).GetField("LabProtocolVersion", BindingFlags.NonPublic | BindingFlags.Static)
+                .GetRawConstantValue();
+            type.GetField("type").SetValue(packet, "config");
+            type.GetField("targetParticipants").SetValue(packet, 3);
+            type.GetField("configRevision").SetValue(packet, revision);
+            type.GetField("tuning").SetValue(packet, tuning);
+            type.GetField("configFingerprint").SetValue(packet, fingerprint ?? LabSessionSettings.Fingerprint(tuning, 3, protocol));
+            return packet;
+        }
+
         private static LabDiscoveredRoom Room(string name, ushort port, int participants, int capacity, bool playing = false) =>
             LabRoomCatalog.GroupTargets(new[] { new LabBonjourTarget("127.0.0.1", port, 1, name, participants, capacity, playing) })[0];
 
@@ -521,6 +682,9 @@ namespace C6Lab.Tests
             public void Set(string field, object value) => typeof(LabNetwork).GetField(field, Private).SetValue(Network, value);
             public void Invoke(string method, params object[] arguments) =>
                 typeof(LabNetwork).GetMethod(method, Private).Invoke(Network, arguments);
+            public object Call(string method) => typeof(LabNetwork).GetMethod(method, Private).Invoke(Network, null);
+            public void ReceiveConfig(object packet) => Invoke("ReceiveSessionConfig", packet);
+            public int Acks => (int)typeof(LabNetwork).GetProperty("ConfigAcknowledgementsSent", Private).GetValue(Network);
 
             public void Connect(ulong id) => typeof(LabNetwork).GetMethod("OnConnected", Private).Invoke(Network, new object[] { id });
             public void Drop(ulong id) => typeof(LabNetwork).GetMethod("OnDisconnected", Private).Invoke(Network, new object[] { id });
