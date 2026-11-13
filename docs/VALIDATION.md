@@ -8791,3 +8791,4 @@ main fbc943e8을 통합하며 VALIDATION 문서 끝의 독립 기록 추가 충�
 
 - **검사 방식의 한계:** PlayMode는 솔로 방장이 참가자 대신 서서, 참가자 전용 `UpdateGuestStartWaits`를 리플렉션으로 부르고 누적값을 한도 직전으로 놓았다. 2:2 로비 복귀는 DEV 솔로 표시를 잠시 끄고 가짜 참가자의 `exit`를 방장에 넣어 확인했다. 실제 두 기기 사이의 `exit` 전송, 실제 10초·45초 경과는 확인하지 않았다.
 - **미실행:** Mac 여러 앱·iPhone 실기기의 참가자 시작 대기 만료, iOS 백그라운드 복귀 중 누적 제외.
+- **main 통합 뒤 재실행 (main `53118b72`, #725 포함):** 충돌은 이 문서 끝의 기록 추가뿐이었다(양쪽 보존). #725가 `GameSession.cs`와 같은 검사 파일을 바꿔 전체를 다시 돌렸다. 전체 EditMode **2412/2412 PASS**, 전체 PlayMode **851/853**. 새 검사 5건(PlayMode 4·EditMode 경계)과 Hapio 검사는 모두 PASS였다. 위 Lab 실패 10건은 #725의 검사 수정으로 모두 통과했다. 실패 2건은 Lab GPU 렌더 검사 `LabPaintGrainRenderTests.SavedGourdShader…`·`LabPaintSpreadFlowRenderTests.SavedShellCompares…`(RGB 반올림 차 3, 허용 1)다. 앞의 두 번의 전체 실행에서는 통과했고, 둘만 따로 다시 돌리면 2/2 PASS여서 간헐 실패로 본다. Hapio를 참조하지 않는 검사다.
