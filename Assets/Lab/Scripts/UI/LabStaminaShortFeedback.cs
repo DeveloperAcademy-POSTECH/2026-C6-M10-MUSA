@@ -5,6 +5,8 @@ namespace C6Lab
     /// <summary>
     /// 스태미나 부족 표시 (#418). 북을 눌렀는데 스태미나가 모자라 Host가 생성을 거절하면, 누른 사람 화면의 스태미나 게이지가
     /// 지지직 흔들리고 지금 충전 중인 칸(차 있는 부분)이 순간 빨갛게 빛난다. 다시 누르면 처음부터 다시 낸다.
+    /// #718부터 조합 영역 전체(판 그림·구슬·북, LabOrbHudComposition)도 같은 시간 동안 함께 흔들린다. 그림만 움직이고 판의 물리·
+    /// 터치 위치는 그대로다. 흔들리는 거리는 프로필의 "Short Board Shake Distance".
     /// 게이지 원본 그림·채움 값은 바꾸지 않고, 흔들림이 끝나면 게이지 자리를 그대로 되돌린다. 시간·세기·색은
     /// Resources/Stamina/StaminaFeedbackProfile(#412 소비 표시와 같은 프로필)의 "스태미나 부족" 칸에서 조절한다.
     /// </summary>
@@ -17,6 +19,7 @@ namespace C6Lab
         private LabNetwork network, subscribed;
         private UnityEngine.UI.Image source, flash;
         private RectTransform bar;
+        private LabOrbHudComposition composition;
         private Vector2 barPosition;
         private float age = -1f;
         private string session;
@@ -40,6 +43,8 @@ namespace C6Lab
         public int ShortCount { get; private set; }
         public bool Playing => age >= 0f;
         public Vector2 ShakeOffset { get; private set; }
+        /// <summary>조합 영역 전체가 밀려난 거리 (Canvas 단위, #718)</summary>
+        public Vector2 BoardShakeOffset { get; private set; }
         public float FlashAlpha { get; private set; }
         public UnityEngine.UI.Image FlashImage => flash;
 
@@ -49,7 +54,7 @@ namespace C6Lab
         {
             Unsubscribe(); Stop();
             network = target;
-            if (source != staminaFill) { DestroyFlash(); source = staminaFill; }
+            if (source != staminaFill) { DestroyFlash(); source = staminaFill; composition = null; }
             bar = source != null ? source.transform.parent as RectTransform : null;
             hasIdentity = false;
             Subscribe();
@@ -106,6 +111,8 @@ namespace C6Lab
             float distance = settings.ShortShakeRatio * Mathf.Abs(source.rectTransform.rect.height);
             ShakeOffset = ShakeAt(age, shakeSeconds, distance, settings.ShortShakeFrequency);
             bar.anchoredPosition = barPosition + ShakeOffset;
+            BoardShakeOffset = ShakeAt(age, shakeSeconds, settings.ShortBoardShakeDistance, settings.ShortShakeFrequency);
+            Composition()?.SetBoardShake(BoardShakeOffset);
             FlashAlpha = settings.ShortFlashColor.a * FlashAmount(age, flashSeconds);
             ShowFlash(settings.ShortFlashColor);
         }
@@ -127,6 +134,16 @@ namespace C6Lab
             if (seconds <= 0f || age < 0f || age >= seconds) return 0f;
             float u = age / seconds;
             return u < .15f ? u / .15f : 1f - Mathf.SmoothStep(0f, 1f, (u - .15f) / .85f);
+        }
+
+        /// <summary>The board picture this gauge belongs to: its HUD's composition, or the battle's only one.</summary>
+        private LabOrbHudComposition Composition()
+        {
+            if (composition != null) return composition;
+            LabHud hud = source != null ? source.GetComponentInParent<LabHud>(true) : null;
+            composition = hud != null ? hud.GetComponent<LabOrbHudComposition>() : null;
+            if (composition == null) composition = FindFirstObjectByType<LabOrbHudComposition>();
+            return composition;
         }
 
         // 걸음마다 -1~1 사이의 정해진 값. 0은 피해 늘 눈에 띄게 움직인다.
@@ -175,6 +192,8 @@ namespace C6Lab
             if (age >= 0f && bar != null) bar.anchoredPosition = barPosition;
             age = -1f;
             ShakeOffset = Vector2.zero;
+            if (BoardShakeOffset != Vector2.zero) Composition()?.SetBoardShake(Vector2.zero);
+            BoardShakeOffset = Vector2.zero;
             FlashAlpha = 0f;
             if (flash != null && flash.gameObject.activeSelf) flash.gameObject.SetActive(false);
         }

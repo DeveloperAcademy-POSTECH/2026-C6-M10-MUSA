@@ -35,7 +35,13 @@ namespace C6Lab
         private bool captured, failed;
         private string initializationError;
 
+        // #718: a short shake of the whole board picture (orbs, drum and the board art behind them), presentation only.
+        private Vector2 boardShake, backdropShakeApplied;
+        private RectTransform shakenBackdrop;
+
         public bool IsCompositing => captured && texture != null && foreground != null;
+        /// <summary>지금 조합 영역 그림이 밀려난 거리 (Canvas 단위, #718).</summary>
+        public Vector2 BoardShake => boardShake;
         public Camera ForegroundCamera => foreground;
         public UnityEngine.UI.RawImage Display => display;
         public RenderTexture Texture => texture;
@@ -254,8 +260,40 @@ namespace C6Lab
             RectTransform rect = display.rectTransform;
             rect.anchorMin = rect.anchorMax = Vector2.zero;
             rect.pivot = Vector2.zero;
-            rect.anchoredPosition = min - parent.rect.min;
+            rect.anchoredPosition = min - parent.rect.min + boardShake;
             rect.sizeDelta = max - min;
+            ApplyBackdropShake();
+        }
+
+        /// <summary>
+        /// 스태미나 부족 (#718): 조합 영역 전체(구슬·북이 그려진 그림과 그 뒤 판 그림)를 offset만큼 밀어 보인다. 그림만 움직이고
+        /// 판의 물리·입력 카메라는 그대로라 터치 위치는 바뀌지 않는다. Vector2.zero로 되돌린다.
+        /// </summary>
+        public void SetBoardShake(Vector2 offset)
+        {
+            Vector2 next = float.IsNaN(offset.x) || float.IsNaN(offset.y) || float.IsInfinity(offset.x)
+                || float.IsInfinity(offset.y) ? Vector2.zero : offset;
+            // Move the already placed picture by the change at once; the next PlaceDisplay keeps it (it adds boardShake).
+            if (display != null && IsCompositing) display.rectTransform.anchoredPosition += next - boardShake;
+            boardShake = next;
+            ApplyBackdropShake();
+        }
+
+        // The board art is placed by its owner (GameBattleUiPresentation); only the shake's own change is added and taken away.
+        private void ApplyBackdropShake()
+        {
+            if (shakenBackdrop != null && shakenBackdrop != presentationBackdrop)
+            {
+                shakenBackdrop.anchoredPosition -= backdropShakeApplied;
+                shakenBackdrop = null;
+                backdropShakeApplied = Vector2.zero;
+            }
+            if (presentationBackdrop == null) return;
+            Vector2 wanted = IsCompositing ? boardShake : Vector2.zero;
+            shakenBackdrop = presentationBackdrop;
+            if (wanted == backdropShakeApplied) return;
+            presentationBackdrop.anchoredPosition += wanted - backdropShakeApplied;
+            backdropShakeApplied = wanted;
         }
 
         private void OnDisable() => Release();
@@ -263,6 +301,9 @@ namespace C6Lab
 
         private void Release()
         {
+            if (shakenBackdrop != null) shakenBackdrop.anchoredPosition -= backdropShakeApplied;
+            shakenBackdrop = null;
+            backdropShakeApplied = boardShake = Vector2.zero;
             if (foreground != null)
             {
                 foreground.enabled = false;

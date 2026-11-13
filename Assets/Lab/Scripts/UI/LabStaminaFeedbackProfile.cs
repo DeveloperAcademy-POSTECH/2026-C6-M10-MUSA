@@ -21,6 +21,9 @@ namespace C6Lab
         [Tooltip("충전 중인 칸이 빨갛게 빛나는 시간 (초)")]
         [SerializeField, Range(.05f, 1f)] private float shortFlashSeconds = .4f;
         [SerializeField] private Color shortFlashColor = new Color(1f, .16f, .12f, .95f);
+        [Tooltip("#718: 게이지와 함께 조합 영역 전체(판 그림·구슬·북)가 흔들리는 거리 (Canvas 기준 픽셀). 0이면 게이지만 흔들린다. " +
+            "시간과 떨림 횟수는 위 게이지 값과 같고, 화면 그림만 움직여 터치 위치는 그대로다.")]
+        [SerializeField, Range(0f, 40f)] private float shortBoardShakeDistance = 8f;
 
         public bool ConsumptionEnabled => consumptionEnabled;
         public float ConsumptionSeconds => Safe(consumptionSeconds, .05f, .5f, .18f);
@@ -30,6 +33,7 @@ namespace C6Lab
         public float ShortShakeRatio => Safe(shortShakeRatio, 0f, 1f, .3f);
         public float ShortShakeFrequency => Safe(shortShakeFrequency, 5f, 60f, 32f);
         public float ShortFlashSeconds => Safe(shortFlashSeconds, .05f, 1f, .4f);
+        public float ShortBoardShakeDistance => Safe(shortBoardShakeDistance, 0f, 40f, 8f);
         public Color ShortFlashColor => new Color(Safe(shortFlashColor.r, 0, 1, 1f), Safe(shortFlashColor.g, 0, 1, .16f),
             Safe(shortFlashColor.b, 0, 1, .12f), Safe(shortFlashColor.a, 0, 1, .95f));
         private static float Safe(float value, float min, float max, float fallback) =>
