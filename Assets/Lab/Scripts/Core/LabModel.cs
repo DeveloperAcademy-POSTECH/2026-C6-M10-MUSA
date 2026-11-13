@@ -778,12 +778,7 @@ namespace C6Lab
                 if (nextComboAt > until) return;
                 comboWarned = false;
                 double at = nextComboAt;
-                var colors = new LabOrbElement[LabGourdCombo.Length];
-                for (int i = 0; i < colors.Length; i++)
-                {
-                    uint index = combo.Count * (uint)LabGourdCombo.Length + (uint)i;
-                    colors[i] = (LabOrbElement)(1 + (int)(DrawFor(seed ^ ComboColorSalt, ComboDrawKey, index) % 5UL));
-                }
+                LabOrbElement[] colors = NextComboColors();
                 // #695: the round's first combo forgives wrong colors until its first slot is hit.
                 combo.Start(colors, at, rules.ComboTimeLimitSeconds, rules.ComboFirstForgive && combo.Count == 0);
                 // Scheduled stages receive the next occurrence from CastGimmicks, never from this effect.
@@ -868,6 +863,21 @@ namespace C6Lab
             && Finite(nextFlashAt) && !flashHeld
             && (flashWarned || (!FlashBlocked(lastTime) && !ComboWarnsBeforeFlash
                 && !FlashBlocked(Math.Max(lastTime, nextFlashAt - rules.FlashWarningSeconds))));
+
+        /// <summary>
+        /// The next combo's four colours. They depend only on the seed and how many combos came before, so the warning can
+        /// show exactly what the combo will be (#719).
+        /// </summary>
+        private LabOrbElement[] NextComboColors()
+        {
+            var colors = new LabOrbElement[LabGourdCombo.Length];
+            for (int i = 0; i < colors.Length; i++)
+            {
+                uint index = combo.Count * (uint)LabGourdCombo.Length + (uint)i;
+                colors[i] = (LabOrbElement)(1 + (int)(DrawFor(seed ^ ComboColorSalt, ComboDrawKey, index) % 5UL));
+            }
+            return colors;
+        }
 
         private bool ComboWarnsBeforeFlash => ComboWaiting && !comboWarned
             && nextComboAt - rules.ComboWarningSeconds <= nextFlashAt - rules.FlashWarningSeconds;
@@ -1395,6 +1405,8 @@ namespace C6Lab
                 comboFailedBy = combo.LastFailedBy,
                 comboNextAt = ComboAnnounced ? nextComboAt : -1d,
                 comboWarningAt = ComboAnnounced ? nextComboAt - rules.ComboWarningSeconds : -1d,
+                // #719: the next combo's colours are fixed in advance, so the warning shows them one by one.
+                comboNextColors = ComboAnnounced ? NextComboColors() : Array.Empty<LabOrbElement>(),
                 flashAt = FlashWaiting ? nextFlashAt : -1d,
                 flashWarningAt = FlashWaiting ? nextFlashAt - rules.FlashWarningSeconds : -1d,
                 flashTarget = nextFlashTarget,

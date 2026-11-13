@@ -149,6 +149,10 @@ namespace C6Lab
         private uint lastComboCount;
         private float popElapsed = -1f;
         private int popSlot = -1;
+        /// <summary>#719: how many of the next combo's colours the warning has shown so far.</summary>
+        private int previewRevealed;
+        /// <summary>#719 시험용: 예고에서 지금 보이는 다음 콤보 색 칸 수 (0이면 미리 보기 없음).</summary>
+        public int PreviewRevealed => previewRevealed;
         private ulong shownFailedBy;
         private bool shownFailedKnown;
         private int shownFailedSeat = -1;
@@ -273,7 +277,7 @@ namespace C6Lab
             if (snapshot.comboCount < lastComboCount || snapshot.foxRoundCount < shownFoxRoundCount) ResetRound();
             DetectChanges(snapshot);
             DetectFoxRound(snapshot, serverNow);
-            DrawCombo(snapshot, serverNow);
+            DrawCombo(snapshot, serverNow, warning);
             DrawResult();
             DrawWarning(snapshot, serverNow, warning);
             DrawShade(warning);
@@ -296,7 +300,7 @@ namespace C6Lab
 
         /// <summary>
         /// 콤보 예고 (#241): 패널 자리에 COMBO! 와 남은 초(3 → 2 → 1). 숫자가 바뀔 때마다 톡 튀어나오고,
-        /// 0이 되는 순간(4칸이 나오는 시각) Host 스냅샷의 새 콤보로 바뀐다. 색은 예고 중에 보여주지 않는다.
+        /// 0이 되는 순간(4칸이 나오는 시각) Host 스냅샷의 새 콤보로 바뀐다. #719부터 야광귀 예고는 패널에 다음 콤보 색을 한 칸씩 미리 보여 준다.
         /// 앞 콤보의 결과 문구가 떠 있으면 그것부터 보여준다.
         /// </summary>
         private void DrawWarning(LabSnapshot snapshot, double serverNow, bool warning)
@@ -312,7 +316,8 @@ namespace C6Lab
                 warningPopElapsed = -1f;
                 return;
             }
-            int count = Mathf.Max(1, Mathf.CeilToInt((float)(snapshot.comboNextAt - serverNow)));
+            // #719: the warning is split in four (넷 → 하나), so a longer warning counts more slowly.
+            int count = Mathf.Max(1, snapshot.ComboWarningCount(serverNow));
             if (yaguang != warningYaguang) shownWarningCount = -1;
             warningYaguang = yaguang;
             // 말풍선은 남은 초를 야광귀식으로 넷 → 셋 → 둘 → 하나 센다(넷까지밖에 몰라서 더 길면 다시 넷부터).
@@ -523,13 +528,21 @@ namespace C6Lab
             lastProgress = snapshot.comboProgress;
         }
 
-        private void DrawCombo(LabSnapshot snapshot, double serverNow)
+        private void DrawCombo(LabSnapshot snapshot, double serverNow, bool warning)
         {
             // 결과 문구가 떠 있는 동안에는 패널을 숨긴다 (콤보 → 결과 → 배지가 겹치지 않게).
             bool finalCheck = StampSuccess && shownResult == LabComboResult.Success && resultDelay > 0f;
-            bool showPanel = (snapshot.comboActive && resultElapsed < 0f || finalCheck) && snapshot.comboColors != null
-                && snapshot.comboColors.Length == LabGourdCombo.Length;
             bool yaguang = YaguangCount;
+            // #719: during the warning the panel shows the next combo's real colours, one more on each count (넷 → 하나),
+            // so the order can be read (and the orbs made) before it starts — without hearing anything.
+            bool preview = yaguang && warning && !snapshot.comboActive && resultElapsed < 0f && !finalCheck
+                && snapshot.comboNextColors != null && snapshot.comboNextColors.Length == LabGourdCombo.Length;
+            int revealed = preview ? Mathf.Clamp(LabGourdCombo.Length + 1 - snapshot.ComboWarningCount(serverNow), 0, LabGourdCombo.Length) : 0;
+            if (revealed > previewRevealed) { popSlot = revealed - 1; popElapsed = 0f; }
+            previewRevealed = revealed;
+            LabOrbElement[] colors = preview ? snapshot.comboNextColors : snapshot.comboColors;
+            bool showPanel = preview || (snapshot.comboActive && resultElapsed < 0f || finalCheck) && snapshot.comboColors != null
+                && snapshot.comboColors.Length == LabGourdCombo.Length;
             figmaPanel = yaguang && LabYaguangComboArt.Load("Panel") != null;
             ApplyPanelArtwork(figmaPanel);
             panel.gameObject.SetActive(showPanel);
@@ -545,13 +558,14 @@ namespace C6Lab
             if (popElapsed >= 0f) popElapsed += Time.unscaledDeltaTime;
             for (int i = 0; i < LabGourdCombo.Length; i++)
             {
-                slotElements[i] = snapshot.comboColors[i];
+                slotElements[i] = colors[i];
                 Sprite art = figmaPanel ? LabYaguangComboArt.Orb(slotElements[i]) : null;
                 slotFills[i].sprite = art != null ? art : DiscSprite();
                 slotFills[i].color = art != null ? Color.white : (Color)LabPaintPalette.SrgbColorFor(slotElements[i]);
-                bool hit = i < snapshot.comboProgress;
+                bool hit = !preview && i < snapshot.comboProgress;
+                bool shown = !preview || i < revealed; // #719: not yet counted = an empty numbered slot
                 slotChecks[i].gameObject.SetActive(hit);
-                slotFills[i].enabled = !figmaPanel || !hit;
+                slotFills[i].enabled = shown && (!figmaPanel || !hit);
                 slotNumbers[i].gameObject.SetActive(figmaPanel && !hit);
                 if (figmaPanel)
                 {
@@ -573,7 +587,7 @@ namespace C6Lab
                 wasChecked[i] = hit;
                 float scale = 1f;
                 if (snapshot.comboActive && i == snapshot.comboProgress) scale += bob;
-                if (!figmaPanel && i == popSlot && popElapsed >= 0f && popElapsed < .25f)
+                if ((!figmaPanel || preview) && i == popSlot && popElapsed >= 0f && popElapsed < .25f)
                     scale += .3f * Mathf.Sin(popElapsed / .25f * Mathf.PI);
                 slots[i].localScale = Vector3.one * scale;
                 // 야광귀 셈법 (#271): 맞힌 칸 위에 그 칸의 수가 톡 튀어나와 남는다.
@@ -753,6 +767,7 @@ namespace C6Lab
             lastComboCount = 0;
             popElapsed = -1f;
             popSlot = -1;
+            previewRevealed = 0;
             System.Array.Clear(wasChecked, 0, wasChecked.Length);
             effectKind = 0;
             effectPopElapsed = -1f;

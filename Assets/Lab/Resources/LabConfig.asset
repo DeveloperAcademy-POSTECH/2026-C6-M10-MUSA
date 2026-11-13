@@ -114,7 +114,7 @@ MonoBehaviour:
   comboPenaltyThrowerOnly: 0
   comboRewardDurationSeconds: 15
   comboRewardSizeScale: 2.5
-  comboWarningSeconds: 4
+  comboWarningSeconds: 6
   orbLifetimeSeconds: 15
   orbRestitution: 0.8
   orbFloorDeceleration: 2

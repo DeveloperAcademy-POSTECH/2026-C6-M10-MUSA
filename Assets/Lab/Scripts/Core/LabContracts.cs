@@ -510,6 +510,26 @@ namespace C6Lab
         /// <summary>이 시각에 콤보 예고 중인지 (#241). 예고 중에는 콤보가 없으므로 맞힌 구슬도 판정하지 않는다.</summary>
         public bool ComboWarningOn(double now) => comboNextAt > comboWarningAt && now >= comboWarningAt && now < comboNextAt;
 
+        /// <summary>
+        /// #719: 예고 동안 미리 보여 주는 다음 콤보의 4칸 색 (Host가 정해 둔 그대로 나온다). 예고가 없거나 옛 Host면 빈 배열.
+        /// </summary>
+        public LabOrbElement[] comboNextColors = Array.Empty<LabOrbElement>();
+
+        /// <summary>
+        /// #719 예고 셈: 예고 시간을 4등분해 넷 → 셋 → 둘 → 하나 (예고가 길수록 천천히 센다). 예고가 아니면 0.
+        /// </summary>
+        public int ComboWarningCount(double now)
+        {
+            if (!ComboWarningOn(now)) return 0;
+            double step = ComboWarningStep;
+            return Math.Max(1, Math.Min(LabGourdCombo.Length, (int)Math.Ceiling((comboNextAt - now) / step - 1e-9)));
+        }
+
+        /// <summary>#719: 예고 셈에서 count(4~1)를 세기 시작하는 시각.</summary>
+        public double ComboWarningCountAt(int count) => comboNextAt - count * ComboWarningStep;
+
+        private double ComboWarningStep => comboNextAt > comboWarningAt ? (comboNextAt - comboWarningAt) / LabGourdCombo.Length : 1d;
+
         // 야광귀 섬광 (#268). 시각은 serverTime과 같은 전투 시계 기준이다. DEV에서 끄면 모두 기본값(섬광 없음)이다.
         /// <summary>
         /// 다음 섬광이 번쩍이는 시각과 그 예고(요괴가 빼꼼 나와 눈이 밝아짐)가 시작되는 시각. 꺼져 있거나 콤보 때문에

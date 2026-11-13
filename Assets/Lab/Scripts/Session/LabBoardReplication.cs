@@ -54,6 +54,8 @@ namespace C6Lab
         public bool hasComboState;
         public bool comboActive;
         public LabOrbElement[] comboColors = Array.Empty<LabOrbElement>();
+        /// <summary>#719: the next combo's colours shown during its warning.</summary>
+        public LabOrbElement[] comboNextColors = Array.Empty<LabOrbElement>();
         public int comboProgress;
         public double comboStartedAt = -1d, comboEndsAt = -1d, comboResultAt = -1d;
         public double comboNextAt = -1d, comboWarningAt = -1d;
@@ -73,6 +75,7 @@ namespace C6Lab
             copy.jigwiStage = LabJigwiStageNetworkValidation.Copy(jigwiStage);
             copy.jigwiAB = LabJigwiABNetworkValidation.Copy(jigwiAB);
             copy.comboColors = comboColors == null ? Array.Empty<LabOrbElement>() : (LabOrbElement[])comboColors.Clone();
+            copy.comboNextColors = comboNextColors == null ? Array.Empty<LabOrbElement>() : (LabOrbElement[])comboNextColors.Clone();
             return copy;
         }
     }
@@ -180,6 +183,7 @@ namespace C6Lab
                 foxRoundGoal = snapshot.foxRoundGoal, foxRoundCleared = snapshot.foxRoundCleared,
                 hasComboState = true, comboActive = snapshot.comboActive,
                 comboColors = snapshot.comboColors == null ? Array.Empty<LabOrbElement>() : (LabOrbElement[])snapshot.comboColors.Clone(),
+                comboNextColors = snapshot.comboNextColors == null ? Array.Empty<LabOrbElement>() : (LabOrbElement[])snapshot.comboNextColors.Clone(),
                 comboProgress = snapshot.comboProgress, comboStartedAt = snapshot.comboStartedAt,
                 comboEndsAt = snapshot.comboEndsAt, comboCount = snapshot.comboCount,
                 comboForgivenCount = snapshot.comboForgivenCount,
@@ -462,6 +466,8 @@ namespace C6Lab
                     // Copy Host control state, never infer progress from a locally presented hit.
                     copy.comboActive = header.comboActive;
                     copy.comboColors = (LabOrbElement[])header.comboColors.Clone();
+                    copy.comboNextColors = header.comboNextColors == null ? Array.Empty<LabOrbElement>()
+                        : (LabOrbElement[])header.comboNextColors.Clone();
                     copy.comboProgress = header.comboProgress; copy.comboCount = header.comboCount;
                     copy.comboForgivenCount = header.comboForgivenCount;
                     copy.comboStartedAt = header.comboStartedAt; copy.comboEndsAt = header.comboEndsAt;
@@ -698,6 +704,7 @@ namespace C6Lab
             foxRoundGoal = source.foxRoundGoal, foxRoundCleared = source.foxRoundCleared,
             comboActive = source.comboActive,
             comboColors = source.comboColors == null ? Array.Empty<LabOrbElement>() : (LabOrbElement[])source.comboColors.Clone(),
+            comboNextColors = source.comboNextColors == null ? Array.Empty<LabOrbElement>() : (LabOrbElement[])source.comboNextColors.Clone(),
             comboProgress = source.comboProgress, comboStartedAt = source.comboStartedAt, comboEndsAt = source.comboEndsAt,
             comboCount = source.comboCount, comboResult = source.comboResult, comboResultCount = source.comboResultCount,
             comboForgivenCount = source.comboForgivenCount,
@@ -736,6 +743,9 @@ namespace C6Lab
             if (value.comboColors == null || (value.comboColors.Length != 0 && value.comboColors.Length != LabGourdCombo.Length)
                 || value.comboActive && value.comboColors.Length != LabGourdCombo.Length
                 || value.comboColors.Any(color => color < LabOrbElement.Fire || color > LabOrbElement.Earth)
+                // #719: the warning's preview is empty or a full row of real colours (an old Host sends none).
+                || value.comboNextColors != null && value.comboNextColors.Length != 0 && value.comboNextColors.Length != LabGourdCombo.Length
+                || value.comboNextColors != null && value.comboNextColors.Any(color => color < LabOrbElement.Fire || color > LabOrbElement.Earth)
                 || value.comboProgress < 0 || value.comboProgress > LabGourdCombo.Length
                 || value.comboResult < LabComboResult.None || value.comboResult > LabComboResult.Timeout) return false;
             return Finite(value.comboStartedAt) && Finite(value.comboEndsAt) && Finite(value.comboResultAt)
