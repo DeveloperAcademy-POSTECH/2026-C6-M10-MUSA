@@ -7,7 +7,7 @@ namespace Hapio
 {
     /// <summary>
     /// 북 넘기기 안내 (#718). 베타테스트에서 북을 넘겨야 하는 줄 모르고 가만히 있던 플레이어를 위해, 북이 내 판에 온 뒤
-    /// hintAfterSeconds(기본 8초) 동안 넘기지 않으면 튜토리얼 4·6단계와 같은 손과 초록 화살표로 북을 옆으로 미는 모습을 보여 준다.
+    /// hintAfterSeconds(기본 4초) 동안 넘기지 않으면 튜토리얼 4·6단계와 같은 손과 초록 화살표로 북을 옆으로 미는 모습을 보여 준다.
     /// - 북을 두드려 구슬을 만들어도 시간은 계속 센다. 북이 내 판을 떠나야(넘겨야) 그 북의 시간이 없어지고, 북이 다시 오면 처음부터 센다.
     ///   일시정지·시작 전·전투가 끝난 뒤에는 세지 않는다. 북이 여러 개면 가장 오래 있던 북을 가리킨다.
     /// - 넘길 수 있는 쪽만 가리킨다: 양쪽이 열려 있으면 손이 한 번 밀 때마다 오른쪽·왼쪽을 번갈아, 방해 기믹으로 한쪽이 막혔거나
@@ -25,7 +25,7 @@ namespace Hapio
         public const int RightSide = 1, LeftSide = 2;
 
         [Tooltip("북이 내 판에 온 뒤 이 시간(초) 동안 넘기지 않으면 안내를 띄운다. 북을 두드려도 시간은 계속 센다.")]
-        [SerializeField, Min(.5f)] private float hintAfterSeconds = 8f;
+        [SerializeField, Min(.5f)] private float hintAfterSeconds = 4f;
 
         private GameSession session;
         private LabOrbBoard board;

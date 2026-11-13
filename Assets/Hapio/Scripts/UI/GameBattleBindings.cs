@@ -63,7 +63,7 @@ namespace Hapio
             RebindScene(network);
             if (!session.IsTutorial) gameObject.AddComponent<GameBattleUiPresentation>().Bind(this, session);
             else gameObject.AddComponent<GameTutorialBoardPresentation>().Bind(this);
-            // #718: a drum kept 8 s without passing gets the tutorial's hand-and-arrow guide (the practice board has its own).
+            // #718: a drum kept 4 s without passing gets the tutorial's hand-and-arrow guide (the practice board has its own).
             if (!session.IsTutorial) gameObject.AddComponent<GameDrumPassHint>().Bind(this, session);
             gameObject.AddComponent<GameHelpView>().Bind(this, session);
             // The gourd's sunk part stays visible over the ground (presentation only; no height, motion or size change).
