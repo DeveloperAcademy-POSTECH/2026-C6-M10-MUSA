@@ -8604,3 +8604,39 @@ main `e3108459`의 #712(칠용 뚜껑 법선 공유와3개 LidPaint 메시)을 �
 ## 2026-11-12 — #711 main 병합 충돌 해결
 
 main fbc943e8을 통합하며 VALIDATION 문서 끝의 독립 기록 추가 충돌을 양쪽 보존으로 해결했다. 자동 병합된 Battle 씬은 Stage2 하위591개 블록이 작업 브랜치와 같고 Stage3 하위710개 블록이 main과 같은 것을 정적 비교했다. 씬 object ID 중복0, 새 미해결 GUID0, 충돌 표식0을 확인했다. 기존 패키지 GUID는 프로젝트 에셋 GUID 검사에서 제외했다. main의 시연/법선 수정과 기존 Stage2 폴리싱을 함께 보존했다. 이 병합본에서 Unity 컴파일/실행 검사는 재실행하지 않았으며 앞선 PASS 기록과 구분한다.
+
+## 2026-11-13 — #717 전투 시작·끝 문구와 결과 전환 (땅따먹기·스토리 1~3)
+
+### 원인 (땅따먹기 끝의 멈춤)
+
+- 결과 화면으로 넘어가기 전 `GameSession.ChangeScene`이 "다 칠한 박" 그림(박 확인)이 준비되길 기다린다(`CanCaptureResult` → `LabGourdResultPreview.SurfaceMatches`, 다 칠한 박만 통과). 시간이 다 되어 끝난 땅따먹기 박은 다 칠해지지 않으므로 이 기다림이 결과 준비 제한 시간(스토리가 아니면 `loadingTimeoutSeconds` 30초)까지 이어진다. 그동안 전투 화면이 그대로 남아 멈춘 것처럼 보였다. 박을 다 칠해 끝난 경우에도 참가자 기기는 마지막 칠 지도가 도착할 때까지 기다린다.
+- 코드 읽기와 Editor API 확인(땅따먹기 설정: 박 확인 켜짐·Paint·목표 100%)으로 찾은 원인이다. 실제 기기에서 몇 초가 걸렸는지는 아직 재지 않았다(NOT_RUN). 이번 변경부터 결과로 넘어갈 때마다 콘솔에 `HAPIO_RESULT_TRANSITION mode=… wait=… capture=… hold=… load=…` 한 줄이 남는다.
+
+### 변경
+
+- 문구 모양: 진홍 `#8A1206` 글자, 크림 `#FCE8C8` 가장자리(3px), 신라문화체 Bold. 세션 위 시작 오버레이(`GameStartOverlay`)가 그린다.
+- 시작: 3·2·1 뒤 스토리 스테이지(1~3, 야광귀 시연 포함)는 "봉인 시작!"(64), 땅따먹기는 "시작!" 그대로. 화면을 막지 않으며, 보이는 시간은 0.5초 → 1초(`GameStartTiming.DefaultStartedLabelSeconds`).
+- 끝 (판이 끝난 것을 본 기기마다, 호루라기 한 번 `Resources/Hapio/Audio/TerritoryWhistle` 1.8초 모노, 덮개와 `SetUiInputBlocked(true)`로 조작 막기):
+  - 땅따먹기(1:1·2:2·3:3): 시간 종료 또는 한 팀이 다 칠함 → "경기 종료!"(64, 옅은 그늘). 결과 화면은 끝을 본 뒤 `battleEndHoldSeconds`(기본 1.8초)가 지나야 열리고, 결과 준비(박 그림 복사)는 그 사이에 한다. 피버 게이지는 그 자리에서 멈춘다(`LabTeamBar`).
+  - 스토리 스테이지(1~3), 시간 안에 다 칠함 → "봉인 성공!"(64, 진홍, 옅은 그늘). 이 기기에서 막타 연출(마지막 일격 다시보기 또는 1.2초 고정 연출)이 시작되면 사라진다. 방장은 막타 연출의 공동 시작을 끝에서 1.8초 뒤보다 이르게 잡지 않는다(`FinishScheduleAllowed`; 여럿이면 예약 여유 0.75초를 빼고 예약, 솔로는 그 시각에 바로 시작). 막타 연출의 공동 제한(12초) 안에서 다시보기(1.95초)가 들어가는지 보는 기존 판정은 그대로다.
+  - 스토리 스테이지(1~3), 다 칠하지 못하고 시간이 끝남 → "시간 초과!"(64, 짙은 청색 `#164B8C`, 크림 가장자리). 막타 연출 없이, 끝을 본 뒤 1.8초가 지나면 바로 실패 화면(게임 오버)으로 간다(`ChangeScene`의 GameOver 전환에서 기다림). 사람이 나가서 끝난 게임 오버 등 다른 끝에는 문구가 없고 기다리지 않는다.
+  - 연습판(튜토리얼)은 그대로다.
+- 다 칠하지 않은 땅따먹기 결과는 박 확인 그림을 기다리지 않는다(`ResultNeedsPreview`). 다 칠해 끝난 경우에도 그 그림은 "경기 종료!" 뒤 `territoryPreviewGraceSeconds`(기본 1초)까지만 기다리고, 그때까지 오지 않으면 그림 없이 결과를 연다. 이때 영어 안내 문구는 띄우지 않는다.
+- Host 판정, 스냅샷, DEV 값, 접속 버전은 바뀌지 않았다. 막타 연출 예약 시각만 방장 기기에서 늦춰지며, 참가자는 원래대로 방장이 보낸 시각을 따른다.
+- 호루라기 출처(ElevenLabs Sound Effects)를 `docs/AUDIO_CREDITS.md`에 추가했다. 만든 계정의 유료 플랜 여부는 확인이 필요하다.
+- `GameSession.TerritoryEnd.cs` → `GameSession.BattleEnd.cs`(같은 meta GUID)로 이름을 바꾸고 스토리 끝(성공·시간 초과)을 함께 다룬다. 시간 초과 판정 문구는 `TimeRanOutReason` 상수로 같은 값("Time ran out.")을 쓴다.
+
+### 확인
+
+- Unity 6000.6.5f1 Editor 컴파일: PASS. 새 멤버(`BattleEndShown`, `ShowTimeUp`)와 새 검사가 있고 옛 `UpdateTerritoryEnd`·`ShowSealFinished`가 없는 것을 리플렉션으로 확인했다. 콘솔 오류 1건은 이 변경과 무관한 기존 Library 캐시 손상(`ResultAction.png`)이다.
+- 호루라기 가져오기: Editor API로 Force To Mono·Decompress On Load, 1.80초·1채널 확인.
+- 검사 추가/갱신 (실행은 NOT_RUN):
+  - `GameSceneFlowTests.AStoryStageSaysSealSucceededWithTheWhistleBeforeItsFinalHitEffect`: 다 칠함 → "봉인 성공!"·진홍·덮개·조합판 막힘·호루라기 1번 → 1.8초 이상 지나 막타 연출 시작 → 문구 사라짐 → 결과 스토리.
+  - `GameSceneFlowTests.AStoryTimeUpSaysTimeUpInBlueWithTheWhistleThenGoesStraightToItsFailure`: 1초 제한 시간 종료 → "시간 초과!"·청색·덮개·조합판 막힘·호루라기 1번 → 1.8초 이상 지나 게임 오버, 막타 연출 없음 → 문구 사라짐.
+  - `GameSceneFlowTests.TerritoryTimeUpSaysGameOverWithTheWhistleThenOpensItsResultWithoutAPaintedGourd`: 시간 종료 → "경기 종료!"·덮개·조합판 막힘·호루라기 1번 → 1.8초 이상, 1.8+3초 안에 결과 → 덮개 사라짐·박 확인 그림 없음 → 나가기.
+  - `GameSceneFlowTests.SharedCountdownWaitsForInitialPresentationAndOnlyThenStartsGameplay`: 시작 문구 "봉인 시작!", 기본 1초.
+  - `GameStartOverlayTests.TheTerritoryEndSaysGameOverInCrimsonWithACreamEdgeAndBlocksTouches`: 네 문구의 글자·색(시간 초과만 청색)·가장자리·입력 막기, "시작!"에는 가장자리 없음.
+  - `LabTeamBattleScreenTests.FeverGaugesCountHitsThenTheFeverTimeAndTheResultShowsFinalNumbers`: 끝난 뒤 피버 게이지 고정.
+  - 다 칠한 뒤 1.8초가 지나기 전에는 막타 연출이 시작하지 않으므로 기존 스토리 완료·다시보기 검사(`GameFinishReplayTests`, `GameStage2GourdHitFinishTests`, 결과 스토리 흐름)와 시간 초과 게임 오버 검사(`AuthoritativeTimeoutLoadsGameOverInsteadOfNextStage`, 실패 화면까지 1.8초 늦음)도 다시 돌려야 한다.
+- 결과 전환과 막타 연출 예약(`GameSession`)이 바뀌었으므로 #637 기준 전체 EditMode·PlayMode: NOT_RUN.
+- Mac 앱 여러 개로 땅따먹기 2:2와 스토리 1스테이지(성공·시간 초과 각각)를 끝까지 진행해 방장·참가자 화면, 막타 연출 시작, `HAPIO_RESULT_TRANSITION` 시간 확인: NOT_RUN.
