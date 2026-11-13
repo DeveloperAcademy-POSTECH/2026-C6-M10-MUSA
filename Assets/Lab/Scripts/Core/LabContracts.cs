@@ -489,6 +489,12 @@ namespace C6Lab
         public int comboProgress;
         /// <summary>#695: 이번 라운드에 봐준 틀린 색 수 (라운드 첫 콤보의 첫 칸 전). 늘면 금옥이 다시 해보자고 한다.</summary>
         public uint comboForgivenCount;
+        /// <summary>#719: 이번 라운드에 박에 맞은 틀린 색 수 (봐준 것 + 실패). 늘면 모두의 화면에서 그 칸에 X가 찍힌다.
+        /// 마지막 틀린 색을 던진 사람, 그 색, 맞혀야 했던 칸(0~3).</summary>
+        public uint comboWrongCount;
+        public ulong comboWrongBy;
+        public LabOrbElement comboWrongElement;
+        public int comboWrongSlot;
         /// <summary>진행 중인 콤보가 나온 시각과 제한 시간이 끝나는 시각</summary>
         public double comboStartedAt = -1d;
         public double comboEndsAt = -1d;

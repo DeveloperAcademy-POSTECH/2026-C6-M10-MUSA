@@ -80,6 +80,29 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void EveryWrongColorIsRememberedForTheXMark()
+        {
+            // #719: forgiven or failing, each wrong colour says who threw what on which slot (everyone's screen stamps an X there).
+            var combo = new LabGourdCombo();
+            combo.Start(Sample, 0d, 10d, forgiveUntilFirstHit: true);
+            Assert.That(combo.Judge(LabOrbElement.Earth, 7, 1d), Is.EqualTo(LabComboResult.None));
+            Assert.That(combo.WrongCount, Is.EqualTo(1u));
+            Assert.That(combo.LastWrongBy, Is.EqualTo(7ul));
+            Assert.That(combo.LastWrongElement, Is.EqualTo(LabOrbElement.Earth));
+            Assert.That(combo.LastWrongSlot, Is.Zero);
+            Assert.That(combo.Judge(LabOrbElement.Fire, 7, 2d), Is.EqualTo(LabComboResult.None));
+            Assert.That(combo.WrongCount, Is.EqualTo(1u), "A right colour is not a wrong one.");
+            Assert.That(combo.Judge(LabOrbElement.Metal, 9, 3d), Is.EqualTo(LabComboResult.WrongColor));
+            Assert.That(combo.WrongCount, Is.EqualTo(2u));
+            Assert.That(combo.LastWrongBy, Is.EqualTo(9ul));
+            Assert.That(combo.LastWrongElement, Is.EqualTo(LabOrbElement.Metal));
+            Assert.That(combo.LastWrongSlot, Is.EqualTo(1), "The second slot (Water) was the one missed.");
+            combo.Reset();
+            Assert.That(combo.WrongCount, Is.Zero);
+            Assert.That(combo.LastWrongElement, Is.EqualTo(LabOrbElement.None));
+        }
+
+        [Test]
         public void TheFirstComboIgnoresWrongColorsUntilItsFirstSlotIsHit()
         {
             // #695: Sample is Fire, Water, Water, Earth.

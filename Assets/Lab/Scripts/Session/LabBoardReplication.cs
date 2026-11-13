@@ -62,6 +62,11 @@ namespace C6Lab
         public uint comboCount, comboResultCount, comboForgivenCount;
         public LabComboResult comboResult;
         public ulong comboFailedBy;
+        /// <summary>#719: the last wrong colour (forgiven or failing), shown as an X on everyone's screen.</summary>
+        public uint comboWrongCount;
+        public ulong comboWrongBy;
+        public LabOrbElement comboWrongElement;
+        public int comboWrongSlot;
         public float targetYawDegrees, targetYawSpeedDegreesPerSecond;
         public float targetRopeCycleElapsed, targetRopeHitOffset, targetRopeHitVelocity;
 
@@ -187,6 +192,8 @@ namespace C6Lab
                 comboProgress = snapshot.comboProgress, comboStartedAt = snapshot.comboStartedAt,
                 comboEndsAt = snapshot.comboEndsAt, comboCount = snapshot.comboCount,
                 comboForgivenCount = snapshot.comboForgivenCount,
+                comboWrongCount = snapshot.comboWrongCount, comboWrongBy = snapshot.comboWrongBy,
+                comboWrongElement = snapshot.comboWrongElement, comboWrongSlot = snapshot.comboWrongSlot,
                 comboResult = snapshot.comboResult, comboResultCount = snapshot.comboResultCount,
                 comboResultAt = snapshot.comboResultAt, comboFailedBy = snapshot.comboFailedBy,
                 comboNextAt = snapshot.comboNextAt, comboWarningAt = snapshot.comboWarningAt,
@@ -470,6 +477,8 @@ namespace C6Lab
                         : (LabOrbElement[])header.comboNextColors.Clone();
                     copy.comboProgress = header.comboProgress; copy.comboCount = header.comboCount;
                     copy.comboForgivenCount = header.comboForgivenCount;
+                    copy.comboWrongCount = header.comboWrongCount; copy.comboWrongBy = header.comboWrongBy;
+                    copy.comboWrongElement = header.comboWrongElement; copy.comboWrongSlot = header.comboWrongSlot;
                     copy.comboStartedAt = header.comboStartedAt; copy.comboEndsAt = header.comboEndsAt;
                     copy.comboResult = header.comboResult; copy.comboResultCount = header.comboResultCount;
                     copy.comboResultAt = header.comboResultAt; copy.comboFailedBy = header.comboFailedBy;
@@ -708,6 +717,8 @@ namespace C6Lab
             comboProgress = source.comboProgress, comboStartedAt = source.comboStartedAt, comboEndsAt = source.comboEndsAt,
             comboCount = source.comboCount, comboResult = source.comboResult, comboResultCount = source.comboResultCount,
             comboForgivenCount = source.comboForgivenCount,
+            comboWrongCount = source.comboWrongCount, comboWrongBy = source.comboWrongBy,
+            comboWrongElement = source.comboWrongElement, comboWrongSlot = source.comboWrongSlot,
             comboResultAt = source.comboResultAt, comboFailedBy = source.comboFailedBy,
             comboNextAt = source.comboNextAt, comboWarningAt = source.comboWarningAt,
             flashWarningAt = source.flashWarningAt, flashAt = source.flashAt, flashTarget = source.flashTarget,
@@ -747,6 +758,9 @@ namespace C6Lab
                 || value.comboNextColors != null && value.comboNextColors.Length != 0 && value.comboNextColors.Length != LabGourdCombo.Length
                 || value.comboNextColors != null && value.comboNextColors.Any(color => color < LabOrbElement.Fire || color > LabOrbElement.Earth)
                 || value.comboProgress < 0 || value.comboProgress > LabGourdCombo.Length
+                || value.comboWrongSlot < 0 || value.comboWrongSlot >= LabGourdCombo.Length
+                || value.comboWrongElement != LabOrbElement.None
+                    && (value.comboWrongElement < LabOrbElement.Fire || value.comboWrongElement > LabOrbElement.Earth)
                 || value.comboResult < LabComboResult.None || value.comboResult > LabComboResult.Timeout) return false;
             return Finite(value.comboStartedAt) && Finite(value.comboEndsAt) && Finite(value.comboResultAt)
                 && Finite(value.comboNextAt) && Finite(value.comboWarningAt);

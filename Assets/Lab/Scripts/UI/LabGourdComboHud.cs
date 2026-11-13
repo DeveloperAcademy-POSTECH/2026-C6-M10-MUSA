@@ -256,6 +256,170 @@ namespace C6Lab
 
         private float tickBeat;
 
+        // ---- #719 틀린 색 X: 박에 틀린 색이 맞으면 모두의 화면에서 맞혀야 했던 칸에 빨간 X가 쾅 찍히고 칸이 흔들린다 ----
+        /// <summary>봐준 틀린 색(실패 아님)의 X가 떠 있는 시간, 진짜 실패 때 결과 문구 전에 패널과 X를 붙잡아 두는 시간.</summary>
+        public const float WrongForgivenSeconds = .9f, WrongFailHoldSeconds = .65f;
+        private bool wrongSeenInit;
+        private uint seenWrongCount;
+        private float wrongElapsed = -1f;
+        private int wrongSlot;
+        private bool wrongFails;
+        private LabOrbElement wrongElement;
+        private string wrongLabel = "";
+        private Image wrongMark, wrongTagBack, wrongTagOrb, edgeFlash;
+        private Text wrongTagText;
+        private static Sprite wrongSprite;
+        public bool WrongMarkShown => wrongMark != null && wrongMark.gameObject.activeInHierarchy;
+        public int WrongMarkSlot => wrongElapsed >= 0f ? wrongSlot : -1;
+        public bool WrongMarkFails => wrongElapsed >= 0f && wrongFails;
+
+        /// <summary>#719: a new wrong colour hit the gourd (forgiven or failing) → stamp an X on the slot it missed.</summary>
+        private void DetectWrong(LabSnapshot snapshot)
+        {
+            if (!wrongSeenInit || snapshot.comboWrongCount < seenWrongCount)
+            {
+                wrongSeenInit = true;
+                seenWrongCount = snapshot.comboWrongCount;
+                return;
+            }
+            if (snapshot.comboWrongCount == seenWrongCount) return;
+            seenWrongCount = snapshot.comboWrongCount;
+            wrongElapsed = 0f;
+            wrongSlot = Mathf.Clamp(snapshot.comboWrongSlot, 0, LabGourdCombo.Length - 1);
+            wrongElement = snapshot.comboWrongElement;
+            // The same snapshot carries a new WrongColor result when this wrong colour ended the combo.
+            wrongFails = snapshot.comboResult == LabComboResult.WrongColor && snapshot.comboResultCount != shownResultCount;
+            wrongLabel = "";
+            if (network != null && snapshot.comboWrongBy == network.LocalPlayerId) wrongLabel = "나";
+            else if (snapshot.players != null)
+                foreach (LabPlayerState player in snapshot.players)
+                    if (player != null && player.id == snapshot.comboWrongBy) { wrongLabel = "P" + (player.seat + 1); break; }
+            // A real failure already buzzes long (LabHaptics); a forgiven one gets a short sharp knock.
+            if (!wrongFails && network != null) LabHaptics.PlayDirect(network.config, LabHapticStyle.Rigid, 1f, .18f, .8f, .7f);
+        }
+
+        /// <summary>#719: how far the missed slot is shaken sideways right now.</summary>
+        private float WrongShake(int slot, float slotWidth)
+        {
+            if (wrongElapsed < 0f || slot != wrongSlot) return 0f;
+            float k = Mathf.Clamp01(1f - wrongElapsed / .45f);
+            return Mathf.Sin(wrongElapsed * 80f) * slotWidth * (wrongFails ? .28f : .18f) * k * k;
+        }
+
+        private void DrawWrong()
+        {
+            if (wrongElapsed >= 0f) wrongElapsed += Time.unscaledDeltaTime;
+            float duration = wrongFails ? WrongFailHoldSeconds : WrongForgivenSeconds;
+            if (wrongElapsed >= duration) wrongElapsed = -1f;
+            bool show = wrongElapsed >= 0f && panel.gameObject.activeSelf;
+            EnsureWrongParts();
+            wrongMark.gameObject.SetActive(show);
+            wrongTagBack.gameObject.SetActive(show);
+            float t = Mathf.Max(0f, wrongElapsed);
+            float edge = wrongElapsed >= 0f ? Mathf.Clamp01(1f - t / .45f) : 0f;
+            edgeFlash.gameObject.SetActive(edge > 0f);
+            edgeFlash.color = new Color(FailColor.r, FailColor.g, FailColor.b, (wrongFails ? .85f : .6f) * edge * edge);
+            if (wrongElapsed >= 0f && wrongFails)
+            {
+                // The big one: the whole screen blinks red once while the X lands (the result words blink again after).
+                float blink = t < .12f ? 1f - t / .12f : 0f;
+                flash.gameObject.SetActive(blink > 0f);
+                flash.color = new Color(FailColor.r, FailColor.g, FailColor.b, .38f * blink);
+            }
+            if (!show) return;
+
+            RectTransform slot = slots[wrongSlot];
+            float alpha = Mathf.Clamp01(t / .05f) * (wrongFails ? 1f : Mathf.Clamp01((duration - t) / .25f));
+            // X: slams down from big onto the slot, tilted, then sits.
+            var mark = wrongMark.rectTransform;
+            if (mark.parent != slot) mark.SetParent(slot, false);
+            mark.SetAsLastSibling();
+            mark.anchorMin = mark.anchorMax = new Vector2(.5f, .5f);
+            mark.sizeDelta = slot.sizeDelta * 1.25f;
+            mark.anchoredPosition = Vector2.zero;
+            float land = Mathf.Clamp01(t / .11f);
+            float slam = Mathf.Lerp(wrongFails ? 2.8f : 2.1f, 1f, 1f - (1f - land) * (1f - land) * (1f - land));
+            mark.localScale = Vector3.one * slam * (wrongFails ? 1.2f : 1f);
+            mark.localRotation = Quaternion.Euler(0f, 0f, Mathf.Lerp(-22f, -6f, land));
+            wrongMark.color = new Color(1f, 1f, 1f, alpha);
+
+            // Who threw which colour: a small tag hanging under the panel at that slot (colour orb + P2 / 나).
+            var tagRect = wrongTagBack.rectTransform;
+            tagRect.SetAsLastSibling();
+            float h = slot.sizeDelta.y * .78f;
+            bool labelled = !string.IsNullOrEmpty(wrongLabel);
+            tagRect.anchorMin = tagRect.anchorMax = new Vector2(0f, 0f);
+            tagRect.pivot = new Vector2(.5f, 1f);
+            tagRect.sizeDelta = new Vector2(labelled ? h * 2.35f : h * 1.3f, h * 1.15f);
+            tagRect.anchoredPosition = new Vector2(slot.anchoredPosition.x, -h * .12f);
+            float pop = t < .16f ? Mathf.Lerp(.4f, 1.12f, t / .16f) : Mathf.Lerp(1.12f, 1f, Mathf.Clamp01((t - .16f) / .1f));
+            tagRect.localScale = Vector3.one * pop;
+            wrongTagBack.color = new Color(1f, 1f, 1f, alpha);
+            Sprite art = LabYaguangComboArt.Orb(wrongElement);
+            wrongTagOrb.sprite = art != null ? art : DiscSprite();
+            Color orbColor = art != null ? Color.white : (Color)LabPaintPalette.SrgbColorFor(wrongElement);
+            wrongTagOrb.color = new Color(orbColor.r, orbColor.g, orbColor.b, alpha);
+            var orb = wrongTagOrb.rectTransform;
+            orb.anchorMin = orb.anchorMax = new Vector2(labelled ? 0f : .5f, .5f);
+            orb.pivot = new Vector2(labelled ? 0f : .5f, .5f);
+            orb.sizeDelta = Vector2.one * h * .85f;
+            orb.anchoredPosition = new Vector2(labelled ? h * .18f : 0f, 0f);
+            wrongTagText.gameObject.SetActive(labelled);
+            wrongTagText.text = wrongLabel;
+            wrongTagText.fontSize = Mathf.Max(1, Mathf.RoundToInt(h * .62f));
+            var label = wrongTagText.rectTransform;
+            label.anchorMin = new Vector2(.42f, 0f);
+            label.anchorMax = new Vector2(1f, 1f);
+            label.offsetMin = label.offsetMax = Vector2.zero;
+            wrongTagText.color = new Color(FailColor.r, FailColor.g, FailColor.b, alpha);
+        }
+
+        private void EnsureWrongParts()
+        {
+            if (wrongMark != null) return;
+            wrongMark = NewRect("Combo Wrong X", panel).gameObject.AddComponent<Image>();
+            wrongMark.sprite = WrongSprite();
+            wrongMark.raycastTarget = false;
+            wrongMark.gameObject.SetActive(false);
+            wrongTagBack = NewRect("Combo Wrong Tag", panel).gameObject.AddComponent<Image>();
+            wrongTagBack.sprite = PillSprite();
+            wrongTagBack.type = Image.Type.Sliced;
+            wrongTagBack.raycastTarget = false;
+            wrongTagOrb = NewRect("Orb", wrongTagBack.rectTransform).gameObject.AddComponent<Image>();
+            wrongTagOrb.raycastTarget = false;
+            wrongTagText = NewText("Who", wrongTagBack.rectTransform, 20, TextAnchor.MiddleCenter);
+            wrongTagBack.gameObject.SetActive(false);
+            // Red screen edges (centre stays clear so the board is still readable).
+            RectTransform edgeRect = NewRect("Combo Wrong Edge", layer);
+            edgeRect.anchorMin = Vector2.zero;
+            edgeRect.anchorMax = Vector2.one;
+            edgeRect.offsetMin = edgeRect.offsetMax = Vector2.zero;
+            edgeFlash = edgeRect.gameObject.AddComponent<Image>();
+            edgeFlash.sprite = VignetteSprite();
+            edgeFlash.color = Color.clear;
+            edgeFlash.raycastTarget = false;
+            edgeRect.gameObject.SetActive(false);
+        }
+
+        /// <summary>#719: a thick hand-drawn red X with a dark ink edge.</summary>
+        private static Sprite WrongSprite()
+        {
+            if (wrongSprite != null) return wrongSprite;
+            float s = TextureSize;
+            Vector2 a = new Vector2(s * .2f, s * .2f), b = new Vector2(s * .8f, s * .8f);
+            Vector2 c2 = new Vector2(s * .2f, s * .8f), d = new Vector2(s * .8f, s * .2f);
+            wrongSprite = Draw("Lab combo wrong", (p, c) =>
+            {
+                float distance = Mathf.Min(SegmentDistance(p, a, b), SegmentDistance(p, c2, d));
+                float core = Mathf.Clamp01(s * .08f + .5f - distance);
+                float edge = Mathf.Clamp01(s * .08f + 4f + .5f - distance);
+                Color color = Color.Lerp((Color)InkColor, FailColor, core);
+                color.a = edge;
+                return color;
+            }, Vector4.zero);
+            return wrongSprite;
+        }
+
         /// <summary>#719: 1 right on each combo clock tick (the same ticks LabYaguangSound plays), fading to 0 before the next.
         /// The combo's start (the 깽) counts as the first beat.</summary>
         private float TickBeat(LabSnapshot snapshot, double serverNow)
@@ -306,10 +470,12 @@ namespace C6Lab
             layer.SetAsLastSibling();
 
             if (snapshot.comboCount < lastComboCount || snapshot.foxRoundCount < shownFoxRoundCount) ResetRound();
+            DetectWrong(snapshot);
             DetectChanges(snapshot);
             DetectFoxRound(snapshot, serverNow);
             DrawCombo(snapshot, serverNow, warning);
             DrawResult();
+            DrawWrong();
             DrawWarning(snapshot, serverNow, warning);
             DrawShade(warning);
             DrawEffect(snapshot, serverNow);
@@ -541,6 +707,9 @@ namespace C6Lab
                     ShowComboPop(LabGourdCombo.Length, true, snapshot.comboCount);
                     resultDelay = comboClearSeconds;
                 }
+                // #719: a wrong colour first stamps its X on the missed slot (panel held), then the result words.
+                if (shownResult == LabComboResult.WrongColor && wrongFails && wrongElapsed >= 0f)
+                    resultDelay = WrongFailHoldSeconds;
             }
             if (snapshot.comboCount != lastComboCount)
             {
@@ -563,16 +732,18 @@ namespace C6Lab
         {
             // 결과 문구가 떠 있는 동안에는 패널을 숨긴다 (콤보 → 결과 → 배지가 겹치지 않게).
             bool finalCheck = StampSuccess && shownResult == LabComboResult.Success && resultDelay > 0f;
+            // #719: a failing wrong colour keeps the panel up a moment so its X lands on the missed slot.
+            bool wrongHold = shownResult == LabComboResult.WrongColor && resultDelay > 0f;
             bool yaguang = YaguangCount;
             // #719: during the warning the panel shows the next combo's real colours, one more on each count (넷 → 하나),
             // so the order can be read (and the orbs made) before it starts — without hearing anything.
-            bool preview = yaguang && warning && !snapshot.comboActive && resultElapsed < 0f && !finalCheck
+            bool preview = yaguang && warning && !snapshot.comboActive && resultElapsed < 0f && !finalCheck && !wrongHold
                 && snapshot.comboNextColors != null && snapshot.comboNextColors.Length == LabGourdCombo.Length;
             int revealed = preview ? Mathf.Clamp(LabGourdCombo.Length + 1 - snapshot.ComboWarningCount(serverNow), 0, LabGourdCombo.Length) : 0;
             if (revealed > previewRevealed) { popSlot = revealed - 1; popElapsed = 0f; }
             previewRevealed = revealed;
             LabOrbElement[] colors = preview ? snapshot.comboNextColors : snapshot.comboColors;
-            bool showPanel = preview || (snapshot.comboActive && resultElapsed < 0f || finalCheck) && snapshot.comboColors != null
+            bool showPanel = preview || (snapshot.comboActive && resultElapsed < 0f || finalCheck || wrongHold) && snapshot.comboColors != null
                 && snapshot.comboColors.Length == LabGourdCombo.Length;
             figmaPanel = yaguang && LabYaguangComboArt.Load("Panel") != null;
             ApplyPanelArtwork(figmaPanel);
@@ -640,6 +811,7 @@ namespace C6Lab
                 if ((!figmaPanel || preview) && i == popSlot && popElapsed >= 0f && popElapsed < .25f)
                     scale += .3f * Mathf.Sin(popElapsed / .25f * Mathf.PI);
                 slots[i].localScale = Vector3.one * scale;
+                slots[i].anchoredPosition += new Vector2(WrongShake(i, slots[i].sizeDelta.x), 0f); // #719 X
                 // 야광귀 셈법 (#271): 맞힌 칸 위에 그 칸의 수가 톡 튀어나와 남는다.
                 Text word = slotWords[i];
                 word.gameObject.SetActive(yaguang && hit && !figmaPanel);
@@ -825,6 +997,8 @@ namespace C6Lab
             popElapsed = -1f;
             popSlot = -1;
             previewRevealed = 0;
+            wrongSeenInit = false;
+            wrongElapsed = -1f;
             System.Array.Clear(wasChecked, 0, wasChecked.Length);
             effectKind = 0;
             effectPopElapsed = -1f;

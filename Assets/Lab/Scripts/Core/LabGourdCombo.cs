@@ -39,6 +39,12 @@ namespace C6Lab
         public bool Forgiving => Active && forgiving && Progress == 0;
         /// <summary>#695: 이번 라운드에 봐준 틀린 색 수. 늘 때마다 금옥이 "한 번만 다시 해보자" 같은 말을 한다.</summary>
         public uint ForgivenCount { get; private set; }
+        /// <summary>#719: 이번 라운드에 박에 맞은 틀린 색 수 (봐준 것과 실패한 것 모두). 늘 때마다 모두의 화면 그 칸에 X가 찍힌다.</summary>
+        public uint WrongCount { get; private set; }
+        /// <summary>#719: 마지막 틀린 색을 던진 사람, 그 색, 맞혀야 했던 칸(0~3).</summary>
+        public ulong LastWrongBy { get; private set; }
+        public LabOrbElement LastWrongElement { get; private set; }
+        public int LastWrongSlot { get; private set; }
 
         public LabOrbElement ColorAt(int index) => colors[index];
         public LabOrbElement[] Colors => (LabOrbElement[])colors.Clone();
@@ -52,6 +58,10 @@ namespace C6Lab
             StartedAt = EndsAt = -1d;
             Count = 0;
             ForgivenCount = 0;
+            WrongCount = 0;
+            LastWrongBy = 0;
+            LastWrongElement = LabOrbElement.None;
+            LastWrongSlot = 0;
             LastResult = LabComboResult.None;
             LastResultCount = 0;
             LastResultAt = -1d;
@@ -92,6 +102,10 @@ namespace C6Lab
             if (at >= EndsAt) return Finish(LabComboResult.Timeout, EndsAt, 0);
             if (element != colors[Progress])
             {
+                WrongCount++;
+                LastWrongBy = thrower;
+                LastWrongElement = element;
+                LastWrongSlot = Progress;
                 if (!Forgiving) return Finish(LabComboResult.WrongColor, at, thrower);
                 ForgivenCount++;
                 return LabComboResult.None;
