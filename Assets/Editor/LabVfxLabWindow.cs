@@ -130,13 +130,21 @@ namespace C6Lab.Editor
             bool running = ready && network.VfxLabComboRunning, active = ready && network.VfxLabComboActive;
             EditorGUILayout.LabelField("Y2(콤보) / Y3(BIG 보상)", EditorStyles.miniBoldLabel);
             using (new EditorGUI.DisabledScope(!ready || running || !network.VfxLabYaguangFeverReady))
-                if (GUILayout.Button("콤보 바로 시작 (COMBO 3/2/1부터)", GUILayout.Height(30)))
-                    Report(network.VfxLabStartCombo(), "콤보 예고를 시작했다.", "지금은 시작할 수 없음 (섬광/콤보 진행 중이거나 보상/벌칙이 남아 있음, 또는 피버 뒤)");
+                if (GUILayout.Button("콤보 바로 시작 (넷 셋 둘 하나 + 색 미리 보기부터)", GUILayout.Height(30)))
+                    Report(network.VfxLabStartCombo(), "콤보 예고를 시작했다. 넷 셋 둘 하나에 맞춰 칸이 실제 색으로 하나씩 채워진다.", "지금은 시작할 수 없음 (섬광/콤보 진행 중이거나 보상/벌칙이 남아 있음, 또는 피버 뒤)");
             using (new EditorGUI.DisabledScope(!active))
             {
                 if (GUILayout.Button("다음 칸 색 구슬 받기 (직접 던져 맞히기)", GUILayout.Height(26)))
                     Report(network.VfxLabGiveComboOrb(out LabOrbElement color), "내 판에 " + Name(color) + " 속성 구슬을 놓았다. 박에 던져 맞히면 칸이 체크된다.",
                         "판이 가득 찼음 (구슬을 하나 던지거나 버린 뒤 다시)");
+                // #719: 콤보 가이딩을 한 단계씩 본다.
+                if (GUILayout.Button("다른 색 구슬 받기 (빛 테두리가 안 붙는지)", GUILayout.Height(26)))
+                    Report(network.VfxLabGiveOtherColorOrb(out LabOrbElement other), "내 판에 " + Name(other) + " 속성 구슬을 놓았다. 다음 칸 색이 아니라 빛나지 않아야 한다.",
+                        "판이 가득 찼음 (구슬을 하나 던지거나 버린 뒤 다시)");
+                if (GUILayout.Button("다음 칸 하나만 맞히기 (도장 → 강조가 다음 칸으로)", GUILayout.Height(26)))
+                    Report(network.VfxLabHitComboSlot(), "한 칸을 맞혔다. 도장이 찍히고 강조와 빛 테두리가 다음 색으로 옮겨 간다.", "맞힐 수 없음 (4칸이 끝났거나 시간이 지남)");
+                if (GUILayout.Button("틀린 색 → 봐주기 (첫 칸 전, 금옥 \"다시 해 보자\")", GUILayout.Height(26)))
+                    Report(network.VfxLabForgiveWrongCombo(), "틀린 색을 봐줬다. 콤보는 계속된다.", "봐줄 수 없음 (첫 칸을 이미 맞혔음 → 아래 실패 버튼)");
                 if (GUILayout.Button("남은 칸 바로 맞히기 → 성공 + BIG 보상", GUILayout.Height(26)))
                     Report(network.VfxLabCompleteCombo(), "콤보 성공. BIG 보상이 걸렸다.", "성공 처리를 못 함 (4칸이 끝났거나 시간이 지남)");
                 if (GUILayout.Button("틀린 색 맞히기 → 실패 + SMALL 벌칙", GUILayout.Height(26)))
@@ -178,6 +186,16 @@ namespace C6Lab.Editor
                     Report(network.VfxLabFinishJigwiMission(true), name + " 성공 처리했다 (부적이면 모두 다 쓴 것으로 → 완성 연출).", "아직 시작 전(예고 중)이거나 끝났음");
                 if (GUILayout.Button(name + " 실패 (시간 끝)", GUILayout.Height(26)))
                     Report(network.VfxLabFinishJigwiMission(false), name + "의 시간이 다 된 것으로 끝냈다 (부적이면 불덩이 → 판이 탐).", "아직 시작 전(예고 중)이거나 끝났음");
+            }
+            // #696/#719: 연기 파편과 검정 구슬 연출을 바로 본다.
+            EditorGUILayout.LabelField("연기 파편 / 검정 구슬", EditorStyles.miniBoldLabel);
+            using (new EditorGUI.DisabledScope(!ready))
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                if (GUILayout.Button("파편 4개 받기", GUILayout.Height(26)))
+                    Report(network.VfxLabGiveSootShards(), "검은 파편 4개(북/서/남/동)를 놓았다. 이웃끼리 끌어다 붙여 본다.", "놓을 수 없음");
+                if (GUILayout.Button("검정 구슬 받기", GUILayout.Height(26)))
+                    Report(network.VfxLabGiveSootOrb(), "검정 구슬을 놓았다. 기운 소리/연기를 보고, 던져서 명중 효과를 본다.", "판이 가득 찼음");
             }
             using (new EditorGUI.DisabledScope(!on))
                 if (GUILayout.Button("지귀 피버 바로 시작 (100초를 지금으로)", GUILayout.Height(30)))

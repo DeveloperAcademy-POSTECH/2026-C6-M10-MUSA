@@ -26,6 +26,8 @@ namespace Hapio.Tests
     {
         private GameSession session;
         private LabNetwork network;
+        private GameFigmaStrokeLibrary.Surface returnBackgroundEntry;
+        private Sprite returnBackgroundSprite;
 
         [UnitySetUp]
         public IEnumerator LoadSavedHome()
@@ -66,6 +68,7 @@ namespace Hapio.Tests
         [UnityTearDown]
         public IEnumerator ReleaseOwnedSession()
         {
+            RestoreReturnBackgroundSource();
             Time.timeScale = 1f;
             // A test that ran the production countdown may have failed inside a nested yield, skipping its finally.
             GameTestStartTiming.UseShort();
@@ -1317,6 +1320,27 @@ namespace Hapio.Tests
             Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.StageResult));
         }
 
+        private void RestoreReturnBackgroundSource()
+        {
+            if (returnBackgroundEntry != null) returnBackgroundEntry.sprite = returnBackgroundSprite;
+            returnBackgroundEntry = null;
+            returnBackgroundSprite = null;
+        }
+
+        private static void AssertViewerReturnBackground(GameScreen screen, bool fallback)
+        {
+            var button = screen.closeViewerButton;
+            var artwork = button.GetComponentInChildren<GameFigmaSurface>(true);
+            var fill = button.GetComponentsInChildren<LabRoundedGraphic>(true).Single();
+            Assert.That(artwork.enabled, Is.EqualTo(!fallback));
+            Assert.That(fill.enabled, Is.EqualTo(fallback));
+            Assert.That(button.GetComponentsInChildren<GameFigmaSurface>(true).Length, Is.EqualTo(1));
+            Canvas.ForceUpdateCanvases();
+            var mesh = (fallback ? (UnityEngine.UI.Graphic)fill : artwork).canvasRenderer.GetMesh();
+            Assert.That(mesh, Is.Not.Null);
+            Assert.That(mesh.vertexCount, Is.GreaterThanOrEqualTo(4), "Return background needs a drawn mesh after reopening.");
+        }
+
         [UnityTest]
         public IEnumerator SavedStoryViewerSkipAndEndingButtonsReceiveRealMouseClicks()
         {
@@ -1406,6 +1430,31 @@ namespace Hapio.Tests
                     Assert.That(story.player.CurrentView, Is.SameAs(sealCard));
                     Assert.That(flip.IsBack, Is.True, "Returning retains the seal card's record face.");
                     Assert.That(story.BoundResult, Is.SameAs(session.ResultSnapshot));
+                    if (stage == 1)
+                    {
+                        yield return ClickVisibleButtonWithMouse(mouse, inspect);
+                        returnBackgroundEntry = GameFigmaStrokeLibrary.Find("ResultAction");
+                        returnBackgroundSprite = returnBackgroundEntry.sprite;
+                        returnBackgroundEntry.sprite = null;
+                        yield return null;
+                        AssertViewerReturnBackground(screen, true);
+                        yield return ClickVisibleButtonWithMouse(mouse, close);
+                        Assert.That(session.IsViewerOpen, Is.False, "The fallback keeps the real return click working.");
+                        session.OpenGourdViewer();
+                        yield return Until(() => session.IsViewerOpen && screen.viewerPanel.activeInHierarchy,
+                            "The saved result can reopen inspection while the source is still missing.");
+                        yield return null;
+                        AssertViewerReturnBackground(screen, true);
+                        yield return ClickVisibleButtonWithMouse(mouse, close);
+                        RestoreReturnBackgroundSource();
+                        yield return null;
+                        yield return ClickVisibleButtonWithMouse(mouse, inspect);
+                        AssertViewerReturnBackground(screen, false);
+                        yield return ClickVisibleButtonWithMouse(mouse, close);
+                        Assert.That(story.player.CurrentView, Is.SameAs(sealCard));
+                        Assert.That(flip.IsBack, Is.True);
+                        Assert.That(JsonUtility.ToJson(session.ResultSnapshot), Is.EqualTo(initialResult));
+                    }
                     if (stage < 3)
                     {
                         yield return FinishResultStory();

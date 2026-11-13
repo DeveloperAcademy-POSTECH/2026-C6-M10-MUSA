@@ -628,6 +628,7 @@ namespace C6Lab
             // Charmed (#251): too dazed to attack until it ends or the players beside wake them.
             if (Charmed(sender, now)) return Reject("CHARMED", out reason);
             if (JigwiBHoldsLaunch(current, now)) return Reject("JIGWI_B_WAIT", out reason); // #551 "지금!" 전에는 못 던짐
+            if (ComboHoldsThrow(current, now)) return Reject("COMBO_HOLD", out reason); // #719 예고 중 / 콤보 중 오색구슬
             ApplyJigwiABOrb(current, now);
             CaptureJigwiABLaunchReward(current, now);
             LaunchJigwiTalismanShards(current); // #540 부적 구슬은 3갈래로 날아간다
@@ -778,14 +779,10 @@ namespace C6Lab
                 if (nextComboAt > until) return;
                 comboWarned = false;
                 double at = nextComboAt;
-                var colors = new LabOrbElement[LabGourdCombo.Length];
-                for (int i = 0; i < colors.Length; i++)
-                {
-                    uint index = combo.Count * (uint)LabGourdCombo.Length + (uint)i;
-                    colors[i] = (LabOrbElement)(1 + (int)(DrawFor(seed ^ ComboColorSalt, ComboDrawKey, index) % 5UL));
-                }
-                // #695: the round's first combo forgives wrong colors until its first slot is hit.
-                combo.Start(colors, at, rules.ComboTimeLimitSeconds, rules.ComboFirstForgive && combo.Count == 0);
+                LabOrbElement[] colors = NextComboColors();
+                // #695/#719 UT: every combo (not only the round's first) forgives wrong colours until its first slot is hit.
+                // #719 UT: with hearts, each wrong colour breaks one (the last one fails) instead of the first-slot forgiving.
+                combo.Start(colors, at, rules.ComboTimeLimitSeconds, rules.ComboFirstForgive && rules.ComboHearts <= 0, rules.ComboHearts);
                 // Scheduled stages receive the next occurrence from CastGimmicks, never from this effect.
                 nextComboAt = rules.YaguangTimeline ? double.PositiveInfinity : at + rules.ComboRepeatIntervalSeconds;
             }
@@ -868,6 +865,21 @@ namespace C6Lab
             && Finite(nextFlashAt) && !flashHeld
             && (flashWarned || (!FlashBlocked(lastTime) && !ComboWarnsBeforeFlash
                 && !FlashBlocked(Math.Max(lastTime, nextFlashAt - rules.FlashWarningSeconds))));
+
+        /// <summary>
+        /// The next combo's four colours. They depend only on the seed and how many combos came before, so the warning can
+        /// show exactly what the combo will be (#719).
+        /// </summary>
+        private LabOrbElement[] NextComboColors()
+        {
+            var colors = new LabOrbElement[LabGourdCombo.Length];
+            for (int i = 0; i < colors.Length; i++)
+            {
+                uint index = combo.Count * (uint)LabGourdCombo.Length + (uint)i;
+                colors[i] = (LabOrbElement)(1 + (int)(DrawFor(seed ^ ComboColorSalt, ComboDrawKey, index) % 5UL));
+            }
+            return colors;
+        }
 
         private bool ComboWarnsBeforeFlash => ComboWaiting && !comboWarned
             && nextComboAt - rules.ComboWarningSeconds <= nextFlashAt - rules.FlashWarningSeconds;
@@ -1045,6 +1057,17 @@ namespace C6Lab
         // 다른 이벤트 때문에 미룰 콤보 예고는 알리지 않는다 (#271). 이미 시작한 예고는 그대로 알린다.
         private bool ComboAnnounced => ComboWaiting && !comboHeld
             && (comboWarned || (!AnyScreenOpen(LabYaguangEvent.Combo, lastTime) && !FlashGoesFirst && !FlashRunsIntoCombo));
+
+        /// <summary>
+        /// #719 UT: 콤보 예고 동안은 아무것도 박에 못 던진다 (미리 던진 구슬이 새 콤보에 잘못 맞지 않게). 생성·합치기·넘기기는 된다.
+        /// 콤보가 진행되는 동안에는 오색구슬을 못 던진다 (콤보가 끝나면 다시 던질 수 있다).
+        /// </summary>
+        internal bool ComboHoldsThrow(LabOrbState orb, double now)
+        {
+            if (rules == null || !rules.ComboEnabled || phase != LabPhase.Playing) return false;
+            if (combo.Active) return orb != null && orb.fiveColor;
+            return ComboAnnounced && now >= nextComboAt - rules.ComboWarningSeconds && now < nextComboAt;
+        }
 
         /// <summary>
         /// 콤보가 끝난 뒤 처리. 성공은 팀 전체에 보상을 주고, 실패는 페널티를 건다.
@@ -1386,6 +1409,12 @@ namespace C6Lab
                 comboColors = combo.Count == 0 ? Array.Empty<LabOrbElement>() : combo.Colors,
                 comboProgress = combo.Progress,
                 comboForgivenCount = combo.ForgivenCount,
+                comboWrongCount = combo.WrongCount,
+                comboHearts = rules.ComboEnabled ? rules.ComboHearts : 0,
+                comboHeartsLeft = combo.Count == 0 ? (rules.ComboEnabled ? rules.ComboHearts : 0) : combo.HeartsLeft,
+                comboWrongBy = combo.LastWrongBy,
+                comboWrongElement = combo.LastWrongElement,
+                comboWrongSlot = combo.LastWrongSlot,
                 comboStartedAt = combo.StartedAt,
                 comboEndsAt = combo.EndsAt,
                 comboCount = combo.Count,
@@ -1395,6 +1424,8 @@ namespace C6Lab
                 comboFailedBy = combo.LastFailedBy,
                 comboNextAt = ComboAnnounced ? nextComboAt : -1d,
                 comboWarningAt = ComboAnnounced ? nextComboAt - rules.ComboWarningSeconds : -1d,
+                // #719: the next combo's colours are fixed in advance, so the warning shows them one by one.
+                comboNextColors = ComboAnnounced ? NextComboColors() : Array.Empty<LabOrbElement>(),
                 flashAt = FlashWaiting ? nextFlashAt : -1d,
                 flashWarningAt = FlashWaiting ? nextFlashAt - rules.FlashWarningSeconds : -1d,
                 flashTarget = nextFlashTarget,
@@ -2058,6 +2089,7 @@ namespace C6Lab
             public readonly bool ComboEnabled, ComboPenaltyThrowerOnly;
             /// <summary>#695: the round's first combo ignores wrong colors until its first slot is hit (Host only).</summary>
             public readonly bool ComboFirstForgive;
+            public readonly int ComboHearts;
             public readonly float ComboFirstStartSeconds, ComboRepeatIntervalSeconds, ComboTimeLimitSeconds,
                 ComboPenaltyDurationSeconds, ComboPenaltySizeScale, ComboRewardDurationSeconds, ComboRewardSizeScale,
                 ComboWarningSeconds;
@@ -2147,6 +2179,7 @@ namespace C6Lab
                 ComboRewardSizeScale = config.ComboRewardSizeScale;
                 ComboWarningSeconds = config.ComboWarningSeconds;
                 ComboFirstForgive = config.YaguangFirstComboForgive;
+                ComboHearts = config.YaguangComboHearts;
                 FlashEnabled = config.YaguangFlashEnabled
                     && (stageYokai == LabStageYokai.None || stageYokai == LabStageYokai.Yaguang);
                 FlashTargetOne = config.YaguangFlashTargetOne;

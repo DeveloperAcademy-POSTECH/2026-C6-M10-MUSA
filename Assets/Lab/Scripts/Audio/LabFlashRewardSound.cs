@@ -9,6 +9,7 @@ namespace C6Lab
     ///   (LabYaguangFlashHud.ShakeCount). 눈부심이 먼저 풀려도 이어서 끝까지 흔들어야 난다.
     ///   다음 섬광·방해 종료·라운드 종료로 풀릴 때는 나지 않는다.
     /// - 오색구슬 피격: 내가 던진 오색구슬(#329)이 박에 맞았을 때, 던진 사람 기기에서만 (LabNetwork.LocalFiveColorHit, 진동과 같은 때).
+    ///   #719: 섬광 보상 오색구슬이 내 판에 나타날 때도 같은 소리를 낸다 (LabNetwork.FiveColorOrbAppeared, 같이 나온 구슬들은 한 번).
     ///   #395에서 국립국악원 징으로, #464에서 25현 가야금 가락 두 개로 바꿨다. 앞 소리가 울리는 중에 또 맞으면 끊고 새로 친다.
     /// 소리 파일은 Resources/Audio/FlashClear(여러 개면 무작위), Resources/Audio/FiveColorHit(여러 개면 이름 순서대로
     /// 번갈아) 폴더의 파일을 쓰고, 없으면 조용히 넘어간다. 크기는 volume × 일시정지 메뉴 효과음 설정.
@@ -42,9 +43,13 @@ namespace C6Lab
 
         public void Bind(LabNetwork target)
         {
-            if (network != null) network.LocalFiveColorHit -= HandleFiveColorHit;
+            if (network != null) { network.LocalFiveColorHit -= HandleFiveColorHit; network.FiveColorOrbAppeared -= HandleFiveColorAppeared; }
             network = target;
-            if (network != null && isActiveAndEnabled) network.LocalFiveColorHit += HandleFiveColorHit;
+            if (network != null && isActiveAndEnabled)
+            {
+                network.LocalFiveColorHit += HandleFiveColorHit;
+                network.FiveColorOrbAppeared += HandleFiveColorAppeared;
+            }
         }
 
         private void Awake()
@@ -63,12 +68,12 @@ namespace C6Lab
 
         private void OnEnable()
         {
-            if (network != null) network.LocalFiveColorHit += HandleFiveColorHit;
+            if (network != null) { network.LocalFiveColorHit += HandleFiveColorHit; network.FiveColorOrbAppeared += HandleFiveColorAppeared; }
         }
 
         private void OnDisable()
         {
-            if (network != null) network.LocalFiveColorHit -= HandleFiveColorHit;
+            if (network != null) { network.LocalFiveColorHit -= HandleFiveColorHit; network.FiveColorOrbAppeared -= HandleFiveColorAppeared; }
         }
 
         private void Update()
@@ -120,6 +125,15 @@ namespace C6Lab
 
         // #713: the Jigwi black orb rings its own hit sound on every device instead (LabJigwiSootSound).
         private void HandleFiveColorHit() { if (network == null || !network.LastFiveColorHitSoot) OnFiveColorHit(); }
+
+        // #719: the flash reward's five-colour orbs ring the same gayageum as their hit when they appear (once for orbs appearing together).
+        private int appearedFrame = -1;
+        private void HandleFiveColorAppeared()
+        {
+            if (appearedFrame == Time.frameCount) return;
+            appearedFrame = Time.frameCount;
+            OnFiveColorHit();
+        }
 
         private bool Play(AudioClip[] clips, float volume)
         {

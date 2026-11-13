@@ -47,6 +47,81 @@ namespace C6Lab
             return true;
         }
 
+        /// <summary>#719 Y2: 다음 칸 하나만 이 사람이 맞힌 것으로 처리한다 (도장, 강조가 다음 칸으로 옮겨 가는 것 확인). 마지막 칸이면 성공.</summary>
+        public bool VfxLabHitComboSlot(ulong thrower, double now)
+        {
+            if (!TryAdvance(now, out _) || phase != LabPhase.Playing || !combo.Active) return false;
+            LabComboResult result = combo.Judge(combo.ColorAt(combo.Progress), thrower, now);
+            if (result != LabComboResult.None) OnComboFinished(result);
+            revision++;
+            return true;
+        }
+
+        /// <summary>
+        /// #719 Y2: 지금 칸에 틀린 색을 맞힌 것으로 처리하되, 첫 칸 전이면 실제 게임처럼 봐준다(실패 없이 금옥 "다시 해 보자").
+        /// 봐줬으면 true, 첫 칸을 이미 맞혀 봐줄 수 없으면 false (그때는 실패 버튼을 쓴다).
+        /// </summary>
+        public bool VfxLabForgiveWrongCombo(ulong thrower, double now)
+        {
+            if (!TryAdvance(now, out _) || phase != LabPhase.Playing || !combo.Active || !combo.Forgiving) return false;
+            LabOrbElement wanted = combo.ColorAt(combo.Progress);
+            LabOrbElement wrong = new[] { LabOrbElement.Fire, LabOrbElement.Water, LabOrbElement.Wood, LabOrbElement.Metal, LabOrbElement.Earth }
+                .First(element => element != wanted);
+            uint before = combo.ForgivenCount;
+            LabComboResult result = combo.Judge(wrong, thrower, now);
+            if (result != LabComboResult.None) OnComboFinished(result);
+            revision++;
+            return combo.ForgivenCount > before;
+        }
+
+        /// <summary>#719 Y2: 콤보가 지금 원하지 않는 색의 결합 구슬 하나를 놓는다 (빛 테두리가 맞는 색에만 붙는지 확인).</summary>
+        public bool VfxLabGiveOtherColorOrb(ulong owner, double now, out LabOrbElement element)
+        {
+            element = LabOrbElement.None;
+            if (!TryAdvance(now, out _) || phase != LabPhase.Playing || !combo.Active || !players.ContainsKey(owner)
+                || CountStored(owner, now) >= rules.OrbStorageLimit) return false;
+            LabOrbElement wanted = combo.ColorAt(combo.Progress);
+            element = new[] { LabOrbElement.Fire, LabOrbElement.Water, LabOrbElement.Wood, LabOrbElement.Metal, LabOrbElement.Earth }
+                .Where(value => value != wanted).ElementAt(Random.Range(0, 4));
+            AddVfxLabOrb(owner, element, false, now);
+            return true;
+        }
+
+        /// <summary>#696/#719 J: 연기 없이 검은 파편 4개(북/서/남/동)를 내 판 가장자리에 놓는다. 판이 가득해도 놓는다.</summary>
+        public bool VfxLabGiveSootShards(ulong owner, double now)
+        {
+            if (!TryAdvance(now, out _) || phase != LabPhase.Playing || !players.ContainsKey(owner)) return false;
+            for (int i = 0; i < JigwiSootShardCount; i++)
+            {
+                Vector2 spot = JigwiSootShardSpot(i);
+                var shard = new LabOrbState
+                {
+                    id = NewOrbId(), owner = owner, kind = LabOrbKind.SootShard, element = LabOrbElement.None, sootPieces = 1 << i,
+                    origin = LabOrbOrigin.Gourd, originOwner = owner, x = spot.x, y = spot.y,
+                    createdAt = now, expiresAt = now + FiveColorOrbLifetimeSeconds, revision = ++revision
+                };
+                orbs.Add(shard.id, shard);
+            }
+            revision++;
+            return true;
+        }
+
+        /// <summary>#696/#719 J: 다 합쳐진 검정 구슬 하나를 내 판에 놓는다 (기운 / 던지기 / 명중 효과 확인).</summary>
+        public bool VfxLabGiveSootOrb(ulong owner, double now)
+        {
+            if (!TryAdvance(now, out _) || phase != LabPhase.Playing || !players.ContainsKey(owner)
+                || CountStored(owner, now) >= rules.OrbStorageLimit) return false;
+            var orb = new LabOrbState
+            {
+                id = NewOrbId(), owner = owner, kind = LabOrbKind.Combined, element = LabOrbElement.None, soot = true, fiveColor = true,
+                origin = LabOrbOrigin.Combined, originOwner = owner, x = .5f, y = .52f,
+                createdAt = now, expiresAt = now + FiveColorOrbLifetimeSeconds, revision = ++revision
+            };
+            orbs.Add(orb.id, orb);
+            revision++;
+            return true;
+        }
+
         /// <summary>Y2/Y3: 남은 칸을 이 사람이 차례로 맞힌 것으로 처리해 콤보를 성공시킨다. 성공 보상(BIG)이 실제 게임처럼 걸린다.</summary>
         public bool VfxLabCompleteCombo(ulong thrower, double now)
         {

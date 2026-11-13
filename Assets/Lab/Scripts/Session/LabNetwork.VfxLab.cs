@@ -34,6 +34,20 @@ namespace C6Lab
             return VfxLabReady && VfxLabPublish(model.VfxLabGiveComboOrb(LocalPlayerId, VfxLabNow, out element));
         }
 
+        /// <summary>#719 Y2: 다음 칸 하나만 맞히기</summary>
+        public bool VfxLabHitComboSlot() => VfxLabReady && VfxLabPublish(model.VfxLabHitComboSlot(LocalPlayerId, VfxLabNow));
+        /// <summary>#719 Y2: 틀린 색이지만 첫 칸 전이라 봐주기</summary>
+        public bool VfxLabForgiveWrongCombo() => VfxLabReady && VfxLabPublish(model.VfxLabForgiveWrongCombo(LocalPlayerId, VfxLabNow));
+        /// <summary>#719 Y2: 콤보가 원하지 않는 색 구슬 받기</summary>
+        public bool VfxLabGiveOtherColorOrb(out LabOrbElement element)
+        {
+            element = LabOrbElement.None;
+            return VfxLabReady && VfxLabPublish(model.VfxLabGiveOtherColorOrb(LocalPlayerId, VfxLabNow, out element));
+        }
+        /// <summary>#696/#719 J: 검은 파편 4개 / 검정 구슬 받기</summary>
+        public bool VfxLabGiveSootShards() => VfxLabReady && VfxLabPublish(model.VfxLabGiveSootShards(LocalPlayerId, VfxLabNow));
+        public bool VfxLabGiveSootOrb() => VfxLabReady && VfxLabPublish(model.VfxLabGiveSootOrb(LocalPlayerId, VfxLabNow));
+
         /// <summary>Y2/Y3: 남은 칸을 바로 맞혀 성공 (BIG 보상)</summary>
         public bool VfxLabCompleteCombo() => VfxLabReady && VfxLabPublish(model.VfxLabCompleteCombo(LocalPlayerId, VfxLabNow));
 

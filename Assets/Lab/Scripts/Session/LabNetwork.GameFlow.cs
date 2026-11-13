@@ -182,10 +182,23 @@ namespace C6Lab
             value.CombineRequested += OnCombineRequested;
             value.FoxFireTouched += OnFoxFireTouched;
             value.ThrowRequested += OnThrowRequested;
-            value.ThrowGate = JigwiBThrowAllowed; // #551 지귀 B: "지금!" 전에는 특수 물구슬을 못 던짐
+            value.ThrowGate = ThrowAllowed; // #551 지귀 B "지금!" 전 특수 물구슬, #719 콤보 예고 중 / 콤보 중 오색구슬
             value.UseRequested += OnUseRequested;
             value.DrumTapped += Generate;
             value.JigwiBurnRequested += OnJigwiBurnRequested;
+        }
+
+        /// <summary>#719: 콤보 예고 동안은 아무것도, 콤보 중에는 오색구슬을 박에 못 던진다. 막힌 구슬은 위로 미끄러져 튕겨 돌아온다.</summary>
+        private bool ThrowAllowed(string orbId)
+        {
+            if (!JigwiBThrowAllowed(orbId)) return false;
+            LabSnapshot snapshot = latest;
+            if (snapshot == null || snapshot.phase != LabPhase.Playing) return true;
+            // Same rule as LabModel.ComboHoldsThrow, on this screen's clock: the orb just slides up and bounces off the top.
+            double now = BattlePresentationTime;
+            bool warning = snapshot.ComboWarningOn(now) && !snapshot.comboActive;
+            bool fiveColor = snapshot.comboActive && board != null && board.IsFiveColor(orbId);
+            return !warning && !fiveColor;
         }
 
         private void UnsubscribeBoard(LabOrbBoard value)
@@ -195,7 +208,7 @@ namespace C6Lab
             value.CombineRequested -= OnCombineRequested;
             value.FoxFireTouched -= OnFoxFireTouched;
             value.ThrowRequested -= OnThrowRequested;
-            if (value.ThrowGate == (System.Func<string, bool>)JigwiBThrowAllowed) value.ThrowGate = null;
+            if (value.ThrowGate == (System.Func<string, bool>)ThrowAllowed) value.ThrowGate = null;
             value.UseRequested -= OnUseRequested;
             value.DrumTapped -= Generate;
             value.JigwiBurnRequested -= OnJigwiBurnRequested;
