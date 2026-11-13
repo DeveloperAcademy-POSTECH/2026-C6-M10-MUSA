@@ -26,6 +26,8 @@ namespace C6Lab
 
         public LabPaintArtJournal PaintArtJournal => paintArtJournal;
         public LabWatercolorStampSettings PinnedWatercolorSettings => pinnedWatercolorSettings;
+        /// <summary>Recording/transfer failure, independent of the disposable live renderer.</summary>
+        public string PaintArtRecordingError => paintArtError ?? paintArtJournal?.Error;
         public string PaintArtError => paintArtError ?? paintArtJournal?.Error ?? paintArtRenderError;
         public bool PaintArtInitialReady => !RequiresPaintArt || latest != null
             && paintArtEpoch == latest.sessionId + "/" + latest.round && !paintArtVersionMismatch

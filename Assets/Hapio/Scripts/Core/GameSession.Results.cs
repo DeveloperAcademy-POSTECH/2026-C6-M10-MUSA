@@ -68,6 +68,7 @@ namespace Hapio
         private void FinishQuitToRooms()
         {
             goingHome = true;
+            CancelGourdViewerPreparation();
             network.Stop(); network.UnbindBattleReferences();
             ResetRoomFlow();
             roomBrowserVisible = true;
