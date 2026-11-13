@@ -94,6 +94,11 @@ namespace C6Lab
         private readonly RectTransform[] slots = new RectTransform[LabGourdCombo.Length];
         private readonly Image[] slotFills = new Image[LabGourdCombo.Length];
         private readonly Image[] slotChecks = new Image[LabGourdCombo.Length];
+        /// <summary>#719: the soft glow behind the slot to hit now.</summary>
+        private readonly Image[] slotGlows = new Image[LabGourdCombo.Length];
+        private static Sprite turnGlowSprite;
+        /// <summary>#719 시험용: 지금 강조하는 칸 (없으면 -1).</summary>
+        public int TurnSlot { get; private set; } = -1;
         private Image timeBarFill;
         private RectTransform gaugeFrame, gaugeContainer;
         private CanvasGroup gaugeGroup, ownedGaugeGroup, panelGroup;
@@ -254,6 +259,11 @@ namespace C6Lab
             LabSnapshot snapshot = network != null ? network.Snapshot : null;
             bool battle = snapshot != null && snapshot.phase == LabPhase.Playing && !snapshot.paused;
             double serverNow = battle ? network.BattlePresentationTime : 0d;
+            // #719: my combined orbs of the colour the combo needs now beat in that colour (one glance = what to throw).
+            LabOrbElement needed = snapshot != null && snapshot.phase == LabPhase.Playing && snapshot.comboActive
+                && snapshot.comboColors != null && snapshot.comboProgress >= 0 && snapshot.comboProgress < snapshot.comboColors.Length
+                ? snapshot.comboColors[snapshot.comboProgress] : LabOrbElement.None;
+            if (network != null && network.board != null) network.board.SetComboHint(needed);
             // 조합판 구슬 크기(#257)는 콤보 화면이 숨어 있어도 정한다. 일시정지 중에는 그대로 둔다.
             if (snapshot == null || snapshot.phase != LabPhase.Playing) SetBoardLook(0);
             else if (!snapshot.paused) SetBoardLook(LocalEffect(snapshot, serverNow, out _));
@@ -549,13 +559,13 @@ namespace C6Lab
             if (showPanel && !panelWasShown) panelShownAt = Time.unscaledTime;
             panelWasShown = showPanel;
             panelGroup.alpha = showPanel ? Mathf.SmoothStep(0f, 1f, (Time.unscaledTime - panelShownAt) / .22f) : 0f;
-            if (!showPanel) return;
+            if (!showPanel) { TurnSlot = -1; return; }
             questionSlot.gameObject.SetActive(yaguang && !figmaPanel);
             if (yaguang)
                 questionSlot.localRotation = Quaternion.Euler(0f, 0f, 8f * Mathf.Sin(Time.unscaledTime * 2.3f));
 
-            float bob = Mathf.Sin(Time.unscaledTime * 8f) * .08f;
             if (popElapsed >= 0f) popElapsed += Time.unscaledDeltaTime;
+            TurnSlot = -1;
             for (int i = 0; i < LabGourdCombo.Length; i++)
             {
                 slotElements[i] = colors[i];
@@ -586,7 +596,26 @@ namespace C6Lab
                 }
                 wasChecked[i] = hit;
                 float scale = 1f;
-                if (snapshot.comboActive && i == snapshot.comboProgress) scale += bob;
+                // #719: the slot to hit now is bigger and glows in its colour, beating like a heart; later slots are faded,
+                // so one glance at the panel shows which colour to throw.
+                bool turn = !preview && snapshot.comboActive && i == snapshot.comboProgress;
+                bool later = !preview && snapshot.comboActive && i > snapshot.comboProgress;
+                float beat = .5f + .5f * Mathf.Sin(Time.unscaledTime * 6.5f);
+                if (turn) scale = 1.18f + .07f * beat;
+                Color fill = slotFills[i].color;
+                slotFills[i].color = new Color(fill.r, fill.g, fill.b, later ? .4f : 1f);
+                Image glowImage = slotGlows[i];
+                if (glowImage != null)
+                {
+                    glowImage.gameObject.SetActive(turn);
+                    if (turn)
+                    {
+                        Color tint = LabPaintPalette.SrgbColorFor(slotElements[i]);
+                        glowImage.color = new Color(tint.r, tint.g, tint.b, Mathf.Lerp(.45f, .95f, beat));
+                        glowImage.rectTransform.localScale = Vector3.one * Mathf.Lerp(.9f, 1.2f, beat);
+                    }
+                }
+                if (turn) TurnSlot = i;
                 if ((!figmaPanel || preview) && i == popSlot && popElapsed >= 0f && popElapsed < .25f)
                     scale += .3f * Mathf.Sin(popElapsed / .25f * Mathf.PI);
                 slots[i].localScale = Vector3.one * scale;
@@ -890,6 +919,17 @@ namespace C6Lab
 
             for (int i = 0; i < LabGourdCombo.Length; i++)
             {
+                // #719: a glow behind the slot whose turn it is (a sibling placed first, so it sits under the slot).
+                RectTransform glowRect = NewRect("Combo Turn Glow " + (i + 1), panel);
+                glowRect.anchorMin = glowRect.anchorMax = new Vector2(0f, 1f);
+                glowRect.pivot = new Vector2(.5f, .5f);
+                glowRect.sizeDelta = new Vector2(slotSize * 2f, slotSize * 2f);
+                glowRect.anchoredPosition = new Vector2(gap + slotSize * .5f + i * (slotSize + gap), -gap - slotSize * .5f);
+                Image glow = glowRect.gameObject.AddComponent<Image>();
+                glow.sprite = TurnGlowSprite();
+                glow.raycastTarget = false;
+                glowRect.gameObject.SetActive(false);
+                slotGlows[i] = glow;
                 RectTransform slot = NewRect("Combo Slot " + (i + 1), panel);
                 slot.anchorMin = slot.anchorMax = new Vector2(0f, 1f);
                 slot.pivot = new Vector2(.5f, .5f);
@@ -1145,6 +1185,19 @@ namespace C6Lab
                 return new Color(1f, 1f, 1f, a);
             }, Vector4.zero);
             return vignetteSprite;
+        }
+
+        /// <summary>#719: a soft round glow (white, tinted by the slot's colour).</summary>
+        private static Sprite TurnGlowSprite()
+        {
+            if (turnGlowSprite != null) return turnGlowSprite;
+            turnGlowSprite = Draw("Lab combo turn glow", (p, c) =>
+            {
+                float r = Vector2.Distance(p, c) / (TextureSize * .5f);
+                float a = Mathf.Clamp01(1f - r);
+                return new Color(1f, 1f, 1f, a * a);
+            }, Vector4.zero);
+            return turnGlowSprite;
         }
 
         private static Sprite DiscSprite()
