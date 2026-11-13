@@ -289,7 +289,7 @@ namespace Hapio
                 SendReady();
             }
             double now = Time.realtimeSinceStartupAsDouble;
-            UpdateTerritoryEnd(now);
+            UpdateBattleEnd(now);
             UpdateBattleStart(now);
             UpdatePaintFinish(now);
             UpdateReplayCover();
@@ -322,7 +322,7 @@ namespace Hapio
             {
                 if (snapshot.phase == LabPhase.Defeat)
                 {
-                    string reason = snapshot.remaining <= 0d ? "Time ran out." : "All players are down.";
+                    string reason = snapshot.remaining <= 0d ? TimeRanOutReason : "All players are down.";
                     if (tutorialRun || IsTerritory) AbortHost(reason);
                     else if (hostFlow.MarkDefeat(snapshot.sessionId, snapshot.round, reason)) SetHostState();
                 }
@@ -526,7 +526,7 @@ namespace Hapio
                 {
                     // #717: a territory battle says "경기 종료!" with its whistle first; the result is prepared under it.
                     if (IsTerritory && SceneManager.GetActiveScene().path == GameScenePaths.Battle)
-                        BeginTerritoryEnd(transitionAt);
+                        BeginBattleEnd(transitionAt, BattleEndKind.TerritoryOver);
                     double waitUntil = ResultCaptureDeadline(Time.realtimeSinceStartupAsDouble);
                     while (!CanCaptureResult() && wantedScene == destination
                         && network.IsConnected && Time.realtimeSinceStartupAsDouble < waitUntil)
@@ -543,10 +543,20 @@ namespace Hapio
                         UiNotice = "All stages are clear. The completed gourd preview could not be synchronized.";
                     CaptureResult();
                     capturedAt = Time.realtimeSinceStartupAsDouble;
-                    while (TerritoryEndHolding(Time.realtimeSinceStartupAsDouble) && wantedScene == destination)
+                    while (EndWordsHolding(Time.realtimeSinceStartupAsDouble) && wantedScene == destination)
                         yield return null;
                     if (wantedScene != destination) continue;
                     heldUntil = Time.realtimeSinceStartupAsDouble;
+                }
+                else if (destination == GameScenePaths.GameOver
+                    && SceneManager.GetActiveScene().path == GameScenePaths.Battle)
+                {
+                    // #717: a story stage that ran out of time says "시간 초과!" with its whistle, then goes straight to its
+                    // failure (no final-hit effect). Other game overs (someone left, ...) have no words and do not wait.
+                    if (StoryTimedOut) BeginBattleEnd(transitionAt, BattleEndKind.TimeUp);
+                    while (EndWordsHolding(Time.realtimeSinceStartupAsDouble) && wantedScene == destination)
+                        yield return null;
+                    if (wantedScene != destination) continue;
                 }
                 network.UnbindBattleReferences();
                 forceBattleReload = false;

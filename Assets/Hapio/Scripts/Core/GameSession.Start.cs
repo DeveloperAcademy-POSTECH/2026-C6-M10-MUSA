@@ -15,7 +15,8 @@ namespace Hapio
         internal const double DefaultCountdownSeconds = 3d;
         internal const double DefaultInitialLeadSeconds = 1d;
         internal const double DefaultMaximumLeadSeconds = 5d;
-        internal const double DefaultStartedLabelSeconds = .5d;
+        // #717: 1 s, so the styled "봉인 시작!" can be read; it never blocks input, like "시작!".
+        internal const double DefaultStartedLabelSeconds = 1d;
 
         /// <summary>The visible 3/2/1, from the first digit to Playing. The three digits split it evenly.</summary>
         internal static double CountdownSeconds { get; private set; } = DefaultCountdownSeconds;
@@ -23,7 +24,7 @@ namespace Hapio
         internal static double InitialLeadSeconds { get; private set; } = DefaultInitialLeadSeconds;
         /// <summary>Cap of the lead that each reschedule for a missing receipt doubles.</summary>
         internal static double MaximumLeadSeconds { get; private set; } = DefaultMaximumLeadSeconds;
-        /// <summary>How long "시작!" stays after the shared start.</summary>
+        /// <summary>How long "시작!" (territory) or "봉인 시작!" (story) stays after the shared start.</summary>
         internal static double StartedLabelSeconds { get; private set; } = DefaultStartedLabelSeconds;
 
         internal static bool IsDefault => CountdownSeconds == DefaultCountdownSeconds
@@ -262,8 +263,9 @@ namespace Hapio
         private void RefreshStartOverlay()
         {
             if (startOverlay == null) return;
-            // #717: a finished territory battle keeps "경기 종료!" over its screen until the result Scene replaces it.
-            if (TerritoryEndCovering) { startOverlay.ShowFinished(); return; }
+            // #717: a finished battle keeps its end words over the screen: "경기 종료!" until the territory result replaces it,
+            // "시간 초과!" until the failure Scene replaces it, "봉인 성공!" until the final-hit effect starts.
+            if (BattleEndCovering) { ShowBattleEnd(); return; }
             if (tutorialRun)
             {
                 // No ready count, countdown or "시작!" on the practice board: one plain cover until it is playable; a RESTART's
@@ -292,7 +294,11 @@ namespace Hapio
                     startOverlay.ShowCountdown(Mathf.Clamp((int)Math.Ceiling(remaining / (CountdownSeconds / 3d)), 1, 3));
                 else if (!countdownCommitted || network.GameStartHeld)
                     startOverlay.ShowPreparing(StartParticipantCount, StartParticipantCount);
-                else if (now - state.battleStartsAt < StartedLabelSeconds) startOverlay.ShowStarted();
+                else if (now - state.battleStartsAt < StartedLabelSeconds)
+                {
+                    // #717: a story stage opens with "봉인 시작!"; the territory match keeps "시작!".
+                    if (state.mode == GameMode.Story) startOverlay.ShowSealStarted(); else startOverlay.ShowStarted();
+                }
                 else startOverlay.Hide();
                 return;
             }

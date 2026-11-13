@@ -144,7 +144,8 @@ namespace Hapio
                 if (ready) finishBarrier.Prepared(network.LocalPlayerId);
                 // One budget starts at Victory, not again when the surface becomes ready.
                 if (realNow >= finishDeadlineAt) finishBarrier.Expire(finishWaitAt + GamePaintFinishBarrier.TimeoutSeconds);
-                if (!finishBarrier.Released && replayDecided && network.TryGetGameServerTime(out double scheduleNow))
+                if (!finishBarrier.Released && replayDecided && FinishScheduleAllowed(realNow, network.IsDeveloperSolo)
+                    && network.TryGetGameServerTime(out double scheduleNow))
                 {
                     bool singleLocal = network.IsDeveloperSolo;
                     if (singleLocal && ready && !finishBarrier.Committed)
