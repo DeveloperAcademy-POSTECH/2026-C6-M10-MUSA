@@ -67,9 +67,9 @@ namespace C6Lab
         [SerializeField, Range(.05f, .8f)] private float steamClearLeft = .1f;
         [Tooltip("#696 연기를 이만큼(0~1) 걷어 내기 시작하면 Host에 검은 파편을 달라고 한다. 파편은 아직 연기 밑 판 구석구석에 깔려 있어, 닦는 동안 하나씩 드러난다.")]
         [SerializeField, Range(0f, .5f)] private float sootRevealWiped = .03f;
-        [Tooltip("#696 화면 위/아래 가장자리에서 연기가 옅어지는 띠의 폭(화면 높이 비율). 손가락이 닿기 어려운 끝자락은 덜 닦아도 걷힌다.")]
+        [Tooltip("#696 화면 위/아래 가장자리 띠의 폭(화면 높이 비율). 손가락이 닿기 어려운 끝자락은 덜 닦아도 걷힌다. #724 UT: 띠도 다른 곳만큼 진하게 보인다(옅게 그리면 '이미 닦였다'로 보여 위쪽을 안 닦게 됐다). 대신 다 닦았는지 셀 때 덜 센다.")]
         [SerializeField, Range(0f, .25f)] private float steamEdgeBand = .08f;
-        [Tooltip("#696 가장자리 끝(맨 위/맨 아래)의 연기 진하기(0~1). 띠 안쪽으로 갈수록 1까지 진해진다.")]
+        [Tooltip("#696/#724 가장자리 끝(맨 위/맨 아래)의 연기를 다 닦았는지 셀 때의 무게(0~1). 띠 안쪽으로 갈수록 1까지 무거워진다. 보이는 진하기는 어디나 같다.")]
         [SerializeField, Range(0f, 1f)] private float steamEdgeAlpha = .3f;
         [Tooltip("문지르는 손가락 굵기(판 폭 비율).")]
         [SerializeField, Range(.03f, .3f)] private float steamBrush = .14f;
@@ -77,6 +77,8 @@ namespace C6Lab
         private RawImage steam;
         private Texture2D steamTexture;
         private readonly float[] steamAlpha = new float[SteamW * SteamH];
+        // #724 UT: how much each texel counts toward "wiped" (the edge band counts less); the smoke itself looks the same everywhere.
+        private readonly float[] steamWeight = new float[SteamW * SteamH];
         private Color32[] steamPixels;
         private Image steamHand; // a small hand rubbing back and forth: "wipe it" without words
         private static Sprite handSprite;
@@ -709,12 +711,11 @@ namespace C6Lab
             {
                 float v = (y + .5f) / SteamH;
                 float edge = steamEdgeBand > 0f ? Mathf.Clamp01(Mathf.Min(v, 1f - v) / steamEdgeBand) : 1f;
-                float alpha = Mathf.Lerp(steamEdgeAlpha, 1f, edge * edge * (3f - 2f * edge));
-                for (int x = 0; x < SteamW; x++) steamAlpha[y * SteamW + x] = alpha;
+                float weight = Mathf.Lerp(steamEdgeAlpha, 1f, edge * edge * (3f - 2f * edge));
+                for (int x = 0; x < SteamW; x++) { steamAlpha[y * SteamW + x] = 1f; steamWeight[y * SteamW + x] = weight; }
             }
             WriteSteam();
-            float startSum = 0f; foreach (float a in steamAlpha) startSum += a;
-            steamStartLeft = steamLeft = lastTickLeft = startSum / steamAlpha.Length;
+            steamStartLeft = steamLeft = lastTickLeft = WeightedLeft();
             lastSqueakLeft = steamLeft;
             if (source != null && source.board != null) { source.board.SetUiInputBlocked(true); steamBlocking = true; }
             if (source != null) source.JigwiSmokeWiping = true; // #696 iOS edge gestures wait while rubbing
@@ -840,7 +841,7 @@ namespace C6Lab
                     float sum = 0f;
                     int x0 = cx * SteamW / cols, x1 = (cx + 1) * SteamW / cols, y0 = cy * SteamH / rows, y1 = (cy + 1) * SteamH / rows;
                     for (int y = y0; y < y1; y += 2)
-                        for (int x = x0; x < x1; x += 2) sum += steamAlpha[y * SteamW + x];
+                        for (int x = x0; x < x1; x += 2) sum += steamAlpha[y * SteamW + x] * steamWeight[y * SteamW + x];
                     if (sum > best) { best = sum; thickestSpot = new Vector2((cx + .5f) / cols, (cy + .5f) / rows); }
                 }
         }
@@ -881,8 +882,7 @@ namespace C6Lab
             }
             if (!changed) return;
             WriteSteam();
-            float sum = 0f; foreach (float a in steamAlpha) sum += a;
-            steamLeft = sum / steamAlpha.Length;
+            steamLeft = WeightedLeft();
             FindThickest();
             float wiped = WipedShare;
             // A light tick for every bit wiped away, a firm one when it is clear.
@@ -907,6 +907,14 @@ namespace C6Lab
         }
 
         /// <summary>#696: 0 at the start of the smoke, 1 when it counts as wiped (the thin edges are already counted as thin).</summary>
+        /// <summary>#724: the smoke left, each texel counted by its weight (the edge band less), as a share of the screen.</summary>
+        private float WeightedLeft()
+        {
+            float sum = 0f;
+            for (int i = 0; i < steamAlpha.Length; i++) sum += steamAlpha[i] * steamWeight[i];
+            return sum / steamAlpha.Length;
+        }
+
         private float WipedShare => Mathf.Clamp01((steamStartLeft - steamLeft) / Mathf.Max(.01f, steamStartLeft - steamClearLeft));
 
         /// <summary>
