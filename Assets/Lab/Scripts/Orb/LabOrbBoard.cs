@@ -1361,6 +1361,23 @@ namespace C6Lab
         /// <summary>#713 이 판에서 파편이 붙었다 (true면 네 조각이 모여 검정 구슬이 됨). 판 주인 기기에서만.</summary>
         public event Action<bool> SootJoined;
 
+        /// <summary>
+        /// #719 콤보 가이딩: 지금 맞혀야 할 콤보 칸의 색(None이면 끔). 그 색의 결합 구슬만 둘레가 그 색으로 두근거린다
+        /// (오색구슬 / 검정 구슬 / 음양은 빼고). 판이 매 프레임 부른다.
+        /// </summary>
+        public void SetComboHint(LabOrbElement element)
+        {
+            Color color = element != LabOrbElement.None ? (Color)LabPaintPalette.SrgbColorFor(element) : Color.white;
+            foreach (var pair in entries)
+            {
+                LabOrbView view = pair.Value.View;
+                if (view == null) continue;
+                bool on = element != LabOrbElement.None && view.Kind == LabOrbKind.Combined && view.Element == element
+                    && !fiveColorIds.Contains(pair.Key) && !pair.Value.HiddenForPending;
+                if (on || view.ComboHintShown) view.SetComboHint(on, color);
+            }
+        }
+
         /// <summary>#713 이 판에 보이는 연기 파편 id들을 into에 담는다.</summary>
         public void CollectSootShards(List<string> into)
         {

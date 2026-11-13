@@ -489,6 +489,14 @@ namespace C6Lab
         public int comboProgress;
         /// <summary>#695: 이번 라운드에 봐준 틀린 색 수 (라운드 첫 콤보의 첫 칸 전). 늘면 금옥이 다시 해보자고 한다.</summary>
         public uint comboForgivenCount;
+        /// <summary>#719: 이번 라운드에 박에 맞은 틀린 색 수 (봐준 것 + 실패). 늘면 모두의 화면에서 그 칸에 X가 찍힌다.
+        /// 마지막 틀린 색을 던진 사람, 그 색, 맞혀야 했던 칸(0~3).</summary>
+        public uint comboWrongCount;
+        /// <summary>#719 UT: 콤보마다 받는 하트 수(0 = 하트 없음)와 지금(또는 마지막) 콤보에 남은 하트 수.</summary>
+        public int comboHearts, comboHeartsLeft;
+        public ulong comboWrongBy;
+        public LabOrbElement comboWrongElement;
+        public int comboWrongSlot;
         /// <summary>진행 중인 콤보가 나온 시각과 제한 시간이 끝나는 시각</summary>
         public double comboStartedAt = -1d;
         public double comboEndsAt = -1d;
@@ -509,6 +517,26 @@ namespace C6Lab
 
         /// <summary>이 시각에 콤보 예고 중인지 (#241). 예고 중에는 콤보가 없으므로 맞힌 구슬도 판정하지 않는다.</summary>
         public bool ComboWarningOn(double now) => comboNextAt > comboWarningAt && now >= comboWarningAt && now < comboNextAt;
+
+        /// <summary>
+        /// #719: 예고 동안 미리 보여 주는 다음 콤보의 4칸 색 (Host가 정해 둔 그대로 나온다). 예고가 없거나 옛 Host면 빈 배열.
+        /// </summary>
+        public LabOrbElement[] comboNextColors = Array.Empty<LabOrbElement>();
+
+        /// <summary>
+        /// #719 예고 셈: 예고 시간을 4등분해 넷 → 셋 → 둘 → 하나 (예고가 길수록 천천히 센다). 예고가 아니면 0.
+        /// </summary>
+        public int ComboWarningCount(double now)
+        {
+            if (!ComboWarningOn(now)) return 0;
+            double step = ComboWarningStep;
+            return Math.Max(1, Math.Min(LabGourdCombo.Length, (int)Math.Ceiling((comboNextAt - now) / step - 1e-9)));
+        }
+
+        /// <summary>#719: 예고 셈에서 count(4~1)를 세기 시작하는 시각.</summary>
+        public double ComboWarningCountAt(int count) => comboNextAt - count * ComboWarningStep;
+
+        private double ComboWarningStep => comboNextAt > comboWarningAt ? (comboNextAt - comboWarningAt) / LabGourdCombo.Length : 1d;
 
         // 야광귀 섬광 (#268). 시각은 serverTime과 같은 전투 시계 기준이다. DEV에서 끄면 모두 기본값(섬광 없음)이다.
         /// <summary>

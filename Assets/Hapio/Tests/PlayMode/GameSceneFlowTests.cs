@@ -26,6 +26,8 @@ namespace Hapio.Tests
     {
         private GameSession session;
         private LabNetwork network;
+        private GameFigmaStrokeLibrary.Surface returnBackgroundEntry;
+        private Sprite returnBackgroundSprite;
 
         [UnitySetUp]
         public IEnumerator LoadSavedHome()
@@ -66,6 +68,7 @@ namespace Hapio.Tests
         [UnityTearDown]
         public IEnumerator ReleaseOwnedSession()
         {
+            RestoreReturnBackgroundSource();
             Time.timeScale = 1f;
             // A test that ran the production countdown may have failed inside a nested yield, skipping its finally.
             GameTestStartTiming.UseShort();
@@ -612,6 +615,93 @@ namespace Hapio.Tests
             yield return Until(() => territory.table.homeButton.IsInteractable(), "Exit is available on the result.");
             territory.table.homeButton.onClick.Invoke();
             yield return WaitHome();
+        }
+
+        [UnityTest]
+        public IEnumerator ADrumKeptFourSecondsGetsTheTutorialsPassGuideUntilItIsPassed()
+        {
+            session.StartSolo();
+            yield return WaitPlaying(1);
+            GameDrumPassHint hint = Object.FindFirstObjectByType<GameDrumPassHint>();
+            Assert.That(hint, Is.Not.Null, "Every story and territory battle has the drum guide (#718).");
+            yield return null;
+            Assert.That(hint.Visible, Is.False, "Not in the first seconds.");
+
+            // Drive it by hand on the real board and drum.
+            hint.enabled = false;
+            ulong me = network.LocalPlayerId;
+            LabSnapshot solo = JsonUtility.FromJson<LabSnapshot>(JsonUtility.ToJson(network.Snapshot));
+            hint.Present(solo, me, hint.HintAfterSeconds + .1f, true, solo: true);
+            Assert.That(hint.Visible, Is.True, "DEV solo shows it too, to check it, though nothing is passed.");
+            Assert.That(hint.PointingSide, Is.EqualTo(1));
+            hint.Present(solo, me, .1f, true, solo: false);
+            Assert.That(hint.Visible, Is.False, "A one-player room that is not DEV solo has nobody to pass to.");
+            hint.Present(null, me, 0f, false);
+            // A three-player copy of the real snapshot.
+            LabSnapshot three = JsonUtility.FromJson<LabSnapshot>(JsonUtility.ToJson(network.Snapshot));
+            LabPlayerState mine = three.players.Single(player => player.id == me);
+            mine.seat = 0;
+            three.players = new[] { mine, new LabPlayerState { id = me + 100, seat = 1 }, new LabPlayerState { id = me + 200, seat = 2 } };
+            LabOrbState drum = three.drums.Single(orb => orb.owner == me);
+            hint.Present(three, me, hint.HintAfterSeconds - .5f, true);
+            Assert.That(hint.Visible, Is.False, "Not before the hint time (4 s).");
+            hint.Present(three, me, 1f, true);
+            Assert.That(hint.Visible, Is.True, "4 s without passing shows the hand and arrow.");
+            Assert.That(hint.PointedDrumId, Is.EqualTo(drum.id));
+            Assert.That(hint.PointingSide, Is.EqualTo(1), "Both sides open: right first.");
+            hint.Present(three, me, Resources.Load<GameTutorialArt>(GameTutorialArt.ResourcePath).handDragSeconds + .05f, true);
+            Assert.That(hint.PointingSide, Is.EqualTo(-1), "Then left, one push each.");
+
+            hint.Present(three, me, .1f, false);
+            Assert.That(hint.Visible, Is.False, "Hidden while paused or not playing.");
+            hint.Present(three, me, .1f, true);
+            Assert.That(hint.Visible, Is.True, "Back when the battle goes on and the drum is still here.");
+
+            LabSnapshot passed = JsonUtility.FromJson<LabSnapshot>(JsonUtility.ToJson(three));
+            passed.drums.Single(orb => orb.id == drum.id).owner = me + 100;
+            hint.Present(passed, me, .1f, true);
+            Assert.That(hint.Visible, Is.False, "Passed: gone at once.");
+            hint.Present(three, me, .1f, true);
+            Assert.That(hint.Visible, Is.False, "Back on my board, it counts from the start again.");
+        }
+
+        [UnityTest]
+        public IEnumerator ShortStaminaSwellsTheGaugeShowsTheWarningAndFlashesTheEdgesRedOnlyOnTheBattleScreen()
+        {
+            session.StartSolo();
+            yield return WaitPlaying(1);
+            yield return null;
+            var bindings = Object.FindFirstObjectByType<GameBattleBindings>();
+            var feedback = bindings.sceneController.GetComponent<LabStaminaShortFeedback>();
+            feedback.enabled = false; // only Advance moves its clock here
+            var composition = bindings.hud.GetComponent<LabOrbHudComposition>();
+            RectTransform display = composition != null && composition.Display != null ? composition.Display.rectTransform : null;
+            Vector2 boardAt = display != null ? display.anchoredPosition : Vector2.zero;
+            RectTransform gauge = (RectTransform)bindings.hud.staminaFill.transform.parent;
+            Vector3 gaugeScale = gauge.localScale;
+
+            feedback.Play();
+            feedback.Advance(.08f);
+            Assert.That(feedback.GaugeScale, Is.GreaterThan(1.02f), "The gauge swells a little while it shakes (#718).");
+            Assert.That(gauge.localScale.x, Is.EqualTo(gaugeScale.x * feedback.GaugeScale).Within(.0001f));
+            Assert.That(feedback.ShakeOffset.magnitude, Is.GreaterThan(0f), "And still shakes.");
+            Assert.That(feedback.WarningVisible, Is.True);
+            Assert.That(feedback.WarningLabel, Is.EqualTo("기운이 부족하다"));
+            Assert.That(feedback.WarningIcon, Is.SameAs(Resources.Load<Sprite>(LabStaminaShortFeedback.WarningIconPath)),
+                "One group with the red mark.");
+            Assert.That(feedback.WarningShake.magnitude, Is.GreaterThan(0f), "The warning shakes with the gauge.");
+            Assert.That(feedback.EdgeAlpha, Is.GreaterThan(0f), "The screen edges flash red.");
+            if (display != null)
+                Assert.That(Vector2.Distance(display.anchoredPosition, boardAt), Is.LessThan(.001f), "The board itself no longer shakes.");
+
+            feedback.Advance(.6f);
+            Assert.That(feedback.GaugeScale, Is.EqualTo(1f).Within(.0001f));
+            Assert.That(feedback.EdgeAlpha, Is.Zero, "The red is gone after its moment...");
+            Assert.That(feedback.WarningVisible, Is.True, "...while the warning stays a little longer.");
+            feedback.Advance(1f);
+            Assert.That(feedback.Playing, Is.False);
+            Assert.That(feedback.WarningVisible, Is.False);
+            Assert.That(gauge.localScale, Is.EqualTo(gaugeScale), "The gauge is its own size again.");
         }
 
         [UnityTest]
@@ -1336,6 +1426,27 @@ namespace Hapio.Tests
             Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.StageResult));
         }
 
+        private void RestoreReturnBackgroundSource()
+        {
+            if (returnBackgroundEntry != null) returnBackgroundEntry.sprite = returnBackgroundSprite;
+            returnBackgroundEntry = null;
+            returnBackgroundSprite = null;
+        }
+
+        private static void AssertViewerReturnBackground(GameScreen screen, bool fallback)
+        {
+            var button = screen.closeViewerButton;
+            var artwork = button.GetComponentInChildren<GameFigmaSurface>(true);
+            var fill = button.GetComponentsInChildren<LabRoundedGraphic>(true).Single();
+            Assert.That(artwork.enabled, Is.EqualTo(!fallback));
+            Assert.That(fill.enabled, Is.EqualTo(fallback));
+            Assert.That(button.GetComponentsInChildren<GameFigmaSurface>(true).Length, Is.EqualTo(1));
+            Canvas.ForceUpdateCanvases();
+            var mesh = (fallback ? (UnityEngine.UI.Graphic)fill : artwork).canvasRenderer.GetMesh();
+            Assert.That(mesh, Is.Not.Null);
+            Assert.That(mesh.vertexCount, Is.GreaterThanOrEqualTo(4), "Return background needs a drawn mesh after reopening.");
+        }
+
         [UnityTest]
         public IEnumerator SavedStoryViewerSkipAndEndingButtonsReceiveRealMouseClicks()
         {
@@ -1425,6 +1536,31 @@ namespace Hapio.Tests
                     Assert.That(story.player.CurrentView, Is.SameAs(sealCard));
                     Assert.That(flip.IsBack, Is.True, "Returning retains the seal card's record face.");
                     Assert.That(story.BoundResult, Is.SameAs(session.ResultSnapshot));
+                    if (stage == 1)
+                    {
+                        yield return ClickVisibleButtonWithMouse(mouse, inspect);
+                        returnBackgroundEntry = GameFigmaStrokeLibrary.Find("ResultAction");
+                        returnBackgroundSprite = returnBackgroundEntry.sprite;
+                        returnBackgroundEntry.sprite = null;
+                        yield return null;
+                        AssertViewerReturnBackground(screen, true);
+                        yield return ClickVisibleButtonWithMouse(mouse, close);
+                        Assert.That(session.IsViewerOpen, Is.False, "The fallback keeps the real return click working.");
+                        session.OpenGourdViewer();
+                        yield return Until(() => session.IsViewerOpen && screen.viewerPanel.activeInHierarchy,
+                            "The saved result can reopen inspection while the source is still missing.");
+                        yield return null;
+                        AssertViewerReturnBackground(screen, true);
+                        yield return ClickVisibleButtonWithMouse(mouse, close);
+                        RestoreReturnBackgroundSource();
+                        yield return null;
+                        yield return ClickVisibleButtonWithMouse(mouse, inspect);
+                        AssertViewerReturnBackground(screen, false);
+                        yield return ClickVisibleButtonWithMouse(mouse, close);
+                        Assert.That(story.player.CurrentView, Is.SameAs(sealCard));
+                        Assert.That(flip.IsBack, Is.True);
+                        Assert.That(JsonUtility.ToJson(session.ResultSnapshot), Is.EqualTo(initialResult));
+                    }
                     if (stage < 3)
                     {
                         yield return FinishResultStory();

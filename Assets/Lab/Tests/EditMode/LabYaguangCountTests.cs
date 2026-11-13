@@ -38,8 +38,9 @@ namespace C6Lab.Tests
                 {
                     Assert.That(source.ComboYaguangCountEnabled, Is.True, "On by default (it only shows when the combo is on).");
                     Assert.That(source.CaptureDeveloperValues()[191], Is.EqualTo(1f));
-                    Assert.That(source.ComboWarningSeconds, Is.EqualTo(4f), "One count a second: 하나, 둘, 셋, 넷.");
                 }
+                Assert.That(config.ComboWarningSeconds, Is.EqualTo(4f), "Code default: one count a second.");
+                Assert.That(authored.ComboWarningSeconds, Is.EqualTo(6f), "#719 UT: the saved game counts 넷 셋 둘 하나 more slowly (1.5 s each).");
                 float[] values = config.CaptureDeveloperValues();
                 var original = (float[])values.Clone();
                 values[191] = 0f;

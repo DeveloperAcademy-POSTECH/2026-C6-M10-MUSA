@@ -94,6 +94,11 @@ namespace C6Lab
         private readonly RectTransform[] slots = new RectTransform[LabGourdCombo.Length];
         private readonly Image[] slotFills = new Image[LabGourdCombo.Length];
         private readonly Image[] slotChecks = new Image[LabGourdCombo.Length];
+        /// <summary>#719: the soft glow behind the slot to hit now.</summary>
+        private readonly Image[] slotGlows = new Image[LabGourdCombo.Length];
+        private static Sprite turnGlowSprite;
+        /// <summary>#719 시험용: 지금 강조하는 칸 (없으면 -1).</summary>
+        public int TurnSlot { get; private set; } = -1;
         private Image timeBarFill;
         private RectTransform gaugeFrame, gaugeContainer;
         private CanvasGroup gaugeGroup, ownedGaugeGroup, panelGroup;
@@ -149,6 +154,10 @@ namespace C6Lab
         private uint lastComboCount;
         private float popElapsed = -1f;
         private int popSlot = -1;
+        /// <summary>#719: how many of the next combo's colours the warning has shown so far.</summary>
+        private int previewRevealed;
+        /// <summary>#719 시험용: 예고에서 지금 보이는 다음 콤보 색 칸 수 (0이면 미리 보기 없음).</summary>
+        public int PreviewRevealed => previewRevealed;
         private ulong shownFailedBy;
         private bool shownFailedKnown;
         private int shownFailedSeat = -1;
@@ -245,11 +254,320 @@ namespace C6Lab
             canvas = uiCanvas != null ? uiCanvas.rootCanvas : null;
         }
 
+        private float tickBeat;
+
+        // ---- #719 UT 하트: 콤보마다 하트 3개(Inspector). 틀린 색이 맞을 때마다 하나가 두 쪽으로 깨져 떨어지고, 마지막 하나가 깨지면 실패 ----
+        public const int MaxHearts = 5;
+        public const float HeartBreakSeconds = .7f;
+        private readonly Image[] heartFull = new Image[MaxHearts], heartEmpty = new Image[MaxHearts];
+        private readonly Image[] heartHalfLeft = new Image[MaxHearts], heartHalfRight = new Image[MaxHearts];
+        private readonly float[] heartBreakAge = new float[MaxHearts];
+        private RectTransform heartRow;
+        private int shownHeartsLeft = -1;
+        private uint heartsCombo = uint.MaxValue;
+        private static Sprite heartSprite, heartEmptySprite;
+        /// <summary>#719: hearts drawn as still whole under the combo panel now (-1 when the row is hidden).</summary>
+        public int HeartsShown { get; private set; } = -1;
+
+        /// <summary>
+        /// #719 UT 하트 줄: 콤보 패널 바로 위 가운데. 예고 동안(미리보기)은 꽉 찬 하트, 콤보 중에는 남은 만큼.
+        /// 하나가 줄면 왼쪽 하트부터 좌우 두 쪽으로 쪼개져 기울며 떨어지고, 빈 하트 테두리만 남는다. 하나 남으면 똑딱에 맞춰 두근거린다.
+        /// </summary>
+        private void DrawHearts(LabSnapshot snapshot, bool preview, bool showPanel)
+        {
+            int total = Mathf.Clamp(snapshot.comboHearts, 0, MaxHearts);
+            if (snapshot.comboCount != heartsCombo)
+            {
+                heartsCombo = snapshot.comboCount;
+                shownHeartsLeft = -1;
+                System.Array.Clear(heartBreakAge, 0, heartBreakAge.Length);
+            }
+            int left = preview ? total : Mathf.Clamp(snapshot.comboHeartsLeft, 0, total);
+            if (shownHeartsLeft < 0 || preview) shownHeartsLeft = left;
+            else if (left < shownHeartsLeft)
+            {
+                // Hearts break from the left: the whole ones are the rightmost `left`.
+                for (int i = total - shownHeartsLeft; i < total - left; i++) heartBreakAge[i] = .0001f; // these break now
+                shownHeartsLeft = left;
+            }
+            bool show = showPanel && total > 0;
+            EnsureHearts();
+            heartRow.gameObject.SetActive(show);
+            HeartsShown = show ? left : -1;
+            if (!show) return;
+
+            float size = slots[0].sizeDelta.y * .62f, gap = size * .18f;
+            // #719 QA: above the panel (it was under it, over the gourd).
+            heartRow.anchorMin = heartRow.anchorMax = new Vector2(.5f, 1f);
+            heartRow.pivot = new Vector2(.5f, 0f);
+            heartRow.sizeDelta = new Vector2(total * size + (total - 1) * gap, size);
+            heartRow.anchoredPosition = new Vector2(0f, size * .15f);
+            float dt = Time.unscaledDeltaTime;
+            for (int i = 0; i < MaxHearts; i++)
+            {
+                bool used = i < total;
+                heartEmpty[i].gameObject.SetActive(used);
+                heartFull[i].gameObject.SetActive(used && i >= total - left);
+                if (!used) { heartHalfLeft[i].gameObject.SetActive(false); heartHalfRight[i].gameObject.SetActive(false); continue; }
+                Vector2 at = new Vector2((i - (total - 1) * .5f) * (size + gap), -size * .5f);
+                foreach (Image part in new[] { heartEmpty[i], heartFull[i], heartHalfLeft[i], heartHalfRight[i] })
+                {
+                    RectTransform rect = part.rectTransform;
+                    rect.anchorMin = rect.anchorMax = new Vector2(.5f, 1f);
+                    rect.sizeDelta = Vector2.one * size;
+                    rect.anchoredPosition = at;
+                    rect.localRotation = Quaternion.identity;
+                }
+                // The last heart left beats with the clock (danger).
+                float beat = !preview && left == 1 && i == total - 1 ? tickBeat : 0f;
+                heartFull[i].rectTransform.localScale = Vector3.one * (1f + .22f * beat);
+
+                float age = heartBreakAge[i];
+                bool breaking = age > 0f && age < HeartBreakSeconds;
+                heartHalfLeft[i].gameObject.SetActive(breaking);
+                heartHalfRight[i].gameObject.SetActive(breaking);
+                if (!breaking) { if (age >= HeartBreakSeconds) heartBreakAge[i] = 0f; continue; }
+                heartBreakAge[i] = age + dt;
+                float t = age / HeartBreakSeconds;
+                // A quick swell, then the two halves split apart, tilt outward and drop while fading.
+                float swell = t < .12f ? 1f + 1.6f * t : 1.2f;
+                float split = Mathf.Max(0f, t - .12f);
+                float fall = split * split * size * 2.4f;
+                float alpha = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.45f, 1f, t));
+                for (int side = 0; side < 2; side++)
+                {
+                    Image half = side == 0 ? heartHalfLeft[i] : heartHalfRight[i];
+                    float dir = side == 0 ? -1f : 1f;
+                    RectTransform rect = half.rectTransform;
+                    rect.anchoredPosition = at + new Vector2(dir * split * size * .55f, -fall);
+                    rect.localRotation = Quaternion.Euler(0f, 0f, -dir * split * 70f);
+                    rect.localScale = Vector3.one * swell;
+                    half.color = new Color(1f, 1f, 1f, alpha);
+                }
+            }
+        }
+
+        private void EnsureHearts()
+        {
+            if (heartRow != null) return;
+            heartRow = NewRect("Combo Hearts", panel);
+            for (int i = 0; i < MaxHearts; i++)
+            {
+                heartEmpty[i] = HeartImage("Heart Empty " + (i + 1), HeartEmptySprite());
+                heartFull[i] = HeartImage("Heart " + (i + 1), HeartSprite());
+                heartHalfLeft[i] = HeartImage("Heart Break Left " + (i + 1), HeartSprite());
+                heartHalfRight[i] = HeartImage("Heart Break Right " + (i + 1), HeartSprite());
+                foreach (Image half in new[] { heartHalfLeft[i], heartHalfRight[i] })
+                {
+                    half.type = Image.Type.Filled;
+                    half.fillMethod = Image.FillMethod.Horizontal;
+                    half.fillAmount = .5f;
+                    half.gameObject.SetActive(false);
+                }
+                heartHalfLeft[i].fillOrigin = (int)Image.OriginHorizontal.Left;
+                heartHalfRight[i].fillOrigin = (int)Image.OriginHorizontal.Right;
+            }
+        }
+
+        private Image HeartImage(string name, Sprite sprite)
+        {
+            Image image = NewRect(name, heartRow).gameObject.AddComponent<Image>();
+            image.sprite = sprite;
+            image.raycastTarget = false;
+            return image;
+        }
+
+        /// <summary>Whether a point (in heart units, centre 0, about -1..1) is inside the classic heart curve.</summary>
+        private static float HeartCoverage(Vector2 p, Vector2 c, float scale)
+        {
+            // 3x3 supersampling for a smooth edge.
+            int inside = 0;
+            for (int sy = 0; sy < 3; sy++)
+                for (int sx = 0; sx < 3; sx++)
+                {
+                    float x = (p.x - .5f + (sx + .5f) / 3f - c.x) / (TextureSize * .36f * scale);
+                    float y = (p.y - .5f + (sy + .5f) / 3f - c.y) / (TextureSize * .36f * scale) + .12f;
+                    float a = x * x + y * y - 1f;
+                    if (a * a * a - x * x * y * y * y <= 0f) inside++;
+                }
+            return inside / 9f;
+        }
+
+        /// <summary>#719: a red heart with a dark ink edge and a small shine.</summary>
+        private static Sprite HeartSprite()
+        {
+            if (heartSprite != null) return heartSprite;
+            Color red = new Color(.86f, .16f, .18f), shine = new Color(1f, .62f, .6f);
+            heartSprite = Draw("Lab combo heart", (p, c) =>
+            {
+                float outer = HeartCoverage(p, c, 1f), inner = HeartCoverage(p, c, .82f);
+                float glint = Mathf.Clamp01(1f - Vector2.Distance(p, c + new Vector2(-.17f, .14f) * TextureSize) / (TextureSize * .07f));
+                Color color = Color.Lerp((Color)InkColor, Color.Lerp(red, shine, glint * .8f), inner);
+                color.a = outer;
+                return color;
+            }, Vector4.zero);
+            return heartSprite;
+        }
+
+        /// <summary>#719: the place of a broken heart: its ink outline over a faint paper fill.</summary>
+        private static Sprite HeartEmptySprite()
+        {
+            if (heartEmptySprite != null) return heartEmptySprite;
+            heartEmptySprite = Draw("Lab combo heart empty", (p, c) =>
+            {
+                float outer = HeartCoverage(p, c, 1f), inner = HeartCoverage(p, c, .82f);
+                Color ink = (Color)InkColor;
+                Color color = Color.Lerp(new Color(ink.r, ink.g, ink.b, outer), new Color(.5f, .45f, .4f, .28f * outer), inner);
+                return color;
+            }, Vector4.zero);
+            return heartEmptySprite;
+        }
+
+        // ---- #719 틀린 색 X: 박에 틀린 색이 맞으면 모두의 화면에서 맞혀야 했던 칸에 빨간 X가 쾅 찍히고 칸이 흔들린다 ----
+        /// <summary>봐준 틀린 색(실패 아님)의 X가 떠 있는 시간, 진짜 실패 때 결과 문구 전에 패널과 X를 붙잡아 두는 시간.</summary>
+        public const float WrongForgivenSeconds = .9f, WrongFailHoldSeconds = .65f;
+        private bool wrongSeenInit;
+        private uint seenWrongCount;
+        private float wrongElapsed = -1f;
+        private int wrongSlot;
+        private bool wrongFails;
+        private Image wrongMark, edgeFlash;
+        private static Sprite wrongSprite;
+        public bool WrongMarkShown => wrongMark != null && wrongMark.gameObject.activeInHierarchy;
+        public int WrongMarkSlot => wrongElapsed >= 0f ? wrongSlot : -1;
+        public bool WrongMarkFails => wrongElapsed >= 0f && wrongFails;
+
+        /// <summary>#719: a new wrong colour hit the gourd (forgiven or failing) → stamp an X on the slot it missed.</summary>
+        private void DetectWrong(LabSnapshot snapshot)
+        {
+            if (!wrongSeenInit || snapshot.comboWrongCount < seenWrongCount)
+            {
+                wrongSeenInit = true;
+                seenWrongCount = snapshot.comboWrongCount;
+                return;
+            }
+            if (snapshot.comboWrongCount == seenWrongCount) return;
+            seenWrongCount = snapshot.comboWrongCount;
+            wrongElapsed = 0f;
+            wrongSlot = Mathf.Clamp(snapshot.comboWrongSlot, 0, LabGourdCombo.Length - 1);
+            // The same snapshot carries a new WrongColor result when this wrong colour ended the combo.
+            wrongFails = snapshot.comboResult == LabComboResult.WrongColor && snapshot.comboResultCount != shownResultCount;
+            // A real failure already buzzes long (LabHaptics); a forgiven one gets a short sharp knock.
+            if (!wrongFails && network != null) LabHaptics.PlayDirect(network.config, LabHapticStyle.Rigid, 1f, .18f, .8f, .7f);
+        }
+
+        /// <summary>#719: how far the missed slot is shaken sideways right now.</summary>
+        private float WrongShake(int slot, float slotWidth)
+        {
+            if (wrongElapsed < 0f || slot != wrongSlot) return 0f;
+            float k = Mathf.Clamp01(1f - wrongElapsed / .45f);
+            return Mathf.Sin(wrongElapsed * 80f) * slotWidth * (wrongFails ? .28f : .18f) * k * k;
+        }
+
+        private void DrawWrong()
+        {
+            if (wrongElapsed >= 0f) wrongElapsed += Time.unscaledDeltaTime;
+            float duration = wrongFails ? WrongFailHoldSeconds : WrongForgivenSeconds;
+            if (wrongElapsed >= duration) wrongElapsed = -1f;
+            bool show = wrongElapsed >= 0f && panel.gameObject.activeSelf;
+            EnsureWrongParts();
+            wrongMark.gameObject.SetActive(show);
+            float t = Mathf.Max(0f, wrongElapsed);
+            float edge = wrongElapsed >= 0f ? Mathf.Clamp01(1f - t / .45f) : 0f;
+            edgeFlash.gameObject.SetActive(edge > 0f);
+            edgeFlash.color = new Color(FailColor.r, FailColor.g, FailColor.b, (wrongFails ? .85f : .6f) * edge * edge);
+            if (wrongElapsed >= 0f && wrongFails)
+            {
+                // The big one: the whole screen blinks red once while the X lands (the result words blink again after).
+                float blink = t < .12f ? 1f - t / .12f : 0f;
+                flash.gameObject.SetActive(blink > 0f);
+                flash.color = new Color(FailColor.r, FailColor.g, FailColor.b, .38f * blink);
+            }
+            if (!show) return;
+
+            RectTransform slot = slots[wrongSlot];
+            float alpha = Mathf.Clamp01(t / .05f) * (wrongFails ? 1f : Mathf.Clamp01((duration - t) / .25f));
+            // X: slams down from big onto the slot, tilted, then sits.
+            var mark = wrongMark.rectTransform;
+            if (mark.parent != slot) mark.SetParent(slot, false);
+            mark.SetAsLastSibling();
+            mark.anchorMin = mark.anchorMax = new Vector2(.5f, .5f);
+            mark.sizeDelta = slot.sizeDelta * 1.25f;
+            mark.anchoredPosition = Vector2.zero;
+            float land = Mathf.Clamp01(t / .11f);
+            float slam = Mathf.Lerp(wrongFails ? 2.8f : 2.1f, 1f, 1f - (1f - land) * (1f - land) * (1f - land));
+            mark.localScale = Vector3.one * slam * (wrongFails ? 1.2f : 1f);
+            mark.localRotation = Quaternion.Euler(0f, 0f, Mathf.Lerp(-22f, -6f, land));
+            wrongMark.color = new Color(1f, 1f, 1f, alpha);
+        }
+
+        private void EnsureWrongParts()
+        {
+            if (wrongMark != null) return;
+            wrongMark = NewRect("Combo Wrong X", panel).gameObject.AddComponent<Image>();
+            wrongMark.sprite = WrongSprite();
+            wrongMark.raycastTarget = false;
+            wrongMark.gameObject.SetActive(false);
+            // Red screen edges (centre stays clear so the board is still readable).
+            RectTransform edgeRect = NewRect("Combo Wrong Edge", layer);
+            edgeRect.anchorMin = Vector2.zero;
+            edgeRect.anchorMax = Vector2.one;
+            edgeRect.offsetMin = edgeRect.offsetMax = Vector2.zero;
+            edgeFlash = edgeRect.gameObject.AddComponent<Image>();
+            edgeFlash.sprite = VignetteSprite();
+            edgeFlash.color = Color.clear;
+            edgeFlash.raycastTarget = false;
+            edgeRect.gameObject.SetActive(false);
+        }
+
+        /// <summary>#719: a thick hand-drawn red X with a dark ink edge.</summary>
+        private static Sprite WrongSprite()
+        {
+            if (wrongSprite != null) return wrongSprite;
+            float s = TextureSize;
+            Vector2 a = new Vector2(s * .2f, s * .2f), b = new Vector2(s * .8f, s * .8f);
+            Vector2 c2 = new Vector2(s * .2f, s * .8f), d = new Vector2(s * .8f, s * .2f);
+            wrongSprite = Draw("Lab combo wrong", (p, c) =>
+            {
+                float distance = Mathf.Min(SegmentDistance(p, a, b), SegmentDistance(p, c2, d));
+                float core = Mathf.Clamp01(s * .08f + .5f - distance);
+                float edge = Mathf.Clamp01(s * .08f + 4f + .5f - distance);
+                Color color = Color.Lerp((Color)InkColor, FailColor, core);
+                color.a = edge;
+                return color;
+            }, Vector4.zero);
+            return wrongSprite;
+        }
+
+        /// <summary>#719: 1 right on each combo clock tick (the same ticks LabYaguangSound plays), fading to 0 before the next.
+        /// The combo's start (the 깽) counts as the first beat.</summary>
+        private float TickBeat(LabSnapshot snapshot, double serverNow)
+        {
+            LabConfig config = network != null ? network.config : null;
+            double fastFor = config != null ? config.YaguangComboTickFastSeconds : LabYaguangSound.DefaultTickFastSeconds;
+            double every = config != null ? config.YaguangComboTickIntervalSeconds : LabYaguangSound.DefaultTickInterval;
+            double fastEvery = config != null ? config.YaguangComboTickFastIntervalSeconds : LabYaguangSound.DefaultTickFastInterval;
+            double tick = LabYaguangSound.LatestTickAt(snapshot.comboStartedAt, snapshot.comboEndsAt, serverNow,
+                fastFor, every, fastEvery, out bool fast);
+            if (double.IsNegativeInfinity(tick)) tick = snapshot.comboStartedAt;
+            double since = System.Math.Max(0d, serverNow - tick);
+            double fade = (fast ? fastEvery : every) * .45d;
+            return Mathf.Clamp01((float)System.Math.Exp(-since / System.Math.Max(.03d, fade)));
+        }
+
         private void LateUpdate()
         {
             LabSnapshot snapshot = network != null ? network.Snapshot : null;
             bool battle = snapshot != null && snapshot.phase == LabPhase.Playing && !snapshot.paused;
             double serverNow = battle ? network.BattlePresentationTime : 0d;
+            // #719: my combined orbs of the colour the combo needs now beat in that colour (one glance = what to throw).
+            LabOrbElement needed = snapshot != null && snapshot.phase == LabPhase.Playing && snapshot.comboActive
+                && snapshot.comboColors != null && snapshot.comboProgress >= 0 && snapshot.comboProgress < snapshot.comboColors.Length
+                ? snapshot.comboColors[snapshot.comboProgress] : LabOrbElement.None;
+            // #719: the glow beats on the clock's tick (똑딱), not on its own rhythm.
+            tickBeat = needed != LabOrbElement.None ? TickBeat(snapshot, serverNow) : 0f;
+            LabOrbComboHint.Beat = tickBeat;
+            if (network != null && network.board != null) network.board.SetComboHint(needed);
             // 조합판 구슬 크기(#257)는 콤보 화면이 숨어 있어도 정한다. 일시정지 중에는 그대로 둔다.
             if (snapshot == null || snapshot.phase != LabPhase.Playing) SetBoardLook(0);
             else if (!snapshot.paused) SetBoardLook(LocalEffect(snapshot, serverNow, out _));
@@ -271,10 +589,12 @@ namespace C6Lab
             layer.SetAsLastSibling();
 
             if (snapshot.comboCount < lastComboCount || snapshot.foxRoundCount < shownFoxRoundCount) ResetRound();
+            DetectWrong(snapshot);
             DetectChanges(snapshot);
             DetectFoxRound(snapshot, serverNow);
-            DrawCombo(snapshot, serverNow);
+            DrawCombo(snapshot, serverNow, warning);
             DrawResult();
+            DrawWrong();
             DrawWarning(snapshot, serverNow, warning);
             DrawShade(warning);
             DrawEffect(snapshot, serverNow);
@@ -296,7 +616,7 @@ namespace C6Lab
 
         /// <summary>
         /// 콤보 예고 (#241): 패널 자리에 COMBO! 와 남은 초(3 → 2 → 1). 숫자가 바뀔 때마다 톡 튀어나오고,
-        /// 0이 되는 순간(4칸이 나오는 시각) Host 스냅샷의 새 콤보로 바뀐다. 색은 예고 중에 보여주지 않는다.
+        /// 0이 되는 순간(4칸이 나오는 시각) Host 스냅샷의 새 콤보로 바뀐다. #719부터 야광귀 예고는 패널에 다음 콤보 색을 한 칸씩 미리 보여 준다.
         /// 앞 콤보의 결과 문구가 떠 있으면 그것부터 보여준다.
         /// </summary>
         private void DrawWarning(LabSnapshot snapshot, double serverNow, bool warning)
@@ -312,7 +632,8 @@ namespace C6Lab
                 warningPopElapsed = -1f;
                 return;
             }
-            int count = Mathf.Max(1, Mathf.CeilToInt((float)(snapshot.comboNextAt - serverNow)));
+            // #719: the warning is split in four (넷 → 하나), so a longer warning counts more slowly.
+            int count = Mathf.Max(1, snapshot.ComboWarningCount(serverNow));
             if (yaguang != warningYaguang) shownWarningCount = -1;
             warningYaguang = yaguang;
             // 말풍선은 남은 초를 야광귀식으로 넷 → 셋 → 둘 → 하나 센다(넷까지밖에 몰라서 더 길면 다시 넷부터).
@@ -505,6 +826,9 @@ namespace C6Lab
                     ShowComboPop(LabGourdCombo.Length, true, snapshot.comboCount);
                     resultDelay = comboClearSeconds;
                 }
+                // #719: a wrong colour first stamps its X on the missed slot (panel held), then the result words.
+                if (shownResult == LabComboResult.WrongColor && wrongFails && wrongElapsed >= 0f)
+                    resultDelay = WrongFailHoldSeconds;
             }
             if (snapshot.comboCount != lastComboCount)
             {
@@ -523,35 +847,47 @@ namespace C6Lab
             lastProgress = snapshot.comboProgress;
         }
 
-        private void DrawCombo(LabSnapshot snapshot, double serverNow)
+        private void DrawCombo(LabSnapshot snapshot, double serverNow, bool warning)
         {
             // 결과 문구가 떠 있는 동안에는 패널을 숨긴다 (콤보 → 결과 → 배지가 겹치지 않게).
             bool finalCheck = StampSuccess && shownResult == LabComboResult.Success && resultDelay > 0f;
-            bool showPanel = (snapshot.comboActive && resultElapsed < 0f || finalCheck) && snapshot.comboColors != null
-                && snapshot.comboColors.Length == LabGourdCombo.Length;
+            // #719: a failing wrong colour keeps the panel up a moment so its X lands on the missed slot.
+            bool wrongHold = shownResult == LabComboResult.WrongColor && resultDelay > 0f;
             bool yaguang = YaguangCount;
+            // #719: during the warning the panel shows the next combo's real colours, one more on each count (넷 → 하나),
+            // so the order can be read (and the orbs made) before it starts — without hearing anything.
+            bool preview = yaguang && warning && !snapshot.comboActive && resultElapsed < 0f && !finalCheck && !wrongHold
+                && snapshot.comboNextColors != null && snapshot.comboNextColors.Length == LabGourdCombo.Length;
+            int revealed = preview ? Mathf.Clamp(LabGourdCombo.Length + 1 - snapshot.ComboWarningCount(serverNow), 0, LabGourdCombo.Length) : 0;
+            if (revealed > previewRevealed) { popSlot = revealed - 1; popElapsed = 0f; }
+            previewRevealed = revealed;
+            LabOrbElement[] colors = preview ? snapshot.comboNextColors : snapshot.comboColors;
+            bool showPanel = preview || (snapshot.comboActive && resultElapsed < 0f || finalCheck || wrongHold) && snapshot.comboColors != null
+                && snapshot.comboColors.Length == LabGourdCombo.Length;
             figmaPanel = yaguang && LabYaguangComboArt.Load("Panel") != null;
             ApplyPanelArtwork(figmaPanel);
             panel.gameObject.SetActive(showPanel);
+            DrawHearts(snapshot, preview, showPanel);
             if (showPanel && !panelWasShown) panelShownAt = Time.unscaledTime;
             panelWasShown = showPanel;
             panelGroup.alpha = showPanel ? Mathf.SmoothStep(0f, 1f, (Time.unscaledTime - panelShownAt) / .22f) : 0f;
-            if (!showPanel) return;
+            if (!showPanel) { TurnSlot = -1; return; }
             questionSlot.gameObject.SetActive(yaguang && !figmaPanel);
             if (yaguang)
                 questionSlot.localRotation = Quaternion.Euler(0f, 0f, 8f * Mathf.Sin(Time.unscaledTime * 2.3f));
 
-            float bob = Mathf.Sin(Time.unscaledTime * 8f) * .08f;
             if (popElapsed >= 0f) popElapsed += Time.unscaledDeltaTime;
+            TurnSlot = -1;
             for (int i = 0; i < LabGourdCombo.Length; i++)
             {
-                slotElements[i] = snapshot.comboColors[i];
+                slotElements[i] = colors[i];
                 Sprite art = figmaPanel ? LabYaguangComboArt.Orb(slotElements[i]) : null;
                 slotFills[i].sprite = art != null ? art : DiscSprite();
                 slotFills[i].color = art != null ? Color.white : (Color)LabPaintPalette.SrgbColorFor(slotElements[i]);
-                bool hit = i < snapshot.comboProgress;
+                bool hit = !preview && i < snapshot.comboProgress;
+                bool shown = !preview || i < revealed; // #719: not yet counted = an empty numbered slot
                 slotChecks[i].gameObject.SetActive(hit);
-                slotFills[i].enabled = !figmaPanel || !hit;
+                slotFills[i].enabled = shown && (!figmaPanel || !hit);
                 slotNumbers[i].gameObject.SetActive(figmaPanel && !hit);
                 if (figmaPanel)
                 {
@@ -572,10 +908,30 @@ namespace C6Lab
                 }
                 wasChecked[i] = hit;
                 float scale = 1f;
-                if (snapshot.comboActive && i == snapshot.comboProgress) scale += bob;
-                if (!figmaPanel && i == popSlot && popElapsed >= 0f && popElapsed < .25f)
+                // #719: the slot to hit now is bigger and glows in its colour, beating like a heart; later slots are faded,
+                // so one glance at the panel shows which colour to throw.
+                bool turn = !preview && snapshot.comboActive && i == snapshot.comboProgress;
+                bool later = !preview && snapshot.comboActive && i > snapshot.comboProgress;
+                float beat = tickBeat;
+                if (turn) scale = 1.18f + .07f * beat;
+                Color fill = slotFills[i].color;
+                slotFills[i].color = new Color(fill.r, fill.g, fill.b, later ? .4f : 1f);
+                Image glowImage = slotGlows[i];
+                if (glowImage != null)
+                {
+                    glowImage.gameObject.SetActive(turn);
+                    if (turn)
+                    {
+                        Color tint = LabPaintPalette.SrgbColorFor(slotElements[i]);
+                        glowImage.color = new Color(tint.r, tint.g, tint.b, Mathf.Lerp(.45f, .95f, beat));
+                        glowImage.rectTransform.localScale = Vector3.one * Mathf.Lerp(.9f, 1.2f, beat);
+                    }
+                }
+                if (turn) TurnSlot = i;
+                if ((!figmaPanel || preview) && i == popSlot && popElapsed >= 0f && popElapsed < .25f)
                     scale += .3f * Mathf.Sin(popElapsed / .25f * Mathf.PI);
                 slots[i].localScale = Vector3.one * scale;
+                slots[i].anchoredPosition += new Vector2(WrongShake(i, slots[i].sizeDelta.x), 0f); // #719 X
                 // 야광귀 셈법 (#271): 맞힌 칸 위에 그 칸의 수가 톡 튀어나와 남는다.
                 Text word = slotWords[i];
                 word.gameObject.SetActive(yaguang && hit && !figmaPanel);
@@ -599,6 +955,13 @@ namespace C6Lab
                 double limit = snapshot.comboEndsAt - snapshot.comboStartedAt;
                 timeBar.anchorMax = new Vector2(limit > 0d ? Mathf.Clamp01((float)(left / limit)) : 0f, 1f);
                 timeBarFill.color = figmaPanel ? Color.white : left <= 3d ? FailColor : (Color)InkColor;
+                timeBar.parent.gameObject.SetActive(true);
+            }
+            else if (preview)
+            {
+                // #719: during the warning the bar sits full (not draining yet) so the panel's bottom isn't empty.
+                timeBar.anchorMax = Vector2.one;
+                timeBarFill.color = figmaPanel ? Color.white : (Color)InkColor;
                 timeBar.parent.gameObject.SetActive(true);
             }
             else timeBar.parent.gameObject.SetActive(false);
@@ -753,6 +1116,11 @@ namespace C6Lab
             lastComboCount = 0;
             popElapsed = -1f;
             popSlot = -1;
+            previewRevealed = 0;
+            wrongSeenInit = false;
+            wrongElapsed = -1f;
+            heartsCombo = uint.MaxValue;
+            shownHeartsLeft = -1;
             System.Array.Clear(wasChecked, 0, wasChecked.Length);
             effectKind = 0;
             effectPopElapsed = -1f;
@@ -875,6 +1243,17 @@ namespace C6Lab
 
             for (int i = 0; i < LabGourdCombo.Length; i++)
             {
+                // #719: a glow behind the slot whose turn it is (a sibling placed first, so it sits under the slot).
+                RectTransform glowRect = NewRect("Combo Turn Glow " + (i + 1), panel);
+                glowRect.anchorMin = glowRect.anchorMax = new Vector2(0f, 1f);
+                glowRect.pivot = new Vector2(.5f, .5f);
+                glowRect.sizeDelta = new Vector2(slotSize * 2f, slotSize * 2f);
+                glowRect.anchoredPosition = new Vector2(gap + slotSize * .5f + i * (slotSize + gap), -gap - slotSize * .5f);
+                Image glow = glowRect.gameObject.AddComponent<Image>();
+                glow.sprite = TurnGlowSprite();
+                glow.raycastTarget = false;
+                glowRect.gameObject.SetActive(false);
+                slotGlows[i] = glow;
                 RectTransform slot = NewRect("Combo Slot " + (i + 1), panel);
                 slot.anchorMin = slot.anchorMax = new Vector2(0f, 1f);
                 slot.pivot = new Vector2(.5f, .5f);
@@ -1130,6 +1509,19 @@ namespace C6Lab
                 return new Color(1f, 1f, 1f, a);
             }, Vector4.zero);
             return vignetteSprite;
+        }
+
+        /// <summary>#719: a soft round glow (white, tinted by the slot's colour).</summary>
+        private static Sprite TurnGlowSprite()
+        {
+            if (turnGlowSprite != null) return turnGlowSprite;
+            turnGlowSprite = Draw("Lab combo turn glow", (p, c) =>
+            {
+                float r = Vector2.Distance(p, c) / (TextureSize * .5f);
+                float a = Mathf.Clamp01(1f - r);
+                return new Color(1f, 1f, 1f, a * a);
+            }, Vector4.zero);
+            return turnGlowSprite;
         }
 
         private static Sprite DiscSprite()

@@ -17,6 +17,11 @@ namespace Hapio
         private GameSealedGourdArt art;
         private GameScreen screen;
         private RawImage shadow;
+        private GameFigmaSurface returnArtwork;
+        private LabRoundedGraphic returnFill;
+        private GameFigmaStrokeLibrary.Surface returnSource;
+        private Sprite returnSprite;
+        private Texture returnTexture;
         private int stage=-1;
         public static void Attach(GameScreen screen)
         {
@@ -52,7 +57,11 @@ namespace Hapio
             BuildButton(screen.closeViewerButton, "결과로 돌아가기", theme.medium, 755f, true);
             ApplyStage(1);
         }
-        private void OnEnable() => transform.SetAsLastSibling();
+        private void OnEnable()
+        {
+            transform.SetAsLastSibling();
+            RefreshReturnBackground(true);
+        }
 
         private void BuildButton(Button button, string caption, Font font, float y, bool primary)
         {
@@ -64,20 +73,38 @@ namespace Hapio
             button.targetGraphic.enabled = true;
             button.targetGraphic.color = Color.clear;
             button.targetGraphic.raycastTarget = true;
-            if (primary && GameFigmaStrokeLibrary.Find("ResultAction") != null)
+            var fill = GameViewerHelpUi.Rect(button.transform, "Button Fill", 0, 0, 234, 45)
+                .gameObject.AddComponent<LabRoundedGraphic>();
+            fill.color = primary ? GameLobbySeatColors.Versus : ResetFill;
+            fill.raycastTarget = false;
+            if (primary)
             {
-                GameViewerHelpUi.Surface(button.transform, "ResultAction", 0, 0, 234, 45);
-            }
-            else
-            {
-                var fill = GameViewerHelpUi.Rect(button.transform, "Button Fill", 0, 0, 234, 45)
-                    .gameObject.AddComponent<LabRoundedGraphic>();
-                fill.color = primary ? GameLobbySeatColors.Versus : ResetFill;
-                fill.raycastTarget = false;
+                // Keep an image-independent background ready before selecting the artwork.
+                returnFill = fill;
+                returnArtwork = GameViewerHelpUi.Surface(button.transform, "ResultAction", 0, 0, 234, 45);
+                RefreshReturnBackground(true);
             }
 
             GameViewerHelpUi.Label(button.transform, "Label", caption, font, 20,
                 GameLobbySeatColors.LightText, 0, 0, 234, 45);
+        }
+        private void RefreshReturnBackground(bool force = false)
+        {
+            if (returnFill == null || returnArtwork == null) return;
+            var source = GameFigmaStrokeLibrary.Find("ResultAction");
+            var sprite = source?.sprite;
+            Texture texture = sprite != null ? sprite.texture : null;
+            if (force || !object.ReferenceEquals(returnSource, source)
+                || !object.ReferenceEquals(returnSprite, sprite) || !object.ReferenceEquals(returnTexture, texture))
+            {
+                returnSource = source;
+                returnSprite = sprite;
+                returnTexture = texture;
+                returnArtwork.ReloadSource();
+            }
+            bool hasArtwork = sprite != null && texture != null;
+            if (returnArtwork.enabled != hasArtwork) returnArtwork.enabled = hasArtwork;
+            if (returnFill.enabled == hasArtwork) returnFill.enabled = !hasArtwork;
         }
         public void ApplyStage(int value)
         {
@@ -106,6 +133,7 @@ namespace Hapio
         private void LateUpdate()
         {
             if(design==null)return;
+            RefreshReturnBackground();
             var session=GameSession.Instance;
             int desired=GameStageBackgrounds.PresentationStage(session);
             if(Mathf.Clamp(desired,1,ShadowFloorCenterY.Length)!=stage)ApplyStage(desired);

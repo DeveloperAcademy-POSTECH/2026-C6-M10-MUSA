@@ -389,11 +389,12 @@ namespace C6Lab
                     comboCountFor = snapshot.comboNextAt;
                     lastComboCount = 0;
                 }
-                int count = Mathf.Max(1, Mathf.CeilToInt((float)(snapshot.comboNextAt - now)));
+                // #719: the warning is split in four, so a longer warning counts more slowly.
+                int count = Mathf.Max(1, snapshot.ComboWarningCount(now));
                 if (count != lastComboCount)
                 {
                     lastComboCount = count;
-                    if (now - (snapshot.comboNextAt - count) <= LateSeconds)
+                    if (now - snapshot.ComboWarningCountAt(count) <= LateSeconds)
                         Play(CountSfx(count), source, 1f, guideRuleWarning ? GuideCountGain(count, GuideCountFade) : 1f);
                 }
             }

@@ -114,7 +114,7 @@ MonoBehaviour:
   comboPenaltyThrowerOnly: 0
   comboRewardDurationSeconds: 15
   comboRewardSizeScale: 2.5
-  comboWarningSeconds: 4
+  comboWarningSeconds: 6
   orbLifetimeSeconds: 15
   orbRestitution: 0.8
   orbFloorDeceleration: 2
@@ -328,6 +328,7 @@ MonoBehaviour:
   yaguangComboClearedDelaySeconds: 0.8
   yaguangComboClearedSoundVolume: 0.9
   yaguangFirstComboForgive: 1
+  yaguangComboHearts: 3
   yaguangComboGuideRuleCombos: 1
   yaguangComboGuideReadyOn: 1
   yaguangComboGuideFeedbackDelaySeconds: 0.3
