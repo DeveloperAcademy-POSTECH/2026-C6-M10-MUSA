@@ -250,26 +250,8 @@ namespace C6Lab
         public void Bind(LabNetwork target, Canvas uiCanvas)
         {
             ReleaseGauge();
-            if (network != null) network.ComboThrowHeld -= OnComboThrowHeld;
             network = target;
-            if (network != null) network.ComboThrowHeld += OnComboThrowHeld;
             canvas = uiCanvas != null ? uiCanvas.rootCanvas : null;
-        }
-
-        /// <summary>#719: a throw was turned away by the combo (warning, or a five-colour orb mid-combo): the rope jolts.</summary>
-        private void OnComboThrowHeld(bool warning)
-        {
-            LabComboThrowSeal seal = network != null ? LabComboThrowSeal.For(network.board) : null;
-            if (seal != null) seal.Knock();
-        }
-
-        /// <summary>#719: the rope across the top of my board is up for the whole combo warning (no throws then).</summary>
-        private void HoldThrowSeal(bool held)
-        {
-            if (network == null || network.board == null) return;
-            LabComboThrowSeal seal = held ? LabComboThrowSeal.For(network.board)
-                : network.board.GetComponentInChildren<LabComboThrowSeal>(true);
-            if (seal != null) seal.SetHeld(held);
         }
 
         private float tickBeat;
@@ -419,8 +401,6 @@ namespace C6Lab
             tickBeat = needed != LabOrbElement.None ? TickBeat(snapshot, serverNow) : 0f;
             LabOrbComboHint.Beat = tickBeat;
             if (network != null && network.board != null) network.board.SetComboHint(needed);
-            HoldThrowSeal(snapshot != null && snapshot.phase == LabPhase.Playing && !snapshot.paused && !snapshot.comboActive
-                && snapshot.ComboWarningOn(network.BattlePresentationTime));
             // 조합판 구슬 크기(#257)는 콤보 화면이 숨어 있어도 정한다. 일시정지 중에는 그대로 둔다.
             if (snapshot == null || snapshot.phase != LabPhase.Playing) SetBoardLook(0);
             else if (!snapshot.paused) SetBoardLook(LocalEffect(snapshot, serverNow, out _));
@@ -1566,7 +1546,6 @@ namespace C6Lab
         }
         private void OnDestroy()
         {
-            if (network != null) network.ComboThrowHeld -= OnComboThrowHeld;
             ReleaseGauge();
             if (layer != null) Destroy(layer.gameObject);
         }

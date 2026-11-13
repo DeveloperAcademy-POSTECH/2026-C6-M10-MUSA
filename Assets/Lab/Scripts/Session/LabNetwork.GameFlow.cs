@@ -188,10 +188,7 @@ namespace C6Lab
             value.JigwiBurnRequested += OnJigwiBurnRequested;
         }
 
-        /// <summary>#719: 내 판에서 던지려던 구슬이 콤보 때문에 막혔다 (true = 예고 중이라 다 막힘, false = 콤보 중 오색구슬).
-        /// 판 위쪽 금줄이 흔들린다 (LabGourdComboHud).</summary>
-        public event System.Action<bool> ComboThrowHeld;
-
+        /// <summary>#719: 콤보 예고 동안은 아무것도, 콤보 중에는 오색구슬을 박에 못 던진다. 막힌 구슬은 위로 미끄러져 튕겨 돌아온다.</summary>
         private bool ThrowAllowed(string orbId)
         {
             if (!JigwiBThrowAllowed(orbId)) return false;
@@ -201,9 +198,7 @@ namespace C6Lab
             double now = BattlePresentationTime;
             bool warning = snapshot.ComboWarningOn(now) && !snapshot.comboActive;
             bool fiveColor = snapshot.comboActive && board != null && board.IsFiveColor(orbId);
-            if (!warning && !fiveColor) return true;
-            ComboThrowHeld?.Invoke(warning);
-            return false;
+            return !warning && !fiveColor;
         }
 
         private void UnsubscribeBoard(LabOrbBoard value)
