@@ -8606,6 +8606,21 @@ main `e3108459`의 #712(칠용 뚜껑 법선 공유와3개 LidPaint 메시)을 �
 main fbc943e8을 통합하며 VALIDATION 문서 끝의 독립 기록 추가 충돌을 양쪽 보존으로 해결했다. 자동 병합된 Battle 씬은 Stage2 하위591개 블록이 작업 브랜치와 같고 Stage3 하위710개 블록이 main과 같은 것을 정적 비교했다. 씬 object ID 중복0, 새 미해결 GUID0, 충돌 표식0을 확인했다. 기존 패키지 GUID는 프로젝트 에셋 GUID 검사에서 제외했다. main의 시연/법선 수정과 기존 Stage2 폴리싱을 함께 보존했다. 이 병합본에서 Unity 컴파일/실행 검사는 재실행하지 않았으며 앞선 PASS 기록과 구분한다.
 
 
+## 2026-11-13 — #720 관람 복귀 버튼 배경 보완
+
+기준 main `9be6d1f1`, `fix/#720-viewer-return-background`, Unity6000.6.5f1/macOS Metal. 사용자가 다른 PC의 일반 Hapio 빌드에서 ‘결과로 돌아가기’ 배경만 없다고 확인했다. 해당 문제 앱/저장 상태에는 접근할 수 없고, 공유된main의Mac Development캡처에는배경이있어 실제 원인은 확정하지 않았다. 현재코드의 항목존재/sprite null 방어 공백과 재오픈 경계를 보완한다.
+
+- `GameSealedGourdView`의 복귀 배경에만 원화/둥근 단색 대체를 준비하고 실제 Sprite/Texture 상태를 판정한다. 재오픈 또는 entry/Sprite/Texture 참조 변경 때만 캐시/메시를 갱신한다. `GameFigmaSurface`의 기존 Show는 유지하고 명시적 internal ReloadSource만 추가했다. 원래 위치·원화·색·글자·콜백·리셋·판정·네트워크·Scene/Prefab/설정은 변경하지 않았다.
+- 최초검사요청은 검사코드가 구형 CanvasRenderer.GetMesh(mesh) API를 사용해 컴파일 오류로0건 종료됐다. 현재 설치 버전의 실제 API GetMesh()를 확인해 수정했다.0건은PASS로 쓰지 않는다.
+- 누락/복구 GPU 집중검사 **3/3 PASS**(0.40초). 항목없음·Sprite없음·소유한테스트Texture파괴를 주입하고 원화/대체/새 항목 복구의 실제 CanvasMesh와 렌더 픽셀을 확인했다. 테스트의 라이브러리 원본 배열은 finally에서 복원하고 테스트가 만든 Texture/Sprite만 해제한다.
+- 전체 EditMode **2400/2400 PASS**(34.47초), 영향 PlayMode **6/6 PASS**(50.20초). SavedStoryViewerSkipAndEndingButtonsReceiveRealMouseClicks1건(24.33초), TerritoryDeveloperSoloUsesDesignedResultsAndReturnsHomeAfterViewingTheGourd1건(3.48초), GameYaguangDemoFlowTests1건(9.97초), GourdResultViewerPlayModeTests3건(12.42초). 실패·skip·inconclusive0.
+- 저장 Scene의 실제 마우스 검사는 일반1~3스테이지에서 관람/리셋/닫기·카드 유지·진행을 확인한다.1스테이지에서 그림을 메모리상 제거해 대체 배경을 확인하고 실제닫기클릭→참조없는상태재오픈→닫기→원화복구후재오픈→닫기까지 확인했다. 원본Sprite는 UnityTearDown에서도복원해 중첩코루틴실패에도 다른검사로새지않게했다. 게임결과/도색복사본은유지됐다.
+- 실제 runtime버튼 코드를 격리한 PreviewScene에서 정상 원화·누락 대체·복구 원화 비교를 렌더해 육안 확인했다. 이는 전체 게임/문제 PC/실기기 스크린샷이 아니다. 처음 additiveScene 캡처는 기존UntitledScene을 저장하지 않아거절됐고, 저장·삭제 없이 PreviewScene으로 변경해 만들었다. 임시Scene/카메라/RT는해제하고 라이브러리는복원했다. 비교이미지와 원시검사결과는 커밋하지 않는 로컬 artifacts/viewer-return-background에 보관한다.
+- 검사 범위: UI표현과 복귀버튼 캐시만변경하고 Scene전환/세션·물리·공유상태·게임판정·빌드설정 동작은 바꾸지 않아 전체 PlayMode는 실행하지 않았다. 전체Edit와 실제관람/클릭/모드 연결의 영향Play를선택했다. 새 Mac/iOS Player빌드·문제PC앱 재현·iPhone/iPad 화면은미검증이다.
+
+- PR 준비 시 최신 main `27caa38e`를 통합했다. 앞선 검증 커밋 `d3b46a16`과의 차이는 README 소개 문구뿐이며 런타임·에셋·검사·패키지·설정·환경은 같다. 저장소의 검사 결과 재사용 기준에 따라 위 통과 결과를 재사용했다. 독립 코드 리뷰에서 병합 차단 사항이 없고, 변경 7개 파일 외 Scene/Prefab/원본 에셋/설정 수정과 미해결 충돌은 없다.
+
+
 ## 2026-11-13 — #719 야광귀 콤보 가이딩 (소리 없이 화면만 보고)
 
 기준 main `9be6d1f1` 위 `feat/#719-yaguang-combo-guide`, Unity Editor(macOS)에서 팀원이 실행했다. 비교 시점에 main에 새 커밋이 없어 병합 충돌은 없다. 공유 설정 개수·인덱스와 프로토콜 5704는 그대로다(새 스냅샷 필드 comboNextColors·comboWrong*은 옛 빌드가 무시하는 추가 필드).
@@ -8613,3 +8628,4 @@ main fbc943e8을 통합하며 VALIDATION 문서 끝의 독립 기록 추가 충�
 - 전체 EditMode 첫 실행 **2,394 PASS / 4 FAIL**(총 2,398, skip 0). 실패 4개는 모두 #719에서 의도한 변경을 옛 기대값이 따르지 못한 것이다: LabDeveloperConfigTests.GourdColorComboFieldsFormTheComboGroupAndStartOff(저장 에셋 예고 6초), LabGourdComboTests.TheWarningCountsDownBeforeTheFourSlotsAppearOnTime(예고 중 던지기 COMBO_HOLD 거절), GameSceneAssetTests.MenuScreens_HaveSavedEditableCanvasAndInput Home·Lobby(장면 DEV 패널 Setting164 값 4). 테스트 기대값과 두 메뉴 장면의 Setting164 값(6)을 고친 뒤 **Rerun Failed 4개 PASS**.
 - 새 테스트 LabGourdComboTests.EveryWrongColorIsRememberedForTheXMark는 첫 실행에서 통과했다.
 - 수정 뒤 전체 EditMode 재실행, PlayMode, 빌드, iOS 실기기·다중 기기 화면 확인은 이번 기록에서 실행하지 않았다. 화면 동작(다음 콤보 색 미리보기, 지금 칸 강조·똑딱 박자, 필요한 색 테두리, 틀린 색 X, 예고 중 던지기 막기, 섬광 보상 오색구슬 등장)은 팀원이 Editor 플레이로 보며 조정했다.
+- PR 준비 시 최신 main `3441e326`(#720 관람 복귀 배경)을 통합했다. 겹친 파일은 이 문서 끝의 기록 추가뿐이라 양쪽 기록을 모두 보존했다. #720은 Hapio 관람 UI만 바꿔 #719 콤보 코드와 겹치지 않는다.
