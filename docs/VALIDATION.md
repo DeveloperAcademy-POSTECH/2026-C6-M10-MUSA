@@ -14,6 +14,7 @@
 | 기존 결과 흐름 검사 | `SealReadinessAndQuitPopup…`, `FigmaResultsWaitForHostNext…`, `GameStageRetryPlayModeTests` 2개 PASS |
 | 3대 Mac 앱 실제 흐름 (Development 빌드, Direct IP, 기본 한도) | P3가 이야기 중 그만두기 팝업을 열어 둠 → 60.0초 뒤 저절로 닫힘. 방장은 준비 뒤 45.0초에 "한 동지가 아직 이야기를 보고 있소.", 120.0초에 `요괴 봉인 시작` 활성(준비 2/3, P3는 준비로 표시되지 않음). 방장이 누르자 3대 모두 2스테이지 전투 진입 |
 
+- **최신 main(`53118b72`, #728 봉인 박 관람 준비) 통합 뒤 재실행:** #728이 같은 `GameSession`·결과 이야기·관람 코드를 바꿔 다시 실행했다. 전체 EditMode 2411/2411 PASS, 전체 PlayMode 852/853. 실패 1건 `LabPaintGrainRenderTests.SavedGourdShaderChangesOnlyPigmentAndZeroStrengthMatchesOffExactly`(RGB 양자화 차이 2 > 1)는 그 fixture만 다시 실행하자 2/2 PASS였다. 새 검사 4건과 #728에서 고쳐진 Lab fixture는 모두 PASS. 3대 Mac 앱 확인은 통합 전 `b5d64eff` 기준이다.
 - **첫 3대 실행의 실패:** 검사 스크립트가 P2의 대기 한도를 90초로 둬서 120초 전에 P2 앱이 꺼졌고, 방장은 기존 규칙대로 GameOver가 됐다. 스크립트 한도를 300초로 늘려 다시 실행한 결과가 위 표다.
 - **미실행:** iPhone 실기기, 4·5인, Completed에서의 결과 누락 제외와 Completed exit의 실제 다기기 확인(코드 경로는 같은 게이트를 쓰며 PlayMode 단위로는 재도전 exit만 확인).
 
