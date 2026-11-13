@@ -1,5 +1,22 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-14 — 결과 화면 무기한 대기 제거 (Game 토큰 55)
+
+- **기준:** `fix/hapio-result-holds` (main `a7208003` 위 `b5d64eff`). Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 프로토콜 5704, `C6PhysicsLab/62`, 설정 265개는 그대로이고 `C6HapioGame/55`로 올렸다.
+- **검사 범위 선정:** 결과 진행 조건·exit 처리·접속 토큰을 바꿨으므로 AGENTS.md 기준 전체 EditMode·PlayMode를 실행했다.
+
+| 확인 | 결과 |
+| --- | --- |
+| 전체 EditMode | 2411/2411 PASS (새 `GameResultHoldTests` 4개, 토큰 55 검사 포함) |
+| 전체 PlayMode | 836/847. 실패 11건은 모두 `LabComboProjectileIntegrationTests`(2)·`LabFiveColorClayNetworkTests`(1)·`LabLocalBoardNetworkIntegrationTests`(7)·`LabPlayerPaintPatternRenderTests`(1) |
+| 같은 4개 fixture를 깨끗한 main `a7208003`에서 실행 | 25/36, 같은 10건 + 같은 fixture의 다른 1건 실패. 이 변경 전부터 main에서 실패하는 검사다 |
+| 새 PlayMode 검사 (가짜 구성원 주입, 줄인 한도) | 120초 보류 뒤 방장 진행·안내 문구, 그만두기 팝업·박 보기 자동 닫힘(준비 유지), 결과 누락 → 중간 스테이지 GameOver, 재도전 대기에서 구성원 exit → 재도전 종료: 모두 PASS |
+| 기존 결과 흐름 검사 | `SealReadinessAndQuitPopup…`, `FigmaResultsWaitForHostNext…`, `GameStageRetryPlayModeTests` 2개 PASS |
+| 3대 Mac 앱 실제 흐름 (Development 빌드, Direct IP, 기본 한도) | P3가 이야기 중 그만두기 팝업을 열어 둠 → 60.0초 뒤 저절로 닫힘. 방장은 준비 뒤 45.0초에 "한 동지가 아직 이야기를 보고 있소.", 120.0초에 `요괴 봉인 시작` 활성(준비 2/3, P3는 준비로 표시되지 않음). 방장이 누르자 3대 모두 2스테이지 전투 진입 |
+
+- **첫 3대 실행의 실패:** 검사 스크립트가 P2의 대기 한도를 90초로 둬서 120초 전에 P2 앱이 꺼졌고, 방장은 기존 규칙대로 GameOver가 됐다. 스크립트 한도를 300초로 늘려 다시 실행한 결과가 위 표다.
+- **미실행:** iPhone 실기기, 4·5인, Completed에서의 결과 누락 제외와 Completed exit의 실제 다기기 확인(코드 경로는 같은 게이트를 쓰며 PlayMode 단위로는 재도전 exit만 확인).
+
 ## 2026-11-12 — 스테이지 박 뚜껑 칠의 흰 노이즈
 
 - **기준:** `fix/lid-paint-smooth-normals` (main `c2829b46`). Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 판정·접속 묶음·설정은 그대로다.
