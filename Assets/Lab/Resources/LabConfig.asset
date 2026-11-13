@@ -328,6 +328,7 @@ MonoBehaviour:
   yaguangComboClearedDelaySeconds: 0.8
   yaguangComboClearedSoundVolume: 0.9
   yaguangFirstComboForgive: 1
+  yaguangComboHearts: 3
   yaguangComboGuideRuleCombos: 1
   yaguangComboGuideReadyOn: 1
   yaguangComboGuideFeedbackDelaySeconds: 0.3

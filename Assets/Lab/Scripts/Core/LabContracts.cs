@@ -492,6 +492,8 @@ namespace C6Lab
         /// <summary>#719: 이번 라운드에 박에 맞은 틀린 색 수 (봐준 것 + 실패). 늘면 모두의 화면에서 그 칸에 X가 찍힌다.
         /// 마지막 틀린 색을 던진 사람, 그 색, 맞혀야 했던 칸(0~3).</summary>
         public uint comboWrongCount;
+        /// <summary>#719 UT: 콤보마다 받는 하트 수(0 = 하트 없음)와 지금(또는 마지막) 콤보에 남은 하트 수.</summary>
+        public int comboHearts, comboHeartsLeft;
         public ulong comboWrongBy;
         public LabOrbElement comboWrongElement;
         public int comboWrongSlot;

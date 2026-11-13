@@ -256,6 +256,172 @@ namespace C6Lab
 
         private float tickBeat;
 
+        // ---- #719 UT 하트: 콤보마다 하트 3개(Inspector). 틀린 색이 맞을 때마다 하나가 두 쪽으로 깨져 떨어지고, 마지막 하나가 깨지면 실패 ----
+        public const int MaxHearts = 5;
+        public const float HeartBreakSeconds = .7f;
+        private readonly Image[] heartFull = new Image[MaxHearts], heartEmpty = new Image[MaxHearts];
+        private readonly Image[] heartHalfLeft = new Image[MaxHearts], heartHalfRight = new Image[MaxHearts];
+        private readonly float[] heartBreakAge = new float[MaxHearts];
+        private RectTransform heartRow;
+        private int shownHeartsLeft = -1;
+        private uint heartsCombo = uint.MaxValue;
+        private static Sprite heartSprite, heartEmptySprite;
+        /// <summary>#719: hearts drawn as still whole under the combo panel now (-1 when the row is hidden).</summary>
+        public int HeartsShown { get; private set; } = -1;
+
+        /// <summary>
+        /// #719 UT 하트 줄: 콤보 패널 바로 아래 가운데. 예고 동안(미리보기)은 꽉 찬 하트, 콤보 중에는 남은 만큼.
+        /// 하나가 줄면 왼쪽 하트부터 좌우 두 쪽으로 쪼개져 기울며 떨어지고, 빈 하트 테두리만 남는다. 하나 남으면 똑딱에 맞춰 두근거린다.
+        /// </summary>
+        private void DrawHearts(LabSnapshot snapshot, bool preview, bool showPanel)
+        {
+            int total = Mathf.Clamp(snapshot.comboHearts, 0, MaxHearts);
+            if (snapshot.comboCount != heartsCombo)
+            {
+                heartsCombo = snapshot.comboCount;
+                shownHeartsLeft = -1;
+                System.Array.Clear(heartBreakAge, 0, heartBreakAge.Length);
+            }
+            int left = preview ? total : Mathf.Clamp(snapshot.comboHeartsLeft, 0, total);
+            if (shownHeartsLeft < 0 || preview) shownHeartsLeft = left;
+            else if (left < shownHeartsLeft)
+            {
+                // Hearts break from the left: the whole ones are the rightmost `left`.
+                for (int i = total - shownHeartsLeft; i < total - left; i++) heartBreakAge[i] = .0001f; // these break now
+                shownHeartsLeft = left;
+            }
+            bool show = showPanel && total > 0;
+            EnsureHearts();
+            heartRow.gameObject.SetActive(show);
+            HeartsShown = show ? left : -1;
+            if (!show) return;
+
+            float size = slots[0].sizeDelta.y * .62f, gap = size * .18f;
+            heartRow.anchorMin = heartRow.anchorMax = new Vector2(.5f, 0f);
+            heartRow.pivot = new Vector2(.5f, 1f);
+            heartRow.sizeDelta = new Vector2(total * size + (total - 1) * gap, size);
+            heartRow.anchoredPosition = new Vector2(0f, -size * .15f);
+            float dt = Time.unscaledDeltaTime;
+            for (int i = 0; i < MaxHearts; i++)
+            {
+                bool used = i < total;
+                heartEmpty[i].gameObject.SetActive(used);
+                heartFull[i].gameObject.SetActive(used && i >= total - left);
+                if (!used) { heartHalfLeft[i].gameObject.SetActive(false); heartHalfRight[i].gameObject.SetActive(false); continue; }
+                Vector2 at = new Vector2((i - (total - 1) * .5f) * (size + gap), -size * .5f);
+                foreach (Image part in new[] { heartEmpty[i], heartFull[i], heartHalfLeft[i], heartHalfRight[i] })
+                {
+                    RectTransform rect = part.rectTransform;
+                    rect.anchorMin = rect.anchorMax = new Vector2(.5f, 1f);
+                    rect.sizeDelta = Vector2.one * size;
+                    rect.anchoredPosition = at;
+                    rect.localRotation = Quaternion.identity;
+                }
+                // The last heart left beats with the clock (danger).
+                float beat = !preview && left == 1 && i == total - 1 ? tickBeat : 0f;
+                heartFull[i].rectTransform.localScale = Vector3.one * (1f + .22f * beat);
+
+                float age = heartBreakAge[i];
+                bool breaking = age > 0f && age < HeartBreakSeconds;
+                heartHalfLeft[i].gameObject.SetActive(breaking);
+                heartHalfRight[i].gameObject.SetActive(breaking);
+                if (!breaking) { if (age >= HeartBreakSeconds) heartBreakAge[i] = 0f; continue; }
+                heartBreakAge[i] = age + dt;
+                float t = age / HeartBreakSeconds;
+                // A quick swell, then the two halves split apart, tilt outward and drop while fading.
+                float swell = t < .12f ? 1f + 1.6f * t : 1.2f;
+                float split = Mathf.Max(0f, t - .12f);
+                float fall = split * split * size * 2.4f;
+                float alpha = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.45f, 1f, t));
+                for (int side = 0; side < 2; side++)
+                {
+                    Image half = side == 0 ? heartHalfLeft[i] : heartHalfRight[i];
+                    float dir = side == 0 ? -1f : 1f;
+                    RectTransform rect = half.rectTransform;
+                    rect.anchoredPosition = at + new Vector2(dir * split * size * .55f, -fall);
+                    rect.localRotation = Quaternion.Euler(0f, 0f, -dir * split * 70f);
+                    rect.localScale = Vector3.one * swell;
+                    half.color = new Color(1f, 1f, 1f, alpha);
+                }
+            }
+        }
+
+        private void EnsureHearts()
+        {
+            if (heartRow != null) return;
+            heartRow = NewRect("Combo Hearts", panel);
+            for (int i = 0; i < MaxHearts; i++)
+            {
+                heartEmpty[i] = HeartImage("Heart Empty " + (i + 1), HeartEmptySprite());
+                heartFull[i] = HeartImage("Heart " + (i + 1), HeartSprite());
+                heartHalfLeft[i] = HeartImage("Heart Break Left " + (i + 1), HeartSprite());
+                heartHalfRight[i] = HeartImage("Heart Break Right " + (i + 1), HeartSprite());
+                foreach (Image half in new[] { heartHalfLeft[i], heartHalfRight[i] })
+                {
+                    half.type = Image.Type.Filled;
+                    half.fillMethod = Image.FillMethod.Horizontal;
+                    half.fillAmount = .5f;
+                    half.gameObject.SetActive(false);
+                }
+                heartHalfLeft[i].fillOrigin = (int)Image.OriginHorizontal.Left;
+                heartHalfRight[i].fillOrigin = (int)Image.OriginHorizontal.Right;
+            }
+        }
+
+        private Image HeartImage(string name, Sprite sprite)
+        {
+            Image image = NewRect(name, heartRow).gameObject.AddComponent<Image>();
+            image.sprite = sprite;
+            image.raycastTarget = false;
+            return image;
+        }
+
+        /// <summary>Whether a point (in heart units, centre 0, about -1..1) is inside the classic heart curve.</summary>
+        private static float HeartCoverage(Vector2 p, Vector2 c, float scale)
+        {
+            // 3x3 supersampling for a smooth edge.
+            int inside = 0;
+            for (int sy = 0; sy < 3; sy++)
+                for (int sx = 0; sx < 3; sx++)
+                {
+                    float x = (p.x - .5f + (sx + .5f) / 3f - c.x) / (TextureSize * .36f * scale);
+                    float y = (p.y - .5f + (sy + .5f) / 3f - c.y) / (TextureSize * .36f * scale) + .12f;
+                    float a = x * x + y * y - 1f;
+                    if (a * a * a - x * x * y * y * y <= 0f) inside++;
+                }
+            return inside / 9f;
+        }
+
+        /// <summary>#719: a red heart with a dark ink edge and a small shine.</summary>
+        private static Sprite HeartSprite()
+        {
+            if (heartSprite != null) return heartSprite;
+            Color red = new Color(.86f, .16f, .18f), shine = new Color(1f, .62f, .6f);
+            heartSprite = Draw("Lab combo heart", (p, c) =>
+            {
+                float outer = HeartCoverage(p, c, 1f), inner = HeartCoverage(p, c, .82f);
+                float glint = Mathf.Clamp01(1f - Vector2.Distance(p, c + new Vector2(-.17f, .14f) * TextureSize) / (TextureSize * .07f));
+                Color color = Color.Lerp((Color)InkColor, Color.Lerp(red, shine, glint * .8f), inner);
+                color.a = outer;
+                return color;
+            }, Vector4.zero);
+            return heartSprite;
+        }
+
+        /// <summary>#719: the place of a broken heart: its ink outline over a faint paper fill.</summary>
+        private static Sprite HeartEmptySprite()
+        {
+            if (heartEmptySprite != null) return heartEmptySprite;
+            heartEmptySprite = Draw("Lab combo heart empty", (p, c) =>
+            {
+                float outer = HeartCoverage(p, c, 1f), inner = HeartCoverage(p, c, .82f);
+                Color ink = (Color)InkColor;
+                Color color = Color.Lerp(new Color(ink.r, ink.g, ink.b, outer), new Color(.5f, .45f, .4f, .28f * outer), inner);
+                return color;
+            }, Vector4.zero);
+            return heartEmptySprite;
+        }
+
         // ---- #719 틀린 색 X: 박에 틀린 색이 맞으면 모두의 화면에서 맞혀야 했던 칸에 빨간 X가 쾅 찍히고 칸이 흔들린다 ----
         /// <summary>봐준 틀린 색(실패 아님)의 X가 떠 있는 시간, 진짜 실패 때 결과 문구 전에 패널과 X를 붙잡아 두는 시간.</summary>
         public const float WrongForgivenSeconds = .9f, WrongFailHoldSeconds = .65f;
@@ -700,6 +866,7 @@ namespace C6Lab
             figmaPanel = yaguang && LabYaguangComboArt.Load("Panel") != null;
             ApplyPanelArtwork(figmaPanel);
             panel.gameObject.SetActive(showPanel);
+            DrawHearts(snapshot, preview, showPanel);
             if (showPanel && !panelWasShown) panelShownAt = Time.unscaledTime;
             panelWasShown = showPanel;
             panelGroup.alpha = showPanel ? Mathf.SmoothStep(0f, 1f, (Time.unscaledTime - panelShownAt) / .22f) : 0f;
@@ -951,6 +1118,8 @@ namespace C6Lab
             previewRevealed = 0;
             wrongSeenInit = false;
             wrongElapsed = -1f;
+            heartsCombo = uint.MaxValue;
+            shownHeartsLeft = -1;
             System.Array.Clear(wasChecked, 0, wasChecked.Length);
             effectKind = 0;
             effectPopElapsed = -1f;

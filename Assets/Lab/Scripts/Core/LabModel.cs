@@ -781,7 +781,8 @@ namespace C6Lab
                 double at = nextComboAt;
                 LabOrbElement[] colors = NextComboColors();
                 // #695/#719 UT: every combo (not only the round's first) forgives wrong colours until its first slot is hit.
-                combo.Start(colors, at, rules.ComboTimeLimitSeconds, rules.ComboFirstForgive);
+                // #719 UT: with hearts, each wrong colour breaks one (the last one fails) instead of the first-slot forgiving.
+                combo.Start(colors, at, rules.ComboTimeLimitSeconds, rules.ComboFirstForgive && rules.ComboHearts <= 0, rules.ComboHearts);
                 // Scheduled stages receive the next occurrence from CastGimmicks, never from this effect.
                 nextComboAt = rules.YaguangTimeline ? double.PositiveInfinity : at + rules.ComboRepeatIntervalSeconds;
             }
@@ -1409,6 +1410,8 @@ namespace C6Lab
                 comboProgress = combo.Progress,
                 comboForgivenCount = combo.ForgivenCount,
                 comboWrongCount = combo.WrongCount,
+                comboHearts = rules.ComboEnabled ? rules.ComboHearts : 0,
+                comboHeartsLeft = combo.Count == 0 ? (rules.ComboEnabled ? rules.ComboHearts : 0) : combo.HeartsLeft,
                 comboWrongBy = combo.LastWrongBy,
                 comboWrongElement = combo.LastWrongElement,
                 comboWrongSlot = combo.LastWrongSlot,
@@ -2086,6 +2089,7 @@ namespace C6Lab
             public readonly bool ComboEnabled, ComboPenaltyThrowerOnly;
             /// <summary>#695: the round's first combo ignores wrong colors until its first slot is hit (Host only).</summary>
             public readonly bool ComboFirstForgive;
+            public readonly int ComboHearts;
             public readonly float ComboFirstStartSeconds, ComboRepeatIntervalSeconds, ComboTimeLimitSeconds,
                 ComboPenaltyDurationSeconds, ComboPenaltySizeScale, ComboRewardDurationSeconds, ComboRewardSizeScale,
                 ComboWarningSeconds;
@@ -2175,6 +2179,7 @@ namespace C6Lab
                 ComboRewardSizeScale = config.ComboRewardSizeScale;
                 ComboWarningSeconds = config.ComboWarningSeconds;
                 ComboFirstForgive = config.YaguangFirstComboForgive;
+                ComboHearts = config.YaguangComboHearts;
                 FlashEnabled = config.YaguangFlashEnabled
                     && (stageYokai == LabStageYokai.None || stageYokai == LabStageYokai.Yaguang);
                 FlashTargetOne = config.YaguangFlashTargetOne;

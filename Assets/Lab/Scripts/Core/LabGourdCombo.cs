@@ -35,8 +35,15 @@ namespace C6Lab
         /// <summary>틀린 색으로 끝났을 때 그 구슬을 던진 사람. 그 밖에는 0.</summary>
         public ulong LastFailedBy { get; private set; }
 
-        /// <summary>#695: 지금 틀린 색을 봐주는 중인지 (라운드 첫 콤보이고 아직 첫 칸을 못 맞힘). 이때 틀린 색은 실패가 아니다.</summary>
-        public bool Forgiving => Active && forgiving && Progress == 0;
+        /// <summary>
+        /// 지금 틀린 색 하나를 봐줄 수 있는지 (다음 틀린 색이 실패가 아닌지). #695 첫 칸 전 봐주기이거나,
+        /// #719 하트가 2개 이상 남았을 때.
+        /// </summary>
+        public bool Forgiving => Active && (forgiving && Progress == 0 || HeartsLeft > 1);
+        /// <summary>#719 UT: 콤보마다 받는 하트 수 (0이면 하트 없음). 틀린 색마다 하나씩 깨지고, 마지막 하나가 깨지면 실패.</summary>
+        public int Hearts { get; private set; }
+        /// <summary>#719: 이번 콤보에 남은 하트 수.</summary>
+        public int HeartsLeft { get; private set; }
         /// <summary>#695: 이번 라운드에 봐준 틀린 색 수. 늘 때마다 금옥이 "한 번만 다시 해보자" 같은 말을 한다.</summary>
         public uint ForgivenCount { get; private set; }
         /// <summary>#719: 이번 라운드에 박에 맞은 틀린 색 수 (봐준 것과 실패한 것 모두). 늘 때마다 모두의 화면 그 칸에 X가 찍힌다.</summary>
@@ -58,6 +65,7 @@ namespace C6Lab
             StartedAt = EndsAt = -1d;
             Count = 0;
             ForgivenCount = 0;
+            Hearts = HeartsLeft = 0;
             WrongCount = 0;
             LastWrongBy = 0;
             LastWrongElement = LabOrbElement.None;
@@ -73,7 +81,7 @@ namespace C6Lab
         /// forgiveUntilFirstHit(#695)이면 첫 칸을 맞힐 때까지 틀린 색은 무시하고(실패 아님), 첫 칸을 맞힌 뒤부터는 평소처럼 바로 실패.
         /// 제한 시간은 그대로다.
         /// </summary>
-        public void Start(LabOrbElement[] nextColors, double at, double timeLimit, bool forgiveUntilFirstHit = false)
+        public void Start(LabOrbElement[] nextColors, double at, double timeLimit, bool forgiveUntilFirstHit = false, int hearts = 0)
         {
             if (nextColors == null || nextColors.Length != Length)
                 throw new ArgumentException("A combo needs exactly four colors.", nameof(nextColors));
@@ -85,6 +93,7 @@ namespace C6Lab
             Array.Copy(nextColors, colors, Length);
             Active = true;
             forgiving = forgiveUntilFirstHit;
+            Hearts = HeartsLeft = Math.Max(0, hearts);
             Progress = 0;
             StartedAt = at;
             EndsAt = at + timeLimit;
@@ -106,16 +115,21 @@ namespace C6Lab
                 LastWrongBy = thrower;
                 LastWrongElement = element;
                 LastWrongSlot = Progress;
-                if (!Forgiving) return Finish(LabComboResult.WrongColor, at, thrower);
-                ForgivenCount++;
-                return LabComboResult.None;
+                if (forgiving && Progress == 0) { ForgivenCount++; return LabComboResult.None; }
+                // #719: a heart breaks; the last one breaking fails the combo.
+                if (HeartsLeft > 0 && --HeartsLeft > 0) { ForgivenCount++; return LabComboResult.None; }
+                return Finish(LabComboResult.WrongColor, at, thrower);
             }
             Progress++;
             return Progress >= Length ? Finish(LabComboResult.Success, at, 0) : LabComboResult.None;
         }
 
         /// <summary>#695: 봐주기를 끝낸다 (VFX 실험실의 콤보 실패 버튼이 첫 콤보에서도 바로 실패시키도록).</summary>
-        public void EndForgiving() => forgiving = false;
+        public void EndForgiving()
+        {
+            forgiving = false;
+            if (HeartsLeft > 1) HeartsLeft = 1; // #719: the next wrong colour breaks the last heart
+        }
 
         /// <summary>Cancel a scheduled pattern without a success/failure result or a new reward/penalty.</summary>
         public void Stop(double at)
