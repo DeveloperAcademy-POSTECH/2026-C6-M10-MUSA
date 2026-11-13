@@ -59,8 +59,25 @@ namespace C6Lab
         [SerializeField, Range(.05f, .6f)] private float revealPopSeconds = .18f;
         [Tooltip("섬광 파훼 보상 (#329): 풀린 뒤 오색구슬을 노리고 이어서 흔들 때, 다음 흔들기까지 이 초가 넘으면 끊긴 것으로 보고 기회가 끝난다.")]
         [SerializeField, Range(.5f, 4f)] private float bonusGapSeconds = 1.5f;
-        [Tooltip("#719 섬광 파훼 보상: 마지막으로 흔든 뒤 이 초가 지나서 오색구슬을 달라고 한다 (흔들기를 멈추고 판을 볼 틈). 구슬은 전처럼 그 자리에 생긴다.")]
-        [SerializeField, Range(0f, 2f)] private float bonusDropDelaySeconds = .8f;
+        [Tooltip("#719 섬광 파훼 보상: 야광귀의 \"으악 어지러워~\"가 끝나고 이 초 뒤에 오색구슬이 생긴다 (마지막 흔들기 기준: 대사 지연 + 대사 길이 + 이 초). 구슬은 전처럼 그 자리에 생긴다.")]
+        [SerializeField, Range(0f, 2f)] private float bonusAfterCaughtSeconds = .1f;
+        private float caughtClipSeconds = -1f;
+
+        /// <summary>#719: from the last shake until the five-colour orbs appear: the "으악 어지러워~" line's delay and length, then a beat.</summary>
+        public float BonusDelaySeconds
+        {
+            get
+            {
+                if (caughtClipSeconds < 0f)
+                {
+                    caughtClipSeconds = 0f;
+                    foreach (AudioClip clip in Resources.LoadAll<AudioClip>(LabYaguangSound.FlashCaughtFolder))
+                        if (clip != null) caughtClipSeconds = Mathf.Max(caughtClipSeconds, clip.length);
+                }
+                float lineDelay = network != null && network.config != null ? network.config.YaguangFlashCaughtDelaySeconds : .2f;
+                return lineDelay + caughtClipSeconds + bonusAfterCaughtSeconds;
+            }
+        }
         [Tooltip("폰 그림이 좌우로 흔들리는 빠르기 (초당 횟수)")]
         [SerializeField, Range(1f, 12f)] private float shakeCueWiggleHz = 5f;
         private LabYaguangShakeCue shakeView;
@@ -294,7 +311,7 @@ namespace C6Lab
             // 최대 횟수까지 이어서 흔들었다: 오색구슬을 받을 때까지 같은 간격으로 다시 알린다 (#329).
             if (live && fiveColor && !bonusLost && shakeCounter.Count >= maxShakes && (myGlare || released)
                 && !BonusConfirmed(snapshot) && Time.unscaledTime - bonusSentAt >= ShakeRetrySeconds
-                && Time.unscaledTime - lastShakeAt >= bonusDropDelaySeconds
+                && Time.unscaledTime - lastShakeAt >= BonusDelaySeconds
                 && network.RequestFlashFiveColorBonus())
                 bonusSentAt = Time.unscaledTime;
             if (ShakesDone(maxShakes)) return 1f;
