@@ -509,14 +509,14 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
-        public IEnumerator ADrumKeptEightSecondsGetsTheTutorialsPassGuideUntilItIsPassed()
+        public IEnumerator ADrumKeptFourSecondsGetsTheTutorialsPassGuideUntilItIsPassed()
         {
             session.StartSolo();
             yield return WaitPlaying(1);
             GameDrumPassHint hint = Object.FindFirstObjectByType<GameDrumPassHint>();
             Assert.That(hint, Is.Not.Null, "Every story and territory battle has the drum guide (#718).");
             yield return null;
-            Assert.That(hint.Visible, Is.False, "Not in the first 8 s.");
+            Assert.That(hint.Visible, Is.False, "Not in the first seconds.");
 
             // Drive it by hand on the real board and drum.
             hint.enabled = false;
@@ -535,9 +535,9 @@ namespace Hapio.Tests
             three.players = new[] { mine, new LabPlayerState { id = me + 100, seat = 1 }, new LabPlayerState { id = me + 200, seat = 2 } };
             LabOrbState drum = three.drums.Single(orb => orb.owner == me);
             hint.Present(three, me, hint.HintAfterSeconds - .5f, true);
-            Assert.That(hint.Visible, Is.False, "Not before 8 s.");
+            Assert.That(hint.Visible, Is.False, "Not before the hint time (4 s).");
             hint.Present(three, me, 1f, true);
-            Assert.That(hint.Visible, Is.True, "8 s without passing shows the hand and arrow.");
+            Assert.That(hint.Visible, Is.True, "4 s without passing shows the hand and arrow.");
             Assert.That(hint.PointedDrumId, Is.EqualTo(drum.id));
             Assert.That(hint.PointingSide, Is.EqualTo(1), "Both sides open: right first.");
             hint.Present(three, me, Resources.Load<GameTutorialArt>(GameTutorialArt.ResourcePath).handDragSeconds + .05f, true);
@@ -557,39 +557,42 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
-        public IEnumerator ShortStaminaShakesTheWholeBoardPictureWithTheGaugeAndPutsItBack()
+        public IEnumerator ShortStaminaSwellsTheGaugeShowsTheWarningAndFlashesTheEdgesRedOnlyOnTheBattleScreen()
         {
             session.StartSolo();
             yield return WaitPlaying(1);
             yield return null;
             var bindings = Object.FindFirstObjectByType<GameBattleBindings>();
-            var composition = bindings.hud.GetComponent<LabOrbHudComposition>();
-            Assert.That(composition != null && composition.IsCompositing, Is.True, "The Hapio battle draws its board through the composition.");
             var feedback = bindings.sceneController.GetComponent<LabStaminaShortFeedback>();
-            RectTransform display = composition.Display.rectTransform;
-            RectTransform board = bindings.GetComponent<GameBattleUiPresentation>().BoardArtwork.rectTransform;
-            Vector2 displayAt = display.anchoredPosition, boardAt = board.anchoredPosition;
-            string drumId = network.Snapshot.drums.Single(orb => orb.owner == network.LocalPlayerId).id;
-            Assert.That(network.board.TryGetScreenPoint(drumId, out Vector2 drumScreen), Is.True);
+            feedback.enabled = false; // only Advance moves its clock here
+            var composition = bindings.hud.GetComponent<LabOrbHudComposition>();
+            RectTransform display = composition != null && composition.Display != null ? composition.Display.rectTransform : null;
+            Vector2 boardAt = display != null ? display.anchoredPosition : Vector2.zero;
+            RectTransform gauge = (RectTransform)bindings.hud.staminaFill.transform.parent;
+            Vector3 gaugeScale = gauge.localScale;
 
             feedback.Play();
-            feedback.Advance(.05f);
-            Vector2 shake = composition.BoardShake;
-            Assert.That(shake.magnitude, Is.GreaterThan(1f), "The board picture moves with the gauge (#718).");
-            Assert.That(feedback.ShakeOffset.magnitude, Is.GreaterThan(0f), "The gauge still shakes as before.");
-            Assert.That(Vector2.Distance(display.anchoredPosition - displayAt, shake), Is.LessThan(.001f),
-                "The orbs and drum move together...");
-            Assert.That(Vector2.Distance(board.anchoredPosition - boardAt, shake), Is.LessThan(.001f),
-                "...with the board art behind them.");
-            Assert.That(network.board.TryGetScreenPoint(drumId, out Vector2 duringShake), Is.True);
-            Assert.That(Vector2.Distance(duringShake, drumScreen), Is.LessThan(.001f), "Touch positions stay where they were.");
+            feedback.Advance(.08f);
+            Assert.That(feedback.GaugeScale, Is.GreaterThan(1.02f), "The gauge swells a little while it shakes (#718).");
+            Assert.That(gauge.localScale.x, Is.EqualTo(gaugeScale.x * feedback.GaugeScale).Within(.0001f));
+            Assert.That(feedback.ShakeOffset.magnitude, Is.GreaterThan(0f), "And still shakes.");
+            Assert.That(feedback.WarningVisible, Is.True);
+            Assert.That(feedback.WarningLabel, Is.EqualTo("기운이 부족하다"));
+            Assert.That(feedback.WarningIcon, Is.SameAs(Resources.Load<Sprite>(LabStaminaShortFeedback.WarningIconPath)),
+                "One group with the red mark.");
+            Assert.That(feedback.WarningShake.magnitude, Is.GreaterThan(0f), "The warning shakes with the gauge.");
+            Assert.That(feedback.EdgeAlpha, Is.GreaterThan(0f), "The screen edges flash red.");
+            if (display != null)
+                Assert.That(Vector2.Distance(display.anchoredPosition, boardAt), Is.LessThan(.001f), "The board itself no longer shakes.");
 
-            feedback.Play();
-            Assert.That(feedback.ShortCount, Is.EqualTo(2));
+            feedback.Advance(.6f);
+            Assert.That(feedback.GaugeScale, Is.EqualTo(1f).Within(.0001f));
+            Assert.That(feedback.EdgeAlpha, Is.Zero, "The red is gone after its moment...");
+            Assert.That(feedback.WarningVisible, Is.True, "...while the warning stays a little longer.");
             feedback.Advance(1f);
-            Assert.That(composition.BoardShake, Is.EqualTo(Vector2.zero));
-            Assert.That(Vector2.Distance(display.anchoredPosition, displayAt), Is.LessThan(.001f), "Put back once it is over.");
-            Assert.That(Vector2.Distance(board.anchoredPosition, boardAt), Is.LessThan(.001f));
+            Assert.That(feedback.Playing, Is.False);
+            Assert.That(feedback.WarningVisible, Is.False);
+            Assert.That(gauge.localScale, Is.EqualTo(gaugeScale), "The gauge is its own size again.");
         }
 
         [UnityTest]
