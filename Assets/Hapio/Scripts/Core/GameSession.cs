@@ -292,6 +292,12 @@ namespace Hapio
             UpdateBattleEnd(now);
             UpdateBattleStart(now);
             UpdatePaintFinish(now);
+            // Preserve the display template while the live Battle still exists, even if
+            // the final record/GPU fence has not yet opened the finishing presentation.
+            if ((state.phase == GameFlowPhase.Playing || IsResultPresentationPhase)
+                && MatchesBattle(network.Snapshot) && network.Snapshot.phase == LabPhase.Victory)
+                CaptureResult();
+            UpdateGourdViewerPreparation(now);
             UpdateReplayCover();
             if (network.IsHost && network.IsConnected && now >= nextStateAt)
             {
@@ -558,6 +564,7 @@ namespace Hapio
                         yield return null;
                     if (wantedScene != destination) continue;
                 }
+                if (resultTransition) FinishGourdViewerHandoff();
                 network.UnbindBattleReferences();
                 forceBattleReload = false;
                 AsyncOperation load = SceneManager.LoadSceneAsync(destination, LoadSceneMode.Single);
@@ -595,31 +602,26 @@ namespace Hapio
             if (state.phase == GameFlowPhase.Completed && !network.IsConnected) return true;
             if (!MatchesBattle(network.Snapshot) || network.Snapshot.phase != LabPhase.Victory) return false;
             if (!ResultNeedsPreview(network.Snapshot)) return true;
-            return LabGourdResultPreview.SurfaceMatches(network, out _, requireExactArtwork: false);
+            // Scene navigation may continue with an independently owned preparation job.
+            // Only an actual preview is Ready; CPU map readiness alone never enables viewing.
+            CaptureResult();
+            return LabGourdResultPreview.SurfaceMatches(network, out _, requireExactArtwork: false)
+                && (PreviewTexture != null || viewerPreparation != null || viewerState == GameGourdViewerState.Failed);
         }
 
         private void CaptureResult()
         {
             CacheResultSnapshot();
             if (HasCapturedResult()) return;
-            if (ResultSnapshot == null || ResultSnapshot.sessionId != state.battleSessionId
-                || ResultSnapshot.round != state.battleRound) return;
+            if (!HasResultSnapshot) return;
             if (!ResultNeedsPreview(ResultSnapshot))
             {
+                viewerState = GameGourdViewerState.Disabled;
                 RememberCapturedResult();
                 return;
             }
-            if (network.config != null && network.config.CompletedGourdViewerEnabled
-                && network.config.GourdMode == LabGourdMode.Paint
-                && LabGourdResultPreview.TryCreate(network, out var copy, out string error))
-            {
-                preview?.Dispose();
-                preview = copy;
-                GameGourdPreviewPresentation.Apply(preview, transform);
-                RememberCapturedResult();
-            }
-            else if (network.RequiresPaintArt && !IsTerritory)
-                UiNotice = "The round result is preserved, but its exact artwork is not ready for viewing.";
+            BeginGourdViewerPreparation();
+            UpdateGourdViewerPreparation(Time.realtimeSinceStartupAsDouble);
         }
 
         private void RememberCapturedResult()
@@ -899,6 +901,7 @@ namespace Hapio
 
         private void PrepareStage()
         {
+            CancelGourdViewerPreparation();
             GameFlowState loading = hostFlow.State;
             Identity(loading, out string stageId, out LabStageYokai yokai);
             LabConfig candidate = tutorialRun ? stageSettings.CreateTutorialConfig()
@@ -1040,6 +1043,7 @@ namespace Hapio
         private bool ReturnTerritoryToLobby(string notice)
         {
             if (!network.IsHost || !hostFlow.ReturnToLobby(notice)) return false;
+            CancelGourdViewerPreparation();
             network.ReturnGameToLobby();
             SetHostState();
             return true;
@@ -1085,6 +1089,7 @@ namespace Hapio
             if (!CanReturnHome) return;
             roomBrowserVisible = state.phase == GameFlowPhase.Lobby;
             goingHome = true;
+            CancelGourdViewerPreparation();
             network.Stop();
             network.UnbindBattleReferences();
             ResetRoomFlow();
@@ -1114,6 +1119,9 @@ namespace Hapio
 
         private void ReleaseResult()
         {
+            CancelGourdViewerPreparation();
+            viewerState = GameGourdViewerState.Disabled;
+            viewerError = null;
             ResetPaintFinish();
             preview?.Dispose(); preview = null; ResultSnapshot = null; IsViewerOpen = false;
             ResetResultAdvance();

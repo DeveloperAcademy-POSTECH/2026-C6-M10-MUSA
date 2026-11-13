@@ -139,8 +139,25 @@ namespace C6Lab
 
         private void Build(LabNetwork network, LabGourdPaint source, int width, int height)
         {
-            LabSnapshot snapshot = network.Snapshot;
-            LabPaintSurface surface = network.PaintSurface;
+            InitializeCpu(network.Snapshot, network.PaintSurface);
+            // Freeze a private copy before Battle unload/Retry can dispose the live GPU maps.
+            // Authoritative CPU copies and eligibility/hash above remain unchanged.
+            source.PrepareVisualCapture();
+            if (source.network != null && source.network.RequiresPaintArt && !source.CompletionVisualReady)
+                throw new InvalidOperationException(source.WatercolorStampError ?? "The exact artwork is still being prepared.");
+            if (source.HighResolutionActive)
+            {
+                visualPaintCopy = CopyVisualMap(source.VisualPaintTexture, false, "Completed high-resolution pigment copy");
+                visualPainterCopy = CopyVisualMap(source.VisualPainterTexture, true, "Completed high-resolution P-number copy");
+                if(source.VisualHeightTexture!=null)visualHeightCopy=CopyVisualMap(source.VisualHeightTexture,false,"Completed clay relief copy");
+            }
+
+            BuildGeometry(source.VisualInstance.transform, width, height, true, true);
+        }
+
+        internal void InitializeCpu(LabSnapshot snapshot, LabPaintSurface surface)
+        {
+            if (paintTexture != null) return;
             var pixels = new Color32[surface.CellCount];
             surface.CopyPixels(pixels);
             foreach (Color32 pixel in pixels)
@@ -170,18 +187,59 @@ namespace C6Lab
             painterTexture.SetPixels32(painterPixels);
             painterTexture.Apply(false, false);
 
-            // Freeze a private copy before Battle unload/Retry can dispose the live GPU maps.
-            // Authoritative CPU copies and eligibility/hash above remain unchanged.
-            source.PrepareVisualCapture();
-            if (source.network != null && source.network.RequiresPaintArt && !source.CompletionVisualReady)
-                throw new InvalidOperationException(source.WatercolorStampError ?? "The exact artwork is still being prepared.");
-            if (source.HighResolutionActive)
-            {
-                visualPaintCopy = CopyVisualMap(source.VisualPaintTexture, false, "Completed high-resolution pigment copy");
-                visualPainterCopy = CopyVisualMap(source.VisualPainterTexture, true, "Completed high-resolution P-number copy");
-                if(source.VisualHeightTexture!=null)visualHeightCopy=CopyVisualMap(source.VisualHeightTexture,false,"Completed clay relief copy");
-            }
+        }
 
+        internal static LabGourdResultPreview CapturePendingModel(LabGourdPaint source, int width, int height)
+        {
+            var result = new LabGourdResultPreview();
+            try
+            {
+                result.BuildGeometry(source.VisualInstance.transform, width, height, false, false);
+                if (Application.isPlaying) UnityEngine.Object.DontDestroyOnLoad(result.root);
+                return result;
+            }
+            catch { result.Dispose(); throw; }
+        }
+
+        internal void CompletePending(Texture colors, Texture painters, Texture heights)
+        {
+            if (disposed || paintTexture == null) throw new InvalidOperationException("The captured result is unavailable.");
+            if (colors != null)
+            {
+                visualPaintCopy = CopyVisualMap(colors, false, "Completed high-resolution pigment copy");
+                visualPainterCopy = CopyVisualMap(painters, true, "Completed high-resolution P-number copy");
+                if (heights != null) visualHeightCopy = CopyVisualMap(heights, false, "Completed clay relief copy");
+            }
+            foreach (MeshRenderer renderer in modelPivot.GetComponentsInChildren<MeshRenderer>(true))
+            {
+                Material[] materials = renderer.sharedMaterials;
+                var block = new MaterialPropertyBlock();
+                renderer.GetPropertyBlock(block);
+                bool painted = Array.Exists(materials, m => m != null && m.HasProperty(PaintMapId) && m.HasProperty(PaintReadyId));
+                if (painted) BindFinalMaps(block);
+                renderer.SetPropertyBlock(block);
+                for (int i = 0; i < materials.Length; i++)
+                {
+                    renderer.GetPropertyBlock(block, i);
+                    if (block.isEmpty) continue;
+                    if (materials[i] != null && materials[i].HasProperty(PaintMapId) && materials[i].HasProperty(PaintReadyId)) BindFinalMaps(block);
+                    renderer.SetPropertyBlock(block, i);
+                }
+            }
+            root.SetActive(true);
+            previewCamera.enabled = true;
+        }
+
+        private void BindFinalMaps(MaterialPropertyBlock block)
+        {
+            block.SetTexture(PaintMapId, VisualPaintTexture);
+            block.SetTexture(PainterMapId, VisualPainterTexture);
+            if (visualHeightCopy != null) block.SetTexture("_HeightMap", visualHeightCopy);
+            else block.SetFloat(PaintReadyId, 1f);
+        }
+
+        private void BuildGeometry(Transform sourceVisual, int width, int height, bool activate, bool bindMaps)
+        {
             root = NewObject("Completed gourd preview", null);
             root.SetActive(false);
             modelPivot = NewObject("Local model rotation", root.transform).transform;
@@ -189,7 +247,7 @@ namespace C6Lab
             var materialCopies = new Dictionary<Material, Material>();
             var renderers = new List<MeshRenderer>();
             int paintedRenderers = 0;
-            CopyHierarchy(source.VisualInstance.transform, normalization, materialCopies, renderers, ref paintedRenderers);
+            CopyHierarchy(sourceVisual, normalization, materialCopies, renderers, ref paintedRenderers, bindMaps);
             if (renderers.Count == 0 || paintedRenderers == 0)
                 throw new InvalidOperationException("The completed presentation has no renderable paint mesh.");
 
@@ -235,8 +293,8 @@ namespace C6Lab
             // Turn the staging rig, camera and model together so a single-color result still
             // shows its spherical shading. Relative framing and local gesture axes stay unchanged.
             root.transform.rotation = Quaternion.Euler(0f, 180f, 0f);
-            root.SetActive(true);
-            previewCamera.enabled = true;
+            root.SetActive(activate);
+            previewCamera.enabled = activate;
         }
 
         private static RenderTexture CopyVisualMap(Texture source, bool categorical, string name)
@@ -264,7 +322,7 @@ namespace C6Lab
         }
 
         private void CopyHierarchy(Transform source, Transform parent, Dictionary<Material, Material> materialCopies,
-            List<MeshRenderer> renderers, ref int paintedRenderers)
+            List<MeshRenderer> renderers, ref int paintedRenderers, bool bindMaps = true)
         {
             GameObject copy = NewObject(source.name, parent);
             copy.transform.localPosition = source.localPosition;
@@ -305,7 +363,7 @@ namespace C6Lab
                 renderer.allowOcclusionWhenDynamic = false;
                 var block = new MaterialPropertyBlock();
                 originalRenderer.GetPropertyBlock(block);
-                if (painted)
+                if (painted && bindMaps)
                 {
                     block.SetTexture(PaintMapId, VisualPaintTexture);
                     block.SetTexture(PainterMapId, VisualPainterTexture);
@@ -314,8 +372,8 @@ namespace C6Lab
                     // Preserve each source Ready value for every rig part (body and lid),
                     // rather than assuming only the legacy 'White Gourd' needs Ready0.
                     if(visualHeightCopy==null)block.SetFloat(PaintReadyId, 1f);
-                    paintedRenderers++;
                 }
+                if (painted) paintedRenderers++;
                 renderer.SetPropertyBlock(block);
                 // Preserve any per-submesh overrides without allowing their old paint texture
                 // to override the independent copy when the live round is later cleared.
@@ -323,7 +381,7 @@ namespace C6Lab
                 {
                     originalRenderer.GetPropertyBlock(block, i);
                     if (block.isEmpty) continue;
-                    if (materials[i] != null && materials[i].HasProperty(PaintMapId)
+                    if (bindMaps && materials[i] != null && materials[i].HasProperty(PaintMapId)
                         && materials[i].HasProperty(PaintReadyId))
                     {
                         block.SetTexture(PaintMapId, VisualPaintTexture);
@@ -336,7 +394,7 @@ namespace C6Lab
                 renderers.Add(renderer);
             }
             for (int i = 0; i < source.childCount; i++)
-                CopyHierarchy(source.GetChild(i), copy.transform, materialCopies, renderers, ref paintedRenderers);
+                CopyHierarchy(source.GetChild(i), copy.transform, materialCopies, renderers, ref paintedRenderers, bindMaps);
         }
 
         private Bounds MeshBounds(List<MeshRenderer> renderers)

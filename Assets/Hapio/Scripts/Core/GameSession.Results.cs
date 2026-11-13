@@ -46,6 +46,7 @@ namespace Hapio
             if (goingHome || tutorialRun || IsTerritory || !IsResultPresentationPhase) return;
             if (state.IsRunActive) ExitRun(); // Notify the other devices using the existing departure policy.
             goingHome = true;
+            CancelGourdViewerPreparation();
             network.Stop(); network.UnbindBattleReferences();
             ResetRoomFlow();
             roomBrowserVisible = true;
