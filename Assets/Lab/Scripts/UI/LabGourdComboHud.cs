@@ -644,6 +644,13 @@ namespace C6Lab
                 timeBarFill.color = figmaPanel ? Color.white : left <= 3d ? FailColor : (Color)InkColor;
                 timeBar.parent.gameObject.SetActive(true);
             }
+            else if (preview)
+            {
+                // #719: during the warning the bar sits full (not draining yet) so the panel's bottom isn't empty.
+                timeBar.anchorMax = Vector2.one;
+                timeBarFill.color = figmaPanel ? Color.white : (Color)InkColor;
+                timeBar.parent.gameObject.SetActive(true);
+            }
             else timeBar.parent.gameObject.SetActive(false);
         }
 
