@@ -8638,5 +8638,11 @@ main fbc943e8을 통합하며 VALIDATION 문서 끝의 독립 기록 추가 충�
   - `GameStartOverlayTests.TheTerritoryEndSaysGameOverInCrimsonWithACreamEdgeAndBlocksTouches`: 네 문구의 글자·색(시간 초과만 청색)·가장자리·입력 막기, "시작!"에는 가장자리 없음.
   - `LabTeamBattleScreenTests.FeverGaugesCountHitsThenTheFeverTimeAndTheResultShowsFinalNumbers`: 끝난 뒤 피버 게이지 고정.
   - 다 칠한 뒤 1.8초가 지나기 전에는 막타 연출이 시작하지 않으므로 기존 스토리 완료·다시보기 검사(`GameFinishReplayTests`, `GameStage2GourdHitFinishTests`, 결과 스토리 흐름)와 시간 초과 게임 오버 검사(`AuthoritativeTimeoutLoadsGameOverInsteadOfNextStage`, 실패 화면까지 1.8초 늦음)도 다시 돌려야 한다.
-- 결과 전환과 막타 연출 예약(`GameSession`)이 바뀌었으므로 #637 기준 전체 EditMode·PlayMode: NOT_RUN.
+- 전체 EditMode (사용자 실행, Unity 재시작 직후): PASS. 재시작 전 첫 실행의 8건 실패(`LabOrbSpriteDesignTests` 5, `GameBattleUiAssetTests` 2, `GameResultStrokeTests` 1)는 이 변경과 무관했다: Editor에서 전투를 한 판 한 뒤 도메인 재로드 없이 남은 구슬 그림 덮어쓰기(`GameBattleUiPresentation.ApplyOrbAppearance`, 별도 작업으로 분리)와 아래 캐시 손상.
+- 전체 PlayMode (사용자 실행, 중간에 취소됨): Test Runner 창 기준 Passed 2872 / Failed 10 / NotRun 354(취소 뒤 남은 검사 포함).
+  - #717 검사: `AStoryStageSaysSealSucceeded…`, `AStoryTimeUpSaysTimeUpInBlue…`, `SharedCountdownWaits…`, `AuthoritativeTimeoutLoadsGameOver…`, `GameStartOverlayTests.TheTerritoryEndSays…`, `GameFinishReplayTests` 6건, `GameStage2GourdHitFinishTests.ARealThrow…` PASS.
+  - 실패 8건(`TerritoryTimeUpSays…`, `TerritoryDeveloperSolo…`, 결과 화면을 여는 `GameSceneFlowTests` 5건, `GameGourdClippingTests` 1건)은 모두 같은 로그 하나로 실패했다: `Unknown error occurred while loading 'VirtualArtifacts/Primary/e3472224bcaa648cf9879fbf8ddf6346'`(`Assets/Hapio/Art/UI/Strokes/ResultAction.png`). 이 기기 Library의 해당 GUID 기록만 망가진 것으로 확인했다: 강제 재가져오기·파일을 뺐다 다시 넣기로도 그대로 null이고, 같은 그림과 같은 가져오기 설정을 다른 GUID로 넣으면 705x144로 정상이다. 저장소 파일·meta는 정상이며 이 변경과 무관하다. Library를 지우고 다시 가져온 뒤 재실행이 필요하다(NOT_RUN).
+  - `LabFiveColorClayNetworkTests.PredictedAndReplicaPaths…`: main #713이 `LabNetwork.OnPredictedShotContact`에 선택 인자 `soot`를 더해 리플렉션 호출 인자 수가 맞지 않았다(`TargetParameterCountException`). 검사에 인자 하나를 더해 고쳤다. 컴파일 PASS, 재실행 NOT_RUN.
+  - `LabLobbyRejoinNetworkTests.ARejoinToAnUnreachableHost…`: 사용자 취소. 재실행 NOT_RUN.
+  - `LabTeamBattleScreenTests.FeverGauges…` 등 취소 뒤 남은 검사: NOT_RUN.
 - Mac 앱 여러 개로 땅따먹기 2:2와 스토리 1스테이지(성공·시간 초과 각각)를 끝까지 진행해 방장·참가자 화면, 막타 연출 시작, `HAPIO_RESULT_TRANSITION` 시간 확인: NOT_RUN.
