@@ -512,6 +512,93 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
+        public IEnumerator ADrumKeptFourSecondsGetsTheTutorialsPassGuideUntilItIsPassed()
+        {
+            session.StartSolo();
+            yield return WaitPlaying(1);
+            GameDrumPassHint hint = Object.FindFirstObjectByType<GameDrumPassHint>();
+            Assert.That(hint, Is.Not.Null, "Every story and territory battle has the drum guide (#718).");
+            yield return null;
+            Assert.That(hint.Visible, Is.False, "Not in the first seconds.");
+
+            // Drive it by hand on the real board and drum.
+            hint.enabled = false;
+            ulong me = network.LocalPlayerId;
+            LabSnapshot solo = JsonUtility.FromJson<LabSnapshot>(JsonUtility.ToJson(network.Snapshot));
+            hint.Present(solo, me, hint.HintAfterSeconds + .1f, true, solo: true);
+            Assert.That(hint.Visible, Is.True, "DEV solo shows it too, to check it, though nothing is passed.");
+            Assert.That(hint.PointingSide, Is.EqualTo(1));
+            hint.Present(solo, me, .1f, true, solo: false);
+            Assert.That(hint.Visible, Is.False, "A one-player room that is not DEV solo has nobody to pass to.");
+            hint.Present(null, me, 0f, false);
+            // A three-player copy of the real snapshot.
+            LabSnapshot three = JsonUtility.FromJson<LabSnapshot>(JsonUtility.ToJson(network.Snapshot));
+            LabPlayerState mine = three.players.Single(player => player.id == me);
+            mine.seat = 0;
+            three.players = new[] { mine, new LabPlayerState { id = me + 100, seat = 1 }, new LabPlayerState { id = me + 200, seat = 2 } };
+            LabOrbState drum = three.drums.Single(orb => orb.owner == me);
+            hint.Present(three, me, hint.HintAfterSeconds - .5f, true);
+            Assert.That(hint.Visible, Is.False, "Not before the hint time (4 s).");
+            hint.Present(three, me, 1f, true);
+            Assert.That(hint.Visible, Is.True, "4 s without passing shows the hand and arrow.");
+            Assert.That(hint.PointedDrumId, Is.EqualTo(drum.id));
+            Assert.That(hint.PointingSide, Is.EqualTo(1), "Both sides open: right first.");
+            hint.Present(three, me, Resources.Load<GameTutorialArt>(GameTutorialArt.ResourcePath).handDragSeconds + .05f, true);
+            Assert.That(hint.PointingSide, Is.EqualTo(-1), "Then left, one push each.");
+
+            hint.Present(three, me, .1f, false);
+            Assert.That(hint.Visible, Is.False, "Hidden while paused or not playing.");
+            hint.Present(three, me, .1f, true);
+            Assert.That(hint.Visible, Is.True, "Back when the battle goes on and the drum is still here.");
+
+            LabSnapshot passed = JsonUtility.FromJson<LabSnapshot>(JsonUtility.ToJson(three));
+            passed.drums.Single(orb => orb.id == drum.id).owner = me + 100;
+            hint.Present(passed, me, .1f, true);
+            Assert.That(hint.Visible, Is.False, "Passed: gone at once.");
+            hint.Present(three, me, .1f, true);
+            Assert.That(hint.Visible, Is.False, "Back on my board, it counts from the start again.");
+        }
+
+        [UnityTest]
+        public IEnumerator ShortStaminaSwellsTheGaugeShowsTheWarningAndFlashesTheEdgesRedOnlyOnTheBattleScreen()
+        {
+            session.StartSolo();
+            yield return WaitPlaying(1);
+            yield return null;
+            var bindings = Object.FindFirstObjectByType<GameBattleBindings>();
+            var feedback = bindings.sceneController.GetComponent<LabStaminaShortFeedback>();
+            feedback.enabled = false; // only Advance moves its clock here
+            var composition = bindings.hud.GetComponent<LabOrbHudComposition>();
+            RectTransform display = composition != null && composition.Display != null ? composition.Display.rectTransform : null;
+            Vector2 boardAt = display != null ? display.anchoredPosition : Vector2.zero;
+            RectTransform gauge = (RectTransform)bindings.hud.staminaFill.transform.parent;
+            Vector3 gaugeScale = gauge.localScale;
+
+            feedback.Play();
+            feedback.Advance(.08f);
+            Assert.That(feedback.GaugeScale, Is.GreaterThan(1.02f), "The gauge swells a little while it shakes (#718).");
+            Assert.That(gauge.localScale.x, Is.EqualTo(gaugeScale.x * feedback.GaugeScale).Within(.0001f));
+            Assert.That(feedback.ShakeOffset.magnitude, Is.GreaterThan(0f), "And still shakes.");
+            Assert.That(feedback.WarningVisible, Is.True);
+            Assert.That(feedback.WarningLabel, Is.EqualTo("기운이 부족하다"));
+            Assert.That(feedback.WarningIcon, Is.SameAs(Resources.Load<Sprite>(LabStaminaShortFeedback.WarningIconPath)),
+                "One group with the red mark.");
+            Assert.That(feedback.WarningShake.magnitude, Is.GreaterThan(0f), "The warning shakes with the gauge.");
+            Assert.That(feedback.EdgeAlpha, Is.GreaterThan(0f), "The screen edges flash red.");
+            if (display != null)
+                Assert.That(Vector2.Distance(display.anchoredPosition, boardAt), Is.LessThan(.001f), "The board itself no longer shakes.");
+
+            feedback.Advance(.6f);
+            Assert.That(feedback.GaugeScale, Is.EqualTo(1f).Within(.0001f));
+            Assert.That(feedback.EdgeAlpha, Is.Zero, "The red is gone after its moment...");
+            Assert.That(feedback.WarningVisible, Is.True, "...while the warning stays a little longer.");
+            feedback.Advance(1f);
+            Assert.That(feedback.Playing, Is.False);
+            Assert.That(feedback.WarningVisible, Is.False);
+            Assert.That(gauge.localScale, Is.EqualTo(gaugeScale), "The gauge is its own size again.");
+        }
+
+        [UnityTest]
         public IEnumerator TerritoryDeveloperSoloUsesDesignedResultsAndReturnsHomeAfterViewingTheGourd()
         {
             session.StartSolo(GameMode.Territory);

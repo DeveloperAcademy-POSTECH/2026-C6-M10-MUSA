@@ -8605,7 +8605,6 @@ main `e3108459`의 #712(칠용 뚜껑 법선 공유와3개 LidPaint 메시)을 �
 
 main fbc943e8을 통합하며 VALIDATION 문서 끝의 독립 기록 추가 충돌을 양쪽 보존으로 해결했다. 자동 병합된 Battle 씬은 Stage2 하위591개 블록이 작업 브랜치와 같고 Stage3 하위710개 블록이 main과 같은 것을 정적 비교했다. 씬 object ID 중복0, 새 미해결 GUID0, 충돌 표식0을 확인했다. 기존 패키지 GUID는 프로젝트 에셋 GUID 검사에서 제외했다. main의 시연/법선 수정과 기존 Stage2 폴리싱을 함께 보존했다. 이 병합본에서 Unity 컴파일/실행 검사는 재실행하지 않았으며 앞선 PASS 기록과 구분한다.
 
-
 ## 2026-11-13 — #720 관람 복귀 버튼 배경 보완
 
 기준 main `9be6d1f1`, `fix/#720-viewer-return-background`, Unity6000.6.5f1/macOS Metal. 사용자가 다른 PC의 일반 Hapio 빌드에서 ‘결과로 돌아가기’ 배경만 없다고 확인했다. 해당 문제 앱/저장 상태에는 접근할 수 없고, 공유된main의Mac Development캡처에는배경이있어 실제 원인은 확정하지 않았다. 현재코드의 항목존재/sprite null 방어 공백과 재오픈 경계를 보완한다.
@@ -8630,3 +8629,36 @@ main fbc943e8을 통합하며 VALIDATION 문서 끝의 독립 기록 추가 충�
 - 수정 뒤 전체 EditMode 재실행, PlayMode, 빌드, iOS 실기기·다중 기기 화면 확인은 이번 기록에서 실행하지 않았다. 화면 동작(다음 콤보 색 미리보기, 지금 칸 강조·똑딱 박자, 필요한 색 테두리, 틀린 색 X, 예고 중 던지기 막기, 섬광 보상 오색구슬 등장)은 팀원이 Editor 플레이로 보며 조정했다.
 - PR 준비 시 최신 main `3441e326`(#720 관람 복귀 배경)을 통합했다. 겹친 파일은 이 문서 끝의 기록 추가뿐이라 양쪽 기록을 모두 보존했다. #720은 Hapio 관람 UI만 바꿔 #719 콤보 코드와 겹치지 않는다.
 - 하트(콤보마다 3개) 추가와 main 통합 뒤 전체 EditMode **2,396 PASS / 7 FAIL**(총 2,403, skip 0). 새 테스트 LabGourdComboTests.ThreeHeartsLetTwoWrongColorsPassAndTheThirdFails·TheModelGivesEveryComboItsHearts를 포함한 콤보 테스트는 모두 통과했다. 실패 7개는 LabOrbSpriteDesignTests.SavedConfigConnectsEachKindToItsOriginalArt 결합 구슬 5종과 GameBattleUiAssetTests 2개로, 메모리의 LabConfig가 BattleOrbAppearance를 가리킨 #701 기록과 같은 현상이다. 저장 LabConfig.asset의 orbAppearance GUID는 변경 없음(이 브랜치의 에셋 차이는 comboWarningSeconds 6·yaguangComboHearts 3뿐). Unity를 재시작한 뒤 재실행해 통과했다. PlayMode·빌드·실기기는 이번에도 실행하지 않았다.
+
+
+## 2026-11-13 — #718 북 넘기기 안내와 스태미나 부족 경고
+
+### 변경
+
+- 북 넘기기 안내 (`GameDrumPassHint`, 튜토리얼이 아닌 모든 전투에 `GameBattleBindings`가 붙임):
+  - 북이 내 판에 온 뒤 4초(Inspector `hintAfterSeconds`, 처음 8초에서 줄임) 동안 넘기지 않으면 튜토리얼 4·6단계와 같은 손(끌기 동작)과 초록 화살표를 북에서 화면 가장자리까지 보여 준다. 그림·크기·속도는 `GameTutorialArt`를 그대로 쓴다.
+  - 북을 두드려도 시간은 계속 센다. 북이 내 판을 떠나면 그 북의 시간은 지워지고, 다시 오면 처음부터 센다. 일시정지·시작 전·전투가 끝난 뒤에는 세지 않는다. 북이 여러 개면 가장 오래 있던 북.
+  - 방향: 넘길 수 있는 쪽만. 양쪽이 열리면 손이 한 번 밀 때마다(1.6초) 오른쪽·왼쪽을 번갈아. 박의 한쪽 넘기기 막기(#215)·땅따먹기 팀 벽이면 열린 쪽만. 땅따먹기 1:1·매혹으로 판이 멈춘 동안은 띄우지 않는다. 개발용 솔로에서는 확인할 수 있게 양쪽이 열린 것처럼 번갈아 띄운다(실제로 넘어가지는 않는다). 손가락으로 판 위 구슬을 잡고 있는 동안은 숨긴다.
+  - 글자 없음, 내 화면 표시만(별도 Canvas, 정렬 50, 터치를 막지 않음). Host 규칙·스냅샷·DEV 값·접속 버전은 바뀌지 않았다.
+- 스태미나 부족 경고 (#418 `LabStaminaShortFeedback` 확장, 누른 사람 화면에만, 터치를 막지 않음):
+  - 처음 넣었던 조합 영역 전체 흔들림(`LabOrbHudComposition.SetBoardShake`)은 되돌렸다. 게이지만 흔들린다.
+  - 게이지가 흔들리는 0.32초 동안 살짝 커졌다(최대 1.15배, 앞 30%)가 원래 크기로 돌아온다. 충전 중인 칸의 빨간 빛은 그대로.
+  - 화면 가운데("시작!"과 같은 높이, 화면 비율 0.5, 0.5: 고유 기믹 안내 글(0.6)과 겹치지 않게 그보다 아래)에 "기운이 부족하다"(신라문화체 Bold 22, 기본 먹색, 프로필 `Short Warning Text Color`)와 빨간 느낌표 그림(`Resources/Stamina/StaminaShortWarning.png`, 원본 1536x1024에서 그림 부분 265x585만 잘라 넣음)이 한 덩어리로 작게 나왔다가 살짝 커진 뒤 제 크기로, 게이지와 같은 박자로 흔들리고 0.8초 뒤 0.2초에 걸쳐 사라진다.
+  - 화면 가장자리가 매혹의 분홍빛과 같은 모양(`LabCharmHeartRain.Vignette`)으로 0.4초 동안 빨갛게 번쩍한다.
+  - 크기·시간·자리·색은 `StaminaFeedbackProfile`의 새 값으로 조절한다. 다시 누르면 처음부터 다시 낸다. 스태미나 부족 소리는 그대로.
+
+### 확인
+
+- Unity 6000.6.5f1 Editor 컴파일: PASS. 느낌표 그림은 Editor API로 Sprite·밉맵 끔으로 가져와 265x585로 읽히는 것을 확인했다. 콘솔 오류 1건은 기존 `ResultAction.png` Library 캐시 손상(#717 기록)이다.
+- 검사 (실행은 NOT_RUN):
+  - EditMode `GameDrumPassHintTests` 4건: 머문 시간(두드려도 계속, 넘기면 지움, 다시 오면 0부터), 가장 오래된 북, 넘길 수 있는 쪽(양쪽·막기 좌우·매혹·혼자·개발용 솔로·1:1·2:2), 번갈아 가리키기.
+  - PlayMode `GameSceneFlowTests.ADrumKeptFourSecondsGetsTheTutorialsPassGuideUntilItIsPassed`: 실제 전투의 북과 판으로 개발용 솔로 표시 → 4초 전 안 보임 → 보임·오른쪽 → 왼쪽 → 일시정지 숨김 → 다시 보임 → 넘기면 사라짐 → 돌아오면 0부터.
+  - PlayMode `GameSceneFlowTests.ShortStaminaSwellsTheGaugeShowsTheWarningAndFlashesTheEdgesRedOnlyOnTheBattleScreen`: 실제 전투에서 게이지 커짐·흔들림, 경고 글자+느낌표, 경고 흔들림, 빨간 가장자리, 조합 영역은 그대로, 끝나면 모두 제자리.
+  - PlayMode `LabStaminaShortFeedbackTests` 2건 추가(게이지 커짐·경고·가장자리·제자리, 커짐·튀어나옴 곡선), 기존 3건 유지.
+- 전체 EditMode·PlayMode: NOT_RUN (전투 화면 표시만 바뀌어 #637 기준 관련 검사 + 전체 EditMode 권장).
+- Mac 앱 3개로 안내 표시·사라짐·방향, 경고 모양 확인: NOT_RUN.
+
+### #718 main 병합 — 2026-11-13
+
+- 최신 main(#720 관람 복귀 배경, #719 야광귀 콤보 가이딩)을 통합했다. 충돌은 이 문서 끝의 기록 추가 한 곳이며 양쪽 기록을 모두 보존했다. `GameSceneFlowTests.cs`는 자동 병합됐다.
+- #718이 바꾼 파일(`GameDrumPassHint`, `GameBattleBindings`, `LabStaminaShortFeedback`·프로필, `LabCharmHeartRain`의 가장자리 그림 공개, `LabOrbHudComposition` 되돌림)은 main 쪽 변경과 겹치지 않는다. 병합 뒤 컴파일과 검사 결과는 아래 확인 줄에 적는다.
