@@ -262,6 +262,8 @@ namespace Hapio
         private void RefreshStartOverlay()
         {
             if (startOverlay == null) return;
+            // #717: a finished territory battle keeps "경기 종료!" over its screen until the result Scene replaces it.
+            if (TerritoryEndCovering) { startOverlay.ShowFinished(); return; }
             if (tutorialRun)
             {
                 // No ready count, countdown or "시작!" on the practice board: one plain cover until it is playable; a RESTART's

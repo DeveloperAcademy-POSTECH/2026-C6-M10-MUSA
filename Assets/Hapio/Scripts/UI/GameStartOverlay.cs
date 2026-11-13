@@ -21,13 +21,33 @@ namespace Hapio
         [SerializeField, Min(12)] private int preparingFontSize = 24;
         [SerializeField, Min(12)] private int countdownFontSize = 88;
         [SerializeField, Min(12)] private int startedFontSize = 56;
+        [Header("땅따먹기 경기 종료 (#717)")]
+        [Tooltip("\"경기 종료!\" 글자 색 (시안의 진홍)")]
+        [SerializeField] private Color finishedTextColor = new Color32(0x8A, 0x12, 0x06, 0xFF);
+        [Tooltip("\"경기 종료!\" 글자 가장자리 색 (시안의 연한 크림)")]
+        [SerializeField] private Color finishedOutlineColor = new Color32(0xFC, 0xE8, 0xC8, 0xFF);
+        [Tooltip("가장자리 두께 (Canvas 기준 픽셀)")]
+        [SerializeField, Min(0f)] private float finishedOutlineWidth = 3f;
+        [Tooltip("\"경기 종료!\" 글자 크기. 기준 화면 너비(390)에서 한 줄로 들어가는 크기")]
+        [SerializeField, Min(12)] private int finishedFontSize = 64;
+        [Tooltip("\"경기 종료!\" 뒤를 덮는 막의 색. 카운트다운과 같은 옅은 그늘이고, 결과 화면이 열릴 때까지 전투 화면을 누르지 못하게 막는다")]
+        [SerializeField] private Color finishedBackground = new Color(0f, 0f, 0f, .25f);
 
-        private enum DisplayMode { Hidden, Preparing, Countdown, Started }
+        public const string FinishedText = "경기 종료!";
+
+        private enum DisplayMode { Hidden, Preparing, Countdown, Started, Finished }
         private DisplayMode mode;
         private int lastReady = -1, lastTotal = -1, lastNumber = -1;
+        private UnityEngine.UI.Outline finishedOutline;
         public bool Visible => visibility != null && visibility.alpha > 0f;
         public bool BlocksInput => Visible && visibility.blocksRaycasts;
         public string DisplayText => caption == null ? string.Empty : caption.text;
+        /// <summary>"경기 종료!"가 떠 있는지 (#717)</summary>
+        public bool ShowsFinished => mode == DisplayMode.Finished && Visible;
+        /// <summary>지금 글자 색 (검사·확인용)</summary>
+        public Color CaptionColor => caption == null ? Color.clear : caption.color;
+        /// <summary>지금 글자 가장자리 색. 가장자리가 꺼져 있으면 투명 (검사·확인용)</summary>
+        public Color CaptionOutlineColor => finishedOutline != null && finishedOutline.enabled ? finishedOutline.effectColor : Color.clear;
 
         public static GameStartOverlay Create(Transform parent)
         {
@@ -91,6 +111,23 @@ namespace Hapio
             Apply(DisplayMode.Started, "시작!", startedFontSize, Color.clear, false);
         }
 
+        /// <summary>
+        /// 땅따먹기가 끝난 순간의 "경기 종료!" (#717): 진홍 글자에 크림색 가장자리, 옅은 그늘. 결과 화면이 열릴 때까지 화면을 덮어
+        /// 전투 화면의 버튼이 눌리지 않는다.
+        /// </summary>
+        public void ShowFinished()
+        {
+            if (mode == DisplayMode.Finished) return;
+            Apply(DisplayMode.Finished, FinishedText, finishedFontSize, finishedBackground, true);
+            caption.color = finishedTextColor;
+            if (finishedOutline == null) finishedOutline = caption.GetComponent<UnityEngine.UI.Outline>();
+            if (finishedOutline == null) finishedOutline = caption.gameObject.AddComponent<UnityEngine.UI.Outline>();
+            finishedOutline.effectColor = finishedOutlineColor;
+            finishedOutline.effectDistance = new Vector2(finishedOutlineWidth, -finishedOutlineWidth);
+            finishedOutline.useGraphicAlpha = true;
+            finishedOutline.enabled = finishedOutlineWidth > 0f;
+        }
+
         public void Hide()
         {
             mode = DisplayMode.Hidden;
@@ -99,6 +136,7 @@ namespace Hapio
             visibility.blocksRaycasts = visibility.interactable = false;
             if (background != null) background.raycastTarget = false;
             if (caption != null) caption.text = string.Empty;
+            if (finishedOutline != null) finishedOutline.enabled = false;
         }
 
         private void Apply(DisplayMode value, string text, int fontSize, Color color, bool block)
@@ -113,6 +151,8 @@ namespace Hapio
             caption.fontSize = fontSize;
             caption.color = textColor;
             caption.raycastTarget = false;
+            // Only "경기 종료!" has an edge; every other caption keeps the plain saved look.
+            if (finishedOutline != null) finishedOutline.enabled = false;
         }
     }
 }

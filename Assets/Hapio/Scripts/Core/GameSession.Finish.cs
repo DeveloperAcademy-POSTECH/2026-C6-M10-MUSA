@@ -329,6 +329,7 @@ namespace Hapio
         }
         double ResultCaptureDeadline(double realNow)
         {
+            if (IsTerritory) return TerritoryResultDeadline(realNow); // #717
             if (state.mode != GameMode.Story) return realNow + loadingTimeoutSeconds;
             ObserveFinishDeadline(finishServerDeadline, realNow);
             return finishDeadlineAt;
@@ -347,9 +348,7 @@ namespace Hapio
                 || ResultSnapshot.paintRevision != capturedPaintRevision) return false;
             if (network.PaintSurface != null && network.PaintSurface.Revision == capturedPaintRevision
                 && network.PaintSurface.VisualVersion != capturedVisualVersion) return false;
-            bool needsPreview = network.config != null && network.config.CompletedGourdViewerEnabled
-                && network.config.GourdMode == LabGourdMode.Paint;
-            return !needsPreview || preview != null && !preview.IsDisposed
+            return !ResultNeedsPreview(ResultSnapshot) || preview != null && !preview.IsDisposed
                 && preview.PaintRevision == capturedPaintRevision;
         }
         static bool FiniteFinishTime(double value) => !double.IsNaN(value) && !double.IsInfinity(value);

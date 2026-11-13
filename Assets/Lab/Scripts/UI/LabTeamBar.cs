@@ -87,6 +87,8 @@ namespace C6Lab
             bool fever = snapshot != null && feverHitsNeeded > 0;
             if (gauges.activeSelf != fever) gauges.SetActive(fever);
             if (!fever) return;
+            // #717: once the battle is over ("경기 종료!") the fever gauges stay where they were instead of running out.
+            if (snapshot.phase != LabPhase.Playing) return;
             Gauge(blueGauge, blueGaugeText, Blue, snapshot.blueFeverHits, feverHitsNeeded,
                 snapshot.blueFeverStartedAt, snapshot.blueFeverUntil, snapshot.serverTime);
             Gauge(redGauge, redGaugeText, Red, snapshot.redFeverHits, feverHitsNeeded,
