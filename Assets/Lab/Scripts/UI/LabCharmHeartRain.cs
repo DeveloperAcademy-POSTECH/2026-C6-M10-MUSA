@@ -257,7 +257,7 @@ namespace C6Lab
         }
 
         /// <summary>White at the edges fading to clear in the middle; the tint colours it.</summary>
-        private static Texture2D Vignette()
+        internal static Texture2D Vignette()
         {
             if (vignetteTexture != null) return vignetteTexture;
             vignetteTexture = new Texture2D(VignetteSize, VignetteSize, TextureFormat.RGBA32, false)

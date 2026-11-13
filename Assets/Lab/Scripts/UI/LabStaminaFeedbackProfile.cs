@@ -21,9 +21,24 @@ namespace C6Lab
         [Tooltip("충전 중인 칸이 빨갛게 빛나는 시간 (초)")]
         [SerializeField, Range(.05f, 1f)] private float shortFlashSeconds = .4f;
         [SerializeField] private Color shortFlashColor = new Color(1f, .16f, .12f, .95f);
-        [Tooltip("#718: 게이지와 함께 조합 영역 전체(판 그림·구슬·북)가 흔들리는 거리 (Canvas 기준 픽셀). 0이면 게이지만 흔들린다. " +
-            "시간과 떨림 횟수는 위 게이지 값과 같고, 화면 그림만 움직여 터치 위치는 그대로다.")]
-        [SerializeField, Range(0f, 40f)] private float shortBoardShakeDistance = 8f;
+        [Header("스태미나 부족 (#718): 게이지가 커졌다 작아짐, 가운데 경고, 화면 가장자리 빨간빛")]
+        [Tooltip("흔들리는 동안 게이지가 잠깐 커지는 크기 (1 = 그대로). 흔들림 시간 안에 커졌다가 원래 크기로 돌아온다.")]
+        [SerializeField, Range(1f, 1.5f)] private float shortGaugePopScale = 1.15f;
+        [SerializeField] private bool shortWarningEnabled = true;
+        [Tooltip("\"기운이 부족하다\"와 빨간 느낌표가 떠 있는 시간 (초). 끝 0.2초 동안 사라진다.")]
+        [SerializeField, Range(.3f, 2f)] private float shortWarningSeconds = .8f;
+        [Tooltip("경고 글자 크기 (Canvas 기준)")]
+        [SerializeField, Range(12f, 48f)] private float shortWarningFontSize = 22f;
+        [Tooltip("경고 글자 색 (\"기운이 부족하다\"). 느낌표 그림의 색은 그대로다.")]
+        [SerializeField] private Color shortWarningTextColor = new Color(.1f, .08f, .07f, 1f);
+        [Tooltip("경고 자리 (화면 비율, 왼쪽 아래 0). 기본은 \"시작!\"과 같은 화면 가운데: 고유 기믹 안내 글(0.6)과 겹치지 않게 그보다 아래.")]
+        [SerializeField] private Vector2 shortWarningAnchor = new Vector2(.5f, .5f);
+        [Tooltip("경고가 게이지와 함께 흔들리는 거리 (Canvas 기준)")]
+        [SerializeField, Range(0f, 20f)] private float shortWarningShakeDistance = 5f;
+        [Tooltip("화면 가장자리 빨간빛이 번쩍하는 시간 (초)")]
+        [SerializeField, Range(.05f, 1f)] private float shortEdgeSeconds = .4f;
+        [Tooltip("화면 가장자리 빨간빛의 색 (알파 = 가장 진할 때)")]
+        [SerializeField] private Color shortEdgeColor = new Color(1f, .12f, .08f, .6f);
 
         public bool ConsumptionEnabled => consumptionEnabled;
         public float ConsumptionSeconds => Safe(consumptionSeconds, .05f, .5f, .18f);
@@ -33,7 +48,17 @@ namespace C6Lab
         public float ShortShakeRatio => Safe(shortShakeRatio, 0f, 1f, .3f);
         public float ShortShakeFrequency => Safe(shortShakeFrequency, 5f, 60f, 32f);
         public float ShortFlashSeconds => Safe(shortFlashSeconds, .05f, 1f, .4f);
-        public float ShortBoardShakeDistance => Safe(shortBoardShakeDistance, 0f, 40f, 8f);
+        public float ShortGaugePopScale => Safe(shortGaugePopScale, 1f, 1.5f, 1.15f);
+        public bool ShortWarningEnabled => shortWarningEnabled;
+        public float ShortWarningSeconds => Safe(shortWarningSeconds, .3f, 2f, .8f);
+        public float ShortWarningFontSize => Safe(shortWarningFontSize, 12f, 48f, 22f);
+        public Color ShortWarningTextColor => new Color(Safe(shortWarningTextColor.r, 0, 1, .1f), Safe(shortWarningTextColor.g, 0, 1, .08f),
+            Safe(shortWarningTextColor.b, 0, 1, .07f), Safe(shortWarningTextColor.a, 0, 1, 1f));
+        public Vector2 ShortWarningAnchor => new Vector2(Safe(shortWarningAnchor.x, 0f, 1f, .5f), Safe(shortWarningAnchor.y, 0f, 1f, .5f));
+        public float ShortWarningShakeDistance => Safe(shortWarningShakeDistance, 0f, 20f, 5f);
+        public float ShortEdgeSeconds => Safe(shortEdgeSeconds, .05f, 1f, .4f);
+        public Color ShortEdgeColor => new Color(Safe(shortEdgeColor.r, 0, 1, 1f), Safe(shortEdgeColor.g, 0, 1, .12f),
+            Safe(shortEdgeColor.b, 0, 1, .08f), Safe(shortEdgeColor.a, 0, 1, .6f));
         public Color ShortFlashColor => new Color(Safe(shortFlashColor.r, 0, 1, 1f), Safe(shortFlashColor.g, 0, 1, .16f),
             Safe(shortFlashColor.b, 0, 1, .12f), Safe(shortFlashColor.a, 0, 1, .95f));
         private static float Safe(float value, float min, float max, float fallback) =>
