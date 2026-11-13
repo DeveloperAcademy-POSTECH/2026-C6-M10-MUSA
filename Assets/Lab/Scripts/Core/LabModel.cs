@@ -628,6 +628,7 @@ namespace C6Lab
             // Charmed (#251): too dazed to attack until it ends or the players beside wake them.
             if (Charmed(sender, now)) return Reject("CHARMED", out reason);
             if (JigwiBHoldsLaunch(current, now)) return Reject("JIGWI_B_WAIT", out reason); // #551 "지금!" 전에는 못 던짐
+            if (ComboHoldsThrow(current, now)) return Reject("COMBO_HOLD", out reason); // #719 예고 중 / 콤보 중 오색구슬
             ApplyJigwiABOrb(current, now);
             CaptureJigwiABLaunchReward(current, now);
             LaunchJigwiTalismanShards(current); // #540 부적 구슬은 3갈래로 날아간다
@@ -1055,6 +1056,17 @@ namespace C6Lab
         // 다른 이벤트 때문에 미룰 콤보 예고는 알리지 않는다 (#271). 이미 시작한 예고는 그대로 알린다.
         private bool ComboAnnounced => ComboWaiting && !comboHeld
             && (comboWarned || (!AnyScreenOpen(LabYaguangEvent.Combo, lastTime) && !FlashGoesFirst && !FlashRunsIntoCombo));
+
+        /// <summary>
+        /// #719 UT: 콤보 예고 동안은 아무것도 박에 못 던진다 (미리 던진 구슬이 새 콤보에 잘못 맞지 않게). 생성·합치기·넘기기는 된다.
+        /// 콤보가 진행되는 동안에는 오색구슬을 못 던진다 (콤보가 끝나면 다시 던질 수 있다).
+        /// </summary>
+        internal bool ComboHoldsThrow(LabOrbState orb, double now)
+        {
+            if (rules == null || !rules.ComboEnabled || phase != LabPhase.Playing) return false;
+            if (combo.Active) return orb != null && orb.fiveColor;
+            return ComboAnnounced && now >= nextComboAt - rules.ComboWarningSeconds && now < nextComboAt;
+        }
 
         /// <summary>
         /// 콤보가 끝난 뒤 처리. 성공은 팀 전체에 보상을 주고, 실패는 페널티를 건다.

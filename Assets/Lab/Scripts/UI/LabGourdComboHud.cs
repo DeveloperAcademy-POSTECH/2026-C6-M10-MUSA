@@ -250,8 +250,26 @@ namespace C6Lab
         public void Bind(LabNetwork target, Canvas uiCanvas)
         {
             ReleaseGauge();
+            if (network != null) network.ComboThrowHeld -= OnComboThrowHeld;
             network = target;
+            if (network != null) network.ComboThrowHeld += OnComboThrowHeld;
             canvas = uiCanvas != null ? uiCanvas.rootCanvas : null;
+        }
+
+        /// <summary>#719: a throw was turned away by the combo (warning, or a five-colour orb mid-combo): the rope jolts.</summary>
+        private void OnComboThrowHeld(bool warning)
+        {
+            LabComboThrowSeal seal = network != null ? LabComboThrowSeal.For(network.board) : null;
+            if (seal != null) seal.Knock();
+        }
+
+        /// <summary>#719: the rope across the top of my board is up for the whole combo warning (no throws then).</summary>
+        private void HoldThrowSeal(bool held)
+        {
+            if (network == null || network.board == null) return;
+            LabComboThrowSeal seal = held ? LabComboThrowSeal.For(network.board)
+                : network.board.GetComponentInChildren<LabComboThrowSeal>(true);
+            if (seal != null) seal.SetHeld(held);
         }
 
         private float tickBeat;
@@ -264,10 +282,7 @@ namespace C6Lab
         private float wrongElapsed = -1f;
         private int wrongSlot;
         private bool wrongFails;
-        private LabOrbElement wrongElement;
-        private string wrongLabel = "";
-        private Image wrongMark, wrongTagBack, wrongTagOrb, edgeFlash;
-        private Text wrongTagText;
+        private Image wrongMark, edgeFlash;
         private static Sprite wrongSprite;
         public bool WrongMarkShown => wrongMark != null && wrongMark.gameObject.activeInHierarchy;
         public int WrongMarkSlot => wrongElapsed >= 0f ? wrongSlot : -1;
@@ -286,14 +301,8 @@ namespace C6Lab
             seenWrongCount = snapshot.comboWrongCount;
             wrongElapsed = 0f;
             wrongSlot = Mathf.Clamp(snapshot.comboWrongSlot, 0, LabGourdCombo.Length - 1);
-            wrongElement = snapshot.comboWrongElement;
             // The same snapshot carries a new WrongColor result when this wrong colour ended the combo.
             wrongFails = snapshot.comboResult == LabComboResult.WrongColor && snapshot.comboResultCount != shownResultCount;
-            wrongLabel = "";
-            if (network != null && snapshot.comboWrongBy == network.LocalPlayerId) wrongLabel = "나";
-            else if (snapshot.players != null)
-                foreach (LabPlayerState player in snapshot.players)
-                    if (player != null && player.id == snapshot.comboWrongBy) { wrongLabel = "P" + (player.seat + 1); break; }
             // A real failure already buzzes long (LabHaptics); a forgiven one gets a short sharp knock.
             if (!wrongFails && network != null) LabHaptics.PlayDirect(network.config, LabHapticStyle.Rigid, 1f, .18f, .8f, .7f);
         }
@@ -314,7 +323,6 @@ namespace C6Lab
             bool show = wrongElapsed >= 0f && panel.gameObject.activeSelf;
             EnsureWrongParts();
             wrongMark.gameObject.SetActive(show);
-            wrongTagBack.gameObject.SetActive(show);
             float t = Mathf.Max(0f, wrongElapsed);
             float edge = wrongElapsed >= 0f ? Mathf.Clamp01(1f - t / .45f) : 0f;
             edgeFlash.gameObject.SetActive(edge > 0f);
@@ -342,36 +350,6 @@ namespace C6Lab
             mark.localScale = Vector3.one * slam * (wrongFails ? 1.2f : 1f);
             mark.localRotation = Quaternion.Euler(0f, 0f, Mathf.Lerp(-22f, -6f, land));
             wrongMark.color = new Color(1f, 1f, 1f, alpha);
-
-            // Who threw which colour: a small tag hanging under the panel at that slot (colour orb + P2 / 나).
-            var tagRect = wrongTagBack.rectTransform;
-            tagRect.SetAsLastSibling();
-            float h = slot.sizeDelta.y * .78f;
-            bool labelled = !string.IsNullOrEmpty(wrongLabel);
-            tagRect.anchorMin = tagRect.anchorMax = new Vector2(0f, 0f);
-            tagRect.pivot = new Vector2(.5f, 1f);
-            tagRect.sizeDelta = new Vector2(labelled ? h * 2.35f : h * 1.3f, h * 1.15f);
-            tagRect.anchoredPosition = new Vector2(slot.anchoredPosition.x, -h * .12f);
-            float pop = t < .16f ? Mathf.Lerp(.4f, 1.12f, t / .16f) : Mathf.Lerp(1.12f, 1f, Mathf.Clamp01((t - .16f) / .1f));
-            tagRect.localScale = Vector3.one * pop;
-            wrongTagBack.color = new Color(1f, 1f, 1f, alpha);
-            Sprite art = LabYaguangComboArt.Orb(wrongElement);
-            wrongTagOrb.sprite = art != null ? art : DiscSprite();
-            Color orbColor = art != null ? Color.white : (Color)LabPaintPalette.SrgbColorFor(wrongElement);
-            wrongTagOrb.color = new Color(orbColor.r, orbColor.g, orbColor.b, alpha);
-            var orb = wrongTagOrb.rectTransform;
-            orb.anchorMin = orb.anchorMax = new Vector2(labelled ? 0f : .5f, .5f);
-            orb.pivot = new Vector2(labelled ? 0f : .5f, .5f);
-            orb.sizeDelta = Vector2.one * h * .85f;
-            orb.anchoredPosition = new Vector2(labelled ? h * .18f : 0f, 0f);
-            wrongTagText.gameObject.SetActive(labelled);
-            wrongTagText.text = wrongLabel;
-            wrongTagText.fontSize = Mathf.Max(1, Mathf.RoundToInt(h * .62f));
-            var label = wrongTagText.rectTransform;
-            label.anchorMin = new Vector2(.42f, 0f);
-            label.anchorMax = new Vector2(1f, 1f);
-            label.offsetMin = label.offsetMax = Vector2.zero;
-            wrongTagText.color = new Color(FailColor.r, FailColor.g, FailColor.b, alpha);
         }
 
         private void EnsureWrongParts()
@@ -381,14 +359,6 @@ namespace C6Lab
             wrongMark.sprite = WrongSprite();
             wrongMark.raycastTarget = false;
             wrongMark.gameObject.SetActive(false);
-            wrongTagBack = NewRect("Combo Wrong Tag", panel).gameObject.AddComponent<Image>();
-            wrongTagBack.sprite = PillSprite();
-            wrongTagBack.type = Image.Type.Sliced;
-            wrongTagBack.raycastTarget = false;
-            wrongTagOrb = NewRect("Orb", wrongTagBack.rectTransform).gameObject.AddComponent<Image>();
-            wrongTagOrb.raycastTarget = false;
-            wrongTagText = NewText("Who", wrongTagBack.rectTransform, 20, TextAnchor.MiddleCenter);
-            wrongTagBack.gameObject.SetActive(false);
             // Red screen edges (centre stays clear so the board is still readable).
             RectTransform edgeRect = NewRect("Combo Wrong Edge", layer);
             edgeRect.anchorMin = Vector2.zero;
@@ -449,6 +419,8 @@ namespace C6Lab
             tickBeat = needed != LabOrbElement.None ? TickBeat(snapshot, serverNow) : 0f;
             LabOrbComboHint.Beat = tickBeat;
             if (network != null && network.board != null) network.board.SetComboHint(needed);
+            HoldThrowSeal(snapshot != null && snapshot.phase == LabPhase.Playing && !snapshot.paused && !snapshot.comboActive
+                && snapshot.ComboWarningOn(network.BattlePresentationTime));
             // 조합판 구슬 크기(#257)는 콤보 화면이 숨어 있어도 정한다. 일시정지 중에는 그대로 둔다.
             if (snapshot == null || snapshot.phase != LabPhase.Playing) SetBoardLook(0);
             else if (!snapshot.paused) SetBoardLook(LocalEffect(snapshot, serverNow, out _));
@@ -1594,6 +1566,7 @@ namespace C6Lab
         }
         private void OnDestroy()
         {
+            if (network != null) network.ComboThrowHeld -= OnComboThrowHeld;
             ReleaseGauge();
             if (layer != null) Destroy(layer.gameObject);
         }

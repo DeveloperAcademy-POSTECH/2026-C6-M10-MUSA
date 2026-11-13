@@ -182,10 +182,28 @@ namespace C6Lab
             value.CombineRequested += OnCombineRequested;
             value.FoxFireTouched += OnFoxFireTouched;
             value.ThrowRequested += OnThrowRequested;
-            value.ThrowGate = JigwiBThrowAllowed; // #551 지귀 B: "지금!" 전에는 특수 물구슬을 못 던짐
+            value.ThrowGate = ThrowAllowed; // #551 지귀 B "지금!" 전 특수 물구슬, #719 콤보 예고 중 / 콤보 중 오색구슬
             value.UseRequested += OnUseRequested;
             value.DrumTapped += Generate;
             value.JigwiBurnRequested += OnJigwiBurnRequested;
+        }
+
+        /// <summary>#719: 내 판에서 던지려던 구슬이 콤보 때문에 막혔다 (true = 예고 중이라 다 막힘, false = 콤보 중 오색구슬).
+        /// 판 위쪽 금줄이 흔들린다 (LabGourdComboHud).</summary>
+        public event System.Action<bool> ComboThrowHeld;
+
+        private bool ThrowAllowed(string orbId)
+        {
+            if (!JigwiBThrowAllowed(orbId)) return false;
+            LabSnapshot snapshot = latest;
+            if (snapshot == null || snapshot.phase != LabPhase.Playing) return true;
+            // Same rule as LabModel.ComboHoldsThrow, on this screen's clock: the orb just slides up and bounces off the top.
+            double now = BattlePresentationTime;
+            bool warning = snapshot.ComboWarningOn(now) && !snapshot.comboActive;
+            bool fiveColor = snapshot.comboActive && board != null && board.IsFiveColor(orbId);
+            if (!warning && !fiveColor) return true;
+            ComboThrowHeld?.Invoke(warning);
+            return false;
         }
 
         private void UnsubscribeBoard(LabOrbBoard value)
@@ -195,7 +213,7 @@ namespace C6Lab
             value.CombineRequested -= OnCombineRequested;
             value.FoxFireTouched -= OnFoxFireTouched;
             value.ThrowRequested -= OnThrowRequested;
-            if (value.ThrowGate == (System.Func<string, bool>)JigwiBThrowAllowed) value.ThrowGate = null;
+            if (value.ThrowGate == (System.Func<string, bool>)ThrowAllowed) value.ThrowGate = null;
             value.UseRequested -= OnUseRequested;
             value.DrumTapped -= Generate;
             value.JigwiBurnRequested -= OnJigwiBurnRequested;
