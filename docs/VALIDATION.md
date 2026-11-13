@@ -8604,3 +8604,16 @@ main `e3108459`의 #712(칠용 뚜껑 법선 공유와3개 LidPaint 메시)을 �
 ## 2026-11-12 — #711 main 병합 충돌 해결
 
 main fbc943e8을 통합하며 VALIDATION 문서 끝의 독립 기록 추가 충돌을 양쪽 보존으로 해결했다. 자동 병합된 Battle 씬은 Stage2 하위591개 블록이 작업 브랜치와 같고 Stage3 하위710개 블록이 main과 같은 것을 정적 비교했다. 씬 object ID 중복0, 새 미해결 GUID0, 충돌 표식0을 확인했다. 기존 패키지 GUID는 프로젝트 에셋 GUID 검사에서 제외했다. main의 시연/법선 수정과 기존 Stage2 폴리싱을 함께 보존했다. 이 병합본에서 Unity 컴파일/실행 검사는 재실행하지 않았으며 앞선 PASS 기록과 구분한다.
+
+
+## 2026-11-13 — #720 관람 복귀 버튼 배경 보완
+
+기준 main `9be6d1f1`, `fix/#720-viewer-return-background`, Unity6000.6.5f1/macOS Metal. 사용자가 다른 PC의 일반 Hapio 빌드에서 ‘결과로 돌아가기’ 배경만 없다고 확인했다. 해당 문제 앱/저장 상태에는 접근할 수 없고, 공유된main의Mac Development캡처에는배경이있어 실제 원인은 확정하지 않았다. 현재코드의 항목존재/sprite null 방어 공백과 재오픈 경계를 보완한다.
+
+- `GameSealedGourdView`의 복귀 배경에만 원화/둥근 단색 대체를 준비하고 실제 Sprite/Texture 상태를 판정한다. 재오픈 또는 entry/Sprite/Texture 참조 변경 때만 캐시/메시를 갱신한다. `GameFigmaSurface`의 기존 Show는 유지하고 명시적 internal ReloadSource만 추가했다. 원래 위치·원화·색·글자·콜백·리셋·판정·네트워크·Scene/Prefab/설정은 변경하지 않았다.
+- 최초검사요청은 검사코드가 구형 CanvasRenderer.GetMesh(mesh) API를 사용해 컴파일 오류로0건 종료됐다. 현재 설치 버전의 실제 API GetMesh()를 확인해 수정했다.0건은PASS로 쓰지 않는다.
+- 누락/복구 GPU 집중검사 **3/3 PASS**(0.40초). 항목없음·Sprite없음·소유한테스트Texture파괴를 주입하고 원화/대체/새 항목 복구의 실제 CanvasMesh와 렌더 픽셀을 확인했다. 테스트의 라이브러리 원본 배열은 finally에서 복원하고 테스트가 만든 Texture/Sprite만 해제한다.
+- 전체 EditMode **2400/2400 PASS**(34.47초), 영향 PlayMode **6/6 PASS**(50.20초). SavedStoryViewerSkipAndEndingButtonsReceiveRealMouseClicks1건(24.33초), TerritoryDeveloperSoloUsesDesignedResultsAndReturnsHomeAfterViewingTheGourd1건(3.48초), GameYaguangDemoFlowTests1건(9.97초), GourdResultViewerPlayModeTests3건(12.42초). 실패·skip·inconclusive0.
+- 저장 Scene의 실제 마우스 검사는 일반1~3스테이지에서 관람/리셋/닫기·카드 유지·진행을 확인한다.1스테이지에서 그림을 메모리상 제거해 대체 배경을 확인하고 실제닫기클릭→참조없는상태재오픈→닫기→원화복구후재오픈→닫기까지 확인했다. 원본Sprite는 UnityTearDown에서도복원해 중첩코루틴실패에도 다른검사로새지않게했다. 게임결과/도색복사본은유지됐다.
+- 실제 runtime버튼 코드를 격리한 PreviewScene에서 정상 원화·누락 대체·복구 원화 비교를 렌더해 육안 확인했다. 이는 전체 게임/문제 PC/실기기 스크린샷이 아니다. 처음 additiveScene 캡처는 기존UntitledScene을 저장하지 않아거절됐고, 저장·삭제 없이 PreviewScene으로 변경해 만들었다. 임시Scene/카메라/RT는해제하고 라이브러리는복원했다. 비교이미지와 원시검사결과는 커밋하지 않는 로컬 artifacts/viewer-return-background에 보관한다.
+- 검사 범위: UI표현과 복귀버튼 캐시만변경하고 Scene전환/세션·물리·공유상태·게임판정·빌드설정 동작은 바꾸지 않아 전체 PlayMode는 실행하지 않았다. 전체Edit와 실제관람/클릭/모드 연결의 영향Play를선택했다. 새 Mac/iOS Player빌드·문제PC앱 재현·iPhone/iPad 화면은미검증이다.
