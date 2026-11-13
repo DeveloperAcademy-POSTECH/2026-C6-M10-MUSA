@@ -1133,7 +1133,7 @@ namespace C6Lab
         [Tooltip("콤보 성공 야광귀 대사 크기 (Audio/YaguangComboClearedFirst, YaguangComboClearedSecond)")]
         [SerializeField, Range(0f, 1f)] private float yaguangComboClearedSoundVolume = .9f;
         [Header("야광귀 콤보 금옥 안내와 첫 콤보 봐주기 (#695, Inspector 전용)")]
-        [Tooltip("라운드 첫 콤보는 첫 칸을 맞힐 때까지 틀린 색을 실패 없이 무시한다 (첫 칸을 맞힌 뒤 틀린 색은 실패, 제한 시간은 그대로). Host 기준")]
+        [Tooltip("콤보마다 첫 칸을 맞힐 때까지 틀린 색을 실패 없이 무시한다 (#719부터 라운드 첫 콤보만이 아니라 모든 콤보. 첫 칸을 맞힌 뒤 틀린 색은 실패, 제한 시간은 그대로). Host 기준")]
         [SerializeField] private bool yaguangFirstComboForgive = true;
         [Tooltip("콤보 예고 때 금옥 규칙 안내(Audio/YaguangComboGuideRule)를 라운드의 처음 몇 번 콤보까지 낼지 (0이면 끔, 1이면 첫 콤보만)")]
         [SerializeField, Range(0, 20)] private int yaguangComboGuideRuleCombos = 1;

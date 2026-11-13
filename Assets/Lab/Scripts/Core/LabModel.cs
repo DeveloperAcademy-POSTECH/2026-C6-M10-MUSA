@@ -779,8 +779,8 @@ namespace C6Lab
                 comboWarned = false;
                 double at = nextComboAt;
                 LabOrbElement[] colors = NextComboColors();
-                // #695: the round's first combo forgives wrong colors until its first slot is hit.
-                combo.Start(colors, at, rules.ComboTimeLimitSeconds, rules.ComboFirstForgive && combo.Count == 0);
+                // #695/#719 UT: every combo (not only the round's first) forgives wrong colours until its first slot is hit.
+                combo.Start(colors, at, rules.ComboTimeLimitSeconds, rules.ComboFirstForgive);
                 // Scheduled stages receive the next occurrence from CastGimmicks, never from this effect.
                 nextComboAt = rules.YaguangTimeline ? double.PositiveInfinity : at + rules.ComboRepeatIntervalSeconds;
             }
