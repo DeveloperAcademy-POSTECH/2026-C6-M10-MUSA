@@ -95,9 +95,18 @@ namespace C6Lab.Tests
             LabSnapshot warning = At(room, 35d);
             Assert.That(warning.comboWarningAt, Is.EqualTo(35d));
             Assert.That(warning.comboNextAt, Is.EqualTo(39d));
+            // #719: the warning already carries the combo's real colours and counts 넷 → 하나 over its four quarters.
+            LabOrbElement[] preview = warning.comboNextColors.ToArray();
+            Assert.That(preview.Length, Is.EqualTo(LabGourdCombo.Length));
+            Assert.That(warning.ComboWarningCount(35d), Is.EqualTo(4));
+            Assert.That(warning.ComboWarningCount(36.5d), Is.EqualTo(3));
+            Assert.That(warning.ComboWarningCount(38.99d), Is.EqualTo(1));
+            Assert.That(warning.ComboWarningCountAt(2), Is.EqualTo(37d).Within(1e-9));
             Assert.That(At(room, 38.99d).comboActive, Is.False);
             LabSnapshot combo = At(room, 39d);
             Assert.That(combo.comboActive, Is.True);
+            Assert.That(combo.comboColors, Is.EqualTo(preview), "The combo is exactly what the warning showed.");
+            Assert.That(combo.comboNextColors, Is.Empty, "No preview while a combo runs.");
             Assert.That(combo.comboEndsAt, Is.EqualTo(52d));
             LabSnapshot timeout = At(room, 52d);
             Assert.That(timeout.comboActive, Is.False);

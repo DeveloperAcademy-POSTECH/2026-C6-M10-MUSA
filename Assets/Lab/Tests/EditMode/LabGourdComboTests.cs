@@ -80,6 +80,72 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void ThreeHeartsLetTwoWrongColorsPassAndTheThirdFails()
+        {
+            // #719 UT: Sample is Fire, Water, Water, Earth. Each wrong colour breaks a heart; the last heart breaking fails.
+            var combo = new LabGourdCombo();
+            combo.Start(Sample, 0d, 10d, hearts: 3);
+            Assert.That(new[] { combo.Hearts, combo.HeartsLeft }, Is.EqualTo(new[] { 3, 3 }));
+            Assert.That(combo.Forgiving, Is.True);
+            Assert.That(combo.Judge(LabOrbElement.Earth, 7, 1d), Is.EqualTo(LabComboResult.None));
+            Assert.That(combo.HeartsLeft, Is.EqualTo(2));
+            Assert.That(combo.Judge(LabOrbElement.Fire, 7, 2d), Is.EqualTo(LabComboResult.None), "The right colour still counts.");
+            Assert.That(combo.Progress, Is.EqualTo(1));
+            Assert.That(combo.Judge(LabOrbElement.Metal, 8, 3d), Is.EqualTo(LabComboResult.None), "After the first slot too.");
+            Assert.That(combo.HeartsLeft, Is.EqualTo(1));
+            Assert.That(combo.Forgiving, Is.False, "One heart left: the next wrong colour fails.");
+            Assert.That(combo.ForgivenCount, Is.EqualTo(2u), "Geumok answers each heart that broke without failing.");
+            Assert.That(combo.Judge(LabOrbElement.Earth, 9, 4d), Is.EqualTo(LabComboResult.WrongColor));
+            Assert.That(combo.HeartsLeft, Is.Zero);
+            Assert.That(combo.LastFailedBy, Is.EqualTo(9ul));
+            Assert.That(combo.WrongCount, Is.EqualTo(3u));
+
+            combo.Start(Sample, 20d, 10d, hearts: 3);
+            Assert.That(combo.HeartsLeft, Is.EqualTo(3), "Every combo starts with all its hearts.");
+            combo.EndForgiving();
+            Assert.That(combo.Judge(LabOrbElement.Earth, 7, 21d), Is.EqualTo(LabComboResult.WrongColor),
+                "The VFX lab's fail button leaves one heart, so its wrong colour fails.");
+        }
+
+        [Test]
+        public void TheModelGivesEveryComboItsHearts()
+        {
+            LabConfig config = Config(enabled: true, hearts: 3);
+            var model = new LabModel();
+            model.Begin("combo-hearts", new ulong[] { 10, 20, 30 }, 0d, config);
+            LabSnapshot warning = model.Snapshot(18d);
+            Assert.That(new[] { warning.comboHearts, warning.comboHeartsLeft }, Is.EqualTo(new[] { 3, 3 }), "Shown full in the warning.");
+            LabSnapshot started = model.Snapshot(20d);
+            Assert.That(started.comboActive, Is.True);
+            Assert.That(new[] { started.comboHearts, started.comboHeartsLeft }, Is.EqualTo(new[] { 3, 3 }));
+            LabSnapshot received = JsonUtility.FromJson<LabSnapshot>(JsonUtility.ToJson(started));
+            Assert.That(received.comboHeartsLeft, Is.EqualTo(3), "Every device reads the same hearts.");
+        }
+
+        [Test]
+        public void EveryWrongColorIsRememberedForTheXMark()
+        {
+            // #719: forgiven or failing, each wrong colour says who threw what on which slot (everyone's screen stamps an X there).
+            var combo = new LabGourdCombo();
+            combo.Start(Sample, 0d, 10d, forgiveUntilFirstHit: true);
+            Assert.That(combo.Judge(LabOrbElement.Earth, 7, 1d), Is.EqualTo(LabComboResult.None));
+            Assert.That(combo.WrongCount, Is.EqualTo(1u));
+            Assert.That(combo.LastWrongBy, Is.EqualTo(7ul));
+            Assert.That(combo.LastWrongElement, Is.EqualTo(LabOrbElement.Earth));
+            Assert.That(combo.LastWrongSlot, Is.Zero);
+            Assert.That(combo.Judge(LabOrbElement.Fire, 7, 2d), Is.EqualTo(LabComboResult.None));
+            Assert.That(combo.WrongCount, Is.EqualTo(1u), "A right colour is not a wrong one.");
+            Assert.That(combo.Judge(LabOrbElement.Metal, 9, 3d), Is.EqualTo(LabComboResult.WrongColor));
+            Assert.That(combo.WrongCount, Is.EqualTo(2u));
+            Assert.That(combo.LastWrongBy, Is.EqualTo(9ul));
+            Assert.That(combo.LastWrongElement, Is.EqualTo(LabOrbElement.Metal));
+            Assert.That(combo.LastWrongSlot, Is.EqualTo(1), "The second slot (Water) was the one missed.");
+            combo.Reset();
+            Assert.That(combo.WrongCount, Is.Zero);
+            Assert.That(combo.LastWrongElement, Is.EqualTo(LabOrbElement.None));
+        }
+
+        [Test]
         public void TheFirstComboIgnoresWrongColorsUntilItsFirstSlotIsHit()
         {
             // #695: Sample is Fire, Water, Water, Earth.
@@ -351,6 +417,12 @@ namespace C6Lab.Tests
             LabConfig config = Config(enabled: true);
             var model = new LabModel();
             model.Begin("combo-warning", new ulong[] { 10, 20, 30 }, 0d, config);
+            // Two coloured orbs ready before the warning; one is thrown just before it starts (still in the air when it begins).
+            var pool = new List<LabOrbState>();
+            int requests = 0;
+            LabOrbState early = Combine(model, 10, pool, ref requests, 16d);
+            LabOrbState held = Combine(model, 10, pool, ref requests, 16.1d);
+            Assert.That(model.TryLaunch(10, early.id, "before-warning-launch", 16.5d, out _, out string reason), Is.True, reason);
 
             LabSnapshot calm = model.Snapshot(16.9d);
             Assert.That(calm.comboNextAt, Is.EqualTo(20d), "The four slots still appear at First Start (20 s).");
@@ -367,11 +439,10 @@ namespace C6Lab.Tests
             Assert.That(new[] { received.comboWarningAt, received.comboNextAt }, Is.EqualTo(new[] { 17d, 20d }),
                 "Every device counts down from the same Host times.");
 
-            // A colored orb that lands during the warning is not judged.
-            var pool = new List<LabOrbState>();
-            int requests = 0;
-            LabOrbState early = Combine(model, 10, pool, ref requests, 18d);
-            Assert.That(model.TryLaunch(10, early.id, "warning-launch", 18d, out _, out string reason), Is.True, reason);
+            // #719 UT: nothing can be thrown at the gourd during the warning (so an early throw cannot land on the new combo).
+            Assert.That(model.TryLaunch(10, held.id, "warning-launch", 18d, out _, out reason), Is.False);
+            Assert.That(reason, Is.EqualTo("COMBO_HOLD"));
+            // A colored orb thrown before the warning that lands during it is not judged.
             Assert.That(model.ConfirmHit(early.id, 18d), Is.True);
             LabSnapshot afterHit = model.Snapshot(18d);
             Assert.That(afterHit.comboResult, Is.EqualTo(LabComboResult.None));
@@ -476,7 +547,7 @@ namespace C6Lab.Tests
         }
 
         private LabConfig Config(bool enabled, float firstStart = 20f, float timeLimit = 10f, bool throwerOnly = false,
-            float warning = 3f, bool forgiveFirst = false)
+            float warning = 3f, bool forgiveFirst = false, int hearts = 0)
         {
             var config = ScriptableObject.CreateInstance<LabConfig>();
             created.Add(config);
@@ -501,7 +572,9 @@ namespace C6Lab.Tests
             // so these go straight onto the asset fields; the model accepts them as before.
             Times(config, firstStart: firstStart, timeLimit: timeLimit);
             // #695: these rule tests fail the round's first combo on a wrong color, so its forgiving is off unless asked for.
-            JsonUtility.FromJsonOverwrite("{\"yaguangFirstComboForgive\":" + (forgiveFirst ? "true" : "false") + "}", config);
+            // #719: and without hearts (each wrong colour fails at once) unless a test asks for them.
+            JsonUtility.FromJsonOverwrite("{\"yaguangFirstComboForgive\":" + (forgiveFirst ? "true" : "false")
+                + ",\"yaguangComboHearts\":" + hearts + "}", config);
             return config;
         }
 

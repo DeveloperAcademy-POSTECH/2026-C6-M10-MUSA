@@ -1133,8 +1133,10 @@ namespace C6Lab
         [Tooltip("콤보 성공 야광귀 대사 크기 (Audio/YaguangComboClearedFirst, YaguangComboClearedSecond)")]
         [SerializeField, Range(0f, 1f)] private float yaguangComboClearedSoundVolume = .9f;
         [Header("야광귀 콤보 금옥 안내와 첫 콤보 봐주기 (#695, Inspector 전용)")]
-        [Tooltip("라운드 첫 콤보는 첫 칸을 맞힐 때까지 틀린 색을 실패 없이 무시한다 (첫 칸을 맞힌 뒤 틀린 색은 실패, 제한 시간은 그대로). Host 기준")]
+        [Tooltip("콤보마다 첫 칸을 맞힐 때까지 틀린 색을 실패 없이 무시한다 (#719부터 라운드 첫 콤보만이 아니라 모든 콤보. 첫 칸을 맞힌 뒤 틀린 색은 실패, 제한 시간은 그대로). Host 기준")]
         [SerializeField] private bool yaguangFirstComboForgive = true;
+        [Tooltip("#719 UT: 콤보마다 받는 하트 수. 틀린 색이 박에 맞을 때마다 하나씩 깨지고, 마지막 하나가 깨지면 실패 (3이면 세 번째 틀린 색에서 실패). 0이면 하트 없이 위 '첫 칸 전 봐주기'를 쓴다. Host 기준")]
+        [SerializeField, Range(0, 5)] private int yaguangComboHearts = 3;
         [Tooltip("콤보 예고 때 금옥 규칙 안내(Audio/YaguangComboGuideRule)를 라운드의 처음 몇 번 콤보까지 낼지 (0이면 끔, 1이면 첫 콤보만)")]
         [SerializeField, Range(0, 20)] private int yaguangComboGuideRuleCombos = 1;
         [Tooltip("규칙 안내 다음 콤보(기본 두 번째 콤보) 예고에서 금옥이 \"자.. 다들 준비 됐지?\"(Audio/YaguangComboGuideReady)를 말할지")]
@@ -1721,6 +1723,7 @@ namespace C6Lab
         public float YaguangComboClearedDelaySeconds => Mathf.Clamp(Finite(yaguangComboClearedDelaySeconds, .8f), 0f, 3f);
         public float YaguangComboClearedSoundVolume => Mathf.Clamp01(Finite(yaguangComboClearedSoundVolume, .9f));
         public bool YaguangFirstComboForgive => yaguangFirstComboForgive;
+        public int YaguangComboHearts => Mathf.Clamp(yaguangComboHearts, 0, 5);
         public int YaguangComboGuideRuleCombos => Mathf.Clamp(yaguangComboGuideRuleCombos, 0, 20);
         public float YaguangComboGuideFeedbackDelaySeconds => Mathf.Clamp(Finite(yaguangComboGuideFeedbackDelaySeconds, .3f), 0f, 2f);
         public float YaguangComboGuideRuleDelaySeconds => Mathf.Clamp(Finite(yaguangComboGuideRuleDelaySeconds, .9f), 0f, 3f);

@@ -8619,3 +8619,14 @@ main fbc943e8을 통합하며 VALIDATION 문서 끝의 독립 기록 추가 충�
 - 검사 범위: UI표현과 복귀버튼 캐시만변경하고 Scene전환/세션·물리·공유상태·게임판정·빌드설정 동작은 바꾸지 않아 전체 PlayMode는 실행하지 않았다. 전체Edit와 실제관람/클릭/모드 연결의 영향Play를선택했다. 새 Mac/iOS Player빌드·문제PC앱 재현·iPhone/iPad 화면은미검증이다.
 
 - PR 준비 시 최신 main `27caa38e`를 통합했다. 앞선 검증 커밋 `d3b46a16`과의 차이는 README 소개 문구뿐이며 런타임·에셋·검사·패키지·설정·환경은 같다. 저장소의 검사 결과 재사용 기준에 따라 위 통과 결과를 재사용했다. 독립 코드 리뷰에서 병합 차단 사항이 없고, 변경 7개 파일 외 Scene/Prefab/원본 에셋/설정 수정과 미해결 충돌은 없다.
+
+
+## 2026-11-13 — #719 야광귀 콤보 가이딩 (소리 없이 화면만 보고)
+
+기준 main `9be6d1f1` 위 `feat/#719-yaguang-combo-guide`, Unity Editor(macOS)에서 팀원이 실행했다. 비교 시점에 main에 새 커밋이 없어 병합 충돌은 없다. 공유 설정 개수·인덱스와 프로토콜 5704는 그대로다(새 스냅샷 필드 comboNextColors·comboWrong*은 옛 빌드가 무시하는 추가 필드).
+
+- 전체 EditMode 첫 실행 **2,394 PASS / 4 FAIL**(총 2,398, skip 0). 실패 4개는 모두 #719에서 의도한 변경을 옛 기대값이 따르지 못한 것이다: LabDeveloperConfigTests.GourdColorComboFieldsFormTheComboGroupAndStartOff(저장 에셋 예고 6초), LabGourdComboTests.TheWarningCountsDownBeforeTheFourSlotsAppearOnTime(예고 중 던지기 COMBO_HOLD 거절), GameSceneAssetTests.MenuScreens_HaveSavedEditableCanvasAndInput Home·Lobby(장면 DEV 패널 Setting164 값 4). 테스트 기대값과 두 메뉴 장면의 Setting164 값(6)을 고친 뒤 **Rerun Failed 4개 PASS**.
+- 새 테스트 LabGourdComboTests.EveryWrongColorIsRememberedForTheXMark는 첫 실행에서 통과했다.
+- 수정 뒤 전체 EditMode 재실행, PlayMode, 빌드, iOS 실기기·다중 기기 화면 확인은 이번 기록에서 실행하지 않았다. 화면 동작(다음 콤보 색 미리보기, 지금 칸 강조·똑딱 박자, 필요한 색 테두리, 틀린 색 X, 예고 중 던지기 막기, 섬광 보상 오색구슬 등장)은 팀원이 Editor 플레이로 보며 조정했다.
+- PR 준비 시 최신 main `3441e326`(#720 관람 복귀 배경)을 통합했다. 겹친 파일은 이 문서 끝의 기록 추가뿐이라 양쪽 기록을 모두 보존했다. #720은 Hapio 관람 UI만 바꿔 #719 콤보 코드와 겹치지 않는다.
+- 하트(콤보마다 3개) 추가와 main 통합 뒤 전체 EditMode **2,396 PASS / 7 FAIL**(총 2,403, skip 0). 새 테스트 LabGourdComboTests.ThreeHeartsLetTwoWrongColorsPassAndTheThirdFails·TheModelGivesEveryComboItsHearts를 포함한 콤보 테스트는 모두 통과했다. 실패 7개는 LabOrbSpriteDesignTests.SavedConfigConnectsEachKindToItsOriginalArt 결합 구슬 5종과 GameBattleUiAssetTests 2개로, 메모리의 LabConfig가 BattleOrbAppearance를 가리킨 #701 기록과 같은 현상이다. 저장 LabConfig.asset의 orbAppearance GUID는 변경 없음(이 브랜치의 에셋 차이는 comboWarningSeconds 6·yaguangComboHearts 3뿐). Unity를 재시작한 뒤 재실행해 통과했다. PlayMode·빌드·실기기는 이번에도 실행하지 않았다.

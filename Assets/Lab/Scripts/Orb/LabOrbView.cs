@@ -418,6 +418,19 @@ namespace C6Lab
 
         public bool FeverShown => rainbow != null && rainbow.Visible;
 
+        private LabOrbComboHint comboHint;
+        /// <summary>#719: a beating ring in the colour of the combo slot to hit now (only on a combined orb of that colour).</summary>
+        public void SetComboHint(bool shown, Color color)
+        {
+            if (comboHint == null)
+            {
+                if (!shown) return;
+                comboHint = LabOrbComboHint.Create(transform);
+            }
+            comboHint.Show(shown, visualRadius * LabOrbSpriteArt.SizeScaleFor(kind), color);
+        }
+        public bool ComboHintShown => comboHint != null && comboHint.Visible;
+
         private LabFiveColorSparkle fiveColor;
 
         /// <summary>
