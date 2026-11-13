@@ -19,14 +19,40 @@ namespace C6Lab
         /// <summary>
         /// sootPieces(비트: 1 북 / 2 서 / 4 남 / 8 동)가 그리는 조각 그림. 이어지지 않은 조합이면 북 조각 하나로 그린다.
         /// </summary>
-        public static Sprite SpriteFor(int pieces)
+        public static Sprite SpriteFor(int pieces) => SpriteFor(pieces, true);
+
+        /// <summary>
+        /// #724: ghost false leaves out the faint dashed outline of the missing part (the shards on the board and the pieces in
+        /// the empty orb: the empty orb itself shows where they go).
+        /// </summary>
+        public static Sprite SpriteFor(int pieces, bool ghost)
         {
             int start = LabModel.SootArcStart(pieces);
             if (start < 0 || pieces == LabModel.SootWholePieces) { pieces = 1; start = 0; }
-            if (cache.TryGetValue(pieces, out Sprite found) && found != null) return found;
-            Sprite made = Build(LabModel.SootPieceCount(pieces), start);
-            cache[pieces] = made;
+            int key = ghost ? pieces : pieces | 256;
+            if (cache.TryGetValue(key, out Sprite found) && found != null) return found;
+            Sprite made = Build(LabModel.SootPieceCount(pieces), start, ghost);
+            cache[key] = made;
             return made;
+        }
+
+        /// <summary>
+        /// #724: where the drawn piece sits in its picture, in half-widths from the centre (north piece: up). The board draws a
+        /// shard bigger and shifted by this so the piece itself sits on (and is as big as) the shard you touch.
+        /// </summary>
+        public static Vector2 Centroid(int pieces)
+        {
+            Vector2 sum = Vector2.zero;
+            int count = 0;
+            for (int q = 0; q < 4; q++)
+            {
+                if ((pieces & (1 << q)) == 0) continue;
+                float angle = (90f + 90f * q) * Mathf.Deg2Rad;
+                sum += new Vector2(Mathf.Cos(angle), Mathf.Sin(angle));
+                count++;
+            }
+            // A 90-degree slice of the disc has its centre of area about 0.6 of the radius out.
+            return count == 0 ? Vector2.zero : sum / count * (.6f * Disc);
         }
 
         private const float Disc = .94f;      // 동그라미 반지름 (그림 반 폭 기준)
@@ -40,7 +66,7 @@ namespace C6Lab
         private static readonly Color SeamGlow = new Color(.62f, .48f, .95f, 1f);
         private static readonly Color Ghost = new Color(.20f, .18f, .24f, 1f);
 
-        private static Sprite Build(int level, int turn)
+        private static Sprite Build(int level, int turn, bool ghost = true)
         {
             var texture = new Texture2D(Size, Size, TextureFormat.RGBA32, false)
             {
@@ -56,7 +82,10 @@ namespace C6Lab
             for (int px = 0; px < Size; px++)
             {
                 float x = (px + .5f) / Size * 2f - 1f, y = (py + .5f) / Size * 2f - 1f;
-                pixels[py * Size + px] = Pixel(x, y, start, span, level, turn, aa);
+                Color pixel = Pixel(x, y, start, span, level, turn, aa);
+                // #724: without the ghost, the missing part (drawn faint and dark) is left fully clear.
+                if (!ghost && pixel.a < .5f && pixel.r == Ghost.r && pixel.g == Ghost.g && pixel.b == Ghost.b) pixel = Color.clear;
+                pixels[py * Size + px] = pixel;
             }
             texture.SetPixels(pixels);
             texture.Apply(false, false);

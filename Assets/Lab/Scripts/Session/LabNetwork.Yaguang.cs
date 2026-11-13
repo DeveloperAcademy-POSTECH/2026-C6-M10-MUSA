@@ -64,6 +64,34 @@ namespace C6Lab
             foreach (Transform part in burst.GetComponentsInChildren<Transform>(true)) part.gameObject.layer = layer;
         }
 
+        /// <summary>
+        /// #724 UT: 내 판에 연기 파편이 있는 동안 판 가운데 검정 구슬 빈자리를 보여 주고, 빈자리에 들어간 조각을 채워 그린다.
+        /// </summary>
+        private readonly System.Collections.Generic.HashSet<string> sootAssembled =
+            new System.Collections.Generic.HashSet<string>(System.StringComparer.Ordinal);
+
+        private void SyncSootSocket(LabSnapshot snapshot)
+        {
+            if (board == null) return;
+            LabSootSocket existing = board.GetComponentInChildren<LabSootSocket>(true);
+            if (existing != null)
+            {
+                existing.HoldAssembly(JigwiSmokeWiping); // #724: the shards wait under the smoke until it is wiped away
+                if (existing.PieceArrived == null) existing.PieceArrived = count => NotifySootShardRevealed(1);
+            }
+            bool any = false;
+            int filled = 0;
+            foreach (LabOrbState orb in snapshot?.orbs ?? System.Array.Empty<LabOrbState>())
+            {
+                if (orb == null || orb.owner != LocalPlayerId || !orb.kind.IsSootShard()) continue;
+                any = true;
+                if (orb.sootSocketed) filled |= orb.sootPieces;
+            }
+            LabSootSocket socket = any ? LabSootSocket.For(board) : board.GetComponentInChildren<LabSootSocket>(true);
+            // #724 QA: the empty orb waits until the smoke over the board is wiped away (it showed through the smoke before).
+            if (socket != null) socket.Set(any && !JigwiSmokeWiping, filled);
+        }
+
         /// <summary>내가 던진 오색구슬이 박에 맞았다 (#329)</summary>
         public event System.Action LocalFiveColorHit;
         private readonly System.Collections.Generic.HashSet<string> knownFiveColorOrbs =

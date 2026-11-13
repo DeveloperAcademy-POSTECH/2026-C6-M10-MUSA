@@ -2339,10 +2339,11 @@ namespace C6Lab
             SyncJigwiRewardBoardPresentation();
             if (board == null || latest == null) return;
             NoticeFiveColorOrbs(latest);
+            SyncSootSocket(latest); // #724
             var current = new HashSet<string>();
             foreach (var orb in latest.orbs ?? Array.Empty<LabOrbState>())
             {
-                if (orb.owner != LocalPlayerId || orb.inFlight || jigwiMissionPurge.Cancels(orb.revision)
+                if (orb.owner != LocalPlayerId || orb.inFlight || orb.sootSocketed || jigwiMissionPurge.Cancels(orb.revision)
                     || jigwiSupplyRetirement.Cancels(orb)) continue;
                 current.Add(orb.id);
                 if (board.IsSnapshotSuppressed(orb.id)) continue;
@@ -2366,7 +2367,8 @@ namespace C6Lab
                     soot: orb.soot, sootPieces: orb.sootPieces, // #696 검정 구슬 / 연기 파편
                     // #696: shards just joined (or became the black orb) burst on the board where they met.
                     sootJoined: (orb.soot || LabModel.SootPieceCount(orb.sootPieces) >= 2)
-                        && latest.serverTime - orb.createdAt < LabOrbState.UnlockEffectWindowSeconds,
+                        && latest.serverTime - orb.createdAt < LabOrbState.UnlockEffectWindowSeconds
+                        && !(orb.soot && orb.origin == LabOrbOrigin.Gourd), // #724: the smoke's black orb bursts when its shards land
                     jigwiABScale: orb.jigwiABRadiusScale * (orb.jigwiTalismanReward ? LabJigwiWaterVolley.SizeScale : 1f) // #540 부적 구슬 1.5배
                         * (orb.soot ? LabModel.SootOrbSizeScale : 1f), // #696 검정 구슬 1.3배
                     // #540: an unfinished talisman's orbs show no A fire at all (they burn to ash in turn instead).
@@ -2378,6 +2380,9 @@ namespace C6Lab
                     stopAt: orb.stopAt);
                 view?.SetJigwiAsh(blaze, (float)LabModel.JigwiTalismanFailBlazeSeconds); // #540 burns to ash from the bottom up
                 if (fiveColorAppearing.Remove(orb.id)) PresentFiveColorAppear(view); // #719
+                if (orb.soot && orb.origin == LabOrbOrigin.Gourd && view != null && sootAssembled.Add(orb.id)
+                    && latest.serverTime - orb.createdAt < 3d)
+                    LabSootSocket.For(board).BeginAssembly(view, JigwiSmokeWiping); // #724 its shards fly together first
                 view?.SetJigwiSupplyWaterArt(!string.IsNullOrEmpty(orb.jigwiABSupplyEventId) || orb.jigwiTalismanReward,
                     latest.paused || GameStartHeld, special: !string.IsNullOrEmpty(orb.jigwiABSupplyEventId), // #509 특수 물구슬
                     talisman: orb.jigwiTalismanReward); // #540 부적 구슬

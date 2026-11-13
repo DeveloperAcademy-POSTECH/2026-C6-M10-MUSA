@@ -689,10 +689,55 @@ namespace C6Lab
             return -1;
         }
 
-        /// <summary>#696: 두 조각이 겹치지 않고, 붙이면 이어진 한 덩어리가 될 때만 붙는다 (북+남처럼 마주 보는 쪽은 안 붙는다).</summary>
+        /// <summary>
+        /// #724 UT: 두 파편 덩어리는 합쳐 네 쪽을 넘지 않으면 어떤 쪽끼리든 붙는다 (#696의 "이웃한 쪽끼리만"은 UT에서
+        /// "붙였는데 안 붙는다"로 읽혀 없앴다). 붙은 덩어리는 조각 수만큼 북부터 채운 모양이 된다 (<see cref="SootPiecesFor"/>).
+        /// </summary>
         public static bool SootPiecesFit(int first, int second) =>
             first > 0 && second > 0 && first < SootWholePieces && second < SootWholePieces
-            && (first & second) == 0 && SootArcStart(first | second) >= 0;
+            && SootPieceCount(first) + SootPieceCount(second) <= 4;
+
+        /// <summary>#724: count quarters as one piece filled from the north on (1 → 북, 2 → 북+서, 3 → 북+서+남, 4 → 검정 구슬).</summary>
+        public static int SootPiecesFor(int count) => (1 << Mathf.Clamp(count, 0, 4)) - 1;
+
+        /// <summary>#724: 판 가운데 검정 구슬 빈자리 (정규 좌표). 다 차면 검정 구슬이 여기서 생긴다.</summary>
+        public static readonly Vector2 SootSocketCenter = new Vector2(.5f, .52f);
+
+        /// <summary>
+        /// #724 UT: 탭한 연기 파편을 판 가운데 빈 구슬에 넣는다. 조각은 제 자리(북 조각은 위쪽)에 들어가고, 순서는 따지지 않는다.
+        /// 네 쪽이 차면 그 자리에서 검정 구슬이 된다.
+        /// 빈자리에 있는 조각은 판 위에 없고 아무 동작도 받지 않는다 (UsableBy).
+        /// </summary>
+        private bool SocketSootShard(ulong sender, LabOrbState shard, double now, out LabOrbState orb, out string reason)
+        {
+            LabOrbState socket = orbs.Values.FirstOrDefault(item => item.owner == sender && item.sootSocketed && item.kind.IsSootShard());
+            // #724 QA: each piece goes into its own place (a south shard fills the south). A piece already there (a second set
+            // of shards) takes the first free place instead.
+            int filled = socket != null ? socket.sootPieces : 0;
+            for (int q = 0; q < 4; q++)
+            {
+                if ((shard.sootPieces & (1 << q)) == 0) continue;
+                int bit = 1 << q;
+                if ((filled & bit) != 0)
+                    for (int free = 0; free < 4; free++) if ((filled & (1 << free)) == 0) { bit = 1 << free; break; }
+                filled |= bit;
+            }
+            orbs.Remove(shard.id);
+            if (socket != null) orbs.Remove(socket.id);
+            bool whole = (filled & SootWholePieces) == SootWholePieces;
+            orb = new LabOrbState
+            {
+                id = NewOrbId(), owner = sender, element = LabOrbElement.None,
+                kind = whole ? LabOrbKind.Combined : LabOrbKind.SootShard, sootPieces = whole ? 0 : filled,
+                sootSocketed = !whole, soot = whole, fiveColor = whole,
+                origin = LabOrbOrigin.Combined, originOwner = sender, x = SootSocketCenter.x, y = SootSocketCenter.y,
+                createdAt = now, expiresAt = now + FiveColorOrbLifetimeSeconds, revision = ++revision
+            };
+            orbs.Add(orb.id, orb);
+            reason = whole ? "SOOT_ORB" : "SOOT_SOCKETED";
+            orb = orb.Copy();
+            return true;
+        }
 
         /// <summary>
         /// #696: 이웃한 연기 파편 둘을 합친다. 쪽(sootPieces)을 모으고, 네 쪽이 다 모이면 검정 구슬(soot, 오색구슬처럼 넓게 먹색으로 칠함)이 된다.
@@ -701,7 +746,7 @@ namespace C6Lab
             double now, out LabOrbState orb, out string reason)
         {
             orbs.Remove(first.id); orbs.Remove(second.id);
-            int pieces = first.sootPieces | second.sootPieces;
+            int pieces = SootPiecesFor(SootPieceCount(first.sootPieces) + SootPieceCount(second.sootPieces));
             bool whole = pieces == SootWholePieces;
             Vector2 motion = Vector2.ClampMagnitude(velocity, rules.MaximumMotionSpeed);
             orb = new LabOrbState
