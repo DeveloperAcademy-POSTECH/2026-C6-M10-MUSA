@@ -2377,6 +2377,7 @@ namespace C6Lab
                     arrival: orb.kind == LabOrbKind.Bomb && orb.JustArrived(latest.serverTime) ? orb.arrival : LabDrumArrival.None,
                     stopAt: orb.stopAt);
                 view?.SetJigwiAsh(blaze, (float)LabModel.JigwiTalismanFailBlazeSeconds); // #540 burns to ash from the bottom up
+                if (fiveColorAppearing.Remove(orb.id)) PresentFiveColorAppear(view); // #719
                 view?.SetJigwiSupplyWaterArt(!string.IsNullOrEmpty(orb.jigwiABSupplyEventId) || orb.jigwiTalismanReward,
                     latest.paused || GameStartHeld, special: !string.IsNullOrEmpty(orb.jigwiABSupplyEventId), // #509 특수 물구슬
                     talisman: orb.jigwiTalismanReward); // #540 부적 구슬
