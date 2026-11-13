@@ -145,6 +145,12 @@ namespace C6Lab.Tests
             Assert.That(bar.BlueGaugeText, Is.EqualTo("피버 6/15"));
             Assert.That(bar.RedGauge, Is.EqualTo(.5f).Within(.001f), "During a fever the gauge runs down its time.");
             Assert.That(bar.RedGaugeText, Is.EqualTo("피버! 4초"));
+            // #717: once the battle is over ("경기 종료!") the fever stays where it was instead of running out.
+            snapshot.phase = LabPhase.Victory; snapshot.serverTime = 23d;
+            bar.Present(snapshot, LabTeam.Blue, null, 15);
+            Assert.That(bar.RedGauge, Is.EqualTo(.5f).Within(.001f));
+            Assert.That(bar.RedGaugeText, Is.EqualTo("피버! 4초"));
+            snapshot.phase = LabPhase.Playing; snapshot.serverTime = 20d;
             Assert.That(bar.NumbersText, Is.Empty, "The battle bar shows no numbers.");
             bar.Present(snapshot, LabTeam.Blue, null, 0);
             Assert.That(bar.GaugesShown, Is.False, "No fever setting, no gauges.");

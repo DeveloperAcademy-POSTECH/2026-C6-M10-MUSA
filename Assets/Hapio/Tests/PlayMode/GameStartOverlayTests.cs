@@ -47,6 +47,34 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
+        public IEnumerator TheTerritoryEndSaysGameOverInCrimsonWithACreamEdgeAndBlocksTouches()
+        {
+            var parent = new GameObject("Territory end overlay test owner");
+            try
+            {
+                GameStartOverlay view = GameStartOverlay.Create(parent.transform);
+                view.ShowFinished();
+                Assert.That(view.DisplayText, Is.EqualTo("경기 종료!"));
+                Assert.That(view.ShowsFinished && view.Visible && view.BlocksInput, Is.True,
+                    "Nothing on the battle screen can be pressed until the result opens (#717).");
+                Assert.That((Color32)view.CaptionColor, Is.EqualTo(new Color32(0x8A, 0x12, 0x06, 0xFF)), "The design's crimson.");
+                Assert.That((Color32)view.CaptionOutlineColor, Is.EqualTo(new Color32(0xFC, 0xE8, 0xC8, 0xFF)),
+                    "The design's cream edge.");
+                // The other captions keep their plain saved look.
+                view.ShowStarted();
+                Assert.That(view.ShowsFinished, Is.False);
+                Assert.That(view.CaptionOutlineColor, Is.EqualTo(Color.clear));
+                Assert.That((Color32)view.CaptionColor, Is.Not.EqualTo(new Color32(0x8A, 0x12, 0x06, 0xFF)));
+                view.ShowFinished();
+                view.Hide();
+                Assert.That(view.Visible || view.BlocksInput || view.ShowsFinished, Is.False);
+                yield return null;
+            }
+            finally { UnityEngine.Object.Destroy(parent); }
+            yield return null;
+        }
+
+        [UnityTest]
         public IEnumerator SessionOwnedOverlaySurvivesTheBattleSceneLoadBoundary()
         {
             var owner = new GameObject("Persistent start overlay test owner");

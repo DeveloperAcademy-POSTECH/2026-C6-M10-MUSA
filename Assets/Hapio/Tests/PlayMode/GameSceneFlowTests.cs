@@ -509,6 +509,49 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
+        public IEnumerator TerritoryTimeUpSaysGameOverWithTheWhistleThenOpensItsResultWithoutAPaintedGourd()
+        {
+            session.StartSolo(GameMode.Territory);
+            yield return WaitPlaying(1);
+            int whistles = session.TerritoryWhistleCount;
+            Assert.That(session.TerritoryEndShown, Is.False);
+            // Bring the time limit to a second from now on the model's own clock (a fixture; the clock itself is not advanced).
+            LabModel model = Model();
+            typeof(LabModel).GetField("deadline", BindingFlags.NonPublic | BindingFlags.Instance)
+                .SetValue(model, ModelTime(model) + 1d);
+            yield return Until(() => session.TerritoryEndShown, "The time-up shows its end on this device (#717).");
+            double endAt = Time.realtimeSinceStartupAsDouble;
+            Assert.That(network.Snapshot.phase, Is.EqualTo(LabPhase.Victory));
+            Assert.That(network.Snapshot.paintCoveredCount, Is.LessThan(network.Snapshot.paintCellCount),
+                "A time-up gourd is not completely painted, so it has no completed picture to wait for.");
+            Assert.That(SceneManager.GetActiveScene().path, Is.EqualTo(GameScenePaths.Battle));
+            yield return null;
+            Assert.That(session.StartOverlay.ShowsFinished, Is.True);
+            Assert.That(session.StartOverlay.DisplayText, Is.EqualTo(GameStartOverlay.FinishedText));
+            Assert.That(session.StartOverlay.BlocksInput, Is.True, "Nothing can be pressed until the result opens.");
+            Assert.That(network.board.UiInputBlocked, Is.True, "No drag, throw or pass under a finger either.");
+            Assert.That(session.TerritoryWhistleCount, Is.EqualTo(whistles + 1), "One whistle, on every device.");
+
+            yield return Until(() => SceneManager.GetActiveScene().path == GameScenePaths.StageResult && !session.IsLoadingScene,
+                "The result opens right after the whistle.");
+            double opened = Time.realtimeSinceStartupAsDouble - endAt;
+            Assert.That(opened, Is.GreaterThanOrEqualTo(session.TerritoryEndHoldSeconds - .1d), "The whistle has its time first.");
+            Assert.That(opened, Is.LessThan(session.TerritoryEndHoldSeconds + 3d),
+                "It no longer waits out the result budget for a completed gourd that never comes.");
+            Assert.That(session.TerritoryWhistleCount, Is.EqualTo(whistles + 1), "Only once.");
+            yield return null;
+            Assert.That(session.StartOverlay.Visible, Is.False, "The result replaces \"경기 종료!\".");
+            Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.Completed));
+            Assert.That(session.ResultSnapshot.teamTerritory, Is.True);
+            Assert.That(session.PreviewTexture, Is.Null, "A gourd that is not completely painted has no 박 확인 picture.");
+            GameTerritoryResultView territory = Object.FindFirstObjectByType<GameScreen>().territoryView;
+            yield return Until(() => territory.gameObject.activeInHierarchy, "The team result shows.");
+            yield return Until(() => territory.table.homeButton.IsInteractable(), "Exit is available on the result.");
+            territory.table.homeButton.onClick.Invoke();
+            yield return WaitHome();
+        }
+
+        [UnityTest]
         public IEnumerator TerritoryDeveloperSoloUsesDesignedResultsAndReturnsHomeAfterViewingTheGourd()
         {
             session.StartSolo(GameMode.Territory);
