@@ -81,7 +81,7 @@ Apple Developer Academy @ POSTECH
 
 | Norton | Yetii | Jess | Fura | Gigi | Ssu |
 | :-: | :-: | :-: | :-: | :-: | :-: |
-| Game Developer & Project Manager  | Game Developer & Art | Game Developer & Sound | Game Developer & Game Director  |  Game Developer & Art | Game Developer & Art |
+| Game Developer & Project Manager  | Game Scenario Writer & Game Artist | Game Developer & Sound | Game Developer & Game Director  |  Game Developer & Art | Game Developer & Art |
 
 ---
 
