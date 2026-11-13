@@ -56,3 +56,5 @@
 - 다음 스테이지·로비·홈·종료 전에는 작업을 취소하고 사본/재질/GPU 자원을 해제한다. 공유 기록은 Network 소유이므로 준비 작업이 직접 폐기하지 않는다. 완성 자료가 이미 남아 있는 최종 연결 종료와 아직 못 받은 자료가 사라진 경우를 구분한다.
 
 연결 지도: `GameSession.GourdViewer.cs`가 준비 상태와 수명을 관리하고 `GameSession.cs`가 Victory/Scene 전환에 연결한다. `LabGourdPreviewPreparation`은 Battle과 독립적인 재생, `LabGourdResultPreview`는 독립 모델·지도·카메라/출력의 소유를 담당한다. 기존 회전·확대·리셋·복귀와 #720 대체 배경은 유지한다. 실제 검사 범위와 실기기 확인 여부는 `docs/VALIDATION.md`의 #725 기록을 따른다.
+
+최신 종료 흐름(#717/#721)과의 통합에서는 `ResultNeedsPreview`를 공통 조건으로 쓴다. 시간 종료 때 완전히 칠해지지 않은 땅따먹기는 관람 준비 없이 Disabled로 결과를 표시하고, 종료 문구/호루라기의 기존 대기 뒤에 결과로 이동한다. Story의 준비 중 작업 인계는 그 대기 후 Battle 참조 해제 직전에 한다.
