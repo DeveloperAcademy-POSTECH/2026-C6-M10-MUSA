@@ -656,7 +656,7 @@ namespace C6Lab
         }
 
         /// <summary>#696: 파편이 판 가운데에서 얼마나 멀리 흩어지는지 (판 너비/높이 비율). 서로 끌어다 붙여야 할 만큼 멀리.</summary>
-        public const float JigwiSootShardSpreadX = .32f, JigwiSootShardSpreadY = .27f;
+        public const float JigwiSootShardSpreadX = .39f, JigwiSootShardSpreadY = .34f; // #724 QA: farther apart (was .32 / .27)
 
         /// <summary>#696: 검정 구슬은 보통 결합 구슬보다 이만큼 크다 (판 위 / 날아갈 때).</summary>
         public const float SootOrbSizeScale = 1.3f;

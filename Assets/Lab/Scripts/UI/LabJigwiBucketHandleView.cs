@@ -748,13 +748,17 @@ namespace C6Lab
             PlaceScreenRect(steam.rectTransform, board);
             if (!steam.gameObject.activeSelf) steam.gameObject.SetActive(true);
             float fadeIn = Mathf.Clamp01((t - steamAt) / .5f);
-            float fadeOut = steamClearedAt >= 0f ? 1f - Mathf.Clamp01((t - steamClearedAt) / .4f) : 1f;
+            // #724 UT: when it counts as wiped the rest of the smoke is blown away at once: it swells outward and thins out.
+            float blown = steamClearedAt >= 0f ? Mathf.Clamp01((t - steamClearedAt) / ClearBlowSeconds) : 0f;
+            float fadeOut = 1f - blown * blown * (3f - 2f * blown);
             WipeGauge = WipedShare;
             steam.color = new Color(SmokeGrey, SmokeGrey * .98f, SmokeGrey * .96f, fadeIn * fadeOut);
+            steam.rectTransform.localScale = Vector3.one * (1f + .45f * (1f - (1f - blown) * (1f - blown)));
+            DriveWipePuffs(board, t);
             if (steamClearedAt >= 0f)
             {
                 RevealSootShards(true); // #713: whatever was still hidden shows as the smoke lifts
-                if (fadeOut <= 0f) EndSteam();
+                if (fadeOut <= 0f && t - steamClearedAt >= ClearPuffSeconds) EndSteam(); // #724 after the blown puffs are gone
                 Show(steamHand, false);
                 // The full ring flashes and swells away with the smoke.
                 float burst = Mathf.Clamp01((t - steamClearedAt) / .4f);
@@ -767,6 +771,7 @@ namespace C6Lab
                 lastPointer = screen; touched = true;
                 Vector2 uv = new Vector2((screen.x - board.xMin) / board.width, (screen.y - board.yMin) / board.height);
                 if (rubbing) Wipe(lastRub, uv, board); else Wipe(uv, uv, board);
+                if (rubbing) EmitWipePuffs(lastRub, uv, board, t);
                 lastRub = uv; rubbing = true;
             }
             else rubbing = false;
@@ -891,6 +896,7 @@ namespace C6Lab
             if (steamLeft <= steamClearLeft)
             {
                 steamClearedAt = Time.unscaledTime;
+                BlowAwayPuffs(Time.unscaledTime);
                 if (source != null) source.RequestJigwiSmokeWiped(steamRound); // #713: everyone wiped = the smoke is over
                 if (source != null) LabHaptics.PlayDirect(source.config, LabHapticStyle.Medium, .7f);
                 Play(clearSoundFolder, clearVolume);
@@ -934,10 +940,105 @@ namespace C6Lab
             return n > 0 ? sum / n : 1f;
         }
 
+        // ---------- #724 UT: smoke scatters from the fingertip, and is blown away at once when wiped ----------
+        public const float ClearBlowSeconds = .55f, WipePuffSeconds = .5f, ClearPuffSeconds = .7f;
+        private const int WipePuffCount = 18, ClearPuffCount = 12;
+        private Image[] wipePuffs;
+        private readonly Vector2[] wipePuffFrom = new Vector2[WipePuffCount + ClearPuffCount], wipePuffVelocity = new Vector2[WipePuffCount + ClearPuffCount];
+        private readonly float[] wipePuffBorn = new float[WipePuffCount + ClearPuffCount], wipePuffSize = new float[WipePuffCount + ClearPuffCount];
+        private int nextWipePuff;
+        private float lastWipePuffAt = float.NegativeInfinity;
+        /// <summary>Smoke puffs flying off now (tests and checks).</summary>
+        public int WipePuffsShown { get; private set; }
+
+        private void EnsureWipePuffs()
+        {
+            if (wipePuffs != null || steam == null) return;
+            wipePuffs = new Image[WipePuffCount + ClearPuffCount];
+            int above = steam.transform.GetSiblingIndex() + 1;
+            for (int i = 0; i < wipePuffs.Length; i++)
+            {
+                wipePuffs[i] = NewImage("Jigwi Smoke Wipe Puff " + i, Puff(), root);
+                wipePuffs[i].transform.SetSiblingIndex(above + i); // over the smoke, under the hand and the ring
+                wipePuffs[i].gameObject.SetActive(false);
+                wipePuffBorn[i] = float.NegativeInfinity;
+            }
+        }
+
+        /// <summary>A rubbing finger moved from a to b (0~1 of the board): a couple of puffs flick out sideways from the fingertip.</summary>
+        private void EmitWipePuffs(Vector2 a, Vector2 b, Rect board, float t)
+        {
+            EnsureWipePuffs();
+            if (wipePuffs == null || t - lastWipePuffAt < .035f) return;
+            Vector2 move = new Vector2((b.x - a.x) * board.width, (b.y - a.y) * board.height);
+            if (move.sqrMagnitude < 4f) return;
+            lastWipePuffAt = t;
+            Vector2 tip = new Vector2(board.xMin + b.x * board.width, board.yMin + b.y * board.height);
+            Vector2 dir = move.normalized, side = new Vector2(-dir.y, dir.x);
+            for (int k = 0; k < 2; k++)
+            {
+                int i = nextWipePuff; nextWipePuff = (nextWipePuff + 1) % WipePuffCount;
+                float sign = k == 0 ? 1f : -1f;
+                wipePuffFrom[i] = tip;
+                wipePuffVelocity[i] = (side * sign * UnityEngine.Random.Range(.55f, 1f) + dir * UnityEngine.Random.Range(.1f, .5f))
+                    * board.width * UnityEngine.Random.Range(.35f, .55f);
+                wipePuffSize[i] = board.width * UnityEngine.Random.Range(.07f, .11f);
+                wipePuffBorn[i] = t;
+            }
+        }
+
+        /// <summary>The smoke counts as wiped: big puffs burst from all over the screen and fly off past the edges.</summary>
+        private void BlowAwayPuffs(float t)
+        {
+            EnsureWipePuffs();
+            if (wipePuffs == null) return;
+            Rect board = new Rect(0f, 0f, Screen.width, Screen.height);
+            Vector2 middle = board.center;
+            for (int k = 0; k < ClearPuffCount; k++)
+            {
+                int i = WipePuffCount + k;
+                float angle = (k + UnityEngine.Random.Range(-.3f, .3f)) / ClearPuffCount * Mathf.PI * 2f;
+                Vector2 dir = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle));
+                wipePuffFrom[i] = middle + Vector2.Scale(dir, new Vector2(board.width * .28f, board.height * .3f));
+                wipePuffVelocity[i] = dir * board.height * UnityEngine.Random.Range(.7f, 1.1f);
+                wipePuffSize[i] = board.width * UnityEngine.Random.Range(.35f, .55f);
+                wipePuffBorn[i] = t;
+            }
+        }
+
+        private void DriveWipePuffs(Rect board, float t)
+        {
+            if (wipePuffs == null) { WipePuffsShown = 0; return; }
+            int shown = 0;
+            for (int i = 0; i < wipePuffs.Length; i++)
+            {
+                bool clear = i >= WipePuffCount;
+                float life = clear ? ClearPuffSeconds : WipePuffSeconds;
+                float age = t - wipePuffBorn[i];
+                bool on = age >= 0f && age < life;
+                if (wipePuffs[i].gameObject.activeSelf != on) wipePuffs[i].gameObject.SetActive(on);
+                if (!on) continue;
+                shown++;
+                float u = age / life;
+                // Flicked off fast, slowing like smoke; it grows and thins as it goes.
+                float travel = (1f - (1f - u) * (1f - u)) * life;
+                Vector2 at = wipePuffFrom[i] + wipePuffVelocity[i] * travel;
+                float size = wipePuffSize[i] * Mathf.Lerp(.6f, clear ? 1.6f : 1.5f, u);
+                PlaceScreenRect(wipePuffs[i].rectTransform, new Rect(at.x - size * .5f, at.y - size * .5f, size, size));
+                wipePuffs[i].rectTransform.localEulerAngles = new Vector3(0f, 0f, (i * 53f + u * 90f) % 360f);
+                float alpha = (clear ? .85f : .6f) * (1f - u) * Mathf.Clamp01(u * 8f);
+                wipePuffs[i].color = new Color(SmokeGrey, SmokeGrey * .98f, SmokeGrey * .96f, alpha);
+            }
+            WipePuffsShown = shown;
+        }
+
         private void EndSteam()
         {
             steamOn = false; rubbing = false;
             if (steam != null && steam.gameObject.activeSelf) steam.gameObject.SetActive(false);
+            if (steam != null) steam.rectTransform.localScale = Vector3.one;
+            if (wipePuffs != null) foreach (Image puff in wipePuffs) if (puff != null) puff.gameObject.SetActive(false);
+            WipePuffsShown = 0;
             Show(steamHand, false);
             WipeGauge = 0f;
             Show(ringBack, false); Show(ringFill, false);
