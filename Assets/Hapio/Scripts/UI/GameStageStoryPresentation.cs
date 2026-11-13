@@ -44,6 +44,7 @@ namespace Hapio
         }
         private Coroutine pendingFinish;
         private StoryResultActions actions;
+        private string viewerReadyCaption;
         public bool IsPresenting => mode != Mode.None;
         public bool IsShowingOverall => showingOverall;
         public bool IsLocalStoryComplete => resultActionsReady && (mode == Mode.ReadyToAdvance || mode == Mode.FailureDashboard);
@@ -58,6 +59,8 @@ namespace Hapio
             StopPresentation();
             UnbindControls();
             screen = owner; session = game; initialized = true;
+            if (viewerReadyCaption == null && viewerButton != null)
+                viewerReadyCaption = viewerButton.GetComponentInChildren<Text>(true)?.text;
             if (player != null)
             {
                 player.playOnStart = false;
@@ -329,6 +332,7 @@ namespace Hapio
             // The sealed gourd stays reachable from the seal card's 봉인 박 둘러보기.
             bool inspect = review && !authoredClear && !HasAction("InspectGourd");
             Show(viewerButton, inspect); Set(viewerButton, inspect && !blocked && session.PreviewTexture != null);
+            Label(viewerButton, GameScreen.ViewerButtonCaption(session, viewerReadyCaption));
             bool skip = player.IsPlaying && (mode == Mode.AfterStage || mode == Mode.Failure || mode == Mode.Ending)
                 && !SkipHiddenOnThisCut;
             Show(skipButton, skip); Set(skipButton, skip && !blocked);
@@ -373,7 +377,9 @@ namespace Hapio
                 action.button.gameObject.SetActive(true);
                 action.button.interactable = interactable;
                 if (action.caption == null) continue;
-                action.caption.text = action.method == "Retry" && !session.Network.IsHost ? "방장이 재도전" : action.originalCaption;
+                action.caption.text = action.method == "InspectGourd"
+                    ? GameScreen.ViewerButtonCaption(session, action.originalCaption)
+                    : action.method == "Retry" && !session.Network.IsHost ? "방장이 재도전" : action.originalCaption;
                 Color color = action.originalColor;
                 color.a *= interactable ? 1 : .45f;
                 action.caption.color = color;

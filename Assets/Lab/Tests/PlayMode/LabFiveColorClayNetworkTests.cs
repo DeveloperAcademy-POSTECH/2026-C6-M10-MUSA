@@ -57,7 +57,11 @@ namespace C6Lab.Tests
             Assert.That(network.StartDeveloperSolo(), Is.True, network.Notice);
             yield return null;
             Assert.That(network.IsHost, Is.True);
+            AssertNoLegacyFiveColorBursts();
             Assert.That(network.VfxLabGiveFiveColorOrbs(1), Is.EqualTo(1));
+            yield return null; // #719 draws its allowed reward-spawn dust before testing the contact.
+            var rewardSpawnDust = new HashSet<LabFiveColorSparkle>(Object.FindObjectsByType<LabFiveColorSparkle>(FindObjectsSortMode.None)
+                .Where(item => item.name == "Five Color Dust Burst"));
             LabOrbState orb = network.Snapshot.orbs.Single(item => item.fiveColor);
             Assert.That(orb.element, Is.EqualTo(LabOrbElement.None), "Exercise the real reward, not an elemental stand-in.");
             Assert.That(orb.kind, Is.EqualTo(LabOrbKind.Combined));
@@ -96,14 +100,14 @@ namespace C6Lab.Tests
             Assert.That(pool.ActiveImpactCount, Is.EqualTo(1));
             AssertTint(pool.transform.Find("Impact 0/Contact squash").GetComponent<MeshRenderer>(), contact.FiveColorAge);
             Assert.That(rewardHits, Is.EqualTo(1), "The thrower's dedicated sound and haptic event still fires.");
-            AssertNoLegacyFiveColorBursts();
+            AssertNoLegacyFiveColorBursts(rewardSpawnDust);
             Invoke("OnProjectileResolved", contact);
             for (int step = 0; step < 3; step++) yield return new WaitForFixedUpdate();
             Assert.That(receipts, Is.EqualTo(1));
             Assert.That(hits, Is.EqualTo(1), "A repeated Host callback cannot confirm the consumed reward twice.");
             Assert.That(rewardHits, Is.EqualTo(1));
             Assert.That(pool.ActiveImpactCount, Is.EqualTo(1));
-            AssertNoLegacyFiveColorBursts();
+            AssertNoLegacyFiveColorBursts(rewardSpawnDust);
         }
 
         [UnityTest]
@@ -136,7 +140,8 @@ namespace C6Lab.Tests
             Vector3 normal = hitbox.forward, incoming = -normal * 10f;
             var contact = new LabProjectileResult(null, 0, LabProjectileHitKind.Monster, point,
                 .3f, 0f, 1f, incoming, hitNormal: normal, visualDiameter: .27f);
-            Invoke("OnPredictedShotContact", 19L, contact, LabOrbElement.None, 20, 1f, true, false, false);
+            // #713 added an optional soot flag; reflection must still supply its ninth argument.
+            Invoke("OnPredictedShotContact", 19L, contact, LabOrbElement.None, 20, 1f, true, false, false, false);
             Assert.That(hits, Is.EqualTo(1));
             Assert.That(pool.ActiveImpactCount, Is.EqualTo(1));
             Assert.That(rewardHits, Is.Zero, "Dedicated reward feedback waits for Host confirmation.");
@@ -181,11 +186,13 @@ namespace C6Lab.Tests
             Assert.That(network.Snapshot.paintCoveredCount, Is.Zero, "Client feedback never performs Host paint adjudication.");
         }
 
-        private static void AssertNoLegacyFiveColorBursts()
+        private static void AssertNoLegacyFiveColorBursts(ISet<LabFiveColorSparkle> existingRewardDust = null)
         {
             Assert.That(Object.FindObjectsByType<LabFiveColorSparkle>(FindObjectsSortMode.None)
-                .Where(item => item.name == "Five Color Sparkle Burst" || item.name == "Five Color Dust Burst"),
-                Is.Empty, "Five-color hits use the common clay contact without legacy billboard overlays.");
+                .Where(item => (item.name == "Five Color Sparkle Burst" || item.name == "Five Color Dust Burst")
+                    && !(item.name == "Five Color Dust Burst" && existingRewardDust != null
+                        && existingRewardDust.Contains(item))),
+                Is.Empty, "Five-color contacts must not create a legacy burst; only the exact pre-contact #719 reward dust may remain.");
         }
 
         private void PrepareClient()
