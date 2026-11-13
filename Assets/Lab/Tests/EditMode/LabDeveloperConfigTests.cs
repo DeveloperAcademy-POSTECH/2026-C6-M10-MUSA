@@ -1479,11 +1479,12 @@ namespace C6Lab.Tests
 
             LabConfig authored = Resources.Load<LabConfig>("LabConfig");
             Assert.That(authored, Is.Not.Null);
-            foreach (LabConfig source in new[] { config, authored })
+            // #719 UT: the authored asset slows the count (넷 셋 둘 하나) to a 6-second warning; the code default stays 4.
+            foreach ((LabConfig source, float warningSeconds) in new[] { (config, 4f), (authored, 6f) })
                 Assert.That(source.CaptureDeveloperValues().Skip(155).Take(10),
-                    Is.EqualTo(new[] { 0f, 50f, 60f, 15f, 15f, .1f, 0f, 15f, 2.5f, 4f }),
+                    Is.EqualTo(new[] { 0f, 50f, 60f, 15f, 15f, .1f, 0f, 15f, 2.5f, warningSeconds }),
                     "By default the combo is off (#266); once turned on it comes first at 50 s, every 60 s, 15 s to clear, the whole team shrinks "
-                    + "to 0.1x or grows to 2.5x for 15 seconds, and a 4-second warning (one yaguang count a second) comes first.");
+                    + "to 0.1x or grows to 2.5x for 15 seconds, and a warning (4 s by code, 6 s authored) comes first.");
 
             float[] values = config.CaptureDeveloperValues();
             float[] before = (float[])values.Clone();

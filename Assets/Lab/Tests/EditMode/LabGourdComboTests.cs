@@ -374,6 +374,12 @@ namespace C6Lab.Tests
             LabConfig config = Config(enabled: true);
             var model = new LabModel();
             model.Begin("combo-warning", new ulong[] { 10, 20, 30 }, 0d, config);
+            // Two coloured orbs ready before the warning; one is thrown just before it starts (still in the air when it begins).
+            var pool = new List<LabOrbState>();
+            int requests = 0;
+            LabOrbState early = Combine(model, 10, pool, ref requests, 16d);
+            LabOrbState held = Combine(model, 10, pool, ref requests, 16.1d);
+            Assert.That(model.TryLaunch(10, early.id, "before-warning-launch", 16.5d, out _, out string reason), Is.True, reason);
 
             LabSnapshot calm = model.Snapshot(16.9d);
             Assert.That(calm.comboNextAt, Is.EqualTo(20d), "The four slots still appear at First Start (20 s).");
@@ -390,11 +396,10 @@ namespace C6Lab.Tests
             Assert.That(new[] { received.comboWarningAt, received.comboNextAt }, Is.EqualTo(new[] { 17d, 20d }),
                 "Every device counts down from the same Host times.");
 
-            // A colored orb that lands during the warning is not judged.
-            var pool = new List<LabOrbState>();
-            int requests = 0;
-            LabOrbState early = Combine(model, 10, pool, ref requests, 18d);
-            Assert.That(model.TryLaunch(10, early.id, "warning-launch", 18d, out _, out string reason), Is.True, reason);
+            // #719 UT: nothing can be thrown at the gourd during the warning (so an early throw cannot land on the new combo).
+            Assert.That(model.TryLaunch(10, held.id, "warning-launch", 18d, out _, out reason), Is.False);
+            Assert.That(reason, Is.EqualTo("COMBO_HOLD"));
+            // A colored orb thrown before the warning that lands during it is not judged.
             Assert.That(model.ConfirmHit(early.id, 18d), Is.True);
             LabSnapshot afterHit = model.Snapshot(18d);
             Assert.That(afterHit.comboResult, Is.EqualTo(LabComboResult.None));
