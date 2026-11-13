@@ -43,6 +43,8 @@ namespace C6Lab
         /// <summary>#719: flash-reward five-colour orbs not yet drawn on my board; they pop in (grow + five-colour dust).</summary>
         private readonly System.Collections.Generic.HashSet<string> fiveColorAppearing =
             new System.Collections.Generic.HashSet<string>(System.StringComparer.Ordinal);
+        /// <summary>#719: a flash-reward five-colour orb just started growing in on my board (its hit sound rings, LabFlashRewardSound).</summary>
+        public event System.Action FiveColorOrbAppeared;
         /// <summary>#719: how long a flash-reward five-colour orb takes to grow in on its spot.</summary>
         public const float FiveColorAppearSeconds = .5f;
 
@@ -54,6 +56,7 @@ namespace C6Lab
         {
             if (view == null || !view.isActiveAndEnabled) return;
             view.PlaySpawnPop(Vector3.zero, 0f, FiveColorAppearSeconds);
+            FiveColorOrbAppeared?.Invoke();
             float radius = config != null ? config.OrbRadius : .3f;
             LabFiveColorSparkle burst = LabFiveColorSparkle.DustBurst(view.transform.position, radius);
             if (burst == null) return;
