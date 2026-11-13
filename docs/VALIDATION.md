@@ -8604,3 +8604,27 @@ main `e3108459`의 #712(칠용 뚜껑 법선 공유와3개 LidPaint 메시)을 �
 ## 2026-11-12 — #711 main 병합 충돌 해결
 
 main fbc943e8을 통합하며 VALIDATION 문서 끝의 독립 기록 추가 충돌을 양쪽 보존으로 해결했다. 자동 병합된 Battle 씬은 Stage2 하위591개 블록이 작업 브랜치와 같고 Stage3 하위710개 블록이 main과 같은 것을 정적 비교했다. 씬 object ID 중복0, 새 미해결 GUID0, 충돌 표식0을 확인했다. 기존 패키지 GUID는 프로젝트 에셋 GUID 검사에서 제외했다. main의 시연/법선 수정과 기존 Stage2 폴리싱을 함께 보존했다. 이 병합본에서 Unity 컴파일/실행 검사는 재실행하지 않았으며 앞선 PASS 기록과 구분한다.
+
+## 2026-11-13 — #718 북 넘기기 안내와 스태미나 부족 시 조합 영역 흔들림
+
+### 변경
+
+- 북 넘기기 안내 (`GameDrumPassHint`, 튜토리얼이 아닌 모든 전투에 `GameBattleBindings`가 붙임):
+  - 북이 내 판에 온 뒤 8초(Inspector `hintAfterSeconds`) 동안 넘기지 않으면 튜토리얼 4·6단계와 같은 손(끌기 동작)과 초록 화살표를 북에서 화면 가장자리까지 보여 준다. 그림·크기·속도는 `GameTutorialArt`를 그대로 쓴다.
+  - 북을 두드려도 시간은 계속 센다. 북이 내 판을 떠나면 그 북의 시간은 지워지고, 다시 오면 처음부터 센다. 일시정지·시작 전·전투가 끝난 뒤에는 세지 않는다. 북이 여러 개면 가장 오래 있던 북.
+  - 방향: 넘길 수 있는 쪽만. 양쪽이 열리면 손이 한 번 밀 때마다(1.6초) 오른쪽·왼쪽을 번갈아. 박의 한쪽 넘기기 막기(#215)·땅따먹기 팀 벽이면 열린 쪽만. 땅따먹기 1:1·매혹으로 판이 멈춘 동안은 띄우지 않는다. 개발용 솔로에서는 확인할 수 있게 양쪽이 열린 것처럼 번갈아 띄운다(실제로 넘어가지는 않는다). 손가락으로 판 위 구슬을 잡고 있는 동안은 숨긴다.
+  - 글자 없음, 내 화면 표시만(별도 Canvas, 정렬 50, 터치를 막지 않음). Host 규칙·스냅샷·DEV 값·접속 버전은 바뀌지 않았다.
+- 스태미나 부족 흔들림 (#418 확장):
+  - 게이지와 함께 조합 영역 전체(구슬·북이 그려진 합성 그림과 그 뒤 판 그림)가 같은 0.32초 동안 흔들린다(`LabOrbHudComposition.SetBoardShake`). 거리는 `StaminaFeedbackProfile`의 새 값 `Short Board Shake Distance`(기본 8, 0이면 게이지만).
+  - 그림만 움직이고 판의 물리·입력 카메라는 그대로라 터치 위치가 바뀌지 않는다. 다시 누르면 처음부터, 겹쳐 커지지 않는다. 누른 사람 화면에서만.
+  - 합성을 쓰지 않는 Lab 실험 씬에서는 예전처럼 게이지만 흔들린다.
+
+### 확인
+
+- Unity 6000.6.5f1 Editor 컴파일: PASS. 새 검사들이 검사 어셈블리에 있는 것을 리플렉션으로 확인했다. 콘솔 오류 1건은 기존 `ResultAction.png` Library 캐시 손상(#717 기록)이다.
+- 검사 추가 (실행은 NOT_RUN):
+  - EditMode `GameDrumPassHintTests` 4건: 머문 시간(두드려도 계속, 넘기면 지움, 다시 오면 0부터), 가장 오래된 북, 넘길 수 있는 쪽(양쪽·막기 좌우·매혹·혼자·개발용 솔로·1:1·2:2), 번갈아 가리키기.
+  - PlayMode `GameSceneFlowTests.ADrumKeptEightSecondsGetsTheTutorialsPassGuideUntilItIsPassed`: 실제 전투의 북과 판으로 개발용 솔로 표시 → 8초 전 안 보임 → 보임·오른쪽 → 왼쪽 → 일시정지 숨김 → 다시 보임 → 넘기면 사라짐 → 돌아오면 0부터.
+  - PlayMode `GameSceneFlowTests.ShortStaminaShakesTheWholeBoardPictureWithTheGaugeAndPutsItBack`: 합성 그림과 판 그림이 같은 거리만큼 움직이고 터치용 화면 위치는 그대로, 끝나면 제자리.
+- 전체 EditMode·PlayMode: NOT_RUN (전투 화면 표시만 바뀌어 #637 기준 관련 검사 + 전체 EditMode 권장).
+- Mac 앱 3개로 안내 표시·사라짐·방향, 흔들림 확인: NOT_RUN.
