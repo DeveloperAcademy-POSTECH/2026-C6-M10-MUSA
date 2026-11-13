@@ -124,7 +124,7 @@ namespace Hapio.Tests
         [UnityTest]
         public IEnumerator SharedCountdownWaitsForInitialPresentationAndOnlyThenStartsGameplay()
         {
-            // This test owns the visible 3/2/1 and "시작!": it runs the production start durations, not the
+            // This test owns the visible 3/2/1 and "봉인 시작!": it runs the production start durations, not the
             // assembly's shortened gate (GameTestStartTiming), and pins those defaults.
             GameTestStartTiming.UseDefaults();
             try
@@ -133,7 +133,7 @@ namespace Hapio.Tests
                 Assert.That(GameStartTiming.CountdownSeconds, Is.EqualTo(3d));
                 Assert.That(GameStartTiming.InitialLeadSeconds, Is.EqualTo(1d));
                 Assert.That(GameStartTiming.MaximumLeadSeconds, Is.EqualTo(5d));
-                Assert.That(GameStartTiming.StartedLabelSeconds, Is.EqualTo(.5d));
+                Assert.That(GameStartTiming.StartedLabelSeconds, Is.EqualTo(1d));
                 session.StartSolo();
                 Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.LoadingBattle));
                 Assert.That(session.StartOverlay.Visible && session.StartOverlay.BlocksInput, Is.True,
@@ -182,7 +182,7 @@ namespace Hapio.Tests
                 Assert.That(network.TryGetGameServerTime(out double serverNow), Is.True);
                 Assert.That(serverNow, Is.GreaterThanOrEqualTo(session.State.battleStartsAt));
                 Assert.That(network.GameStartHeld, Is.False);
-                Assert.That(session.StartOverlay.DisplayText, Is.EqualTo("시작!"));
+                Assert.That(session.StartOverlay.DisplayText, Is.EqualTo("봉인 시작!"), "A story stage opens with 봉인 시작! (#717).");
                 Assert.That(session.StartOverlay.BlocksInput, Is.False);
                 network.Generate();
                 yield return Until(() => network.Snapshot.orbs.Length == 1, "Generation opens after the shared deadline.");
@@ -509,6 +509,112 @@ namespace Hapio.Tests
             Rect local = rectangle.rect;
             return RectTransformUtility.WorldToScreenPoint(null, rectangle.TransformPoint(new Vector3(
                 local.xMin + local.width * x, local.yMin + local.height * y, 0f)));
+        }
+
+        [UnityTest]
+        public IEnumerator AStoryStageSaysSealSucceededWithTheWhistleBeforeItsFinalHitEffect()
+        {
+            session.StartSolo();
+            yield return WaitPlaying(1);
+            int whistles = session.EndWhistleCount;
+            Assert.That(session.BattleEndShown, Is.False);
+            CompleteMapInFixture(Model());
+            yield return Until(() => session.BattleEndShown, "Painting the whole gourd shows its end on this device (#717).");
+            double endAt = Time.realtimeSinceStartupAsDouble;
+            yield return null;
+            Assert.That(session.StartOverlay.DisplayText, Is.EqualTo(GameStartOverlay.SealSucceededText));
+            Assert.That(session.StartOverlay.ShowsFinished && session.StartOverlay.BlocksInput, Is.True,
+                "Nothing can be pressed while 봉인 성공! is up.");
+            Assert.That((Color32)session.StartOverlay.CaptionColor, Is.EqualTo(new Color32(0x8A, 0x12, 0x06, 0xFF)),
+                "The same crimson as the territory's 경기 종료!.");
+            Assert.That(network.board.UiInputBlocked, Is.True);
+            Assert.That(session.EndWhistleCount, Is.EqualTo(whistles + 1), "One whistle.");
+            Assert.That(session.PaintFinishProgress, Is.Zero, "The final-hit effect waits for 봉인 성공!.");
+
+            yield return Until(() => session.PaintFinishProgress > 0f || session.State.phase != GameFlowPhase.Playing,
+                "Then the final-hit effect plays.");
+            Assert.That(Time.realtimeSinceStartupAsDouble - endAt, Is.GreaterThanOrEqualTo(session.BattleEndHoldSeconds - .1d),
+                "봉인 성공! has its time before the final-hit effect.");
+            yield return null;
+            Assert.That(session.StartOverlay.ShowsFinished, Is.False, "봉인 성공! makes way for the final-hit effect.");
+            Assert.That(session.EndWhistleCount, Is.EqualTo(whistles + 1), "Only once.");
+            yield return FinishResultStory();
+        }
+
+        [UnityTest]
+        public IEnumerator AStoryTimeUpSaysTimeUpInBlueWithTheWhistleThenGoesStraightToItsFailure()
+        {
+            float[] values = network.config.CaptureDeveloperValues();
+            Set(values, "Battle Duration (seconds)", 1f);
+            Assert.That(session.ApplyDeveloperSettings(values, out string error), Is.True, error);
+            session.StartSolo();
+            yield return WaitPlaying(1);
+            int whistles = session.EndWhistleCount;
+            // The real Network clock reaches the one-second limit with the gourd unpainted (#717).
+            yield return Until(() => session.BattleEndShown, "Running out of time shows its end on this device.");
+            double endAt = Time.realtimeSinceStartupAsDouble;
+            Assert.That(SceneManager.GetActiveScene().path, Is.EqualTo(GameScenePaths.Battle));
+            yield return null;
+            Assert.That(session.StartOverlay.DisplayText, Is.EqualTo(GameStartOverlay.TimeUpText));
+            Assert.That(session.StartOverlay.ShowsFinished && session.StartOverlay.BlocksInput, Is.True,
+                "Nothing can be pressed while 시간 초과! is up.");
+            Assert.That((Color32)session.StartOverlay.CaptionColor, Is.EqualTo(new Color32(0x16, 0x4B, 0x8C, 0xFF)),
+                "시간 초과! is blue, not the crimson of 봉인 성공!.");
+            Assert.That(network.board.UiInputBlocked, Is.True);
+            Assert.That(session.EndWhistleCount, Is.EqualTo(whistles + 1), "One whistle.");
+
+            yield return WaitGameOver();
+            Assert.That(Time.realtimeSinceStartupAsDouble - endAt, Is.GreaterThanOrEqualTo(session.BattleEndHoldSeconds - .1d),
+                "시간 초과! has its time before the failure.");
+            Assert.That(session.State.endReason, Is.EqualTo("Time ran out."));
+            Assert.That(session.PaintFinishProgress, Is.Zero, "No final-hit effect on a time-up.");
+            Assert.That(session.FinishUsesReplay, Is.False);
+            Assert.That(session.EndWhistleCount, Is.EqualTo(whistles + 1), "Only once.");
+            yield return null;
+            Assert.That(session.StartOverlay.Visible, Is.False, "The failure replaces 시간 초과!.");
+        }
+
+        [UnityTest]
+        public IEnumerator TerritoryTimeUpSaysGameOverWithTheWhistleThenOpensItsResultWithoutAPaintedGourd()
+        {
+            session.StartSolo(GameMode.Territory);
+            yield return WaitPlaying(1);
+            int whistles = session.EndWhistleCount;
+            Assert.That(session.BattleEndShown, Is.False);
+            // Bring the time limit to a second from now on the model's own clock (a fixture; the clock itself is not advanced).
+            LabModel model = Model();
+            typeof(LabModel).GetField("deadline", BindingFlags.NonPublic | BindingFlags.Instance)
+                .SetValue(model, ModelTime(model) + 1d);
+            yield return Until(() => session.BattleEndShown, "The time-up shows its end on this device (#717).");
+            double endAt = Time.realtimeSinceStartupAsDouble;
+            Assert.That(network.Snapshot.phase, Is.EqualTo(LabPhase.Victory));
+            Assert.That(network.Snapshot.paintCoveredCount, Is.LessThan(network.Snapshot.paintCellCount),
+                "A time-up gourd is not completely painted, so it has no completed picture to wait for.");
+            Assert.That(SceneManager.GetActiveScene().path, Is.EqualTo(GameScenePaths.Battle));
+            yield return null;
+            Assert.That(session.StartOverlay.ShowsFinished, Is.True);
+            Assert.That(session.StartOverlay.DisplayText, Is.EqualTo(GameStartOverlay.FinishedText));
+            Assert.That(session.StartOverlay.BlocksInput, Is.True, "Nothing can be pressed until the result opens.");
+            Assert.That(network.board.UiInputBlocked, Is.True, "No drag, throw or pass under a finger either.");
+            Assert.That(session.EndWhistleCount, Is.EqualTo(whistles + 1), "One whistle, on every device.");
+
+            yield return Until(() => SceneManager.GetActiveScene().path == GameScenePaths.StageResult && !session.IsLoadingScene,
+                "The result opens right after the whistle.");
+            double opened = Time.realtimeSinceStartupAsDouble - endAt;
+            Assert.That(opened, Is.GreaterThanOrEqualTo(session.BattleEndHoldSeconds - .1d), "The whistle has its time first.");
+            Assert.That(opened, Is.LessThan(session.BattleEndHoldSeconds + 3d),
+                "It no longer waits out the result budget for a completed gourd that never comes.");
+            Assert.That(session.EndWhistleCount, Is.EqualTo(whistles + 1), "Only once.");
+            yield return null;
+            Assert.That(session.StartOverlay.Visible, Is.False, "The result replaces \"경기 종료!\".");
+            Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.Completed));
+            Assert.That(session.ResultSnapshot.teamTerritory, Is.True);
+            Assert.That(session.PreviewTexture, Is.Null, "A gourd that is not completely painted has no 박 확인 picture.");
+            GameTerritoryResultView territory = Object.FindFirstObjectByType<GameScreen>().territoryView;
+            yield return Until(() => territory.gameObject.activeInHierarchy, "The team result shows.");
+            yield return Until(() => territory.table.homeButton.IsInteractable(), "Exit is available on the result.");
+            territory.table.homeButton.onClick.Invoke();
+            yield return WaitHome();
         }
 
         [UnityTest]

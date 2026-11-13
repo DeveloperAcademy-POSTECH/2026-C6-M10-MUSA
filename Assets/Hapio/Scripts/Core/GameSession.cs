@@ -289,6 +289,7 @@ namespace Hapio
                 SendReady();
             }
             double now = Time.realtimeSinceStartupAsDouble;
+            UpdateBattleEnd(now);
             UpdateBattleStart(now);
             UpdatePaintFinish(now);
             UpdateReplayCover();
@@ -321,7 +322,7 @@ namespace Hapio
             {
                 if (snapshot.phase == LabPhase.Defeat)
                 {
-                    string reason = snapshot.remaining <= 0d ? "Time ran out." : "All players are down.";
+                    string reason = snapshot.remaining <= 0d ? TimeRanOutReason : "All players are down.";
                     if (tutorialRun || IsTerritory) AbortHost(reason);
                     else if (hostFlow.MarkDefeat(snapshot.sessionId, snapshot.round, reason)) SetHostState();
                 }
@@ -518,21 +519,44 @@ namespace Hapio
             while (SceneManager.GetActiveScene().path != wantedScene || forceBattleReload)
             {
                 string destination = wantedScene;
-                if (destination == GameScenePaths.StageResult)
+                double transitionAt = Time.realtimeSinceStartupAsDouble, readyAt = transitionAt;
+                double capturedAt = transitionAt, heldUntil = transitionAt;
+                bool resultTransition = destination == GameScenePaths.StageResult;
+                if (resultTransition)
                 {
+                    // #717: a territory battle says "경기 종료!" with its whistle first; the result is prepared under it.
+                    if (IsTerritory && SceneManager.GetActiveScene().path == GameScenePaths.Battle)
+                        BeginBattleEnd(transitionAt, BattleEndKind.TerritoryOver);
                     double waitUntil = ResultCaptureDeadline(Time.realtimeSinceStartupAsDouble);
                     while (!CanCaptureResult() && wantedScene == destination
                         && network.IsConnected && Time.realtimeSinceStartupAsDouble < waitUntil)
                         yield return null;
                     if (wantedScene != destination) continue;
+                    readyAt = Time.realtimeSinceStartupAsDouble;
                     if (!CanCaptureResult() && state.phase != GameFlowPhase.Completed)
                     {
                         ExitWithLocalReason("The stage result could not be synchronized.");
                         continue;
                     }
-                    if (!CanCaptureResult())
+                    // A territory result simply opens without its 박 확인 picture when that did not arrive in time (#717).
+                    if (!CanCaptureResult() && !IsTerritory)
                         UiNotice = "All stages are clear. The completed gourd preview could not be synchronized.";
                     CaptureResult();
+                    capturedAt = Time.realtimeSinceStartupAsDouble;
+                    while (EndWordsHolding(Time.realtimeSinceStartupAsDouble) && wantedScene == destination)
+                        yield return null;
+                    if (wantedScene != destination) continue;
+                    heldUntil = Time.realtimeSinceStartupAsDouble;
+                }
+                else if (destination == GameScenePaths.GameOver
+                    && SceneManager.GetActiveScene().path == GameScenePaths.Battle)
+                {
+                    // #717: a story stage that ran out of time says "시간 초과!" with its whistle, then goes straight to its
+                    // failure (no final-hit effect). Other game overs (someone left, ...) have no words and do not wait.
+                    if (StoryTimedOut) BeginBattleEnd(transitionAt, BattleEndKind.TimeUp);
+                    while (EndWordsHolding(Time.realtimeSinceStartupAsDouble) && wantedScene == destination)
+                        yield return null;
+                    if (wantedScene != destination) continue;
                 }
                 network.UnbindBattleReferences();
                 forceBattleReload = false;
@@ -549,6 +573,13 @@ namespace Hapio
                     yield return null;
                 }
                 ReportSceneLoad(1f);
+                if (resultTransition)
+                    // #717: where the time from a battle's end to its result went (waiting for the result, copying the gourd,
+                    // "경기 종료!", loading the result Scene).
+                    Debug.Log(string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                        "HAPIO_RESULT_TRANSITION mode={0} wait={1:0.00}s capture={2:0.00}s hold={3:0.00}s load={4:0.00}s",
+                        state.mode, readyAt - transitionAt, capturedAt - readyAt, heldUntil - capturedAt,
+                        Time.realtimeSinceStartupAsDouble - heldUntil));
                 yield return null;
             }
             sceneRoutine = null;
@@ -563,8 +594,7 @@ namespace Hapio
             // a slower peer receives its optional preview texture. Never manufacture its map.
             if (state.phase == GameFlowPhase.Completed && !network.IsConnected) return true;
             if (!MatchesBattle(network.Snapshot) || network.Snapshot.phase != LabPhase.Victory) return false;
-            if (network.config == null || !network.config.CompletedGourdViewerEnabled
-                || network.config.GourdMode != LabGourdMode.Paint) return true;
+            if (!ResultNeedsPreview(network.Snapshot)) return true;
             return LabGourdResultPreview.SurfaceMatches(network, out _, requireExactArtwork: false);
         }
 
@@ -574,9 +604,7 @@ namespace Hapio
             if (HasCapturedResult()) return;
             if (ResultSnapshot == null || ResultSnapshot.sessionId != state.battleSessionId
                 || ResultSnapshot.round != state.battleRound) return;
-            bool needsPreview = network.config != null && network.config.CompletedGourdViewerEnabled
-                && network.config.GourdMode == LabGourdMode.Paint;
-            if (!needsPreview && ResultSnapshot != null)
+            if (!ResultNeedsPreview(ResultSnapshot))
             {
                 RememberCapturedResult();
                 return;
@@ -590,7 +618,7 @@ namespace Hapio
                 GameGourdPreviewPresentation.Apply(preview, transform);
                 RememberCapturedResult();
             }
-            else if (network.RequiresPaintArt)
+            else if (network.RequiresPaintArt && !IsTerritory)
                 UiNotice = "The round result is preserved, but its exact artwork is not ready for viewing.";
         }
 

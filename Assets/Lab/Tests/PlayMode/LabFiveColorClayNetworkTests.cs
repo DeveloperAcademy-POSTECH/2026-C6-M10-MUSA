@@ -136,7 +136,8 @@ namespace C6Lab.Tests
             Vector3 normal = hitbox.forward, incoming = -normal * 10f;
             var contact = new LabProjectileResult(null, 0, LabProjectileHitKind.Monster, point,
                 .3f, 0f, 1f, incoming, hitNormal: normal, visualDiameter: .27f);
-            Invoke("OnPredictedShotContact", 19L, contact, LabOrbElement.None, 20, 1f, true, false, false);
+            // Reflection passes every parameter, including the optional soot flag (#713) the method gained later.
+            Invoke("OnPredictedShotContact", 19L, contact, LabOrbElement.None, 20, 1f, true, false, false, false);
             Assert.That(hits, Is.EqualTo(1));
             Assert.That(pool.ActiveImpactCount, Is.EqualTo(1));
             Assert.That(rewardHits, Is.Zero, "Dedicated reward feedback waits for Host confirmation.");
