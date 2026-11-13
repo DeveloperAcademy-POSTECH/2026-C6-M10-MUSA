@@ -129,24 +129,35 @@ namespace C6Lab.Tests
         }
 
         [Test]
-        public void ALetterWithItsTailStillBlankDoesNotFinish()
+        public void EachStrokeFinishesAtSixtyPercentInOrderAndTheLastOneWritesTheTalisman()
         {
+            // #724 UT: strokes are judged one by one, in order. 60% of a stroke fills the whole stroke at once.
             overlay.Present(Snapshot(-1d), Local, 11d);
             Vector2[] points = LabJigwiTalismanStroke.Water;
             int[][] strokes = LabJigwiTalismanStroke.WaterStrokes;
-            int[] tail = strokes[strokes.Length - 1];
-            // #533: everything but the end of the ㄹ tail (the brush reach still covers two of the five skipped dots,
-            // so three stay blank) — enough dots counted, but the tail visibly blank.
-            for (int s = 0; s < strokes.Length; s++)
-                for (int i = 0; i < strokes[s].Length; i++)
-                    if (s < strokes.Length - 1 || i < tail.Length - 5) overlay.PaintNormalized(points[strokes[s][i]], points[strokes[s][i]]);
-            Assert.That(overlay.Coverage, Is.GreaterThan(.9f));
-            Assert.That(overlay.CompletedCount, Is.Zero, "A blank tail is not a finished letter.");
-            Assert.That(overlay.Stroke.LongestGap(strokes.Length - 1), Is.GreaterThan(1));
-            // Touching the tail end fills it and the letter finishes.
-            overlay.PaintNormalized(points[tail[tail.Length - 3]], points[tail[tail.Length - 3]]);
+            // A later stroke written first does not take: only the guided stroke can be written.
+            foreach (int index in strokes[strokes.Length - 1]) overlay.PaintNormalized(points[index], points[index]);
+            Assert.That(overlay.Stroke.IsStrokeDone(strokes.Length - 1), Is.False);
+            Assert.That(overlay.Stroke.IsCovered(strokes[strokes.Length - 1][0]), Is.False);
+            // The first stroke: a touch at its start is not enough; written on along it, it finishes (and fills) at 60%.
+            int[] first = strokes[0];
+            overlay.PaintNormalized(points[first[0]], points[first[0]]);
+            Assert.That(overlay.Stroke.IsStrokeDone(0), Is.False);
+            Assert.That(System.Array.TrueForAll(first, index => overlay.Stroke.IsCovered(index)), Is.False);
+            for (int i = 1; i < first.Length && !overlay.Stroke.IsStrokeDone(0); i++)
+                overlay.PaintNormalized(points[first[i]], points[first[i]]);
+            Assert.That(overlay.Stroke.IsStrokeDone(0), Is.True);
+            Assert.That(System.Array.TrueForAll(first, index => overlay.Stroke.IsCovered(index)), Is.True, "The whole stroke fills in.");
+            Assert.That(overlay.Stroke.CurrentStroke, Is.EqualTo(1));
+            Assert.That(overlay.CompletedCount, Is.Zero);
+            // Each following stroke written to 60% (in order) finishes the talisman with the last one.
+            for (int s = 1; s < strokes.Length; s++)
+            {
+                int n = Mathf.CeilToInt(strokes[s].Length * .6f - 1e-4f);
+                for (int i = 0; i < n && overlay.Visible; i++) overlay.PaintNormalized(points[strokes[s][i]], points[strokes[s][i]]);
+            }
             Assert.That(overlay.CompletedCount, Is.EqualTo(1));
-            Assert.That(overlay.Stroke.LongestGap(strokes.Length - 1), Is.LessThanOrEqualTo(1));
+            Assert.That(overlay.Visible, Is.False);
         }
 
         [Test]
@@ -177,7 +188,7 @@ namespace C6Lab.Tests
             int firstStroke = overlay.GuideDotsShown;
             Assert.That(firstStroke, Is.GreaterThan(0));
             JsonUtility.FromJsonOverwrite("{\"remainingHintFrom\":0.01,\"remainingHintFadeSeconds\":0}", overlay);
-            Vector2 point = LabJigwiTalismanStroke.Water[0];
+            Vector2 point = LabJigwiTalismanStroke.Water[LabJigwiTalismanStroke.WaterStrokes[0][0]]; // #724: the first stroke (in order)
             overlay.PaintNormalized(point, point);
             Assert.That(overlay.Coverage, Is.GreaterThan(.01f).And.LessThan(1f));
             overlay.DrawGuide(0f);
@@ -190,7 +201,7 @@ namespace C6Lab.Tests
         {
             LabSnapshot snapshot = Snapshot(-1d);
             overlay.Present(snapshot, Local, 11d);
-            Vector2 point = LabJigwiTalismanStroke.Water[0];
+            Vector2 point = LabJigwiTalismanStroke.Water[LabJigwiTalismanStroke.WaterStrokes[0][0]];
             overlay.PaintNormalized(point, point);
             // #533: the A ends with this seat still writing — Jigwi's fire burns the talisman.
             overlay.Present(snapshot, Local, 26d);
