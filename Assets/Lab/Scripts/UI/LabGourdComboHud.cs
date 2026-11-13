@@ -254,6 +254,24 @@ namespace C6Lab
             canvas = uiCanvas != null ? uiCanvas.rootCanvas : null;
         }
 
+        private float tickBeat;
+
+        /// <summary>#719: 1 right on each combo clock tick (the same ticks LabYaguangSound plays), fading to 0 before the next.
+        /// The combo's start (the 깽) counts as the first beat.</summary>
+        private float TickBeat(LabSnapshot snapshot, double serverNow)
+        {
+            LabConfig config = network != null ? network.config : null;
+            double fastFor = config != null ? config.YaguangComboTickFastSeconds : LabYaguangSound.DefaultTickFastSeconds;
+            double every = config != null ? config.YaguangComboTickIntervalSeconds : LabYaguangSound.DefaultTickInterval;
+            double fastEvery = config != null ? config.YaguangComboTickFastIntervalSeconds : LabYaguangSound.DefaultTickFastInterval;
+            double tick = LabYaguangSound.LatestTickAt(snapshot.comboStartedAt, snapshot.comboEndsAt, serverNow,
+                fastFor, every, fastEvery, out bool fast);
+            if (double.IsNegativeInfinity(tick)) tick = snapshot.comboStartedAt;
+            double since = System.Math.Max(0d, serverNow - tick);
+            double fade = (fast ? fastEvery : every) * .45d;
+            return Mathf.Clamp01((float)System.Math.Exp(-since / System.Math.Max(.03d, fade)));
+        }
+
         private void LateUpdate()
         {
             LabSnapshot snapshot = network != null ? network.Snapshot : null;
@@ -263,6 +281,9 @@ namespace C6Lab
             LabOrbElement needed = snapshot != null && snapshot.phase == LabPhase.Playing && snapshot.comboActive
                 && snapshot.comboColors != null && snapshot.comboProgress >= 0 && snapshot.comboProgress < snapshot.comboColors.Length
                 ? snapshot.comboColors[snapshot.comboProgress] : LabOrbElement.None;
+            // #719: the glow beats on the clock's tick (똑딱), not on its own rhythm.
+            tickBeat = needed != LabOrbElement.None ? TickBeat(snapshot, serverNow) : 0f;
+            LabOrbComboHint.Beat = tickBeat;
             if (network != null && network.board != null) network.board.SetComboHint(needed);
             // 조합판 구슬 크기(#257)는 콤보 화면이 숨어 있어도 정한다. 일시정지 중에는 그대로 둔다.
             if (snapshot == null || snapshot.phase != LabPhase.Playing) SetBoardLook(0);
@@ -600,7 +621,7 @@ namespace C6Lab
                 // so one glance at the panel shows which colour to throw.
                 bool turn = !preview && snapshot.comboActive && i == snapshot.comboProgress;
                 bool later = !preview && snapshot.comboActive && i > snapshot.comboProgress;
-                float beat = .5f + .5f * Mathf.Sin(Time.unscaledTime * 6.5f);
+                float beat = tickBeat;
                 if (turn) scale = 1.18f + .07f * beat;
                 Color fill = slotFills[i].color;
                 slotFills[i].color = new Color(fill.r, fill.g, fill.b, later ? .4f : 1f);

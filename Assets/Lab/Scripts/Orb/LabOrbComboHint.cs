@@ -8,13 +8,15 @@ namespace C6Lab
     /// </summary>
     public sealed class LabOrbComboHint : MonoBehaviour
     {
-        /// <summary>테두리 크기 (구슬 반지름 배)와 두근거리는 빠르기.</summary>
-        public const float RingScale = 3.9f, BeatHz = 1.6f;
+        /// <summary>테두리 크기 (구슬 반지름 배).</summary>
+        public const float RingScale = 3.9f;
+        /// <summary>#719: 콤보 시계 째깍(똑딱)마다 1로 튀었다가 다음 째깍 전에 0으로 줄어드는 값. LabGourdComboHud가 매 프레임 정한다.</summary>
+        public static float Beat;
         private const int RingOrder = 1;
         private static Sprite ringSprite;
         private SpriteRenderer ring;
         private Color tint = Color.white;
-        private float radius = .3f, age;
+        private float radius = .3f;
 
         public bool Visible => ring != null && ring.gameObject.activeSelf;
 
@@ -38,7 +40,7 @@ namespace C6Lab
                 ring.sprite = RingSprite();
                 ring.sortingOrder = RingOrder;
             }
-            if (ring.gameObject.activeSelf != shown) { ring.gameObject.SetActive(shown); age = 0f; }
+            if (ring.gameObject.activeSelf != shown) ring.gameObject.SetActive(shown);
             radius = Mathf.Max(.01f, orbRadius);
             tint = color;
             Pose();
@@ -47,16 +49,14 @@ namespace C6Lab
         private void Update()
         {
             if (!Visible) return;
-            age += Time.deltaTime;
             Pose();
         }
 
         private void Pose()
         {
             if (ring == null) return;
-            // A heartbeat: a quick swell and a softer echo, then a rest.
-            float phase = Mathf.Repeat(age * BeatHz, 1f);
-            float beat = Mathf.Exp(-Mathf.Pow((phase - .08f) / .07f, 2f)) + .55f * Mathf.Exp(-Mathf.Pow((phase - .3f) / .07f, 2f));
+            // #719: swells on each tick of the combo clock (똑딱) and settles before the next.
+            float beat = Mathf.Clamp01(Beat);
             ring.transform.localScale = Vector3.one * (RingScale * radius * (1f + .14f * beat));
             ring.color = new Color(tint.r, tint.g, tint.b, Mathf.Lerp(.55f, 1f, Mathf.Clamp01(beat)));
         }
