@@ -46,9 +46,12 @@ MonoBehaviour:
   jigwiATestOnly: 0
   jigwiSmokeFlow: 1
   jigwiDenseTimeline: 1
+  jigwiRelayTimeline: 1
+  jigwiRelayGapSeconds: 14
+  jigwiRelayGapAfterTalismanSeconds: 12
   jigwiSmokeToTalismanSeconds: 12
   jigwiCommonStartSeconds: 25
-  jigwiCommonIntervalSeconds: 15
+  jigwiCommonIntervalSeconds: 20
   jigwiStageWarningSeconds: 1
   jigwiStageActiveSeconds: 7
   jigwiStageRootAngleDegrees: 18
@@ -68,7 +71,7 @@ MonoBehaviour:
   jigwiTalismanRewardDelaySeconds: 2.9
   jigwiAFailDrumSlipSeconds: 20
   jigwiAFailDrumSlipBoost: 2
-  jigwiAFailBurnStartSeconds: 0.6
+  jigwiAFailBurnStartSeconds: 2.9
   jigwiTalismanCoverage: 0.85
   jigwiTalismanTolerance: 0.07
   jigwiBSplashPaintShare: 3
@@ -324,6 +327,21 @@ MonoBehaviour:
   yaguangComboBgmToneSeconds: 0.3
   yaguangComboClearedDelaySeconds: 0.8
   yaguangComboClearedSoundVolume: 0.9
+  yaguangFirstComboForgive: 1
+  yaguangComboGuideRuleCombos: 1
+  yaguangComboGuideReadyOn: 1
+  yaguangComboGuideFeedbackDelaySeconds: 0.3
+  yaguangComboGuideRuleDelaySeconds: 0.9
+  yaguangComboGuideCountFade: 0.6
+  yaguangComboGuideFailDelaySeconds: 0.1
+  yaguangComboGuideFailToTauntSeconds: 0.1
+  yaguangComboGuideSoundVolume: 1
+  yaguangComboStampSoundVolume: 0.8
+  jigwiSootAuraVolume: 1
+  jigwiSootHitVolume: 1
+  jigwiSootRevealVolume: 0.8
+  jigwiSootJoinVolume: 0.8
+  jigwiSootWholeVolume: 1
   yaguangComboWarningShade: 0.5
   comboPopDrumRatio: 0.35
   yaguangFeverDrumPulseScale: 0.12

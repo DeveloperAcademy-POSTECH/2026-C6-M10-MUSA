@@ -61,20 +61,32 @@ namespace C6Lab
         {
             if (target == null) return;
             if (soot) PresentSootHit(targetLocalPoint);
+            // #713: the black orb has its own hit sound (every device), so the five-colour gayageum stays quiet for it.
+            LastFiveColorHitSoot = soot;
             if (owner == LocalPlayerId) LocalFiveColorHit?.Invoke();
         }
 
+        /// <summary>#713: the last five-colour hit presented was the Jigwi black orb (its own sound plays instead).</summary>
+        public bool LastFiveColorHitSoot { get; private set; }
+        /// <summary>#713 검정 구슬이 박에 맞았다 (모든 기기). 전용 명중음이 듣는다.</summary>
+        public event System.Action SootHit;
+        /// <summary>#713 연기를 닦다가 밑에 깔린 파편이 하나 이상 드러났다 (내 기기). 드러난 수를 넘긴다.</summary>
+        public event System.Action<int> SootShardRevealed;
+        public void NotifySootShardRevealed(int count) { if (count > 0) SootShardRevealed?.Invoke(count); }
+
         /// <summary>
-        /// #696 검정 구슬 명중: 박에는 오색구슬만큼 넓게 먹색이 칠해지고(모델), 맞은 자리에서 검은 먹구름과
-        /// 보랏빛 반짝이 별가루가 크게 터진다. 모든 기기에서 보인다.
+        /// #696 검정 구슬 명중: 박에는 오색구슬만큼 넓게 먹색이 칠해지고(모델),
+        /// #713부터 맞은 자리에서 판 위 기운과 같은 검정 기운(먹빛 연기가 확 퍼지고 보랏빛 빛무리가 번진 뒤 연기가 잠시 감돎)이 터진다.
+        /// 모든 기기에서 보인다.
         /// </summary>
         private void PresentSootHit(Vector3 targetLocalPoint)
         {
             Transform hitbox = target.Hitbox != null ? target.Hitbox.transform : target.transform;
             Vector3 point = hitbox.TransformPoint(targetLocalPoint);
             float radius = config != null ? config.OrbRadius : .3f;
-            LabFiveColorSparkle.DustBurst(point, radius, LabFiveColorSparkle.DefaultDustPuffScale * 1.5f, LabFiveColorSparkle.SootTones);
-            LabFiveColorSparkle.Burst(point, radius * 1.2f, LabFiveColorSparkle.SootTones);
+            LabSootAura.PlayHit(point, radius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined) * LabModel.SootOrbSizeScale,
+                target.gameObject.layer);
+            SootHit?.Invoke();
         }
 
         /// <summary>#540 지귀 부적 구슬 명중 이벤트 (맞은 자리 박 기준 좌표, 던진 사람). 소리·진동이 듣는다.</summary>

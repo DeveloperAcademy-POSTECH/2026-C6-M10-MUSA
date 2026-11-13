@@ -130,10 +130,11 @@ namespace C6Lab
 
         public bool PlayImpact(LabOrbElement element, Vector3 point, Vector3 normal, Vector3 incoming,
             float diameter, float strength, Transform target = null, bool leaveMark = true, bool monochrome = false,
-            bool fiveColor = false, float fiveColorAge = 0f)
+            bool fiveColor = false, float fiveColorAge = 0f, Color32[] fiveColorPalette = null)
         {
             float paletteAge=Finite(fiveColorAge) ? Mathf.Max(0f,fiveColorAge) : 0f;
-            return PlayImpactCore(element,point,normal,incoming,diameter,strength,target,leaveMark,monochrome,fiveColor,paletteAge,null,FiveColorBoostEnabled);
+            // #713: the Jigwi black orb passes its soot tones; null keeps the five colours.
+            return PlayImpactCore(element,point,normal,incoming,diameter,strength,target,leaveMark,monochrome,fiveColor,paletteAge,fiveColorPalette,FiveColorBoostEnabled);
         }
 
         private bool PlayImpactCore(LabOrbElement element, Vector3 point, Vector3 normal, Vector3 incoming,

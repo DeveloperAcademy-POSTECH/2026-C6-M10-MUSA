@@ -19,8 +19,12 @@ namespace C6Lab.Tests
             Assert.That(config.JigwiATestOnly, Is.False, "A Test Only (talisman only) is for testing; turn it off before committing.");
             Assert.That(config.JigwiBTestOnly, Is.False, "B Test Only (smoke only) is for testing; turn it off before committing.");
             Assert.That(config.JigwiSmokeFlow, Is.True, "The game runs the smoke flow (#595).");
-            Assert.That(config.JigwiDenseTimeline, Is.True,
-                "#696: six missions, smoke 8 / talisman 24 / smoke 40 / talisman 55 / smoke 70 / talisman 85.");
+            Assert.That(config.JigwiRelayTimeline, Is.True,
+                "#713: smoke at 6 s, then each mission a gap after the one before has fully ended (common gimmicks from 25 s every 20 s).");
+            Assert.That(config.JigwiRelayGapSeconds, Is.EqualTo(14f).Within(.0001f), "After a smoke: time to gather the shards and throw the black orb.");
+            Assert.That(config.JigwiRelayGapAfterTalismanSeconds, Is.EqualTo(12f).Within(.0001f));
+            Assert.That(config.JigwiCommonStartSeconds, Is.EqualTo(25f).Within(.0001f));
+            Assert.That(config.JigwiCommonIntervalSeconds, Is.EqualTo(20f).Within(.0001f));
         }
 
         [Test]

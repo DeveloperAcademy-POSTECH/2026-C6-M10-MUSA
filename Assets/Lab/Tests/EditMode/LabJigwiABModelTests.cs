@@ -455,6 +455,37 @@ namespace C6Lab.Tests
             Assert.That(m.LastHitFiveColor,Is.True,"Hits as wide as a five-color orb (in ink).");
         }
 
+        [Test] public void RelaySmokeFlowStartsEachMissionAGapAfterTheLastOneEnded()
+        {
+            // #713: 연기 6초 → 모두 닦으면 연기 끝 → 10초 뒤 부적 → 못 써서 실패 → 구슬이 다 탄 뒤 10초 뒤 다음 연기.
+            JsonUtility.FromJsonOverwrite("{\"jigwiSmokeFlow\":true,\"jigwiRelayTimeline\":true,\"jigwiRelayGapSeconds\":10,\"jigwiRelayGapAfterTalismanSeconds\":10,\"jigwiABPersonalDurationSeconds\":10,\"jigwiAFailBurnStartSeconds\":2.9}",config);
+            var m=Room3();
+            Assert.That(m.Snapshot(0).jigwiAB.schedule,Is.EqualTo(LabJigwiABTimeline.RelaySmokeFlowSchedule));
+            var smoke=Current(m,6.1);
+            Assert.That(smoke.smoke,Is.True); Assert.That(smoke.activeAt,Is.EqualTo(6d).Within(1e-6));
+            double ready=smoke.players.First().readyAt, wiped=ready+3;
+            Assert.That(m.TryWipeJigwiSmoke(Three[0],smoke.id,wiped),Is.True);
+            Assert.That(m.TryWipeJigwiSmoke(Three[0],smoke.id,wiped),Is.False,"Once per seat.");
+            Assert.That(m.TryWipeJigwiSmoke(Three[1],smoke.id,wiped),Is.True);
+            Assert.That(m.Snapshot(wiped).jigwiAB.rounds.Single(r=>r.id==smoke.id).resolution,Is.EqualTo(LabJigwiABResolution.None),"Not until everyone wiped.");
+            Assert.That(m.TryWipeJigwiSmoke(Three[2],smoke.id,wiped),Is.True);
+            var ended=m.Snapshot(wiped).jigwiAB.rounds.Single(r=>r.id==smoke.id);
+            Assert.That(ended.resolution,Is.Not.EqualTo(LabJigwiABResolution.None),"Everyone wiped: the smoke is over.");
+            Assert.That(ended.resolvedAt,Is.EqualTo(wiped).Within(1e-6));
+
+            double talismanAt=wiped+10d;
+            for(double t=wiped;t<=95d;t+=.5){var mid=m.Snapshot(t);
+                Assert.That(LabJigwiABNetworkValidation.Valid(mid.jigwiAB,mid.players,m.Revision),Is.True,"Valid at "+t+" s");}
+            var r=m.Snapshot(95d).jigwiAB.rounds.OrderBy(x=>x.slot).ToArray();
+            Assert.That(r[1].kind,Is.EqualTo(LabJigwiABKind.PersonalBurn));
+            Assert.That(r[1].activeAt,Is.EqualTo(talismanAt).Within(1e-6),"The talisman comes 10 s (warning included) after the smoke ended.");
+            Assert.That(r[1].resolution,Is.EqualTo(LabJigwiABResolution.Expired),"Nobody wrote it.");
+            double burnt=r[1].resolvedAt+2.9d+LabModel.JigwiTalismanFailBlazeSeconds;
+            Assert.That(r[2].smoke,Is.True);
+            Assert.That(r[2].activeAt,Is.EqualTo(burnt+10d).Within(1e-6),"The next smoke waits until the boards have burnt, then 10 s.");
+            foreach(var x in r) Assert.That(x.activeAt+(x.kind==LabJigwiABKind.PersonalBurn?10d:15d),Is.LessThanOrEqualTo(100d+1e-6),"Every mission fits before the fever.");
+        }
+
         [Test] public void DenseSmokeFlowRunsFiveMissionsWithTimeForTheBlackOrb()
         {
             // #696: 연기 6 / 부적 30 / 연기 44 / 부적 68 / 연기 82 (부적 10초, 연기 15초), 정해진 시각 그대로 확인.

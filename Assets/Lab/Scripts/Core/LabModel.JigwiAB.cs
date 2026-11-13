@@ -32,8 +32,13 @@ namespace C6Lab
         /// <summary>#663: the next slot's activation when a smoke ended early pulled it forward (+∞ = its fixed time).</summary>
         private double jigwiNextSlotPulledAt = double.PositiveInfinity;
         /// <summary>The next slot's activation: its fixed time, or earlier when a finished smoke pulled the talisman forward.</summary>
-        private double JigwiNextSlotActiveAt => Math.Min(jigwiNextSlotPulledAt,
-            jigwiStageStartedAt + LabJigwiABTimeline.ActiveOffset(jigwiStageNextSlot, jigwiSchedule));
+        private double JigwiNextSlotActiveAt => LabJigwiABTimeline.IsRelay(jigwiSchedule) && jigwiStageNextSlot > 0
+            ? jigwiNextSlotPulledAt // #713: after the first smoke every mission waits for the one before it
+            : Math.Min(jigwiNextSlotPulledAt, jigwiStageStartedAt + LabJigwiABTimeline.ActiveOffset(jigwiStageNextSlot, jigwiSchedule));
+        /// <summary>#713 이어달리기: 연기가 끝나고 / 부적이 끝나고 다음 미션이 시작하기까지(초, 예고 포함).</summary>
+        private double jigwiRelayGap = 14d, jigwiRelayGapAfterTalisman = 12d;
+        /// <summary>#713: smoke round id → seats that rubbed their smoke all away (all of them = the smoke is over).</summary>
+        private readonly Dictionary<string, HashSet<ulong>> jigwiSmokeWiped = new Dictionary<string, HashSet<ulong>>(StringComparer.Ordinal);
         /// <summary>#540: once Jigwi's line is over, every orb on an unfinished talisman's board burns away together in this long.</summary>
         public const double JigwiTalismanFailBlazeSeconds = 1d;
         /// <summary>#540: the fireball falls onto a failed seat's board this long after the A ends.</summary>
@@ -95,7 +100,8 @@ namespace C6Lab
             jigwiSchedule = config.JigwiBTestOnly ? LabJigwiABTimeline.BTestSchedule // #551 시험용: B만
                 : config.JigwiATestOnly ? LabJigwiABTimeline.ATestSchedule // #595 시험용: 부적만
                 // #696 연기 6 / 부적 30 / 연기 44 / 부적 68 / 연기 82, 끄면 #595 연기 10 / 부적 45 / 연기 66 / 부적 83
-                : jigwiSmokeFlow ? (config.JigwiDenseTimeline ? LabJigwiABTimeline.DenseSmokeFlowSchedule : LabJigwiABTimeline.SmokeFlowSchedule)
+                : jigwiSmokeFlow ? (config.JigwiRelayTimeline ? LabJigwiABTimeline.RelaySmokeFlowSchedule // #713 이어달리기
+                    : config.JigwiDenseTimeline ? LabJigwiABTimeline.DenseSmokeFlowSchedule : LabJigwiABTimeline.SmokeFlowSchedule)
                 : config.JigwiFlowSchedule ? LabJigwiABTimeline.FlowSchedule : LabJigwiABTimeline.LegacySchedule;
             jigwiAHoldBurn = config.JigwiAHoldBurnUntilEnd;
             jigwiAFailBurnStart = config.JigwiAFailBurnStartSeconds; // #663
@@ -103,6 +109,8 @@ namespace C6Lab
             jigwiBCountdown = config.JigwiBCountdown;
             jigwiCommonStart = config.JigwiCommonStartSeconds; jigwiCommonInterval = config.JigwiCommonIntervalSeconds;
             jigwiSmokeToTalisman = config.JigwiSmokeToTalismanSeconds; jigwiNextSlotPulledAt = double.PositiveInfinity;
+            jigwiRelayGap = config.JigwiRelayGapSeconds; jigwiRelayGapAfterTalisman = config.JigwiRelayGapAfterTalismanSeconds;
+            jigwiSmokeWiped.Clear();
             jigwiABRounds.Clear(); jigwiABActivated.Clear(); jigwiSmokeCleared.Clear(); jigwiABFailureRevision = 0;
             jigwiABLastBurnAt.Clear(); jigwiABBurnQueueId = null; jigwiTalismanDrops.Clear(); jigwiFailBurns.Clear(); jigwiAPausedOrbs.Clear(); jigwiTalismanShards.Clear(); jigwiCommonPours.Clear();
             ResetJigwiABSupply(config);
@@ -204,6 +212,7 @@ namespace C6Lab
         /// </summary>
         private void PullTalismanAfterSmoke(LabJigwiABRound item, LabJigwiABResolution result)
         {
+            if (LabJigwiABTimeline.IsRelay(jigwiSchedule)) return; // #713: the relay schedules every mission after the last one
             if (!item.smoke || jigwiSmokeToTalisman <= 0d || result == LabJigwiABResolution.Cancelled
                 || result == LabJigwiABResolution.Skipped || !LabJigwiABTimeline.IsSmokeFlow(jigwiSchedule)
                 || jigwiStageNextSlot >= LabJigwiABTimeline.SlotCountFor(jigwiSchedule)
@@ -215,6 +224,58 @@ namespace C6Lab
             double from = pulled - LabJigwiABTimeline.WarningSeconds, until = pulled + jigwiABDuration + 1d;
             if (nextCommonGimmickAt >= from && nextCommonGimmickAt < until) nextCommonGimmickAt = until;
         }
+        /// <summary>
+        /// #713 이어달리기: 이 미션이 화면에서 다 끝나는 때. 연기는 모두 닦았거나 15초가 된 때, 부적 성공은 물폭포가 박에 쏟아진 뒤,
+        /// 부적 실패는 실패 대사 뒤 판의 구슬이 다 타 버린 뒤.
+        /// </summary>
+        public double JigwiMissionDoneAt(LabJigwiABRound item)
+        {
+            if (item == null || item.resolvedAt < 0d) return double.PositiveInfinity;
+            if (item.kind != LabJigwiABKind.PersonalBurn) return item.resolvedAt;
+            if (item.resolution == LabJigwiABResolution.Completed && item.common)
+                return item.resolvedAt + LabJigwiABTimeline.CommonTalismanRevealSeconds + LabJigwiABTimeline.CommonTalismanPourSeconds;
+            if (item.resolution == LabJigwiABResolution.Expired)
+                return item.resolvedAt + jigwiAFailBurnStart + JigwiTalismanFailBlazeSeconds;
+            return item.resolvedAt;
+        }
+
+        /// <summary>
+        /// #713 이어달리기: 미션이 끝나면 그 연출까지 끝난 때부터 jigwiRelayGap초 뒤(예고 포함)에 다음 미션을 잡는다.
+        /// 다음 미션을 피버 전에 끝낼 수 없으면 더 잡지 않는다 (공통 기믹은 따로 계속 나온다).
+        /// </summary>
+        private void ScheduleJigwiRelayAfter(LabJigwiABRound item, LabJigwiABResolution result)
+        {
+            if (!LabJigwiABTimeline.IsRelay(jigwiSchedule) || result == LabJigwiABResolution.Cancelled
+                || jigwiStageNextSlot >= LabJigwiABTimeline.SlotCountFor(jigwiSchedule)) return;
+            double gap = item.kind == LabJigwiABKind.PersonalBurn ? jigwiRelayGapAfterTalisman : jigwiRelayGap;
+            double activeAt = JigwiMissionDoneAt(item) + Math.Max(LabJigwiABTimeline.WarningSeconds, gap);
+            bool personal = LabJigwiABTimeline.KindForSlot(jigwiStageNextSlot, jigwiSchedule) == LabJigwiABKind.PersonalBurn;
+            double length = personal ? jigwiABDuration + jigwiAFailBurnStart + JigwiTalismanFailBlazeSeconds : JigwiABMissionSeconds;
+            if (!(activeAt + length <= jigwiStageCutoffAt)) { jigwiStageNextSlot = LabJigwiABTimeline.SlotCountFor(jigwiSchedule); return; }
+            jigwiNextSlotPulledAt = activeAt;
+        }
+
+        /// <summary>
+        /// #713: 이 자리가 자기 화면의 연기를 다 닦았다(LabJigwiBucketHandleView가 셈). 연기를 받은 모두가 닦으면 그 연기는 그때 끝난다
+        /// (15초를 기다리지 않음). 연기마다 한 사람 한 번.
+        /// </summary>
+        public bool TryWipeJigwiSmoke(ulong sender, string roundId, double now)
+        {
+            if (!jigwiABEnabled || string.IsNullOrEmpty(roundId) || !TryAdvance(now, out _) || phase != LabPhase.Playing
+                || !players.ContainsKey(sender)) return false;
+            var round = jigwiABRounds.FirstOrDefault(value => value.id == roundId);
+            if (round == null || !round.smoke || round.resolution != LabJigwiABResolution.None || now >= round.endsAt) return false;
+            var seat = round.players?.FirstOrDefault(value => value.playerId == sender);
+            if (seat == null || now < seat.readyAt) return false;
+            if (!jigwiSmokeWiped.TryGetValue(roundId, out var wiped)) jigwiSmokeWiped[roundId] = wiped = new HashSet<ulong>();
+            if (!wiped.Add(sender)) return false;
+            // Resolved as over-in-time (not a B success): no splash, no board fire; it only frees the timeline.
+            if (round.players.All(value => value != null && wiped.Contains(value.playerId)))
+                ResolveJigwiAB(round, LabJigwiABResolution.Expired, now);
+            revision++;
+            return true;
+        }
+
         private void AdvanceJigwiABActive(LabJigwiABRound active, double now)
         {
             bool firstActivation = jigwiABActivated.Add(active.id);
@@ -242,7 +303,8 @@ namespace C6Lab
                 kind = kind,
                 warningAt = activeAt - LabJigwiABTimeline.WarningSeconds, activeAt = activeAt,
                 endsAt = Math.Min(jigwiStageCutoffAt, personal
-                    ? Math.Min(activeAt + jigwiABDuration, jigwiStageStartedAt + LabJigwiABTimeline.NextOffset(slot, jigwiSchedule))
+                    ? Math.Min(activeAt + jigwiABDuration, LabJigwiABTimeline.IsRelay(jigwiSchedule) ? double.PositiveInfinity
+                        : jigwiStageStartedAt + LabJigwiABTimeline.NextOffset(slot, jigwiSchedule))
                     : activeAt + JigwiABMissionSeconds),
                 // Reserved shrink fields remain on the wire, but the timed mission never shrinks an orb.
                 shrinkAt = activeAt, shrinkScale = 1f,
@@ -285,6 +347,7 @@ namespace C6Lab
             if (item == null || item.resolution != LabJigwiABResolution.None) return;
             item.resolution = result; item.resolvedAt = Math.Max(item.warningAt, at);
             PullTalismanAfterSmoke(item, result);
+            ScheduleJigwiRelayAfter(item, result);
             // #540: an A that runs out punishes every seat that did not finish its talisman (each seat for itself):
             // when Jigwi's line is over, every orb then on its board burns away at once. Drums keep working.
             var failed = new HashSet<ulong>();

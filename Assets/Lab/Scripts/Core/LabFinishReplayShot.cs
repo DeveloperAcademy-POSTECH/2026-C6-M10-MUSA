@@ -26,6 +26,8 @@ namespace C6Lab
         public int Slot;
         public LabOrbElement Element;
         public bool FiveColor, JigwiReward;
+        /// <summary>#713: the five-colour shot was the Jigwi black orb (soot tones, black aura). Old builds read it as five-colour.</summary>
+        public bool Soot;
         /// <summary>LabProjectile.Create's blast size, its radius scale, the independent B shrink and the final radius.</summary>
         public float BlastScale = 1f, RadiusScale = 1f, JigwiRadiusScale = 1f, Radius = .165f;
         /// <summary>The model's launch scale (SMALL/BIG sound), before any B reward size.</summary>
@@ -111,7 +113,7 @@ namespace C6Lab
                 writer.Write(Owner);
                 writer.Write((byte)Mathf.Clamp(Slot, 0, 255));
                 writer.Write((byte)Element);
-                writer.Write((byte)((FiveColor ? 1 : 0) | (JigwiReward ? 2 : 0)));
+                writer.Write((byte)((FiveColor ? 1 : 0) | (JigwiReward ? 2 : 0) | (Soot ? 4 : 0)));
                 foreach (float value in new[] { BlastScale, RadiusScale, JigwiRadiusScale, Radius, LaunchScale,
                     FlightSeconds, Gravity, Damping, PoseStart }) writer.Write(value);
                 foreach (Vector3 value in new[] { LaunchPosition, LaunchVelocity, HitPoint, HitNormal, ImpactVelocity })
@@ -146,7 +148,7 @@ namespace C6Lab
                     if (!Enum.IsDefined(typeof(LabOrbElement), (int)element)) return false;
                     value.Element = (LabOrbElement)element;
                     byte flags = reader.ReadByte();
-                    value.FiveColor = (flags & 1) != 0; value.JigwiReward = (flags & 2) != 0;
+                    value.FiveColor = (flags & 1) != 0; value.JigwiReward = (flags & 2) != 0; value.Soot = value.FiveColor && (flags & 4) != 0;
                     value.BlastScale = reader.ReadSingle(); value.RadiusScale = reader.ReadSingle();
                     value.JigwiRadiusScale = reader.ReadSingle(); value.Radius = reader.ReadSingle();
                     value.LaunchScale = reader.ReadSingle(); value.FlightSeconds = reader.ReadSingle();

@@ -33,8 +33,16 @@ namespace C6Lab
         /// </summary>
         public const int DenseSmokeFlowSchedule = 5;
         private static readonly double[] DenseSmokeFlowOffsets = { 6d, 30d, 44d, 68d, 82d };
-        /// <summary>#595/#696: 연기가 먼저 오고 부적이 뒤따르는 연기 흐름인지 (4개 또는 촘촘한 6개).</summary>
-        public static bool IsSmokeFlow(int schedule) => schedule == SmokeFlowSchedule || schedule == DenseSmokeFlowSchedule;
+        /// <summary>
+        /// #713 이어달리기 연기 흐름: 첫 연기만 6초에 정해진 시각에 오고, 그 뒤로는 앞 미션(벌칙/보상 연출까지)이 끝나고
+        /// RelayGap초 뒤(지귀 예고 2초 포함)에 다음 미션이 온다. 연기 → 부적 → 연기 … 피버 전에 끝낼 수 있는 만큼 (최대 SlotCount개).
+        /// </summary>
+        public const int RelaySmokeFlowSchedule = 6;
+        private static readonly double[] RelaySmokeFlowOffsets = { 6d, 6d, 6d, 6d, 6d, 6d }; // only slot 0 is a fixed time
+        public static bool IsRelay(int schedule) => schedule == RelaySmokeFlowSchedule;
+        /// <summary>#595/#696/#713: 연기가 먼저 오고 부적이 뒤따르는 연기 흐름인지 (4개, 촘촘한 5개, 이어달리기).</summary>
+        public static bool IsSmokeFlow(int schedule) => schedule == SmokeFlowSchedule || schedule == DenseSmokeFlowSchedule
+            || schedule == RelaySmokeFlowSchedule;
         /// <summary>#595: 연기 B가 시작되고(지귀 예고 2초 뒤) 박이 달아오르다 연기가 뿜어져 나오기까지(초). 모든 자리가 같다.</summary>
         public const double SmokeLeadSeconds = 1.5d;
         /// <summary>
@@ -51,9 +59,11 @@ namespace C6Lab
         private static double[] Offsets(int schedule) => schedule == FlowSchedule ? FlowOffsets
             : schedule == BTestSchedule || schedule == ATestSchedule ? BTestOffsets
             : schedule == SmokeFlowSchedule ? SmokeFlowOffsets
-            : schedule == DenseSmokeFlowSchedule ? DenseSmokeFlowOffsets : ActivationOffsets;
+            : schedule == DenseSmokeFlowSchedule ? DenseSmokeFlowOffsets
+            : schedule == RelaySmokeFlowSchedule ? RelaySmokeFlowOffsets : ActivationOffsets;
         public static bool ValidSchedule(int schedule) => schedule == LegacySchedule || schedule == FlowSchedule || schedule == BTestSchedule
-            || schedule == SmokeFlowSchedule || schedule == ATestSchedule || schedule == DenseSmokeFlowSchedule;
+            || schedule == SmokeFlowSchedule || schedule == ATestSchedule || schedule == DenseSmokeFlowSchedule
+            || schedule == RelaySmokeFlowSchedule;
         /// <summary>#551: the kind of a slot in this schedule (the B test schedule is all B).</summary>
         public static LabJigwiABKind KindForSlot(int slot, int schedule) => schedule == BTestSchedule
             ? (slot >= 0 && slot < SlotCount ? LabJigwiABKind.GroupFire : throw new ArgumentOutOfRangeException(nameof(slot)))

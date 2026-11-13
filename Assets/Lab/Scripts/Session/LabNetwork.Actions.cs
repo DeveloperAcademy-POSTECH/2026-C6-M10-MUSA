@@ -593,7 +593,7 @@ namespace C6Lab
                 config.RelayDoubleMultiplier, config.RelayMaxMultiplier);
             localHits.Register(requestId, id);
             visual.LaunchVisual(velocity, config, target,
-                contact => OnPredictedShotContact(requestId, contact, element, attack, comboScale, fiveColor, supply, talisman));
+                contact => OnPredictedShotContact(requestId, contact, element, attack, comboScale, fiveColor, supply, talisman, soot));
             if (talisman) LaunchTalismanVolley(visual, id, LocalPlayerId, position, velocity, scale, element, false); // #540
             predictedShots[request.requestId] = visual;
             presentedShots.Add(request.requestId);
@@ -606,7 +606,7 @@ namespace C6Lab
         /// may block or burn the shot (B curtain, stage fire, legacy fire) wait for the Host as before.
         /// </summary>
         private void OnPredictedShotContact(long requestId, LabProjectileResult contact, LabOrbElement element,
-            int attackValue, float comboScale, bool fiveColor, bool supply, bool talisman)
+            int attackValue, float comboScale, bool fiveColor, bool supply, bool talisman, bool soot = false)
         {
             if (IsHost || target == null || supply || !PredictedContactAllowed()) return;
             if (contact.Kind == LabProjectileHitKind.Monster)
@@ -626,11 +626,13 @@ namespace C6Lab
                     impactFeedback?.PlayHit(target, local, element, attackValue, contact.ImpactVelocity, false);
                 else
                     impactFeedback?.PlayContact(target, local, element, attackValue, contact.ImpactVelocity,
-                        contact.HitNormal, contact.VisualDiameter, fiveColor: fiveColor, fiveColorAge: contact.FiveColorAge);
+                        contact.HitNormal, contact.VisualDiameter, fiveColor: fiveColor, fiveColorAge: contact.FiveColorAge,
+                        fiveColorPalette: soot ? LabFiveColorSparkle.SootTones : null); // #713
                 LastLocalHitOffset = LabThrowSound.HitOffset(local, hitbox.InverseTransformDirection(contact.ImpactVelocity));
                 LastLocalHitSmall = LabThrowSound.IsSmallThrow(comboScale);
                 LastLocalHitBig = LabThrowSound.IsBigThrow(comboScale);
                 LastLocalHitFiveColor = fiveColor;
+                LastLocalHitSoot = soot;
                 LocalThrowHit?.Invoke(attackValue);
             }
             else if (contact.Kind == LabProjectileHitKind.Miss

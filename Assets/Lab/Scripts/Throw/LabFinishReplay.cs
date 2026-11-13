@@ -237,7 +237,7 @@ namespace C6Lab
                 // Realtime sprite tinting would overwrite the clay pool's sampled palette clock.
                 if (Shot.FiveColor && !ghost.ClayFlightActive)
                     LabFiveColorSparkle.AttachArt(ghost.transform,
-                        Network.config.OrbRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined), true);
+                        Network.config.OrbRadius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined), true, ShotPalette);
             }
             float until = Mathf.Min(time, 0f);
             while (sampledFlightTime < until)
@@ -248,7 +248,7 @@ namespace C6Lab
                 replayVfx?.Advance(next - sampledFlightTime);
                 sampledFlightTime = next;
             }
-            ghost.TryTintClayFlight(Mathf.Max(0f, until + Shot.FlightSeconds), LabFiveColorSparkle.FiveColors);
+            ghost.TryTintClayFlight(Mathf.Max(0f, until + Shot.FlightSeconds), ShotPalette ?? LabFiveColorSparkle.FiveColors);
             if (time >= 0f)
             {
                 ghost.EndPuppet();
@@ -265,6 +265,10 @@ namespace C6Lab
             impactAnchor.localScale = frame.lossyScale;
         }
 
+        /// <summary>#713: the black orb's soot tones, or null for an ordinary five-colour (or element) shot.</summary>
+        private Color32[] ShotPalette => Shot.FiveColor && Shot.Soot ? LabFiveColorSparkle.SootTones : null;
+        private LabJigwiSootSound sootSound;
+
         private void PresentImpact(int pass, LabHangingTarget.RigState pose)
         {
             ImpactsPresented++;
@@ -276,7 +280,16 @@ namespace C6Lab
             Vector3 incoming = moved.MultiplyVector(Shot.ImpactVelocity);
             bool clay = replayVfx != null && replayVfx.PlayImpact(Shot.Element, point, posedNormal, incoming,
                 2f * Shot.Radius, LabPaintImpact.Normalize(Shot.ImpactVelocity, normal), impactAnchor,
-                leaveMark: false, fiveColor: Shot.FiveColor, fiveColorAge: Shot.FlightSeconds);
+                leaveMark: false, fiveColor: Shot.FiveColor, fiveColorAge: Shot.FlightSeconds, fiveColorPalette: ShotPalette);
+            // #713: the black orb bursts into its black aura and rings its own hit sound, as in the game.
+            if (Shot.Soot)
+            {
+                LabSootAura.PlayHit(point, Shot.Radius * LabOrbSpriteArt.SizeScaleFor(LabOrbKind.Combined), effectRoot != null
+                    ? effectRoot.gameObject.layer : 0, replayCamera);
+                if (sootSound == null && throwSound != null) sootSound = throwSound.GetComponent<LabJigwiSootSound>();
+                sootSound?.PlayHitSound();
+                return;
+            }
             // Five-color uses the pool's plain-pigment clay fallback if wet shading is unavailable.
             // If neither shader can render, keep sound/transition without resurrecting the legacy dust and stars.
             if (!clay && !Shot.FiveColor)

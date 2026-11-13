@@ -289,7 +289,8 @@ namespace C6Lab
         //       round (foxRound*, foxRoundRunning, its goal and cleared count, up to 100 fox orbs a board) and six more DEV
         //       values (265), on top of #676's 5701 (#664 had also used 5701 on its own branch).
         // 5703: #696 Jigwi dense smoke flow schedule (jigwiAB.schedule 5: six missions); older builds reject the new schedule.
-        internal const ushort LabProtocolVersion = 5703;
+        // 5704: #713 Jigwi relay smoke flow (jigwiAB.schedule 6: each mission follows the last) and the "jigwiSmokeWiped" request.
+        internal const ushort LabProtocolVersion = 5704;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Double-tap a blue fox orb to clear it, and keep your Yin and Yang away.";
@@ -420,6 +421,8 @@ namespace C6Lab
         public bool LastLocalHitBig { get; private set; }
         /// <summary>마지막으로 맞은 내 공이 오색구슬이었는지 (#398, 큰 공 징과 오색구슬 징이 겹치지 않게).</summary>
         public bool LastLocalHitFiveColor { get; private set; }
+        /// <summary>#713 마지막으로 맞은 내 공이 지귀 검정 구슬이었는지 (전용 명중음만 내고 물감 소리는 내지 않는다).</summary>
+        public bool LastLocalHitSoot { get; private set; }
         /// <summary>내 판에서 잠긴 폭탄이 터졌을 때 한 번 알린다. (폭탄 ID, 터진 위치 0..1)</summary>
         public event Action<string, Vector2> BombBlasted;
         /// <summary>An orb on this player's board reached the end of its lifetime and went (#235).</summary>
@@ -2094,6 +2097,13 @@ namespace C6Lab
                 if (model.TryClearJigwiSmoke(sender, packet.firstId, now)) PublishSnapshot(true);
                 return;
             }
+            if (packet.type == JigwiSmokeWipedPacket)
+            {
+                // #713 이 사람이 연기를 다 닦음: 모두 닦으면 그 연기가 끝나고 다음 미션이 그 뒤로 잡힌다.
+                if (battleClock.IsPaused || packet.requestId < 1) return;
+                if (model.TryWipeJigwiSmoke(sender, packet.firstId, now)) PublishSnapshot(true);
+                return;
+            }
             if (packet.type == JigwiTalismanPacket)
             {
                 // #479 지귀 부적: "물"을 다 쓴 사람의 불만 끄고 물 구슬을 준다. 한 회차에 한 사람 한 번.
@@ -2254,7 +2264,8 @@ namespace C6Lab
                         else
                             impactFeedback?.PlayContact(target, targetLocalPoint, element, actualDamage,
                                 result.ImpactVelocity, result.HitNormal, result.VisualDiameter,
-                                fiveColor: fiveColor, fiveColorAge: result.FiveColorAge);
+                                fiveColor: fiveColor, fiveColorAge: result.FiveColorAge,
+                                fiveColorPalette: soot ? LabFiveColorSparkle.SootTones : null); // #713
                     }
                     // The final-hit replay only shows a hit that painted (never a blocked or element-less one).
                     if (!paintBlocked && (element != LabOrbElement.None || fiveColor)) RememberReplayHit(result);
@@ -2267,6 +2278,7 @@ namespace C6Lab
                         LastLocalHitSmall = LabThrowSound.IsSmallThrow(launchScale);
                         LastLocalHitBig = LabThrowSound.IsBigThrow(launchScale);
                         LastLocalHitFiveColor = fiveColor;
+                        LastLocalHitSoot = soot;
                         LocalThrowHit?.Invoke(impactValue);
                     }
                     Color paintColor = fiveColor ? model.PaintColorFor(LabOrbElement.Wood) : model.PaintColorFor(element); // 표시용, 오색구슬은 다섯 색을 칠한다
@@ -2652,7 +2664,8 @@ namespace C6Lab
                                         (LabOrbElement)packet.element, packet.damage, hostVelocity,
                                         pose != null ? hitbox.TransformDirection(pose.localNormal) : Vector3.zero,
                                         pose != null && float.IsFinite(pose.diameter) && pose.diameter > 0f ? pose.diameter : fallbackDiameter,
-                                        fiveColor: packet.fiveColor, fiveColorAge: pose != null ? pose.fiveColorAge : 0f);
+                                        fiveColor: packet.fiveColor, fiveColorAge: pose != null ? pose.fiveColorAge : 0f,
+                                        fiveColorPalette: packet.soot ? LabFiveColorSparkle.SootTones : null); // #713
                                 }
                             }
                             if (packet.fiveColor) PresentFiveColorHit(new Vector3(packet.x, packet.y, packet.z), packet.owner, packet.soot);
@@ -2667,6 +2680,7 @@ namespace C6Lab
                             LastLocalHitSmall = LabThrowSound.IsSmallThrow(packet.sizeScale);
                             LastLocalHitBig = LabThrowSound.IsBigThrow(packet.sizeScale);
                             LastLocalHitFiveColor = packet.fiveColor;
+                            LastLocalHitSoot = packet.soot;
                             LocalThrowHit?.Invoke(packet.impactValue);
                         }
                     }

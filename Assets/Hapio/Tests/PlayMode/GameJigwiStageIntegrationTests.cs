@@ -130,15 +130,19 @@ namespace Hapio.Tests
             clock = (LabBattleClock)Field("battleClock").GetValue(network);
             model = (LabModel)Field("model").GetValue(network);
             startedAt = before.jigwiAB.startedAt;
-            Assert.That(before.jigwiAB.schedule, Is.EqualTo(LabJigwiABTimeline.DenseSmokeFlowSchedule),
-                "The saved main profile runs #696's smoke 8 / talisman 24 / smoke 40 / talisman 55 / smoke 70 / talisman 85 schedule.");
+            Assert.That(before.jigwiAB.schedule, Is.EqualTo(LabJigwiABTimeline.RelaySmokeFlowSchedule),
+                "The saved main profile runs #713's relay: smoke at 6 s, then each mission a gap after the one before.");
             Assert.That(network.config.JigwiAHoldBurnUntilEnd, Is.True,
                 "The saved main profile preserves the board while the talisman is being written.");
             double smokeProbe = LabJigwiABTimeline.ActiveOffset(0, before.jigwiAB.schedule) + LabJigwiABTimeline.SmokeLeadSeconds + .5d;
             // #663: with the saved profile the talisman follows the smoke (which times out here, nobody rubs it) a few seconds later.
             double talismanAt = LabJigwiABTimeline.ActiveOffset(1, before.jigwiAB.schedule);
             double pull = network.config.JigwiSmokeToTalismanSeconds;
-            if (pull > 0d)
+            // #713: in the relay the talisman comes the relay gap after the smoke times out (nobody rubs it here).
+            if (LabJigwiABTimeline.IsRelay(before.jigwiAB.schedule))
+                talismanAt = LabJigwiABTimeline.ActiveOffset(0, before.jigwiAB.schedule) + LabJigwiABTimeline.GroupMissionSeconds
+                    + network.config.JigwiRelayGapSeconds;
+            else if (pull > 0d)
                 talismanAt = Math.Min(talismanAt,
                     LabJigwiABTimeline.ActiveOffset(0, before.jigwiAB.schedule) + LabJigwiABTimeline.GroupMissionSeconds + pull);
             double aProbe = talismanAt + 1.2d;

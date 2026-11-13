@@ -28,6 +28,21 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void TheBlackOrbFlagRoundTripsAndNeedsTheFiveColourFlag()
+        {
+            // #713: the Jigwi black orb replays in soot tones; an ordinary shot never reads as one.
+            LabFinishReplayShot shot = Sample();
+            shot.Soot = true;
+            Assert.That(LabFinishReplayShot.TryDecode(shot.Encode(), out LabFinishReplayShot copy), Is.True);
+            Assert.That(copy.FiveColor && copy.Soot, Is.True);
+            shot.FiveColor = false;
+            Assert.That(LabFinishReplayShot.TryDecode(shot.Encode(), out copy), Is.True);
+            Assert.That(copy.Soot, Is.False, "Only a five-colour shot can be the black orb.");
+            Assert.That(LabFinishReplayShot.TryDecode(Sample().Encode(), out copy), Is.True);
+            Assert.That(copy.Soot, Is.False);
+        }
+
+        [Test]
         public void TheRecordRoundTripsWithinThePacketBudget()
         {
             LabFinishReplayShot shot = Sample();

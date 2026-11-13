@@ -48,6 +48,19 @@ namespace C6Lab
         /// <summary>#696 연기 보상: 연기를 다 걷어 냈다고 Host에 알리는 패킷 종류. firstId에 연기 회차 id.</summary>
         public const string JigwiSmokeClearPacket = "jigwiSmokeClear";
         private string jigwiSmokeClearSentRound;
+        /// <summary>#713: 연기를 다 닦았다고 Host에 알리는 패킷 종류 (모두 닦으면 연기가 끝남). firstId에 연기 회차 id.</summary>
+        public const string JigwiSmokeWipedPacket = "jigwiSmokeWiped";
+        private string jigwiSmokeWipedSentRound;
+
+        /// <summary>#713: 이 기기 화면의 연기를 다 닦았다. 연기 회차마다 한 번 Host에 보낸다. 보냈으면 true.</summary>
+        public bool RequestJigwiSmokeWiped(string roundId)
+        {
+            if (!IsConnected || !CanProcessBattleActions || latest == null || latest.paused || string.IsNullOrEmpty(roundId)
+                || jigwiSmokeWipedSentRound == roundId) return false;
+            jigwiSmokeWipedSentRound = roundId;
+            Request(new LabNetworkPacket { type = JigwiSmokeWipedPacket, requestId = ++requestSequence, firstId = roundId });
+            return true;
+        }
         /// <summary>
         /// #696: 이 기기 화면을 지귀 연기가 덮어 문지르는 중 (판 입력은 막혀 있다). 그동안 iOS 가장자리 제스처(홈/알림 센터 등)를
         /// 미뤄, 화면 끝까지 문질러도 앱이 내려가지 않게 한다 (LabMobilePresentationPolicy).
