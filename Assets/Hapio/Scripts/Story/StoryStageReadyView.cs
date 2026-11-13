@@ -54,7 +54,8 @@ namespace Hapio
             for(int i=count-1;i>0;i--) {hash=unchecked(hash*1664525+1013904223);int j=(int)(hash%(uint)(i+1));int tmp=order[i];order[i]=order[j];order[j]=tmp;}
             return order[Math.Max(0,seat)%count];
         }
-        public void Present(bool allowQuit, bool canStart, int ready, int total, bool blocked, bool finalStage = false)
+        public void Present(bool allowQuit, bool canStart, int ready, int total, bool blocked, bool finalStage = false,
+            string holdNotice = null)
         {
             quit.gameObject.SetActive(allowQuit);
             quit.interactable = !blocked;
@@ -66,7 +67,9 @@ namespace Hapio
             runnerSlot.gameObject.SetActive(!isHost || !all);
             heading.gameObject.SetActive(isHost); count.gameObject.SetActive(isHost);
             memberCaption.gameObject.SetActive(!isHost); start.gameObject.SetActive(isHost);
-            heading.text = all ? "그대의 시작을 기다리고 있소." : "동지들이 채비 중이오.";
+            // After a long hold the Host is told what still keeps the room (#687 exception).
+            heading.text = all ? "그대의 시작을 기다리고 있소."
+                : string.IsNullOrEmpty(holdNotice) ? "동지들이 채비 중이오." : holdNotice;
             ((RectTransform)heading.transform.parent).anchoredPosition = new Vector2(201,-((all ? 177 : 184)+16));
             count.text = "전원 준비 완료 " + ready + "/" + total;
             startCaption.text = finalStage ? (canStart ? "마치기" : "마치기 대기")

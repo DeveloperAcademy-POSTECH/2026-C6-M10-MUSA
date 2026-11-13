@@ -26,7 +26,7 @@ namespace C6Lab.Tests
                     Assert.That(network.SetGameFlowEnabled(true), Is.True);
                     normalDiscovery = LabBonjourDiscovery.ProtocolFor(LabRoomFamily.Game);
                     normalToken = Token(network);
-                    Assert.That(normalToken, Is.EqualTo("C6HapioGame/54"));
+                    Assert.That(normalToken, Is.EqualTo("C6HapioGame/55"));
                 }
                 using (LabGameBuildVariant.OverrideForTests(true))
                 {

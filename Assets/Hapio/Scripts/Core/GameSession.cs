@@ -148,7 +148,8 @@ namespace Hapio
         public bool CanAdvanceStage => network != null && network.IsHost && !IsLoadingScene && AllResultsReady
             && (state.phase == GameFlowPhase.StageResult || state.phase == GameFlowPhase.Completed)
             && (!IsTerritory || !network.IsDeveloperSolo)
-            && (IsTerritory || !IsAnyResultViewerOpen && !IsAnyResultPresentationBusy && AllSealParticipantsReady);
+            && (IsTerritory || ResultHoldOverridden
+                || !IsAnyResultViewerOpen && !IsAnyResultPresentationBusy && AllSealParticipantsReady);
         // The run's own stage count: 2:2 (#281) plays one battle, so it has no next stage to skip to.
         public bool CanDeveloperAdvanceStage => network != null && network.DeveloperBuildAvailable
             && network.IsConnected && network.IsHost && !goingHome && !IsLoadingScene && !restartPending
@@ -163,7 +164,8 @@ namespace Hapio
         {
             get
             {
-                foreach (ulong id in network.ConnectedPlayerIds) if (!resultReady.Contains(id)) return false;
+                foreach (ulong id in network.ConnectedPlayerIds)
+                    if (!resultExcluded.Contains(id) && !resultReady.Contains(id)) return false;
                 return resultReady.Count > 0;
             }
         }
@@ -246,6 +248,7 @@ namespace Hapio
                 if (network.IsHost && hostFlow.RestartCurrentStage(before.runId, before.stageIndex, before.revision))
                     PrepareStage();
             }
+            if (departAt >= 0d) { UpdateGuestDeparture(Time.realtimeSinceStartupAsDouble); return; }
             if (goingHome)
             {
                 // NGO shutdown finishes on a later frame. Its residual IsConnected must not
@@ -311,12 +314,14 @@ namespace Hapio
                 nextResultReadyAt = now + .5d;
                 if (network.IsHost)
                 {
+                    NoteHostResultReady(now);
                     resultReady.Add(network.LocalPlayerId);
                     SetResultViewer(network.LocalPlayerId, IsViewerOpen);
                     SetResultPresentation(network.LocalPlayerId, localResultPresentationBusy);
                 }
                 else network.SendGameFlowToHost(JsonUtility.ToJson(MakeControl("result_ready")));
             }
+            UpdateResultHolds(now);
             LabSnapshot snapshot = network.Snapshot;
             if (network.IsHost && state.phase == GameFlowPhase.Playing && MatchesBattle(snapshot))
             {
@@ -381,6 +386,16 @@ namespace Hapio
                 else if (control.kind == "exit" && state.IsRunActive && control.runId == state.runId
                     && control.stageIndex == state.stageIndex)
                     AbortHost(GameRunFlow.PlayerLeftReason, "한 명이 나가 판을 멈추고 로비로 돌아왔소.");
+                // A member leaving the final result or a retryable defeat now says so, instead of being noticed only by the
+                // 30 s transport timeout: the final result goes on without it, and the defeat can no longer be retried.
+                else if (control.kind == "exit" && control.runId == state.runId && control.stageIndex == state.stageIndex
+                    && state.phase == GameFlowPhase.Completed)
+                    ExcludeResultPeer(control.sender);
+                else if (control.kind == "exit" && control.runId == state.runId && control.stageIndex == state.stageIndex
+                    && state.phase == GameFlowPhase.GameOver && state.retryableDefeat)
+                {
+                    if (hostFlow.EndDefeatRetry(GameRunFlow.PlayerLeftReason)) SetHostState();
+                }
                 return;
             }
             if (control.kind == "countdown_commit")
@@ -928,8 +943,8 @@ namespace Hapio
         }
         public void OpenGourdViewer() { IsViewerOpen = PreviewTexture != null; NotifyResultViewer(); Changed?.Invoke(); }
         public void CloseGourdViewer() { IsViewerOpen = false; NotifyResultViewer(); Changed?.Invoke(); }
-        public void RotatePreview(Vector2 delta) { preview?.Rotate(delta); }
-        public void ZoomPreview(float delta) { preview?.Zoom(delta); }
+        public void RotatePreview(Vector2 delta) { preview?.Rotate(delta); if (IsViewerOpen) viewerInputAt = Time.realtimeSinceStartupAsDouble; }
+        public void ZoomPreview(float delta) { preview?.Zoom(delta); if (IsViewerOpen) viewerInputAt = Time.realtimeSinceStartupAsDouble; }
         public void ResetPreview() { preview?.ResetView(); }
 
         public float[] CaptureDeveloperSettings(int scope) => stageSettings.Capture(scope);
@@ -1083,6 +1098,12 @@ namespace Hapio
             if (goingHome) return;
             if (state.IsRunActive) { ExitRun(); return; }
             if (!CanReturnHome) return;
+            if (BeginGuestDeparture(false)) return;
+            FinishGoHome();
+        }
+
+        private void FinishGoHome()
+        {
             roomBrowserVisible = state.phase == GameFlowPhase.Lobby;
             goingHome = true;
             network.Stop();
@@ -1103,6 +1124,7 @@ namespace Hapio
             CancelRoomCreation(false);
             hostFlow.ReturnHome(); replica.ResetForNewRoom(); controls.Clear();
             restartPending = battleReadyPending = localBattleReady = false; resultReady.Clear();
+            departAt = departResendAt = -1d;
             ResetBattleStart();
             expectedSettingsRevision = 0; expectedSettingsFingerprint = null;
             hostMode = joiningMode = GameMode.Story;

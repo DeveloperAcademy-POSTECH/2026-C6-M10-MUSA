@@ -9,17 +9,33 @@ namespace Hapio
         private readonly HashSet<ulong> resultPresentations = new HashSet<ulong>();
         private bool localResultPresentationBusy;
         private readonly HashSet<ulong> sealParticipantsReady = new HashSet<ulong>();
+        /// <summary>Members no longer counted on this result: they said 'exit', or never reported it in time.</summary>
+        private readonly HashSet<ulong> resultExcluded = new HashSet<ulong>();
+        // Host real times (negative: not started) for the result-ready limit and for a hold by other members.
+        private double resultReadySince = -1d, resultHoldSince = -1d;
+        private GameResultHold.Stage resultHoldStage;
+        // Each device: when its open gourd viewer was last touched.
+        private double viewerInputAt = -1d;
         public bool LocalSealReady { get; private set; }
         private bool RequiresSealReady => !IsTerritory && !tutorialRun
             && (state.phase == GameFlowPhase.StageResult || state.phase == GameFlowPhase.Completed);
-        public int SealParticipantCount => network == null ? 0 : network.ConnectedPlayerIds.Length;
+        public int SealParticipantCount
+        {
+            get
+            {
+                int count = 0;
+                if (network != null) foreach (ulong id in network.ConnectedPlayerIds)
+                    if (!resultExcluded.Contains(id)) count++;
+                return count;
+            }
+        }
         public int SealReadyCount
         {
             get
             {
                 int count = 0;
                 if (network != null) foreach (ulong id in network.ConnectedPlayerIds)
-                    if (sealParticipantsReady.Contains(id) && resultReady.Contains(id)
+                    if (!resultExcluded.Contains(id) && sealParticipantsReady.Contains(id) && resultReady.Contains(id)
                         && !resultPresentations.Contains(id) && !resultViewers.Contains(id)) count++;
                 return count;
             }
@@ -44,7 +60,13 @@ namespace Hapio
         public void QuitStoryToRooms()
         {
             if (goingHome || tutorialRun || IsTerritory || !IsResultPresentationPhase) return;
+            if (BeginGuestDeparture(true)) return;
             if (state.IsRunActive) ExitRun(); // Notify the other devices using the existing departure policy.
+            FinishQuitToRooms();
+        }
+
+        private void FinishQuitToRooms()
+        {
             goingHome = true;
             network.Stop(); network.UnbindBattleReferences();
             ResetRoomFlow();
@@ -53,6 +75,39 @@ namespace Hapio
             goingHome = !network.CanChooseConnection;
             EnterRoomBrowser();
         }
+        // A member leaving a shared result keeps its connection this long so its 'exit' (sent twice) reaches the Host
+        // before the shutdown, instead of the Host learning it only from the 30 s transport timeout.
+        private const double ExitLingerSeconds = .5d, ExitResendSeconds = .25d;
+        private double departAt = -1d, departResendAt = -1d;
+        private bool departToRooms;
+
+        private bool BeginGuestDeparture(bool toRooms)
+        {
+            if (network == null || network.IsHost || !network.IsConnected || tutorialRun || !IsResultPresentationPhase) return false;
+            network.SendGameFlowToHost(JsonUtility.ToJson(MakeControl("exit")));
+            double now = Time.realtimeSinceStartupAsDouble;
+            departAt = now + ExitLingerSeconds;
+            departResendAt = now + ExitResendSeconds;
+            departToRooms = toRooms;
+            goingHome = true; // No other input or Host state is taken while leaving.
+            Changed?.Invoke();
+            return true;
+        }
+
+        private void UpdateGuestDeparture(double now)
+        {
+            if (departResendAt >= 0d && now >= departResendAt && network.IsConnected)
+            {
+                network.SendGameFlowToHost(JsonUtility.ToJson(MakeControl("exit")));
+                departResendAt = -1d;
+            }
+            if (now < departAt && network.IsConnected) return;
+            departAt = departResendAt = -1d;
+            goingHome = false;
+            if (departToRooms) FinishQuitToRooms();
+            else FinishGoHome();
+        }
+
         public bool SummaryStarted { get; private set; }
         /// <summary>
         /// The Host left after the final clear, before starting the summary. Its start signal can no longer arrive,
@@ -112,7 +167,7 @@ namespace Hapio
             && !IsTerritory && !tutorialRun && state.phase == GameFlowPhase.GameOver && state.retryableDefeat;
         public bool CanRetryStage => IsStageRetryAvailable && network.IsHost && !IsLoadingScene && !restartPending
             && HasFailedStageSnapshot && SameRetryRoster && AllResultsReady
-            && !IsAnyResultViewerOpen && !IsAnyResultPresentationBusy;
+            && (ResultHoldOverridden || !IsAnyResultViewerOpen && !IsAnyResultPresentationBusy);
 
         private bool SameRetryRoster => hostFlow.ParticipantCount > 0
             && new HashSet<ulong>(hostFlow.ParticipantIds).SetEquals(network.ConnectedPlayerIds);
@@ -132,7 +187,7 @@ namespace Hapio
 
         public bool CanRetryTerritory => IsTerritory && state.phase == GameFlowPhase.Completed
             && network != null && network.IsConnected && network.IsHost && !goingHome && !IsLoadingScene
-            && AllResultsReady && !IsAnyResultViewerOpen;
+            && AllResultsReady && (ResultHoldOverridden || !IsAnyResultViewerOpen);
 
         public bool RetryTerritory()
         {
@@ -165,6 +220,116 @@ namespace Hapio
             resultViewers.Clear();
             resultPresentations.Clear();
             localResultPresentationBusy = false;
+            resultExcluded.Clear();
+            resultReadySince = resultHoldSince = -1d;
+            resultHoldStage = GameResultHold.Stage.None;
+            viewerInputAt = -1d;
+        }
+
+        /// <summary>
+        /// After the long hold (#687 exception, user decision 2026-11-13) the Host may press start without members who
+        /// are still reading, viewing or have not pressed 다음 봉인. Nothing starts by itself and nobody is marked ready.
+        /// </summary>
+        public bool ResultHoldOverridden => resultHoldStage == GameResultHold.Stage.Override;
+
+        /// <summary>The Host's waiting heading after the notice time: what still holds the room (empty: nothing to say).</summary>
+        public string ResultHoldNotice
+        {
+            get
+            {
+                if (resultHoldStage == GameResultHold.Stage.None || network == null || !network.IsHost) return string.Empty;
+                foreach (ulong id in resultViewers)
+                    if (id != network.LocalPlayerId) return "한 동지가 아직 봉인 박을 보고 있소.";
+                foreach (ulong id in resultPresentations)
+                    if (id != network.LocalPlayerId) return "한 동지가 아직 이야기를 보고 있소.";
+                return "한 동지가 아직 채비하지 않았소.";
+            }
+        }
+
+        /// <summary>
+        /// Host: ends a result that a member never reported (30 s) and times how long other members hold the room.
+        /// Each device: closes its own gourd viewer left untouched (60 s).
+        /// </summary>
+        private void UpdateResultHolds(double now)
+        {
+            if (IsViewerOpen)
+            {
+                if (viewerInputAt < 0d || StoryTapAdvance.HasHeldPointer) viewerInputAt = now;
+                else if (GameResultHold.IdleExpired(viewerInputAt, now)) { CloseGourdViewer(); viewerInputAt = -1d; }
+            }
+            else viewerInputAt = -1d;
+            if (network == null || !network.IsHost || !network.IsConnected || !IsResultPresentationPhase || goingHome)
+            {
+                SetResultHoldStage(GameResultHold.Stage.None);
+                return;
+            }
+            if (!AllResultsReady)
+            {
+                resultHoldSince = -1d;
+                SetResultHoldStage(GameResultHold.Stage.None);
+                if (GameResultHold.ResultReadyExpired(resultReadySince, now)) ExpireMissingResults();
+                return;
+            }
+            bool hostReady = !IsViewerOpen && !localResultPresentationBusy && (!RequiresSealReady || LocalSealReady);
+            if (hostReady && OthersHoldResult())
+            {
+                if (resultHoldSince < 0d) resultHoldSince = now;
+            }
+            else resultHoldSince = -1d;
+            SetResultHoldStage(GameResultHold.HoldStage(resultHoldSince, now));
+        }
+
+        private bool OthersHoldResult()
+        {
+            ulong self = network.LocalPlayerId;
+            foreach (ulong id in resultViewers) if (id != self) return true;
+            if (!IsTerritory)
+            {
+                foreach (ulong id in resultPresentations) if (id != self) return true;
+                if (RequiresSealReady && SealReadyCount < SealParticipantCount) return true;
+            }
+            return false;
+        }
+
+        private void SetResultHoldStage(GameResultHold.Stage stage)
+        {
+            if (resultHoldStage == stage) return;
+            resultHoldStage = stage;
+            Changed?.Invoke();
+        }
+
+        /// <summary>A member who never reports its result (user decision 4): an intermediate stage ends for everyone,
+        /// a completed run goes on without it, and a retryable defeat can no longer be retried.</summary>
+        private void ExpireMissingResults()
+        {
+            resultReadySince = -1d;
+            var missing = new List<ulong>();
+            foreach (ulong id in network.ConnectedPlayerIds)
+                if (!resultExcluded.Contains(id) && !resultReady.Contains(id)) missing.Add(id);
+            if (missing.Count == 0) return;
+            Debug.LogWarning("HAPIO_RESULT_READY_TIMEOUT phase=" + state.phase + " stage=" + state.stageIndex
+                + " missing=" + string.Join(",", missing), this);
+            if (state.phase == GameFlowPhase.StageResult) { AbortHost("The stage result could not be synchronized."); return; }
+            if (state.phase == GameFlowPhase.GameOver)
+            {
+                if (hostFlow.EndDefeatRetry(GameRunFlow.PlayerDisconnectedReason)) SetHostState();
+                return;
+            }
+            foreach (ulong id in missing) resultExcluded.Add(id);
+            Changed?.Invoke();
+        }
+
+        /// <summary>The Host's own first result report starts the 30 s limit for everyone else's.</summary>
+        private void NoteHostResultReady(double now)
+        {
+            if (resultReadySince < 0d) resultReadySince = now;
+        }
+
+        /// <summary>A member left this result screen ('exit'): it no longer holds the Host's buttons.</summary>
+        private void ExcludeResultPeer(ulong id)
+        {
+            resultExcluded.Add(id);
+            ForgetResultPeer(id, false);
         }
 
         private void SetResultViewer(ulong playerId, bool open)
