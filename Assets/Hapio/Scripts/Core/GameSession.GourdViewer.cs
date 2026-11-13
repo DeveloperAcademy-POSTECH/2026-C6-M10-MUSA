@@ -23,8 +23,8 @@ namespace Hapio
         public GameGourdViewerState GourdViewerState => PreviewTexture != null
             ? GameGourdViewerState.Ready : viewerState;
         public string GourdViewerError => viewerError;
-        private bool WantsGourdViewer => network != null && network.config != null
-            && network.config.CompletedGourdViewerEnabled && network.config.GourdMode == LabGourdMode.Paint;
+        private bool WantsGourdViewer => network != null
+            && ResultNeedsPreview(ResultSnapshot ?? network.Snapshot);
         private bool SameViewerGeneration => viewerRun == state.runId && viewerStage == state.stageIndex
             && viewerSession == state.battleSessionId && viewerRound == state.battleRound;
 

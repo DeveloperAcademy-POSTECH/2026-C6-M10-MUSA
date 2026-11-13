@@ -144,7 +144,8 @@ namespace Hapio
                 if (ready) finishBarrier.Prepared(network.LocalPlayerId);
                 // One budget starts at Victory, not again when the surface becomes ready.
                 if (realNow >= finishDeadlineAt) finishBarrier.Expire(finishWaitAt + GamePaintFinishBarrier.TimeoutSeconds);
-                if (!finishBarrier.Released && replayDecided && network.TryGetGameServerTime(out double scheduleNow))
+                if (!finishBarrier.Released && replayDecided && FinishScheduleAllowed(realNow, network.IsDeveloperSolo)
+                    && network.TryGetGameServerTime(out double scheduleNow))
                 {
                     bool singleLocal = network.IsDeveloperSolo;
                     if (singleLocal && ready && !finishBarrier.Committed)
@@ -329,6 +330,7 @@ namespace Hapio
         }
         double ResultCaptureDeadline(double realNow)
         {
+            if (IsTerritory) return TerritoryResultDeadline(realNow); // #717
             if (state.mode != GameMode.Story) return realNow + loadingTimeoutSeconds;
             ObserveFinishDeadline(finishServerDeadline, realNow);
             return finishDeadlineAt;
@@ -347,9 +349,7 @@ namespace Hapio
                 || ResultSnapshot.paintRevision != capturedPaintRevision) return false;
             if (network.PaintSurface != null && network.PaintSurface.Revision == capturedPaintRevision
                 && network.PaintSurface.VisualVersion != capturedVisualVersion) return false;
-            bool needsPreview = network.config != null && network.config.CompletedGourdViewerEnabled
-                && network.config.GourdMode == LabGourdMode.Paint;
-            return !needsPreview || preview != null && !preview.IsDisposed
+            return !ResultNeedsPreview(ResultSnapshot) || preview != null && !preview.IsDisposed
                 && preview.PaintRevision == capturedPaintRevision;
         }
         static bool FiniteFinishTime(double value) => !double.IsNaN(value) && !double.IsInfinity(value);

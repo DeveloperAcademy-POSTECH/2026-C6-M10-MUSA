@@ -80,6 +80,40 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void TheGaugeSwellsAndTheWarningWithItsRedMarkShakesInTheMiddleThenAllGoes()
+        {
+            feedback.Play();
+            feedback.Advance(.08f);
+            Assert.That(feedback.GaugeScale, Is.GreaterThan(1.02f), "#718: the gauge swells a little while it shakes.");
+            Assert.That(bar.localScale.x, Is.EqualTo(feedback.GaugeScale).Within(.0001f));
+            Assert.That(feedback.WarningVisible, Is.True);
+            Assert.That(feedback.WarningLabel, Is.EqualTo(LabStaminaShortFeedback.WarningText));
+            Assert.That(feedback.WarningIcon, Is.Not.Null, "The red mark beside the words, as one group.");
+            Assert.That(feedback.WarningShake.magnitude, Is.GreaterThan(0f));
+            Assert.That(feedback.EdgeAlpha, Is.GreaterThan(0f));
+            var words = root.GetComponentsInChildren<UnityEngine.UI.Text>(true).Single(text => text.text == LabStaminaShortFeedback.WarningText);
+            Assert.That(words.raycastTarget, Is.False, "It never takes a touch.");
+
+            feedback.Advance(profile.ShortWarningSeconds);
+            Assert.That(feedback.Playing, Is.False);
+            Assert.That(feedback.WarningVisible, Is.False);
+            Assert.That(feedback.EdgeAlpha, Is.Zero);
+            Assert.That(bar.localScale, Is.EqualTo(Vector3.one), "The gauge is its own size again.");
+            Assert.That(bar.anchoredPosition, Is.EqualTo(BarPlace));
+        }
+
+        [Test]
+        public void TheGaugeSwellsEarlyAndSettlesByTheEndOfTheShake()
+        {
+            Assert.That(LabStaminaShortFeedback.PopAmount(0f, .32f), Is.Zero);
+            Assert.That(LabStaminaShortFeedback.PopAmount(.096f, .32f), Is.EqualTo(1f).Within(.001f));
+            Assert.That(LabStaminaShortFeedback.PopAmount(.32f, .32f), Is.Zero);
+            Assert.That(LabStaminaShortFeedback.WarningPop(0f), Is.EqualTo(.6f).Within(.001f), "Pops in small...");
+            Assert.That(LabStaminaShortFeedback.WarningPop(.12f), Is.EqualTo(1.15f).Within(.001f), "...a little big...");
+            Assert.That(LabStaminaShortFeedback.WarningPop(.5f), Is.EqualTo(1f), "...then its own size.");
+        }
+
+        [Test]
         public void TappingAgainRestartsFromTheOriginalPlaceInsteadOfDrifting()
         {
             feedback.Play();

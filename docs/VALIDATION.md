@@ -8605,7 +8605,6 @@ main `e3108459`의 #712(칠용 뚜껑 법선 공유와3개 LidPaint 메시)을 �
 
 main fbc943e8을 통합하며 VALIDATION 문서 끝의 독립 기록 추가 충돌을 양쪽 보존으로 해결했다. 자동 병합된 Battle 씬은 Stage2 하위591개 블록이 작업 브랜치와 같고 Stage3 하위710개 블록이 main과 같은 것을 정적 비교했다. 씬 object ID 중복0, 새 미해결 GUID0, 충돌 표식0을 확인했다. 기존 패키지 GUID는 프로젝트 에셋 GUID 검사에서 제외했다. main의 시연/법선 수정과 기존 Stage2 폴리싱을 함께 보존했다. 이 병합본에서 Unity 컴파일/실행 검사는 재실행하지 않았으며 앞선 PASS 기록과 구분한다.
 
-
 ## 2026-11-13 — #720 관람 복귀 버튼 배경 보완
 
 기준 main `9be6d1f1`, `fix/#720-viewer-return-background`, Unity6000.6.5f1/macOS Metal. 사용자가 다른 PC의 일반 Hapio 빌드에서 ‘결과로 돌아가기’ 배경만 없다고 확인했다. 해당 문제 앱/저장 상태에는 접근할 수 없고, 공유된main의Mac Development캡처에는배경이있어 실제 원인은 확정하지 않았다. 현재코드의 항목존재/sprite null 방어 공백과 재오픈 경계를 보완한다.
@@ -8683,3 +8682,83 @@ main fbc943e8을 통합하며 VALIDATION 문서 끝의 독립 기록 추가 충�
 ### 실행하지 않은 환경
 
 새 회귀 검사는 솔로 Host 안에 실제 receiver 페이지 지연을 주입한 검사다. 별도 Mac Host/Guest 프로세스, iOS 빌드/실기기의 일반 Wi-Fi·핫스팟, 사용자 원래 문제 앱의 재현은 미검증이다. 원시 로그·로컬 절대 경로·검사 산출물은 커밋하지 않는다.
+
+## 2026-11-13 — #718 북 넘기기 안내와 스태미나 부족 경고
+
+### 변경
+
+- 북 넘기기 안내 (`GameDrumPassHint`, 튜토리얼이 아닌 모든 전투에 `GameBattleBindings`가 붙임):
+  - 북이 내 판에 온 뒤 4초(Inspector `hintAfterSeconds`, 처음 8초에서 줄임) 동안 넘기지 않으면 튜토리얼 4·6단계와 같은 손(끌기 동작)과 초록 화살표를 북에서 화면 가장자리까지 보여 준다. 그림·크기·속도는 `GameTutorialArt`를 그대로 쓴다.
+  - 북을 두드려도 시간은 계속 센다. 북이 내 판을 떠나면 그 북의 시간은 지워지고, 다시 오면 처음부터 센다. 일시정지·시작 전·전투가 끝난 뒤에는 세지 않는다. 북이 여러 개면 가장 오래 있던 북.
+  - 방향: 넘길 수 있는 쪽만. 양쪽이 열리면 손이 한 번 밀 때마다(1.6초) 오른쪽·왼쪽을 번갈아. 박의 한쪽 넘기기 막기(#215)·땅따먹기 팀 벽이면 열린 쪽만. 땅따먹기 1:1·매혹으로 판이 멈춘 동안은 띄우지 않는다. 개발용 솔로에서는 확인할 수 있게 양쪽이 열린 것처럼 번갈아 띄운다(실제로 넘어가지는 않는다). 손가락으로 판 위 구슬을 잡고 있는 동안은 숨긴다.
+  - 글자 없음, 내 화면 표시만(별도 Canvas, 정렬 50, 터치를 막지 않음). Host 규칙·스냅샷·DEV 값·접속 버전은 바뀌지 않았다.
+- 스태미나 부족 경고 (#418 `LabStaminaShortFeedback` 확장, 누른 사람 화면에만, 터치를 막지 않음):
+  - 처음 넣었던 조합 영역 전체 흔들림(`LabOrbHudComposition.SetBoardShake`)은 되돌렸다. 게이지만 흔들린다.
+  - 게이지가 흔들리는 0.32초 동안 살짝 커졌다(최대 1.15배, 앞 30%)가 원래 크기로 돌아온다. 충전 중인 칸의 빨간 빛은 그대로.
+  - 화면 가운데("시작!"과 같은 높이, 화면 비율 0.5, 0.5: 고유 기믹 안내 글(0.6)과 겹치지 않게 그보다 아래)에 "기운이 부족하다"(신라문화체 Bold 22, 기본 먹색, 프로필 `Short Warning Text Color`)와 빨간 느낌표 그림(`Resources/Stamina/StaminaShortWarning.png`, 원본 1536x1024에서 그림 부분 265x585만 잘라 넣음)이 한 덩어리로 작게 나왔다가 살짝 커진 뒤 제 크기로, 게이지와 같은 박자로 흔들리고 0.8초 뒤 0.2초에 걸쳐 사라진다.
+  - 화면 가장자리가 매혹의 분홍빛과 같은 모양(`LabCharmHeartRain.Vignette`)으로 0.4초 동안 빨갛게 번쩍한다.
+  - 크기·시간·자리·색은 `StaminaFeedbackProfile`의 새 값으로 조절한다. 다시 누르면 처음부터 다시 낸다. 스태미나 부족 소리는 그대로.
+
+### 확인
+
+- Unity 6000.6.5f1 Editor 컴파일: PASS. 느낌표 그림은 Editor API로 Sprite·밉맵 끔으로 가져와 265x585로 읽히는 것을 확인했다. 콘솔 오류 1건은 기존 `ResultAction.png` Library 캐시 손상(#717 기록)이다.
+- 검사 (실행은 NOT_RUN):
+  - EditMode `GameDrumPassHintTests` 4건: 머문 시간(두드려도 계속, 넘기면 지움, 다시 오면 0부터), 가장 오래된 북, 넘길 수 있는 쪽(양쪽·막기 좌우·매혹·혼자·개발용 솔로·1:1·2:2), 번갈아 가리키기.
+  - PlayMode `GameSceneFlowTests.ADrumKeptFourSecondsGetsTheTutorialsPassGuideUntilItIsPassed`: 실제 전투의 북과 판으로 개발용 솔로 표시 → 4초 전 안 보임 → 보임·오른쪽 → 왼쪽 → 일시정지 숨김 → 다시 보임 → 넘기면 사라짐 → 돌아오면 0부터.
+  - PlayMode `GameSceneFlowTests.ShortStaminaSwellsTheGaugeShowsTheWarningAndFlashesTheEdgesRedOnlyOnTheBattleScreen`: 실제 전투에서 게이지 커짐·흔들림, 경고 글자+느낌표, 경고 흔들림, 빨간 가장자리, 조합 영역은 그대로, 끝나면 모두 제자리.
+  - PlayMode `LabStaminaShortFeedbackTests` 2건 추가(게이지 커짐·경고·가장자리·제자리, 커짐·튀어나옴 곡선), 기존 3건 유지.
+- 전체 EditMode·PlayMode: NOT_RUN (전투 화면 표시만 바뀌어 #637 기준 관련 검사 + 전체 EditMode 권장).
+- Mac 앱 3개로 안내 표시·사라짐·방향, 경고 모양 확인: NOT_RUN.
+
+### #718 main 병합 — 2026-11-13
+
+- 최신 main(#720 관람 복귀 배경, #719 야광귀 콤보 가이딩)을 통합했다. 충돌은 이 문서 끝의 기록 추가 한 곳이며 양쪽 기록을 모두 보존했다. `GameSceneFlowTests.cs`는 자동 병합됐다.
+- #718이 바꾼 파일(`GameDrumPassHint`, `GameBattleBindings`, `LabStaminaShortFeedback`·프로필, `LabCharmHeartRain`의 가장자리 그림 공개, `LabOrbHudComposition` 되돌림)은 main 쪽 변경과 겹치지 않는다. 병합 뒤 컴파일과 검사 결과는 아래 확인 줄에 적는다.
+
+
+## 2026-11-13 — #717 전투 시작·끝 문구와 결과 전환 (땅따먹기·스토리 1~3)
+
+### 원인 (땅따먹기 끝의 멈춤)
+
+- 결과 화면으로 넘어가기 전 `GameSession.ChangeScene`이 "다 칠한 박" 그림(박 확인)이 준비되길 기다린다(`CanCaptureResult` → `LabGourdResultPreview.SurfaceMatches`, 다 칠한 박만 통과). 시간이 다 되어 끝난 땅따먹기 박은 다 칠해지지 않으므로 이 기다림이 결과 준비 제한 시간(스토리가 아니면 `loadingTimeoutSeconds` 30초)까지 이어진다. 그동안 전투 화면이 그대로 남아 멈춘 것처럼 보였다. 박을 다 칠해 끝난 경우에도 참가자 기기는 마지막 칠 지도가 도착할 때까지 기다린다.
+- 코드 읽기와 Editor API 확인(땅따먹기 설정: 박 확인 켜짐·Paint·목표 100%)으로 찾은 원인이다. 실제 기기에서 몇 초가 걸렸는지는 아직 재지 않았다(NOT_RUN). 이번 변경부터 결과로 넘어갈 때마다 콘솔에 `HAPIO_RESULT_TRANSITION mode=… wait=… capture=… hold=… load=…` 한 줄이 남는다.
+
+### 변경
+
+- 문구 모양: 진홍 `#8A1206` 글자, 크림 `#FCE8C8` 가장자리(3px), 신라문화체 Bold. 세션 위 시작 오버레이(`GameStartOverlay`)가 그린다.
+- 시작: 3·2·1 뒤 스토리 스테이지(1~3, 야광귀 시연 포함)는 "봉인 시작!"(64), 땅따먹기는 "시작!" 그대로. 화면을 막지 않으며, 보이는 시간은 0.5초 → 1초(`GameStartTiming.DefaultStartedLabelSeconds`).
+- 끝 (판이 끝난 것을 본 기기마다, 호루라기 한 번 `Resources/Hapio/Audio/TerritoryWhistle` 1.8초 모노, 덮개와 `SetUiInputBlocked(true)`로 조작 막기):
+  - 땅따먹기(1:1·2:2·3:3): 시간 종료 또는 한 팀이 다 칠함 → "경기 종료!"(64, 옅은 그늘). 결과 화면은 끝을 본 뒤 `battleEndHoldSeconds`(기본 1.8초)가 지나야 열리고, 결과 준비(박 그림 복사)는 그 사이에 한다. 피버 게이지는 그 자리에서 멈춘다(`LabTeamBar`).
+  - 스토리 스테이지(1~3), 시간 안에 다 칠함 → "봉인 성공!"(64, 진홍, 옅은 그늘). 이 기기에서 막타 연출(마지막 일격 다시보기 또는 1.2초 고정 연출)이 시작되면 사라진다. 방장은 막타 연출의 공동 시작을 끝에서 1.8초 뒤보다 이르게 잡지 않는다(`FinishScheduleAllowed`; 여럿이면 예약 여유 0.75초를 빼고 예약, 솔로는 그 시각에 바로 시작). 막타 연출의 공동 제한(12초) 안에서 다시보기(1.95초)가 들어가는지 보는 기존 판정은 그대로다.
+  - 스토리 스테이지(1~3), 다 칠하지 못하고 시간이 끝남 → "시간 초과!"(64, 짙은 청색 `#164B8C`, 크림 가장자리). 막타 연출 없이, 끝을 본 뒤 1.8초가 지나면 바로 실패 화면(게임 오버)으로 간다(`ChangeScene`의 GameOver 전환에서 기다림). 사람이 나가서 끝난 게임 오버 등 다른 끝에는 문구가 없고 기다리지 않는다.
+  - 연습판(튜토리얼)은 그대로다.
+- 다 칠하지 않은 땅따먹기 결과는 박 확인 그림을 기다리지 않는다(`ResultNeedsPreview`). 다 칠해 끝난 경우에도 그 그림은 "경기 종료!" 뒤 `territoryPreviewGraceSeconds`(기본 1초)까지만 기다리고, 그때까지 오지 않으면 그림 없이 결과를 연다. 이때 영어 안내 문구는 띄우지 않는다.
+- Host 판정, 스냅샷, DEV 값, 접속 버전은 바뀌지 않았다. 막타 연출 예약 시각만 방장 기기에서 늦춰지며, 참가자는 원래대로 방장이 보낸 시각을 따른다.
+- 호루라기 출처(ElevenLabs Sound Effects)를 `docs/AUDIO_CREDITS.md`에 추가했다. 만든 계정의 유료 플랜 여부는 확인이 필요하다.
+- `GameSession.TerritoryEnd.cs` → `GameSession.BattleEnd.cs`(같은 meta GUID)로 이름을 바꾸고 스토리 끝(성공·시간 초과)을 함께 다룬다. 시간 초과 판정 문구는 `TimeRanOutReason` 상수로 같은 값("Time ran out.")을 쓴다.
+
+### 확인
+
+- Unity 6000.6.5f1 Editor 컴파일: PASS. 새 멤버(`BattleEndShown`, `ShowTimeUp`)와 새 검사가 있고 옛 `UpdateTerritoryEnd`·`ShowSealFinished`가 없는 것을 리플렉션으로 확인했다. 콘솔 오류 1건은 이 변경과 무관한 기존 Library 캐시 손상(`ResultAction.png`)이다.
+- 호루라기 가져오기: Editor API로 Force To Mono·Decompress On Load, 1.80초·1채널 확인.
+- 검사 추가/갱신 (실행은 NOT_RUN):
+  - `GameSceneFlowTests.AStoryStageSaysSealSucceededWithTheWhistleBeforeItsFinalHitEffect`: 다 칠함 → "봉인 성공!"·진홍·덮개·조합판 막힘·호루라기 1번 → 1.8초 이상 지나 막타 연출 시작 → 문구 사라짐 → 결과 스토리.
+  - `GameSceneFlowTests.AStoryTimeUpSaysTimeUpInBlueWithTheWhistleThenGoesStraightToItsFailure`: 1초 제한 시간 종료 → "시간 초과!"·청색·덮개·조합판 막힘·호루라기 1번 → 1.8초 이상 지나 게임 오버, 막타 연출 없음 → 문구 사라짐.
+  - `GameSceneFlowTests.TerritoryTimeUpSaysGameOverWithTheWhistleThenOpensItsResultWithoutAPaintedGourd`: 시간 종료 → "경기 종료!"·덮개·조합판 막힘·호루라기 1번 → 1.8초 이상, 1.8+3초 안에 결과 → 덮개 사라짐·박 확인 그림 없음 → 나가기.
+  - `GameSceneFlowTests.SharedCountdownWaitsForInitialPresentationAndOnlyThenStartsGameplay`: 시작 문구 "봉인 시작!", 기본 1초.
+  - `GameStartOverlayTests.TheTerritoryEndSaysGameOverInCrimsonWithACreamEdgeAndBlocksTouches`: 네 문구의 글자·색(시간 초과만 청색)·가장자리·입력 막기, "시작!"에는 가장자리 없음.
+  - `LabTeamBattleScreenTests.FeverGaugesCountHitsThenTheFeverTimeAndTheResultShowsFinalNumbers`: 끝난 뒤 피버 게이지 고정.
+  - 다 칠한 뒤 1.8초가 지나기 전에는 막타 연출이 시작하지 않으므로 기존 스토리 완료·다시보기 검사(`GameFinishReplayTests`, `GameStage2GourdHitFinishTests`, 결과 스토리 흐름)와 시간 초과 게임 오버 검사(`AuthoritativeTimeoutLoadsGameOverInsteadOfNextStage`, 실패 화면까지 1.8초 늦음)도 다시 돌려야 한다.
+- 전체 EditMode (사용자 실행, Unity 재시작 직후): PASS. 재시작 전 첫 실행의 8건 실패(`LabOrbSpriteDesignTests` 5, `GameBattleUiAssetTests` 2, `GameResultStrokeTests` 1)는 이 변경과 무관했다: Editor에서 전투를 한 판 한 뒤 도메인 재로드 없이 남은 구슬 그림 덮어쓰기(`GameBattleUiPresentation.ApplyOrbAppearance`, 별도 작업으로 분리)와 아래 캐시 손상.
+- 전체 PlayMode (사용자 실행, 중간에 취소됨): Test Runner 창 기준 Passed 2872 / Failed 10 / NotRun 354(취소 뒤 남은 검사 포함).
+  - #717 검사: `AStoryStageSaysSealSucceeded…`, `AStoryTimeUpSaysTimeUpInBlue…`, `SharedCountdownWaits…`, `AuthoritativeTimeoutLoadsGameOver…`, `GameStartOverlayTests.TheTerritoryEndSays…`, `GameFinishReplayTests` 6건, `GameStage2GourdHitFinishTests.ARealThrow…` PASS.
+  - 실패 8건(`TerritoryTimeUpSays…`, `TerritoryDeveloperSolo…`, 결과 화면을 여는 `GameSceneFlowTests` 5건, `GameGourdClippingTests` 1건)은 모두 같은 로그 하나로 실패했다: `Unknown error occurred while loading 'VirtualArtifacts/Primary/e3472224bcaa648cf9879fbf8ddf6346'`(`Assets/Hapio/Art/UI/Strokes/ResultAction.png`). 이 기기 Library의 해당 GUID 기록만 망가진 것으로 확인했다: 강제 재가져오기·파일을 뺐다 다시 넣기로도 그대로 null이고, 같은 그림과 같은 가져오기 설정을 다른 GUID로 넣으면 705x144로 정상이다. 저장소 파일·meta는 정상이며 이 변경과 무관하다. Library를 지우고 다시 가져온 뒤 재실행이 필요하다(NOT_RUN).
+  - `LabFiveColorClayNetworkTests.PredictedAndReplicaPaths…`: main #713이 `LabNetwork.OnPredictedShotContact`에 선택 인자 `soot`를 더해 리플렉션 호출 인자 수가 맞지 않았다(`TargetParameterCountException`). 검사에 인자 하나를 더해 고쳤다. 컴파일 PASS, 재실행 NOT_RUN.
+  - `LabLobbyRejoinNetworkTests.ARejoinToAnUnreachableHost…`: 사용자 취소. 재실행 NOT_RUN.
+  - `LabTeamBattleScreenTests.FeverGauges…` 등 취소 뒤 남은 검사: NOT_RUN.
+- Mac 앱 여러 개로 땅따먹기 2:2와 스토리 1스테이지(성공·시간 초과 각각)를 끝까지 진행해 방장·참가자 화면, 막타 연출 시작, `HAPIO_RESULT_TRANSITION` 시간 확인: NOT_RUN.
+
+### #717 main 병합 — 2026-11-13
+
+- 최신 main(#720 관람 복귀 배경, #719 야광귀 콤보 가이딩, #718 북 넘기기 안내·스태미나 부족 경고)을 통합했다. 충돌은 이 문서 끝의 기록 추가와 `GameSceneFlowTests.cs`의 같은 자리에 양쪽이 넣은 검사 두 곳이며, 둘 다 양쪽을 모두 보존했다(#717 검사 3건 뒤에 #718 검사 2건).
+- #717과 #718이 함께 다루는 화면: #718의 "기운이 부족하다" 경고는 HUD Canvas 위, #717의 끝 문구는 세션 위 시작 오버레이(정렬 30000)라 끝 문구가 늘 위에 보인다. 끝 문구가 뜬 뒤에는 판 조작이 막혀 스태미나 부족 경고가 새로 나지 않고, 북 넘기기 안내는 전투가 끝나면(Playing이 아니면) 숨는다. 접속 버전 변경은 양쪽 모두 없다.
