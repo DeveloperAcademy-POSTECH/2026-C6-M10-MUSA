@@ -21,20 +21,22 @@ namespace C6Lab.Tests
         [Test]
         public void AGameJoinMayAddARoomTicketAfterTheTokenButALabJoinMayNot()
         {
-            byte[] token = Encoding.ASCII.GetBytes("C6HapioGame/54");
+            byte[] token = Encoding.ASCII.GetBytes("C6HapioGame/55");
             Assert.That(Read(token, token, true, out string ticket), Is.True);
             Assert.That(ticket, Is.Null);
-            Assert.That(Read(Bytes("C6HapioGame/54|" + TicketA), token, true, out ticket), Is.True);
+            Assert.That(Read(Bytes("C6HapioGame/55|" + TicketA), token, true, out ticket), Is.True);
             Assert.That(ticket, Is.EqualTo(TicketA));
-            Assert.That(Read(Bytes("C6HapioGame/54|" + TicketA), token, false, out _), Is.False, "A Lab room accepts only its token.");
-            Assert.That(Read(Bytes("C6HapioGame/54|" + TicketA.ToUpperInvariant()), token, true, out _), Is.False);
-            Assert.That(Read(Bytes("C6HapioGame/54|" + TicketA.Substring(1)), token, true, out _), Is.False);
-            Assert.That(Read(Bytes("C6HapioGame/54:" + TicketA), token, true, out _), Is.False);
+            Assert.That(Read(Bytes("C6HapioGame/55|" + TicketA), token, false, out _), Is.False, "A Lab room accepts only its token.");
+            Assert.That(Read(Bytes("C6HapioGame/55|" + TicketA.ToUpperInvariant()), token, true, out _), Is.False);
+            Assert.That(Read(Bytes("C6HapioGame/55|" + TicketA.Substring(1)), token, true, out _), Is.False);
+            Assert.That(Read(Bytes("C6HapioGame/55:" + TicketA), token, true, out _), Is.False);
             Assert.That(Read(Bytes("C6HapioGame/47|" + TicketA), token, true, out _), Is.False, "An older game token is still a mismatch.");
             Assert.That(Read(Bytes("C6HapioGame/48|" + TicketA), token, true, out _), Is.False, "The old player-stat contract is not compatible.");
             Assert.That(Read(Bytes("C6HapioGame/49|" + TicketA), token, true, out _), Is.False, "The separate summary-start branch does not carry this statistic yet.");
             Assert.That(Read(Bytes("C6HapioGame/51|" + TicketA), token, true, out _), Is.False,
                 "#664: an app before the fox round and the second charm cannot join.");
+            Assert.That(Read(Bytes("C6HapioGame/54|" + TicketA), token, true, out _), Is.False,
+                "An app that waits forever on a member's result screen cannot join.");
             Assert.That(Read(Bytes("C6PhysicsLab/61"), Bytes("C6PhysicsLab/62"), false, out _), Is.False);
             Assert.That(Read(Bytes("C6PhysicsLab/62"), Bytes("C6PhysicsLab/62"), false, out _), Is.True);
             Assert.That(Read(null, token, true, out _), Is.False);

@@ -469,6 +469,127 @@ namespace Hapio.Tests
             Assert.That(session.LocalSealReady, Is.False);
         }
 
+        // ----- Bounded result holds (user decisions 2026-11-13). Fake members stand in for guests in this solo run. -----
+
+        private System.Collections.Generic.List<ulong> NetworkOrder() => (System.Collections.Generic.List<ulong>)typeof(LabNetwork)
+            .GetField("order", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(network);
+        private System.Collections.Generic.HashSet<ulong> SessionSet(string field) =>
+            (System.Collections.Generic.HashSet<ulong>)typeof(GameSession)
+                .GetField(field, BindingFlags.Instance | BindingFlags.NonPublic).GetValue(session);
+        private void ApplyMemberControl(string kind, ulong sender)
+        {
+            const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
+            object control = typeof(GameSession).GetMethod("MakeControl", flags).Invoke(session, new object[] { kind, null });
+            control.GetType().GetField("sender").SetValue(control, sender);
+            typeof(GameSession).GetMethod("ApplyControl", flags).Invoke(session, new[] { control });
+        }
+
+        [UnityTest]
+        public IEnumerator ALongResultHoldNamesItsCauseThenLetsTheHostStartWithoutTheReader()
+        {
+            GameResultHold.Configure(30d, .4d, 1.2d, 60d);
+            try
+            {
+                session.StartSolo();
+                yield return WaitPlaying(1);
+                CompleteMapInFixture(Model());
+                yield return FinishResultStory();
+                var story = ResultStory();
+                story.Advance();
+                yield return Until(() => story.ReadyView.start.IsInteractable(), "The solo Host is ready.");
+                // A member who has its result but is still reading its story holds the room.
+                NetworkOrder().Add(77);
+                SessionSet("resultReady").Add(77);
+                SessionSet("resultPresentations").Add(77);
+                yield return null;
+                Assert.That(session.CanAdvanceStage, Is.False, "Reading is not readiness.");
+                Assert.That(story.ReadyView.start.IsInteractable(), Is.False);
+                Assert.That(story.ReadyView.heading.text, Is.EqualTo("동지들이 채비 중이오."));
+                yield return Until(() => story.ReadyView.heading.text == "한 동지가 아직 이야기를 보고 있소.",
+                    "After the notice time the Host is told what holds the room.");
+                Assert.That(session.CanAdvanceStage, Is.False, "The notice alone does not open the start.");
+                yield return Until(() => session.ResultHoldOverridden && story.ReadyView.start.IsInteractable(),
+                    "After the long hold the Host may start.");
+                Assert.That(session.SealReadyCount, Is.LessThan(session.SealParticipantCount),
+                    "The waiting member is never marked ready.");
+                Assert.That(session.State.stageIndex, Is.EqualTo(1), "Nothing starts by itself.");
+                NetworkOrder().Remove(77);
+                story.StartPreparedStage();
+                yield return WaitPlaying(2);
+            }
+            finally { NetworkOrder().Remove(77); GameResultHold.Reset(); }
+        }
+
+        [UnityTest]
+        public IEnumerator AnIdleQuitPopupAndGourdViewerCloseByThemselvesAndKeepReadiness()
+        {
+            GameResultHold.Configure(30d, 45d, 120d, .4d);
+            try
+            {
+                session.StartSolo();
+                yield return WaitPlaying(1);
+                CompleteMapInFixture(Model());
+                yield return FinishResultStory();
+                var story = ResultStory();
+                story.Advance();
+                yield return Until(() => story.ReadyView.start.IsInteractable(), "The solo Host is ready.");
+                story.ReadyView.quit.onClick.Invoke();
+                Assert.That(story.ReadyView.IsConfirmingQuit, Is.True);
+                yield return Until(() => !story.ReadyView.IsConfirmingQuit, "An untouched quit popup closes itself.");
+                Assert.That(session.LocalSealReady && story.ReadyView.IsWaiting, Is.True, "Closing it keeps readiness.");
+                Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.StageResult));
+                session.OpenGourdViewer();
+                Assert.That(session.IsViewerOpen, Is.True);
+                yield return Until(() => !session.IsViewerOpen, "An untouched gourd viewer closes itself.");
+                yield return Until(() => story.ReadyView.start.IsInteractable(), "The released viewer no longer holds the start.");
+            }
+            finally { GameResultHold.Reset(); }
+        }
+
+        [UnityTest]
+        public IEnumerator AMemberWithoutItsResultEndsAnIntermediateStageForEveryone()
+        {
+            GameResultHold.Configure(.5d, 45d, 120d, 60d);
+            try
+            {
+                session.StartSolo();
+                yield return WaitPlaying(1);
+                CompleteMapInFixture(Model());
+                yield return WaitResultStory();
+                Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.StageResult));
+                NetworkOrder().Add(77); // Connected, but never reports result_ready.
+                yield return WaitGameOver();
+                Assert.That(session.State.endReason, Is.EqualTo("The stage result could not be synchronized."));
+                Assert.That(session.State.retryableDefeat, Is.False);
+                NetworkOrder().Remove(77);
+                session.GoHome();
+                yield return WaitHome();
+            }
+            finally { NetworkOrder().Remove(77); GameResultHold.Reset(); }
+        }
+
+        [UnityTest]
+        public IEnumerator AMemberLeavingARetryableDefeatEndsTheRetryAtOnce()
+        {
+            session.StartSolo();
+            yield return WaitPlaying(1);
+            LabModel model = Model();
+            Assert.That(model.TryApplyPlayerDamage(network.LocalPlayerId, network.config.PlayerMaxHp, ModelTime(model)), Is.True);
+            yield return WaitGameOver();
+            Assert.That(session.State.retryableDefeat, Is.True);
+            NetworkOrder().Add(77);
+            try
+            {
+                ApplyMemberControl("exit", 77);
+                Assert.That(session.State.retryableDefeat, Is.False,
+                    "The Host learns of the leaver from its exit instead of the 30 s transport timeout.");
+                Assert.That(session.State.endReason, Is.EqualTo(GameRunFlow.PlayerLeftReason));
+            }
+            finally { NetworkOrder().Remove(77); }
+            session.GoHome();
+            yield return WaitHome();
+        }
+
         [UnityTest]
         public IEnumerator SharedCountdownWaitsForInitialPresentationAndOnlyThenStartsGameplay()
         {

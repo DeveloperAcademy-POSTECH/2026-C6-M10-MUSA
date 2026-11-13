@@ -21,7 +21,9 @@ namespace C6Lab
         // 52: #676 Story paint budgets use the actual cooperative participant count (protocol5701/Lab61).
         // 52 was also taken by #664 구미호 co-op gimmicks on its own branch; merged together they are 53.
         // 53: #664 구미호 co-op gimmicks (265 DEV values) on top of #676 (protocol 5702, Lab 62).
-        private static readonly byte[] GameConnectionToken = Encoding.ASCII.GetBytes("C6HapioGame/54");
+        // 55: bounded result holds - a member's 'exit' from the final result or a retryable defeat is handled by the
+        //     Host at once, and the Host may start after a 120 s hold (protocol 5704 and Lab 62 unchanged).
+        private static readonly byte[] GameConnectionToken = Encoding.ASCII.GetBytes("C6HapioGame/55");
         private static readonly byte[] DemoGameConnectionToken = Encoding.ASCII.GetBytes("C6HapioDemo/" + LabGameBuildVariant.YaguangDemoRevision);
         public static string GameConnectionCompatibility => Encoding.ASCII.GetString(
             LabGameBuildVariant.IsYaguangDemo ? DemoGameConnectionToken : GameConnectionToken);
