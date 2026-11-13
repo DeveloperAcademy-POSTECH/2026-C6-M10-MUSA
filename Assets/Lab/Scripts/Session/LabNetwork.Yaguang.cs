@@ -40,14 +40,14 @@ namespace C6Lab
 
         /// <summary>내 판에 오색구슬이 새로 생겼다 (#329). 받은 개수. 진동·소리가 듣는다.</summary>
         public event System.Action<int> FiveColorOrbsReceived;
-        /// <summary>#719: flash-reward five-colour orbs not yet drawn on my board; they pop in (grow + five-colour stars).</summary>
+        /// <summary>#719: flash-reward five-colour orbs not yet drawn on my board; they pop in (grow + five-colour dust).</summary>
         private readonly System.Collections.Generic.HashSet<string> fiveColorAppearing =
             new System.Collections.Generic.HashSet<string>(System.StringComparer.Ordinal);
         /// <summary>#719: how long a flash-reward five-colour orb takes to grow in on its spot.</summary>
         public const float FiveColorAppearSeconds = .5f;
 
         /// <summary>
-        /// #719 섬광 보상 오색구슬이 생기는 모습: 제자리에서 점처럼 작게 시작해 커지며 나타나고, 그 자리에서 다섯 색 별가루가 퍼진다.
+        /// #719 섬광 보상 오색구슬이 생기는 모습: 제자리에서 점처럼 작게 시작해 커지며 나타나고, 그 자리에서 다섯 색 가루 먼지가 털리듯 퍼진다.
         /// 몸(물리)은 처음부터 제자리·제 크기이고 그림만 커진다.
         /// </summary>
         private void PresentFiveColorAppear(LabOrbView view)
@@ -55,7 +55,7 @@ namespace C6Lab
             if (view == null || !view.isActiveAndEnabled) return;
             view.PlaySpawnPop(Vector3.zero, 0f, FiveColorAppearSeconds);
             float radius = config != null ? config.OrbRadius : .3f;
-            LabFiveColorSparkle burst = LabFiveColorSparkle.Burst(view.transform.position, radius * 1.3f);
+            LabFiveColorSparkle burst = LabFiveColorSparkle.DustBurst(view.transform.position, radius);
             if (burst == null) return;
             int layer = view.gameObject.layer;
             foreach (Transform part in burst.GetComponentsInChildren<Transform>(true)) part.gameObject.layer = layer;
