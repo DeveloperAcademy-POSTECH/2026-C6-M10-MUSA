@@ -270,7 +270,7 @@ namespace C6Lab
         public int HeartsShown { get; private set; } = -1;
 
         /// <summary>
-        /// #719 UT 하트 줄: 콤보 패널 바로 아래 가운데. 예고 동안(미리보기)은 꽉 찬 하트, 콤보 중에는 남은 만큼.
+        /// #719 UT 하트 줄: 콤보 패널 바로 위 가운데. 예고 동안(미리보기)은 꽉 찬 하트, 콤보 중에는 남은 만큼.
         /// 하나가 줄면 왼쪽 하트부터 좌우 두 쪽으로 쪼개져 기울며 떨어지고, 빈 하트 테두리만 남는다. 하나 남으면 똑딱에 맞춰 두근거린다.
         /// </summary>
         private void DrawHearts(LabSnapshot snapshot, bool preview, bool showPanel)
@@ -297,10 +297,11 @@ namespace C6Lab
             if (!show) return;
 
             float size = slots[0].sizeDelta.y * .62f, gap = size * .18f;
-            heartRow.anchorMin = heartRow.anchorMax = new Vector2(.5f, 0f);
-            heartRow.pivot = new Vector2(.5f, 1f);
+            // #719 QA: above the panel (it was under it, over the gourd).
+            heartRow.anchorMin = heartRow.anchorMax = new Vector2(.5f, 1f);
+            heartRow.pivot = new Vector2(.5f, 0f);
             heartRow.sizeDelta = new Vector2(total * size + (total - 1) * gap, size);
-            heartRow.anchoredPosition = new Vector2(0f, -size * .15f);
+            heartRow.anchoredPosition = new Vector2(0f, size * .15f);
             float dt = Time.unscaledDeltaTime;
             for (int i = 0; i < MaxHearts; i++)
             {
