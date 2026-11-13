@@ -45,6 +45,81 @@ namespace C6Lab
         public bool Shown => shown;
         private SphereCollider wall;
 
+        // ---- #724 QA: 연결 연기 — 판 위 파편마다 가운데 빈 구슬까지 검은 연기 줄기가 이어져, 연기 알갱이가 빈 구슬 쪽으로 흘러든다 ----
+        public const int TendrilPuffs = 9, MaxTendrils = 6;
+        public const float TendrilFlowSeconds = 1.6f, TendrilAlpha = .42f;
+        private readonly System.Collections.Generic.List<Vector3> shardPoints = new System.Collections.Generic.List<Vector3>();
+        private readonly System.Collections.Generic.List<SpriteRenderer> puffs = new System.Collections.Generic.List<SpriteRenderer>();
+        private static Sprite puffSprite;
+        private const int TendrilOrder = -9;
+        /// <summary>How many shards have a smoke tendril to the empty orb now.</summary>
+        public int Tendrils { get; private set; }
+
+        private void DrawTendrils(Vector3 center, float diameter)
+        {
+            if (shown && alpha > .001f) board.CollectSootShardPoints(shardPoints); else shardPoints.Clear();
+            int count = Mathf.Min(MaxTendrils, shardPoints.Count);
+            Tendrils = count;
+            int needed = count * TendrilPuffs;
+            while (puffs.Count < needed) puffs.Add(Part("Soot Tendril Puff", PuffSprite(), TendrilOrder));
+            float flow = Mathf.Repeat(Time.unscaledTime / TendrilFlowSeconds, 1f);
+            float puffSize = board.OrbRadius * 1.15f;
+            for (int k = 0; k < puffs.Count; k++)
+            {
+                SpriteRenderer puff = puffs[k];
+                int tendril = k / TendrilPuffs, i = k % TendrilPuffs;
+                bool on = tendril < count;
+                if (puff.gameObject.activeSelf != on) puff.gameObject.SetActive(on);
+                if (!on) continue;
+                Vector3 from = shardPoints[tendril];
+                Vector3 to = center;
+                Vector3 along = to - from;
+                float length = along.magnitude;
+                // Stop at the empty orb's rim; nothing between a shard lying on it and the orb.
+                float end = Mathf.Max(0f, length - diameter * .45f);
+                // Each puff drifts towards the orb and loops; a soft sideways sway makes it read as smoke, not a rope.
+                float u = Mathf.Repeat(i / (float)TendrilPuffs + flow + tendril * .13f, 1f);
+                Vector3 side = length > .0001f ? new Vector3(-along.y, along.x, 0f) / length : Vector3.zero;
+                float sway = Mathf.Sin((u * 3f + Time.unscaledTime * 1.3f + tendril) * Mathf.PI) * puffSize * .18f;
+                Vector3 at = from + (length > .0001f ? along / length : Vector3.zero) * (end * u) + side * sway;
+                puff.transform.position = new Vector3(at.x, at.y, center.z);
+                float fade = Mathf.Sin(u * Mathf.PI); // thin at both ends
+                float size = puffSize * Mathf.Lerp(1.1f, .6f, u);
+                puff.transform.localScale = Vector3.one * (size / Mathf.Max(.0001f, puff.sprite.bounds.size.x));
+                puff.transform.localRotation = Quaternion.Euler(0f, 0f, (u * 140f + tendril * 47f + i * 31f) % 360f);
+                puff.color = new Color(.08f, .07f, .1f, TendrilAlpha * alpha * fade);
+            }
+        }
+
+        /// <summary>A soft, slightly lumpy round of smoke (white; tinted ink).</summary>
+        private static Sprite PuffSprite()
+        {
+            if (puffSprite != null) return puffSprite;
+            const int size = 64;
+            var pixels = new Color[size * size];
+            for (int py = 0; py < size; py++)
+                for (int px = 0; px < size; px++)
+                {
+                    float x = (px + .5f) / size * 2f - 1f, y = (py + .5f) / size * 2f - 1f;
+                    float angle = Mathf.Atan2(y, x);
+                    float edge = .78f + .1f * Mathf.Sin(angle * 3f) + .06f * Mathf.Sin(angle * 5f + 1.3f);
+                    float r = Mathf.Sqrt(x * x + y * y) / edge;
+                    float a = Mathf.Clamp01(1f - r);
+                    pixels[py * size + px] = new Color(1f, 1f, 1f, a * a * (3f - 2f * a));
+                }
+            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
+            {
+                name = "Lab soot tendril puff", filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp,
+                hideFlags = HideFlags.DontSave
+            };
+            texture.SetPixels(pixels);
+            texture.Apply(false, true);
+            puffSprite = Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(.5f, .5f), size);
+            puffSprite.name = texture.name;
+            puffSprite.hideFlags = HideFlags.DontSave;
+            return puffSprite;
+        }
+
         /// <summary>#724: whether a finger let go over the empty orb (a shard dropped there flies in).</summary>
         public bool Covers(Vector2 worldPoint)
         {
@@ -218,6 +293,8 @@ namespace C6Lab
             if (board != null) wall.radius = board.OrbRadius * SizeScale * .94f / Mathf.Max(.0001f, transform.lossyScale.x);
             if (alpha <= .001f)
             {
+                foreach (SpriteRenderer puff in puffs) if (puff.gameObject.activeSelf) puff.gameObject.SetActive(false);
+                Tendrils = 0;
                 if (ghost != null && ghost.gameObject.activeSelf)
                 {
                     ghost.gameObject.SetActive(false);
@@ -243,6 +320,7 @@ namespace C6Lab
             }
             // While still empty the dashed ring breathes so the eye finds it.
             float breathe = shownFilled == 0 ? .5f + .5f * Mathf.Sin(Time.unscaledTime * 3.2f) : 1f;
+            DrawTendrils(center, diameter);
             Fit(ghost, diameter * (1f + .05f * (1f - breathe)) * popScale);
             for (int q = 0; q < 4; q++)
             {

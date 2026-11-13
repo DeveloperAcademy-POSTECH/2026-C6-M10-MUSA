@@ -1385,6 +1385,16 @@ namespace C6Lab
         }
 
         /// <summary>#713 이 판에 보이는 연기 파편 id들을 into에 담는다.</summary>
+        /// <summary>#724: where the soot shards on this board are now (world, on the orb plane), skipping ones hidden for a request.</summary>
+        public void CollectSootShardPoints(List<Vector3> into)
+        {
+            if (into == null) return;
+            into.Clear();
+            foreach (var pair in entries)
+                if (pair.Value.View != null && pair.Value.View.Kind.IsSootShard() && !pair.Value.HiddenForPending)
+                    into.Add(pair.Value.View.transform.position);
+        }
+
         public void CollectSootShards(List<string> into)
         {
             if (into == null) return;
