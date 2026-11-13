@@ -97,6 +97,12 @@ namespace C6Lab
         /// 면 번호는 동그라미 위의 경계 자리(0 북서 / 1 남서 / 2 남동 / 3 북동, 조각 시작 쪽 기준 절대 번호)라,
         /// 이웃한 두 조각이 같은 경계에서 같은 모양으로 깨져 꼭 맞물린다.
         /// </summary>
+        /// <summary>
+        /// #724: the broken edge at boundary face (0 북서 / 1 남서 / 2 남동 / 3 북동) at distance r (half-widths) from the
+        /// centre, as an angle in degrees: the empty orb draws its cracks on exactly the shards' zigzag edges.
+        /// </summary>
+        public static float CrackAngle(float r, int face) => 45f + 90f * (face & 3) + Jag(r, face & 3);
+
         private static float Jag(float r, int face)
         {
             float t = r * 2.4f + face * .31f;

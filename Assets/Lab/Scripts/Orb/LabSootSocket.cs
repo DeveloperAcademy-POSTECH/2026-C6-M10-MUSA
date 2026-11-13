@@ -376,14 +376,27 @@ namespace C6Lab
                     float x = (px + .5f) / size * 2f - 1f, y = (py + .5f) / size * 2f - 1f;
                     float r = Mathf.Sqrt(x * x + y * y);
                     float inside = Mathf.Clamp01((.94f - r) * size * .5f);
-                    float rim = Mathf.Clamp01(1f - Mathf.Abs(r - .9f) / .045f) * Mathf.Clamp01((.97f - r) * size * .5f);
+                    // A brushed ink rim: its width wobbles round the circle like the shards' rough edges.
+                    float wob = .045f * (1f + .45f * Mathf.Sin(Mathf.Atan2(y, x) * 7f + .6f) + .3f * Mathf.Sin(Mathf.Atan2(y, x) * 13f + 2.1f));
+                    float rim = Mathf.Clamp01(1f - Mathf.Abs(r - .9f) / Mathf.Max(.02f, wob)) * Mathf.Clamp01((.97f - r) * size * .5f);
                     // Glassy: darker towards the rim, clear in the middle.
                     float shade = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.3f, .9f, r));
-                    float crack = Mathf.Clamp01(1f - Mathf.Min(Mathf.Abs(x - y), Mathf.Abs(x + y)) * .7071f / .02f) * inside * (r > .12f ? 1f : 0f);
+                    // #724 QA: the cracks follow the shards' own zigzag broken edges (LabSootShardArt), not straight lines.
+                    float crack = 0f;
+                    if (r > .06f && r < .94f)
+                    {
+                        float angle = Mathf.Repeat(Mathf.Atan2(y, x) * Mathf.Rad2Deg, 360f);
+                        for (int face = 0; face < 4; face++)
+                        {
+                            float d = Mathf.Abs(Mathf.DeltaAngle(angle, LabSootShardArt.CrackAngle(r, face))) * Mathf.Deg2Rad * r;
+                            crack = Mathf.Max(crack, Mathf.Clamp01(1f - d / .022f));
+                        }
+                        crack *= inside;
+                    }
                     float glint = Mathf.Clamp01(1f - new Vector2(x + .38f, y - .42f).magnitude / .22f);
                     Color c = Color.Lerp(body, ink, shade);
-                    float a = inside * (.18f + .3f * shade) + crack * .35f;
-                    c = Color.Lerp(c, ink, crack * .6f);
+                    float a = inside * (.18f + .3f * shade) + crack * .55f;
+                    c = Color.Lerp(c, ink, crack * .8f);
                     c = Color.Lerp(c, shine, glint * .8f);
                     a = Mathf.Max(a, glint * .55f * inside);
                     c = Color.Lerp(c, ink, rim);
