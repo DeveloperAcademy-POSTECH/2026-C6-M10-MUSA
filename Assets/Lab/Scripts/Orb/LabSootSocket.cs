@@ -346,7 +346,8 @@ namespace C6Lab
         {
             if (ghost != null) return;
             ghost = Part("Soot Socket Ring", GhostSprite(), GhostOrder);
-            for (int q = 0; q < 4; q++) fills[q] = Part("Soot Socket Piece " + q, LabSootShardArt.SpriteFor(1 << q, false), FillOrder);
+            // #724 QA: pieces in the empty orb join with no pale seam (the loose shards keep their broken, lit faces).
+            for (int q = 0; q < 4; q++) fills[q] = Part("Soot Socket Piece " + q, LabSootShardArt.SpriteFor(1 << q, false, true), FillOrder);
         }
 
         private SpriteRenderer Part(string label, Sprite sprite, int order)

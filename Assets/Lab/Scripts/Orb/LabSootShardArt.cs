@@ -25,13 +25,19 @@ namespace C6Lab
         /// #724: ghost false leaves out the faint dashed outline of the missing part (the shards on the board and the pieces in
         /// the empty orb: the empty orb itself shows where they go).
         /// </summary>
-        public static Sprite SpriteFor(int pieces, bool ghost)
+        public static Sprite SpriteFor(int pieces, bool ghost) => SpriteFor(pieces, ghost, false);
+
+        /// <summary>
+        /// #724 QA: seamless draws the piece with no gap and no light band on its broken faces, so pieces laid side by side in
+        /// the empty orb join into one black orb with no pale lines between them.
+        /// </summary>
+        public static Sprite SpriteFor(int pieces, bool ghost, bool seamless)
         {
             int start = LabModel.SootArcStart(pieces);
             if (start < 0 || pieces == LabModel.SootWholePieces) { pieces = 1; start = 0; }
-            int key = ghost ? pieces : pieces | 256;
+            int key = pieces | (ghost ? 0 : 256) | (seamless ? 512 : 0);
             if (cache.TryGetValue(key, out Sprite found) && found != null) return found;
-            Sprite made = Build(LabModel.SootPieceCount(pieces), start, ghost);
+            Sprite made = Build(LabModel.SootPieceCount(pieces), start, ghost, seamless);
             cache[key] = made;
             return made;
         }
@@ -66,7 +72,7 @@ namespace C6Lab
         private static readonly Color SeamGlow = new Color(.62f, .48f, .95f, 1f);
         private static readonly Color Ghost = new Color(.20f, .18f, .24f, 1f);
 
-        private static Sprite Build(int level, int turn, bool ghost = true)
+        private static Sprite Build(int level, int turn, bool ghost = true, bool seamless = false)
         {
             var texture = new Texture2D(Size, Size, TextureFormat.RGBA32, false)
             {
@@ -82,7 +88,7 @@ namespace C6Lab
             for (int px = 0; px < Size; px++)
             {
                 float x = (px + .5f) / Size * 2f - 1f, y = (py + .5f) / Size * 2f - 1f;
-                Color pixel = Pixel(x, y, start, span, level, turn, aa);
+                Color pixel = Pixel(x, y, start, span, level, turn, aa, seamless);
                 // #724: without the ghost, the missing part (drawn faint and dark) is left fully clear.
                 if (!ghost && pixel.a < .5f && pixel.r == Ghost.r && pixel.g == Ghost.g && pixel.b == Ghost.b) pixel = Color.clear;
                 pixels[py * Size + px] = pixel;
@@ -111,8 +117,10 @@ namespace C6Lab
             return Mathf.Rad2Deg * offset / Mathf.Max(r, .05f);
         }
 
-        private static Color Pixel(float x, float y, float start, float span, int level, int turn, float aa)
+        private static Color Pixel(float x, float y, float start, float span, int level, int turn, float aa, bool seamless = false)
         {
+            // Seamless pieces reach a hair past their broken faces so neighbours overlap instead of leaving a pale line.
+            float gap = seamless ? -.012f : Gap;
             float r = Mathf.Sqrt(x * x + y * y);
             if (r > Disc + aa) return Color.clear;
             float discCover = Mathf.Clamp01((Disc - r) / aa + .5f);
@@ -123,9 +131,10 @@ namespace C6Lab
             float inside = Mathf.Min(angle - lo, hi - angle) * arc;
             // 한 바퀴 넘어간 쪽 (angle이 360 근처인데 lo가 음수)도 조각 안으로 본다.
             if (lo < 0f) inside = Mathf.Max(inside, Mathf.Min(angle - 360f - lo, hi - (angle - 360f)) * arc);
-            float cover = Mathf.Clamp01((inside - Gap) / aa + .5f) * discCover;
+            float cover = Mathf.Clamp01((inside - gap) / aa + .5f) * discCover;
             // 가운데 꼭짓점도 살짝 깎는다.
-            cover *= Mathf.Clamp01((r - .02f) / aa + .5f);
+            if (!seamless) cover *= Mathf.Clamp01((r - .02f) / aa + .5f);
+            else if (r < .03f) cover = discCover; // the very middle belongs to every piece
 
             if (cover <= 0f)
             {
@@ -147,10 +156,10 @@ namespace C6Lab
             float rim = Mathf.Clamp01(1f - (Disc - r) / .10f);
             color = Color.Lerp(color, Edge, rim * .45f);
             // 깨진 면을 따라 밝은 띠 (돌이 깨진 단면처럼).
-            float broken = Mathf.Clamp01(1f - (inside - Gap) / Bevel);
+            float broken = seamless ? 0f : Mathf.Clamp01(1f - (inside - Gap) / Bevel);
             color = Color.Lerp(color, Edge, broken * broken * .6f);
             // 합친 자리의 금: 조각 안쪽 경계(90°, 180°, 270°)마다 보랏빛 실금.
-            for (int face = 1; face < level; face++)
+            for (int face = 1; face < level && !seamless; face++)
             {
                 float seamAngle = 90f * face + Jag(r, (turn + face) & 3);
                 float d = Mathf.Abs(angle - seamAngle) * arc;
