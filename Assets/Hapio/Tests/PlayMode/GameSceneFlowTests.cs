@@ -28,10 +28,20 @@ namespace Hapio.Tests
         private LabNetwork network;
         private GameFigmaStrokeLibrary.Surface returnBackgroundEntry;
         private Sprite returnBackgroundSprite;
+        // The receiver is test-owned; the real writer remains attached to the Host model.
+        private LabPaintArtJournal delayedArtworkWriter, delayedArtworkReceiver;
+        private LabGourdResultPreview comparisonPreview;
+        private LabConfig sharedPresentationConfig;
+        private LabOrbAppearance sharedPresentationOverride;
 
         [UnitySetUp]
         public IEnumerator LoadSavedHome()
         {
+            sharedPresentationConfig = Resources.Load<LabConfig>("LabConfig");
+            Assert.That(sharedPresentationConfig, Is.Not.Null);
+            sharedPresentationOverride = (LabOrbAppearance)typeof(LabConfig)
+                .GetField("orbPresentationOverride", BindingFlags.Instance | BindingFlags.NonPublic)
+                .GetValue(sharedPresentationConfig);
             Assert.That(GameSession.Instance, Is.Null, "The previous fixture must release its persistent game session.");
             yield return SceneManager.LoadSceneAsync(GameScenePaths.Home, LoadSceneMode.Single);
             yield return Until(() => GameSession.Instance != null, "Saved Home must bootstrap its saved session prefab.");
@@ -68,24 +78,362 @@ namespace Hapio.Tests
         [UnityTearDown]
         public IEnumerator ReleaseOwnedSession()
         {
-            RestoreReturnBackgroundSource();
-            Time.timeScale = 1f;
-            // A test that ran the production countdown may have failed inside a nested yield, skipping its finally.
-            GameTestStartTiming.UseShort();
-            if (session != null)
+            try
             {
-                network.Stop();
-                Object.Destroy(session.gameObject);
-                yield return null;
-                Assert.That(GameSession.Instance, Is.Null);
+                RestoreReturnBackgroundSource();
+                RestoreDelayedArtworkJournal();
+                comparisonPreview?.Dispose(); comparisonPreview = null;
+                Time.timeScale = 1f;
+                // A test that ran the production countdown may have failed inside a nested yield, skipping its finally.
+                GameTestStartTiming.UseShort();
+                if (session != null)
+                {
+                    // Destroying the session cannot cancel a LoadSceneAsync already handed
+                    // to Unity. Drain its current handoff before a destination can bootstrap a
+                    // replacement singleton behind the next fixture's SetUp assertion.
+                    session.enabled = true;
+                    double deadline = Time.realtimeSinceStartupAsDouble + 20d;
+                    while (session.IsLoadingScene && Time.realtimeSinceStartupAsDouble < deadline) yield return null;
+                    network.Stop();
+                    Object.Destroy(session.gameObject);
+                    yield return null;
+                    Assert.That(GameSession.Instance, Is.Null);
+                }
+                Scene current = SceneManager.GetActiveScene();
+                Scene cleanup = SceneManager.CreateScene("Hapio game fixture cleanup " + Guid.NewGuid().ToString("N"));
+                SceneManager.SetActiveScene(cleanup);
+                if (current.IsValid() && current.isLoaded) yield return SceneManager.UnloadSceneAsync(current);
             }
-            Scene current = SceneManager.GetActiveScene();
-            Scene cleanup = SceneManager.CreateScene("Hapio game fixture cleanup");
-            SceneManager.SetActiveScene(cleanup);
-            if (current.IsValid() && current.isLoaded) yield return SceneManager.UnloadSceneAsync(current);
+            finally
+            {
+                // Battle UI applies a transient appearance to the shared Resource in memory.
+                // Restore the exact incoming override after all Scene bindings have stopped,
+                // including when teardown itself reports an assertion failure.
+                if (sharedPresentationConfig != null)
+                    sharedPresentationConfig.SetOrbPresentationOverride(sharedPresentationOverride);
+                sharedPresentationConfig = null; sharedPresentationOverride = null;
+            }
             session = null;
             network = null;
             yield return null;
+        }
+
+        [Category("GPU")]
+        [UnityTest]
+        public IEnumerator JigwiResultFinishesItsActualArtworkAfterBattleUnloadWhenFinalPagesArriveLate()
+        {
+            yield return StartJigwiWithDelayedArtwork();
+            GameObject source = network.target.GetComponent<LabGourdPaint>().VisualInstance;
+            LabSnapshot terminal = network.Snapshot;
+            string battle = terminal.sessionId;
+            uint round = terminal.round;
+            Color32[] accepted = new Color32[network.PaintSurface.CellCount];
+            network.PaintSurface.CopyPixels(accepted);
+            byte[] painters = new byte[accepted.Length];
+            network.PaintSurface.CopyPainterSlots(painters);
+            ExpireOnlyTheFinishPresentationBudget();
+            yield return WaitResultStory();
+            Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.Completed));
+            Assert.That(session.State.stageIndex, Is.EqualTo(3));
+            Assert.That(network.target, Is.Null, "The result must not keep the live Battle target or its scripts running.");
+            Assert.That(source == null, Is.True, "The original display hierarchy must have unloaded with Battle.");
+            Assert.That(session.GourdViewerState, Is.EqualTo(GameGourdViewerState.Pending));
+            Assert.That(session.PreviewTexture, Is.Null, "An incomplete journal is not a completed painting.");
+            Assert.That(session.IsViewerOpen, Is.False);
+            session.OpenGourdViewer();
+            Assert.That(session.IsViewerOpen, Is.False, "Pending input cannot expose an unfinished or previous-stage picture.");
+            Assert.That(delayedArtworkReceiver.IsSealed, Is.False);
+
+            DeliverDelayedArtworkPages();
+            yield return Until(() => session.GourdViewerState == GameGourdViewerState.Ready,
+                "The retained model and real journal must render after the Battle target has gone: " + session.GourdViewerError);
+            Assert.That(session.PreviewTexture, Is.Not.Null);
+            var preview = (LabGourdResultPreview)typeof(GameSession).GetField("preview",
+                BindingFlags.Instance | BindingFlags.NonPublic).GetValue(session);
+            Assert.That(preview.SessionId, Is.EqualTo(battle));
+            Assert.That(preview.Round, Is.EqualTo(round));
+            Assert.That(preview.PaintTexture.GetPixels32(), Is.EqualTo(accepted),
+                "Background preparation must preserve the exact authoritative final cells.");
+            Assert.That(preview.PainterTexture.GetPixels32().Select(pixel => pixel.r).ToArray(), Is.EqualTo(painters));
+            Assert.That(preview.VisualHeightTexture, Is.Not.Null, "The real clay relief must be recovered with the color artwork.");
+            Assert.That(preview.ModelRoot.GetComponentsInChildren<Rigidbody>(true), Is.Empty);
+            Assert.That(preview.ModelRoot.GetComponentsInChildren<Collider>(true), Is.Empty);
+            Assert.That(preview.ModelRoot.GetComponentsInChildren<AudioSource>(true), Is.Empty);
+            yield return Until(() => !ResultStory().player.UserInputBlocked && !session.SceneFade.BlocksInput,
+                "The restored card must finish the normal result input shield.");
+            var card = ResultStory().player.CurrentView;
+            var flip = card.GetComponentInChildren<StoryCardFlip>(true);
+            flip.Flip();
+            var inspect = card.GetComponentsInChildren<UnityEngine.UI.Button>(true)
+                .Single(button => button.name == "Inspect Gourd Action");
+            yield return Until(() => flip.IsBack && !flip.IsFlipping && inspect.IsInteractable(),
+                "The existing Jigwi card button must become usable when its real picture is ready.");
+            inspect.onClick.Invoke();
+            Assert.That(session.IsViewerOpen, Is.True);
+            session.CloseGourdViewer();
+            Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.Completed));
+            Assert.That(session.State.stageIndex, Is.EqualTo(3));
+            Assert.That(session.ResultSnapshot.sessionId, Is.EqualTo(battle));
+        }
+
+        [Category("GPU")]
+        [UnityTest]
+        public IEnumerator LeavingAResultDisposesPendingArtworkAndLatePagesCannotReopenTheViewer()
+        {
+            yield return StartJigwiWithDelayedArtwork();
+            ExpireOnlyTheFinishPresentationBudget();
+            yield return WaitResultStory();
+            Assert.That(session.GourdViewerState, Is.EqualTo(GameGourdViewerState.Pending));
+            var preparation = (LabGourdPreviewPreparation)typeof(GameSession).GetField("viewerPreparation",
+                BindingFlags.Instance | BindingFlags.NonPublic).GetValue(session);
+            Assert.That(preparation, Is.Not.Null);
+            yield return Until(() => session.CanReturnHome, "A preserved final clear must still allow Home while optional art is pending.");
+            session.GoHome();
+            yield return WaitHome();
+            Assert.That(session.GourdViewerState, Is.EqualTo(GameGourdViewerState.Disabled));
+            Assert.That(session.PreviewTexture, Is.Null);
+            Assert.That(preparation.TakePreview(), Is.Null, "Cancelled preparation cannot hand out a stale result.");
+            Assert.That(delayedArtworkWriter.TryReadPage(0, out byte[] latePage), Is.True);
+            Assert.That(delayedArtworkReceiver.TryImportPage(0, latePage), Is.False,
+                "The previous Network round owns and disposes its receiver on Home.");
+            yield return null;
+            yield return null;
+            Assert.That(session.GourdViewerState, Is.EqualTo(GameGourdViewerState.Disabled));
+            Assert.That(session.PreviewTexture, Is.Null);
+            Assert.That(session.IsViewerOpen, Is.False);
+            session.StartSolo();
+            yield return WaitPlaying(1);
+            Assert.That(session.PreviewTexture, Is.Null, "A new room must never adopt the old final artwork.");
+            Assert.That(session.IsViewerOpen, Is.False);
+        }
+
+        [Category("GPU")]
+        [UnityTest]
+        public IEnumerator ACorruptFinalArtworkReportsFailureButPreservesTheJigwiClearAndHomeAction()
+        {
+            yield return StartJigwiWithDelayedArtwork();
+            delayedArtworkReceiver.Fail("Fixture final artwork storage failure");
+            yield return Until(() => session.GourdViewerState == GameGourdViewerState.Failed,
+                "A permanent journal error must stop preparation rather than remain Pending.");
+            Assert.That(session.GourdViewerError, Does.Contain("Fixture final artwork storage failure"));
+            ExpireOnlyTheFinishPresentationBudget();
+            yield return WaitResultStory();
+            Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.Completed));
+            Assert.That(session.ResultSnapshot.phase, Is.EqualTo(LabPhase.Victory));
+            Assert.That(session.ResultSnapshot.paintCoveredCount, Is.EqualTo(session.ResultSnapshot.paintCellCount));
+            Assert.That(session.GourdViewerState, Is.EqualTo(GameGourdViewerState.Failed));
+            Assert.That(session.PreviewTexture, Is.Null);
+            Assert.That(session.IsLoadingScene, Is.False);
+            session.OpenGourdViewer();
+            Assert.That(session.IsViewerOpen, Is.False);
+            yield return Until(() => session.CanReturnHome, "An optional artwork failure must not remove the final Home action.");
+            session.GoHome();
+            yield return WaitHome();
+        }
+
+        [Category("GPU")]
+        [UnityTest]
+        public IEnumerator AStalledResultArtworkFailsAfterItsIdleBudgetWithoutRestartingSceneLoading()
+        {
+            yield return StartJigwiWithDelayedArtwork();
+            ExpireOnlyTheFinishPresentationBudget();
+            yield return WaitResultStory();
+            var preparation = (LabGourdPreviewPreparation)typeof(GameSession).GetField("viewerPreparation",
+                BindingFlags.Instance | BindingFlags.NonPublic).GetValue(session);
+            yield return Until(() => preparation.AppliedThrough == delayedArtworkReceiver.LastSequence
+                && preparation.RenderedThrough == delayedArtworkReceiver.LastSequence,
+                "The received prefix must finish its real bounded GPU work before testing a genuinely idle wait.");
+            Assert.That(preparation.Ready, Is.False, "A rendered prefix is still not the sealed final painting.");
+            double now = Time.realtimeSinceStartupAsDouble;
+            const BindingFlags fields = BindingFlags.Instance | BindingFlags.NonPublic;
+            typeof(GameSession).GetField("viewerLastSequence", fields).SetValue(session, delayedArtworkReceiver.LastSequence);
+            typeof(GameSession).GetField("viewerApplied", fields).SetValue(session, preparation.AppliedThrough);
+            typeof(GameSession).GetField("viewerRendered", fields).SetValue(session, preparation.RenderedThrough);
+            typeof(GameSession).GetField("viewerProgressAt", fields).SetValue(session, now);
+            typeof(GameSession).GetMethod("UpdateGourdViewerPreparation", fields).Invoke(session, new object[] { now + 31d });
+            Assert.That(session.GourdViewerState, Is.EqualTo(GameGourdViewerState.Failed));
+            Assert.That(session.GourdViewerError, Does.Contain("stopped making progress"));
+            Assert.That(session.IsLoadingScene, Is.False, "The idle budget never introduces another full-screen wait.");
+            Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.Completed));
+            Assert.That(session.ResultSnapshot.phase, Is.EqualTo(LabPhase.Victory));
+            Assert.That(preparation.TakePreview(), Is.Null);
+            Assert.That(session.PreviewTexture, Is.Null);
+            Assert.That(SceneManager.GetActiveScene().path, Is.EqualTo(GameScenePaths.StageResult));
+        }
+
+        [Category("GPU")]
+        [UnityTest]
+        public IEnumerator ADisposedBorrowedJournalFailsPendingViewingWithoutWaitingForTheIdleTimeout()
+        {
+            yield return StartJigwiWithDelayedArtwork();
+            ExpireOnlyTheFinishPresentationBudget();
+            yield return WaitResultStory();
+            Assert.That(delayedArtworkReceiver.Error, Is.Null);
+            delayedArtworkReceiver.Dispose();
+            Assert.That(delayedArtworkReceiver.Error, Is.Null,
+                "Journal disposal need not set Error, so preparation must test its borrowed lifetime too.");
+            yield return Until(() => session.GourdViewerState == GameGourdViewerState.Failed,
+                "A disposed borrowed record is a permanent error, not another 30-second receive wait.");
+            Assert.That(session.GourdViewerError, Does.Contain("no longer available"));
+            Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.Completed));
+            Assert.That(session.IsLoadingScene, Is.False);
+            Assert.That(session.PreviewTexture, Is.Null);
+            Assert.That(typeof(GameSession).GetField("viewerPreparation", BindingFlags.Instance | BindingFlags.NonPublic)
+                .GetValue(session), Is.Null, "The failed background GPU/template owner must be released.");
+        }
+
+        [Category("GPU")]
+        [UnityTest]
+        public IEnumerator DeferredJigwiArtworkMatchesTheLiveFastCaptureForColorOwnerAndClayRelief()
+        {
+            yield return StartJigwiWithDelayedArtwork();
+            var preparation = (LabGourdPreviewPreparation)typeof(GameSession).GetField("viewerPreparation",
+                BindingFlags.Instance | BindingFlags.NonPublic).GetValue(session);
+            LabGourdPaint source = network.target.GetComponent<LabGourdPaint>();
+            // Hold only the session's presentation scheduling while its live paint renderer
+            // consumes the real receiver pages. This does not pause or alter the accepted game result.
+            session.enabled = false;
+            try
+            {
+                DeliverDelayedArtworkPages();
+                yield return Until(() => source != null && source.CompletionVisualReady,
+                    "The source renderer must finish the very same sealed journal before taking its fast copy.");
+                Assert.That(LabGourdResultPreview.TryCreate(network, out comparisonPreview, out string error), Is.True, error);
+                yield return Until(() =>
+                {
+                    preparation.Tick();
+                    return preparation.Ready || preparation.Failed;
+                }, "The independent renderer must finish its delayed replay.");
+                Assert.That(preparation.Failed, Is.False, preparation.Error);
+                session.enabled = true;
+                yield return Until(() => session.GourdViewerState == GameGourdViewerState.Ready,
+                    "The session adopts only the completed independent output.");
+                var deferred = (LabGourdResultPreview)typeof(GameSession).GetField("preview",
+                    BindingFlags.Instance | BindingFlags.NonPublic).GetValue(session);
+                Assert.That(deferred.PaintTexture.GetPixels32(), Is.EqualTo(comparisonPreview.PaintTexture.GetPixels32()));
+                Assert.That(deferred.PainterTexture.GetPixels32(), Is.EqualTo(comparisonPreview.PainterTexture.GetPixels32()));
+                Assert.That(ReadViewerMap(deferred.VisualPaintTexture), Is.EqualTo(ReadViewerMap(comparisonPreview.VisualPaintTexture)),
+                    "The same actual journal must produce the same color texels through both capture paths.");
+                Assert.That(ReadViewerMap(deferred.VisualPainterTexture), Is.EqualTo(ReadViewerMap(comparisonPreview.VisualPainterTexture)),
+                    "The independent replay must not change the owner atlas.");
+                Color[] expected = ReadViewerRelief(comparisonPreview.VisualHeightTexture);
+                Color[] actual = ReadViewerRelief(deferred.VisualHeightTexture);
+                Assert.That(actual.Length, Is.EqualTo(expected.Length));
+                float maximum = 0f;
+                for (int i = 0; i < actual.Length; i++)
+                    for (int channel = 0; channel < 4; channel++)
+                        maximum = Mathf.Max(maximum, Mathf.Abs(actual[i][channel] - expected[i][channel]));
+                Assert.That(maximum, Is.LessThanOrEqualTo(1f / 1024f),
+                    "Half-precision relief and encoded sticker normals must agree within one conservative Half quantization step.");
+            }
+            finally { if (session != null) session.enabled = true; }
+            yield return WaitResultStory();
+            Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.Completed),
+                "Finish the actual pending Scene handoff before releasing this fixture's session.");
+        }
+
+        private static Color32[] ReadViewerMap(Texture texture)
+        {
+            Assert.That(texture, Is.Not.Null);
+            RenderTexture scratch = RenderTexture.GetTemporary(texture.width, texture.height, 0,
+                RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
+            RenderTexture previous = RenderTexture.active;
+            var copy = new Texture2D(texture.width, texture.height, TextureFormat.RGBA32, false, true);
+            try
+            {
+                Graphics.Blit(texture, scratch);
+                RenderTexture.active = scratch;
+                copy.ReadPixels(new Rect(0, 0, texture.width, texture.height), 0, 0);
+                copy.Apply(false, false);
+                return copy.GetPixels32();
+            }
+            finally { RenderTexture.active = previous; Object.DestroyImmediate(copy); RenderTexture.ReleaseTemporary(scratch); }
+        }
+
+        private static Color[] ReadViewerRelief(Texture texture)
+        {
+            Assert.That(texture, Is.Not.Null);
+            RenderTexture scratch = RenderTexture.GetTemporary(texture.width, texture.height, 0,
+                RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
+            RenderTexture previous = RenderTexture.active;
+            var copy = new Texture2D(texture.width, texture.height, TextureFormat.RGBAFloat, false, true);
+            try
+            {
+                Graphics.Blit(texture, scratch);
+                RenderTexture.active = scratch;
+                copy.ReadPixels(new Rect(0, 0, texture.width, texture.height), 0, 0);
+                copy.Apply(false, false);
+                return copy.GetPixels();
+            }
+            finally { RenderTexture.active = previous; Object.DestroyImmediate(copy); RenderTexture.ReleaseTemporary(scratch); }
+        }
+
+        private IEnumerator StartJigwiWithDelayedArtwork()
+        {
+            session.StartSolo();
+            for (int stage = 1; stage < 3; stage++)
+            {
+                yield return WaitPlaying(stage);
+                session.Pause();
+                Assert.That(session.DeveloperNextStage(), Is.True, "Use the real development skip to select Jigwi.");
+            }
+            yield return WaitPlaying(3);
+            Assert.That(network.RequiresPaintArt, Is.True);
+            Assert.That(network.PinnedWatercolorSettings.UsesClayStickers, Is.True);
+            delayedArtworkWriter = network.PaintArtJournal;
+            Assert.That(delayedArtworkWriter, Is.Not.Null);
+            Assert.That(delayedArtworkWriter.Flush(), Is.True, delayedArtworkWriter.Error);
+            delayedArtworkReceiver = new LabPaintArtJournal(System.IO.Path.Combine(Application.temporaryCachePath,
+                "viewer-725-" + Guid.NewGuid().ToString("N") + ".art"), delayedArtworkWriter.Epoch,
+                delayedArtworkWriter.Columns, delayedArtworkWriter.Rows, delayedArtworkWriter.StyleVersion, receiver: true);
+            Assert.That(delayedArtworkReceiver.Error, Is.Null);
+            DeliverDelayedArtworkPages();
+            typeof(LabNetwork).GetField("paintArtJournal", BindingFlags.Instance | BindingFlags.NonPublic)
+                .SetValue(network, delayedArtworkReceiver);
+            CompleteMapInFixture(Model());
+            yield return Until(() => network.Snapshot.phase == LabPhase.Victory,
+                "The real model must publish a complete final result while its artwork is delayed.");
+            string hash = (string)typeof(LabNetwork).GetMethod("HashArtSurface", BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(network, new object[] { Model().PaintSurface });
+            Assert.That(delayedArtworkWriter.Seal(Model().PaintSurface.Revision, hash), Is.True, delayedArtworkWriter.Error);
+            Assert.That(delayedArtworkWriter.PageCount, Is.GreaterThan(delayedArtworkReceiver.PageCount));
+            Assert.That(delayedArtworkReceiver.IsSealed, Is.False);
+            yield return Until(() => typeof(GameSession).GetField("viewerPreparation", BindingFlags.Instance | BindingFlags.NonPublic)
+                .GetValue(session) != null, "Capture a render-only template before the final presentation budget expires.");
+            Assert.That(session.GourdViewerState, Is.EqualTo(GameGourdViewerState.Pending));
+        }
+
+        private void DeliverDelayedArtworkPages()
+        {
+            while (delayedArtworkReceiver.PageCount < delayedArtworkWriter.PageCount)
+            {
+                int page = delayedArtworkReceiver.PageCount;
+                Assert.That(delayedArtworkWriter.TryReadPage(page, out byte[] raw), Is.True, delayedArtworkWriter.Error);
+                Assert.That(delayedArtworkReceiver.TryImportPage(page, raw), Is.True, delayedArtworkReceiver.Error);
+            }
+        }
+
+        private void ExpireOnlyTheFinishPresentationBudget()
+        {
+            var barrier = (GamePaintFinishBarrier)typeof(GameSession).GetField("finishBarrier",
+                BindingFlags.Instance | BindingFlags.NonPublic).GetValue(session);
+            Assert.That(barrier, Is.Not.Null);
+            Assert.That(barrier.Expire(Time.realtimeSinceStartupAsDouble + GamePaintFinishBarrier.TimeoutSeconds + 1d), Is.True);
+            typeof(GameSession).GetField("finishDeadlineAt", BindingFlags.Instance | BindingFlags.NonPublic)
+                .SetValue(session, Time.realtimeSinceStartupAsDouble - 1d);
+        }
+
+        private void RestoreDelayedArtworkJournal()
+        {
+            if (delayedArtworkWriter == null && delayedArtworkReceiver == null) return;
+            if (network != null && network.PaintArtJournal == delayedArtworkReceiver)
+                typeof(LabNetwork).GetField("paintArtJournal", BindingFlags.Instance | BindingFlags.NonPublic)
+                    .SetValue(network, delayedArtworkWriter);
+            delayedArtworkReceiver?.Dispose();
+            // Stop will dispose the production writer when it is still the current round;
+            // a Home/new-room reset already discarded that reference, so release it here.
+            if (network == null || network.PaintArtJournal != delayedArtworkWriter) delayedArtworkWriter?.Dispose();
+            delayedArtworkWriter = delayedArtworkReceiver = null;
         }
 
         [UnityTest]
@@ -738,6 +1086,9 @@ namespace Hapio.Tests
             Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.Completed));
             Assert.That(session.ResultSnapshot.teamTerritory, Is.True);
             Assert.That(session.PreviewTexture, Is.Null, "A gourd that is not completely painted has no 박 확인 picture.");
+            Assert.That(session.GourdViewerState, Is.EqualTo(GameGourdViewerState.Disabled),
+                "An incomplete territory map must not start a pending or failed Story artwork job.");
+            Assert.That(session.GourdViewerError, Is.Null.Or.Empty);
             GameTerritoryResultView territory = Object.FindFirstObjectByType<GameScreen>().territoryView;
             yield return Until(() => territory.gameObject.activeInHierarchy, "The team result shows.");
             yield return Until(() => territory.table.homeButton.IsInteractable(), "Exit is available on the result.");

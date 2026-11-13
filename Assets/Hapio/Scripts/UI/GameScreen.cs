@@ -44,6 +44,7 @@ namespace Hapio
         public float resultTableGap = 12f;
 
         private GameSession session;
+        private readonly Dictionary<UnityEngine.UI.Button, string> viewerReadyCaptions = new Dictionary<UnityEngine.UI.Button, string>();
         // 2:2 (#281) result page: the final Blue/Red bar and the saved title colour for a draw.
         private LabTeamBar resultBar;
         private Color? resultTitleColor;
@@ -344,6 +345,7 @@ namespace Hapio
             Show(viewerButton == null ? null : viewerButton.gameObject, net.config != null && net.config.CompletedGourdViewerEnabled
                 && net.config.GourdMode == LabGourdMode.Paint && result != null && result.paintCoverage >= 1f);
             Interactable(viewerButton, session.PreviewTexture != null);
+            RefreshViewerCaption(viewerButton);
             Texture texture = session.PreviewTexture;
             Show(viewerPanel, session.IsViewerOpen && texture != null);
             if (viewerImage != null) viewerImage.texture = texture;
@@ -390,6 +392,7 @@ namespace Hapio
             Interactable(resultView.homeButton, !complete || session.CanReturnHome);
             GameStageResultView.Label(resultView.homeButton, "나가기");
             Interactable(resultView.viewerButton, victory && session.PreviewTexture != null);
+            if (victory) RefreshViewerCaption(resultView.viewerButton, authoredCaption: true);
             Texture texture = session.PreviewTexture;
             Show(viewerPanel, session.IsViewerOpen && texture != null);
             if (viewerImage != null) viewerImage.texture = texture;
@@ -409,6 +412,7 @@ namespace Hapio
                 Show(territoryView.table.nextButton.gameObject, true);
                 Interactable(territoryView.table.nextButton, session.CanRetryTerritory && !ResultActionsBlocked);
                 Interactable(territoryView.table.viewerButton, session.PreviewTexture != null && !ResultActionsBlocked);
+                RefreshViewerCaption(territoryView.table.viewerButton);
                 Show(viewerPanel, session.IsViewerOpen && session.PreviewTexture != null);
                 if (viewerImage != null) viewerImage.texture = session.PreviewTexture;
                 return;
@@ -425,6 +429,7 @@ namespace Hapio
             Interactable(resultView.homeButton, !net.IsHost || session.CanReturnHome);
             GameStageResultView.Label(resultView.homeButton, "나가기");
             Interactable(resultView.viewerButton, session.PreviewTexture != null);
+            RefreshViewerCaption(resultView.viewerButton, authoredCaption: true);
             Texture texture = session.PreviewTexture;
             Show(viewerPanel, session.IsViewerOpen && texture != null);
             if (viewerImage != null) viewerImage.texture = texture;
@@ -479,6 +484,7 @@ namespace Hapio
             Label(homeButton, "HOME");
             Show(viewerButton == null ? null : viewerButton.gameObject, session.PreviewTexture != null);
             Interactable(viewerButton, session.PreviewTexture != null);
+            RefreshViewerCaption(viewerButton);
             Texture texture = session.PreviewTexture;
             Show(viewerPanel, session.IsViewerOpen && texture != null);
             if (viewerImage != null) viewerImage.texture = texture;
@@ -811,6 +817,29 @@ namespace Hapio
             if (session.PreviewClayAppearance(thickness, gloss, out string error))
                 Text(developerFeedback, "클레이 두께·광택은 즉시 적용됩니다. 다른 설정은 APPLY가 필요합니다.");
             else Text(developerFeedback, error);
+        }
+
+        internal static string ViewerButtonCaption(GameSession game, string readyCaption)
+        {
+            if (game == null || game.PreviewTexture != null) return readyCaption;
+            switch (game.GourdViewerState)
+            {
+                case GameGourdViewerState.Pending: return "봉인 박 준비 중…";
+                case GameGourdViewerState.Failed: return "봉인 박 준비 실패";
+                case GameGourdViewerState.Disabled: return readyCaption;
+                default: return readyCaption;
+            }
+        }
+
+        private void RefreshViewerCaption(UnityEngine.UI.Button button, bool authoredCaption = false)
+        {
+            if (button == null) return;
+            var caption = button.GetComponentInChildren<UnityEngine.UI.Text>(true);
+            if (caption == null) return;
+            // Present() writes the contextual normal caption again; saved legacy buttons keep
+            // the first authored caption so Pending -> Ready never retains a status message.
+            if (authoredCaption || !viewerReadyCaptions.ContainsKey(button)) viewerReadyCaptions[button] = caption.text;
+            Text(caption, ViewerButtonCaption(session, viewerReadyCaptions[button]));
         }
 
         private static void Click(UnityEngine.UI.Button button, UnityEngine.Events.UnityAction action) { if (button != null) button.onClick.AddListener(action); }

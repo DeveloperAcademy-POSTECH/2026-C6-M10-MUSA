@@ -681,7 +681,7 @@ namespace C6Lab.Tests
                     Invoke("OnPredictedShotContact", 60L,
                         new LabProjectileResult(null, 0ul, LabProjectileHitKind.Monster, point, .5f, 1f, 3f,
                             velocity, hitNormal: Vector3.right, visualDiameter: .33f),
-                        LabOrbElement.Water, 20, 1f, false, false, talisman);
+                        LabOrbElement.Water, 20, 1f, false, false, talisman, false); // #713 optional soot, explicit for reflection.
                 }
                 Assert.That(pool.ActiveImpactCount, Is.EqualTo(talisman ? 0 : 1),
                     "Special talisman water effects must not also acquire an ordinary element impact.");
@@ -708,7 +708,8 @@ namespace C6Lab.Tests
         {
             Get<LabLocalHitPresentation>("localHits").Register(requestId, projectileId);
             Invoke("OnPredictedShotContact", requestId,
-                new LabProjectileResult(null, 0ul, kind, point, .5f, 1f, 3f, velocity), LabOrbElement.None, 20, 1f, false, false, false);
+                // Reflection supplies #713's optional soot flag explicitly; these remain ordinary shots.
+                new LabProjectileResult(null, 0ul, kind, point, .5f, 1f, 3f, velocity), LabOrbElement.None, 20, 1f, false, false, false, false);
         }
 
         private void ReceiveImpact(string projectileId, Vector3 worldPoint, Vector3 velocity, float spin)

@@ -8631,6 +8631,58 @@ main fbc943e8을 통합하며 VALIDATION 문서 끝의 독립 기록 추가 충�
 - 하트(콤보마다 3개) 추가와 main 통합 뒤 전체 EditMode **2,396 PASS / 7 FAIL**(총 2,403, skip 0). 새 테스트 LabGourdComboTests.ThreeHeartsLetTwoWrongColorsPassAndTheThirdFails·TheModelGivesEveryComboItsHearts를 포함한 콤보 테스트는 모두 통과했다. 실패 7개는 LabOrbSpriteDesignTests.SavedConfigConnectsEachKindToItsOriginalArt 결합 구슬 5종과 GameBattleUiAssetTests 2개로, 메모리의 LabConfig가 BattleOrbAppearance를 가리킨 #701 기록과 같은 현상이다. 저장 LabConfig.asset의 orbAppearance GUID는 변경 없음(이 브랜치의 에셋 차이는 comboWarningSeconds 6·yaguangComboHearts 3뿐). Unity를 재시작한 뒤 재실행해 통과했다. PlayMode·빌드·실기기는 이번에도 실행하지 않았다.
 
 
+## 2026-11-13 — #725 지귀 관람 준비와 결과 화면 복구
+
+기준 origin/main `1efbf325`(야광귀 #723 포함), 브랜치 `fix/#725-gourd-viewer-preparation`, Unity 6000.6.5f1 / macOS Metal.
+
+사용자는 같은 실행에서 1·2스테이지는 관람 가능하지만 지귀는 참가자·Host에서도 비활성화됐다고 보고했다. 해당 실행의 로그/앱에는 접근하지 못했다. 버튼/Prefab 연결은 정상이며, CPU 준비와 실제 사본 생성 조건의 불일치, 실패 후 Battle 해제, 결과 화면 재시도 부재를 코드에서 확인했다. 이번 검사는 이 구조적 공백에 실제 지연 입력을 넣어 검증한다. 사용자 원래 실행의 개별 실패 원인을 확정한 것은 아니다.
+
+### 구현과 보존 범위
+
+- `GameSession.GourdViewer.cs`의 Disabled/Pending/Ready/Failed를 실제 사본 생성에 연결했다. Victory 직후 원본 모델을 보존하고 기존 12초 완료 예산을 갱신하지 않는다. 독립 준비 작업은 결과 Scene에서도 계속되며, 완성된 표면·기록·GPU 출력만 관람에 사용한다. 30초 유휴 또는 영구 기록 오류는 Failed로 정리하고 클리어·통계·진행은 보존한다.
+- 준비 작업은 표시용 모델/재질과 CPU/GPU 사본만 소유하며 물리·오디오·기믹을 복사하지 않는다. 공유 journal은 Network 소유다. 홈·다음 판·종료 전에 작업을 취소한다. 최종 연결 종료와 원본 기록 폐기/교체/오류를 구분하고, 원본 live GPU 오류와 전송/기록 오류도 분리했다.
+- 기존 빠른 캡처, 땅따먹기의 청홍 표현/수채 제외, 시연 경로, #720 복귀 배경을 보존한다. Scene·Prefab·원본 에셋·패키지·저장 설정·네트워크 wire·게임 판정은 변경하지 않았다. 미병합 #721은 이 브랜치에서 임의로 합치지 않았다.
+
+### 최초 실패와 수정
+
+- 최초 집중 검사 요청은 새 PlayMode 검사가 Editor에 아직 반영되지 않아 0건이었다. PASS로 보지 않았다. AssetDatabase.Refresh 후 실행한 첫 지연 검사는 원본 보존이 연출 준비 완료 뒤에만 시작돼 Scene이 이미 해제되는 시점을 검출했다(NullReference). Victory 직후 준비 작업을 확보하도록 수정했으며 단언을 완화하지 않았다.
+- 첫 전체 EditMode는 2,403건 중 9건 실패했다. 2건은 기능 꺼짐 상태의 기존 버튼 문구가 바뀐 문제로 원문 유지로 수정했다. 7건은 선행 PlayMode 종료 때 메모리에 남은 구슬 외형 override였다. 실제 Editor의 저장 필드와 비직렬화 override를 조회해 구분했고, 저장 GUID/에셋은 main과 같았다. fixture가 시작 전 override를 보관해 전체 정리 뒤 정확히 복원하도록 보완했다. 에셋·기존 단언은 바꾸지 않았다. 새 Editor에서 추가 집중 검사를 수행한 뒤 전체 EditMode를 재실행했다.
+
+### 전체 PlayMode 확장 실행 이력
+
+- 열린 Editor에서 시작한 전체 PlayMode는 비교 앱 검사의 `runInBackground=false`와 Editor 포커스 이탈이 겹치면서 프레임 진행이 멈춰 중단했다. 완료한 전체 검사로 간주하지 않았으며 PASS로 기록하지 않는다. 이후 macOS Metal batch 환경으로 전환해 비교 앱 관련 검사부터 확인했다.
+- 첫 번째 완료된 batch 전체 PlayMode는 **841건 중 795통과·46실패**(628.87초)였다. 11건은 main에 이미 반영된 #719 가이딩/보상 표시와 #713 투척 접촉 인자 변경에 맞지 않는 기존 검사 계약이었고, 나머지 35건은 Hapio fixture의 초기화·정리 실패가 이어진 결과였다. 이 실행을 최종 통과 결과로 대체하지 않고 원인을 구분해 보존한다.
+- 기존 계약 보완은 `LabComboProjectileIntegrationTests`의 현재 슬롯 알파·4박 예고, `LabFiveColorClayNetworkTests`의 접촉 전부터 존재한 #719 보상 먼지와 접촉에서 새로 생긴 구형 효과 구분, `LabLocalBoardNetworkIntegrationTests`·동일 접촉 검사의 #713 선택 인자 명시로 한정했다. 게임 코드와 게임 설정은 바꾸지 않았고, 현행 동작을 지키는 단언을 완화하지 않았다. 보상 먼지 식별 과정에서 추가한 `GetInstanceID`가 현재 Unity에서 obsolete 컴파일 오류를 일으켜 실제 객체 참조 집합으로 식별하도록 고쳤다. 컴파일 실패를 검사 통과로 세지 않았다.
+- `GameSceneFlowTests`는 동등성 비교 후 결과 Scene 로딩이 끝날 때까지 기다리도록 하고, TearDown이 비동기 로딩을 배출한 다음 정리하게 했다. 검사별 임시 자료를 구분하고 구슬 외형 override를 `finally`에서 복원해 다음 검사에 새지 않게 했다. 게임의 Scene 연결·클리어·도색 판정은 변경하지 않았다.
+- 보완 후 기존 계약 집중 묶음 **4/4**(0.38초), **25/25**(0.37초), **2/2**(1.21초)가 통과했고, `GameSceneFlowTests` 전체 **35/35**(176.59초)가 통과했다. 이를 근거로 최종 전체 PlayMode를 다시 시작했다. 실행 중에는 최종 전체 결과를 미확정으로 기록했고, 완료 후 아래 표에 확정했다.
+
+### 실행 결과
+
+| 검사 | 결과 | 시간 |
+| --- | --- | --- |
+| 완료 메타데이터 집중 EditMode | 20/20 PASS | 0.50초 |
+| 지귀 결과 진입 후 실제 기록/GPU 복구 | 1/1 PASS | 4.95초 |
+| 준비 중 홈 이동·늦은 기록 차단 | 1/1 PASS | 4.59초 |
+| 영구 기록 오류·클리어/홈 보존 | 1/1 PASS | 3.67초 |
+| 유휴 한도 초과 | 1/1 PASS | 4.44초 |
+| 폐기된 공유 journal 감지 | 1/1 PASS | 3.19초 |
+| 기존 빠른 캡처와 지연 재생 그림 일치 | 1/1 PASS | 4.48초 |
+| 전체 EditMode | 2403/2403 PASS | 19.13초 |
+| batch 비교 앱 관련 검사 | 17/17 PASS | 17.25초 |
+| LabComboProjectileIntegrationTests | 4/4 PASS | 0.38초 |
+| LabLocalBoardNetworkIntegrationTests | 25/25 PASS | 0.37초 |
+| LabFiveColorClayNetworkTests | 2/2 PASS | 1.21초 |
+| GameSceneFlowTests 전체 | 35/35 PASS | 176.59초 |
+| 최종 전체 PlayMode (batch / Metal) | 841/841 PASS | 863.03초 |
+
+지연 검사는 실제 지귀 모델과 최종 CPU 도색, 실제 receiver 기록 페이지, GPU 재생을 사용하며 가짜 preview를 주입하지 않는다. CPU 색/P와 GPU 색/P는 일치했고, 높이/법선 Half 채널은 검사 정밀도 한도(1/1024) 이내였다. 클리어·홈 진행·원본 Battle 해제·Rigidbody/Collider/Audio 복사 없음도 확인했다. Scene 전환과 공유 수명을 변경하므로 전체 PlayMode를 생략하지 않는다. 독립 코드 리뷰에서 추가 차단 사항은 없었다.
+
+- 최종 재실행: 전체 PlayMode **841/841 PASS**(863.03초), 실패·skip·inconclusive 0. 새 관람 복구 6건과 기존 1~3스테이지·땅따먹기·시연·튜토리얼·투척/통신/도색 검사를 포함한다. 전체 EditMode **2403/2403 PASS**(19.13초)는 같은 런타임 코드의 검사 결과이며, 이후 수정은 PlayMode 계약/정리 코드와 문서뿐이어서 재사용했다. Scene/Prefab/원본 에셋/설정의 실제 diff가 없음을 확인했다.
+
+### 실행하지 않은 환경
+
+새 회귀 검사는 솔로 Host 안에 실제 receiver 페이지 지연을 주입한 검사다. 별도 Mac Host/Guest 프로세스, iOS 빌드/실기기의 일반 Wi-Fi·핫스팟, 사용자 원래 문제 앱의 재현은 미검증이다. 원시 로그·로컬 절대 경로·검사 산출물은 커밋하지 않는다.
+
 ## 2026-11-13 — #718 북 넘기기 안내와 스태미나 부족 경고
 
 ### 변경
@@ -8710,6 +8762,20 @@ main fbc943e8을 통합하며 VALIDATION 문서 끝의 독립 기록 추가 충�
 
 - 최신 main(#720 관람 복귀 배경, #719 야광귀 콤보 가이딩, #718 북 넘기기 안내·스태미나 부족 경고)을 통합했다. 충돌은 이 문서 끝의 기록 추가와 `GameSceneFlowTests.cs`의 같은 자리에 양쪽이 넣은 검사 두 곳이며, 둘 다 양쪽을 모두 보존했다(#717 검사 3건 뒤에 #718 검사 2건).
 - #717과 #718이 함께 다루는 화면: #718의 "기운이 부족하다" 경고는 HUD Canvas 위, #717의 끝 문구는 세션 위 시작 오버레이(정렬 30000)라 끝 문구가 늘 위에 보인다. 끝 문구가 뜬 뒤에는 판 조작이 막혀 스태미나 부족 경고가 새로 나지 않고, 북 넘기기 안내는 전투가 끝나면(Playing이 아니면) 숨는다. 접속 버전 변경은 양쪽 모두 없다.
+
+
+## #725 최신 main 통합과 PR #728
+
+`9b1b4366`의 관람 준비 복구를 main `a7208003`(#721 종료 문구/호루라기와 #726 북 전달 안내/스태미나 경고)에 통합했다. 충돌은 `GameSession.cs`의 결과 캡처/전환, 오색 검사 설명 주석, 이 문서 끝의 독립 기록 추가였다. 기능/검사/기록을 양쪽 보존했고 원화·Scene·Prefab·설정·오디오/에셋은 최신 main과 같다. 이전 #725 기록의 ‘미병합 #721을 임의로 합치지 않음’은 구현 시작 당시 이력이며, 이번에는 main에 이미 병합된 #721/#726을 함께 보존한다.
+
+- `WantsGourdViewer`·캡처/준비 판정·캡처 완료 확인은 main의 `ResultNeedsPreview`를 함께 따른다. 불완전한 땅따먹기 지도는 Disabled이며 Pending/Failed 작업을 만들지 않는다. 해당 시간 종료 검사에 상태 Disabled와 오류 없음 단언을 추가했다.
+- 종료 문구 대기가 끝난 뒤 Battle 참조 해제 직전에 관람 준비 작업을 인계한다. `UpdateBattleEnd`, `FinishScheduleAllowed`, `TerritoryResultDeadline`, 시작 표시 1초/봉인 시작 문구를 보존했다. #725의 관람 6건과 main의 게임 흐름 5건을 함께 유지해 해당 fixture는40건이다.
+- 독립 코드/검사 통합 리뷰에서 차단 사항 없음. `git diff --check origin/main`과 충돌 표식 확인을 통과했다. main에서 가져온 Unity 자동 생성 meta 형식은 그대로 보존했다.
+- 통합 집중 검사(Unity6000.6.5f1/macOS batch Metal): 복귀 배경 GPU3/3(0.27초), 불완전 땅따먹기 결과1/1(5.80초), 지귀 결과 후 실제 도색 복구1/1(4.02초), 스토리 성공/호루라기1/1(6.83초), 시간 초과/실패1/1(4.78초) PASS. 이 결과를 전체 통과로 간주하지 않으며 전체 EditMode·PlayMode를 새로 실행한다.
+- 기존 2403/841 통과는 `1efbf325` 기반 구현 당시 결과다. 최신 main이 세션 시작/종료와 Scene 전환을 바꾸었으므로 이번 통합본의 PASS로 재사용하지 않는다. 최종 통합 전체 결과는 실행 완료 후 아래 기록한다. 별도 Mac Host/Guest 및 iOS/실기기 검증은 이번 PR에서도 미검증이다.
+
+
+최종 통합 검증: main `a7208003`을 병합한 `aec6e100` 기준으로 전체 EditMode **2407/2407 PASS**(21.07초), 전체 PlayMode **849/849 PASS**(963.34초). 실패·skip·inconclusive 0. 일반 Story 1~3스테이지, 지귀 결과 후 관람 복구, 불완전한 땅따먹기 관람 Disabled/오류 없음, #717 종료/호루라기, #718 북 안내/스태미나 경고를 포함한다. 검사 후 변경은 검증 문서·PR 설명뿐이며 동작 코드는 같다. Scene/Prefab/원본 에셋/저장 설정/패키지는 최신 main과 차이가 없다. 통합 전 2403/841 결과와 별개인 이번 실행 결과이며, 별도 기기·iOS 확인은 여전히 미검증이다.
 
 ## 2026-11-14 — 전투 시작 대기의 끝 (방장 시작 재확인·참가자 시작 대기 10초·준비 45초)
 

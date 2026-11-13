@@ -66,6 +66,7 @@ namespace Hapio
             if (!tutorialRun) return;
             tutorialRun = false;
             goingHome = true;
+            CancelGourdViewerPreparation();
             if (!toRooms) roomBrowserVisible = false;
             network.Stop();
             network.UnbindBattleReferences();
