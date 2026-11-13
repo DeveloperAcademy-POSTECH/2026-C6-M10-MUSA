@@ -9,7 +9,7 @@ namespace C6Lab
     public sealed class LabOrbComboHint : MonoBehaviour
     {
         /// <summary>테두리 크기 (구슬 반지름 배).</summary>
-        public const float RingScale = 3.9f;
+        public const float RingScale = 3f; // #719 QA: 3.9 was too big (rings of neighbours overlapped)
         /// <summary>#719: 콤보 시계 째깍(똑딱)마다 1로 튀었다가 다음 째깍 전에 0으로 줄어드는 값. LabGourdComboHud가 매 프레임 정한다.</summary>
         public static float Beat;
         private const int RingOrder = 1;
