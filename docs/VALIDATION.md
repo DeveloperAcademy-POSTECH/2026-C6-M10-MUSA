@@ -8872,3 +8872,10 @@ PR #729 검증 중 main `a7208003`에서 `LabLocalBoardNetworkIntegrationTests` 
 - **미실행:** Mac 여러 앱·iPhone 실기기의 참가자 시작 대기 만료, iOS 백그라운드 복귀 중 누적 제외.
 - **main 통합 뒤 재실행 (main `53118b72`, #725 포함):** 충돌은 이 문서 끝의 기록 추가뿐이었다(양쪽 보존). #725가 `GameSession.cs`와 같은 검사 파일을 바꿔 전체를 다시 돌렸다. 전체 EditMode **2412/2412 PASS**, 전체 PlayMode **851/853**. 새 검사 5건(PlayMode 4·EditMode 경계)과 Hapio 검사는 모두 PASS였다. 위 Lab 실패 10건은 #725의 검사 수정으로 모두 통과했다. 실패 2건은 Lab GPU 렌더 검사 `LabPaintGrainRenderTests.SavedGourdShader…`·`LabPaintSpreadFlowRenderTests.SavedShellCompares…`(RGB 반올림 차 3, 허용 1)다. 앞의 두 번의 전체 실행에서는 통과했고, 둘만 따로 다시 돌리면 2/2 PASS여서 간헐 실패로 본다. Hapio를 참조하지 않는 검사다.
 - **#729(결과 화면 대기 한도, Game 토큰 55) 병합 뒤 재실행 (main `eaa11947`):** 충돌 없이 합쳐졌다. `GameSession`의 같은 partial 클래스를 함께 바꾸므로 전체를 다시 돌렸다. 전체 EditMode **2416/2416 PASS**, 전체 PlayMode **857/857 PASS**.
+
+## 2026-11-14 — #724 3라운드 지귀 UT 반영 (방해 간격·연기 닦기·검은 구슬 조합대·부적 획별 판정)
+
+- **기준:** `feat/#724-jigwi-after-ut` (main `5c00baa0` 기준, 뒤처진 커밋 없음). 접속 규약 5704 그대로이며 새 필드 `sootSocketed`는 추가만 했다. DEV 설정 번호 추가 없음.
+- **실행:** Unity Editor를 재시작한 뒤 Test Runner에서 전체 EditMode Run All, **실패 0건**. 전체 개수는 기록하지 못했다. 이번에 바꾼 `LabJigwiABModelTests`(조합대에 파편 넣기·아무 파편끼리 합치기), `LabJigwiTalismanOverlayTests`(획별 60% 판정), `LabJigwiSavedConfigTests`(간격 18/16/30/25초)가 이 실행에 들어 있다.
+- **수동 확인(Editor):** 연기 다시 번짐(닦지 않고 1초 뒤 구멍 가장자리부터), 다 닦은 뒤 걷힘 1.2초, 파편은 다 닦은 뒤에 나옴을 팀원이 플레이로 보고 속도를 정했다.
+- **미실행:** 전체 PlayMode, Mac 여러 앱·iPhone 실기기에서 연기 밑 판 조작/조합대 동기화.
