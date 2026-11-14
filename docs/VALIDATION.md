@@ -8794,3 +8794,20 @@ main fbc943e8을 통합하며 VALIDATION 문서 끝의 독립 기록 추가 충�
 
 
 최종 통합 검증: main `a7208003`을 병합한 `aec6e100` 기준으로 전체 EditMode **2407/2407 PASS**(21.07초), 전체 PlayMode **849/849 PASS**(963.34초). 실패·skip·inconclusive 0. 일반 Story 1~3스테이지, 지귀 결과 후 관람 복구, 불완전한 땅따먹기 관람 Disabled/오류 없음, #717 종료/호루라기, #718 북 안내/스태미나 경고를 포함한다. 검사 후 변경은 검증 문서·PR 설명뿐이며 동작 코드는 같다. Scene/Prefab/원본 에셋/저장 설정/패키지는 최신 main과 차이가 없다. 통합 전 2403/841 결과와 별개인 이번 실행 결과이며, 별도 기기·iOS 확인은 여전히 미검증이다.
+
+## 2026-11-14 — 전투 시작 대기의 끝 (방장 시작 재확인·참가자 시작 대기 10초·준비 45초)
+
+- **기준:** `fix/hapio-start-waits` (main `a7208003`). Unity 6000.6.5f1 batch(macOS, Metal). 바뀐 코드는 `GameSession.Start.cs`뿐이며 접속 규약·설정 수·`GameStartTiming` 기본값은 그대로다.
+- **범위 선정:** 세션·동기화(전투 시작 장벽 #306)의 동작 변경이라 AGENTS.md에 따라 전체 EditMode·PlayMode를 실행했다.
+
+| 확인 | 결과 |
+| --- | --- |
+| 전체 EditMode | **2412/2412 PASS**. 새 `GameStartWaitLimitsTests` 5건: 10초 경계(.25초 40프레임째에 처음 만료), 세지 않는 동안 합계 유지, 백그라운드 길이 프레임은 .25초만 더함, 준비 한도 기본 45초·`GameTestStartTiming` 42.3초·방장 최장 준비(38초)보다 김, 방장 재확인 0.5초 경계 |
+| 전체 PlayMode 1회차 | 793/847. 새 `AGuestPreparingPastItsLimitLeavesTheRun`이 검사 자체의 부동소수 합(42.3−.1+.05+.05 < 42.3)으로 실패했고, 그 뒤 같은 세션이 남아 이후 Hapio fixture 약 40건이 SetUp에서 연쇄 실패했다. 검사의 두 번째 프레임을 백그라운드 길이(30초 → .25초)로 바꿔 고쳤다(구현 변경 없음) |
+| 전체 PlayMode 2회차 | **837/847**. Hapio 검사는 모두 PASS. 새 검사 4건: `TheHostRetriesItsOwnStartCheckBrieflyAfterTheCommitThenStartsOrAborts`(공통 시작 뒤 방장 초기 상태 미준비 → Countdown 유지 → 회복하면 Playing / 계속 미준비면 시작 0.5초 이상 뒤 "The prepared battle could not be started."), `AGuestHeldTenForegroundSecondsAfterTheSharedStartEndsTheStoryRun`(29초 프레임은 .25초만, 10초에 "This device could not start the stage." → Story GameOver, 재도전 없음, 누적 초기화), `AGuestPreparingPastItsLimitLeavesTheRun`("The host did not start the stage.", 시작 대기 해제), `AGuestStartHoldExitReturnsATerritoryRoomToItsLobby`(참가자의 `exit`를 받은 방장의 2:2가 로비로) |
+| 2회차 실패 10건 | 모두 Lab 검사 어셈블리이며 1·2회차가 같다: `LabLocalBoardNetworkIntegrationTests` 7건(리플렉션 `TargetParameterCountException`), `LabComboProjectileIntegrationTests` 2건(HUD 알파·카운트 "4"), `LabFiveColorClayNetworkTests.SavedSoloHost…`(오색 먼지 덮개 남음). Lab asmdef는 Hapio를 참조하지 않아 이 변경과 무관하다. main에서 따로 재현하지는 않았다(NOT_RUN) |
+
+- **검사 방식의 한계:** PlayMode는 솔로 방장이 참가자 대신 서서, 참가자 전용 `UpdateGuestStartWaits`를 리플렉션으로 부르고 누적값을 한도 직전으로 놓았다. 2:2 로비 복귀는 DEV 솔로 표시를 잠시 끄고 가짜 참가자의 `exit`를 방장에 넣어 확인했다. 실제 두 기기 사이의 `exit` 전송, 실제 10초·45초 경과는 확인하지 않았다.
+- **미실행:** Mac 여러 앱·iPhone 실기기의 참가자 시작 대기 만료, iOS 백그라운드 복귀 중 누적 제외.
+- **main 통합 뒤 재실행 (main `53118b72`, #725 포함):** 충돌은 이 문서 끝의 기록 추가뿐이었다(양쪽 보존). #725가 `GameSession.cs`와 같은 검사 파일을 바꿔 전체를 다시 돌렸다. 전체 EditMode **2412/2412 PASS**, 전체 PlayMode **851/853**. 새 검사 5건(PlayMode 4·EditMode 경계)과 Hapio 검사는 모두 PASS였다. 위 Lab 실패 10건은 #725의 검사 수정으로 모두 통과했다. 실패 2건은 Lab GPU 렌더 검사 `LabPaintGrainRenderTests.SavedGourdShader…`·`LabPaintSpreadFlowRenderTests.SavedShellCompares…`(RGB 반올림 차 3, 허용 1)다. 앞의 두 번의 전체 실행에서는 통과했고, 둘만 따로 다시 돌리면 2/2 PASS여서 간헐 실패로 본다. Hapio를 참조하지 않는 검사다.
+- **#729(결과 화면 대기 한도, Game 토큰 55) 병합 뒤 재실행 (main `eaa11947`):** 충돌 없이 합쳐졌다. `GameSession`의 같은 partial 클래스를 함께 바꾸므로 전체를 다시 돌렸다. 전체 EditMode **2416/2416 PASS**, 전체 PlayMode **857/857 PASS**.

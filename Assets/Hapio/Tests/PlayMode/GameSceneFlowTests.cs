@@ -765,6 +765,134 @@ namespace Hapio.Tests
             Assert.That(network.GameStartHeld, Is.False);
         }
 
+        [UnityTest]
+        public IEnumerator TheHostRetriesItsOwnStartCheckBrieflyAfterTheCommitThenStartsOrAborts()
+        {
+            const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
+            FieldInfo mismatch = typeof(LabNetwork).GetField("paintArtVersionMismatch", flags);
+            FieldInfo committed = typeof(GameSession).GetField("countdownCommitted", flags);
+            try
+            {
+                // A Host whose own initial state lags behind the commit keeps the committed Countdown for a moment.
+                session.StartSolo();
+                yield return Until(() => session.State.phase == GameFlowPhase.Countdown && (bool)committed.GetValue(session),
+                    "The solo Host commits its countdown.");
+                mismatch.SetValue(network, true);
+                Assert.That(network.IsGameInitialStateReady(session.State.battleSessionId, session.State.battleRound), Is.False);
+                double startsAt = session.State.battleStartsAt;
+                double serverNow = 0d;
+                yield return Until(() => network.TryGetGameServerTime(out serverNow) && serverNow >= startsAt + .1d,
+                    "The shared start passes while the Host is not ready.");
+                Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.Countdown), "It does not abort at once.");
+                Assert.That(network.GameStartHeld, Is.True);
+                mismatch.SetValue(network, false);
+                yield return WaitPlaying(1);
+                Assert.That(network.GameStartHeld, Is.False);
+                session.ExitRun();
+                yield return WaitGameOver();
+                session.GoHome();
+                yield return WaitHome();
+
+                // Still not ready half a second after the shared start: the original release failure aborts the run.
+                session.StartSolo();
+                yield return Until(() => session.State.phase == GameFlowPhase.Countdown && (bool)committed.GetValue(session),
+                    "The second solo start commits its countdown.");
+                mismatch.SetValue(network, true);
+                startsAt = session.State.battleStartsAt;
+                yield return WaitGameOver();
+                Assert.That(session.State.endReason, Is.EqualTo("The prepared battle could not be started."));
+                Assert.That(network.TryGetGameServerTime(out serverNow), Is.True);
+                Assert.That(serverNow, Is.GreaterThanOrEqualTo(startsAt + GameStartWaitLimits.HostReleaseRetrySeconds));
+            }
+            finally { mismatch.SetValue(network, false); }
+        }
+
+        [UnityTest]
+        public IEnumerator AGuestHeldTenForegroundSecondsAfterTheSharedStartEndsTheStoryRun()
+        {
+            const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
+            FieldInfo mismatch = typeof(LabNetwork).GetField("paintArtVersionMismatch", flags);
+            FieldInfo held = typeof(GameSession).GetField("startHeldAccum", flags);
+            MethodInfo guestWaits = typeof(GameSession).GetMethod("UpdateGuestStartWaits", flags);
+            try
+            {
+                session.StartSolo();
+                yield return WaitPlaying(1);
+                Assert.That(session.GuestPreparationLimitSeconds, Is.EqualTo(30d + GameTestStartTiming.CountdownSeconds
+                    + GameTestStartTiming.MaximumLeadSeconds + 7d).Within(1e-9), "45 s with the defaults, scaled here.");
+                // This solo Host stands in for a Guest whose own presentation never becomes ready after the start.
+                mismatch.SetValue(network, true);
+                network.SetGameStartHeld(true);
+                yield return null;
+                Assert.That(network.GameStartHeld, Is.True, "Not ready, so the start hold stays.");
+                held.SetValue(session, 9d);
+                // A resume after 29 s in the background (#502) adds only one clamped frame.
+                Assert.That((bool)guestWaits.Invoke(session, new object[] { 29d }), Is.False);
+                Assert.That((double)held.GetValue(session), Is.EqualTo(9.25d));
+                held.SetValue(session, 9.9d);
+                Assert.That((bool)guestWaits.Invoke(session, new object[] { .2d }), Is.True);
+                yield return WaitGameOver();
+                Assert.That(session.State.endReason, Is.EqualTo("This device could not start the stage."));
+                Assert.That(session.State.retryableDefeat, Is.False);
+                Assert.That((double)held.GetValue(session), Is.Zero, "Leaving the start resets the counter.");
+            }
+            finally { mismatch.SetValue(network, false); }
+            session.GoHome();
+            yield return WaitHome();
+        }
+
+        [UnityTest]
+        public IEnumerator AGuestPreparingPastItsLimitLeavesTheRun()
+        {
+            const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
+            FieldInfo preparing = typeof(GameSession).GetField("preparingAccum", flags);
+            MethodInfo guestWaits = typeof(GameSession).GetMethod("UpdateGuestStartWaits", flags);
+            session.StartSolo();
+            yield return Until(() => session.IsPreparingBattle, "The solo stage starts preparing.");
+            Assert.That((double)preparing.GetValue(session), Is.Zero);
+            preparing.SetValue(session, session.GuestPreparationLimitSeconds - .1d);
+            Assert.That((bool)guestWaits.Invoke(session, new object[] { .05d }), Is.False, "Still .05 s short.");
+            // A background-length frame adds only .25 s, which is enough here.
+            Assert.That((bool)guestWaits.Invoke(session, new object[] { 30d }), Is.True);
+            yield return WaitGameOver();
+            Assert.That(session.State.endReason, Is.EqualTo("The host did not start the stage."));
+            Assert.That(network.GameStartHeld, Is.False);
+            session.GoHome();
+            yield return WaitHome();
+        }
+
+        [UnityTest]
+        public IEnumerator AGuestStartHoldExitReturnsATerritoryRoomToItsLobby()
+        {
+            const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
+            FieldInfo solo = typeof(LabNetwork).GetField("developerSolo", flags);
+            var order = (System.Collections.Generic.List<ulong>)typeof(LabNetwork).GetField("order", flags).GetValue(network);
+            var leavers = (System.Collections.Generic.HashSet<ulong>)typeof(LabNetwork).GetField("lobbyLeavers", flags)
+                .GetValue(network);
+            session.StartSolo(GameMode.Territory);
+            yield return WaitPlaying(1);
+            Assert.That(session.IsTerritory, Is.True);
+            // The exit a Guest sends from ExitWithLocalReason, as this room's Host receives it outside DEV solo.
+            order.Add(77);
+            solo.SetValue(network, false);
+            try
+            {
+                object control = typeof(GameSession).GetMethod("MakeControl", flags).Invoke(session, new object[] { "exit", null });
+                control.GetType().GetField("sender").SetValue(control, 77UL);
+                typeof(GameSession).GetMethod("ApplyControl", flags).Invoke(session, new[] { control });
+                Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.Lobby), "A 2:2 room goes back to its lobby.");
+                Assert.That(session.State.mode, Is.EqualTo(GameMode.Territory));
+            }
+            finally
+            {
+                solo.SetValue(network, true);
+                order.Remove(77);
+                leavers.Remove(77);
+            }
+            session.GoHome();
+            yield return WaitHome();
+        }
+
         [Category("Bonjour")]
         [UnityTest]
         public IEnumerator PendingGameCardsSurviveBattleGameOverAndHomeWhileLobbyLeaveReturnsToTheBrowser()
