@@ -8915,3 +8915,13 @@ PR #729 검증 중 main `a7208003`에서 `LabLocalBoardNetworkIntegrationTests` 
 - 빌드 때 작업 트리는 미커밋 상태였으며 manifest도 `sourceHasUncommittedChanges=true`로 남겼다. 이후 변경은 검증용 검사·문서뿐이고 앱의 런타임 코드·에셋은 같다.
 - iOS 내보내기·설치·일반 Wi-Fi/개인용 핫스팟의 실제 세 기기 UI: **미실행**. QR URL은 미정이며 실제 QR 스캔도 미실행이다.
 - 원시 로그·NUnit XML·빌드 산출물·테스트 임시 Scene은 커밋하지 않는다. 사용법은 `docs/STAFF_STAGE_DEMO.md`를 따른다.
+
+
+### #735 PR 통합 확인 — 최신 main #734 보존
+
+- **통합 기준:** `origin/main be181ba3`(#736, 남은 30초 알림)을 `feat/#735-staff-stage-demo`에 병합한 `101d7241`. 충돌 없음. 추가된 14개 파일은 표시·음원·Inspector 전용 6개 설정이며 `GameSession`·접속 규약·265개 공유 설정 배열은 바뀌지 않았다. main의 LabConfig 알림 기본값도 유지했다.
+- **재검사 범위:** 최신 main 통합 뒤 전체 EditMode와 선택형 시연·기존 로비·전투 HUD·기존 Lab 솔로의 영향 PlayMode를 실행했다. 세션/게임 규칙 코드가 이전 검증 뒤 추가 변경되지 않아 무관한 기존 전체 PlayMode 결과는 재사용했으며 전체를 다시 PASS로 표시하지 않는다.
+- **전체 EditMode: 2474/2474 PASS**, 19.06초. #734 알림 검사 6건 포함. 실패·건너뜀 0.
+- **영향 PlayMode: 46/46 PASS**, 100.32초. `GameStaffStageDemoFlowTests` 3건, `GameStaffStageDemoSessionTests` 4건, `StaffDemoFinalPageTests` 1건, 기존 `GameLobbyViewTests` 20건, `GameBattleUiPresentationTests` 4건, `LabDeveloperSoloIntegrationTests` 14건. 실제 패킷 참가자 3명·선택별 한 판·총평/엔딩/QR/복귀·실제 UI 입력 모듈·일반 로비/전투 UI·기존 Lab 경로를 포함한다.
+- 소스·문서 공백 검사 통과. Unity가 생성한 직렬화 자료의 기본 빈 값 뒤 공백은 수작업으로 변경하지 않았다. 정상 Scene·Story 원본·ProjectSettings·패키지·렌더 설정은 PR 변경 대상에서 제외했다.
+- PR은 저장소 템플릿을 사용했다. iOS·실제 3기기 일반 Wi-Fi/핫스팟 확인과 QR 스캔은 여전히 미실행이며, Mac 시연 앱은 병합된 main에서 다시 빌드한다.
