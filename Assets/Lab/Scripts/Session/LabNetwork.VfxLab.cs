@@ -90,7 +90,13 @@ namespace C6Lab
         /// <summary>공통/구미호 기믹(박 폭탄, 넘기기 막기, 여우불, 매혹)을 지금 나에게 건다.</summary>
         public bool VfxLabCastGimmick(LabSabotageKind kind) =>
             VfxLabReady && VfxLabPublish(model.VfxLabCastGimmick(kind, LocalPlayerId, VfxLabNow));
-        public bool VfxLabStartFlash() => VfxLabReady && VfxLabPublish(model.VfxLabStartFlash(VfxLabNow));
+        public bool VfxLabStartFlash(bool skipWarning = false) => VfxLabReady && VfxLabPublish(model.VfxLabStartFlash(VfxLabNow, skipWarning));
+        /// <summary>#741: 콤보 4칸을 예고 없이 바로 / 틀린 색 한 번(봐주기 → 하트 → 실패)</summary>
+        public bool VfxLabStartComboNow() => VfxLabReady && VfxLabPublish(model.VfxLabStartCombo(VfxLabNow, true));
+        public bool VfxLabWrongCombo() => VfxLabReady && VfxLabPublish(model.VfxLabWrongCombo(LocalPlayerId, VfxLabNow));
+        /// <summary>#741: 연기 / 부적을 골라 지금 시작 (skipWarning이면 예고 없이 본체부터)</summary>
+        public bool VfxLabStartJigwiMission(LabJigwiABKind kind, bool skipWarning) => VfxLabReady
+            && VfxLabPublish(model.VfxLabStartJigwiMission(kind, skipWarning, VfxLabNow));
         public bool VfxLabFailCombo() => VfxLabReady && VfxLabPublish(model.VfxLabFailCombo(LocalPlayerId, VfxLabNow));
         public bool VfxLabStartGumihoFever() => VfxLabReady && VfxLabStage == LabStageYokai.Gumiho
             && VfxLabPublish(model.VfxLabStartGumihoFever(VfxLabNow));

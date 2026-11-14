@@ -164,98 +164,185 @@ namespace C6Lab.Editor
             EditorGUILayout.Space();
         }
 
+        // ───────── #741: 기믹마다 묶고, 기믹 안에서 예보 / 진행 / 파훼 / 보상 / 처벌 줄로 나눈다 ─────────
+        private static void Gimmick(string title)
+        {
+            EditorGUILayout.Space(4);
+            EditorGUILayout.LabelField(title, EditorStyles.boldLabel);
+        }
+
+        /// <summary>한 줄: 왼쪽에 단계 이름, 오른쪽에 그 단계 버튼들.</summary>
+        private static EditorGUILayout.HorizontalScope Phase(string name)
+        {
+            var row = new EditorGUILayout.HorizontalScope();
+            EditorGUILayout.LabelField(name, EditorStyles.miniBoldLabel, GUILayout.Width(34));
+            return row;
+        }
+
+        private static bool Button(string label, bool enabled)
+        {
+            using (new EditorGUI.DisabledScope(!enabled))
+                return GUILayout.Button(label, GUILayout.Height(24));
+        }
+
+        private static void Note(string text) => EditorGUILayout.LabelField(text, EditorStyles.wordWrappedMiniLabel);
+
         private void DrawYaguang(LabNetwork network, bool ready)
         {
             EditorGUILayout.LabelField("2. 야광귀", EditorStyles.boldLabel);
-            EditorGUILayout.LabelField("Y1(섬광)", EditorStyles.miniBoldLabel);
-            using (new EditorGUI.DisabledScope(!ready || !network.VfxLabYaguangFeverReady))
-                if (GUILayout.Button("섬광 바로 시작 (눈 뜸 예고부터)", GUILayout.Height(28)))
-                    Report(network.VfxLabStartFlash(), "섬광 예고를 시작했다. 번쩍인 뒤 폰을 흔들어 푼다.", "지금은 시작할 수 없음 (섬광/콤보 진행 중이거나 섬광이 꺼져 있음, 또는 피버 뒤)");
-            // #741: 흔들지 않고 다 흔든 것으로 → 해제 → "으악 어지러워~" → 오색구슬 (실제 게임과 같은 길)
-            using (new EditorGUI.DisabledScope(!ready || !network.VfxLabFlashGlared))
-                if (GUILayout.Button("섬광 바로 해제 (다 흔든 것으로 → 대사 → 오색구슬)", GUILayout.Height(28)))
+            bool timeline = ready && network.VfxLabYaguangFeverReady;
+            bool running = ready && network.VfxLabComboRunning, active = ready && network.VfxLabComboActive;
+
+            Gimmick("Y1 섬광");
+            using (Phase("예보"))
+            {
+                if (Button("눈 뜸 → 3 2 1부터", timeline))
+                    Report(network.VfxLabStartFlash(), "섬광 예고를 시작했다 (눈 뜸 → 3 2 1 → 번쩍).", "지금은 시작할 수 없음 (섬광/콤보/보상/벌칙 진행 중, 또는 피버 뒤)");
+            }
+            using (Phase("진행"))
+            {
+                if (Button("예고 없이 바로 번쩍", timeline))
+                    Report(network.VfxLabStartFlash(true), "바로 번쩍했다. 화면이 하얗다.", "지금은 시작할 수 없음 (섬광/콤보/보상/벌칙 진행 중, 또는 피버 뒤)");
+            }
+            using (Phase("파훼"))
+            {
+                if (Button("다 흔든 것으로 해제", ready && network.VfxLabFlashGlared))
                 {
                     LabYaguangFlashHud flashHud = Object.FindFirstObjectByType<LabYaguangFlashHud>();
-                    Report(flashHud != null && flashHud.VfxLabShakeAll(), "흔들기를 다 채웠다. 섬광이 풀리고 대사 뒤 오색구슬이 나온다.", "지금 눈부시지 않음 (섬광이 걸려 있을 때만)");
+                    Report(flashHud != null && flashHud.VfxLabShakeAll(), "흔들기를 다 채웠다. 섬광이 풀리고 \"으악 어지러워~\" 뒤 오색구슬이 나온다.", "지금 눈부시지 않음 (섬광이 걸려 있을 때만)");
                 }
-            bool running = ready && network.VfxLabComboRunning, active = ready && network.VfxLabComboActive;
-            EditorGUILayout.LabelField("Y2(콤보) / Y3(BIG 보상)", EditorStyles.miniBoldLabel);
-            using (new EditorGUI.DisabledScope(!ready || running || !network.VfxLabYaguangFeverReady))
-                if (GUILayout.Button("콤보 바로 시작 (넷 셋 둘 하나 + 색 미리 보기부터)", GUILayout.Height(30)))
-                    Report(network.VfxLabStartCombo(), "콤보 예고를 시작했다. 넷 셋 둘 하나에 맞춰 칸이 실제 색으로 하나씩 채워진다.", "지금은 시작할 수 없음 (섬광/콤보 진행 중이거나 보상/벌칙이 남아 있음, 또는 피버 뒤)");
-            // #741: BIG / SMALL 15초를 기다리지 않고 끝나는 연출
-            using (new EditorGUI.DisabledScope(!ready || !network.VfxLabComboEffectOn))
-                if (GUILayout.Button("BIG / SMALL 바로 끝내기", GUILayout.Height(26)))
-                    Report(network.VfxLabEndComboEffect(), "BIG / SMALL을 끝냈다. 끝 연출과 소리가 나온다.", "걸려 있는 BIG / SMALL이 없음");
-            using (new EditorGUI.DisabledScope(!active))
-            {
-                if (GUILayout.Button("다음 칸 색 구슬 받기 (직접 던져 맞히기)", GUILayout.Height(26)))
-                    Report(network.VfxLabGiveComboOrb(out LabOrbElement color), "내 판에 " + Name(color) + " 속성 구슬을 놓았다. 박에 던져 맞히면 칸이 체크된다.",
-                        "판이 가득 찼음 (구슬을 하나 던지거나 버린 뒤 다시)");
-                // #719: 콤보 가이딩을 한 단계씩 본다.
-                if (GUILayout.Button("다른 색 구슬 받기 (빛 테두리가 안 붙는지)", GUILayout.Height(26)))
-                    Report(network.VfxLabGiveOtherColorOrb(out LabOrbElement other), "내 판에 " + Name(other) + " 속성 구슬을 놓았다. 다음 칸 색이 아니라 빛나지 않아야 한다.",
-                        "판이 가득 찼음 (구슬을 하나 던지거나 버린 뒤 다시)");
-                if (GUILayout.Button("다음 칸 하나만 맞히기 (도장 → 강조가 다음 칸으로)", GUILayout.Height(26)))
-                    Report(network.VfxLabHitComboSlot(), "한 칸을 맞혔다. 도장이 찍히고 강조와 빛 테두리가 다음 색으로 옮겨 간다.", "맞힐 수 없음 (4칸이 끝났거나 시간이 지남)");
-                if (GUILayout.Button("틀린 색 → 봐주기 (첫 칸 전, 금옥 \"다시 해 보자\")", GUILayout.Height(26)))
-                    Report(network.VfxLabForgiveWrongCombo(), "틀린 색을 봐줬다. 콤보는 계속된다.", "봐줄 수 없음 (첫 칸을 이미 맞혔음 → 아래 실패 버튼)");
-                if (GUILayout.Button("남은 칸 바로 맞히기 → 성공 + BIG 보상", GUILayout.Height(26)))
-                    Report(network.VfxLabCompleteCombo(), "콤보 성공. BIG 보상이 걸렸다.", "성공 처리를 못 함 (4칸이 끝났거나 시간이 지남)");
-                if (GUILayout.Button("틀린 색 맞히기 → 실패 + SMALL 벌칙", GUILayout.Height(26)))
-                    Report(network.VfxLabFailCombo(), "콤보 실패. SMALL 벌칙이 걸렸다.", "실패 처리를 못 함 (4칸이 끝났거나 시간이 지남)");
             }
-            if (ready && running && !active) EditorGUILayout.LabelField("예고 중. 4칸이 나오면 아래 두 버튼이 켜진다.", EditorStyles.wordWrappedMiniLabel);
-
-            EditorGUILayout.LabelField("Y4(오색구슬)", EditorStyles.miniBoldLabel);
-            fiveColorCount = EditorGUILayout.IntSlider("받을 개수", fiveColorCount, 1, 3);
-            using (new EditorGUI.DisabledScope(!ready))
-                if (GUILayout.Button("오색구슬 받기 (흔들기 없이)", GUILayout.Height(26)))
+            using (Phase("보상"))
+            {
+                fiveColorCount = EditorGUILayout.IntSlider(fiveColorCount, 1, 3, GUILayout.Width(120));
+                if (Button("오색구슬 받기 (흔들기 없이)", ready))
                 {
                     int dropped = network.VfxLabGiveFiveColorOrbs(fiveColorCount);
                     Report(dropped > 0, "오색구슬 " + dropped + "개를 놓았다. 박에 던지면 다섯 색으로 칠한다.", "판이 가득 찼음");
                 }
+            }
+            using (Phase("처벌")) Note("따로 없음: 못 풀면 하얀 화면이 다음 섬광 / 피버까지 남는다 (진행 버튼 뒤 흔들지 않고 둔다).");
 
-            EditorGUILayout.LabelField("Y5(야광귀 피버)", EditorStyles.miniBoldLabel);
-            using (new EditorGUI.DisabledScope(!ready || !network.VfxLabYaguangFeverReady))
-                if (GUILayout.Button("피버 바로 시작 (100초를 지금으로)", GUILayout.Height(30)))
+            Gimmick("Y2 콤보 / Y3 BIG · SMALL");
+            using (Phase("예보"))
+            {
+                if (Button("넷 셋 둘 하나 + 색 미리 보기부터", timeline && !running))
+                    Report(network.VfxLabStartCombo(), "콤보 예고를 시작했다. 넷 셋 둘 하나에 맞춰 칸이 실제 색으로 채워진다.", "지금은 시작할 수 없음 (섬광/콤보/보상/벌칙 진행 중, 또는 피버 뒤)");
+            }
+            using (Phase("진행"))
+            {
+                if (Button("예고 없이 바로 4칸", timeline && !running))
+                    Report(network.VfxLabStartComboNow(), "콤보 4칸이 바로 시작됐다 (하트 3개).", "지금은 시작할 수 없음 (섬광/콤보/보상/벌칙 진행 중, 또는 피버 뒤)");
+                if (Button("다음 칸 색 구슬 받기", active))
+                    Report(network.VfxLabGiveComboOrb(out LabOrbElement color), "내 판에 " + Name(color) + " 구슬을 놓았다. 박에 던져 맞히면 칸이 체크된다.", "판이 가득 찼음");
+                if (Button("다른 색 구슬 받기", active))
+                    Report(network.VfxLabGiveOtherColorOrb(out LabOrbElement other), "내 판에 " + Name(other) + " 구슬을 놓았다. 빛 테두리가 붙지 않아야 한다.", "판이 가득 찼음");
+            }
+            using (Phase("파훼"))
+            {
+                if (Button("한 칸 맞히기", active))
+                    Report(network.VfxLabHitComboSlot(), "한 칸을 맞혔다. 도장 → 강조가 다음 칸으로.", "맞힐 수 없음");
+                if (Button("남은 칸 다 맞히기 → 성공", active))
+                    Report(network.VfxLabCompleteCombo(), "콤보 성공. BIG 보상이 걸렸다.", "성공 처리를 못 함");
+            }
+            using (Phase("보상"))
+            {
+                Note("BIG: 파훼에서 \"남은 칸 다 맞히기\".");
+                if (Button("BIG / SMALL 바로 끝내기", ready && network.VfxLabComboEffectOn))
+                    Report(network.VfxLabEndComboEffect(), "BIG / SMALL을 끝냈다. 끝 연출과 소리가 나온다.", "걸려 있는 BIG / SMALL이 없음");
+            }
+            using (Phase("처벌"))
+            {
+                if (Button("틀린 색 한 번 (봐주기 → 하트 깨짐)", active))
+                    Report(network.VfxLabWrongCombo(), "틀린 색을 맞혔다. 첫 칸 전이면 봐주고, 아니면 하트가 하나 깨진다 (마지막 하트면 실패).", "콤보 4칸이 진행 중이 아님");
+                if (Button("바로 실패 → SMALL", active))
+                    Report(network.VfxLabFailCombo(), "콤보 실패. SMALL 벌칙이 걸렸다.", "실패 처리를 못 함");
+            }
+            if (ready && running && !active) Note("예고 중. 4칸이 나오면 진행 / 파훼 / 처벌 버튼이 켜진다.");
+
+            Gimmick("Y5 야광귀 피버");
+            using (Phase("진행"))
+            {
+                if (Button("피버 바로 시작 (100초를 지금으로)", timeline))
                     Report(network.VfxLabStartYaguangFever(), "피버를 시작했다. 이 판의 콤보/섬광은 더 나오지 않는다.", "피버를 시작할 수 없음");
-            if (ready && !network.VfxLabYaguangFeverReady) EditorGUILayout.LabelField("이미 피버 중. 다시 보려면 Play를 멈추고 다시 연다.", EditorStyles.wordWrappedMiniLabel);
+            }
+            if (ready && !timeline) Note("이미 피버 중. 다시 보려면 Play를 멈추고 다시 연다.");
         }
 
         private void DrawJigwi(LabNetwork network, bool ready)
         {
             EditorGUILayout.LabelField("3. 지귀", EditorStyles.boldLabel);
-            // #673: 시간표를 기다리지 않고 미션을 지금 부르고 끝낸다.
             LabJigwiABKind? mission = ready ? network.VfxLabJigwiMission : null;
-            bool on = ready && network.VfxLabJigwiOn;
-            EditorGUILayout.LabelField("지금 부르기 (시간표의 다음 미션)", EditorStyles.miniBoldLabel);
-            using (new EditorGUI.DisabledScope(!on || mission != null))
-                if (GUILayout.Button("다음 미션 바로 시작 (연기 또는 부적, 예고부터)", GUILayout.Height(28)))
-                    Report(network.VfxLabStartNextJigwiMission(), "다음 미션 예고를 시작했다.", "지금은 시작할 수 없음 (남은 미션이 없거나 피버 뒤)");
-            using (new EditorGUI.DisabledScope(!on || mission == null))
-            using (new EditorGUILayout.HorizontalScope())
+            bool on = ready && network.VfxLabJigwiOn, free = on && mission == null;
+            bool smoke = on && mission == LabJigwiABKind.GroupFire, talisman = on && mission == LabJigwiABKind.PersonalBurn;
+            Note("지금: " + (!ready ? "전투 전" : !on ? "피버 (미션 없음)" : smoke ? "연기 진행 중" : talisman ? "부적 진행 중" : "미션 없음"));
+
+            Gimmick("J1 연기 → 검은 구슬");
+            using (Phase("예보"))
             {
-                string name = mission == LabJigwiABKind.PersonalBurn ? "부적" : mission == LabJigwiABKind.GroupFire ? "연기" : "미션";
-                if (GUILayout.Button(name + " 성공", GUILayout.Height(26)))
-                    Report(network.VfxLabFinishJigwiMission(true), name + " 성공 처리했다 (부적이면 모두 다 쓴 것으로 → 완성 연출).", "아직 시작 전(예고 중)이거나 끝났음");
-                if (GUILayout.Button(name + " 실패 (시간 끝)", GUILayout.Height(26)))
-                    Report(network.VfxLabFinishJigwiMission(false), name + "의 시간이 다 된 것으로 끝냈다 (부적이면 불덩이 → 판이 탐).", "아직 시작 전(예고 중)이거나 끝났음");
+                if (Button("지귀 도발 예고부터", free))
+                    Report(network.VfxLabStartJigwiMission(LabJigwiABKind.GroupFire, false), "연기 예고를 시작했다 (2초 뒤 연기가 덮는다).", "지금은 시작할 수 없음 (다른 미션 진행 중이거나 남은 차례가 없음)");
             }
-            // #696/#719: 연기 파편과 검정 구슬 연출을 바로 본다.
-            EditorGUILayout.LabelField("연기 파편 / 검정 구슬", EditorStyles.miniBoldLabel);
-            using (new EditorGUI.DisabledScope(!ready))
-            using (new EditorGUILayout.HorizontalScope())
+            using (Phase("진행"))
             {
-                if (GUILayout.Button("파편 4개 받기", GUILayout.Height(26)))
-                    Report(network.VfxLabGiveSootShards(), "검은 파편 4개(북/서/남/동)를 놓았다. 이웃끼리 끌어다 붙여 본다.", "놓을 수 없음");
-                if (GUILayout.Button("검정 구슬 받기", GUILayout.Height(26)))
-                    Report(network.VfxLabGiveSootOrb(), "검정 구슬을 놓았다. 기운 소리/연기를 보고, 던져서 명중 효과를 본다.", "판이 가득 찼음");
+                if (Button("예고 없이 바로 연기", free))
+                    Report(network.VfxLabStartJigwiMission(LabJigwiABKind.GroupFire, true), "연기가 바로 덮었다. 문질러 닦아 본다 (멈추면 다시 번짐).", "지금은 시작할 수 없음");
             }
-            using (new EditorGUI.DisabledScope(!on))
-                if (GUILayout.Button("지귀 피버 바로 시작 (100초를 지금으로)", GUILayout.Height(30)))
+            using (Phase("파훼"))
+            {
+                if (Button("다 닦은 것으로 → 확 걷힘", smoke))
+                {
+                    LabJigwiBucketHandleView view = Object.FindFirstObjectByType<LabJigwiBucketHandleView>();
+                    Report(view != null && view.VfxLabWipeAll(), "연기를 다 닦았다. 확 걷히고 파편 4개 + 가운데 빈 구슬이 나온다.", "내 화면에 연기가 없음 (연기가 덮은 뒤에)");
+                }
+            }
+            using (Phase("보상"))
+            {
+                if (Button("파편 4개 받기", ready))
+                    Report(network.VfxLabGiveSootShards(), "검은 파편 4개를 놓았다. 탭하거나 끌어다 가운데 빈 구슬에 넣는다.", "놓을 수 없음");
+                if (Button("검정 구슬 받기", ready))
+                    Report(network.VfxLabGiveSootOrb(), "검정 구슬을 놓았다 (파편이 모여드는 장면 → 던져서 명중).", "판이 가득 찼음");
+            }
+            using (Phase("처벌"))
+            {
+                if (Button("시간 끝 (파편 없이 사라짐)", smoke))
+                    Report(network.VfxLabFinishJigwiMission(false), "연기 시간이 다 됐다. 파편 없이 끝난다.", "연기가 진행 중이 아님");
+            }
+
+            Gimmick("J2 부적 → J4 물 폭포 / J3 실패");
+            using (Phase("예보"))
+            {
+                if (Button("지귀 도발 예고부터", free))
+                    Report(network.VfxLabStartJigwiMission(LabJigwiABKind.PersonalBurn, false), "부적 예고를 시작했다 (2초 뒤 부적이 뜬다).", "지금은 시작할 수 없음 (다른 미션 진행 중이거나 남은 차례가 없음)");
+            }
+            using (Phase("진행"))
+            {
+                if (Button("예고 없이 바로 부적", free))
+                    Report(network.VfxLabStartJigwiMission(LabJigwiABKind.PersonalBurn, true), "부적이 바로 떴다. 획을 순서대로 따라 쓴다.", "지금은 시작할 수 없음");
+                fakeSeats = EditorGUILayout.IntSlider(fakeSeats, 0, 4, GUILayout.Width(150));
+                // 지귀 전투를 혼자 Host로 할 때만 화면에 더한다. Test Runner를 돌릴 때는 이 창을 닫는다.
+                LabJigwiScreenPresentation.VfxLabFakeSeats = ready ? fakeSeats : 0;
+            }
+            Note("가짜 자리 수: 부적이 시작되면 가짜 자리가 0.6초 간격으로 다 쓴 것처럼 켜진다 (화면만).");
+            using (Phase("파훼"))
+            {
+                if (Button("모두 다 쓴 것으로", talisman))
+                    Report(network.VfxLabFinishJigwiMission(true), "부적 완성. 2.5초 뒤 부적이 빛나고 물 폭포가 쏟아진다.", "부적이 진행 중이 아님 (예고 중이면 잠시 뒤)");
+            }
+            using (Phase("보상")) Note("물 폭포: 파훼 2.5초 뒤 저절로 (박에 물 칠).");
+            using (Phase("처벌"))
+            {
+                if (Button("시간 끝 → 구슬 탐 + 북 미끄러움", talisman))
+                    Report(network.VfxLabFinishJigwiMission(false), "부적 실패. 대사 뒤 판의 구슬이 타고 북이 미끄러워진다.", "부적이 진행 중이 아님");
+            }
+
+            Gimmick("지귀 피버");
+            using (Phase("진행"))
+            {
+                if (Button("피버 바로 시작 (100초를 지금으로)", on))
                     Report(network.VfxLabStartJigwiFever(), "지귀 피버를 시작했다. 진행 중이던 미션은 여기서 끝난다.", "피버를 시작할 수 없음 (이미 피버 중)");
-            if (ready && !on) EditorGUILayout.LabelField("이미 피버 중. 다시 보려면 Play를 멈추고 다시 연다.", EditorStyles.wordWrappedMiniLabel);
+            }
+            if (ready && !on) Note("이미 피버 중. 다시 보려면 Play를 멈추고 다시 연다.");
             EditorGUILayout.LabelField("어떤 기믹을 띄울까 (Play 전에 고른다)", EditorStyles.miniBoldLabel);
             {
                 // #724: the mode lives only in this editor session (SessionState), never in LabConfig.asset.
@@ -268,12 +355,6 @@ namespace C6Lab.Editor
                 if (mode != 0)
                     EditorGUILayout.HelpBox("실험실에서만 켜졌다 (LabConfig.asset은 그대로). 이 창을 닫으면 기본 시간표로 돌아간다.", MessageType.Info);
             }
-            EditorGUILayout.LabelField("J4(공용 부적 완성)", EditorStyles.miniBoldLabel);
-            fakeSeats = EditorGUILayout.IntSlider("가짜 자리 수 (나 말고)", fakeSeats, 0, 4);
-            // 지귀 전투를 혼자 Host로 할 때만 화면에 더한다. Test Runner를 돌릴 때는 이 창을 닫는다.
-            LabJigwiScreenPresentation.VfxLabFakeSeats = ready ? fakeSeats : 0;
-            EditorGUILayout.LabelField("부적이 시작되면 가짜 자리가 0.6초 간격으로 다 쓴 것처럼 켜진다. 내가 마지막으로 다 쓰면 실제 게임처럼 완성(빛남 → 물 폭포)된다. 화면만 바뀌고 판정은 그대로다.",
-                EditorStyles.wordWrappedMiniLabel);
             if (EditorApplication.isPlaying && !ready) EditorGUILayout.LabelField("지귀 전투에서만 보인다.", EditorStyles.wordWrappedMiniLabel);
         }
 

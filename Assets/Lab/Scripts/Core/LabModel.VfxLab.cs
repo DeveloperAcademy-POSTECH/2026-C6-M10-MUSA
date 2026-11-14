@@ -56,11 +56,12 @@ namespace C6Lab
         /// Y2(콤보): 지금 바로 콤보 예고(COMBO 3/2/1)를 시작한다. 시간표가 콤보 차례를 꺼낼 때와 같은 길이다.
         /// 다른 콤보/섬광이 진행 중이거나 그 보상/벌칙이 남아 있으면 false.
         /// </summary>
-        public bool VfxLabStartCombo(double now)
+        public bool VfxLabStartCombo(double now, bool skipWarning = false)
         {
             if (!TryAdvance(now, out _) || phase != LabPhase.Playing || !VfxLabYaguangTimelineOn || !rules.ComboEnabled
                 || YaguangUniqueBusy(now)) return false;
-            nextComboAt = now + rules.ComboWarningSeconds;
+            // #741: skipWarning starts the four slots at once (no 넷 셋 둘 하나).
+            nextComboAt = now + (skipWarning ? 0d : rules.ComboWarningSeconds);
             comboWarned = true;
             comboHeld = comboWasHeld = false;
             comboQueuedAt = -1d;
@@ -215,11 +216,12 @@ namespace C6Lab
         }
 
         /// <summary>#673 Y1(섬광): 지금 바로 섬광 예고를 시작한다. 시간표가 섬광 차례를 꺼낼 때와 같은 길이다.</summary>
-        public bool VfxLabStartFlash(double now)
+        public bool VfxLabStartFlash(double now, bool skipWarning = false)
         {
             if (!TryAdvance(now, out _) || phase != LabPhase.Playing || !VfxLabYaguangTimelineOn || !rules.FlashEnabled
                 || YaguangUniqueBusy(now)) return false;
-            nextFlashAt = now + rules.FlashWarningSeconds;
+            // #741: skipWarning flashes at once (no eyes opening / 3 2 1).
+            nextFlashAt = now + (skipWarning ? 0d : rules.FlashWarningSeconds);
             SettleFlashTarget(now);
             flashWarned = true;
             flashHeld = flashWasHeld = false;
@@ -241,6 +243,22 @@ namespace C6Lab
             if (result != LabComboResult.None) OnComboFinished(result);
             revision++;
             return result == LabComboResult.WrongColor;
+        }
+
+        /// <summary>
+        /// #741 Y2(콤보 처벌): 지금 칸에 틀린 색을 맞힌 것으로 한 번 처리한다. 실제 게임처럼 첫 칸 전이면 봐주고, 아니면 하트가 하나
+        /// 깨지고, 마지막 하트면 실패(SMALL)한다.
+        /// </summary>
+        public bool VfxLabWrongCombo(ulong thrower, double now)
+        {
+            if (!TryAdvance(now, out _) || phase != LabPhase.Playing || !combo.Active) return false;
+            LabOrbElement wanted = combo.ColorAt(combo.Progress);
+            LabOrbElement wrong = new[] { LabOrbElement.Fire, LabOrbElement.Water, LabOrbElement.Wood, LabOrbElement.Metal, LabOrbElement.Earth }
+                .First(element => element != wanted);
+            LabComboResult result = combo.Judge(wrong, thrower, now);
+            if (result != LabComboResult.None) OnComboFinished(result);
+            revision++;
+            return true;
         }
 
         /// <summary>#673 G(구미호 피버): 남은 시간이 피버 시간이 된 때를 지금으로 당겨 피버를 바로 시작한다.</summary>
@@ -274,6 +292,23 @@ namespace C6Lab
             AdvanceJigwiAB(now);
             revision++;
             return true;
+        }
+
+        /// <summary>
+        /// #741 J(지귀): 연기 또는 부적을 골라 지금 시작한다. 시간표의 다음 차례가 다른 종류면 그 차례를 하나 건너뛴다(실험실 판에서만).
+        /// skipWarning이면 지귀 예고 없이 바로 본체부터. 진행 중인 미션이 있거나 남은 차례가 없으면 false.
+        /// </summary>
+        public bool VfxLabStartJigwiMission(LabJigwiABKind kind, bool skipWarning, double now)
+        {
+            if (!TryAdvance(now, out _) || phase != LabPhase.Playing || !VfxLabJigwiOn
+                || jigwiABRounds.Any(value => value.resolution == LabJigwiABResolution.None)) return false;
+            int count = LabJigwiABTimeline.SlotCountFor(jigwiSchedule);
+            if (jigwiStageNextSlot < count && LabJigwiABTimeline.KindForSlot(jigwiStageNextSlot, jigwiSchedule) != kind) jigwiStageNextSlot++;
+            if (jigwiStageNextSlot >= count || LabJigwiABTimeline.KindForSlot(jigwiStageNextSlot, jigwiSchedule) != kind) return false;
+            jigwiNextSlotPulledAt = now + (skipWarning ? 0d : LabJigwiABTimeline.WarningSeconds);
+            AdvanceJigwiAB(now);
+            revision++;
+            return jigwiABRounds.Any(value => value.resolution == LabJigwiABResolution.None && value.kind == kind);
         }
 
         /// <summary>

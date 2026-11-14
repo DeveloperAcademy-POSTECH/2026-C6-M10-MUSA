@@ -115,6 +115,33 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void TheLabPicksTheSmokeOrTheTalismanAndCanSkipTheWarning()
+        {
+            // #741: 연기 / 부적을 골라 부른다. 다음 차례가 다른 종류면 하나 건너뛰고, skipWarning이면 예고 없이 본체부터.
+            LabModel room = Room(LabStageYokai.Jigwi);
+            Assert.That(room.VfxLabStartJigwiMission(LabJigwiABKind.GroupFire, true, 1d), Is.True);
+            LabJigwiABRound smoke = room.Snapshot(1.1d).jigwiAB.Active(1.1d);
+            Assert.That(smoke, Is.Not.Null); Assert.That(smoke.kind, Is.EqualTo(LabJigwiABKind.GroupFire));
+            Assert.That(smoke.activeAt, Is.EqualTo(1d).Within(1e-9), "No warning.");
+            Assert.That(room.VfxLabStartJigwiMission(LabJigwiABKind.PersonalBurn, false, 1.2d), Is.False, "One mission at a time.");
+            Assert.That(room.VfxLabFinishJigwiMission(false, 2d), Is.True);
+            Assert.That(room.VfxLabStartJigwiMission(LabJigwiABKind.PersonalBurn, false, 3d), Is.True);
+            LabJigwiABRound talisman = room.Snapshot(5.1d).jigwiAB.Active(5.1d);
+            Assert.That(talisman, Is.Not.Null); Assert.That(talisman.kind, Is.EqualTo(LabJigwiABKind.PersonalBurn));
+            Assert.That(talisman.activeAt, Is.EqualTo(3d + LabJigwiABTimeline.WarningSeconds).Within(1e-9), "With its warning.");
+        }
+
+        [Test]
+        public void TheLabCanStartTheComboWithoutItsWarning()
+        {
+            // #741: 콤보 4칸을 예고 없이 바로.
+            LabModel room = Room();
+            Assert.That(room.VfxLabStartCombo(1d, true), Is.True);
+            Assert.That(room.Snapshot(1.05d).comboActive, Is.True, "The four slots are on at once.");
+            Assert.That(room.VfxLabWrongCombo(0ul, 1.1d), Is.True, "A wrong colour (forgiven, a heart, or the end).");
+        }
+
+        [Test]
         public void TheLabRunsJigwiMissionsNowAndItsFever()
         {
             LabModel room = Room(LabStageYokai.Jigwi);
