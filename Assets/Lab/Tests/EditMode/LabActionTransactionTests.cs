@@ -234,6 +234,90 @@ namespace C6Lab.Tests
             Assert.That(lateReceipt.accepted, Is.True, "A delayed Host receipt can resolve a recovery-required action.");
         }
 
+        /// <summary>One attempt, sent at 0 and unanswered: it needs recovery from .25 s.</summary>
+        private static LabLocalActionCoordinator RecoveringCombination()
+        {
+            var coordinator = Coordinator(1);
+            Assert.That(coordinator.TryRegister(1, new[] { "yin", "yang" }, "pending-a", 0, out _), Is.True);
+            Assert.That(coordinator.TryRegister(2, new[] { "pending-a" }, "pending-b", 0, out _), Is.True);
+            Assert.That(coordinator.TryRegister(3, new[] { "pending-b" }, null, 0, out _), Is.True);
+            Assert.That(coordinator.MarkSent(1, 0), Is.True);
+            Assert.That(coordinator.GetDueRequestIds(.25, true), Is.Empty);
+            Assert.That(coordinator.GetRecoveryRequiredRequestIds(), Is.EqualTo(new long[] { 1 }));
+            return coordinator;
+        }
+
+        [Test]
+        public void RecoveryIsGivenUpThirtySecondsAfterItStartedTogetherWithItsDependents()
+        {
+            var coordinator = RecoveringCombination();
+            Assert.That(coordinator.TryRegister(4, new[] { "drum" }, null, 0, out _), Is.True);
+            Assert.That(LabLocalActionCoordinator.RecoveryAbandonSeconds, Is.EqualTo(30d));
+            Assert.That(coordinator.ExpireRecovery(.25 + 29.999), Is.Empty, "Still inside the recovery window.");
+            Assert.That(coordinator.TryGetPending(1, out var waiting), Is.True);
+            Assert.That(waiting.state, Is.EqualTo(LabPendingActionState.RecoveryRequired));
+
+            LabLocalActionResolution[] expired = coordinator.ExpireRecovery(30.25);
+            Assert.That(expired.Length, Is.EqualTo(1));
+            Assert.That(expired[0].requestId, Is.EqualTo(1));
+            Assert.That(expired[0].accepted, Is.False);
+            Assert.That(expired[0].rejectedDependents, Is.EquivalentTo(new long[] { 2, 3 }));
+            Assert.That(coordinator.TryGetPending(1, out var abandoned), Is.True);
+            Assert.That(abandoned.state, Is.EqualTo(LabPendingActionState.Rejected));
+            Assert.That(abandoned.reason, Is.EqualTo(LabLocalActionCoordinator.RecoveryAbandonedReason));
+            Assert.That(coordinator.TryGetPending(3, out var descendant), Is.True);
+            Assert.That(descendant.reason, Is.EqualTo("DEPENDENCY_REJECTED"));
+            Assert.That(coordinator.GetRecoveryRequiredRequestIds(), Is.Empty, "No more queries for a given-up action.");
+            Assert.That(coordinator.ExpireRecovery(1000), Is.Empty, "Each action is given up once.");
+            Assert.That(coordinator.GetDueRequestIds(30.25, true), Is.EqualTo(new long[] { 4 }), "Independent actions continue.");
+            Assert.That(coordinator.TryRegister(5, new[] { "pending-a" }, null, 31, out string reason), Is.False);
+            Assert.That(reason, Is.EqualTo("DEPENDENCY_REJECTED"));
+        }
+
+        [Test]
+        public void ALateReceiptAfterRecoveryWasGivenUpIsRecognisedButNeverResolvesTheActionAgain()
+        {
+            var coordinator = RecoveringCombination();
+            LabActionReceipt late = Receipt(1, provisional: "pending-a", output: "combined-9");
+            Assert.That(coordinator.WasAbandoned(late), Is.False, "Before expiry a late receipt still resolves recovery.");
+            coordinator.ExpireRecovery(30.25);
+            Assert.That(coordinator.WasAbandoned(late), Is.True);
+            Assert.That(coordinator.ApplyReceipt(late, out _), Is.False, "Local views were already rolled back.");
+            Assert.That(coordinator.TryGetMappedId("pending-a", out _), Is.False, "Dependents cannot be revived.");
+            Assert.That(coordinator.WasAbandoned(Receipt(2)), Is.False, "A dependent was rejected, not abandoned.");
+            Assert.That(coordinator.WasAbandoned(null), Is.False);
+            LabActionReceipt otherRound = Receipt(1, provisional: "pending-a", output: "combined-9");
+            otherRound.round = 1;
+            Assert.That(coordinator.WasAbandoned(otherRound), Is.False);
+            LabActionReceipt otherSender = Receipt(1, provisional: "pending-a", output: "combined-9");
+            otherSender.sender = 8;
+            Assert.That(coordinator.WasAbandoned(otherSender), Is.False);
+        }
+
+        [Test]
+        public void OnlyRecoveryIsBoundedAndANewRoundForgetsIt()
+        {
+            var coordinator = Coordinator();
+            coordinator.TryRegister(1, new[] { "orb" }, null, 0, out _);
+            Assert.That(coordinator.MarkSent(1, 0), Is.True);
+            Assert.That(coordinator.ExpireRecovery(1000), Is.Empty, "An action still being retried is not recovery.");
+            Assert.That(coordinator.ExpireRecovery(double.NaN), Is.Empty);
+
+            coordinator = RecoveringCombination();
+            coordinator.SetActive("session", 3, 7);
+            Assert.That(coordinator.Count, Is.Zero);
+            Assert.That(coordinator.ExpireRecovery(1000), Is.Empty);
+            coordinator.SetActive("session", 2, 7);
+            Assert.That(coordinator.WasAbandoned(Receipt(1, provisional: "pending-a", output: "combined-9")), Is.False);
+
+            coordinator = RecoveringCombination();
+            coordinator.ExpireRecovery(30.25);
+            coordinator.Reset();
+            coordinator.SetActive("session", 2, 7);
+            Assert.That(coordinator.WasAbandoned(Receipt(1, provisional: "pending-a", output: "combined-9")), Is.False,
+                "A round reset forgets given-up actions.");
+        }
+
         [Test]
         public void NewRoundAndWrongSenderReceiptCannotCompletePendingAction()
         {

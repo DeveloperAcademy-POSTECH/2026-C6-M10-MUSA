@@ -259,6 +259,7 @@ Home/Lobby DEV의 `공통 / 구미호 / 야광귀 / 지귀`에서 해당 값만 
 | 6명 | 막힘 | 3:3 | 6명은 땅따먹기 3:3만 할 수 있소. |
 
 - 규칙의 바탕은 `LabModel.ValidRoomSize`(기본 방 2~5명, 땅따먹기 방 2·4·6명)다. 방 만들기·방 광고 기록·방장 세션·참가자 설정 확인·세션 지문이 모두 이것을 따른다. 기본 모드의 3명 이상은 Hapio 화면 규칙(`GameLobbyView.ModeAllowed`)이고, 모델과 DEV·검사 경로는 2명 기본 방을 그대로 받는다.
+- 구성원이 방장 설정을 지문 불일치나 설치 실패로 거절하면, 로비(`LobbyRejoinAllowed`)와 Lab 방에서는 `C6_LAB_CONFIG_REJECTED`를 남기고 스스로 나간다. 나갈 때 `lobby_leave`를 보내므로 방장은 그 P를 바로 풀고, Hapio 구성원은 방 목록으로 돌아간다. 게임 진행 중의 거절은 방장의 설정 확인 예산이 처리한다. 앞선 revision, 깨진 패킷, 같은 revision 재수신으로는 나가지 않는다.
 - 최대 인원: 기본 모드는 `LabModel.MaximumParticipants` 5명 그대로, 땅따먹기만 `TerritoryMaximumParticipants` 6명이다. 칠 기록의 P번호도 P6까지다(P6 무늬 = P2와 반대 방향 사선).
 
 ### 팀 규칙 (`LabTeams`)
