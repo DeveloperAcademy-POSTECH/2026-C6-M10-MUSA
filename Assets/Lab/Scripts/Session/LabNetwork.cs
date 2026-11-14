@@ -1696,18 +1696,25 @@ namespace C6Lab
         private void BroadcastLobby()
         {
             if (!IsHost) return;
+            var packet = LobbyPacket();
+            foreach (ulong id in order)
+                if (id != manager.LocalClientId && !Send(id, packet))
+                    Debug.LogWarning("C6_LAB_SEND_FAILED type=lobby peer=" + id + " revision=" + packet.lobbyRevision);
+            SetStatus("LOBBY: " + order.Count + " / " + targetParticipantCount
+                + " · P " + (playerSlots?.SelectedCount ?? 0) + "/" + targetParticipantCount
+                + " · settings " + configAcknowledgements.Count + "/" + order.Count);
+            Changed?.Invoke();
+        }
+
+        private LabNetworkPacket LobbyPacket()
+        {
             // A held place stays seated with its P, and ids name the held seats (#501, game rooms only).
-            var packet = new LabNetworkPacket { type = "lobby", seats = LobbySeats(), ids = HeldLobbySeats(),
+            return new LabNetworkPacket { type = "lobby", seats = LobbySeats(), ids = HeldLobbySeats(),
                 slotAssignments = playerSlots?.Snapshot() ?? Array.Empty<LabPlayerSlotAssignment>(),
                 targetParticipants = targetParticipantCount, configRevision = configRevision,
                 configFingerprint = configFingerprint, snapshotSequence = snapshotSequence,
                 lobbyRevision = ++lobbyRevision, roomName = connectedRoomName,
                 restarting = pendingDeveloperRestart };
-            foreach (ulong id in order) if (id != manager.LocalClientId) Send(id, packet);
-            SetStatus("LOBBY: " + order.Count + " / " + targetParticipantCount
-                + " · P " + (playerSlots?.SelectedCount ?? 0) + "/" + targetParticipantCount
-                + " · settings " + configAcknowledgements.Count + "/" + order.Count);
-            Changed?.Invoke();
         }
 
         /// <summary>A Guest's copy of the Host's lobby; a malformed or old one is dropped without changing the last.</summary>
@@ -1798,10 +1805,16 @@ namespace C6Lab
         private void SendSessionConfig(ulong id)
         {
             if (!IsHost || config == null || id == LocalPlayerId) return;
-            Send(id, new LabNetworkPacket { type = "config", targetParticipants = targetParticipantCount,
-                configRevision = configRevision, configFingerprint = configFingerprint,
-                tuning = config.CaptureDeveloperValues() });
+            if (!Send(id, SessionConfigPacket()))
+                Debug.LogWarning("C6_LAB_SEND_FAILED type=config peer=" + id + " revision=" + configRevision);
         }
+
+        private LabNetworkPacket SessionConfigPacket() => new LabNetworkPacket { type = "config",
+            targetParticipants = targetParticipantCount, configRevision = configRevision,
+            configFingerprint = configFingerprint, tuning = config.CaptureDeveloperValues() };
+
+        /// <summary>The bytes <see cref="Send"/> checks against <see cref="MaximumPacketBytes"/>, for size tests.</summary>
+        private static int EncodedPacketBytes(LabNetworkPacket packet) => Utf8.GetBytes(JsonUtility.ToJson(packet)).Length + 8;
 
         /// <summary>UT용 기믹 기록 파일 이름 (#311). 기기의 Application.persistentDataPath 아래에 판마다 한 줄씩 붙는다.</summary>
         public const string GimmickStatsFileName = "gimmick-stats.jsonl";
@@ -2787,30 +2800,54 @@ namespace C6Lab
             catch (ArgumentException) { return; }
             if (expected != packet.configFingerprint)
             {
-                SetStatus("Host settings failed integrity check. Rejoin the room.");
+                // An older revision is a reordered copy; only the current or a newer generation decides the room.
+                if (packet.configRevision < configRevision) return;
+                AbandonRoomForSettings("Host settings failed integrity check. Rejoin the room.");
                 return;
             }
             if (clientConfigReady && packet.configRevision == configRevision
                 && packet.configFingerprint == configFingerprint)
             {
-                Send(NetworkManager.ServerClientId, new LabNetworkPacket { type = "config_ack",
-                    configRevision = configRevision, configFingerprint = configFingerprint });
+                SendConfigAck();
                 return;
             }
             if (packet.configRevision < configRevision) return;
             if (!TryInstallValues(packet.tuning, out string error))
             {
-                SetStatus("Host settings rejected: " + error);
+                AbandonRoomForSettings("Host settings rejected: " + error);
                 return;
             }
             targetParticipantCount = packet.targetParticipants;
             configRevision = packet.configRevision;
             configFingerprint = packet.configFingerprint;
             clientConfigReady = true;
-            Send(NetworkManager.ServerClientId, new LabNetworkPacket { type = "config_ack",
-                configRevision = configRevision, configFingerprint = configFingerprint });
+            SendConfigAck();
             SetStatus("Settings confirmed; waiting for " + targetParticipantCount + " players.");
             Debug.Log("C6_LAB_CONFIG_READY revision=" + configRevision + " fingerprint=" + configFingerprint);
+        }
+
+        private void SendConfigAck()
+        {
+            ConfigAcknowledgementsSent++;
+            Send(NetworkManager.ServerClientId, new LabNetworkPacket { type = "config_ack",
+                configRevision = configRevision, configFingerprint = configFingerprint });
+        }
+
+        /// <summary>Guest config_ack attempts, counted for tests (a repeated revision must still be acknowledged).</summary>
+        private int ConfigAcknowledgementsSent { get; set; }
+
+        /// <summary>
+        /// The Host's settings can never install on this device, and the Host waits for every config_ack
+        /// before it starts, so the room would wait forever. In a lobby (or a Lab room) leave instead:
+        /// the deferred Stop says lobby_leave, so the Host frees this P at once. During a game run the
+        /// Host's own settings-confirmation budget ends it as before.
+        /// </summary>
+        private void AbandonRoomForSettings(string status)
+        {
+            SetStatus(status);
+            bool leave = !IsHost && (!gameFlowEnabled || LobbyRejoinAllowed);
+            Debug.LogWarning("C6_LAB_CONFIG_REJECTED revision=" + configRevision + " leave=" + leave + " reason=" + status);
+            if (leave) stopAfterDisconnect = true;
         }
 
         private void ReceiveSnapshotChunk(LabNetworkPacket packet)

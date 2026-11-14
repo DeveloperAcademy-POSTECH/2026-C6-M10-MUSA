@@ -186,6 +186,79 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void AGivenUpRecoveryRollsBackItsViewsAndAContiguousLateReceiptStillLands()
+        {
+            UseSavedOrbAppearance();
+            LabOrbView yin = FindOrb("yin"), yang = FindOrb("yang");
+            string temporary = AbandonCombinationWithDependentLaunch();
+            Assert.That(board.Count, Is.EqualTo(2), "Both raw orbs are back on the board.");
+            Assert.That(board.IsProvisional(temporary), Is.False);
+            Assert.That(board.IsSnapshotSuppressed("yin") || board.IsSnapshotSuppressed("yang"), Is.False);
+            Assert.That(FindOrb("yin"), Is.SameAs(yin));
+            Assert.That(FindOrb("yang"), Is.SameAs(yang));
+            foreach (LabOrbView restored in new[] { yin, yang })
+            {
+                Assert.That(restored.gameObject.activeInHierarchy, Is.True);
+                Assert.That(restored.Visual.GetComponentInChildren<LabOrbSpriteArt>()
+                    .GetComponent<SpriteRenderer>().sprite, Is.SameAs(config.OrbAppearance.SpriteFor(restored.Kind)));
+            }
+            Assert.That(Get<bool>("boardCheckpointWanted"), Is.True, "The Host's board is asked for to settle it.");
+
+            // The Host did commit it; its receipt is the next stream sequence, so the board can take it.
+            LogAssert.Expect(LogType.Log, new System.Text.RegularExpressions.Regex("C6_LAB_ACTION_LATE_RECEIPT request=1 .*applied=True"));
+            Invoke("ReceiveActionReceipt", CombinedReceipt(1, temporary, 1));
+            Assert.That(network.Snapshot.orbs.Select(orb => orb.id), Is.EqualTo(new[] { "combined" }));
+            Assert.That(Get<LabBoardReplica>("boardReplica").NeedsCheckpoint, Is.False);
+            Assert.That(board.IsProvisional(temporary), Is.False);
+            LabLocalActionCoordinator coordinator = Get<LabLocalActionCoordinator>("localActions");
+            Assert.That(coordinator.TryGetPending(1, out var parent), Is.True);
+            Assert.That(parent.state, Is.EqualTo(LabPendingActionState.Rejected), "The given-up action stays given up.");
+            Assert.That(coordinator.TryGetPending(2, out var launch), Is.True);
+            Assert.That(launch.state, Is.EqualTo(LabPendingActionState.Rejected));
+        }
+
+        [Test]
+        public void ALateReceiptAfterAGapLeavesTheGivenUpActionToTheCheckpoint()
+        {
+            string temporary = AbandonCombinationWithDependentLaunch();
+            LogAssert.Expect(LogType.Log, new System.Text.RegularExpressions.Regex("C6_LAB_ACTION_LATE_RECEIPT request=1 .*applied=False"));
+            Invoke("ReceiveActionReceipt", CombinedReceipt(1, temporary, 3));
+            Assert.That(Get<LabBoardReplica>("boardReplica").NeedsCheckpoint, Is.True);
+            Assert.That(board.InteractionEnabled, Is.False);
+            Assert.That(network.Snapshot.orbs.Select(orb => orb.id), Is.EquivalentTo(new[] { "yin", "yang" }));
+            LabBoardFrame checkpoint = EmptyCheckpoint(4);
+            checkpoint.states = new[] { Combined() };
+            Invoke("ReceiveBoardFrame", checkpoint);
+            Assert.That(Get<LabBoardReplica>("boardReplica").NeedsCheckpoint, Is.False);
+            Assert.That(network.Snapshot.orbs.Select(orb => orb.id), Is.EqualTo(new[] { "combined" }));
+            Assert.That(board.Count, Is.EqualTo(1));
+            Assert.That(board.InteractionEnabled, Is.True);
+        }
+
+        /// <summary>A combination (with a launch of its output) whose receipt never came, given up at 30 s.</summary>
+        private string AbandonCombinationWithDependentLaunch()
+        {
+            object combine = Submit("combine", 1, "yin", "yang");
+            string temporary = PacketField<string>(combine, "provisionalId");
+            Submit("launch", 2, temporary);
+            Assert.That(board.IsProvisional(temporary), Is.True);
+            LabLocalActionCoordinator coordinator = Get<LabLocalActionCoordinator>("localActions");
+            // The fixture has no transport, so drive the real coordinator through its sends by hand.
+            for (int attempt = 0; attempt < 6; attempt++) Assert.That(coordinator.MarkSent(1, 1d), Is.True);
+            const double recoveryAt = 1000d;
+            coordinator.GetDueRequestIds(recoveryAt, true);
+            Assert.That(coordinator.GetRecoveryRequiredRequestIds(), Is.EqualTo(new long[] { 1 }));
+            Invoke("ExpireActionRecovery", recoveryAt + 29.999);
+            Assert.That(board.IsProvisional(temporary), Is.True, "Still recovering at 29.999 s.");
+            Assert.That(network.AbandonedActions, Is.Zero);
+            LogAssert.Expect(LogType.Warning, "C6_LAB_ACTION_ABANDONED request=1 dependents=1");
+            Invoke("ExpireActionRecovery", recoveryAt + LabLocalActionCoordinator.RecoveryAbandonSeconds);
+            Assert.That(network.AbandonedActions, Is.EqualTo(1));
+            Assert.That(coordinator.GetRecoveryRequiredRequestIds(), Is.Empty);
+            return temporary;
+        }
+
+        [Test]
         public void ABoardCheckpointBeforeTheReceiptCannotDuplicateAProvisionalBodyOrItsDependentLaunch()
         {
             object combine = Submit("combine", 1, "yin", "yang");
@@ -681,7 +754,7 @@ namespace C6Lab.Tests
                     Invoke("OnPredictedShotContact", 60L,
                         new LabProjectileResult(null, 0ul, LabProjectileHitKind.Monster, point, .5f, 1f, 3f,
                             velocity, hitNormal: Vector3.right, visualDiameter: .33f),
-                        LabOrbElement.Water, 20, 1f, false, false, talisman);
+                        LabOrbElement.Water, 20, 1f, false, false, talisman, false); // #713 optional soot, explicit for reflection.
                 }
                 Assert.That(pool.ActiveImpactCount, Is.EqualTo(talisman ? 0 : 1),
                     "Special talisman water effects must not also acquire an ordinary element impact.");
@@ -708,7 +781,8 @@ namespace C6Lab.Tests
         {
             Get<LabLocalHitPresentation>("localHits").Register(requestId, projectileId);
             Invoke("OnPredictedShotContact", requestId,
-                new LabProjectileResult(null, 0ul, kind, point, .5f, 1f, 3f, velocity), LabOrbElement.None, 20, 1f, false, false, false);
+                // Reflection supplies #713's optional soot flag explicitly; these remain ordinary shots.
+                new LabProjectileResult(null, 0ul, kind, point, .5f, 1f, 3f, velocity), LabOrbElement.None, 20, 1f, false, false, false, false);
         }
 
         private void ReceiveImpact(string projectileId, Vector3 worldPoint, Vector3 velocity, float spin)

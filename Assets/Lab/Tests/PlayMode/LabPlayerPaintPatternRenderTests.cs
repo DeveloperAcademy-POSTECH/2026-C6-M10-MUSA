@@ -401,15 +401,23 @@ namespace C6Lab.Tests
 
         private sealed class ShellRenderRig : IDisposable
         {
+            private static readonly int GlobalMipBias = Shader.PropertyToID("_GlobalMipBias");
             private readonly GameObject root;
             private readonly Vector3 initialPosition;
             private readonly Renderer renderer;
             private readonly Camera camera;
             private readonly RenderTexture texture;
             private readonly Texture2D readback;
+            private readonly Camera[] pausedCameras;
 
             public ShellRenderRig(LabGourdPaint paint)
             {
+                // The Lab scene's own cameras keep rendering every frame. While they ran beside
+                // these manual renders, an unchanged map read back 1-3 LSB apart on a few hundred
+                // pixels in about one capture in 40, a different test failing each run. With them
+                // paused, repeated captures of the same state are identical. Restored in Dispose.
+                pausedCameras = Camera.allCameras;
+                foreach (Camera other in pausedCameras) other.enabled = false;
                 root = new GameObject("Painter saved-shell GPU fixture");
                 root.transform.position = new Vector3(1000f, 1000f, 1000f);
                 initialPosition = root.transform.position;
@@ -441,9 +449,15 @@ namespace C6Lab.Tests
             public Color32[] Capture(LabGourdPaint paint, string evidenceName)
             {
                 RenderTexture previous = RenderTexture.active;
+                Vector4 previousMipBias = Shader.GetGlobalVector(GlobalMipBias);
                 try
                 {
                     renderer.SetPropertyBlock(ReadBlock(paint.Shell.GetComponent<Renderer>()));
+                    // URP's SAMPLE_TEXTURE2D_GRAD scales the paper derivatives by this global.
+                    // A manual Render can sample the value left by the previous camera (scene
+                    // load (0,0), the Lab camera, or this rig), so the same map drifted 1-3 LSB
+                    // depending on frame timing. Every capture starts from the same explicit state.
+                    Shader.SetGlobalVector(GlobalMipBias, new Vector4(0f, 1f, 0f, 0f));
                     camera.Render();
                     RenderTexture.active = texture;
                     readback.ReadPixels(new Rect(0, 0, 512, 512), 0, 0); readback.Apply(false, false);
@@ -456,13 +470,18 @@ namespace C6Lab.Tests
                     }
                     return readback.GetPixels32();
                 }
-                finally { RenderTexture.active = previous; }
+                finally
+                {
+                    RenderTexture.active = previous;
+                    Shader.SetGlobalVector(GlobalMipBias, previousMipBias);
+                }
             }
 
             public void Dispose()
             {
                 camera.targetTexture = null; texture.Release();
                 Object.Destroy(readback); Object.Destroy(texture); Object.Destroy(root);
+                foreach (Camera other in pausedCameras) if (other != null) other.enabled = true;
             }
         }
     }

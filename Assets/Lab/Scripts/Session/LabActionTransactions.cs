@@ -242,10 +242,18 @@ namespace C6Lab
             public string provisional;
             public int attempts;
             public double due;
+            /// <summary>When this action became RecoveryRequired; recovery is given up after RecoveryAbandonSeconds.</summary>
+            public double recoveryAt;
             public LabPendingActionState state;
             public string reason;
         }
 
+        /// <summary>
+        /// Recovery queries stop after this long. It matches the transport disconnect time, so a Host that
+        /// simply stopped answering is always handled by the disconnect path first.
+        /// </summary>
+        public const double RecoveryAbandonSeconds = 30d;
+        public const string RecoveryAbandonedReason = "ACTION_RECOVERY_ABANDONED";
         private readonly Dictionary<long, Pending> pending = new Dictionary<long, Pending>();
         private readonly Dictionary<string, long> producers = new Dictionary<string, long>(StringComparer.Ordinal);
         private readonly Dictionary<string, string> mappings = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -338,6 +346,7 @@ namespace C6Lab
                 {
                     action.state = LabPendingActionState.RecoveryRequired;
                     action.reason = "ACTION_RECEIPT_TIMEOUT";
+                    action.recoveryAt = now;
                     continue;
                 }
                 if (action.state == LabPendingActionState.WaitingForDependencies)
@@ -393,6 +402,41 @@ namespace C6Lab
             info = new LabPendingActionInfo(action.id, action.attempts, action.state, action.reason);
             return true;
         }
+
+        /// <summary>
+        /// Give up every recovery that has waited <paramref name="abandonSeconds"/> or longer: the action and
+        /// the actions built on its output become Rejected, exactly as a rejected receipt would leave them,
+        /// so the caller can roll their local views back and ask for an authoritative board checkpoint.
+        /// </summary>
+        public LabLocalActionResolution[] ExpireRecovery(double now, double abandonSeconds = RecoveryAbandonSeconds)
+        {
+            if (!Finite(now) || !Finite(abandonSeconds) || abandonSeconds < 0d) return Array.Empty<LabLocalActionResolution>();
+            var expired = new List<long>();
+            foreach (var pair in pending)
+                if (pair.Value.state == LabPendingActionState.RecoveryRequired && now - pair.Value.recoveryAt >= abandonSeconds)
+                    expired.Add(pair.Key);
+            if (expired.Count == 0) return Array.Empty<LabLocalActionResolution>();
+            expired.Sort();
+            var result = new List<LabLocalActionResolution>();
+            foreach (long id in expired)
+            {
+                var action = pending[id];
+                // An earlier expired parent already rejected it as a dependent.
+                if (action.state != LabPendingActionState.RecoveryRequired) continue;
+                action.state = LabPendingActionState.Rejected;
+                action.reason = RecoveryAbandonedReason;
+                var rejected = new List<long>();
+                RejectDependents(id, rejected);
+                result.Add(new LabLocalActionResolution { requestId = id, accepted = false, rejectedDependents = rejected.ToArray() });
+            }
+            return result.ToArray();
+        }
+
+        /// <summary>A receipt for an action whose recovery this device already gave up in the active round.</summary>
+        public bool WasAbandoned(LabActionReceipt receipt) => receipt != null
+            && LabActionValidation.Identity(receipt.Identity, session, round, sender, out _)
+            && pending.TryGetValue(receipt.requestId, out var action) && action.state == LabPendingActionState.Rejected
+            && action.reason == RecoveryAbandonedReason;
 
         public long[] GetRecoveryRequiredRequestIds()
         {

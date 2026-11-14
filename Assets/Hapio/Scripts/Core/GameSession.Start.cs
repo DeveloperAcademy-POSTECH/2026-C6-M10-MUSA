@@ -60,6 +60,46 @@ namespace Hapio
         private static void ResetOnPlayModeEnter() => Reset();
     }
 
+    /// <summary>
+    /// Limits of a Guest's own wait at the battle start, so a stuck start always ends (2026-11-14). They are not
+    /// part of <see cref="GameStartTiming"/>: they never change the shared start order or the Host's load budget.
+    /// Both counters add only foreground frame time, each frame clamped to <see cref="MaximumFrameSeconds"/>, so an
+    /// iPhone that was briefly in the background (#502) resumes with almost nothing added.
+    /// </summary>
+    public static class GameStartWaitLimits
+    {
+        /// <summary>The longest single frame a counter adds; a resume after the background adds only this.</summary>
+        public const double MaximumFrameSeconds = .25d;
+        /// <summary>A committed Guest still held this long after the shared start leaves the run.</summary>
+        public const double StartHeldLimitSeconds = 10d;
+        /// <summary>Margin above the Host's longest normal preparation (load budget + countdown + maximum lead).</summary>
+        public const double PreparationMarginSeconds = 7d;
+        /// <summary>How long after the shared start the Host retries its own initial-state check before aborting.</summary>
+        public const double HostReleaseRetrySeconds = .5d;
+
+        /// <summary>45 s with the defaults (30 + 3 + 5 + 7); it follows the test-only start lengths too.</summary>
+        public static double PreparationLimitSeconds(double loadingTimeoutSeconds, double countdownSeconds,
+            double maximumLeadSeconds) =>
+            loadingTimeoutSeconds + countdownSeconds + maximumLeadSeconds + PreparationMarginSeconds;
+
+        /// <summary>The foreground time one frame adds: never negative or non-finite, at most one clamped frame.</summary>
+        public static double ForegroundDelta(double unscaledDeltaTime) =>
+            double.IsNaN(unscaledDeltaTime) || unscaledDeltaTime <= 0d ? 0d
+                : Math.Min(unscaledDeltaTime, MaximumFrameSeconds);
+
+        /// <summary>Adds this frame while <paramref name="counting"/>; true once the total reaches the limit.</summary>
+        public static bool Advance(ref double elapsed, bool counting, double unscaledDeltaTime, double limitSeconds)
+        {
+            if (!counting) return false;
+            elapsed += ForegroundDelta(unscaledDeltaTime);
+            return elapsed >= limitSeconds;
+        }
+
+        /// <summary>The Host waits for its own initial state only shortly after the shared start.</summary>
+        public static bool HostMayRetryRelease(double serverNow, double battleStartsAt) =>
+            serverNow < battleStartsAt + HostReleaseRetrySeconds;
+    }
+
     public sealed partial class GameSession
     {
         private static double CountdownSeconds => GameStartTiming.CountdownSeconds;
@@ -69,6 +109,8 @@ namespace Hapio
         private double nextInitialReadyAt, nextCountdownReadyAt, nextCountdownCommitAt;
         private double countdownLeadSeconds = GameStartTiming.InitialLeadSeconds;
         private bool countdownCommitted;
+        // Foreground-time counters of a Guest's own start waits (GameStartWaitLimits).
+        private double startHeldAccum, preparingAccum;
         private GameFrameSpikeProbe frameProbe;
 
         /// <summary>The Development/Editor battle frame probe (#481); null in a release player.</summary>
@@ -88,6 +130,12 @@ namespace Hapio
         {
             if (IsPreparingBattle)
             {
+                bool wasPreparing = previous.phase == GameFlowPhase.LoadingBattle
+                    || previous.phase == GameFlowPhase.SynchronizingBattle || previous.phase == GameFlowPhase.Countdown;
+                // One preparation counter covers loading, synchronization and countdown; a countdown reschedule keeps it.
+                if (!wasPreparing || previous.runId != state.runId || previous.stageIndex != state.stageIndex
+                    || state.phase == GameFlowPhase.LoadingBattle && previous.revision != state.revision)
+                    preparingAccum = startHeldAccum = 0d;
                 network.SetGameStartHeld(true);
                 startParticipantCount = network.IsDeveloperSolo ? 1 : network.TargetParticipantCount;
                 if (previous.runId != state.runId || previous.stageIndex != state.stageIndex
@@ -123,6 +171,7 @@ namespace Hapio
         {
             countdownCommitted = false;
             initialReadyFrame = -1;
+            startHeldAccum = preparingAccum = 0d;
             startReadyCount = startParticipantCount = 0;
             nextInitialReadyAt = nextCountdownReadyAt = nextCountdownCommitAt = 0d;
             startOverlay?.Hide();
@@ -230,7 +279,11 @@ namespace Hapio
                             network.BroadcastGameFlow(JsonUtility.ToJson(MakeControl("countdown_commit")));
                         }
                     }
-                    if (countdownCommitted && countdownNow >= state.battleStartsAt)
+                    // The Host's own initial state may lag a frame behind the commit (a late owner board or paint
+                    // install): stay committed in Countdown briefly, then keep the original release-or-abort.
+                    if (countdownCommitted && countdownNow >= state.battleStartsAt
+                        && (network.IsGameInitialStateReady(state.battleSessionId, state.battleRound)
+                            || !GameStartWaitLimits.HostMayRetryRelease(countdownNow, state.battleStartsAt)))
                     {
                         GameFlowState countdown = hostFlow.State;
                         if (hostFlow.MarkPlaying(countdown.runId, countdown.stageIndex, countdown.revision,
@@ -249,7 +302,39 @@ namespace Hapio
                 && network.TryGetGameServerTime(out double playingNow) && playingNow >= state.battleStartsAt
                 && InitialPresentationReady()) network.SetGameStartHeld(false);
 
+            if (!network.IsHost && UpdateGuestStartWaits(Time.unscaledDeltaTime)) return;
             RefreshStartOverlay();
+        }
+
+        /// <summary>Preparation limit of this session: 45 s with the defaults.</summary>
+        internal double GuestPreparationLimitSeconds => GameStartWaitLimits.PreparationLimitSeconds(
+            loadingTimeoutSeconds, GameStartTiming.CountdownSeconds, GameStartTiming.MaximumLeadSeconds);
+
+        /// <summary>
+        /// A Guest leaves the run through the ordinary exit (the Host then stops it for everyone: GameOver, or the
+        /// 2:2 lobby) when its own committed start stays held, or when the Host never finishes starting the stage.
+        /// True when it left this frame.
+        /// </summary>
+        private bool UpdateGuestStartWaits(double unscaledDeltaTime)
+        {
+            bool held = countdownCommitted && network.GameStartHeld
+                && (state.phase == GameFlowPhase.Countdown || state.phase == GameFlowPhase.Playing)
+                && network.TryGetGameServerTime(out double serverNow) && serverNow >= state.battleStartsAt;
+            if (GameStartWaitLimits.Advance(ref startHeldAccum, held, unscaledDeltaTime,
+                GameStartWaitLimits.StartHeldLimitSeconds))
+            {
+                Debug.LogWarning("HAPIO_START_HELD_EXPIRED", this);
+                ExitWithLocalReason("This device could not start the stage.");
+                return true;
+            }
+            if (GameStartWaitLimits.Advance(ref preparingAccum, IsPreparingBattle, unscaledDeltaTime,
+                GuestPreparationLimitSeconds))
+            {
+                Debug.LogWarning("HAPIO_START_PREPARATION_EXPIRED", this);
+                ExitWithLocalReason("The host did not start the stage.");
+                return true;
+            }
+            return false;
         }
 
         // Integer-ms schedules are stable through Unity JSON on Editor and Player. Receipts

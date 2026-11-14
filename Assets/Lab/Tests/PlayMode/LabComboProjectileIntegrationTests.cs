@@ -157,7 +157,10 @@ namespace C6Lab.Tests
                 Assert.That(hud.PanelVisible, Is.True);
                 for (int i = 0; i < colors.Length; i++)
                 {
-                    Assert.That(hud.SlotColor(i), Is.EqualTo((Color)LabPaintPalette.SrgbColorFor(colors[i])));
+                    // #719 keeps each Host RGB, dims later slots and emphasizes the current turn.
+                    Color expected = LabPaintPalette.SrgbColorFor(colors[i]);
+                    expected.a = i > snapshot.comboProgress ? .4f : 1f;
+                    Assert.That(hud.SlotColor(i), Is.EqualTo(expected));
                     Assert.That(hud.SlotChecked(i), Is.EqualTo(i < 2));
                 }
                 foreach (Graphic graphic in canvasRoot.GetComponentsInChildren<Graphic>(true))
@@ -210,21 +213,26 @@ namespace C6Lab.Tests
                 latest.SetValue(network, JsonUtility.FromJson<LabSnapshot>(JsonUtility.ToJson(waiting)));
                 yield return null;
                 Assert.That(hud.WarningVisible, Is.True);
-                Assert.That(hud.WarningCount, Is.EqualTo("2"), "1.5 s left shows 2, counting 3, 2, 1.");
+                Assert.That(hud.WarningCount, Is.EqualTo("2"), "#719 divides the warning into four equal beats; 1.5 s of a 3 s warning shows 2.");
                 Assert.That(hud.PanelVisible, Is.False, "The colors stay hidden until the combo starts.");
                 Assert.That(hud.EffectVisible, Is.False, "The SMALL badge steps aside during the warning.");
                 foreach (Graphic graphic in canvasRoot.GetComponentsInChildren<Graphic>(true))
                     Assert.That(graphic.raycastTarget, Is.False, "The warning cannot steal throw/board input.");
 
-                // The very first combo has a warning too, before any combo has been counted.
-                latest.SetValue(network, new LabSnapshot
+                // The first combo also uses #719's four equal warning beats, independent of duration.
+                double[] beatTimes = { 17.2d, 17.9d, 18.65d, 19.4d };
+                for (int beat = 0; beat < beatTimes.Length; beat++)
                 {
-                    sessionId = "combo-warning", round = 2, phase = LabPhase.Playing, serverTime = 17.2d,
-                    comboWarningAt = 17d, comboNextAt = 20d
-                });
-                yield return null;
-                Assert.That(hud.WarningVisible, Is.True);
-                Assert.That(hud.WarningCount, Is.EqualTo("3"));
+                    latest.SetValue(network, new LabSnapshot
+                    {
+                        sessionId = "combo-warning", round = 2, phase = LabPhase.Playing, serverTime = beatTimes[beat],
+                        comboWarningAt = 17d, comboNextAt = 20d
+                    });
+                    yield return null;
+                    Assert.That(hud.WarningVisible, Is.True);
+                    Assert.That(hud.WarningCount, Is.EqualTo((4 - beat).ToString()));
+                    Assert.That(hud.PanelVisible, Is.False, "An old Host without preview colors keeps the slots hidden.");
+                }
 
                 latest.SetValue(network, new LabSnapshot
                 {

@@ -44,6 +44,7 @@ namespace Hapio
         }
         private Coroutine pendingFinish;
         private StoryResultActions actions;
+        private string viewerReadyCaption;
         public bool IsPresenting => mode != Mode.None;
         public bool IsShowingOverall => showingOverall;
         public bool IsLocalStoryComplete => resultActionsReady && (mode == Mode.ReadyToAdvance || mode == Mode.FailureDashboard);
@@ -58,6 +59,8 @@ namespace Hapio
             StopPresentation();
             UnbindControls();
             screen = owner; session = game; initialized = true;
+            if (viewerReadyCaption == null && viewerButton != null)
+                viewerReadyCaption = viewerButton.GetComponentInChildren<Text>(true)?.text;
             if (player != null)
             {
                 player.playOnStart = false;
@@ -318,7 +321,7 @@ namespace Hapio
                 readyView.transform.SetAsLastSibling();
                 readyView.Present(victory && (mode == Mode.AfterStage || review || mode == Mode.Ending),
                     final ? session.CanStartSummary : session.CanAdvanceStage,
-                    session.SealReadyCount, session.SealParticipantCount, blocked, final);
+                    session.SealReadyCount, session.SealParticipantCount, blocked, final, session.ResultHoldNotice);
             }
             Show(advanceButton, primary && !authoredClear);
             Set(advanceButton, primary && !blocked && (failed ? session.CanRetryStage : final ? session.CanReturnHome : session.CanAdvanceStage));
@@ -329,6 +332,7 @@ namespace Hapio
             // The sealed gourd stays reachable from the seal card's 봉인 박 둘러보기.
             bool inspect = review && !authoredClear && !HasAction("InspectGourd");
             Show(viewerButton, inspect); Set(viewerButton, inspect && !blocked && session.PreviewTexture != null);
+            Label(viewerButton, GameScreen.ViewerButtonCaption(session, viewerReadyCaption));
             bool skip = player.IsPlaying && (mode == Mode.AfterStage || mode == Mode.Failure || mode == Mode.Ending)
                 && !SkipHiddenOnThisCut;
             Show(skipButton, skip); Set(skipButton, skip && !blocked);
@@ -373,7 +377,9 @@ namespace Hapio
                 action.button.gameObject.SetActive(true);
                 action.button.interactable = interactable;
                 if (action.caption == null) continue;
-                action.caption.text = action.method == "Retry" && !session.Network.IsHost ? "방장이 재도전" : action.originalCaption;
+                action.caption.text = action.method == "InspectGourd"
+                    ? GameScreen.ViewerButtonCaption(session, action.originalCaption)
+                    : action.method == "Retry" && !session.Network.IsHost ? "방장이 재도전" : action.originalCaption;
                 Color color = action.originalColor;
                 color.a *= interactable ? 1 : .45f;
                 action.caption.color = color;
@@ -442,6 +448,17 @@ namespace Hapio
             readyView.ShowQuit(true);
             SetBusy(true);
             RefreshControls();
+        }
+
+        // A quit popup left open without any touch closes itself (user decision 2026-11-13); readiness is kept.
+        private double quitInputAt = -1d;
+
+        private void Update()
+        {
+            if (readyView == null || !readyView.IsConfirmingQuit) { quitInputAt = -1d; return; }
+            double now = Time.realtimeSinceStartupAsDouble;
+            if (quitInputAt < 0d || StoryTapAdvance.HasHeldPointer) quitInputAt = now;
+            else if (GameResultHold.IdleExpired(quitInputAt, now)) { quitInputAt = -1d; CancelQuit(); }
         }
 
         public void CancelQuit()

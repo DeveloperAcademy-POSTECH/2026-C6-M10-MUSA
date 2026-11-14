@@ -1,5 +1,42 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-14 — 설정 거절·행동 복구의 무기한 대기 (PR-A)
+
+- **기준:** `fix/lab-config-action-waits` (main `53118b72` 위). Unity 6000.6.5f1 batch(macOS, Metal). 접속 묶음 5704·`C6PhysicsLab/62`·`C6HapioGame/54`와 설정 수는 그대로다.
+- **원인:** ① 로비에서 구성원이 방장 설정을 지문 불일치나 설치 실패로 거절하면 상태 글자만 바꾸고 config_ack를 보내지 않았다. 방장은 모든 ACK를 기다리므로 방이 시작되지 못한 채 머물렀다. ② 행동 영수증이 끝내 오지 않아 RecoveryRequired가 된 행동은 2초마다 `action_query`만 보내고 끝나지 않았다. 숨긴 구슬·미리보기가 그대로 남았다.
+- **고친 것:** ① 이런 거절에서는 `AbandonRoomForSettings`가 `C6_LAB_CONFIG_REJECTED`를 남기고 다음 프레임에 `Stop`을 부른다. `Stop`이 `lobby_leave`를 보내므로 방장은 P를 바로 푼다. 조건은 `!gameFlowEnabled || LobbyRejoinAllowed`다. 게임 진행 중의 거절은 예전처럼 방장의 설정 확인 예산이 처리한다. 앞선 revision, 깨진 패킷, 같은 revision 재수신은 떠나지 않으며, 같은 revision을 다시 받으면 ACK를 다시 보낸다. `lobby`/`config` 전송 실패는 `C6_LAB_SEND_FAILED type=…`로 남긴다. ② RecoveryRequired가 된 시각부터 30초(`RecoveryAbandonSeconds`, 전송 끊김 시간과 같음)가 지나면 그 행동과 딸린 행동을 거절과 같은 경로로 되돌린다. 이때 `C6_LAB_ACTION_ABANDONED`를 남기고 `board_checkpoint`를 요청한다(0.5초 간격 유지). 그 뒤 늦게 온 영수증은 판 순번이 이어질 때만 판에 반영하고, 아니면 체크포인트를 기다린다.
+
+| 확인 | 결과 |
+| --- | --- |
+| 전체 EditMode | 2415/2415 PASS |
+| 전체 PlayMode | 851/851 PASS |
+| 새 EditMode: 설정 거절(지문 불일치·설치 실패의 로비/Lab 퇴장, 진행 중 유지, 이전·깨진 패킷 무시, 같은 revision 재ACK) | 4/4 PASS |
+| 새 EditMode: 가장 큰 lobby/config 패킷 크기(6자리, 63자 방 이름, 모든 값이 가장 긴 float) | lobby 1,768 B, config 2,893 B(가장 긴 float일 때 7,405 B). 상한 32,768 B |
+| 새 EditMode: `ExpireRecovery` 29.999초/30초 경계, 딸린 행동, 만료 뒤 늦은 영수증, 라운드 초기화 | 3/3 PASS |
+| 새 PlayMode: 복구 포기 뒤 구슬·스프라이트 복원, 이어지는 늦은 영수증 반영, 순번이 빈 늦은 영수증은 체크포인트로 처리 | 2/2 PASS |
+
+- **최초 실패와 재실행:** 첫 EditMode에서는 새 검사 2건이 실패했다. 하나는 설정 준비 로그를 기대하지 않았고, 다른 하나는 예약된 `ulong.MaxValue` id로 자리를 골랐다. 검사를 고쳐 재실행했다. main `a7208003` 위의 첫 전체 PlayMode는 834/845였다. 그중 10건(`LabComboProjectileIntegrationTests` 2, `LabFiveColorClayNetworkTests` 1, `LabLocalBoardNetworkIntegrationTests`의 기존 `PresentContact` 리플렉션 7)은 변경 없는 `a7208003`에서도 같게 실패했다. 나머지 1건은 새 검사로, 순번이 빈 늦은 영수증 뒤에 판 입력을 다시 막지 않았다(`SyncBoard` 누락). 이를 고친 뒤 main `53118b72`로 다시 올려 위 전체 결과를 얻었다.
+- **미실행:** 여러 기기 실제 네트워크, iPhone 실기기.
+- **#729·#730 병합 뒤 재실행 (main `df1899d2`):** 충돌은 이 문서의 기록 추가뿐이었다(양쪽 보존). 전체 EditMode **2424/2424 PASS**, 전체 PlayMode **858/859**. 실패 1건 `LabOrbBoardTrailTests.PendingLaunchStaysClearUntilRestoredAtItsApprovedBoardPosition`(기대·실제 모두 (-1.60, 0.00, 0.00)로 출력되는 부동소수 위치 비교)은 이 변경이 건드리지 않은 검사·코드이며, 그 fixture만 두 번 다시 돌리자 10/10, 10/10 PASS였다.
+
+## 2026-11-14 — 결과 화면 무기한 대기 제거 (Game 토큰 55)
+
+- **기준:** `fix/hapio-result-holds` (main `a7208003` 위 `b5d64eff`). Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 프로토콜 5704, `C6PhysicsLab/62`, 설정 265개는 그대로이고 `C6HapioGame/55`로 올렸다.
+- **검사 범위 선정:** 결과 진행 조건·exit 처리·접속 토큰을 바꿨으므로 AGENTS.md 기준 전체 EditMode·PlayMode를 실행했다.
+
+| 확인 | 결과 |
+| --- | --- |
+| 전체 EditMode | 2411/2411 PASS (새 `GameResultHoldTests` 4개, 토큰 55 검사 포함) |
+| 전체 PlayMode | 836/847. 실패 11건은 모두 `LabComboProjectileIntegrationTests`(2)·`LabFiveColorClayNetworkTests`(1)·`LabLocalBoardNetworkIntegrationTests`(7)·`LabPlayerPaintPatternRenderTests`(1) |
+| 같은 4개 fixture를 깨끗한 main `a7208003`에서 실행 | 25/36, 같은 10건 + 같은 fixture의 다른 1건 실패. 이 변경 전부터 main에서 실패하는 검사다 |
+| 새 PlayMode 검사 (가짜 구성원 주입, 줄인 한도) | 120초 보류 뒤 방장 진행·안내 문구, 그만두기 팝업·박 보기 자동 닫힘(준비 유지), 결과 누락 → 중간 스테이지 GameOver, 재도전 대기에서 구성원 exit → 재도전 종료: 모두 PASS |
+| 기존 결과 흐름 검사 | `SealReadinessAndQuitPopup…`, `FigmaResultsWaitForHostNext…`, `GameStageRetryPlayModeTests` 2개 PASS |
+| 3대 Mac 앱 실제 흐름 (Development 빌드, Direct IP, 기본 한도) | P3가 이야기 중 그만두기 팝업을 열어 둠 → 60.0초 뒤 저절로 닫힘. 방장은 준비 뒤 45.0초에 "한 동지가 아직 이야기를 보고 있소.", 120.0초에 `요괴 봉인 시작` 활성(준비 2/3, P3는 준비로 표시되지 않음). 방장이 누르자 3대 모두 2스테이지 전투 진입 |
+
+- **최신 main(`53118b72`, #728 봉인 박 관람 준비) 통합 뒤 재실행:** #728이 같은 `GameSession`·결과 이야기·관람 코드를 바꿔 다시 실행했다. 전체 EditMode 2411/2411 PASS, 전체 PlayMode 852/853. 실패 1건 `LabPaintGrainRenderTests.SavedGourdShaderChangesOnlyPigmentAndZeroStrengthMatchesOffExactly`(RGB 양자화 차이 2 > 1)는 그 fixture만 다시 실행하자 2/2 PASS였다. 새 검사 4건과 #728에서 고쳐진 Lab fixture는 모두 PASS. 3대 Mac 앱 확인은 통합 전 `b5d64eff` 기준이다.
+- **첫 3대 실행의 실패:** 검사 스크립트가 P2의 대기 한도를 90초로 둬서 120초 전에 P2 앱이 꺼졌고, 방장은 기존 규칙대로 GameOver가 됐다. 스크립트 한도를 300초로 늘려 다시 실행한 결과가 위 표다.
+- **미실행:** iPhone 실기기, 4·5인, Completed에서의 결과 누락 제외와 Completed exit의 실제 다기기 확인(코드 경로는 같은 게이트를 쓰며 PlayMode 단위로는 재도전 exit만 확인).
+
 ## 2026-11-12 — 스테이지 박 뚜껑 칠의 흰 노이즈
 
 - **기준:** `fix/lid-paint-smooth-normals` (main `c2829b46`). Unity 6000.6.5f1 batch(macOS, Apple M3 Pro, Metal). 판정·접속 묶음·설정은 그대로다.
@@ -8631,6 +8668,58 @@ main fbc943e8을 통합하며 VALIDATION 문서 끝의 독립 기록 추가 충�
 - 하트(콤보마다 3개) 추가와 main 통합 뒤 전체 EditMode **2,396 PASS / 7 FAIL**(총 2,403, skip 0). 새 테스트 LabGourdComboTests.ThreeHeartsLetTwoWrongColorsPassAndTheThirdFails·TheModelGivesEveryComboItsHearts를 포함한 콤보 테스트는 모두 통과했다. 실패 7개는 LabOrbSpriteDesignTests.SavedConfigConnectsEachKindToItsOriginalArt 결합 구슬 5종과 GameBattleUiAssetTests 2개로, 메모리의 LabConfig가 BattleOrbAppearance를 가리킨 #701 기록과 같은 현상이다. 저장 LabConfig.asset의 orbAppearance GUID는 변경 없음(이 브랜치의 에셋 차이는 comboWarningSeconds 6·yaguangComboHearts 3뿐). Unity를 재시작한 뒤 재실행해 통과했다. PlayMode·빌드·실기기는 이번에도 실행하지 않았다.
 
 
+## 2026-11-13 — #725 지귀 관람 준비와 결과 화면 복구
+
+기준 origin/main `1efbf325`(야광귀 #723 포함), 브랜치 `fix/#725-gourd-viewer-preparation`, Unity 6000.6.5f1 / macOS Metal.
+
+사용자는 같은 실행에서 1·2스테이지는 관람 가능하지만 지귀는 참가자·Host에서도 비활성화됐다고 보고했다. 해당 실행의 로그/앱에는 접근하지 못했다. 버튼/Prefab 연결은 정상이며, CPU 준비와 실제 사본 생성 조건의 불일치, 실패 후 Battle 해제, 결과 화면 재시도 부재를 코드에서 확인했다. 이번 검사는 이 구조적 공백에 실제 지연 입력을 넣어 검증한다. 사용자 원래 실행의 개별 실패 원인을 확정한 것은 아니다.
+
+### 구현과 보존 범위
+
+- `GameSession.GourdViewer.cs`의 Disabled/Pending/Ready/Failed를 실제 사본 생성에 연결했다. Victory 직후 원본 모델을 보존하고 기존 12초 완료 예산을 갱신하지 않는다. 독립 준비 작업은 결과 Scene에서도 계속되며, 완성된 표면·기록·GPU 출력만 관람에 사용한다. 30초 유휴 또는 영구 기록 오류는 Failed로 정리하고 클리어·통계·진행은 보존한다.
+- 준비 작업은 표시용 모델/재질과 CPU/GPU 사본만 소유하며 물리·오디오·기믹을 복사하지 않는다. 공유 journal은 Network 소유다. 홈·다음 판·종료 전에 작업을 취소한다. 최종 연결 종료와 원본 기록 폐기/교체/오류를 구분하고, 원본 live GPU 오류와 전송/기록 오류도 분리했다.
+- 기존 빠른 캡처, 땅따먹기의 청홍 표현/수채 제외, 시연 경로, #720 복귀 배경을 보존한다. Scene·Prefab·원본 에셋·패키지·저장 설정·네트워크 wire·게임 판정은 변경하지 않았다. 미병합 #721은 이 브랜치에서 임의로 합치지 않았다.
+
+### 최초 실패와 수정
+
+- 최초 집중 검사 요청은 새 PlayMode 검사가 Editor에 아직 반영되지 않아 0건이었다. PASS로 보지 않았다. AssetDatabase.Refresh 후 실행한 첫 지연 검사는 원본 보존이 연출 준비 완료 뒤에만 시작돼 Scene이 이미 해제되는 시점을 검출했다(NullReference). Victory 직후 준비 작업을 확보하도록 수정했으며 단언을 완화하지 않았다.
+- 첫 전체 EditMode는 2,403건 중 9건 실패했다. 2건은 기능 꺼짐 상태의 기존 버튼 문구가 바뀐 문제로 원문 유지로 수정했다. 7건은 선행 PlayMode 종료 때 메모리에 남은 구슬 외형 override였다. 실제 Editor의 저장 필드와 비직렬화 override를 조회해 구분했고, 저장 GUID/에셋은 main과 같았다. fixture가 시작 전 override를 보관해 전체 정리 뒤 정확히 복원하도록 보완했다. 에셋·기존 단언은 바꾸지 않았다. 새 Editor에서 추가 집중 검사를 수행한 뒤 전체 EditMode를 재실행했다.
+
+### 전체 PlayMode 확장 실행 이력
+
+- 열린 Editor에서 시작한 전체 PlayMode는 비교 앱 검사의 `runInBackground=false`와 Editor 포커스 이탈이 겹치면서 프레임 진행이 멈춰 중단했다. 완료한 전체 검사로 간주하지 않았으며 PASS로 기록하지 않는다. 이후 macOS Metal batch 환경으로 전환해 비교 앱 관련 검사부터 확인했다.
+- 첫 번째 완료된 batch 전체 PlayMode는 **841건 중 795통과·46실패**(628.87초)였다. 11건은 main에 이미 반영된 #719 가이딩/보상 표시와 #713 투척 접촉 인자 변경에 맞지 않는 기존 검사 계약이었고, 나머지 35건은 Hapio fixture의 초기화·정리 실패가 이어진 결과였다. 이 실행을 최종 통과 결과로 대체하지 않고 원인을 구분해 보존한다.
+- 기존 계약 보완은 `LabComboProjectileIntegrationTests`의 현재 슬롯 알파·4박 예고, `LabFiveColorClayNetworkTests`의 접촉 전부터 존재한 #719 보상 먼지와 접촉에서 새로 생긴 구형 효과 구분, `LabLocalBoardNetworkIntegrationTests`·동일 접촉 검사의 #713 선택 인자 명시로 한정했다. 게임 코드와 게임 설정은 바꾸지 않았고, 현행 동작을 지키는 단언을 완화하지 않았다. 보상 먼지 식별 과정에서 추가한 `GetInstanceID`가 현재 Unity에서 obsolete 컴파일 오류를 일으켜 실제 객체 참조 집합으로 식별하도록 고쳤다. 컴파일 실패를 검사 통과로 세지 않았다.
+- `GameSceneFlowTests`는 동등성 비교 후 결과 Scene 로딩이 끝날 때까지 기다리도록 하고, TearDown이 비동기 로딩을 배출한 다음 정리하게 했다. 검사별 임시 자료를 구분하고 구슬 외형 override를 `finally`에서 복원해 다음 검사에 새지 않게 했다. 게임의 Scene 연결·클리어·도색 판정은 변경하지 않았다.
+- 보완 후 기존 계약 집중 묶음 **4/4**(0.38초), **25/25**(0.37초), **2/2**(1.21초)가 통과했고, `GameSceneFlowTests` 전체 **35/35**(176.59초)가 통과했다. 이를 근거로 최종 전체 PlayMode를 다시 시작했다. 실행 중에는 최종 전체 결과를 미확정으로 기록했고, 완료 후 아래 표에 확정했다.
+
+### 실행 결과
+
+| 검사 | 결과 | 시간 |
+| --- | --- | --- |
+| 완료 메타데이터 집중 EditMode | 20/20 PASS | 0.50초 |
+| 지귀 결과 진입 후 실제 기록/GPU 복구 | 1/1 PASS | 4.95초 |
+| 준비 중 홈 이동·늦은 기록 차단 | 1/1 PASS | 4.59초 |
+| 영구 기록 오류·클리어/홈 보존 | 1/1 PASS | 3.67초 |
+| 유휴 한도 초과 | 1/1 PASS | 4.44초 |
+| 폐기된 공유 journal 감지 | 1/1 PASS | 3.19초 |
+| 기존 빠른 캡처와 지연 재생 그림 일치 | 1/1 PASS | 4.48초 |
+| 전체 EditMode | 2403/2403 PASS | 19.13초 |
+| batch 비교 앱 관련 검사 | 17/17 PASS | 17.25초 |
+| LabComboProjectileIntegrationTests | 4/4 PASS | 0.38초 |
+| LabLocalBoardNetworkIntegrationTests | 25/25 PASS | 0.37초 |
+| LabFiveColorClayNetworkTests | 2/2 PASS | 1.21초 |
+| GameSceneFlowTests 전체 | 35/35 PASS | 176.59초 |
+| 최종 전체 PlayMode (batch / Metal) | 841/841 PASS | 863.03초 |
+
+지연 검사는 실제 지귀 모델과 최종 CPU 도색, 실제 receiver 기록 페이지, GPU 재생을 사용하며 가짜 preview를 주입하지 않는다. CPU 색/P와 GPU 색/P는 일치했고, 높이/법선 Half 채널은 검사 정밀도 한도(1/1024) 이내였다. 클리어·홈 진행·원본 Battle 해제·Rigidbody/Collider/Audio 복사 없음도 확인했다. Scene 전환과 공유 수명을 변경하므로 전체 PlayMode를 생략하지 않는다. 독립 코드 리뷰에서 추가 차단 사항은 없었다.
+
+- 최종 재실행: 전체 PlayMode **841/841 PASS**(863.03초), 실패·skip·inconclusive 0. 새 관람 복구 6건과 기존 1~3스테이지·땅따먹기·시연·튜토리얼·투척/통신/도색 검사를 포함한다. 전체 EditMode **2403/2403 PASS**(19.13초)는 같은 런타임 코드의 검사 결과이며, 이후 수정은 PlayMode 계약/정리 코드와 문서뿐이어서 재사용했다. Scene/Prefab/원본 에셋/설정의 실제 diff가 없음을 확인했다.
+
+### 실행하지 않은 환경
+
+새 회귀 검사는 솔로 Host 안에 실제 receiver 페이지 지연을 주입한 검사다. 별도 Mac Host/Guest 프로세스, iOS 빌드/실기기의 일반 Wi-Fi·핫스팟, 사용자 원래 문제 앱의 재현은 미검증이다. 원시 로그·로컬 절대 경로·검사 산출물은 커밋하지 않는다.
+
 ## 2026-11-13 — #718 북 넘기기 안내와 스태미나 부족 경고
 
 ### 변경
@@ -8710,3 +8799,76 @@ main fbc943e8을 통합하며 VALIDATION 문서 끝의 독립 기록 추가 충�
 
 - 최신 main(#720 관람 복귀 배경, #719 야광귀 콤보 가이딩, #718 북 넘기기 안내·스태미나 부족 경고)을 통합했다. 충돌은 이 문서 끝의 기록 추가와 `GameSceneFlowTests.cs`의 같은 자리에 양쪽이 넣은 검사 두 곳이며, 둘 다 양쪽을 모두 보존했다(#717 검사 3건 뒤에 #718 검사 2건).
 - #717과 #718이 함께 다루는 화면: #718의 "기운이 부족하다" 경고는 HUD Canvas 위, #717의 끝 문구는 세션 위 시작 오버레이(정렬 30000)라 끝 문구가 늘 위에 보인다. 끝 문구가 뜬 뒤에는 판 조작이 막혀 스태미나 부족 경고가 새로 나지 않고, 북 넘기기 안내는 전투가 끝나면(Playing이 아니면) 숨는다. 접속 버전 변경은 양쪽 모두 없다.
+
+
+## #725 최신 main 통합과 PR #728
+
+`9b1b4366`의 관람 준비 복구를 main `a7208003`(#721 종료 문구/호루라기와 #726 북 전달 안내/스태미나 경고)에 통합했다. 충돌은 `GameSession.cs`의 결과 캡처/전환, 오색 검사 설명 주석, 이 문서 끝의 독립 기록 추가였다. 기능/검사/기록을 양쪽 보존했고 원화·Scene·Prefab·설정·오디오/에셋은 최신 main과 같다. 이전 #725 기록의 ‘미병합 #721을 임의로 합치지 않음’은 구현 시작 당시 이력이며, 이번에는 main에 이미 병합된 #721/#726을 함께 보존한다.
+
+- `WantsGourdViewer`·캡처/준비 판정·캡처 완료 확인은 main의 `ResultNeedsPreview`를 함께 따른다. 불완전한 땅따먹기 지도는 Disabled이며 Pending/Failed 작업을 만들지 않는다. 해당 시간 종료 검사에 상태 Disabled와 오류 없음 단언을 추가했다.
+- 종료 문구 대기가 끝난 뒤 Battle 참조 해제 직전에 관람 준비 작업을 인계한다. `UpdateBattleEnd`, `FinishScheduleAllowed`, `TerritoryResultDeadline`, 시작 표시 1초/봉인 시작 문구를 보존했다. #725의 관람 6건과 main의 게임 흐름 5건을 함께 유지해 해당 fixture는40건이다.
+- 독립 코드/검사 통합 리뷰에서 차단 사항 없음. `git diff --check origin/main`과 충돌 표식 확인을 통과했다. main에서 가져온 Unity 자동 생성 meta 형식은 그대로 보존했다.
+- 통합 집중 검사(Unity6000.6.5f1/macOS batch Metal): 복귀 배경 GPU3/3(0.27초), 불완전 땅따먹기 결과1/1(5.80초), 지귀 결과 후 실제 도색 복구1/1(4.02초), 스토리 성공/호루라기1/1(6.83초), 시간 초과/실패1/1(4.78초) PASS. 이 결과를 전체 통과로 간주하지 않으며 전체 EditMode·PlayMode를 새로 실행한다.
+- 기존 2403/841 통과는 `1efbf325` 기반 구현 당시 결과다. 최신 main이 세션 시작/종료와 Scene 전환을 바꾸었으므로 이번 통합본의 PASS로 재사용하지 않는다. 최종 통합 전체 결과는 실행 완료 후 아래 기록한다. 별도 Mac Host/Guest 및 iOS/실기기 검증은 이번 PR에서도 미검증이다.
+
+
+최종 통합 검증: main `a7208003`을 병합한 `aec6e100` 기준으로 전체 EditMode **2407/2407 PASS**(21.07초), 전체 PlayMode **849/849 PASS**(963.34초). 실패·skip·inconclusive 0. 일반 Story 1~3스테이지, 지귀 결과 후 관람 복구, 불완전한 땅따먹기 관람 Disabled/오류 없음, #717 종료/호루라기, #718 북 안내/스태미나 경고를 포함한다. 검사 후 변경은 검증 문서·PR 설명뿐이며 동작 코드는 같다. Scene/Prefab/원본 에셋/저장 설정/패키지는 최신 main과 차이가 없다. 통합 전 2403/841 결과와 별개인 이번 실행 결과이며, 별도 기기·iOS 확인은 여전히 미검증이다.
+
+
+## 2026-11-14 — 기존 PlayMode 실패 4개 fixture 재확인과 칠 무늬 GPU 검사 간헐 실패 수정
+
+기준 origin/main `53118b72`(#728 병합), 브랜치 `fix/paint-pattern-render-flake`, Unity 6000.6.5f1 / macOS batch Metal.
+
+PR #729 검증 중 main `a7208003`에서 `LabLocalBoardNetworkIntegrationTests` 7건(`TargetParameterCountException`), `LabComboProjectileIntegrationTests` 2건(슬롯 알파 0.4·예고 숫자 "4"), `LabFiveColorClayNetworkTests` 1건(`Five Color Dust Burst`), `LabPlayerPaintPatternRenderTests` 1건(실행마다 다른 검사, 1픽셀·1 LSB 차이)이 실패한다는 보고를 받았다.
+
+### 앞의 세 fixture: 이미 #728에서 반영됨
+
+- `a7208003` 다음에 병합된 #728(`9b1b4366`)이 세 fixture의 기대값을 현재 규칙에 맞췄다. #713이 `OnPredictedShotContact`에 추가한 선택 인자 `soot`를 리플렉션 호출에 명시했고(리플렉션은 기본값을 채우지 않아 인자 수 예외가 났다), #719의 현재 차례 강조(뒤 슬롯 알파 0.4)·예고 4박, #719 보상 생성 먼지와 접촉에서 새로 생긴 구형 효과를 구분했다. 게임 코드 변경 없이 기대값이 낡았던 경우다. 근거는 위 #725 절이다.
+- 이번 기준 `53118b72`에서 네 fixture를 함께 다시 실행해 **36/36 PASS**를 확인했다. 따라서 이번 PR은 세 fixture를 바꾸지 않는다.
+
+### `LabPlayerPaintPatternRenderTests` 간헐 실패 원인
+
+- 재현: 같은 기준에서 fixture를 `-repeat 15`로 실행하자 5번째 반복에서 `ActualSavedShaderDistinguishesAllSixPaintersWithoutChangingPaperAlphaOrCoverage`가 "The ownership motif must modulate pigment brightness only at 20696"으로 실패했다.
+- 임시 조사 검사(커밋하지 않음)로 같은 도색 지도를 한 상태에서 40번씩 다시 그려 비교했다. CPU에서 보이는 상태(재질·property block 값, 키워드, 바인딩된 고해상도 칠·P 텍스처의 내용 해시, `_GlobalMipBias`, 비등방 필터)는 모든 캡처에서 같았는데도, 약 40번 중 1~2번의 캡처가 박 전체(한지 포함)에 흩어진 수백 픽셀을 1~3 LSB 다르게 읽었다. 같은 프레임 안의 연속 캡처 사이에서도 생겼다. 그래서 `neutral`이나 `paper` 기준 캡처가 그런 캡처면 한지 픽셀 일부가 칠로 분류되어 밝기·동일성 단언이 실패했고, 어느 검사가 실패할지는 실행마다 달랐다.
+- 배제한 가설: P 무늬 셰이더의 분기 안 `fwidth`(분기 앞으로 옮겨도 그대로, 셰이더 변경은 되돌림), URP render scale 0.8 중간 버퍼(1로 바꿔도 그대로), `LabGourdPaint` 갱신(끄고도 그대로). Lab Scene의 다른 카메라를 끄자 7개 P×40회 캡처가 모두 같았다.
+- 별도로, 장면 로드 직후 첫 수동 렌더는 이전 렌더가 남긴 `_GlobalMipBias`(로드 직후 (0,0))로 한지를 샘플링해 다음 캡처와 달랐다.
+
+### 수정 (검사 fixture만)
+
+- `ShellRenderRig`가 살아 있는 동안 Lab Scene의 활성 카메라를 멈추고 `Dispose`에서 되돌린다. 캡처마다 `_GlobalMipBias`를 명시값 (0,1)로 두고 렌더한 뒤 이전 값으로 되돌린다. 단언·허용치·캡처 대상은 바꾸지 않았다. 게임 코드·셰이더·Scene·Prefab·에셋·설정·접속 규약은 변경하지 않았다.
+- 같은 셰이더 분기 구조(`PainterInk`의 조기 반환 뒤 `fwidth`)는 `ClayStickerSurface.shader`와 실험용 셰이더에도 있다. 이번 흔들림의 원인이 아님을 확인했으므로 고치지 않았다. `ClayStickerSurface.shader`는 이미지 미리보기 실험 manifest의 SHA 고정 대상이기도 하다.
+
+### 실행 결과
+
+| 검사 | 결과 | 시간 |
+| --- | --- | --- |
+| 수정 전 4 fixture (`53118b72`) | 36/36 PASS | — |
+| 수정 전 `LabPlayerPaintPatternRenderTests` `-repeat 15` | 5번째 반복에서 1건 FAIL(위 메시지) | — |
+| 수정 후 `LabPlayerPaintPatternRenderTests` `-repeat 20` × 2회 실행 | 40회 반복 모두 PASS(5/5씩) | 116.1초, 104.8초 |
+| 전체 EditMode | 2407/2407 PASS | 25.33초 |
+| 전체 PlayMode | **846/849, 3 FAIL** (아래) | 877.04초 |
+| Hapio 실패 3건 단독 재실행 | 1/3 PASS (`PauseMenuRestart…` 통과, 나머지 2건 FAIL) | 14.31초 |
+| `GameStageRetryPlayModeTests`·`GameYaguangDemoFlowTests`·`GameTutorialFlowTests` fixture 재실행 | 6/8 PASS, 2 FAIL | 41.11초 |
+
+전체 PlayMode의 실패 3건은 모두 Hapio Scene 흐름 검사의 `Until` 대기 실패다: `GameStageRetryPlayModeTests.FailedSecondStageRetriesInTheSameRoomWithFreshResourcesAndKeepsStageOneRecord`("The saved result Scene must finish loading."), `GameTutorialFlowTests.PauseMenuRestartStartsThePracticeBoardOverAndQuitGoesToTheTitle`("The practice board plays its first line"), `GameYaguangDemoFlowTests.ThreePlayersFinishOnlyOriginalStageTwoThenReadItsAfterstorySummaryEndingAndRealTitle`("Yaguang afterstory ends at its final picture"). 재실행할 때마다 실패하는 검사가 바뀌었다(fixture 재실행에서는 `GameTutorialFlowTests.FinishedOpeningOpensThePracticeBoardOnceThenTheRoomList`가 새로 실패하고 `PauseMenuRestart…`·야광귀 시연은 통과). 이 검사들은 이번에 바꾼 `LabPlayerPaintPatternRenderTests`를 실행하지 않으며 게임 코드도 바뀌지 않았다. 같은 런타임 코드의 #728 기록은 849/849였다. 실행 당시 같은 Mac에서 다른 세션의 Unity가 함께 돌아 load average가 7~18이었고, 41초 분량의 fixture 실행이 76분 걸렸다. 실패 검사의 소요 시간(3.6초·5.8초)이 `Until`의 실시간 한도(20초·30초)보다 짧아 프로세스 정지·시계 도약도 의심된다. 원인을 확정하지 못했으므로 PASS로 쓰지 않고 미해결로 남긴다. 부하 없는 환경에서의 재실행은 하지 못했다.
+
+**#729·#730·#731 병합 뒤 재실행 (main `da39c5f9`, 다른 Unity 실행 없음):** 충돌은 이 문서의 기록 추가뿐이었다(양쪽 보존). 전체 EditMode **2424/2424 PASS**, 전체 PlayMode **859/859 PASS**. 위에서 미해결로 남긴 Hapio Scene 흐름 3건(`FailedSecondStageRetries…`, `PauseMenuRestart…`, 야광귀 시연)과 `FinishedOpeningOpens…`도 이번에는 모두 PASS여서, 부하 중 실패라는 추정과 맞는다(부하 원인을 따로 재현하지는 않았다).
+
+`-repeat`는 첫 실패에서 멈추며 결과 XML에는 마지막 반복만 남는다. 반복 횟수는 fixture 소요 시간(1회 약 5.7초)으로 확인했다. iOS·실기기·다른 GPU(Mac Intel/AMD)는 실행하지 않았다. 원시 로그·조사용 캡처 이미지는 커밋하지 않는다.
+
+## 2026-11-14 — 전투 시작 대기의 끝 (방장 시작 재확인·참가자 시작 대기 10초·준비 45초)
+
+- **기준:** `fix/hapio-start-waits` (main `a7208003`). Unity 6000.6.5f1 batch(macOS, Metal). 바뀐 코드는 `GameSession.Start.cs`뿐이며 접속 규약·설정 수·`GameStartTiming` 기본값은 그대로다.
+- **범위 선정:** 세션·동기화(전투 시작 장벽 #306)의 동작 변경이라 AGENTS.md에 따라 전체 EditMode·PlayMode를 실행했다.
+
+| 확인 | 결과 |
+| --- | --- |
+| 전체 EditMode | **2412/2412 PASS**. 새 `GameStartWaitLimitsTests` 5건: 10초 경계(.25초 40프레임째에 처음 만료), 세지 않는 동안 합계 유지, 백그라운드 길이 프레임은 .25초만 더함, 준비 한도 기본 45초·`GameTestStartTiming` 42.3초·방장 최장 준비(38초)보다 김, 방장 재확인 0.5초 경계 |
+| 전체 PlayMode 1회차 | 793/847. 새 `AGuestPreparingPastItsLimitLeavesTheRun`이 검사 자체의 부동소수 합(42.3−.1+.05+.05 < 42.3)으로 실패했고, 그 뒤 같은 세션이 남아 이후 Hapio fixture 약 40건이 SetUp에서 연쇄 실패했다. 검사의 두 번째 프레임을 백그라운드 길이(30초 → .25초)로 바꿔 고쳤다(구현 변경 없음) |
+| 전체 PlayMode 2회차 | **837/847**. Hapio 검사는 모두 PASS. 새 검사 4건: `TheHostRetriesItsOwnStartCheckBrieflyAfterTheCommitThenStartsOrAborts`(공통 시작 뒤 방장 초기 상태 미준비 → Countdown 유지 → 회복하면 Playing / 계속 미준비면 시작 0.5초 이상 뒤 "The prepared battle could not be started."), `AGuestHeldTenForegroundSecondsAfterTheSharedStartEndsTheStoryRun`(29초 프레임은 .25초만, 10초에 "This device could not start the stage." → Story GameOver, 재도전 없음, 누적 초기화), `AGuestPreparingPastItsLimitLeavesTheRun`("The host did not start the stage.", 시작 대기 해제), `AGuestStartHoldExitReturnsATerritoryRoomToItsLobby`(참가자의 `exit`를 받은 방장의 2:2가 로비로) |
+| 2회차 실패 10건 | 모두 Lab 검사 어셈블리이며 1·2회차가 같다: `LabLocalBoardNetworkIntegrationTests` 7건(리플렉션 `TargetParameterCountException`), `LabComboProjectileIntegrationTests` 2건(HUD 알파·카운트 "4"), `LabFiveColorClayNetworkTests.SavedSoloHost…`(오색 먼지 덮개 남음). Lab asmdef는 Hapio를 참조하지 않아 이 변경과 무관하다. main에서 따로 재현하지는 않았다(NOT_RUN) |
+
+- **검사 방식의 한계:** PlayMode는 솔로 방장이 참가자 대신 서서, 참가자 전용 `UpdateGuestStartWaits`를 리플렉션으로 부르고 누적값을 한도 직전으로 놓았다. 2:2 로비 복귀는 DEV 솔로 표시를 잠시 끄고 가짜 참가자의 `exit`를 방장에 넣어 확인했다. 실제 두 기기 사이의 `exit` 전송, 실제 10초·45초 경과는 확인하지 않았다.
+- **미실행:** Mac 여러 앱·iPhone 실기기의 참가자 시작 대기 만료, iOS 백그라운드 복귀 중 누적 제외.
+- **main 통합 뒤 재실행 (main `53118b72`, #725 포함):** 충돌은 이 문서 끝의 기록 추가뿐이었다(양쪽 보존). #725가 `GameSession.cs`와 같은 검사 파일을 바꿔 전체를 다시 돌렸다. 전체 EditMode **2412/2412 PASS**, 전체 PlayMode **851/853**. 새 검사 5건(PlayMode 4·EditMode 경계)과 Hapio 검사는 모두 PASS였다. 위 Lab 실패 10건은 #725의 검사 수정으로 모두 통과했다. 실패 2건은 Lab GPU 렌더 검사 `LabPaintGrainRenderTests.SavedGourdShader…`·`LabPaintSpreadFlowRenderTests.SavedShellCompares…`(RGB 반올림 차 3, 허용 1)다. 앞의 두 번의 전체 실행에서는 통과했고, 둘만 따로 다시 돌리면 2/2 PASS여서 간헐 실패로 본다. Hapio를 참조하지 않는 검사다.
+- **#729(결과 화면 대기 한도, Game 토큰 55) 병합 뒤 재실행 (main `eaa11947`):** 충돌 없이 합쳐졌다. `GameSession`의 같은 partial 클래스를 함께 바꾸므로 전체를 다시 돌렸다. 전체 EditMode **2416/2416 PASS**, 전체 PlayMode **857/857 PASS**.
