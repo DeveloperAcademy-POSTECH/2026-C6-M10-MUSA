@@ -349,6 +349,12 @@ MonoBehaviour:
   yaguangFeverDrumPulseRate: 1.6
   yaguangFeverTapComboSeconds: 0.8
   yaguangFeverTapCountSize: 0.45
+  thirtySecondsLeftAt: 30
+  thirtySecondsLeftBubbleSeconds: 2.2
+  thirtySecondsLeftSound: 2
+  thirtySecondsLeftDrumDelaySeconds: 0.8
+  thirtySecondsLeftVolume: 1
+  thirtySecondsLeftHaptic: 1
   hapticsEnabled: 1
   generateHapticStyle: 1
   generateHapticIntensity: 1

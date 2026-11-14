@@ -1183,6 +1183,19 @@ namespace C6Lab
         [SerializeField, Range(.2f, 2f)] private float yaguangFeverTapComboSeconds = .8f;
         [Tooltip("피버 북 연타 숫자(x2, x3…) 크기 배율 (#441, 1 = 예전 크기, 기본 0.45로 훨씬 작게, 0이면 숨김)")]
         [SerializeField, Range(0f, 1.5f)] private float yaguangFeverTapCountSize = .45f;
+        [Header("남은 30초 알림 (#734, Inspector 전용)")]
+        [Tooltip("스토리 1/2/3라운드에서 남은 시간이 이 초가 되는 순간 시간 숫자 밑에서 \"N초 남았소!\"가 튀어나온다 (모든 기기)")]
+        [SerializeField, Range(5f, 90f)] private float thirtySecondsLeftAt = 30f;
+        [Tooltip("\"30초 남았소!\" 말풍선이 떠 있는 시간 (초). 마지막 0.4초에 흐려진다")]
+        [SerializeField, Range(.5f, 5f)] private float thirtySecondsLeftBubbleSeconds = 2.2f;
+        [Tooltip("남은 30초 경고음: 징(Audio/ThirtySecondsLeftGong), 북(Audio/ThirtySecondsLeftDrum), 또는 징 다음 북. 들어 보고 고른다")]
+        [SerializeField] private LabThirtySecondsLeftSound thirtySecondsLeftSound = LabThirtySecondsLeftSound.GongThenDrum;
+        [Tooltip("\"징 다음 북\"일 때 징이 울리고 북이 울리기까지 (초)")]
+        [SerializeField, Range(0f, 3f)] private float thirtySecondsLeftDrumDelaySeconds = .8f;
+        [Tooltip("남은 30초 경고음 크기 (모든 기기)")]
+        [SerializeField, Range(0f, 1f)] private float thirtySecondsLeftVolume = 1f;
+        [Tooltip("남은 30초 진동 세기 (강한 탭 한 번 + 짧은 여운, 0이면 끔)")]
+        [SerializeField, Range(0f, 1f)] private float thirtySecondsLeftHaptic = 1f;
 
         [Header("Haptics (아이폰 진동, 해당 플레이어 기기만)")]
         [Tooltip("끄면 생성·타격 진동이 모두 나지 않는다.")]
@@ -1753,6 +1766,12 @@ namespace C6Lab
         public float JigwiSootAuraVolume => Mathf.Clamp01(Finite(jigwiSootAuraVolume, 1f));
         public float JigwiSootHitVolume => Mathf.Clamp01(Finite(jigwiSootHitVolume, 1f));
         public float JigwiSootRevealVolume => Mathf.Clamp01(Finite(jigwiSootRevealVolume, .8f));
+        public float ThirtySecondsLeftAt => Mathf.Clamp(Finite(thirtySecondsLeftAt, 30f), 5f, 90f);
+        public float ThirtySecondsLeftBubbleSeconds => Mathf.Clamp(Finite(thirtySecondsLeftBubbleSeconds, 2.2f), .5f, 5f);
+        public LabThirtySecondsLeftSound ThirtySecondsLeftSound => thirtySecondsLeftSound;
+        public float ThirtySecondsLeftDrumDelaySeconds => Mathf.Clamp(Finite(thirtySecondsLeftDrumDelaySeconds, .8f), 0f, 3f);
+        public float ThirtySecondsLeftVolume => Mathf.Clamp01(Finite(thirtySecondsLeftVolume, 1f));
+        public float ThirtySecondsLeftHaptic => Mathf.Clamp01(Finite(thirtySecondsLeftHaptic, 1f));
         public float JigwiSootJoinVolume => Mathf.Clamp01(Finite(jigwiSootJoinVolume, .8f));
         public float JigwiSootWholeVolume => Mathf.Clamp01(Finite(jigwiSootWholeVolume, 1f));
         public float JigwiSootHitVoiceVolume => Mathf.Clamp01(Finite(jigwiSootHitVoiceVolume, 1f));
