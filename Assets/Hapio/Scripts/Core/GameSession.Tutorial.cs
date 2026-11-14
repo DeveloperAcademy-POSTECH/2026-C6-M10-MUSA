@@ -21,7 +21,7 @@ namespace Hapio
         public bool IsTutorial => tutorialRun;
 
         /// <summary>Whether this app run still owes its one tutorial.</summary>
-        public static bool TutorialPending => !C6Lab.LabGameBuildVariant.IsYaguangDemo && !tutorialConsumed;
+        public static bool TutorialPending => !C6Lab.LabGameBuildVariant.IsDemo && !tutorialConsumed;
 
         /// <summary>Count the tutorial as seen for this app run, so the opening leads straight to the room list.</summary>
         public static void SkipTutorialThisRun() => tutorialConsumed = true;
@@ -35,7 +35,7 @@ namespace Hapio
         /// <summary>Open the practice board from Home. <paramref name="again"/> replays it in the same run (testing).</summary>
         public bool TryStartTutorial(bool again = false)
         {
-            if (C6Lab.LabGameBuildVariant.IsYaguangDemo || tutorialConsumed && !again
+            if (C6Lab.LabGameBuildVariant.IsDemo || tutorialConsumed && !again
                 || IsCreatingRoom || state.phase != GameFlowPhase.Home) return false;
             tutorialConsumed = true;
             if (!network.PrepareTutorialGame())

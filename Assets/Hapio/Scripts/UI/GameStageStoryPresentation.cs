@@ -21,7 +21,7 @@ namespace Hapio
         public Button advanceButton, exitButton, skipButton, overallButton, viewerButton;
         public Text statusText;
 
-        private enum Mode { None, Waiting, AfterStage, ReadyToAdvance, Failure, FailureDashboard, Ending }
+        private enum Mode { None, Waiting, AfterStage, ReadyToAdvance, Failure, FailureDashboard, Ending, FinalPage }
         private Mode mode;
         private GameSession session;
         private LabSnapshot boundResult;
@@ -33,6 +33,8 @@ namespace Hapio
         private bool resultActionsReady, transitionPending;
         private StoryStageReadyView readyView;
         public StoryStageReadyView ReadyView => readyView;
+        private StaffDemoFinalPage finalPage;
+        public StaffDemoFinalPage FinalPage => finalPage;
         private readonly List<BoundAction> boundActions = new List<BoundAction>();
         private sealed class BoundAction
         {
@@ -50,8 +52,12 @@ namespace Hapio
         public bool IsLocalStoryComplete => resultActionsReady && (mode == Mode.ReadyToAdvance || mode == Mode.FailureDashboard);
         public bool IsResultActionReady => IsLocalStoryComplete;
         public LabSnapshot BoundResult => boundResult;
-        private StorySequence EndingSequence => C6Lab.LabGameBuildVariant.IsYaguangDemo
-            ? Resources.Load<StorySequence>(YaguangDemoEndingResource) : ending;
+        public static string StaffDemoEndingResource(int stage) => stage >= 1 && stage <= 3
+            ? "Hapio/Demo/Staff/Stage" + stage + "/GameEnding" : null;
+        private StorySequence EndingSequence => C6Lab.LabGameBuildVariant.IsStaffStageDemo
+            ? Resources.Load<StorySequence>(StaffDemoEndingResource(session != null ? session.State.stageIndex : 0) ?? string.Empty)
+            : C6Lab.LabGameBuildVariant.IsYaguangDemo
+                ? Resources.Load<StorySequence>(YaguangDemoEndingResource) : ending;
 
         public void Initialize(GameScreen owner, GameSession game)
         {
@@ -142,7 +148,10 @@ namespace Hapio
                 && session.State.stageIndex <= afterStages.Length ? afterStages[session.State.stageIndex - 1] : failure;
             StorySequence finalStory = EndingSequence;
             return sequence != null && sequence.Validate(out _)
-                && (!successful || session.State.phase != GameFlowPhase.Completed || finalStory != null && finalStory.Validate(out _));
+                && (!successful || session.State.phase != GameFlowPhase.Completed || finalStory != null && finalStory.Validate(out _)
+                    && (!C6Lab.LabGameBuildVariant.IsStaffStageDemo
+                        || Resources.Load<StaffDemoFinalPage>(StaffDemoFinalPage.ResourcePath) != null
+                        && Resources.Load<StaffDemoFinalPageConfig>(StaffDemoFinalPageConfig.ResourcePath) != null));
         }
 
         private bool MatchesResult(LabSnapshot result, bool successful) => result != null
@@ -289,7 +298,27 @@ namespace Hapio
             while (IsPresenting && session != null && GenerationKey(session) == generation && !session.CanReturnHome) yield return null;
             pendingFinish = null;
             if (IsPresenting && session != null && GenerationKey(session) == generation)
-            { SetBusy(false); screen.TryStoryHome(); }
+            {
+                SetBusy(false);
+                if (C6Lab.LabGameBuildVariant.IsStaffStageDemo) ShowFinalPage();
+                else screen.TryStoryHome();
+            }
+        }
+
+        private void ShowFinalPage()
+        {
+            if (finalPage == null) finalPage = StaffDemoFinalPage.Create(presentationRoot.transform);
+            mode = Mode.FinalPage;
+            if (readyView != null) readyView.ResetView();
+            finalPage.Show(Resources.Load<StaffDemoFinalPageConfig>(StaffDemoFinalPageConfig.ResourcePath), ReturnToDemoSelection);
+            RefreshControls();
+        }
+
+        private void ReturnToDemoSelection()
+        {
+            if (mode != Mode.FinalPage || session == null || transitionPending) return;
+            transitionPending = true;
+            session.ReturnToDemoSelection();
         }
 
         // The seal card and the first failure picture are read in full; skipping starts from the next picture.
@@ -310,7 +339,7 @@ namespace Hapio
             bool review = mode == Mode.ReadyToAdvance;
             bool failed = mode == Mode.FailureDashboard;
             bool final = victory && session.State.phase == GameFlowPhase.Completed;
-            player.SetInputBlocked(blocked || showingOverall || review || failed);
+            player.SetInputBlocked(blocked || showingOverall || review || failed || mode == Mode.FinalPage);
             // The game uses tap-to-read; the authoring preview keeps its own toolbar unchanged.
             Show(player.nextButton, false); Set(player.nextButton, false);
             bool primary = review && (final || session.Network.IsHost) || failed && session.Network.IsHost && !HasAction("Retry");
@@ -514,6 +543,7 @@ namespace Hapio
 
         public void StopPresentation()
         {
+            if (finalPage != null) finalPage.Hide();
             if (pendingFinish != null) StopCoroutine(pendingFinish);
             pendingFinish = null;
             if (pendingReady != null) StopCoroutine(pendingReady);

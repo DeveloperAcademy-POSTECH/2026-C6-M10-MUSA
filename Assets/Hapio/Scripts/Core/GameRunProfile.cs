@@ -12,6 +12,9 @@ namespace Hapio
         public static readonly GameRunProfile NormalStory = new GameRunProfile("story", 1, 2, 3);
         public static readonly GameRunProfile YaguangDemo = new GameRunProfile("yaguang-demo", 2);
         public static readonly GameRunProfile Territory = new GameRunProfile("territory", 1);
+        private static readonly GameRunProfile[] staffDemos = {
+            new GameRunProfile("staff-stage-1", 1), new GameRunProfile("staff-stage-2", 2),
+            new GameRunProfile("staff-stage-3", 3) };
         private readonly int[] stages;
 
         private GameRunProfile(string id, params int[] stages)
@@ -26,11 +29,18 @@ namespace Hapio
         public int Count => stages.Length;
         public bool IsYaguangDemo => ReferenceEquals(this, YaguangDemo);
 
-        public static GameRunProfile ForMode(GameMode mode)
+        public static GameRunProfile ForMode(GameMode mode, int demoStageIndex = 0)
         {
             if (!Enum.IsDefined(typeof(GameMode), mode)) throw new ArgumentOutOfRangeException(nameof(mode));
             return mode == GameMode.Territory ? Territory
+                : LabGameBuildVariant.IsStaffStageDemo ? StaffStage(demoStageIndex == 0 ? 1 : demoStageIndex)
                 : LabGameBuildVariant.IsYaguangDemo ? YaguangDemo : NormalStory;
+        }
+
+        public static GameRunProfile StaffStage(int stage)
+        {
+            if (stage < 1 || stage > 3) throw new ArgumentOutOfRangeException(nameof(stage));
+            return staffDemos[stage - 1];
         }
 
         public bool Contains(int stage) => Position(stage) > 0;

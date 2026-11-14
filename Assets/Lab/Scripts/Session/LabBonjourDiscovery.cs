@@ -22,12 +22,13 @@ namespace C6Lab
         public bool WaitingForHost { get; }
         /// <summary>A 2:2 team territory room (#281).</summary>
         public bool Team { get; }
+        public int DemoStageIndex { get; }
         public string Key => ServiceName + "|" + InterfaceIndex + "|" + Address + "|" + Port;
         public LabBonjourTarget(string address, ushort port, uint interfaceIndex, string serviceName,
-            int participants = 0, int targetParticipants = 0, bool playing = false, bool waitingForHost = false, bool team = false)
+            int participants = 0, int targetParticipants = 0, bool playing = false, bool waitingForHost = false, bool team = false, int demoStage = 0)
         { Address = address; Port = port; InterfaceIndex = interfaceIndex; ServiceName = serviceName;
           Participants = participants; TargetParticipants = targetParticipants; Playing = playing; WaitingForHost = waitingForHost;
-          Team = team; }
+          Team = team; DemoStageIndex = demoStage; }
     }
 
     /// <summary>One visible room, possibly reachable through several network interfaces and IP families.</summary>
@@ -43,12 +44,13 @@ namespace C6Lab
         public bool WaitingForHost { get; }
         /// <summary>A 2:2 team territory room (#281).</summary>
         public bool Team { get; }
+        public int DemoStageIndex { get; }
         public bool IsFull => TargetParticipants > 0 && Participants >= TargetParticipants;
         internal LabDiscoveredRoom(string name, ushort port, int participants = 0, int capacity = 0, bool playing = false,
-            bool waitingForHost = false, bool team = false)
+            bool waitingForHost = false, bool team = false, int demoStage = 0)
         { Name = name; Port = port; Key = LabRoomCatalog.Key(name, port);
           Participants = participants; TargetParticipants = capacity; Playing = playing; WaitingForHost = waitingForHost;
-          Team = team; }
+          Team = team; DemoStageIndex = demoStage; }
     }
 
     /// <summary>Keep the room picker independent of the number of Bonjour A/AAAA records.</summary>
@@ -63,7 +65,7 @@ namespace C6Lab
                     StringComparer.OrdinalIgnoreCase)
                 .Select(group => new LabDiscoveredRoom(group.First().ServiceName, group.First().Port,
                     group.First().Participants, group.First().TargetParticipants, group.First().Playing, group.First().WaitingForHost,
-                    group.First().Team))
+                    group.First().Team, group.First().DemoStageIndex))
                 .OrderBy(room => LabRoomNames.SortNumber(room.Name))
                 .ThenBy(room => room.Name, StringComparer.OrdinalIgnoreCase).ThenBy(room => room.Port)
                 .ToArray();
@@ -130,7 +132,8 @@ namespace C6Lab
         }
 
         public static string ProtocolFor(LabRoomFamily family) => family == LabRoomFamily.Lab ? Protocol
-             : family == LabRoomFamily.Game ? (LabGameBuildVariant.IsYaguangDemo
+             : family == LabRoomFamily.Game ? (LabGameBuildVariant.IsStaffStageDemo
+                ? "C6-HAPIO-STAFF-" + LabGameBuildVariant.StaffStageDemoRevision + "-" : LabGameBuildVariant.IsYaguangDemo
                 ? "C6-HAPIO-DEMO-" + LabGameBuildVariant.YaguangDemoRevision + "-" : "C6-HAPIO-")
                 + LabNetwork.LabProtocolVersion.ToString(CultureInfo.InvariantCulture)
             : throw new ArgumentOutOfRangeException(nameof(family));
@@ -147,12 +150,14 @@ namespace C6Lab
         public int ActiveNativeOperations => operations.Count(x => !x.Done);
         public IReadOnlyList<LabBonjourTarget> Targets => Array.AsReadOnly(services.Values.SelectMany(s => s.Addresses.Values.Select(x =>
             new LabBonjourTarget(x.Target.Address, x.Target.Port, x.Target.InterfaceIndex, x.Target.ServiceName,
-                s.Participants, s.Capacity, s.Playing, s.WaitingForHost, s.Team))).OrderBy(x => x.ServiceName, StringComparer.Ordinal).ThenBy(x => x.InterfaceIndex)
+                s.Participants, s.Capacity, s.Playing, s.WaitingForHost, s.Team, s.DemoStageIndex))).OrderBy(x => x.ServiceName, StringComparer.Ordinal).ThenBy(x => x.InterfaceIndex)
             .ThenBy(x => x.Address, StringComparer.Ordinal).ToArray());
         public static bool IsSupported => Application.platform == RuntimePlatform.OSXEditor || Application.platform == RuntimePlatform.OSXPlayer || Application.platform == RuntimePlatform.IPhonePlayer;
 
         /// <summary>Advertise this room as a 2:2 team territory room (#281). Kept when a pending room is handed to its Host.</summary>
         public bool Team { get; set; }
+        /// <summary>Canonical selected stage for staff-demo rooms only; zero preserves normal metadata.</summary>
+        public int DemoStageIndex { get; set; }
 
         public bool UpdatePresence(int participants, int capacity, bool playing, bool waitingForHost = false)
             => UpdatePresence(advertisedIpv4, advertisedIpv6, participants, capacity, playing, waitingForHost);
@@ -162,7 +167,7 @@ namespace C6Lab
         {
             CheckOwner();
             if (!IsAdvertising) return false;
-            byte[] record = LabRoomPresence.Encode(ExpectedProtocol, ipv4, ipv6, participants, capacity, playing, waitingForHost, Team);
+            byte[] record = LabRoomPresence.Encode(ExpectedProtocol, ipv4, ipv6, participants, capacity, playing, waitingForHost, Team, DemoStageIndex);
             if (advertisedPresence != null && record.SequenceEqual(advertisedPresence)) return true;
             int error = Native(() => LabBonjourNative.DNSServiceUpdateRecord(advertisement.Reference, IntPtr.Zero, 0,
                 (ushort)record.Length, record, 0));
@@ -182,7 +187,7 @@ namespace C6Lab
             if (string.IsNullOrWhiteSpace(serviceName) || Encoding.UTF8.GetByteCount(serviceName) > 63 ||
                 (!LabRoomNames.TryNumber(serviceName, out _, LabRoomNames.ServiceBaseFor(Family)) && serviceName.Any(c => !(c >= 'a' && c <= 'z') && !(c >= 'A' && c <= 'Z') && !(c >= '0' && c <= '9') && c != '-')) || port == 0)
                 throw new ArgumentException("Use an ASCII room service label (letters, digits, hyphens; max63bytes) and a nonzero port.");
-            byte[] txt = LabRoomPresence.Encode(ExpectedProtocol, ipv4, ipv6, participants, capacity, playing, waitingForHost, Team);
+            byte[] txt = LabRoomPresence.Encode(ExpectedProtocol, ipv4, ipv6, participants, capacity, playing, waitingForHost, Team, DemoStageIndex);
             StopAdvertisingInternal();
             Cleanup(); // A replacement must retire its old native registration before reusing its name.
             LastError = null; RegistrationNameConflict = LocalRegistrationNameConflict = false;
@@ -416,6 +421,9 @@ namespace C6Lab
         private bool Unavailable()
         { LastError = "Lab Bonjour room is available on macOS and iOS."; changed = true; Report("stage=platform result=unsupported"); Flush(); return false; }
 
+        private bool AcceptsDemoStage(int stage) => Family == LabRoomFamily.Game && LabGameBuildVariant.IsStaffStageDemo
+            ? stage >= 1 && stage <= 3 : stage == 0;
+
         private void CheckOwner()
         {
             if (disposed) throw new ObjectDisposedException(nameof(LabBonjourDiscovery));
@@ -502,7 +510,8 @@ namespace C6Lab
                 { owner.Fail(operation, "Bonjour room metadata invalid."); return; }
                 var record = new byte[length]; Marshal.Copy(txt, record, 0, length);
                 if (!LabRoomPresence.TryDecode(record, owner.ExpectedProtocol, out service.Ipv4, out service.Ipv6,
-                    out service.Participants, out service.Capacity, out service.Playing, out service.WaitingForHost, out service.Team))
+                    out service.Participants, out service.Capacity, out service.Playing, out service.WaitingForHost, out service.Team, out service.DemoStageIndex)
+                    || !owner.AcceptsDemoStage(service.DemoStageIndex))
                 {
                     // The shared service type deliberately includes the other room family.
                     // Ignore an incompatible record without turning a healthy browse into an error.
@@ -560,7 +569,8 @@ namespace C6Lab
                 if (length < 2 || length > 128 || bytes == IntPtr.Zero) return;
                 var record = new byte[length]; Marshal.Copy(bytes, record, 0, length);
                 if (!LabRoomPresence.TryDecode(record, owner.ExpectedProtocol, out bool ipv4, out bool ipv6,
-                    out int count, out int capacity, out bool playing, out bool waitingForHost, out bool team))
+                    out int count, out int capacity, out bool playing, out bool waitingForHost, out bool team, out int demoStage)
+                    || !owner.AcceptsDemoStage(demoStage))
                 {
                     if (owner.services.TryGetValue(operation.Service.Key, out Service listed) && listed == operation.Service)
                         owner.Remove(operation.Service.Key);
@@ -577,7 +587,7 @@ namespace C6Lab
                         service.Addresses.Remove(key);
                 }
                 service.Participants = count; service.Capacity = capacity; service.Playing = playing; service.WaitingForHost = waitingForHost;
-                service.Team = team;
+                service.Team = team; service.DemoStageIndex = demoStage;
                 operation.HasAddressOrReply = true; owner.changed = true;
             });
         }
@@ -594,7 +604,7 @@ namespace C6Lab
 
         private sealed class Service
         {
-            internal string Key, Name, HostName; internal int RetryAttempt; internal uint InterfaceIndex; internal ushort Port; internal bool Ipv4, Ipv6, Playing, WaitingForHost, Team; internal int Participants, Capacity; internal Operation Resolve, Address, Presence;
+            internal string Key, Name, HostName; internal int RetryAttempt; internal uint InterfaceIndex; internal ushort Port; internal bool Ipv4, Ipv6, Playing, WaitingForHost, Team; internal int Participants, Capacity, DemoStageIndex; internal Operation Resolve, Address, Presence;
             internal readonly Dictionary<string, AddressRecord> Addresses = new Dictionary<string, AddressRecord>(StringComparer.Ordinal);
         }
         private sealed class AddressRecord
