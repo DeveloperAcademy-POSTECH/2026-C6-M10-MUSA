@@ -169,6 +169,9 @@ namespace C6Lab
             // 야광귀 피버타임 시작 (#343): 화면이 번쩍이고 "피버타임!" 문구가 크게 뜨며 부적이 마구 쏟아진다
             if (hud != null && boardNetwork != null && GetComponent<LabYaguangFeverHud>() == null)
                 gameObject.AddComponent<LabYaguangFeverHud>().Bind(boardNetwork, hud.GetComponentInParent<Canvas>());
+            // 남은 30초 알림 (#734): 스토리 1/2/3라운드에서 30초가 되는 순간 시간 숫자 밑에서 "30초 남았소!"가 튀어나온다
+            if (hud != null && boardNetwork != null && hud.timeText != null && GetComponent<LabThirtySecondsLeftHud>() == null)
+                gameObject.AddComponent<LabThirtySecondsLeftHud>().Bind(boardNetwork, hud.GetComponentInParent<Canvas>(), hud.timeText);
             // 야광귀 피버 북 신호 (#414): 피버 동안 내 북이 두근두근 뛰고, 연달아 누르면 북 옆에 x2, x3…
             if (hud != null && boardNetwork != null && GetComponent<LabYaguangFeverDrumCue>() == null)
                 gameObject.AddComponent<LabYaguangFeverDrumCue>().Bind(boardNetwork, hud.GetComponentInParent<Canvas>());
