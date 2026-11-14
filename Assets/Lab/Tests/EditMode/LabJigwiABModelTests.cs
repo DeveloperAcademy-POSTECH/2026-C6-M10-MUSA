@@ -518,6 +518,27 @@ namespace C6Lab.Tests
             foreach(var x in r) Assert.That(x.activeAt+(x.kind==LabJigwiABKind.PersonalBurn?10d:15d),Is.LessThanOrEqualTo(100d+1e-6),"Every mission fits before the fever.");
         }
 
+        static double NextCommon(LabModel m)=>(double)typeof(LabModel).GetField("nextCommonGimmickAt",BindingFlags.Instance|BindingFlags.NonPublic).GetValue(m);
+
+        [Test] public void EarlyCommonGimmickWaitsUntilTheSmokeIsOverButNotInTheMiddle()
+        {
+            // #737: the first smoke (warning 4 s, 6 s ~ 21 s) covers the 8 s common gimmick; in the first 40 s it waits until 1 s after.
+            JsonUtility.FromJsonOverwrite("{\"jigwiSmokeFlow\":true,\"jigwiRelayTimeline\":true,\"jigwiCommonStartSeconds\":8,\"jigwiCommonIntervalSeconds\":40,\"stageEarlyPhaseSeconds\":40,\"stageEarlyCommonGapSeconds\":1}",config);
+            var m=Room3();
+            m.Tick(10);
+            Assert.That(NextCommon(m),Is.EqualTo(double.PositiveInfinity),"Held while the smoke is on.");
+            var smoke=m.Snapshot(10).jigwiAB.rounds.Single(x=>x.smoke);
+            m.Tick(smoke.endsAt+.5);
+            Assert.That(m.Snapshot(smoke.endsAt+.5).jigwiAB.rounds.Single(x=>x.id==smoke.id).resolution,Is.Not.EqualTo(LabJigwiABResolution.None));
+            Assert.That(NextCommon(m),Is.EqualTo(48d).Within(1e-6),"Cast at 22 s (1 s after the smoke timed out); the next one keeps its own time.");
+
+            // Off (0 s): it comes at 8 s on top of the smoke, as in the middle phase.
+            JsonUtility.FromJsonOverwrite("{\"stageEarlyPhaseSeconds\":0}",config);
+            var off=Room3();
+            off.Tick(10);
+            Assert.That(NextCommon(off),Is.EqualTo(48d).Within(1e-6),"Not held.");
+        }
+
         [Test] public void DenseSmokeFlowRunsFiveMissionsWithTimeForTheBlackOrb()
         {
             // #696: 연기 6 / 부적 30 / 연기 44 / 부적 68 / 연기 82 (부적 10초, 연기 15초), 정해진 시각 그대로 확인.

@@ -1183,6 +1183,11 @@ namespace C6Lab
         [SerializeField, Range(.2f, 2f)] private float yaguangFeverTapComboSeconds = .8f;
         [Tooltip("피버 북 연타 숫자(x2, x3…) 크기 배율 (#441, 1 = 예전 크기, 기본 0.45로 훨씬 작게, 0이면 숨김)")]
         [SerializeField, Range(0f, 1.5f)] private float yaguangFeverTapCountSize = .45f;
+        [Header("2R/3R 시간표 다듬기 (#737, Inspector 전용)")]
+        [Tooltip("초반 길이 (초). 이때까지는 고유 기믹(섬광/콤보/연기/부적, 예고 포함)이 화면에 있으면 공통 기믹(박 폭탄/넘기기 막기)이 그것이 끝난 뒤로 미뤄진다. 0이면 끔 (중반처럼 겹침)")]
+        [SerializeField, Range(0f, 100f)] private float stageEarlyPhaseSeconds = 40f;
+        [Tooltip("초반에 미뤄진 공통 기믹이 고유 기믹이 끝나고 몇 초 뒤에 올지")]
+        [SerializeField, Range(0f, 10f)] private float stageEarlyCommonGapSeconds = 1f;
         [Header("남은 30초 알림 (#734, Inspector 전용)")]
         [Tooltip("스토리 1/2/3라운드에서 남은 시간이 이 초가 되는 순간 시간 숫자 밑에서 \"N초 남았소!\"가 튀어나온다 (모든 기기)")]
         [SerializeField, Range(5f, 90f)] private float thirtySecondsLeftAt = 30f;
@@ -1766,6 +1771,8 @@ namespace C6Lab
         public float JigwiSootAuraVolume => Mathf.Clamp01(Finite(jigwiSootAuraVolume, 1f));
         public float JigwiSootHitVolume => Mathf.Clamp01(Finite(jigwiSootHitVolume, 1f));
         public float JigwiSootRevealVolume => Mathf.Clamp01(Finite(jigwiSootRevealVolume, .8f));
+        public float StageEarlyPhaseSeconds => Mathf.Clamp(Finite(stageEarlyPhaseSeconds, 40f), 0f, 100f);
+        public float StageEarlyCommonGapSeconds => Mathf.Clamp(Finite(stageEarlyCommonGapSeconds, 1f), 0f, 10f);
         public float ThirtySecondsLeftAt => Mathf.Clamp(Finite(thirtySecondsLeftAt, 30f), 5f, 90f);
         public float ThirtySecondsLeftBubbleSeconds => Mathf.Clamp(Finite(thirtySecondsLeftBubbleSeconds, 2.2f), .5f, 5f);
         public LabThirtySecondsLeftSound ThirtySecondsLeftSound => thirtySecondsLeftSound;
