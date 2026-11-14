@@ -259,6 +259,7 @@ Home/Lobby DEV의 `공통 / 구미호 / 야광귀 / 지귀`에서 해당 값만 
 | 6명 | 막힘 | 3:3 | 6명은 땅따먹기 3:3만 할 수 있소. |
 
 - 규칙의 바탕은 `LabModel.ValidRoomSize`(기본 방 2~5명, 땅따먹기 방 2·4·6명)다. 방 만들기·방 광고 기록·방장 세션·참가자 설정 확인·세션 지문이 모두 이것을 따른다. 기본 모드의 3명 이상은 Hapio 화면 규칙(`GameLobbyView.ModeAllowed`)이고, 모델과 DEV·검사 경로는 2명 기본 방을 그대로 받는다.
+- 구성원이 방장 설정을 지문 불일치나 설치 실패로 거절하면, 로비(`LobbyRejoinAllowed`)와 Lab 방에서는 `C6_LAB_CONFIG_REJECTED`를 남기고 스스로 나간다. 나갈 때 `lobby_leave`를 보내므로 방장은 그 P를 바로 풀고, Hapio 구성원은 방 목록으로 돌아간다. 게임 진행 중의 거절은 방장의 설정 확인 예산이 처리한다. 앞선 revision, 깨진 패킷, 같은 revision 재수신으로는 나가지 않는다.
 - 최대 인원: 기본 모드는 `LabModel.MaximumParticipants` 5명 그대로, 땅따먹기만 `TerritoryMaximumParticipants` 6명이다. 칠 기록의 P번호도 P6까지다(P6 무늬 = P2와 반대 방향 사선).
 
 ### 팀 규칙 (`LabTeams`)
@@ -313,6 +314,9 @@ Home/Lobby DEV의 `공통 / 구미호 / 야광귀 / 지귀`에서 해당 값만 
 - 공통 시작 시각의 3초 전부터 3/2/1, 해당 시각에 시작!을 표시한다. Host만 실제 판정 시계를 해제하고 참가자는 확정된 예약/Playing과 초기 상태가 맞을 때 조작을 연다. 시작! 표시는 0.5초 후 사라지며 그동안 터치를 가로막지 않는다.
 - 시간 길이(3/2/1 3초, 첫 예약 여유 1초, 재예약 상한 5초, 시작! 0.5초)는 `GameSession.Start.cs`의 `GameStartTiming` 기본값이다. 게임 코드는 이 값을 바꾸지 않는다. `Hapio.PlayModeTests`만 `GameTestStartTiming`([SetUpFixture])으로 0.3초·0.1초·5초·0.1초로 줄였다가 끝나면 되돌린다. 순서·ACK·재예약·로드 한도는 같고 길이만 다르다. 카운트다운 자체를 보는 검사(`SharedCountdown…`)는 기본값으로 실행한다.
 - Scene 로딩·초기 동기화·예약 확정까지 합쳐 기존 30초 한도를 적용하고 확정된 3초 표시는 별도로 마친다. 구세대·중복 ACK는 판/설정/revision으로 거부하며 재예약하면 이전 예약 ACK를 지운다. 실패·이탈은 기존 Story GameOver와 2:2 같은 방 로비 복귀 정책을 따른다.
+- 시작 대기의 끝 (2026-11-14): 확정 뒤 공통 시작 시각에 방장 자신의 초기 상태가 아직 맞지 않으면(늦은 조합판·도색 반영) Countdown 확정 상태로 최대 0.5초(`GameStartWaitLimits.HostReleaseRetrySeconds`) 다시 확인한다. 그 뒤에도 맞지 않으면 예전처럼 `MarkPlaying` → 해제 실패 → `AbortHost`다.
+- 참가자는 확정된 Countdown·Playing에서 공통 시작 시각이 지났는데도 `GameStartHeld`가 풀리지 않은 채 앞 화면 시간 10초(`StartHeldLimitSeconds`)가 지나면 "This device could not start the stage."로 판을 나간다. 준비 단계(Loading·Synchronizing·Countdown) 전체가 앞 화면 시간 `loadingTimeoutSeconds + CountdownSeconds + MaximumLeadSeconds + 7`(기본 45초, `GameTestStartTiming`에서는 42.3초)을 넘으면 "The host did not start the stage."로 나간다. 방장의 30초 예산과 확정 뒤 최대 8초보다 늘 길어, 연결은 살아 있지만 방장이 멈춘 경우만 잡는다. 두 경우 모두 기존 `ExitWithLocalReason` → `exit` → 방장 `AbortHost` 경로라 Story는 전원 GameOver, 2:2는 같은 방 로비로 간다.
+- 두 참가자 시간은 프레임마다 `min(Time.unscaledDeltaTime, 0.25초)`만 더하므로 iPhone 백그라운드 시간은 세지 않는다(#502: 30초 미만 백그라운드는 복귀 허용). 준비 시간은 새 판·스테이지·새 로딩 revision에서, 시작 대기 시간은 시작 대기가 끝날 때(`ResetBattleStart`) 0으로 돌아가며 Countdown 재예약은 준비 시간을 초기화하지 않는다. 상수와 계산은 `GameSession.Start.cs`의 `GameStartWaitLimits`이고 `GameStartTiming`은 바꾸지 않았다. 접속 규약 변경은 없다.
 - 전환 UI는 `Resources/Hapio/GameStartOverlay.prefab`의 실제 Canvas·Background·SafeArea·Caption 객체다. 영속 GameSession이 소유하므로 Scene 언로드 중에도 남는다. 기존 Scene 배치를 다시 생성하지 않는다. `Hapio/Create Missing Battle Start Overlay`는 이 새 프리팹이 없을 때만 생성한다.
 
 연결은 `GameSession.Start.cs`(준비·예약·표시), `GameRunFlow`/`GameFlowSnapshot`(세대·전환 검증), `LabNetwork.GameFlow`(초기 상태·내부 hold·시계·해제), `GameBattleBindings.IsPresentationReady`, `GameStartOverlay`다. 현재 작업의 실행 결과와 미실행 환경은 `VALIDATION.md`의 #306 절에 기록한다.
@@ -402,3 +406,15 @@ B는 전원 동시에 자기 발화점을 소화하면 그 순간부터5초 보�
 - **사라지는 방식:** 찍히는 순간이 가장 진하고, 머무는 시간 없이 바로 옅어지며 살짝 번져 커진다.
 - **소리:** 지금은 넣지 않았다. `TouchInkArt`의 `Tap Sound`에 소리를 넣으면 코드 수정 없이 터치할 때 한 번 난다(여러 손가락이 동시에 닿아도 한 번). Home 등에는 AudioListener가 없어서 소리가 나는 동안만 잠깐 붙이고, 게임의 효과음 크기 설정을 함께 따른다. 소리를 넣을 때는 [오디오 출처](AUDIO_CREDITS.md)에도 기록한다.
 - **조절:** `Assets/Hapio/Resources/Hapio/UI/TouchInkArt.asset`의 Inspector 값이다. 터치 소리(`Tap Sound`)와 크기(`Sound Volume`), 희미한 정도(`Ink Strength`), 가운데 얼룩 크기(`Stain Size`), 사라지는 시간(`Fade Seconds`), 먹 방울 수(`Droplets Min/Max`)와 크기(`Droplet Size Min/Max`), 동시 표시 수(`Max Marks`). Play 중에 바꾸면 희미한 정도와 시간은 바로, 모양은 다음 터치부터 반영된다.
+
+## 결과 화면 대기 한도 (2026-11-13)
+
+결과 화면의 진행 조건(결과 받음, 다음 봉인 준비, 이야기·관람 중 표시)은 모두 방장이 모은다. 예전에는 한 명이 멈추면 그 사람이 나가거나 30초 연결 끊김이 날 때까지 방장이 다음 단계로 갈 수 없었고, 0.5초마다 오는 결과 보고가 연결을 살려 두어 끊김조차 일어나지 않았다. 이제 `GameSession.UpdateResultHolds`가 다음을 처리한다.
+
+- 방장 자기 결과 보고부터 30초 안에 보고하지 않은 참여자: 중간 스테이지는 전원 GameOver, 최종 스테이지는 그 사람 없이 진행, 재도전 대기 패배는 재도전만 종료.
+- 다른 참여자가 읽기·관람·미준비로 막는 시간: 45초에 방장에게 이유 표시, 120초에 방장이 직접 시작 가능. 자동 시작하지 않는다.
+- 각 기기의 그만두기 팝업·봉인 박 둘러보기: 터치 없이 60초면 닫힌다.
+- 구성원이 결과 화면을 떠나면 `exit`을 보내고 0.5초 뒤 연결을 끊는다. 방장은 30초 끊김을 기다리지 않고 바로 반영한다.
+
+값과 표는 `docs/STAGE_STORY_UI_INTEGRATION.md`의 "결과 대기 한도"를 따른다. Game 접속 토큰은 `C6HapioGame/55`다.
+
