@@ -1,5 +1,21 @@
 # C6 Physics Lab 검증 범위
 
+## 2026-11-14 — 스태프 시연 로비 방 제목
+
+- **기준:** `fix/staff-demo-room-title` (main `73d32a60` 위). Unity 6000.6.5f1 batch(macOS, Metal). 접속 묶음·설정 수·Bonjour 공개 이름은 그대로다.
+- **원인:** 스태프 시연 방은 충돌 확인용 고정 이름 `Hapio-Staff-2-5705-Stage-N`으로 공개된다. 그런데 `LabRoomNames.Display`가 앞의 `Hapio-`만 `수장고-`로 바꿔서, 로비 제목이 `수장고-Staff-2-5705-Stage-2`처럼 리비전과 프로토콜 번호까지 그대로 보였다.
+- **고친 것:** `LabRoomNames.TryStaffStage`가 정확히 이 형식(리비전·프로토콜 숫자, 스테이지 1~3)일 때만 스테이지를 읽는다. 그때 `Display`는 `수장고-N스테이지 <요괴>`(구미호·야광귀·지귀)를 돌려준다. 다른 이름(번호 접미사, 잘못된 스테이지, 형식이 다른 이름)은 예전 표시 그대로다. 검색·접속·카드 키는 실제 공개 이름을 계속 쓴다.
+
+| 확인 | 결과 |
+| --- | --- |
+| 전체 EditMode (새 `LabRoomNamesTests` 스태프 3건·형식 밖 8건 포함) | 2497/2497 PASS |
+| PlayMode `GameLobbyViewTests`·`LabFigmaLobbyTests`·`GameStaffStageDemo*`·`LabLobby*`·`GameSceneFlowTests` | 102/102 PASS |
+| 스태프 시연 QA Mac 빌드, 앱 3개 3스테이지(중도 이탈→다시 도전→자리 선택→정상 패배→재도전→승리→엔딩→선택 화면) | 세 대 모두 끝까지 진행. 방장·구성원 로비 제목 `수장고-3스테이지 지귀` 확인 |
+
+- **범위:** 로비 제목 표시만 바꾸는 UI 변경이라 전체 EditMode와 로비·시연·화면 흐름 PlayMode를 실행했다. 전체 PlayMode는 실행하지 않았다(세션·통신·판정 경로 변경 없음).
+- **최초 실패:** 첫 실행은 새 검사가 접근할 수 없는 `LabNetwork.LabProtocolVersion`을 참조해 컴파일 오류였다. 검사를 고쳐 재실행했다.
+- **미실행:** iPhone 실기기, 실제 Wi-Fi·핫스팟.
+
 ## 2026-11-14 — 설정 거절·행동 복구의 무기한 대기 (PR-A)
 
 - **기준:** `fix/lab-config-action-waits` (main `53118b72` 위). Unity 6000.6.5f1 batch(macOS, Metal). 접속 묶음 5704·`C6PhysicsLab/62`·`C6HapioGame/54`와 설정 수는 그대로다.
