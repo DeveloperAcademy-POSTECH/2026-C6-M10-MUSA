@@ -376,6 +376,7 @@ namespace C6Lab
             ResetStageYokai(config, now);
             ResetYaguangTimeline(now);
             ResetJigwiStage(config, now);
+            ResetStageTimetable(config, now); // #737
             ResetFeverTime(now);
         }
 
@@ -1709,11 +1710,13 @@ namespace C6Lab
                 AdvanceCombo(until);
                 AdvanceFlash(until);
             }
+            ReleaseHeldEarlyCommon(until); // #737
             while (nextCommonGimmickAt <= until || nextUniqueGimmickAt <= until)
             {
                 if (nextCommonGimmickAt <= nextUniqueGimmickAt)
                 {
                     double at = nextCommonGimmickAt;
+                    if (HoldEarlyCommon(at)) continue; // #737 초반에는 고유 기믹이 끝난 뒤로
                     uint index = commonGimmickCount++;
                     nextCommonGimmickAt = JigwiStageEnabled ? NextJigwiStageCommonAt(commonGimmickCount)
                         : rules.YaguangTimeline ? NextYaguangCommonAt(commonGimmickCount)

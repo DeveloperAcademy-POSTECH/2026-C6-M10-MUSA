@@ -26,6 +26,20 @@ namespace C6Lab.Tests
             values[153] = 2f;
             values[2] = 120f; // The authored two-minute battle every stage now shares (#328).
             Apply(values);
+            // #737's early-phase hold and penalty rest are checked on their own below; these fixtures keep #314's timetable.
+            JsonUtility.FromJsonOverwrite("{\"stageEarlyPhaseSeconds\":0,\"stagePenaltyRestSeconds\":0}", config);
+        }
+
+        [Test]
+        public void AfterTheSmallPenaltyTheNextUniqueWaitsTheRestSeconds()
+        {
+            // #737: the combo times out at 52 s and SMALL lasts until 60 s; the 60 s flash waits 5 s more.
+            JsonUtility.FromJsonOverwrite("{\"stagePenaltyRestSeconds\":5}", config);
+            LabModel room = Room();
+            LabSnapshot timeout = At(room, 52d);
+            Assert.That(timeout.players.All(player => player.comboPenaltyUntil == 60d), Is.True);
+            Assert.That(At(room, 62d).FlashWarningOn(62d), Is.False, "Not right after the penalty.");
+            Assert.That(At(room, 65d).flashWarningAt, Is.EqualTo(65d).Within(1e-9), "The penalty ended at 60 s, then 5 s of rest.");
         }
 
         [TearDown] public void Dispose() => Object.DestroyImmediate(config);

@@ -8925,3 +8925,11 @@ PR #729 검증 중 main `a7208003`에서 `LabLocalBoardNetworkIntegrationTests` 
 - **영향 PlayMode: 46/46 PASS**, 100.32초. `GameStaffStageDemoFlowTests` 3건, `GameStaffStageDemoSessionTests` 4건, `StaffDemoFinalPageTests` 1건, 기존 `GameLobbyViewTests` 20건, `GameBattleUiPresentationTests` 4건, `LabDeveloperSoloIntegrationTests` 14건. 실제 패킷 참가자 3명·선택별 한 판·총평/엔딩/QR/복귀·실제 UI 입력 모듈·일반 로비/전투 UI·기존 Lab 경로를 포함한다.
 - 소스·문서 공백 검사 통과. Unity가 생성한 직렬화 자료의 기본 빈 값 뒤 공백은 수작업으로 변경하지 않았다. 정상 Scene·Story 원본·ProjectSettings·패키지·렌더 설정은 PR 변경 대상에서 제외했다.
 - PR은 저장소 템플릿을 사용했다. iOS·실제 3기기 일반 Wi-Fi/핫스팟 확인과 QR 스캔은 여전히 미실행이며, Mac 시연 앱은 병합된 main에서 다시 빌드한다.
+
+## 2026-11-14 — #737 2R/3R 시간표 다듬기 (야광귀 콤보 먼저 / 지귀 부적 먼저 + 미션 사이 7초 / 초반 공용 기믹 미루기 / 벌칙 뒤 쉬는 시간)
+
+- **기준:** `feat/#737-round-timetable` (main #738 병합 뒤). 접속 규약 5704 → **5705** (지귀 시간표 번호 7 `RelayTalismanFirstSchedule`이 새로 생겨 예전 빌드가 읽지 못함). DEV 설정 수 265 그대로, 야광귀 고유 기믹 종류 값(DEV 214/216/218/220)을 콤보 먼저로 바꾸고 Home/Lobby 장면 DEV 패널 값도 맞춤.
+- **실행:** Unity Editor를 재시작한 뒤 Test Runner 전체 EditMode Run All **2476 통과 / 1 실패**. 실패는 새로 쓴 `LabJigwiABModelTests.EarlyCommonGimmickWaitsUntilTheSmokeIsOverButNotInTheMiddle`(22초 공용 기믹을 21.5초에 확인한 검사 쪽 실수, 기대 48 / 실제 22)였고, 검사를 고친 뒤 단독 재실행 통과. 접속 규약 5705로 바꾼 뒤 `LabSharedSettingsSchemaTests` / `LabGameFlowBridgeTests` 단독 실행 통과.
+- **PlayMode:** `GameJigwiStageIntegrationTests` 단독 실행 통과 (저장된 설정이 부적 먼저이면 부적 → 연기 순서로 확인하도록 고침). 전체 PlayMode는 실행하지 않았다.
+- **새 검사:** 초반 연기 동안 공용 기믹이 끝난 1초 뒤로 미뤄짐, SMALL 뒤 쉬는 5초, 부적 실패 뒤 북 미끄러움 대기(검사 값 13초), 저장된 설정(부적 먼저 / 간격 9 / 9 / 북 미끄러움 대기 10초).
+- **미실행:** 실제 3R 한 판 플레이로 10초 부적 / 7초 틈 확인, Mac 여러 앱·iPhone 실기기.

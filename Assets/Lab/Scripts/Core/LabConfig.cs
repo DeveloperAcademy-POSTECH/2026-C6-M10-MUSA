@@ -607,6 +607,8 @@ namespace C6Lab
         [SerializeField] private bool jigwiDenseTimeline = false;
         [Tooltip("#713 연기 흐름 이어달리기: 첫 연기만 6초에 오고, 그 뒤로는 앞 미션이 끝나고(연기는 모두 닦거나 15초, 부적은 물폭포나 구슬이 다 탄 뒤) Jigwi Relay Gap Seconds 뒤에 다음 미션. 피버 전에 끝낼 수 있는 만큼. 켜면 Jigwi Dense Timeline보다 앞선다. Host 기준")]
         [SerializeField] private bool jigwiRelayTimeline = false;
+        [Tooltip("#737: 이어달리기에서 부적이 먼저 (10초), 그 뒤 연기 → 부적 … 끄면 #713처럼 연기가 먼저 (6초)")]
+        [SerializeField] private bool jigwiTalismanFirst = false;
         [Tooltip("#713 이어달리기: 연기가 끝나고 다음 부적이 시작하기까지(초, 지귀 예고 2초 포함). 드러난 파편을 모아 검정 구슬을 던질 틈")]
         [SerializeField, Range(2f, 30f)] private float jigwiRelayGapSeconds = 14f;
         [Tooltip("#713 이어달리기: 부적(성공 물폭포 / 실패 구슬 타기까지)이 끝나고 다음 연기가 시작하기까지(초, 지귀 예고 2초 포함)")]
@@ -1183,6 +1185,15 @@ namespace C6Lab
         [SerializeField, Range(.2f, 2f)] private float yaguangFeverTapComboSeconds = .8f;
         [Tooltip("피버 북 연타 숫자(x2, x3…) 크기 배율 (#441, 1 = 예전 크기, 기본 0.45로 훨씬 작게, 0이면 숨김)")]
         [SerializeField, Range(0f, 1.5f)] private float yaguangFeverTapCountSize = .45f;
+        [Header("2R/3R 시간표 다듬기 (#737, Inspector 전용)")]
+        [Tooltip("초반 길이 (초). 이때까지는 고유 기믹(섬광/콤보/연기/부적, 예고 포함)이 화면에 있으면 공통 기믹(박 폭탄/넘기기 막기)이 그것이 끝난 뒤로 미뤄진다. 0이면 끔 (중반처럼 겹침)")]
+        [SerializeField, Range(0f, 100f)] private float stageEarlyPhaseSeconds = 40f;
+        [Tooltip("초반에 미뤄진 공통 기믹이 고유 기믹이 끝나고 몇 초 뒤에 올지")]
+        [SerializeField, Range(0f, 10f)] private float stageEarlyCommonGapSeconds = 1f;
+        [Tooltip("2R SMALL 벌칙이 끝나고 이 초가 지나야 다음 고유 기믹 예고가 시작된다. 0이면 벌칙이 끝나자마자")]
+        [SerializeField, Range(0f, 20f)] private float stagePenaltyRestSeconds = 5f;
+        [Tooltip("3R 부적 실패의 북 미끄러움이 시작되고 이 초가 지나면 (미끄러움이 남아 있어도) 다음 미션 예고가 올 수 있다. 이어달리기 간격보다 이르게 오지는 않는다")]
+        [SerializeField, Range(0f, 30f)] private float jigwiDrumSlipWaitSeconds = 10f;
         [Header("남은 30초 알림 (#734, Inspector 전용)")]
         [Tooltip("스토리 1/2/3라운드에서 남은 시간이 이 초가 되는 순간 시간 숫자 밑에서 \"N초 남았소!\"가 튀어나온다 (모든 기기)")]
         [SerializeField, Range(5f, 90f)] private float thirtySecondsLeftAt = 30f;
@@ -1330,6 +1341,7 @@ namespace C6Lab
         public bool JigwiSmokeFlow => jigwiSmokeFlow;
         public bool JigwiDenseTimeline => jigwiDenseTimeline;
         public bool JigwiRelayTimeline => jigwiRelayTimeline;
+        public bool JigwiTalismanFirst => jigwiTalismanFirst;
         public float JigwiRelayGapSeconds => Mathf.Clamp(Finite(jigwiRelayGapSeconds, 14f), (float)LabJigwiABTimeline.WarningSeconds, 30f);
         public float JigwiRelayGapAfterTalismanSeconds =>
             Mathf.Clamp(Finite(jigwiRelayGapAfterTalismanSeconds, 12f), (float)LabJigwiABTimeline.WarningSeconds, 30f);
@@ -1766,6 +1778,10 @@ namespace C6Lab
         public float JigwiSootAuraVolume => Mathf.Clamp01(Finite(jigwiSootAuraVolume, 1f));
         public float JigwiSootHitVolume => Mathf.Clamp01(Finite(jigwiSootHitVolume, 1f));
         public float JigwiSootRevealVolume => Mathf.Clamp01(Finite(jigwiSootRevealVolume, .8f));
+        public float StageEarlyPhaseSeconds => Mathf.Clamp(Finite(stageEarlyPhaseSeconds, 40f), 0f, 100f);
+        public float JigwiDrumSlipWaitSeconds => Mathf.Clamp(Finite(jigwiDrumSlipWaitSeconds, 10f), 0f, 30f);
+        public float StagePenaltyRestSeconds => Mathf.Clamp(Finite(stagePenaltyRestSeconds, 5f), 0f, 20f);
+        public float StageEarlyCommonGapSeconds => Mathf.Clamp(Finite(stageEarlyCommonGapSeconds, 1f), 0f, 10f);
         public float ThirtySecondsLeftAt => Mathf.Clamp(Finite(thirtySecondsLeftAt, 30f), 5f, 90f);
         public float ThirtySecondsLeftBubbleSeconds => Mathf.Clamp(Finite(thirtySecondsLeftBubbleSeconds, 2.2f), .5f, 5f);
         public LabThirtySecondsLeftSound ThirtySecondsLeftSound => thirtySecondsLeftSound;

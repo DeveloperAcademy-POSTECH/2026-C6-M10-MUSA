@@ -518,6 +518,45 @@ namespace C6Lab.Tests
             foreach(var x in r) Assert.That(x.activeAt+(x.kind==LabJigwiABKind.PersonalBurn?10d:15d),Is.LessThanOrEqualTo(100d+1e-6),"Every mission fits before the fever.");
         }
 
+        static double NextCommon(LabModel m)=>(double)typeof(LabModel).GetField("nextCommonGimmickAt",BindingFlags.Instance|BindingFlags.NonPublic).GetValue(m);
+
+        [Test] public void EarlyCommonGimmickWaitsUntilTheSmokeIsOverButNotInTheMiddle()
+        {
+            // #737: the first smoke (warning 4 s, 6 s ~ 21 s) covers the 8 s common gimmick; in the first 40 s it waits until 1 s after.
+            JsonUtility.FromJsonOverwrite("{\"jigwiSmokeFlow\":true,\"jigwiRelayTimeline\":true,\"jigwiCommonStartSeconds\":8,\"jigwiCommonIntervalSeconds\":40,\"stageEarlyPhaseSeconds\":40,\"stageEarlyCommonGapSeconds\":1}",config);
+            var m=Room3();
+            m.Tick(10);
+            Assert.That(NextCommon(m),Is.EqualTo(double.PositiveInfinity),"Held while the smoke is on.");
+            var smoke=m.Snapshot(10).jigwiAB.rounds.Single(x=>x.smoke);
+            m.Tick(smoke.endsAt+.5);
+            Assert.That(m.Snapshot(smoke.endsAt+.5).jigwiAB.rounds.Single(x=>x.id==smoke.id).resolution,Is.Not.EqualTo(LabJigwiABResolution.None));
+            Assert.That(NextCommon(m),Is.EqualTo(smoke.endsAt+1d).Within(1e-6),"Due 1 s after the smoke timed out (22 s).");
+            m.Tick(smoke.endsAt+1.5);
+            Assert.That(NextCommon(m),Is.EqualTo(48d).Within(1e-6),"Cast at 22 s; the next one keeps its own time.");
+
+            // Off (0 s): it comes at 8 s on top of the smoke, as in the middle phase.
+            JsonUtility.FromJsonOverwrite("{\"stageEarlyPhaseSeconds\":0}",config);
+            var off=Room3();
+            off.Tick(10);
+            Assert.That(NextCommon(off),Is.EqualTo(48d).Within(1e-6),"Not held.");
+        }
+
+        [Test] public void AfterAFailedTalismanTheNextSmokeWaitsThirteenSecondsOfTheSlipperyDrum()
+        {
+            // #737: smoke 6~21 s (timed out) → talisman 31~41 s (nobody writes) → boards burn until 44.9 s and the drums slip
+            // from 41.45 s for 20 s. The next smoke may warn 13 s into the slip (54.45 s, active 56.45 s), not after all 20 s.
+            JsonUtility.FromJsonOverwrite("{\"jigwiSmokeFlow\":true,\"jigwiRelayTimeline\":true,\"jigwiRelayGapSeconds\":10,\"jigwiRelayGapAfterTalismanSeconds\":10,\"jigwiABPersonalDurationSeconds\":10,\"jigwiAFailBurnStartSeconds\":2.9,\"jigwiAFailDrumSlipSeconds\":20,\"jigwiDrumSlipWaitSeconds\":13}",config);
+            var m=Room3();
+            for(double t=1;t<=95d;t+=.5) m.Tick(t);
+            var r=m.Snapshot(95d).jigwiAB.rounds.OrderBy(x=>x.slot).ToArray();
+            Assert.That(r[0].smoke,Is.True); Assert.That(r[0].resolvedAt,Is.EqualTo(21d).Within(1e-6));
+            Assert.That(r[1].kind,Is.EqualTo(LabJigwiABKind.PersonalBurn)); Assert.That(r[1].activeAt,Is.EqualTo(31d).Within(1e-6));
+            Assert.That(r[1].resolution,Is.EqualTo(LabJigwiABResolution.Expired));
+            Assert.That(m.JigwiPenaltyEndAt(r[1]),Is.EqualTo(54.45d).Within(1e-6));
+            Assert.That(r[2].smoke,Is.True);
+            Assert.That(r[2].activeAt,Is.EqualTo(56.45d).Within(1e-6),"13 s into the slip, not 54.9 s while the boards still burn nor after all 20 s.");
+        }
+
         [Test] public void DenseSmokeFlowRunsFiveMissionsWithTimeForTheBlackOrb()
         {
             // #696: 연기 6 / 부적 30 / 연기 44 / 부적 68 / 연기 82 (부적 10초, 연기 15초), 정해진 시각 그대로 확인.

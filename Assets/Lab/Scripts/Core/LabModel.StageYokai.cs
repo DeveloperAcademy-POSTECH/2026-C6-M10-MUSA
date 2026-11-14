@@ -100,6 +100,7 @@ namespace C6Lab
             {
                 Include(player.comboPenaltyUntil);
                 Include(player.comboRewardUntil);
+                Include(PenaltyRestUntil(player.comboPenaltyUntil)); // #737 벌칙 뒤 쉬는 시간 끝
             }
             if (FoxRoundOn(lastTime)) Include(foxRoundEndsAt); // #664: the time-up
             foreach (var state in jigwiStates.Values)

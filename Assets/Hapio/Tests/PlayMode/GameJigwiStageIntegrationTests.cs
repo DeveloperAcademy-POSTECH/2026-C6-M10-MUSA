@@ -130,10 +130,11 @@ namespace Hapio.Tests
             clock = (LabBattleClock)Field("battleClock").GetValue(network);
             model = (LabModel)Field("model").GetValue(network);
             startedAt = before.jigwiAB.startedAt;
-            Assert.That(before.jigwiAB.schedule, Is.EqualTo(LabJigwiABTimeline.RelaySmokeFlowSchedule),
-                "The saved main profile runs #713's relay: smoke at 6 s, then each mission a gap after the one before.");
+            Assert.That(before.jigwiAB.schedule, Is.EqualTo(LabJigwiABTimeline.RelayTalismanFirstSchedule),
+                "The saved main profile runs #737's relay: the talisman at 10 s, then each mission a gap after the one before.");
             Assert.That(network.config.JigwiAHoldBurnUntilEnd, Is.True,
                 "The saved main profile preserves the board while the talisman is being written.");
+            bool talismanFirst = LabJigwiABTimeline.KindForSlot(0, before.jigwiAB.schedule) == LabJigwiABKind.PersonalBurn;
             double smokeProbe = LabJigwiABTimeline.ActiveOffset(0, before.jigwiAB.schedule) + LabJigwiABTimeline.SmokeLeadSeconds + .5d;
             // #663: with the saved profile the talisman follows the smoke (which times out here, nobody rubs it) a few seconds later.
             double talismanAt = LabJigwiABTimeline.ActiveOffset(1, before.jigwiAB.schedule);
@@ -145,7 +146,26 @@ namespace Hapio.Tests
             else if (pull > 0d)
                 talismanAt = Math.Min(talismanAt,
                     LabJigwiABTimeline.ActiveOffset(0, before.jigwiAB.schedule) + LabJigwiABTimeline.GroupMissionSeconds + pull);
+            if (talismanFirst)
+            {
+                // #737: the talisman comes first at its fixed time; nobody writes it, so the smoke follows the relay gap after the
+                // boards have burnt, and not before the slippery drum's wait.
+                talismanAt = LabJigwiABTimeline.ActiveOffset(0, before.jigwiAB.schedule);
+                double failAt = talismanAt + Math.Min(15f, network.config.JigwiABPersonalDurationSeconds);
+                double burnt = failAt + network.config.JigwiAFailBurnStartSeconds + LabModel.JigwiTalismanFailBlazeSeconds;
+                double smokeAt = Math.Max(burnt + Math.Max(LabJigwiABTimeline.WarningSeconds, network.config.JigwiRelayGapAfterTalismanSeconds),
+                    failAt + LabModel.JigwiTalismanFailBurnDelaySeconds
+                    + Math.Min(network.config.JigwiAFailDrumSlipSeconds, network.config.JigwiDrumSlipWaitSeconds) + LabJigwiABTimeline.WarningSeconds);
+                smokeProbe = smokeAt + LabJigwiABTimeline.SmokeLeadSeconds + .5d;
+            }
             double aProbe = talismanAt + 1.2d;
+            if (talismanFirst) { yield return CheckTalisman(); yield return CheckSmoke(); }
+            else { yield return CheckSmoke(); yield return CheckTalisman(); }
+            TestContext.WriteLine("JIGWI_AB_SAVED_STAGE3: Home/DEV skips/#595 smoke + shared talisman probes (#737 order)/no bucket/no special Water/no B colliders. "
+                + "Rubbing the smoke and writing the talisman are not exercised by this held-clock fixture. Screen Space Overlay GPU pixels are not sampled by camera.Render; device/GPU visual review is separate.");
+
+            IEnumerator CheckSmoke()
+            {
             HoldAt(smokeProbe);
             // The same clock stays held across the forward seek; no real-time Update can roll it back.
             Method("SyncJigwiFireSurfaces").Invoke(network, null);
@@ -183,7 +203,10 @@ namespace Hapio.Tests
             Assert.That(target.GetComponentsInChildren<Collider>(true).Length, Is.EqualTo(originalColliderCount));
             Assert.That(clock.IsPaused, Is.True);
             CaptureScreenEvidence("smoke"); yield return null;
+            }
 
+            IEnumerator CheckTalisman()
+            {
             HoldAt(aProbe);
             yield return null;
             Assert.That(network.Snapshot.paused, Is.True);
@@ -203,8 +226,7 @@ namespace Hapio.Tests
             Assert.That(target.GetComponentsInChildren<Collider>(true).Length, Is.EqualTo(originalColliderCount));
             network.LocalStaminaSpent -= onSpent;
             CaptureScreenEvidence("talisman"); yield return null;
-            TestContext.WriteLine("JIGWI_AB_SAVED_STAGE3: Home/DEV skips/#595 smoke 10 + shared talisman 45 probes/no bucket/no special Water/no B colliders. "
-                + "Rubbing the smoke and writing the talisman are not exercised by this held-clock fixture. Screen Space Overlay GPU pixels are not sampled by camera.Render; device/GPU visual review is separate.");
+            }
         }
 
         private static void CaptureScreenEvidence(string phase)

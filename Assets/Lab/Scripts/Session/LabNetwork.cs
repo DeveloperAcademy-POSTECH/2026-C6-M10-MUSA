@@ -290,7 +290,8 @@ namespace C6Lab
         //       values (265), on top of #676's 5701 (#664 had also used 5701 on its own branch).
         // 5703: #696 Jigwi dense smoke flow schedule (jigwiAB.schedule 5: six missions); older builds reject the new schedule.
         // 5704: #713 Jigwi relay smoke flow (jigwiAB.schedule 6: each mission follows the last) and the "jigwiSmokeWiped" request.
-        internal const ushort LabProtocolVersion = 5704;
+        // 5705: #737 Jigwi relay with the talisman first (jigwiAB.schedule 7); older builds reject the new schedule.
+        internal const ushort LabProtocolVersion = 5705;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Double-tap a blue fox orb to clear it, and keep your Yin and Yang away.";
