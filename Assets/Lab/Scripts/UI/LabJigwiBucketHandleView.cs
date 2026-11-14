@@ -717,7 +717,12 @@ namespace C6Lab
             WriteSteam();
             steamStartLeft = steamLeft = lastTickLeft = WeightedLeft();
             lastSqueakLeft = steamLeft;
-            if (source != null && source.board != null) { source.board.SetUiInputBlocked(true); steamBlocking = true; }
+            if (source != null && source.board != null)
+            {
+                source.board.SetUiInputBlocked(true);
+                source.board.BlockedPressGate = WipedAt; // #724 UT: where the smoke is wiped away, the board works
+                steamBlocking = true;
+            }
             if (source != null) source.JigwiSmokeWiping = true; // #696 iOS edge gestures wait while rubbing
             if (source != null) LabHaptics.PlayDirect(source.config, LabHapticStyle.Heavy, 1f, .45f, .8f, .3f);
             Play(fogHitSoundFolder, fogHitVolume);
@@ -767,7 +772,9 @@ namespace C6Lab
                 return;
             }
             // Rub: every finger (or mouse) drag over the board wipes a stroke out of the fog.
-            if (TryPointer(out Vector2 screen) && board.Contains(screen))
+            // #724: a finger holding an orb or drum (picked up where the smoke was wiped) moves it, it does not wipe.
+            bool holding = source != null && source.board != null && source.board.HeldThroughGate;
+            if (!holding && TryPointer(out Vector2 screen) && board.Contains(screen))
             {
                 lastPointer = screen; touched = true;
                 Vector2 uv = new Vector2((screen.x - board.xMin) / board.width, (screen.y - board.yMin) / board.height);
@@ -900,7 +907,7 @@ namespace C6Lab
                 if (source != null) source.RequestJigwiSmokeWiped(steamRound); // #713: everyone wiped = the smoke is over
                 if (source != null) LabHaptics.PlayDirect(source.config, LabHapticStyle.Medium, .7f);
                 Play(clearSoundFolder, clearVolume);
-                if (steamBlocking && source != null && source.board != null) source.board.SetUiInputBlocked(false);
+                if (steamBlocking && source != null && source.board != null) { source.board.SetUiInputBlocked(false); source.board.BlockedPressGate = null; }
                 steamBlocking = false;
                 if (source != null) source.JigwiSmokeWiping = false;
             }
@@ -936,6 +943,18 @@ namespace C6Lab
             }
             source.NotifySootShardRevealed(found);
         }
+
+        /// <summary>
+        /// #724 UT: whether the smoke at this screen point (pixels) is wiped thin enough to see through, so a press starting
+        /// there reaches the board (pick up, combine, throw, pass). A press starting on the smoke wipes instead.
+        /// </summary>
+        public bool WipedAt(Vector2 screen)
+        {
+            if (!steamOn || steamClearedAt >= 0f || Screen.width <= 0 || Screen.height <= 0) return false;
+            return SmokeAt(screen.x / Screen.width, screen.y / Screen.height) <= WipedThroughAlpha;
+        }
+        /// <summary>#724: smoke this thin (0~1) or thinner counts as wiped for touching the board under it.</summary>
+        public const float WipedThroughAlpha = .35f;
 
         /// <summary>#713: the smoke left around a screen point (0~1 each way), averaged over a few texels.</summary>
         private float SmokeAt(float u, float v)
@@ -1050,7 +1069,7 @@ namespace C6Lab
             Show(steamHand, false);
             WipeGauge = 0f;
             Show(ringBack, false); Show(ringFill, false);
-            if (steamBlocking && source != null && source.board != null) source.board.SetUiInputBlocked(false);
+            if (steamBlocking && source != null && source.board != null) { source.board.SetUiInputBlocked(false); source.board.BlockedPressGate = null; }
             steamBlocking = false;
             if (source != null) source.JigwiSmokeWiping = false;
         }

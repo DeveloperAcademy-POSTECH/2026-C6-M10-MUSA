@@ -1558,6 +1558,26 @@ namespace C6Lab
                 if (entry.View != null) SetBodyMode(entry);
         }
 
+        /// <summary>
+        /// #724 UT: while input is blocked, a press that starts where this says yes (screen point) still reaches the board and
+        /// keeps working until it is let go (drag, combine, throw, pass). The Jigwi smoke uses it: where it is wiped away
+        /// the board can be used. Null = a block stops everything (the usual).
+        /// </summary>
+        public Func<Vector2, bool> BlockedPressGate;
+        private bool heldThroughGate;
+        /// <summary>#724: the orb or drum held now was picked up through the smoke gate.</summary>
+        public bool HeldThroughGate => heldThroughGate && heldId != null;
+
+        /// <summary>#724: a press began this frame where the gate lets it through the block.</summary>
+        private bool GatePressThisFrame()
+        {
+            if (BlockedPressGate == null) return false;
+            var touch = Touchscreen.current?.primaryTouch;
+            if (touch != null && touch.press.wasPressedThisFrame) return BlockedPressGate(touch.position.ReadValue());
+            var mouse = Mouse.current;
+            return mouse != null && mouse.leftButton.wasPressedThisFrame && BlockedPressGate(mouse.position.ReadValue());
+        }
+
         /// <summary>Block pointer gestures while a modal UI is open, without pausing orb physics.</summary>
         public void SetUiInputBlocked(bool blocked)
         {
@@ -1845,7 +1865,11 @@ namespace C6Lab
 
         private void Update()
         {
-            if (!configured || simulationHeld || !interactionEnabled || uiInputBlocked) return;
+            if (!configured || simulationHeld || !interactionEnabled) return;
+            if (heldId == null) heldThroughGate = false;
+            // #724: a block still lets through a press the gate allows (and that press until it is let go).
+            bool throughGate = uiInputBlocked && (heldThroughGate || heldId == null && GatePressThisFrame());
+            if (uiInputBlocked && !throughGate) return;
             double now = Time.realtimeSinceStartupAsDouble;
             if (heldId != null)
             {
@@ -1879,6 +1903,7 @@ namespace C6Lab
                 && TryBeginDragAtWorld(touchPoint, now))
             {
                 heldByTouch = true;
+                heldThroughGate = uiInputBlocked;
                 return;
             }
             var pointer = Mouse.current;
@@ -1887,7 +1912,10 @@ namespace C6Lab
                 && !PointerStartedOverUi(pointer.position.ReadValue())
                 && TryScreenToWorld(pointer.position.ReadValue(), out var mousePoint)
                 && TryBeginDragAtWorld(mousePoint, now))
+            {
                 heldByTouch = false;
+                heldThroughGate = uiInputBlocked;
+            }
         }
 
         private static bool PointerStartedOverUi(Vector2 screenPosition)
