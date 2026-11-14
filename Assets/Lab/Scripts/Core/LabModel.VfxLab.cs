@@ -16,6 +16,26 @@ namespace C6Lab
         /// <summary>야광귀 시간표가 돌고 있어(피버 전) 콤보/피버를 띄울 수 있는지</summary>
         public bool VfxLabYaguangTimelineOn => rules != null && rules.YaguangTimeline && !yaguangTimelineEnded;
 
+        /// <summary>#741 Y3: 지금 누군가에게 BIG 보상이나 SMALL 벌칙이 걸려 있는지</summary>
+        public bool VfxLabComboEffectOn(double now) => players.Values.Any(p => p.comboRewardUntil > now || p.comboPenaltyUntil > now);
+
+        /// <summary>
+        /// #741 Y3: 걸려 있는 BIG 보상 / SMALL 벌칙을 지금 끝낸다. 15초를 기다린 것처럼 끝나는 시각만 당기므로 끝 연출과 소리는
+        /// 실제 게임과 같은 길로 나온다. 걸려 있는 것이 없으면 false.
+        /// </summary>
+        public bool VfxLabEndComboEffect(double now)
+        {
+            if (!TryAdvance(now, out _) || phase != LabPhase.Playing) return false;
+            bool changed = false;
+            foreach (LabPlayerState player in players.Values)
+            {
+                if (player.comboRewardUntil > now) { player.comboRewardUntil = now; changed = true; }
+                if (player.comboPenaltyUntil > now) { player.comboPenaltyUntil = now; changed = true; }
+            }
+            if (changed) revision++;
+            return changed;
+        }
+
         /// <summary>
         /// Y2(콤보): 지금 바로 콤보 예고(COMBO 3/2/1)를 시작한다. 시간표가 콤보 차례를 꺼낼 때와 같은 길이다.
         /// 다른 콤보/섬광이 진행 중이거나 그 보상/벌칙이 남아 있으면 false.

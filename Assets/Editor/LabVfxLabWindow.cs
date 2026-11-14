@@ -167,11 +167,22 @@ namespace C6Lab.Editor
             using (new EditorGUI.DisabledScope(!ready || !network.VfxLabYaguangFeverReady))
                 if (GUILayout.Button("섬광 바로 시작 (눈 뜸 예고부터)", GUILayout.Height(28)))
                     Report(network.VfxLabStartFlash(), "섬광 예고를 시작했다. 번쩍인 뒤 폰을 흔들어 푼다.", "지금은 시작할 수 없음 (섬광/콤보 진행 중이거나 섬광이 꺼져 있음, 또는 피버 뒤)");
+            // #741: 흔들지 않고 다 흔든 것으로 → 해제 → "으악 어지러워~" → 오색구슬 (실제 게임과 같은 길)
+            using (new EditorGUI.DisabledScope(!ready || !network.VfxLabFlashGlared))
+                if (GUILayout.Button("섬광 바로 해제 (다 흔든 것으로 → 대사 → 오색구슬)", GUILayout.Height(28)))
+                {
+                    LabYaguangFlashHud flashHud = Object.FindFirstObjectByType<LabYaguangFlashHud>();
+                    Report(flashHud != null && flashHud.VfxLabShakeAll(), "흔들기를 다 채웠다. 섬광이 풀리고 대사 뒤 오색구슬이 나온다.", "지금 눈부시지 않음 (섬광이 걸려 있을 때만)");
+                }
             bool running = ready && network.VfxLabComboRunning, active = ready && network.VfxLabComboActive;
             EditorGUILayout.LabelField("Y2(콤보) / Y3(BIG 보상)", EditorStyles.miniBoldLabel);
             using (new EditorGUI.DisabledScope(!ready || running || !network.VfxLabYaguangFeverReady))
                 if (GUILayout.Button("콤보 바로 시작 (넷 셋 둘 하나 + 색 미리 보기부터)", GUILayout.Height(30)))
                     Report(network.VfxLabStartCombo(), "콤보 예고를 시작했다. 넷 셋 둘 하나에 맞춰 칸이 실제 색으로 하나씩 채워진다.", "지금은 시작할 수 없음 (섬광/콤보 진행 중이거나 보상/벌칙이 남아 있음, 또는 피버 뒤)");
+            // #741: BIG / SMALL 15초를 기다리지 않고 끝나는 연출
+            using (new EditorGUI.DisabledScope(!ready || !network.VfxLabComboEffectOn))
+                if (GUILayout.Button("BIG / SMALL 바로 끝내기", GUILayout.Height(26)))
+                    Report(network.VfxLabEndComboEffect(), "BIG / SMALL을 끝냈다. 끝 연출과 소리가 나온다.", "걸려 있는 BIG / SMALL이 없음");
             using (new EditorGUI.DisabledScope(!active))
             {
                 if (GUILayout.Button("다음 칸 색 구슬 받기 (직접 던져 맞히기)", GUILayout.Height(26)))

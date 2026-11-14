@@ -72,6 +72,22 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void TheLabEndsTheSmallPenaltyAtOnce()
+        {
+            // #741: the SMALL penalty (15 s) ends now, as if its time had run out.
+            LabModel room = Room();
+            Assert.That(room.VfxLabEndComboEffect(1d), Is.False, "Nothing to end yet.");
+            Assert.That(room.VfxLabStartCombo(1d), Is.True);
+            double active = 1d + config.ComboWarningSeconds + .1d;
+            Assert.That(room.VfxLabFailCombo(0ul, active), Is.True);
+            double now = active + 1d;
+            Assert.That(room.VfxLabComboEffectOn(now), Is.True);
+            Assert.That(room.VfxLabEndComboEffect(now), Is.True);
+            Assert.That(room.VfxLabComboEffectOn(now + .01d), Is.False);
+            Assert.That(room.Snapshot(now + .01d).players.All(player => player.comboPenaltyUntil <= now), Is.True, "SMALL ended at the press.");
+        }
+
+        [Test]
         public void TheLabStartsAFlashWhenTheYaguangFlashIsOn()
         {
             float[] values = config.CaptureDeveloperValues();
