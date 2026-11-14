@@ -17,6 +17,7 @@
 
 - **최초 실패와 재실행:** 첫 EditMode에서는 새 검사 2건이 실패했다. 하나는 설정 준비 로그를 기대하지 않았고, 다른 하나는 예약된 `ulong.MaxValue` id로 자리를 골랐다. 검사를 고쳐 재실행했다. main `a7208003` 위의 첫 전체 PlayMode는 834/845였다. 그중 10건(`LabComboProjectileIntegrationTests` 2, `LabFiveColorClayNetworkTests` 1, `LabLocalBoardNetworkIntegrationTests`의 기존 `PresentContact` 리플렉션 7)은 변경 없는 `a7208003`에서도 같게 실패했다. 나머지 1건은 새 검사로, 순번이 빈 늦은 영수증 뒤에 판 입력을 다시 막지 않았다(`SyncBoard` 누락). 이를 고친 뒤 main `53118b72`로 다시 올려 위 전체 결과를 얻었다.
 - **미실행:** 여러 기기 실제 네트워크, iPhone 실기기.
+- **#729·#730 병합 뒤 재실행 (main `df1899d2`):** 충돌은 이 문서의 기록 추가뿐이었다(양쪽 보존). 전체 EditMode **2424/2424 PASS**, 전체 PlayMode **858/859**. 실패 1건 `LabOrbBoardTrailTests.PendingLaunchStaysClearUntilRestoredAtItsApprovedBoardPosition`(기대·실제 모두 (-1.60, 0.00, 0.00)로 출력되는 부동소수 위치 비교)은 이 변경이 건드리지 않은 검사·코드이며, 그 fixture만 두 번 다시 돌리자 10/10, 10/10 PASS였다.
 
 ## 2026-11-14 — 결과 화면 무기한 대기 제거 (Game 토큰 55)
 
