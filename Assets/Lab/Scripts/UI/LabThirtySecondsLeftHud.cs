@@ -95,6 +95,15 @@ namespace C6Lab
             if (age < float.PositiveInfinity) Step(Time.unscaledDeltaTime);
         }
 
+        /// <summary>
+        /// VFX 실험실(#734): 남은 시간과 상관없이 지금 한 번 띄운다 (화면/소리/진동만). 실제 30초 알림은 그대로 따로 뜬다.
+        /// </summary>
+        public bool PreviewNow()
+        {
+            Begin(network != null && network.config != null ? network.config.ThirtySecondsLeftAt : 30f);
+            return layer != null;
+        }
+
         private void OnDisable() => Hide();
 
         private void OnDestroy()

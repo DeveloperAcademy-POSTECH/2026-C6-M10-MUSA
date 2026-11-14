@@ -97,7 +97,29 @@ namespace C6Lab.Editor
                     Report(network.VfxLabCastGimmick(LabSabotageKind.SwipeBlock), "내 한쪽 넘기기가 막혔다.", "이미 넘기기 막기가 걸려 있음");
             }
             if (EditorApplication.isPlaying && !ready) EditorGUILayout.LabelField("전투 중에 켜진다.", EditorStyles.wordWrappedMiniLabel);
+            DrawTimeLeft(network, ready);
             EditorGUILayout.Space();
+        }
+
+        /// <summary>#734: 남은 30초 알림 ("30초 남았소!" 말풍선, 시간 숫자 깜빡임, 가장자리 번쩍임, 경고음, 진동).</summary>
+        private void DrawTimeLeft(LabNetwork network, bool ready)
+        {
+            EditorGUILayout.LabelField("남은 30초 알림 (#734)", EditorStyles.miniBoldLabel);
+            LabThirtySecondsLeftHud hud = ready ? Object.FindFirstObjectByType<LabThirtySecondsLeftHud>() : null;
+            using (new EditorGUI.DisabledScope(hud == null))
+            {
+                if (GUILayout.Button("30초 알림 지금 보기 (화면/소리/진동만, 시간은 그대로)", GUILayout.Height(28)))
+                    Report(hud.PreviewNow(), "\"30초 남았소!\"를 띄웠다. 몇 번이든 다시 누를 수 있다. 실제 알림은 남은 30초에 따로 뜬다.",
+                        "알림을 그릴 화면을 찾지 못함");
+            }
+            if (ready && network.Snapshot != null && network.config != null)
+            {
+                double until = network.Snapshot.remaining - network.config.ThirtySecondsLeftAt;
+                EditorGUILayout.LabelField(until > 0d ? "실제 알림까지 " + Mathf.CeilToInt((float)until) + "초 (튜토리얼/2:2에서는 안 뜸)"
+                    : "실제 알림 시각이 지났다.", EditorStyles.wordWrappedMiniLabel);
+                Repaint();
+            }
+            else if (ready && hud == null) EditorGUILayout.LabelField("이 화면에는 알림이 붙어 있지 않다.", EditorStyles.wordWrappedMiniLabel);
         }
 
         /// <summary>#673: 1R 구미호 기믹.</summary>
