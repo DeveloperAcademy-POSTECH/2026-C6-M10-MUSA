@@ -256,11 +256,14 @@ namespace C6Lab
 
         private float tickBeat;
 
-        // ---- #719 UT 하트: 콤보마다 하트 3개(Inspector). 틀린 색이 맞을 때마다 하나가 두 쪽으로 깨져 떨어지고, 마지막 하나가 깨지면 실패 ----
+        // ---- #719 UT 하트: 콤보마다 하트 3개(Inspector). 틀린 색이 맞을 때마다 하나에 먹물이 떨어져 번지고, 마지막 하나가 깨지면 실패 ----
+        // #741: 하트는 한지 위 붉은 물감 + 붓 테두리(Resources/Yaguang/Combo/Heart, HeartEmpty, HeartInk, HeartInkDrop, 임시 그림).
         public const int MaxHearts = 5;
-        public const float HeartBreakSeconds = .7f;
+        public const float HeartBreakSeconds = .8f;
+        /// <summary>#741 먹물 하트: 먹물 방울이 떨어지는 동안 / 번지기가 끝나는 때 (HeartBreakSeconds에 대한 비율).</summary>
+        public const float HeartDropShare = .2f, HeartSoakShare = .55f;
         private readonly Image[] heartFull = new Image[MaxHearts], heartEmpty = new Image[MaxHearts];
-        private readonly Image[] heartHalfLeft = new Image[MaxHearts], heartHalfRight = new Image[MaxHearts];
+        private readonly Image[] heartInk = new Image[MaxHearts], heartDrop = new Image[MaxHearts];
         private readonly float[] heartBreakAge = new float[MaxHearts];
         private RectTransform heartRow;
         private int shownHeartsLeft = -1;
@@ -271,7 +274,7 @@ namespace C6Lab
 
         /// <summary>
         /// #719 UT 하트 줄: 콤보 패널 바로 위 가운데. 예고 동안(미리보기)은 꽉 찬 하트, 콤보 중에는 남은 만큼.
-        /// 하나가 줄면 왼쪽 하트부터 좌우 두 쪽으로 쪼개져 기울며 떨어지고, 빈 하트 테두리만 남는다. 하나 남으면 똑딱에 맞춰 두근거린다.
+        /// 하나가 줄면 왼쪽 하트부터 먹물 방울이 떨어져 검게 번지고 옅어져, 점선 빈 하트만 남는다 (#741). 하나 남으면 똑딱에 맞춰 두근거린다.
         /// </summary>
         private void DrawHearts(LabSnapshot snapshot, bool preview, bool showPanel)
         {
@@ -296,21 +299,28 @@ namespace C6Lab
             HeartsShown = show ? left : -1;
             if (!show) return;
 
-            float size = slots[0].sizeDelta.y * .62f, gap = size * .18f;
+            // #741 QA: bigger (the hanji heart picture has room around it, so the size is the picture's box).
+            float size = slots[0].sizeDelta.y * 1.05f, gap = size * -.08f;
             // #719 QA: above the panel (it was under it, over the gourd).
             heartRow.anchorMin = heartRow.anchorMax = new Vector2(.5f, 1f);
             heartRow.pivot = new Vector2(.5f, 0f);
             heartRow.sizeDelta = new Vector2(total * size + (total - 1) * gap, size);
-            heartRow.anchoredPosition = new Vector2(0f, size * .15f);
+            heartRow.anchoredPosition = new Vector2(0f, -size * .08f);
             float dt = Time.unscaledDeltaTime;
             for (int i = 0; i < MaxHearts; i++)
             {
                 bool used = i < total;
+                float age = heartBreakAge[i];
+                bool breaking = used && age > 0f && age < HeartBreakSeconds;
+                float t = breaking ? age / HeartBreakSeconds : 1f;
                 heartEmpty[i].gameObject.SetActive(used);
-                heartFull[i].gameObject.SetActive(used && i >= total - left);
-                if (!used) { heartHalfLeft[i].gameObject.SetActive(false); heartHalfRight[i].gameObject.SetActive(false); continue; }
+                // The red heart stays under the ink until it has soaked through.
+                heartFull[i].gameObject.SetActive(used && (i >= total - left || breaking && t < HeartSoakShare));
+                heartInk[i].gameObject.SetActive(breaking && t >= HeartDropShare);
+                heartDrop[i].gameObject.SetActive(breaking && t < HeartDropShare);
+                if (!used) continue;
                 Vector2 at = new Vector2((i - (total - 1) * .5f) * (size + gap), -size * .5f);
-                foreach (Image part in new[] { heartEmpty[i], heartFull[i], heartHalfLeft[i], heartHalfRight[i] })
+                foreach (Image part in new[] { heartEmpty[i], heartFull[i], heartInk[i] })
                 {
                     RectTransform rect = part.rectTransform;
                     rect.anchorMin = rect.anchorMax = new Vector2(.5f, 1f);
@@ -322,28 +332,21 @@ namespace C6Lab
                 float beat = !preview && left == 1 && i == total - 1 ? tickBeat : 0f;
                 heartFull[i].rectTransform.localScale = Vector3.one * (1f + .22f * beat);
 
-                float age = heartBreakAge[i];
-                bool breaking = age > 0f && age < HeartBreakSeconds;
-                heartHalfLeft[i].gameObject.SetActive(breaking);
-                heartHalfRight[i].gameObject.SetActive(breaking);
                 if (!breaking) { if (age >= HeartBreakSeconds) heartBreakAge[i] = 0f; continue; }
                 heartBreakAge[i] = age + dt;
-                float t = age / HeartBreakSeconds;
-                // A quick swell, then the two halves split apart, tilt outward and drop while fading.
-                float swell = t < .12f ? 1f + 1.6f * t : 1.2f;
-                float split = Mathf.Max(0f, t - .12f);
-                float fall = split * split * size * 2.4f;
-                float alpha = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.45f, 1f, t));
-                for (int side = 0; side < 2; side++)
-                {
-                    Image half = side == 0 ? heartHalfLeft[i] : heartHalfRight[i];
-                    float dir = side == 0 ? -1f : 1f;
-                    RectTransform rect = half.rectTransform;
-                    rect.anchoredPosition = at + new Vector2(dir * split * size * .55f, -fall);
-                    rect.localRotation = Quaternion.Euler(0f, 0f, -dir * split * 70f);
-                    rect.localScale = Vector3.one * swell;
-                    half.color = new Color(1f, 1f, 1f, alpha);
-                }
+                // #741: an ink drop falls onto the heart, soaks it black from the middle out, then the ink fades to the dotted place.
+                RectTransform drop = heartDrop[i].rectTransform;
+                drop.anchorMin = drop.anchorMax = new Vector2(.5f, 1f);
+                drop.sizeDelta = Vector2.one * size * .38f;
+                float fall = Mathf.Clamp01(t / HeartDropShare);
+                drop.anchoredPosition = at + new Vector2(0f, size * 1.3f * (1f - fall * fall));
+                // The heart gives a little squash when the drop lands.
+                float land = t >= HeartDropShare && t < HeartDropShare + .12f ? Mathf.Sin((t - HeartDropShare) / .12f * Mathf.PI) : 0f;
+                heartFull[i].rectTransform.localScale = new Vector3(1f + .1f * land, 1f - .08f * land, 1f);
+                float soak = Mathf.Clamp01((t - HeartDropShare) / (HeartSoakShare - HeartDropShare));
+                float spread = 1f - (1f - soak) * (1f - soak);
+                heartInk[i].rectTransform.localScale = Vector3.one * Mathf.Lerp(.2f, 1f, spread);
+                heartInk[i].color = new Color(1f, 1f, 1f, 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(HeartSoakShare + .1f, 1f, t)));
             }
         }
 
@@ -355,17 +358,10 @@ namespace C6Lab
             {
                 heartEmpty[i] = HeartImage("Heart Empty " + (i + 1), HeartEmptySprite());
                 heartFull[i] = HeartImage("Heart " + (i + 1), HeartSprite());
-                heartHalfLeft[i] = HeartImage("Heart Break Left " + (i + 1), HeartSprite());
-                heartHalfRight[i] = HeartImage("Heart Break Right " + (i + 1), HeartSprite());
-                foreach (Image half in new[] { heartHalfLeft[i], heartHalfRight[i] })
-                {
-                    half.type = Image.Type.Filled;
-                    half.fillMethod = Image.FillMethod.Horizontal;
-                    half.fillAmount = .5f;
-                    half.gameObject.SetActive(false);
-                }
-                heartHalfLeft[i].fillOrigin = (int)Image.OriginHorizontal.Left;
-                heartHalfRight[i].fillOrigin = (int)Image.OriginHorizontal.Right;
+                heartInk[i] = HeartImage("Heart Ink " + (i + 1), HeartInkSprite());
+                heartDrop[i] = HeartImage("Heart Ink Drop " + (i + 1), HeartInkDropSprite());
+                heartInk[i].gameObject.SetActive(false);
+                heartDrop[i].gameObject.SetActive(false);
             }
         }
 
@@ -393,9 +389,33 @@ namespace C6Lab
             return inside / 9f;
         }
 
-        /// <summary>#719: a red heart with a dark ink edge and a small shine.</summary>
+        /// <summary>#741: 먹물에 젖은 하트와 떨어지는 먹물 방울 (그림이 없으면 하트 모양 먹색 / 둥근 점).</summary>
+        private static Sprite HeartInkSprite()
+        {
+            Sprite authored = LabYaguangComboArt.Load("HeartInk");
+            if (authored != null) return authored;
+            if (heartInkSprite != null) return heartInkSprite;
+            heartInkSprite = Draw("Lab combo heart ink", (p, c) =>
+            {
+                Color ink = (Color)InkColor;
+                ink.a = HeartCoverage(p, c, 1.05f);
+                return ink;
+            }, Vector4.zero);
+            return heartInkSprite;
+        }
+
+        private static Sprite HeartInkDropSprite()
+        {
+            Sprite authored = LabYaguangComboArt.Load("HeartInkDrop");
+            return authored != null ? authored : RoundedSprite();
+        }
+        private static Sprite heartInkSprite;
+
+        /// <summary>#719: a red heart with a dark ink edge and a small shine. #741: the authored hanji/brush heart when present.</summary>
         private static Sprite HeartSprite()
         {
+            Sprite authored = LabYaguangComboArt.Load("Heart");
+            if (authored != null) return authored;
             if (heartSprite != null) return heartSprite;
             Color red = new Color(.86f, .16f, .18f), shine = new Color(1f, .62f, .6f);
             heartSprite = Draw("Lab combo heart", (p, c) =>
@@ -412,6 +432,8 @@ namespace C6Lab
         /// <summary>#719: the place of a broken heart: its ink outline over a faint paper fill.</summary>
         private static Sprite HeartEmptySprite()
         {
+            Sprite authored = LabYaguangComboArt.Load("HeartEmpty");
+            if (authored != null) return authored;
             if (heartEmptySprite != null) return heartEmptySprite;
             heartEmptySprite = Draw("Lab combo heart empty", (p, c) =>
             {

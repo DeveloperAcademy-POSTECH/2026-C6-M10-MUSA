@@ -1150,6 +1150,9 @@ namespace C6Lab
         private static Sprite sparkleSprite, shineSprite;
         private readonly Vector3[] flyFrom = new Vector3[LabJigwiABNetworkValidation.MaximumPlayers];
         private readonly UnityEngine.UI.Image[] drops = new UnityEngine.UI.Image[24];
+        // #741: white foam puffs boiling up where the waterfall hits the boss.
+        private readonly UnityEngine.UI.Image[] foams = new UnityEngine.UI.Image[8];
+        private static Texture2D mistTexture;
         private readonly Vector2[] dropVelocity = new Vector2[24];
         private readonly Vector3[] dropAt = new Vector3[24];
         private readonly float[] dropBorn = new float[24];
@@ -1255,7 +1258,7 @@ namespace C6Lab
             foreach (var part in new UnityEngine.UI.Graphic[] { waterfallBack, waterfall, splash })
                 if (part.gameObject.activeSelf != pour) part.gameObject.SetActive(pour);
             AnimateDrops(t, unit);
-            if (!pour) return;
+            if (!pour) { foreach (var foam in foams) if (foam != null && foam.gameObject.activeSelf) foam.gameObject.SetActive(false); return; }
             if (!poured)
             {
                 poured = true;
@@ -1271,11 +1274,25 @@ namespace C6Lab
             float width = (rect != null ? rect.rect.width : 600f) * .3f;
             float grow = Mathf.Clamp01(s / .18f), fade = 1f - Mathf.Clamp01((s - (PourSeconds - .4f)) / .4f);
             float wobble = 1f + .06f * Mathf.Sin(t * 17f) + .04f * Mathf.Sin(t * 29f);
-            PlaceColumn(waterfallBack, boss, top, width * 1.25f * wobble * Mathf.Lerp(.5f, 1f, grow), grow, t * 1.6f, .55f * fade, -.5f);
-            PlaceColumn(waterfall, boss, top, width * (2f - wobble) * Mathf.Lerp(.5f, 1f, grow), grow, t * 2.8f, .95f * fade, .3f);
+            // #741: a soft spray behind (wider, slower), the water in front; a flat white splash and foam boiling up where it lands.
+            PlaceColumn(waterfallBack, boss, top, width * 1.9f * wobble * Mathf.Lerp(.5f, 1f, grow), grow, t * 1.2f, .5f * fade, -.5f);
+            PlaceColumn(waterfall, boss, top, width * (2f - wobble) * Mathf.Lerp(.5f, 1f, grow), grow, t * 3.2f, fade, .3f);
             splash.rectTransform.position = boss;
-            splash.rectTransform.sizeDelta = Vector2.one * width * 1.7f * (1f + .1f * Mathf.Sin(t * 30f));
-            splash.color = new Color(.8f, .94f, 1f, .8f * fade * grow);
+            float splashPulse = 1f + .12f * Mathf.Sin(t * 30f);
+            splash.rectTransform.sizeDelta = new Vector2(width * 2.4f * splashPulse, width * .9f * splashPulse);
+            splash.color = new Color(.92f, .98f, 1f, .85f * fade * grow);
+            for (int i = 0; i < foams.Length; i++)
+            {
+                var foam = foams[i];
+                // Each puff rises and swells over .6 s, one after another, so the foam keeps boiling.
+                float life = Mathf.Repeat(t * 1.7f + i / (float)foams.Length, 1f);
+                float side = (i % 2 == 0 ? -1f : 1f) * (.25f + .55f * ((i * 37) % 10) / 10f);
+                foam.rectTransform.position = boss + new Vector3(side * width * .6f * unit, life * width * .45f * unit, 0f);
+                float puff = width * Mathf.Lerp(.35f, .8f, life);
+                foam.rectTransform.sizeDelta = new Vector2(puff, puff * .8f);
+                foam.color = new Color(1f, 1f, 1f, .85f * fade * grow * (1f - life) * Mathf.Clamp01(life * 6f));
+                if (!foam.gameObject.activeSelf) foam.gameObject.SetActive(true);
+            }
             // Rolling surges on top of the rumble, every 0.45 s, fading with the pour.
             if (source != null && waterfallPulseAt > 0f && t >= waterfallPulseAt && fade > .3f)
             { waterfallPulseAt = t + .45f; LabHaptics.PlayDirect(source.config, LabHapticStyle.Medium, .55f * fade); }
@@ -1290,8 +1307,8 @@ namespace C6Lab
                 // #626: place and size it before it shows, or for one frame it appeared at its default spot and size
                 // (a big blue circle below the boss as the waterfall started).
                 d.rectTransform.position = dropAt[i2];
-                d.rectTransform.sizeDelta = new Vector2(26f, 26f * 1.25f);
-                d.color = new Color(.75f, .92f, 1f, 1f);
+                d.rectTransform.sizeDelta = new Vector2(22f, 22f * 1.25f);
+                d.color = new Color(.85f, .96f, 1f, 1f);
                 d.gameObject.SetActive(true);
             }
         }
@@ -1317,9 +1334,9 @@ namespace C6Lab
                 if (life > .6f) { d.gameObject.SetActive(false); continue; }
                 Vector2 v = dropVelocity[i];
                 d.rectTransform.position = dropAt[i] + new Vector3(v.x * life, v.y * life - 1400f * life * life, 0f) * unit;
-                float size = Mathf.Lerp(26f, 10f, life / .6f);
+                float size = Mathf.Lerp(22f, 8f, life / .6f);
                 d.rectTransform.sizeDelta = new Vector2(size, size * 1.25f);
-                d.color = new Color(.75f, .92f, 1f, 1f - life / .6f);
+                d.color = new Color(.85f, .96f, 1f, 1f - life / .6f);
             }
         }
 
@@ -1332,7 +1349,10 @@ namespace C6Lab
                 sealRoot.gameObject.layer = gameObject.layer; sealRoot.SetParent(transform, false);
                 sealRoot.anchorMin = Vector2.zero; sealRoot.anchorMax = Vector2.one; sealRoot.offsetMin = sealRoot.offsetMax = Vector2.zero;
                 waterfallBack = NewRaw("Talisman Waterfall Back"); waterfall = NewRaw("Talisman Waterfall");
+                waterfallBack.texture = MistTexture(); // #741: a soft spray around the column, not a second hard-edged column
                 splash = NewSealImage("Talisman Waterfall Splash", LabProceduralFire.Glow());
+                for (int i = 0; i < foams.Length; i++)
+                { foams[i] = NewSealImage("Waterfall Foam " + i, LabOrbVanishSmoke.PuffSprite()); foams[i].gameObject.SetActive(false); }
                 whiteFlash = NewSealImage("Talisman White Light", null);
                 whiteFlash.rectTransform.anchorMin = Vector2.zero; whiteFlash.rectTransform.anchorMax = Vector2.one;
                 whiteFlash.rectTransform.offsetMin = whiteFlash.rectTransform.offsetMax = Vector2.zero;
@@ -1427,37 +1447,67 @@ namespace C6Lab
         }
 
         /// <summary>
-        /// Falling water like the talisman orb's tail: a dark ink edge, the blue body, and light highlight streaks
-        /// (tiles vertically for the rush).
+        /// #741: falling water drawn like the game's ink-wash art: a deep blue edge that softens into the light middle, a thin
+        /// wobbling ink line on each side, and white foam streaks of different widths (tiles vertically for the rush).
+        /// The sides fade out instead of stopping at a hard rectangle.
         /// </summary>
         private static Texture2D WaterfallTexture()
         {
             if (waterfallTexture != null) return waterfallTexture;
-            const int w = 96, h = 192;
+            const int w = 128, h = 256;
             waterfallTexture = new Texture2D(w, h, TextureFormat.RGBA32, false)
-            { name = "Jigwi talisman waterfall (#595 runtime)", hideFlags = HideFlags.DontSave, wrapMode = TextureWrapMode.Repeat };
+            { name = "Jigwi talisman waterfall (#741 runtime)", hideFlags = HideFlags.DontSave, wrapMode = TextureWrapMode.Repeat };
             var pixels = new Color[w * h];
-            Color ink = new Color(.015f, .105f, .2f, .96f), body = new Color(.12f, .64f, .98f, .98f), light = new Color(.72f, .97f, 1f, .95f);
+            Color ink = new Color(.03f, .16f, .32f, 1f), deep = new Color(.13f, .45f, .86f, 1f), body = new Color(.36f, .74f, 1f, 1f);
+            Color foam = new Color(.95f, .99f, 1f, 1f);
             for (int y = 0; y < h; y++)
                 for (int x = 0; x < w; x++)
                 {
                     float u = (x + .5f) / w, v = (y + .5f) / h;
-                    // The edge wobbles down the column so it reads as flowing water, not a bar.
-                    float edge = .43f + .035f * Mathf.Sin(v * Mathf.PI * 6f) + .02f * Mathf.Sin(v * Mathf.PI * 14f + 1.3f);
+                    float edge = .40f + .03f * Mathf.Sin(v * Mathf.PI * 4f) + .015f * Mathf.Sin(v * Mathf.PI * 10f + 1.3f);
                     float d = Mathf.Abs(u - .5f);
-                    Color c;
-                    if (d > edge + .05f) c = Color.clear;
-                    else if (d > edge) c = ink;
-                    else
+                    float inside = 1f - Mathf.SmoothStep(edge - .01f, edge + .015f, d);
+                    // Thin ink line just inside the edge, broken here and there like a brush.
+                    float line = Mathf.Clamp01(1f - Mathf.Abs(d - edge + .012f) / .012f) * (.55f + .45f * Mathf.Sin(v * Mathf.PI * 6f + u * 3f));
+                    float depth = Mathf.SmoothStep(0f, 1f, d / edge);
+                    Color c = Color.Lerp(body, deep, depth * depth);
+                    // Foam streaks: several thin bands that wander a little sideways down the column.
+                    float wander = Mathf.Sin(v * Mathf.PI * 2f + u * 5f) * .03f;
+                    float streak = 0f;
+                    for (int k = 0; k < 5; k++)
                     {
-                        float streak = Mathf.Pow(.5f + .5f * Mathf.Sin(u * 40f + Mathf.Sin(v * Mathf.PI * 4f) * 2f), 6f);
-                        float shine = Mathf.Clamp01(1f - Mathf.Abs(u - .36f) / .07f) * (.6f + .4f * Mathf.Sin(v * Mathf.PI * 8f));
-                        c = Color.Lerp(body, light, Mathf.Clamp01(streak * .7f + shine));
+                        float at = .2f + k * .15f + wander;
+                        float bandWidth = .012f + .01f * ((k * 7) % 3);
+                        float dash = .5f + .5f * Mathf.Sin(v * Mathf.PI * (4f + k * 2f) + k * 1.7f);
+                        streak = Mathf.Max(streak, Mathf.Clamp01(1f - Mathf.Abs(u - at) / bandWidth) * dash);
                     }
+                    c = Color.Lerp(c, foam, Mathf.Clamp01(streak * (1f - depth * .6f)));
+                    c = Color.Lerp(c, ink, Mathf.Clamp01(line) * .85f);
+                    c.a = inside * .97f;
                     pixels[y * w + x] = c;
                 }
             waterfallTexture.SetPixels(pixels); waterfallTexture.Apply(false, true);
             return waterfallTexture;
+        }
+
+        /// <summary>#741: a soft white-blue spray band (no edges) laid behind the waterfall.</summary>
+        private static Texture2D MistTexture()
+        {
+            if (mistTexture != null) return mistTexture;
+            const int w = 64, h = 128;
+            mistTexture = new Texture2D(w, h, TextureFormat.RGBA32, false)
+            { name = "Jigwi talisman waterfall mist (#741 runtime)", hideFlags = HideFlags.DontSave, wrapMode = TextureWrapMode.Repeat };
+            var pixels = new Color[w * h];
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                {
+                    float u = (x + .5f) / w * 2f - 1f, v = (y + .5f) / h;
+                    float band = Mathf.Exp(-u * u * 4.5f);
+                    float puffs = .75f + .25f * Mathf.Sin(v * Mathf.PI * 6f + u * 2f) * Mathf.Sin(v * Mathf.PI * 2f);
+                    pixels[y * w + x] = new Color(.82f, .94f, 1f, band * puffs * .7f);
+                }
+            mistTexture.SetPixels(pixels); mistTexture.Apply(false, true);
+            return mistTexture;
         }
 
         private static Sprite Drop()
@@ -1471,8 +1521,10 @@ namespace C6Lab
                 for (int x = 0; x < s; x++)
                 {
                     float d = new Vector2(x + .5f - s * .5f, y + .5f - s * .5f).magnitude / (s * .5f);
-                    pixels[y * s + x] = d > 1f ? Color.clear : d > .78f ? new Color(.015f, .105f, .2f, .9f)
-                        : d < .35f && x < s / 2 && y > s / 2 ? Color.white : new Color(.45f, .8f, 1f, 1f);
+                    // #741: a filled droplet with a soft edge and a white glint (no dark ring).
+                    float alpha = Mathf.Clamp01((1f - d) / .18f);
+                    bool glint = d < .38f && x < s / 2 && y > s / 2;
+                    pixels[y * s + x] = new Color(glint ? 1f : .55f, glint ? 1f : .84f, 1f, alpha);
                 }
             texture.SetPixels(pixels); texture.Apply(false, true);
             dropSprite = Sprite.Create(texture, new Rect(0f, 0f, s, s), new Vector2(.5f, .5f), s);
