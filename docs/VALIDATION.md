@@ -8933,3 +8933,18 @@ PR #729 검증 중 main `a7208003`에서 `LabLocalBoardNetworkIntegrationTests` 
 - **PlayMode:** `GameJigwiStageIntegrationTests` 단독 실행 통과 (저장된 설정이 부적 먼저이면 부적 → 연기 순서로 확인하도록 고침). 전체 PlayMode는 실행하지 않았다.
 - **새 검사:** 초반 연기 동안 공용 기믹이 끝난 1초 뒤로 미뤄짐, SMALL 뒤 쉬는 5초, 부적 실패 뒤 북 미끄러움 대기(검사 값 13초), 저장된 설정(부적 먼저 / 간격 9 / 9 / 북 미끄러움 대기 10초).
 - **미실행:** 실제 3R 한 판 플레이로 10초 부적 / 7초 틈 확인, Mac 여러 앱·iPhone 실기기.
+
+## 2026-11-14 — #740 스태프 시연 중도 종료 재도전 → 자리 선택
+
+- **기준:** main `9c4b066b`(#739 시간표 포함)에서 만든 `fix/#740-staff-demo-retry-seats`. 기존 데스크탑 작업 폴더와 다른 작업 브랜치/파일을 바꾸지 않았다. 초기/완료 시 데스크탑의 추적·미추적 변경은 없었으며 그 HEAD도 유지했다.
+- **변경 범위:** 스태프 시연의 이탈·연결 끊김 GameOver에서 누구든 재도전하면 Host 승인으로 같은 방의 자리 로비로 전원 복귀한다. 전원 P선택·보류 자리·이전 자리 기억·전투/결과/관람/시작 준비를 지운다. Host가 살아 있으면 종료 화면은 유지하면서 입장을 먼저 다시 열어 끊긴 참가자의 명시적 재입장도 받을 수 있다. Host 부재/5초 승인 한도는 종료 완료·Home 로드 후 같은 선택 스테이지의 기존 검색/입장/생성으로 복구한다. 일반 정상 패배 재도전·Lab·땅따먹기·세 명 준비 뒤 방장 수동 시작은 유지한다.
+- **호환:** 시연 전용 revision 1→2 (`C6HapioStaffDemo/2/S1~3`, `C6-HAPIO-STAFF-2-5705`). main의 일반 Game55·Lab62/프로토콜5705·공유 설정265개는 이 변경으로 바꾸지 않았다. 구형 시연 revision1과 혼용하지 않는다.
+- **검사 선택 근거:** 공통 세션·통신 로비 수명·Scene 전환을 수정하므로 저장소 기준에 따라 전체 EditMode와 전체 PlayMode를 실행했다. Unity 6000.6.5f1 / macOS / batch·Metal 환경이다.
+- **초기 영향 검사:** EditMode **55/55 PASS**(0.33초), PlayMode **12/12 PASS**(62.05초). 세 스테이지 단판·Guest 종료/중복 재도전·기존 방 재입장·실제 저장 GameOver 버튼·P0 초기화·새 P선택/수동 새 판·이전 판 요청 거절·일반 정상 패배 재도전을 포함한다.
+- **Guest 추가 검사:** `GameStaffStageDemoSessionTests` **6/6 PASS**(1.93초). Host 부재 상태를 설정한 실제 저장 GameOver→Home 로드→같은 Stage2 검색 재개와, 로컬 ExitRun의 선행 revision·다른 run/stage/낡은 revision/선택/일반판 복귀 거절을 포함한다. Host 부재 사례는 Scene/요청 수명 검사이며 실제 Host 프로세스 종료 시험으로 표현하지 않는다.
+- **최종 전체 EditMode: 2486/2486 PASS**, 19.46초. **최종 전체 PlayMode: 872/872 PASS**, 1024.22초. 실패·건너뜀 0. 이번 실행에는 실패가 없었고 단언 완화나 Ignore 처리는 하지 않았다.
+- **Mac Release 빌드 PASS:** `GameDemoBuild.Mac` 종료0, manifest `Succeeded`/오류0/identityVerified=true/development=false/variantRevision=2. 빌드는 main 기준 위 미커밋 구현을 포함해 만들었으며 manifest의 `sourceHasUncommittedChanges=true`를 유지했다. 이후 런타임·에셋 변경 없이 문서만 정리했다. 일반 Scene·Prefab·ProjectSettings·패키지 diff 없음.
+- **실제 Mac 앱 3개 UI 확인 PASS:** 동일 빌드의 검증 사본 세 개를 실행하고 각각 앱 이름/ID만 로컬에서 구분했다(일반 앱 식별자나 소스 변경 없음). 실제 클릭으로 Stage1 같은 방 3/3 입장→P1/P2/P3 선택→Host 수동 시작→Guest P2 일시정지/나가기→전원 GameOver→다른 Guest P3의 `다시 도전`→같은 방 세 화면 `3/3 입장·0/3 자리 확정`과 비활성 시작을 확인했다. 다시 Host=P3/두 Guest=P1,P2로 선택해 자동 시작 없이 대기함을 확인하고 Host 클릭으로 새 전투의 시간 재진행·0%를 확인했다. 이어 Host의 일시정지/나가기→전원 GameOver→Host 재도전→세 화면 같은 방 `3/3·0/3` 복귀를 확인했다. 앱 세 개는 해당 자리 미선택 화면에 남겼다.
+- **화면 근거:** 로컬 검증 산출물 `retry-lobby-host/guest2/guest3.png`, `host-retry-lobby-host/guest2/guest3.png`에 저장했다. 원시 로그·XML·스크린샷·검증 사본·빌드는 커밋하지 않는다.
+- **미실행:** iOS 내보내기/설치·물리 기기 LAN/핫스팟, 실제 Mac Host 프로세스 종료 후 새 Host 생성, 실제 5초 승인 무응답 복구. 끊긴 Guest의 같은 Host 재입장은 실제 로컬 패킷 통합 검사로 확인했으며 별도 Guest 앱 강제 종료 시험과 구분한다.
+- **보존 확인:** 일반 Story 정상 실패 재도전·모든 기존 PlayMode 포함 전체 통과. 저장 Scene/Prefab/Material/설정/패키지 수정 없음. 사용법은 `docs/STAFF_STAGE_DEMO.md`의 #740 절을 따른다.

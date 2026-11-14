@@ -72,6 +72,102 @@ namespace Hapio.Tests
             }
         }
 
+        [TestCase(1), TestCase(2), TestCase(3)]
+        public void InterruptedStaffRetryRetiresTheRunAndWaitsForThreeNewSeats(int stage)
+        {
+            using (LabGameBuildVariant.OverrideStaffStageDemoForTests(true))
+            {
+                var flow = new GameRunFlow();
+                flow.ConfigureDemoStage(stage); flow.EnterLobby(); flow.BeginRun(Players);
+                Play(flow);
+                Assert.That(flow.Abort(GameRunFlow.PlayerLeftReason), Is.True);
+                GameFlowState interrupted = flow.State;
+                Assert.That(GameRunFlow.IsStaffDemoInterrupted(interrupted), Is.True);
+                Assert.That(flow.ReturnStaffDemoToLobby(interrupted.runId, stage, interrupted.revision, "Choose seats again."), Is.True);
+                GameFlowState lobby = flow.State;
+                Assert.That(lobby.phase, Is.EqualTo(GameFlowPhase.Lobby));
+                Assert.That(lobby.mode, Is.EqualTo(GameMode.Story));
+                Assert.That(lobby.demoStageIndex, Is.EqualTo(stage));
+                Assert.That(lobby.stageIndex, Is.Zero);
+                Assert.That(lobby.totalStages, Is.EqualTo(1));
+                Assert.That(lobby.revision, Is.EqualTo(interrupted.revision + 1));
+                Assert.That(lobby.runId, Is.Empty);
+                Assert.That(lobby.battleSessionId, Is.Empty);
+                Assert.That(lobby.battleRound, Is.Zero);
+                Assert.That(lobby.battleStartsAt, Is.Zero);
+                Assert.That(lobby.endReason, Is.Empty);
+                Assert.That(lobby.retryableDefeat, Is.False);
+                Assert.That(lobby.notice, Is.EqualTo("Choose seats again."));
+                Assert.That(GameFlowSnapshot.IsValid(lobby, out string reason), Is.True, reason);
+                Assert.That(flow.ParticipantCount, Is.Zero);
+                Assert.That(flow.ReadyCount + flow.InitialStateReadyCount + flow.CountdownReadyCount, Is.Zero);
+                Assert.That(flow.MarkBattleReady(Players[0], interrupted.runId, stage, interrupted.revision), Is.False);
+                Assert.That(flow.ReturnStaffDemoToLobby(interrupted.runId, stage, interrupted.revision, ""), Is.False,
+                    "A duplicate retry does not reset the reopened lobby again.");
+                Assert.That(flow.BeginRun(new[] { Players[0], Players[1] }), Is.False);
+                Assert.That(flow.State.phase, Is.EqualTo(GameFlowPhase.Lobby));
+                Assert.That(flow.BeginRun(Players), Is.True, "The Host explicitly starts a new three-member run.");
+                Assert.That(flow.State.runId, Is.Not.EqualTo(interrupted.runId));
+                Assert.That(flow.State.stageIndex, Is.EqualTo(stage));
+            }
+        }
+
+        [TestCase(GameRunFlow.PlayerLeftReason)]
+        [TestCase(GameRunFlow.PlayerDisconnectedReason)]
+        [TestCase(GameRunFlow.HostDisconnectedReason)]
+        public void StaffRetryRequiresCurrentInterruptedGeneration(string interruption)
+        {
+            using (LabGameBuildVariant.OverrideStaffStageDemoForTests(true))
+            {
+                var flow = new GameRunFlow();
+                flow.ConfigureDemoStage(2); flow.EnterLobby(); flow.BeginRun(Players);
+                GameFlowState playing = Play(flow);
+                Assert.That(flow.ReturnStaffDemoToLobby(playing.runId, 2, playing.revision, ""), Is.False);
+                flow.Abort(interruption);
+                GameFlowState failed = flow.State;
+                Assert.That(flow.ReturnStaffDemoToLobby("another run", 2, failed.revision, ""), Is.False);
+                Assert.That(flow.ReturnStaffDemoToLobby(failed.runId, 1, failed.revision, ""), Is.False);
+                Assert.That(flow.ReturnStaffDemoToLobby(failed.runId, 2, failed.revision - 1, ""), Is.False);
+                Assert.That(flow.ReturnStaffDemoToLobby(failed.runId, 2, failed.revision + 1, ""), Is.False);
+                Assert.That(flow.ReturnStaffDemoToLobby(failed.runId, 2, failed.revision, null), Is.False);
+                Assert.That(flow.ReturnStaffDemoToLobby(failed.runId, 2, failed.revision, new string('n', 129)), Is.False);
+                Assert.That(flow.State.phase, Is.EqualTo(GameFlowPhase.GameOver));
+                Assert.That(flow.State.revision, Is.EqualTo(failed.revision));
+                Assert.That(flow.State.runId, Is.EqualTo(failed.runId));
+                Assert.That(flow.ReturnStaffDemoToLobby(failed.runId, 2, failed.revision, ""), Is.True);
+            }
+        }
+
+        [Test]
+        public void StaffRetryDoesNotReplaceNormalDefeatOrOtherFailureHandling()
+        {
+            using (LabGameBuildVariant.OverrideStaffStageDemoForTests(true))
+            {
+                var flow = new GameRunFlow();
+                flow.ConfigureDemoStage(3); flow.EnterLobby(); flow.BeginRun(Players);
+                Play(flow);
+                Assert.That(flow.MarkDefeat("staff-round", 1, "Time ran out."), Is.True);
+                GameFlowState defeat = flow.State;
+                Assert.That(GameRunFlow.IsStaffDemoInterrupted(defeat), Is.False);
+                Assert.That(flow.ReturnStaffDemoToLobby(defeat.runId, 3, defeat.revision, ""), Is.False);
+                Assert.That(flow.RetryFailedStage(defeat.runId, 3, defeat.revision), Is.True,
+                    "Normal defeat retains its existing direct stage retry.");
+                Assert.That(flow.Abort("The stage could not be loaded."), Is.True);
+                GameFlowState loadingFailure = flow.State;
+                Assert.That(flow.ReturnStaffDemoToLobby(loadingFailure.runId, 3, loadingFailure.revision, ""), Is.False);
+            }
+            using (LabGameBuildVariant.OverrideStaffStageDemoForTests(false))
+            using (LabGameBuildVariant.OverrideForTests(false))
+            {
+                var normal = new GameRunFlow();
+                normal.EnterLobby(); normal.BeginRun(Players); Play(normal);
+                normal.Abort(GameRunFlow.PlayerLeftReason);
+                GameFlowState failed = normal.State;
+                Assert.That(GameRunFlow.IsStaffDemoInterrupted(failed), Is.False);
+                Assert.That(normal.ReturnStaffDemoToLobby(failed.runId, failed.stageIndex, failed.revision, ""), Is.False);
+            }
+        }
+
         private static GameFlowState Play(GameRunFlow flow)
         {
             GameFlowState loading = flow.State;

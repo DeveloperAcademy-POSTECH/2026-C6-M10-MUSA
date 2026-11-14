@@ -9,12 +9,20 @@ namespace Hapio
         public UnityEngine.UI.Text dialogue;
         public UnityEngine.UI.Button homeButton;
         private bool selected;
+        private UnityEngine.UI.Text homeCaption;
+        private string originalHomeCaption;
         private UnityEngine.UI.RawImage parchment;
         private readonly Vector3[] canvasCorners = new Vector3[4];
         private void Awake() => GameResultStrokes.Apply(this);
 
-        public void Present(bool canReturnHome)
+        public void Present(bool canReturnHome, bool staffRetry = false)
         {
+            if (homeCaption == null)
+            {
+                homeCaption = homeButton.GetComponentInChildren<UnityEngine.UI.Text>(true);
+                if (homeCaption != null) originalHomeCaption = homeCaption.text;
+            }
+            if (homeCaption != null) homeCaption.text = staffRetry ? "다시 도전" : originalHomeCaption;
             if (!selected)
             {
                 bool useGeumok = Random.Range(0, 2) == 1;

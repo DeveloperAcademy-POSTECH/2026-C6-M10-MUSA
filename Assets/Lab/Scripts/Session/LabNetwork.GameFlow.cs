@@ -134,6 +134,28 @@ namespace C6Lab
         }
 
         /// <summary>
+        /// The staff demo retries an interrupted round in the same room, with every P unselected.
+        /// Keep membership and room tickets, but never restore an old held/remembered choice on a later rejoin.
+        /// GameSession owns the explicit terminal-screen-to-lobby authorization and Scene transition.
+        /// </summary>
+        public bool ReturnStaffDemoGameToLobby()
+        {
+            if (!gameFlowEnabled || !LabGameBuildVariant.IsStaffStageDemo || !IsHost
+                || targetParticipantCount != 3 || DemoStageIndex < 1 || DemoStageIndex > 3
+                || developerSolo) return false;
+            playerSlots = new LabPlayerSlots(targetParticipantCount);
+            lobbySeatHolds.Clear();
+            rememberedSlots.Clear();
+            heldSeatOwners.Clear();
+            ClearPendingSlotSelection();
+            // Preserve slot request high-water marks: an old accepted request must not select a P again.
+            // Explicit leavers stay marked until they disconnect, so they cannot occupy a held empty place.
+            configAcknowledgements.Clear();
+            configAcknowledgements.Add(LocalPlayerId);
+            return ReturnGameToLobby();
+        }
+
+        /// <summary>
         /// Attach the loaded Battle Scene after its board has been configured. No Scene object
         /// becomes persistent: only this transport and the authoritative data survive a load.
         /// </summary>

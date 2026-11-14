@@ -8,7 +8,7 @@ namespace C6Lab
         public const string YaguangDemoDefine = "HAPIO_YAGUANG_DEMO";
         public const int YaguangDemoRevision = 1;
         public const string StaffStageDemoDefine = "HAPIO_STAFF_STAGE_DEMO";
-        public const int StaffStageDemoRevision = 1;
+        public const int StaffStageDemoRevision = 2;
 
 #if HAPIO_YAGUANG_DEMO && HAPIO_STAFF_STAGE_DEMO
 #error A player cannot contain both the legacy Yaguang demo and staff stage-selection demo.

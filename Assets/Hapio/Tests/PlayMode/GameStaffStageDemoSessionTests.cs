@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using C6Lab;
 using NUnit.Framework;
 using UnityEngine;
@@ -249,6 +250,97 @@ namespace Hapio.Tests
             Assert.That(session.RoomBrowserVisible, Is.False);
             Assert.That(selector.gameObject.activeInHierarchy, Is.True);
             Assert.That(GameOpeningController.IsPresenting, Is.False);
+        }
+
+        [UnityTest, Category("Bonjour")]
+        public IEnumerator UnavailableHostRetryPreservesStageThroughHomeAndRestartsItsEntrySearch()
+        {
+            Assert.That(session.SelectDemoStage(2), Is.True);
+            session.CancelDemoEntry();
+            Assert.That(session.Network.IsConnected, Is.False);
+            // This is a Scene/intent-lifetime test, not a simulated transport loss: a real
+            // three-peer departure/admission is covered by GameStaffStageDemoFlowTests.
+            var interrupted = new GameFlowState
+            {
+                phase = GameFlowPhase.GameOver, mode = GameMode.Story, totalStages = 1,
+                demoStageIndex = 2, stageIndex = 2, runId = "staff-host-unavailable",
+                revision = 9, battleSessionId = "interrupted-staff-battle", battleRound = 1,
+                endReason = GameRunFlow.HostDisconnectedReason
+            };
+            Assert.That(GameFlowSnapshot.IsValid(interrupted, out string invalid), Is.True, invalid);
+            typeof(GameSession).GetMethod("SetLocalState", BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(session, new object[] { interrupted });
+            yield return Until(() => !session.IsLoadingScene && SceneManager.GetActiveScene().path == GameScenePaths.GameOver,
+                "The interrupted flow opens its actual saved GameOver Scene");
+            Assert.That(session.CanRetryStaffDemo, Is.True);
+            Assert.That(session.RetryStaffDemo(), Is.True);
+            Assert.That(session.RetryStaffDemo(), Is.False, "A pending retry cannot queue a second room entry.");
+            yield return Until(() => session.IsDemoEntryPending && session.State.phase == GameFlowPhase.Home
+                && SceneManager.GetActiveScene().path == GameScenePaths.Home,
+                "Retry completes Home/shutdown cleanup then searches the retained canonical stage");
+            Assert.That(session.SelectedDemoStage, Is.EqualTo(2));
+            Assert.That(session.Network.DemoStageIndex, Is.EqualTo(2));
+            Assert.That(session.RunProfile.FirstStage, Is.EqualTo(2));
+            Assert.That(session.State.runId, Is.Empty, "The new entry does not inherit the abandoned run identity.");
+            Assert.That(session.StageResults, Is.Empty);
+            session.CancelDemoEntry(); // Cancel within the browse window, before creating a replacement Host.
+            Assert.That(session.Network.IsConnected || session.Network.IsJoiningRoom, Is.False);
+            Assert.That(session.PendingRooms, Is.Empty);
+            Assert.That(session.IsStaffRetryPending || session.IsDemoEntryPending, Is.False);
+        }
+
+        [UnityTest, Category("Bonjour")]
+        public IEnumerator LobbyReturnProofAcceptsOptimisticGuestExitAndRejectsOtherRunsStagesAndRevisions()
+        {
+            Assert.That(session.SelectDemoStage(2), Is.True);
+            session.CancelDemoEntry();
+            // ExitRun increments the Guest's local state while its replica can still contain
+            // Playing. Check the commit fence against that optimistic state without loosening it.
+            GameFlowState current = session.State;
+            current.phase = GameFlowPhase.GameOver; current.stageIndex = 2; current.demoStageIndex = 2;
+            current.runId = "staff-optimistic-exit"; current.revision = 9;
+            current.battleSessionId = "staff-old-battle"; current.battleRound = 1;
+            current.endReason = GameRunFlow.PlayerLeftReason;
+            Type controlType = typeof(GameSession).GetNestedType("Control", BindingFlags.NonPublic);
+            MethodInfo accepts = typeof(GameSession).GetMethod("IsStaffLobbyReturn", BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(controlType, Is.Not.Null);
+            Assert.That(accepts, Is.Not.Null);
+            object control = Activator.CreateInstance(controlType, nonPublic: true);
+            var lobby = new GameFlowState
+            {
+                phase = GameFlowPhase.Lobby, mode = GameMode.Story, totalStages = 1,
+                demoStageIndex = 2, revision = 10
+            };
+            void Put(string field, object value) => controlType.GetField(field).SetValue(control, value);
+            bool Accepts() => (bool)accepts.Invoke(session, new[] { control });
+            Put("state", lobby);
+            Put("previousRunId", current.runId);
+            Put("previousStageIndex", 2);
+            Put("previousRevision", 9u);
+            Assert.That(Accepts(), Is.True, "The matching Host commit accepts the Guest's optimistic exit revision.");
+            current.phase = GameFlowPhase.Playing; current.revision = 8; current.endReason = string.Empty;
+            Assert.That(Accepts(), Is.True, "A member that missed GameOver can consume the same Host lobby commit.");
+            current.phase = GameFlowPhase.GameOver; current.revision = 9; current.endReason = GameRunFlow.PlayerLeftReason;
+            Put("previousRunId", "another-run");
+            Assert.That(Accepts(), Is.False);
+            Put("previousRunId", current.runId);
+            Put("previousStageIndex", 3);
+            Assert.That(Accepts(), Is.False);
+            Put("previousStageIndex", 2);
+            Put("previousRevision", 8u); lobby.revision = 9;
+            Assert.That(Accepts(), Is.False, "The proof cannot precede the local interrupted generation.");
+            Put("previousRevision", 0u); lobby.revision = 1;
+            Assert.That(Accepts(), Is.False, "An ordinary old lobby heartbeat lacks retry authorization.");
+            Put("previousRevision", 9u); lobby.revision = 11;
+            Assert.That(Accepts(), Is.False, "The commit revision must follow its proof exactly once.");
+            lobby.revision = 10; lobby.demoStageIndex = 3;
+            Assert.That(Accepts(), Is.False, "A different staff selection cannot be accepted inside the same room.");
+            lobby.demoStageIndex = 2;
+            using (LabGameBuildVariant.OverrideStaffStageDemoForTests(false))
+                Assert.That(Accepts(), Is.False, "Normal-game terminal behavior does not gain this exception.");
+            current.phase = GameFlowPhase.Home; current.stageIndex = 0; current.runId = string.Empty;
+            current.revision = 0; current.battleSessionId = string.Empty; current.battleRound = 0; current.endReason = string.Empty;
+            yield return null;
         }
 
         private static IEnumerator Until(Func<bool> condition, string message)

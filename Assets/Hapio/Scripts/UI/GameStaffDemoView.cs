@@ -42,7 +42,7 @@ namespace Hapio
         private void Refresh()
         {
             if (session == null) return;
-            bool pending = session.IsDemoEntryPending;
+            bool pending = session.IsDemoEntryPending || session.IsStaffRetryPending;
             bool idle = !pending && session.Network.CanChooseConnection && session.State.phase == GameFlowPhase.Home;
             foreach (UnityEngine.UI.Button button in stageButtons) button.interactable = idle;
             backButton.gameObject.SetActive(pending);
