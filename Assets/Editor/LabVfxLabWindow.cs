@@ -99,6 +99,10 @@ namespace C6Lab.Editor
                 if (GUILayout.Button("넘기기 막기 (나)", GUILayout.Height(26)))
                     Report(network.VfxLabCastGimmick(LabSabotageKind.SwipeBlock), "내 한쪽 넘기기가 막혔다.", "이미 넘기기 막기가 걸려 있음");
             }
+            // #741: 도화선을 기다리지 않고 폭발 연출 보기
+            using (new EditorGUI.DisabledScope(!ready || !network.VfxLabHasBomb))
+                if (GUILayout.Button("박 폭탄 바로 터뜨리기 (내 판, 잠긴 폭탄)", GUILayout.Height(26)))
+                    Report(network.VfxLabDetonateBomb(), "도화선이 다 탄 것으로 했다. 곧 터진다.", "내 판에 잠긴 박 폭탄이 없음 (먼저 박 폭탄을 떨어뜨린다)");
             if (EditorApplication.isPlaying && !ready) EditorGUILayout.LabelField("전투 중에 켜진다.", EditorStyles.wordWrappedMiniLabel);
             DrawTimeLeft(network, ready);
             EditorGUILayout.Space();

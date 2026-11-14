@@ -48,6 +48,10 @@ namespace C6Lab
         public bool VfxLabGiveSootShards() => VfxLabReady && VfxLabPublish(model.VfxLabGiveSootShards(LocalPlayerId, VfxLabNow));
         public bool VfxLabGiveSootOrb() => VfxLabReady && VfxLabPublish(model.VfxLabGiveSootOrb(LocalPlayerId, VfxLabNow));
 
+        /// <summary>#741 공통: 내 판에 잠긴 박 폭탄이 있는지, 그리고 지금 터뜨리기</summary>
+        public bool VfxLabHasBomb => VfxLabReady && model.VfxLabLockedBombId(LocalPlayerId) != null;
+        public bool VfxLabDetonateBomb() => VfxLabReady && VfxLabPublish(model.VfxLabDetonateBomb(LocalPlayerId, VfxLabNow));
+
         /// <summary>#741 Y3: BIG / SMALL이 걸려 있는지, 그리고 지금 끝내기</summary>
         public bool VfxLabComboEffectOn => VfxLabReady && model.VfxLabComboEffectOn(VfxLabNow);
         public bool VfxLabEndComboEffect() => VfxLabReady && VfxLabPublish(model.VfxLabEndComboEffect(VfxLabNow));

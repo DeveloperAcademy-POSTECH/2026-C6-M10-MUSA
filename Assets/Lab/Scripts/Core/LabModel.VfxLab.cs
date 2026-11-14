@@ -16,6 +16,22 @@ namespace C6Lab
         /// <summary>야광귀 시간표가 돌고 있어(피버 전) 콤보/피버를 띄울 수 있는지</summary>
         public bool VfxLabYaguangTimelineOn => rules != null && rules.YaguangTimeline && !yaguangTimelineEnded;
 
+        /// <summary>#741 공통: 이 사람 판에 있는 잠긴 박 폭탄(가장 먼저 생긴 것). 없으면 null.</summary>
+        public string VfxLabLockedBombId(ulong owner) => orbs.Values
+            .Where(orb => orb.owner == owner && orb.kind == LabOrbKind.Bomb && !orb.inFlight && orb.lockSwipes > 0)
+            .OrderBy(orb => orb.createdAt).ThenBy(orb => orb.id, System.StringComparer.Ordinal).Select(orb => orb.id).FirstOrDefault();
+
+        /// <summary>
+        /// #741 공통: 내 판의 잠긴 박 폭탄을 도화선 끝까지 기다리지 않고 지금 터뜨린다. 도화선이 다 탄 것처럼 시각만 당기므로
+        /// 폭발 연출과 소리는 실제 게임과 같은 길로 나온다 (아트팀 폭탄 실험실과 같은 방법). 폭탄이 없으면 false.
+        /// </summary>
+        public bool VfxLabDetonateBomb(ulong owner, double now)
+        {
+            if (!TryAdvance(now, out _) || phase != LabPhase.Playing) return false;
+            string id = VfxLabLockedBombId(owner);
+            return id != null && ArtLabSetBombFuse(id, now, .05f);
+        }
+
         /// <summary>#741 Y3: 지금 누군가에게 BIG 보상이나 SMALL 벌칙이 걸려 있는지</summary>
         public bool VfxLabComboEffectOn(double now) => players.Values.Any(p => p.comboRewardUntil > now || p.comboPenaltyUntil > now);
 

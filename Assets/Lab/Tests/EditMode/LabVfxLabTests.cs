@@ -48,6 +48,22 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void TheLabDetonatesMyLockedBombNow()
+        {
+            // #741: the bomb on my board blows up right away instead of after its whole fuse.
+            LabModel room = Room(LabStageYokai.Gumiho);
+            Assert.That(room.VfxLabDetonateBomb(0ul, 1d), Is.False, "No bomb yet.");
+            Assert.That(room.VfxLabCastGimmick(LabSabotageKind.GourdBomb, 0ul, 1d), Is.True);
+            double landed = 1d; // after the warning, the throw and the fall
+            while (room.VfxLabLockedBombId(0ul) == null && landed < 12d) { landed += .25d; room.Tick(landed); }
+            Assert.That(room.VfxLabLockedBombId(0ul), Is.Not.Null, "The bomb is on my board, locked.");
+            Assert.That(room.VfxLabDetonateBomb(0ul, landed), Is.True);
+            room.Tick(landed + 1d);
+            Assert.That(room.Snapshot(landed + 1d).orbs.Any(orb => orb.kind == LabOrbKind.Bomb && orb.owner == 0ul), Is.False,
+                "It has gone off.");
+        }
+
+        [Test]
         public void TheLabStartsTheFoxFeverNow()
         {
             LabModel room = Room(LabStageYokai.Gumiho);
