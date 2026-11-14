@@ -145,7 +145,7 @@ namespace C6Lab
                 timerTouched = true;
             }
             LabConfig config = network != null ? network.config : null;
-            PlayAlarm(sound ?? (config != null ? config.ThirtySecondsLeftSound : LabThirtySecondsLeftSound.Gong), config);
+            PlayAlarm(sound ?? (config != null ? config.ThirtySecondsLeftSound : LabThirtySecondsLeftSound.GongThenDrum), config);
             float haptic = config != null ? config.ThirtySecondsLeftHaptic : 1f;
             if (haptic > 0f) LabHaptics.PlayDirect(config, LabHapticStyle.Heavy, haptic, .3f, .8f * haptic, .9f);
         }

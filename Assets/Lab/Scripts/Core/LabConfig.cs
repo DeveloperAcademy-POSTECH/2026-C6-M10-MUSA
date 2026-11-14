@@ -1189,7 +1189,7 @@ namespace C6Lab
         [Tooltip("\"30초 남았소!\" 말풍선이 떠 있는 시간 (초). 마지막 0.4초에 흐려진다")]
         [SerializeField, Range(.5f, 5f)] private float thirtySecondsLeftBubbleSeconds = 2.2f;
         [Tooltip("남은 30초 경고음: 징(Audio/ThirtySecondsLeftGong), 북(Audio/ThirtySecondsLeftDrum), 또는 징 다음 북. 들어 보고 고른다")]
-        [SerializeField] private LabThirtySecondsLeftSound thirtySecondsLeftSound = LabThirtySecondsLeftSound.Gong;
+        [SerializeField] private LabThirtySecondsLeftSound thirtySecondsLeftSound = LabThirtySecondsLeftSound.GongThenDrum;
         [Tooltip("\"징 다음 북\"일 때 징이 울리고 북이 울리기까지 (초)")]
         [SerializeField, Range(0f, 3f)] private float thirtySecondsLeftDrumDelaySeconds = .8f;
         [Tooltip("남은 30초 경고음 크기 (모든 기기)")]

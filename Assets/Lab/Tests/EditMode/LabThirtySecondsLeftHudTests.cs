@@ -63,7 +63,7 @@ namespace C6Lab.Tests
                 Assert.That(config.ThirtySecondsLeftAt, Is.EqualTo(30f));
                 Assert.That(config.ThirtySecondsLeftBubbleSeconds, Is.EqualTo(2.2f).Within(.001f));
                 Assert.That(config.ThirtySecondsLeftHaptic, Is.EqualTo(1f));
-                Assert.That(config.ThirtySecondsLeftSound, Is.EqualTo(LabThirtySecondsLeftSound.Gong));
+                Assert.That(config.ThirtySecondsLeftSound, Is.EqualTo(LabThirtySecondsLeftSound.GongThenDrum), "Gong, then drum.");
                 Assert.That(LabThirtySecondsLeftHud.FolderFor(LabThirtySecondsLeftSound.Gong), Is.EqualTo("ThirtySecondsLeftGong"));
                 Assert.That(LabThirtySecondsLeftHud.FolderFor(LabThirtySecondsLeftSound.Drum), Is.EqualTo("ThirtySecondsLeftDrum"));
                 Assert.That(LabThirtySecondsLeftHud.FolderFor(LabThirtySecondsLeftSound.GongThenDrum), Is.EqualTo("ThirtySecondsLeftGong"), "The gong first.");
