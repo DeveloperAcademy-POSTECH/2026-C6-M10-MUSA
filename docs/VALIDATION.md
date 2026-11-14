@@ -8852,6 +8852,8 @@ PR #729 검증 중 main `a7208003`에서 `LabLocalBoardNetworkIntegrationTests` 
 
 전체 PlayMode의 실패 3건은 모두 Hapio Scene 흐름 검사의 `Until` 대기 실패다: `GameStageRetryPlayModeTests.FailedSecondStageRetriesInTheSameRoomWithFreshResourcesAndKeepsStageOneRecord`("The saved result Scene must finish loading."), `GameTutorialFlowTests.PauseMenuRestartStartsThePracticeBoardOverAndQuitGoesToTheTitle`("The practice board plays its first line"), `GameYaguangDemoFlowTests.ThreePlayersFinishOnlyOriginalStageTwoThenReadItsAfterstorySummaryEndingAndRealTitle`("Yaguang afterstory ends at its final picture"). 재실행할 때마다 실패하는 검사가 바뀌었다(fixture 재실행에서는 `GameTutorialFlowTests.FinishedOpeningOpensThePracticeBoardOnceThenTheRoomList`가 새로 실패하고 `PauseMenuRestart…`·야광귀 시연은 통과). 이 검사들은 이번에 바꾼 `LabPlayerPaintPatternRenderTests`를 실행하지 않으며 게임 코드도 바뀌지 않았다. 같은 런타임 코드의 #728 기록은 849/849였다. 실행 당시 같은 Mac에서 다른 세션의 Unity가 함께 돌아 load average가 7~18이었고, 41초 분량의 fixture 실행이 76분 걸렸다. 실패 검사의 소요 시간(3.6초·5.8초)이 `Until`의 실시간 한도(20초·30초)보다 짧아 프로세스 정지·시계 도약도 의심된다. 원인을 확정하지 못했으므로 PASS로 쓰지 않고 미해결로 남긴다. 부하 없는 환경에서의 재실행은 하지 못했다.
 
+**#729·#730·#731 병합 뒤 재실행 (main `da39c5f9`, 다른 Unity 실행 없음):** 충돌은 이 문서의 기록 추가뿐이었다(양쪽 보존). 전체 EditMode **2424/2424 PASS**, 전체 PlayMode **859/859 PASS**. 위에서 미해결로 남긴 Hapio Scene 흐름 3건(`FailedSecondStageRetries…`, `PauseMenuRestart…`, 야광귀 시연)과 `FinishedOpeningOpens…`도 이번에는 모두 PASS여서, 부하 중 실패라는 추정과 맞는다(부하 원인을 따로 재현하지는 않았다).
+
 `-repeat`는 첫 실패에서 멈추며 결과 XML에는 마지막 반복만 남는다. 반복 횟수는 fixture 소요 시간(1회 약 5.7초)으로 확인했다. iOS·실기기·다른 GPU(Mac Intel/AMD)는 실행하지 않았다. 원시 로그·조사용 캡처 이미지는 커밋하지 않는다.
 
 ## 2026-11-14 — 전투 시작 대기의 끝 (방장 시작 재확인·참가자 시작 대기 10초·준비 45초)
