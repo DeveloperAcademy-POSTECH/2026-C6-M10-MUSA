@@ -106,7 +106,8 @@ namespace C6Lab
             return true;
         }
 
-        /// <summary>#696/#719 J: 다 합쳐진 검정 구슬 하나를 내 판에 놓는다 (기운 / 던지기 / 명중 효과 확인).</summary>
+        /// <summary>#696/#719 J: 다 합쳐진 검정 구슬 하나를 내 판에 놓는다 (기운 / 던지기 / 명중 효과 확인).
+        /// #724: 연기를 닦았을 때처럼 판 가운데에 주므로, 파편 4개가 모여드는 모습(LabSootSocket)도 같이 확인된다.</summary>
         public bool VfxLabGiveSootOrb(ulong owner, double now)
         {
             if (!TryAdvance(now, out _) || phase != LabPhase.Playing || !players.ContainsKey(owner)
@@ -114,7 +115,7 @@ namespace C6Lab
             var orb = new LabOrbState
             {
                 id = NewOrbId(), owner = owner, kind = LabOrbKind.Combined, element = LabOrbElement.None, soot = true, fiveColor = true,
-                origin = LabOrbOrigin.Combined, originOwner = owner, x = .5f, y = .52f,
+                origin = LabOrbOrigin.Gourd, originOwner = owner, x = SootSocketCenter.x, y = SootSocketCenter.y,
                 createdAt = now, expiresAt = now + FiveColorOrbLifetimeSeconds, revision = ++revision
             };
             orbs.Add(orb.id, orb);

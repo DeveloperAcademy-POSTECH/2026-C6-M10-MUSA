@@ -459,6 +459,28 @@ namespace C6Lab
         /// #696 파편끼리 붙는 순간: 붙은 자리에서 먹빛 연기가 확 퍼지고 보랏빛 빛이 번쩍인다.
         /// 네 쪽이 다 모여 검정 구슬이 될 때(whole)는 더 크고 길게.
         /// </summary>
+        private readonly System.Collections.Generic.List<GameObject> assemblyHidden = new System.Collections.Generic.List<GameObject>();
+        /// <summary>#724: everything drawn for this orb is hidden while its shards fly together (the body stays, locked by the board).</summary>
+        public bool AssemblyHidden => assemblyHidden.Count > 0;
+        /// <summary>#724: a shard's whole-orb picture is drawn this much bigger, so its one piece is about an orb in size.</summary>
+        public const float ShardArtScale = 1.9f;
+        /// <summary>#724: the world width of this shard's whole-orb picture (for the copy that flies into the empty orb).</summary>
+        public float ShardArtWidth => orbSpriteArt != null
+            ? orbSpriteArt.transform.lossyScale.x * Mathf.Max(.0001f, orbSpriteArt.GetComponent<SpriteRenderer>().sprite != null
+                ? orbSpriteArt.GetComponent<SpriteRenderer>().sprite.bounds.size.x : 1f) : visualRadius * 2f;
+        public void SetAssemblyHidden(bool hidden)
+        {
+            if (hidden)
+            {
+                if (assemblyHidden.Count > 0) return;
+                foreach (Transform child in transform)
+                    if (child.gameObject.activeSelf) { assemblyHidden.Add(child.gameObject); child.gameObject.SetActive(false); }
+                return;
+            }
+            foreach (GameObject part in assemblyHidden) if (part != null) part.SetActive(true);
+            assemblyHidden.Clear();
+        }
+
         public void PlaySootJoin(bool whole)
         {
             float art = visualRadius * (orbSpriteArt != null && orbSpriteArt.gameObject.activeSelf ? LabOrbSpriteArt.SizeScaleFor(kind) : 1.2f);
@@ -886,7 +908,7 @@ namespace C6Lab
             Sprite drumSprite = kind.IsDrum() && appearance != null ? appearance.DrumSprite : null;
             Sprite orbSprite = appearance != null ? appearance.SpriteFor(kind, element) : null;
             // #696: a soot shard is drawn as a broken piece of the black orb.
-            if (kind == LabOrbKind.SootShard) orbSprite = LabSootShardArt.SpriteFor(sootPieces > 0 ? sootPieces : 1);
+            if (kind == LabOrbKind.SootShard) orbSprite = LabSootShardArt.SpriteFor(sootPieces > 0 ? sootPieces : 1, false);
             // Flat art (the drum's, or the cartoon bomb's on the item marker) replaces the ball.
             bool flatArt = drumSprite != null || HasBombArt || orbSprite != null;
             Transform defaultSphere = visual.Find("Default Sphere");
@@ -904,6 +926,14 @@ namespace C6Lab
             // Element art is 20% larger; Yin/Yang art and every collider retain their original size.
             float spriteRadius = visualRadius * LabOrbSpriteArt.SizeScaleFor(kind);
             orbSpriteArt = LabOrbSpriteArt.Set(visual, orbSpriteArt, orbSprite, spriteRadius, -visualRadius);
+            if (kind == LabOrbKind.SootShard && orbSpriteArt != null)
+            {
+                // #724 UT: the piece itself (not its whole-orb picture) is shard sized and sits on the body you touch.
+                Vector2 centroid = LabSootShardArt.Centroid(sootPieces > 0 ? sootPieces : 1);
+                orbSpriteArt.transform.localScale *= ShardArtScale;
+                orbSpriteArt.transform.localPosition = new Vector3(-centroid.x * spriteRadius * ShardArtScale,
+                    -centroid.y * spriteRadius * ShardArtScale, -visualRadius);
+            }
             UpdateContactShadow();
             UpdateItemMarker();
         }

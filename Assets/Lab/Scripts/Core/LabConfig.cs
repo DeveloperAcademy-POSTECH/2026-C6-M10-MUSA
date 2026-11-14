@@ -1302,8 +1302,27 @@ namespace C6Lab
         public bool JigwiAHoldBurnUntilEnd => jigwiAHoldBurnUntilEnd;
         public bool JigwiBCountdown => jigwiBCountdown;
         public bool JigwiBBucket => jigwiBBucket;
-        public bool JigwiBTestOnly => jigwiBTestOnly;
-        public bool JigwiATestOnly => jigwiATestOnly;
+        public bool JigwiBTestOnly => jigwiBTestOnly || VfxLabJigwiMode == 1;
+        public bool JigwiATestOnly => jigwiATestOnly || VfxLabJigwiMode == 2;
+
+        /// <summary>#724: VFX 실험실의 지귀 시험 모드 (0 기본 / 1 연기만 / 2 부적만)를 이 에디터 세션에만 기억하는 키.</summary>
+        public const string VfxLabJigwiModeKey = "C6Lab.VfxLab.JigwiMode";
+
+        /// <summary>
+        /// #724: VFX 실험실이 고른 지귀 시험 모드. LabConfig.asset 값은 건드리지 않고 에디터 세션 값(SessionState)으로만 얹는다
+        /// (예전에는 실험실이 B/A Test Only를 에셋에 직접 써서 커밋에 섞여 들어갔다). 빌드에서는 늘 0. 실험실 창을 닫으면 0으로 돌아간다.
+        /// </summary>
+        public static int VfxLabJigwiMode
+        {
+            get
+            {
+#if UNITY_EDITOR
+                return UnityEditor.SessionState.GetInt(VfxLabJigwiModeKey, 0);
+#else
+                return 0;
+#endif
+            }
+        }
         public bool JigwiSmokeFlow => jigwiSmokeFlow;
         public bool JigwiDenseTimeline => jigwiDenseTimeline;
         public bool JigwiRelayTimeline => jigwiRelayTimeline;

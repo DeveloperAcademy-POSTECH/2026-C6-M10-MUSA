@@ -64,6 +64,23 @@ namespace Hapio
             LabSnapshot snapshot = network.Snapshot;
             bool live = snapshot != null && snapshot.phase == LabPhase.Playing && !snapshot.paused && !network.GameStartHeld;
             Present(snapshot, network.LocalPlayerId, Time.unscaledDeltaTime, live, network.IsDeveloperSolo);
+            // #724: while the Jigwi smoke covers the screen the hint lies under it (seen only where the smoke is wiped away).
+            if (overlayCanvas != null)
+                overlayCanvas.sortingOrder = network.JigwiSmokeWiping ? SmokeCanvasOrder() - 1 : OverlaySortingOrder;
+        }
+
+        private Canvas smokeCanvas;
+
+        /// <summary>#724: the sorting order of the canvas the Jigwi smoke is drawn on (the battle HUD's).</summary>
+        private int SmokeCanvasOrder()
+        {
+            if (smokeCanvas == null)
+            {
+                var smoke = FindAnyObjectByType<LabJigwiBucketHandleView>();
+                Canvas found = smoke != null ? smoke.GetComponentInParent<Canvas>() : null;
+                smokeCanvas = found != null ? found.rootCanvas : null;
+            }
+            return smokeCanvas != null ? smokeCanvas.sortingOrder : 0;
         }
 
         /// <summary>

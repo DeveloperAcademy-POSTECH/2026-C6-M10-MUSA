@@ -146,6 +146,11 @@ namespace C6Lab
         /// </summary>
         public int sootPieces;
         /// <summary>
+        /// #724 UT: 탭해서 판 가운데 검정 구슬 빈자리에 들어간 연기 파편 (주인당 하나, 들어간 조각 수만큼 sootPieces가 북부터 채워짐).
+        /// 판 위 구슬로는 그리지 않고 빈자리 그림(LabSootSocket)이 보여 주며, 아무 동작도 받지 않는다.
+        /// </summary>
+        public bool sootSocketed;
+        /// <summary>
         /// #696 검정 구슬: 연기 파편 4개를 합친 구슬. 오색구슬(fiveColor)처럼 넓게, 먹색으로 칠한다. 원소가 없어 콤보에는 세지 않고,
         /// 지귀 불에 타지 않으며 던질 때까지 남는다.
         /// </summary>

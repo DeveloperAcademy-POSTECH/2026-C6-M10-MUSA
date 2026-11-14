@@ -1150,6 +1150,8 @@ namespace C6Lab
                 CountFoxCleared(now); // #664: one more toward the team's goal
                 return true;
             }
+            // #724 UT: one tap sends a smoke shard into the black orb's socket in the middle of the board.
+            if (current.kind.IsSootShard()) return SocketSootShard(sender, current, now, out orb, out reason);
             if (current.kind == LabOrbKind.Bomb)
             {
                 if (current.lockSwipes > 0) return Reject("ITEM_LOCKED", out reason);
@@ -1958,7 +1960,8 @@ namespace C6Lab
             do id = Guid.NewGuid().ToString("N"); while (orbs.ContainsKey(id) || drums.ContainsKey(id));
             return id;
         }
-        private static bool UsableBy(LabOrbState orb, ulong sender) => orb.owner == sender && !orb.inFlight;
+        private static bool UsableBy(LabOrbState orb, ulong sender) => orb.owner == sender && !orb.inFlight
+            && !orb.sootSocketed; // #724: a shard in the socket takes no gesture
         private static bool Reject(string value, out string reason) { reason = value; return false; }
         private static bool Unit(float value) => Finite(value) && value >= 0f && value <= 1f;
         private static bool Finite(Vector2 value) => Finite(value.x) && Finite(value.y);

@@ -8,12 +8,11 @@ namespace C6Lab.Editor
     /// <summary>
     /// VFX 녹화용 실험실 (#610, #673에서 1~3라운드 모든 기믹으로 확장). 혼자 플레이로는 녹화하기 어려운 장면을 실제 게임 화면 그대로 바로 띄운다.
     /// 라운드를 골라 Home → 혼자 시작으로 열고, 전투 중 버튼으로 장면을 부른다. 빌드에는 들어가지 않고 게임 설정도 바꾸지 않는다
-    /// (지귀의 B/A Test Only만 LabConfig 값을 직접 켜고 끈다. 시험이 끝나면 기본 시간표로 돌린다).
+    /// (#724: 지귀의 연기만 / 부적만 모드도 LabConfig.asset을 건드리지 않고 이 에디터 세션 값으로만 켠다. 창을 닫으면 기본 시간표로 돌아간다).
     /// </summary>
     public sealed class LabVfxLabWindow : EditorWindow
     {
         private const string AutoSoloKey = "C6Lab.VfxLab.AutoSolo";
-        private const string ConfigPath = "Assets/Lab/Resources/LabConfig.asset";
         private static readonly string[] Rounds = { "1R 구미호", "2R 야광귀", "3R 지귀" };
         private static readonly string[] JigwiModes = { "기본 시간표", "J1 연기만", "J2~J4 부적만" };
         private static readonly string[] JigwiModeHelp =
@@ -33,7 +32,11 @@ namespace C6Lab.Editor
 
         private void OnEnable() => round = Mathf.Clamp(EditorPrefs.GetInt(GameSession.DeveloperSoloStartStageKey, 2) - 1, 0, 2);
 
-        private void OnDisable() => LabJigwiScreenPresentation.VfxLabFakeSeats = 0;
+        private void OnDisable()
+        {
+            LabJigwiScreenPresentation.VfxLabFakeSeats = 0;
+            SessionState.SetInt(LabConfig.VfxLabJigwiModeKey, 0); // #724: a closed lab leaves the real timetable
+        }
 
         private void OnGUI()
         {
@@ -224,28 +227,16 @@ namespace C6Lab.Editor
                     Report(network.VfxLabStartJigwiFever(), "지귀 피버를 시작했다. 진행 중이던 미션은 여기서 끝난다.", "피버를 시작할 수 없음 (이미 피버 중)");
             if (ready && !on) EditorGUILayout.LabelField("이미 피버 중. 다시 보려면 Play를 멈추고 다시 연다.", EditorStyles.wordWrappedMiniLabel);
             EditorGUILayout.LabelField("어떤 기믹을 띄울까 (Play 전에 고른다)", EditorStyles.miniBoldLabel);
-            var config = AssetDatabase.LoadAssetAtPath<LabConfig>(ConfigPath);
-            if (config != null)
             {
-                var serialized = new SerializedObject(config);
-                SerializedProperty bOnly = serialized.FindProperty("jigwiBTestOnly"), aOnly = serialized.FindProperty("jigwiATestOnly");
-                if (bOnly != null && aOnly != null)
-                {
-                    int mode = bOnly.boolValue ? 1 : aOnly.boolValue ? 2 : 0;
-                    // #663: write only when the toolbar is clicked. Writing every repaint put A Test Only back on whenever
-                    // it was turned off in the Inspector (and saved it into LabConfig.asset while this window was open).
-                    EditorGUI.BeginChangeCheck();
-                    using (new EditorGUI.DisabledScope(EditorApplication.isPlayingOrWillChangePlaymode))
-                        mode = GUILayout.Toolbar(mode, JigwiModes);
-                    if (EditorGUI.EndChangeCheck())
-                    {
-                        bOnly.boolValue = mode == 1; aOnly.boolValue = mode == 2;
-                        serialized.ApplyModifiedProperties();
-                    }
-                    EditorGUILayout.LabelField(JigwiModeHelp[mode], EditorStyles.wordWrappedMiniLabel);
-                    if (mode != 0)
-                        EditorGUILayout.HelpBox("LabConfig 값(B/A Test Only)을 켰다. 녹화가 끝나면 \"기본 시간표\"로 돌리고, 이 값은 커밋하지 않는다.", MessageType.Warning);
-                }
+                // #724: the mode lives only in this editor session (SessionState), never in LabConfig.asset.
+                int mode = Mathf.Clamp(SessionState.GetInt(LabConfig.VfxLabJigwiModeKey, 0), 0, JigwiModes.Length - 1);
+                EditorGUI.BeginChangeCheck();
+                using (new EditorGUI.DisabledScope(EditorApplication.isPlayingOrWillChangePlaymode))
+                    mode = GUILayout.Toolbar(mode, JigwiModes);
+                if (EditorGUI.EndChangeCheck()) SessionState.SetInt(LabConfig.VfxLabJigwiModeKey, mode);
+                EditorGUILayout.LabelField(JigwiModeHelp[mode], EditorStyles.wordWrappedMiniLabel);
+                if (mode != 0)
+                    EditorGUILayout.HelpBox("실험실에서만 켜졌다 (LabConfig.asset은 그대로). 이 창을 닫으면 기본 시간표로 돌아간다.", MessageType.Info);
             }
             EditorGUILayout.LabelField("J4(공용 부적 완성)", EditorStyles.miniBoldLabel);
             fakeSeats = EditorGUILayout.IntSlider("가짜 자리 수 (나 말고)", fakeSeats, 0, 4);

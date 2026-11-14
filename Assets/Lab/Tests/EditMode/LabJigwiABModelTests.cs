@@ -391,14 +391,16 @@ namespace C6Lab.Tests
         }
         [Test] public void SootShardsAreNorthWestSouthEastPiecesThatOnlyJoinTheirNeighbours()
         {
-            // 1 북 / 2 서 / 4 남 / 8 동: 이웃끼리만 붙는다.
+            // 1 북 / 2 서 / 4 남 / 8 동. #724 UT: 합쳐 네 쪽을 넘지 않으면 어떤 쪽끼리든 붙는다.
             Assert.That(LabModel.SootPiecesFit(1, 2), Is.True, "north + west");
             Assert.That(LabModel.SootPiecesFit(8, 1), Is.True, "east + north");
-            Assert.That(LabModel.SootPiecesFit(1, 4), Is.False, "north + south leave a bow tie");
-            Assert.That(LabModel.SootPiecesFit(2, 8), Is.False, "west + east");
+            Assert.That(LabModel.SootPiecesFit(1, 4), Is.True, "north + south too (it used to refuse: \"they don't join\")");
+            Assert.That(LabModel.SootPiecesFit(2, 8), Is.True, "west + east");
             Assert.That(LabModel.SootPiecesFit(1 | 2, 4), Is.True);
             Assert.That(LabModel.SootPiecesFit(1 | 2, 4 | 8), Is.True, "two halves make the whole orb");
-            Assert.That(LabModel.SootPiecesFit(1 | 2, 2 | 4), Is.False, "the same piece twice");
+            Assert.That(LabModel.SootPiecesFit(1 | 2, 1 | 2 | 4), Is.False, "more than four quarters");
+            Assert.That(new[] { LabModel.SootPiecesFor(1), LabModel.SootPiecesFor(2), LabModel.SootPiecesFor(3), LabModel.SootPiecesFor(4) },
+                Is.EqualTo(new[] { 1, 1 | 2, 1 | 2 | 4, LabModel.SootWholePieces }), "Filled from the north on.");
             Assert.That(LabModel.SootArcStart(8 | 1), Is.EqualTo(3));
             Assert.That(LabModel.SootArcStart(1 | 4), Is.EqualTo(-1));
             // 북 조각은 위쪽, 동 조각은 오른쪽에 놓인다.
@@ -429,19 +431,18 @@ namespace C6Lab.Tests
             Assert.That(m.TryClearJigwiSmoke(Three[0],"other",ready+2),Is.False);
             Assert.That(m.TryClearJigwiSmoke(Three[0],smoke.id,ready+2),Is.True);
             Assert.That(m.TryClearJigwiSmoke(Three[0],smoke.id,ready+2.5),Is.False,"Once per smoke.");
-            var shards=m.Snapshot(ready+2.5).orbs.Where(o=>o.kind==LabOrbKind.SootShard).ToArray();
+            var shards=m.Snapshot(ready+2.5).orbs.Where(o=>o.owner==Three[0]&&o.kind==LabOrbKind.SootShard).ToArray();
             Assert.That(shards.Length,Is.EqualTo(LabModel.JigwiSootShardCount));
-            Assert.That(shards.All(o=>o.owner==Three[0]&&o.element==LabOrbElement.None),Is.True);
+            Assert.That(shards.All(o=>o.element==LabOrbElement.None),Is.True);
             Assert.That(shards.Select(o=>o.sootPieces).OrderBy(v=>v),Is.EqualTo(new[]{1,2,4,8}),"North, west, south, east.");
             shards=shards.OrderBy(o=>o.sootPieces).ToArray(); // 0 북, 1 서, 2 남, 3 동
             Assert.That(m.TryLaunch(Three[0],shards[0].id,Request(),ready+2.6,out _,out var why),Is.False,"A shard cannot be thrown.");
 
             double t=ready+3;
-            Assert.That(m.TryCombineAt(Three[0],shards[0].id,shards[2].id,Request(),t,new Vector2(.5f,.5f),Vector2.zero,out _,out var e0),Is.False);
-            Assert.That(e0,Is.EqualTo("SOOT_MISFIT"),"North and south do not touch.");
-            Assert.That(m.TryCombineAt(Three[0],shards[0].id,shards[1].id,Request(),t,new Vector2(.5f,.5f),Vector2.zero,out var a,out var e),Is.True,e);
+            // #724 UT: any two shards join (north + south too), filled from the north on.
+            Assert.That(m.TryCombineAt(Three[0],shards[0].id,shards[2].id,Request(),t,new Vector2(.5f,.5f),Vector2.zero,out var a,out var e),Is.True,e);
             Assert.That(e,Is.EqualTo("SOOT_MERGED")); Assert.That(a.kind,Is.EqualTo(LabOrbKind.SootShard)); Assert.That(a.sootPieces,Is.EqualTo(1|2));
-            Assert.That(m.TryCombineAt(Three[0],shards[2].id,shards[3].id,Request(),t,new Vector2(.4f,.5f),Vector2.zero,out var b,out e),Is.True,e);
+            Assert.That(m.TryCombineAt(Three[0],shards[1].id,shards[3].id,Request(),t,new Vector2(.4f,.5f),Vector2.zero,out var b,out e),Is.True,e);
             Assert.That(m.TryCombineAt(Three[0],a.id,b.id,Request(),t+.1,new Vector2(.45f,.5f),Vector2.zero,out var black,out e),Is.True,e);
             Assert.That(e,Is.EqualTo("SOOT_ORB"));
             Assert.That(black.kind,Is.EqualTo(LabOrbKind.Combined)); Assert.That(black.soot&&black.fiveColor,Is.True);
@@ -453,6 +454,37 @@ namespace C6Lab.Tests
             Launch(m,black,t+1.1);
             Assert.That(m.ConfirmHit(black.id,t+1.2),Is.True);
             Assert.That(m.LastHitFiveColor,Is.True,"Hits as wide as a five-color orb (in ink).");
+        }
+
+        [Test] public void TappingSootShardsFillsTheSocketInTheMiddleIntoTheBlackOrb()
+        {
+            // #724 UT: 파편을 탭하면 판 가운데 빈 구슬의 제 자리로 들어가고(순서 상관없음), 네 쪽이 차면 그 자리에서 검정 구슬.
+            JsonUtility.FromJsonOverwrite("{\"jigwiSmokeFlow\":true,\"jigwiDenseTimeline\":true,\"jigwiABPersonalDurationSeconds\":10,\"jigwiSmokeToTalismanSeconds\":0}",config);
+            var m=Room3();
+            var smoke=Current(m,8.1);
+            double ready=smoke.players.First().readyAt;
+            Assert.That(m.VfxLabGiveSootShards(Three[0],ready+2),Is.True);
+            var shards=m.Snapshot(ready+2.5).orbs.Where(o=>o.kind==LabOrbKind.SootShard).OrderBy(o=>o.sootPieces).ToArray();
+            double t=ready+3;
+            // South first: any order, each piece in its own place.
+            Assert.That(m.TryUseItemAt(Three[0],shards[2].id,Request(),t,new Vector2(.5f,.3f),out var s1,out var e1),Is.True,e1);
+            Assert.That(e1,Is.EqualTo("SOOT_SOCKETED"));
+            Assert.That(s1.sootSocketed,Is.True); Assert.That(s1.sootPieces,Is.EqualTo(4),"The south piece fills the south.");
+            Assert.That(new[]{s1.x,s1.y},Is.EqualTo(new[]{LabModel.SootSocketCenter.x,LabModel.SootSocketCenter.y}));
+            Assert.That(m.TryLaunch(Three[0],s1.id,Request(),t+.05,out _,out var held),Is.False,"A shard in the socket takes no gesture.");
+            Assert.That(m.TryUseItemAt(Three[0],shards[0].id,Request(),t+.1,new Vector2(.5f,.7f),out var s2,out var e2),Is.True,e2);
+            Assert.That(s2.sootPieces,Is.EqualTo(1|4),"North and south: not touching, still kept in the empty orb.");
+            Assert.That(m.Snapshot(t+.15).orbs.Count(o=>o.sootSocketed),Is.EqualTo(1),"One socket per player.");
+            Assert.That(m.TryUseItemAt(Three[0],shards[3].id,Request(),t+.2,new Vector2(.8f,.5f),out var s3,out var e3),Is.True,e3);
+            Assert.That(s3.sootPieces,Is.EqualTo(1|4|8));
+            Assert.That(m.TryUseItemAt(Three[0],shards[1].id,Request(),t+.3,new Vector2(.2f,.5f),out var black,out var e4),Is.True,e4);
+            Assert.That(e4,Is.EqualTo("SOOT_ORB"));
+            Assert.That(black.kind,Is.EqualTo(LabOrbKind.Combined)); Assert.That(black.soot&&black.fiveColor,Is.True);
+            Assert.That(black.sootSocketed,Is.False);
+            Assert.That(new[]{black.x,black.y},Is.EqualTo(new[]{LabModel.SootSocketCenter.x,LabModel.SootSocketCenter.y}),"Born right in the socket.");
+            Assert.That(m.Snapshot(t+.4).orbs.Count(o=>o.kind==LabOrbKind.SootShard),Is.Zero);
+            Launch(m,black,t+1);
+            Assert.That(m.ConfirmHit(black.id,t+1.1),Is.True);
         }
 
         [Test] public void RelaySmokeFlowStartsEachMissionAGapAfterTheLastOneEnded()

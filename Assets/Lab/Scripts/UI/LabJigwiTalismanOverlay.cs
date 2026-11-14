@@ -34,6 +34,8 @@ namespace C6Lab
         [SerializeField, Range(0, 4)] private int maxStrokeGap = 1;
         [Tooltip("#533: 한 획을 이만큼 쓰면 깜빡이는 안내 점이 다음 획으로 넘어간다 (0~1). 칠하기 자체는 순서와 상관없다.")]
         [SerializeField, Range(.3f, 1f)] private float strokeAdvance = .8f;
+        [Tooltip("#724 UT: 획별 판정. 켜면 안내하는 획만 써지고(순서대로), 그 획의 점을 이 비율만큼 쓰면 획 전체가 채워지며 완료된다. 8획이 다 완료되면 바로 성공 (글자 전체 비율 / 끊김 검사는 쓰지 않음). 0이면 예전처럼 글자 전체로 판정.")]
+        [SerializeField, Range(0f, 1f)] private float strokeDoneShare = .6f;
         [Tooltip("#533: 글자에서 이만큼(글자 칸 대비) 떨어진 곳을 문지르면 '글자 밖'으로 센다.")]
         [SerializeField, Range(.05f, .3f)] private float offDistance = .11f;
         [Tooltip("#533: 글자 밖을 문지른 길이(글자 칸 폭 = 1)가 이만큼 쌓이면 '번졌다'며 처음부터 다시 쓴다. 아무렇게나 문지르기 막기. 클수록 너그럽다.")]
@@ -1113,6 +1115,9 @@ namespace C6Lab
             stroke.AddOffGuide(from, to, offDistance);
             if (stroke.OffLength > smudgeBudget) { Smudge(); return; }
             stroke.StrokeAdvance = strokeAdvance;
+            bool byStroke = strokeDoneShare > 0f;
+            stroke.EnforceOrder = byStroke;
+            stroke.StrokeDoneShare = byStroke ? strokeDoneShare : 0f;
             stroke.Paint(from, to, Tolerance, fresh);
             for (int i = 0; i < fresh.Count; i++)
                 if (fresh[i] < dots.Length && dots[fresh[i]] != null) ShowWritten(dots[fresh[i]], fresh[i]);
@@ -1124,7 +1129,7 @@ namespace C6Lab
             }
             // #533: finish only when the letter LOOKS whole — every stroke written end to end with no visible gap —
             // not merely when enough dots are counted (that used to finish with the ㄹ tail still blank).
-            if (stroke.Coverage + 1e-5f < Required || !stroke.LooksComplete(maxStrokeGap)) return;
+            if (byStroke ? !stroke.AllStrokesDone : stroke.Coverage + 1e-5f < Required || !stroke.LooksComplete(maxStrokeGap)) return;
             writtenRound = RoundId;
             CompletedCount++;
             Send();
@@ -2477,6 +2482,23 @@ namespace C6Lab
         public float StrokeAdvance { get; set; } = .8f;
         /// <summary>#533: 켜면 안내 획보다 뒤 획은 칠해지지 않는다. 직접 해 보니 너무 엄격해 기본은 끔(순서는 안내만).</summary>
         public bool EnforceOrder { get; set; }
+        /// <summary>
+        /// #724 UT 획별 판정: 0보다 크면, 한 획의 점을 이 비율만큼 칠하는 순간 그 획의 남은 점이 모두 칠해지며 획이 완료된다.
+        /// </summary>
+        public float StrokeDoneShare { get; set; }
+        private bool[] strokeDone = Array.Empty<bool>();
+        /// <summary>#724: whether that stroke is finished (written to StrokeDoneShare, or every point painted).</summary>
+        public bool IsStrokeDone(int stroke) => stroke >= 0 && stroke < strokes.Length
+            && (strokeDone.Length > stroke && strokeDone[stroke] || strokeCovered[stroke] >= strokes[stroke].Length);
+        /// <summary>#724: every stroke is finished: the talisman is written.</summary>
+        public bool AllStrokesDone
+        {
+            get
+            {
+                for (int s = 0; s < strokes.Length; s++) if (!IsStrokeDone(s)) return false;
+                return true;
+            }
+        }
 
         /// <summary>strokes가 없으면 획 순서 없이 아무 점이나 칠한다.</summary>
         public LabJigwiTalismanStroke(Vector2[] samples, int[][] strokeOrder = null)
@@ -2565,6 +2587,7 @@ namespace C6Lab
         {
             Array.Clear(covered, 0, covered.Length); CoveredCount = 0; OffLength = 0f;
             Array.Clear(strokeCovered, 0, strokeCovered.Length); CurrentStroke = 0;
+            Array.Clear(strokeDone, 0, strokeDone.Length);
         }
 
         /// <summary>선분 from→to에서 tolerance 안에 든 점을 칠하고, 새로 칠한 점 번호를 fresh에 담는다. #533: EnforceOrder일 때만 아직 열리지 않은 획을 건너뛴다.</summary>
@@ -2577,7 +2600,23 @@ namespace C6Lab
                 if (covered[i] || (EnforceOrder && strokeOf[i] > CurrentStroke) || DistanceSquared(Samples[i], from, to) > limit) continue;
                 covered[i] = true; CoveredCount++; strokeCovered[strokeOf[i]]++;
                 fresh?.Add(i);
+                FinishStrokeIfWritten(strokeOf[i], fresh);
                 Advance();
+            }
+        }
+
+        /// <summary>#724: once a stroke is written to StrokeDoneShare, the rest of it fills in at once and it counts as done.</summary>
+        private void FinishStrokeIfWritten(int s, List<int> fresh)
+        {
+            if (!(StrokeDoneShare > 0f)) return;
+            if (strokeDone.Length != strokes.Length) strokeDone = new bool[strokes.Length];
+            if (strokeDone[s] || strokeCovered[s] < Mathf.CeilToInt(strokes[s].Length * Mathf.Clamp01(StrokeDoneShare) - 1e-4f)) return;
+            strokeDone[s] = true;
+            foreach (int index in strokes[s])
+            {
+                if (covered[index]) continue;
+                covered[index] = true; CoveredCount++; strokeCovered[s]++;
+                fresh?.Add(index);
             }
         }
 
