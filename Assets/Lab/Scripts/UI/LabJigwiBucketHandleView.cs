@@ -65,8 +65,6 @@ namespace C6Lab
         // #551 failure: Jigwi's steam fogs my board until I rub it clear.
         [Tooltip("김이 이만큼(0~1) 남을 때까지 문지르면 닦인 것.")]
         [SerializeField, Range(.05f, .8f)] private float steamClearLeft = .1f;
-        [Tooltip("#696 연기를 이만큼(0~1) 걷어 내기 시작하면 Host에 검은 파편을 달라고 한다. 파편은 아직 연기 밑 판 구석구석에 깔려 있어, 닦는 동안 하나씩 드러난다.")]
-        [SerializeField, Range(0f, .5f)] private float sootRevealWiped = .03f;
         [Tooltip("#696 화면 위/아래 가장자리 띠의 폭(화면 높이 비율). 손가락이 닿기 어려운 끝자락은 덜 닦아도 걷힌다. #724 UT: 띠도 다른 곳만큼 진하게 보인다(옅게 그리면 '이미 닦였다'로 보여 위쪽을 안 닦게 됐다). 대신 다 닦았는지 셀 때 덜 센다.")]
         [SerializeField, Range(0f, .25f)] private float steamEdgeBand = .08f;
         [Tooltip("#696/#724 가장자리 끝(맨 위/맨 아래)의 연기를 다 닦았는지 셀 때의 무게(0~1). 띠 안쪽으로 갈수록 1까지 무거워진다. 보이는 진하기는 어디나 같다.")]
@@ -694,6 +692,7 @@ namespace C6Lab
         {
             if (steamRound == roundId) return;
             steamRound = roundId; steamOn = true; steamAt = Time.unscaledTime; steamClearedAt = -1f; rubbing = false;
+            lastRubAt = float.NegativeInfinity; lastRegrowAt = steamAt; SmokeRegrowSteps = 0;
             sootRevealed.Clear();
             lastSqueakLeft = 1f; lastSqueakAt = -1f;
             thickestSpot = handSpot = new Vector2(.5f, .66f); WipeGauge = 0f; touched = false; // #595
@@ -781,8 +780,10 @@ namespace C6Lab
                 if (rubbing) Wipe(lastRub, uv, board); else Wipe(uv, uv, board);
                 if (rubbing) EmitWipePuffs(lastRub, uv, board, t);
                 lastRub = uv; rubbing = true;
+                lastRubAt = t;
             }
             else rubbing = false;
+            RegrowSmoke(t);
             RevealSootShards(false);
             // A small hand rubs back and forth where the most smoke is left (hidden while a finger is already rubbing).
             bool hint = !rubbing;
@@ -899,9 +900,11 @@ namespace C6Lab
             if (lastSqueakLeft - steamLeft >= .04f && Time.unscaledTime - lastSqueakAt >= .25f)
             { lastSqueakLeft = steamLeft; lastSqueakAt = Time.unscaledTime; PlayRub(wiped); }
             // #696: once rubbing starts the Host lays the soot shards under the smoke, so wiping uncovers them one by one.
-            if (steamStartLeft - steamLeft >= sootRevealWiped && source != null) source.RequestJigwiSmokeClear(steamRound);
             if (steamLeft <= steamClearLeft)
             {
+                // #724 UT: the soot shards come only once the smoke is wiped away completely (they used to be laid under
+                // the smoke a little way in, and were found while rubbing).
+                if (source != null) source.RequestJigwiSmokeClear(steamRound);
                 steamClearedAt = Time.unscaledTime;
                 BlowAwayPuffs(Time.unscaledTime);
                 if (source != null) source.RequestJigwiSmokeWiped(steamRound); // #713: everyone wiped = the smoke is over
@@ -965,6 +968,53 @@ namespace C6Lab
             for (int y = Mathf.Max(0, cy - 2); y <= Mathf.Min(SteamH - 1, cy + 2); y++)
                 for (int x = Mathf.Max(0, cx - 2); x <= Mathf.Min(SteamW - 1, cx + 2); x++) { sum += steamAlpha[y * SteamW + x]; n++; }
             return n > 0 ? sum / n : 1f;
+        }
+
+        // ---------- #724 UT: smoke left unwiped slowly spreads back over the wiped holes while no finger rubs ----------
+        [Tooltip("#724 UT: 문지르지 않고 이 초가 지나면 남은 연기가 닦인 구멍 가장자리부터 다시 번진다 (대충 뚫고 버티기보다 끝까지 닦게).")]
+        [SerializeField, Range(0f, 5f)] private float smokeRegrowDelaySeconds = 1f;
+        [Tooltip("#724 UT: 다시 번지는 빠르기 (연기 가장자리 1칸이 1초에 이만큼 진해짐, 0이면 안 번짐).")]
+        [SerializeField, Range(0f, 3f)] private float smokeRegrowRate = .6f;
+        private const float RegrowStepSeconds = .1f;
+        private float lastRubAt = float.NegativeInfinity, lastRegrowAt;
+        private float[] regrowScratch;
+        /// <summary>How many times the smoke has crept back (tests and checks).</summary>
+        public int SmokeRegrowSteps { get; private set; }
+
+        /// <summary>
+        /// #724: every 0.1 s while nobody rubs (after the delay), each wiped texel next to smoke thickens toward its thickest
+        /// neighbour, so the smoke creeps back in from the edges of the holes. A thick wall far from a hole does nothing; a
+        /// hole closes from its rim inward. It never passes the clear line on its own (it only adds smoke).
+        /// </summary>
+        private void RegrowSmoke(float t)
+        {
+            if (smokeRegrowRate <= 0f || rubbing || t - lastRubAt < smokeRegrowDelaySeconds || t - steamAt < .5f) return;
+            if (t - lastRegrowAt < RegrowStepSeconds) return;
+            float step = Mathf.Min(.5f, smokeRegrowRate * (t - Mathf.Max(lastRegrowAt, t - .5f)));
+            lastRegrowAt = t;
+            if (regrowScratch == null || regrowScratch.Length != steamAlpha.Length) regrowScratch = new float[steamAlpha.Length];
+            bool changed = false;
+            for (int y = 0; y < SteamH; y++)
+                for (int x = 0; x < SteamW; x++)
+                {
+                    int i = y * SteamW + x;
+                    float a = steamAlpha[i];
+                    if (a >= 1f) { regrowScratch[i] = a; continue; }
+                    float n = a;
+                    if (x > 0) n = Mathf.Max(n, steamAlpha[i - 1]);
+                    if (x < SteamW - 1) n = Mathf.Max(n, steamAlpha[i + 1]);
+                    if (y > 0) n = Mathf.Max(n, steamAlpha[i - SteamW]);
+                    if (y < SteamH - 1) n = Mathf.Max(n, steamAlpha[i + SteamW]);
+                    float next = n > a + .02f ? Mathf.Min(n, a + step * n) : a;
+                    regrowScratch[i] = next;
+                    if (next > a + .0005f) changed = true;
+                }
+            if (!changed) return;
+            System.Array.Copy(regrowScratch, steamAlpha, steamAlpha.Length);
+            SmokeRegrowSteps++;
+            WriteSteam();
+            steamLeft = WeightedLeft();
+            FindThickest();
         }
 
         // ---------- #724 UT: smoke scatters from the fingertip, and is blown away at once when wiped ----------
