@@ -1188,8 +1188,10 @@ namespace C6Lab
         [SerializeField, Range(5f, 90f)] private float thirtySecondsLeftAt = 30f;
         [Tooltip("\"30초 남았소!\" 말풍선이 떠 있는 시간 (초). 마지막 0.4초에 흐려진다")]
         [SerializeField, Range(.5f, 5f)] private float thirtySecondsLeftBubbleSeconds = 2.2f;
-        [Tooltip("남은 30초 경고음: 징(Audio/ThirtySecondsLeftGong) 또는 북(Audio/ThirtySecondsLeftDrum). 들어 보고 고른다")]
+        [Tooltip("남은 30초 경고음: 징(Audio/ThirtySecondsLeftGong), 북(Audio/ThirtySecondsLeftDrum), 또는 징 다음 북. 들어 보고 고른다")]
         [SerializeField] private LabThirtySecondsLeftSound thirtySecondsLeftSound = LabThirtySecondsLeftSound.Gong;
+        [Tooltip("\"징 다음 북\"일 때 징이 울리고 북이 울리기까지 (초)")]
+        [SerializeField, Range(0f, 3f)] private float thirtySecondsLeftDrumDelaySeconds = .8f;
         [Tooltip("남은 30초 경고음 크기 (모든 기기)")]
         [SerializeField, Range(0f, 1f)] private float thirtySecondsLeftVolume = 1f;
         [Tooltip("남은 30초 진동 세기 (강한 탭 한 번 + 짧은 여운, 0이면 끔)")]
@@ -1767,6 +1769,7 @@ namespace C6Lab
         public float ThirtySecondsLeftAt => Mathf.Clamp(Finite(thirtySecondsLeftAt, 30f), 5f, 90f);
         public float ThirtySecondsLeftBubbleSeconds => Mathf.Clamp(Finite(thirtySecondsLeftBubbleSeconds, 2.2f), .5f, 5f);
         public LabThirtySecondsLeftSound ThirtySecondsLeftSound => thirtySecondsLeftSound;
+        public float ThirtySecondsLeftDrumDelaySeconds => Mathf.Clamp(Finite(thirtySecondsLeftDrumDelaySeconds, .8f), 0f, 3f);
         public float ThirtySecondsLeftVolume => Mathf.Clamp01(Finite(thirtySecondsLeftVolume, 1f));
         public float ThirtySecondsLeftHaptic => Mathf.Clamp01(Finite(thirtySecondsLeftHaptic, 1f));
         public float JigwiSootJoinVolume => Mathf.Clamp01(Finite(jigwiSootJoinVolume, .8f));

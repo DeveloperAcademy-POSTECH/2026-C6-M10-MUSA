@@ -66,6 +66,8 @@ namespace C6Lab.Tests
                 Assert.That(config.ThirtySecondsLeftSound, Is.EqualTo(LabThirtySecondsLeftSound.Gong));
                 Assert.That(LabThirtySecondsLeftHud.FolderFor(LabThirtySecondsLeftSound.Gong), Is.EqualTo("ThirtySecondsLeftGong"));
                 Assert.That(LabThirtySecondsLeftHud.FolderFor(LabThirtySecondsLeftSound.Drum), Is.EqualTo("ThirtySecondsLeftDrum"));
+                Assert.That(LabThirtySecondsLeftHud.FolderFor(LabThirtySecondsLeftSound.GongThenDrum), Is.EqualTo("ThirtySecondsLeftGong"), "The gong first.");
+                Assert.That(config.ThirtySecondsLeftDrumDelaySeconds, Is.EqualTo(.8f).Within(.001f));
             }
             finally { UnityEngine.Object.DestroyImmediate(config); }
         }

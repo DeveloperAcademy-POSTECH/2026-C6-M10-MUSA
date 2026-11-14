@@ -4,7 +4,7 @@ using UnityEngine.UI;
 namespace C6Lab
 {
     /// <summary>#734 남은 30초 경고음 종류 (LabConfig에서 들어 보고 고른다).</summary>
-    public enum LabThirtySecondsLeftSound { Gong = 0, Drum = 1 }
+    public enum LabThirtySecondsLeftSound { Gong = 0, Drum = 1, GongThenDrum = 2 }
 
     /// <summary>
     /// 남은 30초 알림 (#734). 스토리 1/2/3라운드(구미호/야광귀/지귀)에서 남은 시간이 30초가 되는 순간 모든 기기 화면에
@@ -46,6 +46,9 @@ namespace C6Lab
         private double lastRemaining = double.NaN;
         private float age = float.PositiveInfinity;
         private AudioSource sfx;
+        // 징 다음 북: 북이 울릴 시각(unscaled). 없으면 무한대.
+        private float drumAt = float.PositiveInfinity;
+        private float drumVolume;
         private static readonly Vector3[] Corners = new Vector3[4];
 
         /// <summary>알림을 띄운 횟수 (테스트·확인용)</summary>
@@ -80,6 +83,14 @@ namespace C6Lab
 
         private void LateUpdate()
         {
+            if (Time.unscaledTime >= drumAt)
+            {
+                drumAt = float.PositiveInfinity;
+                PlaySound(DrumFolder, drumVolume);
+                LabConfig config = network != null ? network.config : null;
+                float haptic = config != null ? config.ThirtySecondsLeftHaptic : 1f;
+                if (haptic > 0f) LabHaptics.PlayDirect(config, LabHapticStyle.Heavy, haptic * .8f);
+            }
             LabSnapshot snapshot = network != null ? network.Snapshot : null;
             bool playing = snapshot != null && snapshot.phase == LabPhase.Playing;
             if (!playing)
@@ -101,15 +112,15 @@ namespace C6Lab
         /// <summary>
         /// VFX 실험실(#734): 남은 시간과 상관없이 지금 한 번 띄운다 (화면/소리/진동만). 실제 30초 알림은 그대로 따로 뜬다.
         /// </summary>
-        public bool PreviewNow()
+        public bool PreviewNow(LabThirtySecondsLeftSound? sound = null)
         {
-            Begin(network != null && network.config != null ? network.config.ThirtySecondsLeftAt : 30f);
+            Begin(network != null && network.config != null ? network.config.ThirtySecondsLeftAt : 30f, sound);
             return layer != null;
         }
 
         /// <summary>VFX 실험실(#734): 고른 경고음만 지금 한 번 들려준다 (말풍선 없이, LabConfig 크기로).</summary>
         public void PreviewSound(LabThirtySecondsLeftSound sound)
-            => PlaySound(FolderFor(sound), network != null && network.config != null ? network.config.ThirtySecondsLeftVolume : 1f);
+            => PlayAlarm(sound, network != null ? network.config : null);
 
         private void OnDisable() => Hide();
 
@@ -119,7 +130,7 @@ namespace C6Lab
             if (layer != null) Destroy(layer.gameObject);
         }
 
-        private void Begin(float at)
+        private void Begin(float at, LabThirtySecondsLeftSound? sound = null)
         {
             if (!EnsureLayer()) return;
             ShowCount++;
@@ -134,8 +145,7 @@ namespace C6Lab
                 timerTouched = true;
             }
             LabConfig config = network != null ? network.config : null;
-            PlaySound(FolderFor(config != null ? config.ThirtySecondsLeftSound : LabThirtySecondsLeftSound.Gong),
-                config != null ? config.ThirtySecondsLeftVolume : 1f);
+            PlayAlarm(sound ?? (config != null ? config.ThirtySecondsLeftSound : LabThirtySecondsLeftSound.Gong), config);
             float haptic = config != null ? config.ThirtySecondsLeftHaptic : 1f;
             if (haptic > 0f) LabHaptics.PlayDirect(config, LabHapticStyle.Heavy, haptic, .3f, .8f * haptic, .9f);
         }
@@ -242,8 +252,19 @@ namespace C6Lab
                 y + BubbleHeight * .5f);
         }
 
-        /// <summary>경고음 종류의 Resources/Audio 폴더 이름.</summary>
+        /// <summary>경고음 종류의 Resources/Audio 폴더 이름 (징 다음 북은 먼저 울리는 징).</summary>
         public static string FolderFor(LabThirtySecondsLeftSound sound) => sound == LabThirtySecondsLeftSound.Drum ? DrumFolder : GongFolder;
+
+        /// <summary>경고음을 울린다. 징 다음 북이면 징을 울리고 LabConfig의 간격 뒤에 북을 울린다.</summary>
+        private void PlayAlarm(LabThirtySecondsLeftSound sound, LabConfig config)
+        {
+            float volume = config != null ? config.ThirtySecondsLeftVolume : 1f;
+            PlaySound(FolderFor(sound), volume);
+            drumAt = float.PositiveInfinity;
+            if (sound != LabThirtySecondsLeftSound.GongThenDrum) return;
+            drumVolume = volume;
+            drumAt = Time.unscaledTime + (config != null ? config.ThirtySecondsLeftDrumDelaySeconds : .8f);
+        }
 
         private void PlaySound(string folder, float volume)
         {

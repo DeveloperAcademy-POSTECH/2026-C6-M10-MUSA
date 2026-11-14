@@ -114,16 +114,21 @@ namespace C6Lab.Editor
                 if (GUILayout.Button("30초 알림 지금 보기 (화면/소리/진동만, 시간은 그대로)", GUILayout.Height(28)))
                     Report(hud.PreviewNow(), "\"30초 남았소!\"를 띄웠다. 몇 번이든 다시 누를 수 있다. 실제 알림은 남은 30초에 따로 뜬다.",
                         "알림을 그릴 화면을 찾지 못함");
+                EditorGUILayout.LabelField("알림 화면과 함께 소리 골라 듣기 (LabConfig는 그대로)", EditorStyles.wordWrappedMiniLabel);
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    if (GUILayout.Button("징 소리만 듣기", GUILayout.Height(24)))
-                    { hud.PreviewSound(LabThirtySecondsLeftSound.Gong); last = "징 소리를 틀었다 (Audio/ThirtySecondsLeftGong)."; }
-                    if (GUILayout.Button("북 소리만 듣기", GUILayout.Height(24)))
-                    { hud.PreviewSound(LabThirtySecondsLeftSound.Drum); last = "북 소리를 틀었다 (Audio/ThirtySecondsLeftDrum)."; }
+                    if (GUILayout.Button("알림 + 징", GUILayout.Height(26)))
+                        Report(hud.PreviewNow(LabThirtySecondsLeftSound.Gong), "알림과 징 소리를 띄웠다.", "알림을 그릴 화면을 찾지 못함");
+                    if (GUILayout.Button("알림 + 북", GUILayout.Height(26)))
+                        Report(hud.PreviewNow(LabThirtySecondsLeftSound.Drum), "알림과 북 소리를 띄웠다.", "알림을 그릴 화면을 찾지 못함");
+                    if (GUILayout.Button("알림 + 징 다음 북", GUILayout.Height(26)))
+                        Report(hud.PreviewNow(LabThirtySecondsLeftSound.GongThenDrum), "알림과 징 → 북 소리를 띄웠다 (간격은 LabConfig).",
+                            "알림을 그릴 화면을 찾지 못함");
                 }
             }
             if (ready && network.config != null)
-                EditorGUILayout.LabelField("실제 게임에서 쓰는 소리: " + (network.config.ThirtySecondsLeftSound == LabThirtySecondsLeftSound.Drum ? "북" : "징")
+                EditorGUILayout.LabelField("실제 게임에서 쓰는 소리: " + (network.config.ThirtySecondsLeftSound == LabThirtySecondsLeftSound.Drum ? "북"
+                    : network.config.ThirtySecondsLeftSound == LabThirtySecondsLeftSound.GongThenDrum ? "징 다음 북" : "징")
                     + " (LabConfig \"남은 30초 알림\"에서 바꾼다)", EditorStyles.wordWrappedMiniLabel);
             if (ready && network.Snapshot != null && network.config != null)
             {
