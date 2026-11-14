@@ -8814,6 +8814,48 @@ main fbc943e8을 통합하며 VALIDATION 문서 끝의 독립 기록 추가 충�
 
 최종 통합 검증: main `a7208003`을 병합한 `aec6e100` 기준으로 전체 EditMode **2407/2407 PASS**(21.07초), 전체 PlayMode **849/849 PASS**(963.34초). 실패·skip·inconclusive 0. 일반 Story 1~3스테이지, 지귀 결과 후 관람 복구, 불완전한 땅따먹기 관람 Disabled/오류 없음, #717 종료/호루라기, #718 북 안내/스태미나 경고를 포함한다. 검사 후 변경은 검증 문서·PR 설명뿐이며 동작 코드는 같다. Scene/Prefab/원본 에셋/저장 설정/패키지는 최신 main과 차이가 없다. 통합 전 2403/841 결과와 별개인 이번 실행 결과이며, 별도 기기·iOS 확인은 여전히 미검증이다.
 
+
+## 2026-11-14 — 기존 PlayMode 실패 4개 fixture 재확인과 칠 무늬 GPU 검사 간헐 실패 수정
+
+기준 origin/main `53118b72`(#728 병합), 브랜치 `fix/paint-pattern-render-flake`, Unity 6000.6.5f1 / macOS batch Metal.
+
+PR #729 검증 중 main `a7208003`에서 `LabLocalBoardNetworkIntegrationTests` 7건(`TargetParameterCountException`), `LabComboProjectileIntegrationTests` 2건(슬롯 알파 0.4·예고 숫자 "4"), `LabFiveColorClayNetworkTests` 1건(`Five Color Dust Burst`), `LabPlayerPaintPatternRenderTests` 1건(실행마다 다른 검사, 1픽셀·1 LSB 차이)이 실패한다는 보고를 받았다.
+
+### 앞의 세 fixture: 이미 #728에서 반영됨
+
+- `a7208003` 다음에 병합된 #728(`9b1b4366`)이 세 fixture의 기대값을 현재 규칙에 맞췄다. #713이 `OnPredictedShotContact`에 추가한 선택 인자 `soot`를 리플렉션 호출에 명시했고(리플렉션은 기본값을 채우지 않아 인자 수 예외가 났다), #719의 현재 차례 강조(뒤 슬롯 알파 0.4)·예고 4박, #719 보상 생성 먼지와 접촉에서 새로 생긴 구형 효과를 구분했다. 게임 코드 변경 없이 기대값이 낡았던 경우다. 근거는 위 #725 절이다.
+- 이번 기준 `53118b72`에서 네 fixture를 함께 다시 실행해 **36/36 PASS**를 확인했다. 따라서 이번 PR은 세 fixture를 바꾸지 않는다.
+
+### `LabPlayerPaintPatternRenderTests` 간헐 실패 원인
+
+- 재현: 같은 기준에서 fixture를 `-repeat 15`로 실행하자 5번째 반복에서 `ActualSavedShaderDistinguishesAllSixPaintersWithoutChangingPaperAlphaOrCoverage`가 "The ownership motif must modulate pigment brightness only at 20696"으로 실패했다.
+- 임시 조사 검사(커밋하지 않음)로 같은 도색 지도를 한 상태에서 40번씩 다시 그려 비교했다. CPU에서 보이는 상태(재질·property block 값, 키워드, 바인딩된 고해상도 칠·P 텍스처의 내용 해시, `_GlobalMipBias`, 비등방 필터)는 모든 캡처에서 같았는데도, 약 40번 중 1~2번의 캡처가 박 전체(한지 포함)에 흩어진 수백 픽셀을 1~3 LSB 다르게 읽었다. 같은 프레임 안의 연속 캡처 사이에서도 생겼다. 그래서 `neutral`이나 `paper` 기준 캡처가 그런 캡처면 한지 픽셀 일부가 칠로 분류되어 밝기·동일성 단언이 실패했고, 어느 검사가 실패할지는 실행마다 달랐다.
+- 배제한 가설: P 무늬 셰이더의 분기 안 `fwidth`(분기 앞으로 옮겨도 그대로, 셰이더 변경은 되돌림), URP render scale 0.8 중간 버퍼(1로 바꿔도 그대로), `LabGourdPaint` 갱신(끄고도 그대로). Lab Scene의 다른 카메라를 끄자 7개 P×40회 캡처가 모두 같았다.
+- 별도로, 장면 로드 직후 첫 수동 렌더는 이전 렌더가 남긴 `_GlobalMipBias`(로드 직후 (0,0))로 한지를 샘플링해 다음 캡처와 달랐다.
+
+### 수정 (검사 fixture만)
+
+- `ShellRenderRig`가 살아 있는 동안 Lab Scene의 활성 카메라를 멈추고 `Dispose`에서 되돌린다. 캡처마다 `_GlobalMipBias`를 명시값 (0,1)로 두고 렌더한 뒤 이전 값으로 되돌린다. 단언·허용치·캡처 대상은 바꾸지 않았다. 게임 코드·셰이더·Scene·Prefab·에셋·설정·접속 규약은 변경하지 않았다.
+- 같은 셰이더 분기 구조(`PainterInk`의 조기 반환 뒤 `fwidth`)는 `ClayStickerSurface.shader`와 실험용 셰이더에도 있다. 이번 흔들림의 원인이 아님을 확인했으므로 고치지 않았다. `ClayStickerSurface.shader`는 이미지 미리보기 실험 manifest의 SHA 고정 대상이기도 하다.
+
+### 실행 결과
+
+| 검사 | 결과 | 시간 |
+| --- | --- | --- |
+| 수정 전 4 fixture (`53118b72`) | 36/36 PASS | — |
+| 수정 전 `LabPlayerPaintPatternRenderTests` `-repeat 15` | 5번째 반복에서 1건 FAIL(위 메시지) | — |
+| 수정 후 `LabPlayerPaintPatternRenderTests` `-repeat 20` × 2회 실행 | 40회 반복 모두 PASS(5/5씩) | 116.1초, 104.8초 |
+| 전체 EditMode | 2407/2407 PASS | 25.33초 |
+| 전체 PlayMode | **846/849, 3 FAIL** (아래) | 877.04초 |
+| Hapio 실패 3건 단독 재실행 | 1/3 PASS (`PauseMenuRestart…` 통과, 나머지 2건 FAIL) | 14.31초 |
+| `GameStageRetryPlayModeTests`·`GameYaguangDemoFlowTests`·`GameTutorialFlowTests` fixture 재실행 | 6/8 PASS, 2 FAIL | 41.11초 |
+
+전체 PlayMode의 실패 3건은 모두 Hapio Scene 흐름 검사의 `Until` 대기 실패다: `GameStageRetryPlayModeTests.FailedSecondStageRetriesInTheSameRoomWithFreshResourcesAndKeepsStageOneRecord`("The saved result Scene must finish loading."), `GameTutorialFlowTests.PauseMenuRestartStartsThePracticeBoardOverAndQuitGoesToTheTitle`("The practice board plays its first line"), `GameYaguangDemoFlowTests.ThreePlayersFinishOnlyOriginalStageTwoThenReadItsAfterstorySummaryEndingAndRealTitle`("Yaguang afterstory ends at its final picture"). 재실행할 때마다 실패하는 검사가 바뀌었다(fixture 재실행에서는 `GameTutorialFlowTests.FinishedOpeningOpensThePracticeBoardOnceThenTheRoomList`가 새로 실패하고 `PauseMenuRestart…`·야광귀 시연은 통과). 이 검사들은 이번에 바꾼 `LabPlayerPaintPatternRenderTests`를 실행하지 않으며 게임 코드도 바뀌지 않았다. 같은 런타임 코드의 #728 기록은 849/849였다. 실행 당시 같은 Mac에서 다른 세션의 Unity가 함께 돌아 load average가 7~18이었고, 41초 분량의 fixture 실행이 76분 걸렸다. 실패 검사의 소요 시간(3.6초·5.8초)이 `Until`의 실시간 한도(20초·30초)보다 짧아 프로세스 정지·시계 도약도 의심된다. 원인을 확정하지 못했으므로 PASS로 쓰지 않고 미해결로 남긴다. 부하 없는 환경에서의 재실행은 하지 못했다.
+
+**#729·#730·#731 병합 뒤 재실행 (main `da39c5f9`, 다른 Unity 실행 없음):** 충돌은 이 문서의 기록 추가뿐이었다(양쪽 보존). 전체 EditMode **2424/2424 PASS**, 전체 PlayMode **859/859 PASS**. 위에서 미해결로 남긴 Hapio Scene 흐름 3건(`FailedSecondStageRetries…`, `PauseMenuRestart…`, 야광귀 시연)과 `FinishedOpeningOpens…`도 이번에는 모두 PASS여서, 부하 중 실패라는 추정과 맞는다(부하 원인을 따로 재현하지는 않았다).
+
+`-repeat`는 첫 실패에서 멈추며 결과 XML에는 마지막 반복만 남는다. 반복 횟수는 fixture 소요 시간(1회 약 5.7초)으로 확인했다. iOS·실기기·다른 GPU(Mac Intel/AMD)는 실행하지 않았다. 원시 로그·조사용 캡처 이미지는 커밋하지 않는다.
+
 ## 2026-11-14 — 전투 시작 대기의 끝 (방장 시작 재확인·참가자 시작 대기 10초·준비 45초)
 
 - **기준:** `fix/hapio-start-waits` (main `a7208003`). Unity 6000.6.5f1 batch(macOS, Metal). 바뀐 코드는 `GameSession.Start.cs`뿐이며 접속 규약·설정 수·`GameStartTiming` 기본값은 그대로다.
