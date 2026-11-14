@@ -65,11 +65,9 @@ namespace C6Lab
         // #551 failure: Jigwi's steam fogs my board until I rub it clear.
         [Tooltip("김이 이만큼(0~1) 남을 때까지 문지르면 닦인 것.")]
         [SerializeField, Range(.05f, .8f)] private float steamClearLeft = .1f;
-        [Tooltip("#696 연기를 이만큼(0~1) 걷어 내기 시작하면 Host에 검은 파편을 달라고 한다. 파편은 아직 연기 밑 판 구석구석에 깔려 있어, 닦는 동안 하나씩 드러난다.")]
-        [SerializeField, Range(0f, .5f)] private float sootRevealWiped = .03f;
-        [Tooltip("#696 화면 위/아래 가장자리에서 연기가 옅어지는 띠의 폭(화면 높이 비율). 손가락이 닿기 어려운 끝자락은 덜 닦아도 걷힌다.")]
+        [Tooltip("#696 화면 위/아래 가장자리 띠의 폭(화면 높이 비율). 손가락이 닿기 어려운 끝자락은 덜 닦아도 걷힌다. #724 UT: 띠도 다른 곳만큼 진하게 보인다(옅게 그리면 '이미 닦였다'로 보여 위쪽을 안 닦게 됐다). 대신 다 닦았는지 셀 때 덜 센다.")]
         [SerializeField, Range(0f, .25f)] private float steamEdgeBand = .08f;
-        [Tooltip("#696 가장자리 끝(맨 위/맨 아래)의 연기 진하기(0~1). 띠 안쪽으로 갈수록 1까지 진해진다.")]
+        [Tooltip("#696/#724 가장자리 끝(맨 위/맨 아래)의 연기를 다 닦았는지 셀 때의 무게(0~1). 띠 안쪽으로 갈수록 1까지 무거워진다. 보이는 진하기는 어디나 같다.")]
         [SerializeField, Range(0f, 1f)] private float steamEdgeAlpha = .3f;
         [Tooltip("문지르는 손가락 굵기(판 폭 비율).")]
         [SerializeField, Range(.03f, .3f)] private float steamBrush = .14f;
@@ -77,6 +75,8 @@ namespace C6Lab
         private RawImage steam;
         private Texture2D steamTexture;
         private readonly float[] steamAlpha = new float[SteamW * SteamH];
+        // #724 UT: how much each texel counts toward "wiped" (the edge band counts less); the smoke itself looks the same everywhere.
+        private readonly float[] steamWeight = new float[SteamW * SteamH];
         private Color32[] steamPixels;
         private Image steamHand; // a small hand rubbing back and forth: "wipe it" without words
         private static Sprite handSprite;
@@ -692,6 +692,7 @@ namespace C6Lab
         {
             if (steamRound == roundId) return;
             steamRound = roundId; steamOn = true; steamAt = Time.unscaledTime; steamClearedAt = -1f; rubbing = false;
+            lastRubAt = float.NegativeInfinity; lastRegrowAt = steamAt; SmokeRegrowSteps = 0;
             sootRevealed.Clear();
             lastSqueakLeft = 1f; lastSqueakAt = -1f;
             thickestSpot = handSpot = new Vector2(.5f, .66f); WipeGauge = 0f; touched = false; // #595
@@ -709,14 +710,18 @@ namespace C6Lab
             {
                 float v = (y + .5f) / SteamH;
                 float edge = steamEdgeBand > 0f ? Mathf.Clamp01(Mathf.Min(v, 1f - v) / steamEdgeBand) : 1f;
-                float alpha = Mathf.Lerp(steamEdgeAlpha, 1f, edge * edge * (3f - 2f * edge));
-                for (int x = 0; x < SteamW; x++) steamAlpha[y * SteamW + x] = alpha;
+                float weight = Mathf.Lerp(steamEdgeAlpha, 1f, edge * edge * (3f - 2f * edge));
+                for (int x = 0; x < SteamW; x++) { steamAlpha[y * SteamW + x] = 1f; steamWeight[y * SteamW + x] = weight; }
             }
             WriteSteam();
-            float startSum = 0f; foreach (float a in steamAlpha) startSum += a;
-            steamStartLeft = steamLeft = lastTickLeft = startSum / steamAlpha.Length;
+            steamStartLeft = steamLeft = lastTickLeft = WeightedLeft();
             lastSqueakLeft = steamLeft;
-            if (source != null && source.board != null) { source.board.SetUiInputBlocked(true); steamBlocking = true; }
+            if (source != null && source.board != null)
+            {
+                source.board.SetUiInputBlocked(true);
+                source.board.BlockedPressGate = WipedAt; // #724 UT: where the smoke is wiped away, the board works
+                steamBlocking = true;
+            }
             if (source != null) source.JigwiSmokeWiping = true; // #696 iOS edge gestures wait while rubbing
             if (source != null) LabHaptics.PlayDirect(source.config, LabHapticStyle.Heavy, 1f, .45f, .8f, .3f);
             Play(fogHitSoundFolder, fogHitVolume);
@@ -748,28 +753,37 @@ namespace C6Lab
             PlaceScreenRect(steam.rectTransform, board);
             if (!steam.gameObject.activeSelf) steam.gameObject.SetActive(true);
             float fadeIn = Mathf.Clamp01((t - steamAt) / .5f);
-            float fadeOut = steamClearedAt >= 0f ? 1f - Mathf.Clamp01((t - steamClearedAt) / .4f) : 1f;
+            // #724 UT: when it counts as wiped the rest of the smoke is blown away at once: it swells outward and thins out.
+            float blown = steamClearedAt >= 0f ? Mathf.Clamp01((t - steamClearedAt) / ClearBlowSeconds) : 0f;
+            float fadeOut = 1f - blown * blown * (3f - 2f * blown);
             WipeGauge = WipedShare;
             steam.color = new Color(SmokeGrey, SmokeGrey * .98f, SmokeGrey * .96f, fadeIn * fadeOut);
+            steam.rectTransform.localScale = Vector3.one * (1f + .45f * (1f - (1f - blown) * (1f - blown)));
+            DriveWipePuffs(board, t);
             if (steamClearedAt >= 0f)
             {
                 RevealSootShards(true); // #713: whatever was still hidden shows as the smoke lifts
-                if (fadeOut <= 0f) EndSteam();
+                if (fadeOut <= 0f && t - steamClearedAt >= ClearPuffSeconds) EndSteam(); // #724 after the blown puffs are gone
                 Show(steamHand, false);
                 // The full ring flashes and swells away with the smoke.
-                float burst = Mathf.Clamp01((t - steamClearedAt) / .4f);
+                float burst = Mathf.Clamp01((t - steamClearedAt) / (ClearBlowSeconds * .75f));
                 DrawWipeGauge(1f, 1f + .5f * burst, 1f - burst, board);
                 return;
             }
             // Rub: every finger (or mouse) drag over the board wipes a stroke out of the fog.
-            if (TryPointer(out Vector2 screen) && board.Contains(screen))
+            // #724: a finger holding an orb or drum (picked up where the smoke was wiped) moves it, it does not wipe.
+            bool holding = source != null && source.board != null && source.board.HeldThroughGate;
+            if (!holding && TryPointer(out Vector2 screen) && board.Contains(screen))
             {
                 lastPointer = screen; touched = true;
                 Vector2 uv = new Vector2((screen.x - board.xMin) / board.width, (screen.y - board.yMin) / board.height);
                 if (rubbing) Wipe(lastRub, uv, board); else Wipe(uv, uv, board);
+                if (rubbing) EmitWipePuffs(lastRub, uv, board, t);
                 lastRub = uv; rubbing = true;
+                lastRubAt = t;
             }
             else rubbing = false;
+            RegrowSmoke(t);
             RevealSootShards(false);
             // A small hand rubs back and forth where the most smoke is left (hidden while a finger is already rubbing).
             bool hint = !rubbing;
@@ -835,7 +849,7 @@ namespace C6Lab
                     float sum = 0f;
                     int x0 = cx * SteamW / cols, x1 = (cx + 1) * SteamW / cols, y0 = cy * SteamH / rows, y1 = (cy + 1) * SteamH / rows;
                     for (int y = y0; y < y1; y += 2)
-                        for (int x = x0; x < x1; x += 2) sum += steamAlpha[y * SteamW + x];
+                        for (int x = x0; x < x1; x += 2) sum += steamAlpha[y * SteamW + x] * steamWeight[y * SteamW + x];
                     if (sum > best) { best = sum; thickestSpot = new Vector2((cx + .5f) / cols, (cy + .5f) / rows); }
                 }
         }
@@ -876,8 +890,7 @@ namespace C6Lab
             }
             if (!changed) return;
             WriteSteam();
-            float sum = 0f; foreach (float a in steamAlpha) sum += a;
-            steamLeft = sum / steamAlpha.Length;
+            steamLeft = WeightedLeft();
             FindThickest();
             float wiped = WipedShare;
             // A light tick for every bit wiped away, a firm one when it is clear.
@@ -887,20 +900,31 @@ namespace C6Lab
             if (lastSqueakLeft - steamLeft >= .04f && Time.unscaledTime - lastSqueakAt >= .25f)
             { lastSqueakLeft = steamLeft; lastSqueakAt = Time.unscaledTime; PlayRub(wiped); }
             // #696: once rubbing starts the Host lays the soot shards under the smoke, so wiping uncovers them one by one.
-            if (steamStartLeft - steamLeft >= sootRevealWiped && source != null) source.RequestJigwiSmokeClear(steamRound);
             if (steamLeft <= steamClearLeft)
             {
+                // #724 UT: the soot shards come only once the smoke is wiped away completely (they used to be laid under
+                // the smoke a little way in, and were found while rubbing).
+                if (source != null) source.RequestJigwiSmokeClear(steamRound);
                 steamClearedAt = Time.unscaledTime;
+                BlowAwayPuffs(Time.unscaledTime);
                 if (source != null) source.RequestJigwiSmokeWiped(steamRound); // #713: everyone wiped = the smoke is over
                 if (source != null) LabHaptics.PlayDirect(source.config, LabHapticStyle.Medium, .7f);
                 Play(clearSoundFolder, clearVolume);
-                if (steamBlocking && source != null && source.board != null) source.board.SetUiInputBlocked(false);
+                if (steamBlocking && source != null && source.board != null) { source.board.SetUiInputBlocked(false); source.board.BlockedPressGate = null; }
                 steamBlocking = false;
                 if (source != null) source.JigwiSmokeWiping = false;
             }
         }
 
         /// <summary>#696: 0 at the start of the smoke, 1 when it counts as wiped (the thin edges are already counted as thin).</summary>
+        /// <summary>#724: the smoke left, each texel counted by its weight (the edge band less), as a share of the screen.</summary>
+        private float WeightedLeft()
+        {
+            float sum = 0f;
+            for (int i = 0; i < steamAlpha.Length; i++) sum += steamAlpha[i] * steamWeight[i];
+            return sum / steamAlpha.Length;
+        }
+
         private float WipedShare => Mathf.Clamp01((steamStartLeft - steamLeft) / Mathf.Max(.01f, steamStartLeft - steamClearLeft));
 
         /// <summary>
@@ -923,6 +947,18 @@ namespace C6Lab
             source.NotifySootShardRevealed(found);
         }
 
+        /// <summary>
+        /// #724 UT: whether the smoke at this screen point (pixels) is wiped thin enough to see through, so a press starting
+        /// there reaches the board (pick up, combine, throw, pass). A press starting on the smoke wipes instead.
+        /// </summary>
+        public bool WipedAt(Vector2 screen)
+        {
+            if (!steamOn || steamClearedAt >= 0f || Screen.width <= 0 || Screen.height <= 0) return false;
+            return SmokeAt(screen.x / Screen.width, screen.y / Screen.height) <= WipedThroughAlpha;
+        }
+        /// <summary>#724: smoke this thin (0~1) or thinner counts as wiped for touching the board under it.</summary>
+        public const float WipedThroughAlpha = .35f;
+
         /// <summary>#713: the smoke left around a screen point (0~1 each way), averaged over a few texels.</summary>
         private float SmokeAt(float u, float v)
         {
@@ -934,14 +970,161 @@ namespace C6Lab
             return n > 0 ? sum / n : 1f;
         }
 
+        // ---------- #724 UT: smoke left unwiped slowly spreads back over the wiped holes while no finger rubs ----------
+        [Tooltip("#724 UT: 문지르지 않고 이 초가 지나면 남은 연기가 닦인 구멍 가장자리부터 다시 번진다 (대충 뚫고 버티기보다 끝까지 닦게).")]
+        [SerializeField, Range(0f, 5f)] private float smokeRegrowDelaySeconds = 1f;
+        [Tooltip("#724 UT: 다시 번지는 빠르기 (연기 가장자리 1칸이 1초에 이만큼 진해짐, 0이면 안 번짐).")]
+        [SerializeField, Range(0f, 3f)] private float smokeRegrowRate = .6f;
+        private const float RegrowStepSeconds = .1f;
+        private float lastRubAt = float.NegativeInfinity, lastRegrowAt;
+        private float[] regrowScratch;
+        /// <summary>How many times the smoke has crept back (tests and checks).</summary>
+        public int SmokeRegrowSteps { get; private set; }
+
+        /// <summary>
+        /// #724: every 0.1 s while nobody rubs (after the delay), each wiped texel next to smoke thickens toward its thickest
+        /// neighbour, so the smoke creeps back in from the edges of the holes. A thick wall far from a hole does nothing; a
+        /// hole closes from its rim inward. It never passes the clear line on its own (it only adds smoke).
+        /// </summary>
+        private void RegrowSmoke(float t)
+        {
+            if (smokeRegrowRate <= 0f || rubbing || t - lastRubAt < smokeRegrowDelaySeconds || t - steamAt < .5f) return;
+            if (t - lastRegrowAt < RegrowStepSeconds) return;
+            float step = Mathf.Min(.5f, smokeRegrowRate * (t - Mathf.Max(lastRegrowAt, t - .5f)));
+            lastRegrowAt = t;
+            if (regrowScratch == null || regrowScratch.Length != steamAlpha.Length) regrowScratch = new float[steamAlpha.Length];
+            bool changed = false;
+            for (int y = 0; y < SteamH; y++)
+                for (int x = 0; x < SteamW; x++)
+                {
+                    int i = y * SteamW + x;
+                    float a = steamAlpha[i];
+                    if (a >= 1f) { regrowScratch[i] = a; continue; }
+                    float n = a;
+                    if (x > 0) n = Mathf.Max(n, steamAlpha[i - 1]);
+                    if (x < SteamW - 1) n = Mathf.Max(n, steamAlpha[i + 1]);
+                    if (y > 0) n = Mathf.Max(n, steamAlpha[i - SteamW]);
+                    if (y < SteamH - 1) n = Mathf.Max(n, steamAlpha[i + SteamW]);
+                    float next = n > a + .02f ? Mathf.Min(n, a + step * n) : a;
+                    regrowScratch[i] = next;
+                    if (next > a + .0005f) changed = true;
+                }
+            if (!changed) return;
+            System.Array.Copy(regrowScratch, steamAlpha, steamAlpha.Length);
+            SmokeRegrowSteps++;
+            WriteSteam();
+            steamLeft = WeightedLeft();
+            FindThickest();
+        }
+
+        // ---------- #724 UT: smoke scatters from the fingertip, and is blown away at once when wiped ----------
+        public const float WipePuffSeconds = .5f;
+        [SerializeField, Range(.3f, 3f), Tooltip("#724 UT: how long the smoke takes to swell and blow away once it is wiped (it was .55s, too fast).")]
+        private float clearBlowSeconds = 1.2f;
+        /// <summary>How long the wiped smoke takes to blow away; its big puffs last a little longer.</summary>
+        public float ClearBlowSeconds => Mathf.Max(.1f, clearBlowSeconds);
+        public float ClearPuffSeconds => ClearBlowSeconds + .15f;
+        private const int WipePuffCount = 18, ClearPuffCount = 12;
+        private Image[] wipePuffs;
+        private readonly Vector2[] wipePuffFrom = new Vector2[WipePuffCount + ClearPuffCount], wipePuffVelocity = new Vector2[WipePuffCount + ClearPuffCount];
+        private readonly float[] wipePuffBorn = new float[WipePuffCount + ClearPuffCount], wipePuffSize = new float[WipePuffCount + ClearPuffCount];
+        private int nextWipePuff;
+        private float lastWipePuffAt = float.NegativeInfinity;
+        /// <summary>Smoke puffs flying off now (tests and checks).</summary>
+        public int WipePuffsShown { get; private set; }
+
+        private void EnsureWipePuffs()
+        {
+            if (wipePuffs != null || steam == null) return;
+            wipePuffs = new Image[WipePuffCount + ClearPuffCount];
+            int above = steam.transform.GetSiblingIndex() + 1;
+            for (int i = 0; i < wipePuffs.Length; i++)
+            {
+                wipePuffs[i] = NewImage("Jigwi Smoke Wipe Puff " + i, Puff(), root);
+                wipePuffs[i].transform.SetSiblingIndex(above + i); // over the smoke, under the hand and the ring
+                wipePuffs[i].gameObject.SetActive(false);
+                wipePuffBorn[i] = float.NegativeInfinity;
+            }
+        }
+
+        /// <summary>A rubbing finger moved from a to b (0~1 of the board): a couple of puffs flick out sideways from the fingertip.</summary>
+        private void EmitWipePuffs(Vector2 a, Vector2 b, Rect board, float t)
+        {
+            EnsureWipePuffs();
+            if (wipePuffs == null || t - lastWipePuffAt < .035f) return;
+            Vector2 move = new Vector2((b.x - a.x) * board.width, (b.y - a.y) * board.height);
+            if (move.sqrMagnitude < 4f) return;
+            lastWipePuffAt = t;
+            Vector2 tip = new Vector2(board.xMin + b.x * board.width, board.yMin + b.y * board.height);
+            Vector2 dir = move.normalized, side = new Vector2(-dir.y, dir.x);
+            for (int k = 0; k < 2; k++)
+            {
+                int i = nextWipePuff; nextWipePuff = (nextWipePuff + 1) % WipePuffCount;
+                float sign = k == 0 ? 1f : -1f;
+                wipePuffFrom[i] = tip;
+                wipePuffVelocity[i] = (side * sign * UnityEngine.Random.Range(.55f, 1f) + dir * UnityEngine.Random.Range(.1f, .5f))
+                    * board.width * UnityEngine.Random.Range(.35f, .55f);
+                wipePuffSize[i] = board.width * UnityEngine.Random.Range(.07f, .11f);
+                wipePuffBorn[i] = t;
+            }
+        }
+
+        /// <summary>The smoke counts as wiped: big puffs burst from all over the screen and fly off past the edges.</summary>
+        private void BlowAwayPuffs(float t)
+        {
+            EnsureWipePuffs();
+            if (wipePuffs == null) return;
+            Rect board = new Rect(0f, 0f, Screen.width, Screen.height);
+            Vector2 middle = board.center;
+            for (int k = 0; k < ClearPuffCount; k++)
+            {
+                int i = WipePuffCount + k;
+                float angle = (k + UnityEngine.Random.Range(-.3f, .3f)) / ClearPuffCount * Mathf.PI * 2f;
+                Vector2 dir = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle));
+                wipePuffFrom[i] = middle + Vector2.Scale(dir, new Vector2(board.width * .28f, board.height * .3f));
+                wipePuffVelocity[i] = dir * board.height * UnityEngine.Random.Range(.7f, 1.1f) * (.7f / ClearPuffSeconds); // the same distance, only slower
+                wipePuffSize[i] = board.width * UnityEngine.Random.Range(.35f, .55f);
+                wipePuffBorn[i] = t;
+            }
+        }
+
+        private void DriveWipePuffs(Rect board, float t)
+        {
+            if (wipePuffs == null) { WipePuffsShown = 0; return; }
+            int shown = 0;
+            for (int i = 0; i < wipePuffs.Length; i++)
+            {
+                bool clear = i >= WipePuffCount;
+                float life = clear ? ClearPuffSeconds : WipePuffSeconds;
+                float age = t - wipePuffBorn[i];
+                bool on = age >= 0f && age < life;
+                if (wipePuffs[i].gameObject.activeSelf != on) wipePuffs[i].gameObject.SetActive(on);
+                if (!on) continue;
+                shown++;
+                float u = age / life;
+                // Flicked off fast, slowing like smoke; it grows and thins as it goes.
+                float travel = (1f - (1f - u) * (1f - u)) * life;
+                Vector2 at = wipePuffFrom[i] + wipePuffVelocity[i] * travel;
+                float size = wipePuffSize[i] * Mathf.Lerp(.6f, clear ? 1.6f : 1.5f, u);
+                PlaceScreenRect(wipePuffs[i].rectTransform, new Rect(at.x - size * .5f, at.y - size * .5f, size, size));
+                wipePuffs[i].rectTransform.localEulerAngles = new Vector3(0f, 0f, (i * 53f + u * 90f) % 360f);
+                float alpha = (clear ? .85f : .6f) * (1f - u) * Mathf.Clamp01(u * 8f);
+                wipePuffs[i].color = new Color(SmokeGrey, SmokeGrey * .98f, SmokeGrey * .96f, alpha);
+            }
+            WipePuffsShown = shown;
+        }
+
         private void EndSteam()
         {
             steamOn = false; rubbing = false;
             if (steam != null && steam.gameObject.activeSelf) steam.gameObject.SetActive(false);
+            if (steam != null) steam.rectTransform.localScale = Vector3.one;
+            if (wipePuffs != null) foreach (Image puff in wipePuffs) if (puff != null) puff.gameObject.SetActive(false);
+            WipePuffsShown = 0;
             Show(steamHand, false);
             WipeGauge = 0f;
             Show(ringBack, false); Show(ringFill, false);
-            if (steamBlocking && source != null && source.board != null) source.board.SetUiInputBlocked(false);
+            if (steamBlocking && source != null && source.board != null) { source.board.SetUiInputBlocked(false); source.board.BlockedPressGate = null; }
             steamBlocking = false;
             if (source != null) source.JigwiSmokeWiping = false;
         }

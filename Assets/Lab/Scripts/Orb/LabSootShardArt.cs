@@ -19,14 +19,46 @@ namespace C6Lab
         /// <summary>
         /// sootPieces(비트: 1 북 / 2 서 / 4 남 / 8 동)가 그리는 조각 그림. 이어지지 않은 조합이면 북 조각 하나로 그린다.
         /// </summary>
-        public static Sprite SpriteFor(int pieces)
+        public static Sprite SpriteFor(int pieces) => SpriteFor(pieces, true);
+
+        /// <summary>
+        /// #724: ghost false leaves out the faint dashed outline of the missing part (the shards on the board and the pieces in
+        /// the empty orb: the empty orb itself shows where they go).
+        /// </summary>
+        public static Sprite SpriteFor(int pieces, bool ghost) => SpriteFor(pieces, ghost, false);
+
+        /// <summary>
+        /// #724 QA: seamless draws the piece with no gap and no light band on its broken faces, so pieces laid side by side in
+        /// the empty orb join into one black orb with no pale lines between them.
+        /// </summary>
+        public static Sprite SpriteFor(int pieces, bool ghost, bool seamless)
         {
             int start = LabModel.SootArcStart(pieces);
             if (start < 0 || pieces == LabModel.SootWholePieces) { pieces = 1; start = 0; }
-            if (cache.TryGetValue(pieces, out Sprite found) && found != null) return found;
-            Sprite made = Build(LabModel.SootPieceCount(pieces), start);
-            cache[pieces] = made;
+            int key = pieces | (ghost ? 0 : 256) | (seamless ? 512 : 0);
+            if (cache.TryGetValue(key, out Sprite found) && found != null) return found;
+            Sprite made = Build(LabModel.SootPieceCount(pieces), start, ghost, seamless);
+            cache[key] = made;
             return made;
+        }
+
+        /// <summary>
+        /// #724: where the drawn piece sits in its picture, in half-widths from the centre (north piece: up). The board draws a
+        /// shard bigger and shifted by this so the piece itself sits on (and is as big as) the shard you touch.
+        /// </summary>
+        public static Vector2 Centroid(int pieces)
+        {
+            Vector2 sum = Vector2.zero;
+            int count = 0;
+            for (int q = 0; q < 4; q++)
+            {
+                if ((pieces & (1 << q)) == 0) continue;
+                float angle = (90f + 90f * q) * Mathf.Deg2Rad;
+                sum += new Vector2(Mathf.Cos(angle), Mathf.Sin(angle));
+                count++;
+            }
+            // A 90-degree slice of the disc has its centre of area about 0.6 of the radius out.
+            return count == 0 ? Vector2.zero : sum / count * (.6f * Disc);
         }
 
         private const float Disc = .94f;      // 동그라미 반지름 (그림 반 폭 기준)
@@ -40,7 +72,7 @@ namespace C6Lab
         private static readonly Color SeamGlow = new Color(.62f, .48f, .95f, 1f);
         private static readonly Color Ghost = new Color(.20f, .18f, .24f, 1f);
 
-        private static Sprite Build(int level, int turn)
+        private static Sprite Build(int level, int turn, bool ghost = true, bool seamless = false)
         {
             var texture = new Texture2D(Size, Size, TextureFormat.RGBA32, false)
             {
@@ -56,7 +88,10 @@ namespace C6Lab
             for (int px = 0; px < Size; px++)
             {
                 float x = (px + .5f) / Size * 2f - 1f, y = (py + .5f) / Size * 2f - 1f;
-                pixels[py * Size + px] = Pixel(x, y, start, span, level, turn, aa);
+                Color pixel = Pixel(x, y, start, span, level, turn, aa, seamless);
+                // #724: without the ghost, the missing part (drawn faint and dark) is left fully clear.
+                if (!ghost && pixel.a < .5f && pixel.r == Ghost.r && pixel.g == Ghost.g && pixel.b == Ghost.b) pixel = Color.clear;
+                pixels[py * Size + px] = pixel;
             }
             texture.SetPixels(pixels);
             texture.Apply(false, false);
@@ -68,6 +103,12 @@ namespace C6Lab
         /// 면 번호는 동그라미 위의 경계 자리(0 북서 / 1 남서 / 2 남동 / 3 북동, 조각 시작 쪽 기준 절대 번호)라,
         /// 이웃한 두 조각이 같은 경계에서 같은 모양으로 깨져 꼭 맞물린다.
         /// </summary>
+        /// <summary>
+        /// #724: the broken edge at boundary face (0 북서 / 1 남서 / 2 남동 / 3 북동) at distance r (half-widths) from the
+        /// centre, as an angle in degrees: the empty orb draws its cracks on exactly the shards' zigzag edges.
+        /// </summary>
+        public static float CrackAngle(float r, int face) => 45f + 90f * (face & 3) + Jag(r, face & 3);
+
         private static float Jag(float r, int face)
         {
             float t = r * 2.4f + face * .31f;
@@ -76,8 +117,10 @@ namespace C6Lab
             return Mathf.Rad2Deg * offset / Mathf.Max(r, .05f);
         }
 
-        private static Color Pixel(float x, float y, float start, float span, int level, int turn, float aa)
+        private static Color Pixel(float x, float y, float start, float span, int level, int turn, float aa, bool seamless = false)
         {
+            // Seamless pieces reach a hair past their broken faces so neighbours overlap instead of leaving a pale line.
+            float gap = seamless ? -.012f : Gap;
             float r = Mathf.Sqrt(x * x + y * y);
             if (r > Disc + aa) return Color.clear;
             float discCover = Mathf.Clamp01((Disc - r) / aa + .5f);
@@ -88,9 +131,10 @@ namespace C6Lab
             float inside = Mathf.Min(angle - lo, hi - angle) * arc;
             // 한 바퀴 넘어간 쪽 (angle이 360 근처인데 lo가 음수)도 조각 안으로 본다.
             if (lo < 0f) inside = Mathf.Max(inside, Mathf.Min(angle - 360f - lo, hi - (angle - 360f)) * arc);
-            float cover = Mathf.Clamp01((inside - Gap) / aa + .5f) * discCover;
+            float cover = Mathf.Clamp01((inside - gap) / aa + .5f) * discCover;
             // 가운데 꼭짓점도 살짝 깎는다.
-            cover *= Mathf.Clamp01((r - .02f) / aa + .5f);
+            if (!seamless) cover *= Mathf.Clamp01((r - .02f) / aa + .5f);
+            else if (r < .03f) cover = discCover; // the very middle belongs to every piece
 
             if (cover <= 0f)
             {
@@ -112,10 +156,10 @@ namespace C6Lab
             float rim = Mathf.Clamp01(1f - (Disc - r) / .10f);
             color = Color.Lerp(color, Edge, rim * .45f);
             // 깨진 면을 따라 밝은 띠 (돌이 깨진 단면처럼).
-            float broken = Mathf.Clamp01(1f - (inside - Gap) / Bevel);
+            float broken = seamless ? 0f : Mathf.Clamp01(1f - (inside - Gap) / Bevel);
             color = Color.Lerp(color, Edge, broken * broken * .6f);
             // 합친 자리의 금: 조각 안쪽 경계(90°, 180°, 270°)마다 보랏빛 실금.
-            for (int face = 1; face < level; face++)
+            for (int face = 1; face < level && !seamless; face++)
             {
                 float seamAngle = 90f * face + Jag(r, (turn + face) & 3);
                 float d = Mathf.Abs(angle - seamAngle) * arc;

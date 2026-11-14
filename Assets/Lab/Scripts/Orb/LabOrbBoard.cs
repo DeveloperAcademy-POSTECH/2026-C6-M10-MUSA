@@ -1360,6 +1360,12 @@ namespace C6Lab
         private readonly HashSet<string> sootIds = new HashSet<string>(StringComparer.Ordinal);
         /// <summary>#713 이 판에서 파편이 붙었다 (true면 네 조각이 모여 검정 구슬이 됨). 판 주인 기기에서만.</summary>
         public event Action<bool> SootJoined;
+        /// <summary>#724: the shards finished flying together into this black orb: the join burst and its sound.</summary>
+        public void NotifySootJoined(LabOrbView view, bool whole)
+        {
+            if (view != null) view.PlaySootJoin(whole);
+            SootJoined?.Invoke(whole);
+        }
 
         /// <summary>
         /// #719 콤보 가이딩: 지금 맞혀야 할 콤보 칸의 색(None이면 끔). 그 색의 결합 구슬만 둘레가 그 색으로 두근거린다
@@ -1379,6 +1385,16 @@ namespace C6Lab
         }
 
         /// <summary>#713 이 판에 보이는 연기 파편 id들을 into에 담는다.</summary>
+        /// <summary>#724: where the soot shards on this board are now (world, on the orb plane), skipping ones hidden for a request.</summary>
+        public void CollectSootShardPoints(List<Vector3> into)
+        {
+            if (into == null) return;
+            into.Clear();
+            foreach (var pair in entries)
+                if (pair.Value.View != null && pair.Value.View.Kind.IsSootShard() && !pair.Value.HiddenForPending)
+                    into.Add(pair.Value.View.transform.position);
+        }
+
         public void CollectSootShards(List<string> into)
         {
             if (into == null) return;
@@ -1540,6 +1556,26 @@ namespace C6Lab
             if (simulationHeld) { CancelDrag(); ResetRestingRecovery(); }
             foreach (var entry in entries.Values)
                 if (entry.View != null) SetBodyMode(entry);
+        }
+
+        /// <summary>
+        /// #724 UT: while input is blocked, a press that starts where this says yes (screen point) still reaches the board and
+        /// keeps working until it is let go (drag, combine, throw, pass). The Jigwi smoke uses it: where it is wiped away
+        /// the board can be used. Null = a block stops everything (the usual).
+        /// </summary>
+        public Func<Vector2, bool> BlockedPressGate;
+        private bool heldThroughGate;
+        /// <summary>#724: the orb or drum held now was picked up through the smoke gate.</summary>
+        public bool HeldThroughGate => heldThroughGate && heldId != null;
+
+        /// <summary>#724: a press began this frame where the gate lets it through the block.</summary>
+        private bool GatePressThisFrame()
+        {
+            if (BlockedPressGate == null) return false;
+            var touch = Touchscreen.current?.primaryTouch;
+            if (touch != null && touch.press.wasPressedThisFrame) return BlockedPressGate(touch.position.ReadValue());
+            var mouse = Mouse.current;
+            return mouse != null && mouse.leftButton.wasPressedThisFrame && BlockedPressGate(mouse.position.ReadValue());
         }
 
         /// <summary>Block pointer gestures while a modal UI is open, without pausing orb physics.</summary>
@@ -1728,6 +1764,13 @@ namespace C6Lab
                 DrumTapped?.Invoke(id);
                 return true;
             }
+            // #724 UT: a tap, or letting go of a shard over the empty orb in the middle, sends it flying in (the Host fills it).
+            if (entry.View.Kind.IsSootShard() && (tapped || LabSootSocket.For(this).Covers(worldPoint)))
+            {
+                lastTapId = null;
+                SendSootShardIn(entry);
+                return true;
+            }
             if (tapped && entry.View.Kind.IsDoubleTapUsable() && entry.View.LockSwipes == 0)
             {
                 if (lastTapId == id && now - lastTapTime <= DoubleTapWindow)
@@ -1822,7 +1865,11 @@ namespace C6Lab
 
         private void Update()
         {
-            if (!configured || simulationHeld || !interactionEnabled || uiInputBlocked) return;
+            if (!configured || simulationHeld || !interactionEnabled) return;
+            if (heldId == null) heldThroughGate = false;
+            // #724: a block still lets through a press the gate allows (and that press until it is let go).
+            bool throughGate = uiInputBlocked && (heldThroughGate || heldId == null && GatePressThisFrame());
+            if (uiInputBlocked && !throughGate) return;
             double now = Time.realtimeSinceStartupAsDouble;
             if (heldId != null)
             {
@@ -1856,6 +1903,7 @@ namespace C6Lab
                 && TryBeginDragAtWorld(touchPoint, now))
             {
                 heldByTouch = true;
+                heldThroughGate = uiInputBlocked;
                 return;
             }
             var pointer = Mouse.current;
@@ -1864,7 +1912,10 @@ namespace C6Lab
                 && !PointerStartedOverUi(pointer.position.ReadValue())
                 && TryScreenToWorld(pointer.position.ReadValue(), out var mousePoint)
                 && TryBeginDragAtWorld(mousePoint, now))
+            {
                 heldByTouch = false;
+                heldThroughGate = uiInputBlocked;
+            }
         }
 
         private static bool PointerStartedOverUi(Vector2 screenPosition)
@@ -2086,8 +2137,25 @@ namespace C6Lab
         /// 두 구슬을 그 자리에 멈추고 방장에게 결합을 요청한다.
         /// 놓아서 결합과 닿으면 결합이 함께 쓴다.
         /// </summary>
+        /// <summary>#724: one shard flies into the empty orb in the middle (shown here at once, filled by the Host).</summary>
+        private void SendSootShardIn(Entry entry)
+        {
+            LabSootSocket.For(this).PlayFlyIn(entry.View);
+            entry.Locked = true;
+            StopMotion(entry.View.Body);
+            SetBodyMode(entry);
+            UseRequested?.Invoke(entry.View.OrbId);
+        }
+
         private void RequestCombine(Entry first, Entry second, bool passiveContact = false)
         {
+            // #724 UT: two shards put together both fly into the empty orb in the middle (the same effect as a tap).
+            if (first.View.Kind.IsSootShard() && second.View.Kind.IsSootShard())
+            {
+                SendSootShardIn(first);
+                SendSootShardIn(second);
+                return;
+            }
             first.BeforeRequest = CaptureMotion(first);
             second.BeforeRequest = CaptureMotion(second);
             first.Locked = true;
@@ -2380,6 +2448,11 @@ namespace C6Lab
             worldPoint = ray.GetPoint(distance);
             return Finite(worldPoint);
         }
+
+        /// <summary>#724: the world point (on the orb plane) of a normalized board spot, e.g. the black orb's socket.</summary>
+        public Vector3 WorldPointFor(Vector2 normalized) => OnPlane(ToWorld(normalized, config.OrbRadius));
+        /// <summary>#724: an ordinary orb's radius on this board (world units).</summary>
+        public float OrbRadius => config != null ? config.OrbRadius : .3f;
 
         private Vector2 ToWorld(Vector2 normalized, float radius) => areaShape.Clamp(
             areaShape.ToWorld(normalized, areaShape.IsCurved ? radius : config.OrbRadius), radius);

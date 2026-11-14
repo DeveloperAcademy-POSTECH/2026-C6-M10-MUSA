@@ -413,7 +413,7 @@ namespace C6Lab
             // An empty local board is valid: some participants do not initially hold a drum.
             var shown = new System.Collections.Generic.HashSet<string>(board.OrbIds, StringComparer.Ordinal);
             foreach (LabOrbState orb in latest.orbs ?? Array.Empty<LabOrbState>())
-                if (orb != null && orb.owner == LocalPlayerId && !orb.inFlight && !shown.Contains(orb.id)) return false;
+                if (orb != null && orb.owner == LocalPlayerId && !orb.inFlight && !orb.sootSocketed && !shown.Contains(orb.id)) return false;
             foreach (LabOrbState drum in latest.drums ?? Array.Empty<LabOrbState>())
                 if (drum != null && drum.owner == LocalPlayerId && !shown.Contains(drum.id)) return false;
             return true;

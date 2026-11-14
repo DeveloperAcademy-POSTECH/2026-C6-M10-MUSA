@@ -21,10 +21,11 @@ namespace C6Lab.Tests
             Assert.That(config.JigwiSmokeFlow, Is.True, "The game runs the smoke flow (#595).");
             Assert.That(config.JigwiRelayTimeline, Is.True,
                 "#713: smoke at 6 s, then each mission a gap after the one before has fully ended (common gimmicks from 25 s every 20 s).");
-            Assert.That(config.JigwiRelayGapSeconds, Is.EqualTo(14f).Within(.0001f), "After a smoke: time to gather the shards and throw the black orb.");
-            Assert.That(config.JigwiRelayGapAfterTalismanSeconds, Is.EqualTo(12f).Within(.0001f));
-            Assert.That(config.JigwiCommonStartSeconds, Is.EqualTo(25f).Within(.0001f));
-            Assert.That(config.JigwiCommonIntervalSeconds, Is.EqualTo(20f).Within(.0001f));
+            // #724 UT: the third round felt too packed, so every gap is a little looser (was 14 / 12 / 25 / 20).
+            Assert.That(config.JigwiRelayGapSeconds, Is.EqualTo(18f).Within(.0001f), "After a smoke: time to gather the shards and throw the black orb.");
+            Assert.That(config.JigwiRelayGapAfterTalismanSeconds, Is.EqualTo(16f).Within(.0001f));
+            Assert.That(config.JigwiCommonStartSeconds, Is.EqualTo(30f).Within(.0001f));
+            Assert.That(config.JigwiCommonIntervalSeconds, Is.EqualTo(25f).Within(.0001f));
         }
 
         [Test]

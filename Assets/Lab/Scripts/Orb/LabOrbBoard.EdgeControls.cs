@@ -45,7 +45,7 @@ namespace C6Lab
             }
         }
         private bool EdgeControlsActive => configured && EdgeControlSettings.Enabled && interactionEnabled
-            && !simulationHeld && !uiInputBlocked;
+            && !simulationHeld && (!uiInputBlocked || HeldThroughGate); // #724: an orb picked up through the smoke can be passed
 
         /// <summary>Explicit camera viewport and safe-area geometry for render-target hosts and deterministic tests.</summary>
         public void SetEdgeControlScreenGeometry(Rect viewport, Rect safeArea)
