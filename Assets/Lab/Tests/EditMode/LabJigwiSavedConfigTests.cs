@@ -21,9 +21,12 @@ namespace C6Lab.Tests
             Assert.That(config.JigwiSmokeFlow, Is.True, "The game runs the smoke flow (#595).");
             Assert.That(config.JigwiRelayTimeline, Is.True,
                 "#713: smoke at 6 s, then each mission a gap after the one before has fully ended (common gimmicks from 25 s every 20 s).");
-            // #724 UT: the third round felt too packed, so every gap is a little looser (was 14 / 12 / 25 / 20).
-            Assert.That(config.JigwiRelayGapSeconds, Is.EqualTo(18f).Within(.0001f), "After a smoke: time to gather the shards and throw the black orb.");
-            Assert.That(config.JigwiRelayGapAfterTalismanSeconds, Is.EqualTo(16f).Within(.0001f));
+            // #737: the talisman comes first (10 s); after each mission, done with its waterfall or burn, the next one's warning
+            // starts 7 s later (gap 9 s with the 2 s warning). A failed talisman's slippery drum lets the next one in after 10 s.
+            Assert.That(config.JigwiTalismanFirst, Is.True, "#737: talisman → smoke → talisman …");
+            Assert.That(config.JigwiRelayGapSeconds, Is.EqualTo(9f).Within(.0001f), "7 s between missions + the 2 s warning.");
+            Assert.That(config.JigwiRelayGapAfterTalismanSeconds, Is.EqualTo(9f).Within(.0001f));
+            Assert.That(config.JigwiDrumSlipWaitSeconds, Is.EqualTo(10f).Within(.0001f));
             Assert.That(config.JigwiCommonStartSeconds, Is.EqualTo(30f).Within(.0001f));
             Assert.That(config.JigwiCommonIntervalSeconds, Is.EqualTo(25f).Within(.0001f));
         }

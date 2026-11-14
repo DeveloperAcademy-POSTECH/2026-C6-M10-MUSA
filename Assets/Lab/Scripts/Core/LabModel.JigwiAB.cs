@@ -100,7 +100,9 @@ namespace C6Lab
             jigwiSchedule = config.JigwiBTestOnly ? LabJigwiABTimeline.BTestSchedule // #551 시험용: B만
                 : config.JigwiATestOnly ? LabJigwiABTimeline.ATestSchedule // #595 시험용: 부적만
                 // #696 연기 6 / 부적 30 / 연기 44 / 부적 68 / 연기 82, 끄면 #595 연기 10 / 부적 45 / 연기 66 / 부적 83
-                : jigwiSmokeFlow ? (config.JigwiRelayTimeline ? LabJigwiABTimeline.RelaySmokeFlowSchedule // #713 이어달리기
+                : jigwiSmokeFlow ? (config.JigwiRelayTimeline ? (config.JigwiTalismanFirst
+                        ? LabJigwiABTimeline.RelayTalismanFirstSchedule // #737 부적 먼저 이어달리기
+                        : LabJigwiABTimeline.RelaySmokeFlowSchedule) // #713 이어달리기
                     : config.JigwiDenseTimeline ? LabJigwiABTimeline.DenseSmokeFlowSchedule : LabJigwiABTimeline.SmokeFlowSchedule)
                 : config.JigwiFlowSchedule ? LabJigwiABTimeline.FlowSchedule : LabJigwiABTimeline.LegacySchedule;
             jigwiAHoldBurn = config.JigwiAHoldBurnUntilEnd;
@@ -249,7 +251,7 @@ namespace C6Lab
                 || jigwiStageNextSlot >= LabJigwiABTimeline.SlotCountFor(jigwiSchedule)) return;
             double gap = item.kind == LabJigwiABKind.PersonalBurn ? jigwiRelayGapAfterTalisman : jigwiRelayGap;
             double activeAt = JigwiMissionDoneAt(item) + Math.Max(LabJigwiABTimeline.WarningSeconds, gap);
-            // #737: 부적 실패의 북 미끄러움이 걸려 있으면 미끄러움이 시작되고 13초(LabConfig)가 지난 뒤에 다음 예고가 시작된다.
+            // #737: 부적 실패의 북 미끄러움이 걸려 있으면 미끄러움이 시작되고 10초(LabConfig)가 지난 뒤에 다음 예고가 시작된다.
             activeAt = Math.Max(activeAt, JigwiPenaltyEndAt(item) + LabJigwiABTimeline.WarningSeconds);
             bool personal = LabJigwiABTimeline.KindForSlot(jigwiStageNextSlot, jigwiSchedule) == LabJigwiABKind.PersonalBurn;
             double length = personal ? jigwiABDuration + jigwiAFailBurnStart + JigwiTalismanFailBlazeSeconds : JigwiABMissionSeconds;

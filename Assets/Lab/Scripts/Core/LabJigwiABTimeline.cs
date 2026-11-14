@@ -39,10 +39,16 @@ namespace C6Lab
         /// </summary>
         public const int RelaySmokeFlowSchedule = 6;
         private static readonly double[] RelaySmokeFlowOffsets = { 6d, 6d, 6d, 6d, 6d, 6d }; // only slot 0 is a fixed time
-        public static bool IsRelay(int schedule) => schedule == RelaySmokeFlowSchedule;
-        /// <summary>#595/#696/#713: 연기가 먼저 오고 부적이 뒤따르는 연기 흐름인지 (4개, 촘촘한 5개, 이어달리기).</summary>
+        /// <summary>
+        /// #737 부적 먼저 이어달리기: 첫 부적만 10초에 정해진 시각에 오고, 그 뒤로는 #713과 같이 앞 미션이 끝나고 간격 뒤에
+        /// 다음 미션이 온다. 부적 → 연기 → 부적 … (연기는 양동이 없이 모두의 화면, 부적은 공용 — 연기 흐름과 같은 규칙)
+        /// </summary>
+        public const int RelayTalismanFirstSchedule = 7;
+        private static readonly double[] RelayTalismanFirstOffsets = { 10d, 10d, 10d, 10d, 10d, 10d }; // only slot 0 is a fixed time
+        public static bool IsRelay(int schedule) => schedule == RelaySmokeFlowSchedule || schedule == RelayTalismanFirstSchedule;
+        /// <summary>#595/#696/#713/#737: 연기(양동이 없음)와 공용 부적이 번갈아 오는 연기 흐름인지 (4개, 촘촘한 5개, 이어달리기 두 가지).</summary>
         public static bool IsSmokeFlow(int schedule) => schedule == SmokeFlowSchedule || schedule == DenseSmokeFlowSchedule
-            || schedule == RelaySmokeFlowSchedule;
+            || schedule == RelaySmokeFlowSchedule || schedule == RelayTalismanFirstSchedule;
         /// <summary>#595: 연기 B가 시작되고(지귀 예고 2초 뒤) 박이 달아오르다 연기가 뿜어져 나오기까지(초). 모든 자리가 같다.</summary>
         public const double SmokeLeadSeconds = 1.5d;
         /// <summary>
@@ -60,16 +66,19 @@ namespace C6Lab
             : schedule == BTestSchedule || schedule == ATestSchedule ? BTestOffsets
             : schedule == SmokeFlowSchedule ? SmokeFlowOffsets
             : schedule == DenseSmokeFlowSchedule ? DenseSmokeFlowOffsets
-            : schedule == RelaySmokeFlowSchedule ? RelaySmokeFlowOffsets : ActivationOffsets;
+            : schedule == RelaySmokeFlowSchedule ? RelaySmokeFlowOffsets
+            : schedule == RelayTalismanFirstSchedule ? RelayTalismanFirstOffsets : ActivationOffsets;
         public static bool ValidSchedule(int schedule) => schedule == LegacySchedule || schedule == FlowSchedule || schedule == BTestSchedule
             || schedule == SmokeFlowSchedule || schedule == ATestSchedule || schedule == DenseSmokeFlowSchedule
-            || schedule == RelaySmokeFlowSchedule;
+            || schedule == RelaySmokeFlowSchedule || schedule == RelayTalismanFirstSchedule;
         /// <summary>#551: the kind of a slot in this schedule (the B test schedule is all B).</summary>
         public static LabJigwiABKind KindForSlot(int slot, int schedule) => schedule == BTestSchedule
             ? (slot >= 0 && slot < SlotCount ? LabJigwiABKind.GroupFire : throw new ArgumentOutOfRangeException(nameof(slot)))
             // #595: 연기(B)가 먼저, 부적(A)이 다음.
             : schedule == ATestSchedule
                 ? (slot >= 0 && slot < SlotCount ? LabJigwiABKind.PersonalBurn : throw new ArgumentOutOfRangeException(nameof(slot)))
+            // #737: 부적 먼저 이어달리기는 부적(A)이 먼저, 연기(B)가 다음.
+            : schedule == RelayTalismanFirstSchedule ? KindForSlot(slot)
             : IsSmokeFlow(schedule) ? (KindForSlot(slot) == LabJigwiABKind.PersonalBurn ? LabJigwiABKind.GroupFire : LabJigwiABKind.PersonalBurn)
             : KindForSlot(slot);
         public static int SlotCountFor(int schedule) => Offsets(schedule).Length;

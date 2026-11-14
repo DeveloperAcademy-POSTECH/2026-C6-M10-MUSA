@@ -10,7 +10,7 @@ namespace C6Lab
     ///   넘기기 막기)은 그것이 화면에서 다 끝나고 stageEarlyCommonGapSeconds 뒤에 온다. 중반부터는 겹쳐도 그대로 온다.
     /// - 벌칙 뒤 쉬는 시간: 고유 기믹은 앞 고유 기믹과 그 보상/벌칙이 다 끝나야 온다(원래 규칙). 거기에 더해 2R SMALL이
     ///   끝나고 stagePenaltyRestSeconds가 지나야 다음 고유 기믹 예고가 시작된다.
-    /// - 3R 부적 실패의 북 미끄러움(20초)은 예외: 미끄러움이 시작되고 jigwiDrumSlipWaitSeconds(13초)가 지나면 미끄러움이
+    /// - 3R 부적 실패의 북 미끄러움(20초)은 예외: 미끄러움이 시작되고 jigwiDrumSlipWaitSeconds(10초)가 지나면 미끄러움이
     ///   남아 있어도 다음 미션 예고가 올 수 있다 (이어달리기 간격보다 이르게 오지는 않는다).
     /// </summary>
     public sealed partial class LabModel
@@ -32,7 +32,7 @@ namespace C6Lab
             timetableEarlyGap = config != null ? config.StageEarlyCommonGapSeconds : 1d;
             timetablePenaltyRest = config != null ? config.StagePenaltyRestSeconds : 0d;
             timetableDrumSlipSeconds = config != null ? config.JigwiAFailDrumSlipSeconds : 0d;
-            timetableDrumSlipWait = config != null ? config.JigwiDrumSlipWaitSeconds : 13d;
+            timetableDrumSlipWait = config != null ? config.JigwiDrumSlipWaitSeconds : 10d;
         }
 
         /// <summary>#737: 이 시각에 끝나는 벌칙 뒤 쉬는 시간이 끝나는 시각. 이 판에 규칙을 쓰지 않거나 벌칙이 없었으면 -∞.</summary>

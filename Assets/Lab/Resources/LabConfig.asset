@@ -47,8 +47,9 @@ MonoBehaviour:
   jigwiSmokeFlow: 1
   jigwiDenseTimeline: 1
   jigwiRelayTimeline: 1
-  jigwiRelayGapSeconds: 18
-  jigwiRelayGapAfterTalismanSeconds: 16
+  jigwiTalismanFirst: 1
+  jigwiRelayGapSeconds: 9
+  jigwiRelayGapAfterTalismanSeconds: 9
   jigwiSmokeToTalismanSeconds: 12
   jigwiCommonStartSeconds: 30
   jigwiCommonIntervalSeconds: 25
@@ -208,7 +209,7 @@ MonoBehaviour:
   - 35
   - 60
   - 75
-  yaguangTimelineUniqueKinds: 00000000010000000000000001000000i
+  yaguangTimelineUniqueKinds: 01000000000000000100000000000000i
   yaguangTimelineCommonSeconds:
   - 25
   - 40
@@ -349,6 +350,10 @@ MonoBehaviour:
   yaguangFeverDrumPulseRate: 1.6
   yaguangFeverTapComboSeconds: 0.8
   yaguangFeverTapCountSize: 0.45
+  stageEarlyPhaseSeconds: 40
+  stageEarlyCommonGapSeconds: 1
+  stagePenaltyRestSeconds: 5
+  jigwiDrumSlipWaitSeconds: 10
   thirtySecondsLeftAt: 30
   thirtySecondsLeftBubbleSeconds: 2.2
   thirtySecondsLeftSound: 2
