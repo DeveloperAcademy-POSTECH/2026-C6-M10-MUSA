@@ -72,9 +72,10 @@ namespace Hapio
             network.Stop(); network.UnbindBattleReferences();
             ResetRoomFlow();
             roomBrowserVisible = true;
+            ClearDemoSelectionAfterLeave();
             SetLocalState(new GameFlowState());
             goingHome = !network.CanChooseConnection;
-            EnterRoomBrowser();
+            if (!C6Lab.LabGameBuildVariant.IsStaffStageDemo) EnterRoomBrowser();
         }
         // A member leaving a shared result keeps its connection this long so its 'exit' (sent twice) reaches the Host
         // before the shutdown, instead of the Host learning it only from the 30 s transport timeout.

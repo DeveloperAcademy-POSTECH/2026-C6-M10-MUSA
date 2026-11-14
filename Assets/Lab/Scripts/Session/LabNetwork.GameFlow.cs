@@ -26,7 +26,8 @@ namespace C6Lab
         private static readonly byte[] GameConnectionToken = Encoding.ASCII.GetBytes("C6HapioGame/55");
         private static readonly byte[] DemoGameConnectionToken = Encoding.ASCII.GetBytes("C6HapioDemo/" + LabGameBuildVariant.YaguangDemoRevision);
         public static string GameConnectionCompatibility => Encoding.ASCII.GetString(
-            LabGameBuildVariant.IsYaguangDemo ? DemoGameConnectionToken : GameConnectionToken);
+            LabGameBuildVariant.IsStaffStageDemo ? StaffDemoToken(0)
+                : LabGameBuildVariant.IsYaguangDemo ? DemoGameConnectionToken : GameConnectionToken);
         private const int MaximumGameFlowBytes = 8192;
         private bool gameFlowEnabled;
         private bool gameBattleFrozen;
@@ -64,7 +65,22 @@ namespace C6Lab
         /// <summary>A copy of confirmed transport members, independent of chosen P numbers.</summary>
         public ulong[] ConnectedPlayerIds => order.ToArray();
         public Camera BattleCamera { get; private set; }
-        private byte[] ActiveConnectionToken => gameFlowEnabled ? (LabGameBuildVariant.IsYaguangDemo ? DemoGameConnectionToken : GameConnectionToken) : LabConnectionToken;
+        private byte[] ActiveConnectionToken => gameFlowEnabled ? (LabGameBuildVariant.IsStaffStageDemo ? StaffDemoToken(DemoStageIndex)
+            : LabGameBuildVariant.IsYaguangDemo ? DemoGameConnectionToken : GameConnectionToken) : LabConnectionToken;
+
+        /// <summary>Room-scoped stage identity survives NGO ResetLocal during address fallback and lobby rejoin.</summary>
+        public int DemoStageIndex { get; private set; }
+        public bool SetDemoStageIdentity(int stage)
+        {
+            if (!CanChooseConnection || stage < 0 || stage > 3 || !gameFlowEnabled
+                || !LabGameBuildVariant.IsStaffStageDemo) return false;
+            DemoStageIndex = stage;
+            return true;
+        }
+
+        private static byte[] StaffDemoToken(int stage) => Encoding.ASCII.GetBytes("C6HapioStaffDemo/"
+            + LabGameBuildVariant.StaffStageDemoRevision.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            + "/S" + stage.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
         /// <summary>Choose the room family before Host/Join; live rooms cannot change family.</summary>
         public bool SetGameFlowEnabled(bool enabled)
@@ -72,6 +88,7 @@ namespace C6Lab
             if (!CanChooseConnection) return false;
             if (gameFlowEnabled == enabled) return true;
             gameFlowEnabled = enabled;
+            DemoStageIndex = 0;
             // A discovery instance never changes family. Retire any old browse/cache before switching.
             DisposeDiscovery();
             return true;
@@ -289,6 +306,7 @@ namespace C6Lab
         public bool PrepareGameStage(LabConfig stageConfig, int stageIndex, string stageId, LabStageYokai yokai)
         {
             if (!gameFlowEnabled || !IsHost || stageConfig == null
+                || LabGameBuildVariant.IsStaffStageDemo && stageIndex != DemoStageIndex
                 || !ValidGameStage(stageIndex, stageId, yokai, stageConfig.TeamTerritoryEnabled)
                 || !TryInstallSessionConfig(stageConfig, out _)) return false;
             if (!PrepareGameStage()) return false;
@@ -312,13 +330,14 @@ namespace C6Lab
         /// <summary>The three yokai stages, or the single yokai-free 2:2 territory battle (#281).</summary>
         private static bool ValidGameStage(int stageIndex, string stageId, LabStageYokai yokai, bool territory) =>
             (!LabGameBuildVariant.IsYaguangDemo || !territory && stageIndex == 2 && yokai == LabStageYokai.Yaguang)
+            && (!LabGameBuildVariant.IsStaffStageDemo || !territory)
             && stageIndex >= 1 && stageIndex <= 3 && !string.IsNullOrWhiteSpace(stageId)
             && stageId.Length <= 64 && !System.Linq.Enumerable.Any(stageId, char.IsControl)
             && Enum.IsDefined(typeof(LabStageYokai), yokai)
             && (territory ? stageIndex == 1 && yokai == LabStageYokai.None : (int)yokai == stageIndex);
 
         private bool AllowsDemoRoom(int participants, bool territory) => !gameFlowEnabled
-            || !LabGameBuildVariant.IsYaguangDemo || participants == 3 && !territory;
+            || !LabGameBuildVariant.IsDemo || participants == 3 && !territory;
 
         /// <summary>Both the Scene-ready receipt and start command name the exact settings generation.</summary>
         public bool MatchesGameStageConfig(int revision, string fingerprint) =>

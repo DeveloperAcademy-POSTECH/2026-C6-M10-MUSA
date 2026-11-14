@@ -67,7 +67,7 @@ namespace Hapio
         /// <summary>True means this click is owned by the opening, including its failure fallback.</summary>
         public bool TryBeginFromStartButton(Action afterOpening)
         {
-            if (!isActiveAndEnabled) return false;
+            if (C6Lab.LabGameBuildVariant.IsStaffStageDemo || !isActiveAndEnabled) return false;
             if (presenting) return true;
             // The exhibition build gives every new party the opening when they press Start again.
             // The normal game's once-per-app rule remains independent of that build choice.

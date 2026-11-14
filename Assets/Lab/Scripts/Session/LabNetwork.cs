@@ -751,6 +751,7 @@ namespace C6Lab
         {
             if (!CanChooseConnection || registeredRoom == null || registeredRoom.Family != RoomFamily || !registeredRoom.IsAdvertising
                 || !registeredRoom.AdvertisingConfirmed || !ValidRoomName(registeredRoom.RegisteredServiceName)
+                || registeredRoom.DemoStageIndex != DemoStageIndex
                 || roomPort == 0 || !AllowsDemoRoom(capacity, registeredRoom.Team)
                 || !LabModel.ValidRoomSize(capacity, registeredRoom.Team)) return false;
             port = roomPort;
@@ -761,7 +762,8 @@ namespace C6Lab
         private bool HostInternal(LabBonjourDiscovery registeredRoom)
         {
             if (!CanChooseConnection || manager == null || transport == null || config == null
-                || !AllowsDemoRoom(targetParticipantCount, config.TeamTerritoryEnabled)) return false;
+                || !AllowsDemoRoom(targetParticipantCount, config.TeamTerritoryEnabled)
+                || gameFlowEnabled && LabGameBuildVariant.IsStaffStageDemo && DemoStageIndex == 0) return false;
             // A room without a registered card is advertised as a plain room, so it holds 2 to 5 players. Check before the
             // Host starts: a six-player size left from a 3:3 room must not open a half-advertised room (#405).
             if (registeredRoom == null && !LabModel.ValidRoomSize(targetParticipantCount, false))
@@ -3143,7 +3145,7 @@ namespace C6Lab
         {
             DisposeDiscovery();
             if (!LabBonjourDiscovery.IsSupported) return;
-            discovery = registeredRoom ?? new LabBonjourDiscovery(RoomFamily);
+            discovery = registeredRoom ?? new LabBonjourDiscovery(RoomFamily) { DemoStageIndex = gameFlowEnabled ? DemoStageIndex : 0 };
             discovery.Diagnostic += message => Debug.Log("C6_LAB_DISCOVERY " + message);
             discovery.Changed += OnDiscoveryChanged;
             bool ipv4 = !(transport is LabDualStackTransport dual) || dual.HasIpv4Listener;
@@ -3161,11 +3163,13 @@ namespace C6Lab
             }
             // Authored room cards transfer their explicit sequential registration above.
             // Keep the existing direct Game Host API's unique name; it has no pending-room allocator.
-            advertisedName = gameFlowEnabled ? "Hapio-" + Guid.NewGuid().ToString("N").Substring(0, 8)
+            advertisedName = gameFlowEnabled && LabGameBuildVariant.IsStaffStageDemo ? LabPendingRoom.StaffStageName(DemoStageIndex)
+                : gameFlowEnabled ? "Hapio-" + Guid.NewGuid().ToString("N").Substring(0, 8)
                 : LabRoomNames.ServiceBase;
             // The requested name, not a daemon rename, so a later re-registration keeps the room's identity (#476).
-            RememberHostAdvertisement(advertisedName, true);
-            if (!discovery.StartAdvertise(advertisedName, port, ipv4, ipv6, order.Count, targetParticipantCount))
+            bool autoRename = !gameFlowEnabled || !LabGameBuildVariant.IsStaffStageDemo;
+            RememberHostAdvertisement(advertisedName, autoRename);
+            if (!discovery.StartAdvertise(advertisedName, port, ipv4, ipv6, order.Count, targetParticipantCount, false, false, autoRename))
             {
                 // Keep the discovery: RecoverHostAdvertisement retries this registration with backoff.
                 Debug.LogWarning("C6_LAB_DISCOVERY_UNAVAILABLE " + discovery.LastError);

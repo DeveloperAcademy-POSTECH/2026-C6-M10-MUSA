@@ -490,3 +490,12 @@
 - 시연 여부는 전용 빌드의 `HAPIO_YAGUANG_DEMO`이며 Development 여부/EditorPrefs로 콘텐츠를 고르지 않는다.3인 Story만 생성/입장/시작하고 튜토리얼·솔로·팀전을 열지 않는다. 일반 Game54/Lab62·5703·265개 설정은 유지하고 시연의 토큰 `C6HapioDemo/1`과 Game Bonjour `C6-HAPIO-DEMO-1-5703`를 함께 구분한다.
 - 시연은 메인 스토리→방 목록→3인 야광귀→해당 후일담→전원 준비·방장 총평→실제Stage2만의 총평→엔딩6컷→타이틀이다. 일반 엔딩/총평을 덮어쓰지 않고 `Resources/Hapio/Demo/Yaguang`의 사본을 사용한다. 준비는 `Hapio/Demo/Update Yaguang Demo Stories`의 명시적 동작이고 빌드는 이를 자동 재생성하지 않는다.
 - 전용 Release/Development QA 메뉴와 출력·앱ID를 구분하고 빌드 임시 설정/플랫폼/Scene 목록을 복원한다. 홈 복귀는 연결 종료가 끝날 때까지 재입장 전이를 막아 타이틀/방목록 목적지를 유지한다. 사용법은 `docs/YAGUANG_DEMO.md`, 실제 검증은 `docs/VALIDATION.md`를 따른다.
+
+
+## #735 스태프 스테이지 선택 시연
+
+- 현재 `Hapio/Demo Build` 메뉴는 `HAPIO_STAFF_STAGE_DEMO` 전용 앱을 만든다. 위 #706의 야광귀 `[2]` 자료·테스트 경로는 보존하지만 현행 메뉴와 구분한다. 일반 Story `[1,2,3]`·Lab·땅따먹기·일반 앱 식별자는 바꾸지 않는다.
+- 스태프 선택은 DEV가 아니다. Release에서도 1·2·3 선택 박스를 표시하며, DEV 진입은 기존 Release 차단을 유지한다. 공통 Battle을 사용하고 선택한 실제 스테이지 한 판 `[1]`/`[2]`/`[3]`만 진행한다. `GameFlowState.demoStageIndex`·방 광고·접속 승인 토큰의 선택 번호가 일치해야 하며 진행 위치1/1을 Stage1로 해석하지 않는다.
+- 같은 스테이지 방이 없으면 생성·즉시 입장하고, 있으면 참가한다. 만석·진행 중 방을 피해 새 그룹을 자동 생성하지 않는다. 고정 이름 충돌은 재검색으로 처리하고 일반 방의 자동 번호 정책은 유지한다. 정확히3명·P자리·설정 준비 뒤 방장만 시작한다.
+- 로비 나가기는 연결 정리 후 스태프 선택으로, 전투 중 이탈은 기존 전원 게임 오버로 간다. 한 판의 기존 기록·후일담·총평·엔딩 뒤 임시 QR 페이지에서 명시적으로 선택 화면으로 돌아간다. 새 순위 점수·서버 기록·가짜 QR을 추가하지 않는다.
+- 저장 UI/선택별 엔딩은 `Hapio/Demo/Prepare Staff Stage Demo`로 명시적으로 준비한다. 빌드는 이를 자동 재생성하거나 일반 Scene·설정을 저장하지 않는다. 사용법은 `docs/STAFF_STAGE_DEMO.md`, 실제 실행 결과는 `docs/VALIDATION.md`를 따른다.

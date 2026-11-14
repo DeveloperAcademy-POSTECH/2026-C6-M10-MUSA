@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using C6Lab;
 
 namespace Hapio
 {
@@ -16,7 +17,12 @@ namespace Hapio
                 return Reject("invalid text fields", out reason);
             if (!Enum.IsDefined(typeof(GameMode), value.mode) || value.totalStages != GameRunFlow.StagesFor(value.mode))
                 return Reject("unsupported stage count", out reason);
-            GameRunProfile profile = GameRunProfile.ForMode(value.mode);
+            if (LabGameBuildVariant.IsStaffStageDemo
+                ? value.mode != GameMode.Story || value.demoStageIndex < 0 || value.demoStageIndex > 3
+                    || value.phase != GameFlowPhase.Home && value.demoStageIndex == 0
+                : value.demoStageIndex != 0)
+                return Reject("invalid demo stage", out reason);
+            GameRunProfile profile = GameRunProfile.ForMode(value.mode, value.demoStageIndex);
             if (value.notice == null || value.notice.Length > 128
                 || value.phase != GameFlowPhase.Lobby && value.notice.Length != 0)
                 return Reject("invalid notice", out reason);
@@ -67,8 +73,11 @@ namespace Hapio
             bool allowNewRun, out string reason)
         {
             if (!IsValid(incoming, out reason)) return false;
-            GameRunProfile profile = GameRunProfile.ForMode(incoming.mode);
+            GameRunProfile profile = GameRunProfile.ForMode(incoming.mode, incoming.demoStageIndex);
             if (current == null) return true;
+            if (incoming.demoStageIndex != current.demoStageIndex
+                && (current.phase != GameFlowPhase.Home || current.demoStageIndex != 0))
+                return Reject("demo stage changed inside a room", out reason);
             if (incoming.runId != current.runId)
             {
                 if (!allowNewRun) return Reject("different run", out reason);
@@ -137,8 +146,9 @@ namespace Hapio
             current != null && incoming != null && current.phase == GameFlowPhase.GameOver
             && current.retryableDefeat && current.mode == GameMode.Story && incoming.mode == GameMode.Story
             && current.runId == incoming.runId && !string.IsNullOrEmpty(current.runId)
+            && current.demoStageIndex == incoming.demoStageIndex
             && current.totalStages == incoming.totalStages && incoming.totalStages == GameRunFlow.StagesFor(incoming.mode)
-            && GameRunProfile.ForMode(current.mode).Contains(current.stageIndex)
+            && GameRunProfile.ForMode(current.mode, current.demoStageIndex).Contains(current.stageIndex)
             && incoming.stageIndex == current.stageIndex && incoming.revision > current.revision
             && incoming.phase == GameFlowPhase.LoadingBattle && !incoming.retryableDefeat
             && string.IsNullOrEmpty(incoming.battleSessionId) && incoming.battleRound == 0

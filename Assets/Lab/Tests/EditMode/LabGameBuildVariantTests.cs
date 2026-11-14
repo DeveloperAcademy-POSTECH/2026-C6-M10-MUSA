@@ -37,5 +37,41 @@ namespace C6Lab.Tests
             }
             Assert.That(LabGameBuildVariant.IsYaguangDemo, Is.False);
         }
+
+        [Test]
+        public void StaffOverrideDoesNotBecomeLegacyYaguangAndRestoresNestedScopes()
+        {
+            Assert.That(LabGameBuildVariant.IsStaffStageDemo, Is.False);
+            Assert.That(LabGameBuildVariant.IsDemo, Is.False);
+            using (LabGameBuildVariant.OverrideStaffStageDemoForTests(true))
+            {
+                Assert.That(LabGameBuildVariant.IsStaffStageDemo, Is.True);
+                Assert.That(LabGameBuildVariant.IsYaguangDemo, Is.False);
+                Assert.That(LabGameBuildVariant.IsDemo, Is.True);
+                using (LabGameBuildVariant.OverrideStaffStageDemoForTests(false))
+                    Assert.That(LabGameBuildVariant.IsDemo, Is.False);
+                Assert.That(LabGameBuildVariant.IsStaffStageDemo, Is.True);
+            }
+            Assert.That(LabGameBuildVariant.IsDemo, Is.False);
+        }
+
+        [Test]
+        public void StaffOverrideCannotLeakAfterAnExceptionOrRepeatedDisposal()
+        {
+            Assert.Throws<InvalidOperationException>(() =>
+            {
+                using (LabGameBuildVariant.OverrideStaffStageDemoForTests(true))
+                    throw new InvalidOperationException("Staff QA failed");
+            });
+            Assert.That(LabGameBuildVariant.IsDemo, Is.False);
+            IDisposable scope = LabGameBuildVariant.OverrideStaffStageDemoForTests(true);
+            scope.Dispose();
+            using (LabGameBuildVariant.OverrideStaffStageDemoForTests(true))
+            {
+                scope.Dispose();
+                Assert.That(LabGameBuildVariant.IsStaffStageDemo, Is.True);
+            }
+            Assert.That(LabGameBuildVariant.IsDemo, Is.False);
+        }
     }
 }
