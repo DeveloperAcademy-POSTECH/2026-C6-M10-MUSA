@@ -47,6 +47,14 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void TheRedEdgeStaysWhileTheBubbleIsUpAndGoesWithIt()
+        {
+            Assert.That(LabThirtySecondsLeftHud.EdgeAlphaAt(0f, 1f, 0f), Is.EqualTo(.6f).Within(.001f), "Flashes first.");
+            Assert.That(LabThirtySecondsLeftHud.EdgeAlphaAt(1.5f, 1f, 0f), Is.GreaterThan(.2f), "Still red with the bubble up.");
+            Assert.That(LabThirtySecondsLeftHud.EdgeAlphaAt(2.2f, 0f, 0f), Is.Zero, "Gone with the bubble.");
+        }
+
+        [Test]
         public void TheDefaultsAreThirtySecondsAndAStrongBuzz()
         {
             var config = UnityEngine.ScriptableObject.CreateInstance<LabConfig>();

@@ -7,7 +7,7 @@ namespace C6Lab
     /// 남은 30초 알림 (#734). 스토리 1/2/3라운드(구미호/야광귀/지귀)에서 남은 시간이 30초가 되는 순간 모든 기기 화면에
     /// - 위쪽 남은 시간 숫자가 크게 부풀었다 돌아오며 빨갛게 몇 번 깜빡이고,
     /// - 그 바로 밑에서 "30초 남았소!" 말풍선이 튀어나와 흔들리다가 잠시 머물고 흐려지며,
-    /// - 화면 가장자리가 한 번 붉게 번쩍이고, 강한 경고음과 강한 진동이 한 번 난다.
+    /// - 화면 가장자리가 붉게 번쩍인 뒤 말풍선이 떠 있는 동안 붉은 테두리로 숨 쉬며 남고, 강한 경고음과 강한 진동이 한 번 난다.
     /// 튜토리얼 연습판과 2:2 대결에서는 띄우지 않는다. 남은 시간(스냅샷)만 보고 판단해서 라운드 기믹 코드와 따로 돈다.
     /// 30초가 지난 뒤(LateWindowSeconds 넘게) 들어온 기기에는 띄우지 않는다. 화면 표시만 하며 터치를 막지 않는다.
     /// 알림 시각, 말풍선 시간, 소리 크기, 진동 세기는 LabConfig Inspector "남은 30초 알림 (#734)".
@@ -25,8 +25,8 @@ namespace C6Lab
         // 시간 숫자: 이만큼 부풀고, 이 시간 동안 이 횟수만큼 빨갛게 깜빡인다.
         private const float TimerSwell = .55f, TimerSwellSeconds = .45f, TimerBlinkSeconds = 1.2f;
         private const int TimerBlinks = 3;
-        // 가장자리 번쩍임
-        private const float EdgeSeconds = .6f, EdgeAlpha = .6f;
+        // 가장자리: 처음에 이만큼 밝게 번쩍이고(EdgeSeconds에 걸쳐 빠짐), 말풍선이 떠 있는 동안 EdgeHold 언저리로 숨 쉬며 남는다.
+        private const float EdgeSeconds = .6f, EdgeAlpha = .6f, EdgeHold = .38f, EdgeBreathe = .1f, EdgeHz = 2f;
         // 말풍선 크기 (Canvas 단위)
         private const float BubbleWidth = 176f, BubbleHeight = 46f, BubbleGap = 12f;
         private const int WordsSize = 26;
@@ -161,12 +161,12 @@ namespace C6Lab
                 bool red = age < TimerBlinkSeconds && Mathf.FloorToInt(age / TimerBlinkSeconds * TimerBlinks * 2f) % 2 == 0;
                 timer.color = red ? new Color(AlarmRed.r, AlarmRed.g, AlarmRed.b, timerColor.a) : timerColor;
             }
-            // 가장자리: 한 번 붉게 번쩍이고 빠지게 사라진다.
-            float edgeAlpha = age < EdgeSeconds ? EdgeAlpha * Mathf.Pow(1f - age / EdgeSeconds, 2f) : 0f;
-            edge.gameObject.SetActive(edgeAlpha > 0f);
-            if (edgeAlpha > 0f) edge.color = new Color(AlarmRed.r, AlarmRed.g, AlarmRed.b, edgeAlpha);
             // 말풍선: 시간 숫자 밑에서 튀어나와 좌우로 흔들리다 자리를 잡고, 끝에 흐려진다.
             float alpha = BubbleAlpha(age, seconds);
+            // 가장자리: 처음에 붉게 번쩍이고, 말풍선이 떠 있는 동안 붉은 테두리로 숨 쉬며 남다가 말풍선과 함께 흐려진다.
+            float edgeAlpha = EdgeAlphaAt(age, alpha, Time.unscaledTime);
+            edge.gameObject.SetActive(edgeAlpha > 0f);
+            if (edgeAlpha > 0f) edge.color = new Color(AlarmRed.r, AlarmRed.g, AlarmRed.b, edgeAlpha);
             bubble.gameObject.SetActive(alpha > 0f);
             tail.gameObject.SetActive(alpha > 0f);
             if (alpha > 0f)
@@ -179,6 +179,16 @@ namespace C6Lab
                 words.color = new Color(AlarmRed.r, AlarmRed.g, AlarmRed.b, alpha);
             }
             if (alpha <= 0f && age >= TimerBlinkSeconds && edgeAlpha <= 0f) Hide();
+        }
+
+        /// <summary>
+        /// 시작한 지 t초의 붉은 테두리 불투명도: 처음 번쩍임과, 말풍선이 떠 있는 동안(bubbleAlpha) 숨 쉬며 남는 테두리 중 큰 쪽.
+        /// </summary>
+        public static float EdgeAlphaAt(float t, float bubbleAlpha, float time)
+        {
+            float flash = t >= 0f && t < EdgeSeconds ? EdgeAlpha * Mathf.Pow(1f - t / EdgeSeconds, 2f) : 0f;
+            float hold = bubbleAlpha * (EdgeHold + EdgeBreathe * Mathf.Sin(time * EdgeHz * 2f * Mathf.PI));
+            return Mathf.Max(flash, hold);
         }
 
         /// <summary>시작한 지 t초의 말풍선 크기: 작게 시작해 1.3배까지 튀었다가 1배로 돌아온다.</summary>
