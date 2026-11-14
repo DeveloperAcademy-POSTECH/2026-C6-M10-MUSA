@@ -937,7 +937,8 @@ namespace C6Lab
                 float beat = tickBeat;
                 if (turn) scale = 1.18f + .07f * beat;
                 Color fill = slotFills[i].color;
-                slotFills[i].color = new Color(fill.r, fill.g, fill.b, later ? .4f : 1f);
+                // #741 QA: the colours still to come stay readable (they were faded to .4 and hard to see).
+                slotFills[i].color = new Color(fill.r, fill.g, fill.b, later ? .85f : 1f);
                 Image glowImage = slotGlows[i];
                 if (glowImage != null)
                 {
