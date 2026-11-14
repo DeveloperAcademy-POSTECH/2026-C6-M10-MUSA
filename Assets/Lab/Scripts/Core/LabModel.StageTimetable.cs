@@ -8,10 +8,13 @@ namespace C6Lab
     /// 그 위에 규칙을 얹는다. 1R 구미호와 2:2에는 쓰지 않는다.
     /// - 초반 겹침 막기: 초반(전투 시작 뒤 stageEarlyPhaseSeconds 전)에 고유 기믹(예고 포함)이 진행 중이면, 공통 기믹(박 폭탄 /
     ///   넘기기 막기)은 그것이 화면에서 다 끝나고 stageEarlyCommonGapSeconds 뒤에 온다. 중반부터는 겹쳐도 그대로 온다.
+    /// - 벌칙 뒤 쉬는 시간: 고유 기믹은 앞 고유 기믹과 그 보상/벌칙이 다 끝나야 온다(원래 규칙). 거기에 더해 벌칙(2R SMALL /
+    ///   3R 부적 실패의 북 미끄러움)이 끝나고 stagePenaltyRestSeconds가 지나야 다음 고유 기믹 예고가 시작된다.
     /// </summary>
     public sealed partial class LabModel
     {
         private double timetableStartAt, timetableEarlyUntil = double.NegativeInfinity, timetableEarlyGap;
+        private double timetablePenaltyRest, timetableDrumSlipSeconds;
         // 끝을 아직 몰라(미션/콤보 진행 중) 붙잡아 둔 공통 기믹의 원래 시각. 없으면 NaN.
         private double heldEarlyCommonAt = double.NaN;
 
@@ -25,6 +28,25 @@ namespace C6Lab
             float early = config != null ? config.StageEarlyPhaseSeconds : 0f;
             timetableEarlyUntil = early > 0f ? now + early : double.NegativeInfinity;
             timetableEarlyGap = config != null ? config.StageEarlyCommonGapSeconds : 1d;
+            timetablePenaltyRest = config != null ? config.StagePenaltyRestSeconds : 0d;
+            timetableDrumSlipSeconds = config != null ? config.JigwiAFailDrumSlipSeconds : 0d;
+        }
+
+        /// <summary>#737: 이 시각에 끝나는 벌칙 뒤 쉬는 시간이 끝나는 시각. 이 판에 규칙을 쓰지 않거나 벌칙이 없었으면 -∞.</summary>
+        private double PenaltyRestUntil(double penaltyEnd)
+            => TimetableRulesOn && timetablePenaltyRest > 0d && penaltyEnd > timetableStartAt
+                ? penaltyEnd + timetablePenaltyRest : double.NegativeInfinity;
+
+        /// <summary>
+        /// #737: 3R 미션의 벌칙까지 다 끝나는 시각. 부적 실패는 판 구슬이 탄 뒤에도 북이 미끄러운 동안(LabConfig Jigwi A Fail
+        /// Drum Slip Seconds, 화면 LabJigwiScreenPresentation.DrumFireSecondsLeft와 같은 시작)까지, 그 밖에는 미션이 끝나는 때.
+        /// </summary>
+        public double JigwiPenaltyEndAt(LabJigwiABRound item)
+        {
+            double done = JigwiMissionDoneAt(item);
+            if (item == null || item.kind != LabJigwiABKind.PersonalBurn || item.resolution != LabJigwiABResolution.Expired
+                || !(timetableDrumSlipSeconds > 0d)) return done;
+            return Math.Max(done, item.resolvedAt + JigwiTalismanFailBurnDelaySeconds + timetableDrumSlipSeconds);
         }
 
         /// <summary>
@@ -76,7 +98,7 @@ namespace C6Lab
                     if (at < item.warningAt || item.resolution == LabJigwiABResolution.Cancelled
                         || item.resolution == LabJigwiABResolution.Skipped) continue;
                     if (item.resolution == LabJigwiABResolution.None) return double.PositiveInfinity;
-                    until = Math.Max(until, JigwiMissionDoneAt(item));
+                    until = Math.Max(until, JigwiPenaltyEndAt(item));
                 }
                 return until;
             }

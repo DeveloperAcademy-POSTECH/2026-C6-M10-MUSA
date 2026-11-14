@@ -1188,6 +1188,8 @@ namespace C6Lab
         [SerializeField, Range(0f, 100f)] private float stageEarlyPhaseSeconds = 40f;
         [Tooltip("초반에 미뤄진 공통 기믹이 고유 기믹이 끝나고 몇 초 뒤에 올지")]
         [SerializeField, Range(0f, 10f)] private float stageEarlyCommonGapSeconds = 1f;
+        [Tooltip("벌칙(2R SMALL / 3R 부적 실패의 북 미끄러움)이 끝나고 이 초가 지나야 다음 고유 기믹 예고가 시작된다. 0이면 벌칙이 끝나자마자")]
+        [SerializeField, Range(0f, 20f)] private float stagePenaltyRestSeconds = 5f;
         [Header("남은 30초 알림 (#734, Inspector 전용)")]
         [Tooltip("스토리 1/2/3라운드에서 남은 시간이 이 초가 되는 순간 시간 숫자 밑에서 \"N초 남았소!\"가 튀어나온다 (모든 기기)")]
         [SerializeField, Range(5f, 90f)] private float thirtySecondsLeftAt = 30f;
@@ -1772,6 +1774,7 @@ namespace C6Lab
         public float JigwiSootHitVolume => Mathf.Clamp01(Finite(jigwiSootHitVolume, 1f));
         public float JigwiSootRevealVolume => Mathf.Clamp01(Finite(jigwiSootRevealVolume, .8f));
         public float StageEarlyPhaseSeconds => Mathf.Clamp(Finite(stageEarlyPhaseSeconds, 40f), 0f, 100f);
+        public float StagePenaltyRestSeconds => Mathf.Clamp(Finite(stagePenaltyRestSeconds, 5f), 0f, 20f);
         public float StageEarlyCommonGapSeconds => Mathf.Clamp(Finite(stageEarlyCommonGapSeconds, 1f), 0f, 10f);
         public float ThirtySecondsLeftAt => Mathf.Clamp(Finite(thirtySecondsLeftAt, 30f), 5f, 90f);
         public float ThirtySecondsLeftBubbleSeconds => Mathf.Clamp(Finite(thirtySecondsLeftBubbleSeconds, 2.2f), .5f, 5f);

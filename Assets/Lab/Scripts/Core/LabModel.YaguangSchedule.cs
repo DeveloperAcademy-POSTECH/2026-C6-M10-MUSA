@@ -79,7 +79,9 @@ namespace C6Lab
         {
             if (combo.Active || comboWarned || flashWarned) return true;
             if (flashCount > 0 && at < lastFlashAt + rules.FlashGlareSeconds + rules.FlashRecoverySeconds) return true;
-            return players.Values.Any(player => player.comboPenaltyUntil > at || player.comboRewardUntil > at);
+            // #737: 벌칙(SMALL)이 끝나도 쉬는 시간(timetablePenaltyRest)이 지나야 다음 고유 기믹이 온다.
+            return players.Values.Any(player => player.comboPenaltyUntil > at || player.comboRewardUntil > at
+                || PenaltyRestUntil(player.comboPenaltyUntil) > at);
         }
 
         private void StartWaitingYaguangUnique(double at)
