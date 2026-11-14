@@ -766,7 +766,7 @@ namespace C6Lab
                 if (fadeOut <= 0f && t - steamClearedAt >= ClearPuffSeconds) EndSteam(); // #724 after the blown puffs are gone
                 Show(steamHand, false);
                 // The full ring flashes and swells away with the smoke.
-                float burst = Mathf.Clamp01((t - steamClearedAt) / .4f);
+                float burst = Mathf.Clamp01((t - steamClearedAt) / (ClearBlowSeconds * .75f));
                 DrawWipeGauge(1f, 1f + .5f * burst, 1f - burst, board);
                 return;
             }
@@ -1018,7 +1018,12 @@ namespace C6Lab
         }
 
         // ---------- #724 UT: smoke scatters from the fingertip, and is blown away at once when wiped ----------
-        public const float ClearBlowSeconds = .55f, WipePuffSeconds = .5f, ClearPuffSeconds = .7f;
+        public const float WipePuffSeconds = .5f;
+        [SerializeField, Range(.3f, 3f), Tooltip("#724 UT: how long the smoke takes to swell and blow away once it is wiped (it was .55s, too fast).")]
+        private float clearBlowSeconds = 1.2f;
+        /// <summary>How long the wiped smoke takes to blow away; its big puffs last a little longer.</summary>
+        public float ClearBlowSeconds => Mathf.Max(.1f, clearBlowSeconds);
+        public float ClearPuffSeconds => ClearBlowSeconds + .15f;
         private const int WipePuffCount = 18, ClearPuffCount = 12;
         private Image[] wipePuffs;
         private readonly Vector2[] wipePuffFrom = new Vector2[WipePuffCount + ClearPuffCount], wipePuffVelocity = new Vector2[WipePuffCount + ClearPuffCount];
@@ -1077,7 +1082,7 @@ namespace C6Lab
                 float angle = (k + UnityEngine.Random.Range(-.3f, .3f)) / ClearPuffCount * Mathf.PI * 2f;
                 Vector2 dir = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle));
                 wipePuffFrom[i] = middle + Vector2.Scale(dir, new Vector2(board.width * .28f, board.height * .3f));
-                wipePuffVelocity[i] = dir * board.height * UnityEngine.Random.Range(.7f, 1.1f);
+                wipePuffVelocity[i] = dir * board.height * UnityEngine.Random.Range(.7f, 1.1f) * (.7f / ClearPuffSeconds); // the same distance, only slower
                 wipePuffSize[i] = board.width * UnityEngine.Random.Range(.35f, .55f);
                 wipePuffBorn[i] = t;
             }
