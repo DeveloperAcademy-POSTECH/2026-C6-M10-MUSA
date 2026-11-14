@@ -3,6 +3,9 @@ using UnityEngine.UI;
 
 namespace C6Lab
 {
+    /// <summary>#734 남은 30초 경고음 종류 (LabConfig에서 들어 보고 고른다).</summary>
+    public enum LabThirtySecondsLeftSound { Gong = 0, Drum = 1 }
+
     /// <summary>
     /// 남은 30초 알림 (#734). 스토리 1/2/3라운드(구미호/야광귀/지귀)에서 남은 시간이 30초가 되는 순간 모든 기기 화면에
     /// - 위쪽 남은 시간 숫자가 크게 부풀었다 돌아오며 빨갛게 몇 번 깜빡이고,
@@ -10,13 +13,13 @@ namespace C6Lab
     /// - 화면 가장자리가 붉게 번쩍인 뒤 말풍선이 떠 있는 동안 붉은 테두리로 숨 쉬며 남고, 강한 경고음과 강한 진동이 한 번 난다.
     /// 튜토리얼 연습판과 2:2 대결에서는 띄우지 않는다. 남은 시간(스냅샷)만 보고 판단해서 라운드 기믹 코드와 따로 돈다.
     /// 30초가 지난 뒤(LateWindowSeconds 넘게) 들어온 기기에는 띄우지 않는다. 화면 표시만 하며 터치를 막지 않는다.
-    /// 알림 시각, 말풍선 시간, 소리 크기, 진동 세기는 LabConfig Inspector "남은 30초 알림 (#734)".
+    /// 알림 시각, 말풍선 시간, 경고음(징/북)과 크기, 진동 세기는 LabConfig Inspector "남은 30초 알림 (#734)".
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class LabThirtySecondsLeftHud : MonoBehaviour
     {
         public const string WordsEnd = "초 남았소!";
-        public const string SoundFolder = "ThirtySecondsLeft";
+        public const string GongFolder = "ThirtySecondsLeftGong", DrumFolder = "ThirtySecondsLeftDrum";
         /// <summary>알림 시각을 넘은 지 이 초 안에 본 기기만 띄운다.</summary>
         public const double LateWindowSeconds = 1.5d;
         public static readonly Color AlarmRed = new Color(.86f, .12f, .16f);
@@ -104,6 +107,10 @@ namespace C6Lab
             return layer != null;
         }
 
+        /// <summary>VFX 실험실(#734): 고른 경고음만 지금 한 번 들려준다 (말풍선 없이, LabConfig 크기로).</summary>
+        public void PreviewSound(LabThirtySecondsLeftSound sound)
+            => PlaySound(FolderFor(sound), network != null && network.config != null ? network.config.ThirtySecondsLeftVolume : 1f);
+
         private void OnDisable() => Hide();
 
         private void OnDestroy()
@@ -127,7 +134,8 @@ namespace C6Lab
                 timerTouched = true;
             }
             LabConfig config = network != null ? network.config : null;
-            PlaySound(config != null ? config.ThirtySecondsLeftVolume : 1f);
+            PlaySound(FolderFor(config != null ? config.ThirtySecondsLeftSound : LabThirtySecondsLeftSound.Gong),
+                config != null ? config.ThirtySecondsLeftVolume : 1f);
             float haptic = config != null ? config.ThirtySecondsLeftHaptic : 1f;
             if (haptic > 0f) LabHaptics.PlayDirect(config, LabHapticStyle.Heavy, haptic, .3f, .8f * haptic, .9f);
         }
@@ -234,10 +242,13 @@ namespace C6Lab
                 y + BubbleHeight * .5f);
         }
 
-        private void PlaySound(float volume)
+        /// <summary>경고음 종류의 Resources/Audio 폴더 이름.</summary>
+        public static string FolderFor(LabThirtySecondsLeftSound sound) => sound == LabThirtySecondsLeftSound.Drum ? DrumFolder : GongFolder;
+
+        private void PlaySound(string folder, float volume)
         {
             if (volume <= 0f) return;
-            AudioClip[] clips = Resources.LoadAll<AudioClip>("Audio/" + SoundFolder);
+            AudioClip[] clips = Resources.LoadAll<AudioClip>("Audio/" + folder);
             if (clips == null || clips.Length == 0) return;
             if (sfx == null) { sfx = gameObject.AddComponent<AudioSource>(); sfx.playOnAwake = false; sfx.spatialBlend = 0f; }
             sfx.PlayOneShot(clips[Random.Range(0, clips.Length)], volume * LabAudioSettings.SfxVolume);
