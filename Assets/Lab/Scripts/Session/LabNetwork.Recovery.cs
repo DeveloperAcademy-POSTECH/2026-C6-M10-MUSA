@@ -139,7 +139,7 @@ namespace C6Lab
                 + " name=" + hostAdvertiseName + " result=" + (started ? "started" : "failed"));
             if (started) return;
             // Another local room took the freed explicit name: let the daemon pick a free one instead.
-            if (active.LocalRegistrationNameConflict) hostAdvertiseAutoRename = true;
+            if (active.LocalRegistrationNameConflict && (!gameFlowEnabled || !LabGameBuildVariant.IsStaffStageDemo)) hostAdvertiseAutoRename = true;
             ScheduleHostAdvertiseRetry(now);
         }
 

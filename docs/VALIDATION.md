@@ -8879,3 +8879,39 @@ PR #729 검증 중 main `a7208003`에서 `LabLocalBoardNetworkIntegrationTests` 
 - **실행:** Unity Editor를 재시작한 뒤 Test Runner에서 전체 EditMode Run All, **실패 0건**. 전체 개수는 기록하지 못했다. 이번에 바꾼 `LabJigwiABModelTests`(조합대에 파편 넣기·아무 파편끼리 합치기), `LabJigwiTalismanOverlayTests`(획별 60% 판정), `LabJigwiSavedConfigTests`(간격 18/16/30/25초)가 이 실행에 들어 있다.
 - **수동 확인(Editor):** 연기 다시 번짐(닦지 않고 1초 뒤 구멍 가장자리부터), 다 닦은 뒤 걷힘 1.2초, 파편은 다 닦은 뒤에 나옴을 팀원이 플레이로 보고 속도를 정했다.
 - **미실행:** 전체 PlayMode, Mac 여러 앱·iPhone 실기기에서 연기 밑 판 조작/조합대 동기화.
+
+
+## 2026-11-14 — #735 스태프 스테이지 선택·3인 단판 시연
+
+- **기준:** `feat/#735-staff-stage-demo`, `origin/main 1292e881`에서 분리. Unity 6000.6.5f1·macOS ARM64·Metal batch 환경. 데스크탑 프로젝트의 기존 main과 로컬 상태는 별도 작업 폴더로 보존했다.
+- **검사 범위 선정:** 방 검색·입장 승인·진행 경로 직렬화·공유 수명·빌드 변형을 바꾸므로 처음에는 전체 EditMode·PlayMode를 실행했다. 이후 발견된 선택 패널의 기하 수정과 신규 검사 입력 환경 보완은 시연 Home UI에 한정됐고, 세션·통신·게임 규칙 코드는 추가 변경하지 않았다. 최종 전체 EditMode와 시연 경로·정상 로비의 영향 PlayMode를 다시 실행했다. 이전에 통과한 무관한 게임 경로의 검사는 재사용했다.
+
+| 검사 | 수행 결과와 근거 |
+| --- | --- |
+| 컴파일·저장 자료 생성 | 명시적 `StaffStageDemoSetup.Prepare` 실행 종료 0. 선택별 총평·엔딩·임시 QR 설정·UI 저장 연결 검사 수행 |
+| 최초 전체 EditMode | **2468/2468 PASS**, 20.20초. 실패·건너뜀 0 |
+| 최초 전체 PlayMode | **863/865**, 884.17초. 신규 선택창 클릭 검사와 신규 마무리 페이지의 가상 입력 유지 검사 2건 실패. 아래 원인·수정 기록 참조 |
+| 수정 후 영향 PlayMode | **27/27 PASS**, 71.68초. `GameStaffStageDemoFlowTests` 3건·`GameStaffStageDemoSessionTests` 3건·`StaffDemoFinalPageTests` 1건·기존 `GameLobbyViewTests` 20건. 실패·건너뜀 0 |
+| 최종 전체 EditMode | **2468/2468 PASS**, 18.71초. 수정된 저장 패널·빌드 계약 포함, 실패·건너뜀 0 |
+| 실제 UI 입력 후속 PlayMode | **4/4 PASS**, 0.99초. `GameStaffStageDemoSessionTests` 전체: 기존 3건과 실제 InputSystem 마우스 이동·누르기·떼기 → 저장된 UI 입력 모듈 → Stage2 검색 요청·취소 1건. 직접 UnityEvent 호출 없이 확인, 입력 설정·기기 복원. 런타임 추가 변경 없음 |
+
+### 최초 실패와 수정
+
+1. **실제 선택창 결함:** 미리보기 Scene의 Overlay Canvas가 스케일 0으로 저장돼 세 박스가 한 지점으로 겹쳤고, 첫 박스 중심에서 Stage3가 최상위 클릭 대상으로 잡혔다. 초기 스케일 보정만으로 저장 드라이버를 막지 못해 에셋 검증도 중단됐다. 별도 Canvas를 제거하고 기존 Home Canvas·Scaler·Raycaster 아래에 붙는 저장 패널로 수정했다. 저장 크기·스케일 검증과 실제 세 박스 중심의 화면 범위·최상위 raycast 단언을 유지해 재실행했다. 정상 Scene·원래 로비 배치는 수정하지 않았다.
+2. **검사 입력 환경:** batch Editor의 포커스 정책이 가상 마우스를 다음 프레임에 해제해 마무리 페이지가 입력 해제 상태로 판단했다. 기존 오프닝 검사와 같은 임시 InputSettings 사본으로 포커스 조건을 명시했고 원본 객체·JSON·hideFlags와 가상 기기 해제를 확인했다. 마우스·손가락을 동시에 누르고 각각 해제해, 마지막 손가락을 놓기 전 복귀가 차단되는 단언을 추가했다. 실제 게임의 입력 차단 규칙은 변경하지 않았다.
+
+### 확인한 실제 연결 범위
+
+- `GameStaffStageDemoFlowTests`: 저장 Home의 실제 선택 요청 → Bonjour 대기 광고 → 생성자의 자동 Host 입장. 다른 스테이지 토큰 참가자는 거절되고, 같은 스테이지의 실제 `LabNetwork` 패킷 참가자 2명이 연결된다. 서로 다른 P자리·설정 승인 뒤에도 자동 출발하지 않고 방장 입력으로 시작한다.
+- 실제 CPU 표면에 새 도색을 등록해 완료시킨 뒤, **Stage1·2·3 각각** 한 판만 `Completed`로 끝남을 확인했다. 후일담·이번 방 3명의 결과·명시적 준비·방장 총평 승인·선택한 판의 시간/기여도·공통 엔딩 6컷·임시 QR·버튼 복귀까지 실행했다. 복귀 후 스테이지·연결·결과가 초기화돼 다음 그룹에 남지 않음을 확인했다.
+- 이 참가자 2개는 같은 Mac 프로세스의 실제 전송 객체다. 별도 Guest 앱의 전체 UI나 실제 세 휴대폰 플레이를 검증한 것으로 표현하지 않는다. 100% 도색은 검사에서 판정 표면에 직접 공급했으며 실제 투척 입력은 기존 전체 검사의 범위다.
+- 일반 Game/Lab 접속 토큰과 정상 방 TXT 바이트, 일반 Story `[1,2,3]`·땅따먹기 진행, 고정 방 이름 충돌·만석·진행 중·취소·선택 불일치 경계를 검사했다. 네트워크가 격리된 환경에서 중복 방을 절대 만들지 않는다는 보장은 하지 않는다.
+- 일반 Scene·Story 원본·LabConfig·StageCatalog·ProjectSettings·패키지는 변경 대상에서 제외했다. 새 자료는 시연 전용 Resources 경로에 생성했다.
+
+### 빌드·화면 확인과 미실행 항목
+
+- **Mac Release 빌드 PASS:** `GameDemoBuild.Mac` 실행 종료 0, manifest `result=Succeeded`·`totalErrors=0`·`identityVerified=true`·`development=false`. `staff-stage-demo`·3인·선택 가능 스테이지 3개·정상 5개 Scene 목록을 확인했다. 빌드 뒤 정상 Scene·ProjectSettings·패키지·렌더 설정에 diff가 없었다.
+- **실제 Mac 화면:** 390×844 콘텐츠 크기로 Release 앱 한 개를 실행해 1·2·3 박스·요괴 이름·안내가 표시되고 기존 타이틀/방 목록이 가려진 모습을 확인했다. 컴퓨터 자동 클릭으로 실제 앱의 방 입장까지는 확인하지 못했다. 이를 실제 수동 입력 PASS로 기록하지 않으며, 별도로 위 InputSystem→UI 모듈 자동 검사로 입력 연결을 확인했다. 확인한 앱과 배치 Editor는 종료했다.
+- 빌드 때 작업 트리는 미커밋 상태였으며 manifest도 `sourceHasUncommittedChanges=true`로 남겼다. 이후 변경은 검증용 검사·문서뿐이고 앱의 런타임 코드·에셋은 같다.
+- iOS 내보내기·설치·일반 Wi-Fi/개인용 핫스팟의 실제 세 기기 UI: **미실행**. QR URL은 미정이며 실제 QR 스캔도 미실행이다.
+- 원시 로그·NUnit XML·빌드 산출물·테스트 임시 Scene은 커밋하지 않는다. 사용법은 `docs/STAFF_STAGE_DEMO.md`를 따른다.

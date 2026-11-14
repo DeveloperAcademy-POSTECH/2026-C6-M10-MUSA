@@ -26,6 +26,8 @@ namespace Hapio
         public string runId = string.Empty;
         public uint revision;
         public int stageIndex;
+        /// <summary>Staff demo's immutable canonical stage; zero in normal/legacy builds.</summary>
+        public int demoStageIndex;
         public int totalStages = GameRunFlow.StagesFor(GameMode.Story);
         public GameMode mode;
         public GameFlowPhase phase = GameFlowPhase.Home;

@@ -154,7 +154,9 @@ namespace C6Lab
             && !string.IsNullOrEmpty(roomKey) && string.Equals(rejoinTicketRoom, roomKey, StringComparison.OrdinalIgnoreCase);
 
         /// <summary>A listed room this device may try: open, or full while possibly holding this device's place.</summary>
-        internal bool RoomOpenToThisDevice(LabDiscoveredRoom room) => room != null && !room.Playing && !room.WaitingForHost
+        internal bool RoomOpenToThisDevice(LabDiscoveredRoom room) => room != null
+            && (!gameFlowEnabled || !LabGameBuildVariant.IsStaffStageDemo || DemoStageIndex >= 1 && room.DemoStageIndex == DemoStageIndex)
+            && !room.Playing && !room.WaitingForHost
             && (!room.IsFull || HoldsRoomTicket(room.Key));
 
         /// <summary>The Host admitted this device's ticket into its lobby (#501).</summary>

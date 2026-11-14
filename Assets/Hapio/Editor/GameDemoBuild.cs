@@ -20,10 +20,10 @@ namespace Hapio.Editor
     /// <summary>Explicit demo exports; saved scene lists, defines and normal player identity remain unchanged.</summary>
     public static class GameDemoBuild
     {
-        public const string ProductName = "Hapio Yaguang Demo";
-        public const string DemoVersion = "0.1.0";
-        public const string DemoBuildNumber = "1";
-        private const string LastOutput = "Hapio.LastYaguangDemoBuild";
+        public const string ProductName = "Hapio Staff Demo";
+        public const string DemoVersion = "0.2.0";
+        public const string DemoBuildNumber = "2";
+        private const string LastOutput = "Hapio.LastStaffStageDemoBuild";
         private const string ManifestFileName = "build-manifest.json";
 
         [MenuItem("Hapio/Demo Build/Release/Build Mac App")]
@@ -52,7 +52,7 @@ namespace Hapio.Editor
                 target = target,
                 locationPathName = output,
                 options = development ? BuildOptions.Development : BuildOptions.None,
-                extraScriptingDefines = new[] { LabGameBuildVariant.YaguangDemoDefine }
+                extraScriptingDefines = new[] { LabGameBuildVariant.StaffStageDemoDefine }
             };
         }
 
@@ -60,9 +60,10 @@ namespace Hapio.Editor
         {
             if (string.IsNullOrWhiteSpace(normalIdentifier))
                 throw new InvalidOperationException("The normal application identifier must be set before exporting a demo.");
-            if (normalIdentifier.EndsWith(".yaguangdemo", StringComparison.OrdinalIgnoreCase))
+            if (normalIdentifier.EndsWith(".yaguangdemo", StringComparison.OrdinalIgnoreCase)
+                || normalIdentifier.EndsWith(".staffdemo", StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException("The saved application identifier already has the demo suffix. Restore the normal identifier first.");
-            return normalIdentifier + ".yaguangdemo";
+            return normalIdentifier + ".staffdemo";
         }
 
         /// <summary>Read-only: missing authored assets must be prepared explicitly, never generated during a build.</summary>
@@ -75,12 +76,17 @@ namespace Hapio.Editor
                 if (SceneManager.GetSceneAt(i).isDirty)
                     throw new InvalidOperationException("Save or discard scene edits before exporting a demo. The build does not save scenes.");
             GameStageCatalog catalog = GameStageCatalog.RequireDefault();
-            GameStageDefinition stage = catalog.Get(2);
-            if (stage.yokai != LabStageYokai.Yaguang || stage.stageIndex != 2)
-                throw new InvalidOperationException("The demo must use the original Stage 2 Yaguang definition.");
+            LabStageYokai[] expectedYokai = { LabStageYokai.Gumiho, LabStageYokai.Yaguang, LabStageYokai.Jigwi };
+            for (int index = 1; index <= 3; index++)
+            {
+                GameStageDefinition stage = catalog.Get(index);
+                if (stage.yokai != expectedYokai[index - 1] || stage.stageIndex != index)
+                    throw new InvalidOperationException("The staff demo must retain the original Stage " + index + " definition.");
+            }
             if (AssetDatabase.LoadAssetAtPath<LabConfig>("Assets/Lab/Resources/LabConfig.asset") == null)
                 throw new InvalidOperationException("The saved LabConfig is required; the demo never creates tuning defaults.");
-            YaguangDemoStoryAssets.Validate();
+            StaffDemoUiAssets.Validate();
+            StaffStageDemoStoryAssets.Validate();
         }
 
         private static void Build(BuildTarget target, bool development)
@@ -91,7 +97,9 @@ namespace Hapio.Editor
             NamedBuildTarget namedTarget = NamedTarget(target);
             if (!BuildPipeline.IsBuildTargetSupported(BuildPipeline.GetBuildTargetGroup(target), target))
                 throw new InvalidOperationException("Install the Unity build support module for " + target + " first.");
-            if (PlayerSettings.GetScriptingDefineSymbols(namedTarget).Split(';').Contains(LabGameBuildVariant.YaguangDemoDefine))
+            string[] savedDefines = PlayerSettings.GetScriptingDefineSymbols(namedTarget).Split(';');
+            if (savedDefines.Contains(LabGameBuildVariant.YaguangDemoDefine)
+                || savedDefines.Contains(LabGameBuildVariant.StaffStageDemoDefine))
                 throw new InvalidOperationException("Remove the demo symbol from saved Player Settings. Only the dedicated demo build may supply it.");
             Validate();
 
@@ -102,7 +110,7 @@ namespace Hapio.Editor
             string project = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
             string folder = Path.Combine(project, "Builds", "HapioDemo", run);
             string output = Path.Combine(folder, target == BuildTarget.iOS ? "iOS"
-                : "macOS/Hapio-Yaguang-Demo" + (development ? "-QA.app" : ".app"));
+                : "macOS/Hapio-Staff-Demo" + (development ? "-QA.app" : ".app"));
             if (Directory.Exists(folder) || File.Exists(folder))
                 throw new InvalidOperationException("The demo output already exists: " + folder);
             BuildManifest manifest = CreateManifest(target, development, identifier, run, project);
@@ -226,10 +234,22 @@ namespace Hapio.Editor
         {
             GameStageCatalog catalog = GameStageCatalog.RequireDefault();
             var source = AssetDatabase.LoadAssetAtPath<LabConfig>("Assets/Lab/Resources/LabConfig.asset");
-            float[] values;
-            using (var settings = new GameStageSettings(source, catalog)) values = settings.Capture(2);
+            var stages = new StageManifest[3];
+            int developerFields = 0;
+            using (var settings = new GameStageSettings(source, catalog))
+                for (int index = 1; index <= stages.Length; index++)
+                {
+                    float[] values = settings.Capture(index);
+                    developerFields = values.Length;
+                    stages[index - 1] = new StageManifest
+                    {
+                        stageIndex = index, stageId = catalog.Get(index).stageId,
+                        yokai = catalog.Get(index).yokai.ToString(),
+                        stageSettingsSha256 = SettingsHash(index, values)
+                    };
+                }
             string connection, discovery;
-            using (LabGameBuildVariant.OverrideForTests(true))
+            using (LabGameBuildVariant.OverrideStaffStageDemoForTests(true))
             {
                 connection = LabNetwork.GameConnectionCompatibility;
                 discovery = LabBonjourDiscovery.ProtocolFor(LabRoomFamily.Game);
@@ -246,27 +266,24 @@ namespace Hapio.Editor
                 applicationIdentifier = identifier,
                 version = DemoVersion,
                 buildNumber = target == BuildTarget.iOS ? DemoBuildNumber : string.Empty,
-                variant = "yaguang-demo",
-                variantRevision = LabGameBuildVariant.YaguangDemoRevision,
-                scriptingDefine = LabGameBuildVariant.YaguangDemoDefine,
+                variant = "staff-stage-demo",
+                variantRevision = LabGameBuildVariant.StaffStageDemoRevision,
+                scriptingDefine = LabGameBuildVariant.StaffStageDemoDefine,
                 connectionCompatibility = connection,
                 discoveryCompatibility = discovery,
                 labCompatibility = LabBonjourDiscovery.ProtocolFor(LabRoomFamily.Lab),
-                stageIndex = 2,
-                stageId = catalog.Get(2).stageId,
-                yokai = catalog.Get(2).yokai.ToString(),
+                selectableStages = stages,
                 participants = 3,
-                developerFieldCount = values.Length,
-                stageSettingsSha256 = SettingsHash(values),
+                developerFieldCount = developerFields,
                 scenes = (string[])GameScenePaths.All.Clone(),
                 result = "Building",
                 totalErrors = -1
             };
         }
 
-        private static string SettingsHash(float[] values)
+        private static string SettingsHash(int stage, float[] values)
         {
-            string text = "stage=2;participants=3;" + string.Join(";", values.Select(value => value.ToString("R", CultureInfo.InvariantCulture)));
+            string text = "stage=" + stage + ";participants=3;" + string.Join(";", values.Select(value => value.ToString("R", CultureInfo.InvariantCulture)));
             using (SHA256 sha = SHA256.Create())
                 return BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(text))).Replace("-", string.Empty).ToLowerInvariant();
         }
@@ -333,7 +350,7 @@ namespace Hapio.Editor
         private static void RequireTarget(BuildTarget target)
         {
             if (target != BuildTarget.StandaloneOSX && target != BuildTarget.iOS)
-                throw new ArgumentOutOfRangeException(nameof(target), target, "The Yaguang demo supports Mac and iOS exports.");
+                throw new ArgumentOutOfRangeException(nameof(target), target, "The staff stage demo supports Mac and iOS exports.");
         }
 
         [Serializable]
@@ -344,12 +361,19 @@ namespace Hapio.Editor
             public string target, productName, applicationIdentifier, version, buildNumber, variant;
             public int variantRevision;
             public string scriptingDefine, connectionCompatibility, discoveryCompatibility, labCompatibility;
-            public int stageIndex, participants, developerFieldCount;
-            public string stageId, yokai, stageSettingsSha256;
+            public int participants, developerFieldCount;
+            public StageManifest[] selectableStages;
             public string[] scenes;
             public string result;
             public int totalErrors;
             public bool identityVerified;
+        }
+
+        [Serializable]
+        private sealed class StageManifest
+        {
+            public int stageIndex;
+            public string stageId, yokai, stageSettingsSha256;
         }
     }
 }

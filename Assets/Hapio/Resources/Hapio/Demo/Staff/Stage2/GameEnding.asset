@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4bae6e6b969784f88aaed65c04d155b1, type: 3}
+  m_Name: GameEnding
+  m_EditorClassIdentifier: Hapio.Runtime::Hapio.StorySequence
+  storyId: game-ending-staff-demo-stage-2
+  cuts:
+  - {fileID: 11400000, guid: d4fdf6e2dad63427f848add5925a41a2, type: 2}
+  - {fileID: 11400000, guid: 5ac1ae890afe74b9e90474f3b9a76ded, type: 2}
+  - {fileID: 11400000, guid: 6e6effbe629a94102b27aa6075f8c66e, type: 2}
+  - {fileID: 11400000, guid: 4e74b0a85aa6f45adbd67620644b3efe, type: 2}
+  - {fileID: 11400000, guid: 9718014aa60644b28acb200164385a53, type: 2}
+  - {fileID: 11400000, guid: b459c19e4d69841139fd2bea28372595, type: 2}
+  - {fileID: 11400000, guid: 6602f876578e8471da8acd05c42583be, type: 2}
