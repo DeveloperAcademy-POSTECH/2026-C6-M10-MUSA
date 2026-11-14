@@ -530,7 +530,9 @@ namespace C6Lab.Tests
             var smoke=m.Snapshot(10).jigwiAB.rounds.Single(x=>x.smoke);
             m.Tick(smoke.endsAt+.5);
             Assert.That(m.Snapshot(smoke.endsAt+.5).jigwiAB.rounds.Single(x=>x.id==smoke.id).resolution,Is.Not.EqualTo(LabJigwiABResolution.None));
-            Assert.That(NextCommon(m),Is.EqualTo(48d).Within(1e-6),"Cast at 22 s (1 s after the smoke timed out); the next one keeps its own time.");
+            Assert.That(NextCommon(m),Is.EqualTo(smoke.endsAt+1d).Within(1e-6),"Due 1 s after the smoke timed out (22 s).");
+            m.Tick(smoke.endsAt+1.5);
+            Assert.That(NextCommon(m),Is.EqualTo(48d).Within(1e-6),"Cast at 22 s; the next one keeps its own time.");
 
             // Off (0 s): it comes at 8 s on top of the smoke, as in the middle phase.
             JsonUtility.FromJsonOverwrite("{\"stageEarlyPhaseSeconds\":0}",config);
