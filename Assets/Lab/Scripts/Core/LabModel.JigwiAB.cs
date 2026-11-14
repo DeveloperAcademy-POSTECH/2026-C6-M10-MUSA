@@ -249,8 +249,8 @@ namespace C6Lab
                 || jigwiStageNextSlot >= LabJigwiABTimeline.SlotCountFor(jigwiSchedule)) return;
             double gap = item.kind == LabJigwiABKind.PersonalBurn ? jigwiRelayGapAfterTalisman : jigwiRelayGap;
             double activeAt = JigwiMissionDoneAt(item) + Math.Max(LabJigwiABTimeline.WarningSeconds, gap);
-            // #737: 벌칙(부적 실패의 북 미끄러움)이 끝나고 쉬는 시간이 지난 뒤에 다음 예고가 시작된다.
-            activeAt = Math.Max(activeAt, PenaltyRestUntil(JigwiPenaltyEndAt(item)) + LabJigwiABTimeline.WarningSeconds);
+            // #737: 부적 실패의 북 미끄러움이 걸려 있으면 미끄러움이 시작되고 13초(LabConfig)가 지난 뒤에 다음 예고가 시작된다.
+            activeAt = Math.Max(activeAt, JigwiPenaltyEndAt(item) + LabJigwiABTimeline.WarningSeconds);
             bool personal = LabJigwiABTimeline.KindForSlot(jigwiStageNextSlot, jigwiSchedule) == LabJigwiABKind.PersonalBurn;
             double length = personal ? jigwiABDuration + jigwiAFailBurnStart + JigwiTalismanFailBlazeSeconds : JigwiABMissionSeconds;
             if (!(activeAt + length <= jigwiStageCutoffAt)) { jigwiStageNextSlot = LabJigwiABTimeline.SlotCountFor(jigwiSchedule); return; }

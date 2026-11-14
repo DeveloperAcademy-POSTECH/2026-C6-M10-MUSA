@@ -539,20 +539,20 @@ namespace C6Lab.Tests
             Assert.That(NextCommon(off),Is.EqualTo(48d).Within(1e-6),"Not held.");
         }
 
-        [Test] public void AfterAFailedTalismanTheNextSmokeWaitsForTheSlipperyDrumAndTheRest()
+        [Test] public void AfterAFailedTalismanTheNextSmokeWaitsThirteenSecondsOfTheSlipperyDrum()
         {
-            // #737: smoke 6~21 s (timed out) → talisman 31~41 s (nobody writes) → boards burn until 44.9 s, but the drums stay
-            // slippery until 41 + .45 + 20 = 61.45 s; the next smoke's warning starts 5 s after that (active 68.45 s).
-            JsonUtility.FromJsonOverwrite("{\"jigwiSmokeFlow\":true,\"jigwiRelayTimeline\":true,\"jigwiRelayGapSeconds\":10,\"jigwiRelayGapAfterTalismanSeconds\":10,\"jigwiABPersonalDurationSeconds\":10,\"jigwiAFailBurnStartSeconds\":2.9,\"jigwiAFailDrumSlipSeconds\":20,\"stagePenaltyRestSeconds\":5}",config);
+            // #737: smoke 6~21 s (timed out) → talisman 31~41 s (nobody writes) → boards burn until 44.9 s and the drums slip
+            // from 41.45 s for 20 s. The next smoke may warn 13 s into the slip (54.45 s, active 56.45 s), not after all 20 s.
+            JsonUtility.FromJsonOverwrite("{\"jigwiSmokeFlow\":true,\"jigwiRelayTimeline\":true,\"jigwiRelayGapSeconds\":10,\"jigwiRelayGapAfterTalismanSeconds\":10,\"jigwiABPersonalDurationSeconds\":10,\"jigwiAFailBurnStartSeconds\":2.9,\"jigwiAFailDrumSlipSeconds\":20,\"jigwiDrumSlipWaitSeconds\":13}",config);
             var m=Room3();
             for(double t=1;t<=95d;t+=.5) m.Tick(t);
             var r=m.Snapshot(95d).jigwiAB.rounds.OrderBy(x=>x.slot).ToArray();
             Assert.That(r[0].smoke,Is.True); Assert.That(r[0].resolvedAt,Is.EqualTo(21d).Within(1e-6));
             Assert.That(r[1].kind,Is.EqualTo(LabJigwiABKind.PersonalBurn)); Assert.That(r[1].activeAt,Is.EqualTo(31d).Within(1e-6));
             Assert.That(r[1].resolution,Is.EqualTo(LabJigwiABResolution.Expired));
-            Assert.That(m.JigwiPenaltyEndAt(r[1]),Is.EqualTo(61.45d).Within(1e-6));
+            Assert.That(m.JigwiPenaltyEndAt(r[1]),Is.EqualTo(54.45d).Within(1e-6));
             Assert.That(r[2].smoke,Is.True);
-            Assert.That(r[2].activeAt,Is.EqualTo(68.45d).Within(1e-6),"Not 54.9 s while the drums are still slippery.");
+            Assert.That(r[2].activeAt,Is.EqualTo(56.45d).Within(1e-6),"13 s into the slip, not 54.9 s while the boards still burn nor after all 20 s.");
         }
 
         [Test] public void DenseSmokeFlowRunsFiveMissionsWithTimeForTheBlackOrb()
