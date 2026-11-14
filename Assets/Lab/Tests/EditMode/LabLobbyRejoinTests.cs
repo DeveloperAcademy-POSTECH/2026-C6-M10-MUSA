@@ -349,6 +349,64 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void StaffRetryClearsAllSeatMemoryButKeepsTheRoomAndRejectsOldSelectionRequests()
+        {
+            using (LabGameBuildVariant.OverrideStaffStageDemoForTests(true))
+            using (var room = new HostRoom(3))
+            {
+                room.Set("<DemoStageIndex>k__BackingField", 2);
+                room.Join(5, TicketA, 2);
+                room.Join(6, TicketB, 3);
+                room.Drop(5);
+                Assert.That(room.Network.HeldSeatCount, Is.EqualTo(1));
+                Assert.That(((Dictionary<string, int>)room.Get("rememberedSlots")).Count, Is.EqualTo(1));
+                var requestIds = (Dictionary<ulong, long>)room.Get("slotRequestIds");
+                requestIds[6] = 100;
+                var acknowledgements = (HashSet<ulong>)room.Get("configAcknowledgements");
+                acknowledgements.UnionWith(new[] { 0UL, 6UL });
+                var tickets = new Dictionary<ulong, string>((Dictionary<ulong, string>)room.Get("memberTickets"));
+                room.Network.LockGameRoster();
+
+                Assert.That(room.Network.ReturnStaffDemoGameToLobby(), Is.True);
+                Assert.That(room.Order, Is.EqualTo(new[] { 0UL, 6UL }), "No connected device is removed from the room.");
+                Assert.That(room.Network.LocalSlotNumber, Is.Zero, "Host must also choose again.");
+                Assert.That(room.Network.SelectedParticipantCount, Is.Zero);
+                Assert.That(room.Network.HeldSeatCount, Is.Zero);
+                Assert.That(((Dictionary<string, int>)room.Get("rememberedSlots")), Is.Empty);
+                Assert.That((Dictionary<ulong, string>)room.Get("memberTickets"), Is.EqualTo(tickets));
+                Assert.That(requestIds[6], Is.EqualTo(100), "A late old slot request remains stale after the reset.");
+                Assert.That(acknowledgements, Is.EquivalentTo(new[] { 0UL }), "Guests reconfirm their settings.");
+                Assert.That(room.Network.CanStartBattle, Is.False);
+                Assert.That(room.Network.CanSelectPlayerSlot, Is.True);
+                Assert.That(room.Network.DemoStageIndex, Is.EqualTo(2));
+                Assert.That(room.Approve(9, TicketA), Is.True);
+                room.Connect(9);
+                Assert.That(room.Slots.GetSlot(9), Is.Zero, "Returning ticket must not restore an old P.");
+                Assert.That(room.Network.ParticipantCount, Is.EqualTo(3));
+                Assert.That(room.Network.CanStartBattle, Is.False, "Three devices do not automatically choose or start.");
+            }
+        }
+
+        [Test]
+        public void StaffRetryResetCannotChangeANormalRoomOrAGuest()
+        {
+            using (LabGameBuildVariant.OverrideStaffStageDemoForTests(false))
+            using (var normal = new HostRoom(3))
+            {
+                normal.Join(5, TicketA, 2);
+                Assert.That(normal.Network.ReturnStaffDemoGameToLobby(), Is.False);
+                Assert.That(normal.Slots.GetSlot(0), Is.EqualTo(1));
+                Assert.That(normal.Slots.GetSlot(5), Is.EqualTo(2));
+            }
+            using (LabGameBuildVariant.OverrideStaffStageDemoForTests(true))
+            using (var guest = new HostRoom(3, false))
+            {
+                guest.Set("<DemoStageIndex>k__BackingField", 2);
+                Assert.That(guest.Network.ReturnStaffDemoGameToLobby(), Is.False);
+            }
+        }
+
+        [Test]
         public void AGuestThatQuitTheRunIsNotHeldWhenTheRoomReturnsToItsLobby()
         {
             using (var room = new HostRoom(4))

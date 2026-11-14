@@ -227,7 +227,9 @@ namespace Hapio
                 SetStoryContentVisible(false);
                 session.SetResultPresentationBusy(false);
                 gameOverView.gameObject.SetActive(true);
-                gameOverView.Present(session.CanReturnHome && !ResultActionsBlocked);
+                bool staffRetry = GameRunFlow.IsStaffDemoInterrupted(session.State);
+                gameOverView.Present((staffRetry ? session.CanRetryStaffDemo : session.CanReturnHome)
+                    && !ResultActionsBlocked, staffRetry);
                 return;
             }
             SetStoryContentVisible(true);
@@ -575,6 +577,7 @@ namespace Hapio
         private void OnHomeButton()
         {
             if (ResultActionsBlocked) return;
+            if (GameRunFlow.IsStaffDemoInterrupted(session.State)) { session.RetryStaffDemo(); return; }
             if (stageStory != null && stageStory.IsPresenting) stageStory.RequestExit();
             else session.GoHome();
         }

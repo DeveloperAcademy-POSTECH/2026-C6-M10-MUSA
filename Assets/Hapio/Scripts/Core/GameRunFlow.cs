@@ -248,6 +248,32 @@ namespace Hapio
             return true;
         }
 
+        /// <summary>Only the staff demo's interrupted run offers a fresh choice of seats in its current room.</summary>
+        public static bool IsStaffDemoInterrupted(GameFlowState value) => LabGameBuildVariant.IsStaffStageDemo
+            && value != null && value.mode == GameMode.Story && value.phase == GameFlowPhase.GameOver
+            && !value.retryableDefeat && value.demoStageIndex >= 1 && value.demoStageIndex <= StageCount
+            && value.stageIndex == value.demoStageIndex && !string.IsNullOrEmpty(value.runId) && value.revision > 0
+            && (value.endReason == PlayerLeftReason || value.endReason == PlayerDisconnectedReason
+                || value.endReason == HostDisconnectedReason);
+
+        /// <summary>
+        /// #740: the Host retires one interrupted staff run, while keeping its selected stage and room.
+        /// Transport membership and releasing P assignments belong to the session/network caller.
+        /// </summary>
+        public bool ReturnStaffDemoToLobby(string runId, int stageIndex, uint revision, string notice)
+        {
+            if (!IsStaffDemoInterrupted(state) || !Matches(runId, stageIndex, revision)
+                || notice == null || notice.Length > 128) return false;
+            state = new GameFlowState
+            {
+                phase = GameFlowPhase.Lobby, mode = GameMode.Story, demoStageIndex = state.demoStageIndex,
+                totalStages = StagesFor(GameMode.Story), revision = state.revision + 1, notice = notice
+            };
+            participants.Clear();
+            ClearReadiness();
+            return true;
+        }
+
         /// <summary>
         /// 2:2 (#281): end the battle or its result and keep the room. The lobby state's revision follows the run's,
         /// so a lobby state from before this run can never pull a peer back out of a later battle.

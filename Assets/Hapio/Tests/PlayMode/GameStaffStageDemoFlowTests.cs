@@ -58,6 +58,147 @@ namespace Hapio.Tests
         [UnityTest]
         public IEnumerator ThreePlayersFinishOnlyStageThree() { yield return ThreePlayerRound(3); }
 
+        [UnityTest]
+        public IEnumerator GuestInterruptedRetryReturnsEveryoneToUnselectedSeatsAndRequiresManualStart()
+        {
+            yield return StartRetryRound(2);
+            string oldRun = session.State.runId;
+            string oldBattle = session.State.battleSessionId;
+            ulong[] members = network.ConnectedPlayerIds;
+            second.SendCurrent("exit");
+            yield return Until(() => session.State.phase == GameFlowPhase.GameOver && !session.IsLoadingScene
+                && second.LastState?.phase == GameFlowPhase.GameOver && third.LastState?.phase == GameFlowPhase.GameOver,
+                "Guest exit is shared as an interrupted GameOver before a retry is requested");
+            Assert.That(session.State.retryableDefeat, Is.False);
+            Assert.That(session.CanRetryStaffDemo, Is.True);
+            // Reopening admission must not itself skip the GameOver screen.
+            yield return null; yield return null;
+            Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.GameOver));
+            string repeatedRequest = second.CurrentRequest("staff_retry_lobby");
+            Assert.That(second.Network.SendGameFlowToHost(repeatedRequest), Is.True);
+            Assert.That(second.Network.SendGameFlowToHost(repeatedRequest), Is.True);
+            yield return UnselectedRetryLobby(2);
+            Assert.That(network.ConnectedPlayerIds, Is.EquivalentTo(members), "Retry retains the existing room transport and identities.");
+            Assert.That(session.RetryStaffDemo(), Is.False, "A second retry cannot reset the fresh lobby again.");
+            Assert.That(network.Snapshot, Is.Null);
+            Assert.That(session.ResultSnapshot, Is.Null);
+            Assert.That(session.StageResults, Is.Empty);
+            Assert.That(session.PreviewTexture, Is.Null);
+            Assert.That(session.IsViewerOpen, Is.False);
+
+            Assert.That(network.RequestPlayerSlot(3), Is.True);
+            Assert.That(second.Network.RequestPlayerSlot(1), Is.True);
+            yield return Until(() => network.SelectedParticipantCount == 2, "Two fresh P choices are committed");
+            session.StartGame();
+            Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.Lobby), "Two P choices cannot start a three-player demo.");
+            Assert.That(third.Network.RequestPlayerSlot(2), Is.True);
+            yield return Until(() => network.CanStartBattle, "The third fresh P choice and settings release Host start");
+            yield return null;
+            Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.Lobby), "Readiness never starts a retry automatically.");
+            session.StartGame();
+            yield return PlayingRetryStage(2);
+            Assert.That(session.State.runId, Is.Not.EqualTo(oldRun));
+            Assert.That(session.State.battleSessionId, Is.Not.EqualTo(oldBattle));
+            Assert.That(network.Snapshot.orbs, Is.Empty);
+            Assert.That(network.Snapshot.paintCoveredCount, Is.Zero);
+            Assert.That(network.LocalSlotNumber, Is.EqualTo(3));
+            Assert.That(second.Network.SendGameFlowToHost(repeatedRequest), Is.True);
+            yield return null; yield return null; yield return null;
+            Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.Playing), "A delayed request from the retired run cannot reset the new battle.");
+        }
+
+        [UnityTest]
+        public IEnumerator DisconnectedMemberCanRejoinInterruptedHostAndOpenTheSameStageSeatLobby()
+        {
+            yield return StartRetryRound(3);
+            var originalNetwork = network;
+            ulong remainingGuest = third.Network.LocalPlayerId;
+            second.Dispose(); second = null;
+            yield return Until(() => network.ParticipantCount == 2 && session.State.phase == GameFlowPhase.GameOver
+                && !session.IsLoadingScene, "A real socket departure interrupts the staff battle");
+            Assert.That(session.State.endReason, Is.EqualTo(GameRunFlow.PlayerDisconnectedReason));
+            Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.GameOver), "Admission recovery waits for an explicit retry or join.");
+            Assert.That(network.Snapshot, Is.Null, "The recovery Host removes its old battle before admitting a retrying Guest.");
+            Assert.That(network.CanStartBattle, Is.False);
+            second = new ProtocolPeer("Staff returning member", network.port, 3);
+            second.Network.Join("127.0.0.1");
+            yield return Until(() => second.Network.IsConnected && network.ParticipantCount == 3,
+                "A retrying same-stage member is admitted instead of being rejected as a still-playing room");
+            yield return UnselectedRetryLobby(3);
+            Assert.That(session.Network, Is.SameAs(originalNetwork));
+            Assert.That(network.ConnectedPlayerIds, Has.Member(remainingGuest), "The surviving Guest stays in the original room.");
+            Assert.That(network.IsHost, Is.True);
+            Assert.That(network.HeldSeatCount, Is.Zero, "The retired P assignment cannot reserve a place in the new selection.");
+            Assert.That(network.CanStartBattle, Is.False);
+        }
+
+        [UnityTest]
+        public IEnumerator HostRetryUsesTheAuthoredGameOverActionAndDoesNotReturnToStagePicker()
+        {
+            yield return StartRetryRound(1);
+            session.ExitRun();
+            yield return Until(() => session.State.phase == GameFlowPhase.GameOver && !session.IsLoadingScene
+                && second.LastState?.phase == GameFlowPhase.GameOver && third.LastState?.phase == GameFlowPhase.GameOver,
+                "Host pause-menu exit produces the shared GameOver screen");
+            var over = Object.FindFirstObjectByType<GameOverCharacterView>();
+            Assert.That(over, Is.Not.Null);
+            yield return Until(() => over.homeButton.interactable, "The saved retry action releases its entry input guard");
+            Assert.That(over.homeButton.GetComponentInChildren<UnityEngine.UI.Text>(true).text, Does.Contain("다시"));
+            over.homeButton.onClick.Invoke();
+            yield return UnselectedRetryLobby(1);
+            Assert.That(session.SelectedDemoStage, Is.EqualTo(1));
+            Assert.That(Object.FindFirstObjectByType<GameStaffDemoView>(), Is.Null,
+                "Retry opens P selection directly instead of returning to the three stage cards.");
+        }
+
+        private IEnumerator StartRetryRound(int stage)
+        {
+            Assert.That(session.SelectDemoStage(stage), Is.True);
+            yield return Until(() => network.IsHost && session.State.phase == GameFlowPhase.Lobby && !session.IsLoadingScene,
+                "The retry fixture enters the chosen staff stage room");
+            float[] values = network.config.CaptureDeveloperValues();
+            Set(values, "Battle Duration (seconds)", 600f);
+            Set(values, "Paint Surface Resolution (0 low 1 medium 2 high)", 0f);
+            Set(values, "Paint Drying (0 off, 1 on)", 0f);
+            Assert.That(session.ApplyDeveloperSettings(values, out string error), Is.True, error);
+            Assert.That(network.RequestPlayerSlot(1), Is.True);
+            second = new ProtocolPeer("Staff retry P2", network.port, stage);
+            third = new ProtocolPeer("Staff retry P3", network.port, stage);
+            second.Network.Join("127.0.0.1"); third.Network.Join("127.0.0.1");
+            yield return Until(() => second.Network.CanSelectPlayerSlot && third.Network.CanSelectPlayerSlot,
+                "Both matching-stage packet members are ready to choose P");
+            Assert.That(second.Network.RequestPlayerSlot(2), Is.True);
+            Assert.That(third.Network.RequestPlayerSlot(3), Is.True);
+            yield return Until(() => network.CanStartBattle, "Initial three P choices and config are ready");
+            session.StartGame();
+            yield return PlayingRetryStage(stage);
+        }
+
+        private IEnumerator PlayingRetryStage(int stage) => Until(() => session.State.phase == GameFlowPhase.Playing
+            && session.State.stageIndex == stage && !session.IsLoadingScene && network.HasBattleReferences,
+            "Host manually starts the selected canonical stage after its preparation barriers");
+
+        private IEnumerator UnselectedRetryLobby(int stage)
+        {
+            yield return Until(() => session.State.phase == GameFlowPhase.Lobby && !session.IsLoadingScene
+                && SceneManager.GetActiveScene().path == GameScenePaths.Lobby
+                && second.LastState?.phase == GameFlowPhase.Lobby && third.LastState?.phase == GameFlowPhase.Lobby
+                && second.Network.CanSelectPlayerSlot && third.Network.CanSelectPlayerSlot,
+                "All three members observe the same room's fresh P selection lobby");
+            Assert.That(session.SelectedDemoStage, Is.EqualTo(stage));
+            Assert.That(session.State.demoStageIndex, Is.EqualTo(stage));
+            Assert.That(session.State.stageIndex, Is.Zero);
+            Assert.That(session.State.runId, Is.Empty);
+            Assert.That(network.ParticipantCount, Is.EqualTo(3));
+            foreach (var member in new[] { network, second.Network, third.Network })
+            {
+                Assert.That(member.DemoStageIndex, Is.EqualTo(stage));
+                Assert.That(member.LocalSlotNumber, Is.Zero);
+                Assert.That(member.SelectedParticipantCount, Is.Zero);
+                Assert.That(member.CanStartBattle, Is.False);
+            }
+        }
+
         private IEnumerator ThreePlayerRound(int stage)
         {
             Assert.That(session.SelectDemoStage(stage), Is.True);
@@ -240,6 +381,7 @@ namespace Hapio.Tests
             public readonly LabNetwork Network;
             private PeerControl last;
             public bool PresentationBusy = true, Ready, ViewerOpen, SummaryStarted;
+            public GameFlowState LastState => last?.state;
 
             public ProtocolPeer(string name, ushort port, int stage)
             {
@@ -275,6 +417,14 @@ namespace Hapio.Tests
                 }
             }
             public void ReportResult() { if (last != null && last.state.phase == GameFlowPhase.Completed) Send("result_ready"); }
+            public void SendCurrent(string kind) => Send(kind);
+            public string CurrentRequest(string kind)
+            {
+                Assert.That(last, Is.Not.Null);
+                var control = JsonUtility.FromJson<PeerControl>(JsonUtility.ToJson(last));
+                control.kind = kind; control.state = null;
+                return JsonUtility.ToJson(control);
+            }
             private void Send(string kind)
             {
                 var control = JsonUtility.FromJson<PeerControl>(JsonUtility.ToJson(last));

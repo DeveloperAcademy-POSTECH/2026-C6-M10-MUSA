@@ -20,7 +20,7 @@ namespace Hapio
         /// <summary>One staff card owns one bounded browse/create/join operation. No gameplay begins here.</summary>
         public bool SelectDemoStage(int stage)
         {
-            if (!LabGameBuildVariant.IsStaffStageDemo || IsDemoEntryPending || IsCreatingRoom
+            if (!LabGameBuildVariant.IsStaffStageDemo || IsDemoEntryPending || IsStaffRetryPending || goingHome || IsCreatingRoom
                 || !SetSelectedDemoStage(stage) || !network.SetDemoStageIdentity(stage)) return false;
             double now = Time.realtimeSinceStartupAsDouble;
             demoEntryDeadline = now + DemoEntryTimeout;
@@ -136,6 +136,7 @@ namespace Hapio
 
         public void CancelDemoEntry()
         {
+            staffRetryEntryStage = 0;
             if (demoCreationHandle != null) pendingRooms.Cancel(demoCreationHandle);
             demoCreationHandle = null;
             bool active = IsDemoEntryPending;

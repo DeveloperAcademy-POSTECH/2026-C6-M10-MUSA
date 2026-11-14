@@ -76,6 +76,7 @@ namespace C6Lab.Tests
                     {
                         Assert.That(network.SetDemoStageIdentity(stage), Is.True);
                         tokens[stage - 1] = Token(network);
+                        Assert.That(Encoding.ASCII.GetString(tokens[stage - 1]), Is.EqualTo("C6HapioStaffDemo/2/S" + stage));
                     }
                     Assert.That(tokens.Select(Encoding.ASCII.GetString).Distinct().Count(), Is.EqualTo(3));
                     Assert.That(tokens.All(value => !value.SequenceEqual(normal)), Is.True);
@@ -83,6 +84,9 @@ namespace C6Lab.Tests
                     Assert.That(decode.Invoke(null, new object[] { tokens[0], tokens[1], true, null }), Is.False,
                         "Stage identity is authoritative admission data, not just a room-card label.");
                     Assert.That(decode.Invoke(null, new object[] { tokens[1], tokens[1], true, null }), Is.True);
+                    Assert.That(decode.Invoke(null, new object[] {
+                        Encoding.ASCII.GetBytes("C6HapioStaffDemo/1/S2"), tokens[1], true, null }), Is.False,
+                        "A staff app without shared interrupted retry cannot join the new recovery room.");
                     Assert.That(network.SetTargetParticipantCount(2), Is.False);
                     Assert.That(network.SetTargetParticipantCount(4), Is.False);
                     Assert.That(network.SetTargetParticipantCount(3), Is.True);

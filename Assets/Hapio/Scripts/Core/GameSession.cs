@@ -91,6 +91,9 @@ namespace Hapio
             public bool sealReady;
             public bool summaryStarted;
             public double finishDeadline;
+            public string previousRunId;
+            public int previousStageIndex;
+            public uint previousRevision;
             [NonSerialized] public ulong sender;
         }
 
@@ -242,6 +245,7 @@ namespace Hapio
             UpdateRoomCreation();
             UpdateDemoEntry();
             while (controls.Count > 0) ApplyControl(controls.Dequeue());
+            UpdateStaffDemoRetry();
             if (restartPending)
             {
                 restartPending = false;
@@ -370,7 +374,10 @@ namespace Hapio
                 // already be back in its lobby; a later drop of this guest is then not held.
                 if (control.kind == "exit") network.MarkLobbyLeaver(control.sender);
                 if (!MatchesControlIdentity(control, control.kind == "exit")) return;
-                if (control.kind == "loaded")
+                if (control.kind == "staff_retry_lobby" && GameRunFlow.IsStaffDemoInterrupted(state)
+                    && System.Linq.Enumerable.Contains(network.ConnectedPlayerIds, control.sender))
+                    ReturnStaffRetryToLobby();
+                else if (control.kind == "loaded")
                     hostFlow.MarkBattleReady(control.sender, control.runId, control.stageIndex, control.revision);
                 else if (control.kind == "initial_ready")
                     hostFlow.MarkInitialStateReady(control.sender, control.runId, control.stageIndex, control.revision);
@@ -419,14 +426,15 @@ namespace Hapio
                 ReadFinishDeadline(control);
                 ReadSummaryStart(control);
             }
+            bool staffLobbyReturn = IsStaffLobbyReturn(control);
             if (state.phase == GameFlowPhase.GameOver)
             {
                 if (!state.retryableDefeat && control.state.retryableDefeat) return;
                 if (control.state.phase != GameFlowPhase.GameOver
-                    && !GameFlowSnapshot.IsDefeatRetryLoad(state, control.state)) return;
+                    && !GameFlowSnapshot.IsDefeatRetryLoad(state, control.state) && !staffLobbyReturn) return;
             }
             bool newRun = state.phase == GameFlowPhase.Home || state.phase == GameFlowPhase.Lobby
-                || BackToLobby(control.state);
+                || BackToLobby(control.state) || staffLobbyReturn;
             if (replica.Apply(control.state, newRun, out _))
             {
                 expectedSettingsRevision = control.settingsRevision;
@@ -497,6 +505,7 @@ namespace Hapio
             }
             if (IsResultPresentationPhase) CacheResultSnapshot();
             if (state.phase == GameFlowPhase.GameOver) network.FreezeGameBattle();
+            ObserveStaffRetryState(previous);
             QueueScene(SceneFor(state.phase));
             Changed?.Invoke();
         }
@@ -694,7 +703,10 @@ namespace Hapio
                 resultPresentationBusy = localResultPresentationBusy,
                 sealReady = LocalSealReady,
                 summaryStarted = SummaryStarted && current.phase == GameFlowPhase.Completed,
-                finishDeadline = finishServerDeadline
+                finishDeadline = finishServerDeadline,
+                previousRunId = kind == "state" && current.phase == GameFlowPhase.Lobby ? staffLobbyPreviousRun : null,
+                previousStageIndex = kind == "state" && current.phase == GameFlowPhase.Lobby ? staffLobbyPreviousStage : 0,
+                previousRevision = kind == "state" && current.phase == GameFlowPhase.Lobby ? staffLobbyPreviousRevision : 0
             };
         }
 
@@ -1135,6 +1147,7 @@ namespace Hapio
         {
             CancelRoomCreation(false);
             hostFlow.ReturnHome(); replica.ResetForNewRoom(); controls.Clear();
+            ResetStaffRetryRoom();
             restartPending = battleReadyPending = localBattleReady = false; resultReady.Clear();
             departAt = departResendAt = -1d;
             ResetBattleStart();
