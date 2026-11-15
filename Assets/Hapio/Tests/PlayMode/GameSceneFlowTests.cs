@@ -1305,6 +1305,39 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
+        public IEnumerator TerritoryMountsTheYagwanggwiGourdAndPaintsItsTeamColoursStraightOnIt()
+        {
+            session.StartSolo(GameMode.Territory);
+            yield return WaitPlaying(1);
+            yield return null;
+            var paint = network.target.GetComponent<LabGourdPaint>();
+            Assert.That(paint.IsReady, Is.True, paint.InitializationError);
+            Assert.That(paint.RigFallbackReason, Is.Null);
+            LabGourdVisualRig rig = paint.Rig;
+            Assert.That(rig, Is.Not.Null, "#762: the territory mounts the baked 야광귀 gourd, not the white one.");
+            Assert.That(paint.VisualInstance.name, Does.StartWith("Stage02_Yagwanggwi_Battle"), "The same gourd as its 야광귀 background.");
+            Assert.That(session.GourdStageDefinition.stageIndex, Is.EqualTo(GameStageBackgrounds.TerritoryArtStage));
+            Assert.That(session.CurrentStageDefinition, Is.Null, "Only the look is borrowed; the territory has no story stage.");
+            Assert.That(Object.FindFirstObjectByType<GameBattleBindings>().stageLabel.text, Does.Contain("땅따먹기"));
+            Assert.That(network.target.Hitbox.sharedMesh, Is.SameAs(rig.hitShell.sharedMesh), "Hits land on the model's own shell.");
+            Assert.That(paint.VisualInstance.transform.localScale.x,
+                Is.EqualTo(network.config.GourdVisualSize / rig.referenceVisualSize * LabGourdVisualRig.StageSizeMultiplier).Within(1e-4f),
+                "The story's gourd size.");
+
+            // The team battle's clear, opaque team paint sits straight on the body and lid (no clay coat).
+            Assert.That(paint.HighResolutionActive, Is.True);
+            Assert.That(paint.ClayStickersActive || paint.WatercolorActive, Is.False);
+            paint.RefreshCommittedMap();
+            foreach (Renderer part in new Renderer[] { rig.paintShell }.Concat(paint.PaintExtras))
+            {
+                var block = new MaterialPropertyBlock();
+                part.GetPropertyBlock(block);
+                Assert.That(block.GetFloat("_PaintMapReady"), Is.EqualTo(1f), part.name + " shows the team paint itself.");
+                Assert.That(block.GetTexture("_PaintMap"), Is.SameAs(paint.VisualPaintTexture), part.name);
+            }
+        }
+
+        [UnityTest]
         public IEnumerator TerritoryDeveloperSoloUsesDesignedResultsAndReturnsHomeAfterViewingTheGourd()
         {
             session.StartSolo(GameMode.Territory);
