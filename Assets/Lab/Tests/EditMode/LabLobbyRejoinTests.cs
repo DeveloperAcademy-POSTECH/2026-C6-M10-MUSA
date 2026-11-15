@@ -355,6 +355,7 @@ namespace C6Lab.Tests
             using (var room = new HostRoom(3))
             {
                 room.Set("<DemoStageIndex>k__BackingField", 2);
+                room.Set("<DemoGroupId>k__BackingField", 1);
                 room.Join(5, TicketA, 2);
                 room.Join(6, TicketB, 3);
                 room.Drop(5);
@@ -388,6 +389,32 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void StaffGroupsApproveOnlyTheirOwnMembersAndRetryDoesNotTouchTheOtherRoom()
+        {
+            using (LabGameBuildVariant.OverrideStaffStageDemoForTests(true))
+            using (var a = new HostRoom(3))
+            using (var b = new HostRoom(3))
+            {
+                a.Set("<DemoStageIndex>k__BackingField", 2); a.Set("<DemoGroupId>k__BackingField", 1);
+                b.Set("<DemoStageIndex>k__BackingField", 2); b.Set("<DemoGroupId>k__BackingField", 2);
+                Assert.That(a.Approve(8, null, "C6HapioStaffDemo/3/S2/G2"), Is.False);
+                Assert.That(b.Approve(8, null, "C6HapioStaffDemo/3/S2/G1"), Is.False);
+                Assert.That(a.Approve(8, null, "C6HapioStaffDemo/2/S2"), Is.False);
+                a.Join(5, TicketA, 2); a.Join(6, TicketB, 3);
+                Assert.That(a.Approve(9, null), Is.False, "A is full, independently of B.");
+                b.Join(15, TicketA, 2); b.Join(16, TicketB, 3);
+                Assert.That(a.Network.ParticipantCount, Is.EqualTo(3));
+                Assert.That(b.Network.ParticipantCount, Is.EqualTo(3));
+                Assert.That(a.Network.SetDemoStageIdentity(2, 2), Is.False, "An active room cannot change group.");
+                a.Network.LockGameRoster(); b.Network.LockGameRoster();
+                Assert.That(a.Network.ReturnStaffDemoGameToLobby(), Is.True);
+                Assert.That(a.Network.SelectedParticipantCount, Is.Zero);
+                Assert.That(b.Network.SelectedParticipantCount, Is.EqualTo(3), "A retry must not clear B's seats.");
+                Assert.That(b.Network.DemoGroupId, Is.EqualTo(2));
+            }
+        }
+
+        [Test]
         public void StaffRetryResetCannotChangeANormalRoomOrAGuest()
         {
             using (LabGameBuildVariant.OverrideStaffStageDemoForTests(false))
@@ -402,6 +429,7 @@ namespace C6Lab.Tests
             using (var guest = new HostRoom(3, false))
             {
                 guest.Set("<DemoStageIndex>k__BackingField", 2);
+                guest.Set("<DemoGroupId>k__BackingField", 1);
                 Assert.That(guest.Network.ReturnStaffDemoGameToLobby(), Is.False);
             }
         }
@@ -723,13 +751,13 @@ namespace C6Lab.Tests
             public List<ulong> Order => (List<ulong>)typeof(LabNetwork).GetField("order", Private).GetValue(Network);
             public LabPlayerSlots Slots => (LabPlayerSlots)typeof(LabNetwork).GetField("playerSlots", Private).GetValue(Network);
 
-            public bool Approve(ulong id, string ticket)
+            public bool Approve(ulong id, string ticket, string suppliedToken = null)
             {
                 MethodInfo approve = typeof(LabNetwork).GetMethod("Approve", Private);
                 Type requestType = approve.GetParameters()[0].ParameterType;
                 Type responseType = approve.GetParameters()[1].ParameterType;
                 object request = Activator.CreateInstance(requestType);
-                string token = Encoding.ASCII.GetString((byte[])typeof(LabNetwork).GetProperty("ActiveConnectionToken", Private)
+                string token = suppliedToken ?? Encoding.ASCII.GetString((byte[])typeof(LabNetwork).GetProperty("ActiveConnectionToken", Private)
                     .GetValue(Network));
                 requestType.GetField("Payload").SetValue(request, Bytes(ticket == null ? token : token + "|" + ticket));
                 requestType.GetField("ClientNetworkId").SetValue(request, id);

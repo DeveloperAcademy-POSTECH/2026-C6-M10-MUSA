@@ -87,6 +87,10 @@
 
 키링과 별도로 모델 루트에 달려 있던 `Gumiho_Teal_Jeogori_Ribbon`(구미호·지귀), `Saekdong_Ribbon_1` 및 `Saekdong_Ribbon_1_Separate_Rope_Tie`(세 스테이지)를 함께 비활성화한다. 복제 접미사는 기존 BaseName 규칙으로 처리하며 재굽기에도 같은 정책을 적용한다. 원본 아트와 천 BlendShape/노드 경로는 보존한다. 박 몸통·뚜껑·뚜껑의 손잡이·테두리와 요괴는 그대로다.
 
+## #749 2라운드 밧줄 연결점
+
+Rope Socket을 비활성화한 Rear_Rope_Binding의 AABB 상단(y 1.638)에서 계산했다. 그래서 남아 있는 매듭 메시 model_part4보다 높은 곳에서 밧줄이 끝나 사이가 떠 보였다. model_part4는 상단 두 갈래 사이가 비어 있어 bounds 상단도 연결 표면이 아니다. 그래서 Stage2만 밧줄 축(binding 중심 x·z)을 따라 model_part4를 MeshCollider로 raycast한다. 처음 닿은 표면에서 0.01 안쪽을 Rope Socket으로 쓴다(y 약 1.3488). 굽기 계산(`GameGourdRigBake.Compute`)과 저장 Prefab을 `Hapio > Gourds > Bake Stage 2 Yagwanggwi Gourd`로 맞추고, `GameStageGourdVisualTests.Stage2RopeEndsInsideTheVisibleAttachment`가 둘의 일치와 표면 위치를 확인한다. Rope Socket은 밧줄을 그리는 끝점일 뿐이다. 물리·판정·도색·통신은 바뀌지 않으며 1·3스테이지와 흰 박도 그대로다.
+
 ## #754 둘러보기 상단 부속물 제외
 
 LabGourdResultPreview가 모델을 복사할 때 스토리 리그의 model_part4(Blender 숫자 접미사 포함)를 제외한다. 1~3라운드의 상단 고리·매듭·짧은 줄과 해당 bounds가 둘러보기 모델/프레이밍에서 빠진다. 뚜껑 둘레 밧줄·몸통·뚜껑은 유지한다. 전투 Prefab, 밧줄 연결점과 원본 활성 상태는 변경하지 않는다.

@@ -95,6 +95,34 @@ namespace Hapio.Tests
         }
 
         [Test]
+        public void Stage2RopeEndsInsideTheVisibleAttachment()
+        {
+            var instance = Object.Instantiate(Resources.Load<GameObject>(StageResources[1]));
+            try
+            {
+                var rig = instance.GetComponent<LabGourdVisualRig>();
+                Transform attachment = null;
+                foreach (Transform part in instance.GetComponentsInChildren<Transform>(true))
+                    if (GameGourdRigBake.BaseName(part.name) == "model_part4") attachment = part;
+                Assert.That(attachment, Is.Not.Null);
+                Bounds bounds = attachment.GetComponent<Renderer>().bounds;
+                Assert.That(bounds.Contains(rig.ropeSocket.position), Is.True,
+                    "The rope must overlap the visible attachment rather than the removed binding.");
+                var collider = attachment.gameObject.AddComponent<MeshCollider>();
+                collider.sharedMesh = attachment.GetComponent<MeshFilter>().sharedMesh;
+                Physics.SyncTransforms();
+                Vector3 socket = rig.ropeSocket.position;
+                Assert.That(collider.Raycast(new Ray(socket + Vector3.up, Vector3.down), out RaycastHit hit, 2f), Is.True);
+                Assert.That(hit.point.y - socket.y, Is.EqualTo(.01f).Within(.001f),
+                    "The endpoint must reach the real surface between the prongs, not just its AABB.");
+                var baked = GameGourdRigBake.Compute(GameGourdRigBake.Stage2);
+                try { Assert.That(Vector3.Distance(baked.RopeSocket, rig.ropeSocket.position), Is.LessThan(.001f)); }
+                finally { baked.Destroy(); }
+            }
+            finally { Object.DestroyImmediate(instance); }
+        }
+
+        [Test]
         public void TheStageGourdIsAPathAndThePreviewOverlayIsGone()
         {
             var field = typeof(GameStageDefinition).GetField(nameof(GameStageDefinition.gourdVisualResource));

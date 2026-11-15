@@ -57,10 +57,12 @@ namespace C6Lab
             switch (yokai)
             {
                 // #664: the fox round ticks and goes BIG/SMALL with the 야광귀 combo's sounds.
+                // #745: and the sped-up stage song it switches to with 30 seconds left (also started mid-way).
                 case LabStageYokai.Gumiho: return LabGumihoSound.ClipFolders.Concat(LabYaguangSound.FoxRoundClipFolders)
-                    .Append(LabBattleBgm.GumihoFeverClipFolder).ToArray();
-                case LabStageYokai.Yaguang: return LabYaguangSound.ClipFolders.Append(LabBattleBgm.FeverClipFolder).ToArray();
-                case LabStageYokai.Jigwi: return LabJigwiSootSound.ClipFolders; // 지귀 has no fever song; #713 soot sounds.
+                    .Append(LabBattleBgm.GumihoFeverClipFolder).Append(LabBattleBgm.GumihoRushClipFolder).ToArray();
+                case LabStageYokai.Yaguang: return LabYaguangSound.ClipFolders.Append(LabBattleBgm.FeverClipFolder)
+                    .Append(LabBattleBgm.YaguangRushClipFolder).ToArray();
+                case LabStageYokai.Jigwi: return LabJigwiSootSound.ClipFolders.Append(LabBattleBgm.JigwiRushClipFolder).ToArray(); // #713 soot sounds
                 default: return System.Array.Empty<string>();
             }
         }
