@@ -40,6 +40,22 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void TheVfxLabCanSkipTheBattleClockAheadEvenWhilePaused()
+        {
+            var clock = new LabBattleClock();
+            Assert.That(clock.Now(10d), Is.EqualTo(10d));
+            Assert.That(clock.Skip(80d), Is.True);
+            Assert.That(clock.Now(10d), Is.EqualTo(90d));
+            Assert.That(clock.Skip(0d), Is.False);
+            Assert.That(clock.Skip(-5d), Is.False);
+            clock.Pause(12d);
+            Assert.That(clock.Skip(3d), Is.True);
+            Assert.That(clock.Now(20d), Is.EqualTo(95d), "Paused: it stays at the skipped time.");
+            clock.Resume(20d);
+            Assert.That(clock.Now(21d), Is.EqualTo(96d));
+        }
+
+        [Test]
         public void EachStagePreloadsItsFastSong()
         {
             Assert.That(LabBattleAudioWarmup.StageFolders(LabStageYokai.Gumiho), Does.Contain(LabBattleBgm.GumihoRushClipFolder));

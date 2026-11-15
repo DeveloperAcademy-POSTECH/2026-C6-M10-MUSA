@@ -113,9 +113,15 @@ namespace C6Lab.Editor
         {
             EditorGUILayout.LabelField("남은 30초 알림 (#734)", EditorStyles.miniBoldLabel);
             LabThirtySecondsLeftHud hud = ready ? Object.FindFirstObjectByType<LabThirtySecondsLeftHud>() : null;
+            // #745: 실제로 남은 30초로 시간을 넘긴다 → 진짜 알림 + 빨라진 BGM, 10초 뒤 피버.
+            float alarmAt = ready && network.config != null ? network.config.ThirtySecondsLeftAt : 30f;
+            using (new EditorGUI.DisabledScope(!ready || network.Snapshot == null || network.Snapshot.remaining <= alarmAt + .5d))
+                if (GUILayout.Button("남은 " + Mathf.RoundToInt(alarmAt) + "초로 시간 넘기기 (실제로: 알림 + 빨라진 BGM → 피버)", GUILayout.Height(28)))
+                    Report(network.VfxLabSkipToSecondsLeft(alarmAt), "남은 시간을 " + alarmAt + "초 + 0.5초로 넘겼다. 곧 실제 알림이 뜨고 BGM이 빨라진다.",
+                        "이미 그보다 적게 남았음 (Play를 멈추고 다시 연다)");
             using (new EditorGUI.DisabledScope(hud == null))
             {
-                if (GUILayout.Button("30초 알림 지금 보기 (화면/소리/진동만, 시간은 그대로)", GUILayout.Height(28)))
+                if (GUILayout.Button("30초 알림만 지금 보기 (화면/소리/진동만, 시간은 그대로)", GUILayout.Height(26)))
                     Report(hud.PreviewNow(), "\"30초 남았소!\"를 띄웠다. 몇 번이든 다시 누를 수 있다. 실제 알림은 남은 30초에 따로 뜬다.",
                         "알림을 그릴 화면을 찾지 못함");
                 EditorGUILayout.LabelField("알림 화면과 함께 소리 골라 듣기 (LabConfig는 그대로)", EditorStyles.wordWrappedMiniLabel);
@@ -130,15 +136,6 @@ namespace C6Lab.Editor
                             "알림을 그릴 화면을 찾지 못함");
                 }
             }
-            // #745: 남은 30초부터 빨라지는 라운드 곡 (음높이 그대로 1.15배)
-            LabBattleBgm bgm = ready ? Object.FindFirstObjectByType<LabBattleBgm>() : null;
-            using (new EditorGUI.DisabledScope(bgm == null))
-                if (GUILayout.Button("알림 + 빨라진 BGM 10초 듣기 (음높이 그대로 " + LabBattleBgm.RushSpeed + "배)", GUILayout.Height(26)))
-                {
-                    if (hud != null) hud.PreviewNow();
-                    Report(bgm.PreviewRush(10f), "10초 동안 라운드 곡을 빠르게 튼다. 실제 게임은 남은 30초부터 피버까지.",
-                        "빨라진 곡이 없음 (구미호 / 야광귀 / 지귀 전투에서만, 피버 중에는 안 됨)");
-                }
             if (ready && network.config != null)
                 EditorGUILayout.LabelField("실제 게임에서 쓰는 소리: " + (network.config.ThirtySecondsLeftSound == LabThirtySecondsLeftSound.Drum ? "북"
                     : network.config.ThirtySecondsLeftSound == LabThirtySecondsLeftSound.GongThenDrum ? "징 다음 북" : "징")

@@ -79,7 +79,6 @@ namespace C6Lab
         private AudioClip[] cueClips;
         private AudioClip rushClip; // 이번 라운드 곡의 빨라진 판 (#745), 없으면 null
         private float rushBlend; // 0 = 평소 곡, 1 = 빨라진 곡
-        private float rushPreviewUntil = float.NegativeInfinity;
         /// <summary>피버 시작 추임새를 낸 횟수 (테스트·확인용)</summary>
         public int FeverCueCount { get; private set; }
         private LabNetwork network;
@@ -374,16 +373,6 @@ namespace C6Lab
             return Mathf.Repeat(sourceTime / speed, rushLength);
         }
 
-        /// <summary>
-        /// VFX 실험실(#745): 남은 시간과 상관없이 seconds초 동안 빨라진 곡을 들려준다. 실제 빨라지기는 그대로 따로 된다.
-        /// </summary>
-        public bool PreviewRush(float seconds)
-        {
-            if (rushClip == null || source == null || !source.isPlaying || feverOn) return false;
-            rushPreviewUntil = Time.unscaledTime + Mathf.Max(0f, seconds);
-            return true;
-        }
-
         /// <summary>#745: 빨라진 곡을 켜고 끄며 평소 곡과의 섞임(rushBlend)을 옮긴다. 크기는 DriveFever가 정한다.</summary>
         private void DriveRush(LabSnapshot snapshot)
         {
@@ -392,7 +381,7 @@ namespace C6Lab
                 snapshot.teamTerritory, network.GameStageYokai);
             float at = network != null && network.config != null ? network.config.ThirtySecondsLeftAt : 30f;
             bool want = rushEnabled && rushClip != null && !feverOn
-                && (RushOn(applies, snapshot.remaining, at) || Time.unscaledTime < rushPreviewUntil);
+                && RushOn(applies, snapshot.remaining, at);
             if (want && !rushSource.isPlaying && rushBlend <= 0f && !snapshot.paused)
             {
                 rushSource.clip = rushClip;
@@ -412,7 +401,6 @@ namespace C6Lab
         private void StopRush()
         {
             rushBlend = 0f;
-            rushPreviewUntil = float.NegativeInfinity;
             if (rushSource == null) return;
             rushSource.Stop();
             rushSource.volume = 0f;

@@ -184,6 +184,16 @@ namespace C6Lab
             return true;
         }
 
+        /// <summary>
+        /// VFX 실험실(#745): 전투 시각을 seconds초 앞으로 넘긴다 (멈춰 있어도). 다음 스냅샷이 그만큼 흐른 판을 그대로 계산한다.
+        /// </summary>
+        public bool Skip(double seconds)
+        {
+            if (!Valid(seconds) || seconds <= 0d) return false;
+            pausedDuration -= seconds;
+            return true;
+        }
+
         public void Reset()
         {
             pausedAt = 0d;
