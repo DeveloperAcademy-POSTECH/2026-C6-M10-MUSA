@@ -17,7 +17,7 @@ namespace Hapio.Tests
     /// Two real NGO/dual-stack rooms and six steady participants on loopback. This validates transport,
     /// admission and authoritative round separation, not six independent displays or wireless devices.
     /// </summary>
-    [Category("Slow"), Category("Bonjour")]
+    [Category("Bonjour")]
     public sealed class GameStaffDemoGroupIsolationTests
     {
         private readonly List<Peer> peers = new List<Peer>();
