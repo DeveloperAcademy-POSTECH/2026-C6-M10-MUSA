@@ -8975,3 +8975,48 @@ PR #729 검증 중 main `a7208003`에서 `LabLocalBoardNetworkIntegrationTests` 
 - **새 / 바뀐 검사:** `LabVfxLabTests`에 SMALL 바로 끝내기, 잠긴 박 폭탄 바로 터뜨리기, 연기 / 부적 골라 예고 없이 시작(다른 종류 차례면 한 칸 건너뜀), 콤보 예고 없이 시작 4개. `LabComboProjectileIntegrationTests`는 다음 칸 투명도 기대값을 .85로.
 - **눈으로 확인:** VFX 실험실에서 2R 콤보 하트(한지 붉은 하트, 먹물 깨짐, 크기), 다음 색 칸이 보이는지, 3R 물 폭포(배경 먹선 구름 + 수채 물줄기, 박을 덜 가림, 가운데 물보라 그림 삭제)를 팀원이 확인했다.
 - **미실행:** 여러 기기 실제 네트워크, iPhone 실기기, 아트팀 녹화(이 PR 뒤 `docs/VFX_LAB.md` 표대로).
+
+## 2026-11-15 — #750 야광귀 전용 시연 빌드 메뉴·사용법
+
+- **기준:** main `766158b7`(#748 엔딩 수정 포함)에서 `feat/#750-stage2-demo-build`로 분리했다. 앞서 전달한 일회성 앱(main `a754d500` 기준)과 이번 정식 메뉴·검사는 구분한다. 기존 데스크탑 프로젝트와 #740 작업 브랜치/로컬 파일은 보존했다.
+- **범위:** `Demo Build/Stage 2 Only`의 Mac/iOS Release·QA 옵션, 별도 앱 이름/ID/출력/최근 출력, manifest의 실제 Stage2 하나, UI·API 선택 제한을 추가했다. 일반 3카드 시연 메뉴·일반 Story/Lab/땅따먹기·Staff revision2/S2·공유 설정·Scene·Prefab·에셋은 유지했다. Player 전용 define을 사용하고 저장된 define은 바꾸지 않는다.
+- **검사 선택:** 빌드 설정과 공통 세션 선택 경로를 변경하므로 전체 EditMode·PlayMode를 실행한다. Unity 6000.6.5f1 / macOS / batch·Metal 환경이다.
+- **전체 EditMode: 2514/2514 PASS**, 18.81초. 추가 13건은 Mac/iOS 옵션·일반 옵션 보존·성공/실패/취소 시 설정 복원·전용 이름/식별자/버전·단일 Stage2 manifest·테스트 override 복원을 확인한다. iOS 옵션 검사는 실제 Xcode 내보내기 성공과 구분한다.
+- **전체 PlayMode: 875/875 PASS**, 917.75초. 실패·건너뜀 0. 추가 2건은 저장 Home의 야광귀 카드 하나·실제 raycast·숨긴1/3 요청 거절, Host 부재 재도전 후 같은 Stage2 검색/단일 카드 복원을 검사했다. 기존 세 스테이지 단판·일반 패배 재도전·일반 Story·Lab·땅따먹기·#748 엔딩 검사도 유지했다.
+- **정식 메뉴 Mac Release 빌드 PASS:** `GameDemoBuild.StageTwoMac` 종료0, manifest `Succeeded`/오류0/identityVerified=true/development=false, `staff-stage-2-only-demo`·Stage2 하나·3인·두 전용 define을 확인했다. 미커밋 구현을 포함한 빌드이며 manifest의 `sourceHasUncommittedChanges=true`를 보존했다. 이후 런타임·에셋 변경 여부를 검사 결과 재사용 시 다시 확인한다.
+- **Mac 서명:** Editor와 같은 macOS 권한 환경에서 `codesign --verify --deep --strict` 재검사 통과. 제한된 도구 환경의 추가 검사에서는 UnityPlayer 서명이 잘못됐다고 나왔으나, 동일 파일을 환경 제한 없이 검사하면 `valid on disk`·`satisfies its Designated Requirement`였다. 이를 코드 결함이나 재서명 성공으로 기록하지 않는다. 실제 빌드의 유효 서명은 보존하고, 재서명 분기는 별도 실패 재현하지 않았다.
+- **UI·흐름 근거 구분:** 앞서 일회성 Mac 앱에서 야광귀 카드 하나·Stage2 3인 로비 생성은 실제로 확인했다. 이번 정식 코드의 저장 Home 카드·raycast·숨긴1/3 요청 거절·Host 부재 재도전 후 제한 유지는 추가 PlayMode로 통과했다. 새 정식 앱의 실제 창은 이번 작업에서 다시 열지 않았으며 이전 앱 확인을 새 앱 실기기 PASS로 대체하지 않는다.
+- **미실행:** iOS 실제 내보내기·서명·설치, 실제 여러 기기의 LAN/핫스팟, 서명 실패 후 복구 분기. 원시 로그·XML·빌드·일회성 준비 스크립트는 커밋하지 않는다. 사용법은 `docs/STAFF_STAGE_DEMO.md`의 #750 절을 따른다.
+- **PR 최종 대조:** 전체 검사 뒤 main은 같은 `766158b7`이며 충돌 없음. 검사·빌드 뒤 실행 로직/에셋/설정은 변경하지 않았고 사용법·검증 기록·동작 없는 주석만 정리해 결과를 재사용했다. 원본 프로젝트·기존 브랜치·로컬 파일은 유지했다.
+
+## 2026-11-15 — #747 엔딩 대화 상자와 네임택
+
+- 기준: main `a754d500`에서 `fix/747-ending-dialogue`; Unity6000.6.5f1 macOS Editor, 활성 iOS 대상. 개인 ProjectSettings/EditorBuildSettings/Build Profiles는 작업 시작 상태를 보존하며 커밋에서 제외했다.
+- 범위: 엔딩 컷별 대화 UI와 공유 StoryPlayer의 표시값 적용·복원만 변경. 세션/Scene 전환 알고리즘·네트워크·물리·도색은 변경하지 않아 전체 PlayMode 대신 Story 어셈블리와 실제 결과→엔딩·버튼 입력 경로를 선택했다.
+- 컴파일 오류0. 전체 EditMode 최종 **2,501/2,501 PASS**(37.83초). 첫 실행도2,501/2,501 PASS(39.16초).
+- `Hapio.Story.PlayModeTests` 최종 **52/52 PASS**(2.95초): 동일 그림에서 불이→만복 색 전환, 솔이 색, 무대사 숨김, 종이/그림자/폰트/줄바꿈 복원, 기존 오프닝·스토리 검사 포함. 첫 실행도52/52 PASS(3.72초).
+- `GameSceneFlowTests.FigmaResultsWaitForHostNextAndShowEachYokaiThenKeepFinalOverallAndHomeNavigation` 및 `SavedStoryViewerSkipAndEndingButtonsReceiveRealMouseClicks` **2/2 PASS**(65.03초). 이후 줄바꿈 표시만 수정했으며 전환/입력/수명 경로는 동일해 해당 결과를 재사용했다.
+- 화면 확인: 저장된 GameStageStoryCanvas와 실제 컷을 Unity 카메라로402×874 렌더하여 불이·만복·솔이·마지막 불이4페이지 확인. 처음 캡처에서 긴 문장 자동 줄바꿈을 발견해 `dialogueNoWrap`으로 수정했고 위 최종 검사를 재실행했다. 격리 캡처에서는 게임 어댑터가 평소 제어하는 결과/공통 버튼을 숨겨 대화 상자만 비교했다. 종이/이름표의 다운로드 원본과 로컬 파일 SHA-1 일치 확인. 그림 배치와 범위 밖 버튼 외형은 변경하지 않았다.
+- 작업 전 Console의 iOS `Subtarget property is not available` 오류1건을 기록했으며 새 코드 컴파일 후 오류0. 자동 검사 실패/단언 완화 없음. 실기기·iOS 빌드·전체 PlayMode는 실행하지 않았다.
+
+## #749 Stage2 밧줄 연결점 (2026-11-15)
+
+- 기존 Stage2 에셋을 Unity에서 인스턴스화: 이전 Rope Socket은 남아 있는 model_part4 메시 bounds 밖임을 확인.
+- 수정 Prefab 좌표를 메모리 인스턴스에 적용: yaw 0/45/90/180/270 × swing -20/0/20, 크기 1.1, 이동 포함 15개 조합에서 메시 로컬 bounds 안쪽 연결 PASS. 원본 에셋은 저장하지 않음.
+- 작업 브랜치 git diff --check PASS. 재베이크와 저장 Prefab 일치를 검사하는 EditMode 회귀 검사 추가.
+- 현재 Unity는 별도 체크아웃이므로 이 브랜치의 전체 컴파일·EditMode 검사·실제 전투 화면 시각 검증은 미실행. 실기기 검증 미실행.
+
+### #749 보완 검증
+- 최초 AABB 내부 검사만으로는 두 갈래 사이의 빈 공간을 검출하지 못했다. 기존 15개 포즈 검사는 시각 연결의 근거가 아니다.
+- 현재 Unity 프로젝트에도 수정 반영. 매듭 메시의 밧줄 축으로 MeshCollider.Raycast를 수행해 실제 표면 y=1.358825, 연결점 y=1.348825를 계산.
+- Unity 도메인 리로드 후 변경된 베이크 Compute 실행 성공. 저장 Prefab과 계산 위치 차이 0.00000025 미만.
+- 현재 Unity에서 수정 Prefab과 동일 지름의 밧줄을 임시 구성해 근접 렌더링: 빈틈 없이 연결됨을 이미지 확인. 임시 객체 제거, Scene 저장 안 함. 실제 전투 전체 및 실기기 검사는 미실행.
+
+### #749 병합 전 검증 (2026-11-15)
+- **기준:** `fix/#749-round2-rope` `8eacb623`(main `766158b7` 위). Unity 6000.6.5f1 batch(macOS, Metal). Rope Socket은 `LabHangingTarget.UpdateContinuousRope`의 밧줄 끝점에만 쓰여 물리·판정·도색·통신·설정 수·접속 묶음은 그대로다.
+- **메뉴 재굽기:** `-executeMethod Hapio.Editor.GameGourdRigBaker.BakeStage2` 실행 뒤 BakeReport는 같았다. Prefab은 Rope Socket 좌표 한 줄만 1e-7 이하의 표기 차이로 바뀌었다(`y 1.348825` → `1.3488247` 등, 손으로 넣은 자릿수를 Unity 직렬화 값으로 교체). 이 메뉴 결과를 커밋했다.
+- **전체 EditMode:** 2502/2502 PASS(새 `Stage2RopeEndsInsideTheVisibleAttachment`, 굽기 최신성 검사 포함).
+- **PlayMode 영향 묶음:** `GameStageGourdIntegrationTests`·`LabContinuousRopeTests`·`LabGourdVisualRigTests`·`GameSceneFlowTests` 58/58 PASS. 판정·통신 경로 변경이 없어 전체 PlayMode는 실행하지 않았다.
+- **화면(Development Mac 빌드, DEV 솔로 2스테이지, 임시 캡처 스크립트는 저장소에 남기지 않음):** 전투 카메라 3배 확대 캡처로 비교했다. 새 연결점은 정지, 옆으로 친 흔들림 4프레임, 야광귀 등장 클립 15·26·29·38프레임에서 밧줄이 매듭 두 갈래에 붙어 있었다. 같은 실행에서 연결점만 예전 값(y 1.6383)으로 되돌리면 정지·흔들림 모두 밧줄과 매듭 사이에 틈이 보였다. `model_part4`는 `Lid_Hinge` 아래가 아니어서 뚜껑과 따로 움직이지 않는다.
+- **미실행:** iPhone 실기기, 실제 멀티 전투.
+- **main `e5814f57`(#751) 병합 뒤 재실행:** 충돌 없음(#751은 시연 빌드 도구만 변경). 전체 EditMode **2515/2515 PASS**, PlayMode 영향 묶음(위 4종 + `GameStaffStageDemoSessionTests`) **66/66 PASS**.

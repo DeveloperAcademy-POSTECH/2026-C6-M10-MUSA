@@ -1838,6 +1838,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StageStoryShowcase
   player: {fileID: 1195766121}
+  previewAsHost: 1
   groups:
   - {fileID: 11400000, guid: 6edb8fec6b5fb4ec89984b9e03c4d8ec, type: 2}
   - {fileID: 11400000, guid: a893e38730f6742648cc1b63f8ec94db, type: 2}
@@ -1958,12 +1959,15 @@ MonoBehaviour:
   sequence: {fileID: 11400000, guid: 6edb8fec6b5fb4ec89984b9e03c4d8ec, type: 2}
   cutHost: {fileID: 381631126}
   dialogueGroup: {fileID: 282889483}
+  dialoguePaper: {fileID: 1600631913}
   speakerText: {fileID: 1603633226}
   dialogueText: {fileID: 874805989}
   progressText: {fileID: 1892443698}
+  hideProgress: 0
   nextButton: {fileID: 966484928}
   previousButton: {fileID: 1164643708}
   skipButton: {fileID: 548439479}
+  hideSkipDuringCinematics: 0
   autoButton: {fileID: 1847665818}
   autoLabel: {fileID: 121112219}
   speakerBadge: {fileID: 992615944}
@@ -1971,6 +1975,7 @@ MonoBehaviour:
   voiceSource: {fileID: 1195766120}
   playOnStart: 1
   touchOnly: 0
+  hideInlineContinueButtons: 0
   onCompleted:
     m_PersistentCalls:
       m_Calls: []

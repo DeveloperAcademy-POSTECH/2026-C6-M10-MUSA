@@ -101,6 +101,60 @@ namespace Hapio.Tests
             yield return null;
         }
 
+        [UnityTest, Category("Bonjour")]
+        public IEnumerator StageTwoOnlySavedHomeShowsOneClickableCardAndRejectsHiddenStageActions()
+        {
+            using (LabGameBuildVariant.OverrideStaffStageTwoOnlyForTests(true))
+            {
+                // The permanent export uses this same saved Home/selector; no separate Scene is authored.
+                yield return SceneManager.LoadSceneAsync(GameScenePaths.Home, LoadSceneMode.Single);
+                yield return Until(() => !session.IsLoadingScene, "The fixed-stage selector binds to the existing session");
+                yield return null;
+                selector = Object.FindFirstObjectByType<GameStaffDemoView>();
+                Assert.That(selector, Is.Not.Null);
+                Assert.That(selector.stageButtons, Has.Length.EqualTo(3), "Keep all saved references for the ordinary three-card export.");
+                Assert.That(selector.stageButtons[0].gameObject.activeInHierarchy, Is.False);
+                Assert.That(selector.stageButtons[1].gameObject.activeInHierarchy, Is.True);
+                Assert.That(selector.stageButtons[2].gameObject.activeInHierarchy, Is.False);
+                Assert.That(selector.transform.Find("SafeArea/Title").GetComponent<UnityEngine.UI.Text>().text,
+                    Is.EqualTo("야광귀 시연"));
+                Assert.That(selector.transform.Find("SafeArea/StaffCaption").GetComponent<UnityEngine.UI.Text>().text,
+                    Does.Contain("2스테이지"));
+                Assert.That(selector.status.text, Does.Contain("야광귀"));
+                Canvas.ForceUpdateCanvases();
+                var button = selector.stageButtons[1];
+                var rect = (RectTransform)button.transform;
+                Vector2 center = RectTransformUtility.WorldToScreenPoint(null, rect.TransformPoint(rect.rect.center));
+                var hits = new List<RaycastResult>();
+                EventSystem.current.RaycastAll(new PointerEventData(EventSystem.current) { position = center }, hits);
+                Assert.That(hits, Is.Not.Empty);
+                Assert.That(hits[0].gameObject, Is.SameAs(button.gameObject), "The visible Stage2 card must retain actual UI raycast access.");
+                foreach (int stage in new[] { -1, 0, 1, 3, 4 }) Assert.That(session.SelectDemoStage(stage), Is.False);
+                // Even stale UnityEvents cannot bypass the session's selection fence.
+                selector.stageButtons[0].onClick.Invoke();
+                selector.stageButtons[2].onClick.Invoke();
+                Assert.That(session.IsDemoEntryPending || session.Network.IsConnected || session.Network.IsJoiningRoom, Is.False);
+                Assert.That(session.SelectedDemoStage, Is.Zero);
+                button.onClick.Invoke();
+                Assert.That(session.IsDemoEntryPending, Is.True, session.DemoEntryNotice);
+                Assert.That(session.SelectedDemoStage, Is.EqualTo(2));
+                Assert.That(session.Network.DemoStageIndex, Is.EqualTo(2));
+                Assert.That(session.RunProfile.FirstStage, Is.EqualTo(2));
+                Assert.That(session.RunProfile.FinalStage, Is.EqualTo(2));
+                Assert.That(session.RunProfile.Count, Is.EqualTo(1));
+                Assert.That(session.SelectDemoStage(1) || session.SelectDemoStage(3), Is.False);
+                selector.SendMessage("LateUpdate", SendMessageOptions.RequireReceiver);
+                Assert.That(button.interactable, Is.False);
+                selector.backButton.onClick.Invoke(); // Retire search before the two-second create window.
+                Assert.That(session.IsDemoEntryPending, Is.False);
+                Assert.That(session.Network.IsConnected || session.Network.IsJoiningRoom, Is.False);
+                Assert.That(session.PendingRooms, Is.Empty);
+                Assert.That(session.SelectedDemoStage, Is.EqualTo(2));
+                Assert.That(session.SelectDemoStage(1) || session.SelectDemoStage(3), Is.False);
+            }
+            Assert.That(LabGameBuildVariant.IsStaffStageTwoOnly, Is.False);
+        }
+
         [UnityTest]
         public IEnumerator InvalidStagesSoloTutorialAndOtherRoomModesDoNotOpenConnections()
         {
@@ -254,6 +308,29 @@ namespace Hapio.Tests
 
         [UnityTest, Category("Bonjour")]
         public IEnumerator UnavailableHostRetryPreservesStageThroughHomeAndRestartsItsEntrySearch()
+        {
+            yield return AssertUnavailableHostRetry();
+        }
+
+        [UnityTest, Category("Bonjour")]
+        public IEnumerator StageTwoOnlyRetryRestoresItsSingleCardWithoutLosingTheSelectedStage()
+        {
+            using (LabGameBuildVariant.OverrideStaffStageTwoOnlyForTests(true))
+            {
+                yield return AssertUnavailableHostRetry();
+                selector = Object.FindFirstObjectByType<GameStaffDemoView>();
+                Assert.That(selector, Is.Not.Null, "Retry must reopen the saved staff selector after Home loading.");
+                Assert.That(selector.stageButtons[0].gameObject.activeInHierarchy, Is.False);
+                Assert.That(selector.stageButtons[1].gameObject.activeInHierarchy, Is.True);
+                Assert.That(selector.stageButtons[2].gameObject.activeInHierarchy, Is.False);
+                Assert.That(session.SelectDemoStage(1) || session.SelectDemoStage(3), Is.False);
+                Assert.That(session.SelectedDemoStage, Is.EqualTo(2));
+                Assert.That(session.Network.DemoStageIndex, Is.EqualTo(2));
+            }
+            Assert.That(LabGameBuildVariant.IsStaffStageTwoOnly, Is.False);
+        }
+
+        private IEnumerator AssertUnavailableHostRetry()
         {
             Assert.That(session.SelectDemoStage(2), Is.True);
             session.CancelDemoEntry();

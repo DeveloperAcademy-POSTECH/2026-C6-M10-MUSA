@@ -4,7 +4,7 @@ paintOrigin=(0.0000, 0.0001, 0.0001) axis=(0.0000, 0.8660, 0.5000) bodyExtentInF
 bodyTris=12000 outerTris=6114 starShaped=100.00 %
 hitMissingDirections=48 rings=3 north=1.2149 south=0.8412
 hitTris=2208 hitMaxDeviation=0.0449 hitMeanDeviation=0.0131
-ropeSocket=(-0.0002, 1.6383, 0.0276) sizeAnchor=(0.0000, 1.0523, 0.6075) hitTopInPaint=1.2149
+ropeSocket=(0.0001, 1.3488, 0.0273) sizeAnchor=(0.0000, 1.0523, 0.6075) hitTopInPaint=1.2149
 timeline frames opens=15 risen=26 held=29 sink=38 sunk=45 closed=47 cycle=48
 renderers=17 triangles=71011
 animationAboveHitShell=False

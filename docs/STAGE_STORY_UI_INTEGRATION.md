@@ -146,3 +146,11 @@ Host advances everyone to the next game for stages 1/2. After Jigwi, StartSummar
 이 변경으로 Game 접속 토큰만 **C6HapioGame/55**로 올렸다(프로토콜 5704, Lab 62, 설정 265개 유지). 이야기 읽기는 자동으로 넘기지 않으며 강제 퇴장은 하지 않는다.
 
 화면은 `Assets/Hapio/Resources/Hapio/Story/StageReadyView.prefab`, 생성기는 `Assets/Hapio/Editor/StageReadyAssets.cs`다. Figma `4814:7810`(방장 대기), `4814:8090`(전원 준비), `4814:7976`(구성원), `4814:8646`(확인)을 기준으로 좌표·폰트·색·배경·딤을 구성했다. `Hapio > Story > Update Stage Ready and Quit UI`는 이 프리팹만 명시적으로 다시 만들며 일반 실행/빌드에서 자동 재생성하지 않는다. 원본 PNG와 meta는 `Art/Story/StageReady`에 보관한다.
+
+## 엔딩 대화 상자 (#747)
+
+- 2026-11-15 Figma `4210:3318`·`5346:6910`·`4210:3333`·`4210:3358`의 대화 상자를 적용한다. `Ending_01`의 불이·만복은 기존 두 페이지로 유지해 그림/연출을 다시 시작하지 않는다. 무대사 컷·마지막 안내·타이틀 복귀와 음성 참조는 유지한다.
+- 종이 `(11,677,379,181)`, 이름표 `(57,713,79.34009,29.010992)`, 이름 13.186813, 본문20을 사용한다(402×874 기준). 본문은 Figma의 명시적 줄바꿈만 사용한다. 마지막 불이 대사는 `이건... 우리가 깬게 아닌데...?`다.
+- 종이/이름표는 기존 오프닝의 `b24cb.png`·`9769e.png` 원본을 재사용한다. 이름표 색은 `Opening/SpeakerPalette.asset`의 사용자 승인 공통 캐릭터색을 사용한다(불이 빨강, 만복 갈색, 솔이 초록). 별도의 엔딩 색상 사본을 만들지 않는다.
+- 컷별 종이·이름 크기·줄바꿈 설정은 `StoryCutView`에 저장한다. `StoryPlayer`는 다른 컷으로 이동하면 원래 종이·그림자·이름 크기·줄바꿈 방식을 복원한다. 일반 후일담의 저장된 상자나 오프닝 연출을 일괄 변경하지 않는다.
+- 명시적 갱신 메뉴: `Hapio/Story/Update Ending Dialogue`. 기존 프리팹 GUID·그림·연출·음성을 보존하며, 게임 Canvas와 제작용 StageStoryPreview의 종이 참조도 연결한다. 시연 엔딩은 같은 viewPrefab을 사용하므로 선택 요괴별 첫 대사를 그대로 유지하며 새 상자를 사용한다.

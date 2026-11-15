@@ -79,6 +79,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 4784720071588144357}
   isBackground: 0
+  softFadeIn: 0
   delay: 0.12
   enterSeconds: 0.65
   enterOffset: {x: 0, y: -12}
@@ -305,33 +306,49 @@ MonoBehaviour:
   - {fileID: 6727847600753606363}
   - {fileID: 5655985510996632766}
   beats: []
+  openingMotions: []
+  authoredDialogue: {fileID: 0}
+  artworkContinuityKey:
   continueButton: {fileID: 0}
+  requireContinueButton: 0
+  waitForEntrance: 0
+  autoContinueAfterSeconds: 0
+  exitCloudWipe: {fileID: 0}
   music: {fileID: 8300000, guid: 7fbd5585167f44b0db25f415f8309a4a, type: 3}
   musicVolume: 0.075
   hideEmptyDialogue: 1
   sourceFigmaNumber: 0
   sourceFigmaNodeId: 4210:3358
   overrideDialogueLayout: 1
-  dialogueFontSize: 20.69646
+  dialogueFontSize: 20
+  dialoguePaper: {fileID: 21300000, guid: 88e39f28d90fe4b2ba01dae4a7617f73, type: 3}
+  dialoguePaperRect:
+    serializedVersion: 2
+    x: 11
+    y: 677
+    width: 379
+    height: 181
+  speakerFontSize: 13.186813
+  dialogueNoWrap: 1
   dialogueRect:
     serializedVersion: 2
-    x: 94
-    y: 758
-    width: 259
-    height: 24
+    x: 81
+    y: 757
+    width: 214
+    height: 23
   speakerRect:
     serializedVersion: 2
     x: 57
-    y: 713
-    width: 91
-    height: 33
-  speakerBadge: {fileID: 21300000, guid: def196c3020714538a28e77356ca4116, type: 3}
+    y: 720.03296
+    width: 79.34009
+    height: 15
+  speakerBadge: {fileID: 21300000, guid: 32413498a6beb42b5ad2c10dddf4c9ce, type: 3}
   speakerBadgeRect:
     serializedVersion: 2
     x: 57
     y: 713
-    width: 91
-    height: 33
+    width: 79.34009
+    height: 29.010992
   centerSpeakerName: 1
   speakerColor: {r: 1, g: 1, b: 1, a: 1}
 --- !u!1 &1533410852984096000
@@ -413,6 +430,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 885916126488125783}
   isBackground: 1
+  softFadeIn: 0
   delay: 0
   enterSeconds: 0.65
   enterOffset: {x: 0, y: 0}
@@ -573,6 +591,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 8585199065662848420}
   isBackground: 0
+  softFadeIn: 0
   delay: 0.24
   enterSeconds: 0.65
   enterOffset: {x: 0, y: -12}
@@ -808,6 +827,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 1893580511910193974}
   isBackground: 0
+  softFadeIn: 0
   delay: 0.35
   enterSeconds: 0.65
   enterOffset: {x: 0, y: -12}
@@ -968,6 +988,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 4501079489892656202}
   isBackground: 0
+  softFadeIn: 0
   delay: 0.35
   enterSeconds: 0.65
   enterOffset: {x: 0, y: -12}
@@ -1053,6 +1074,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 2931028680498216387}
   isBackground: 0
+  softFadeIn: 0
   delay: 0.29999998
   enterSeconds: 0.65
   enterOffset: {x: 0, y: -12}
@@ -1138,6 +1160,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 4858288290658393117}
   isBackground: 0
+  softFadeIn: 0
   delay: 0.35
   enterSeconds: 0.65
   enterOffset: {x: 0, y: -12}
@@ -1223,6 +1246,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 8613716418162983336}
   isBackground: 0
+  softFadeIn: 0
   delay: 0.06
   enterSeconds: 0.65
   enterOffset: {x: 0, y: -12}
@@ -1383,6 +1407,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 8310991703287536447}
   isBackground: 0
+  softFadeIn: 0
   delay: 0.35
   enterSeconds: 0.65
   enterOffset: {x: 0, y: -12}
@@ -1507,6 +1532,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryLayer
   artwork: {fileID: 3931417192440435139}
   isBackground: 0
+  softFadeIn: 0
   delay: 0.17999999
   enterSeconds: 0.65
   enterOffset: {x: 0, y: -12}
