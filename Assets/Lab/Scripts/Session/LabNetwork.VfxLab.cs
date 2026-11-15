@@ -48,6 +48,17 @@ namespace C6Lab
         public bool VfxLabGiveSootShards() => VfxLabReady && VfxLabPublish(model.VfxLabGiveSootShards(LocalPlayerId, VfxLabNow));
         public bool VfxLabGiveSootOrb() => VfxLabReady && VfxLabPublish(model.VfxLabGiveSootOrb(LocalPlayerId, VfxLabNow));
 
+        /// <summary>#741 공통: 내 판에 잠긴 박 폭탄이 있는지, 그리고 지금 터뜨리기</summary>
+        public bool VfxLabHasBomb => VfxLabReady && model.VfxLabLockedBombId(LocalPlayerId) != null;
+        public bool VfxLabDetonateBomb() => VfxLabReady && VfxLabPublish(model.VfxLabDetonateBomb(LocalPlayerId, VfxLabNow));
+
+        /// <summary>#741 Y3: BIG / SMALL이 걸려 있는지, 그리고 지금 끝내기</summary>
+        public bool VfxLabComboEffectOn => VfxLabReady && model.VfxLabComboEffectOn(VfxLabNow);
+        public bool VfxLabEndComboEffect() => VfxLabReady && VfxLabPublish(model.VfxLabEndComboEffect(VfxLabNow));
+        /// <summary>#741 Y1: 지금 내가 섬광에 눈부신지 (실험실 "섬광 바로 해제" 버튼이 켜지는 때)</summary>
+        public bool VfxLabFlashGlared => VfxLabReady && config != null && latest != null
+            && LabYaguangFlash.Glared(latest, BattlePresentationTime, LocalPlayerId, config.YaguangFlashGlareLimitSeconds);
+
         /// <summary>Y2/Y3: 남은 칸을 바로 맞혀 성공 (BIG 보상)</summary>
         public bool VfxLabCompleteCombo() => VfxLabReady && VfxLabPublish(model.VfxLabCompleteCombo(LocalPlayerId, VfxLabNow));
 
@@ -79,7 +90,13 @@ namespace C6Lab
         /// <summary>공통/구미호 기믹(박 폭탄, 넘기기 막기, 여우불, 매혹)을 지금 나에게 건다.</summary>
         public bool VfxLabCastGimmick(LabSabotageKind kind) =>
             VfxLabReady && VfxLabPublish(model.VfxLabCastGimmick(kind, LocalPlayerId, VfxLabNow));
-        public bool VfxLabStartFlash() => VfxLabReady && VfxLabPublish(model.VfxLabStartFlash(VfxLabNow));
+        public bool VfxLabStartFlash(bool skipWarning = false) => VfxLabReady && VfxLabPublish(model.VfxLabStartFlash(VfxLabNow, skipWarning));
+        /// <summary>#741: 콤보 4칸을 예고 없이 바로 / 틀린 색 한 번(봐주기 → 하트 → 실패)</summary>
+        public bool VfxLabStartComboNow() => VfxLabReady && VfxLabPublish(model.VfxLabStartCombo(VfxLabNow, true));
+        public bool VfxLabWrongCombo() => VfxLabReady && VfxLabPublish(model.VfxLabWrongCombo(LocalPlayerId, VfxLabNow));
+        /// <summary>#741: 연기 / 부적을 골라 지금 시작 (skipWarning이면 예고 없이 본체부터)</summary>
+        public bool VfxLabStartJigwiMission(LabJigwiABKind kind, bool skipWarning) => VfxLabReady
+            && VfxLabPublish(model.VfxLabStartJigwiMission(kind, skipWarning, VfxLabNow));
         public bool VfxLabFailCombo() => VfxLabReady && VfxLabPublish(model.VfxLabFailCombo(LocalPlayerId, VfxLabNow));
         public bool VfxLabStartGumihoFever() => VfxLabReady && VfxLabStage == LabStageYokai.Gumiho
             && VfxLabPublish(model.VfxLabStartGumihoFever(VfxLabNow));

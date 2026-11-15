@@ -48,6 +48,22 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void TheLabDetonatesMyLockedBombNow()
+        {
+            // #741: the bomb on my board blows up right away instead of after its whole fuse.
+            LabModel room = Room(LabStageYokai.Gumiho);
+            Assert.That(room.VfxLabDetonateBomb(0ul, 1d), Is.False, "No bomb yet.");
+            Assert.That(room.VfxLabCastGimmick(LabSabotageKind.GourdBomb, 0ul, 1d), Is.True);
+            double landed = 1d; // after the warning, the throw and the fall
+            while (room.VfxLabLockedBombId(0ul) == null && landed < 12d) { landed += .25d; room.Tick(landed); }
+            Assert.That(room.VfxLabLockedBombId(0ul), Is.Not.Null, "The bomb is on my board, locked.");
+            Assert.That(room.VfxLabDetonateBomb(0ul, landed), Is.True);
+            room.Tick(landed + 1d);
+            Assert.That(room.Snapshot(landed + 1d).orbs.Any(orb => orb.kind == LabOrbKind.Bomb && orb.owner == 0ul), Is.False,
+                "It has gone off.");
+        }
+
+        [Test]
         public void TheLabStartsTheFoxFeverNow()
         {
             LabModel room = Room(LabStageYokai.Gumiho);
@@ -72,6 +88,22 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void TheLabEndsTheSmallPenaltyAtOnce()
+        {
+            // #741: the SMALL penalty (15 s) ends now, as if its time had run out.
+            LabModel room = Room();
+            Assert.That(room.VfxLabEndComboEffect(1d), Is.False, "Nothing to end yet.");
+            Assert.That(room.VfxLabStartCombo(1d), Is.True);
+            double active = 1d + config.ComboWarningSeconds + .1d;
+            Assert.That(room.VfxLabFailCombo(0ul, active), Is.True);
+            double now = active + 1d;
+            Assert.That(room.VfxLabComboEffectOn(now), Is.True);
+            Assert.That(room.VfxLabEndComboEffect(now), Is.True);
+            Assert.That(room.VfxLabComboEffectOn(now + .01d), Is.False);
+            Assert.That(room.Snapshot(now + .01d).players.All(player => player.comboPenaltyUntil <= now), Is.True, "SMALL ended at the press.");
+        }
+
+        [Test]
         public void TheLabStartsAFlashWhenTheYaguangFlashIsOn()
         {
             float[] values = config.CaptureDeveloperValues();
@@ -80,6 +112,33 @@ namespace C6Lab.Tests
             LabModel room = Room();
             Assert.That(room.VfxLabStartFlash(1d), Is.True);
             Assert.That(room.VfxLabStartFlash(1.1d), Is.False, "One flash at a time.");
+        }
+
+        [Test]
+        public void TheLabPicksTheSmokeOrTheTalismanAndCanSkipTheWarning()
+        {
+            // #741: 연기 / 부적을 골라 부른다. 다음 차례가 다른 종류면 하나 건너뛰고, skipWarning이면 예고 없이 본체부터.
+            LabModel room = Room(LabStageYokai.Jigwi);
+            Assert.That(room.VfxLabStartJigwiMission(LabJigwiABKind.GroupFire, true, 1d), Is.True);
+            LabJigwiABRound smoke = room.Snapshot(1.1d).jigwiAB.Active(1.1d);
+            Assert.That(smoke, Is.Not.Null); Assert.That(smoke.kind, Is.EqualTo(LabJigwiABKind.GroupFire));
+            Assert.That(smoke.activeAt, Is.EqualTo(1d).Within(1e-9), "No warning.");
+            Assert.That(room.VfxLabStartJigwiMission(LabJigwiABKind.PersonalBurn, false, 1.2d), Is.False, "One mission at a time.");
+            Assert.That(room.VfxLabFinishJigwiMission(false, 2d), Is.True);
+            Assert.That(room.VfxLabStartJigwiMission(LabJigwiABKind.PersonalBurn, false, 3d), Is.True);
+            LabJigwiABRound talisman = room.Snapshot(5.1d).jigwiAB.Active(5.1d);
+            Assert.That(talisman, Is.Not.Null); Assert.That(talisman.kind, Is.EqualTo(LabJigwiABKind.PersonalBurn));
+            Assert.That(talisman.activeAt, Is.EqualTo(3d + LabJigwiABTimeline.WarningSeconds).Within(1e-9), "With its warning.");
+        }
+
+        [Test]
+        public void TheLabCanStartTheComboWithoutItsWarning()
+        {
+            // #741: 콤보 4칸을 예고 없이 바로.
+            LabModel room = Room();
+            Assert.That(room.VfxLabStartCombo(1d, true), Is.True);
+            Assert.That(room.Snapshot(1.05d).comboActive, Is.True, "The four slots are on at once.");
+            Assert.That(room.VfxLabWrongCombo(0ul, 1.1d), Is.True, "A wrong colour (forgiven, a heart, or the end).");
         }
 
         [Test]
