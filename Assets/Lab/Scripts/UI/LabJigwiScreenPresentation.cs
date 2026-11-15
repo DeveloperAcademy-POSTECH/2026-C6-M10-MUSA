@@ -1138,13 +1138,13 @@ namespace C6Lab
         // 위에서 부적 구슬 꼬리처럼 먹 테두리·물·하이라이트 세 겹 폭포가 쏟아지고 물방울이 튄다 ----------
         private RectTransform sealRoot;
         private UnityEngine.UI.Text waterGlyph;
-        // #741: drawn in the backgrounds' 2D style (flat colours, ink lines, 민화 clouds): two tapered, swaying ribbons (pale
-        // spray behind, the water in front), swirl clouds it pours out of, and a curling foam crest, ink ripples and drops below.
-        // The pictures are Resources/Jigwi/Waterfall/* (placeholders until the art team's).
+        // #741: drawn to match the 3R background: watercolour water on hanji (like the curtain douse) in two tapered, swaying
+        // ribbons (pale spray behind, the water in front), pouring out of the background's own dry-brush ink clouds, with a
+        // watercolour drops where it lands. The pictures are Resources/Jigwi/Waterfall/* (until the art team's).
         private LabWaterfallRibbon waterfallBack, waterfall;
-        private readonly UnityEngine.UI.Image[] clouds = new UnityEngine.UI.Image[4], ripples = new UnityEngine.UI.Image[3];
+        private readonly UnityEngine.UI.Image[] clouds = new UnityEngine.UI.Image[3];
         private const string WaterfallArt = "Jigwi/Waterfall/";
-        private UnityEngine.UI.Image splash, whiteFlash;
+        private UnityEngine.UI.Image whiteFlash;
         private static Sprite dropSprite;
         private readonly UnityEngine.UI.Image[] flyers = new UnityEngine.UI.Image[LabJigwiABNetworkValidation.MaximumPlayers];
         private readonly UnityEngine.UI.Image[] flyerGlows = new UnityEngine.UI.Image[LabJigwiABNetworkValidation.MaximumPlayers];
@@ -1154,8 +1154,6 @@ namespace C6Lab
         private static Sprite sparkleSprite, shineSprite;
         private readonly Vector3[] flyFrom = new Vector3[LabJigwiABNetworkValidation.MaximumPlayers];
         private readonly UnityEngine.UI.Image[] drops = new UnityEngine.UI.Image[24];
-        // #741: white foam puffs boiling up where the waterfall hits the boss.
-        private readonly UnityEngine.UI.Image[] foams = new UnityEngine.UI.Image[8];
         private readonly Vector2[] dropVelocity = new Vector2[24];
         private readonly Vector3[] dropAt = new Vector3[24];
         private readonly float[] dropBorn = new float[24];
@@ -1256,7 +1254,7 @@ namespace C6Lab
                 waterGlyph.color = new Color(.2f, .62f, 1f, 1f - g * g);
             }
             // ③ The waterfall: an ink-edged water column (like the talisman orb's tail) in two layers rushing at different
-            // speeds, wobbling a little, with a splash and drops flying off where it hits the boss.
+            // speeds, wobbling a little, with drops flying off where it hits the boss.
             bool pour = s >= 0f && s < PourSeconds;
             foreach (var part in WaterfallParts())
                 if (part != null && part.gameObject.activeSelf != pour) part.gameObject.SetActive(pour);
@@ -1278,52 +1276,28 @@ namespace C6Lab
             float grow = Mathf.Clamp01(s / .18f), fade = 1f - Mathf.Clamp01((s - (PourSeconds - .4f)) / .4f);
             float wobble = 1f + .06f * Mathf.Sin(t * 17f) + .04f * Mathf.Sin(t * 29f);
             // #741: spray behind (wide, slow), the water (tapered, swaying), bright streaks in front (fast). They pour out of
-            // 민화 swirl clouds at the top, and where they land a curling foam crest, foam curls, ink ripples and drops.
+            // the background's ink clouds at the top, and drops fly off where they land. It hardly widens and fades out at the
+            // bottom so the boss stays in sight.
             float open = Mathf.Lerp(.55f, 1f, grow);
-            PlaceRibbon(waterfallBack, boss, top, width * 2.2f * wobble * open, grow, t * .8f, .95f * fade, .5f, .34f, t * 2.1f);
-            PlaceRibbon(waterfall, boss, top, width * 1.45f * (2f - wobble) * open, grow, t * 1.6f, fade, .8f, .42f, t * 2.6f);
+            PlaceRibbon(waterfallBack, boss, top, width * 1.35f * wobble * open, grow, t * .8f, .9f * fade, .4f, .7f, t * 2.1f);
+            PlaceRibbon(waterfall, boss, top, width * .95f * (2f - wobble) * open, grow, t * 1.6f, fade, .6f, .75f, t * 2.6f);
             float reach = (top - boss.y) / Mathf.Max(.0001f, unit);
             for (int i = 0; i < clouds.Length; i++)
             {
+                // The background's ink clouds: one each side behind (the right one mirrored), the biggest in front.
                 var cloud = clouds[i];
-                float side = (i - (clouds.Length - 1) * .5f);
-                float drift = Mathf.Sin(t * .9f + i * 1.7f) * width * .06f;
-                cloud.rectTransform.position = new Vector3(boss.x + (side * width * .55f + drift) * unit, top - width * (.12f + .08f * (i % 2)) * unit, boss.z);
-                float size = width * (1.05f + .25f * (i % 2));
-                cloud.rectTransform.sizeDelta = new Vector2(size * 1.25f, size * .8f);
+                float side = i == 0 ? -.5f : i == 1 ? .5f : 0f;
+                float drift = Mathf.Sin(t * .9f + i * 1.7f) * width * .05f;
+                float wide = width * (i == 2 ? 2.5f : 2.1f);
+                cloud.rectTransform.position = new Vector3(boss.x + (side * width + drift) * unit, top - wide * (i == 2 ? .1f : .04f) * unit, boss.z);
+                cloud.rectTransform.sizeDelta = new Vector2(wide, wide / 3f);
+                cloud.rectTransform.localScale = new Vector3(i == 1 ? -1f : 1f, 1f, 1f);
                 cloud.color = new Color(1f, 1f, 1f, fade * Mathf.Clamp01(s / .25f));
-            }
-            // The curling foam crest sits on the boss where the water lands, bobbing a little.
-            float bob = .06f * Mathf.Sin(t * 14f);
-            splash.rectTransform.position = boss + new Vector3(0f, width * (.05f + bob) * unit, 0f);
-            splash.rectTransform.sizeDelta = new Vector2(width * 2.6f * (1f + bob), width * 1.3f * (1f - bob));
-            splash.color = new Color(1f, 1f, 1f, fade * grow);
-            for (int i = 0; i < ripples.Length; i++)
-            {
-                // Rings spread out on the water where it lands, one after another.
-                float life = Mathf.Repeat(t * 1.1f + i / (float)ripples.Length, 1f);
-                var ring = ripples[i];
-                ring.rectTransform.position = boss - new Vector3(0f, width * .12f * unit, 0f);
-                float wide = width * Mathf.Lerp(1.2f, 3.6f, life);
-                ring.rectTransform.sizeDelta = new Vector2(wide, wide * .3f);
-                ring.color = new Color(1f, 1f, 1f, .85f * (1f - life) * fade * grow);
-            }
-            for (int i = 0; i < foams.Length; i++)
-            {
-                var foam = foams[i];
-                // Each puff rises and swells over .6 s, one after another, so the foam keeps boiling.
-                float life = Mathf.Repeat(t * 1.7f + i / (float)foams.Length, 1f);
-                float side = (i % 2 == 0 ? -1f : 1f) * (.25f + .55f * ((i * 37) % 10) / 10f);
-                foam.rectTransform.position = boss + new Vector3(side * width * .9f * unit, (.2f + life * .55f) * width * unit, 0f);
-                float puff = width * Mathf.Lerp(.35f, .7f, life);
-                foam.rectTransform.sizeDelta = new Vector2(puff, puff * .62f);
-                foam.color = new Color(1f, 1f, 1f, fade * grow * (1f - life * life) * Mathf.Clamp01(life * 6f));
-                if (!foam.gameObject.activeSelf) foam.gameObject.SetActive(true);
             }
             // Rolling surges on top of the rumble, every 0.45 s, fading with the pour.
             if (source != null && waterfallPulseAt > 0f && t >= waterfallPulseAt && fade > .3f)
             { waterfallPulseAt = t + .45f; LabHaptics.PlayDirect(source.config, LabHapticStyle.Medium, .55f * fade); }
-            // Drops fly off the splash all the time it pours.
+            // Drops fly off where it lands all the time it pours.
             if (fade > .2f && t - lastDropAt > .03f)
             {
                 lastDropAt = t;
@@ -1334,7 +1308,7 @@ namespace C6Lab
                 // #626: place and size it before it shows, or for one frame it appeared at its default spot and size
                 // (a big blue circle below the boss as the waterfall started).
                 d.rectTransform.position = dropAt[i2];
-                d.rectTransform.sizeDelta = new Vector2(26f, 26f * 1.33f);
+                d.rectTransform.sizeDelta = new Vector2(20f, 20f * DropAspect);
                 d.color = Color.white;
                 d.gameObject.SetActive(true);
             }
@@ -1346,8 +1320,8 @@ namespace C6Lab
             var fall = ribbon.rectTransform;
             fall.pivot = new Vector2(.5f, 1f);
             fall.position = new Vector3(boss.x, top, boss.z);
-            // A little past the boss's middle, under the splash.
-            float length = (top - boss.y) / Mathf.Max(.0001f, fall.lossyScale.y) + width * .1f;
+            // Down to the boss's middle; the ribbon fades out over its lower part.
+            float length = (top - boss.y) / Mathf.Max(.0001f, fall.lossyScale.y);
             fall.sizeDelta = new Vector2(width, length);
             ribbon.grow = grow; ribbon.scroll = scroll; ribbon.sway = sway; ribbon.topWidth = topWidth; ribbon.phase = phase;
             ribbon.color = new Color(1f, 1f, 1f, alpha);
@@ -1357,10 +1331,8 @@ namespace C6Lab
         /// <summary>#741: every piece of the waterfall (switched on and off together).</summary>
         private System.Collections.Generic.IEnumerable<UnityEngine.UI.Graphic> WaterfallParts()
         {
-            yield return waterfallBack; yield return waterfall; yield return splash;
+            yield return waterfallBack; yield return waterfall;
             foreach (var part in clouds) yield return part;
-            foreach (var part in ripples) yield return part;
-            foreach (var part in foams) yield return part;
         }
 
         private void AnimateDrops(float t, float unit)
@@ -1373,8 +1345,8 @@ namespace C6Lab
                 if (life > .6f) { d.gameObject.SetActive(false); continue; }
                 Vector2 v = dropVelocity[i];
                 d.rectTransform.position = dropAt[i] + new Vector3(v.x * life, v.y * life - 1400f * life * life, 0f) * unit;
-                float size = Mathf.Lerp(26f, 12f, life / .6f);
-                d.rectTransform.sizeDelta = new Vector2(size, size * 1.33f);
+                float size = Mathf.Lerp(20f, 10f, life / .6f);
+                d.rectTransform.sizeDelta = new Vector2(size, size * DropAspect);
                 d.color = new Color(1f, 1f, 1f, 1f - life / .6f);
             }
         }
@@ -1387,13 +1359,9 @@ namespace C6Lab
                 sealRoot = new GameObject("TalismanSeal", typeof(RectTransform)).GetComponent<RectTransform>();
                 sealRoot.gameObject.layer = gameObject.layer; sealRoot.SetParent(transform, false);
                 sealRoot.anchorMin = Vector2.zero; sealRoot.anchorMax = Vector2.one; sealRoot.offsetMin = sealRoot.offsetMax = Vector2.zero;
-                // #741: back to front — spray, water, ink ripples, the foam crest, foam curls, clouds on top.
+                // #741: back to front — spray, water, clouds on top.
                 waterfallBack = NewRibbon("Talisman Waterfall Spray", WaterTexture(true));
                 waterfall = NewRibbon("Talisman Waterfall", WaterTexture(false));
-                for (int i = 0; i < ripples.Length; i++) { ripples[i] = NewSealImage("Waterfall Ripple " + i, WaterfallSprite("WaterfallRipple")); ripples[i].preserveAspect = false; }
-                splash = NewSealImage("Talisman Waterfall Splash", WaterfallSprite("WaterfallSplash"));
-                for (int i = 0; i < foams.Length; i++)
-                { foams[i] = NewSealImage("Waterfall Foam " + i, WaterfallSprite("WaterfallCloud")); foams[i].gameObject.SetActive(false); }
                 for (int i = 0; i < clouds.Length; i++) clouds[i] = NewSealImage("Waterfall Cloud " + i, WaterfallSprite("WaterfallCloud"));
                 whiteFlash = NewSealImage("Talisman White Light", null);
                 whiteFlash.rectTransform.anchorMin = Vector2.zero; whiteFlash.rectTransform.anchorMax = Vector2.one;
@@ -1492,6 +1460,8 @@ namespace C6Lab
         }
 
         private static Texture2D waterfallWaterTexture, waterfallSprayTexture;
+        /// <summary>Height over width of a flying drop (the watercolour drop picture is tall, with a tail).</summary>
+        private float DropAspect => drops[0] != null && drops[0].sprite != null ? drops[0].sprite.rect.height / Mathf.Max(1f, drops[0].sprite.rect.width) : 1.33f;
 
         /// <summary>
         /// #741: falling water in the backgrounds' 2D style — three flat blue tones (light middle, deep sides), a dark ink outline
@@ -1502,6 +1472,14 @@ namespace C6Lab
         {
             Texture2D cached = spray ? waterfallSprayTexture : waterfallWaterTexture;
             if (cached != null) return cached;
+            // The painted watercolour water (tiles top to bottom); drawn below only if it is missing.
+            var painted = Resources.Load<Texture2D>(WaterfallArt + (spray ? "WaterfallSpray" : "WaterfallWater"));
+            if (painted != null)
+            {
+                painted.wrapMode = TextureWrapMode.Repeat;
+                if (spray) waterfallSprayTexture = painted; else waterfallWaterTexture = painted;
+                return painted;
+            }
             const int w = 128, h = 256;
             var texture = new Texture2D(w, h, TextureFormat.RGBA32, false)
             { name = spray ? "Jigwi waterfall spray (#741 runtime)" : "Jigwi waterfall (#741 runtime)", hideFlags = HideFlags.DontSave, wrapMode = TextureWrapMode.Repeat };

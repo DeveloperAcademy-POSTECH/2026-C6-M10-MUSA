@@ -21,6 +21,8 @@ namespace C6Lab
         public float sway, phase;
         /// <summary>위에서부터 보이는 길이 비율 (0이면 안 보이고 1이면 끝까지).</summary>
         public float grow = 1f;
+        /// <summary>아래쪽 몇 비율에 걸쳐 투명하게 사라지는지 (0이면 끝까지 그대로).</summary>
+        public float fadeEnd = .3f;
         public int segments = 28;
 
         public override Texture mainTexture => texture != null ? texture : s_WhiteTexture;
@@ -45,8 +47,12 @@ namespace C6Lab
                 float half = r.width * .5f * Mathf.Lerp(topWidth, 1f, Mathf.Pow(v, .75f));
                 float x = r.center.x + Mathf.Sin(v * Mathf.PI * 2.2f + phase) * sway * r.width * .05f * v;
                 float tv = scroll - v * tiles * aspect;
-                vh.AddVert(new Vector3(x - half, y), c, new Vector2(0f, tv));
-                vh.AddVert(new Vector3(x + half, y), c, new Vector2(1f, tv));
+                // The end fades out (by where it is on the full ribbon, so it stays put while it grows).
+                Color32 cv = c;
+                float toEnd = 1f - v * Mathf.Clamp01(grow);
+                if (fadeEnd > 0f) cv.a = (byte)(c.a * Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(toEnd / fadeEnd)));
+                vh.AddVert(new Vector3(x - half, y), cv, new Vector2(0f, tv));
+                vh.AddVert(new Vector3(x + half, y), cv, new Vector2(1f, tv));
                 if (k == 0) continue;
                 int i = k * 2;
                 vh.AddTriangle(i - 2, i - 1, i);
