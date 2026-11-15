@@ -9173,3 +9173,10 @@ PR #729 검증 중 main `a7208003`에서 `LabLocalBoardNetworkIntegrationTests` 
 - `GameSceneFlowTests` 전체(사용자 실행): Passed 25 / Failed 24. 실패 24건은 모두 같은 로그 하나로 실패했다: `Unknown error occurred while loading 'VirtualArtifacts/Primary/e3472224bcaa648cf9879fbf8ddf6346'`(`Assets/Hapio/Art/UI/Strokes/ResultAction.png`). 결과 화면·봉인 박 관람을 여는 검사만 실패했고, 이 기기 Library의 그 GUID 기록 손상이다(#717 기록과 같음, Unity 6.6 통합 저장소라 그 항목만 지울 수 없음). 저장소 파일·meta는 정상이며 #762와 무관하다. 땅따먹기 결과 검사 2건(`TerritoryDeveloperSolo…`, `TerritoryTimeUp…`)도 이 이유로 실패해 박 교체 뒤 결과 화면은 Library 재생성 뒤 재실행이 필요하다(NOT_RUN).
 - 스토리 박 검사(`GameStageGourdIntegrationTests`, `GameStageGourdSizeTests`), `GameBattleUiPresentationTests` 땅따먹기: NOT_RUN.
 - 실제 화면(청·홍 칠이 야광귀 박에 보이는 모습, 커진 박과 위쪽 팀 막대·아래 판의 겹침), Mac 여러 앱 땅따먹기: NOT_RUN.
+
+### #762 병합 전 검증 (2026-11-15)
+- **기준:** `feat/#762-territory-stage-gourd`에 main `9c24dccc`(#760 포함) 병합. 충돌은 이 문서 기록 추가뿐이며 양쪽을 보존했다. Unity 6000.6.5f1 batch(macOS, Metal).
+- **추가 수정:** 땅따먹기 판정 껍데기·크기가 바뀌므로 접속 토큰을 `C6HapioGame/56`으로 올렸다(Game55 거절 검사 추가). AGENTS·GAME_FLOW·GOURD_MODELS의 "땅따먹기=흰 박" 설명도 고쳤다. 프로토콜 5705·Lab62·설정 265개는 그대로다.
+- **전체 EditMode:** 2583/2583 PASS. **전체 PlayMode:** 878/878 PASS(새 `TerritoryMountsTheYagwanggwiGourd…`와 땅따먹기 결과 검사 포함).
+- **화면(Development Mac 빌드, DEV 솔로 땅따먹기, main과 같은 임시 캡처):** 전투 박이 흰 박에서 1.4배 야광귀 박으로 바뀌었다. 청홍 칠이 몸통·뚜껑에 바로 칠해지고, 상단 막대·조합판과는 겹치지 않는다. 결과 박 보기도 야광귀 박이며 #760처럼 상단 고리가 없다. 튜토리얼 박은 흰 박 그대로다.
+- **미실행:** iPhone 실기기, 실제 여러 기기 땅따먹기(1:1·2:2·3:3) 네트워크 전투.
