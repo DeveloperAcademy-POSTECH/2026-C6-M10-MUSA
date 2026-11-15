@@ -83,9 +83,9 @@ QR 설정은 `Assets/Hapio/Resources/Hapio/Demo/Staff/FinalPageConfig.asset`의 
 이미 준비된 에셋으로 빌드할 때 갱신 메뉴를 다시 실행할 필요는 없다. 빌드는 저장된 에셋과 연결을 검사하며 누락 자료를 자동 생성하거나 일반 Scene을 저장하지 않는다. iOS 내보내기 뒤에는 생성된 Xcode 프로젝트에서 기존 개발 Team·연결 기기·서명을 설정한다. Xcode 프로젝트 생성 성공과 실제 기기 설치·실행 성공은 구분한다.
 
 - 출력 폴더: `Builds/HapioDemo/<UTC시각-고유번호-release또는qa>/`
-- Mac 앱: `macOS/Hapio-Staff-Demo.app`, QA는 `Hapio-Staff-Demo-QA.app`
+- Mac 앱: `macOS/합이오_쇼케이스.app` (Release·QA 동일 파일명, 출력 폴더로 구분)
 - iOS 프로젝트: `iOS/`
-- 앱 표시명: `Hapio Staff Demo`
+- 앱 표시명: `합이오_쇼케이스`
 - 앱 식별자: 원래 플랫폼 Bundle ID + `.staffdemo`
 
 Release에서도 스태프 선택 화면은 제공하지만 숨김 DEV는 열리지 않는다. QA는 기존 숨김 DEV 입력을 사용할 수 있다. Release와 QA는 같은 시연 앱을 교체할 수 있으므로 빌드의 `build-manifest.json`에서 생성 시각·소스 커밋·미커밋 변경·대상·QA 여부·스테이지별 설정 해시를 확인한다. 빌드 도구는 임시 앱 이름·식별자·플랫폼·Scene 목록·설정을 복원하며 기존 출력 폴더를 덮어쓰지 않는다.
@@ -109,11 +109,11 @@ Release에서도 스태프 선택 화면은 제공하지만 숨김 DEV는 열리
 | 이번 Editor에서 만든 최근 야광귀 전용 출력 | `Hapio > Demo Build > Stage 2 Only > Open Last Output` |
 
 - 출력: `Builds/HapioStage2Demo/<UTC시각-고유번호-release또는qa>/`.
-- Mac: `macOS/Hapio-Stage2-Demo.app`, QA는 `Hapio-Stage2-Demo-QA.app`. 표시명은 `Hapio Stage 2 Demo`다.
+- Mac: `macOS/합이오_쇼케이스.app` (Release·QA 동일 파일명). 표시명은 `합이오_쇼케이스`다.
 - Mac 앱 빌드는 로컬 서명 도구가 있는 macOS의 Unity Editor에서 실행한다.
 - iOS: `iOS/`. 생성된 Xcode 프로젝트에서 Team·연결 기기·서명을 설정해 빌드한다. Xcode 내보내기·서명·설치·실행은 각각 별도 확인한다.
 - 식별자: 일반 플랫폼 Bundle ID + `.staffdemo.stage2`. 일반 앱과 기존 3카드 시연 앱을 교체하지 않는다. Release와 QA는 같은 전용 식별자를 사용한다.
-- Mac 앱은 생성 후 서명을 검증한다. 내장 Unity 라이브러리 서명이 유효하지 않은 로컬 산출물만 다시 로컬 서명하고 검증한다. 이미 유효한 서명과 iOS 서명은 바꾸지 않는다. 이 로컬 서명은 App Store 배포용 서명이 아니다.
+- Mac 앱은 생성 후 내부 실행 파일명을 `HapioShowcase`로 정리하고 서명을 검증한다. 화면 표시명과 `.app` 이름은 `합이오_쇼케이스`를 유지하며 한글 실행 파일명에서 발생하는 macOS 서명 도구의 충돌을 피한다. 내장 Unity 라이브러리 서명이 유효하지 않은 로컬 산출물만 다시 로컬 서명하고 검증한다. 이미 유효한 서명과 iOS 서명은 바꾸지 않는다. 이 로컬 서명은 App Store 배포용 서명이 아니다.
 
 터미널에서는 같은 Unity Editor에 프로젝트 경로와 `-executeMethod Hapio.Editor.GameDemoBuild.StageTwoMac`을 전달하면 Release Mac 앱을 만든다. iOS는 `StageTwoIos`, QA는 `StageTwoMacDevelopment`/`StageTwoIosDevelopment`다. 저장된 Player Settings의 Scripting Define이나 Build Settings Scene을 수동으로 바꾸지 않는다. 일반 Build Settings에서 Scene만 골라 빌드하면 이 제한이 들어가지 않는다.
 
@@ -190,3 +190,17 @@ flowchart TD
 선택별 1·2·3 경로, 같은 스테이지 방 참가·동시 생성 충돌·만석·진행 중·취소·재입장·선택 불일치 거절, 세 명 수동 시작, 한 판 완료, 실제 기록과 선택별 엔딩·QR 복귀를 확인한다. 일반 Story·Lab·땅따먹기는 회귀 대상으로 유지한다.
 
 자동 검사는 코드·저장 자료와 로컬 패킷 참가자의 흐름을 확인한다. 실제 세 기기의 UI·무선 환경을 확인한 것으로 표현하지 않는다. 최초 스태프 시연의 수행 결과는 `VALIDATION.md`의 #735, 현재 A/B 그룹은 #753 기록을 따른다. iPhone/iPad 일반 Wi-Fi·핫스팟 확인은 별도 실기기 검증 항목이며, 수행 전에는 미실행으로 남긴다.
+
+## 쇼케이스 로고·앱 이름 (#772)
+
+현재 `Demo Build`의 전체 스테이지·Stage 2 Only 및 Release·Development QA는 앱 표시명과 Mac 파일명을 **합이오_쇼케이스**로 사용한다. 각 출력 폴더와 앱 식별자는 기존과 같아 일반 게임·시연 종류별 연결 구분을 유지한다.
+
+시작 화면은 Unity 로고 대신 일반 게임 타이틀의 검은 `합이오` 글자 로고를 2초 표시한다. 같은 타이틀의 글꼴·색을 재사용한 로고 PNG와 밝은 아이보리 배경의 불투명 1024px 아이콘을 사용한다. iOS 홈 화면과 Mac 앱 아이콘도 이 아이콘을 사용한다.
+
+- 평소에는 기존 빌드 메뉴를 그대로 사용한다. 이미 준비된 PNG를 다시 만들 필요는 없다.
+- 원래 타이틀 글꼴이 바뀌었거나 로고 자료가 없을 때만 `Hapio > Demo > Prepare Showcase Branding`을 실행한다. `AnimatedTitle.prefab`의 `합이오` Text에서 글꼴·색을 읽어 `Assets/Hapio/Art/Branding/ShowcaseLogo.png`와 `ShowcaseIcon.png`를 다시 만든다. 원본 타이틀와 Scene은 저장하지 않는다.
+- 빌드는 로고 자료를 자동 생성하지 않는다. 저장된 PNG가 없으면 준비 메뉴를 안내하며 중단한다.
+- iOS와 Mac 내부 실행 파일명은 서명 도구 호환을 위해 `HapioShowcase`를 쓴다. 홈 화면·Finder의 앱 표시명과 Mac `.app` 파일명은 `합이오_쇼케이스`다.
+- 로고·시작 화면·아이콘·표시명은 시연 빌드 동안만 적용하고, 성공·실패·취소 뒤 원래 Player Settings를 복원한다. 일반 게임 및 Lab 빌드의 설정은 유지한다.
+- 정식 앱 아이콘 원본은 아직 확인되지 않아 현재는 타이틀 글자 기반 임시 아이콘을 쓴다. 나중에 `ShowcaseIcon.png`를 같은 1024×1024 불투명 RGB PNG로 교체하면 된다. 수동 교체 뒤에는 Prepare 메뉴가 임시 아이콘으로 다시 덮어쓰므로 실행하지 않는다.
+- 기존 설치 앱은 자동 변경되지 않는다. 새 이름·로고를 보려면 다시 내보내고 설치해야 한다.
