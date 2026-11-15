@@ -1398,26 +1398,33 @@ namespace Hapio.Tests
                 && renderer.sharedMaterials.Any(material => material != null && material.shader != null
                     && material.shader.name == shaderName);
 
-            int[] PartPath(Transform part, Transform visualRoot)
+            // By name, not sibling index: the gourd viewer copy omits the suspension part (#754), so indices shift.
+            string[] PartPath(Transform part, Transform visualRoot)
             {
-                var path = new System.Collections.Generic.List<int>();
+                var path = new System.Collections.Generic.List<string>();
                 for (Transform current = part; current != visualRoot; current = current.parent)
                 {
                     Assert.That(current, Is.Not.Null, "Every paintable part belongs to the live visual instance.");
-                    path.Add(current.GetSiblingIndex());
+                    path.Add(current.name);
                 }
                 path.Reverse();
                 return path.ToArray();
             }
 
-            void AssertStampSurfaceBindings(Transform visualRoot, int[][] partPaths, Mesh[] partMeshes,
+            void AssertStampSurfaceBindings(Transform visualRoot, string[][] partPaths, Mesh[] partMeshes,
                 LabWatercolorStampSettings expected, Texture[] maps, string context)
             {
                 Assert.That(visualRoot, Is.Not.Null, context + ": a gourd model must exist.");
                 Renderer[] shells = partPaths.Select(path =>
                 {
                     Transform part = visualRoot;
-                    foreach (int child in path) part = part.GetChild(child);
+                    foreach (string child in path)
+                    {
+                        Transform next = null;
+                        foreach (Transform candidate in part) if (candidate.name == child) { next = candidate; break; }
+                        Assert.That(next, Is.Not.Null, context + ": the copied gourd keeps the paintable part " + child + ".");
+                        part = next;
+                    }
                     return part.GetComponent<Renderer>();
                 }).ToArray();
                 Assert.That(visualRoot.GetComponentsInChildren<Renderer>(true)
@@ -1578,7 +1585,7 @@ namespace Hapio.Tests
                     .Concat(livePaint.PaintExtras).Distinct().ToArray();
                 Assert.That(paintParts, Is.Not.Empty);
                 Assert.That(paintParts.All(part => part != null), Is.True);
-                int[][] paintPartPaths = paintParts.Select(part => PartPath(part.transform, liveVisualRoot)).ToArray();
+                string[][] paintPartPaths = paintParts.Select(part => PartPath(part.transform, liveVisualRoot)).ToArray();
                 Mesh[] paintPartMeshes = paintParts.Select(part => part.GetComponent<MeshFilter>().sharedMesh).ToArray();
                 Texture[] liveMaps = { livePaint.VisualPaintTexture, livePaint.VisualPainterTexture, livePaint.VisualHeightTexture };
                 AssertStampSurfaceBindings(liveVisualRoot, paintPartPaths, paintPartMeshes, roundWatercolor, liveMaps,
