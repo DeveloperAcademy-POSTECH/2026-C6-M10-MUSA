@@ -105,7 +105,23 @@ namespace C6Lab.Editor
                     Report(network.VfxLabDetonateBomb(), "도화선이 다 탄 것으로 했다. 곧 터진다.", "내 판에 잠긴 박 폭탄이 없음 (먼저 박 폭탄을 떨어뜨린다)");
             if (EditorApplication.isPlaying && !ready) EditorGUILayout.LabelField("전투 중에 켜진다.", EditorStyles.wordWrappedMiniLabel);
             DrawTimeLeft(network, ready);
+            DrawResultJingle(network);
             EditorGUILayout.Space();
+        }
+
+        /// <summary>#745: 스토리 결과 징글 + 진동 (결과 표가 뜨는 순간 나오는 것). 화면 없이 소리와 진동만.</summary>
+        private void DrawResultJingle(LabNetwork network)
+        {
+            EditorGUILayout.LabelField("결과 징글 + 진동 (#745, 스토리 결과 표가 뜰 때)", EditorStyles.miniBoldLabel);
+            using (new EditorGUI.DisabledScope(!EditorApplication.isPlaying))
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                LabConfig config = network != null ? network.config : null;
+                if (GUILayout.Button("승리 징글", GUILayout.Height(26)))
+                    Report(Hapio.GameResultJingle.Preview(true, config), "승리 징글과 진동을 냈다 (진동은 iPhone에서만).", "");
+                if (GUILayout.Button("패배 징글", GUILayout.Height(26)))
+                    Report(Hapio.GameResultJingle.Preview(false, config), "패배 징글과 진동을 냈다 (소리 파일이 없으면 진동만).", "");
+            }
         }
 
         /// <summary>#734: 남은 30초 알림 ("30초 남았소!" 말풍선, 시간 숫자 깜빡임, 가장자리 번쩍임, 경고음, 진동).</summary>
@@ -113,9 +129,15 @@ namespace C6Lab.Editor
         {
             EditorGUILayout.LabelField("남은 30초 알림 (#734)", EditorStyles.miniBoldLabel);
             LabThirtySecondsLeftHud hud = ready ? Object.FindFirstObjectByType<LabThirtySecondsLeftHud>() : null;
+            // #745: 실제로 남은 30초로 시간을 넘긴다 → 진짜 알림 + 빨라진 BGM, 10초 뒤 피버.
+            float alarmAt = ready && network.config != null ? network.config.ThirtySecondsLeftAt : 30f;
+            using (new EditorGUI.DisabledScope(!ready || network.Snapshot == null || network.Snapshot.remaining <= alarmAt + .5d))
+                if (GUILayout.Button("남은 " + Mathf.RoundToInt(alarmAt) + "초로 시간 넘기기 (실제로: 알림 + 빨라진 BGM → 피버)", GUILayout.Height(28)))
+                    Report(network.VfxLabSkipToSecondsLeft(alarmAt), "남은 시간을 " + alarmAt + "초 + 0.5초로 넘겼다. 곧 실제 알림이 뜨고 BGM이 빨라진다.",
+                        "이미 그보다 적게 남았음 (Play를 멈추고 다시 연다)");
             using (new EditorGUI.DisabledScope(hud == null))
             {
-                if (GUILayout.Button("30초 알림 지금 보기 (화면/소리/진동만, 시간은 그대로)", GUILayout.Height(28)))
+                if (GUILayout.Button("30초 알림만 지금 보기 (화면/소리/진동만, 시간은 그대로)", GUILayout.Height(26)))
                     Report(hud.PreviewNow(), "\"30초 남았소!\"를 띄웠다. 몇 번이든 다시 누를 수 있다. 실제 알림은 남은 30초에 따로 뜬다.",
                         "알림을 그릴 화면을 찾지 못함");
                 EditorGUILayout.LabelField("알림 화면과 함께 소리 골라 듣기 (LabConfig는 그대로)", EditorStyles.wordWrappedMiniLabel);

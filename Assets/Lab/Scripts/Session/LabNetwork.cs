@@ -184,6 +184,16 @@ namespace C6Lab
             return true;
         }
 
+        /// <summary>
+        /// VFX 실험실(#745): 전투 시각을 seconds초 앞으로 넘긴다 (멈춰 있어도). 다음 스냅샷이 그만큼 흐른 판을 그대로 계산한다.
+        /// </summary>
+        public bool Skip(double seconds)
+        {
+            if (!Valid(seconds) || seconds <= 0d) return false;
+            pausedDuration -= seconds;
+            return true;
+        }
+
         public void Reset()
         {
             pausedAt = 0d;
@@ -752,7 +762,7 @@ namespace C6Lab
         {
             if (!CanChooseConnection || registeredRoom == null || registeredRoom.Family != RoomFamily || !registeredRoom.IsAdvertising
                 || !registeredRoom.AdvertisingConfirmed || !ValidRoomName(registeredRoom.RegisteredServiceName)
-                || registeredRoom.DemoStageIndex != DemoStageIndex
+                || registeredRoom.DemoStageIndex != DemoStageIndex || registeredRoom.DemoGroupId != DemoGroupId
                 || roomPort == 0 || !AllowsDemoRoom(capacity, registeredRoom.Team)
                 || !LabModel.ValidRoomSize(capacity, registeredRoom.Team)) return false;
             port = roomPort;
@@ -764,7 +774,7 @@ namespace C6Lab
         {
             if (!CanChooseConnection || manager == null || transport == null || config == null
                 || !AllowsDemoRoom(targetParticipantCount, config.TeamTerritoryEnabled)
-                || gameFlowEnabled && LabGameBuildVariant.IsStaffStageDemo && DemoStageIndex == 0) return false;
+                || gameFlowEnabled && LabGameBuildVariant.IsStaffStageDemo && !LabGameBuildVariant.IsValidStaffRoomIdentity(DemoStageIndex, DemoGroupId)) return false;
             // A room without a registered card is advertised as a plain room, so it holds 2 to 5 players. Check before the
             // Host starts: a six-player size left from a 3:3 room must not open a half-advertised room (#405).
             if (registeredRoom == null && !LabModel.ValidRoomSize(targetParticipantCount, false))
@@ -1529,7 +1539,9 @@ namespace C6Lab
 
         private void Approve(NetworkManager.ConnectionApprovalRequest request, NetworkManager.ConnectionApprovalResponse response)
         {
-            bool validPayload = TryReadConnectionPayload(request.Payload, ActiveConnectionToken, gameFlowEnabled, out string ticket);
+            bool validPayload = TryReadConnectionPayload(request.Payload, ActiveConnectionToken, gameFlowEnabled, out string ticket)
+                && (!gameFlowEnabled || !LabGameBuildVariant.IsStaffStageDemo
+                    || LabGameBuildVariant.IsValidStaffRoomIdentity(DemoStageIndex, DemoGroupId));
             // Held places count toward the room size; a returning ticket takes its own back (#501).
             string rejection = !manager.IsHost ? "The room is no longer hosted."
                 : !validPayload
@@ -3146,7 +3158,7 @@ namespace C6Lab
         {
             DisposeDiscovery();
             if (!LabBonjourDiscovery.IsSupported) return;
-            discovery = registeredRoom ?? new LabBonjourDiscovery(RoomFamily) { DemoStageIndex = gameFlowEnabled ? DemoStageIndex : 0 };
+            discovery = registeredRoom ?? new LabBonjourDiscovery(RoomFamily) { DemoStageIndex = gameFlowEnabled ? DemoStageIndex : 0, DemoGroupId = gameFlowEnabled ? DemoGroupId : 0 };
             discovery.Diagnostic += message => Debug.Log("C6_LAB_DISCOVERY " + message);
             discovery.Changed += OnDiscoveryChanged;
             bool ipv4 = !(transport is LabDualStackTransport dual) || dual.HasIpv4Listener;
@@ -3164,7 +3176,7 @@ namespace C6Lab
             }
             // Authored room cards transfer their explicit sequential registration above.
             // Keep the existing direct Game Host API's unique name; it has no pending-room allocator.
-            advertisedName = gameFlowEnabled && LabGameBuildVariant.IsStaffStageDemo ? LabPendingRoom.StaffStageName(DemoStageIndex)
+            advertisedName = gameFlowEnabled && LabGameBuildVariant.IsStaffStageDemo ? LabPendingRoom.StaffStageName(DemoStageIndex, DemoGroupId)
                 : gameFlowEnabled ? "Hapio-" + Guid.NewGuid().ToString("N").Substring(0, 8)
                 : LabRoomNames.ServiceBase;
             // The requested name, not a daemon rename, so a later re-registration keeps the room's identity (#476).

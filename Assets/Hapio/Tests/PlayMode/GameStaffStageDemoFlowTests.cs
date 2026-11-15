@@ -153,6 +153,7 @@ namespace Hapio.Tests
 
         private IEnumerator StartRetryRound(int stage)
         {
+            Assert.That(session.SelectDemoGroup(1), Is.True);
             Assert.That(session.SelectDemoStage(stage), Is.True);
             yield return Until(() => network.IsHost && session.State.phase == GameFlowPhase.Lobby && !session.IsLoadingScene,
                 "The retry fixture enters the chosen staff stage room");
@@ -186,6 +187,7 @@ namespace Hapio.Tests
                 && second.Network.CanSelectPlayerSlot && third.Network.CanSelectPlayerSlot,
                 "All three members observe the same room's fresh P selection lobby");
             Assert.That(session.SelectedDemoStage, Is.EqualTo(stage));
+            Assert.That(session.SelectedDemoGroup, Is.EqualTo(1));
             Assert.That(session.State.demoStageIndex, Is.EqualTo(stage));
             Assert.That(session.State.stageIndex, Is.Zero);
             Assert.That(session.State.runId, Is.Empty);
@@ -193,6 +195,7 @@ namespace Hapio.Tests
             foreach (var member in new[] { network, second.Network, third.Network })
             {
                 Assert.That(member.DemoStageIndex, Is.EqualTo(stage));
+                Assert.That(member.DemoGroupId, Is.EqualTo(1));
                 Assert.That(member.LocalSlotNumber, Is.Zero);
                 Assert.That(member.SelectedParticipantCount, Is.Zero);
                 Assert.That(member.CanStartBattle, Is.False);
@@ -201,6 +204,7 @@ namespace Hapio.Tests
 
         private IEnumerator ThreePlayerRound(int stage)
         {
+            Assert.That(session.SelectDemoGroup(1), Is.True);
             Assert.That(session.SelectDemoStage(stage), Is.True);
             Assert.That(session.SelectDemoStage(stage == 1 ? 3 : 1), Is.False, "One card request runs at a time.");
             yield return Until(() => network.IsHost && session.State.phase == GameFlowPhase.Lobby && !session.IsLoadingScene,
@@ -330,6 +334,8 @@ namespace Hapio.Tests
             Assert.That(Object.FindFirstObjectByType<GameStaffDemoView>(), Is.Not.Null);
             Assert.That(session.RoomBrowserVisible, Is.False);
             Assert.That(network.DemoStageIndex, Is.Zero);
+            Assert.That(session.SelectedDemoGroup, Is.EqualTo(1), "Normal QR return retains the device group for the next party.");
+            Assert.That(network.DemoGroupId, Is.Zero, "Retired room metadata is cleared independently of the Home choice.");
             Assert.That(session.StageResults, Is.Empty, "The next party never inherits this group's record.");
         }
 
@@ -368,7 +374,7 @@ namespace Hapio.Tests
         private sealed class PeerControl
         {
             public string kind, runId, stageId, settingsFingerprint;
-            public int stageIndex, settingsRevision;
+            public int stageIndex, settingsRevision, demoGroupId;
             public uint revision;
             public LabStageYokai yokai;
             public GameFlowState state;
@@ -392,7 +398,7 @@ namespace Hapio.Tests
                 Network.config = Resources.Load<LabConfig>("LabConfig"); Network.port = port;
                 root.SetActive(true); Object.DontDestroyOnLoad(root);
                 Assert.That(Network.SetGameFlowEnabled(true), Is.True);
-                Assert.That(Network.SetDemoStageIdentity(stage), Is.True);
+                Assert.That(Network.SetDemoStageIdentity(stage, 1), Is.True);
                 Network.GameFlowMessage += Receive;
             }
             private void Receive(ulong sender, string json)

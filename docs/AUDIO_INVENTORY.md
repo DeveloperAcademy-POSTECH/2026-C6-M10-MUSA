@@ -61,6 +61,9 @@
 - `Assets/Lab/Resources/Audio/JigwiBucketSlosh/JigwiBucketSlosh_2.wav`
 - `Assets/Lab/Resources/Audio/JigwiBucketSmoke/JigwiBucketSmoke.wav`
 - `Assets/Lab/Resources/Audio/JigwiFever/Jigwi_Fever.wav`
+- `Assets/Lab/Resources/Audio/GumihoBGMRush/Gumiho_Stage_Rush.ogg`
+- `Assets/Lab/Resources/Audio/YaguangBGMRush/Yaguang_Stage_Rush.ogg`
+- `Assets/Lab/Resources/Audio/JigwiBGMRush/Jigwi_Stage_Rush.ogg`
 - `Assets/Lab/Resources/Audio/JigwiTalismanWaterfall/JigwiTalismanWaterfall.wav`
 - `Assets/Lab/Resources/Audio/StaminaShort/StaminaShort.wav`
 - `Assets/Lab/Resources/Audio/YaguangBGM/Yaguang_Stage.wav`

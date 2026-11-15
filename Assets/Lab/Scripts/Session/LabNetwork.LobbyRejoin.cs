@@ -112,6 +112,13 @@ namespace C6Lab
             return true;
         }
 
+        private void ClearRejoinTicket()
+        {
+            rejoinTicket = rejoinTicketRoom = null;
+            rejoinTicketPort = 0;
+            rejoinTicketAdmitted = false;
+        }
+
         /// <summary>
         /// A new ticket for a new room. Joining the same room again keeps it, so a held or remembered P returns. A room
         /// card is known by "port:name" and a Direct IP join by "address:port"; a Direct IP join to the port of an
@@ -155,7 +162,8 @@ namespace C6Lab
 
         /// <summary>A listed room this device may try: open, or full while possibly holding this device's place.</summary>
         internal bool RoomOpenToThisDevice(LabDiscoveredRoom room) => room != null
-            && (!gameFlowEnabled || !LabGameBuildVariant.IsStaffStageDemo || DemoStageIndex >= 1 && room.DemoStageIndex == DemoStageIndex)
+            && (!gameFlowEnabled || !LabGameBuildVariant.IsStaffStageDemo || LabGameBuildVariant.IsValidStaffRoomIdentity(DemoStageIndex, DemoGroupId)
+                && room.DemoStageIndex == DemoStageIndex && room.DemoGroupId == DemoGroupId)
             && !room.Playing && !room.WaitingForHost
             && (!room.IsFull || HoldsRoomTicket(room.Key));
 

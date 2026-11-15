@@ -204,6 +204,23 @@ namespace Hapio
             Transform binding = Find(model, RopeBinding);
             Bounds bindingBounds = binding.GetComponent<Renderer>().bounds;
             result.RopeSocket = new Vector3(bindingBounds.center.x, bindingBounds.max.y, bindingBounds.center.z);
+            if (spec.Stage == 2)
+            {
+                // #749: the eye has two prongs with empty space between them. An AABB top is not a surface.
+                Transform eye = Find(model, "model_part4");
+                var collider = eye.gameObject.AddComponent<MeshCollider>();
+                try
+                {
+                    collider.sharedMesh = eye.GetComponent<MeshFilter>().sharedMesh;
+                    Physics.SyncTransforms();
+                    Bounds bounds = eye.GetComponent<Renderer>().bounds;
+                    var ray = new Ray(new Vector3(bounds.center.x, bounds.max.y + 1f, bounds.center.z), Vector3.down);
+                    if (!collider.Raycast(ray, out RaycastHit hit, bounds.size.y + 2f))
+                        throw new InvalidOperationException("Stage 2 rope axis does not meet the attachment mesh.");
+                    result.RopeSocket = hit.point + Vector3.down * .01f;
+                }
+                finally { Object.DestroyImmediate(collider); }
+            }
             Bounds hitBounds = result.HitShell.bounds;
             result.SizeAnchor = origin + rotation * new Vector3(0f, hitBounds.max.y, 0f);
             result.Log.AppendLine("ropeSocket=" + result.RopeSocket.ToString("F4") + " sizeAnchor=" + result.SizeAnchor.ToString("F4")

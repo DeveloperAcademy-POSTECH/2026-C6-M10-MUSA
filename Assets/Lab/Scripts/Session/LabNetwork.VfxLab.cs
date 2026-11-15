@@ -111,6 +111,19 @@ namespace C6Lab
                 && snapshot.sessionId == vfxLabYaguangFeverSession
                 ? vfxLabYaguangFeverPlayed : -1d;
 
+        /// <summary>
+        /// #745: 전투 시각을 남은 secondsLeft초 + 0.5초까지 실제로 넘긴다. 0.5초 뒤 실제 "30초 남았소!"와 빨라진 BGM이 나오고,
+        /// 그 뒤 피버도 시간표대로 온다. 넘긴 동안 시간표에 있던 기믹은 실제 게임처럼 한꺼번에 계산된다. 이미 그보다 적게 남았으면 false.
+        /// </summary>
+        public bool VfxLabSkipToSecondsLeft(float secondsLeft)
+        {
+            if (!VfxLabReady) return false;
+            double skip = latest.remaining - (secondsLeft + .5d);
+            if (skip <= 0d || !battleClock.Skip(skip)) return false;
+            PublishSnapshot(true);
+            return true;
+        }
+
         private bool VfxLabPublish(bool changed)
         {
             if (changed) PublishSnapshot(true);
