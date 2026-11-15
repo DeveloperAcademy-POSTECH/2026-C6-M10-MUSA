@@ -37,6 +37,15 @@ namespace Hapio.Editor
                 Label(safe, "Title", font, new Vector2(.08f, .90f), new Vector2(.92f, .98f), "스테이지 선택", 28);
                 Label(safe, "StaffCaption", font, new Vector2(.08f, .85f), new Vector2(.92f, .90f), "스태프용 · 3인 단판 시연", 16);
 
+                var groups = new UnityEngine.UI.Button[2];
+                for (int index = 0; index < groups.Length; index++)
+                {
+                    float top = .77f - index * .25f;
+                    groups[index] = BoxButton(safe, "Group" + (index == 0 ? "A" : "B"), font,
+                        new Vector2(.10f, top - .20f), new Vector2(.90f, top),
+                        (index == 0 ? "A그룹" : "B그룹") + "\n방 만들기 / 입장", 25);
+                }
+
                 var buttons = new UnityEngine.UI.Button[3];
                 string[] yokai = { "구미호", "야광귀", "지귀" };
                 for (int index = 0; index < buttons.Length; index++)
@@ -64,8 +73,13 @@ namespace Hapio.Editor
                 back.targetGraphic = cancelImage;
                 Label(cancel, "Label", font, Vector2.zero, Vector2.one, "취소", 20);
                 cancel.gameObject.SetActive(false);
+                var groupChange = BoxButton(safe, "ChangeGroup", font, new Vector2(.18f, .04f),
+                    new Vector2(.82f, .11f), "그룹 변경", 20);
+                groupChange.gameObject.SetActive(false);
                 var view = root.AddComponent<GameStaffDemoView>();
                 view.stageButtons = buttons;
+                view.groupButtons = groups;
+                view.groupChangeButton = groupChange;
                 view.status = status;
                 view.backButton = back;
                 // This is a saved UI panel, not another root Overlay Canvas. Preview scenes have
@@ -96,12 +110,17 @@ namespace Hapio.Editor
             var view = prefab != null ? prefab.GetComponent<GameStaffDemoView>() : null;
             var rect = prefab != null ? prefab.GetComponent<RectTransform>() : null;
             if (view == null || rect == null
-                || view.stageButtons == null || view.stageButtons.Length != 3 || view.status == null || view.backButton == null)
+                || view.stageButtons == null || view.stageButtons.Length != 3
+                || view.groupButtons == null || view.groupButtons.Length != 2 || view.groupChangeButton == null
+                || view.status == null || view.backButton == null)
                 throw new InvalidOperationException("Prepare the saved staff selector with Hapio/Demo/Update Staff Demo UI before exporting.");
-            foreach (var button in view.stageButtons)
+            foreach (var button in System.Linq.Enumerable.Concat(view.stageButtons, view.groupButtons))
                 if (button == null || button.targetGraphic == null || !button.targetGraphic.raycastTarget
                     || !button.transform.IsChildOf(prefab.transform))
                     throw new InvalidOperationException("Every stage box must have its own saved, clickable button binding.");
+            if (!view.groupChangeButton.transform.IsChildOf(prefab.transform)
+                || view.groupChangeButton.targetGraphic == null || !view.groupChangeButton.targetGraphic.raycastTarget)
+                throw new InvalidOperationException("The group change action needs its own saved button binding.");
             if (prefab.GetComponentInChildren<Canvas>(true) != null
                 || prefab.GetComponentInChildren<UnityEngine.UI.CanvasScaler>(true) != null
                 || prefab.GetComponentInChildren<UnityEngine.UI.GraphicRaycaster>(true) != null)
@@ -118,6 +137,21 @@ namespace Hapio.Editor
             rect.anchorMax = max;
             rect.offsetMin = rect.offsetMax = Vector2.zero;
             return rect;
+        }
+
+        private static UnityEngine.UI.Button BoxButton(Transform parent, string name, Font font,
+            Vector2 min, Vector2 max, string label, int size)
+        {
+            var rect = Rect(parent, name, min, max);
+            var image = rect.gameObject.AddComponent<UnityEngine.UI.Image>();
+            image.color = GameBattleUiColors.Light; // TextColor/SecondaryLightIvory/200.
+            var outline = rect.gameObject.AddComponent<UnityEngine.UI.Outline>();
+            outline.effectColor = GameBattleUiColors.Brown; // TextColor/PrimaryBrown/500***.
+            outline.effectDistance = new Vector2(1f, -1f);
+            var button = rect.gameObject.AddComponent<UnityEngine.UI.Button>();
+            button.targetGraphic = image;
+            Label(rect, "Label", font, new Vector2(.05f, .08f), new Vector2(.95f, .92f), label, size);
+            return button;
         }
 
         private static UnityEngine.UI.Text Label(Transform parent, string name, Font font,

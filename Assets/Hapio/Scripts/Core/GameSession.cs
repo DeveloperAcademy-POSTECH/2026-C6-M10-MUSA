@@ -79,6 +79,7 @@ namespace Hapio
             public GameFlowState state;
             public string runId;
             public int stageIndex;
+            public int demoGroupId;
             public uint revision;
             public string stageId;
             public LabStageYokai yokai;
@@ -266,7 +267,7 @@ namespace Hapio
             if (LabGameBuildVariant.IsDemo && network.IsConnected
                 && (state.phase == GameFlowPhase.Home || state.phase == GameFlowPhase.Lobby)
                 && (!AllowsRoom(network.config.TeamTerritoryEnabled ? GameMode.Territory : GameMode.Story,
-                    network.TargetParticipantCount)))
+                    network.TargetParticipantCount) || !MatchesStaffDemoRoom(SelectedDemoGroup)))
             {
                 GoHome();
                 EnterRoomBrowser();
@@ -367,7 +368,7 @@ namespace Hapio
 
         private void ApplyControl(Control control)
         {
-            if (!network.IsConnected || goingHome) return;
+            if (!network.IsConnected || goingHome || !MatchesStaffDemoRoom(control.demoGroupId)) return;
             if (network.IsHost)
             {
                 // #501: whatever run or stage it names, an "exit" means this guest is leaving the room. A 2:2 room may
@@ -694,6 +695,7 @@ namespace Hapio
             {
                 kind = kind, state = kind == "state" ? current : null,
                 runId = current.runId, stageIndex = current.stageIndex, revision = current.revision,
+                demoGroupId = LabGameBuildVariant.IsStaffStageDemo ? SelectedDemoGroup : 0,
                 stageId = stageId,
                 yokai = yokai,
                 settingsRevision = network.IsHost ? network.SessionConfigRevision : expectedSettingsRevision,
@@ -715,7 +717,7 @@ namespace Hapio
             GameFlowState incoming = control.state;
             if (!GameFlowSnapshot.IsValid(incoming, out _)) return false;
             if (LabGameBuildVariant.IsStaffStageDemo && (SelectedDemoStage < 1
-                || incoming.demoStageIndex != SelectedDemoStage || network.DemoStageIndex != SelectedDemoStage)) return false;
+                || incoming.demoStageIndex != SelectedDemoStage || !MatchesStaffDemoRoom(control.demoGroupId))) return false;
             if (LabGameBuildVariant.IsDemo && incoming.mode != GameMode.Story) return false;
             if (!FiniteFinishTime(control.finishDeadline) || control.finishDeadline < 0d) return false;
             if (control.runId != incoming.runId || control.stageIndex != incoming.stageIndex
@@ -730,7 +732,7 @@ namespace Hapio
 
         private bool MatchesControlIdentity(Control control, bool allowPreviousRevision = false)
         {
-            if (!RunProfile.Contains(state.stageIndex)) return false;
+            if (!MatchesStaffDemoRoom(control.demoGroupId) || !RunProfile.Contains(state.stageIndex)) return false;
             Identity(state, out string stageId, out LabStageYokai yokai);
             return control.runId == state.runId && control.stageIndex == state.stageIndex
                 && (control.revision == state.revision || allowPreviousRevision
@@ -873,7 +875,7 @@ namespace Hapio
 
         public void StartGame()
         {
-            if (LabGameBuildVariant.IsStaffStageDemo && (SelectedDemoStage < 1 || network.DemoStageIndex != SelectedDemoStage)) return;
+            if (LabGameBuildVariant.IsStaffStageDemo && !MatchesStaffDemoRoom(SelectedDemoGroup)) return;
             if (!network.CanStartBattle || state.phase != GameFlowPhase.Lobby
                 || !AllowsRoom(state.mode, network.TargetParticipantCount)
                 || LabGameBuildVariant.IsDemo && network.ParticipantCount != 3) return;

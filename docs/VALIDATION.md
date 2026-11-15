@@ -8998,3 +8998,15 @@ PR #729 검증 중 main `a7208003`에서 `LabLocalBoardNetworkIntegrationTests` 
 - `GameSceneFlowTests.FigmaResultsWaitForHostNextAndShowEachYokaiThenKeepFinalOverallAndHomeNavigation` 및 `SavedStoryViewerSkipAndEndingButtonsReceiveRealMouseClicks` **2/2 PASS**(65.03초). 이후 줄바꿈 표시만 수정했으며 전환/입력/수명 경로는 동일해 해당 결과를 재사용했다.
 - 화면 확인: 저장된 GameStageStoryCanvas와 실제 컷을 Unity 카메라로402×874 렌더하여 불이·만복·솔이·마지막 불이4페이지 확인. 처음 캡처에서 긴 문장 자동 줄바꿈을 발견해 `dialogueNoWrap`으로 수정했고 위 최종 검사를 재실행했다. 격리 캡처에서는 게임 어댑터가 평소 제어하는 결과/공통 버튼을 숨겨 대화 상자만 비교했다. 종이/이름표의 다운로드 원본과 로컬 파일 SHA-1 일치 확인. 그림 배치와 범위 밖 버튼 외형은 변경하지 않았다.
 - 작업 전 Console의 iOS `Subtarget property is not available` 오류1건을 기록했으며 새 코드 컴파일 후 오류0. 자동 검사 실패/단언 완화 없음. 실기기·iOS 빌드·전체 PlayMode는 실행하지 않았다.
+
+## 2026-11-15 — #753 A/B 독립 시연 세션·그룹 즉시 입장
+
+- **기준/범위:** main `e5814f57`에서 `feat/#753-staff-demo-session-groups`. Unity6000.6.5f1/macOS/Metal. Stage2 Only는 야광귀 선택 카드 없이 A/B 버튼으로 검색·생성·입장한다. 기존 3카드 시연은 그룹을 먼저 선택한다. 접속·광고·재입장 식별을 바꾸므로 전체 EditMode·PlayMode가 필요하다.
+- **컴파일/저장 자료:** `StaffDemoUiAssets.CreateOrUpdate` 성공·컴파일 오류0. 변경한 저장 UI는 시연의 `StageSelection.prefab` 하나이며 Unity 편집 도구로 작성했다. 일반 Home/Lobby/Battle/StageResult/GameOver 및 Lab Scene·일반 Prefab·Material·원본 설정·패키지는 변경하지 않았다.
+- **전체 EditMode:** 최초 **2,540/2,540 PASS**(19.86초), QR 복귀 문구까지 반영한 최종 **2,540/2,540 PASS**(18.80초), 실패·건너뜀0. A/B 메타데이터·이름/TXT 불일치·Host 승인·정원·검색/재연결 티켓 정리와 기존 일반 게임 계약을 포함한다.
+- **관련 PlayMode 첫 실행:** 15개 중13통과·2실패(86.40초). 새 6연결 시험이 AUTO 북을 Host가 소유한다고 가정했지만 3인 AUTO는 무작위 자리 한 곳에 북1개만 배치하므로 Host `Generate()`가 의도대로 아무 일도 하지 않았다. 시험 전용 북3개와 Host 북 존재 단언으로 수정했으며 게임 기본값은 유지한다. 다른 실패는 비활성 Stage 카드를 켠 같은 프레임에서 raycast한 준비 순서였다. 정상 프레임·Canvas 갱신 후 동일한 최상위 터치 대상 단언을 검사하도록 수정했다. 단언 삭제/완화는 없다.
+- **관련 PlayMode 재실행:** **15/15 PASS**(56.44초). 실제 소켓 Host2+Guest4, 다른 그룹 토큰 거절, P1~P3·시작·생성·일시정지·전투 시각·승리·자리 복귀의 독립성과 저장 Home의 그룹/카드 raycast·즉시 입장·재도전/QR 그룹 보존을 포함한다.
+- **전체 PlayMode:** **876/876 PASS**(915.07초), 실패·건너뜀0. 일반 Story·Lab·땅따먹기·연결/재도전·결과/엔딩·도색/물리 등을 포함한 전체 묶음이다. 실행 시작 이후 소스/에셋 해시가 동일함을 확인했다.
+- **Mac Release 빌드:** 진행 중. 완료 결과로 갱신한다.
+- **검증 구분:** 새 6연결 검사는 Mac의 실제 NGO/dual-stack 소켓 Host2+Guest4이며 여섯 화면이나 물리 무선 기기를 관찰한 시험이 아니다. 미실행 iOS 설치·물리 기기6대 일반 Wi-Fi/핫스팟은 PASS로 표시하지 않는다.
+- **보존:** 데스크탑 main 작업 폴더와 #740/#750 작업 폴더를 전환·저장하지 않았다. 시연만 Staff revision3으로 바꾸고 일반5705/Game55/Lab·공유 설정·도색·투척 규칙을 유지한다. 빌드/운영/Scene 흐름은 `docs/STAFF_STAGE_DEMO.md`를 따른다.

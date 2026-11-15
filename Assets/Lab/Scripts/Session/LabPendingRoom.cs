@@ -19,14 +19,15 @@ namespace C6Lab
         public bool Team { get; private set; }
         public LabRoomFamily Family { get; }
         public int DemoStageIndex { get; private set; }
+        public int DemoGroupId { get; private set; }
         /// <summary>A fixed staff-stage name was already leased. Its creator must browse/join rather than number a new room.</summary>
         public bool DemoNameConflict { get; private set; }
-        public static string StaffStageName(int stage)
+        public static string StaffStageName(int stage, int group)
         {
-            if (stage < 1 || stage > 3) throw new ArgumentOutOfRangeException(nameof(stage));
+            if (!LabGameBuildVariant.IsValidStaffRoomIdentity(stage, group)) throw new ArgumentOutOfRangeException();
             return "Hapio-Staff-" + LabGameBuildVariant.StaffStageDemoRevision.ToString(CultureInfo.InvariantCulture)
                 + "-" + LabNetwork.LabProtocolVersion.ToString(CultureInfo.InvariantCulture)
-                + "-Stage-" + stage.ToString(CultureInfo.InvariantCulture);
+                + "-Stage-" + stage.ToString(CultureInfo.InvariantCulture) + "-Group-" + group.ToString(CultureInfo.InvariantCulture);
         }
         public ushort Port { get; private set; }
         public string Name => advertisement?.RegisteredServiceName ?? string.Empty;
@@ -51,27 +52,27 @@ namespace C6Lab
             => TryCreate(capacity, family, false, out room, out error);
 
         public static bool TryCreate(int capacity, LabRoomFamily family, bool team, out LabPendingRoom room, out string error)
-            => TryCreate(capacity, family, team, 0, out room, out error);
+            => TryCreate(capacity, family, team, 0, 0, out room, out error);
 
-        public static bool TryCreateStaffStage(int stage, out LabPendingRoom room, out string error)
+        public static bool TryCreateStaffStage(int stage, int group, out LabPendingRoom room, out string error)
         {
             room = null; error = string.Empty;
-            if (!LabGameBuildVariant.IsStaffStageDemo || stage < 1 || stage > 3)
+            if (!LabGameBuildVariant.IsStaffStageDemo || !LabGameBuildVariant.IsValidStaffRoomIdentity(stage, group))
             { error = "시연할 스테이지를 골라주시오."; return false; }
-            return TryCreate(3, LabRoomFamily.Game, false, stage, out room, out error);
+            return TryCreate(3, LabRoomFamily.Game, false, stage, group, out room, out error);
         }
 
-        private static bool TryCreate(int capacity, LabRoomFamily family, bool team, int demoStage, out LabPendingRoom room, out string error)
+        private static bool TryCreate(int capacity, LabRoomFamily family, bool team, int demoStage, int demoGroup, out LabPendingRoom room, out string error)
         {
             room = null; error = string.Empty;
             if (!LabModel.ValidRoomSize(capacity, team)) { error = "함께할 인원을 골라주시오."; return false; }
             if (!Enum.IsDefined(typeof(LabRoomFamily), family)) { error = "방 종류를 확인해주시오."; return false; }
             if (!LabBonjourDiscovery.IsSupported) { error = "이 기기에서는 방을 만들 수 없소."; return false; }
-            var pending = new LabPendingRoom(family) { Capacity = capacity, Team = team, DemoStageIndex = demoStage };
+            var pending = new LabPendingRoom(family) { Capacity = capacity, Team = team, DemoStageIndex = demoStage, DemoGroupId = demoGroup };
             try
             {
                 pending.ReservePort();
-                pending.advertisement = new LabBonjourDiscovery(family) { Team = team, DemoStageIndex = demoStage };
+                pending.advertisement = new LabBonjourDiscovery(family) { Team = team, DemoStageIndex = demoStage, DemoGroupId = demoGroup };
                 room = pending;
                 return true;
             }
@@ -130,7 +131,7 @@ namespace C6Lab
                 registrationStarted = true;
                 // A room still being numbered follows the cards before it; a confirmed one asks for its own name again.
                 if (!confirmed) candidateNumber = Math.Max(candidateNumber, firstNumber);
-                string requestedName = DemoStageIndex != 0 ? StaffStageName(DemoStageIndex)
+                string requestedName = DemoStageIndex != 0 ? StaffStageName(DemoStageIndex, DemoGroupId)
                     : LabRoomNames.ServiceBaseFor(Family) + (candidateNumber == 1 ? string.Empty
                     : " (" + candidateNumber.ToString(CultureInfo.InvariantCulture) + ")");
                 bool accepted = advertisement.StartAdvertise(requestedName, Port, ipv4 != null, ipv6 != null, 1, Capacity, false, true, false);
@@ -185,7 +186,7 @@ namespace C6Lab
         public bool EnterAsCreator(LabNetwork network)
         {
             if (network == null || Family != network.RoomFamily || !Ready || !network.CanChooseConnection
-                || DemoStageIndex != network.DemoStageIndex) return false;
+                || DemoStageIndex != network.DemoStageIndex || DemoGroupId != network.DemoGroupId) return false;
             ReleasePort();
             if (!network.HostRegisteredRoom(advertisement, Port, Capacity)) { Dispose(); return false; }
             // Transfer the original registration, preserving its confirmed name and join key.

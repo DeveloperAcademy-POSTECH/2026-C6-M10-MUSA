@@ -61,98 +61,118 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
-        public IEnumerator SavedHomeShowsThreeStaffBoxesInsteadOfTheNormalTitleAndRoomBrowser()
+        public IEnumerator SavedHomeRequiresAnExplicitGroupBeforeShowingTheThreeStageCards()
         {
             var lobby = Object.FindFirstObjectByType<GameLobbyView>();
             Assert.That(lobby, Is.Not.Null);
             Assert.That(selector.gameObject.activeInHierarchy, Is.True);
+            Assert.That(session.SelectedDemoGroup, Is.Zero, "A new app/session must never silently join group A.");
+            Assert.That(selector.groupButtons, Has.Length.EqualTo(2));
+            Assert.That(selector.groupButtons.Distinct().Count(), Is.EqualTo(2));
             Assert.That(selector.stageButtons, Has.Length.EqualTo(3));
-            Assert.That(selector.stageButtons.Distinct().Count(), Is.EqualTo(3));
+            Assert.That(selector.stageButtons.All(button => !button.gameObject.activeInHierarchy), Is.True);
+            Assert.That(session.SelectDemoStage(2), Is.False, "The API also requires a deliberate group choice.");
             Canvas.ForceUpdateCanvases();
-            Assert.That(EventSystem.current, Is.Not.Null, "The saved Home supplies the selector's EventSystem.");
+            Assert.That(EventSystem.current, Is.Not.Null);
+            foreach (var groupButton in selector.groupButtons) AssertRaycastAccess(groupButton);
+            Assert.That(selector.backButton.gameObject.activeInHierarchy, Is.False);
+            Assert.That(lobby.titlePage.activeInHierarchy || lobby.browserPage.activeInHierarchy || lobby.positionPage.activeInHierarchy, Is.False);
+            Assert.That(lobby.soloButton.gameObject.activeInHierarchy || lobby.teamSoloButton.gameObject.activeInHierarchy, Is.False);
+            Assert.That(GameOpeningController.IsPresenting, Is.False);
+            Assert.That(session.Network.IsConnected || session.Network.IsJoiningRoom, Is.False);
+
+            selector.groupButtons[0].onClick.Invoke();
+            selector.SendMessage("LateUpdate", SendMessageOptions.RequireReceiver);
+            // Previously inactive Graphics enter the Canvas registry during the normal frame.
+            yield return null;
+            Canvas.ForceUpdateCanvases();
+            Assert.That(session.SelectedDemoGroup, Is.EqualTo(1));
+            Assert.That(session.SelectedDemoStage, Is.Zero, "The ordinary staff app still asks which stage to play.");
+            Assert.That(session.IsDemoEntryPending, Is.False);
             for (int index = 0; index < selector.stageButtons.Length; index++)
             {
                 var button = selector.stageButtons[index];
                 Assert.That(button.gameObject.activeInHierarchy && button.interactable, Is.True);
                 Assert.That(button.GetComponentsInChildren<UnityEngine.UI.Text>(true).Select(text => text.text),
                     Has.Member((index + 1) + "스테이지"));
-                var rect = (RectTransform)button.transform;
-                Assert.That(rect.rect.width > 0f && rect.rect.height > 0f, Is.True);
-                Vector2 center = RectTransformUtility.WorldToScreenPoint(null, rect.TransformPoint(rect.rect.center));
-                Assert.That(center.x, Is.InRange(0f, (float)Screen.width));
-                Assert.That(center.y, Is.InRange(0f, (float)Screen.height));
-                var hits = new List<RaycastResult>();
-                EventSystem.current.RaycastAll(new PointerEventData(EventSystem.current) { position = center }, hits);
-                Assert.That(hits, Is.Not.Empty, "The saved box must be clickable, not merely visible.");
-                Assert.That(hits[0].gameObject, Is.SameAs(button.gameObject), "No hidden title or full-screen graphic may cover a stage box.");
+                AssertRaycastAccess(button);
             }
-            Assert.That(selector.backButton.gameObject.activeInHierarchy, Is.False, "Cancel is only shown during an entry attempt.");
-            Assert.That(lobby.titlePage.activeInHierarchy, Is.False);
-            Assert.That(lobby.browserPage.activeInHierarchy, Is.False);
-            Assert.That(lobby.positionPage.activeInHierarchy, Is.False);
-            Assert.That(lobby.soloButton.gameObject.activeInHierarchy, Is.False);
-            Assert.That(lobby.teamSoloButton.gameObject.activeInHierarchy, Is.False);
-            Assert.That(GameOpeningController.IsPresenting, Is.False);
-            Assert.That(session.SelectedDemoStage, Is.Zero);
-            Assert.That(session.Network.DemoStageIndex, Is.Zero);
-            Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.Home));
-            Assert.That(session.Network.TargetParticipantCount, Is.EqualTo(3));
-            Assert.That(session.Network.IsConnected || session.Network.IsJoiningRoom, Is.False);
+            Assert.That(selector.groupChangeButton.gameObject.activeInHierarchy, Is.True);
+            selector.groupChangeButton.onClick.Invoke();
+            selector.SendMessage("LateUpdate", SendMessageOptions.RequireReceiver);
+            Assert.That(session.SelectedDemoGroup, Is.Zero);
+            Assert.That(selector.groupButtons.All(button => button.gameObject.activeInHierarchy && button.interactable), Is.True);
+            Assert.That(selector.stageButtons.All(button => !button.gameObject.activeInHierarchy), Is.True);
             yield return null;
         }
 
         [UnityTest, Category("Bonjour")]
-        public IEnumerator StageTwoOnlySavedHomeShowsOneClickableCardAndRejectsHiddenStageActions()
+        public IEnumerator StageTwoOnlyGroupButtonsEnterImmediatelyWithoutAStageCard()
         {
             using (LabGameBuildVariant.OverrideStaffStageTwoOnlyForTests(true))
             {
-                // The permanent export uses this same saved Home/selector; no separate Scene is authored.
                 yield return SceneManager.LoadSceneAsync(GameScenePaths.Home, LoadSceneMode.Single);
                 yield return Until(() => !session.IsLoadingScene, "The fixed-stage selector binds to the existing session");
                 yield return null;
                 selector = Object.FindFirstObjectByType<GameStaffDemoView>();
                 Assert.That(selector, Is.Not.Null);
-                Assert.That(selector.stageButtons, Has.Length.EqualTo(3), "Keep all saved references for the ordinary three-card export.");
-                Assert.That(selector.stageButtons[0].gameObject.activeInHierarchy, Is.False);
-                Assert.That(selector.stageButtons[1].gameObject.activeInHierarchy, Is.True);
-                Assert.That(selector.stageButtons[2].gameObject.activeInHierarchy, Is.False);
-                Assert.That(selector.transform.Find("SafeArea/Title").GetComponent<UnityEngine.UI.Text>().text,
-                    Is.EqualTo("야광귀 시연"));
-                Assert.That(selector.transform.Find("SafeArea/StaffCaption").GetComponent<UnityEngine.UI.Text>().text,
-                    Does.Contain("2스테이지"));
-                Assert.That(selector.status.text, Does.Contain("야광귀"));
-                Canvas.ForceUpdateCanvases();
-                var button = selector.stageButtons[1];
-                var rect = (RectTransform)button.transform;
-                Vector2 center = RectTransformUtility.WorldToScreenPoint(null, rect.TransformPoint(rect.rect.center));
-                var hits = new List<RaycastResult>();
-                EventSystem.current.RaycastAll(new PointerEventData(EventSystem.current) { position = center }, hits);
-                Assert.That(hits, Is.Not.Empty);
-                Assert.That(hits[0].gameObject, Is.SameAs(button.gameObject), "The visible Stage2 card must retain actual UI raycast access.");
-                foreach (int stage in new[] { -1, 0, 1, 3, 4 }) Assert.That(session.SelectDemoStage(stage), Is.False);
-                // Even stale UnityEvents cannot bypass the session's selection fence.
+                Assert.That(selector.stageButtons, Has.Length.EqualTo(3), "Keep saved references for the ordinary staff export.");
+                Assert.That(selector.stageButtons.All(button => !button.gameObject.activeInHierarchy), Is.True,
+                    "There is no separate Yaguang or Stage2 click in the fixed demo.");
+                Assert.That(selector.groupButtons, Has.Length.EqualTo(2));
+                foreach (var button in selector.groupButtons) AssertRaycastAccess(button);
+                Assert.That(selector.groupChangeButton.gameObject.activeInHierarchy, Is.False);
+                foreach (int group in new[] { -1, 0, 3 }) Assert.That(session.SelectDemoGroup(group), Is.False);
+                foreach (int stage in new[] { -1, 0, 1, 2, 3, 4 }) Assert.That(session.SelectDemoStage(stage), Is.False,
+                    "No stage request may bypass the initial group choice.");
                 selector.stageButtons[0].onClick.Invoke();
                 selector.stageButtons[2].onClick.Invoke();
                 Assert.That(session.IsDemoEntryPending || session.Network.IsConnected || session.Network.IsJoiningRoom, Is.False);
-                Assert.That(session.SelectedDemoStage, Is.Zero);
-                button.onClick.Invoke();
+
+                selector.groupButtons[1].onClick.Invoke();
                 Assert.That(session.IsDemoEntryPending, Is.True, session.DemoEntryNotice);
+                Assert.That(session.SelectedDemoGroup, Is.EqualTo(2));
+                Assert.That(session.Network.DemoGroupId, Is.EqualTo(2));
                 Assert.That(session.SelectedDemoStage, Is.EqualTo(2));
                 Assert.That(session.Network.DemoStageIndex, Is.EqualTo(2));
                 Assert.That(session.RunProfile.FirstStage, Is.EqualTo(2));
                 Assert.That(session.RunProfile.FinalStage, Is.EqualTo(2));
                 Assert.That(session.RunProfile.Count, Is.EqualTo(1));
+                Assert.That(session.SelectDemoGroup(1), Is.False, "A pending B entry cannot be redirected by a second A tap.");
                 Assert.That(session.SelectDemoStage(1) || session.SelectDemoStage(3), Is.False);
                 selector.SendMessage("LateUpdate", SendMessageOptions.RequireReceiver);
-                Assert.That(button.interactable, Is.False);
-                selector.backButton.onClick.Invoke(); // Retire search before the two-second create window.
+                Assert.That(selector.groupButtons.All(button => !button.interactable), Is.True);
+                selector.backButton.onClick.Invoke();
                 Assert.That(session.IsDemoEntryPending, Is.False);
                 Assert.That(session.Network.IsConnected || session.Network.IsJoiningRoom, Is.False);
                 Assert.That(session.PendingRooms, Is.Empty);
-                Assert.That(session.SelectedDemoStage, Is.EqualTo(2));
-                Assert.That(session.SelectDemoStage(1) || session.SelectDemoStage(3), Is.False);
+                Assert.That(session.SelectedDemoGroup, Is.EqualTo(2), "Cancelling entry retains the staff's group choice.");
+                selector.SendMessage("LateUpdate", SendMessageOptions.RequireReceiver);
+                Assert.That(selector.groupButtons.All(button => button.gameObject.activeInHierarchy && button.interactable), Is.True);
+                selector.groupButtons[0].onClick.Invoke();
+                Assert.That(session.IsDemoEntryPending, Is.True);
+                Assert.That(session.SelectedDemoGroup, Is.EqualTo(1));
+                Assert.That(session.Network.DemoGroupId, Is.EqualTo(1), "An explicit idle Home change retires the previous group's network identity.");
+                session.CancelDemoEntry();
             }
             Assert.That(LabGameBuildVariant.IsStaffStageTwoOnly, Is.False);
+        }
+
+        private static void AssertRaycastAccess(UnityEngine.UI.Button button)
+        {
+            Assert.That(button.gameObject.activeInHierarchy && button.interactable, Is.True);
+            Canvas.ForceUpdateCanvases();
+            var rect = (RectTransform)button.transform;
+            Assert.That(rect.rect.width > 0f && rect.rect.height > 0f, Is.True);
+            Canvas canvas = button.GetComponentInParent<Canvas>().rootCanvas;
+            Camera camera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
+            Vector2 center = RectTransformUtility.WorldToScreenPoint(camera, rect.TransformPoint(rect.rect.center));
+            Assert.That(center.x, Is.InRange(0f, (float)Screen.width));
+            Assert.That(center.y, Is.InRange(0f, (float)Screen.height));
+            var hits = new List<RaycastResult>();
+            EventSystem.current.RaycastAll(new PointerEventData(EventSystem.current) { position = center }, hits);
+            Assert.That(hits, Is.Not.Empty);
+            Assert.That(hits[0].gameObject, Is.SameAs(button.gameObject), "No other UI may cover this saved clickable box.");
         }
 
         [UnityTest]
@@ -209,6 +229,8 @@ namespace Hapio.Tests
                 Assert.That(EventSystem.current.currentInputModule.isActiveAndEnabled, Is.True);
                 EventSystem.current.SetSelectedGameObject(null);
                 Canvas.ForceUpdateCanvases();
+                Assert.That(session.SelectDemoGroup(1), Is.True);
+                selector.SendMessage("LateUpdate", SendMessageOptions.RequireReceiver);
                 var button = selector.stageButtons[1];
                 var rect = (RectTransform)button.transform;
                 Canvas canvas = button.GetComponentInParent<Canvas>().rootCanvas;
@@ -266,6 +288,8 @@ namespace Hapio.Tests
         [UnityTest, Category("Bonjour")]
         public IEnumerator SavedStageButtonsLockDuplicateRequestsCancelAndAllowAnotherStageWithoutOpeningAHost()
         {
+            Assert.That(session.SelectDemoGroup(1), Is.True);
+            selector.SendMessage("LateUpdate", SendMessageOptions.RequireReceiver);
             // Exercise the real browse and button binding, but cancel before the two-second absence window.
             // No Host socket, advertisement, or fake multiplayer result is created by this fixture.
             for (int stage = 1; stage <= 3; stage++)
@@ -313,16 +337,16 @@ namespace Hapio.Tests
         }
 
         [UnityTest, Category("Bonjour")]
-        public IEnumerator StageTwoOnlyRetryRestoresItsSingleCardWithoutLosingTheSelectedStage()
+        public IEnumerator StageTwoOnlyRetryRetainsItsGroupWithoutRestoringAStageCard()
         {
             using (LabGameBuildVariant.OverrideStaffStageTwoOnlyForTests(true))
             {
                 yield return AssertUnavailableHostRetry();
                 selector = Object.FindFirstObjectByType<GameStaffDemoView>();
                 Assert.That(selector, Is.Not.Null, "Retry must reopen the saved staff selector after Home loading.");
-                Assert.That(selector.stageButtons[0].gameObject.activeInHierarchy, Is.False);
-                Assert.That(selector.stageButtons[1].gameObject.activeInHierarchy, Is.True);
-                Assert.That(selector.stageButtons[2].gameObject.activeInHierarchy, Is.False);
+                Assert.That(selector.stageButtons.All(button => !button.gameObject.activeInHierarchy), Is.True);
+                Assert.That(session.SelectedDemoGroup, Is.EqualTo(2));
+                Assert.That(session.Network.DemoGroupId, Is.EqualTo(2));
                 Assert.That(session.SelectDemoStage(1) || session.SelectDemoStage(3), Is.False);
                 Assert.That(session.SelectedDemoStage, Is.EqualTo(2));
                 Assert.That(session.Network.DemoStageIndex, Is.EqualTo(2));
@@ -332,7 +356,8 @@ namespace Hapio.Tests
 
         private IEnumerator AssertUnavailableHostRetry()
         {
-            Assert.That(session.SelectDemoStage(2), Is.True);
+            Assert.That(session.SelectDemoGroup(2), Is.True);
+            if (!LabGameBuildVariant.IsStaffStageTwoOnly) Assert.That(session.SelectDemoStage(2), Is.True);
             session.CancelDemoEntry();
             Assert.That(session.Network.IsConnected, Is.False);
             // This is a Scene/intent-lifetime test, not a simulated transport loss: a real
@@ -357,6 +382,8 @@ namespace Hapio.Tests
                 "Retry completes Home/shutdown cleanup then searches the retained canonical stage");
             Assert.That(session.SelectedDemoStage, Is.EqualTo(2));
             Assert.That(session.Network.DemoStageIndex, Is.EqualTo(2));
+            Assert.That(session.SelectedDemoGroup, Is.EqualTo(2));
+            Assert.That(session.Network.DemoGroupId, Is.EqualTo(2));
             Assert.That(session.RunProfile.FirstStage, Is.EqualTo(2));
             Assert.That(session.State.runId, Is.Empty, "The new entry does not inherit the abandoned run identity.");
             Assert.That(session.StageResults, Is.Empty);
@@ -369,6 +396,7 @@ namespace Hapio.Tests
         [UnityTest, Category("Bonjour")]
         public IEnumerator LobbyReturnProofAcceptsOptimisticGuestExitAndRejectsOtherRunsStagesAndRevisions()
         {
+            Assert.That(session.SelectDemoGroup(1), Is.True);
             Assert.That(session.SelectDemoStage(2), Is.True);
             session.CancelDemoEntry();
             // ExitRun increments the Guest's local state while its replica can still contain
@@ -390,11 +418,15 @@ namespace Hapio.Tests
             };
             void Put(string field, object value) => controlType.GetField(field).SetValue(control, value);
             bool Accepts() => (bool)accepts.Invoke(session, new[] { control });
+            Put("demoGroupId", 1);
             Put("state", lobby);
             Put("previousRunId", current.runId);
             Put("previousStageIndex", 2);
             Put("previousRevision", 9u);
             Assert.That(Accepts(), Is.True, "The matching Host commit accepts the Guest's optimistic exit revision.");
+            Put("demoGroupId", 2);
+            Assert.That(Accepts(), Is.False, "A matching run and stage from the other group cannot reset this lobby.");
+            Put("demoGroupId", 1);
             current.phase = GameFlowPhase.Playing; current.revision = 8; current.endReason = string.Empty;
             Assert.That(Accepts(), Is.True, "A member that missed GameOver can consume the same Host lobby commit.");
             current.phase = GameFlowPhase.GameOver; current.revision = 9; current.endReason = GameRunFlow.PlayerLeftReason;

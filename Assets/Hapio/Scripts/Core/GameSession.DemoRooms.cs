@@ -21,7 +21,7 @@ namespace Hapio
         public bool SelectDemoStage(int stage)
         {
             if (!LabGameBuildVariant.IsStaffStageDemo || IsDemoEntryPending || IsStaffRetryPending || goingHome || IsCreatingRoom
-                || !SetSelectedDemoStage(stage) || !network.SetDemoStageIdentity(stage)) return false;
+                || !SetSelectedDemoStage(stage) || !network.SetDemoStageIdentity(stage, SelectedDemoGroup)) return false;
             double now = Time.realtimeSinceStartupAsDouble;
             demoEntryDeadline = now + DemoEntryTimeout;
             demoCreateAttempts = 0;
@@ -39,7 +39,7 @@ namespace Hapio
         {
             demoEntryPhase = DemoEntryPhase.Searching;
             demoSearchUntil = now + DemoSearchSeconds;
-            DemoEntryNotice = "선택한 스테이지의 방을 찾고 있소...";
+            DemoEntryNotice = SelectedDemoGroupLabel + "의 방을 찾고 있소...";
             return network.IsSearchingRooms || network.StartRoomSearch();
         }
 
@@ -90,17 +90,17 @@ namespace Hapio
                 return;
             }
 
-            LabDiscoveredRoom room = DemoRoomForStage(network.DiscoveredRooms, SelectedDemoStage);
+            LabDiscoveredRoom room = DemoRoomForStage(network.DiscoveredRooms, SelectedDemoStage, SelectedDemoGroup);
             if (room != null)
             {
-                if (room.Playing) { FinishDemoEntry("이 스테이지는 전투 중이오. 끝난 뒤 다시 골라주시오."); return; }
+                if (room.Playing) { FinishDemoEntry(SelectedDemoGroupLabel + "은 전투 중이오. 끝난 뒤 다시 입장해주시오."); return; }
                 if (room.WaitingForHost)
                 {
                     DemoEntryNotice = "방장이 방에 들어오고 있소...";
                     return;
                 }
                 if (room.IsFull && !network.HoldsRoomTicket(room.Key))
-                { FinishDemoEntry("이 스테이지의 방은 세 명이 모두 모였소."); return; }
+                { FinishDemoEntry(SelectedDemoGroupLabel + "의 방은 세 명이 모두 모였소."); return; }
                 if (network.CanJoinDiscoveredRoom(room.Key))
                 {
                     demoEntryPhase = DemoEntryPhase.Joining;
@@ -115,28 +115,28 @@ namespace Hapio
             if (network.RoomSearchFailed || !network.IsSearchingRooms)
             { FinishDemoEntry("방 검색을 계속할 수 없소. 네트워크 권한을 확인해주시오."); return; }
             if (now < demoSearchUntil) return;
-            if (!pendingRooms.TryCreateStaffStage(SelectedDemoStage, out demoCreationHandle, out string error))
+            if (!pendingRooms.TryCreateStaffStage(SelectedDemoStage, SelectedDemoGroup, out demoCreationHandle, out string error))
             { FinishDemoEntry(error); return; }
             demoCreateAttempts++;
             demoEntryPhase = DemoEntryPhase.Creating;
-            DemoEntryNotice = "방을 만들고 있소. 준비되면 바로 입장하오...";
+            DemoEntryNotice = SelectedDemoGroupLabel + "의 방을 만들고 있소. 준비되면 바로 입장하오...";
             Changed?.Invoke();
         }
 
         /// <summary>Stable choice across A/AAAA routes; stale/full/playing rows remain visible blockers, never new groups.</summary>
-        internal static LabDiscoveredRoom DemoRoomForStage(System.Collections.Generic.IReadOnlyList<LabDiscoveredRoom> rooms, int stage)
+        internal static LabDiscoveredRoom DemoRoomForStage(System.Collections.Generic.IReadOnlyList<LabDiscoveredRoom> rooms, int stage, int group)
         {
-            if (rooms == null || stage < 1 || stage > 3) return null;
+            if (rooms == null || stage < 1 || stage > 3 || group < 1 || group > 2) return null;
             LabDiscoveredRoom chosen = null;
             foreach (LabDiscoveredRoom room in rooms)
-                if (room != null && room.DemoStageIndex == stage && !room.Team && room.TargetParticipants == 3
+                if (room != null && room.DemoStageIndex == stage && room.DemoGroupId == group && !room.Team && room.TargetParticipants == 3
                     && (chosen == null || string.Compare(room.Key, chosen.Key, StringComparison.Ordinal) < 0)) chosen = room;
             return chosen;
         }
 
         public void CancelDemoEntry()
         {
-            staffRetryEntryStage = 0;
+            staffRetryEntryStage = staffRetryEntryGroup = 0;
             if (demoCreationHandle != null) pendingRooms.Cancel(demoCreationHandle);
             demoCreationHandle = null;
             bool active = IsDemoEntryPending;

@@ -21,6 +21,7 @@ namespace Hapio
         /// <summary>The team territory mode (1:1, 2:2 or 3:3 by capacity; #281, #394) or the three-yokai story.</summary>
         public GameMode Mode { get; }
         public int DemoStageIndex { get; }
+        public int DemoGroupId { get; }
 
         internal GamePendingRoomInfo(LabPendingRoom room)
         {
@@ -28,6 +29,7 @@ namespace Hapio
             Ready = room.Ready; Failed = room.Failed; Mode = room.Team ? GameMode.Territory : GameMode.Story;
             RetryPending = room.RetryPending; RetryAttempts = room.RetryAttempts;
             DemoStageIndex = room.DemoStageIndex;
+            DemoGroupId = room.DemoGroupId;
         }
     }
 
@@ -57,7 +59,7 @@ namespace Hapio
             error = string.Empty;
             if (disposed) { error = "방 목록이 닫혔소."; return false; }
             if (LabGameBuildVariant.IsStaffStageDemo)
-            { error = "시연 스테이지를 선택해 방에 입장해주시오."; return false; }
+            { error = "시연 그룹을 선택해 방에 입장해주시오."; return false; }
             if (LabGameBuildVariant.IsYaguangDemo && (mode != GameMode.Story || capacity != 3))
             { error = "야광귀 시연은 3인 기본 모드만 사용할 수 있소."; return false; }
             if (rooms.Count >= LabBonjourDiscovery.MaximumServices)
@@ -69,13 +71,13 @@ namespace Hapio
             return true;
         }
 
-        public bool TryCreateStaffStage(int stage, out GamePendingRoomHandle handle, out string error)
+        public bool TryCreateStaffStage(int stage, int group, out GamePendingRoomHandle handle, out string error)
         {
             handle = null; error = string.Empty;
             if (disposed) { error = "방 목록이 닫혔소."; return false; }
             if (rooms.Count >= LabBonjourDiscovery.MaximumServices)
             { error = "열린 방이 너무 많소."; return false; }
-            if (!LabPendingRoom.TryCreateStaffStage(stage, out LabPendingRoom room, out error)) return false;
+            if (!LabPendingRoom.TryCreateStaffStage(stage, group, out LabPendingRoom room, out error)) return false;
             rooms.Add(room);
             handle = new GamePendingRoomHandle(room);
             return true;
