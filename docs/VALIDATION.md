@@ -9262,3 +9262,12 @@ PR #729 검증 중 main `a7208003`에서 `LabLocalBoardNetworkIntegrationTests` 
 - main `9c24dccc`의 #754 박 둘러보기 고리 제거를 통합했다. 충돌은 이 문서의 추가 기록뿐이어서 양쪽을 보존했다. 오프닝 코드·에셋·검사는 변경되지 않아 관련 PlayMode 결과를 재사용하며, 전체 EditMode는 통합 뒤 재실행한다.
 
 - 통합 직후에는 Unity가 이전 어셈블리를 유지해 초기 재검사 결과를 통합 검증으로 사용하지 않았다. 스크립트 컴파일을 요청하고 #754 신규 검사 메서드가 로드됨을 확인한 뒤 전체 EditMode를 다시 실행: 도구 보고 **2,580/2,580 PASS**(84.77초). 오프닝 관련 코드와 에셋은 통합 전과 동일하다.
+
+### #770 병합 전 검증 (2026-11-15)
+- **기준:** `fix/770-opening-transitions`에 main `cef1579d`(#768 포함) 병합. 충돌은 이 문서 기록 추가뿐이며 양쪽을 보존했다. Unity 6000.6.5f1 batch(macOS, Metal).
+- **전체 EditMode:** 2587/2587 PASS. **PlayMode** 오프닝·스토리 묶음(`Opening*`·`StoryTapAdvanceTests`·`StoryPlayerTests`·`EndingDialogueTests`·`GameStageStory*`·`GameSceneFlowTests`·`GameStaffStageDemoFlowTests`·`GameYaguangDemoFlowTests`·`StaffStageDemoStory*`·`YaguangDemoStory*`): 107/107 PASS.
+- **화면(Development Mac 빌드, main과 같은 임시 캡처로 전환 직후 프레임 비교):**
+  - 3→4(오른쪽 터치 뒤 0.06/0.18/0.32/0.5/1.2초): main은 0.06초에 이미 OP_004로 바뀌었다. #770은 OP_003이 호리병 쪽으로 확대되며 약 0.5초 동안 겹쳐 사라진다. 1.2초 화면은 둘이 같다.
+  - 14→15(자동 진행 순간부터 0~1.5초): main은 OP_015 호리병이 정해진 시작 자세에서 바로 떨어진다. #770은 OP_014의 선반 장면이 0.2초 안에 겹쳐 사라지고, 호리병이 OP_014의 위치·기울기를 이어받아 떨어진다. 0.4초 뒤 자세는 둘이 거의 같다.
+- **영향 범위:** 겹침 전환은 `smoothOpeningTransitions`가 켜진 오프닝 시퀀스만 쓴다. 컷이 바뀔 때 목소리를 먼저 멈추는 처리는 모든 스토리에 적용되지만, 원래 이전 화면을 정리할 때 멈추던 것과 같다.
+- **미실행:** iPhone 실기기, 오프닝 소리 청취.
