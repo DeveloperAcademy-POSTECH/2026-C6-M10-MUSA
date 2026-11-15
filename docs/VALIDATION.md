@@ -9019,3 +9019,4 @@ PR #729 검증 중 main `a7208003`에서 `LabLocalBoardNetworkIntegrationTests` 
 - **PlayMode 영향 묶음:** `GameStageGourdIntegrationTests`·`LabContinuousRopeTests`·`LabGourdVisualRigTests`·`GameSceneFlowTests` 58/58 PASS. 판정·통신 경로 변경이 없어 전체 PlayMode는 실행하지 않았다.
 - **화면(Development Mac 빌드, DEV 솔로 2스테이지, 임시 캡처 스크립트는 저장소에 남기지 않음):** 전투 카메라 3배 확대 캡처로 비교했다. 새 연결점은 정지, 옆으로 친 흔들림 4프레임, 야광귀 등장 클립 15·26·29·38프레임에서 밧줄이 매듭 두 갈래에 붙어 있었다. 같은 실행에서 연결점만 예전 값(y 1.6383)으로 되돌리면 정지·흔들림 모두 밧줄과 매듭 사이에 틈이 보였다. `model_part4`는 `Lid_Hinge` 아래가 아니어서 뚜껑과 따로 움직이지 않는다.
 - **미실행:** iPhone 실기기, 실제 멀티 전투.
+- **main `e5814f57`(#751) 병합 뒤 재실행:** 충돌 없음(#751은 시연 빌드 도구만 변경). 전체 EditMode **2515/2515 PASS**, PlayMode 영향 묶음(위 4종 + `GameStaffStageDemoSessionTests`) **66/66 PASS**.
