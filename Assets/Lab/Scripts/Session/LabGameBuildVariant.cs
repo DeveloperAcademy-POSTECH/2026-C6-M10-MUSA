@@ -8,16 +8,30 @@ namespace C6Lab
         public const string YaguangDemoDefine = "HAPIO_YAGUANG_DEMO";
         public const int YaguangDemoRevision = 1;
         public const string StaffStageDemoDefine = "HAPIO_STAFF_STAGE_DEMO";
-        public const int StaffStageDemoRevision = 2;
+        public const int StaffStageDemoRevision = 3;
+        /// <summary>Staff demo group is independent of player P slots and territory teams.</summary>
+        public static bool IsValidDemoGroup(int group) => group == 1 || group == 2;
+        public static bool IsValidStaffRoomIdentity(int stage, int group) => stage >= 1 && stage <= 3 && IsValidDemoGroup(group);
+        public const string StaffStageTwoOnlyDefine = "HAPIO_STAFF_STAGE_TWO_ONLY";
 
 #if HAPIO_YAGUANG_DEMO && HAPIO_STAFF_STAGE_DEMO
 #error A player cannot contain both the legacy Yaguang demo and staff stage-selection demo.
+#endif
+
+#if HAPIO_STAFF_STAGE_TWO_ONLY && !HAPIO_STAFF_STAGE_DEMO
+#error The Stage2-only selection requires the staff stage-selection demo.
 #endif
 
 #if HAPIO_YAGUANG_DEMO
         private const bool BuiltAsYaguangDemo = true;
 #else
         private const bool BuiltAsYaguangDemo = false;
+#endif
+
+#if HAPIO_STAFF_STAGE_TWO_ONLY
+        private const bool BuiltAsStaffStageTwoOnly = true;
+#else
+        private const bool BuiltAsStaffStageTwoOnly = false;
 #endif
 
 #if HAPIO_STAFF_STAGE_DEMO
@@ -50,15 +64,54 @@ namespace C6Lab
 
         public static bool IsDemo => IsYaguangDemo || IsStaffStageDemo;
 
+        /// <summary>A build-only selection restriction; it retains the staff Stage2 route and compatibility.</summary>
+        public static bool IsStaffStageTwoOnly
+        {
+            get
+            {
+                if (!IsStaffStageDemo) return false;
+#if UNITY_EDITOR
+                if (staffStageTwoOnlyTestOverride.HasValue) return staffStageTwoOnlyTestOverride.Value;
+#endif
+                return BuiltAsStaffStageTwoOnly;
+            }
+        }
+
+        public static bool AllowsStaffDemoStage(int stage) => stage >= 1 && stage <= 3
+            && (!IsStaffStageTwoOnly || stage == 2);
+
 #if UNITY_EDITOR
         private static bool? testOverride;
         private static bool? staffStageTestOverride;
+        private static bool? staffStageTwoOnlyTestOverride;
 
         /// <summary>Scoped, in-memory QA only; never writes preferences or player settings.</summary>
         public static IDisposable OverrideForTests(bool isYaguangDemo) => new TestOverride(isYaguangDemo);
 
         /// <summary>In-memory staff content selection for QA; never persists build symbols.</summary>
         public static IDisposable OverrideStaffStageDemoForTests(bool enabled) => new StaffStageTestOverride(enabled);
+
+        /// <summary>Scoped QA for the fixed selection, without changing the Editor's saved build symbols.</summary>
+        public static IDisposable OverrideStaffStageTwoOnlyForTests(bool enabled) => new StaffStageTwoOnlyTestOverride(enabled);
+
+        private sealed class StaffStageTwoOnlyTestOverride : IDisposable
+        {
+            private readonly bool? previous;
+            private bool disposed;
+
+            public StaffStageTwoOnlyTestOverride(bool value)
+            {
+                previous = staffStageTwoOnlyTestOverride;
+                staffStageTwoOnlyTestOverride = value;
+            }
+
+            public void Dispose()
+            {
+                if (disposed) return;
+                disposed = true;
+                staffStageTwoOnlyTestOverride = previous;
+            }
+        }
 
         private sealed class StaffStageTestOverride : IDisposable
         {

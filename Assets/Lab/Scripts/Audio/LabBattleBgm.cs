@@ -29,6 +29,10 @@ namespace C6Lab
     /// - 야광귀 콤보 BIG/SMALL 톤: BIG 배지가 떠 있는 동안 전투 BGM이 Inspector 반음(기본 2)만큼 높아지고, SMALL 동안
     ///   그만큼 낮아진다(AudioSource.pitch라 빠르기도 같이 바뀐다). 배지가 나오고 사라지는 때(LabYaguangSound의 SMALL/BIG
     ///   시작/끝 소리와 같은 때)에 Inspector 초(기본 0.3초)에 걸쳐 바뀐다. 모든 기기. 피버 곡은 바꾸지 않는다.
+    /// - #745 남은 30초 빨라지기: "30초 남았소!"(LabThirtySecondsLeftHud와 같은 시각과 조건)부터 피버 곡으로 넘어갈 때까지 라운드 곡을
+    ///   음높이는 그대로 빠르기만 1.15배로 튼다. AudioSource.pitch는 음높이도 같이 올리므로, 미리 늘려 둔 곡
+    ///   (Resources/Audio/{Gumiho,Yaguang,Jigwi}BGMRush, rubberband tempo 1.15)을 같은 자리(지금 시각 ÷ 1.15)에서 이어 받아
+    ///   rushCrossfadeSeconds에 걸쳐 바꾼다. 효과음 / 대사 / 피버 곡은 그대로. 튜토리얼 / 땅따먹기 / Lab 단판은 30초 알림이 없어 그대로.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class LabBattleBgm : MonoBehaviour
@@ -47,6 +51,11 @@ namespace C6Lab
         public const string JigwiFeverClipFolder = "Audio/JigwiFever";
         /// <summary>#629 튜토리얼(연습판) 곡. 크기는 LabConfig Tutorial Bgm Volume. 비어 있으면 지금처럼 기본 BGM.</summary>
         public const string TutorialClipFolder = "Audio/TutorialBGM";
+        /// <summary>#745 남은 30초부터 트는, 음높이는 그대로 1.15배 빠르게 늘린 라운드 곡.</summary>
+        public const string GumihoRushClipFolder = "Audio/GumihoBGMRush", YaguangRushClipFolder = "Audio/YaguangBGMRush",
+            JigwiRushClipFolder = "Audio/JigwiBGMRush";
+        /// <summary>#745 빨라진 곡의 빠르기. 곡 파일을 이 빠르기로 미리 만들어 두었으므로 바꾸려면 파일도 다시 만든다.</summary>
+        public const float RushSpeed = 1.15f;
 
         [Tooltip("LabConfig를 읽을 수 없을 때만 쓰는 기본 크기. 평소에는 LabConfig의 BGM Volume을 쓴다.")]
         [Range(0f, 1f)] public float volume = .2f;
@@ -57,13 +66,19 @@ namespace C6Lab
         [Min(0f)] public float feverCrossfadeSeconds = .25f;
         [Tooltip("피버가 시작될 때 내는 추임새(콤보 성공과 같은 파일) 크기")]
         [Range(0f, 1f)] public float cueVolume = 1f;
+        [Tooltip("#745 남은 30초부터 라운드 곡을 빠르게(음높이 그대로) 튼다")]
+        public bool rushEnabled = true;
+        [Tooltip("#745 평소 곡에서 빨라진 곡으로 넘어가는 시간 (초)")]
+        [Min(0f)] public float rushCrossfadeSeconds = .4f;
         // 피버가 시작된 지 이 초 안에 알아챈 기기만 추임새를 낸다 (다시 접속한 기기가 뒤늦게 내지 않게).
         private const double CueWindowSeconds = 1d;
 
-        private AudioSource source, feverSource, cueSource;
+        private AudioSource source, feverSource, cueSource, rushSource;
         private AudioClip battleClip, gumihoClip, feverClip, gumihoFeverClip, yaguangClip, territoryClip, jigwiClip, jigwiFeverClip,
-            tutorialClip;
+            tutorialClip, gumihoRushClip, yaguangRushClip, jigwiRushClip;
         private AudioClip[] cueClips;
+        private AudioClip rushClip; // 이번 라운드 곡의 빨라진 판 (#745), 없으면 null
+        private float rushBlend; // 0 = 평소 곡, 1 = 빨라진 곡
         /// <summary>피버 시작 추임새를 낸 횟수 (테스트·확인용)</summary>
         public int FeverCueCount { get; private set; }
         private LabNetwork network;
@@ -83,6 +98,8 @@ namespace C6Lab
         public AudioClip FeverClip => feverSource != null ? feverSource.clip : null;
         /// <summary>지금 전투 BGM 높이 (반음, 테스트·확인용). BIG이면 +, SMALL이면 -</summary>
         public float ToneSemitones => toneSemitones;
+        /// <summary>#745 빨라진 곡을 틀고 있는지 (테스트·확인용)</summary>
+        public bool RushPlaying => rushSource != null && rushSource.isPlaying && rushBlend > 0f;
 
         // 기본 크기(LabConfig: Inspector·DEV, 구미호 전투 BGM은 Inspector) × 이 기기의 BGM 설정(일시정지 메뉴)
         private float BaseVolume => network == null || network.config == null ? volume
@@ -119,6 +136,9 @@ namespace C6Lab
             jigwiClip = FirstClip(JigwiClipFolder);
             jigwiFeverClip = FirstClip(JigwiFeverClipFolder);
             tutorialClip = FirstClip(TutorialClipFolder);
+            gumihoRushClip = FirstClip(GumihoRushClipFolder);
+            yaguangRushClip = FirstClip(YaguangRushClipFolder);
+            jigwiRushClip = FirstClip(JigwiRushClipFolder);
             source = gameObject.AddComponent<AudioSource>();
             source.playOnAwake = false;
             source.loop = true;
@@ -135,6 +155,12 @@ namespace C6Lab
             cueSource = gameObject.AddComponent<AudioSource>();
             cueSource.playOnAwake = false;
             cueSource.spatialBlend = 0f;
+            // #745: added last so the battle / fever / cue sources keep their order.
+            rushSource = gameObject.AddComponent<AudioSource>();
+            rushSource.playOnAwake = false;
+            rushSource.loop = true;
+            rushSource.spatialBlend = 0f;
+            rushSource.volume = 0f;
         }
 
         private static AudioClip FirstClip(string folder)
@@ -170,7 +196,8 @@ namespace C6Lab
             else if (!fever && feverOn) StopFever();
             float step = feverCrossfadeSeconds <= 0f ? 1f : Time.unscaledDeltaTime / feverCrossfadeSeconds;
             feverBlend = Mathf.MoveTowards(feverBlend, feverOn ? 1f : 0f, step);
-            source.volume = TargetVolume * (1f - feverBlend);
+            source.volume = TargetVolume * (1f - feverBlend) * (1f - rushBlend);
+            if (rushSource != null) rushSource.volume = TargetVolume * (1f - feverBlend) * rushBlend;
             feverSource.volume = FeverTargetVolume * feverBlend;
             if (!feverOn) return;
             feverSource.pitch = FeverSpeed;
@@ -275,6 +302,8 @@ namespace C6Lab
                     source.Stop();
                     source.clip = tutorialBgm ? tutorialClip
                         : jigwiBgm ? jigwiClip : gumihoBgm ? stageClip : yaguangBgm ? yaguangClip : battleClip;
+                    StopRush();
+                    rushClip = RushClipFor(source.clip);
                     source.volume = TargetVolume;
                     source.time = 0f;
                     if (!snapshot.paused && source.clip != null)
@@ -287,6 +316,8 @@ namespace C6Lab
                     yaguangBgm = !yaguangBgm;
                     source.Stop();
                     source.clip = yaguangBgm ? yaguangClip : battleClip;
+                    StopRush();
+                    rushClip = RushClipFor(source.clip);
                     source.volume = TargetVolume;
                     source.time = 0f;
                     if (!snapshot.paused && source.clip != null) source.Play();
@@ -302,21 +333,78 @@ namespace C6Lab
                     source.UnPause();
                     if (!source.isPlaying) source.Play();
                 }
-                if (!tutorialBgm) DriveFever(snapshot); // #629: the practice board keeps its own song to the end
+                if (!tutorialBgm)
+                {
+                    DriveRush(snapshot);
+                    DriveFever(snapshot); // #629: the practice board keeps its own song to the end
+                }
                 if (!snapshot.paused) DriveTone(snapshot, network.BattlePresentationTime, Time.unscaledDeltaTime);
                 return;
             }
 
-            // 승리/패배: 서서히 끄기 (피버 곡도 함께)
-            if (source.isPlaying || FeverPlaying)
+            // 승리/패배: 서서히 끄기 (피버 곡 / 빨라진 곡도 함께)
+            if (source.isPlaying || FeverPlaying || rushSource != null && rushSource.isPlaying)
             {
                 fading = true;
                 float step = fadeOutSeconds <= 0f ? 1f : TargetVolume * Time.unscaledDeltaTime / fadeOutSeconds;
                 float feverStep = fadeOutSeconds <= 0f ? 1f : FeverTargetVolume * Time.unscaledDeltaTime / fadeOutSeconds;
                 source.volume = Mathf.Max(0f, source.volume - step);
                 if (feverSource != null) feverSource.volume = Mathf.Max(0f, feverSource.volume - feverStep);
-                if (source.volume <= 0f && (feverSource == null || feverSource.volume <= 0f)) StopNow();
+                if (rushSource != null) rushSource.volume = Mathf.Max(0f, rushSource.volume - step);
+                if (source.volume <= 0f && (feverSource == null || feverSource.volume <= 0f)
+                    && (rushSource == null || rushSource.volume <= 0f)) StopNow();
             }
+        }
+
+        /// <summary>#745: 이번 라운드 곡의 빨라진 판. 구미호 / 야광귀 / 지귀 곡에만 있다.</summary>
+        private AudioClip RushClipFor(AudioClip clip) =>
+            clip == null ? null : clip == gumihoClip ? gumihoRushClip : clip == yaguangClip ? yaguangRushClip
+            : clip == jigwiClip ? jigwiRushClip : null;
+
+        /// <summary>
+        /// #745: 빨라진 곡을 틀 때인지. 30초 알림이 붙는 판(LabThirtySecondsLeftHud.AppliesTo)에서 남은 시간이 알림 시각 이하가 된 뒤.
+        /// 피버로 넘어가면 DriveFever가 빨라진 곡도 함께 줄인다.
+        /// </summary>
+        public static bool RushOn(bool applies, double remaining, float at) => applies && remaining <= at && remaining > 0d;
+
+        /// <summary>#745: 평소 곡의 지금 자리(초)에 해당하는 빨라진 곡의 자리. 빨라진 곡은 speed배 짧다.</summary>
+        public static float RushTimeFor(float sourceTime, float speed, float rushLength)
+        {
+            if (rushLength <= 0f || speed <= 0f) return 0f;
+            return Mathf.Repeat(sourceTime / speed, rushLength);
+        }
+
+        /// <summary>#745: 빨라진 곡을 켜고 끄며 평소 곡과의 섞임(rushBlend)을 옮긴다. 크기는 DriveFever가 정한다.</summary>
+        private void DriveRush(LabSnapshot snapshot)
+        {
+            if (rushSource == null) return;
+            bool applies = network != null && LabThirtySecondsLeftHud.AppliesTo(network.GameFlowEnabled, network.IsTutorial,
+                snapshot.teamTerritory, network.GameStageYokai);
+            float at = network != null && network.config != null ? network.config.ThirtySecondsLeftAt : 30f;
+            bool want = rushEnabled && rushClip != null && !feverOn
+                && RushOn(applies, snapshot.remaining, at);
+            if (want && !rushSource.isPlaying && rushBlend <= 0f && !snapshot.paused)
+            {
+                rushSource.clip = rushClip;
+                rushSource.pitch = source.pitch;
+                rushSource.time = RushTimeFor(source.time, RushSpeed, rushClip.length);
+                rushSource.volume = 0f;
+                rushSource.Play();
+            }
+            if (feverOn && feverBlend >= 1f) { StopRush(); return; }
+            float step = rushCrossfadeSeconds <= 0f ? 1f : Time.unscaledDeltaTime / rushCrossfadeSeconds;
+            if (!snapshot.paused) rushBlend = Mathf.MoveTowards(rushBlend, want || feverOn && rushSource.isPlaying ? 1f : 0f, step);
+            if (snapshot.paused) { if (rushSource.isPlaying) rushSource.Pause(); }
+            else if (rushBlend > 0f && !rushSource.isPlaying) rushSource.UnPause();
+            if (rushBlend <= 0f && rushSource.isPlaying && !want) rushSource.Stop();
+        }
+
+        private void StopRush()
+        {
+            rushBlend = 0f;
+            if (rushSource == null) return;
+            rushSource.Stop();
+            rushSource.volume = 0f;
         }
 
         /// <summary>
@@ -354,12 +442,14 @@ namespace C6Lab
         {
             toneSemitones = semitones;
             if (source != null) source.pitch = BattleSpeed * Mathf.Pow(2f, semitones / 12f);
+            if (rushSource != null) rushSource.pitch = BattleSpeed * Mathf.Pow(2f, semitones / 12f);
         }
 
         private void StopNow()
         {
             if (source.isPlaying || fading) source.Stop();
             StopFever();
+            StopRush();
             SetTone(0f);
             fading = false;
             source.volume = TargetVolume;

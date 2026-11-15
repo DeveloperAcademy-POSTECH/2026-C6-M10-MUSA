@@ -31,14 +31,21 @@ namespace C6Lab
             return true;
         }
 
-        /// <summary>Exactly "Hapio-Staff-&lt;revision&gt;-&lt;protocol&gt;-Stage-&lt;1..3&gt;"; anything else is not a staff room.</summary>
-        public static bool TryStaffStage(string name, out int stage)
+        /// <summary>Parse current grouped and historical ungrouped names for display only; admission checks the live protocol.</summary>
+        public static bool TryStaffStage(string name, out int stage) => TryStaffRoom(name, out stage, out _);
+
+        public static bool TryStaffRoom(string name, out int stage, out int group)
         {
-            stage = 0;
+            stage = group = 0;
             if (name == null || !name.StartsWith(StaffServicePrefix, StringComparison.Ordinal)) return false;
             string[] parts = name.Substring(StaffServicePrefix.Length).Split('-');
-            if (parts.Length != 4 || parts[2] != "Stage" || !IsDigits(parts[0]) || !IsDigits(parts[1])
+            if ((parts.Length != 4 && parts.Length != 6) || parts[2] != "Stage" || !IsDigits(parts[0]) || !IsDigits(parts[1])
                 || parts[3].Length != 1 || parts[3][0] < '1' || parts[3][0] > '3') return false;
+            if (parts.Length == 6)
+            {
+                if (parts[4] != "Group" || parts[5].Length != 1 || parts[5][0] < '1' || parts[5][0] > '2') return false;
+                group = parts[5][0] - '0';
+            }
             stage = parts[3][0] - '0';
             return true;
         }
@@ -56,8 +63,9 @@ namespace C6Lab
         {
             if (TryNumber(name, out int number)) return "수장고-" + number.ToString(CultureInfo.InvariantCulture);
             // The fixed staff name carries the demo revision and protocol only for Bonjour; players see the stage.
-            if (TryStaffStage(name, out int stage))
-                return "수장고-" + stage.ToString(CultureInfo.InvariantCulture) + "스테이지 " + StaffStageYokai[stage - 1];
+            if (TryStaffRoom(name, out int stage, out int group))
+                return (group == 0 ? "수장고-" : (group == 1 ? "A그룹 · " : "B그룹 · "))
+                    + stage.ToString(CultureInfo.InvariantCulture) + "스테이지 " + StaffStageYokai[stage - 1];
             if (string.IsNullOrWhiteSpace(name)) return "방 이름 확인 중";
             // Preserve compatibility with already-running versions on the same LAN.
             if (name.StartsWith("C6Lab-", StringComparison.Ordinal)) return "수장고-" + name.Substring(6);

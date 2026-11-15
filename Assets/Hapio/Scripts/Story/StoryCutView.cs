@@ -32,6 +32,11 @@ namespace Hapio
         public bool overrideDialogueLayout;
         [Tooltip("Optional cut-specific text size; zero uses the player default.")]
         [Min(0)] public float dialogueFontSize;
+        [Tooltip("Optional paper override for this cut; null keeps the player's original paper.")]
+        public Sprite dialoguePaper;
+        public Rect dialoguePaperRect = new Rect(11, 677, 379, 181);
+        [Min(0)] public float speakerFontSize;
+        public bool dialogueNoWrap;
         public Rect dialogueRect = new Rect(84, 740, 259, 56);
         public Rect speakerRect = new Rect(84, 721, 36, 18);
         public Sprite speakerBadge;

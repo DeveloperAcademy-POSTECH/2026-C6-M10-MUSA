@@ -159,7 +159,7 @@ namespace C6Lab.Tests
                 {
                     // #719 keeps each Host RGB, dims later slots and emphasizes the current turn.
                     Color expected = LabPaintPalette.SrgbColorFor(colors[i]);
-                    expected.a = i > snapshot.comboProgress ? .4f : 1f;
+                    expected.a = i > snapshot.comboProgress ? .85f : 1f; // #741: later colours stay readable
                     Assert.That(hud.SlotColor(i), Is.EqualTo(expected));
                     Assert.That(hud.SlotChecked(i), Is.EqualTo(i < 2));
                 }

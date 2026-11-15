@@ -1138,9 +1138,13 @@ namespace C6Lab
         // 위에서 부적 구슬 꼬리처럼 먹 테두리·물·하이라이트 세 겹 폭포가 쏟아지고 물방울이 튄다 ----------
         private RectTransform sealRoot;
         private UnityEngine.UI.Text waterGlyph;
-        private UnityEngine.UI.RawImage waterfallBack, waterfall;
-        private UnityEngine.UI.Image splash, whiteFlash;
-        private static Texture2D waterfallTexture;
+        // #741: drawn to match the 3R background: watercolour water on hanji (like the curtain douse) in two tapered, swaying
+        // ribbons (pale spray behind, the water in front), pouring out of the background's own dry-brush ink clouds, with a
+        // watercolour drops where it lands. The pictures are Resources/Jigwi/Waterfall/* (until the art team's).
+        private LabWaterfallRibbon waterfallBack, waterfall;
+        private readonly UnityEngine.UI.Image[] clouds = new UnityEngine.UI.Image[3];
+        private const string WaterfallArt = "Jigwi/Waterfall/";
+        private UnityEngine.UI.Image whiteFlash;
         private static Sprite dropSprite;
         private readonly UnityEngine.UI.Image[] flyers = new UnityEngine.UI.Image[LabJigwiABNetworkValidation.MaximumPlayers];
         private readonly UnityEngine.UI.Image[] flyerGlows = new UnityEngine.UI.Image[LabJigwiABNetworkValidation.MaximumPlayers];
@@ -1250,10 +1254,10 @@ namespace C6Lab
                 waterGlyph.color = new Color(.2f, .62f, 1f, 1f - g * g);
             }
             // ③ The waterfall: an ink-edged water column (like the talisman orb's tail) in two layers rushing at different
-            // speeds, wobbling a little, with a splash and drops flying off where it hits the boss.
+            // speeds, wobbling a little, with drops flying off where it hits the boss.
             bool pour = s >= 0f && s < PourSeconds;
-            foreach (var part in new UnityEngine.UI.Graphic[] { waterfallBack, waterfall, splash })
-                if (part.gameObject.activeSelf != pour) part.gameObject.SetActive(pour);
+            foreach (var part in WaterfallParts())
+                if (part != null && part.gameObject.activeSelf != pour) part.gameObject.SetActive(pour);
             AnimateDrops(t, unit);
             if (!pour) return;
             if (!poured)
@@ -1271,15 +1275,29 @@ namespace C6Lab
             float width = (rect != null ? rect.rect.width : 600f) * .3f;
             float grow = Mathf.Clamp01(s / .18f), fade = 1f - Mathf.Clamp01((s - (PourSeconds - .4f)) / .4f);
             float wobble = 1f + .06f * Mathf.Sin(t * 17f) + .04f * Mathf.Sin(t * 29f);
-            PlaceColumn(waterfallBack, boss, top, width * 1.25f * wobble * Mathf.Lerp(.5f, 1f, grow), grow, t * 1.6f, .55f * fade, -.5f);
-            PlaceColumn(waterfall, boss, top, width * (2f - wobble) * Mathf.Lerp(.5f, 1f, grow), grow, t * 2.8f, .95f * fade, .3f);
-            splash.rectTransform.position = boss;
-            splash.rectTransform.sizeDelta = Vector2.one * width * 1.7f * (1f + .1f * Mathf.Sin(t * 30f));
-            splash.color = new Color(.8f, .94f, 1f, .8f * fade * grow);
+            // #741: spray behind (wide, slow), the water (tapered, swaying), bright streaks in front (fast). They pour out of
+            // the background's ink clouds at the top, and drops fly off where they land. It hardly widens and fades out at the
+            // bottom so the boss stays in sight.
+            float open = Mathf.Lerp(.55f, 1f, grow);
+            PlaceRibbon(waterfallBack, boss, top, width * 1.35f * wobble * open, grow, t * .8f, .9f * fade, .4f, .7f, t * 2.1f);
+            PlaceRibbon(waterfall, boss, top, width * .95f * (2f - wobble) * open, grow, t * 1.6f, fade, .6f, .75f, t * 2.6f);
+            float reach = (top - boss.y) / Mathf.Max(.0001f, unit);
+            for (int i = 0; i < clouds.Length; i++)
+            {
+                // The background's ink clouds: one each side behind (the right one mirrored), the biggest in front.
+                var cloud = clouds[i];
+                float side = i == 0 ? -.5f : i == 1 ? .5f : 0f;
+                float drift = Mathf.Sin(t * .9f + i * 1.7f) * width * .05f;
+                float wide = width * (i == 2 ? 2.5f : 2.1f);
+                cloud.rectTransform.position = new Vector3(boss.x + (side * width + drift) * unit, top - wide * (i == 2 ? .1f : .04f) * unit, boss.z);
+                cloud.rectTransform.sizeDelta = new Vector2(wide, wide / 3f);
+                cloud.rectTransform.localScale = new Vector3(i == 1 ? -1f : 1f, 1f, 1f);
+                cloud.color = new Color(1f, 1f, 1f, fade * Mathf.Clamp01(s / .25f));
+            }
             // Rolling surges on top of the rumble, every 0.45 s, fading with the pour.
             if (source != null && waterfallPulseAt > 0f && t >= waterfallPulseAt && fade > .3f)
             { waterfallPulseAt = t + .45f; LabHaptics.PlayDirect(source.config, LabHapticStyle.Medium, .55f * fade); }
-            // Drops fly off the splash all the time it pours.
+            // Drops fly off where it lands all the time it pours.
             if (fade > .2f && t - lastDropAt > .03f)
             {
                 lastDropAt = t;
@@ -1290,21 +1308,31 @@ namespace C6Lab
                 // #626: place and size it before it shows, or for one frame it appeared at its default spot and size
                 // (a big blue circle below the boss as the waterfall started).
                 d.rectTransform.position = dropAt[i2];
-                d.rectTransform.sizeDelta = new Vector2(26f, 26f * 1.25f);
-                d.color = new Color(.75f, .92f, 1f, 1f);
+                d.rectTransform.sizeDelta = new Vector2(20f, 20f * DropAspect);
+                d.color = Color.white;
                 d.gameObject.SetActive(true);
             }
         }
 
-        private void PlaceColumn(UnityEngine.UI.RawImage column, Vector3 boss, float top, float width, float grow, float scroll, float alpha, float sway)
+        private void PlaceRibbon(LabWaterfallRibbon ribbon, Vector3 boss, float top, float width, float grow, float scroll, float alpha,
+            float sway, float topWidth, float phase)
         {
-            var fall = column.rectTransform;
+            var fall = ribbon.rectTransform;
             fall.pivot = new Vector2(.5f, 1f);
             fall.position = new Vector3(boss.x, top, boss.z);
+            // Down to the boss's middle; the ribbon fades out over its lower part.
             float length = (top - boss.y) / Mathf.Max(.0001f, fall.lossyScale.y);
-            fall.sizeDelta = new Vector2(width, length * grow);
-            column.uvRect = new Rect(sway * .1f * Mathf.Sin(scroll), scroll, 1f, 1.4f);
-            column.color = new Color(1f, 1f, 1f, alpha);
+            fall.sizeDelta = new Vector2(width, length);
+            ribbon.grow = grow; ribbon.scroll = scroll; ribbon.sway = sway; ribbon.topWidth = topWidth; ribbon.phase = phase;
+            ribbon.color = new Color(1f, 1f, 1f, alpha);
+            ribbon.Refresh();
+        }
+
+        /// <summary>#741: every piece of the waterfall (switched on and off together).</summary>
+        private System.Collections.Generic.IEnumerable<UnityEngine.UI.Graphic> WaterfallParts()
+        {
+            yield return waterfallBack; yield return waterfall;
+            foreach (var part in clouds) yield return part;
         }
 
         private void AnimateDrops(float t, float unit)
@@ -1317,9 +1345,9 @@ namespace C6Lab
                 if (life > .6f) { d.gameObject.SetActive(false); continue; }
                 Vector2 v = dropVelocity[i];
                 d.rectTransform.position = dropAt[i] + new Vector3(v.x * life, v.y * life - 1400f * life * life, 0f) * unit;
-                float size = Mathf.Lerp(26f, 10f, life / .6f);
-                d.rectTransform.sizeDelta = new Vector2(size, size * 1.25f);
-                d.color = new Color(.75f, .92f, 1f, 1f - life / .6f);
+                float size = Mathf.Lerp(20f, 10f, life / .6f);
+                d.rectTransform.sizeDelta = new Vector2(size, size * DropAspect);
+                d.color = new Color(1f, 1f, 1f, 1f - life / .6f);
             }
         }
 
@@ -1331,13 +1359,15 @@ namespace C6Lab
                 sealRoot = new GameObject("TalismanSeal", typeof(RectTransform)).GetComponent<RectTransform>();
                 sealRoot.gameObject.layer = gameObject.layer; sealRoot.SetParent(transform, false);
                 sealRoot.anchorMin = Vector2.zero; sealRoot.anchorMax = Vector2.one; sealRoot.offsetMin = sealRoot.offsetMax = Vector2.zero;
-                waterfallBack = NewRaw("Talisman Waterfall Back"); waterfall = NewRaw("Talisman Waterfall");
-                splash = NewSealImage("Talisman Waterfall Splash", LabProceduralFire.Glow());
+                // #741: back to front — spray, water, clouds on top.
+                waterfallBack = NewRibbon("Talisman Waterfall Spray", WaterTexture(true));
+                waterfall = NewRibbon("Talisman Waterfall", WaterTexture(false));
+                for (int i = 0; i < clouds.Length; i++) clouds[i] = NewSealImage("Waterfall Cloud " + i, WaterfallSprite("WaterfallCloud"));
                 whiteFlash = NewSealImage("Talisman White Light", null);
                 whiteFlash.rectTransform.anchorMin = Vector2.zero; whiteFlash.rectTransform.anchorMax = Vector2.one;
                 whiteFlash.rectTransform.offsetMin = whiteFlash.rectTransform.offsetMax = Vector2.zero;
                 whiteFlash.transform.SetAsFirstSibling(); // behind the glowing talismans
-                for (int i = 0; i < drops.Length; i++) { drops[i] = NewSealImage("Waterfall Drop " + i, Drop()); drops[i].gameObject.SetActive(false); }
+                for (int i = 0; i < drops.Length; i++) { drops[i] = NewSealImage("Waterfall Drop " + i, WaterfallSprite("WaterfallDrop") ?? Drop()); drops[i].gameObject.SetActive(false); }
                 for (int i = 0; i < flyers.Length; i++)
                 {
                     flyerGlows[i] = NewSealImage("Talisman Glow " + i, LabProceduralFire.Glow());
@@ -1359,7 +1389,7 @@ namespace C6Lab
             if (glyphFont != null) waterGlyph.font = glyphFont;
             sealRoot.gameObject.SetActive(true); sealRoot.SetAsLastSibling();
             waterGlyph.gameObject.SetActive(false);
-            foreach (var part in new UnityEngine.UI.Graphic[] { waterfallBack, waterfall, splash }) part.gameObject.SetActive(false);
+            foreach (var part in WaterfallParts()) if (part != null) part.gameObject.SetActive(false);
             // The lit icons in the row take off from where they are.
             flyCount = 0;
             for (int i = 0; i < talismanIcons.Length && flyCount < flyers.Length; i++)
@@ -1410,13 +1440,16 @@ namespace C6Lab
             return sparkleSprite;
         }
 
-        private UnityEngine.UI.RawImage NewRaw(string name)
+        private LabWaterfallRibbon NewRibbon(string name, Texture texture)
         {
-            var raw = new GameObject(name, typeof(RectTransform)).AddComponent<UnityEngine.UI.RawImage>();
-            raw.gameObject.layer = gameObject.layer; raw.raycastTarget = false; raw.texture = WaterfallTexture();
-            raw.transform.SetParent(sealRoot, false);
-            return raw;
+            var ribbon = new GameObject(name, typeof(RectTransform)).AddComponent<LabWaterfallRibbon>();
+            ribbon.gameObject.layer = gameObject.layer; ribbon.raycastTarget = false; ribbon.texture = texture;
+            ribbon.transform.SetParent(sealRoot, false);
+            return ribbon;
         }
+
+        /// <summary>#741: a picture from Resources/Jigwi/Waterfall (null if missing).</summary>
+        private static Sprite WaterfallSprite(string name) => Resources.Load<Sprite>(WaterfallArt + name);
 
         private UnityEngine.UI.Image NewSealImage(string name, Sprite sprite)
         {
@@ -1426,38 +1459,69 @@ namespace C6Lab
             return image;
         }
 
+        private static Texture2D waterfallWaterTexture, waterfallSprayTexture;
+        /// <summary>Height over width of a flying drop (the watercolour drop picture is tall, with a tail).</summary>
+        private float DropAspect => drops[0] != null && drops[0].sprite != null ? drops[0].sprite.rect.height / Mathf.Max(1f, drops[0].sprite.rect.width) : 1.33f;
+
         /// <summary>
-        /// Falling water like the talisman orb's tail: a dark ink edge, the blue body, and light highlight streaks
-        /// (tiles vertically for the rush).
+        /// #741: falling water in the backgrounds' 2D style — three flat blue tones (light middle, deep sides), a dark ink outline
+        /// that wobbles, ink water strokes (민화 물결선) and cream strokes running down. spray: the pale ribbon behind it.
+        /// Every wave is a whole number of cycles, so it tiles vertically for the rush.
         /// </summary>
-        private static Texture2D WaterfallTexture()
+        private static Texture2D WaterTexture(bool spray)
         {
-            if (waterfallTexture != null) return waterfallTexture;
-            const int w = 96, h = 192;
-            waterfallTexture = new Texture2D(w, h, TextureFormat.RGBA32, false)
-            { name = "Jigwi talisman waterfall (#595 runtime)", hideFlags = HideFlags.DontSave, wrapMode = TextureWrapMode.Repeat };
+            Texture2D cached = spray ? waterfallSprayTexture : waterfallWaterTexture;
+            if (cached != null) return cached;
+            // The painted watercolour water (tiles top to bottom); drawn below only if it is missing.
+            var painted = Resources.Load<Texture2D>(WaterfallArt + (spray ? "WaterfallSpray" : "WaterfallWater"));
+            if (painted != null)
+            {
+                painted.wrapMode = TextureWrapMode.Repeat;
+                if (spray) waterfallSprayTexture = painted; else waterfallWaterTexture = painted;
+                return painted;
+            }
+            const int w = 128, h = 256;
+            var texture = new Texture2D(w, h, TextureFormat.RGBA32, false)
+            { name = spray ? "Jigwi waterfall spray (#741 runtime)" : "Jigwi waterfall (#741 runtime)", hideFlags = HideFlags.DontSave, wrapMode = TextureWrapMode.Repeat };
             var pixels = new Color[w * h];
-            Color ink = new Color(.015f, .105f, .2f, .96f), body = new Color(.12f, .64f, .98f, .98f), light = new Color(.72f, .97f, 1f, .95f);
+            Color ink = new Color(.17f, .14f, .13f, 1f), cream = new Color(.96f, .94f, .88f, 1f);
+            Color deep = spray ? new Color(.62f, .78f, .86f) : new Color(.20f, .40f, .58f);
+            Color mid = spray ? new Color(.84f, .92f, .95f) : new Color(.42f, .66f, .80f);
+            Color light = spray ? new Color(.95f, .97f, .97f) : new Color(.70f, .86f, .92f);
+            float[] lineAt = { .18f, .30f, .42f, .58f, .70f, .82f }, lineAmp = { .025f, .02f, .018f, .02f, .018f, .025f };
+            float[] creamAt = { .36f, .5f, .64f };
             for (int y = 0; y < h; y++)
                 for (int x = 0; x < w; x++)
                 {
                     float u = (x + .5f) / w, v = (y + .5f) / h;
-                    // The edge wobbles down the column so it reads as flowing water, not a bar.
-                    float edge = .43f + .035f * Mathf.Sin(v * Mathf.PI * 6f) + .02f * Mathf.Sin(v * Mathf.PI * 14f + 1.3f);
+                    float edge = .42f + .02f * Mathf.Sin(v * Mathf.PI * 4f) + .01f * Mathf.Sin(v * Mathf.PI * 10f + 1.3f);
                     float d = Mathf.Abs(u - .5f);
-                    Color c;
-                    if (d > edge + .05f) c = Color.clear;
-                    else if (d > edge) c = ink;
-                    else
+                    if (d > edge + .035f) { pixels[y * w + x] = Color.clear; continue; }
+                    float depth = Mathf.Min(1f, d / edge);
+                    Color c = Color.Lerp(mid, deep, Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.70f, .76f, depth)));
+                    c = Color.Lerp(light, c, Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.28f, .34f, depth)));
+                    float line = 0f, strokes = 0f;
+                    for (int k = 0; k < lineAt.Length; k++)
                     {
-                        float streak = Mathf.Pow(.5f + .5f * Mathf.Sin(u * 40f + Mathf.Sin(v * Mathf.PI * 4f) * 2f), 6f);
-                        float shine = Mathf.Clamp01(1f - Mathf.Abs(u - .36f) / .07f) * (.6f + .4f * Mathf.Sin(v * Mathf.PI * 8f));
-                        c = Color.Lerp(body, light, Mathf.Clamp01(streak * .7f + shine));
+                        float at = lineAt[k] + lineAmp[k] * Mathf.Sin(v * Mathf.PI * (k % 2 == 0 ? 2f : 4f) + k * 1.3f);
+                        float dash = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.3f, .6f, .5f + .5f * Mathf.Sin(v * Mathf.PI * 2f * (1 + k % 2) + k)));
+                        line = Mathf.Max(line, Mathf.Clamp01(1f - Mathf.Abs(u - at) / .016f) * dash);
                     }
+                    for (int k = 0; k < creamAt.Length; k++)
+                    {
+                        float at = creamAt[k] + .02f * Mathf.Sin(v * Mathf.PI * (k == 1 ? 4f : 2f) + k * 2f);
+                        float dash = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.5f, .8f, .5f + .5f * Mathf.Sin(v * Mathf.PI * 4f + k * 2.2f)));
+                        strokes = Mathf.Max(strokes, Mathf.Clamp01(1f - Mathf.Abs(u - at) / .016f) * dash);
+                    }
+                    c = Color.Lerp(c, cream, strokes * .95f);
+                    c = Color.Lerp(c, ink, Mathf.Clamp01(line * 1.6f) * (spray ? .45f : .8f));
+                    if (d > edge) c = ink;
+                    c.a = 1f;
                     pixels[y * w + x] = c;
                 }
-            waterfallTexture.SetPixels(pixels); waterfallTexture.Apply(false, true);
-            return waterfallTexture;
+            texture.SetPixels(pixels); texture.Apply(false, true);
+            if (spray) waterfallSprayTexture = texture; else waterfallWaterTexture = texture;
+            return texture;
         }
 
         private static Sprite Drop()
@@ -1471,8 +1535,10 @@ namespace C6Lab
                 for (int x = 0; x < s; x++)
                 {
                     float d = new Vector2(x + .5f - s * .5f, y + .5f - s * .5f).magnitude / (s * .5f);
-                    pixels[y * s + x] = d > 1f ? Color.clear : d > .78f ? new Color(.015f, .105f, .2f, .9f)
-                        : d < .35f && x < s / 2 && y > s / 2 ? Color.white : new Color(.45f, .8f, 1f, 1f);
+                    // #741: a filled droplet with a soft edge and a white glint (no dark ring).
+                    float alpha = Mathf.Clamp01((1f - d) / .18f);
+                    bool glint = d < .38f && x < s / 2 && y > s / 2;
+                    pixels[y * s + x] = new Color(glint ? 1f : .55f, glint ? 1f : .84f, 1f, alpha);
                 }
             texture.SetPixels(pixels); texture.Apply(false, true);
             dropSprite = Sprite.Create(texture, new Rect(0f, 0f, s, s), new Vector2(.5f, .5f), s);

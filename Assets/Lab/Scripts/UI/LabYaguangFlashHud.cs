@@ -332,6 +332,21 @@ namespace C6Lab
         /// 다 흔들었는지: 최대 횟수(DEV 기본 10번)를 채웠다. 판의 하얀 구슬이 먼저 다 돌아와도(#330) 섬광은 최대 횟수를
         /// 채워야 풀린다 (#343, 그 순간 섬광 해제 소리와 오색구슬 보상).
         /// </summary>
+        /// <summary>
+        /// VFX 실험실(#741): 폰을 흔들지 않고 이번 섬광의 흔들기를 다 채운다. 그 뒤는 실제로 다 흔든 것과 같은 길
+        /// (해제 요청 → "으악 어지러워~" → 오색구슬 요청)로 흘러간다. 지금 내가 눈부시지 않으면 false.
+        /// </summary>
+        public bool VfxLabShakeAll()
+        {
+            if (network == null || network.config == null || network.Snapshot == null) return false;
+            LabConfig config = network.config;
+            if (!config.YaguangFlashShakeRelease || !LabYaguangFlash.Glared(network.Snapshot, network.BattlePresentationTime,
+                network.LocalPlayerId, config.YaguangFlashGlareLimitSeconds)) return false;
+            while (shakeCounter.Count < Mathf.Max(1, config.YaguangFlashShakeCount)) shakeCounter.AddOne();
+            lastShakeAt = Time.unscaledTime;
+            return true;
+        }
+
         private bool ShakesDone(int maxShakes) => shakeCounter.Count >= Mathf.Max(1, maxShakes);
 
         /// <summary>새로 센 흔들기마다 판의 하얀 구슬 하나씩 색을 돌려준다. 다 흔들었으면 남은 구슬도 모두 돌려준다.</summary>

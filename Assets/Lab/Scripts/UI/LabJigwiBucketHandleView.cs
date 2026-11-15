@@ -889,6 +889,23 @@ namespace C6Lab
                     }
             }
             if (!changed) return;
+            AfterWiped();
+        }
+
+        /// <summary>
+        /// VFX 실험실(#741): 문지르지 않고 내 화면의 연기를 다 닦은 것으로 한다. 그 뒤는 실제로 다 닦은 것과 같은 길
+        /// (확 걷힘 → 파편 요청 → 다 닦음 알림)로 흘러간다. 지금 연기가 덮고 있지 않으면 false.
+        /// </summary>
+        public bool VfxLabWipeAll()
+        {
+            if (!steamOn || steamClearedAt >= 0f) return false;
+            System.Array.Clear(steamAlpha, 0, steamAlpha.Length);
+            AfterWiped();
+            return true;
+        }
+
+        private void AfterWiped()
+        {
             WriteSteam();
             steamLeft = WeightedLeft();
             FindThickest();

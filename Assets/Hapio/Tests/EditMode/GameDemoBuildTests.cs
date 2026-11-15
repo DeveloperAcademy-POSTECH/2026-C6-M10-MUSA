@@ -51,8 +51,22 @@ namespace Hapio.Tests
         [TestCase(BuildTarget.iOS, "success")]
         [TestCase(BuildTarget.iOS, "failure")]
         [TestCase(BuildTarget.iOS, "cancel")]
-        public void TemporaryIdentityAlwaysRestoresNormalSettings(BuildTarget target, string outcome)
+        public void TemporaryIdentityAlwaysRestoresNormalSettings(BuildTarget target, string outcome) =>
+            AssertTemporaryIdentityRestored(target, outcome, "WithTemporaryPlayerSettings", "ProductName", ".staffdemo");
+
+        [TestCase(BuildTarget.StandaloneOSX, "success")]
+        [TestCase(BuildTarget.StandaloneOSX, "failure")]
+        [TestCase(BuildTarget.StandaloneOSX, "cancel")]
+        [TestCase(BuildTarget.iOS, "success")]
+        [TestCase(BuildTarget.iOS, "failure")]
+        [TestCase(BuildTarget.iOS, "cancel")]
+        public void StageTwoIdentityRestoresNormalSettingsAfterSuccessFailureAndCancellation(BuildTarget target, string outcome) =>
+            AssertTemporaryIdentityRestored(target, outcome, "WithTemporaryStageTwoPlayerSettings", "StageTwoProductName", ".staffdemo.stage2");
+
+        private static void AssertTemporaryIdentityRestored(BuildTarget target, string outcome,
+            string builderMethod, string productConstant, string suffix)
         {
+            string expectedIdentifier = "com.example.hapio" + suffix;
             var namedTarget = NamedBuildTarget.FromBuildTargetGroup(BuildPipeline.GetBuildTargetGroup(target));
             string name = PlayerSettings.productName;
             string identifier = PlayerSettings.GetApplicationIdentifier(namedTarget);
@@ -65,22 +79,22 @@ namespace Hapio.Tests
             Action simulatedBuild = () =>
             {
                 called = true;
-                Assert.That(PlayerSettings.productName, Is.EqualTo(Constant("ProductName")));
-                Assert.That(PlayerSettings.GetApplicationIdentifier(namedTarget), Is.EqualTo("com.example.hapio.staffdemo"));
+                Assert.That(PlayerSettings.productName, Is.EqualTo(Constant(productConstant)));
+                Assert.That(PlayerSettings.GetApplicationIdentifier(namedTarget), Is.EqualTo(expectedIdentifier));
                 Assert.That(PlayerSettings.bundleVersion, Is.EqualTo(Constant("DemoVersion")));
                 if (target == BuildTarget.iOS) Assert.That(PlayerSettings.iOS.buildNumber, Is.EqualTo(Constant("DemoBuildNumber")));
-                if (target == BuildTarget.iOS) Assert.That(PlayerSettings.iOS.applicationDisplayName, Is.EqualTo(Constant("ProductName")));
+                if (target == BuildTarget.iOS) Assert.That(PlayerSettings.iOS.applicationDisplayName, Is.EqualTo(Constant(productConstant)));
                 EditorUserBuildSettings.development = !development;
                 if (outcome == "cancel") throw new OperationCanceledException("Simulated build cancellation");
                 if (outcome == "failure") throw new InvalidOperationException("Simulated build failure");
             };
             try
             {
-                if (outcome == "success") Invoke("WithTemporaryPlayerSettings", target, "com.example.hapio.staffdemo", simulatedBuild);
+                if (outcome == "success") Invoke(builderMethod, target, expectedIdentifier, simulatedBuild);
                 else
                 {
                     TargetInvocationException error = Assert.Throws<TargetInvocationException>(() =>
-                        Invoke("WithTemporaryPlayerSettings", target, "com.example.hapio.staffdemo", simulatedBuild));
+                        Invoke(builderMethod, target, expectedIdentifier, simulatedBuild));
                     Assert.That(error.InnerException, Is.TypeOf(outcome == "cancel" ? typeof(OperationCanceledException) : typeof(InvalidOperationException)));
                 }
                 Assert.That(called, Is.True);
@@ -149,6 +163,113 @@ namespace Hapio.Tests
             Assert.That(LabGameBuildVariant.IsDemo, Is.False);
         }
 
+        [TestCase(BuildTarget.StandaloneOSX)]
+        [TestCase(BuildTarget.iOS)]
+        public void StageTwoOptionsRestrictContentWithoutChangingTheOrdinaryStaffBuild(BuildTarget target)
+        {
+            var namedTarget = NamedBuildTarget.FromBuildTargetGroup(BuildPipeline.GetBuildTargetGroup(target));
+            string defines = PlayerSettings.GetScriptingDefineSymbols(namedTarget);
+            string identifier = PlayerSettings.GetApplicationIdentifier(namedTarget);
+            string[] scenes = EditorBuildSettings.scenes.Select(scene => scene.path + ":" + scene.enabled).ToArray();
+            bool development = EditorUserBuildSettings.development;
+            var release = (BuildPlayerOptions)Invoke("CreateStageTwoOptions", target, "unused-stage-two-release", false);
+            var qa = (BuildPlayerOptions)Invoke("CreateStageTwoOptions", target, "unused-stage-two-qa", true);
+            var ordinary = (BuildPlayerOptions)Invoke("CreateOptions", target, "unused-three-card-demo", false);
+            Assert.That(release.options, Is.EqualTo(BuildOptions.None));
+            Assert.That(qa.options, Is.EqualTo(BuildOptions.Development));
+            Assert.That(release.extraScriptingDefines, Is.EqualTo(new[] {
+                LabGameBuildVariant.StaffStageDemoDefine, LabGameBuildVariant.StaffStageTwoOnlyDefine }));
+            Assert.That(qa.extraScriptingDefines, Is.EqualTo(release.extraScriptingDefines));
+            Assert.That(ordinary.extraScriptingDefines, Is.EqualTo(new[] { LabGameBuildVariant.StaffStageDemoDefine }),
+                "Adding the fixed-stage export must not silently restrict the existing three-card export.");
+            Assert.That(release.scenes, Is.EqualTo(GameScenePaths.All));
+            Assert.That(release.scenes, Is.Not.SameAs(GameScenePaths.All));
+            Assert.That(release.target, Is.EqualTo(target));
+            Assert.That(release.locationPathName, Is.EqualTo("unused-stage-two-release"));
+            Assert.That(PlayerSettings.GetScriptingDefineSymbols(namedTarget), Is.EqualTo(defines));
+            Assert.That(PlayerSettings.GetApplicationIdentifier(namedTarget), Is.EqualTo(identifier));
+            Assert.That(EditorBuildSettings.scenes.Select(scene => scene.path + ":" + scene.enabled), Is.EqualTo(scenes));
+            Assert.That(EditorUserBuildSettings.development, Is.EqualTo(development));
+            Assert.That(LabGameBuildVariant.IsStaffStageTwoOnly, Is.False, "Preparing a build must not change the Editor's content variant.");
+        }
+
+        [Test]
+        public void StageTwoIdentifierIsSeparateAndRejectsPersistedDemoSuffixes()
+        {
+            Assert.That(Invoke("StageTwoApplicationIdentifier", "com.example.hapio"), Is.EqualTo("com.example.hapio.staffdemo.stage2"));
+            Assert.That(Invoke("DemoApplicationIdentifier", "com.example.hapio"), Is.EqualTo("com.example.hapio.staffdemo"));
+            foreach (string builderMethod in new[] { "StageTwoApplicationIdentifier", "DemoApplicationIdentifier" })
+            {
+                var missing = Assert.Throws<TargetInvocationException>(() => Invoke(builderMethod, ""));
+                Assert.That(missing.InnerException, Is.TypeOf<InvalidOperationException>());
+                foreach (string suffix in new[] { ".staffdemo.stage2", ".staffdemo", ".yaguangdemo" })
+                {
+                    var persisted = Assert.Throws<TargetInvocationException>(() => Invoke(builderMethod, "com.example.hapio" + suffix));
+                    Assert.That(persisted.InnerException, Is.TypeOf<InvalidOperationException>(),
+                        "A previous demo ID must not produce a nested suffix or replace another export.");
+                }
+            }
+        }
+
+        [Test]
+        public void StageTwoManifestRetainsCanonicalStageTwoAndStaffRoomCompatibility()
+        {
+            string normalConnection = LabNetwork.GameConnectionCompatibility;
+            string normalDiscovery = LabBonjourDiscovery.ProtocolFor(LabRoomFamily.Game);
+            string project = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
+            object manifest = Invoke("CreateStageTwoManifest", BuildTarget.StandaloneOSX, false,
+                "com.example.hapio.staffdemo.stage2", "stage-two-generation", project);
+            object ordinary = Invoke("CreateManifest", BuildTarget.StandaloneOSX, false,
+                "com.example.hapio.staffdemo", "ordinary-generation", project);
+            Type type = manifest.GetType();
+            object Get(object value, string field) => type.GetField(field).GetValue(value);
+            Assert.That(Get(manifest, "productName"), Is.EqualTo(Constant("StageTwoProductName")));
+            Assert.That(Get(manifest, "applicationIdentifier"), Is.EqualTo("com.example.hapio.staffdemo.stage2"));
+            Assert.That(Get(manifest, "participants"), Is.EqualTo(3));
+            Assert.That(Get(manifest, "development"), Is.EqualTo(false));
+            Assert.That((string)Get(manifest, "scriptingDefine"), Does.Contain(LabGameBuildVariant.StaffStageDemoDefine)
+                .And.Contain(LabGameBuildVariant.StaffStageTwoOnlyDefine));
+            var stages = (Array)Get(manifest, "selectableStages");
+            Assert.That(stages.Length, Is.EqualTo(1));
+            object stage = stages.GetValue(0);
+            Type stageType = stage.GetType();
+            Assert.That(stageType.GetField("stageIndex").GetValue(stage), Is.EqualTo(2), "The single route position must not become canonical Stage1.");
+            Assert.That(stageType.GetField("stageId").GetValue(stage), Is.EqualTo(GameStageCatalog.RequireDefault().Get(2).stageId));
+            Assert.That(stageType.GetField("yokai").GetValue(stage), Is.EqualTo(LabStageYokai.Yaguang.ToString()));
+            Assert.That(stageType.GetField("stageSettingsSha256").GetValue(stage), Does.Match("^[0-9a-f]{64}$"));
+            Assert.That(Get(manifest, "scenes"), Is.EqualTo(GameScenePaths.All));
+            Assert.That(Get(manifest, "connectionCompatibility"), Is.EqualTo(Get(ordinary, "connectionCompatibility")));
+            Assert.That(Get(manifest, "discoveryCompatibility"), Is.EqualTo(Get(ordinary, "discoveryCompatibility")));
+            Assert.That(Get(manifest, "variantRevision"), Is.EqualTo(LabGameBuildVariant.StaffStageDemoRevision));
+            Assert.That(LabNetwork.GameConnectionCompatibility, Is.EqualTo(normalConnection));
+            Assert.That(LabBonjourDiscovery.ProtocolFor(LabRoomFamily.Game), Is.EqualTo(normalDiscovery));
+            Assert.That(LabGameBuildVariant.IsDemo || LabGameBuildVariant.IsStaffStageTwoOnly, Is.False);
+        }
+
+        [Test]
+        public void StageTwoTestScopeCannotRestrictNormalOrOrdinaryStaffContentAfterDisposal()
+        {
+            using (LabGameBuildVariant.OverrideStaffStageDemoForTests(false))
+            using (LabGameBuildVariant.OverrideStaffStageTwoOnlyForTests(true))
+                Assert.That(LabGameBuildVariant.IsStaffStageTwoOnly, Is.False, "The fixed restriction requires the staff content variant.");
+            using (LabGameBuildVariant.OverrideStaffStageDemoForTests(true))
+            {
+                Assert.That(LabGameBuildVariant.IsStaffStageTwoOnly, Is.False);
+                using (LabGameBuildVariant.OverrideStaffStageTwoOnlyForTests(true))
+                {
+                    Assert.That(LabGameBuildVariant.IsStaffStageTwoOnly, Is.True);
+                    foreach (int stage in new[] { -1, 0, 1, 3, 4 }) Assert.That(LabGameBuildVariant.AllowsStaffDemoStage(stage), Is.False);
+                    Assert.That(LabGameBuildVariant.AllowsStaffDemoStage(2), Is.True);
+                    using (LabGameBuildVariant.OverrideStaffStageTwoOnlyForTests(false))
+                        foreach (int stage in new[] { 1, 2, 3 }) Assert.That(LabGameBuildVariant.AllowsStaffDemoStage(stage), Is.True);
+                    Assert.That(LabGameBuildVariant.IsStaffStageTwoOnly, Is.True, "Nested scopes restore their caller.");
+                }
+                Assert.That(LabGameBuildVariant.IsStaffStageTwoOnly, Is.False);
+                foreach (int stage in new[] { 1, 2, 3 }) Assert.That(LabGameBuildVariant.AllowsStaffDemoStage(stage), Is.True);
+            }
+            Assert.That(LabGameBuildVariant.IsStaffStageTwoOnly, Is.False);
+        }
+
         [Test]
         public void SavedStaffSelectorHasThreeDistinctStageBoxesAndReusesTheHomeCanvas()
         {
@@ -189,6 +310,49 @@ namespace Hapio.Tests
                 File.WriteAllText(project, appConfig + appConfig.Replace(identifier, "com.example.hapio"));
                 TargetInvocationException error = Assert.Throws<TargetInvocationException>(() => Invoke("ValidateOutputIdentity", BuildTarget.iOS, output, identifier));
                 Assert.That(error.InnerException, Is.TypeOf<InvalidOperationException>(), "A normal app ID would replace the installed normal app.");
+            }
+            finally { Directory.Delete(output, true); }
+        }
+
+        [TestCase(BuildTarget.StandaloneOSX)]
+        [TestCase(BuildTarget.iOS)]
+        public void StageTwoOutputIdentityRequiresItsOwnNameIdentifierAndVersion(BuildTarget target)
+        {
+            string output = Path.Combine(Path.GetTempPath(), "hapio-stage-two-identity-" + Guid.NewGuid().ToString("N"));
+            string plist = target == BuildTarget.iOS ? Path.Combine(output, "Info.plist") : Path.Combine(output, "Contents", "Info.plist");
+            Directory.CreateDirectory(Path.GetDirectoryName(plist));
+            const string identifier = "com.example.hapio.staffdemo.stage2";
+            string product = Constant("StageTwoProductName");
+            string version = Constant("DemoVersion");
+            string build = Constant("DemoBuildNumber");
+            void Write(string name, string id, string shortVersion, string buildNumber) =>
+                new XDocument(new XElement("plist", new XElement("dict",
+                    Pair(target == BuildTarget.iOS ? "CFBundleDisplayName" : "CFBundleName", name),
+                    Pair("CFBundleIdentifier", id), Pair("CFBundleShortVersionString", shortVersion),
+                    Pair("CFBundleVersion", buildNumber)))).Save(plist);
+            void Reject()
+            {
+                var error = Assert.Throws<TargetInvocationException>(() =>
+                    Invoke("ValidateOutputIdentityFor", target, output, identifier, product));
+                Assert.That(error.InnerException, Is.TypeOf<InvalidOperationException>());
+            }
+            try
+            {
+                Write(product, identifier, version, build);
+                Assert.DoesNotThrow(() => Invoke("ValidateOutputIdentityFor", target, output, identifier, product));
+                Assert.Throws<TargetInvocationException>(() => Invoke("ValidateOutputIdentity", target, output, identifier),
+                    "The ordinary staff validator must keep expecting the ordinary product name.");
+                Write(Constant("ProductName"), identifier, version, build);
+                Reject();
+                Write(product, "com.example.hapio.staffdemo", version, build);
+                Reject();
+                Write(product, identifier, "999.0.0", build);
+                Reject();
+                if (target == BuildTarget.iOS)
+                {
+                    Write(product, identifier, version, "999");
+                    Reject();
+                }
             }
             finally { Directory.Delete(output, true); }
         }

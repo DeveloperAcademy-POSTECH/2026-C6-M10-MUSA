@@ -9,11 +9,14 @@ namespace Hapio
     {
         /// <summary>The selected catalog stage. Not a seat, route position, or local developer override.</summary>
         public int SelectedDemoStage { get; private set; }
+        /// <summary>Staff session A/B. Kept for this app lifetime, independently of P seats and territory teams.</summary>
+        public int SelectedDemoGroup { get; private set; }
+        public string SelectedDemoGroupLabel => SelectedDemoGroup == 1 ? "A그룹" : SelectedDemoGroup == 2 ? "B그룹" : string.Empty;
 
         private bool staffRetryRequested, staffRecoveryPrepared;
         private double nextStaffRetryAt, staffRetryDeadline;
         private const double StaffRetryAcknowledgementSeconds = 5d;
-        private int staffRetryEntryStage;
+        private int staffRetryEntryStage, staffRetryEntryGroup;
         private readonly HashSet<ulong> staffRecoveryMembers = new HashSet<ulong>();
         // Kept on every lobby heartbeat until the next run, so losing one commit packet is recoverable.
         private string staffLobbyPreviousRun;
@@ -23,7 +26,39 @@ namespace Hapio
         public bool IsStaffRetryPending => staffRetryRequested || staffRetryEntryStage != 0;
         public bool CanRetryStaffDemo => GameRunFlow.IsStaffDemoInterrupted(state)
             && !goingHome && !IsLoadingScene && !IsStaffRetryPending && !IsDemoEntryPending
+            && SelectedDemoGroup >= 1 && SelectedDemoGroup <= 2
+            && (!network.IsConnected || MatchesStaffDemoRoom(SelectedDemoGroup))
             && SelectedDemoStage == state.demoStageIndex;
+
+        public bool CanChangeDemoGroup => LabGameBuildVariant.IsStaffStageDemo && network != null
+            && !goingHome && !IsCreatingRoom && !IsDemoEntryPending && !IsStaffRetryPending
+            && !IsLoadingScene && state.phase == GameFlowPhase.Home && network.CanChooseConnection;
+
+        /// <summary>Stage2-only enters immediately. The three-card staff build chooses its stage afterwards.</summary>
+        public bool SelectDemoGroup(int group)
+        {
+            if (!CanChangeDemoGroup || group < 1 || group > 2 || !network.SetDemoStageIdentity(0, 0)) return false;
+            SelectedDemoGroup = group;
+            SelectedDemoStage = 0;
+            hostFlow.ConfigureDemoStage(0);
+            roomBrowserVisible = false;
+            UiNotice = string.Empty;
+            DemoEntryNotice = string.Empty;
+            Changed?.Invoke();
+            return !LabGameBuildVariant.IsStaffStageTwoOnly || SelectDemoStage(2);
+        }
+
+        /// <summary>Only the idle Home selector can release its remembered group. Never changes a live room.</summary>
+        public bool ClearDemoGroup()
+        {
+            if (!CanChangeDemoGroup || !network.SetDemoStageIdentity(0, 0)) return false;
+            SelectedDemoGroup = SelectedDemoStage = 0;
+            hostFlow.ConfigureDemoStage(0);
+            roomBrowserVisible = false;
+            UiNotice = DemoEntryNotice = string.Empty;
+            Changed?.Invoke();
+            return true;
+        }
 
         /// <summary>Any member may ask the Host to reopen this stage's seat lobby. Never starts a battle.</summary>
         public bool RetryStaffDemo()
@@ -52,8 +87,9 @@ namespace Hapio
             {
                 if (goingHome || !network.CanChooseConnection || state.phase != GameFlowPhase.Home
                     || IsLoadingScene || SceneManager.GetActiveScene().path != GameScenePaths.Home) return;
-                int stage = staffRetryEntryStage;
-                staffRetryEntryStage = 0;
+                int stage = staffRetryEntryStage, group = staffRetryEntryGroup;
+                staffRetryEntryStage = staffRetryEntryGroup = 0;
+                SelectedDemoGroup = group;
                 SelectDemoStage(stage);
                 return;
             }
@@ -72,12 +108,13 @@ namespace Hapio
 
         private void ReenterStaffRetryStage()
         {
-            int stage = SelectedDemoStage;
+            int stage = SelectedDemoStage, group = SelectedDemoGroup;
             staffRetryRequested = false;
             // Preserve the intent separately: FinishGoHome must still retire the old room/stage identity.
             FinishGoHome();
             staffRetryEntryStage = stage;
-            UiNotice = "같은 스테이지의 방을 다시 준비하고 있소...";
+            staffRetryEntryGroup = group;
+            UiNotice = SelectedDemoGroupLabel + "의 방을 다시 준비하고 있소...";
             Changed?.Invoke();
         }
 
@@ -133,6 +170,7 @@ namespace Hapio
         {
             GameFlowState incoming = control.state;
             return LabGameBuildVariant.IsStaffStageDemo && incoming != null
+                && MatchesStaffDemoRoom(control.demoGroupId)
                 && incoming.phase == GameFlowPhase.Lobby && incoming.mode == GameMode.Story
                 && (state.IsRunActive || GameRunFlow.IsStaffDemoInterrupted(state))
                 && incoming.demoStageIndex == SelectedDemoStage && state.demoStageIndex == SelectedDemoStage
@@ -145,6 +183,7 @@ namespace Hapio
         private void ResetStaffRetryRoom()
         {
             staffRetryRequested = staffRecoveryPrepared = false;
+            staffRetryEntryStage = staffRetryEntryGroup = 0;
             staffRecoveryMembers.Clear();
             staffLobbyPreviousRun = null;
             staffLobbyPreviousStage = 0;
@@ -153,7 +192,8 @@ namespace Hapio
 
         private bool SetSelectedDemoStage(int stage)
         {
-            if (!LabGameBuildVariant.IsStaffStageDemo || stage < 1 || stage > 3 || goingHome
+            if (!LabGameBuildVariant.IsStaffStageDemo || SelectedDemoGroup < 1 || SelectedDemoGroup > 2
+                || !LabGameBuildVariant.AllowsStaffDemoStage(stage) || goingHome
                 || state.phase != GameFlowPhase.Home || !network.CanChooseConnection
                 || !hostFlow.ConfigureDemoStage(stage)) return false;
             SelectedDemoStage = stage;
@@ -165,9 +205,14 @@ namespace Hapio
             if (!LabGameBuildVariant.IsStaffStageDemo) return;
             SelectedDemoStage = 0;
             hostFlow.ConfigureDemoStage(0);
-            if (network.CanChooseConnection) network.SetDemoStageIdentity(0);
+            if (network.CanChooseConnection) network.SetDemoStageIdentity(0, 0);
             roomBrowserVisible = false;
         }
+
+        private bool MatchesStaffDemoRoom(int group) => !LabGameBuildVariant.IsStaffStageDemo
+            || SelectedDemoGroup >= 1 && SelectedDemoGroup <= 2 && group == SelectedDemoGroup
+                && network != null && network.DemoGroupId == SelectedDemoGroup
+                && SelectedDemoStage >= 1 && network.DemoStageIndex == SelectedDemoStage;
 
         /// <summary>Only a deliberate menu action returns the completed demo to its staff screen.</summary>
         public void ReturnToDemoSelection()

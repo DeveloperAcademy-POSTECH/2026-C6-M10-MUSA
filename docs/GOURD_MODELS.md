@@ -86,3 +86,7 @@
 ### #701 후속 — 저고리·색동 천 장식
 
 키링과 별도로 모델 루트에 달려 있던 `Gumiho_Teal_Jeogori_Ribbon`(구미호·지귀), `Saekdong_Ribbon_1` 및 `Saekdong_Ribbon_1_Separate_Rope_Tie`(세 스테이지)를 함께 비활성화한다. 복제 접미사는 기존 BaseName 규칙으로 처리하며 재굽기에도 같은 정책을 적용한다. 원본 아트와 천 BlendShape/노드 경로는 보존한다. 박 몸통·뚜껑·뚜껑의 손잡이·테두리와 요괴는 그대로다.
+
+## #749 2라운드 밧줄 연결점
+
+Rope Socket을 비활성화한 Rear_Rope_Binding의 AABB 상단(y 1.638)에서 계산했다. 그래서 남아 있는 매듭 메시 model_part4보다 높은 곳에서 밧줄이 끝나 사이가 떠 보였다. model_part4는 상단 두 갈래 사이가 비어 있어 bounds 상단도 연결 표면이 아니다. 그래서 Stage2만 밧줄 축(binding 중심 x·z)을 따라 model_part4를 MeshCollider로 raycast한다. 처음 닿은 표면에서 0.01 안쪽을 Rope Socket으로 쓴다(y 약 1.3488). 굽기 계산(`GameGourdRigBake.Compute`)과 저장 Prefab을 `Hapio > Gourds > Bake Stage 2 Yagwanggwi Gourd`로 맞추고, `GameStageGourdVisualTests.Stage2RopeEndsInsideTheVisibleAttachment`가 둘의 일치와 표면 위치를 확인한다. Rope Socket은 밧줄을 그리는 끝점일 뿐이다. 물리·판정·도색·통신은 바뀌지 않으며 1·3스테이지와 흰 박도 그대로다.

@@ -63,7 +63,7 @@ namespace Hapio.Tests
         {
             var ending=Sequence("Ending");Assert.That(ending.cuts[0].GetPage(0).speaker,Is.EqualTo("불이"));
             Assert.That(ending.cuts[1].GetPage(0).speaker,Is.EqualTo("솔이"));
-            Assert.That(ending.cuts[4].GetPage(0).dialogue,Is.EqualTo("이건 ... 우리가 깬게 아닌..데..?"));
+            Assert.That(ending.cuts[4].GetPage(0).dialogue,Is.EqualTo("이건... 우리가 깬게 아닌데...?"));
             foreach(int i in new[]{2,3,5,6})Assert.That(ending.cuts[i].GetPage(0).dialogue,Is.Empty);
             foreach(var cut in ending.cuts)Assert.That(cut.viewPrefab.hideEmptyDialogue,Is.True);
         }
