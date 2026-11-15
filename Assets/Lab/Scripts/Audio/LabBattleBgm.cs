@@ -151,15 +151,16 @@ namespace C6Lab
             feverSource.spatialBlend = 0f;
             feverSource.volume = 0f;
             feverSource.clip = feverClip;
+            cueClips = Resources.LoadAll<AudioClip>(LabComboClearSound.ClipFolder);
+            cueSource = gameObject.AddComponent<AudioSource>();
+            cueSource.playOnAwake = false;
+            cueSource.spatialBlend = 0f;
+            // #745: added last so the battle / fever / cue sources keep their order.
             rushSource = gameObject.AddComponent<AudioSource>();
             rushSource.playOnAwake = false;
             rushSource.loop = true;
             rushSource.spatialBlend = 0f;
             rushSource.volume = 0f;
-            cueClips = Resources.LoadAll<AudioClip>(LabComboClearSound.ClipFolder);
-            cueSource = gameObject.AddComponent<AudioSource>();
-            cueSource.playOnAwake = false;
-            cueSource.spatialBlend = 0f;
         }
 
         private static AudioClip FirstClip(string folder)
