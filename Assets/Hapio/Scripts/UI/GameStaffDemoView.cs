@@ -13,16 +13,21 @@ namespace Hapio
         public UnityEngine.UI.Button groupChangeButton;
         public UnityEngine.UI.Text status;
         public UnityEngine.UI.Button backButton;
+        public GameObject creationConfirmation;
+        public UnityEngine.UI.Text creationConfirmationMessage;
+        public UnityEngine.UI.Button confirmCreationButton, cancelCreationButton;
         private GameSession session;
         private UnityEngine.UI.Text title, caption;
+        private UnityEngine.UI.Text[] groupLabels;
 
         public void Initialize(GameSession value)
         {
             if (session != null) return;
             if (value == null || stageButtons == null || stageButtons.Length != 3
                 || groupButtons == null || groupButtons.Length != 2 || groupChangeButton == null
-                || status == null || backButton == null)
-                throw new InvalidOperationException("The saved staff screen needs A/B groups, stages, group change, status and cancel.");
+                || status == null || backButton == null || creationConfirmation == null
+                || creationConfirmationMessage == null || confirmCreationButton == null || cancelCreationButton == null)
+                throw new InvalidOperationException("The saved staff screen needs A/B groups, stages, status, cancel and its room-creation confirmation.");
             if (transform is RectTransform rect)
             {
                 rect.localScale = Vector3.one;
@@ -36,21 +41,30 @@ namespace Hapio
             {
                 int stage = i + 1;
                 if (stageButtons[i] == null) throw new InvalidOperationException("A staff stage button is missing.");
-                stageButtons[i].onClick.AddListener(() => session.SelectDemoStage(stage));
+                stageButtons[i].onClick.AddListener(() => { if (!session.IsDemoCreationConfirmationPending) session.SelectDemoStage(stage); });
             }
+            groupLabels = new UnityEngine.UI.Text[groupButtons.Length];
             for (int i = 0; i < groupButtons.Length; i++)
             {
                 int group = i + 1;
                 if (groupButtons[i] == null) throw new InvalidOperationException("A staff group button is missing.");
-                groupButtons[i].onClick.AddListener(() => session.SelectDemoGroup(group));
-                var label = groupButtons[i].GetComponentInChildren<UnityEngine.UI.Text>(true);
-                if (label != null) label.text = (group == 1 ? "A그룹" : "B그룹")
-                    + (LabGameBuildVariant.IsStaffStageTwoOnly ? "\n방 만들기 / 입장" : string.Empty);
+                groupButtons[i].onClick.AddListener(() => { if (!session.IsDemoCreationConfirmationPending) session.SelectDemoGroup(group); });
+                groupLabels[i] = groupButtons[i].GetComponentInChildren<UnityEngine.UI.Text>(true);
             }
             title = transform.Find("SafeArea/Title")?.GetComponent<UnityEngine.UI.Text>();
             caption = transform.Find("SafeArea/StaffCaption")?.GetComponent<UnityEngine.UI.Text>();
             backButton.onClick.AddListener(() => session.CancelDemoEntry());
             groupChangeButton.onClick.AddListener(() => session.ClearDemoGroup());
+            confirmCreationButton.onClick.AddListener(() =>
+            {
+                if (session.IsDemoCreationConfirmationPending) session.ConfirmDemoRoomCreation();
+                Refresh();
+            });
+            cancelCreationButton.onClick.AddListener(() =>
+            {
+                if (session.IsDemoCreationConfirmationPending) session.CancelDemoRoomCreation();
+                Refresh();
+            });
             Refresh();
         }
 
@@ -61,14 +75,20 @@ namespace Hapio
         {
             if (session == null) return;
             bool pending = session.IsDemoEntryPending || session.IsStaffRetryPending;
-            bool idle = session.CanChangeDemoGroup;
+            bool confirming = session.IsDemoCreationConfirmationPending;
+            bool idle = session.CanChangeDemoGroup && !confirming;
             bool directEntry = LabGameBuildVariant.IsStaffStageTwoOnly;
             bool hasGroup = session.SelectedDemoGroup == 1 || session.SelectedDemoGroup == 2;
             string groupName = session.SelectedDemoGroup == 1 ? "A그룹" : "B그룹";
-            foreach (UnityEngine.UI.Button button in groupButtons)
+            for (int i = 0; i < groupButtons.Length; i++)
             {
+                UnityEngine.UI.Button button = groupButtons[i];
                 button.gameObject.SetActive(directEntry || !hasGroup);
                 button.interactable = idle;
+                string label = i == 0 ? "A그룹" : "B그룹";
+                string overview = directEntry ? session.GetDemoGroupStatus(i + 1) : string.Empty;
+                if (!string.IsNullOrEmpty(overview)) label += "\n" + overview;
+                SetText(groupLabels[i], label);
             }
             for (int i = 0; i < stageButtons.Length; i++)
             {
@@ -77,7 +97,7 @@ namespace Hapio
             }
             groupChangeButton.gameObject.SetActive(!directEntry && hasGroup && !pending);
             groupChangeButton.interactable = idle;
-            backButton.gameObject.SetActive(pending);
+            backButton.gameObject.SetActive(pending && !confirming);
             if (title != null) title.text = directEntry ? "시연 방 입장" : hasGroup ? "스테이지 선택" : "시연 그룹 선택";
             if (caption != null) caption.text = directEntry ? "A/B 독립 시연 · 각 3명"
                 : hasGroup ? groupName + " · 3인 단판 시연" : "함께할 세 기기는 같은 그룹을 고르시오.";
@@ -86,8 +106,20 @@ namespace Hapio
                     + "함께할 세 기기는 같은 그룹을 고르시오.\n방 입장 후 자리를 고르면 방장이 시작하오."
                 : hasGroup ? groupName + "에서 플레이할 스테이지를 선택하시오."
                     : "A/B는 서로 다른 방이오.\n같은 그룹의 세 명이 함께 출발하오.";
-            status.text = !string.IsNullOrEmpty(session.DemoEntryNotice) ? session.DemoEntryNotice
-                : !string.IsNullOrEmpty(session.UiNotice) ? session.UiNotice : idleNotice;
+            SetText(status, !string.IsNullOrEmpty(session.DemoEntryNotice) ? session.DemoEntryNotice
+                : !string.IsNullOrEmpty(session.UiNotice) ? session.UiNotice : idleNotice);
+            creationConfirmation.SetActive(confirming);
+            if (confirming)
+            {
+                creationConfirmation.transform.SetAsLastSibling();
+                SetText(creationConfirmationMessage, session.DemoCreationConfirmationMessage);
+            }
+            confirmCreationButton.interactable = cancelCreationButton.interactable = confirming;
+        }
+
+        private static void SetText(UnityEngine.UI.Text label, string value)
+        {
+            if (label != null && label.text != value) label.text = value;
         }
     }
 }

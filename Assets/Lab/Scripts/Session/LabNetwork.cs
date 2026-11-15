@@ -762,6 +762,7 @@ namespace C6Lab
         {
             if (!CanChooseConnection || registeredRoom == null || registeredRoom.Family != RoomFamily || !registeredRoom.IsAdvertising
                 || !registeredRoom.AdvertisingConfirmed || !ValidRoomName(registeredRoom.RegisteredServiceName)
+                || !MatchesStaffRoomName(registeredRoom.RegisteredServiceName)
                 || registeredRoom.DemoStageIndex != DemoStageIndex || registeredRoom.DemoGroupId != DemoGroupId
                 || roomPort == 0 || !AllowsDemoRoom(capacity, registeredRoom.Team)
                 || !LabModel.ValidRoomSize(capacity, registeredRoom.Team)) return false;
@@ -3221,7 +3222,8 @@ namespace C6Lab
                 RefreshDiscoveredRooms();
                 Debug.Log("C6_LAB_ROOM_LIST count=" + discoveredRooms.Count);
             }
-            else if (IsHost && discovery != null && discovery.AdvertisingConfirmed)
+            else if (IsHost && discovery != null && discovery.AdvertisingConfirmed
+                && MatchesStaffRoomName(discovery.RegisteredServiceName))
             {
                 OnHostAdvertisementConfirmed();
                 string confirmed = discovery.RegisteredServiceName ?? string.Empty;
@@ -3234,6 +3236,11 @@ namespace C6Lab
             }
             Changed?.Invoke();
         }
+
+        private bool MatchesStaffRoomName(string name)
+            => !gameFlowEnabled || !LabGameBuildVariant.IsStaffStageDemo
+                || LabGameBuildVariant.IsValidStaffRoomIdentity(DemoStageIndex, DemoGroupId)
+                && string.Equals(name, LabPendingRoom.StaffStageName(DemoStageIndex, DemoGroupId), StringComparison.OrdinalIgnoreCase);
 
         private void RefreshDiscoveredRooms()
         {
