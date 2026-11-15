@@ -51,6 +51,8 @@ namespace Hapio
         public int CurrentPageIndex { get; private set; } = -1;
         public bool IsPlaying { get; private set; }
         public bool AutoAdvance { get; private set; }
+        public bool UsesSideTapNavigation => sequence != null && sequence.sideTapNavigation;
+        private bool navigationHidden, nextWasActive, previousWasActive;
         public bool IsReading { get; private set; }
         public StoryCutView CurrentView => currentView;
         public bool IsTransitioning => activeCloudWipe != null;
@@ -123,6 +125,7 @@ namespace Hapio
             }
             Cancel();
             sequence = story;
+            PrepareSideNavigation();
             AutoAdvance = false;
             lastInputFrame = -1;
             suppressMultiTouch = false;
@@ -189,6 +192,49 @@ namespace Hapio
         {
             if (currentView != null && currentView.requireContinueButton) return;
             RequestNext();
+        }
+
+        public void RequestSurfacePrevious()
+        {
+            if (!UsesSideTapNavigation || IsCinematicCut ||
+                CurrentCutIndex == 0 && CurrentPageIndex == 0 || !AcceptUserInput()) return;
+            AutoAdvance = false;
+            UpdateAutoLabel();
+            if (CurrentPageIndex > 0) ShowPage(CurrentPageIndex - 1);
+            else
+            {
+                Previous();
+                if (!IsCinematicCut && sequence.cuts[CurrentCutIndex].PageCount > 1)
+                    ShowPage(sequence.cuts[CurrentCutIndex].PageCount - 1);
+            }
+        }
+
+        private void PrepareSideNavigation()
+        {
+            if (UsesSideTapNavigation && !navigationHidden)
+            {
+                nextWasActive = nextButton != null && nextButton.gameObject.activeSelf;
+                previousWasActive = previousButton != null && previousButton.gameObject.activeSelf;
+                if (nextButton != null) nextButton.gameObject.SetActive(false);
+                if (previousButton != null) previousButton.gameObject.SetActive(false);
+                navigationHidden = true;
+            }
+            else if (!UsesSideTapNavigation && navigationHidden)
+            {
+                if (nextButton != null) nextButton.gameObject.SetActive(nextWasActive);
+                if (previousButton != null) previousButton.gameObject.SetActive(previousWasActive);
+                navigationHidden = false;
+            }
+            if (!UsesSideTapNavigation || GetComponentInChildren<StoryTapAdvance>(true) != null) return;
+            // Authoring previews use the same input surface as the game, beneath interactive controls.
+            var surface = new GameObject("Story Tap Surface", typeof(RectTransform), typeof(Image), typeof(StoryTapAdvance));
+            surface.transform.SetParent(cutHost.parent, false);
+            surface.transform.SetAsFirstSibling();
+            var rect = (RectTransform)surface.transform;
+            rect.anchorMin = Vector2.zero; rect.anchorMax = Vector2.one;
+            rect.offsetMin = rect.offsetMax = Vector2.zero;
+            surface.GetComponent<Image>().color = Color.clear;
+            surface.GetComponent<StoryTapAdvance>().player = this;
         }
 
         public void RequestPrevious() { if (AcceptUserInput()) Previous(); }
