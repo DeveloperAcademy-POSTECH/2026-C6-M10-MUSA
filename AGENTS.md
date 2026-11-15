@@ -506,3 +506,8 @@
 - 스태프 시연의 이탈·연결 끊김 GameOver만 `다시 도전`으로 같은 스테이지의 자리 로비에 복귀한다. 누구든 요청할 수 있고 Host가 이전 판 identity를 확인해 전원 이동·P선택/보류자리/준비 초기화를 승인한다. 일반 Story 정상 패배 재도전·Lab·땅따먹기는 유지한다.
 - Host는 종료 화면을 유지한 채 전투 자료/입장 잠금을 먼저 정리하며, 끊긴 참가자의 명시적 같은 스테이지 재입장도 복귀 요청이다. Host 부재/승인 한도 뒤에는 종료 완료와 Home 로드 후 선택 스테이지 검색·입장/생성을 재사용한다. 세 명 새 자리 선택·설정 확인 뒤 방장 수동 시작이며 자동 시작하지 않는다.
 - StaffStageDemoRevision은 2다. 기존 일반 Game/Lab의 버전·설정·Scene을 이 변경 때문에 올리거나 재생성하지 않는다. 상세는 `docs/STAFF_STAGE_DEMO.md`, 실제 검사는 `docs/VALIDATION.md`에 기록한다.
+
+## #750 야광귀만 선택하는 스태프 빌드
+
+- 기존 `Demo Build`는 세 카드, `Demo Build/Stage 2 Only`는 야광귀 카드 하나다. 전용 Player에만 staff+stage-two-only define을 전달하고, 일반 Scene·원본 설정·빌드 define을 저장하지 않는다. 별도 Stage2 Scene이나 구형 #706 오프닝 흐름을 만들지 않는다.
+- Stage2 제한은 UI와 선택 API에 함께 적용하며, 기존 3인 자리 선택·#740 재도전·결과·엔딩·QR과 Staff revision2/S2를 유지한다. 출력/앱 식별자는 별도로 구분하고, 실패·취소 시에도 기존 빌드 설정을 복원한다. 빌드/사용법은 `docs/STAFF_STAGE_DEMO.md`, 실행한 검사만 `docs/VALIDATION.md`에 기록한다.

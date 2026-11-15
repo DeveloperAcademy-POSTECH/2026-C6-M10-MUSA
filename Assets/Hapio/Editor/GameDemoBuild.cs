@@ -21,9 +21,11 @@ namespace Hapio.Editor
     public static class GameDemoBuild
     {
         public const string ProductName = "Hapio Staff Demo";
+        public const string StageTwoProductName = "Hapio Stage 2 Demo";
         public const string DemoVersion = "0.2.0";
         public const string DemoBuildNumber = "2";
         private const string LastOutput = "Hapio.LastStaffStageDemoBuild";
+        private const string LastStageTwoOutput = "Hapio.LastStaffStageTwoDemoBuild";
         private const string ManifestFileName = "build-manifest.json";
 
         [MenuItem("Hapio/Demo Build/Release/Build Mac App")]
@@ -34,16 +36,34 @@ namespace Hapio.Editor
         public static void MacDevelopment() => Build(BuildTarget.StandaloneOSX, true);
         [MenuItem("Hapio/Demo Build/Development QA/Export iOS Xcode Project")]
         public static void IosDevelopment() => Build(BuildTarget.iOS, true);
+        [MenuItem("Hapio/Demo Build/Stage 2 Only/Release/Build Mac App")]
+        public static void StageTwoMac() => BuildFor(BuildTarget.StandaloneOSX, false, true);
+        [MenuItem("Hapio/Demo Build/Stage 2 Only/Release/Export iOS Xcode Project")]
+        public static void StageTwoIos() => BuildFor(BuildTarget.iOS, false, true);
+        [MenuItem("Hapio/Demo Build/Stage 2 Only/Development QA/Build Mac App")]
+        public static void StageTwoMacDevelopment() => BuildFor(BuildTarget.StandaloneOSX, true, true);
+        [MenuItem("Hapio/Demo Build/Stage 2 Only/Development QA/Export iOS Xcode Project")]
+        public static void StageTwoIosDevelopment() => BuildFor(BuildTarget.iOS, true, true);
+        [MenuItem("Hapio/Demo Build/Stage 2 Only/Open Last Output")]
+        public static void OpenStageTwoOutput() => OpenLastOutput(LastStageTwoOutput);
         [MenuItem("Hapio/Demo Build/Open Last Output")]
-        public static void OpenOutput()
+        public static void OpenOutput() => OpenLastOutput(LastOutput);
+
+        private static void OpenLastOutput(string key)
         {
-            string path = SessionState.GetString(LastOutput, string.Empty);
+            string path = SessionState.GetString(key, string.Empty);
             if (!string.IsNullOrEmpty(path) && Directory.Exists(path)) EditorUtility.RevealInFinder(path);
             else Debug.LogWarning("HAPIO_DEMO_BUILD_OUTPUT_UNAVAILABLE: complete a demo build first.");
         }
 
         /// <summary>Only this player's compilation receives the variant; no saved scripting symbols are changed.</summary>
-        public static BuildPlayerOptions CreateOptions(BuildTarget target, string output, bool development)
+        public static BuildPlayerOptions CreateOptions(BuildTarget target, string output, bool development) =>
+            CreateOptionsFor(target, output, development, false);
+
+        public static BuildPlayerOptions CreateStageTwoOptions(BuildTarget target, string output, bool development) =>
+            CreateOptionsFor(target, output, development, true);
+
+        private static BuildPlayerOptions CreateOptionsFor(BuildTarget target, string output, bool development, bool stageTwoOnly)
         {
             RequireTarget(target);
             return new BuildPlayerOptions
@@ -52,7 +72,9 @@ namespace Hapio.Editor
                 target = target,
                 locationPathName = output,
                 options = development ? BuildOptions.Development : BuildOptions.None,
-                extraScriptingDefines = new[] { LabGameBuildVariant.StaffStageDemoDefine }
+                extraScriptingDefines = stageTwoOnly
+                    ? new[] { LabGameBuildVariant.StaffStageDemoDefine, LabGameBuildVariant.StaffStageTwoOnlyDefine }
+                    : new[] { LabGameBuildVariant.StaffStageDemoDefine }
             };
         }
 
@@ -61,10 +83,13 @@ namespace Hapio.Editor
             if (string.IsNullOrWhiteSpace(normalIdentifier))
                 throw new InvalidOperationException("The normal application identifier must be set before exporting a demo.");
             if (normalIdentifier.EndsWith(".yaguangdemo", StringComparison.OrdinalIgnoreCase)
-                || normalIdentifier.EndsWith(".staffdemo", StringComparison.OrdinalIgnoreCase))
+                || normalIdentifier.EndsWith(".staffdemo", StringComparison.OrdinalIgnoreCase)
+                || normalIdentifier.EndsWith(".staffdemo.stage2", StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException("The saved application identifier already has the demo suffix. Restore the normal identifier first.");
             return normalIdentifier + ".staffdemo";
         }
+
+        public static string StageTwoApplicationIdentifier(string normalIdentifier) => DemoApplicationIdentifier(normalIdentifier) + ".stage2";
 
         /// <summary>Read-only: missing authored assets must be prepared explicitly, never generated during a build.</summary>
         public static void Validate()
@@ -89,7 +114,9 @@ namespace Hapio.Editor
             StaffStageDemoStoryAssets.Validate();
         }
 
-        private static void Build(BuildTarget target, bool development)
+        private static void Build(BuildTarget target, bool development) => BuildFor(target, development, false);
+
+        private static void BuildFor(BuildTarget target, bool development, bool stageTwoOnly)
         {
             RequireTarget(target);
             if (EditorApplication.isPlayingOrWillChangePlaymode || EditorApplication.isCompiling || EditorApplication.isUpdating || BuildPipeline.isBuildingPlayer)
@@ -99,21 +126,24 @@ namespace Hapio.Editor
                 throw new InvalidOperationException("Install the Unity build support module for " + target + " first.");
             string[] savedDefines = PlayerSettings.GetScriptingDefineSymbols(namedTarget).Split(';');
             if (savedDefines.Contains(LabGameBuildVariant.YaguangDemoDefine)
-                || savedDefines.Contains(LabGameBuildVariant.StaffStageDemoDefine))
+                || savedDefines.Contains(LabGameBuildVariant.StaffStageDemoDefine)
+                || savedDefines.Contains(LabGameBuildVariant.StaffStageTwoOnlyDefine))
                 throw new InvalidOperationException("Remove the demo symbol from saved Player Settings. Only the dedicated demo build may supply it.");
             Validate();
 
             string normalIdentifier = PlayerSettings.GetApplicationIdentifier(namedTarget);
-            string identifier = DemoApplicationIdentifier(normalIdentifier);
+            string identifier = stageTwoOnly ? StageTwoApplicationIdentifier(normalIdentifier) : DemoApplicationIdentifier(normalIdentifier);
             string run = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture)
                 + "-" + Guid.NewGuid().ToString("N").Substring(0, 8) + (development ? "-qa" : "-release");
             string project = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
-            string folder = Path.Combine(project, "Builds", "HapioDemo", run);
+            string folder = Path.Combine(project, "Builds", stageTwoOnly ? "HapioStage2Demo" : "HapioDemo", run);
+            string appName = stageTwoOnly ? "Hapio-Stage2-Demo" : "Hapio-Staff-Demo";
             string output = Path.Combine(folder, target == BuildTarget.iOS ? "iOS"
-                : "macOS/Hapio-Staff-Demo" + (development ? "-QA.app" : ".app"));
+                : "macOS/" + appName + (development ? "-QA.app" : ".app"));
             if (Directory.Exists(folder) || File.Exists(folder))
                 throw new InvalidOperationException("The demo output already exists: " + folder);
-            BuildManifest manifest = CreateManifest(target, development, identifier, run, project);
+            BuildManifest manifest = stageTwoOnly ? CreateStageTwoManifest(target, development, identifier, run, project)
+                : CreateManifest(target, development, identifier, run, project);
             Directory.CreateDirectory(folder);
             string manifestPath = Path.Combine(folder, ManifestFileName);
             WriteManifest(manifestPath, manifest);
@@ -121,15 +151,21 @@ namespace Hapio.Editor
             try
             {
                 Debug.Log("HAPIO_DEMO_BUILD_START target=" + target + " development=" + development + " output=" + output);
-                WithTemporaryEditorBuildState(target, () => WithTemporaryPlayerSettings(target, identifier,
-                    () => report = BuildPipeline.BuildPlayer(CreateOptions(target, output, development))));
+                Action build = () => report = BuildPipeline.BuildPlayer(stageTwoOnly
+                    ? CreateStageTwoOptions(target, output, development) : CreateOptions(target, output, development));
+                WithTemporaryEditorBuildState(target, () =>
+                {
+                    if (stageTwoOnly) WithTemporaryStageTwoPlayerSettings(target, identifier, build);
+                    else WithTemporaryPlayerSettings(target, identifier, build);
+                });
                 manifest.result = report == null ? "NoReport" : report.summary.result.ToString();
                 manifest.totalErrors = report == null ? -1 : (int)report.summary.totalErrors;
                 if (report == null || report.summary.result != BuildResult.Succeeded)
                     throw new InvalidOperationException("HAPIO_DEMO_BUILD_FAILED result=" + manifest.result + " output=" + output);
-                ValidateOutputIdentity(target, output, identifier);
+                if (stageTwoOnly && target == BuildTarget.StandaloneOSX) VerifyStageTwoMacSignature(output);
+                ValidateOutputIdentityFor(target, output, identifier, stageTwoOnly ? StageTwoProductName : ProductName);
                 manifest.identityVerified = true;
-                SessionState.SetString(LastOutput, folder);
+                SessionState.SetString(stageTwoOnly ? LastStageTwoOutput : LastOutput, folder);
                 Debug.Log("HAPIO_DEMO_BUILD_OK output=" + output + " manifest=" + manifestPath);
             }
             catch
@@ -142,7 +178,13 @@ namespace Hapio.Editor
         }
 
         // Kept as a single scope so a failed/cancelled BuildPlayer cannot leak demo identity or DEV into the Editor.
-        private static void WithTemporaryPlayerSettings(BuildTarget target, string identifier, Action action)
+        private static void WithTemporaryPlayerSettings(BuildTarget target, string identifier, Action action) =>
+            WithTemporaryPlayerSettingsFor(target, identifier, ProductName, action);
+
+        private static void WithTemporaryStageTwoPlayerSettings(BuildTarget target, string identifier, Action action) =>
+            WithTemporaryPlayerSettingsFor(target, identifier, StageTwoProductName, action);
+
+        private static void WithTemporaryPlayerSettingsFor(BuildTarget target, string identifier, string product, Action action)
         {
             NamedBuildTarget namedTarget = NamedTarget(target);
             string previousName = PlayerSettings.productName;
@@ -153,13 +195,13 @@ namespace Hapio.Editor
             bool previousDevelopment = EditorUserBuildSettings.development;
             try
             {
-                PlayerSettings.productName = ProductName;
+                PlayerSettings.productName = product;
                 PlayerSettings.SetApplicationIdentifier(namedTarget, identifier);
                 PlayerSettings.bundleVersion = DemoVersion;
                 if (target == BuildTarget.iOS)
                 {
                     PlayerSettings.iOS.buildNumber = DemoBuildNumber;
-                    PlayerSettings.iOS.applicationDisplayName = ProductName;
+                    PlayerSettings.iOS.applicationDisplayName = product;
                 }
                 action();
             }
@@ -230,18 +272,26 @@ namespace Hapio.Editor
                 throw new IOException("Could not restore the original build configuration file: " + Path.GetFileName(path));
         }
 
-        private static BuildManifest CreateManifest(BuildTarget target, bool development, string identifier, string generation, string project)
+        private static BuildManifest CreateManifest(BuildTarget target, bool development, string identifier, string generation, string project) =>
+            CreateManifestFor(target, development, identifier, generation, project, false);
+
+        private static BuildManifest CreateStageTwoManifest(BuildTarget target, bool development, string identifier, string generation, string project) =>
+            CreateManifestFor(target, development, identifier, generation, project, true);
+
+        private static BuildManifest CreateManifestFor(BuildTarget target, bool development, string identifier, string generation, string project, bool stageTwoOnly)
         {
             GameStageCatalog catalog = GameStageCatalog.RequireDefault();
             var source = AssetDatabase.LoadAssetAtPath<LabConfig>("Assets/Lab/Resources/LabConfig.asset");
-            var stages = new StageManifest[3];
+            int[] indices = stageTwoOnly ? new[] { 2 } : new[] { 1, 2, 3 };
+            var stages = new StageManifest[indices.Length];
             int developerFields = 0;
             using (var settings = new GameStageSettings(source, catalog))
-                for (int index = 1; index <= stages.Length; index++)
+                for (int row = 0; row < indices.Length; row++)
                 {
+                    int index = indices[row];
                     float[] values = settings.Capture(index);
                     developerFields = values.Length;
-                    stages[index - 1] = new StageManifest
+                    stages[row] = new StageManifest
                     {
                         stageIndex = index, stageId = catalog.Get(index).stageId,
                         yokai = catalog.Get(index).yokai.ToString(),
@@ -262,13 +312,14 @@ namespace Hapio.Editor
                 sourceHasUncommittedChanges = !string.IsNullOrWhiteSpace(ReadGit(project, "status --porcelain --untracked-files=normal")),
                 target = target.ToString(),
                 development = development,
-                productName = ProductName,
+                productName = stageTwoOnly ? StageTwoProductName : ProductName,
                 applicationIdentifier = identifier,
                 version = DemoVersion,
                 buildNumber = target == BuildTarget.iOS ? DemoBuildNumber : string.Empty,
-                variant = "staff-stage-demo",
+                variant = stageTwoOnly ? "staff-stage-2-only-demo" : "staff-stage-demo",
                 variantRevision = LabGameBuildVariant.StaffStageDemoRevision,
-                scriptingDefine = LabGameBuildVariant.StaffStageDemoDefine,
+                scriptingDefine = LabGameBuildVariant.StaffStageDemoDefine
+                    + (stageTwoOnly ? ";" + LabGameBuildVariant.StaffStageTwoOnlyDefine : string.Empty),
                 connectionCompatibility = connection,
                 discoveryCompatibility = discovery,
                 labCompatibility = LabBonjourDiscovery.ProtocolFor(LabRoomFamily.Lab),
@@ -307,12 +358,15 @@ namespace Hapio.Editor
             }
         }
 
-        private static void ValidateOutputIdentity(BuildTarget target, string output, string identifier)
+        private static void ValidateOutputIdentity(BuildTarget target, string output, string identifier) =>
+            ValidateOutputIdentityFor(target, output, identifier, ProductName);
+
+        private static void ValidateOutputIdentityFor(BuildTarget target, string output, string identifier, string product)
         {
             string plist = target == BuildTarget.iOS ? Path.Combine(output, "Info.plist") : Path.Combine(output, "Contents", "Info.plist");
             XDocument document = XDocument.Load(plist);
             string displayName = PlistValue(document, "CFBundleDisplayName") ?? PlistValue(document, "CFBundleName");
-            if (displayName != ProductName)
+            if (displayName != product)
                 throw new InvalidOperationException("The generated demo display name does not match: " + displayName);
             string actualIdentifier = PlistValue(document, "CFBundleIdentifier");
             if (actualIdentifier != identifier)
@@ -337,6 +391,32 @@ namespace Hapio.Editor
             return appSettings.Length > 0 && appSettings.All(settings =>
                 Regex.Match(settings, @"\bPRODUCT_BUNDLE_IDENTIFIER\s*=\s*""?(?<identifier>[^"";\r\n]+)""?\s*;")
                     .Groups["identifier"].Value.Trim() == expected);
+        }
+
+        // Some local Unity exports contain a stale UnityPlayer.dylib signature. Repair only this
+        // standalone demo when necessary; keep a valid signature, and never touch iOS signing.
+        private static void VerifyStageTwoMacSignature(string output)
+        {
+            if (RunCodeSign("--verify --deep --strict", output, out _)) return;
+            if (!RunCodeSign("--force --deep --sign -", output, out string repair)
+                || !RunCodeSign("--verify --deep --strict", output, out repair))
+                throw new InvalidOperationException("The Stage2 Mac app signature could not be verified: " + repair);
+        }
+
+        private static bool RunCodeSign(string options, string output, out string error)
+        {
+            using (var process = new System.Diagnostics.Process())
+            {
+                process.StartInfo = new System.Diagnostics.ProcessStartInfo("/usr/bin/codesign",
+                    options + " \"" + output.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"")
+                {
+                    UseShellExecute = false, RedirectStandardError = true, CreateNoWindow = true
+                };
+                process.Start();
+                error = process.StandardError.ReadToEnd();
+                process.WaitForExit();
+                return process.ExitCode == 0;
+            }
         }
 
         private static string PlistValue(XDocument document, string key)
