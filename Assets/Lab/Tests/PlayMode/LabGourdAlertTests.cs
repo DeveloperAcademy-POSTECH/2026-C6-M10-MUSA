@@ -19,6 +19,16 @@ namespace C6Lab.Tests
             yield return null;
         }
 
+        [Test]
+        public void BlockNoticeHoldsThenFadesWithoutChangingTheRestrictionDuration()
+        {
+            Assert.That(LabGourdAlert.BlockNoticeAlpha(0f), Is.Zero);
+            Assert.That(LabGourdAlert.BlockNoticeAlpha(.2f), Is.EqualTo(1f));
+            Assert.That(LabGourdAlert.BlockNoticeAlpha(1.9f), Is.EqualTo(1f));
+            Assert.That(LabGourdAlert.BlockNoticeAlpha(2.2f), Is.EqualTo(.5f).Within(.001f));
+            Assert.That(LabGourdAlert.BlockNoticeAlpha(2.4f), Is.Zero.Within(.001f));
+        }
+
         [UnityTest]
         public IEnumerator TheAlertPopsAnExclamationBubbleBesideTheGourdFollowsItAndLeavesByItself()
         {
@@ -107,17 +117,22 @@ namespace C6Lab.Tests
             Assert.That(alert.Visible, Is.True);
             Assert.That(alert.BlockRight, Is.True);
             Assert.That(alert.Label, Is.EqualTo("→ 🚫"));
-            Assert.That(blockMark.gameObject.activeSelf, Is.True, "A drawn arrow and no-entry sign...");
+            Assert.That(blockMark.gameObject.activeSelf, Is.False, "The old cartoon mark is replaced by the Figma panel.");
             Assert.That(exclamation.gameObject.activeSelf, Is.False, "...instead of the bomb's \"!\".");
-            var image = blockMark.GetComponent<Image>();
-            Assert.That(image.sprite.name, Is.EqualTo("Lab gourd block right"));
+            var image = alert.Bubble.GetComponent<Image>();
+            Assert.That(image.sprite.name, Is.EqualTo("BlockRight"));
             Assert.That(image.raycastTarget, Is.False, "It never blocks a touch.");
 
             alert.ShowBlock(gourd, false);
             Assert.That(alert.Label, Is.EqualTo("← 🚫"));
-            Assert.That(image.sprite.name, Is.EqualTo("Lab gourd block left"));
+            Assert.That(image.sprite.name, Is.EqualTo("BlockLeft"));
 
-            float shown = Time.time;
+            yield return new WaitForSeconds(.2f);
+            Assert.That(alert.BlockPanelAlpha, Is.EqualTo(1f).Within(.01f));
+            Assert.That(alert.Bubble.localRotation, Is.EqualTo(Quaternion.identity));
+            yield return new WaitForSeconds(1.95f);
+            Assert.That(alert.BlockPanelAlpha, Is.InRange(.1f, .9f), "The panel fades instead of shrinking/wiggling.");
+            float shown = Time.time - 2.15f;
             float until = Time.time + LabGourdAlert.BlockShowSeconds + 1f;
             while (alert.Active && Time.time < until) yield return null;
             Assert.That(alert.Active, Is.False, "It leaves by itself.");

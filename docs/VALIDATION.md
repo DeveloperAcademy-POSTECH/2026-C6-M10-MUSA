@@ -9049,3 +9049,18 @@ PR #729 검증 중 main `a7208003`에서 `LabLocalBoardNetworkIntegrationTests` 
     - `StoryTapAdvanceTests` 2개(`LastPageFinishesOnceOnReleaseClickRatherThanPointerDown`, `RaycastSurfaceAdvancesOnlyOnCompletedTapAndKeepsDirectNextSynchronous`): 화면 가운데 레이캐스트가 비어 있음. 이 브랜치는 이야기 입력 / 그 검사를 건드리지 않았고, 실행 때 에디터가 Simulator 탭이었다. 다시 실행하지 않아 원인은 확인하지 못함.
 - **눈 / 귀로 확인:** VFX 실험실에서 1~3R "남은 30초로 시간 넘기기" → 알림 + 빨라진 BGM → 10초 뒤 피버, 승리 / 패배 징글 미리 듣기, 지귀 루프 이음매와 피버(꽹과리).
 - **미실행:** iPhone 실기기 진동, 여러 기기 실제 네트워크, 실제 스토리 한 판의 결과 화면에서 징글이 나오는 순간.
+
+## #763 북 전달 제한 안내 UI
+
+- 새 작업 브랜치: feat/#763-drum-pass-block-ui. 현재 열린 Unity 체크아웃에도 동일한 관련 소스와 에셋을 적용해 검사했다. 전체 프로젝트/모든 검사가 이 브랜치에서 실행된 것은 아니다.
+- Figma VFX의 좌·우 한지 패널(원본 신라문화체 Bold/Medium 윤곽선)과 게임용 신라문화체 Bold Font를 Resources/Sabotage/DrumPassBlock에 추가. PNG는 Sprite/Single, alpha transparency, no mipmap, uncompressed, max2048. GUID는 Unity가 생성한 메타를 보존.
+- 안내: 0.12초 페이드인, 2초까지 유지, 마지막0.4초 페이드아웃(총2.4초). 도중 해제·일시정지·전투 종료 시 정리. 기존 가장자리 제한 판정·타이머·통신은 변경하지 않음.
+- PlayMode: LabGourdAlertTests 3/3 PASS, 가장자리 카운트다운·보드 초기화 영향 검사2/2 PASS(추가 pure fade test 전 실행).
+- Unity 직접 검사: 10~0 전 값·Font glyph 존재·단일 TextMesh(겹친 외곽선 없음), 숫자/빛 RGB 일치(#A92511), fade2.2초 alpha0.5 확인. 가장자리 숫자10을 임시 카메라800×800으로 렌더하여 클리핑과 외곽선 부재 확인.
+- 실기기/실제 멀티 전투/모든 화면 비율 미실행. Scene과 원본 LabConfig는 저장하지 않음.
+
+- 최종 소스 정리·pure fade 경계 검사 추가 후 같은 관련 PlayMode 묶음 재실행: **6/6 PASS**(6.33초). 작업 브랜치 git diff --check PASS.
+
+- #763 후속 사용자 시안: 안내 위치를 상단16%/폭88%로 변경하고 가장자리 효과를 곡선 조합판 반면 그라데이션(alpha0.11~0.3,0.6Hz)으로 변경. 최초 관련 검사5/6에서 이전 밝기 범위 기대값(.2~.6)이 새 시안(.11~.3)과 달라 실패. 기대 범위와 폭을 새 요구사항에 맞춰 명시적으로 갱신한 뒤 **6/6 PASS**(6.26초). 좌·우 renderer bounds가 각각 판 절반(폭3/전체6)에 해당함을 Unity 직접 확인. git diff --check PASS.
+
+- 숫자 PNG 전환 후 Unity 솔로 전투 실제 화면 캡처: 밝은 외곽선 없이 #7F1C0D 숫자9 표시를 이미지 확인. Unity 직접 검사에서10~0 전환의 활성 스프라이트 개수와 로드 성공 확인.
