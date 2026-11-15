@@ -78,6 +78,12 @@ namespace Hapio.Tests
 
             // Its own full-screen camera; the battle cameras and every battle HUD canvas are off; the live gourd draws.
             Assert.That(replay.ReplayCamera != null && replay.ReplayCamera.enabled, Is.True);
+            var captions = replay.Overlay.GetComponentsInChildren<UnityEngine.UI.Text>();
+            var expectedCaptions = new List<string> { "마지막 일격!", "눌러서 건너뛰시오." };
+            if (replay.Shot.Slot > 0) expectedCaptions.Add("P" + replay.Shot.Slot);
+            Assert.That(captions.Select(label => label.text), Is.EquivalentTo(expectedCaptions));
+            Assert.That(replay.Overlay.transform.Find("Top Bar"), Is.Null);
+            Assert.That(replay.Overlay.transform.Find("Bottom Bar"), Is.Null);
             Assert.That(replay.ReplayCamera.rect, Is.EqualTo(new Rect(0f, 0f, 1f, 1f)));
             Assert.That(network.BattleCamera.enabled, Is.False);
             Canvas[] visibleBattleCanvases = Object.FindObjectsByType<Canvas>(FindObjectsSortMode.None)

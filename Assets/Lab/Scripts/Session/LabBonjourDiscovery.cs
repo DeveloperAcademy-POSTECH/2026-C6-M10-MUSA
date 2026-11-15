@@ -475,12 +475,23 @@ namespace C6Lab
                 var owner = operation.Owner;
                 if (error != 0) { owner.RegistrationNameConflict = error == -65548; owner.Fail(operation, Error("register", error)); return; }
                 bool confirmed = (flags & LabBonjourNative.Add) != 0;
+                string registeredName = Utf8(name, 256);
+                if (confirmed && LabGameBuildVariant.IsValidStaffRoomIdentity(owner.DemoStageIndex, owner.DemoGroupId)
+                    && !string.Equals(registeredName, LabPendingRoom.StaffStageName(owner.DemoStageIndex, owner.DemoGroupId),
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    // A staff group has exactly one fixed registration name. A daemon-renamed reply
+                    // must never be promoted into a second Host for that group.
+                    owner.RegistrationNameConflict = true;
+                    owner.Fail(operation, "Bonjour staff registration returned a different room name.");
+                    return;
+                }
                 // dns_sd.h: a successful removal can precede automatic rename/re-registration.
                 // It is not an error or a confirmed advertisement. Bound this new reply wait too;
                 // the initial successful registration must not disable its timeout permanently.
                 operation.HasAddressOrReply = confirmed;
                 if (!confirmed) operation.Deadline = owner.now + ResolveTimeoutSeconds;
-                owner.RegisteredServiceName = Utf8(name, 256); owner.AdvertisingConfirmed = confirmed;
+                owner.RegisteredServiceName = registeredName; owner.AdvertisingConfirmed = confirmed;
                 owner.changed = true; owner.Report("stage=register result=" + (owner.AdvertisingConfirmed ? "confirmed" : "removed"));
             });
         }

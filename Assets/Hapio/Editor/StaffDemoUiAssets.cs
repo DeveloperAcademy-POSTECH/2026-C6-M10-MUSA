@@ -43,7 +43,7 @@ namespace Hapio.Editor
                     float top = .77f - index * .25f;
                     groups[index] = BoxButton(safe, "Group" + (index == 0 ? "A" : "B"), font,
                         new Vector2(.10f, top - .20f), new Vector2(.90f, top),
-                        (index == 0 ? "A그룹" : "B그룹") + "\n방 만들기 / 입장", 25);
+                        (index == 0 ? "A그룹" : "B그룹") + "\n방 확인 중", 25);
                 }
 
                 var buttons = new UnityEngine.UI.Button[3];
@@ -76,12 +76,37 @@ namespace Hapio.Editor
                 var groupChange = BoxButton(safe, "ChangeGroup", font, new Vector2(.18f, .04f),
                     new Vector2(.82f, .11f), "그룹 변경", 20);
                 groupChange.gameObject.SetActive(false);
+                RectTransform confirmation = Rect(root.transform, "RoomCreationConfirmation", Vector2.zero, Vector2.one);
+                var blocker = confirmation.gameObject.AddComponent<UnityEngine.UI.Image>();
+                // TextColor/DarkIvory/500***70%: use the token's actual alpha, not its name.
+                blocker.color = new Color(0.8352941274642944f, 0.7450980544090271f, 0.6470588445663452f, .5f);
+                blocker.raycastTarget = true;
+                RectTransform confirmationSafe = Rect(confirmation, "SafeArea", Vector2.zero, Vector2.one);
+                confirmationSafe.gameObject.AddComponent<GameSafeArea>();
+                RectTransform card = Rect(confirmationSafe, "Card", new Vector2(.08f, .34f), new Vector2(.92f, .66f));
+                var cardImage = card.gameObject.AddComponent<UnityEngine.UI.Image>();
+                cardImage.color = GameLobbySeatColors.LightText;
+                cardImage.raycastTarget = true;
+                var cardOutline = card.gameObject.AddComponent<UnityEngine.UI.Outline>();
+                cardOutline.effectColor = GameBattleUiColors.Brown;
+                cardOutline.effectDistance = new Vector2(1f, -1f);
+                var confirmationMessage = Label(card, "Message", font, new Vector2(.08f, .43f), new Vector2(.92f, .90f),
+                    "A그룹 방이 없습니다.\n새로 만들까요?", 23);
+                var cancelCreation = BoxButton(card, "CancelCreation", font, new Vector2(.08f, .10f),
+                    new Vector2(.46f, .33f), "취소", 21);
+                var confirmCreation = BoxButton(card, "ConfirmCreation", font, new Vector2(.54f, .10f),
+                    new Vector2(.92f, .33f), "확인", 21);
+                confirmation.gameObject.SetActive(false);
                 var view = root.AddComponent<GameStaffDemoView>();
                 view.stageButtons = buttons;
                 view.groupButtons = groups;
                 view.groupChangeButton = groupChange;
                 view.status = status;
                 view.backButton = back;
+                view.creationConfirmation = confirmation.gameObject;
+                view.creationConfirmationMessage = confirmationMessage;
+                view.confirmCreationButton = confirmCreation;
+                view.cancelCreationButton = cancelCreation;
                 // This is a saved UI panel, not another root Overlay Canvas. Preview scenes have
                 // no physical display, so a Canvas would bake a driven zero-scale transform here.
                 // Runtime installs the panel under the existing Home root canvas/raycaster and
@@ -112,7 +137,8 @@ namespace Hapio.Editor
             if (view == null || rect == null
                 || view.stageButtons == null || view.stageButtons.Length != 3
                 || view.groupButtons == null || view.groupButtons.Length != 2 || view.groupChangeButton == null
-                || view.status == null || view.backButton == null)
+                || view.status == null || view.backButton == null || view.creationConfirmation == null
+                || view.creationConfirmationMessage == null || view.confirmCreationButton == null || view.cancelCreationButton == null)
                 throw new InvalidOperationException("Prepare the saved staff selector with Hapio/Demo/Update Staff Demo UI before exporting.");
             foreach (var button in System.Linq.Enumerable.Concat(view.stageButtons, view.groupButtons))
                 if (button == null || button.targetGraphic == null || !button.targetGraphic.raycastTarget
@@ -121,6 +147,19 @@ namespace Hapio.Editor
             if (!view.groupChangeButton.transform.IsChildOf(prefab.transform)
                 || view.groupChangeButton.targetGraphic == null || !view.groupChangeButton.targetGraphic.raycastTarget)
                 throw new InvalidOperationException("The group change action needs its own saved button binding.");
+            var blocker = view.creationConfirmation.GetComponent<UnityEngine.UI.Image>();
+            var blockerRect = view.creationConfirmation.GetComponent<RectTransform>();
+            if (!view.creationConfirmation.transform.IsChildOf(prefab.transform) || view.creationConfirmation.activeSelf
+                || blocker == null || !blocker.raycastTarget || blockerRect == null
+                || blockerRect.anchorMin != Vector2.zero || blockerRect.anchorMax != Vector2.one
+                || blockerRect.offsetMin != Vector2.zero || blockerRect.offsetMax != Vector2.zero
+                || view.confirmCreationButton == view.cancelCreationButton
+                || !view.creationConfirmationMessage.transform.IsChildOf(view.creationConfirmation.transform))
+                throw new InvalidOperationException("The saved room confirmation must start hidden and block the entire selector.");
+            foreach (var button in new[] { view.confirmCreationButton, view.cancelCreationButton })
+                if (!button.transform.IsChildOf(view.creationConfirmation.transform)
+                    || button.targetGraphic == null || !button.targetGraphic.raycastTarget)
+                    throw new InvalidOperationException("Room creation needs separate saved confirm and cancel buttons.");
             if (prefab.GetComponentInChildren<Canvas>(true) != null
                 || prefab.GetComponentInChildren<UnityEngine.UI.CanvasScaler>(true) != null
                 || prefab.GetComponentInChildren<UnityEngine.UI.GraphicRaycaster>(true) != null)

@@ -49,8 +49,8 @@ namespace Hapio.Tests
                 var button = go.GetComponent<Button>();
                 button.targetGraphic = go.GetComponent<Image>();
                 var theme = Resources.Load<GameBattleUiTheme>(GameBattleUiTheme.ResourcePath);
-                typeof(GameSealedGourdView).GetMethod("BuildButton", Private)
-                    .Invoke(view, new object[] { button, "결과로 돌아가기", theme.medium, 755f, true });
+                typeof(GameSealedGourdView).GetMethod("BuildReturnButton", Private)
+                    .Invoke(view, new object[] { button, theme.medium });
                 var rect = (RectTransform)go.transform;
                 rect.anchorMin = rect.anchorMax = rect.pivot = Vector2.one * .5f;
                 rect.anchoredPosition = Vector2.zero;

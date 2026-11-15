@@ -155,6 +155,7 @@ namespace Hapio.Tests
         {
             Assert.That(session.SelectDemoGroup(1), Is.True);
             Assert.That(session.SelectDemoStage(stage), Is.True);
+            yield return ConfirmNewStaffRoom();
             yield return Until(() => network.IsHost && session.State.phase == GameFlowPhase.Lobby && !session.IsLoadingScene,
                 "The retry fixture enters the chosen staff stage room");
             float[] values = network.config.CaptureDeveloperValues();
@@ -178,6 +179,16 @@ namespace Hapio.Tests
         private IEnumerator PlayingRetryStage(int stage) => Until(() => session.State.phase == GameFlowPhase.Playing
             && session.State.stageIndex == stage && !session.IsLoadingScene && network.HasBattleReferences,
             "Host manually starts the selected canonical stage after its preparation barriers");
+
+        private IEnumerator ConfirmNewStaffRoom()
+        {
+            yield return Until(() => session.IsDemoCreationConfirmationPending,
+                "No advertised group asks the staff before creating a room");
+            Assert.That(network.IsHost || network.IsConnected, Is.False);
+            Assert.That(session.PendingRooms, Is.Empty, "Opening the question does not reserve or advertise a room.");
+            Assert.That(session.ConfirmDemoRoomCreation(), Is.True);
+            Assert.That(session.ConfirmDemoRoomCreation(), Is.False, "One confirmation owns one recheck/create operation.");
+        }
 
         private IEnumerator UnselectedRetryLobby(int stage)
         {
@@ -207,6 +218,7 @@ namespace Hapio.Tests
             Assert.That(session.SelectDemoGroup(1), Is.True);
             Assert.That(session.SelectDemoStage(stage), Is.True);
             Assert.That(session.SelectDemoStage(stage == 1 ? 3 : 1), Is.False, "One card request runs at a time.");
+            yield return ConfirmNewStaffRoom();
             yield return Until(() => network.IsHost && session.State.phase == GameFlowPhase.Lobby && !session.IsLoadingScene,
                 "A stage card creates and enters its own three-player room");
             Assert.That(network.TargetParticipantCount, Is.EqualTo(3));

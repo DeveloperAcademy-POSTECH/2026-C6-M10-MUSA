@@ -539,6 +539,226 @@
       },
       "exportWidth": 235.0,
       "exportHeight": 48.0
+    },
+    {
+      "name": "StartPressed",
+      "source": "4788:3498",
+      "width": 293,
+      "height": 56,
+      "offset": {
+        "x": -0.09474372863769531,
+        "y": -4,
+        "w": 294.4856872558594,
+        "h": 61.531951904296875
+      },
+      "brush": {
+        "type": "BRUSH",
+        "brushType": "STRETCH",
+        "brushName": "HEIST",
+        "direction": "FORWARD"
+      },
+      "strokeOnly": false,
+      "exportWidth": 295,
+      "exportHeight": 62
+    },
+    {
+      "name": "CreatePressed",
+      "source": "4788:3500",
+      "width": 348,
+      "height": 45,
+      "offset": {
+        "x": -0.459136962890625,
+        "y": -2.5,
+        "w": 349.1138000488281,
+        "h": 48.45747375488281
+      },
+      "brush": {
+        "type": "BRUSH",
+        "brushType": "STRETCH",
+        "brushName": "HEIST",
+        "direction": "FORWARD"
+      },
+      "strokeOnly": false,
+      "exportWidth": 350,
+      "exportHeight": 49
+    },
+    {
+      "name": "ModePressed",
+      "source": "4788:3502",
+      "width": 303,
+      "height": 48,
+      "offset": {
+        "x": -0.17369556427001953,
+        "y": -2.5,
+        "w": 303.90399169921875,
+        "h": 51.45746994018555
+      },
+      "brush": {
+        "type": "BRUSH",
+        "brushType": "STRETCH",
+        "brushName": "HEIST",
+        "direction": "FORWARD"
+      },
+      "strokeOnly": false,
+      "exportWidth": 304,
+      "exportHeight": 52
+    },
+    {
+      "name": "SealReadyPressed",
+      "source": "4788:3507",
+      "width": 349,
+      "height": 58,
+      "offset": {
+        "x": -0.60577392578125,
+        "y": -4,
+        "w": 350.86273193359375,
+        "h": 63.531982421875
+      },
+      "brush": {
+        "type": "BRUSH",
+        "brushType": "STRETCH",
+        "brushName": "HEIST",
+        "direction": "FORWARD"
+      },
+      "strokeOnly": false,
+      "exportWidth": 351,
+      "exportHeight": 64
+    },
+    {
+      "name": "ResultActionPressed",
+      "source": "4784:3254",
+      "width": 234,
+      "height": 45,
+      "offset": {
+        "x": -0.04517364501953125,
+        "y": -2.12591552734375
+      },
+      "strokeOnly": false,
+      "brush": {
+        "type": "BRUSH",
+        "brushType": "STRETCH",
+        "brushName": "HEIST",
+        "direction": "FORWARD"
+      },
+      "exportWidth": 235.0,
+      "exportHeight": 48.0
+    },
+    {
+      "name": "ChipPressed",
+      "source": "4405:2966",
+      "width": 48,
+      "height": 38,
+      "offset": {
+        "x": -1.079345703125,
+        "y": -1.8356170654296875,
+        "w": 51.802162170410156,
+        "h": 41.900177001953125
+      },
+      "brush": {
+        "type": "BRUSH",
+        "brushType": "STRETCH",
+        "brushName": "SLASHER",
+        "direction": "FORWARD"
+      },
+      "strokeOnly": false,
+      "exportWidth": 52,
+      "exportHeight": 42
+    },
+    {
+      "width": 37,
+      "height": 37,
+      "offset": {
+        "x": 0,
+        "y": 0
+      },
+      "exportWidth": 37,
+      "exportHeight": 37,
+      "name": "ClosePressed",
+      "source": "4788:3516"
+    },
+    {
+      "name": "Refresh",
+      "source": "5348:4065",
+      "width": 39,
+      "height": 38,
+      "offset": {
+        "x": -1.0374,
+        "y": -1.8354
+      },
+      "exportWidth": 42.3707,
+      "exportHeight": 41.9011
+    },
+    {
+      "name": "RefreshPressed",
+      "source": "5348:4066",
+      "width": 39,
+      "height": 38,
+      "offset": {
+        "x": -1.0374,
+        "y": -1.8354
+      },
+      "exportWidth": 42.3707,
+      "exportHeight": 41.9011
+    },
+    {
+      "name": "GourdRotateDark",
+      "source": "5357:6097",
+      "width": 67.992,
+      "height": 67.992,
+      "offset": {
+        "x": 0,
+        "y": 0
+      },
+      "exportWidth": 67.992,
+      "exportHeight": 68.992
+    },
+    {
+      "name": "GourdRotateLight",
+      "source": "5357:6098",
+      "width": 67.992,
+      "height": 67.992,
+      "offset": {
+        "x": 0,
+        "y": 0
+      },
+      "exportWidth": 67.992,
+      "exportHeight": 68.992
+    },
+    {
+      "name": "GourdResetDark",
+      "source": "5357:6099",
+      "width": 39,
+      "height": 38,
+      "offset": {
+        "x": 0,
+        "y": 0
+      },
+      "exportWidth": 39,
+      "exportHeight": 38
+    },
+    {
+      "name": "GourdResetLight",
+      "source": "5357:6100",
+      "width": 39,
+      "height": 38,
+      "offset": {
+        "x": 0,
+        "y": 0
+      },
+      "exportWidth": 39,
+      "exportHeight": 38
+    },
+    {
+      "name": "PauseAction",
+      "source": "4418:1625 / 4418:1626",
+      "width": 147,
+      "height": 48,
+      "offset": {
+        "x": -0.17369556,
+        "y": -2.5
+      },
+      "exportWidth": 148,
+      "exportHeight": 52
     }
   ]
 }

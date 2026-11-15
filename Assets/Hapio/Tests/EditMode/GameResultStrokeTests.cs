@@ -51,6 +51,135 @@ namespace Hapio.Tests
             finally { EditorSceneManager.CloseScene(scene,true); }
         }
 
+        [Test]
+        public void StoryResultStrokeUsesTheRoundedGraphicAndTextButtonsShowPressFeedback()
+        {
+            var page = new GameObject("Story actions", typeof(RectTransform));
+            try
+            {
+                var button = GameViewerHelpUi.Hit(page.transform, "Retry", 0, 0, 234, 45);
+                var shape = GameViewerHelpUi.Rect(page.transform, "Story Brush Layer", 0, 0, 234, 45)
+                    .gameObject.AddComponent<C6Lab.LabRoundedGraphic>();
+                GameFigmaButton.AttachResultArtwork(button, shape);
+                var stroke = button.GetComponent<GameFigmaButton>();
+                var pointer = new PointerEventData(null) { button = PointerEventData.InputButton.Left };
+                Assert.That(stroke.artwork.SurfaceName, Is.EqualTo("ResultAction"));
+                Assert.That(shape.enabled, Is.False);
+                Assert.That(stroke.artwork.raycastTarget, Is.False);
+                Assert.That(button.targetGraphic.raycastTarget, Is.True);
+                stroke.OnPointerDown(pointer);
+                Assert.That(stroke.artwork.SurfaceName, Is.EqualTo("ResultActionPressed"));
+
+                var exit = GameViewerHelpUi.Hit(page.transform, "Exit", 0, 50, 95, 45);
+                var caption = GameViewerHelpUi.Label(exit.transform, "Label", "나가기", null, 18, Color.black, 0, 0, 95, 45);
+                GameFigmaButton.AttachResultText(exit, caption);
+                var feedback = exit.GetComponent<GameFigmaButton>();
+                var fill = exit.GetComponentInChildren<C6Lab.LabRoundedGraphic>(true);
+                Assert.That(fill.enabled, Is.False);
+                feedback.OnPointerDown(pointer);
+                Assert.That(fill.enabled, Is.True);
+                Assert.That(caption.color, Is.EqualTo(GameResultStrokes.ActionNormal));
+                feedback.OnPointerUp(pointer);
+                Assert.That(fill.enabled, Is.False);
+                Assert.That(caption.color, Is.EqualTo(Color.black));
+            }
+            finally { Object.DestroyImmediate(page); }
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void TerritoryResultButtonDrawsAndRemainsClickableWhenStrokeArtIsMissing(bool retry)
+        {
+            var scene = EditorSceneManager.OpenScene(GameScenePaths.StageResult, OpenSceneMode.Additive);
+            var canvas = new GameObject("Result background test", typeof(Canvas));
+            var camera = new GameObject("Result background camera").AddComponent<Camera>();
+            var target = new RenderTexture(402, 874, 24);
+            var library = Resources.Load<GameFigmaStrokeLibrary>("Hapio/UI/FigmaStrokeLibrary");
+            var allSurfaces = library.surfaces;
+            var normal = GameFigmaStrokeLibrary.Find("ResultAction");
+            Sprite savedSprite = normal.sprite;
+            try
+            {
+                var view = scene.GetRootGameObjects().SelectMany(root =>
+                    root.GetComponentsInChildren<GameTerritoryResultView>(true)).Single();
+                GameResultStrokes.Apply(view);
+                var button = Object.Instantiate(retry ? view.table.nextButton : view.table.viewerButton, canvas.transform);
+                button.gameObject.SetActive(true);
+                button.interactable = true;
+                var part = button.GetComponent<GameFigmaButton>();
+                var rect = (RectTransform)button.transform;
+                rect.anchorMin = rect.anchorMax = rect.pivot = Vector2.one * .5f;
+                rect.anchoredPosition = Vector2.zero;
+                var c = canvas.GetComponent<Canvas>();
+                c.renderMode = RenderMode.ScreenSpaceCamera;
+                c.worldCamera = camera;
+                c.planeDistance = 1;
+                camera.targetTexture = target;
+
+                int clicks = 0;
+                button.onClick.AddListener(() => clicks++);
+                var pointer = new PointerEventData(null) { button = PointerEventData.InputButton.Left };
+                AssertBackground(retry ? part.original : part.artwork, camera);
+                Assert.That(part.artwork.enabled, Is.EqualTo(!retry));
+                if (retry) Assert.That(part.original.color, Is.EqualTo(GameResultStrokes.SecondaryActionNormal));
+                Assert.That(button.transition, Is.EqualTo(Selectable.Transition.None));
+                var caption = button.GetComponentInChildren<Text>();
+                Assert.That(caption.color, Is.EqualTo((Color)new Color32(250, 246, 241, 255)));
+                Assert.That(caption.fontSize * caption.rectTransform.localScale.x, Is.EqualTo(20));
+
+                part.OnPointerDown(pointer);
+                Assert.That(part.artwork.SurfaceName, Is.EqualTo(retry ? "ResultAction" : "ResultActionPressed"));
+                AssertBackground(part.artwork, camera);
+                part.OnPointerUp(pointer);
+
+                library.surfaces = allSurfaces.Where(item => item.name != "ResultActionPressed").ToArray();
+                part.OnPointerDown(pointer);
+                Assert.That(part.artwork.SurfaceName, Is.EqualTo("ResultAction"));
+                AssertBackground(part.artwork, camera);
+                part.OnPointerUp(pointer);
+
+                normal.sprite = null;
+                part.Refresh();
+                Assert.That(part.artwork.enabled, Is.False);
+                Assert.That(part.original.raycastTarget, Is.True);
+                AssertBackground(part.original, camera);
+                var normalColor = retry ? GameResultStrokes.SecondaryActionNormal : GameResultStrokes.ActionNormal;
+                Assert.That(part.original.color, Is.EqualTo(normalColor));
+                part.OnPointerDown(pointer);
+                Assert.That(part.original.color, Is.EqualTo(retry ? GameResultStrokes.ActionNormal : GameResultStrokes.ActionPressed));
+                part.OnPointerUp(pointer);
+                Assert.That(part.original.color, Is.EqualTo(normalColor));
+                button.OnPointerClick(pointer);
+                Assert.That(clicks, Is.EqualTo(1));
+                button.interactable = false;
+                button.OnPointerClick(pointer);
+                Assert.That(clicks, Is.EqualTo(1));
+
+                normal.sprite = savedSprite;
+                part.Refresh();
+                Assert.That(part.original.enabled, Is.EqualTo(retry));
+                AssertBackground(retry ? part.original : part.artwork, camera);
+            }
+            finally
+            {
+                normal.sprite = savedSprite;
+                library.surfaces = allSurfaces;
+                camera.targetTexture = null;
+                Object.DestroyImmediate(camera.gameObject);
+                Object.DestroyImmediate(target);
+                Object.DestroyImmediate(canvas);
+                EditorSceneManager.CloseScene(scene, true);
+            }
+        }
+
+        private static void AssertBackground(Graphic graphic, Camera camera)
+        {
+            Canvas.ForceUpdateCanvases();
+            camera.Render();
+            Assert.That(graphic.isActiveAndEnabled, Is.True);
+            Assert.That(graphic.canvasRenderer.GetMesh()?.vertexCount, Is.GreaterThanOrEqualTo(4));
+        }
+
         [TestCase("Home", "SealReady")]
         [TestCase("Viewer", "ResultAction")]
         [TestCase("Next", "ResultAction")]
