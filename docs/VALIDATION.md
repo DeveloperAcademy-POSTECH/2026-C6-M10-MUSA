@@ -9020,3 +9020,15 @@ PR #729 검증 중 main `a7208003`에서 `LabLocalBoardNetworkIntegrationTests` 
 - **화면(Development Mac 빌드, DEV 솔로 2스테이지, 임시 캡처 스크립트는 저장소에 남기지 않음):** 전투 카메라 3배 확대 캡처로 비교했다. 새 연결점은 정지, 옆으로 친 흔들림 4프레임, 야광귀 등장 클립 15·26·29·38프레임에서 밧줄이 매듭 두 갈래에 붙어 있었다. 같은 실행에서 연결점만 예전 값(y 1.6383)으로 되돌리면 정지·흔들림 모두 밧줄과 매듭 사이에 틈이 보였다. `model_part4`는 `Lid_Hinge` 아래가 아니어서 뚜껑과 따로 움직이지 않는다.
 - **미실행:** iPhone 실기기, 실제 멀티 전투.
 - **main `e5814f57`(#751) 병합 뒤 재실행:** 충돌 없음(#751은 시연 빌드 도구만 변경). 전체 EditMode **2515/2515 PASS**, PlayMode 영향 묶음(위 4종 + `GameStaffStageDemoSessionTests`) **66/66 PASS**.
+
+## 2026-11-15 — #745 남은 30초 BGM 빨라지기 / 승리·패배 징글과 진동 / 지귀 BGM·피버 다시 만들기
+
+- **기준:** `feat/#745-bgm-rush-result-sfx` (main `b41a3095`(#752) 병합 뒤). 접속 규약 5705 / DEV 설정 수 / 게임 규칙은 바꾸지 않았다. 화면·소리·진동과 VFX 실험실(Editor)만 바뀐다.
+- **바뀐 것:** 남은 30초(30초 알림과 같은 조건)부터 피버 전까지 라운드 곡을 음 그대로 1.15배 판으로 같은 자리에서 이어 받음(`LabBattleBgm` 네 번째 AudioSource, 미리 늘린 `*BGMRush` ogg 3개, 전투 시작 때 미리 불러 둠). VFX 실험실 "남은 30초로 시간 넘기기"(`LabBattleClock.Skip`, Host 혼자일 때만). 스토리 결과 카드 / 실패 게이지가 뜨는 순간 승리 / 패배 징글 + 박자 맞춘 진동(`GameResultJingle`, 장면이 열릴 때 결과 이야기에 스스로 붙음, 팀원 결과 화면 코드는 그대로). 지귀 BGM을 원곡 35~58마디 루프(41.1초, 이음매 0.35초 크로스페이드)로, 빠른 판도 그 루프로, 피버는 4마디씩 1.15→1.3배 + 꽹과리 동살풀이로 다시 만듦(웹 편집대에서 팀원이 고른 설정).
+- **실행:** Unity Test Runner (팀원 Mac).
+  - 전체 EditMode Run All: 실패 0 (새 `LabBattleBgmRushTests` 5개, `GameResultJingleTests` 2개 포함).
+  - 전체 PlayMode Run All 첫 실행: 872개 중 **5개 실패**.
+    - `LabBattleBgmStageTests` 3개: BGM의 AudioSource가 3개라고 기대했으나 빠른 곡 통로가 더해져 4개. 검사 기대값을 4로 바꾸고, 빠른 곡 통로를 맨 뒤에 만들어 전투 / 피버 / 추임새 통로 순서(0 / 1 / 2)를 예전 그대로 둠. 고친 뒤 이 3개 다시 실행 **통과**.
+    - `StoryTapAdvanceTests` 2개(`LastPageFinishesOnceOnReleaseClickRatherThanPointerDown`, `RaycastSurfaceAdvancesOnlyOnCompletedTapAndKeepsDirectNextSynchronous`): 화면 가운데 레이캐스트가 비어 있음. 이 브랜치는 이야기 입력 / 그 검사를 건드리지 않았고, 실행 때 에디터가 Simulator 탭이었다. 다시 실행하지 않아 원인은 확인하지 못함.
+- **눈 / 귀로 확인:** VFX 실험실에서 1~3R "남은 30초로 시간 넘기기" → 알림 + 빨라진 BGM → 10초 뒤 피버, 승리 / 패배 징글 미리 듣기, 지귀 루프 이음매와 피버(꽹과리).
+- **미실행:** iPhone 실기기 진동, 여러 기기 실제 네트워크, 실제 스토리 한 판의 결과 화면에서 징글이 나오는 순간.
