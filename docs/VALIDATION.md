@@ -8998,3 +8998,10 @@ PR #729 검증 중 main `a7208003`에서 `LabLocalBoardNetworkIntegrationTests` 
 - `GameSceneFlowTests.FigmaResultsWaitForHostNextAndShowEachYokaiThenKeepFinalOverallAndHomeNavigation` 및 `SavedStoryViewerSkipAndEndingButtonsReceiveRealMouseClicks` **2/2 PASS**(65.03초). 이후 줄바꿈 표시만 수정했으며 전환/입력/수명 경로는 동일해 해당 결과를 재사용했다.
 - 화면 확인: 저장된 GameStageStoryCanvas와 실제 컷을 Unity 카메라로402×874 렌더하여 불이·만복·솔이·마지막 불이4페이지 확인. 처음 캡처에서 긴 문장 자동 줄바꿈을 발견해 `dialogueNoWrap`으로 수정했고 위 최종 검사를 재실행했다. 격리 캡처에서는 게임 어댑터가 평소 제어하는 결과/공통 버튼을 숨겨 대화 상자만 비교했다. 종이/이름표의 다운로드 원본과 로컬 파일 SHA-1 일치 확인. 그림 배치와 범위 밖 버튼 외형은 변경하지 않았다.
 - 작업 전 Console의 iOS `Subtarget property is not available` 오류1건을 기록했으며 새 코드 컴파일 후 오류0. 자동 검사 실패/단언 완화 없음. 실기기·iOS 빌드·전체 PlayMode는 실행하지 않았다.
+
+## #754 둘러보기 고리 제거
+
+- 현재 열린 Unity의 동일 CopyHierarchy 수정 컴파일 후 직접 실행: 1~3라운드 각각 전투 원본 model_part4 1개 유지, 둘러보기 복사본 0개, Paint Shell 1개 유지 확인. 임시 인스턴스 정리 및 Scene 미저장.
+- Stage2 둘러보기 복사본을 임시 카메라로 렌더링하여 상단 고리·매듭·짧은 줄이 없고 몸통·뚜껑·둘레 밧줄이 남는 것을 이미지로 확인.
+- 작업 브랜치 git diff --check PASS. 작업 브랜치 BuildGeometry 경로의 3스테이지 회귀 검사 추가, 해당 EditMode 검사 실행은 미실행(열린 Unity는 다른 체크아웃).
+- 실제 게임 결과 UI 버튼 진입·실기기 검사는 미실행.

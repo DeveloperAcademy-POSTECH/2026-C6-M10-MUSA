@@ -86,3 +86,7 @@
 ### #701 후속 — 저고리·색동 천 장식
 
 키링과 별도로 모델 루트에 달려 있던 `Gumiho_Teal_Jeogori_Ribbon`(구미호·지귀), `Saekdong_Ribbon_1` 및 `Saekdong_Ribbon_1_Separate_Rope_Tie`(세 스테이지)를 함께 비활성화한다. 복제 접미사는 기존 BaseName 규칙으로 처리하며 재굽기에도 같은 정책을 적용한다. 원본 아트와 천 BlendShape/노드 경로는 보존한다. 박 몸통·뚜껑·뚜껑의 손잡이·테두리와 요괴는 그대로다.
+
+## #754 둘러보기 상단 부속물 제외
+
+LabGourdResultPreview가 모델을 복사할 때 스토리 리그의 model_part4(Blender 숫자 접미사 포함)를 제외한다. 1~3라운드의 상단 고리·매듭·짧은 줄과 해당 bounds가 둘러보기 모델/프레이밍에서 빠진다. 뚜껑 둘레 밧줄·몸통·뚜껑은 유지한다. 전투 Prefab, 밧줄 연결점과 원본 활성 상태는 변경하지 않는다.
