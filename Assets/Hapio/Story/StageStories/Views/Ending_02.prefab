@@ -1540,3 +1540,8 @@ MonoBehaviour:
     volume: 0.8
     stopMusic: 1
     stopSeconds: 0.7
+  - clip: {fileID: 8300000, guid: 3d7261b613c44e649e76a5af4a68274e, type: 3}
+    delay: 0.2
+    volume: 0.7
+    stopMusic: 0
+    stopSeconds: 0.7
