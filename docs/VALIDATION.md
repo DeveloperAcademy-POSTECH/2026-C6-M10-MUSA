@@ -9253,3 +9253,17 @@ PR #729 검증 중 main `a7208003`에서 `LabLocalBoardNetworkIntegrationTests` 
 | 설정 보존 | 두 빌드 후 ProjectSettings/EditorBuildSettings 파일 SHA-256이 빌드 전과 동일, 기존 stash 불변, StandaloneOSX·Home·Play 정지 복원 |
 
 iOS에는 기존 com.unity.pipeline의 StandaloneBuildSubtarget 전처리 진단1건이 기록되지만 내보내기·식별 검증 성공. 오류0으로 표기하지 않음. 사용자 요청으로 Mac 실행·실제 시작 화면 촬영·iOS Xcode 서명/설치/실행·실기기 확인은 미실행. 검사가 만든 빈 기본 아이콘 슬롯과 Importer의 SVG 메타 공백은 사본 보존 후 원래대로 정리. 실패 이력·세부 결과는 로컬 별도 산출물에 보존하며 원시 로그·빌드·개인 경로·서명 정보는 커밋하지 않음.
+
+
+### #772 최신 main 통합·병합 전 확인 (2026-11-15)
+
+main `cef1579d`의 #760 관람·#762 땅따먹기 박/Game56·#727 튜토리얼·#766 스토리 이동을 보존해 통합했다. 구현 파일 충돌은 없고 양쪽 VALIDATION 추가 기록을 모두 유지했다. 이전 기준 결과를 재사용하지 않고 전체 검사를 다시 실행했다.
+
+- 최초 통합 EditMode 2,592건 중 1건 실패: 새 Native 설정에서 `SetIcons(empty)`가 없던 Mac 아이콘 항목을 8개 빈 슬롯으로 만들었다. 복원 배열 단언을 유지하고 보완했다.
+- JSON 복원 대안은 Native 설정 역직렬화가 무관한 Android 경로 필드까지 재해석해 14개 강화 검사에서 불일치를 발생시켰으므로 폐기했다. 구현·검사 정리에서 JSON 덮어쓰기를 제거하고 아이콘 두 속성 배열만 형식 지정 레코드로 저장·복원한다. 원본 설정 파일에서 Unity를 다시 열어 초기 상태로 검증했다.
+- 빌드 관련 **33/33 PASS**(0.51초): 정상·실패·취소, 실제 빈 배열과 사용자 아이콘, 다른 플랫폼의 아이콘, 전체 Native 설정 동일성·원본 파일 바이트 보존을 확인했다. 검사 정리 자체의 빈 슬롯 오염도 제거했다.
+- 통합 최종 전체 EditMode **2,594/2,594 PASS**(21.82초), 전체 PlayMode **881/881 PASS**(1109.01초), 실패·skip0. 관련 코드·에셋·패키지·환경을 고정하고 수행했다.
+- Mac 최신 출력: `Builds/HapioStage2Demo/20261115-132644-82a69fad-release/macOS/합이오_쇼케이스.app`, Succeeded·오류0·identityVerified=true, 한글 표시명·HapioShowcase 실행 파일과 엄격 서명 재확인.
+- iOS 최신 출력: `Builds/HapioStage2Demo/20261115-132711-b24fafba-release/iOS/`, Succeeded·identityVerified=true. 한글 표시명, PRODUCT_NAME_APP 4곳, 아이콘19개와 알파 없는 Store PNG를 재확인했다. 기존 Pipeline 전처리 진단1은 계속 기록한다.
+- 두 빌드 전후 원본 ProjectSettings/EditorBuildSettings SHA-256과 기존 stash가 동일했다. 일반 Scene·타이틀·폰트·팔레트·Package/설정은 #772 diff에 없다. Importer의 기존 SVG 공백만 사본 보존 후 정리했다. 문서만 추가한 뒤 코드/에셋 재검사를 반복하지 않는다.
+- 사용자 요청대로 앱 실행·실기기·Xcode 서명/설치는 제외했다. 이전 기준의 산출물도 삭제하지 않았다.
