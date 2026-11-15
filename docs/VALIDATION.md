@@ -9032,3 +9032,11 @@ PR #729 검증 중 main `a7208003`에서 `LabLocalBoardNetworkIntegrationTests` 
     - `StoryTapAdvanceTests` 2개(`LastPageFinishesOnceOnReleaseClickRatherThanPointerDown`, `RaycastSurfaceAdvancesOnlyOnCompletedTapAndKeepsDirectNextSynchronous`): 화면 가운데 레이캐스트가 비어 있음. 이 브랜치는 이야기 입력 / 그 검사를 건드리지 않았고, 실행 때 에디터가 Simulator 탭이었다. 다시 실행하지 않아 원인은 확인하지 못함.
 - **눈 / 귀로 확인:** VFX 실험실에서 1~3R "남은 30초로 시간 넘기기" → 알림 + 빨라진 BGM → 10초 뒤 피버, 승리 / 패배 징글 미리 듣기, 지귀 루프 이음매와 피버(꽹과리).
 - **미실행:** iPhone 실기기 진동, 여러 기기 실제 네트워크, 실제 스토리 한 판의 결과 화면에서 징글이 나오는 순간.
+
+## 2026-11-15 — #757 엔딩 스토리 BGM 두 곡과 컷별 효과음, 엔딩 SFX 창
+
+- **기준:** `feat/#757-ending-bgm-sfx` (main `a754d500` 이후 #745 머지 위). 접속 규약 / DEV 설정 / 게임 규칙은 바꾸지 않았다. 엔딩 이야기의 소리와 Editor 창만 바뀐다.
+- **바뀐 것:** 엔딩 01~02 후일담 곡(`EndingBgm1`, 25.9초 루프) → 02 대사 뒤 1.4초에 테이프 멈추듯 끊김 → 03~06 북소리 긴장 곡(`EndingBgm2`, 23.7초 루프, 끝의 심벌즈 같은 부풂은 잘라 냄). 01 만복 대사 효과음(대사 음성 칸, 0.45초 뒤), 02~06 컷 앰비언스 5개(새 `StoryCutSound`에 컷 시작 뒤 초와 크기). 원래 있던 꼬르륵(`Hungry`) / 박 깨짐(`BrokenGourd`) 연결은 뺐다(파일은 그대로). `StoryCutSoundDriver`가 장면이 열릴 때 모든 StoryPlayer에 스스로 붙어 컷별 효과음을 낸다(StoryPlayer 코드는 그대로). Editor `Hapio > 엔딩 SFX` 창에서 컷을 바로 띄우고 소리를 바꿔 끼워 듣고 저장한다.
+- **실행:** Unity Test Runner (팀원 Mac), 전체 EditMode Run All / 전체 PlayMode Run All **모두 통과**(개수는 기록하지 않음). 이 PR에는 새 자동 검사를 더하지 않았다.
+- **귀로 확인:** 엔딩 SFX 창에서 엔딩 처음부터 끝까지 여러 번 들으며 효과음 시각 / 크기 / 속도와 곡 전환을 팀원이 맞췄다.
+- **미실행:** 실제 3스테이지 클리어 뒤 게임 안 엔딩 한 판, iPhone 실기기 소리 크기.
