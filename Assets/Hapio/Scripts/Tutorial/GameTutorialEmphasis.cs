@@ -11,7 +11,7 @@ namespace Hapio
     /// 튜토리얼 대사 키워드 강조 (#727). 대본(GameTutorialScript)의 대사에 아래 표시를 넣으면 말풍선과 대화 기록에서 그 부분만 다르게 보인다.
     /// - &lt;big&gt;…&lt;/big&gt;: 글자 색은 그대로, 크기만 그 말풍선 글자 크기의 GameTutorialArt.emphasisScale배 (기본 1.35). 말풍선이 넘쳐 글자가
     ///   작아지면 큰 글자도 같은 비율로 작아진다(FitBubble). 대화 기록에서는 크기를 키우지 않는다.
-    /// - &lt;red&gt;…&lt;/red&gt;: 진홍(GameTutorialArt.emphasisRed, 기본 #8A1206, "경기 종료!"와 같은 색).
+    /// - &lt;red&gt;…&lt;/red&gt;: 진홍(GameTutorialArt.emphasisRed, 기본 색상 토큰 `5OrbsColor/Firered/700` #7F1C0D).
     /// - &lt;fire&gt; &lt;water&gt; &lt;wood&gt; &lt;metal&gt; &lt;earth&gt;: 전투 화면 오행 구슬 그림의 색(OrbTextColor, 시안과 같음). 테두리 없이 글자만
     ///   (시안). GameTutorialArt.elementOutlineWidth를 0보다 크게 하면 이 다섯 색 글자에만 먹색 테두리를 두를 수 있다.
     /// 강조한 부분(크게·빨강·오행 색)은 모두 굵게(&lt;b&gt;) 그린다. 대화 기록에서도 굵게 보인다(크기만 키우지 않는다).

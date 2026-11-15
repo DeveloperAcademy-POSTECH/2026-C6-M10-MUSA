@@ -8,7 +8,7 @@ namespace Hapio.Tests
     /// <summary>튜토리얼 대사 키워드 강조 (#727): 대본 표시, 리치 텍스트, 말풍선 맞춤, 오행 글자 테두리.</summary>
     public sealed class GameTutorialEmphasisTests
     {
-        private static readonly Color Red = new Color32(0x8A, 0x12, 0x06, 0xFF);
+        private static readonly Color Red = new Color32(0x7F, 0x1C, 0x0D, 0xFF);
 
         [Test]
         public void TheAgreedKeywordsAreMarkedWhileTheWordsStayTheApprovedScript()
@@ -48,13 +48,13 @@ namespace Hapio.Tests
             Assert.That(GameTutorialEmphasis.ToRichText("먼저 <big>북</big>을 쳐 봐.", 23, Red), Is.EqualTo("먼저 <size=23><b>북</b></size>을 쳐 봐."),
                 "Every emphasis is bold too.");
             Assert.That(GameTutorialEmphasis.ToRichText("<red>같은 색끼리는 안 붙어!</red>", 23, Red),
-                Is.EqualTo("<color=#8A1206><b>같은 색끼리는 안 붙어!</b></color>"));
+                Is.EqualTo("<color=#7F1C0D><b>같은 색끼리는 안 붙어!</b></color>"));
             Assert.That(GameTutorialEmphasis.ToRichText("<fire>화</fire>·<metal>금</metal>", 23, Red),
                 Is.EqualTo("<color=#D32E15><b>화</b></color>·<color=#F9B521><b>금</b></color>"), "The 5OrbsColor/*/500*** colour tokens.");
-            Assert.That(GameTutorialEmphasis.ToRichText("<red>쳐</red>", 23, Red, bold: false), Is.EqualTo("<color=#8A1206>쳐</color>"),
+            Assert.That(GameTutorialEmphasis.ToRichText("<red>쳐</red>", 23, Red, bold: false), Is.EqualTo("<color=#7F1C0D>쳐</color>"),
                 "Bold can be turned off in the art.");
             string log = GameTutorialScript.LogLine(GameTutorialEmphasis.ToRichText("먼저 <big>북</big>을\n<red>쳐</red> 봐.", 0, Red));
-            Assert.That(log, Is.EqualTo("먼저 <b>북</b>을 <color=#8A1206><b>쳐</b></color> 봐."),
+            Assert.That(log, Is.EqualTo("먼저 <b>북</b>을 <color=#7F1C0D><b>쳐</b></color> 봐."),
                 "The log is one line, bold and coloured, never bigger.");
             Assert.That(GameTutorialEmphasis.BigSize(17, 1.35f), Is.EqualTo(23));
             Assert.That(GameTutorialEmphasis.BigSize(14, 1.35f), Is.EqualTo(19));

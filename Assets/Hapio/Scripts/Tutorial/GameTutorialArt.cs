@@ -48,8 +48,8 @@ namespace Hapio
         [Header("키워드 강조 (#727)")]
         [Tooltip("대본의 <big> 글자 크기: 그 말풍선 글자 크기의 몇 배. 말풍선이 넘쳐 글자가 작아지면 같은 비율로 같이 작아진다.")]
         [Range(1f, 2f)] public float emphasisScale = 1.35f;
-        [Tooltip("대본의 <red> 글자 색 (\"경기 종료!\"와 같은 진홍)")]
-        public Color emphasisRed = new Color32(0x8A, 0x12, 0x06, 0xFF);
+        [Tooltip("대본의 <red> 글자 색 (색상 토큰 5OrbsColor/Firered/700)")]
+        public Color emphasisRed = new Color32(0x7F, 0x1C, 0x0D, 0xFF); // 5OrbsColor/Firered/700 #7F1C0D
         [Tooltip("오행 색 글자(화·수·목·금·토)에만 두르는 먹색 테두리 두께. 0(기본, 시안처럼 글자만)이면 테두리 없음.")]
         [Min(0f)] public float elementOutlineWidth = 0f;
         [Tooltip("강조한 부분(크게·빨강·오행 색)을 모두 굵게. 대화 기록에서도 굵게 보인다.")]
