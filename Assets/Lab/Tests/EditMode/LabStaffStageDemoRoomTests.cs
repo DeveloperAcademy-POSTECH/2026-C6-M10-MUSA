@@ -66,7 +66,7 @@ namespace C6Lab.Tests
                 byte[] lab = Token(network);
                 Assert.That(network.SetGameFlowEnabled(true), Is.True);
                 byte[] normal = Token(network);
-                Assert.That(Encoding.ASCII.GetString(normal), Is.EqualTo("C6HapioGame/55"));
+                Assert.That(Encoding.ASCII.GetString(normal), Is.EqualTo("C6HapioGame/56"));
                 string normalDiscovery = LabBonjourDiscovery.ProtocolFor(LabRoomFamily.Game);
                 using (LabGameBuildVariant.OverrideStaffStageDemoForTests(true))
                 {
