@@ -1531,7 +1531,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryCutSound
   entries:
   - clip: {fileID: 8300000, guid: 78482d0a70444681831765cb832fa125, type: 3}
-    delay: 0.0
+    delay: 1.35
     volume: 0.8
     stopMusic: 0
     stopSeconds: 0.7
