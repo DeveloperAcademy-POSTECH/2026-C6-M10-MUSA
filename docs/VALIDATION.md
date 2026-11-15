@@ -9221,3 +9221,13 @@ PR #729 검증 중 main `a7208003`에서 `LabLocalBoardNetworkIntegrationTests` 
 - GameOpeningControllerTests: 14/14 통과(16.48초). 타이틀 진입·오프닝 완료/스킵·입력 해제 대기를 검증했다.
 - 화면: 실제 GameOpening/GameStageStoryCanvas 프리팹을 미리보기 카메라에서 804×1748로 렌더해 오프닝3·엔딩1을 확인했다. 게임 컨트롤러가 숨기는 제작용 진행 번호/결과 조작 그룹은 캡처에서도 숨겼다. 첫 렌더에서 혼합 크기 글자의 추가 행간을 발견하여 기본 크기 run의 실제 위치 차이33으로 수정한 뒤 다시 렌더하고 검사를 재실행했다. 엔딩의 기존 건너뛰기 모양·위치는 이번 범위에서 변경하지 않았다.
 - 종료 상태: Home 장면, dirty=false, playing=false. git diff --check 통과. 전체 EditMode/전체 PlayMode/iOS 빌드/실기기는 실행하지 않았다.
+
+### #766 병합 전 검증 (2026-11-15)
+- **기준:** `fix/766-story-touch-navigation`에 main `067f0cb6`(#760·#762·#727 포함) 병합. 충돌은 이 문서 기록 추가뿐이며 양쪽을 보존했다. Unity 6000.6.5f1 batch(macOS, Metal).
+- **전체 EditMode:** 2587/2587 PASS. **PlayMode Story 묶음**(`StoryTapAdvanceTests`·`StoryPlayerTests`·`EndingDialogueTests`·`GameStageStory*`·`GameOpening*`·`OpeningCinematicTests`·`OpeningDialogue*`·`GameStaffStageDemoFlowTests`·`GameYaguangDemoFlowTests`·`GameSceneFlowTests`·`StaffStageDemoStory*`·`YaguangDemoStory*`): 98/98 PASS.
+- **화면(Development Mac 빌드, main과 같은 임시 캡처, 실제 `StoryTapAdvance` 포인터 처리로 좌·우 터치):**
+  - 오프닝 상단 이전·다음 버튼이 숨겨졌다. 오른쪽 터치로 OP_001→OP_002→OP_003, 왼쪽 터치로 OP_002로 돌아갔다. main에서는 같은 왼쪽 터치가 OP_004로 넘어갔다.
+  - 엔딩 1컷에서 오른쪽 터치는 다음 쪽, 왼쪽 터치는 앞 쪽으로 돌아갔다. main에서는 다음 컷으로 넘어갔다.
+  - OP_003 두 줄 간격이 Figma 33에 맞게 좁아졌다.
+- **기록만:** 엔딩 뒤 클리어 화면은 이 표시를 쓰지 않아 기존 버튼이 그대로다. 왼쪽 터치는 `requireContinueButton` 컷에서도 뒤로 간다.
+- **미실행:** iPhone 실기기 터치.
