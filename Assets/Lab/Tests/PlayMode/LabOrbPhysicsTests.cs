@@ -1804,7 +1804,7 @@ namespace C6Lab.Tests
             Assert.That(edge.SecondsPosition.x, Is.InRange(bounds.xMin, bounds.xMin + .15f * bounds.width), "...just inside it.");
             Assert.That(edge.SecondsPosition.z, Is.LessThan(-config.OrbRadius), "The seconds stay in front of the orbs.");
             Assert.That(edge.Opening, Is.True, "As the block begins, the edge flashes...");
-            Assert.That(edge.Brightness, Is.GreaterThan(.9f), "...bright red...");
+            Assert.That(edge.Brightness, Is.InRange(.99f, 1f), "The blocked outer edge opens fully saturated.");
             Assert.That(edge.GlowReach, Is.GreaterThan(.15f * bounds.width), "...reaching further in than its glow.");
 
             board.SetSwipeBlock(-1, 3.1f);
@@ -1816,8 +1816,8 @@ namespace C6Lab.Tests
             Assert.That(edge.SecondsText, Is.EqualTo("3"), "It counts down.");
             while (Time.time < until && edge.Opening) yield return null;
             Assert.That(edge.Opening, Is.False, "After three flashes...");
-            Assert.That(edge.Brightness, Is.InRange(.2f, .6f), "...it settles into a light red that stays...");
-            Assert.That(edge.GlowReach, Is.EqualTo(.1f * bounds.width).Within(1e-3f), "...at its usual width.");
+            Assert.That(edge.Brightness, Is.InRange(.74f, 1f), "...the stronger half-board tint stays visible throughout its pulse...");
+            Assert.That(edge.GlowReach, Is.EqualTo(.28f * bounds.width).Within(1e-3f), "...covering the outer 28% of the board.");
             Assert.That(edge.Visible, Is.True, "...for as long as the block lasts.");
 
             board.SetSwipeBlock(1, .6f);
