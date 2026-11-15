@@ -1,4 +1,5 @@
 using System;
+using C6Lab;
 using UnityEngine;
 
 namespace Hapio
@@ -31,6 +32,14 @@ namespace Hapio
                 int stage = i + 1;
                 if (stageButtons[i] == null) throw new InvalidOperationException("A staff stage button is missing.");
                 stageButtons[i].onClick.AddListener(() => session.SelectDemoStage(stage));
+                stageButtons[i].gameObject.SetActive(LabGameBuildVariant.AllowsStaffDemoStage(stage));
+            }
+            if (LabGameBuildVariant.IsStaffStageTwoOnly)
+            {
+                Transform title = transform.Find("SafeArea/Title");
+                if (title != null) title.GetComponent<UnityEngine.UI.Text>().text = "야광귀 시연";
+                Transform caption = transform.Find("SafeArea/StaffCaption");
+                if (caption != null) caption.GetComponent<UnityEngine.UI.Text>().text = "2스테이지 · 3인 단판 시연";
             }
             backButton.onClick.AddListener(() => session.CancelDemoEntry());
             Refresh();
@@ -46,8 +55,11 @@ namespace Hapio
             bool idle = !pending && session.Network.CanChooseConnection && session.State.phase == GameFlowPhase.Home;
             foreach (UnityEngine.UI.Button button in stageButtons) button.interactable = idle;
             backButton.gameObject.SetActive(pending);
+            string idleNotice = LabGameBuildVariant.IsStaffStageTwoOnly
+                ? "야광귀를 선택하시오.\n같은 방의 세 명이 함께 출발하오."
+                : "플레이할 스테이지를 선택하시오.\n같은 스테이지를 고른 세 명이 함께 출발하오.";
             status.text = !string.IsNullOrEmpty(session.DemoEntryNotice) ? session.DemoEntryNotice
-                : !string.IsNullOrEmpty(session.UiNotice) ? session.UiNotice : "플레이할 스테이지를 선택하시오.\n같은 스테이지를 고른 세 명이 함께 출발하오.";
+                : !string.IsNullOrEmpty(session.UiNotice) ? session.UiNotice : idleNotice;
         }
     }
 }
