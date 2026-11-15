@@ -43,11 +43,12 @@ namespace Hapio
         public Rect speakerBadgeRect = new Rect(57, 713, 91, 33);
         public bool centerSpeakerName;
         public Color speakerColor = Color.white;
+        internal float minimumEntranceDuration;
         public float EntranceDuration
         {
             get
             {
-                float duration = 0f;
+                float duration = minimumEntranceDuration;
                 if (openingMotions != null)
                     foreach (var motion in openingMotions)
                         if (motion != null) duration = Mathf.Max(duration, motion.Duration);
