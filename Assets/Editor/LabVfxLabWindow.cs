@@ -105,7 +105,23 @@ namespace C6Lab.Editor
                     Report(network.VfxLabDetonateBomb(), "도화선이 다 탄 것으로 했다. 곧 터진다.", "내 판에 잠긴 박 폭탄이 없음 (먼저 박 폭탄을 떨어뜨린다)");
             if (EditorApplication.isPlaying && !ready) EditorGUILayout.LabelField("전투 중에 켜진다.", EditorStyles.wordWrappedMiniLabel);
             DrawTimeLeft(network, ready);
+            DrawResultJingle(network);
             EditorGUILayout.Space();
+        }
+
+        /// <summary>#745: 스토리 결과 징글 + 진동 (결과 표가 뜨는 순간 나오는 것). 화면 없이 소리와 진동만.</summary>
+        private void DrawResultJingle(LabNetwork network)
+        {
+            EditorGUILayout.LabelField("결과 징글 + 진동 (#745, 스토리 결과 표가 뜰 때)", EditorStyles.miniBoldLabel);
+            using (new EditorGUI.DisabledScope(!EditorApplication.isPlaying))
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                LabConfig config = network != null ? network.config : null;
+                if (GUILayout.Button("승리 징글", GUILayout.Height(26)))
+                    Report(Hapio.GameResultJingle.Preview(true, config), "승리 징글과 진동을 냈다 (진동은 iPhone에서만).", "");
+                if (GUILayout.Button("패배 징글", GUILayout.Height(26)))
+                    Report(Hapio.GameResultJingle.Preview(false, config), "패배 징글과 진동을 냈다 (소리 파일이 없으면 진동만).", "");
+            }
         }
 
         /// <summary>#734: 남은 30초 알림 ("30초 남았소!" 말풍선, 시간 숫자 깜빡임, 가장자리 번쩍임, 경고음, 진동).</summary>
