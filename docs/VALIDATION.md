@@ -9320,4 +9320,5 @@ main `cef1579d`의 #760 관람·#762 땅따먹기 박/Game56·#727 튜토리얼�
   - 테이프 멈춤 도중 컷을 넘기거나 되돌아가면 다음 곡이 무음이 되던 문제: 컷이 바뀌거나 스토리가 끝나면 멈춤을 취소하고 곡 빠르기(pitch)를 되돌린다. 곡을 끄는 건 시작한 컷에 그대로 있을 때만.
   - 스태프 시연 1/2/3라운드 / 야광귀 시연의 `Cuts/Ending_01.asset` 사본 4개도 만복 효과음(`EndingSfx01_Manbok`)으로 맞췄다.
   - PlayMode `StoryCutSoundTests` 4개 추가: 그대로 두면 느려지다 멈춤 / 멈춤 도중 다음 컷으로 넘기면 다음 곡 정상 재생 / 멈춤 도중 같은 곡 컷으로 돌아가면 계속 재생 / 컷 효과음 한 번만.
+  - 리뷰 반영 + main 병합 뒤 Unity Test Runner (팀원 Mac): 전체 EditMode Run All **통과**, PlayMode `StoryCutSoundTests` 4개 Run Selected **통과**(개수는 기록하지 않음). 전체 PlayMode Run All은 다시 돌리지 않았다.
 - **main `6bcf8e8d`(#760 / #764 / #759 / #768 / #773 / #771) 병합:** 충돌은 이 문서 기록 추가뿐이어서 양쪽을 보존했다. main의 `Ending.asset`에는 좌우 터치 넘기기(`sideTapNavigation`)만 더해져 엔딩 소리 설정과 겹치지 않는다.
