@@ -9007,6 +9007,7 @@ PR #729 검증 중 main `a7208003`에서 `LabLocalBoardNetworkIntegrationTests` 
 - **관련 PlayMode 첫 실행:** 15개 중13통과·2실패(86.40초). 새 6연결 시험이 AUTO 북을 Host가 소유한다고 가정했지만 3인 AUTO는 무작위 자리 한 곳에 북1개만 배치하므로 Host `Generate()`가 의도대로 아무 일도 하지 않았다. 시험 전용 북3개와 Host 북 존재 단언으로 수정했으며 게임 기본값은 유지한다. 다른 실패는 비활성 Stage 카드를 켠 같은 프레임에서 raycast한 준비 순서였다. 정상 프레임·Canvas 갱신 후 동일한 최상위 터치 대상 단언을 검사하도록 수정했다. 단언 삭제/완화는 없다.
 - **관련 PlayMode 재실행:** **15/15 PASS**(56.44초). 실제 소켓 Host2+Guest4, 다른 그룹 토큰 거절, P1~P3·시작·생성·일시정지·전투 시각·승리·자리 복귀의 독립성과 저장 Home의 그룹/카드 raycast·즉시 입장·재도전/QR 그룹 보존을 포함한다.
 - **전체 PlayMode:** **876/876 PASS**(915.07초), 실패·건너뜀0. 일반 Story·Lab·땅따먹기·연결/재도전·결과/엔딩·도색/물리 등을 포함한 전체 묶음이다. 실행 시작 이후 소스/에셋 해시가 동일함을 확인했다.
-- **Mac Release 빌드:** 진행 중. 완료 결과로 갱신한다.
+- **Mac Release 빌드:** 정식 `GameDemoBuild.StageTwoMac` 경로 성공·오류0. 원본 커밋 `816dc17e`, 미커밋 변경 없음. manifest의 Staff revision3·Stage2 단일 항목·3인·Release·별도 앱 식별자·identityVerified를 확인했다. `codesign --verify --deep --strict` 통과. 빌드 뒤 소스/에셋 해시와 저장 설정이 유지됐다. 출력은 `Builds/HapioStage2Demo/<생성시각>/macOS/Hapio-Stage2-Demo.app`이며 바이너리/원시 로그는 커밋하지 않는다.
+- **실제 Mac 화면:** Release 앱을 실행해 `시연 방 입장` 제목·A/B 입장 버튼2개·각3명 안내·야광귀 카드 부재·글자/버튼 배치를 확인했다. 자동화 도구의 좌표 클릭이 `noWindowsAvailable` 오류로 전달되지 않아 실제 앱에서 로비 입장은 확인하지 못했다. 이를 게임 실패나 입장 PASS로 기록하지 않는다. 저장 UI raycast·그룹 버튼 입장·로비/전투 흐름은 위 PlayMode 검사로 별도 확인했다. 확인 후 앱 종료를 관찰했다.
 - **검증 구분:** 새 6연결 검사는 Mac의 실제 NGO/dual-stack 소켓 Host2+Guest4이며 여섯 화면이나 물리 무선 기기를 관찰한 시험이 아니다. 미실행 iOS 설치·물리 기기6대 일반 Wi-Fi/핫스팟은 PASS로 표시하지 않는다.
 - **보존:** 데스크탑 main 작업 폴더와 #740/#750 작업 폴더를 전환·저장하지 않았다. 시연만 Staff revision3으로 바꾸고 일반5705/Game55/Lab·공유 설정·도색·투척 규칙을 유지한다. 빌드/운영/Scene 흐름은 `docs/STAFF_STAGE_DEMO.md`를 따른다.
