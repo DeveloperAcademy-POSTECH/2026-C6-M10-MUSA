@@ -53,6 +53,56 @@ namespace C6Lab.Tests
             }
         }
 
+        [TestCase("renamed", false)]
+        [TestCase("other-group", false)]
+        [TestCase("empty", false)]
+        [TestCase("renamed", true)]
+        public void StaffRegistrationWithADifferentNameFailsAndReleasesItsLeaseAfterCleanup(string replyKind, bool previouslyConfirmed)
+        {
+            using (LabGameBuildVariant.OverrideStaffStageDemoForTests(true))
+            using (var owner = new LabBonjourDiscovery(LabRoomFamily.Game) { DemoStageIndex = 2, DemoGroupId = 1 })
+            using (var contender = new LabBonjourDiscovery(LabRoomFamily.Game))
+            {
+                string requested = LabPendingRoom.StaffStageName(2, 1);
+                string returned = replyKind == "other-group" ? LabPendingRoom.StaffStageName(2, 2)
+                    : replyKind == "empty" ? string.Empty : requested + " (2)";
+                object operation = Registration(owner), next = Registration(contender);
+                Assert.That(Lease(operation, requested), Is.True);
+                if (previouslyConfirmed) Reply(owner, operation, 2, requested, 100);
+
+                Reply(owner, operation, 2, returned, 200);
+                Assert.That(owner.RegistrationNameConflict, Is.True);
+                Assert.That(owner.AdvertisingConfirmed || owner.IsAdvertising, Is.False,
+                    "A changed fixed staff name must fail, rather than remain permanently unready.");
+                Assert.That(owner.RegisteredServiceName, Is.Null);
+                Assert.That(owner.LastError, Is.EqualTo("Bonjour staff registration returned a different room name."));
+                Assert.That(Lease(next, requested), Is.False,
+                    "A failed callback must keep the lease until its native operation has been cleaned up.");
+
+                owner.Tick(201);
+                Assert.That(owner.ActiveNativeOperations, Is.Zero);
+                Assert.That(Lease(next, requested), Is.True,
+                    "The existing browse/join recovery must be able to reuse the fixed name after cleanup.");
+            }
+        }
+
+        [TestCase(1)]
+        [TestCase(2)]
+        public void StaffRegistrationAcceptsItsCanonicalNameCaseInsensitively(int group)
+        {
+            using (LabGameBuildVariant.OverrideStaffStageDemoForTests(true))
+            using (var discovery = new LabBonjourDiscovery(LabRoomFamily.Game) { DemoStageIndex = 2, DemoGroupId = group })
+            {
+                object operation = Registration(discovery);
+                string name = LabPendingRoom.StaffStageName(2, group).ToUpperInvariant();
+                Reply(discovery, operation, 2, name, 100);
+                Assert.That(discovery.AdvertisingConfirmed && discovery.IsAdvertising, Is.True);
+                Assert.That(discovery.RegisteredServiceName, Is.EqualTo(name));
+                Assert.That(discovery.RegistrationNameConflict, Is.False);
+                Assert.That(discovery.LastError, Is.Null);
+            }
+        }
+
         [Test]
         public void ExplicitDnsNameLeaseIsCaseInsensitiveAcrossPortsAndTxtFamilies()
         {

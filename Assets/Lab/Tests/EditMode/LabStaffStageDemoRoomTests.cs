@@ -124,6 +124,31 @@ namespace C6Lab.Tests
             }
         }
 
+        [Test]
+        public void UnexpectedConfirmedStaffNameIsRejectedAndItsReservationReleased()
+        {
+            using (LabGameBuildVariant.OverrideStaffStageDemoForTests(true))
+            using (var advertisement = new LabBonjourDiscovery(LabRoomFamily.Game))
+            {
+                var pending = (LabPendingRoom)Activator.CreateInstance(typeof(LabPendingRoom), true);
+                try
+                {
+                    typeof(LabPendingRoom).GetField("<DemoStageIndex>k__BackingField", Private).SetValue(pending, 2);
+                    typeof(LabPendingRoom).GetField("<DemoGroupId>k__BackingField", Private).SetValue(pending, 1);
+                    typeof(LabPendingRoom).GetField("advertisement", Private).SetValue(pending, advertisement);
+                    typeof(LabBonjourDiscovery).GetField("<AdvertisingConfirmed>k__BackingField", Private).SetValue(advertisement, true);
+                    typeof(LabBonjourDiscovery).GetField("<RegisteredServiceName>k__BackingField", Private).SetValue(advertisement,
+                        LabPendingRoom.StaffStageName(2, 1) + "-renamed");
+                    Assert.That(pending.Ready, Is.False);
+                    Assert.That(typeof(LabPendingRoom).GetMethod("RejectUnexpectedStaffName", Private).Invoke(pending, null), Is.True);
+                    Assert.That(pending.DemoNameConflict && pending.Failed, Is.True);
+                    Assert.That(pending.Name, Is.Empty);
+                    Assert.That(pending.RetryPending, Is.False);
+                }
+                finally { pending.Dispose(); }
+            }
+        }
+
         [TestCase("s=2")] [TestCase("g=1")] [TestCase("s=2;g=0")] [TestCase("s=2;g=3")]
         [TestCase("s=2;g=01")] [TestCase("s=2;g=1;g=2")] [TestCase("g=1;s=2")]
         [TestCase("s=2;g=1;t=1")] [TestCase("t=1;s=2;g=1")]

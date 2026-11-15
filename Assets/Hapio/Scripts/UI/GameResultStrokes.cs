@@ -7,12 +7,20 @@ namespace Hapio
     /// <summary>Original Figma surfaces only; result values, winner flags and navigation remain owned by their views.</summary>
     public static class GameResultStrokes
     {
+        // Figma 4784:3260, TextColor/DarkRed/600 and /700, SecondaryLightIvory/100.
+        internal static readonly Color ActionNormal = new Color32(140, 57, 45, 255);
+        internal static readonly Color ActionPressed = new Color32(105, 43, 33, 255);
+        // Figma 4784:3256, TextColor/DarkRed/400.
+        internal static readonly Color SecondaryActionNormal = new Color32(191, 108, 96, 255);
+        private static readonly Color ActionText = new Color32(250, 246, 241, 255);
+
         public static void Apply(GameOverCharacterView view) => GameFigmaButton.Attach(view.homeButton, "SealReady");
 
         public static void Apply(GameTerritoryResultView view)
         {
-            GameFigmaButton.Attach(view.table.viewerButton, "ResultAction");
-            GameFigmaButton.Attach(view.table.nextButton, "ResultAction");
+            ApplyAction(view.table.viewerButton, secondary: false);
+            ApplyAction(view.table.nextButton, secondary: true);
+            GameFigmaButton.AttachResultText(view.table.homeButton);
             if (GameFigmaStrokeLibrary.Find("ResultFill") == null) return;
             var frame = (RectTransform)view.table.design.Find("TerritoryBarFrame");
             var track = (RectTransform)view.blueFill.parent;
@@ -40,6 +48,29 @@ namespace Hapio
             var outline = Surface(frame,"Brush Outline","TeamPaint",original.color);
             outline.transform.SetSiblingIndex(clip.GetSiblingIndex()+1);
             original.enabled = false;
+        }
+
+        private static void ApplyAction(Button button, bool secondary)
+        {
+            if (button == null || button.targetGraphic == null) return;
+            // The Figma artwork owns the transition. Keep the original Image untinted for fallback rendering.
+            button.transition = Selectable.Transition.None;
+            button.targetGraphic.color = secondary ? SecondaryActionNormal : ActionNormal;
+            button.targetGraphic.canvasRenderer.SetColor(Color.white);
+            GameFigmaButton.Attach(button, secondary ? "ResultActionSecondary" : "ResultAction");
+
+            var caption = button.GetComponentInChildren<Text>(true);
+            if (caption == null) return;
+            caption.color = ActionText;
+            caption.alignment = TextAnchor.MiddleCenter;
+            caption.resizeTextForBestFit = false;
+            caption.fontSize = 40;
+            // Render the 20-unit label at twice its nominal resolution.
+            var rect = caption.rectTransform;
+            rect.anchorMin = rect.anchorMax = rect.pivot = Vector2.one * .5f;
+            rect.anchoredPosition = Vector2.zero;
+            rect.sizeDelta = new Vector2(468, 90);
+            rect.localScale = new Vector3(.5f, .5f, 1);
         }
 
         private static void Fill(RectTransform rect)

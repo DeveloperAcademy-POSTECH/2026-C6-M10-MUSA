@@ -32,7 +32,9 @@ namespace C6Lab
         public ushort Port { get; private set; }
         public string Name => advertisement?.RegisteredServiceName ?? string.Empty;
         public string Key => LabRoomCatalog.Key(Name, Port);
-        public bool Ready => advertisement != null && advertisement.IsAdvertising && advertisement.AdvertisingConfirmed;
+        public bool Ready => advertisement != null && advertisement.IsAdvertising && advertisement.AdvertisingConfirmed
+            && (DemoStageIndex == 0 || string.Equals(advertisement.RegisteredServiceName,
+                StaffStageName(DemoStageIndex, DemoGroupId), StringComparison.OrdinalIgnoreCase));
         public bool Failed => DemoNameConflict || retriesExhausted || (registrationStarted && (advertisement == null || !advertisement.IsAdvertising));
         /// <summary>
         /// A registration that failed for a reason other than its name waits here, then registers again (#503). It
@@ -142,12 +144,25 @@ namespace C6Lab
                 { Dispose(); return; }
             }
             advertisement?.Tick();
+            if (RejectUnexpectedStaffName()) return;
             if (RetryNameConflict()) return;
             // A confirmed room starts any later failure, and any later name conflict, with a full budget.
             if (Ready) { confirmed = true; retryAttempts = 0; registrationAttempts = 0; }
             // A registration that died later (an error reply, a timeout, or one lost after it was confirmed).
             else if (registrationStarted && advertisement != null && !advertisement.IsAdvertising && !advertisement.RegistrationNameConflict)
                 ScheduleRetry(now);
+        }
+
+        // NoAutoRename is required, but a native callback must also prove it kept the exact shared identity.
+        // A renamed candidate is not another valid room for this group and must release its reservation.
+        private bool RejectUnexpectedStaffName()
+        {
+            if (DemoStageIndex == 0 || advertisement == null || !advertisement.AdvertisingConfirmed
+                || string.Equals(advertisement.RegisteredServiceName, StaffStageName(DemoStageIndex, DemoGroupId),
+                    StringComparison.OrdinalIgnoreCase)) return false;
+            DemoNameConflict = true;
+            Dispose();
+            return true;
         }
 
         /// <summary>Waits 1, 2, 4, 8, 16, then 30 s, like the Host's own advertisement (#476); false once those run out.</summary>

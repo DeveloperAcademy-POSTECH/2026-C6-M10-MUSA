@@ -199,3 +199,87 @@ MonoBehaviour:
     size: {x: 234, y: 45}
     offset: {x: -0.045173645, y: -2.1259155}
     exportSize: {x: 235, y: 48}
+  - name: StartPressed
+    source: 4788:3498
+    sprite: {fileID: 21300000, guid: 3ebff2ea2edb4595951f8df7b52c4ae5, type: 3}
+    size: {x: 293, y: 56}
+    offset: {x: -0.09474373, y: -4}
+    exportSize: {x: 295, y: 62}
+  - name: CreatePressed
+    source: 4788:3500
+    sprite: {fileID: 21300000, guid: 372e724464814b8fa0f6fb85d81daee0, type: 3}
+    size: {x: 348, y: 45}
+    offset: {x: -0.45913696, y: -2.5}
+    exportSize: {x: 350, y: 49}
+  - name: ModePressed
+    source: 4788:3502
+    sprite: {fileID: 21300000, guid: 2299fd6b6e4c4b71a0bc4149c6d84426, type: 3}
+    size: {x: 303, y: 48}
+    offset: {x: -0.17369556, y: -2.5}
+    exportSize: {x: 304, y: 52}
+  - name: SealReadyPressed
+    source: 4788:3507
+    sprite: {fileID: 21300000, guid: c2e475be41f04f39852413595d693d6f, type: 3}
+    size: {x: 349, y: 58}
+    offset: {x: -0.6057739, y: -4}
+    exportSize: {x: 351, y: 64}
+  - name: ResultActionPressed
+    source: 4784:3254
+    sprite: {fileID: 21300000, guid: c29140d3c2424c16a481879cc332012e, type: 3}
+    size: {x: 234, y: 45}
+    offset: {x: -0.045173645, y: -2.1259155}
+    exportSize: {x: 235, y: 48}
+  - name: ChipPressed
+    source: 4405:2966
+    sprite: {fileID: 21300000, guid: 7443df8e9a444ad8ba57fa7957a75d77, type: 3}
+    size: {x: 48, y: 38}
+    offset: {x: -1.0793457, y: -1.8356171}
+    exportSize: {x: 52, y: 42}
+  - name: ClosePressed
+    source: 4788:3516
+    sprite: {fileID: 21300000, guid: 5f90b6db9b334f129b46ea888a01e954, type: 3}
+    size: {x: 37, y: 37}
+    offset: {x: 0, y: 0}
+    exportSize: {x: 37, y: 37}
+  - name: Refresh
+    source: 5348:4065
+    sprite: {fileID: 21300000, guid: 8482e1674bd0453ea9b56025dd81c62c, type: 3}
+    size: {x: 39, y: 38}
+    offset: {x: -1.0374, y: -1.8354}
+    exportSize: {x: 42.3707, y: 41.9011}
+  - name: RefreshPressed
+    source: 5348:4066
+    sprite: {fileID: 21300000, guid: 8f0a629e237f44b18e1fc076da5ddc1e, type: 3}
+    size: {x: 39, y: 38}
+    offset: {x: -1.0374, y: -1.8354}
+    exportSize: {x: 42.3707, y: 41.9011}
+  - name: GourdRotateDark
+    source: 5357:6097
+    sprite: {fileID: 21300000, guid: 9c0739f4f7754fbeaa15ea6eb372a0aa, type: 3}
+    size: {x: 67.992, y: 67.992}
+    offset: {x: 0, y: 0}
+    exportSize: {x: 67.992, y: 68.992}
+  - name: GourdRotateLight
+    source: 5357:6098
+    sprite: {fileID: 21300000, guid: e3529d3efb2e41a5a7819a52698877a1, type: 3}
+    size: {x: 67.992, y: 67.992}
+    offset: {x: 0, y: 0}
+    exportSize: {x: 67.992, y: 68.992}
+  - name: GourdResetDark
+    source: 5357:6099
+    sprite: {fileID: 21300000, guid: b8dd6d5d91ed47bea9afd0353b41568c, type: 3}
+    size: {x: 39, y: 38}
+    offset: {x: 0, y: 0}
+    exportSize: {x: 39, y: 38}
+  - name: GourdResetLight
+    source: 5357:6100
+    sprite: {fileID: 21300000, guid: 633ff2bc4d9c420db915c005d9e53d5d, type: 3}
+    size: {x: 39, y: 38}
+    offset: {x: 0, y: 0}
+    exportSize: {x: 39, y: 38}
+  - name: PauseAction
+    source: 4418:1625 / 4418:1626
+    sprite: {fileID: 21300000, guid: eb66e89dbe0b4ad3b9a9e20ee8a55303, type: 3}
+    size: {x: 147, y: 48}
+    offset: {x: -0.17369556, y: -2.5}
+    exportSize: {x: 148, y: 52}
