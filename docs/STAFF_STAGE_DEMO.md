@@ -80,6 +80,44 @@ QR 설정은 `Assets/Hapio/Resources/Hapio/Demo/Staff/FinalPageConfig.asset`의 
 
 Release에서도 스태프 선택 화면은 제공하지만 숨김 DEV는 열리지 않는다. QA는 기존 숨김 DEV 입력을 사용할 수 있다. Release와 QA는 같은 시연 앱을 교체할 수 있으므로 빌드의 `build-manifest.json`에서 생성 시각·소스 커밋·미커밋 변경·대상·QA 여부·스테이지별 설정 해시를 확인한다. 빌드 도구는 임시 앱 이름·식별자·플랫폼·Scene 목록·설정을 복원하며 기존 출력 폴더를 덮어쓰지 않는다.
 
+## 야광귀만 선택하는 전용 빌드 (#750)
+
+일반 `Demo Build > Release` 메뉴는 계속 1·2·3 선택 앱을 만든다. 야광귀만 보여줄 때는 아래 **Stage 2 Only** 메뉴를 사용한다. 이 옵션은 이전 #706 타이틀·오프닝 전용 시연과 다르며, 현재 스태프 시연의 3인 자리 선택·수동 시작·#740 재도전·결과·총평·엔딩·QR을 그대로 사용한다.
+
+### Unity에서 빌드하기
+
+1. 로컬 작업을 먼저 보존하고 이 프로젝트의 최신 main을 Pull한다. Unity Hub에서 같은 프로젝트 폴더를 열고 컴파일을 마친다. Play 모드를 종료하고 저장할 Scene 변경은 먼저 저장한다. 빌드 도구가 미저장 Scene을 임의 저장하지 않는다.
+2. 아래 메뉴에서 대상을 선택한다. 이미 저장된 시연 자료가 있으면 Prepare/Update 메뉴를 다시 실행할 필요가 없다.
+3. 완료 로그의 `HAPIO_DEMO_BUILD_OK` 또는 `Stage 2 Only > Open Last Output`으로 출력 폴더를 연다.
+
+| 목적 | Unity 메뉴 |
+| --- | --- |
+| DEV가 숨겨진 Mac 시연 앱 | `Hapio > Demo Build > Stage 2 Only > Release > Build Mac App` |
+| DEV가 숨겨진 iOS Xcode 프로젝트 | `Hapio > Demo Build > Stage 2 Only > Release > Export iOS Xcode Project` |
+| DEV 조절을 사용하는 Mac 앱 | `Hapio > Demo Build > Stage 2 Only > Development QA > Build Mac App` |
+| DEV 조절을 사용하는 iOS Xcode 프로젝트 | `Hapio > Demo Build > Stage 2 Only > Development QA > Export iOS Xcode Project` |
+| 이번 Editor에서 만든 최근 야광귀 전용 출력 | `Hapio > Demo Build > Stage 2 Only > Open Last Output` |
+
+- 출력: `Builds/HapioStage2Demo/<UTC시각-고유번호-release또는qa>/`.
+- Mac: `macOS/Hapio-Stage2-Demo.app`, QA는 `Hapio-Stage2-Demo-QA.app`. 표시명은 `Hapio Stage 2 Demo`다.
+- Mac 앱 빌드는 로컬 서명 도구가 있는 macOS의 Unity Editor에서 실행한다.
+- iOS: `iOS/`. 생성된 Xcode 프로젝트에서 Team·연결 기기·서명을 설정해 빌드한다. Xcode 내보내기·서명·설치·실행은 각각 별도 확인한다.
+- 식별자: 일반 플랫폼 Bundle ID + `.staffdemo.stage2`. 일반 앱과 기존 3카드 시연 앱을 교체하지 않는다. Release와 QA는 같은 전용 식별자를 사용한다.
+- Mac 앱은 생성 후 서명을 검증한다. 내장 Unity 라이브러리 서명이 유효하지 않은 로컬 산출물만 다시 로컬 서명하고 검증한다. 이미 유효한 서명과 iOS 서명은 바꾸지 않는다. 이 로컬 서명은 App Store 배포용 서명이 아니다.
+
+터미널에서는 같은 Unity Editor에 프로젝트 경로와 `-executeMethod Hapio.Editor.GameDemoBuild.StageTwoMac`을 전달하면 Release Mac 앱을 만든다. iOS는 `StageTwoIos`, QA는 `StageTwoMacDevelopment`/`StageTwoIosDevelopment`다. 저장된 Player Settings의 Scripting Define이나 Build Settings Scene을 수동으로 바꾸지 않는다. 일반 Build Settings에서 Scene만 골라 빌드하면 이 제한이 들어가지 않는다.
+
+### 세 명이 사용하기
+
+1. 같은 빌드를 실행하고 같은 LAN 또는 핫스팟에 연결한다. Mac 앱은 Mac용이며 iPhone에는 iOS 빌드를 설치한다.
+2. 화면 중앙의 `2스테이지 / 야광귀`를 누른다. 해당 방이 있으면 참가하고 없으면 생성해 들어간다. 1·3스테이지 버튼은 표시되지 않으며 해당 진입 요청도 거절된다.
+3. 세 명이 서로 다른 P1·P2·P3를 고른 뒤 방장이 시작한다. 두 명이나 자리 미선택 상태에서는 시작하지 않는다.
+4. 야광귀 한 판 뒤 기존 개인 기록·야광귀 총평·엔딩·QR로 이동한다. 중도 종료 뒤 `다시 도전`하면 같은 스테이지 자리 선택으로 돌아온다. 정상 엔딩 뒤 복귀해도 야광귀 카드 하나만 표시된다.
+
+manifest는 `variant=staff-stage-2-only-demo`, `selectableStages=[Stage2]`, `participants=3`이며 실제 번호·설정·결과 키도 Stage2다. Staff revision2/S2를 그대로 사용하므로 같은 통신 버전의 기존 3카드 시연에서 Stage2를 선택한 참가자와도 호환된다. 일반 게임·Lab·구형 #706 앱과는 섞지 않는다.
+
+전용 빌드는 `HAPIO_STAFF_STAGE_DEMO`와 `HAPIO_STAFF_STAGE_TWO_ONLY`를 **해당 Player 컴파일에만** 전달한다. 일반 게임의 Scene·StageCatalog·LabConfig·원본 에셋·저장된 빌드 설정을 바꾸지 않으며, 일회성 반영 스크립트나 별도 Scene이 필요하지 않다. 실제 수행한 Mac/iOS·실기기 검증 범위는 `VALIDATION.md`의 #750 기록을 확인한다.
+
 ## 코드 연결과 버전 경계
 
 | 코드 | 책임 |

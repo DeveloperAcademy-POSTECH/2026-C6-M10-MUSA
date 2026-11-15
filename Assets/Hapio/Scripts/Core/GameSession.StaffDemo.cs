@@ -153,7 +153,7 @@ namespace Hapio
 
         private bool SetSelectedDemoStage(int stage)
         {
-            if (!LabGameBuildVariant.IsStaffStageDemo || stage < 1 || stage > 3 || goingHome
+            if (!LabGameBuildVariant.IsStaffStageDemo || !LabGameBuildVariant.AllowsStaffDemoStage(stage) || goingHome
                 || state.phase != GameFlowPhase.Home || !network.CanChooseConnection
                 || !hostFlow.ConfigureDemoStage(stage)) return false;
             SelectedDemoStage = stage;
