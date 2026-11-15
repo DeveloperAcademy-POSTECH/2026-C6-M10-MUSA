@@ -36,7 +36,14 @@ namespace C6Lab
         private const float WiggleDegrees = 9f;
         private const float WiggleHz = 3f;
         /// <summary>넘기기 막기 말풍선이 떠 있는 시간 (초, #215). 막힌 가장자리와 남은 초는 막기 내내 판에 남는다.</summary>
-        public const float BlockShowSeconds = 2f;
+        public const float BlockShowSeconds = 2.4f;
+        public const float BlockFadeSeconds = .4f;
+        public const string BlockArtRoot = "Sabotage/DrumPassBlock/";
+        private bool blockPanelShown;
+        private CanvasGroup bubbleFade;
+        public float BlockPanelAlpha => bubbleFade != null ? bubbleFade.alpha : 1f;
+        public static float BlockNoticeAlpha(float age) => Mathf.Clamp01(age / .12f)
+            * (1f - Mathf.Clamp01((age - (BlockShowSeconds - BlockFadeSeconds)) / BlockFadeSeconds));
         // 막기 표시 그림 (픽셀, 아래가 0): 왼쪽 절반에 막힌 쪽을 가리키는 화살표, 오른쪽에 금지 표시.
         private const int MarkWidth = 128, MarkHeight = 64;
         private static readonly Color32 SignColor = new Color32(232, 41, 26, 255);
@@ -260,6 +267,18 @@ namespace C6Lab
             blockRight = right;
             blockMark.sprite = right ? BlockRightSprite() : BlockLeftSprite();
             ShowOnly(blockMark.gameObject);
+            Sprite panelArt = Resources.Load<Sprite>(BlockArtRoot + (right ? "BlockRight" : "BlockLeft"));
+            blockPanelShown = panelArt != null;
+            if (blockPanelShown)
+            {
+                blockMark.gameObject.SetActive(false);
+                var background = bubble.GetComponent<Image>();
+                background.sprite = panelArt;
+                background.preserveAspect = true;
+                bubble.pivot = new Vector2(.5f, .5f);
+                if (bubbleFade == null) bubbleFade = bubble.gameObject.AddComponent<CanvasGroup>();
+                bubbleFade.blocksRaycasts = bubbleFade.interactable = false;
+            }
             Begin(gourd, BlockShowSeconds);
         }
 
@@ -308,6 +327,8 @@ namespace C6Lab
         // 말풍선 안 표시는 한 번에 하나만 보인다.
         private void ShowOnly(GameObject shown)
         {
+            blockPanelShown = false;
+            if (bubbleFade != null) bubbleFade.alpha = 1f;
             var background = bubble.GetComponent<Image>();
             background.enabled = true;
             background.sprite = BubbleSprite();
@@ -353,7 +374,9 @@ namespace C6Lab
             bool battle = network == null
                 || (snapshot != null && snapshot.phase == LabPhase.Playing && !snapshot.paused);
             elapsed += Time.deltaTime;
-            if (!battle || target == null || elapsed >= duration)
+            bool blockEnded = blockPanelShown && network != null && snapshot != null
+                && elapsed > .15f && !snapshot.SwipeBlockOn(network.LocalPlayerId);
+            if (!battle || blockEnded || target == null || elapsed >= duration)
             {
                 Hide();
                 return;
@@ -365,6 +388,16 @@ namespace C6Lab
         /// <summary>꼬리 끝을 화면에서 박의 오른쪽 위 어깨에 맞춘다.</summary>
         private void Place()
         {
+            if (blockPanelShown)
+            {
+                // #763: reference mockup places the notice above the gourd, centered at 16% from the top.
+                // Match the 6% side margins proportionally rather than anchoring it over the play board.
+                float width = canvasRect.rect.width * .88f;
+                bubble.sizeDelta = new Vector2(width, width * 120f / 640f);
+                bubble.anchoredPosition = new Vector2(0f, canvasRect.rect.height * .34f);
+                bubble.gameObject.SetActive(true);
+                return;
+            }
             if (showingEyes)
             {
                 float size = 104f * LabYaguangShakeCue.FitScale(canvasRect.rect.size);
@@ -395,6 +428,13 @@ namespace C6Lab
         private void Animate()
         {
             float t = Mathf.Max(0f, elapsed);
+            if (blockPanelShown)
+            {
+                bubble.localScale = Vector3.one;
+                bubble.localRotation = Quaternion.identity;
+                bubbleFade.alpha = BlockNoticeAlpha(t);
+                return;
+            }
             float pop = t < PopSeconds ? EaseOut(t / PopSeconds) * 1.15f
                 : Mathf.Lerp(1.15f, 1f, Mathf.Clamp01((t - PopSeconds) / .12f));
             float leave = Mathf.Clamp01((t - (duration - LeaveSeconds)) / LeaveSeconds);

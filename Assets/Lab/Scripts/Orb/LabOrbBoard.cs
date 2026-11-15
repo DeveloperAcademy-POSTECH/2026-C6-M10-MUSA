@@ -784,7 +784,9 @@ namespace C6Lab
             // The side planes are the board's visible side edges; the area gives the edge's height there.
             float edgeX = blockedSide > 0 ? bounds.xMax : bounds.xMin;
             Vector2 range = areaShape.VerticalRange(edgeX, 0f);
-            edgeBlock.Show(blockedSide > 0, edgeX, range.x, range.y, bounds.width, config.OrbRadius);
+            float visualBottom = inputCamera != null
+                ? inputCamera.ViewportToWorldPoint(Vector3.zero).y : range.x;
+            edgeBlock.Show(blockedSide > 0, edgeX, range.x, range.y, bounds.width, config.OrbRadius, areaShape, visualBottom);
             edgeBlock.SetSeconds(blockSecondsLeft);
         }
 

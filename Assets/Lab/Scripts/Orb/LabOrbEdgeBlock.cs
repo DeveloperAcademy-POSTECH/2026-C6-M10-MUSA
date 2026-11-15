@@ -4,7 +4,7 @@ namespace C6Lab
 {
     /// <summary>
     /// The gourd's swipe block on this player's board (#215): as the block begins, the blocked side edge
-    /// flashes bright red three times, wider than its glow, so the player sees it at once; then it settles
+    /// flashes in Hapio fire-red three times, wider than its glow, so the player sees it at once; then it settles
     /// into a light red that breathes slowly until the block ends. A bright line runs down the edge
     /// itself, and the whole seconds left sit in the edge's vertical middle. It brightens for a moment
     /// when something bounces off it. Presentation only;
@@ -13,26 +13,34 @@ namespace C6Lab
     /// </summary>
     public sealed class LabOrbEdgeBlock : MonoBehaviour
     {
-        private const float GlowShare = .1f, LineShare = .012f;
-        private const float GlowAlpha = .45f, LineAlpha = .8f;
-        private const float BreatheHz = .8f, FlashSeconds = .35f;
-        /// <summary>The bright flashes as a block begins: three of this length.</summary>
+        private const float GlowShare = .28f, LineShare = .012f;
+        private const float GlowAlpha = 1f, LineAlpha = 0f;
+        private const float BreatheHz = .6f, FlashSeconds = .35f;
+        /// <summary>The opening flashes as a block begins: three of this length.</summary>
         private const float BlinkSeconds = .35f;
         private const int Blinks = 3;
         /// <summary>How much wider than its usual glow the edge flashes.</summary>
-        private const float FlashWiden = .9f;
-        private static readonly Color FlashRed = new Color(1f, .22f, .16f);
+        private const float FlashWiden = 0f;
         private const int GlowOrder = -20, LineOrder = -19, TextOrder = 30, FontSize = 64;
-        private static readonly Color Red = new Color(.93f, .16f, .12f);
-        private static readonly Color Outline = new Color(1f, 1f, 1f, .95f);
-        private static readonly Vector2[] OutlineDirections = { Vector2.up, Vector2.down, Vector2.left, Vector2.right };
+        // Hap-io / 5OrbsColor/Firered/600 (#A92511), from Hapio.tokens.json.
+        public static readonly Color BlockInk = new Color32(169, 37, 17, 255);
+        // User-specified countdown ink; keep the half-board tint on Fire red/600.
+        public static readonly Color CountdownInk = new Color32(232, 210, 185, 255);
+        public const string CountdownFontPath = "Sabotage/DrumPassBlock/ShillaCultureBold";
+        private static readonly Color Red = BlockInk;
         private static Sprite glowSprite;
         private static Sprite lineSprite;
 
+        private LabOrbAreaShape cachedShape;
+        private bool cachedRight;
+        private float cachedBottom = float.NaN;
+        private Sprite halfSprite;
+        private Texture2D halfTexture;
         private SpriteRenderer glow;
         private SpriteRenderer line;
         private TextMesh seconds;
-        private readonly TextMesh[] outline = new TextMesh[4];
+        private readonly System.Collections.Generic.List<SpriteRenderer> digitViews = new System.Collections.Generic.List<SpriteRenderer>();
+        private float digitHeight;
         private bool right;
         private bool secondsShown = true;
         private float age;
@@ -80,34 +88,50 @@ namespace C6Lab
         }
 
         /// <summary>Lays the glow along the edge at edgeX (world), from bottom to top, reaching inward.</summary>
-        public void Show(bool rightEdge, float edgeX, float bottom, float top, float boardWidth, float orbRadius)
+        public void Show(bool rightEdge, float edgeX, float bottom, float top, float boardWidth, float orbRadius, LabOrbAreaShape shape = null, float visualBottom = float.NaN)
         {
             EnsureParts();
             // A new block, or one moved to the other edge, opens with its flashes again.
             if (!Visible || rightEdge != right) age = 0f;
             right = rightEdge;
             float inward = right ? -1f : 1f;
+            if (shape != null)
+            {
+                bottom = float.PositiveInfinity;
+                top = float.NegativeInfinity;
+                foreach (Vector2 point in shape.LowerBoundary) bottom = Mathf.Min(bottom, point.y);
+                foreach (Vector2 point in shape.UpperBoundary) top = Mathf.Max(top, point.y);
+            }
+            float secondsMiddle = (bottom + top) * .5f;
+            // The physics silhouette stops above the bottom HUD. The tint must continue to the viewport edge.
+            if (!float.IsNaN(visualBottom) && !float.IsInfinity(visualBottom))
+                bottom = Mathf.Min(bottom, visualBottom);
             float height = Mathf.Max(.01f, top - bottom);
             float middle = (bottom + top) * .5f;
             float glowWidth = GlowShare * boardWidth;
+            if (halfSprite == null || cachedShape != shape || cachedRight != right || !Mathf.Approximately(cachedBottom, bottom))
+            {
+                ReleaseHalfSprite();
+                cachedShape = shape;
+                cachedRight = right;
+                cachedBottom = bottom;
+                halfSprite = CreateHalfSprite(shape, edgeX, bottom, top, glowWidth, inward);
+                glow.sprite = halfSprite;
+            }
             // The sprites grow inward from their pivot on the edge; a negative width mirrors them.
             glow.transform.position = new Vector3(edgeX, middle, 0f);
-            glowScale = new Vector3(inward * glowWidth, height, 1f);
+            glowScale = new Vector3(inward * glowWidth, height * .5f, 1f);
             glow.transform.localScale = glowScale;
             line.transform.position = new Vector3(edgeX, middle, 0f);
             line.transform.localScale = new Vector3(inward * LineShare * boardWidth, height, 1f);
 
             float textHeight = 1.2f * orbRadius;
             float size = textHeight / (FontSize * .1f);
-            Vector3 at = new Vector3(edgeX + inward * glowWidth * .5f, middle, -2f * orbRadius);
+            Vector3 at = new Vector3(edgeX + inward * Mathf.Max(boardWidth * .065f, textHeight * .8f), secondsMiddle, -2f * orbRadius);
             seconds.characterSize = size;
             seconds.transform.position = at;
-            for (int i = 0; i < outline.Length; i++)
-            {
-                outline[i].characterSize = size;
-                Vector2 offset = OutlineDirections[i] * (.06f * orbRadius);
-                outline[i].transform.position = at + new Vector3(offset.x, offset.y, .01f);
-            }
+            digitHeight = textHeight;
+            DrawDigits(seconds.text);
             SetShown(true);
             Pose();
         }
@@ -119,7 +143,25 @@ namespace C6Lab
             string text = Mathf.CeilToInt(Mathf.Max(0f, secondsLeft)).ToString();
             if (seconds.text == text) return;
             seconds.text = text;
-            foreach (TextMesh copy in outline) copy.text = text;
+            DrawDigits(text);
+        }
+
+        private void DrawDigits(string value)
+        {
+            if (seconds == null || digitHeight <= 0f) return;
+            for (int i = 0; i < value.Length; i++)
+            {
+                if (i >= digitViews.Count)
+                    digitViews.Add(CreateSprite("Block Countdown Digit", null, TextOrder + 1));
+                SpriteRenderer digit = digitViews[i];
+                digit.sprite = Resources.Load<Sprite>("Sabotage/DrumPassBlock/Digits/" + value[i]);
+                digit.color = CountdownInk;
+                digit.transform.position = seconds.transform.position
+                    + Vector3.right * ((i - (value.Length - 1) * .5f) * digitHeight * .7f);
+                digit.transform.localScale = Vector3.one * (digitHeight * 1.5f);
+                digit.gameObject.SetActive(seconds.gameObject.activeSelf && secondsShown);
+            }
+            for (int i = value.Length; i < digitViews.Count; i++) digitViews[i].gameObject.SetActive(false);
         }
 
         /// <summary>Something just bounced off the edge.</summary>
@@ -141,7 +183,7 @@ namespace C6Lab
 
         private void Pose()
         {
-            float breathe = .75f + .25f * Mathf.Sin(age * BreatheHz * 2f * Mathf.PI);
+            float breathe = .75f + .25f * (.5f + .5f * Mathf.Sin(age * BreatheHz * 2f * Mathf.PI));
             float lift = flash / FlashSeconds;
             // The opening flashes: each blink jumps to full red at once and fades, three times over.
             float opening = 0f;
@@ -150,9 +192,9 @@ namespace C6Lab
                 float blink = (age % BlinkSeconds) / BlinkSeconds;
                 opening = 1f - blink * blink;
             }
-            Color red = Color.Lerp(Red, FlashRed, opening);
+            Color red = Red; // Keep the RGB fixed; only opacity/width breathe and flash.
             glow.color = new Color(red.r, red.g, red.b,
-                Mathf.Min(1f, Mathf.Lerp(GlowAlpha * breathe, 1f, opening) + .4f * lift));
+                Mathf.Min(1f, Mathf.Lerp(GlowAlpha * breathe, 1f, opening) + .05f * lift));
             line.color = new Color(red.r, red.g, red.b,
                 Mathf.Min(1f, Mathf.Lerp(LineAlpha * breathe, 1f, opening) + .2f * lift));
             glow.transform.localScale = new Vector3(glowScale.x * (1f + FlashWiden * opening), glowScale.y, 1f);
@@ -160,12 +202,24 @@ namespace C6Lab
 
         private void EnsureParts()
         {
+            // Remove legacy offset copies retained by an existing runtime hierarchy after a script reload.
+            for (int i = transform.childCount - 1; i >= 0; i--)
+            {
+                Transform child = transform.GetChild(i);
+                if (child.name == "Swipe Block Seconds Outline")
+                {
+                    child.gameObject.SetActive(false);
+                    if (Application.isPlaying) Destroy(child.gameObject);
+                    else DestroyImmediate(child.gameObject);
+                }
+            }
             if (glow != null) return;
             glow = CreateSprite("Swipe Block Glow", GlowSprite(), GlowOrder);
             line = CreateSprite("Swipe Block Line", LineSprite(), LineOrder);
-            Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            for (int i = 0; i < outline.Length; i++) outline[i] = CreateText("Swipe Block Seconds Outline", font, Outline, TextOrder);
-            seconds = CreateText("Swipe Block Seconds", font, Red, TextOrder + 1);
+            Font font = Resources.Load<Font>(CountdownFontPath);
+            if (font == null) font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            seconds = CreateText("Swipe Block Seconds", font, CountdownInk, TextOrder + 1);
+            seconds.GetComponent<MeshRenderer>().enabled = false;
             SetShown(false);
         }
 
@@ -173,9 +227,10 @@ namespace C6Lab
         {
             if (glow == null) return;
             glow.gameObject.SetActive(shown);
-            line.gameObject.SetActive(shown);
+            line.gameObject.SetActive(false);
             seconds.gameObject.SetActive(shown && secondsShown);
-            foreach (TextMesh copy in outline) copy.gameObject.SetActive(shown && secondsShown);
+            for (int i = 0; i < digitViews.Count; i++)
+                digitViews[i].gameObject.SetActive(shown && secondsShown && i < seconds.text.Length);
         }
 
         private SpriteRenderer CreateSprite(string label, Sprite sprite, int order)
@@ -201,13 +256,59 @@ namespace C6Lab
                 part.GetComponent<MeshRenderer>().sharedMaterial = font.material;
             }
             text.fontSize = FontSize;
-            text.fontStyle = FontStyle.Bold;
+            text.fontStyle = FontStyle.Normal;
             text.anchor = TextAnchor.MiddleCenter;
             text.alignment = TextAlignment.Center;
             text.color = color;
             part.GetComponent<MeshRenderer>().sortingOrder = order;
             return text;
         }
+
+        // #763: a linear tint covers only the blocked half, clipped to the actual curved board.
+        private Sprite CreateHalfSprite(LabOrbAreaShape shape, float edgeX, float bottom, float top,
+            float width, float inward)
+        {
+            const int columns = 128, rows = 256;
+            var pixels = new Color32[columns * rows];
+            for (int x = 0; x < columns; x++)
+            {
+                float u = (x + .5f) / columns;
+                float worldX = edgeX + inward * u * width;
+                Vector2 range = shape != null ? shape.VerticalRange(worldX, 0f) : new Vector2(bottom, top);
+                for (int y = 0; y < rows; y++)
+                {
+                    float worldY = Mathf.Lerp(bottom, top, (y + .5f) / rows);
+                    // Keep the outermost band fully saturated; soften across the rest of the blocked half.
+                    float gradient = Mathf.Pow(1f - Mathf.InverseLerp(.08f, 1f, u), .7f);
+                    float alpha = worldY >= bottom && worldY <= range.y ? gradient : 0f;
+                    pixels[y * columns + x] = new Color32(255, 255, 255, (byte)Mathf.RoundToInt(alpha * 255f));
+                }
+            }
+            halfTexture = new Texture2D(columns, rows, TextureFormat.RGBA32, false)
+            { name = "Blocked half curved mask", filterMode = FilterMode.Bilinear,
+                wrapMode = TextureWrapMode.Clamp, hideFlags = HideFlags.DontSave };
+            halfTexture.SetPixels32(pixels);
+            halfTexture.Apply(false, true);
+            return Sprite.Create(halfTexture, new Rect(0, 0, columns, rows), new Vector2(0f, .5f), columns);
+        }
+
+        private void ReleaseHalfSprite()
+        {
+            if (Application.isPlaying)
+            {
+                if (halfSprite != null) Destroy(halfSprite);
+                if (halfTexture != null) Destroy(halfTexture);
+            }
+            else
+            {
+                if (halfSprite != null) DestroyImmediate(halfSprite);
+                if (halfTexture != null) DestroyImmediate(halfTexture);
+            }
+            halfSprite = null;
+            halfTexture = null;
+        }
+
+        private void OnDestroy() => ReleaseHalfSprite();
 
         /// <summary>1 unit square, pivot on its left edge: strongest there, fading inward and at both ends.</summary>
         private static Sprite GlowSprite() =>
