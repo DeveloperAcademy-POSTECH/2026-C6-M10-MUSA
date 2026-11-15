@@ -214,9 +214,9 @@ namespace C6Lab.Tests
                 audioRoot.SetActive(false);
                 Bgm = audioRoot.AddComponent<LabBattleBgm>();
                 Bgm.Bind(Network);
-                audioRoot.SetActive(true); // Awake loads the real clips and creates all three sources.
+                audioRoot.SetActive(true); // Awake loads the real clips and creates all four sources (#745: + the fast song).
                 Sources = audioRoot.GetComponents<AudioSource>();
-                Assert.That(Sources, Has.Length.EqualTo(3));
+                Assert.That(Sources, Has.Length.EqualTo(4));
                 foreach (AudioSource source in Sources) source.mute = true; // Before the first Update/Play.
             }
 

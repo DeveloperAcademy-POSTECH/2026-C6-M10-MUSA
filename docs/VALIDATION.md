@@ -9011,3 +9011,37 @@ PR #729 검증 중 main `a7208003`에서 `LabLocalBoardNetworkIntegrationTests` 
 - **실제 Mac 화면:** Release 앱을 실행해 `시연 방 입장` 제목·A/B 입장 버튼2개·각3명 안내·야광귀 카드 부재·글자/버튼 배치를 확인했다. 자동화 도구의 좌표 클릭이 `noWindowsAvailable` 오류로 전달되지 않아 실제 앱에서 로비 입장은 확인하지 못했다. 이를 게임 실패나 입장 PASS로 기록하지 않는다. 저장 UI raycast·그룹 버튼 입장·로비/전투 흐름은 위 PlayMode 검사로 별도 확인했다. 확인 후 앱 종료를 관찰했다.
 - **검증 구분:** 새 6연결 검사는 Mac의 실제 NGO/dual-stack 소켓 Host2+Guest4이며 여섯 화면이나 물리 무선 기기를 관찰한 시험이 아니다. 미실행 iOS 설치·물리 기기6대 일반 Wi-Fi/핫스팟은 PASS로 표시하지 않는다.
 - **보존:** 데스크탑 main 작업 폴더와 #740/#750 작업 폴더를 전환·저장하지 않았다. 시연만 Staff revision3으로 바꾸고 일반5705/Game55/Lab·공유 설정·도색·투척 규칙을 유지한다. 빌드/운영/Scene 흐름은 `docs/STAFF_STAGE_DEMO.md`를 따른다.
+
+## #749 Stage2 밧줄 연결점 (2026-11-15)
+
+- 기존 Stage2 에셋을 Unity에서 인스턴스화: 이전 Rope Socket은 남아 있는 model_part4 메시 bounds 밖임을 확인.
+- 수정 Prefab 좌표를 메모리 인스턴스에 적용: yaw 0/45/90/180/270 × swing -20/0/20, 크기 1.1, 이동 포함 15개 조합에서 메시 로컬 bounds 안쪽 연결 PASS. 원본 에셋은 저장하지 않음.
+- 작업 브랜치 git diff --check PASS. 재베이크와 저장 Prefab 일치를 검사하는 EditMode 회귀 검사 추가.
+- 현재 Unity는 별도 체크아웃이므로 이 브랜치의 전체 컴파일·EditMode 검사·실제 전투 화면 시각 검증은 미실행. 실기기 검증 미실행.
+
+### #749 보완 검증
+- 최초 AABB 내부 검사만으로는 두 갈래 사이의 빈 공간을 검출하지 못했다. 기존 15개 포즈 검사는 시각 연결의 근거가 아니다.
+- 현재 Unity 프로젝트에도 수정 반영. 매듭 메시의 밧줄 축으로 MeshCollider.Raycast를 수행해 실제 표면 y=1.358825, 연결점 y=1.348825를 계산.
+- Unity 도메인 리로드 후 변경된 베이크 Compute 실행 성공. 저장 Prefab과 계산 위치 차이 0.00000025 미만.
+- 현재 Unity에서 수정 Prefab과 동일 지름의 밧줄을 임시 구성해 근접 렌더링: 빈틈 없이 연결됨을 이미지 확인. 임시 객체 제거, Scene 저장 안 함. 실제 전투 전체 및 실기기 검사는 미실행.
+
+### #749 병합 전 검증 (2026-11-15)
+- **기준:** `fix/#749-round2-rope` `8eacb623`(main `766158b7` 위). Unity 6000.6.5f1 batch(macOS, Metal). Rope Socket은 `LabHangingTarget.UpdateContinuousRope`의 밧줄 끝점에만 쓰여 물리·판정·도색·통신·설정 수·접속 묶음은 그대로다.
+- **메뉴 재굽기:** `-executeMethod Hapio.Editor.GameGourdRigBaker.BakeStage2` 실행 뒤 BakeReport는 같았다. Prefab은 Rope Socket 좌표 한 줄만 1e-7 이하의 표기 차이로 바뀌었다(`y 1.348825` → `1.3488247` 등, 손으로 넣은 자릿수를 Unity 직렬화 값으로 교체). 이 메뉴 결과를 커밋했다.
+- **전체 EditMode:** 2502/2502 PASS(새 `Stage2RopeEndsInsideTheVisibleAttachment`, 굽기 최신성 검사 포함).
+- **PlayMode 영향 묶음:** `GameStageGourdIntegrationTests`·`LabContinuousRopeTests`·`LabGourdVisualRigTests`·`GameSceneFlowTests` 58/58 PASS. 판정·통신 경로 변경이 없어 전체 PlayMode는 실행하지 않았다.
+- **화면(Development Mac 빌드, DEV 솔로 2스테이지, 임시 캡처 스크립트는 저장소에 남기지 않음):** 전투 카메라 3배 확대 캡처로 비교했다. 새 연결점은 정지, 옆으로 친 흔들림 4프레임, 야광귀 등장 클립 15·26·29·38프레임에서 밧줄이 매듭 두 갈래에 붙어 있었다. 같은 실행에서 연결점만 예전 값(y 1.6383)으로 되돌리면 정지·흔들림 모두 밧줄과 매듭 사이에 틈이 보였다. `model_part4`는 `Lid_Hinge` 아래가 아니어서 뚜껑과 따로 움직이지 않는다.
+- **미실행:** iPhone 실기기, 실제 멀티 전투.
+- **main `e5814f57`(#751) 병합 뒤 재실행:** 충돌 없음(#751은 시연 빌드 도구만 변경). 전체 EditMode **2515/2515 PASS**, PlayMode 영향 묶음(위 4종 + `GameStaffStageDemoSessionTests`) **66/66 PASS**.
+
+## 2026-11-15 — #745 남은 30초 BGM 빨라지기 / 승리·패배 징글과 진동 / 지귀 BGM·피버 다시 만들기
+
+- **기준:** `feat/#745-bgm-rush-result-sfx` (main `b41a3095`(#752) 병합 뒤). 접속 규약 5705 / DEV 설정 수 / 게임 규칙은 바꾸지 않았다. 화면·소리·진동과 VFX 실험실(Editor)만 바뀐다.
+- **바뀐 것:** 남은 30초(30초 알림과 같은 조건)부터 피버 전까지 라운드 곡을 음 그대로 1.15배 판으로 같은 자리에서 이어 받음(`LabBattleBgm` 네 번째 AudioSource, 미리 늘린 `*BGMRush` ogg 3개, 전투 시작 때 미리 불러 둠). VFX 실험실 "남은 30초로 시간 넘기기"(`LabBattleClock.Skip`, Host 혼자일 때만). 스토리 결과 카드 / 실패 게이지가 뜨는 순간 승리 / 패배 징글 + 박자 맞춘 진동(`GameResultJingle`, 장면이 열릴 때 결과 이야기에 스스로 붙음, 팀원 결과 화면 코드는 그대로). 지귀 BGM을 원곡 35~58마디 루프(41.1초, 이음매 0.35초 크로스페이드)로, 빠른 판도 그 루프로, 피버는 4마디씩 1.15→1.3배 + 꽹과리 동살풀이로 다시 만듦(웹 편집대에서 팀원이 고른 설정).
+- **실행:** Unity Test Runner (팀원 Mac).
+  - 전체 EditMode Run All: 실패 0 (새 `LabBattleBgmRushTests` 5개, `GameResultJingleTests` 2개 포함).
+  - 전체 PlayMode Run All 첫 실행: 872개 중 **5개 실패**.
+    - `LabBattleBgmStageTests` 3개: BGM의 AudioSource가 3개라고 기대했으나 빠른 곡 통로가 더해져 4개. 검사 기대값을 4로 바꾸고, 빠른 곡 통로를 맨 뒤에 만들어 전투 / 피버 / 추임새 통로 순서(0 / 1 / 2)를 예전 그대로 둠. 고친 뒤 이 3개 다시 실행 **통과**.
+    - `StoryTapAdvanceTests` 2개(`LastPageFinishesOnceOnReleaseClickRatherThanPointerDown`, `RaycastSurfaceAdvancesOnlyOnCompletedTapAndKeepsDirectNextSynchronous`): 화면 가운데 레이캐스트가 비어 있음. 이 브랜치는 이야기 입력 / 그 검사를 건드리지 않았고, 실행 때 에디터가 Simulator 탭이었다. 다시 실행하지 않아 원인은 확인하지 못함.
+- **눈 / 귀로 확인:** VFX 실험실에서 1~3R "남은 30초로 시간 넘기기" → 알림 + 빨라진 BGM → 10초 뒤 피버, 승리 / 패배 징글 미리 듣기, 지귀 루프 이음매와 피버(꽹과리).
+- **미실행:** iPhone 실기기 진동, 여러 기기 실제 네트워크, 실제 스토리 한 판의 결과 화면에서 징글이 나오는 순간.
