@@ -9153,6 +9153,65 @@ PR #729 검증 중 main `a7208003`에서 `LabLocalBoardNetworkIntegrationTests` 
 - **화면(Development Mac 빌드, 솔로 1→2→3스테이지, main과 같은 임시 캡처):** 1·2·3스테이지 봉인 박 둘러보기에서 상단 고리·매듭·짧은 줄이 사라지고 박이 다시 가운데에 맞춰졌다(정면·회전·확대). 같은 스테이지 전투 박 확대에서는 고리와 밧줄 연결이 그대로다. 땅따먹기 박 보기(흰 박)는 같다.
 - **미실행:** iPhone 실기기.
 
+## 2026-11-15 — #762 땅따먹기 화면에 새 박(야광귀) 적용
+
+### 확인한 상태 (변경 전)
+
+- 스토리 1~3스테이지는 `GameBattleBindings.MountStageGourd`가 스테이지 정보(`gourdVisualResource`)로 새 박 모델(구미호·야광귀·지귀, 클레이 채색·키링 제거)을 붙인다. 땅따먹기는 `CurrentStageDefinition`이 없어(스토리만 있음) 이 단계를 건너뛰고 예전 흰 박이 그대로 나왔다. 배경은 이미 2스테이지(야광귀) 배경(`GameStageBackgrounds.TerritoryArtStage = 2`)을 쓰고 있었다.
+
+### 변경
+
+- `GameSession.GourdStageDefinition`: 스토리는 그 스테이지, 땅따먹기(1:1·2:2·3:3)는 배경과 같은 2스테이지(야광귀) 정의. `MountStageGourd`가 이것으로 박을 붙여 땅따먹기에 `Stage02_Yagwanggwi_Battle` 박이 붙는다. 박 모양만 빌리고 땅따먹기 규칙·값·화면 이름("땅따먹기")은 그대로다. 튜토리얼은 흰 박 그대로.
+- 칠: 땅따먹기는 클레이 없이 선명한 고해상도 칠을 쓰므로 박 몸통·뚜껑이 칠 지도를 그대로 그린다(`_PaintMapReady` 1). 맞는 판정 껍데기는 박 모델의 것.
+- 크기: 박 모델에는 스토리 박 크기(`LabGourdVisualRig.StageSizeMultiplier` 1.4배, #590)가 붙어, 땅따먹기 박과 판정도 흰 박보다 1.4배 커진다(스토리 2스테이지와 같은 크기).
+- 네트워크·접속 버전·DEV 값 변경 없음.
+
+
+## 2026-11-15 — #727 튜토리얼 대사 키워드 강조
+
+### 변경
+
+- 강조 기준: 크게 = 꼭 알아야 할 대상·행동·목표, 빨강 = 주의·경고(안 되는 것, 줄어들거나 사라지는 것, 위험, 방해), 오행 색 = 화·수·목·금·토 이름. 모두 굵게.
+- 대본(`GameTutorialScript`)의 대사 17줄에 강조 표시를 넣었다: `<big>`(검정 그대로 크게) 빈틈없이 칠하면·북·음구슬·양구슬·오행구슬·100%·우측 지도·바로바로 넘겨 줘·적힌 숫자만큼·두 개, `<red>`(진홍 `#8A1206`) 기운이 줄어·같은 색끼리는 안 붙어!·오래 두면 사라져·터지니까·빨개졌어·막은 것 같아·어떤 방해, 오행 표시 화·수·목·금·토(전투 오행 구슬 그림 색: 화 `#D32E16`·수 `#0E6192`·목 `#2E6946`·금 `#F9B520`·토 `#654029`, 사용자 시안의 글자 색과 같음).
+- 대사의 `Text`는 표시를 뺀 원래 문장(승인된 대본과 같음)이고, 화면에 그릴 때만 `Marked`를 Unity 리치 텍스트로 바꾼다(`GameTutorialEmphasis`). 대화 기록 항목도 `Text`는 그대로, `Marked`를 따로 갖는다.
+- 말풍선: 큰 글자는 그 말풍선 글자 크기의 1.35배(`GameTutorialArt.emphasisScale`). Unity 자동 맞춤은 `<size>` 글자를 같이 줄이지 않아 끄고, 큰 글자까지 넣은 글이 칸 높이에 들어가며 대본에 쓴 줄바꿈 말고는 더 나뉘지 않는 가장 큰 크기를 직접 고른다(`FitBubble`). 기본 말풍선에서 17줄 모두 그대로 17(큰 글자 23)이다. ("구슬은 오래 두면 사라져."를 크게 했을 때는 그 줄만 16으로 한 단계 줄어 2줄을 지켰고, 빨강으로 바꾼 뒤에는 17.) 좁은 칸에서는 줄 전체와 큰 글자가 같은 비율로 함께 작아진다.
+- 오행 글자는 시안처럼 테두리 없이 색만. 먹색 테두리(`GameTutorialElementOutline`, 정점 색이 오행 색인 글자만)는 `elementOutlineWidth`(기본 0)를 올리면 켜진다. 처음에 넣었던 1.2 테두리는 시안에 맞춰 껐다.
+- 강조한 부분(크게·빨강·오행 색)은 모두 굵게(`<b>`, `GameTutorialArt.emphasisBold`, 기본 켬). 말풍선 글꼴(신라문화체 M)에 굵은 글꼴이 따로 연결돼 있지 않아 Unity가 굵게 그린 글자를 쓴다(글자 칸은 1px 커지고 글자 간격은 그대로).
+- 대화 기록: 빨강·오행 색·굵게는 그대로, 크기는 키우지 않는다.
+- 아래 행동 안내 띠, 6단계(막기) 등 표시 없는 대사는 그대로다. 게임 규칙·네트워크·접속 버전 변경 없음.
+
+### 확인
+
+- Unity 6000.6.5f1 Editor 컴파일: PASS. 콘솔 오류 1건은 기존 `ResultAction.png` Library 캐시 손상이다.
+- 검사 추가: PlayMode `GameSceneFlowTests.TerritoryMountsTheYagwanggwiGourdAndPaintsItsTeamColoursStraightOnIt` **PASS**(사용자 실행) — DEV 솔로 땅따먹기에서 야광귀 박 모델·판정 껍데기·스토리 크기, 화면 이름 "땅따먹기", 고해상도 칠이 몸통·뚜껑에 바로 묶임(클레이·물감 없음).
+- `GameSceneFlowTests` 전체(사용자 실행): Passed 25 / Failed 24. 실패 24건은 모두 같은 로그 하나로 실패했다: `Unknown error occurred while loading 'VirtualArtifacts/Primary/e3472224bcaa648cf9879fbf8ddf6346'`(`Assets/Hapio/Art/UI/Strokes/ResultAction.png`). 결과 화면·봉인 박 관람을 여는 검사만 실패했고, 이 기기 Library의 그 GUID 기록 손상이다(#717 기록과 같음, Unity 6.6 통합 저장소라 그 항목만 지울 수 없음). 저장소 파일·meta는 정상이며 #762와 무관하다. 땅따먹기 결과 검사 2건(`TerritoryDeveloperSolo…`, `TerritoryTimeUp…`)도 이 이유로 실패해 박 교체 뒤 결과 화면은 Library 재생성 뒤 재실행이 필요하다(NOT_RUN).
+- 스토리 박 검사(`GameStageGourdIntegrationTests`, `GameStageGourdSizeTests`), `GameBattleUiPresentationTests` 땅따먹기: NOT_RUN.
+- 실제 화면(청·홍 칠이 야광귀 박에 보이는 모습, 커진 박과 위쪽 팀 막대·아래 판의 겹침), Mac 여러 앱 땅따먹기: NOT_RUN.
+
+### #762 병합 전 검증 (2026-11-15)
+- **기준:** `feat/#762-territory-stage-gourd`에 main `9c24dccc`(#760 포함) 병합. 충돌은 이 문서 기록 추가뿐이며 양쪽을 보존했다. Unity 6000.6.5f1 batch(macOS, Metal).
+- **추가 수정:** 땅따먹기 판정 껍데기·크기가 바뀌므로 접속 토큰을 `C6HapioGame/56`으로 올렸다(Game55 거절 검사 추가). AGENTS·GAME_FLOW·GOURD_MODELS의 "땅따먹기=흰 박" 설명도 고쳤다. 프로토콜 5705·Lab62·설정 265개는 그대로다.
+- **전체 EditMode:** 2583/2583 PASS. **전체 PlayMode:** 878/878 PASS(새 `TerritoryMountsTheYagwanggwiGourd…`와 땅따먹기 결과 검사 포함).
+- **화면(Development Mac 빌드, DEV 솔로 땅따먹기, main과 같은 임시 캡처):** 전투 박이 흰 박에서 1.4배 야광귀 박으로 바뀌었다. 청홍 칠이 몸통·뚜껑에 바로 칠해지고, 상단 막대·조합판과는 겹치지 않는다. 결과 박 보기도 야광귀 박이며 #760처럼 상단 고리가 없다. 튜토리얼 박은 흰 박 그대로다.
+- **미실행:** iPhone 실기기, 실제 여러 기기 땅따먹기(1:1·2:2·3:3) 네트워크 전투.
+
+- Editor API(Play 없이)로 실제 튜토리얼 그림(`TutorialArt`)의 글꼴·말풍선 칸으로 확인: 표시된 17줄, `Text`에 표시 새어 나감 0, 17줄 모두 대본 줄 수 그대로(위 크기), 좁은 칸(170x112)에서 14/19·15/20로 함께 작아짐, 테두리를 켰을 때 오행 줄은 테두리 글자 5개·다른 줄 0개. 굵게를 더한 뒤에도 크기·줄 수가 같다. 오행 색(구슬 그림 색, 테두리 없음)과 새 강조를 같은 글꼴로 그려 눈으로 확인했다. 굵게 전후를 같은 글꼴로 그려 비교해 굵어진 것을 눈으로 확인했다.
+- 검사 추가 (실행은 NOT_RUN): EditMode `GameTutorialEmphasisTests` 4건 (합의한 키워드와 원래 대본 유지, 리치 텍스트·기록 변환, 모든 표시 줄의 줄바꿈과 비율 축소, 오행 글자 색과 기본 테두리 없음, 켜면 오행 글자만 테두리). 기존 `GameTutorialTests`·`GameTutorialLogTests`는 `Text`가 그대로라 그대로 둔다.
+- 튜토리얼 EditMode·PlayMode(`GameTutorialFlowTests`) 실행, iPhone 비율 화면 확인: NOT_RUN.
+
+### #727 main 병합 — 2026-11-15
+
+- 최신 main(#753 시연 그룹 분리, #749 Stage2 밧줄 연결점, #745 남은 30초 BGM·결과 징글)을 통합했다. 충돌은 이 문서 끝의 기록 추가 한 곳이며 양쪽 기록을 모두 보존했다. 병합 뒤 컴파일 결과는 PR에 적는다.
+
+### #727 병합 전 검증 (2026-11-15)
+- **기준:** `feat/#727-tutorial-keyword-highlight`에 main `6691ccb6`(#760·#762 포함) 병합. 충돌은 이 문서 기록 추가뿐이며 양쪽을 보존했다. Unity 6000.6.5f1 batch(macOS, Metal).
+- **색상 규칙 맞춤(AGENTS 합이오 UI 컬러 시스템):** 위 기록의 색은 이 절로 바뀌었다.
+  - 오행 글자 색을 `5OrbsColor/*/500***` 토큰 값으로 바꿨다. 화 `#D32E16→#D32E15`, 목 `#2E6946→#2F6946`, 금 `#F9B520→#F9B521`이고 수·토는 원래 같았다. 토큰 경로 주석도 남겼다.
+  - 경고 `<red>`는 토큰이 아닌 `#8A1206` 대신 `5OrbsColor/Firered/700` `#7F1C0D`로 바꿨다. 실제 말풍선 캡처에서 후보 4개를 비교해 사용자가 골랐다.
+- **전체 EditMode:** 2587/2587 PASS(새 `GameTutorialEmphasisTests` 포함). **PlayMode `GameTutorial*`:** 5/5 PASS.
+- **화면(Development Mac 빌드, main과 같은 임시 캡처로 튜토리얼 대사 줄마다 비교):** 강조 대사의 글자는 그대로다. 핵심 단어만 굵고 크게, 경고는 Firered/700, 오행 이름은 구슬 색으로 바뀌었다. 말풍선 밖으로 넘치는 줄은 없었다. 대화 기록과 지적 말풍선도 확인했다.
+- **미실행:** iPhone 실기기.
+
 ## 2026-11-15 — #766 스토리 좌우 터치와 오프닝 3번 행간
 
 - 기준: origin/main 9a01c3c4에서 fix/766-story-touch-navigation. 기존 프로젝트에서 작업하며 개인 ProjectSettings/Build Profiles 변경은 제외한다. 이슈 #766 생성 후 사용자 미리보기 승인을 받았다.
