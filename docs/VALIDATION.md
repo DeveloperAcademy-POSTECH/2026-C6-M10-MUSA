@@ -8975,3 +8975,13 @@ PR #729 검증 중 main `a7208003`에서 `LabLocalBoardNetworkIntegrationTests` 
 - **새 / 바뀐 검사:** `LabVfxLabTests`에 SMALL 바로 끝내기, 잠긴 박 폭탄 바로 터뜨리기, 연기 / 부적 골라 예고 없이 시작(다른 종류 차례면 한 칸 건너뜀), 콤보 예고 없이 시작 4개. `LabComboProjectileIntegrationTests`는 다음 칸 투명도 기대값을 .85로.
 - **눈으로 확인:** VFX 실험실에서 2R 콤보 하트(한지 붉은 하트, 먹물 깨짐, 크기), 다음 색 칸이 보이는지, 3R 물 폭포(배경 먹선 구름 + 수채 물줄기, 박을 덜 가림, 가운데 물보라 그림 삭제)를 팀원이 확인했다.
 - **미실행:** 여러 기기 실제 네트워크, iPhone 실기기, 아트팀 녹화(이 PR 뒤 `docs/VFX_LAB.md` 표대로).
+
+## 2026-11-15 — #747 엔딩 대화 상자와 네임택
+
+- 기준: main `a754d500`에서 `fix/747-ending-dialogue`; Unity6000.6.5f1 macOS Editor, 활성 iOS 대상. 개인 ProjectSettings/EditorBuildSettings/Build Profiles는 작업 시작 상태를 보존하며 커밋에서 제외했다.
+- 범위: 엔딩 컷별 대화 UI와 공유 StoryPlayer의 표시값 적용·복원만 변경. 세션/Scene 전환 알고리즘·네트워크·물리·도색은 변경하지 않아 전체 PlayMode 대신 Story 어셈블리와 실제 결과→엔딩·버튼 입력 경로를 선택했다.
+- 컴파일 오류0. 전체 EditMode 최종 **2,501/2,501 PASS**(37.83초). 첫 실행도2,501/2,501 PASS(39.16초).
+- `Hapio.Story.PlayModeTests` 최종 **52/52 PASS**(2.95초): 동일 그림에서 불이→만복 색 전환, 솔이 색, 무대사 숨김, 종이/그림자/폰트/줄바꿈 복원, 기존 오프닝·스토리 검사 포함. 첫 실행도52/52 PASS(3.72초).
+- `GameSceneFlowTests.FigmaResultsWaitForHostNextAndShowEachYokaiThenKeepFinalOverallAndHomeNavigation` 및 `SavedStoryViewerSkipAndEndingButtonsReceiveRealMouseClicks` **2/2 PASS**(65.03초). 이후 줄바꿈 표시만 수정했으며 전환/입력/수명 경로는 동일해 해당 결과를 재사용했다.
+- 화면 확인: 저장된 GameStageStoryCanvas와 실제 컷을 Unity 카메라로402×874 렌더하여 불이·만복·솔이·마지막 불이4페이지 확인. 처음 캡처에서 긴 문장 자동 줄바꿈을 발견해 `dialogueNoWrap`으로 수정했고 위 최종 검사를 재실행했다. 격리 캡처에서는 게임 어댑터가 평소 제어하는 결과/공통 버튼을 숨겨 대화 상자만 비교했다. 종이/이름표의 다운로드 원본과 로컬 파일 SHA-1 일치 확인. 그림 배치와 범위 밖 버튼 외형은 변경하지 않았다.
+- 작업 전 Console의 iOS `Subtarget property is not available` 오류1건을 기록했으며 새 코드 컴파일 후 오류0. 자동 검사 실패/단언 완화 없음. 실기기·iOS 빌드·전체 PlayMode는 실행하지 않았다.

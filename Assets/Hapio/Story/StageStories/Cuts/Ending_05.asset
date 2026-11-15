@@ -16,7 +16,7 @@ MonoBehaviour:
   viewPrefab: {fileID: 5948098439593393351, guid: d489fb5f68a8e4d279625268cd08bb9e, type: 3}
   pages:
   - speaker: "\uBD88\uC774"
-    dialogue: "\uC774\uAC74 ... \uC6B0\uB9AC\uAC00 \uAE6C\uAC8C \uC544\uB2CC..\uB370..?"
+    dialogue: "\uC774\uAC74... \uC6B0\uB9AC\uAC00 \uAE6C\uAC8C \uC544\uB2CC\uB370...?"
     autoReadSeconds: 4
     voice: {fileID: 0}
   direction: "\uD53C\uADF8\uB9C8 4210:3358 \uC6D0\uBCF8 \uBC30\uCE58. \uC2E4\uC81C \uC2A4\uD14C\uC774\uC9C0 \uC9C4\uC785\uC740 \uD300\uC6D0 \uC5F0\uACB0 \uC608\uC815."
