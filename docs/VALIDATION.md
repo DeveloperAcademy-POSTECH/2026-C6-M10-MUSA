@@ -8999,6 +8999,23 @@ PR #729 검증 중 main `a7208003`에서 `LabLocalBoardNetworkIntegrationTests` 
 - 화면 확인: 저장된 GameStageStoryCanvas와 실제 컷을 Unity 카메라로402×874 렌더하여 불이·만복·솔이·마지막 불이4페이지 확인. 처음 캡처에서 긴 문장 자동 줄바꿈을 발견해 `dialogueNoWrap`으로 수정했고 위 최종 검사를 재실행했다. 격리 캡처에서는 게임 어댑터가 평소 제어하는 결과/공통 버튼을 숨겨 대화 상자만 비교했다. 종이/이름표의 다운로드 원본과 로컬 파일 SHA-1 일치 확인. 그림 배치와 범위 밖 버튼 외형은 변경하지 않았다.
 - 작업 전 Console의 iOS `Subtarget property is not available` 오류1건을 기록했으며 새 코드 컴파일 후 오류0. 자동 검사 실패/단언 완화 없음. 실기기·iOS 빌드·전체 PlayMode는 실행하지 않았다.
 
+## 2026-11-15 — #753 A/B 독립 시연 세션·그룹 즉시 입장
+
+- **기준/범위:** main `e5814f57`에서 `feat/#753-staff-demo-session-groups`. Unity6000.6.5f1/macOS/Metal. Stage2 Only는 야광귀 선택 카드 없이 A/B 버튼으로 검색·생성·입장한다. 기존 3카드 시연은 그룹을 먼저 선택한다. 접속·광고·재입장 식별을 바꾸므로 전체 EditMode·PlayMode가 필요하다.
+- **컴파일/저장 자료:** `StaffDemoUiAssets.CreateOrUpdate` 성공·컴파일 오류0. 변경한 저장 UI는 시연의 `StageSelection.prefab` 하나이며 Unity 편집 도구로 작성했다. 일반 Home/Lobby/Battle/StageResult/GameOver 및 Lab Scene·일반 Prefab·Material·원본 설정·패키지는 변경하지 않았다.
+- **전체 EditMode:** 최초 **2,540/2,540 PASS**(19.86초), QR 복귀 문구까지 반영한 최종 **2,540/2,540 PASS**(18.80초), 실패·건너뜀0. A/B 메타데이터·이름/TXT 불일치·Host 승인·정원·검색/재연결 티켓 정리와 기존 일반 게임 계약을 포함한다.
+- **관련 PlayMode 첫 실행:** 15개 중13통과·2실패(86.40초). 새 6연결 시험이 AUTO 북을 Host가 소유한다고 가정했지만 3인 AUTO는 무작위 자리 한 곳에 북1개만 배치하므로 Host `Generate()`가 의도대로 아무 일도 하지 않았다. 시험 전용 북3개와 Host 북 존재 단언으로 수정했으며 게임 기본값은 유지한다. 다른 실패는 비활성 Stage 카드를 켠 같은 프레임에서 raycast한 준비 순서였다. 정상 프레임·Canvas 갱신 후 동일한 최상위 터치 대상 단언을 검사하도록 수정했다. 단언 삭제/완화는 없다.
+- **관련 PlayMode 재실행:** **15/15 PASS**(56.44초). 실제 소켓 Host2+Guest4, 다른 그룹 토큰 거절, P1~P3·시작·생성·일시정지·전투 시각·승리·자리 복귀의 독립성과 저장 Home의 그룹/카드 raycast·즉시 입장·재도전/QR 그룹 보존을 포함한다.
+- **전체 PlayMode:** **876/876 PASS**(915.07초), 실패·건너뜀0. 일반 Story·Lab·땅따먹기·연결/재도전·결과/엔딩·도색/물리 등을 포함한 전체 묶음이다. 실행 시작 이후 소스/에셋 해시가 동일함을 확인했다.
+- **Mac Release 빌드:** 정식 `GameDemoBuild.StageTwoMac` 경로 성공·오류0. 원본 커밋 `816dc17e`, 미커밋 변경 없음. manifest의 Staff revision3·Stage2 단일 항목·3인·Release·별도 앱 식별자·identityVerified를 확인했다. `codesign --verify --deep --strict` 통과. 빌드 뒤 소스/에셋 해시와 저장 설정이 유지됐다. 출력은 `Builds/HapioStage2Demo/<생성시각>/macOS/Hapio-Stage2-Demo.app`이며 바이너리/원시 로그는 커밋하지 않는다.
+- **실제 Mac 화면:** Release 앱을 실행해 `시연 방 입장` 제목·A/B 입장 버튼2개·각3명 안내·야광귀 카드 부재·글자/버튼 배치를 확인했다. 자동화 도구의 좌표 클릭이 `noWindowsAvailable` 오류로 전달되지 않아 실제 앱에서 로비 입장은 확인하지 못했다. 이를 게임 실패나 입장 PASS로 기록하지 않는다. 저장 UI raycast·그룹 버튼 입장·로비/전투 흐름은 위 PlayMode 검사로 별도 확인했다. 확인 후 앱 종료를 관찰했다.
+- **최신 main 통합:** 검증 중 올라온 main `7ce304c5`의 #752(야광귀 줄 연결)·#755(BGM/결과 효과음)를 `65a65a8c`에 보존했다. 코드 충돌은 없었고 `VALIDATION.md`의 양쪽 추가 기록만 함께 유지해 해결했다. `LabBattleClock.Skip`은 VFX 실험실 전용 새 호출, Rope Socket은 줄 표시 끝점, BGM/징글은 스냅샷을 읽는 로컬 연출이며 A/B 승인·흐름·통신 계약은 바뀌지 않았다. 따라서 이전 전체 PlayMode의 변경 없는 경로 결과를 재사용하고 영향 경로를 다시 검사했다.
+- **통합본 재검증:** 전체 EditMode **2,550/2,550 PASS**(19.75초), 영향 PlayMode **81/81 PASS**(331.92초). A/B6연결·시연 입장/재도전·Stage2 실제 명중/완료·박/줄 표시·BGM·일반 Scene 전환·`StoryTapAdvanceTests`를 포함하며 실패·건너뜀0. #745 기록에서 원인 미확정이던 스토리 입력도 이번 기본 batch 환경에서는 통과했다. 이81개를 통합본 전체 PlayMode 실행으로 표시하지 않는다.
+- **통합본 Mac 재빌드:** 소스 `65a65a8c`·미커밋 변경 없음으로 정식 StageTwoMac Release 빌드 성공·오류0·identityVerified·Staff3/S0/G0·Stage2 하나·3인을 재확인했다. 깊은 서명 검사 통과, 통합 후54개 소스/에셋 해시가 검사 시작부터 빌드 종료까지 동일했다. UI 자체는 앞서 관찰한 버전과 같으며 통합본 앱은 추가 실행하지 않았다. 위 #753의 일반 Prefab 무수정은 기능 자체 범위이며, 최신 main에서 받은 줄 Prefab·오디오 파일은 삭제/되돌리지 않았다.
+- **최종 검사 분류:** 실제 약1초인 새6연결 fixture에서 `Slow`만 제거하고 `Bonjour`는 유지했다. 동일 검사를 재실행해 **1/1 PASS**(1.25초). 단언·실행 본문·게임 코드는 바꾸지 않아 나머지 결과와 빌드를 재사용한다. 마지막 커밋의 앱 소스와의 차이는 검사 분류와 검증 문서뿐이다.
+- **검증 구분:** 새 6연결 검사는 Mac의 실제 NGO/dual-stack 소켓 Host2+Guest4이며 여섯 화면이나 물리 무선 기기를 관찰한 시험이 아니다. 미실행 iOS 설치·물리 기기6대 일반 Wi-Fi/핫스팟은 PASS로 표시하지 않는다.
+- **보존:** 데스크탑 main 작업 폴더와 #740/#750 작업 폴더를 전환·저장하지 않았다. 시연만 Staff revision3으로 바꾸고 일반5705/Game55/Lab·공유 설정·도색·투척 규칙을 유지한다. 빌드/운영/Scene 흐름은 `docs/STAFF_STAGE_DEMO.md`를 따른다.
+
 ## #749 Stage2 밧줄 연결점 (2026-11-15)
 
 - 기존 Stage2 에셋을 Unity에서 인스턴스화: 이전 Rope Socket은 남아 있는 model_part4 메시 bounds 밖임을 확인.

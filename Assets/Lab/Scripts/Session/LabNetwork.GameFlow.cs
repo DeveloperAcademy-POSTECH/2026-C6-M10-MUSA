@@ -26,7 +26,7 @@ namespace C6Lab
         private static readonly byte[] GameConnectionToken = Encoding.ASCII.GetBytes("C6HapioGame/55");
         private static readonly byte[] DemoGameConnectionToken = Encoding.ASCII.GetBytes("C6HapioDemo/" + LabGameBuildVariant.YaguangDemoRevision);
         public static string GameConnectionCompatibility => Encoding.ASCII.GetString(
-            LabGameBuildVariant.IsStaffStageDemo ? StaffDemoToken(0)
+            LabGameBuildVariant.IsStaffStageDemo ? StaffDemoToken(0, 0)
                 : LabGameBuildVariant.IsYaguangDemo ? DemoGameConnectionToken : GameConnectionToken);
         private const int MaximumGameFlowBytes = 8192;
         private bool gameFlowEnabled;
@@ -65,22 +65,33 @@ namespace C6Lab
         /// <summary>A copy of confirmed transport members, independent of chosen P numbers.</summary>
         public ulong[] ConnectedPlayerIds => order.ToArray();
         public Camera BattleCamera { get; private set; }
-        private byte[] ActiveConnectionToken => gameFlowEnabled ? (LabGameBuildVariant.IsStaffStageDemo ? StaffDemoToken(DemoStageIndex)
+        private byte[] ActiveConnectionToken => gameFlowEnabled ? (LabGameBuildVariant.IsStaffStageDemo ? StaffDemoToken(DemoStageIndex, DemoGroupId)
             : LabGameBuildVariant.IsYaguangDemo ? DemoGameConnectionToken : GameConnectionToken) : LabConnectionToken;
 
-        /// <summary>Room-scoped stage identity survives NGO ResetLocal during address fallback and lobby rejoin.</summary>
+        /// <summary>Room-scoped stage/group identity survives address fallback and lobby rejoin.</summary>
         public int DemoStageIndex { get; private set; }
-        public bool SetDemoStageIdentity(int stage)
+        public int DemoGroupId { get; private set; }
+        public bool SetDemoStageIdentity(int stage) => SetDemoStageIdentity(stage, stage == 0 ? 0 : DemoGroupId);
+        public bool SetDemoStageIdentity(int stage, int group)
         {
-            if (!CanChooseConnection || stage < 0 || stage > 3 || !gameFlowEnabled
-                || !LabGameBuildVariant.IsStaffStageDemo) return false;
+            if (!CanChooseConnection || !gameFlowEnabled || !LabGameBuildVariant.IsStaffStageDemo
+                || !(stage == 0 && group == 0 || LabGameBuildVariant.IsValidStaffRoomIdentity(stage, group))) return false;
+            if (stage == DemoStageIndex && group == DemoGroupId) return true;
+            // Old browse candidates and room tickets must never follow a new group or stage.
+            DisposeDiscovery();
+            joinCandidates.Clear();
+            lobbyRejoinRoutes.Clear();
+            connectedRoomName = string.Empty;
+            ClearRejoinTicket();
             DemoStageIndex = stage;
+            DemoGroupId = group;
             return true;
         }
 
-        private static byte[] StaffDemoToken(int stage) => Encoding.ASCII.GetBytes("C6HapioStaffDemo/"
+        private static byte[] StaffDemoToken(int stage, int group) => Encoding.ASCII.GetBytes("C6HapioStaffDemo/"
             + LabGameBuildVariant.StaffStageDemoRevision.ToString(System.Globalization.CultureInfo.InvariantCulture)
-            + "/S" + stage.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            + "/S" + stage.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            + "/G" + group.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
         /// <summary>Choose the room family before Host/Join; live rooms cannot change family.</summary>
         public bool SetGameFlowEnabled(bool enabled)
@@ -88,7 +99,8 @@ namespace C6Lab
             if (!CanChooseConnection) return false;
             if (gameFlowEnabled == enabled) return true;
             gameFlowEnabled = enabled;
-            DemoStageIndex = 0;
+            if (DemoGroupId != 0) ClearRejoinTicket();
+            DemoStageIndex = DemoGroupId = 0;
             // A discovery instance never changes family. Retire any old browse/cache before switching.
             DisposeDiscovery();
             return true;
@@ -141,7 +153,7 @@ namespace C6Lab
         public bool ReturnStaffDemoGameToLobby()
         {
             if (!gameFlowEnabled || !LabGameBuildVariant.IsStaffStageDemo || !IsHost
-                || targetParticipantCount != 3 || DemoStageIndex < 1 || DemoStageIndex > 3
+                || targetParticipantCount != 3 || !LabGameBuildVariant.IsValidStaffRoomIdentity(DemoStageIndex, DemoGroupId)
                 || developerSolo) return false;
             playerSlots = new LabPlayerSlots(targetParticipantCount);
             lobbySeatHolds.Clear();
