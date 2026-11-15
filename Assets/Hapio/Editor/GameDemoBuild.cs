@@ -393,8 +393,8 @@ namespace Hapio.Editor
                     .Groups["identifier"].Value.Trim() == expected);
         }
 
-        // Some local Unity exports contain a stale UnityPlayer.dylib signature. Repair only this
-        // standalone demo when necessary; keep a valid signature, and never touch iOS signing.
+        // Verify the local demo before reporting success. Preserve valid signatures, repair only
+        // an invalid Stage2 Mac bundle, and leave iOS signing to Xcode.
         private static void VerifyStageTwoMacSignature(string output)
         {
             if (RunCodeSign("--verify --deep --strict", output, out _)) return;

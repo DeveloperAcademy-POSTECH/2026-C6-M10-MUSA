@@ -8982,11 +8982,12 @@ PR #729 검증 중 main `a7208003`에서 `LabLocalBoardNetworkIntegrationTests` 
 - **범위:** `Demo Build/Stage 2 Only`의 Mac/iOS Release·QA 옵션, 별도 앱 이름/ID/출력/최근 출력, manifest의 실제 Stage2 하나, UI·API 선택 제한을 추가했다. 일반 3카드 시연 메뉴·일반 Story/Lab/땅따먹기·Staff revision2/S2·공유 설정·Scene·Prefab·에셋은 유지했다. Player 전용 define을 사용하고 저장된 define은 바꾸지 않는다.
 - **검사 선택:** 빌드 설정과 공통 세션 선택 경로를 변경하므로 전체 EditMode·PlayMode를 실행한다. Unity 6000.6.5f1 / macOS / batch·Metal 환경이다.
 - **전체 EditMode: 2514/2514 PASS**, 18.81초. 추가 13건은 Mac/iOS 옵션·일반 옵션 보존·성공/실패/취소 시 설정 복원·전용 이름/식별자/버전·단일 Stage2 manifest·테스트 override 복원을 확인한다. iOS 옵션 검사는 실제 Xcode 내보내기 성공과 구분한다.
-- **전체 PlayMode:** 실행 중. 최종 결과와 실제 수행 범위는 완료 후 이 절에 갱신한다.
+- **전체 PlayMode: 875/875 PASS**, 917.75초. 실패·건너뜀 0. 추가 2건은 저장 Home의 야광귀 카드 하나·실제 raycast·숨긴1/3 요청 거절, Host 부재 재도전 후 같은 Stage2 검색/단일 카드 복원을 검사했다. 기존 세 스테이지 단판·일반 패배 재도전·일반 Story·Lab·땅따먹기·#748 엔딩 검사도 유지했다.
 - **정식 메뉴 Mac Release 빌드 PASS:** `GameDemoBuild.StageTwoMac` 종료0, manifest `Succeeded`/오류0/identityVerified=true/development=false, `staff-stage-2-only-demo`·Stage2 하나·3인·두 전용 define을 확인했다. 미커밋 구현을 포함한 빌드이며 manifest의 `sourceHasUncommittedChanges=true`를 보존했다. 이후 런타임·에셋 변경 여부를 검사 결과 재사용 시 다시 확인한다.
 - **Mac 서명:** Editor와 같은 macOS 권한 환경에서 `codesign --verify --deep --strict` 재검사 통과. 제한된 도구 환경의 추가 검사에서는 UnityPlayer 서명이 잘못됐다고 나왔으나, 동일 파일을 환경 제한 없이 검사하면 `valid on disk`·`satisfies its Designated Requirement`였다. 이를 코드 결함이나 재서명 성공으로 기록하지 않는다. 실제 빌드의 유효 서명은 보존하고, 재서명 분기는 별도 실패 재현하지 않았다.
-- **UI·흐름 근거 구분:** 앞서 일회성 Mac 앱에서 야광귀 카드 하나·Stage2 3인 로비 생성은 실제로 확인했다. 이번 정식 코드의 저장 Home 카드·raycast·숨긴1/3 요청 거절·Host 부재 재도전 후 제한 유지는 추가 PlayMode 검사 대상이다. 새 정식 앱의 실제 창은 이번 작업에서 다시 열지 않았으며 이전 앱 확인을 새 앱 실기기 PASS로 대체하지 않는다.
+- **UI·흐름 근거 구분:** 앞서 일회성 Mac 앱에서 야광귀 카드 하나·Stage2 3인 로비 생성은 실제로 확인했다. 이번 정식 코드의 저장 Home 카드·raycast·숨긴1/3 요청 거절·Host 부재 재도전 후 제한 유지는 추가 PlayMode로 통과했다. 새 정식 앱의 실제 창은 이번 작업에서 다시 열지 않았으며 이전 앱 확인을 새 앱 실기기 PASS로 대체하지 않는다.
 - **미실행:** iOS 실제 내보내기·서명·설치, 실제 여러 기기의 LAN/핫스팟, 서명 실패 후 복구 분기. 원시 로그·XML·빌드·일회성 준비 스크립트는 커밋하지 않는다. 사용법은 `docs/STAFF_STAGE_DEMO.md`의 #750 절을 따른다.
+- **PR 최종 대조:** 전체 검사 뒤 main은 같은 `766158b7`이며 충돌 없음. 검사·빌드 뒤 실행 로직/에셋/설정은 변경하지 않았고 사용법·검증 기록·동작 없는 주석만 정리해 결과를 재사용했다. 원본 프로젝트·기존 브랜치·로컬 파일은 유지했다.
 
 ## 2026-11-15 — #747 엔딩 대화 상자와 네임택
 

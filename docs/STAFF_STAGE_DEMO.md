@@ -86,7 +86,7 @@ Release에서도 스태프 선택 화면은 제공하지만 숨김 DEV는 열리
 
 ### Unity에서 빌드하기
 
-1. Unity Hub에서 이 프로젝트를 열고 컴파일을 마친다. Play 모드를 종료하고 저장할 Scene 변경은 먼저 저장한다. 빌드 도구가 미저장 Scene을 임의 저장하지 않는다.
+1. 로컬 작업을 먼저 보존하고 이 프로젝트의 최신 main을 Pull한다. Unity Hub에서 같은 프로젝트 폴더를 열고 컴파일을 마친다. Play 모드를 종료하고 저장할 Scene 변경은 먼저 저장한다. 빌드 도구가 미저장 Scene을 임의 저장하지 않는다.
 2. 아래 메뉴에서 대상을 선택한다. 이미 저장된 시연 자료가 있으면 Prepare/Update 메뉴를 다시 실행할 필요가 없다.
 3. 완료 로그의 `HAPIO_DEMO_BUILD_OK` 또는 `Stage 2 Only > Open Last Output`으로 출력 폴더를 연다.
 
