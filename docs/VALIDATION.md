@@ -9144,3 +9144,11 @@ PR #729 검증 중 main `a7208003`에서 `LabLocalBoardNetworkIntegrationTests` 
 - Stage2 둘러보기 복사본을 임시 카메라로 렌더링하여 상단 고리·매듭·짧은 줄이 없고 몸통·뚜껑·둘레 밧줄이 남는 것을 이미지로 확인.
 - 작업 브랜치 git diff --check PASS. 작업 브랜치 BuildGeometry 경로의 3스테이지 회귀 검사 추가, 해당 EditMode 검사 실행은 미실행(열린 Unity는 다른 체크아웃).
 - 실제 게임 결과 UI 버튼 진입·실기기 검사는 미실행.
+
+### #754 병합 전 검증 (2026-11-15)
+- **기준:** `fix/#754-gourd-viewer-remove-ring`에 main `2c9b3487` 병합(충돌은 이 문서 기록 추가뿐, 양쪽 보존). Unity 6000.6.5f1 batch(macOS, Metal).
+- **최초 실패와 수정:** PlayMode `GameSceneFlowTests.SavedHomeRunsThreeFreshBattlesWithOneRoomAndKeepsCompletedMapAfterUnload`가 `Transform child out of bounds`로 실패했다. 둘러보기 복사본이 `model_part4`를 빼서 형제 순서가 바뀌었는데, 검사가 칠 부품을 형제 순서로 찾았기 때문이다. 박 보기 자체는 재질로 칠을 묶어 영향이 없다. 검사를 이름 경로로 찾게 고쳤다.
+- **전체 EditMode:** 2583/2583 PASS(새 `ViewerOmitsSuspensionAssemblyWithoutChangingBattleRig` 포함).
+- **PlayMode** `GameStageGourd*`·`LabGourdVisualRigTests`·`GameSceneFlowTests`·`LabGourdResultPreview*`: 수정 뒤 55/55 PASS(수정 전 54/55).
+- **화면(Development Mac 빌드, 솔로 1→2→3스테이지, main과 같은 임시 캡처):** 1·2·3스테이지 봉인 박 둘러보기에서 상단 고리·매듭·짧은 줄이 사라지고 박이 다시 가운데에 맞춰졌다(정면·회전·확대). 같은 스테이지 전투 박 확대에서는 고리와 밧줄 연결이 그대로다. 땅따먹기 박 보기(흰 박)는 같다.
+- **미실행:** iPhone 실기기.
