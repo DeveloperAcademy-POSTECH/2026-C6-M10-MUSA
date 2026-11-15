@@ -9097,6 +9097,17 @@ PR #729 검증 중 main `a7208003`에서 `LabLocalBoardNetworkIntegrationTests` 
 - Unity 6000.6.5f1 / macOS / Metal EditMode **26/26**, PlayMode **5/5** 통과. 스토리 관람 버튼의 붓선 및 클릭, 스토리 실패 결과, 땅따먹기 결과·관람, 일시정지 버튼의 실제 장면 연결, 로비 인원 선택과 새로고침을 포함한다. iOS 실기기는 미실행이다.
 
 
+## 2026-11-15 — #766 스토리 좌우 터치와 오프닝 3번 행간
+
+- 기준: origin/main 9a01c3c4에서 fix/766-story-touch-navigation. 기존 프로젝트에서 작업하며 개인 ProjectSettings/Build Profiles 변경은 제외한다. 이슈 #766 생성 후 사용자 미리보기 승인을 받았다.
+- 컴파일: Unity 6000.6.5f1 script recompile_status completed, failed=false, errors=[]. 작업 전부터 별도 MCP WebSocket 연결 오류가 반복되어 있었으며 이번 검증은 연결된 Unity Pipeline으로 수행했다.
+- 최종 Story PlayMode assembly: 55/55 통과(7.74초). 새 좌우 페이지 순서·같은 그림 유지·첫 페이지·팝업 차단·자동 연출 입력 차단·일반 이야기 제어 복원과 저장된 글자 간격 검사를 포함한다. 기존 드래그/다중 포인터/건너뛰기/배경/대사 연속성도 통과했다.
+- 관련 EditMode(Story 필터): 143/143 통과(4.61초).
+- GameOpeningControllerTests: 14/14 통과(16.48초). 타이틀 진입·오프닝 완료/스킵·입력 해제 대기를 검증했다.
+- 화면: 실제 GameOpening/GameStageStoryCanvas 프리팹을 미리보기 카메라에서 804×1748로 렌더해 오프닝3·엔딩1을 확인했다. 게임 컨트롤러가 숨기는 제작용 진행 번호/결과 조작 그룹은 캡처에서도 숨겼다. 첫 렌더에서 혼합 크기 글자의 추가 행간을 발견하여 기본 크기 run의 실제 위치 차이33으로 수정한 뒤 다시 렌더하고 검사를 재실행했다. 엔딩의 기존 건너뛰기 모양·위치는 이번 범위에서 변경하지 않았다.
+- 종료 상태: Home 장면, dirty=false, playing=false. git diff --check 통과. 전체 EditMode/전체 PlayMode/iOS 빌드/실기기는 실행하지 않았다.
+
+
 ## 2026-11-15 · #767 A/B 인원 표시·생성 확인·동시 생성 보완
 
 - 기준: 원격 main `9a01c3c4`에서 `feat/#767-staff-demo-room-overview`를 분리했다. 기존 #753 작업 폴더·Desktop 프로젝트·기존 iOS 내보내기는 변경하지 않았다.
@@ -9137,6 +9148,20 @@ PR #729 검증 중 main `a7208003`에서 `LabLocalBoardNetworkIntegrationTests` 
 - 새 이름 수정본을 세 iPhone에서 다시 실행한 뒤 사용자가 정상 동작을 확인했다. 이는 사용자 수락 확인이며, 새 이름 버전의 로비를 에이전트가 추가 촬영했다고 쓰지 않는다.
 - 원격 main `9a01c3c4`가 검증 기준과 같아 추가 통합 코드 변경이 없다. 마지막 변경은 이 확인 기록과 생성 Prefab의 빈 `m_Name:` 줄 공백 정리뿐이다. 기존 전체 검사와 방 제목 후속 검사 결과를 재사용했다.
 - 독립 검토에서 생성 확인/취소/재도전 수명, 그룹 간 분리, 실제 UI 바인딩, 검사 실행 순서와 공개 diff 범위를 확인했다. 병합을 막을 기능 오류는 발견하지 못했다.
+
+## 2026-11-15 — #770 오프닝 장면 전환
+
+- 원본 프로젝트의 `fix/770-opening-transitions`에서 작업. #766의2850c1b1 위에 최신main2c9b3487을d588d733으로 통합. VALIDATION 충돌은 양쪽 기록을 모두 보존했다. 개인 ProjectSettings/Build Profiles와 SVG importer 자동 변경은 이번 작업에 포함하지 않는다.
+- 오프닝 전용 겹침 전환, 3→4 확대, 14→15 시작 자세 전달, 일반 종이 등장 축소, 대사 페이드. 엔딩·타이틀·마지막 구름 인계 원본은 변경하지 않는다.
+- 초기 Story 필터 PlayMode:71/71 통과(105.71초). 이 결과는 낙하 좌표·스킵·직접 이동의 후속 보정 전 결과다.
+- 광범위 Opening 필터는 개인 활성 빌드 설정에 Lab 장면이 없어 오류가 발생하여 취소했다. 통과로 기록하지 않는다.
+- 오프닝 전용 검사 최초6/8: 낙하의 localPosition/anchoredPosition 차이와 전환 중 스킵 차단을 발견했다. 코드 수정 후8/8 통과(0.94초).
+- 이후 GameOpeningController 검사에서 기존 무제한 Direct Next 루프가 겹침 전환 대기에 걸려 Editor가 응답하지 않았다. 사용자 입력의 전환 잠금과 직접 제작/검사 API를 분리하고 기존 루프에100회 한도를 추가했다. 사용자 승인 후 멈춘 Editor를 종료/재시작했다. 최종 컴파일 오류0, 직접 이동 신규 검사를 포함한 오프닝 전용 PlayMode9/9(1.13초), Home 컨트롤러14/14(17.98초) 재통과. 무제한 루프를 통과로 기록하지 않는다.
+- 최종 공통 StoryPlayer PlayMode11/11 통과(0.55초).
+- 원본 Home의 실제 GameOpeningController로 재생. Game 창에서3→4 확대 및15번 낙하/그림자를 확인했고14~16이 터치 없이17번으로 도달함을 확인했다. 화면 캡처 명령은 검은 이미지를 반환해 시각 근거로 사용하지 않고 실제 Unity 창으로 확인했다. 프레임5798→7784 진행, 마지막 사용자 확인용3번에서 일시정지를 해제하고 실제 StartTutorialOrRooms 후속 연결을 유지했다.
+- 사용자가 Unity 오프닝 전환 미리보기를 확인하고 커밋·PR 작성을 승인했다. iOS·실기기·전체 PlayMode는 미실행이다. 표현 전용 opt-in과 공통 StoryPlayer 호출부 변경으로 관련 PlayMode 및 전체 EditMode를 선택했다. 세션·네트워크·전투 판정은 변경하지 않아 전체 PlayMode는 생략한다.
+
+- #770 PR 전 전체 EditMode **2,580/2,580 PASS**(55.32초, Unity 6000.6.5f1/macOS). 사용자 승인 이후 동작 코드는 바꾸지 않았으며 기존 관련 PlayMode 결과를 재사용했다.
 
 ## #754 둘러보기 고리 제거
 
@@ -9267,3 +9292,19 @@ main `cef1579d`의 #760 관람·#762 땅따먹기 박/Game56·#727 튜토리얼�
 - iOS 최신 출력: `Builds/HapioStage2Demo/20261115-132711-b24fafba-release/iOS/`, Succeeded·identityVerified=true. 한글 표시명, PRODUCT_NAME_APP 4곳, 아이콘19개와 알파 없는 Store PNG를 재확인했다. 기존 Pipeline 전처리 진단1은 계속 기록한다.
 - 두 빌드 전후 원본 ProjectSettings/EditorBuildSettings SHA-256과 기존 stash가 동일했다. 일반 Scene·타이틀·폰트·팔레트·Package/설정은 #772 diff에 없다. Importer의 기존 SVG 공백만 사본 보존 후 정리했다. 문서만 추가한 뒤 코드/에셋 재검사를 반복하지 않는다.
 - 사용자 요청대로 앱 실행·실기기·Xcode 서명/설치는 제외했다. 이전 기준의 산출물도 삭제하지 않았다.
+
+### #770 PR 최신 main 통합
+
+- main `9c24dccc`의 #754 박 둘러보기 고리 제거를 통합했다. 충돌은 이 문서의 추가 기록뿐이어서 양쪽을 보존했다. 오프닝 코드·에셋·검사는 변경되지 않아 관련 PlayMode 결과를 재사용하며, 전체 EditMode는 통합 뒤 재실행한다.
+
+- 통합 직후에는 Unity가 이전 어셈블리를 유지해 초기 재검사 결과를 통합 검증으로 사용하지 않았다. 스크립트 컴파일을 요청하고 #754 신규 검사 메서드가 로드됨을 확인한 뒤 전체 EditMode를 다시 실행: 도구 보고 **2,580/2,580 PASS**(84.77초). 오프닝 관련 코드와 에셋은 통합 전과 동일하다.
+
+### #770 병합 전 검증 (2026-11-15)
+- **기준:** `fix/770-opening-transitions`에 main `cef1579d`(#768 포함) 병합. 충돌은 이 문서 기록 추가뿐이며 양쪽을 보존했다. Unity 6000.6.5f1 batch(macOS, Metal).
+- **전체 EditMode:** 2587/2587 PASS. **PlayMode** 오프닝·스토리 묶음(`Opening*`·`StoryTapAdvanceTests`·`StoryPlayerTests`·`EndingDialogueTests`·`GameStageStory*`·`GameSceneFlowTests`·`GameStaffStageDemoFlowTests`·`GameYaguangDemoFlowTests`·`StaffStageDemoStory*`·`YaguangDemoStory*`): 107/107 PASS.
+- **화면(Development Mac 빌드, main과 같은 임시 캡처로 전환 직후 프레임 비교):**
+  - 3→4(오른쪽 터치 뒤 0.06/0.18/0.32/0.5/1.2초): main은 0.06초에 이미 OP_004로 바뀌었다. #770은 OP_003이 호리병 쪽으로 확대되며 약 0.5초 동안 겹쳐 사라진다. 1.2초 화면은 둘이 같다.
+  - 14→15(자동 진행 순간부터 0~1.5초): main은 OP_015 호리병이 정해진 시작 자세에서 바로 떨어진다. #770은 OP_014의 선반 장면이 0.2초 안에 겹쳐 사라지고, 호리병이 OP_014의 위치·기울기를 이어받아 떨어진다. 0.4초 뒤 자세는 둘이 거의 같다.
+- **영향 범위:** 겹침 전환은 `smoothOpeningTransitions`가 켜진 오프닝 시퀀스만 쓴다. 컷이 바뀔 때 목소리를 먼저 멈추는 처리는 모든 스토리에 적용되지만, 원래 이전 화면을 정리할 때 멈추던 것과 같다.
+- **미실행:** iPhone 실기기, 오프닝 소리 청취.
+- **main `d51318dc`(#773) 병합 뒤:** 충돌은 이 문서 기록 추가뿐이었다. #773은 시연 빌드 도구·아이콘만 바꿔 스토리 실행 경로와 겹치지 않는다. 그래서 위 PlayMode 결과를 재사용하고 전체 EditMode만 다시 돌려 **2594/2594 PASS**였다.

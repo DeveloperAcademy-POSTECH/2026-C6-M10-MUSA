@@ -45,11 +45,11 @@ namespace Hapio.Editor
             var cuts=new List<StoryCutDefinition>();
             foreach(var frame in manifest.frames.OrderBy(f=>f.number)) cuts.Add(BuildFrame(frame));
             var sequence=AssetDatabase.LoadAssetAtPath<StorySequence>(Root+"Opening.asset");
-            sequence.cuts=cuts;EditorUtility.SetDirty(sequence);
+            sequence.cuts=cuts;sequence.smoothOpeningTransitions=true;EditorUtility.SetDirty(sequence);
             foreach(var name in new[]{"OpeningPreview","BatchPreview"})
             {
                 var preview=AssetDatabase.LoadAssetAtPath<StorySequence>(Root+name+".asset");
-                if(preview==null)continue; preview.cuts=new List<StoryCutDefinition>(cuts);EditorUtility.SetDirty(preview);
+                if(preview==null)continue; preview.cuts=new List<StoryCutDefinition>(cuts);preview.smoothOpeningTransitions=true;EditorUtility.SetDirty(preview);
             }
             AssetDatabase.SaveAssets();
             Debug.Log("HAPIO_OPENING_28_READY: 28 exact Figma frames; existing title and cloud handoff retained.");

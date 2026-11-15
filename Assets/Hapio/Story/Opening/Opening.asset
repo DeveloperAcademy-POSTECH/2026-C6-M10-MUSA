@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StorySequence
   storyId: opening
   sideTapNavigation: 1
+  smoothOpeningTransitions: 1
   cuts:
   - {fileID: 11400000, guid: c513a44297fed461e9c4d150a1dc4d5d, type: 2}
   - {fileID: 11400000, guid: 756cc5c47ee504ee1bc48871bb63c291, type: 2}

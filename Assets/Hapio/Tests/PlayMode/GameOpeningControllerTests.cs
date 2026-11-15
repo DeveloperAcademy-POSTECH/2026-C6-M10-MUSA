@@ -152,7 +152,7 @@ namespace Hapio.Tests
             for (int cutIndex = 0; cutIndex < player.sequence.cuts.Count; cutIndex++)
             {
                 Assert.That(player.CurrentCutIndex, Is.EqualTo(cutIndex));
-                if (!player.IsReading) player.AdvanceTime(player.CurrentView.EntranceDuration + .1f);
+                if (!player.IsReading) player.AdvanceTime(player.CurrentView.EntranceDuration + .2f);
                 StoryCutView picture = player.CurrentView;
                 int pageCount = player.sequence.cuts[cutIndex].PageCount;
                 for (int pageIndex = 0; pageIndex < pageCount; pageIndex++)
@@ -188,9 +188,12 @@ namespace Hapio.Tests
             yield return LoadHome();
             yield return PressStart();
             StoryPlayer player = opening.player;
-            while (player.CurrentCutIndex < player.sequence.cuts.Count - 1 ||
-                player.CurrentPageIndex < player.sequence.cuts[player.CurrentCutIndex].PageCount - 1 || !player.IsReading)
+            for (int steps = 0; player.CurrentCutIndex < player.sequence.cuts.Count - 1 ||
+                player.CurrentPageIndex < player.sequence.cuts[player.CurrentCutIndex].PageCount - 1 || !player.IsReading; steps++)
+            {
+                Assert.That(steps, Is.LessThan(100), "Direct story sequencing must make progress without a real-time wait.");
                 player.Next();
+            }
             var surface = opening.openingRoot.GetComponentInChildren<StoryTapAdvance>();
             Assert.That(surface, Is.Not.Null);
             var events = UnityEngine.EventSystems.EventSystem.current;
@@ -266,9 +269,12 @@ namespace Hapio.Tests
             yield return LoadHome();
             yield return PressStart();
             StoryPlayer player = opening.player;
-            while (player.CurrentCutIndex < player.sequence.cuts.Count - 1 ||
-                player.CurrentPageIndex < player.sequence.cuts[player.CurrentCutIndex].PageCount - 1 || !player.IsReading)
+            for (int steps = 0; player.CurrentCutIndex < player.sequence.cuts.Count - 1 ||
+                player.CurrentPageIndex < player.sequence.cuts[player.CurrentCutIndex].PageCount - 1 || !player.IsReading; steps++)
+            {
+                Assert.That(steps, Is.LessThan(100), "Direct story sequencing must make progress without a real-time wait.");
                 player.Next();
+            }
             GameObject toolbar = player.skipButton.transform.parent.gameObject;
             Assert.That(toolbar.activeSelf, Is.True);
             Vector3 hostScale = player.cutHost.localScale, hostPosition = player.cutHost.localPosition;
