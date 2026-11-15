@@ -8985,3 +8985,23 @@ PR #729 검증 중 main `a7208003`에서 `LabLocalBoardNetworkIntegrationTests` 
 - `GameSceneFlowTests.FigmaResultsWaitForHostNextAndShowEachYokaiThenKeepFinalOverallAndHomeNavigation` 및 `SavedStoryViewerSkipAndEndingButtonsReceiveRealMouseClicks` **2/2 PASS**(65.03초). 이후 줄바꿈 표시만 수정했으며 전환/입력/수명 경로는 동일해 해당 결과를 재사용했다.
 - 화면 확인: 저장된 GameStageStoryCanvas와 실제 컷을 Unity 카메라로402×874 렌더하여 불이·만복·솔이·마지막 불이4페이지 확인. 처음 캡처에서 긴 문장 자동 줄바꿈을 발견해 `dialogueNoWrap`으로 수정했고 위 최종 검사를 재실행했다. 격리 캡처에서는 게임 어댑터가 평소 제어하는 결과/공통 버튼을 숨겨 대화 상자만 비교했다. 종이/이름표의 다운로드 원본과 로컬 파일 SHA-1 일치 확인. 그림 배치와 범위 밖 버튼 외형은 변경하지 않았다.
 - 작업 전 Console의 iOS `Subtarget property is not available` 오류1건을 기록했으며 새 코드 컴파일 후 오류0. 자동 검사 실패/단언 완화 없음. 실기기·iOS 빌드·전체 PlayMode는 실행하지 않았다.
+
+## 2026-11-15 — #727 튜토리얼 대사 키워드 강조
+
+### 변경
+
+- 강조 기준: 크게 = 꼭 알아야 할 대상·행동·목표, 빨강 = 주의·경고(안 되는 것, 줄어들거나 사라지는 것, 위험, 방해), 오행 색 = 화·수·목·금·토 이름. 모두 굵게.
+- 대본(`GameTutorialScript`)의 대사 17줄에 강조 표시를 넣었다: `<big>`(검정 그대로 크게) 빈틈없이 칠하면·북·음구슬·양구슬·오행구슬·100%·우측 지도·바로바로 넘겨 줘·적힌 숫자만큼·두 개, `<red>`(진홍 `#8A1206`) 기운이 줄어·같은 색끼리는 안 붙어!·오래 두면 사라져·터지니까·빨개졌어·막은 것 같아·어떤 방해, 오행 표시 화·수·목·금·토(전투 오행 구슬 그림 색: 화 `#D32E16`·수 `#0E6192`·목 `#2E6946`·금 `#F9B520`·토 `#654029`, 사용자 시안의 글자 색과 같음).
+- 대사의 `Text`는 표시를 뺀 원래 문장(승인된 대본과 같음)이고, 화면에 그릴 때만 `Marked`를 Unity 리치 텍스트로 바꾼다(`GameTutorialEmphasis`). 대화 기록 항목도 `Text`는 그대로, `Marked`를 따로 갖는다.
+- 말풍선: 큰 글자는 그 말풍선 글자 크기의 1.35배(`GameTutorialArt.emphasisScale`). Unity 자동 맞춤은 `<size>` 글자를 같이 줄이지 않아 끄고, 큰 글자까지 넣은 글이 칸 높이에 들어가며 대본에 쓴 줄바꿈 말고는 더 나뉘지 않는 가장 큰 크기를 직접 고른다(`FitBubble`). 기본 말풍선에서 17줄 모두 그대로 17(큰 글자 23)이다. ("구슬은 오래 두면 사라져."를 크게 했을 때는 그 줄만 16으로 한 단계 줄어 2줄을 지켰고, 빨강으로 바꾼 뒤에는 17.) 좁은 칸에서는 줄 전체와 큰 글자가 같은 비율로 함께 작아진다.
+- 오행 글자는 시안처럼 테두리 없이 색만. 먹색 테두리(`GameTutorialElementOutline`, 정점 색이 오행 색인 글자만)는 `elementOutlineWidth`(기본 0)를 올리면 켜진다. 처음에 넣었던 1.2 테두리는 시안에 맞춰 껐다.
+- 강조한 부분(크게·빨강·오행 색)은 모두 굵게(`<b>`, `GameTutorialArt.emphasisBold`, 기본 켬). 말풍선 글꼴(신라문화체 M)에 굵은 글꼴이 따로 연결돼 있지 않아 Unity가 굵게 그린 글자를 쓴다(글자 칸은 1px 커지고 글자 간격은 그대로).
+- 대화 기록: 빨강·오행 색·굵게는 그대로, 크기는 키우지 않는다.
+- 아래 행동 안내 띠, 6단계(막기) 등 표시 없는 대사는 그대로다. 게임 규칙·네트워크·접속 버전 변경 없음.
+
+### 확인
+
+- Unity 6000.6.5f1 Editor 컴파일: PASS. 콘솔 오류 1건은 기존 `ResultAction.png` Library 캐시 손상이다.
+- Editor API(Play 없이)로 실제 튜토리얼 그림(`TutorialArt`)의 글꼴·말풍선 칸으로 확인: 표시된 17줄, `Text`에 표시 새어 나감 0, 17줄 모두 대본 줄 수 그대로(위 크기), 좁은 칸(170x112)에서 14/19·15/20로 함께 작아짐, 테두리를 켰을 때 오행 줄은 테두리 글자 5개·다른 줄 0개. 굵게를 더한 뒤에도 크기·줄 수가 같다. 오행 색(구슬 그림 색, 테두리 없음)과 새 강조를 같은 글꼴로 그려 눈으로 확인했다. 굵게 전후를 같은 글꼴로 그려 비교해 굵어진 것을 눈으로 확인했다.
+- 검사 추가 (실행은 NOT_RUN): EditMode `GameTutorialEmphasisTests` 4건 (합의한 키워드와 원래 대본 유지, 리치 텍스트·기록 변환, 모든 표시 줄의 줄바꿈과 비율 축소, 오행 글자 색과 기본 테두리 없음, 켜면 오행 글자만 테두리). 기존 `GameTutorialTests`·`GameTutorialLogTests`는 `Text`가 그대로라 그대로 둔다.
+- 튜토리얼 EditMode·PlayMode(`GameTutorialFlowTests`) 실행, iPhone 비율 화면 확인: NOT_RUN.
