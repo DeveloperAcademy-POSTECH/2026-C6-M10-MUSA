@@ -22,7 +22,7 @@ MonoBehaviour:
   - speaker: "\uB9CC\uBCF5"
     dialogue: "\uC598\uB4E4\uC544.. \uBC30 \uC548\uACE0\uD30C?\n\uC6B0\uB9AC \uBA87\uB9C8\uB9AC \uB354 \uC7A1\uACE0 \uBC25 \uBA39\uC744\uAE4C?"
     autoReadSeconds: 4
-    voice: {fileID: 8300000, guid: 0d88a169c1be642cb8ba26bd421aca7d, type: 3}
+    voice: {fileID: 0}
   direction: "\uD53C\uADF8\uB9C8 4210:3318 \uC6D0\uBCF8 \uBC30\uCE58. \uC2E4\uC81C \uC2A4\uD14C\uC774\uC9C0 \uC9C4\uC785\uC740 \uD300\uC6D0 \uC5F0\uACB0 \uC608\uC815."
   speaker: 
   dialogue: 
