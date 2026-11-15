@@ -45,6 +45,15 @@ namespace Hapio
         [Min(8)] public int maxFontSize = 17;
         [Min(8)] public int minFontSize = 12;
         public Color textColor = new Color(.12f, .1f, .09f, 1f);
+        [Header("키워드 강조 (#727)")]
+        [Tooltip("대본의 <big> 글자 크기: 그 말풍선 글자 크기의 몇 배. 말풍선이 넘쳐 글자가 작아지면 같은 비율로 같이 작아진다.")]
+        [Range(1f, 2f)] public float emphasisScale = 1.35f;
+        [Tooltip("대본의 <red> 글자 색 (\"경기 종료!\"와 같은 진홍)")]
+        public Color emphasisRed = new Color32(0x8A, 0x12, 0x06, 0xFF);
+        [Tooltip("오행 색 글자(화·수·목·금·토)에만 두르는 먹색 테두리 두께. 0(기본, 시안처럼 글자만)이면 테두리 없음.")]
+        [Min(0f)] public float elementOutlineWidth = 0f;
+        [Tooltip("강조한 부분(크게·빨강·오행 색)을 모두 굵게. 대화 기록에서도 굵게 보인다.")]
+        public bool emphasisBold = true;
 
         [Header("누르기 표시 (말풍선 오른쪽 아래 ▽)")]
         [Tooltip("화면을 눌러 다음 대사로 넘기라는 표시. 말풍선이 다 커지고 누를 수 있게 된 순간부터, 누르면 넘어가는 대사에만 뜬다.")]
