@@ -13,6 +13,7 @@ namespace Hapio
         public StorySequence sequence;
         public RectTransform cutHost;
         public CanvasGroup dialogueGroup;
+        public Image dialoguePaper;
         public Text speakerText;
         public Text dialogueText;
         public Text progressText;
@@ -66,12 +67,20 @@ namespace Hapio
         private bool suppressMultiTouch;
         private StoryDialoguePage currentPage;
         private Text cachedDialogue, cachedSpeaker;
+        private Image cachedPaper;
+        private Sprite defaultPaperSprite;
+        private Vector2 defaultPaperPosition, defaultPaperSize;
+        private Shadow paperShadow;
+        private bool defaultPaperShadowEnabled;
+        private int defaultSpeakerFontSize;
+        private Vector3 defaultSpeakerScale;
         private Image cachedBadge;
         private Material defaultBadgeMaterial;
         private Color defaultBadgeColor;
         private Vector2 defaultDialoguePosition, defaultDialogueSize, defaultSpeakerPosition, defaultSpeakerSize;
         private Color defaultSpeakerColor;
         private int defaultDialogueFontSize;
+        private HorizontalWrapMode defaultDialogueWrap;
         private Vector3 defaultDialogueScale;
         private HorizontalWrapMode defaultSpeakerWrap;
         private TextAnchor defaultSpeakerAlignment;
@@ -444,6 +453,26 @@ namespace Hapio
 
         private void ApplyDialogueLayout()
         {
+            if (dialoguePaper != null)
+            {
+                if (cachedPaper != dialoguePaper)
+                {
+                    cachedPaper = dialoguePaper;
+                    defaultPaperSprite = dialoguePaper.sprite;
+                    defaultPaperPosition = dialoguePaper.rectTransform.anchoredPosition;
+                    defaultPaperSize = dialoguePaper.rectTransform.sizeDelta;
+                    paperShadow = dialoguePaper.GetComponent<Shadow>();
+                    defaultPaperShadowEnabled = paperShadow != null && paperShadow.enabled;
+                }
+                bool customPaper = currentView.dialoguePaper != null;
+                var bounds = ValidLayout(currentView.dialoguePaperRect, new Rect(11, 677, 379, 181));
+                dialoguePaper.sprite = customPaper ? currentView.dialoguePaper : defaultPaperSprite;
+                dialoguePaper.rectTransform.anchoredPosition = customPaper
+                    ? new Vector2(bounds.x, -bounds.y) : defaultPaperPosition;
+                dialoguePaper.rectTransform.sizeDelta = customPaper ? bounds.size : defaultPaperSize;
+                // The revised source art already includes its own shadow.
+                if (paperShadow != null) paperShadow.enabled = !customPaper && defaultPaperShadowEnabled;
+            }
             if (dialogueText != null)
             {
                 var rect = dialogueText.rectTransform;
@@ -453,8 +482,10 @@ namespace Hapio
                     defaultDialoguePosition = rect.anchoredPosition;
                     defaultDialogueSize = rect.sizeDelta;
                     defaultDialogueFontSize = dialogueText.fontSize;
+                    defaultDialogueWrap = dialogueText.horizontalOverflow;
                     defaultDialogueScale = rect.localScale;
                 }
+                dialogueText.horizontalOverflow = currentView.dialogueNoWrap ? HorizontalWrapMode.Overflow : defaultDialogueWrap;
                 if (currentView.dialogueFontSize > 0)
                 {
                     dialogueText.fontSize = Mathf.CeilToInt(currentView.dialogueFontSize);
@@ -487,13 +518,20 @@ namespace Hapio
                     defaultSpeakerPosition = rect.anchoredPosition;
                     defaultSpeakerSize = rect.sizeDelta;
                     defaultSpeakerColor = speakerText.color;
+                    defaultSpeakerFontSize = speakerText.fontSize;
+                    defaultSpeakerScale = rect.localScale;
                     defaultSpeakerWrap = speakerText.horizontalOverflow;
                     defaultSpeakerAlignment = speakerText.alignment;
                 }
+                float speakerScale = currentView.speakerFontSize > 0
+                    ? currentView.speakerFontSize / Mathf.CeilToInt(currentView.speakerFontSize) : 1;
+                speakerText.fontSize = currentView.speakerFontSize > 0
+                    ? Mathf.CeilToInt(currentView.speakerFontSize) : defaultSpeakerFontSize;
+                rect.localScale = currentView.speakerFontSize > 0 ? Vector3.one * speakerScale : defaultSpeakerScale;
                 var layout = ValidLayout(currentView.speakerRect, new Rect(84, 721, 36, 18));
                 rect.anchoredPosition = currentView.overrideDialogueLayout
                     ? new Vector2(layout.x, -layout.y) : defaultSpeakerPosition;
-                rect.sizeDelta = currentView.overrideDialogueLayout ? layout.size : defaultSpeakerSize;
+                rect.sizeDelta = currentView.overrideDialogueLayout ? layout.size / speakerScale : defaultSpeakerSize;
                 speakerText.color = currentView.overrideDialogueLayout ? currentView.speakerColor : defaultSpeakerColor;
                 speakerText.alignment = currentView.overrideDialogueLayout && currentView.centerSpeakerName
                     ? TextAnchor.MiddleCenter : defaultSpeakerAlignment;
