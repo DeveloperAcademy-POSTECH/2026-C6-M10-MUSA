@@ -44,7 +44,7 @@
 - 흰 박의 마운트·판정·칠 binding·요괴 자세는 main에서 기록한 골든(`Assets/Lab/Tests/PlayMode/Golden/`)과 같아야 한다. #473에서 기본 크기를 1.54로 올리며 마운트 골든만 다시 기록했다.
 - 1스테이지: `Hapio/Gourds/Stage01_Gumiho_Battle`, 2스테이지: `Stage02_Yagwanggwi_Battle`, 3스테이지: `Stage03_Jigwi_Battle`. 게임 토큰 `C6HapioGame/30`(도입 당시, 현재 기준은 `AGENTS.md`).
 - 2스테이지는 #526부터 경량 재출력 `Models/Yagwanggwi_Gourd_100K.fbx`(22렌더러·99,865삼각형, 원본 446,594)를 감싼 `Prefabs/Yagwanggwi_Gourd_100K_GameReady.prefab`에서 굽는다(`GameGourdRigBake.Spec.SourceVariant = "_100K"`). 원본 FBX·GameReady 프리팹은 그대로 보존한다. 새 GameReady는 원본과 같은 루트 배율·모델 위치·Animator 컨트롤러를 쓴다. 두 FBX의 노드 29개와 공연 클립 커브 280개가 같다(최대 차 1.5e-5).
-- 흰 박은 Lab 단판, 2:2 땅따먹기(스토리 스테이지 정의가 없음), 튜토리얼 연습 판에만 쓰인다.
+- 흰 박은 Lab 단판과 튜토리얼 연습 판에만 쓰인다. 땅따먹기(1:1·2:2·3:3)는 #762부터 `GameSession.GourdStageDefinition`으로 2스테이지 야광귀 박을 쓴다(판정 껍데기·크기 포함, `C6HapioGame/56`).
 
 ## 스테이지 박 굽기 (#507)
 
