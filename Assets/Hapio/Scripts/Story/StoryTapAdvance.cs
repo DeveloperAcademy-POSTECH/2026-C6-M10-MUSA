@@ -61,7 +61,12 @@ namespace Hapio
             bool advance = releasedTap && releasedPointer == data.pointerId &&
                 pointers.Count == 0 && PressedTouchCount == 0;
             releasedTap = false;
-            if (advance && player != null && player.isActiveAndEnabled) player.RequestSurfaceAdvance();
+            if (!advance || player == null || !player.isActiveAndEnabled) return;
+            var rect = transform as RectTransform;
+            bool left = rect != null && RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                rect, data.pressPosition, data.pressEventCamera, out var local) && local.x < rect.rect.center.x;
+            if (player.UsesSideTapNavigation && left) player.RequestSurfacePrevious();
+            else player.RequestSurfaceAdvance();
         }
 
         // IDragHandler is required for EventSystem to acquire a drag target and send BeginDrag.

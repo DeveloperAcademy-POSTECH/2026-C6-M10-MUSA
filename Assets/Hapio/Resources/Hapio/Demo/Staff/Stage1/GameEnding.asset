@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: GameEnding
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StorySequence
   storyId: game-ending-staff-demo-stage-1
+  sideTapNavigation: 1
   cuts:
   - {fileID: 11400000, guid: 7b508b30131d648ba8e3cbb881f6cd9a, type: 2}
   - {fileID: 11400000, guid: d07847f7495224e1c8a91ad333dcdb6a, type: 2}

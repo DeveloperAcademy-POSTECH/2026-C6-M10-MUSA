@@ -300,6 +300,15 @@ MonoBehaviour:
   sourceFigmaNodeId: 4553:2625
   overrideDialogueLayout: 0
   dialogueFontSize: 0
+  dialoguePaper: {fileID: 0}
+  dialoguePaperRect:
+    serializedVersion: 2
+    x: 11
+    y: 677
+    width: 379
+    height: 181
+  speakerFontSize: 0
+  dialogueNoWrap: 0
   dialogueRect:
     serializedVersion: 2
     x: 84
@@ -970,7 +979,7 @@ MonoBehaviour:
     m_RichText: 1
     m_HorizontalOverflow: 1
     m_VerticalOverflow: 1
-    m_LineSpacing: 1.4042553
+    m_LineSpacing: 1.0195312
   m_Text: "<size=80>\uD2B9\uD788 \uC548\uCABD \uC120\uBC18\uC5D0 \uC788\uB294 \uBB3C\uAC74\uC740\n</size><size=120>\uC808\uB300</size><size=80>\uB85C \uAC74\uB4DC\uB9AC\uC9C0 \uB9D0\uAC70\uB77C.</size>"
 --- !u!1 &8616385867006760595
 GameObject:

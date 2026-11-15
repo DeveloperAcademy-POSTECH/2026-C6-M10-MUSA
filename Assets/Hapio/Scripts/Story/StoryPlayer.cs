@@ -8,7 +8,7 @@ namespace Hapio
     public enum StoryExitReason { Completed, Skipped }
 
     /// <summary>Local presentation only. Call Play and await Finished before returning to the game flow.</summary>
-    public sealed class StoryPlayer : MonoBehaviour
+    public sealed partial class StoryPlayer : MonoBehaviour
     {
         public StorySequence sequence;
         public RectTransform cutHost;
@@ -51,9 +51,11 @@ namespace Hapio
         public int CurrentPageIndex { get; private set; } = -1;
         public bool IsPlaying { get; private set; }
         public bool AutoAdvance { get; private set; }
+        public bool UsesSideTapNavigation => sequence != null && sequence.sideTapNavigation;
+        private bool navigationHidden, nextWasActive, previousWasActive;
         public bool IsReading { get; private set; }
         public StoryCutView CurrentView => currentView;
-        public bool IsTransitioning => activeCloudWipe != null;
+        public bool IsTransitioning => activeCloudWipe != null || outgoingView != null;
         private bool IsCinematicCut => currentView != null && currentView.autoContinueAfterSeconds > 0;
 
         private StoryCutView currentView;
@@ -123,6 +125,7 @@ namespace Hapio
             }
             Cancel();
             sequence = story;
+            PrepareSideNavigation();
             AutoAdvance = false;
             lastInputFrame = -1;
             suppressMultiTouch = false;
@@ -148,13 +151,15 @@ namespace Hapio
         internal void AdvanceTime(float seconds)
         {
             if (!IsPlaying || currentView == null) return;
-            if (IsTransitioning)
+            if (activeCloudWipe != null)
             {
                 AdvanceCloudWipe(seconds);
                 return;
             }
+            AdvanceOpeningBlend(seconds);
             elapsed += seconds;
             currentView.Sample(elapsed);
+            AdvanceDialogueFade(seconds);
             if (IsCinematicCut)
             {
                 float end = Mathf.Max(currentView.EntranceDuration, currentView.autoContinueAfterSeconds);
@@ -169,7 +174,11 @@ namespace Hapio
             }
             if (!IsReading)
             {
-                if (elapsed >= currentView.EntranceDuration) BeginReading();
+                if (elapsed >= currentView.EntranceDuration)
+                {
+                    BeginReading();
+                    AdvanceDialogueFade(elapsed - currentView.EntranceDuration);
+                }
                 return;
             }
             if (!AutoAdvance) return;
@@ -191,12 +200,56 @@ namespace Hapio
             RequestNext();
         }
 
-        public void RequestPrevious() { if (AcceptUserInput()) Previous(); }
-        public void RequestSkip() { if (!(hideSkipDuringCinematics && IsCinematicCut) && AcceptUserInput()) Skip(); }
-
-        private bool AcceptUserInput()
+        public void RequestSurfacePrevious()
         {
-            if (!IsPlaying || UserInputBlocked || IsTransitioning) return false;
+            if (!UsesSideTapNavigation || IsCinematicCut ||
+                CurrentCutIndex == 0 && CurrentPageIndex == 0 || !AcceptUserInput()) return;
+            AutoAdvance = false;
+            UpdateAutoLabel();
+            if (CurrentPageIndex > 0) ShowPage(CurrentPageIndex - 1);
+            else
+            {
+                Previous();
+                if (!IsCinematicCut && sequence.cuts[CurrentCutIndex].PageCount > 1)
+                    ShowPage(sequence.cuts[CurrentCutIndex].PageCount - 1);
+            }
+        }
+
+        private void PrepareSideNavigation()
+        {
+            if (UsesSideTapNavigation && !navigationHidden)
+            {
+                nextWasActive = nextButton != null && nextButton.gameObject.activeSelf;
+                previousWasActive = previousButton != null && previousButton.gameObject.activeSelf;
+                if (nextButton != null) nextButton.gameObject.SetActive(false);
+                if (previousButton != null) previousButton.gameObject.SetActive(false);
+                navigationHidden = true;
+            }
+            else if (!UsesSideTapNavigation && navigationHidden)
+            {
+                if (nextButton != null) nextButton.gameObject.SetActive(nextWasActive);
+                if (previousButton != null) previousButton.gameObject.SetActive(previousWasActive);
+                navigationHidden = false;
+            }
+            if (!UsesSideTapNavigation || GetComponentInChildren<StoryTapAdvance>(true) != null) return;
+            // Authoring previews use the same input surface as the game, beneath interactive controls.
+            var surface = new GameObject("Story Tap Surface", typeof(RectTransform), typeof(Image), typeof(StoryTapAdvance));
+            surface.transform.SetParent(cutHost.parent, false);
+            surface.transform.SetAsFirstSibling();
+            var rect = (RectTransform)surface.transform;
+            rect.anchorMin = Vector2.zero; rect.anchorMax = Vector2.one;
+            rect.offsetMin = rect.offsetMax = Vector2.zero;
+            surface.GetComponent<Image>().color = Color.clear;
+            surface.GetComponent<StoryTapAdvance>().player = this;
+        }
+
+        public void RequestPrevious() { if (AcceptUserInput()) Previous(); }
+        public void RequestSkip() { if (!(hideSkipDuringCinematics && IsCinematicCut) && AcceptUserInput(true)) Skip(); }
+
+        private bool AcceptUserInput(bool allowOpeningBlend = false)
+        {
+            if (!IsPlaying || UserInputBlocked || activeCloudWipe != null ||
+                outgoingView != null && !allowOpeningBlend) return false;
             if (touchOnly)
             {
                 if (StoryTapAdvance.PressedTouchCount > 0) suppressMultiTouch = true;
@@ -208,7 +261,9 @@ namespace Hapio
 
         public void Next()
         {
-            if (!IsPlaying || IsTransitioning) return;
+            if (!IsPlaying || activeCloudWipe != null) return;
+            // Direct sequencing is also used by editor tooling. UI requests are gated before reaching here.
+            ClearOpeningBlend();
             if (!IsReading)
             {
                 elapsed = currentView.EntranceDuration;
@@ -319,8 +374,10 @@ namespace Hapio
             var previousView = currentView;
             var cut = sequence.cuts[index];
             if (TryChangeAuthoredDialogue(index, cut)) return;
+            if (voiceSource != null) { voiceSource.Stop(); voiceSource.clip = null; }
             var nextView = Instantiate(cut.viewPrefab, cutHost, false);
             // Prepare the next background before removing the picture covering the paper base.
+            PrepareOpeningEntrance(nextView, previousView);
             nextView.Sample(0f);
             CurrentCutIndex = index;
             currentView = nextView;
@@ -344,7 +401,7 @@ namespace Hapio
             UpdatePageText();
             SetDialogueVisible(false);
             UpdatePreviousButton();
-            ReleaseView(previousView);
+            if (!StartOpeningBlend(previousView)) ReleaseView(previousView);
             ViewChanged?.Invoke(currentView);
         }
 
@@ -372,6 +429,9 @@ namespace Hapio
             UpdatePageText();
             UpdatePreviousButton();
             BeginReading();
+            // Dialogue-only pages keep the paper visible; no second entrance or blank panel.
+            fadingDialogue = null;
+            nextDialogue.alpha = 1f;
             ViewChanged?.Invoke(currentView);
             return true;
         }
@@ -565,6 +625,13 @@ namespace Hapio
             {
                 currentView.authoredDialogue.alpha = visible ? 1f : 0f;
                 currentView.authoredDialogue.blocksRaycasts = false;
+                if (visible && sequence != null && sequence.smoothOpeningTransitions)
+                {
+                    fadingDialogue = currentView.authoredDialogue;
+                    dialogueFadeElapsed = 0f;
+                    fadingDialogue.alpha = 0f;
+                }
+                else fadingDialogue = null;
                 visible = false;
             }
             if (dialogueGroup == null) return;
@@ -606,6 +673,7 @@ namespace Hapio
             if (currentView != null && currentView.requireContinueButton && currentView.continueButton != null)
                 currentView.continueButton.gameObject.SetActive(false);
             ClearCloudWipe();
+            ClearOpeningBlend();
             UpdatePreviousButton();
             if (voiceSource != null) voiceSource.Stop();
             musicTarget = 0;
@@ -618,6 +686,8 @@ namespace Hapio
         {
             IsPlaying = IsReading = false;
             ClearCloudWipe();
+            ClearOpeningBlend();
+            fadingDialogue = null;
             musicTarget = 0;
             if (musicSource != null) musicSource.Stop();
             UpdatePreviousButton();

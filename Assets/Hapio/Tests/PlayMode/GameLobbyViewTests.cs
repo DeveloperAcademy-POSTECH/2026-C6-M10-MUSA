@@ -92,7 +92,12 @@ namespace Hapio.Tests
             yield return Click(view.enterButton);
             Assert.That(session.RoomBrowserVisible, Is.True);
             Assert.That(view.browserPage.activeInHierarchy, Is.True);
+            Assert.That(view.CreationCapacity, Is.Zero);
+            foreach (var chip in view.countButtons)
+                Assert.That(chip.GetComponent<GameFigmaButton>().artwork.SurfaceName, Is.EqualTo("Chip"));
+            AssertTouchable(view.refreshButton);
             yield return Click(view.countButtons[0]);
+            Assert.That(view.countButtons[0].GetComponent<GameFigmaButton>().artwork.SurfaceName, Is.EqualTo("ChipPressed"));
             Assert.That(view.CreationCapacity, Is.EqualTo(2));
             Assert.That(session.Network.TargetParticipantCount, Is.EqualTo(2));
             yield return Click(view.directConnectionButton);
@@ -205,6 +210,27 @@ namespace Hapio.Tests
             Assert.That(session.Network.port, Is.EqualTo(reservedPort), "Automatic entry must retain the reserved advertised port.");
             Assert.That(session.Network.ConnectedRoomName, Does.StartWith(LabRoomNames.GameServiceBase));
             Assert.That(view.roomName.text, Is.EqualTo(LabRoomNames.Display(session.Network.ConnectedRoomName)));
+            // Exercise the saved room-title binding without opening a staff service on the
+            // same LAN as a real demo. Only the presentation input changes within this frame.
+            var connectedName = typeof(LabNetwork).GetField("connectedRoomName",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            string savedName = session.Network.ConnectedRoomName;
+            try
+            {
+                for (int group = 1; group <= 2; group++)
+                {
+                    connectedName.SetValue(session.Network, LabPendingRoom.StaffStageName(2, group));
+                    view.SendMessage("LateUpdate", SendMessageOptions.RequireReceiver);
+                    Assert.That(view.roomName.text, Is.EqualTo(group == 1 ? "A그룹" : "B그룹"));
+                    Assert.That(session.Network.DemoStageIndex, Is.Zero,
+                        "Displaying a group label never changes this ordinary room's stage or admission identity.");
+                }
+            }
+            finally
+            {
+                connectedName.SetValue(session.Network, savedName);
+                view.SendMessage("LateUpdate", SendMessageOptions.RequireReceiver);
+            }
             Assert.That(session.Network.LocalSlotNumber, Is.Zero);
             Assert.That(session.PendingRooms, Is.Empty);
             Assert.That(view.positionPage.activeInHierarchy, Is.True);

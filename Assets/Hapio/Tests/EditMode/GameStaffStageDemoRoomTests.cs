@@ -73,6 +73,47 @@ namespace Hapio.Tests
             }
         }
 
+        [Test]
+        public void SimultaneousUnenteredCandidatesUseTheSameWinnerRegardlessOfArrivalOrder()
+        {
+            var rooms = LabRoomCatalog.GroupTargets(new[] {
+                Target("fixed-group", 7103, 2, 1, false, true, 1),
+                Target("fixed-group", 7101, 2, 1, false, true, 1),
+                Target("fixed-group", 7102, 2, 1, false, true, 1),
+                Target("other-group", 7000, 2, 1, false, true, 2)
+            });
+            string first = LabRoomCatalog.Key("fixed-group", 7101);
+            Assert.That(CreationWinner(rooms, first), Is.Null, "The smallest candidate keeps its own reservation.");
+            foreach (string other in new[] { LabRoomCatalog.Key("fixed-group", 7102), LabRoomCatalog.Key("fixed-group", 7103) })
+            {
+                Assert.That(CreationWinner(rooms, other)?.Key, Is.EqualTo(first));
+                Assert.That(CreationWinner(rooms.Reverse().ToArray(), other)?.Key, Is.EqualTo(first));
+            }
+        }
+
+        [TestCase(false, 1)] [TestCase(false, 3)] [TestCase(true, 3)]
+        public void AnAlreadyOpenedHostAlwaysBlocksAnotherCandidateEvenWhenItsKeySortsLater(bool playing, int players)
+        {
+            var rooms = LabRoomCatalog.GroupTargets(new[] {
+                Target("fixed-group", 7101, 2, 1, false, true, 1),
+                Target("fixed-group", 7199, 2, players, playing, false, 1),
+                Target("other-stage", 7000, 1, 1, false, false, 1),
+                Target("other-group", 7001, 2, 1, false, false, 2)
+            });
+            var winner = CreationWinner(rooms, LabRoomCatalog.Key("fixed-group", 7102));
+            Assert.That(winner?.Port, Is.EqualTo(7199));
+            Assert.That((winner.Playing, winner.IsFull), Is.EqualTo((playing, players == 3)),
+                "Full and playing rooms stay blockers rather than being replaced by another Host.");
+            var entryChoice = (LabDiscoveredRoom)typeof(GameSession).GetMethod("DemoRoomForStage", BindingFlags.NonPublic | BindingFlags.Static)
+                .Invoke(null, new object[] { rooms, 2, 1 });
+            Assert.That(entryChoice?.Key, Is.EqualTo(winner.Key),
+                "A new entrant also follows the open Host instead of a lower-key pending advertisement.");
+        }
+
+        private static LabDiscoveredRoom CreationWinner(System.Collections.Generic.IReadOnlyList<LabDiscoveredRoom> rooms, string ownKey)
+            => (LabDiscoveredRoom)typeof(GameSession).GetMethod("DemoCreationWinner", BindingFlags.NonPublic | BindingFlags.Static)
+                .Invoke(null, new object[] { rooms, 2, 1, ownKey });
+
         [TestCase(0)] [TestCase(4)] [TestCase(-1)]
         public void InvalidStageCannotReserveARoom(int stage)
         {

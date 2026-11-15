@@ -66,7 +66,7 @@ namespace C6Lab.Tests
                 byte[] lab = Token(network);
                 Assert.That(network.SetGameFlowEnabled(true), Is.True);
                 byte[] normal = Token(network);
-                Assert.That(Encoding.ASCII.GetString(normal), Is.EqualTo("C6HapioGame/55"));
+                Assert.That(Encoding.ASCII.GetString(normal), Is.EqualTo("C6HapioGame/56"));
                 string normalDiscovery = LabBonjourDiscovery.ProtocolFor(LabRoomFamily.Game);
                 using (LabGameBuildVariant.OverrideStaffStageDemoForTests(true))
                 {
@@ -117,6 +117,31 @@ namespace C6Lab.Tests
                     Assert.That(pending.DemoNameConflict, Is.True);
                     Assert.That(pending.Failed, Is.True);
                     Assert.That(typeof(LabPendingRoom).GetField("candidateNumber", Private).GetValue(pending), Is.EqualTo(1));
+                    Assert.That(pending.Name, Is.Empty);
+                    Assert.That(pending.RetryPending, Is.False);
+                }
+                finally { pending.Dispose(); }
+            }
+        }
+
+        [Test]
+        public void UnexpectedConfirmedStaffNameIsRejectedAndItsReservationReleased()
+        {
+            using (LabGameBuildVariant.OverrideStaffStageDemoForTests(true))
+            using (var advertisement = new LabBonjourDiscovery(LabRoomFamily.Game))
+            {
+                var pending = (LabPendingRoom)Activator.CreateInstance(typeof(LabPendingRoom), true);
+                try
+                {
+                    typeof(LabPendingRoom).GetField("<DemoStageIndex>k__BackingField", Private).SetValue(pending, 2);
+                    typeof(LabPendingRoom).GetField("<DemoGroupId>k__BackingField", Private).SetValue(pending, 1);
+                    typeof(LabPendingRoom).GetField("advertisement", Private).SetValue(pending, advertisement);
+                    typeof(LabBonjourDiscovery).GetField("<AdvertisingConfirmed>k__BackingField", Private).SetValue(advertisement, true);
+                    typeof(LabBonjourDiscovery).GetField("<RegisteredServiceName>k__BackingField", Private).SetValue(advertisement,
+                        LabPendingRoom.StaffStageName(2, 1) + "-renamed");
+                    Assert.That(pending.Ready, Is.False);
+                    Assert.That(typeof(LabPendingRoom).GetMethod("RejectUnexpectedStaffName", Private).Invoke(pending, null), Is.True);
+                    Assert.That(pending.DemoNameConflict && pending.Failed, Is.True);
                     Assert.That(pending.Name, Is.Empty);
                     Assert.That(pending.RetryPending, Is.False);
                 }

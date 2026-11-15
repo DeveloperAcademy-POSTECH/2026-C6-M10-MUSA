@@ -8,6 +8,10 @@ namespace Hapio
     {
         [Tooltip("Stable identifier, independent of the display name or cut order.")]
         public string storyId;
+        [Tooltip("Hide navigation buttons; tap the left/right half to read the previous/next page.")]
+        public bool sideTapNavigation;
+        [Tooltip("Opening only: overlap pictures and soften entrances without changing story timing.")]
+        public bool smoothOpeningTransitions;
         public List<StoryCutDefinition> cuts = new List<StoryCutDefinition>();
 
         public bool Validate(out string error)

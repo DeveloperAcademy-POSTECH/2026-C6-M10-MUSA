@@ -44,7 +44,7 @@
 - 흰 박의 마운트·판정·칠 binding·요괴 자세는 main에서 기록한 골든(`Assets/Lab/Tests/PlayMode/Golden/`)과 같아야 한다. #473에서 기본 크기를 1.54로 올리며 마운트 골든만 다시 기록했다.
 - 1스테이지: `Hapio/Gourds/Stage01_Gumiho_Battle`, 2스테이지: `Stage02_Yagwanggwi_Battle`, 3스테이지: `Stage03_Jigwi_Battle`. 게임 토큰 `C6HapioGame/30`(도입 당시, 현재 기준은 `AGENTS.md`).
 - 2스테이지는 #526부터 경량 재출력 `Models/Yagwanggwi_Gourd_100K.fbx`(22렌더러·99,865삼각형, 원본 446,594)를 감싼 `Prefabs/Yagwanggwi_Gourd_100K_GameReady.prefab`에서 굽는다(`GameGourdRigBake.Spec.SourceVariant = "_100K"`). 원본 FBX·GameReady 프리팹은 그대로 보존한다. 새 GameReady는 원본과 같은 루트 배율·모델 위치·Animator 컨트롤러를 쓴다. 두 FBX의 노드 29개와 공연 클립 커브 280개가 같다(최대 차 1.5e-5).
-- 흰 박은 Lab 단판, 2:2 땅따먹기(스토리 스테이지 정의가 없음), 튜토리얼 연습 판에만 쓰인다.
+- 흰 박은 Lab 단판과 튜토리얼 연습 판에만 쓰인다. 땅따먹기(1:1·2:2·3:3)는 #762부터 `GameSession.GourdStageDefinition`으로 2스테이지 야광귀 박을 쓴다(판정 껍데기·크기 포함, `C6HapioGame/56`).
 
 ## 스테이지 박 굽기 (#507)
 
@@ -90,3 +90,7 @@
 ## #749 2라운드 밧줄 연결점
 
 Rope Socket을 비활성화한 Rear_Rope_Binding의 AABB 상단(y 1.638)에서 계산했다. 그래서 남아 있는 매듭 메시 model_part4보다 높은 곳에서 밧줄이 끝나 사이가 떠 보였다. model_part4는 상단 두 갈래 사이가 비어 있어 bounds 상단도 연결 표면이 아니다. 그래서 Stage2만 밧줄 축(binding 중심 x·z)을 따라 model_part4를 MeshCollider로 raycast한다. 처음 닿은 표면에서 0.01 안쪽을 Rope Socket으로 쓴다(y 약 1.3488). 굽기 계산(`GameGourdRigBake.Compute`)과 저장 Prefab을 `Hapio > Gourds > Bake Stage 2 Yagwanggwi Gourd`로 맞추고, `GameStageGourdVisualTests.Stage2RopeEndsInsideTheVisibleAttachment`가 둘의 일치와 표면 위치를 확인한다. Rope Socket은 밧줄을 그리는 끝점일 뿐이다. 물리·판정·도색·통신은 바뀌지 않으며 1·3스테이지와 흰 박도 그대로다.
+
+## #754 둘러보기 상단 부속물 제외
+
+LabGourdResultPreview가 모델을 복사할 때 스토리 리그의 model_part4(Blender 숫자 접미사 포함)를 제외한다. 1~3라운드의 상단 고리·매듭·짧은 줄과 해당 bounds가 둘러보기 모델/프레이밍에서 빠진다. 뚜껑 둘레 밧줄·몸통·뚜껑은 유지한다. 전투 Prefab, 밧줄 연결점과 원본 활성 상태는 변경하지 않는다.

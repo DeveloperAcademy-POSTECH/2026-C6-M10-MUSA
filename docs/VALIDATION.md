@@ -9050,10 +9050,274 @@ PR #729 검증 중 main `a7208003`에서 `LabLocalBoardNetworkIntegrationTests` 
 - **눈 / 귀로 확인:** VFX 실험실에서 1~3R "남은 30초로 시간 넘기기" → 알림 + 빨라진 BGM → 10초 뒤 피버, 승리 / 패배 징글 미리 듣기, 지귀 루프 이음매와 피버(꽹과리).
 - **미실행:** iPhone 실기기 진동, 여러 기기 실제 네트워크, 실제 스토리 한 판의 결과 화면에서 징글이 나오는 순간.
 
+## 2026-11-15 — #756 Figma 버튼 기본·눌림·비활성 상태
+
+- Unity 6000.6.5f1 / macOS / Metal에서 런타임과 테스트 어셈블리를 컴파일했다.
+- EditMode **26/26 통과**. `GameFigmaStrokeTests`, `GameLobbyAssetTests`, `GamePauseViewTests`, `GameResultStrokeTests`에서 스프라이트 로딩, 상태 전환, 비활성 입력 차단, 기존 클릭 영역을 확인했다.
+- PlayMode **3/3 통과**. 전투 도움말, 스토리 결과의 실제 마우스 입력, 땅따먹기 결과에서 박 둘러보기와 나가기 흐름을 확인했다.
+- iOS 실기기와 전체 테스트 모음은 실행하지 않았다.
+
+### #756 로비 인원 선택과 새로고침
+
+- [로비 빈 목록 시안](https://www.figma.com/design/wW7ny7lNQ4DXNJ4kD46AuR/?node-id=5348-4018) 기준. 처음에는 인원 칩을 선택하지 않는다. 새로고침의 Figma 기본·눌림 벡터(5348:4065, 5348:4066)를 39×38 버튼에 연결하고, 기존 방 검색 동작을 사용한다.
+- Unity 6000.6.5f1 / macOS / Metal에서 EditMode **17/17**, PlayMode **2/2** 통과. 최초 칩 상태, 명시적 인원 선택, 새로고침 클릭 영역 및 눌림 상태, 방 생성·입장 흐름을 확인했다. iOS 실기기는 미실행이다.
+
+### #756 땅따먹기 청팀·홍팀 결과 화질
+
+- Figma의 결과 시안 4752:13706 및 4752:13793과 대조했다. 한지·구름·수채 원본이 저장소 에셋과 각각 일치했다. 한지와 구름의 가져오기 과정에서 2의 거듭제곱 크기로 바꾸던 설정을 해제했다.
+- macOS Unity 6000.6.5f1 / Metal에서 한지 693×1024, 구름 2172×724, 수채 1254×1254가 실제로 사용되는지 확인했다. 결과 화면과 버튼 EditMode **15/15**, DEV 솔로의 결과·박 관람·나가기 PlayMode **1/1** 통과. 실기기와 전후 화면 촬영 비교는 미실행이다.
+
+### #756 박 둘러보기 버튼과 회전 표시
+
+- Figma 5348:4218, 5348:4150, 5357:4339, 5357:6690을 확인했다. 회전·리셋 원본 SVG(5357:6097~6100)를 3×로 가져오고, 구미호용 어두운 그림과 야광귀·지귀용 밝은 그림을 연결했다. 땅따먹기는 야광귀 배경과 컨트롤을 사용한다. 구미호는 최신 공통 버튼 배치를 적용하고 기존 전용 배경을 사용한다.
+- Unity 6000.6.5f1 / macOS / Metal에서 EditMode **13/13**, PlayMode **3/3** 통과. 결과 복귀 배경 복구, 스토리 세 스테이지의 관람과 실제 클릭, 땅따먹기 결과의 야광귀 배경·리셋 그림, 전투 도움말을 확인했다. iOS 실기기는 미실행이다.
+
+- 캡처 피드백 반영. 야광귀·지귀·땅따먹기 하단 사각형을 제거했다. 관람 안내와 복귀 버튼의 글자는 두 배로 래스터화한 뒤 같은 화면 크기로 표시하며, 스테이지 배경은 원본 804×1748로 가져온다. Unity 1206×2622에서 네 화면을 다시 촬영하고 야광귀 하단을 전후 비교했다. EditMode **13/13**, PlayMode **2/2** 통과.
+- 회전 표시 업데이트. Figma 5357:6685의 최신 50% 투명도 SVG 두 종을 교체하고, 화면 시안 5348:4217·5348:4150·5357:4339에 맞춰 402×874 기준 (271, 180)에 배치했다. Unity PlayMode **2/2** 통과. 스토리 세 스테이지와 땅따먹기에서 1206×2622 캡처로 표시를 확인했다.
+
+### #756 마지막 일격 UI
+
+- Figma 4767:18429의 기존 리플레이 참고 화면과 4813:9429의 목표 시안을 확인했다. Hapio 스토리 리플레이에 상단 P번호·마지막 일격과 하단 건너뛰기 안내를 연결하고, 실제 리플레이 카메라를 검은 띠 없이 표시한다. 번호가 없는 DEV 솔로는 제목만 표시한다.
+- Unity macOS / Metal에서 관련 PlayMode 17건을 검증했다. 첫 실행의 14건이 통과했고, DEV 솔로가 P0을 표시할 것으로 가정한 새 단언을 수정해 스토리 3개 스테이지 리플레이를 재실행하여 **3/3 통과**했다. P2 예시를 주입한 야광귀 실시간 리플레이를 1206×2622로 촬영했다. 실기기는 미실행이다.
+
+### #756 UI 최종 재점검
+
+- Unity 6000.6.5f1 / macOS / Metal에서 현재 #756 작업본으로 관련 EditMode **40/40**, PlayMode **22/22** 통과. 실패·건너뜀 0.
+- 버튼 기본·눌림·비활성 상태 및 클릭 영역, 로비 초기 인원 미선택 및 새로고침 클릭으로 Bonjour 방 검색 재시작, 구미호·야광귀·지귀와 땅따먹기 박 관람의 실제 입력, 마지막 일격의 스테이지별 재생과 건너뛰기, 청팀·홍팀 결과의 원본 텍스처 크기를 확인했다. 방 검색 재시작 단언은 검증 복사본에서 추가했다.
+- iOS 실기기 및 전체 테스트 모음은 이번 재점검에 포함하지 않았다.
+
+- 땅따먹기 결과 화면에서 붉은 배경 없이 버튼 글자만 표시된 제보를 반영했다. 눌림 아트가 없으면 기본 아트, 기본 아트도 사용할 수 없으면 Scene에 저장된 붉은 Image를 표시한다. EditMode **22/22**에서 두 버튼의 아트 누락·복구 및 비활성 클릭 차단을 확인했다. PlayMode **2/2**에서 땅따먹기 결과의 두 버튼 렌더링과 스토리 관람 복귀를 확인했다. 제보 기기에서 원본 이미지가 비어 있던 이유는 확인하지 못했다.
+- Figma 4784:3260 및 청팀·홍팀 결과 시안에서 확인한 주요 버튼 스타일을 두 액션에 재적용했다. DarkRed/600 기본·DarkRed/700 눌림, SecondaryLightIvory/100 글자와 20 디자인 단위 크기를 적용했다. 붉은 배경이 이미지 누락 시 Unity 기본 색 조절로 옅어지던 경로를 제거했다. EditMode **27/27**, PlayMode **1/1** 통과. 정상과 이미지 누락 결과를 1206×2622 Unity PNG로 확인했다.
+- 다시 도전은 Figma 4784:3256·3258의 보조 버튼으로 변경했다. 기본 DarkRed/400은 매끈한 캡슐, 눌림 DarkRed/600은 바깥 여백을 포함한 기존 Figma 붓선이다. 봉인 박 둘러보기(5357:4262)는 주요 색과 붓선을 두 상태 모두에 사용한다. EditMode **19/19**, PlayMode **1/1** 통과. Unity PNG에서 버튼 내부 색상과 바깥 붓선 표시를 확인했다.
+
+### #756 공통 버튼 상태·붓선 추가 점검
+
+- Figma 통합 컴포넌트 4840:6805의 상태 시안을 대조했다. 스토리 봉인 카드·실패 결과의 기존 둥근 그래픽에도 기본·눌림 붓선을 연결했다. 텍스트형 결과 액션의 눌림 배경과 글자 색을 4784:3271에 맞췄다.
+- 일시정지 나가기·재시작에 공통 모드 버튼 원본의 둥근 끝과 바깥 붓선을 적용했다. 음량 손잡이 기본 SVG는 원본과 일치했고, 눌림 SVG는 4418:1601·1615로 교체했다. 공통 버튼에서 아트가 비어 있으면 기존 그래픽이나 새로고침 기호를 사용한다.
+- Unity 6000.6.5f1 / macOS / Metal EditMode **26/26**, PlayMode **5/5** 통과. 스토리 관람 버튼의 붓선 및 클릭, 스토리 실패 결과, 땅따먹기 결과·관람, 일시정지 버튼의 실제 장면 연결, 로비 인원 선택과 새로고침을 포함한다. iOS 실기기는 미실행이다.
+
+
+## 2026-11-15 — #766 스토리 좌우 터치와 오프닝 3번 행간
+
+- 기준: origin/main 9a01c3c4에서 fix/766-story-touch-navigation. 기존 프로젝트에서 작업하며 개인 ProjectSettings/Build Profiles 변경은 제외한다. 이슈 #766 생성 후 사용자 미리보기 승인을 받았다.
+- 컴파일: Unity 6000.6.5f1 script recompile_status completed, failed=false, errors=[]. 작업 전부터 별도 MCP WebSocket 연결 오류가 반복되어 있었으며 이번 검증은 연결된 Unity Pipeline으로 수행했다.
+- 최종 Story PlayMode assembly: 55/55 통과(7.74초). 새 좌우 페이지 순서·같은 그림 유지·첫 페이지·팝업 차단·자동 연출 입력 차단·일반 이야기 제어 복원과 저장된 글자 간격 검사를 포함한다. 기존 드래그/다중 포인터/건너뛰기/배경/대사 연속성도 통과했다.
+- 관련 EditMode(Story 필터): 143/143 통과(4.61초).
+- GameOpeningControllerTests: 14/14 통과(16.48초). 타이틀 진입·오프닝 완료/스킵·입력 해제 대기를 검증했다.
+- 화면: 실제 GameOpening/GameStageStoryCanvas 프리팹을 미리보기 카메라에서 804×1748로 렌더해 오프닝3·엔딩1을 확인했다. 게임 컨트롤러가 숨기는 제작용 진행 번호/결과 조작 그룹은 캡처에서도 숨겼다. 첫 렌더에서 혼합 크기 글자의 추가 행간을 발견하여 기본 크기 run의 실제 위치 차이33으로 수정한 뒤 다시 렌더하고 검사를 재실행했다. 엔딩의 기존 건너뛰기 모양·위치는 이번 범위에서 변경하지 않았다.
+- 종료 상태: Home 장면, dirty=false, playing=false. git diff --check 통과. 전체 EditMode/전체 PlayMode/iOS 빌드/실기기는 실행하지 않았다.
+
+
+## 2026-11-15 · #767 A/B 인원 표시·생성 확인·동시 생성 보완
+
+- 기준: 원격 main `9a01c3c4`에서 `feat/#767-staff-demo-room-overview`를 분리했다. 기존 #753 작업 폴더·Desktop 프로젝트·기존 iOS 내보내기는 변경하지 않았다.
+- 변경: Stage2 Only Home에서 입장 없는 A/B 현황 검색, 기존 광고의 정원 점유수 표시, 명시적 생성 확인·취소, 확인 뒤 새 검색 2초, 등록 확정 뒤 후보 확인 2초, 고정 이름 불일치 거절을 추가했다. 기존 광고·전투 형식과 일반 게임 규칙은 유지했다.
+- 검사 범위 선정: UI만이 아니라 공유 Bonjour 등록·Host 인수 경로와 시연 세션의 입장/재도전 수명을 다루므로 전체 EditMode·PlayMode를 실행했다. 핵심 단언을 삭제하거나 완화하지 않았다.
+- 환경: macOS arm64, Unity `6000.6.5f1`, GPU 사용 가능한 기본 batch 환경.
+- `StaffDemoUiAssets.CreateOrUpdate` 컴파일·시연 선택 Prefab 저장 성공. 일반 Home/Lobby/Battle/결과 Scene 파일은 변경하지 않았다.
+- 전체 EditMode: **2,580/2,580 PASS**, 20.47초. 카운트/실패 구분, 도착 순서에 무관한 후보 선택, 고정 이름 불일치·등록 정리·일반 이름 변경 유지, 저장 확인창 바인딩을 포함한다.
+- 전체 PlayMode: **877/877 PASS**, 943.97초. 실제 저장 UI의 모달 입력 차단·취소 후 미생성, A/B 6연결 분리, 3인 전투·재도전 등 기존 전체 검사를 포함한다.
+- 정식 StageTwoIos Release 내보내기 성공: `staff-stage-2-only-demo`, 3인, identityVerified=true. `com.unity.pipeline`의 iOS `GetSubtarget<StandaloneBuildSubtarget>` 전처리 오류 1건은 기존 #753 내보내기와 동일하게 기록됐다. BuildReport 결과는 Succeeded이며 실제 Xcode 빌드와 서명 검증도 성공했다. 이를 오류 0건으로 기재하지 않는다.
+- Xcode `Unity-iPhone` / `ReleaseForRunning` 빌드 성공. 기존 개발팀의 자동 서명을 빌드 명령에만 적용했고, 서명 검증 및 대상 세 iPhone의 프로필 포함 여부를 확인했다. 서명 자료·기기 식별자·원시 로그는 저장소에 추가하지 않았다.
+- 실기기 일반 Wi-Fi · iPhone 17 세 대에 같은 새 Release 앱 설치·실행 성공. 버튼 조작은 사용자가 수행했고, 에이전트가 Xcode 기기 화면 캡처와 앱 연결 로그/Bonjour 광고를 확인했다.
+- 초기 A/B 선택 화면: 세 대 모두 두 그룹의 `방 없음` 표시 확인. 생성창 `취소` 후 재진입 성공. 세 대가 확인창을 띄운 채 기다리는 동안 Host·Join 이벤트와 시연 방 광고가 0건인 것을 확인했다. 확인창의 문구·버튼·입력 차단 레이어도 실제 화면에서 확인했다.
+- 사용자가 세 대의 `확인`을 가능한 한 동시에 누르는 시나리오 **PASS**. 세 화면 모두 `A그룹 · 2스테이지 야광귀`, `3/3명 입장`으로 모였다. 로그에는 Host 한 대만 생성됐고 다른 두 대는 같은 Host/포트로 Join하여 Host의 참가 인원이 1→2→3으로 늘었다. Bonjour의 여러 인터페이스 행은 같은 고정 방 이름이며 별도 방으로 세지 않았다.
+- Guest 한 대의 명시적 `방 나가기` 뒤 A/B 선택 화면이 `A그룹 2/3 · 입장 가능`, `B그룹 방 없음`으로 갱신되는 것을 사용자 응답과 실제 캡처로 확인했다. Host와 나머지 Guest의 기존 방은 유지했다.
+- 실제 iPhone 전투 시작/완료, B그룹 별도 실기기 방 생성, 핫스팟은 이번에 실행하지 않았다. A/B 두 방·총6연결의 전투/재도전 분리는 위 전체 PlayMode에 포함된 로컬 소켓 검사이며 실제 여섯 기기 검증으로 쓰지 않는다.
+- 한계: 기존 `name+port` 방 식별과 Bonjour를 재사용한다. 서로 검색할 수 없는 네트워크 구역을 아우르는 전역 단일 Host/Host migration은 제공하지 않는다. UI 숫자는 기존 정원 점유수이며 재연결 보류 자리도 포함한다. 이번 실기기 검증은 일반 Wi-Fi이며 핫스팟은 미실행이다.
+
+
+### #767 PR 전 방 제목 문구 수정
+
+- 그룹이 포함된 시연 방의 화면 이름은 `A그룹`/`B그룹`만 표시한다. 실제 스테이지 번호·요괴 이름은 화면 이름에서 제거하고, Bonjour 이름·그룹/스테이지 파싱·입장 검증은 유지한다. 현재 저장된 Lobby의 다른 활성 경로가 요괴 이름으로 덮어쓰지 않는 것도 확인했다.
+- 후속 컴파일 및 전체 EditMode **2,580/2,580 PASS**(20.40초), 실제 저장 로비 제목 바인딩과 일반 방 생성/자리 선택을 포함한 관련 PlayMode **1/1 PASS**(6.32초).
+- 이번 추가 diff는 표시 문자열·검사·문서이며 세션/광고/직렬화/승패 동작을 바꾸지 않아 위 전체 PlayMode877 결과를 재사용하고 영향 화면 검사만 재실행했다.
+- 추가 문구 수정 뒤 iOS 재빌드/재설치는 하지 않았다. 앞선 세 iPhone 캡처와 동시 생성 결과는 문구 변경 전 빌드의 실제 기록이며, 최신 그룹명만 표시하는 변경은 다음 빌드에 포함된다.
+
+
+### #767 이름 수정본 iPhone 재실행
+
+- 사용자 재실행 요청으로 이름 수정이 포함된 StageTwoIos Release를 다시 내보냈다(`20261115-101222-ad4ee95b-release`, identityVerified=true). 기존 Pipeline iOS 전처리 오류1건은 같은 진단이며 BuildReport/Xcode 결과는 Succeeded다.
+- 별도 DerivedData에서 Xcode 빌드·서명 검증 성공, 세 대상 기기의 프로필 포함을 확인했다. 같은 새 앱을 세 iPhone에 모두 설치·실행했고, 새로 시작된 세 프로세스가 유지되는 것을 확인했다.
+- 이 단계는 설치·실행 확인이다. 이름 수정 후의 실제 방 재입장/로비 촬영은 아직 하지 않았고, 그룹명만 표시하는 바인딩은 위 관련 PlayMode 검사로 확인했다.
+- 일반 Scene·머터리얼·저장 빌드 설정은 유지했다. Unity가 자동 변경한 관련 없는 SVG 메타7개는 원래 값으로 되돌렸다.
+
+
+### #767 PR 전 최종 확인
+
+- 새 이름 수정본을 세 iPhone에서 다시 실행한 뒤 사용자가 정상 동작을 확인했다. 이는 사용자 수락 확인이며, 새 이름 버전의 로비를 에이전트가 추가 촬영했다고 쓰지 않는다.
+- 원격 main `9a01c3c4`가 검증 기준과 같아 추가 통합 코드 변경이 없다. 마지막 변경은 이 확인 기록과 생성 Prefab의 빈 `m_Name:` 줄 공백 정리뿐이다. 기존 전체 검사와 방 제목 후속 검사 결과를 재사용했다.
+- 독립 검토에서 생성 확인/취소/재도전 수명, 그룹 간 분리, 실제 UI 바인딩, 검사 실행 순서와 공개 diff 범위를 확인했다. 병합을 막을 기능 오류는 발견하지 못했다.
+
+## 2026-11-15 — #770 오프닝 장면 전환
+
+- 원본 프로젝트의 `fix/770-opening-transitions`에서 작업. #766의2850c1b1 위에 최신main2c9b3487을d588d733으로 통합. VALIDATION 충돌은 양쪽 기록을 모두 보존했다. 개인 ProjectSettings/Build Profiles와 SVG importer 자동 변경은 이번 작업에 포함하지 않는다.
+- 오프닝 전용 겹침 전환, 3→4 확대, 14→15 시작 자세 전달, 일반 종이 등장 축소, 대사 페이드. 엔딩·타이틀·마지막 구름 인계 원본은 변경하지 않는다.
+- 초기 Story 필터 PlayMode:71/71 통과(105.71초). 이 결과는 낙하 좌표·스킵·직접 이동의 후속 보정 전 결과다.
+- 광범위 Opening 필터는 개인 활성 빌드 설정에 Lab 장면이 없어 오류가 발생하여 취소했다. 통과로 기록하지 않는다.
+- 오프닝 전용 검사 최초6/8: 낙하의 localPosition/anchoredPosition 차이와 전환 중 스킵 차단을 발견했다. 코드 수정 후8/8 통과(0.94초).
+- 이후 GameOpeningController 검사에서 기존 무제한 Direct Next 루프가 겹침 전환 대기에 걸려 Editor가 응답하지 않았다. 사용자 입력의 전환 잠금과 직접 제작/검사 API를 분리하고 기존 루프에100회 한도를 추가했다. 사용자 승인 후 멈춘 Editor를 종료/재시작했다. 최종 컴파일 오류0, 직접 이동 신규 검사를 포함한 오프닝 전용 PlayMode9/9(1.13초), Home 컨트롤러14/14(17.98초) 재통과. 무제한 루프를 통과로 기록하지 않는다.
+- 최종 공통 StoryPlayer PlayMode11/11 통과(0.55초).
+- 원본 Home의 실제 GameOpeningController로 재생. Game 창에서3→4 확대 및15번 낙하/그림자를 확인했고14~16이 터치 없이17번으로 도달함을 확인했다. 화면 캡처 명령은 검은 이미지를 반환해 시각 근거로 사용하지 않고 실제 Unity 창으로 확인했다. 프레임5798→7784 진행, 마지막 사용자 확인용3번에서 일시정지를 해제하고 실제 StartTutorialOrRooms 후속 연결을 유지했다.
+- 사용자가 Unity 오프닝 전환 미리보기를 확인하고 커밋·PR 작성을 승인했다. iOS·실기기·전체 PlayMode는 미실행이다. 표현 전용 opt-in과 공통 StoryPlayer 호출부 변경으로 관련 PlayMode 및 전체 EditMode를 선택했다. 세션·네트워크·전투 판정은 변경하지 않아 전체 PlayMode는 생략한다.
+
+- #770 PR 전 전체 EditMode **2,580/2,580 PASS**(55.32초, Unity 6000.6.5f1/macOS). 사용자 승인 이후 동작 코드는 바꾸지 않았으며 기존 관련 PlayMode 결과를 재사용했다.
+
+## #754 둘러보기 고리 제거
+
+- 현재 열린 Unity의 동일 CopyHierarchy 수정 컴파일 후 직접 실행: 1~3라운드 각각 전투 원본 model_part4 1개 유지, 둘러보기 복사본 0개, Paint Shell 1개 유지 확인. 임시 인스턴스 정리 및 Scene 미저장.
+- Stage2 둘러보기 복사본을 임시 카메라로 렌더링하여 상단 고리·매듭·짧은 줄이 없고 몸통·뚜껑·둘레 밧줄이 남는 것을 이미지로 확인.
+- 작업 브랜치 git diff --check PASS. 작업 브랜치 BuildGeometry 경로의 3스테이지 회귀 검사 추가, 해당 EditMode 검사 실행은 미실행(열린 Unity는 다른 체크아웃).
+- 실제 게임 결과 UI 버튼 진입·실기기 검사는 미실행.
+
+### #754 병합 전 검증 (2026-11-15)
+- **기준:** `fix/#754-gourd-viewer-remove-ring`에 main `2c9b3487` 병합(충돌은 이 문서 기록 추가뿐, 양쪽 보존). Unity 6000.6.5f1 batch(macOS, Metal).
+- **최초 실패와 수정:** PlayMode `GameSceneFlowTests.SavedHomeRunsThreeFreshBattlesWithOneRoomAndKeepsCompletedMapAfterUnload`가 `Transform child out of bounds`로 실패했다. 둘러보기 복사본이 `model_part4`를 빼서 형제 순서가 바뀌었는데, 검사가 칠 부품을 형제 순서로 찾았기 때문이다. 박 보기 자체는 재질로 칠을 묶어 영향이 없다. 검사를 이름 경로로 찾게 고쳤다.
+- **전체 EditMode:** 2583/2583 PASS(새 `ViewerOmitsSuspensionAssemblyWithoutChangingBattleRig` 포함).
+- **PlayMode** `GameStageGourd*`·`LabGourdVisualRigTests`·`GameSceneFlowTests`·`LabGourdResultPreview*`: 수정 뒤 55/55 PASS(수정 전 54/55).
+- **화면(Development Mac 빌드, 솔로 1→2→3스테이지, main과 같은 임시 캡처):** 1·2·3스테이지 봉인 박 둘러보기에서 상단 고리·매듭·짧은 줄이 사라지고 박이 다시 가운데에 맞춰졌다(정면·회전·확대). 같은 스테이지 전투 박 확대에서는 고리와 밧줄 연결이 그대로다. 땅따먹기 박 보기(흰 박)는 같다.
+- **미실행:** iPhone 실기기.
+
+## 2026-11-15 — #762 땅따먹기 화면에 새 박(야광귀) 적용
+
+### 확인한 상태 (변경 전)
+
+- 스토리 1~3스테이지는 `GameBattleBindings.MountStageGourd`가 스테이지 정보(`gourdVisualResource`)로 새 박 모델(구미호·야광귀·지귀, 클레이 채색·키링 제거)을 붙인다. 땅따먹기는 `CurrentStageDefinition`이 없어(스토리만 있음) 이 단계를 건너뛰고 예전 흰 박이 그대로 나왔다. 배경은 이미 2스테이지(야광귀) 배경(`GameStageBackgrounds.TerritoryArtStage = 2`)을 쓰고 있었다.
+
+### 변경
+
+- `GameSession.GourdStageDefinition`: 스토리는 그 스테이지, 땅따먹기(1:1·2:2·3:3)는 배경과 같은 2스테이지(야광귀) 정의. `MountStageGourd`가 이것으로 박을 붙여 땅따먹기에 `Stage02_Yagwanggwi_Battle` 박이 붙는다. 박 모양만 빌리고 땅따먹기 규칙·값·화면 이름("땅따먹기")은 그대로다. 튜토리얼은 흰 박 그대로.
+- 칠: 땅따먹기는 클레이 없이 선명한 고해상도 칠을 쓰므로 박 몸통·뚜껑이 칠 지도를 그대로 그린다(`_PaintMapReady` 1). 맞는 판정 껍데기는 박 모델의 것.
+- 크기: 박 모델에는 스토리 박 크기(`LabGourdVisualRig.StageSizeMultiplier` 1.4배, #590)가 붙어, 땅따먹기 박과 판정도 흰 박보다 1.4배 커진다(스토리 2스테이지와 같은 크기).
+- 네트워크·접속 버전·DEV 값 변경 없음.
+
+
+## 2026-11-15 — #727 튜토리얼 대사 키워드 강조
+
+### 변경
+
+- 강조 기준: 크게 = 꼭 알아야 할 대상·행동·목표, 빨강 = 주의·경고(안 되는 것, 줄어들거나 사라지는 것, 위험, 방해), 오행 색 = 화·수·목·금·토 이름. 모두 굵게.
+- 대본(`GameTutorialScript`)의 대사 17줄에 강조 표시를 넣었다: `<big>`(검정 그대로 크게) 빈틈없이 칠하면·북·음구슬·양구슬·오행구슬·100%·우측 지도·바로바로 넘겨 줘·적힌 숫자만큼·두 개, `<red>`(진홍 `#8A1206`) 기운이 줄어·같은 색끼리는 안 붙어!·오래 두면 사라져·터지니까·빨개졌어·막은 것 같아·어떤 방해, 오행 표시 화·수·목·금·토(전투 오행 구슬 그림 색: 화 `#D32E16`·수 `#0E6192`·목 `#2E6946`·금 `#F9B520`·토 `#654029`, 사용자 시안의 글자 색과 같음).
+- 대사의 `Text`는 표시를 뺀 원래 문장(승인된 대본과 같음)이고, 화면에 그릴 때만 `Marked`를 Unity 리치 텍스트로 바꾼다(`GameTutorialEmphasis`). 대화 기록 항목도 `Text`는 그대로, `Marked`를 따로 갖는다.
+- 말풍선: 큰 글자는 그 말풍선 글자 크기의 1.35배(`GameTutorialArt.emphasisScale`). Unity 자동 맞춤은 `<size>` 글자를 같이 줄이지 않아 끄고, 큰 글자까지 넣은 글이 칸 높이에 들어가며 대본에 쓴 줄바꿈 말고는 더 나뉘지 않는 가장 큰 크기를 직접 고른다(`FitBubble`). 기본 말풍선에서 17줄 모두 그대로 17(큰 글자 23)이다. ("구슬은 오래 두면 사라져."를 크게 했을 때는 그 줄만 16으로 한 단계 줄어 2줄을 지켰고, 빨강으로 바꾼 뒤에는 17.) 좁은 칸에서는 줄 전체와 큰 글자가 같은 비율로 함께 작아진다.
+- 오행 글자는 시안처럼 테두리 없이 색만. 먹색 테두리(`GameTutorialElementOutline`, 정점 색이 오행 색인 글자만)는 `elementOutlineWidth`(기본 0)를 올리면 켜진다. 처음에 넣었던 1.2 테두리는 시안에 맞춰 껐다.
+- 강조한 부분(크게·빨강·오행 색)은 모두 굵게(`<b>`, `GameTutorialArt.emphasisBold`, 기본 켬). 말풍선 글꼴(신라문화체 M)에 굵은 글꼴이 따로 연결돼 있지 않아 Unity가 굵게 그린 글자를 쓴다(글자 칸은 1px 커지고 글자 간격은 그대로).
+- 대화 기록: 빨강·오행 색·굵게는 그대로, 크기는 키우지 않는다.
+- 아래 행동 안내 띠, 6단계(막기) 등 표시 없는 대사는 그대로다. 게임 규칙·네트워크·접속 버전 변경 없음.
+
+### 확인
+
+- Unity 6000.6.5f1 Editor 컴파일: PASS. 콘솔 오류 1건은 기존 `ResultAction.png` Library 캐시 손상이다.
+- 검사 추가: PlayMode `GameSceneFlowTests.TerritoryMountsTheYagwanggwiGourdAndPaintsItsTeamColoursStraightOnIt` **PASS**(사용자 실행) — DEV 솔로 땅따먹기에서 야광귀 박 모델·판정 껍데기·스토리 크기, 화면 이름 "땅따먹기", 고해상도 칠이 몸통·뚜껑에 바로 묶임(클레이·물감 없음).
+- `GameSceneFlowTests` 전체(사용자 실행): Passed 25 / Failed 24. 실패 24건은 모두 같은 로그 하나로 실패했다: `Unknown error occurred while loading 'VirtualArtifacts/Primary/e3472224bcaa648cf9879fbf8ddf6346'`(`Assets/Hapio/Art/UI/Strokes/ResultAction.png`). 결과 화면·봉인 박 관람을 여는 검사만 실패했고, 이 기기 Library의 그 GUID 기록 손상이다(#717 기록과 같음, Unity 6.6 통합 저장소라 그 항목만 지울 수 없음). 저장소 파일·meta는 정상이며 #762와 무관하다. 땅따먹기 결과 검사 2건(`TerritoryDeveloperSolo…`, `TerritoryTimeUp…`)도 이 이유로 실패해 박 교체 뒤 결과 화면은 Library 재생성 뒤 재실행이 필요하다(NOT_RUN).
+- 스토리 박 검사(`GameStageGourdIntegrationTests`, `GameStageGourdSizeTests`), `GameBattleUiPresentationTests` 땅따먹기: NOT_RUN.
+- 실제 화면(청·홍 칠이 야광귀 박에 보이는 모습, 커진 박과 위쪽 팀 막대·아래 판의 겹침), Mac 여러 앱 땅따먹기: NOT_RUN.
+
+### #762 병합 전 검증 (2026-11-15)
+- **기준:** `feat/#762-territory-stage-gourd`에 main `9c24dccc`(#760 포함) 병합. 충돌은 이 문서 기록 추가뿐이며 양쪽을 보존했다. Unity 6000.6.5f1 batch(macOS, Metal).
+- **추가 수정:** 땅따먹기 판정 껍데기·크기가 바뀌므로 접속 토큰을 `C6HapioGame/56`으로 올렸다(Game55 거절 검사 추가). AGENTS·GAME_FLOW·GOURD_MODELS의 "땅따먹기=흰 박" 설명도 고쳤다. 프로토콜 5705·Lab62·설정 265개는 그대로다.
+- **전체 EditMode:** 2583/2583 PASS. **전체 PlayMode:** 878/878 PASS(새 `TerritoryMountsTheYagwanggwiGourd…`와 땅따먹기 결과 검사 포함).
+- **화면(Development Mac 빌드, DEV 솔로 땅따먹기, main과 같은 임시 캡처):** 전투 박이 흰 박에서 1.4배 야광귀 박으로 바뀌었다. 청홍 칠이 몸통·뚜껑에 바로 칠해지고, 상단 막대·조합판과는 겹치지 않는다. 결과 박 보기도 야광귀 박이며 #760처럼 상단 고리가 없다. 튜토리얼 박은 흰 박 그대로다.
+- **미실행:** iPhone 실기기, 실제 여러 기기 땅따먹기(1:1·2:2·3:3) 네트워크 전투.
+
+- Editor API(Play 없이)로 실제 튜토리얼 그림(`TutorialArt`)의 글꼴·말풍선 칸으로 확인: 표시된 17줄, `Text`에 표시 새어 나감 0, 17줄 모두 대본 줄 수 그대로(위 크기), 좁은 칸(170x112)에서 14/19·15/20로 함께 작아짐, 테두리를 켰을 때 오행 줄은 테두리 글자 5개·다른 줄 0개. 굵게를 더한 뒤에도 크기·줄 수가 같다. 오행 색(구슬 그림 색, 테두리 없음)과 새 강조를 같은 글꼴로 그려 눈으로 확인했다. 굵게 전후를 같은 글꼴로 그려 비교해 굵어진 것을 눈으로 확인했다.
+- 검사 추가 (실행은 NOT_RUN): EditMode `GameTutorialEmphasisTests` 4건 (합의한 키워드와 원래 대본 유지, 리치 텍스트·기록 변환, 모든 표시 줄의 줄바꿈과 비율 축소, 오행 글자 색과 기본 테두리 없음, 켜면 오행 글자만 테두리). 기존 `GameTutorialTests`·`GameTutorialLogTests`는 `Text`가 그대로라 그대로 둔다.
+- 튜토리얼 EditMode·PlayMode(`GameTutorialFlowTests`) 실행, iPhone 비율 화면 확인: NOT_RUN.
+
+### #727 main 병합 — 2026-11-15
+
+- 최신 main(#753 시연 그룹 분리, #749 Stage2 밧줄 연결점, #745 남은 30초 BGM·결과 징글)을 통합했다. 충돌은 이 문서 끝의 기록 추가 한 곳이며 양쪽 기록을 모두 보존했다. 병합 뒤 컴파일 결과는 PR에 적는다.
+
+### #727 병합 전 검증 (2026-11-15)
+- **기준:** `feat/#727-tutorial-keyword-highlight`에 main `6691ccb6`(#760·#762 포함) 병합. 충돌은 이 문서 기록 추가뿐이며 양쪽을 보존했다. Unity 6000.6.5f1 batch(macOS, Metal).
+- **색상 규칙 맞춤(AGENTS 합이오 UI 컬러 시스템):** 위 기록의 색은 이 절로 바뀌었다.
+  - 오행 글자 색을 `5OrbsColor/*/500***` 토큰 값으로 바꿨다. 화 `#D32E16→#D32E15`, 목 `#2E6946→#2F6946`, 금 `#F9B520→#F9B521`이고 수·토는 원래 같았다. 토큰 경로 주석도 남겼다.
+  - 경고 `<red>`는 토큰이 아닌 `#8A1206` 대신 `5OrbsColor/Firered/700` `#7F1C0D`로 바꿨다. 실제 말풍선 캡처에서 후보 4개를 비교해 사용자가 골랐다.
+- **전체 EditMode:** 2587/2587 PASS(새 `GameTutorialEmphasisTests` 포함). **PlayMode `GameTutorial*`:** 5/5 PASS.
+- **화면(Development Mac 빌드, main과 같은 임시 캡처로 튜토리얼 대사 줄마다 비교):** 강조 대사의 글자는 그대로다. 핵심 단어만 굵고 크게, 경고는 Firered/700, 오행 이름은 구슬 색으로 바뀌었다. 말풍선 밖으로 넘치는 줄은 없었다. 대화 기록과 지적 말풍선도 확인했다.
+- **미실행:** iPhone 실기기.
+
+## 2026-11-15 — #766 스토리 좌우 터치와 오프닝 3번 행간
+
+- 기준: origin/main 9a01c3c4에서 fix/766-story-touch-navigation. 기존 프로젝트에서 작업하며 개인 ProjectSettings/Build Profiles 변경은 제외한다. 이슈 #766 생성 후 사용자 미리보기 승인을 받았다.
+- 컴파일: Unity 6000.6.5f1 script recompile_status completed, failed=false, errors=[]. 작업 전부터 별도 MCP WebSocket 연결 오류가 반복되어 있었으며 이번 검증은 연결된 Unity Pipeline으로 수행했다.
+- 최종 Story PlayMode assembly: 55/55 통과(7.74초). 새 좌우 페이지 순서·같은 그림 유지·첫 페이지·팝업 차단·자동 연출 입력 차단·일반 이야기 제어 복원과 저장된 글자 간격 검사를 포함한다. 기존 드래그/다중 포인터/건너뛰기/배경/대사 연속성도 통과했다.
+- 관련 EditMode(Story 필터): 143/143 통과(4.61초).
+- GameOpeningControllerTests: 14/14 통과(16.48초). 타이틀 진입·오프닝 완료/스킵·입력 해제 대기를 검증했다.
+- 화면: 실제 GameOpening/GameStageStoryCanvas 프리팹을 미리보기 카메라에서 804×1748로 렌더해 오프닝3·엔딩1을 확인했다. 게임 컨트롤러가 숨기는 제작용 진행 번호/결과 조작 그룹은 캡처에서도 숨겼다. 첫 렌더에서 혼합 크기 글자의 추가 행간을 발견하여 기본 크기 run의 실제 위치 차이33으로 수정한 뒤 다시 렌더하고 검사를 재실행했다. 엔딩의 기존 건너뛰기 모양·위치는 이번 범위에서 변경하지 않았다.
+- 종료 상태: Home 장면, dirty=false, playing=false. git diff --check 통과. 전체 EditMode/전체 PlayMode/iOS 빌드/실기기는 실행하지 않았다.
+
+### #766 병합 전 검증 (2026-11-15)
+- **기준:** `fix/766-story-touch-navigation`에 main `067f0cb6`(#760·#762·#727 포함) 병합. 충돌은 이 문서 기록 추가뿐이며 양쪽을 보존했다. Unity 6000.6.5f1 batch(macOS, Metal).
+- **전체 EditMode:** 2587/2587 PASS. **PlayMode Story 묶음**(`StoryTapAdvanceTests`·`StoryPlayerTests`·`EndingDialogueTests`·`GameStageStory*`·`GameOpening*`·`OpeningCinematicTests`·`OpeningDialogue*`·`GameStaffStageDemoFlowTests`·`GameYaguangDemoFlowTests`·`GameSceneFlowTests`·`StaffStageDemoStory*`·`YaguangDemoStory*`): 98/98 PASS.
+- **화면(Development Mac 빌드, main과 같은 임시 캡처, 실제 `StoryTapAdvance` 포인터 처리로 좌·우 터치):**
+  - 오프닝 상단 이전·다음 버튼이 숨겨졌다. 오른쪽 터치로 OP_001→OP_002→OP_003, 왼쪽 터치로 OP_002로 돌아갔다. main에서는 같은 왼쪽 터치가 OP_004로 넘어갔다.
+  - 엔딩 1컷에서 오른쪽 터치는 다음 쪽, 왼쪽 터치는 앞 쪽으로 돌아갔다. main에서는 다음 컷으로 넘어갔다.
+  - OP_003 두 줄 간격이 Figma 33에 맞게 좁아졌다.
+- **기록만:** 엔딩 뒤 클리어 화면은 이 표시를 쓰지 않아 기존 버튼이 그대로다. 왼쪽 터치는 `requireContinueButton` 컷에서도 뒤로 간다.
+- **미실행:** iPhone 실기기 터치.
+
+## #772 — 쇼케이스 시작 로고·앱 이름 (2026-11-15)
+
+기준 main `2c9b3487`, Unity 6000.6.5f1·macOS arm64의 Desktop 프로젝트. 일반 게임의 Scene·타이틀·폰트·팔레트·게임 규칙·Bundle ID를 보존했다. 별도 시연 빌드에만 로고·아이콘·표시명을 임시 적용한다.
+
+- 표시명과 Mac 파일명: `합이오_쇼케이스`. 정식 아이콘 원본은 미수령 가능성이 있어 사용자 지시에 따라 기존 타이틀 글꼴·색으로 만든 임시 아이콘 사용.
+- Unity Preview Scene에서 로고 2048×1024 RGBA(투명 여백)와 아이콘 1024×1024 RGB(알파 없음)를 명시적으로 베이크. 원본 Scene은 저장하지 않으며 빌드 중 자동 생성하지 않음.
+- 빌드 설정 동작 변경으로 전체 검사 실행: 최종 EditMode **2,585/2,585 PASS**(39.61초), PlayMode **877/877 PASS**(1116.15초), 실패/skip0.
+- 최초 관련 검사 26건 중 8건 실패: Mac 단일 아이콘이 8개 지원 크기 전체에 적용되지 않던 구현을 수정하고, 두 시연의 같은 표시명 계약으로 검사를 갱신. 중간 전체 EditMode의 구형 이름 전제 2건 실패는 최신 검사 재컴파일 후 2,580건 통과.
+- 첫 Mac BuildReport는 성공·오류0이었으나, 한글 내부 실행 파일명에서 codesign의 CoreFoundation 실행파일 URL 재귀가 SIGBUS를 발생시킴. 생성 산출물에서 내부 이름만 영문으로 바꾸면 엄격 서명이 통과함을 확인해 자동 후처리 추가. 표시명과 .app 이름은 한글 유지.
+- iOS applicationDisplayName 설정이 productName도 바꿔 독립 설정을 시도한 중간 검사 6건 실패. 한글 PlayerSettings 표시명을 유지하고 Xcode PRODUCT_NAME_APP만 영문으로 정리하도록 수정. Mac NFC/NFD·충돌 및 iOS 다중 설정·누락 검사 후 최종 전체 EditMode 2,585건 통과.
+- 후속 변경은 Editor 포장 후처리·검사뿐이며 Scene·런타임·통신·게임 코드·패키지는 같고 Application.productName에 의존하는 런타임도 없음. 전체 PlayMode 결과는 재사용하고 전체 EditMode와 실제 Mac/iOS 빌드를 다시 확인.
+
+| 확인 | 결과 |
+| --- | --- |
+| Stage2 Release Mac | `Builds/HapioStage2Demo/20261115-123958-3ff8ad0b-release/macOS/합이오_쇼케이스.app`, Succeeded·오류0·identityVerified=true |
+| Mac 포장 | 한글 표시명·영문 실행 파일 HapioShowcase·기존 stage2 Bundle ID·실제 ICNS 확인, codesign --verify --deep --strict 성공 |
+| Stage2 Release iOS | `Builds/HapioStage2Demo/20261115-124003-7b5bf98e-release/iOS/`, Succeeded·identityVerified=true |
+| iOS 포장 | CFBundleDisplayName 합이오_쇼케이스, PRODUCT_NAME_APP 4곳 모두 HapioShowcase, 아이콘 19개·1024px Store RGB PNG 확인 |
+| 설정 보존 | 두 빌드 후 ProjectSettings/EditorBuildSettings 파일 SHA-256이 빌드 전과 동일, 기존 stash 불변, StandaloneOSX·Home·Play 정지 복원 |
+
+iOS에는 기존 com.unity.pipeline의 StandaloneBuildSubtarget 전처리 진단1건이 기록되지만 내보내기·식별 검증 성공. 오류0으로 표기하지 않음. 사용자 요청으로 Mac 실행·실제 시작 화면 촬영·iOS Xcode 서명/설치/실행·실기기 확인은 미실행. 검사가 만든 빈 기본 아이콘 슬롯과 Importer의 SVG 메타 공백은 사본 보존 후 원래대로 정리. 실패 이력·세부 결과는 로컬 별도 산출물에 보존하며 원시 로그·빌드·개인 경로·서명 정보는 커밋하지 않음.
+
+
+### #772 최신 main 통합·병합 전 확인 (2026-11-15)
+
+main `cef1579d`의 #760 관람·#762 땅따먹기 박/Game56·#727 튜토리얼·#766 스토리 이동을 보존해 통합했다. 구현 파일 충돌은 없고 양쪽 VALIDATION 추가 기록을 모두 유지했다. 이전 기준 결과를 재사용하지 않고 전체 검사를 다시 실행했다.
+
+- 최초 통합 EditMode 2,592건 중 1건 실패: 새 Native 설정에서 `SetIcons(empty)`가 없던 Mac 아이콘 항목을 8개 빈 슬롯으로 만들었다. 복원 배열 단언을 유지하고 보완했다.
+- JSON 복원 대안은 Native 설정 역직렬화가 무관한 Android 경로 필드까지 재해석해 14개 강화 검사에서 불일치를 발생시켰으므로 폐기했다. 구현·검사 정리에서 JSON 덮어쓰기를 제거하고 아이콘 두 속성 배열만 형식 지정 레코드로 저장·복원한다. 원본 설정 파일에서 Unity를 다시 열어 초기 상태로 검증했다.
+- 빌드 관련 **33/33 PASS**(0.51초): 정상·실패·취소, 실제 빈 배열과 사용자 아이콘, 다른 플랫폼의 아이콘, 전체 Native 설정 동일성·원본 파일 바이트 보존을 확인했다. 검사 정리 자체의 빈 슬롯 오염도 제거했다.
+- 통합 최종 전체 EditMode **2,594/2,594 PASS**(21.82초), 전체 PlayMode **881/881 PASS**(1109.01초), 실패·skip0. 관련 코드·에셋·패키지·환경을 고정하고 수행했다.
+- Mac 최신 출력: `Builds/HapioStage2Demo/20261115-132644-82a69fad-release/macOS/합이오_쇼케이스.app`, Succeeded·오류0·identityVerified=true, 한글 표시명·HapioShowcase 실행 파일과 엄격 서명 재확인.
+- iOS 최신 출력: `Builds/HapioStage2Demo/20261115-132711-b24fafba-release/iOS/`, Succeeded·identityVerified=true. 한글 표시명, PRODUCT_NAME_APP 4곳, 아이콘19개와 알파 없는 Store PNG를 재확인했다. 기존 Pipeline 전처리 진단1은 계속 기록한다.
+- 두 빌드 전후 원본 ProjectSettings/EditorBuildSettings SHA-256과 기존 stash가 동일했다. 일반 Scene·타이틀·폰트·팔레트·Package/설정은 #772 diff에 없다. Importer의 기존 SVG 공백만 사본 보존 후 정리했다. 문서만 추가한 뒤 코드/에셋 재검사를 반복하지 않는다.
+- 사용자 요청대로 앱 실행·실기기·Xcode 서명/설치는 제외했다. 이전 기준의 산출물도 삭제하지 않았다.
+
+### #770 PR 최신 main 통합
+
+- main `9c24dccc`의 #754 박 둘러보기 고리 제거를 통합했다. 충돌은 이 문서의 추가 기록뿐이어서 양쪽을 보존했다. 오프닝 코드·에셋·검사는 변경되지 않아 관련 PlayMode 결과를 재사용하며, 전체 EditMode는 통합 뒤 재실행한다.
+
+- 통합 직후에는 Unity가 이전 어셈블리를 유지해 초기 재검사 결과를 통합 검증으로 사용하지 않았다. 스크립트 컴파일을 요청하고 #754 신규 검사 메서드가 로드됨을 확인한 뒤 전체 EditMode를 다시 실행: 도구 보고 **2,580/2,580 PASS**(84.77초). 오프닝 관련 코드와 에셋은 통합 전과 동일하다.
+
+### #770 병합 전 검증 (2026-11-15)
+- **기준:** `fix/770-opening-transitions`에 main `cef1579d`(#768 포함) 병합. 충돌은 이 문서 기록 추가뿐이며 양쪽을 보존했다. Unity 6000.6.5f1 batch(macOS, Metal).
+- **전체 EditMode:** 2587/2587 PASS. **PlayMode** 오프닝·스토리 묶음(`Opening*`·`StoryTapAdvanceTests`·`StoryPlayerTests`·`EndingDialogueTests`·`GameStageStory*`·`GameSceneFlowTests`·`GameStaffStageDemoFlowTests`·`GameYaguangDemoFlowTests`·`StaffStageDemoStory*`·`YaguangDemoStory*`): 107/107 PASS.
+- **화면(Development Mac 빌드, main과 같은 임시 캡처로 전환 직후 프레임 비교):**
+  - 3→4(오른쪽 터치 뒤 0.06/0.18/0.32/0.5/1.2초): main은 0.06초에 이미 OP_004로 바뀌었다. #770은 OP_003이 호리병 쪽으로 확대되며 약 0.5초 동안 겹쳐 사라진다. 1.2초 화면은 둘이 같다.
+  - 14→15(자동 진행 순간부터 0~1.5초): main은 OP_015 호리병이 정해진 시작 자세에서 바로 떨어진다. #770은 OP_014의 선반 장면이 0.2초 안에 겹쳐 사라지고, 호리병이 OP_014의 위치·기울기를 이어받아 떨어진다. 0.4초 뒤 자세는 둘이 거의 같다.
+- **영향 범위:** 겹침 전환은 `smoothOpeningTransitions`가 켜진 오프닝 시퀀스만 쓴다. 컷이 바뀔 때 목소리를 먼저 멈추는 처리는 모든 스토리에 적용되지만, 원래 이전 화면을 정리할 때 멈추던 것과 같다.
+- **미실행:** iPhone 실기기, 오프닝 소리 청취.
+- **main `d51318dc`(#773) 병합 뒤:** 충돌은 이 문서 기록 추가뿐이었다. #773은 시연 빌드 도구·아이콘만 바꿔 스토리 실행 경로와 겹치지 않는다. 그래서 위 PlayMode 결과를 재사용하고 전체 EditMode만 다시 돌려 **2594/2594 PASS**였다.
+
 ## 2026-11-15 — #757 엔딩 스토리 BGM 두 곡과 컷별 효과음, 엔딩 SFX 창
 
 - **기준:** `feat/#757-ending-bgm-sfx` (main `a754d500` 이후 #745 머지 위). 접속 규약 / DEV 설정 / 게임 규칙은 바꾸지 않았다. 엔딩 이야기의 소리와 Editor 창만 바뀐다.
 - **바뀐 것:** 엔딩 01~02 후일담 곡(`EndingBgm1`, 25.9초 루프) → 02 대사 뒤 1.4초에 테이프 멈추듯 끊김 → 03~06 북소리 긴장 곡(`EndingBgm2`, 23.7초 루프, 끝의 심벌즈 같은 부풂은 잘라 냄). 01 만복 대사 효과음(대사 음성 칸, 0.45초 뒤), 02~06 컷 앰비언스 5개(새 `StoryCutSound`에 컷 시작 뒤 초와 크기). 원래 있던 꼬르륵(`Hungry`) / 박 깨짐(`BrokenGourd`) 연결은 뺐다(파일은 그대로). `StoryCutSoundDriver`가 장면이 열릴 때 모든 StoryPlayer에 스스로 붙어 컷별 효과음을 낸다(StoryPlayer 코드는 그대로). Editor `Hapio > 엔딩 SFX` 창에서 컷을 바로 띄우고 소리를 바꿔 끼워 듣고 저장한다.
-- **실행:** Unity Test Runner (팀원 Mac), 전체 EditMode Run All / 전체 PlayMode Run All **모두 통과**(개수는 기록하지 않음). 이 PR에는 새 자동 검사를 더하지 않았다.
+- **실행:** Unity Test Runner (팀원 Mac), 전체 EditMode Run All / 전체 PlayMode Run All **모두 통과**(개수는 기록하지 않음). 이때는 새 자동 검사가 없었다.
 - **귀로 확인:** 엔딩 SFX 창에서 엔딩 처음부터 끝까지 여러 번 들으며 효과음 시각 / 크기 / 속도와 곡 전환을 팀원이 맞췄다.
 - **미실행:** 실제 3스테이지 클리어 뒤 게임 안 엔딩 한 판, iPhone 실기기 소리 크기.
+- **리뷰 반영:**
+  - 테이프 멈춤 도중 컷을 넘기거나 되돌아가면 다음 곡이 무음이 되던 문제: 컷이 바뀌거나 스토리가 끝나면 멈춤을 취소하고 곡 빠르기(pitch)를 되돌린다. 곡을 끄는 건 시작한 컷에 그대로 있을 때만.
+  - 스태프 시연 1/2/3라운드 / 야광귀 시연의 `Cuts/Ending_01.asset` 사본 4개도 만복 효과음(`EndingSfx01_Manbok`)으로 맞췄다.
+  - PlayMode `StoryCutSoundTests` 4개 추가: 그대로 두면 느려지다 멈춤 / 멈춤 도중 다음 컷으로 넘기면 다음 곡 정상 재생 / 멈춤 도중 같은 곡 컷으로 돌아가면 계속 재생 / 컷 효과음 한 번만.
+- **main `6bcf8e8d`(#760 / #764 / #759 / #768 / #773 / #771) 병합:** 충돌은 이 문서 기록 추가뿐이어서 양쪽을 보존했다. main의 `Ending.asset`에는 좌우 터치 넘기기(`sideTapNavigation`)만 더해져 엔딩 소리 설정과 겹치지 않는다.

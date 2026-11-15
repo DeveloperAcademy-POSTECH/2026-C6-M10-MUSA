@@ -1305,6 +1305,39 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
+        public IEnumerator TerritoryMountsTheYagwanggwiGourdAndPaintsItsTeamColoursStraightOnIt()
+        {
+            session.StartSolo(GameMode.Territory);
+            yield return WaitPlaying(1);
+            yield return null;
+            var paint = network.target.GetComponent<LabGourdPaint>();
+            Assert.That(paint.IsReady, Is.True, paint.InitializationError);
+            Assert.That(paint.RigFallbackReason, Is.Null);
+            LabGourdVisualRig rig = paint.Rig;
+            Assert.That(rig, Is.Not.Null, "#762: the territory mounts the baked 야광귀 gourd, not the white one.");
+            Assert.That(paint.VisualInstance.name, Does.StartWith("Stage02_Yagwanggwi_Battle"), "The same gourd as its 야광귀 background.");
+            Assert.That(session.GourdStageDefinition.stageIndex, Is.EqualTo(GameStageBackgrounds.TerritoryArtStage));
+            Assert.That(session.CurrentStageDefinition, Is.Null, "Only the look is borrowed; the territory has no story stage.");
+            Assert.That(Object.FindFirstObjectByType<GameBattleBindings>().stageLabel.text, Does.Contain("땅따먹기"));
+            Assert.That(network.target.Hitbox.sharedMesh, Is.SameAs(rig.hitShell.sharedMesh), "Hits land on the model's own shell.");
+            Assert.That(paint.VisualInstance.transform.localScale.x,
+                Is.EqualTo(network.config.GourdVisualSize / rig.referenceVisualSize * LabGourdVisualRig.StageSizeMultiplier).Within(1e-4f),
+                "The story's gourd size.");
+
+            // The team battle's clear, opaque team paint sits straight on the body and lid (no clay coat).
+            Assert.That(paint.HighResolutionActive, Is.True);
+            Assert.That(paint.ClayStickersActive || paint.WatercolorActive, Is.False);
+            paint.RefreshCommittedMap();
+            foreach (Renderer part in new Renderer[] { rig.paintShell }.Concat(paint.PaintExtras))
+            {
+                var block = new MaterialPropertyBlock();
+                part.GetPropertyBlock(block);
+                Assert.That(block.GetFloat("_PaintMapReady"), Is.EqualTo(1f), part.name + " shows the team paint itself.");
+                Assert.That(block.GetTexture("_PaintMap"), Is.SameAs(paint.VisualPaintTexture), part.name);
+            }
+        }
+
+        [UnityTest]
         public IEnumerator TerritoryDeveloperSoloUsesDesignedResultsAndReturnsHomeAfterViewingTheGourd()
         {
             session.StartSolo(GameMode.Territory);
@@ -1359,6 +1392,12 @@ namespace Hapio.Tests
             yield return Until(() => session.IsViewerOpen && screen.viewerPanel.activeInHierarchy,
                 "The team result must open the same owned gourd preview.");
             Assert.That(screen.viewerImage.texture, Is.SameAs(preview));
+            yield return null;
+            var gourdViewer = screen.viewerPanel.GetComponent<GameSealedGourdView>();
+            var gourdArt = Resources.Load<GameSealedGourdArt>("Hapio/UI/SealedGourdArt");
+            Assert.That(gourdViewer.background.texture, Is.SameAs(gourdArt.stageBackgrounds[1]));
+            Assert.That(screen.resetViewerButton.GetComponentInChildren<GameFigmaSurface>().SurfaceName,
+                Is.EqualTo("GourdResetLight"));
             Assert.That(JsonUtility.ToJson(session.ResultSnapshot), Is.EqualTo(result));
             screen.closeViewerButton.onClick.Invoke();
             yield return Until(() => !session.IsViewerOpen && !screen.viewerPanel.activeSelf, "Closing the preview restores the team result.");
@@ -1392,26 +1431,33 @@ namespace Hapio.Tests
                 && renderer.sharedMaterials.Any(material => material != null && material.shader != null
                     && material.shader.name == shaderName);
 
-            int[] PartPath(Transform part, Transform visualRoot)
+            // By name, not sibling index: the gourd viewer copy omits the suspension part (#754), so indices shift.
+            string[] PartPath(Transform part, Transform visualRoot)
             {
-                var path = new System.Collections.Generic.List<int>();
+                var path = new System.Collections.Generic.List<string>();
                 for (Transform current = part; current != visualRoot; current = current.parent)
                 {
                     Assert.That(current, Is.Not.Null, "Every paintable part belongs to the live visual instance.");
-                    path.Add(current.GetSiblingIndex());
+                    path.Add(current.name);
                 }
                 path.Reverse();
                 return path.ToArray();
             }
 
-            void AssertStampSurfaceBindings(Transform visualRoot, int[][] partPaths, Mesh[] partMeshes,
+            void AssertStampSurfaceBindings(Transform visualRoot, string[][] partPaths, Mesh[] partMeshes,
                 LabWatercolorStampSettings expected, Texture[] maps, string context)
             {
                 Assert.That(visualRoot, Is.Not.Null, context + ": a gourd model must exist.");
                 Renderer[] shells = partPaths.Select(path =>
                 {
                     Transform part = visualRoot;
-                    foreach (int child in path) part = part.GetChild(child);
+                    foreach (string child in path)
+                    {
+                        Transform next = null;
+                        foreach (Transform candidate in part) if (candidate.name == child) { next = candidate; break; }
+                        Assert.That(next, Is.Not.Null, context + ": the copied gourd keeps the paintable part " + child + ".");
+                        part = next;
+                    }
                     return part.GetComponent<Renderer>();
                 }).ToArray();
                 Assert.That(visualRoot.GetComponentsInChildren<Renderer>(true)
@@ -1572,7 +1618,7 @@ namespace Hapio.Tests
                     .Concat(livePaint.PaintExtras).Distinct().ToArray();
                 Assert.That(paintParts, Is.Not.Empty);
                 Assert.That(paintParts.All(part => part != null), Is.True);
-                int[][] paintPartPaths = paintParts.Select(part => PartPath(part.transform, liveVisualRoot)).ToArray();
+                string[][] paintPartPaths = paintParts.Select(part => PartPath(part.transform, liveVisualRoot)).ToArray();
                 Mesh[] paintPartMeshes = paintParts.Select(part => part.GetComponent<MeshFilter>().sharedMesh).ToArray();
                 Texture[] liveMaps = { livePaint.VisualPaintTexture, livePaint.VisualPainterTexture, livePaint.VisualHeightTexture };
                 AssertStampSurfaceBindings(liveVisualRoot, paintPartPaths, paintPartMeshes, roundWatercolor, liveMaps,
@@ -2085,6 +2131,10 @@ namespace Hapio.Tests
                         "The back of the seal card exposes its inspect button.");
                     Assert.That(session.IsViewerOpen, Is.False, "Inspection starts from the result card.");
                     Assert.That(story.screen.viewerPanel.activeInHierarchy, Is.False);
+                    var inspectArt = inspect.GetComponent<GameFigmaButton>();
+                    Assert.That(inspectArt, Is.Not.Null, "The authored rounded background needs the Figma brush.");
+                    Assert.That(inspectArt.artwork.SurfaceName, Is.EqualTo("ResultAction"));
+                    Assert.That(inspectArt.artwork.isActiveAndEnabled, Is.True);
                     yield return ClickVisibleButtonWithMouse(mouse, inspect);
                     GameScreen screen = story.screen;
                     Assert.That(session.IsViewerOpen && screen.viewerPanel.activeInHierarchy, Is.True, "Stage " + stage);
@@ -2099,8 +2149,8 @@ namespace Hapio.Tests
                     Assert.That(screen.resetViewerButton.gameObject.activeInHierarchy, Is.True);
                     Assert.That(screen.closeViewerButton.gameObject.activeInHierarchy, Is.True);
                     var close = screen.closeViewerButton;
-                    Assert.That(((RectTransform)screen.resetViewerButton.transform).anchoredPosition.y, Is.EqualTo(-698f));
-                    Assert.That(((RectTransform)close.transform).anchoredPosition.y, Is.EqualTo(-755f));
+                    Assert.That(((RectTransform)screen.resetViewerButton.transform).anchoredPosition, Is.EqualTo(new Vector2(326f, -49f)));
+                    Assert.That(((RectTransform)close.transform).anchoredPosition, Is.EqualTo(new Vector2(84f, -741f)));
                     var surface = close.GetComponentInChildren<GameFigmaSurface>();
                     Assert.That(surface, Is.Not.Null, "The return button shows the Figma brush surface.");
                     Assert.That(surface.SurfaceName, Is.EqualTo("ResultAction"));
@@ -2112,6 +2162,14 @@ namespace Hapio.Tests
                     var hint = screen.viewerPanel.GetComponentsInChildren<UnityEngine.UI.Text>()
                         .Single(text => text.name == "Rotate Hint");
                     Assert.That(hint.color, Is.EqualTo(GameBattleUiColors.SecondaryLightIvory800));
+                    Assert.That(hint.text, Is.EqualTo("봉인이 잘 되었는지 둘러보시오."));
+                    var resetArt = screen.resetViewerButton.GetComponentInChildren<GameFigmaSurface>();
+                    Assert.That(resetArt.SurfaceName, Is.EqualTo(stage == 1 ? "GourdResetDark" : "GourdResetLight"));
+                    var rotationArt = viewer.design.GetComponentsInChildren<GameFigmaSurface>()
+                        .Single(item => item.SurfaceName.StartsWith("GourdRotate"));
+                    Assert.That(rotationArt.SurfaceName, Is.EqualTo(stage == 1 ? "GourdRotateDark" : "GourdRotateLight"));
+                    Assert.That(rotationArt.raycastTarget, Is.False);
+                    Assert.That(rotationArt.rectTransform.anchoredPosition, Is.EqualTo(new Vector2(271f, -180f)));
                     var preview = (LabGourdResultPreview)typeof(GameSession).GetField("preview",
                         BindingFlags.Instance | BindingFlags.NonPublic).GetValue(session);
                     Quaternion initialRotation = preview.ModelRotation;
