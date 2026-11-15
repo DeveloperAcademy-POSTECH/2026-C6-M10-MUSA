@@ -32,6 +32,7 @@ namespace Hapio.Editor
         public static void WithTemporarySettings(BuildTarget target, Action build)
         {
             Validate();
+            var originalIcons = ShowcaseIconSettingsSnapshot.Capture();
             var named = NamedBuildTarget.FromBuildTargetGroup(BuildPipeline.GetBuildTargetGroup(target));
             bool show = PlayerSettings.SplashScreen.show, unityLogo = PlayerSettings.SplashScreen.showUnityLogo;
             var logos = PlayerSettings.SplashScreen.logos;
@@ -90,6 +91,7 @@ namespace Hapio.Editor
                         PlayerSettings.SetPlatformIcons(named, entry.kind, entry.slots);
                     }
                 else PlayerSettings.SetIcons(named, oldIcons, IconKind.Application);
+                originalIcons.Restore();
             }
         }
 

@@ -64,9 +64,24 @@ namespace Hapio.Tests
         public void StageTwoIdentityRestoresNormalSettingsAfterSuccessFailureAndCancellation(BuildTarget target, string outcome) =>
             AssertTemporaryIdentityRestored(target, outcome, "WithTemporaryStageTwoPlayerSettings", "StageTwoProductName", ".staffdemo.stage2");
 
+        // Used only for cleanup; assertions independently inspect the native JSON and public icon APIs.
+        private static object CaptureNativeIconSettings()
+        {
+            Type type = AppDomain.CurrentDomain.GetAssemblies()
+                .Select(assembly => assembly.GetType("Hapio.Editor.ShowcaseIconSettingsSnapshot")).First(value => value != null);
+            return type.GetMethod("Capture", BindingFlags.Public | BindingFlags.Static).Invoke(null, null);
+        }
+        private static void RestoreNativeIconSettings(object state) =>
+            state.GetType().GetMethod("Restore", BindingFlags.Public | BindingFlags.Instance).Invoke(state, null);
+
         private static void AssertTemporaryIdentityRestored(BuildTarget target, string outcome,
             string builderMethod, string productConstant, string suffix)
         {
+            var nativeSettings = UnityEditor.Unsupported.GetSerializedAssetInterfaceSingleton("PlayerSettings");
+            string originalNativeSettings = EditorJsonUtility.ToJson(nativeSettings);
+            object originalIconSettings = CaptureNativeIconSettings();
+            string settingsPath = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "ProjectSettings", "ProjectSettings.asset"));
+            byte[] originalSettingsBytes = File.ReadAllBytes(settingsPath);
             string expectedIdentifier = "com.example.hapio" + suffix;
             var namedTarget = NamedBuildTarget.FromBuildTargetGroup(BuildPipeline.GetBuildTargetGroup(target));
             string name = PlayerSettings.productName;
@@ -186,34 +201,83 @@ namespace Hapio.Tests
                         Assert.That(slots[slot].GetTextures(), Is.EqualTo(originalTextures[kind][slot]),
                             "A previously empty icon slot must remain empty after this export.");
                 }
+                Assert.That(EditorJsonUtility.ToJson(nativeSettings), Is.EqualTo(originalNativeSettings),
+                    "The complete native profile must retain absent overrides, empty slots and unrelated platform settings exactly.");
             }
             finally
             {
-                // A failed restoration assertion must still leave the developer's project intact.
+                // Restore properties independently; never round-trip the entire native profile through JSON.
                 PlayerSettings.productName = name;
                 PlayerSettings.SetApplicationIdentifier(namedTarget, identifier);
                 PlayerSettings.bundleVersion = version;
                 PlayerSettings.iOS.buildNumber = build;
                 PlayerSettings.iOS.applicationDisplayName = displayName;
+                Splash.show = showSplash; Splash.showUnityLogo = unityLogo;
+                Splash.animationMode = animation; Splash.unityLogoStyle = logoStyle;
+                Splash.backgroundColor = backgroundColor; Splash.background = background;
+                Splash.backgroundPortrait = backgroundPortrait; Splash.blurBackgroundImage = blurBackground;
+                Splash.overlayOpacity = overlay; Splash.logos = logos;
                 EditorUserBuildSettings.development = development;
-                Splash.show = showSplash;
-                Splash.showUnityLogo = unityLogo;
-                Splash.animationMode = animation;
-                Splash.unityLogoStyle = logoStyle;
-                Splash.backgroundColor = backgroundColor;
-                Splash.background = background;
-                Splash.backgroundPortrait = backgroundPortrait;
-                Splash.blurBackgroundImage = blurBackground;
-                Splash.overlayOpacity = overlay;
-                Splash.logos = logos;
-                if (target == BuildTarget.StandaloneOSX)
-                    PlayerSettings.SetIcons(NamedBuildTarget.Standalone, applicationIcons, IconKind.Application);
-                for (int kind = 0; kind < iconKinds.Length; kind++)
+                RestoreNativeIconSettings(originalIconSettings);
+                if (!File.ReadAllBytes(settingsPath).SequenceEqual(originalSettingsBytes))
+                    File.WriteAllBytes(settingsPath, originalSettingsBytes);
+            }
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void ShowcasePreservesAbsentAndCustomNativeIconOverridesAndOtherPlatforms(bool customMacIcons)
+        {
+            var nativeSettings = UnityEditor.Unsupported.GetSerializedAssetInterfaceSingleton("PlayerSettings");
+            string originalNativeSettings = EditorJsonUtility.ToJson(nativeSettings);
+            object originalIconSettings = CaptureNativeIconSettings();
+            string settingsPath = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "ProjectSettings", "ProjectSettings.asset"));
+            byte[] originalSettingsBytes = File.ReadAllBytes(settingsPath);
+            bool development = EditorUserBuildSettings.development;
+            try
+            {
+                // Start from an actual absent override, not eight null entries left by an earlier test.
+                var serialized = new SerializedObject(nativeSettings);
+                serialized.FindProperty("m_BuildTargetIcons").ClearArray();
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+                var userIcon = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Lab/Art/UI/PlayerPositionSoloIcon.png");
+                Assert.That(userIcon, Is.Not.Null);
+                var iosKinds = PlayerSettings.GetSupportedIconKinds(NamedBuildTarget.iOS);
+                Assert.That(iosKinds, Is.Not.Empty);
+                var iosSlots = PlayerSettings.GetPlatformIcons(NamedBuildTarget.iOS, iosKinds[0]);
+                Assert.That(iosSlots, Is.Not.Empty);
+                iosSlots[0].SetTexture(userIcon, 0);
+                PlayerSettings.SetPlatformIcons(NamedBuildTarget.iOS, iosKinds[0], iosSlots);
+                if (customMacIcons)
+                    PlayerSettings.SetIcons(NamedBuildTarget.Standalone,
+                        Enumerable.Repeat(userIcon, PlayerSettings.GetIconSizes(NamedBuildTarget.Standalone, IconKind.Application).Length).ToArray(),
+                        IconKind.Application);
+                var expectedMacIcons = PlayerSettings.GetIcons(NamedBuildTarget.Standalone, IconKind.Application).ToArray();
+                if (customMacIcons) Assert.That(expectedMacIcons, Is.Not.Empty.And.All.SameAs(userIcon));
+                else Assert.That(expectedMacIcons, Is.Empty, "The zero-entry native state must be exercised explicitly.");
+                string expectedNativeSettings = EditorJsonUtility.ToJson(nativeSettings);
+                bool called = false;
+                Action build = () =>
                 {
-                    for (int slot = 0; slot < platformIcons[kind].Length; slot++)
-                        platformIcons[kind][slot].SetTextures(originalTextures[kind][slot]);
-                    PlayerSettings.SetPlatformIcons(NamedBuildTarget.iOS, iconKinds[kind], platformIcons[kind]);
-                }
+                    called = true;
+                    var showcaseIcon = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Hapio/Art/Branding/ShowcaseIcon.png");
+                    Assert.That(showcaseIcon, Is.Not.Null.And.Not.SameAs(userIcon));
+                    Assert.That(PlayerSettings.GetIcons(NamedBuildTarget.Standalone, IconKind.Application), Has.All.SameAs(showcaseIcon));
+                };
+                Invoke("WithTemporaryStageTwoPlayerSettings", BuildTarget.StandaloneOSX,
+                    "com.example.hapio.staffdemo.stage2", build);
+                Assert.That(called, Is.True);
+                Assert.That(PlayerSettings.GetIcons(NamedBuildTarget.Standalone, IconKind.Application), Is.EqualTo(expectedMacIcons));
+                Assert.That(PlayerSettings.GetPlatformIcons(NamedBuildTarget.iOS, iosKinds[0])[0].GetTexture(0), Is.SameAs(userIcon));
+                Assert.That(EditorJsonUtility.ToJson(nativeSettings), Is.EqualTo(expectedNativeSettings),
+                    "The native representation and unrelated iOS icon override must survive the Mac build scope unchanged.");
+            }
+            finally
+            {
+                EditorUserBuildSettings.development = development;
+                RestoreNativeIconSettings(originalIconSettings);
+                if (!File.ReadAllBytes(settingsPath).SequenceEqual(originalSettingsBytes))
+                    File.WriteAllBytes(settingsPath, originalSettingsBytes);
             }
         }
 
