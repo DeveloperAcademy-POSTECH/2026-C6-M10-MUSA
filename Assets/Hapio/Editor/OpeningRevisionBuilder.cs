@@ -175,6 +175,7 @@ namespace Hapio.Editor
                 var generator=new TextGenerator();generator.Populate("가\n가",text.GetGenerationSettings(new Vector2(4000,4000)));
                 if(generator.lines.Count>1)text.lineSpacing=t.lineHeight*density/(generator.lines[0].topY-generator.lines[1].topY);
             }
+            if(t.id=="4553:4317") StoryNavigationAssets.MatchLineHeight(text,t.lineHeight*density);
             return r;
         }
         static void ConfigureFlight(OpeningLayerMotion motion, Item item)

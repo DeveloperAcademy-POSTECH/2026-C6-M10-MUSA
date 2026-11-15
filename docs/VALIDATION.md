@@ -9211,3 +9211,23 @@ PR #729 검증 중 main `a7208003`에서 `LabLocalBoardNetworkIntegrationTests` 
 - **전체 EditMode:** 2587/2587 PASS(새 `GameTutorialEmphasisTests` 포함). **PlayMode `GameTutorial*`:** 5/5 PASS.
 - **화면(Development Mac 빌드, main과 같은 임시 캡처로 튜토리얼 대사 줄마다 비교):** 강조 대사의 글자는 그대로다. 핵심 단어만 굵고 크게, 경고는 Firered/700, 오행 이름은 구슬 색으로 바뀌었다. 말풍선 밖으로 넘치는 줄은 없었다. 대화 기록과 지적 말풍선도 확인했다.
 - **미실행:** iPhone 실기기.
+
+## 2026-11-15 — #766 스토리 좌우 터치와 오프닝 3번 행간
+
+- 기준: origin/main 9a01c3c4에서 fix/766-story-touch-navigation. 기존 프로젝트에서 작업하며 개인 ProjectSettings/Build Profiles 변경은 제외한다. 이슈 #766 생성 후 사용자 미리보기 승인을 받았다.
+- 컴파일: Unity 6000.6.5f1 script recompile_status completed, failed=false, errors=[]. 작업 전부터 별도 MCP WebSocket 연결 오류가 반복되어 있었으며 이번 검증은 연결된 Unity Pipeline으로 수행했다.
+- 최종 Story PlayMode assembly: 55/55 통과(7.74초). 새 좌우 페이지 순서·같은 그림 유지·첫 페이지·팝업 차단·자동 연출 입력 차단·일반 이야기 제어 복원과 저장된 글자 간격 검사를 포함한다. 기존 드래그/다중 포인터/건너뛰기/배경/대사 연속성도 통과했다.
+- 관련 EditMode(Story 필터): 143/143 통과(4.61초).
+- GameOpeningControllerTests: 14/14 통과(16.48초). 타이틀 진입·오프닝 완료/스킵·입력 해제 대기를 검증했다.
+- 화면: 실제 GameOpening/GameStageStoryCanvas 프리팹을 미리보기 카메라에서 804×1748로 렌더해 오프닝3·엔딩1을 확인했다. 게임 컨트롤러가 숨기는 제작용 진행 번호/결과 조작 그룹은 캡처에서도 숨겼다. 첫 렌더에서 혼합 크기 글자의 추가 행간을 발견하여 기본 크기 run의 실제 위치 차이33으로 수정한 뒤 다시 렌더하고 검사를 재실행했다. 엔딩의 기존 건너뛰기 모양·위치는 이번 범위에서 변경하지 않았다.
+- 종료 상태: Home 장면, dirty=false, playing=false. git diff --check 통과. 전체 EditMode/전체 PlayMode/iOS 빌드/실기기는 실행하지 않았다.
+
+### #766 병합 전 검증 (2026-11-15)
+- **기준:** `fix/766-story-touch-navigation`에 main `067f0cb6`(#760·#762·#727 포함) 병합. 충돌은 이 문서 기록 추가뿐이며 양쪽을 보존했다. Unity 6000.6.5f1 batch(macOS, Metal).
+- **전체 EditMode:** 2587/2587 PASS. **PlayMode Story 묶음**(`StoryTapAdvanceTests`·`StoryPlayerTests`·`EndingDialogueTests`·`GameStageStory*`·`GameOpening*`·`OpeningCinematicTests`·`OpeningDialogue*`·`GameStaffStageDemoFlowTests`·`GameYaguangDemoFlowTests`·`GameSceneFlowTests`·`StaffStageDemoStory*`·`YaguangDemoStory*`): 98/98 PASS.
+- **화면(Development Mac 빌드, main과 같은 임시 캡처, 실제 `StoryTapAdvance` 포인터 처리로 좌·우 터치):**
+  - 오프닝 상단 이전·다음 버튼이 숨겨졌다. 오른쪽 터치로 OP_001→OP_002→OP_003, 왼쪽 터치로 OP_002로 돌아갔다. main에서는 같은 왼쪽 터치가 OP_004로 넘어갔다.
+  - 엔딩 1컷에서 오른쪽 터치는 다음 쪽, 왼쪽 터치는 앞 쪽으로 돌아갔다. main에서는 다음 컷으로 넘어갔다.
+  - OP_003 두 줄 간격이 Figma 33에 맞게 좁아졌다.
+- **기록만:** 엔딩 뒤 클리어 화면은 이 표시를 쓰지 않아 기존 버튼이 그대로다. 왼쪽 터치는 `requireContinueButton` 컷에서도 뒤로 간다.
+- **미실행:** iPhone 실기기 터치.

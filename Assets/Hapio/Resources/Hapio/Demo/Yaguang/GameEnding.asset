@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: GameEnding
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StorySequence
   storyId: game-ending-yaguang-demo
+  sideTapNavigation: 1
   cuts:
   - {fileID: 11400000, guid: 482bd350f36194007aeb661f742b52be, type: 2}
   - {fileID: 11400000, guid: 1fc18836f2c31449cab225f915088795, type: 2}

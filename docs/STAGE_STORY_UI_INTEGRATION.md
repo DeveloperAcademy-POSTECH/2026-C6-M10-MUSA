@@ -154,3 +154,8 @@ Host advances everyone to the next game for stages 1/2. After Jigwi, StartSummar
 - 종이/이름표는 기존 오프닝의 `b24cb.png`·`9769e.png` 원본을 재사용한다. 이름표 색은 `Opening/SpeakerPalette.asset`의 사용자 승인 공통 캐릭터색을 사용한다(불이 빨강, 만복 갈색, 솔이 초록). 별도의 엔딩 색상 사본을 만들지 않는다.
 - 컷별 종이·이름 크기·줄바꿈 설정은 `StoryCutView`에 저장한다. `StoryPlayer`는 다른 컷으로 이동하면 원래 종이·그림자·이름 크기·줄바꿈 방식을 복원한다. 일반 후일담의 저장된 상자나 오프닝 연출을 일괄 변경하지 않는다.
 - 명시적 갱신 메뉴: `Hapio/Story/Update Ending Dialogue`. 기존 프리팹 GUID·그림·연출·음성을 보존하며, 게임 Canvas와 제작용 StageStoryPreview의 종이 참조도 연결한다. 시연 엔딩은 같은 viewPrefab을 사용하므로 선택 요괴별 첫 대사를 그대로 유지하며 새 상자를 사용한다.
+
+## 엔딩 좌우 터치 이동 (#766)
+
+- 일반·시연 엔딩의 `sideTapNavigation`을 켜 상단 이전/다음 버튼 대신 화면 좌우로 읽는다. 같은 그림의 불이→만복 대사에서도 왼쪽은 직전 대사로 돌아가며 그림을 재생성하지 않는다.
+- 준비 대기·그만두기 팝업·봉인 총평의 명시적 확인·마지막 종료 경로는 기존 입력 차단과 확인 버튼을 유지한다. 일반 스테이지 후일담은 이 옵션을 켜지 않는다.
