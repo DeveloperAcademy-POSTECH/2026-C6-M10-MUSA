@@ -23,6 +23,9 @@ namespace Hapio
             foreach(Transform child in hud.pauseButton.transform)child.gameObject.SetActive(false);
             hud.pauseButton.targetGraphic.color=Color.clear;
             GameHudButtonArtwork.Attach(hud.pauseButton,"Pause");
+            GameFigmaButton.AttachClose(hud.resumeButton);
+            if (hud.pauseMenu != null)
+                hud.pauseMenu.GetComponent<GamePauseView>()?.ApplyArt(hud.returnLobbyButton);
             var pause = (RectTransform)hud.pauseButton.transform;
             helpButton = GameViewerHelpUi.Hit(pause.parent, "Help", 0, 0, 44, 44);
             var help = (RectTransform)helpButton.transform;
@@ -50,6 +53,7 @@ namespace Hapio
             closeButton=GameViewerHelpUi.Hit(design,"Close Help",322,237,37,37);
             var closeImage=closeButton.GetComponent<Image>();
             closeImage.sprite=hud.resumeButton.GetComponent<Image>().sprite;closeImage.color=Color.white;
+            GameFigmaButton.AttachClose(closeButton);
             closeButton.onClick.AddListener(Close);
             string[] titles={"만들기","합치기","굴리기","색칠하기"};
             string[] descriptions={"북을 쳐서 흑백 음양\n구슬을 만드시오.","흑과 백을 합치면\n오행 색 구슬이 돼오.","구슬을 옆으로 밀어\n필요한 친구에게 보내시오.","구슬을 던져 박을 칠하시오.\n다 칠하면 봉인 성공!"};

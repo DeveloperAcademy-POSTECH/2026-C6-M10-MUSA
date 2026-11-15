@@ -23,6 +23,19 @@ Missing silhouettes came from substituting plain rounded primitives for Figma HE
 
 Sprites use FullRect, bilinear/clamp, no mipmaps and no compression. `GameFigmaStrokeLibrary` maps export bounds onto the existing logical RectTransform without expanding click bounds. Scroll clipping has 4-unit allowance for centred strokes. `Hapio > Upgrade Figma UI Strokes` imports and saves the shared lobby prefab and battle theme; existing menu/seat/battle authoring paths preserve these bindings.
 
+## #756 버튼 상태
+
+[통합 UI 컴포넌트](https://www.figma.com/design/wW7ny7lNQ4DXNJ4kD46AuR/?node-id=4840-6805)의 눌림 색을 기존 스트로크 실루엣에 적용했다. `manifest.json`에 눌림 시안의 Figma 노드와 스프라이트 경계를 기록한다.
+
+| 버튼 | 눌림 색상 토큰 |
+| --- | --- |
+| 게임 시작, 새 방 만들기, 모드 선택 | `TextColor/PrimaryBrown/700` |
+| 동지 수 칩 | 배경 `TextColor/PrimaryBrown/500***`, 글자 `TextColor/SecondaryLightIvory/100` |
+| 봉인 시작, 주요 결과 액션 | `TextColor/DarkRed/700` |
+| 방 카드 | 기존 눌림 스프라이트, 글자 `TextColor/SecondaryLightIvory/100` |
+
+일시정지와 도움말의 닫기 버튼은 Figma의 닫기 눌림 SVG를 3×로 래스터화해 Unity의 Sprite Swap에 연결한다. 모드 선택은 비활성 스프라이트를, 봉인 시작은 입력할 수 없을 때 대기 스프라이트를 표시한다.
+
 ## Supplied nodes
 
 | Node | Design | Scope |

@@ -9,7 +9,7 @@ namespace C6Lab
     /// Presentation-only replay of the final hit, shown three times from different angles before a story result. It
     /// draws the live, completed gourd at the Host's recorded poses (render-only, see
     /// <see cref="LabHangingTarget.SetPresentationPose"/>), a physics-free ghost orb on the recorded flight, and its own
-    /// camera with letterbox bars over a hidden battle HUD. It never changes global time, hits, paint, stats, the
+    /// camera and an overlay over the hidden battle HUD. It never changes global time, hits, paint, stats, the
     /// battle camera's pose or any network state. A new tap skips it on this device only.
     /// </summary>
     [DisallowMultipleComponent]
@@ -72,7 +72,7 @@ namespace C6Lab
         }
 
         /// <summary>Starts the replay. False (nothing changed) when the record or the battle references are missing.</summary>
-        public bool Begin(LabFinishReplayShot shot)
+        public bool Begin(LabFinishReplayShot shot, System.Action<RectTransform, int> buildCaption = null)
         {
             if (Running || Complete) return Running;
             if (shot == null || !shot.IsValid() || Network == null || Network.target == null || Network.config == null
@@ -98,7 +98,7 @@ namespace C6Lab
 
             BuildCamera(battle);
             HideBattleView(battle);
-            BuildOverlay();
+            BuildOverlay(buildCaption);
             effectRoot = new GameObject("Final hit replay · effects").transform;
             UnityEngine.SceneManagement.SceneManager.MoveGameObjectToScene(effectRoot.gameObject, gameObject.scene);
             replayVfx = LabFiveElementVfx.CreateManual(effectRoot);
@@ -417,11 +417,14 @@ namespace C6Lab
         private void UpdateOverlay(int pass, float passElapsed)
         {
             if (overlay == null) return;
-            float bars = Mathf.Clamp01(Elapsed / LetterboxSeconds);
-            bars = bars * bars * (3f - 2f * bars);
-            float height = ((RectTransform)overlay.transform).rect.height * LetterboxShare * bars;
-            topBar.sizeDelta = new Vector2(0f, height);
-            bottomBar.sizeDelta = new Vector2(0f, height);
+            if (topBar != null && bottomBar != null)
+            {
+                float bars = Mathf.Clamp01(Elapsed / LetterboxSeconds);
+                bars = bars * bars * (3f - 2f * bars);
+                float height = ((RectTransform)overlay.transform).rect.height * LetterboxShare * bars;
+                topBar.sizeDelta = new Vector2(0f, height);
+                bottomBar.sizeDelta = new Vector2(0f, height);
+            }
             float cut = pass > 0 ? 1f - Mathf.Clamp01(passElapsed / LabFinishReplayTimeline.CutFlashSeconds) : 0f;
             flash.color = new Color(1f, 1f, 1f, .35f * cut);
             flash.enabled = cut > 0f;
@@ -460,29 +463,38 @@ namespace C6Lab
             }
         }
 
-        private void BuildOverlay()
+        private void BuildOverlay(System.Action<RectTransform, int> buildCaption)
         {
-            Font font = null;
-            foreach (Canvas canvas in hiddenCanvases) { font = LabGuideText.FontOf(canvas); if (font != null) break; }
-            if (font == null) font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            var root = new GameObject("Final hit replay · letterbox", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler));
+            var root = new GameObject("Final hit replay · overlay", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler));
             overlay = root.GetComponent<Canvas>();
             overlay.renderMode = RenderMode.ScreenSpaceOverlay;
             overlay.overrideSorting = true;
             overlay.sortingOrder = OverlaySortingOrder;
             var scaler = root.GetComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(390f, 844f);
-            scaler.matchWidthOrHeight = .5f;
-            topBar = Bar("Top Bar", root.transform, 1f);
-            bottomBar = Bar("Bottom Bar", root.transform, 0f);
+            scaler.referenceResolution = buildCaption == null ? new Vector2(390f, 844f) : new Vector2(402f, 874f);
+            scaler.matchWidthOrHeight = buildCaption == null ? .5f : 1f;
+            if (buildCaption == null)
+            {
+                topBar = Bar("Top Bar", root.transform, 1f);
+                bottomBar = Bar("Bottom Bar", root.transform, 0f);
+            }
             flash = Stretch("Cut Flash", root.transform).gameObject.AddComponent<Image>();
             flash.raycastTarget = false;
             flash.color = Color.clear;
-            var caption = Stretch("Caption", bottomBar);
+            var caption = Stretch("Caption", bottomBar != null ? bottomBar : root.transform);
             captionGroup = caption.gameObject.AddComponent<CanvasGroup>();
             captionGroup.alpha = 0f;
             captionGroup.blocksRaycasts = false;
+            if (buildCaption != null)
+            {
+                buildCaption(caption, Shot.Slot);
+                return;
+            }
+
+            Font font = null;
+            foreach (Canvas canvas in hiddenCanvases) { font = LabGuideText.FontOf(canvas); if (font != null) break; }
+            if (font == null) font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             string who = Shot.Slot > 0 ? "P" + Shot.Slot + " 마지막 일격" : "마지막 일격";
             Label(caption, "Who", font, who, 20, TextAnchor.MiddleLeft, new Color(1f, .93f, .78f, 1f));
             Label(caption, "Skip Hint", font, "탭하여 건너뛰기", 13, TextAnchor.MiddleRight, new Color(1f, 1f, 1f, .7f));

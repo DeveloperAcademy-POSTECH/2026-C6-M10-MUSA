@@ -27,6 +27,30 @@ namespace Hapio
         public int AppliedStage => appliedStage;
         public GameBattleUiTheme Theme => theme;
 
+        internal static void BuildFinishReplayCaption(RectTransform caption, int playerSlot)
+        {
+            var replayTheme = Resources.Load<GameBattleUiTheme>(GameBattleUiTheme.ResourcePath);
+            Font bold = replayTheme != null && replayTheme.bold != null
+                ? replayTheme.bold : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            var page = GameViewerHelpUi.Design(caption, "Final Hit Design");
+            // Figma 4813:9429. TextColor/DarkIvory/100 and TextColor/GreenGray/700.
+            Color title = new Color32(247, 242, 237, 255);
+            Color hint = new Color32(66, 67, 58, 255);
+            if (playerSlot > 0)
+                AddReplayLabel(page, "Player", "P" + playerSlot, bold, title, 50, 79, 55);
+            AddReplayLabel(page, "Final Hit", "마지막 일격!", bold, title, 50, playerSlot > 0 ? 139 : 79, 55);
+            AddReplayLabel(page, "Skip Hint", "눌러서 건너뛰시오.", bold, hint, 20, 762, 22);
+        }
+
+        private static void AddReplayLabel(Transform page, string name, string caption, Font font,
+            Color color, int size, float y, float height)
+        {
+            // Keep the mobile typography sharp at the same logical size.
+            var label = GameViewerHelpUi.Label(page, name, caption, font, size * 2,
+                color, 63, y, 552, height * 2);
+            label.rectTransform.localScale = Vector3.one * .5f;
+        }
+
         public void Bind(GameBattleBindings target, GameSession owner)
         {
             bindings = target; session = owner;
