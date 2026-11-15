@@ -207,7 +207,7 @@
 
 ## #507 박 모델 계약
 
-- 스테이지 박은 `GameStageDefinition.gourdVisualResource`(Resources 경로, 비면 흰 박)를 `GameBattleBindings.MountStageGourd`가 `LabGourdPaint.PrepareVisual`로 `Attach`보다 먼저 지정한다. 2:2·Lab 단판·튜토리얼(#477)은 흰 박이다. 프리팹 직접 참조로 바꾸지 않는다.
+- 스테이지 박은 `GameStageDefinition.gourdVisualResource`(Resources 경로, 비면 흰 박)를 `GameBattleBindings.MountStageGourd`가 `LabGourdPaint.PrepareVisual`로 `Attach`보다 먼저 지정한다. Lab 단판·튜토리얼(#477)은 흰 박이고, 땅따먹기는 #762부터 2스테이지(야광귀) 박이다(아래 #762 절). 프리팹 직접 참조로 바꾸지 않는다.
 - `LabGourdVisualRig`가 없는 프리팹(흰 박)은 기존 경로를 글자 그대로 탄다. 흰 박의 마운트·판정·칠·요괴 자세는 `Assets/Lab/Tests/PlayMode/Golden/`의 main 기록과 같아야 하며, 골든은 흰 박이 바뀌는 의도된 변경에서만 `GOURD_GOLDEN_RECORD=1`로 다시 기록한다. 계약 검사 실패는 `C6_GOURD_RIG_FALLBACK`과 함께 흰 박으로 돌아간다. 상세는 `docs/GOURD_MODELS.md`.
 - 세 스테이지 모두 `gourdVisualResource = Hapio/Gourds/Stage0N_<요괴>_Battle`(구미호·야광귀·지귀 박)이며 판정·도색·요괴 반응·완성/결과/PNG까지 이 박을 쓴다. 경로는 굽기 도구만 설정하고 `GameStageAssets.EnsureAssets`는 건드리지 않는다. 아트 원본 프리팹은 고치지 않고 `Hapio > Gourds > Bake All Stage Gourds`(`GameGourdRigBaker`, 스테이지별 메뉴도 있음)로만 다시 굽는다. 미리보기 덧씌우기(`GameGourdModelPreview`·`GourdPreview` 리소스)는 삭제했으며 재생성하지 않는다.
 - #526: 2스테이지 굽기 원본은 경량 `Yagwanggwi_Gourd_100K_GameReady`(`Spec.SourceVariant`, 전투 박 71,011삼각형)다. 원본 FBX·GameReady는 보존하고, 다른 경량 재출력도 같은 방식으로 새 GameReady를 추가해 굽는다.
@@ -421,7 +421,7 @@
 
 ## 스토리 스테이지 박 크기
 
-- 1~3스테이지 박과 판정 껍데기는 Gourd Visual Size(DEV 140) 값에 더해 `LabGourdVisualRig.StageSizeMultiplier` 1.4배로 그린다(실제 화면 시안으로 승인). `LabGourdPaint`가 rig 기준 크기를 이 값으로 나눠 쓰므로 rig가 없는 흰 박(튜토리얼·2:2·Lab)과 그 골든은 바뀌지 않는다. 다시 굽지 않으며 프리팹의 `referenceVisualSize` 1.4도 그대로다.
+- 1~3스테이지 박과 판정 껍데기는 Gourd Visual Size(DEV 140) 값에 더해 `LabGourdVisualRig.StageSizeMultiplier` 1.4배로 그린다(실제 화면 시안으로 승인). `LabGourdPaint`가 rig 기준 크기를 이 값으로 나눠 쓰므로 rig가 없는 흰 박(튜토리얼·Lab)과 그 골든은 바뀌지 않는다. 다시 굽지 않으며 프리팹의 `referenceVisualSize` 1.4도 그대로다.
 - 박은 줄 쪽 기준점을 유지한 채 아래로 커진다. 정지 자세의 실제 바닥은 땅 위지만 줄 흔들림의 아래쪽에서는 잠깐 땅과 겹칠 수 있다.
 - 당시 호환 묶음은 설정259개·5697·`C6PhysicsLab/58`·**`C6HapioGame/47`**였다(현재 기준은 아래 #647 절). 판정 모양이 달라져 Game46 이하 앱과 혼용하지 않는다.
 - #595 지귀 연기 흐름(round.smoke / round.common)으로 호환 묶음이 설정259개·**5698**·`C6PhysicsLab/59`·**`C6HapioGame/48`**이 됐다(현재 기준은 아래 #647 절). 5697 이하 앱과 혼용하지 않는다.
@@ -481,7 +481,7 @@
 - `GameResultHold`의 기본값만 쓴다(검사만 줄인다). 방장: 자기 결과 보고부터 30초 안에 결과를 보고하지 않은 참여자가 있으면 중간 StageResult는 전원 GameOver, Completed는 그 사람을 빼고 진행, 재도전 대기 패배는 재도전만 끝낸다. 다른 참여자가 막고 있으면 45초에 대기 제목으로 이유(이야기·봉인 박·미준비)를 알리고 120초에 시작을 연다.
 - 각 기기: 그만두기 확인 팝업과 봉인 박 둘러보기는 터치 없이 60초가 지나면 기존 취소/닫기로 닫는다(준비 유지). 이야기 읽기는 자동으로 넘기지 않는다.
 - 구성원이 결과 화면(StageResult·Completed·재도전 대기 패배)을 떠날 때 `exit`을 보내고 0.5초 동안 연결을 유지하며 한 번 더 보낸다. 방장은 Completed의 `exit`은 그 사람을 결과 계산에서 빼고, 재도전 대기의 `exit`은 재도전을 끝낸다. 강제 퇴장(kick)은 하지 않는다.
-- 현재 접속 묶음은 설정265개·**5704**/`C6PhysicsLab/62`/**`C6HapioGame/55`**다. Game54 이하와 혼용하지 않는다. 상세는 docs/STAGE_STORY_UI_INTEGRATION.md·docs/GAME_FLOW.md, 실행 검사는 docs/VALIDATION.md를 따른다.
+- 이 변경 당시 접속 묶음은 설정265개·**5704**/`C6PhysicsLab/62`/**`C6HapioGame/55`**였다(현재 기준은 아래 #762 절). Game54 이하와 혼용하지 않는다. 상세는 docs/STAGE_STORY_UI_INTEGRATION.md·docs/GAME_FLOW.md, 실행 검사는 docs/VALIDATION.md를 따른다.
 
 
 ## #706 야광귀 3인 시연 빌드
@@ -518,3 +518,8 @@
 - Stage2 Only Home에는 야광귀 카드 없이 A/B 방 입장 버튼만 표시한다. 현재 #767처럼 선택 전부터 인원수를 검색하고, 그룹 선택 시 기존 방에 입장하거나 방이 없으면 명시적 생성 확인을 거친다. 등록 후 후보를 재확인하며 이름 충돌 패자는 자기 후보만 정리하고 기존 방을 기다린다. 광고·전투 형식은 유지하며, 정확히3명·P1~P3·설정 준비 뒤 방장이 수동 시작한다. 기존 3카드 시연은 그룹 선택 뒤 스테이지를 고른다.
 - 광고 이름·TXT·검색 후보·생성자 입장·Host 승인·재연결 모두 그룹과 스테이지를 함께 확인한다. 같은 그룹 만석·전투 중은 기존 차단을 유지하고 다른 그룹의 생성·입장을 막지 않는다. 다른 그룹으로 자동 이동하거나 만석을 피해 그룹을 추가 생성하지 않는다.
 - 그룹은 앱 실행 중 Home·QR·재도전·Host 부재 복구에도 보존하며 연결 종료가 끝난 Home에서만 바꾼다. 앱 재실행은 미선택이다. 시연 전용 호환은 Staff revision3이며 그룹 없는 revision2와 혼용하지 않는다. 일반5705/Game55/Lab 통신·공유 설정은 유지한다. 상세 사용법·Scene 흐름은 `docs/STAFF_STAGE_DEMO.md`를 따른다.
+
+## #762 땅따먹기 야광귀 박
+
+- 땅따먹기(1:1·2:2·3:3)는 `GameSession.GourdStageDefinition`이 배경과 같은 2스테이지를 돌려줘 `GameBattleBindings.MountStageGourd`가 `Stage02_Yagwanggwi_Battle`을 붙인다. 박 모양·판정 껍데기·스토리 박 크기 1.4배만 빌리고 땅따먹기 규칙·값·청홍 칠·이름은 그대로다. 클레이·수채는 쓰지 않고 몸통·뚜껑에 고해상도 청홍 칠을 바로 그린다. 튜토리얼·Lab 단판은 흰 박이다.
+- 판정 껍데기와 크기가 바뀌어 현재 호환 묶음은 설정265개·5705·`C6PhysicsLab/62`·**`C6HapioGame/56`**다. 흰 박으로 땅따먹기를 판정하는 Game55 이하 앱과 혼용하지 않는다. 실행한 검사는 `docs/VALIDATION.md`만 따른다.

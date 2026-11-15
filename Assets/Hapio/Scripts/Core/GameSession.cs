@@ -109,6 +109,13 @@ namespace Hapio
             ?? (network.IsDeveloperSolo ? 1 : network.TargetParticipantCount)) : string.Empty;
         public GameStageDefinition CurrentStageDefinition => state.mode == GameMode.Story
             && state.stageIndex >= 1 && state.stageIndex <= 3 ? stageCatalog.Get(state.stageIndex) : null;
+        /// <summary>
+        /// #762: the stage whose gourd model this battle mounts. A story stage mounts its own; the territory match mounts the
+        /// 야광귀 gourd, the same stage as its background (GameStageBackgrounds.TerritoryArtStage). Null keeps the white gourd.
+        /// Only the gourd's look comes from it: the territory's rules, values and stage label stay its own.
+        /// </summary>
+        public GameStageDefinition GourdStageDefinition => IsTerritory
+            ? stageCatalog.Get(GameStageBackgrounds.TerritoryArtStage) : CurrentStageDefinition;
         public LabSnapshot ResultSnapshot { get; private set; }
         /// <summary>이번 판에서 깬 스테이지들의 결과 (스테이지 순서). ALL STAGES CLEAR 화면의 전체 대시보드가 쓴다.</summary>
         public IReadOnlyList<LabResultStage> StageResults => new List<LabResultStage>(stageResults.Values);
