@@ -92,7 +92,12 @@ namespace Hapio.Tests
             yield return Click(view.enterButton);
             Assert.That(session.RoomBrowserVisible, Is.True);
             Assert.That(view.browserPage.activeInHierarchy, Is.True);
+            Assert.That(view.CreationCapacity, Is.Zero);
+            foreach (var chip in view.countButtons)
+                Assert.That(chip.GetComponent<GameFigmaButton>().artwork.SurfaceName, Is.EqualTo("Chip"));
+            AssertTouchable(view.refreshButton);
             yield return Click(view.countButtons[0]);
+            Assert.That(view.countButtons[0].GetComponent<GameFigmaButton>().artwork.SurfaceName, Is.EqualTo("ChipPressed"));
             Assert.That(view.CreationCapacity, Is.EqualTo(2));
             Assert.That(session.Network.TargetParticipantCount, Is.EqualTo(2));
             yield return Click(view.directConnectionButton);
