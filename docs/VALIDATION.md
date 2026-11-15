@@ -8964,3 +8964,14 @@ PR #729 검증 중 main `a7208003`에서 `LabLocalBoardNetworkIntegrationTests` 
 - **화면 근거:** 로컬 검증 산출물 `retry-lobby-host/guest2/guest3.png`, `host-retry-lobby-host/guest2/guest3.png`에 저장했다. 원시 로그·XML·스크린샷·검증 사본·빌드는 커밋하지 않는다.
 - **미실행:** iOS 내보내기/설치·물리 기기 LAN/핫스팟, 실제 Mac Host 프로세스 종료 후 새 Host 생성, 실제 5초 승인 무응답 복구. 끊긴 Guest의 같은 Host 재입장은 실제 로컬 패킷 통합 검사로 확인했으며 별도 Guest 앱 강제 종료 시험과 구분한다.
 - **보존 확인:** 일반 Story 정상 실패 재도전·모든 기존 PlayMode 포함 전체 통과. 저장 Scene/Prefab/Material/설정/패키지 수정 없음. 사용법은 `docs/STAFF_STAGE_DEMO.md`의 #740 절을 따른다.
+
+## 2026-11-15 — #741 VFX 실험실 고도화 (기믹별 예보 / 진행 / 파훼 / 보상 / 처벌), 콤보 한지 하트, 지귀 물 폭포 다시 그림
+
+- **기준:** `feat/#741-vfx-lab-upgrade` (main `306b6053` 위, PR #744로 main `7584f4a8`에 머지). 이 기록은 머지 뒤 `docs/#741-validation-record`로 따로 올린다. 접속 규약 / DEV 설정 수 / 게임 규칙은 바꾸지 않았다. 실험실은 Editor 창과 Host 전용 `VfxLab*` 함수만 쓰고, 화면 쪽은 콤보 하트 / 다음 칸 투명도 / 물 폭포 그림만 바뀌었다.
+- **실행:** Unity Test Runner, 전체 EditMode Run All / 전체 PlayMode Run All (팀원 Mac).
+  - 첫 EditMode: 2478개 중 **7개 실패**. `LabOrbSpriteDesignTests.SavedConfigConnectsEachKindToItsOriginalArt` 5개(Fire / Water / Wood / Metal / Earth)와 `GameBattleUiAssetTests` 2개. 원인은 이 브랜치 코드가 아니라 에디터 상태였다. 전투 화면(`GameBattleUiPresentation`)이 LabConfig에 저장하지 않는 구슬 그림 덮어쓰기(`BattleOrbAppearance`)를 걸고, 이 프로젝트는 Play 때 도메인을 다시 불러오지 않아 Play를 멈춘 뒤에도 그 값이 LabConfig 에셋에 남았다. 저장된 `LabConfig.asset`은 `LabOrbAppearance`를 그대로 가리킨다.
+  - 고친 것: `LabConfig`에 Editor 전용 `playModeStateChanged` 훅을 넣어 Edit 모드로 돌아올 때 덮어쓰기를 지운다. 팀원 코드는 바꾸지 않았다.
+  - 재실행: VFX 실험실로 Play했다 멈춘 뒤(실패 상황 재현) 전체 EditMode / 전체 PlayMode **실패 0**.
+- **새 / 바뀐 검사:** `LabVfxLabTests`에 SMALL 바로 끝내기, 잠긴 박 폭탄 바로 터뜨리기, 연기 / 부적 골라 예고 없이 시작(다른 종류 차례면 한 칸 건너뜀), 콤보 예고 없이 시작 4개. `LabComboProjectileIntegrationTests`는 다음 칸 투명도 기대값을 .85로.
+- **눈으로 확인:** VFX 실험실에서 2R 콤보 하트(한지 붉은 하트, 먹물 깨짐, 크기), 다음 색 칸이 보이는지, 3R 물 폭포(배경 먹선 구름 + 수채 물줄기, 박을 덜 가림, 가운데 물보라 그림 삭제)를 팀원이 확인했다.
+- **미실행:** 여러 기기 실제 네트워크, iPhone 실기기, 아트팀 녹화(이 PR 뒤 `docs/VFX_LAB.md` 표대로).
