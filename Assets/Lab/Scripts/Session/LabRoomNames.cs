@@ -62,10 +62,10 @@ namespace C6Lab
         public static string Display(string name)
         {
             if (TryNumber(name, out int number)) return "수장고-" + number.ToString(CultureInfo.InvariantCulture);
-            // The fixed staff name carries the demo revision and protocol only for Bonjour; players see the stage.
+            // Grouped staff names keep their stage/revision/protocol for discovery only.
             if (TryStaffRoom(name, out int stage, out int group))
-                return (group == 0 ? "수장고-" : (group == 1 ? "A그룹 · " : "B그룹 · "))
-                    + stage.ToString(CultureInfo.InvariantCulture) + "스테이지 " + StaffStageYokai[stage - 1];
+                return group == 1 ? "A그룹" : group == 2 ? "B그룹"
+                    : "수장고-" + stage.ToString(CultureInfo.InvariantCulture) + "스테이지 " + StaffStageYokai[stage - 1];
             if (string.IsNullOrWhiteSpace(name)) return "방 이름 확인 중";
             // Preserve compatibility with already-running versions on the same LAN.
             if (name.StartsWith("C6Lab-", StringComparison.Ordinal)) return "수장고-" + name.Substring(6);

@@ -90,7 +90,7 @@ namespace Hapio
                 int stage = staffRetryEntryStage, group = staffRetryEntryGroup;
                 staffRetryEntryStage = staffRetryEntryGroup = 0;
                 SelectedDemoGroup = group;
-                SelectDemoStage(stage);
+                SelectDemoStageForStaffRetry(stage);
                 return;
             }
             if (staffRetryRequested)

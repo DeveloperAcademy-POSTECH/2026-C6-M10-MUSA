@@ -240,10 +240,12 @@ namespace Hapio
             UpdateLoading();
             UpdateCloudCover();
             // The browse that resumes behind the title after a game must not keep the phone awake there (#476).
-            network.RoomSearchKeepsAwake = roomBrowserVisible;
+            network.RoomSearchKeepsAwake = roomBrowserVisible || LabGameBuildVariant.IsStaffStageDemo
+                && state.phase == GameFlowPhase.Home && !goingHome;
             pendingRooms.Tick(out string pendingError);
             if (!string.IsNullOrEmpty(pendingError)) { UiNotice = pendingError; Changed?.Invoke(); }
             UpdateRoomCreation();
+            UpdateDemoRoomOverview();
             UpdateDemoEntry();
             while (controls.Count > 0) ApplyControl(controls.Dequeue());
             UpdateStaffDemoRetry();
