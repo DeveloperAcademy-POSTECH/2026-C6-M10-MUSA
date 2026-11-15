@@ -1392,6 +1392,12 @@ namespace Hapio.Tests
             yield return Until(() => session.IsViewerOpen && screen.viewerPanel.activeInHierarchy,
                 "The team result must open the same owned gourd preview.");
             Assert.That(screen.viewerImage.texture, Is.SameAs(preview));
+            yield return null;
+            var gourdViewer = screen.viewerPanel.GetComponent<GameSealedGourdView>();
+            var gourdArt = Resources.Load<GameSealedGourdArt>("Hapio/UI/SealedGourdArt");
+            Assert.That(gourdViewer.background.texture, Is.SameAs(gourdArt.stageBackgrounds[1]));
+            Assert.That(screen.resetViewerButton.GetComponentInChildren<GameFigmaSurface>().SurfaceName,
+                Is.EqualTo("GourdResetLight"));
             Assert.That(JsonUtility.ToJson(session.ResultSnapshot), Is.EqualTo(result));
             screen.closeViewerButton.onClick.Invoke();
             yield return Until(() => !session.IsViewerOpen && !screen.viewerPanel.activeSelf, "Closing the preview restores the team result.");
@@ -2118,6 +2124,10 @@ namespace Hapio.Tests
                         "The back of the seal card exposes its inspect button.");
                     Assert.That(session.IsViewerOpen, Is.False, "Inspection starts from the result card.");
                     Assert.That(story.screen.viewerPanel.activeInHierarchy, Is.False);
+                    var inspectArt = inspect.GetComponent<GameFigmaButton>();
+                    Assert.That(inspectArt, Is.Not.Null, "The authored rounded background needs the Figma brush.");
+                    Assert.That(inspectArt.artwork.SurfaceName, Is.EqualTo("ResultAction"));
+                    Assert.That(inspectArt.artwork.isActiveAndEnabled, Is.True);
                     yield return ClickVisibleButtonWithMouse(mouse, inspect);
                     GameScreen screen = story.screen;
                     Assert.That(session.IsViewerOpen && screen.viewerPanel.activeInHierarchy, Is.True, "Stage " + stage);
@@ -2132,8 +2142,8 @@ namespace Hapio.Tests
                     Assert.That(screen.resetViewerButton.gameObject.activeInHierarchy, Is.True);
                     Assert.That(screen.closeViewerButton.gameObject.activeInHierarchy, Is.True);
                     var close = screen.closeViewerButton;
-                    Assert.That(((RectTransform)screen.resetViewerButton.transform).anchoredPosition.y, Is.EqualTo(-698f));
-                    Assert.That(((RectTransform)close.transform).anchoredPosition.y, Is.EqualTo(-755f));
+                    Assert.That(((RectTransform)screen.resetViewerButton.transform).anchoredPosition, Is.EqualTo(new Vector2(326f, -49f)));
+                    Assert.That(((RectTransform)close.transform).anchoredPosition, Is.EqualTo(new Vector2(84f, -741f)));
                     var surface = close.GetComponentInChildren<GameFigmaSurface>();
                     Assert.That(surface, Is.Not.Null, "The return button shows the Figma brush surface.");
                     Assert.That(surface.SurfaceName, Is.EqualTo("ResultAction"));
@@ -2145,6 +2155,14 @@ namespace Hapio.Tests
                     var hint = screen.viewerPanel.GetComponentsInChildren<UnityEngine.UI.Text>()
                         .Single(text => text.name == "Rotate Hint");
                     Assert.That(hint.color, Is.EqualTo(GameBattleUiColors.SecondaryLightIvory800));
+                    Assert.That(hint.text, Is.EqualTo("봉인이 잘 되었는지 둘러보시오."));
+                    var resetArt = screen.resetViewerButton.GetComponentInChildren<GameFigmaSurface>();
+                    Assert.That(resetArt.SurfaceName, Is.EqualTo(stage == 1 ? "GourdResetDark" : "GourdResetLight"));
+                    var rotationArt = viewer.design.GetComponentsInChildren<GameFigmaSurface>()
+                        .Single(item => item.SurfaceName.StartsWith("GourdRotate"));
+                    Assert.That(rotationArt.SurfaceName, Is.EqualTo(stage == 1 ? "GourdRotateDark" : "GourdRotateLight"));
+                    Assert.That(rotationArt.raycastTarget, Is.False);
+                    Assert.That(rotationArt.rectTransform.anchoredPosition, Is.EqualTo(new Vector2(271f, -180f)));
                     var preview = (LabGourdResultPreview)typeof(GameSession).GetField("preview",
                         BindingFlags.Instance | BindingFlags.NonPublic).GetValue(session);
                     Quaternion initialRotation = preview.ModelRotation;

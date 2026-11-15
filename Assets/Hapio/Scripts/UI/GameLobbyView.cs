@@ -77,7 +77,7 @@ namespace Hapio
         private int[] storyLocalLabelFontSizes;
         // 기본 모드(요괴 봉인)를 열 수 있는 가장 적은 인원 (#394). 2명은 땅따먹기 1:1만 연다.
         private const int StoryMinimumPlayers = 3;
-        private int creationCapacity = 3;
+        private int creationCapacity;
         // 3:3 (#394): the team page on screen, 0 = Blue (P1~P3), 1 = Red (P4~P6); it follows the local seat when that changes.
         private int teamPage, pageSeat = -1;
         private string localError = string.Empty;
@@ -382,7 +382,6 @@ namespace Hapio
 
         private void RefreshBrowser()
         {
-            if (LabGameBuildVariant.IsDemo) creationCapacity = 3;
             bool canChoose = Network.CanChooseConnection && !session.IsCreatingRoom;
             createButton.interactable = canChoose && (modePanel != null || creationCapacity >= 2);
             // The mode card can also be closed without SetModes (Home hidden for the opening); the button comes back then too.
@@ -398,7 +397,6 @@ namespace Hapio
                 countButtons[i].gameObject.SetActive(!LabGameBuildVariant.IsDemo || i + 2 == 3);
                 countButtons[i].interactable = canChoose && (!LabGameBuildVariant.IsDemo || i + 2 == 3);
                 countButtons[i].targetGraphic.color = selected ? ColorOf("D5BEA5") : new Color(232f/255f, 210f/255f, 185f/255f, .7f);
-                countButtons[i].GetComponentInChildren<UnityEngine.UI.Text>().color = ColorOf("312B23");
             }
             RoomRow[] rooms = session.PendingRooms.Select(room => new RoomRow
                 { key = room.Key, name = room.Name, port = room.Port, participants = 1, capacity = room.Capacity,

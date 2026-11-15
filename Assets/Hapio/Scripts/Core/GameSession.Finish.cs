@@ -174,7 +174,7 @@ namespace Hapio
             if (finishCommitted && ready && network.TryGetGameServerTime(out double now) && now >= finishStartsAt)
             {
                 // A device that cannot start the replay falls back to the fixed effect on its own screen.
-                if (ReplayPlaying && !finishReplay.Running && !finishReplay.Complete && !finishReplay.Begin(replayShot))
+                if (ReplayPlaying && !finishReplay.Running && !finishReplay.Complete && !finishReplay.Begin(replayShot, GameBattleUiPresentation.BuildFinishReplayCaption))
                     replayShot = null;
                 if (ReplayPlaying) finishReplay.Sample(now - finishStartsAt);
                 else

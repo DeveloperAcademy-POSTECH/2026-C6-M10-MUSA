@@ -49,6 +49,13 @@ namespace Hapio.Tests
             view.helpButton.onClick.Invoke();yield return null;
             Object.FindFirstObjectByType<GameBattleBindings>().hud.pauseButton.onClick.Invoke();yield return null;
             Assert.That(session.Network.IsBattlePaused,Is.True);
+            var hud = Object.FindFirstObjectByType<GameBattleBindings>().hud;
+            var pauseView = hud.pauseMenu.GetComponent<GamePauseView>();
+            foreach (var action in new[] { hud.returnLobbyButton, pauseView.restartButton })
+            {
+                Assert.That(action.targetGraphic, Is.TypeOf<GameFigmaSurface>());
+                Assert.That(((GameFigmaSurface)action.targetGraphic).SurfaceName, Is.EqualTo("PauseAction"));
+            }
             Assert.That(view.IsOpen,Is.False,"Shared pause takes precedence over local help.");
             Assert.That(C6Lab.LabOrbBoard.ExternalModalOpen,Is.False);
 

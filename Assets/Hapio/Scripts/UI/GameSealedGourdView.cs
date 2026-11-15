@@ -12,8 +12,7 @@ namespace Hapio
 
         public RectTransform design;
         public RawImage background;
-        // TextColor/DarkRed/400
-        private static readonly Color ResetFill = new Color(.75054085f, .42286396f, .37500101f);
+        private GameFigmaSurface resetArtwork, rotateArtwork;
         private GameSealedGourdArt art;
         private GameScreen screen;
         private RawImage shadow;
@@ -51,10 +50,12 @@ namespace Hapio
             shadow.enabled = false;
             design=GameViewerHelpUi.Design(transform,"Sealed Gourd Design");
             viewport.SetParent(design,false);GameViewerHelpUi.Place(viewport,0,128,402,414);
-            GameViewerHelpUi.Label(design, "Rotate Hint", "회전해서 박을 확인하시오,", theme.bold,
-                20, GameBattleUiColors.SecondaryLightIvory800, 63, 647, 276, 30);
-            BuildButton(screen.resetViewerButton, "박 리셋", theme.medium, 698f, false);
-            BuildButton(screen.closeViewerButton, "결과로 돌아가기", theme.medium, 755f, true);
+            AddViewerLabel(design, "Rotate Hint", "봉인이 잘 되었는지 둘러보시오.", theme.bold,
+                GameBattleUiColors.SecondaryLightIvory800, 63, 693, 276, 22);
+            rotateArtwork = GameViewerHelpUi.Surface(design, "GourdRotateDark", 271, 180, 67.992f, 67.992f);
+            PrepareButton(screen.resetViewerButton, 326, 49, 39, 38);
+            resetArtwork = GameViewerHelpUi.Surface(screen.resetViewerButton.transform, "GourdResetDark", 0, 0, 39, 38);
+            BuildReturnButton(screen.closeViewerButton, theme.medium);
             ApplyStage(1);
         }
         private void OnEnable()
@@ -63,35 +64,43 @@ namespace Hapio
             RefreshReturnBackground(true);
         }
 
-        private void BuildButton(Button button, string caption, Font font, float y, bool primary)
+        private void PrepareButton(Button button, float x, float y, float width, float height)
         {
             button.transform.SetParent(design, false);
-            GameViewerHelpUi.Place((RectTransform)button.transform, 84, y, 234, 45);
+            GameViewerHelpUi.Place((RectTransform)button.transform, x, y, width, height);
             foreach (Transform child in button.transform) child.gameObject.SetActive(false);
 
             button.transition = Selectable.Transition.None;
             button.targetGraphic.enabled = true;
             button.targetGraphic.color = Color.clear;
             button.targetGraphic.raycastTarget = true;
-            var fill = GameViewerHelpUi.Rect(button.transform, "Button Fill", 0, 0, 234, 45)
-                .gameObject.AddComponent<LabRoundedGraphic>();
-            fill.color = primary ? GameLobbySeatColors.Versus : ResetFill;
-            fill.raycastTarget = false;
-            if (primary)
-            {
-                // Keep an image-independent background ready before selecting the artwork.
-                returnFill = fill;
-                returnArtwork = GameViewerHelpUi.Surface(button.transform, "ResultAction", 0, 0, 234, 45);
-                RefreshReturnBackground(true);
-            }
+        }
 
-            GameViewerHelpUi.Label(button.transform, "Label", caption, font, 20,
+        private void BuildReturnButton(Button button, Font font)
+        {
+            PrepareButton(button, 84, 741, 234, 45);
+            returnFill = GameViewerHelpUi.Rect(button.transform, "Button Fill", 0, 0, 234, 45)
+                .gameObject.AddComponent<LabRoundedGraphic>();
+            returnFill.color = GameLobbySeatColors.Versus;
+            returnFill.raycastTarget = false;
+            returnArtwork = GameViewerHelpUi.Surface(button.transform, "ResultAction", 0, 0, 234, 45);
+            GameHudButtonArtwork.Attach(button, returnArtwork, "ResultAction", "ResultActionPressed");
+            RefreshReturnBackground(true);
+            AddViewerLabel(button.transform, "Label", "결과로 돌아가기", font,
                 GameLobbySeatColors.LightText, 0, 0, 234, 45);
+        }
+
+        private static void AddViewerLabel(Transform parent, string name, string caption, Font font,
+            Color color, float x, float y, float width, float height)
+        {
+            // Rasterize the dynamic font at twice the size while retaining the 20-unit layout.
+            var label = GameViewerHelpUi.Label(parent, name, caption, font, 40, color, x, y, width * 2, height * 2);
+            label.rectTransform.localScale = Vector3.one * .5f;
         }
         private void RefreshReturnBackground(bool force = false)
         {
             if (returnFill == null || returnArtwork == null) return;
-            var source = GameFigmaStrokeLibrary.Find("ResultAction");
+            var source = GameFigmaStrokeLibrary.Find(returnArtwork.SurfaceName);
             var sprite = source?.sprite;
             Texture texture = sprite != null ? sprite.texture : null;
             if (force || !object.ReferenceEquals(returnSource, source)
@@ -111,6 +120,9 @@ namespace Hapio
             stage = Mathf.Clamp(value, 1, ShadowFloorCenterY.Length);
             int index = stage - 1;
             background.texture = art.stageBackgrounds[index];
+            bool bright = stage == 1;
+            resetArtwork.Show(bright ? "GourdResetDark" : "GourdResetLight");
+            rotateArtwork.Show(bright ? "GourdRotateDark" : "GourdRotateLight");
             coverAspect = -1f;
         }
         private float coverAspect = -1f;

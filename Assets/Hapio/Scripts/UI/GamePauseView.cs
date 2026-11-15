@@ -14,6 +14,26 @@ namespace Hapio
             restartButton.onClick.AddListener(Restart);
         }
 
+        internal void ApplyArt(UnityEngine.UI.Button leaveButton)
+        {
+            ApplyActionArt(leaveButton);
+            ApplyActionArt(restartButton);
+        }
+
+        private static void ApplyActionArt(UnityEngine.UI.Button button)
+        {
+            if (button == null || !(button.targetGraphic is UnityEngine.UI.Image original)) return;
+            var sprite = GameFigmaStrokeLibrary.Find("PauseAction")?.sprite;
+            if (sprite == null || sprite.texture == null) return;
+            var surface = GameViewerHelpUi.Surface(button.transform, "PauseAction", 0, 0, 147, 48);
+            GameViewerHelpUi.Stretch(surface.rectTransform);
+            surface.transform.SetAsFirstSibling();
+            surface.color = original.color;
+            surface.raycastTarget = original.raycastTarget;
+            button.targetGraphic = surface;
+            original.enabled = false;
+        }
+
         private void Restart()
         {
             if (session.RestartPausedBattle()) restartButton.interactable = false;
