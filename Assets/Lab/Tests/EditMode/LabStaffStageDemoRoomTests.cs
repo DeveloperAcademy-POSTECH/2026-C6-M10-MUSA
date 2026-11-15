@@ -17,15 +17,15 @@ namespace C6Lab.Tests
             using (LabGameBuildVariant.OverrideStaffStageDemoForTests(true))
             {
                 string protocol = LabBonjourDiscovery.ProtocolFor(LabRoomFamily.Game);
-                byte[] record = LabRoomPresence.Encode(protocol, true, true, 1, 3, false, true, false, stage);
+                byte[] record = LabRoomPresence.Encode(protocol, true, true, 1, 3, false, true, false, stage, 1);
                 Assert.That(LabRoomPresence.TryDecode(record, protocol, out bool v4, out bool v6,
-                    out int count, out int capacity, out bool playing, out bool waiting, out bool team, out int decoded), Is.True);
-                Assert.That((v4, v6, count, capacity, playing, waiting, team, decoded),
-                    Is.EqualTo((true, true, 1, 3, false, true, false, stage)));
-                string name = LabPendingRoom.StaffStageName(stage);
+                    out int count, out int capacity, out bool playing, out bool waiting, out bool team, out int decoded, out int group), Is.True);
+                Assert.That((v4, v6, count, capacity, playing, waiting, team, decoded, group),
+                    Is.EqualTo((true, true, 1, 3, false, true, false, stage, 1)));
+                string name = LabPendingRoom.StaffStageName(stage, 1);
                 var routes = new[] {
-                    new LabBonjourTarget("192.0.2.1", 7777, 4, name, 2, 3, false, false, false, stage),
-                    new LabBonjourTarget("2001:db8::1", 7777, 4, name, 2, 3, false, false, false, stage)
+                    new LabBonjourTarget("192.0.2.1", 7777, 4, name, 2, 3, false, false, false, stage, 1),
+                    new LabBonjourTarget("2001:db8::1", 7777, 4, name, 2, 3, false, false, false, stage, 1)
                 };
                 var rooms = LabRoomCatalog.GroupTargets(routes);
                 Assert.That(rooms.Count, Is.EqualTo(1));
@@ -74,9 +74,9 @@ namespace C6Lab.Tests
                     byte[][] tokens = new byte[3][];
                     for (int stage = 1; stage <= 3; stage++)
                     {
-                        Assert.That(network.SetDemoStageIdentity(stage), Is.True);
+                        Assert.That(network.SetDemoStageIdentity(stage, 1), Is.True);
                         tokens[stage - 1] = Token(network);
-                        Assert.That(Encoding.ASCII.GetString(tokens[stage - 1]), Is.EqualTo("C6HapioStaffDemo/2/S" + stage));
+                        Assert.That(Encoding.ASCII.GetString(tokens[stage - 1]), Is.EqualTo("C6HapioStaffDemo/3/S" + stage + "/G1"));
                     }
                     Assert.That(tokens.Select(Encoding.ASCII.GetString).Distinct().Count(), Is.EqualTo(3));
                     Assert.That(tokens.All(value => !value.SequenceEqual(normal)), Is.True);
@@ -121,6 +121,84 @@ namespace C6Lab.Tests
                     Assert.That(pending.RetryPending, Is.False);
                 }
                 finally { pending.Dispose(); }
+            }
+        }
+
+        [TestCase("s=2")] [TestCase("g=1")] [TestCase("s=2;g=0")] [TestCase("s=2;g=3")]
+        [TestCase("s=2;g=01")] [TestCase("s=2;g=1;g=2")] [TestCase("g=1;s=2")]
+        [TestCase("s=2;g=1;t=1")] [TestCase("t=1;s=2;g=1")]
+        public void MissingOrMalformedGroupCannotBecomeAStaffCandidate(string suffix)
+        {
+            string protocol = "C6-HAPIO-STAFF-3-5705";
+            byte[] bytes = Encoding.UTF8.GetBytes("p=" + protocol + ";f=46;n=1;c=3;b=0;" + suffix);
+            byte[] record = new byte[bytes.Length + 1]; record[0] = (byte)bytes.Length;
+            Buffer.BlockCopy(bytes, 0, record, 1, bytes.Length);
+            Assert.That(LabRoomPresence.TryDecode(record, protocol, out _, out _, out _, out _, out _, out _, out _, out _, out _), Is.False);
+        }
+
+        [Test]
+        public void GroupIdentitySurvivesDualStackCatalogAndConflictingRoutesAreNotJoinable()
+        {
+            string a = LabPendingRoom.StaffStageName(2, 1), b = LabPendingRoom.StaffStageName(2, 2);
+            var targets = new[] {
+                new LabBonjourTarget("192.0.2.1", 7001, 4, a, 3, 3, true, false, false, 2, 1),
+                new LabBonjourTarget("2001:db8::1", 7001, 4, a, 3, 3, true, false, false, 2, 1),
+                new LabBonjourTarget("192.0.2.2", 7002, 4, b, 1, 3, false, false, false, 2, 2)
+            };
+            var rooms = LabRoomCatalog.GroupTargets(targets);
+            Assert.That(rooms.Count, Is.EqualTo(2));
+            Assert.That(rooms.Select(room => room.DemoGroupId), Is.EquivalentTo(new[] { 1, 2 }));
+            Assert.That(LabRoomCatalog.RoutesForRoom(targets, LabRoomCatalog.Key(a, 7001)).Length, Is.EqualTo(2));
+            var conflicting = new[] { targets[0], new LabBonjourTarget("2001:db8::1", 7001, 4, a, 1, 3, false, false, false, 2, 2) };
+            Assert.That(LabRoomCatalog.GroupTargets(conflicting), Is.Empty, "A single name/port cannot be both groups.");
+            Assert.That(LabRoomCatalog.RoutesForRoom(conflicting, LabRoomCatalog.Key(a, 7001)), Is.Empty);
+        }
+
+        [Test]
+        public void StaffGroupSelectionIsExplicitAndChangingItRetiresPriorRoomTicketsAndRoutes()
+        {
+            var go = new GameObject("staff group identity");
+            try
+            {
+                var network = go.AddComponent<LabNetwork>();
+                network.SetGameFlowEnabled(true);
+                using (LabGameBuildVariant.OverrideStaffStageDemoForTests(true))
+                {
+                    Assert.That(network.SetDemoStageIdentity(2), Is.False, "Unselected never silently means group A.");
+                    Assert.That(network.SetDemoStageIdentity(2, 0), Is.False);
+                    Assert.That(network.SetDemoStageIdentity(0, 1), Is.False);
+                    Assert.That(network.SetDemoStageIdentity(2, 1), Is.True);
+                    byte[] a = Token(network);
+                    typeof(LabNetwork).GetField("rejoinTicket", Private).SetValue(network, "old-group-ticket");
+                    typeof(LabNetwork).GetField("rejoinTicketAdmitted", Private).SetValue(network, true);
+                    var routes = (System.Collections.Generic.List<string>)typeof(LabNetwork).GetField("joinCandidates", Private).GetValue(network);
+                    routes.Add("192.0.2.1");
+                    Assert.That(network.SetDemoStageIdentity(2, 2), Is.True);
+                    Assert.That(Token(network), Is.Not.EqualTo(a));
+                    Assert.That(Encoding.ASCII.GetString(Token(network)), Is.EqualTo("C6HapioStaffDemo/3/S2/G2"));
+                    Assert.That(typeof(LabNetwork).GetField("rejoinTicket", Private).GetValue(network), Is.Null);
+                    Assert.That(routes, Is.Empty);
+                    Assert.That(network.DemoGroupId, Is.EqualTo(2));
+                    Assert.That(network.SetDemoStageIdentity(0), Is.True);
+                    Assert.That((network.DemoStageIndex, network.DemoGroupId), Is.EqualTo((0, 0)));
+                }
+            }
+            finally { UnityEngine.Object.DestroyImmediate(go); }
+        }
+
+        [TestCase(1)] [TestCase(2)]
+        public void GroupedStaffNameAndPresenceMustAgreeBeforeNativeRoutesAreAccepted(int group)
+        {
+            using (LabGameBuildVariant.OverrideStaffStageDemoForTests(true))
+            using (var discovery = new LabBonjourDiscovery(LabRoomFamily.Game))
+            {
+                MethodInfo accepts = typeof(LabBonjourDiscovery).GetMethod("AcceptsDemoStage", Private);
+                string name = LabPendingRoom.StaffStageName(2, group);
+                Assert.That(accepts.Invoke(discovery, new object[] { name, 2, group }), Is.True);
+                Assert.That(accepts.Invoke(discovery, new object[] { name, 2, 3 - group }), Is.False);
+                Assert.That(accepts.Invoke(discovery, new object[] { name, 1, group }), Is.False);
+                Assert.That(accepts.Invoke(discovery, new object[] { "Hapio-Staff-2-5705-Stage-2", 2, group }), Is.False);
+                Assert.That(accepts.Invoke(discovery, new object[] { name, 0, 0 }), Is.False);
             }
         }
 
