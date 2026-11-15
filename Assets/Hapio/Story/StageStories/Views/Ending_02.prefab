@@ -702,6 +702,7 @@ GameObject:
   m_Component:
   - component: {fileID: 6415586698364472954}
   - component: {fileID: 1835297937788357182}
+  - component: {fileID: 5229303809397207800}
   m_Layer: 0
   m_Name: Ending_02
   m_TagString: Untagged
@@ -770,8 +771,8 @@ MonoBehaviour:
   waitForEntrance: 0
   autoContinueAfterSeconds: 0
   exitCloudWipe: {fileID: 0}
-  music: {fileID: 8300000, guid: 7fbd5585167f44b0db25f415f8309a4a, type: 3}
-  musicVolume: 0.075
+  music: {fileID: 8300000, guid: de69ef7066a54834bb04ac38f27bbfc7, type: 3}
+  musicVolume: 0.2
   hideEmptyDialogue: 1
   sourceFigmaNumber: 0
   sourceFigmaNodeId: 4210:3333
@@ -1521,3 +1522,21 @@ MonoBehaviour:
   startHeight: 1
   idleAmplitude: {x: 0, y: 0}
   idlePeriod: 6
+--- !u!114 &5229303809397207800
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6243470944750378743}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c364b1ed5d3b40c58f269e8e79defe83, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Hapio.Runtime::Hapio.StoryCutSound
+  entries:
+  - clip: {fileID: 0}
+    delay: 0.2
+    volume: 0.8
+    stopMusic: 1
+    stopSeconds: 0.7

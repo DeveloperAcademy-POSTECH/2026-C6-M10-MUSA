@@ -1192,8 +1192,8 @@ MonoBehaviour:
   waitForEntrance: 0
   autoContinueAfterSeconds: 0
   exitCloudWipe: {fileID: 0}
-  music: {fileID: 8300000, guid: 7fbd5585167f44b0db25f415f8309a4a, type: 3}
-  musicVolume: 0.32
+  music: {fileID: 8300000, guid: de69ef7066a54834bb04ac38f27bbfc7, type: 3}
+  musicVolume: 0.2
   hideEmptyDialogue: 1
   sourceFigmaNumber: 0
   sourceFigmaNodeId: 4210:3318
