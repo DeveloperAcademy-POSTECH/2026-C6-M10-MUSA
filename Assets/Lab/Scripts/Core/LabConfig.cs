@@ -1675,6 +1675,21 @@ namespace C6Lab
         public LabOrbAppearance OrbAppearance => orbPresentationOverride != null ? orbPresentationOverride : orbAppearance;
         /// <summary>Local art override only; never serialized into the source asset or shared numeric settings.</summary>
         public void SetOrbPresentationOverride(LabOrbAppearance value) => orbPresentationOverride = value;
+#if UNITY_EDITOR
+        /// <summary>
+        /// Play를 멈추면 화면용 구슬 그림 덮어쓰기를 지운다. 이 프로젝트는 Play 때 도메인을 다시 불러오지 않아서(Enter Play Mode
+        /// Options), 지우지 않으면 전투가 덮어쓴 Hapio 그림이 LabConfig 에셋에 남아 Edit Mode 검사가 원래 그림 대신 그것을 본다.
+        /// </summary>
+        [UnityEditor.InitializeOnLoadMethod]
+        private static void ClearOrbPresentationOverridesAfterPlay()
+        {
+            UnityEditor.EditorApplication.playModeStateChanged += state =>
+            {
+                if (state != UnityEditor.PlayModeStateChange.EnteredEditMode) return;
+                foreach (LabConfig config in Resources.FindObjectsOfTypeAll<LabConfig>()) config.orbPresentationOverride = null;
+            };
+        }
+#endif
         /// <summary>DEV 소리 크기의 기본값. 이 값이면 Inspector 값을 그대로 쓴다.</summary>
         public const float DevVolumeDefault = 50f;
 
