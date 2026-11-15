@@ -130,6 +130,15 @@ namespace C6Lab.Editor
                             "알림을 그릴 화면을 찾지 못함");
                 }
             }
+            // #745: 남은 30초부터 빨라지는 라운드 곡 (음높이 그대로 1.15배)
+            LabBattleBgm bgm = ready ? Object.FindFirstObjectByType<LabBattleBgm>() : null;
+            using (new EditorGUI.DisabledScope(bgm == null))
+                if (GUILayout.Button("알림 + 빨라진 BGM 10초 듣기 (음높이 그대로 " + LabBattleBgm.RushSpeed + "배)", GUILayout.Height(26)))
+                {
+                    if (hud != null) hud.PreviewNow();
+                    Report(bgm.PreviewRush(10f), "10초 동안 라운드 곡을 빠르게 튼다. 실제 게임은 남은 30초부터 피버까지.",
+                        "빨라진 곡이 없음 (구미호 / 야광귀 / 지귀 전투에서만, 피버 중에는 안 됨)");
+                }
             if (ready && network.config != null)
                 EditorGUILayout.LabelField("실제 게임에서 쓰는 소리: " + (network.config.ThirtySecondsLeftSound == LabThirtySecondsLeftSound.Drum ? "북"
                     : network.config.ThirtySecondsLeftSound == LabThirtySecondsLeftSound.GongThenDrum ? "징 다음 북" : "징")
