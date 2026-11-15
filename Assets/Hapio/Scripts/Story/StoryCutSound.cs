@@ -7,7 +7,7 @@ namespace Hapio
     /// <summary>
     /// #757 컷 하나에 덧붙이는 효과음 목록 (데이터만). 컷 View 프리팹 맨 위에 붙이고, StoryCutSoundDriver가 그 컷이 시작된 뒤
     /// delay초에 한 번씩 낸다. stopMusic을 켜면 그 순간 이야기 배경음악을 테이프가 멈추듯 느려지며 끊는다(소리 파일은 없어도 된다).
-    /// SFX 실험실(Hapio > SFX 실험실)에서 고치고 듣는다.
+    /// 엔딩 SFX 창(Hapio > 엔딩 SFX)에서 고치고 듣는다.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class StoryCutSound : MonoBehaviour

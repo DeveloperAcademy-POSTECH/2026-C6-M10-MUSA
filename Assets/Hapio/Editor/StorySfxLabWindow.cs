@@ -6,7 +6,7 @@ using UnityEngine;
 namespace Hapio.Editor
 {
     /// <summary>
-    /// #757 SFX 실험실: 엔딩 이야기를 컷 단위로 바로 띄우고, 컷마다 배경음악 / 대사 음성 / 그림 효과음 / 덧붙인 효과음(StoryCutSound)을
+    /// #757 엔딩 SFX 창: 엔딩 이야기를 컷 단위로 바로 띄우고, 컷마다 배경음악 / 대사 음성 / 그림 효과음 / 덧붙인 효과음(StoryCutSound)을
     /// 바꿔 끼워 바로 듣는다. 고친 값은 컷 에셋과 View 프리팹에 바로 들어가고 "저장"으로 디스크에 쓴다(실제 게임 엔딩도 같은 에셋을 쓴다).
     /// </summary>
     public sealed class StorySfxLabWindow : EditorWindow
@@ -15,8 +15,8 @@ namespace Hapio.Editor
         private int selected;
         private Vector2 scroll;
 
-        [MenuItem("Hapio/SFX 실험실")]
-        public static void Open() => GetWindow<StorySfxLabWindow>("SFX 실험실");
+        [MenuItem("Hapio/엔딩 SFX")]
+        public static void Open() => GetWindow<StorySfxLabWindow>("엔딩 SFX");
 
         private void OnInspectorUpdate() { if (EditorApplication.isPlaying) Repaint(); }
 
