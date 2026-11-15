@@ -64,6 +64,7 @@ namespace Hapio.Tests
                     player.Next();
                     Assert.That(player.CurrentCutIndex, Is.EqualTo(first + 2));
                     Assert.That(player.CurrentView, Is.Not.SameAs(view));
+                    player.AdvanceTime(.6f); // Outgoing artwork remains only for the short dissolve.
                     yield return null;
                     Assert.That(player.cutHost.GetComponentsInChildren<StoryCutView>(), Has.Length.EqualTo(1));
                 }

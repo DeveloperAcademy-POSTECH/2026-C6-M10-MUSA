@@ -23,6 +23,15 @@ namespace Hapio
         Vector3 scale;
         Quaternion rotation;
         Image sigh;
+        Vector2 carriedPosition;
+        Quaternion carriedRotation = Quaternion.identity;
+
+        public void CarryDropPose(OpeningLayerMotion source)
+        {
+            Sample(0);
+            carriedPosition = (Vector2)(rect.parent.InverseTransformPoint(source.transform.position) - rect.localPosition);
+            carriedRotation = Quaternion.Inverse(rect.parent.rotation * rotation) * source.transform.rotation;
+        }
         public void Sample(float elapsed)
         {
             if (rect == null)
@@ -67,8 +76,8 @@ namespace Hapio
                 case Kind.Drop:
                     group.alpha = 1;
                     float fall = t * t;
-                    rect.anchoredPosition = rest + travel * fall;
-                    rect.localRotation = rotation * Quaternion.Euler(0, 0, angle * fall);
+                    rect.anchoredPosition = rest + travel * fall + carriedPosition * (1 - fall);
+                    rect.localRotation = rotation * Quaternion.Slerp(carriedRotation, Quaternion.Euler(0, 0, angle), fall);
                     // Stay fully visible until contact; exchange intact/shattered artwork on the ground.
                     if(fadeAtEnd) group.alpha *= 1 - Mathf.SmoothStep(0,1,Mathf.Clamp01((age-seconds)/ImpactFadeSeconds));
                     break;

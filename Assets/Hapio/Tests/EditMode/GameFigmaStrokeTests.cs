@@ -22,7 +22,8 @@ namespace Hapio.Tests
                 Assert.That(draw.xMin, Is.LessThan(logical.xMin));
                 Assert.That(draw.width, Is.EqualTo(295*scale).Within(.001f));
             }
-            foreach (string key in new[] {"Start","Create","Chip","ChipSelected","RoomDark","RoomDarkPressed","RoomLight","RoomLightPressed","Mode","ModeDisabled","SealWait","SealReady","Time","Pause","Paint","TeamPaint","Stamina","StaminaCells"})
+            foreach (string key in new[] {"Start","Create","Chip","ChipSelected","RoomDark","RoomDarkPressed","RoomLight","RoomLightPressed","Mode","ModeDisabled","SealWait","SealReady","Time","Pause","Paint","TeamPaint","Stamina","StaminaCells",
+                "StartPressed","CreatePressed","ChipPressed","ModePressed","SealReadyPressed","ResultActionPressed","ClosePressed","Refresh","RefreshPressed"})
             {
                 var surface = GameFigmaStrokeLibrary.Find(key);
                 Assert.That(surface?.sprite, Is.Not.Null, key);
@@ -42,7 +43,7 @@ namespace Hapio.Tests
                 var oldBounds = ((RectTransform)view.enterButton.transform).rect;
                 GameFigmaButton.Apply(view); GameFigmaButton.Apply(view);
                 var parts = root.GetComponentsInChildren<GameFigmaButton>(true);
-                Assert.That(parts.Length, Is.EqualTo(11));
+                Assert.That(parts.Length, Is.EqualTo(12));
                 foreach (var part in parts)
                 {
                     Assert.That(part.button.targetGraphic, Is.SameAs(part.original));
@@ -51,7 +52,14 @@ namespace Hapio.Tests
                     Assert.That(part.GetComponentsInChildren<GameFigmaSurface>(true).Length, Is.EqualTo(1));
                 }
                 Assert.That(((RectTransform)view.enterButton.transform).rect, Is.EqualTo(oldBounds));
+                var refresh = view.refreshButton.GetComponent<GameFigmaButton>();
+                Assert.That(refresh.artwork.SurfaceName, Is.EqualTo("Refresh"));
+                Assert.That(((RectTransform)refresh.transform).rect.size, Is.EqualTo(new Vector2(39, 38)));
+                Assert.That(refresh.transform.Find("Label").gameObject.activeSelf, Is.False);
+                Assert.That(refresh.transform.Find("RefreshGlyph").gameObject.activeSelf, Is.False);
                 var room = view.roomTemplate.GetComponent<GameFigmaButton>();
+                for (Transform node = room.transform; node != null; node = node.parent)
+                    node.gameObject.SetActive(true);
                 room.button.interactable = true; room.original.color = new Color(1,1,1,.5f); room.Refresh();
                 Assert.That(room.artwork.SurfaceName, Is.EqualTo("RoomDark"));
                 room.OnPointerDown(new PointerEventData(null) {button=PointerEventData.InputButton.Left});
@@ -64,6 +72,47 @@ namespace Hapio.Tests
                 Assert.That(room.artwork.SurfaceName, Is.EqualTo("RoomLight"));
             }
             finally { PrefabUtility.UnloadPrefabContents(root); }
+        }
+
+        [TestCase("Start", "Start", "StartPressed", "Start")]
+        [TestCase("Create", "Create", "CreatePressed", "Create")]
+        [TestCase("Refresh", "Refresh", "RefreshPressed", "Refresh")]
+        [TestCase("Chip", "Chip", "ChipPressed", "Chip")]
+        [TestCase("Mode", "Mode", "ModePressed", "ModeDisabled")]
+        [TestCase("Seal", "SealReady", "SealReadyPressed", "SealWait")]
+        [TestCase("ResultAction", "ResultAction", "ResultActionPressed", "ResultAction")]
+        public void HeldButtonRestoresArtworkOnExitReleaseAndDisable(string kind, string normal, string pressed, string disabled)
+        {
+            var root = new GameObject(kind, typeof(RectTransform), typeof(Image), typeof(Button));
+            try
+            {
+                var button = root.GetComponent<Button>();
+                button.targetGraphic = root.GetComponent<Image>();
+                button.targetGraphic.color = new Color(1, 1, 1, .7f);
+                GameFigmaButton.Attach(button, kind);
+                var surface = root.GetComponent<GameFigmaButton>();
+                var pointer = new PointerEventData(null) { button = PointerEventData.InputButton.Left, pointerId = 1 };
+                Assert.That(surface.artwork.SurfaceName, Is.EqualTo(normal));
+
+                surface.OnPointerDown(pointer);
+                Assert.That(surface.artwork.SurfaceName, Is.EqualTo(pressed));
+                surface.OnPointerExit(pointer);
+                Assert.That(surface.artwork.SurfaceName, Is.EqualTo(normal));
+                surface.OnPointerEnter(pointer);
+                Assert.That(surface.artwork.SurfaceName, Is.EqualTo(pressed));
+                surface.OnPointerUp(pointer);
+                Assert.That(surface.artwork.SurfaceName, Is.EqualTo(normal));
+
+                surface.OnPointerDown(pointer);
+                button.interactable = false;
+                surface.Refresh();
+                Assert.That(surface.artwork.SurfaceName, Is.EqualTo(disabled));
+                surface.OnPointerDown(pointer);
+                button.interactable = true;
+                surface.Refresh();
+                Assert.That(surface.artwork.SurfaceName, Is.EqualTo(normal));
+            }
+            finally { Object.DestroyImmediate(root); }
         }
 
         [Test]

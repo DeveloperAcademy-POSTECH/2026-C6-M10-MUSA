@@ -20,8 +20,8 @@ namespace Hapio.Editor
     /// <summary>Explicit demo exports; saved scene lists, defines and normal player identity remain unchanged.</summary>
     public static class GameDemoBuild
     {
-        public const string ProductName = "Hapio Staff Demo";
-        public const string StageTwoProductName = "Hapio Stage 2 Demo";
+        public const string ProductName = ShowcaseBranding.ProductName;
+        public const string StageTwoProductName = ShowcaseBranding.ProductName;
         public const string DemoVersion = "0.2.0";
         public const string DemoBuildNumber = "2";
         private const string LastOutput = "Hapio.LastStaffStageDemoBuild";
@@ -110,6 +110,7 @@ namespace Hapio.Editor
             }
             if (AssetDatabase.LoadAssetAtPath<LabConfig>("Assets/Lab/Resources/LabConfig.asset") == null)
                 throw new InvalidOperationException("The saved LabConfig is required; the demo never creates tuning defaults.");
+            ShowcaseBranding.Validate();
             StaffDemoUiAssets.Validate();
             StaffStageDemoStoryAssets.Validate();
         }
@@ -137,9 +138,9 @@ namespace Hapio.Editor
                 + "-" + Guid.NewGuid().ToString("N").Substring(0, 8) + (development ? "-qa" : "-release");
             string project = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
             string folder = Path.Combine(project, "Builds", stageTwoOnly ? "HapioStage2Demo" : "HapioDemo", run);
-            string appName = stageTwoOnly ? "Hapio-Stage2-Demo" : "Hapio-Staff-Demo";
+            string appName = ShowcaseBranding.ProductName;
             string output = Path.Combine(folder, target == BuildTarget.iOS ? "iOS"
-                : "macOS/" + appName + (development ? "-QA.app" : ".app"));
+                : "macOS/" + appName + ".app");
             if (Directory.Exists(folder) || File.Exists(folder))
                 throw new InvalidOperationException("The demo output already exists: " + folder);
             BuildManifest manifest = stageTwoOnly ? CreateStageTwoManifest(target, development, identifier, run, project)
@@ -162,7 +163,12 @@ namespace Hapio.Editor
                 manifest.totalErrors = report == null ? -1 : (int)report.summary.totalErrors;
                 if (report == null || report.summary.result != BuildResult.Succeeded)
                     throw new InvalidOperationException("HAPIO_DEMO_BUILD_FAILED result=" + manifest.result + " output=" + output);
-                if (stageTwoOnly && target == BuildTarget.StandaloneOSX) VerifyStageTwoMacSignature(output);
+                if (target == BuildTarget.StandaloneOSX)
+                {
+                    NormalizeMacExecutable(output);
+                    VerifyMacSignature(output);
+                }
+                else NormalizeIosExecutable(output);
                 ValidateOutputIdentityFor(target, output, identifier, stageTwoOnly ? StageTwoProductName : ProductName);
                 manifest.identityVerified = true;
                 SessionState.SetString(stageTwoOnly ? LastStageTwoOutput : LastOutput, folder);
@@ -203,7 +209,7 @@ namespace Hapio.Editor
                     PlayerSettings.iOS.buildNumber = DemoBuildNumber;
                     PlayerSettings.iOS.applicationDisplayName = product;
                 }
-                action();
+                ShowcaseBranding.WithTemporarySettings(target, action);
             }
             finally
             {
@@ -393,14 +399,50 @@ namespace Hapio.Editor
                     .Groups["identifier"].Value.Trim() == expected);
         }
 
-        // Verify the local demo before reporting success. Preserve valid signatures, repair only
-        // an invalid Stage2 Mac bundle, and leave iOS signing to Xcode.
-        private static void VerifyStageTwoMacSignature(string output)
+        // Xcode derives the executable and product folder from this variable. DisplayName stays Korean.
+        private static void NormalizeIosExecutable(string output)
+        {
+            string project = Path.Combine(output, "Unity-iPhone.xcodeproj", "project.pbxproj");
+            string original = File.ReadAllText(project);
+            const string pattern = @"\bPRODUCT_NAME_APP\s*=\s*[^;\r\n]+;";
+            if (!Regex.IsMatch(original, pattern))
+                throw new InvalidOperationException("The iOS project has no application product-name setting.");
+            string updated = Regex.Replace(original, pattern, "PRODUCT_NAME_APP = " + ShowcaseBranding.ExecutableName + ";");
+            if (updated != original) File.WriteAllText(project, updated);
+        }
+
+        // macOS codesign can recurse indefinitely resolving a Hangul executable filename.
+        // Keep the user-facing bundle/product name, but give the executable a stable ASCII name.
+        private static void NormalizeMacExecutable(string output)
+        {
+            string plist = Path.Combine(output, "Contents", "Info.plist");
+            XDocument document = XDocument.Load(plist);
+            XElement key = document.Root?.Element("dict")?.Elements("key")
+                .FirstOrDefault(element => element.Value == "CFBundleExecutable");
+            XElement value = key?.ElementsAfterSelf().FirstOrDefault();
+            string previous = value?.Value;
+            if (string.IsNullOrEmpty(previous) || previous == "." || previous == ".."
+                || previous.IndexOfAny(new[] { '/', '\\' }) >= 0)
+                throw new InvalidOperationException("The Mac bundle executable name is invalid.");
+            const string executable = ShowcaseBranding.ExecutableName;
+            string folder = Path.Combine(output, "Contents", "MacOS");
+            string source = Path.Combine(folder, previous);
+            string destination = Path.Combine(folder, executable);
+            if (!File.Exists(source)) throw new FileNotFoundException("The Mac bundle executable is missing.", source);
+            if (previous == executable) return;
+            if (File.Exists(destination)) throw new IOException("The showcase executable destination already exists.");
+            File.Move(source, destination);
+            value.Value = executable;
+            document.Save(plist);
+        }
+
+        // Preserve valid signatures, repair only an invalid local Mac bundle; iOS signing belongs to Xcode.
+        private static void VerifyMacSignature(string output)
         {
             if (RunCodeSign("--verify --deep --strict", output, out _)) return;
             if (!RunCodeSign("--force --deep --sign -", output, out string repair)
                 || !RunCodeSign("--verify --deep --strict", output, out repair))
-                throw new InvalidOperationException("The Stage2 Mac app signature could not be verified: " + repair);
+                throw new InvalidOperationException("The showcase Mac app signature could not be verified: " + repair);
         }
 
         private static bool RunCodeSign(string options, string output, out string error)
@@ -410,7 +452,8 @@ namespace Hapio.Editor
                 process.StartInfo = new System.Diagnostics.ProcessStartInfo("/usr/bin/codesign",
                     options + " \"" + output.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"")
                 {
-                    UseShellExecute = false, RedirectStandardError = true, CreateNoWindow = true
+                    UseShellExecute = false, RedirectStandardError = true, CreateNoWindow = true,
+                    StandardErrorEncoding = Encoding.UTF8
                 };
                 process.Start();
                 error = process.StandardError.ReadToEnd();

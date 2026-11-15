@@ -158,6 +158,55 @@ namespace Hapio.Tests
             Assert.That(LabGameBuildVariant.IsStaffStageTwoOnly, Is.False);
         }
 
+        [UnityTest, Category("Bonjour")]
+        public IEnumerator SavedCreationConfirmationBlocksUnderlyingChoicesAndCancelDoesNotOpenAHost()
+        {
+            Assert.That(session.SelectDemoGroup(1), Is.True);
+            Assert.That(session.SelectDemoStage(2), Is.True);
+            // This test owns the rendered confirmation, not Bonjour's absence timing. The entry
+            // tests cover reaching this phase from actual missing-room searches independently.
+            FieldInfo phase = typeof(GameSession).GetField("demoEntryPhase", BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.That(phase, Is.Not.Null);
+            phase.SetValue(session, Enum.Parse(phase.FieldType, "AwaitingCreationConfirmation"));
+            selector.SendMessage("LateUpdate", SendMessageOptions.RequireReceiver);
+            yield return null;
+            Canvas.ForceUpdateCanvases();
+
+            Assert.That(selector.creationConfirmation.activeInHierarchy, Is.True);
+            Assert.That(selector.creationConfirmationMessage.text, Is.EqualTo(session.DemoCreationConfirmationMessage));
+            Assert.That(selector.creationConfirmationMessage.text, Does.Contain("A그룹"));
+            Assert.That(selector.stageButtons.All(button => !button.interactable), Is.True);
+            Assert.That(selector.groupButtons.All(button => !button.interactable), Is.True);
+            Assert.That(selector.backButton.gameObject.activeInHierarchy, Is.False);
+            AssertRaycastAccess(selector.confirmCreationButton);
+            AssertRaycastAccess(selector.cancelCreationButton);
+
+            var backgroundChoice = (RectTransform)selector.stageButtons[0].transform;
+            Canvas canvas = backgroundChoice.GetComponentInParent<Canvas>().rootCanvas;
+            Camera camera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
+            Vector2 position = RectTransformUtility.WorldToScreenPoint(camera, backgroundChoice.TransformPoint(backgroundChoice.rect.center));
+            var hits = new List<RaycastResult>();
+            EventSystem.current.RaycastAll(new PointerEventData(EventSystem.current) { position = position }, hits);
+            Assert.That(hits, Is.Not.Empty);
+            Assert.That(hits[0].gameObject.transform.IsChildOf(selector.creationConfirmation.transform)
+                || hits[0].gameObject == selector.creationConfirmation, Is.True,
+                "The full-screen confirmation owns pointer input above every underlying selector.");
+            selector.stageButtons[2].onClick.Invoke();
+            selector.groupButtons[1].onClick.Invoke();
+            Assert.That(session.SelectedDemoStage, Is.EqualTo(2));
+            Assert.That(session.SelectedDemoGroup, Is.EqualTo(1));
+
+            selector.cancelCreationButton.onClick.Invoke();
+            Assert.That(session.IsDemoCreationConfirmationPending || session.IsDemoEntryPending, Is.False);
+            Assert.That(selector.creationConfirmation.activeSelf, Is.False);
+            Assert.That(session.PendingRooms, Is.Empty);
+            Assert.That(session.Network.IsHost || session.Network.IsConnected || session.Network.IsJoiningRoom, Is.False);
+            Assert.That(session.SelectedDemoGroup, Is.EqualTo(1));
+            Assert.That(selector.stageButtons.All(button => button.interactable), Is.True);
+            selector.confirmCreationButton.onClick.Invoke();
+            Assert.That(session.IsDemoEntryPending, Is.False, "A hidden confirmation cannot start a delayed extra operation.");
+        }
+
         private static void AssertRaycastAccess(UnityEngine.UI.Button button)
         {
             Assert.That(button.gameObject.activeInHierarchy && button.interactable, Is.True);
@@ -309,7 +358,8 @@ namespace Hapio.Tests
                 yield return null;
                 Assert.That(session.IsDemoEntryPending || session.IsCreatingRoom, Is.False);
                 Assert.That(session.PendingRooms, Is.Empty);
-                Assert.That(session.Network.IsConnected || session.Network.IsJoiningRoom || session.Network.IsSearchingRooms, Is.False);
+                Assert.That(session.Network.IsConnected || session.Network.IsJoiningRoom, Is.False,
+                    "Cancelling admission never starts a Host or Join; Home may resume its read-only room overview.");
                 Assert.That(selector.stageButtons.All(button => button.interactable), Is.True);
                 Assert.That(selector.backButton.gameObject.activeInHierarchy, Is.False);
                 Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.Home));

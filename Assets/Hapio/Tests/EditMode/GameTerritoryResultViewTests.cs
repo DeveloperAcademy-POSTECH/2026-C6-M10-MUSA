@@ -68,6 +68,20 @@ namespace Hapio.Tests
         }
 
         [Test]
+        public void BothWinnerScreensKeepTheOriginalRasterDimensions()
+        {
+            var paper = view.table.background.texture;
+            var cloud = view.table.design.Find("CloudBottom").GetComponent<UnityEngine.UI.RawImage>().texture;
+            var blue = view.blueDecoration.transform.Find("Left").GetComponent<UnityEngine.UI.RawImage>().texture;
+            var red = view.redDecoration.transform.Find("Left").GetComponent<UnityEngine.UI.RawImage>().texture;
+
+            Assert.That(new Vector2Int(paper.width, paper.height), Is.EqualTo(new Vector2Int(693, 1024)));
+            Assert.That(new Vector2Int(cloud.width, cloud.height), Is.EqualTo(new Vector2Int(2172, 724)));
+            Assert.That(new Vector2Int(blue.width, blue.height), Is.EqualTo(new Vector2Int(1254, 1254)));
+            Assert.That(red, Is.SameAs(blue));
+        }
+
+        [Test]
         public void WaitingResultClearsWinnerAndAllArtworkIsLocal()
         {
             view.Present(new LabSnapshot { teamWinner = LabTeam.Red, paintCellCount = 100, redCells = 70 }, 7);

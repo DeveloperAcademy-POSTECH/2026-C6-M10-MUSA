@@ -120,7 +120,7 @@ GameOver에서 전투 발행을 동결해도, 마지막 결과 발행 당시 Bul
 | 2 야광귀 | 기존 색상 콤보·셈법·섬광, 화면별 이벤트 차례/휴식 | 박 폭탄·좌우 전달 막기 (공용 기믹 묶음) | 공통 박 내부 검은 요괴, 스테이지명과 패턴으로 구분 |
 | 3 지귀 | 소화 도전·생성 화상 자동 추첨, 기존 DEV 수동 발동 유지 | 박 폭탄·좌우 전달 막기 (공용 기믹 묶음) | 공통 박 내부 검은 요괴, 스테이지명·불길로 구분 |
 
-세 스테이지는 `gourdVisualResource`로 구운 각자의 박(`Resources/Hapio/Gourds/Stage01_Gumiho_Battle`·`Stage02_Yagwanggwi_Battle`·`Stage03_Jigwi_Battle`)을 칠·판정·요괴 반응·완성/결과까지 정식으로 쓴다(#507, [박 모델](GOURD_MODELS.md)). #297의 공통 WhiteGourd 검은 요괴는 Lab 단판과 2:2 땅따먹기에 남는다. 스테이지별 모델 override는 비워 두며 `GameStageAssets.EnsureAssets`도 구미호 모델을 다시 연결하지 않는다. 요괴별 이름·능력·DEV 값은 StageDefinition으로 유지한다. 공통 WhiteGourd의 도색 메시·충돌체·밧줄·회전·완성 박 관람은 그대로 사용한다. 구미호 원본 에셋은 보존하며 기본 게임의 외형 교체에는 사용하지 않는다.
+세 스테이지는 `gourdVisualResource`로 구운 각자의 박(`Resources/Hapio/Gourds/Stage01_Gumiho_Battle`·`Stage02_Yagwanggwi_Battle`·`Stage03_Jigwi_Battle`)을 칠·판정·요괴 반응·완성/결과까지 정식으로 쓴다(#507, [박 모델](GOURD_MODELS.md)). #297의 공통 WhiteGourd 검은 요괴는 Lab 단판과 튜토리얼에 남는다. 땅따먹기는 #762부터 2스테이지 야광귀 박을 쓴다. 스테이지별 모델 override는 비워 두며 `GameStageAssets.EnsureAssets`도 구미호 모델을 다시 연결하지 않는다. 요괴별 이름·능력·DEV 값은 StageDefinition으로 유지한다. 공통 WhiteGourd의 도색 메시·충돌체·밧줄·회전·완성 박 관람은 그대로 사용한다. 구미호 원본 에셋은 보존하며 기본 게임의 외형 교체에는 사용하지 않는다.
 
 Home/Lobby DEV의 `공통 / 구미호 / 야광귀 / 지귀`에서 해당 값만 편집한다. 공통은 시간·개인HP·구슬·물리·도색·폭탄 무게·막기 시간 등 모든 스테이지에 공유한다. 전용 값은 해당 스테이지만 바뀐다. #311부터 공용 기믹 묶음의 간격·폭탄/막기 켜기·비율(205·207·208·169·170)은 공통이 아니라 **세 스테이지 탭 각각**에 있어 스테이지마다 따로 정한다. 기본값을 초기화할 때만 StageDefinition의 토글을 적용하며 매 NEXT/재시작마다 사용자 OFF를 다시 ON으로 덮지 않는다.
 
@@ -416,7 +416,7 @@ B는 전원 동시에 자기 발화점을 소화하면 그 순간부터5초 보�
 - 각 기기의 그만두기 팝업·봉인 박 둘러보기: 터치 없이 60초면 닫힌다.
 - 구성원이 결과 화면을 떠나면 `exit`을 보내고 0.5초 뒤 연결을 끊는다. 방장은 30초 끊김을 기다리지 않고 바로 반영한다.
 
-값과 표는 `docs/STAGE_STORY_UI_INTEGRATION.md`의 "결과 대기 한도"를 따른다. Game 접속 토큰은 `C6HapioGame/55`다.
+값과 표는 `docs/STAGE_STORY_UI_INTEGRATION.md`의 "결과 대기 한도"를 따른다. Game 접속 토큰은 `C6HapioGame/55`였다(현재는 #762의 `C6HapioGame/56`).
 
 
 ## #763 북 전달 제한 알림 표현

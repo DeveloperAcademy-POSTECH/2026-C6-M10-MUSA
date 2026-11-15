@@ -134,6 +134,86 @@ namespace Hapio.Tests
             yield return null;
         }
 
+        [UnityTest]
+        public IEnumerator SideTapsReviewPagesInOrderAndHideNavigationButtons()
+        {
+            CreatePresentation();
+            player.sequence.sideTapNavigation = true;
+            player.Play(player.sequence);
+            yield return null;
+            Assert.That(nextButton.gameObject.activeSelf, Is.False);
+            var left = new Vector2(Screen.width * .25f, Screen.height * .5f);
+            var right = new Vector2(Screen.width * .75f, Screen.height * .5f);
+            Tap(Raycast(Pointer(1, left)), Pointer(1, left));
+            Assert.That(player.CurrentCutIndex, Is.Zero);
+            Assert.That(player.IsReading, Is.False, "Left on the first page must not consume its entrance.");
+            yield return null;
+            Tap(surface.gameObject, Pointer(2, right));
+            yield return null;
+            Tap(surface.gameObject, Pointer(3, right));
+            Assert.That(player.CurrentPageIndex, Is.EqualTo(1));
+            var picture = player.CurrentView;
+            yield return null;
+            Tap(surface.gameObject, Pointer(4, left));
+            Assert.That(player.CurrentPageIndex, Is.Zero);
+            Assert.That(player.CurrentView, Is.SameAs(picture), "Reviewing dialogue must not restart the picture.");
+            player.Next(); player.Next();
+            Assert.That(player.CurrentCutIndex, Is.EqualTo(1));
+            yield return null;
+            Tap(surface.gameObject, Pointer(5, left));
+            Assert.That(player.CurrentCutIndex, Is.Zero);
+            Assert.That(player.CurrentPageIndex, Is.EqualTo(1), "Return to the immediately preceding page.");
+            yield return null;
+            player.SetInputBlocked(true);
+            Tap(surface.gameObject, Pointer(6, left));
+            Assert.That(player.CurrentPageIndex, Is.EqualTo(1), "A popup blocks backward navigation too.");
+            player.SetInputBlocked(false);
+            player.sequence.sideTapNavigation = false;
+            player.Play(player.sequence);
+            Assert.That(nextButton.gameObject.activeSelf, Is.True, "Other stories keep their existing controls.");
+        }
+
+        [UnityTest]
+        public IEnumerator SideTapsCannotInterruptTheCinematic()
+        {
+            CreatePresentation();
+            player.sequence.sideTapNavigation = true;
+            player.Play(player.sequence);
+            player.Next(); player.Next(); player.Next();
+            Assert.That(player.CurrentCutIndex, Is.EqualTo(1));
+            player.CurrentView.autoContinueAfterSeconds = 100;
+            yield return null;
+            Tap(surface.gameObject, Pointer(1, new Vector2(Screen.width * .25f, Screen.height * .5f)));
+            Assert.That(player.CurrentCutIndex, Is.EqualTo(1));
+            yield return null;
+            Tap(surface.gameObject, Pointer(2, new Vector2(Screen.width * .75f, Screen.height * .5f)));
+            Assert.That(player.CurrentCutIndex, Is.EqualTo(1));
+            Assert.That(player.CurrentPageIndex, Is.Zero);
+        }
+
+#if UNITY_EDITOR
+        [Test]
+        public void SavedStoriesOptInAndOpeningThirdFrameMatchesFigmaLineAdvance()
+        {
+            foreach (var path in new[] {
+                "Assets/Hapio/Story/Opening/Opening.asset",
+                "Assets/Hapio/Story/StageStories/Ending.asset",
+                "Assets/Hapio/Story/StageStories/GameEnding.asset",
+                "Assets/Hapio/Resources/Hapio/Demo/Staff/Stage2/GameEnding.asset" })
+                Assert.That(UnityEditor.AssetDatabase.LoadAssetAtPath<StorySequence>(path).sideTapNavigation, Is.True, path);
+            var view = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Hapio/Story/Opening/Views/OP_003.prefab");
+            var text = System.Array.Find(view.GetComponentsInChildren<Text>(true), t => t.name == "Text [4553:4317]");
+            using (var generator = new TextGenerator())
+            {
+                generator.Populate(text.text, text.GetGenerationSettings(text.rectTransform.rect.size));
+                var first = generator.characters[generator.lines[0].startCharIdx].cursorPos.y;
+                var second = generator.characters[generator.lines[1].startCharIdx].cursorPos.y;
+                Assert.That((first - second) * text.rectTransform.localScale.y, Is.EqualTo(33).Within(.25f));
+                Assert.That(text.text, Does.Contain("<size=120>절대</size>"));
+            }
+        }
+#endif
+
         private void CreatePresentation(int cutCount = 2)
         {
             var eventObject = new GameObject("Story Tap Test EventSystem", typeof(EventSystem));

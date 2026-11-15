@@ -9,12 +9,16 @@ namespace Hapio
     public readonly struct GameTutorialLogEntry
     {
         public readonly GameTutorialSpeaker Speaker;
+        /// <summary>강조 표시를 뺀 대사.</summary>
         public readonly string Text;
+        /// <summary>강조 표시가 있는 대사 (#727). 기록에서는 색만 보이고 크기는 키우지 않는다.</summary>
+        public readonly string Marked;
 
-        public GameTutorialLogEntry(GameTutorialSpeaker speaker, string text)
+        public GameTutorialLogEntry(GameTutorialSpeaker speaker, string text, string marked = null)
         {
             Speaker = speaker;
             Text = text;
+            Marked = marked ?? text;
         }
     }
 
@@ -71,7 +75,7 @@ namespace Hapio
         private void NoteLinePassed()
         {
             if (!HasBeat || !CurrentBeat.IsLine) return;
-            dialogueLog.Add(new GameTutorialLogEntry(CurrentBeat.Speaker, CurrentBeat.Text));
+            dialogueLog.Add(new GameTutorialLogEntry(CurrentBeat.Speaker, CurrentBeat.Text, CurrentBeat.Marked));
         }
 
         private void BuildLogButton()
@@ -204,6 +208,7 @@ namespace Hapio
 
             Text words = AddText("Words", root, LogFont, art.logTextFontSize, art.textColor);
             words.resizeTextMinSize = Mathf.Min(art.logMinTextFontSize, art.logTextFontSize);
+            AddElementOutline(words);
             words.alignment = TextAnchor.MiddleLeft;
             return new LogRow { Root = root, Face = face, Name = name, Words = words, WordsBox = words.rectTransform };
         }
@@ -218,7 +223,9 @@ namespace Hapio
         {
             row.Face.sprite = FaceOf(entry.Speaker);
             row.Name.text = GameTutorialScript.NameOf(entry.Speaker);
-            row.Words.text = GameTutorialScript.LogLine(entry.Text);
+            // #727: the same colours and bold as in the bubble (and the element letters' outline), but no bigger words in the log.
+            row.Words.supportRichText = true;
+            row.Words.text = GameTutorialScript.LogLine(GameTutorialEmphasis.ToRichText(entry.Marked, 0, art.emphasisRed, art.emphasisBold));
             // Only two lines' height, so a long line shrinks to fit two lines instead of breaking into a third.
             float pad = Mathf.Max(0f, (art.logBarSize.y - art.logTextFontSize * LogWordsLineHeights) * .5f);
             row.WordsBox.offsetMin = new Vector2(art.logTextLeft, pad);

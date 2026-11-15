@@ -8,6 +8,7 @@ using NUnit.Framework;
 using UnityEditor;
 using UnityEditor.Build;
 using UnityEngine;
+using Splash = UnityEditor.PlayerSettings.SplashScreen;
 
 namespace Hapio.Tests
 {
@@ -63,9 +64,24 @@ namespace Hapio.Tests
         public void StageTwoIdentityRestoresNormalSettingsAfterSuccessFailureAndCancellation(BuildTarget target, string outcome) =>
             AssertTemporaryIdentityRestored(target, outcome, "WithTemporaryStageTwoPlayerSettings", "StageTwoProductName", ".staffdemo.stage2");
 
+        // Used only for cleanup; assertions independently inspect the native JSON and public icon APIs.
+        private static object CaptureNativeIconSettings()
+        {
+            Type type = AppDomain.CurrentDomain.GetAssemblies()
+                .Select(assembly => assembly.GetType("Hapio.Editor.ShowcaseIconSettingsSnapshot")).First(value => value != null);
+            return type.GetMethod("Capture", BindingFlags.Public | BindingFlags.Static).Invoke(null, null);
+        }
+        private static void RestoreNativeIconSettings(object state) =>
+            state.GetType().GetMethod("Restore", BindingFlags.Public | BindingFlags.Instance).Invoke(state, null);
+
         private static void AssertTemporaryIdentityRestored(BuildTarget target, string outcome,
             string builderMethod, string productConstant, string suffix)
         {
+            var nativeSettings = UnityEditor.Unsupported.GetSerializedAssetInterfaceSingleton("PlayerSettings");
+            string originalNativeSettings = EditorJsonUtility.ToJson(nativeSettings);
+            object originalIconSettings = CaptureNativeIconSettings();
+            string settingsPath = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "ProjectSettings", "ProjectSettings.asset"));
+            byte[] originalSettingsBytes = File.ReadAllBytes(settingsPath);
             string expectedIdentifier = "com.example.hapio" + suffix;
             var namedTarget = NamedBuildTarget.FromBuildTargetGroup(BuildPipeline.GetBuildTargetGroup(target));
             string name = PlayerSettings.productName;
@@ -75,15 +91,70 @@ namespace Hapio.Tests
             string displayName = PlayerSettings.iOS.applicationDisplayName;
             string defines = PlayerSettings.GetScriptingDefineSymbols(namedTarget);
             bool development = EditorUserBuildSettings.development;
+            bool showSplash = Splash.show;
+            bool unityLogo = Splash.showUnityLogo;
+            var animation = Splash.animationMode;
+            var logoStyle = Splash.unityLogoStyle;
+            Color backgroundColor = Splash.backgroundColor;
+            var background = Splash.background;
+            var backgroundPortrait = Splash.backgroundPortrait;
+            bool blurBackground = Splash.blurBackgroundImage;
+            float overlay = Splash.overlayOpacity;
+            var logos = Splash.logos.ToArray();
+            var applicationIcons = target == BuildTarget.StandaloneOSX
+                ? PlayerSettings.GetIcons(NamedBuildTarget.Standalone, IconKind.Application).ToArray() : null;
+            var iconKinds = target == BuildTarget.iOS
+                ? PlayerSettings.GetSupportedIconKinds(NamedBuildTarget.iOS) : Array.Empty<PlatformIconKind>();
+            var platformIcons = iconKinds.Select(kind => PlayerSettings.GetPlatformIcons(NamedBuildTarget.iOS, kind)).ToArray();
+            // Slot objects are mutable; keeping their texture arrays alone would miss restoration failures.
+            var originalTextures = platformIcons.Select(slots => slots.Select(slot => slot.GetTextures()?.ToArray()).ToArray()).ToArray();
             bool called = false;
             Action simulatedBuild = () =>
             {
                 called = true;
-                Assert.That(PlayerSettings.productName, Is.EqualTo(Constant(productConstant)));
+                Assert.That(Constant(productConstant), Is.EqualTo("합이오_쇼케이스"));
+                Assert.That(PlayerSettings.productName, Is.EqualTo("합이오_쇼케이스"),
+                    "The native iOS display-name setter aliases productName; internal executable normalization belongs to the export only.");
                 Assert.That(PlayerSettings.GetApplicationIdentifier(namedTarget), Is.EqualTo(expectedIdentifier));
                 Assert.That(PlayerSettings.bundleVersion, Is.EqualTo(Constant("DemoVersion")));
                 if (target == BuildTarget.iOS) Assert.That(PlayerSettings.iOS.buildNumber, Is.EqualTo(Constant("DemoBuildNumber")));
-                if (target == BuildTarget.iOS) Assert.That(PlayerSettings.iOS.applicationDisplayName, Is.EqualTo(Constant(productConstant)));
+                if (target == BuildTarget.iOS) Assert.That(PlayerSettings.iOS.applicationDisplayName, Is.EqualTo("합이오_쇼케이스"));
+                Assert.That(Splash.show, Is.True, "The custom mark replaces the Unity splash instead of removing all startup branding.");
+                Assert.That(Splash.showUnityLogo, Is.False);
+                Assert.That(Splash.animationMode.ToString(), Is.EqualTo("Static"));
+                Assert.That(Splash.unityLogoStyle.ToString(), Is.EqualTo("DarkOnLight"));
+                Assert.That(Splash.overlayOpacity, Is.EqualTo(1f));
+                Assert.That(Splash.backgroundColor.r, Is.GreaterThan(.8f));
+                Assert.That(Splash.backgroundColor.g, Is.GreaterThan(.8f));
+                Assert.That(Splash.backgroundColor.b, Is.GreaterThan(.8f));
+                Assert.That(Splash.backgroundColor.a, Is.EqualTo(1f));
+                Assert.That(Splash.background, Is.Null);
+                Assert.That(Splash.backgroundPortrait, Is.Null);
+                Assert.That(Splash.blurBackgroundImage, Is.False);
+                var expectedLogo = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Hapio/Art/Branding/ShowcaseLogo.png");
+                var expectedIcon = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Hapio/Art/Branding/ShowcaseIcon.png");
+                Assert.That(expectedLogo, Is.Not.Null);
+                Assert.That(expectedIcon, Is.Not.Null);
+                Assert.That(Splash.logos, Has.Length.EqualTo(1));
+                Assert.That(Splash.logos[0].logo, Is.SameAs(expectedLogo));
+                Assert.That(Splash.logos[0].duration, Is.EqualTo(2f));
+                if (target == BuildTarget.StandaloneOSX)
+                {
+                    var current = PlayerSettings.GetIcons(NamedBuildTarget.Standalone, IconKind.Application);
+                    Assert.That(current, Is.Not.Empty);
+                    Assert.That(current, Has.All.SameAs(expectedIcon));
+                }
+                else
+                {
+                    Assert.That(iconKinds, Is.Not.Empty);
+                    foreach (var kind in iconKinds)
+                    {
+                        var slots = PlayerSettings.GetPlatformIcons(NamedBuildTarget.iOS, kind);
+                        Assert.That(slots, Is.Not.Empty);
+                        foreach (var slot in slots)
+                            Assert.That(slot.GetTexture(0), Is.SameAs(expectedIcon), "Every supported iOS icon size must replace its Unity placeholder.");
+                    }
+                }
                 EditorUserBuildSettings.development = !development;
                 if (outcome == "cancel") throw new OperationCanceledException("Simulated build cancellation");
                 if (outcome == "failure") throw new InvalidOperationException("Simulated build failure");
@@ -105,16 +176,108 @@ namespace Hapio.Tests
                 Assert.That(PlayerSettings.iOS.applicationDisplayName, Is.EqualTo(displayName));
                 Assert.That(EditorUserBuildSettings.development, Is.EqualTo(development));
                 Assert.That(PlayerSettings.GetScriptingDefineSymbols(namedTarget), Is.EqualTo(defines));
+                Assert.That(Splash.show, Is.EqualTo(showSplash));
+                Assert.That(Splash.showUnityLogo, Is.EqualTo(unityLogo));
+                Assert.That(Splash.animationMode, Is.EqualTo(animation));
+                Assert.That(Splash.unityLogoStyle, Is.EqualTo(logoStyle));
+                Assert.That(Splash.backgroundColor, Is.EqualTo(backgroundColor));
+                Assert.That(Splash.background, Is.SameAs(background));
+                Assert.That(Splash.backgroundPortrait, Is.SameAs(backgroundPortrait));
+                Assert.That(Splash.blurBackgroundImage, Is.EqualTo(blurBackground));
+                Assert.That(Splash.overlayOpacity, Is.EqualTo(overlay));
+                Assert.That(Splash.logos, Has.Length.EqualTo(logos.Length));
+                for (int i = 0; i < logos.Length; i++)
+                {
+                    Assert.That(Splash.logos[i].logo, Is.SameAs(logos[i].logo));
+                    Assert.That(Splash.logos[i].duration, Is.EqualTo(logos[i].duration));
+                }
+                if (target == BuildTarget.StandaloneOSX)
+                    Assert.That(PlayerSettings.GetIcons(NamedBuildTarget.Standalone, IconKind.Application), Is.EqualTo(applicationIcons));
+                for (int kind = 0; kind < iconKinds.Length; kind++)
+                {
+                    var slots = PlayerSettings.GetPlatformIcons(NamedBuildTarget.iOS, iconKinds[kind]);
+                    Assert.That(slots, Has.Length.EqualTo(originalTextures[kind].Length));
+                    for (int slot = 0; slot < slots.Length; slot++)
+                        Assert.That(slots[slot].GetTextures(), Is.EqualTo(originalTextures[kind][slot]),
+                            "A previously empty icon slot must remain empty after this export.");
+                }
+                Assert.That(EditorJsonUtility.ToJson(nativeSettings), Is.EqualTo(originalNativeSettings),
+                    "The complete native profile must retain absent overrides, empty slots and unrelated platform settings exactly.");
             }
             finally
             {
-                // A failed restoration assertion must still leave the developer's project intact.
+                // Restore properties independently; never round-trip the entire native profile through JSON.
                 PlayerSettings.productName = name;
                 PlayerSettings.SetApplicationIdentifier(namedTarget, identifier);
                 PlayerSettings.bundleVersion = version;
                 PlayerSettings.iOS.buildNumber = build;
                 PlayerSettings.iOS.applicationDisplayName = displayName;
+                Splash.show = showSplash; Splash.showUnityLogo = unityLogo;
+                Splash.animationMode = animation; Splash.unityLogoStyle = logoStyle;
+                Splash.backgroundColor = backgroundColor; Splash.background = background;
+                Splash.backgroundPortrait = backgroundPortrait; Splash.blurBackgroundImage = blurBackground;
+                Splash.overlayOpacity = overlay; Splash.logos = logos;
                 EditorUserBuildSettings.development = development;
+                RestoreNativeIconSettings(originalIconSettings);
+                if (!File.ReadAllBytes(settingsPath).SequenceEqual(originalSettingsBytes))
+                    File.WriteAllBytes(settingsPath, originalSettingsBytes);
+            }
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void ShowcasePreservesAbsentAndCustomNativeIconOverridesAndOtherPlatforms(bool customMacIcons)
+        {
+            var nativeSettings = UnityEditor.Unsupported.GetSerializedAssetInterfaceSingleton("PlayerSettings");
+            string originalNativeSettings = EditorJsonUtility.ToJson(nativeSettings);
+            object originalIconSettings = CaptureNativeIconSettings();
+            string settingsPath = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "ProjectSettings", "ProjectSettings.asset"));
+            byte[] originalSettingsBytes = File.ReadAllBytes(settingsPath);
+            bool development = EditorUserBuildSettings.development;
+            try
+            {
+                // Start from an actual absent override, not eight null entries left by an earlier test.
+                var serialized = new SerializedObject(nativeSettings);
+                serialized.FindProperty("m_BuildTargetIcons").ClearArray();
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+                var userIcon = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Lab/Art/UI/PlayerPositionSoloIcon.png");
+                Assert.That(userIcon, Is.Not.Null);
+                var iosKinds = PlayerSettings.GetSupportedIconKinds(NamedBuildTarget.iOS);
+                Assert.That(iosKinds, Is.Not.Empty);
+                var iosSlots = PlayerSettings.GetPlatformIcons(NamedBuildTarget.iOS, iosKinds[0]);
+                Assert.That(iosSlots, Is.Not.Empty);
+                iosSlots[0].SetTexture(userIcon, 0);
+                PlayerSettings.SetPlatformIcons(NamedBuildTarget.iOS, iosKinds[0], iosSlots);
+                if (customMacIcons)
+                    PlayerSettings.SetIcons(NamedBuildTarget.Standalone,
+                        Enumerable.Repeat(userIcon, PlayerSettings.GetIconSizes(NamedBuildTarget.Standalone, IconKind.Application).Length).ToArray(),
+                        IconKind.Application);
+                var expectedMacIcons = PlayerSettings.GetIcons(NamedBuildTarget.Standalone, IconKind.Application).ToArray();
+                if (customMacIcons) Assert.That(expectedMacIcons, Is.Not.Empty.And.All.SameAs(userIcon));
+                else Assert.That(expectedMacIcons, Is.Empty, "The zero-entry native state must be exercised explicitly.");
+                string expectedNativeSettings = EditorJsonUtility.ToJson(nativeSettings);
+                bool called = false;
+                Action build = () =>
+                {
+                    called = true;
+                    var showcaseIcon = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/Hapio/Art/Branding/ShowcaseIcon.png");
+                    Assert.That(showcaseIcon, Is.Not.Null.And.Not.SameAs(userIcon));
+                    Assert.That(PlayerSettings.GetIcons(NamedBuildTarget.Standalone, IconKind.Application), Has.All.SameAs(showcaseIcon));
+                };
+                Invoke("WithTemporaryStageTwoPlayerSettings", BuildTarget.StandaloneOSX,
+                    "com.example.hapio.staffdemo.stage2", build);
+                Assert.That(called, Is.True);
+                Assert.That(PlayerSettings.GetIcons(NamedBuildTarget.Standalone, IconKind.Application), Is.EqualTo(expectedMacIcons));
+                Assert.That(PlayerSettings.GetPlatformIcons(NamedBuildTarget.iOS, iosKinds[0])[0].GetTexture(0), Is.SameAs(userIcon));
+                Assert.That(EditorJsonUtility.ToJson(nativeSettings), Is.EqualTo(expectedNativeSettings),
+                    "The native representation and unrelated iOS icon override must survive the Mac build scope unchanged.");
+            }
+            finally
+            {
+                EditorUserBuildSettings.development = development;
+                RestoreNativeIconSettings(originalIconSettings);
+                if (!File.ReadAllBytes(settingsPath).SequenceEqual(originalSettingsBytes))
+                    File.WriteAllBytes(settingsPath, originalSettingsBytes);
             }
         }
 
@@ -316,7 +479,7 @@ namespace Hapio.Tests
 
         [TestCase(BuildTarget.StandaloneOSX)]
         [TestCase(BuildTarget.iOS)]
-        public void StageTwoOutputIdentityRequiresItsOwnNameIdentifierAndVersion(BuildTarget target)
+        public void StageTwoOutputIdentitySharesTheShowcaseNameButRequiresItsIdentifierAndVersion(BuildTarget target)
         {
             string output = Path.Combine(Path.GetTempPath(), "hapio-stage-two-identity-" + Guid.NewGuid().ToString("N"));
             string plist = target == BuildTarget.iOS ? Path.Combine(output, "Info.plist") : Path.Combine(output, "Contents", "Info.plist");
@@ -340,9 +503,15 @@ namespace Hapio.Tests
             {
                 Write(product, identifier, version, build);
                 Assert.DoesNotThrow(() => Invoke("ValidateOutputIdentityFor", target, output, identifier, product));
-                Assert.Throws<TargetInvocationException>(() => Invoke("ValidateOutputIdentity", target, output, identifier),
-                    "The ordinary staff validator must keep expecting the ordinary product name.");
-                Write(Constant("ProductName"), identifier, version, build);
+                Assert.That(product, Is.EqualTo("합이오_쇼케이스"));
+                Assert.That(Constant("ProductName"), Is.EqualTo(product), "Both exports intentionally use the same visible showcase name.");
+                Assert.DoesNotThrow(() => Invoke("ValidateOutputIdentity", target, output, identifier),
+                    "The shared visible name does not make the fixed-stage identity invalid.");
+                var wrongVariant = Assert.Throws<TargetInvocationException>(() =>
+                    Invoke("ValidateOutputIdentity", target, output, "com.example.hapio.staffdemo"));
+                Assert.That(wrongVariant.InnerException, Is.TypeOf<InvalidOperationException>(),
+                    "A shared visible name must never accept the other variant's bundle identifier.");
+                Write("Hapio Stage 2 Demo", identifier, version, build);
                 Reject();
                 Write(product, "com.example.hapio.staffdemo", version, build);
                 Reject();
@@ -355,6 +524,121 @@ namespace Hapio.Tests
                 }
             }
             finally { Directory.Delete(output, true); }
+        }
+
+        [TestCase("NFC")]
+        [TestCase("NFD")]
+        [TestCase("existing-target")]
+        public void MacExecutableNormalizationPreservesVisibleBrandingAndRejectsNameCollisions(string scenario)
+        {
+            const string visibleName = "합이오_쇼케이스";
+            const string normalizedExecutable = "HapioShowcase";
+            string originalExecutable = visibleName.Normalize(scenario == "NFD"
+                ? System.Text.NormalizationForm.FormD : System.Text.NormalizationForm.FormC);
+            string root = Path.Combine(Path.GetTempPath(), "hapio-showcase-executable-" + Guid.NewGuid().ToString("N"));
+            string output = Path.Combine(root, visibleName + ".app");
+            string contents = Path.Combine(output, "Contents");
+            string macos = Path.Combine(contents, "MacOS");
+            string resources = Path.Combine(contents, "Resources");
+            string originalPath = Path.Combine(macos, originalExecutable);
+            string normalizedPath = Path.Combine(macos, normalizedExecutable);
+            string plist = Path.Combine(contents, "Info.plist");
+            Directory.CreateDirectory(macos);
+            Directory.CreateDirectory(Path.Combine(resources, "Data"));
+            byte[] executable = { 0xcf, 0xfa, 0xed, 0xfe, 1, 2, 3, 4 };
+            byte[] icon = { 0x69, 0x63, 0x6e, 0x73, 9, 8, 7, 6 };
+            byte[] gameData = { 5, 4, 3, 2, 1 };
+            var originalPlist = new XDocument(new XElement("plist", new XElement("dict",
+                Pair("CFBundleName", visibleName), Pair("CFBundleDisplayName", visibleName),
+                Pair("CFBundleExecutable", originalExecutable), Pair("CFBundleIdentifier", "com.example.hapio.staffdemo.stage2"),
+                Pair("CFBundleIconFile", "PlayerIcon.icns"), Pair("CFBundleShortVersionString", "0.2.0"), Pair("CFBundleVersion", "2"))));
+            try
+            {
+                File.WriteAllBytes(originalPath, executable);
+                File.WriteAllBytes(Path.Combine(resources, "PlayerIcon.icns"), icon);
+                File.WriteAllBytes(Path.Combine(resources, "Data", "globalgamemanagers"), gameData);
+                originalPlist.Save(plist);
+                if (scenario == "existing-target")
+                {
+                    byte[] collision = { 99, 98, 97 };
+                    File.WriteAllBytes(normalizedPath, collision);
+                    byte[] originalPlistBytes = File.ReadAllBytes(plist);
+                    Assert.Throws<TargetInvocationException>(() => Invoke("NormalizeMacExecutable", output),
+                        "Packaging must reject a pre-existing target rather than overwrite an unrelated executable.");
+                    Assert.That(File.ReadAllBytes(originalPath), Is.EqualTo(executable));
+                    Assert.That(File.ReadAllBytes(normalizedPath), Is.EqualTo(collision));
+                    Assert.That(File.ReadAllBytes(plist), Is.EqualTo(originalPlistBytes));
+                }
+                else
+                {
+                    Assert.DoesNotThrow(() => Invoke("NormalizeMacExecutable", output));
+                    Assert.That(File.Exists(originalPath), Is.False);
+                    Assert.That(File.ReadAllBytes(normalizedPath), Is.EqualTo(executable),
+                        "Only the filename changes; the executable bytes must remain intact.");
+                    var expectedPlist = new XDocument(originalPlist);
+                    expectedPlist.Root.Element("dict").Elements("key")
+                        .Single(key => key.Value == "CFBundleExecutable").ElementsAfterSelf().First().Value = normalizedExecutable;
+                    Assert.That(XDocument.Load(plist).ToString(), Is.EqualTo(expectedPlist.ToString()),
+                        "The Korean visible name, bundle identity, version and icon reference must remain unchanged.");
+                    byte[] normalizedPlist = File.ReadAllBytes(plist);
+                    Assert.DoesNotThrow(() => Invoke("NormalizeMacExecutable", output));
+                    Assert.That(File.ReadAllBytes(plist), Is.EqualTo(normalizedPlist), "A second packaging pass is a no-op.");
+                    Assert.That(File.ReadAllBytes(normalizedPath), Is.EqualTo(executable));
+                }
+                Assert.That(Directory.Exists(Path.Combine(root, visibleName + ".app")), Is.True);
+                Assert.That(File.ReadAllBytes(Path.Combine(resources, "PlayerIcon.icns")), Is.EqualTo(icon));
+                Assert.That(File.ReadAllBytes(Path.Combine(resources, "Data", "globalgamemanagers")), Is.EqualTo(gameData));
+            }
+            finally { Directory.Delete(root, true); }
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void IosExecutableNormalizationOnlyChangesTheExportedApplicationProductName(bool missingSetting)
+        {
+            string root = Path.Combine(Path.GetTempPath(), "hapio-showcase-ios-executable-" + Guid.NewGuid().ToString("N"));
+            string project = Path.Combine(root, "Unity-iPhone.xcodeproj", "project.pbxproj");
+            string plist = Path.Combine(root, "Info.plist");
+            Directory.CreateDirectory(Path.GetDirectoryName(project));
+            string first = "PRODUCT_NAME_APP = \"합이오_쇼케이스\";";
+            string second = "PRODUCT_NAME_APP= HapioStage2Demo;";
+            string original = "Release = { buildSettings = { " + first
+                + " PRODUCT_NAME = \"$(PRODUCT_NAME_APP)\"; PRODUCT_BUNDLE_IDENTIFIER = com.example.hapio.staffdemo.stage2;"
+                + " DEVELOPMENT_TEAM = TESTTEAM; CODE_SIGN_STYLE = Automatic; }; name = Release; };\n"
+                + "Debug = { buildSettings = { " + second
+                + " PRODUCT_NAME = \"$(PRODUCT_NAME_APP)\"; PRODUCT_BUNDLE_IDENTIFIER = com.example.hapio.staffdemo.stage2;"
+                + " DEVELOPMENT_TEAM = TESTTEAM; CODE_SIGN_STYLE = Manual; }; name = Debug; };\n"
+                + "Framework = { PRODUCT_NAME = UnityFramework; name = UnityFramework; };\n";
+            if (missingSetting) original = original.Replace(first, string.Empty).Replace(second, string.Empty);
+            try
+            {
+                File.WriteAllText(project, original);
+                new XDocument(new XElement("plist", new XElement("dict",
+                    Pair("CFBundleDisplayName", "합이오_쇼케이스"), Pair("CFBundleName", "합이오_쇼케이스"),
+                    Pair("CFBundleIdentifier", "com.example.hapio.staffdemo.stage2"), Pair("CFBundleExecutable", "$(EXECUTABLE_NAME)"))))
+                    .Save(plist);
+                byte[] plistBytes = File.ReadAllBytes(plist);
+                byte[] projectBytes = File.ReadAllBytes(project);
+                if (missingSetting)
+                {
+                    var error = Assert.Throws<TargetInvocationException>(() => Invoke("NormalizeIosExecutable", root));
+                    Assert.That(error.InnerException, Is.TypeOf<InvalidOperationException>());
+                    Assert.That(File.ReadAllBytes(project), Is.EqualTo(projectBytes), "An unexpected export format must fail without altering the project.");
+                }
+                else
+                {
+                    Assert.DoesNotThrow(() => Invoke("NormalizeIosExecutable", root));
+                    string expected = original.Replace(first, "PRODUCT_NAME_APP = HapioShowcase;")
+                        .Replace(second, "PRODUCT_NAME_APP = HapioShowcase;");
+                    Assert.That(File.ReadAllText(project), Is.EqualTo(expected),
+                        "Both app configurations change; bundle IDs, signing, target names and UnityFramework settings remain untouched.");
+                    byte[] normalized = File.ReadAllBytes(project);
+                    Assert.DoesNotThrow(() => Invoke("NormalizeIosExecutable", root));
+                    Assert.That(File.ReadAllBytes(project), Is.EqualTo(normalized));
+                }
+                Assert.That(File.ReadAllBytes(plist), Is.EqualTo(plistBytes), "The Korean visible display name belongs to Info.plist and must remain intact.");
+            }
+            finally { Directory.Delete(root, true); }
         }
 
         private static object[] Pair(string key, string value) => new object[] { new XElement("key", key), new XElement("string", value) };

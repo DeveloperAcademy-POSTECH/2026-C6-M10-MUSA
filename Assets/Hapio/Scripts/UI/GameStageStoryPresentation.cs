@@ -86,7 +86,11 @@ namespace Hapio
                 readyView.ResetView();
             }
             if (advanceButton != null) advanceButton.onClick.AddListener(Advance);
-            if (exitButton != null) exitButton.onClick.AddListener(RequestExit);
+            if (exitButton != null)
+            {
+                GameFigmaButton.AttachResultText(exitButton);
+                exitButton.onClick.AddListener(RequestExit);
+            }
             if (skipButton != null && (player == null || skipButton != player.skipButton)) skipButton.onClick.AddListener(Skip);
             if (overallButton != null) overallButton.onClick.AddListener(OpenOverall);
             if (viewerButton != null) viewerButton.onClick.AddListener(InspectGourd);
@@ -173,9 +177,22 @@ namespace Hapio
             UnbindActions();
             if (view == null || boundResult == null) return;
             clearControls = view.GetComponent<StoryStageClearControls>();
-            if (clearControls != null) clearControls.nextSeal.onClick.AddListener(Advance);
+            if (clearControls != null)
+            {
+                Button next = clearControls.nextSeal;
+                var arrow = next.GetComponentsInChildren<Graphic>(true).FirstOrDefault(item => item.name.StartsWith("Arrow"));
+                GameFigmaButton.AttachResultText(next, arrow: arrow);
+                next.onClick.AddListener(Advance);
+            }
             var summary = view.GetComponent<SealRunSummary>();
-            if (summary != null) summary.Bind(session.SealStageResults, session.ResultLocalPlayerId);
+            if (summary != null)
+            {
+                summary.Bind(session.SealStageResults, session.ResultLocalPlayerId);
+                var caption = view.GetComponentsInChildren<Text>(true).FirstOrDefault(text =>
+                    text.transform.parent != null && text.transform.parent.name.StartsWith("ContinueLabel"));
+                var arrow = view.GetComponentsInChildren<Graphic>(true).FirstOrDefault(item => item.name.StartsWith("ContinueArrow"));
+                GameFigmaButton.AttachResultText(view.continueButton, caption, arrow);
+            }
             StoryCardRecords.Record[] rows = CardRecords(boundResult, session.ResultLocalPlayerId);
             StoryCardRecords[] cards = view.GetComponentsInChildren<StoryCardRecords>(true);
             foreach (var records in cards)
@@ -388,6 +405,20 @@ namespace Hapio
                         string label = method == "Retry" ? "다시 도전" : method == "Exit" ? "나가기" : "봉인 박 둘러보기";
                         caption = actions.GetComponentsInChildren<Text>(true).FirstOrDefault(text => text.text == label);
                     }
+                    if (method != "Exit" && caption != null)
+                    {
+                        Transform surface = caption.transform.parent;
+                        // The story exporter puts the background and caption in separate sibling layers.
+                        var parent = surface.parent;
+                        for (int child = 0; parent != null && child < parent.childCount; child++)
+                        {
+                            Transform candidate = parent.GetChild(child);
+                            if (!candidate.name.StartsWith("Frame 263 [", System.StringComparison.Ordinal)) continue;
+                            GameFigmaButton.AttachResultArtwork(button, candidate.GetComponent<Graphic>());
+                            break;
+                        }
+                    }
+                    if (method == "Exit") GameFigmaButton.AttachResultText(button, caption);
                     boundActions.Add(new BoundAction { button = button, method = method, caption = caption,
                         originalCaption = caption != null ? caption.text : null, originalColor = caption != null ? caption.color : Color.white });
                 }
@@ -411,7 +442,9 @@ namespace Hapio
                     : action.method == "Retry" && !session.Network.IsHost ? "방장이 재도전" : action.originalCaption;
                 Color color = action.originalColor;
                 color.a *= interactable ? 1 : .45f;
-                action.caption.color = color;
+                if (action.method == "Exit" && action.button.TryGetComponent<GameFigmaButton>(out var feedback))
+                    feedback.SetResultTextBaseColor(color);
+                else action.caption.color = color;
             }
         }
 
