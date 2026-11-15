@@ -9231,3 +9231,25 @@ PR #729 검증 중 main `a7208003`에서 `LabLocalBoardNetworkIntegrationTests` 
   - OP_003 두 줄 간격이 Figma 33에 맞게 좁아졌다.
 - **기록만:** 엔딩 뒤 클리어 화면은 이 표시를 쓰지 않아 기존 버튼이 그대로다. 왼쪽 터치는 `requireContinueButton` 컷에서도 뒤로 간다.
 - **미실행:** iPhone 실기기 터치.
+
+## #772 — 쇼케이스 시작 로고·앱 이름 (2026-11-15)
+
+기준 main `2c9b3487`, Unity 6000.6.5f1·macOS arm64의 Desktop 프로젝트. 일반 게임의 Scene·타이틀·폰트·팔레트·게임 규칙·Bundle ID를 보존했다. 별도 시연 빌드에만 로고·아이콘·표시명을 임시 적용한다.
+
+- 표시명과 Mac 파일명: `합이오_쇼케이스`. 정식 아이콘 원본은 미수령 가능성이 있어 사용자 지시에 따라 기존 타이틀 글꼴·색으로 만든 임시 아이콘 사용.
+- Unity Preview Scene에서 로고 2048×1024 RGBA(투명 여백)와 아이콘 1024×1024 RGB(알파 없음)를 명시적으로 베이크. 원본 Scene은 저장하지 않으며 빌드 중 자동 생성하지 않음.
+- 빌드 설정 동작 변경으로 전체 검사 실행: 최종 EditMode **2,585/2,585 PASS**(39.61초), PlayMode **877/877 PASS**(1116.15초), 실패/skip0.
+- 최초 관련 검사 26건 중 8건 실패: Mac 단일 아이콘이 8개 지원 크기 전체에 적용되지 않던 구현을 수정하고, 두 시연의 같은 표시명 계약으로 검사를 갱신. 중간 전체 EditMode의 구형 이름 전제 2건 실패는 최신 검사 재컴파일 후 2,580건 통과.
+- 첫 Mac BuildReport는 성공·오류0이었으나, 한글 내부 실행 파일명에서 codesign의 CoreFoundation 실행파일 URL 재귀가 SIGBUS를 발생시킴. 생성 산출물에서 내부 이름만 영문으로 바꾸면 엄격 서명이 통과함을 확인해 자동 후처리 추가. 표시명과 .app 이름은 한글 유지.
+- iOS applicationDisplayName 설정이 productName도 바꿔 독립 설정을 시도한 중간 검사 6건 실패. 한글 PlayerSettings 표시명을 유지하고 Xcode PRODUCT_NAME_APP만 영문으로 정리하도록 수정. Mac NFC/NFD·충돌 및 iOS 다중 설정·누락 검사 후 최종 전체 EditMode 2,585건 통과.
+- 후속 변경은 Editor 포장 후처리·검사뿐이며 Scene·런타임·통신·게임 코드·패키지는 같고 Application.productName에 의존하는 런타임도 없음. 전체 PlayMode 결과는 재사용하고 전체 EditMode와 실제 Mac/iOS 빌드를 다시 확인.
+
+| 확인 | 결과 |
+| --- | --- |
+| Stage2 Release Mac | `Builds/HapioStage2Demo/20261115-123958-3ff8ad0b-release/macOS/합이오_쇼케이스.app`, Succeeded·오류0·identityVerified=true |
+| Mac 포장 | 한글 표시명·영문 실행 파일 HapioShowcase·기존 stage2 Bundle ID·실제 ICNS 확인, codesign --verify --deep --strict 성공 |
+| Stage2 Release iOS | `Builds/HapioStage2Demo/20261115-124003-7b5bf98e-release/iOS/`, Succeeded·identityVerified=true |
+| iOS 포장 | CFBundleDisplayName 합이오_쇼케이스, PRODUCT_NAME_APP 4곳 모두 HapioShowcase, 아이콘 19개·1024px Store RGB PNG 확인 |
+| 설정 보존 | 두 빌드 후 ProjectSettings/EditorBuildSettings 파일 SHA-256이 빌드 전과 동일, 기존 stash 불변, StandaloneOSX·Home·Play 정지 복원 |
+
+iOS에는 기존 com.unity.pipeline의 StandaloneBuildSubtarget 전처리 진단1건이 기록되지만 내보내기·식별 검증 성공. 오류0으로 표기하지 않음. 사용자 요청으로 Mac 실행·실제 시작 화면 촬영·iOS Xcode 서명/설치/실행·실기기 확인은 미실행. 검사가 만든 빈 기본 아이콘 슬롯과 Importer의 SVG 메타 공백은 사본 보존 후 원래대로 정리. 실패 이력·세부 결과는 로컬 별도 산출물에 보존하며 원시 로그·빌드·개인 경로·서명 정보는 커밋하지 않음.
