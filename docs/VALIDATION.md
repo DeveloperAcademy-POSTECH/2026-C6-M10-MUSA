@@ -8998,3 +8998,11 @@ PR #729 검증 중 main `a7208003`에서 `LabLocalBoardNetworkIntegrationTests` 
 - 현재 Unity 프로젝트에도 수정 반영. 매듭 메시의 밧줄 축으로 MeshCollider.Raycast를 수행해 실제 표면 y=1.358825, 연결점 y=1.348825를 계산.
 - Unity 도메인 리로드 후 변경된 베이크 Compute 실행 성공. 저장 Prefab과 계산 위치 차이 0.00000025 미만.
 - 현재 Unity에서 수정 Prefab과 동일 지름의 밧줄을 임시 구성해 근접 렌더링: 빈틈 없이 연결됨을 이미지 확인. 임시 객체 제거, Scene 저장 안 함. 실제 전투 전체 및 실기기 검사는 미실행.
+
+### #749 병합 전 검증 (2026-11-15)
+- **기준:** `fix/#749-round2-rope` `8eacb623`(main `766158b7` 위). Unity 6000.6.5f1 batch(macOS, Metal). Rope Socket은 `LabHangingTarget.UpdateContinuousRope`의 밧줄 끝점에만 쓰여 물리·판정·도색·통신·설정 수·접속 묶음은 그대로다.
+- **메뉴 재굽기:** `-executeMethod Hapio.Editor.GameGourdRigBaker.BakeStage2` 실행 뒤 BakeReport는 같았다. Prefab은 Rope Socket 좌표 한 줄만 1e-7 이하의 표기 차이로 바뀌었다(`y 1.348825` → `1.3488247` 등, 손으로 넣은 자릿수를 Unity 직렬화 값으로 교체). 이 메뉴 결과를 커밋했다.
+- **전체 EditMode:** 2502/2502 PASS(새 `Stage2RopeEndsInsideTheVisibleAttachment`, 굽기 최신성 검사 포함).
+- **PlayMode 영향 묶음:** `GameStageGourdIntegrationTests`·`LabContinuousRopeTests`·`LabGourdVisualRigTests`·`GameSceneFlowTests` 58/58 PASS. 판정·통신 경로 변경이 없어 전체 PlayMode는 실행하지 않았다.
+- **화면(Development Mac 빌드, DEV 솔로 2스테이지, 임시 캡처 스크립트는 저장소에 남기지 않음):** 전투 카메라 3배 확대 캡처로 비교했다. 새 연결점은 정지, 옆으로 친 흔들림 4프레임, 야광귀 등장 클립 15·26·29·38프레임에서 밧줄이 매듭 두 갈래에 붙어 있었다. 같은 실행에서 연결점만 예전 값(y 1.6383)으로 되돌리면 정지·흔들림 모두 밧줄과 매듭 사이에 틈이 보였다. `model_part4`는 `Lid_Hinge` 아래가 아니어서 뚜껑과 따로 움직이지 않는다.
+- **미실행:** iPhone 실기기, 실제 멀티 전투.

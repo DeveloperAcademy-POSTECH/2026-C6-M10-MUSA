@@ -89,6 +89,4 @@
 
 ## #749 2라운드 밧줄 연결점
 
-제거된 Rear_Rope_Binding 상단이 남아 있는 model_part4 고리 메시보다 약 0.093 높아 빈틈이 생겼다. Stage2는 model_part4 bounds 상단에서 0.01 안쪽을 Rope Socket으로 사용한다. Prefab과 베이크 계산을 함께 수정하며 다른 스테이지와 물리는 유지한다.
-
-#749 보완: Stage2의 model_part4는 상단 두 갈래 사이가 비어 있어 bounds 상단은 연결 표면이 아니다. 밧줄 축으로 메시를 raycast한 첫 표면에서 0.01 안쪽을 사용한다(y 약 1.348825). 최초 bounds 기반 설명은 이 방식으로 대체한다.
+Rope Socket을 비활성화한 Rear_Rope_Binding의 AABB 상단(y 1.638)에서 계산했다. 그래서 남아 있는 매듭 메시 model_part4보다 높은 곳에서 밧줄이 끝나 사이가 떠 보였다. model_part4는 상단 두 갈래 사이가 비어 있어 bounds 상단도 연결 표면이 아니다. 그래서 Stage2만 밧줄 축(binding 중심 x·z)을 따라 model_part4를 MeshCollider로 raycast한다. 처음 닿은 표면에서 0.01 안쪽을 Rope Socket으로 쓴다(y 약 1.3488). 굽기 계산(`GameGourdRigBake.Compute`)과 저장 Prefab을 `Hapio > Gourds > Bake Stage 2 Yagwanggwi Gourd`로 맞추고, `GameStageGourdVisualTests.Stage2RopeEndsInsideTheVisibleAttachment`가 둘의 일치와 표면 위치를 확인한다. Rope Socket은 밧줄을 그리는 끝점일 뿐이다. 물리·판정·도색·통신은 바뀌지 않으며 1·3스테이지와 흰 박도 그대로다.
