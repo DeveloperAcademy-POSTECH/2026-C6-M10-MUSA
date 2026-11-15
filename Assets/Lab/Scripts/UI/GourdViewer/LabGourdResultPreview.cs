@@ -324,6 +324,14 @@ namespace C6Lab
         private void CopyHierarchy(Transform source, Transform parent, Dictionary<Material, Material> materialCopies,
             List<MeshRenderer> renderers, ref int paintedRenderers, bool bindMaps = true)
         {
+            // #754: all three story rigs keep the suspension eye, knot and short rope in model_part4.
+            // Exclude it only from the viewer copy, including bounds/framing; leave the battle rig untouched.
+            string partName = source.name;
+            int suffix = partName.LastIndexOf('.');
+            if (suffix >= 0 && int.TryParse(partName.Substring(suffix + 1), out _))
+                partName = partName.Substring(0, suffix);
+            if (partName == "model_part4" && source.GetComponentInParent<LabGourdVisualRig>() != null) return;
+
             GameObject copy = NewObject(source.name, parent);
             copy.transform.localPosition = source.localPosition;
             copy.transform.localRotation = source.localRotation;

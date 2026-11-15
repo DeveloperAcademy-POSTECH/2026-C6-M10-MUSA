@@ -65,6 +65,35 @@ namespace Hapio.Tests
             Assert.That(prefab.transform.localScale, Is.EqualTo(Vector3.one));
         }
 
+        [TestCase(1)]
+        [TestCase(2)]
+        [TestCase(3)]
+        public void ViewerOmitsSuspensionAssemblyWithoutChangingBattleRig(int stage)
+        {
+            var source = Object.Instantiate(Resources.Load<GameObject>(StageResources[stage - 1]));
+            var previewType = typeof(LabGourdResultPreview);
+            var preview = (LabGourdResultPreview)System.Activator.CreateInstance(previewType, true);
+            try
+            {
+                Transform attachment = GameGourdRigBake.Find(source.transform, "model_part4");
+                Assert.That(attachment, Is.Not.Null);
+                Assert.That(attachment.gameObject.activeInHierarchy, Is.True);
+                var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+                previewType.GetMethod("BuildGeometry", flags).Invoke(preview,
+                    new object[] { source.transform, 128, 128, true, false });
+                foreach (Transform part in preview.ModelRoot.GetComponentsInChildren<Transform>(true))
+                    Assert.That(GameGourdRigBake.BaseName(part.name), Is.Not.EqualTo("model_part4"));
+                Assert.That(GameGourdRigBake.Find(preview.ModelRoot, "Paint Shell"), Is.Not.Null);
+                Assert.That(GameGourdRigBake.Find(preview.ModelRoot, "Lid Paint"), Is.Not.Null);
+                Assert.That(attachment.gameObject.activeInHierarchy, Is.True, "Battle attachment stays visible.");
+            }
+            finally
+            {
+                preview.Dispose();
+                Object.DestroyImmediate(source);
+            }
+        }
+
         [Test]
         public void Stage2RopeEndsInsideTheVisibleAttachment()
         {
