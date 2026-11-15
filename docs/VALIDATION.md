@@ -8985,3 +8985,16 @@ PR #729 검증 중 main `a7208003`에서 `LabLocalBoardNetworkIntegrationTests` 
 - `GameSceneFlowTests.FigmaResultsWaitForHostNextAndShowEachYokaiThenKeepFinalOverallAndHomeNavigation` 및 `SavedStoryViewerSkipAndEndingButtonsReceiveRealMouseClicks` **2/2 PASS**(65.03초). 이후 줄바꿈 표시만 수정했으며 전환/입력/수명 경로는 동일해 해당 결과를 재사용했다.
 - 화면 확인: 저장된 GameStageStoryCanvas와 실제 컷을 Unity 카메라로402×874 렌더하여 불이·만복·솔이·마지막 불이4페이지 확인. 처음 캡처에서 긴 문장 자동 줄바꿈을 발견해 `dialogueNoWrap`으로 수정했고 위 최종 검사를 재실행했다. 격리 캡처에서는 게임 어댑터가 평소 제어하는 결과/공통 버튼을 숨겨 대화 상자만 비교했다. 종이/이름표의 다운로드 원본과 로컬 파일 SHA-1 일치 확인. 그림 배치와 범위 밖 버튼 외형은 변경하지 않았다.
 - 작업 전 Console의 iOS `Subtarget property is not available` 오류1건을 기록했으며 새 코드 컴파일 후 오류0. 자동 검사 실패/단언 완화 없음. 실기기·iOS 빌드·전체 PlayMode는 실행하지 않았다.
+
+## #749 Stage2 밧줄 연결점 (2026-11-15)
+
+- 기존 Stage2 에셋을 Unity에서 인스턴스화: 이전 Rope Socket은 남아 있는 model_part4 메시 bounds 밖임을 확인.
+- 수정 Prefab 좌표를 메모리 인스턴스에 적용: yaw 0/45/90/180/270 × swing -20/0/20, 크기 1.1, 이동 포함 15개 조합에서 메시 로컬 bounds 안쪽 연결 PASS. 원본 에셋은 저장하지 않음.
+- 작업 브랜치 git diff --check PASS. 재베이크와 저장 Prefab 일치를 검사하는 EditMode 회귀 검사 추가.
+- 현재 Unity는 별도 체크아웃이므로 이 브랜치의 전체 컴파일·EditMode 검사·실제 전투 화면 시각 검증은 미실행. 실기기 검증 미실행.
+
+### #749 보완 검증
+- 최초 AABB 내부 검사만으로는 두 갈래 사이의 빈 공간을 검출하지 못했다. 기존 15개 포즈 검사는 시각 연결의 근거가 아니다.
+- 현재 Unity 프로젝트에도 수정 반영. 매듭 메시의 밧줄 축으로 MeshCollider.Raycast를 수행해 실제 표면 y=1.358825, 연결점 y=1.348825를 계산.
+- Unity 도메인 리로드 후 변경된 베이크 Compute 실행 성공. 저장 Prefab과 계산 위치 차이 0.00000025 미만.
+- 현재 Unity에서 수정 Prefab과 동일 지름의 밧줄을 임시 구성해 근접 렌더링: 빈틈 없이 연결됨을 이미지 확인. 임시 객체 제거, Scene 저장 안 함. 실제 전투 전체 및 실기기 검사는 미실행.

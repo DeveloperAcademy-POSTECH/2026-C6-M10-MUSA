@@ -86,3 +86,9 @@
 ### #701 후속 — 저고리·색동 천 장식
 
 키링과 별도로 모델 루트에 달려 있던 `Gumiho_Teal_Jeogori_Ribbon`(구미호·지귀), `Saekdong_Ribbon_1` 및 `Saekdong_Ribbon_1_Separate_Rope_Tie`(세 스테이지)를 함께 비활성화한다. 복제 접미사는 기존 BaseName 규칙으로 처리하며 재굽기에도 같은 정책을 적용한다. 원본 아트와 천 BlendShape/노드 경로는 보존한다. 박 몸통·뚜껑·뚜껑의 손잡이·테두리와 요괴는 그대로다.
+
+## #749 2라운드 밧줄 연결점
+
+제거된 Rear_Rope_Binding 상단이 남아 있는 model_part4 고리 메시보다 약 0.093 높아 빈틈이 생겼다. Stage2는 model_part4 bounds 상단에서 0.01 안쪽을 Rope Socket으로 사용한다. Prefab과 베이크 계산을 함께 수정하며 다른 스테이지와 물리는 유지한다.
+
+#749 보완: Stage2의 model_part4는 상단 두 갈래 사이가 비어 있어 bounds 상단은 연결 표면이 아니다. 밧줄 축으로 메시를 raycast한 첫 표면에서 0.01 안쪽을 사용한다(y 약 1.348825). 최초 bounds 기반 설명은 이 방식으로 대체한다.
