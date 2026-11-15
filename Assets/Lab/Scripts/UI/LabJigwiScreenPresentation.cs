@@ -1491,7 +1491,7 @@ namespace C6Lab
             return image;
         }
 
-        private static Texture2D waterTexture, sprayTexture;
+        private static Texture2D waterfallWaterTexture, waterfallSprayTexture;
 
         /// <summary>
         /// #741: falling water in the backgrounds' 2D style — three flat blue tones (light middle, deep sides), a dark ink outline
@@ -1500,7 +1500,7 @@ namespace C6Lab
         /// </summary>
         private static Texture2D WaterTexture(bool spray)
         {
-            Texture2D cached = spray ? sprayTexture : waterTexture;
+            Texture2D cached = spray ? waterfallSprayTexture : waterfallWaterTexture;
             if (cached != null) return cached;
             const int w = 128, h = 256;
             var texture = new Texture2D(w, h, TextureFormat.RGBA32, false)
@@ -1542,7 +1542,7 @@ namespace C6Lab
                     pixels[y * w + x] = c;
                 }
             texture.SetPixels(pixels); texture.Apply(false, true);
-            if (spray) sprayTexture = texture; else waterTexture = texture;
+            if (spray) waterfallSprayTexture = texture; else waterfallWaterTexture = texture;
             return texture;
         }
 
