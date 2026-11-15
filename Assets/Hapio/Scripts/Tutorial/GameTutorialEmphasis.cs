@@ -63,18 +63,18 @@ namespace Hapio
         }
 
         /// <summary>
-        /// 오행 글자 색: 전투 화면 오행 구슬 그림(Hapio/Art/UI/Battle의 구슬, BattleOrbAppearance)의 가운데 색. 사용자 시안의 글자 색과 같다.
-        /// 박에 칠해지는 색(LabPaintPalette)보다 조금 진하다.
+        /// 오행 글자 색: 색상 토큰 `5OrbsColor/*/500***`(Assets/Hapio/Art/UI/Source/Hapio.tokens.json, docs/COLOR_SYSTEM.md). 전투 화면 오행 구슬
+        /// 그림의 가운데 색·사용자 시안과 같은 계열이며, 박에 칠해지는 색(LabPaintPalette)보다 조금 진하다.
         /// </summary>
         public static Color32 OrbTextColor(LabOrbElement element)
         {
             switch (element)
             {
-                case LabOrbElement.Fire: return new Color32(0xD3, 0x2E, 0x16, 0xFF);
-                case LabOrbElement.Water: return new Color32(0x0E, 0x61, 0x92, 0xFF);
-                case LabOrbElement.Wood: return new Color32(0x2E, 0x69, 0x46, 0xFF);
-                case LabOrbElement.Metal: return new Color32(0xF9, 0xB5, 0x20, 0xFF);
-                case LabOrbElement.Earth: return new Color32(0x65, 0x40, 0x29, 0xFF);
+                case LabOrbElement.Fire: return new Color32(0xD3, 0x2E, 0x15, 0xFF);  // 5OrbsColor/Firered/500***
+                case LabOrbElement.Water: return new Color32(0x0E, 0x61, 0x92, 0xFF); // 5OrbsColor/WaterBlue/500***
+                case LabOrbElement.Wood: return new Color32(0x2F, 0x69, 0x46, 0xFF);  // 5OrbsColor/TreeGreen/500***
+                case LabOrbElement.Metal: return new Color32(0xF9, 0xB5, 0x21, 0xFF); // 5OrbsColor/MetalYellow/500***
+                case LabOrbElement.Earth: return new Color32(0x65, 0x40, 0x29, 0xFF); // 5OrbsColor/SoilBrown/500***
                 default: return new Color32(0, 0, 0, 0xFF);
             }
         }

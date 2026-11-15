@@ -50,7 +50,7 @@ namespace Hapio.Tests
             Assert.That(GameTutorialEmphasis.ToRichText("<red>같은 색끼리는 안 붙어!</red>", 23, Red),
                 Is.EqualTo("<color=#8A1206><b>같은 색끼리는 안 붙어!</b></color>"));
             Assert.That(GameTutorialEmphasis.ToRichText("<fire>화</fire>·<metal>금</metal>", 23, Red),
-                Is.EqualTo("<color=#D32E16><b>화</b></color>·<color=#F9B520><b>금</b></color>"), "The battle orbs' own colours, as in the design.");
+                Is.EqualTo("<color=#D32E15><b>화</b></color>·<color=#F9B521><b>금</b></color>"), "The 5OrbsColor/*/500*** colour tokens.");
             Assert.That(GameTutorialEmphasis.ToRichText("<red>쳐</red>", 23, Red, bold: false), Is.EqualTo("<color=#8A1206>쳐</color>"),
                 "Bold can be turned off in the art.");
             string log = GameTutorialScript.LogLine(GameTutorialEmphasis.ToRichText("먼저 <big>북</big>을\n<red>쳐</red> 봐.", 0, Red));
