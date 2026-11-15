@@ -9049,3 +9049,24 @@ PR #729 검증 중 main `a7208003`에서 `LabLocalBoardNetworkIntegrationTests` 
     - `StoryTapAdvanceTests` 2개(`LastPageFinishesOnceOnReleaseClickRatherThanPointerDown`, `RaycastSurfaceAdvancesOnlyOnCompletedTapAndKeepsDirectNextSynchronous`): 화면 가운데 레이캐스트가 비어 있음. 이 브랜치는 이야기 입력 / 그 검사를 건드리지 않았고, 실행 때 에디터가 Simulator 탭이었다. 다시 실행하지 않아 원인은 확인하지 못함.
 - **눈 / 귀로 확인:** VFX 실험실에서 1~3R "남은 30초로 시간 넘기기" → 알림 + 빨라진 BGM → 10초 뒤 피버, 승리 / 패배 징글 미리 듣기, 지귀 루프 이음매와 피버(꽹과리).
 - **미실행:** iPhone 실기기 진동, 여러 기기 실제 네트워크, 실제 스토리 한 판의 결과 화면에서 징글이 나오는 순간.
+
+## 2026-11-15 — #762 땅따먹기 화면에 새 박(야광귀) 적용
+
+### 확인한 상태 (변경 전)
+
+- 스토리 1~3스테이지는 `GameBattleBindings.MountStageGourd`가 스테이지 정보(`gourdVisualResource`)로 새 박 모델(구미호·야광귀·지귀, 클레이 채색·키링 제거)을 붙인다. 땅따먹기는 `CurrentStageDefinition`이 없어(스토리만 있음) 이 단계를 건너뛰고 예전 흰 박이 그대로 나왔다. 배경은 이미 2스테이지(야광귀) 배경(`GameStageBackgrounds.TerritoryArtStage = 2`)을 쓰고 있었다.
+
+### 변경
+
+- `GameSession.GourdStageDefinition`: 스토리는 그 스테이지, 땅따먹기(1:1·2:2·3:3)는 배경과 같은 2스테이지(야광귀) 정의. `MountStageGourd`가 이것으로 박을 붙여 땅따먹기에 `Stage02_Yagwanggwi_Battle` 박이 붙는다. 박 모양만 빌리고 땅따먹기 규칙·값·화면 이름("땅따먹기")은 그대로다. 튜토리얼은 흰 박 그대로.
+- 칠: 땅따먹기는 클레이 없이 선명한 고해상도 칠을 쓰므로 박 몸통·뚜껑이 칠 지도를 그대로 그린다(`_PaintMapReady` 1). 맞는 판정 껍데기는 박 모델의 것.
+- 크기: 박 모델에는 스토리 박 크기(`LabGourdVisualRig.StageSizeMultiplier` 1.4배, #590)가 붙어, 땅따먹기 박과 판정도 흰 박보다 1.4배 커진다(스토리 2스테이지와 같은 크기).
+- 네트워크·접속 버전·DEV 값 변경 없음.
+
+### 확인
+
+- Unity 6000.6.5f1 Editor 컴파일: PASS. 콘솔 오류 1건은 기존 `ResultAction.png` Library 캐시 손상이다.
+- 검사 추가: PlayMode `GameSceneFlowTests.TerritoryMountsTheYagwanggwiGourdAndPaintsItsTeamColoursStraightOnIt` **PASS**(사용자 실행) — DEV 솔로 땅따먹기에서 야광귀 박 모델·판정 껍데기·스토리 크기, 화면 이름 "땅따먹기", 고해상도 칠이 몸통·뚜껑에 바로 묶임(클레이·물감 없음).
+- `GameSceneFlowTests` 전체(사용자 실행): Passed 25 / Failed 24. 실패 24건은 모두 같은 로그 하나로 실패했다: `Unknown error occurred while loading 'VirtualArtifacts/Primary/e3472224bcaa648cf9879fbf8ddf6346'`(`Assets/Hapio/Art/UI/Strokes/ResultAction.png`). 결과 화면·봉인 박 관람을 여는 검사만 실패했고, 이 기기 Library의 그 GUID 기록 손상이다(#717 기록과 같음, Unity 6.6 통합 저장소라 그 항목만 지울 수 없음). 저장소 파일·meta는 정상이며 #762와 무관하다. 땅따먹기 결과 검사 2건(`TerritoryDeveloperSolo…`, `TerritoryTimeUp…`)도 이 이유로 실패해 박 교체 뒤 결과 화면은 Library 재생성 뒤 재실행이 필요하다(NOT_RUN).
+- 스토리 박 검사(`GameStageGourdIntegrationTests`, `GameStageGourdSizeTests`), `GameBattleUiPresentationTests` 땅따먹기: NOT_RUN.
+- 실제 화면(청·홍 칠이 야광귀 박에 보이는 모습, 커진 박과 위쪽 팀 막대·아래 판의 겹침), Mac 여러 앱 땅따먹기: NOT_RUN.
