@@ -34,10 +34,11 @@ namespace Hapio
             new Beat(.03f, LabHapticStyle.Light, .55f), new Beat(.2f, LabHapticStyle.Light, .6f), new Beat(.38f, LabHapticStyle.Medium, .7f),
             new Beat(.63f, LabHapticStyle.Heavy, 1f, 1.4f, .55f, .3f),
         };
-        /// <summary>패배: 무겁게 한 번 길게 (패배 소리가 정해지면 박자를 맞춘다).</summary>
+        /// <summary>패배: 낮은 북 심장 소리에 맞춰 쿵 / 쿵 / 쿵, 마지막 징 울림 동안 낮게 길게 떨리다 사라진다.</summary>
         public static readonly Beat[] DefeatBeats =
         {
-            new Beat(0f, LabHapticStyle.Heavy, .9f, 1.2f, .7f, .1f), new Beat(1.1f, LabHapticStyle.Heavy, .7f),
+            new Beat(.14f, LabHapticStyle.Heavy, .8f), new Beat(.47f, LabHapticStyle.Medium, .5f),
+            new Beat(.77f, LabHapticStyle.Heavy, .7f), new Beat(1.27f, LabHapticStyle.Heavy, .6f, 1.4f, .35f, .1f),
         };
 
         [Range(0f, 1f)] public float volume = .9f;

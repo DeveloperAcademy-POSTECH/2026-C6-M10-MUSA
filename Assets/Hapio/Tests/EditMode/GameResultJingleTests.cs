@@ -7,11 +7,14 @@ namespace Hapio.Tests
     public sealed class GameResultJingleTests
     {
         [Test]
-        public void TheVictoryJingleIsInResourcesAndShort()
+        public void BothJinglesAreInResourcesAndShort()
         {
-            var clip = Resources.Load<AudioClip>(GameResultJingle.VictoryPath);
-            Assert.That(clip, Is.Not.Null);
-            Assert.That(clip.length, Is.InRange(2f, 6f));
+            foreach (string path in new[] { GameResultJingle.VictoryPath, GameResultJingle.DefeatPath })
+            {
+                var clip = Resources.Load<AudioClip>(path);
+                Assert.That(clip, Is.Not.Null, path);
+                Assert.That(clip.length, Is.InRange(2f, 6f), path);
+            }
         }
 
         [Test]
