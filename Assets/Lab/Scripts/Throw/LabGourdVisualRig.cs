@@ -25,7 +25,8 @@ namespace C6Lab
         public Transform ropeSocket;
         /// <summary>
         /// Story-stage gourds are drawn this much larger than Gourd Visual Size alone would (approved from in-game
-        /// mockups). Only baked rigs use it, so the white gourd of the tutorial, 2:2 and Lab keeps its size.
+        /// mockups). Only baked rigs use it, so the white gourd of the tutorial and Lab keeps its size; the territory match mounts
+        /// the 야광귀 rig since #762 and so has this size too.
         /// </summary>
         public const float StageSizeMultiplier = 1.4f;
         [Tooltip("이 프리팹이 배율 1로 맞는 Gourd Visual Size 값(LabConfig). 흰 박은 1.8에 해당한다.")]

@@ -383,6 +383,7 @@ namespace Hapio
             Stretch(bubbleArt);
             bubbleText = AddText("Line", bubbleRoot, art.dialogueFont, art.maxFontSize, art.textColor);
             bubbleText.resizeTextMinSize = Mathf.Min(art.minFontSize, art.maxFontSize);
+            AddElementOutline(bubbleText);
             // ▽ at the words' bottom-right corner: on the bubble, not its (mirrored) art, so it is never flipped.
             tapHint = AddImage("Tap Hint", bubbleRoot, Color.white, art.tapHint, false);
             tapHint.preserveAspect = true;
@@ -435,6 +436,14 @@ namespace Hapio
             RectTransform success = successText.rectTransform;
             success.anchorMin = success.anchorMax = new Vector2(.5f, y);
             success.anchoredPosition = Vector2.zero;
+        }
+
+        /// <summary>#727: an optional thin ink outline round only the five element colours' letters (off by default, as in the design).</summary>
+        private void AddElementOutline(Text text)
+        {
+            var outline = text.gameObject.AddComponent<GameTutorialElementOutline>();
+            outline.outlineColor = art.textColor;
+            outline.width = art.elementOutlineWidth;
         }
 
         private Text AddText(string name, Transform parent, Font font, int size, Color color)
@@ -584,7 +593,7 @@ namespace Hapio
             {
                 board.SetAllowedGestures(LabBoardGestures.None);
                 tapCatcher.raycastTarget = true;
-                ShowBubble(beat.Speaker, beat.Text);
+                ShowBubble(beat.Speaker, beat.Marked);
                 if (beat.Cue == GameTutorialCue.StaminaShort) session.Network.TutorialPlayStaminaShort();
                 // "고마워! 대신 내가 만든 거 줄게~": the yang, then the drum, slide back in from 금옥이's side.
                 if (beat.Cue == GameTutorialCue.GiveBack) { giveBackStage = 1; giveBackAt = Now + art.giveBackDelay; }
@@ -638,10 +647,13 @@ namespace Hapio
         private void ShowBubble(GameTutorialSpeaker speaker, string text)
         {
             bool fromRight = speaker == GameTutorialSpeaker.Geumok;
-            bubbleText.text = text;
             LayoutBubble(fromRight, false);
             tapHint.gameObject.SetActive(false);
             bubbleRoot.sizeDelta = art.bubbleSize;
+            // #727: the line's emphasis (bigger words, red, the five element colours). Fitted by hand so the bigger words shrink
+            // with the rest when a long line needs a smaller size (Unity's best fit would leave them big and overflow).
+            GameTutorialEmphasis.FitBubble(bubbleText, text, art.maxFontSize, Mathf.Min(art.minFontSize, art.maxFontSize),
+                art.emphasisScale, art.emphasisRed, art.emphasisBold);
             Image face = portraits[GameTutorialScript.SeatOf(speaker)];
             speakerPortrait.sprite = face != null ? face.sprite : null;
             bubbleRoot.gameObject.SetActive(true);
