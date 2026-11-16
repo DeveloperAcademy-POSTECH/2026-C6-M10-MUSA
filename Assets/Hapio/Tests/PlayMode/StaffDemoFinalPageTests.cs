@@ -11,7 +11,44 @@ namespace Hapio.Tests
     public sealed class StaffDemoFinalPageTests
     {
         [UnityTest]
-        public IEnumerator EndingGestureCannotSkipTheFinalPageAndOnlyOneNewReturnActionRuns()
+        public IEnumerator ReturnGateCanOpenAfterQrIsArmedWithoutConsumingABlockedReturn()
+        {
+            var parent = new GameObject("Demo gated return fixture", typeof(RectTransform));
+            try
+            {
+                var page = StaffDemoFinalPage.Create(parent.transform);
+                bool canReturn = false;
+                int returns = 0;
+                page.Show(null, () => returns++, () => canReturn);
+                yield return null; yield return null;
+                Assert.That(page.IsReady, Is.True, "The QR page releases its finishing gesture without waiting for the room.");
+                Assert.That(page.returnButton.interactable, Is.False, "Pending result receipts hold only return, not the visible QR page.");
+                page.returnButton.onClick.Invoke();
+                Assert.That(returns, Is.Zero);
+                Assert.That(page.IsReady, Is.True, "A rejected programmatic callback cannot consume the armed return action.");
+
+                canReturn = true;
+                yield return null; yield return null;
+                Assert.That(page.returnButton.interactable, Is.True, "A later receipt restores the existing action without showing QR again.");
+                page.returnButton.onClick.Invoke();
+                page.returnButton.onClick.Invoke();
+                Assert.That(returns, Is.EqualTo(1));
+                Assert.That(page.IsReady || page.returnButton.interactable, Is.False);
+
+                canReturn = false;
+                page.Show(null, () => returns += 10);
+                yield return null; yield return null;
+                Assert.That(page.IsReady && page.returnButton.interactable, Is.True,
+                    "A later showing without a predicate must not retain the old gate.");
+                page.returnButton.onClick.Invoke();
+                Assert.That(returns, Is.EqualTo(11));
+            }
+            finally { Object.DestroyImmediate(parent); }
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator FinishingGestureCannotSkipTheFinalPageAndOnlyOneNewReturnActionRuns()
         {
             var parent = new GameObject("Demo completion page fixture", typeof(RectTransform));
             InputSettings original = InputSystem.settings;
@@ -39,7 +76,7 @@ namespace Hapio.Tests
                     { touchId = 91, phase = UnityEngine.InputSystem.TouchPhase.Began, position = new Vector2(20, 20) });
                 InputSystem.Update();
                 Assert.That(mouse.leftButton.isPressed && touch.primaryTouch.press.isPressed, Is.True,
-                    "The owned ending pointers must actually be pressed before the page is shown.");
+                    "The owned finishing pointers must actually be pressed before the page is shown.");
                 page = StaffDemoFinalPage.Create(parent.transform);
                 int returns = 0;
                 page.Show(Resources.Load<StaffDemoFinalPageConfig>(StaffDemoFinalPageConfig.ResourcePath), () => returns++);
@@ -48,9 +85,9 @@ namespace Hapio.Tests
                 yield return null;
                 yield return null;
                 Assert.That(mouse.leftButton.isPressed && touch.primaryTouch.press.isPressed, Is.True,
-                    "Editor focus must not release the synthetic ending gesture between frames.");
+                    "Editor focus must not release the synthetic finishing gesture between frames.");
                 Assert.That(returns, Is.Zero);
-                Assert.That(page.IsReady, Is.False, "A held ending touch must not arm the return button.");
+                Assert.That(page.IsReady, Is.False, "A held finishing touch must not arm the return button.");
                 InputSystem.QueueStateEvent(mouse, new MouseState());
                 InputSystem.Update();
                 yield return null;

@@ -8,7 +8,8 @@ namespace C6Lab
         public const string YaguangDemoDefine = "HAPIO_YAGUANG_DEMO";
         public const int YaguangDemoRevision = 1;
         public const string StaffStageDemoDefine = "HAPIO_STAFF_STAGE_DEMO";
-        public const int StaffStageDemoRevision = 3;
+        // Revision 4 finishes each local afterstory directly at QR; older apps wait for shared readiness and an ending.
+        public const int StaffStageDemoRevision = 4;
         /// <summary>Staff demo group is independent of player P slots and territory teams.</summary>
         public static bool IsValidDemoGroup(int group) => group == 1 || group == 2;
         public static bool IsValidStaffRoomIdentity(int stage, int group) => stage >= 1 && stage <= 3 && IsValidDemoGroup(group);

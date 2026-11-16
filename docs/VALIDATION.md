@@ -9341,3 +9341,15 @@ main `cef1579d`의 #760 관람·#762 땅따먹기 박/Game56·#727 튜토리얼�
 - **main `6bcf8e8d`(#760 / #764 / #759 / #768 / #773 / #771) 병합:** 충돌은 이 문서 기록 추가뿐이어서 양쪽을 보존했다. main의 `Ending.asset`에는 좌우 터치 넘기기(`sideTapNavigation`)만 더해져 엔딩 소리 설정과 겹치지 않는다.
 - **main `3f32b324`(#774) 병합:** 충돌은 이 문서 기록 추가뿐이어서 양쪽을 보존했다. #774는 `Assets/Lab`의 북 전달 막힘 UI / 검사와 `docs/GAME_FLOW.md`만 바꿔 엔딩 소리와 겹치지 않는다.
 - **SVG meta 정리:** `Assets/Hapio/Art/UI/Strokes/Source`의 `.svg.meta` 7개만 빈 값 뒤 공백이 빠진 채 저장돼 있어, Unity가 다시 읽을 때마다 변경으로 떴다. Unity가 쓰는 형식(나머지 132개와 같음)으로 한 번 맞췄다. 아이콘 설정 값은 그대로다.
+
+
+## #782 — 시연 후일담 완료 후 QR 직행 (2026-11-16)
+
+- **기준:** main `38dc564e`, Unity 6000.6.5f1·macOS arm64, `feat/#782-staff-demo-direct-qr`. 시연의 후일담 마지막 `마치기`는 각자 QR로 바로 이동한다. 전원 준비 대기·봉인 총평·엔딩은 시연에서 표시하지 않는다. 봉인 카드·개인 기록·선택 관람·후일담은 유지한다.
+- 공유 결과 수명과 통신 호환을 다루므로 전체 검사를 수행했다. 컴파일 오류0. 전체 EditMode **2,592/2,592 PASS**(41.24초), 전체 PlayMode **894/894 PASS**(1190.61초), 실패·skip·inconclusive0. 통과 이후 9개 변경 C# 파일과 ProjectSettings 27개 파일의 SHA-256이 검사 시작 시점과 동일했다.
+- 실제 통신 참가자 2명을 둔 Host 통합 검사에서 선택 스테이지1·2·3의 QR 직행, 다른 참가자가 읽는 중인 상태, 늦은 결과 수신 확인, 완료 후 Host 전송 종료, QR 중 참가자 이탈, 중도 종료 후 자리 재선택을 확인했다. QR 표시와 기존 Host 결과 수신 확인 조건은 분리되며, 막힌 복귀 입력이 버튼을 영구 비활성화하지 않는다. 기존 일반 게임·구형 야광귀 시연 검사도 전체 결과에 포함된다.
+- **화면:** 저장된 Scene을 바꾸지 않고 Editor의 실제 390×844 GameView를 촬영했다. Host와 통신 참가자2명을 사용해 `봉인 카드 → 후일담 마치기 → QR → A/B 선택`을 확인했다. QR 시점에 다른 참가자는 모두 읽는 중, 준비0, 대기false, 총평false였다. 촬영만을 위해 세션 도색량을100%로 높였고 파일에 저장하지 않았다. 촬영 후 참가자·Play·임시 시연 override를 종료하고 Home·원래 GameView 크기를 복원했다.
+- **Mac Release:** `Builds/HapioStage2Demo/20261116-031307-57a93cc0-release/macOS/합이오_쇼케이스.app` 생성. Succeeded·오류0·identityVerified=true. 3인·Stage2 Only·Staff revision4·5개 Scene·Release 설정을 manifest에서 확인했다. 원본 ProjectSettings 27개 파일은 빌드 전후 바이트가 동일하다. Mac 앱 자체는 실행하지 않았으며 화면 촬영은 Editor다.
+- 시연 호환은 Staff3→4로 갱신했다. 전역5705·Lab62·일반 Game56과 공유 설정265개는 유지한다. 운영할 모든 기기에 동일한 새 시연 앱을 설치해야 하며 구형 시연과 방을 섞지 않는다.
+- Scene·Prefab·Resources·Packages의 저장 변경은 없다. 기존 로컬 SVG 메타7개는 사본과 보존 stash를 남겼고 최신 main의 동일 파일 내용과 일치한다. 과거 총평·엔딩 에셋과 일반 게임 기능은 삭제하지 않았다.
+- **미실행:** iOS 내보내기·실기기 설치/터치, 독립 Guest UI에서 Host 이탈 확인. 통신 Guest를 사용한 자동 검사와 실제 Guest 앱 화면 검증을 구분한다. 원시 로그·전체 검사 JSON·빌드·개인 경로는 커밋하지 않는다.
