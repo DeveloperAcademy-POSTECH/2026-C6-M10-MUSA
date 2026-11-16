@@ -18,6 +18,7 @@ namespace Hapio
     ///   그리는 화면 UI 기믹(남은 시간 알림/섬광/매혹/부적/연기/콤보 칸/박 말풍선 등)과 HUD 글자 / 버튼이 모두 안내를 덮는다.
     ///   구슬판 그림 안에 섞여 그리는 기믹(내 판의 박 폭탄 / 여우불, 넘기기 막기 빨간 가장자리)은 층으로 나눌 수 없어서, 그것이 내 판에
     ///   있는 동안은 안내를 숨긴다(북 시간은 계속 센다). 구슬판 그림이 없으면 전투 HUD Canvas 바로 밑 Canvas로 그린다.
+    ///   지귀 부적 / 연기처럼 판을 잠그는 화면(LabOrbBoard.UiInputBlocked)이 떠 있는 동안에도 안내를 멈춘다.
     /// - 글자 없이 손과 화살표만. 내 화면에만 보이는 표시라 Host 규칙·DEV 값·접속 버전과 무관하고, 터치를 막지 않는다.
     /// 연습판(튜토리얼)에는 붙지 않는다(자체 안내가 있다). 그림과 크기는 튜토리얼 그림(GameTutorialArt)을 그대로 쓴다.
     /// </summary>
@@ -154,7 +155,7 @@ namespace Hapio
             string drum = Longest(heldSeconds, out float seconds);
             int open = live ? OpenSides(snapshot, localPlayer, solo) : 0;
             bool show = open != 0 && drum != null && seconds >= hintAfterSeconds && board != null && !board.IsHolding
-                && !BoardGimmickOn(snapshot, localPlayer)
+                && !BoardGimmickOn(snapshot, localPlayer) && !board.UiInputBlocked
                 && TryDrumCircle(drum, out Vector2 center, out float radius);
             if (!show)
             {
