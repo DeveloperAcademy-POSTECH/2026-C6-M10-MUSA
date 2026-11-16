@@ -415,6 +415,30 @@ namespace Hapio.Tests
                 refresh();
                 AssertPlayerBadgeSprite(hud.localPlayerCircle, hud.battleStaminaPortraits[0], "Red team Buri with team badge assets");
                 Assert.That(hud.TeamBar.LocalRing == null || !hud.TeamBar.LocalRing.gameObject.activeSelf, Is.True);
+
+                // Without character or team art (the standalone Lab scene), the global P numbers and the team ring still work.
+                Sprite[] staminaArt = hud.battleStaminaPortraits, portraitArt = hud.battleCharacterPortraits;
+                hud.battleStaminaPortraits = hud.battleCharacterPortraits = null;
+                hud.territoryBlueBadges = hud.territoryRedBadges = null;
+                try
+                {
+                    refresh();
+                    AssertPlayerBadgeSprite(hud.localPlayerCircle, hud.playerCircleSprites[4], "Fallback global P5");
+                    AssertPlayerBadgeSprite(hud.leftPlayerCircle, hud.playerCircleSprites[5], "Fallback global P6 left");
+                    AssertPlayerBadgeSprite(hud.rightPlayerCircle, hud.playerCircleSprites[3], "Fallback global P4 right");
+                    Assert.That(hud.TeamBar.LocalRing, Is.Not.Null);
+                    Assert.That(hud.TeamBar.LocalRing.gameObject.activeSelf, Is.True, "The fallback number wears the team ring.");
+                }
+                finally
+                {
+                    hud.battleStaminaPortraits = staminaArt;
+                    hud.battleCharacterPortraits = portraitArt;
+                    hud.territoryBlueBadges = originalBlue;
+                    hud.territoryRedBadges = originalRed;
+                    refresh();
+                }
+                AssertPlayerBadgeSprite(hud.localPlayerCircle, hud.battleStaminaPortraits[0], "Restored red team Buri");
+                Assert.That(hud.TeamBar.LocalRing.gameObject.activeSelf, Is.False, "Restored character art hides the fallback ring.");
             }
             finally
             {
@@ -443,7 +467,9 @@ namespace Hapio.Tests
             var panelRect = (RectTransform)hud.battleUi.transform.Find("Character Stamina Panel");
             Assert.That(panelRect, Is.Not.Null);
             Assert.That(badge.anchorMin, Is.EqualTo(panelRect.anchorMin));
-            float portraitX = hud.localPlayerCircle.sprite.name == "StaminaPortrait2" ? -132.5f : -131.5f;
+            // 묵이(2) and 만복(5) sit one design unit further left in their panels.
+            string portraitName = hud.localPlayerCircle.sprite.name;
+            float portraitX = portraitName == "StaminaPortrait2" || portraitName == "StaminaPortrait5" ? -132.5f : -131.5f;
             Assert.That(Vector2.Distance(badge.anchoredPosition, new Vector2(portraitX, 4f)), Is.LessThan(.001f));
             for (int index = 0; index < 5; index++)
             {

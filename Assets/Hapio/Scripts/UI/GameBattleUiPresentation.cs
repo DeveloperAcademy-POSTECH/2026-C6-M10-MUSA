@@ -20,13 +20,14 @@ namespace Hapio
         private Sprite[] staminaPanels, staminaNames;
         private const string CharacterArt = "Hapio/UI/BattleCharacters/";
         private static readonly string[] CharacterNames = { "불이", "솔이", "묵이", "금옥", "만복" };
-        // Figma 5573:4233. Match the visible name and portrait in each variant:
-        // Fire red/300, Tree Green/300, Water Blue/300, Metal Yellow/400, Soil Brown/300.
+        // Figma 5573:4233. Match the visible name and portrait in each variant. Colour tokens (Hapio.tokens.json), in
+        // art order 불이·솔이·묵이·금옥·만복: 5OrbsColor/Firered/300***, 5OrbsColor/TreeGreen/300***,
+        // 5OrbsColor/WaterBlue/300***, 5OrbsColor/MetalYellow/400, 5OrbsColor/SoilBrown/300***.
         private static readonly Color32[] FilledCells = {
             new Color32(229,130,115,255), new Color32(130,165,144,255), new Color32(110,160,190,255),
             new Color32(250,196,77,255), new Color32(163,140,127,255)
         };
-        // Corresponding 5 Orbs Color/100 styles.
+        // The same families' 100 tokens: 5OrbsColor/{Firered,TreeGreen,WaterBlue,MetalYellow,SoilBrown}/100.
         private static readonly Color32[] EmptyCells = {
             new Color32(246,213,208,255), new Color32(213,225,218,255), new Color32(207,223,233,255),
             new Color32(254,240,211,255), new Color32(224,217,212,255)
