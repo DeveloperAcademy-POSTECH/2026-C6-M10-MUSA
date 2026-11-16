@@ -1,7 +1,6 @@
 using System;
 using System.Linq;
 using System.Reflection;
-using C6Lab;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
@@ -13,64 +12,48 @@ namespace Hapio.Tests
     {
         private const string Root = "Assets/Hapio/Resources/Hapio/Demo/Staff";
         private const string Source = "Assets/Hapio/Story/StageStories";
-        private static readonly string[] Names = { "구미호", "야광귀", "지귀" };
-
-        [TestCase(1), TestCase(2), TestCase(3)]
-        public void SelectedStageSummaryUsesOnlyThatCanonicalRecordAndEveryActualParticipantsContribution(int stage)
+        [TestCase("AfterGumiho"), TestCase("AfterYagwanggui"), TestCase("AfterJigwi")]
+        public void StaffAfterstoryRetainsCardRecordsAndAnEditableFinishAction(string name)
         {
-            var instance = Object.Instantiate(Require<GameObject>(Root + "/Stage" + stage + "/Views/SealRunSummary.prefab"));
+            var sequence = Require<StorySequence>(Source + "/" + name + ".asset");
+            Assert.That(sequence.Validate(out string error), Is.True, error);
+            Assert.That(sequence.cuts[0].viewPrefab.GetComponentInChildren<StoryCardRecords>(true), Is.Not.Null);
+            Assert.That(sequence.cuts[0].viewPrefab.GetComponentInChildren<StoryCardFlip>(true), Is.Not.Null);
+            var instance = Object.Instantiate(sequence.cuts.Last().viewPrefab.gameObject);
             try
             {
-                var summary = instance.GetComponent<SealRunSummary>();
-                Assert.That(summary.stageIndices, Is.EqualTo(new[] { stage }));
-                Assert.That(summary.stageTimes, Has.Length.EqualTo(1));
-                Assert.That(summary.contributions, Has.Length.EqualTo(1));
-                var rows = new LabResultStage[3];
-                rows[stage - 1] = new LabResultStage(new[] {
-                    new LabPlayerState { id = 19, paintedCellsTotal = 25 },
-                    new LabPlayerState { id = 42, paintedCellsTotal = 35 },
-                    new LabPlayerState { id = 71, paintedCellsTotal = 40 }
-                }, 83.8);
-                foreach (var pair in new[] { (id: 19UL, percent: "25%"), (id: 42UL, percent: "35%"), (id: 71UL, percent: "40%") })
-                {
-                    summary.Bind(rows, pair.id);
-                    Assert.That(summary.stageTimes[0].text, Is.EqualTo("01:23"));
-                    Assert.That(summary.totalTime.text, Is.EqualTo("01:23"), "Unplayed stages are not missing from a single-stage route.");
-                    Assert.That(summary.contributions[0].text, Is.EqualTo(pair.percent));
-                }
-                summary.Bind(rows, 999);
-                Assert.That(summary.contributions[0].text, Is.EqualTo("—"));
-                summary.Bind(new LabResultStage[3], 19);
-                Assert.That(summary.totalTime.text, Is.EqualTo("—"));
-                Assert.That(instance.GetComponentInChildren<SealRunSummaryPreview>(true), Is.Null);
+                var finish = instance.GetComponent<StoryStageClearControls>();
+                Assert.That(finish, Is.Not.Null);
+                Assert.That(finish.nextSeal, Is.Not.Null);
+                finish.Present(true, false, true, true);
+                Assert.That(finish.nextSeal.gameObject.activeSelf && finish.nextSeal.interactable, Is.True,
+                    "Every local participant can finish the single selected stage.");
+                Assert.That(finish.nextSeal.GetComponentInChildren<UnityEngine.UI.Text>(true).text,
+                    Is.EqualTo(StoryStageClearControls.FinishLabel));
+                Assert.That(finish.waiting.gameObject.activeSelf, Is.False);
+                if (finish.heading != null) Assert.That(finish.heading.gameObject.activeSelf, Is.False);
             }
             finally { Object.DestroyImmediate(instance); }
         }
 
-        [TestCase(1), TestCase(2), TestCase(3)]
-        public void EndingKeepsItsSelectedYokaiAndOriginalStoryPicturesWithoutClaimingOtherCaptures(int stage)
+        [Test]
+        public void StaffBuildValidationNeedsAfterstoriesAndQrWithoutRequiringRetiredSummariesOrEndings()
         {
-            var source = Require<StorySequence>(Source + "/GameEnding.asset");
-            var selected = Resources.Load<StorySequence>(GameStageStoryPresentation.StaffDemoEndingResource(stage));
-            Assert.That(selected, Is.Not.Null);
-            Assert.That(selected.Validate(out string error), Is.True, error);
-            Assert.That(selected.cuts, Has.Count.EqualTo(7));
-            Assert.That(selected.cuts[0].viewPrefab.GetComponent<SealRunSummary>().stageIndices, Is.EqualTo(new[] { stage }));
-            Assert.That(selected.cuts[1], Is.Not.SameAs(source.cuts[1]));
-            Assert.That(selected.cuts[1].viewPrefab, Is.SameAs(source.cuts[1].viewPrefab));
-            Assert.That(selected.cuts[1].GetPage(0).dialogue, Is.EqualTo("이야~\n" + Names[stage - 1] + "도 무사히 봉인했네~!"));
-            for (int i = 2; i < 7; i++) Assert.That(selected.cuts[i], Is.SameAs(source.cuts[i]));
-            var view = selected.cuts[0].viewPrefab;
-            Assert.That(view.requireContinueButton && view.waitForEntrance, Is.True);
-            Assert.That(view.continueButton, Is.Not.Null);
-            Assert.That(view.exitCloudWipe, Is.Not.Null);
-            Assert.That(view.beats.Count(beat => beat.motion == StoryVisualBeat.Motion.SpinSeal), Is.EqualTo(1));
-            var captions = view.GetComponentsInChildren<UnityEngine.UI.Text>(true).Select(text => text.text).ToArray();
-            Assert.That(captions, Does.Contain(Names[stage - 1] + " 봉인 완료"));
-            for (int i = 0; i < Names.Length; i++)
-                if (i != stage - 1) Assert.That(captions, Does.Not.Contain(Names[i]));
-            Assert.That(source.cuts[0].viewPrefab.GetComponent<SealRunSummary>().stageIndices, Is.EqualTo(new[] { 1, 2, 3 }));
-            Assert.That(source.cuts[1].GetPage(0).dialogue, Does.Contain("세마리"), "Normal ending stays authored as before.");
+            Type builder = Type.GetType("Hapio.Editor.StaffStageDemoStoryAssets, Assembly-CSharp-Editor", true);
+            var requested = new System.Collections.Generic.List<string>();
+            Func<string, Object> load = path =>
+            {
+                requested.Add(path);
+                if (path.Contains("/Demo/Staff/Stage") || path.EndsWith("/GameEnding.asset", StringComparison.Ordinal))
+                    throw new AssertionException("The direct-QR build must not read a retired ending or summary: " + path);
+                return AssetDatabase.LoadAssetAtPath<Object>(path);
+            };
+            Assert.DoesNotThrow(() => builder.GetMethod("ValidateRuntimeAssets", BindingFlags.NonPublic | BindingFlags.Static)
+                .Invoke(null, new object[] { load }));
+            Assert.That(requested, Is.EquivalentTo(new[] {
+                Source + "/AfterGumiho.asset", Source + "/AfterYagwanggui.asset", Source + "/AfterJigwi.asset",
+                Root + "/FinalPage.prefab", Root + "/FinalPageConfig.asset"
+            }));
         }
 
         [Test]

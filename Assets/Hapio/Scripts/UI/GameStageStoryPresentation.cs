@@ -52,12 +52,10 @@ namespace Hapio
         public bool IsLocalStoryComplete => resultActionsReady && (mode == Mode.ReadyToAdvance || mode == Mode.FailureDashboard);
         public bool IsResultActionReady => IsLocalStoryComplete;
         public LabSnapshot BoundResult => boundResult;
-        public static string StaffDemoEndingResource(int stage) => stage >= 1 && stage <= 3
-            ? "Hapio/Demo/Staff/Stage" + stage + "/GameEnding" : null;
-        private StorySequence EndingSequence => C6Lab.LabGameBuildVariant.IsStaffStageDemo
-            ? Resources.Load<StorySequence>(StaffDemoEndingResource(session != null ? session.State.stageIndex : 0) ?? string.Empty)
-            : C6Lab.LabGameBuildVariant.IsYaguangDemo
-                ? Resources.Load<StorySequence>(YaguangDemoEndingResource) : ending;
+        private bool IsStaffCompletedResult => C6Lab.LabGameBuildVariant.IsStaffStageDemo
+            && session != null && session.State.phase == GameFlowPhase.Completed;
+        private StorySequence EndingSequence => C6Lab.LabGameBuildVariant.IsYaguangDemo
+            ? Resources.Load<StorySequence>(YaguangDemoEndingResource) : ending;
 
         public void Initialize(GameScreen owner, GameSession game)
         {
@@ -130,7 +128,7 @@ namespace Hapio
             }
             if (mode == Mode.AfterStage && clearControls != null && player.IsReading && !player.IsTransitioning)
                 player.Next(); // The silent final picture itself is the ready/waiting screen.
-            if (mode == Mode.ReadyToAdvance && resultActionsReady && session.SummaryAllowed)
+            if (!IsStaffCompletedResult && mode == Mode.ReadyToAdvance && resultActionsReady && session.SummaryAllowed)
                 BeginEnding();
             screen.RefreshStoryViewer();
             if (showingOverall)
@@ -150,12 +148,14 @@ namespace Hapio
                 || presentationRoot == gameObject || transform.IsChildOf(presentationRoot.transform)) return false;
             StorySequence sequence = successful && session.State.stageIndex >= 1 && afterStages != null
                 && session.State.stageIndex <= afterStages.Length ? afterStages[session.State.stageIndex - 1] : failure;
+            if (sequence == null || !sequence.Validate(out _)) return false;
+            if (!successful || session.State.phase != GameFlowPhase.Completed) return true;
+            // Staff completion uses the local QR page; retained ending assets are not a runtime dependency.
+            if (IsStaffCompletedResult)
+                return Resources.Load<StaffDemoFinalPage>(StaffDemoFinalPage.ResourcePath) != null
+                    && Resources.Load<StaffDemoFinalPageConfig>(StaffDemoFinalPageConfig.ResourcePath) != null;
             StorySequence finalStory = EndingSequence;
-            return sequence != null && sequence.Validate(out _)
-                && (!successful || session.State.phase != GameFlowPhase.Completed || finalStory != null && finalStory.Validate(out _)
-                    && (!C6Lab.LabGameBuildVariant.IsStaffStageDemo
-                        || Resources.Load<StaffDemoFinalPage>(StaffDemoFinalPage.ResourcePath) != null
-                        && Resources.Load<StaffDemoFinalPageConfig>(StaffDemoFinalPageConfig.ResourcePath) != null));
+            return finalStory != null && finalStory.Validate(out _);
         }
 
         private bool MatchesResult(LabSnapshot result, bool successful) => result != null
@@ -294,7 +294,7 @@ namespace Hapio
                 || GenerationKey(session) != expectedGeneration) yield break;
             resultActionsReady = true;
             SetBusy(false);
-            if (session.LocalSealReady && readyView != null && mode == Mode.ReadyToAdvance)
+            if (!IsStaffCompletedResult && session.LocalSealReady && readyView != null && mode == Mode.ReadyToAdvance)
                 readyView.BeginWaiting(session.Network.IsHost, session.State.runId, session.State.stageIndex, boundResult.players, session.ResultLocalPlayerId);
             RefreshControls();
         }
@@ -326,14 +326,17 @@ namespace Hapio
         {
             if (finalPage == null) finalPage = StaffDemoFinalPage.Create(presentationRoot.transform);
             mode = Mode.FinalPage;
+            showingOverall = false;
+            SetBusy(false);
             if (readyView != null) readyView.ResetView();
-            finalPage.Show(Resources.Load<StaffDemoFinalPageConfig>(StaffDemoFinalPageConfig.ResourcePath), ReturnToDemoSelection);
+            finalPage.Show(Resources.Load<StaffDemoFinalPageConfig>(StaffDemoFinalPageConfig.ResourcePath), ReturnToDemoSelection,
+                () => session != null && session.CanReturnHome);
             RefreshControls();
         }
 
         private void ReturnToDemoSelection()
         {
-            if (mode != Mode.FinalPage || session == null || transitionPending) return;
+            if (mode != Mode.FinalPage || session == null || transitionPending || !session.CanReturnHome) return;
             transitionPending = true;
             session.ReturnToDemoSelection();
         }
@@ -370,9 +373,10 @@ namespace Hapio
                     session.SealReadyCount, session.SealParticipantCount, blocked, final, session.ResultHoldNotice);
             }
             Show(advanceButton, primary && !authoredClear);
-            Set(advanceButton, primary && !blocked && (failed ? session.CanRetryStage : final ? session.CanReturnHome : session.CanAdvanceStage));
-            Label(advanceButton, failed ? "이 스테이지 재도전" : final ? "봉인 총평" : "다음 스테이지");
-            bool overall = final && review && !authoredClear && session.StageResults.Count > 0;
+            Set(advanceButton, primary && !blocked && (failed ? session.CanRetryStage
+                : IsStaffCompletedResult || (final ? session.CanReturnHome : session.CanAdvanceStage)));
+            Label(advanceButton, failed ? "이 스테이지 재도전" : IsStaffCompletedResult ? "마치기" : final ? "봉인 총평" : "다음 스테이지");
+            bool overall = final && !IsStaffCompletedResult && review && !authoredClear && session.StageResults.Count > 0;
             Show(overallButton, overall); Set(overallButton, overall && !blocked);
             // The approved clear picture has only its own 다음 봉인/마치기: no footer 완성 박 보기 or 나가기 (#647).
             // The sealed gourd stays reachable from the seal card's 봉인 박 둘러보기.
@@ -463,6 +467,11 @@ namespace Hapio
             if (!IsPresenting || ActionsBlocked) return;
             if (mode == Mode.FailureDashboard) { Retry(); return; }
             if (mode != Mode.ReadyToAdvance) return;
+            if (IsStaffCompletedResult)
+            {
+                ShowFinalPage();
+                return;
+            }
             if (session.LocalSealReady || !session.ConfirmSealReady()) return;
             readyView.BeginWaiting(session.Network.IsHost, session.State.runId, session.State.stageIndex,
                 boundResult.players, session.ResultLocalPlayerId);
@@ -471,7 +480,8 @@ namespace Hapio
 
         public void StartPreparedStage()
         {
-            if (mode != Mode.ReadyToAdvance || ActionsBlocked || !session.LocalSealReady || !session.Network.IsHost) return;
+            if (IsStaffCompletedResult || mode != Mode.ReadyToAdvance || ActionsBlocked
+                || !session.LocalSealReady || !session.Network.IsHost) return;
             if (session.State.phase == GameFlowPhase.Completed)
             {
                 if (session.StartSummary()) BeginEnding();
@@ -538,7 +548,7 @@ namespace Hapio
 
         private void BeginEnding()
         {
-            if (mode == Mode.Ending || !session.SummaryAllowed || !session.CanReturnHome) return;
+            if (IsStaffCompletedResult || mode == Mode.Ending || !session.SummaryAllowed || !session.CanReturnHome) return;
             showingOverall = false; mode = Mode.Ending; SetBusy(true);
             if (readyView != null) readyView.ResetView();
             player.Play(EndingSequence); RefreshControls();

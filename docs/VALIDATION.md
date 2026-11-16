@@ -9399,3 +9399,30 @@ main `cef1579d`의 #760 관람·#762 땅따먹기 박/Game56·#727 튜토리얼�
 - 먹선 안내·색상 일치·성공 색종이 후속: LabComboEffectLookTests PlayMode 9/9 통과(오색 전체 사용·사각 조각·터치 비차단·Clear 포함). 최초 테스트 요청은 Editor가 Playing 상태여서 시작되지 않았고 Stop 후 재요청했다. Unity PreviewScene 실제 컴포넌트로 화살표·손가락·오색 색종이·숫자/전달불가 색을 렌더해 육안 확인했다. 튜토리얼 전체 흐름과 iOS 실기기는 이번 후속에서 미실행. 스크립트 컴파일 오류는 없었으며 Console에는 Transport.ResetStatics의 Collection modified 생명주기 오류 1건이 별도로 있었다.
 
 - 전달불가/숫자 동시 점멸 후속: 최초 검사는 TextMesh 8비트 alpha와 Sprite float alpha의 반올림 차이로 1건 실패했다. 공통 alpha를 8비트로 맞춘 뒤 동시 점멸·숫자 교체 검사와 기존 가장자리 카운트다운 검사 PlayMode 2/2 통과. Unity 실제 컴포넌트의 34프레임을 고정 시각으로 렌더했다.
+## #782 — 시연 후일담 완료 후 QR 직행 (2026-11-16)
+
+- **기준:** main `38dc564e`, Unity 6000.6.5f1·macOS arm64, `feat/#782-staff-demo-direct-qr`. 시연의 후일담 마지막 `마치기`는 각자 QR로 바로 이동한다. 전원 준비 대기·봉인 총평·엔딩은 시연에서 표시하지 않는다. 봉인 카드·개인 기록·선택 관람·후일담은 유지한다.
+- 공유 결과 수명과 통신 호환을 다루므로 전체 검사를 수행했다. 컴파일 오류0. 전체 EditMode **2,592/2,592 PASS**(41.24초), 전체 PlayMode **894/894 PASS**(1190.61초), 실패·skip·inconclusive0. 통과 이후 9개 변경 C# 파일과 ProjectSettings 27개 파일의 SHA-256이 검사 시작 시점과 동일했다.
+- 실제 통신 참가자 2명을 둔 Host 통합 검사에서 선택 스테이지1·2·3의 QR 직행, 다른 참가자가 읽는 중인 상태, 늦은 결과 수신 확인, 완료 후 Host 전송 종료, QR 중 참가자 이탈, 중도 종료 후 자리 재선택을 확인했다. QR 표시와 기존 Host 결과 수신 확인 조건은 분리되며, 막힌 복귀 입력이 버튼을 영구 비활성화하지 않는다. 기존 일반 게임·구형 야광귀 시연 검사도 전체 결과에 포함된다.
+- **화면:** 저장된 Scene을 바꾸지 않고 Editor의 실제 390×844 GameView를 촬영했다. Host와 통신 참가자2명을 사용해 `봉인 카드 → 후일담 마치기 → QR → A/B 선택`을 확인했다. QR 시점에 다른 참가자는 모두 읽는 중, 준비0, 대기false, 총평false였다. 촬영만을 위해 세션 도색량을100%로 높였고 파일에 저장하지 않았다. 촬영 후 참가자·Play·임시 시연 override를 종료하고 Home·원래 GameView 크기를 복원했다.
+- **Mac Release:** `Builds/HapioStage2Demo/20261116-031307-57a93cc0-release/macOS/합이오_쇼케이스.app` 생성. Succeeded·오류0·identityVerified=true. 3인·Stage2 Only·Staff revision4·5개 Scene·Release 설정을 manifest에서 확인했다. 원본 ProjectSettings 27개 파일은 빌드 전후 바이트가 동일하다. Mac 앱 자체는 실행하지 않았으며 화면 촬영은 Editor다.
+- 시연 호환은 Staff3→4로 갱신했다. 전역5705·Lab62·일반 Game56과 공유 설정265개는 유지한다. 운영할 모든 기기에 동일한 새 시연 앱을 설치해야 하며 구형 시연과 방을 섞지 않는다.
+- Scene·Prefab·Resources·Packages의 저장 변경은 없다. 기존 로컬 SVG 메타7개는 사본과 보존 stash를 남겼고 최신 main의 동일 파일 내용과 일치한다. 과거 총평·엔딩 에셋과 일반 게임 기능은 삭제하지 않았다.
+- **미실행:** iOS 내보내기·실기기 설치/터치, 독립 Guest UI에서 Host 이탈 확인. 통신 Guest를 사용한 자동 검사와 실제 Guest 앱 화면 검증을 구분한다. 원시 로그·전체 검사 JSON·빌드·개인 경로는 커밋하지 않는다.
+
+
+### #782 PR #784 최신 main 통합·병합 전 검증 (2026-11-16)
+
+- main `df6db7cc`의 #778 로비·폰트 정수화·3:3 미니맵과 #780 알림·북 손 안내·연기·금옥 안내 변경을 보존했다. 구현/에셋 충돌은 없었고 VALIDATION의 양쪽 추가 기록만 함께 유지했다. 통합 코드 기준은 `855e5d47`이다.
+- 공유 StoryPlayer·후일담/로비 Prefab·LabConfig가 달라져 이전 결과를 최종 통합 검증으로 사용하지 않았다. 컴파일 오류0, 전체 EditMode **2,598/2,598 PASS**(29.85초), 전체 PlayMode **894/894 PASS**(1225.88초), 실패·skip·inconclusive0.
+- 시연 QR 직행·결과 수신 지연·Host 전송 종료·참가자 이탈·자리 선택 재도전 9건과 일반 게임·구형 시연 검사를 포함한다. 두 독립 코드 검토에서도 차단 결함을 찾지 못했다. PR은 의도한 12개 파일이며 최신 main의 Scene/Prefab/Resources/Packages/ProjectSettings는 덮어쓰지 않는다.
+- Mac Stage2 Only Release `Builds/HapioStage2Demo/20261116-064921-11004438-release/macOS/합이오_쇼케이스.app`: Succeeded·오류0·identityVerified=true. 소스855e5d47·sourceHasUncommittedChanges=false·Staff4·3인·Stage2·5개 Scene을 확인했다. 앱 자체는 실행하지 않았다.
+- 최신 통합본의 실제 Editor 390×844 화면을 다시 촬영해 `봉인 카드 → 후일담 마치기 → QR → A/B 선택`을 확인했다. QR 시점 다른 두 참가자는 읽는 중·준비false였고 대기false·총평false·준비 수0이었다. 촬영용 세션만 완료를 단축했으며 저장 설정/Scene은 바꾸지 않았다. 촬영 후 Play·통신 참가자·임시 override를 종료하고 원래 Home/GameView로 복원했다.
+- 검사/빌드 후 ProjectSettings 27개와 관련 코드·에셋 85개는 검사 전 해시와 동일했다. 새 SVG 메타1개는 Importer가 만든 빈 값 뒤 공백만 달랐고, 검사 시점 사본·정규화 비교로 값이 동일함을 확인한 뒤 원격 main 형식으로 복원했다. 기존 로컬 SVG 메타7개는 사본과 바이트가 동일하며 stash도 유지한다. 문서만 추가한 뒤 게임 검사를 반복하지 않는다.
+- iOS 내보내기/실기기와 독립 Guest UI에서 Host 이탈 확인은 미실행이다. Mac 앱 실행과 Editor 촬영을 구분하며 Staff4 새 빌드를 모든 운영 기기에 설치해야 한다.
+
+### #783 최신 main 충돌 해결·검증 (2026-11-16)
+
+- main `c9abf049`(#784)을 #783에 병합했다. 충돌은 이 문서의 병렬 추가 기록 한 곳이었고 #783/#782 기록을 모두 보존했다. 코드 충돌은 없었다.
+- 통합 후 Unity 6000.6.5f1 MCP: 컴파일 Console 오류0, PlayMode 관련 17/17 통과(LabGourdAlertTests·LabComboEffectLookTests·전달 차단 점멸/카운트다운·폭발 정리·StaffDemoFinalPageTests). EditMode 관련 13/13 통과(LabYaguangFeverHudTests·StaffStageDemoStoryTests).
+- 전체 검사·실기기·독립 앱 다인 전투는 이번 병합에서 미실행이다.

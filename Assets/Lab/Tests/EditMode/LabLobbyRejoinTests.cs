@@ -399,8 +399,8 @@ namespace C6Lab.Tests
             {
                 a.Set("<DemoStageIndex>k__BackingField", 2); a.Set("<DemoGroupId>k__BackingField", 1);
                 b.Set("<DemoStageIndex>k__BackingField", 2); b.Set("<DemoGroupId>k__BackingField", 2);
-                Assert.That(a.Approve(8, null, "C6HapioStaffDemo/3/S2/G2"), Is.False);
-                Assert.That(b.Approve(8, null, "C6HapioStaffDemo/3/S2/G1"), Is.False);
+                Assert.That(a.Approve(8, null, "C6HapioStaffDemo/4/S2/G2"), Is.False);
+                Assert.That(b.Approve(8, null, "C6HapioStaffDemo/4/S2/G1"), Is.False);
                 Assert.That(a.Approve(8, null, "C6HapioStaffDemo/2/S2"), Is.False);
                 a.Join(5, TicketA, 2); a.Join(6, TicketB, 3);
                 Assert.That(a.Approve(9, null), Is.False, "A is full, independently of B.");
