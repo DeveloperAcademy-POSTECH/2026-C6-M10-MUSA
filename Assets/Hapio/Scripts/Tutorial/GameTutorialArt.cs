@@ -194,7 +194,7 @@ namespace Hapio
         [Tooltip("목록 아래 끝과 \"뒤로 가기\" 버튼 위 끝 사이")] [Min(0f)] public float logBackGap = 8f;
 
         [Header("화살표 (끌어 놓을 방향)")]
-        public Color arrowColor = new Color(.36f, .66f, .29f, 1f);
+        public Color arrowColor = Color.black;
         [Min(1f)] public float arrowWidth = 7f;
         [Min(1f)] public float arrowHeadLength = 18f;
         [Min(1f)] public float arrowHeadWidth = 22f;

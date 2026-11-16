@@ -969,10 +969,13 @@ namespace C6Lab.Tests
                 Assert.That(paper.sortingOrder, Is.LessThan(board.EdgeBlock.GlowSortingOrder),
                     "The transparent paper plate is drawn first, so it never covers the red glow.");
                 Assert.That(paper.sortingOrder, Is.EqualTo(LabSceneController.PlateSortingOrder));
+                // #783: the blocked edge itself says so; the gourd's bubble no longer shows the blocked way.
+                Assert.That(board.EdgeBlock.Right, Is.EqualTo(right), "The notice sits on the blocked side.");
+                Assert.That(board.EdgeBlock.BlockedLabel.Replace("\n", string.Empty), Is.EqualTo("전달불가"),
+                    "The blocked edge carries the vertical notice.");
                 var alert = UnityEngine.Object.FindFirstObjectByType<LabGourdAlert>();
                 Assert.That(alert, Is.Not.Null);
-                Assert.That(alert.ShowingBlock, Is.True, "The gourd's bubble shows the blocked way.");
-                Assert.That(alert.BlockRight, Is.EqualTo(right));
+                Assert.That(alert.ShowingHeart || alert.ShowingEyes, Is.False, "Blocking raises no other gourd bubble.");
 
                 until = Time.realtimeSinceStartup + .5f;
                 while (Time.realtimeSinceStartup < until) yield return null;

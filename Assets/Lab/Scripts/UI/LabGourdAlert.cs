@@ -8,8 +8,7 @@ namespace C6Lab
     /// 흰 말풍선에 굵은 테두리, 박을 가리키는 꼬리, 빨간 "!"가 그려진 그림체이며, 톡 튀어나와 흔들리다
     /// 들어간다. 박이 흔들리고 돌아도 화면에서 박 위를 따라간다. 화면 표시만 하며 터치를 막지 않는다.
     /// 일시정지 중이거나 전투가 끝나면 사라진다.
-    /// 박이 내 한쪽 넘기기를 막을 때(#215)는 같은 말풍선에 "← 🚫" 또는 "→ 🚫"(먹색 화살표와 빨간 금지
-    /// 표시를 직접 그림)가 떠, 막힌 사람 화면에만 보인다.
+    /// 넘기기 막기(#215)는 이 말풍선을 쓰지 않는다. #783부터 막힌 가장자리의 세로 "전달불가"와 남은 초(LabOrbEdgeBlock)가 알린다.
     /// 요괴가 통합 추첨으로 매혹을 걸 때(#251)는 같은 말풍선에 하트(직접 그림)가 떠, 매혹된 사람 화면에만 보인다.
     /// 야광귀 섬광 예고(#268)에는 같은 말풍선에 야광귀의 튀어나온 두 눈(직접 그림)이 떠 모든 기기에서 보이고,
     /// 섬광 직전에 눈이 갑자기 노랗게 빛난다(`SetEyeGlow`). 번쩍이는 순간 말풍선은 들어간다.
@@ -18,6 +17,7 @@ namespace C6Lab
     public sealed class LabGourdAlert : MonoBehaviour
     {
         public const string Text = "!";
+        public const string ExclamationArtPath = "Sabotage/GourdExclamation";
         public const string YaguangTauntPath = "Sabotage/YaguangTauntBubble";
         public const string YaguangReleasePath = "Sabotage/YaguangReleaseBubble";
         private const int TextureSize = 150;
@@ -35,21 +35,7 @@ namespace C6Lab
         private const float LeaveSeconds = .15f;
         private const float WiggleDegrees = 9f;
         private const float WiggleHz = 3f;
-        /// <summary>넘기기 막기 말풍선이 떠 있는 시간 (초, #215). 막힌 가장자리와 남은 초는 막기 내내 판에 남는다.</summary>
-        public const float BlockShowSeconds = 2.4f;
-        public const float BlockFadeSeconds = .4f;
-        public const string BlockArtRoot = "Sabotage/DrumPassBlock/";
-        private bool blockPanelShown;
-        private CanvasGroup bubbleFade;
-        public float BlockPanelAlpha => bubbleFade != null ? bubbleFade.alpha : 1f;
-        public static float BlockNoticeAlpha(float age) => Mathf.Clamp01(age / .12f)
-            * (1f - Mathf.Clamp01((age - (BlockShowSeconds - BlockFadeSeconds)) / BlockFadeSeconds));
-        // 막기 표시 그림 (픽셀, 아래가 0): 왼쪽 절반에 막힌 쪽을 가리키는 화살표, 오른쪽에 금지 표시.
-        private const int MarkWidth = 128, MarkHeight = 64;
-        private static readonly Color32 SignColor = new Color32(232, 41, 26, 255);
         private static Sprite bubbleSprite;
-        private static Sprite blockLeftSprite;
-        private static Sprite blockRightSprite;
         private static Sprite heartSprite;
         private static Sprite eyesSprite;
         private static Sprite eyesLitSprite;
@@ -78,7 +64,6 @@ namespace C6Lab
         private RectTransform layer;
         private RectTransform bubble;
         private UnityEngine.UI.Text mark;
-        private Image blockMark;
         private Image heartMark;
         private bool showingHeart;
         private bool wasCharmed;
@@ -92,16 +77,14 @@ namespace C6Lab
         private float wordPopElapsed = -1f;
         private float elapsed = -1f;
         private float duration;
-        private bool showingBlock;
-        private bool blockRight;
 
         /// <summary>박 폭탄 알림이 진행 중인지 (박이 화면 밖이라 안 보이는 순간도 포함).</summary>
         public bool Active => elapsed >= 0f;
         /// <summary>말풍선이 지금 화면에 그려지고 있는지.</summary>
         public bool Visible => bubble != null && bubble.gameObject.activeSelf;
         public RectTransform Bubble => bubble;
-        /// <summary>말풍선의 내용: 폭탄이면 "!", 넘기기 막기면 "← 🚫" 또는 "→ 🚫", 매혹이면 "♥".</summary>
-        public string Label => showingBlock ? (blockRight ? "→ 🚫" : "← 🚫") : showingHeart ? "♥"
+        /// <summary>말풍선의 내용: 폭탄이면 "!", 매혹이면 "♥".</summary>
+        public string Label => showingHeart ? "♥"
             : showingEyes ? "👀" : mark != null ? mark.text : string.Empty;
         /// <summary>지금 야광귀 눈 말풍선을 보여 주는 중인지 (#268).</summary>
         public bool ShowingEyes => Active && showingEyes;
@@ -110,18 +93,12 @@ namespace C6Lab
         /// <summary>지금 매혹 하트 말풍선을 보여 주는 중인지 (#251).</summary>
         public bool ShowingHeart => Active && showingHeart;
         public float ShowSeconds => showSeconds;
-        /// <summary>지금 넘기기 막기 말풍선을 보여 주는 중인지 (#215).</summary>
-        public bool ShowingBlock => Active && showingBlock;
-        /// <summary>막기 말풍선이 오른쪽 막힘을 가리키는지.</summary>
-        public bool BlockRight => blockRight;
-
         /// <summary>박 폭탄 신호를 받을 네트워크와, 말풍선을 그릴 Canvas·전투 카메라를 연결한다.</summary>
         public void Bind(LabNetwork target, Canvas uiCanvas, Camera camera)
         {
             if (network != null)
             {
                 network.GourdBombDropped -= OnGourdBombDropped;
-                network.SwipeBlockStarted -= OnSwipeBlockStarted;
                 network.SabotageCast -= OnSabotageCast;
             }
             network = target;
@@ -130,7 +107,6 @@ namespace C6Lab
             if (network != null)
             {
                 network.GourdBombDropped += OnGourdBombDropped;
-                network.SwipeBlockStarted += OnSwipeBlockStarted;
                 network.SabotageCast += OnSabotageCast;
             }
         }
@@ -158,17 +134,18 @@ namespace C6Lab
             if (network != null) Show(network.target);
         }
 
-        // 네트워크는 막힌 사람 자신에게만 알린다.
-        private void OnSwipeBlockStarted(bool right, float seconds)
-        {
-            if (network != null) ShowBlock(network.target, right);
-        }
-
         /// <summary>박 옆에 "!" 말풍선을 띄운다. 이미 떠 있으면 처음부터 다시 튀어나온다.</summary>
         public void Show(LabTarget gourd)
         {
+            if (ShowArtwork(gourd, ExclamationArtPath, showSeconds))
+            {
+                mark.text = Text; // Logical label; the artwork includes the brush mark.
+                markOutline.enabled = false;
+                bubble.pivot = new Vector2(.22f, .09f);
+                return;
+            }
             if (gourd == null || !EnsureBubble()) return;
-            showingBlock = showingHeart = false;
+            showingHeart = false;
             ShowOnly(mark.gameObject);
             mark.text = Text;
             mark.fontSize = Mathf.RoundToInt(bubbleSize * .5f);
@@ -199,7 +176,7 @@ namespace C6Lab
                 return;
             }
             bool continuing = Active && showingWord && target == gourd;
-            showingBlock = showingHeart = false;
+            showingHeart = false;
             ShowOnly(mark.gameObject);
             showingWord = true;
             wordPopElapsed = 0f;
@@ -230,7 +207,7 @@ namespace C6Lab
         {
             Sprite artwork = Resources.Load<Sprite>(resourcePath);
             if (gourd == null || artwork == null || !EnsureBubble()) return false;
-            showingBlock = showingHeart = false;
+            showingHeart = false;
             ShowOnly(null);
             mark.text = string.Empty;
             var image = bubble.GetComponent<Image>();
@@ -250,36 +227,9 @@ namespace C6Lab
         public void ShowHeart(LabTarget gourd)
         {
             if (gourd == null || !EnsureBubble()) return;
-            showingBlock = false;
             showingHeart = true;
             ShowOnly(heartMark.gameObject);
             Begin(gourd, showSeconds);
-        }
-
-        /// <summary>
-        /// 박이 이 사람의 한쪽 넘기기를 막았다고(#215) "← 🚫" 또는 "→ 🚫" 말풍선을 띄운다. 막힌 사람 화면에서만 부른다.
-        /// </summary>
-        public void ShowBlock(LabTarget gourd, bool right)
-        {
-            if (gourd == null || !EnsureBubble()) return;
-            showingBlock = true;
-            showingHeart = false;
-            blockRight = right;
-            blockMark.sprite = right ? BlockRightSprite() : BlockLeftSprite();
-            ShowOnly(blockMark.gameObject);
-            Sprite panelArt = Resources.Load<Sprite>(BlockArtRoot + (right ? "BlockRight" : "BlockLeft"));
-            blockPanelShown = panelArt != null;
-            if (blockPanelShown)
-            {
-                blockMark.gameObject.SetActive(false);
-                var background = bubble.GetComponent<Image>();
-                background.sprite = panelArt;
-                background.preserveAspect = true;
-                bubble.pivot = new Vector2(.5f, .5f);
-                if (bubbleFade == null) bubbleFade = bubble.gameObject.AddComponent<CanvasGroup>();
-                bubbleFade.blocksRaycasts = bubbleFade.interactable = false;
-            }
-            Begin(gourd, BlockShowSeconds);
         }
 
         /// <summary>
@@ -289,7 +239,7 @@ namespace C6Lab
         public void ShowEyes(LabTarget gourd, float seconds)
         {
             if (gourd == null || !EnsureBubble()) return;
-            showingBlock = showingHeart = false;
+            showingHeart = false;
             showingEyes = true;
             ShowOnly(eyesRect.gameObject);
             bubble.GetComponent<Image>().enabled = false;
@@ -327,8 +277,6 @@ namespace C6Lab
         // 말풍선 안 표시는 한 번에 하나만 보인다.
         private void ShowOnly(GameObject shown)
         {
-            blockPanelShown = false;
-            if (bubbleFade != null) bubbleFade.alpha = 1f;
             var background = bubble.GetComponent<Image>();
             background.enabled = true;
             background.sprite = BubbleSprite();
@@ -343,7 +291,6 @@ namespace C6Lab
                 FitLongWord(false);
             }
             mark.gameObject.SetActive(shown == mark.gameObject);
-            blockMark.gameObject.SetActive(shown == blockMark.gameObject);
             heartMark.gameObject.SetActive(shown == heartMark.gameObject);
             eyesRect.gameObject.SetActive(shown == eyesRect.gameObject);
         }
@@ -374,9 +321,7 @@ namespace C6Lab
             bool battle = network == null
                 || (snapshot != null && snapshot.phase == LabPhase.Playing && !snapshot.paused);
             elapsed += Time.deltaTime;
-            bool blockEnded = blockPanelShown && network != null && snapshot != null
-                && elapsed > .15f && !snapshot.SwipeBlockOn(network.LocalPlayerId);
-            if (!battle || blockEnded || target == null || elapsed >= duration)
+            if (!battle || target == null || elapsed >= duration)
             {
                 Hide();
                 return;
@@ -388,16 +333,6 @@ namespace C6Lab
         /// <summary>꼬리 끝을 화면에서 박의 오른쪽 위 어깨에 맞춘다.</summary>
         private void Place()
         {
-            if (blockPanelShown)
-            {
-                // #763: reference mockup places the notice above the gourd, centered at 16% from the top.
-                // Match the 6% side margins proportionally rather than anchoring it over the play board.
-                float width = canvasRect.rect.width * .88f;
-                bubble.sizeDelta = new Vector2(width, width * 120f / 640f);
-                bubble.anchoredPosition = new Vector2(0f, canvasRect.rect.height * .34f);
-                bubble.gameObject.SetActive(true);
-                return;
-            }
             if (showingEyes)
             {
                 float size = 104f * LabYaguangShakeCue.FitScale(canvasRect.rect.size);
@@ -428,13 +363,6 @@ namespace C6Lab
         private void Animate()
         {
             float t = Mathf.Max(0f, elapsed);
-            if (blockPanelShown)
-            {
-                bubble.localScale = Vector3.one;
-                bubble.localRotation = Quaternion.identity;
-                bubbleFade.alpha = BlockNoticeAlpha(t);
-                return;
-            }
             float pop = t < PopSeconds ? EaseOut(t / PopSeconds) * 1.15f
                 : Mathf.Lerp(1.15f, 1f, Mathf.Clamp01((t - PopSeconds) / .12f));
             float leave = Mathf.Clamp01((t - (duration - LeaveSeconds)) / LeaveSeconds);
@@ -498,15 +426,6 @@ namespace C6Lab
             markOutline = markRect.gameObject.AddComponent<Outline>();
             markOutline.effectColor = InkColor;
             markOutline.effectDistance = new Vector2(2.5f, -2.5f);
-
-            RectTransform blockRect = NewRect("Gourd Alert Block Mark", bubble);
-            blockRect.anchorMin = blockRect.anchorMax = center;
-            blockRect.sizeDelta = new Vector2(bubbleSize * .68f, bubbleSize * .34f);
-            blockMark = blockRect.gameObject.AddComponent<Image>();
-            blockMark.sprite = BlockLeftSprite();
-            blockMark.preserveAspect = true;
-            blockMark.raycastTarget = false;
-            blockRect.gameObject.SetActive(false);
 
             RectTransform heartRect = NewRect("Gourd Alert Heart", bubble);
             heartRect.anchorMin = heartRect.anchorMax = center;
@@ -679,69 +598,6 @@ namespace C6Lab
             return a * a * a - u * u * v * v * v <= 0f;
         }
 
-        private static Sprite BlockLeftSprite() =>
-            blockLeftSprite != null ? blockLeftSprite : blockLeftSprite = BlockSprite(false);
-
-        private static Sprite BlockRightSprite() =>
-            blockRightSprite != null ? blockRightSprite : blockRightSprite = BlockSprite(true);
-
-        /// <summary>
-        /// 막기 표시 (#215): 왼쪽 절반에 막힌 쪽을 가리키는 굵은 먹색 화살표, 오른쪽에 얇은 먹색 테두리를
-        /// 두른 빨간 금지 표시(고리와 왼쪽 위에서 오른쪽 아래로 긋는 사선). 글꼴에 없을 수 있는 이모지 대신 직접 그린다.
-        /// </summary>
-        private static Sprite BlockSprite(bool right)
-        {
-            var pixels = new Color32[MarkWidth * MarkHeight];
-            var center = new Vector2(96f, 32f);
-            float slash = 24f / Mathf.Sqrt(2f);
-            var slashA = new Vector2(center.x - slash, center.y + slash);
-            var slashB = new Vector2(center.x + slash, center.y - slash);
-            for (int y = 0; y < MarkHeight; y++)
-                for (int x = 0; x < MarkWidth; x++)
-                {
-                    var p = new Vector2(x + .5f, y + .5f);
-                    // The arrow is drawn pointing left in its half, mirrored there for the right.
-                    var a = new Vector2(right ? 64f - p.x : p.x, p.y);
-                    float arrow = Mathf.Min(BoxDistance(a, 24f, 26f, 58f, 38f),
-                        TriangleDistance(a, new Vector2(6f, 32f), new Vector2(30f, 52f), new Vector2(30f, 12f)));
-                    float sign = Mathf.Min(Mathf.Abs(Vector2.Distance(p, center) - 24f) - 5f,
-                        SegmentDistance(p, slashA, slashB) - 5f);
-                    Color32 color = new Color32(0, 0, 0, 0);
-                    if (sign < 2.5f)
-                    {
-                        color = Color32.Lerp(SignColor, InkColor, Mathf.Clamp01(sign + 1f));
-                        color.a = (byte)Mathf.RoundToInt(Mathf.Clamp01(2.5f - sign) * 255f);
-                    }
-                    else if (arrow < .5f)
-                    {
-                        color = InkColor;
-                        color.a = (byte)Mathf.RoundToInt(Mathf.Clamp01(.5f - arrow) * 255f);
-                    }
-                    pixels[y * MarkWidth + x] = color;
-                }
-            var texture = new Texture2D(MarkWidth, MarkHeight, TextureFormat.RGBA32, false)
-            {
-                name = right ? "Lab gourd block right" : "Lab gourd block left",
-                filterMode = FilterMode.Bilinear,
-                wrapMode = TextureWrapMode.Clamp,
-                hideFlags = HideFlags.DontSave
-            };
-            texture.SetPixels32(pixels);
-            texture.Apply(false, true);
-            Sprite sprite = Sprite.Create(texture, new Rect(0f, 0f, MarkWidth, MarkHeight), new Vector2(.5f, .5f), 100f);
-            sprite.name = texture.name;
-            sprite.hideFlags = HideFlags.DontSave;
-            return sprite;
-        }
-
-        /// <summary>점에서 직사각형 테두리까지의 거리. 안쪽이면 음수.</summary>
-        private static float BoxDistance(Vector2 p, float xMin, float yMin, float xMax, float yMax)
-        {
-            float dx = Mathf.Max(xMin - p.x, 0f, p.x - xMax), dy = Mathf.Max(yMin - p.y, 0f, p.y - yMax);
-            float outside = Mathf.Sqrt(dx * dx + dy * dy);
-            return outside > 0f ? outside : -Mathf.Min(Mathf.Min(p.x - xMin, xMax - p.x), Mathf.Min(p.y - yMin, yMax - p.y));
-        }
-
         private static RectTransform NewRect(string name, Transform parent)
         {
             var rect = new GameObject(name, typeof(RectTransform)).GetComponent<RectTransform>();
@@ -816,7 +672,6 @@ namespace C6Lab
             if (network != null)
             {
                 network.GourdBombDropped -= OnGourdBombDropped;
-                network.SwipeBlockStarted -= OnSwipeBlockStarted;
                 network.SabotageCast -= OnSabotageCast;
             }
             if (layer != null) Destroy(layer.gameObject);

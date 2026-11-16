@@ -9387,6 +9387,18 @@ main `cef1579d`의 #760 관람·#762 땅따먹기 박/Game56·#727 튜토리얼�
 - **미실행:** iPhone 실기기, 여러 기기 실제 네트워크에서 60/30초 알림과 북 손 안내 위치.
 - **main `0478c1fe`(#779) 병합:** 충돌은 이 문서 기록 추가뿐이어서 양쪽을 보존했다. #779가 바꾼 72개 파일 중 이 PR이 바꾼 파일과 겹치는 것은 없다.
 
+
+## #783 전투 VFX 후속
+
+가장자리 세로 전달불가·한지 느낌표·무지개 피버타임·실패 멘트 박스·붉은 한지 뻥이요를 이 브랜치로 옮겼다. 최신 콤보 가이드·X 피드백·다른 게임 기능은 보존했다. 이전 별도 Unity checkout에서 통과한 결과를 이 checkout의 실행 결과로 간주하지 않는다. 이 checkout 검증은 아래에 별도로 기록한다.
+
+- 이 checkout 실행 결과: Unity 6000.6.5f1 MCP에서 LabGourdAlertTests·LabComboEffectLookTests·가장자리 카운트다운·폭발 표시/자동 정리 PlayMode 총 13/13 통과. 컴파일 Console 오류 0건. 최초 에디터 import가 자동 변경한 SVG meta와 URP 전역 설정은 원복했다.
+
+- 가장자리 사각 경계 후속: 글자 뒤 별도 붉은 Sprite 띠를 제거했다. 같은 Unity MCP에서 재컴파일 후 Console 오류 0건, 실제 LabOrbEdgeBlock을 PreviewScene에서 렌더해 사각 경계 없이 그라데이션과 글자만 남는 것을 육안 확인했다.
+
+- 먹선 안내·색상 일치·성공 색종이 후속: LabComboEffectLookTests PlayMode 9/9 통과(오색 전체 사용·사각 조각·터치 비차단·Clear 포함). 최초 테스트 요청은 Editor가 Playing 상태여서 시작되지 않았고 Stop 후 재요청했다. Unity PreviewScene 실제 컴포넌트로 화살표·손가락·오색 색종이·숫자/전달불가 색을 렌더해 육안 확인했다. 튜토리얼 전체 흐름과 iOS 실기기는 이번 후속에서 미실행. 스크립트 컴파일 오류는 없었으며 Console에는 Transport.ResetStatics의 Collection modified 생명주기 오류 1건이 별도로 있었다.
+
+- 전달불가/숫자 동시 점멸 후속: 최초 검사는 TextMesh 8비트 alpha와 Sprite float alpha의 반올림 차이로 1건 실패했다. 공통 alpha를 8비트로 맞춘 뒤 동시 점멸·숫자 교체 검사와 기존 가장자리 카운트다운 검사 PlayMode 2/2 통과. Unity 실제 컴포넌트의 34프레임을 고정 시각으로 렌더했다.
 ## #782 — 시연 후일담 완료 후 QR 직행 (2026-11-16)
 
 - **기준:** main `38dc564e`, Unity 6000.6.5f1·macOS arm64, `feat/#782-staff-demo-direct-qr`. 시연의 후일담 마지막 `마치기`는 각자 QR로 바로 이동한다. 전원 준비 대기·봉인 총평·엔딩은 시연에서 표시하지 않는다. 봉인 카드·개인 기록·선택 관람·후일담은 유지한다.
@@ -9408,6 +9420,37 @@ main `cef1579d`의 #760 관람·#762 땅따먹기 박/Game56·#727 튜토리얼�
 - 최신 통합본의 실제 Editor 390×844 화면을 다시 촬영해 `봉인 카드 → 후일담 마치기 → QR → A/B 선택`을 확인했다. QR 시점 다른 두 참가자는 읽는 중·준비false였고 대기false·총평false·준비 수0이었다. 촬영용 세션만 완료를 단축했으며 저장 설정/Scene은 바꾸지 않았다. 촬영 후 Play·통신 참가자·임시 override를 종료하고 원래 Home/GameView로 복원했다.
 - 검사/빌드 후 ProjectSettings 27개와 관련 코드·에셋 85개는 검사 전 해시와 동일했다. 새 SVG 메타1개는 Importer가 만든 빈 값 뒤 공백만 달랐고, 검사 시점 사본·정규화 비교로 값이 동일함을 확인한 뒤 원격 main 형식으로 복원했다. 기존 로컬 SVG 메타7개는 사본과 바이트가 동일하며 stash도 유지한다. 문서만 추가한 뒤 게임 검사를 반복하지 않는다.
 - iOS 내보내기/실기기와 독립 Guest UI에서 Host 이탈 확인은 미실행이다. Mac 앱 실행과 Editor 촬영을 구분하며 Staff4 새 빌드를 모든 운영 기기에 설치해야 한다.
+
+### #783 최신 main 충돌 해결·검증 (2026-11-16)
+
+- main `c9abf049`(#784)을 #783에 병합했다. 충돌은 이 문서의 병렬 추가 기록 한 곳이었고 #783/#782 기록을 모두 보존했다. 코드 충돌은 없었다.
+- 통합 후 Unity 6000.6.5f1 MCP: 컴파일 Console 오류0, PlayMode 관련 17/17 통과(LabGourdAlertTests·LabComboEffectLookTests·전달 차단 점멸/카운트다운·폭발 정리·StaffDemoFinalPageTests). EditMode 관련 13/13 통과(LabYaguangFeverHudTests·StaffStageDemoStoryTests).
+- 전체 검사·실기기·독립 앱 다인 전투는 이번 병합에서 미실행이다.
+
+### #783 병합 전 검증 (2026-11-16)
+- **기준:** `fix/#783-drum-pass-blocked-vfx`(main `c9abf049` 포함). Unity 6000.6.5f1 batch(macOS, Metal). 판정·통신·공유 설정·접속 묶음은 바꾸지 않는다.
+- **퇴역한 검사와 근거:** #783이 넘기기 막기의 가운데 말풍선을 없앴다(막힌 가장자리의 세로 `전달불가`와 남은 초가 대신한다).
+  - `LabGourdAlert`의 `ShowBlock`·`ShowingBlock`·`BlockRight`와 `SwipeBlockStarted` 구독을 지웠고, 호출자는 남아 있지 않다.
+  - 이 말풍선만 보던 `LabGourdAlertTests`의 막기 말풍선 검사 2건을 지웠다.
+  - 같은 계약(막힌 쪽, 글자, 남은 초, 점멸 동기)은 `LabOrbPhysicsTests`의 가장자리 검사와 `LabDeveloperSoloIntegrationTests`가 맡는다.
+- **고친 것:**
+  - `LabDeveloperSoloIntegrationTests`가 없어진 말풍선(`ShowingBlock`)을 기대해 실패하게 되어 있었다. 막힌 쪽 가장자리의 `전달불가`와 방향을 확인하도록 옮겼다.
+  - 쓰이지 않게 된 그림 `Bomb/BombPpeong`·`BombPpeongOutline`·`Sabotage/DrumPassBlock/BlockLeft`·`BlockRight`와 폭탄 외곽 글자 코드를 지웠다. 별 모양 폭발은 그림이 없을 때의 대체 표현이라 남겼다.
+  - 무관한 `0130f.svg.meta` 공백 변경을 되돌렸다.
+- **최초 실패:** 정리 중 `LabGourdAlert`의 `Show` 계열 메서드까지 잘못 지워 컴파일 오류가 났다. 되돌린 뒤 다시 실행했다.
+- **전체 EditMode:** 2598/2598 PASS.
+- **PlayMode** `LabGourdAlertTests`·`LabOrbPhysicsTests`·`LabComboEffectLookTests`·`LabYaguang*`·`LabDeveloperSoloIntegrationTests`·`GameTutorial*`·`GameDrumPassHint*`·`LabBomb*`·`StaffDemoFinalPageTests`·`GameSceneFlowTests`: 170/170 PASS. 판정·통신 경로 변경이 없어 전체 PlayMode는 병합 뒤 main에서 한 번 돌린다.
+- **화면(Development Mac 빌드, 같은 임시 캡처 스크립트로 main과 27장씩 비교, 스크립트는 저장소에 남기지 않음):**
+  - 튜토리얼 조작 단계: 화살표와 손이 먹선으로 바뀌었다.
+  - 2스테이지 솔로 전투에서 효과를 정해진 순서로 띄웠다.
+  - 좌·우 전달 막기: 숫자 위, 세로 `전달불가` 아래로 가장자리 안에 들어가고 스태미나·타이머를 가리지 않는다.
+  - 느낌표 한지 말풍선, 붉은 한지 `뻥이요!`, 전투 중 북 넘기기 안내의 먹선 화살표·손, 피버 제목 무지개, 색 틀림 한지 박스(`내가 색 틀림`), 오색 색종이: 잘림·누락 그림 없음.
+  - 튜토리얼 한 대사에서 `전달불가` 글자가 말풍선 테두리와 살짝 맞닿는다(읽는 데 지장 없음).
+- **기록만:**
+  - 새 PNG 3장이 크다(1.25~2.78 MB). 가져오기 상한이 있어 빌드에 들어가는 크기는 작다.
+  - 피버 무지개는 일시정지 중에도 흐른다.
+  - 콤보 결과는 캡처에서 리플렉션으로 띄웠다.
+- **미실행:** iPhone 실기기, 여러 기기 전투.
 
 ## #785 인게임 캐릭터 프로필과 스태미나 표시 (2026-11-16)
 

@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 93b85b987712643cfb34c0e3e98252cc
+guid: 4961b1e4c9c354f059c88f7541683816
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -1628649359032458417
-    second: BlockRight_0
+      213: 561482245297795877
+    second: BombPpeongHanji_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -77,7 +77,7 @@ TextureImporter:
     maxTextureSize: 2048
     resizeAlgorithm: 0
     textureFormat: -1
-    textureCompression: 0
+    textureCompression: 1
     compressionQuality: 50
     crunchedCompression: 0
     allowsAlphaSplitting: 0
@@ -115,13 +115,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: BlockRight_0
+      name: BombPpeongHanji_0
       rect:
         serializedVersion: 2
         x: 0
         y: 0
-        width: 1920
-        height: 360
+        width: 1536
+        height: 1024
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -130,8 +130,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: f43e3337900e569e0800000000000000
-      internalID: -1628649359032458417
+      spriteID: 523f9a29029cac700800000000000000
+      internalID: 561482245297795877
       vertices: []
       indices: 
       edges: []
