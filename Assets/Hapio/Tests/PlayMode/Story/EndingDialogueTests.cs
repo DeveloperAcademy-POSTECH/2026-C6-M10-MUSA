@@ -39,7 +39,7 @@ namespace Hapio.Tests
                 Assert.That(paper.rectTransform.sizeDelta, Is.EqualTo(new Vector2(379, 181)));
                 Assert.That(paper.GetComponent<Shadow>().enabled, Is.False);
                 Assert.That(player.dialogueText.fontSize, Is.EqualTo(20));
-                Assert.That(player.speakerText.fontSize * player.speakerText.rectTransform.localScale.x, Is.EqualTo(13.186813f).Within(.001f));
+                Assert.That(player.speakerText.fontSize * player.speakerText.rectTransform.localScale.x, Is.EqualTo(13f));
                 Assert.That(player.dialogueText.horizontalOverflow, Is.EqualTo(HorizontalWrapMode.Overflow));
                 CheckStyle(player, "불이");
                 player.Next();

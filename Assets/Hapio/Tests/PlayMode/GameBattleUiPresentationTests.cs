@@ -251,7 +251,17 @@ namespace Hapio.Tests
                         ulong mine=players[first].id;
                         map.Rebuild(LabTeams.VisibleTeammates(snapshot,mine),mine);
                         Assert.That(map.SeatPositions.Count,Is.EqualTo(total/2));
-                        foreach(var point in map.SeatPositions.Values) Assert.That(point.x,Is.Zero);
+                        if (total == 4)
+                        {
+                            foreach (var point in map.SeatPositions.Values) Assert.That(point.x, Is.Zero);
+                        }
+                        else
+                        {
+                            Assert.That(map.Panel.sizeDelta, Is.EqualTo(new Vector2(100, 72)));
+                            Assert.That(map.SeatPositions[mine], Is.EqualTo(new Vector2(2, -21)));
+                            Assert.That(map.SeatPositions[players[first + 1].id], Is.EqualTo(new Vector2(-27, 21)));
+                            Assert.That(map.SeatPositions[players[first + 2].id], Is.EqualTo(new Vector2(27, 21)));
+                        }
                         var theme=bindings.GetComponent<GameBattleUiPresentation>().Theme;
                         Transform latestSeats = null;
                         Transform latestLines = null;
@@ -262,8 +272,14 @@ namespace Hapio.Tests
                         }
                         var connector = latestLines.Find("Team Connector").GetComponent<UnityEngine.UI.Image>();
                         Assert.That(connector.sprite, Is.SameAs(total == 4 ? theme.teamPairConnector : theme.teamTrioConnector));
-                        Assert.That(Vector2.Distance(map.SeatPositions[mine], map.SeatPositions[players[first + 1].id]),
-                            Is.EqualTo(total == 4 ? 42 : 26));
+                        if (total == 4)
+                            Assert.That(Vector2.Distance(map.SeatPositions[mine], map.SeatPositions[players[first + 1].id]), Is.EqualTo(42));
+                        else
+                        {
+                            Assert.That(connector.sprite.name, Is.EqualTo("0130f"));
+                            Assert.That(connector.rectTransform.sizeDelta, Is.EqualTo(new Vector2(65.9468f, 51.282f)));
+                            Assert.That(Mathf.DeltaAngle(connector.rectTransform.localEulerAngles.z, 180), Is.Zero.Within(.001f));
+                        }
                         foreach(Transform marker in latestSeats)
                             Assert.That(marker.GetComponent<UnityEngine.UI.Image>().sprite,Is.SameAs(first==0?theme.teamBlueMarker:theme.teamRedMarker));
                         map.SyncDrums(new[] {new LabOrbState {id="ui-test-drum",kind=LabOrbKind.Drum,owner=mine}});
@@ -275,6 +291,14 @@ namespace Hapio.Tests
                         map.SyncDrums(Array.Empty<LabOrbState>());
                         map.Advance(0);
                         Assert.That(latestSeats.GetChild(0).GetComponent<UnityEngine.UI.Image>().enabled, Is.True);
+                        if (total == 6)
+                        {
+                            ulong next = players[first + 1].id;
+                            map.Rebuild(LabTeams.VisibleTeammates(snapshot, next), next);
+                            Assert.That(map.SeatPositions[next], Is.EqualTo(new Vector2(2, -21)));
+                            Assert.That(map.SeatPositions[players[first + 2].id], Is.EqualTo(new Vector2(-27, 21)));
+                            Assert.That(map.SeatPositions[mine], Is.EqualTo(new Vector2(27, 21)));
+                        }
                     }
                 }
             }

@@ -77,7 +77,7 @@ namespace Hapio.Editor
                 view.speakerBadge = AssetDatabase.LoadAssetAtPath<Sprite>(BadgePath);
                 view.speakerBadgeRect = new Rect(57, 713, 79.3400879f, 29.0109921f);
                 view.speakerRect = new Rect(57, 720.032968f, 79.3400879f, 15);
-                view.speakerFontSize = 13.186813f;
+                view.speakerFontSize = 13;
                 view.centerSpeakerName = true;
                 view.hideEmptyDialogue = true;
                 if (view.dialoguePaper == null || view.speakerBadge == null)

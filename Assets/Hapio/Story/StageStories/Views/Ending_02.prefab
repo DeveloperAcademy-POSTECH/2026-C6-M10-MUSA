@@ -785,7 +785,7 @@ MonoBehaviour:
     y: 677
     width: 379
     height: 181
-  speakerFontSize: 13.186813
+  speakerFontSize: 13
   dialogueNoWrap: 1
   dialogueRect:
     serializedVersion: 2

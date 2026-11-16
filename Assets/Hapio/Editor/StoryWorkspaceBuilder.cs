@@ -155,10 +155,6 @@ namespace Hapio.Editor
                 shadow.effectDistance = new Vector2(0, -5);
                 var speaker = Text("Speaker", dialogue, new Rect(84, 716, 240, 24), "", 15);
                 var body = Text("Dialogue Text", dialogue, new Rect(84, 740, 259, 56), "", 21);
-                // Legacy Text takes integer font sizes; retain Figma's fractional visible size and wrapping.
-                const float dialogueScale = 20.696f / 21f;
-                body.rectTransform.localScale = Vector3.one * dialogueScale;
-                body.rectTransform.sizeDelta = new Vector2(259, 56) / dialogueScale;
                 var safe = Rect("Safe Controls", canvas.transform, new Rect(0, 0, 402, 874));
                 Stretch(safe);
                 safe.gameObject.AddComponent<GameSafeArea>();

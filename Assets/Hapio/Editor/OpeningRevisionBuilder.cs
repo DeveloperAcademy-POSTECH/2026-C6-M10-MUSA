@@ -167,7 +167,13 @@ namespace Hapio.Editor
             r.pivot=Vector2.one*.5f;r.anchoredPosition+=new Vector2(t.width/2,-t.height/2);r.localRotation=Quaternion.Euler(0,0,t.rotation);
             var text=r.gameObject.AddComponent<Text>();text.font=AssetDatabase.LoadAssetAtPath<Font>("Assets/Lab/Art/Fonts/Shilla_Culture(M).otf");
             const float density=4; r.sizeDelta*=density;r.localScale=Vector3.one/density;
-            text.fontSize=Mathf.RoundToInt(t.size*density);text.supportRichText=true;text.text=t.richText;
+            text.fontSize=Mathf.FloorToInt(t.size + .5f)*(int)density;
+            text.supportRichText=true;
+            text.text=System.Text.RegularExpressions.Regex.Replace(t.richText ?? string.Empty, @"<size=(\d+)>", match =>
+            {
+                float authoredSize = int.Parse(match.Groups[1].Value) / density;
+                return "<size=" + Mathf.FloorToInt(authoredSize + .5f)*(int)density + ">";
+            });
             text.alignment=TextAnchor.MiddleLeft;text.color=t.white?Color.white:Color.black;text.raycastTarget=false;
             text.horizontalOverflow=t.dialogue?HorizontalWrapMode.Overflow:HorizontalWrapMode.Wrap;text.verticalOverflow=VerticalWrapMode.Overflow;
             if(t.lineHeight>0)

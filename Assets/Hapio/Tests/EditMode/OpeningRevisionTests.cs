@@ -23,7 +23,8 @@ namespace Hapio.Tests
     Assert.That(cut.viewPrefab.sourceFigmaNodeId,Is.EqualTo(frame.id));Assert.That(cut.PageCount,Is.EqualTo(1));
     Assert.That(cut.GetPage(0).speaker,Is.EqualTo(frame.speaker));Assert.That(cut.GetPage(0).dialogue,Is.EqualTo(frame.dialogue));
     var texts=cut.viewPrefab.GetComponentsInChildren<Text>(true);Assert.That(texts.Length,Is.EqualTo(frame.texts.Length));
-    foreach(var t in frame.texts){var actual=texts.Single(x=>x.name=="Text ["+t.id+"]");Assert.That(actual.text,Is.EqualTo(t.richText));
+    foreach(var t in frame.texts){var actual=texts.Single(x=>x.name=="Text ["+t.id+"]");Assert.That(actual.text,Is.EqualTo(t.richText.Replace("<size=53>","<size=52>")));
+     Assert.That(actual.fontSize * actual.rectTransform.localScale.x,Is.EqualTo(Mathf.Round(actual.fontSize * actual.rectTransform.localScale.x)));
      Assert.That(actual.rectTransform.sizeDelta.x*actual.rectTransform.localScale.x,Is.EqualTo(t.width).Within(.01));
      Assert.That(actual.rectTransform.anchoredPosition.x,Is.EqualTo(t.x+t.width/2).Within(.01));
      Assert.That(actual.rectTransform.anchoredPosition.y,Is.EqualTo(-t.y-t.height/2).Within(.01));
@@ -39,7 +40,7 @@ namespace Hapio.Tests
     var badge=cut.viewPrefab.authoredDialogue.GetComponentsInChildren<Image>(true).Single(x=>x.sprite!=null&&x.sprite.name=="9769e");
     Assert.That(badge.color,Is.EqualTo(style.badgeColor),cut.cutId);
     Assert.That(badge.material,Is.SameAs(palette.badgeMaterial),cut.cutId);
-    var name=cut.viewPrefab.authoredDialogue.GetComponentsInChildren<Text>(true).Single(x=>x.text=="<size=53>"+speaker+"</size>");
+    var name=cut.viewPrefab.authoredDialogue.GetComponentsInChildren<Text>(true).Single(x=>x.text=="<size=52>"+speaker+"</size>");
     Assert.That(name.color,Is.EqualTo(style.textColor),cut.cutId);
    }
   }
