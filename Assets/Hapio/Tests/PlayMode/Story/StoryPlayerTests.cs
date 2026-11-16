@@ -227,7 +227,7 @@ namespace Hapio.Tests
             var second = Object.Instantiate(player.sequence.cuts[1].viewPrefab);
             cleanup.Add(second.gameObject);
             second.overrideDialogueLayout = true;
-            second.dialogueFontSize = 19;
+            second.dialogueFontSize = 18.7f;
             second.dialogueRect = new Rect(94, 745, 259, 48);
             var texture = new Texture2D(2, 2);
             var sprite = Sprite.Create(texture, new Rect(0, 0, 2, 2), Vector2.one * .5f);

@@ -74,7 +74,7 @@ namespace Hapio.Editor
                 text.font = AssetDatabase.LoadAssetAtPath<Font>(item.fontPath);
                 // Render tiny scroll lettering from a larger glyph atlas for clear strokes.
                 text.fontSize = Mathf.Max(32, Mathf.CeilToInt(item.fontSize));
-                float scale = item.fontSize / text.fontSize;
+                float scale = Mathf.FloorToInt(item.fontSize + .5f) / (float)text.fontSize;
                 textRect.localScale = new Vector3(scale, scale, 1);
                 textRect.sizeDelta /= scale;
                 text.alignment = TextAnchor.MiddleLeft;
@@ -232,7 +232,7 @@ namespace Hapio.Editor
                 view.sourceFigmaNumber = frame.number;
                 view.sourceFigmaNodeId = frame.nodeId;
                 view.overrideDialogueLayout = true;
-                view.dialogueFontSize = frame.dialogueFontSize;
+                view.dialogueFontSize = Mathf.FloorToInt(frame.dialogueFontSize + .5f);
                 if (frame.dialogueRect != null) view.dialogueRect = frame.dialogueRect.Rect;
                 if (frame.speakerRect != null) view.speakerRect = frame.speakerRect.Rect;
                 if (frame.badgeRect != null) view.speakerBadgeRect = frame.badgeRect.Rect;

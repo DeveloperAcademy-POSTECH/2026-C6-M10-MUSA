@@ -546,17 +546,10 @@ namespace Hapio
                     defaultDialogueScale = rect.localScale;
                 }
                 dialogueText.horizontalOverflow = currentView.dialogueNoWrap ? HorizontalWrapMode.Overflow : defaultDialogueWrap;
-                if (currentView.dialogueFontSize > 0)
-                {
-                    dialogueText.fontSize = Mathf.CeilToInt(currentView.dialogueFontSize);
-                    float scale = currentView.dialogueFontSize / dialogueText.fontSize;
-                    rect.localScale = new Vector3(scale, scale, 1);
-                }
-                else
-                {
-                    dialogueText.fontSize = defaultDialogueFontSize;
-                    rect.localScale = defaultDialogueScale;
-                }
+                bool customSize = currentView.dialogueFontSize > 0;
+                dialogueText.fontSize = customSize
+                    ? Mathf.Max(1, Mathf.FloorToInt(currentView.dialogueFontSize + .5f)) : defaultDialogueFontSize;
+                rect.localScale = customSize ? Vector3.one : defaultDialogueScale;
                 if (currentView.overrideDialogueLayout)
                 {
                     var layout = ValidLayout(currentView.dialogueRect, new Rect(84, 740, 259, 56));
@@ -583,19 +576,18 @@ namespace Hapio
                     defaultSpeakerWrap = speakerText.horizontalOverflow;
                     defaultSpeakerAlignment = speakerText.alignment;
                 }
-                float speakerScale = currentView.speakerFontSize > 0
-                    ? currentView.speakerFontSize / Mathf.CeilToInt(currentView.speakerFontSize) : 1;
-                speakerText.fontSize = currentView.speakerFontSize > 0
-                    ? Mathf.CeilToInt(currentView.speakerFontSize) : defaultSpeakerFontSize;
-                rect.localScale = currentView.speakerFontSize > 0 ? Vector3.one * speakerScale : defaultSpeakerScale;
+                bool customSize = currentView.speakerFontSize > 0;
+                speakerText.fontSize = customSize
+                    ? Mathf.Max(1, Mathf.FloorToInt(currentView.speakerFontSize + .5f)) : defaultSpeakerFontSize;
+                rect.localScale = customSize ? Vector3.one : defaultSpeakerScale;
                 var layout = ValidLayout(currentView.speakerRect, new Rect(84, 721, 36, 18));
                 rect.anchoredPosition = currentView.overrideDialogueLayout
                     ? new Vector2(layout.x, -layout.y) : defaultSpeakerPosition;
-                rect.sizeDelta = currentView.overrideDialogueLayout ? layout.size / speakerScale : defaultSpeakerSize;
+                rect.sizeDelta = currentView.overrideDialogueLayout ? layout.size : defaultSpeakerSize;
                 speakerText.color = currentView.overrideDialogueLayout ? currentView.speakerColor : defaultSpeakerColor;
                 speakerText.alignment = currentView.overrideDialogueLayout && currentView.centerSpeakerName
                     ? TextAnchor.MiddleCenter : defaultSpeakerAlignment;
-                // Figma's single-line name can exceed an integer text box by a rounding fraction.
+                // Keep an authored speaker name on one line.
                 speakerText.horizontalOverflow = currentView.overrideDialogueLayout ? HorizontalWrapMode.Overflow : defaultSpeakerWrap;
             }
             if (speakerBadge != null)

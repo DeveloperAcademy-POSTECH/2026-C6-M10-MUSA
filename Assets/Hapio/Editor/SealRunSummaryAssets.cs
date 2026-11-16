@@ -202,7 +202,7 @@ namespace Hapio.Editor
         private static void SetText(UnityEngine.UI.Text text, float size, Vector2 bounds)
         {
             text.fontSize = Mathf.Max(32,Mathf.CeilToInt(size));
-            float scale = size / text.fontSize;
+            float scale = Mathf.FloorToInt(size + .5f) / (float)text.fontSize;
             text.rectTransform.localScale = Vector3.one * scale;
             text.rectTransform.sizeDelta = bounds / scale;
         }
