@@ -1263,6 +1263,16 @@ namespace Hapio.Tests
             Assert.That(hint.Visible, Is.False, "Passed: gone at once.");
             hint.Present(three, me, .1f, true);
             Assert.That(hint.Visible, Is.False, "Back on my board, it counts from the start again.");
+
+            // #780: a screen that locks the board (Jigwi talisman / smoke) stops the guide, which comes back after.
+            hint.Present(three, me, hint.HintAfterSeconds + .1f, true);
+            Assert.That(hint.Visible, Is.True);
+            network.board.SetUiInputBlocked(true);
+            hint.Present(three, me, .1f, true);
+            Assert.That(hint.Visible, Is.False, "Talisman or smoke up: no hand.");
+            network.board.SetUiInputBlocked(false);
+            hint.Present(three, me, .1f, true);
+            Assert.That(hint.Visible, Is.True, "Back once the board is free.");
         }
 
         [UnityTest]

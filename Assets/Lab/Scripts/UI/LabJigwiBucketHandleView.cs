@@ -17,7 +17,7 @@ namespace C6Lab
     /// - Editor/DEV 빌드: A/D 또는 ←/→를 누르고 있으면 그쪽으로 기운다(섬광 흔들기의 K처럼 키보드 대체).
     /// - 판 가운데 📱 그림이 좌우로 기울며 할 일을 보여 주고, 박 아래 한 줄 안내.
     /// - #595 연기(round.smoke): 양동이 없이 박이 달아오르다 seat.readyAt에 바로 실패 흐름(지귀 대사 → 연기가 화면을 덮음)으로 간다.
-    ///   모든 자리가 같은 때에 덮이고, 각자 90% 문질러 걷어 낸다.
+    ///   모든 자리가 같은 때에 덮이고, 각자 70% 문질러 걷어 낸다(#780).
     /// </summary>
     public sealed class LabJigwiBucketHandleView : MonoBehaviour
     {
@@ -63,8 +63,10 @@ namespace C6Lab
         private int sloshes, side, pourSide, tiltStep, nextDrop;
         private bool poured, splashed;
         // #551 failure: Jigwi's steam fogs my board until I rub it clear.
-        [Tooltip("김이 이만큼(0~1) 남을 때까지 문지르면 닦인 것.")]
-        [SerializeField, Range(.05f, .8f)] private float steamClearLeft = .1f;
+        [Tooltip("김이 이만큼(0~1) 남을 때까지 문지르면 닦인 것. #780 미니 QA: 0.1(90% 문지르기) → 0.3(70% 문지르기).")]
+        [SerializeField, Range(.05f, .8f)] private float steamClearLeft = .3f;
+        /// <summary>#780: 연기가 이만큼(0~1) 남으면 걷힌 것 (0.3 = 70% 문지르기).</summary>
+        public float SteamClearLeft => steamClearLeft;
         [Tooltip("#696 화면 위/아래 가장자리 띠의 폭(화면 높이 비율). 손가락이 닿기 어려운 끝자락은 덜 닦아도 걷힌다. #724 UT: 띠도 다른 곳만큼 진하게 보인다(옅게 그리면 '이미 닦였다'로 보여 위쪽을 안 닦게 됐다). 대신 다 닦았는지 셀 때 덜 센다.")]
         [SerializeField, Range(0f, .25f)] private float steamEdgeBand = .08f;
         [Tooltip("#696/#724 가장자리 끝(맨 위/맨 아래)의 연기를 다 닦았는지 셀 때의 무게(0~1). 띠 안쪽으로 갈수록 1까지 무거워진다. 보이는 진하기는 어디나 같다.")]
@@ -111,7 +113,7 @@ namespace C6Lab
         [SerializeField] private string rubSoundFolder = "JigwiBucketFan";
         [Tooltip("출렁할 때마다 찰랑 소리 폴더(기운 쪽 스피커로 치우쳐 난다).")]
         [SerializeField] private string sloshSoundFolder = "JigwiBucketSlosh";
-        [Tooltip("연기를 90% 문질러 완전히 걷힌 순간 나는 소리 폴더.")]
+        [Tooltip("연기를 70% 문질러 완전히 걷힌 순간 나는 소리 폴더.")]
         [SerializeField] private string clearSoundFolder = "JigwiBucketClear";
         [Tooltip("실패 연기가 화면을 다 덮는 순간 쿵 하는 소리 폴더.")]
         [SerializeField] private string fogHitSoundFolder = "JigwiBucketFogHit";
@@ -687,7 +689,7 @@ namespace C6Lab
         }
 
         // ---------- failure: Jigwi's smoke over the whole screen ----------
-        /// <summary>내 양동이를 제시간에 못 쏟았다: 지귀 연기가 화면 전체(3D 영역과 조합판)를 덮는다(한 회차에 한 번). 판 입력이 막히고, 90% 문질러야 걷힌다.</summary>
+        /// <summary>내 양동이를 제시간에 못 쏟았다: 지귀 연기가 화면 전체(3D 영역과 조합판)를 덮는다(한 회차에 한 번). 판 입력이 막히고, 70% 문질러야 걷힌다(#780).</summary>
         private void StartSteam(string roundId)
         {
             if (steamRound == roundId) return;
