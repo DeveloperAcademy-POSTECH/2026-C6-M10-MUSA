@@ -71,5 +71,29 @@ namespace C6Lab.Tests
             }
             finally { UnityEngine.Object.DestroyImmediate(config); }
         }
+
+        [Test]
+        public void ItAlsoFiresAtSixtySecondsWithTheSameLookOnlyBigger()
+        {
+            var config = UnityEngine.ScriptableObject.CreateInstance<LabConfig>();
+            try
+            {
+                Assert.That(config.SixtySecondsLeftAt, Is.EqualTo(60f), "#780: a second alarm at 60 s.");
+                Assert.That(config.ThirtySecondsLeftAt, Is.EqualTo(30f), "The 30 s alarm (and the rush BGM) stays at 30 s.");
+                Assert.That(config.ThirtySecondsLeftSize, Is.EqualTo(1.4f).Within(.001f), "#780: bigger than #734.");
+                Assert.That(LabThirtySecondsLeftHud.WordsFor(config.SixtySecondsLeftAt), Is.EqualTo("60초 남았소!"));
+                Assert.That(LabThirtySecondsLeftHud.Crossed(60.02d, 59.99d, 60f), Is.True);
+                Assert.That(LabThirtySecondsLeftHud.Crossed(59.99d, 59.97d, 60f), Is.False, "Once.");
+                Assert.That(LabThirtySecondsLeftHud.Crossed(59.99d, 59.97d, 30f), Is.False, "Not the 30 s one yet.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(config); }
+        }
+
+        [Test]
+        public void TheAlarmDrawsAboveTheGimmicksButUnderTheFinishReplay()
+        {
+            Assert.That(LabThirtySecondsLeftHud.TopSortingOrder, Is.GreaterThan(20000), "Above the HUD, the gimmick screens and the drum pass hint.");
+            Assert.That(LabThirtySecondsLeftHud.TopSortingOrder, Is.LessThan(LabFinishReplay.OverlaySortingOrder));
+        }
     }
 }

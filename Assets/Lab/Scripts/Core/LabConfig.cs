@@ -1207,6 +1207,10 @@ namespace C6Lab
         [SerializeField, Range(0f, 1f)] private float thirtySecondsLeftVolume = 1f;
         [Tooltip("남은 30초 진동 세기 (강한 탭 한 번 + 짧은 여운, 0이면 끔)")]
         [SerializeField, Range(0f, 1f)] private float thirtySecondsLeftHaptic = 1f;
+        [Tooltip("#780: 남은 시간이 이 초가 될 때도 같은 알림(\"60초 남았소!\", 같은 소리/진동)을 한 번 더 띄운다. 0이면 끔. 30초에 빨라지는 BGM은 위 알림 시각에만 바뀐다")]
+        [SerializeField, Range(0f, 120f)] private float sixtySecondsLeftAt = 60f;
+        [Tooltip("#780: 남은 시간 알림의 말풍선과 시간 숫자 부풂 크기 배율 (1이면 #734 크기)")]
+        [SerializeField, Range(1f, 2f)] private float thirtySecondsLeftSize = 1.4f;
 
         [Header("Haptics (아이폰 진동, 해당 플레이어 기기만)")]
         [Tooltip("끄면 생성·타격 진동이 모두 나지 않는다.")]
@@ -1803,6 +1807,16 @@ namespace C6Lab
         public float ThirtySecondsLeftDrumDelaySeconds => Mathf.Clamp(Finite(thirtySecondsLeftDrumDelaySeconds, .8f), 0f, 3f);
         public float ThirtySecondsLeftVolume => Mathf.Clamp01(Finite(thirtySecondsLeftVolume, 1f));
         public float ThirtySecondsLeftHaptic => Mathf.Clamp01(Finite(thirtySecondsLeftHaptic, 1f));
+        /// <summary>#780: 두 번째(먼저 오는) 남은 시간 알림 시각. 0이면 없음. 30초 알림 시각보다 늦거나 같으면 없음.</summary>
+        public float SixtySecondsLeftAt
+        {
+            get
+            {
+                float at = Mathf.Clamp(Finite(sixtySecondsLeftAt, 60f), 0f, 120f);
+                return at > ThirtySecondsLeftAt ? at : 0f;
+            }
+        }
+        public float ThirtySecondsLeftSize => Mathf.Clamp(Finite(thirtySecondsLeftSize, 1.4f), 1f, 2f);
         public float JigwiSootJoinVolume => Mathf.Clamp01(Finite(jigwiSootJoinVolume, .8f));
         public float JigwiSootWholeVolume => Mathf.Clamp01(Finite(jigwiSootWholeVolume, 1f));
         public float JigwiSootHitVoiceVolume => Mathf.Clamp01(Finite(jigwiSootHitVoiceVolume, 1f));

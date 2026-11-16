@@ -360,6 +360,8 @@ MonoBehaviour:
   thirtySecondsLeftDrumDelaySeconds: 0.8
   thirtySecondsLeftVolume: 1
   thirtySecondsLeftHaptic: 1
+  sixtySecondsLeftAt: 60
+  thirtySecondsLeftSize: 1.4
   hapticsEnabled: 1
   generateHapticStyle: 1
   generateHapticIntensity: 1
