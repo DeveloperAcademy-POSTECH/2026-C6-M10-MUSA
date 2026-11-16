@@ -39,17 +39,20 @@ namespace C6Lab
         private SpriteRenderer glow;
         private SpriteRenderer line;
         private TextMesh seconds;
+        private TextMesh blockedLabel;
         private readonly System.Collections.Generic.List<SpriteRenderer> digitViews = new System.Collections.Generic.List<SpriteRenderer>();
         private float digitHeight;
         private bool right;
         private bool secondsShown = true;
         private float age;
         private float flash;
+        private float noticeAlpha = 1f;
         private Vector3 glowScale = Vector3.one;
 
         public bool Visible => glow != null && glow.gameObject.activeSelf;
         /// <summary>The right edge is blocked; otherwise the left.</summary>
         public bool Right => right;
+        public string BlockedLabel => blockedLabel != null && blockedLabel.gameObject.activeSelf ? blockedLabel.text : string.Empty;
         public string SecondsText => seconds != null && seconds.gameObject.activeSelf ? seconds.text : string.Empty;
 
         /// <summary>
@@ -129,7 +132,11 @@ namespace C6Lab
             float size = textHeight / (FontSize * .1f);
             Vector3 at = new Vector3(edgeX + inward * Mathf.Max(boardWidth * .065f, textHeight * .8f), secondsMiddle, -2f * orbRadius);
             seconds.characterSize = size;
-            seconds.transform.position = at;
+            // The label stays at the edge midpoint; the countdown sits above it.
+            blockedLabel.characterSize = size * 1.35f;
+            blockedLabel.lineSpacing = .85f;
+            blockedLabel.transform.position = at;
+            seconds.transform.position = at + Vector3.up * textHeight * 3.8f;
             digitHeight = textHeight;
             DrawDigits(seconds.text);
             SetShown(true);
@@ -155,7 +162,7 @@ namespace C6Lab
                     digitViews.Add(CreateSprite("Block Countdown Digit", null, TextOrder + 1));
                 SpriteRenderer digit = digitViews[i];
                 digit.sprite = Resources.Load<Sprite>("Sabotage/DrumPassBlock/Digits/" + value[i]);
-                digit.color = CountdownInk;
+                digit.color = new Color(CountdownInk.r, CountdownInk.g, CountdownInk.b, noticeAlpha);
                 digit.transform.position = seconds.transform.position
                     + Vector3.right * ((i - (value.Length - 1) * .5f) * digitHeight * .7f);
                 digit.transform.localScale = Vector3.one * (digitHeight * 1.5f);
@@ -192,6 +199,14 @@ namespace C6Lab
                 float blink = (age % BlinkSeconds) / BlinkSeconds;
                 opening = 1f - blink * blink;
             }
+            // One opacity clock for the countdown sprites and vertical wording, including digit changes.
+            float pulse = age < OpeningSeconds ? opening : .5f + .5f * Mathf.Sin(age * BreatheHz * 2f * Mathf.PI);
+            noticeAlpha = Mathf.Round(Mathf.Lerp(.3f, 1f, pulse) * 255f) / 255f;
+            Color labelInk = blockedLabel.color;
+            labelInk.a = noticeAlpha;
+            blockedLabel.color = labelInk;
+            foreach (var digit in digitViews)
+                digit.color = new Color(CountdownInk.r, CountdownInk.g, CountdownInk.b, noticeAlpha);
             Color red = Red; // Keep the RGB fixed; only opacity/width breathe and flash.
             glow.color = new Color(red.r, red.g, red.b,
                 Mathf.Min(1f, Mathf.Lerp(GlowAlpha * breathe, 1f, opening) + .05f * lift));
@@ -220,6 +235,11 @@ namespace C6Lab
             if (font == null) font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             seconds = CreateText("Swipe Block Seconds", font, CountdownInk, TextOrder + 1);
             seconds.GetComponent<MeshRenderer>().enabled = false;
+            // TextMesh's font shader consumes linear vertex RGB; SpriteRenderer converts its tint.
+            // Use the linear equivalent so both render as the same SecondaryLightIvory/500***.
+            Color labelInk = QualitySettings.activeColorSpace == ColorSpace.Linear ? CountdownInk.linear : CountdownInk;
+            blockedLabel = CreateText("Swipe Block Vertical Label", font, labelInk, TextOrder);
+            blockedLabel.text = "전\n달\n불\n가";
             SetShown(false);
         }
 
@@ -229,6 +249,7 @@ namespace C6Lab
             glow.gameObject.SetActive(shown);
             line.gameObject.SetActive(false);
             seconds.gameObject.SetActive(shown && secondsShown);
+            blockedLabel.gameObject.SetActive(shown);
             for (int i = 0; i < digitViews.Count; i++)
                 digitViews[i].gameObject.SetActive(shown && secondsShown && i < seconds.text.Length);
         }

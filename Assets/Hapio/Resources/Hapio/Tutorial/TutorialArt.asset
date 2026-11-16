@@ -35,6 +35,10 @@ MonoBehaviour:
   maxFontSize: 17
   minFontSize: 12
   textColor: {r: 0.12, g: 0.1, b: 0.09, a: 1}
+  emphasisScale: 1.35
+  emphasisRed: {r: 0.49803922, g: 0.10980392, b: 0.050980393, a: 1}
+  elementOutlineWidth: 0
+  emphasisBold: 1
   tapHint: {fileID: 21300000, guid: 25a97783e4f1249f1baf70606dccbac4, type: 3}
   tapHintSize: {x: 16, y: 14}
   tapHintOffset: {x: 0, y: 5}
@@ -132,7 +136,7 @@ MonoBehaviour:
   logHandleTouchWidth: 24
   logHandleColor: {r: 0.906, g: 0.737, b: 0.573, a: 1}
   logBackGap: 8
-  arrowColor: {r: 0.36, g: 0.66, b: 0.29, a: 1}
+  arrowColor: {r: 0, g: 0, b: 0, a: 1}
   arrowWidth: 7
   arrowHeadLength: 18
   arrowHeadWidth: 22

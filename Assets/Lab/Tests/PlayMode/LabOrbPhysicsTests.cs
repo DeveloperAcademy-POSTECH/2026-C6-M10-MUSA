@@ -1210,11 +1210,11 @@ namespace C6Lab.Tests
             Assert.That(effect, Is.Not.Null, "A blast draws a burst where the bomb was.");
             Assert.That(effect.Label, Is.EqualTo("뻥이요!"), "The hand-lettered blast word (#305)...");
             SpriteRenderer word = effect.transform.Find("뻥이요").GetComponent<SpriteRenderer>();
-            SpriteRenderer outline = effect.transform.Find("뻥이요 Outline").GetComponent<SpriteRenderer>();
             Assert.That(word.sprite, Is.SameAs(Resources.Load<Sprite>(LabBombBlastEffect.ArtPath)));
-            Assert.That(outline.sprite, Is.SameAs(Resources.Load<Sprite>(LabBombBlastEffect.OutlinePath)));
-            Assert.That(word.sortingOrder, Is.GreaterThan(outline.sortingOrder), "...in ink over its cream outline...");
-            Assert.That(outline.sortingOrder, Is.GreaterThan(32), "...above the burst.");
+            Assert.That(effect.transform.Find("뻥이요 Outline"), Is.Null, "The authored hanji sticker supplies its own edge.");
+            foreach (var renderer in effect.GetComponentsInChildren<SpriteRenderer>(true))
+                if (renderer.name == "Burst") Assert.That(renderer.gameObject.activeSelf, Is.False,
+                    "The old bright comic star layers must not cover the hanji artwork.");
             Assert.That(effect.gameObject.layer, Is.EqualTo(board.gameObject.layer), "It shows on the board camera only.");
             Assert.That(effect.GetComponentsInChildren<Collider>(), Is.Empty, "The burst never touches physics.");
             Vector3 at = effect.transform.position;
@@ -1789,6 +1789,31 @@ namespace C6Lab.Tests
             Assert.That(edge.Visible, Is.False);
         }
 
+        [Test]
+        public void BlockedWordingAndCountdownBlinkTogetherAcrossDigitChanges()
+        {
+            board.SetSwipeBlock(-1, 10f);
+            var edge = board.EdgeBlock;
+            var flags = BindingFlags.Instance | BindingFlags.NonPublic;
+            var ageField = typeof(LabOrbEdgeBlock).GetField("age", flags);
+            var pose = typeof(LabOrbEdgeBlock).GetMethod("Pose", flags);
+            var wording = edge.transform.Find("Swipe Block Vertical Label").GetComponent<TextMesh>();
+            float firstAlpha = wording.color.a;
+            ageField.SetValue(edge, .25f);
+            pose.Invoke(edge, null);
+            Assert.That(wording.color.a, Is.LessThan(firstAlpha), "The warning fades with its countdown.");
+            edge.SetSeconds(9f);
+            foreach (var digit in edge.GetComponentsInChildren<SpriteRenderer>())
+                if (digit.name == "Block Countdown Digit")
+                    Assert.That(digit.color.a, Is.EqualTo(wording.color.a).Within(.001f),
+                        "Changing the digit must retain the same blink phase.");
+            ageField.SetValue(edge, 2f);
+            pose.Invoke(edge, null);
+            foreach (var digit in edge.GetComponentsInChildren<SpriteRenderer>())
+                if (digit.name == "Block Countdown Digit")
+                    Assert.That(digit.color.a, Is.EqualTo(wording.color.a).Within(.001f));
+        }
+
         [UnityTest]
         public IEnumerator ABlockedEdgeGlowsRedAndCountsItsSecondsDownInItsMiddle()
         {
@@ -1800,7 +1825,8 @@ namespace C6Lab.Tests
             Assert.That(edge.Right, Is.False);
             Assert.That(edge.SecondsText, Is.EqualTo("4"), "The whole seconds left, rounded up.");
             Assert.That(edge.GlowPosition.x, Is.EqualTo(bounds.xMin).Within(1e-4f), "The glow lies on the left edge...");
-            Assert.That(edge.SecondsPosition.y, Is.EqualTo(bounds.center.y).Within(1e-3f), "...with the seconds at its middle...");
+            Assert.That(edge.SecondsPosition.y, Is.GreaterThan(bounds.center.y), "The countdown sits above the vertical label.");
+            Assert.That(edge.BlockedLabel, Is.EqualTo("전\n달\n불\n가"));
             Assert.That(edge.SecondsPosition.x, Is.InRange(bounds.xMin, bounds.xMin + .15f * bounds.width), "...just inside it.");
             Assert.That(edge.SecondsPosition.z, Is.LessThan(-config.OrbRadius), "The seconds stay in front of the orbs.");
             Assert.That(edge.Opening, Is.True, "As the block begins, the edge flashes...");

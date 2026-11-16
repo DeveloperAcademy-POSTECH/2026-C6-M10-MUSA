@@ -93,6 +93,69 @@ namespace C6Lab.Tests
             }
         }
 
+        [Test]
+        public void ComboConfettiUsesAllFiveOrbColorsAndClearsWithoutChangingOtherRain()
+        {
+            var parent = new GameObject("Confetti", typeof(RectTransform));
+            try
+            {
+                ((RectTransform)parent.transform).sizeDelta = new Vector2(600, 800);
+                var rain = parent.AddComponent<LabComboRewardStars>();
+                rain.Initialize((RectTransform)parent.transform, 1f, useConfetti: true);
+                rain.Burst(-400f);
+                Assert.That(rain.UsesConfetti, Is.True);
+                Assert.That(rain.UsesBujeok, Is.False);
+                var colors = new System.Collections.Generic.HashSet<Color32>();
+                foreach (var image in rain.Area.GetComponentsInChildren<Image>())
+                {
+                    Assert.That(image.sprite, Is.Null, "Plain paper rectangles, with no talisman artwork.");
+                    Assert.That(image.raycastTarget, Is.False);
+                    Assert.That(image.rectTransform.sizeDelta.x, Is.LessThan(image.rectTransform.sizeDelta.y));
+                    colors.Add(image.color);
+                }
+                foreach (var color in LabFiveColorSparkle.FiveColors) Assert.That(colors.Contains(color), Is.True);
+                rain.Clear();
+                Assert.That(rain.Area.GetComponentsInChildren<Image>(), Is.Empty);
+            }
+            finally { Object.DestroyImmediate(parent); }
+        }
+
+        [Test]
+        public void WrongColorMessageFitsInsideThePanelAndLeavesWithTheResult()
+        {
+            var root = new GameObject("Wrong color message test");
+            var canvasRoot = new GameObject("Canvas", typeof(RectTransform), typeof(Canvas));
+            try
+            {
+                var hud = root.AddComponent<LabGourdComboHud>();
+                hud.enabled = false;
+                hud.Bind(null, canvasRoot.GetComponent<Canvas>());
+                var flags = BindingFlags.Instance | BindingFlags.NonPublic;
+                typeof(LabGourdComboHud).GetMethod("EnsureLayer", flags).Invoke(hud, null);
+                typeof(LabGourdComboHud).GetField("shownResult", flags).SetValue(hud, LabComboResult.WrongColor);
+                typeof(LabGourdComboHud).GetField("resultElapsed", flags).SetValue(hud, .3f);
+                var text = (Text)typeof(LabGourdComboHud).GetField("resultText", flags).GetValue(hud);
+                text.text = "내가 색 틀림";
+                var draw = typeof(LabGourdComboHud).GetMethod("DrawResult", flags);
+                draw.Invoke(hud, null);
+                var box = (Image)typeof(LabGourdComboHud).GetField("wrongColorBox", flags).GetValue(hud);
+                Assert.That(box.gameObject.activeSelf, Is.True);
+                Assert.That(text.rectTransform.sizeDelta.x, Is.LessThan(box.rectTransform.sizeDelta.x));
+                Assert.That(text.rectTransform.sizeDelta.y, Is.LessThan(box.rectTransform.sizeDelta.y));
+                Assert.That(text.rectTransform.anchoredPosition, Is.EqualTo(Vector2.zero));
+                Assert.That(text.rectTransform.localScale, Is.EqualTo(Vector3.one));
+                Assert.That(box.raycastTarget, Is.False);
+                typeof(LabGourdComboHud).GetField("resultElapsed", flags).SetValue(hud, -1f);
+                draw.Invoke(hud, null);
+                Assert.That(box.gameObject.activeSelf, Is.False);
+            }
+            finally
+            {
+                Object.DestroyImmediate(root);
+                Object.DestroyImmediate(canvasRoot);
+            }
+        }
+
         [UnityTest]
         public IEnumerator SmallShowsABarWithoutSecondsAndBigRainsStarsInstead()
         {

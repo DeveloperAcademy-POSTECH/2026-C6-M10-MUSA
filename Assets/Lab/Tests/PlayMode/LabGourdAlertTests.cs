@@ -19,16 +19,6 @@ namespace C6Lab.Tests
             yield return null;
         }
 
-        [Test]
-        public void BlockNoticeHoldsThenFadesWithoutChangingTheRestrictionDuration()
-        {
-            Assert.That(LabGourdAlert.BlockNoticeAlpha(0f), Is.Zero);
-            Assert.That(LabGourdAlert.BlockNoticeAlpha(.2f), Is.EqualTo(1f));
-            Assert.That(LabGourdAlert.BlockNoticeAlpha(1.9f), Is.EqualTo(1f));
-            Assert.That(LabGourdAlert.BlockNoticeAlpha(2.2f), Is.EqualTo(.5f).Within(.001f));
-            Assert.That(LabGourdAlert.BlockNoticeAlpha(2.4f), Is.Zero.Within(.001f));
-        }
-
         [UnityTest]
         public IEnumerator TheAlertPopsAnExclamationBubbleBesideTheGourdFollowsItAndLeavesByItself()
         {
@@ -52,7 +42,7 @@ namespace C6Lab.Tests
             Assert.That(alert.Visible, Is.True, "The gourd is on screen, so the bubble shows.");
             Assert.That(alert.Label, Is.EqualTo("!"));
             Assert.That(alert.Bubble.GetComponent<Image>().raycastTarget, Is.False, "It never blocks a touch.");
-            Assert.That(alert.Bubble.GetComponentInChildren<Text>().raycastTarget, Is.False);
+            Assert.That(alert.Bubble.GetComponentInChildren<Text>(true).raycastTarget, Is.False);
             // Its tail sits on the gourd's upper right as seen from this camera, so the bubble opens beside it.
             Vector3 gourdOnScreen = battleCamera.WorldToScreenPoint(gourd.Hitbox.bounds.center);
             Vector2 tail = RectTransformUtility.WorldToScreenPoint(null, alert.Bubble.position);
@@ -91,60 +81,6 @@ namespace C6Lab.Tests
             yield return null;
             Assert.That(alert.Active, Is.True);
             Assert.That(alert.Visible, Is.False, "Off screen, the bubble is hidden.");
-        }
-
-        [UnityTest]
-        public IEnumerator TheBlockBubbleShowsTheBlockedWayInsteadOfTheExclamationAndStaysLonger()
-        {
-            root = new GameObject("Gourd block alert test");
-            var cameraObject = new GameObject("Battle camera");
-            cameraObject.transform.SetParent(root.transform, false);
-            cameraObject.transform.position = new Vector3(0f, 1f, -8f);
-            var battleCamera = cameraObject.AddComponent<Camera>();
-            var canvasObject = new GameObject("Canvas", typeof(RectTransform));
-            canvasObject.transform.SetParent(root.transform, false);
-            var canvas = canvasObject.AddComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            LabTarget gourd = LabTarget.CreateCylinder(root.transform, new Vector3(0f, 1f, 0f), .8f, 2f);
-            var alert = root.AddComponent<LabGourdAlert>();
-            alert.Bind(null, canvas, battleCamera);
-            yield return null;
-
-            alert.ShowBlock(gourd, true);
-            Transform blockMark = alert.Bubble.Find("Gourd Alert Block Mark");
-            Transform exclamation = alert.Bubble.Find("Gourd Alert Mark");
-            Assert.That(alert.ShowingBlock, Is.True, "The gourd's swipe block pops its own bubble (#215).");
-            Assert.That(alert.Visible, Is.True);
-            Assert.That(alert.BlockRight, Is.True);
-            Assert.That(alert.Label, Is.EqualTo("→ 🚫"));
-            Assert.That(blockMark.gameObject.activeSelf, Is.False, "The old cartoon mark is replaced by the Figma panel.");
-            Assert.That(exclamation.gameObject.activeSelf, Is.False, "...instead of the bomb's \"!\".");
-            var image = alert.Bubble.GetComponent<Image>();
-            Assert.That(image.sprite.name, Is.EqualTo("BlockRight"));
-            Assert.That(image.raycastTarget, Is.False, "It never blocks a touch.");
-
-            alert.ShowBlock(gourd, false);
-            Assert.That(alert.Label, Is.EqualTo("← 🚫"));
-            Assert.That(image.sprite.name, Is.EqualTo("BlockLeft"));
-
-            yield return new WaitForSeconds(.2f);
-            Assert.That(alert.BlockPanelAlpha, Is.EqualTo(1f).Within(.01f));
-            Assert.That(alert.Bubble.localRotation, Is.EqualTo(Quaternion.identity));
-            yield return new WaitForSeconds(1.95f);
-            Assert.That(alert.BlockPanelAlpha, Is.InRange(.1f, .9f), "The panel fades instead of shrinking/wiggling.");
-            float shown = Time.time - 2.15f;
-            float until = Time.time + LabGourdAlert.BlockShowSeconds + 1f;
-            while (alert.Active && Time.time < until) yield return null;
-            Assert.That(alert.Active, Is.False, "It leaves by itself.");
-            Assert.That(Time.time - shown, Is.GreaterThanOrEqualTo(LabGourdAlert.BlockShowSeconds - .1f),
-                "After about two seconds, longer than the bomb's bubble.");
-            Assert.That(LabGourdAlert.BlockShowSeconds, Is.GreaterThan(alert.ShowSeconds));
-
-            alert.Show(gourd);
-            Assert.That(alert.ShowingBlock, Is.False);
-            Assert.That(alert.Label, Is.EqualTo("!"), "A bomb still shows its \"!\".");
-            Assert.That(exclamation.gameObject.activeSelf, Is.True);
-            Assert.That(blockMark.gameObject.activeSelf, Is.False);
         }
 
         [UnityTest]
@@ -222,7 +158,7 @@ namespace C6Lab.Tests
             alert.ShowWord(gourd, "넷!", 1f);
             Assert.That(word.resizeTextForBestFit, Is.False);
             alert.Show(gourd);
-            Assert.That(word.GetComponent<Outline>().enabled, Is.True, "The bomb's red \"!\" keeps its outline.");
+            Assert.That(word.GetComponent<Outline>().enabled, Is.False, "The artwork contains the brush exclamation.");
             alert.ShowEyes(gourd, 2f);
             alert.Show(gourd);
             Assert.That(alert.ShowingEyes, Is.False, "A bomb's \"!\" replaces the eyes.");

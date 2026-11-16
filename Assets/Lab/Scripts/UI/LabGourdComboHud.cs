@@ -112,6 +112,8 @@ namespace C6Lab
         private bool figmaPanel;
         private readonly LabOrbElement[] slotElements = new LabOrbElement[LabGourdCombo.Length];
         private Text resultText;
+        private Image wrongColorBox;
+        private Vector2 defaultResultSize;
         private Image successStamp;
         // #668 도장은 야광귀 콤보 성공에만 찍는다. #664 구미호 여우구슬 성공도 같은 결과 문구를 쓰지만 도장 없이 성공!을 띄운다.
         private bool StampSuccess => YaguangCount && !resultIsFoxRound && successStamp != null && successStamp.sprite != null;
@@ -1042,6 +1044,11 @@ namespace C6Lab
         private void DrawResult()
         {
             DrawComboPop();
+            wrongColorBox.gameObject.SetActive(false);
+            resultText.resizeTextForBestFit = false;
+            resultText.horizontalOverflow = HorizontalWrapMode.Overflow;
+            resultText.rectTransform.sizeDelta = defaultResultSize;
+            resultText.GetComponent<Outline>().enabled = true;
             if (successStamp != null) successStamp.gameObject.SetActive(false);
             resultText.enabled = true;
             if (resultElapsed < 0f)
@@ -1123,6 +1130,32 @@ namespace C6Lab
             resultText.rectTransform.anchoredPosition = new Vector2(
                 Mathf.Sin(t * 95f) * 16f * unit * shake, Mathf.Cos(t * 71f) * 8f * unit * shake);
             resultText.rectTransform.localRotation = Quaternion.Euler(0f, 0f, 12f * Mathf.Sin(t * 47f) * shake);
+            if (shownResult == LabComboResult.WrongColor && !resultIsFoxRound)
+            {
+                // Replace the order panel with a message inside the same hanji rectangle.
+                var box = wrongColorBox.rectTransform;
+                var source = panel.GetComponent<Image>();
+                box.anchorMin = box.anchorMax = resultText.rectTransform.anchorMin;
+                box.sizeDelta = panel.sizeDelta;
+                box.anchoredPosition = Vector2.zero;
+                wrongColorBox.sprite = source.sprite;
+                wrongColorBox.type = source.type;
+                Color paper = source.color;
+                paper.a *= 1f - leave;
+                wrongColorBox.color = paper;
+                wrongColorBox.gameObject.SetActive(true);
+                resultText.rectTransform.sizeDelta = panel.sizeDelta * new Vector2(.86f, .72f);
+                resultText.rectTransform.localScale = Vector3.one;
+                resultText.rectTransform.localRotation = Quaternion.identity;
+                resultText.rectTransform.anchoredPosition = Vector2.zero;
+                resultText.resizeTextForBestFit = true;
+                resultText.resizeTextMinSize = 10;
+                resultText.resizeTextMaxSize = Mathf.Max(14, Mathf.RoundToInt(panel.sizeDelta.y * .38f));
+                resultText.horizontalOverflow = HorizontalWrapMode.Wrap;
+                resultText.GetComponent<Outline>().enabled = false;
+                // TextColor/DarkRed/500***, alpha follows the existing result fade.
+                resultText.color = new Color(175f / 255f, 71f / 255f, 56f / 255f, 1f - leave);
+            }
             float blink = t < .12f ? 1f - t / .12f : t < .3f ? .6f * Mathf.Clamp01(1f - (t - .18f) / .12f) * (t > .18f ? 1f : 0f) : 0f;
             flash.gameObject.SetActive(blink > 0f);
             Color flashColor = FailColor;
@@ -1250,7 +1283,7 @@ namespace C6Lab
 
             // 보상 별(#257): 번쩍임 바로 앞, 콤보 패널·결과 문구·배지 뒤에 그린다.
             stars = layer.gameObject.AddComponent<LabComboRewardStars>();
-            stars.Initialize(layer, u);
+            stars.Initialize(layer, u, useConfetti: true);
             float gap = slotSize * .22f;
             float width = slotSize * LabGourdCombo.Length + gap * (LabGourdCombo.Length + 1);
             panel = NewRect("Gourd Combo Panel", layer);
@@ -1356,9 +1389,15 @@ namespace C6Lab
             timeBarFill.color = InkColor;
             timeBarFill.raycastTarget = false;
 
+            var wrongBoxRect = NewRect("Wrong Color Message Box", layer);
+            wrongColorBox = wrongBoxRect.gameObject.AddComponent<Image>();
+            wrongColorBox.raycastTarget = false;
+            wrongBoxRect.gameObject.SetActive(false);
             resultText = NewText("Combo Result", layer, Mathf.Max(14, Mathf.RoundToInt(54f * u)), TextAnchor.MiddleCenter);
+            resultText.font = Resources.Load<Font>(LabOrbEdgeBlock.CountdownFontPath) ?? font;
             resultText.rectTransform.anchorMin = resultText.rectTransform.anchorMax = panelAnchor;
             resultText.rectTransform.sizeDelta = new Vector2(width * 1.6f, 80f * u);
+            defaultResultSize = resultText.rectTransform.sizeDelta;
             float badgeHeight = 34f * u;
             // 결과 문구는 사라진 콤보 패널 자리 가운데에 뜬다.
             resultText.rectTransform.anchoredPosition = Vector2.zero;

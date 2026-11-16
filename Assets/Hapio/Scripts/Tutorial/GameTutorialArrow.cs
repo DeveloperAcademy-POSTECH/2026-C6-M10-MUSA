@@ -13,6 +13,34 @@ namespace Hapio
         private Vector2 from, to;
         private float width = 7f, headLength = 18f, headWidth = 22f;
 
+        private static Texture2D brushTexture;
+        public override Texture mainTexture => BrushTexture();
+
+        private static Texture2D BrushTexture()
+        {
+            if (brushTexture != null) return brushTexture;
+            const int w = 128, h = 64;
+            var pixels = new Color32[w * h];
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                {
+                    float u = (x + .5f) / w, v = (y + .5f) / h;
+                    float edge = .06f + .025f * Mathf.Sin(x * .51f) + .02f * Mathf.Sin(x * 1.73f);
+                    float coverage = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((Mathf.Min(v, 1f - v) - edge) / .07f));
+                    float grain = Mathf.Repeat(Mathf.Sin(x * 12.9898f + y * 78.233f) * 43758.547f, 1f);
+                    float streak = Mathf.Abs(v - (.38f + .025f * Mathf.Sin(u * 18f)));
+                    if (streak < .012f && u > .15f && u < .85f) coverage *= .25f;
+                    coverage *= grain < .07f ? .35f : .9f + .1f * grain;
+                    pixels[y * w + x] = new Color32(255, 255, 255, (byte)Mathf.RoundToInt(coverage * 255f));
+                }
+            brushTexture = new Texture2D(w, h, TextureFormat.RGBA32, false)
+            { name = "Tutorial dry ink brush", filterMode = FilterMode.Bilinear,
+                wrapMode = TextureWrapMode.Clamp, hideFlags = HideFlags.DontSave };
+            brushTexture.SetPixels32(pixels);
+            brushTexture.Apply(false, true);
+            return brushTexture;
+        }
+
         public Vector2 From => from;
         public Vector2 To => to;
 
@@ -46,18 +74,18 @@ namespace Hapio
             if (length > head)
             {
                 Vector2 side = across * (width * .5f);
-                mesh.AddVert(from - side, tint, Vector4.zero);
-                mesh.AddVert(from + side, tint, Vector4.zero);
-                mesh.AddVert(neck + side, tint, Vector4.zero);
-                mesh.AddVert(neck - side, tint, Vector4.zero);
+                mesh.AddVert(from - side, tint, new Vector2(0f, 0f));
+                mesh.AddVert(from + side, tint, new Vector2(0f, 1f));
+                mesh.AddVert(neck + side, tint, new Vector2(1f, 1f));
+                mesh.AddVert(neck - side, tint, new Vector2(1f, 0f));
                 mesh.AddTriangle(0, 1, 2);
                 mesh.AddTriangle(2, 3, 0);
             }
             int tip = mesh.currentVertCount;
             Vector2 wing = across * (headWidth * headScale * .5f);
-            mesh.AddVert(neck - wing, tint, Vector4.zero);
-            mesh.AddVert(neck + wing, tint, Vector4.zero);
-            mesh.AddVert(to, tint, Vector4.zero);
+            mesh.AddVert(neck - wing, tint, new Vector2(0f, 0f));
+            mesh.AddVert(neck + wing, tint, new Vector2(0f, 1f));
+            mesh.AddVert(to, tint, new Vector2(1f, .5f));
             mesh.AddTriangle(tip, tip + 1, tip + 2);
         }
     }
