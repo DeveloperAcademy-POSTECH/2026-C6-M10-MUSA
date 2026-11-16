@@ -114,6 +114,39 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void TheLiftModeRaisesAndJittersTheCellsAndTurnsTheFilledOnesRedThenPutsAllBack()
+        {
+            // #788: the Hapio character panel's gauge.
+            feedback.LiftGaugeMode = true;
+            Color own = fill.filledColor;
+            feedback.Play();
+            feedback.Advance(.08f);
+            Assert.That(feedback.ShakeOffset.y, Is.EqualTo(profile.ShortGaugeLiftHeight).Within(.001f), "Risen.");
+            Assert.That(Mathf.Abs(feedback.ShakeOffset.x), Is.GreaterThan(0f).And.LessThanOrEqualTo(profile.ShortGaugeSideShake + .001f));
+            Assert.That(bar.anchoredPosition, Is.EqualTo(BarPlace + feedback.ShakeOffset));
+            Assert.That(bar.localScale, Is.EqualTo(Vector3.one), "No swelling in this mode.");
+            Assert.That(fill.FilledFlashAmount, Is.GreaterThan(.5f), "The filled cells turn red.");
+            Assert.That(fill.ShownFilledColor.r, Is.GreaterThan(fill.ShownFilledColor.g));
+            Assert.That(fill.filledColor, Is.EqualTo(own), "Their own colour is kept.");
+            Assert.That(feedback.FlashImage == null || !feedback.FlashImage.gameObject.activeSelf, Is.True, "No red layer on top.");
+
+            feedback.Advance(1f);
+            Assert.That(feedback.Playing, Is.False);
+            Assert.That(bar.anchoredPosition, Is.EqualTo(BarPlace));
+            Assert.That(fill.FilledFlashAmount, Is.Zero);
+            Assert.That(fill.ShownFilledColor, Is.EqualTo(own));
+        }
+
+        [Test]
+        public void TheCellsRiseEarlyStayUpAndComeDownByTheEndOfTheShake()
+        {
+            Assert.That(LabStaminaShortFeedback.LiftAmount(0f, .32f), Is.Zero);
+            Assert.That(LabStaminaShortFeedback.LiftAmount(.064f, .32f), Is.EqualTo(1f).Within(.001f));
+            Assert.That(LabStaminaShortFeedback.LiftAmount(.2f, .32f), Is.EqualTo(1f));
+            Assert.That(LabStaminaShortFeedback.LiftAmount(.32f, .32f), Is.Zero);
+        }
+
+        [Test]
         public void TappingAgainRestartsFromTheOriginalPlaceInsteadOfDrifting()
         {
             feedback.Play();

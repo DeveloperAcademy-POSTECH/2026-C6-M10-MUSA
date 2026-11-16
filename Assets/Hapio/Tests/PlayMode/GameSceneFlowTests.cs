@@ -1276,7 +1276,7 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
-        public IEnumerator ShortStaminaSwellsTheGaugeShowsTheWarningAndFlashesTheEdgesRedOnlyOnTheBattleScreen()
+        public IEnumerator ShortStaminaLiftsTheCellsTurnsThemRedShowsTheWarningAndFlashesTheEdgesOnTheBattleScreen()
         {
             session.StartSolo();
             yield return WaitPlaying(1);
@@ -1289,16 +1289,25 @@ namespace Hapio.Tests
             Vector2 boardAt = display != null ? display.anchoredPosition : Vector2.zero;
             RectTransform gauge = (RectTransform)bindings.hud.staminaFill.transform.parent;
             Vector3 gaugeScale = gauge.localScale;
+            Vector2 gaugeAt = gauge.anchoredPosition;
+            var cells = (LabShapeFillImage)bindings.hud.staminaFill;
+            Color ownColour = cells.filledColor;
+            LabStaminaFeedbackProfile profile = feedback.Profile;
 
             feedback.Play();
             feedback.Advance(.08f);
-            Assert.That(feedback.GaugeScale, Is.GreaterThan(1.02f), "The gauge swells a little while it shakes (#718).");
-            // #785: the character name sits beside the gauge, so on the Hapio battle screen it moves and swells only vertically.
-            Assert.That(feedback.VerticalGaugeMotionOnly, Is.True);
-            Assert.That(gauge.localScale.y, Is.EqualTo(gaugeScale.y * feedback.GaugeScale).Within(.0001f));
-            Assert.That(gauge.localScale.x, Is.EqualTo(gaugeScale.x).Within(.0001f), "Its width never reaches the name.");
-            Assert.That(feedback.ShakeOffset.x, Is.Zero);
-            Assert.That(Mathf.Abs(feedback.ShakeOffset.y), Is.GreaterThan(0f), "And still shakes.");
+            // #788: on the character panel only the 6 cells rise a little, jitter a little sideways and turn red.
+            Assert.That(feedback.LiftGaugeMode, Is.True);
+            Assert.That(feedback.ShakeOffset.y, Is.EqualTo(profile.ShortGaugeLiftHeight).Within(.001f), "Risen to its full lift.");
+            Assert.That(Mathf.Abs(feedback.ShakeOffset.x), Is.GreaterThan(0f).And.LessThanOrEqualTo(profile.ShortGaugeSideShake + .001f),
+                "A small sideways jitter that stays clear of the name.");
+            Assert.That(Vector2.Distance(gauge.anchoredPosition, gaugeAt + feedback.ShakeOffset), Is.LessThan(.001f));
+            Assert.That(gauge.localScale, Is.EqualTo(gaugeScale), "No swelling toward the name.");
+            Assert.That(feedback.GaugeRedAmount, Is.GreaterThan(0f));
+            Assert.That(cells.FilledFlashAmount, Is.EqualTo(feedback.GaugeRedAmount).Within(.0001f), "The filled cells themselves turn red.");
+            Assert.That(cells.ShownFilledColor.r, Is.GreaterThan(cells.ShownFilledColor.g));
+            Assert.That(cells.filledColor, Is.EqualTo(ownColour), "The character's own colour is kept to come back to.");
+            Assert.That(feedback.FlashImage == null || !feedback.FlashImage.gameObject.activeSelf, Is.True, "No red layer over the cells.");
             Assert.That(feedback.WarningVisible, Is.True);
             Assert.That(feedback.WarningLabel, Is.EqualTo("기운이 부족하다"));
             Assert.That(feedback.WarningIcon, Is.SameAs(Resources.Load<Sprite>(LabStaminaShortFeedback.WarningIconPath)),
@@ -1309,13 +1318,15 @@ namespace Hapio.Tests
                 Assert.That(Vector2.Distance(display.anchoredPosition, boardAt), Is.LessThan(.001f), "The board itself no longer shakes.");
 
             feedback.Advance(.6f);
-            Assert.That(feedback.GaugeScale, Is.EqualTo(1f).Within(.0001f));
+            Assert.That(Vector2.Distance(gauge.anchoredPosition, gaugeAt), Is.LessThan(.001f), "Back down in its place.");
+            Assert.That(cells.FilledFlashAmount, Is.Zero, "Back to the character's colour.");
             Assert.That(feedback.EdgeAlpha, Is.Zero, "The red is gone after its moment...");
             Assert.That(feedback.WarningVisible, Is.True, "...while the warning stays a little longer.");
             feedback.Advance(1f);
             Assert.That(feedback.Playing, Is.False);
             Assert.That(feedback.WarningVisible, Is.False);
             Assert.That(gauge.localScale, Is.EqualTo(gaugeScale), "The gauge is its own size again.");
+            Assert.That(cells.ShownFilledColor, Is.EqualTo(ownColour));
         }
 
         [UnityTest]
