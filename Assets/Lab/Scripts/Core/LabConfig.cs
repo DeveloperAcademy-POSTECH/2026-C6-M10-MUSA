@@ -595,13 +595,13 @@ namespace C6Lab
         [SerializeField] private bool jigwiAHoldBurnUntilEnd = false;
         [Tooltip("#551 Inspector 전용(Host): 켜면 지귀 B는 지목된 사람이 모두 특수 물구슬을 잡고 있을 때 3-2-1이 울리고 \"던져!\"에 함께 위로 휙 던진다. \"던져!\" 전에는 던져지지 않고(놓으면 카운트 취소), \"던져!\" 뒤 1초 안에 모두 던져야 하며, 첫 명중부터 1.5초 안에 모두 맞혀야 성공. 끄면 #509처럼 아무 때나 던져 1초 안에 모두 맞히기.")]
         [SerializeField] private bool jigwiBCountdown = false;
-        [Tooltip("#551 Inspector 전용(Host): 켜면 지귀 B는 개별 \"나무 물통\"이다(여우구슬처럼 따로따로). B 시작 3.5초 뒤부터 1초 간격으로 한 사람씩 박 위에 자기 양동이가 생기고, 7초 안에 폰을 좌우로 기울여 3번 출렁이면 쏟아져 박 윗부분에 크게 물을 칠한다. 못 쏟으면 지귀 연기가 그 사람 화면 전체를 덮어 90% 문질러야 걷히고 그동안 조합판을 쓸 수 없다. 특수 물구슬과 3-2-1은 없다.")]
+        [Tooltip("#551 Inspector 전용(Host): 켜면 지귀 B는 개별 \"나무 물통\"이다(여우구슬처럼 따로따로). B 시작 3.5초 뒤부터 1초 간격으로 한 사람씩 박 위에 자기 양동이가 생기고, 7초 안에 폰을 좌우로 기울여 3번 출렁이면 쏟아져 박 윗부분에 크게 물을 칠한다. 못 쏟으면 지귀 연기가 그 사람 화면 전체를 덮어 70% 문질러야 걷히고 그동안 조합판을 쓸 수 없다. 특수 물구슬과 3-2-1은 없다.")]
         [SerializeField] private bool jigwiBBucket = false;
         [Tooltip("#551 시험용 Inspector 전용(Host): 켜면 지귀 스테이지에서 B만 4초부터 17초마다(4/21/38/55/72초) 나오고 A와 공통 기믹(폭탄 등)은 나오지 않는다. 시험이 끝나면 끈다.")]
         [SerializeField] private bool jigwiBTestOnly = false;
         [Tooltip("#595 시험용 Inspector 전용(Host): 켜면 지귀 스테이지에서 부적만 4초부터 17초마다(4/21/38/55/72초) 나오고 연기와 공통 기믹(폭탄 등)은 나오지 않는다. Jigwi Smoke Flow가 켜져 있으면 공용 부적(모두 써야 보상). 시험이 끝나면 끈다.")]
         [SerializeField] private bool jigwiATestOnly = false;
-        [Tooltip("#595 Inspector 전용(Host): 켜면 지귀 시간표가 연기 10초 / 부적 45초 / 연기 66초 / 부적 83초(공통 기믹은 Jigwi Common Start Seconds부터)다. 연기는 양동이 없이 모두의 화면을 같은 때에 덮어 각자 90% 문질러 걷어 내고, 부적은 모두가 써야 모두 보상(한 명이라도 못 쓰면 모두의 판이 탄다). 켜면 Jigwi Flow Schedule과 Jigwi B Bucket보다 앞선다. B Test Only / A Test Only와 함께 켜면 연기만 / 공용 부적만 시험한다.")]
+        [Tooltip("#595 Inspector 전용(Host): 켜면 지귀 시간표가 연기 10초 / 부적 45초 / 연기 66초 / 부적 83초(공통 기믹은 Jigwi Common Start Seconds부터)다. 연기는 양동이 없이 모두의 화면을 같은 때에 덮어 각자 70% 문질러 걷어 내고, 부적은 모두가 써야 모두 보상(한 명이라도 못 쓰면 모두의 판이 탄다). 켜면 Jigwi Flow Schedule과 Jigwi B Bucket보다 앞선다. B Test Only / A Test Only와 함께 켜면 연기만 / 공용 부적만 시험한다.")]
         [SerializeField] private bool jigwiSmokeFlow = false;
         [Tooltip("#696 연기 흐름을 미션 5개로: 연기 6 / 부적 30 / 연기 44 / 부적 68 / 연기 82, 연기마다 검정 구슬을 던질 틈이 있게 (끄면 #595 연기 10 / 부적 45 / 연기 66 / 부적 83). Host 기준")]
         [SerializeField] private bool jigwiDenseTimeline = false;
@@ -1139,10 +1139,10 @@ namespace C6Lab
         [SerializeField] private bool yaguangFirstComboForgive = true;
         [Tooltip("#719 UT: 콤보마다 받는 하트 수. 틀린 색이 박에 맞을 때마다 하나씩 깨지고, 마지막 하나가 깨지면 실패 (3이면 세 번째 틀린 색에서 실패). 0이면 하트 없이 위 '첫 칸 전 봐주기'를 쓴다. Host 기준")]
         [SerializeField, Range(0, 5)] private int yaguangComboHearts = 3;
-        [Tooltip("콤보 예고 때 금옥 규칙 안내(Audio/YaguangComboGuideRule)를 라운드의 처음 몇 번 콤보까지 낼지 (0이면 끔, 1이면 첫 콤보만)")]
-        [SerializeField, Range(0, 20)] private int yaguangComboGuideRuleCombos = 1;
+        [Tooltip("콤보 예고 때 금옥 규칙 안내(Audio/YaguangComboGuideRule)를 라운드의 처음 몇 번 콤보까지 낼지 (0이면 끔, 1이면 첫 콤보만). #780 미니 QA: 기본 끔")]
+        [SerializeField, Range(0, 20)] private int yaguangComboGuideRuleCombos = 0;
         [Tooltip("규칙 안내 다음 콤보(기본 두 번째 콤보) 예고에서 금옥이 \"자.. 다들 준비 됐지?\"(Audio/YaguangComboGuideReady)를 말할지")]
-        [SerializeField] private bool yaguangComboGuideReadyOn = true;
+        [SerializeField] private bool yaguangComboGuideReadyOn = false; // #780 미니 QA: 규칙 안내와 함께 뺌
         [Tooltip("칸을 맞힌 뒤 금옥 칭찬(좋아! / 잘했어! / 하나만 더..! / 그렇지!!)까지 지연 (초). 맞힌 소리 뒤에 들리게")]
         [SerializeField, Range(0f, 2f)] private float yaguangComboGuideFeedbackDelaySeconds = .3f;
         [Tooltip("규칙 안내가 있는 예고에서 야광귀가 \"넷\"을 센 뒤 금옥 규칙 안내가 나오기까지 (예고 시작부터 초)")]
@@ -1207,6 +1207,10 @@ namespace C6Lab
         [SerializeField, Range(0f, 1f)] private float thirtySecondsLeftVolume = 1f;
         [Tooltip("남은 30초 진동 세기 (강한 탭 한 번 + 짧은 여운, 0이면 끔)")]
         [SerializeField, Range(0f, 1f)] private float thirtySecondsLeftHaptic = 1f;
+        [Tooltip("#780: 남은 시간이 이 초가 될 때도 같은 알림(\"60초 남았소!\", 같은 소리/진동)을 한 번 더 띄운다. 0이면 끔. 30초에 빨라지는 BGM은 위 알림 시각에만 바뀐다")]
+        [SerializeField, Range(0f, 120f)] private float sixtySecondsLeftAt = 60f;
+        [Tooltip("#780: 남은 시간 알림의 말풍선과 시간 숫자 부풂 크기 배율 (1이면 #734 크기)")]
+        [SerializeField, Range(1f, 2f)] private float thirtySecondsLeftSize = 1.4f;
 
         [Header("Haptics (아이폰 진동, 해당 플레이어 기기만)")]
         [Tooltip("끄면 생성·타격 진동이 모두 나지 않는다.")]
@@ -1803,6 +1807,16 @@ namespace C6Lab
         public float ThirtySecondsLeftDrumDelaySeconds => Mathf.Clamp(Finite(thirtySecondsLeftDrumDelaySeconds, .8f), 0f, 3f);
         public float ThirtySecondsLeftVolume => Mathf.Clamp01(Finite(thirtySecondsLeftVolume, 1f));
         public float ThirtySecondsLeftHaptic => Mathf.Clamp01(Finite(thirtySecondsLeftHaptic, 1f));
+        /// <summary>#780: 두 번째(먼저 오는) 남은 시간 알림 시각. 0이면 없음. 30초 알림 시각보다 늦거나 같으면 없음.</summary>
+        public float SixtySecondsLeftAt
+        {
+            get
+            {
+                float at = Mathf.Clamp(Finite(sixtySecondsLeftAt, 60f), 0f, 120f);
+                return at > ThirtySecondsLeftAt ? at : 0f;
+            }
+        }
+        public float ThirtySecondsLeftSize => Mathf.Clamp(Finite(thirtySecondsLeftSize, 1.4f), 1f, 2f);
         public float JigwiSootJoinVolume => Mathf.Clamp01(Finite(jigwiSootJoinVolume, .8f));
         public float JigwiSootWholeVolume => Mathf.Clamp01(Finite(jigwiSootWholeVolume, 1f));
         public float JigwiSootHitVoiceVolume => Mathf.Clamp01(Finite(jigwiSootHitVoiceVolume, 1f));

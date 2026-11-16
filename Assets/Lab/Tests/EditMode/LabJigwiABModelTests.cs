@@ -1103,5 +1103,14 @@ namespace C6Lab.Tests
             Assert.That(LabJigwiABFireMotion.Position(b,f,0,31),Is.EqualTo(first));Assert.That(LabJigwiABFireMotion.Position(b,f,0,32),Is.Not.EqualTo(first));
             for(int i=0;i<100;i++){var p=LabJigwiABFireMotion.Position(b,f,0,31+i*.1);Assert.That(p.x,Is.InRange(.1f,.9f));Assert.That(p.y,Is.InRange(.48f,.86f));}
         }
+
+        [Test]
+        public void TheSmokeClearsOnceSeventyPercentIsRubbedAway()
+        {
+            // #780 미니 QA: 90% → 70% 문지르기. 연기가 30% 남으면 걷힌다.
+            var host = new GameObject("jigwi-smoke");
+            try { Assert.That(host.AddComponent<LabJigwiBucketHandleView>().SteamClearLeft, Is.EqualTo(.3f).Within(1e-5f)); }
+            finally { Object.DestroyImmediate(host); }
+        }
     }
 }

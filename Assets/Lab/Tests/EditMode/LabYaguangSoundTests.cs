@@ -262,6 +262,26 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void ByDefaultGeumokSaysNothingBeforeACombo()
+        {
+            // #780 미니 QA: "잠깐 지금부터는 색 순서대로 던져야 해"와 "자.. 다들 준비 됐지?"는 기본으로 뺀다 (Inspector로 다시 켤 수 있음).
+            var config = ScriptableObject.CreateInstance<LabConfig>();
+            try
+            {
+                Assert.That(config.YaguangComboGuideRuleCombos, Is.Zero);
+                Assert.That(config.YaguangComboGuideReadyOn, Is.False);
+                for (uint shown = 0; shown < 5; shown++)
+                    Assert.That(LabYaguangSound.WarningLine(shown, config.YaguangComboGuideRuleCombos, config.YaguangComboGuideReadyOn), Is.Null,
+                        "No Geumok line before combo " + (shown + 1));
+            }
+            finally { Object.DestroyImmediate(config); }
+            LabConfig shipped = Resources.Load<LabConfig>("LabConfig");
+            Assert.That(shipped, Is.Not.Null);
+            Assert.That(shipped.YaguangComboGuideRuleCombos, Is.Zero, "The game's LabConfig too.");
+            Assert.That(shipped.YaguangComboGuideReadyOn, Is.False);
+        }
+
+        [Test]
         public void TheCountFadesFourThreeTwoOneUnderTheRule()
         {
             Assert.That(LabYaguangSound.GuideCountGain(4, .6f), Is.EqualTo(1f).Within(1e-5f), "넷 at full size");

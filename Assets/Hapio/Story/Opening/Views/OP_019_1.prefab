@@ -512,7 +512,7 @@ MonoBehaviour:
   sourceFigmaNumber: 19
   sourceFigmaNodeId: 3331:479
   overrideDialogueLayout: 1
-  dialogueFontSize: 20.69
+  dialogueFontSize: 21
   dialogueRect:
     serializedVersion: 2
     x: 84

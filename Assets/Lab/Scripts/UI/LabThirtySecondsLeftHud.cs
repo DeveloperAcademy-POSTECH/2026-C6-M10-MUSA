@@ -14,6 +14,9 @@ namespace C6Lab
     /// 튜토리얼 연습판과 2:2 대결에서는 띄우지 않는다. 남은 시간(스냅샷)만 보고 판단해서 라운드 기믹 코드와 따로 돈다.
     /// 30초가 지난 뒤(LateWindowSeconds 넘게) 들어온 기기에는 띄우지 않는다. 화면 표시만 하며 터치를 막지 않는다.
     /// 알림 시각, 말풍선 시간, 경고음(징/북)과 크기, 진동 세기는 LabConfig Inspector "남은 30초 알림 (#734)".
+    /// #780: 남은 60초에도 같은 알림("60초 남았소!", 같은 소리/진동)을 한 번 더 띄운다(LabConfig "Sixty Seconds Left At", 0이면 끔).
+    /// 말풍선과 시간 숫자 부풂은 LabConfig 크기 배율(기본 1.4배)만큼 크고, 알림은 자기 Canvas로 모든 기믹 효과 위에 그린다
+    /// (TopSortingOrder: 전투 HUD / 북 가이딩 / 기믹 화면 위, 결승 다시보기 / 화면 전환 덮개 아래).
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class LabThirtySecondsLeftHud : MonoBehaviour
@@ -22,6 +25,8 @@ namespace C6Lab
         public const string GongFolder = "ThirtySecondsLeftGong", DrumFolder = "ThirtySecondsLeftDrum";
         /// <summary>알림 시각을 넘은 지 이 초 안에 본 기기만 띄운다.</summary>
         public const double LateWindowSeconds = 1.5d;
+        /// <summary>#780: 알림 Canvas 순서. 전투 HUD(0) / 기믹 화면 / 북 가이딩 위, 튜토리얼 / 도움말(20000~) / 결승 다시보기(29000) / 화면 전환(30000~) 아래.</summary>
+        public const int TopSortingOrder = 19500;
         public static readonly Color AlarmRed = new Color(.86f, .12f, .16f);
         private static readonly Color PaperColor = new Color(1f, .97f, .9f, .97f);
         private static readonly Color InkColor = new Color32(43, 36, 32, 255);
@@ -43,6 +48,7 @@ namespace C6Lab
         private RectTransform layer, bubble, tail;
         private Image back, tailImage, edge;
         private Text words;
+        private Canvas topCanvas;
         private double lastRemaining = double.NaN;
         private float age = float.PositiveInfinity;
         private AudioSource sfx;
@@ -103,6 +109,8 @@ namespace C6Lab
             if (on)
             {
                 float at = network.config != null ? network.config.ThirtySecondsLeftAt : 30f;
+                float early = network.config != null ? network.config.SixtySecondsLeftAt : 60f;
+                if (early > 0f && Crossed(lastRemaining, snapshot.remaining, early)) Begin(early);
                 if (Crossed(lastRemaining, snapshot.remaining, at)) Begin(at);
                 lastRemaining = snapshot.remaining;
             }
@@ -117,6 +125,20 @@ namespace C6Lab
             Begin(network != null && network.config != null ? network.config.ThirtySecondsLeftAt : 30f, sound);
             return layer != null;
         }
+
+        /// <summary>VFX 실험실(#780): 남은 60초 알림을 지금 한 번 띄운다 (LabConfig 소리 그대로). 60초 알림이 꺼져 있으면 60으로.</summary>
+        public bool PreviewSixtyNow()
+        {
+            float early = network != null && network.config != null ? network.config.SixtySecondsLeftAt : 60f;
+            Begin(early > 0f ? early : 60f);
+            return layer != null;
+        }
+
+        /// <summary>#780: 지금 알림 크기 배율 (LabConfig, 기본 1.4).</summary>
+        public float Size => network != null && network.config != null ? network.config.ThirtySecondsLeftSize : 1.4f;
+
+        /// <summary>#780: 알림을 그리는 Canvas의 순서 (테스트·확인용). 아직 그리지 않았으면 int.MinValue.</summary>
+        public int SortingOrder => topCanvas != null ? topCanvas.sortingOrder : int.MinValue;
 
         /// <summary>VFX 실험실(#734): 고른 경고음만 지금 한 번 들려준다 (말풍선 없이, LabConfig 크기로).</summary>
         public void PreviewSound(LabThirtySecondsLeftSound sound)
@@ -175,7 +197,7 @@ namespace C6Lab
             if (timer != null && timerTouched)
             {
                 float swell = age < TimerSwellSeconds ? Mathf.Sin(Mathf.PI * age / TimerSwellSeconds) : 0f;
-                timer.rectTransform.localScale = timerScale * (1f + TimerSwell * swell);
+                timer.rectTransform.localScale = timerScale * (1f + TimerSwell * Size * swell);
                 bool red = age < TimerBlinkSeconds && Mathf.FloorToInt(age / TimerBlinkSeconds * TimerBlinks * 2f) % 2 == 0;
                 timer.color = red ? new Color(AlarmRed.r, AlarmRed.g, AlarmRed.b, timerColor.a) : timerColor;
             }
@@ -190,7 +212,7 @@ namespace C6Lab
             if (alpha > 0f)
             {
                 Place(BubbleShake(age));
-                float scale = BubbleScale(age);
+                float scale = BubbleScale(age) * Size;
                 bubble.localScale = tail.localScale = Vector3.one * scale;
                 back.color = new Color(PaperColor.r, PaperColor.g, PaperColor.b, PaperColor.a * alpha);
                 tailImage.color = back.color;
@@ -245,11 +267,12 @@ namespace C6Lab
                 timerCenterX = (min.x + max.x) * .5f;
                 anchor.x = timerCenterX - ((max.x - min.x) * .5f / Mathf.Max(.01f, grow));
             }
-            float x = Mathf.Clamp(anchor.x + BubbleWidth * .5f - 8f, area.xMin + BubbleWidth * .5f + 6f, area.xMax - BubbleWidth * .5f - 6f);
-            float y = timerBottom - BubbleGap - BubbleHeight * .5f;
+            float size = Size, width = BubbleWidth * size, height = BubbleHeight * size;
+            float x = Mathf.Clamp(anchor.x + width * .5f - 8f, area.xMin + width * .5f + 6f, area.xMax - width * .5f - 6f);
+            float y = timerBottom - BubbleGap - height * .5f;
             bubble.anchoredPosition = new Vector2(x + shake, y);
-            tail.anchoredPosition = new Vector2(Mathf.Clamp(timerCenterX, x - BubbleWidth * .4f, x + BubbleWidth * .4f) + shake,
-                y + BubbleHeight * .5f);
+            tail.anchoredPosition = new Vector2(Mathf.Clamp(timerCenterX, x - width * .4f, x + width * .4f) + shake,
+                y + height * .5f);
         }
 
         /// <summary>경고음 종류의 Resources/Audio 폴더 이름 (징 다음 북은 먼저 울리는 징).</summary>
@@ -288,6 +311,10 @@ namespace C6Lab
             layer = NewRect("Thirty Seconds Left", canvasRect);
             layer.anchorMin = Vector2.zero; layer.anchorMax = Vector2.one;
             layer.offsetMin = layer.offsetMax = Vector2.zero;
+            // #780: its own Canvas so it draws above every gimmick screen and the drum pass hint (touches pass through: no raycaster).
+            topCanvas = layer.gameObject.AddComponent<Canvas>();
+            topCanvas.overrideSorting = true;
+            topCanvas.sortingOrder = TopSortingOrder;
             edge = NewRect("Thirty Seconds Left Edge", layer).gameObject.AddComponent<Image>();
             edge.rectTransform.anchorMin = Vector2.zero; edge.rectTransform.anchorMax = Vector2.one;
             edge.rectTransform.offsetMin = edge.rectTransform.offsetMax = Vector2.zero;

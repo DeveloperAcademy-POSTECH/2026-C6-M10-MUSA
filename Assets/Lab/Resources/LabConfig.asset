@@ -330,8 +330,8 @@ MonoBehaviour:
   yaguangComboClearedSoundVolume: 0.9
   yaguangFirstComboForgive: 1
   yaguangComboHearts: 3
-  yaguangComboGuideRuleCombos: 1
-  yaguangComboGuideReadyOn: 1
+  yaguangComboGuideRuleCombos: 0
+  yaguangComboGuideReadyOn: 0
   yaguangComboGuideFeedbackDelaySeconds: 0.3
   yaguangComboGuideRuleDelaySeconds: 0.9
   yaguangComboGuideCountFade: 0.6
@@ -360,6 +360,8 @@ MonoBehaviour:
   thirtySecondsLeftDrumDelaySeconds: 0.8
   thirtySecondsLeftVolume: 1
   thirtySecondsLeftHaptic: 1
+  sixtySecondsLeftAt: 60
+  thirtySecondsLeftSize: 1.4
   hapticsEnabled: 1
   generateHapticStyle: 1
   generateHapticIntensity: 1

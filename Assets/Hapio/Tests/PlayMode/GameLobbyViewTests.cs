@@ -68,6 +68,7 @@ namespace Hapio.Tests
             GameLobbyView view = View();
             Assert.That(view.titlePage.activeSelf, Is.True);
             Assert.That(view.browserPage.activeSelf, Is.False);
+            Assert.That(view.browserQuitButton.gameObject.activeInHierarchy, Is.False);
             Assert.That(view.screen.externalNavigation, Is.True);
             Assert.That(view.screen.hostButton.gameObject.activeInHierarchy, Is.False);
             view.screen.hostButton.onClick.Invoke();
@@ -114,6 +115,13 @@ namespace Hapio.Tests
             Assert.That(view.directFeedback.text, Does.Contain("포트"));
             yield return Click(view.closeDirectConnectionButton);
             Assert.That(view.directConnectionPanel.activeSelf, Is.False);
+            yield return Click(view.browserQuitButton);
+            Assert.That(session.RoomBrowserVisible, Is.False);
+            Assert.That(view.titlePage.activeInHierarchy, Is.True);
+            Assert.That(view.browserQuitButton.gameObject.activeInHierarchy, Is.False);
+            yield return Click(view.enterButton);
+            Assert.That(session.RoomBrowserVisible, Is.True);
+            AssertTouchable(view.browserQuitButton);
         }
 
         [UnityTest]

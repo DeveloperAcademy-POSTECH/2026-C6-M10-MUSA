@@ -53,7 +53,7 @@ MonoBehaviour:
   teamRedMarker: {fileID: 21300000, guid: e57ae4d9eb17c43eb9a4f94617681205, type: 3}
   drumIcon: {fileID: 21300000, guid: 4c7d7031ad2234ac984b862cd8fa7e58, type: 3}
   teamPairConnector: {fileID: 21300000, guid: 028b7824efd254de99c723b8ca9b9116, type: 3}
-  teamTrioConnector: {fileID: 21300000, guid: 8b62622b0a760455192a0100aa1552ef, type: 3}
+  teamTrioConnector: {fileID: 21300000, guid: 34ededabd1ee4de3a6beadae0520f937, type: 3}
   blueFlagDark: {fileID: 21300000, guid: 10f7ebd5fe27f423782dada427071e4f, type: 3}
   redFlagDark: {fileID: 21300000, guid: 5cce18e931d7b437aa94953d107c1c2f, type: 3}
   blueFlagLight: {fileID: 21300000, guid: b61b76219e88947a78cfdf26cc84f45a, type: 3}
