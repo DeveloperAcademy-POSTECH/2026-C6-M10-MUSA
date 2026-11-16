@@ -20,4 +20,15 @@ MonoBehaviour:
   shortShakeRatio: 0.3
   shortShakeFrequency: 32
   shortFlashSeconds: 0.4
-  shortFlashColor: {r: 1, g: 0.16, b: 0.12, a: 0.95}
+  shortFlashColor: {r: 0.49803922, g: 0.10980392, b: 0.050980393, a: 0.95}
+  shortGaugeLiftHeight: 6
+  shortGaugeSideShake: 3
+  shortGaugePopScale: 1.15
+  shortWarningEnabled: 1
+  shortWarningSeconds: 0.8
+  shortWarningFontSize: 22
+  shortWarningTextColor: {r: 0.20754719, g: 0.2046102, b: 0.2046102, a: 1}
+  shortWarningAnchor: {x: 0.5, y: 0.5}
+  shortWarningShakeDistance: 5
+  shortEdgeSeconds: 0.4
+  shortEdgeColor: {r: 0, g: 0, b: 0, a: 0.7176471}
