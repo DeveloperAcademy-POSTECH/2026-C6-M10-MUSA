@@ -9484,3 +9484,26 @@ main `cef1579d`의 #760 관람·#762 땅따먹기 박/Game56·#727 튜토리얼�
 - 땅따먹기 3:3에 청1~청3·홍1~홍3을 좌우·하단·미니맵에 표시한다. 북이 자리에 도착해도 미니맵 번호가 남는 동작과 2:2의 팀 표기를 확인했다. Unity 전투 UI PlayMode 4/4 통과.
 
 - 스태미나 부족 때 Hapio 게이지의 가로 위치·폭을 고정하고 세로 흔들림·확대를 적용해 캐릭터 이름을 가리지 않게 했다. 전투 UI·부족 효과 PlayMode 11/11 통과.
+
+### #785 병합 전 검증 (2026-11-16)
+- **기준:** `feat/#785-update-ingame-player-stamina-ui`에 main `fd6990b6`(#783 포함)을 병합했다. 충돌은 이 문서 기록 추가뿐이며 양쪽을 보존했다. Unity 6000.6.5f1 batch(macOS, Metal). 판정·통신·공유 설정·접속 묶음은 바꾸지 않는다.
+- **추가 수정:**
+  - 캐릭터·팀 그림이 없을 때(독립 Lab Scene) P번호와 팀 고리로 돌아가는 검사를 다시 넣었다.
+  - 묵이·만복 두 초상의 가로 위치를 모두 검사한다.
+  - 스태미나 칸 색 주석에 색상 토큰 경로(`5OrbsColor/*/300***`·`MetalYellow/400`·`*/100`)를 적었다. 값은 토큰과 같다.
+  - AGENTS #359/#360 절에 캐릭터 초상 표시 규칙을 추가했다.
+  - 무관한 `0130f.svg.meta` 공백 변경을 되돌렸다.
+- **최초 실패와 수정:** PlayMode `GameSceneFlowTests.ShortStaminaSwellsTheGauge…`가 실패했다(기대 1.1389, 실제 1.0). Hapio 전투는 이름을 가리지 않게 게이지를 세로로만 흔들고 키우는데(`VerticalGaugeMotionOnly`) 검사가 가로 확대를 기대했다. 검사를 세로 전용 동작에 맞췄다.
+- **전체 EditMode:** 2598/2598 PASS.
+- **PlayMode** `GameBattleUiPresentationTests`·`LabStamina*`·`LabOrbHudCompositionTests`·`LabTeamBattleScreenTests`·`LabDrumMinimapTests`·`LabPlayerCircleTests`·`LabPlayerPaintPatternUiTests`·`GameTutorial*`·`GameSceneFlowTests`·`GameDrumPassHint*`·`LabOrbPhysicsTests`: 153/153 PASS(수정 전 87/88). 전체 PlayMode는 병합 뒤 main에서 한 번 돌린다.
+- **화면(Development Mac 빌드, 같은 임시 캡처 스크립트로 main `fd6990b6`과 비교, 80쌍):**
+  - 솔로(튜토리얼, 2스테이지 솔로와 효과 27장): 튜토리얼 배치는 그대로다. 솔로 하단은 불이 패널로 바뀌었고 효과와 겹치지 않는다.
+  - 스토리 3인·5인(앱 3·5개, 각 자리 화면): 자리별 캐릭터(P1 불이·P2 묵이·P3 솔이·P4 금옥·P5 만복), 좌우 이웃 이름과 방향, 칸 색, 미니맵 초상이 main의 P번호 배치와 일치한다.
+  - 땅따먹기 1:1·2:2(앱 2·4개): 청팀 묵이·홍팀 불이, 2:2 이웃 이름 `청팀`/`홍팀`.
+  - 자리 선택 화면은 P번호 그대로다.
+- **기록만:**
+  - 캐릭터 색 칸이 같은 계열 패널 위라 예전 진한 파랑보다 대비가 낮다(Figma 토큰대로). 캡처는 모두 스태미나가 가득 찬 상태라 찬 칸과 빈 칸의 구분은 화면으로 확인하지 못했다.
+  - 왼쪽 전달 막기 때 붉은 가장자리가 왼쪽 아래 초상 위에 겹쳐 초상이 붉게 물든다. 이름·칸·숫자는 가려지지 않는다.
+  - 미니맵에서 북이 놓인 자리는 초상 대신 태극만 보인다(main의 P번호도 같았다).
+  - `Name*.png.meta`·`Portrait*.png.meta`의 스프라이트 이름·rect가 복사된 값이지만, Single 모드라 Unity가 다시 가져와도 바뀌지 않아 그대로 두었다.
+- **미실행:** 3:3 전투 화면(한 Mac에서 앱 6개가 방에 모이지 못함, main도 같음. 자동 검사 `TerritoryUsesTeamMarkersForTwoAndThreePlayers…`로만 확인), 스태미나 부족 흔들림의 실제 화면, 지귀 A/B·피버 강조와 이름의 겹침, iPhone 실기기.
