@@ -89,7 +89,7 @@ namespace Hapio.Editor
                     var name=ending ? frame.nodes.FirstOrDefault(n=>n.kind=="text" && n.size<=18) : null;
                     if (body!=null)
                     {
-                        view.overrideDialogueLayout=true;view.dialogueFontSize=body.size;view.dialogueRect=body.Rect;
+                        view.overrideDialogueLayout=true;view.dialogueFontSize=Mathf.FloorToInt(body.size + .5f);view.dialogueRect=body.Rect;
                         view.speakerRect = new Rect(57,713,91,33);view.centerSpeakerName=true;
                         view.speakerBadge=AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Hapio/Art/Story/Opening/OP_002/SpeakerBadge.png");
                     }
@@ -136,7 +136,7 @@ namespace Hapio.Editor
             if(n.kind=="text")
             {
                 var text=Rect("Text",rect,new Rect(0,0,n.width,n.height)).gameObject.AddComponent<Text>();text.font=Font(n.bold);
-                text.fontSize=Mathf.Max(32,Mathf.CeilToInt(n.size));float scale=n.size/text.fontSize;
+                text.fontSize=Mathf.Max(32,Mathf.CeilToInt(n.size));float scale=Mathf.FloorToInt(n.size + .5f)/(float)text.fontSize;
                 text.rectTransform.localScale=Vector3.one*scale;text.rectTransform.sizeDelta/=scale;
                 text.text=n.text;text.color=new Color(n.color.r,n.color.g,n.color.b);text.raycastTarget=false;
                 text.horizontalOverflow=HorizontalWrapMode.Overflow;text.verticalOverflow=VerticalWrapMode.Overflow;

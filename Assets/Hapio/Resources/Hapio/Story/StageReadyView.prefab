@@ -218,7 +218,7 @@ RectTransform:
   m_GameObject: {fileID: 472194638646897825}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0.47953126, y: 0.47953126, z: 0.47953126}
+  m_LocalScale: {x: 0.46875, y: 0.46875, z: 0.46875}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 1715069197977693393}
@@ -226,7 +226,7 @@ RectTransform:
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 237.73216, y: 41.707397}
+  m_SizeDelta: {x: 243.200005, y: 42.666668}
   m_Pivot: {x: 0, y: 1}
 --- !u!222 &269543886215117070
 CanvasRenderer:
@@ -2432,7 +2432,7 @@ RectTransform:
   m_GameObject: {fileID: 7810334931692323203}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0.47953126, y: 0.47953126, z: 0.47953126}
+  m_LocalScale: {x: 0.46875, y: 0.46875, z: 0.46875}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 1923507673378147655}
@@ -2440,7 +2440,7 @@ RectTransform:
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 237.73216, y: 41.707397}
+  m_SizeDelta: {x: 243.200005, y: 42.666668}
   m_Pivot: {x: 0, y: 1}
 --- !u!222 &2386322506538627732
 CanvasRenderer:
@@ -2756,7 +2756,7 @@ RectTransform:
   m_GameObject: {fileID: 8624242406540330963}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0.59634376, y: 0.59634376, z: 0.59634376}
+  m_LocalScale: {x: 0.59375, y: 0.59375, z: 0.59375}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 8723650536340192490}
@@ -2764,7 +2764,7 @@ RectTransform:
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 643.199, y: 83.84426}
+  m_SizeDelta: {x: 646.008775, y: 84.2105284}
   m_Pivot: {x: 0, y: 1}
 --- !u!222 &2537867580315272821
 CanvasRenderer:
@@ -2806,7 +2806,7 @@ MonoBehaviour:
     m_RichText: 1
     m_HorizontalOverflow: 1
     m_VerticalOverflow: 1
-    m_LineSpacing: 1.1032139
+    m_LineSpacing: 1.10803322
   m_Text: "\uBC29\uC7A5\uC774 \uB2E4\uC74C \uBD09\uC778\uC744\n\uC900\uBE44\uD558\uACE0 \uC788\uC18C."
 --- !u!1 &8778628955767013435
 GameObject:

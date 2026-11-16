@@ -145,8 +145,8 @@ namespace C6Lab
             EnsurePanel();
             if (panel == null) return;
             var seats = (players ?? new LabPlayerState[0]).Where(p => p != null).OrderBy(p => p.seat).ToArray();
-            bool teamColumn = compactGamePresentation && network != null && network.Snapshot != null && network.Snapshot.teamTerritory;
-            string key = localId + ":" + teamColumn + ":" + string.Join(",", seats.Select(p => p.id + "@" + p.seat));
+            bool teamMap = compactGamePresentation && network != null && network.Snapshot != null && network.Snapshot.teamTerritory;
+            string key = localId + ":" + teamMap + ":" + string.Join(",", seats.Select(p => p.id + "@" + p.seat));
             if (key == layoutKey) return;
             layoutKey = key;
             for (int i = content.childCount - 1; i >= 0; i--) Remove(content.GetChild(i).gameObject);
@@ -163,6 +163,7 @@ namespace C6Lab
             labelLayer = AddLayer("Labels");
 
             int n = seats.Length;
+            bool teamTriangle = teamMap && n == 3;
             int mine = System.Array.FindIndex(seats, p => p.id == localId);
             if (mine < 0) mine = 0; // 관전 등 내가 없으면 첫 번째 자리를 아래에 둔다
             float radius = CircleRadius(n);
@@ -188,29 +189,34 @@ namespace C6Lab
             for (int k = 0; k < n; k++) points[k] = (unit[k] - center) * scale;
             if (compactGamePresentation)
             {
-                if (teamColumn)
+                if (teamTriangle)
                 {
-                    float gap = n == 2 ? 42f : 26f;
-                    for (int k = 0; k < n; k++) points[k] = new Vector2(0, ((n - 1) * .5f - k) * gap);
-                    homePosition = n >= 3 ? new Vector2(-1, -1) : new Vector2(0, 2);
+                    // Figma 5457:7989 / 5457:8087, relative to the center of the 100x72 frame.
+                    points = new[] { new Vector2(2, -21), new Vector2(-27, 21), new Vector2(27, 21) };
+                    homePosition = new Vector2(0, 2);
+                }
+                else if (teamMap)
+                {
+                    for (int k = 0; k < n; k++) points[k] = new Vector2(0, ((n - 1) * .5f - k) * 42f);
+                    homePosition = new Vector2(0, 2);
                 }
                 else if (n == 3) points = new[] { new Vector2(0,-23), new Vector2(-26,24), new Vector2(26,24) };
                 else if (n == 4) points = new[] { new Vector2(0,-23), new Vector2(-27,0), new Vector2(0,24), new Vector2(27,0) };
                 else if (n == 5) points = new[] { new Vector2(1,-23), new Vector2(-24,-5), new Vector2(-17,23), new Vector2(19,23), new Vector2(24,-5) };
-                if (!teamColumn) homePosition = Vector2.zero;
-                panel.sizeDelta = teamColumn ? new Vector2(64, n >= 3 ? 78 : 72) : size;
+                if (!teamMap) homePosition = Vector2.zero;
+                panel.sizeDelta = teamMap && !teamTriangle ? new Vector2(64, 72) : size;
             }
             // 선 먼저 (원 아래에 깔리도록). 2인은 선 하나, 3인 이상은 이웃끼리 둘레를 잇는다.
-            Sprite connector = teamColumn ? (n == 2 ? teamPairConnector : teamTrioConnector) : null;
+            Sprite connector = teamTriangle ? teamTrioConnector : teamMap && n == 2 ? teamPairConnector : null;
             if (n > 1 && connector != null)
             {
-                AddTeamConnector(connector);
+                AddTeamConnector(connector, teamTriangle);
             }
             else if (n == 2) AddLine(points[0], points[1]);
-            else if (n > 2) for (int k = 0; k < (teamColumn ? n - 1 : n); k++) AddLine(points[k], points[(k + 1) % n]);
+            else if (n > 2) for (int k = 0; k < n; k++) AddLine(points[k], points[(k + 1) % n]);
             for (int k = 0; k < n; k++)
             {
-                LabPlayerState player = seats[teamColumn ? k : (mine + k) % n];
+                LabPlayerState player = seats[teamMap && !teamTriangle ? k : (mine + k) % n];
                 bool me = player.id == localId;
                 seatPositions[player.id] = points[k];
                 ringOrder.Add(player.id);
@@ -218,7 +224,7 @@ namespace C6Lab
                 Image circle = AddCircle(points[k], radius, me ? meColor : otherColor);
                 seatImages[player.id] = circle;
                 seatNumbers[player.id] = number;
-                if (teamColumn && teamBlueMarker != null && teamRedMarker != null)
+                if (teamMap && teamBlueMarker != null && teamRedMarker != null)
                 {
                     circle.sprite = LabTeams.TeamOf(network.Snapshot, player.id) == LabTeam.Blue ? teamBlueMarker : teamRedMarker;
                     circle.color = Color.white;
@@ -374,12 +380,17 @@ namespace C6Lab
             panel.gameObject.SetActive(false);
         }
 
-        private void AddTeamConnector(Sprite sprite)
+        private void AddTeamConnector(Sprite sprite, bool triangle)
         {
             var go = new GameObject("Team Connector", typeof(RectTransform), typeof(Image));
             var rect = (RectTransform)go.transform;
             rect.SetParent(lineLayer, false);
-            rect.sizeDelta = sprite == teamPairConnector ? new Vector2(4,28) : new Vector2(4,52);
+            rect.sizeDelta = triangle ? new Vector2(65.9468f, 51.282f) : new Vector2(4, 28);
+            if (triangle)
+            {
+                rect.anchoredPosition = new Vector2(-.5f, -.07f);
+                rect.localRotation = Quaternion.Euler(0, 0, 180);
+            }
             var image = go.GetComponent<Image>();
             image.sprite = sprite;
             image.raycastTarget = false;

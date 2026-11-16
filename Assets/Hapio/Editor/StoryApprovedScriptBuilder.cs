@@ -55,7 +55,7 @@ namespace Hapio.Editor
                             view.dialogueRect = new Rect(84, 720, 270, 100);
                         view.overrideDialogueLayout = true;
                         float size = frame.pages.Any(page => !string.IsNullOrEmpty(page.dialogue) &&
-                            page.dialogue.Count(character => character == '\n') >= 2) ? 18f : 20.696f;
+                            page.dialogue.Count(character => character == '\n') >= 2) ? 18f : 21f;
                         foreach (var page in frame.pages)
                         {
                             if (string.IsNullOrEmpty(page.dialogue) || !page.dialogue.Contains("\n")) continue;
@@ -65,7 +65,7 @@ namespace Hapio.Editor
                                 if (width > 0) size = Mathf.Min(size, 21f * 268f / width);
                             }
                         }
-                        view.dialogueFontSize = Mathf.Floor(size * 100) / 100;
+                        view.dialogueFontSize = Mathf.FloorToInt(size);
                         view.speakerRect = new Rect(57, 721, 91, 18);
                         view.speakerBadgeRect = new Rect(57, 713, 91, 33);
                         view.speakerBadge = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Hapio/Art/Story/Opening/OP_002/SpeakerBadge.png");

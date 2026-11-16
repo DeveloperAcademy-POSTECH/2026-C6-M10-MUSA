@@ -53,7 +53,7 @@ namespace Hapio.Editor
             theme.teamPositionArtwork = new[] { Sprite("Position2v2Red"),Sprite("Position2v2Blue"),Sprite("Position3v3Red"),Sprite("Position3v3Blue") };
             theme.teamBlueMarker=Sprite("TeamBlue"); theme.teamRedMarker=Sprite("TeamRed"); theme.drumIcon=Sprite("DrumIcon");
             theme.teamPairConnector = Sprite("07b57");
-            theme.teamTrioConnector = Sprite("a49d1");
+            theme.teamTrioConnector = Sprite("0130f");
             theme.blueFlagDark=Sprite("50224"); theme.redFlagDark=Sprite("3aff5"); theme.blueFlagLight=Sprite("4da2d"); theme.redFlagLight=Sprite("a794d");
             theme.tickDark=Sprite("ead0b"); theme.tickLight=Sprite("57d73"); theme.tickCenter=Sprite("0e7c5");
             theme.medium=AssetDatabase.LoadAssetAtPath<Font>("Assets/Lab/Art/Fonts/Shilla_Culture(M).otf");

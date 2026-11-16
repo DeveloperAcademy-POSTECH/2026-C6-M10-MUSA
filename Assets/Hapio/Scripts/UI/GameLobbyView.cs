@@ -14,6 +14,7 @@ namespace Hapio
         public RectTransform design;
         public UnityEngine.UI.RawImage background;
         public GameObject titlePage, browserPage, positionPage, emptyRooms;
+        public UnityEngine.UI.Button browserQuitButton;
         public UnityEngine.UI.Button enterButton, createButton, refreshButton, cancelButton, leaveButton, sealButton;
         public UnityEngine.UI.Button clearSlotButton, directConnectionButton, directJoinButton, closeDirectConnectionButton;
         public UnityEngine.UI.Button developerButton, soloButton;
@@ -152,6 +153,13 @@ namespace Hapio
             storySealFontSize = sealButton.GetComponentInChildren<UnityEngine.UI.Text>().fontSize;
             storyLocalLabelFontSizes = localLabels.Select(label => label.fontSize).ToArray();
             BindNavigation(enterButton, EnterGame);
+            BindNavigation(browserQuitButton, () =>
+            {
+                if (!session.RoomBrowserVisible || !browserPage.activeInHierarchy
+                    || session.IsCreatingRoom || !Network.CanChooseConnection) return;
+                localError = string.Empty;
+                session.GoHome();
+            });
             // 2:2 (#281): "새 방 만들기 +" first asks which mode. A prefab without the mode panel keeps the old story flow.
             BindNavigation(createButton, () =>
             {
@@ -383,6 +391,7 @@ namespace Hapio
         private void RefreshBrowser()
         {
             bool canChoose = Network.CanChooseConnection && !session.IsCreatingRoom;
+            if (browserQuitButton != null) browserQuitButton.interactable = canChoose;
             createButton.interactable = canChoose && (modePanel != null || creationCapacity >= 2);
             // The mode card can also be closed without SetModes (Home hidden for the opening); the button comes back then too.
             ShowCreateButtonUnlessChoosingMode();

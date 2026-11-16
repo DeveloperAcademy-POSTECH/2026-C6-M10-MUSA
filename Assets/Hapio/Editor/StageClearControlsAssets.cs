@@ -49,7 +49,14 @@ namespace Hapio.Editor
                     }
                     var caption=controls.nextSeal.GetComponentsInChildren<UnityEngine.UI.Text>(true).FirstOrDefault(t=>t.name=="Caption")
                         ?? controls.nextSeal.GetComponentInChildren<UnityEngine.UI.Text>(true);
-                    if(caption!=null) caption.text=controls.finalStage ? StoryStageClearControls.FinishLabel : StoryStageClearControls.NextSealLabel;
+                    if (caption != null)
+                    {
+                        var rect = caption.rectTransform;
+                        float scale = 19f / caption.fontSize;
+                        rect.sizeDelta *= rect.localScale.x / scale;
+                        rect.localScale = Vector3.one * scale;
+                        caption.text = controls.finalStage ? StoryStageClearControls.FinishLabel : StoryStageClearControls.NextSealLabel;
+                    }
                     controls.Present(false,false,false);
                     PrefabUtility.SaveAsPrefabAsset(root,path);
                 }
