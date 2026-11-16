@@ -54,6 +54,7 @@ namespace C6Lab
         public int ShortCount { get; private set; }
         public bool Playing => age >= 0f;
         public Vector2 ShakeOffset { get; private set; }
+        public bool VerticalGaugeMotionOnly { get; set; }
         /// <summary>게이지가 지금 커진 배율 (1 = 그대로, #718)</summary>
         public float GaugeScale { get; private set; } = 1f;
         /// <summary>가운데 경고("기운이 부족하다" + 느낌표)가 보이는지 (#718)</summary>
@@ -135,10 +136,14 @@ namespace C6Lab
             if (age >= Mathf.Max(Mathf.Max(shakeSeconds, flashSeconds), Mathf.Max(warningSeconds, edgeSeconds))) { Stop(); return; }
             float distance = settings.ShortShakeRatio * Mathf.Abs(source.rectTransform.rect.height);
             ShakeOffset = ShakeAt(age, shakeSeconds, distance, settings.ShortShakeFrequency);
+            // Hapio places the character name beside the gauge, so the gauge keeps its horizontal bounds.
+            if (VerticalGaugeMotionOnly) ShakeOffset = new Vector2(0f, ShakeOffset.y);
             bar.anchoredPosition = barPosition + ShakeOffset;
             // #718: the gauge swells a little and settles back while it shakes.
             GaugeScale = 1f + (settings.ShortGaugePopScale - 1f) * PopAmount(age, shakeSeconds);
-            bar.localScale = barScale * GaugeScale;
+            bar.localScale = VerticalGaugeMotionOnly
+                ? new Vector3(barScale.x, barScale.y * GaugeScale, barScale.z)
+                : barScale * GaugeScale;
             ShowWarning(settings, warningSeconds, shakeSeconds);
             EdgeAlpha = settings.ShortEdgeColor.a * FlashAmount(age, edgeSeconds);
             ShowEdges(settings.ShortEdgeColor);

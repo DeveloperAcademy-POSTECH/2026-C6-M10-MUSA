@@ -282,6 +282,8 @@ namespace Hapio
         private void Start()
         {
             if (bindings == null || theme == null) return;
+            var shortage = bindings.sceneController.GetComponent<LabStaminaShortFeedback>();
+            if (shortage != null) shortage.VerticalGaugeMotionOnly = true;
             bindings.sceneController.GetComponent<LabDrumMinimap>()?.Bind(session.Network, bindings.hud.rightPlayerCircle.rectTransform, theme.medium);
             var composition = bindings.hud.GetComponent<LabOrbHudComposition>();
             if (composition != null)
