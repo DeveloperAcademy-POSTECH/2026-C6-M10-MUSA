@@ -9426,3 +9426,28 @@ main `cef1579d`의 #760 관람·#762 땅따먹기 박/Game56·#727 튜토리얼�
 - main `c9abf049`(#784)을 #783에 병합했다. 충돌은 이 문서의 병렬 추가 기록 한 곳이었고 #783/#782 기록을 모두 보존했다. 코드 충돌은 없었다.
 - 통합 후 Unity 6000.6.5f1 MCP: 컴파일 Console 오류0, PlayMode 관련 17/17 통과(LabGourdAlertTests·LabComboEffectLookTests·전달 차단 점멸/카운트다운·폭발 정리·StaffDemoFinalPageTests). EditMode 관련 13/13 통과(LabYaguangFeverHudTests·StaffStageDemoStoryTests).
 - 전체 검사·실기기·독립 앱 다인 전투는 이번 병합에서 미실행이다.
+
+### #783 병합 전 검증 (2026-11-16)
+- **기준:** `fix/#783-drum-pass-blocked-vfx`(main `c9abf049` 포함). Unity 6000.6.5f1 batch(macOS, Metal). 판정·통신·공유 설정·접속 묶음은 바꾸지 않는다.
+- **퇴역한 검사와 근거:** #783이 넘기기 막기의 가운데 말풍선을 없앴다(막힌 가장자리의 세로 `전달불가`와 남은 초가 대신한다).
+  - `LabGourdAlert`의 `ShowBlock`·`ShowingBlock`·`BlockRight`와 `SwipeBlockStarted` 구독을 지웠고, 호출자는 남아 있지 않다.
+  - 이 말풍선만 보던 `LabGourdAlertTests`의 막기 말풍선 검사 2건을 지웠다.
+  - 같은 계약(막힌 쪽, 글자, 남은 초, 점멸 동기)은 `LabOrbPhysicsTests`의 가장자리 검사와 `LabDeveloperSoloIntegrationTests`가 맡는다.
+- **고친 것:**
+  - `LabDeveloperSoloIntegrationTests`가 없어진 말풍선(`ShowingBlock`)을 기대해 실패하게 되어 있었다. 막힌 쪽 가장자리의 `전달불가`와 방향을 확인하도록 옮겼다.
+  - 쓰이지 않게 된 그림 `Bomb/BombPpeong`·`BombPpeongOutline`·`Sabotage/DrumPassBlock/BlockLeft`·`BlockRight`와 폭탄 외곽 글자 코드를 지웠다. 별 모양 폭발은 그림이 없을 때의 대체 표현이라 남겼다.
+  - 무관한 `0130f.svg.meta` 공백 변경을 되돌렸다.
+- **최초 실패:** 정리 중 `LabGourdAlert`의 `Show` 계열 메서드까지 잘못 지워 컴파일 오류가 났다. 되돌린 뒤 다시 실행했다.
+- **전체 EditMode:** 2598/2598 PASS.
+- **PlayMode** `LabGourdAlertTests`·`LabOrbPhysicsTests`·`LabComboEffectLookTests`·`LabYaguang*`·`LabDeveloperSoloIntegrationTests`·`GameTutorial*`·`GameDrumPassHint*`·`LabBomb*`·`StaffDemoFinalPageTests`·`GameSceneFlowTests`: 170/170 PASS. 판정·통신 경로 변경이 없어 전체 PlayMode는 병합 뒤 main에서 한 번 돌린다.
+- **화면(Development Mac 빌드, 같은 임시 캡처 스크립트로 main과 27장씩 비교, 스크립트는 저장소에 남기지 않음):**
+  - 튜토리얼 조작 단계: 화살표와 손이 먹선으로 바뀌었다.
+  - 2스테이지 솔로 전투에서 효과를 정해진 순서로 띄웠다.
+  - 좌·우 전달 막기: 숫자 위, 세로 `전달불가` 아래로 가장자리 안에 들어가고 스태미나·타이머를 가리지 않는다.
+  - 느낌표 한지 말풍선, 붉은 한지 `뻥이요!`, 전투 중 북 넘기기 안내의 먹선 화살표·손, 피버 제목 무지개, 색 틀림 한지 박스(`내가 색 틀림`), 오색 색종이: 잘림·누락 그림 없음.
+  - 튜토리얼 한 대사에서 `전달불가` 글자가 말풍선 테두리와 살짝 맞닿는다(읽는 데 지장 없음).
+- **기록만:**
+  - 새 PNG 3장이 크다(1.25~2.78 MB). 가져오기 상한이 있어 빌드에 들어가는 크기는 작다.
+  - 피버 무지개는 일시정지 중에도 흐른다.
+  - 콤보 결과는 캡처에서 리플렉션으로 띄웠다.
+- **미실행:** iPhone 실기기, 여러 기기 전투.
