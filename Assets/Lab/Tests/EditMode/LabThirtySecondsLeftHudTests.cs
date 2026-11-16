@@ -92,7 +92,8 @@ namespace C6Lab.Tests
         [Test]
         public void TheAlarmDrawsAboveTheGimmicksButUnderTheFinishReplay()
         {
-            Assert.That(LabThirtySecondsLeftHud.TopSortingOrder, Is.GreaterThan(20000), "Above the HUD, the gimmick screens and the drum pass hint.");
+            Assert.That(LabThirtySecondsLeftHud.TopSortingOrder, Is.GreaterThan(5000), "Above the HUD (0), the gimmick screens and the drum pass hint.");
+            Assert.That(LabThirtySecondsLeftHud.TopSortingOrder, Is.LessThan(20000), "Under the tutorial / help screens (20000~), so help opened over it still shows.");
             Assert.That(LabThirtySecondsLeftHud.TopSortingOrder, Is.LessThan(LabFinishReplay.OverlaySortingOrder));
         }
     }

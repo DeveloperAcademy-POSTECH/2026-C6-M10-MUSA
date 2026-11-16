@@ -25,7 +25,7 @@ namespace C6Lab
         public const string GongFolder = "ThirtySecondsLeftGong", DrumFolder = "ThirtySecondsLeftDrum";
         /// <summary>알림 시각을 넘은 지 이 초 안에 본 기기만 띄운다.</summary>
         public const double LateWindowSeconds = 1.5d;
-        /// <summary>#780: 알림 Canvas 순서. 전투 HUD(0) / 기믹 화면 / 튜토리얼(20000) 위, 결승 다시보기(29000) / 화면 전환(30000~) 아래.</summary>
+        /// <summary>#780: 알림 Canvas 순서. 전투 HUD(0) / 기믹 화면 / 북 가이딩 위, 튜토리얼 / 도움말(20000~) / 결승 다시보기(29000) / 화면 전환(30000~) 아래.</summary>
         public const int TopSortingOrder = 19500;
         public static readonly Color AlarmRed = new Color(.86f, .12f, .16f);
         private static readonly Color PaperColor = new Color(1f, .97f, .9f, .97f);
