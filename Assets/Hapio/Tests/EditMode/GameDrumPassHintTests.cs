@@ -87,6 +87,29 @@ namespace Hapio.Tests
             Assert.That(GameDrumPassHint.SideFor(0, 0f, 1.6f), Is.Zero);
         }
 
+        [Test]
+        public void ItHidesWhileABoardGimmickIsOnMyBoardSoItNeverCoversIt()
+        {
+            LabSnapshot snapshot = Story(Drum("a", Me));
+            Assert.That(GameDrumPassHint.BoardGimmickOn(snapshot, Me), Is.False, "Only the drum: the guide may show.");
+            snapshot.orbs = new[] { new LabOrbState { id = "bomb", owner = Me, kind = LabOrbKind.Bomb } };
+            Assert.That(GameDrumPassHint.BoardGimmickOn(snapshot, Me), Is.True, "#780: a bomb on my board.");
+            Assert.That(GameDrumPassHint.BoardGimmickOn(snapshot, Left), Is.False, "Someone else's bomb does not hide mine.");
+            snapshot.orbs = new[] { new LabOrbState { id = "fox", owner = Me, kind = LabOrbKind.FoxFire } };
+            Assert.That(GameDrumPassHint.BoardGimmickOn(snapshot, Me), Is.True, "Fox fire on my board.");
+            snapshot.orbs = new[] { new LabOrbState { id = "yin", owner = Me, kind = LabOrbKind.Yin } };
+            Assert.That(GameDrumPassHint.BoardGimmickOn(snapshot, Me), Is.False, "Plain orbs do not.");
+            snapshot.swipeBlockedPlayer = Me; snapshot.swipeBlockedUntil = snapshot.serverTime + 5d;
+            Assert.That(GameDrumPassHint.BoardGimmickOn(snapshot, Me), Is.True, "My swipe block's red edge.");
+            Assert.That(GameDrumPassHint.BoardGimmickOn(null, Me), Is.False);
+        }
+
+        [Test]
+        public void WithoutTheBoardImageItDrawsJustUnderTheBattleHud()
+        {
+            Assert.That(GameDrumPassHint.OverlaySortingOrder, Is.LessThan(0), "#780: under the battle HUD canvas (0), not above it.");
+        }
+
         private static LabSnapshot Story(params LabOrbState[] drums) => new LabSnapshot
         {
             sessionId = "drum-hint", round = 1, phase = LabPhase.Playing, serverTime = 30d, drums = drums,

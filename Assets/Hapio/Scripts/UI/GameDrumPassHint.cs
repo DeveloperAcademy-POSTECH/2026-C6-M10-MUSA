@@ -14,14 +14,18 @@ namespace Hapio
     ///   땅따먹기처럼 한쪽으로만 넘기면 열린 쪽만. 넘길 곳이 없으면(땅따먹기 1:1) 띄우지 않는다.
     /// - 개발용 솔로에서도 확인할 수 있게 띄운다: 옆 사람은 없지만 양쪽이 열린 것처럼 번갈아 가리킨다(실제로 넘어가지는 않는다).
     /// - 매혹으로 판이 멈췄을 때와 손가락으로 판 위의 구슬·북을 잡고 있는 동안은 숨긴다(놓았는데 북이 아직 있으면 다시 보인다).
+    /// - #780: 다른 기믹을 가리지 않는다. 전투 HUD 안에서 구슬판 그림(LabOrbHudComposition.Display) 바로 위 층에 그려서, 그 뒤에
+    ///   그리는 화면 UI 기믹(남은 시간 알림/섬광/매혹/부적/연기/콤보 칸/박 말풍선 등)과 HUD 글자 / 버튼이 모두 안내를 덮는다.
+    ///   구슬판 그림 안에 섞여 그리는 기믹(내 판의 박 폭탄 / 여우불, 넘기기 막기 빨간 가장자리)은 층으로 나눌 수 없어서, 그것이 내 판에
+    ///   있는 동안은 안내를 숨긴다(북 시간은 계속 센다). 구슬판 그림이 없으면 전투 HUD Canvas 바로 밑 Canvas로 그린다.
     /// - 글자 없이 손과 화살표만. 내 화면에만 보이는 표시라 Host 규칙·DEV 값·접속 버전과 무관하고, 터치를 막지 않는다.
     /// 연습판(튜토리얼)에는 붙지 않는다(자체 안내가 있다). 그림과 크기는 튜토리얼 그림(GameTutorialArt)을 그대로 쓴다.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class GameDrumPassHint : MonoBehaviour
     {
-        /// <summary>전투 HUD(1~3) 위, 시작·끝 문구와 화면 전환 덮개(5000 이상) 아래.</summary>
-        public const int OverlaySortingOrder = 50;
+        /// <summary>#780: 구슬판 그림이 없을 때 쓰는 Canvas 순서. 전투 HUD Canvas(0) 바로 밑.</summary>
+        public const int OverlaySortingOrder = -1;
         public const int RightSide = 1, LeftSide = 2;
 
         [Tooltip("북이 내 판에 온 뒤 이 시간(초) 동안 넘기지 않으면 안내를 띄운다. 북을 두드려도 시간은 계속 센다.")]
@@ -64,12 +68,69 @@ namespace Hapio
             LabSnapshot snapshot = network.Snapshot;
             bool live = snapshot != null && snapshot.phase == LabPhase.Playing && !snapshot.paused && !network.GameStartHeld;
             Present(snapshot, network.LocalPlayerId, Time.unscaledDeltaTime, live, network.IsDeveloperSolo);
-            // #724: while the Jigwi smoke covers the screen the hint lies under it (seen only where the smoke is wiped away).
-            if (overlayCanvas != null)
-                overlayCanvas.sortingOrder = network.JigwiSmokeWiping ? SmokeCanvasOrder() - 1 : OverlaySortingOrder;
+            Dock(network);
+        }
+
+        /// <summary>#780: 지금 안내가 구슬판 그림 바로 위에 붙어 있는지 (검사·확인용).</summary>
+        public bool DockedAboveBoard { get; private set; }
+
+        /// <summary>
+        /// #780: 구슬판 그림(RawImage) 바로 다음 형제로 붙여 그 위의 모든 HUD / 기믹 아래에 그린다. 구슬판 그림이 없으면 따로 된 Canvas로
+        /// 전투 HUD Canvas(그리고 지귀 연기) 바로 밑에 그린다 (#724).
+        /// </summary>
+        private void Dock(LabNetwork network)
+        {
+            if (overlayCanvas == null) return;
+            var composition = hud != null ? hud.GetComponent<LabOrbHudComposition>() : null;
+            RawImage display = composition != null && composition.IsCompositing ? composition.Display : null;
+            if (display != null && display.transform.parent != null)
+            {
+                Transform parent = display.transform.parent;
+                if (overlay.parent != parent)
+                {
+                    overlay.SetParent(parent, false);
+                    overlay.anchorMin = Vector2.zero; overlay.anchorMax = Vector2.one;
+                    overlay.offsetMin = overlay.offsetMax = Vector2.zero;
+                    overlay.localScale = Vector3.one;
+                    overlayCanvas.overrideSorting = false;
+                }
+                int index = display.transform.GetSiblingIndex() + 1;
+                if (overlay.GetSiblingIndex() != index) overlay.SetSiblingIndex(index < parent.childCount ? index : parent.childCount - 1);
+                DockedAboveBoard = true;
+                return;
+            }
+            if (DockedAboveBoard)
+            {
+                overlay.SetParent(transform, false);
+                DockedAboveBoard = false;
+            }
+            overlayCanvas.sortingOrder = Mathf.Min(OverlaySortingOrder, HudCanvasOrder() - 1,
+                network != null && network.JigwiSmokeWiping ? SmokeCanvasOrder() - 1 : int.MaxValue);
         }
 
         private Canvas smokeCanvas;
+
+        /// <summary>#780: the sorting order of the battle HUD's root canvas (where the screen gimmicks are drawn).</summary>
+        private int HudCanvasOrder()
+        {
+            Graphic sample = hud != null ? (hud.timeText != null ? (Graphic)hud.timeText : hud.localPlayerCircle) : null;
+            Canvas root = sample != null && sample.canvas != null ? sample.canvas.rootCanvas : null;
+            return root != null ? root.sortingOrder : 0;
+        }
+
+        /// <summary>
+        /// #780: 구슬판 위에 그리는 기믹이 이 사람 판에 있는지: 내 판의 박 폭탄 / 여우불, 내 넘기기 막기(빨간 가장자리).
+        /// 있으면 안내를 숨긴다 (층으로는 그 밑에 넣을 수 없어서).
+        /// </summary>
+        public static bool BoardGimmickOn(LabSnapshot snapshot, ulong player)
+        {
+            if (snapshot == null) return false;
+            if (snapshot.SwipeBlockOn(player)) return true;
+            if (snapshot.orbs == null) return false;
+            foreach (LabOrbState orb in snapshot.orbs)
+                if (orb != null && orb.owner == player && (orb.kind == LabOrbKind.Bomb || orb.kind == LabOrbKind.FoxFire)) return true;
+            return false;
+        }
 
         /// <summary>#724: the sorting order of the canvas the Jigwi smoke is drawn on (the battle HUD's).</summary>
         private int SmokeCanvasOrder()
@@ -93,6 +154,7 @@ namespace Hapio
             string drum = Longest(heldSeconds, out float seconds);
             int open = live ? OpenSides(snapshot, localPlayer, solo) : 0;
             bool show = open != 0 && drum != null && seconds >= hintAfterSeconds && board != null && !board.IsHolding
+                && !BoardGimmickOn(snapshot, localPlayer)
                 && TryDrumCircle(drum, out Vector2 center, out float radius);
             if (!show)
             {
@@ -204,7 +266,8 @@ namespace Hapio
             radius = 0f;
             if (board == null || overlay == null || !board.TryGetScreenPoint(drumId, out Vector2 screen)) return false;
             RectTransformUtility.ScreenPointToLocalPointInRectangle(overlay, screen, null, out center);
-            float scale = overlayCanvas != null && overlayCanvas.scaleFactor > 0f ? overlayCanvas.scaleFactor : 1f;
+            Canvas scaled = overlayCanvas != null ? overlayCanvas.rootCanvas : null;
+            float scale = scaled != null && scaled.scaleFactor > 0f ? scaled.scaleFactor : 1f;
             radius = board.TryGetDrumScreenDiameter(out float pixels) ? pixels * .5f / scale : 40f;
             return true;
         }
@@ -261,5 +324,11 @@ namespace Hapio
         }
 
         private void OnDisable() => Hide();
+
+        // #780: docked under the battle HUD, the overlay is no longer our child.
+        private void OnDestroy()
+        {
+            if (overlay != null && overlay.parent != transform) Destroy(overlay.gameObject);
+        }
     }
 }
