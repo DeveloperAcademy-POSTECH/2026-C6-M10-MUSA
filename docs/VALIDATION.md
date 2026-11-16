@@ -9507,3 +9507,24 @@ main `cef1579d`의 #760 관람·#762 땅따먹기 박/Game56·#727 튜토리얼�
   - 미니맵에서 북이 놓인 자리는 초상 대신 태극만 보인다(main의 P번호도 같았다).
   - `Name*.png.meta`·`Portrait*.png.meta`의 스프라이트 이름·rect가 복사된 값이지만, Single 모드라 Unity가 다시 가져와도 바뀌지 않아 그대로 두었다.
 - **미실행:** 3:3 전투 화면(한 Mac에서 앱 6개가 방에 모이지 못함, main도 같음. 자동 검사 `TerritoryUsesTeamMarkersForTwoAndThreePlayers…`로만 확인), 스태미나 부족 흔들림의 실제 화면, 지귀 A/B·피버 강조와 이름의 겹침, iPhone 실기기.
+
+## 2026-11-17 — #788 바뀐 스태미나 UI에 부족 연출 다시 적용
+
+### 확인한 상태 (변경 전)
+
+- #785(PR #787)로 하단 바가 캐릭터 패널(초상·이름·색 배경)과 6칸 게이지로 바뀌었다. Figma(5557:7541)에서도 6칸을 감싸는 별도 테두리는 없고, 이름 오른쪽 약 7 단위 옆에 6칸이 있다.
+- #785가 이름을 가리지 않게 부족 흔들림을 세로 전용(`VerticalGaugeMotionOnly`)으로 바꿔, 6칸이 게이지 높이의 약 12%만큼 위아래로만 움직이고 세로로만 커져 실제 화면에서 거의 보이지 않았다. 충전 중인 칸에 덮던 빨간 빛(#418)은 칸 그림을 덮는 별도 층이었다.
+
+### 변경
+
+- `LabStaminaShortFeedback.LiftGaugeMode`(Hapio 전투에서 켬, `VerticalGaugeMotionOnly` 대신): 6칸만 위로 떠올라(`Short Gauge Lift Height` 기본 6) 좌우로 잘게 흔들리고(`Short Gauge Side Shake` 기본 3, 이름까지의 틈보다 작음) 0.32초 안에 제자리로 내려온다(앞 20% 떠오름·뒤 35% 내려옴, `LiftAmount`). 크기는 바꾸지 않는다. 초상·이름·패널 배경은 제자리.
+- 같은 순간 차 있는 칸 전체가 빨갛게 바뀌었다가 돌아온다: `LabShapeFillImage.SetFilledFlash`로 칸 자체의 차 있는 부분 색을 섞는다(캐릭터 색 `filledColor`는 그대로 두고 돌아올 색으로 남김). 색·시간은 기존 `Short Flash Color`·`Short Flash Seconds`. 이 모드에서는 칸 위에 덮던 빨간 층을 쓰지 않는다.
+- Lab 실험 화면(모드 끔)은 예전 그대로(흔들림·커짐·충전 칸 빨간 층). "기운이 부족하다❗"·가장자리 빛(#718)은 그대로.
+- 접속 버전·Host 규칙 변경 없음(누른 사람 화면 표시만).
+
+### 확인
+
+- Unity 6000.6.5f1 Editor 컴파일: PASS(CS 오류 0). 콘솔 오류 1건은 기존 `ResultAction.png` Library 캐시 손상이다.
+- Editor에서 실제 불이 패널·칸 그림으로 그려 확인: 0.08초 시점 6칸 위로 6·좌우 1.66 이동, 차 있는 칸 빨강 0.94. 로컬 프로필의 빨간색(0.92, 0.34, 0.34, 커밋 전 값)은 불이의 분홍 칸과 가까워 약하게 보인다.
+- 검사 (실행은 NOT_RUN): `GameSceneFlowTests.ShortStaminaLiftsTheCellsTurnsThemRedShowsTheWarningAndFlashesTheEdgesOnTheBattleScreen`(실제 전투, 이름 바꿈·새 동작), `LabStaminaShortFeedbackTests` 2건 추가(떠오름·흔들림·빨강·제자리, 떠오름 곡선), 기존 Lab 검사 유지.
+- 스토리 각 캐릭터·땅따먹기 청홍 게이지 화면, iPhone 확인: NOT_RUN.
