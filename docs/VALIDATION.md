@@ -9397,3 +9397,14 @@ main `cef1579d`의 #760 관람·#762 땅따먹기 박/Game56·#727 튜토리얼�
 - 시연 호환은 Staff3→4로 갱신했다. 전역5705·Lab62·일반 Game56과 공유 설정265개는 유지한다. 운영할 모든 기기에 동일한 새 시연 앱을 설치해야 하며 구형 시연과 방을 섞지 않는다.
 - Scene·Prefab·Resources·Packages의 저장 변경은 없다. 기존 로컬 SVG 메타7개는 사본과 보존 stash를 남겼고 최신 main의 동일 파일 내용과 일치한다. 과거 총평·엔딩 에셋과 일반 게임 기능은 삭제하지 않았다.
 - **미실행:** iOS 내보내기·실기기 설치/터치, 독립 Guest UI에서 Host 이탈 확인. 통신 Guest를 사용한 자동 검사와 실제 Guest 앱 화면 검증을 구분한다. 원시 로그·전체 검사 JSON·빌드·개인 경로는 커밋하지 않는다.
+
+
+### #782 PR #784 최신 main 통합·병합 전 검증 (2026-11-16)
+
+- main `df6db7cc`의 #778 로비·폰트 정수화·3:3 미니맵과 #780 알림·북 손 안내·연기·금옥 안내 변경을 보존했다. 구현/에셋 충돌은 없었고 VALIDATION의 양쪽 추가 기록만 함께 유지했다. 통합 코드 기준은 `855e5d47`이다.
+- 공유 StoryPlayer·후일담/로비 Prefab·LabConfig가 달라져 이전 결과를 최종 통합 검증으로 사용하지 않았다. 컴파일 오류0, 전체 EditMode **2,598/2,598 PASS**(29.85초), 전체 PlayMode **894/894 PASS**(1225.88초), 실패·skip·inconclusive0.
+- 시연 QR 직행·결과 수신 지연·Host 전송 종료·참가자 이탈·자리 선택 재도전 9건과 일반 게임·구형 시연 검사를 포함한다. 두 독립 코드 검토에서도 차단 결함을 찾지 못했다. PR은 의도한 12개 파일이며 최신 main의 Scene/Prefab/Resources/Packages/ProjectSettings는 덮어쓰지 않는다.
+- Mac Stage2 Only Release `Builds/HapioStage2Demo/20261116-064921-11004438-release/macOS/합이오_쇼케이스.app`: Succeeded·오류0·identityVerified=true. 소스855e5d47·sourceHasUncommittedChanges=false·Staff4·3인·Stage2·5개 Scene을 확인했다. 앱 자체는 실행하지 않았다.
+- 최신 통합본의 실제 Editor 390×844 화면을 다시 촬영해 `봉인 카드 → 후일담 마치기 → QR → A/B 선택`을 확인했다. QR 시점 다른 두 참가자는 읽는 중·준비false였고 대기false·총평false·준비 수0이었다. 촬영용 세션만 완료를 단축했으며 저장 설정/Scene은 바꾸지 않았다. 촬영 후 Play·통신 참가자·임시 override를 종료하고 원래 Home/GameView로 복원했다.
+- 검사/빌드 후 ProjectSettings 27개와 관련 코드·에셋 85개는 검사 전 해시와 동일했다. 새 SVG 메타1개는 Importer가 만든 빈 값 뒤 공백만 달랐고, 검사 시점 사본·정규화 비교로 값이 동일함을 확인한 뒤 원격 main 형식으로 복원했다. 기존 로컬 SVG 메타7개는 사본과 바이트가 동일하며 stash도 유지한다. 문서만 추가한 뒤 게임 검사를 반복하지 않는다.
+- iOS 내보내기/실기기와 독립 Guest UI에서 Host 이탈 확인은 미실행이다. Mac 앱 실행과 Editor 촬영을 구분하며 Staff4 새 빌드를 모든 운영 기기에 설치해야 한다.
