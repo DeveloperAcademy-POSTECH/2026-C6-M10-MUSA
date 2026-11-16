@@ -18,6 +18,7 @@ namespace C6Lab
 
         // Optional presentation-only backdrop below HUD decorations and the existing orb foreground.
         public RectTransform presentationBackdrop;
+        public RectTransform presentationStaminaPanel;
 
         private LabHud hud;
         private LabOrbBoard board;
@@ -175,6 +176,8 @@ namespace C6Lab
             int next = 0;
             if (presentationBackdrop != null && presentationBackdrop.parent == hud.battleUi.transform)
                 PlaceSibling(presentationBackdrop, next++);
+            if (presentationStaminaPanel != null && presentationStaminaPanel.parent == hud.battleUi.transform)
+                PlaceSibling(presentationStaminaPanel, next++);
             foreach (Transform decoration in rearDecorations)
             {
                 if (decoration == null) continue;

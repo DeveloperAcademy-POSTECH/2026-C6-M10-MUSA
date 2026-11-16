@@ -42,6 +42,7 @@ namespace C6Lab
 
         [Header("Saved concept artwork")]
         public Sprite[] playerSprites;
+        public Sprite[] battleCharacterPortraits;
         public Sprite drumIconSprite;
         public Sprite soloDrumSprite;
         [Header("Optional game HUD presentation; standalone Lab keeps its existing layout")]
@@ -224,7 +225,23 @@ namespace C6Lab
                 Image circle = AddCircle(points[k], radius, me ? meColor : otherColor);
                 seatImages[player.id] = circle;
                 seatNumbers[player.id] = number;
-                if (teamMap && teamBlueMarker != null && teamRedMarker != null)
+                int character = LabHud.BattleCharacterIndex(network?.Snapshot, number);
+                Sprite portrait = CharacterSprite(character);
+                if (teamMap && portrait != null)
+                {
+                    circle.sprite = portrait;
+                    circle.color = Color.white;
+                    circle.preserveAspect = true;
+                    teamLabels[player.id] = null;
+                    if (teamTriangle)
+                    {
+                        // Keep the seat number readable when the drum replaces its portrait.
+                        float labelOffset = points[k].y > 0f ? radius + 6f : -radius - 7f;
+                        AddLabel(LabHud.BattleTeamCaption(network.Snapshot, number),
+                            points[k] + Vector2.up * labelOffset, radius, otherTextColor);
+                    }
+                }
+                else if (teamMap && teamBlueMarker != null && teamRedMarker != null)
                 {
                     circle.sprite = LabTeams.TeamOf(network.Snapshot, player.id) == LabTeam.Blue ? teamBlueMarker : teamRedMarker;
                     circle.color = Color.white;
@@ -233,7 +250,7 @@ namespace C6Lab
                 }
                 else if (HasConceptArt && number >= 1 && number <= playerSprites.Length)
                 {
-                    circle.sprite = playerSprites[number - 1];
+                    circle.sprite = portrait != null ? portrait : playerSprites[number - 1];
                     circle.color = Color.white;
                     circle.preserveAspect = true;
                 }
@@ -270,7 +287,7 @@ namespace C6Lab
             if (HasConceptArt && ringOrder.Count == 1 && soloDrumSprite != null && teamLabels.Count == 0)
             {
                 ulong owner = ringOrder[0];
-                seatImages[owner].sprite = drums.Any(pair => pair.Value.Owner == owner && seen.Contains(pair.Key)) ? soloDrumSprite : playerSprites[seatNumbers[owner] - 1];
+                seatImages[owner].sprite = drums.Any(pair => pair.Value.Owner == owner && seen.Contains(pair.Key)) ? soloDrumSprite : PlayerSprite(seatNumbers[owner]);
             }
             foreach (string gone in drums.Keys.Where(id => !seen.Contains(id)).ToArray())
             {
@@ -297,18 +314,29 @@ namespace C6Lab
                 float t = Mathf.SmoothStep(0f, 1f, marker.Progress - index);
                 marker.Rect.anchoredPosition = Vector2.Lerp(marker.Path[index], marker.Path[index + 1], t);
             }
-            // The drum artwork replaces the holder badge at rest, as in the Figma component.
-            foreach (var label in teamLabels)
+            // A landed marker takes the place of its portrait. During a pass the
+            // portraits remain visible and the marker travels at its usual size.
+            bool replacePortraits = compactGamePresentation && ringOrder.Count > 1;
+            foreach (var drum in drums.Values)
             {
+                if (drum.Rect == null) continue;
+                float diameter = DrumDiameter * (replacePortraits && drum.Path.Count == 0 ? 1.12f : 1f);
+                if (!Mathf.Approximately(drum.Rect.sizeDelta.x, diameter))
+                    drum.Rect.sizeDelta = Vector2.one * diameter;
+            }
+            foreach (var seat in seatImages)
+            {
+                bool hasTeamLabel = teamLabels.TryGetValue(seat.Key, out var label);
+                if (!replacePortraits && !hasTeamLabel) continue;
                 bool occupied = false;
                 foreach (var drum in drums.Values)
                 {
-                    if (drum.Owner != label.Key || drum.Path.Count > 0) continue;
+                    if (drum.Owner != seat.Key || drum.Path.Count > 0) continue;
                     occupied = true;
                     break;
                 }
-                seatImages[label.Key].enabled = !occupied;
-                label.Value.enabled = !occupied;
+                seat.Value.enabled = !occupied;
+                if (label != null) label.enabled = !occupied;
             }
         }
 
@@ -331,7 +359,14 @@ namespace C6Lab
             }
         }
 
-        private float CircleRadius(int count) => compactGamePresentation ? 12f : HasConceptArt
+        private Sprite CharacterSprite(int index) =>
+            battleCharacterPortraits != null && index >= 0 && index < battleCharacterPortraits.Length
+                ? battleCharacterPortraits[index] : null;
+
+        private Sprite PlayerSprite(int number) =>
+            CharacterSprite(LabHud.BattleCharacterIndex(network?.Snapshot, number)) ?? playerSprites[number - 1];
+
+        private float CircleRadius(int count) => compactGamePresentation ? 10.5f : HasConceptArt
             ? (count <= 1 ? 35.5f : 18.5f)
             : count <= 3 ? 17f : count == 4 ? 15f : 13f;
 
@@ -434,6 +469,9 @@ namespace C6Lab
             return rect;
         }
 
+        private float DrumDiameter => CircleRadius(ringOrder.Count) * 2f
+            * (HasConceptArt && !compactGamePresentation ? .746f : 1f);
+
         /// <summary>북을 가진 사람 원 안쪽의 태극. 솔로는 제공된 완성 배지를 쓴다.</summary>
         private RectTransform AddTaegeuk(Vector2 at)
         {
@@ -441,7 +479,7 @@ namespace C6Lab
             var rect = (RectTransform)go.transform;
             rect.SetParent(drumLayer, false);
             rect.anchoredPosition = at;
-            rect.sizeDelta = Vector2.one * (CircleRadius(ringOrder.Count) * 2f * (HasConceptArt && !compactGamePresentation ? .746f : 1f));
+            rect.sizeDelta = Vector2.one * DrumDiameter;
             var image = go.GetComponent<Image>();
             image.sprite = HasConceptArt ? drumIconSprite : TaegeukSprite();
             image.enabled = !(HasConceptArt && ringOrder.Count == 1 && soloDrumSprite != null && teamLabels.Count == 0);

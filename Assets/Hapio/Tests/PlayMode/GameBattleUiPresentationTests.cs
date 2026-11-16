@@ -159,7 +159,7 @@ namespace Hapio.Tests
                     Assert.That(bindings.board.transform.Find("OrbBoardPlate").GetComponent<Renderer>().enabled,Is.False);
                     Assert.That(ui.BoardArtwork.transform.GetSiblingIndex(),Is.LessThan(composite.Display.transform.GetSiblingIndex()),"Board artwork must remain below actual orb rendering.");
                 }
-                Assert.That(bindings.hud.staminaFill.sprite,Is.SameAs(ui.Theme.staminaCells));
+                Assert.That(bindings.hud.staminaFill.sprite,Is.SameAs(Resources.Load<Sprite>("Hapio/UI/BattleCharacters/Cells")));
                 Assert.That(bindings.hud.staminaFill.transform.parent.parent,Is.SameAs(bindings.hud.battleUi.transform),"Orb composition keeps the stamina root directly under Battle UI.");
                 AssertPlayerBadgeLayout(bindings.hud);
                 Assert.That(bindings.sceneController.GetComponent<LabDrumMinimap>().compactGamePresentation,Is.True);
@@ -218,7 +218,26 @@ namespace Hapio.Tests
             Assert.That(moon.group.gameObject.activeInHierarchy, Is.False, "The moon must not sit behind the territory team flag.");
             Assert.That(backgrounds.Resolve(1).studio.gameObject.activeSelf, Is.False);
             Assert.That(ui.AppliedStage, Is.EqualTo(2));
+            var blueStamina = (LabShapeFillImage)bindings.hud.staminaFill;
+            Assert.That((Color32)blueStamina.filledColor, Is.EqualTo(new Color32(110, 160, 190, 255)),
+                "The blue team uses Mugi's blue character gauge.");
             AssertPlayerBadgeLayout(bindings.hud);
+            var hud = bindings.hud;
+            var cells = (RectTransform)hud.staminaFill.transform.parent;
+            var panel = (RectTransform)hud.battleUi.transform.Find("Character Stamina Panel");
+            var portrait = hud.localPlayerCircle.rectTransform;
+            Vector2 initialCells = cells.anchoredPosition;
+            Vector2 initialPanel = panel.anchoredPosition;
+            Vector2 initialPortrait = portrait.anchoredPosition;
+            var shortage = bindings.sceneController.GetComponent<LabStaminaShortFeedback>();
+            Assert.That(shortage, Is.Not.Null);
+            shortage.Play();
+            shortage.Advance(.05f);
+            Assert.That(cells.anchoredPosition, Is.Not.EqualTo(initialCells));
+            Assert.That(panel.anchoredPosition, Is.EqualTo(initialPanel));
+            Assert.That(portrait.anchoredPosition, Is.EqualTo(initialPortrait));
+            shortage.Advance(5f);
+            Assert.That(cells.anchoredPosition, Is.EqualTo(initialCells));
             Assert.That(ui.BoardArtwork.texture, Is.SameAs(ui.Theme.BoardFor(2)));
             Assert.That(bindings.stageLabel.color, Is.EqualTo(GameBattleUiColors.Light));
             var composition = bindings.hud.GetComponent<LabOrbHudComposition>();
@@ -280,14 +299,33 @@ namespace Hapio.Tests
                             Assert.That(connector.rectTransform.sizeDelta, Is.EqualTo(new Vector2(65.9468f, 51.282f)));
                             Assert.That(Mathf.DeltaAngle(connector.rectTransform.localEulerAngles.z, 180), Is.Zero.Within(.001f));
                         }
-                        foreach(Transform marker in latestSeats)
-                            Assert.That(marker.GetComponent<UnityEngine.UI.Image>().sprite,Is.SameAs(first==0?theme.teamBlueMarker:theme.teamRedMarker));
+                        for (int i = 0; i < latestSeats.childCount; i++)
+                        {
+                            int character = first == 0 ? 2 : 0;
+                            Sprite expected = map.battleCharacterPortraits[character];
+                            Transform marker = latestSeats.GetChild(i);
+                            Assert.That(marker.GetComponent<UnityEngine.UI.Image>().sprite, Is.SameAs(expected));
+                            Assert.That(marker.GetComponent<UnityEngine.UI.Outline>(), Is.Null);
+                            Assert.That(((RectTransform)marker).rect.width, Is.EqualTo(21f).Within(.001f));
+                        }
+                        var labels = map.Panel.Find("Content").Cast<Transform>().Last(layer => layer.name == "Labels");
+                        if (total == 6)
+                        {
+                            string prefix = first == 0 ? "청" : "홍";
+                            Assert.That(labels.Cast<Transform>().Select(item => item.GetComponent<UnityEngine.UI.Text>().text),
+                                Is.EquivalentTo(new[] { prefix + "1", prefix + "2", prefix + "3" }));
+                        }
                         map.SyncDrums(new[] {new LabOrbState {id="ui-test-drum",kind=LabOrbKind.Drum,owner=mine}});
                         Assert.That(map.DrumOwner("ui-test-drum"),Is.EqualTo(mine));
                         Assert.That(map.DrumPosition("ui-test-drum"),Is.EqualTo(map.SeatPositions[mine]));
                         map.Advance(0);
                         Assert.That(latestSeats.GetChild(0).GetComponent<UnityEngine.UI.Image>().enabled, Is.False);
+                        var drumLayer = map.Panel.Find("Content").Cast<Transform>().Last(layer => layer.name == "Drums");
+                        var drum = (RectTransform)drumLayer.Find("Drum");
+                        Assert.That(drum.rect.width, Is.GreaterThan(((RectTransform)latestSeats.GetChild(0)).rect.width));
                         Assert.That(latestSeats.GetChild(1).GetComponent<UnityEngine.UI.Image>().enabled, Is.True);
+                        if (total == 6)
+                            Assert.That(labels.GetChild(0).GetComponent<UnityEngine.UI.Text>().enabled, Is.True);
                         map.SyncDrums(Array.Empty<LabOrbState>());
                         map.Advance(0);
                         Assert.That(latestSeats.GetChild(0).GetComponent<UnityEngine.UI.Image>().enabled, Is.True);
@@ -337,36 +375,41 @@ namespace Hapio.Tests
                     {
                         snapshot.players = roster(total, mine);
                         refresh();
-                        var badges = mine < size ? theme.territoryBlueBadges : theme.territoryRedBadges;
+                        int character = mine < size ? 2 : 0;
                         int number = mine % size;
                         string context = total + " players, global P" + (mine + 1);
-                        AssertPlayerBadgeSprite(hud.localPlayerCircle, badges[number], context + " local");
-                        AssertPlayerBadgeSprite(hud.leftPlayerCircle, left[number] < 0 ? null : badges[left[number]], context + " left");
-                        AssertPlayerBadgeSprite(hud.rightPlayerCircle, right[number] < 0 ? null : badges[right[number]], context + " right");
-                        Assert.That(hud.TeamBar.LocalRing == null || !hud.TeamBar.LocalRing.gameObject.activeSelf, Is.True,
-                            context + ": team artwork already carries its own colour rim.");
+                        string team = mine < size ? "청" : "홍";
+                        string Caption(int position) => total == 6 ? team + (position + 1) : team + "팀";
+                        Assert.That(LabHud.BattleTeamCaption(snapshot, mine + 1), Is.EqualTo(Caption(number)));
+                        if (left[number] >= 0) Assert.That(hud.leftNeighborText.text, Is.EqualTo("< " + Caption(left[number])));
+                        if (right[number] >= 0) Assert.That(hud.rightNeighborText.text, Is.EqualTo(Caption(right[number]) + " >"));
+                        Sprite Neighbor(int position) => position < 0 ? null : hud.battleCharacterPortraits[character];
+                        AssertPlayerBadgeSprite(hud.localPlayerCircle, hud.battleStaminaPortraits[character], context + " local");
+                        AssertPlayerBadgeSprite(hud.leftPlayerCircle, Neighbor(left[number]), context + " left");
+                        AssertPlayerBadgeSprite(hud.rightPlayerCircle, Neighbor(right[number]), context + " right");
+                        Assert.That(hud.TeamBar.LocalRing != null && hud.TeamBar.LocalRing.gameObject.activeSelf,
+                            Is.False, context + " character has no additional team rim");
                     }
                 }
                 snapshot.players = roster(1, 0);
                 refresh();
-                AssertPlayerBadgeSprite(hud.localPlayerCircle, theme.territoryBlueBadges[0], "Solo blue P1");
+                AssertPlayerBadgeSprite(hud.localPlayerCircle, hud.battleStaminaPortraits[2], "Solo blue Mugi");
                 AssertPlayerBadgeSprite(hud.leftPlayerCircle, null, "Solo left");
                 AssertPlayerBadgeSprite(hud.rightPlayerCircle, null, "Solo right");
 
-                // Without the optional theme art, global P numbers and the legacy team ring still work.
+                // Character art is independent of the legacy number assets.
                 snapshot.players = roster(6, 4);
                 hud.territoryBlueBadges = hud.territoryRedBadges = null;
                 refresh();
-                AssertPlayerBadgeSprite(hud.localPlayerCircle, hud.playerCircleSprites[4], "Fallback global P5");
-                AssertPlayerBadgeSprite(hud.leftPlayerCircle, hud.playerCircleSprites[5], "Fallback global P6 left");
-                AssertPlayerBadgeSprite(hud.rightPlayerCircle, hud.playerCircleSprites[3], "Fallback global P4 right");
-                Assert.That(hud.TeamBar.LocalRing, Is.Not.Null);
-                Assert.That(hud.TeamBar.LocalRing.gameObject.activeSelf, Is.True);
+                AssertPlayerBadgeSprite(hud.localPlayerCircle, hud.battleStaminaPortraits[0], "Red team Buri");
+                AssertPlayerBadgeSprite(hud.leftPlayerCircle, hud.battleCharacterPortraits[0], "Red team P6 left");
+                AssertPlayerBadgeSprite(hud.rightPlayerCircle, hud.battleCharacterPortraits[0], "Red team P4 right");
+                Assert.That(hud.TeamBar.LocalRing == null || !hud.TeamBar.LocalRing.gameObject.activeSelf, Is.True);
                 hud.territoryBlueBadges = originalBlue;
                 hud.territoryRedBadges = originalRed;
                 refresh();
-                AssertPlayerBadgeSprite(hud.localPlayerCircle, theme.territoryRedBadges[1], "Restored red P2");
-                Assert.That(hud.TeamBar.LocalRing.gameObject.activeSelf, Is.False, "Restored team art hides the fallback ring.");
+                AssertPlayerBadgeSprite(hud.localPlayerCircle, hud.battleStaminaPortraits[0], "Red team Buri with team badge assets");
+                Assert.That(hud.TeamBar.LocalRing == null || !hud.TeamBar.LocalRing.gameObject.activeSelf, Is.True);
             }
             finally
             {
@@ -386,20 +429,32 @@ namespace Hapio.Tests
 
         private static void AssertPlayerBadgeLayout(LabHud hud)
         {
+            int[] storyCharacters = { 0, 2, 1, 3, 4 };
+            for (int i = 0; i < storyCharacters.Length; i++)
+                Assert.That(LabHud.BattleCharacterIndex(null, i + 1), Is.EqualTo(storyCharacters[i]));
             var stamina = (RectTransform)hud.staminaFill.transform.parent;
             var badge = hud.localPlayerCircle.rectTransform;
-            Assert.That(badge.anchorMin, Is.EqualTo(stamina.anchorMin));
-            Assert.That(badge.anchorMin.x, Is.EqualTo(.5f));
-            float badgeLeft = badge.anchoredPosition.x - badge.rect.width * .5f;
-            float staminaRight = stamina.anchoredPosition.x + stamina.rect.width * .5f;
-            float gap = staminaRight - stamina.rect.width - (badgeLeft + badge.rect.width);
-            Assert.That(badgeLeft + staminaRight, Is.EqualTo(0f).Within(.01f));
-            Assert.That(gap, Is.EqualTo(9f).Within(.01f));
+            Assert.That(badge.sizeDelta, Is.EqualTo(new Vector2(82, 82)));
+            var panelRect = (RectTransform)hud.battleUi.transform.Find("Character Stamina Panel");
+            Assert.That(panelRect, Is.Not.Null);
+            Assert.That(badge.anchorMin, Is.EqualTo(panelRect.anchorMin));
+            float portraitX = hud.localPlayerCircle.sprite.name == "StaminaPortrait2" ? -132.5f : -131.5f;
+            Assert.That(Vector2.Distance(badge.anchoredPosition, new Vector2(portraitX, 4f)), Is.LessThan(.001f));
+            for (int index = 0; index < 5; index++)
+            {
+                Assert.That(hud.battleStaminaPortraits[index].rect.size, Is.EqualTo(new Vector2(164, 164)));
+                Assert.That(hud.battleCharacterPortraits[index].rect.size, Is.EqualTo(new Vector2(162, 162)));
+            }
+            Assert.That(stamina.anchorMin, Is.EqualTo(panelRect.anchorMin));
+            Assert.That(stamina.anchoredPosition.y, Is.EqualTo(-27f - 1f / 3f).Within(.001f));
+            var panel = hud.battleUi.transform.Find("Character Stamina Panel");
+            Assert.That(panel, Is.Not.Null);
+            Assert.That(panel.parent, Is.SameAs(stamina.parent), "The character panel must not shake with the cells.");
             var left = hud.leftPlayerCircle.rectTransform;
             var right = hud.rightPlayerCircle.rectTransform;
-            Assert.That(left.anchorMin.x, Is.EqualTo(14.5f / 402f).Within(.0001f));
-            Assert.That(right.anchorMin.x, Is.EqualTo(387.5f / 402f).Within(.0001f));
-            Assert.That(left.anchorMin.y, Is.EqualTo(1f - 495.5f / 874f).Within(.0001f));
+            Assert.That(left.anchorMin.x, Is.EqualTo(23f / 402f).Within(.0001f));
+            Assert.That(right.anchorMin.x, Is.EqualTo(379f / 402f).Within(.0001f));
+            Assert.That(left.anchorMin.y, Is.EqualTo(1f - 502f / 874f).Within(.0001f));
             Assert.That(right.anchorMin.y, Is.EqualTo(left.anchorMin.y));
         }
 
