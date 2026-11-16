@@ -422,7 +422,7 @@ B는 전원 동시에 자기 발화점을 소화하면 그 순간부터5초 보�
 
 ## #763 북 전달 제한 알림 표현
 
-넘기기 막기 시작 시 해당 플레이어에게 방향별 Figma 한지 안내를 잠깐 표시한 뒤 페이드아웃한다. 안내가 사라져도 실제 제한 시간 동안 가장자리 빛·남은 초는 유지한다. 안내 해제는 제한 해제가 아니다. 문구 패널의 좌/우 PNG는 Resources/Sabotage/DrumPassBlock/BlockLeft·BlockRight이다. 가장자리 남은 초는 같은 폴더의 ShillaCultureBold Font로 모든 숫자를 렌더하며 인위적인 Bold/겹친 외곽선을 적용하지 않는다. 숫자·가장자리 빛은 Hap-io/5OrbsColor/Firered/600(#A92511)이며 점멸은 투명도만 바꾼다.
+넘기기 막기는 #783부터 가운데 안내를 띄우지 않는다. 막힌 쪽 가장자리의 붉은 빛 위에 세로 `전달불가`와 남은 초를 제한 시간 내내 표시한다(`LabOrbEdgeBlock`). 글자와 숫자는 같은 투명도로 점멸한다. 남은 초는 Resources/Sabotage/DrumPassBlock의 ShillaCultureBold Font와 Digits로 그리고, 글자색은 SecondaryLightIvory/500***, 가장자리 빛은 Hap-io/5OrbsColor/Firered/600(#A92511)이다. 예전 좌/우 문구 패널 PNG(BlockLeft·BlockRight)는 지웠다. 상세는 `docs/SESSION_FINISH_UI.md`의 #783 절을 따른다.
 
 - 후속 배치: 사용자 시안 기준으로 화면 상단에서16% 지점에 안내 중심을 두고, 폭88%(좌우 각6% 여백), 에셋640:120 비율을 유지한다. 기존2.4초 표시/페이드 시간은 유지한다.
 

@@ -84,33 +84,6 @@ namespace C6Lab.Tests
         }
 
         [UnityTest]
-        public IEnumerator BlockingUsesTheEdgeNoticeWithoutShowingACentralBubble()
-        {
-            root = new GameObject("Gourd block alert test");
-            var cameraObject = new GameObject("Battle camera");
-            cameraObject.transform.SetParent(root.transform, false);
-            cameraObject.transform.position = new Vector3(0f, 1f, -8f);
-            var battleCamera = cameraObject.AddComponent<Camera>();
-            var canvasObject = new GameObject("Canvas", typeof(RectTransform));
-            canvasObject.transform.SetParent(root.transform, false);
-            var canvas = canvasObject.AddComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            LabTarget gourd = LabTarget.CreateCylinder(root.transform, new Vector3(0f, 1f, 0f), .8f, 2f);
-            var alert = root.AddComponent<LabGourdAlert>();
-            alert.Bind(null, canvas, battleCamera);
-            yield return null;
-
-            alert.ShowBlock(gourd, true);
-            Assert.That(alert.Active, Is.False, "The edge supplies the warning; no central alert.");
-            alert.ShowBlock(gourd, false);
-            Assert.That(alert.Active, Is.False);
-            alert.Show(gourd);
-            Assert.That(alert.Label, Is.EqualTo("!"));
-            alert.ShowBlock(gourd, true);
-            Assert.That(alert.Label, Is.EqualTo("!"), "Blocking must not replace another active alert.");
-        }
-
-        [UnityTest]
         public IEnumerator TheYaguangEyesShowPlainThenGlowAndLeaveAtTheFlash()
         {
             root = new GameObject("Gourd eyes alert test");

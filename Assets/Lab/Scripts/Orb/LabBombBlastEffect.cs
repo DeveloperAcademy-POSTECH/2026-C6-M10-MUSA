@@ -13,7 +13,6 @@ namespace C6Lab
     {
         public const string Text = "뻥이요!";
         public const string ArtPath = "Bomb/BombPpeongHanji";
-        public const string OutlinePath = "Bomb/BombPpeongOutline";
         public const float Seconds = .9f;
         // In front of every orb, drum and item marker on the board plane (z = 0), facing its camera.
         private const float FrontZ = -1.5f;
@@ -37,7 +36,6 @@ namespace C6Lab
         private readonly Vector2[] puffDirections = new Vector2[PuffCount];
         private SpriteRenderer ring;
         private SpriteRenderer label;
-        private SpriteRenderer labelOutline;
         private float labelScale;
         private float reach;
         private float elapsed;
@@ -125,10 +123,6 @@ namespace C6Lab
             label.transform.localScale = Vector3.one * (labelScale * textPop);
             label.transform.localPosition = new Vector3(0f, rise, -.02f);
             label.color = WithAlpha(Color.white, 1f - leave);
-            if (labelOutline == null) return;
-            labelOutline.transform.localScale = label.transform.localScale;
-            labelOutline.transform.localPosition = new Vector3(0f, rise, -.01f);
-            labelOutline.color = WithAlpha(Color.white, 1f - leave);
         }
 
         private SpriteRenderer CreateSprite(string partName, Sprite sprite, Color color, int order)
