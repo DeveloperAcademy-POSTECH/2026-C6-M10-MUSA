@@ -1293,8 +1293,12 @@ namespace Hapio.Tests
             feedback.Play();
             feedback.Advance(.08f);
             Assert.That(feedback.GaugeScale, Is.GreaterThan(1.02f), "The gauge swells a little while it shakes (#718).");
-            Assert.That(gauge.localScale.x, Is.EqualTo(gaugeScale.x * feedback.GaugeScale).Within(.0001f));
-            Assert.That(feedback.ShakeOffset.magnitude, Is.GreaterThan(0f), "And still shakes.");
+            // #785: the character name sits beside the gauge, so on the Hapio battle screen it moves and swells only vertically.
+            Assert.That(feedback.VerticalGaugeMotionOnly, Is.True);
+            Assert.That(gauge.localScale.y, Is.EqualTo(gaugeScale.y * feedback.GaugeScale).Within(.0001f));
+            Assert.That(gauge.localScale.x, Is.EqualTo(gaugeScale.x).Within(.0001f), "Its width never reaches the name.");
+            Assert.That(feedback.ShakeOffset.x, Is.Zero);
+            Assert.That(Mathf.Abs(feedback.ShakeOffset.y), Is.GreaterThan(0f), "And still shakes.");
             Assert.That(feedback.WarningVisible, Is.True);
             Assert.That(feedback.WarningLabel, Is.EqualTo("기운이 부족하다"));
             Assert.That(feedback.WarningIcon, Is.SameAs(Resources.Load<Sprite>(LabStaminaShortFeedback.WarningIconPath)),
