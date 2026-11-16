@@ -67,6 +67,9 @@ namespace C6Lab
         public Image leftPlayerCircle;
         public Image rightPlayerCircle;
         public Sprite[] playerCircleSprites;
+        public Sprite[] battleCharacterPortraits;
+        public Sprite[] battleStaminaPortraits;
+        public string[] battleCharacterNames;
         [System.NonSerialized] public Sprite[] territoryBlueBadges, territoryRedBadges;
         [Header("Saved player paint-pattern samples")]
         public Image[] playerSlotPatternSamples;
@@ -332,19 +335,22 @@ namespace C6Lab
             SetFill(playerHpFill, local == null ? 0f : Fraction(local.personalHp, network.config.PlayerMaxHp));
             SetStaminaCells(local == null ? 0f : Fraction(local.stamina, network.config.StaminaMax));
             GetNeighborLabels(snapshot, network.LocalPlayerId, out string left, out string right);
-            Set(leftNeighborText, left);
-            Set(rightNeighborText, right);
             int localNumber = local == null ? 0 : local.seat + 1;
             int leftNumber = ParsePlayerNumber(left);
             int rightNumber = ParsePlayerNumber(right);
-            Sprite localTerritoryBadge = TerritoryBadge(snapshot, localNumber);
-            SetPlayerCircle(localPlayerCircle, localNumber, localTerritoryBadge);
-            SetPlayerCircle(leftPlayerCircle, leftNumber, TerritoryBadge(snapshot, leftNumber));
-            SetPlayerCircle(rightPlayerCircle, rightNumber, TerritoryBadge(snapshot, rightNumber));
+            Set(leftNeighborText, NeighborCaption(snapshot, leftNumber, left, false));
+            Set(rightNeighborText, NeighborCaption(snapshot, rightNumber, right, true));
+            int localCharacter = BattleCharacterIndex(snapshot, localNumber);
+            bool hasCharacter = BadgeAt(battleStaminaPortraits, localCharacter) != null
+                || BadgeAt(battleCharacterPortraits, localCharacter) != null;
+            Sprite localTerritoryBadge = hasCharacter ? null : TerritoryBadge(snapshot, localNumber);
+            SetPlayerCircle(localPlayerCircle, localCharacter, localNumber, localTerritoryBadge);
+            SetPlayerCircle(leftPlayerCircle, BattleCharacterIndex(snapshot, leftNumber), leftNumber, TerritoryBadge(snapshot, leftNumber));
+            SetPlayerCircle(rightPlayerCircle, BattleCharacterIndex(snapshot, rightNumber), rightNumber, TerritoryBadge(snapshot, rightNumber));
             SetPaintPatternSample(localPlayerPatternSample, local == null ? 0 : local.seat + 1, battleVisible);
             SetPaintPatternSample(leftPlayerPatternSample, ParsePlayerNumber(left), hasNeighbors);
             SetPaintPatternSample(rightPlayerPatternSample, ParsePlayerNumber(right), hasNeighbors);
-            RefreshTeamHud(snapshot, battleVisible, localTerritoryBadge != null ? null : localPlayerCircle);
+            RefreshTeamHud(snapshot, battleVisible, hasCharacter || localTerritoryBadge != null ? null : localPlayerCircle);
         }
 
         /// <summary>A 2:2 battle (#281) ends with the winning team or a draw; every other battle keeps its words.</summary>
@@ -473,10 +479,60 @@ namespace C6Lab
         private static Sprite BadgeAt(Sprite[] badges, int index) =>
             badges != null && index >= 0 && index < badges.Length ? badges[index] : null;
 
-        private void SetPlayerCircle(Image image, int number, Sprite territoryBadge)
+        // Indices into the Hapio artwork: 불이, 솔이, 묵이, 금옥, 만복.
+        public static int BattleCharacterIndex(LabSnapshot snapshot, int number)
+        {
+            const int buri = 0, soli = 1, mugi = 2;
+            if (number <= 0) return -1;
+            if (snapshot == null || !snapshot.teamTerritory)
+            {
+                if (number == 2) return mugi;
+                if (number == 3) return soli;
+                return number - 1;
+            }
+
+            switch (BattleSeatTeam(snapshot, number))
+            {
+                case LabTeam.Blue: return mugi;
+                case LabTeam.Red: return buri;
+                default: return -1;
+            }
+        }
+
+        private static LabTeam BattleSeatTeam(LabSnapshot snapshot, int number)
+        {
+            int count = snapshot.players?.Length ?? 0;
+            return count == 1 && number == 1 ? LabTeam.Blue : LabTeams.SeatTeam(number - 1, count);
+        }
+
+        public static string BattleTeamCaption(LabSnapshot snapshot, int number)
+        {
+            if (snapshot == null || !snapshot.teamTerritory) return null;
+            LabTeam team = BattleSeatTeam(snapshot, number);
+            if (team == LabTeam.None) return null;
+            string prefix = team == LabTeam.Blue ? "청" : "홍";
+            int teamSize = LabTeams.TeamSize(snapshot.players?.Length ?? 0);
+            return teamSize == 3
+                ? prefix + (number - (team == LabTeam.Red ? teamSize : 0))
+                : prefix + "팀";
+        }
+
+        private string NeighborCaption(LabSnapshot snapshot, int number, string fallback, bool right)
+        {
+            int index = BattleCharacterIndex(snapshot, number);
+            if (battleCharacterNames == null || index < 0 || index >= battleCharacterNames.Length
+                || BadgeAt(battleCharacterPortraits, index) == null)
+                return fallback;
+            string name = BattleTeamCaption(snapshot, number) ?? battleCharacterNames[index];
+            return right ? name + " >" : "< " + name;
+        }
+
+        private void SetPlayerCircle(Image image, int character, int number, Sprite territoryBadge)
         {
             if (image == null) return;
-            Sprite art = territoryBadge != null ? territoryBadge : BadgeAt(playerCircleSprites, number - 1);
+            Sprite art = image == localPlayerCircle ? BadgeAt(battleStaminaPortraits, character) : null;
+            if (art == null) art = BadgeAt(battleCharacterPortraits, character);
+            if (art == null) art = territoryBadge != null ? territoryBadge : BadgeAt(playerCircleSprites, number - 1);
             image.enabled = art != null;
             if (image.sprite != art) image.sprite = art;
         }
