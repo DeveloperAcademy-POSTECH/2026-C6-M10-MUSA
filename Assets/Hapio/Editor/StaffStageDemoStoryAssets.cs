@@ -53,39 +53,27 @@ namespace Hapio.Editor
             Validate();
         }
 
-        public static void Validate()
+        public static void Validate() => ValidateRuntimeAssets(path => AssetDatabase.LoadAssetAtPath<Object>(path));
+
+        // Retained stage-specific ending copies are authoring history, not dependencies of the direct-QR player.
+        private static void ValidateRuntimeAssets(Func<string, Object> load)
         {
-            var source = Require<StorySequence>(GameStageStoryUpgrade.GameEnding);
-            for (int stage = 1; stage <= 3; stage++)
+            string[] afterStories = { "AfterGumiho", "AfterYagwanggui", "AfterJigwi" };
+            foreach (string name in afterStories)
             {
-                var ending = Require<StorySequence>(EndingPath(stage));
-                if (!ending.Validate(out string error) || ending.cuts.Count != 7
-                    || ending.cuts[0] != Require<StoryCutDefinition>(SummaryCutPath(stage))
-                    || ending.cuts[1] != Require<StoryCutDefinition>(FirstEndingCutPath(stage))
-                    || ending.cuts[1] == source.cuts[1]
-                    || ending.cuts[1].GetPage(0).dialogue != FirstEndingDialogue(stage))
-                    throw new InvalidOperationException("Staff demo needs truthful, selected-stage summary and ending: " + stage + ". " + error);
-                for (int i = 2; i < 7; i++)
-                    if (ending.cuts[i] != source.cuts[i])
-                        throw new InvalidOperationException("Staff demo must reuse the original ending picture: " + i);
-                var prefab = Require<GameObject>(SummaryViewPath(stage));
-                var summary = prefab.GetComponent<SealRunSummary>();
-                var view = prefab.GetComponent<StoryCutView>();
-                if (summary == null || view == null || summary.stageIndices == null
-                    || !summary.stageIndices.SequenceEqual(new[] { stage })
-                    || summary.stageTimes == null || summary.stageTimes.Length != 1 || summary.stageTimes[0] == null
-                    || summary.contributions == null || summary.contributions.Length != 1 || summary.contributions[0] == null
-                    || summary.totalTime == null || !view.requireContinueButton || view.continueButton == null
-                    || view.exitCloudWipe == null || ending.cuts[0].viewPrefab != view
-                    || view.beats.Count(beat => beat != null && beat.motion == StoryVisualBeat.Motion.SpinSeal) != 1
-                    || Label(prefab.transform, "Subtitle").text != YokaiNames[stage - 1] + " 봉인 완료"
-                    || Label(prefab.transform, "Yokai" + (stage - 1)).text != YokaiNames[stage - 1])
-                    throw new InvalidOperationException("Staff demo summary must retain exactly its canonical stage: " + stage);
-                if (prefab.GetComponentInChildren<SealRunSummaryPreview>(true) != null)
-                    throw new InvalidOperationException("Demo results cannot contain preview sample data.");
+                var after = RequireRuntimeAsset<StorySequence>(StageStoryAssets.Root + "/" + name + ".asset", load);
+                if (!after.Validate(out string error))
+                    throw new InvalidOperationException("The staff demo needs its saved card and afterstory: " + name + ". " + error);
+                var first = after.cuts[0].viewPrefab;
+                var last = after.cuts[after.cuts.Count - 1].viewPrefab;
+                var finish = last.GetComponent<StoryStageClearControls>();
+                if (first.GetComponentInChildren<StoryCardRecords>(true) == null
+                    || first.GetComponentInChildren<StoryCardFlip>(true) == null
+                    || finish == null || finish.nextSeal == null || finish.waiting == null)
+                    throw new InvalidOperationException("The staff demo afterstory needs its card records and final Finish action: " + name);
             }
-            var config = Require<StaffDemoFinalPageConfig>(FinalPageConfigPath);
-            var page = Require<GameObject>(FinalPagePath).GetComponent<StaffDemoFinalPage>();
+            var config = RequireRuntimeAsset<StaffDemoFinalPageConfig>(FinalPageConfigPath, load);
+            var page = RequireRuntimeAsset<GameObject>(FinalPagePath, load).GetComponent<StaffDemoFinalPage>();
             if (page == null || page.heading == null || page.message == null || page.qrCaption == null
                 || page.qrImage == null || page.placeholder == null || page.returnButton == null
                 || page.GetComponent<StoryPageFit>() == null)
@@ -96,6 +84,9 @@ namespace Hapio.Editor
                 .Any(text => text.text.Contains("준비 중")))
                 throw new InvalidOperationException("An unassigned QR must use an explicit placeholder.");
         }
+
+        private static T RequireRuntimeAsset<T>(string path, Func<string, Object> load) where T : Object => load(path) as T
+            ?? throw new InvalidOperationException("Missing saved asset: " + path);
 
         private static void CreateSummaryView(int stage)
         {

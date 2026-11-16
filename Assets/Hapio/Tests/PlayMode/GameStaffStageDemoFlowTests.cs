@@ -59,6 +59,24 @@ namespace Hapio.Tests
         public IEnumerator ThreePlayersFinishOnlyStageThree() { yield return ThreePlayerRound(3); }
 
         [UnityTest]
+        public IEnumerator HostOpensQrBeforeLateResultReceiptAndReturnsAfterReceiptWithoutWaitingForStories()
+        {
+            yield return ThreePlayerRound(2, withholdLastResultReceipt: true);
+        }
+
+        [UnityTest]
+        public IEnumerator CompletedStaffHostCanFinishToQrAfterItsConnectionEndsWithoutAnAutomaticEnding()
+        {
+            yield return ThreePlayerRound(2, disconnectBeforeFinish: true);
+        }
+
+        [UnityTest]
+        public IEnumerator AnotherMemberLeavingWhileQrIsOpenKeepsTheCompletedPageAndReturnAction()
+        {
+            yield return ThreePlayerRound(2, memberLeavesOnQr: true);
+        }
+
+        [UnityTest]
         public IEnumerator GuestInterruptedRetryReturnsEveryoneToUnselectedSeatsAndRequiresManualStart()
         {
             yield return StartRetryRound(2);
@@ -213,7 +231,8 @@ namespace Hapio.Tests
             }
         }
 
-        private IEnumerator ThreePlayerRound(int stage)
+        private IEnumerator ThreePlayerRound(int stage, bool withholdLastResultReceipt = false,
+            bool disconnectBeforeFinish = false, bool memberLeavesOnQr = false)
         {
             Assert.That(session.SelectDemoGroup(1), Is.True);
             Assert.That(session.SelectDemoStage(stage), Is.True);
@@ -245,7 +264,8 @@ namespace Hapio.Tests
             yield return null;
 
             second = new ProtocolPeer("Staff protocol P2", network.port, stage);
-            third = new ProtocolPeer("Staff protocol P3", network.port, stage);
+            third = new ProtocolPeer("Staff protocol P3", network.port, stage)
+                { ReportResultEnabled = !withholdLastResultReceipt };
             second.Network.Join("127.0.0.1"); third.Network.Join("127.0.0.1");
             yield return Until(() => second.Network.IsConnected && third.Network.IsConnected
                 && second.Network.CanSelectPlayerSlot && third.Network.CanSelectPlayerSlot, "Matching-stage members join");
@@ -276,68 +296,95 @@ namespace Hapio.Tests
             session.NextStage();
             Assert.That(session.State.stageIndex, Is.EqualTo(stage));
             Assert.That(session.State.battleSessionId, Is.EqualTo(battle), "No later stage can start from the single-round result.");
-            yield return VerifyStoryEndingAndReturn(stage, battle);
+            yield return VerifyDirectQrAndReturn(stage, battle, withholdLastResultReceipt, disconnectBeforeFinish, memberLeavesOnQr);
         }
 
-        private IEnumerator VerifyStoryEndingAndReturn(int stage, string battle)
+        private IEnumerator VerifyDirectQrAndReturn(int stage, string battle, bool withholdLastResultReceipt,
+            bool disconnectBeforeFinish, bool memberLeavesOnQr)
         {
             var story = Object.FindFirstObjectByType<GameStageStoryPresentation>();
             Assert.That(story, Is.Not.Null);
             Assert.That(story.player.sequence, Is.SameAs(story.afterStages[stage - 1]));
             Assert.That(story.BoundResult.players, Has.Length.EqualTo(3), "The existing record screen uses this room's three authoritative players.");
+            var shownViews = new List<string>();
+            story.player.ViewChanged += view => shownViews.Add(view.name);
             yield return Until(() => story.player.CurrentView != null && !story.player.UserInputBlocked,
                 "The selected stage afterstory releases input");
             story.player.Skip();
             yield return Until(() => story.IsLocalStoryComplete && story.player.CurrentView != null
                 && story.player.CurrentView.GetComponent<StoryStageClearControls>() != null,
                 "Afterstory retains its final clear picture");
-            Assert.That(session.LocalSealReady, Is.False, "Reading alone does not confirm readiness.");
+            Assert.That(session.LocalSealReady, Is.False, "Reading does not enter the retired shared preparation flow.");
             var clear = story.player.CurrentView.GetComponent<StoryStageClearControls>();
             Assert.That(clear.heading.gameObject.activeSelf, Is.False, "Every selected stage is this run's final stage.");
             Assert.That(clear.nextSeal.GetComponentInChildren<UnityEngine.UI.Text>(true).text, Is.EqualTo("마치기"));
-            clear.nextSeal.onClick.Invoke();
-            yield return Until(() => session.LocalSealReady && story.ReadyView.IsWaiting, "Host explicitly confirms the final result");
-            second.PresentationBusy = third.PresentationBusy = false;
-            second.Ready = third.Ready = true;
-            second.ReportResult(); third.ReportResult();
-            yield return Until(() => session.SealReadyCount == 3 && story.ReadyView.start.interactable,
-                "All three result confirmations permit the Host's summary button");
-            Assert.That(session.SummaryStarted, Is.False, "Readiness does not automatically leave the result.");
-            story.ReadyView.start.onClick.Invoke();
-            yield return Until(() => story.player.CurrentView != null
-                && story.player.CurrentView.GetComponent<SealRunSummary>() != null,
-                "Host starts this selected-stage summary");
-            yield return Until(() => second.SummaryStarted && third.SummaryStarted,
-                "Both packet members receive the summary authorization");
-            var summary = story.player.CurrentView.GetComponent<SealRunSummary>();
-            Assert.That(summary.stageIndices, Is.EqualTo(new[] { stage }));
-            Assert.That(story.player.sequence, Is.SameAs(Resources.Load<StorySequence>(
-                GameStageStoryPresentation.StaffDemoEndingResource(stage))));
-            Assert.That(summary.stageTimes, Has.Length.EqualTo(1));
-            Assert.That(summary.stageTimes[0].text, Is.EqualTo(SealRunSummary.FormatTime(session.ResultSnapshot.playedSeconds)));
-            Assert.That(summary.totalTime.text, Is.EqualTo(summary.stageTimes[0].text));
-            Assert.That(summary.contributions[0].text, Is.EqualTo("100%"), "Only this Host supplied actual new paint cells.");
-            Assert.That(session.State.battleSessionId, Is.EqualTo(battle));
-            yield return Until(() => story.player.IsReading
-                && story.player.CurrentView.continueButton.gameObject.activeInHierarchy, "Summary Continue appears");
-            story.player.CurrentView.continueButton.onClick.Invoke();
-            yield return Until(() => story.player.CurrentCutIndex == 1 && !story.player.IsTransitioning,
-                "Summary transitions into the selected stage ending");
-            var cuts = new HashSet<string>();
-            double until = Time.realtimeSinceStartupAsDouble + 30d;
-            while (story != null && story.player.IsPlaying && Time.realtimeSinceStartupAsDouble < until)
+            yield return Until(() => clear.nextSeal.interactable, "The local finish action is available after its input release.");
+            Assert.That(second.PresentationBusy && third.PresentationBusy, Is.True,
+                "Both other participants are deliberately still reading their afterstories.");
+            Assert.That(second.Ready || third.Ready, Is.False, "Neither participant sends a shared ready confirmation.");
+            if (disconnectBeforeFinish)
             {
-                cuts.Add(story.player.sequence.cuts[story.player.CurrentCutIndex].cutId);
-                story.player.Next();
-                yield return null;
+                ulong resultOwner = session.ResultLocalPlayerId;
+                network.Stop();
+                yield return Until(() => !network.IsConnected && network.CanChooseConnection,
+                    "The completed Host transport fully ends while its local result remains open.");
+                yield return null; yield return null;
+                Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.Completed));
+                Assert.That(session.ResultLocalPlayerId, Is.EqualTo(resultOwner), "The cached result keeps its real local owner after transport identity is lost.");
+                Assert.That(story.FinalPage == null || !story.FinalPage.gameObject.activeInHierarchy, Is.True,
+                    "Losing the connection cannot consume the participant's own finish action.");
+                Assert.That(story.player.CurrentView.GetComponent<StoryStageClearControls>(), Is.SameAs(clear),
+                    "The retained afterstory stays visible instead of opening an automatic ending.");
+                Assert.That(session.SummaryStarted, Is.False);
+                yield return Until(() => clear.nextSeal.interactable, "The offline completed result still allows its local finish action.");
             }
-            Assert.That(cuts, Is.EquivalentTo(Enumerable.Range(1, 6).Select(i => "Ending_0" + i)));
+            clear.nextSeal.onClick.Invoke();
             yield return Until(() => story.FinalPage != null && story.FinalPage.gameObject.activeInHierarchy
-                && story.FinalPage.IsReady, "The ending opens the real temporary QR page");
+                && story.FinalPage.IsReady, "The local finish action opens QR directly, without the other stories ending.");
+            Assert.That(story.ReadyView.IsWaiting || story.ReadyView.waitingPage.activeInHierarchy, Is.False,
+                "The staff route never opens the retired all-player preparation page.");
+            Assert.That(session.LocalSealReady, Is.False);
+            Assert.That(session.SealReadyCount, Is.Zero);
+            Assert.That(session.SummaryStarted || second.SummaryStarted || third.SummaryStarted, Is.False,
+                "Direct QR must not authorize or transmit a summary start.");
+            Assert.That(shownViews.Any(name => name.StartsWith("Ending_", StringComparison.Ordinal)
+                || name.StartsWith("SealRunSummary", StringComparison.Ordinal)), Is.False,
+                "No summary or ending picture may appear between the afterstory and QR.");
+            Assert.That(story.player.CurrentView == null
+                || story.player.CurrentView.GetComponent<SealRunSummary>() == null, Is.True);
             Assert.That(story.FinalPage.placeholder.activeSelf, Is.True);
             Assert.That(story.FinalPage.qrImage.gameObject.activeSelf, Is.False);
             Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.Completed), "The final page waits for a deliberate return action.");
-            Assert.That(network.IsConnected, Is.True);
+            Assert.That(session.State.battleSessionId, Is.EqualTo(battle));
+            Assert.That(network.IsConnected, Is.EqualTo(!disconnectBeforeFinish));
+
+            if (withholdLastResultReceipt)
+            {
+                Assert.That(third.LastState?.phase, Is.EqualTo(GameFlowPhase.Completed));
+                Assert.That(session.CanReturnHome, Is.False, "The Host must retain its final result until the late member acknowledges it.");
+                Assert.That(story.FinalPage.returnButton.interactable, Is.False,
+                    "QR is visible immediately while only its room-return action waits for result delivery.");
+                story.FinalPage.returnButton.onClick.Invoke();
+                yield return null; yield return null;
+                Assert.That(story.FinalPage.IsReady, Is.True, "A blocked callback must not consume the armed page and soft-lock return.");
+                Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.Completed));
+                Assert.That(network.IsConnected, Is.True);
+                third.ReportResultEnabled = true;
+                third.ReportResult();
+            }
+            yield return Until(() => session.CanReturnHome && story.FinalPage.returnButton.interactable,
+                "Result receipts enable return even while the other participants are still reading.");
+            Assert.That(second.PresentationBusy && third.PresentationBusy, Is.True);
+            Assert.That(second.Ready || third.Ready, Is.False);
+            if (memberLeavesOnQr)
+            {
+                third.Dispose(); third = null;
+                yield return Until(() => network.ParticipantCount == 2, "A real member departure is observed while QR is visible.");
+                Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.Completed), "A result departure does not turn the clear into GameOver.");
+                Assert.That(session.State.battleSessionId, Is.EqualTo(battle));
+                Assert.That(story.FinalPage.gameObject.activeInHierarchy && story.FinalPage.IsReady, Is.True);
+                yield return Until(() => story.FinalPage.returnButton.interactable, "The departed member cannot leave the QR return action blocked.");
+            }
             story.FinalPage.returnButton.onClick.Invoke();
             yield return Until(() => session.State.phase == GameFlowPhase.Home && !session.IsLoadingScene
                 && !network.IsConnected && session.SelectedDemoStage == 0
@@ -399,6 +446,7 @@ namespace Hapio.Tests
             public readonly LabNetwork Network;
             private PeerControl last;
             public bool PresentationBusy = true, Ready, ViewerOpen, SummaryStarted;
+            public bool ReportResultEnabled = true;
             public GameFlowState LastState => last?.state;
 
             public ProtocolPeer(string name, ushort port, int stage)
@@ -434,7 +482,7 @@ namespace Hapio.Tests
                     case GameFlowPhase.Completed: ReportResult(); break;
                 }
             }
-            public void ReportResult() { if (last != null && last.state.phase == GameFlowPhase.Completed) Send("result_ready"); }
+            public void ReportResult() { if (ReportResultEnabled && last != null && last.state.phase == GameFlowPhase.Completed) Send("result_ready"); }
             public void SendCurrent(string kind) => Send(kind);
             public string CurrentRequest(string kind)
             {
