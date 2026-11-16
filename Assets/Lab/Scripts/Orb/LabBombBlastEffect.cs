@@ -12,13 +12,13 @@ namespace C6Lab
     public sealed class LabBombBlastEffect : MonoBehaviour
     {
         public const string Text = "뻥이요!";
-        public const string ArtPath = "Bomb/BombPpeong";
+        public const string ArtPath = "Bomb/BombPpeongHanji";
         public const string OutlinePath = "Bomb/BombPpeongOutline";
         public const float Seconds = .9f;
         // In front of every orb, drum and item marker on the board plane (z = 0), facing its camera.
         private const float FrontZ = -1.5f;
         // The lettering's height, in blast reaches.
-        private const float LabelHeight = .45f;
+        private const float LabelHeight = 1.05f;
         private const int PuffCount = 7;
         private static readonly Color[] BurstColors =
         {
@@ -71,10 +71,11 @@ namespace C6Lab
                 bursts[i] = CreateSprite("Burst", Star(), BurstColors[i], 30 + i);
                 bursts[i].transform.localRotation = Quaternion.Euler(0f, 0f, BurstTurns[i]);
             }
-            Sprite art = Resources.Load<Sprite>(ArtPath), outline = Resources.Load<Sprite>(OutlinePath);
+            Sprite art = Resources.Load<Sprite>(ArtPath);
             if (art != null)
             {
-                if (outline != null) labelOutline = CreateSprite("뻥이요 Outline", outline, Color.white, 33);
+                // The new hanji artwork contains both the paper burst and brush lettering.
+                foreach (var burst in bursts) burst.gameObject.SetActive(false);
                 label = CreateSprite("뻥이요", art, Color.white, 34);
                 labelScale = LabelHeight * reach / Mathf.Max(.0001f, art.bounds.size.y);
             }

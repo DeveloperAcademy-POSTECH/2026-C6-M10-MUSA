@@ -159,9 +159,8 @@ namespace C6Lab
             if (bannerAlpha > 0f)
             {
                 banner.localScale = Vector3.one * BannerScale(since);
-                Color titleColor = LabFiveColorSparkle.ColorAt(Mathf.Repeat(time / Mathf.Max(.05f, colorSeconds), 5f) * .9f);
-                titleColor.a = bannerAlpha;
-                title.color = titleColor;
+                // Per-vertex rainbow supplies RGB; preserve the existing banner fade.
+                title.color = new Color(1f, 1f, 1f, bannerAlpha);
                 subtitle.color = new Color(1f, .97f, .88f, bannerAlpha);
             }
             // 부적: 피버 내내 공격 영역에서 같은 양으로 조금씩 흘러내린다.
@@ -265,6 +264,7 @@ namespace C6Lab
             text.raycastTarget = false;
             text.text = words;
             // 번쩍이는 하얀 화면 위에서도 읽히게 진한 테두리를 두 겹 두른다.
+            if (name == "Title") rect.gameObject.AddComponent<LabFeverRainbowText>();
             Outline outline = rect.gameObject.AddComponent<Outline>();
             outline.effectColor = InkColor;
             outline.effectDistance = new Vector2(3f, -3f);

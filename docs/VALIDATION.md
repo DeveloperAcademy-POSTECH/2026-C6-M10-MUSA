@@ -9386,3 +9386,16 @@ main `cef1579d`의 #760 관람·#762 땅따먹기 박/Game56·#727 튜토리얼�
 - **실행:** Unity Test Runner (팀원 Mac), 전체 EditMode Run All에서 새 레이어 검사 1개가 기대값 잘못으로 실패 → 기대값을 고친 뒤 EditMode / PlayMode 검사 **통과**(개수는 기록하지 않음).
 - **미실행:** iPhone 실기기, 여러 기기 실제 네트워크에서 60/30초 알림과 북 손 안내 위치.
 - **main `0478c1fe`(#779) 병합:** 충돌은 이 문서 기록 추가뿐이어서 양쪽을 보존했다. #779가 바꾼 72개 파일 중 이 PR이 바꾼 파일과 겹치는 것은 없다.
+
+
+## #783 전투 VFX 후속
+
+가장자리 세로 전달불가·한지 느낌표·무지개 피버타임·실패 멘트 박스·붉은 한지 뻥이요를 이 브랜치로 옮겼다. 최신 콤보 가이드·X 피드백·다른 게임 기능은 보존했다. 이전 별도 Unity checkout에서 통과한 결과를 이 checkout의 실행 결과로 간주하지 않는다. 이 checkout 검증은 아래에 별도로 기록한다.
+
+- 이 checkout 실행 결과: Unity 6000.6.5f1 MCP에서 LabGourdAlertTests·LabComboEffectLookTests·가장자리 카운트다운·폭발 표시/자동 정리 PlayMode 총 13/13 통과. 컴파일 Console 오류 0건. 최초 에디터 import가 자동 변경한 SVG meta와 URP 전역 설정은 원복했다.
+
+- 가장자리 사각 경계 후속: 글자 뒤 별도 붉은 Sprite 띠를 제거했다. 같은 Unity MCP에서 재컴파일 후 Console 오류 0건, 실제 LabOrbEdgeBlock을 PreviewScene에서 렌더해 사각 경계 없이 그라데이션과 글자만 남는 것을 육안 확인했다.
+
+- 먹선 안내·색상 일치·성공 색종이 후속: LabComboEffectLookTests PlayMode 9/9 통과(오색 전체 사용·사각 조각·터치 비차단·Clear 포함). 최초 테스트 요청은 Editor가 Playing 상태여서 시작되지 않았고 Stop 후 재요청했다. Unity PreviewScene 실제 컴포넌트로 화살표·손가락·오색 색종이·숫자/전달불가 색을 렌더해 육안 확인했다. 튜토리얼 전체 흐름과 iOS 실기기는 이번 후속에서 미실행. 스크립트 컴파일 오류는 없었으며 Console에는 Transport.ResetStatics의 Collection modified 생명주기 오류 1건이 별도로 있었다.
+
+- 전달불가/숫자 동시 점멸 후속: 최초 검사는 TextMesh 8비트 alpha와 Sprite float alpha의 반올림 차이로 1건 실패했다. 공통 alpha를 8비트로 맞춘 뒤 동시 점멸·숫자 교체 검사와 기존 가장자리 카운트다운 검사 PlayMode 2/2 통과. Unity 실제 컴포넌트의 34프레임을 고정 시각으로 렌더했다.

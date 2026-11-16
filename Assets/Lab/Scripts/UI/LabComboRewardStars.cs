@@ -21,6 +21,10 @@ namespace C6Lab
         public const string BujeokPath = "Combo/Bujeok";
         private Sprite fallingSprite;
         private bool bujeok;
+        private bool confetti;
+        private int paletteIndex;
+        private readonly Color[] particleColors = new Color[MaximumStars];
+        public bool UsesConfetti => confetti;
         private Color baseColor = StarColor;
         /// <summary>부적은 별보다 크게 그리는 대신 이 비율만큼만 떨어뜨린다 (#268).</summary>
         public const float BujeokCountScale = .5f;
@@ -53,9 +57,10 @@ namespace C6Lab
         public bool UsesBujeok => bujeok;
 
         /// <summary>HUD 레이어 안에 별 영역을 만든다. unit은 HUD 크기 비율(칸 크기 / 64).</summary>
-        public void Initialize(RectTransform parent, float hudUnit)
+        public void Initialize(RectTransform parent, float hudUnit, bool useConfetti = false)
         {
             if (area != null) return;
+            confetti = useConfetti;
             unit = Mathf.Max(.1f, hudUnit);
             area = new GameObject("Combo Reward Stars", typeof(RectTransform)).GetComponent<RectTransform>();
             area.gameObject.layer = parent.gameObject.layer;
@@ -64,8 +69,8 @@ namespace C6Lab
             area.anchorMax = Vector2.one;
             area.offsetMin = area.offsetMax = Vector2.zero;
             Sprite art = Resources.Load<Sprite>(BujeokPath);
-            bujeok = art != null;
-            fallingSprite = bujeok ? art : StarSprite();
+            bujeok = !confetti && art != null;
+            fallingSprite = confetti ? null : bujeok ? art : StarSprite();
             // 부적 그림은 제 색 그대로, 별은 노랗게 칠한다.
             baseColor = bujeok ? Color.white : StarColor;
             for (int i = 0; i < MaximumStars; i++)
@@ -76,7 +81,7 @@ namespace C6Lab
                 rect.anchorMin = rect.anchorMax = new Vector2(.5f, .5f);
                 Image image = rect.gameObject.AddComponent<Image>();
                 image.sprite = fallingSprite;
-                image.preserveAspect = true;
+                image.preserveAspect = !confetti;
                 image.raycastTarget = false;
                 image.color = baseColor;
                 rect.gameObject.SetActive(false);
@@ -138,7 +143,8 @@ namespace C6Lab
                 rect.localRotation = Quaternion.Euler(0f, 0f, rect.localEulerAngles.z + spin[i] * deltaTime);
                 // 떨어지는 길의 마지막 30%에서 점점 투명해진다.
                 float travel = Mathf.InverseLerp(top, bottomY, position.y);
-                Color color = baseColor;
+                if (confetti) rect.localScale = new Vector3(.25f + .75f * Mathf.Abs(Mathf.Cos(age[i] * 5f + sway[i])), 1f, 1f);
+                Color color = confetti ? particleColors[i] : baseColor;
                 color.a = travel < .7f ? 1f : Mathf.Clamp01(1f - (travel - .7f) / .3f);
                 stars[i].color = color;
                 if (position.y <= bottomY || color.a <= 0f)
@@ -157,6 +163,7 @@ namespace C6Lab
         {
             pending = 0f;
             Emitting = false;
+            paletteIndex = 0;
             ActiveCount = 0;
             for (int i = 0; i < MaximumStars; i++)
             {
@@ -172,10 +179,10 @@ namespace C6Lab
             if (slot < 0) return;
             Rect rect = area.rect;
             RectTransform star = stars[slot].rectTransform;
-            float size = Mathf.Lerp(18f, 34f, Next()) * unit;
+            float size = confetti ? Mathf.Lerp(12f, 22f, Next()) * unit : Mathf.Lerp(18f, 34f, Next()) * unit;
             // 부적은 세로로 긴 종이라 별보다 조금 크게, 폭은 높이의 절반으로 그린다.
             if (bujeok) size *= BujeokSizeScale;
-            star.sizeDelta = bujeok ? new Vector2(size * .5f, size) : new Vector2(size, size);
+            star.sizeDelta = confetti ? new Vector2(size * .58f, size) : bujeok ? new Vector2(size * .5f, size) : new Vector2(size, size);
             float x = Mathf.Lerp(rect.xMin + size, rect.xMax - size, Next());
             // 한꺼번에 쏟아질 때는 위쪽 띠 여러 높이에서 시작해 비처럼 보이게 한다.
             float y = rect.yMax + size + (burst ? Next() * (rect.yMax - bottomY) * .35f * -1f : 0f);
@@ -187,7 +194,10 @@ namespace C6Lab
             sway[slot] = Next() * Mathf.PI * 2f;
             age[slot] = 0f;
             alive[slot] = true;
-            stars[slot].color = baseColor;
+            star.localScale = Vector3.one;
+            // Same five inks as the five-color orb; each piece keeps its assigned color while falling.
+            particleColors[slot] = confetti ? (Color)LabFiveColorSparkle.FiveColors[paletteIndex++ % LabFiveColorSparkle.FiveColors.Length] : baseColor;
+            stars[slot].color = particleColors[slot];
             star.gameObject.SetActive(true);
         }
 
