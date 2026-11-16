@@ -54,7 +54,14 @@ namespace C6Lab
         public int ShortCount { get; private set; }
         public bool Playing => age >= 0f;
         public Vector2 ShakeOffset { get; private set; }
-        public bool VerticalGaugeMotionOnly { get; set; }
+        /// <summary>
+        /// #788 (Hapio 전투의 바뀐 하단 게이지): 게이지 6칸만 위로 살짝 떠올라 좌우로 잘게 흔들리다 제자리로 내려오고, 그동안 차 있는 칸
+        /// 전체가 빨갛게 바뀌었다 돌아온다. 크기는 바꾸지 않아 옆의 캐릭터 이름을 가리지 않는다. 끄면(Lab 실험 화면) 예전처럼 게이지가
+        /// 흔들리며 커지고 충전 중인 칸에 빨간 빛을 덮는다.
+        /// </summary>
+        public bool LiftGaugeMode { get; set; }
+        /// <summary>차 있는 칸이 지금 빨갛게 바뀐 정도 (0~1, #788)</summary>
+        public float GaugeRedAmount { get; private set; }
         /// <summary>게이지가 지금 커진 배율 (1 = 그대로, #718)</summary>
         public float GaugeScale { get; private set; } = 1f;
         /// <summary>가운데 경고("기운이 부족하다" + 느낌표)가 보이는지 (#718)</summary>
@@ -134,21 +141,34 @@ namespace C6Lab
             float warningSeconds = settings.ShortWarningEnabled ? settings.ShortWarningSeconds : 0f;
             float edgeSeconds = settings.ShortEdgeSeconds;
             if (age >= Mathf.Max(Mathf.Max(shakeSeconds, flashSeconds), Mathf.Max(warningSeconds, edgeSeconds))) { Stop(); return; }
-            float distance = settings.ShortShakeRatio * Mathf.Abs(source.rectTransform.rect.height);
-            ShakeOffset = ShakeAt(age, shakeSeconds, distance, settings.ShortShakeFrequency);
-            // Hapio places the character name beside the gauge, so the gauge keeps its horizontal bounds.
-            if (VerticalGaugeMotionOnly) ShakeOffset = new Vector2(0f, ShakeOffset.y);
+            float redness = FlashAmount(age, flashSeconds);
+            if (LiftGaugeMode)
+            {
+                // #788: the cells rise a little and jitter sideways a little, then settle back; the name beside them, the portrait
+                // and the panel stay. The filled cells themselves turn red for a moment (no red layer over them).
+                Vector2 jitter = ShakeAt(age, shakeSeconds, settings.ShortGaugeSideShake, settings.ShortShakeFrequency);
+                ShakeOffset = new Vector2(jitter.x, settings.ShortGaugeLiftHeight * LiftAmount(age, shakeSeconds));
+                GaugeScale = 1f;
+                bar.localScale = barScale;
+                GaugeRedAmount = settings.ShortFlashColor.a * redness;
+                if (source is LabShapeFillImage cells) cells.SetFilledFlash(settings.ShortFlashColor, GaugeRedAmount);
+                FlashAlpha = 0f; // no red layer over the cells in this mode
+                ShowFlash(settings.ShortFlashColor);
+            }
+            else
+            {
+                float distance = settings.ShortShakeRatio * Mathf.Abs(source.rectTransform.rect.height);
+                ShakeOffset = ShakeAt(age, shakeSeconds, distance, settings.ShortShakeFrequency);
+                // #718: the gauge swells a little and settles back while it shakes.
+                GaugeScale = 1f + (settings.ShortGaugePopScale - 1f) * PopAmount(age, shakeSeconds);
+                bar.localScale = barScale * GaugeScale;
+                FlashAlpha = settings.ShortFlashColor.a * redness;
+                ShowFlash(settings.ShortFlashColor);
+            }
             bar.anchoredPosition = barPosition + ShakeOffset;
-            // #718: the gauge swells a little and settles back while it shakes.
-            GaugeScale = 1f + (settings.ShortGaugePopScale - 1f) * PopAmount(age, shakeSeconds);
-            bar.localScale = VerticalGaugeMotionOnly
-                ? new Vector3(barScale.x, barScale.y * GaugeScale, barScale.z)
-                : barScale * GaugeScale;
             ShowWarning(settings, warningSeconds, shakeSeconds);
             EdgeAlpha = settings.ShortEdgeColor.a * FlashAmount(age, edgeSeconds);
             ShowEdges(settings.ShortEdgeColor);
-            FlashAlpha = settings.ShortFlashColor.a * FlashAmount(age, flashSeconds);
-            ShowFlash(settings.ShortFlashColor);
         }
 
         /// <summary>
@@ -160,6 +180,16 @@ namespace C6Lab
             float decay = 1f - age / Mathf.Max(.001f, seconds);
             int step = Mathf.FloorToInt(age * Mathf.Max(1f, frequency));
             return new Vector2(Jitter(step), .4f * Jitter(step + 97)) * (distance * decay);
+        }
+
+        /// <summary>게이지 6칸이 떠오른 정도 (0~1, #788): 흔들림의 앞 20%에 떠올라 머물다가 뒤 35%에 제자리로 내려온다.</summary>
+        public static float LiftAmount(float age, float seconds)
+        {
+            if (seconds <= 0f || age < 0f || age >= seconds) return 0f;
+            float u = age / seconds;
+            if (u < .2f) return Mathf.SmoothStep(0f, 1f, u / .2f);
+            if (u < .65f) return 1f;
+            return 1f - Mathf.SmoothStep(0f, 1f, (u - .65f) / .35f);
         }
 
         /// <summary>게이지가 커진 정도 (0~1): 흔들림의 앞 30%에 커지고 나머지 동안 원래 크기로 돌아온다 (#718).</summary>
@@ -234,6 +264,8 @@ namespace C6Lab
             age = -1f;
             ShakeOffset = WarningShake = Vector2.zero;
             GaugeScale = 1f;
+            if (GaugeRedAmount > 0f && source is LabShapeFillImage cells) cells.SetFilledFlash(Color.clear, 0f);
+            GaugeRedAmount = 0f;
             WarningScale = 0f;
             FlashAlpha = EdgeAlpha = 0f;
             if (flash != null && flash.gameObject.activeSelf) flash.gameObject.SetActive(false);

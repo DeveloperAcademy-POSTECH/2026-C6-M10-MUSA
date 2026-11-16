@@ -21,6 +21,12 @@ namespace C6Lab
         [Tooltip("충전 중인 칸이 빨갛게 빛나는 시간 (초)")]
         [SerializeField, Range(.05f, 1f)] private float shortFlashSeconds = .4f;
         [SerializeField] private Color shortFlashColor = new Color(1f, .16f, .12f, .95f);
+        [Header("스태미나 부족 (#788): 바뀐 하단 게이지(Hapio 전투)가 떠서 흔들리고 빨갛게")]
+        [Tooltip("게이지 6칸이 위로 떠오르는 높이 (Canvas 기준). 흔들림 시간 앞쪽에 떠올라 끝에 제자리로 내려온다. " +
+            "빨갛게 바뀌는 색·시간은 위 \"Short Flash Color\"·\"Short Flash Seconds\"를 쓴다.")]
+        [SerializeField, Range(0f, 20f)] private float shortGaugeLiftHeight = 6f;
+        [Tooltip("떠 있는 동안 좌우로 흔들리는 폭 (Canvas 기준). 옆의 캐릭터 이름을 가리지 않게 작게.")]
+        [SerializeField, Range(0f, 10f)] private float shortGaugeSideShake = 3f;
         [Header("스태미나 부족 (#718): 게이지가 커졌다 작아짐, 가운데 경고, 화면 가장자리 빨간빛")]
         [Tooltip("흔들리는 동안 게이지가 잠깐 커지는 크기 (1 = 그대로). 흔들림 시간 안에 커졌다가 원래 크기로 돌아온다.")]
         [SerializeField, Range(1f, 1.5f)] private float shortGaugePopScale = 1.15f;
@@ -48,6 +54,8 @@ namespace C6Lab
         public float ShortShakeRatio => Safe(shortShakeRatio, 0f, 1f, .3f);
         public float ShortShakeFrequency => Safe(shortShakeFrequency, 5f, 60f, 32f);
         public float ShortFlashSeconds => Safe(shortFlashSeconds, .05f, 1f, .4f);
+        public float ShortGaugeLiftHeight => Safe(shortGaugeLiftHeight, 0f, 20f, 6f);
+        public float ShortGaugeSideShake => Safe(shortGaugeSideShake, 0f, 10f, 3f);
         public float ShortGaugePopScale => Safe(shortGaugePopScale, 1f, 1.5f, 1.15f);
         public bool ShortWarningEnabled => shortWarningEnabled;
         public float ShortWarningSeconds => Safe(shortWarningSeconds, .3f, 2f, .8f);

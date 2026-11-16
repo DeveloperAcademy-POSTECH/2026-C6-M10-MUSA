@@ -284,7 +284,8 @@ namespace Hapio
         {
             if (bindings == null || theme == null) return;
             var shortage = bindings.sceneController.GetComponent<LabStaminaShortFeedback>();
-            if (shortage != null) shortage.VerticalGaugeMotionOnly = true;
+            // #788: on the character panel only the 6 cells rise, jitter a little sideways (clear of the name) and turn red.
+            if (shortage != null) shortage.LiftGaugeMode = true;
             bindings.sceneController.GetComponent<LabDrumMinimap>()?.Bind(session.Network, bindings.hud.rightPlayerCircle.rectTransform, theme.medium);
             var composition = bindings.hud.GetComponent<LabOrbHudComposition>();
             if (composition != null)
