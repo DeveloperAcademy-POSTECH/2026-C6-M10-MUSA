@@ -9541,3 +9541,13 @@ main `cef1579d`의 #760 관람·#762 땅따먹기 박/Game56·#727 튜토리얼�
 - **화면 확인(Mac Development 빌드, 임시 캡처 스크립트는 저장소에 남기지 않음):** 땅따먹기 1:1·2:2(청 P1·홍 P3 자리)의 전투 화면이 #785 이전 빌드와 같다. 스토리 3인 화면은 캐릭터 초상·패널 그대로다.
 - **남은 차이:** 스태미나 부족 연출의 색(빨간 층·가장자리·경고 글자)은 공유 `StaminaFeedbackProfile`을 쓰므로 #788에서 조정한 색이 땅따먹기에도 적용된다. #785 이전 색과 다르다.
 - **미검증:** 땅따먹기 3:3 전투 화면(Mac 한 대에서 6개 앱으로 방을 채우지 못함), 스태미나 부족 순간의 땅따먹기 화면, iPhone 실기기, 실제 Wi-Fi 여러 기기.
+
+## 마지막 일격 다시보기 자막의 캐릭터 이름 (2026-11-17)
+
+- **변경:** 자막 첫 줄이 던진 사람의 P번호("P1") 대신 전투 캐릭터 이름에 "의"를 붙인 것("불이의")이다. `GameBattleUiPresentation.FinishReplayOwner`가 기록의 P번호를 `LabHud.BattleCharacterIndex`로 바꾼다. 다시보기 기록·통신 형식·판정·접속 묶음은 바꾸지 않았다.
+- **검사 범위 선정:** UI 표현 변경이므로 전체 EditMode와 다시보기·전투 HUD 경로의 PlayMode를 실행했다. 전체 PlayMode는 실행하지 않았다.
+- **결과(Unity 6000.6.5f1 batch, macOS, 기준 main `7b17482b`):** EditMode 2598/2598 PASS. PlayMode `GameFinishReplayTests`·`GameSessionFinishTests`·`LabFinishReplay*`·`GameBattleUiPresentationTests`·`GameSceneFlowTests` 71개 중 68 PASS, 3 FAIL.
+  - 최초 실패 3건: `GameFinishReplayTests.TheFinalThrowIsReplayedThreeTimesThenTheResultOpensUnderTheCover(1~3)`. 새로 쓴 기대값이 솔로 던진 사람을 P1로 가정했는데, DEV 솔로는 고른 P번호가 없어 기록의 Slot이 0이고 이름 줄이 나오지 않는다(기존 동작). 기대값을 "Slot이 0보다 크면 캐릭터 이름"으로 고쳤다. 구현은 바꾸지 않았다.
+  - 재실행: `GameFinishReplayTests` 7/7 PASS(새 `TheCaptionNamesTheThrowersBattleCharacter` 포함: 1~5번 불이의·묵이의·솔이의·금옥의·만복의, 6번 "P6의", 0번은 이름 줄 없음).
+- **화면 확인(Mac Development 빌드, 임시 캡처 스크립트는 저장소에 남기지 않음):** DEV 솔로 1스테이지에서 실제 다시보기를 띄웠다. 솔로의 실제 자막은 전·후 모두 "마지막 일격!"만 나온다. 같은 다시보기 화면에서 같은 자막 함수로 1~5번 자막을 만들어 찍었다: 전 "P1"~"P5", 후 "불이의"~"만복의". 글꼴·크기·위치는 같다.
+- **미검증:** 여러 기기가 자리를 고른 방에서 실제로 전달된 P번호로 나오는 자막(멀티 다시보기), iPhone 실기기.
