@@ -316,7 +316,7 @@ namespace C6Lab
             }
             // A landed marker takes the place of its portrait. During a pass the
             // portraits remain visible and the marker travels at its usual size.
-            bool replacePortraits = compactGamePresentation && ringOrder.Count > 1;
+            bool replacePortraits = compactGamePresentation && battleCharacterPortraits != null && ringOrder.Count > 1;
             foreach (var drum in drums.Values)
             {
                 if (drum.Rect == null) continue;
@@ -366,7 +366,7 @@ namespace C6Lab
         private Sprite PlayerSprite(int number) =>
             CharacterSprite(LabHud.BattleCharacterIndex(network?.Snapshot, number)) ?? playerSprites[number - 1];
 
-        private float CircleRadius(int count) => compactGamePresentation ? 10.5f : HasConceptArt
+        private float CircleRadius(int count) => compactGamePresentation ? (battleCharacterPortraits != null ? 10.5f : 12f) : HasConceptArt
             ? (count <= 1 ? 35.5f : 18.5f)
             : count <= 3 ? 17f : count == 4 ? 15f : 13f;
 

@@ -9528,3 +9528,16 @@ main `cef1579d`의 #760 관람·#762 땅따먹기 박/Game56·#727 튜토리얼�
 - Editor에서 실제 불이 패널·칸 그림으로 그려 확인: 0.08초 시점 6칸 위로 6·좌우 1.66 이동, 차 있는 칸 빨강 0.94. 로컬 프로필의 빨간색(0.92, 0.34, 0.34, 커밋 전 값)은 불이의 분홍 칸과 가까워 약하게 보인다.
 - 검사 (실행은 NOT_RUN): `GameSceneFlowTests.ShortStaminaLiftsTheCellsTurnsThemRedShowsTheWarningAndFlashesTheEdgesOnTheBattleScreen`(실제 전투, 이름 바꿈·새 동작), `LabStaminaShortFeedbackTests` 2건 추가(떠오름·흔들림·빨강·제자리, 떠오름 곡선), 기존 Lab 검사 유지.
 - 스토리 각 캐릭터·땅따먹기 청홍 게이지 화면, iPhone 확인: NOT_RUN.
+
+## 땅따먹기 전투 HUD를 #785 이전으로 되돌림 (2026-11-17)
+
+- **변경:** 땅따먹기(2:2·3:3·DEV 솔로) 전투만 #785(PR #787) 이전 HUD를 쓴다. 내 표시·좌우 이웃은 청/홍 팀 배지, 하단은 파란 6칸 스태미나 줄과 테두리, 미니맵은 팀 마커와 P번호, 스태미나 부족은 예전 흔들림·커짐이다. `GameBattleUiPresentation.Build`가 `session.IsTerritory`로 `BuildTeamHud`/`BuildCharacterHud`를 고른다. 스토리 1~3스테이지의 캐릭터 HUD(#785)와 #788 게이지 떠오름은 그대로다. 판정·통신·공유 설정·접속 묶음은 바꾸지 않았다.
+- **검사 범위 선정:** UI 표현 변경이므로 전체 EditMode와 전투 HUD 호출 경로의 PlayMode를 실행했다. 전체 PlayMode는 이 변경으로는 실행하지 않았다(아래 main 실행 참고).
+- **기준 main `92884782` 전체 실행(변경 전, Unity 6000.6.5f1 batch, macOS):** EditMode 2598/2598 PASS. PlayMode 897개 중 896 PASS, 1 FAIL.
+  - 실패: `GameBattleUiPresentationTests.TerritoryUsesTeamMarkersForTwoAndThreePlayersWithoutChangingDrumOwnership`. #788(PR #789)이 게이지를 좌우로도 흔들고 크기를 고정하게 바꿨는데, 이 검사는 #785의 세로 전용 흔들림을 기대했다. 이번 변경으로 땅따먹기가 예전 HUD로 돌아가 이 검사의 땅따먹기 기대값을 #785 이전 것으로 되돌렸다.
+  - 이보다 앞선 두 번의 실행(`31a33945` 전체, 실패 fixture 재실행)은 Mac 덮개가 닫혀 잠자기로 끊겨 무효다(17분 실행이 4시간, 시간 초과 실패 14건·26건). 결과로 쓰지 않는다.
+- **변경 후(`fix/territory-classic-battle-hud`):** EditMode 2598/2598 PASS. PlayMode `GameBattleUiPresentationTests`·`GameSceneFlowTests`·`GameTutorialFlowTests`·`LabStaminaShortFeedbackTests`·`LabStaminaBarHudTests`·`LabOrbHudCompositionTests`·`LabTeamBattleScreenTests`·`LabPlayerPaintPatternUiTests` 83/83 PASS. 스토리 초상 검사를 추가한 뒤 `GameBattleUiPresentationTests`·`LabStaminaShortFeedbackTests`·`LabTeamBattleScreenTests`·`LabOrbHudCompositionTests`·`GameTutorialFlowTests` 30/30 PASS.
+- **검사 변경:** 땅따먹기 검사의 배지·미니맵·배치 기대값을 #785 이전(`fd6990b6`)과 같게 되돌렸다. 그 검사에만 있던 스토리용 단언(내 표시·이웃 초상과 이름, 미니맵 초상·지름 21, 도착한 북이 초상을 대신함)은 스토리 검사의 `AssertStoryCharacterSprites`로 옮겼다. `LabHud.BattleCharacterIndex`·`BattleTeamCaption`의 땅따먹기 분기는 Hapio에서 더는 쓰이지 않고 검사도 없다([확인 필요] 코드는 남겨 두었다).
+- **화면 확인(Mac Development 빌드, 임시 캡처 스크립트는 저장소에 남기지 않음):** 땅따먹기 1:1·2:2(청 P1·홍 P3 자리)의 전투 화면이 #785 이전 빌드와 같다. 스토리 3인 화면은 캐릭터 초상·패널 그대로다.
+- **남은 차이:** 스태미나 부족 연출의 색(빨간 층·가장자리·경고 글자)은 공유 `StaminaFeedbackProfile`을 쓰므로 #788에서 조정한 색이 땅따먹기에도 적용된다. #785 이전 색과 다르다.
+- **미검증:** 땅따먹기 3:3 전투 화면(Mac 한 대에서 6개 앱으로 방을 채우지 못함), 스태미나 부족 순간의 땅따먹기 화면, iPhone 실기기, 실제 Wi-Fi 여러 기기.
