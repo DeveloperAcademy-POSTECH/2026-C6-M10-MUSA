@@ -8,13 +8,18 @@ namespace Hapio
     public sealed class StaffDemoFinalPageConfig : ScriptableObject
     {
         public const string ResourcePath = "Hapio/Demo/Staff/FinalPageConfig";
-        public string heading = "함께 봉인해 주어 고맙소!";
-        [TextArea] public string message = "합이오 시연을 마쳤소.\n다음 만남을 기다리겠소.";
+        public const string DefaultHeading = "함께 봉인해주어 고맙소!";
+        public const string DefaultMessage = "아직 남은 요괴들이 있소.";
+        public const string DefaultQrCaption = "앱스토어에서 만나보시오.";
+        public const string DefaultReturnCaption = "수장고로 돌아가기";
+        public string heading = DefaultHeading;
+        [TextArea] public string message = DefaultMessage;
         [Tooltip("Replace with the final QR image. Empty uses an explicitly labelled placeholder, never a fake code.")]
         public Sprite qrSprite;
         [Tooltip("Document the destination encoded in qrSprite. The app does not manufacture a QR from this text.")]
         public string destinationUrl;
-        public string qrCaption = "QR 준비 중 · 추후 교체 예정";
+        public string qrCaption = DefaultQrCaption;
+        public string returnCaption = DefaultReturnCaption;
 
         public bool HasDestination => Uri.TryCreate(destinationUrl, UriKind.Absolute, out Uri destination)
             && (destination.Scheme == Uri.UriSchemeHttps || destination.Scheme == Uri.UriSchemeHttp);

@@ -9613,3 +9613,16 @@ main `cef1579d`의 #760 관람·#762 땅따먹기 박/Game56·#727 튜토리얼�
 - **환경:** Unity 6000.6.5f1 batch, macOS, 덮개를 연 상태에서 잠자기 방지(`caffeinate`). 실행 시간과 벽시계가 일치한다(PlayMode 1082초, 12:18~12:36 KST).
 - **결과:** EditMode 2605/2605 PASS. PlayMode 903/903 PASS.
 - **미검증:** iPhone 실기기, 실제 Wi-Fi 여러 기기. 화면 확인은 각 PR의 기록을 따른다.
+
+
+## #798 최신 main 시연 Release 빌드와 Figma 마무리 페이지 (2026-11-17)
+
+- **기준·범위:** main `2e3666b7`(게임 코드 `f21965fd`)에서 분기했다. Figma UI 페이지의 `시연용` 프레임 `5706:14518`(402×874)을 시연 전용 FinalPage Prefab·Config에 적용했다. 기존 자리·캐릭터 팝업, A/B 독립 3인·선택 스테이지 단판, 후일담→QR과 입력 해제·결과 수신 확인·1회 복귀 보호는 유지했다. 일반 게임·Lab·저장 Scene·전투 규칙·통신 형식은 변경하지 않았다.
+- **에셋·연결:** 기존 한지·구름을 재사용하고 Figma QR·박 그림·구분선 원본을 추가했다. 원본 해시·노드·QR 목적지는 `Art/UI/Showcase/FigmaSource.json`에 기록했다. 실제 QR의 합이오 App Store 주소를 Config에도 연결했다. QR 전용 갱신 메뉴는 로비나 보존된 구형 엔딩 사본을 재작성하지 않는다.
+- **검사 범위 선정:** QR 화면·문구·에셋 연결만 변경했으며 공통 입력/Scene 전환/ACK 조건은 유지했다. 컴파일·전체 EditMode와 영향 경로 PlayMode를 실행했다. main의 전체 PlayMode903건 기록은 위 main 전체 검사 절의 근거로 보존하며 이번 변경의 재실행으로 표기하지 않는다.
+- **자동 검사(Unity6000.6.5f1, macOS 연결 Editor):** 컴파일 오류0. 전체 EditMode **2605/2605 PASS**(41.76초). 관련 PlayMode **11/11 PASS**: `StaffDemoFinalPageTests`2(0.10초), `GameStaffStageDemoFlowTests`9(112.29초). 실패·skip·inconclusive0. Stage2 전용 런타임 문구, 완료 터치의 연속 작동 차단, 늦은 결과 수신 확인, 완료 후 연결 종료·다른 참가자 복귀·3인 재도전과 선택 화면 복귀를 포함한다.
+- **화면 확인:** Editor 실제390×844 GameView에서 저장된 Prefab과 런타임 Show(Config)로 최종 페이지를 렌더했다. 한지·구름·상단 박 그림의 crop·문구·QR·복귀 버튼1개가 표시됐다. 원본 QR 및 실제 화면 캡처를 CPU QR 판독기로 해독해 같은 App Store 주소를 확인했다. 이는 최종 페이지 렌더 확인이며 독립 Guest 화면이나 실기기 카메라 검증으로 표기하지 않는다. 촬영용 Canvas는 Play 종료로 제거하고 기존 GameView 크기로 복원했다.
+- **Mac Release:** 전용 Stage2 Only 빌드 성공, 오류0·앱 이름/내부 실행 파일·서명·식별 검증 통과. `합이오_쇼케이스`, `HapioShowcase`, staff-stage-2-only-demo, Development=false, Staff4·5706·공유 설정265개·3인·Stage2를 Manifest와 출력에서 확인했다. 새 Mac 앱은 실행하지 않았다.
+- **iOS 내보내기:** 첫 Xcode 내보내기는 Succeeded·식별 검증 통과였으나 기존 `com.unity.pipeline`의 빌드 전처리기가 iOS에도 Standalone Subtarget을 읽어 ArgumentException1건을 보고했다. 게임/셰이더/QR 오류가 아니다. 패키지 캐시 원본을 백업하고 Standalone일 때만 해당 값을 읽도록 조건1개를 임시 보정한 뒤 새 폴더로 다시 내보냈다. 재내보내기는 **Succeeded·오류0·식별 검증 통과**이며 세로 고정·로컬 네트워크/Bonjour 항목과 Xcode 프로젝트를 확인했다. Release에 Pipeline 런타임 assembly/임시 Resources가 포함되지 않았음을 확인했다. 이후 패키지 원본의 해시까지 복원하고 재컴파일했다. manifest·lock·게임 코드에 이 도구 보정을 넣지 않았다. 원본 패키지의 동일 오류가 추후 내보내기에서도 나타날 수 있으므로 첫 결과를 오류0으로 소급하지 않는다.
+- **보존 확인:** 빌드 전후 ProjectSettings·Build Settings·일반 로비·StageCatalog·저장 Scene 등41개 파일의 해시가 같고 기존 stash를 보존했다. Home Scene·StandaloneOSX 플랫폼·Play 종료 상태로 복원했다. 빌드 결과와 원시 로그·기기 식별자·개인 경로·스크린샷은 커밋하지 않는다.
+- **미검증:** Mac Release 앱 실제 실행, iPhone/iPad 설치·터치·실기기 QR 인식, 실제 Wi-Fi/핫스팟/이더넷 여러 기기 동시 플레이. 로비/캐릭터 팝업의 추가 Figma 변경은 이번 범위 밖이다.

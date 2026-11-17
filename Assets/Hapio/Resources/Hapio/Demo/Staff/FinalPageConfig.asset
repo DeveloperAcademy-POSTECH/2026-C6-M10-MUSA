@@ -12,8 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4eb5a9e55a29849d19a823ee49b1ee1f, type: 3}
   m_Name: FinalPageConfig
   m_EditorClassIdentifier: Hapio.Runtime::Hapio.StaffDemoFinalPageConfig
-  heading: "\uD568\uAED8 \uBD09\uC778\uD574 \uC8FC\uC5B4 \uACE0\uB9D9\uC18C!"
-  message: "\uD569\uC774\uC624 \uC2DC\uC5F0\uC744 \uB9C8\uCCE4\uC18C.\n\uB2E4\uC74C \uB9CC\uB0A8\uC744 \uAE30\uB2E4\uB9AC\uACA0\uC18C."
-  qrSprite: {fileID: 0}
-  destinationUrl: 
-  qrCaption: "QR \uC900\uBE44 \uC911 \xB7 \uCD94\uD6C4 \uAD50\uCCB4 \uC608\uC815"
+  heading: "\uD568\uAED8 \uBD09\uC778\uD574\uC8FC\uC5B4 \uACE0\uB9D9\uC18C!"
+  message: "\uC544\uC9C1 \uB0A8\uC740 \uC694\uAD34\uB4E4\uC774 \uC788\uC18C."
+  qrSprite: {fileID: 21300000, guid: 39c32be93650f4271a9a23cd07e6d353, type: 3}
+  destinationUrl: https://apps.apple.com/kr/app/hap-io/id6827923355?l=en-GB
+  qrCaption: "\uC571\uC2A4\uD1A0\uC5B4\uC5D0\uC11C \uB9CC\uB098\uBCF4\uC2DC\uC624."
+  returnCaption: "\uC218\uC7A5\uACE0\uB85C \uB3CC\uC544\uAC00\uAE30"

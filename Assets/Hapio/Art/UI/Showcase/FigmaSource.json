@@ -1,0 +1,32 @@
+{
+  "sourceFileKey": "wW7ny7lNQ4DXNJ4kD46AuR",
+  "sourcePage": "UI",
+  "sourceFrame": "시연용",
+  "sourceNodeId": "5706:14518",
+  "referenceSize": [
+    402,
+    874
+  ],
+  "qrDestination": "https://apps.apple.com/kr/app/hap-io/id6827923355?l=en-GB",
+  "assets": [
+    {
+      "file": "02cb8.png",
+      "figmaNodeId": "5706:14864",
+      "sha256": "4562a7d0db2b7540c95a3ccb27b84a36f2c82dfeca8297c7a838dd269e4b1f16"
+    },
+    {
+      "file": "a5d40.png",
+      "figmaNodeId": "5706:14870",
+      "sha256": "91d07dee7458f0db5458a058471372ed4248e3818cb473c71cf1aa7eac8b3199"
+    },
+    {
+      "file": "e101f.svg",
+      "figmaNodeId": "5706:14871",
+      "sha256": "40d094c3503ef40e087e544b7542388f93e806d5594051c2c86a9cae39ab1c1d"
+    }
+  ],
+  "reusedAssets": [
+    "Assets/Hapio/Art/Story/StageStories/624c4.png",
+    "Assets/Hapio/Art/Story/StageStories/5e97a.png"
+  ]
+}

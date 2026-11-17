@@ -366,8 +366,15 @@ namespace Hapio.Tests
                 "No summary or ending picture may appear between the afterstory and QR.");
             Assert.That(story.player.CurrentView == null
                 || story.player.CurrentView.GetComponent<SealRunSummary>() == null, Is.True);
-            Assert.That(story.FinalPage.placeholder.activeSelf, Is.True);
-            Assert.That(story.FinalPage.qrImage.gameObject.activeSelf, Is.False);
+            Assert.That(story.FinalPage.placeholder.activeSelf, Is.False,
+                "The Figma final page shows its assigned QR, not the retired temporary placeholder.");
+            Assert.That(story.FinalPage.qrImage.gameObject.activeSelf, Is.True);
+            Assert.That(story.FinalPage.qrImage.sprite, Is.Not.Null);
+            Assert.That(story.FinalPage.heading.text, Is.EqualTo("함께 봉인해주어 고맙소!"));
+            Assert.That(story.FinalPage.message.text, Is.EqualTo("아직 남은 요괴들이 있소."));
+            Assert.That(story.FinalPage.qrCaption.text, Is.EqualTo("앱스토어에서 만나보시오."));
+            Assert.That(story.FinalPage.returnButton.GetComponentInChildren<UnityEngine.UI.Text>(true).text,
+                Is.EqualTo("수장고로 돌아가기"), "The staff route must retain the authored Figma caption.");
             Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.Completed), "The final page waits for a deliberate return action.");
             Assert.That(session.State.battleSessionId, Is.EqualTo(battle));
             Assert.That(network.IsConnected, Is.EqualTo(!disconnectBeforeFinish));

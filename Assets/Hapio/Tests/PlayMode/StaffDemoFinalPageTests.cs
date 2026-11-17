@@ -79,7 +79,16 @@ namespace Hapio.Tests
                     "The owned finishing pointers must actually be pressed before the page is shown.");
                 page = StaffDemoFinalPage.Create(parent.transform);
                 int returns = 0;
-                page.Show(Resources.Load<StaffDemoFinalPageConfig>(StaffDemoFinalPageConfig.ResourcePath), () => returns++);
+                var config = Resources.Load<StaffDemoFinalPageConfig>(StaffDemoFinalPageConfig.ResourcePath);
+                Assert.That(config, Is.Not.Null);
+                using (C6Lab.LabGameBuildVariant.OverrideStaffStageDemoForTests(true))
+                using (C6Lab.LabGameBuildVariant.OverrideStaffStageTwoOnlyForTests(true))
+                {
+                    Assert.That(C6Lab.LabGameBuildVariant.IsStaffStageTwoOnly, Is.True);
+                    page.Show(config, () => returns++);
+                    Assert.That(page.returnButton.GetComponentInChildren<UnityEngine.UI.Text>(true).text,
+                        Is.EqualTo(config.returnCaption), "Stage 2 Only must not replace the authored Figma return caption.");
+                }
                 Assert.That(page.IsReady || page.returnButton.interactable, Is.False);
                 page.returnButton.onClick.Invoke();
                 yield return null;

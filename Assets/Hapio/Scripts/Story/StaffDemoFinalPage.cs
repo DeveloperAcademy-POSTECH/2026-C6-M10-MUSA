@@ -34,19 +34,17 @@ namespace Hapio
             transform.SetAsLastSibling();
             returnToSelection = onReturn;
             this.canReturn = canReturn;
-            heading.text = config != null ? config.heading : "함께 봉인해 주어 고맙소!";
-            message.text = config != null ? config.message : "합이오 시연을 마쳤소.";
+            heading.text = config != null ? config.heading : StaffDemoFinalPageConfig.DefaultHeading;
+            message.text = config != null ? config.message : StaffDemoFinalPageConfig.DefaultMessage;
             bool hasQr = config != null && config.qrSprite != null;
             qrImage.sprite = hasQr ? config.qrSprite : null;
             qrImage.preserveAspect = true;
             qrImage.gameObject.SetActive(hasQr);
             placeholder.SetActive(!hasQr);
             qrCaption.text = hasQr ? config.qrCaption : "QR 준비 중 · 추후 교체 예정";
-            if (C6Lab.LabGameBuildVariant.IsStaffStageTwoOnly)
-            {
-                var label = returnButton.GetComponentInChildren<UnityEngine.UI.Text>(true);
-                if (label != null) label.text = "방 선택으로 돌아가기";
-            }
+            var label = returnButton.GetComponentInChildren<UnityEngine.UI.Text>(true);
+            if (label != null) label.text = config != null && !string.IsNullOrEmpty(config.returnCaption)
+                ? config.returnCaption : StaffDemoFinalPageConfig.DefaultReturnCaption;
             returnButton.onClick.AddListener(Return);
             armRoutine = StartCoroutine(ArmAfterRelease());
         }
