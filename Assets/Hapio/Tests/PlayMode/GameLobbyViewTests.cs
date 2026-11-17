@@ -318,6 +318,21 @@ namespace Hapio.Tests
             Assert.That(session.Network.TargetParticipantCount, Is.EqualTo(5));
             Assert.That(session.Network.LocalSlotNumber, Is.Zero);
             Assert.That(session.PendingRooms, Is.Empty);
+            // Five seats: lines run down from the two upper seats, so their names sit above them; the others stay below.
+            yield return null;
+            view = View();
+            float[] seatY = Enumerable.Range(0, 5)
+                .Select(i => ((RectTransform)view.slotButtons[i].transform).anchoredPosition.y).ToArray();
+            int upperSeats = 0;
+            for (int i = 0; i < 5; i++)
+            {
+                bool upper = seatY[i] >= seatY.Max() - 1f;
+                if (upper) upperSeats++;
+                float labelY = view.localLabels[i].rectTransform.anchoredPosition.y;
+                if (upper) Assert.That(labelY, Is.GreaterThan(seatY[i] + 31.5f), "P" + (i + 1) + " name above its seat");
+                else Assert.That(labelY, Is.LessThan(seatY[i] - 31.5f), "P" + (i + 1) + " name below its seat");
+            }
+            Assert.That(upperSeats, Is.EqualTo(2));
         }
 
         [Category("Bonjour")]
