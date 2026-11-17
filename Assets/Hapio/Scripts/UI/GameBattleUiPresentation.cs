@@ -14,7 +14,7 @@ namespace Hapio
         private GameSession session;
         private RectTransform parts, paint;
         private Image underline;
-        private GameUiFrame paintFrame;
+        private GameUiFrame paintFrame, staminaFrame;
         private Image staminaPanel, staminaNameArt;
         private Text staminaName;
         private Sprite[] staminaPanels, staminaNames;
@@ -134,11 +134,13 @@ namespace Hapio
             Style(hud.hpText, theme.bold, 21, GameBattleUiColors.Ink);
             if (oldPaint != parent && oldPaint != parts) oldPaint.gameObject.SetActive(false);
 
-            BuildCharacterHud(hud, parent);
+            // Land grab keeps the HUD from before #785 (team badges, the blue stamina row, the local team ring).
+            if (territory) BuildTeamHud(hud);
+            else BuildCharacterHud(hud, parent);
             var minimap = bindings.sceneController.GetComponent<LabDrumMinimap>() ?? bindings.sceneController.gameObject.AddComponent<LabDrumMinimap>();
             minimap.compactGamePresentation = true; minimap.size = new Vector2(100,72); minimap.lineWidth = 2;
             minimap.labelSize = 10; minimap.lineColor = GameBattleUiColors.Brown; minimap.otherTextColor = GameBattleUiColors.Ink;
-            minimap.battleCharacterPortraits = hud.battleCharacterPortraits;
+            minimap.battleCharacterPortraits = territory ? null : hud.battleCharacterPortraits;
             minimap.playerSprites = theme.minimapBadges; minimap.drumIconSprite = theme.drumIcon; minimap.soloDrumSprite = theme.drumIcon;
             minimap.teamBlueMarker = theme.teamBlueMarker; minimap.teamRedMarker = theme.teamRedMarker;
             minimap.teamPairConnector = theme.teamPairConnector;
@@ -149,6 +151,38 @@ namespace Hapio
             plateRenderer = plate; originalPlateEnabled = plate.enabled; originalPlateMaterial = plate.sharedMaterial;
             plateMaterial = new Material(plate.sharedMaterial) { name = "Hapio Board UI (local instance)" };
             plate.sharedMaterial = plateMaterial;
+        }
+
+        private void BuildTeamHud(LabHud hud)
+        {
+            RectTransform stamina = (RectTransform)hud.staminaFill.transform.parent;
+            const float badgeWidth = 45, badgeHeight = 47, staminaWidth = 241, staminaGap = 9;
+            const float designCenterX = 201, bottomRowTop = 800;
+            // Use the same center anchor and fixed offsets so the row stays centered as the canvas resizes.
+            Guide(stamina, designCenterX - staminaWidth * .5f, bottomRowTop + 4, staminaWidth, 39);
+            stamina.anchoredPosition = new Vector2((badgeWidth + staminaGap) * .5f, 0);
+            foreach (Transform child in stamina) if (child != hud.staminaFill.transform) child.gameObject.SetActive(false);
+            Place(hud.staminaFill.rectTransform, 9, 8, 223, 23);
+            var cellSurface = GameFigmaStrokeLibrary.Find("StaminaCells");
+            if (cellSurface != null)
+                Place(hud.staminaFill.rectTransform, 9 + cellSurface.offset.x, 8 + cellSurface.offset.y,
+                    cellSurface.exportSize.x, cellSurface.exportSize.y);
+            hud.staminaFill.sprite = theme.staminaCells; hud.staminaFill.color = Color.white;
+            if (hud.staminaFill is LabShapeFillImage cells)
+            { cells.filledColor = GameBattleUiColors.Blue; cells.emptyColor = GameBattleUiColors.BlueEmpty; }
+            staminaFrame = Frame(stamina, "Stage Stamina Outline", new Rect(0,0,241,39), GameBattleUiColors.Brown, 6, 11);
+            staminaFrame.UseBrush("Stamina");
+            hud.playerCircleSprites = theme.playerBadges;
+            hud.territoryBlueBadges = theme.territoryBlueBadges;
+            hud.territoryRedBadges = theme.territoryRedBadges;
+            RectTransform localBadge = hud.localPlayerCircle.rectTransform;
+            Guide(localBadge, designCenterX - badgeWidth * .5f, bottomRowTop, badgeWidth, badgeHeight);
+            localBadge.anchoredPosition = new Vector2(-(staminaWidth + staminaGap) * .5f, 0);
+            const float neighborTop = 472f;
+            if (hud.leftPlayerCircle != null)
+                Guide(hud.leftPlayerCircle.rectTransform, -8, neighborTop, badgeWidth, badgeHeight);
+            if (hud.rightPlayerCircle != null)
+                Guide(hud.rightPlayerCircle.rectTransform, 365, neighborTop, badgeWidth, badgeHeight);
         }
 
         private void BuildCharacterHud(LabHud hud, RectTransform parent)
@@ -228,6 +262,7 @@ namespace Hapio
 
         private void RefreshCharacterStamina()
         {
+            if (staminaPanel == null) return;
             var net = session.Network;
             var snapshot = net?.Snapshot;
             var players = snapshot?.players;
@@ -271,6 +306,7 @@ namespace Hapio
             Color ink = light ? GameBattleUiColors.Light : GameBattleUiColors.Ink;
             underline.sprite = light ? theme.underlineLight : theme.underlineDark;
             bindings.stageLabel.color = ink; bindings.hud.hpText.color = ink; paintFrame.color = ink;
+            if (staminaFrame != null) staminaFrame.color = theme.staminaBorders[appliedStage - 1];
             plateMaterial.mainTexture = theme.BoardFor(appliedStage);
             boardArtwork.texture = theme.BoardFor(appliedStage);
             Rect bounds = BoardDesignBounds(appliedStage);
@@ -285,13 +321,13 @@ namespace Hapio
             if (bindings == null || theme == null) return;
             var shortage = bindings.sceneController.GetComponent<LabStaminaShortFeedback>();
             // #788: on the character panel only the 6 cells rise, jitter a little sideways (clear of the name) and turn red.
-            if (shortage != null) shortage.LiftGaugeMode = true;
+            if (shortage != null) shortage.LiftGaugeMode = staminaPanel != null;
             bindings.sceneController.GetComponent<LabDrumMinimap>()?.Bind(session.Network, bindings.hud.rightPlayerCircle.rectTransform, theme.medium);
             var composition = bindings.hud.GetComponent<LabOrbHudComposition>();
             if (composition != null)
             {
                 composition.presentationBackdrop = boardArtwork.rectTransform;
-                composition.presentationStaminaPanel = staminaPanel.rectTransform;
+                composition.presentationStaminaPanel = staminaPanel != null ? staminaPanel.rectTransform : null;
             }
         }
 
@@ -312,6 +348,8 @@ namespace Hapio
             var bar = bindings.hud.TeamBar;
             if (bar != null && bar != dressedTeamBar)
             { DressTeamBar(bar, GameBattleUiTheme.LightInkForStage(appliedStage)); dressedTeamBar = bar; }
+            if (bar != null && bar.LocalRing != null)
+                bar.LocalRing.color = LabTeams.TeamOf(session.Network.Snapshot, session.Network.LocalPlayerId) == LabTeam.Blue ? GameBattleUiColors.Blue : GameBattleUiColors.Fire;
         }
 
         private void DressTeamBar(LabTeamBar bar, bool light)
@@ -370,6 +408,12 @@ namespace Hapio
             var frame = root.gameObject.AddComponent<GameUiFrame>(); frame.color = border; frame.stroke = stroke; frame.radius = radius; frame.raycastTarget = false;
             frame.UseBrush(name == "Time" ? "Time" : name == "Paper" ? "Pause" : name == "Figma Team Outline" ? "TeamPaint" : "Paint");
             return root;
+        }
+        private static GameUiFrame Frame(Transform parent, string name, Rect box, Color color, float stroke, float radius)
+        {
+            var rect = parent.Find(name) as RectTransform ?? Rect(parent,name); Place(rect,box.x,box.y,box.width,box.height);
+            var frame = rect.GetComponent<GameUiFrame>() ?? rect.gameObject.AddComponent<GameUiFrame>();
+            frame.color=color; frame.stroke=stroke; frame.radius=radius; frame.raycastTarget=false; return frame;
         }
         private static Image Picture(Transform parent, string name, Sprite sprite, Rect box)
         {
