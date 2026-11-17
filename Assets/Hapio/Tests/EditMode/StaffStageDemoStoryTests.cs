@@ -57,17 +57,40 @@ namespace Hapio.Tests
         }
 
         [Test]
-        public void FinalPageHasAnExplicitTemporaryQrAndOneSavedReturnAction()
+        public void FinalPageMatchesTheFigmaShowcaseAndRetainsOneSavedReturnAction()
         {
             var page = Require<GameObject>(Root + "/FinalPage.prefab").GetComponent<StaffDemoFinalPage>();
             var config = Require<StaffDemoFinalPageConfig>(Root + "/FinalPageConfig.asset");
             Assert.That(page, Is.Not.Null);
-            Assert.That(page.GetComponent<StoryPageFit>().referenceSize, Is.EqualTo(new Vector2(402, 874)));
-            Assert.That(page.placeholder.GetComponentsInChildren<UnityEngine.UI.Text>(true).Any(text => text.text.Contains("준비 중")), Is.True);
+            Assert.That(page.GetComponent<StoryPageFit>().referenceSize, Is.EqualTo(new Vector2(402, 874)),
+                "The saved page uses Figma UI / 시연용 frame 5706:14518 without recreating game scenes.");
+            Assert.That(config.heading, Is.EqualTo("함께 봉인해주어 고맙소!"));
+            Assert.That(config.message, Is.EqualTo("아직 남은 요괴들이 있소."));
+            Assert.That(config.qrCaption, Is.EqualTo("앱스토어에서 만나보시오."));
+            Assert.That(config.returnCaption, Is.EqualTo("수장고로 돌아가기"));
+            Assert.That(page.heading.text, Is.EqualTo(config.heading));
+            Assert.That(page.message.text, Is.EqualTo(config.message));
+            Assert.That(page.qrCaption.text, Is.EqualTo(config.qrCaption));
             Assert.That(page.GetComponentsInChildren<UnityEngine.UI.Button>(true), Has.Length.EqualTo(1));
-            Assert.That(config.qrSprite, Is.Null);
-            Assert.That(config.destinationUrl, Is.Null.Or.Empty);
-            Assert.That(config.HasDestination, Is.False);
+            Assert.That(page.returnButton.GetComponentInChildren<UnityEngine.UI.Text>(true).text,
+                Is.EqualTo(config.returnCaption));
+            Assert.That(config.qrSprite, Is.Not.Null, "The final page must show the actual Figma QR rather than its retired placeholder.");
+            Assert.That(config.HasDestination, Is.True, "Record the actual HTTP(S) destination encoded in the supplied QR image.");
+            Assert.That(config.destinationUrl, Is.EqualTo("https://apps.apple.com/kr/app/hap-io/id6827923355?l=en-GB"),
+                "The documented destination must match the decoded source QR rather than an invented or stale link.");
+            Assert.That(page.qrImage.sprite, Is.EqualTo(config.qrSprite));
+            Assert.That(page.qrImage.preserveAspect, Is.True);
+            Assert.That(AssetDatabase.GetAssetPath(config.qrSprite), Is.EqualTo("Assets/Hapio/Art/UI/Showcase/02cb8.png"));
+            AssertFigmaBounds(page.qrImage.rectTransform, new Rect(109.25f, 396.52f, 182.009f, 185.388f));
+            var topCrop = page.transform.Find("Page/GourdTop") as RectTransform;
+            Assert.That(topCrop, Is.Not.Null, "Preserve the top gourd artwork crop from the source frame.");
+            AssertFigmaBounds(topCrop, new Rect(77, 267, 247.421f, 138.201f));
+            Assert.That(topCrop.GetComponent<UnityEngine.UI.RectMask2D>(), Is.Not.Null);
+            Assert.That(page.qrImage.raycastTarget, Is.False, "The QR artwork cannot intercept the saved return action.");
+            Assert.That(page.qrImage.gameObject.activeSelf, Is.True);
+            Assert.That(page.placeholder.activeSelf, Is.False);
+            Assert.That(page.placeholder.GetComponentsInChildren<UnityEngine.UI.Text>(true).Any(text => text.text.Contains("준비 중")), Is.True,
+                "Keep an explicit fallback when an editor intentionally clears the QR assignment.");
             Assert.DoesNotThrow(() => Type.GetType("Hapio.Editor.StaffStageDemoStoryAssets, Assembly-CSharp-Editor", true)
                 .GetMethod("Validate", BindingFlags.Static | BindingFlags.Public).Invoke(null, null));
         }
@@ -82,6 +105,14 @@ namespace Hapio.Tests
             var config = ScriptableObject.CreateInstance<StaffDemoFinalPageConfig>();
             try { config.destinationUrl = url; Assert.That(config.HasDestination, Is.EqualTo(expected)); }
             finally { Object.DestroyImmediate(config); }
+        }
+
+        private static void AssertFigmaBounds(RectTransform rect, Rect bounds)
+        {
+            Assert.That(rect.anchoredPosition.x, Is.EqualTo(bounds.x).Within(.01f));
+            Assert.That(rect.anchoredPosition.y, Is.EqualTo(-bounds.y).Within(.01f));
+            Assert.That(rect.sizeDelta.x, Is.EqualTo(bounds.width).Within(.01f));
+            Assert.That(rect.sizeDelta.y, Is.EqualTo(bounds.height).Within(.01f));
         }
 
         private static T Require<T>(string path) where T : Object

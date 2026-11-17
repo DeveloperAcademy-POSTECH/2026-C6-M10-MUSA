@@ -12,6 +12,8 @@ namespace Hapio.Editor
         public const string Root = "Assets/Hapio/Resources/Hapio/Demo/Staff";
         public const string FinalPagePath = Root + "/FinalPage.prefab";
         public const string FinalPageConfigPath = Root + "/FinalPageConfig.asset";
+        public const string FinalPageArt = "Assets/Hapio/Art/UI/Showcase/";
+        public const string FinalPageDestination = "https://apps.apple.com/kr/app/hap-io/id6827923355?l=en-GB";
         private static readonly string[] YokaiNames = { "구미호", "야광귀", "지귀" };
 
         public static string StageRoot(int stage) => Root + "/Stage" + RequireStage(stage);
@@ -47,8 +49,34 @@ namespace Hapio.Editor
                 ending.cuts[1] = first;
                 Save(ending);
             }
-            if (AssetDatabase.LoadAssetAtPath<StaffDemoFinalPageConfig>(FinalPageConfigPath) == null)
-                AssetDatabase.CreateAsset(ScriptableObject.CreateInstance<StaffDemoFinalPageConfig>(), FinalPageConfigPath);
+            UpdateFinalPage();
+        }
+
+        [MenuItem("Hapio/Demo/Update Showcase Final Page")]
+        public static void UpdateFinalPage()
+        {
+            if (Application.isPlaying) throw new InvalidOperationException("Stop Play before authoring demo assets.");
+            // This entry point intentionally leaves the retained summary/ending copies and every Scene alone.
+            var qr = Require<Sprite>(FinalPageArt + "02cb8.png");
+            Require<Sprite>(FinalPageArt + "a5d40.png");
+            Require<Sprite>(FinalPageArt + "e101f.svg");
+            Require<Sprite>(StageStoryAssets.Art + "624c4.png");
+            Require<Sprite>(StageStoryAssets.Art + "5e97a.png");
+            EnsureFolder(Root);
+            var config = AssetDatabase.LoadAssetAtPath<StaffDemoFinalPageConfig>(FinalPageConfigPath);
+            if (config == null)
+            {
+                config = ScriptableObject.CreateInstance<StaffDemoFinalPageConfig>();
+                AssetDatabase.CreateAsset(config, FinalPageConfigPath);
+            }
+            config.heading = StaffDemoFinalPageConfig.DefaultHeading;
+            config.message = StaffDemoFinalPageConfig.DefaultMessage;
+            config.qrSprite = qr;
+            config.qrCaption = StaffDemoFinalPageConfig.DefaultQrCaption;
+            config.returnCaption = StaffDemoFinalPageConfig.DefaultReturnCaption;
+            // Decoded from the Figma source QR; the player displays that artwork without manufacturing a code.
+            config.destinationUrl = FinalPageDestination;
+            Save(config);
             CreateFinalPage();
             Validate();
         }
@@ -78,11 +106,8 @@ namespace Hapio.Editor
                 || page.qrImage == null || page.placeholder == null || page.returnButton == null
                 || page.GetComponent<StoryPageFit>() == null)
                 throw new InvalidOperationException("The saved staff demo final page is incomplete.");
-            if (!string.IsNullOrEmpty(config.destinationUrl) && !config.HasDestination)
-                throw new InvalidOperationException("The demo QR destination must be an absolute HTTP(S) URL or empty.");
-            if (config.qrSprite == null && !page.placeholder.GetComponentsInChildren<UnityEngine.UI.Text>(true)
-                .Any(text => text.text.Contains("준비 중")))
-                throw new InvalidOperationException("An unassigned QR must use an explicit placeholder.");
+            if (config.qrSprite == null || !config.HasDestination)
+                throw new InvalidOperationException("The saved showcase page needs its real QR sprite and a verified absolute HTTP(S) destination.");
         }
 
         private static T RequireRuntimeAsset<T>(string path, Func<string, Object> load) where T : Object => load(path) as T
@@ -130,30 +155,97 @@ namespace Hapio.Editor
                 var background = page.gameObject.AddComponent<UnityEngine.UI.Image>();
                 background.color = GameBattleUiColors.Light; // TextColor/SecondaryLightIvory/200
                 background.raycastTarget = true;
-                view.heading = Text(page, "Heading", "함께 봉인해 주어 고맙소!", new Rect(25, 120, 352, 58), 27, true);
-                view.message = Text(page, "Message", "합이오 시연을 마쳤소.\n다음 만남을 기다리겠소.", new Rect(35, 197, 332, 70), 20, false);
-                RectTransform qr = Rect("QRImage", page, new Rect(101, 330, 200, 200));
-                view.qrImage = qr.gameObject.AddComponent<UnityEngine.UI.Image>();
-                view.qrImage.color = Color.white; view.qrImage.raycastTarget = false;
-                view.qrImage.preserveAspect = true; qr.gameObject.SetActive(false);
-                RectTransform placeholder = Rect("QRPlaceholder", page, new Rect(101, 330, 200, 200));
+                page.gameObject.AddComponent<UnityEngine.UI.RectMask2D>();
+
+                // Figma UI / 시연용 5706:14518. Decorative art is clipped to the authored 402×874 page.
+                Picture(page, "Parchment", new Rect(-74, -167, 704, 1041),
+                    Require<Sprite>(StageStoryAssets.Art + "624c4.png"));
+                var cloud = Require<Sprite>(StageStoryAssets.Art + "5e97a.png");
+                Picture(page, "CloudLeft", new Rect(-250, 167, 337, 112), cloud);
+                Picture(page, "CloudLowerLeft", new Rect(-175, 744, 337, 112), cloud);
+                Picture(page, "CloudUpperRight", new Rect(286, 31, 235, 78), cloud);
+                Picture(page, "CloudLowerRight", new Rect(304, 666, 235, 78), cloud);
+
+                view.heading = FinalText(page, "Heading", StaffDemoFinalPageConfig.DefaultHeading,
+                    new Rect(44, 141, 314, 44), 34, true, Color.black);
+                view.message = FinalText(page, "Message", StaffDemoFinalPageConfig.DefaultMessage,
+                    new Rect(64, 203, 276, 30), 20, true, Hex("68645C"));
+
+                RectTransform gourd = Rect("GourdTop", page, new Rect(77, 267, 247.421f, 138.201f));
+                gourd.gameObject.AddComponent<UnityEngine.UI.RectMask2D>();
+                Picture(gourd, "Artwork", new Rect(-.0008f * 247.421f, 0, 1.0016f * 247.421f, 1.5294f * 138.201f),
+                    Require<Sprite>(FinalPageArt + "a5d40.png"));
+                Picture(page, "GourdSeparator", new Rect(119.56f, 392.36f, 162.287f, 4.02f),
+                    Require<Sprite>(FinalPageArt + "e101f.svg"));
+
+                view.qrImage = Picture(page, "QRImage", new Rect(109.25f, 396.52f, 182.009f, 185.388f),
+                    Require<Sprite>(FinalPageArt + "02cb8.png"));
+                view.qrImage.preserveAspect = true;
+                var border = Rect("QRBorder", view.qrImage.transform, new Rect(0, 0, 182.009f, 185.388f))
+                    .gameObject.AddComponent<GameUiFrame>();
+                border.radius = 12.582f; border.stroke = 5.033f;
+                border.color = Color.black; border.raycastTarget = false;
+
+                // Kept for an explicitly unconfigured/null preview; the shipped page always has real QR art.
+                RectTransform placeholder = Rect("QRPlaceholder", page, new Rect(109.25f, 396.52f, 182.009f, 185.388f));
                 var placeholderFill = placeholder.gameObject.AddComponent<UnityEngine.UI.Image>();
                 placeholderFill.color = GameLobbySeatColors.Disabled; // TextColor/PrimaryBrown/300
                 placeholderFill.raycastTarget = false;
-                Text(placeholder, "PlaceholderCaption", "QR\n준비 중", new Rect(15, 55, 170, 90), 28, true);
+                FinalText(placeholder, "PlaceholderCaption", "QR\n준비 중", new Rect(8, 45, 166.009f, 90),
+                    28, true, GameLobbySeatColors.Ink);
                 view.placeholder = placeholder.gameObject;
-                view.qrCaption = Text(page, "QRCaption", "QR 준비 중 · 추후 교체 예정", new Rect(30, 548, 342, 52), 16, false);
-                RectTransform action = Rect("ReturnToSelection", page, new Rect(36, 712, 330, 62));
-                var fill = action.gameObject.AddComponent<UnityEngine.UI.Image>();
-                fill.color = GameLobbySeatColors.Ready; // TextColor/DarkRed/500***
+                view.placeholder.SetActive(false);
+                view.qrCaption = FinalText(page, "QRCaption", StaffDemoFinalPageConfig.DefaultQrCaption,
+                    new Rect(100.8f, 608.91f, 200.4f, 30), 21.472f, false, Color.black);
+
+                RectTransform action = Rect("ReturnToSelection", page, new Rect(27, 768, 349, 58));
+                var fill = action.gameObject.AddComponent<C6Lab.LabRoundedGraphic>();
+                fill.radius = 27; fill.color = Color.white; fill.raycastTarget = true;
                 view.returnButton = action.gameObject.AddComponent<UnityEngine.UI.Button>();
                 view.returnButton.targetGraphic = fill;
-                var caption = Text(action, "Caption", "스테이지 선택으로", new Rect(8, 12, 314, 38), 23, true);
-                caption.color = GameLobbySeatColors.LightText; // TextColor/SecondaryLightIvory/100
+                var colors = view.returnButton.colors;
+                // TextColor/DarkRed/500*** and SecondaryLightIvory/100 use their canonical token components.
+                colors.normalColor = colors.highlightedColor = colors.selectedColor = GameLobbySeatColors.Ready;
+                colors.pressedColor = Hex("692B21"); // TextColor/DarkRed/700
+                colors.disabledColor = GameLobbySeatColors.Ready; colors.colorMultiplier = 1;
+                view.returnButton.colors = colors;
+                FinalText(action, "Caption", StaffDemoFinalPageConfig.DefaultReturnCaption,
+                    new Rect(8, 0, 333, 58), 24, true, GameLobbySeatColors.LightText, TextAnchor.MiddleCenter);
                 PrefabUtility.SaveAsPrefabAsset(root, FinalPagePath);
             }
             finally { Object.DestroyImmediate(root); }
         }
+
+        private static UnityEngine.UI.Image Picture(Transform parent, string name, Rect bounds, Sprite sprite)
+        {
+            var image = Rect(name, parent, bounds).gameObject.AddComponent<UnityEngine.UI.Image>();
+            image.sprite = sprite;
+            image.color = Color.white;
+            image.raycastTarget = false;
+            return image;
+        }
+
+        private static UnityEngine.UI.Text FinalText(Transform parent, string name, string value, Rect bounds,
+            float size, bool bold, Color color, TextAnchor alignment = TextAnchor.UpperCenter)
+        {
+            var placement = Rect(name, parent, bounds);
+            var text = Rect("Text", placement, new Rect(0, 0, bounds.width, bounds.height))
+                .gameObject.AddComponent<UnityEngine.UI.Text>();
+            text.font = Require<Font>("Assets/Lab/Art/Fonts/" + (bold ? "ShillaCultureBold.otf" : "Shilla_Culture(M).otf"));
+            // Match StageStoryAssets.Element: integer visual font snapping with a fixed, higher raster size.
+            text.fontSize = Mathf.CeilToInt(Mathf.Max(32, size));
+            float scale = Mathf.FloorToInt(size + .5f) / (float)text.fontSize;
+            text.rectTransform.localScale = Vector3.one * scale;
+            text.rectTransform.sizeDelta /= scale;
+            text.text = value; text.color = color; text.raycastTarget = false;
+            text.horizontalOverflow = HorizontalWrapMode.Overflow;
+            text.verticalOverflow = VerticalWrapMode.Overflow;
+            text.alignment = alignment;
+            return text;
+        }
+
+        private static Color Hex(string value) => ColorUtility.TryParseHtmlString("#" + value, out Color color)
+            ? color : throw new InvalidOperationException("Invalid final-page colour: " + value);
 
         private static RectTransform Rect(string name, Transform parent, Rect bounds)
         {
@@ -161,13 +253,6 @@ namespace Hapio.Editor
             rect.SetParent(parent, false);
             StoryStageReadyView.Place(rect, bounds);
             return rect;
-        }
-        private static UnityEngine.UI.Text Text(Transform parent, string name, string value, Rect bounds, float size, bool bold)
-        {
-            var ink = GameLobbySeatColors.Ink; // TextColor/PrimaryBrown/700
-            return StageStoryAssets.Element(parent, new StageStoryAssets.Node { name = name, nodeId = "735", kind = "text", text = value,
-                x = bounds.x, y = bounds.y, width = bounds.width, height = bounds.height, size = size, bold = bold, align = "CENTER",
-                color = new StageStoryAssets.Rgb { r = ink.r, g = ink.g, b = ink.b } }).GetComponentInChildren<UnityEngine.UI.Text>();
         }
         private static int RequireStage(int stage) => stage >= 1 && stage <= 3 ? stage : throw new ArgumentOutOfRangeException(nameof(stage));
         private static void SetTop(RectTransform rect, float y) => rect.anchoredPosition = new Vector2(rect.anchoredPosition.x, -y);
