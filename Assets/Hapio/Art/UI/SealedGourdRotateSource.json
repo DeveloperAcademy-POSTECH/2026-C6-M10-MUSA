@@ -1,0 +1,23 @@
+{
+  "figmaFileKey": "wW7ny7lNQ4DXNJ4kD46AuR",
+  "frameNodeId": "5348:4217",
+  "componentNodeId": "5380:6778",
+  "asset": "Assets/Hapio/Resources/Hapio/UI/SealedGourdRotate.png",
+  "source": "User-supplied original transparent PNG matching the Figma rotation indicator; copied unchanged.",
+  "png": [
+    663,
+    664
+  ],
+  "sha256": "98cad45e0e90789210e16945dc5ea9f56fb2de4617ce718c57deb3a9919b9aa7",
+  "layout": {
+    "reference": [
+      402,
+      874
+    ],
+    "x": 56,
+    "y": 360,
+    "width": 165.655,
+    "height": 165.959,
+    "raycastTarget": false
+  }
+}

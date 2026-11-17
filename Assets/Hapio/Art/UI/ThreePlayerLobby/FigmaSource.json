@@ -5,7 +5,8 @@
   "frames": [
     "5820:31051",
     "5820:32875",
-    "5820:32908"
+    "5820:32908",
+    "5820:33177"
   ],
   "characterSection": "5820:31181",
   "exportScale": 4,
@@ -494,6 +495,116 @@
       "sha256": "246ba45a1b5069be519bd4f1cbb058d761e0ed2c8045ec1dcc842a8546136f75",
       "sourceNodeId": "5820:32884",
       "asset": "Assets/Hapio/Resources/Hapio/UI/ThreePlayerLobby/Taken.png"
+    },
+    {
+      "name": "SeatHostMe1",
+      "scale": 4,
+      "png": [
+        232,
+        292
+      ],
+      "sha256": "36dc3b620961f111977e550e3e82fb84d8712d2ea5418db2769f3a28b129ee1e",
+      "asset": "Assets/Hapio/Resources/Hapio/UI/ThreePlayerLobby/SeatHostMe1.png",
+      "sourceNodeId": "5902:6508"
+    },
+    {
+      "name": "SeatHostMe2",
+      "scale": 4,
+      "png": [
+        232,
+        292
+      ],
+      "sha256": "43cea35e7e44970f56e521613f1b86a1ae7d86c3cbc5402bb97469c4a5a30195",
+      "asset": "Assets/Hapio/Resources/Hapio/UI/ThreePlayerLobby/SeatHostMe2.png",
+      "sourceNodeId": "5902:6512"
+    },
+    {
+      "name": "SeatHostMe3",
+      "scale": 4,
+      "png": [
+        232,
+        292
+      ],
+      "sha256": "7dbd0fb5ece2e0bb83b2e46de33bfb48caff3c9e4f1daa021241930a056dadd5",
+      "asset": "Assets/Hapio/Resources/Hapio/UI/ThreePlayerLobby/SeatHostMe3.png",
+      "sourceNodeId": "5902:6511"
+    },
+    {
+      "name": "SeatHostMe4",
+      "scale": 4,
+      "png": [
+        232,
+        292
+      ],
+      "sha256": "6bf2d046ff81e4c0c8200b014605e9a7588a52c3edde481eb1ed59d836a7a8bd",
+      "asset": "Assets/Hapio/Resources/Hapio/UI/ThreePlayerLobby/SeatHostMe4.png",
+      "sourceNodeId": "5902:6509"
+    },
+    {
+      "name": "SeatHostMe5",
+      "scale": 4,
+      "png": [
+        232,
+        292
+      ],
+      "sha256": "348d5310b79a3eb6e2c05b6713aa05e7b3744cf58387c5b51ff0e70f01af72e8",
+      "asset": "Assets/Hapio/Resources/Hapio/UI/ThreePlayerLobby/SeatHostMe5.png",
+      "sourceNodeId": "5902:6510"
+    },
+    {
+      "name": "SeatMe1",
+      "scale": 4,
+      "png": [
+        232,
+        292
+      ],
+      "sha256": "cae70d2ad5c9e42e6f885f01b5ddacb638d0d7b932fbc0800718cf8f6c1086c8",
+      "asset": "Assets/Hapio/Resources/Hapio/UI/ThreePlayerLobby/SeatMe1.png",
+      "sourceNodeId": "5902:6727"
+    },
+    {
+      "name": "SeatMe2",
+      "scale": 4,
+      "png": [
+        232,
+        292
+      ],
+      "sha256": "719202cf2b86c791b4249a525f8e829069385077caf09fb44589a146786e5953",
+      "asset": "Assets/Hapio/Resources/Hapio/UI/ThreePlayerLobby/SeatMe2.png",
+      "sourceNodeId": "5902:6731"
+    },
+    {
+      "name": "SeatMe3",
+      "scale": 4,
+      "png": [
+        232,
+        292
+      ],
+      "sha256": "aa119549ed88e7d72ba27b5c386d81dc3dca02ebf5cda825acfef647d2ae159a",
+      "asset": "Assets/Hapio/Resources/Hapio/UI/ThreePlayerLobby/SeatMe3.png",
+      "sourceNodeId": "5902:6730"
+    },
+    {
+      "name": "SeatMe4",
+      "scale": 4,
+      "png": [
+        232,
+        292
+      ],
+      "sha256": "3535013f6e413b86101640b0285b173455bb5574114ed805bf2c8ed8699a5478",
+      "asset": "Assets/Hapio/Resources/Hapio/UI/ThreePlayerLobby/SeatMe4.png",
+      "sourceNodeId": "5902:6728"
+    },
+    {
+      "name": "SeatMe5",
+      "scale": 4,
+      "png": [
+        232,
+        292
+      ],
+      "sha256": "00a205c9e6624aa4c77dd2e73a1bca008a1f434128d2726c26832f3f3d0c7fac",
+      "asset": "Assets/Hapio/Resources/Hapio/UI/ThreePlayerLobby/SeatMe5.png",
+      "sourceNodeId": "5902:6729"
     }
   ],
   "characterIds": {
@@ -544,5 +655,6 @@
       "nameColor": "#312B23",
       "overlay": "ChoiceCheck"
     }
-  }
+  },
+  "localSeatSection": "5902:6334"
 }

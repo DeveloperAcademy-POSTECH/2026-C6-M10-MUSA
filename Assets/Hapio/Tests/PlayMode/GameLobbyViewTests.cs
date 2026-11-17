@@ -328,7 +328,7 @@ namespace Hapio.Tests
             Assert.That(session.Network.LocalSlotNumber, Is.EqualTo(2));
             Assert.That(session.Network.LocalCharacter, Is.EqualTo(4));
             Assert.That(session.Network.GetCharacterOwner(4), Is.EqualTo(session.Network.LocalPlayerId));
-            Assert.That(view.slotImages[1].sprite, Is.SameAs(GameThreePlayerLobbyArt.Seat(4, true)),
+            Assert.That(view.slotImages[1].sprite, Is.SameAs(GameThreePlayerLobbyArt.Seat(4, true, true)),
                 "The Host chose P2 and 금옥: choose the actual Host+character artwork, never P1 or the slot number.");
             Assert.That(view.slotImages[0].sprite, Is.SameAs(GameThreePlayerLobbyArt.Empty(1)),
                 "P1 stays empty when the Host selected P2.");
@@ -732,6 +732,50 @@ namespace Hapio.Tests
         }
 
         [Category("Bonjour")]
+        [UnityTest]
+        public IEnumerator FourPlayerStoryUsesOriginalComponentsForEveryCharacter() => StoryComponents(4);
+
+        [UnityTest]
+        public IEnumerator FivePlayerStoryUsesOriginalComponentsForEveryCharacter() => StoryComponents(5);
+
+        private IEnumerator StoryComponents(int capacity)
+        {
+            session.Network.SetTargetParticipantCount(capacity);
+            session.Host();
+            yield return Until(() => session.State.phase == GameFlowPhase.Lobby && !session.IsLoadingScene,
+                "Story lobby for original seat components");
+            var network = session.Network;
+            var view = View();
+            var slots = (LabPlayerSlots)typeof(LabNetwork).GetField("playerSlots",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(network);
+            // P2 deliberately differs from the character ID, and the Host is not fixed to P1.
+            for (int character = 1; character <= 5; character++)
+            {
+                Assert.That(network.RequestPlayerSlot(2, character), Is.True);
+                yield return null; yield return null;
+                Assert.That(view.slotImages[1].sprite, Is.SameAs(GameThreePlayerLobbyArt.Seat(character, true, true)));
+                Assert.That(view.localLabels[1].gameObject.activeSelf, Is.False, "The authored name and badges must not be duplicated.");
+                Assert.That(view.slotImages[1].rectTransform.localEulerAngles, Is.EqualTo(Vector3.zero));
+                Assert.That(((RectTransform)view.slotButtons[1].transform).rect.size, Is.EqualTo(new Vector2(63, 63)));
+                Assert.That(network.RequestPlayerSlot(0), Is.True);
+                Assert.That(slots.TrySelect(77, 3, character, out string reason), Is.True, reason);
+                yield return null; yield return null;
+                Assert.That(view.slotImages[2].sprite, Is.SameAs(GameThreePlayerLobbyArt.Seat(character, false, false)),
+                    "Another player's component must not inherit my highlight or Host badge.");
+                Assert.That(view.localLabels[2].gameObject.activeSelf, Is.False);
+                if (capacity == 5)
+                {
+                    var split = view.slotImages[2].transform.Find("Upper Seat Component");
+                    Assert.That(split != null && split.gameObject.activeSelf, Is.True);
+                    foreach (var layer in split.GetComponentsInChildren<UnityEngine.UI.Image>())
+                        Assert.That(layer.sprite, Is.SameAs(view.slotImages[2].sprite), "Move the original name pixels above the connecting lines without substituting artwork.");
+                }
+                slots.Release(77);
+                yield return null; yield return null;
+                Assert.That(view.slotImages[2].sprite, Is.SameAs(view.emptySlots[2]), "Clearing restores this capacity's original empty marker.");
+            }
+        }
+
         [UnityTest]
         public IEnumerator DevSoloAfterLeavingASixPlayerRoomStartsAloneInsteadOfReopeningIt()
         {

@@ -42,10 +42,17 @@ namespace Hapio
             for (int i = 0; i < view.slotImages.Length; i++)
             {
                 var image = view.slotImages[i];
+                image.enabled = true;
+                var upperComponent = image.transform.Find("Upper Seat Component");
+                if (upperComponent != null) upperComponent.gameObject.SetActive(false);
                 if (!view.slotButtons[i].gameObject.activeSelf) continue;
-                if (!team && players == 3)
+                // Character components are shared by every story capacity, not only the three-seat layout.
+                // Keep each layout's existing empty markers and anchors outside the three-player design.
+                if (!team && (players == 3 || view.SeatCharacter(i) > 0))
                 {
-                    PresentThreePlayerSeat(view, i);
+                    PresentStorySeat(view, i);
+                    if (players == 5 && ((RectTransform)view.slotButtons[i].transform).anchoredPosition.y >= topRow - 1f)
+                        PresentUpperStoryName(view, i);
                     continue;
                 }
                 // A story seat taken with a character shows its portrait upright, filling the 63-unit seat.
@@ -78,14 +85,15 @@ namespace Hapio
             else if (!allChosen) text.text = team ? "땅따먹기 대기 중" : "요괴 봉인 대기";
         }
 
-        private static void PresentThreePlayerSeat(GameLobbyView view, int index)
+        private static void PresentStorySeat(GameLobbyView view, int index)
         {
             int character = view.SeatCharacter(index);
             bool host = view.SeatIsHost(index), held = view.SeatIsHeld(index);
+            bool local = view.SeatIsLocal(index) && !held;
             var image = view.slotImages[index];
-            image.sprite = character > 0 ? GameThreePlayerLobbyArt.Seat(character, host)
+            image.sprite = character > 0 ? GameThreePlayerLobbyArt.Seat(character, host, local)
                 : GameThreePlayerLobbyArt.Empty(index + 1);
-            Rect bounds = character > 0 ? GameThreePlayerLobbyArt.SeatBounds(character, host)
+            Rect bounds = character > 0 ? GameThreePlayerLobbyArt.SeatBounds(character, host, local)
                 : GameThreePlayerLobbyArt.EmptyBounds(index + 1);
             Place(image.transform, bounds.x, bounds.y, bounds.width, bounds.height);
             image.type = Image.Type.Simple;
@@ -106,5 +114,45 @@ namespace Hapio
 
         private static void Place(Transform target, float x, float y, float width, float height)
             => LabLobbyView.Place((RectTransform)target, x, y, width, height);
+
+        // Keep the original component pixels, but put its name above the two upper seats where the
+        // pentagon lines run downwards. Rect masks separate the authored name without editing the PNG.
+        private static void PresentUpperStoryName(GameLobbyView view, int index)
+        {
+            var source = view.slotImages[index];
+            var root = source.transform.Find("Upper Seat Component");
+            if (root == null)
+            {
+                root = new GameObject("Upper Seat Component", typeof(RectTransform)).transform;
+                root.SetParent(source.transform, false);
+                for (int i = 0; i < 2; i++)
+                {
+                    var mask = new GameObject(i == 0 ? "Portrait" : "Name", typeof(RectTransform), typeof(RectMask2D)).transform;
+                    mask.SetParent(root, false);
+                    var art = new GameObject("Original Component", typeof(RectTransform), typeof(Image)).GetComponent<Image>();
+                    art.transform.SetParent(mask, false); art.raycastTarget = false;
+                }
+            }
+            root.gameObject.SetActive(true);
+            float scale = 63f / 38.347824f;
+            int character = view.SeatCharacter(index);
+            bool framed = view.SeatIsHost(index) || view.SeatIsLocal(index) && !view.SeatIsHeld(index);
+            var bounds = source.rectTransform;
+            float shift = (63f - 42f * scale) * .5f;
+            float sourceTop = -bounds.anchoredPosition.y - bounds.rect.height * .5f;
+            float nameTop = framed ? (character == 5 ? 51 : 53) * scale
+                : 46 * scale - (sourceTop - shift);
+            Place(root, 0, 0, bounds.rect.width, bounds.rect.height);
+            for (int i = 0; i < 2; i++)
+            {
+                var mask = root.GetChild(i);
+                Place(mask, 0, i == 0 ? 0 : -40 - sourceTop,
+                    bounds.rect.width, i == 0 ? nameTop : bounds.rect.height - nameTop);
+                var art = mask.GetChild(0).GetComponent<Image>();
+                art.sprite = source.sprite; art.color = source.color;
+                Place(art.transform, 0, i == 0 ? 0 : -nameTop, bounds.rect.width, bounds.rect.height);
+            }
+            source.enabled = false;
+        }
     }
 }

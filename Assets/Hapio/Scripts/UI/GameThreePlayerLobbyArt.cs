@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace Hapio
 {
-    /// <summary>Original Figma presentation assets for three-person story lobbies; owns no seat or character rules.</summary>
+    /// <summary>Original Figma story seat components and three-player picker assets; owns no seat or character rules.</summary>
     public static class GameThreePlayerLobbyArt
     {
         public const string Root = "Hapio/UI/ThreePlayerLobby/";
@@ -26,10 +26,10 @@ namespace Hapio
             return Load("Empty" + seat);
         }
 
-        public static Sprite Seat(int character, bool host)
+        public static Sprite Seat(int character, bool host, bool local = false)
         {
             RequireCharacter(character);
-            return Load((host ? "SeatHost" : "Seat") + character);
+            return Load((local ? host ? "SeatHostMe" : "SeatMe" : host ? "SeatHost" : "Seat") + character);
         }
 
         public static Rect EmptyBounds(int seat)
@@ -39,13 +39,13 @@ namespace Hapio
             return new Rect((63f - size.x) * .5f, (63f - size.y) * .5f, size.x, size.y);
         }
 
-        public static Rect SeatBounds(int character, bool host)
+        public static Rect SeatBounds(int character, bool host, bool local = false)
         {
-            Vector2 size = Seat(character, host).rect.size * (.25f * FrameScale);
+            Vector2 size = Seat(character, host, local).rect.size * (.25f * FrameScale);
             // Preserve the reference frame's occupied/empty ratio: a 42-unit avatar becomes 69 units,
             // centred on the same 63-unit hit rectangle used by the empty logical circle.
             float shift = (63f - 42f * FrameScale) * .5f;
-            Vector2 origin = host
+            Vector2 origin = host || local
                 ? new Vector2(-8f * FrameScale + shift, -(character == 5 ? 5f : 7f) * FrameScale + shift)
                 : SeatOffsets[character - 1] * (FrameScale / 1.5f) + Vector2.one * shift;
             return new Rect(origin, size);

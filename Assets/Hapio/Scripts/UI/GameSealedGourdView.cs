@@ -12,7 +12,8 @@ namespace Hapio
 
         public RectTransform design;
         public RawImage background;
-        private GameFigmaSurface resetArtwork, rotateArtwork;
+        private GameFigmaSurface resetArtwork;
+        private Image rotateArtwork;
         private GameSealedGourdArt art;
         private GameScreen screen;
         private RawImage shadow;
@@ -52,7 +53,12 @@ namespace Hapio
             viewport.SetParent(design,false);GameViewerHelpUi.Place(viewport,0,128,402,414);
             AddViewerLabel(design, "Rotate Hint", "봉인이 잘 되었는지 둘러보시오.", theme.bold,
                 GameBattleUiColors.SecondaryLightIvory800, 63, 693, 276, 22);
-            rotateArtwork = GameViewerHelpUi.Surface(design, "GourdRotateDark", 271, 180, 67.992f, 67.992f);
+            // Figma 5348:4217 / 5380:6778; retain the supplied transparent canvas and its authored placement.
+            rotateArtwork = GameViewerHelpUi.Rect(design, "Gourd Rotation Indicator", 56, 360, 165.655f, 165.959f)
+                .gameObject.AddComponent<Image>();
+            rotateArtwork.sprite = Resources.Load<Sprite>("Hapio/UI/SealedGourdRotate");
+            rotateArtwork.preserveAspect = true;
+            rotateArtwork.raycastTarget = false;
             PrepareButton(screen.resetViewerButton, 326, 49, 39, 38);
             resetArtwork = GameViewerHelpUi.Surface(screen.resetViewerButton.transform, "GourdResetDark", 0, 0, 39, 38);
             BuildReturnButton(screen.closeViewerButton, theme.medium);
@@ -122,7 +128,6 @@ namespace Hapio
             background.texture = art.stageBackgrounds[index];
             bool bright = stage == 1;
             resetArtwork.Show(bright ? "GourdResetDark" : "GourdResetLight");
-            rotateArtwork.Show(bright ? "GourdRotateDark" : "GourdRotateLight");
             coverAspect = -1f;
         }
         private float coverAspect = -1f;

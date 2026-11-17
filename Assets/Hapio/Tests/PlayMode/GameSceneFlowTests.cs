@@ -2206,13 +2206,17 @@ namespace Hapio.Tests
                     Assert.That(hint.text, Is.EqualTo("봉인이 잘 되었는지 둘러보시오."));
                     var resetArt = screen.resetViewerButton.GetComponentInChildren<GameFigmaSurface>();
                     Assert.That(resetArt.SurfaceName, Is.EqualTo(stage == 1 ? "GourdResetDark" : "GourdResetLight"));
-                    var rotationArt = viewer.design.GetComponentsInChildren<GameFigmaSurface>()
-                        .Single(item => item.SurfaceName.StartsWith("GourdRotate"));
-                    Assert.That(rotationArt.SurfaceName, Is.EqualTo(stage == 1 ? "GourdRotateDark" : "GourdRotateLight"));
+                    var rotationArt = viewer.design.Find("Gourd Rotation Indicator").GetComponent<UnityEngine.UI.Image>();
+                    Assert.That(rotationArt.sprite, Is.SameAs(Resources.Load<Sprite>("Hapio/UI/SealedGourdRotate")));
                     Assert.That(rotationArt.raycastTarget, Is.False);
-                    Assert.That(rotationArt.rectTransform.anchoredPosition, Is.EqualTo(new Vector2(271f, -180f)));
+                    Assert.That(rotationArt.rectTransform.anchoredPosition, Is.EqualTo(new Vector2(56f, -360f)));
+                    Assert.That(rotationArt.rectTransform.sizeDelta, Is.EqualTo(new Vector2(165.655f, 165.959f)));
                     var preview = (LabGourdResultPreview)typeof(GameSession).GetField("preview",
                         BindingFlags.Instance | BindingFlags.NonPublic).GetValue(session);
+                    var shell = preview.ModelRoot.GetComponentsInChildren<MeshRenderer>()
+                        .Single(item => item.name == "Paint Shell");
+                    Assert.That(Vector3.Dot(shell.transform.up, preview.PreviewCamera.transform.up), Is.GreaterThan(.9999f),
+                        "The baked shell's top must point up in the viewer, including its static art lean.");
                     Quaternion initialRotation = preview.ModelRotation;
                     float initialZoom = preview.ZoomNormalized;
                     string initialPaint = preview.PaintPixelHash;
@@ -2227,6 +2231,8 @@ namespace Hapio.Tests
                         "Reset keeps the current stage's gourd viewer open.");
                     Assert.That(Quaternion.Angle(initialRotation, preview.ModelRotation), Is.LessThan(.001f));
                     Assert.That(preview.ZoomNormalized, Is.EqualTo(initialZoom).Within(.001f));
+                    Assert.That(Vector3.Dot(shell.transform.up, preview.PreviewCamera.transform.up), Is.GreaterThan(.9999f),
+                        "Reset restores the shell's upright axis after arbitrary drag rotations.");
                     Assert.That(preview.PaintPixelHash, Is.EqualTo(initialPaint));
                     Assert.That(JsonUtility.ToJson(session.ResultSnapshot), Is.EqualTo(initialResult));
                     yield return ClickVisibleButtonWithMouse(mouse, close);
