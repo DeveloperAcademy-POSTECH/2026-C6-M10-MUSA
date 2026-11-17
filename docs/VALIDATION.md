@@ -9572,3 +9572,14 @@ main `cef1579d`의 #760 관람·#762 땅따먹기 박/Game56·#727 튜토리얼�
 - 변경 C#5개·ProjectSettings27개·저장 Scene16개의 SHA-256이 검사 시작 시점과 동일했다. 기존 stash 목록도 동일하며 Scene·Prefab·Resources·Packages와 공유 설정·프로토콜을 변경하지 않았다. 새 SVG Importer가 만든 빈 값 뒤 공백1건만 사본 보존·값 비교 후 main 형식으로 복원했다.
 - 촬영 후 Play·통신 참가자·임시 시연 override를 종료하고 Home·원래 GameView 크기를 복원했다. 최종 추가 변경은 검증 문서뿐이므로 게임 검사를 반복하지 않는다.
 - **미실행:** 별도 Mac 앱 빌드/실행, iOS 내보내기·실기기 터치. Host 화면+통신 Guest 자동 검사/Editor 촬영을 독립 Guest 앱이나 실기기 확인으로 표기하지 않는다. 원시 로그·전체 검사 JSON·개인 경로·화면 산출물은 커밋하지 않는다.
+
+
+### #791 PR #794 최신 main 통합·병합 전 검증 (2026-11-17)
+
+- 최신 main `dc7841d2`의 #792 마지막 일격 캐릭터 이름과 #793 결과/전투 이름·공동 수상 글자 맞춤을 통합했다. 충돌은 VALIDATION의 추가 기록 한 곳뿐이어서 양쪽 이력을 모두 보존했다. 통합 코드 기준은 `0d7e2fd0`이며 이름 계산 `ResultNames(snapshot)`과 #791 Skip 정책을 함께 유지했다.
+- main 이후 추가 변화는 이름·글자 맞춤뿐이다. 기존 전체900건 이후 StoryPlayer 입력 정책·세션/공유 수명·통신·물리·도색·설정·Scene/Prefab은 바뀌지 않았다. 따라서 이전 전체900건 결과는 해당 경로의 근거로 보존하고, 통합본은 전체 EditMode와 실제 영향 경로의 PlayMode를 다시 실행했다. 이전900건을 최신 main 전체 재실행으로 표기하지 않는다.
+- 컴파일 오류0. 통합 전체 EditMode **2,602/2,602 PASS**(46.71초). 통합 PlayMode는 **고유277/277 PASS**: Hapio.PlayModeTests180(792.54초), Hapio.Story.PlayModeTests66(8.98초), LabCharm17(5.55초), LabComboEffectLookTests9(1.29초), LabResultDashboardTests5(0.06초). 실패·skip·inconclusive0. 일반 게임의 실제 후일담 클릭·최종 엔딩 Skip, 새 이름 표시·다시보기, 시연 QR/재도전, 오프닝·도구용 Skip과 Lab/P번호 fallback을 포함한다.
+- 읽기 전용 검토에서 PR 범위가 의도한9개 파일이며 최신 main의 관련14개 파일을 그대로 보존한 것을 확인했다. 수정한 입력 코드·검사4개 파일은 main 통합 전과 같고, 결과 어댑터의 새 이름 계산만 추가됐다.
+- Editor 실제390×844 화면에서 Host+통신 참가자2명으로 후일담 Skip 숨김·비활성화, 기존 그만두기·마치기·QR→A/B 복귀를 재확인했다. 카드 기록은 완료 단축용 직접 도색으로 공격 기록이 비어 있어, 별도 복사본에만 공동 수상 표시값60을 넣고 기존 CardRecords/StoryRecordHighlight 함수로 `불이(나), 묵이, 솔이` 표시와 글자 맞춤을 촬영했다. 실제 ResultSnapshot·전투 기록·판정은 변경하지 않았으며 표시 예시와 실제 진행 화면을 구분한다.
+- 관련 파일16개·ProjectSettings27개·저장 Scene16개의 검사 전후 해시가 동일하고 기존 stash도 보존했다. SVG Importer의 빈 값 뒤 공백만 사본 보존 후 원래 형식으로 복원했다. 촬영 후 Play·통신 참가자·임시 시연 override를 종료하고 Home·기존 GameView 크기를 복원했다. 이후 추가 변경은 문서뿐이므로 검사를 반복하지 않는다.
+- 별도 Mac 앱 빌드/실행과 iOS 내보내기·실기기, 독립 Guest UI는 미실행이다. 원시 로그·전체 검사 JSON·개인 경로·화면 산출물은 커밋하지 않는다.
