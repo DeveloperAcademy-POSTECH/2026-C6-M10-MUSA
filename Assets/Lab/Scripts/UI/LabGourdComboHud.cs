@@ -236,13 +236,14 @@ namespace C6Lab
         /// 콤보 결과 문구 (#301). 성공은 CLEAR!, 시간 초과는 TIME UP. 틀린 색은 틀린 사람을 앞에 붙인다:
         /// 이 기기 플레이어면 "내가 색 틀림", 아니면 좌석 번호로 "P2 색 틀림". 누군지 모르면 이름 없이.
         /// </summary>
-        public static string ResultTextFor(LabComboResult result, bool failedKnown, bool failedIsMe, int failedSeat)
+        public static string ResultTextFor(LabComboResult result, bool failedKnown, bool failedIsMe, int failedSeat,
+            string failedName = null)
         {
             if (result == LabComboResult.Success) return ClearText;
             if (result == LabComboResult.Timeout) return TimeUpText;
             if (!failedKnown) return WrongColorText;
             if (failedIsMe) return YouText + " " + WrongColorText;
-            return failedSeat >= 0 ? "P" + (failedSeat + 1) + " " + WrongColorText : WrongColorText;
+            return failedSeat >= 0 ? (failedName ?? "P" + (failedSeat + 1)) + " " + WrongColorText : WrongColorText;
         }
         public bool SlotChecked(int index) => slotChecks[index] != null && slotChecks[index].gameObject.activeSelf;
         public Color SlotColor(int index) => figmaPanel ? (Color)LabPaintPalette.SrgbColorFor(slotElements[index])
@@ -836,7 +837,8 @@ namespace C6Lab
                 resultElapsed = 0f;
                 RememberFailer(snapshot);
                 resultText.text = ResultTextFor(shownResult, shownFailedKnown,
-                    network != null && shownFailedBy == network.LocalPlayerId, shownFailedSeat);
+                    network != null && shownFailedBy == network.LocalPlayerId, shownFailedSeat,
+                    shownFailedSeat >= 0 ? LabHud.BattlePlayerLabel(snapshot, shownFailedSeat + 1) : null);
                 // 다 맞혔으면(#301) 4 COMBO!!를 먼저 크게 보여준 다음 CLEAR!.
                 resultDelay = 0f;
                 if (shownResult == LabComboResult.Success && StampSuccess)

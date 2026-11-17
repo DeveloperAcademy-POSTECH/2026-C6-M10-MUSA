@@ -113,6 +113,7 @@ namespace C6Lab
 
         private void Awake()
         {
+            shown = this;
             UpdateNoticeVisibility();
             CacheGoalTitle();
             if (directConnectionButton != null)
@@ -478,6 +479,24 @@ namespace C6Lab
 
         private static Sprite BadgeAt(Sprite[] badges, int index) =>
             badges != null && index >= 0 && index < badges.Length ? badges[index] : null;
+
+        private static LabHud shown;
+
+        /// <summary>
+        /// What a battle text calls the player at this P number: the battle character's name where the screen shows characters
+        /// (Hapio story), otherwise "P" + number (land grab, standalone Lab, no name table). names is in artwork order.
+        /// </summary>
+        public static string BattlePlayerLabel(LabSnapshot snapshot, int number, string[] names)
+        {
+            if (number <= 0) return "P—";
+            if (names == null || snapshot != null && snapshot.teamTerritory) return "P" + number;
+            int index = BattleCharacterIndex(snapshot, number);
+            return index >= 0 && index < names.Length && !string.IsNullOrEmpty(names[index]) ? names[index] : "P" + number;
+        }
+
+        /// <summary>The same label with the names of the battle HUD on screen (none in a standalone Lab scene).</summary>
+        public static string BattlePlayerLabel(LabSnapshot snapshot, int number) =>
+            BattlePlayerLabel(snapshot, number, shown != null ? shown.battleCharacterNames : null);
 
         // Indices into the Hapio artwork: 불이, 솔이, 묵이, 금옥, 만복.
         public static int BattleCharacterIndex(LabSnapshot snapshot, int number)

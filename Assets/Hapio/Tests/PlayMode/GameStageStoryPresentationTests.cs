@@ -33,14 +33,36 @@ namespace Hapio.Tests
             var snapshot = new LabSnapshot { phase = LabPhase.Victory, players = new[] { p1, p2 }, playedSeconds = 100 };
             var records = GameStageStoryPresentation.CardRecords(snapshot);
             Assert.That(records.Length, Is.EqualTo(5));
-            Assert.That(records[0].player, Is.EqualTo("P1"));
-            Assert.That(records[1].player, Is.EqualTo("P1"));
-            Assert.That(records[2].player, Is.EqualTo("P2"));
-            Assert.That(records[3].player, Is.EqualTo("P2"));
-            Assert.That(records[4].player, Is.EqualTo("P2"), "The fifth printed row is drum ownership, not last hit.");
+            // Story results name the battle characters: P1 불이, P2 묵이.
+            Assert.That(records[0].player, Is.EqualTo("불이"));
+            Assert.That(records[1].player, Is.EqualTo("불이"));
+            Assert.That(records[2].player, Is.EqualTo("묵이"));
+            Assert.That(records[3].player, Is.EqualTo("묵이"));
+            Assert.That(records[4].player, Is.EqualTo("묵이"), "The fifth printed row is drum ownership, not last hit.");
             Assert.That(records[4].value, Does.Contain("88초"));
             Assert.That(p1.damageTotal, Is.EqualTo(80));
             Assert.That(snapshot.playedSeconds, Is.EqualTo(100));
+        }
+
+        [Test]
+        public void ResultNamesFollowTheBattleCharactersAndLandGrabKeepsPNumbers()
+        {
+            string[] expected = { "불이", "묵이", "솔이", "금옥", "만복" };
+            var story = new LabSnapshot();
+            for (int seat = 0; seat < expected.Length; seat++)
+                Assert.That(GameBattleUiPresentation.ResultNames(story)(new LabPlayerState { seat = seat }), Is.EqualTo(expected[seat]));
+            Assert.That(GameBattleUiPresentation.ResultNames(null)(new LabPlayerState { seat = 2 }), Is.EqualTo("솔이"));
+            Assert.That(GameBattleUiPresentation.ResultNames(story)(new LabPlayerState { seat = 5 }), Is.EqualTo("P6"));
+            Assert.That(GameBattleUiPresentation.ResultNames(story)(null), Is.EqualTo("P—"));
+            var landGrab = new LabSnapshot { teamTerritory = true, players = new LabPlayerState[4] };
+            Assert.That(GameBattleUiPresentation.ResultNames(landGrab)(new LabPlayerState { seat = 0 }), Is.EqualTo("P1"));
+
+            // The shared label behind every battle text: no name table (standalone Lab) keeps the P number.
+            Assert.That(LabHud.BattlePlayerLabel(story, 2, null), Is.EqualTo("P2"));
+            Assert.That(LabHud.BattlePlayerLabel(story, 2, new[] { "불이", "솔이", "묵이", "금옥", "만복" }), Is.EqualTo("묵이"));
+            Assert.That(LabGourdComboHud.ResultTextFor(LabComboResult.WrongColor, true, false, 1, "묵이"), Is.EqualTo("묵이 색 틀림"));
+            Assert.That(LabGourdComboHud.ResultTextFor(LabComboResult.WrongColor, true, false, 1), Is.EqualTo("P2 색 틀림"));
+            Assert.That(LabCharmHud.WarningText(new[] { "나", "솔이" }, true), Is.EqualTo("요괴가 나와 솔이에게\n매혹을 걸려고 한다!"));
         }
 
         [Test]
@@ -54,9 +76,9 @@ namespace Hapio.Tests
 
             var records = GameStageStoryPresentation.CardRecords(snapshot, 20);
             Assert.That(records.Select(record => record.mine), Is.EqualTo(new[] { false, false, true, true, true }));
-            Assert.That(records[0].player, Is.EqualTo("P1"));
-            Assert.That(records[2].player, Is.EqualTo("P1, P2(나)"), "A tie marks the row and only the local name.");
-            Assert.That(records[3].player, Is.EqualTo("P2(나)"));
+            Assert.That(records[0].player, Is.EqualTo("불이"));
+            Assert.That(records[2].player, Is.EqualTo("불이, 묵이(나)"), "A tie marks the row and only the local name.");
+            Assert.That(records[3].player, Is.EqualTo("묵이(나)"));
             Assert.That(GameStageStoryPresentation.CardRecords(snapshot, 99).Any(record => record.mine), Is.False);
         }
 
