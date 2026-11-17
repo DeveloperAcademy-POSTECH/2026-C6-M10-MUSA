@@ -61,10 +61,21 @@ namespace Hapio
             Color title = new Color32(247, 242, 237, 255);
             Color hint = new Color32(66, 67, 58, 255);
             if (playerSlot > 0)
-                AddReplayLabel(page, "Player", "P" + playerSlot, bold, title, 50, 79, 55);
+                AddReplayLabel(page, "Player", FinishReplayOwner(playerSlot), bold, title, 50, 79, 55);
             AddReplayLabel(page, "Final Hit", "마지막 일격!", bold, title, 50, playerSlot > 0 ? 139 : 79, 55);
             AddReplayLabel(page, "Skip Hint", "눌러서 건너뛰시오.", bold, hint, 20, 762, 22);
         }
+
+        /// <summary>The caption's first line: the thrower's battle character as shown on every screen, e.g. "불이의" (story seats only).</summary>
+        internal static string FinishReplayOwner(int playerSlot) =>
+            LabHud.BattlePlayerLabel(null, playerSlot, CharacterNames) + "의";
+
+        /// <summary>
+        /// Names for a story result: each player's battle character ("불이"), as on the battle screen. Land grab snapshots keep
+        /// "P" + number.
+        /// </summary>
+        public static Func<LabPlayerState, string> ResultNames(LabSnapshot snapshot) => player =>
+            player == null ? LabResultStats.PlayerName(null) : LabHud.BattlePlayerLabel(snapshot, player.seat + 1, CharacterNames);
 
         private static void AddReplayLabel(Transform page, string name, string caption, Font font,
             Color color, int size, float y, float height)

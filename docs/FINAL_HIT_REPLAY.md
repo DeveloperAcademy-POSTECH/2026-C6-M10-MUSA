@@ -30,6 +30,7 @@
 - **판정 불변:** 실제 박은 숨기지 않는다. 기록 자세는 렌더 콜백 사이에서만 그린다(`LabHangingTarget.SetPresentationPose`, #454 방식). 물리·Collider·스크립트·스냅샷은 고정 자세를 읽는다.
 - **구슬:** 물리 없는 ghost(`LabProjectile.BeginPuppet`: kinematic, `detectCollisions` 꺼짐, Collider 꺼짐)다. 판정·피해·도색·통계·전역 `Time.timeScale`을 바꾸지 않는다.
 - **화면:** 전용 연출 카메라(전체 화면, 재생 중에만 `MainCamera` 태그)를 쓴다. 재생 중에는 BattleCamera·OrbCamera와 Battle Scene의 루트 Canvas를 끄고 레터박스(sorting 29000)를 얹는다. Reset/씬 해제 때 원래대로 돌린다.
+- **자막:** 첫 줄은 던진 사람의 전투 캐릭터 이름에 "의"를 붙인 것이고("불이의"), 둘째 줄은 "마지막 일격!"이다. 이름은 기록의 P번호(`LabFinishReplayShot.Slot`)를 전투 HUD와 같은 `LabHud.BattleCharacterIndex`로 바꿔 얻는다(P1 불이·P2 묵이·P3 솔이·P4 금옥·P5 만복, `GameBattleUiPresentation.FinishReplayOwner`). 던진 사람을 모르면(0) 이름 줄을 생략한다. 기록·통신 형식은 바꾸지 않았다.
 - **건너뛰기:** 재생 시작 0.15초 뒤의 새 터치·클릭만 받는다. 내 기기만 건너뛰며, 결과 진행은 모두를 기다린다. 솔로는 바로 결과로 간다.
 - 기록 형식이나 장면 시간표를 바꾸면 게임 토큰을 올린다. 도입 당시(#525)는 `C6HapioGame/33`·설정 259개·5687·`C6PhysicsLab/48`이었다. 현재 호환 묶음은 `AGENTS.md`(#509 절 마지막 줄)를 따른다.
 

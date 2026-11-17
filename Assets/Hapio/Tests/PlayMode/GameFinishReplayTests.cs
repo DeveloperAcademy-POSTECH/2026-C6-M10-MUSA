@@ -56,6 +56,28 @@ namespace Hapio.Tests
             yield return null;
         }
 
+        [Test]
+        public void TheCaptionNamesTheThrowersBattleCharacter()
+        {
+            string[] expected = { "불이의", "묵이의", "솔이의", "금옥의", "만복의" };
+            for (int slot = 1; slot <= expected.Length; slot++)
+                Assert.That(GameBattleUiPresentation.FinishReplayOwner(slot), Is.EqualTo(expected[slot - 1]), "P" + slot);
+            Assert.That(GameBattleUiPresentation.FinishReplayOwner(6), Is.EqualTo("P6의"), "A seat without a character keeps its number.");
+
+            var root = new GameObject("Caption", typeof(RectTransform));
+            try
+            {
+                GameBattleUiPresentation.BuildFinishReplayCaption((RectTransform)root.transform, 3);
+                Assert.That(root.GetComponentsInChildren<UnityEngine.UI.Text>().Select(label => label.text),
+                    Is.EquivalentTo(new[] { "솔이의", "마지막 일격!", "눌러서 건너뛰시오." }));
+                foreach (Transform child in root.transform) Object.DestroyImmediate(child.gameObject);
+                GameBattleUiPresentation.BuildFinishReplayCaption((RectTransform)root.transform, 0);
+                Assert.That(root.GetComponentsInChildren<UnityEngine.UI.Text>().Select(label => label.text),
+                    Is.EquivalentTo(new[] { "마지막 일격!", "눌러서 건너뛰시오." }), "An unknown thrower has no name line.");
+            }
+            finally { Object.DestroyImmediate(root); }
+        }
+
         [UnityTest]
         public IEnumerator TheFinalThrowIsReplayedThreeTimesThenTheResultOpensUnderTheCover([Values(1, 2, 3)] int stage)
         {
@@ -80,7 +102,8 @@ namespace Hapio.Tests
             Assert.That(replay.ReplayCamera != null && replay.ReplayCamera.enabled, Is.True);
             var captions = replay.Overlay.GetComponentsInChildren<UnityEngine.UI.Text>();
             var expectedCaptions = new List<string> { "마지막 일격!", "눌러서 건너뛰시오." };
-            if (replay.Shot.Slot > 0) expectedCaptions.Add("P" + replay.Shot.Slot);
+            // DEV solo has no chosen P number (Slot 0), so there is no name line; a seated thrower shows their character.
+            if (replay.Shot.Slot > 0) expectedCaptions.Add(GameBattleUiPresentation.FinishReplayOwner(replay.Shot.Slot));
             Assert.That(captions.Select(label => label.text), Is.EquivalentTo(expectedCaptions));
             Assert.That(replay.Overlay.transform.Find("Top Bar"), Is.Null);
             Assert.That(replay.Overlay.transform.Find("Bottom Bar"), Is.Null);

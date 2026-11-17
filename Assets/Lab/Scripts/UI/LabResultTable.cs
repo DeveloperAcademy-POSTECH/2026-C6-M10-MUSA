@@ -65,24 +65,25 @@ namespace C6Lab
         /// 칭호 목록을 표의 줄로 바꾼다. 내가 받은 칭호(동점 포함)는 Mine으로 표시한다.
         /// </summary>
         public static List<LabResultRow> RowsFor(IEnumerable<LabResultAward> awards, ulong localPlayerId,
-            double playedSeconds)
+            double playedSeconds, System.Func<LabPlayerState, string> name = null)
         {
             var rows = new List<LabResultRow>();
             if (awards == null) return rows;
             foreach (LabResultAward award in awards)
-                rows.Add(new LabResultRow(LabResultStats.Label(award.Title), LabResultStats.WinnerNames(award),
+                rows.Add(new LabResultRow(LabResultStats.Label(award.Title), LabResultStats.WinnerNames(award, name),
                     LabResultStats.Record(award, playedSeconds),
                     award.Winners != null && award.Winners.Any(w => w != null && w.id == localPlayerId)));
             return rows;
         }
 
         /// <summary>전체 게임 대시보드의 줄. 칭호·누구는 RowsFor와 같고 기록 칸만 평균/횟수로 적는다.</summary>
-        public static List<LabResultRow> OverallRowsFor(IEnumerable<LabResultStage> stages, ulong localPlayerId)
+        public static List<LabResultRow> OverallRowsFor(IEnumerable<LabResultStage> stages, ulong localPlayerId,
+            System.Func<LabPlayerState, string> name = null)
         {
             LabResultOverall overall = LabResultStats.Overall(stages);
             var rows = new List<LabResultRow>();
             foreach (LabResultAward award in overall.Awards)
-                rows.Add(new LabResultRow(LabResultStats.Label(award.Title), LabResultStats.WinnerNames(award),
+                rows.Add(new LabResultRow(LabResultStats.Label(award.Title), LabResultStats.WinnerNames(award, name),
                     LabResultStats.OverallRecord(award, overall),
                     award.Winners != null && award.Winners.Any(w => w != null && w.id == localPlayerId)));
             return rows;

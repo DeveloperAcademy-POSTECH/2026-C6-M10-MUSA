@@ -364,12 +364,14 @@ namespace Hapio
             LabSnapshot result = victory ? session.ResultSnapshot : net.Snapshot;
             if (!victory && (result == null || result.phase != LabPhase.Defeat
                 || result.sessionId != session.State.battleSessionId || result.round != session.State.battleRound)) result = null;
-            var rows = overall ? LabResultTable.OverallRowsFor(session.StageResults, net.LocalPlayerId)
+            // Story results name each player's battle character; a land grab result (if it ever lands here) keeps P numbers.
+            Func<LabPlayerState, string> names = session.IsTerritory ? null : GameBattleUiPresentation.ResultNames(null);
+            var rows = overall ? LabResultTable.OverallRowsFor(session.StageResults, net.LocalPlayerId, names)
                 : result == null ? new List<LabResultRow>() : LabResultTable.RowsFor(
-                    LabResultStats.Awards(result.players, victory), net.LocalPlayerId, result.playedSeconds);
+                    LabResultStats.Awards(result.players, victory), net.LocalPlayerId, result.playedSeconds, names);
             int seat = result != null && result.players != null
                 ? Array.FindIndex(result.players, player => player != null && player.id == net.LocalPlayerId) : -1;
-            string localName = seat < 0 ? null : LabResultStats.PlayerName(result.players[seat]);
+            string localName = seat < 0 ? null : (names ?? LabResultStats.PlayerName)(result.players[seat]);
             for (int i = 0; i < rows.Count; i++)
             {
                 LabResultRow row = rows[i];
@@ -529,13 +531,14 @@ namespace Hapio
             resultTable.anchorMin = resultTable.anchorMax = new Vector2((area.anchorMin.x + area.anchorMax.x) * .5f, area.anchorMax.y);
             resultTable.anchoredPosition = Vector2.zero;
             List<LabResultRow> rows;
-            if (overall) rows = LabResultTable.OverallRowsFor(stages, net.LocalPlayerId);
+            Func<LabPlayerState, string> names = session.IsTerritory ? null : GameBattleUiPresentation.ResultNames(result);
+            if (overall) rows = LabResultTable.OverallRowsFor(stages, net.LocalPlayerId, names);
             else
             {
                 var players = Array.FindAll(result.players, p => p != null);
                 Array.Sort(players, (a, b) => a.seat.CompareTo(b.seat));
                 rows = LabResultTable.RowsFor(LabResultStats.Awards(players, result.phase == LabPhase.Victory),
-                    net.LocalPlayerId, result.playedSeconds);
+                    net.LocalPlayerId, result.playedSeconds, names);
             }
             float height = LabResultTable.Fill(resultTable, rows, resultTableStyle, details.font);
             // 안내 글이 표 밑에서 시작하도록 Details 윗변을 표 높이만큼 내린다.

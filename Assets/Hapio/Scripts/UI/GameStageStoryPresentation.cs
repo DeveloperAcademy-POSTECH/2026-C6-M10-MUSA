@@ -229,7 +229,8 @@ namespace Hapio
                 foreach (var award in awards)
                     if (award.Title == order[i])
                     {
-                        result[i] = new StoryCardRecords.Record { player = LabResultStats.WinnerNames(award, localPlayerId),
+                        result[i] = new StoryCardRecords.Record { player = LabResultStats.WinnerNames(award, localPlayerId,
+                                GameBattleUiPresentation.ResultNames(snapshot)),
                             value = LabResultStats.Record(award, snapshot.playedSeconds),
                             mine = award.Winners != null && award.Winners.Any(winner => winner != null && winner.id == localPlayerId) };
                         break;
