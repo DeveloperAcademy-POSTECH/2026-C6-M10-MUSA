@@ -43,6 +43,11 @@ namespace Hapio
             {
                 var image = view.slotImages[i];
                 if (!view.slotButtons[i].gameObject.activeSelf) continue;
+                if (!team && players == 3)
+                {
+                    PresentThreePlayerSeat(view, i);
+                    continue;
+                }
                 // A story seat taken with a character shows its portrait upright, filling the 63-unit seat.
                 bool portrait = view.SeatCharacter(i) > 0;
                 bool filled = portrait || (team ? image.sprite == view.blueTeamFilledSlot || image.sprite == view.redTeamFilledSlot
@@ -71,6 +76,32 @@ namespace Hapio
             text.fontSize = 20; text.color = GameLobbySeatColors.LightText;
             if (start) text.text = team ? "땅따먹기 시작" : "요괴 봉인 시작";
             else if (!allChosen) text.text = team ? "땅따먹기 대기 중" : "요괴 봉인 대기";
+        }
+
+        private static void PresentThreePlayerSeat(GameLobbyView view, int index)
+        {
+            int character = view.SeatCharacter(index);
+            bool host = view.SeatIsHost(index), held = view.SeatIsHeld(index);
+            var image = view.slotImages[index];
+            image.sprite = character > 0 ? GameThreePlayerLobbyArt.Seat(character, host)
+                : GameThreePlayerLobbyArt.Empty(index + 1);
+            Rect bounds = character > 0 ? GameThreePlayerLobbyArt.SeatBounds(character, host)
+                : GameThreePlayerLobbyArt.EmptyBounds(index + 1);
+            Place(image.transform, bounds.x, bounds.y, bounds.width, bounds.height);
+            image.type = Image.Type.Simple;
+            image.preserveAspect = false;
+            image.rectTransform.localEulerAngles = Vector3.zero;
+            // RefreshPositions already applied the held/disabled opacity; preserve it without tinting the source art.
+            image.color = new Color(1f, 1f, 1f, image.color.a);
+            view.slotLabels[index].text = string.Empty;
+
+            // Selected source components already contain their name and, for the actual Host, its badge.
+            var label = view.localLabels[index];
+            label.gameObject.SetActive(character == 0 || held);
+            if (held) label.text = GameLobbyView.HeldSeatLabel;
+            label.fontSize = 20; label.color = GameLobbySeatColors.Host;
+            Vector2 center = ((RectTransform)view.slotButtons[index].transform).anchoredPosition;
+            Place(label.transform, center.x - 60, -center.y - 67, 120, 26);
         }
 
         private static void Place(Transform target, float x, float y, float width, float height)

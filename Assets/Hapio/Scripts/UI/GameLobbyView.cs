@@ -527,7 +527,9 @@ namespace Hapio
         private GameLobbyCharacterPicker characterPicker;
         public GameLobbyCharacterPicker CharacterPicker => characterPicker;
         /// <summary>The battle character confirmed on that story seat (1..5, artwork order); 0 on an empty or land grab seat.</summary>
-        public int SeatCharacter(int index) => StorySeats ? Network.GetSlotCharacter(index + 1) : 0;
+        public int SeatCharacter(int index) => Network != null && StorySeats ? Network.GetSlotCharacter(index + 1) : 0;
+        public bool SeatIsHost(int index) => Network != null && Network.GetSlotOwner(index + 1) == Unity.Netcode.NetworkManager.ServerClientId;
+        public bool SeatIsHeld(int index) => Network != null && Network.IsSlotHeld(index + 1);
         private bool StorySeats => !TerritoryRoom(Network.TargetParticipantCount);
 
         /// <summary>

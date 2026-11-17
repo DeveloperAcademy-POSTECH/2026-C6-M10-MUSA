@@ -164,6 +164,156 @@ namespace Hapio.Tests
             Assert.That(view.directConnectionPanel.activeSelf, Is.False);
         }
 
+        [Test]
+        public void ThreePlayerOriginalSpritesPreserveTheirTransparentMarginsWithoutCompression()
+        {
+            string[] names = Enumerable.Range(1, 3).Select(i => "Empty" + i)
+                .Concat(Enumerable.Range(1, 5).SelectMany(i => new[] { "Seat" + i, "SeatHost" + i, "Choice" + i, "ChoiceTaken" + i, "ChoiceSelected" + i }))
+                .Concat(new[] { "Taken", "ChoiceCheck", "Close", "PopupPanel" }).ToArray();
+            foreach (string name in names)
+            {
+                Sprite sprite = Resources.Load<Sprite>(GameThreePlayerLobbyArt.Root + name);
+                Assert.That(sprite, Is.Not.Null, "The saved original asset must be packaged: " + name);
+                string path = AssetDatabase.GetAssetPath(sprite);
+                Assert.That(path, Does.StartWith("Assets/Hapio/Resources/"), name);
+                var importer = AssetImporter.GetAtPath(path) as TextureImporter;
+                Assert.That(importer, Is.Not.Null, path);
+                Assert.That(importer.textureType, Is.EqualTo(TextureImporterType.Sprite), name);
+                Assert.That(importer.spriteImportMode, Is.EqualTo(SpriteImportMode.Single), name);
+                Assert.That(importer.alphaIsTransparency, Is.True, name);
+                Assert.That(importer.mipmapEnabled, Is.False, "Fine outlines stay crisp at their authored UI size: " + name);
+                Assert.That(importer.textureCompression, Is.EqualTo(TextureImporterCompression.Uncompressed), name);
+                var settings = new TextureImporterSettings(); importer.ReadTextureSettings(settings);
+                Assert.That(settings.spriteMeshType, Is.EqualTo(SpriteMeshType.FullRect),
+                    "Retain Figma's exported transparent padding rather than trimming to the opaque silhouette: " + name);
+                // Inspect the actual PNG rather than an imported GPU texture (which stays non-readable in the game).
+                // A valid source ID/hash can still describe a bad export with the ancestor canvas baked behind it.
+                string diskAsset = System.IO.Path.Combine(Application.dataPath, path.Substring("Assets/".Length));
+                var decoded = new Texture2D(2, 2, TextureFormat.RGBA32, false, true);
+                try
+                {
+                    Assert.That(ImageConversion.LoadImage(decoded, System.IO.File.ReadAllBytes(diskAsset)), Is.True, name);
+                    foreach (Vector2Int corner in new[] { Vector2Int.zero, new Vector2Int(decoded.width - 1, 0),
+                        new Vector2Int(0, decoded.height - 1), new Vector2Int(decoded.width - 1, decoded.height - 1) })
+                        Assert.That(decoded.GetPixel(corner.x, corner.y).a, Is.Zero,
+                            "The original PNG corner must remain transparent; do not bake a canvas background into " + name + " at " + corner);
+                }
+                finally { Object.DestroyImmediate(decoded); }
+            }
+            AssertThreePlayerCharacterSourceIdentity();
+        }
+
+        [System.Serializable]
+        private sealed class FigmaLobbySource
+        {
+            public FigmaLobbySourceAsset[] assets;
+        }
+
+        [System.Serializable]
+        private sealed class FigmaLobbySourceAsset
+        {
+            public string name, sourceNodeId, asset, sha256, pickerState, stateReferenceNodeId;
+        }
+
+        private static void AssertThreePlayerCharacterSourceIdentity()
+        {
+            const string sourcePath = "Assets/Hapio/Art/UI/ThreePlayerLobby/FigmaSource.json";
+            string diskSource = System.IO.Path.Combine(Application.dataPath, sourcePath.Substring("Assets/".Length));
+            var source = JsonUtility.FromJson<FigmaLobbySource>(System.IO.File.ReadAllText(diskSource));
+            Assert.That(source?.assets, Is.Not.Null, "Preserve the exported art's Figma source identity.");
+            // Game IDs are not the visual picker order: 2 is Soli, 3 is Muki. Loading the wrong picture can
+            // still pass every seat/character rule, so verify each original source rather than only non-null sprites.
+            Assert.That(GameBattleUiPresentation.CharacterNames, Is.EqualTo(new[] { "불이", "솔이", "묵이", "금옥", "만복" }));
+            Assert.That(LabPlayerSlots.CharacterOrder, Is.EqualTo(new[] { 1, 3, 2, 4, 5 }));
+            string[][] expected =
+            {
+                new[] { "Seat", "5808:5334", "5808:5338", "5808:5337", "5808:5335", "5808:5336" },
+                new[] { "SeatHost", "5808:5339", "5808:5343", "5808:5342", "5808:5340", "5808:5341" },
+                new[] { "Choice", "5820:32883", "5820:32893", "5820:32889", "5820:32897", "5820:32904" },
+                new[] { "ChoiceTaken", "5820:32883", "5820:32893", "5820:32889", "5820:32897", "5820:32904" },
+                new[] { "ChoiceSelected", "5820:32883", "5820:32893", "5820:32889", "5820:32897", "5820:32904" }
+            };
+            foreach (string[] family in expected)
+            for (int character = 1; character <= 5; character++)
+            {
+                string name = family[0] + character;
+                var entry = source.assets.Single(asset => asset.name == name);
+                Assert.That(entry.sourceNodeId, Is.EqualTo(family[character]), name + " must depict the actual character ID.");
+                bool picker = family[0].StartsWith("Choice", System.StringComparison.Ordinal);
+                var state = family[0] == "ChoiceTaken" ? GameThreePlayerLobbyArt.ChoiceState.Taken
+                    : family[0] == "ChoiceSelected" ? GameThreePlayerLobbyArt.ChoiceState.Selected
+                    : GameThreePlayerLobbyArt.ChoiceState.Available;
+                Sprite sprite = picker ? GameThreePlayerLobbyArt.Choice(character, state)
+                    : GameThreePlayerLobbyArt.Seat(character, family[0] == "SeatHost");
+                Assert.That(AssetDatabase.GetAssetPath(sprite), Is.EqualTo(entry.asset), name);
+                if (picker)
+                {
+                    Assert.That(entry.pickerState, Is.EqualTo(state.ToString()), name);
+                    string reference = state == GameThreePlayerLobbyArt.ChoiceState.Available ? "5820:32889"
+                        : state == GameThreePlayerLobbyArt.ChoiceState.Selected ? "5820:32922"
+                        : character == 1 ? "5820:32883" : "5820:32897";
+                    Assert.That(entry.stateReferenceNodeId, Is.EqualTo(reference),
+                        name + " must use the original state's border and opacity, not just the right portrait.");
+                }
+                string diskAsset = System.IO.Path.Combine(Application.dataPath, entry.asset.Substring("Assets/".Length));
+                using (var sha = System.Security.Cryptography.SHA256.Create())
+                {
+                    string actual = System.BitConverter.ToString(sha.ComputeHash(System.IO.File.ReadAllBytes(diskAsset)))
+                        .Replace("-", string.Empty).ToLowerInvariant();
+                    Assert.That(actual, Is.EqualTo(entry.sha256), name + " PNG must match its recorded original export.");
+                }
+            }
+        }
+
+        [TestCase(4)]
+        [TestCase(5)]
+        public void OnePickerCanSwitchBackToExistingRoomLayoutsAndRestoreThreePlayerArt(int otherPlayers)
+        {
+            var fixture = new GameObject("Three-player picker layout isolation fixture"); fixture.SetActive(false);
+            var config = ScriptableObject.CreateInstance<LabConfig>();
+            try
+            {
+                var network = fixture.AddComponent<LabNetwork>(); network.config = config;
+                Assert.That(network.SetGameFlowEnabled(true), Is.True);
+                Assert.That(network.SetTargetParticipantCount(3), Is.True);
+                var parent = new GameObject("Authored lobby reference", typeof(RectTransform)).GetComponent<RectTransform>();
+                parent.SetParent(fixture.transform, false); parent.sizeDelta = new Vector2(402, 874);
+                var font = AssetDatabase.LoadAssetAtPath<Font>("Assets/Lab/Art/Fonts/ShillaCultureBold.otf");
+                var picker = GameLobbyCharacterPicker.Create(parent, font, null, network, (seat, character) => { });
+                // No transport is opened in this presentation check. Open refreshes the style, then correctly closes
+                // because the device is disconnected; the same instance is reused for the next room configuration.
+                picker.Open(1);
+                Assert.That(picker.UsesThreePlayerArt, Is.True);
+                var originalChoice = picker.Choice(0);
+                var originalLayer = originalChoice.transform.parent.gameObject;
+                Assert.That(originalChoice.transform.Find("Portrait").GetComponent<UnityEngine.UI.Image>().sprite,
+                    Is.SameAs(GameThreePlayerLobbyArt.Choice(1)));
+
+                Assert.That(network.SetTargetParticipantCount(otherPlayers), Is.True);
+                picker.Open(1);
+                Assert.That(picker.UsesThreePlayerArt, Is.False);
+                Assert.That(originalLayer.activeSelf, Is.False, "An old hidden picker must not leave hit targets over the new one.");
+                var existingChoice = picker.Choice(0);
+                Assert.That(existingChoice, Is.Not.SameAs(originalChoice));
+                Assert.That(existingChoice.transform.Find("Portrait").GetComponent<UnityEngine.UI.Image>().sprite,
+                    Is.SameAs(GameLobbyCharacterPicker.Portrait(1)), "Other capacities retain the pre-existing portrait.");
+
+                Assert.That(network.SetTargetParticipantCount(3), Is.True);
+                picker.Open(1);
+                Assert.That(picker.UsesThreePlayerArt, Is.True);
+                Assert.That(picker.Choice(0), Is.SameAs(originalChoice), "Reopening restores the cached original layout without duplicate controls.");
+                Assert.That(network.SetGameFlowEnabled(false), Is.True);
+                picker.Open(1);
+                Assert.That(picker.UsesThreePlayerArt, Is.False, "A three-person standalone Lab must retain its existing presentation too.");
+                Assert.That(picker.Choice(0), Is.SameAs(existingChoice));
+            }
+            finally
+            {
+                Object.DestroyImmediate(fixture);
+                Object.DestroyImmediate(config);
+            }
+        }
+
         [TestCase(GameScenePaths.Home, GameScreenKind.Home)]
         [TestCase(GameScenePaths.Lobby, GameScreenKind.Lobby)]
         public void HomeAndLobbyUseTheSamePrefabWithoutReplacingTheExistingScopedDeveloperPanel(string path, GameScreenKind kind)

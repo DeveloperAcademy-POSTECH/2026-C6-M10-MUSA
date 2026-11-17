@@ -243,7 +243,15 @@ namespace Hapio.Tests
             Assert.That(session.PendingRooms, Is.Empty);
             Assert.That(view.positionPage.activeInHierarchy, Is.True);
             Assert.That(view.slotButtons.Count(button => button.gameObject.activeSelf), Is.EqualTo(3));
-            Assert.That(view.slotImages[0].sprite, Is.Not.SameAs(view.filledSlots[0]));
+            for (int i = 0; i < 3; i++)
+            {
+                Assert.That(view.slotImages[i].sprite, Is.SameAs(GameThreePlayerLobbyArt.Empty(i + 1)),
+                    "Each empty three-player seat uses its exported dashed circle and plus artwork.");
+                Assert.That(view.slotImages[i].color, Is.EqualTo(Color.white), "Do not tint the original marker a second time.");
+                Assert.That(view.slotImages[i].raycastTarget, Is.False, "The original art cannot intercept its saved seat button.");
+                Assert.That(view.slotLabels[i].text, Is.Empty, "The plus is in the Figma artwork; do not layer P numbers over it.");
+                Assert.That(view.slotButtons[i].interactable, Is.True);
+            }
             Assert.That(session.Network.RequestPlayerSlot(4), Is.False, "P4 does not exist in this three-player room.");
             yield return null;
             Assert.That(view.message.gameObject.activeInHierarchy, Is.False, "The approved lobby design has no status line.");
@@ -266,17 +274,93 @@ namespace Hapio.Tests
             }
             Assert.That(Enumerable.Range(0, 5).Select(GameLobbyCharacterPicker.CharacterAt).Select(GameLobbyCharacterPicker.NameOf),
                 Is.EqualTo(new[] { "불이", "묵이", "솔이", "금옥", "만복" }));
+            Assert.That(picker.UsesThreePlayerArt, Is.True);
+            var panel = picker.GetComponentsInChildren<UnityEngine.UI.Image>().Single(image => image.sprite == GameThreePlayerLobbyArt.PopupPanel);
+            Assert.That(panel.color, Is.EqualTo(Color.white), "Keep the exported popup colour, not a second paper tint.");
+            for (int i = 0; i < 5; i++)
+                Assert.That(picker.Choice(i).transform.Find("Portrait").GetComponent<UnityEngine.UI.Image>().sprite,
+                    Is.SameAs(GameThreePlayerLobbyArt.Choice(GameLobbyCharacterPicker.CharacterAt(i))));
+            // Read the real Host-approved assignments as another player's character changes while this picker is open.
+            // No fake transport peer is needed: network duplicate admission remains covered by LabPlayerSlotsTests.
+            var slots = (LabPlayerSlots)typeof(LabNetwork).GetField("playerSlots", System.Reflection.BindingFlags.Instance
+                | System.Reflection.BindingFlags.NonPublic).GetValue(session.Network);
+            Assert.That(slots.TrySelect(77, 3, 1, out string takenReason), Is.True, takenReason);
+            yield return null; yield return null;
+            Assert.That(picker.Checked(0), Is.True);
+            Assert.That(picker.Choice(0).interactable, Is.False);
+            var takenPortrait = picker.Choice(0).transform.Find("Portrait").GetComponent<UnityEngine.UI.Image>();
+            Assert.That(takenPortrait.sprite, Is.SameAs(GameThreePlayerLobbyArt.Choice(1, GameThreePlayerLobbyArt.ChoiceState.Taken)),
+                "A taken choice uses the original thin solid border and whole-instance 25% opacity.");
+            Assert.That(takenPortrait.color, Is.EqualTo(Color.white), "The native faded PNG must not be faded a second time.");
+            var stamp = picker.Choice(0).transform.Find("Taken").GetComponent<UnityEngine.UI.Image>();
+            Assert.That(stamp.sprite, Is.SameAs(GameThreePlayerLobbyArt.Taken));
+            Assert.That(stamp.raycastTarget, Is.False, "The stamp cannot block the enabled/disabled choice button.");
+            Assert.That(view.slotImages[2].sprite, Is.SameAs(GameThreePlayerLobbyArt.Seat(1, false)),
+                "The guest in P3 uses its own character's ordinary icon, not the Host artwork.");
+            picker.Choice(0).onClick.Invoke(); // Even a stale direct callback must respect the current owner.
+            Assert.That(picker.IsOpen, Is.True);
+            Assert.That(session.Network.LocalSlotNumber, Is.Zero);
+            Assert.That(session.Network.RequestPlayerSlot(2, 1), Is.False, "The Host still rejects another player's character.");
+            Assert.That(session.Network.LocalSlotNumber, Is.Zero);
+            // Every character can become taken: switching only two pre-authored portraits must not hide a state mismatch.
+            for (int character = 2; character <= 5; character++)
+            {
+                slots.Release(77);
+                Assert.That(slots.TrySelect(77, 3, character, out takenReason), Is.True, takenReason);
+                yield return null; yield return null;
+                int position = Array.IndexOf(LabPlayerSlots.CharacterOrder, character);
+                var choice = picker.Choice(position);
+                var portrait = choice.transform.Find("Portrait").GetComponent<UnityEngine.UI.Image>();
+                Assert.That(portrait.sprite, Is.SameAs(GameThreePlayerLobbyArt.Choice(character, GameThreePlayerLobbyArt.ChoiceState.Taken)));
+                Assert.That(portrait.sprite, Is.Not.SameAs(GameThreePlayerLobbyArt.Choice(character)));
+                Assert.That(portrait.color, Is.EqualTo(Color.white));
+                Assert.That(choice.interactable, Is.False);
+                Assert.That(picker.Checked(position), Is.True);
+                Assert.That(choice.transform.Find("Current Choice").gameObject.activeSelf, Is.False,
+                    "Other players get the taken stamp, never my own selected check.");
+            }
+            slots.Release(77);
+            yield return null; yield return null;
+            Assert.That(picker.Checked(0), Is.False);
+            Assert.That(picker.Choice(0).interactable, Is.True);
             yield return Click(picker.Choice(3)); // 금옥
             Assert.That(picker.IsOpen, Is.False);
             Assert.That(session.Network.LocalSlotNumber, Is.EqualTo(2));
             Assert.That(session.Network.LocalCharacter, Is.EqualTo(4));
             Assert.That(session.Network.GetCharacterOwner(4), Is.EqualTo(session.Network.LocalPlayerId));
-            Assert.That(view.slotImages[1].sprite, Is.SameAs(GameLobbyCharacterPicker.Portrait(4)), "The seat shows the chosen character.");
+            Assert.That(view.slotImages[1].sprite, Is.SameAs(GameThreePlayerLobbyArt.Seat(4, true)),
+                "The Host chose P2 and 금옥: choose the actual Host+character artwork, never P1 or the slot number.");
+            Assert.That(view.slotImages[0].sprite, Is.SameAs(GameThreePlayerLobbyArt.Empty(1)),
+                "P1 stays empty when the Host selected P2.");
             Assert.That(view.slotLabels[1].text, Is.Empty);
-            Assert.That(view.localLabels[1].text, Does.Contain("금옥"));
-            Assert.That(view.localLabels[1].text, Does.Contain("방장"));
+            Assert.That(view.localLabels[1].gameObject.activeSelf, Is.False,
+                "The original component already contains its name and Host badge; do not draw duplicate text over it.");
             Assert.That(view.localLabels[0].text, Does.Not.Contain("방장"));
-            Assert.That(view.slotLabels[0].text, Is.EqualTo("P1"), "An empty seat keeps its P marker.");
+            Assert.That(view.slotLabels[0].text, Is.Empty,
+                "The unchosen three-player seat keeps the original plus artwork, with no P marker drawn over it.");
+            // Reopening a current choice (also used by preview/return flows) must display the selected solid border
+            // and original check for the actual owner, without turning their character into someone else's taken state.
+            for (int character = 1; character <= 5; character++)
+            {
+                Assert.That(session.Network.RequestPlayerSlot(2, character), Is.True);
+                picker.Open(2);
+                yield return null; yield return null;
+                int position = Array.IndexOf(LabPlayerSlots.CharacterOrder, character);
+                var choice = picker.Choice(position);
+                var portrait = choice.transform.Find("Portrait").GetComponent<UnityEngine.UI.Image>();
+                Assert.That(portrait.sprite, Is.SameAs(GameThreePlayerLobbyArt.Choice(character, GameThreePlayerLobbyArt.ChoiceState.Selected)));
+                Assert.That(portrait.sprite, Is.Not.SameAs(GameThreePlayerLobbyArt.Choice(character)));
+                Assert.That(portrait.color, Is.EqualTo(Color.white));
+                Assert.That(choice.interactable, Is.True);
+                Assert.That(picker.Checked(position), Is.False);
+                var check = choice.transform.Find("Current Choice").GetComponent<UnityEngine.UI.Image>();
+                Assert.That(check.gameObject.activeSelf, Is.True);
+                Assert.That(check.sprite, Is.SameAs(GameThreePlayerLobbyArt.ChoiceCheck));
+                Assert.That(check.raycastTarget, Is.False);
+                picker.Close();
+            }
+            Assert.That(session.Network.RequestPlayerSlot(2, 4), Is.True);
+            yield return null; yield return null;
             Vector2 anchor = view.seats3[1].anchoredPosition;
             view.seats3[1].anchoredPosition += Vector2.right * 5f;
             yield return null;
@@ -333,6 +417,18 @@ namespace Hapio.Tests
                 else Assert.That(labelY, Is.LessThan(seatY[i] - 31.5f), "P" + (i + 1) + " name below its seat");
             }
             Assert.That(upperSeats, Is.EqualTo(2));
+            for (int i = 0; i < 5; i++)
+                Assert.That(view.slotImages[i].sprite, Is.SameAs(view.emptySlots[i]),
+                    "The three-player original markers must not replace the legacy five-player layout.");
+            yield return Click(view.slotButtons[0]);
+            var fivePlayerPicker = view.CharacterPicker;
+            Assert.That(fivePlayerPicker.IsOpen, Is.True);
+            Assert.That(fivePlayerPicker.UsesThreePlayerArt, Is.False);
+            Assert.That(fivePlayerPicker.Choice(3).transform.Find("Portrait").GetComponent<UnityEngine.UI.Image>().sprite,
+                Is.SameAs(GameLobbyCharacterPicker.Portrait(4)), "Five players retain the existing character picker artwork.");
+            fivePlayerPicker.GetComponent<UnityEngine.UI.Button>().onClick.Invoke();
+            yield return null;
+            Assert.That(session.Network.LocalSlotNumber, Is.Zero, "Closing the fallback picker still takes no seat.");
         }
 
         [Category("Bonjour")]
@@ -821,7 +917,7 @@ namespace Hapio.Tests
             // #501: the Host holds P2 for a dropped guest. It is set here by hand to read the screen; the real
             // drop and return are covered by C6Lab's LabLobbyRejoinNetworkTests.
             var slots = (LabPlayerSlots)typeof(LabNetwork).GetField("playerSlots", flags).GetValue(network);
-            Assert.That(slots.TrySelect(77, 2, out string reason), Is.True, reason);
+            Assert.That(slots.TrySelect(77, 2, 3, out string reason), Is.True, reason);
             Type holdType = typeof(LabNetwork).GetNestedType("LobbySeatHold", System.Reflection.BindingFlags.NonPublic);
             object hold = Activator.CreateInstance(holdType);
             holdType.GetField("ticket").SetValue(hold, new string('a', 32));
@@ -833,6 +929,9 @@ namespace Hapio.Tests
             yield return null; yield return null;
             Assert.That(network.HeldSeatCount, Is.EqualTo(1));
             Assert.That(view.localLabels[1].text, Is.EqualTo(GameLobbyView.HeldSeatLabel));
+            Assert.That(view.localLabels[1].gameObject.activeSelf, Is.True,
+                "The original character name must not hide the existing away status.");
+            Assert.That(view.slotImages[1].sprite, Is.SameAs(GameThreePlayerLobbyArt.Seat(3, false)));
             Assert.That(view.subheading.text, Is.EqualTo(GameLobbyView.HeldSeatHint));
             Assert.That(view.joinedCount.text, Is.EqualTo("1 / 3명 입장"), "A held seat is not counted as joined.");
             Assert.That(view.slotImages[1].color.a, Is.LessThan(.5f), "The held seat is faded.");

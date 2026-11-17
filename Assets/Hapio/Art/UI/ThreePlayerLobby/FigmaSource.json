@@ -1,0 +1,548 @@
+{
+  "fileKey": "wW7ny7lNQ4DXNJ4kD46AuR",
+  "pageId": "5813:30930",
+  "pageName": "적용되어야할UI",
+  "frames": [
+    "5820:31051",
+    "5820:32875",
+    "5820:32908"
+  ],
+  "characterSection": "5820:31181",
+  "exportScale": 4,
+  "format": "PNG",
+  "policy": "Native Figma renderer at 4x with intrinsic transparency; no path edits, repainting, cropping or postprocessing. Picker state strokes copied from approved original state references onto temporary profile copies; original source nodes preserved and temporary copies removed. Seat names remain baked exactly as authored.",
+  "assets": [
+    {
+      "name": "Choice1",
+      "scale": 4,
+      "png": [
+        212,
+        212
+      ],
+      "sha256": "df27af0ab792466264b8f372e23d10aee3824dfa7cef244a101ffe802bf2401c",
+      "asset": "Assets/Hapio/Resources/Hapio/UI/ThreePlayerLobby/Choice1.png",
+      "sourceNodeId": "5820:32883",
+      "pickerState": "Available",
+      "stateReferenceNodeId": "5820:32889",
+      "strokeWeight": 2.5,
+      "dashPattern": [
+        8,
+        8
+      ],
+      "opacity": 1,
+      "strokeAlign": "INSIDE",
+      "exportState": "Original portrait/crop/paper preserved. Approved Figma state stroke copied on temporary instance only; profile opacity baked once; check and taken stamp are separate original overlays."
+    },
+    {
+      "name": "Choice2",
+      "scale": 4,
+      "png": [
+        212,
+        212
+      ],
+      "sha256": "1938a533dab2a298b9be7a3207bb3f643b9d5421fb9702506a9ef6a9867d5a9f",
+      "asset": "Assets/Hapio/Resources/Hapio/UI/ThreePlayerLobby/Choice2.png",
+      "sourceNodeId": "5820:32893",
+      "pickerState": "Available",
+      "stateReferenceNodeId": "5820:32889",
+      "strokeWeight": 2.5,
+      "dashPattern": [
+        8,
+        8
+      ],
+      "opacity": 1,
+      "strokeAlign": "INSIDE",
+      "exportState": "Original portrait/crop/paper preserved. Approved Figma state stroke copied on temporary instance only; profile opacity baked once; check and taken stamp are separate original overlays."
+    },
+    {
+      "name": "Choice3",
+      "scale": 4,
+      "png": [
+        212,
+        212
+      ],
+      "sha256": "7f3fc7bb8d6f8d44e4d06d8c7a38308c8f019c05ed3d56d4798ddcb97a360e7b",
+      "asset": "Assets/Hapio/Resources/Hapio/UI/ThreePlayerLobby/Choice3.png",
+      "sourceNodeId": "5820:32889",
+      "pickerState": "Available",
+      "stateReferenceNodeId": "5820:32889",
+      "strokeWeight": 2.5,
+      "dashPattern": [
+        8,
+        8
+      ],
+      "opacity": 1,
+      "strokeAlign": "INSIDE",
+      "exportState": "Original portrait/crop/paper preserved. Approved Figma state stroke copied on temporary instance only; profile opacity baked once; check and taken stamp are separate original overlays."
+    },
+    {
+      "name": "Choice4",
+      "scale": 4,
+      "png": [
+        212,
+        212
+      ],
+      "sha256": "7993a6f85bb05f78bcac7806049d8b78d872d2c26db3e8118386efb06b407378",
+      "asset": "Assets/Hapio/Resources/Hapio/UI/ThreePlayerLobby/Choice4.png",
+      "sourceNodeId": "5820:32897",
+      "pickerState": "Available",
+      "stateReferenceNodeId": "5820:32889",
+      "strokeWeight": 2.5,
+      "dashPattern": [
+        8,
+        8
+      ],
+      "opacity": 1,
+      "strokeAlign": "INSIDE",
+      "exportState": "Original portrait/crop/paper preserved. Approved Figma state stroke copied on temporary instance only; profile opacity baked once; check and taken stamp are separate original overlays."
+    },
+    {
+      "name": "Choice5",
+      "scale": 4,
+      "png": [
+        212,
+        212
+      ],
+      "sha256": "edc5684b429fa0185f7410a764c28fd14f32092dfe5c10c2206f761ffe471037",
+      "asset": "Assets/Hapio/Resources/Hapio/UI/ThreePlayerLobby/Choice5.png",
+      "sourceNodeId": "5820:32904",
+      "pickerState": "Available",
+      "stateReferenceNodeId": "5820:32889",
+      "strokeWeight": 2.5,
+      "dashPattern": [
+        8,
+        8
+      ],
+      "opacity": 1,
+      "strokeAlign": "INSIDE",
+      "exportState": "Original portrait/crop/paper preserved. Approved Figma state stroke copied on temporary instance only; profile opacity baked once; check and taken stamp are separate original overlays."
+    },
+    {
+      "name": "ChoiceCheck",
+      "scale": 4,
+      "png": [
+        144,
+        120
+      ],
+      "sha256": "dd0b5cb4d6f164e88d74e571a61ae4806dce021169a9d95bcffb8a0ce9ce6a82",
+      "sourceNodeId": "5820:32923",
+      "asset": "Assets/Hapio/Resources/Hapio/UI/ThreePlayerLobby/ChoiceCheck.png"
+    },
+    {
+      "name": "ChoiceSelected1",
+      "scale": 4,
+      "png": [
+        212,
+        212
+      ],
+      "sha256": "66375e76ab7148bb78d302cada6f006fc64d2f28fb196ec3c002f42c07ec1f0e",
+      "asset": "Assets/Hapio/Resources/Hapio/UI/ThreePlayerLobby/ChoiceSelected1.png",
+      "sourceNodeId": "5820:32883",
+      "pickerState": "Selected",
+      "stateReferenceNodeId": "5820:32922",
+      "strokeWeight": 3,
+      "dashPattern": [],
+      "opacity": 1,
+      "strokeAlign": "INSIDE",
+      "exportState": "Original portrait/crop/paper preserved. Approved Figma state stroke copied on temporary instance only; profile opacity baked once; check and taken stamp are separate original overlays."
+    },
+    {
+      "name": "ChoiceSelected2",
+      "scale": 4,
+      "png": [
+        212,
+        212
+      ],
+      "sha256": "e9811e50ffceee7b9b604f661248151797867a4a6aa0de6ef2f3bdced6cbb05e",
+      "asset": "Assets/Hapio/Resources/Hapio/UI/ThreePlayerLobby/ChoiceSelected2.png",
+      "sourceNodeId": "5820:32893",
+      "pickerState": "Selected",
+      "stateReferenceNodeId": "5820:32922",
+      "strokeWeight": 3,
+      "dashPattern": [],
+      "opacity": 1,
+      "strokeAlign": "INSIDE",
+      "exportState": "Original portrait/crop/paper preserved. Approved Figma state stroke copied on temporary instance only; profile opacity baked once; check and taken stamp are separate original overlays."
+    },
+    {
+      "name": "ChoiceSelected3",
+      "scale": 4,
+      "png": [
+        212,
+        212
+      ],
+      "sha256": "9ed7b6913475361143f8cd13e467bca927c079568489d07a620060e73893935b",
+      "asset": "Assets/Hapio/Resources/Hapio/UI/ThreePlayerLobby/ChoiceSelected3.png",
+      "sourceNodeId": "5820:32889",
+      "pickerState": "Selected",
+      "stateReferenceNodeId": "5820:32922",
+      "strokeWeight": 3,
+      "dashPattern": [],
+      "opacity": 1,
+      "strokeAlign": "INSIDE",
+      "exportState": "Original portrait/crop/paper preserved. Approved Figma state stroke copied on temporary instance only; profile opacity baked once; check and taken stamp are separate original overlays."
+    },
+    {
+      "name": "ChoiceSelected4",
+      "scale": 4,
+      "png": [
+        212,
+        212
+      ],
+      "sha256": "1755e4222fc0d2d09dd9de77b6424a95559a98654116e73a0ff6056e0004663b",
+      "asset": "Assets/Hapio/Resources/Hapio/UI/ThreePlayerLobby/ChoiceSelected4.png",
+      "sourceNodeId": "5820:32897",
+      "pickerState": "Selected",
+      "stateReferenceNodeId": "5820:32922",
+      "strokeWeight": 3,
+      "dashPattern": [],
+      "opacity": 1,
+      "strokeAlign": "INSIDE",
+      "exportState": "Original portrait/crop/paper preserved. Approved Figma state stroke copied on temporary instance only; profile opacity baked once; check and taken stamp are separate original overlays."
+    },
+    {
+      "name": "ChoiceSelected5",
+      "scale": 4,
+      "png": [
+        212,
+        212
+      ],
+      "sha256": "cb209b093a7487aeb3d693445ee9c4c0afe88a27653f8355a59fcdb1bfbb5c5c",
+      "asset": "Assets/Hapio/Resources/Hapio/UI/ThreePlayerLobby/ChoiceSelected5.png",
+      "sourceNodeId": "5820:32904",
+      "pickerState": "Selected",
+      "stateReferenceNodeId": "5820:32922",
+      "strokeWeight": 3,
+      "dashPattern": [],
+      "opacity": 1,
+      "strokeAlign": "INSIDE",
+      "exportState": "Original portrait/crop/paper preserved. Approved Figma state stroke copied on temporary instance only; profile opacity baked once; check and taken stamp are separate original overlays."
+    },
+    {
+      "name": "ChoiceTaken1",
+      "scale": 4,
+      "png": [
+        212,
+        212
+      ],
+      "sha256": "767489c805577e47ecb7f3647413be68e2ba8163b4867e2f3ba9fe3852952c83",
+      "asset": "Assets/Hapio/Resources/Hapio/UI/ThreePlayerLobby/ChoiceTaken1.png",
+      "sourceNodeId": "5820:32883",
+      "pickerState": "Taken",
+      "stateReferenceNodeId": "5820:32883",
+      "strokeWeight": 1.327868938446045,
+      "dashPattern": [],
+      "opacity": 0.25,
+      "strokeAlign": "INSIDE",
+      "exportState": "Original portrait/crop/paper preserved. Approved Figma state stroke copied on temporary instance only; profile opacity baked once; check and taken stamp are separate original overlays."
+    },
+    {
+      "name": "ChoiceTaken2",
+      "scale": 4,
+      "png": [
+        212,
+        212
+      ],
+      "sha256": "18c5d580765bc49c33cc8e70843c99b12b5cb337645ddbdeec0cce1eefabb134",
+      "asset": "Assets/Hapio/Resources/Hapio/UI/ThreePlayerLobby/ChoiceTaken2.png",
+      "sourceNodeId": "5820:32893",
+      "pickerState": "Taken",
+      "stateReferenceNodeId": "5820:32897",
+      "strokeWeight": 1.327868938446045,
+      "dashPattern": [],
+      "opacity": 0.25,
+      "strokeAlign": "INSIDE",
+      "exportState": "Original portrait/crop/paper preserved. Approved Figma state stroke copied on temporary instance only; profile opacity baked once; check and taken stamp are separate original overlays."
+    },
+    {
+      "name": "ChoiceTaken3",
+      "scale": 4,
+      "png": [
+        212,
+        212
+      ],
+      "sha256": "fcc3fd999d72557f9eba25a6746641c137273c66cd2e5e8a83761d4d0bea5a12",
+      "asset": "Assets/Hapio/Resources/Hapio/UI/ThreePlayerLobby/ChoiceTaken3.png",
+      "sourceNodeId": "5820:32889",
+      "pickerState": "Taken",
+      "stateReferenceNodeId": "5820:32897",
+      "strokeWeight": 1.327868938446045,
+      "dashPattern": [],
+      "opacity": 0.25,
+      "strokeAlign": "INSIDE",
+      "exportState": "Original portrait/crop/paper preserved. Approved Figma state stroke copied on temporary instance only; profile opacity baked once; check and taken stamp are separate original overlays."
+    },
+    {
+      "name": "ChoiceTaken4",
+      "scale": 4,
+      "png": [
+        212,
+        212
+      ],
+      "sha256": "4ed1bca042671e5e8dfb053183c56604ec97cef6c8de304c12561f30759b43cb",
+      "asset": "Assets/Hapio/Resources/Hapio/UI/ThreePlayerLobby/ChoiceTaken4.png",
+      "sourceNodeId": "5820:32897",
+      "pickerState": "Taken",
+      "stateReferenceNodeId": "5820:32897",
+      "strokeWeight": 1.327868938446045,
+      "dashPattern": [],
+      "opacity": 0.25,
+      "strokeAlign": "INSIDE",
+      "exportState": "Original portrait/crop/paper preserved. Approved Figma state stroke copied on temporary instance only; profile opacity baked once; check and taken stamp are separate original overlays."
+    },
+    {
+      "name": "ChoiceTaken5",
+      "scale": 4,
+      "png": [
+        212,
+        212
+      ],
+      "sha256": "24c07d24e2c314965e73f963dd3cc2bfbd60d2505d7c3ec076b9842c7c8b4d6e",
+      "asset": "Assets/Hapio/Resources/Hapio/UI/ThreePlayerLobby/ChoiceTaken5.png",
+      "sourceNodeId": "5820:32904",
+      "pickerState": "Taken",
+      "stateReferenceNodeId": "5820:32897",
+      "strokeWeight": 1.327868938446045,
+      "dashPattern": [],
+      "opacity": 0.25,
+      "strokeAlign": "INSIDE",
+      "exportState": "Original portrait/crop/paper preserved. Approved Figma state stroke copied on temporary instance only; profile opacity baked once; check and taken stamp are separate original overlays."
+    },
+    {
+      "name": "Close",
+      "scale": 4,
+      "png": [
+        148,
+        148
+      ],
+      "sha256": "15256bbbfccaeee08777a5ff2a707fc1c284045ad9b932820cf16ae368cfecbf",
+      "sourceNodeId": "I5820:32876;4418:1709",
+      "asset": "Assets/Hapio/Resources/Hapio/UI/ThreePlayerLobby/Close.png"
+    },
+    {
+      "name": "Empty1",
+      "scale": 4,
+      "png": [
+        164,
+        164
+      ],
+      "sha256": "9456639d054e27d55ecdc8e7c38828a78811e76f160dcefa61cc612b54bc2fac",
+      "sourceNodeId": "I5820:31066;4746:2219",
+      "asset": "Assets/Hapio/Resources/Hapio/UI/ThreePlayerLobby/Empty1.png"
+    },
+    {
+      "name": "Empty2",
+      "scale": 4,
+      "png": [
+        164,
+        164
+      ],
+      "sha256": "5f843cc34397b97d0b854e71944e81d2cdcf8e04cf681f0c01554dcd1e81be8b",
+      "sourceNodeId": "I5820:31066;4746:2220",
+      "asset": "Assets/Hapio/Resources/Hapio/UI/ThreePlayerLobby/Empty2.png"
+    },
+    {
+      "name": "Empty3",
+      "scale": 4,
+      "png": [
+        164,
+        164
+      ],
+      "sha256": "b5f200d764a90af94b550902c6704c55cbad4c206f8137eb8c513a54d8f0c0d6",
+      "sourceNodeId": "I5820:31066;4746:2221",
+      "asset": "Assets/Hapio/Resources/Hapio/UI/ThreePlayerLobby/Empty3.png"
+    },
+    {
+      "name": "PopupPanel",
+      "scale": 4,
+      "png": [
+        1392,
+        1040
+      ],
+      "sha256": "5c1bacb8e962fdd5338bc004a0d4d730852c6593fb6c01bc350371052fe1ae73",
+      "sourceNodeId": "I5820:32876;4418:1668",
+      "asset": "Assets/Hapio/Resources/Hapio/UI/ThreePlayerLobby/PopupPanel.png",
+      "exportState": "Original panel copied without its separately exported close-button child."
+    },
+    {
+      "name": "Seat1",
+      "scale": 4,
+      "png": [
+        177,
+        262
+      ],
+      "sha256": "8e1aeec70444f535399679f6a863e4eb0457dbb2163995c829005cf037795ed3",
+      "sourceNodeId": "5808:5334",
+      "asset": "Assets/Hapio/Resources/Hapio/UI/ThreePlayerLobby/Seat1.png",
+      "includesCharacterName": true
+    },
+    {
+      "name": "Seat2",
+      "scale": 4,
+      "png": [
+        177,
+        262
+      ],
+      "sha256": "fd7c57f74dd1651d1729fa5e68a4570f71540c90b643d365a7f786f97cda84d7",
+      "sourceNodeId": "5808:5338",
+      "asset": "Assets/Hapio/Resources/Hapio/UI/ThreePlayerLobby/Seat2.png",
+      "includesCharacterName": true
+    },
+    {
+      "name": "Seat3",
+      "scale": 4,
+      "png": [
+        179,
+        262
+      ],
+      "sha256": "eb752afe08da554fbdff44429d45614f7c242d95bda297ffabc5505e8a60f43d",
+      "sourceNodeId": "5808:5337",
+      "asset": "Assets/Hapio/Resources/Hapio/UI/ThreePlayerLobby/Seat3.png",
+      "includesCharacterName": true
+    },
+    {
+      "name": "Seat4",
+      "scale": 4,
+      "png": [
+        178,
+        262
+      ],
+      "sha256": "b9ced56d1ce508bd24de0b689956de9a4788fb750bda1ac491454fb59a329314",
+      "sourceNodeId": "5808:5335",
+      "asset": "Assets/Hapio/Resources/Hapio/UI/ThreePlayerLobby/Seat4.png",
+      "includesCharacterName": true
+    },
+    {
+      "name": "Seat5",
+      "scale": 4,
+      "png": [
+        179,
+        262
+      ],
+      "sha256": "45efd15a3a7cfe1feddb7a7a912a538ae7c61b74bf66dec7ef157aa254e66cc4",
+      "sourceNodeId": "5808:5336",
+      "asset": "Assets/Hapio/Resources/Hapio/UI/ThreePlayerLobby/Seat5.png",
+      "includesCharacterName": true
+    },
+    {
+      "name": "SeatHost1",
+      "scale": 4,
+      "png": [
+        232,
+        292
+      ],
+      "sha256": "1e3d8fc15f774bbc05527f6dfd3aceddf0ffec06de7238611912f56e33e93dcf",
+      "sourceNodeId": "5808:5339",
+      "asset": "Assets/Hapio/Resources/Hapio/UI/ThreePlayerLobby/SeatHost1.png",
+      "includesCharacterName": true
+    },
+    {
+      "name": "SeatHost2",
+      "scale": 4,
+      "png": [
+        232,
+        292
+      ],
+      "sha256": "cc8ad127f3f4d37443a24db90fae967e634ef6ce758fbe2f9a82109e3ed52df4",
+      "sourceNodeId": "5808:5343",
+      "asset": "Assets/Hapio/Resources/Hapio/UI/ThreePlayerLobby/SeatHost2.png",
+      "includesCharacterName": true
+    },
+    {
+      "name": "SeatHost3",
+      "scale": 4,
+      "png": [
+        232,
+        292
+      ],
+      "sha256": "cfa0629e19d8366b4d3529fabd86a911f9a1f2f47f8026b6df4aaa2aa9e895a0",
+      "sourceNodeId": "5808:5342",
+      "asset": "Assets/Hapio/Resources/Hapio/UI/ThreePlayerLobby/SeatHost3.png",
+      "includesCharacterName": true
+    },
+    {
+      "name": "SeatHost4",
+      "scale": 4,
+      "png": [
+        232,
+        292
+      ],
+      "sha256": "601c45fd84535c3002a218eeb3320a5f4a45b68010901e98437c778669ba92e5",
+      "sourceNodeId": "5808:5340",
+      "asset": "Assets/Hapio/Resources/Hapio/UI/ThreePlayerLobby/SeatHost4.png",
+      "includesCharacterName": true
+    },
+    {
+      "name": "SeatHost5",
+      "scale": 4,
+      "png": [
+        232,
+        292
+      ],
+      "sha256": "24792d0e69094f7898d800da7f3df9028cf77d050d77fe79c498ba3d7141949b",
+      "sourceNodeId": "5808:5341",
+      "asset": "Assets/Hapio/Resources/Hapio/UI/ThreePlayerLobby/SeatHost5.png",
+      "includesCharacterName": true
+    },
+    {
+      "name": "Taken",
+      "scale": 4,
+      "png": [
+        174,
+        124
+      ],
+      "sha256": "246ba45a1b5069be519bd4f1cbb058d761e0ed2c8045ec1dcc842a8546136f75",
+      "sourceNodeId": "5820:32884",
+      "asset": "Assets/Hapio/Resources/Hapio/UI/ThreePlayerLobby/Taken.png"
+    }
+  ],
+  "characterIds": {
+    "1": "불이",
+    "2": "솔이",
+    "3": "묵이",
+    "4": "금옥",
+    "5": "만복"
+  },
+  "pickerOrder": [
+    1,
+    3,
+    2,
+    4,
+    5
+  ],
+  "exportMethod": "Figma Plugin API node.exportAsync, PNG SCALE 4, intrinsic transparency; no canvas or ancestor background",
+  "temporaryExportCopiesRemoved": true,
+  "originalNodesPreserved": true,
+  "pickerStates": {
+    "Available": {
+      "reference": "5820:32889",
+      "strokeWeight": 2.5,
+      "dashPattern": [
+        8,
+        8
+      ],
+      "opacity": 1,
+      "nameOpacity": 1,
+      "overlay": null
+    },
+    "Taken": {
+      "reference": "5820:32897",
+      "buliReference": "5820:32883",
+      "strokeWeight": 1.327868938446045,
+      "dashPattern": [],
+      "opacity": 0.25,
+      "nameOpacity": 0.56,
+      "overlay": "Taken",
+      "interactable": false
+    },
+    "Selected": {
+      "reference": "5820:32922",
+      "strokeWeight": 3,
+      "dashPattern": [],
+      "opacity": 1,
+      "nameOpacity": 1,
+      "nameColor": "#312B23",
+      "overlay": "ChoiceCheck"
+    }
+  }
+}
