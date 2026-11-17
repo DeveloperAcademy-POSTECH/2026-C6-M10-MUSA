@@ -80,11 +80,23 @@ QR 설정은 `Assets/Hapio/Resources/Hapio/Demo/Staff/FinalPageConfig.asset`의 
 | QR 안내 | 앱스토어에서 만나보시오. |
 | 복귀 버튼 | 수장고로 돌아가기 |
 
-원본 `02cb8.png`의 QR을 해독한 목적지는 [합이오 App Store 페이지](https://apps.apple.com/kr/app/hap-io/id6827923355?l=en-GB)다. 이 주소를 `FinalPageConfig.destinationUrl`에도 기록한다. QR 원본의 검은 무늬·투명 배경과 기존 종이·구름 원본을 그대로 사용하며, QR을 새로 만들어 바꾸지 않는다. QR 미할당 안내는 `Show(null)` 등 편집기 미리보기의 대체 표시로 남긴다. 실제 시연 빌드는 QR Sprite와 목적지 주소가 모두 있어야 한다. QR 미할당 안내는 `Show(null)` 등 편집기 미리보기의 대체 표시로 남긴다. 실제 시연 빌드는 QR Sprite와 유효한 목적지 URL이 없으면 검증에서 중단한다.
+원본 `02cb8.png`의 QR을 해독한 목적지는 [합이오 App Store 페이지](https://apps.apple.com/kr/app/hap-io/id6827923355?l=en-GB)다. 이 주소를 `FinalPageConfig.destinationUrl`에도 기록한다. QR 원본의 검은 무늬·투명 배경과 기존 종이·구름 원본을 그대로 사용하며, QR을 새로 만들어 바꾸지 않는다. QR 미할당 안내는 `Show(null)` 등 편집기 미리보기의 대체 표시로 남긴다. 실제 시연 빌드는 QR Sprite와 유효한 목적지 URL이 없으면 검증에서 중단한다.
 
 Stage 2 Only에서 `수장고로 돌아가기`를 누르면 기존처럼 연결을 정리하고 Home의 A/B 방 선택으로 돌아간다. 일반 게임의 홈·로비·결과 Scene이나 스토리 순서는 변경하지 않는다. 후일담 `마치기` 터치의 연속 입력 차단과 Host의 결과 수신 확인 조건도 유지한다.
 
 이미 저장된 화면으로 빌드할 때는 UI 갱신 메뉴를 실행할 필요가 없다. 마무리 페이지만 명시적으로 갱신할 때는 `Hapio > Demo > Update Showcase Final Page`를 사용한다(`StaffStageDemoStoryAssets.UpdateFinalPage`). 이 메뉴는 로비·캐릭터 팝업·선택 화면을 다시 만들지 않는다. 이후 Figma 변경을 반영할 때도 공통 로비 전체 갱신과 QR 페이지 갱신을 구분한다.
+
+### 버튼과 QR 테두리 원본 이미지 (#800)
+
+마무리 페이지의 복귀 버튼 배경과 QR 테두리는 Figma에서 추출한 원본 외곽을 사용한다. `Assets/Hapio/Art/UI/Showcase/`의 `ReturnButtonNormal.png`, `ReturnButtonPressed.png`, `QrBorder.png`는 각각 기본 버튼 배경·눌린 버튼 배경·투명 중심의 QR 테두리다. 글자는 배경에 굽지 않고 기존 편집 가능한 UI 텍스트로 유지한다. 일반 게임의 공통 버튼과 로비는 바꾸지 않는다.
+
+- 버튼은 `SpriteSwap`으로 기본·눌림 이미지를 교체한다. 색이 들어 있는 원본에 빨간색을 다시 곱하지 않도록 이미지의 기본 색은 흰색이다. 강조·선택·비활성 상태는 기본 이미지를 유지하며, Host의 결과 수신 확인과 입력 해제 조건은 기존처럼 클릭 가능 여부만 결정한다.
+- 원본 외곽은 4배 해상도 PNG로 보존하며, Figma가 내보낸 여백도 함께 배치한다. 보이는 배경은 여백을 포함해 351×64지만 실제 클릭 영역은 기존 위치의 349×58이다. 배경 그림은 클릭을 가로채지 않으며 투명한 부모 영역이 입력을 받는다.
+- QR은 기존 `02cb8.png`와 종이 배경을 유지한다. `QrBorder.png`에는 테두리만 포함하며, 이전 생성형 테두리를 함께 겹치거나 QR 뒤에 흰색 판을 추가하지 않는다. 실제 화면에 배치한 QR도 같은 App Store 주소로 읽히는지 확인한다.
+
+Figma에서 선택한 원본 벡터는 `Assets/Hapio/Art/UI/Showcase/Source/`에 보존한다. `FigmaSource.json`에는 선택한 노드·경로, 원본과 PNG의 해시, 4배 렌더 배율과 여백을 기록한다. 원본 폰트나 공유 UI를 바꾸지 않고 글자 없는 배경·테두리만 추출한다.
+
+이 세 이미지는 저장된 최종 페이지에서 참조한다. 이미 저장된 페이지로 빌드할 때 추가 설정은 필요 없다. 버튼 배경과 QR 테두리만 다시 적용하려면 `Hapio > Demo > Update Showcase Original Shapes`(`StaffStageDemoStoryAssets.UpdateFinalPageShapes`)를 사용한다. 이 메뉴는 저장된 페이지의 나머지 문구·그림·배치를 보존한다. `Update Showcase Final Page`는 새 원본 Sprite를 사용하면서 최종 페이지 전체를 다시 구성하는 별도 메뉴다. 버튼 클릭 영역·문구·후일담→QR→A/B 복귀 동작과 한 번만 복귀하는 보호는 유지한다.
 
 ## 후일담 완료 후 QR 직행 (#782)
 
@@ -104,6 +116,7 @@ Stage 2 Only에서 `수장고로 돌아가기`를 누르면 기존처럼 연결�
 | 저장된 스태프 선택 UI를 명시적으로 준비/갱신 | `Hapio > Demo > Update Staff Demo UI` |
 | 보존된 스토리 사본·마무리 페이지를 명시적으로 준비/갱신 | `Hapio > Demo > Update Staff Stage Demo Stories and Final Page` |
 | 로비·스토리를 유지하고 마무리 페이지만 명시적으로 갱신 | `Hapio > Demo > Update Showcase Final Page` |
+| 마무리 페이지의 나머지 객체를 유지하고 버튼·QR 테두리만 갱신 | `Hapio > Demo > Update Showcase Original Shapes` |
 | 배포용 Mac | `Hapio > Demo Build > Release > Build Mac App` |
 | 배포용 iOS Xcode 프로젝트 | `Hapio > Demo Build > Release > Export iOS Xcode Project` |
 | DEV 사용 가능 Mac/iOS 확인용 | `Hapio > Demo Build > Development QA` 아래 대상 메뉴 |

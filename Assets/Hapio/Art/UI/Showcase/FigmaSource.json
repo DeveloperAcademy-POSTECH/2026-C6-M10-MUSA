@@ -28,5 +28,58 @@
   "reusedAssets": [
     "Assets/Hapio/Art/Story/StageStories/624c4.png",
     "Assets/Hapio/Art/Story/StageStories/5e97a.png"
-  ]
+  ],
+  "shapeAssets": {
+    "issue": 800,
+    "exportScale": 4,
+    "rasterizer": "Figma PNG export, sRGB, transparent, full SVG canvas",
+    "extraction": "Original exported fill/stroke path data selected without redrawing; button text omitted; QR fill omitted. Temporary path-only SVG export nodes removed. Original source nodes unchanged.",
+    "assets": [
+      {
+        "file": "ReturnButtonNormal.png",
+        "sourceVector": "Source/ReturnButtonNormal.svg",
+        "figmaNodeId": "5706:14524",
+        "renderOffset": [
+          -0.60546875,
+          -4
+        ],
+        "renderCanvasSize": [
+          351,
+          64
+        ],
+        "sha256": "d9e14a26c7d4eaf19a5ef36d5fd0318a49d34fa106918749cc4528417dbdf325",
+        "sourceVectorSha256": "29675de94a64966df3e4ba4589288b2aa1060664a867e24a36edcf80764fae08"
+      },
+      {
+        "file": "ReturnButtonPressed.png",
+        "sourceVector": "Source/ReturnButtonPressed.svg",
+        "figmaNodeId": "4788:3507",
+        "renderOffset": [
+          -0.60546875,
+          -4
+        ],
+        "renderCanvasSize": [
+          351,
+          64
+        ],
+        "sha256": "e7bdb7cc73e3203e2ff2eb08c7791a0b0e457ddc9b4bf74e60ffe8c3d46cfe14",
+        "sourceVectorSha256": "1e70b2e95990aee7876dcdba36f8416a9ebfc436668b52cefd69c1fd8d128c7a"
+      },
+      {
+        "file": "QrBorder.png",
+        "sourceVector": "Source/QrBorder.svg",
+        "figmaNodeId": "5706:14864",
+        "renderOffset": [
+          -2.431640625,
+          -1.8515625
+        ],
+        "renderCanvasSize": [
+          187,
+          190
+        ],
+        "sha256": "db5bdb2e3a675d6b450b6dbb142e5583ed3b51fa9027e3ec542d9775a2270a48",
+        "sourceVectorSha256": "3a7fb16f19db93ce287a0be2ef67d8e9beb527cf5c623ae9da14dc99625ef496"
+      }
+    ]
+  }
 }

@@ -9628,3 +9628,17 @@ main `cef1579d`의 #760 관람·#762 땅따먹기 박/Game56·#727 튜토리얼�
 - **미검증:** Mac Release 앱 실제 실행, iPhone/iPad 설치·터치·실기기 QR 인식, 실제 Wi-Fi/핫스팟/이더넷 여러 기기 동시 플레이. 로비/캐릭터 팝업의 추가 Figma 변경은 이번 범위 밖이다.
 
 - **PR 준비 확인:** 원격 main이 기준 `2e3666b7`과 동일하고 검사 대상 코드·에셋이 그대로임을 재확인했다. 최종 검토의 추가 변경은 QR 미지정 안내와 저장 빌드 검증의 차이를 명확히 한 문서뿐이므로 자동 검사·빌드는 반복하지 않았다.
+
+
+## #800 시연 마무리 페이지 Figma 원본 도형 교체 (2026-11-17)
+
+- **기준·범위:** main `e2d84d22`에서 `fix/#800-showcase-figma-shapes`로 분기했다. 시연 FinalPage의 생성형 버튼 배경과 QR 외곽만 원본 이미지로 바꿨다. 런타임 스크립트·Config·글꼴·원본 QR·일반 게임·로비·캐릭터 팝업·Scene·통신·게임 규칙은 변경하지 않았다.
+- **원본 추출:** Figma UI/시연용(`5706:14518`)의 버튼 기본(`5706:14524`)·눌림(`4788:3507`)·QR(`5706:14864`)에서 내보낸 SVG의 해당 fill/stroke 경로만 그대로 분리했다. 원본 복제 시 MCP의 Shilla 커스텀 글꼴을 불러올 수 없어, 텍스트를 건드리지 않는 경로 추출로 전환했다. 경로 좌표를 다시 만들지 않았다. 임시 벡터 노드에서 Figma sRGB PNG4배 내보내기 후 모두 제거했고 원본 노드는 변경하지 않았다. 페이지 자식 목록 복원도 확인했다. PNG는 버튼1404×256 두 장·QR테두리748×760 한 장이며 투명 모서리와 QR 중심 alpha0을 확인했다. 원본 경로·노드·SHA256·여백·배율은 Source SVG와 FigmaSource.json에 보존한다.
+- **연결·보존:** 기존 Prefab을 LoadPrefabContents로 열어 도형만 교체하는 `Update Showcase Original Shapes` 메뉴를 추가했다. 전체 페이지 생성 도구도 같은 원본을 사용한다. 버튼의 투명 부모 Image가 기존349×58 입력 영역을 받고, 흰색 틴트의 자식 Image가 여백 포함351×64 그림을 표시한다. SpriteSwap으로 눌림 원본을 사용한다. QR 외곽은 투명 중심의187×190 원본으로 교체했다. 기존 런타임 필드 fileID 연결과 다른 요소 배치를 보존했다.
+- **검사 범위:** 화면·Prefab·에셋·Editor 작성 도구만 바뀌었으므로 컴파일·전체 EditMode와 관련 PlayMode를 실행했다. 공통 입력·세션·판정·Scene 흐름 변경이 없어 전체 PlayMode903건은 반복하지 않았다. 검증 이후 추가 변경은 문서뿐이다.
+- **자동 검사(Unity6000.6.5f1, macOS 연결 Editor):** 컴파일 오류0. 전체 EditMode **2605/2605 PASS**(40.89초). 관련 PlayMode **11/11 PASS**: StaffDemoFinalPageTests2(0.07초), GameStaffStageDemoFlowTests9(114.94초). 실패·skip·inconclusive0. 기존 완료 입력·늦은 ACK·한 번만 복귀·시연 완료 및 재도전 보호를 유지했다.
+- **실제 렌더·입력:** 교체 전과 교체 후를 같은390×844 GameView에서 저장된 Prefab+Show(Config)로 촬영하고 Figma 원본과 비교했다. 기본·눌림 이미지를 확인하고, 실제 중앙 Raycast의 첫 대상이 ReturnToSelection이며 클릭이 실행된 뒤 한 번만 복귀하도록 잠기는 것을 확인했다. 결과 수신 확인이 잠긴 상태도 확인했다. 교체 후 캡처의 QR은 같은 합이오 App Store 주소로 판독됐다. 전후 화면·원본·눌림 캡처는 로컬 산출물로 보관하며 저장소에 넣지 않는다. 이는 Editor 렌더 확인이며 iPhone 화면 검증으로 표기하지 않는다.
+- **iOS 빌드:** Stage2 Only Release Xcode 내보내기 Succeeded·오류0·식별 검증 통과. 알려진 Pipeline iOS 하위 플랫폼 조회 오류는 기존처럼 로컬 캐시에 플랫폼 조건만 임시 보완하고 내보내기 직후 원본 해시까지 복원했다. Packages/manifest/lock은 변경하지 않았다. Xcode ReleaseForRunning 서명 앱 BUILD SUCCEEDED, codesign deep/strict 검증 통과. 새 원본 PNG3장이 실제 내보내기 사용 에셋 목록에 포함됐다. 표시명 합이오_쇼케이스, Development=false, Staff4·5706·공유설정265·3인·Stage2를 유지했다.
+- **보존·종료 상태:** ProjectSettings·Build Settings·일반 로비·StageCatalog·저장 Scene 등41개 파일 해시와 기존 stash를 보존했다. Home·StandaloneOSX·Play 종료·미저장 Scene 없음·촬영용 객체0개로 복원했다. 빌드 산출물·개인 경로·기기 식별자·원시 로그는 커밋하지 않는다.
+- **범위 변경·미검증:** 사용자가 이번에는 빌드까지만 진행하도록 선택하여 기기 설치·실행을 하지 않았다. iPhone/iPad 실제 UI·터치·QR 인식과 다기기 플레이는 미검증이며 기존 기기 앱은 교체하지 않았다.
+- **PR 준비 재확인:** 최신 원격 main이 기준 `e2d84d22`와 같고 검증한 코드·에셋·패키지·설정이 유지됨을 확인했다. 독립 검토에서도 일반 게임과 보존 대상의 변경이 없었다. 검사 이후 추가 변경은 문서뿐이므로 같은 검사를 반복하지 않았다.
