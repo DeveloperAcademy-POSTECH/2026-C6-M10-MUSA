@@ -9541,3 +9541,15 @@ main `cef1579d`의 #760 관람·#762 땅따먹기 박/Game56·#727 튜토리얼�
 - **화면 확인(Mac Development 빌드, 임시 캡처 스크립트는 저장소에 남기지 않음):** 땅따먹기 1:1·2:2(청 P1·홍 P3 자리)의 전투 화면이 #785 이전 빌드와 같다. 스토리 3인 화면은 캐릭터 초상·패널 그대로다.
 - **남은 차이:** 스태미나 부족 연출의 색(빨간 층·가장자리·경고 글자)은 공유 `StaminaFeedbackProfile`을 쓰므로 #788에서 조정한 색이 땅따먹기에도 적용된다. #785 이전 색과 다르다.
 - **미검증:** 땅따먹기 3:3 전투 화면(Mac 한 대에서 6개 앱으로 방을 채우지 못함), 스태미나 부족 순간의 땅따먹기 화면, iPhone 실기기, 실제 Wi-Fi 여러 기기.
+
+
+## #791 — 클리어 후일담 건너뛰기 제거 (2026-11-17)
+
+- **기준:** 원격 main `7b17482b`, Unity 6000.6.5f1·macOS arm64, `feat/#791-afterstory-no-skip`. 일반 1·2·3스테이지와 시연용 후일담에서 사용자 건너뛰기만 제거했다. 화면 터치·마지막 다음 봉인/마치기·Host 수동 시작·시연 QR 직행과 기존 그만두기는 유지한다. 오프닝·튜토리얼·실패·최종 전체 엔딩·작성 미리보기는 기존 동작이다.
+- `StoryPlayer.UserSkipAllowed`는 저장되지 않는 인스턴스 정책이다. RequestSkip을 프레임 입력 처리 전에 차단하고, 실제 Skip 버튼의 활성/입력 상태를 보존·복원한다. 후일담 시작 전에 차단하고 컷 전환·Replay·관람 복귀에서 유지하며 최종 엔딩/표시 종료에서 해제한다. 직접 `Skip()`는 작성/검사 도구 API로 보존한다.
+- **검사 범위:** 공통 사용자 입력 정책과 결과 표시 수명에 영향이 있어 전체 EditMode·PlayMode를 선택했다. 먼저 새 입력 정책 4/4 PASS(11.35초), 실제 마우스 흐름 1/1 PASS(33.89초)로 변경 경로를 확인했다. 이후 컴파일 오류0, 전체 EditMode **2,598/2,598 PASS**(43.68초), 전체 PlayMode **900/900 PASS**(1251.54초), 실패·skip·inconclusive0.
+- 기존 후일담 Skip 표시/클릭 전제는 숨김·비활성화·우회 차단 및 순서대로 읽기 검사로 교체했다. `GameSceneFlowTests.UserSkipCannotBypassAfterStoryReadingOrItsManualStageAction`이 실제 후일담에서 어댑터·RequestSkip·숨긴 UnityEvent를 검사하고, `SavedStoryViewerAfterstoryTapsAndEndingButtonsReceiveRealMouseClicks`는 세 스테이지 후일담을 실제 InputSystem 마우스 클릭으로 읽는다. 기존 관람·결과 데이터·마지막 버튼·준비/Host 시작·최종 엔딩 Skip 검사를 유지했다. 공통 정책 단위3건을 추가했고 시연 9건의 QR/재도전 검사도 통과했다.
+- **화면:** Editor 실제 390×844 GameView에서 시연용 Host와 통신 참가자2명을 사용해 후일담 읽기 화면의 건너뛰기 숨김·비활성화와 `마치기→QR→A/B 선택`을 촬영했다. 좌상단의 기존 `그만두기`는 StageReady의 Quit.png와 일치하며 그대로 유지했다. 다른 참가자가 읽는 중에도 QR을 열 수 있었다. 촬영용 세션만 100% 초기 도색 등으로 단축하고 도구용 Next/Skip을 사용했으며, 실제 마우스 진행은 위 자동 검사와 구분한다.
+- 변경 C#5개·ProjectSettings27개·저장 Scene16개의 SHA-256이 검사 시작 시점과 동일했다. 기존 stash 목록도 동일하며 Scene·Prefab·Resources·Packages와 공유 설정·프로토콜을 변경하지 않았다. 새 SVG Importer가 만든 빈 값 뒤 공백1건만 사본 보존·값 비교 후 main 형식으로 복원했다.
+- 촬영 후 Play·통신 참가자·임시 시연 override를 종료하고 Home·원래 GameView 크기를 복원했다. 최종 추가 변경은 검증 문서뿐이므로 게임 검사를 반복하지 않는다.
+- **미실행:** 별도 Mac 앱 빌드/실행, iOS 내보내기·실기기 터치. Host 화면+통신 Guest 자동 검사/Editor 촬영을 독립 Guest 앱이나 실기기 확인으로 표기하지 않는다. 원시 로그·전체 검사 JSON·개인 경로·화면 산출물은 커밋하지 않는다.
