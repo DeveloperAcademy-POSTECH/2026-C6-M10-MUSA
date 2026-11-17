@@ -9583,3 +9583,16 @@ main `cef1579d`의 #760 관람·#762 땅따먹기 박/Game56·#727 튜토리얼�
 - Editor 실제390×844 화면에서 Host+통신 참가자2명으로 후일담 Skip 숨김·비활성화, 기존 그만두기·마치기·QR→A/B 복귀를 재확인했다. 카드 기록은 완료 단축용 직접 도색으로 공격 기록이 비어 있어, 별도 복사본에만 공동 수상 표시값60을 넣고 기존 CardRecords/StoryRecordHighlight 함수로 `불이(나), 묵이, 솔이` 표시와 글자 맞춤을 촬영했다. 실제 ResultSnapshot·전투 기록·판정은 변경하지 않았으며 표시 예시와 실제 진행 화면을 구분한다.
 - 관련 파일16개·ProjectSettings27개·저장 Scene16개의 검사 전후 해시가 동일하고 기존 stash도 보존했다. SVG Importer의 빈 값 뒤 공백만 사본 보존 후 원래 형식으로 복원했다. 촬영 후 Play·통신 참가자·임시 시연 override를 종료하고 Home·기존 GameView 크기를 복원했다. 이후 추가 변경은 문서뿐이므로 검사를 반복하지 않는다.
 - 별도 Mac 앱 빌드/실행과 iOS 내보내기·실기기, 독립 Guest UI는 미실행이다. 원시 로그·전체 검사 JSON·개인 경로·화면 산출물은 커밋하지 않는다.
+
+## 로비 캐릭터 선택 (2026-11-17)
+
+- **변경:** Hapio 스토리 방의 로비에서 자리를 누르면 캐릭터 5명 중 하나를 고르는 팝업이 뜨고, 자리와 캐릭터를 Host가 함께 승인한다. 고른 캐릭터는 로비 패킷과 전투 스냅샷(`LabPlayerState.character`)으로 전달돼 전투 HUD·미니맵·마지막 일격 자막·결과 이름·전투 문구에 쓰인다. 땅따먹기와 Lab 단독 방은 그대로다. 접속 묶음은 5706·`C6PhysicsLab/63`·`C6HapioGame/57`(설정 265개 그대로)이다.
+- **검사 범위 선정:** 통신 규약·세션·로비 규칙이 바뀌므로 전체 EditMode와 전체 PlayMode를 실행했다(Unity 6000.6.5f1 batch, macOS, 잠자기 방지, 기준 main `dc7841d2`).
+- **1차 전체 실행(`eef10dd1`, 캐릭터 없는 요청에 첫 빈 캐릭터를 주던 판):** EditMode 2604/2604 PASS. PlayMode 900개 중 899 PASS, 1 FAIL.
+  - 실패: `GameLobbyViewTests.CreatingARoomAutomaticallyEntersTheGameLobbyAndHostCanChooseClearAndCreateAnotherRoom`. 새로 쓴 검사가 팝업 바깥(가림막)을 화면 가운데 좌표로 눌렀는데 그 자리에 캐릭터 칸이 있었다. 구현 문제가 아니라 검사의 누르는 방식 문제여서 가림막 버튼을 직접 누르도록 고쳤다.
+- **규칙 변경 뒤 2차 전체 실행(`5e47272d`):** 캐릭터 없는 자리 요청을 거절(`CHARACTER_REQUIRED`)하고, 재입장 복구에서 캐릭터를 빼앗긴 경우 자리만 유지하도록 바꿨다. 기존 검사의 자리 요청은 캐릭터를 명시하도록 고쳤다. EditMode 2604/2604 PASS, PlayMode 900/900 PASS(실행 1075초, 벽시계도 18분).
+- **그 뒤 추가:** `LabLobbyRejoinTests.AReturningGuestGetsItsCharacterBackOrKeepsTheSeatAndPicksAgain`. 최초 실패 1회는 검사가 방장이 쓰는 1번 자리를 다른 손님에게 주려 한 것이라 자리 번호를 3으로 고쳤다. `LabLobbyRejoinTests`·`LabPlayerSlotsTests` 41/41 PASS. 팝업 불투명 바탕(표현만) 변경 뒤에는 전체 검사를 다시 돌리지 않았다.
+- **추가한 검사:** 캐릭터 중복 거절·잘못된 번호·자리 해제 시 캐릭터 해제·캐릭터 없는 요청 거절·`TryRestoreSeat`·로비 사본의 캐릭터 전달과 중복 거절(`LabPlayerSlotsTests`), 재입장 시 캐릭터 유지/자리만 유지(`LabLobbyRejoinTests`), 팝업 열림·선택·닫기·내 자리 해제와 자리 표시(`GameLobbyViewTests`), 고른 캐릭터가 캐릭터 대응·자막·결과 이름·전체 결과에 쓰이는지(`GameStageStoryPresentationTests`).
+- **화면 확인(Mac Development 빌드 앱 3개, 임시 캡처 스크립트는 저장소에 남기지 않음):** P1 만복·P2 불이·P3 금옥을 골랐다. 세 번째 사람의 팝업에서 불이·만복이 체크와 함께 흐려졌다. 로비 자리에 초상과 이름이 나오고, P1 전투 화면의 내 패널은 만복, 좌우 이웃은 불이·금옥, 미니맵도 같은 초상이다. 팝업 카드가 반투명해 뒤 자리가 비치던 것을 불투명 바탕으로 고친 뒤 다시 찍어 확인했다.
+- **최신 main 통합(`99a9e452`, #791 후일담 건너뛰기 제거):** 충돌은 AGENTS.md와 이 문서의 기록 추가뿐이며 양쪽을 보존했다. #791이 이야기 진행·결과 흐름·시연 흐름 검사를 바꿨으므로 합친 브랜치에서 전체 EditMode 2605/2605 PASS, PlayMode `GameSceneFlowTests`·`GameStaffStageDemoFlowTests`·`GameStaffDemoGroupIsolationTests`·`GameYaguangDemoFlowTests`·`StoryPlayerTests`·`GameLobbyViewTests`·`GameStageStoryPresentationTests`·`GameStageRetryPlayModeTests`·`LabLobbyRejoinNetworkTests`·`LabLobbyPositionSelectionTests`·`GameFinishReplayTests`·`GameBattleUiPresentationTests` 125/125 PASS. 통합 뒤 전체 PlayMode는 다시 돌리지 않았다.
+- **미검증:** 재입장 뒤 캐릭터 다시 고르기 화면(자동 팝업·"자리 비우기")과 그 네트워크 왕복은 규칙 검사로만 확인했다. 4·5인 방 화면, 고른 캐릭터의 마지막 일격 자막·봉인 카드 실제 화면, 스태프·야광귀 시연 빌드의 로비 화면, iPhone 실기기, 실제 Wi-Fi 여러 기기. 팝업은 Figma 시안 없이 만든 것이다.

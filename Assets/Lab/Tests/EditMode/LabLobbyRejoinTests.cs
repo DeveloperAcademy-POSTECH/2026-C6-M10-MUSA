@@ -23,15 +23,15 @@ namespace C6Lab.Tests
         [Test]
         public void AGameJoinMayAddARoomTicketAfterTheTokenButALabJoinMayNot()
         {
-            byte[] token = Encoding.ASCII.GetBytes("C6HapioGame/56");
+            byte[] token = Encoding.ASCII.GetBytes("C6HapioGame/57");
             Assert.That(Read(token, token, true, out string ticket), Is.True);
             Assert.That(ticket, Is.Null);
-            Assert.That(Read(Bytes("C6HapioGame/56|" + TicketA), token, true, out ticket), Is.True);
+            Assert.That(Read(Bytes("C6HapioGame/57|" + TicketA), token, true, out ticket), Is.True);
             Assert.That(ticket, Is.EqualTo(TicketA));
-            Assert.That(Read(Bytes("C6HapioGame/56|" + TicketA), token, false, out _), Is.False, "A Lab room accepts only its token.");
-            Assert.That(Read(Bytes("C6HapioGame/56|" + TicketA.ToUpperInvariant()), token, true, out _), Is.False);
-            Assert.That(Read(Bytes("C6HapioGame/56|" + TicketA.Substring(1)), token, true, out _), Is.False);
-            Assert.That(Read(Bytes("C6HapioGame/56:" + TicketA), token, true, out _), Is.False);
+            Assert.That(Read(Bytes("C6HapioGame/57|" + TicketA), token, false, out _), Is.False, "A Lab room accepts only its token.");
+            Assert.That(Read(Bytes("C6HapioGame/57|" + TicketA.ToUpperInvariant()), token, true, out _), Is.False);
+            Assert.That(Read(Bytes("C6HapioGame/57|" + TicketA.Substring(1)), token, true, out _), Is.False);
+            Assert.That(Read(Bytes("C6HapioGame/57:" + TicketA), token, true, out _), Is.False);
             Assert.That(Read(Bytes("C6HapioGame/47|" + TicketA), token, true, out _), Is.False, "An older game token is still a mismatch.");
             Assert.That(Read(Bytes("C6HapioGame/48|" + TicketA), token, true, out _), Is.False, "The old player-stat contract is not compatible.");
             Assert.That(Read(Bytes("C6HapioGame/49|" + TicketA), token, true, out _), Is.False, "The separate summary-start branch does not carry this statistic yet.");
@@ -41,8 +41,8 @@ namespace C6Lab.Tests
                 "An app that waits forever on a member's result screen cannot join.");
             Assert.That(Read(Bytes("C6HapioGame/55|" + TicketA), token, true, out _), Is.False,
                 "#762: an app that judges territory on the white gourd cannot join.");
-            Assert.That(Read(Bytes("C6PhysicsLab/61"), Bytes("C6PhysicsLab/62"), false, out _), Is.False);
-            Assert.That(Read(Bytes("C6PhysicsLab/62"), Bytes("C6PhysicsLab/62"), false, out _), Is.True);
+            Assert.That(Read(Bytes("C6PhysicsLab/62"), Bytes("C6PhysicsLab/63"), false, out _), Is.False);
+            Assert.That(Read(Bytes("C6PhysicsLab/63"), Bytes("C6PhysicsLab/63"), false, out _), Is.True);
             Assert.That(Read(null, token, true, out _), Is.False);
         }
 
@@ -124,6 +124,36 @@ namespace C6Lab.Tests
                 Assert.That(room.Approve(9, TicketA), Is.True);
                 room.Connect(9);
                 Assert.That(room.Slots.GetSlot(9), Is.Zero, "A place given up does not bring its P back.");
+            }
+        }
+
+        [Test]
+        public void AReturningGuestGetsItsCharacterBackOrKeepsTheSeatAndPicksAgain()
+        {
+            using (var room = new HostRoom(3))
+            {
+                // Held place: the seat comes back with the character it was taken with.
+                room.Join(5, TicketA, 2);
+                Assert.That(room.Slots.TrySelect(5, 2, 4, out _), Is.True);
+                room.Drop(5);
+                Assert.That(room.Slots.GetCharacterOwner(4), Is.EqualTo(5UL), "A held seat keeps its character taken.");
+                Assert.That(room.Approve(9, TicketA), Is.True);
+                room.Connect(9);
+                room.Hear(9);
+                Assert.That(room.Network.GetSlotOwner(2), Is.EqualTo(9UL));
+                Assert.That(room.Slots.GetCharacter(9), Is.EqualTo(4));
+
+                // After the hold ended someone else took the character: the seat is kept, the character is picked again.
+                room.Drop(9);
+                room.Expire(Time.realtimeSinceStartupAsDouble + LabNetwork.LobbySeatHoldSeconds + 1d);
+                Assert.That(room.Slots.GetCharacterOwner(4), Is.EqualTo(ulong.MaxValue), "The expired hold frees the character.");
+                room.Join(6, TicketB, 3);
+                Assert.That(room.Slots.TrySelect(6, 3, 4, out _), Is.True);
+                Assert.That(room.Approve(10, TicketA), Is.True);
+                room.Connect(10);
+                Assert.That(room.Network.GetSlotOwner(2), Is.EqualTo(10UL), "Its P is still free, so it comes back.");
+                Assert.That(room.Slots.GetCharacter(10), Is.Zero, "The character now belongs to someone else.");
+                Assert.That(room.Slots.GetCharacter(6), Is.EqualTo(4));
             }
         }
 

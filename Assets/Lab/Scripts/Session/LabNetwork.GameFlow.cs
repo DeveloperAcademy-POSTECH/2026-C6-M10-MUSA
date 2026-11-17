@@ -24,7 +24,8 @@ namespace C6Lab
         // 55: bounded result holds - a member's 'exit' from the final result or a retryable defeat is handled by the
         //     Host at once, and the Host may start after a 120 s hold (protocol 5704 and Lab 62 unchanged).
         // 56: #762 territory mounts the Stage2 Yagwanggwi gourd, so its hit shell and size (judgment) differ from 55.
-        private static readonly byte[] GameConnectionToken = Encoding.ASCII.GetBytes("C6HapioGame/56");
+        // 57: story lobby seats are taken together with one of five battle characters (protocol 5706, Lab 63).
+        private static readonly byte[] GameConnectionToken = Encoding.ASCII.GetBytes("C6HapioGame/57");
         private static readonly byte[] DemoGameConnectionToken = Encoding.ASCII.GetBytes("C6HapioDemo/" + LabGameBuildVariant.YaguangDemoRevision);
         public static string GameConnectionCompatibility => Encoding.ASCII.GetString(
             LabGameBuildVariant.IsStaffStageDemo ? StaffDemoToken(0, 0)
@@ -159,6 +160,7 @@ namespace C6Lab
             playerSlots = new LabPlayerSlots(targetParticipantCount);
             lobbySeatHolds.Clear();
             rememberedSlots.Clear();
+            rememberedCharacters.Clear();
             heldSeatOwners.Clear();
             ClearPendingSlotSelection();
             // Preserve slot request high-water marks: an old accepted request must not select a P again.

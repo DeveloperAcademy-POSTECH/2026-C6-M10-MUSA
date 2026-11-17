@@ -16,7 +16,7 @@ Figma `4185:2672`, `4203:1039`, `4203:1589`, `4234:1028`의 UI 부품을 Hapio �
 
 ## 기존 동작 연결
 
-#785의 [캐릭터 컴포넌트](https://www.figma.com/design/wW7ny7lNQ4DXNJ4kD46AuR/?node-id=5573-4233)와 [전투 화면](https://www.figma.com/design/wW7ny7lNQ4DXNJ4kD46AuR/?node-id=5548-6617)에 맞춰 구미호·야광귀·지귀의 인게임 프로필은 P1 불이, P2 묵이, P3 솔이, P4 금옥, P5 만복이다. 좌우 프로필은 이름 앞뒤에 방향을 붙인다. 자리 선택 UI와 실제 팀·자리 배정은 기존 흐름을 사용한다.
+#785의 [캐릭터 컴포넌트](https://www.figma.com/design/wW7ny7lNQ4DXNJ4kD46AuR/?node-id=5573-4233)와 [전투 화면](https://www.figma.com/design/wW7ny7lNQ4DXNJ4kD46AuR/?node-id=5548-6617)에 맞춰 구미호·야광귀·지귀의 인게임 프로필은 P1 불이, P2 묵이, P3 솔이, P4 금옥, P5 만복이다. 이것은 캐릭터를 고르지 않은 경우(DEV 솔로 등)의 기본 대응이다. 로비에서 자리와 함께 캐릭터를 고른 방은 고른 캐릭터를 쓴다(`LabPlayerState.character`, `LabHud.BattleCharacterIndex`). 좌우 프로필은 이름 앞뒤에 방향을 붙인다. 자리 선택 UI와 실제 팀·자리 배정은 기존 흐름을 사용한다.
 
 스토리에서 플레이어를 가리키는 글자도 캐릭터 이름이다: 마지막 일격 자막, 결과 화면의 수상자("불이, 묵이(나)"), 매혹 경고("요괴가 나와 솔이에게…"), 콤보 색 틀림("묵이 색 틀림"). 모두 `LabHud.BattlePlayerLabel(snapshot, P번호, 이름표)`를 거친다. 이름표(`LabHud.battleCharacterNames`)가 없거나 땅따먹기 스냅샷이면 "P번호"를 돌려준다. Lab 수동 화재 실험의 지귀 안내(`LabJigwiHud`)와 지금 흐름에서 쓰지 않는 3-2-1 번호 칩은 P번호 그대로다.
 

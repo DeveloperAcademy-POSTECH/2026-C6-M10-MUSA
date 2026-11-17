@@ -505,6 +505,9 @@ namespace C6Lab
             if (number <= 0) return -1;
             if (snapshot == null || !snapshot.teamTerritory)
             {
+                // The character chosen with the seat in the lobby; without one (DEV solo, tutorial, Lab) it follows the P number.
+                int chosen = ChosenCharacter(snapshot, number);
+                if (chosen > 0) return chosen - 1;
                 if (number == 2) return mugi;
                 if (number == 3) return soli;
                 return number - 1;
@@ -516,6 +519,15 @@ namespace C6Lab
                 case LabTeam.Red: return buri;
                 default: return -1;
             }
+        }
+
+        private static int ChosenCharacter(LabSnapshot snapshot, int number)
+        {
+            LabPlayerState[] players = snapshot?.players;
+            if (players == null) return 0;
+            foreach (LabPlayerState player in players)
+                if (player != null && player.seat == number - 1) return player.character;
+            return 0;
         }
 
         private static LabTeam BattleSeatTeam(LabSnapshot snapshot, int number)

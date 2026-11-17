@@ -66,12 +66,12 @@ namespace C6Lab.Tests
                 byte[] lab = Token(network);
                 Assert.That(network.SetGameFlowEnabled(true), Is.True);
                 byte[] normal = Token(network);
-                Assert.That(Encoding.ASCII.GetString(normal), Is.EqualTo("C6HapioGame/56"));
+                Assert.That(Encoding.ASCII.GetString(normal), Is.EqualTo("C6HapioGame/57"));
                 string normalDiscovery = LabBonjourDiscovery.ProtocolFor(LabRoomFamily.Game);
                 using (LabGameBuildVariant.OverrideStaffStageDemoForTests(true))
                 {
                     Assert.That(LabBonjourDiscovery.ProtocolFor(LabRoomFamily.Game), Is.Not.EqualTo(normalDiscovery));
-                    Assert.That(LabBonjourDiscovery.ProtocolFor(LabRoomFamily.Game), Is.EqualTo("C6-HAPIO-STAFF-4-5705"));
+                    Assert.That(LabBonjourDiscovery.ProtocolFor(LabRoomFamily.Game), Is.EqualTo("C6-HAPIO-STAFF-4-5706"));
                     byte[][] tokens = new byte[3][];
                     for (int stage = 1; stage <= 3; stage++)
                     {
@@ -91,7 +91,7 @@ namespace C6Lab.Tests
                     Assert.That(decode.Invoke(null, new object[] {
                         Encoding.ASCII.GetBytes("C6HapioStaffDemo/3/S2/G1"), tokens[1], true, null }), Is.False,
                         "An app that still waits for shared readiness and an ending cannot join a direct-QR room.");
-                    byte[] oldPresence = LabRoomPresence.Encode("C6-HAPIO-STAFF-3-5705", true, true, 1, 3, false,
+                    byte[] oldPresence = LabRoomPresence.Encode("C6-HAPIO-STAFF-3-5706", true, true, 1, 3, false,
                         false, false, 2, 1);
                     Assert.That(LabRoomPresence.TryDecode(oldPresence, LabBonjourDiscovery.ProtocolFor(LabRoomFamily.Game),
                         out _, out _, out _, out _, out _, out _, out _, out _, out _), Is.False,
@@ -163,7 +163,7 @@ namespace C6Lab.Tests
         [TestCase("s=2;g=1;t=1")] [TestCase("t=1;s=2;g=1")]
         public void MissingOrMalformedGroupCannotBecomeAStaffCandidate(string suffix)
         {
-            string protocol = "C6-HAPIO-STAFF-4-5705";
+            string protocol = "C6-HAPIO-STAFF-4-5706";
             byte[] bytes = Encoding.UTF8.GetBytes("p=" + protocol + ";f=46;n=1;c=3;b=0;" + suffix);
             byte[] record = new byte[bytes.Length + 1]; record[0] = (byte)bytes.Length;
             Buffer.BlockCopy(bytes, 0, record, 1, bytes.Length);
@@ -231,7 +231,7 @@ namespace C6Lab.Tests
                 Assert.That(accepts.Invoke(discovery, new object[] { name, 2, group }), Is.True);
                 Assert.That(accepts.Invoke(discovery, new object[] { name, 2, 3 - group }), Is.False);
                 Assert.That(accepts.Invoke(discovery, new object[] { name, 1, group }), Is.False);
-                Assert.That(accepts.Invoke(discovery, new object[] { "Hapio-Staff-2-5705-Stage-2", 2, group }), Is.False);
+                Assert.That(accepts.Invoke(discovery, new object[] { "Hapio-Staff-2-5706-Stage-2", 2, group }), Is.False);
                 Assert.That(accepts.Invoke(discovery, new object[] { name, 0, 0 }), Is.False);
             }
         }

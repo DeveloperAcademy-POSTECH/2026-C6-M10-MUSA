@@ -74,7 +74,7 @@
 
 - Home은 타이틀을 먼저 표시한다. 첫 게임 시작 → 현재25컷·27페이지(#364의19-1 확대 컷 포함) → 완료/스킵 → 방 목록이며, 같은 실행의 후속 게임 시작은 바로 방 목록이다. 시작/종료 포인터 해제 대기와 #356의 수동 터치 진행을 보존한다. DEV·SOLO는 기존 타이틀에서 가능하며, 비활성화/Scene 이탈은 방 검색을 시작하지 않는다.
 - 내 P 표시와 자식 도색 패턴·2:2 팀 고리는 기존 LabOrbHudComposition의 구슬 합성 이미지 아래에 둔다. 기존 Image/RectTransform/번호 갱신·카메라/텍스처를 재사용하고 좌우 이웃·미니맵·로비 P와 입력/물리 규칙은 유지한다. Scene이나 UI 전체를 재생성하지 않는다.
-- #785부터 Hapio **스토리** 전투의 내 표시·좌우 이웃·미니맵은 P번호 대신 캐릭터 초상이다: P1 불이·P2 묵이·P3 솔이·P4 금옥·P5 만복. 하단은 캐릭터별 스태미나 패널(`Resources/Hapio/UI/BattleCharacters`)이다. **땅따먹기는 #785 이전 HUD를 쓴다**(2026-11-17): 팀 배지(청/홍 P번호), 파란 스태미나 줄과 테두리, 팀 마커 미니맵, 예전 스태미나 부족 흔들림이다. `GameBattleUiPresentation.Build`가 `session.IsTerritory`로 `BuildTeamHud`/`BuildCharacterHud`를 고르며, 땅따먹기에서는 `LabHud`·`LabDrumMinimap`에 캐릭터 그림을 넘기지 않는다. 자리 선택(로비) 화면은 P번호 그대로다. 그림이 없는 독립 Lab Scene은 기존 P번호·팀 고리로 돌아간다. 자리→캐릭터 대응은 `LabHud.BattleCharacterIndex` 하나만 쓴다. 마지막 일격 다시보기 자막의 첫 줄도 P번호가 아니라 이 대응의 캐릭터 이름에 "의"를 붙인 것이다("불이의 / 마지막 일격!"). 스토리의 결과 화면(봉인 카드·실패 기록판·예비 결과 표)과 전투 중 문구(매혹 경고, 콤보 색 틀림)도 P번호 대신 이 이름을 쓴다("불이, 묵이(나)"). 이름은 `LabHud.BattlePlayerLabel` 하나로 얻고, 이름표가 없는 화면(땅따먹기·Lab 단독·튜토리얼)은 P번호 그대로다. 봉인 카드의 공동 수상 이름이 옆 글자에 닿을 때만 `StoryRecordHighlight`가 글자를 줄인다. 입력·물리·판정·통신은 바꾸지 않았다. 상세는 `docs/BATTLE_UI_COMPONENTS.md`를 따른다.
+- #785부터 Hapio **스토리** 전투의 내 표시·좌우 이웃·미니맵은 P번호 대신 캐릭터 초상이다: P1 불이·P2 묵이·P3 솔이·P4 금옥·P5 만복. 하단은 캐릭터별 스태미나 패널(`Resources/Hapio/UI/BattleCharacters`)이다. **땅따먹기는 #785 이전 HUD를 쓴다**(2026-11-17): 팀 배지(청/홍 P번호), 파란 스태미나 줄과 테두리, 팀 마커 미니맵, 예전 스태미나 부족 흔들림이다. `GameBattleUiPresentation.Build`가 `session.IsTerritory`로 `BuildTeamHud`/`BuildCharacterHud`를 고르며, 땅따먹기에서는 `LabHud`·`LabDrumMinimap`에 캐릭터 그림을 넘기지 않는다. 자리 선택(로비) 화면은 P번호 그대로다. 그림이 없는 독립 Lab Scene은 기존 P번호·팀 고리로 돌아간다. 자리→캐릭터 대응은 `LabHud.BattleCharacterIndex` 하나만 쓴다. 로비에서 캐릭터를 고른 스토리 방은 P번호 고정 대응 대신 고른 캐릭터를 쓴다(아래 `로비 캐릭터 선택` 절). 마지막 일격 다시보기 자막의 첫 줄도 P번호가 아니라 이 대응의 캐릭터 이름에 "의"를 붙인 것이다("불이의 / 마지막 일격!"). 스토리의 결과 화면(봉인 카드·실패 기록판·예비 결과 표)과 전투 중 문구(매혹 경고, 콤보 색 틀림)도 P번호 대신 이 이름을 쓴다("불이, 묵이(나)"). 이름은 `LabHud.BattlePlayerLabel` 하나로 얻고, 이름표가 없는 화면(땅따먹기·Lab 단독·튜토리얼)은 P번호 그대로다. 봉인 카드의 공동 수상 이름이 옆 글자에 닿을 때만 `StoryRecordHighlight`가 글자를 줄인다. 입력·물리·판정·통신은 바꾸지 않았다. 상세는 `docs/BATTLE_UI_COMPONENTS.md`를 따른다.
 
 ## #367 결과 수동 진행과 완료 대기
 
@@ -523,7 +523,7 @@
 ## #762 땅따먹기 야광귀 박
 
 - 땅따먹기(1:1·2:2·3:3)는 `GameSession.GourdStageDefinition`이 배경과 같은 2스테이지를 돌려줘 `GameBattleBindings.MountStageGourd`가 `Stage02_Yagwanggwi_Battle`을 붙인다. 박 모양·판정 껍데기·스토리 박 크기 1.4배만 빌리고 땅따먹기 규칙·값·청홍 칠·이름은 그대로다. 클레이·수채는 쓰지 않고 몸통·뚜껑에 고해상도 청홍 칠을 바로 그린다. 튜토리얼·Lab 단판은 흰 박이다.
-- 판정 껍데기와 크기가 바뀌어 현재 호환 묶음은 설정265개·5705·`C6PhysicsLab/62`·**`C6HapioGame/56`**다. 흰 박으로 땅따먹기를 판정하는 Game55 이하 앱과 혼용하지 않는다. 실행한 검사는 `docs/VALIDATION.md`만 따른다.
+- 판정 껍데기와 크기가 바뀌어 당시 호환 묶음은 설정265개·5705·`C6PhysicsLab/62`·**`C6HapioGame/56`**였다(현재 기준은 아래 `로비 캐릭터 선택` 절). 흰 박으로 땅따먹기를 판정하는 Game55 이하 앱과 혼용하지 않는다. 실행한 검사는 `docs/VALIDATION.md`만 따른다.
 
 ## #782 스태프 시연 후일담 → QR 직행
 
@@ -536,3 +536,12 @@
 
 - 일반 1·2·3스테이지와 시연의 클리어 후 후일담은 건너뛰기 버튼·사용자 Skip 요청을 허용하지 않는다. `StoryPlayer.UserSkipAllowed`는 기본 true인 인스턴스 런타임 정책으로, 성공 후일담 재생 전에 false로 두고 최종 엔딩·표시 종료에서 복원한다. 컷 전환·박 관람 복귀·오래된 버튼 이벤트로 우회하지 않으며 거절된 Skip은 다음 터치를 소비하지 않는다.
 - 화면 터치·마지막 다음 봉인/마치기·Host 수동 시작·시연 QR 직행은 유지한다. 오프닝·튜토리얼·실패·최종 전체 엔딩과 작성 도구는 기존 동작이다. 직접 `StoryPlayer.Skip()`는 작성/검사 도구 API로 남기며 사용자 UI와 구분한다. 공용 Skip 오브젝트나 Scene/Prefab 배치를 삭제·재생성하지 않고 실제 검증은 `docs/VALIDATION.md`에 기록한다.
+
+## 로비 캐릭터 선택 (2026-11-17)
+
+- Hapio 스토리 방의 로비는 자리(P번호)를 고를 때 전투 캐릭터 5명(불이·묵이·솔이·금옥·만복) 중 하나를 함께 고른다. 빈 자리를 누르면 `GameLobbyCharacterPicker` 팝업이 뜨고, 다른 사람이 고른 캐릭터는 체크 표시로 막는다. 자리와 캐릭터는 한 요청(`slot_select`의 `slotNumber`·`character`)으로 Host가 함께 승인한다. 자리를 풀면 캐릭터도 풀린다. 땅따먹기와 Lab 단독 방은 자리만 고른다(`LabNetwork.LobbyUsesCharacters`).
+- 캐릭터 번호는 그림 순서 1~5(불이·솔이·묵이·금옥·만복, `BattleCharacters`의 Portrait1~5)이고 0은 없음이다. 팝업 표시 순서는 `LabPlayerSlots.CharacterOrder`(불이·묵이·솔이·금옥·만복)다. 규칙은 `LabPlayerSlots`가 가진다: 한 캐릭터는 한 사람만(`CHARACTER_TAKEN`), 스토리 방(`RequireCharacter`)에서 캐릭터 없는 자리 요청은 거절한다(`CHARACTER_REQUIRED`). 모든 자리에 캐릭터가 있어야 시작할 수 있다. 자동 배정 스모크 경로(`autoStart`)는 `FirstFreeCharacter`를 명시해 요청한다.
+- 고른 캐릭터는 로비 패킷의 `slotAssignments[].character`와 전투 스냅샷의 `LabPlayerState.character`로 전달되고, 스테이지 1~3과 같은 방 재도전에서 유지된다. `LabHud.BattleCharacterIndex`는 이 값이 있으면 그것을 쓰고, 없으면(DEV 솔로·튜토리얼·Lab) P번호 고정 대응을 쓴다. 전투 HUD·미니맵·마지막 일격 자막·결과 이름·전투 문구가 모두 이 함수를 거친다. 좌우 이웃·전달 순서·카메라 위치는 계속 자리(P번호)가 정한다.
+- 로비 재입장(#501)에서 맡아 둔 자리는 캐릭터도 함께 맡는다. 맡는 시간이 끝난 뒤 돌아왔는데 그 캐릭터를 다른 사람이 가져갔으면 자리만 돌려준다(`TryRestoreSeat`). 그 사람 화면에는 팝업이 자동으로 뜨고(자기 자리를 눌러도 열림, "자리 비우기" 포함), 캐릭터를 다시 고를 때까지 방장은 시작할 수 없다. 스태프 시연 재시도는 자리와 함께 캐릭터도 비운다.
+- 팝업은 실행 중에 만든다(저장된 `GameLobby.prefab`은 바꾸지 않음). Figma 시안이 없어 로비의 한지 카드·글꼴과 `Hapio.tokens.json` 색, `BattleCharacters` 초상을 쓴다. 시안이 나오면 그에 맞춘다.
+- 현재 호환 묶음은 설정265개·**5706**·`C6PhysicsLab/63`·**`C6HapioGame/57`**다. 로비 패킷과 스냅샷 형식이 바뀌어 5705/Lab62/Game56 이하 앱과 혼용하지 않는다. 실행한 검사는 `docs/VALIDATION.md`만 따른다.

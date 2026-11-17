@@ -66,6 +66,33 @@ namespace Hapio.Tests
         }
 
         [Test]
+        public void ACharacterChosenInTheLobbyReplacesThePNumberMappingEverywhere()
+        {
+            // P1 chose 만복(5), P2 chose 불이(1); P3 carries none and keeps the P-number character (솔이).
+            var players = new[]
+            {
+                new LabPlayerState { id = 10, seat = 0, character = 5, damageTotal = 80, hitTotal = 4, throwTotal = 4 },
+                new LabPlayerState { id = 20, seat = 1, character = 1, passedTotal = 3 },
+                new LabPlayerState { id = 30, seat = 2 },
+            };
+            var snapshot = new LabSnapshot { phase = LabPhase.Victory, players = players, playedSeconds = 100 };
+            Assert.That(LabHud.BattleCharacterIndex(snapshot, 1), Is.EqualTo(4));
+            Assert.That(LabHud.BattleCharacterIndex(snapshot, 2), Is.EqualTo(0));
+            Assert.That(LabHud.BattleCharacterIndex(snapshot, 3), Is.EqualTo(1));
+            Assert.That(GameBattleUiPresentation.FinishReplayOwner(1, snapshot), Is.EqualTo("만복의"));
+            Assert.That(GameBattleUiPresentation.FinishReplayOwner(2, snapshot), Is.EqualTo("불이의"));
+            var records = GameStageStoryPresentation.CardRecords(snapshot, 20);
+            Assert.That(records[0].player, Is.EqualTo("만복"));
+            Assert.That(records[2].player, Is.EqualTo("불이(나)"));
+            // Overall rows have no snapshot: the name comes from the player's own record.
+            Assert.That(GameBattleUiPresentation.ResultNames(null)(players[0]), Is.EqualTo("만복"));
+            Assert.That(GameBattleUiPresentation.ResultNames(null)(players[2]), Is.EqualTo("솔이"));
+            var overall = LabResultStats.Overall(new[] { new LabResultStage(players, 100d) });
+            Assert.That(overall.Awards.SelectMany(award => award.Winners).First(winner => winner.id == 10).character, Is.EqualTo(5),
+                "The averaged record keeps the character.");
+        }
+
+        [Test]
         public void OnlyTheAwardsTheLocalPlayerEarnedAreMarkedIncludingTies()
         {
             var p1 = new LabPlayerState { id = 10, seat = 0, damageTotal = 80, hitTotal = 4, throwTotal = 4,

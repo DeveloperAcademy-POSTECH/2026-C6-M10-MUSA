@@ -104,12 +104,12 @@ namespace Hapio.Tests
             Assert.That(session.PreviewTexture, Is.Null);
             Assert.That(session.IsViewerOpen, Is.False);
 
-            Assert.That(network.RequestPlayerSlot(3), Is.True);
-            Assert.That(second.Network.RequestPlayerSlot(1), Is.True);
+            Assert.That(network.RequestPlayerSlot(3, 3), Is.True);
+            Assert.That(second.Network.RequestPlayerSlot(1, 1), Is.True);
             yield return Until(() => network.SelectedParticipantCount == 2, "Two fresh P choices are committed");
             session.StartGame();
             Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.Lobby), "Two P choices cannot start a three-player demo.");
-            Assert.That(third.Network.RequestPlayerSlot(2), Is.True);
+            Assert.That(third.Network.RequestPlayerSlot(2, 2), Is.True);
             yield return Until(() => network.CanStartBattle, "The third fresh P choice and settings release Host start");
             yield return null;
             Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.Lobby), "Readiness never starts a retry automatically.");
@@ -181,14 +181,14 @@ namespace Hapio.Tests
             Set(values, "Paint Surface Resolution (0 low 1 medium 2 high)", 0f);
             Set(values, "Paint Drying (0 off, 1 on)", 0f);
             Assert.That(session.ApplyDeveloperSettings(values, out string error), Is.True, error);
-            Assert.That(network.RequestPlayerSlot(1), Is.True);
+            Assert.That(network.RequestPlayerSlot(1, 1), Is.True);
             second = new ProtocolPeer("Staff retry P2", network.port, stage);
             third = new ProtocolPeer("Staff retry P3", network.port, stage);
             second.Network.Join("127.0.0.1"); third.Network.Join("127.0.0.1");
             yield return Until(() => second.Network.CanSelectPlayerSlot && third.Network.CanSelectPlayerSlot,
                 "Both matching-stage packet members are ready to choose P");
-            Assert.That(second.Network.RequestPlayerSlot(2), Is.True);
-            Assert.That(third.Network.RequestPlayerSlot(3), Is.True);
+            Assert.That(second.Network.RequestPlayerSlot(2, 2), Is.True);
+            Assert.That(third.Network.RequestPlayerSlot(3, 3), Is.True);
             yield return Until(() => network.CanStartBattle, "Initial three P choices and config are ready");
             session.StartGame();
             yield return PlayingRetryStage(stage);
@@ -245,7 +245,7 @@ namespace Hapio.Tests
             Assert.That(session.State.demoStageIndex, Is.EqualTo(stage));
             Assert.That(session.RunProfile.FirstStage, Is.EqualTo(stage));
             Assert.That(session.RunProfile.Count, Is.EqualTo(1));
-            Assert.That(network.RequestPlayerSlot(1), Is.True);
+            Assert.That(network.RequestPlayerSlot(1, 1), Is.True);
 
             float[] values = network.config.CaptureDeveloperValues();
             Set(values, "Paint Surface Resolution (0 low 1 medium 2 high)", 0f);
@@ -269,8 +269,8 @@ namespace Hapio.Tests
             second.Network.Join("127.0.0.1"); third.Network.Join("127.0.0.1");
             yield return Until(() => second.Network.IsConnected && third.Network.IsConnected
                 && second.Network.CanSelectPlayerSlot && third.Network.CanSelectPlayerSlot, "Matching-stage members join");
-            Assert.That(second.Network.RequestPlayerSlot(2), Is.True);
-            Assert.That(third.Network.RequestPlayerSlot(3), Is.True);
+            Assert.That(second.Network.RequestPlayerSlot(2, 2), Is.True);
+            Assert.That(third.Network.RequestPlayerSlot(3, 3), Is.True);
             yield return Until(() => network.CanStartBattle && network.ParticipantCount == 3,
                 "Three distinct seats and settings are ready");
             yield return null;

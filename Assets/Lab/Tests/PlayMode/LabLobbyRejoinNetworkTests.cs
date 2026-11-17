@@ -109,13 +109,13 @@ namespace C6Lab.Tests
             Assert.That(host.Network.SetTargetParticipantCount(2), Is.True);
             host.Network.Host();
             yield return Until(() => host.Network.IsHost && host.Network.IsConnected, 10d, "The Host did not start.");
-            Assert.That(host.Network.RequestPlayerSlot(1), Is.True);
+            Assert.That(host.Network.RequestPlayerSlot(1, 1), Is.True);
             guest = new Peer("#501 Guest", config, port);
             guest.Network.LobbyRejoinAllowed = true;
             guest.Network.Join("127.0.0.1");
             yield return Until(() => guest.Network.IsConnected && guest.Network.CanSelectPlayerSlot, 15d,
                 "The guest did not reach the lobby.");
-            Assert.That(guest.Network.RequestPlayerSlot(2), Is.True);
+            Assert.That(guest.Network.RequestPlayerSlot(2, 2), Is.True);
             yield return Until(() => guest.Network.LocalSlotNumber == 2
                 && host.Network.GetSlotOwner(2) == guest.Network.LocalPlayerId, 10d, "The guest did not get P2.");
         }

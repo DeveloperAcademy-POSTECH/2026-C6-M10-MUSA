@@ -125,7 +125,7 @@ namespace C6Lab
             foreach (LabResultStage stage in list)
                 foreach (LabPlayerState p in stage.Players)
                 {
-                    if (!sums.TryGetValue(p.id, out OverallSum sum)) sums[p.id] = sum = new OverallSum { id = p.id, seat = p.seat };
+                    if (!sums.TryGetValue(p.id, out OverallSum sum)) sums[p.id] = sum = new OverallSum { id = p.id, seat = p.seat, character = p.character };
                     sum.damage += p.damageTotal;
                     sum.passed += p.passedTotal;
                     sum.drumPassed += p.drumPassedTotal;
@@ -141,7 +141,7 @@ namespace C6Lab
                 lastHits[sum.id] = sum.lastHits;
                 averaged.Add(new LabPlayerState
                 {
-                    id = sum.id, seat = sum.seat,
+                    id = sum.id, seat = sum.seat, character = sum.character,
                     damageTotal = Average(sum.damage, n), passedTotal = Average(sum.passed, n),
                     drumPassedTotal = Average(sum.drumPassed, n), drumSeconds = sum.drumSeconds / n,
                     hitTotal = (int)Math.Min(int.MaxValue, sum.hits), throwTotal = (int)Math.Min(int.MaxValue, sum.throws),
@@ -173,7 +173,7 @@ namespace C6Lab
         private sealed class OverallSum
         {
             public ulong id;
-            public int seat;
+            public int seat, character;
             public long damage, passed, drumPassed, hits, throws;
             public double drumSeconds;
             public int lastHits;

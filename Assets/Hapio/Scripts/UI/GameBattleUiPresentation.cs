@@ -19,7 +19,7 @@ namespace Hapio
         private Text staminaName;
         private Sprite[] staminaPanels, staminaNames;
         private const string CharacterArt = "Hapio/UI/BattleCharacters/";
-        private static readonly string[] CharacterNames = { "불이", "솔이", "묵이", "금옥", "만복" };
+        internal static readonly string[] CharacterNames = { "불이", "솔이", "묵이", "금옥", "만복" };
         // Figma 5573:4233. Match the visible name and portrait in each variant. Colour tokens (Hapio.tokens.json), in
         // art order 불이·솔이·묵이·금옥·만복: 5OrbsColor/Firered/300***, 5OrbsColor/TreeGreen/300***,
         // 5OrbsColor/WaterBlue/300***, 5OrbsColor/MetalYellow/400, 5OrbsColor/SoilBrown/300***.
@@ -51,7 +51,11 @@ namespace Hapio
         public int AppliedStage => appliedStage;
         public GameBattleUiTheme Theme => theme;
 
-        internal static void BuildFinishReplayCaption(RectTransform caption, int playerSlot)
+        internal static void BuildFinishReplayCaption(RectTransform caption, int playerSlot) =>
+            BuildFinishReplayCaption(caption, playerSlot, null);
+
+        /// <summary>snapshot carries the characters chosen in the lobby; without it the name follows the P number.</summary>
+        internal static void BuildFinishReplayCaption(RectTransform caption, int playerSlot, LabSnapshot snapshot)
         {
             var replayTheme = Resources.Load<GameBattleUiTheme>(GameBattleUiTheme.ResourcePath);
             Font bold = replayTheme != null && replayTheme.bold != null
@@ -61,21 +65,25 @@ namespace Hapio
             Color title = new Color32(247, 242, 237, 255);
             Color hint = new Color32(66, 67, 58, 255);
             if (playerSlot > 0)
-                AddReplayLabel(page, "Player", FinishReplayOwner(playerSlot), bold, title, 50, 79, 55);
+                AddReplayLabel(page, "Player", FinishReplayOwner(playerSlot, snapshot), bold, title, 50, 79, 55);
             AddReplayLabel(page, "Final Hit", "마지막 일격!", bold, title, 50, playerSlot > 0 ? 139 : 79, 55);
             AddReplayLabel(page, "Skip Hint", "눌러서 건너뛰시오.", bold, hint, 20, 762, 22);
         }
 
         /// <summary>The caption's first line: the thrower's battle character as shown on every screen, e.g. "불이의" (story seats only).</summary>
-        internal static string FinishReplayOwner(int playerSlot) =>
-            LabHud.BattlePlayerLabel(null, playerSlot, CharacterNames) + "의";
+        internal static string FinishReplayOwner(int playerSlot, LabSnapshot snapshot = null) =>
+            LabHud.BattlePlayerLabel(snapshot, playerSlot, CharacterNames) + "의";
 
         /// <summary>
         /// Names for a story result: each player's battle character ("불이"), as on the battle screen. Land grab snapshots keep
         /// "P" + number.
         /// </summary>
         public static Func<LabPlayerState, string> ResultNames(LabSnapshot snapshot) => player =>
-            player == null ? LabResultStats.PlayerName(null) : LabHud.BattlePlayerLabel(snapshot, player.seat + 1, CharacterNames);
+            player == null ? LabResultStats.PlayerName(null)
+            // The character chosen in the lobby travels with the player's own record (stage and overall results alike).
+            : player.character > 0 && player.character <= CharacterNames.Length && (snapshot == null || !snapshot.teamTerritory)
+                ? CharacterNames[player.character - 1]
+            : LabHud.BattlePlayerLabel(snapshot, player.seat + 1, CharacterNames);
 
         private static void AddReplayLabel(Transform page, string name, string caption, Font font,
             Color color, int size, float y, float height)
