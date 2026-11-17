@@ -81,6 +81,20 @@ namespace Hapio.Editor
             Validate();
         }
 
+        [MenuItem("Hapio/Demo/Update Showcase Original Shapes")]
+        public static void UpdateFinalPageShapes()
+        {
+            if (Application.isPlaying) throw new InvalidOperationException("Stop Play before authoring demo assets.");
+            var root = PrefabUtility.LoadPrefabContents(FinalPagePath);
+            try
+            {
+                ApplyOriginalShapes(root.GetComponent<StaffDemoFinalPage>());
+                PrefabUtility.SaveAsPrefabAsset(root, FinalPagePath);
+            }
+            finally { PrefabUtility.UnloadPrefabContents(root); }
+            Validate();
+        }
+
         public static void Validate() => ValidateRuntimeAssets(path => AssetDatabase.LoadAssetAtPath<Object>(path));
 
         // Retained stage-specific ending copies are authoring history, not dependencies of the direct-QR player.
@@ -181,10 +195,6 @@ namespace Hapio.Editor
                 view.qrImage = Picture(page, "QRImage", new Rect(109.25f, 396.52f, 182.009f, 185.388f),
                     Require<Sprite>(FinalPageArt + "02cb8.png"));
                 view.qrImage.preserveAspect = true;
-                var border = Rect("QRBorder", view.qrImage.transform, new Rect(0, 0, 182.009f, 185.388f))
-                    .gameObject.AddComponent<GameUiFrame>();
-                border.radius = 12.582f; border.stroke = 5.033f;
-                border.color = Color.black; border.raycastTarget = false;
 
                 // Kept for an explicitly unconfigured/null preview; the shipped page always has real QR art.
                 RectTransform placeholder = Rect("QRPlaceholder", page, new Rect(109.25f, 396.52f, 182.009f, 185.388f));
@@ -199,21 +209,55 @@ namespace Hapio.Editor
                     new Rect(100.8f, 608.91f, 200.4f, 30), 21.472f, false, Color.black);
 
                 RectTransform action = Rect("ReturnToSelection", page, new Rect(27, 768, 349, 58));
-                var fill = action.gameObject.AddComponent<C6Lab.LabRoundedGraphic>();
-                fill.radius = 27; fill.color = Color.white; fill.raycastTarget = true;
                 view.returnButton = action.gameObject.AddComponent<UnityEngine.UI.Button>();
-                view.returnButton.targetGraphic = fill;
-                var colors = view.returnButton.colors;
-                // TextColor/DarkRed/500*** and SecondaryLightIvory/100 use their canonical token components.
-                colors.normalColor = colors.highlightedColor = colors.selectedColor = GameLobbySeatColors.Ready;
-                colors.pressedColor = Hex("692B21"); // TextColor/DarkRed/700
-                colors.disabledColor = GameLobbySeatColors.Ready; colors.colorMultiplier = 1;
-                view.returnButton.colors = colors;
                 FinalText(action, "Caption", StaffDemoFinalPageConfig.DefaultReturnCaption,
                     new Rect(8, 0, 333, 58), 24, true, GameLobbySeatColors.LightText, TextAnchor.MiddleCenter);
+                ApplyOriginalShapes(view);
                 PrefabUtility.SaveAsPrefabAsset(root, FinalPagePath);
             }
             finally { Object.DestroyImmediate(root); }
+        }
+
+        private static void ApplyOriginalShapes(StaffDemoFinalPage view)
+        {
+            if (view == null || view.returnButton == null || view.qrImage == null)
+                throw new InvalidOperationException("The saved final page needs its button and QR references.");
+            var normal = Require<Sprite>(FinalPageArt + "ReturnButtonNormal.png");
+            var pressed = Require<Sprite>(FinalPageArt + "ReturnButtonPressed.png");
+            var frame = Require<Sprite>(FinalPageArt + "QrBorder.png");
+            var action = (RectTransform)view.returnButton.transform;
+            // Keep the authored 349x58 hit rectangle; exported paint extends outside that rectangle.
+            var oldFill = action.GetComponent<C6Lab.LabRoundedGraphic>();
+            if (oldFill != null) Object.DestroyImmediate(oldFill);
+            var hit = action.GetComponent<UnityEngine.UI.Image>() ?? action.gameObject.AddComponent<UnityEngine.UI.Image>();
+            hit.sprite = null; hit.color = Color.clear; hit.raycastTarget = true;
+            var artwork = action.Find("Artwork") as RectTransform;
+            if (artwork == null) artwork = Rect("Artwork", action, new Rect(-.60546875f, -4f, 351, 64));
+            else StoryStageReadyView.Place(artwork, new Rect(-.60546875f, -4f, 351, 64));
+            artwork.SetAsFirstSibling();
+            var image = artwork.GetComponent<UnityEngine.UI.Image>() ?? artwork.gameObject.AddComponent<UnityEngine.UI.Image>();
+            image.type = UnityEngine.UI.Image.Type.Simple;
+            image.sprite = normal; image.overrideSprite = null; image.color = Color.white;
+            image.preserveAspect = false; image.raycastTarget = false;
+            view.returnButton.targetGraphic = image;
+            view.returnButton.transition = UnityEngine.UI.Selectable.Transition.SpriteSwap;
+            var states = view.returnButton.spriteState;
+            states.highlightedSprite = states.selectedSprite = states.disabledSprite = normal;
+            states.pressedSprite = pressed; view.returnButton.spriteState = states;
+            var colors = view.returnButton.colors;
+            colors.normalColor = colors.highlightedColor = colors.selectedColor = colors.pressedColor = colors.disabledColor = Color.white;
+            colors.colorMultiplier = 1; view.returnButton.colors = colors;
+
+            var border = view.qrImage.transform.Find("QRBorder") as RectTransform;
+            Rect bounds = new Rect(-2.431640625f, -1.8515625f, 187, 190);
+            if (border == null) border = Rect("QRBorder", view.qrImage.transform, bounds);
+            else StoryStageReadyView.Place(border, bounds);
+            var oldBorder = border.GetComponent<GameUiFrame>();
+            if (oldBorder != null) Object.DestroyImmediate(oldBorder);
+            var borderImage = border.GetComponent<UnityEngine.UI.Image>() ?? border.gameObject.AddComponent<UnityEngine.UI.Image>();
+            borderImage.type = UnityEngine.UI.Image.Type.Simple;
+            borderImage.sprite = frame; borderImage.color = Color.white;
+            borderImage.preserveAspect = false; borderImage.raycastTarget = false;
         }
 
         private static UnityEngine.UI.Image Picture(Transform parent, string name, Rect bounds, Sprite sprite)
