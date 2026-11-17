@@ -310,11 +310,25 @@ namespace Hapio.Tests
             story.player.ViewChanged += view => shownViews.Add(view.name);
             yield return Until(() => story.player.CurrentView != null && !story.player.UserInputBlocked,
                 "The selected stage afterstory releases input");
+            var firstPicture = story.player.CurrentView;
+            Assert.That(story.player.UserSkipAllowed, Is.False);
+            Assert.That(story.skipButton.gameObject.activeSelf || story.skipButton.interactable, Is.False,
+                "Every selected staff stage hides and disables after-story SKIP.");
+            story.Skip();
+            story.player.RequestSkip();
+            story.skipButton.onClick.Invoke();
+            yield return null;
+            Assert.That(story.player.CurrentView, Is.SameAs(firstPicture), "Neither a hidden button nor user Skip can bypass the staff after-story.");
+            Assert.That(story.player.IsPlaying, Is.True);
+            Assert.That(story.IsLocalStoryComplete, Is.False);
+            // Fixture-only direct sequencing stays available; the real pointer path is covered by GameSceneFlowTests.
             story.player.Skip();
             yield return Until(() => story.IsLocalStoryComplete && story.player.CurrentView != null
                 && story.player.CurrentView.GetComponent<StoryStageClearControls>() != null,
                 "Afterstory retains its final clear picture");
             Assert.That(session.LocalSealReady, Is.False, "Reading does not enter the retired shared preparation flow.");
+            Assert.That(story.skipButton.gameObject.activeSelf || story.skipButton.interactable, Is.False,
+                "The retained clear picture must not restore after-story SKIP.");
             var clear = story.player.CurrentView.GetComponent<StoryStageClearControls>();
             Assert.That(clear.heading.gameObject.activeSelf, Is.False, "Every selected stage is this run's final stage.");
             Assert.That(clear.nextSeal.GetComponentInChildren<UnityEngine.UI.Text>(true).text, Is.EqualTo("마치기"));

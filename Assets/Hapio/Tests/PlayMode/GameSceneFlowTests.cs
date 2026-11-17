@@ -1993,7 +1993,7 @@ namespace Hapio.Tests
             story.player.ViewChanged += _ => viewChanges++;
             Assert.That(story.skipButton.gameObject.activeSelf, Is.False, "The seal card has no SKIP.");
             yield return AdvancePast(story.player, () => story.player.CurrentView == firstCard);
-            Assert.That(story.skipButton.gameObject.activeSelf, Is.True, "SKIP appears on the after-story pictures.");
+            AssertAfterstorySkipUnavailable(story);
             int steps = 0;
             while (story.player.IsPlaying && steps++ < 40)
             {
@@ -2005,6 +2005,7 @@ namespace Hapio.Tests
                     story.player.AdvanceTime(1f);
                 }
                 AssertNoInlineContinue(story.player.CurrentView);
+                AssertAfterstorySkipUnavailable(story);
                 if (!story.player.IsPlaying)
                 {
                     Assert.That(story.advanceButton.interactable, Is.False, "The story-ending frame cannot also activate NEXT.");
@@ -2041,13 +2042,14 @@ namespace Hapio.Tests
             session.CloseGourdViewer();
             yield return Until(() => clear.nextSeal.interactable, "Inspection restores the same manual stage action.");
             Assert.That(story.player.CurrentView, Is.SameAs(retained));
+            AssertAfterstorySkipUnavailable(story);
             Assert.That(viewChanges, Is.EqualTo(2), "Closing inspection does not replay any story cut.");
             Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.StageResult));
             Assert.That(session.State.stageIndex, Is.EqualTo(1));
         }
 
         [UnityTest]
-        public IEnumerator SkipDuringAfterStoryReadingKeepsThePictureWithoutAnInlineNextAction()
+        public IEnumerator UserSkipCannotBypassAfterStoryReadingOrItsManualStageAction()
         {
             session.StartSolo();
             yield return WaitPlaying(1);
@@ -2069,21 +2071,35 @@ namespace Hapio.Tests
             }
             Assert.That(story.player.CurrentCutIndex, Is.EqualTo(1));
             Assert.That(story.player.IsReading, Is.True, "Exercise an actual after-story dialogue, not only the initial card.");
-            StoryCutView skipped = story.player.CurrentView;
-            Assert.That(skipped.GetComponent<StoryStageClearControls>(), Is.Null,
-                "Skip from an after-story picture before the authored clear picture.");
-            AssertNoInlineContinue(skipped);
+            StoryCutView reading = story.player.CurrentView;
+            Assert.That(reading.GetComponent<StoryStageClearControls>(), Is.Null,
+                "Exercise the after-story picture before the authored clear picture.");
+            AssertNoInlineContinue(reading);
+            AssertAfterstorySkipUnavailable(story);
+            int page = story.player.CurrentPageIndex;
+            int skipped = 0;
+            story.player.Finished += reason => { if (reason == StoryExitReason.Skipped) skipped++; };
             story.Skip();
+            story.player.RequestSkip();
+            story.skipButton.onClick.Invoke();
+            yield return null;
+            Assert.That(story.player.CurrentView, Is.SameAs(reading), "Neither adapter nor hidden button events may bypass the picture.");
+            Assert.That(story.player.CurrentPageIndex, Is.EqualTo(page));
+            Assert.That(story.player.IsPlaying, Is.True);
+            Assert.That(story.IsLocalStoryComplete, Is.False);
+            Assert.That(skipped, Is.Zero);
+            yield return AdvancePast(story.player, () => story.player.CurrentView == reading);
             yield return Until(() => story.IsLocalStoryComplete && story.player.CurrentView != null
                     && story.player.CurrentView.GetComponent<StoryStageClearControls>() != null
                     && story.player.CurrentView.GetComponent<StoryStageClearControls>().nextSeal.interactable,
-                "Skipping the reading cut lands on the clear picture and releases the one explicit Host stage action.");
+                "Reading in order reaches the clear picture and releases the one explicit Host stage action.");
             StoryCutView retained = story.player.CurrentView;
             StoryStageClearControls clear = retained.GetComponent<StoryStageClearControls>();
-            Assert.That(story.player.sequence.cuts, Has.Count.EqualTo(1));
-            Assert.That(story.player.sequence.cuts[0], Is.SameAs(story.afterStages[0].cuts[story.afterStages[0].cuts.Count - 1]),
-                "SKIP shows the stage's last authored picture once.");
-            Assert.That(retained.GetComponentInChildren<StoryCardFlip>(true), Is.Null, "SKIP does not replay the seal card.");
+            Assert.That(story.player.sequence, Is.SameAs(story.afterStages[0]), "Reading preserves the complete saved after-story sequence.");
+            Assert.That(story.player.CurrentCutIndex, Is.EqualTo(story.afterStages[0].cuts.Count - 1));
+            Assert.That(skipped, Is.Zero);
+            Assert.That(retained.GetComponentInChildren<StoryCardFlip>(true), Is.Null, "Reading does not replay the seal card.");
+            AssertAfterstorySkipUnavailable(story);
             Assert.That(retained.continueButton, Is.Null,
                 "The clear picture's 다음 봉인 replaces the removed inline next-yokai control.");
             AssertNoInlineContinue(retained);
@@ -2119,7 +2135,7 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
-        public IEnumerator SavedStoryViewerSkipAndEndingButtonsReceiveRealMouseClicks()
+        public IEnumerator SavedStoryViewerAfterstoryTapsAndEndingButtonsReceiveRealMouseClicks()
         {
             InputSettings original = InputSystem.settings;
             HideFlags originalFlags = original.hideFlags;
@@ -2219,6 +2235,7 @@ namespace Hapio.Tests
                     Assert.That(story.player.CurrentView, Is.SameAs(sealCard));
                     Assert.That(flip.IsBack, Is.True, "Returning retains the seal card's record face.");
                     Assert.That(story.BoundResult, Is.SameAs(session.ResultSnapshot));
+                    AssertAfterstorySkipUnavailable(story);
                     if (stage == 1)
                     {
                         yield return ClickVisibleButtonWithMouse(mouse, inspect);
@@ -2246,7 +2263,8 @@ namespace Hapio.Tests
                     }
                     if (stage < 3)
                     {
-                        yield return FinishResultStory();
+                        yield return AdvancePast(story.player, () => story.player.CurrentView == sealCard);
+                        yield return ReadAfterstoryWithMouse(mouse, story);
                         var next = story.player.CurrentView.GetComponent<StoryStageClearControls>().nextSeal;
                         yield return Until(() => next.gameObject.activeInHierarchy && next.IsInteractable(),
                             "Closing inspection allows the Host to start the next stage.");
@@ -2262,18 +2280,13 @@ namespace Hapio.Tests
                 Assert.That(story.skipButton.gameObject.activeSelf, Is.False, "The seal card has no SKIP.");
                 StoryCutView card = story.player.CurrentView;
                 yield return AdvancePast(story.player, () => story.player.CurrentView == card);
-                yield return Until(() => story.skipButton.gameObject.activeInHierarchy && story.skipButton.IsInteractable()
-                    && story.player.IsReading && !story.player.IsTransitioning && !story.player.UserInputBlocked,
-                    "SKIP appears on the first after-story picture.");
-                StoryCutView skippedView = story.player.CurrentView;
-                yield return ClickVisibleButtonWithMouse(mouse, story.skipButton);
-                yield return Until(() => story.IsLocalStoryComplete,
-                    "A real pointer click on the top SKIP must finish Jigwi's after-story.");
+                AssertAfterstorySkipUnavailable(story);
+                yield return ReadAfterstoryWithMouse(mouse, story);
                 StoryStageClearControls clear = story.player.CurrentView.GetComponent<StoryStageClearControls>();
-                Assert.That(clear, Is.Not.Null, "SKIP lands on Jigwi's last authored clear picture.");
-                Assert.That(story.player.CurrentView, Is.Not.SameAs(skippedView));
+                Assert.That(clear, Is.Not.Null, "Picture taps reach Jigwi's last authored clear picture.");
+                Assert.That(story.player.CurrentView, Is.Not.SameAs(card));
                 Assert.That(story.player.CurrentView.GetComponentInChildren<StoryCardFlip>(true), Is.Null,
-                    "SKIP does not replay a card.");
+                    "Reading through the pictures does not replay a card.");
                 Assert.That(story.player.nextButton.gameObject.activeInHierarchy, Is.False);
                 Assert.That(story.advanceButton.gameObject.activeInHierarchy, Is.False);
                 yield return Until(() => clear.nextSeal.gameObject.activeInHierarchy && clear.nextSeal.IsInteractable(),
@@ -2357,6 +2370,50 @@ namespace Hapio.Tests
             long whole = (long)Math.Floor(seconds);
             return (whole / 60).ToString("00", System.Globalization.CultureInfo.InvariantCulture) + ":"
                 + (whole % 60).ToString("00", System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        private static void AssertAfterstorySkipUnavailable(GameStageStoryPresentation story)
+        {
+            Assert.That(story.skipButton.gameObject.activeSelf, Is.False, "The whole after-story has no user SKIP, including cut/viewer changes.");
+            Assert.That(story.skipButton.interactable, Is.False);
+            if (story.player.IsPlaying)
+                Assert.That(story.player.UserSkipAllowed, Is.False, "Hidden button callbacks must also be rejected.");
+        }
+
+        private static IEnumerator ReadAfterstoryWithMouse(Mouse mouse, GameStageStoryPresentation story)
+        {
+            double deadline = Time.realtimeSinceStartupAsDouble + 30d;
+            int clicks = 0;
+            while (!story.IsLocalStoryComplete && Time.realtimeSinceStartupAsDouble < deadline && clicks < 40)
+            {
+                AssertAfterstorySkipUnavailable(story);
+                if (!story.player.IsPlaying || !story.player.IsReading || story.player.IsTransitioning || story.player.UserInputBlocked)
+                { yield return null; continue; }
+                var surface = story.presentationRoot.GetComponentsInChildren<StoryTapAdvance>()
+                    .Single(item => item.player == story.player);
+                Canvas.ForceUpdateCanvases();
+                var rect = (RectTransform)surface.transform;
+                var canvas = surface.GetComponentInParent<Canvas>();
+                Camera camera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
+                Vector2 point = RectTransformUtility.WorldToScreenPoint(camera, rect.TransformPoint(
+                    new Vector3(rect.rect.xMin + rect.rect.width * .75f, rect.rect.center.y)));
+                var pointer = new PointerEventData(EventSystem.current) { position = point };
+                var hits = new System.Collections.Generic.List<RaycastResult>();
+                EventSystem.current.RaycastAll(pointer, hits);
+                Assert.That(hits, Is.Not.Empty, "The story picture must be reachable through the saved EventSystem.");
+                Assert.That(ExecuteEvents.GetEventHandler<IPointerClickHandler>(hits[0].gameObject), Is.SameAs(surface.gameObject),
+                    "The actual top hit must route to the picture tap rather than an invisible control.");
+                InputSystem.QueueStateEvent(mouse, new MouseState { position = point });
+                yield return null; yield return null;
+                InputSystem.QueueStateEvent(mouse, new MouseState { position = point }.WithButton(MouseButton.Left));
+                yield return null; yield return null;
+                InputSystem.QueueStateEvent(mouse, new MouseState { position = point });
+                yield return null; yield return null;
+                clicks++;
+            }
+            Assert.That(clicks, Is.GreaterThan(0), "This path must actually use picture taps, not direct sequence completion.");
+            Assert.That(story.IsLocalStoryComplete, Is.True, "Fresh picture clicks complete the after-story in order within a bounded wait.");
+            AssertAfterstorySkipUnavailable(story);
         }
 
         private static IEnumerator ClickVisibleButtonWithMouse(Mouse mouse, UnityEngine.UI.Button button)

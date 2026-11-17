@@ -46,6 +46,16 @@ namespace Hapio
         private float voiceBaseVolume = -1f;
         public bool UserInputBlocked { get; private set; }
         public void SetInputBlocked(bool value) => UserInputBlocked = value;
+        /// <summary>Per-playback user policy; direct Skip remains available to authoring and test tools.</summary>
+        public bool UserSkipAllowed { get; private set; } = true;
+        private Button policyHiddenSkip;
+        private bool skipWasActive, skipWasInteractable;
+
+        public void SetUserSkipAllowed(bool value)
+        {
+            UserSkipAllowed = value;
+            UpdateSkipButton();
+        }
 
         public int CurrentCutIndex { get; private set; } = -1;
         public int CurrentPageIndex { get; private set; } = -1;
@@ -244,7 +254,10 @@ namespace Hapio
         }
 
         public void RequestPrevious() { if (AcceptUserInput()) Previous(); }
-        public void RequestSkip() { if (!(hideSkipDuringCinematics && IsCinematicCut) && AcceptUserInput(true)) Skip(); }
+        public void RequestSkip()
+        {
+            if (UserSkipAllowed && !(hideSkipDuringCinematics && IsCinematicCut) && AcceptUserInput(true)) Skip();
+        }
 
         private bool AcceptUserInput(bool allowOpeningBlend = false)
         {
@@ -307,7 +320,31 @@ namespace Hapio
         {
             if (previousButton != null) previousButton.interactable = IsPlaying && CurrentCutIndex > 0;
             if (nextButton != null) nextButton.interactable = IsPlaying && !IsCinematicCut;
-            if (hideSkipDuringCinematics && skipButton != null)
+            UpdateSkipButton();
+        }
+
+        private void UpdateSkipButton()
+        {
+            // Restore the exact caller-owned state when this local policy is released or the button is replaced.
+            if (policyHiddenSkip != null && (UserSkipAllowed || policyHiddenSkip != skipButton))
+            {
+                policyHiddenSkip.gameObject.SetActive(skipWasActive);
+                policyHiddenSkip.interactable = skipWasInteractable;
+                policyHiddenSkip = null;
+            }
+            if (skipButton == null) return;
+            if (!UserSkipAllowed)
+            {
+                if (policyHiddenSkip == null)
+                {
+                    policyHiddenSkip = skipButton;
+                    skipWasActive = skipButton.gameObject.activeSelf;
+                    skipWasInteractable = skipButton.interactable;
+                }
+                skipButton.gameObject.SetActive(false);
+                skipButton.interactable = false;
+            }
+            else if (hideSkipDuringCinematics)
                 skipButton.gameObject.SetActive(IsPlaying && !IsCinematicCut);
         }
 

@@ -9562,6 +9562,28 @@ main `cef1579d`의 #760 관람·#762 땅따먹기 박/Game56·#727 튜토리얼�
 - **화면 확인(Mac Development 빌드, 임시 캡처 스크립트는 저장소에 남기지 않음):** DEV 솔로 1스테이지의 실제 봉인 카드가 전 "P1(나)", 후 "불이(나)"다. 같은 카드에 3명·5명 공동 수상 줄을 넣어 찍었다: 전에는 P번호 이름이 기록 글자와 겹쳤고, 후에는 겹치지 않고 한 줄에 들어간다. 3명 이상은 글자가 절반 가까이 작아진다.
 - **미검증:** 전투 중 매혹 경고·콤보 색 틀림 문구의 실제 화면(다른 플레이어가 대상이어야 해서 여러 기기 방이 필요함, 문구는 검사로만 확인), 실패 기록판 실제 화면, iPhone 실기기.
 
+## #791 — 클리어 후일담 건너뛰기 제거 (2026-11-17)
+
+- **기준:** 원격 main `7b17482b`, Unity 6000.6.5f1·macOS arm64, `feat/#791-afterstory-no-skip`. 일반 1·2·3스테이지와 시연용 후일담에서 사용자 건너뛰기만 제거했다. 화면 터치·마지막 다음 봉인/마치기·Host 수동 시작·시연 QR 직행과 기존 그만두기는 유지한다. 오프닝·튜토리얼·실패·최종 전체 엔딩·작성 미리보기는 기존 동작이다.
+- `StoryPlayer.UserSkipAllowed`는 저장되지 않는 인스턴스 정책이다. RequestSkip을 프레임 입력 처리 전에 차단하고, 실제 Skip 버튼의 활성/입력 상태를 보존·복원한다. 후일담 시작 전에 차단하고 컷 전환·Replay·관람 복귀에서 유지하며 최종 엔딩/표시 종료에서 해제한다. 직접 `Skip()`는 작성/검사 도구 API로 보존한다.
+- **검사 범위:** 공통 사용자 입력 정책과 결과 표시 수명에 영향이 있어 전체 EditMode·PlayMode를 선택했다. 먼저 새 입력 정책 4/4 PASS(11.35초), 실제 마우스 흐름 1/1 PASS(33.89초)로 변경 경로를 확인했다. 이후 컴파일 오류0, 전체 EditMode **2,598/2,598 PASS**(43.68초), 전체 PlayMode **900/900 PASS**(1251.54초), 실패·skip·inconclusive0.
+- 기존 후일담 Skip 표시/클릭 전제는 숨김·비활성화·우회 차단 및 순서대로 읽기 검사로 교체했다. `GameSceneFlowTests.UserSkipCannotBypassAfterStoryReadingOrItsManualStageAction`이 실제 후일담에서 어댑터·RequestSkip·숨긴 UnityEvent를 검사하고, `SavedStoryViewerAfterstoryTapsAndEndingButtonsReceiveRealMouseClicks`는 세 스테이지 후일담을 실제 InputSystem 마우스 클릭으로 읽는다. 기존 관람·결과 데이터·마지막 버튼·준비/Host 시작·최종 엔딩 Skip 검사를 유지했다. 공통 정책 단위3건을 추가했고 시연 9건의 QR/재도전 검사도 통과했다.
+- **화면:** Editor 실제 390×844 GameView에서 시연용 Host와 통신 참가자2명을 사용해 후일담 읽기 화면의 건너뛰기 숨김·비활성화와 `마치기→QR→A/B 선택`을 촬영했다. 좌상단의 기존 `그만두기`는 StageReady의 Quit.png와 일치하며 그대로 유지했다. 다른 참가자가 읽는 중에도 QR을 열 수 있었다. 촬영용 세션만 100% 초기 도색 등으로 단축하고 도구용 Next/Skip을 사용했으며, 실제 마우스 진행은 위 자동 검사와 구분한다.
+- 변경 C#5개·ProjectSettings27개·저장 Scene16개의 SHA-256이 검사 시작 시점과 동일했다. 기존 stash 목록도 동일하며 Scene·Prefab·Resources·Packages와 공유 설정·프로토콜을 변경하지 않았다. 새 SVG Importer가 만든 빈 값 뒤 공백1건만 사본 보존·값 비교 후 main 형식으로 복원했다.
+- 촬영 후 Play·통신 참가자·임시 시연 override를 종료하고 Home·원래 GameView 크기를 복원했다. 최종 추가 변경은 검증 문서뿐이므로 게임 검사를 반복하지 않는다.
+- **미실행:** 별도 Mac 앱 빌드/실행, iOS 내보내기·실기기 터치. Host 화면+통신 Guest 자동 검사/Editor 촬영을 독립 Guest 앱이나 실기기 확인으로 표기하지 않는다. 원시 로그·전체 검사 JSON·개인 경로·화면 산출물은 커밋하지 않는다.
+
+
+### #791 PR #794 최신 main 통합·병합 전 검증 (2026-11-17)
+
+- 최신 main `dc7841d2`의 #792 마지막 일격 캐릭터 이름과 #793 결과/전투 이름·공동 수상 글자 맞춤을 통합했다. 충돌은 VALIDATION의 추가 기록 한 곳뿐이어서 양쪽 이력을 모두 보존했다. 통합 코드 기준은 `0d7e2fd0`이며 이름 계산 `ResultNames(snapshot)`과 #791 Skip 정책을 함께 유지했다.
+- main 이후 추가 변화는 이름·글자 맞춤뿐이다. 기존 전체900건 이후 StoryPlayer 입력 정책·세션/공유 수명·통신·물리·도색·설정·Scene/Prefab은 바뀌지 않았다. 따라서 이전 전체900건 결과는 해당 경로의 근거로 보존하고, 통합본은 전체 EditMode와 실제 영향 경로의 PlayMode를 다시 실행했다. 이전900건을 최신 main 전체 재실행으로 표기하지 않는다.
+- 컴파일 오류0. 통합 전체 EditMode **2,602/2,602 PASS**(46.71초). 통합 PlayMode는 **고유277/277 PASS**: Hapio.PlayModeTests180(792.54초), Hapio.Story.PlayModeTests66(8.98초), LabCharm17(5.55초), LabComboEffectLookTests9(1.29초), LabResultDashboardTests5(0.06초). 실패·skip·inconclusive0. 일반 게임의 실제 후일담 클릭·최종 엔딩 Skip, 새 이름 표시·다시보기, 시연 QR/재도전, 오프닝·도구용 Skip과 Lab/P번호 fallback을 포함한다.
+- 읽기 전용 검토에서 PR 범위가 의도한9개 파일이며 최신 main의 관련14개 파일을 그대로 보존한 것을 확인했다. 수정한 입력 코드·검사4개 파일은 main 통합 전과 같고, 결과 어댑터의 새 이름 계산만 추가됐다.
+- Editor 실제390×844 화면에서 Host+통신 참가자2명으로 후일담 Skip 숨김·비활성화, 기존 그만두기·마치기·QR→A/B 복귀를 재확인했다. 카드 기록은 완료 단축용 직접 도색으로 공격 기록이 비어 있어, 별도 복사본에만 공동 수상 표시값60을 넣고 기존 CardRecords/StoryRecordHighlight 함수로 `불이(나), 묵이, 솔이` 표시와 글자 맞춤을 촬영했다. 실제 ResultSnapshot·전투 기록·판정은 변경하지 않았으며 표시 예시와 실제 진행 화면을 구분한다.
+- 관련 파일16개·ProjectSettings27개·저장 Scene16개의 검사 전후 해시가 동일하고 기존 stash도 보존했다. SVG Importer의 빈 값 뒤 공백만 사본 보존 후 원래 형식으로 복원했다. 촬영 후 Play·통신 참가자·임시 시연 override를 종료하고 Home·기존 GameView 크기를 복원했다. 이후 추가 변경은 문서뿐이므로 검사를 반복하지 않는다.
+- 별도 Mac 앱 빌드/실행과 iOS 내보내기·실기기, 독립 Guest UI는 미실행이다. 원시 로그·전체 검사 JSON·개인 경로·화면 산출물은 커밋하지 않는다.
+
 ## 로비 캐릭터 선택 (2026-11-17)
 
 - **변경:** Hapio 스토리 방의 로비에서 자리를 누르면 캐릭터 5명 중 하나를 고르는 팝업이 뜨고, 자리와 캐릭터를 Host가 함께 승인한다. 고른 캐릭터는 로비 패킷과 전투 스냅샷(`LabPlayerState.character`)으로 전달돼 전투 HUD·미니맵·마지막 일격 자막·결과 이름·전투 문구에 쓰인다. 땅따먹기와 Lab 단독 방은 그대로다. 접속 묶음은 5706·`C6PhysicsLab/63`·`C6HapioGame/57`(설정 265개 그대로)이다.
