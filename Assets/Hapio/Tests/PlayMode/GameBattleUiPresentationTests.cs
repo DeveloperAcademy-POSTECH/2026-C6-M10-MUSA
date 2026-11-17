@@ -163,6 +163,7 @@ namespace Hapio.Tests
                 Assert.That(bindings.hud.staminaFill.transform.parent.parent,Is.SameAs(bindings.hud.battleUi.transform),"Orb composition keeps the stamina root directly under Battle UI.");
                 AssertPlayerBadgeLayout(bindings.hud);
                 Assert.That(bindings.sceneController.GetComponent<LabDrumMinimap>().compactGamePresentation,Is.True);
+                AssertStoryCharacterSprites(bindings.hud, bindings.sceneController.GetComponent<LabDrumMinimap>(), session.Network);
                 yield return Until(() => !session.IsLoadingScreenUp && !session.IsPreparingBattle);
                 yield return null; // The invisible hit target refreshes availability after the start cover closes.
                 Assert.That(bindings.hud.developerSettingsHidden, Is.True);
@@ -313,6 +314,59 @@ namespace Hapio.Tests
             }
             finally { snapshot.players=original; }
         }
+        // #785: a story battle shows P1 불이·P2 묵이·P3 솔이 on my circle, both neighbours and the drum minimap.
+        private static void AssertStoryCharacterSprites(LabHud hud, LabDrumMinimap map, LabNetwork network)
+        {
+            var snapshot = network.Snapshot;
+            var originalPlayers = snapshot.players;
+            var update = typeof(LabHud).GetMethod("Update", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            ulong mine = network.LocalPlayerId;
+            var players = Enumerable.Range(0, 3)
+                .Select(seat => new LabPlayerState { seat = seat, id = seat == 0 ? mine : mine + (ulong)seat + 1 }).ToArray();
+            try
+            {
+                // Refresh in the same frame: the live solo Host must not replace this display-only roster.
+                snapshot.players = players;
+                update.Invoke(hud, null);
+                AssertPlayerBadgeSprite(hud.localPlayerCircle, hud.battleStaminaPortraits[0], "Story P1 is 불이");
+                int[] neighbours = { 2, 1 }; // P2 묵이, P3 솔이
+                var shown = new[] { hud.leftPlayerCircle.sprite, hud.rightPlayerCircle.sprite };
+                Assert.That(shown, Is.EquivalentTo(neighbours.Select(index => hud.battleCharacterPortraits[index])));
+                int leftCharacter = Array.IndexOf(hud.battleCharacterPortraits, hud.leftPlayerCircle.sprite);
+                int rightCharacter = Array.IndexOf(hud.battleCharacterPortraits, hud.rightPlayerCircle.sprite);
+                Assert.That(hud.leftNeighborText.text, Is.EqualTo("< " + hud.battleCharacterNames[leftCharacter]));
+                Assert.That(hud.rightNeighborText.text, Is.EqualTo(hud.battleCharacterNames[rightCharacter] + " >"));
+
+                Assert.That(map.battleCharacterPortraits, Is.SameAs(hud.battleCharacterPortraits));
+                map.Rebuild(players, mine);
+                var content = map.Panel.Find("Content");
+                var seats = content.Cast<Transform>().Last(layer => layer.name == "Seats");
+                Assert.That(seats.Cast<Transform>().Select(seat => seat.GetComponent<UnityEngine.UI.Image>().sprite),
+                    Is.EquivalentTo(new[] { 0, 2, 1 }.Select(index => map.battleCharacterPortraits[index])));
+                foreach (RectTransform seat in seats)
+                {
+                    Assert.That(seat.GetComponent<UnityEngine.UI.Outline>(), Is.Null);
+                    Assert.That(seat.rect.width, Is.EqualTo(21f).Within(.001f));
+                }
+                var mySeat = seats.Cast<Transform>().Select(seat => seat.GetComponent<UnityEngine.UI.Image>())
+                    .Single(image => image.sprite == map.battleCharacterPortraits[0]);
+                map.SyncDrums(new[] { new LabOrbState { id = "story-ui-test-drum", kind = LabOrbKind.Drum, owner = mine } });
+                map.Advance(0);
+                Assert.That(mySeat.enabled, Is.False, "The landed drum takes the place of its holder's portrait.");
+                var drum = (RectTransform)content.Cast<Transform>().Last(layer => layer.name == "Drums").Find("Drum");
+                Assert.That(drum.rect.width, Is.GreaterThan(mySeat.rectTransform.rect.width));
+                map.SyncDrums(Array.Empty<LabOrbState>());
+                map.Advance(0);
+                Assert.That(mySeat.enabled, Is.True);
+            }
+            finally
+            {
+                snapshot.players = originalPlayers;
+                update.Invoke(hud, null);
+                map.Rebuild(originalPlayers, mine);
+            }
+        }
+
         private static void AssertTerritoryPlayerBadgeSprites(LabHud hud, GameBattleUiTheme theme, LabNetwork network)
         {
             Assert.That(theme.territoryBlueBadges, Has.Length.EqualTo(3));
