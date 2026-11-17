@@ -9551,3 +9551,13 @@ main `cef1579d`의 #760 관람·#762 땅따먹기 박/Game56·#727 튜토리얼�
   - 재실행: `GameFinishReplayTests` 7/7 PASS(새 `TheCaptionNamesTheThrowersBattleCharacter` 포함: 1~5번 불이의·묵이의·솔이의·금옥의·만복의, 6번 "P6의", 0번은 이름 줄 없음).
 - **화면 확인(Mac Development 빌드, 임시 캡처 스크립트는 저장소에 남기지 않음):** DEV 솔로 1스테이지에서 실제 다시보기를 띄웠다. 솔로의 실제 자막은 전·후 모두 "마지막 일격!"만 나온다. 같은 다시보기 화면에서 같은 자막 함수로 1~5번 자막을 만들어 찍었다: 전 "P1"~"P5", 후 "불이의"~"만복의". 글꼴·크기·위치는 같다.
 - **미검증:** 여러 기기가 자리를 고른 방에서 실제로 전달된 P번호로 나오는 자막(멀티 다시보기), iPhone 실기기.
+
+## 스토리 결과 화면·전투 문구의 캐릭터 이름 (2026-11-17)
+
+- **변경:** 스토리의 봉인 카드·실패 기록판·예비 결과 표의 수상자, 매혹 경고, 콤보 색 틀림 문구가 P번호 대신 전투 캐릭터 이름을 쓴다("불이, 묵이(나)", "요괴가 나와 솔이에게…", "묵이 색 틀림"). 이름은 `LabHud.BattlePlayerLabel` 하나로 얻는다. 땅따먹기 결과, Lab 결과 카드, 튜토리얼은 P번호 그대로다. 통신 형식·판정·접속 묶음은 바꾸지 않았다.
+- **계획과 다른 점:** `LabJigwiHud`의 플레이어 표기는 바꾸지 않았다. Lab 수동 화재 실험에서만 나오고 스토리 지귀(시간표)에서는 나오지 않는다.
+- **글자 줄이기:** 공동 수상 이름이 그 줄의 칭호나 기록 글자에 닿을 때만 `StoryRecordHighlight`가 이름 글자를 줄이고 줄 가운데 높이를 유지한다. 측정(봉인 카드, 시안 크기 32): 1~2명 32 유지, 3명 공동 + "60 (2·3·4회 타격)" 17, 5명 공동 + "5회" 18.
+- **검사 범위 선정:** UI 표현 변경이므로 전체 EditMode와 결과·전투 문구 경로의 PlayMode를 실행했다. 전체 PlayMode는 실행하지 않았다.
+- **결과(Unity 6000.6.5f1 batch, macOS, 기준 main `819cb234`):** EditMode 2602/2602 PASS. PlayMode `GameStageStoryPresentationTests`·`GameSceneFlowTests`·`GameFinishReplayTests`·`LabComboEffectLookTests`·`LabDeveloperSoloIntegrationTests`·`GameBattleUiPresentationTests`·`GameStageRetryPlayModeTests` 등 102/102 PASS. 높이 보정을 넣은 뒤 `StoryRecordHighlightTests` 14/14 PASS.
+- **화면 확인(Mac Development 빌드, 임시 캡처 스크립트는 저장소에 남기지 않음):** DEV 솔로 1스테이지의 실제 봉인 카드가 전 "P1(나)", 후 "불이(나)"다. 같은 카드에 3명·5명 공동 수상 줄을 넣어 찍었다: 전에는 P번호 이름이 기록 글자와 겹쳤고, 후에는 겹치지 않고 한 줄에 들어간다. 3명 이상은 글자가 절반 가까이 작아진다.
+- **미검증:** 전투 중 매혹 경고·콤보 색 틀림 문구의 실제 화면(다른 플레이어가 대상이어야 해서 여러 기기 방이 필요함, 문구는 검사로만 확인), 실패 기록판 실제 화면, iPhone 실기기.
