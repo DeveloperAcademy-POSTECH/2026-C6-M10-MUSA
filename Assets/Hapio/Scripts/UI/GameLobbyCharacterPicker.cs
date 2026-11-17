@@ -56,6 +56,10 @@ namespace Hapio
             var close = root.gameObject.AddComponent<Button>(); close.transition = Selectable.Transition.None;
             close.onClick.AddListener(picker.Close);
 
+            // The lobby's card art is translucent; an opaque sheet under it keeps the seats behind from showing through.
+            // TextColor/SecondaryLightIvory/100.
+            var sheet = Child(root, "Sheet", 32.5f, 322, 337, 230).gameObject.AddComponent<Image>();
+            sheet.color = GameLobbySeatColors.LightText; sheet.raycastTarget = false;
             var card = Child(root, "Card", 28.5f, 318, 345, 238).gameObject.AddComponent<Image>();
             card.sprite = paper; card.type = Image.Type.Simple;
             if (paper == null) card.color = GameLobbySeatColors.LightText;
