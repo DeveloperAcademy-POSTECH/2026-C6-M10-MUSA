@@ -9626,3 +9626,5 @@ main `cef1579d`의 #760 관람·#762 땅따먹기 박/Game56·#727 튜토리얼�
 - **iOS 내보내기:** 첫 Xcode 내보내기는 Succeeded·식별 검증 통과였으나 기존 `com.unity.pipeline`의 빌드 전처리기가 iOS에도 Standalone Subtarget을 읽어 ArgumentException1건을 보고했다. 게임/셰이더/QR 오류가 아니다. 패키지 캐시 원본을 백업하고 Standalone일 때만 해당 값을 읽도록 조건1개를 임시 보정한 뒤 새 폴더로 다시 내보냈다. 재내보내기는 **Succeeded·오류0·식별 검증 통과**이며 세로 고정·로컬 네트워크/Bonjour 항목과 Xcode 프로젝트를 확인했다. Release에 Pipeline 런타임 assembly/임시 Resources가 포함되지 않았음을 확인했다. 이후 패키지 원본의 해시까지 복원하고 재컴파일했다. manifest·lock·게임 코드에 이 도구 보정을 넣지 않았다. 원본 패키지의 동일 오류가 추후 내보내기에서도 나타날 수 있으므로 첫 결과를 오류0으로 소급하지 않는다.
 - **보존 확인:** 빌드 전후 ProjectSettings·Build Settings·일반 로비·StageCatalog·저장 Scene 등41개 파일의 해시가 같고 기존 stash를 보존했다. Home Scene·StandaloneOSX 플랫폼·Play 종료 상태로 복원했다. 빌드 결과와 원시 로그·기기 식별자·개인 경로·스크린샷은 커밋하지 않는다.
 - **미검증:** Mac Release 앱 실제 실행, iPhone/iPad 설치·터치·실기기 QR 인식, 실제 Wi-Fi/핫스팟/이더넷 여러 기기 동시 플레이. 로비/캐릭터 팝업의 추가 Figma 변경은 이번 범위 밖이다.
+
+- **PR 준비 확인:** 원격 main이 기준 `2e3666b7`과 동일하고 검사 대상 코드·에셋이 그대로임을 재확인했다. 최종 검토의 추가 변경은 QR 미지정 안내와 저장 빌드 검증의 차이를 명확히 한 문서뿐이므로 자동 검사·빌드는 반복하지 않았다.
