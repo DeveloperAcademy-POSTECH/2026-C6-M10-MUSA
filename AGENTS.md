@@ -534,8 +534,8 @@
 ## 로비 캐릭터 선택 (2026-11-17)
 
 - Hapio 스토리 방의 로비는 자리(P번호)를 고를 때 전투 캐릭터 5명(불이·묵이·솔이·금옥·만복) 중 하나를 함께 고른다. 빈 자리를 누르면 `GameLobbyCharacterPicker` 팝업이 뜨고, 다른 사람이 고른 캐릭터는 체크 표시로 막는다. 자리와 캐릭터는 한 요청(`slot_select`의 `slotNumber`·`character`)으로 Host가 함께 승인한다. 자리를 풀면 캐릭터도 풀린다. 땅따먹기와 Lab 단독 방은 자리만 고른다(`LabNetwork.LobbyUsesCharacters`).
-- 캐릭터 번호는 그림 순서 1~5(불이·솔이·묵이·금옥·만복, `BattleCharacters`의 Portrait1~5)이고 0은 없음이다. 팝업 표시 순서는 `LabPlayerSlots.CharacterOrder`(불이·묵이·솔이·금옥·만복)다. 규칙은 `LabPlayerSlots`가 가진다: 한 캐릭터는 한 사람만(`CHARACTER_TAKEN`), 캐릭터를 말하지 않은 요청(0)은 스토리 방에서 첫 빈 캐릭터를 받는다(`RequireCharacter`, 검사·자동 배정 경로용).
+- 캐릭터 번호는 그림 순서 1~5(불이·솔이·묵이·금옥·만복, `BattleCharacters`의 Portrait1~5)이고 0은 없음이다. 팝업 표시 순서는 `LabPlayerSlots.CharacterOrder`(불이·묵이·솔이·금옥·만복)다. 규칙은 `LabPlayerSlots`가 가진다: 한 캐릭터는 한 사람만(`CHARACTER_TAKEN`), 스토리 방(`RequireCharacter`)에서 캐릭터 없는 자리 요청은 거절한다(`CHARACTER_REQUIRED`). 모든 자리에 캐릭터가 있어야 시작할 수 있다. 자동 배정 스모크 경로(`autoStart`)는 `FirstFreeCharacter`를 명시해 요청한다.
 - 고른 캐릭터는 로비 패킷의 `slotAssignments[].character`와 전투 스냅샷의 `LabPlayerState.character`로 전달되고, 스테이지 1~3과 같은 방 재도전에서 유지된다. `LabHud.BattleCharacterIndex`는 이 값이 있으면 그것을 쓰고, 없으면(DEV 솔로·튜토리얼·Lab) P번호 고정 대응을 쓴다. 전투 HUD·미니맵·마지막 일격 자막·결과 이름·전투 문구가 모두 이 함수를 거친다. 좌우 이웃·전달 순서·카메라 위치는 계속 자리(P번호)가 정한다.
-- 로비 재입장(#501)에서 맡아 둔 자리는 캐릭터도 함께 맡는다. 맡는 시간이 끝난 뒤 돌아오면 그 캐릭터가 비어 있을 때만 돌려주고, 아니면 첫 빈 캐릭터를 준다. 스태프 시연 재시도는 자리와 함께 캐릭터도 비운다.
+- 로비 재입장(#501)에서 맡아 둔 자리는 캐릭터도 함께 맡는다. 맡는 시간이 끝난 뒤 돌아왔는데 그 캐릭터를 다른 사람이 가져갔으면 자리만 돌려준다(`TryRestoreSeat`). 그 사람 화면에는 팝업이 자동으로 뜨고(자기 자리를 눌러도 열림, "자리 비우기" 포함), 캐릭터를 다시 고를 때까지 방장은 시작할 수 없다. 스태프 시연 재시도는 자리와 함께 캐릭터도 비운다.
 - 팝업은 실행 중에 만든다(저장된 `GameLobby.prefab`은 바꾸지 않음). Figma 시안이 없어 로비의 한지 카드·글꼴과 `Hapio.tokens.json` 색, `BattleCharacters` 초상을 쓴다. 시안이 나오면 그에 맞춘다.
 - 현재 호환 묶음은 설정265개·**5706**·`C6PhysicsLab/63`·**`C6HapioGame/57`**다. 로비 패킷과 스냅샷 형식이 바뀌어 5705/Lab62/Game56 이하 앱과 혼용하지 않는다. 실행한 검사는 `docs/VALIDATION.md`만 따른다.
