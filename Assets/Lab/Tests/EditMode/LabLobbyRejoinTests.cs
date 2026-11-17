@@ -128,6 +128,36 @@ namespace C6Lab.Tests
         }
 
         [Test]
+        public void AReturningGuestGetsItsCharacterBackOrKeepsTheSeatAndPicksAgain()
+        {
+            using (var room = new HostRoom(3))
+            {
+                // Held place: the seat comes back with the character it was taken with.
+                room.Join(5, TicketA, 2);
+                Assert.That(room.Slots.TrySelect(5, 2, 4, out _), Is.True);
+                room.Drop(5);
+                Assert.That(room.Slots.GetCharacterOwner(4), Is.EqualTo(5UL), "A held seat keeps its character taken.");
+                Assert.That(room.Approve(9, TicketA), Is.True);
+                room.Connect(9);
+                room.Hear(9);
+                Assert.That(room.Network.GetSlotOwner(2), Is.EqualTo(9UL));
+                Assert.That(room.Slots.GetCharacter(9), Is.EqualTo(4));
+
+                // After the hold ended someone else took the character: the seat is kept, the character is picked again.
+                room.Drop(9);
+                room.Expire(Time.realtimeSinceStartupAsDouble + LabNetwork.LobbySeatHoldSeconds + 1d);
+                Assert.That(room.Slots.GetCharacterOwner(4), Is.EqualTo(ulong.MaxValue), "The expired hold frees the character.");
+                room.Join(6, TicketB, 3);
+                Assert.That(room.Slots.TrySelect(6, 3, 4, out _), Is.True);
+                Assert.That(room.Approve(10, TicketA), Is.True);
+                room.Connect(10);
+                Assert.That(room.Network.GetSlotOwner(2), Is.EqualTo(10UL), "Its P is still free, so it comes back.");
+                Assert.That(room.Slots.GetCharacter(10), Is.Zero, "The character now belongs to someone else.");
+                Assert.That(room.Slots.GetCharacter(6), Is.EqualTo(4));
+            }
+        }
+
+        [Test]
         public void AReturnAfterTheHoldEndedGetsItsPBackOnlyIfStillFree()
         {
             using (var room = new HostRoom(3))
