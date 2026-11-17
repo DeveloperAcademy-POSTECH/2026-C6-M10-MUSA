@@ -158,7 +158,7 @@ namespace C6Lab
                 if (charmed == local) { includesMe = true; continue; }
                 LabPlayerState target = System.Array.Find(snapshot.players ?? new LabPlayerState[0],
                     player => player != null && player.id == charmed);
-                names.Add(LabResultStats.PlayerName(target));
+                names.Add(target == null ? LabResultStats.PlayerName(null) : LabHud.BattlePlayerLabel(snapshot, target.seat + 1));
             }
             if (includesMe) names.Insert(0, "나");
             warning.text = WarningText(names, includesMe);

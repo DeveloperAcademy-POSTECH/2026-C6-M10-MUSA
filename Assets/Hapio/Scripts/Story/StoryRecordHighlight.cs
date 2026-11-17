@@ -58,6 +58,7 @@ namespace Hapio
                 // longer value drifted off its column. Centre each value under its header instead.
                 if (cells.Length >= 2)
                 {
+                    FitPlayer(cells[0], titles[row], cells[1], playerHeader, recordHeader, parent);
                     CenterUnder(cells[0], playerHeader, parent);
                     CenterUnder(cells[1], recordHeader, parent);
                 }
@@ -76,6 +77,49 @@ namespace Hapio
                     .Select(text => SiblingUnder(text.transform, parent)).Min());
             }
         }
+
+        private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Text, object> DesignSizes =
+            new System.Runtime.CompilerServices.ConditionalWeakTable<Text, object>();
+        public const int SmallestPlayerSize = 8;
+
+        /// <summary>
+        /// Several tied winners ("불이, 묵이, 솔이(나)") can be wider than the room between the title and the record on that row.
+        /// Only then the player text shrinks to stay on its one line; shorter names keep the design's size.
+        /// </summary>
+        private static void FitPlayer(Text player, Text title, Text record, Text playerHeader, Text recordHeader, Transform space)
+        {
+            if (player == null || title == null || record == null || playerHeader == null || recordHeader == null) return;
+            var saved = (Vector2)DesignSizes.GetValue(player, text => (object)new Vector2(text.fontSize, text.rectTransform.anchoredPosition.y));
+            int design = Mathf.RoundToInt(saved.x);
+            player.fontSize = design;
+            SetHeight(player, saved.y);
+            float room = PlayerRoom(title, record, playerHeader, recordHeader, space);
+            float width = DrawnWidth(player, space);
+            if (room <= 0f || width <= room) return;
+            player.fontSize = Mathf.Max(SmallestPlayerSize, Mathf.FloorToInt(design * room / width));
+            // The cell is top-aligned: lower the smaller text so it stays on the row's middle line.
+            SetHeight(player, saved.y - (design - player.fontSize) * .5f * player.rectTransform.localScale.y);
+        }
+
+        private static void SetHeight(Text text, float y)
+        {
+            Vector2 at = text.rectTransform.anchoredPosition;
+            if (!Mathf.Approximately(at.y, y)) text.rectTransform.anchoredPosition = new Vector2(at.x, y);
+        }
+
+        /// <summary>The width a centred player text may take on this row without touching the title or the record.</summary>
+        public static float PlayerRoom(Text title, Text record, Text playerHeader, Text recordHeader, Transform space)
+        {
+            float center = DrawnCenterX(playerHeader, space);
+            RectEdges(title.rectTransform, space, out float titleLeft, out _, out _);
+            float titleRight = titleLeft + DrawnWidth(title, space);
+            float recordLeft = DrawnCenterX(recordHeader, space) - DrawnWidth(record, space) * .5f;
+            return 2f * Mathf.Min(center - titleRight, recordLeft - center) * .92f;
+        }
+
+        /// <summary>A label's drawn text width in <paramref name="space"/> (it overflows its box, so the box is not used).</summary>
+        public static float DrawnWidth(Text text, Transform space) =>
+            text.preferredWidth * space.InverseTransformVector(text.rectTransform.TransformVector(Vector3.right)).magnitude;
 
         /// <summary>Centre the cell's text on the header's drawn text; repeated calls keep it there.</summary>
         private static void CenterUnder(Text cell, Text header, Transform space)

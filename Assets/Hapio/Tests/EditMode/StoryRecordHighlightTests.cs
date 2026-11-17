@@ -112,6 +112,47 @@ namespace Hapio.Tests
             finally { Object.DestroyImmediate(view); }
         }
 
+        [TestCase("Gumiho_SealCard"), TestCase("Yagwanggui_SealCard"), TestCase("Jigwi_SealCard"), TestCase("Failure_Dashboard")]
+        public void TiedCharacterNamesShrinkOnlyWhenTheyWouldTouchTheTitleOrTheRecord(string prefab)
+        {
+            GameObject view = Object.Instantiate(AssetDatabase.LoadAssetAtPath<GameObject>(Views + prefab + ".prefab"));
+            try
+            {
+                var rows = new[]
+                {
+                    new StoryCardRecords.Record { player = "불이, 묵이, 솔이(나)", value = "60 (2·3·4회 타격)", mine = true },
+                    new StoryCardRecords.Record { player = "묵이(나)", value = "100%", mine = true },
+                    new StoryCardRecords.Record { player = "불이, 묵이, 솔이, 금옥, 만복(나)", value = "5회", mine = true },
+                    new StoryCardRecords.Record { player = "금옥", value = "8회" },
+                    new StoryCardRecords.Record { player = "불이, 묵이", value = "93초 · 86%" },
+                };
+                foreach (StoryCardRecords records in view.GetComponentsInChildren<StoryCardRecords>(true)) records.Bind(1f, 12f, rows);
+                bool dashboard = view.GetComponentsInChildren<StoryCardRecords>(true).Length == 0;
+                Text[] texts = view.GetComponentsInChildren<Text>(true);
+                Text Cell(string value) => texts.First(text => text.text == value);
+                int design = dashboard ? 0 : Cell(rows[1].player).fontSize;
+                StoryRecordHighlight.Apply(view.transform, rows, dashboard);
+                StoryRecordHighlight.Apply(view.transform, rows, dashboard); // binding again must not shrink twice
+                if (dashboard) design = Cell(rows[1].player).fontSize;
+                Text playerHeader = Cell(StoryRecordHighlight.PlayerHeader), recordHeader = Cell(StoryRecordHighlight.RecordHeader);
+                Transform table = playerHeader.transform.parent;
+                for (int row = 0; row < rows.Length; row++)
+                {
+                    Text player = Cell(rows[row].player), record = Cell(rows[row].value);
+                    float room = StoryRecordHighlight.PlayerRoom(Title(view, row), record, playerHeader, recordHeader, table);
+                    float width = StoryRecordHighlight.DrawnWidth(player, table);
+                    string context = prefab + " row " + row + " " + rows[row].player + " size " + player.fontSize + " width " + width + " room " + room;
+                    Assert.That(player.fontSize, Is.GreaterThanOrEqualTo(StoryRecordHighlight.SmallestPlayerSize), context);
+                    if (row == 1 || row == 3) Assert.That(player.fontSize, Is.EqualTo(design), "A single name keeps the design size. " + context);
+                    else if (player.fontSize > StoryRecordHighlight.SmallestPlayerSize)
+                        Assert.That(width, Is.LessThanOrEqualTo(room + .01f), "Tied names stay clear of both neighbours. " + context);
+                    TestContext.WriteLine(context);
+                }
+                Assert.That(Cell(rows[2].player).fontSize, Is.LessThan(design), "Five tied names do not fit at the design size.");
+            }
+            finally { Object.DestroyImmediate(view); }
+        }
+
         [Test]
         public void TheCardFrontIsNotTreatedAsPartOfTheTable()
         {

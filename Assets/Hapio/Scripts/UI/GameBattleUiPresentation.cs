@@ -67,12 +67,15 @@ namespace Hapio
         }
 
         /// <summary>The caption's first line: the thrower's battle character as shown on every screen, e.g. "불이의" (story seats only).</summary>
-        internal static string FinishReplayOwner(int playerSlot)
-        {
-            int character = LabHud.BattleCharacterIndex(null, playerSlot);
-            string name = character >= 0 && character < CharacterNames.Length ? CharacterNames[character] : "P" + playerSlot;
-            return name + "의";
-        }
+        internal static string FinishReplayOwner(int playerSlot) =>
+            LabHud.BattlePlayerLabel(null, playerSlot, CharacterNames) + "의";
+
+        /// <summary>
+        /// Names for a story result: each player's battle character ("불이"), as on the battle screen. Land grab snapshots keep
+        /// "P" + number.
+        /// </summary>
+        public static Func<LabPlayerState, string> ResultNames(LabSnapshot snapshot) => player =>
+            player == null ? LabResultStats.PlayerName(null) : LabHud.BattlePlayerLabel(snapshot, player.seat + 1, CharacterNames);
 
         private static void AddReplayLabel(Transform page, string name, string caption, Font font,
             Color color, int size, float y, float height)
