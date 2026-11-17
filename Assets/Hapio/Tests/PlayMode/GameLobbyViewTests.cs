@@ -251,10 +251,30 @@ namespace Hapio.Tests
             Assert.That(view.message.text, Does.Contain("available P number"));
             Assert.That(view.message.text, Is.Not.EqualTo(session.Network.RoomSearchMessage),
                 "The connected lobby must show a rejected seat request rather than the browser's default help.");
+            // A story seat is taken together with a character: the press opens the picker and takes nothing yet.
             yield return Click(view.slotButtons[1]);
+            GameLobbyCharacterPicker picker = view.CharacterPicker;
+            Assert.That(picker != null && picker.IsOpen, Is.True, "Pressing an empty story seat asks for a character.");
+            Assert.That(picker.Seat, Is.EqualTo(2));
+            Assert.That(session.Network.LocalSlotNumber, Is.Zero);
+            for (int i = 0; i < LabPlayerSlots.CharacterCount; i++)
+            {
+                Assert.That(picker.Choice(i).interactable, Is.True, "Nobody holds a character yet.");
+                Assert.That(picker.Checked(i), Is.False);
+            }
+            Assert.That(Enumerable.Range(0, 5).Select(GameLobbyCharacterPicker.CharacterAt).Select(GameLobbyCharacterPicker.NameOf),
+                Is.EqualTo(new[] { "불이", "묵이", "솔이", "금옥", "만복" }));
+            yield return Click(picker.Choice(3)); // 금옥
+            Assert.That(picker.IsOpen, Is.False);
             Assert.That(session.Network.LocalSlotNumber, Is.EqualTo(2));
+            Assert.That(session.Network.LocalCharacter, Is.EqualTo(4));
+            Assert.That(session.Network.GetCharacterOwner(4), Is.EqualTo(session.Network.LocalPlayerId));
+            Assert.That(view.slotImages[1].sprite, Is.SameAs(GameLobbyCharacterPicker.Portrait(4)), "The seat shows the chosen character.");
+            Assert.That(view.slotLabels[1].text, Is.Empty);
+            Assert.That(view.localLabels[1].text, Does.Contain("금옥"));
             Assert.That(view.localLabels[1].text, Does.Contain("방장"));
             Assert.That(view.localLabels[0].text, Does.Not.Contain("방장"));
+            Assert.That(view.slotLabels[0].text, Is.EqualTo("P1"), "An empty seat keeps its P marker.");
             Vector2 anchor = view.seats3[1].anchoredPosition;
             view.seats3[1].anchoredPosition += Vector2.right * 5f;
             yield return null;
@@ -263,8 +283,18 @@ namespace Hapio.Tests
             view.seats3[1].anchoredPosition = anchor;
             yield return Click(view.slotButtons[1]);
             Assert.That(session.Network.LocalSlotNumber, Is.Zero);
+            Assert.That(session.Network.LocalCharacter, Is.Zero, "Clearing the seat frees its character.");
+            Assert.That(session.Network.GetCharacterOwner(4), Is.EqualTo(ulong.MaxValue));
+            Assert.That(picker.IsOpen, Is.False, "Clearing my own seat does not ask for a character.");
             yield return Click(view.slotButtons[0]);
+            Assert.That(picker.IsOpen, Is.True);
+            yield return Click(picker.GetComponent<UnityEngine.UI.Button>()); // outside the card
+            Assert.That(picker.IsOpen, Is.False);
+            Assert.That(session.Network.LocalSlotNumber, Is.Zero, "Closing the picker takes no seat.");
+            yield return Click(view.slotButtons[0]);
+            yield return Click(picker.Choice(0)); // 불이
             Assert.That(session.Network.LocalSlotNumber, Is.EqualTo(1));
+            Assert.That(session.Network.LocalCharacter, Is.EqualTo(1));
             yield return Click(view.slotButtons[0]);
             Assert.That(session.Network.LocalSlotNumber, Is.Zero, "Tapping one's selected seat also clears it.");
             view.sealButton.onClick.Invoke();
