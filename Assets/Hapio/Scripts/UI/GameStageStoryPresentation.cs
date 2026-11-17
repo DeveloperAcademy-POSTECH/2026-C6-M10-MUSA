@@ -122,6 +122,7 @@ namespace Hapio
                 {
                     boundResult = result;
                     mode = successful ? Mode.AfterStage : Mode.Failure;
+                    player.SetUserSkipAllowed(!successful);
                     if (!player.Play(successful ? afterStages[session.State.stageIndex - 1] : failure))
                     { StopPresentation(); return false; }
                 }
@@ -342,10 +343,8 @@ namespace Hapio
             session.ReturnToDemoSelection();
         }
 
-        // The seal card and the first failure picture are read in full; skipping starts from the next picture.
-        private bool SkipHiddenOnThisCut => mode == Mode.AfterStage && player.CurrentView != null
-                && player.CurrentView.GetComponentInChildren<StoryCardFlip>(true) != null
-            || mode == Mode.Failure && player.CurrentCutIndex == 0
+        // Clear afterstories have no user skip. Failure and final-ending pictures keep their existing policy.
+        private bool SkipHiddenOnThisCut => mode == Mode.Failure && player.CurrentCutIndex == 0
             || player.CurrentView != null && player.CurrentView.GetComponent<SealRunSummary>() != null;
 
         private bool ActionsBlocked => screen.StoryActionsBlocked || session.IsLoadingScene
@@ -384,7 +383,7 @@ namespace Hapio
             bool inspect = review && !authoredClear && !HasAction("InspectGourd");
             Show(viewerButton, inspect); Set(viewerButton, inspect && !blocked && session.PreviewTexture != null);
             Label(viewerButton, GameScreen.ViewerButtonCaption(session, viewerReadyCaption));
-            bool skip = player.IsPlaying && (mode == Mode.AfterStage || mode == Mode.Failure || mode == Mode.Ending)
+            bool skip = player.IsPlaying && player.UserSkipAllowed && (mode == Mode.Failure || mode == Mode.Ending)
                 && !SkipHiddenOnThisCut;
             Show(skipButton, skip); Set(skipButton, skip && !blocked);
             bool exit = review && !final && !authoredClear || failed && !HasAction("Exit");
@@ -497,7 +496,7 @@ namespace Hapio
 
         public void Skip()
         {
-            if (!IsPresenting || ActionsBlocked) return;
+            if (!IsPresenting || ActionsBlocked || !player.UserSkipAllowed) return;
             player.RequestSkip();
         }
 
@@ -552,6 +551,7 @@ namespace Hapio
             if (IsStaffCompletedResult || mode == Mode.Ending || !session.SummaryAllowed || !session.CanReturnHome) return;
             showingOverall = false; mode = Mode.Ending; SetBusy(true);
             if (readyView != null) readyView.ResetView();
+            player.SetUserSkipAllowed(true);
             player.Play(EndingSequence); RefreshControls();
         }
 
@@ -598,7 +598,7 @@ namespace Hapio
             UnbindActions();
             if (subscribed && player != null) { player.Finished -= OnFinished; player.ViewChanged -= BindView; }
             subscribed = false;
-            if (player != null) { player.Cancel(); player.SetInputBlocked(false); }
+            if (player != null) { player.Cancel(); player.SetInputBlocked(false); player.SetUserSkipAllowed(true); }
             if (presentationRoot != null) presentationRoot.SetActive(false);
             if (failureDashboard != null) Destroy(failureDashboard);
             failureDashboard = null;

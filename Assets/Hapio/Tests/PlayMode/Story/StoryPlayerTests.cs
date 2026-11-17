@@ -38,6 +38,19 @@ namespace Hapio.Tests
             return player;
         }
 
+        private StoryPlayer CreatePlayerWithSkipButton()
+        {
+            var player = CreatePlayer();
+            player.gameObject.SetActive(false);
+            var buttonObject = new GameObject("Skip", typeof(RectTransform), typeof(UnityEngine.UI.Image), typeof(UnityEngine.UI.Button));
+            buttonObject.transform.SetParent(player.transform, false);
+            player.skipButton = buttonObject.GetComponent<UnityEngine.UI.Button>();
+            // Re-enable the real component so OnEnable wires RequestSkip, as it does in saved players.
+            player.gameObject.SetActive(true);
+            player.Replay();
+            return player;
+        }
+
         [UnityTest]
         public IEnumerator PreviousButtonReturnsToThePreviousPictureFirstPageAndPausesAuto()
         {
@@ -331,6 +344,82 @@ namespace Hapio.Tests
             player.Next(); player.Next(); player.Next(); player.Skip();
             Assert.That(finished, Is.EqualTo(1));
             Assert.That(player.IsPlaying, Is.False);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator DisabledUserSkipRejectsButtonAndRequestWithoutConsumingTheNextTap()
+        {
+            var player = CreatePlayerWithSkipButton();
+            player.touchOnly = true;
+            player.Next(); // Finish entrance before exercising the next picture's user input.
+            yield return null;
+            var picture = player.CurrentView;
+            int skipped = 0;
+            player.Finished += reason => { if (reason == StoryExitReason.Skipped) skipped++; };
+            player.SetUserSkipAllowed(false);
+            Assert.That(player.UserSkipAllowed, Is.False);
+            Assert.That(player.skipButton.gameObject.activeSelf, Is.False);
+            Assert.That(player.skipButton.interactable, Is.False);
+
+            player.RequestSkip();
+            player.skipButton.onClick.Invoke(); // A stale queued UnityEvent cannot bypass the hidden button's policy.
+            Assert.That(player.IsPlaying, Is.True);
+            Assert.That(player.CurrentView, Is.SameAs(picture));
+            Assert.That(player.CurrentCutIndex, Is.Zero);
+            Assert.That(skipped, Is.Zero);
+            player.RequestNext();
+            Assert.That(player.CurrentCutIndex, Is.EqualTo(1), "A rejected skip must not consume this frame's only allowed tap.");
+            Assert.That(player.CurrentView, Is.Not.SameAs(picture));
+            Assert.That(player.UserSkipAllowed, Is.False);
+        }
+
+        [UnityTest]
+        public IEnumerator UserSkipPolicySurvivesCutChangesAndReplayThenRestoresTheExistingButton()
+        {
+            var player = CreatePlayerWithSkipButton();
+            int skipped = 0;
+            player.Finished += reason => { if (reason == StoryExitReason.Skipped) skipped++; };
+            Assert.That(player.UserSkipAllowed, Is.True, "Opening and authoring players keep their default user skip.");
+            player.skipButton.onClick.Invoke();
+            Assert.That(player.IsPlaying, Is.False);
+            Assert.That(skipped, Is.EqualTo(1));
+            yield return null;
+
+            player.Replay();
+            player.SetUserSkipAllowed(false);
+            player.Next(); player.Next();
+            Assert.That(player.CurrentCutIndex, Is.EqualTo(1));
+            Assert.That(player.skipButton.gameObject.activeSelf, Is.False, "Moving to another picture cannot reveal the disabled action.");
+            player.Replay();
+            Assert.That(player.UserSkipAllowed, Is.False, "A new playback cannot silently override its caller's policy.");
+            Assert.That(player.skipButton.gameObject.activeSelf, Is.False);
+            Assert.That(player.skipButton.interactable, Is.False);
+            player.RequestSkip();
+            player.skipButton.onClick.Invoke();
+            Assert.That(player.IsPlaying, Is.True);
+            Assert.That(player.CurrentCutIndex, Is.Zero);
+            Assert.That(skipped, Is.EqualTo(1));
+
+            player.SetUserSkipAllowed(true);
+            Assert.That(player.skipButton.gameObject.activeSelf, Is.True);
+            Assert.That(player.skipButton.interactable, Is.True);
+            player.skipButton.onClick.Invoke();
+            Assert.That(player.IsPlaying, Is.False, "A later ending or preview can use the restored existing button.");
+            Assert.That(skipped, Is.EqualTo(2));
+        }
+
+        [UnityTest]
+        public IEnumerator DirectToolSkipStillFinishesWhileUserSkipIsDisabled()
+        {
+            var player = CreatePlayer();
+            int skipped = 0;
+            player.Finished += reason => { if (reason == StoryExitReason.Skipped) skipped++; };
+            player.SetUserSkipAllowed(false);
+            player.Skip(); player.Skip();
+            Assert.That(player.IsPlaying, Is.False);
+            Assert.That(skipped, Is.EqualTo(1), "The direct sequencing API used by tooling still finishes exactly once.");
+            Assert.That(player.UserSkipAllowed, Is.False);
             yield return null;
         }
 
