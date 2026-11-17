@@ -88,12 +88,12 @@ namespace Hapio.Tests
             Peer b3 = JoinPeer("B P3", b.Network.port, 2);
             yield return Until(() => new[] { a2, a3, b2, b3 }.All(peer => peer.Network.CanSelectPlayerSlot),
                 "All four Guests reach their own group's lobby");
-            Assert.That(a.Network.RequestPlayerSlot(1), Is.True);
-            Assert.That(a2.Network.RequestPlayerSlot(2), Is.True);
-            Assert.That(a3.Network.RequestPlayerSlot(3), Is.True);
-            Assert.That(b.Network.RequestPlayerSlot(1), Is.True);
-            Assert.That(b2.Network.RequestPlayerSlot(2), Is.True);
-            Assert.That(b3.Network.RequestPlayerSlot(3), Is.True);
+            Assert.That(a.Network.RequestPlayerSlot(1, 1), Is.True);
+            Assert.That(a2.Network.RequestPlayerSlot(2, 2), Is.True);
+            Assert.That(a3.Network.RequestPlayerSlot(3, 3), Is.True);
+            Assert.That(b.Network.RequestPlayerSlot(1, 1), Is.True);
+            Assert.That(b2.Network.RequestPlayerSlot(2, 2), Is.True);
+            Assert.That(b3.Network.RequestPlayerSlot(3, 3), Is.True);
             yield return Until(() => a.Network.CanStartBattle && b.Network.CanStartBattle,
                 "Both groups independently hold exactly three selected, configured P places");
             foreach (Peer peer in new[] { a, a2, a3 })

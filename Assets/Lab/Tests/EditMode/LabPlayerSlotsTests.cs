@@ -134,9 +134,21 @@ namespace C6Lab.Tests
             Assert.That(slots.TrySelect(10ul, 3, 1, out reason), Is.True);
             Assert.That(reason, Is.EqualTo("SLOT_UNCHANGED"));
 
-            // A request that names no character takes the first free one in the picker's order (불이 1, 묵이 3, 솔이 2...).
-            Assert.That(slots.TrySelect(30ul, 2, 0, out _), Is.True);
-            Assert.That(slots.GetCharacter(30ul), Is.EqualTo(3), "불이(1) is taken, so 묵이(3) comes next.");
+            // A seat cannot be taken without a character; scripted claims ask for the first free one in the picker's order.
+            Assert.That(slots.TrySelect(30ul, 2, 0, out reason), Is.False);
+            Assert.That(reason, Is.EqualTo("CHARACTER_REQUIRED"));
+            Assert.That(slots.TrySelect(30ul, 2, out reason), Is.False, "The seat-only request has no character either.");
+            Assert.That(slots.GetSlot(30ul), Is.Zero);
+            Assert.That(slots.FirstFreeCharacter(), Is.EqualTo(3), "불이(1) is taken, so 묵이(3) comes next.");
+            Assert.That(slots.IsComplete(new[] { 10ul, 20ul, 30ul }), Is.False);
+            // A returning player whose character was taken keeps the seat alone and must pick again before the start.
+            Assert.That(slots.TryRestoreSeat(30ul, 2), Is.True);
+            Assert.That(slots.GetSlot(30ul), Is.EqualTo(2));
+            Assert.That(slots.GetCharacter(30ul), Is.Zero);
+            Assert.That(slots.IsComplete(new[] { 10ul, 20ul, 30ul }), Is.False, "A seat without a character cannot start.");
+            Assert.That(slots.TrySelect(30ul, 2, 1, out reason), Is.False);
+            Assert.That(reason, Is.EqualTo("CHARACTER_TAKEN"));
+            Assert.That(slots.TrySelect(30ul, 2, 3, out _), Is.True, "Picking a character keeps the seat.");
             Assert.That(slots.IsComplete(new[] { 10ul, 20ul, 30ul }), Is.True);
             Assert.That(slots.CharactersInSlotOrder(), Is.EqualTo(new[] { 5, 3, 1 }));
 

@@ -663,11 +663,13 @@ namespace C6Lab
         private bool TrySelectSlot(ulong playerId, int slotNumber, int character = 0)
         {
             SyncSlotRules();
+            // Only story lobbies have characters; a land grab or Lab seat never keeps one.
+            if (!LobbyUsesCharacters) character = 0;
             string reason = null;
             if (!IsHost || developerSolo || model != null || !order.Contains(playerId)
                 || playerSlots == null || !playerSlots.TrySelect(playerId, slotNumber, character, out reason))
             {
-                SetNotice(reason == "CHARACTER_TAKEN" ? SlotRejectionText(reason, gameFlowEnabled)
+                SetNotice(reason == "CHARACTER_TAKEN" || reason == "CHARACTER_REQUIRED" ? SlotRejectionText(reason, gameFlowEnabled)
                     : "That P number is unavailable. Choose another.");
                 return false;
             }
@@ -686,7 +688,8 @@ namespace C6Lab
             if (!autoStart || playerSlots == null || playerSlots.GetSlot(playerId) != 0) return;
             SyncSlotRules();
             int slot = FirstAvailableSlot();
-            if (slot > 0) playerSlots.TrySelect(playerId, slot, out _);
+            if (slot > 0) playerSlots.TrySelect(playerId, slot,
+                playerSlots.RequireCharacter ? playerSlots.FirstFreeCharacter() : 0, out _);
         }
 
         private int FirstAvailableSlot()
@@ -1834,7 +1837,7 @@ namespace C6Lab
                 slotRequestIds[sender] = packet.requestId;
                 int previousSlot = playerSlots.GetSlot(sender), previousCharacter = playerSlots.GetCharacter(sender);
                 SyncSlotRules();
-                accepted = playerSlots.TrySelect(sender, packet.slotNumber, packet.character, out reason);
+                accepted = playerSlots.TrySelect(sender, packet.slotNumber, LobbyUsesCharacters ? packet.character : 0, out reason);
                 changed = accepted && (previousSlot != packet.slotNumber || previousCharacter != playerSlots.GetCharacter(sender));
             }
             Send(sender, new LabNetworkPacket { type = "slot_result", requestId = packet.requestId,
@@ -3337,7 +3340,8 @@ namespace C6Lab
 
         /// <summary>The Lab shows the Host's reason; the game says it in words a player can act on.</summary>
         public static string SlotRejectionText(string reason, bool game) => !game ? "P number selection was rejected: " + reason
-            : reason == "CHARACTER_TAKEN" ? "이미 고른 캐릭터요. 다른 캐릭터를 골라주시오." : "자리를 고르지 못했소. 다시 골라주시오.";
+            : reason == "CHARACTER_TAKEN" ? "이미 고른 캐릭터요. 다른 캐릭터를 골라주시오."
+            : reason == "CHARACTER_REQUIRED" ? "함께할 캐릭터를 골라주시오." : "자리를 고르지 못했소. 다시 골라주시오.";
 
         /// <summary>A Host reason such as INSUFFICIENT_STAMINA names a log entry, not something to tell a player.</summary>
         public static bool IsInternalReasonCode(string reason)

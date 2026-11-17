@@ -51,8 +51,9 @@ namespace Hapio
                 var label = view.localLabels[i];
                 bool host = label.text.Contains("방장"), held = label.text == GameLobbyView.HeldSeatLabel;
                 string who = portrait ? GameLobbyCharacterPicker.NameOf(view.SeatCharacter(i)) : null;
+                bool pick = label.text.Contains("캐릭터 고르기");
                 label.text = held ? GameLobbyView.HeldSeatLabel : who != null ? (host ? who + " · 방장" : who)
-                    : host ? "방장" : string.Empty;
+                    : pick ? "캐릭터 고르기" : host ? "방장" : string.Empty;
                 label.fontSize = 20; label.color = GameLobbySeatColors.Host;
                 Vector2 center = ((RectTransform)view.slotButtons[i].transform).anchoredPosition;
                 Place(label.transform, center.x - 60, -center.y + (team ? -67 : 43), 120, 26);

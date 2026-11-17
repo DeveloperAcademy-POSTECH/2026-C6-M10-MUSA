@@ -232,7 +232,7 @@ namespace C6Lab.Tests
                 Assert.That(fixture.Network.CanSelectPlayerSlot, Is.True);
                 Assert.That(fixture.Approves(23), Is.True,
                     "The Lab's ordinary lobby keeps its original approval path.");
-                Assert.That(fixture.Network.RequestPlayerSlot(1), Is.True);
+                Assert.That(fixture.Network.RequestPlayerSlot(1, 1), Is.True);
                 Assert.That(fixture.Network.GetSlotOwner(1), Is.EqualTo(0ul));
             }
         }
@@ -262,7 +262,7 @@ namespace C6Lab.Tests
                 fixture.AddPlayer(0, 1);
                 Assert.That(fixture.Network.RequestPlayerSlot(0), Is.True);
                 Assert.That(fixture.Network.GetSlotOwner(1), Is.EqualTo(ulong.MaxValue));
-                Assert.That(fixture.Network.RequestPlayerSlot(2), Is.True);
+                Assert.That(fixture.Network.RequestPlayerSlot(2, 2), Is.True);
                 Assert.That(fixture.Network.GetSlotOwner(2), Is.EqualTo(0ul));
                 fixture.AddPlayer(23, 0);
                 fixture.DeliverSlot(23, 1);

@@ -270,8 +270,9 @@ namespace C6Lab
         {
             if (slot <= 0 || playerSlots == null || playerSlots.GetOwner(slot) != ulong.MaxValue) return;
             SyncSlotRules();
-            // Its character comes back with the P; if someone took it after the hold ended, the first free one is used.
-            if (playerSlots.TrySelect(id, slot, returningCharacter, out _) || playerSlots.TrySelect(id, slot, 0, out _))
+            // Its character comes back with the P. If someone took it after the hold ended, the seat is kept without one
+            // and the player picks again before the room can start.
+            if (playerSlots.TrySelect(id, slot, returningCharacter, out _) || playerSlots.TryRestoreSeat(id, slot))
                 Debug.Log("C6_LAB_LOBBY_REJOIN host=restored id=" + id + " p=" + slot + " c=" + playerSlots.GetCharacter(id));
             returningCharacter = 0;
         }

@@ -40,12 +40,13 @@ namespace C6Lab
         /// <summary>The order a picker shows them in, as character numbers: 불이, 묵이, 솔이, 금옥, 만복.</summary>
         public static readonly int[] CharacterOrder = { 1, 3, 2, 4, 5 };
         /// <summary>
-        /// Every seat has a character (Hapio story rooms). A request that names none (0) keeps the player's character or
-        /// takes the first free one in CharacterOrder. Off (land grab, standalone Lab): 0 stays "none".
+        /// A seat is taken only together with a character (Hapio story rooms): a request without one is refused, and
+        /// the room is not complete until every seat has one. Off (land grab, standalone Lab): seats have no character.
         /// </summary>
         public bool RequireCharacter { get; set; }
 
-        private int FirstFreeCharacter()
+        /// <summary>The first character nobody holds, in the picker's order (0 if none); for scripted automatic claims.</summary>
+        public int FirstFreeCharacter()
         {
             foreach (int character in CharacterOrder)
                 if (GetCharacterOwner(character) == ulong.MaxValue) return character;
@@ -84,7 +85,17 @@ namespace C6Lab
         /// Take a seat together with a battle character (0 = none). Releasing the seat (0) releases the character too.
         /// A character another player holds cannot be taken, and nothing changes when the request is refused.
         /// </summary>
-        public bool TrySelect(ulong playerId, int slotNumber, int character, out string reason)
+        public bool TrySelect(ulong playerId, int slotNumber, int character, out string reason) =>
+            TrySelect(playerId, slotNumber, character, false, out reason);
+
+        /// <summary>
+        /// Give a returning player its seat back when its character went to someone else meanwhile: the seat is kept
+        /// without a character, and the player picks one again before the room can start.
+        /// </summary>
+        public bool TryRestoreSeat(ulong playerId, int slotNumber) =>
+            slotNumber > 0 && TrySelect(playerId, slotNumber, 0, true, out _);
+
+        private bool TrySelect(ulong playerId, int slotNumber, int character, bool seatOnly, out string reason)
         {
             if (playerId == ulong.MaxValue || slotNumber < 0 || slotNumber > Capacity)
             {
@@ -102,8 +113,11 @@ namespace C6Lab
                 reason = "SLOT_TAKEN";
                 return false;
             }
-            if (slotNumber > 0 && character == 0 && RequireCharacter)
-                character = GetCharacter(playerId) > 0 ? GetCharacter(playerId) : FirstFreeCharacter();
+            if (slotNumber > 0 && character == 0 && RequireCharacter && !seatOnly)
+            {
+                reason = "CHARACTER_REQUIRED";
+                return false;
+            }
             if (character > 0)
             {
                 ulong holder = GetCharacterOwner(character);

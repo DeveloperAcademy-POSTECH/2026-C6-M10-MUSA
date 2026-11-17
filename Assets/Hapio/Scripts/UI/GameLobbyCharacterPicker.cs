@@ -25,6 +25,7 @@ namespace Hapio
         private LabNetwork network;
         private Action<int, int> choose;
         private Text title;
+        private Button release;
 
         /// <summary>The seat (P number) being taken; 0 while closed.</summary>
         public int Seat { get; private set; }
@@ -85,6 +86,11 @@ namespace Hapio
             var cancel = Label(card.rectTransform, "Close", font, 18, GameLobbySeatColors.Host, 0, 202, 345, 26);
             cancel.text = "닫기"; cancel.raycastTarget = true;
             cancel.gameObject.AddComponent<Button>().onClick.AddListener(picker.Close);
+            // Only while re-picking for a seat I already hold: give the seat up instead.
+            var leave = Label(card.rectTransform, "Release Seat", font, 18, GameLobbySeatColors.Versus, 200, 202, 130, 26);
+            leave.text = "자리 비우기"; leave.raycastTarget = true;
+            picker.release = leave.gameObject.AddComponent<Button>();
+            picker.release.onClick.AddListener(() => { picker.Close(); choose?.Invoke(0, 0); });
             root.gameObject.SetActive(false);
             return picker;
         }
@@ -92,7 +98,9 @@ namespace Hapio
         public void Open(int seat)
         {
             Seat = seat;
-            title.text = "함께할 캐릭터를 고르시오.";
+            bool mine = network != null && network.LocalSlotNumber == seat;
+            title.text = mine ? "캐릭터를 다시 고르시오." : "함께할 캐릭터를 고르시오.";
+            release.gameObject.SetActive(mine);
             transform.SetAsLastSibling();
             gameObject.SetActive(true);
             Refresh();

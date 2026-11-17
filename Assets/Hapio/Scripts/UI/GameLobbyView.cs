@@ -536,13 +536,24 @@ namespace Hapio
         /// </summary>
         private void PressSeat(int number)
         {
-            if (Network.LocalSlotNumber == number) { session.SelectSlot(0); return; }
+            bool mine = Network.LocalSlotNumber == number;
+            // My seat came back without its character (taken while I was away): pressing it picks one again.
+            if (mine && !LocalNeedsCharacter) { session.SelectSlot(0); return; }
             if (!StorySeats) { session.SelectSlot(number); return; }
-            if (!Network.CanSelectPlayerSlot || Network.GetSlotOwner(number) != ulong.MaxValue) return;
+            if (!Network.CanSelectPlayerSlot || !mine && Network.GetSlotOwner(number) != ulong.MaxValue) return;
+            OpenCharacterPicker(number);
+        }
+
+        /// <summary>I hold a story seat but no character, so the room cannot start until I pick one.</summary>
+        public bool LocalNeedsCharacter => StorySeats && Network.LocalSlotNumber > 0 && Network.LocalCharacter == 0;
+        private int characterPromptedSeat;
+
+        private void OpenCharacterPicker(int number)
+        {
             if (characterPicker == null)
                 characterPicker = GameLobbyCharacterPicker.Create((RectTransform)sealButton.transform.parent, heading.font,
                     seatDesign != null ? seatDesign.storyPaper : null, Network,
-                    (seat, character) => Network.RequestPlayerSlot(seat, character));
+                    (seat, character) => { if (seat == 0) session.SelectSlot(0); else Network.RequestPlayerSlot(seat, character); });
             characterPicker.Open(number);
         }
 
@@ -582,6 +593,17 @@ namespace Hapio
                 connectionLines.sprite = lines[storyLines];
                 CopyRect(lineLayouts[storyLines], connectionLines.rectTransform);
             }
+            // Back in the room with my seat but without my character: ask once, without waiting for a press.
+            if (!waiting && LocalNeedsCharacter && Network.CanSelectPlayerSlot)
+            {
+                subheading.text = "함께할 캐릭터를 다시 고르시오.";
+                if (characterPromptedSeat != Network.LocalSlotNumber)
+                {
+                    characterPromptedSeat = Network.LocalSlotNumber;
+                    OpenCharacterPicker(Network.LocalSlotNumber);
+                }
+            }
+            else if (!LocalNeedsCharacter) characterPromptedSeat = 0;
             RectTransform[] anchors = team ? teamAnchors : count == 2 ? seats2 : count == 3 ? seats3 : count == 4 ? seats4 : seats5;
             for (int i = 0; i < slotButtons.Length; i++)
             {
@@ -617,6 +639,7 @@ namespace Hapio
                 string who = portrait != null ? GameLobbyCharacterPicker.NameOf(character) : null;
                 localLabels[i].text = held ? HeldSeatLabel
                     : who != null ? who + (host ? " · 방장" : string.Empty) + (mine ? " · 나" : string.Empty)
+                    : mine && LocalNeedsCharacter ? (host ? "방장 · 캐릭터 고르기" : "캐릭터 고르기")
                     : (host ? "방장" : string.Empty) + (mine ? (host ? " · 나 · 취소" : "나 · 취소") : string.Empty);
                 Vector2 center = anchors[i].anchoredPosition;
                 // Labels stay clear of the team lines: above the upper seats (2:2 P1·P3, 3:3 P2·P3·P5·P6) and both 1:1

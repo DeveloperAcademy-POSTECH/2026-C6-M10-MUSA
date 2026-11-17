@@ -67,14 +67,14 @@ namespace Hapio.Tests
             yield return Until(() => session.State.phase == GameFlowPhase.Lobby && !session.IsLoadingScene && network.IsHost,
                 "The demo Host opens its three-person seat lobby");
             Assert.That(network.TargetParticipantCount, Is.EqualTo(3));
-            Assert.That(network.RequestPlayerSlot(1), Is.True);
+            Assert.That(network.RequestPlayerSlot(1, 1), Is.True);
             second = new ProtocolPeer("Demo protocol P2", network.port);
             third = new ProtocolPeer("Demo protocol P3", network.port);
             second.Network.Join("127.0.0.1"); third.Network.Join("127.0.0.1");
             yield return Until(() => second.Network.IsConnected && third.Network.IsConnected
                 && second.Network.CanSelectPlayerSlot && third.Network.CanSelectPlayerSlot, "Both loopback members join");
-            Assert.That(second.Network.RequestPlayerSlot(2), Is.True);
-            Assert.That(third.Network.RequestPlayerSlot(3), Is.True);
+            Assert.That(second.Network.RequestPlayerSlot(2, 2), Is.True);
+            Assert.That(third.Network.RequestPlayerSlot(3, 3), Is.True);
             yield return Until(() => network.CanStartBattle && network.ParticipantCount == 3, "Three distinct approved seats and settings");
             session.StartGame();
             yield return Until(() => session.State.phase == GameFlowPhase.Playing && !session.IsLoadingScene

@@ -251,6 +251,8 @@ namespace Hapio.Tests
             Assert.That(view.message.text, Does.Contain("available P number"));
             Assert.That(view.message.text, Is.Not.EqualTo(session.Network.RoomSearchMessage),
                 "The connected lobby must show a rejected seat request rather than the browser's default help.");
+            Assert.That(session.Network.RequestPlayerSlot(2), Is.False, "A story seat cannot be taken without a character.");
+            Assert.That(session.Network.LocalSlotNumber, Is.Zero);
             // A story seat is taken together with a character: the press opens the picker and takes nothing yet.
             yield return Click(view.slotButtons[1]);
             GameLobbyCharacterPicker picker = view.CharacterPicker;
@@ -288,7 +290,8 @@ namespace Hapio.Tests
             Assert.That(picker.IsOpen, Is.False, "Clearing my own seat does not ask for a character.");
             yield return Click(view.slotButtons[0]);
             Assert.That(picker.IsOpen, Is.True);
-            yield return Click(picker.GetComponent<UnityEngine.UI.Button>()); // outside the card
+            picker.GetComponent<UnityEngine.UI.Button>().onClick.Invoke(); // a press outside the card
+            yield return null;
             Assert.That(picker.IsOpen, Is.False);
             Assert.That(session.Network.LocalSlotNumber, Is.Zero, "Closing the picker takes no seat.");
             yield return Click(view.slotButtons[0]);
