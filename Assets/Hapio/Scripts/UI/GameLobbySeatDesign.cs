@@ -33,6 +33,12 @@ namespace Hapio
             Place(view.heading.transform, 27, 162, 349, 45);
             Place(view.subheading.transform, 27, 211, 349, 32);
             view.clearSlotButton.gameObject.SetActive(false); // The existing own-seat click still clears the choice.
+            // Five story seats: the two upper seats have lines running down from them, so their names go above the seat.
+            float topRow = float.MinValue;
+            if (!team && players == 5)
+                for (int i = 0; i < view.slotButtons.Length; i++)
+                    if (view.slotButtons[i].gameObject.activeSelf)
+                        topRow = Mathf.Max(topRow, ((RectTransform)view.slotButtons[i].transform).anchoredPosition.y);
             for (int i = 0; i < view.slotImages.Length; i++)
             {
                 var image = view.slotImages[i];
@@ -56,7 +62,8 @@ namespace Hapio
                     : pick ? "캐릭터 고르기" : host ? "방장" : string.Empty;
                 label.fontSize = 20; label.color = GameLobbySeatColors.Host;
                 Vector2 center = ((RectTransform)view.slotButtons[i].transform).anchoredPosition;
-                Place(label.transform, center.x - 60, -center.y + (team ? -67 : 43), 120, 26);
+                bool above = team || center.y >= topRow - 1f;
+                Place(label.transform, center.x - 60, -center.y + (above ? -67 : 43), 120, 26);
             }
             Place(view.sealButton.transform, 27, start ? 766 : 768, 349, start ? 58 : 56);
             view.sealButton.targetGraphic.color = start ? GameLobbySeatColors.Ready : GameLobbySeatColors.Disabled;
