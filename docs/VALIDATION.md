@@ -9596,3 +9596,12 @@ main `cef1579d`의 #760 관람·#762 땅따먹기 박/Game56·#727 튜토리얼�
 - **화면 확인(Mac Development 빌드 앱 3개, 임시 캡처 스크립트는 저장소에 남기지 않음):** P1 만복·P2 불이·P3 금옥을 골랐다. 세 번째 사람의 팝업에서 불이·만복이 체크와 함께 흐려졌다. 로비 자리에 초상과 이름이 나오고, P1 전투 화면의 내 패널은 만복, 좌우 이웃은 불이·금옥, 미니맵도 같은 초상이다. 팝업 카드가 반투명해 뒤 자리가 비치던 것을 불투명 바탕으로 고친 뒤 다시 찍어 확인했다.
 - **최신 main 통합(`99a9e452`, #791 후일담 건너뛰기 제거):** 충돌은 AGENTS.md와 이 문서의 기록 추가뿐이며 양쪽을 보존했다. #791이 이야기 진행·결과 흐름·시연 흐름 검사를 바꿨으므로 합친 브랜치에서 전체 EditMode 2605/2605 PASS, PlayMode `GameSceneFlowTests`·`GameStaffStageDemoFlowTests`·`GameStaffDemoGroupIsolationTests`·`GameYaguangDemoFlowTests`·`StoryPlayerTests`·`GameLobbyViewTests`·`GameStageStoryPresentationTests`·`GameStageRetryPlayModeTests`·`LabLobbyRejoinNetworkTests`·`LabLobbyPositionSelectionTests`·`GameFinishReplayTests`·`GameBattleUiPresentationTests` 125/125 PASS. 통합 뒤 전체 PlayMode는 다시 돌리지 않았다.
 - **미검증:** 재입장 뒤 캐릭터 다시 고르기 화면(자동 팝업·"자리 비우기")과 그 네트워크 왕복은 규칙 검사로만 확인했다. 4·5인 방 화면, 고른 캐릭터의 마지막 일격 자막·봉인 카드 실제 화면, 스태프·야광귀 시연 빌드의 로비 화면, iPhone 실기기, 실제 Wi-Fi 여러 기기. 팝업은 Figma 시안 없이 만든 것이다.
+
+## 5인 스토리 로비의 자리 이름 위치 (2026-11-17)
+
+- **변경:** 5인 스토리 로비에서 위쪽 두 자리의 이름을 자리 아래에서 자리 위로 옮겼다(`GameLobbySeatDesign.Present`). 그 자리 아래로 연결선이 내려가 이름과 겹쳤다. 나머지 세 자리, 3·4인 방, 땅따먹기 배치는 그대로다. 규칙·통신·접속 묶음은 바꾸지 않았다.
+- **발견 경위:** 병합된 main `41657ed5`를 Mac Development 빌드 앱 4개·5개로 확인했다(P1 만복·P2 불이·P3 금옥·P4 솔이·P5 묵이). 팝업의 체크 표시, 로비 초상·이름, 전투의 내 패널·좌우 이웃·미니맵이 고른 캐릭터와 자리 순서대로 나왔다. 5인 로비에서만 "금옥"·"솔이" 이름이 연결선과 겹쳤다.
+- **검사 범위 선정:** 로비 화면 표현 한 곳의 변경이므로 로비 화면 PlayMode만 실행했다. 전체 EditMode·PlayMode는 실행하지 않았다.
+- **결과(Unity 6000.6.5f1 batch, macOS):** PlayMode `GameLobbyViewTests` 20/20 PASS(5인 방에서 위쪽 두 자리 이름은 자리 위, 나머지는 자리 아래임을 확인하는 단언 추가).
+- **화면 확인:** 수정 빌드 앱 5개로 5인 로비를 다시 찍어 이름이 연결선과 겹치지 않음을 확인했다. 임시 캡처 스크립트는 저장소에 남기지 않았다.
+- **미검증:** iPhone 실기기.
