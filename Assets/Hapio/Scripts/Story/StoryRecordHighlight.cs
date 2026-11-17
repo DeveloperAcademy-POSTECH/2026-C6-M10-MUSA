@@ -89,12 +89,22 @@ namespace Hapio
         private static void FitPlayer(Text player, Text title, Text record, Text playerHeader, Text recordHeader, Transform space)
         {
             if (player == null || title == null || record == null || playerHeader == null || recordHeader == null) return;
-            int design = (int)DesignSizes.GetValue(player, text => (object)text.fontSize);
+            var saved = (Vector2)DesignSizes.GetValue(player, text => (object)new Vector2(text.fontSize, text.rectTransform.anchoredPosition.y));
+            int design = Mathf.RoundToInt(saved.x);
             player.fontSize = design;
+            SetHeight(player, saved.y);
             float room = PlayerRoom(title, record, playerHeader, recordHeader, space);
             float width = DrawnWidth(player, space);
             if (room <= 0f || width <= room) return;
             player.fontSize = Mathf.Max(SmallestPlayerSize, Mathf.FloorToInt(design * room / width));
+            // The cell is top-aligned: lower the smaller text so it stays on the row's middle line.
+            SetHeight(player, saved.y - (design - player.fontSize) * .5f * player.rectTransform.localScale.y);
+        }
+
+        private static void SetHeight(Text text, float y)
+        {
+            Vector2 at = text.rectTransform.anchoredPosition;
+            if (!Mathf.Approximately(at.y, y)) text.rectTransform.anchoredPosition = new Vector2(at.x, y);
         }
 
         /// <summary>The width a centred player text may take on this row without touching the title or the record.</summary>
