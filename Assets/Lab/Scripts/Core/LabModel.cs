@@ -271,14 +271,14 @@ namespace C6Lab
 
         /// <summary>ids must be the Host-approved player IDs in P1..PN order.</summary>
         public void Begin(string id, ulong[] ids, double now, LabConfig config,
-            LabStageYokai stageYokai = LabStageYokai.None)
+            LabStageYokai stageYokai = LabStageYokai.None, int[] characters = null)
         {
             // 6명은 땅따먹기 3:3 (#394)일 때만 받는다.
             int maximum = TeamModeFor(config, TerritoryMaximumParticipants) ? TerritoryMaximumParticipants : MaximumParticipants;
             if (ids == null || ids.Length < MinimumParticipants || ids.Length > maximum
                 || ids.Distinct().Count() != ids.Length)
                 throw new ArgumentException("Two to five distinct player IDs (six for 3:3 territory) are required.", nameof(ids));
-            BeginWithSeats(id, ids, now, config, stageYokai);
+            BeginWithSeats(id, ids, now, config, stageYokai, characters);
         }
 
         /// <summary>Development-only battle model with one real player and no transferable neighbor.</summary>
@@ -288,7 +288,8 @@ namespace C6Lab
             BeginWithSeats(id, new[] { playerId }, now, config, stageYokai);
         }
 
-        private void BeginWithSeats(string id, ulong[] ids, double now, LabConfig config, LabStageYokai stageYokai)
+        private void BeginWithSeats(string id, ulong[] ids, double now, LabConfig config, LabStageYokai stageYokai,
+            int[] characters = null)
         {
             if (string.IsNullOrWhiteSpace(id) || id.Length > 128) throw new ArgumentException("A bounded session ID is required.", nameof(id));
             if (!Finite(now) || now < 0d || config == null) throw new ArgumentException("Valid Host time and a Config are required.");
@@ -323,7 +324,8 @@ namespace C6Lab
             {
                 players.Add(ids[i], new LabPlayerState
                 {
-                    id = ids[i], seat = i, stamina = rules.StaminaStart, personalHp = rules.PlayerMaxHp
+                    id = ids[i], seat = i, stamina = rules.StaminaStart, personalHp = rules.PlayerMaxHp,
+                    character = characters != null && i < characters.Length ? characters[i] : 0
                 });
                 generatedCounts.Add(ids[i], 0u);
             }

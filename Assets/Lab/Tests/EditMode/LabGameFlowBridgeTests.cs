@@ -20,14 +20,14 @@ namespace C6Lab.Tests
             {
                 var network = root.AddComponent<LabNetwork>();
                 Assert.That(network.GameFlowEnabled, Is.False);
-                Assert.That(Token(network), Is.EqualTo("C6PhysicsLab/62"));
+                Assert.That(Token(network), Is.EqualTo("C6PhysicsLab/63"));
                 Assert.That(typeof(LabNetwork).GetField("LabProtocolVersion",
-                    BindingFlags.Static | BindingFlags.NonPublic).GetRawConstantValue(), Is.EqualTo((ushort)5705));
+                    BindingFlags.Static | BindingFlags.NonPublic).GetRawConstantValue(), Is.EqualTo((ushort)5706));
                 Assert.That(LabConfig.DeveloperFields.Count, Is.EqualTo(265));
                 Assert.That(network.SetGameFlowEnabled(true), Is.True);
-                Assert.That(Token(network), Is.EqualTo("C6HapioGame/56"));
+                Assert.That(Token(network), Is.EqualTo("C6HapioGame/57"));
                 Assert.That(network.SetGameFlowEnabled(false), Is.True);
-                Assert.That(Token(network), Is.EqualTo("C6PhysicsLab/62"));
+                Assert.That(Token(network), Is.EqualTo("C6PhysicsLab/63"));
             }
             finally { UnityEngine.Object.DestroyImmediate(root); }
         }

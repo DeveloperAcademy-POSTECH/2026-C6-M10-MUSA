@@ -21,6 +21,8 @@ namespace C6Lab
         public ulong[] seats;
         public LabPlayerSlotAssignment[] slotAssignments;
         public int slotNumber;
+        /// <summary>The battle character requested with slotNumber (story lobby): 1..5, 0 = none named.</summary>
+        public int character;
         public bool accepted;
         public bool restarting;
         public long lobbyRevision;
@@ -301,7 +303,9 @@ namespace C6Lab
         // 5703: #696 Jigwi dense smoke flow schedule (jigwiAB.schedule 5: six missions); older builds reject the new schedule.
         // 5704: #713 Jigwi relay smoke flow (jigwiAB.schedule 6: each mission follows the last) and the "jigwiSmokeWiped" request.
         // 5705: #737 Jigwi relay with the talisman first (jigwiAB.schedule 7); older builds reject the new schedule.
-        internal const ushort LabProtocolVersion = 5705;
+        // 5706: lobby character choice - slot_select/slot_result/slotAssignments carry the battle character and every
+        //       player state has 'character' (story seats pick one of five characters; older builds drop it).
+        internal const ushort LabProtocolVersion = 5706;
         private const string BombBlastNotice = "BOMB! The blast pushed the orbs around it away.";
         private const string GourdBombNotice = "The gourd dropped a bomb on you! Pass it on before it blows.";
         private const string FoxFireNotice = "Fox fire! Double-tap a blue fox orb to clear it, and keep your Yin and Yang away.";
@@ -310,7 +314,7 @@ namespace C6Lab
         /// with each fox fire, so this is the most a board can hold (the stored orb limit's DEV maximum).
         /// </summary>
         private const int MaximumFoxFireOrbs = 100;
-        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/62");
+        private static readonly byte[] LabConnectionToken = Encoding.ASCII.GetBytes("C6PhysicsLab/63");
         private const int MaximumPacketBytes = 32768;
         private const double JoinAttemptSeconds = 12d;
         private const double JoinBudgetSeconds = 60d;
@@ -373,6 +377,7 @@ namespace C6Lab
         private bool slotSelectionPending;
         private long pendingSlotRequestId;
         private int pendingSlotNumber;
+        private int pendingSlotCharacter;
         private double slotRequestSentAt;
         private bool pendingSlotApproved;
         private long pendingSlotLobbyRevision;
@@ -484,6 +489,24 @@ namespace C6Lab
             && (!gameFlowEnabled || !gameRosterLocked)
             && playerSlots != null && order.Contains(LocalPlayerId) && !slotSelectionPending && !pendingDeveloperRestart;
         public ulong GetSlotOwner(int slotNumber) => playerSlots?.GetOwner(slotNumber) ?? ulong.MaxValue;
+        /// <summary>
+        /// The lobby picks a battle character with each seat: Hapio story rooms. Land grab and standalone Lab rooms pick
+        /// only the seat.
+        /// </summary>
+        public bool LobbyUsesCharacters => gameFlowEnabled && config != null && !config.TeamTerritoryEnabled;
+        /// <summary>The character (1..5, artwork order) confirmed for that seat, 0 if none.</summary>
+        public int GetSlotCharacter(int slotNumber)
+        {
+            ulong owner = GetSlotOwner(slotNumber);
+            return owner == ulong.MaxValue || playerSlots == null ? 0 : playerSlots.GetCharacter(owner);
+        }
+        /// <summary>Who holds that character in the lobby (ulong.MaxValue if free).</summary>
+        public ulong GetCharacterOwner(int character) => playerSlots?.GetCharacterOwner(character) ?? ulong.MaxValue;
+        public int LocalCharacter => IsConnected && playerSlots != null ? playerSlots.GetCharacter(LocalPlayerId) : 0;
+        private void SyncSlotRules()
+        {
+            if (playerSlots != null) playerSlots.RequireCharacter = IsHost && LobbyUsesCharacters;
+        }
         public bool IsSearchingRooms => roomSearchActive && discovery != null && discovery.IsBrowsing;
         public IReadOnlyList<LabDiscoveredRoom> DiscoveredRooms => discoveredRooms;
         /// <summary>Includes the NGO shutdown wait after cancellation or a failed attempt, and a lobby rejoin (#501).</summary>
@@ -610,17 +633,18 @@ namespace C6Lab
         /// Select P1..PN in a connected room lobby, or 0 to clear the choice. The Host alone
         /// accepts a claim; the requesting client waits for its result and the new lobby state.
         /// </summary>
-        public bool RequestPlayerSlot(int slotNumber)
+        public bool RequestPlayerSlot(int slotNumber, int character = 0)
         {
-            if (!CanSelectPlayerSlot || slotNumber < 0 || slotNumber > targetParticipantCount)
+            if (!CanSelectPlayerSlot || slotNumber < 0 || slotNumber > targetParticipantCount
+                || character < 0 || character > LabPlayerSlots.CharacterCount)
             {
                 SetNotice("Choose an available P number in the room lobby.");
                 return false;
             }
-            if (IsHost) return TrySelectSlot(LocalPlayerId, slotNumber);
+            if (IsHost) return TrySelectSlot(LocalPlayerId, slotNumber, character);
             long id = ++requestSequence;
             if (!Send(NetworkManager.ServerClientId, new LabNetworkPacket
-                { type = "slot_select", requestId = id, slotNumber = slotNumber }))
+                { type = "slot_select", requestId = id, slotNumber = slotNumber, character = character }))
             {
                 SetNotice("Could not send the P number selection. Try again.");
                 return false;
@@ -628,6 +652,7 @@ namespace C6Lab
             slotSelectionPending = true;
             pendingSlotRequestId = id;
             pendingSlotNumber = slotNumber;
+            pendingSlotCharacter = slotNumber > 0 ? character : 0;
             slotRequestSentAt = Time.realtimeSinceStartupAsDouble;
             pendingSlotApproved = false;
             pendingSlotLobbyRevision = 0;
@@ -635,17 +660,20 @@ namespace C6Lab
             return true;
         }
 
-        private bool TrySelectSlot(ulong playerId, int slotNumber)
+        private bool TrySelectSlot(ulong playerId, int slotNumber, int character = 0)
         {
+            SyncSlotRules();
+            string reason = null;
             if (!IsHost || developerSolo || model != null || !order.Contains(playerId)
-                || playerSlots == null || !playerSlots.TrySelect(playerId, slotNumber, out string reason))
+                || playerSlots == null || !playerSlots.TrySelect(playerId, slotNumber, character, out reason))
             {
-                SetNotice("That P number is unavailable. Choose another.");
+                SetNotice(reason == "CHARACTER_TAKEN" ? SlotRejectionText(reason, gameFlowEnabled)
+                    : "That P number is unavailable. Choose another.");
                 return false;
             }
             SetNotice(string.Empty);
             BroadcastLobby();
-            Debug.Log("C6_LAB_SLOT player=" + playerId + " p=" + slotNumber + " result=" + reason);
+            Debug.Log("C6_LAB_SLOT player=" + playerId + " p=" + slotNumber + " c=" + playerSlots.GetCharacter(playerId) + " result=" + reason);
             if (autoStart && CanStartBattle) StartBattle();
             else TryStartPendingDeveloperRestart();
             return true;
@@ -656,6 +684,7 @@ namespace C6Lab
             // Only explicit scripted smoke tests opt into automatic claims. Normal joins
             // start unselected and never replace another participant's chosen P number.
             if (!autoStart || playerSlots == null || playerSlots.GetSlot(playerId) != 0) return;
+            SyncSlotRules();
             int slot = FirstAvailableSlot();
             if (slot > 0) playerSlots.TrySelect(playerId, slot, out _);
         }
@@ -1119,7 +1148,8 @@ namespace C6Lab
             ulong[] playersInPOrder = playerSlots.PlayersInSlotOrder();
             double beginAt = Time.realtimeSinceStartupAsDouble;
             model.Begin(sessionId, playersInPOrder, beginAt, config,
-                stageYokai: gameFlowEnabled ? gameStageYokai : LabStageYokai.None);
+                stageYokai: gameFlowEnabled ? gameStageYokai : LabStageYokai.None,
+                characters: LobbyUsesCharacters ? playerSlots.CharactersInSlotOrder() : null);
             BeginPaintArt();
             if (GameStartHeld) battleClock.Pause(beginAt);
             model.PaintSurface?.PreloadPatternMask();
@@ -1795,18 +1825,20 @@ namespace C6Lab
             else if (slotRequestIds.TryGetValue(sender, out long previous) && packet.requestId <= previous)
             {
                 accepted = packet.requestId == previous && playerSlots != null
-                    && playerSlots.GetSlot(sender) == packet.slotNumber;
+                    && playerSlots.GetSlot(sender) == packet.slotNumber
+                    && (packet.character == 0 || playerSlots.GetCharacter(sender) == packet.character);
                 reason = accepted ? "SLOT_UNCHANGED" : "STALE_SLOT_REQUEST";
             }
             else
             {
                 slotRequestIds[sender] = packet.requestId;
-                int previousSlot = playerSlots.GetSlot(sender);
-                accepted = playerSlots.TrySelect(sender, packet.slotNumber, out reason);
-                changed = accepted && previousSlot != packet.slotNumber;
+                int previousSlot = playerSlots.GetSlot(sender), previousCharacter = playerSlots.GetCharacter(sender);
+                SyncSlotRules();
+                accepted = playerSlots.TrySelect(sender, packet.slotNumber, packet.character, out reason);
+                changed = accepted && (previousSlot != packet.slotNumber || previousCharacter != playerSlots.GetCharacter(sender));
             }
             Send(sender, new LabNetworkPacket { type = "slot_result", requestId = packet.requestId,
-                slotNumber = packet.slotNumber, accepted = accepted, reason = reason,
+                slotNumber = packet.slotNumber, character = packet.character, accepted = accepted, reason = reason,
                 lobbyRevision = accepted ? lobbyRevision + 1 : 0 });
             if (!accepted) return;
             // Also republish an unchanged accepted selection. A retried request must be
@@ -2773,7 +2805,7 @@ namespace C6Lab
             if (!packet.accepted)
             {
                 ClearPendingSlotSelection();
-                SetNotice(packet.reason == "SLOT_TAKEN" ? "That P number is already selected."
+                SetNotice(packet.reason == "SLOT_TAKEN" && !gameFlowEnabled ? "That P number is already selected."
                     : SlotRejectionText(packet.reason, gameFlowEnabled));
                 return;
             }
@@ -2789,7 +2821,8 @@ namespace C6Lab
             // controls or display a speculative assignment until both agree.
             if (!slotSelectionPending || !pendingSlotApproved
                 || receivedLobbyRevision < pendingSlotLobbyRevision
-                || playerSlots == null || playerSlots.GetSlot(LocalPlayerId) != pendingSlotNumber) return;
+                || playerSlots == null || playerSlots.GetSlot(LocalPlayerId) != pendingSlotNumber
+                || pendingSlotCharacter > 0 && playerSlots.GetCharacter(LocalPlayerId) != pendingSlotCharacter) return;
             ClearPendingSlotSelection();
             SetNotice(string.Empty);
         }
@@ -2799,6 +2832,7 @@ namespace C6Lab
             slotSelectionPending = false;
             pendingSlotRequestId = 0;
             pendingSlotNumber = 0;
+            pendingSlotCharacter = 0;
             slotRequestSentAt = 0d;
             pendingSlotApproved = false;
             pendingSlotLobbyRevision = 0;
@@ -3302,8 +3336,8 @@ namespace C6Lab
         private void SetNotice(string notice) { Notice = notice; Changed?.Invoke(); }
 
         /// <summary>The Lab shows the Host's reason; the game says it in words a player can act on.</summary>
-        public static string SlotRejectionText(string reason, bool game) => game
-            ? "자리를 고르지 못했소. 다시 골라주시오." : "P number selection was rejected: " + reason;
+        public static string SlotRejectionText(string reason, bool game) => !game ? "P number selection was rejected: " + reason
+            : reason == "CHARACTER_TAKEN" ? "이미 고른 캐릭터요. 다른 캐릭터를 골라주시오." : "자리를 고르지 못했소. 다시 골라주시오.";
 
         /// <summary>A Host reason such as INSUFFICIENT_STAMINA names a log entry, not something to tell a player.</summary>
         public static bool IsInternalReasonCode(string reason)

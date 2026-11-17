@@ -42,6 +42,9 @@ namespace C6Lab
         private readonly HashSet<ulong> heardLobbyMembers = new HashSet<ulong>();
         private readonly HashSet<ulong> replacedMembers = new HashSet<ulong>();
         private readonly Dictionary<string, int> rememberedSlots = new Dictionary<string, int>();
+        // The character that went with a remembered or reclaimed P (story lobby); 0 = none.
+        private readonly Dictionary<string, int> rememberedCharacters = new Dictionary<string, int>();
+        private int returningCharacter;
         // Guest: the lobby's held seats, and this device's ticket and rejoin state, which outlive ResetLocal.
         private readonly HashSet<ulong> heldSeatOwners = new HashSet<ulong>();
         private readonly List<string> lobbyRejoinRoutes = new List<string>();
@@ -214,6 +217,7 @@ namespace C6Lab
         private int ReclaimLobbyPlace(ulong id, string ticket, out bool confirmed)
         {
             confirmed = false;
+            returningCharacter = 0;
             if (ticket == null || !LobbyRosterOpen) return 0;
             int slot = 0;
             bool found = false;
@@ -225,6 +229,7 @@ namespace C6Lab
                 // Only a member the Host had heard from is ever held.
                 confirmed = true;
                 lobbySeatHolds.RemoveAt(i);
+                if (hold.slot > 0) returningCharacter = playerSlots?.GetCharacter(hold.playerId) ?? 0;
                 playerSlots?.Release(hold.playerId);
                 if (hold.slot > 0) slot = hold.slot;
                 Debug.Log("C6_LAB_LOBBY_REJOIN host=reclaimed id=" + id + " p=" + hold.slot);
@@ -235,7 +240,7 @@ namespace C6Lab
                 found = true;
                 if (heardLobbyMembers.Contains(stale)) confirmed = true;
                 int staleSlot = playerSlots?.GetSlot(stale) ?? 0;
-                if (staleSlot > 0) slot = staleSlot;
+                if (staleSlot > 0) { slot = staleSlot; returningCharacter = playerSlots.GetCharacter(stale); }
                 ForgetLobbyMember(stale);
                 replacedMembers.Add(stale);
                 Debug.Log("C6_LAB_LOBBY_REJOIN host=replaced old=" + stale + " new=" + id + " p=" + staleSlot);
@@ -246,10 +251,12 @@ namespace C6Lab
             if (!found && rememberedSlots.TryGetValue(ticket, out int remembered))
             {
                 slot = remembered;
+                rememberedCharacters.TryGetValue(ticket, out returningCharacter);
                 // Only a heard lobby drop is remembered, so this device knew it had been let in.
                 confirmed = true;
             }
             rememberedSlots.Remove(ticket);
+            rememberedCharacters.Remove(ticket);
             return slot;
         }
 
@@ -262,7 +269,11 @@ namespace C6Lab
         private void RestoreLobbySlot(ulong id, int slot)
         {
             if (slot <= 0 || playerSlots == null || playerSlots.GetOwner(slot) != ulong.MaxValue) return;
-            if (playerSlots.TrySelect(id, slot, out _)) Debug.Log("C6_LAB_LOBBY_REJOIN host=restored id=" + id + " p=" + slot);
+            SyncSlotRules();
+            // Its character comes back with the P; if someone took it after the hold ended, the first free one is used.
+            if (playerSlots.TrySelect(id, slot, returningCharacter, out _) || playerSlots.TrySelect(id, slot, 0, out _))
+                Debug.Log("C6_LAB_LOBBY_REJOIN host=restored id=" + id + " p=" + slot + " c=" + playerSlots.GetCharacter(id));
+            returningCharacter = 0;
         }
 
         /// <summary>The same cleanup as a disconnect, for a lobby member the Host removes itself.</summary>
@@ -311,11 +322,13 @@ namespace C6Lab
             if (!lobbyDrop)
             {
                 rememberedSlots.Remove(ticket);
+                rememberedCharacters.Remove(ticket);
                 return false;
             }
             if (lobbyLeavers.Contains(id))
             {
                 rememberedSlots.Remove(ticket);
+                rememberedCharacters.Remove(ticket);
                 Debug.Log("C6_LAB_LOBBY_HOLD result=left id=" + id + " p=" + slot);
                 return false;
             }
@@ -324,11 +337,12 @@ namespace C6Lab
                 // Never heard from since its admission: the device may not know it got in (a join canceled at that
                 // moment), so it could not come back for the place. Free it at once.
                 rememberedSlots.Remove(ticket);
+                rememberedCharacters.Remove(ticket);
                 Debug.Log("C6_LAB_LOBBY_HOLD result=unconfirmed id=" + id);
                 return false;
             }
-            if (slot > 0) rememberedSlots[ticket] = slot;
-            else rememberedSlots.Remove(ticket);
+            if (slot > 0) { rememberedSlots[ticket] = slot; rememberedCharacters[ticket] = playerSlots?.GetCharacter(id) ?? 0; }
+            else { rememberedSlots.Remove(ticket); rememberedCharacters.Remove(ticket); }
             lobbySeatHolds.Add(new LobbySeatHold { ticket = ticket, playerId = id, slot = slot,
                 until = Time.realtimeSinceStartupAsDouble + lobbySeatHoldSeconds });
             Debug.Log("C6_LAB_LOBBY_HOLD result=held id=" + id + " p=" + slot
@@ -403,6 +417,7 @@ namespace C6Lab
             heardLobbyMembers.Clear();
             replacedMembers.Clear();
             rememberedSlots.Clear();
+            rememberedCharacters.Clear();
             heldSeatOwners.Clear();
             hostClosedLobby = false;
         }

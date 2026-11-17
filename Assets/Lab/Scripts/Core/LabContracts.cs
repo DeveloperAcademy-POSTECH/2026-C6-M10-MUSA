@@ -220,6 +220,8 @@ namespace C6Lab
         public float stamina;
         public int personalHp;
         public int seat;
+        /// <summary>The battle character chosen in the lobby: 1..5 in artwork order (불이, 솔이, 묵이, 금옥, 만복); 0 = by P number.</summary>
+        public int character;
 
         // 결과 대시보드용 이번 라운드 기록. Host가 성공한 행동만 센다.
         /// <summary>구슬 생성 성공 수</summary>

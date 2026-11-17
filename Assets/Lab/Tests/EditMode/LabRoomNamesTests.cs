@@ -26,8 +26,8 @@ namespace C6Lab.Tests
             Assert.That(LabRoomNames.Display(name),Is.EqualTo("A그룹"));
             Assert.That(LabRoomNames.Display(name),Does.Not.Contain("Staff").And.Not.Contain("Stage-"));
         }
-        [TestCase("Hapio-Staff-2-5705-Stage-4")] [TestCase("Hapio-Staff-2-5705-Stage-0")] [TestCase("Hapio-Staff-2-5705-Stage-12")]
-        [TestCase("Hapio-Staff-2-5705-Stage-2 (2)")] [TestCase("Hapio-Staff-x-5705-Stage-2")] [TestCase("Hapio-Staff-2-5705-Room-2")]
+        [TestCase("Hapio-Staff-2-5706-Stage-4")] [TestCase("Hapio-Staff-2-5706-Stage-0")] [TestCase("Hapio-Staff-2-5706-Stage-12")]
+        [TestCase("Hapio-Staff-2-5706-Stage-2 (2)")] [TestCase("Hapio-Staff-x-5706-Stage-2")] [TestCase("Hapio-Staff-2-5706-Room-2")]
         [TestCase("Hapio-Staff-2-Stage-2")] [TestCase("Hapio-Staff-")]
         public void OtherStaffLikeNamesKeepTheOldDisplay(string name)
         {
@@ -43,12 +43,12 @@ namespace C6Lab.Tests
             Assert.That(LabRoomNames.Display(name), Is.EqualTo(expected));
             Assert.That(name.Length, Is.LessThanOrEqualTo(63));
             Assert.That(name, Is.Not.EqualTo(LabPendingRoom.StaffStageName(2, 3 - group)));
-            Assert.That(LabRoomNames.Display("Hapio-Staff-2-5705-Stage-2"), Is.EqualTo("수장고-2스테이지 야광귀"));
+            Assert.That(LabRoomNames.Display("Hapio-Staff-2-5706-Stage-2"), Is.EqualTo("수장고-2스테이지 야광귀"));
         }
-        [TestCase("Hapio-Staff-3-5705-Stage-2-Group-0")]
-        [TestCase("Hapio-Staff-3-5705-Stage-2-Group-3")]
-        [TestCase("Hapio-Staff-3-5705-Stage-2-Group-01")]
-        [TestCase("Hapio-Staff-3-5705-Stage-2-Group-1-trailing")]
+        [TestCase("Hapio-Staff-3-5706-Stage-2-Group-0")]
+        [TestCase("Hapio-Staff-3-5706-Stage-2-Group-3")]
+        [TestCase("Hapio-Staff-3-5706-Stage-2-Group-01")]
+        [TestCase("Hapio-Staff-3-5706-Stage-2-Group-1-trailing")]
         public void InvalidGroupedNameCannotAliasAGroup(string name)
         { Assert.That(LabRoomNames.TryStaffRoom(name, out _, out _), Is.False); }
 

@@ -37,18 +37,22 @@ namespace Hapio
             {
                 var image = view.slotImages[i];
                 if (!view.slotButtons[i].gameObject.activeSelf) continue;
-                bool filled = team ? image.sprite == view.blueTeamFilledSlot || image.sprite == view.redTeamFilledSlot
-                    : image.sprite == view.filledSlots[i];
-                Vector2 bounds = image.sprite.rect.size / 4f;
+                // A story seat taken with a character shows its portrait upright, filling the 63-unit seat.
+                bool portrait = view.SeatCharacter(i) > 0;
+                bool filled = portrait || (team ? image.sprite == view.blueTeamFilledSlot || image.sprite == view.redTeamFilledSlot
+                    : image.sprite == view.filledSlots[i]);
+                Vector2 bounds = portrait ? new Vector2(63, 63) : image.sprite.rect.size / 4f;
                 Place(image.transform, (63 - bounds.x) * .5f, (63 - bounds.y) * .5f, bounds.x, bounds.y);
                 // P6's component is unrotated; every other marker component uses the same 180-degree orientation.
-                image.rectTransform.localEulerAngles = new Vector3(0, 0, i == 5 && filled ? 0 : 180);
+                image.rectTransform.localEulerAngles = new Vector3(0, 0, portrait || i == 5 && filled ? 0 : 180);
                 view.slotLabels[i].fontSize = 24;
                 view.slotLabels[i].color = filled && (team || i != 3) ? GameLobbySeatColors.LightText : GameLobbySeatColors.SeatInk;
                 Place(view.slotLabels[i].transform, 0, 0, 63, 63);
                 var label = view.localLabels[i];
                 bool host = label.text.Contains("방장"), held = label.text == GameLobbyView.HeldSeatLabel;
-                label.text = host ? "방장" : held ? GameLobbyView.HeldSeatLabel : string.Empty;
+                string who = portrait ? GameLobbyCharacterPicker.NameOf(view.SeatCharacter(i)) : null;
+                label.text = held ? GameLobbyView.HeldSeatLabel : who != null ? (host ? who + " · 방장" : who)
+                    : host ? "방장" : string.Empty;
                 label.fontSize = 20; label.color = GameLobbySeatColors.Host;
                 Vector2 center = ((RectTransform)view.slotButtons[i].transform).anchoredPosition;
                 Place(label.transform, center.x - 60, -center.y + (team ? -67 : 43), 120, 26);

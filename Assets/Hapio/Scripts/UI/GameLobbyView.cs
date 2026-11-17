@@ -226,7 +226,7 @@ namespace Hapio
             for (int i = 0; i < slotButtons.Length; i++)
             {
                 int number = i + 1;
-                BindNavigation(slotButtons[i], () => session.SelectSlot(Network.LocalSlotNumber == number ? 0 : number));
+                BindNavigation(slotButtons[i], () => PressSeat(number));
             }
             if (emptySlots[0] == filledSlots[0]) emptySlots[0] = emptySlots[1];
             BindNavigation(teamPreviousPage, () => teamPage = 0);
@@ -524,6 +524,28 @@ namespace Hapio
             return slotImageColors[index];
         }
 
+        private GameLobbyCharacterPicker characterPicker;
+        public GameLobbyCharacterPicker CharacterPicker => characterPicker;
+        /// <summary>The battle character confirmed on that story seat (1..5, artwork order); 0 on an empty or land grab seat.</summary>
+        public int SeatCharacter(int index) => StorySeats ? Network.GetSlotCharacter(index + 1) : 0;
+        private bool StorySeats => !TerritoryRoom(Network.TargetParticipantCount);
+
+        /// <summary>
+        /// My own seat clears it, as before. An empty story seat first asks which character to take it with; a land grab
+        /// seat (a team place) is taken at once.
+        /// </summary>
+        private void PressSeat(int number)
+        {
+            if (Network.LocalSlotNumber == number) { session.SelectSlot(0); return; }
+            if (!StorySeats) { session.SelectSlot(number); return; }
+            if (!Network.CanSelectPlayerSlot || Network.GetSlotOwner(number) != ulong.MaxValue) return;
+            if (characterPicker == null)
+                characterPicker = GameLobbyCharacterPicker.Create((RectTransform)sealButton.transform.parent, heading.font,
+                    seatDesign != null ? seatDesign.storyPaper : null, Network,
+                    (seat, character) => Network.RequestPlayerSlot(seat, character));
+            characterPicker.Open(number);
+        }
+
         private void RefreshPositions()
         {
             int count = Network.TargetParticipantCount;
@@ -573,14 +595,18 @@ namespace Hapio
                 bool occupied = owner != ulong.MaxValue, mine = occupied && owner == Network.LocalPlayerId;
                 // #501: the Host keeps a dropped player's seat for a while; it shows taken but faded.
                 bool held = occupied && Network.IsSlotHeld(i + 1);
-                slotImages[i].sprite = team ? TeamSlot(i, occupied) : occupied ? filledSlots[i] : emptySlots[i];
-                slotImages[i].rectTransform.localEulerAngles = new Vector3(0, 0, 180);
-                slotLabels[i].text = "P" + (i + 1);
+                // A story seat shows the character it was taken with instead of its P marker.
+                int character = team || !occupied ? 0 : Network.GetSlotCharacter(i + 1);
+                Sprite portrait = GameLobbyCharacterPicker.Portrait(character);
+                slotImages[i].sprite = portrait != null ? portrait
+                    : team ? TeamSlot(i, occupied) : occupied ? filledSlots[i] : emptySlots[i];
+                slotImages[i].rectTransform.localEulerAngles = new Vector3(0, 0, portrait != null ? 0 : 180);
+                slotLabels[i].text = portrait != null ? string.Empty : "P" + (i + 1);
                 slotLabels[i].color = ColorOf(occupied ? "F6F6F6" : "3F3D38");
                 slotButtons[i].interactable = Network.CanSelectPlayerSlot && (!occupied || mine);
                 // The Button tints only its transparent hit area, so dim an empty seat that cannot be chosen. A choice
                 // or developer restart awaiting the Host only pauses the seats; they are not refused.
-                Color seatColor = SlotImageColor(i);
+                Color seatColor = portrait != null ? Color.white : SlotImageColor(i);
                 if (held || !occupied && !slotButtons[i].interactable && !Network.SlotSelectionPending
                     && !Network.IsDeveloperRestartPending)
                     seatColor.a *= DisabledSeatAlpha;
@@ -588,7 +614,9 @@ namespace Hapio
                 bool host = occupied && owner == Unity.Netcode.NetworkManager.ServerClientId;
                 localLabels[i].fontSize = team ? teamLocalLabelFontSize
                     : storyLocalLabelFontSizes[Mathf.Min(i, storyLocalLabelFontSizes.Length - 1)];
+                string who = portrait != null ? GameLobbyCharacterPicker.NameOf(character) : null;
                 localLabels[i].text = held ? HeldSeatLabel
+                    : who != null ? who + (host ? " · 방장" : string.Empty) + (mine ? " · 나" : string.Empty)
                     : (host ? "방장" : string.Empty) + (mine ? (host ? " · 나 · 취소" : "나 · 취소") : string.Empty);
                 Vector2 center = anchors[i].anchoredPosition;
                 // Labels stay clear of the team lines: above the upper seats (2:2 P1·P3, 3:3 P2·P3·P5·P6) and both 1:1
