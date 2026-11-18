@@ -136,7 +136,8 @@ namespace Hapio
             root.gameObject.SetActive(true);
             float scale = 63f / 38.347824f;
             int character = view.SeatCharacter(index);
-            bool framed = view.SeatIsHost(index) || view.SeatIsLocal(index) && !view.SeatIsHeld(index);
+            bool held = view.SeatIsHeld(index);
+            bool framed = view.SeatIsHost(index) || view.SeatIsLocal(index) && !held;
             var bounds = source.rectTransform;
             float shift = (63f - 42f * scale) * .5f;
             float sourceTop = -bounds.anchoredPosition.y - bounds.rect.height * .5f;
@@ -146,6 +147,9 @@ namespace Hapio
             for (int i = 0; i < 2; i++)
             {
                 var mask = root.GetChild(i);
+                // The away label uses the upper name row. Keep the portrait, but hide duplicate name pixels
+                // until the seat is reclaimed; the same original name layer is restored on the next refresh.
+                mask.gameObject.SetActive(i == 0 || !held);
                 Place(mask, 0, i == 0 ? 0 : -40 - sourceTop,
                     bounds.rect.width, i == 0 ? nameTop : bounds.rect.height - nameTop);
                 var art = mask.GetChild(0).GetComponent<Image>();

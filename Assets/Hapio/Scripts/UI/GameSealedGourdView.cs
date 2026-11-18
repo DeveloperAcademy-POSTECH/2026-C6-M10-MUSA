@@ -67,7 +67,13 @@ namespace Hapio
         private void OnEnable()
         {
             transform.SetAsLastSibling();
+            if (rotateArtwork != null) rotateArtwork.enabled = true;
             RefreshReturnBackground(true);
+        }
+
+        public void DismissRotationHint()
+        {
+            if (rotateArtwork != null) rotateArtwork.enabled = false;
         }
 
         private void PrepareButton(Button button, float x, float y, float width, float height)

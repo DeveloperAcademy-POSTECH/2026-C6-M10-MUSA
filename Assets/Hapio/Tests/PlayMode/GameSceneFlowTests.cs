@@ -972,6 +972,9 @@ namespace Hapio.Tests
             Assert.That(image.GetComponents<MonoBehaviour>().OfType<IDragHandler>().Count(), Is.EqualTo(1),
                 "The adapter and the shared surface must not dispatch the same drag twice.");
             Assert.That(image.GetComponents<GourdViewerGestureSurface>(), Has.Length.EqualTo(1));
+            var rotationArt = screen.viewerPanel.GetComponent<GameSealedGourdView>().design
+                .Find("Gourd Rotation Indicator").GetComponent<UnityEngine.UI.Image>();
+            Assert.That(rotationArt.enabled, Is.True, "Opening inspection explains rotation before the first interaction.");
             var preview = (LabGourdResultPreview)typeof(GameSession).GetField("preview",
                 BindingFlags.Instance | BindingFlags.NonPublic).GetValue(session);
             Quaternion initial = preview.ModelRotation;
@@ -998,8 +1001,20 @@ namespace Hapio.Tests
                 Assert.That(local.y, Is.InRange(viewport.rect.yMin - .01f, viewport.rect.yMax + .01f));
             }
             Vector2 start = PreviewScreenPoint(rectangle, .4f, .5f);
+            var ignored = new PointerEventData(EventSystem.current) { pointerId = 9999, position = start,
+                button = PointerEventData.InputButton.Right };
+            ExecuteEvents.Execute(image, ignored, ExecuteEvents.pointerDownHandler);
+            Assert.That(rotationArt.enabled, Is.True, "A right-click is not a viewer gesture.");
+            ignored.button = PointerEventData.InputButton.Left;
+            ignored.position = PreviewScreenPoint(rectangle, -1f, .5f);
+            ExecuteEvents.Execute(image, ignored, ExecuteEvents.pointerDownHandler);
+            Assert.That(rotationArt.enabled, Is.True, "An outside press cannot dismiss this viewer's hint.");
+            ignored.position = start; ignored.scrollDelta = Vector2.zero;
+            ExecuteEvents.Execute(image, ignored, ExecuteEvents.scrollHandler);
+            Assert.That(rotationArt.enabled, Is.True, "A zero scroll is not an interaction.");
             var pointer = new PointerEventData(EventSystem.current) { pointerId = 12345, position = start };
             ExecuteEvents.Execute(image, pointer, ExecuteEvents.pointerDownHandler);
+            Assert.That(rotationArt.enabled, Is.False, "The first press hides the PNG immediately, before any drag.");
             pointer.position = PreviewScreenPoint(rectangle, .41f, .5f);
             pointer.delta = pointer.position - start; // Pixel movement exceeds 1px on the saved layout.
             ExecuteEvents.Execute(image, pointer, ExecuteEvents.dragHandler);
@@ -1012,14 +1027,23 @@ namespace Hapio.Tests
             ExecuteEvents.Execute(image, pointer, ExecuteEvents.dragHandler);
             Assert.That(Quaternion.Angle(initial, preview.ModelRotation), Is.LessThan(.001f),
                 "Reset must discard a held pointer's old baseline.");
+            ExecuteEvents.Execute(image, pointer, ExecuteEvents.pointerUpHandler);
+            Assert.That(rotationArt.enabled, Is.False, "Pointer release and reset keep inspection unobstructed.");
             screen.closeViewerButton.onClick.Invoke();
             yield return null;
             Assert.That(screen.viewerPanel.activeSelf, Is.False);
             screen.resultView.viewerButton.onClick.Invoke();
             yield return null;
+            Assert.That(rotationArt.enabled, Is.True, "Closing and reopening shows the guide for this new visit.");
             ExecuteEvents.Execute(image, pointer, ExecuteEvents.dragHandler);
             Assert.That(Quaternion.Angle(initial, preview.ModelRotation), Is.LessThan(.001f),
                 "Reopening must not adopt an old drag without a fresh pointer down.");
+            Assert.That(rotationArt.enabled, Is.True, "A stale drag without a new down does not dismiss the reopened guide.");
+            float beforeScroll = preview.ZoomNormalized;
+            var wheel = new PointerEventData(EventSystem.current) { position = start, scrollDelta = Vector2.up };
+            ExecuteEvents.Execute(image, wheel, ExecuteEvents.scrollHandler);
+            Assert.That(rotationArt.enabled, Is.False, "The Mac wheel also clears the guide.");
+            Assert.That(preview.ZoomNormalized, Is.GreaterThan(beforeScroll), "The original zoom handler still receives the same wheel event.");
             Assert.That(image.GetComponents<GourdViewerGestureSurface>(), Has.Length.EqualTo(1));
             Assert.That(preview.PaintPixelHash, Is.EqualTo(paintHash));
             Assert.That(preview.PaintTexture.GetPixels32(), Is.EqualTo(paintPixels));
@@ -2217,6 +2241,16 @@ namespace Hapio.Tests
                         .Single(item => item.name == "Paint Shell");
                     Assert.That(Vector3.Dot(shell.transform.up, preview.PreviewCamera.transform.up), Is.GreaterThan(.9999f),
                         "The baked shell's top must point up in the viewer, including its static art lean.");
+                    Assert.That(rotationArt.enabled, Is.True, "A newly opened stage viewer starts with its guide.");
+                    Vector2 previewPoint = PreviewScreenPoint(screen.viewerImage.rectTransform, .5f, .5f);
+                    InputSystem.QueueStateEvent(mouse, new MouseState { position = previewPoint });
+                    yield return null; yield return null;
+                    InputSystem.QueueStateEvent(mouse, new MouseState { position = previewPoint }.WithButton(MouseButton.Left));
+                    yield return null; yield return null;
+                    Assert.That(rotationArt.enabled, Is.False, "A real UI press hides the PNG before release at stage " + stage);
+                    InputSystem.QueueStateEvent(mouse, new MouseState { position = previewPoint });
+                    yield return null; yield return null;
+                    Assert.That(rotationArt.enabled, Is.False, "Releasing the pointer does not restore the guide.");
                     Quaternion initialRotation = preview.ModelRotation;
                     float initialZoom = preview.ZoomNormalized;
                     string initialPaint = preview.PaintPixelHash;
@@ -2229,6 +2263,7 @@ namespace Hapio.Tests
                     yield return ClickVisibleButtonWithMouse(mouse, screen.resetViewerButton);
                     Assert.That(session.IsViewerOpen && screen.viewerPanel.activeInHierarchy, Is.True,
                         "Reset keeps the current stage's gourd viewer open.");
+                    Assert.That(rotationArt.enabled, Is.False, "Reset preserves the dismissed guide at stage " + stage);
                     Assert.That(Quaternion.Angle(initialRotation, preview.ModelRotation), Is.LessThan(.001f));
                     Assert.That(preview.ZoomNormalized, Is.EqualTo(initialZoom).Within(.001f));
                     Assert.That(Vector3.Dot(shell.transform.up, preview.PreviewCamera.transform.up), Is.GreaterThan(.9999f),
