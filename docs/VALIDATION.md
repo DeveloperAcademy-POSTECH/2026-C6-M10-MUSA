@@ -9708,3 +9708,17 @@ main `cef1579d`의 #760 관람·#762 땅따먹기 박/Game56·#727 튜토리얼�
 - **실제 화면:** 390×844 Editor GameView에서 5인 상단 두 자리 부재중/복귀와 야광귀 관람 안내 표시/첫 누름 후 숨김/재개방 5장을 촬영했다. 로비 구성원은 승인 자료로 재현한 상태이며 실제 5기기 접속이 아니다. 관람은 기존 판정 API로 완성시킨 단색 테스트 도안으로, 실제 플레이의 색 무늬 품질을 검증한 화면이 아니다. 관람 중심의 실제 UI Raycast가 GourdPreview인 것과 PointerDown 직후 숨김, 해제·리셋 후 숨김, 재개방 복원을 확인했다. 캡처·원시 결과는 로컬에만 보관한다.
 - **보존·종료:** Scene·Prefab·ProjectSettings 등 보호41개 및 이번 PR의 의도한 변경을 제외한 보호114개 파일 해시, 기존 stash11개를 보존했다. 원본 PNG를 추가 보정하지 않았고 런타임 DEV 복사본으로만 촬영했다. GameView 크기 복원·Play 종료·Home Scene/미저장 변경 없음으로 돌렸다. 최신 원격 main은 검사 기준과 동일했고 최종 독립 검토에서 병합을 막을 문제는 없었다. 이후 변경은 검증/PR 문서뿐이므로 검사를 반복하지 않았다.
 - **미검증:** 이번 보완에서 Mac/iOS 앱 빌드·설치, 실기기 터치, 실제 다기기 Guest·Wi-Fi·핫스팟 검증은 수행하지 않았다. 기존 기기 앱을 교체하지 않았다.
+
+
+## #806 3인 쇼케이스 최신 main iOS 빌드·설치 확인 (2026-11-18)
+
+- **기준·변경 범위:** #805가 병합된 main `a563ca99`의 미커밋 변경 없는 소스로 새 3인 야광귀 시연용 Release를 만들었다. 로비/캐릭터 선택·나/방장 표시·관람 바른 자세 리셋·첫 터치 안내 숨김은 이미 #802/#804/#805에 구현된 기능이며 이번에 새로 구현하지 않았다. #806 PR은 사용 문서와 이번 수행 기록만 추가하고 일반 게임·Scene·Prefab·에셋·코드·패키지·빌드 설정은 바꾸지 않는다.
+- **검사 선정·재사용:** 동일 코드·에셋·패키지·설정·macOS Unity6000.6.5f1/Metal 환경에서 통과한 #805 전체 EditMode **2608/2608**, 관련 PlayMode **41/41**을 재사용했다. 추가로 시연 완료/QR·재도전과 A/B 독립·마무리 페이지 PlayMode를 실행했다. 이후 문서만 변경하므로 컴파일·자동 검사·빌드를 반복하지 않았다. 이 문서 변경은 AGENTS의 전체 검사 대상이 아니다.
+- **추가 자동 검사:** PlayMode **12/12 PASS**, 실패·skip·inconclusive0. `GameStaffStageDemoFlowTests`9(113.96초), `GameStaffDemoGroupIsolationTests`1(1.02초), `StaffDemoFinalPageTests`2(0.05초). 완료 뒤 각자 QR, 늦은 결과 수신 확인, Host/참가자 이탈 후 완료 유지, 중도 종료 재도전의 자리 선택 복귀·수동 시작, 두 3인 그룹의 독립을 확인했다. 자동 참가자 자료를 쓴 검사이며 실기기 3인 플레이와 구분한다.
+- **iOS 산출물:** `GameDemoBuild.StageTwoIos`로 Stage 2 Only Release 내보내기 **Succeeded·오류0·식별 검증 통과**. 생성 기록은 `staff-stage-2-only-demo`, 정원3명, 실제 Stage2/yaguang/Yaguang 하나, Staff revision4, `development=false`, 전용 두 define과 `.staffdemo.stage2`를 확인했다. 한글 표시명 `합이오_쇼케이스`, 내부 실행 파일 `HapioShowcase`, 세로 고정, 기존 로컬 네트워크/Bonjour 권한 선언을 유지했다.
+- **실제 에셋 포함:** 이번 iOS 출력 경로와 일치하는 `BuildReport.GetLatestReport()`의 `packedAssets.contents.sourceAssetPath`를 대조했다. 공통 로비 PNG42장과 회전 안내 PNG1장 **43/43 포함·누락0**이었다. 이전 빌드의 파일명 목록을 이번 포함 근거로 재사용하지 않았다.
+- **서명 빌드:** Xcode26.6(17F113), `Unity-iPhone` 스킴, `ReleaseForRunning`, generic iOS 대상으로 **BUILD SUCCEEDED**(120.7초). 생성 앱의 Bundle ID·표시명·실행 파일명이 manifest와 일치하고 `codesign --verify --deep --strict`를 통과했다. 내보내기 성공과 기기 설치·실행은 아래처럼 구분한다.
+- **기기 설치·실행:** USB 연결된 iPhone17 세 대 모두 같은 새 앱의 업데이트 설치·설치 앱 조회에 성공했다. 전경 실행 뒤 각 프로세스가 유지되는 것을 재확인했으며 사용자가 확인했다. 방 생성·전투를 자동 시작하지 않았다. 최초 실행 명령의 인수 순서 오류는 설치에 영향을 주지 않았고 명령을 정정해 재실행했다. 한 기기의 첫 iOS 보안 확인 거절은 재시도에서 정상 실행됐으며 영구 서명 오류로 단정하지 않았다.
+- **빌드 도구 임시 보완·복원:** 기존 Pipeline 캐시의 iOS `GetSubtarget<StandaloneBuildSubtarget>` 조회 오류를 피하려고 Standalone에만 조회하도록 로컬 캐시 한 파일을 일시 보완했다. 내보내기 직후 원본 바이트·SHA와 재컴파일 완료까지 복원했다. Packages manifest/lock·저장 소스는 변경하지 않았다. 기본 Xcode 선택은 CommandLineTools였으므로 빌드 프로세스의 `DEVELOPER_DIR`만 Xcode로 지정했고 전역 선택을 바꾸지 않았다.
+- **보존·종료:** 보호 파일122개와 기존 stash11개를 보존했다. Home Scene·미저장 변경 없음·Play 종료·StandaloneOSX와 저장된 일반/시연 define 미설정 상태로 복원했다. 원격 main과 실제 빌드 소스의 일치를 확인했다. 빌드·원시 로그·검사 결과·서명 자료·기기 식별자·개인 경로는 저장소에 추가하지 않고 로컬 산출물에만 보관한다.
+- **미검증:** 이번 설치 확인에서 실제 3인 라운드 완주·실기기 로비/관람 터치·QR 스캔·일반 Wi-Fi/핫스팟/이더넷 동작·6기기 동시 플레이는 별도로 수행하지 않았다. 이번 Mac 앱 빌드도 하지 않았다. 과거 통과 기록이나 프로세스 유지 확인을 이 항목의 PASS로 쓰지 않는다.

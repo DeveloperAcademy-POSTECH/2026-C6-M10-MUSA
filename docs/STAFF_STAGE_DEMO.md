@@ -159,6 +159,28 @@ Release에서도 스태프 선택 화면은 제공하지만 숨김 DEV는 열리
 
 터미널에서는 같은 Unity Editor에 프로젝트 경로와 `-executeMethod Hapio.Editor.GameDemoBuild.StageTwoMac`을 전달하면 Release Mac 앱을 만든다. iOS는 `StageTwoIos`, QA는 `StageTwoMacDevelopment`/`StageTwoIosDevelopment`다. 저장된 Player Settings의 Scripting Define이나 Build Settings Scene을 수동으로 바꾸지 않는다. 일반 Build Settings에서 Scene만 골라 빌드하면 이 제한이 들어가지 않는다.
 
+### 최신 로비·관람 UI와 빌드 결과 확인
+
+시연은 일반 게임과 같은 공통 로비·캐릭터 팝업·관람 코드를 사용한다. #802/#804/#805가 포함된 소스로 다시 빌드하면 별도 UI 이식이나 Prepare/Update 재실행 없이 다음 표시를 사용한다.
+
+- 3인 로비는 빈자리 점선 원과 `+`, 선택한 원본 캐릭터·방장·나/방장+나 배지를 표시한다.
+- 캐릭터 팝업은 선택 가능(점선), 타인 선점(옅은 실선·선점·선택 차단), 내 선택(굵은 실선·체크)을 구분하며 선택하면 즉시 닫힌다.
+- 박 관람은 최초와 리셋 시 위아래가 바르게 서고, 첫 유효 터치/왼쪽 누름 또는 세로 휠에서 회전 안내 PNG를 숨긴다. 손을 떼거나 리셋해도 숨김을 유지하며 닫았다 다시 열면 안내를 복원한다. 자세한 공통 동작은 [로비 UI](THREE_PLAYER_LOBBY_UI.md)와 [관람 UI](SESSION_FINISH_UI.md)를 따른다.
+
+전체 스테이지 시연과 Stage 2 Only는 모두 표시명이 `합이오_쇼케이스`다. 앱 이름만으로 종류나 최신 여부를 판단하지 말고 새 출력의 `build-manifest.json`에서 다음을 확인한다.
+
+| 확인 항목 | 3인 야광귀 Release의 기대값 |
+| --- | --- |
+| `sourceRevision`, `sourceHasUncommittedChanges` | 빌드할 main 커밋과 일치, 재현 가능한 배포 기준은 `false` |
+| `variant`, `participants` | `staff-stage-2-only-demo`, `3` |
+| `development`, `target` | `false`, iPhone용은 `iOS` |
+| `selectableStages` | 실제 `stageIndex=2`, `stageId=yaguang`, `yokai=Yaguang`인 항목 하나 |
+| `scriptingDefine` | `HAPIO_STAFF_STAGE_DEMO;HAPIO_STAFF_STAGE_TWO_ONLY` |
+| `applicationIdentifier`, `variantRevision` | 전용 `.staffdemo.stage2` 식별자, 현재 Staff revision4 |
+| `result`, `totalErrors`, `identityVerified` | `Succeeded`, `0`, `true` |
+
+iOS 내보내기 성공, Xcode 서명 앱 생성, 기기 설치, 기기 실행은 각각 확인한다. 세 기기에는 같은 산출물을 설치한다. 설치·실행 프로세스 확인만으로 실제 3인 전투나 터치·네트워크·QR 인식까지 통과한 것으로 기록하지 않는다. 실행한 결과와 미검증 범위는 [검증 기록](VALIDATION.md)의 2026-11-18 쇼케이스 항목을 확인한다.
+
 ### 세 명이 사용하기
 
 1. 같은 빌드를 실행하고 같은 LAN 또는 핫스팟에 연결한다. Mac 앱은 Mac용이며 iPhone에는 iOS 빌드를 설치한다.
