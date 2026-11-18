@@ -328,7 +328,7 @@ namespace Hapio.Tests
             Assert.That(session.Network.LocalSlotNumber, Is.EqualTo(2));
             Assert.That(session.Network.LocalCharacter, Is.EqualTo(4));
             Assert.That(session.Network.GetCharacterOwner(4), Is.EqualTo(session.Network.LocalPlayerId));
-            Assert.That(view.slotImages[1].sprite, Is.SameAs(GameThreePlayerLobbyArt.Seat(4, true)),
+            Assert.That(view.slotImages[1].sprite, Is.SameAs(GameThreePlayerLobbyArt.Seat(4, true, true)),
                 "The Host chose P2 and 금옥: choose the actual Host+character artwork, never P1 or the slot number.");
             Assert.That(view.slotImages[0].sprite, Is.SameAs(GameThreePlayerLobbyArt.Empty(1)),
                 "P1 stays empty when the Host selected P2.");
@@ -733,6 +733,107 @@ namespace Hapio.Tests
 
         [Category("Bonjour")]
         [UnityTest]
+        public IEnumerator FourPlayerStoryUsesOriginalComponentsForEveryCharacter() => StoryComponents(4);
+
+        [UnityTest]
+        public IEnumerator FivePlayerStoryUsesOriginalComponentsForEveryCharacter() => StoryComponents(5);
+
+        private IEnumerator StoryComponents(int capacity)
+        {
+            session.Network.SetTargetParticipantCount(capacity);
+            session.Host();
+            yield return Until(() => session.State.phase == GameFlowPhase.Lobby && !session.IsLoadingScene,
+                "Story lobby for original seat components");
+            var network = session.Network;
+            var view = View();
+            var slots = (LabPlayerSlots)typeof(LabNetwork).GetField("playerSlots",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).GetValue(network);
+            // P2 deliberately differs from the character ID, and the Host is not fixed to P1.
+            for (int character = 1; character <= 5; character++)
+            {
+                Assert.That(network.RequestPlayerSlot(2, character), Is.True);
+                yield return null; yield return null;
+                Assert.That(view.slotImages[1].sprite, Is.SameAs(GameThreePlayerLobbyArt.Seat(character, true, true)));
+                Assert.That(view.localLabels[1].gameObject.activeSelf, Is.False, "The authored name and badges must not be duplicated.");
+                Assert.That(view.slotImages[1].rectTransform.localEulerAngles, Is.EqualTo(Vector3.zero));
+                Assert.That(((RectTransform)view.slotButtons[1].transform).rect.size, Is.EqualTo(new Vector2(63, 63)));
+                Assert.That(network.RequestPlayerSlot(0), Is.True);
+                Assert.That(slots.TrySelect(77, 3, character, out string reason), Is.True, reason);
+                yield return null; yield return null;
+                Assert.That(view.slotImages[2].sprite, Is.SameAs(GameThreePlayerLobbyArt.Seat(character, false, false)),
+                    "Another player's component must not inherit my highlight or Host badge.");
+                Assert.That(view.localLabels[2].gameObject.activeSelf, Is.False);
+                if (capacity == 5)
+                {
+                    var split = view.slotImages[2].transform.Find("Upper Seat Component");
+                    Assert.That(split != null && split.gameObject.activeSelf, Is.True);
+                    foreach (var layer in split.GetComponentsInChildren<UnityEngine.UI.Image>())
+                        Assert.That(layer.sprite, Is.SameAs(view.slotImages[2].sprite), "Move the original name pixels above the connecting lines without substituting artwork.");
+                }
+                if (capacity == 5 && (character == 1 || character == 5))
+                    yield return VerifyHeldUpperStorySeats(view, slots, character);
+                slots.Release(77);
+                yield return null; yield return null;
+                Assert.That(view.slotImages[2].sprite, Is.SameAs(view.emptySlots[2]), "Clearing restores this capacity's original empty marker.");
+            }
+        }
+
+        private IEnumerator VerifyHeldUpperStorySeats(GameLobbyView view, LabPlayerSlots slots, int character)
+        {
+            var network = session.Network;
+            IList holds = null;
+            try
+            {
+                foreach (int seat in new[] { 3, 4 })
+                {
+                    slots.Release(77); slots.Release(78);
+                    Assert.That(slots.TrySelect(77, seat, character, out string reason), Is.True, reason);
+                    yield return null; yield return null;
+                    var source = view.slotImages[seat - 1];
+                    var split = source.transform.Find("Upper Seat Component");
+                    Assert.That(split != null && split.gameObject.activeInHierarchy, Is.True, "Both upper story seats use split original art.");
+                    var portrait = split.Find("Portrait");
+                    var name = split.Find("Name");
+                    Sprite original = source.sprite;
+                    Assert.That(name.gameObject.activeInHierarchy, Is.True);
+
+                    holds = HoldLobbySeat(network, 77, seat);
+                    yield return null; yield return null;
+                    Assert.That(view.localLabels[seat - 1].gameObject.activeInHierarchy, Is.True);
+                    Assert.That(view.localLabels[seat - 1].text, Is.EqualTo(GameLobbyView.HeldSeatLabel));
+                    Assert.That(name.gameObject.activeSelf, Is.False, "P" + seat + " must show only away status in the upper name row.");
+                    var heldPortrait = portrait.GetComponentInChildren<UnityEngine.UI.Image>();
+                    Assert.That(heldPortrait != null && heldPortrait.gameObject.activeInHierarchy, Is.True,
+                        "Hiding a held name must not hide the original portrait.");
+                    Assert.That(heldPortrait.sprite, Is.SameAs(original));
+                    Assert.That(heldPortrait.color.a, Is.LessThan(.5f));
+                    Assert.That(view.slotButtons[seat - 1].interactable, Is.False, "The held seat cannot be taken by another player.");
+
+                    // Supply the authoritative mapping a reconnect can publish with a new transport owner.
+                    holds.Clear(); slots.Release(77);
+                    Assert.That(slots.TrySelect(78, seat, character, out reason), Is.True, reason);
+                    yield return null; yield return null;
+                    Assert.That(network.GetSlotOwner(seat), Is.EqualTo(78ul));
+                    Assert.That(name.gameObject.activeInHierarchy, Is.True, "The original name must return after the hold is cleared.");
+                    Assert.That(view.localLabels[seat - 1].gameObject.activeSelf, Is.False, "Reclaiming cannot leave stale away text over the name.");
+                    Assert.That(heldPortrait.sprite, Is.SameAs(original));
+                    Assert.That(heldPortrait.color.a, Is.EqualTo(1f));
+
+                    slots.Release(78);
+                    yield return null; yield return null;
+                    Assert.That(source.sprite, Is.SameAs(view.emptySlots[seat - 1]));
+                    Assert.That(source.enabled, Is.True, "Clearing restores the ordinary empty Image.");
+                    Assert.That(split.gameObject.activeSelf, Is.False, "A cleared seat must not leave cropped portrait or name layers behind.");
+                }
+            }
+            finally
+            {
+                holds?.Clear();
+                slots.Release(77); slots.Release(78);
+            }
+        }
+
+        [UnityTest]
         public IEnumerator DevSoloAfterLeavingASixPlayerRoomStartsAloneInsteadOfReopeningIt()
         {
             if (!LabBonjourDiscovery.IsSupported) Assert.Ignore("Native game-room advertisement requires macOS or iOS.");
@@ -918,14 +1019,7 @@ namespace Hapio.Tests
             // drop and return are covered by C6Lab's LabLobbyRejoinNetworkTests.
             var slots = (LabPlayerSlots)typeof(LabNetwork).GetField("playerSlots", flags).GetValue(network);
             Assert.That(slots.TrySelect(77, 2, 3, out string reason), Is.True, reason);
-            Type holdType = typeof(LabNetwork).GetNestedType("LobbySeatHold", System.Reflection.BindingFlags.NonPublic);
-            object hold = Activator.CreateInstance(holdType);
-            holdType.GetField("ticket").SetValue(hold, new string('a', 32));
-            holdType.GetField("playerId").SetValue(hold, 77UL);
-            holdType.GetField("slot").SetValue(hold, 2);
-            holdType.GetField("until").SetValue(hold, Time.realtimeSinceStartupAsDouble + 60d);
-            var holds = (IList)typeof(LabNetwork).GetField("lobbySeatHolds", flags).GetValue(network);
-            holds.Add(hold);
+            IList holds = HoldLobbySeat(network, 77, 2);
             yield return null; yield return null;
             Assert.That(network.HeldSeatCount, Is.EqualTo(1));
             Assert.That(view.localLabels[1].text, Is.EqualTo(GameLobbyView.HeldSeatLabel));
@@ -1096,6 +1190,21 @@ namespace Hapio.Tests
             Assert.That(card.anchoredPosition, Is.EqualTo(savedCard), "The direct connection card stays where it was saved.");
             yield return Click(view.closeDirectConnectionButton);
             Assert.That(view.directConnectionPanel.activeSelf, Is.False);
+        }
+
+        private static IList HoldLobbySeat(LabNetwork network, ulong player, int seat)
+        {
+            const System.Reflection.BindingFlags flags = System.Reflection.BindingFlags.Instance
+                | System.Reflection.BindingFlags.NonPublic;
+            Type type = typeof(LabNetwork).GetNestedType("LobbySeatHold", System.Reflection.BindingFlags.NonPublic);
+            object hold = Activator.CreateInstance(type);
+            type.GetField("ticket").SetValue(hold, new string('a', 32));
+            type.GetField("playerId").SetValue(hold, player);
+            type.GetField("slot").SetValue(hold, seat);
+            type.GetField("until").SetValue(hold, Time.realtimeSinceStartupAsDouble + 60d);
+            var holds = (IList)typeof(LabNetwork).GetField("lobbySeatHolds", flags).GetValue(network);
+            holds.Add(hold);
+            return holds;
         }
 
         private static GameLobbyView View() => SceneManager.GetActiveScene().GetRootGameObjects()

@@ -25,6 +25,7 @@ namespace C6Lab
         private readonly List<Material> ownedMaterials = new List<Material>();
         private GameObject root;
         private Transform modelPivot;
+        private Quaternion resetRotation = Quaternion.identity;
         private Camera previewCamera;
         private RenderTexture texture;
         private Texture2D paintTexture;
@@ -243,6 +244,15 @@ namespace C6Lab
             root = NewObject("Completed gourd preview", null);
             root.SetActive(false);
             modelPivot = NewObject("Local model rotation", root.transform).transform;
+            var sourceRig = sourceVisual.GetComponent<LabGourdVisualRig>();
+            if (sourceRig != null && sourceRig.paintShell != null)
+            {
+                // Baked stage shells carry the art's static forward lean. The copied hierarchy keeps
+                // that pose, so identity on the gesture pivot alone is not an upright reset.
+                Vector3 shellUp = sourceVisual.localRotation
+                    * sourceVisual.InverseTransformDirection(sourceRig.paintShell.transform.up);
+                resetRotation = Quaternion.FromToRotation(shellUp, Vector3.up);
+            }
             Transform normalization = NewObject("Centered model", modelPivot).transform;
             var materialCopies = new Dictionary<Material, Material>();
             var renderers = new List<MeshRenderer>();
@@ -456,7 +466,7 @@ namespace C6Lab
         public void ResetView()
         {
             if (disposed) return;
-            if (modelPivot != null) modelPivot.localRotation = Quaternion.identity;
+            if (modelPivot != null) modelPivot.localRotation = resetRotation;
             zoomNormalized = DefaultZoom;
             ApplyCameraPose();
         }

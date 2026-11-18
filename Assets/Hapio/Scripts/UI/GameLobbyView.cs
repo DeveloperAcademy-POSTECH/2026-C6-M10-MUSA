@@ -530,6 +530,9 @@ namespace Hapio
         public int SeatCharacter(int index) => Network != null && StorySeats ? Network.GetSlotCharacter(index + 1) : 0;
         public bool SeatIsHost(int index) => Network != null && Network.GetSlotOwner(index + 1) == Unity.Netcode.NetworkManager.ServerClientId;
         public bool SeatIsHeld(int index) => Network != null && Network.IsSlotHeld(index + 1);
+        public bool SeatIsLocal(int index) => Network != null
+            && Network.GetSlotOwner(index + 1) != ulong.MaxValue
+            && Network.GetSlotOwner(index + 1) == Network.LocalPlayerId;
         private bool StorySeats => !TerritoryRoom(Network.TargetParticipantCount);
 
         /// <summary>

@@ -168,7 +168,7 @@ namespace Hapio.Tests
         public void ThreePlayerOriginalSpritesPreserveTheirTransparentMarginsWithoutCompression()
         {
             string[] names = Enumerable.Range(1, 3).Select(i => "Empty" + i)
-                .Concat(Enumerable.Range(1, 5).SelectMany(i => new[] { "Seat" + i, "SeatHost" + i, "Choice" + i, "ChoiceTaken" + i, "ChoiceSelected" + i }))
+                .Concat(Enumerable.Range(1, 5).SelectMany(i => new[] { "Seat" + i, "SeatHost" + i, "SeatMe" + i, "SeatHostMe" + i, "Choice" + i, "ChoiceTaken" + i, "ChoiceSelected" + i }))
                 .Concat(new[] { "Taken", "ChoiceCheck", "Close", "PopupPanel" }).ToArray();
             foreach (string name in names)
             {
@@ -229,6 +229,8 @@ namespace Hapio.Tests
             {
                 new[] { "Seat", "5808:5334", "5808:5338", "5808:5337", "5808:5335", "5808:5336" },
                 new[] { "SeatHost", "5808:5339", "5808:5343", "5808:5342", "5808:5340", "5808:5341" },
+                new[] { "SeatMe", "5902:6727", "5902:6731", "5902:6730", "5902:6728", "5902:6729" },
+                new[] { "SeatHostMe", "5902:6508", "5902:6512", "5902:6511", "5902:6509", "5902:6510" },
                 new[] { "Choice", "5820:32883", "5820:32893", "5820:32889", "5820:32897", "5820:32904" },
                 new[] { "ChoiceTaken", "5820:32883", "5820:32893", "5820:32889", "5820:32897", "5820:32904" },
                 new[] { "ChoiceSelected", "5820:32883", "5820:32893", "5820:32889", "5820:32897", "5820:32904" }
@@ -244,7 +246,7 @@ namespace Hapio.Tests
                     : family[0] == "ChoiceSelected" ? GameThreePlayerLobbyArt.ChoiceState.Selected
                     : GameThreePlayerLobbyArt.ChoiceState.Available;
                 Sprite sprite = picker ? GameThreePlayerLobbyArt.Choice(character, state)
-                    : GameThreePlayerLobbyArt.Seat(character, family[0] == "SeatHost");
+                    : GameThreePlayerLobbyArt.Seat(character, family[0].Contains("Host"), family[0].EndsWith("Me"));
                 Assert.That(AssetDatabase.GetAssetPath(sprite), Is.EqualTo(entry.asset), name);
                 if (picker)
                 {
