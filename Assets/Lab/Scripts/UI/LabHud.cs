@@ -747,6 +747,13 @@ namespace C6Lab
         private void TryAutomaticRoomSearch()
         {
             if (!automaticRoomSearchPending || network == null) return;
+            // The outgoing tutorial HUD can observe shutdown before Battle unloads. Its standalone lobby must not
+            // restart discovery after the tutorial-only session returned to the title and canceled it.
+            if (network.GameFlowEnabled && LabGameBuildVariant.IsTutorialOnly)
+            {
+                automaticRoomSearchPending = false;
+                return;
+            }
             if (network.IsConnected || network.IsJoiningRoom || network.IsSearchingRooms
                 || network.RoomSearchFailed)
             {

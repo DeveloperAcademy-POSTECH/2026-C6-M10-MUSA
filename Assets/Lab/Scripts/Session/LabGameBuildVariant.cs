@@ -14,6 +14,11 @@ namespace C6Lab
         public static bool IsValidDemoGroup(int group) => group == 1 || group == 2;
         public static bool IsValidStaffRoomIdentity(int stage, int group) => stage >= 1 && stage <= 3 && IsValidDemoGroup(group);
         public const string StaffStageTwoOnlyDefine = "HAPIO_STAFF_STAGE_TWO_ONLY";
+        public const string TutorialOnlyDefine = "HAPIO_TUTORIAL_ONLY";
+
+#if HAPIO_TUTORIAL_ONLY && (HAPIO_YAGUANG_DEMO || HAPIO_STAFF_STAGE_DEMO || HAPIO_STAFF_STAGE_TWO_ONLY)
+#error The tutorial-only player cannot contain a multiplayer demo variant.
+#endif
 
 #if HAPIO_YAGUANG_DEMO && HAPIO_STAFF_STAGE_DEMO
 #error A player cannot contain both the legacy Yaguang demo and staff stage-selection demo.
@@ -41,6 +46,12 @@ namespace C6Lab
         private const bool BuiltAsStaffStageDemo = false;
 #endif
 
+#if HAPIO_TUTORIAL_ONLY
+        private const bool BuiltAsTutorialOnly = true;
+#else
+        private const bool BuiltAsTutorialOnly = false;
+#endif
+
         public static bool IsYaguangDemo
         {
             get
@@ -65,6 +76,18 @@ namespace C6Lab
 
         public static bool IsDemo => IsYaguangDemo || IsStaffStageDemo;
 
+        /// <summary>Title-to-tutorial replay build; deliberately not a multiplayer demo.</summary>
+        public static bool IsTutorialOnly
+        {
+            get
+            {
+#if UNITY_EDITOR
+                if (tutorialOnlyTestOverride.HasValue) return tutorialOnlyTestOverride.Value;
+#endif
+                return BuiltAsTutorialOnly;
+            }
+        }
+
         /// <summary>A build-only selection restriction; it retains the staff Stage2 route and compatibility.</summary>
         public static bool IsStaffStageTwoOnly
         {
@@ -85,6 +108,29 @@ namespace C6Lab
         private static bool? testOverride;
         private static bool? staffStageTestOverride;
         private static bool? staffStageTwoOnlyTestOverride;
+        private static bool? tutorialOnlyTestOverride;
+
+        /// <summary>Scoped QA for title/tutorial replay without saving a player define.</summary>
+        public static IDisposable EditorOverrideTutorialOnlyForTests(bool enabled) => new TutorialOnlyTestOverride(enabled);
+
+        private sealed class TutorialOnlyTestOverride : IDisposable
+        {
+            private readonly bool? previous;
+            private bool disposed;
+
+            public TutorialOnlyTestOverride(bool value)
+            {
+                previous = tutorialOnlyTestOverride;
+                tutorialOnlyTestOverride = value;
+            }
+
+            public void Dispose()
+            {
+                if (disposed) return;
+                disposed = true;
+                tutorialOnlyTestOverride = previous;
+            }
+        }
 
         /// <summary>Scoped, in-memory QA only; never writes preferences or player settings.</summary>
         public static IDisposable OverrideForTests(bool isYaguangDemo) => new TestOverride(isYaguangDemo);

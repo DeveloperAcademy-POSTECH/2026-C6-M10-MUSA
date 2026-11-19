@@ -21,6 +21,7 @@ namespace Hapio.Tests
     public sealed class GameTutorialFlowTests
     {
         private GameSession session;
+        private IDisposable tutorialOnlyVariant;
 #if UNITY_EDITOR
         private PortraitGameView portraitGameView;
 #endif
@@ -51,6 +52,7 @@ namespace Hapio.Tests
         [UnityTearDown]
         public IEnumerator Cleanup()
         {
+            tutorialOnlyVariant?.Dispose(); tutorialOnlyVariant = null;
             Time.timeScale = 1f;
             GameSession owned = session != null ? session : GameSession.Instance;
             if (owned != null)
@@ -150,7 +152,16 @@ namespace Hapio.Tests
 #endif
 
         [UnityTest]
-        public IEnumerator FinishedOpeningOpensThePracticeBoardOnceThenTheRoomList()
+        public IEnumerator FinishedOpeningOpensThePracticeBoardOnceThenTheRoomList() => WholeTutorial(false);
+
+        [UnityTest]
+        public IEnumerator TutorialOnlyKeepsTheTitleThenPlaysTheUnchangedWholeTutorialAndReturnsToTitle()
+        {
+            tutorialOnlyVariant = LabGameBuildVariant.EditorOverrideTutorialOnlyForTests(true);
+            yield return WholeTutorial(true);
+        }
+
+        private IEnumerator WholeTutorial(bool tutorialOnly)
         {
             yield return SceneManager.LoadSceneAsync(GameScenePaths.Home, LoadSceneMode.Single);
             yield return Until(() => GameSession.Instance != null && !GameSession.Instance.IsLoadingScene, "Saved Home bootstrap");
@@ -160,24 +171,39 @@ namespace Hapio.Tests
             var opening = Object.FindFirstObjectByType<GameOpeningController>();
             Assert.That(opening, Is.Not.Null);
 
-            opening.lobbyView.enterButton.onClick.Invoke();
-            yield return Until(() => opening.IsPlaying, "First Start opens the story");
-            Assert.That(opening.player.sequence.cuts.Count, Is.EqualTo(28));
-            for (int cut = 0; cut < 28; cut++)
+            if (tutorialOnly)
             {
-                Assert.That(opening.player.CurrentCutIndex, Is.EqualTo(cut));
-                opening.player.AdvanceTime(opening.player.CurrentView.EntranceDuration + .1f);
-                opening.player.Next();
+                AssertTutorialOnlyTitle();
+                for (int frame = 0; frame < 5; frame++) yield return null;
+                AssertTutorialOnlyTitle();
+                Assert.That(opening.TryBeginFromStartButton(session.StartTutorialOrRooms), Is.False,
+                    "The dedicated player cannot open the narrative through a stale opening callback.");
+                opening.lobbyView.enterButton.onClick.Invoke();
+                string run = session.State.runId;
+                opening.lobbyView.enterButton.onClick.Invoke();
+                Assert.That(session.State.runId, Is.EqualTo(run), "Repeated Start owns only one practice run.");
             }
-            Assert.That(opening.player.CurrentView.authoredDialogue.alpha, Is.Zero, "The authored words hide under the closing clouds.");
-            yield return Until(() => !GameOpeningController.IsPresenting, "The opening hands over");
-            Assert.That(session.IsTutorial, Is.True, "The opening hands over to the tutorial, not the room list.");
+            else
+            {
+                opening.lobbyView.enterButton.onClick.Invoke();
+                yield return Until(() => opening.IsPlaying, "First Start opens the story");
+                Assert.That(opening.player.sequence.cuts.Count, Is.EqualTo(28));
+                for (int cut = 0; cut < 28; cut++)
+                {
+                    Assert.That(opening.player.CurrentCutIndex, Is.EqualTo(cut));
+                    opening.player.AdvanceTime(opening.player.CurrentView.EntranceDuration + .1f);
+                    opening.player.Next();
+                }
+                Assert.That(opening.player.CurrentView.authoredDialogue.alpha, Is.Zero, "The authored words hide under the closing clouds.");
+                yield return Until(() => !GameOpeningController.IsPresenting, "The opening hands over");
+            }
+            Assert.That(session.IsTutorial, Is.True, "Game start reaches the existing practice board, not the room list.");
             Assert.That(session.RoomBrowserVisible, Is.False);
             Assert.That(GameSession.TutorialPending, Is.False, "Once per app run.");
 
             // #635: the clouds that closed over the opening stay, wordless, while the board is prepared, lift once it can be
             // played, and only then does its first line come.
-            Assert.That(session.CloudsUp, Is.True, "The clouds cover the hand-over.");
+            Assert.That(session.CloudsUp, Is.EqualTo(!tutorialOnly), "Only the normal opening uses the cloud hand-over.");
             GameTutorialDirector director = null;
             bool heldWhilePreparing = false, coverUnderClouds = false, lineUnderClouds = false, loadingScreen = false;
             float deadline = Time.realtimeSinceStartup + 30f;
@@ -192,7 +218,7 @@ namespace Hapio.Tests
                 yield return null;
             }
             Assert.That(director != null && director.IsShowingLine, Is.True, "The practice board plays its first line");
-            Assert.That(heldWhilePreparing, Is.True, "The clouds wait, covering, while the board is prepared.");
+            Assert.That(heldWhilePreparing, Is.EqualTo(!tutorialOnly), "The normal opening's clouds wait while the board is prepared.");
             Assert.That(coverUnderClouds, Is.False, "No \"튜토리얼 준비 중\" words under the clouds.");
             Assert.That(loadingScreen, Is.False, "Nor the loading screen.");
             Assert.That(lineUnderClouds, Is.False, "The first line waits until the clouds have lifted.");
@@ -639,11 +665,154 @@ namespace Hapio.Tests
                 GameTutorialScript.Steps.SelectMany(part => part.Beats).Where(said => said.IsLine)
                     .Select(said => (said.Speaker, said.Text)).ToArray()), "The whole script, nothing else.");
             yield return Until(() => session.State.phase == GameFlowPhase.Home && !session.IsLoadingScene
-                && session.RoomBrowserVisible, "The tutorial leaves for the room list", 30f);
+                && session.RoomBrowserVisible == !tutorialOnly, tutorialOnly ? "The tutorial returns to the title" : "The tutorial leaves for the room list", 30f);
             Assert.That(session.IsTutorial, Is.False);
             Assert.That(network.IsTutorial, Is.False);
             yield return Until(() => session.SceneFade == null || !session.SceneFade.Visible, "Home fades back in");
+            if (tutorialOnly) AssertTutorialOnlyTitle();
         }
+
+        private void AssertTutorialOnlyTitle()
+        {
+            var view = Object.FindFirstObjectByType<GameLobbyView>();
+            Assert.That(view, Is.Not.Null);
+            Assert.That(view.titlePage.activeInHierarchy, Is.True);
+            Assert.That(view.browserPage.activeInHierarchy, Is.False);
+            Assert.That(session.RoomBrowserVisible, Is.False);
+            Assert.That(session.Network.IsSearchingRooms, Is.False,
+                "The outgoing Battle HUD must not restart discovery after this player returns to its title.");
+            Assert.That(GameOpeningController.IsPresenting || GameOpeningController.HasPlayedThisRun, Is.False);
+            Assert.That(session.IsTutorial, Is.False);
+            Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.Home));
+        }
+
+        [UnityTest]
+        public IEnumerator TutorialOnlyCanRepeatAfterFinishSkipAndPauseRestartQuitWithoutOpeningRooms()
+        {
+            yield return LoadTutorialOnlyTitle();
+            for (int attempt = 0; attempt < 3; attempt++)
+            {
+                AssertTutorialOnlyTitle();
+                var title = Object.FindFirstObjectByType<GameLobbyView>();
+                title.enterButton.onClick.Invoke();
+                string run = session.State.runId;
+                title.enterButton.onClick.Invoke(); session.StartTutorialOrRooms();
+                Assert.That(session.State.runId, Is.EqualTo(run), "A burst of Start callbacks cannot replace the accepted tutorial.");
+                GameTutorialDirector director = null;
+                yield return Until(() => (director = Object.FindFirstObjectByType<GameTutorialDirector>()) != null && director.IsShowingLine,
+                    "The unchanged tutorial opens from its first line on every deliberate Start", 30f);
+                Assert.That((director.StepIndex, director.BeatIndex), Is.EqualTo((0, 0)));
+                Assert.That(director.DialogueLog, Is.Empty);
+                if (attempt == 0) session.FinishTutorial(); // The full completion path is separately exercised above.
+                else if (attempt == 1)
+                {
+                    var buttons = director.GetComponentsInChildren<UnityEngine.UI.Button>(true);
+                    yield return WaitForTapToCount(director, GameTutorialArt.Load());
+                    buttons.Single(button => button.name == "Tap To Continue").onClick.Invoke();
+                    yield return Until(() => director.SkipButtonAlpha >= .999f, "The existing skip button fades in");
+                    buttons.Single(button => button.name == "Skip Button").onClick.Invoke();
+                    Assert.That(director.IsSkipDialogOpen, Is.True);
+                    LogAssert.Expect(LogType.Log, new System.Text.RegularExpressions.Regex("^C6_LAB_TUTORIAL_SKIP step=0 beat=1$"));
+                    buttons.Single(button => button.name == "Skip Tutorial").onClick.Invoke();
+                    buttons.Single(button => button.name == "Skip Tutorial").onClick.Invoke();
+                }
+                else
+                {
+                    director.GetComponentsInChildren<UnityEngine.UI.Button>(true).Single(button => button.name == "Pause").onClick.Invoke();
+                    yield return Until(() => session.Network.IsBattlePaused && director.IsSteppedAsideForPause, "The existing pause menu opens");
+                    string battleBeforeDevSkip = session.State.battleSessionId;
+                    Assert.That(session.CanDeveloperAdvanceStage, Is.False, "The dedicated app never exposes another game stage through DEV.");
+                    Assert.That(session.DeveloperNextStage(), Is.False);
+                    Assert.That(session.State.battleSessionId, Is.EqualTo(battleBeforeDevSkip));
+                    Assert.That(session.Network.IsBattlePaused, Is.True, "Rejecting DEV next leaves the original pause and Restart intact.");
+                    var hud = Object.FindFirstObjectByType<GameBattleBindings>().hud;
+                    LogAssert.Expect(LogType.Log, new System.Text.RegularExpressions.Regex("^C6_LAB_TUTORIAL_RESTART step=0 beat=0$"));
+                    hud.pauseMenu.GetComponent<GamePauseView>().restartButton.onClick.Invoke();
+                    GameTutorialDirector restarted = null;
+                    yield return Until(() => (restarted = Object.FindFirstObjectByType<GameTutorialDirector>()) != null && restarted != director
+                        && restarted.IsShowingLine, "Pause restart retains its original fresh-practice behavior", 30f);
+                    Assert.That((restarted.StepIndex, restarted.BeatIndex), Is.EqualTo((0, 0)));
+                    restarted.GetComponentsInChildren<UnityEngine.UI.Button>(true).Single(button => button.name == "Pause").onClick.Invoke();
+                    yield return Until(() => session.Network.IsBattlePaused && restarted.IsSteppedAsideForPause, "Pause opens after restarting");
+                    Object.FindFirstObjectByType<GameBattleBindings>().hud.returnLobbyButton.onClick.Invoke();
+                }
+                Assert.That(session.TryStartTutorial(again: true), Is.False, "The outgoing Battle cannot immediately start a replacement run.");
+                session.StartTutorialOrRooms();
+                Assert.That(session.RoomBrowserVisible, Is.False, "A refused transition-time Start never falls through to rooms.");
+                yield return WaitTutorialOnlyTitle();
+                AssertTutorialOnlyTitle();
+                Assert.That(session.ResultSnapshot, Is.Null);
+            }
+            // Consumption survives the loop, while the dedicated Start explicitly allows another tutorial.
+            Assert.That(GameSession.TutorialPending, Is.False);
+            Object.FindFirstObjectByType<GameLobbyView>().enterButton.onClick.Invoke();
+            yield return Until(() => session.IsTutorial && session.State.phase == GameFlowPhase.Playing && !session.IsLoadingScene,
+                "A fourth deliberate Start still opens the tutorial rather than rooms", 30f);
+        }
+
+        [UnityTest]
+        public IEnumerator TutorialOnlyLostHostCallbackReturnsToTitleAndAllowsAnotherStart()
+        {
+            yield return LoadTutorialOnlyTitle();
+            Object.FindFirstObjectByType<GameLobbyView>().enterButton.onClick.Invoke();
+            yield return Until(() => Object.FindFirstObjectByType<GameTutorialDirector>() is GameTutorialDirector director && director.IsShowingLine,
+                "The dedicated tutorial is playing before transport is lost", 30f);
+            // Stop deliberately suppresses callbacks. Deliver the late callback only after the real Host is down.
+            session.Network.Stop();
+            yield return Until(() => session.Network.CanChooseConnection && !session.Network.IsHost, "Transport has completed its shutdown");
+            Assert.That(session.IsTutorial, Is.True, "This fixture delivers the shutdown callback explicitly.");
+            typeof(GameSession).GetMethod("OnPeerDisconnected", BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(session, new object[] { ulong.MaxValue, true });
+            Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.Home), "A late Host-loss callback cannot open Game Over in this player.");
+            yield return WaitTutorialOnlyTitle();
+            AssertTutorialOnlyTitle();
+            Assert.That(session.ResultSnapshot, Is.Null);
+            Object.FindFirstObjectByType<GameLobbyView>().enterButton.onClick.Invoke();
+            yield return Until(() => Object.FindFirstObjectByType<GameTutorialDirector>() is GameTutorialDirector director && director.IsShowingLine,
+                "The title can start the unchanged tutorial again after transport cleanup", 30f);
+        }
+
+        [UnityTest]
+        public IEnumerator TutorialOnlyRejectsOrdinaryEntriesAndPreparationFailureStaysAtTheTitle()
+        {
+            yield return LoadTutorialOnlyTitle();
+            session.EnterRoomBrowser(); session.GoHomeToRoomBrowser();
+            Assert.That(session.CreatePendingRoom(3), Is.False);
+            Assert.That(session.CreateAndEnterRoom(3), Is.False);
+            Assert.That(session.CreateAndEnterRoom(4, GameMode.Territory), Is.False);
+            Assert.That(session.EnterPendingRoom("unused"), Is.False);
+            session.Host(); session.JoinRoom("unused"); session.JoinDirect("127.0.0.1");
+            session.StartSolo(); session.StartSolo(GameMode.Territory); session.StartGame();
+            yield return null;
+            AssertTutorialOnlyTitle();
+            Assert.That(session.PendingRooms, Is.Empty);
+            Assert.That(session.Network.IsConnected || session.Network.IsJoiningRoom, Is.False);
+
+            // Host preparation rejects a missing config before starting transport. Cleanup must also work before tutorialRun is true.
+            LabConfig original = session.Network.config;
+            try { session.Network.config = null; session.StartTutorialOrRooms(); }
+            finally { if (session.Network.config == null) session.Network.config = original; }
+            yield return WaitTutorialOnlyTitle();
+            AssertTutorialOnlyTitle();
+            Assert.That(session.Network.IsConnected || session.Network.IsTutorial || session.IsTutorial, Is.False);
+            Assert.That(session.Network.config, Is.Not.Null);
+            Object.FindFirstObjectByType<GameLobbyView>().enterButton.onClick.Invoke();
+            yield return Until(() => Object.FindFirstObjectByType<GameTutorialDirector>() is GameTutorialDirector director && director.IsShowingLine,
+                "A failed attempt can retry from the same title without opening rooms", 30f);
+        }
+
+        private IEnumerator LoadTutorialOnlyTitle()
+        {
+            tutorialOnlyVariant = LabGameBuildVariant.EditorOverrideTutorialOnlyForTests(true);
+            yield return SceneManager.LoadSceneAsync(GameScenePaths.Home, LoadSceneMode.Single);
+            yield return Until(() => GameSession.Instance != null && !GameSession.Instance.IsLoadingScene, "Saved tutorial-only Home");
+            session = GameSession.Instance; session.Network.port = AvailablePort();
+            yield return WaitTutorialOnlyTitle();
+        }
+
+        private IEnumerator WaitTutorialOnlyTitle() => Until(() => session.State.phase == GameFlowPhase.Home && !session.IsLoadingScene
+            && SceneManager.GetActiveScene().path == GameScenePaths.Home && session.Network.CanChooseConnection
+            && !session.IsLoadingScreenUp && (session.SceneFade == null || !session.SceneFade.BlocksInput), "The real title is ready for another Start", 30f);
 
         [UnityTest]
         public IEnumerator QuittingThePracticeBoardIsNoGameOverAndLeavesForTheRoomList()
