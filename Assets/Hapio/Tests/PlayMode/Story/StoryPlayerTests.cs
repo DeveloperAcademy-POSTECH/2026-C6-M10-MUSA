@@ -52,6 +52,48 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
+        public IEnumerator InstanceContinuePolicyControlsEntranceAndAllNextPathsWithoutChangingToolSkip()
+        {
+            var player = CreatePlayer();
+            var template = player.sequence.cuts[0].viewPrefab;
+            var target = new GameObject("Continue", typeof(RectTransform), typeof(UnityEngine.UI.Image), typeof(UnityEngine.UI.Button));
+            target.transform.SetParent(template.transform, false);
+            template.continueButton = target.GetComponent<UnityEngine.UI.Button>();
+            template.requireContinueButton = true;
+            StoryContinueState state = StoryContinueState.Hidden;
+            player.SetContinuePolicy(_ => state);
+            player.Replay();
+            var first = player.CurrentView;
+            player.AdvanceTime(first.EntranceDuration + .01f);
+            Assert.That(player.IsReading, Is.True);
+            Assert.That(first.continueButton.gameObject.activeSelf, Is.False,
+                "BeginReading must not briefly reveal a policy-hidden action.");
+            player.Next(); player.RequestNext();
+            Assert.That(player.CurrentView, Is.SameAs(first), "Direct and user Next consult the same instance policy.");
+
+            state = StoryContinueState.Locked; player.RefreshContinuePolicy();
+            Assert.That(first.continueButton.gameObject.activeSelf, Is.True);
+            Assert.That(first.continueButton.interactable, Is.False);
+            player.Next(); player.RequestNext(); first.continueButton.onClick.Invoke();
+            Assert.That(player.CurrentView, Is.SameAs(first), "A stale button event cannot bypass the lock.");
+            state = StoryContinueState.Ready; player.RefreshContinuePolicy();
+            Assert.That(first.continueButton.interactable, Is.True);
+            player.RequestNext();
+            Assert.That(player.CurrentCutIndex, Is.EqualTo(1), "Rejected requests must not consume the input-frame gate.");
+            player.AdvanceTime(player.CurrentView.EntranceDuration + .01f);
+            state = StoryContinueState.Locked; player.RefreshContinuePolicy();
+            var last = player.CurrentView;
+            Assert.That(last.continueButton.interactable, Is.False);
+            player.SetContinuePolicy(null);
+            Assert.That(last.continueButton.interactable, Is.True, "Removing the policy restores the authored button state.");
+            player.SetContinuePolicy(_ => StoryContinueState.Locked);
+            player.Skip();
+            Assert.That(player.IsPlaying, Is.False, "Direct tool Skip deliberately retains its existing contract.");
+            yield return null;
+            Assert.That(last.continueButton.gameObject.activeSelf, Is.False, "Policy refresh cannot revive a finished continue action.");
+        }
+
+        [UnityTest]
         public IEnumerator PreviousButtonReturnsToThePreviousPictureFirstPageAndPausesAuto()
         {
             var player = CreatePlayer();

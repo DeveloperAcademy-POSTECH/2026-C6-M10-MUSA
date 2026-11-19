@@ -46,9 +46,10 @@ namespace Hapio
                 var upperComponent = image.transform.Find("Upper Seat Component");
                 if (upperComponent != null) upperComponent.gameObject.SetActive(false);
                 if (!view.slotButtons[i].gameObject.activeSelf) continue;
-                // Character components are shared by every story capacity, not only the three-seat layout.
-                // Keep each layout's existing empty markers and anchors outside the three-player design.
-                if (!team && (players == 3 || view.SeatCharacter(i) > 0))
+                // Staff's three empty seats retain the saved P markers. Chosen characters still use the
+                // common portrait/name/badge components, including held seats and every story capacity.
+                bool numberedStaffEmpty = LabGameBuildVariant.IsStaffStageDemo && players == 3;
+                if (!team && (players == 3 && !numberedStaffEmpty || view.SeatCharacter(i) > 0))
                 {
                     PresentStorySeat(view, i);
                     if (players == 5 && ((RectTransform)view.slotButtons[i].transform).anchoredPosition.y >= topRow - 1f)

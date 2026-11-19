@@ -9722,3 +9722,30 @@ main `cef1579d`의 #760 관람·#762 땅따먹기 박/Game56·#727 튜토리얼�
 - **빌드 도구 임시 보완·복원:** 기존 Pipeline 캐시의 iOS `GetSubtarget<StandaloneBuildSubtarget>` 조회 오류를 피하려고 Standalone에만 조회하도록 로컬 캐시 한 파일을 일시 보완했다. 내보내기 직후 원본 바이트·SHA와 재컴파일 완료까지 복원했다. Packages manifest/lock·저장 소스는 변경하지 않았다. 기본 Xcode 선택은 CommandLineTools였으므로 빌드 프로세스의 `DEVELOPER_DIR`만 Xcode로 지정했고 전역 선택을 바꾸지 않았다.
 - **보존·종료:** 보호 파일122개와 기존 stash11개를 보존했다. Home Scene·미저장 변경 없음·Play 종료·StandaloneOSX와 저장된 일반/시연 define 미설정 상태로 복원했다. 원격 main과 실제 빌드 소스의 일치를 확인했다. 빌드·원시 로그·검사 결과·서명 자료·기기 식별자·개인 경로는 저장소에 추가하지 않고 로컬 산출물에만 보관한다.
 - **미검증:** 이번 설치 확인에서 실제 3인 라운드 완주·실기기 로비/관람 터치·QR 스캔·일반 Wi-Fi/핫스팟/이더넷 동작·6기기 동시 플레이는 별도로 수행하지 않았다. 이번 Mac 앱 빌드도 하지 않았다. 과거 통과 기록이나 프로세스 유지 확인을 이 항목의 PASS로 쓰지 않는다.
+
+
+## #808 시연 P번호·수장고 표시와 봉인 박 관람 후 진행 (2026-11-18)
+
+- **기준·범위:** main `ebdcb76e`에서 `fix/#808-showcase-lobby-seal-review`로 분리했다. 현행 쇼케이스는 **Stage 2 Only의 야광귀 한 판**이며 스테이지 선택/3연전을 추가하지 않았다. 실행 중 `FirstStage=2`, `Count=1`, 실제 `stageIndex=2`, `totalStages=1`을 확인했다. 기존 다른 스테이지의 Staff 검사들은 공용 코드 비회귀 범위이며 현행 시연 빌드 사양과 구분한다.
+- **표시:** Staff 시연 3인 빈자리만 저장된 emptySlots·자리색·P1/P2/P3를 사용한다. 선택 캐릭터·Host·나·보류 자리, 기존 캐릭터 팝업과 자리/캐릭터 승인 규칙은 유지한다. 시연 화면의 선택·생성 확인·생성/입장 대기·로비 제목·재도전은 `수장고 - 가`/`수장고 - 나` 공통 표시를 쓴다. Stage2 입장의 `A/B 독립 시연 · 각 3명` 줄을 숨기고 실제 인원 표시는 유지한다. 저장 Prefab은 Text 세 곳만 수정했다.
+- **관람 진행:** Staff 승리 봉인 카드에만 인스턴스 계속 정책을 설치한다. 앞면/뒤집는 중에는 버튼과 클릭 영역을 숨기고, 뒷면 관람 전에는 원본색 기준 Alpha45%로 잠근다. 실제 관람이 열리고 같은 결과로 돌아와 다음 프레임·모든 포인터 해제를 지나야 진행한다. 단순 콜백/관람 OFF·Pending·Failed는 완료가 아니며 기존 그만두기는 유지한다. 같은 결과의 flip에는 완료를 유지하고 새 결과/표시 종료에서는 초기화한다. 일반 게임·실패·제작 미리보기는 정책이 없고 직접 도구 Skip 계약은 유지한다.
+- **검사 선정:** UI 표시와 로컬 Story 입력 정책 변경이므로 컴파일·전체 EditMode·Story PlayMode와 일반 게임/시연의 로비·결과·관람·재도전을 포함한 Hapio PlayMode를 실행했다. 통신·직렬화·공유 설정·투척/물리·도색·승패·실제 Scene 경로/공유 수명은 바꾸지 않아 Lab까지 포함한 전체 PlayMode는 반복하지 않았다. macOS 연결 Unity6000.6.5f1/Metal 환경이며 batch·기기 앱 결과와 구분한다.
+- **첫 자동 검사:** 컴파일 오류0. EditMode **2610/2610 PASS**(40.15초), Story 어셈블리 **67/67 PASS**(8.94초). 첫 Hapio 어셈블리는 **184건 중178 PASS·6 FAIL**(738.22초)이었다. 실패 기록을 보존했다.
+- **신규 실패3건 수정:** Staff Stage1/2/3의 새 실제 관람 경로가 앞면 Continue 노출을 검출했다. 성공 카드에는 `StoryCardRecords`가 있는데 실패 화면 전용 `StorySealGauge`를 요구했던 것이 원인이다. 승리·AfterStage 범위 안에서 캐시된 Flip+Records로 실제 성공 카드를 식별하도록 수정했다. 기존 단언/시간 제한을 완화하지 않았다.
+- **수정 후 자동 검사:** 컴파일 오류0. 집중 관람1건 PASS(21.11초), 시연 흐름 전체 **10/10 PASS**(145.24초), 최종 전체 EditMode **2610/2610 PASS**(39.92초), StoryPlayer **15/15 PASS**(0.50초). 앞면/flip 숨김, 직접 Next·사용자 Next·오래된 버튼 이벤트 차단, 실제 Inspect/Close·입력 유지와 해제, 실패 관람3종·그만두기, 원본 Alpha 비누적, 동일 결과 flip과 새 세대 초기화, 실제 Continue 후 후일담·QR·재도전을 확인했다. 일반 3인 + 및 캐릭터/보류 자리 원본, 두 그룹·입장/동시 생성 계약도 기존 관련 검사에 포함된다.
+- **일반 경로 대기 실패3건:** 첫 집합 실행의 `DeveloperNextStageCannotOvertakeAQueuedRestartOrLeaveGameOver`(전투 시작), `FigmaResultsWaitForHostNextAndShowEachYokaiThenKeepFinalOverallAndHomeNavigation`(결과 바인딩), `SabotageSettingsSurviveRestartAndNextStageWhileFoxAndCharmStateReset`(결과 조작 대기)를 같은 구현으로 개별 재실행해 모두 PASS(각2.14/34.79/17.22초)했다. 이 대기 실패의 원인은 단독 재실행으로 재현하지 못했으며, 일반 게임 구현·기존 시간 제한은 변경하지 않았다. 간헐 가능성을 해결됐다고 단정하지 않는다.
+- **재사용 범위:** 첫 실행 뒤 동작 수정은 Staff 승리 카드 식별 조건 한 곳이고, 추가 검사 변경은 메시지 문구뿐이다. StoryPlayer·이름·로비·저장 에셋·일반 경로·패키지/설정은 동일했다. 영향받는 Staff 흐름 전부와 첫 일반 실패3건, 전체 EditMode·StoryPlayer를 재실행하고 나머지 동등 경로의 통과 결과를 재사용했다. 최종 소스에서 전체184건을 한 묶음으로 다시 실행한 것으로 표기하지 않는다.
+- **실제 화면:** 390×844 Editor에서 Stage2 Only 입장·가/나 생성 확인·수장고 - 나 P번호 로비·선택 캐릭터·야광귀 부적 앞면/뒷면 잠금/실제 관람/복귀 후 활성 화면을 촬영했다. 표시를 수동 변경한 승인 전 시안과 구분되는 실제 코드 출력이다. 3인 세션은 Host와 자동 loopback ProtocolPeer2개이며 세 Mac/iPhone 앱이 아니다. 결과 재현은 DEV 복사본의 최초100% 도색과 기존 RegisterHit 판정 API를 사용한 단색 도안이다. 실제 플레이 무늬 품질·물리·다기기 지연 검증으로 쓰지 않는다.
+- **보존·종료:** 보호3470개 중 의도한 StageSelection Prefab1개만 변경했고, 의미 있는 차이는 Text3줄이다. 다른 Scene·Prefab·Material·meta·패키지·ProjectSettings, 기존 stash11개, README와 저장소 전체 지침은 보존했다. 테스트 임시 Scene은 종료 때 제거됐고 촬영용 방/참가자·Play를 종료했다. GameView 크기와 Home Scene·미저장 변경 없음으로 복원했다. 캡처·원시 결과·개인 경로는 로컬에만 보관한다.
+- **미검증:** 새 Mac/iOS 앱 빌드·설치, 실기기 터치, 일반 Wi-Fi·핫스팟·이더넷의 실제 3/6기기 동시 플레이는 수행하지 않았다. 기존 기기 앱을 갱신하지 않았다. 위 일반 경로 집합 실행의 대기 실패3건은 단독 재실행 통과와 구분해 남긴다.
+
+
+## #808 시연 iOS 재빌드·세 기기 설치와 Xcode 전달 (2026-11-19)
+
+- **기준:** `fix/#808-showcase-lobby-seal-review`의 main `ebdcb76e` + 승인된 미커밋15파일을 그대로 빌드했다. 새 게임 코드를 추가하거나 원격 main 병합으로 표시하지 않는다. 기존 Editor 검사·화면 확인과 다른, 이번 iOS 내보내기·서명·설치 결과다.
+- **빌드:** `GameDemoBuild.StageTwoIos` Release 내보내기 Succeeded·오류0·식별 검증 통과(임시 도구 컴파일 포함45.2초), Xcode26.6/ReleaseForRunning 서명 빌드 BUILD SUCCEEDED(110.0초), codesign strict 검증 통과. `staff-stage-2-only-demo`, Staff4·정원3·실제Stage2 하나·development=false·한글 표시명/실행 파일명을 확인했다. 스테이지 선택·3연전을 추가하지 않았다.
+- **아이콘:** 기존 사용자 제공 `.icon` 원본2파일의 해시를 보존해 새 Xcode 출력에 연결했다. main 앱4개 구성의 ShowcaseAppIcon과 native icon filetype을 확인했고, 최종 앱의 CFBundleIconName·실제 PNG·Assets.car 포함을 확인했다. UnityFramework의 아이콘 설정을 바꾸지 않았다. 이 원본 연결은 생성된 Xcode 출력의 변경이며 일반 게임 아이콘/원본 에셋을 덮어쓰지 않는다.
+- **기기:** 최초 연결 기기 중 등록 대기 이력이 있는 두 기기의 로컬 프로필 미포함을 즉시 알렸고, 사용자 요청으로 등록된 세 기기로 대상을 교체했다. 새 대상 모두 개발자 모드·같은 서명 프로필 포함을 확인했다. 프로필은 wildcard이므로 suffix 비교가 아닌 application-identifier 패턴 매칭으로 확인했다. 새 앱3대 설치·설치 앱 조회와 실행 요청3건은 성공했다. 5초 뒤 프로세스 유지 조회는2대 확인·1대 미확인이었으며 crash/등록 오류로 단정하지 않았다. 사용자가 세 대 설치를 확인하고 작업 마무리를 요청해 추가 실행 조사는 하지 않았다.
+- **보존:** 기존 Pipeline 캐시의 iOS GetSubtarget 오류만 로컬 파일 한 곳에 임시 guard로 보완하고 finally에서 원본 바이트/SHA·컴파일을 복원했다. 저장 Packages/소스는 변경하지 않았다. 빌드 전후 추적6195파일과 기존 stash가 같았으며, 이후 의도한 변경은 이 수행 기록뿐이다. Home·미저장 변경 없음·Play 종료·StandaloneOSX와 저장 설정을 복원했다. 기존 빌드·프로젝트·기기 데이터는 보존했다.
+- **전달:** 최신 iOS 출력 전체를 별도 사본으로 복사해 Xcode 프로젝트·Data·Classes·Frameworks·Libraries·Il2CppOutputProject·원본 아이콘·한국어 READ_ME를 ZIP 하나로 묶었다. 사본의 앱/Framework 서명만 Automatic·Team 미선택으로 정리했고, 그 외 게임 파일은 원본 출력과 해시가 같다. 원본 출력은 그대로다. 파일4912개·830172821바이트·전체 ZIP CRC 검증 통과, 실행 도구 권한과 필수 파일 포함을 확인했다. 개인 인증키·프로비저닝 자료·사용자/빌드 캐시는 넣지 않았다. 받는 Mac에서는 Xcode26.6·iOS SDK와 본인 Team/기기를 선택해 빌드한다. Unity Editor 재설치는 이 생성 프로젝트의 재빌드에 필수로 요구되지 않는다.
+- **미검증:** 다른 Mac에서의 실제 재빌드·서명·설치, 새 앱의 실기기3인 라운드 완주·관람 터치·QR/일반 Wi-Fi·핫스팟·이더넷·6인 동시 운영은 수행하지 않았다. 설치/실행 요청 성공과 프로세스 유지·실제 게임 검증을 구분한다. 원시 기기 식별자·계정/서명 자료·빌드·압축·로그는 로컬에만 보관한다.

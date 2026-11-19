@@ -6,6 +6,7 @@ using UnityEngine.UI;
 namespace Hapio
 {
     public enum StoryExitReason { Completed, Skipped }
+    public enum StoryContinueState { Default, Hidden, Locked, Ready }
 
     /// <summary>Local presentation only. Call Play and await Finished before returning to the game flow.</summary>
     public sealed partial class StoryPlayer : MonoBehaviour
@@ -50,6 +51,48 @@ namespace Hapio
         public bool UserSkipAllowed { get; private set; } = true;
         private Button policyHiddenSkip;
         private bool skipWasActive, skipWasInteractable;
+        private Func<StoryCutView, StoryContinueState> continuePolicy;
+        private Button policyContinueButton;
+        private bool continueWasInteractable;
+
+        /// <summary>Optional local cut policy. Previews and ordinary stories retain direct Next; tool Skip is never gated.</summary>
+        public void SetContinuePolicy(Func<StoryCutView, StoryContinueState> policy)
+        {
+            RestoreContinueButton();
+            continuePolicy = policy;
+            RefreshContinuePolicy();
+        }
+
+        private StoryContinueState ContinueState => continuePolicy != null && currentView != null
+            ? continuePolicy(currentView) : StoryContinueState.Default;
+
+        private bool CanContinue
+        {
+            get { StoryContinueState state = ContinueState; return state != StoryContinueState.Hidden && state != StoryContinueState.Locked; }
+        }
+
+        public void RefreshContinuePolicy()
+        {
+            Button button = currentView != null ? currentView.continueButton : null;
+            if (policyContinueButton != button) RestoreContinueButton();
+            if (button == null) return;
+            StoryContinueState state = ContinueState;
+            if (state == StoryContinueState.Default) RestoreContinueButton();
+            else
+            {
+                if (policyContinueButton == null)
+                { policyContinueButton = button; continueWasInteractable = button.interactable; }
+                button.interactable = state == StoryContinueState.Ready;
+            }
+            button.gameObject.SetActive(IsPlaying && IsReading && (currentView.requireContinueButton || !hideInlineContinueButtons)
+                && state != StoryContinueState.Hidden);
+        }
+
+        private void RestoreContinueButton()
+        {
+            if (policyContinueButton != null) policyContinueButton.interactable = continueWasInteractable;
+            policyContinueButton = null;
+        }
 
         public void SetUserSkipAllowed(bool value)
         {
@@ -149,6 +192,7 @@ namespace Hapio
         {
             if (touchOnly && StoryTapAdvance.PressedTouchCount > 1) suppressMultiTouch = true;
             AdvanceTime(Time.unscaledDeltaTime);
+            if (continuePolicy != null) RefreshContinuePolicy();
             UpdateMusic(Time.unscaledDeltaTime);
         }
 
@@ -156,6 +200,7 @@ namespace Hapio
         {
             // Clear only after EventSystem has processed the last release in this frame.
             if (StoryTapAdvance.PressedTouchCount == 0) suppressMultiTouch = false;
+            if (continuePolicy != null) RefreshContinuePolicy();
         }
 
         internal void AdvanceTime(float seconds)
@@ -200,7 +245,7 @@ namespace Hapio
         /// <summary>UI input shares one frame gate. Direct sequencing and preview AUTO keep their existing API.</summary>
         public void RequestNext()
         {
-            if (IsCinematicCut || (!IsReading && currentView != null && currentView.waitForEntrance) || !AcceptUserInput()) return;
+            if (!CanContinue || IsCinematicCut || (!IsReading && currentView != null && currentView.waitForEntrance) || !AcceptUserInput()) return;
             Next();
         }
 
@@ -274,7 +319,7 @@ namespace Hapio
 
         public void Next()
         {
-            if (!IsPlaying || activeCloudWipe != null) return;
+            if (!IsPlaying || activeCloudWipe != null || !CanContinue) return;
             // Direct sequencing is also used by editor tooling. UI requests are gated before reaching here.
             ClearOpeningBlend();
             if (!IsReading)
@@ -476,8 +521,7 @@ namespace Hapio
         private void BeginReading()
         {
             IsReading = true;
-            if (currentView.continueButton != null)
-                currentView.continueButton.gameObject.SetActive(currentView.requireContinueButton || !hideInlineContinueButtons);
+            RefreshContinuePolicy();
             readElapsed = 0f;
             SetDialogueVisible(!currentView.hideEmptyDialogue ||
                 !string.IsNullOrWhiteSpace(currentPage.dialogue) || !string.IsNullOrWhiteSpace(currentPage.speaker));
@@ -713,6 +757,7 @@ namespace Hapio
 
         public void Cancel()
         {
+            RestoreContinueButton();
             IsPlaying = IsReading = false;
             ClearCloudWipe();
             ClearOpeningBlend();

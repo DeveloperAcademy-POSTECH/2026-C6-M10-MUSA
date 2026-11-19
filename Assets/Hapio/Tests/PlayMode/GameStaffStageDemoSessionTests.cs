@@ -69,6 +69,9 @@ namespace Hapio.Tests
             Assert.That(session.SelectedDemoGroup, Is.Zero, "A new app/session must never silently join group A.");
             Assert.That(selector.groupButtons, Has.Length.EqualTo(2));
             Assert.That(selector.groupButtons.Distinct().Count(), Is.EqualTo(2));
+            for (int i = 0; i < selector.groupButtons.Length; i++)
+                Assert.That(selector.groupButtons[i].GetComponentInChildren<UnityEngine.UI.Text>(true).text,
+                    Is.EqualTo(LabRoomNames.StaffGroupLabel(i + 1)));
             Assert.That(selector.stageButtons, Has.Length.EqualTo(3));
             Assert.That(selector.stageButtons.All(button => !button.gameObject.activeInHierarchy), Is.True);
             Assert.That(session.SelectDemoStage(2), Is.False, "The API also requires a deliberate group choice.");
@@ -120,6 +123,11 @@ namespace Hapio.Tests
                 Assert.That(selector.stageButtons.All(button => !button.gameObject.activeInHierarchy), Is.True,
                     "There is no separate Yaguang or Stage2 click in the fixed demo.");
                 Assert.That(selector.groupButtons, Has.Length.EqualTo(2));
+                Assert.That(selector.transform.Find("SafeArea/StaffCaption").gameObject.activeSelf, Is.False,
+                    "The fixed demo hides the staff-only A/B and participant-count caption.");
+                for (int i = 0; i < selector.groupButtons.Length; i++)
+                    Assert.That(selector.groupButtons[i].GetComponentInChildren<UnityEngine.UI.Text>(true).text,
+                        Does.StartWith(LabRoomNames.StaffGroupLabel(i + 1)));
                 foreach (var button in selector.groupButtons) AssertRaycastAccess(button);
                 Assert.That(selector.groupChangeButton.gameObject.activeInHierarchy, Is.False);
                 foreach (int group in new[] { -1, 0, 3 }) Assert.That(session.SelectDemoGroup(group), Is.False);
@@ -132,6 +140,8 @@ namespace Hapio.Tests
                 selector.groupButtons[1].onClick.Invoke();
                 Assert.That(session.IsDemoEntryPending, Is.True, session.DemoEntryNotice);
                 Assert.That(session.SelectedDemoGroup, Is.EqualTo(2));
+                Assert.That(session.SelectedDemoGroupLabel, Is.EqualTo("수장고 - 나"));
+                Assert.That(session.DemoEntryNotice, Does.Contain("수장고 - 나"));
                 Assert.That(session.Network.DemoGroupId, Is.EqualTo(2));
                 Assert.That(session.SelectedDemoStage, Is.EqualTo(2));
                 Assert.That(session.Network.DemoStageIndex, Is.EqualTo(2));
@@ -156,6 +166,9 @@ namespace Hapio.Tests
                 session.CancelDemoEntry();
             }
             Assert.That(LabGameBuildVariant.IsStaffStageTwoOnly, Is.False);
+            selector.SendMessage("LateUpdate", SendMessageOptions.RequireReceiver);
+            Assert.That(selector.transform.Find("SafeArea/StaffCaption").gameObject.activeSelf, Is.True,
+                "Returning to the ordinary staff selector restores its own caption.");
         }
 
         [UnityTest, Category("Bonjour")]
@@ -174,7 +187,7 @@ namespace Hapio.Tests
 
             Assert.That(selector.creationConfirmation.activeInHierarchy, Is.True);
             Assert.That(selector.creationConfirmationMessage.text, Is.EqualTo(session.DemoCreationConfirmationMessage));
-            Assert.That(selector.creationConfirmationMessage.text, Does.Contain("A그룹"));
+            Assert.That(selector.creationConfirmationMessage.text, Does.Contain("수장고 - 가"));
             Assert.That(selector.stageButtons.All(button => !button.interactable), Is.True);
             Assert.That(selector.groupButtons.All(button => !button.interactable), Is.True);
             Assert.That(selector.backButton.gameObject.activeInHierarchy, Is.False);

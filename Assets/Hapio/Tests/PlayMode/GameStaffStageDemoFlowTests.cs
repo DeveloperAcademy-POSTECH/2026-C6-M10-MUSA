@@ -8,6 +8,9 @@ using System.Reflection;
 using C6Lab;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.LowLevel;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using Object = UnityEngine.Object;
@@ -50,13 +53,19 @@ namespace Hapio.Tests
         }
 
         [UnityTest]
-        public IEnumerator ThreePlayersFinishOnlyStageOne() { yield return ThreePlayerRound(1); }
+        public IEnumerator ThreePlayersFinishOnlyStageOne() { yield return ThreePlayerRound(1, inspectSeal: true); }
 
         [UnityTest]
         public IEnumerator ThreePlayersFinishOnlyStageTwo() { yield return ThreePlayerRound(2); }
 
         [UnityTest]
-        public IEnumerator ThreePlayersFinishOnlyStageThree() { yield return ThreePlayerRound(3); }
+        public IEnumerator ThreePlayersFinishOnlyStageThree() { yield return ThreePlayerRound(3, inspectSeal: true); }
+
+        [UnityTest]
+        public IEnumerator StaffSealCardRequiresSuccessfulViewerReturnAndFreshReleaseBeforeContinue()
+        {
+            yield return ThreePlayerRound(2, inspectSeal: true);
+        }
 
         [UnityTest]
         public IEnumerator HostOpensQrBeforeLateResultReceiptAndReturnsAfterReceiptWithoutWaitingForStories()
@@ -232,7 +241,7 @@ namespace Hapio.Tests
         }
 
         private IEnumerator ThreePlayerRound(int stage, bool withholdLastResultReceipt = false,
-            bool disconnectBeforeFinish = false, bool memberLeavesOnQr = false)
+            bool disconnectBeforeFinish = false, bool memberLeavesOnQr = false, bool inspectSeal = false)
         {
             Assert.That(session.SelectDemoGroup(1), Is.True);
             Assert.That(session.SelectDemoStage(stage), Is.True);
@@ -296,11 +305,11 @@ namespace Hapio.Tests
             session.NextStage();
             Assert.That(session.State.stageIndex, Is.EqualTo(stage));
             Assert.That(session.State.battleSessionId, Is.EqualTo(battle), "No later stage can start from the single-round result.");
-            yield return VerifyDirectQrAndReturn(stage, battle, withholdLastResultReceipt, disconnectBeforeFinish, memberLeavesOnQr);
+            yield return VerifyDirectQrAndReturn(stage, battle, withholdLastResultReceipt, disconnectBeforeFinish, memberLeavesOnQr, inspectSeal);
         }
 
         private IEnumerator VerifyDirectQrAndReturn(int stage, string battle, bool withholdLastResultReceipt,
-            bool disconnectBeforeFinish, bool memberLeavesOnQr)
+            bool disconnectBeforeFinish, bool memberLeavesOnQr, bool inspectSeal)
         {
             var story = Object.FindFirstObjectByType<GameStageStoryPresentation>();
             Assert.That(story, Is.Not.Null);
@@ -321,8 +330,9 @@ namespace Hapio.Tests
             Assert.That(story.player.CurrentView, Is.SameAs(firstPicture), "Neither a hidden button nor user Skip can bypass the staff after-story.");
             Assert.That(story.player.IsPlaying, Is.True);
             Assert.That(story.IsLocalStoryComplete, Is.False);
-            // Fixture-only direct sequencing stays available; the real pointer path is covered by GameSceneFlowTests.
-            story.player.Skip();
+            if (inspectSeal) yield return ReviewStaffSealAndContinue(story);
+            // Retain the existing tool-Skip smoke path; the separate review case exercises the real card controls.
+            else story.player.Skip();
             yield return Until(() => story.IsLocalStoryComplete && story.player.CurrentView != null
                 && story.player.CurrentView.GetComponent<StoryStageClearControls>() != null,
                 "Afterstory retains its final clear picture");
@@ -417,6 +427,136 @@ namespace Hapio.Tests
             Assert.That(session.SelectedDemoGroup, Is.EqualTo(1), "Normal QR return retains the device group for the next party.");
             Assert.That(network.DemoGroupId, Is.Zero, "Retired room metadata is cleared independently of the Home choice.");
             Assert.That(session.StageResults, Is.Empty, "The next party never inherits this group's record.");
+        }
+
+        private IEnumerator ReviewStaffSealAndContinue(GameStageStoryPresentation story)
+        {
+            yield return Until(() => story.player.IsReading && !story.player.IsTransitioning && !story.player.UserInputBlocked,
+                "The saved seal card finishes its entrance before review input");
+            StoryCutView card = story.player.CurrentView;
+            var flip = card.GetComponentInChildren<StoryCardFlip>(true);
+            var next = card.continueButton;
+            var graphics = next.GetComponentsInChildren<UnityEngine.UI.Graphic>(true);
+            Color[] originalColors = graphics.Select(graphic => graphic.color).ToArray();
+            Assert.That(next.gameObject.activeSelf, Is.False, "The front has no continue label or hit target.");
+            story.player.Next(); story.player.RequestNext(); next.onClick.Invoke(); story.InspectGourd();
+            Assert.That(story.player.CurrentView, Is.SameAs(card));
+            Assert.That(session.IsViewerOpen || story.IsSealReviewComplete, Is.False,
+                "Neither a stale continue event nor a front-face inspect callback bypasses the card.");
+            CompletePointer(flip.gameObject);
+            story.TryRefresh(true);
+            Assert.That(flip.IsFlipping, Is.True);
+            Assert.That(next.gameObject.activeSelf, Is.False, "Flipping also hides the complete continue hit area.");
+            story.player.Next(); story.InspectGourd();
+            Assert.That(session.IsViewerOpen || story.IsSealReviewComplete, Is.False);
+            yield return Until(() => flip.IsBack && !flip.IsFlipping && next.gameObject.activeInHierarchy,
+                "The record face exposes a locked continue action");
+            Assert.That(next.interactable, Is.False);
+            for (int refresh = 0; refresh < 4; refresh++) story.TryRefresh(true);
+            for (int i = 0; i < graphics.Length; i++)
+                Assert.That(graphics[i].color.a, Is.EqualTo(originalColors[i].a * .45f).Within(.001f),
+                    "Disabled colours derive from the saved original rather than accumulating opacity loss.");
+
+            // Missing output is not a successful visit, whether the feature was disabled or preparation failed.
+            var previewField = typeof(GameSession).GetField("preview", Private);
+            var stateField = typeof(GameSession).GetField("viewerState", Private);
+            object preview = previewField.GetValue(session), state = stateField.GetValue(session);
+            try
+            {
+                previewField.SetValue(session, null);
+                foreach (var unavailable in new[] { GameGourdViewerState.Disabled, GameGourdViewerState.Pending, GameGourdViewerState.Failed })
+                {
+                    stateField.SetValue(session, unavailable);
+                    story.TryRefresh(true); story.InspectGourd(); next.onClick.Invoke(); story.player.Next();
+                    Assert.That(session.IsViewerOpen || story.IsSealReviewComplete || next.interactable, Is.False);
+                    Assert.That(story.player.CurrentView, Is.SameAs(card));
+                    Assert.That(story.ReadyView.quit.gameObject.activeInHierarchy, Is.True,
+                        "A missing viewer keeps the existing explicit quit route available.");
+                }
+            }
+            finally { previewField.SetValue(session, preview); stateField.SetValue(session, state); }
+            story.TryRefresh(true);
+            var inspect = card.GetComponentsInChildren<UnityEngine.UI.Button>(true)
+                .Single(button => button.name == "Inspect Gourd Action");
+            yield return Until(() => inspect.IsInteractable(), "The real finished output enables inspection");
+            ClickButton(inspect);
+            Assert.That(session.IsViewerOpen && story.screen.viewerPanel.activeInHierarchy, Is.True);
+            Assert.That(story.IsSealReviewComplete, Is.False, "Opening inspection alone cannot unlock continue.");
+
+            Mouse previousMouse = Mouse.current;
+            Mouse mouse = InputSystem.AddDevice<Mouse>("Staff review release mouse"); mouse.MakeCurrent();
+            try
+            {
+                InputSystem.QueueStateEvent(mouse, new MouseState().WithButton(MouseButton.Left)); InputSystem.Update();
+                ClickButton(story.screen.closeViewerButton);
+                Assert.That(session.IsViewerOpen, Is.False);
+                story.TryRefresh(true); story.player.Next(); next.onClick.Invoke();
+                Assert.That(story.IsSealReviewComplete || next.interactable, Is.False,
+                    "The close callback and stale continue callback cannot consume the same input.");
+                yield return null; yield return null;
+                Assert.That(story.IsSealReviewComplete, Is.False, "Inspection return waits while a real input is still held.");
+                InputSystem.QueueStateEvent(mouse, new MouseState()); InputSystem.Update();
+                yield return Until(() => story.IsSealReviewComplete && next.interactable,
+                    "A later released frame unlocks this exact result's continue action");
+            }
+            finally
+            {
+                if (mouse.added) InputSystem.RemoveDevice(mouse);
+                if (previousMouse != null && previousMouse.added) previousMouse.MakeCurrent();
+            }
+            Assert.That(story.player.CurrentView, Is.SameAs(card));
+            Assert.That(flip.IsBack, Is.True, "The same record face survives inspection.");
+            for (int i = 0; i < graphics.Length; i++) Assert.That(graphics[i].color, Is.EqualTo(originalColors[i]));
+            CompletePointer(flip.gameObject);
+            yield return Until(() => !flip.IsBack && !flip.IsFlipping, "Return to the front of this same result");
+            Assert.That(next.gameObject.activeSelf, Is.False);
+            Assert.That(story.IsSealReviewComplete, Is.True, "Flipping never discards an already completed review.");
+            CompletePointer(flip.gameObject);
+            yield return Until(() => flip.IsBack && !flip.IsFlipping && next.interactable, "The reviewed record face remains unlocked");
+
+            // Simulate a retired local presenter generation, without changing Host state or network result identity.
+            typeof(GameStageStoryPresentation).GetField("generation", Private).SetValue(story, "retired-result-generation");
+            Assert.That(story.TryRefresh(true), Is.True);
+            Assert.That(story.IsSealReviewComplete, Is.False, "A newly bound result must never inherit the previous review grant.");
+            Assert.That(story.player.CurrentView, Is.Not.SameAs(card));
+            card = story.player.CurrentView;
+            flip = card.GetComponentInChildren<StoryCardFlip>(true); next = card.continueButton;
+            yield return Until(() => story.player.IsReading && !story.player.UserInputBlocked, "The newly bound seal card finishes its entrance");
+            Assert.That(next.gameObject.activeSelf, Is.False);
+            CompletePointer(flip.gameObject);
+            yield return Until(() => flip.IsBack && !flip.IsFlipping && next.gameObject.activeInHierarchy, "The new record face is locked again");
+            Assert.That(next.interactable, Is.False);
+            inspect = card.GetComponentsInChildren<UnityEngine.UI.Button>(true).Single(button => button.name == "Inspect Gourd Action");
+            ClickButton(inspect); ClickButton(story.screen.closeViewerButton);
+            yield return Until(() => story.IsSealReviewComplete && next.interactable, "This new generation requires its own actual visit and return");
+            ClickButton(next);
+            yield return Until(() => story.player.CurrentView != card, "The real continue control starts the next authored picture");
+            double deadline = Time.realtimeSinceStartupAsDouble + 30;
+            while (!story.IsLocalStoryComplete && Time.realtimeSinceStartupAsDouble < deadline)
+            {
+                if (story.player.IsReading && !story.player.IsTransitioning && !story.player.UserInputBlocked)
+                    story.player.RequestNext();
+                yield return null;
+            }
+            Assert.That(story.IsLocalStoryComplete, Is.True, "The remaining afterstory reaches its existing final clear picture.");
+        }
+
+        private static void ClickButton(UnityEngine.UI.Button button)
+        {
+            Assert.That(button.gameObject.activeInHierarchy && button.IsInteractable(), Is.True, button.name);
+            CompletePointer(button.gameObject);
+        }
+
+        private static void CompletePointer(GameObject target)
+        {
+            var rectangle = (RectTransform)target.transform;
+            var canvas = target.GetComponentInParent<Canvas>();
+            Vector2 position = RectTransformUtility.WorldToScreenPoint(canvas.worldCamera, rectangle.TransformPoint(rectangle.rect.center));
+            var pointer = new PointerEventData(EventSystem.current)
+                { pointerId = -1, button = PointerEventData.InputButton.Left, position = position, pressPosition = position };
+            ExecuteEvents.Execute(target, pointer, ExecuteEvents.pointerDownHandler);
+            ExecuteEvents.Execute(target, pointer, ExecuteEvents.pointerUpHandler);
+            ExecuteEvents.Execute(target, pointer, ExecuteEvents.pointerClickHandler);
         }
 
         private static void Set(float[] values, string label, float value)

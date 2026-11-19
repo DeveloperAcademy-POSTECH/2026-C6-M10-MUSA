@@ -59,13 +59,20 @@ namespace C6Lab
 
         public static int SortNumber(string name) => TryNumber(name, out int number) ? number : int.MaxValue;
 
+        /// <summary>Staff UI only; group numbers and advertised room names remain unchanged.</summary>
+        public static string StaffGroupLabel(int group) => group == 1 ? "수장고 - 가"
+            : group == 2 ? "수장고 - 나" : string.Empty;
+
         public static string Display(string name)
         {
             if (TryNumber(name, out int number)) return "수장고-" + number.ToString(CultureInfo.InvariantCulture);
             // Grouped staff names keep their stage/revision/protocol for discovery only.
             if (TryStaffRoom(name, out int stage, out int group))
-                return group == 1 ? "A그룹" : group == 2 ? "B그룹"
-                    : "수장고-" + stage.ToString(CultureInfo.InvariantCulture) + "스테이지 " + StaffStageYokai[stage - 1];
+            {
+                if (group != 0) return LabGameBuildVariant.IsStaffStageDemo ? StaffGroupLabel(group)
+                    : group == 1 ? "A그룹" : "B그룹";
+                return "수장고-" + stage.ToString(CultureInfo.InvariantCulture) + "스테이지 " + StaffStageYokai[stage - 1];
+            }
             if (string.IsNullOrWhiteSpace(name)) return "방 이름 확인 중";
             // Preserve compatibility with already-running versions on the same LAN.
             if (name.StartsWith("C6Lab-", StringComparison.Ordinal)) return "수장고-" + name.Substring(6);
