@@ -47,10 +47,19 @@ namespace Hapio
         private Coroutine pendingFinish;
         private StoryResultActions actions;
         private string viewerReadyCaption;
+        private StoryCardFlip sealReviewCard;
+        private StoryCutView sealPolicyView;
+        private StoryCardFlip sealPolicyCard;
+        private bool sealPolicyViewMatches;
+        private Graphic[] sealContinueGraphics;
+        private Color[] sealContinueColors;
+        private bool sealViewerOpened, sealViewerWasOpen, sealReviewed;
+        private Coroutine pendingSealReview;
         public bool IsPresenting => mode != Mode.None;
         public bool IsShowingOverall => showingOverall;
         public bool IsLocalStoryComplete => resultActionsReady && (mode == Mode.ReadyToAdvance || mode == Mode.FailureDashboard);
         public bool IsResultActionReady => IsLocalStoryComplete;
+        public bool IsSealReviewComplete => sealReviewed;
         public LabSnapshot BoundResult => boundResult;
         private bool IsStaffCompletedResult => C6Lab.LabGameBuildVariant.IsStaffStageDemo
             && session != null && session.State.phase == GameFlowPhase.Completed;
@@ -123,6 +132,7 @@ namespace Hapio
                     boundResult = result;
                     mode = successful ? Mode.AfterStage : Mode.Failure;
                     player.SetUserSkipAllowed(!successful);
+                    player.SetContinuePolicy(LabGameBuildVariant.IsStaffStageDemo && successful ? SealContinuePolicy : null);
                     if (!player.Play(successful ? afterStages[session.State.stageIndex - 1] : failure))
                     { StopPresentation(); return false; }
                 }
@@ -205,6 +215,16 @@ namespace Hapio
             {
                 gauge.Show(boundResult.paintCoverage);
                 if (!victory) BeginResultReady(Mode.FailureDashboard);
+            }
+            if (IsStaffSealCard(view))
+            {
+                sealReviewCard = sealPolicyCard;
+                sealReviewCard.onFlipped.AddListener(RefreshSealContinue);
+                if (view.continueButton != null)
+                {
+                    sealContinueGraphics = view.continueButton.GetComponentsInChildren<Graphic>(true);
+                    sealContinueColors = sealContinueGraphics.Select(graphic => graphic.color).ToArray();
+                }
             }
             actions = view.GetComponent<StoryResultActions>();
             if (actions != null)
@@ -355,6 +375,7 @@ namespace Hapio
         private void RefreshControls()
         {
             if (!IsPresenting || session == null) return;
+            ObserveSealViewerReturn();
             bool blocked = ActionsBlocked;
             bool review = mode == Mode.ReadyToAdvance;
             bool failed = mode == Mode.FailureDashboard;
@@ -392,7 +413,72 @@ namespace Hapio
             // The approved result design has no status line, so the saved label stays hidden.
             if (statusText != null && statusText.gameObject.activeSelf) statusText.gameObject.SetActive(false);
             RefreshActionButtons(blocked);
+            RefreshSealContinue();
             ApplyVisibility();
+        }
+
+        private bool IsStaffSealCard(StoryCutView view)
+        {
+            if (!LabGameBuildVariant.IsStaffStageDemo || !victory || mode != Mode.AfterStage || boundResult == null || view == null)
+                return false;
+            if (sealPolicyView != view)
+            {
+                sealPolicyView = view;
+                sealPolicyCard = view.GetComponentInChildren<StoryCardFlip>(true);
+                sealPolicyViewMatches = sealPolicyCard != null && view.GetComponentInChildren<StoryCardRecords>(true) != null;
+            }
+            return sealPolicyViewMatches;
+        }
+
+        private StoryContinueState SealContinuePolicy(StoryCutView view)
+        {
+            if (!IsStaffSealCard(view)) return StoryContinueState.Default;
+            var card = sealPolicyCard;
+            if (!card.IsBack || card.IsFlipping) return StoryContinueState.Hidden;
+            return sealReviewed && player.IsReading && !ActionsBlocked
+                ? StoryContinueState.Ready : StoryContinueState.Locked;
+        }
+
+        private void RefreshSealContinue()
+        {
+            if (player == null || !IsStaffSealCard(player.CurrentView)) return;
+            StoryContinueState state = SealContinuePolicy(player.CurrentView);
+            player.RefreshContinuePolicy();
+            if (sealContinueGraphics == null) return;
+            for (int i = 0; i < sealContinueGraphics.Length; i++)
+                if (sealContinueGraphics[i] != null)
+                {
+                    Color color = sealContinueColors[i];
+                    color.a *= state == StoryContinueState.Locked ? .45f : 1f;
+                    sealContinueGraphics[i].color = color;
+                }
+        }
+
+        private void ObserveSealViewerReturn()
+        {
+            if (!sealViewerOpened || sealReviewed || pendingSealReview != null) return;
+            if (session.IsViewerOpen) { sealViewerWasOpen = true; return; }
+            if (sealViewerWasOpen) pendingSealReview = StartCoroutine(SealReviewedAfterRelease(generation));
+        }
+
+        private IEnumerator SealReviewedAfterRelease(string expectedGeneration)
+        {
+            // Closing inspection cannot also activate the newly unlocked story button.
+            yield return null;
+            while (IsPresenting && generation == expectedGeneration
+                && (StoryTapAdvance.HasHeldPointer || session.IsViewerOpen || screen.StoryActionsBlocked)) yield return null;
+            pendingSealReview = null;
+            if (!IsPresenting || generation != expectedGeneration || session == null
+                || GenerationKey(session) != expectedGeneration) yield break;
+            sealReviewed = true;
+            RefreshSealContinue();
+        }
+
+        private void LateUpdate()
+        {
+            if (!IsPresenting || session == null || sealReviewCard == null) return;
+            ObserveSealViewerReturn();
+            RefreshSealContinue();
         }
 
         private void BindActionButtons()
@@ -502,7 +588,11 @@ namespace Hapio
 
         public void InspectGourd()
         {
-            if (victory && IsPresenting && !ActionsBlocked && screen.TryStoryViewer()) RefreshControls();
+            if (player != null && IsStaffSealCard(player.CurrentView)
+                && (sealReviewCard == null || !sealReviewCard.IsBack || sealReviewCard.IsFlipping)) return;
+            if (!victory || !IsPresenting || ActionsBlocked || !screen.TryStoryViewer()) return;
+            if (IsStaffSealCard(player.CurrentView)) sealViewerOpened = sealViewerWasOpen = true;
+            RefreshControls();
         }
 
         public void Retry()
@@ -575,6 +665,13 @@ namespace Hapio
 
         private void UnbindActions()
         {
+            if (sealReviewCard != null) sealReviewCard.onFlipped.RemoveListener(RefreshSealContinue);
+            sealReviewCard = null;
+            sealPolicyView = null; sealPolicyCard = null; sealPolicyViewMatches = false;
+            if (sealContinueGraphics != null)
+                for (int i = 0; i < sealContinueGraphics.Length; i++)
+                    if (sealContinueGraphics[i] != null) sealContinueGraphics[i].color = sealContinueColors[i];
+            sealContinueGraphics = null; sealContinueColors = null;
             if (clearControls != null) clearControls.nextSeal.onClick.RemoveListener(Advance);
             clearControls = null;
             boundActions.Clear();
@@ -587,6 +684,9 @@ namespace Hapio
 
         public void StopPresentation()
         {
+            if (pendingSealReview != null) StopCoroutine(pendingSealReview);
+            pendingSealReview = null;
+            sealViewerOpened = sealViewerWasOpen = sealReviewed = false;
             if (finalPage != null) finalPage.Hide();
             if (pendingFinish != null) StopCoroutine(pendingFinish);
             pendingFinish = null;
@@ -598,7 +698,7 @@ namespace Hapio
             UnbindActions();
             if (subscribed && player != null) { player.Finished -= OnFinished; player.ViewChanged -= BindView; }
             subscribed = false;
-            if (player != null) { player.Cancel(); player.SetInputBlocked(false); player.SetUserSkipAllowed(true); }
+            if (player != null) { player.SetContinuePolicy(null); player.Cancel(); player.SetInputBlocked(false); player.SetUserSkipAllowed(true); }
             if (presentationRoot != null) presentationRoot.SetActive(false);
             if (failureDashboard != null) Destroy(failureDashboard);
             failureDashboard = null;

@@ -45,6 +45,24 @@ namespace C6Lab.Tests
             Assert.That(name, Is.Not.EqualTo(LabPendingRoom.StaffStageName(2, 3 - group)));
             Assert.That(LabRoomNames.Display("Hapio-Staff-2-5706-Stage-2"), Is.EqualTo("수장고-2스테이지 야광귀"));
         }
+        [TestCase(1, "수장고 - 가")] [TestCase(2, "수장고 - 나")]
+        public void StaffDisplayUsesWarehouseNamesWithoutChangingNormalLabelsOrRoomIdentity(int group, string expected)
+        {
+            string name = LabPendingRoom.StaffStageName(2, group);
+            string ordinaryLabel = LabRoomNames.Display(name);
+            using (LabGameBuildVariant.OverrideStaffStageDemoForTests(true))
+            {
+                Assert.That(LabRoomNames.Display(name), Is.EqualTo(expected));
+                Assert.That(LabRoomNames.StaffGroupLabel(group), Is.EqualTo(expected));
+                Assert.That(LabPendingRoom.StaffStageName(2, group), Is.EqualTo(name));
+                Assert.That(LabRoomNames.TryStaffRoom(name, out int stage, out int actualGroup), Is.True);
+                Assert.That((stage, actualGroup), Is.EqualTo((2, group)));
+                Assert.That(LabRoomNames.Display("Hapio-Room (2)"), Is.EqualTo("수장고-2"));
+            }
+            Assert.That(LabRoomNames.Display(name), Is.EqualTo(ordinaryLabel));
+            using (LabGameBuildVariant.OverrideForTests(true))
+                Assert.That(LabRoomNames.Display(name), Is.EqualTo(ordinaryLabel), "The legacy demo keeps its existing display.");
+        }
         [TestCase("Hapio-Staff-3-5706-Stage-2-Group-0")]
         [TestCase("Hapio-Staff-3-5706-Stage-2-Group-3")]
         [TestCase("Hapio-Staff-3-5706-Stage-2-Group-01")]

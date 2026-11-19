@@ -79,13 +79,13 @@ namespace Hapio
             bool idle = session.CanChangeDemoGroup && !confirming;
             bool directEntry = LabGameBuildVariant.IsStaffStageTwoOnly;
             bool hasGroup = session.SelectedDemoGroup == 1 || session.SelectedDemoGroup == 2;
-            string groupName = session.SelectedDemoGroup == 1 ? "A그룹" : "B그룹";
+            string groupName = session.SelectedDemoGroupLabel;
             for (int i = 0; i < groupButtons.Length; i++)
             {
                 UnityEngine.UI.Button button = groupButtons[i];
                 button.gameObject.SetActive(directEntry || !hasGroup);
                 button.interactable = idle;
-                string label = i == 0 ? "A그룹" : "B그룹";
+                string label = LabRoomNames.StaffGroupLabel(i + 1);
                 string overview = directEntry ? session.GetDemoGroupStatus(i + 1) : string.Empty;
                 if (!string.IsNullOrEmpty(overview)) label += "\n" + overview;
                 SetText(groupLabels[i], label);
@@ -99,13 +99,17 @@ namespace Hapio
             groupChangeButton.interactable = idle;
             backButton.gameObject.SetActive(pending && !confirming);
             if (title != null) title.text = directEntry ? "시연 방 입장" : hasGroup ? "스테이지 선택" : "시연 그룹 선택";
-            if (caption != null) caption.text = directEntry ? "A/B 독립 시연 · 각 3명"
-                : hasGroup ? groupName + " · 3인 단판 시연" : "함께할 세 기기는 같은 그룹을 고르시오.";
+            if (caption != null)
+            {
+                caption.gameObject.SetActive(!directEntry);
+                if (!directEntry) caption.text = hasGroup ? groupName + " · 3인 단판 시연"
+                    : "함께할 세 기기는 같은 수장고를 고르시오.";
+            }
             string idleNotice = directEntry
                 ? (hasGroup ? "현재 " + groupName + "\n" : string.Empty)
-                    + "함께할 세 기기는 같은 그룹을 고르시오.\n방 입장 후 자리를 고르면 방장이 시작하오."
+                    + "함께할 세 기기는 같은 수장고를 고르시오.\n방 입장 후 자리를 고르면 방장이 시작하오."
                 : hasGroup ? groupName + "에서 플레이할 스테이지를 선택하시오."
-                    : "A/B는 서로 다른 방이오.\n같은 그룹의 세 명이 함께 출발하오.";
+                    : "두 수장고는 서로 다른 방이오.\n같은 수장고의 세 명이 함께 출발하오.";
             SetText(status, !string.IsNullOrEmpty(session.DemoEntryNotice) ? session.DemoEntryNotice
                 : !string.IsNullOrEmpty(session.UiNotice) ? session.UiNotice : idleNotice);
             creationConfirmation.SetActive(confirming);

@@ -43,7 +43,7 @@ namespace Hapio.Editor
                     float top = .77f - index * .25f;
                     groups[index] = BoxButton(safe, "Group" + (index == 0 ? "A" : "B"), font,
                         new Vector2(.10f, top - .20f), new Vector2(.90f, top),
-                        (index == 0 ? "A그룹" : "B그룹") + "\n방 확인 중", 25);
+                        C6Lab.LabRoomNames.StaffGroupLabel(index + 1) + "\n방 확인 중", 25);
                 }
 
                 var buttons = new UnityEngine.UI.Button[3];
@@ -91,7 +91,7 @@ namespace Hapio.Editor
                 cardOutline.effectColor = GameBattleUiColors.Brown;
                 cardOutline.effectDistance = new Vector2(1f, -1f);
                 var confirmationMessage = Label(card, "Message", font, new Vector2(.08f, .43f), new Vector2(.92f, .90f),
-                    "A그룹 방이 없습니다.\n새로 만들까요?", 23);
+                    C6Lab.LabRoomNames.StaffGroupLabel(1) + " 방이 없습니다.\n새로 만들까요?", 23);
                 var cancelCreation = BoxButton(card, "CancelCreation", font, new Vector2(.08f, .10f),
                     new Vector2(.46f, .33f), "취소", 21);
                 var confirmCreation = BoxButton(card, "ConfirmCreation", font, new Vector2(.54f, .10f),

@@ -11,7 +11,7 @@ namespace Hapio
         public int SelectedDemoStage { get; private set; }
         /// <summary>Staff session A/B. Kept for this app lifetime, independently of P seats and territory teams.</summary>
         public int SelectedDemoGroup { get; private set; }
-        public string SelectedDemoGroupLabel => SelectedDemoGroup == 1 ? "A그룹" : SelectedDemoGroup == 2 ? "B그룹" : string.Empty;
+        public string SelectedDemoGroupLabel => LabRoomNames.StaffGroupLabel(SelectedDemoGroup);
 
         private bool staffRetryRequested, staffRecoveryPrepared;
         private double nextStaffRetryAt, staffRetryDeadline;

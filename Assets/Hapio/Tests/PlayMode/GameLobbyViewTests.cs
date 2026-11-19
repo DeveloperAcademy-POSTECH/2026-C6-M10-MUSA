@@ -252,6 +252,7 @@ namespace Hapio.Tests
                 Assert.That(view.slotLabels[i].text, Is.Empty, "The plus is in the Figma artwork; do not layer P numbers over it.");
                 Assert.That(view.slotButtons[i].interactable, Is.True);
             }
+            VerifyStaffNumberedSeats(view);
             Assert.That(session.Network.RequestPlayerSlot(4), Is.False, "P4 does not exist in this three-player room.");
             yield return null;
             Assert.That(view.message.gameObject.activeInHierarchy, Is.False, "The approved lobby design has no status line.");
@@ -338,6 +339,7 @@ namespace Hapio.Tests
             Assert.That(view.localLabels[0].text, Does.Not.Contain("방장"));
             Assert.That(view.slotLabels[0].text, Is.Empty,
                 "The unchosen three-player seat keeps the original plus artwork, with no P marker drawn over it.");
+            VerifyStaffNumberedSeats(view);
             // Reopening a current choice (also used by preview/return flows) must display the selected solid border
             // and original check for the actual owner, without turning their character into someone else's taken state.
             for (int character = 1; character <= 5; character++)
@@ -384,6 +386,7 @@ namespace Hapio.Tests
             Assert.That(session.Network.LocalCharacter, Is.EqualTo(1));
             yield return Click(view.slotButtons[0]);
             Assert.That(session.Network.LocalSlotNumber, Is.Zero, "Tapping one's selected seat also clears it.");
+            VerifyStaffNumberedSeats(view);
             view.sealButton.onClick.Invoke();
             Assert.That(session.State.phase, Is.EqualTo(GameFlowPhase.Lobby));
             Assert.That(session.Network.Snapshot, Is.Null, "An incomplete room must not start a legacy single battle.");
@@ -1000,6 +1003,43 @@ namespace Hapio.Tests
             yield return Until(() => session.Network.CanChooseConnection, "Canceled join", 15f);
         }
 
+        // Scope only the presenter within one frame: never advertise a real staff room on the user's LAN.
+        private static void VerifyStaffNumberedSeats(GameLobbyView view)
+        {
+            bool[] selectable = view.slotButtons.Take(3).Select(button => button.interactable).ToArray();
+            float[] alpha = view.slotImages.Take(3).Select(image => image.color.a).ToArray();
+            try
+            {
+                using (LabGameBuildVariant.OverrideStaffStageDemoForTests(true))
+                {
+                    view.SendMessage("LateUpdate", SendMessageOptions.RequireReceiver);
+                    for (int i = 0; i < 3; i++)
+                    {
+                        int character = view.SeatCharacter(i);
+                        if (character == 0)
+                        {
+                            Assert.That(view.slotImages[i].sprite, Is.SameAs(view.emptySlots[i]));
+                            Assert.That(view.slotLabels[i].text, Is.EqualTo("P" + (i + 1)));
+                            Assert.That(view.slotImages[i].rectTransform.localEulerAngles.z, Is.EqualTo(180f));
+                        }
+                        else Assert.That(view.slotImages[i].sprite,
+                            Is.SameAs(GameThreePlayerLobbyArt.Seat(character, view.SeatIsHost(i), view.SeatIsLocal(i) && !view.SeatIsHeld(i))));
+                        Assert.That(view.slotButtons[i].interactable, Is.EqualTo(selectable[i]));
+                        Assert.That(view.slotImages[i].color.a, Is.EqualTo(alpha[i]));
+                        Assert.That(view.slotImages[i].raycastTarget, Is.False);
+                        Assert.That(((RectTransform)view.slotButtons[i].transform).rect.size, Is.EqualTo(new Vector2(63, 63)));
+                    }
+                }
+            }
+            finally { view.SendMessage("LateUpdate", SendMessageOptions.RequireReceiver); }
+            for (int i = 0; i < 3; i++)
+                if (view.SeatCharacter(i) == 0)
+                {
+                    Assert.That(view.slotImages[i].sprite, Is.SameAs(GameThreePlayerLobbyArt.Empty(i + 1)));
+                    Assert.That(view.slotLabels[i].text, Is.Empty, "Ordinary three-player rooms retain the original plus artwork.");
+                }
+        }
+
         [Category("Bonjour")]
         [UnityTest]
         public IEnumerator AHeldSeatShowsAwayAndARejoiningLobbySaysItIsGettingBackIn()
@@ -1030,6 +1070,7 @@ namespace Hapio.Tests
             Assert.That(view.joinedCount.text, Is.EqualTo("1 / 3명 입장"), "A held seat is not counted as joined.");
             Assert.That(view.slotImages[1].color.a, Is.LessThan(.5f), "The held seat is faded.");
             Assert.That(view.slotButtons[1].interactable, Is.False, "Nobody else can take the held seat.");
+            VerifyStaffNumberedSeats(view);
             holds.Clear();
             slots.Release(77);
             // A guest that is getting back in shows the pending lobby and its own message. The flag is set by hand on
