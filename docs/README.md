@@ -17,6 +17,7 @@
 | Home·Lobby·3스테이지·결과·재시작·빌드 | [게임 흐름](GAME_FLOW.md) |
 | 3인 스토리 로비·원본 캐릭터 선택 그림·기존 모드 경계 | [3인 로비 UI](THREE_PLAYER_LOBBY_UI.md) |
 | 스태프 스테이지 선택·3인 단판 시연 앱·마무리 QR·빌드 | [스태프 스테이지 시연](STAFF_STAGE_DEMO.md) |
+| 게임 시작 → 기존 튜토리얼 → 타이틀 반복 전용 앱·빌드 | [튜토리얼 반복 전용 앱](TUTORIAL_ONLY_BUILD.md) |
 | 전투 화면 밖 터치 먹물 번짐·조절 값 | [게임 흐름](GAME_FLOW.md#터치-먹물-번짐-587) |
 | 합이오 컬러 토큰·전체 팔레트·불투명도 | [컬러 시스템](COLOR_SYSTEM.md) |
 | 스테이지별 배경·PNG 교체·미리보기 | [스테이지 배경 편집](STAGE_BACKGROUNDS.md) |

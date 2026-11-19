@@ -162,7 +162,7 @@ namespace Hapio
             && (IsTerritory || ResultHoldOverridden
                 || !IsAnyResultViewerOpen && !IsAnyResultPresentationBusy && AllSealParticipantsReady);
         // The run's own stage count: 2:2 (#281) plays one battle, so it has no next stage to skip to.
-        public bool CanDeveloperAdvanceStage => network != null && network.DeveloperBuildAvailable
+        public bool CanDeveloperAdvanceStage => !LabGameBuildVariant.IsTutorialOnly && network != null && network.DeveloperBuildAvailable
             && network.IsConnected && network.IsHost && !goingHome && !IsLoadingScene && !restartPending
             && state.phase == GameFlowPhase.Playing && RunProfile.Next(state.stageIndex) != 0
             && network.IsBattlePaused
@@ -766,7 +766,7 @@ namespace Hapio
             ? stageSettings.CreateTerritoryConfig()
             : stageSettings.CreateStageConfig(stage >= 1 ? stage : GameRunProfile.ForMode(mode, SelectedDemoStage).FirstStage);
 
-        private static bool AllowsRoom(GameMode mode, int capacity) => Enum.IsDefined(typeof(GameMode), mode)
+        private static bool AllowsRoom(GameMode mode, int capacity) => !LabGameBuildVariant.IsTutorialOnly && Enum.IsDefined(typeof(GameMode), mode)
             && (!LabGameBuildVariant.IsDemo || mode == GameMode.Story && capacity == 3);
 
         /// <summary>Install the room's mode before hosting; a previous 2:2 room must not leak into a story room.</summary>
@@ -813,7 +813,7 @@ namespace Hapio
 
         public void EnterRoomBrowser()
         {
-            if (state.phase != GameFlowPhase.Home) return;
+            if (LabGameBuildVariant.IsTutorialOnly || state.phase != GameFlowPhase.Home) return;
             roomBrowserVisible = true;
             if (network.CanChooseConnection && !network.IsSearchingRooms) network.StartRoomSearch();
             Changed?.Invoke();
@@ -835,7 +835,7 @@ namespace Hapio
 
         public bool EnterPendingRoom(string key)
         {
-            if (IsCreatingRoom || state.phase != GameFlowPhase.Home || !network.CanChooseConnection || !pendingRooms.CanEnter(key)) return false;
+            if (LabGameBuildVariant.IsTutorialOnly || IsCreatingRoom || state.phase != GameFlowPhase.Home || !network.CanChooseConnection || !pendingRooms.CanEnter(key)) return false;
             ResetRoomFlow();
             GamePendingRoomInfo room = null;
             foreach (GamePendingRoomInfo item in pendingRooms.Rooms) if (item.Key == key) room = item;
@@ -854,7 +854,7 @@ namespace Hapio
 
         public void Host()
         {
-            if (IsCreatingRoom || !network.CanChooseConnection || state.phase != GameFlowPhase.Home) return;
+            if (LabGameBuildVariant.IsTutorialOnly || IsCreatingRoom || !network.CanChooseConnection || state.phase != GameFlowPhase.Home) return;
             roomBrowserVisible = true;
             ResetRoomFlow();
             if (!ConfigureRoomMode(GameMode.Story, network.TargetParticipantCount)) return;
@@ -863,7 +863,7 @@ namespace Hapio
 
         public void JoinRoom(string roomKey)
         {
-            if (IsCreatingRoom || !network.CanJoinDiscoveredRoom(roomKey) || state.phase != GameFlowPhase.Home) return;
+            if (LabGameBuildVariant.IsTutorialOnly || IsCreatingRoom || !network.CanJoinDiscoveredRoom(roomKey) || state.phase != GameFlowPhase.Home) return;
             foreach (LabDiscoveredRoom room in network.DiscoveredRooms)
                 if (room.Key == roomKey && !AllowsRoom(room.Team ? GameMode.Territory : GameMode.Story, room.TargetParticipants)) return;
             roomBrowserVisible = true;
@@ -875,7 +875,7 @@ namespace Hapio
 
         public void JoinDirect(string address)
         {
-            if (IsCreatingRoom || !network.CanChooseConnection || state.phase != GameFlowPhase.Home) return;
+            if (LabGameBuildVariant.IsTutorialOnly || IsCreatingRoom || !network.CanChooseConnection || state.phase != GameFlowPhase.Home) return;
             roomBrowserVisible = true;
             ResetRoomFlow(); network.Join(address);
         }
@@ -896,7 +896,7 @@ namespace Hapio
         /// <summary>DEV 2:2 solo check (#281): alone on the Blue team, with combined colors alternating Blue and Red.</summary>
         public void StartSolo(GameMode mode)
         {
-            if (LabGameBuildVariant.IsDemo || IsCreatingRoom || state.phase != GameFlowPhase.Home
+            if (LabGameBuildVariant.IsDemo || LabGameBuildVariant.IsTutorialOnly || IsCreatingRoom || state.phase != GameFlowPhase.Home
                 || !network.PrepareDeveloperSoloGame()) return;
             hostMode = mode;
             hostFlow.EnterLobby(mode);
@@ -1096,6 +1096,8 @@ namespace Hapio
         {
             if (state.phase == GameFlowPhase.Completed) { CacheResultSnapshot(); ForgetResultPeer(peer, lostHost); return; }
             if (goingHome) return;
+            // Transport shutdown can finish before this callback, so IsHost may already be false.
+            if (LabGameBuildVariant.IsTutorialOnly && tutorialRun) { FinishTutorial(); return; }
             if (state.phase == GameFlowPhase.GameOver && state.retryableDefeat)
             {
                 string reason = lostHost ? GameRunFlow.HostDisconnectedReason : GameRunFlow.PlayerDisconnectedReason;
@@ -1137,10 +1139,11 @@ namespace Hapio
 
         private void FinishGoHome()
         {
-            roomBrowserVisible = state.phase == GameFlowPhase.Lobby;
+            roomBrowserVisible = !LabGameBuildVariant.IsTutorialOnly && state.phase == GameFlowPhase.Lobby;
             goingHome = true;
             CancelGourdViewerPreparation();
             network.Stop();
+            if (LabGameBuildVariant.IsTutorialOnly) network.CancelRoomSearch();
             network.UnbindBattleReferences();
             ResetRoomFlow();
             ClearDemoSelectionAfterLeave();
@@ -1150,6 +1153,12 @@ namespace Hapio
 
         public void GoHomeToRoomBrowser()
         {
+            if (LabGameBuildVariant.IsTutorialOnly)
+            {
+                if (tutorialRun) QuitTutorialToTitle();
+                else GoHome();
+                return;
+            }
             if (state.phase == GameFlowPhase.Lobby) GoHome();
             else if (state.phase == GameFlowPhase.Home) EnterRoomBrowser();
         }

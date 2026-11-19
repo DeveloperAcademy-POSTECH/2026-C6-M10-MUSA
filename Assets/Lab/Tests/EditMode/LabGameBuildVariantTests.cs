@@ -6,6 +6,41 @@ namespace C6Lab.Tests
     public sealed class LabGameBuildVariantTests
     {
         [Test]
+        public void TutorialOnlyOverrideIsIndependentOfMultiplayerDemosAndRestoresNestedScopes()
+        {
+            Assert.That(LabGameBuildVariant.IsTutorialOnly, Is.False);
+            Assert.That(LabGameBuildVariant.TutorialOnlyDefine, Is.EqualTo("HAPIO_TUTORIAL_ONLY"));
+            using (LabGameBuildVariant.EditorOverrideTutorialOnlyForTests(true))
+            {
+                Assert.That(LabGameBuildVariant.IsTutorialOnly, Is.True);
+                Assert.That(LabGameBuildVariant.IsDemo || LabGameBuildVariant.IsYaguangDemo || LabGameBuildVariant.IsStaffStageDemo, Is.False);
+                using (LabGameBuildVariant.EditorOverrideTutorialOnlyForTests(false))
+                    Assert.That(LabGameBuildVariant.IsTutorialOnly, Is.False);
+                Assert.That(LabGameBuildVariant.IsTutorialOnly, Is.True);
+            }
+            Assert.That(LabGameBuildVariant.IsTutorialOnly, Is.False);
+        }
+
+        [Test]
+        public void TutorialOnlyOverrideCannotLeakAfterAnExceptionOrRepeatedDisposal()
+        {
+            Assert.Throws<InvalidOperationException>(() =>
+            {
+                using (LabGameBuildVariant.EditorOverrideTutorialOnlyForTests(true))
+                    throw new InvalidOperationException("Tutorial QA failed");
+            });
+            Assert.That(LabGameBuildVariant.IsTutorialOnly, Is.False);
+            IDisposable scope = LabGameBuildVariant.EditorOverrideTutorialOnlyForTests(true);
+            scope.Dispose();
+            using (LabGameBuildVariant.EditorOverrideTutorialOnlyForTests(true))
+            {
+                scope.Dispose();
+                Assert.That(LabGameBuildVariant.IsTutorialOnly, Is.True);
+            }
+            Assert.That(LabGameBuildVariant.IsTutorialOnly, Is.False);
+        }
+
+        [Test]
         public void EditorDefaultsToNormalAndScopedOverridesRestoreTheirPreviousValue()
         {
             Assert.That(LabGameBuildVariant.IsYaguangDemo, Is.False,

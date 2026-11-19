@@ -84,7 +84,8 @@ namespace Hapio.Editor
                 throw new InvalidOperationException("The normal application identifier must be set before exporting a demo.");
             if (normalIdentifier.EndsWith(".yaguangdemo", StringComparison.OrdinalIgnoreCase)
                 || normalIdentifier.EndsWith(".staffdemo", StringComparison.OrdinalIgnoreCase)
-                || normalIdentifier.EndsWith(".staffdemo.stage2", StringComparison.OrdinalIgnoreCase))
+                || normalIdentifier.EndsWith(".staffdemo.stage2", StringComparison.OrdinalIgnoreCase)
+                || normalIdentifier.EndsWith(".tutorial", StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException("The saved application identifier already has the demo suffix. Restore the normal identifier first.");
             return normalIdentifier + ".staffdemo";
         }
@@ -128,7 +129,8 @@ namespace Hapio.Editor
             string[] savedDefines = PlayerSettings.GetScriptingDefineSymbols(namedTarget).Split(';');
             if (savedDefines.Contains(LabGameBuildVariant.YaguangDemoDefine)
                 || savedDefines.Contains(LabGameBuildVariant.StaffStageDemoDefine)
-                || savedDefines.Contains(LabGameBuildVariant.StaffStageTwoOnlyDefine))
+                || savedDefines.Contains(LabGameBuildVariant.StaffStageTwoOnlyDefine)
+                || savedDefines.Contains(LabGameBuildVariant.TutorialOnlyDefine))
                 throw new InvalidOperationException("Remove the demo symbol from saved Player Settings. Only the dedicated demo build may supply it.");
             Validate();
 
@@ -190,7 +192,11 @@ namespace Hapio.Editor
         private static void WithTemporaryStageTwoPlayerSettings(BuildTarget target, string identifier, Action action) =>
             WithTemporaryPlayerSettingsFor(target, identifier, StageTwoProductName, action);
 
-        private static void WithTemporaryPlayerSettingsFor(BuildTarget target, string identifier, string product, Action action)
+        private static void WithTemporaryPlayerSettingsFor(BuildTarget target, string identifier, string product, Action action) =>
+            WithTemporaryPlayerIdentity(target, identifier, product, DemoVersion, DemoBuildNumber, action);
+
+        internal static void WithTemporaryPlayerIdentity(BuildTarget target, string identifier, string product,
+            string version, string buildNumber, Action action)
         {
             NamedBuildTarget namedTarget = NamedTarget(target);
             string previousName = PlayerSettings.productName;
@@ -203,10 +209,10 @@ namespace Hapio.Editor
             {
                 PlayerSettings.productName = product;
                 PlayerSettings.SetApplicationIdentifier(namedTarget, identifier);
-                PlayerSettings.bundleVersion = DemoVersion;
+                PlayerSettings.bundleVersion = version;
                 if (target == BuildTarget.iOS)
                 {
-                    PlayerSettings.iOS.buildNumber = DemoBuildNumber;
+                    PlayerSettings.iOS.buildNumber = buildNumber;
                     PlayerSettings.iOS.applicationDisplayName = product;
                 }
                 ShowcaseBranding.WithTemporarySettings(target, action);
@@ -225,7 +231,7 @@ namespace Hapio.Editor
             }
         }
 
-        private static void WithTemporaryEditorBuildState(BuildTarget target, Action action)
+        internal static void WithTemporaryEditorBuildState(BuildTarget target, Action action)
         {
             BuildTarget previousTarget = EditorUserBuildSettings.activeBuildTarget;
             EditorBuildSettingsScene[] previousScenes = EditorBuildSettings.scenes
@@ -345,7 +351,7 @@ namespace Hapio.Editor
                 return BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(text))).Replace("-", string.Empty).ToLowerInvariant();
         }
 
-        private static string ReadGit(string project, string arguments)
+        internal static string ReadGit(string project, string arguments)
         {
             using (var process = new System.Diagnostics.Process())
             {
@@ -400,14 +406,19 @@ namespace Hapio.Editor
         }
 
         // Xcode derives the executable and product folder from this variable. DisplayName stays Korean.
-        private static void NormalizeIosExecutable(string output)
+        private static void NormalizeIosExecutable(string output) =>
+            NormalizeIosExecutableFor(output, ShowcaseBranding.ExecutableName);
+
+        internal static void NormalizeIosExecutableFor(string output, string executable)
         {
+            if (string.IsNullOrEmpty(executable) || !Regex.IsMatch(executable, @"^[A-Za-z][A-Za-z0-9_]*$"))
+                throw new ArgumentException("The iOS executable needs a stable ASCII name.", nameof(executable));
             string project = Path.Combine(output, "Unity-iPhone.xcodeproj", "project.pbxproj");
             string original = File.ReadAllText(project);
             const string pattern = @"\bPRODUCT_NAME_APP\s*=\s*[^;\r\n]+;";
             if (!Regex.IsMatch(original, pattern))
                 throw new InvalidOperationException("The iOS project has no application product-name setting.");
-            string updated = Regex.Replace(original, pattern, "PRODUCT_NAME_APP = " + ShowcaseBranding.ExecutableName + ";");
+            string updated = Regex.Replace(original, pattern, "PRODUCT_NAME_APP = " + executable + ";");
             if (updated != original) File.WriteAllText(project, updated);
         }
 

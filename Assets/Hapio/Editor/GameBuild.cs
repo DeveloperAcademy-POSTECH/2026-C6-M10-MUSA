@@ -21,8 +21,17 @@ namespace Hapio.Editor
             if (!string.IsNullOrEmpty(path) && (Directory.Exists(path) || File.Exists(path))) EditorUtility.RevealInFinder(path);
             else Debug.LogWarning("HAPIO_BUILD_OUTPUT_UNAVAILABLE: complete a development build first.");
         }
+        internal static void ValidateSavedTutorialDefine(string symbols)
+        {
+            if (Array.Exists((symbols ?? string.Empty).Split(';'),
+                symbol => symbol.Trim() == C6Lab.LabGameBuildVariant.TutorialOnlyDefine))
+                throw new InvalidOperationException("Remove the saved tutorial-only define; use its dedicated export menu instead.");
+        }
+
         private static void Build(BuildTarget target)
         {
+            ValidateSavedTutorialDefine(PlayerSettings.GetScriptingDefineSymbols(
+                UnityEditor.Build.NamedBuildTarget.FromBuildTargetGroup(BuildPipeline.GetBuildTargetGroup(target))));
             foreach (string scene in GameScenePaths.All)
                 if (!File.Exists(scene)) throw new InvalidOperationException("Create the missing game scenes first: Hapio/Create Missing Development Game Scenes.");
             string project = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));

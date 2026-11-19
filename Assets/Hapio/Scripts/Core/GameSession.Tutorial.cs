@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace Hapio
 {
@@ -29,18 +30,28 @@ namespace Hapio
         /// <summary>What the opening hands over to: the tutorial once per app run, otherwise the room list.</summary>
         public void StartTutorialOrRooms()
         {
+            if (C6Lab.LabGameBuildVariant.IsTutorialOnly)
+            {
+                TryStartTutorial(again: true);
+                return; // A refused or failed attempt must stay at the title, never open a room browser.
+            }
             if (!TryStartTutorial()) EnterRoomBrowser();
         }
 
         /// <summary>Open the practice board from Home. <paramref name="again"/> replays it in the same run (testing).</summary>
         public bool TryStartTutorial(bool again = false)
         {
+            if (C6Lab.LabGameBuildVariant.IsTutorialOnly && (tutorialRun || goingHome || IsLoadingScene || IsLoadingScreenUp
+                || sceneFade != null && sceneFade.BlocksInput
+                || SceneManager.GetActiveScene().path != GameScenePaths.Home || network == null || !network.CanChooseConnection))
+                return false;
             if (C6Lab.LabGameBuildVariant.IsDemo || tutorialConsumed && !again
                 || IsCreatingRoom || state.phase != GameFlowPhase.Home) return false;
             tutorialConsumed = true;
             if (!network.PrepareTutorialGame())
             {
-                if (network.IsConnected) network.Stop();
+                if (C6Lab.LabGameBuildVariant.IsTutorialOnly) ResetTutorialToHome(false);
+                else if (network.IsConnected) network.Stop();
                 return false;
             }
             tutorialRun = true;
@@ -56,7 +67,7 @@ namespace Hapio
         }
 
         /// <summary>Leave the practice board straight for Home's room list, with no result or Game Over (the end, or 건너뛰기).</summary>
-        public void FinishTutorial() => LeaveTutorial(true);
+        public void FinishTutorial() => LeaveTutorial(!C6Lab.LabGameBuildVariant.IsTutorialOnly);
 
         /// <summary>The pause menu's 나가기 on the practice board: back to the title screen, not the room list.</summary>
         public void QuitTutorialToTitle() => LeaveTutorial(false);
@@ -64,11 +75,17 @@ namespace Hapio
         private void LeaveTutorial(bool toRooms)
         {
             if (!tutorialRun) return;
+            ResetTutorialToHome(toRooms);
+        }
+
+        private void ResetTutorialToHome(bool toRooms)
+        {
             tutorialRun = false;
             goingHome = true;
             CancelGourdViewerPreparation();
             if (!toRooms) roomBrowserVisible = false;
             network.Stop();
+            if (C6Lab.LabGameBuildVariant.IsTutorialOnly) network.CancelRoomSearch();
             network.UnbindBattleReferences();
             ResetRoomFlow();
             SetLocalState(new GameFlowState());

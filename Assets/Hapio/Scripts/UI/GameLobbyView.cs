@@ -98,6 +98,11 @@ namespace Hapio
         private void EnterGame()
         {
             if (session.State.phase != GameFlowPhase.Home || session.RoomBrowserVisible) return;
+            if (LabGameBuildVariant.IsTutorialOnly)
+            {
+                session.StartTutorialOrRooms();
+                return;
+            }
             // The opening hands over to the tutorial (#477), which leaves for the room list when it ends.
             if (openingController != null && openingController.TryBeginFromStartButton(session.StartTutorialOrRooms)) return;
             session.EnterRoomBrowser();
